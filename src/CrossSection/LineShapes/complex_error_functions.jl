@@ -1,3 +1,5 @@
+using SpecialFunctions
+
 abstract type AbstractComplexErrorFunction end
 
 "Humlicek only formulation for Complex Error Function"
