@@ -1,15 +1,14 @@
-
 module HITRAN
 
-using Pandas
+using ..CrossSection
 
 export readHITRAN
 
 varNames = ["molec_id", "local_iso_id", "nu", "sw", "a", "gamma_air",
-            "gamma_self", "elower", "n_air", "delta_air", "global_upper_quanta",
-            "global_lower_quanta", "local_upper_quanta", "local_lower_quanta",
-            "ierr", "iref", "line_mixing_flag", "gp", "gpp"]
-varLengths = [2, 1, 12, 10, 10, 5, 5, 10, 4, 8, 15, 15, 15, 15, 6, 12, 1, 7, 7]
+            "gamma_self", "elower", "n_air", "delta_air"] #, "global_upper_quanta",
+            # "global_lower_quanta", "local_upper_quanta", "local_lower_quanta",
+            # "ierr", "iref", "line_mixing_flag", "gp", "gpp"]
+varLengths = [2, 1, 12, 10, 10, 5, 5, 10, 4, 8] #, 15, 15, 15, 15, 6, 12, 1, 7, 7]
 idxRanges = append!([0], [sum(varLengths[1:i]) for i in 1:length(varLengths)])
 
 
@@ -24,16 +23,12 @@ function readHITRAN(filename, molecule, isotope, ν_min, ν_max)
             end
         end
 
-        allDataDict = Dict()
+        parts = [[allDataRows[i][j] for i in 1:length(allDataRows)] for j in 1:length(varNames)]
 
-        for j in 1:length(varNames)
-            parts = [allDataRows[i][j] for i in 1:length(allDataRows)]
-            allDataDict[varNames[j]] = parts
-        end
+        finalStruct = HitranTable(mol=parts[1], iso=parts[2], νᵢ=parts[3], Sᵢ=parts[4], Aᵢ=parts[5], γ_air=parts[6], γ_self=parts[7], E″=parts[8], n_air=parts[9], δ_air=parts[10])
 
-        allDataDF = DataFrame(allDataDict)
+        return finalStruct
 
-        return allDataDF
     end
 
 end
