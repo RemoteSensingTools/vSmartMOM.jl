@@ -69,6 +69,16 @@ function line_shape(
     Nₐ                 = FT(6.02214076e23);
     c₂                 = FT(1.4387769);
 
+    cMassMol = 1.66053873e-27
+    cSqrtLn2divSqrtPi = 0.469718639319144059835
+    cLn2 = 0.6931471805599
+    cSqrtLn2 = 0.8325546111577
+    cSqrt2Ln2 = 1.1774100225
+    fSqrtMass = sqrt(43.98983)
+    cc_ = 2.99792458e8
+    cBolts_ = 1.3806503e-23
+    cSqrt2Ln2 = 1.1774100225
+
     # store results here (or create ! function later)
     result = similar(grid);
     result .= 0.0;
@@ -106,6 +116,12 @@ function line_shape(
             # Doppler HWHM
             γ_d = hitran.νᵢ[j]/CGS_SPEED_OF_LIGHT *
                   sqrt(2*CGS_BOLTZMANN*temperature*FT(pi)/(molWeight/Nₐ));
+
+            # γ_d = hitran.νᵢ[j]/CGS_SPEED_OF_LIGHT *
+            #         sqrt(2*CGS_BOLTZMANN*temperature*FT(pi)/(molWeight/Nₐ)) * ln(2);
+
+                    # CGS_BOLTZMANN = FT(1.3806513e-16);
+                    # cBolts_ = 1.3806503e-23
             #println(γ_d)
             # Ratio of widths
             y = sqrt(log(FT(2))) * γ_l/γ_d
@@ -122,27 +138,22 @@ function line_shape(
             end
             ind_start = Int(round(interp_linear_low(ν-wingCutoff)))
             ind_stop  = Int(round(interp_linear_high(ν+wingCutoff)))
-            # println(S)
             for i=ind_start:ind_stop
 
                 if mod === doppler
-
-                    cSqrtLn2divSqrtPi = 0.469718639319144059835
-                    cLn2 = 0.6931471805599
-                    cSqrtLn2 = 0.8325546111577
-                    cSqrt2Ln2 = 1.1774100225
-
-                    lineshape_val = cSqrtLn2divSqrtPi*exp(-cLn2*((grid[i] - ν) /γ_d) ^2) /γ_d
+                    GammaD = (cSqrt2Ln2/cc_)*sqrt(cBolts_/cMassMol)*sqrt(temperature) * hitran.νᵢ[j]/fSqrtMass
+                    print(GammaD)
+                    lineshape_val = cSqrtLn2divSqrtPi*exp(-cLn2*((grid[i] - ν) /GammaD) ^2) /GammaD
                     result[i] += S * lineshape_val
 
                 elseif mod === lorentz
 
-                    # lineshape_val = Gam0/(pi*(Gam0**2+(sg-sg0)**2))
-                    # result[i] += pre_fac * S * lineshape_val
+                    lineshape_val = γ_l/(pi*(γ_l^2+(grid[i] - ν) ^ 2))
+                    result[i] += S * lineshape_val
 
                 elseif mod === voigt
                     compl_error = w(modCEF, sqrt(log(FT(2)))/γ_d * (grid[i] - ν) + 1im*y);
-                    result[i]  += pre_fac * S * real(compl_error)
+                    result[i] += pre_fac * S * real(compl_error)
                 end
 
 
