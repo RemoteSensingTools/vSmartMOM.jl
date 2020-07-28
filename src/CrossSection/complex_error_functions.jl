@@ -1,28 +1,9 @@
 using SpecialFunctions
-
-abstract type AbstractComplexErrorFunction end
-
-"Humlicek only formulation for Complex Error Function"
-struct HumlicekErrorFunction <: AbstractComplexErrorFunction end
-"Mix of Humlicek and Weidemann (N=32) Error Function, suggested for Voigt function"
-struct HumlicekWeidemann32VoigtErrorFunction <: AbstractComplexErrorFunction end
-"Mix of Humlicek and Weidemann (N=32) Error Function, suggested for Speed Dependent Voigt function"
-struct HumlicekWeidemann32SDErrorFunction <: AbstractComplexErrorFunction end
-
-struct CPF12ErrorFunction <: AbstractComplexErrorFunction end
-
-"Mix of Humplicek and erfc Special Function for Voigt"
-struct ErfcHumliErrorFunctionVoigt  <: AbstractComplexErrorFunction end
-
-"Mix of Humplicek and erfc Special Function for Voigt"
-struct ErfcHumliErrorFunctionSD  <: AbstractComplexErrorFunction end
-
-"erfc Special Function for Voigt"
-struct ErfcErrorFunction  <: AbstractComplexErrorFunction end
+using ..CrossSection
 
 
 """
-    Humlicek (1982) rational approximation:  region I. 
+    Humlicek (1982) rational approximation:  region I.
 """
 function humlicek1(z)
     FT = eltype(real(z));
@@ -53,7 +34,7 @@ function Humlicek2(z)
 end
 
 """
-    Humlicek (1982) rational approximation:  region III. 
+    Humlicek (1982) rational approximation:  region III.
 """
 function humlicek3(z)
     FT = eltype(real(z));
@@ -63,7 +44,7 @@ function humlicek3(z)
 end
 
 """
-    Humlicek (1982) rational approximation:  region IV. 
+    Humlicek (1982) rational approximation:  region IV.
 """
 function humlicek4(z)
     FT = eltype(real(z));
@@ -74,7 +55,7 @@ function humlicek4(z)
     w  = exp(u) - nom/den
 end
 
-""" 
+"""
     Humlicek (1982) complex probability function:  w4 rational approximations.
 """
 function humlicek(z)
@@ -96,7 +77,7 @@ end
 
 
 """
-    Humlicek (1979) complex probability function:  rational approximation for y>0.85 OR |x|<18.1*y+1.65. 
+    Humlicek (1979) complex probability function:  rational approximation for y>0.85 OR |x|<18.1*y+1.65.
 """
 function cpf12a(z)
     FT = eltype(real(z));
@@ -105,7 +86,7 @@ function cpf12a(z)
     cb  = Array{FT,1}([1.011728045548831,    -0.7519714696746353, 0.01255772699323164, 0.01002200814515897, -2.420681348155727e-4,  5.008480613664576e-7])
     cr  = FT(1.5);
     crr = FT(2.25);
-    
+
     x = real(z)
     y = imag(z)
     ry = cr+y
@@ -126,7 +107,7 @@ function cpf12a(z)
 end
 
 """
-    Humlicek (1979) complex probability function:  rational approximation for y<0.85 AND |x|>18.1*y+1.65. 
+    Humlicek (1979) complex probability function:  rational approximation for y<0.85 AND |x|>18.1*y+1.65.
 """
 function cpf12b(z)
     FT = eltype(real(z));
@@ -164,7 +145,7 @@ function cpf12b(z)
 end
 
 """
-    Complex error function --- J.A.C. Weideman: SIAM J. Num. Anal. 31 1497-1518 (1994); equation (38.I) and table I. 
+    Complex error function --- J.A.C. Weideman: SIAM J. Num. Anal. 31 1497-1518 (1994); equation (38.I) and table I.
 """
 function weideman32a(z)
     FT = eltype(real(z));
@@ -192,7 +173,7 @@ function weideman32a(z)
 end
 
 """
-    Humlicek (1979) complex probability function w(z): a single rational approximation. 
+    Humlicek (1979) complex probability function w(z): a single rational approximation.
 """
 function w(mod::CPF12ErrorFunction, z)
     FT = eltype(real(z));
@@ -204,10 +185,10 @@ function w(mod::CPF12ErrorFunction, z)
     end
 end
 
-""" 
+"""
     Complex error function w(z) using Humlicek's and Weideman's rational approximation:
         |x|+y>15:  Humlicek (JQSRT, 1982) rational approximation for region I;
-        else:      J.A.C. Weideman (SIAM-NA 1994); equation (38.I) and table I. 
+        else:      J.A.C. Weideman (SIAM-NA 1994); equation (38.I) and table I.
 """
 function w(mod::HumlicekWeidemann32VoigtErrorFunction, z)
     FT = eltype(real(z));
@@ -222,7 +203,7 @@ end
 """
  Complex error function w(z) using Humlicek's and Weideman's rational approximation:
         |x|+y>8:  Humlicek (JQSRT, 1982) rational approximation for region II;
-        else:      J.A.C. Weideman (SIAM-NA 1994); equation (38.I) and table I. 
+        else:      J.A.C. Weideman (SIAM-NA 1994); equation (38.I) and table I.
 """
 function w(mod::HumlicekWeidemann32SDErrorFunction, z)
     FT = eltype(real(z));
@@ -234,10 +215,10 @@ function w(mod::HumlicekWeidemann32SDErrorFunction, z)
     return w
 end
 
-""" 
+"""
     Complex error function w(z) using Humlicek's and Weideman's rational approximation:
         |x|+y>15:  Humlicek (JQSRT, 1982) rational approximation for region I;
-        else:      using erfc(-iz) from Special Functions 
+        else:      using erfc(-iz) from Special Functions
 """
 function w(mod::ErfcHumliErrorFunctionVoigt, z)
     FT = eltype(real(z));
@@ -270,5 +251,3 @@ end
 function w(mod::ErfcErrorFunction, z)
     erfcx(-1im*z)
 end
-
-

@@ -1,4 +1,4 @@
-include("LineShapes/complex_error_functions.jl")
+# include("LineShapes/complex_error_functions.jl")
 
 module CrossSection
 
@@ -6,47 +6,11 @@ using Parameters
 using DocStringExtensions
 using Interpolations
 
-include("LineShapes/complex_error_functions.jl")
+include("types.jl")
+include("hitran.jl")
+include("complex_error_functions.jl")
 
-export HitranTable, line_shape, doppler, lorentz, voigt
-
-"""
-    type AbstractCrossSection
-Abstract Cross Section type for generic cross section calculations
-"""
-abstract type AbstractCrossSection end
-"""
-    struct HitranCrossSection{FT}
-An [`AbstractCrossSection`](@ref) type struct, which provides all HITRAN line parameters needed to compute absorption cross sections
-see https://hitran.org/docs/definitions-and-units/ for details
-# Fields
-$(DocStringExtensions.FIELDS)
-"""
-@with_kw struct HitranTable{FT<:AbstractFloat} <: AbstractCrossSection
-    "The molecular species identification (ID) number"
-    mol::Array{Int,1};
-    "The isotopologue ID number"
-    iso::Array{Int,1};
-    "The wavenumber of the spectral line transition (cm-1) in vacuum"
-    νᵢ::Array{FT,1};
-    "The spectral line intensity (cm−1/(molecule·cm−2)) at Tref=296K"
-    Sᵢ::Array{FT,1};
-    "The Einstein-A coefficient (s-1) of a transition"
-    Aᵢ::Array{FT,1};
-    "The air-broadened half width at half maximum (HWHM) (cm−1/atm) at Tref=296K and reference pressure pref=1atm"
-    γ_air::Array{FT,1};
-    "The self-broadened half width at half maximum (HWHM) (cm−1/atm) at Tref=296K and reference pressure pref=1atm"
-    γ_self::Array{FT,1};
-    "The lower-state energy of the transition (cm-1)"
-    E″::Array{FT,1};
-    "The coefficient of the temperature dependence of the air-broadened half width"
-    n_air::Array{FT,1};
-    "The pressure shift (cm−1/atm) at Tref=296K and pref=1atm of the line position with respect to the vacuum transition wavenumber νij"
-    δ_air::Array{FT,1};
-end
-
-@enum BroadeningFunction doppler=1 lorentz=2 voigt=3
-
+export readHITRAN, line_shape, doppler, lorentz, voigt, HumlicekErrorFunction, HumlicekWeidemann32VoigtErrorFunction, HumlicekWeidemann32SDErrorFunction, CPF12ErrorFunction, ErfcHumliErrorFunctionVoigt, ErfcHumliErrorFunctionSD, ErfcErrorFunction
 
 function line_shape(
                 mod,                   # Line shape model (Voigt here)
@@ -60,7 +24,7 @@ function line_shape(
                 vmr                    # VMR of gas itself [0-1]
                 )
 
-    println(mod)
+    # println(mod)
 
     # Get Type
     FT = eltype(grid);
@@ -142,7 +106,6 @@ function line_shape(
 
                 if mod === doppler
                     GammaD = (cSqrt2Ln2/cc_)*sqrt(cBolts_/cMassMol)*sqrt(temperature) * hitran.νᵢ[j]/fSqrtMass
-                    print(GammaD)
                     lineshape_val = cSqrtLn2divSqrtPi*exp(-cLn2*((grid[i] - ν) /GammaD) ^2) /GammaD
                     result[i] += S * lineshape_val
 
@@ -169,9 +132,5 @@ function line_shape(
     end
     return result
 end
-
-include("./HITRAN/HITRAN.jl")
-include("./LineShapes/DopplerShape.jl")
-# include("./LineShapes/complex_error_functions.jl")
 
 end
