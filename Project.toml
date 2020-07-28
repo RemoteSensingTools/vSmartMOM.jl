@@ -3,6 +3,17 @@ uuid = "ace8185b-fa20-42f5-912d-1e850dbe6a09"
 authors = ["Rupesh Jeyaram <rjeyaram@caltech.edu> and contributors"]
 version = "0.1.0"
 
+[deps]
+Atom = "c52e3926-4ff0-5f6e-af25-54175e0327b1"
+DocStringExtensions = "ffbed154-4ef7-542d-bbb7-c09d3a79fcae"
+Interpolations = "a98d9a8b-a2ab-59e6-89dd-64a1c18fca59"
+Juno = "e5e0dc1b-0480-54bc-9374-aad01c23163d"
+Parameters = "d96e819e-fc66-5662-9728-84c9c7592b0a"
+PyCall = "438e738f-606a-5dbb-bf0a-cddfbfd45ab0"
+SpecialFunctions = "276daf66-3868-5448-9aa4-cd146d93841b"
+Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
+TimerOutputs = "a759f4b9-e2f1-59dc-863e-4aeb61b1ea8f"
+
 [compat]
 julia = "1"
 

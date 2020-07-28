@@ -1,8 +1,3 @@
-module HITRAN
-
-using ..CrossSection
-
-export readHITRAN
 
 varNames = ["molec_id", "local_iso_id", "nu", "sw", "a", "gamma_air",
             "gamma_self", "elower", "n_air", "delta_air"] #, "global_upper_quanta",
@@ -30,7 +25,5 @@ function readHITRAN(filename, molecule, isotope, ν_min, ν_max)
         return finalStruct
 
     end
-
-end
 
 end
