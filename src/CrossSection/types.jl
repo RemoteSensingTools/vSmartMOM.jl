@@ -57,3 +57,7 @@ struct ErfcHumliErrorFunctionSD  <: AbstractComplexErrorFunction end
 
 "erfc Special Function for Voigt"
 struct ErfcErrorFunction  <: AbstractComplexErrorFunction end
+
+
+struct HitranEmptyError <: Exception end
+Base.showerror(io::IO, e::HitranEmptyError) = print(io, e, "No HITRAN records match the parameters")
