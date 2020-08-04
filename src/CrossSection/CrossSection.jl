@@ -1,5 +1,3 @@
-# include("LineShapes/complex_error_functions.jl")
-
 module CrossSection
 
 using Parameters
@@ -9,8 +7,12 @@ using Interpolations
 include("types.jl")
 include("hitran.jl")
 include("complex_error_functions.jl")
+include("iso_properties.jl")
 
-export readHITRAN, line_shape, doppler, lorentz, voigt, HumlicekErrorFunction, HumlicekWeidemann32VoigtErrorFunction, HumlicekWeidemann32SDErrorFunction, CPF12ErrorFunction, ErfcHumliErrorFunctionVoigt, ErfcHumliErrorFunctionSD, ErfcErrorFunction
+include("TIPS_2017.jl")
+include("partition_sums.jl")
+
+export readHITRAN, line_shape, doppler, lorentz, voigt, HumlicekErrorFunction, HumlicekWeidemann32VoigtErrorFunction, HumlicekWeidemann32SDErrorFunction, CPF12ErrorFunction, ErfcHumliErrorFunctionVoigt, ErfcHumliErrorFunctionSD, ErfcErrorFunction, qoft
 
 function line_shape(
                 mod,                   # Line shape model (Voigt here)
@@ -23,8 +25,6 @@ function line_shape(
                 wingCutoff,            # wing cutoff [cm-1]
                 vmr                    # VMR of gas itself [0-1]
                 )
-
-    # println(mod)
 
     # Get Type
     FT = eltype(grid);
@@ -44,12 +44,13 @@ function line_shape(
     cSqrt2Ln2 = 1.1774100225
 
     # store results here (or create ! function later)
+    # result = SharedArray{Float64}(length(grid))
     result = similar(grid);
     result .= 0.0;
 
     # need to add partition functions here:...
 
-    p_ref = FT(1013.0);   # reference pressure [hPa]
+    p_ref = FT(1013.25);  # reference pressure [hPa]
     t_ref = FT(296.0);    # reference temperature [K]
     wuPi  = FT(sqrt(1/pi));
 
@@ -63,8 +64,20 @@ function line_shape(
 
     interp_linear_low  = LinearInterpolation(grid, 1:1:length(grid),extrapolation_bc = 1)
     interp_linear_high = LinearInterpolation(grid, 1:1:length(grid),extrapolation_bc = length(grid))
+
+    times = []
+
+    # rate=0.0
+    # rate = Vector
+
+    # println("runnning latest")
+
+    rate = zeros(1)
+    # println(rate)
+
     # Loop through all lines:
     for j in eachindex(hitran.Sᵢ)
+        # println(j)
         if hitran.νᵢ[j] < gridMax && hitran.νᵢ[j] > gridMin
             # Apply pressure shift
             ν   = hitran.νᵢ[j] + pressure/p_ref*hitran.δ_air[j]
@@ -75,38 +88,60 @@ function line_shape(
                   (t_ref/temperature)^hitran.n_air[j]
 
             # Gaussian HWHM
-            #γ_d = hitran.νᵢ[j]/CGS_SPEED_OF_LIGHT*sqrt(2*CGS_BOLTZMANN*temperature*pi/(qmolWeight(MOLEC(j),ISOTOP(j))/Nₐ));
-            molWeight = FT(43.98983) # Hardcoded for CO2 now, need qmolWeight(molecID,isoID)
+
+
             # Doppler HWHM
-            γ_d = hitran.νᵢ[j]/CGS_SPEED_OF_LIGHT *
-                  sqrt(2*CGS_BOLTZMANN*temperature*FT(pi)/(molWeight/Nₐ));
+            molWeight = FT(mol_weight(hitran.mol[j],hitran.iso[j]))
+            γ_d = (cSqrt2Ln2/cc_)*sqrt(cBolts_/cMassMol)*sqrt(temperature) * hitran.νᵢ[j]/fSqrtMass
 
-            # γ_d = hitran.νᵢ[j]/CGS_SPEED_OF_LIGHT *
-            #         sqrt(2*CGS_BOLTZMANN*temperature*FT(pi)/(molWeight/Nₐ)) * ln(2);
-
-                    # CGS_BOLTZMANN = FT(1.3806513e-16);
-                    # cBolts_ = 1.3806503e-23
-            #println(γ_d)
             # Ratio of widths
             y = sqrt(log(FT(2))) * γ_l/γ_d
+
             # pre factor sqrt(ln(2)/pi)/γ_d
             pre_fac = sqrt(log(FT(2))/pi)/γ_d
+
             # Line intensity (temperature corrections)
             S = hitran.Sᵢ[j]
             if hitran.E″[j] != -1
                 #still needs partition sum correction:
-                #S = S * qoft(MOLEC(j),ISOTOP(j),t_ref)/qoft(MOLEC(j),ISOTOP(j),temperature) *
-                S = S * 1 *
+
+                # S = S * 1 *
+                # CURRT = typeof()
+
+                qoft!(2,1,temperature,t_ref, rate)
+
+
+                # append!(times, time)
+                # println(rate)
+                # println(typeof(S))
+                # println(typeof(rate))
+                # println(typeof(c₂))
+                # println(typeof(hitran.E″[j]))
+                # println(typeof(1/t_ref-1/temperature))
+                # println(typeof((1-exp(-c₂*hitran.νᵢ[j]/temperature))))
+                # println(typeof(1-exp(-c₂*hitran.νᵢ[j]/t_ref)))
+                #
+                # println((S))
+                # println((rate))
+                # println((c₂))
+                # println((hitran.E″[j]))
+                # println((1/t_ref-1/temperature))
+                # println(((1-exp(-c₂*hitran.νᵢ[j]/temperature))))
+                # println((1-exp(-c₂*hitran.νᵢ[j]/t_ref)))
+
+                S = S * rate[1] *
                         exp(c₂*hitran.E″[j]*(1/t_ref-1/temperature)) *
                         (1-exp(-c₂*hitran.νᵢ[j]/temperature))/(1-exp(-c₂*hitran.νᵢ[j]/t_ref));
+
+                # break
+
             end
             ind_start = Int(round(interp_linear_low(ν-wingCutoff)))
             ind_stop  = Int(round(interp_linear_high(ν+wingCutoff)))
             for i=ind_start:ind_stop
 
                 if mod === doppler
-                    GammaD = (cSqrt2Ln2/cc_)*sqrt(cBolts_/cMassMol)*sqrt(temperature) * hitran.νᵢ[j]/fSqrtMass
-                    lineshape_val = cSqrtLn2divSqrtPi*exp(-cLn2*((grid[i] - ν) /GammaD) ^2) /GammaD
+                    lineshape_val = cSqrtLn2divSqrtPi*exp(-cLn2*((grid[i] - ν) /γ_d) ^2) /γ_d
                     result[i] += S * lineshape_val
 
                 elseif mod === lorentz
@@ -130,7 +165,10 @@ function line_shape(
 
         end
     end
-    return result
+
+    # println(sum(times))
+
+    return result # (result, times)
 end
 
 end
