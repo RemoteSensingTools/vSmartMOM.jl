@@ -1,32 +1,61 @@
+#####
+##### Function to parse hitran par-file data
+#####
 
+"""
+    readHITRAN(filepath::String, mol::Int=-1, iso::Int=-1, ν_min::Number=0, ν_max::Number=Inf)
 
-function readHITRAN(filename, molecule, isotope, ν_min, ν_max)
+Read/parse a HITRAN data file and return the data in [`HitranTable`](@ref) format
 
+"""
+function readHITRAN(filepath::String; mol::Int=-1, iso::Int=-1, ν_min::Number=0, ν_max::Number=Inf)
+
+    # Declare some constant properties of the hitran line parameters, such as
+    # names, lengths, and types
     varNames = ["molec_id", "local_iso_id", "nu", "sw", "a", "gamma_air",
-                "gamma_self", "elower", "n_air", "delta_air"] #, "global_upper_quanta",
-                # "global_lower_quanta", "local_upper_quanta", "local_lower_quanta",
-                # "ierr", "iref", "line_mixing_flag", "gp", "gpp"]
-    varLengths = [2, 1, 12, 10, 10, 5, 5, 10, 4, 8] #, 15, 15, 15, 15, 6, 12, 1, 7, 7]
+                "gamma_self", "elower", "n_air", "delta_air", "global_upper_quanta",
+                "global_lower_quanta", "local_upper_quanta", "local_lower_quanta",
+                "ierr", "iref", "line_mixing_flag", "gp", "gpp"]
+    varLengths = [2, 1, 12, 10, 10, 5, 5, 10, 4, 8, 15, 15, 15, 15, 6, 12, 1, 7, 7]
+    varTypes = [Int64, Int64, Float64, Float64, Float64, Float64, Float64,
+                Float64, Float64, Float64, String, String, String, String,
+                String, String, String, Float64, Float64]
+
+    # Take the line parameters' lengths and assemble an index-ranges list
+    # Each value is the starting index, minus 1, of var i and ending index of var i-1
+    # i.e.
+    #   [0, 2, 3, 15, 25, 35, 40, 45, 55, 59, 67, 82, 97, 112, 127, 133, 145, 146, 153, 160]
+    # Starting at 0 correctly produces (1,2), (3,3), (4,15), ..., (154, 160)
     idxRanges = append!([0], [sum(varLengths[1:i]) for i in 1:length(varLengths)])
 
-    open(filename) do file
-        allDataRows = []
+    # Open the file specified
+    open(filepath, "r") do file
+
+        # Where to hold the matching rows
+        rows = []
+
+        # Loop through every line
         for ln in eachline(file)
-            parts = [tryparse(Float64, replace(ln[(idxRanges[i]+1):idxRanges[i+1]], " " => "")) for i in 1:(length(varLengths))]
-            if(parts[1] == molecule && (parts[2] == isotope || isotope == -1) && (ν_min <= parts[3] <= ν_max))
-                allDataRows = append!(allDataRows, [parts])
+
+            # Go from a line to a list of values
+            values = [varTypes[i] == String ? ln[(idxRanges[i]+1):idxRanges[i+1]] : tryparse(varTypes[i], ln[(idxRanges[i]+1):idxRanges[i+1]]) for i in 1:(length(varLengths))]
+
+            # Check that the search criteria are met (molecule, isotope and wavenumber range)
+            if((values[1] == mol || mol == -1) && (values[2] == iso || iso == -1) && (ν_min <= values[3] <= ν_max))
+
+                # Add this row to the list of rows
+                rows = append!(rows, [values])
             end
         end
 
-        parts = [[allDataRows[i][j] for i in 1:length(allDataRows)] for j in 1:length(varNames)]
+        # Convert the row-major list of lists to a column-major list of lists
+        cols = [[rows[i][j] for i in 1:length(rows)] for j in 1:length(varNames)]
 
-        if(length(parts[1]) == 0)
-            throw(HitranEmptyError())
-        end
+        # Check that there is at least 1 matching record in the HITRAN file
+        length(cols[1]) == 0 ? throw(HitranEmptyError()) : nothing
 
-        finalStruct = HitranTable(mol=parts[1], iso=parts[2], νᵢ=parts[3], Sᵢ=parts[4], Aᵢ=parts[5], γ_air=parts[6], γ_self=parts[7], E″=parts[8], n_air=parts[9], δ_air=parts[10])
-
-        return finalStruct
+        # Return a HitranTable struct populated with the obtained columns
+        return HitranTable(mol=cols[1], iso=cols[2], νᵢ=cols[3], Sᵢ=cols[4], Aᵢ=cols[5], γ_air=cols[6], γ_self=cols[7], E″=cols[8], n_air=cols[9], δ_air=cols[10], global_upper_quanta=cols[11], global_lower_quanta=cols[12], local_upper_quanta=cols[13], local_lower_quanta=cols[14], ierr=cols[15], iref=cols[16], line_mixing_flag=cols[17], g′=cols[18], g″=cols[19])
 
     end
 

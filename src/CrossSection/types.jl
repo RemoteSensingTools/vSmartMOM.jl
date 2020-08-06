@@ -3,34 +3,57 @@
 Abstract Cross Section type for generic cross section calculations
 """
 abstract type AbstractCrossSection end
+
 """
     struct HitranCrossSection{FT}
-An [`AbstractCrossSection`](@ref) type struct, which provides all HITRAN line parameters needed to compute absorption cross sections
-see https://hitran.org/docs/definitions-and-units/ for details
+
+An [`AbstractCrossSection`](@ref) type struct, which provides all HITRAN line
+parameters needed to compute absorption cross sections
+
+See https://hitran.org/docs/definitions-and-units/ for details
+
 # Fields
 $(DocStringExtensions.FIELDS)
 """
 @with_kw struct HitranTable{FT<:AbstractFloat} <: AbstractCrossSection
     "The molecular species identification (ID) number"
-    mol::Array{Int,1};
+    mol::Array{Int,1}
     "The isotopologue ID number"
-    iso::Array{Int,1};
+    iso::Array{Int,1}
     "The wavenumber of the spectral line transition (cm-1) in vacuum"
-    νᵢ::Array{FT,1};
+    νᵢ::Array{FT,1}
     "The spectral line intensity (cm−1/(molecule·cm−2)) at Tref=296K"
-    Sᵢ::Array{FT,1};
+    Sᵢ::Array{FT,1}
     "The Einstein-A coefficient (s-1) of a transition"
-    Aᵢ::Array{FT,1};
+    Aᵢ::Array{FT,1}
     "The air-broadened half width at half maximum (HWHM) (cm−1/atm) at Tref=296K and reference pressure pref=1atm"
-    γ_air::Array{FT,1};
+    γ_air::Array{FT,1}
     "The self-broadened half width at half maximum (HWHM) (cm−1/atm) at Tref=296K and reference pressure pref=1atm"
-    γ_self::Array{FT,1};
+    γ_self::Array{FT,1}
     "The lower-state energy of the transition (cm-1)"
-    E″::Array{FT,1};
+    E″::Array{FT,1}
     "The coefficient of the temperature dependence of the air-broadened half width"
-    n_air::Array{FT,1};
+    n_air::Array{FT,1}
     "The pressure shift (cm−1/atm) at Tref=296K and pref=1atm of the line position with respect to the vacuum transition wavenumber νij"
-    δ_air::Array{FT,1};
+    δ_air::Array{FT,1}
+    "The electronic and vibrational quantum numbers and labels for the upper state of a transition"
+    global_upper_quanta::Array{String,1}
+    "The electronic and vibrational quantum numbers and labels for the lower state of a transition"
+    global_lower_quanta::Array{String,1}
+    "Rotational, hyperfine and other quantum numbers and labels for the upper state of a transition"
+    local_upper_quanta::Array{String,1}
+    "Rotational, hyperfine and other quantum numbers and labels for the lower state of a transition"
+    local_lower_quanta::Array{String,1}
+    "Ordered list of indices corresponding to uncertainty estimates of transition parameters"
+    ierr::Array{String,1}
+    "Ordered list of reference identifiers for transition parameters"
+    iref::Array{String,1}
+    "A flag indicating the presence of additional data and code relating to line-mixing"
+    line_mixing_flag::Array{String,1}
+    "The upper state degeneracy"
+    g′::Array{FT,1}
+    "The lower state degeneracy"
+    g″::Array{FT,1}
 end
 
 @enum BroadeningFunction doppler=1 lorentz=2 voigt=3
