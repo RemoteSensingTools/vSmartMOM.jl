@@ -12,7 +12,7 @@ include("iso_properties.jl")
 include("TIPS_2017.jl")
 include("partition_sums.jl")
 
-export readHITRAN, line_shape, doppler, lorentz, voigt, HumlicekErrorFunction, HumlicekWeidemann32VoigtErrorFunction, HumlicekWeidemann32SDErrorFunction, CPF12ErrorFunction, ErfcHumliErrorFunctionVoigt, ErfcHumliErrorFunctionSD, ErfcErrorFunction, qoft
+export readHITRAN, line_shape, doppler, lorentz, voigt, HumlicekErrorFunction, HumlicekWeidemann32VoigtErrorFunction, HumlicekWeidemann32SDErrorFunction, CPF12ErrorFunction, ErfcHumliErrorFunctionVoigt, ErfcHumliErrorFunctionSD, ErfcErrorFunction, qoft, HitranTable, AbstractCrossSection
 
 function line_shape(
                 mod,                   # Line shape model (Voigt here)
@@ -103,37 +103,11 @@ function line_shape(
             # Line intensity (temperature corrections)
             S = hitran.Sᵢ[j]
             if hitran.E″[j] != -1
-                #still needs partition sum correction:
-
-                # S = S * 1 *
-                # CURRT = typeof()
-
                 qoft!(2,1,temperature,t_ref, rate)
-
-
-                # append!(times, time)
-                # println(rate)
-                # println(typeof(S))
-                # println(typeof(rate))
-                # println(typeof(c₂))
-                # println(typeof(hitran.E″[j]))
-                # println(typeof(1/t_ref-1/temperature))
-                # println(typeof((1-exp(-c₂*hitran.νᵢ[j]/temperature))))
-                # println(typeof(1-exp(-c₂*hitran.νᵢ[j]/t_ref)))
-                #
-                # println((S))
-                # println((rate))
-                # println((c₂))
-                # println((hitran.E″[j]))
-                # println((1/t_ref-1/temperature))
-                # println(((1-exp(-c₂*hitran.νᵢ[j]/temperature))))
-                # println((1-exp(-c₂*hitran.νᵢ[j]/t_ref)))
 
                 S = S * rate[1] *
                         exp(c₂*hitran.E″[j]*(1/t_ref-1/temperature)) *
                         (1-exp(-c₂*hitran.νᵢ[j]/temperature))/(1-exp(-c₂*hitran.νᵢ[j]/t_ref));
-
-                # break
 
             end
             ind_start = Int(round(interp_linear_low(ν-wingCutoff)))
