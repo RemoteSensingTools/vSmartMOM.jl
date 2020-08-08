@@ -148,94 +148,27 @@ function AtoB(aa,A,B,npt)
 
 end
 
-function qoft(M, I, T; TT_=TIPS_2017_ISOT_HASH_CONST, TQ_ = TIPS_2017_ISOQ_HASH_CONST)
-
-  # return 1
-    # println("Recompiled 4")
-    # get temperature grid
-    # TT = TIPS_2017_ISOT_HASH[(M,I)]
-    TT = TT_[(M,I)]
-    TQ = TQ_[(M,I)]
-
-    Tmin = minimum(TT); Tmax = maximum(TT)
-
-    # out of temperature range
-    if T<Tmin || T>Tmax
-      error("TIPS2017: T ($T) must be between $Tmin K and $Tmax K.")
-    end
-
-    # interpolate partition sum for specified isotopologue
-
-    # Lagrange interpolation from HAPI for now -- will eventually replace with
-    # Interpolations.jl function
-
-    Qt = AtoB(T,TT,TQ,length(TT))
-
-    # You can uncomment this print line and see that the calculation is indeed
-    # *Happening!*
-
-    # println(rand() * Qt)
-
-    return Qt
-
-    # return rand() * Qt
-    # return Qt
-
-end
-
-function qoft_ratio(M, I, T,T_ref; TT_=TIPS_2017_ISOT_HASH_CONST, TQ_ = TIPS_2017_ISOQ_HASH_CONST)
-  # return 1
-    # println("Recompiled 4")
-    # get temperature grid
-    # TT = TIPS_2017_ISOT_HASH[(M,I)]
-    TT = TT_[(M,I)]
-    TQ = TQ_[(M,I)]
-    Tmin = minimum(TT); Tmax = maximum(TT)
-    # out of temperature range
-    if T<Tmin || T>Tmax
-      error("TIPS2017: T ($T) must be between $Tmin K and $Tmax K.")
-    end
-    # interpolate partition sum for specified isotopologue
-    # Lagrange interpolation from HAPI for now -- will eventually replace with
-    # Interpolations.jl function
-    Qt = AtoB(T,TT,TQ,length(TT))
-    Qt2 = AtoB(T_ref,TT,TQ,length(TT))
-
-    # println(Qt2/Qt);
-    # result = Qt2/Qt;
-    # You can uncomment this print line and see that the calculation is indeed
-    # *Happening!*
-    # println(rand() * Qt)
-    return Qt2/Qt
-    # return rand() * Qt
-    # return Qt
-end
-
 function qoft!(M, I, T,T_ref, result; TT_=TIPS_2017_ISOT_HASH_CONST, TQ_ = TIPS_2017_ISOQ_HASH_CONST)
-  # return 1
-    # println("Recompiled 4")
-    # get temperature grid
-    # TT = TIPS_2017_ISOT_HASH[(M,I)]
+
+    # Get temperature grid
     TT = TT_[(M,I)]
     TQ = TQ_[(M,I)]
     Tmin = minimum(TT); Tmax = maximum(TT)
-    # out of temperature range
+
+    # Error if out of temperature range
     if T<Tmin || T>Tmax
       error("TIPS2017: T ($T) must be between $Tmin K and $Tmax K.")
     end
-    # interpolate partition sum for specified isotopologue
+
+    # Interpolate partition sum for specified isotopologue
     # Lagrange interpolation from HAPI for now -- will eventually replace with
     # Interpolations.jl function
+    # Qt = LinearInterpolation(grid, 1:1:length(grid),extrapolation_bc = 1); AtoB(T,TT,TQ,length(TT))
+    # LI = LinearInterpolation(TT, TQ, extrapolation_bc=NaN)
     Qt = AtoB(T,TT,TQ,length(TT))
     Qt2 = AtoB(T_ref,TT,TQ,length(TT))
 
-    # println(Qt2/Qt);
-    # result = Qt2/Qt;
-    # You can uncomment this print line and see that the calculation is indeed
-    # *Happening!*
-    # println(rand() * Qt)
+    # Save the ratio result 
     result[1] = Qt2/Qt
     return nothing
-    # return rand() * Qt
-    # return Qt
 end
