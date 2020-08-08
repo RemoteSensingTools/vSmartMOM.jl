@@ -3,10 +3,14 @@
 ## Reading HITRAN Files
 
 ```@docs
-readHITRAN
+read_hitran
 ```
 
 ## Computing Cross Sections
+
+```@docs
+absorption_cross_section
+```
 
 ## Types
 

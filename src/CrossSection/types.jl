@@ -1,3 +1,8 @@
+#####
+##### Types for holding input transition states, intensities and related
+##### variables. (Currently intended for storing HITRAN database)
+#####
+
 """
     type AbstractCrossSection
 Abstract Cross Section type for generic cross section calculations
@@ -56,20 +61,27 @@ $(DocStringExtensions.FIELDS)
     g″::Array{FT,1}
 end
 
-@enum BroadeningFunction doppler=1 lorentz=2 voigt=3
 
+#####
+##### Types of Complex Error Functions
+#####
 
-
-
+"""
+    type AbstractComplexErrorFunction
+Abstract Complex Error Function type for generic complex error functions
+"""
 abstract type AbstractComplexErrorFunction end
 
 "Humlicek only formulation for Complex Error Function"
 struct HumlicekErrorFunction <: AbstractComplexErrorFunction end
+
 "Mix of Humlicek and Weidemann (N=32) Error Function, suggested for Voigt function"
 struct HumlicekWeidemann32VoigtErrorFunction <: AbstractComplexErrorFunction end
+
 "Mix of Humlicek and Weidemann (N=32) Error Function, suggested for Speed Dependent Voigt function"
 struct HumlicekWeidemann32SDErrorFunction <: AbstractComplexErrorFunction end
 
+"Humlicek with a single rational approximation."
 struct CPF12ErrorFunction <: AbstractComplexErrorFunction end
 
 "Mix of Humplicek and erfc Special Function for Voigt"
@@ -81,6 +93,33 @@ struct ErfcHumliErrorFunctionSD  <: AbstractComplexErrorFunction end
 "erfc Special Function for Voigt"
 struct ErfcErrorFunction  <: AbstractComplexErrorFunction end
 
+
+#####
+##### Types of Broadening Functions
+##### Currently: Doppler, Lorentz, and Voigt
+#####
+
+"""
+    type AbstractBroadeningFunction
+Abstract Broadening Function type for generic line broadening function
+"""
+abstract type AbstractBroadeningFunction end
+
+"Doppler line broadening"
+struct Doppler <: AbstractBroadeningFunction end
+
+"Lorentz line broadening"
+struct Lorentz <: AbstractBroadeningFunction end
+
+"Voigt line broadening"
+struct Voigt <: AbstractBroadeningFunction
+    CEF::AbstractComplexErrorFunction
+end
+
+
+#####
+##### Types of Errors that may be thrown
+#####
 
 struct HitranEmptyError <: Exception end
 Base.showerror(io::IO, e::HitranEmptyError) = print(io, e, "No HITRAN records match the parameters")

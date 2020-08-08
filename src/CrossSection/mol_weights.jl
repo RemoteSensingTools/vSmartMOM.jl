@@ -1,11 +1,3 @@
-# ISO_INDEX = Dict([
-#     ("id",1),
-#     ("iso_name",2),
-#     ("abundance",3),
-#     ("mass",4),
-#     ("mol_name",5)
-# ])
-
 const ISO_mass = Dict([
 (( 1,   1 ),  18.010565),
 (( 1,   2 ),  20.014811),

@@ -3,12 +3,12 @@
 #####
 
 """
-    readHITRAN(filepath::String, mol::Int=-1, iso::Int=-1, ν_min::Number=0, ν_max::Number=Inf)
+    read_hitran(filepath::String, mol::Int=-1, iso::Int=-1, ν_min::Real=0, ν_max::Real=Inf)
 
 Read/parse a HITRAN data file and return the data in [`HitranTable`](@ref) format
 
 """
-function readHITRAN(filepath::String; mol::Int=-1, iso::Int=-1, ν_min::Number=0, ν_max::Number=Inf)
+function read_hitran(filepath::String; mol::Int=-1, iso::Int=-1, ν_min::Real=0, ν_max::Real=Inf)
 
     # Declare some constant properties of the hitran line parameters, such as
     # names, lengths, and types

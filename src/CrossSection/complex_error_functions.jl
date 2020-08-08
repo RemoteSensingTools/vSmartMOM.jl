@@ -1,7 +1,6 @@
 using SpecialFunctions
 using ..CrossSection
 
-
 """
     Humlicek (1982) rational approximation:  region I.
 """
