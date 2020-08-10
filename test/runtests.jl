@@ -109,12 +109,6 @@ using Plots
                 jl_cs = absorption_cross_section(Voigt(CEF),test_ht,grid,false,pres,temp,40,vmr=0)
                 py_cs = readdlm("helper/Voigt_CO2_T" * string(temp) * "_P" * string(pres) * ".csv")
                 Δcs = abs.(jl_cs - py_cs)
-
-                display(plot(grid, Δcs, ylims=(0, ϵ)))
-
-                plot(grid, py_cs, ylims=(0, 1.3*maximum(py_cs)))
-                display(plot!(grid, jl_cs, ylims=(0, 1.3*maximum(py_cs))))
-
                 @test maximum(Δcs) < ϵ
             end
         end
