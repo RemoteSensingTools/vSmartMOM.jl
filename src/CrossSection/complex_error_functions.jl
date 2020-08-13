@@ -1,10 +1,9 @@
 using SpecialFunctions
-using ..CrossSection
 
 """
     Humlicek (1982) rational approximation:  region I.
 """
-function humlicek1(z)
+function humlicek1(z::Complex)
     FT = eltype(real(z));
     #t = z.imag-1j*z.real;   w = t * recSqrtPi / (0.5 + t*t)
     w = 1im*FT(1/sqrt(pi)) *z / (z*z-FT(0.5))
@@ -14,7 +13,7 @@ end
 """
     Humlicek (1982) rational approximation:  region II.
 """
-function humlicek2(z)
+function humlicek2(z::Complex)
     FT = eltype(real(z));
     # this implementation corresponds to the fortran code
     t = imag(z)-1im*real(z)
@@ -25,7 +24,7 @@ end
 """
     Humlicek (1982) rational approximation:  region II.
 """
-function Humlicek2(z)
+function Humlicek2(z::Complex)
     FT = eltype(real(z));
     # this implementation corresponds to Eq. (12) of the manuscript
     zz = z*z
@@ -35,7 +34,7 @@ end
 """
     Humlicek (1982) rational approximation:  region III.
 """
-function humlicek3(z)
+function humlicek3(z::Complex)
     FT = eltype(real(z));
     t = imag(z)-1im*real(z)
     w =  (FT(16.4955) + t * (FT(20.20933) + t * (FT(11.96482) + t * (FT(3.778987) + FT(0.5642236)*t)))) /
@@ -45,7 +44,7 @@ end
 """
     Humlicek (1982) rational approximation:  region IV.
 """
-function humlicek4(z)
+function humlicek4(z::Complex)
     FT = eltype(real(z));
     t = imag(z)-1im*real(z)
     u = t*t
@@ -57,7 +56,7 @@ end
 """
     Humlicek (1982) complex probability function:  w4 rational approximations.
 """
-function humlicek(z)
+function humlicek(z::Complex)
     s = abs(real(z)) + imag(z)
     # Choices depending on regions:
     if s>15.0
@@ -78,7 +77,7 @@ end
 """
     Humlicek (1979) complex probability function:  rational approximation for y>0.85 OR |x|<18.1*y+1.65.
 """
-function cpf12a(z)
+function cpf12a(z::Complex)
     FT = eltype(real(z));
     ct  = Array{FT,1}([.3142403762544,  .9477883912402, 1.5976826351526, 2.2795070805011, 3.0206370251209, 3.88972489786978])
     ca  = Array{FT,1}([-1.393236997981977,  -0.2311524061886763,   +0.1553514656420944, -0.006218366236965554, -9.190829861057117e-5, +6.275259577e-7])
@@ -108,7 +107,7 @@ end
 """
     Humlicek (1979) complex probability function:  rational approximation for y<0.85 AND |x|>18.1*y+1.65.
 """
-function cpf12b(z)
+function cpf12b(z::Complex)
     FT = eltype(real(z));
     ct  = Array{FT,1}([.3142403762544,  .9477883912402, 1.5976826351526, 2.2795070805011, 3.0206370251209, 3.88972489786978])
     ca  = Array{FT,1}([-1.393236997981977,  -0.2311524061886763,   +0.1553514656420944, -0.006218366236965554, -9.190829861057117e-5, +6.275259577e-7])
@@ -146,7 +145,7 @@ end
 """
     Complex error function --- J.A.C. Weideman: SIAM J. Num. Anal. 31 1497-1518 (1994); equation (38.I) and table I.
 """
-function weideman32a(z)
+function weideman32a(z::Complex)
     FT = eltype(real(z));
     L32 = FT(sqrt(32/sqrt(2)));
     a32 = Array{FT,1}([ 2.5722534081245696e+00,   2.2635372999002676e+00,   1.8256696296324824e+00,   1.3455441692345453e+00,
@@ -174,7 +173,7 @@ end
 """
     Humlicek (1979) complex probability function w(z): a single rational approximation.
 """
-function w(mod::CPF12ErrorFunction, z)
+function w(::CPF12ErrorFunction, z::Complex)
     FT = eltype(real(z));
     # Needs to be double checked, implemented slightly differently from Schreier
     if (abs(real(z))<FT(18.1)*imag(z)+FT(1.65)) || (imag(z)>FT(0.85))
@@ -189,7 +188,8 @@ end
         |x|+y>15:  Humlicek (JQSRT, 1982) rational approximation for region I;
         else:      J.A.C. Weideman (SIAM-NA 1994); equation (38.I) and table I.
 """
-function w(mod::HumlicekWeidemann32VoigtErrorFunction, z)
+function w(::HumlicekWeidemann32VoigtErrorFunction, z::Complex)
+    
     FT = eltype(real(z));
     if abs(real(z))+imag(z)>15
         w = 1im*FT(1/sqrt(pi)) * z / (z*z-FT(0.5))  # Humlicek (1982) approx 1 for s>15
@@ -204,7 +204,7 @@ end
         |x|+y>8:  Humlicek (JQSRT, 1982) rational approximation for region II;
         else:      J.A.C. Weideman (SIAM-NA 1994); equation (38.I) and table I.
 """
-function w(mod::HumlicekWeidemann32SDErrorFunction, z)
+function w(::HumlicekWeidemann32SDErrorFunction, z::Complex)
     FT = eltype(real(z));
     if abs(real(z))+imag(z)>=8
         w = humlicek2(z)  # Humlicek (1982) approx 1 for s>8
@@ -219,7 +219,7 @@ end
         |x|+y>15:  Humlicek (JQSRT, 1982) rational approximation for region I;
         else:      using erfc(-iz) from Special Functions
 """
-function w(mod::ErfcHumliErrorFunctionVoigt, z)
+function w(::ErfcHumliErrorFunctionVoigt, z::Complex)
     FT = eltype(real(z));
     if abs(real(z))+imag(z)>15
         w = 1im*FT(1/sqrt(pi)) * z / (z*z-FT(0.5))  # Humlicek (1982) approx 1 for s>15
@@ -234,7 +234,7 @@ end
         |x|+y>8:  Humlicek (JQSRT, 1982) rational approximation for region II;
         else:     using erfc(-iz) from Special Functions
 """
-function w(mod::ErfcHumliErrorFunctionSD, z)
+function w(::ErfcHumliErrorFunctionSD, z::Complex)
     FT = eltype(real(z));
     if abs(real(z))+imag(z)>=8
         w = humlicek2(z)  # Humlicek (1982) approx 1 for s>8
@@ -247,6 +247,6 @@ end
 """
  Complex error function w(z) using erfc(-iz) from Special Functions
 """
-function w(mod::ErfcErrorFunction, z)
+function w(::ErfcErrorFunction, z::Complex)
     erfcx(-1im*z)
 end

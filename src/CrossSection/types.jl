@@ -4,23 +4,17 @@
 #####
 
 """
-    type AbstractCrossSection
-Abstract Cross Section type for generic cross section calculations
-"""
-abstract type AbstractCrossSection end
+    struct HitranTable{FT}
 
-"""
-    struct HitranCrossSection{FT}
-
-An [`AbstractCrossSection`](@ref) type struct, which provides all HITRAN line
-parameters needed to compute absorption cross sections
+A struct, which provides all HITRAN line parameters needed to compute 
+absorption cross sections
 
 See https://hitran.org/docs/definitions-and-units/ for details
 
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-@with_kw struct HitranTable{FT<:AbstractFloat} <: AbstractCrossSection
+@with_kw struct HitranTable{FT<:AbstractFloat} 
     "The molecular species identification (ID) number"
     mol::Array{Int,1}
     "The isotopologue ID number"
@@ -112,8 +106,79 @@ struct Doppler <: AbstractBroadeningFunction end
 struct Lorentz <: AbstractBroadeningFunction end
 
 "Voigt line broadening"
-struct Voigt <: AbstractBroadeningFunction
-    CEF::AbstractComplexErrorFunction
+struct Voigt <: AbstractBroadeningFunction end
+
+#####
+##### Types of models that can be used to calculate an absorption cross-
+##### section. 
+#####
+
+"""
+    type AbstractCrossSectionModel
+Abstract Cross Section Model type for generic cross section calculations
+Currently either a HitranModel or an InterpolationModel
+"""
+abstract type AbstractCrossSectionModel end
+
+"""
+    struct HitranModel{FT}
+
+A struct which provides all model parameters needed for cross-section 
+calculations using HITRAN data
+
+# Fields
+$(DocStringExtensions.FIELDS)
+"""
+@with_kw struct HitranModel <: AbstractCrossSectionModel
+
+    "Struct with hitran data"
+    hitran::HitranTable
+    "Broadening function (Doppler/Lorentz/Voigt)"
+    broadening::AbstractBroadeningFunction
+    "Wing cutoff [cm-1]"
+    wing_cutoff::Real
+    "VMR of gas itself [0-1]"
+    vmr::Real
+    "Complex Error Function to Use"
+    CEF::AbstractComplexErrorFunction = ErfcErrorFunction()
+
+end
+
+"""
+    struct InterpolationModel{FT}
+
+A struct which provides all model parameters needed for cross-section 
+calculations using an Interpolator
+
+# Fields
+$(DocStringExtensions.FIELDS)
+"""
+@with_kw struct InterpolationModel <: AbstractCrossSectionModel 
+
+    "The interpolator"
+    itp
+
+    # Everything below is metadata associated with the interpolation"
+
+    "The molecular species identification (ID) number"
+    mol::Int
+    "The isotopologue ID number"
+    iso::Int
+    "Broadening function (Doppler/Lorentz/Voigt), as a string"
+    broadening::String
+    "Wavelength grids"
+    ν_grid::Array{Float64,1}
+    "Wavelength grids"
+    p_grid::Array{Float64,1}
+    "Wavelength grids"
+    t_grid::Array{Float64,1}
+    "Wing cutoff [cm-1]"
+    wing_cutoff::Real
+    "VMR of gas itself [0-1]"
+    vmr::Real = 0
+    "Complex Error Function to Use"
+    CEF::AbstractComplexErrorFunction = ErfcErrorFunction()
+
 end
 
 

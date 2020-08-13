@@ -130,37 +130,76 @@
 
 
 # using Revise 
+# using RadiativeTransfer.CrossSection
+# using DelimitedFiles
+# using Plots
+
+# # pyplot()
+
+# test_ht = CrossSection.read_hitran("helper/CO2.data", ν_min=6000, ν_max=6400)
+
+# temperatures = [100, 175, 250, 325, 400]
+# pressures = [250, 500, 750, 1000, 1250]
+
+# grid = collect(6000:0.01:6400);
+# CEF = ErfcHumliErrorFunctionVoigt()
+
+# # Threshold -- our value must be within ϵ of the HAPI value
+# ϵ = 3.5e-27
+
+# for temp in temperatures
+#     println(temp)
+#     for pres in pressures
+#         jl_cs = absorption_cross_section(Voigt(CEF),test_ht,grid,false,pres,temp,40,vmr=0)
+#         py_cs = readdlm("/home/rjeyaram/RadiativeTransfer/test/helper/Voigt_CO2_T" * string(temp) * "_P" * string(pres) * ".csv")
+#         Δcs = abs.(jl_cs - py_cs)
+
+#         display(plot(grid, Δcs, ylims=(0, ϵ)))
+
+#         plot(grid, py_cs, ylims=(0, 1.3*maximum(py_cs)))
+#         display(plot!(grid, jl_cs, ylims=(0, 1.3*maximum(py_cs))))
+
+#         # println("Max: ", )
+#         # println("MAE: ", mean(Δcs))
+#         @test maximum(Δcs) < ϵ
+#     end
+
+# end
+
+using Revise
+using Profile
+# using RadiativeTransfer
 using RadiativeTransfer.CrossSection
-using DelimitedFiles
-using Plots
 
-# pyplot()
+using BenchmarkTools
 
-test_ht = CrossSection.read_hitran("helper/CO2.data", ν_min=6000, ν_max=6400)
+test_ht = read_hitran("/home/rjeyaram/RadiativeTransfer/test/helper/CO2.data", mol=2, iso=1, ν_min=6000, ν_max=6400)
 
-temperatures = [100, 175, 250, 325, 400]
-pressures = [250, 500, 750, 1000, 1250]
+const ν_grid = 6000:0.01:6400
+const p_grid = collect(1:25:1050)
+const t_grid = collect(200:10:380)
 
-grid = collect(6000:0.01:6400);
-CEF = ErfcHumliErrorFunctionVoigt()
+const CEF = HumlicekWeidemann32VoigtErrorFunction()
 
-# Threshold -- our value must be within ϵ of the HAPI value
-ϵ = 3.5e-27
+const model2 = HitranModel(hitran=test_ht, broadening=Doppler(), wing_cutoff=40, vmr=0)
 
-for temp in temperatures
-    println(temp)
-    for pres in pressures
-        jl_cs = absorption_cross_section(Voigt(CEF),test_ht,grid,false,pres,temp,40,vmr=0)
-        py_cs = readdlm("/home/rjeyaram/RadiativeTransfer/test/helper/Voigt_CO2_T" * string(temp) * "_P" * string(pres) * ".csv")
-        Δcs = abs.(jl_cs - py_cs)
+const model4 = HitranModel(hitran=test_ht, broadening=Voigt(), wing_cutoff=40, vmr=0, CEF=HumlicekWeidemann32VoigtErrorFunction())
 
-        display(plot(grid, Δcs, ylims=(0, ϵ)))
+# @code_warntype absorption_cross_section(test_ht, Voigt(CEF), collect(ν_grid), false, 1000.1, 296.1, 40, vmr=0)
+# @profview absorption_cross_section(test_ht, Voigt(CEF), collect(ν_grid), false, 1000.1, 296.1, 40, vmr=0)
 
-        plot(grid, py_cs, ylims=(0, 1.3*maximum(py_cs)))
-        display(plot!(grid, jl_cs, ylims=(0, 1.3*maximum(py_cs))))
+@btime a = absorption_cross_section(test_ht, Voigt(), CEF, collect(ν_grid), false, 1000.1, 296.1, 40, vmr=0)
+@benchmark absorption_cross_section(model4, collect(ν_grid), false, 1000.1, 296.1)
 
-        # println("Max: ", )
-        # println("MAE: ", mean(Δcs))
-        @test maximum(Δcs) < ϵ
-    end
+# @time absorption_cross_section(test_ht, Voigt(CEF), collect(ν_grid), false, 1000.1, 296.1, 40, vmr=0)
+# @time absorption_cross_section(model, collect(ν_grid), false, 1000.1, 296.1)
+@time itp_model = make_interpolation_model(model4, collect(ν_grid), false, p_grid, t_grid)
+# @time save_interpolation_model(itp_model, "/home/rjeyaram/RadiativeTransfer/test/helper/saved_model.data")
+# itp_model_new = load_interpolation_model("/home/rjeyaram/RadiativeTransfer/test/helper/saved_model.data")
+
+using SpecialFunctions
+function testReturn(x::Real)
+    erfc(-1im*x)
 end
+
+@code_warntype testReturn(3)
