@@ -3,14 +3,20 @@ module CrossSection
 using Parameters                # For constructing HitranTable with keywords
 using DocStringExtensions       # For simplifying docstring
 using Interpolations            # For interpolating in both lookup tables and qoft!
+using JLD2                      # For saving and loading the interpolator
+using ProgressMeter             # For showing progress, especially in creating the interpolator
 
-include("constants.jl")         # Scientific and mathematicsl constants
+include("constants.jl")         # Scientific and mathematical constants
 include("types.jl")             # All types used in this module
 include("hitran.jl")            # HITRAN file-related functions
 include("complex_error_functions.jl")   # Complex error functions used in line broadening
 include("mol_weights.jl")       # Molecular weights (TODO: replace with netCDF file)
 include("TIPS_2017.jl")         # Partition sums data (TODO: replace with netCDF file)
 include("partition_sums.jl")    # Partition sums interpolator (TODO: replace with LinearInterpolation)
+include("cross_section_interpolator.jl") # Cross-section interpolator functions
+
+# Export the Cross Section models
+export HitranModel, InterpolationModel
 
 # Export the absorption_cross_section functions
 export absorption_cross_section
@@ -25,35 +31,41 @@ export Doppler, Lorentz, Voigt
 export HumlicekErrorFunction, HumlicekWeidemann32VoigtErrorFunction, HumlicekWeidemann32SDErrorFunction, CPF12ErrorFunction, ErfcHumliErrorFunctionVoigt, ErfcHumliErrorFunctionSD, ErfcErrorFunction
 
 # Export the hitran table struct type
-export HitranTable, AbstractCrossSection
+export HitranTable
+
+# Export the interpolator functions
+export make_interpolation_model, save_interpolation_model, load_interpolation_model
 
 """
-    $(FUNCTIONNAME)(broadening::AbstractBroadeningFunction, hitran::HitranTable, grid::Array{<:Real,1}, wavelength_flag::Bool, pressure::Real, temperature::Real, wingCutoff::Real; vmr=0)
+    $(FUNCTIONNAME)(model::HitranModel, grid::Array{<:Real,1}, wavelength_flag::Bool, pressure::Real, temperature::Real)
 
-Read/parse a HITRAN data file and return the data in [`HitranTable`](@ref) format
+Using a HitranModel, calculate an absorption cross-section at the given pressure, 
+temperature, and grid of wavelengths (or wavenumbers)
 
 """
 function absorption_cross_section(
-                broadening::AbstractBroadeningFunction,    # Broadening function (AbstractBroadeningFunction)
-                hitran::HitranTable,                       # Struct with hitran data
-                grid::Array{<:Real,1},                       # Wavelength [nm] or wavenumber [cm-1] grid
-                wavelength_flag::Bool,                     # Use wavelength in nm (true) or wavenumber cm-1 units (false)
-                pressure::Real,                            # actual pressure [hPa]
-                temperature::Real,                         # actual temperature [K]
-                wingCutoff::Real;                          # wing cutoff [cm-1]
-                vmr=0                                      # VMR of gas itself [0-1]
+                hitran::HitranTable,    # Model to use in this cross section calculation 
+                                        # (Calculation from Hitran data vs. using Interpolator)
+                broadening::AbstractBroadeningFunction, # Broadening function to use
+                grid::Array{<:Real,1},  # Wavelength [nm] or wavenumber [cm-1] grid
+                wavelength_flag::Bool,  # Use wavelength in nm (true) or wavenumber cm-1 units (false)
+                pressure::Real,         # actual pressure [hPa]
+                temperature::Real,      # actual temperature [K] 
+                wing_cutoff::Real;      # Wing cutoff [cm -1]
+                vmr::Real=0,            # VMR of gas [0-1]
+                CEF::AbstractComplexErrorFunction=ErfcErrorFunction() # Error function to use (if Voigt broadening)
                 )
 
-    # store results here to return
+    # Store results here to return
     result = similar(grid);
     result .= 0.0;
 
-    # convert to wavenumber from [nm] space if necessary
+    # Convert to wavenumber from [nm] space if necessary
     grid = wavelength_flag ? nm_per_m ./ grid : grid
 
     # Calculate the minimum and maximum grid bounds, including the wing cutoff
-    grid_max = maximum(grid) + wingCutoff
-    grid_min = minimum(grid) - wingCutoff
+    grid_max = maximum(grid) + wing_cutoff
+    grid_min = minimum(grid) - wing_cutoff
 
     # Interpolators from grid bounds to index values
     grid_idx_interp_low  = LinearInterpolation(grid, 1:1:length(grid),extrapolation_bc = 1)
@@ -80,7 +92,7 @@ function absorption_cross_section(
 
             # Compute Doppler HWHM
             γ_d = ((cSqrt2Ln2/cc_)*sqrt(cBolts_/cMassMol)*sqrt(temperature) * 
-                    hitran.νᵢ[j]/sqrt(mol_weight(hitran.mol[j],hitran.iso[j])))
+            hitran.νᵢ[j]/sqrt(mol_weight(hitran.mol[j],hitran.iso[j])))
 
             # Ratio of widths
             y = sqrt(cLn2) * γ_l/γ_d
@@ -92,7 +104,6 @@ function absorption_cross_section(
             S = hitran.Sᵢ[j]
             if hitran.E″[j] != -1
                 qoft!(2,1,temperature,t_ref, rate)
-                # println(rate)
                 S = S * rate[1] *
                         exp(c₂*hitran.E″[j]*(1/t_ref-1/temperature)) *
                         (1-exp(-c₂*hitran.νᵢ[j]/temperature))/(1-exp(-c₂*hitran.νᵢ[j]/t_ref));
@@ -100,11 +111,11 @@ function absorption_cross_section(
             end
 
             # Calculate index range that this ν impacts
-            ind_start = Int(round(grid_idx_interp_low(ν - wingCutoff)))
-            ind_stop  = Int(round(grid_idx_interp_high(ν + wingCutoff)))
+            ind_start = Int64(round(grid_idx_interp_low(ν - wing_cutoff)))
+            ind_stop  = Int64(round(grid_idx_interp_high(ν + wing_cutoff)))
 
             # Loop over every ν in input grid that this transition impacts
-            for i=ind_start:ind_stop
+            for i in ind_start:ind_stop
 
                 # Depending on the type of input broadening specified, apply that transformation
                 # and add to the result array
@@ -121,7 +132,7 @@ function absorption_cross_section(
 
                 # Voigt
                 elseif broadening isa Voigt
-                    compl_error = w(broadening.CEF, sqrt(cLn2)/γ_d * (grid[i] - ν) + 1im * y);
+                    compl_error = w(CEF, sqrt(cLn2)/γ_d * (grid[i] - ν) + 1im * y);
                     result[i] += pre_fac * S * real(compl_error)
                 end
             end
@@ -130,6 +141,38 @@ function absorption_cross_section(
 
     # Return the resulting lineshape
     return result
+end
+
+function absorption_cross_section(
+                model::HitranModel,     # Model to use in this cross section calculation 
+                                        # (Calculation from Hitran data vs. using Interpolator)
+                grid::Array{<:Real,1},  # Wavelength [nm] or wavenumber [cm-1] grid
+                wavelength_flag::Bool,  # Use wavelength in nm (true) or wavenumber cm-1 units (false)
+                pressure::Real,         # actual pressure [hPa]
+                temperature::Real       # actual temperature [K]           
+                )
+
+    return absorption_cross_section(model.hitran, model.broadening, grid, wavelength_flag, pressure, temperature, model.wing_cutoff, vmr=model.vmr, CEF=model.CEF)
+
+end
+
+function absorption_cross_section(
+    model::InterpolationModel,  # Model to use in this cross section calculation 
+                                # (Calculation from Interpolator vs. Hitran Data)
+    grid::Array{<:Real,1},      # Wavelength [nm] or wavenumber [cm-1] grid
+    wavelength_flag::Bool,      # Use wavelength in nm (true) or wavenumber cm-1 units (false)
+    pressure::Real,             # actual pressure [hPa]
+    temperature::Real,          # actual temperature [K]               
+    )
+
+    # Convert to wavenumber from [nm] space if necessary
+    grid = wavelength_flag ? nm_per_m ./ grid : grid
+
+    # TODO: Figure out how to turn grid arrays into ranges!
+    sitp = scale(model.itp,250:250:1250,100:75:400,6000:0.01:6400)
+
+    # Perform the interpolation and return the resulting grid
+    return sitp(pressure, temperature, grid)
 end
 
 end
