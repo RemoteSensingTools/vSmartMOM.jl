@@ -60,3 +60,8 @@ function read_hitran(filepath::String; mol::Int=-1, iso::Int=-1, ν_min::Real=0,
     end
 
 end
+
+"""Convenience function to make a HitranModel out of the parameters (Mainly to match make_interpolation_model)"""
+function make_hitran_model(hitran::HitranTable, broadening::AbstractBroadeningFunction; wing_cutoff::Real=40, vmr::Real=0, CEF::AbstractComplexErrorFunction=HumlicekWeidemann32SDErrorFunction())
+    return HitranModel(hitran=hitran, broadening=broadening , wing_cutoff=wing_cutoff , vmr=vmr, CEF=CEF)
+end
