@@ -184,7 +184,8 @@ const CEF = HumlicekWeidemann32VoigtErrorFunction()
 const model2 = HitranModel(hitran=test_ht, broadening=Doppler(), wing_cutoff=40, vmr=0)
 
 const model4 = HitranModel(hitran=test_ht, broadening=Voigt(), wing_cutoff=40, vmr=0, CEF=HumlicekWeidemann32VoigtErrorFunction())
-
+const model5 = HitranModel(hitran=test_ht, broadening=Voigt(), wing_cutoff=40, vmr=0, CEF=ErfcHumliErrorFunctionVoigt())
+const model6 = HitranModel(hitran=test_ht, broadening=Voigt(), wing_cutoff=40, vmr=0, CEF=HumlicekWeidemann32SDErrorFunction())
 # @code_warntype absorption_cross_section(test_ht, Voigt(CEF), collect(ν_grid), false, 1000.1, 296.1, 40, vmr=0)
 # @profview absorption_cross_section(test_ht, Voigt(CEF), collect(ν_grid), false, 1000.1, 296.1, 40, vmr=0)
 
