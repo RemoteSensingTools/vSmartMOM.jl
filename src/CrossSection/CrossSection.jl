@@ -5,6 +5,8 @@ using DocStringExtensions       # For simplifying docstring
 using Interpolations            # For interpolating in both lookup tables and qoft!
 using JLD2                      # For saving and loading the interpolator
 using ProgressMeter             # For showing progress, especially in creating the interpolator
+using KernelAbstractions
+using CUDA
 
 include("constants.jl")         # Scientific and mathematical constants
 include("types.jl")             # All types used in this module
@@ -57,8 +59,9 @@ function absorption_cross_section(
                 )
 
     # Store results here to return
+    gridC = CuArray(grid);
     result = similar(grid);
-    result .= 0.0;
+    fill!(result,0);
 
     # Convert to wavenumber from [nm] space if necessary
     grid = wavelength_flag ? nm_per_m ./ grid : grid
@@ -113,9 +116,18 @@ function absorption_cross_section(
             # Calculate index range that this ν impacts
             ind_start = Int64(round(grid_idx_interp_low(ν - wing_cutoff)))
             ind_stop  = Int64(round(grid_idx_interp_high(ν + wing_cutoff)))
-
+            
+            grid_     = view(grid   ,ind_start:ind_stop);
+            result_   = view(result ,ind_start:ind_stop);
+            
+            device = CPU()
+            kernelVoigt! = voigt_shape32!(device,1)
+            #kernelCPU = doppler_shape!(CUDADevice(), 1024)
+            #γ_d,ν,y,S,
+            event = kernelVoigt!(result_, grid_,Float32(γ_d),Float32(ν),Float32(y),Float32(S), CEF, ndrange=length(grid_));wait(device,event)
+            #testerCPU!(result_, grid_,γ_d,ν,y,S);
             # Loop over every ν in input grid that this transition impacts
-            for i in ind_start:ind_stop
+            #= for i in ind_start:ind_stop
 
                 # Depending on the type of input broadening specified, apply that transformation
                 # and add to the result array
@@ -133,14 +145,15 @@ function absorption_cross_section(
                 # Voigt
                 elseif broadening isa Voigt
                     compl_error = w(CEF, sqrt(cLn2)/γ_d * (grid[i] - ν) + 1im * y);
+                    #compl_error = weideman32a(sqrt(cLn2)/γ_d * (grid[i] - ν) + 1im * y);
                     result[i] += pre_fac * S * real(compl_error)
                 end
-            end
+            end =#
         end
     end
 
     # Return the resulting lineshape
-    return result
+    return Array(result)
 end
 
 function absorption_cross_section(
@@ -174,5 +187,24 @@ function absorption_cross_section(
     # Perform the interpolation and return the resulting grid
     return sitp(pressure, temperature, grid)
 end
+
+@kernel function voigt_shape32!(A, @Const(grid),γ_d,ν,y,S, modShape  )
+    cSqrtLn2divSqrtPi  = Float32(0.469718639319144059835)
+    cLn2               = Float32(0.6931471805599)
+    #sqrt(cLn2)/γ_d * (grid[I] - ν) + im * y;
+    #γ_d = Float32(0.08);
+    #ν = Float32(6050);
+    I = @index(Global, Linear)
+    @inbounds A[I] += S * sqrt(cLn2/pi)/γ_d * real(w(modShape,sqrt(cLn2)/γ_d * (grid[I] - ν) + im * y))
+end
+
+function testerCPU!(A, grid,γ_d,ν,y,S)
+    cSqrtLn2divSqrtPi  = Float32(0.469718639319144059835)
+    cLn2               = Float32(0.6931471805599)
+    for I in eachindex(grid)
+        @inbounds A[I] += S * sqrt(cLn2/pi)/γ_d * real(weideman32a(sqrt(cLn2)/γ_d * (grid[I] - ν) + im * y))
+    end
+end
+
 
 end
