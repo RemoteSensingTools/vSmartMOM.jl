@@ -11,6 +11,8 @@ using ProgressMeter
     # Test that a hitran fixed-width file is correctly parsed
     @testset "read_hitran" begin
 
+        println("Testing read_hitran...")
+
         ####
         #### These tests check that the correct values & types are extracted from the file,
         #### especially that molecule/isotope match and ν between ν_min and ν_max)
@@ -81,6 +83,8 @@ using ProgressMeter
 
     @testset "absorption_cross_section_hitran" begin
 
+        println("Testing absorption_cross_section_hitran...")
+
         ####
         #### These tests check that for one molecule (CO2), over a temperature/
         #### pressure grid and in a specific band (6000<ν<6400), our Voigt 
@@ -122,6 +126,8 @@ using ProgressMeter
     # using a new interpolator
 
     @testset "absorption_cross_section_interpolator" begin
+
+    println("Testing absorption_cross_section_interpolator...")
 
         # Get the test data
         test_ht = CrossSection.read_hitran("/home/rjeyaram/RadiativeTransfer/test/helper/CO2.data", ν_min=6000, ν_max=6400)

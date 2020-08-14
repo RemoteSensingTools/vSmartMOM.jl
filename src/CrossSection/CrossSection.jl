@@ -61,7 +61,7 @@ function compute_absorption_cross_section(
                 )
 
     # Store results here to return
-    gridC = CuArray(grid);
+    # gridC = CuArray(grid);
     result = similar(grid);
     fill!(result,0);
 
@@ -78,6 +78,9 @@ function compute_absorption_cross_section(
 
     # Temporary storage array for output of qoft!. Compiler/speed issues when returning value in qoft
     rate = zeros(1)
+
+    # Declare the device being used
+    device = CPU()
 
     # Loop through all transition lines:
     for j in eachindex(hitran.Sᵢ)
@@ -102,9 +105,6 @@ function compute_absorption_cross_section(
             # Ratio of widths
             y = sqrt(cLn2) * γ_l/γ_d
 
-            # Pre factor sqrt(ln(2)/pi)/γ_d
-            pre_fac = sqrt(cLn2/pi)/γ_d
-
             # Apply line intensity temperature corrections
             S = hitran.Sᵢ[j]
             if hitran.E″[j] != -1
@@ -119,38 +119,17 @@ function compute_absorption_cross_section(
             ind_start = Int64(round(grid_idx_interp_low(ν - wing_cutoff)))
             ind_stop  = Int64(round(grid_idx_interp_high(ν + wing_cutoff)))
             
-            grid_     = view(grid   ,ind_start:ind_stop);
-            result_   = view(result ,ind_start:ind_stop);
-            
-            device = CPU()
-            kernelVoigt! = voigt_shape32!(device,1)
-            #kernelCPU = doppler_shape!(CUDADevice(), 1024)
-            #γ_d,ν,y,S,
-            event = kernelVoigt!(result_, grid_,Float32(γ_d),Float32(ν),Float32(y),Float32(S), CEF, ndrange=length(grid_));wait(device,event)
-            #testerCPU!(result_, grid_,γ_d,ν,y,S);
-            # Loop over every ν in input grid that this transition impacts
-            #= for i in ind_start:ind_stop
+            # Create views from the result and grid arrays
+            result_view   = view(result ,ind_start:ind_stop);
+            grid_view     = view(grid   ,ind_start:ind_stop);
 
-                # Depending on the type of input broadening specified, apply that transformation
-                # and add to the result array
+            # Kernel for performing the lineshape calculation
+            kernel! = line_shape!(device,1)
 
-                # Doppler
-                if broadening isa Doppler
-                    lineshape_val = cSqrtLn2divSqrtPi*exp(-cLn2*((grid[i] - ν) /γ_d) ^2) /γ_d
-                    result[i] += S * lineshape_val
-
-                # Lorentz
-                elseif broadening isa Lorentz
-                    lineshape_val = γ_l/(pi*(γ_l^2 + (grid[i] - ν) ^ 2))
-                    result[i] += S * lineshape_val
-
-                # Voigt
-                elseif broadening isa Voigt
-                    compl_error = w(CEF, sqrt(cLn2)/γ_d * (grid[i] - ν) + 1im * y);
-                    #compl_error = weideman32a(sqrt(cLn2)/γ_d * (grid[i] - ν) + 1im * y);
-                    result[i] += pre_fac * S * real(compl_error)
-                end
-            end =#
+            # Run the event on the kernel 
+            # That this, this function adds to each element in result, the contribution from this transition
+            event = kernel!(result_view, grid_view, ν, γ_d, γ_l, y, S, broadening, CEF, ndrange=length(grid_view))
+            wait(device,event)
         end
     end
 
@@ -208,23 +187,30 @@ function absorption_cross_section(
     return sitp(pressure, temperature, grid)
 end
 
-@kernel function voigt_shape32!(A, @Const(grid),γ_d,ν,y,S, modShape  )
-    cSqrtLn2divSqrtPi  = Float32(0.469718639319144059835)
-    cLn2               = Float32(0.6931471805599)
-    #sqrt(cLn2)/γ_d * (grid[I] - ν) + im * y;
-    #γ_d = Float32(0.08);
-    #ν = Float32(6050);
+#####
+##### Lineshape functions that are called by absorption_cross_section
+#####
+
+@kernel function line_shape!(A, @Const(grid), ν, γ_d, γ_l, y, S, ::Doppler, CEF)
+    FT = eltype(ν)
     I = @index(Global, Linear)
-    @inbounds A[I] += S * sqrt(cLn2/pi)/γ_d * real(w(modShape,sqrt(cLn2)/γ_d * (grid[I] - ν) + im * y))
+    @inbounds A[I] += FT(S) * FT(cSqrtLn2divSqrtPi) * exp(-FT(cLn2) * ((FT(grid[I]) - FT(ν)) / FT(γ_d)) ^2) / FT(γ_d)
 end
 
-function testerCPU!(A, grid,γ_d,ν,y,S)
-    cSqrtLn2divSqrtPi  = Float32(0.469718639319144059835)
-    cLn2               = Float32(0.6931471805599)
-    for I in eachindex(grid)
-        @inbounds A[I] += S * sqrt(cLn2/pi)/γ_d * real(weideman32a(sqrt(cLn2)/γ_d * (grid[I] - ν) + im * y))
-    end
+@kernel function line_shape!(A, @Const(grid), ν, γ_d, γ_l, y, S, ::Lorentz, CEF)
+    FT = eltype(ν)
+    I = @index(Global, Linear)
+    @inbounds A[I] += FT(S) * FT(γ_l) / (FT(pi) * (FT(γ_l) ^2 + (FT(grid[I]) - FT(ν)) ^ 2))
 end
 
+@kernel function line_shape!(A, @Const(grid), ν, γ_d, γ_l, y, S, ::Voigt, CEF)
+    FT = eltype(ν)
+    I = @index(Global, Linear)
+    @inbounds A[I] += FT(S) * FT(cSqrtLn2divSqrtPi)/FT(γ_d) * real(w(CEF, FT(cSqrtLn2) / FT(γ_d) * (FT(grid[I]) - FT(ν)) + im * FT(y)))
+end
+
+@kernel function line_shape32!(A, @Const(grid), ν, γ_d, γ_l, y, S, broadening, CEF)
+    line_shape!(A, grid, Float32(ν), Float32(γ_d), Float32(γ_l), Float32(y), Float32(S), broadening, CEF)
+end
 
 end
