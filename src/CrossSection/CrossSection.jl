@@ -19,10 +19,10 @@ include("cross_section_interpolator.jl") # Cross-section interpolator functions
 export HitranModel, InterpolationModel
 
 # Export the absorption_cross_section functions
-export absorption_cross_section
+export compute_absorption_cross_section, absorption_cross_section
 
-# Export the read_hitran function from hitran.jl
-export read_hitran
+# Export the hitran functions from hitran.jl
+export read_hitran, make_hitran_model
 
 # Export the broadening function types
 export Doppler, Lorentz, Voigt
@@ -37,22 +37,24 @@ export HitranTable
 export make_interpolation_model, save_interpolation_model, load_interpolation_model
 
 """
-    $(FUNCTIONNAME)(model::HitranModel, grid::Array{<:Real,1}, wavelength_flag::Bool, pressure::Real, temperature::Real)
+    $(FUNCTIONNAME)(hitran::HitranTable,broadening::AbstractBroadeningFunction,grid::Array{<:Real,1},wavelength_flag::Bool,pressure::Real,temperature::Real,wing_cutoff::Real;vmr::Real=0,CEF::AbstractComplexErrorFunction=ErfcErrorFunction())
 
-Using a HitranModel, calculate an absorption cross-section at the given pressure, 
+Given the hitran data and necessary parameters, calculate an absorption cross-section at the given pressure, 
 temperature, and grid of wavelengths (or wavenumbers)
 
 """
-function absorption_cross_section(
-                hitran::HitranTable,    # Model to use in this cross section calculation 
-                                        # (Calculation from Hitran data vs. using Interpolator)
+function compute_absorption_cross_section(
+                #Required
+                hitran::HitranTable,          # Model to use in this cross section calculation 
+                                              # (Calculation from Hitran data vs. using Interpolator)
                 broadening::AbstractBroadeningFunction, # Broadening function to use
-                grid::Array{<:Real,1},  # Wavelength [nm] or wavenumber [cm-1] grid
-                wavelength_flag::Bool,  # Use wavelength in nm (true) or wavenumber cm-1 units (false)
-                pressure::Real,         # actual pressure [hPa]
-                temperature::Real,      # actual temperature [K] 
-                wing_cutoff::Real;      # Wing cutoff [cm -1]
-                vmr::Real=0,            # VMR of gas [0-1]
+                grid::Array{<:Real,1},        # Wavelength [nm] or wavenumber [cm-1] grid
+                pressure::Real,               # actual pressure [hPa]
+                temperature::Real;            # actual temperature [K] 
+                # Optionals
+                wavelength_flag::Bool=false,  # Use wavelength in nm (true) or wavenumber cm-1 units (false)
+                wing_cutoff::Real=40,         # Wing cutoff [cm -1]
+                vmr::Real=0,                  # VMR of gas [0-1]
                 CEF::AbstractComplexErrorFunction=ErfcErrorFunction() # Error function to use (if Voigt broadening)
                 )
 
@@ -61,7 +63,7 @@ function absorption_cross_section(
     result .= 0.0;
 
     # Convert to wavenumber from [nm] space if necessary
-    grid = wavelength_flag ? nm_per_m ./ grid : grid
+    grid = wavelength_flag ? reverse(nm_per_m ./ grid) : grid
 
     # Calculate the minimum and maximum grid bounds, including the wing cutoff
     grid_max = maximum(grid) + wing_cutoff
@@ -103,7 +105,7 @@ function absorption_cross_section(
             # Apply line intensity temperature corrections
             S = hitran.Sᵢ[j]
             if hitran.E″[j] != -1
-                qoft!(2,1,temperature,t_ref, rate)
+                qoft!(hitran.mol[j],hitran.iso[j],temperature,t_ref, rate)
                 S = S * rate[1] *
                         exp(c₂*hitran.E″[j]*(1/t_ref-1/temperature)) *
                         (1-exp(-c₂*hitran.νᵢ[j]/temperature))/(1-exp(-c₂*hitran.νᵢ[j]/t_ref));
@@ -143,33 +145,51 @@ function absorption_cross_section(
     return result
 end
 
+"""
+    $(FUNCTIONNAME)(model::HitranModel, grid::Array{<:Real,1}, wavelength_flag::Bool, pressure::Real, temperature::Real)
+
+Given a HitranModel, return the calculated absorption cross-section at the given pressure, 
+temperature, and grid of wavelengths (or wavenumbers)
+
+"""
 function absorption_cross_section(
-                model::HitranModel,     # Model to use in this cross section calculation 
-                                        # (Calculation from Hitran data vs. using Interpolator)
-                grid::Array{<:Real,1},  # Wavelength [nm] or wavenumber [cm-1] grid
-                wavelength_flag::Bool,  # Use wavelength in nm (true) or wavenumber cm-1 units (false)
-                pressure::Real,         # actual pressure [hPa]
-                temperature::Real       # actual temperature [K]           
+                # Required
+                model::HitranModel,          # Model to use in this cross section calculation 
+                                             # (Calculation from Hitran data vs. using Interpolator)
+                grid::AbstractRange{<:Real}, # Wavelength [nm] or wavenumber [cm-1] grid (modify using wavelength_flag)
+                pressure::Real,              # actual pressure [hPa]
+                temperature::Real,           # actual temperature [K]    
+                # Optionals
+                wavelength_flag::Bool=false  # Use wavelength in nm (true) or wavenumber cm-1 units (false)       
                 )
 
-    return absorption_cross_section(model.hitran, model.broadening, grid, wavelength_flag, pressure, temperature, model.wing_cutoff, vmr=model.vmr, CEF=model.CEF)
+    return compute_absorption_cross_section(model.hitran, model.broadening, collect(grid), pressure, temperature, wavelength_flag=wavelength_flag, wing_cutoff=model.wing_cutoff, vmr=model.vmr, CEF=model.CEF)
 
 end
 
+"""
+    $(FUNCTIONNAME)(model::InterpolationModel, grid::Array{<:Real,1}, wavelength_flag::Bool, pressure::Real, temperature::Real)
+
+Given an Interpolation Model, return the interpolated absorption cross-section at the given pressure, 
+temperature, and grid of wavelengths (or wavenumbers)
+
+"""
 function absorption_cross_section(
-    model::InterpolationModel,  # Model to use in this cross section calculation 
-                                # (Calculation from Interpolator vs. Hitran Data)
-    grid::Array{<:Real,1},      # Wavelength [nm] or wavenumber [cm-1] grid
-    wavelength_flag::Bool,      # Use wavelength in nm (true) or wavenumber cm-1 units (false)
-    pressure::Real,             # actual pressure [hPa]
-    temperature::Real,          # actual temperature [K]               
+    # Required
+    model::InterpolationModel,      # Model to use in this cross section calculation 
+                                    # (Calculation from Interpolator vs. Hitran Data)
+    grid::AbstractRange{<:Real},    # Wavelength [nm] or wavenumber [cm-1] grid
+    pressure::Real,                 # actual pressure [hPa]
+    temperature::Real,              # actual temperature [K]  
+    #Optionals 
+    wavelength_flag::Bool=false,    # Use wavelength in nm (true) or wavenumber cm-1 units (false)            
     )
 
     # Convert to wavenumber from [nm] space if necessary
-    grid = wavelength_flag ? nm_per_m ./ grid : grid
+    grid = wavelength_flag ? reverse(nm_per_m ./ collect(grid)) : collect(grid)
 
-    # TODO: Figure out how to turn grid arrays into ranges!
-    sitp = scale(model.itp,250:250:1250,100:75:400,6000:0.01:6400)
+    # Scale the interpolation to match the model grids
+    sitp = scale(model.itp, model.p_grid, model.t_grid, model.ν_grid)
 
     # Perform the interpolation and return the resulting grid
     return sitp(pressure, temperature, grid)

@@ -55,6 +55,26 @@ $(DocStringExtensions.FIELDS)
     g″::Array{FT,1}
 end
 
+#####
+##### Types of Broadening Functions
+##### Currently: Doppler, Lorentz, and Voigt
+#####
+
+"""
+    type AbstractBroadeningFunction
+Abstract Broadening Function type for generic line broadening function
+"""
+abstract type AbstractBroadeningFunction end
+
+"Doppler line broadening"
+struct Doppler <: AbstractBroadeningFunction end
+
+"Lorentz line broadening"
+struct Lorentz <: AbstractBroadeningFunction end
+
+"Voigt line broadening"
+struct Voigt <: AbstractBroadeningFunction end
+
 
 #####
 ##### Types of Complex Error Functions
@@ -86,27 +106,6 @@ struct ErfcHumliErrorFunctionSD  <: AbstractComplexErrorFunction end
 
 "erfc Special Function for Voigt"
 struct ErfcErrorFunction  <: AbstractComplexErrorFunction end
-
-
-#####
-##### Types of Broadening Functions
-##### Currently: Doppler, Lorentz, and Voigt
-#####
-
-"""
-    type AbstractBroadeningFunction
-Abstract Broadening Function type for generic line broadening function
-"""
-abstract type AbstractBroadeningFunction end
-
-"Doppler line broadening"
-struct Doppler <: AbstractBroadeningFunction end
-
-"Lorentz line broadening"
-struct Lorentz <: AbstractBroadeningFunction end
-
-"Voigt line broadening"
-struct Voigt <: AbstractBroadeningFunction end
 
 #####
 ##### Types of models that can be used to calculate an absorption cross-
@@ -140,7 +139,7 @@ $(DocStringExtensions.FIELDS)
     "VMR of gas itself [0-1]"
     vmr::Real
     "Complex Error Function to Use"
-    CEF::AbstractComplexErrorFunction = ErfcErrorFunction()
+    CEF::AbstractComplexErrorFunction
 
 end
 
@@ -158,26 +157,26 @@ $(DocStringExtensions.FIELDS)
     "The interpolator"
     itp
 
-    # Everything below is metadata associated with the interpolation"
+    # Everything below is metadata associated with the interpolator
 
     "The molecular species identification (ID) number"
     mol::Int
     "The isotopologue ID number"
     iso::Int
     "Broadening function (Doppler/Lorentz/Voigt), as a string"
-    broadening::String
+    broadening::AbstractBroadeningFunction
     "Wavelength grids"
-    ν_grid::Array{Float64,1}
+    ν_grid::AbstractRange{<:Real}
     "Wavelength grids"
-    p_grid::Array{Float64,1}
+    p_grid::AbstractRange{<:Real}
     "Wavelength grids"
-    t_grid::Array{Float64,1}
+    t_grid::AbstractRange{<:Real}
     "Wing cutoff [cm-1]"
     wing_cutoff::Real
     "VMR of gas itself [0-1]"
-    vmr::Real = 0
+    vmr::Real
     "Complex Error Function to Use"
-    CEF::AbstractComplexErrorFunction = ErfcErrorFunction()
+    CEF::AbstractComplexErrorFunction
 
 end
 

@@ -89,34 +89,33 @@ using ProgressMeter
         ####
 
         # Temperature and pressure grids. 
-        # Note that these are static -- the values are defined in generateHapiTests.py
+        # Note that these are pre-defined for testing -- the values are defined in generateHapiTests.py
         # To test against a different range, you must change the grids in that 
         # file and rerun it. Then, you can change it here. 
 
-        temperatures = [100, 175, 250, 325, 400]
-        pressures = [250, 500, 750, 1000, 1250]
+        pressures = 250:250:1250
+        temperatures = 100:75:400 
 
         # Get the test data
         test_ht = CrossSection.read_hitran("helper/CO2.data", ν_min=6000, ν_max=6400)
 
-        grid = collect(6000:0.01:6400);
+        grid = 6000:0.01:6400;
 
         # Threshold -- our value must be within ϵ of the HAPI value
         ϵ = 3.5e-27
 
         # Create a HitranModel 
-        model = HitranModel(hitran=test_ht, broadening=Voigt() , wing_cutoff=40 , vmr=0, CEF=ErfcHumliErrorFunctionVoigt())
+        model = make_hitran_model(test_ht, Voigt(), CEF=ErfcHumliErrorFunctionVoigt())
 
         # Loop over every temperature/pressure combo and test that the results match HAPI
         @showprogress 1 "Testing HAPI equivalence (HitranModel)..." for temp in temperatures
             for pres in pressures
-                jl_cs = absorption_cross_section(model, grid, false, pres, temp)
+                jl_cs = absorption_cross_section(model, grid, pres, temp)
                 py_cs = readdlm("helper/Voigt_CO2_T" * string(temp) * "_P" * string(pres) * ".csv")
                 Δcs = abs.(jl_cs - py_cs)
                 @test maximum(Δcs) < ϵ
             end
         end
-
     end
 
     # Test that absorption cross sections are calculated correctly 
@@ -128,17 +127,14 @@ using ProgressMeter
         test_ht = CrossSection.read_hitran("/home/rjeyaram/RadiativeTransfer/test/helper/CO2.data", ν_min=6000, ν_max=6400)
 
         # Pressure and temperature grids
-        pressures = [250, 500, 750, 1000, 1250]
-        temperatures = [100, 175, 250, 325, 400]
+        pressures = 250:250:1250
+        temperatures = 100:75:400 
 
         # Wavelength grid
-        ν_grid = collect(6000:0.01:6400)
+        ν_grid = 6000:0.01:6400
 
-        # Create a Hitran Model that the Interpolator Model can use to create interpolations
-        model = HitranModel(hitran=test_ht, broadening=Voigt() , wing_cutoff=40 , vmr=0, CEF=ErfcHumliErrorFunctionVoigt())
-
-        # Create the interpolation model
-        interp_model = make_interpolation_model(model, ν_grid, false, pressures, temperatures)
+        # Create the Interpolation Model
+       interp_model = make_interpolation_model(test_ht, Voigt(), ν_grid, pressures, temperatures, CEF=ErfcHumliErrorFunctionVoigt()) 
 
         # Threshold -- our value must be within ϵ of the HAPI value
         ϵ = 3.5e-27
@@ -146,7 +142,7 @@ using ProgressMeter
         # Loop over every temperature/pressure combo and test that the results match HAPI
         for temp in temperatures
             for pres in pressures
-                jl_cs = absorption_cross_section(interp_model, ν_grid, false, pres, temp)
+                jl_cs = absorption_cross_section(interp_model, ν_grid, pres, temp)
                 py_cs = readdlm("helper/Voigt_CO2_T" * string(temp) * "_P" * string(pres) * ".csv")
                 Δcs = abs.(jl_cs - py_cs)
                 @test maximum(Δcs) < ϵ
@@ -154,6 +150,5 @@ using ProgressMeter
         end
 
     end 
-
 
 end
