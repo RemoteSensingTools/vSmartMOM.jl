@@ -4,7 +4,7 @@
 #####
 
 using CUDA
-using RadiativeTransfer.Architectures
+using ..Architectures
 
 """
     struct HitranTable{FT}
