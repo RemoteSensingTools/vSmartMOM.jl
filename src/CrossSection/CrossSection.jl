@@ -5,8 +5,8 @@ using DocStringExtensions       # For simplifying docstring
 using Interpolations            # For interpolating in both lookup tables and qoft!
 using JLD2                      # For saving and loading the interpolator
 using ProgressMeter             # For showing progress, especially in creating the interpolator
-using KernelAbstractions
-using CUDA
+using KernelAbstractions        # For heterogeneous (GPU+CPU) programming
+using CUDA                      # For GPU programming
 
 include("constants.jl")         # Scientific and mathematical constants
 include("types.jl")             # All types used in this module
@@ -191,24 +191,28 @@ end
 ##### Lineshape functions that are called by absorption_cross_section
 #####
 
+# Doppler lineshape
 @kernel function line_shape!(A, @Const(grid), ν, γ_d, γ_l, y, S, ::Doppler, CEF)
     FT = eltype(ν)
     I = @index(Global, Linear)
     @inbounds A[I] += FT(S) * FT(cSqrtLn2divSqrtPi) * exp(-FT(cLn2) * ((FT(grid[I]) - FT(ν)) / FT(γ_d)) ^2) / FT(γ_d)
 end
 
+# Lorentz lineshape
 @kernel function line_shape!(A, @Const(grid), ν, γ_d, γ_l, y, S, ::Lorentz, CEF)
     FT = eltype(ν)
     I = @index(Global, Linear)
     @inbounds A[I] += FT(S) * FT(γ_l) / (FT(pi) * (FT(γ_l) ^2 + (FT(grid[I]) - FT(ν)) ^ 2))
 end
 
+# Voigt lineshape
 @kernel function line_shape!(A, @Const(grid), ν, γ_d, γ_l, y, S, ::Voigt, CEF)
     FT = eltype(ν)
     I = @index(Global, Linear)
     @inbounds A[I] += FT(S) * FT(cSqrtLn2divSqrtPi)/FT(γ_d) * real(w(CEF, FT(cSqrtLn2) / FT(γ_d) * (FT(grid[I]) - FT(ν)) + im * FT(y)))
 end
 
+# Call a lineshape above with Float32 parameters
 @kernel function line_shape32!(A, @Const(grid), ν, γ_d, γ_l, y, S, broadening, CEF)
     line_shape!(A, grid, Float32(ν), Float32(γ_d), Float32(γ_l), Float32(y), Float32(S), broadening, CEF)
 end
