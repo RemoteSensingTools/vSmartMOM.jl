@@ -5,7 +5,7 @@ using DocStringExtensions       # For simplifying docstring
 using Interpolations            # For interpolating in both lookup tables and qoft!
 using JLD2                      # For saving and loading the interpolator
 using ProgressMeter             # For showing progress, especially in creating the interpolator
-using ..Architectures: devi
+using ..Architectures: device
 
 include("constants.jl")         # Scientific and mathematical constants
 include("types.jl")             # All types used in this module
