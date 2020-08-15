@@ -168,39 +168,22 @@
 
 using Revise
 using Profile
-# using RadiativeTransfer
+using RadiativeTransfer
 using RadiativeTransfer.CrossSection
 
 using BenchmarkTools
 
-test_ht = read_hitran("/home/rjeyaram/RadiativeTransfer/test/helper/CO2.data", mol=2, iso=1, ν_min=6000, ν_max=6400)
+model4 = HitranModel("/home/rjeyaram/RadiativeTransfer/test/helper/CO2.data")
+model4_GPU = HitranModel("/home/rjeyaram/RadiativeTransfer/test/helper/CO2.data";  architecture=RadiativeTransfer.Architectures.GPU())
+
 
 const ν_grid = 6000:0.01:6400
 const p_grid = collect(1:25:1050)
 const t_grid = collect(200:10:380)
 
-const CEF = HumlicekWeidemann32VoigtErrorFunction()
+@btime absorption_cross_section(model4, ν_grid, 1000.1, 296.1)
+@btime absorption_cross_section(model4_GPU, ν_grid, 1000.1, 296.1)
 
-const model2 = HitranModel(hitran=test_ht, broadening=Doppler(), wing_cutoff=40, vmr=0)
 
-const model4 = HitranModel(hitran=test_ht, broadening=Voigt(), wing_cutoff=40, vmr=0, CEF=HumlicekWeidemann32VoigtErrorFunction())
-const model5 = HitranModel(hitran=test_ht, broadening=Voigt(), wing_cutoff=40, vmr=0, CEF=ErfcHumliErrorFunctionVoigt())
-const model6 = HitranModel(hitran=test_ht, broadening=Voigt(), wing_cutoff=40, vmr=0, CEF=HumlicekWeidemann32SDErrorFunction())
-# @code_warntype absorption_cross_section(test_ht, Voigt(CEF), collect(ν_grid), false, 1000.1, 296.1, 40, vmr=0)
-# @profview absorption_cross_section(test_ht, Voigt(CEF), collect(ν_grid), false, 1000.1, 296.1, 40, vmr=0)
-
-@btime a = absorption_cross_section(test_ht, Voigt(), CEF, collect(ν_grid), false, 1000.1, 296.1, 40, vmr=0)
-@benchmark absorption_cross_section(model4, collect(ν_grid), false, 1000.1, 296.1)
-
-# @time absorption_cross_section(test_ht, Voigt(CEF), collect(ν_grid), false, 1000.1, 296.1, 40, vmr=0)
-# @time absorption_cross_section(model, collect(ν_grid), false, 1000.1, 296.1)
-@time itp_model = make_interpolation_model(model4, collect(ν_grid), false, p_grid, t_grid)
-# @time save_interpolation_model(itp_model, "/home/rjeyaram/RadiativeTransfer/test/helper/saved_model.data")
-# itp_model_new = load_interpolation_model("/home/rjeyaram/RadiativeTransfer/test/helper/saved_model.data")
-
-using SpecialFunctions
-function testReturn(x::Real)
-    erfc(-1im*x)
-end
 
 @code_warntype testReturn(3)
