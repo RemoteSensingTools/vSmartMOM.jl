@@ -9,7 +9,10 @@ Read/parse a HITRAN data file and return the data in [`HitranTable`](@ref) forma
 
 """
 function read_hitran(filepath::String; mol::Int=-1, iso::Int=-1, ν_min::Real=0, ν_max::Real=Inf)
-    FT = typeof(ν_min)
+
+    # Infer type from input ν_min
+    FT = eltype(AbstractFloat(ν_min))
+
     # Declare some constant properties of the hitran line parameters, such as
     # names, lengths, and types
     varNames = ["molec_id", "local_iso_id", "nu", "sw", "a", "gamma_air",
@@ -17,9 +20,7 @@ function read_hitran(filepath::String; mol::Int=-1, iso::Int=-1, ν_min::Real=0,
                 "global_lower_quanta", "local_upper_quanta", "local_lower_quanta",
                 "ierr", "iref", "line_mixing_flag", "gp", "gpp"]
     varLengths = [2, 1, 12, 10, 10, 5, 5, 10, 4, 8, 15, 15, 15, 15, 6, 12, 1, 7, 7]
-    varTypes = [Int64, Int64, FT, FT, FT, FT, FT,
-    FT, FT, FT, String, String, String, String,
-                String, String, String, FT, FT]
+    varTypes = [Int64, Int64, FT, FT, FT, FT, FT, FT, FT, FT, String, String, String, String, String, String, String, FT, FT]
 
     # Take the line parameters' lengths and assemble an index-ranges list
     # Each value is the starting index, minus 1, of var i and ending index of var i-1
@@ -61,7 +62,13 @@ function read_hitran(filepath::String; mol::Int=-1, iso::Int=-1, ν_min::Real=0,
 
 end
 
-"""Convenience function to make a HitranModel out of the parameters (Mainly to match make_interpolation_model)"""
-function make_hitran_model(hitran::HitranTable, broadening::AbstractBroadeningFunction; wing_cutoff::Real=40, vmr::Real=0, CEF::AbstractComplexErrorFunction=HumlicekWeidemann32SDErrorFunction())
-    return HitranModel(hitran=hitran, broadening=broadening , wing_cutoff=wing_cutoff , vmr=vmr, CEF=CEF)
+"""Convenience function to make a HitranModel out of the parameters (Matches make_interpolation_model)"""
+function make_hitran_model(hitran::HitranTable, 
+                           broadening::AbstractBroadeningFunction; 
+                           wing_cutoff::Real=40, 
+                           vmr::Real=0, 
+                           CEF::AbstractComplexErrorFunction=HumlicekWeidemann32SDErrorFunction(), 
+                           architecture = Architectures.CPU())
+    
+    return HitranModel(hitran=hitran, broadening=broadening , wing_cutoff=wing_cutoff , vmr=vmr, CEF=CEF, architecture=architecture)
 end

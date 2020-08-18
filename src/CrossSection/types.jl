@@ -131,42 +131,34 @@ calculations using HITRAN data
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-mutable struct HitranModel{H, A<:AbstractArchitecture, AB, FT, CF } <: AbstractCrossSectionModel
-        hitran :: H     # Struct with hitran data
-  architecture :: A     # Computer `Architecture` on which `Model` is run
-    broadening :: AB    # Broadening function (Doppler/Lorentz/Voigt)
-   wing_cutoff :: FT    # Wing cutoff [cm-1]
-           vmr :: FT    # VMR of gas itself [0-1]
-           CEF :: CF    # "Complex Error Function to Use"
-           mol :: Int   # Molecule number
-           iso :: Int   # Isotope number 
-         ν_min :: FT    # min wavenumber (cm-1)
-         ν_max :: FT    # max wavenumber (cm-1)
+@with_kw struct HitranModel <: AbstractCrossSectionModel
+
+    "Struct with hitran data"
+    hitran::HitranTable
+    "Broadening function (Doppler/Lorentz/Voigt)"
+    broadening::AbstractBroadeningFunction
+    "Wing cutoff [cm-1]"
+    wing_cutoff::Real
+    "VMR of gas itself [0-1]"
+    vmr::Real
+    "Complex Error Function to Use"
+    CEF::AbstractComplexErrorFunction
+    "Computer `Architecture` on which `Model` is run"
+    architecture::AbstractArchitecture 
 end
 
-function HitranModel(hitran_file;
-architecture = Architectures.CPU(),
-FT   = Float64,
-mol=2, 
-iso=-1, 
-ν_min=6000, 
-ν_max=6400,
-wing_cutoff  = 40.0,
-vmr          = 0.0,
-CEF          = HumlicekWeidemann32SDErrorFunction(),
-broadening   = Voigt()
-)
-
-if architecture == Architectures.GPU() && !has_cuda()
-   throw(ArgumentError("Cannot create a GPU model. No CUDA-enabled GPU was detected!"))
-end
-
-ht = read_hitran(hitran_file, mol=mol, iso=iso, ν_min=FT(ν_min), ν_max=FT(ν_max))
-
-return HitranModel(ht, architecture, broadening, FT(wing_cutoff), FT(vmr), CEF, mol,iso,FT(ν_min), FT(ν_max))
-end
-
-
+# @with_kw struct HitranModel{H, A<:AbstractArchitecture, AB, FT, CF } <: AbstractCrossSectionModel
+#         hitran :: H     # Struct with hitran data
+#     broadening :: AB    # Broadening function (Doppler/Lorentz/Voigt)
+#    wing_cutoff :: FT    # Wing cutoff [cm-1]
+#            vmr :: FT    # VMR of gas itself [0-1]
+#            CEF :: CF    # "Complex Error Function to Use"
+#            mol :: Int   # Molecule number
+#            iso :: Int   # Isotope number 
+#          ν_min :: FT    # min wavenumber (cm-1)
+#          ν_max :: FT    # max wavenumber (cm-1)
+#   architecture :: A     # Computer `Architecture` on which `Model` is run
+# end
 
 """
     struct InterpolationModel{FT}
@@ -202,6 +194,8 @@ $(DocStringExtensions.FIELDS)
     vmr::Real
     "Complex Error Function to Use"
     CEF::AbstractComplexErrorFunction
+    "Computer `Architecture` on which `Model` is run"
+    architecture::AbstractArchitecture     
 
 end
 

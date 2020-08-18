@@ -40,6 +40,4 @@ export HitranTable
 # Export the interpolator functions
 export make_interpolation_model, save_interpolation_model, load_interpolation_model
 
-
-
 end

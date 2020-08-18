@@ -173,17 +173,17 @@ using RadiativeTransfer.CrossSection
 
 using BenchmarkTools
 
-model4 = HitranModel("/home/rjeyaram/RadiativeTransfer/test/helper/CO2.data")
-model4_GPU = HitranModel("/home/rjeyaram/RadiativeTransfer/test/helper/CO2.data";  architecture=RadiativeTransfer.Architectures.GPU())
+test_ht = read_hitran("/home/rjeyaram/RadiativeTransfer/test/helper/CO2.data", ν_min=6000, ν_max=6400)
+
+model4 = make_hitran_model(test_ht, Voigt(), architecture = Architectures.CPU())
+model4_GPU = make_hitran_model(test_ht, Voigt(), architecture = Architectures.GPU())
 
 
 const ν_grid = 6000:0.01:6400
-const p_grid = collect(1:25:1050)
-const t_grid = collect(200:10:380)
 
 @btime absorption_cross_section(model4, ν_grid, 1000.1, 296.1)
 @btime absorption_cross_section(model4_GPU, ν_grid, 1000.1, 296.1)
 
-
+@time absorption_cross_section(model4_GPU, ν_grid, 1000.1, 296.1)
 
 @code_warntype testReturn(3)

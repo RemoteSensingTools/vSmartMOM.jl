@@ -12,16 +12,19 @@ temperature, and grid of wavelengths (or wavenumbers)
 """
 function compute_absorption_cross_section(
                 #Required
-                model::HitranModel,          # Model to use in this cross section calculation  (Calculation from Hitran data vs. using Interpolator)
-                grid::Array{<:Real,1},       # Wavelength [nm] or wavenumber [cm-1] grid
-                pressure::Real,              # actual pressure [hPa]
-                temperature::Real;           # actual temperature [K] 
+                hitran::HitranTable,          # Model to use in this cross section calculation 
+                                              # (Calculation from Hitran data vs. using Interpolator)
+                broadening::AbstractBroadeningFunction, # Broadening function to use
+                grid::Array{<:Real,1},        # Wavelength [nm] or wavenumber [cm-1] grid
+                pressure::Real,               # actual pressure [hPa]
+                temperature::Real;            # actual temperature [K] 
                 # Optionals
-                wavelength_flag::Bool=false  # Use wavelength in nm (true) or wavenumber cm-1 units (false)
+                wavelength_flag::Bool=false,  # Use wavelength in nm (true) or wavenumber cm-1 units (false)
+                wing_cutoff::Real=40,         # Wing cutoff [cm -1]
+                vmr::Real=0,                  # VMR of gas [0-1]
+                CEF::AbstractComplexErrorFunction=ErfcErrorFunction(), # Error function to use (if Voigt broadening)
+                architecture::AbstractArchitecture=Architectures.CPU()
                 )
-    
-    @unpack hitran, broadening, architecture, CEF, wing_cutoff, vmr  = model
-   
 
     # Store results here to return
     gridC = array_type(architecture)(grid);
@@ -88,12 +91,12 @@ function compute_absorption_cross_section(
             grid_view     = view(gridC   ,ind_start:ind_stop);
 
             # Kernel for performing the lineshape calculation
-            kernel! = line_shape!(device )
+            kernel! = line_shape!(device)
 
             # Run the event on the kernel 
             # That this, this function adds to each element in result, the contribution from this transition
             event = kernel!(result_view, grid_view, ν, γ_d, γ_l, y, S, broadening, CEF, ndrange=length(grid_view))
-            wait(device ,event)
+            wait(device, event)
         end
     end
 
@@ -118,8 +121,8 @@ function absorption_cross_section(
                 # Optionals
                 wavelength_flag::Bool=false  # Use wavelength in nm (true) or wavenumber cm-1 units (false)       
                 )
-    FT = typeof(model.vmr)
-    return compute_absorption_cross_section(model, collect(FT,grid), pressure, temperature, wavelength_flag=wavelength_flag)
+    FT = typeof(AbstractFloat(model.vmr))
+    return compute_absorption_cross_section(model.hitran, model.broadening, collect(grid), pressure, temperature, wavelength_flag=wavelength_flag, wing_cutoff=model.wing_cutoff, vmr=model.vmr, CEF=model.CEF, architecture=model.architecture)
 
 end
 

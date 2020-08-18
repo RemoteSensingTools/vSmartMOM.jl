@@ -1,8 +1,6 @@
 module RadiativeTransfer
 
-export
-    # Architectures
-    CPU, GPU,device
+export Architectures, CPU, GPU,device
 
 # Export the Cross Section models
 export HitranModel, InterpolationModel

@@ -20,7 +20,8 @@ function make_interpolation_model(
                                   wavelength_flag::Bool=false,
                                   wing_cutoff::Real=40, 
                                   vmr::Real=0, 
-                                  CEF::AbstractComplexErrorFunction=HumlicekWeidemann32SDErrorFunction()
+                                  CEF::AbstractComplexErrorFunction=HumlicekWeidemann32SDErrorFunction(),
+                                  architecture::AbstractArchitecture=Architectures.CPU()     # Computer `Architecture` on which `Model` is run
                                 )
 
     # Convert from wavelength to wavenumber if necessary
@@ -32,7 +33,7 @@ function make_interpolation_model(
     # Calculate all the cross-sections at the pressure and temperature grids
     @showprogress 1 "Computing Cross Sections for Interpolation..." for i in 1:length(p_grid)
         for j in 1:length(t_grid)
-            cs_matrix[i,j,:] = compute_absorption_cross_section(hitran, broadening, collect(ν_grid), p_grid[i], t_grid[j], wavelength_flag=wavelength_flag, wing_cutoff=wing_cutoff, vmr=vmr, CEF=CEF)
+            cs_matrix[i,j,:] = compute_absorption_cross_section(hitran, broadening, collect(ν_grid), p_grid[i], t_grid[j], wavelength_flag=wavelength_flag, wing_cutoff=wing_cutoff, vmr=vmr, CEF=CEF, architecture=architecture)
         end
     end
     
@@ -44,7 +45,7 @@ function make_interpolation_model(
     iso = all(x->x==hitran.iso[1], hitran.iso) ? hitran.iso[1] : -1
 
     # Return the interpolation model with all the proper parameters
-    return InterpolationModel(itp, mol, iso, broadening, ν_grid, p_grid, t_grid, wing_cutoff, vmr, CEF)
+    return InterpolationModel(itp, mol, iso, broadening, ν_grid, p_grid, t_grid, wing_cutoff, vmr, CEF, architecture)
 end
 
 """ Convenience function to save an InterpolationModel at a specified filepath (Using JLD2) """
