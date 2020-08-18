@@ -120,6 +120,24 @@ using ProgressMeter
                 @test maximum(Δcs) < ϵ
             end
         end
+
+        # Loop over every temperature/pressure combo and test that the results match HAPI
+        # (Doing this for other molecules)
+        # @showprogress 1 "Testing HAPI equivalence (Other Molecules)..." for name in names
+
+        #     pres = 1000
+        #     temp = 250
+
+        #     # Get the test data
+        #     test_ht = CrossSection.read_hitran("helper/" * name * ".data", ν_min=6000, ν_max=6400)
+        #     # Create a HitranModel 
+        #     model = make_hitran_model(test_ht, Voigt(), CEF=ErfcHumliErrorFunctionVoigt())
+
+        #     jl_cs = absorption_cross_section(model, grid, pres, temp)
+        #     py_cs = readdlm("helper/Voigt_" * name * "_T250_P1000.csv")
+        #     Δcs = abs.(jl_cs - py_cs)
+        #     @test maximum(Δcs) < ϵ
+        # end
     end
 
     # Test that absorption cross sections are calculated correctly 
@@ -127,7 +145,7 @@ using ProgressMeter
 
     @testset "absorption_cross_section_interpolator" begin
 
-    println("Testing absorption_cross_section_interpolator...")
+        println("Testing absorption_cross_section_interpolator...")
 
         # Get the test data
         test_ht = CrossSection.read_hitran("/home/rjeyaram/RadiativeTransfer/test/helper/CO2.data", ν_min=6000, ν_max=6400)

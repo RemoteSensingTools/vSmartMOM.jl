@@ -135,13 +135,9 @@ function AtoB(aa,A,B,npt)
         bb = A0*B[J-2] + A1*B[J-1] + A2*B[J] + A3*B[J+1]
 
         return bb
-
       end
-
       break
-
     end
-
   end
 
   return bb
@@ -163,7 +159,6 @@ function qoft!(M, I, T,T_ref, result; TT_=TIPS_2017_ISOT_HASH_CONST, TQ_ = TIPS_
     # Interpolate partition sum for specified isotopologue
     # Lagrange interpolation from HAPI for now -- will eventually replace with
     # Interpolations.jl function
-    # Qt = LinearInterpolation(grid, 1:1:length(grid),extrapolation_bc = 1); AtoB(T,TT,TQ,length(TT))
     # LI = LinearInterpolation(TT, TQ, extrapolation_bc=NaN)
     Qt = AtoB(T,TT,TQ,length(TT))
     Qt2 = AtoB(T_ref,TT,TQ,length(TT))
