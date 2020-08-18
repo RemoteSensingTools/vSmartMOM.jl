@@ -148,7 +148,7 @@ using ProgressMeter
         println("Testing absorption_cross_section_interpolator...")
 
         # Get the test data
-        test_ht = CrossSection.read_hitran("/home/rjeyaram/RadiativeTransfer/test/helper/CO2.data", ν_min=6000, ν_max=6400)
+        test_ht = CrossSection.read_hitran("helper/CO2.data", ν_min=6000, ν_max=6400)
 
         # Pressure and temperature grids
         pressures = 250:250:1250
