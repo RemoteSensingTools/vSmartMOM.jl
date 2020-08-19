@@ -1,2 +1,322 @@
 [hitran]
 git-tree-sha1 = "9fb2bde5493edee9217e83a9847dd2c00b535cfa"
+
+[hitran_molec_id_10_NO2]
+git-tree-sha1 = "80bf2e9e09f2592ce53b0c0fc8e6f2cb087df0ee"
+lazy = true
+
+    [[hitran_molec_id_10_NO2.download]]
+    sha256 = "0a387230a0c99fb9386d0ec1f3ae3c7250306570cf2e0d4a62fd2235439c31e7"
+    url = "ftp://fluo.gps.caltech.edu/XYZT_hitran/hitran_molec_id_10_NO2.tar.gz"
+
+[hitran_molec_id_11_NH3]
+git-tree-sha1 = "a82f5a1596dc4290bbe28deffe9fef19fb0cbc50"
+lazy = true
+
+    [[hitran_molec_id_11_NH3.download]]
+    sha256 = "82abcaafa78c9ae07323f60ce479d7f38cee5473d9fd708adc2689c776910e9a"
+    url = "ftp://fluo.gps.caltech.edu/XYZT_hitran/hitran_molec_id_11_NH3.tar.gz"
+
+[hitran_molec_id_12_HNO3]
+git-tree-sha1 = "87b62a8a207cca3e14ef3e06243641f32dc49889"
+lazy = true
+
+    [[hitran_molec_id_12_HNO3.download]]
+    sha256 = "9b59068c79dc8cd0d9d398256f76635a30b870f597ce8a9cb1c20093d59a5950"
+    url = "ftp://fluo.gps.caltech.edu/XYZT_hitran/hitran_molec_id_12_HNO3.tar.gz"
+
+[hitran_molec_id_13_OH]
+git-tree-sha1 = "0a35f9d2ed816dd7c737b69ee365e568219bb9e0"
+lazy = true
+
+    [[hitran_molec_id_13_OH.download]]
+    sha256 = "b1594658d8687d4dc96957a85b564b506b0296162de27526f44b13736125feee"
+    url = "ftp://fluo.gps.caltech.edu/XYZT_hitran/hitran_molec_id_13_OH.tar.gz"
+
+[hitran_molec_id_14_HF]
+git-tree-sha1 = "8c985b23504e98a4987169729cf4baff2f446670"
+lazy = true
+
+    [[hitran_molec_id_14_HF.download]]
+    sha256 = "58ba418a9333ca9eb9803bcce2ffa870539afa9be1b501ef9ca704c024b14f7c"
+    url = "ftp://fluo.gps.caltech.edu/XYZT_hitran/hitran_molec_id_14_HF.tar.gz"
+
+[hitran_molec_id_15_HCl]
+git-tree-sha1 = "0f3910f483ec93c28966af24f8df191273ba42d4"
+lazy = true
+
+    [[hitran_molec_id_15_HCl.download]]
+    sha256 = "91dd2775d96489ce5f72d1c890fcc65d9703b491e41e9e50fa5c54d17d26955e"
+    url = "ftp://fluo.gps.caltech.edu/XYZT_hitran/hitran_molec_id_15_HCl.tar.gz"
+
+[hitran_molec_id_16_HBr]
+git-tree-sha1 = "16b122595b8b1f62ad6b6c80afd8883ad4110ccf"
+lazy = true
+
+    [[hitran_molec_id_16_HBr.download]]
+    sha256 = "53a4c75d5533282718be9e40bc62cdcf7463255d7b581be5494872f886171cc9"
+    url = "ftp://fluo.gps.caltech.edu/XYZT_hitran/hitran_molec_id_16_HBr.tar.gz"
+
+[hitran_molec_id_17_HI]
+git-tree-sha1 = "2e90414da959c2ea31e433565d01baa89a966868"
+lazy = true
+
+    [[hitran_molec_id_17_HI.download]]
+    sha256 = "09ab0b700cb5ab773deab288742b1be5f38cf252d39246ed2fa70849e8f09385"
+    url = "ftp://fluo.gps.caltech.edu/XYZT_hitran/hitran_molec_id_17_HI.tar.gz"
+
+[hitran_molec_id_18_ClO]
+git-tree-sha1 = "5a3fa3bf9ed2455573137c3c188beb5b0613af4b"
+lazy = true
+
+    [[hitran_molec_id_18_ClO.download]]
+    sha256 = "97bd8dafdbb6f14846b7b1aeec9f211362b6c9bccceaab866a1d0ef00ca05c0d"
+    url = "ftp://fluo.gps.caltech.edu/XYZT_hitran/hitran_molec_id_18_ClO.tar.gz"
+
+[hitran_molec_id_19_OCS]
+git-tree-sha1 = "87d8c6de532d90481a72fe56b0cb0df60032cabc"
+lazy = true
+
+    [[hitran_molec_id_19_OCS.download]]
+    sha256 = "0023f618a236ace32fb71589168d096a25332b98d535458a747ac63c06190426"
+    url = "ftp://fluo.gps.caltech.edu/XYZT_hitran/hitran_molec_id_19_OCS.tar.gz"
+
+[hitran_molec_id_1_H2O]
+git-tree-sha1 = "738b53c3ad6f795ebae1f9af6642f7b04efba4d6"
+lazy = true
+
+    [[hitran_molec_id_1_H2O.download]]
+    sha256 = "713aa0ac571d9656de383b4d55754d0e459981a360ba12b36adf99947ee49148"
+    url = "ftp://fluo.gps.caltech.edu/XYZT_hitran/hitran_molec_id_1_H2O.tar.gz"
+
+[hitran_molec_id_20_H2CO]
+git-tree-sha1 = "2d658b942566ff2b763f59e1e1a80f79a9f30855"
+lazy = true
+
+    [[hitran_molec_id_20_H2CO.download]]
+    sha256 = "cf90dfab5e3f6fea9d6d4c18a593e77394adc32499fb52780954a3bbcc8397d7"
+    url = "ftp://fluo.gps.caltech.edu/XYZT_hitran/hitran_molec_id_20_H2CO.tar.gz"
+
+[hitran_molec_id_21_HOCl]
+git-tree-sha1 = "a36c6e2ff41ddc34db81ccf04eb4b95c93fd201c"
+lazy = true
+
+    [[hitran_molec_id_21_HOCl.download]]
+    sha256 = "ecf62e03c178024538e98930d0e0b6279ca15b104c84828d5058338be97e6569"
+    url = "ftp://fluo.gps.caltech.edu/XYZT_hitran/hitran_molec_id_21_HOCl.tar.gz"
+
+[hitran_molec_id_22_N2]
+git-tree-sha1 = "5fb2ee8bd79de88bc65d42030ceb34c798be98a3"
+lazy = true
+
+    [[hitran_molec_id_22_N2.download]]
+    sha256 = "1e9a89499c42b53cb94e0a248a3688a1291f3ccef21af331a0b02000a01f364b"
+    url = "ftp://fluo.gps.caltech.edu/XYZT_hitran/hitran_molec_id_22_N2.tar.gz"
+
+[hitran_molec_id_23_HCN]
+git-tree-sha1 = "e9578a691291ad5cd824aa18c169c7583ffe2d79"
+lazy = true
+
+    [[hitran_molec_id_23_HCN.download]]
+    sha256 = "1fee09596c2e21d98cb88cbaede1cfdef8c7a832165af66c41daaec93abc68bd"
+    url = "ftp://fluo.gps.caltech.edu/XYZT_hitran/hitran_molec_id_23_HCN.tar.gz"
+
+[hitran_molec_id_24_CH3Cl]
+git-tree-sha1 = "4a2a3577d2fa112dc6e9098d7b37f2fb84d528ae"
+lazy = true
+
+    [[hitran_molec_id_24_CH3Cl.download]]
+    sha256 = "2fbf74c273d6a8f6d6b506f8cb47406d3109147f634803c63a7b9d89e15b036d"
+    url = "ftp://fluo.gps.caltech.edu/XYZT_hitran/hitran_molec_id_24_CH3Cl.tar.gz"
+
+[hitran_molec_id_25_H2O2]
+git-tree-sha1 = "ffbf19b1f44fce14bcb59ecf46b5a8711fe64175"
+lazy = true
+
+    [[hitran_molec_id_25_H2O2.download]]
+    sha256 = "32c55557ffab4a0f1f68805f7d90b43e2142093b08ffcc1c4a027c1c15a6a841"
+    url = "ftp://fluo.gps.caltech.edu/XYZT_hitran/hitran_molec_id_25_H2O2.tar.gz"
+
+[hitran_molec_id_26_C2H2]
+git-tree-sha1 = "2f16168d3c88a2e1e27219503cb8c5957e080747"
+lazy = true
+
+    [[hitran_molec_id_26_C2H2.download]]
+    sha256 = "a89380d5d7785b3ee9df8d6176ee4502a347e90e68a69b3f00195e71b23f5732"
+    url = "ftp://fluo.gps.caltech.edu/XYZT_hitran/hitran_molec_id_26_C2H2.tar.gz"
+
+[hitran_molec_id_27_C2H6]
+git-tree-sha1 = "2551c5d408d1ffe0a508cd08cf164aef4028417c"
+lazy = true
+
+    [[hitran_molec_id_27_C2H6.download]]
+    sha256 = "9baab04c7a24c42185d4b9d6cfd1c22e647688fcb51b9d13556c4800b74a3e74"
+    url = "ftp://fluo.gps.caltech.edu/XYZT_hitran/hitran_molec_id_27_C2H6.tar.gz"
+
+[hitran_molec_id_28_PH3]
+git-tree-sha1 = "7ed04d3457af8fb082ee2ddd5c40f294defa084a"
+lazy = true
+
+    [[hitran_molec_id_28_PH3.download]]
+    sha256 = "d3078299118c5185459b4eaa16dd90f4c216fab60fea01439cea0a6f98c98d4e"
+    url = "ftp://fluo.gps.caltech.edu/XYZT_hitran/hitran_molec_id_28_PH3.tar.gz"
+
+[hitran_molec_id_29_COF2]
+git-tree-sha1 = "e644a7b750124ca52508c461654d09f63c104489"
+lazy = true
+
+    [[hitran_molec_id_29_COF2.download]]
+    sha256 = "bea4a23018d185955fc9fabfb85953f196e0e9880572541f99b5fc93372d2cbd"
+    url = "ftp://fluo.gps.caltech.edu/XYZT_hitran/hitran_molec_id_29_COF2.tar.gz"
+
+[hitran_molec_id_2_CO2]
+git-tree-sha1 = "bd1208b6552fe1d2c7419043680ba0b7486062a6"
+lazy = true
+
+    [[hitran_molec_id_2_CO2.download]]
+    sha256 = "15e3ab6a188ed659ac89955bb9c938f36b096817c9c154547ee504f7df47d007"
+    url = "ftp://fluo.gps.caltech.edu/XYZT_hitran/hitran_molec_id_2_CO2.tar.gz"
+
+[hitran_molec_id_31_H2S]
+git-tree-sha1 = "267bcf6a281f0212a15bac1f1b634d6f248fa654"
+lazy = true
+
+    [[hitran_molec_id_31_H2S.download]]
+    sha256 = "9a6e55f1fdb959a83cfd4743adabc51ee5ff290b59035f8ff0e47d042a713ff4"
+    url = "ftp://fluo.gps.caltech.edu/XYZT_hitran/hitran_molec_id_31_H2S.tar.gz"
+
+[hitran_molec_id_32_HCOOH]
+git-tree-sha1 = "1a634910a7e7d9dda697a7d211fad54483d1f250"
+lazy = true
+
+    [[hitran_molec_id_32_HCOOH.download]]
+    sha256 = "2cd3b5225ae4f2bfb7e77497407fb86dd9f5a425b08438681ba1a66dd847b9a4"
+    url = "ftp://fluo.gps.caltech.edu/XYZT_hitran/hitran_molec_id_32_HCOOH.tar.gz"
+
+[hitran_molec_id_33_HO2]
+git-tree-sha1 = "c0e37e9be99645dc33f388b319d1b2c912b16554"
+lazy = true
+
+    [[hitran_molec_id_33_HO2.download]]
+    sha256 = "d474187a8ccde56856cbc54eef7197e6419900574a3e4838f9d0ba21c4f04854"
+    url = "ftp://fluo.gps.caltech.edu/XYZT_hitran/hitran_molec_id_33_HO2.tar.gz"
+
+[hitran_molec_id_34_O]
+git-tree-sha1 = "901406cdf27279622f89a17558b8236015172175"
+lazy = true
+
+    [[hitran_molec_id_34_O.download]]
+    sha256 = "906c694163edbae2c4414bcafa19fc7b851979246e63d26bd453ba85f2fa5d4b"
+    url = "ftp://fluo.gps.caltech.edu/XYZT_hitran/hitran_molec_id_34_O.tar.gz"
+
+[hitran_molec_id_36_NOp]
+git-tree-sha1 = "4a8eb1a14a185eb0e4332f67a55bad708862a705"
+lazy = true
+
+    [[hitran_molec_id_36_NOp.download]]
+    sha256 = "94cb1f260292ad45f5ce0a26cd00f3979e0e42674d4e8850290a9392e692001f"
+    url = "ftp://fluo.gps.caltech.edu/XYZT_hitran/hitran_molec_id_36_NOp.tar.gz"
+
+[hitran_molec_id_37_HOBr]
+git-tree-sha1 = "02dce84e305f08bc8580d8f180625cd0694cb65b"
+lazy = true
+
+    [[hitran_molec_id_37_HOBr.download]]
+    sha256 = "e1ee65b23e9d83b6d98792416cde0f5634b313e2fdae793b746f55cda892766d"
+    url = "ftp://fluo.gps.caltech.edu/XYZT_hitran/hitran_molec_id_37_HOBr.tar.gz"
+
+[hitran_molec_id_38_C2H4]
+git-tree-sha1 = "bb4c108ca89ade9a278bf243811026e2b99d35a7"
+lazy = true
+
+    [[hitran_molec_id_38_C2H4.download]]
+    sha256 = "376f845f6d486c20410fea08bb8e0da55ca902612cde892b7ea2de2c897b0b67"
+    url = "ftp://fluo.gps.caltech.edu/XYZT_hitran/hitran_molec_id_38_C2H4.tar.gz"
+
+[hitran_molec_id_39_CH3OH]
+git-tree-sha1 = "b7cf31a2cbae8742d6652e40235c033d8b00dfec"
+lazy = true
+
+    [[hitran_molec_id_39_CH3OH.download]]
+    sha256 = "b0b4a44b6e059b5b4404d7354a3e505b9149cff0a040f85b4f0724fbada260c0"
+    url = "ftp://fluo.gps.caltech.edu/XYZT_hitran/hitran_molec_id_39_CH3OH.tar.gz"
+
+[hitran_molec_id_3_O3]
+git-tree-sha1 = "c2c28f36f479d91e3818d5e9133bcd6cba992bf2"
+lazy = true
+
+    [[hitran_molec_id_3_O3.download]]
+    sha256 = "3159ddd10058b0957cf999859a8b84a5ca637503f8d19aeda4cc1be43eca4242"
+    url = "ftp://fluo.gps.caltech.edu/XYZT_hitran/hitran_molec_id_3_O3.tar.gz"
+
+[hitran_molec_id_40_CH3Br]
+git-tree-sha1 = "9da577ecb9a53c507aedb7eb6e447ab469718c7b"
+lazy = true
+
+    [[hitran_molec_id_40_CH3Br.download]]
+    sha256 = "91c500c7e844044597befd740123f200358532bbab5e1045d1ff4f9568bab312"
+    url = "ftp://fluo.gps.caltech.edu/XYZT_hitran/hitran_molec_id_40_CH3Br.tar.gz"
+
+[hitran_molec_id_41_CH3CN]
+git-tree-sha1 = "164146faf7844be6324cdee00fc5f149c9776e01"
+lazy = true
+
+    [[hitran_molec_id_41_CH3CN.download]]
+    sha256 = "7dbb1656bb6a01753916bcbde5b7b0b6f215965dac45ae63a45c2a60ea583532"
+    url = "ftp://fluo.gps.caltech.edu/XYZT_hitran/hitran_molec_id_41_CH3CN.tar.gz"
+
+[hitran_molec_id_49_COCl2]
+git-tree-sha1 = "e4cef38f7f4aac3a45e3f6a1d38fb186ff16b164"
+lazy = true
+
+    [[hitran_molec_id_49_COCl2.download]]
+    sha256 = "072af5ef8aed65b46a38b316accea04d36422f003e724634581f66cd020bcf02"
+    url = "ftp://fluo.gps.caltech.edu/XYZT_hitran/hitran_molec_id_49_COCl2.tar.gz"
+
+[hitran_molec_id_4_N2O]
+git-tree-sha1 = "50cd7506415bf23b906917fb9ffa43a89030f587"
+lazy = true
+
+    [[hitran_molec_id_4_N2O.download]]
+    sha256 = "7d3c39dc4d512d49755ad3909c4baa5c1edddd246c386342ad7b75482cc1b0ff"
+    url = "ftp://fluo.gps.caltech.edu/XYZT_hitran/hitran_molec_id_4_N2O.tar.gz"
+
+[hitran_molec_id_5_CO]
+git-tree-sha1 = "36666454592523a1dcb1acc60be2430d0fdfec4e"
+lazy = true
+
+    [[hitran_molec_id_5_CO.download]]
+    sha256 = "ccbcab27c7f22bd866c8f31ca1bbd9c801c4c5d67519ba7f4e712d5f97e85549"
+    url = "ftp://fluo.gps.caltech.edu/XYZT_hitran/hitran_molec_id_5_CO.tar.gz"
+
+[hitran_molec_id_6_CH4]
+git-tree-sha1 = "d62e9581682e7b509e6b634e88600746ae37ed67"
+lazy = true
+
+    [[hitran_molec_id_6_CH4.download]]
+    sha256 = "82f290c6c1d50b54cf7a161089376253a1e93221f3a4de4e6b629c14eda009df"
+    url = "ftp://fluo.gps.caltech.edu/XYZT_hitran/hitran_molec_id_6_CH4.tar.gz"
+
+[hitran_molec_id_7_O2]
+git-tree-sha1 = "50a1eed75de2de99f58510ad8122318dc60b47d1"
+lazy = true
+
+    [[hitran_molec_id_7_O2.download]]
+    sha256 = "ac99b06656f7cce6bd4b015d2b6121f572f6c488747e679750736418507d9032"
+    url = "ftp://fluo.gps.caltech.edu/XYZT_hitran/hitran_molec_id_7_O2.tar.gz"
+
+[hitran_molec_id_8_NO]
+git-tree-sha1 = "dfd98e07e12accacb4977b91922fb4bcf1a6e74a"
+lazy = true
+
+    [[hitran_molec_id_8_NO.download]]
+    sha256 = "a6be51bec00f3afcbe9e13194ab57be07147e6c8e2746660ad3106e49df4b1ad"
+    url = "ftp://fluo.gps.caltech.edu/XYZT_hitran/hitran_molec_id_8_NO.tar.gz"
+
+[hitran_molec_id_9_SO2]
+git-tree-sha1 = "1b39a70ddad15a0fb12fc639f7e1e9108d42c518"
+lazy = true
+
+    [[hitran_molec_id_9_SO2.download]]
+    sha256 = "b4a9f106ee8b3722f8f27e69579a5cdd697f14ad8e61c8c0ab6303b7955ca8c1"
+    url = "ftp://fluo.gps.caltech.edu/XYZT_hitran/hitran_molec_id_9_SO2.tar.gz"
