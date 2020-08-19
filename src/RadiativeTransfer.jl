@@ -1,4 +1,5 @@
 module RadiativeTransfer
+using Pkg.Artifacts
 
 export Architectures, CPU, GPU,device
 
