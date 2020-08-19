@@ -112,7 +112,7 @@ using ProgressMeter
         model = make_hitran_model(test_ht, Voigt(), CEF=ErfcHumliErrorFunctionVoigt())
 
         # Loop over every temperature/pressure combo and test that the results match HAPI
-        @showprogress 1 "Testing HAPI equivalence (HitranModel)..." for temp in temperatures
+        @showprogress 1 "Testing HAPI equivalence (On CO2 Band)..." for temp in temperatures
             for pres in pressures
                 jl_cs = absorption_cross_section(model, grid, pres, temp)
                 py_cs = readdlm("helper/Voigt_CO2_T" * string(temp) * "_P" * string(pres) * ".csv")
@@ -121,23 +121,31 @@ using ProgressMeter
             end
         end
 
+        #### 
+        #### Now test HAPI equivalence with other molecules
+        ####
+
+        names = ["H2O", "CO2", "O3", "N2O", "CO"]#, "CH4", "O2", "NO", "SO2", "NO2"]
+        molecules = [1, 2, 3, 4, 5]#, 6, 7, 8, 9, 10]
+        isotopes = [1, 1, 1, 1, 1]#, 2, 1, 2, 1, 1]
+
         # Loop over every temperature/pressure combo and test that the results match HAPI
         # (Doing this for other molecules)
-        # @showprogress 1 "Testing HAPI equivalence (Other Molecules)..." for name in names
+        @showprogress 1 "Testing HAPI equivalence (On Other Molecules)..." for name in names
 
-        #     pres = 1000
-        #     temp = 250
+            pres = 1000
+            temp = 250
 
-        #     # Get the test data
-        #     test_ht = CrossSection.read_hitran("helper/" * name * ".data", ν_min=6000, ν_max=6400)
-        #     # Create a HitranModel 
-        #     model = make_hitran_model(test_ht, Voigt(), CEF=ErfcHumliErrorFunctionVoigt())
+            # Get the test data
+            test_ht = CrossSection.read_hitran("helper/" * name * ".data", ν_min=6000, ν_max=6400)
+            # Create a HitranModel 
+            model = make_hitran_model(test_ht, Voigt(), CEF=ErfcHumliErrorFunctionVoigt())
 
-        #     jl_cs = absorption_cross_section(model, grid, pres, temp)
-        #     py_cs = readdlm("helper/Voigt_" * name * "_T250_P1000.csv")
-        #     Δcs = abs.(jl_cs - py_cs)
-        #     @test maximum(Δcs) < ϵ
-        # end
+            jl_cs = absorption_cross_section(model, grid, pres, temp)
+            py_cs = readdlm("helper/Voigt_" * name * "_T250_P1000.csv")
+            Δcs = abs.(jl_cs - py_cs)
+            @test maximum(Δcs) < ϵ
+        end
     end
 
     # Test that absorption cross sections are calculated correctly 
