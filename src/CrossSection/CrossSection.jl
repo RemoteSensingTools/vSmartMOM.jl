@@ -20,7 +20,7 @@ include("cross_section_interpolator.jl") # Cross-section interpolator functions
 include("absorption_cross_section.jl")   # Cross-section from HITRAN
 
 # Export the Cross Section models
-export HitranModel, InterpolationModel
+export AbstractCrossSectionModel, HitranModel, InterpolationModel
 
 # Export the absorption_cross_section functions
 export compute_absorption_cross_section, absorption_cross_section
@@ -32,7 +32,7 @@ export read_hitran, make_hitran_model
 export Doppler, Lorentz, Voigt
 
 # Export the complex error functions
-export HumlicekErrorFunction, HumlicekWeidemann32VoigtErrorFunction, HumlicekWeidemann32SDErrorFunction, CPF12ErrorFunction, ErfcHumliErrorFunctionVoigt, ErfcHumliErrorFunctionSD, ErfcErrorFunction
+export AbstractComplexErrorFunction, HumlicekErrorFunction, HumlicekWeidemann32VoigtErrorFunction, HumlicekWeidemann32SDErrorFunction, CPF12ErrorFunction, ErfcHumliErrorFunctionVoigt, ErfcHumliErrorFunctionSD, ErfcErrorFunction
 
 # Export the hitran table struct type
 export HitranTable
