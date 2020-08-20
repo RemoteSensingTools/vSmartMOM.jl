@@ -6,7 +6,7 @@
 
 **An end-to-end modular software suite for radiative transfer calculations, written in <a href="https://julialang.org">Julia</a>**
 
-![Slider demo](https://i.imgur.com/bXfRkaH.gifv)
+<img src='docs/slider.gif' class='center'></img>
 
 This project aims to revamp and modernize key atmospheric remote sensing tools. Specifically, it will enable the fast computation of atmospheric optical properties, full-polarized radiative transfer simulations, and commonly-used inversion routines. 
 
