@@ -1,20 +1,6 @@
-# Cross-Section Module
+# Home
 
-## Reading HITRAN Files
+RadiativeTransfer.jl aims to revamp and modernize key atmospheric remote sensing tools. Specifically, it will enable the fast computation of atmospheric optical properties, full-polarized radiative transfer simulations, and commonly-used inversion routines. 
 
-```@docs
-read_hitran
-```
 
-## Computing Cross Sections
-
-```@docs
-absorption_cross_section
-```
-
-## Types
-
-```@docs
-AbstractCrossSection
-HitranTable
-```
+By taking advantage of modern software tools, such as GPU acceleration and HPC computing, the software suite significantly accelerates computationally-intensive calculations and models, while keeping the interface easy-to-use for researchers and students.
