@@ -3,7 +3,16 @@
 #####
 
 """
-    $(FUNCTIONNAME)(model::HitranModel, wave_grid::Array{<:Real,1}, wavelength_flag::Bool, p_grid::Array{<:Real,1}, t_grid::Array{<:Real,1})
+    $(FUNCTIONNAME)(hitran::HitranTable, 
+                    broadening::AbstractBroadeningFunction, 
+                    wave_grid::AbstractRange{<:Real}, 
+                    p_grid::AbstractRange{<:Real},
+                    t_grid::AbstractRange{<:Real}; 
+                    wavelength_flag::Bool=false,
+                    wing_cutoff::Real=40, 
+                    vmr::Real=0, 
+                    CEF::AbstractComplexErrorFunction=HumlicekWeidemann32SDErrorFunction(),
+                    architecture::AbstractArchitecture=Architectures.CPU() )
 
 Using a HitranModel, create an InterpolationModel by interpolating the lineshape function 
 at the given pressure and temperature grids

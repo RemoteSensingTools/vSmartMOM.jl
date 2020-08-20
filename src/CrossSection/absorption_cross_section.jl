@@ -4,11 +4,8 @@ using Parameters
 using ..Architectures: devi
 
 """
-    $(FUNCTIONNAME)(hitran::HitranTable,broadening::AbstractBroadeningFunction,grid::Array{<:Real,1},wavelength_flag::Bool,pressure::Real,temperature::Real,wing_cutoff::Real;vmr::Real=0,CEF::AbstractComplexErrorFunction=ErfcErrorFunction())
-
 Given the hitran data and necessary parameters, calculate an absorption cross-section at the given pressure, 
 temperature, and grid of wavelengths (or wavenumbers)
-
 """
 function compute_absorption_cross_section(
                 #Required
@@ -105,7 +102,7 @@ function compute_absorption_cross_section(
 end
 
 """
-    $(FUNCTIONNAME)(model::HitranModel, grid::Array{<:Real,1}, wavelength_flag::Bool, pressure::Real, temperature::Real)
+    $(FUNCTIONNAME)(model::HitranModel, grid::AbstractRange{<:Real}, pressure::Real, temperature::Real; wavelength_flag::Bool=false)
 
 Given a HitranModel, return the calculated absorption cross-section at the given pressure, 
 temperature, and grid of wavelengths (or wavenumbers)
@@ -127,7 +124,7 @@ function absorption_cross_section(
 end
 
 """
-    $(FUNCTIONNAME)(model::InterpolationModel, grid::Array{<:Real,1}, wavelength_flag::Bool, pressure::Real, temperature::Real)
+    $(FUNCTIONNAME)(model::InterpolationModel, grid::AbstractRange{<:Real}, pressure::Real, temperature::Real; wavelength_flag::Bool=false)
 
 Given an Interpolation Model, return the interpolated absorption cross-section at the given pressure, 
 temperature, and grid of wavelengths (or wavenumbers)

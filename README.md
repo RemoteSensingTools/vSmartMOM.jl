@@ -1,8 +1,19 @@
 # RadiativeTransfer.jl
 
-<a href="https://travis-ci.org/github/RupeshJey/RadiativeTransfer.jl">
-    <img src="https://travis-ci.org/RupeshJey/RadiativeTransfer.jl.svg?branch=master" />
-</a>
+
+| **Documentation**    | [![dev][docs-latest-img]][docs-latest-url]       |
+|----------------------|--------------------------------------------------|
+| **Unit Tests**       | [![unit tests][unit-tests-img]][unit-tests-url]  |
+| **Code Coverage**    | [![codecov][codecov-img]][codecov-url]           |
+
+[docs-latest-img]: https://img.shields.io/badge/docs-latest-blue.svg
+[docs-latest-url]: http://tofu.gps.caltech.edu:5055
+
+[unit-tests-img]: https://travis-ci.org/RupeshJey/RadiativeTransfer.jl.svg?branch=master
+[unit-tests-url]: https://travis-ci.org/github/RupeshJey/RadiativeTransfer.jl
+
+[codecov-img]: https://codecov.io/gh/RupeshJey/RadiativeTransfer.jl/branch/master/graph/badge.svg
+[codecov-url]: https://codecov.io/gh/RupeshJey/RadiativeTransfer.jl
 
 **An end-to-end modular software suite for radiative transfer calculations, written in <a href="https://julialang.org">Julia</a>**
 
@@ -43,7 +54,7 @@ $ julia --project test/runtests.jl
 
 **Note: This section provides only a quick overview of the available modules in RadiativeTransfer.jl.** 
 
-For in-depth examples, tutorials, and implementation details, please see the complete Documentation.
+For in-depth examples, tutorials, and implementation details, please see the complete <a href="http://tofu.gps.caltech.edu:5055">Documentation</a>.
 
 ### Ready to use: 
 
