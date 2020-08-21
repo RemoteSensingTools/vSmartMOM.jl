@@ -39,14 +39,12 @@ $ git clone https://github.com/RupeshJey/RadiativeTransfer.jl
 ```
 3. `cd` into the RadiativeTransfer.jl directory and install the required packages:
 ```
-$ julia --project -e 'using Pkg; pkg"instantiate"';
+$ cd RadiativeTransfer.jl
+$ julia --project -e 'using Pkg; pkg"instantiate"'
 ```
-4. Pre-compile the packages to allow the RadiativeTransfer.jl to start faster:
+4. Verify your installation using: 
 ```
-$ julia --project -e 'using Pkg; pkg"precompile"'
-```
-5. Verify your installation using: 
-```
+$ cd test
 $ julia --project test/runtests.jl
 ```
 
