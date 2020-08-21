@@ -4,7 +4,7 @@ julia:
   - 1.4.1
   - 1.5.0
 
-codecov: true
+coveralls: true
 
 after_success:
-  - julia -e 'cd(Pkg.dir("RadiativeTransfer")); Pkg.add("Coverage"); using Coverage; Codecov.submit(Codecov.process_folder())'
+- julia -e 'using Pkg; Pkg.add("Coverage"); using Coverage; Coveralls.submit(process_folder())'
