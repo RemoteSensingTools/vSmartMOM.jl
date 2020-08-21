@@ -9,6 +9,7 @@ function compute_mie_ab(size_param::Real, refractive_idx::Number)
     Dn = zeros(ComplexF64, nmx)
     an = zeros(ComplexF64, n_max)
     bn = zeros(ComplexF64, n_max)
+    #
 
     # Downward Recursion, eq. 4.89, Bohren and Huffman
     for n = nmx-1:-1:1
