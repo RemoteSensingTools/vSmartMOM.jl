@@ -1,5 +1,5 @@
 using Pkg.Artifacts
-usinh HTTP
+using HTTP
 
 # This is the path to the Artifacts.toml we will manipulate
 artifact_toml = joinpath(@__DIR__, "Artifacts.toml")

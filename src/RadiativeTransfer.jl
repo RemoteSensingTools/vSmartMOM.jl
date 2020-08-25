@@ -16,6 +16,9 @@ include("Architectures.jl")
 # Absorption Cross Section stuff:
 include("CrossSection/CrossSection.jl")
 
+# Mie Phase Function stuff:
+include("PhaseFunction/PhaseFunction.jl")
+
 using .Architectures
 using .CrossSection
 
