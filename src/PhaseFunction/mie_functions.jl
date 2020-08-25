@@ -1,22 +1,23 @@
-function compute_mie_ab(refractive_idx::Number; size_param=10.0)
+using KernelAbstractions
+
+function compute_mie_ab!(size_param, refractive_idx::Number,an,bn; N=350)
     FT = typeof(refractive_idx)
+
     y = size_param * refractive_idx
     # Maximum expansion (see eq. ...)
     n_max = round(Int,size_param + 4size_param^(1/3) + 2.0)
-    # Not sure where this comes from ?
-    nmx = round(Int, max(n_max, abs(y)) + 17)
-
+    # Make sure downward recurrence starts higher up (at least 15)
+    nmx = round(Int, max(n_max, abs(y))+17 )
+    @assert N>n_max
+    
     # Dn as in eq 4.88, Bohren and Huffman, to calculate an and bn
     Dn = zeros(FT, nmx)
-    an = zeros(FT, n_max)
-    bn = zeros(FT, n_max)
-
     # Downward Recursion, eq. 4.89, Bohren and Huffman
     for n = nmx-1:-1:1
         rn = n+1
         Dn[n] = (rn/y) - (1 / (Dn[n+1] + rn/y))
+        #@show Dn[n]
     end
-
     # Get recursion for bessel functions ψ and ξ
     ψ₀ =  cos(size_param)
     ψ₁ =  sin(size_param)
@@ -37,13 +38,18 @@ function compute_mie_ab(refractive_idx::Number; size_param=10.0)
 
         an[n] = (t_a * ψ - ψ₁) / (t_a * ξ - ξ₁)
         bn[n] = (t_b * ψ - ψ₁) / (t_b * ξ - ξ₁)
-        
+            
         ψ₀ = ψ₁
         ψ₁ = ψ
         χ₀ = χ₁
         χ₁ = χ
         ξ₁ = FT(ψ₁, -χ₁)
     end
+    return nothing
+end
 
-    return an,bn
+# Kernels, I don't think this will run well on a GPU, might have to spell everything out
+@kernel function comp_ab!(@Const(grid),an,bn,n)
+    I = @index(Global, Linear)
+    compute_mie_ab!(grid[I],n,view(an,:,I),view(bn,:,I))
 end

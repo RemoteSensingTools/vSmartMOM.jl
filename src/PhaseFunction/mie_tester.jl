@@ -1,53 +1,43 @@
-function compute_mie_ab(size_param::Real, refractive_idx::Number)
-    y = size_param * refractive_idx
-    # Maximum expansion (see eq. ...)
-    n_max = round(Int,size_param + 4size_param^(1/3) + 2.0)
-    # Not sure where this comes from ?
-    nmx = round(Int, max(n_max, abs(y)) + 15)
+# Quick testing function:
+using RadiativeTransfer.PhaseFunction
+using Distributions
+using FastGaussQuadrature
+using Plots
 
-    # Dn as in eq 4.88, Bohren and Huffman, to calculate an and bn
-    Dn = zeros(ComplexF64, nmx)
-    an = zeros(ComplexF64, n_max)
-    bn = zeros(ComplexF64, n_max)
-    #
+# Define median radius, sigma and wavelength (all in micron!)
+μ  = 0.3
+σ  = 6.82
+wl = 0.55
 
-    # Downward Recursion, eq. 4.89, Bohren and Huffman
-    for n = nmx-1:-1:1
-        rn = n+1
-        Dn[n] = (rn/y) - (1 / (Dn[n+1] + rn/y))
-    end
 
-    # Get recursion for bessel functions ψ and ξ
-    ψ₀ =  cos(size_param)
-    ψ₁ =  sin(size_param)
-    χ₀ = -sin(size_param)
-    χ₁ =  cos(size_param)
+# Generate aerosol:
+aero1 = PhaseFunction.UnivariateAerosol(LogNormal(log(μ), log(σ)), 30.0, 10000,1.3,0.01)
+# Obtain Gauss Legendre Quadrature Points:
+x,w = gausslegendre( aero1.nquad_radius )
+maxSizeParam = 2π * aero1.r_max
+x_sizeParam  = x*maxSizeParam/2 .+ maxSizeParam/2
 
-    ξ₁ = ComplexF64(ψ₁, -χ₁)
-    
-    for n = 1:n_max
-        fn = (2n+1) / (n*(n+1))
-        ψ = (2n-1) * ψ₁/size_param - ψ₀
-        χ = (2n-1) * χ₁/size_param - χ₀
+an = (zeros(Complex{Float32},350,length(x)))
+bn = (zeros(Complex{Float32},350,length(x)))
 
-        ξ = ComplexF64(ψ, -χ)
-        t_a = Dn[n] / refractive_idx + n/size_param
-        t_b = Dn[n] * refractive_idx + n/size_param
-        if n==1
-            @show ψ - ψ₁
-            @show ξ - ξ₁
-            @show t_a
-            @show t_b
-        end
-        an[n] = (t_a * ψ - ψ₁) / (t_a * ξ - ξ₁)
-        bn[n] = (t_b * ψ - ψ₁) / (t_b * ξ - ξ₁)
-        
-        ψ₀ = ψ₁
-        ψ₁ = ψ
-        χ₀ = χ₁
-        χ₁ = χ
-        ξ₁ = ComplexF64(ψ₁, -χ₁)
-    end
-
-    return an,bn
+# This is still not really geared towards GPU, will have to think about how we could do that
+function run()
+    kernel! = PhaseFunction.comp_ab!(CPU(),4)
+    event = kernel!(x_sizeParam,an,bn,aero1.nᵣ-aero1.nᵢ*im,ndrange=length(x)); wait(event)
 end
+
+@time run()
+
+l = @layout [a; b; c; d]
+p1 = plot(x_sizeParam, real(an[1,:]), label="Real(a1)")
+p2 = plot(x_sizeParam, imag(an[1,:]), label="Imag(a1)")
+p3 = plot(x_sizeParam, real(bn[1,:]), label="Real(b1)")
+p4 = plot(x_sizeParam, imag(bn[1,:]), label="Imag(b1)")
+plot(p1, p2, p3,p4, layout = l)
+xlabel!("Size Parameter")
+
+
+
+
+
+
