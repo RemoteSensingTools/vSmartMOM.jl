@@ -1,9 +1,9 @@
-"""
-    $(FUNCTIONNAME)(m, n, l, wig_values)
+# """
+#     $(FUNCTIONNAME)(m, n, l, wig_values)
 
-Compute the Wigner 3j values for all n to nmax and all m from mstart to (n+l+1)
+# Compute the Wigner 3j values for all n to nmax and all m from mstart to (n+l+1)
 
-"""
+# """
 function recursive_wigner_m110!(m::Integer, n::Integer, l::Integer, wig_values)
     
     # Only compute the value if this condition is met
@@ -67,3 +67,75 @@ function recursive_wigner_m110!(m::Integer, n::Integer, l::Integer, wig_values)
     end
 end
 
+function recursive_wigner_000!(m::Integer, n::Integer, l::Integer, wig_values)
+
+    if (m == n + l + 1)
+        return 0.0
+    elseif (m == n + l)
+        return recursive_wigner_m110!(n+l, n, l, wig_values) * 2 * 
+               sqrt((n+l) * (n+l+1) * n * (n+1))/(l*(l+1) - (l+n)*(l+n+1) - n*(n+1))
+
+    else 
+
+        if (iseven(m + n + l == 0))
+            return -recursive_wigner_000!(m+2, n, l, wig_values) * 
+                    sqrt(((m+2)^2 - (n-l)^2 ) / ((m+1)^2 - (n-l)^2 )) * 
+                    sqrt((1-(1/(n+l-m))) * (1+(1/(m+n+l+2))))
+        else
+            return 0.0
+        end
+
+    end
+
+    
+end
+
+function recursive_wigner_m1m12!(m::Integer, n::Integer, l::Integer, wig_values)
+
+    return (-1)^(m+n+l) * (((l-1) * l * (l+1) * (l+2))^(-0.5)) * 
+           ( (m*(m+1) + (-1)^(m+n+l)*n*(n+1)) * 
+             recursive_wigner_m110!(m, n, l, wig_values) +
+             2 * sqrt(m*(m+1)*n*(n+1)) * 
+             recursive_wigner_000!(m, n, l, wig_values) )
+    
+end
+
+function recursive_wigner!(j₁::Integer, j₂::Integer, j₃::Integer, 
+                           m₁::Integer, m₂::Integer, m₃::Integer)
+
+    
+    if (m₁ == -1 && m₂ == 1 && m₃ == 0)
+
+        m110_values = Array{Any}(nothing, j₂+j₃+1, j₂+1);
+        return recursive_wigner_m110!(j₁, j₂, j₃, m110_values)
+
+    elseif (m₁ == -1 && m₂ == -1 && m₃ == 2)
+
+        m110_values = Array{Any}(nothing, j₂+j₃+1, j₂+1);
+        m1m12_values = Array{Any}(nothing, j₂+j₃+1, j₂+1);
+        return recursive_wigner_m1m12!(j₁, j₂, j₃, m110_values)
+
+    elseif (m₁ == 0 && m₂ == 0 && m₃ == 0)
+
+        m110_values = Array{Any}(nothing, j₂+j₃+1, j₂+1);
+        return recursive_wigner_000!(j₁, j₂, j₃, m110_values)
+
+    else
+        throw(DomainError((m₁, m₂, m₃,), 
+            "Unsupported configuration. Supported: (-1,1,0), (-1,-1,2), (0,0,0)"))
+    end
+
+end
+
+m = 11
+n = 5
+l = 10
+
+m1 = -1
+m2 = -1
+m3 = 2
+
+recursive_wigner!(m, n, l, m1, m2, m3)
+
+using WignerSymbols
+Float64(wigner3j(m, n, l, m1, m2, m3))
