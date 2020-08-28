@@ -13,10 +13,10 @@ using KernelAbstractions
 # GPU/CPU Architecture (from Oceanigans)
 include("Architectures.jl")
 
-# Absorption Cross Section stuff:
+# Absorption Cross Section module:
 include("CrossSection/CrossSection.jl")
 
-# Mie Phase Function stuff:
+# Mie Phase Function module:
 include("PhaseFunction/PhaseFunction.jl")
 
 using .Architectures
