@@ -86,19 +86,46 @@ end
     
 end
 
-function compute_pi_tau!(μ, nmax, π_, τ_)
-    #@assert length(π_) == length(τ_) == nmax
+function compute_mie_π_τ!(μ, nmax, π_, τ_)
+    @assert size(π_) == size(τ_) == (nmax,length(μ))
+    # BH book, pages 94-96:
     π_[1,:] .= 1.0;
     π_[2,:] .= 3μ;
     τ_[1,:] .= μ;
+    # This is equivalent to 3*cos(2*acos(μ))
     τ_[2,:] .= 6μ.^2 .-3;
     for n=2:nmax-1
         for i in eachindex(μ)
-            π_[n+1,i] = ((2n + 1) * μ[i] * π_[n,i] - (n+1) * π_[n-1,1]) / n 
+            π_[n+1,i] = ((2n + 1) * μ[i] * π_[n,i] - (n+1) * π_[n-1,i]) / n 
             τ_[n+1,i] = (n+1) * μ[i] * π_[n+1,i] - (n+2)*π_[n,i]
             # @show n+1,μ[i], π_[n+1,i], τ_[n+1,i], π_[n,i]
         end
     end
+end
+
+function compute_mie_S1S2(an, bn, π_, τ_)
+    nmax = size(an)[1];
+    nμ   = size(π_)[2];
+    S1 = zeros(Complex{Float64}, nμ)
+    S2 = zeros(Complex{Float64},nμ)
+    for l=1:nmax
+        for iμ=1:nμ 
+            S1[iμ] += (2l + 1) / (l*(l+1)) * (an[l] * τ_[l,iμ] + bn[l] * π_[l,iμ])
+            S2[iμ] += (2l + 1) / (l*(l+1)) * (an[l] * π_[l,iμ] + bn[l] *  τ_[l,iμ])
+        end
+    end
+
+    return S1,S2
+end
+
+function compute_mie_S1S2!(an, bn, π_, τ_)
+    nmax = size(an)[1];
+    S1 = zeros()
+    n = collect(1:nmax)
+    n = @. (2n + 1) / (n*(n+1))
+    S1 = transpose(n.*an) * τ_ + transpose(n.*bn) * π_
+    S2 = transpose(n.*an) * π_ + transpose(n.*bn) * τ_
+    return S1,S2
 end
 
 function eval_legendre!(x,nmax,P)
