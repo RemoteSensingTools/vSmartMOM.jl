@@ -24,8 +24,9 @@ maxSizeParam = 2π * aero1.r_max/wl
 n_max = PhaseFunction.get_n_max(maxSizeParam)
 x_sizeParam  = x*maxSizeParam/2 .+ maxSizeParam/2
 
-# 1) Gauss Legendre quadrature over μ
-n_mu = 2n_max;
+# 1) Gauss Legendre quadrature over μ (requires 2Nmax-1 to be accurate!)
+n_mu = 2n_max-1;
+
 μ, w_μ = gausslegendre( n_mu )
 
 leg_π = zeros(n_max,n_mu)
@@ -105,20 +106,34 @@ function testSiewert(x_sizeParam,leg_π,leg_τ, aero1, λ,μ,w_μ )
     bulk_f₃₄ /= bulk_C_sca
 
     lMax = length(μ);
-    P = PhaseFunction.eval_legendre(μ,lMax)
+    P, P², R², T² = PhaseFunction.compute_legendre_poly(μ,lMax)
     # Compute Greek coefficients:
+    α = zeros(lMax)
     β = zeros(lMax)
+    δ = zeros(lMax)
+    γ = zeros(lMax)
+    ϵ = zeros(lMax)
+    ζ = zeros(lMax)
     #@show size(avg_f11), size(P), size(w_μ), size(f11), size(wₓ)
-    for l=1:length(β)
-        β[l] = (2(l-1)+1)/2 * sum(w_μ' * (bulk_f₁₁' .* P[l,:]))
+    for l=0:length(β)-1
+        fac = (2l+1)/2 * sqrt(factorial(big(l-2))/factorial(big(l+2)))
+        δ[l+1] = (2l+1)/2 * sum(w_μ' * (bulk_f₃₃' .* P[l+1,:]))
+        β[l+1] = (2l+1)/2 * sum(w_μ' * (bulk_f₁₁' .* P[l+1,:]))
+        γ[l+1] = fac * sum(w_μ' * (bulk_f₁₂' .* P²[l+1,:]))
+        ϵ[l+1] = fac * sum(w_μ' * (bulk_f₃₄' .* P²[l+1,:]))
+        ζ[l+1] = fac * sum(w_μ' * (bulk_f₃₃' .* R²[l+1,:] + bulk_f₁₁' .* T²[l+1,:]) )
+        α[l+1] = fac * sum(w_μ' * (bulk_f₁₁' .* R²[l+1,:] + bulk_f₃₃' .* T²[l+1,:]) )
+
+        #@show sum(w_μ' * (bulk_f₁₂' .* P²[l+1,:]))
+        #@show sum((bulk_f₁₂' .* P²[l+1,:]))
+        #@show (2l+1)/2 * factorial(big(l-2))/factorial(big(l+2))
     end
-    return bulk_f₁₁, f₁₁, f₃₃, f₁₂,f₃₄,  C_ext, C_sca,bulk_C_sca, bulk_C_ext, β
+    return bulk_f₁₁, bulk_f₁₂, f₁₁, f₃₃, f₁₂,f₃₄,  C_ext, C_sca,bulk_C_sca, bulk_C_ext, β,γ,ϵ
 end
 
 
-@time avg_f11, f₁₁, f₃₃, f₁₂,f₃₄,  C_ext, C_sca,avg_C_sca, avg_C_ext, β_2nmax = testSiewert(x_sizeParam, leg_π,leg_τ, aero1,wl,μ,w_μ)
+@time bulk_f₁₁, bulk_f₁₂, f₁₁, f₃₃, f₁₂,f₃₄,  C_ext, C_sca,avg_C_sca, avg_C_ext, β,γ,ϵ = testSiewert(x_sizeParam, leg_π,leg_τ, aero1,wl,μ,w_μ)
     
-
 
 
 
