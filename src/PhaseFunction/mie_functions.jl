@@ -29,6 +29,7 @@ function compute_mie_ab!(size_param, refractive_idx::Number,an,bn,Dn)
         rn = n+1
         #@show n, (rn/y) - (1 / (Dn[n+1] + rn/y))
         Dn[n] = (rn/y) - (1 / (Dn[n+1] + rn/y))
+        #@show n, Dn[n]
     end
 
     # Get recursion for bessel functions ψ and ξ
@@ -48,10 +49,10 @@ function compute_mie_ab!(size_param, refractive_idx::Number,an,bn,Dn)
         ξ   = FT(ψ, -χ)
         t_a = Dn[n] / refractive_idx + n/size_param
         t_b = Dn[n] * refractive_idx + n/size_param
-
+         
         an[n] = (t_a * ψ - ψ₁) / (t_a * ξ - ξ₁)
         bn[n] = (t_b * ψ - ψ₁) / (t_b * ξ - ξ₁)
-            
+        #@show n, ψ, ψ₁, ξ,  ξ₁, real(an[n])
         ψ₀ = ψ₁
         ψ₁ = ψ
         χ₀ = χ₁
@@ -130,12 +131,12 @@ The function returns `S₁`,`S₂` as a function of the cosine of the scattering
 function compute_mie_S1S2(an, bn, π_, τ_)
     nmax = size(an)[1];
     nμ   = size(π_)[2];
-    S₁     = zeros(Complex{Float64}, nμ)
-    S₂ = zeros(Complex{Float64},nμ)
+    S₁   = zeros(Complex{Float64}, nμ);
+    S₂   = zeros(Complex{Float64}, nμ);
     for l=1:nmax
         for iμ=1:nμ 
-            S1[iμ] += (2l + 1) / (l*(l+1)) * (an[l] * τ_[l,iμ] + bn[l] * π_[l,iμ])
-            S2[iμ] += (2l + 1) / (l*(l+1)) * (an[l] * π_[l,iμ] + bn[l] *  τ_[l,iμ])
+            S₁[iμ] += (2l + 1) / (l*(l+1)) * (an[l] * τ_[l,iμ] + bn[l] * π_[l,iμ])
+            S₂[iμ] += (2l + 1) / (l*(l+1)) * (an[l] * π_[l,iμ] + bn[l] *  τ_[l,iμ])
         end
     end
 
@@ -144,18 +145,21 @@ end
 
 
 # DEBUG stage:
-function eval_legendre!(x,nmax,P)
+function eval_legendre(x,nmax)
     @assert nmax > 1
-    @assert size(P) == (nmax,length(x))
+    #@assert size(P) == (nmax,length(x))
+    P = zeros(nmax,length(x));
     # 0th Legendre polynomial, a constant
     P[1,:] .= 1;
     # 1st Legendre polynomial, x
+    
     P[2,:] = x;
     for n=2:nmax-1
         for i in eachindex(x)
-            P[n+1,:] = ((2n + 1) * x[i] * P[n,i] - n * P[n-1,1])/(n+1) 
+            P[n+1,i] = ((2n + 1) * x[i] * P[n,i] - n * P[n-1,i])/(n+1) 
         end
     end
+    return P
 end  
 
 # DEBUG stage:
