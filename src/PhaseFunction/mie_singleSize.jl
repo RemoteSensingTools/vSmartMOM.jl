@@ -16,7 +16,7 @@ wl = 0.55
 FT = Float64
 
 # Generate aerosol:
-aero1 = PhaseFunction.UnivariateAerosol(LogNormal(log(μ), log(σ)), 30.0, 10000,1.3,-0.01)
+aero1 = PhaseFunction.UnivariateAerosol(LogNormal(log(μ), log(σ)), 30.0, 10000,1.3,-1e-6)
 
 # Obtain Gauss Legendre Quadrature Points:
 x,w = gausslegendre( aero1.nquad_radius )
@@ -24,8 +24,10 @@ maxSizeParam = 2π * aero1.r_max/wl
 n_max = PhaseFunction.get_n_max(maxSizeParam)
 x_sizeParam  = x*maxSizeParam/2 .+ maxSizeParam/2
 
-# 1) Gauss Legendre quadrature over μ
-n_mu = 2n_max;
+#x_sizeParam=
+# 1) Gauss Legendre quadrature over μ (requires 2Nmax-1 to be accurate!)
+n_mu = 2n_max-1;
+
 μ, w_μ = gausslegendre( n_mu )
 
 leg_π = zeros(n_max,n_mu)
@@ -41,8 +43,8 @@ function testSiewert(x_sizeParam,leg_π,leg_τ, aero1, λ,μ,w_μ )
     # Radius
     r = x_sizeParam/2π*wl
 
-    S₁ = zeros(Complex{FT},length(x_sizeParam),size1)
-    S₂ = zeros(Complex{FT},length(x_sizeParam),size1)
+    S₁  = zeros(Complex{FT},length(x_sizeParam),size1)
+    S₂  = zeros(Complex{FT},length(x_sizeParam),size1)
     f₁₁ = zeros(length(x_sizeParam),size1)
     f₃₃ = zeros(length(x_sizeParam),size1)
     f₁₂ = zeros(length(x_sizeParam),size1)
@@ -57,7 +59,7 @@ function testSiewert(x_sizeParam,leg_π,leg_τ, aero1, λ,μ,w_μ )
     wₓ /= sum(wₓ)
     #wₓ /= maximum(x_sizeParam/2π*wl)
 
-    @showprogress 1 "Computing PhaseFunctions Siewert style ..." for i = 1:length(x_sizeParam)
+    @showprogress 1 "Computing PhaseFunctions Siewert NAI-2 style ..." for i = 1:length(x_sizeParam)
         #println(i, " ", x_sizeParam[i])
         # Maximum expansion (see eq. A17 from de Rooij and Stap, 1984)
         n_max = PhaseFunction.get_n_max(x_sizeParam[i])
@@ -76,6 +78,7 @@ function testSiewert(x_sizeParam,leg_π,leg_τ, aero1, λ,μ,w_μ )
         #S1[i,:],S2[i,:] = PhaseFunction.compute_mie_S1S2(view(an,1:n_max), view(bn,1:n_max), leg_π, leg_τ)
         PhaseFunction.compute_mie_ab!(x_sizeParam[i],aero1.nᵣ-aero1.nᵢ*im,an,bn,Dn)
         S₁[i,:],S₂[i,:] = PhaseFunction.compute_mie_S1S2(an, bn, leg_π, leg_τ)
+        
         # Compute Extinction and scattering cross sections: 
         C_sca[i] = 2pi/k^2 * (n_' * (abs2.(an) + abs2.(bn)))
         C_ext[i] = 2pi/k^2 * (n_' * real(an + bn))
@@ -85,10 +88,6 @@ function testSiewert(x_sizeParam,leg_π,leg_τ, aero1, λ,μ,w_μ )
         f₃₃[i,:] = 0.5/x_sizeParam[i]^2  * real(S₁[i,:] .* conj(S₂[i,:]) + S₂[i,:] .* conj(S₁[i,:]));
         f₁₂[i,:] = -0.5/x_sizeParam[i]^2  * real(abs2.(S₁[i,:]) - abs2.(S₂[i,:]));
         f₃₄[i,:] = -0.5/x_sizeParam[i]^2 * imag(S₁[i,:] .* conj(S₂[i,:]) - S₂[i,:] .* conj(S₁[i,:]));
-
-        
-        #@show x_sizeParam[i], sum(real(an)), sum(real(bn))
-        
 
     end
     bulk_C_sca =  sum(wₓ .* C_sca)
@@ -105,21 +104,55 @@ function testSiewert(x_sizeParam,leg_π,leg_τ, aero1, λ,μ,w_μ )
     bulk_f₃₄ /= bulk_C_sca
 
     lMax = length(μ);
-    P = PhaseFunction.eval_legendre(μ,lMax)
+    P, P², R², T² = PhaseFunction.compute_legendre_poly(μ,lMax)
     # Compute Greek coefficients:
+    α = zeros(lMax)
     β = zeros(lMax)
+    δ = zeros(lMax)
+    γ = zeros(lMax)
+    ϵ = zeros(lMax)
+    ζ = zeros(lMax)
     #@show size(avg_f11), size(P), size(w_μ), size(f11), size(wₓ)
-    for l=1:length(β)
-        β[l] = (2(l-1)+1)/2 * sum(w_μ' * (bulk_f₁₁' .* P[l,:]))
+    for l=0:length(β)-1
+        # Factorial can be smarter through recursion I guess! 
+        fac = (2l+1)/2 * sqrt(factorial(big(l-2))/factorial(big(l+2)))
+        δ[l+1] = (2l+1)/2 * sum(w_μ' * (bulk_f₃₃[1,:] .* P[l+1,:]))
+        β[l+1] = (2l+1)/2 * sum(w_μ' * (bulk_f₁₁[1,:] .* P[l+1,:]))
+        γ[l+1] = fac * sum(w_μ' * (bulk_f₁₂[1,:] .* P²[l+1,:]))
+        ϵ[l+1] = fac * sum(w_μ' * (bulk_f₃₄[1,:] .* P²[l+1,:]))
+        ζ[l+1] = fac * sum(w_μ' * (bulk_f₃₃[1,:] .* R²[l+1,:] + bulk_f₁₁[1,:] .* T²[l+1,:]) )
+        α[l+1] = fac * sum(w_μ' * (bulk_f₁₁[1,:] .* R²[l+1,:] + bulk_f₃₃[1,:] .* T²[l+1,:]) )
     end
-    return bulk_f₁₁, f₁₁, f₃₃, f₁₂,f₃₄,  C_ext, C_sca,bulk_C_sca, bulk_C_ext, β
+    return bulk_f₁₁, bulk_f₁₂, f₁₁, f₃₃, f₁₂,f₃₄,  C_ext, C_sca,bulk_C_sca, bulk_C_ext, α, β, γ, δ, ϵ, ζ
 end
 
 
-@time avg_f11, f₁₁, f₃₃, f₁₂,f₃₄,  C_ext, C_sca,avg_C_sca, avg_C_ext, β_2nmax = testSiewert(x_sizeParam, leg_π,leg_τ, aero1,wl,μ,w_μ)
+@time bulk_f₁₁, bulk_f₁₂, f₁₁, f₃₃, f₁₂,f₃₄,  C_ext, C_sca,avg_C_sca, avg_C_ext, α, β, γ, δ, ϵ, ζ= testSiewert(x_sizeParam, leg_π,leg_τ, aero1,wl,μ,w_μ)
     
+l = @layout [a ; b; c; d; e; f]
+p1 = plot(α,label="α")
+p2 = plot(β,label="β")
+p3 = plot(γ,label="γ")
+p4 = plot(δ,label="δ")
+p5 = plot(ϵ,label="ϵ")
+p6 = plot(ζ,label="ζ")
 
+plot(p1, p2, p3,p4,p5,p6, layout = l)
+plot!(size=(400,600))
 
+# Test single particle:
+function testSingle(index)
+    lMax = 750;
+    P⁰, P², R², T² = PhaseFunction.compute_legendre_poly(μ,lMax)
+    ϵ_s = zeros(lMax);
+    #index = 100
+    for l=0:lMax-1
+        fac = (2l+1)/2 * sqrt(factorial(big(l-2))/factorial(big(l+2)))
+        ϵ_s[l+1] = fac * sum(w_μ' * (f₃₄[index,:] .* P²[l+1,:]))
+    end
+    return ϵ_s
+end
 
+plot(testSingle(1000))
 
 
