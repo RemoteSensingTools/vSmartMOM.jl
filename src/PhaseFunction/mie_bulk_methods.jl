@@ -2,11 +2,15 @@
 
 
 # ToDo: Enable arrays of aerosols (for μ̄, σ, nᵣ, nᵢ)
-function calc_aer_opt_prop(mod::NAI2, r, λ::Number, μ̄::Number, σ::Number, nᵣ, nᵢ; nquad_radius=2500, r_max = 30.0)
-    FT = eltype(μ̄)
-    n_radius = length(r)
-    # Generate aerosol:
-    aero = UnivariateAerosol(LogNormal(log(μ̄), log(σ)), r_max, nquad_radius, nᵣ, nᵢ)
+#function calc_aer_opt_prop(mod::NAI2, r, λ::Number, μ̄::Number, σ::Number, nᵣ, nᵢ; nquad_radius=2500, r_max = 30.0)
+function calc_aer_opt_prop(mod::NAI2, aero::AbstractAerosolType, λ::Number)
+    # Extract variables from struct:
+    @unpack nquad_radius, nᵣ, nᵢ,r_max =  aero
+
+    FT = eltype(nᵣ);
+    # Get radius quadrature points and weights (for mean, thus normalized):
+    r, wᵣ = gauleg(nquad_radius, 0.0, r_max ; norm=true) 
+    
     # Size parameter
     x_sizeParam = 2π * r/λ
     # Compute Nmax for largest size:
@@ -17,30 +21,29 @@ function calc_aer_opt_prop(mod::NAI2, r, λ::Number, μ̄::Number, σ::Number, n
     μ, w_μ = gausslegendre( n_mu )
     # Compute π and τ functions
     leg_π, leg_τ = compute_mie_π_τ(μ, n_max)
-    # @show size(leg_π), size(leg_τ), n_mu, n_max
     # Wavenumber:
     k = 2π/λ
 
     # Pre-allocate arrays:
-    S₁    = zeros(Complex{FT},n_radius,n_mu)
-    S₂    = zeros(Complex{FT},n_radius,n_mu)
-    f₁₁   = zeros(FT, n_radius,n_mu)
-    f₃₃   = zeros(FT, n_radius,n_mu)
-    f₁₂   = zeros(FT, n_radius,n_mu)
-    f₃₄   = zeros(FT, n_radius,n_mu)
-    C_ext = zeros(FT, n_radius)
-    C_sca = zeros(FT, n_radius)
+    S₁    = zeros(Complex{FT},nquad_radius,n_mu)
+    S₂    = zeros(Complex{FT},nquad_radius,n_mu)
+    f₁₁   = zeros(FT, nquad_radius,n_mu)
+    f₃₃   = zeros(FT, nquad_radius,n_mu)
+    f₁₂   = zeros(FT, nquad_radius,n_mu)
+    f₃₄   = zeros(FT, nquad_radius,n_mu)
+    C_ext = zeros(FT, nquad_radius)
+    C_sca = zeros(FT, nquad_radius)
     # Weights for the size distribution:
     wₓ = pdf.(aero.size_distribution,r)
-    # Try Gauss-Legendre later (multiply with wx)
-    @show eltype(S₁)
-    # normalize:
+    # pre multiply with wᵣ to get proper means eventually:
+    wₓ .*= wᵣ
+    # normalize (could apply a check whether cdf.(aero.size_distribution,r_max) is larger than 0.99:
     wₓ /= sum(wₓ)
     
     @showprogress 1 "Computing PhaseFunctions Siewert NAI-2 style ..." for i = 1:length(x_sizeParam)
         #println(i, " ", x_sizeParam[i])
         # Maximum expansion (see eq. A17 from de Rooij and Stap, 1984)
-        n_max = PhaseFunction.get_n_max(x_sizeParam[i])
+        n_max = get_n_max(x_sizeParam[i])
 
         # In Domke methods, we want to pre-allocate these as 2D outside of this loop.
         an = (zeros(Complex{FT},n_max))
@@ -110,8 +113,8 @@ function calc_aer_opt_prop(mod::NAI2, r, λ::Number, μ̄::Number, σ::Number, n
 end
 
 function f_test(x)
-    r = collect(range(0.0005,30,length=10000));
-    α, β, γ, δ, ϵ, ζ, bulk_C_sca, bulk_C_ext = calc_aer_opt_prop(NAI2(), r, 0.55, x[1], x[2], x[3],x[4])
-    return [α; β; γ; δ; ϵ; ζ]
+    aero = UnivariateAerosol(LogNormal(log(x[1]), log(x[2])), 30.0, 2500, x[3], x[4])
+    α, β, γ, δ, ϵ, ζ, bulk_C_sca, bulk_C_ext = calc_aer_opt_prop(NAI2(), aero, 0.55)
+    return [α; β; γ; δ; ϵ; ζ; bulk_C_sca; bulk_C_ext]
           
 end
