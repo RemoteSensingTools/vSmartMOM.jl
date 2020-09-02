@@ -175,7 +175,26 @@ function compute_legendre_poly(x,nmax)
         end
     end
     return P⁰, P², R², T²
-end  
+end
+
+"""
+$(FUNCTIONNAME)(n,xmin,xmax; norm=false)
+Returns the `n` Gauss-Legendre quadrature points and weights with a change of interval between xmin and xmax
+- `n` number of quadrature points
+- `xmin`,`xmax` lower and upper bound of integral
+- `norm`: if `true`, normalizes the weights so that a mean can be computed instead of full integration
+The function returns `n` quadrature points ξ within [xmin,xmax] with associated weightes `w` 
+"""
+function gauleg(n,xmin,xmax; norm=false)
+    ξ,w = gausslegendre( n )
+    ξ = (xmax-xmin)/2 * ξ .+ (xmin+xmax)/2
+    if norm
+        w /= sum(w)
+    else
+        w *= (xmax-xmin)/2
+    end
+    return ξ,w
+end
 
 # DEBUG stage:
 function average_anbn(an,bn,w,k)
