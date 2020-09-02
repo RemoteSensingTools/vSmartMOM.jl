@@ -18,7 +18,7 @@ function compute_mie_ab!(size_param, refractive_idx::Number,an,bn,Dn)
     n_max = get_n_max(size_param)
 
     # Make sure downward recurrence starts higher up (at least 15, check eq. A9 in de Rooij and Stap, 1984, may need to check what is needed)
-    nmx = round(Int, max(n_max, abs(y))+20 )
+    nmx = round(Int, max(n_max, abs(y))+50 )
     @assert size(an)[1]>=n_max
     @assert size(an) == size(bn)
     fill!(Dn,0);
@@ -80,30 +80,14 @@ $(FUNCTIONNAME)(μ, nmax, π, τ)
 Computes the associated Legendre functions  amplitude functions `π` and `τ` in Mie theory (stored internally). See eq 6 in Sanghavi 2014
 - `μ` cosine of the scattering angle
 - `nmax` max number of legendre terms (depends on size parameter, see [`get_n_max`](@ref))
-- `π` and `τ` pre-allocated arrays, values will be stored there (need to be of size (nmax,length(μ)) )
+Functions returns `π` and `τ` (of size `[nmax,length(μ)]`)
 """
-function compute_mie_π_τ!(μ, nmax, π_, τ_)
-    @assert size(π_) == size(τ_) == (nmax,length(μ))
-    # BH book, pages 94-96:
-    π_[1,:] .= 1.0;
-    π_[2,:] .= 3μ;
-    τ_[1,:] .= μ;
-    # This is equivalent to 3*cos(2*acos(μ))
-    τ_[2,:] .= 6μ.^2 .-3;
-    for n=2:nmax-1
-        for i in eachindex(μ)
-            π_[n+1,i] = ((2n + 1) * μ[i] * π_[n,i] - (n+1) * π_[n-1,i]) / n 
-            τ_[n+1,i] = (n+1) * μ[i] * π_[n+1,i] - (n+2)*π_[n,i]
-            # @show n+1,μ[i], π_[n+1,i], τ_[n+1,i], π_[n,i]
-        end
-    end
-end
-
-# Or use this? Not yet sure what is the best in the long run (pre-allocating? Looks a bit more cumbersome at times...)
 function compute_mie_π_τ(μ, nmax)
-    π_ = zeros(nmax,length(μ))
-    τ_ = zeros(nmax,length(μ))
-    #@assert size(π_) == size(τ_) == (nmax,length(μ))
+    FT = eltype(μ)
+    # Allocate arrays:
+    π_ = zeros(FT,nmax,length(μ))
+    τ_ = zeros(FT,nmax,length(μ))
+
     # BH book, pages 94-96:
     π_[1,:] .= 1.0;
     π_[2,:] .= 3μ;
@@ -117,9 +101,8 @@ function compute_mie_π_τ(μ, nmax)
             # @show n+1,μ[i], π_[n+1,i], τ_[n+1,i], π_[n,i]
         end
     end
-    return π_,τ_
+    return π_, τ_
 end
-
 
 """
 $(FUNCTIONNAME)(an, bn, π_, τ_)
@@ -128,19 +111,19 @@ Returns the amplitude functions `S₁`,`S₂` in Mie theory
 - `π` and `τ` pre-calculated associated Legendre functions `π` and `τ`, see [`compute_mie_π_τ!`](@ref) function 
 The function returns `S₁`,`S₂` as a function of the cosine of the scattering angle `ξ`. Users need to make sure `an` and `bn`, `π` and `τ` are pre-computed.
 """
-function compute_mie_S1S2(an, bn, π_, τ_)
+function compute_mie_S₁S₂!(an, bn, π_, τ_, S₁, S₂)
+    FT = eltype(an)
     nmax = size(an)[1];
     nμ   = size(π_)[2];
-    S₁   = zeros(Complex{Float64}, nμ);
-    S₂   = zeros(Complex{Float64}, nμ);
+    #S₁   = zeros(Complex{FT}, nμ);
+    #S₂   = zeros(Complex{FT}, nμ);
     for l=1:nmax
         for iμ=1:nμ 
             S₁[iμ] += (2l + 1) / (l*(l+1)) * (an[l] * τ_[l,iμ] + bn[l] * π_[l,iμ])
-            S₂[iμ] += (2l + 1) / (l*(l+1)) * (an[l] * π_[l,iμ] + bn[l] *  τ_[l,iμ])
+            S₂[iμ] += (2l + 1) / (l*(l+1)) * (an[l] * π_[l,iμ] + bn[l] * τ_[l,iμ])
         end
     end
-
-    return S₁,S₂
+    return nothing
 end
 
 
