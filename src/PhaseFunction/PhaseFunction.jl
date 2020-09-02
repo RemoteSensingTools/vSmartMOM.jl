@@ -8,6 +8,7 @@ using ProgressMeter             # For showing progress
 using KernelAbstractions        # For heterogeneous (GPU+CPU) programming
 using CUDA                      # For GPU programming
 using Distributions             # Distributions from Julia 
+using ForwardDiff, DiffResults  # Automatic Differentiation tools
 using ..Architectures: device
 
 include("types.jl")              # All types used in this module
