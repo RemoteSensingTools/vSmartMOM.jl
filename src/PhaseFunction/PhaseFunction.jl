@@ -17,6 +17,6 @@ include("mie_bulk_methods.jl")   # Functions for Mie calculations over size dist
 include("wigner3j_recursive.jl") # Recursive Wigner 3j calculations
 
 # Export the mie models
-export compute_ab, UnivariateAerosol, comp_ab, wigner!
+export compute_ab, UnivariateAerosol, comp_ab, wigner!, compute_mie_π_τ!
 
 end

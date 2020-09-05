@@ -127,6 +127,11 @@ Compute the Wigner 3j values for all n to nmax and all m from mstart to (n+l+1)
 function wigner!(j₁::Integer, j₂::Integer, j₃::Integer, 
                  m₁::Integer, m₂::Integer, m₃::Integer)
 
+    # Perform a check that the input j's satisfy condition
+    if ((j₁<abs(j₂-j₃))||(j₃<abs(j₂-j₁))||(j₂<abs(j₁-j₃)))
+        return 0.0
+    end
+
     # Switch between the three different configurations and call appropriate function
     # (m₁, m₂, m₃): (-1, 1, 0), (-1, -1, 2), (0, 0, 0)
     if (m₁ == -1 && m₂ == 1 && m₃ == 0)
@@ -149,5 +154,12 @@ function wigner!(j₁::Integer, j₂::Integer, j₃::Integer,
         throw(DomainError((m₁, m₂, m₃,), 
             "Unsupported configuration. Supported: (-1,1,0), (-1,-1,2), (0,0,0)"))
     end
+
+end
+
+function compute_wigner_matrices(ls, ms, ns)
+
+    
+
 
 end
