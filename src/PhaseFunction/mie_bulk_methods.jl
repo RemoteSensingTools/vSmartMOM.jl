@@ -6,6 +6,7 @@
 function calc_aer_opt_prop(mod::NAI2, aero::AbstractAerosolType, λ::Number)
     # Extract variables from struct:
     @unpack nquad_radius, nᵣ, nᵢ,r_max =  aero
+    @assert nᵢ >= 0
 
     FT = eltype(nᵣ);
     # Get radius quadrature points and weights (for mean, thus normalized):
