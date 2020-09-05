@@ -10,89 +10,100 @@ function compute_C_scatt(k, nmax, an, bn)
 end
 
 # <|a_n|^2 + |b_n|^2> averaged over size distribution
-function compute_avg_C_scatt(k, ans_bns)
-    return (2π/k^2) * sum(n->(2n+1)*mean(abs2.(ans_bns[1,n,:]) + abs2.(ans_bns[2,n,:])), 1:size(ans_bns)[2])
+function compute_avg_C_scatt(k, ans_bns,w)
+    a = 0
+    for n=1:size(ans_bns)[2]
+        a += (2n+1)* (w' * (abs2.(ans_bns[1,n,:]) + abs2.(ans_bns[2,n,:])))
+    end
+    return (2π/k^2) * a
 end
 
 # Eqn. 22
-function compute_Sl_νν(l, ν, k, N_max, ans_bns, wigner_A, wigner_B)
-    
-    coef = π / k^2
+function compute_Sl_νν(l, ν, k, N_max, ans_bns, wigner_A, wigner_B,w)
+    ll = l-1
+    coef = (2ll+1)*π / k^2
+    #@show ll
+    first_term = 0
+    second_term = 0
+
+    for n = 1:N_max
+
+        m_star = max(ll-n,n+1)
+        m_max = min(ll+n,N_max)
+        for m = m_star:m_max
+
+            real_avg = real(w' *( (adjoint.(ans_bns[1,n,:]) + adjoint.(ans_bns[2,n,:])) .* (ans_bns[1,m,:] + ans_bns[2,m,:])) )
+            #@show real_avg
+            #real_avg = 1.3;
+            A_lnm2 = 2 * (2m + 1)  * (2n + 1)
+            first_term += (real_avg * (wigner_A[m, n, l])^2 * A_lnm2)
+        end
+
+        A_lnn2 = (2n + 1)^2
+        second_term += w' *(abs2.(ans_bns[1,n,:] .+ ans_bns[2,n,:])) * (wigner_A[n, n, l])^2 * A_lnn2
+
+    end
+
+    return coef * (first_term + second_term)
+end
+
+# Eqn. 22
+function compute_Sl_νmν(l, ν, k, N_max, ans_bns, wigner_A, wigner_B,w)
+    ll = l-1
+    coef = (2ll+1)*π / k^2
 
     first_term = 0
     second_term = 0
 
     for n = 1:N_max
 
-        m_star = max(abs(l-n), n+1)
+        m_star  = max(ll-n,n+1)
+        m_max = min(ll+n,N_max)
+        for m = m_star:m_max
 
-        for m = m_star:(n+l)
-
-            real_avg = mean( real( (adjoint.(ans_bns[1,n,:]) + adjoint.(ans_bns[2,n,:])) .* (ans_bns[1,m,:] + ans_bns[1,m,:])) )
-            A_lnm2 = 2 * (2 * l + 1) * (2 * m + 1)  * (2 * n + 1)
+            real_avg = real(w' *( (adjoint.(ans_bns[1,n,:]) - adjoint.(ans_bns[2,n,:])) .* (ans_bns[1,m,:] - ans_bns[2,m,:])) )
+            #real_avg = 1.2;
+            A_lnm2 = ((-1) ^ (ll + n + m)) * 2 * (2m + 1)  * (2n + 1)
             first_term += (real_avg * (wigner_A[m, n, l])^2 * A_lnm2)
         end
 
-        A_lnn2 = 2 * (2 * l + 1) * (2 * n + 1)^2
-        second_term += mean(abs2.(ans_bns[1,n,:] .+ ans_bns[2,n,:])) * (wigner_A[n, n, l])^2 * A_lnn2
+        A_lnn2 = ((-1)^ll) * (2n + 1)^2
+        second_term += w' *(abs2.(ans_bns[1,n,:] .- ans_bns[2,n,:])) * (wigner_A[n, n, l])^2 * A_lnn2
 
     end
 
-    return coef * (first_term + 0.5 * second_term)
-end
-
-# Eqn. 22
-function compute_Sl_νmν(l, ν, k, N_max, ans_bns, wigner_A, wigner_B)
-
-    coef = π / k^2
-
-    first_term = 0
-    second_term = 0
-
-    for n = 1:N_max
-
-        m_star = max(abs(l-n), n+1)
-
-        for m = m_star:(n+l)
-
-            real_avg = mean( real( (adjoint.(ans_bns[1,n,:]) - adjoint.(ans_bns[2,n,:])) .* (ans_bns[1,m,:] - ans_bns[1,m,:])) )
-            A_lnm2 = ((-1) ^ (l + n + m)) * 2 * (2 * l + 1) * (2 * m + 1)  * (2 * n + 1)
-            first_term += (real_avg * (wigner_A[m, n, l])^2 * A_lnm2)
-        end
-
-        A_lnn2 = ((-1)^l) * 2 * (2 * l + 1) * (2 * n + 1)^2
-        second_term += mean(abs2.(ans_bns[1,n,:] .- ans_bns[2,n,:])) * (wigner_A[n, n, l])^2 * A_lnn2
-
-    end
-
-    return coef * (first_term + 0.5 * second_term)
+    return coef * (first_term + second_term)
     
 end
 
-function compute_B(aerosol::UnivariateAerosol, wigner_A, wigner_B)
-
+function compute_B2(aerosol::UnivariateAerosol, wigner_A, wigner_B, wl, radius,w)
+    #@show w
     # Find overall N_max from the maximum radius
     N_max = PhaseFunction.get_n_max(2 * π * aerosol.r_max/ wl)
-
+    #@show N_max
     # Where to store an, bn, computed over size distribution
     ans_bns = zeros(Complex, 2, 2 * N_max + 1, aerosol.nquad_radius)
 
-    Dn = zeros(Complex{FT}, N_max)
+    #Dn = zeros(Complex{FT}, N_max)
 
     # Loop over the size distribution, and compute an, bn, for each size
     for i in 1:aerosol.nquad_radius
 
-        r = i * aerosol.r_max/aerosol.nquad_radius
-        size_param = 2 * π * r
+        r = radius[i] 
+        size_param = 2 * π * r / wl
+        # Pre-allocate Dn:
+        y = size_param * (aerosol.nᵣ-aerosol.nᵢ);
+        nmx = round(Int, max(N_max, abs(y))+51 )
+        Dn = zeros(Complex{FT},nmx)
 
-        PhaseFunction.compute_mie_ab!(size_param, aerosol.nᵣ - aerosol.nᵢ * im, 
+        PhaseFunction.compute_mie_ab!(size_param, aerosol.nᵣ + aerosol.nᵢ * im, 
                                       view(ans_bns, 1, :, i), 
                                       view(ans_bns, 2, :, i), Dn)
     end
 
     # Compute the average cross-sectional scattering
     k = 2 * π / wl
-    avg_C_scatt = compute_avg_C_scatt(k, ans_bns)
+    avg_C_scatt = compute_avg_C_scatt(k, ans_bns,w)
 
     # Only do these l's for now
     ls = 1:10
@@ -105,9 +116,9 @@ function compute_B(aerosol::UnivariateAerosol, wigner_A, wigner_B)
 
         # Compute β_l
 
-        println(l)
-        Sl_00 = compute_Sl_νν(l, 0, k, N_max, ans_bns, wigner_A, wigner_B)
-        Sl_0m0 = compute_Sl_νmν(l, 0, k, N_max, ans_bns, wigner_A, wigner_B)
+        #println(l)
+        Sl_00  =  compute_Sl_νν(l, 0, k, N_max, ans_bns, wigner_A, wigner_B,w)
+        Sl_0m0 = compute_Sl_νmν(l, 0, k, N_max, ans_bns, wigner_A, wigner_B,w)
         println("Sl_00: ", Sl_00)
         println("Sl_0m0: ",Sl_0m0)
         println("avg_C_scatt: ",avg_C_scatt)
@@ -120,21 +131,59 @@ function compute_B(aerosol::UnivariateAerosol, wigner_A, wigner_B)
 
 end
 
+
+function compute_abns(aerosol::UnivariateAerosol, wigner_A, wigner_B,wl,radius)
+
+    # Find overall N_max from the maximum radius
+    N_max = PhaseFunction.get_n_max(2 * π * aerosol.r_max/ wl)
+
+    # Where to store an, bn, computed over size distribution
+    ans_bns = zeros(Complex, 2, N_max, aerosol.nquad_radius)
+
+    #Dn = zeros(Complex{FT}, N_max)
+
+    # Loop over the size distribution, and compute an, bn, for each size
+    for i in 1:aerosol.nquad_radius
+
+        r = radius[i]
+        size_param = 2 * π * r / wl
+        n_max = PhaseFunction.get_n_max(size_param)
+        y = size_param * (aerosol.nᵣ-aerosol.nᵢ);
+        nmx = round(Int, max(n_max, abs(y))+51 )
+        Dn = zeros(Complex{FT},nmx)
+        
+        PhaseFunction.compute_mie_ab!(size_param, aerosol.nᵣ + aerosol.nᵢ * im, 
+                                      view(ans_bns, 1, 1:n_max, i), 
+                                      view(ans_bns, 2, 1:n_max, i), Dn)
+    end
+
+    # Compute the average cross-sectional scattering
+    k = 2 * π / wl
+    #avg_C_scatt = compute_avg_C_scatt(k, ans_bns)
+    return ans_bns;
+    
+
+end
 # Constants
 
-μ  = 0.3
-σ  = 6.82
-wl = 0.55
+const μ  = 0.3
+const σ  = 6.82
+const wl = 0.55
 
-FT = Float64
+const FT = Float64
 
 size_distribution = LogNormal(log(μ), log(σ))
 
 # Generate aerosol:
-aero1 = PhaseFunction.UnivariateAerosol(size_distribution, 30.0, 10000, 1.3, 0.0)
+aero = PhaseFunction.UnivariateAerosol(size_distribution, 30.0, 2500, 1.3, 0.0)
+r, wᵣ = PhaseFunction.gauleg(aero.nquad_radius, 0.0, aero.r_max ; norm=true)
+wₓ = pdf.(aero.size_distribution,r)
+# pre multiply with wᵣ to get proper means eventually:
+wₓ .*= wᵣ
+# normalize (could apply a check whether cdf.(aero.size_distribution,r_max) is larger than 0.99:
+wₓ /= sum(wₓ)
 
-
-N_max = PhaseFunction.get_n_max(2 * π * aero1.r_max/ wl)
+N_max = PhaseFunction.get_n_max(2 * π * aero.r_max/ wl)
 ls = 1:10
 ms = 1:(2 * N_max + 1)
 ns = 1:(N_max + 1)
@@ -149,11 +198,11 @@ wigner_B = zeros(size(ms, 1), size(ns, 1), size(ls, 1))
 for l in ls
     for m in ms
         for n in ns 
-            wigner_A[m, n, l] = wigner!(m, n, l, -1, 1, 0)
-            wigner_B[m, n, l] = wigner!(m, n, l, -1, -1, 2)
+            wigner_A[m, n, l] = wigner!(m, n, l-1, -1, 1, 0)
+            wigner_B[m, n, l] = wigner!(m, n, l-1, -1, -1, 2)
         end
     end
 end
 
 # Compute B matrix (just betas for now)
-β_ls = compute_B(aero1, wigner_A, wigner_B)
+β_ls = compute_B2(aero, wigner_A, wigner_B,wl,r,wₓ)
