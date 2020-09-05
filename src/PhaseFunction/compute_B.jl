@@ -9,11 +9,21 @@ function compute_C_scatt(k, nmax, an, bn)
     return (2π/k^2) * sum(n->(2n+1)*(abs2(an[n]) + abs2(bn[n])), 1:nmax)
 end
 
+function compute_avg_C_scatt(k, an,bn,w)
+    a = 0
+    @inbounds for n=1:size(an)[1]
+            a += (2n+1)* (w' * (abs2.(an[n,:]) + abs2.(bn[n,:])))
+    end
+    return (2π/k^2) * a
+end
+
 # <|a_n|^2 + |b_n|^2> averaged over size distribution
-function compute_avg_C_scatt(k, ans_bns,w)
+function compute_avg_C_scatt2(k, ans_bns,w)
     a = 0
     for n=1:size(ans_bns)[2]
-        a += (2n+1)* (w' * (abs2.(ans_bns[1,n,:]) + abs2.(ans_bns[2,n,:])))
+        for m=1:size(ans_bns)[3]
+            a += (2n+1)* (w[m] * (abs2(ans_bns[1,n,m]) + abs2(ans_bns[2,n,m])))
+        end
     end
     return (2π/k^2) * a
 end
@@ -82,7 +92,7 @@ function compute_B2(aerosol::UnivariateAerosol, wigner_A, wigner_B, wl, radius,w
     N_max = PhaseFunction.get_n_max(2 * π * aerosol.r_max/ wl)
     #@show N_max
     # Where to store an, bn, computed over size distribution
-    ans_bns = zeros(Complex, 2, 2 * N_max + 1, aerosol.nquad_radius)
+    ans_bns = zeros(Complex{Float64}, 2, 2 * N_max + 1, aerosol.nquad_radius)
 
     #Dn = zeros(Complex{FT}, N_max)
 
@@ -138,7 +148,7 @@ function compute_abns(aerosol::UnivariateAerosol, wigner_A, wigner_B,wl,radius)
     N_max = PhaseFunction.get_n_max(2 * π * aerosol.r_max/ wl)
 
     # Where to store an, bn, computed over size distribution
-    ans_bns = zeros(Complex, 2, N_max, aerosol.nquad_radius)
+    ans_bns = zeros(Complex{Float32}, 2, N_max, aerosol.nquad_radius)
 
     #Dn = zeros(Complex{FT}, N_max)
 
