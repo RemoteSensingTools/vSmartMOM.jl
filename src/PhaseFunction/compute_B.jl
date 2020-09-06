@@ -3,6 +3,7 @@ using Plots
 using Distributions
 using RadiativeTransfer
 using RadiativeTransfer.PhaseFunction
+using KernelAbstractions
 
 # Eqn. 1
 function compute_C_scatt(k, nmax, an, bn)
@@ -15,29 +16,57 @@ function compute_avg_C_scatt(k, an,bn,w)
     return 2π/k^2 * n_' * (w' * (abs2.(an) + abs2.(bn))')'
 end
 
-function compute_avg_anbn(an,bn,w,Nmax)
+@kernel function compute_Sl_νν!(@Const(wignerA),@Const(wignerB), an, bn, Sνν, @Const(lMax))
+    # Get length of an:
+    san = size(an)[1];
+    # Indices over n and m
+    n, m = @index(Global, NTuple)
+    
+    # Outer loop over l
+    for l = 1:lMax
+        if max(l-n,n) <= m <= min(san,n+l)
+            #println((an[n]' + bn[n]') * (an[m] + bn[m]) * wignerA[l,n,m]^2)
+            Sνν[l] += real((an[n]' + bn[n]') * (an[m] + bn[m]) * wignerA[l,n,m]^2)
+            Sνν[l] += 1/2 *  real(abs2(an[n] + bn[n]) * wignerA[l,n,m]^2)
+        end
+    end
+    
+end
+
+@kernel function avg_anbn!(@Const(an), @Const(bn),mat_anam,mat_bnbm,mat_anbm,mat_bnam,w)
     FT = eltype(an)
-    mat_anam = UpperTriangular(zeros(FT,Nmax,Nmax))
-    mat_bnbm = UpperTriangular(zeros(FT,Nmax,Nmax))
-    mat_anbm = UpperTriangular(zeros(FT,Nmax,Nmax))
-    mat_bnam = UpperTriangular(zeros(FT,Nmax,Nmax))
+    # Indices over n and m
+    m, n, i = @index(Global, NTuple)
+    if m>=n
+            @inbounds mat_anam[n,m] += (w[i] * (an[n,i]' * an[m,i]));
+            @inbounds mat_bnbm[n,m] += (w[i] * (bn[n,i]' * bn[m,i]));
+            @inbounds mat_anbm[n,m] += (w[i] * (an[n,i]' * bn[m,i]));
+            @inbounds mat_bnam[n,m] += (w[i] * (bn[n,i]' * an[m,i]));
+    end
+end
+
+function compute_avg_anbn(an,bn,w,Nmax)
+    FT2 = eltype(an)
+    mat_anam = UpperTriangular(zeros(FT2,Nmax,Nmax))
+    mat_bnbm = UpperTriangular(zeros(FT2,Nmax,Nmax))
+    mat_anbm = UpperTriangular(zeros(FT2,Nmax,Nmax))
+    mat_bnam = UpperTriangular(zeros(FT2,Nmax,Nmax))
     @inbounds for n=1:Nmax
         @inbounds for m=n:Nmax
-            #anam = 0;
-            #bnbm = 0;
-            #anbm = 0;
-            #bnam = 0;
+            anam = FT(0);
+            bnbm = FT(0);
+            anbm = FT(0);
+            bnam = FT(0);
             @inbounds for i = 1:size(an)[2]
-                #anam += w[i] * an[n,i]' * an[m,i]
-                #bnbm += w[i] * bn[n,i]' * bn[m,i]
-                #anbm += w[i] * an[n,i]' * bn[m,i]
-                #bnam += w[i] * bn[n,i]' * an[m,i]
-                mat_anam[n,m] += w[i] * an[n,i]' * an[m,i]
-                mat_bnbm[n,m] += w[i] * bn[n,i]' * bn[m,i]
-                mat_anbm[n,m] += w[i] * an[n,i]' * bn[m,i]
-                mat_bnam[n,m] += w[i] * bn[n,i]' * an[m,i]
+                anam += w[i] * an[n,i]' * an[m,i]
+                bnbm += w[i] * bn[n,i]' * bn[m,i]
+                anbm += w[i] * an[n,i]' * bn[m,i]
+                bnam += w[i] * bn[n,i]' * an[m,i]
             end 
-            #@inbounds mat_anam[n,m] = anam
+            @inbounds mat_anam[n,m] = anam;
+            @inbounds mat_bnbm[n,m] = bnbm;
+            @inbounds mat_anbm[n,m] = anbm;
+            @inbounds mat_bnam[n,m] = bnam;
         end
     end
     return mat_anam, mat_bnam, mat_anbm, mat_bnam
@@ -139,7 +168,7 @@ function compute_B2(aerosol::UnivariateAerosol, wigner_A, wigner_B, wl, radius,w
 
     # Compute the average cross-sectional scattering
     k = 2 * π / wl
-    avg_C_scatt = compute_avg_C_scatt(k, ans_bns,w)
+    avg_C_scatt = compute_avg_C_scatt2(k, ans_bns,w)
 
     # Only do these l's for now
     ls = 1:10
@@ -168,13 +197,13 @@ function compute_B2(aerosol::UnivariateAerosol, wigner_A, wigner_B, wl, radius,w
 end
 
 
-function compute_abns(aerosol::UnivariateAerosol, wigner_A, wigner_B,wl,radius)
-
+function compute_abns(aerosol::UnivariateAerosol,wl,radius)
+    FT = eltype(radius)
     # Find overall N_max from the maximum radius
     N_max = PhaseFunction.get_n_max(2 * π * aerosol.r_max/ wl)
 
     # Where to store an, bn, computed over size distribution
-    ans_bns = zeros(Complex{Float32}, 2, N_max, aerosol.nquad_radius)
+    ans_bns = zeros(Complex{FT}, 2, N_max, aerosol.nquad_radius)
 
     #Dn = zeros(Complex{FT}, N_max)
 
@@ -244,3 +273,47 @@ end
 
 # Compute B matrix (just betas for now)
 β_ls = compute_B2(aero, wigner_A, wigner_B,wl,r,wₓ)
+
+function goCPU()
+    fill!(mat_anam,0)
+    fill!(mat_bnbm,0)
+    fill!(mat_bnam,0)
+    fill!(mat_anbm,0)
+    kernel! = avg_anbn!(CPU())
+    event = kernel!(an,bn,mat_anam, mat_bnbm,mat_anbm,mat_bnam,wₓ, ndrange=(Nmax,Nmax,length(wₓ))); 
+    wait(CPU(), event) 
+    @show  mat_anam[10,12]       
+end
+
+
+anC = CuArray(an)
+    bnC = CuArray(bn)
+    mat_anamC = CuArray(mat_anam)
+    mat_bnbmC = CuArray(mat_bnbm)
+    mat_bnamC = CuArray(mat_bnam)
+    mat_anbmC = CuArray(mat_anbm)
+    wₓC = CuArray(wₓ)
+
+function goCUDA()
+    fill!(mat_anamC,0)
+    fill!(mat_bnbmC,0)
+    fill!(mat_bnamC,0)
+    fill!(mat_anbmC,0)
+    kernel! = avg_anbn!(CUDADevice())
+    event = kernel!(anC,bnC,mat_anamC, mat_bnbmC,mat_anbmC,mat_bnamC,wₓC, ndrange=(Nmax,Nmax,length(wₓ))); 
+    wait(CUDADevice(), event)    
+    #@show  Array(mat_anamC)[10,12]  
+    return mat_anamC
+end
+
+Nmax = N_max
+using LinearAlgebra
+FT2 = Complex{Float64}
+mat_anam = UpperTriangular(zeros(FT2,Nmax,Nmax));
+mat_bnbm = UpperTriangular(zeros(FT2,Nmax,Nmax));
+mat_anbm = UpperTriangular(zeros(FT2,Nmax,Nmax));
+mat_bnam = UpperTriangular(zeros(FT2,Nmax,Nmax));
+
+ans_bns = compute_abns(aero, wl, r);
+an = ans_bns[1,:,:];
+bn = ans_bns[2,:,:];
