@@ -10,11 +10,37 @@ function compute_C_scatt(k, nmax, an, bn)
 end
 
 function compute_avg_C_scatt(k, an,bn,w)
-    a = 0
-    @inbounds for n=1:size(an)[1]
-            a += (2n+1)* (w' * (abs2.(an[n,:]) + abs2.(bn[n,:])))
+    n_ = collect(1:size(an)[1]);
+    n_ = 2n_ .+ 1
+    return 2π/k^2 * n_' * (w' * (abs2.(an) + abs2.(bn))')'
+end
+
+function compute_avg_anbn(an,bn,w,Nmax)
+    FT = eltype(an)
+    mat_anam = UpperTriangular(zeros(FT,Nmax,Nmax))
+    mat_bnbm = UpperTriangular(zeros(FT,Nmax,Nmax))
+    mat_anbm = UpperTriangular(zeros(FT,Nmax,Nmax))
+    mat_bnam = UpperTriangular(zeros(FT,Nmax,Nmax))
+    @inbounds for n=1:Nmax
+        @inbounds for m=n:Nmax
+            #anam = 0;
+            #bnbm = 0;
+            #anbm = 0;
+            #bnam = 0;
+            @inbounds for i = 1:size(an)[2]
+                #anam += w[i] * an[n,i]' * an[m,i]
+                #bnbm += w[i] * bn[n,i]' * bn[m,i]
+                #anbm += w[i] * an[n,i]' * bn[m,i]
+                #bnam += w[i] * bn[n,i]' * an[m,i]
+                mat_anam[n,m] += w[i] * an[n,i]' * an[m,i]
+                mat_bnbm[n,m] += w[i] * bn[n,i]' * bn[m,i]
+                mat_anbm[n,m] += w[i] * an[n,i]' * bn[m,i]
+                mat_bnam[n,m] += w[i] * bn[n,i]' * an[m,i]
+            end 
+            #@inbounds mat_anam[n,m] = anam
+        end
     end
-    return (2π/k^2) * a
+    return mat_anam, mat_bnam, mat_anbm, mat_bnam
 end
 
 # <|a_n|^2 + |b_n|^2> averaged over size distribution
@@ -174,6 +200,8 @@ function compute_abns(aerosol::UnivariateAerosol, wigner_A, wigner_B,wl,radius)
     
 
 end
+
+
 # Constants
 
 const μ  = 0.3
