@@ -39,10 +39,10 @@ end
     # Indices over n and m
     m, n, i = @index(Global, NTuple)
     if m>=n && m<nMax[i] && n < nMax[i]
-        @inbounds mat_anam[n,m] += (w[i] * (an[n,i]' * an[m,i]));
-        @inbounds mat_bnbm[n,m] += (w[i] * (bn[n,i]' * bn[m,i]));
-        @inbounds mat_anbm[n,m] += (w[i] * (an[n,i]' * bn[m,i]));
-        @inbounds mat_bnam[n,m] += (w[i] * (bn[n,i]' * an[m,i]));
+        @inbounds mat_anam[m,n] += (w[i] * (an[n,i]' * an[m,i]));
+        @inbounds mat_bnbm[m,n] += (w[i] * (bn[n,i]' * bn[m,i]));
+        @inbounds mat_anbm[m,n] += (w[i] * (an[n,i]' * bn[m,i]));
+        @inbounds mat_bnam[m,n] += (w[i] * (bn[n,i]' * an[m,i]));
  
     end
 end
@@ -67,10 +67,10 @@ function compute_avg_anbn!(an,bn,w,Nmax,N_max_, mat_anam,mat_bnbm,mat_anbm,mat_b
                     bnam += w[i] * bn[n,i]' * an[m,i]
                 end
             end 
-            @inbounds mat_anam[n,m] = anam;
-            @inbounds mat_bnbm[n,m] = bnbm;
-            @inbounds mat_anbm[n,m] = anbm;
-            @inbounds mat_bnam[n,m] = bnam;
+            @inbounds mat_anam[m,n] = anam;
+            @inbounds mat_bnbm[m,n] = bnbm;
+            @inbounds mat_anbm[m,n] = anbm;
+            @inbounds mat_bnam[m,n] = bnam;
         end
     end
     return nothing
@@ -281,7 +281,7 @@ end
 # Compute B matrix (just betas for now)
 β_ls = compute_B2(aero, wigner_A, wigner_B,wl,r,wₓ)
 
-function goCPU()
+function goCPU!(mat_anam, mat_bnbm,mat_anbm,mat_bnam)
     fill!(mat_anam,0)
     fill!(mat_bnbm,0)
     fill!(mat_bnam,0)
@@ -289,12 +289,13 @@ function goCPU()
     kernel! = avg_anbn!(CPU())
     event = kernel!(an,bn,mat_anam, mat_bnbm,mat_anbm,mat_bnam,wₓ,N_max_, ndrange=(Nmax,Nmax,length(wₓ))); 
     wait(CPU(), event) 
-    @show  mat_anam[10,12]       
+    #@show  mat_anam[10,12]
+    return nothing       
 end
 
 
 
-function goCUDA!()
+function goCUDA!(mat_anamC, mat_bnbmC,mat_anbmC,mat_bnamC)
     fill!(mat_anamC,0);
     fill!(mat_bnbmC,0);
     fill!(mat_bnamC,0);
@@ -302,8 +303,8 @@ function goCUDA!()
     kernel! = avg_anbn!(CUDADevice())
     event = kernel!(anC,bnC,mat_anamC, mat_bnbmC,mat_anbmC,mat_bnamC,wₓC,N_max_C, ndrange=(Nmax,Nmax,length(wₓ))); 
     wait(CUDADevice(), event)    ;
-    #@show  Array(mat_anamC)[10,12]  
-    #return mat_anamC
+    #@show  Array(mat_anamC)[12,10]  
+    return nothing
 end
 
 Nmax = N_max
@@ -311,23 +312,25 @@ Nmax = N_max
 using LinearAlgebra
 N_max_ = PhaseFunction.get_n_max.(2π * r/ wl)
 
+
+wₓC = CuArray(wₓ)
+N_max_C = CuArray(N_max_)
+FT2 = Complex{Float64}
+mat_anam = LowerTriangular(zeros(FT2,Nmax,Nmax));
+mat_bnbm = LowerTriangular(zeros(FT2,Nmax,Nmax));
+mat_anbm = LowerTriangular(zeros(FT2,Nmax,Nmax));
+mat_bnam = LowerTriangular(zeros(FT2,Nmax,Nmax));
+
+ans_bns = compute_abns(aero, wl, r);
+an = ans_bns[1,:,:];
+bn = ans_bns[2,:,:];
+
 anC = CuArray(an)
 bnC = CuArray(bn)
 mat_anamC = CuArray(mat_anam)
 mat_bnbmC = CuArray(mat_bnbm)
 mat_bnamC = CuArray(mat_bnam)
 mat_anbmC = CuArray(mat_anbm)
-wₓC = CuArray(wₓ)
-N_max_C = CuArray(N_max_)
-FT2 = Complex{Float64}
-mat_anam = UpperTriangular(zeros(FT2,Nmax,Nmax));
-mat_bnbm = UpperTriangular(zeros(FT2,Nmax,Nmax));
-mat_anbm = UpperTriangular(zeros(FT2,Nmax,Nmax));
-mat_bnam = UpperTriangular(zeros(FT2,Nmax,Nmax));
-
-ans_bns = compute_abns(aero, wl, r);
-an = ans_bns[1,:,:];
-bn = ans_bns[2,:,:];
 
 @time goCPU()
 
