@@ -39,10 +39,10 @@ end
     # Indices over n and m
     m, n, i = @index(Global, NTuple)
     if m>=n && m<nMax[i] && n < nMax[i]
-        @inbounds mat_anam[m,n] += (w[i] * (an[n,i]' * an[m,i]));
-        @inbounds mat_bnbm[m,n] += (w[i] * (bn[n,i]' * bn[m,i]));
-        @inbounds mat_anbm[m,n] += (w[i] * (an[n,i]' * bn[m,i]));
-        @inbounds mat_bnam[m,n] += (w[i] * (bn[n,i]' * an[m,i]));
+        @inbounds mat_anam[m,n] += (w[i] * (an[i,n]' * an[i,m]));
+        @inbounds mat_bnbm[m,n] += (w[i] * (bn[i,n]' * bn[i,m]));
+        @inbounds mat_anbm[m,n] += (w[i] * (an[i,n]' * bn[i,m]));
+        @inbounds mat_bnam[m,n] += (w[i] * (bn[i,n]' * an[i,m]));
  
     end
 end
@@ -59,12 +59,12 @@ function compute_avg_anbn!(an,bn,w,Nmax,N_max_, mat_anam,mat_bnbm,mat_anbm,mat_b
             bnbm = FT2(0);
             anbm = FT2(0);
             bnam = FT2(0);
-            @inbounds for i = 1:size(an)[2]
+            @inbounds for i = 1:size(an,1)
                 if m < N_max_[i] && n < N_max_[i]
-                    anam += w[i] * an[n,i]' * an[m,i]
-                    bnbm += w[i] * bn[n,i]' * bn[m,i]
-                    anbm += w[i] * an[n,i]' * bn[m,i]
-                    bnam += w[i] * bn[n,i]' * an[m,i]
+                    anam += w[i] * an[i,n]' * an[i,m]
+                    bnbm += w[i] * bn[i,n]' * bn[i,m]
+                    anbm += w[i] * an[i,n]' * bn[i,m]
+                    bnam += w[i] * bn[i,n]' * an[i,m]
                 end
             end 
             @inbounds mat_anam[m,n] = anam;
@@ -210,8 +210,8 @@ function compute_abns(aerosol::UnivariateAerosol,wl,radius)
     N_max = PhaseFunction.get_n_max(2 * π * aerosol.r_max/ wl)
 
     # Where to store an, bn, computed over size distribution
-    ans_bns = zeros(Complex{FT}, 2, N_max, aerosol.nquad_radius)
-
+    an = zeros(Complex{FT}, aerosol.nquad_radius, N_max)
+    bn = zeros(Complex{FT}, aerosol.nquad_radius, N_max)
     #Dn = zeros(Complex{FT}, N_max)
 
     # Loop over the size distribution, and compute an, bn, for each size
@@ -225,15 +225,14 @@ function compute_abns(aerosol::UnivariateAerosol,wl,radius)
         Dn = zeros(Complex{FT},nmx)
         
         PhaseFunction.compute_mie_ab!(size_param, aerosol.nᵣ + aerosol.nᵢ * im, 
-                                      view(ans_bns, 1, 1:n_max, i), 
-                                      view(ans_bns, 2, 1:n_max, i), Dn)
+                                      view(an, i, 1:n_max), 
+                                      view(bn, i, 1:n_max), Dn)
     end
 
     # Compute the average cross-sectional scattering
     k = 2 * π / wl
     #avg_C_scatt = compute_avg_C_scatt(k, ans_bns)
-    return ans_bns;
-    
+    return an,bn;
 
 end
 
@@ -321,9 +320,9 @@ mat_bnbm = LowerTriangular(zeros(FT2,Nmax,Nmax));
 mat_anbm = LowerTriangular(zeros(FT2,Nmax,Nmax));
 mat_bnam = LowerTriangular(zeros(FT2,Nmax,Nmax));
 
-ans_bns = compute_abns(aero, wl, r);
-an = ans_bns[1,:,:];
-bn = ans_bns[2,:,:];
+an, bn = compute_abns(aero, wl, r);
+#an = ans_bns[1,:,:];
+#bn = ans_bns[2,:,:];
 
 anC = CuArray(an)
 bnC = CuArray(bn)
