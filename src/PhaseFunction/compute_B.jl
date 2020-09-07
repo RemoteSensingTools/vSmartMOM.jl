@@ -34,7 +34,7 @@ end
 end
 
 # This can add another flag/number to avoid multiplications by 0 (e.g. where an,bn is 0)
-@kernel function avg_anbn!(@Const(an), @Const(bn),mat_anam,mat_bnbm,mat_anbm,mat_bnam,w,nMax)
+@kernel function avg_anbn!(@Const(an), @Const(bn),mat_anam,mat_bnbm,mat_anbm,mat_bnam,@Const(w),@Const(nMax))
     FT = eltype(an)
     # Indices over n and m
     m, n, i = @index(Global, NTuple)
@@ -47,23 +47,25 @@ end
     end
 end
 
-function compute_avg_anbn(an,bn,w,Nmax)
+function compute_avg_anbn!(an,bn,w,Nmax,N_max_, mat_anam,mat_bnbm,mat_anbm,mat_bnam)
     FT2 = eltype(an)
-    mat_anam = UpperTriangular(zeros(FT2,Nmax,Nmax))
-    mat_bnbm = UpperTriangular(zeros(FT2,Nmax,Nmax))
-    mat_anbm = UpperTriangular(zeros(FT2,Nmax,Nmax))
-    mat_bnam = UpperTriangular(zeros(FT2,Nmax,Nmax))
+    fill!(mat_anam,0)
+    fill!(mat_bnbm,0)
+    fill!(mat_anbm,0)
+    fill!(mat_bnam,0)
     @inbounds for n=1:Nmax
         @inbounds for m=n:Nmax
-            anam = FT(0);
-            bnbm = FT(0);
-            anbm = FT(0);
-            bnam = FT(0);
+            anam = FT2(0);
+            bnbm = FT2(0);
+            anbm = FT2(0);
+            bnam = FT2(0);
             @inbounds for i = 1:size(an)[2]
-                anam += w[i] * an[n,i]' * an[m,i]
-                bnbm += w[i] * bn[n,i]' * bn[m,i]
-                anbm += w[i] * an[n,i]' * bn[m,i]
-                bnam += w[i] * bn[n,i]' * an[m,i]
+                if m < N_max_[i] && n < N_max_[i]
+                    anam += w[i] * an[n,i]' * an[m,i]
+                    bnbm += w[i] * bn[n,i]' * bn[m,i]
+                    anbm += w[i] * an[n,i]' * bn[m,i]
+                    bnam += w[i] * bn[n,i]' * an[m,i]
+                end
             end 
             @inbounds mat_anam[n,m] = anam;
             @inbounds mat_bnbm[n,m] = bnbm;
@@ -71,7 +73,7 @@ function compute_avg_anbn(an,bn,w,Nmax)
             @inbounds mat_bnam[n,m] = bnam;
         end
     end
-    return mat_anam, mat_bnam, mat_anbm, mat_bnam
+    return nothing
 end
 
 # <|a_n|^2 + |b_n|^2> averaged over size distribution
