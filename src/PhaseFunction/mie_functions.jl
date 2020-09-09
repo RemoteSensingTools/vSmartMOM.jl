@@ -1,5 +1,4 @@
 
-
 """
 $(FUNCTIONNAME)(size_parameter,refractive_idx::Number,an,bn,Dn)
 Computes Mie coefficients `an` and `bn` as a function of size parameter and complex refractive index. See eq 4.88 in Bohren and Huffman
@@ -76,35 +75,6 @@ end
 
 
 """
-$(FUNCTIONNAME)(μ, nmax, π, τ)
-Computes the associated Legendre functions  amplitude functions `π` and `τ` in Mie theory (stored internally). See eq 6 in Sanghavi 2014
-- `μ` cosine of the scattering angle
-- `nmax` max number of legendre terms (depends on size parameter, see [`get_n_max`](@ref))
-Functions returns `π` and `τ` (of size `[nmax,length(μ)]`)
-"""
-function compute_mie_π_τ(μ, nmax)
-    FT = eltype(μ)
-    # Allocate arrays:
-    π_ = zeros(FT,nmax,length(μ))
-    τ_ = zeros(FT,nmax,length(μ))
-
-    # BH book, pages 94-96:
-    π_[1,:] .= 1.0;
-    π_[2,:] .= 3μ;
-    τ_[1,:] .= μ;
-    # This is equivalent to 3*cos(2*acos(μ))
-    τ_[2,:] .= 6μ.^2 .-3;
-    for n=2:nmax-1
-        for i in eachindex(μ)
-            π_[n+1,i] = ((2n + 1) * μ[i] * π_[n,i] - (n+1) * π_[n-1,i]) / n 
-            τ_[n+1,i] = (n+1) * μ[i] * π_[n+1,i] - (n+2)*π_[n,i]
-            # @show n+1,μ[i], π_[n+1,i], τ_[n+1,i], π_[n,i]
-        end
-    end
-    return π_, τ_
-end
-
-"""
 $(FUNCTIONNAME)(an, bn, π_, τ_)
 Returns the amplitude functions `S₁`,`S₂` in Mie theory
 - `an` and `bn` pre-calculated Mie coefficients `an` and `bn`, see [`compute_mie_ab!`](@ref) function
@@ -128,56 +98,6 @@ end
 
 
 """
-$(FUNCTIONNAME)(x,nmax)
-Returns the associated legendre functions Pᵢ, P²ᵢ, R²ᵢ, and T²ᵢ as a function of x and i=1:nmax 
-- `x` array of locations to be evaluated [-1,1]
-- `nmax` max number of legendre terms (depends on size parameter, see [`get_n_max`](@ref))
-The function returns `Pᵢ`, `P²ᵢ`, `R²ᵢ`, and `T²ᵢ`, for a size distribution, this can be pre-computed with nmax derived from the maximum size parameter.
-"""
-function compute_legendre_poly(x,nmax)
-    FT = eltype(x)
-    @assert nmax > 1
-    #@assert size(P) == (nmax,length(x))
-    P⁰ = zeros(nmax,length(x));
-    P² = zeros(nmax,length(x));
-    R² = zeros(nmax,length(x));
-    T² = zeros(nmax,length(x));
-    # 0th Legendre polynomial, a constant
-    P⁰[1,:] .= 1;
-    P²[1,:] .= 0;
-    R²[1,:] .= 0;
-    T²[1,:] .= 0; 
-    # 1st Legendre polynomial, x
-    P⁰[2,:] = x;
-    P²[2,:] .= 0;
-    R²[2,:] .= 0;
-    T²[2,:] .= 0;
-
-    # 2nd Legendre polynomial, x
-    #P¹[2,:] = x;
-    P²[3,:] .= 3   * (1 .- x.^2);
-    R²[3,:] .= sqrt(1.5) * (1 .+ x.^2);
-    T²[3,:] .= sqrt(6) * x;
-
-    for n=2:nmax-1
-        for i in eachindex(x)
-            l = n-1;
-            P⁰[n+1,i] = ((2l + 1) * x[i] * P⁰[n,i] - l * P⁰[n-1,i])/(l+1)
-            if n>2
-                ia = (2l+1) * x[i];
-	            ib = sqrt( (l+2) * (l-2) ) * (l+2) / (l);
-	            ic = 4.0 * (2*l+1) / ( (l+1)*l );
-	            id = sqrt( (l+3) * (l-1) ) * (l-1) / (l+1);
-                P²[n+1,i] = ( ia * P²[n,i] - (l+2) * P²[n-1,i] ) / (l-1)
-                R²[n+1,i] = ( ia * R²[n,i] - ib * R²[n-1,i] - ic * T²[n,i] ) / id;
-	            T²[n+1,i] = ( ia * T²[n,i] - ib * T²[n-1,i] - ic * R²[n,i] ) / id;
-            end  
-        end
-    end
-    return P⁰, P², R², T²
-end
-
-"""
 $(FUNCTIONNAME)(n,xmin,xmax; norm=false)
 Returns the `n` Gauss-Legendre quadrature points and weights with a change of interval between xmin and xmax
 - `n` number of quadrature points
@@ -196,32 +116,3 @@ function gauleg(n,xmin,xmax; norm=false)
     return ξ,w
 end
 
-# DEBUG stage:
-function average_anbn(an,bn,w,k)
-    # Compute <an+bn>
-    anbn = sum(w .* (an + bn),dims=2)
-    # Compute <|an|²+|bn|²>
-    abs2an_abs2bn = sum(w .* (abs2(an) + abs2(bn)),dims=2) 
-
-    return anbn, abs2an_abs2bn
-    #Cₑₓ = sum()
-end
-
-# DEBUG stage: Kernels, I don't think this will run well on a GPU, might have to spell everything out
-@kernel function comp_ab!(@Const(grid),an,bn,Dn,n)
-    I = @index(Global, Linear)
-    compute_mie_ab!(grid[I],n,view(an,:,I),view(bn,:,I),Dn)
-end
-
-# DEBUG stage: Sνν
-@kernel function compute_Sl_νν!(@Const(wignerA),@Const(wignerB),an,bn,w,lMax)
-    # Indices over n and m
-    n, m = @index(Global, NTuple)
-    Sνν = zeros(eltype(an),lMax)
-    # Outer loop over l
-    for l = 1:lMax
-        Sνν[l] += real(sum(w .* (an[n,:]' + bn[n,:]') .* (an[m,:] + bn[m,:]))) * wignerA[l,n,m]^2
-        Sνν[l] += 1/2 *  sum(w .* abs2(an[n,:] + bn[n,:])) * wignerA[l,n,m]^2
-    end
-    
-end
