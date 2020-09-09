@@ -6,5 +6,6 @@ artifacts
 prefs
 packages
 *.cpp
+*.f90
 .vscode
 # *.csv
