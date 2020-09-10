@@ -26,12 +26,13 @@ function calc_aer_opt_prop(mod::NAI2, aero::AbstractAerosolType, λ::Number)
     k = 2π/λ
 
     # Pre-allocate arrays:
-    S₁    = zeros(Complex{FT},nquad_radius,n_mu)
-    S₂    = zeros(Complex{FT},nquad_radius,n_mu)
-    f₁₁   = zeros(FT, nquad_radius,n_mu)
-    f₃₃   = zeros(FT, nquad_radius,n_mu)
-    f₁₂   = zeros(FT, nquad_radius,n_mu)
-    f₃₄   = zeros(FT, nquad_radius,n_mu)
+    
+    S₁    = zeros(Complex{FT},n_mu,nquad_radius)
+    S₂    = zeros(Complex{FT},n_mu,nquad_radius)
+    f₁₁   = zeros(FT, n_mu,nquad_radius)
+    f₃₃   = zeros(FT, n_mu,nquad_radius)
+    f₁₂   = zeros(FT, n_mu,nquad_radius)
+    f₃₄   = zeros(FT, n_mu,nquad_radius)
     C_ext = zeros(FT, nquad_radius)
     C_sca = zeros(FT, nquad_radius)
     # Weights for the size distribution:
@@ -62,33 +63,39 @@ function calc_aer_opt_prop(mod::NAI2, aero::AbstractAerosolType, λ::Number)
         #PhaseFunction.compute_mie_ab!(x_sizeParam[i],aero1.nᵣ-aero1.nᵢ*im,view(an,1:n_max),view(bn,1:n_max),Dn)
         #S1[i,:],S2[i,:] = PhaseFunction.compute_mie_S1S2(view(an,1:n_max), view(bn,1:n_max), leg_π, leg_τ)
         compute_mie_ab!(x_sizeParam[i],aero.nᵣ+aero.nᵢ*im,an,bn,Dn)
-        compute_mie_S₁S₂!(an, bn, leg_π, leg_τ, view(S₁,i,:), view(S₂,i,:))
+        compute_mie_S₁S₂!(an, bn, leg_π, leg_τ, view(S₁,:,i), view(S₂,:,i))
         
         # Compute Extinction and scattering cross sections: 
         C_sca[i] = 2pi/k^2 * (n_' * (abs2.(an) + abs2.(bn)))
         C_ext[i] = 2pi/k^2 * (n_' * real(an + bn))
 
         # Compute scattering matrix components per size parameter (might change column/row ordering):
-        f₁₁[i,:] = 0.5/x_sizeParam[i]^2  * real(abs2.(S₁[i,:]) + abs2.(S₂[i,:]));
-        f₃₃[i,:] = 0.5/x_sizeParam[i]^2  * real(S₁[i,:] .* conj(S₂[i,:]) + S₂[i,:] .* conj(S₁[i,:]));
-        f₁₂[i,:] = -0.5/x_sizeParam[i]^2  * real(abs2.(S₁[i,:]) - abs2.(S₂[i,:]));
-        f₃₄[i,:] = -0.5/x_sizeParam[i]^2 * imag(S₁[i,:] .* conj(S₂[i,:]) - S₂[i,:] .* conj(S₁[i,:]));
+        f₁₁[:,i] =  0.5/x_sizeParam[i]^2  * real(abs2.(S₁[:,i]) + abs2.(S₂[:,i]));
+        f₃₃[:,i] =  0.5/x_sizeParam[i]^2  * real(S₁[:,i] .* conj(S₂[:,i]) + S₂[:,i] .* conj(S₁[:,i]));
+        f₁₂[:,i] = -0.5/x_sizeParam[i]^2  * real(abs2.(S₁[:,i]) - abs2.(S₂[:,i]));
+        f₃₄[:,i] = -0.5/x_sizeParam[i]^2  * imag(S₁[:,i] .* conj(S₂[:,i]) - S₂[:,i] .* conj(S₁[:,i]));
 
     end
+
     bulk_C_sca =  sum(wₓ .* C_sca)
     bulk_C_ext =  sum(wₓ .* C_ext)
     
-    bulk_f₁₁   =  sum(4π*r.^2 .*  wₓ .* f₁₁,dims=1)[1,:]
-    bulk_f₃₃   =  sum(4π*r.^2 .*  wₓ .* f₃₃,dims=1)[1,:]
-    bulk_f₁₂   =  sum(4π*r.^2 .*  wₓ .* f₁₂,dims=1)[1,:]
-    bulk_f₃₄   =  sum(4π*r.^2 .*  wₓ .* f₃₄,dims=1)[1,:]
+    #bulk_f₁₁   =  sum(4π*r.^2 .*  wₓ .* f₁₁,dims=2)[1,:]
+    #bulk_f₃₃   =  sum(4π*r.^2 .*  wₓ .* f₃₃,dims=2)[1,:]
+    #bulk_f₁₂   =  sum(4π*r.^2 .*  wₓ .* f₁₂,dims=2)[1,:]
+    #bulk_f₃₄   =  sum(4π*r.^2 .*  wₓ .* f₃₄,dims=2)[1,:]
+    wr = (4π*r.^2 .*  wₓ) 
+    bulk_f₁₁   =  f₁₁ * wr
+    bulk_f₃₃   =  f₃₃ * wr
+    bulk_f₁₂   =  f₁₂ * wr
+    bulk_f₃₄   =  f₃₄ * wr
 
     # Normalize Phase function with bulk scattering cross section.
     bulk_f₁₁ /= bulk_C_sca 
     bulk_f₃₃ /= bulk_C_sca
     bulk_f₁₂ /= bulk_C_sca
     bulk_f₃₄ /= bulk_C_sca
-
+    
     lMax = length(μ);
     P, P², R², T² = compute_legendre_poly(μ,lMax)
 
