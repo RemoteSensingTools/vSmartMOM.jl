@@ -232,12 +232,12 @@ function compute_legendre_poly(x,nmax)
             l = n-1;
             P⁰[n+1,i] = ((2l + 1) * x[i] * P⁰[n,i] - l * P⁰[n-1,i])/(l+1)
             if n>2
-               ia = (2l+1) * x[i];
+                ia = (2l+1) * x[i];
 	            ib = sqrt( (l+2) * (l-2) ) * (l+2) / (l);
 	            ic = 4.0 * (2l+1) / ( (l+1)*l );
 	            id = sqrt( (l+3) * (l-1) ) * (l-1) / (l+1);
-               P²[n+1,i] = ( ia * P²[n,i] - (l+2) * P²[n-1,i] ) / (l-1)
-               R²[n+1,i] = ( ia * R²[n,i] - ib * R²[n-1,i] - ic * T²[n,i] ) / id;
+                P²[n+1,i] = ( ia * P²[n,i] - (l+2) * P²[n-1,i] ) / (l-1)
+                R²[n+1,i] = ( ia * R²[n,i] - ib * R²[n-1,i] - ic * T²[n,i] ) / id;
 	            T²[n+1,i] = ( ia * T²[n,i] - ib * T²[n-1,i] - ic * R²[n,i] ) / id;
             end  
         end

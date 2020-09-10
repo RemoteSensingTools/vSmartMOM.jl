@@ -116,3 +116,36 @@ function gauleg(n,xmin,xmax; norm=false)
     return ξ,w
 end
 
+# Reconstruct Phase Matrix elements from greek coefficients:
+function reconstruct_phase(α, β, γ, δ, ϵ, ζ, μ)
+    FT = eltype(α)
+    #@assert length(μ) == length(α)
+    lMax = length(α);
+    nμ = length(μ)
+    P, P², R², T² = compute_legendre_poly(μ,lMax)
+    # To stay general, we also don't assume f₂₂=f₁₁ or f₄₄=f₃₃
+    # which only holds for spherical
+    f₁₁   = zeros(FT, nμ)
+    f₃₃   = zeros(FT, nμ)
+    f₁₂   = zeros(FT, nμ)
+    f₃₄   = zeros(FT, nμ)
+    f₂₂   = zeros(FT, nμ)
+    f₄₄   = zeros(FT, nμ)
+
+    fac = zeros(lMax);
+    for l=2:lMax-1
+        fac[l+1] = sqrt(1 / ( ( l-1) * l * (l+1) * (l+2) ));
+    end
+    
+    f₁₁[:] = β' * P                            # a₁ in Rooij notation
+    f₄₄[:] = δ' * P                            # a₄ in Rooij notation
+    f₁₂[:] = (fac.*γ)' * P²                    # b₁ in Rooij notation
+    f₃₄[:] = (fac.*ϵ)' * P²                    # b₂ in Rooij notation
+    f₂₂[:] = (fac.*α)' * R² .+ (fac.*ζ)' * T²  # a₂ in Rooij notation
+    f₃₃[:] = (fac.*ζ)' * R² .+ (fac.*α)' * T²  # a₃ in Rooij notation
+
+   return f₁₁, f₁₂, f₂₂, f₃₃, f₃₄, f₄₄
+end
+
+
+

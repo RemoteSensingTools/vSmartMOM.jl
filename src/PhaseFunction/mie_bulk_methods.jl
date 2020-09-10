@@ -102,8 +102,11 @@ function calc_aer_opt_prop(mod::NAI2, aero::AbstractAerosolType, λ::Number)
     
     #@show size(avg_f11), size(P), size(w_μ), size(f11), size(wₓ)
     for l=0:length(β)-1
-        # Factorial can be smarter through recursion I guess! 
-        fac = (2l+1)/2 * sqrt(factorial(big(l-2))/factorial(big(l+2)))
+        # 
+        fac = (2l+1)/2 * sqrt(1/((l-1)*(l)*(l+1)*(l+2)))
+        if l<2
+            fac = 0
+        end
         δ[l+1] = (2l+1)/2 * sum(w_μ' * (bulk_f₃₃ .* P[l+1,:]))
         β[l+1] = (2l+1)/2 * sum(w_μ' * (bulk_f₁₁ .* P[l+1,:]))
         γ[l+1] = fac * sum(w_μ' * (bulk_f₁₂ .* P²[l+1,:]))
@@ -119,5 +122,5 @@ function f_test(x)
     aero = UnivariateAerosol(LogNormal(log(x[1]), log(x[2])), 30.0, 2500, x[3], x[4])
     α, β, γ, δ, ϵ, ζ, bulk_C_sca, bulk_C_ext = calc_aer_opt_prop(NAI2(), aero, 0.55)
     return [α; β; γ; δ; ϵ; ζ; bulk_C_sca; bulk_C_ext]
-          
+
 end
