@@ -22,9 +22,11 @@ function compute_Π_matrix(μ,Lmax)
     cmu = μ 
     for  m=0:Lmax
         for l=m:Lmax
-            #indices for arrays:
-            im = m+1;
-            il = l+1;
+            #indices for arrays (swap position for l and m here, too lazy to change all indices):
+            #im = m+1;
+            #il = l+1;  # Note: Swapped this here
+            im = l+1;
+            il = m+1;
             if m==0
                 if l==0 # then !eq.28a
                     da[im,il] = 1
@@ -176,19 +178,19 @@ Functions returns `π` and `τ` (of size `[nmax,length(μ)]`)
 function compute_mie_π_τ(μ, nmax)
     FT = eltype(μ)
     # Allocate arrays:
-    π_ = zeros(FT,nmax,length(μ))
-    τ_ = zeros(FT,nmax,length(μ))
+    π_ = zeros(FT,length(μ),nmax)
+    τ_ = zeros(FT,length(μ),nmax)
 
     # BH book, pages 94-96:
-    π_[1,:] .= 1.0;
-    π_[2,:] .= 3μ;
-    τ_[1,:] .= μ;
+    π_[:,1] .= 1.0;
+    π_[:,2] .= 3μ;
+    τ_[:,1] .= μ;
     # This is equivalent to 3*cos(2*acos(μ))
-    τ_[2,:] .= 6μ.^2 .-3;
+    τ_[:,2] .= 6μ.^2 .-3;
     for n=2:nmax-1
         for i in eachindex(μ)
-            π_[n+1,i] = ((2n + 1) * μ[i] * π_[n,i] - (n+1) * π_[n-1,i]) / n 
-            τ_[n+1,i] = (n+1) * μ[i] * π_[n+1,i] - (n+2)*π_[n,i]
+            π_[i,n+1] = ((2n + 1) * μ[i] * π_[i,n] - (n+1) * π_[i,n-1]) / n 
+            τ_[i,n+1] = (n+1) * μ[i] * π_[i,n+1] - (n+2)*π_[i,n]
             # @show n+1,μ[i], π_[n+1,i], τ_[n+1,i], π_[n,i]
         end
     end
@@ -206,39 +208,39 @@ function compute_legendre_poly(x,nmax)
     FT = eltype(x)
     @assert nmax > 1
     #@assert size(P) == (nmax,length(x))
-    P⁰ = zeros(nmax,length(x));
-    P² = zeros(nmax,length(x));
-    R² = zeros(nmax,length(x));
-    T² = zeros(nmax,length(x));
+    P⁰ = zeros(length(x),nmax);
+    P² = zeros(length(x),nmax);
+    R² = zeros(length(x),nmax);
+    T² = zeros(length(x),nmax);
     # 0th Legendre polynomial, a constant
-    P⁰[1,:] .= 1;
-    P²[1,:] .= 0;
-    R²[1,:] .= 0;
-    T²[1,:] .= 0; 
+    P⁰[:,1] .= 1;
+    P²[:,1] .= 0;
+    R²[:,1] .= 0;
+    T²[:,1] .= 0; 
     # 1st Legendre polynomial, x
-    P⁰[2,:]  = x;
-    P²[2,:] .= 0;
-    R²[2,:] .= 0;
-    T²[2,:] .= 0;
+    P⁰[:,2]  = x;
+    P²[:,2] .= 0;
+    R²[:,2] .= 0;
+    T²[:,2] .= 0;
 
     # 2nd Legendre polynomial, x
     #P¹[2,:] = x;
-    P²[3,:] .= 3   * (1 .- x.^2);
-    R²[3,:] .= sqrt(1.5) * (1 .+ x.^2);
-    T²[3,:] .= sqrt(6) * x;
+    P²[:,3] .= 3   * (1 .- x.^2);
+    R²[:,3] .= sqrt(1.5) * (1 .+ x.^2);
+    T²[:,3] .= sqrt(6) * x;
 
     for n=2:nmax-1
         for i in eachindex(x)
             l = n-1;
-            P⁰[n+1,i] = ((2l + 1) * x[i] * P⁰[n,i] - l * P⁰[n-1,i])/(l+1)
+            P⁰[i,n+1] = ((2l + 1) * x[i] * P⁰[i,n] - l * P⁰[i,n-1])/(l+1)
             if n>2
                 ia = (2l+1) * x[i];
 	            ib = sqrt( (l+2) * (l-2) ) * (l+2) / (l);
 	            ic = 4.0 * (2l+1) / ( (l+1)*l );
 	            id = sqrt( (l+3) * (l-1) ) * (l-1) / (l+1);
-                P²[n+1,i] = ( ia * P²[n,i] - (l+2) * P²[n-1,i] ) / (l-1)
-                R²[n+1,i] = ( ia * R²[n,i] - ib * R²[n-1,i] - ic * T²[n,i] ) / id;
-	            T²[n+1,i] = ( ia * T²[n,i] - ib * T²[n-1,i] - ic * R²[n,i] ) / id;
+                P²[i,n+1] = ( ia * P²[i,n] - (l+2) * P²[i,n-1] ) / (l-1)
+                R²[i,n+1] = ( ia * R²[i,n] - ib * R²[i,n-1] - ic * T²[i,n] ) / id;
+	            T²[i,n+1] = ( ia * T²[i,n] - ib * T²[i,n-1] - ic * R²[i,n] ) / id;
             end  
         end
     end

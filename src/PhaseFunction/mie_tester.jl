@@ -2,6 +2,7 @@
 using Revise
 using RadiativeTransfer.PhaseFunction
 using ForwardDiff, DiffResults
+using Distributions
 
 x = [0.3, 6.82, 1.33,0.00001]
 x2 = copy(x);

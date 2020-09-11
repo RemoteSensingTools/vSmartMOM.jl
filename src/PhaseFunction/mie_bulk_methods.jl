@@ -35,11 +35,13 @@ function calc_aer_opt_prop(mod::NAI2, aero::AbstractAerosolType, λ::Number)
     f₃₄   = zeros(FT, n_mu,nquad_radius)
     C_ext = zeros(FT, nquad_radius)
     C_sca = zeros(FT, nquad_radius)
+
     # Weights for the size distribution:
     wₓ = pdf.(aero.size_distribution,r)
     # pre multiply with wᵣ to get proper means eventually:
     wₓ .*= wᵣ
     # normalize (could apply a check whether cdf.(aero.size_distribution,r_max) is larger than 0.99:
+    @info "Fraction of size distribution cut by max radius: $((1-cdf.(aero.size_distribution,r_max))*100) %"  
     wₓ /= sum(wₓ)
     
     @showprogress 1 "Computing PhaseFunctions Siewert NAI-2 style ..." for i = 1:length(x_sizeParam)
@@ -59,15 +61,14 @@ function calc_aer_opt_prop(mod::NAI2, aero::AbstractAerosolType, λ::Number)
         y = x_sizeParam[i] * (aero.nᵣ-aero.nᵢ);
         nmx = round(Int, max(n_max, abs(y))+51 )
         Dn = zeros(Complex{FT},nmx)
-        #@show typeof(Dn)
-        #PhaseFunction.compute_mie_ab!(x_sizeParam[i],aero1.nᵣ-aero1.nᵢ*im,view(an,1:n_max),view(bn,1:n_max),Dn)
-        #S1[i,:],S2[i,:] = PhaseFunction.compute_mie_S1S2(view(an,1:n_max), view(bn,1:n_max), leg_π, leg_τ)
+
+        # Compute an,bn and S₁,S₂
         compute_mie_ab!(x_sizeParam[i],aero.nᵣ+aero.nᵢ*im,an,bn,Dn)
         compute_mie_S₁S₂!(an, bn, leg_π, leg_τ, view(S₁,:,i), view(S₂,:,i))
         
         # Compute Extinction and scattering cross sections: 
-        C_sca[i] = 2pi/k^2 * (n_' * (abs2.(an) + abs2.(bn)))
-        C_ext[i] = 2pi/k^2 * (n_' * real(an + bn))
+        C_sca[i] = 2π/k^2 * (n_' * (abs2.(an) + abs2.(bn)))
+        C_ext[i] = 2π/k^2 * (n_' * real(an + bn))
 
         # Compute scattering matrix components per size parameter (might change column/row ordering):
         f₁₁[:,i] =  0.5/x_sizeParam[i]^2  * real(abs2.(S₁[:,i]) + abs2.(S₂[:,i]));
@@ -80,10 +81,6 @@ function calc_aer_opt_prop(mod::NAI2, aero::AbstractAerosolType, λ::Number)
     bulk_C_sca =  sum(wₓ .* C_sca)
     bulk_C_ext =  sum(wₓ .* C_ext)
     
-    #bulk_f₁₁   =  sum(4π*r.^2 .*  wₓ .* f₁₁,dims=2)[1,:]
-    #bulk_f₃₃   =  sum(4π*r.^2 .*  wₓ .* f₃₃,dims=2)[1,:]
-    #bulk_f₁₂   =  sum(4π*r.^2 .*  wₓ .* f₁₂,dims=2)[1,:]
-    #bulk_f₃₄   =  sum(4π*r.^2 .*  wₓ .* f₃₄,dims=2)[1,:]
     wr = (4π*r.^2 .*  wₓ) 
     bulk_f₁₁   =  f₁₁ * wr
     bulk_f₃₃   =  f₃₃ * wr
@@ -107,19 +104,20 @@ function calc_aer_opt_prop(mod::NAI2, aero::AbstractAerosolType, λ::Number)
     ϵ = zeros(FT,lMax)
     ζ = zeros(FT,lMax)
     
-    #@show size(avg_f11), size(P), size(w_μ), size(f11), size(wₓ)
+    # Compute Greek coefficients from bulk scattering matrix elements (spherical only here!)
     for l=0:length(β)-1
-        # 
-        fac = (2l+1)/2 * sqrt(1/((l-1)*(l)*(l+1)*(l+2)))
-        if l<2
+        # pre-factor:
+        if l>=2
+            fac = (2l+1)/2 * sqrt(1/((l-1)*(l)*(l+1)*(l+2)))
+        else
             fac = 0
         end
-        δ[l+1] = (2l+1)/2 * sum(w_μ' * (bulk_f₃₃ .* P[l+1,:]))
-        β[l+1] = (2l+1)/2 * sum(w_μ' * (bulk_f₁₁ .* P[l+1,:]))
-        γ[l+1] = fac * sum(w_μ' * (bulk_f₁₂ .* P²[l+1,:]))
-        ϵ[l+1] = fac * sum(w_μ' * (bulk_f₃₄ .* P²[l+1,:]))
-        ζ[l+1] = fac * sum(w_μ' * (bulk_f₃₃ .* R²[l+1,:] + bulk_f₁₁ .* T²[l+1,:]) )
-        α[l+1] = fac * sum(w_μ' * (bulk_f₁₁ .* R²[l+1,:] + bulk_f₃₃ .* T²[l+1,:]) )
+        δ[l+1] = (2l+1)/2 * w_μ' * (bulk_f₃₃ .* P[:,l+1])
+        β[l+1] = (2l+1)/2 * w_μ' * (bulk_f₁₁ .* P[:,l+1])
+        γ[l+1] = fac      * w_μ' * (bulk_f₁₂ .* P²[:,l+1])
+        ϵ[l+1] = fac      * w_μ' * (bulk_f₃₄ .* P²[:,l+1])
+        ζ[l+1] = fac      * w_μ' * (bulk_f₃₃ .* R²[:,l+1] + bulk_f₁₁ .* T²[:,l+1]) 
+        α[l+1] = fac      * w_μ' * (bulk_f₁₁ .* R²[:,l+1] + bulk_f₃₃ .* T²[:,l+1]) 
     end
     # return bulk_f₁₁, bulk_f₁₂, f₁₁, f₃₃, f₁₂,f₃₄,  C_ext, C_sca,bulk_C_sca, bulk_C_ext, α, β, γ, δ, ϵ, ζ
     return α, β, γ, δ, ϵ, ζ, bulk_C_sca, bulk_C_ext
