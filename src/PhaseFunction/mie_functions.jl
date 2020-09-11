@@ -75,22 +75,23 @@ end
 
 
 """
-$(FUNCTIONNAME)(an, bn, π_, τ_)
-Returns the amplitude functions `S₁`,`S₂` in Mie theory
+$(FUNCTIONNAME)(an, bn, π_, τ_, S₁, S₂)
+Determines the amplitude functions `S₁`,`S₂` in Mie theory
 - `an` and `bn` pre-calculated Mie coefficients `an` and `bn`, see [`compute_mie_ab!`](@ref) function
 - `π` and `τ` pre-calculated associated Legendre functions `π` and `τ`, see [`compute_mie_π_τ!`](@ref) function 
 The function returns `S₁`,`S₂` as a function of the cosine of the scattering angle `ξ`. Users need to make sure `an` and `bn`, `π` and `τ` are pre-computed.
 """
 function compute_mie_S₁S₂!(an, bn, π_, τ_, S₁, S₂)
     FT = eltype(an)
-    nmax = size(an)[1];
-    nμ   = size(π_)[2];
-    #S₁   = zeros(Complex{FT}, nμ);
-    #S₂   = zeros(Complex{FT}, nμ);
+    nmax = size(an,1);
+    nμ   = size(π_,1);
+    @assert size(S₁) == size(S₂)
+    @assert length(S₁) == nμ
+
     for l=1:nmax
         for iμ=1:nμ 
-            S₁[iμ] += (2l + 1) / (l*(l+1)) * (an[l] * τ_[l,iμ] + bn[l] * π_[l,iμ])
-            S₂[iμ] += (2l + 1) / (l*(l+1)) * (an[l] * π_[l,iμ] + bn[l] * τ_[l,iμ])
+            S₁[iμ] += (2l + 1) / (l*(l+1)) * (an[l] * τ_[iμ,l] + bn[l] * π_[iμ,l])
+            S₂[iμ] += (2l + 1) / (l*(l+1)) * (an[l] * π_[iμ,l] + bn[l] * τ_[iμ,l])
         end
     end
     return nothing
@@ -116,8 +117,13 @@ function gauleg(n,xmin,xmax; norm=false)
     return ξ,w
 end
 
-# Reconstruct Phase Matrix elements from greek coefficients:
-function reconstruct_phase(α, β, γ, δ, ϵ, ζ, μ)
+"""
+$(FUNCTIONNAME)(α, β, γ, δ, ϵ, ζ, μ; returnLeg = false)
+Returns the reconstructed elements of the 4x4 scattering matrix at positions f₁₁, f₁₂, f₂₂, f₃₃, f₃₄, f₄₄ from the greek coefficients α, β, γ, δ, ϵ, ζ
+- `α, β, γ, δ, ϵ, ζ` greek coefficients (arrays)
+- `returnLeg` if `false` (default), just return `f₁₁, f₁₂, f₂₂, f₃₃, f₃₄, f₄₄`, if `true`, return `f₁₁, f₁₂, f₂₂, f₃₃, f₃₄, f₄₄, P, P²` (i.e. also the two legendre polynomials as matrices)
+"""
+function reconstruct_phase(α, β, γ, δ, ϵ, ζ, μ; returnLeg = false)
     FT = eltype(α)
     #@assert length(μ) == length(α)
     lMax = length(α);
@@ -136,16 +142,18 @@ function reconstruct_phase(α, β, γ, δ, ϵ, ζ, μ)
     for l=2:lMax-1
         fac[l+1] = sqrt(1 / ( ( l-1) * l * (l+1) * (l+2) ));
     end
-    
-    f₁₁[:] = β' * P                            # a₁ in Rooij notation
-    f₄₄[:] = δ' * P                            # a₄ in Rooij notation
-    f₁₂[:] = (fac.*γ)' * P²                    # b₁ in Rooij notation
-    f₃₄[:] = (fac.*ϵ)' * P²                    # b₂ in Rooij notation
-    f₂₂[:] = (fac.*α)' * R² .+ (fac.*ζ)' * T²  # a₂ in Rooij notation
-    f₃₃[:] = (fac.*ζ)' * R² .+ (fac.*α)' * T²  # a₃ in Rooij notation
+    # In matrix form:
+    f₁₁[:] = P * β                               # a₁ in Rooij notation
+    f₄₄[:] = P * δ                               # a₄ in Rooij notation
+    f₁₂[:] = P² * (fac .* γ)                     # b₁ in Rooij notation
+    f₃₄[:] = P² * (fac .* ϵ)                     # b₂ in Rooij notation
+    f₂₂[:] = R² * (fac .* α) .+ T² * (fac .* ζ)  # a₂ in Rooij notation
+    f₃₃[:] = R² * (fac .* ζ) .+ T² * (fac .* α)  # a₃ in Rooij notation
 
-   return f₁₁, f₁₂, f₂₂, f₃₃, f₃₄, f₄₄
+    # For truncation in δ-BGE, we need P and P² as well, convenient to return here:
+    if returnLeg
+        return f₁₁, f₁₂, f₂₂, f₃₃, f₃₄, f₄₄, P, P²
+    else
+        return f₁₁, f₁₂, f₂₂, f₃₃, f₃₄, f₄₄
+    end
 end
-
-
-
