@@ -17,6 +17,21 @@ struct NAI2  <: AbstractGreekType end
 
 struct Domke <: AbstractGreekType end
 
+
+"""
+    type AbstractTruncationType
+Abstract greek coefficient truncation type 
+"""
+abstract type AbstractTruncationType end
+
+struct δBGE{FT} <: AbstractTruncationType
+    "Trunction length for legendre terms"
+    l_max::Int
+    "Exclusion angle for forward peak (in fitting procedure) `[degrees]`"
+    Δ_angle::FT
+end
+
+
 """
     struct UnivariateAerosol{FT}
 
