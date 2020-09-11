@@ -9,12 +9,15 @@ using KernelAbstractions        # For heterogeneous (GPU+CPU) programming
 using CUDA                      # For GPU programming
 using Distributions             # Distributions from Julia 
 using ForwardDiff, DiffResults  # Automatic Differentiation tools
+using LinearAlgebra
+
 using ..Architectures: device
 
 include("types.jl")              # All types used in this module
 include("mie_functions.jl")      # Mie file-related functions
 include("legendre_functions.jl") # Recursions for associated Legendre Polynomials
 include("mie_bulk_methods.jl")   # Functions for Mie calculations over size distribution
+include("phase_truncation.jl")   # Functions for truncation
 include("wigner3j_recursive.jl") # Recursive Wigner 3j calculations
 
 # Export the mie models
