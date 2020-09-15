@@ -22,23 +22,24 @@ function truncate_phase(mod::δBGE, α, β, γ, δ, ϵ, ζ, C_sca, C_ext)
 
     # Weights (also avoid division by 0)
     minY = zeros(length(iμ)) .+ 1e-8;
-    W₁₁ = Diagonal( 1 ./ max(abs.(y₁₁), minY) );
-    W₁₂ = Diagonal( 1 ./ max(abs.(y₁₂), minY) );
-    W₃₄ = Diagonal( 1 ./ max(abs.(y₃₄), minY) );
-    # Julia backslash operator for least squares (just like Matlab); omit w_μ here
-    cl = ((W₁₁*A) \ (W₁₁*y₁₁))
-    γᵗ = ((W₁₂*B) \ (W₁₂*y₁₂))
-    ϵᵗ = ((W₃₄*B) \ (W₃₄*y₃₄))
+    W₁₁ = Diagonal( w_μ[iμ] ./ max(abs.(y₁₁), minY) );
+    W₁₂ = Diagonal( w_μ[iμ] ./ max(abs.(y₁₂), minY) );
+    W₃₄ = Diagonal( w_μ[iμ] ./ max(abs.(y₃₄), minY) );
+    
+    # Julia backslash operator for least squares (just like Matlab);
+    cl = ((W₁₁*A) \ (W₁₁*y₁₁))   # B in δ-BGR (β)
+    γᵗ = ((W₁₂*B) \ (W₁₂*y₁₂))   # G in δ-BGE (γ)
+    ϵᵗ = ((W₃₄*B) \ (W₃₄*y₃₄))   # E in δ-BGE (ϵ)
     # Integrate truncated function for later renormalization (here: fraction that IS still scattered):
-    @show size(cl), size(P)
     c₀ = ( w_μ' * (P[:,1:l_max] * cl) ) / 2
 
     # Compute truncated greek coefficients:
-    βᵗ = cl / c₀                                    # Eq. 38a
-    δᵗ = (δ[1:l_max] .- (β[1:l_max] .- cl)) / c₀    # Eq. 38b
-    αᵗ = (α[1:l_max] .- (β[1:l_max] .- cl)) / c₀    # Eq. 38c
-    ζᵗ = (ζ[1:l_max] .- (β[1:l_max] .- cl)) / c₀    # Eq. 38d
+    βᵗ = cl / c₀                                    # Eq. 38a, B in δ-BGR (β)
+    δᵗ = (δ[1:l_max] .- (β[1:l_max] .- cl)) / c₀    # Eq. 38b, derived from β
+    αᵗ = (α[1:l_max] .- (β[1:l_max] .- cl)) / c₀    # Eq. 38c, derived from β
+    ζᵗ = (ζ[1:l_max] .- (β[1:l_max] .- cl)) / c₀    # Eq. 38d, derived from β
 
+    # To Do: Adjust ω̃ and extinction
     return αᵗ, βᵗ, γᵗ, δᵗ, ϵᵗ, ζᵗ, c₀
 end
 

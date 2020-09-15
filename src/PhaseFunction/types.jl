@@ -19,6 +19,18 @@ struct Domke <: AbstractGreekType end
 
 
 """
+    type AbstractPolarizationType
+Abstract Polarization type 
+"""
+abstract type AbstractPolarizationType end
+
+# Use full Stokes Vector:
+struct FullStokes <: AbstractPolarizationType end
+
+# Use scalar only:
+struct Scalar <: AbstractPolarizationType end
+
+"""
     type AbstractTruncationType
 Abstract greek coefficient truncation type 
 """
