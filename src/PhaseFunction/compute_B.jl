@@ -1,223 +1,26 @@
+using RadiativeTransfer
+using RadiativeTransfer.PhaseFunction
+
 using Revise
 using Plots
 using JLD2
 using Distributions
 using BenchmarkTools
 using LinearAlgebra
-using RadiativeTransfer
-using RadiativeTransfer.PhaseFunction
 using KernelAbstractions
+using SparseArrays
 
-# Eqn. 1
-function compute_C_scatt(k, nmax, an, bn)
-    return (2π/k^2) * sum(n->(2n+1)*(abs2(an[n]) + abs2(bn[n])), 1:nmax)
-end
-
+# Eqn. 1, averaged over size distribution
 function compute_avg_C_scatt(k, an, bn, w)
     n_ = collect(1:size(an)[1]);
     n_ = 2n_ .+ 1
     return 2π/k^2 * n_' * (w' * (abs2.(an) + abs2.(bn))')'
 end
 
-# <|a_n|^2 + |b_n|^2> averaged over size distribution
-function compute_avg_C_scatt2(k, ans_bns, w)
-    a = 0
-    for n=1:size(ans_bns)[2]
-        for m=1:size(ans_bns)[3]
-            a += (2n+1)* (w[m] * (abs2(ans_bns[1,n,m]) + abs2(ans_bns[2,n,m])))
-        end
-    end
-    return (2π/k^2) * a
-end
-
-@kernel function compute_Sl_νν!(@Const(wignerA),@Const(wignerB), an, bn, Sνν, @Const(lMax))
-    # Get length of an:
-    san = size(an)[1];
-    # Indices over n and m
-    n, m = @index(Global, NTuple)
+# Convenience function to compute all an, bn
+function compute_anbn(aerosol::UnivariateAerosol, wl, radius)
     
-    # Outer loop over l
-    for l = 1:lMax
-        if max(l-n,n) <= m <= min(san,n+l)
-            #println((an[n]' + bn[n]') * (an[m] + bn[m]) * wignerA[l,n,m]^2)
-            Sνν[l] += real((an[n]' + bn[n]') * (an[m] + bn[m]) * wignerA[l,n,m]^2)
-            Sνν[l] += 1/2 *  real(abs2(an[n] + bn[n]) * wignerA[l,n,m]^2)
-        end
-    end
-    
-end
-
-# This can add another flag/number to avoid multiplications by 0 (e.g. where an,bn is 0)
-@kernel function avg_anbn!(@Const(an), @Const(bn), mat_anam, mat_bnbm, mat_anbm, mat_bnam, @Const(w), @Const(nMax))
-    FT = eltype(an)
-    # Indices over n and m
-    m, n, i = @index(Global, NTuple)
-    if m>=n && m<nMax[i] && n < nMax[i]
-        @inbounds mat_anam[m,n] += (w[i] * (an[i,n]' * an[i,m]));
-        @inbounds mat_bnbm[m,n] += (w[i] * (bn[i,n]' * bn[i,m]));
-        @inbounds mat_anbm[m,n] += (w[i] * (an[i,n]' * bn[i,m]));
-        @inbounds mat_bnam[m,n] += (w[i] * (bn[i,n]' * an[i,m]));
- 
-    end
-end
-
-function compute_avg_anbn!(an, bn, w, Nmax, N_max_, mat_anam, mat_bnbm, mat_anbm, mat_bnam)
-    FT2 = eltype(an)
-    fill!(mat_anam,0)
-    fill!(mat_bnbm,0)
-    fill!(mat_anbm,0)
-    fill!(mat_bnam,0)
-    @inbounds for n=1:Nmax
-        @inbounds for m=n:Nmax
-            anam = FT2(0);
-            bnbm = FT2(0);
-            anbm = FT2(0);
-            bnam = FT2(0);
-            @inbounds for i = 1:size(an,1)
-                if m < N_max_[i] && n < N_max_[i]
-                    anam += w[i] * an[i,n]' * an[i,m]
-                    bnbm += w[i] * bn[i,n]' * bn[i,m]
-                    anbm += w[i] * an[i,n]' * bn[i,m]
-                    bnam += w[i] * bn[i,n]' * an[i,m]
-                end
-            end 
-            @inbounds mat_anam[m,n] = anam;
-            @inbounds mat_bnbm[m,n] = bnbm;
-            @inbounds mat_anbm[m,n] = anbm;
-            @inbounds mat_bnam[m,n] = bnam;
-        end
-    end
-    return nothing
-end
-
-# Eqn. 22
-function compute_Sl_νν(l, ν, k, N_max, an,bn, wigner_A, wigner_B, w)
-    
-    ll = l-1
-    coef = (2ll+1)*π / k^2
-    #@show ll
-    first_term = 0
-    second_term = 0
-
-    for n = 1:N_max
-
-        m_star = max(ll-n,n+1)
-        m_max = min(ll+n,N_max)
-        for m = m_star:m_max
-            anam,bnbm,anbm,bnam = get_abnabm(an,bn,n,m,w)
-            real_avg = real(anam+anbm+bnam+bnbm);
-            A_lnm2 = 2 * (2m + 1)  * (2n + 1)
-            first_term += (real_avg * (wigner_A[m, n, l])^2 * A_lnm2)
-        end
-
-        A_lnn2 = (2n + 1)^2
-        second_term += w' *(abs2.(an[n,:] .+ bn[n,:])) * (wigner_A[n, n, l])^2 * A_lnn2
-
-    end
-
-    return coef * (first_term + second_term)
-end
-
-# Eqn. 22
-function compute_Sl_νmν(l, ν, k, N_max, an,bn, wigner_A, wigner_B,w)
-    ll = l-1
-    coef = (2ll+1)*π / k^2
-
-    first_term = 0
-    second_term = 0
-
-    for n = 1:N_max
-
-        m_star  = max(ll-n,n+1)
-        m_max = min(ll+n,N_max)
-        for m = m_star:m_max
-            anam,bnbm,anbm,bnam = get_abnabm(an,bn,n,m,w)
-            real_avg = real(anam-anbm-bnam+bnbm);
-            A_lnm2 = ((-1) ^ (ll + n + m)) * 2 * (2m + 1)  * (2n + 1)
-            first_term += (real_avg * (wigner_A[m, n, l])^2 * A_lnm2)
-        end
-
-        A_lnn2 = ((-1)^ll) * (2n + 1)^2
-        second_term += w' *(abs2.(an[n,:] .- bn[n,:])) * (wigner_A[n, n, l])^2 * A_lnn2
-
-    end
-
-    return coef * (first_term + second_term)
-    
-end
-
-function compute_abns(aerosol::UnivariateAerosol, wl, radius)
     FT = eltype(radius)
-    # Find overall N_max from the maximum radius
-    N_max = PhaseFunction.get_n_max(2 * π * aerosol.r_max/ wl)
-
-    # Where to store an, bn, computed over size distribution
-    an = zeros(Complex{FT}, aerosol.nquad_radius, N_max)
-    bn = zeros(Complex{FT}, aerosol.nquad_radius, N_max)
-    #Dn = zeros(Complex{FT}, N_max)
-
-    # Loop over the size distribution, and compute an, bn, for each size
-    for i in 1:aerosol.nquad_radius
-
-        r = radius[i]
-        size_param = 2 * π * r / wl
-        n_max = PhaseFunction.get_n_max(size_param)
-        y = size_param * (aerosol.nᵣ-aerosol.nᵢ);
-        nmx = round(Int, max(n_max, abs(y))+51 )
-        Dn = zeros(Complex{FT},nmx)
-        
-        PhaseFunction.compute_mie_ab!(size_param, aerosol.nᵣ + aerosol.nᵢ * im, 
-                                      view(an, i, 1:n_max), 
-                                      view(bn, i, 1:n_max), Dn)
-    end
-
-    # Compute the average cross-sectional scattering
-    k = 2 * π / wl
-    #avg_C_scatt = compute_avg_C_scatt(k, ans_bns)
-    return an,bn;
-
-end
-
-function goCPU!(mat_anam, mat_bnbm,mat_anbm,mat_bnam)
-    fill!(mat_anam,0)
-    fill!(mat_bnbm,0)
-    fill!(mat_bnam,0)
-    fill!(mat_anbm,0)
-    kernel! = avg_anbn!(CPU())
-    event = kernel!(an,bn,mat_anam, mat_bnbm,mat_anbm,mat_bnam,wₓ,N_max_, ndrange=(Nmax,Nmax,length(wₓ))); 
-    wait(CPU(), event) 
-    #@show  mat_anam[10,12]
-    return nothing       
-end
-
-function goCUDA!(mat_anamC, mat_bnbmC,mat_anbmC,mat_bnamC)
-    fill!(mat_anamC,0);
-    fill!(mat_bnbmC,0);
-    fill!(mat_bnamC,0);
-    fill!(mat_anbmC,0);
-    kernel! = avg_anbn!(CUDADevice())
-    event = kernel!(anC,bnC,mat_anamC, mat_bnbmC,mat_anbmC,mat_bnamC,wₓC,N_max_C, ndrange=(Nmax,Nmax,length(wₓ))); 
-    wait(CUDADevice(), event)    ;
-    #@show  Array(mat_anamC)[12,10]  
-    return nothing
-end
-
-function get_abnabm(an,bn,n,m,w)
-    FT = eltype(an)
-    anam = FT(0);
-    bnbm = FT(0);
-    anbm = FT(0);
-    bnam = FT(0);
-    @inbounds for i=1:size(an)[2]
-        anam += w[i] * an[n,i]' * an[m,i]
-        bnbm += w[i] * bn[n,i]' * bn[m,i]
-        anbm += w[i] * an[n,i]' * bn[m,i]
-        bnam += w[i] * bn[n,i]' * an[m,i]
-    end
-    return anam,bnbm,anbm,bnam
-end
-
-function compute_B2(aerosol::UnivariateAerosol, wigner_A, wigner_B, wl, radius, w)
 
     # Find overall N_max from the maximum radius
     N_max = PhaseFunction.get_n_max(2 * π * aerosol.r_max/ wl)
@@ -244,17 +47,32 @@ function compute_B2(aerosol::UnivariateAerosol, wigner_A, wigner_B, wl, radius, 
                                       view(bn, :, i), Dn)
     end
 
+    return an, bn;
+end
+
+function compute_B2(aerosol::UnivariateAerosol, wigner_A, wigner_B, wl, radius, w)
+
+    # Find overall N_max from the maximum radius
+    N_max = PhaseFunction.get_n_max(2 * π * aerosol.r_max/ wl)
+
+    # Compute an, bn values
+    an, bn = compute_anbn(aerosol::UnivariateAerosol, wl, radius)
+
     # Compute the average cross-sectional scattering
     k = 2 * π / wl
-    avg_C_scatt = compute_avg_C_scatt(k, an,bn,w)
+
+    avg_C_scatt = compute_avg_C_scatt(k, an, bn, w)
 
     # Only do these l's for now
-    ls = 1:(2 * N_max)
+    ls = 1:5#(2 * N_max)
 
-    # Where to store the β values
+    # Where to store the values
     β_ls = zeros(size(ls, 1))
-    # Where to store the δ values
     δ_ls = zeros(size(ls, 1))
+    α_ls = zeros(size(ls, 1))
+    ζ_ls = zeros(size(ls, 1))
+    γ_ls = zeros(size(ls, 1))
+    ϵ_ls = zeros(size(ls, 1))
 
     # For each l
     for l in ls
@@ -262,67 +80,58 @@ function compute_B2(aerosol::UnivariateAerosol, wigner_A, wigner_B, wl, radius, 
         # Compute β_l
 
         println(l)
-        Sl_00  =  compute_Sl_νν(l, 0, k, N_max, an,bn, wigner_A, wigner_B,w)
-        Sl_0m0 = compute_Sl_νmν(l, 0, k, N_max, an,bn, wigner_A, wigner_B,w)
-        β_l = (1/avg_C_scatt) * (Sl_00 + Sl_0m0)
-        δ_l = (1/avg_C_scatt) * (Sl_00 - Sl_0m0)
-        β_ls[l] = β_l
-        δ_ls[l] = δ_l
+        Sl_00  =  compute_Sl(l, 0, 0, true, k, N_max, an,bn, wigner_A, wigner_B, w)
+        Sl_0m0 = compute_Sl(l, 0, 0, false, k, N_max, an,bn, wigner_A, wigner_B, w)
+        Sl_22  =  compute_Sl(l, 2, 2, true, k, N_max, an,bn, wigner_A, wigner_B, w)
+        Sl_2m2 = compute_Sl(l, 2, -2, false, k, N_max, an,bn, wigner_A, wigner_B, w)
+        Sl_02 = compute_Sl(l, 0, 2, true, k, N_max, an,bn, wigner_A, wigner_B, w)
+
+        println(Sl_22)
+        println(Sl_2m2)
+
+        β_ls[l] = (1/avg_C_scatt) * (Sl_00 + Sl_0m0)
+        δ_ls[l] = (1/avg_C_scatt) * (Sl_00 - Sl_0m0)
+        α_ls[l] = (1/avg_C_scatt) * (Sl_22 + Sl_2m2)
+        ζ_ls[l] = (1/avg_C_scatt) * (Sl_22 - Sl_2m2)
+        γ_ls[l] = (1/avg_C_scatt) * real(Sl_02)
+        ϵ_ls[l] = (1/avg_C_scatt) * imag(Sl_02)
     end
 
-    return β_ls, δ_ls
+    return β_ls, δ_ls, α_ls, ζ_ls, γ_ls, ϵ_ls
 
 end
 
-# Constants
+function test_B()
 
-const μ  = 0.3
-const σ  = 6.82
-const wl = 0.55
+    # Constants
+    μ  = 0.3
+    σ  = 6.82
+    wl = 0.55
+    FT = Float64
 
-const FT = Float64
+    size_distribution = LogNormal(log(μ), log(σ))
 
-size_distribution = LogNormal(log(μ), log(σ))
+    # Generate aerosol:
+    aero = PhaseFunction.UnivariateAerosol(size_distribution, 30.0, 2500, 1.3, 0.0)
+    r, wᵣ = PhaseFunction.gauleg(aero.nquad_radius, 0.0, aero.r_max ; norm=true)
+    wₓ = pdf.(aero.size_distribution,r)
+    # pre multiply with wᵣ to get proper means eventually:
+    wₓ .*= wᵣ
+    # normalize (could apply a check whether cdf.(aero.size_distribution,r_max) is larger than 0.99:
+    wₓ /= sum(wₓ)
 
-# Generate aerosol:
-aero = PhaseFunction.UnivariateAerosol(size_distribution, 30.0, 2500, 1.3, 0.0)
-r, wᵣ = PhaseFunction.gauleg(aero.nquad_radius, 0.0, aero.r_max ; norm=true)
-wₓ = pdf.(aero.size_distribution,r)
-# pre multiply with wᵣ to get proper means eventually:
-wₓ .*= wᵣ
-# normalize (could apply a check whether cdf.(aero.size_distribution,r_max) is larger than 0.99:
-wₓ /= sum(wₓ)
+    N_max = PhaseFunction.get_n_max(2 * π * aero.r_max/ wl)
 
-N_max = PhaseFunction.get_n_max(2 * π * aero.r_max/ wl)
+    wigner_A, wigner_B = PhaseFunction.load_wigner_values("/home/rjeyaram/RadiativeTransfer/src/PhaseFunction/wigner_values.jld") 
 
-wigner_A, wigner_B = PhaseFunction.load_wigner_values("/home/rjeyaram/RadiativeTransfer/src/PhaseFunction/wigner_values.jld") 
+    # Pre-compute Wigner symbols
+    # PhaseFunction.save_wigner_values("/home/rjeyaram/RadiativeTransfer/src/PhaseFunction/wigner_values.jld", wigner_A, wigner_B)
 
-# Pre-compute Wigner symbols
-wigner_A, wigner_B = PhaseFunction.compute_wigner_values((2 * N_max + 1), N_max + 1, 2 * N_max + 1)
+    # wigner_A, wigner_B = PhaseFunction.compute_wigner_values((2 * N_max + 1), N_max + 1, 2 * N_max + 1)
+    # Compute B matrix 
 
-# Compute B matrix (just betas for now)
-β_ls, δ_ls = compute_B2(aero, wigner_A, wigner_B, wl, r, wₓ)
+    return compute_B2(aero, wigner_A, wigner_B, wl, r, wₓ)
+end
 
-PhaseFunction.save_wigner_values("/home/rjeyaram/RadiativeTransfer/src/PhaseFunction/wigner_values.jld", wigner_A, wigner_B)
+β_ls, δ_ls, α_ls, ζ_ls, γ_ls, ϵ_ls = test_B()
 
-Nmax = N_max
-N_max_ = PhaseFunction.get_n_max.(2π * r/ wl)
-
-wₓC = CuArray(wₓ)
-N_max_C = CuArray(N_max_)
-FT2 = Complex{Float64}
-mat_anam = LowerTriangular(zeros(FT2,Nmax,Nmax));
-mat_bnbm = LowerTriangular(zeros(FT2,Nmax,Nmax));
-mat_anbm = LowerTriangular(zeros(FT2,Nmax,Nmax));
-mat_bnam = LowerTriangular(zeros(FT2,Nmax,Nmax));
-
-an, bn = compute_abns(aero, wl, r);
-
-anC = CuArray(an)
-bnC = CuArray(bn)
-mat_anamC = CuArray(mat_anam)
-mat_bnbmC = CuArray(mat_bnbm)
-mat_bnamC = CuArray(mat_bnam)
-mat_anbmC = CuArray(mat_anbm)
-
-@time goCPU()

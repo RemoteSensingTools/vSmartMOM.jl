@@ -171,12 +171,8 @@ function compute_wigner_values(m_max, n_max, l_max)
     ns = 1:n_max
     ls = 1:l_max
 
-    wigner_A = Array{Float64}(undef, m_max, n_max, l_max);
-    wigner_B = Array{Float64}(undef, m_max, n_max, l_max);
-
-    fill!(wigner_A, NaN)
-    fill!(wigner_B, NaN)
-
+    wigner_A = zeros(m_max, n_max, l_max);
+    wigner_B = zeros(m_max, n_max, l_max);
 
     # Using nested loop syntax is so nice!!
     for l in ls, n in ns, m in ms

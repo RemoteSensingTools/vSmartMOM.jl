@@ -20,8 +20,12 @@ include("legendre_functions.jl") # Recursions for associated Legendre Polynomial
 include("mie_bulk_methods.jl")   # Functions for Mie calculations over size distribution
 include("phase_truncation.jl")   # Functions for truncation
 include("wigner3j_recursive.jl") # Recursive Wigner 3j calculations
+include("compute_Sl.jl")         # Sl_νν functions
+
 
 # Export the mie models
-export compute_ab, UnivariateAerosol, comp_ab, wigner!, compute_mie_π_τ!
+export compute_ab, UnivariateAerosol, comp_ab, wigner!, compute_mie_π_τ!, 
+       compute_wigner_values, save_wigner_values, load_wigner_values, 
+       compute_Sl
 
 end
