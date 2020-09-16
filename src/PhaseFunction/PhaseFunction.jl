@@ -10,6 +10,7 @@ using CUDA                      # For GPU programming
 using Distributions             # Distributions from Julia 
 using ForwardDiff, DiffResults  # Automatic Differentiation tools
 using LinearAlgebra
+using BenchmarkTools
 
 using ..Architectures: device
 

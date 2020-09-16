@@ -9,6 +9,9 @@ using BenchmarkTools
 using LinearAlgebra
 using KernelAbstractions
 using SparseArrays
+using ..Architectures: device
+using ..Architectures: devi
+using CUDA
 
 # Eqn. 1, averaged over size distribution
 function compute_avg_C_scatt(k, an, bn, w)
@@ -64,40 +67,43 @@ function compute_B2(aerosol::UnivariateAerosol, wigner_A, wigner_B, wl, radius, 
     avg_C_scatt = compute_avg_C_scatt(k, an, bn, w)
 
     # Only do these l's for now
-    ls = 1:5#(2 * N_max)
+    ls = 1:50#(2 * N_max)
 
     # Where to store the values
-    β_ls = zeros(size(ls, 1))
-    δ_ls = zeros(size(ls, 1))
-    α_ls = zeros(size(ls, 1))
-    ζ_ls = zeros(size(ls, 1))
-    γ_ls = zeros(size(ls, 1))
-    ϵ_ls = zeros(size(ls, 1))
+    greek_coefs = zeros(6, size(ls, 1))
+
+    # Kernel for performing the lineshape calculation
+    # architecture = Architectures.GPU()
+    # device = devi(architecture)
+    # kernel! = compute_l_coefs!(device)
+
+    # Run the event on the kernel 
+    # That this, this function adds to each element in result, the contribution from this transition
+    # greek_coefs = CuArray(greek_coefs)
+    # event = kernel!(greek_coefs, k, N_max, CuArray(an), CuArray(bn), CuArray(wigner_A), CuArray(wigner_B), CuArray(w), avg_C_scatt, CuArray(zeros(1)), ndrange=length(ls))
+    # wait(device, event)
 
     # For each l
     for l in ls
 
         # Compute β_l
-
         println(l)
-        Sl_00  =  compute_Sl(l, 0, 0, true, k, N_max, an,bn, wigner_A, wigner_B, w)
+
+        Sl_00 = compute_Sl(l, 0, 0, true, k, N_max, an,bn, wigner_A, wigner_B, w)
         Sl_0m0 = compute_Sl(l, 0, 0, false, k, N_max, an,bn, wigner_A, wigner_B, w)
-        Sl_22  =  compute_Sl(l, 2, 2, true, k, N_max, an,bn, wigner_A, wigner_B, w)
+        Sl_22 = compute_Sl(l, 2, 2, true, k, N_max, an,bn, wigner_A, wigner_B, w)
         Sl_2m2 = compute_Sl(l, 2, -2, false, k, N_max, an,bn, wigner_A, wigner_B, w)
         Sl_02 = compute_Sl(l, 0, 2, true, k, N_max, an,bn, wigner_A, wigner_B, w)
 
-        println(Sl_22)
-        println(Sl_2m2)
-
-        β_ls[l] = (1/avg_C_scatt) * (Sl_00 + Sl_0m0)
-        δ_ls[l] = (1/avg_C_scatt) * (Sl_00 - Sl_0m0)
-        α_ls[l] = (1/avg_C_scatt) * (Sl_22 + Sl_2m2)
-        ζ_ls[l] = (1/avg_C_scatt) * (Sl_22 - Sl_2m2)
-        γ_ls[l] = (1/avg_C_scatt) * real(Sl_02)
-        ϵ_ls[l] = (1/avg_C_scatt) * imag(Sl_02)
+        @inbounds greek_coefs[1,l] = (1/avg_C_scatt) * (Sl_00 + Sl_0m0)
+        @inbounds greek_coefs[2,l] = (1/avg_C_scatt) * (Sl_00 - Sl_0m0)
+        @inbounds greek_coefs[3,l] = (1/avg_C_scatt) * (Sl_22 + Sl_2m2)
+        @inbounds greek_coefs[4,l] = (1/avg_C_scatt) * (Sl_22 - Sl_2m2)
+        @inbounds greek_coefs[5,l] = (1/avg_C_scatt) * real(Sl_02)
+        @inbounds greek_coefs[6,l] = (1/avg_C_scatt) * imag(Sl_02)
     end
 
-    return β_ls, δ_ls, α_ls, ζ_ls, γ_ls, ϵ_ls
+    return greek_coefs
 
 end
 
@@ -133,5 +139,5 @@ function test_B()
     return compute_B2(aero, wigner_A, wigner_B, wl, r, wₓ)
 end
 
-β_ls, δ_ls, α_ls, ζ_ls, γ_ls, ϵ_ls = test_B()
 
+@benchmark greek_coefs = test_B()
