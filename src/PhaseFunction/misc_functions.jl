@@ -15,29 +15,7 @@ function compute_avg_C_scatt2(k, ans_bns, w)
     return (2π/k^2) * a
 end
 
-function goCPU!(mat_anam, mat_bnbm,mat_anbm,mat_bnam)
-    fill!(mat_anam,0)
-    fill!(mat_bnbm,0)
-    fill!(mat_bnam,0)
-    fill!(mat_anbm,0)
-    kernel! = avg_anbn!(CPU())
-    event = kernel!(an,bn,mat_anam, mat_bnbm,mat_anbm,mat_bnam,wₓ,N_max_, ndrange=(Nmax,Nmax,length(wₓ))); 
-    wait(CPU(), event) 
-    #@show  mat_anam[10,12]
-    return nothing       
-end
 
-function goCUDA!(mat_anamC, mat_bnbmC,mat_anbmC,mat_bnamC)
-    fill!(mat_anamC,0);
-    fill!(mat_bnbmC,0);
-    fill!(mat_bnamC,0);
-    fill!(mat_anbmC,0);
-    kernel! = avg_anbn!(CUDADevice())
-    event = kernel!(anC,bnC,mat_anamC, mat_bnbmC,mat_anbmC,mat_bnamC,wₓC,N_max_C, ndrange=(Nmax,Nmax,length(wₓ))); 
-    wait(CUDADevice(), event)    ;
-    #@show  Array(mat_anamC)[12,10]  
-    return nothing
-end
 
 function compute_avg_anbn!(an, bn, w, Nmax, N_max_, mat_anam, mat_bnbm, mat_anbm, mat_bnam)
     FT2 = eltype(an)
@@ -68,19 +46,7 @@ function compute_avg_anbn!(an, bn, w, Nmax, N_max_, mat_anam, mat_bnbm, mat_anbm
     return nothing
 end
 
-# This can add another flag/number to avoid multiplications by 0 (e.g. where an,bn is 0)
-@kernel function avg_anbn!(@Const(an), @Const(bn), mat_anam, mat_bnbm, mat_anbm, mat_bnam, @Const(w), @Const(nMax))
-    FT = eltype(an)
-    # Indices over n and m
-    m, n, i = @index(Global, NTuple)
-    if m>=n && m<nMax[i] && n < nMax[i]
-        @inbounds mat_anam[m,n] += (w[i] * (an[i,n]' * an[i,m]));
-        @inbounds mat_bnbm[m,n] += (w[i] * (bn[i,n]' * bn[i,m]));
-        @inbounds mat_anbm[m,n] += (w[i] * (an[i,n]' * bn[i,m]));
-        @inbounds mat_bnam[m,n] += (w[i] * (bn[i,n]' * an[i,m]));
- 
-    end
-end
+
 
 # wₓC = CuArray(wₓ)
 # N_max_C = CuArray(N_max_)
