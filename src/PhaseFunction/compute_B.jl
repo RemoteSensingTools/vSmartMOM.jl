@@ -53,13 +53,13 @@ function compute_anbn(aerosol::UnivariateAerosol, wl, radius)
     return an, bn;
 end
 
-function compute_B2(aerosol::UnivariateAerosol, wigner_A, wigner_B, wl, radius, w)
+function compute_B(aerosol::UnivariateAerosol, wigner_A, wigner_B, wl, r, w)
 
     # Find overall N_max from the maximum radius
     N_max = PhaseFunction.get_n_max(2 * π * aerosol.r_max/ wl)
 
     # Compute an, bn values
-    an, bn = compute_anbn(aerosol::UnivariateAerosol, wl, radius)
+    an, bn = compute_anbn(aerosol::UnivariateAerosol, wl, r)
 
     # Compute the average cross-sectional scattering
     k = 2 * π / wl
@@ -72,28 +72,27 @@ function compute_B2(aerosol::UnivariateAerosol, wigner_A, wigner_B, wl, radius, 
     # Where to store the values
     greek_coefs = zeros(6, size(ls, 1))
 
-    # Kernel for performing the lineshape calculation
-    # architecture = Architectures.GPU()
-    # device = devi(architecture)
-    # kernel! = compute_l_coefs!(device)
-
-    # Run the event on the kernel 
-    # That this, this function adds to each element in result, the contribution from this transition
-    # greek_coefs = CuArray(greek_coefs)
-    # event = kernel!(greek_coefs, k, N_max, CuArray(an), CuArray(bn), CuArray(wigner_A), CuArray(wigner_B), CuArray(w), avg_C_scatt, CuArray(zeros(1)), ndrange=length(ls))
-    # wait(device, event)
-
+    # Pre-compute anbn averages
+    FT2 = Complex{Float64}
+    mat_anam = LowerTriangular(zeros(FT2, N_max, N_max));
+    mat_bnbm = LowerTriangular(zeros(FT2, N_max, N_max));
+    mat_anbm = LowerTriangular(zeros(FT2, N_max, N_max));
+    mat_bnam = LowerTriangular(zeros(FT2, N_max, N_max));
+    
+    N_max_ = PhaseFunction.get_n_max.(2π * r/ wl)
+    PhaseFunction.fill_avg_anbns!(an, bn, mat_anam, mat_bnbm, mat_anbm, mat_bnam, w, N_max, N_max_, CPU())
+    
     # For each l
     for l in ls
 
         # Compute β_l
         println(l)
 
-        Sl_00 = compute_Sl(l, 0, 0, true, k, N_max, an,bn, wigner_A, wigner_B, w)
-        Sl_0m0 = compute_Sl(l, 0, 0, false, k, N_max, an,bn, wigner_A, wigner_B, w)
-        Sl_22 = compute_Sl(l, 2, 2, true, k, N_max, an,bn, wigner_A, wigner_B, w)
-        Sl_2m2 = compute_Sl(l, 2, -2, false, k, N_max, an,bn, wigner_A, wigner_B, w)
-        Sl_02 = compute_Sl(l, 0, 2, true, k, N_max, an,bn, wigner_A, wigner_B, w)
+        Sl_00 = compute_Sl(l, 0, 0, true, k, N_max, an,bn, mat_anam, mat_bnbm, mat_anbm, mat_bnam, wigner_A, wigner_B, w)
+        Sl_0m0 = compute_Sl(l, 0, 0, false, k, N_max, an,bn, mat_anam, mat_bnbm, mat_anbm, mat_bnam, wigner_A, wigner_B, w)
+        Sl_22 = compute_Sl(l, 2, 2, true, k, N_max, an,bn, mat_anam, mat_bnbm, mat_anbm, mat_bnam, wigner_A, wigner_B, w)
+        Sl_2m2 = compute_Sl(l, 2, -2, false, k, N_max, an,bn, mat_anam, mat_bnbm, mat_anbm, mat_bnam, wigner_A, wigner_B, w)
+        Sl_02 = compute_Sl(l, 0, 2, true, k, N_max, an,bn, mat_anam, mat_bnbm, mat_anbm, mat_bnam, wigner_A, wigner_B, w)
 
         @inbounds greek_coefs[1,l] = (1/avg_C_scatt) * (Sl_00 + Sl_0m0)
         @inbounds greek_coefs[2,l] = (1/avg_C_scatt) * (Sl_00 - Sl_0m0)
@@ -104,6 +103,7 @@ function compute_B2(aerosol::UnivariateAerosol, wigner_A, wigner_B, wl, radius, 
     end
 
     return greek_coefs
+    # return mat_anam, mat_bnbm, mat_anbm, mat_bnam
 
 end
 
@@ -136,7 +136,7 @@ function test_B()
     # wigner_A, wigner_B = PhaseFunction.compute_wigner_values((2 * N_max + 1), N_max + 1, 2 * N_max + 1)
     # Compute B matrix 
 
-    return compute_B2(aero, wigner_A, wigner_B, wl, r, wₓ)
+    return compute_B(aero, wigner_A, wigner_B, wl, r, wₓ)
 end
 
 
