@@ -157,3 +157,36 @@ function reconstruct_phase(α, β, γ, δ, ϵ, ζ, μ; returnLeg = false)
         return f₁₁, f₁₂, f₂₂, f₃₃, f₃₄, f₄₄
     end
 end
+
+function get_greek_rayleigh(depol)
+    # Rayleigh Greek Parameters
+    dpl_p = (1 - depol)  / (1 + depol/2)
+    dpl_q = (1 + depol)  / (1 - depol)
+    dpl_r = (1 - 2depol) / (1 - depol)
+  
+    α  =  [0.0, 0.0,             3dpl_p]
+    β  =  [1.0, 0.0,             0.5*dpl_p]
+    γ  =  [0.0, 0.0,             dpl_p*sqrt(1.5)] 
+    δ  =  [0.0, dpl_p*dpl_r*1.5, 0.0] 
+    ϵ  =  [0.0, 0.0,             0.0] 
+    ζ  =  [0.0, 0.0,             0.0]
+    return α, β, γ, δ, ϵ, ζ 
+end
+
+function construct_B_matrix(mod::FullStokes, α, β, γ, δ, ϵ, ζ,l::Int)
+    𝐁 = SMatrix{4,4}([β[l] γ[l] 0 0 ; γ[l] α[l] 0 0; 0 0 ζ[l] -ϵ[l]; 0 0 ϵ[l] δ[l]])
+end
+
+function construct_B_matrix(mod::Scalar, α, β, γ, δ, ϵ, ζ,l::Int)
+    𝐁 = β[l]
+end
+
+function construct_Π_matrix(mod::FullStokes, P,R,T,l::Int,m::Int)
+    𝐁 = SMatrix{4,4}([P[l,m] 0 0 0 ; 0 R[l,m] -T[l,m] 0; 0 -T[l,m] -R[l,m] 0; 0 0 0 P[l,m]])
+end
+
+function construct_Π_matrix(mod::Scalar, P,R,T,l::Int,m::Int)
+    𝐁 = P[l,m]
+end
+
+

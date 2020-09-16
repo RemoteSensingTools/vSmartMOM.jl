@@ -22,53 +22,52 @@ function compute_Π_matrix(μ,Lmax)
     cmu = μ 
     for  m=0:Lmax
         for l=m:Lmax
-            #indices for arrays (swap position for l and m here, too lazy to change all indices):
-            #im = m+1;
-            #il = l+1;  # Note: Swapped this here
-            im = l+1;
-            il = m+1;
+            #indices for arrays
+            im = m+1;
+            il = l+1;
+
             if m==0
                 if l==0 # then !eq.28a
-                    da[im,il] = 1
-                    db[im,il] = 0
-                    dc[im,il] = 0
+                    da[il,im] = 1
+                    db[il,im] = 0
+                    dc[il,im] = 0
                 elseif l==1 # then !eq.28b
-                    da[im,il] = cmu
-                    db[im,il] = 0
-                    dc[im,il] = 0
+                    da[il,im] = cmu
+                    db[il,im] = 0
+                    dc[il,im] = 0
                 elseif l==2 # then !eq.28c, 29, 30
                     cA = 0.5*(3.0*cmu*cmu-1.0)
                     cB = 0.5*sqrt(1.5)*smu*smu
 
-                    da[im,il] = cA
-                    db[im,il] = cB
-                    dc[im,il] = 0.0
+                    da[il,im] = cA
+                    db[il,im] = cB
+                    dc[il,im] = 0.0
                 else #!eq.30, 31a, 31b
                     Y_lm1 = l-1
                     X_lm1 = l
 
-                    da[im,il] = (da[im,il-1] * (2l-1) * cmu -  da[im,il-2] * Y_lm1 ) / X_lm1
+                    da[il,im] = (da[il-1,im] * (2l-1) * cmu -  da[il-2,im] * Y_lm1 ) / X_lm1
 
                     Y_lm1 = sqrt( (l+1) * (l-3) )
                     X_lm1 = sqrt( l*l - 4 )
 
-                    db[im,il] = (db[im,il-1] * (2*l-1) * cmu -  db[im,il-2] * Y_lm1) / X_lm1
-                    dc[im,il] = 0.0
+                    db[il,im] = (db[il-1,im] * (2*l-1) * cmu -  db[il-2,im] * Y_lm1) / X_lm1
+                    dc[il,im] = 0.0
                 end
 
             elseif m==1 # then
                 if l==1 # then !eq.32a
                     m1 = sqrt(0.5)
-                    da[im,il] = m1*smu
-                    db[im,il] = 0.0
-                    dc[im,il] = 0.0
+                    da[il,im] = m1*smu
+                    db[il,im] = 0.0
+                    dc[il,im] = 0.0
                 elseif l==2 # then !eq.32b, 33a, 33b
                     m1 = sqrt(1/6)
                     cA = 3cmu*smu
                     cB = sqrt(1.5)*smu
-                    da[im,il] = m1*cA
-                    db[im,il] = -m1*cmu*cB
-                    dc[im,il] = m1*cB
+                    da[il,im] = m1*cA
+                    db[il,im] = -m1*cmu*cB
+                    dc[il,im] = m1*cB
                 else #!eq.34, 35a, 35b, 35c
                     m1 = sqrt((l-1)/(l+1))
                     m2 = m1 * sqrt( (l-2) / l )
@@ -76,18 +75,18 @@ function compute_Π_matrix(μ,Lmax)
                     Y_lm1 = (l-1+m)
                     X_lm1 = (l-m)
 
-                    da[im,il] = (m1 * da[im,il-1] * (2l-1) * cmu 
-                                - m2 * da[im,il-2] * Y_lm1 ) / X_lm1
+                    da[il,im] = (m1 * da[il-1,im] * (2l-1) * cmu 
+                                - m2 * da[il-2,im] * Y_lm1 ) / X_lm1
 
                     Z_lm1 = (2m * (2l-1) ) / (l * (l-1))
                     Y_lm1 = ( (l+m-1) / (l-1)) * sqrt( (l-3) * (l+1) )
                     X_lm1 = ( (l-m)   /  l   ) * sqrt( (l*l-4) )
 
-                    db[im,il] = (m1*db[im,il-1] * (2l-1) * cmu 
-                                -m2 * db[im,il-2] * Y_lm1 +m1 * dc[im,il-1] * Z_lm1 ) /X_lm1
+                    db[il,im] = (m1*db[il-1,im] * (2l-1) * cmu 
+                                -m2 * db[il-2,im] * Y_lm1 +m1 * dc[il-1,im] * Z_lm1 ) /X_lm1
 
-                    dc[im,il] = (m1*dc[im,il-1] * (2l-1) * cmu
-                                -m2 * dc[im,il-2] * Y_lm1 +m1 * db[im,il-1] * Z_lm1 ) /X_lm1
+                    dc[il,im] = (m1*dc[il-1,im] * (2l-1) * cmu
+                                -m2 * dc[il-2,im] * Y_lm1 +m1 * db[il-1,im] * Z_lm1 ) /X_lm1
                 end
             else 
                 if l==m # then !eq.36, 37
@@ -117,9 +116,9 @@ function compute_Π_matrix(μ,Lmax)
                             Aij=0.0
                         end
                     end
-                    da[im,il] = fact1
-                    db[im,il] =  Aii
-                    dc[im,il] = -Aij
+                    da[il,im] = fact1
+                    db[il,im] =  Aii
+                    dc[il,im] = -Aij
 
                 elseif l==(m+1) # then !eq.38, 35a, 35b
                     # typo 1 and l??
@@ -128,16 +127,16 @@ function compute_Π_matrix(μ,Lmax)
                     Y_lm1 = (l-1+m)
                     X_lm1 = (l-m)
 
-                    da[im,il] = ( m1 * da[im,il-1] * (2l-1) * cmu ) / X_lm1
+                    da[il,im] = ( m1 * da[il-1,im] * (2l-1) * cmu ) / X_lm1
 
                     Z_lm1 = (2m * (2l-1)) / (l*(l-1))
                     Y_lm1 = ((l+m-1) / (l-1)) * sqrt( (l-3) * (l+1) ) 
                     X_lm1 = ( (l-m) /l ) * sqrt(l*l-4)
 
-                    db[im,il] = ( m1 * db[im,il-1] * (2l-1) * cmu 
-                                + m1 * dc[im,il-1] * Z_lm1 ) / X_lm1
-                    dc[im,il] = ( m1 * dc[im,il-1] * (2l-1) * cmu 
-                                + m1 * db[im,il-1] * Z_lm1 ) / X_lm1
+                    db[il,im] = ( m1 * db[il-1,im] * (2l-1) * cmu 
+                                + m1 * dc[il-1,im] * Z_lm1 ) / X_lm1
+                    dc[il,im] = ( m1 * dc[il-1,im] * (2l-1) * cmu 
+                                + m1 * db[il-1,im] * Z_lm1 ) / X_lm1
 
                 else #!eq.38, 35a, 35b
                     m1 = sqrt( (l-m) / (l+m) )
@@ -146,20 +145,20 @@ function compute_Π_matrix(μ,Lmax)
                     Y_lm1 = (l-1+m)
                     X_lm1 = (l-m)
 
-                    da[im,il] = ( m1 * da[im,il-1] * (2l-1) * cmu 
-                                - m2 * da[im,il-2] * Y_lm1 ) / X_lm1
+                    da[il,im] = ( m1 * da[il-1,im] * (2l-1) * cmu 
+                                - m2 * da[il-2,im] * Y_lm1 ) / X_lm1
 
                     Z_lm1 = (2m*(2l-1)) / (l*(l-1))
                     Y_lm1 = ( (l+m-1) / (l-1) ) * sqrt( (l-3) * (l+1) )
                     X_lm1 = ( (l-m) / l ) * sqrt( l*l-4 )
 
-                    db[im,il] = ( m1 * db[im,il-1] * (2l-1) * cmu 
-                                - m2 * db[im,il-2] * Y_lm1  
-                                + m1 * dc[im,il-1] * Z_lm1) / X_lm1
+                    db[il,im] = ( m1 * db[il-1,im] * (2l-1) * cmu 
+                                - m2 * db[il-2,im] * Y_lm1  
+                                + m1 * dc[il-1,im] * Z_lm1) / X_lm1
 
-                    dc[im,il] = ( m1 * dc[im,il-1] * (2l-1) * cmu 
-                                - m2 * dc[im,il-2] * Y_lm1
-                                + m1 * db[im,il-1] * Z_lm1) / X_lm1
+                    dc[il,im] = ( m1 * dc[il-1,im] * (2l-1) * cmu 
+                                - m2 * dc[il-2,im] * Y_lm1
+                                + m1 * db[il-1,im] * Z_lm1) / X_lm1
 
                 end
           end
@@ -267,7 +266,7 @@ function compute_legendre_P(μ , Lmax)
                 im = m+1
                 A =  sqrt( (4l^2-1) / (l^2 - m^2) )
                 B = -sqrt( ((l-1)^2-m^2) / (4*(l-1)^2 - 1) )  
-                da[im,il] = A * (μ * da[im,il-1] + B * da[im,il-2] )
+                da[il,im] = A * (μ * da[il-1,im] + B * da[il-2,im] )
             end
             da[il-1,il] = μ * sqrt(2*(l-1)+3) * temp;
             temp = -sqrt(1 + 0.5/l ) * sintheta * temp
