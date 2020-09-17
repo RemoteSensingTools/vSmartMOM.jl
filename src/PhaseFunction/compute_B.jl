@@ -15,9 +15,9 @@ using CUDA
 
 # Eqn. 1, averaged over size distribution
 function compute_avg_C_scatt(k, an, bn, w)
-    n_ = collect(1:size(an)[1]);
+    n_ = collect(1:size(an)[2]);
     n_ = 2n_ .+ 1
-    return 2π/k^2 * n_' * (w' * (abs2.(an) + abs2.(bn))')'
+    return 2π/k^2 * n_' * (w' * (abs2.(an') + abs2.(bn'))')'
 end
 
 # Convenience function to compute all an, bn
@@ -29,8 +29,8 @@ function compute_anbn(aerosol::UnivariateAerosol, wl, radius)
     N_max = PhaseFunction.get_n_max(2 * π * aerosol.r_max/ wl)
 
     # Where to store an, bn, computed over size distribution
-    an = zeros(Complex{Float64}, N_max, aerosol.nquad_radius)
-    bn = zeros(Complex{Float64}, N_max, aerosol.nquad_radius)
+    an = zeros(Complex{Float64}, aerosol.nquad_radius, N_max)
+    bn = zeros(Complex{Float64}, aerosol.nquad_radius, N_max)
 
     # Loop over the size distribution, and compute an, bn, for each size
     for i in 1:aerosol.nquad_radius
@@ -46,8 +46,8 @@ function compute_anbn(aerosol::UnivariateAerosol, wl, radius)
 
         # Compute an, bn
         PhaseFunction.compute_mie_ab!(size_param, aerosol.nᵣ + aerosol.nᵢ * im, 
-                                      view(an, :, i), 
-                                      view(bn, :, i), Dn)
+                                      view(an, i, :), 
+                                      view(bn, i, :), Dn)
     end
 
     return an, bn;
@@ -128,16 +128,26 @@ function test_B()
 
     N_max = PhaseFunction.get_n_max(2 * π * aero.r_max/ wl)
 
+    # println(N_max)
+
     wigner_A, wigner_B = PhaseFunction.load_wigner_values("/home/rjeyaram/RadiativeTransfer/src/PhaseFunction/wigner_values.jld") 
 
     # Pre-compute Wigner symbols
     # PhaseFunction.save_wigner_values("/home/rjeyaram/RadiativeTransfer/src/PhaseFunction/wigner_values.jld", wigner_A, wigner_B)
-
+    # N_max = 400
     # wigner_A, wigner_B = PhaseFunction.compute_wigner_values((2 * N_max + 1), N_max + 1, 2 * N_max + 1)
     # Compute B matrix 
 
+    # return wigner_A, wigner_B 
     return compute_B(aero, wigner_A, wigner_B, wl, r, wₓ)
 end
 
+# N_max = 400
+# wigner_A, wigner_B = PhaseFunction.compute_wigner_values((2 * N_max + 1), N_max + 1, 2 * N_max + 1)
+# PhaseFunction.save_wigner_values("/home/rjeyaram/RadiativeTransfer/src/PhaseFunction/wigner_values_sparse.jld", wigner_A, wigner_B)
 
-@benchmark greek_coefs = test_B()
+# wigner_A, wigner_B = PhaseFunction.load_wigner_values("/home/rjeyaram/RadiativeTransfer/src/PhaseFunction/wigner_values_sparse.jld") 
+# wigner_A
+
+# greek_coefs = test_B() 
+greek_coefs = test_B()
