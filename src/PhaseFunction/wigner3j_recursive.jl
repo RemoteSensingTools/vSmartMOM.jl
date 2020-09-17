@@ -173,14 +173,31 @@ function compute_wigner_values(m_max, n_max, l_max)
 
     wigner_A = zeros(m_max, n_max, l_max);
     wigner_B = zeros(m_max, n_max, l_max);
+    fill!(wigner_A, NaN)
+    fill!(wigner_B, NaN)
+
+    values_1 = []
+    values_2 = []
 
     # Using nested loop syntax is so nice!!
-    for l in ls, n in ns, m in ms
+    @showprogress 1 "Computing Wigner Symbols... " for l in ls, n in ns, m in ms
         wigner_A[m, n, l] = wigner!(m, n, l-1, -1, 1, 0, wigner_A, wigner_B)
         wigner_B[m, n, l] = wigner!(m, n, l-1, -1, -1, 2, wigner_A, wigner_B)
+        
+        push!(values_1, wigner_A[m, n, l])
+        push!(values_2, wigner_B[m, n, l])
     end
 
-    return wigner_A, wigner_B
+    # println(values_1)
+
+    ms_ = repeat(ms, inner = n_max * l_max)
+    ns_ = repeat(ns, inner = l_max, outer = m_max)
+    ls_ = repeat(ls, outer = n_max * m_max)
+    
+    # return (table((ms=ms_, ns=ns_, ls=ls_, values=values_1); pkey = [:ms, :ns, :ls]), table((ms=ms_, ns=ns_, ls=ls_, values=values_2); pkey = [:ms, :ns, :ls]))
+    return (ndsparse((ms=ms_, ns=ns_, ls=ls_), values_1), ndsparse((ms=ms_, ns=ns_, ls=ls_), values_2))
+
+    # return wigner_A, wigner_B
 end
 
 function save_wigner_values(filepath, wigner_A, wigner_B)

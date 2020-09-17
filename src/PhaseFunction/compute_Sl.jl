@@ -4,10 +4,10 @@ function get_abnabm(an,bn,n,m,w)
     FT = eltype(an)
     anam = bnbm = anbm = bnam = FT(0);
     @inbounds for i=1:size(an)[2]
-        anam += w[i] * an[n,i]' * an[m,i]
-        bnbm += w[i] * bn[n,i]' * bn[m,i]
-        anbm += w[i] * an[n,i]' * bn[m,i]
-        bnam += w[i] * bn[n,i]' * an[m,i]
+        anam += w[i] * an[i,n]' * an[i,m]
+        bnbm += w[i] * bn[i,n]' * bn[i,m]
+        anbm += w[i] * an[i,n]' * bn[i,m]
+        bnam += w[i] * bn[i,n]' * an[i,m]
     end
     return anam,bnbm,anbm,bnam
 end
@@ -18,10 +18,10 @@ end
     # Indices over n and m
     m, n, i = @index(Global, NTuple)
     if m>=n && m<nMax[i] && n < nMax[i]
-        @inbounds mat_anam[m,n] += (w[i] * (an[n,i]' * an[m,i]));
-        @inbounds mat_bnbm[m,n] += (w[i] * (bn[n,i]' * bn[m,i]));
-        @inbounds mat_anbm[m,n] += (w[i] * (an[n,i]' * bn[m,i]));
-        @inbounds mat_bnam[m,n] += (w[i] * (bn[n,i]' * an[m,i]));
+        @inbounds mat_anam[m,n] += (w[i] * (an[i,n]' * an[i,m]));
+        @inbounds mat_bnbm[m,n] += (w[i] * (bn[i,n]' * bn[i,m]));
+        @inbounds mat_anbm[m,n] += (w[i] * (an[i,n]' * bn[i,m]));
+        @inbounds mat_bnam[m,n] += (w[i] * (bn[i,n]' * an[i,m]));
  
     end
 end
@@ -72,14 +72,14 @@ function compute_Sl(l, ν₁, ν₂, ν₂_positive_flag, k, N_max, an, bn, mat_
 
             for m = m_star:m_max
 
-                anam,bnbm,anbm,bnam = get_abnabm(an,bn,n,m,w)
+                anam,bnbm,anbm,bnam = (mat_anam[m,n], mat_bnbm[m,n], mat_anbm[m,n], mat_bnam[m,n])
                 aman,bmbn,ambn,bman = get_abnabm(an,bn,m,n,w)
 
                 avg = (exp_m1(ll + n + m)) * (anam + bnam - anbm - bnbm) + (aman - ambn + bman - bmbn)
                 first_term += avg * (2n+1) * (2m+1) * wigner_A[m, n, l] * wigner_B[m, n, l]
             end
 
-            anan,anbn,bnan,bnbn = get_abnabm(an,bn,n,n,w)
+            anan,anbn,bnan,bnbn = (mat_anam[n,n], mat_bnbm[n,n], mat_anbm[n,n], mat_bnam[n,n])
             avg = anan - anbn + bnan - bnbn
             second_term += avg * (2n+1) * (2n+1) * wigner_A[n, n, l] * wigner_B[n, n, l]
         end
@@ -100,19 +100,19 @@ function compute_Sl(l, ν₁, ν₂, ν₂_positive_flag, k, N_max, an, bn, mat_
 
             coef_lnn2 = (2n + 1)^2 * (ν₂_positive_flag ? 1 : (exp_m1(ll)))
 
-            # for i = 1:size(an,2)
-            #     if (ν₂_positive_flag)
-            #         second_term += w[i]' * (abs2(an[n,i] + bn[n,i])) * (wig_lnm[n, n, l])^2 * coef_lnn2
-            #     else 
-            #         second_term += w[i]' * (abs2(an[n,i] - bn[n,i])) * (wig_lnm[n, n, l])^2 * coef_lnn2
-            #     end
-            # end
-
-            if (ν₂_positive_flag)
-                second_term += w' *(abs2.(an[n,:] .+ bn[n,:])) * (wig_lnm[n, n, l])^2 * coef_lnn2
-            else 
-                second_term += w' *(abs2.(an[n,:] .- bn[n,:])) * (wig_lnm[n, n, l])^2 * coef_lnn2
+            for i = 1:size(an,1)
+                if (ν₂_positive_flag)
+                    second_term += w[i]' * (abs2(an[i,n] + bn[i,n])) * (wig_lnm[n, n, l])^2 * coef_lnn2
+                else 
+                    second_term += w[i]' * (abs2(an[i,n] - bn[i,n])) * (wig_lnm[n, n, l])^2 * coef_lnn2
+                end
             end
+
+            # if (ν₂_positive_flag)
+            #     second_term += w' *(abs2.(an[n,:] .+ bn[n,:])) * (wig_lnm[n, n, l])^2 * coef_lnn2
+            # else 
+            #     second_term += w' *(abs2.(an[n,:] .- bn[n,:])) * (wig_lnm[n, n, l])^2 * coef_lnn2
+            # end
         end
     end
 
