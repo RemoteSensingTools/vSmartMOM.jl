@@ -127,7 +127,6 @@ function wigner_m1m12!(m::Integer, n::Integer, l::Integer, wigner_A::Array{Float
 
     wigner_B[m, n, l+1] = result
 
-    
     return result
 end
 
@@ -143,7 +142,7 @@ function wigner!(j₁::Integer, j₂::Integer, j₃::Integer,
                  wigner_B::Array{Float64,3})
 
     # Perform a check that the input j's satisfy condition
-    if ((j₁<abs(j₂-j₃))||(j₃<abs(j₂-j₁))||(j₂<abs(j₁-j₃)))
+    if ((j₁<abs(j₂-j₃))||(j₃<abs(j₂-j₁))||(j₂<abs(j₁-j₃))||m₁>j₁||m₁<-j₁||m₂>j₂||m₂<-j₂||m₃>j₃||m₃<-j₃)
         return 0.0
     end
 
@@ -184,20 +183,18 @@ function compute_wigner_values(m_max, n_max, l_max)
         wigner_A[m, n, l] = wigner!(m, n, l-1, -1, 1, 0, wigner_A, wigner_B)
         wigner_B[m, n, l] = wigner!(m, n, l-1, -1, -1, 2, wigner_A, wigner_B)
         
-        push!(values_1, wigner_A[m, n, l])
-        push!(values_2, wigner_B[m, n, l])
+        # push!(values_1, wigner_A[m, n, l])
+        # push!(values_2, wigner_B[m, n, l])
     end
 
-    # println(values_1)
-
-    ms_ = repeat(ms, inner = n_max * l_max)
-    ns_ = repeat(ns, inner = l_max, outer = m_max)
-    ls_ = repeat(ls, outer = n_max * m_max)
+    # ms_ = repeat(ms, inner = n_max * l_max)
+    # ns_ = repeat(ns, inner = l_max, outer = m_max)
+    # ls_ = repeat(ls, outer = n_max * m_max)
     
     # return (table((ms=ms_, ns=ns_, ls=ls_, values=values_1); pkey = [:ms, :ns, :ls]), table((ms=ms_, ns=ns_, ls=ls_, values=values_2); pkey = [:ms, :ns, :ls]))
-    return (ndsparse((ms=ms_, ns=ns_, ls=ls_), values_1), ndsparse((ms=ms_, ns=ns_, ls=ls_), values_2))
+    # return (ndsparse((ms=ms_, ns=ns_, ls=ls_), values_1), ndsparse((ms=ms_, ns=ns_, ls=ls_), values_2))
 
-    # return wigner_A, wigner_B
+    return wigner_A, wigner_B
 end
 
 function save_wigner_values(filepath, wigner_A, wigner_B)
