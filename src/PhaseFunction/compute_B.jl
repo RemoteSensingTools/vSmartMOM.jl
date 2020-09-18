@@ -67,7 +67,7 @@ function compute_B(aerosol::UnivariateAerosol, wigner_A, wigner_B, wl, r, w)
     avg_C_scatt = compute_avg_C_scatt(k, an, bn, w)
 
     # Only do these l's for now
-    ls = 1:50#(2 * N_max)
+    ls = 1:700#(2 * N_max)
 
     # Where to store the values
     greek_coefs = zeros(6, size(ls, 1))
@@ -151,3 +151,12 @@ wigner_A, wigner_B = PhaseFunction.compute_wigner_values((2 * N_max + 1), N_max 
 # PhaseFunction.save_wigner_values("/home/rjeyaram/RadiativeTransfer/src/PhaseFunction/wigner_values.jld", wigner_A, wigner_B)
 # greek_coefs = test_B() 
 @time greek_coefs = test_B()
+
+α = greek_coefs[3,:]
+β = greek_coefs[1,:]
+γ = greek_coefs[5,:]
+δ = greek_coefs[2,:]
+ϵ = greek_coefs[6,:]
+ζ = greek_coefs[4,:]
+
+f₁₁, f₁₂, f₂₂, f₃₃, f₃₄, f₄₄ = PhaseFunction.reconstruct_phase(α, β, γ, δ, ϵ, ζ, [0.3])
