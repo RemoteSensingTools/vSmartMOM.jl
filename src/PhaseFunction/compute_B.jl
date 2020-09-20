@@ -108,7 +108,7 @@ function compute_B(aerosol::UnivariateAerosol, wigner_A, wigner_B, wl, r, w)
 
 end
 
-function test_B()
+function test_B(wigner_A, wigner_B)
 
     # Constants
     μ  = 0.3
@@ -129,7 +129,7 @@ function test_B()
 
     N_max = PhaseFunction.get_n_max(2 * π * aero.r_max/ wl)
 
-    wigner_A, wigner_B = PhaseFunction.load_wigner_values("/home/rjeyaram/RadiativeTransfer/src/PhaseFunction/wigner_values.jld") 
+     
 
     return compute_B(aero, wigner_A, wigner_B, wl, r, wₓ)
 end
@@ -152,7 +152,8 @@ end
 # wigner_A, wigner_B = PhaseFunction.compute_wigner_values((2 * N_max + 1), N_max + 1, 2 * N_max + 1)
 # PhaseFunction.save_wigner_values("/home/rjeyaram/RadiativeTransfer/src/PhaseFunction/wigner_values.jld", wigner_A, wigner_B)
 # greek_coefs = test_B() 
-@time greek_coefs = test_B()
+wigner_A, wigner_B = PhaseFunction.load_wigner_values("/home/rjeyaram/RadiativeTransfer/src/PhaseFunction/wigner_values.jld")
+@time greek_coefs = test_B(wigner_A, wigner_B)
 
 α = greek_coefs[3,:]
 β = greek_coefs[1,:]
