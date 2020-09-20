@@ -26,6 +26,35 @@ end
     end
 end
 
+function compute_avg_anbn!(an, bn,  mat_anam, mat_bnbm, mat_anbm, mat_bnam,w, Nmax, N_max_)
+    FT2 = eltype(an)
+    fill!(mat_anam,0)
+    fill!(mat_bnbm,0)
+    fill!(mat_anbm,0)
+    fill!(mat_bnam,0)
+    @inbounds for n=1:Nmax
+        @inbounds for m=n:Nmax
+            anam = FT2(0);
+            bnbm = FT2(0);
+            anbm = FT2(0);
+            bnam = FT2(0);
+            @inbounds for i = 1:size(an,1)
+                if m < N_max_[i] && n < N_max_[i]
+                    anam += w[i] * an[i,n]' * an[i,m]
+                    bnbm += w[i] * bn[i,n]' * bn[i,m]
+                    anbm += w[i] * an[i,n]' * bn[i,m]
+                    bnam += w[i] * bn[i,n]' * an[i,m]
+                end
+            end 
+            @inbounds mat_anam[m,n] = anam;
+            @inbounds mat_bnbm[m,n] = bnbm;
+            @inbounds mat_anbm[m,n] = anbm;
+            @inbounds mat_bnam[m,n] = bnam;
+        end
+    end
+    return nothing
+end
+
 function fill_avg_anbns!(an, bn, mat_anam, mat_bnbm, mat_anbm, mat_bnam, wₓ, N_max, N_max_, architecture)
 
     # Fill all matrices with 0

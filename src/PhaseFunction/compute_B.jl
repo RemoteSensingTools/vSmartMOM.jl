@@ -81,7 +81,8 @@ function compute_B(aerosol::UnivariateAerosol, wigner_A, wigner_B, wl, r, w)
     mat_bnam = LowerTriangular(zeros(FT2, N_max, N_max));
     
     N_max_ = PhaseFunction.get_n_max.(2π * r/ wl)
-    PhaseFunction.fill_avg_anbns!(an, bn, mat_anam, mat_bnbm, mat_anbm, mat_bnam, w, N_max, N_max_, CPU())
+    #PhaseFunction.fill_avg_anbns!(an, bn, mat_anam, mat_bnbm, mat_anbm, mat_bnam, w, N_max, N_max_, CPU())
+    PhaseFunction.compute_avg_anbn!(an, bn, mat_anam, mat_bnbm, mat_anbm, mat_bnam, w, N_max, N_max_)
     an_m_bn = transpose(abs2.(an-bn)) * w
     an_p_bn = transpose(abs2.(an+bn)) * w
     # For each l
