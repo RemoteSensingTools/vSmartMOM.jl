@@ -9,6 +9,7 @@ using Distributions
 using BenchmarkTools
 using LinearAlgebra
 using KernelAbstractions
+using ProgressMeter
 using SparseArrays
 using ..Architectures: device
 using ..Architectures: devi
@@ -81,15 +82,12 @@ function compute_B(aerosol::UnivariateAerosol, wigner_A, wigner_B, wl, r, w)
     mat_bnam = LowerTriangular(zeros(FT2, N_max, N_max));
     
     N_max_ = PhaseFunction.get_n_max.(2π * r/ wl)
-    #PhaseFunction.fill_avg_anbns!(an, bn, mat_anam, mat_bnbm, mat_anbm, mat_bnam, w, N_max, N_max_, CPU())
     PhaseFunction.compute_avg_anbn!(an, bn, mat_anam, mat_bnbm, mat_anbm, mat_bnam, w, N_max, N_max_)
     an_m_bn = transpose(abs2.(an-bn)) * w
     an_p_bn = transpose(abs2.(an+bn)) * w
+
     # For each l
     @showprogress 1 "Computing S functions ..." for l in ls
-
-        # Compute β_l
-        #println(l)
 
         Sl_00  = compute_Sl(l, 0, 0,  true,  k, N_max, an,bn, mat_anam, mat_bnbm, mat_anbm, mat_bnam, wigner_A, wigner_B,an_m_bn,an_p_bn, w)
         Sl_0m0 = compute_Sl(l, 0, 0,  false, k, N_max, an,bn, mat_anam, mat_bnbm, mat_anbm, mat_bnam, wigner_A, wigner_B,an_m_bn,an_p_bn, w)
@@ -105,7 +103,8 @@ function compute_B(aerosol::UnivariateAerosol, wigner_A, wigner_B, wl, r, w)
         @inbounds greek_coefs[6,l] = (1/avg_C_scatt) * imag(Sl_02)
     end
 
-    return greek_coefs
+    return Domke(greek_coefs[3,:], greek_coefs[1,:], greek_coefs[5,:], 
+                 greek_coefs[2,:], greek_coefs[6,:], greek_coefs[4,:])
 
 end
 
@@ -130,8 +129,6 @@ function test_B(wigner_A, wigner_B)
 
     N_max = PhaseFunction.get_n_max(2 * π * aero.r_max/ wl)
 
-     
-
     return compute_B(aero, wigner_A, wigner_B, wl, r, wₓ)
 end
 
@@ -147,34 +144,16 @@ end
 ### If the wigner symbols are saved, load them from file: 
 ### 
 
-# wigner_A, wigner_B = PhaseFunction.load_wigner_values("/home/rjeyaram/RadiativeTransfer/src/PhaseFunction/wigner_values.jld") 
-
-# N_max = 400
-# wigner_A, wigner_B = PhaseFunction.compute_wigner_values((2 * N_max + 1), N_max + 1, 2 * N_max + 1)
-# PhaseFunction.save_wigner_values("/home/rjeyaram/RadiativeTransfer/src/PhaseFunction/wigner_values.jld", wigner_A, wigner_B)
-# greek_coefs = test_B() 
 wigner_A, wigner_B = PhaseFunction.load_wigner_values("/home/rjeyaram/RadiativeTransfer/src/PhaseFunction/wigner_values.jld")
-@time greek_coefs = test_B(wigner_A, wigner_B)
+greek_coefs = test_B(wigner_A, wigner_B)
 
-α = greek_coefs[3,:]
-β = greek_coefs[1,:]
-γ = greek_coefs[5,:]
-δ = greek_coefs[2,:]
-ϵ = greek_coefs[6,:]
-ζ = greek_coefs[4,:]
 
 N_max = PhaseFunction.get_n_max(2 * π * 30.0/ 0.55)
 n_mu = 2*N_max-1;
 
 μ, w_μ = gausslegendre( n_mu )
 
-# μs = -0.99:0.01:0.99
-
-# μ = gausslegendre( 2 * 700 + 1 )
-
-f₁₁, f₁₂, f₂₂, f₃₃, f₃₄, f₄₄ = PhaseFunction.reconstruct_phase(α, β, γ, δ, ϵ, ζ, μ)
+f₁₁, f₁₂, f₂₂, f₃₃, f₃₄, f₄₄ = PhaseFunction.reconstruct_phase(greek_coefs, μ)
 
 plot(vcat(acos.(μ), acos.(-μ) + 3.141592653589 * ones(n_mu)), vcat(f₁₁, f₁₁), proj=:polar,  lims=(0,14))
-# plot(acos.(μ), f₁₁, proj=:polar)
-plot(μs, log.(f₁₁))
-# , lims=(0,14),lw=10
+# plot(μs, log.(f₁₁))

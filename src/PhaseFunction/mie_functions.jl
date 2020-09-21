@@ -118,17 +118,17 @@ function gauleg(n,xmin,xmax; norm=false)
 end
 
 """
-$(FUNCTIONNAME)(α, β, γ, δ, ϵ, ζ, μ; returnLeg = false)
-Returns the reconstructed elements of the 4x4 scattering matrix at positions f₁₁, f₁₂, f₂₂, f₃₃, f₃₄, f₄₄ from the greek coefficients α, β, γ, δ, ϵ, ζ
-- `α, β, γ, δ, ϵ, ζ` greek coefficients (arrays)
+$(FUNCTIONNAME)(greek_coefs, μ; returnLeg = false)
+Returns the reconstructed elements of the 4x4 scattering matrix at positions f₁₁, f₁₂, f₂₂, f₃₃, f₃₄, f₄₄ from the greek coefficients
+- `greek_coefs` greek coefficients (Domke Type)
 - `returnLeg` if `false` (default), just return `f₁₁, f₁₂, f₂₂, f₃₃, f₃₄, f₄₄`, if `true`, return `f₁₁, f₁₂, f₂₂, f₃₃, f₃₄, f₄₄, P, P²` (i.e. also the two legendre polynomials as matrices)
 """
-function reconstruct_phase(α, β, γ, δ, ϵ, ζ, μ; returnLeg = false)
-    FT = eltype(α)
+function reconstruct_phase(greek_coefs, μ; returnLeg = false)
+    FT = eltype(greek_coefs.α)
     #@assert length(μ) == length(α)
-    lMax = length(α);
+    lMax = length(greek_coefs.α);
     nμ = length(μ)
-    P, P², R², T² = compute_legendre_poly(μ,lMax)
+    P, P², R², T² = compute_legendre_poly(μ, lMax)
     # To stay general, we also don't assume f₂₂=f₁₁ or f₄₄=f₃₃
     # which only holds for spherical
     f₁₁   = zeros(FT, nμ)
@@ -143,12 +143,12 @@ function reconstruct_phase(α, β, γ, δ, ϵ, ζ, μ; returnLeg = false)
         fac[l+1] = sqrt(1 / ( ( l-1) * l * (l+1) * (l+2) ));
     end
     # In matrix form:
-    f₁₁[:] = P * β                               # a₁ in Rooij notation
-    f₄₄[:] = P * δ                               # a₄ in Rooij notation
-    f₁₂[:] = P² * (fac .* γ)                     # b₁ in Rooij notation
-    f₃₄[:] = P² * (fac .* ϵ)                     # b₂ in Rooij notation
-    f₂₂[:] = R² * (fac .* α) .+ T² * (fac .* ζ)  # a₂ in Rooij notation
-    f₃₃[:] = R² * (fac .* ζ) .+ T² * (fac .* α)  # a₃ in Rooij notation
+    f₁₁[:] = P * greek_coefs.β                               # a₁ in Rooij notation
+    f₄₄[:] = P * greek_coefs.δ                               # a₄ in Rooij notation
+    f₁₂[:] = P² * (fac .* greek_coefs.γ)                     # b₁ in Rooij notation
+    f₃₄[:] = P² * (fac .* greek_coefs.ϵ)                     # b₂ in Rooij notation
+    f₂₂[:] = R² * (fac .* greek_coefs.α) .+ T² * (fac .* greek_coefs.ζ)  # a₂ in Rooij notation
+    f₃₃[:] = R² * (fac .* greek_coefs.ζ) .+ T² * (fac .* greek_coefs.α)  # a₃ in Rooij notation
 
     # For truncation in δ-BGE, we need P and P² as well, convenient to return here:
     if returnLeg

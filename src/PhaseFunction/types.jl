@@ -15,7 +15,14 @@ abstract type AbstractGreekType end
 
 struct NAI2  <: AbstractGreekType end
 
-struct Domke <: AbstractGreekType end
+struct Domke{FT} <: AbstractGreekType 
+    α::Array{FT,1}
+    β::Array{FT,1}
+    γ::Array{FT,1}
+    δ::Array{FT,1}
+    ϵ::Array{FT,1}
+    ζ::Array{FT,1}
+end
 
 
 """
@@ -47,8 +54,8 @@ end
 """
     struct UnivariateAerosol{FT}
 
-A struct which provides all model parameters needed for cross-section 
-calculations using HITRAN data
+A struct which provides all univariate aerosol parameters needed for Mie 
+computation
 
 # Fields
 $(DocStringExtensions.FIELDS)
