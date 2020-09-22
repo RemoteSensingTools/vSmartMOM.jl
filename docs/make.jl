@@ -22,5 +22,15 @@ pages = Any[
 #     collapselevel = 1,
 # )
 
-makedocs(sitename="Radiative Transfer", 
+makedocs(sitename="Radiative Transfer",
          pages=pages)
+makedocs(
+    sitename = "Radiative Transfer",
+    pages = pages,
+)
+
+deploydocs(
+    repo = "github.com/RupeshJey/RadiativeTransfer.jl.git",
+    target = "build",
+    push_preview = true,
+)
