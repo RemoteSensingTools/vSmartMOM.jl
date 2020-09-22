@@ -1,4 +1,4 @@
-Manifest.toml
+#Manifest.toml
 .DS_Store
 logs
 compiled
@@ -7,3 +7,5 @@ prefs
 packages
 *.cpp
 # *.csv
+
+docs/build/*
