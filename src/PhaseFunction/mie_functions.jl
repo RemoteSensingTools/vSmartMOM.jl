@@ -173,6 +173,27 @@ function get_greek_rayleigh(depol)
     return α, β, γ, δ, ϵ, ζ 
 end
 
+function construct_Π_matrix(mo::FullStokes, P,R,T,l::Int,m::Int; sign_change=false)
+    if sign_change # (basically gets it for -μ due to symmetries on P,R,T)
+        if mod(l-m,2) == 1
+            Π = [SMatrix{4,4}([-P[i,l,m] 0 0 0 ; 0 -R[i,l,m] -T[i,l,m] 0; 0 -T[i,l,m] -R[i,l,m] 0; 0 0 0 -P[i,l,m]]) for i in 1:size(P,1)] 
+        else
+            Π = [SMatrix{4,4}([P[i,l,m] 0 0 0 ; 0 R[i,l,m] T[i,l,m] 0; 0 T[i,l,m] R[i,l,m] 0; 0 0 0 P[i,l,m]]) for i in 1:size(P,1)]
+        end
+    else
+        Π = [SMatrix{4,4}([P[i,l,m] 0 0 0 ; 0 R[i,l,m] -T[i,l,m] 0; 0 -T[i,l,m] R[i,l,m] 0; 0 0 0 P[i,l,m]]) for i in 1:size(P,1)]
+    end
+    return Π
+end
+
+function construct_Π_matrix(mod::Scalar, P,R,T,l::Int,m::Int; sign_change=false)
+    if sign_change # (basically gets it for -μ due to symmetries on P,R,T)
+        Π = -P[:,l,m]
+    else
+        Π = P[:,l,m]
+    end        
+end
+
 function construct_B_matrix(mod::FullStokes, α, β, γ, δ, ϵ, ζ,l::Int)
     𝐁 = SMatrix{4,4}([β[l] γ[l] 0 0 ; γ[l] α[l] 0 0; 0 0 ζ[l] -ϵ[l]; 0 0 ϵ[l] δ[l]])
 end
@@ -181,13 +202,6 @@ function construct_B_matrix(mod::Scalar, α, β, γ, δ, ϵ, ζ,l::Int)
     𝐁 = β[l]
 end
 
-function construct_Π_matrix(mod::FullStokes, P,R,T,l::Int,m::Int)
-    𝐁 = SMatrix{4,4}([P[l,m] 0 0 0 ; 0 R[l,m] -T[l,m] 0; 0 -T[l,m] -R[l,m] 0; 0 0 0 P[l,m]])
-end
-
-function construct_Π_matrix(mod::Scalar, P,R,T,l::Int,m::Int)
-    𝐁 = P[l,m]
-end
 
 function compute_Z_moments(mod::AbstractPolarizationType, μ, α, β, γ, δ, ϵ, ζ, m::Int)
     FT = eltype(β)
@@ -203,7 +217,7 @@ function compute_Z_moments(mod::AbstractPolarizationType, μ, α, β, γ, δ, ϵ
     # get Lmax just from length of array:
     Lmax = length(β)
     # Check that all μ are positive here ([0,1])
-    @assert all(0 .≤ μ .≤ 1)
+    @assert all(0 .< μ .≤ 1)
     # Compute legendre Polynomials at μ and up to lmax
     P,R,T = PhaseFunction.compute_associated_legendre_PRT(μ,Lmax)
     P⁻,R⁻,T⁻ = PhaseFunction.compute_associated_legendre_PRT(-μ,Lmax)
