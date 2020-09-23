@@ -189,4 +189,73 @@ function construct_Π_matrix(mod::Scalar, P,R,T,l::Int,m::Int)
     𝐁 = P[l,m]
 end
 
+function compute_Z_moments(mod::AbstractPolarizationType, μ, α, β, γ, δ, ϵ, ζ, m::Int)
+    FT = eltype(β)
+    n = length(μ)
+    
+    # Set prefactor for moments:
+    if m==0
+        fact=0.5
+    else
+        fact = 1.0
+    end
 
+    # get Lmax just from length of array:
+    Lmax = length(β)
+    # Check that all μ are positive here ([0,1])
+    @assert all(0 .≤ μ .≤ 1)
+    # Compute legendre Polynomials at μ and up to lmax
+    P,R,T = PhaseFunction.compute_associated_legendre_PRT(μ,Lmax)
+    P⁻,R⁻,T⁻ = PhaseFunction.compute_associated_legendre_PRT(-μ,Lmax)
+    # Pre-compute all required B matrices
+    𝐁_all = [construct_B_matrix(mod,α, β, γ, δ, ϵ, ζ,i) for i in 1:Lmax]
+    # Get dimension of square matrix (easier for Scalar/Stokes dimensions)
+    B_dim = Int(sqrt(length(𝐁_all[1])))
+    
+    # Create matrices:
+    nb = B_dim*n
+    𝐙⁺⁺ = zeros(FT,nb,nb)
+    𝐙⁺⁻ = zeros(FT,nb,nb)
+    A⁺⁺ = zeros(FT,B_dim,B_dim,n,n)
+    A⁺⁻ = zeros(FT,B_dim,B_dim,n,n)
+
+    # Iterate over l
+    for l = m:Lmax
+        # B matrix for l
+        𝐁 = 𝐁_all[l];
+        # Construct Π matrix for l,m pair (change to in place later!)
+        # See eq. 15 in Sanghavi 2014, note that P,R,T are already normalized
+        Π  = construct_Π_matrix(mod,P,R,T,l,m)
+        Π⁻ = construct_Π_matrix(mod,P⁻,R⁻,T⁻,l,m)
+        # Iterate over angles
+        for i in eachindex(μ), j in eachindex(μ)
+            if B_dim==1
+                A⁺⁺[B_dim,B_dim,i,j] += Π[i] * 𝐁 * Π[j]
+                A⁺⁻[B_dim,B_dim,i,j] += Π[i] * 𝐁 * Π⁻[j]
+            else
+                A⁺⁺[:,:,i,j] += Π[i] * 𝐁 * Π[j]
+                A⁺⁻[:,:,i,j] += Π[i] * 𝐁 * Π⁻[j]
+            end
+        end
+    end
+    # Now get to the Z part:
+    for imu in eachindex(μ), jmu in eachindex(μ)
+        # Indices adjusted for size of A
+        ii=(imu-1)*B_dim
+        jj=(jmu-1)*B_dim
+        
+        # This is equivalent to Z̄ = 1/(1+δ) * C̄m+S̄m = 1/(1+δ) * (A+DAD+AD-DA) (see eq 11 in Sanghavi et al, 2013)
+        for i=1:B_dim, j=1:B_dim
+            𝐙⁺⁺[ii+i,jj+j] = 2fact*A⁺⁺[i,j,imu,jmu]
+            if i<=2 && j>=3
+                𝐙⁺⁻[ii+i,jj+j] = -2fact*A⁺⁻[i,j,imu,jmu]
+            elseif i>=3 && j<=2
+                𝐙⁺⁻[ii+i,jj+j] = -2fact*A⁺⁻[i,j,imu,jmu]
+            else
+                𝐙⁺⁻[ii+i,jj+j] = 2fact*A⁺⁻[i,j,imu,jmu]
+            end
+        end
+    end
+    return 𝐙⁺⁺,𝐙⁺⁻
+end
+    
