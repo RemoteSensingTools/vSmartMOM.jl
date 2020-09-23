@@ -78,7 +78,6 @@ function goCUDA!(mat_anamC, mat_bnbmC,mat_anbmC,mat_bnamC)
     kernel! = avg_anbn!(CUDADevice())
     event = kernel!(anC,bnC,mat_anamC, mat_bnbmC,mat_anbmC,mat_bnamC,wₓC,N_max_C, ndrange=(Nmax,Nmax,length(wₓ))); 
     wait(CUDADevice(), event)    ;
-    #@show  Array(mat_anamC)[12,10]  
     return nothing
 end
 
@@ -100,40 +99,41 @@ function compute_Sl(l, ν₁, ν₂, ν₂_positive_flag, k, N_max, an, bn, mat_
             m_max = min(ll+n,N_max)
 
             @inbounds for m = m_star:m_max
-
-                #anam,bnbm,anbm,bnam = (mat_anam[m,n], mat_bnbm[m,n], mat_anbm[m,n], mat_bnam[m,n])
-                #aman,bmbn,ambn,bman = get_abnabm(an,bn,m,n,w)
-                #@show anam,aman
                 avg = (exp_m1(ll + n + m)) * (mat_anam[m,n] + mat_bnam[m,n] - mat_anbm[m,n] - mat_bnbm[m,n]) + (mat_anam[m,n]' - mat_bnam[m,n]' + mat_anbm[m,n]' - mat_bnbm[m,n]')
-                first_term += avg * (2n+1) * (2m+1) * wigner_A[m, n, l] * wigner_B[m, n, l]
+                first_term += avg * 2 * (2n+1) * (2m+1) * wigner_A[m, n, l] * wigner_B[m, n, l]
+                # first_term += avg * (2n+1) * (2m+1) * get(wigner_A, (m, n, l), 0.0) * get(wigner_B, (m, n, l), 0.0)
             end
 
-            anan,anbn,bnan,bnbn = (mat_anam[n,n], mat_bnbm[n,n], mat_anbm[n,n], mat_bnam[n,n])
+            # anan,anbn,bnan,bnbn = (mat_anam[n,n], mat_bnbm[n,n], mat_anbm[n,n], mat_bnam[n,n])
+            anan,anbn,bnan,bnbn = (mat_anam[n,n], mat_anbm[n,n], mat_bnam[n,n], mat_bnbm[n,n])
             avg = anan - anbn + bnan - bnbn
-            second_term += avg * (2n+1) * (2n+1) * wigner_A[n, n, l] * wigner_B[n, n, l]
+            second_term += avg * 2 * (2n+1) * (2n+1) * wigner_A[n, n, l] * wigner_B[n, n, l]
+            # second_term += avg * (2n+1) * (2n+1) * get(wigner_A, (n, n, l), 0.0) * get(wigner_B, (n, n, l), 0.0)
         end
 
     else
         wig_lnm = ν₁ == 0 ? wigner_A : wigner_B
-        
 
         @inbounds for n = 1:N_max
             m_star = max(ll-n,n+1)
             m_max = min(ll+n,N_max)
             
             @inbounds for m = m_star:m_max
-                anam,bnbm,anbm,bnam = (mat_anam[m,n], mat_bnbm[m,n], mat_anbm[m,n], mat_bnam[m,n]) # get_abnabm(an,bn,n,m,w)
+                anam,bnbm,anbm,bnam = (mat_anam[m,n], mat_bnbm[m,n], mat_anbm[m,n], mat_bnam[m,n])
                 real_avg = ν₂_positive_flag ? real(anam+anbm+bnam+bnbm) : real(anam-anbm-bnam+bnbm);
                 coef_lnm2 = 2 * (2m + 1)  * (2n + 1) * (ν₂_positive_flag ? 1 : (exp_m1(ll + n + m)))
                 first_term += (real_avg * (wig_lnm[m, n, l])^2 * coef_lnm2)
+                # first_term += (real_avg * (get(wig_lnm, (m, n, l), 0.0))^2 * coef_lnm2)
             end
 
             coef_lnn2 = (2n + 1)^2 * (ν₂_positive_flag ? 1 : (exp_m1(ll)))
             
             if (ν₂_positive_flag)
                 second_term += an_p_bn[n] * (wig_lnm[n, n, l])^2 * coef_lnn2
+                # second_term += an_p_bn[n] * (get(wig_lnm, (n, n, l), 0.0))^2 * coef_lnn2
             else 
                 second_term += an_m_bn[n] * (wig_lnm[n, n, l])^2 * coef_lnn2
+                # second_term += an_m_bn[n] * (get(wig_lnm, (n, n, l), 0.0))^2 * coef_lnn2
             end
 
         end
