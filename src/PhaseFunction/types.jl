@@ -33,6 +33,9 @@ abstract type AbstractPolarizationType end
 # Use full Stokes Vector:
 struct FullStokes <: AbstractPolarizationType end
 
+# Use full Stokes Vector (rename these to Stokes_I, Stokes_IQU and Stokes_IQUV?):
+struct IQUStokes <: AbstractPolarizationType end
+
 # Use scalar only:
 struct Scalar <: AbstractPolarizationType end
 
