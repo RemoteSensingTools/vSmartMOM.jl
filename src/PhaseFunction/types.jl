@@ -15,14 +15,7 @@ abstract type AbstractGreekType end
 
 struct NAI2  <: AbstractGreekType end
 
-struct Domke{FT} <: AbstractGreekType 
-    α::Array{FT,1}
-    β::Array{FT,1}
-    γ::Array{FT,1}
-    δ::Array{FT,1}
-    ϵ::Array{FT,1}
-    ζ::Array{FT,1}
-end
+struct Domke{FT} <: AbstractGreekType end
 
 """
     type AbstractQuadratureType
@@ -77,4 +70,21 @@ struct UnivariateAerosol{FT,FT2} <: AbstractAerosolType
     nᵣ::FT2
     "Imaginary part of refractive Index"
     nᵢ::FT2
+end
+
+"""
+    struct UnivariateAerosol{FT}
+
+A struct which holds all Greek coefficient lists (over l) in one object
+
+# Fields
+$(DocStringExtensions.FIELDS)
+"""
+struct GreekCoefs{FT}
+    α::Array{FT,1}
+    β::Array{FT,1}
+    γ::Array{FT,1}
+    δ::Array{FT,1}
+    ϵ::Array{FT,1}
+    ζ::Array{FT,1}
 end

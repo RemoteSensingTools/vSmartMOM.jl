@@ -26,7 +26,7 @@ include("compute_Sl.jl")         # Sl_νν functions
 
 
 # Export the mie models
-export compute_ab, UnivariateAerosol, Domke, comp_ab, wigner!, compute_mie_π_τ!, 
+export compute_ab, UnivariateAerosol, GreekCoefs, comp_ab, wigner!, compute_mie_π_τ!, 
        compute_wigner_values, save_wigner_values, load_wigner_values, 
        compute_Sl, gausslegendre
 

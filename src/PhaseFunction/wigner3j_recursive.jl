@@ -175,16 +175,32 @@ function compute_wigner_values(m_max, n_max, l_max)
     fill!(wigner_A, NaN)
     fill!(wigner_B, NaN)
 
-    values_1 = []
-    values_2 = []
+    # values_1 = []
+    # values_2 = []
+
+    # wigner_A_sparse = Dict{Tuple{Int64, Int64, Int64}, Float64}()
+    # wigner_B_sparse = Dict{Tuple{Int64, Int64, Int64}, Float64}()
+
+    wigner_A_sparse = Dict{Tuple{Int64, Int64, Int64}, Float64}()
+    wigner_B_sparse = Dict{Tuple{Int64, Int64, Int64}, Float64}()
 
     # Using nested loop syntax is so nice!!
-    @showprogress 1 "Computing Wigner Symbols... " for l in ls, n in ns, m in ms
-        wigner_A[m, n, l] = wigner!(m, n, l-1, -1, 1, 0, wigner_A, wigner_B)
-        wigner_B[m, n, l] = wigner!(m, n, l-1, -1, -1, 2, wigner_A, wigner_B)
-        
-        # push!(values_1, wigner_A[m, n, l])
-        # push!(values_2, wigner_B[m, n, l])
+    @showprogress 1 "Computing Wigner Symbols... " for l in ls
+        for n in ns
+
+            # ms = (n < l/2) ? ((l-n):(l+n)) : (n:(n+l))
+
+            for m in ms
+                wigner_A[m, n, l] = wigner!(m, n, l-1, -1, 1, 0, wigner_A, wigner_B)
+                wigner_B[m, n, l] = wigner!(m, n, l-1, -1, -1, 2, wigner_A, wigner_B)
+                # if (wigner_A[m,n,l] != 0)
+                #     wigner_A_sparse[(m, n, l)] = wigner_A[m, n, l]
+                # end
+                # if (wigner_B[m,n,l] != 0)
+                #     wigner_B_sparse[(m, n, l)] = wigner_B[m, n, l]
+                # end
+            end
+        end
     end
 
     # ms_ = repeat(ms, inner = n_max * l_max)
@@ -194,6 +210,7 @@ function compute_wigner_values(m_max, n_max, l_max)
     # return (table((ms=ms_, ns=ns_, ls=ls_, values=values_1); pkey = [:ms, :ns, :ls]), table((ms=ms_, ns=ns_, ls=ls_, values=values_2); pkey = [:ms, :ns, :ls]))
     # return (ndsparse((ms=ms_, ns=ns_, ls=ls_), values_1), ndsparse((ms=ms_, ns=ns_, ls=ls_), values_2))
 
+    # return wigner_A_sparse, wigner_B_sparse
     return wigner_A, wigner_B
 end
 
