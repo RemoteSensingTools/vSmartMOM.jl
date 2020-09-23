@@ -7,165 +7,167 @@ Computes the normalized Π matrix elements with generalized spherical functions 
 - `Lmax` max `l` Polynomial degree to be computed (m adjusted accordingly) 
 The function returns matrices containing ``P_l^m(\\mu)``,  ``R_l^m(\\mu)``, ``-T_l^m(\\mu)``, all normalized by ``\\sqrt{\\frac{(l-m)!}{(l+m)!}}``
 """ 
-function compute_Π_matrix(μ,Lmax)
-    # Note: P_l^m(μ) double-checked against Matlab, really hard to find other benchmarks for R and T!
-    # Can probably be sped up but it can be pre-computed anyhow as angles μ and Lmax will be fixed per run
+function compute_associated_legendre_PRT(μ,Lmax)
+     # Note: P_l^m(μ) double-checked against Matlab, really hard to find other benchmarks for R and T!
+     # Can probably be sped up but it can be pre-computed anyhow as angles μ and Lmax will be fixed per run
     FT = eltype(μ)
 
     # Create Arrays for the associate legendre coefficients (Siewert, eq. 10)
-    da = (zeros(FT,Lmax+1,Lmax+1));
-    db = (zeros(FT,Lmax+1,Lmax+1));
-    dc = (zeros(FT,Lmax+1,Lmax+1));
-
+    P = (zeros(FT,length(μ),Lmax,Lmax));
+    R = (zeros(FT,length(μ),Lmax,Lmax));
+    T = (zeros(FT,length(μ),Lmax,Lmax));
     # Following Suniti Sanghavi code, looks somewhat different than Siewert as normalization is built in. 
-    smu = sqrt(1.0 - μ*μ)
-    cmu = μ 
-    for  m=0:Lmax
-        for l=m:Lmax
-            #indices for arrays
-            im = m+1;
-            il = l+1;
+    for  m=0:Lmax-1
+        for l=m:Lmax-1
+            for iμ in eachindex(μ)
+                smu = sqrt(1.0 - μ[iμ]^2)
+                cmu = μ[iμ] 
+                #indices for arrays
+                im = m+1;
+                il = l+1;
 
-            if m==0
-                if l==0 # then !eq.28a
-                    da[il,im] = 1
-                    db[il,im] = 0
-                    dc[il,im] = 0
-                elseif l==1 # then !eq.28b
-                    da[il,im] = cmu
-                    db[il,im] = 0
-                    dc[il,im] = 0
-                elseif l==2 # then !eq.28c, 29, 30
-                    cA = 0.5*(3.0*cmu*cmu-1.0)
-                    cB = 0.5*sqrt(1.5)*smu*smu
+                if m==0
+                    if l==0 # then !eq.28a
+                        P[iμ,il,im] = 1
+                        R[iμ,il,im] = 0
+                        T[iμ,il,im] = 0
+                    elseif l==1 # then !eq.28b
+                        P[iμ,il,im] = cmu
+                        R[iμ,il,im] = 0
+                        T[iμ,il,im] = 0
+                    elseif l==2 # then !eq.28c, 29, 30
+                        cA = 0.5*(3.0*cmu*cmu-1.0)
+                        cB = 0.5*sqrt(1.5)*smu*smu
 
-                    da[il,im] = cA
-                    db[il,im] = cB
-                    dc[il,im] = 0.0
-                else #!eq.30, 31a, 31b
-                    Y_lm1 = l-1
-                    X_lm1 = l
+                        P[iμ,il,im] = cA
+                        R[iμ,il,im] = cB
+                        T[iμ,il,im] = 0.0
+                    else #!eq.30, 31a, 31b
+                        Y_lm1 = l-1
+                        X_lm1 = l
 
-                    da[il,im] = (da[il-1,im] * (2l-1) * cmu -  da[il-2,im] * Y_lm1 ) / X_lm1
+                        P[iμ,il,im] = (P[iμ,il-1,im] * (2l-1) * cmu -  P[iμ,il-2,im] * Y_lm1 ) / X_lm1
 
-                    Y_lm1 = sqrt( (l+1) * (l-3) )
-                    X_lm1 = sqrt( l*l - 4 )
+                        Y_lm1 = sqrt( (l+1) * (l-3) )
+                        X_lm1 = sqrt( l*l - 4 )
 
-                    db[il,im] = (db[il-1,im] * (2*l-1) * cmu -  db[il-2,im] * Y_lm1) / X_lm1
-                    dc[il,im] = 0.0
-                end
-
-            elseif m==1 # then
-                if l==1 # then !eq.32a
-                    m1 = sqrt(0.5)
-                    da[il,im] = m1*smu
-                    db[il,im] = 0.0
-                    dc[il,im] = 0.0
-                elseif l==2 # then !eq.32b, 33a, 33b
-                    m1 = sqrt(1/6)
-                    cA = 3cmu*smu
-                    cB = sqrt(1.5)*smu
-                    da[il,im] = m1*cA
-                    db[il,im] = -m1*cmu*cB
-                    dc[il,im] = m1*cB
-                else #!eq.34, 35a, 35b, 35c
-                    m1 = sqrt((l-1)/(l+1))
-                    m2 = m1 * sqrt( (l-2) / l )
-
-                    Y_lm1 = (l-1+m)
-                    X_lm1 = (l-m)
-
-                    da[il,im] = (m1 * da[il-1,im] * (2l-1) * cmu 
-                                - m2 * da[il-2,im] * Y_lm1 ) / X_lm1
-
-                    Z_lm1 = (2m * (2l-1) ) / (l * (l-1))
-                    Y_lm1 = ( (l+m-1) / (l-1)) * sqrt( (l-3) * (l+1) )
-                    X_lm1 = ( (l-m)   /  l   ) * sqrt( (l*l-4) )
-
-                    db[il,im] = (m1*db[il-1,im] * (2l-1) * cmu 
-                                -m2 * db[il-2,im] * Y_lm1 +m1 * dc[il-1,im] * Z_lm1 ) /X_lm1
-
-                    dc[il,im] = (m1*dc[il-1,im] * (2l-1) * cmu
-                                -m2 * dc[il-2,im] * Y_lm1 +m1 * db[il-1,im] * Z_lm1 ) /X_lm1
-                end
-            else 
-                if l==m # then !eq.36, 37
-                    fact1=1.0
-                    fact2=1.0
-
-                    sfull = smu
-                    shalf = sfull/2
-                    for i=1:m
-                        fact1 = fact1*((2i-1)*sfull) / sqrt((i*(i+m)))
-                        if i>2  #then
-                            fact2 = fact2 * shalf * sqrt((m+i)/(i-2))
-                        else
-                            fact2 = fact2 * shalf
-                        end
+                        R[iμ,il,im] = (R[iμ,il-1,im] * (2*l-1) * cmu -  R[iμ,il-2,im] * Y_lm1) / X_lm1
+                        T[iμ,il,im] = 0.0
                     end
-                    if smu>1e-8  # then
-                        Km = (fact2)
-                        Aii= Km * (1.0+cmu*cmu) / (smu*smu)
-                        Aij= Km * (2cmu) / (smu*smu)
-                    else
-                        if m==2 # then
-                            Aii=0.5
-                            Aij=0.5
-                        else
-                            Aii=0.0
-                            Aij=0.0
-                        end
+
+                elseif m==1 # then
+                    if l==1 # then !eq.32a
+                        m1 = sqrt(0.5)
+                        P[iμ,il,im] = m1*smu
+                        R[iμ,il,im] = 0.0
+                        T[iμ,il,im] = 0.0
+                    elseif l==2 # then !eq.32b, 33a, 33b
+                        m1 = sqrt(1/6)
+                        cA = 3cmu*smu
+                        cB = sqrt(1.5)*smu
+                        P[iμ,il,im] = m1*cA
+                        R[iμ,il,im] = -m1*cmu*cB
+                        T[iμ,il,im] = m1*cB
+                    else #!eq.34, 35a, 35b, 35c
+                        m1 = sqrt((l-1)/(l+1))
+                        m2 = m1 * sqrt( (l-2) / l )
+
+                        Y_lm1 = (l-1+m)
+                        X_lm1 = (l-m)
+
+                        P[iμ,il,im] = (m1 * P[iμ,il-1,im] * (2l-1) * cmu 
+                                    - m2 * P[iμ,il-2,im] * Y_lm1 ) / X_lm1
+
+                        Z_lm1 = (2m * (2l-1) ) / (l * (l-1))
+                        Y_lm1 = ( (l+m-1) / (l-1)) * sqrt( (l-3) * (l+1) )
+                        X_lm1 = ( (l-m)   /  l   ) * sqrt( (l*l-4) )
+
+                        R[iμ,il,im] = (m1*R[iμ,il-1,im] * (2l-1) * cmu 
+                                    -m2 * R[iμ,il-2,im] * Y_lm1 +m1 * T[iμ,il-1,im] * Z_lm1 ) /X_lm1
+
+                        T[iμ,il,im] = (m1*T[iμ,il-1,im] * (2l-1) * cmu
+                                    -m2 * T[iμ,il-2,im] * Y_lm1 +m1 * R[iμ,il-1,im] * Z_lm1 ) /X_lm1
                     end
-                    da[il,im] = fact1
-                    db[il,im] =  Aii
-                    dc[il,im] = -Aij
+                else 
+                    if l==m # then !eq.36, 37
+                        fact1=1.0
+                        fact2=1.0
 
-                elseif l==(m+1) # then !eq.38, 35a, 35b
-                    # typo 1 and l??
-                    m1 = sqrt((1)/(l+m))
+                        sfull = smu
+                        shalf = sfull/2
+                        for i=1:m
+                            fact1 = fact1*((2i-1)*sfull) / sqrt((i*(i+m)))
+                            if i>2  #then
+                                fact2 = fact2 * shalf * sqrt((m+i)/(i-2))
+                            else
+                                fact2 = fact2 * shalf
+                            end
+                        end
+                        if smu>1e-8  # then
+                            Km = (fact2)
+                            Aii= Km * (1.0+cmu*cmu) / (smu*smu)
+                            Aij= Km * (2cmu) / (smu*smu)
+                        else
+                            if m==2 # then
+                                Aii=0.5
+                                Aij=0.5
+                            else
+                                Aii=0.0
+                                Aij=0.0
+                            end
+                        end
+                        P[iμ,il,im] = fact1
+                        R[iμ,il,im] =  Aii
+                        T[iμ,il,im] = -Aij
 
-                    Y_lm1 = (l-1+m)
-                    X_lm1 = (l-m)
+                    elseif l==(m+1) # then !eq.38, 35a, 35b
+                        # typo 1 and l??
+                        m1 = sqrt((1)/(l+m))
 
-                    da[il,im] = ( m1 * da[il-1,im] * (2l-1) * cmu ) / X_lm1
+                        Y_lm1 = (l-1+m)
+                        X_lm1 = (l-m)
 
-                    Z_lm1 = (2m * (2l-1)) / (l*(l-1))
-                    Y_lm1 = ((l+m-1) / (l-1)) * sqrt( (l-3) * (l+1) ) 
-                    X_lm1 = ( (l-m) /l ) * sqrt(l*l-4)
+                        P[iμ,il,im] = ( m1 * P[iμ,il-1,im] * (2l-1) * cmu ) / X_lm1
 
-                    db[il,im] = ( m1 * db[il-1,im] * (2l-1) * cmu 
-                                + m1 * dc[il-1,im] * Z_lm1 ) / X_lm1
-                    dc[il,im] = ( m1 * dc[il-1,im] * (2l-1) * cmu 
-                                + m1 * db[il-1,im] * Z_lm1 ) / X_lm1
+                        Z_lm1 = (2m * (2l-1)) / (l*(l-1))
+                        Y_lm1 = ((l+m-1) / (l-1)) * sqrt( (l-3) * (l+1) ) 
+                        X_lm1 = ( (l-m) /l ) * sqrt(l*l-4)
 
-                else #!eq.38, 35a, 35b
-                    m1 = sqrt( (l-m) / (l+m) )
-                    m2 = m1 * sqrt( (l-m-1) / (l+m-1) )
+                        R[iμ,il,im] = ( m1 * R[iμ,il-1,im] * (2l-1) * cmu 
+                                    + m1 * T[iμ,il-1,im] * Z_lm1 ) / X_lm1
+                        T[iμ,il,im] = ( m1 * T[iμ,il-1,im] * (2l-1) * cmu 
+                                    + m1 * R[iμ,il-1,im] * Z_lm1 ) / X_lm1
 
-                    Y_lm1 = (l-1+m)
-                    X_lm1 = (l-m)
+                    else #!eq.38, 35a, 35b
+                        m1 = sqrt( (l-m) / (l+m) )
+                        m2 = m1 * sqrt( (l-m-1) / (l+m-1) )
 
-                    da[il,im] = ( m1 * da[il-1,im] * (2l-1) * cmu 
-                                - m2 * da[il-2,im] * Y_lm1 ) / X_lm1
+                        Y_lm1 = (l-1+m)
+                        X_lm1 = (l-m)
 
-                    Z_lm1 = (2m*(2l-1)) / (l*(l-1))
-                    Y_lm1 = ( (l+m-1) / (l-1) ) * sqrt( (l-3) * (l+1) )
-                    X_lm1 = ( (l-m) / l ) * sqrt( l*l-4 )
+                        P[iμ,il,im] = ( m1 * P[iμ,il-1,im] * (2l-1) * cmu 
+                                    - m2 * P[iμ,il-2,im] * Y_lm1 ) / X_lm1
 
-                    db[il,im] = ( m1 * db[il-1,im] * (2l-1) * cmu 
-                                - m2 * db[il-2,im] * Y_lm1  
-                                + m1 * dc[il-1,im] * Z_lm1) / X_lm1
+                        Z_lm1 = (2m*(2l-1)) / (l*(l-1))
+                        Y_lm1 = ( (l+m-1) / (l-1) ) * sqrt( (l-3) * (l+1) )
+                        X_lm1 = ( (l-m) / l ) * sqrt( l*l-4 )
 
-                    dc[il,im] = ( m1 * dc[il-1,im] * (2l-1) * cmu 
-                                - m2 * dc[il-2,im] * Y_lm1
-                                + m1 * db[il-1,im] * Z_lm1) / X_lm1
+                        R[iμ,il,im] = ( m1 * R[iμ,il-1,im] * (2l-1) * cmu 
+                                    - m2 * R[iμ,il-2,im] * Y_lm1  
+                                    + m1 * T[iμ,il-1,im] * Z_lm1) / X_lm1
 
+                        T[iμ,il,im] = ( m1 * T[iμ,il-1,im] * (2l-1) * cmu 
+                                    - m2 * T[iμ,il-2,im] * Y_lm1
+                                    + m1 * R[iμ,il-1,im] * Z_lm1) / X_lm1
+
+                    end
                 end
-          end
+            end
        end
     end
-    return da,db,dc
+    return P,R,T
 end
+
 
 """
 $(FUNCTIONNAME)(μ, nmax, π, τ)
