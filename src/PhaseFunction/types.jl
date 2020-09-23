@@ -24,6 +24,12 @@ struct Domke{FT} <: AbstractGreekType
     ζ::Array{FT,1}
 end
 
+"""
+    type AbstractQuadratureType
+Abstract Quadrature type 
+"""
+abstract type AbstractQuadratureType end
+
 
 """
     type AbstractPolarizationType
