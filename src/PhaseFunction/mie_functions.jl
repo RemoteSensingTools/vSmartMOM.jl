@@ -195,7 +195,7 @@ function construct_Π_matrix(mod::Scalar, P,R,T,l::Int,m::Int; sign_change=false
 end
 
 function construct_B_matrix(mod::FullStokes, α, β, γ, δ, ϵ, ζ,l::Int)
-    𝐁 = SMatrix{4,4}([β[l] γ[l] 0 0 ; γ[l] α[l] 0 0; 0 0 ζ[l] -ϵ[l]; 0 0 ϵ[l] δ[l]])
+    𝐁 = SMatrix{4,4}([β[l] γ[l] 0 0 ; γ[l] α[l] 0 0; 0 0 ζ[l] ϵ[l]; 0 0 -ϵ[l] δ[l]])
 end
 
 function construct_B_matrix(mod::Scalar, α, β, γ, δ, ϵ, ζ,l::Int)
@@ -207,8 +207,8 @@ function compute_Z_moments(mod::AbstractPolarizationType, μ, α, β, γ, δ, ϵ
     FT = eltype(β)
     n = length(μ)
     
-    # Set prefactor for moments:
-    if m==0
+    # Set prefactor for moments (note 1-notation for `m` here):
+    if m==1
         fact=0.5
     else
         fact = 1.0
@@ -217,10 +217,11 @@ function compute_Z_moments(mod::AbstractPolarizationType, μ, α, β, γ, δ, ϵ
     # get Lmax just from length of array:
     Lmax = length(β)
     # Check that all μ are positive here ([0,1])
-    @assert all(0 .< μ .≤ 1)
+    @assert all(0 .< μ .≤ 1) "all μ's within compute_Z_moments have to be ∈ ]0,1]"
     # Compute legendre Polynomials at μ and up to lmax
-    P,R,T = PhaseFunction.compute_associated_legendre_PRT(μ,Lmax)
+    P,R,T    = PhaseFunction.compute_associated_legendre_PRT(μ,Lmax)
     P⁻,R⁻,T⁻ = PhaseFunction.compute_associated_legendre_PRT(-μ,Lmax)
+  
     # Pre-compute all required B matrices
     𝐁_all = [construct_B_matrix(mod,α, β, γ, δ, ϵ, ζ,i) for i in 1:Lmax]
     # Get dimension of square matrix (easier for Scalar/Stokes dimensions)
@@ -235,11 +236,13 @@ function compute_Z_moments(mod::AbstractPolarizationType, μ, α, β, γ, δ, ϵ
 
     # Iterate over l
     for l = m:Lmax
+        #@show l
         # B matrix for l
         𝐁 = 𝐁_all[l];
         # Construct Π matrix for l,m pair (change to in place later!)
         # See eq. 15 in Sanghavi 2014, note that P,R,T are already normalized
         Π  = construct_Π_matrix(mod,P,R,T,l,m)
+        #Π⁻ = construct_Π_matrix(mod,P,R,T,l,m; sign_change=true)
         Π⁻ = construct_Π_matrix(mod,P⁻,R⁻,T⁻,l,m)
         # Iterate over angles
         for i in eachindex(μ), j in eachindex(μ)
