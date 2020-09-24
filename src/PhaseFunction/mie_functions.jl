@@ -173,7 +173,7 @@ function get_greek_rayleigh(depol)
     return α, β, γ, δ, ϵ, ζ 
 end
 
-function construct_Π_matrix(mo::FullStokes, P,R,T,l::Int,m::Int; sign_change=false)
+function construct_Π_matrix(mo::Stokes_IQUV, P,R,T,l::Int,m::Int; sign_change=false)
     if sign_change # (basically gets it for -μ due to symmetries on P,R,T)
         if mod(l-m,2) == 1
             Π = [SMatrix{4,4}([-P[i,l,m] 0 0 0 ; 0 -R[i,l,m] -T[i,l,m] 0; 0 -T[i,l,m] -R[i,l,m] 0; 0 0 0 -P[i,l,m]]) for i in 1:size(P,1)] 
@@ -186,7 +186,20 @@ function construct_Π_matrix(mo::FullStokes, P,R,T,l::Int,m::Int; sign_change=fa
     return Π
 end
 
-function construct_Π_matrix(mod::Scalar, P,R,T,l::Int,m::Int; sign_change=false)
+function construct_Π_matrix(mo::Stokes_IQU, P,R,T,l::Int,m::Int; sign_change=false)
+    if sign_change # (basically gets it for -μ due to symmetries on P,R,T)
+        if mod(l-m,2) == 1
+            Π = [SMatrix{3,3}([-P[i,l,m] 0 0  ; 0 -R[i,l,m] -T[i,l,m] ; 0 -T[i,l,m] -R[i,l,m] ]) for i in 1:size(P,1)] 
+        else
+            Π = [SMatrix{3,3}([P[i,l,m] 0 0  ; 0 R[i,l,m] T[i,l,m] ; 0 T[i,l,m] R[i,l,m] ]) for i in 1:size(P,1)]
+        end
+    else
+        Π = [SMatrix{3,3}([P[i,l,m] 0 0  ; 0 R[i,l,m] -T[i,l,m] ; 0 -T[i,l,m] R[i,l,m] ]) for i in 1:size(P,1)]
+    end
+    return Π
+end
+
+function construct_Π_matrix(mod::Stokes_I, P,R,T,l::Int,m::Int; sign_change=false)
     if sign_change # (basically gets it for -μ due to symmetries on P,R,T)
         Π = -P[:,l,m]
     else
@@ -194,11 +207,15 @@ function construct_Π_matrix(mod::Scalar, P,R,T,l::Int,m::Int; sign_change=false
     end        
 end
 
-function construct_B_matrix(mod::FullStokes, α, β, γ, δ, ϵ, ζ,l::Int)
+function construct_B_matrix(mod::Stokes_IQUV, α, β, γ, δ, ϵ, ζ,l::Int)
     𝐁 = SMatrix{4,4}([β[l] γ[l] 0 0 ; γ[l] α[l] 0 0; 0 0 ζ[l] ϵ[l]; 0 0 -ϵ[l] δ[l]])
 end
 
-function construct_B_matrix(mod::Scalar, α, β, γ, δ, ϵ, ζ,l::Int)
+function construct_B_matrix(mod::Stokes_IQU, α, β, γ, δ, ϵ, ζ,l::Int)
+    𝐁 = SMatrix{3,3}([β[l] γ[l] 0 ; γ[l] α[l] 0 ; 0 0 ζ[l]])
+end
+
+function construct_B_matrix(mod::Stokes_I, α, β, γ, δ, ϵ, ζ,l::Int)
     𝐁 = β[l]
 end
 
