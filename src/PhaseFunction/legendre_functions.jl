@@ -165,7 +165,8 @@ function compute_associated_legendre_PRT(μ,Lmax)
             end
        end
     end
-    return P,R,T
+    # Note: from Suniti's code, -T is actually computed, so I return the "true" T here:
+    return P,R,-T
 end
 
 
