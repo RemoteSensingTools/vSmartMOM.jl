@@ -30,14 +30,14 @@ Abstract Polarization type
 """
 abstract type AbstractPolarizationType end
 
-# Use full Stokes Vector:
-struct FullStokes <: AbstractPolarizationType end
+"Use full Stokes Vector ([I,Q,U,V])"
+struct Stokes_IQUV <: AbstractPolarizationType end
 
-# Use full Stokes Vector (rename these to Stokes_I, Stokes_IQU and Stokes_IQUV?):
-struct IQUStokes <: AbstractPolarizationType end
+"Use part of Stokes Vector ([I,Q,U])"
+struct Stokes_IQU <: AbstractPolarizationType end
 
-# Use scalar only:
-struct Scalar <: AbstractPolarizationType end
+"Use scalar only ([I]):"
+struct Stokes_I <: AbstractPolarizationType end
 
 """
     type AbstractTruncationType
