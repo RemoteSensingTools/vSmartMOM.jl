@@ -22,5 +22,31 @@ pages = Any[
 #     collapselevel = 1,
 # )
 
-makedocs(sitename="Radiative Transfer", 
-         pages=pages)
+mathengine = MathJax(Dict(
+    :TeX => Dict(
+        :equationNumbers => Dict(:autoNumber => "AMS"),
+        :Macros => Dict(),
+    ),
+))
+
+# The format will make other pages in parallel with the index page
+format = Documenter.HTML(
+    prettyurls = get(ENV, "CI", nothing) == "true",
+    mathengine = mathengine,
+    collapselevel = 1,
+)
+
+# This way it shows warnings of functions that have not been documented
+makedocs(
+    sitename = "Radiative Transfer",
+    format = format,
+    clean = false,
+    modules = [RadiativeTransfer],
+    pages = pages,
+)
+
+deploydocs(
+    repo = "github.com/RupeshJey/RadiativeTransfer.jl.git",
+    target = "build",
+    push_preview = true,
+)
