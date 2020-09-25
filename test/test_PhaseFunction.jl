@@ -2,41 +2,65 @@
 @testset "wigner3j" begin
 
     # Meta-parameters
-    j_max = 1000
-    N = 1000
+    j_max = 300     # Range of j-values to test
+    N = 1000        # Number of randomized tests to perform
 
-    # Testing all three cases
-    for m_set in [[-1, 1, 0], [0, 0, 0], [-1, -1, 2]]
+    # Compute Wigner matrices
+    wigner_A, wigner_B = PhaseFunction.compute_wigner_values((2j_max + 1), j_max + 1, 2j_max + 1)
 
-        # Set counter to 1
-        count = 0
+    println("Verifying Wigner Symbols...")
 
-        # Run 1000 non-zero tests that compare our wigner 3j symbols to the WignerSymbols pkg
-        while true
+    # Outputs
+    phase_function_results_A = Array{Float64,1}()
+    phase_function_results_B = Array{Float64,1}()
+    wigner_symbols_results_A = Array{Float64,1}()
+    wigner_symbols_results_B = Array{Float64,1}()
 
-            # Random inputs 
-            # (greater than 2, because of an angular momentum rule: abs(m_i)<j_i
-            m = rand(3:j_max)
-            n = rand(3:j_max)
-            l = rand(3:j_max)
+    # Set counter to 1
+    count = 0
 
-            # Result from PhaseFunction module 
-            res = wigner!(m, n, l, m_set[1], m_set[2], m_set[3])
+    # Loop until we see N non-zeros Wigner values
+    while count < N
 
-            # Compare the result with WignerSymbols package value
-            @test res ≈ Float64(wigner3j(m, n, l, m_set[1], m_set[2], m_set[3]))
+        # Random inputs 
+        m = rand(1:j_max)
+        n = rand(1:j_max)
+        l = rand(1:j_max)
 
-            # Only increment if non-zero
-            if res > 0 
-                count = count + 1
-            end
+        # Result from PhaseFunction module 
+        push!(phase_function_results_A, wigner_A[m, n, l])
+        push!(phase_function_results_B, wigner_B[m, n, l])
 
-            # Break if we've reached 1000 successful tests
-            count == N ? break : nothing
-
+        # Result from external Wigner Symbols package
+        # If there's a domain error, replace with 0.0. 
+        # (The 3j symbol *should* be zero outside the domain)
+        try
+            push!(wigner_symbols_results_A, Float64(wigner3j(m, n, l-1, -1, 1, 0)))
+        catch
+            push!(wigner_symbols_results_A, 0.0)
         end
+
+        try
+            push!(wigner_symbols_results_B, Float64(wigner3j(m, n, l-1, -1, -1, 2)))
+        catch
+            push!(wigner_symbols_results_B, 0.0)
+        end
+
+        # If a discrepancy ever pops up, print the discrepancy so it can be reproduced: 
+        if (phase_function_results_A[end] ≉ wigner_symbols_results_A[end] || 
+            phase_function_results_B[end] ≉ wigner_symbols_results_B[end])
+            println("Error with: ", (m, n, l))
+            println("PhaseFunction output: ", (phase_function_results_A[end], phase_function_results_B[end]))
+            println("WignerSymbols output: ", (wigner_symbols_results_A[end], wigner_symbols_results_B[end]))
+        end
+
+        # Only increment the counter if non-zero
+        (phase_function_results_A[end] > 0) && (count = count + 1)
+
     end
 
-    # Testing -1, 1, 0 case
+    # Compare the result with WignerSymbols package values
+    @test phase_function_results_A ≈ wigner_symbols_results_A
+    @test phase_function_results_B ≈ wigner_symbols_results_B
 
 end
