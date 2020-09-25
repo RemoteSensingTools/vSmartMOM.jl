@@ -59,7 +59,6 @@ Revise = "2.7"
 SpecialFunctions = "0.10"
 TimerOutputs = "0.5"
 WebIO = "0.8"
-
 julia = "1"
 
 [extras]
