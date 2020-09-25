@@ -10,4 +10,4 @@ using WignerSymbols
 @testset "RadiativeTransfer.CrossSection" begin include("test_CrossSection.jl") end
 
 # Test the Phase Function module
-# @testset "RadiativeTransfer.PhaseFunction" begin include("test_PhaseFunction.jl") end
+@testset "RadiativeTransfer.PhaseFunction" begin include("test_PhaseFunction.jl") end

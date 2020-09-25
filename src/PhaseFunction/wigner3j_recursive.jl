@@ -13,8 +13,12 @@
 ###       +   ((l-1) * l * (l+1) * (l+2)) ^ (-0.5)
 ###
 
-# Compute wigner 3j symbol where m₁ = -1, m₂ = 1, and m₃ = 0
-function wigner_m110!(m::Integer, n::Integer, l::Integer, 
+"""
+    $(FUNCTIONNAME)(m::Integer, n::Integer, l::Integer, wigner_A::Array{Float64, 3}, wigner_B::Array{Float64, 3})
+
+Compute the wigner 3j symbol for provided m, n, l, (aka j₁, j₂, j₃) where m₁ = -1, m₂ = 1, and m₃ = 0
+"""
+function wigner3j_m110!(m::Integer, n::Integer, l::Integer, 
                       wigner_A::Array{Float64, 3}, wigner_B::Array{Float64, 3})
     
     # Only compute the value if this condition is met
@@ -26,7 +30,7 @@ function wigner_m110!(m::Integer, n::Integer, l::Integer,
 
         # Only perform this computation if it has not been calculated yet. 
         # In these cases, always store the result before returning
-        # This technique is called ** memoization ** (forgot the word til just now)
+        # (Memoization)
         if (wigner_A[m,n,l+1] === NaN) 
 
             # Base Case 1: m is l+n+1, in which case the result is 0
@@ -46,7 +50,7 @@ function wigner_m110!(m::Integer, n::Integer, l::Integer,
 
                 # If n is not 1, return recursive expression (recursing on n, Eqn. 27)
                 else 
-                    result = -wigner_m110!(l+n-1, n-1, l, wigner_A, wigner_B) * 
+                    result = -wigner3j_m110!(l+n-1, n-1, l, wigner_A, wigner_B) * 
                               sqrt((n * (2n-1) * ((n+l)^2-1))/ ((n+l) * (2(n+l)+1) * (n^2-1)))
                               wigner_A[m,n,l+1] = result
                     return result
@@ -67,8 +71,8 @@ function wigner_m110!(m::Integer, n::Integer, l::Integer,
                 # Incorrect: sqrt(2*m+3)
                 # Correct: 2*m+3
                 result = (1/D_k_nl) * 
-                         (M_k * (2*m+3) * wigner_m110!(m+1, n, l, wigner_A, wigner_B) 
-                             - D_kP1_nl * wigner_m110!(m+2, n, l, wigner_A, wigner_B))
+                         (M_k * (2*m+3) * wigner3j_m110!(m+1, n, l, wigner_A, wigner_B) 
+                             - D_kP1_nl * wigner3j_m110!(m+2, n, l, wigner_A, wigner_B))
 
                 wigner_A[m,n,l+1] = result
                 return result
@@ -85,8 +89,12 @@ function wigner_m110!(m::Integer, n::Integer, l::Integer,
     end
 end
 
-# Compute wigner 3j symbol where m₁ = 0, m₂ = 0, and m₃ = 0
-function wigner_000!(m::Integer, n::Integer, l::Integer, 
+"""
+    $(FUNCTIONNAME)(m::Integer, n::Integer, l::Integer, wigner_A::Array{Float64, 3}, wigner_B::Array{Float64, 3})
+
+Compute the wigner 3j symbol for provided m, n, l, (aka j₁, j₂, j₃) where m₁ = 0, m₂ = 0, and m₃ = 0
+"""
+function wigner3j_000!(m::Integer, n::Integer, l::Integer, 
                      wigner_A::Array{Float64, 3}, wigner_B::Array{Float64, 3})
 
     # If m = n+l+1, return 0 (does not satisfy condition)
@@ -94,14 +102,14 @@ function wigner_000!(m::Integer, n::Integer, l::Integer,
         return 0.0
     # If m = n+l, return the result specified (Eqn. 30)
     elseif (m == n + l)
-        return wigner_m110!(n+l, n, l, wigner_A, wigner_B) * 2 * 
+        return wigner3j_m110!(n+l, n, l, wigner_A, wigner_B) * 2 * 
                sqrt((n+l) * (n+l+1) * n * (n+1))/(l*(l+1) - (l+n)*(l+n+1) - n*(n+1))
     # If m < n+l,
     else 
 
         # If m+n+l is even, return the result specified (Eqn. 29)
         if (iseven(m + n + l == 0))
-            return -wigner_000!(m+2, n, l, wigner_A, wigner_B) * 
+            return -wigner3j_000!(m+2, n, l, wigner_A, wigner_B) * 
                     sqrt(((m+2)^2 - (n-l)^2 ) / ((m+1)^2 - (n-l)^2 )) * 
                     sqrt((1-(1/(n+l-m))) * (1+(1/(m+n+l+2))))
         
@@ -114,16 +122,21 @@ function wigner_000!(m::Integer, n::Integer, l::Integer,
     
 end
 
-# Compute wigner 3j symbol where m₁ = -1, m₂ = -1, and m₃ = 2
-function wigner_m1m12!(m::Integer, n::Integer, l::Integer, wigner_A::Array{Float64, 3}, wigner_B::Array{Float64, 3})
+"""
+    $(FUNCTIONNAME)(m::Integer, n::Integer, l::Integer, wigner_A::Array{Float64, 3}, wigner_B::Array{Float64, 3})
+
+Compute the wigner 3j symbol for provided m, n, l, (aka j₁, j₂, j₃) where m₁ = -1, m₂ = -1, and m₃ = 2
+"""
+function wigner_m1m12!(m::Integer, n::Integer, l::Integer, 
+                       wigner_A::Array{Float64, 3}, wigner_B::Array{Float64, 3})
 
     # Simply save and return the result specified in Eqn. 31 
 
     result = (-1)^(m+n+l) * (((l-1) * l * (l+1) * (l+2))^(-0.5)) * 
                 ( (m*(m+1) + (-1)^(m+n+l)*n*(n+1)) * 
-                wigner_m110!(m, n, l, wigner_A, wigner_B) +
+                wigner3j_m110!(m, n, l, wigner_A, wigner_B) +
                 2 * sqrt(m*(m+1)*n*(n+1)) * 
-                wigner_000!(m, n, l, wigner_A, wigner_B) )
+                wigner3j_000!(m, n, l, wigner_A, wigner_B) )
 
     wigner_B[m, n, l+1] = result
 
@@ -131,15 +144,15 @@ function wigner_m1m12!(m::Integer, n::Integer, l::Integer, wigner_A::Array{Float
 end
 
 """
-    $(FUNCTIONNAME)(m, n, l, wig_values)
+    $(FUNCTIONNAME)(j₁::Integer, j₂::Integer, j₃::Integer, m₁::Integer, m₂::Integer, m₃::Integer, wigner_A::Array{Float64,3}, wigner_B::Array{Float64,3})
 
-Compute the Wigner 3j values for all n to nmax and all m from mstart to (n+l+1)
+Compute the Wigner 3j values for all n to nmax and all m from mstart to (n+l+1), using 
+wigner_A and wigner_B to store computed values for (-1, 1, 0) and (-1, -1, 2) respectively. 
 
 """
-function wigner!(j₁::Integer, j₂::Integer, j₃::Integer, 
+function wigner3j!(j₁::Integer, j₂::Integer, j₃::Integer, 
                  m₁::Integer, m₂::Integer, m₃::Integer, 
-                 wigner_A::Array{Float64,3}, 
-                 wigner_B::Array{Float64,3})
+                 wigner_A::Array{Float64,3}, wigner_B::Array{Float64,3})
 
     # Perform a check that the input j's satisfy condition
     if ((j₁<abs(j₂-j₃))||(j₃<abs(j₂-j₁))||(j₂<abs(j₁-j₃))||m₁>j₁||m₁<-j₁||m₂>j₂||m₂<-j₂||m₃>j₃||m₃<-j₃)
@@ -149,13 +162,13 @@ function wigner!(j₁::Integer, j₂::Integer, j₃::Integer,
     # Switch between the three different configurations and call appropriate function
     # (m₁, m₂, m₃): (-1, 1, 0), (-1, -1, 2), (0, 0, 0)
     if (m₁ == -1 && m₂ == 1 && m₃ == 0)
-        return wigner_m110!(j₁, j₂, j₃, wigner_A, wigner_B)
+        return wigner3j_m110!(j₁, j₂, j₃, wigner_A, wigner_B)
 
     elseif (m₁ == -1 && m₂ == -1 && m₃ == 2)
         return wigner_m1m12!(j₁, j₂, j₃, wigner_A, wigner_B)
 
     elseif (m₁ == 0 && m₂ == 0 && m₃ == 0)
-        return wigner_000!(j₁, j₂, j₃, wigner_A, wigner_B)
+        return wigner3j_000!(j₁, j₂, j₃, wigner_A, wigner_B)
 
     else
         throw(DomainError((m₁, m₂, m₃,), 
@@ -164,60 +177,49 @@ function wigner!(j₁::Integer, j₂::Integer, j₃::Integer,
 
 end
 
-function compute_wigner_values(m_max, n_max, l_max)
+"""
+    $(FUNCTIONNAME)(m_max::Integer, n_max::Integer, l_max::Integer)
+
+Compute the Wigner 3j values for all (m, n, l) combinations up to m/n/l_max, for 
+(m1, m2, m3) = (-1, 1, 0) (wigner_A) and (-1, -1, 2) (wigner_B)
+
+"""
+function compute_wigner_values(m_max::Integer, n_max::Integer, l_max::Integer)
     
+    # Create the m, n, l ranges 
     ms = 1:m_max
     ns = 1:n_max
     ls = 1:l_max
 
+    # Create empty matrices to 
     wigner_A = zeros(m_max, n_max, l_max);
     wigner_B = zeros(m_max, n_max, l_max);
     fill!(wigner_A, NaN)
     fill!(wigner_B, NaN)
 
-    # values_1 = []
-    # values_2 = []
-
-    # wigner_A_sparse = Dict{Tuple{Int64, Int64, Int64}, Float64}()
-    # wigner_B_sparse = Dict{Tuple{Int64, Int64, Int64}, Float64}()
-
-    wigner_A_sparse = Dict{Tuple{Int64, Int64, Int64}, Float64}()
-    wigner_B_sparse = Dict{Tuple{Int64, Int64, Int64}, Float64}()
-
     # Using nested loop syntax is so nice!!
-    @showprogress 1 "Computing Wigner Symbols... " for l in ls
-        for n in ns
-
-            # ms = (n < l/2) ? ((l-n):(l+n)) : (n:(n+l))
-
-            for m in ms
-                wigner_A[m, n, l] = wigner!(m, n, l-1, -1, 1, 0, wigner_A, wigner_B)
-                wigner_B[m, n, l] = wigner!(m, n, l-1, -1, -1, 2, wigner_A, wigner_B)
-                # if (wigner_A[m,n,l] != 0)
-                #     wigner_A_sparse[(m, n, l)] = wigner_A[m, n, l]
-                # end
-                # if (wigner_B[m,n,l] != 0)
-                #     wigner_B_sparse[(m, n, l)] = wigner_B[m, n, l]
-                # end
-            end
-        end
+    @showprogress 1 "Computing Wigner Symbols... " for l in ls, n in ns, m in ms
+                wigner_A[m, n, l] = wigner3j!(m, n, l-1, -1, 1, 0, wigner_A, wigner_B)
+                wigner_B[m, n, l] = wigner3j!(m, n, l-1, -1, -1, 2, wigner_A, wigner_B)
     end
 
-    # ms_ = repeat(ms, inner = n_max * l_max)
-    # ns_ = repeat(ns, inner = l_max, outer = m_max)
-    # ls_ = repeat(ls, outer = n_max * m_max)
-    
-    # return (table((ms=ms_, ns=ns_, ls=ls_, values=values_1); pkey = [:ms, :ns, :ls]), table((ms=ms_, ns=ns_, ls=ls_, values=values_2); pkey = [:ms, :ns, :ls]))
-    # return (ndsparse((ms=ms_, ns=ns_, ls=ls_), values_1), ndsparse((ms=ms_, ns=ns_, ls=ls_), values_2))
-
-    # return wigner_A_sparse, wigner_B_sparse
     return wigner_A, wigner_B
 end
 
+"""
+    $(FUNCTIONNAME)(filepath, wigner_A, wigner_B)
+
+Save the Wigner A and Wigner B matrices at the given filepath
+"""
 function save_wigner_values(filepath, wigner_A, wigner_B)
     @save filepath wigner_A wigner_B
 end
 
+"""
+    $(FUNCTIONNAME)(filename)
+
+Load the Wigner A and Wigner B matrices from the given filepath
+"""
 function load_wigner_values(filename) 
     @load filename wigner_A wigner_B
     return wigner_A, wigner_B
