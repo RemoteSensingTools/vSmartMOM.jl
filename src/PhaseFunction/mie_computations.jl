@@ -3,9 +3,13 @@
 
 # ToDo: Enable arrays of aerosols (for μ̄, σ, nᵣ, nᵢ)
 #function calc_aer_opt_prop(mod::NAI2, r, λ::Number, μ̄::Number, σ::Number, nᵣ, nᵢ; nquad_radius=2500, r_max = 30.0)
-function calc_aer_opt_prop(mod::NAI2, aero::AbstractAerosolType, λ::Number)
+function compute_aerosol_optical_properties(model::MieModel{FDT}) where FDT<:NAI2
+
+    # Unpack the model
+    @unpack computation_type, aerosol, λ, polarization_type, truncation_type, wigner_A, wigner_B = model
+
     # Extract variables from struct:
-    @unpack nquad_radius, nᵣ, nᵢ,r_max =  aero
+    @unpack nquad_radius, nᵣ, nᵢ,r_max =  aerosol
     @assert nᵢ >= 0
 
     FT = eltype(nᵣ);
@@ -37,11 +41,11 @@ function calc_aer_opt_prop(mod::NAI2, aero::AbstractAerosolType, λ::Number)
     C_sca = zeros(FT, nquad_radius)
 
     # Weights for the size distribution:
-    wₓ = pdf.(aero.size_distribution,r)
+    wₓ = pdf.(aerosol.size_distribution,r)
     # pre multiply with wᵣ to get proper means eventually:
     wₓ .*= wᵣ
     # normalize (could apply a check whether cdf.(aero.size_distribution,r_max) is larger than 0.99:
-    @info "Fraction of size distribution cut by max radius: $((1-cdf.(aero.size_distribution,r_max))*100) %"  
+    @info "Fraction of size distribution cut by max radius: $((1-cdf.(aerosol.size_distribution,r_max))*100) %"  
     wₓ /= sum(wₓ)
     
     @showprogress 1 "Computing PhaseFunctions Siewert NAI-2 style ..." for i = 1:length(x_sizeParam)
@@ -58,12 +62,12 @@ function calc_aer_opt_prop(mod::NAI2, aero::AbstractAerosolType, λ::Number)
         n_ = 2n_ .+ 1
 
         # Pre-allocate Dn:
-        y = x_sizeParam[i] * (aero.nᵣ-aero.nᵢ);
+        y = x_sizeParam[i] * (aerosol.nᵣ-aerosol.nᵢ);
         nmx = round(Int, max(n_max, abs(y))+51 )
         Dn = zeros(Complex{FT},nmx)
 
         # Compute an,bn and S₁,S₂
-        compute_mie_ab!(x_sizeParam[i],aero.nᵣ+aero.nᵢ*im,an,bn,Dn)
+        compute_mie_ab!(x_sizeParam[i],aerosol.nᵣ+aerosol.nᵢ*im,an,bn,Dn)
         compute_mie_S₁S₂!(an, bn, leg_π, leg_τ, view(S₁,:,i), view(S₂,:,i))
         
         # Compute Extinction and scattering cross sections: 
@@ -120,8 +124,33 @@ function calc_aer_opt_prop(mod::NAI2, aero::AbstractAerosolType, λ::Number)
         α[l+1] = fac      * w_μ' * (bulk_f₁₁ .* R²[:,l+1] + bulk_f₃₃ .* T²[:,l+1]) 
     end
     # return bulk_f₁₁, bulk_f₁₂, f₁₁, f₃₃, f₁₂,f₃₄,  C_ext, C_sca,bulk_C_sca, bulk_C_ext, α, β, γ, δ, ϵ, ζ
-    return α, β, γ, δ, ϵ, ζ, bulk_C_sca, bulk_C_ext
+
+    greek_coefs = GreekCoefs(α, β, γ, δ, ϵ, ζ)
+    return AerosolOptics(greek_coefs, bulk_C_sca, bulk_C_ext) 
 end
+
+function compute_aerosol_optical_properties(model::MieModel{FDT}) where FDT<:PCW
+
+    # Unpack the model
+    @unpack computation_type, aerosol, λ, polarization_type, truncation_type, wigner_A, wigner_B = model
+
+    # Extract variables from struct:
+    @unpack size_distribution, nquad_radius, nᵣ, nᵢ,r_max =  aerosol
+
+    # Generate aerosol:
+    # aero = PhaseFunction.UnivariateAerosol(size_distribution, 30.0, 2500, 1.3, 0.0)
+    r, wᵣ = PhaseFunction.gauleg(nquad_radius, 0.0, r_max ; norm=true)
+    wₓ = pdf.(size_distribution,r)
+
+    # pre multiply with wᵣ to get proper means eventually:
+    wₓ .*= wᵣ
+
+    # normalize (could apply a check whether cdf.(aero.size_distribution,r_max) is larger than 0.99:
+    wₓ /= sum(wₓ)
+
+    return compute_B(aerosol, wigner_A, wigner_B, λ, r, wₓ)
+end
+
 
 function f_test(x)
     aero = UnivariateAerosol(LogNormal(log(x[1]), log(x[2])), 30.0, 2500, x[3], x[4])
