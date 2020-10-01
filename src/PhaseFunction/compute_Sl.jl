@@ -1,3 +1,4 @@
+""" Convenience function to perform (-1)^x using x's parity """
 exp_m1(x) = iseven(x) ? 1 : -1
 
 function get_abnabm(an,bn,n,m,w)
@@ -130,10 +131,8 @@ function compute_Sl(l, ν₁, ν₂, ν₂_positive_flag, k, N_max, an, bn, mat_
             
             if (ν₂_positive_flag)
                 second_term += an_p_bn[n] * (wig_lnm[n, n, l])^2 * coef_lnn2
-                # second_term += an_p_bn[n] * (get(wig_lnm, (n, n, l), 0.0))^2 * coef_lnn2
             else 
                 second_term += an_m_bn[n] * (wig_lnm[n, n, l])^2 * coef_lnn2
-                # second_term += an_m_bn[n] * (get(wig_lnm, (n, n, l), 0.0))^2 * coef_lnn2
             end
 
         end

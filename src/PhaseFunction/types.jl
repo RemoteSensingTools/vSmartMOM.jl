@@ -94,6 +94,27 @@ struct δBGE{FT} <: AbstractTruncationType
 end
 
 #####
+##### Model that specifies the Mie computation details 
+#####
+
+"""
+    type MieModel
+Model to hold all Mie computation details for NAI2 and PCW
+"""
+@with_kw struct MieModel{FDT<:AbstractFourierDecompositionType}
+
+    computation_type::FDT
+    aerosol::AbstractAerosolType
+    λ
+    polarization_type::AbstractPolarizationType
+    truncation_type::AbstractTruncationType
+
+    wigner_A = zeros(1, 1, 1)
+    wigner_B = zeros(1, 1, 1)
+
+end
+
+#####
 ##### Types that are needed for the output of the Fourier decomposition
 #####
 
