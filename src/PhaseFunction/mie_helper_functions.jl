@@ -20,17 +20,15 @@ function compute_mie_ab!(size_param, refractive_idx::Number,an,bn,Dn)
 
     # Make sure downward recurrence starts higher up (at least 15, check eq. A9 in de Rooij and Stap, 1984, may need to check what is needed)
     nmx = round(Int, max(n_max, abs(y))+50 )
-    @assert size(an)[1]>=n_max
+    @assert size(an)[1] ≥ n_max
     @assert size(an) == size(bn)
     fill!(Dn,0);
     # Dn as in eq 4.88, Bohren and Huffman, to calculate an and bn
-    #Dn = zeros(FT, nmx)
+
     # Downward Recursion, eq. 4.89, Bohren and Huffman
     for n = nmx-1:-1:1
         rn = n+1
-        #@show n, (rn/y) - (1 / (Dn[n+1] + rn/y))
         Dn[n] = (rn/y) - (1 / (Dn[n+1] + rn/y))
-        #@show n, Dn[n]
     end
 
     # Get recursion for bessel functions ψ and ξ
@@ -270,9 +268,9 @@ function compute_Z_moments(mod::AbstractPolarizationType, μ, α, β, γ, δ, ϵ
         # This is equivalent to Z̄ = 1/(1+δ) * C̄m+S̄m = 1/(1+δ) * (A+DAD+AD-DA) (see eq 11 in Sanghavi et al, 2013)
         for i=1:B_dim, j=1:B_dim
             𝐙⁺⁺[ii+i,jj+j] = 2fact*A⁺⁺[i,j,imu,jmu]
-            if i<=2 && j>=3
+            if i≤2 && j≥3
                 𝐙⁺⁻[ii+i,jj+j] = -2fact*A⁺⁻[i,j,imu,jmu]
-            elseif i>=3 && j<=2
+            elseif i≥3 && j≤2
                 𝐙⁺⁻[ii+i,jj+j] = -2fact*A⁺⁻[i,j,imu,jmu]
             else
                 𝐙⁺⁻[ii+i,jj+j] = 2fact*A⁺⁻[i,j,imu,jmu]
@@ -299,7 +297,7 @@ end
     FT = eltype(an)
     # Indices over n and m
     m, n, i = @index(Global, NTuple)
-    if m>=n && m<nMax[i] && n < nMax[i]
+    if m≥n && m<nMax[i] && n < nMax[i]
         @inbounds mat_anam[m,n] += (w[i] * (an[i,n]' * an[i,m]));
         @inbounds mat_bnbm[m,n] += (w[i] * (bn[i,n]' * bn[i,m]));
         @inbounds mat_anbm[m,n] += (w[i] * (an[i,n]' * bn[i,m]));
