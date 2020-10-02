@@ -1,15 +1,18 @@
 
-
-
 # ToDo: Enable arrays of aerosols (for μ̄, σ, nᵣ, nᵢ)
-#function calc_aer_opt_prop(mod::NAI2, r, λ::Number, μ̄::Number, σ::Number, nᵣ, nᵢ; nquad_radius=2500, r_max = 30.0)
+"""
+    $(FUNCTIONNAME)(model::MieModel{FDT}) where FDT<:NAI2
+
+Compute the aerosol optical properties using the Siewart-NAI2 method
+Pass in a MieModel, holding all computation and aerosol properties
+"""
 function compute_aerosol_optical_properties(model::MieModel{FDT}) where FDT<:NAI2
 
-    # Unpack the model
+    # Unpack the model and aerosol
     @unpack computation_type, aerosol, λ, polarization_type, truncation_type, wigner_A, wigner_B = model
-
-    # Extract variables from struct:
-    @unpack nquad_radius, nᵣ, nᵢ,r_max =  aerosol
+    @unpack size_distribution, nquad_radius, nᵣ, nᵢ,r_max =  aerosol
+    
+    # Real part of the 
     @assert nᵢ >= 0
 
     FT = eltype(nᵣ);
@@ -18,14 +21,19 @@ function compute_aerosol_optical_properties(model::MieModel{FDT}) where FDT<:NAI
     
     # Size parameter
     x_sizeParam = 2π * r/λ
+
     # Compute Nmax for largest size:
     n_max = get_n_max(maximum(x_sizeParam))
+
     # Determine max amount of Gaussian quadrature points for angle dependence of phas functions:
     n_mu = 2n_max-1;
+
     # Obtain Gauss-Legendre quadrature points and weights for phase function
     μ, w_μ = gausslegendre( n_mu )
+
     # Compute π and τ functions
     leg_π, leg_τ = compute_mie_π_τ(μ, n_max)
+
     # Wavenumber:
     k = 2π/λ
 
@@ -41,11 +49,13 @@ function compute_aerosol_optical_properties(model::MieModel{FDT}) where FDT<:NAI
     C_sca = zeros(FT, nquad_radius)
 
     # Weights for the size distribution:
-    wₓ = pdf.(aerosol.size_distribution,r)
+    wₓ = pdf.(size_distribution,r)
+
     # pre multiply with wᵣ to get proper means eventually:
     wₓ .*= wᵣ
-    # normalize (could apply a check whether cdf.(aero.size_distribution,r_max) is larger than 0.99:
-    @info "Fraction of size distribution cut by max radius: $((1-cdf.(aerosol.size_distribution,r_max))*100) %"  
+
+    # normalize (could apply a check whether cdf.(size_distribution,r_max) is larger than 0.99:
+    @info "Fraction of size distribution cut by max radius: $((1-cdf.(size_distribution,r_max))*100) %"  
     wₓ /= sum(wₓ)
     
     @showprogress 1 "Computing PhaseFunctions Siewert NAI-2 style ..." for i = 1:length(x_sizeParam)
@@ -123,12 +133,18 @@ function compute_aerosol_optical_properties(model::MieModel{FDT}) where FDT<:NAI
         ζ[l+1] = fac      * w_μ' * (bulk_f₃₃ .* R²[:,l+1] + bulk_f₁₁ .* T²[:,l+1]) 
         α[l+1] = fac      * w_μ' * (bulk_f₁₁ .* R²[:,l+1] + bulk_f₃₃ .* T²[:,l+1]) 
     end
-    # return bulk_f₁₁, bulk_f₁₂, f₁₁, f₃₃, f₁₂,f₃₄,  C_ext, C_sca,bulk_C_sca, bulk_C_ext, α, β, γ, δ, ϵ, ζ
 
     greek_coefs = GreekCoefs(α, β, γ, δ, ϵ, ζ)
     return AerosolOptics(greek_coefs, bulk_C_sca, bulk_C_ext) 
 end
 
+"""
+    $(FUNCTIONNAME)(model::MieModel{FDT}) where FDT<:NAI2
+
+Compute the aerosol optical properties using the Domke-PCW method
+Input: MieModel, holding all computation and aerosol properties 
+Output: AerosolOptics, holding all Greek coefficients and Cross-Sectional information
+"""
 function compute_aerosol_optical_properties(model::MieModel{FDT}) where FDT<:PCW
 
     # Unpack the model
@@ -138,8 +154,7 @@ function compute_aerosol_optical_properties(model::MieModel{FDT}) where FDT<:PCW
     @unpack size_distribution, nquad_radius, nᵣ, nᵢ,r_max =  aerosol
 
     # Generate aerosol:
-    # aero = PhaseFunction.UnivariateAerosol(size_distribution, 30.0, 2500, 1.3, 0.0)
-    r, wᵣ = PhaseFunction.gauleg(nquad_radius, 0.0, r_max ; norm=true)
+    r, wᵣ = gauleg(nquad_radius, 0.0, r_max ; norm=true)
     wₓ = pdf.(size_distribution,r)
 
     # pre multiply with wᵣ to get proper means eventually:
@@ -149,12 +164,4 @@ function compute_aerosol_optical_properties(model::MieModel{FDT}) where FDT<:PCW
     wₓ /= sum(wₓ)
 
     return compute_B(aerosol, wigner_A, wigner_B, λ, r, wₓ)
-end
-
-
-function f_test(x)
-    aero = UnivariateAerosol(LogNormal(log(x[1]), log(x[2])), 30.0, 2500, x[3], x[4])
-    α, β, γ, δ, ϵ, ζ, bulk_C_sca, bulk_C_ext = calc_aer_opt_prop(NAI2(), aero, 0.55)
-    return [α; β; γ; δ; ϵ; ζ; bulk_C_sca; bulk_C_ext]
-
 end

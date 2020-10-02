@@ -7,6 +7,7 @@ using RadiativeTransfer.PhaseFunction
 
 # ? Should we make a wrapper around LogNormal?
 using Distributions
+using BenchmarkTools
 
 ## 
 ## STEP 1: Create the Aerosol
@@ -42,7 +43,10 @@ model_PCW = make_mie_model(PCW(), aero, λ, polarization_type, truncation_type, 
 ## STEP 3: Perform the Mie Calculations
 ## 
 
-aerosol_optics_NAI2 = compute_aerosol_optical_properties(model_NAI2)
-aerosol_optics_PCW = compute_aerosol_optical_properties(model_PCW)
+@btime aerosol_optics_NAI2 = compute_aerosol_optical_properties(model_NAI2);
+@btime aerosol_optics_PCW = compute_aerosol_optical_properties(model_PCW);
 
-# aerosol_optics_NAI2.greek_coefs.α ≈ aerosol_optics_PCW.greek_coefs.α
+aerosol_optics_NAI2 = compute_aerosol_optical_properties(model_NAI2);
+aerosol_optics_PCW = compute_aerosol_optical_properties(model_PCW);
+
+aerosol_optics_NAI2.greek_coefs.α ≈ aerosol_optics_PCW.greek_coefs.α
