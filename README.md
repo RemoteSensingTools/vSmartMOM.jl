@@ -70,7 +70,7 @@ For in-depth examples, tutorials, and implementation details, please see the com
 
 ## Support
 
-This project is being developed in the Christian Frankenberg and Paul Wennberg labs at Caltech, with support from the Schmidt Academy for Software Engineering (SASE).
+This project is being developed in the Christian Frankenberg and Paul Wennberg labs at Caltech and Suniti Sanghavi, with support from the Schmidt Academy for Software Engineering (SASE).
 
 Please <a href="mailto:cfranken@caltech.edu,wennberg@gps.caltech.edu?cc=rjeyaram@caltech.edu"> email us</a> if you have any questions, suggestions, or contributions!
 
