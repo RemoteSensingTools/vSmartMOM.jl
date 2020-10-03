@@ -11,10 +11,13 @@ function truncate_phase(mod::δBGE, aero::AerosolOptics)
 
     # Obtain Gauss-Legendre quadrature points and weights for phase function:
     μ, w_μ = gausslegendre(length(β));
+
     # Reconstruct phase matrix elements:
     f₁₁, f₁₂, f₂₂, f₃₃, f₃₄, f₄₄, P, P² = reconstruct_phase(α, β, γ, δ, ϵ, ζ, μ; returnLeg=true)
+
     # Find elements that exclude the peak (if wanted!)
     iμ = findall(x -> x < cosd(Δ_angle), μ)
+
     # Prefactor for P2:
     fac = zeros(l_max);
     for l = 2:l_max - 1
@@ -38,6 +41,7 @@ function truncate_phase(mod::δBGE, aero::AerosolOptics)
     cl = ((W₁₁ * A) \ (W₁₁ * y₁₁))   # B in δ-BGR (β)
     γᵗ = ((W₁₂ * B) \ (W₁₂ * y₁₂))   # G in δ-BGE (γ)
     ϵᵗ = ((W₃₄ * B) \ (W₃₄ * y₃₄))   # E in δ-BGE (ϵ)
+
     # Integrate truncated function for later renormalization (here: fraction that IS still scattered):
     c₀ = ( w_μ' * (P[:,1:l_max] * cl) ) / 2
 
@@ -52,6 +56,7 @@ function truncate_phase(mod::δBGE, aero::AerosolOptics)
     C_sca  = (ω̃ * k);
     C_scaᵗ = C_sca * c₀; 
     C_ext  = k - (C_sca - C_scaᵗ);
+    
     return AerosolOptics(greek_coefs, C_scaᵗ / C_ext, C_ext) 
 end
 

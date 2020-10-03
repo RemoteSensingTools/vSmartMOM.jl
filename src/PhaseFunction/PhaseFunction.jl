@@ -19,13 +19,13 @@ using ..Architectures: device
 include("types.jl")                # All types used in this module
 include("mie_helper_functions.jl") # Mie file-related functions
 include("legendre_functions.jl")   # Recursions for associated Legendre Polynomials
-include("mie_computations.jl")     # Functions for Mie calculations over size distribution
+# include("mie_computations.jl")     # Functions for Mie calculations over size distribution
 include("phase_truncation.jl")     # Functions for truncation
 include("wigner3j_recursive.jl")   # Recursive Wigner 3j calculations
-include("compute_Sl.jl")           # Sl_νν functions
 include("aerosol.jl")
 include("mie_model.jl")
-include("compute_B.jl")
+include("compute_NAI2.jl")
+include("compute_PCW.jl")
 
 
 # Export make functions/types
@@ -37,6 +37,7 @@ export NAI2, PCW, UnivariateAerosol, MieModel, Stokes_IQUV, Stokes_I, Stokes_IQU
 
 export compute_B, compute_ab, GreekCoefs, comp_ab, compute_mie_π_τ!, 
        compute_wigner_values, save_wigner_values, load_wigner_values, 
-       compute_Sl, gausslegendre, compute_aerosol_optical_properties
+       compute_Sl, gausslegendre, compute_aerosol_optical_properties, 
+       ConjugateTransposePairs
 
 end

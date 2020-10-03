@@ -1,10 +1,10 @@
-
 # ToDo: Enable arrays of aerosols (for μ̄, σ, nᵣ, nᵢ)
 """
     $(FUNCTIONNAME)(model::MieModel{FDT}) where FDT<:NAI2
 
 Compute the aerosol optical properties using the Siewart-NAI2 method
-Pass in a MieModel, holding all computation and aerosol properties
+Input: MieModel, holding all computation and aerosol properties 
+Output: AerosolOptics, holding all Greek coefficients and Cross-Sectional information
 """
 function compute_aerosol_optical_properties(model::MieModel{FDT}) where FDT<:NAI2
 
@@ -12,18 +12,19 @@ function compute_aerosol_optical_properties(model::MieModel{FDT}) where FDT<:NAI
     @unpack computation_type, aerosol, λ, polarization_type, truncation_type, wigner_A, wigner_B = model
     @unpack size_distribution, nquad_radius, nᵣ, nᵢ,r_max =  aerosol
     
-    # Real part of the 
-    @assert nᵢ >= 0
+    # Imaginary part of the refractive index must be ≥ 0
+    @assert nᵢ ≥ 0
 
     FT = eltype(nᵣ);
+
     # Get radius quadrature points and weights (for mean, thus normalized):
     r, wᵣ = gauleg(nquad_radius, 0.0, r_max ; norm=true) 
     
-    # Size parameter
-    x_sizeParam = 2π * r/λ
+    x_size_param = 2π * r/λ  # Size parameter
+    k = 2π/λ                # Wavenumber
 
     # Compute Nmax for largest size:
-    n_max = get_n_max(maximum(x_sizeParam))
+    n_max = get_n_max(maximum(x_size_param))
 
     # Determine max amount of Gaussian quadrature points for angle dependence of phas functions:
     n_mu = 2n_max-1;
@@ -33,9 +34,6 @@ function compute_aerosol_optical_properties(model::MieModel{FDT}) where FDT<:NAI
 
     # Compute π and τ functions
     leg_π, leg_τ = compute_mie_π_τ(μ, n_max)
-
-    # Wavenumber:
-    k = 2π/λ
 
     # Pre-allocate arrays:
     
@@ -48,20 +46,13 @@ function compute_aerosol_optical_properties(model::MieModel{FDT}) where FDT<:NAI
     C_ext = zeros(FT, nquad_radius)
     C_sca = zeros(FT, nquad_radius)
 
-    # Weights for the size distribution:
-    wₓ = pdf.(size_distribution,r)
-
-    # pre multiply with wᵣ to get proper means eventually:
-    wₓ .*= wᵣ
-
-    # normalize (could apply a check whether cdf.(size_distribution,r_max) is larger than 0.99:
-    @info "Fraction of size distribution cut by max radius: $((1-cdf.(size_distribution,r_max))*100) %"  
-    wₓ /= sum(wₓ)
+    # Standardized weights for the size distribution:
+    wₓ = compute_wₓ(size_distribution, wᵣ, r, r_max) 
     
-    @showprogress 1 "Computing PhaseFunctions Siewert NAI-2 style ..." for i = 1:length(x_sizeParam)
-        #println(i, " ", x_sizeParam[i])
+    @showprogress 1 "Computing PhaseFunctions Siewert NAI-2 style ..." for i = 1:length(x_size_param)
+
         # Maximum expansion (see eq. A17 from de Rooij and Stap, 1984)
-        n_max = get_n_max(x_sizeParam[i])
+        n_max = get_n_max(x_size_param[i])
 
         # In Domke methods, we want to pre-allocate these as 2D outside of this loop.
         an = (zeros(Complex{FT},n_max))
@@ -72,12 +63,12 @@ function compute_aerosol_optical_properties(model::MieModel{FDT}) where FDT<:NAI
         n_ = 2n_ .+ 1
 
         # Pre-allocate Dn:
-        y = x_sizeParam[i] * (aerosol.nᵣ-aerosol.nᵢ);
+        y = x_size_param[i] * (aerosol.nᵣ-aerosol.nᵢ);
         nmx = round(Int, max(n_max, abs(y))+51 )
         Dn = zeros(Complex{FT},nmx)
 
         # Compute an,bn and S₁,S₂
-        compute_mie_ab!(x_sizeParam[i],aerosol.nᵣ+aerosol.nᵢ*im,an,bn,Dn)
+        compute_mie_ab!(x_size_param[i],aerosol.nᵣ+aerosol.nᵢ*im,an,bn,Dn)
         compute_mie_S₁S₂!(an, bn, leg_π, leg_τ, view(S₁,:,i), view(S₂,:,i))
         
         # Compute Extinction and scattering cross sections: 
@@ -85,10 +76,10 @@ function compute_aerosol_optical_properties(model::MieModel{FDT}) where FDT<:NAI
         C_ext[i] = 2π/k^2 * (n_' * real(an + bn))
 
         # Compute scattering matrix components per size parameter (might change column/row ordering):
-        f₁₁[:,i] =  0.5/x_sizeParam[i]^2  * real(abs2.(S₁[:,i]) + abs2.(S₂[:,i]));
-        f₃₃[:,i] =  0.5/x_sizeParam[i]^2  * real(S₁[:,i] .* conj(S₂[:,i]) + S₂[:,i] .* conj(S₁[:,i]));
-        f₁₂[:,i] = -0.5/x_sizeParam[i]^2  * real(abs2.(S₁[:,i]) - abs2.(S₂[:,i]));
-        f₃₄[:,i] = -0.5/x_sizeParam[i]^2  * imag(S₁[:,i] .* conj(S₂[:,i]) - S₂[:,i] .* conj(S₁[:,i]));
+        f₁₁[:,i] =  0.5/x_size_param[i]^2  * real(abs2.(S₁[:,i]) + abs2.(S₂[:,i]));
+        f₃₃[:,i] =  0.5/x_size_param[i]^2  * real(S₁[:,i] .* conj(S₂[:,i]) + S₂[:,i] .* conj(S₁[:,i]));
+        f₁₂[:,i] = -0.5/x_size_param[i]^2  * real(abs2.(S₁[:,i]) - abs2.(S₂[:,i]));
+        f₃₄[:,i] = -0.5/x_size_param[i]^2  * imag(S₁[:,i] .* conj(S₂[:,i]) - S₂[:,i] .* conj(S₁[:,i]));
 
     end
 
@@ -120,12 +111,10 @@ function compute_aerosol_optical_properties(model::MieModel{FDT}) where FDT<:NAI
     
     # Compute Greek coefficients from bulk scattering matrix elements (spherical only here!)
     for l=0:length(β)-1
+
         # pre-factor:
-        if l>=2
-            fac = (2l+1)/2 * sqrt(1/((l-1)*(l)*(l+1)*(l+2)))
-        else
-            fac = 0
-        end
+        fac = l ≥ 2 ? (2l+1)/2 * sqrt(1/((l-1)*(l)*(l+1)*(l+2))) : 0
+
         δ[l+1] = (2l+1)/2 * w_μ' * (bulk_f₃₃ .* P[:,l+1])
         β[l+1] = (2l+1)/2 * w_μ' * (bulk_f₁₁ .* P[:,l+1])
         γ[l+1] = fac      * w_μ' * (bulk_f₁₂ .* P²[:,l+1])
@@ -136,32 +125,4 @@ function compute_aerosol_optical_properties(model::MieModel{FDT}) where FDT<:NAI
 
     greek_coefs = GreekCoefs(α, β, γ, δ, ϵ, ζ)
     return AerosolOptics(greek_coefs, bulk_C_sca, bulk_C_ext) 
-end
-
-"""
-    $(FUNCTIONNAME)(model::MieModel{FDT}) where FDT<:NAI2
-
-Compute the aerosol optical properties using the Domke-PCW method
-Input: MieModel, holding all computation and aerosol properties 
-Output: AerosolOptics, holding all Greek coefficients and Cross-Sectional information
-"""
-function compute_aerosol_optical_properties(model::MieModel{FDT}) where FDT<:PCW
-
-    # Unpack the model
-    @unpack computation_type, aerosol, λ, polarization_type, truncation_type, wigner_A, wigner_B = model
-
-    # Extract variables from struct:
-    @unpack size_distribution, nquad_radius, nᵣ, nᵢ,r_max =  aerosol
-
-    # Generate aerosol:
-    r, wᵣ = gauleg(nquad_radius, 0.0, r_max ; norm=true)
-    wₓ = pdf.(size_distribution,r)
-
-    # pre multiply with wᵣ to get proper means eventually:
-    wₓ .*= wᵣ
-
-    # normalize (could apply a check whether cdf.(aero.size_distribution,r_max) is larger than 0.99:
-    wₓ /= sum(wₓ)
-
-    return compute_B(aerosol, wigner_A, wigner_B, λ, r, wₓ)
 end

@@ -340,26 +340,28 @@ end
     end
 end
 
-function compute_avg_anbn!(an, bn,  mat_anam, mat_bnbm, mat_anbm, mat_bnam, w, Nmax, N_max_)
+function compute_avg_anbn!(an, bn, ab_pairs, w, Nmax, N_max_)
     FT2 = eltype(an)
+
+    mat_anam, mat_anbm, mat_bnam, mat_bnbm = ab_pairs
 
     # Fill all matrices with 0
     [fill!(mat, 0) for mat in [mat_anam, mat_bnbm, mat_anbm, mat_bnam]]
 
     @inbounds for n in 1:Nmax, m in n:Nmax
-                anam = bnbm = anbm = bnam = FT2(0);
-            @inbounds for i = 1:size(an, 1)
-                if m < N_max_[i] && n < N_max_[i]
+        anam = bnbm = anbm = bnam = FT2(0);
+        @inbounds for i = 1:size(an, 1)
+            if m < N_max_[i] && n < N_max_[i]
                 anam += w[i] * an[i,n]' * an[i,m]
-        bnbm += w[i] * bn[i,n]' * bn[i,m]
-            anbm += w[i] * an[i,n]' * bn[i,m]
-                    bnam += w[i] * bn[i,n]' * an[i,m]
-                end
-            end 
+                bnbm += w[i] * bn[i,n]' * bn[i,m]
+                anbm += w[i] * an[i,n]' * bn[i,m]
+                bnam += w[i] * bn[i,n]' * an[i,m]
+            end
+        end 
         @inbounds mat_anam[m,n] = anam;
-    @inbounds mat_bnbm[m,n] = bnbm;
-            @inbounds mat_anbm[m,n] = anbm;
-            @inbounds mat_bnam[m,n] = bnam;
+        @inbounds mat_bnbm[m,n] = bnbm;
+        @inbounds mat_anbm[m,n] = anbm;
+        @inbounds mat_bnam[m,n] = bnam;
     end
     return nothing
 end
@@ -433,4 +435,15 @@ function compute_anbn(aerosol::UnivariateAerosol, wl, radius)
     end
 
     return an, bn;
+end
+
+function compute_wₓ(size_distribution, wᵣ, r, r_max) 
+    # Weights from distribution
+    wₓ = pdf.(size_distribution,r)
+    # pre multiply with wᵣ to get proper means eventually:
+    wₓ .*= wᵣ
+    # normalize (could apply a check whether cdf.(size_distribution,r_max) is larger than 0.99:
+    @info "Fraction of size distribution cut by max radius: $((1-cdf.(size_distribution,r_max))*100) %"  
+    wₓ /= sum(wₓ)
+    return wₓ
 end
