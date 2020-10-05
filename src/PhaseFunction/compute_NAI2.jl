@@ -2,31 +2,40 @@
 """
     $(FUNCTIONNAME)(model::MieModel{FDT}) where FDT<:NAI2
 
+Reference: Suniti Sanghavi 2014, https://doi.org/10.1016/j.jqsrt.2013.12.015
+
 Compute the aerosol optical properties using the Siewart-NAI2 method
 Input: MieModel, holding all computation and aerosol properties 
 Output: AerosolOptics, holding all Greek coefficients and Cross-Sectional information
 """
 function compute_aerosol_optical_properties(model::MieModel{FDT}) where FDT<:NAI2
 
-    # Unpack the model and aerosol
+    # Unpack the model
     @unpack computation_type, aerosol, λ, polarization_type, truncation_type, wigner_A, wigner_B = model
+
+    # Extract variables from aerosol struct:
     @unpack size_distribution, nquad_radius, nᵣ, nᵢ,r_max =  aerosol
     
     # Imaginary part of the refractive index must be ≥ 0
     @assert nᵢ ≥ 0
 
+    # Get the refractive index's real part type
     FT = eltype(nᵣ);
 
     # Get radius quadrature points and weights (for mean, thus normalized):
     r, wᵣ = gauleg(nquad_radius, 0.0, r_max ; norm=true) 
     
-    x_size_param = 2π * r/λ  # Size parameter
-    k = 2π/λ                # Wavenumber
+    # Wavenumber
+    k = 2π/λ  
 
-    # Compute Nmax for largest size:
+    # Size parameter
+    x_size_param = k * r # (2πr/λ)
+
+    # Compute n_max for largest size:
     n_max = get_n_max(maximum(x_size_param))
 
-    # Determine max amount of Gaussian quadrature points for angle dependence of phas functions:
+    # Determine max amount of Gaussian quadrature points for angle dependence of 
+    # phase functions:
     n_mu = 2n_max-1;
 
     # Obtain Gauss-Legendre quadrature points and weights for phase function
@@ -36,7 +45,6 @@ function compute_aerosol_optical_properties(model::MieModel{FDT}) where FDT<:NAI
     leg_π, leg_τ = compute_mie_π_τ(μ, n_max)
 
     # Pre-allocate arrays:
-    
     S₁    = zeros(Complex{FT},n_mu,nquad_radius)
     S₂    = zeros(Complex{FT},n_mu,nquad_radius)
     f₁₁   = zeros(FT, n_mu,nquad_radius)
@@ -49,6 +57,7 @@ function compute_aerosol_optical_properties(model::MieModel{FDT}) where FDT<:NAI
     # Standardized weights for the size distribution:
     wₓ = compute_wₓ(size_distribution, wᵣ, r, r_max) 
     
+    # Loop over size parameters
     @showprogress 1 "Computing PhaseFunctions Siewert NAI-2 style ..." for i = 1:length(x_size_param)
 
         # Maximum expansion (see eq. A17 from de Rooij and Stap, 1984)
@@ -83,9 +92,11 @@ function compute_aerosol_optical_properties(model::MieModel{FDT}) where FDT<:NAI
 
     end
 
+    # Calculate bulk scattering and extinction coeffitientcs
     bulk_C_sca =  sum(wₓ .* C_sca)
     bulk_C_ext =  sum(wₓ .* C_ext)
     
+    # Compute bulk scattering 
     wr = (4π*r.^2 .*  wₓ) 
     bulk_f₁₁   =  f₁₁ * wr
     bulk_f₃₃   =  f₃₃ * wr
@@ -98,22 +109,28 @@ function compute_aerosol_optical_properties(model::MieModel{FDT}) where FDT<:NAI
     bulk_f₁₂ /= bulk_C_sca
     bulk_f₃₄ /= bulk_C_sca
     
-    lMax = length(μ);
-    P, P², R², T² = compute_legendre_poly(μ,lMax)
+    # Range of l-values
+    l_max = length(μ);
+
+    # Get legendre polynomials for l-max 
+    P, P², R², T² = compute_legendre_poly(μ,l_max)
 
     # Compute Greek coefficients:
-    α = zeros(FT,lMax)
-    β = zeros(FT,lMax)
-    δ = zeros(FT,lMax)
-    γ = zeros(FT,lMax)
-    ϵ = zeros(FT,lMax)
-    ζ = zeros(FT,lMax)
+    α = zeros(FT,l_max)
+    β = zeros(FT,l_max)
+    δ = zeros(FT,l_max)
+    γ = zeros(FT,l_max)
+    ϵ = zeros(FT,l_max)
+    ζ = zeros(FT,l_max)
     
     # Compute Greek coefficients from bulk scattering matrix elements (spherical only here!)
     for l=0:length(β)-1
 
         # pre-factor:
         fac = l ≥ 2 ? (2l+1)/2 * sqrt(1/((l-1)*(l)*(l+1)*(l+2))) : 0
+
+        # Compute Greek coefficients 
+        # Eq 17 in Sanghavi 2014
 
         δ[l+1] = (2l+1)/2 * w_μ' * (bulk_f₃₃ .* P[:,l+1])
         β[l+1] = (2l+1)/2 * w_μ' * (bulk_f₁₁ .* P[:,l+1])
@@ -123,6 +140,9 @@ function compute_aerosol_optical_properties(model::MieModel{FDT}) where FDT<:NAI
         α[l+1] = fac      * w_μ' * (bulk_f₁₁ .* R²[:,l+1] + bulk_f₃₃ .* T²[:,l+1]) 
     end
 
+    # Create GreekCoefs object with α, β, γ, δ, ϵ, ζ
     greek_coefs = GreekCoefs(α, β, γ, δ, ϵ, ζ)
+
+    # Return the packaged AerosolOptics object
     return AerosolOptics(greek_coefs, bulk_C_sca, bulk_C_ext) 
 end
