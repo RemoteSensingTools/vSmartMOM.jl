@@ -49,7 +49,7 @@ function compute_aerosol_optical_properties(model::MieModel{FDT}) where FDT<:PCW
     N_max_ = PhaseFunction.get_n_max.(2π * r/ λ)
 
     # Then pre-compute anbn averages
-    PhaseFunction.compute_avg_anbn!(an, bn, ab_pairs, wₓ, N_max, N_max_)
+    PhaseFunction.compute_avg_anbns!(an, bn, ab_pairs, wₓ, N_max, N_max_)
 
     # Pre-compute |an ± bn|² * w
     an_m_bn = transpose(abs2.(an-bn)) * wₓ
