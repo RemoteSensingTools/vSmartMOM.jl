@@ -142,6 +142,12 @@ struct GreekCoefs{FT}
     ζ::Array{FT,1}
 end
 
+""" Extend Base.isapprox (≈) to compare two GreekCoefs """
+function Base.:isapprox(greek_coefs_a::GreekCoefs, greek_coefs_b::GreekCoefs) 
+    field_names = fieldnames(GreekCoefs)
+    return all([getproperty(greek_coefs_a, field) ≈ getproperty(greek_coefs_b, field) for field in field_names])
+end
+
 """
     struct AerosolOptics
 
@@ -159,7 +165,13 @@ struct AerosolOptics{FT}
     k::FT
 end
 
-# TODO: Delete the following if not needed
+""" Extend Base.isapprox (≈) to compare two AerosolOptics """
+function Base.:isapprox(aerosol_optics_a::AerosolOptics, aerosol_optics_b::AerosolOptics) 
+    field_names = fieldnames(AerosolOptics)
+    return all([getproperty(aerosol_optics_a, field) ≈ getproperty(aerosol_optics_b, field) for field in field_names])
+end
+
+
 
 # """
 #     type AbstractQuadratureType
