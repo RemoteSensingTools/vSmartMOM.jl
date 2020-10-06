@@ -8,3 +8,5 @@ packages
 *.f90
 .vscode
 # *.csv
+
+docs/build/*
