@@ -1,4 +1,3 @@
-Manifest.toml
 .DS_Store
 logs
 compiled
@@ -9,5 +8,3 @@ packages
 *.f90
 .vscode
 # *.csv
-diff.txt
-diff2.txt
