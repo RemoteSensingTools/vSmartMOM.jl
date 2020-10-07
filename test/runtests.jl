@@ -5,6 +5,7 @@ using DelimitedFiles
 using Statistics
 using ProgressMeter
 using WignerSymbols
+using Distributions
 
 # Test the Cross Section module
 @testset "RadiativeTransfer.CrossSection" begin include("test_CrossSection.jl") end

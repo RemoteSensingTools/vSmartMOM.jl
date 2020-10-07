@@ -16,6 +16,7 @@ function compute_associated_legendre_PRT(μ,Lmax)
     P = (zeros(FT,length(μ),Lmax,Lmax));
     R = (zeros(FT,length(μ),Lmax,Lmax));
     T = (zeros(FT,length(μ),Lmax,Lmax));
+    
     # Following Suniti Sanghavi code, looks somewhat different than Siewert as normalization is built in. 
     for  m=0:Lmax-1
         for l=m:Lmax-1
