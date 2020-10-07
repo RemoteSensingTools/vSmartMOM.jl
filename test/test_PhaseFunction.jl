@@ -6,7 +6,7 @@
     N = 1000        # Number of randomized tests to perform
 
     # Compute Wigner matrices
-    wigner_A, wigner_B = PhaseFunction.compute_wigner_values((2j_max + 1), j_max + 1, 2j_max + 1)
+    wigner_A, wigner_B = compute_wigner_values((2j_max + 1), j_max + 1, 2j_max + 1)
 
     println("Verifying Wigner Symbols...")
 
@@ -62,5 +62,43 @@
     # Compare the result with WignerSymbols package values
     @test phase_function_results_A ≈ wigner_symbols_results_A
     @test phase_function_results_B ≈ wigner_symbols_results_B
+end
+
+# Test the Aerosol Optics calculations (both NAI2 and Siewert)
+@testset "aerosol_optics" begin
+
+    println("Testing NAI2 and PCW equivalence...")
+
+    # STEP 1: Create the Aerosol
+
+    # Aerosol particle distribution and properties 
+    μ  = 0.3                # Log mean radius
+    σ  = 6.82               # Log stddev of radius
+    r_max = 30.0            # Maximum radius
+    nquad_radius = 2500     # Number of quadrature points for integrating of size dist.
+    nᵣ = 1.3                # Real part of refractive index
+    nᵢ = 0.0                # Imag part of refractive index
+    size_distribution = LogNormal(log(μ), log(σ))
+
+    # Create the aerosol
+    aero = make_univariate_aerosol(size_distribution, r_max, nquad_radius, nᵣ, nᵢ)
+
+    # STEP 2: Create the Mie Calculations model
+
+    λ = 0.55   # Incident wavelength
+    polarization_type = Stokes_IQUV()
+    truncation_type = δBGE(10, 10)
+    model_NAI2 = make_mie_model(NAI2(), aero, λ, polarization_type, truncation_type)
+
+    j_max = 600
+    wigner_A, wigner_B = compute_wigner_values((2j_max + 1), j_max + 1, 2j_max + 1)
+    model_PCW = make_mie_model(PCW(), aero, λ, polarization_type, truncation_type, wigner_A, wigner_B)
+
+    # STEP 3: Perform the Mie Calculations and compare the results
+
+    aerosol_optics_NAI2 = compute_aerosol_optical_properties(model_NAI2);
+    aerosol_optics_PCW = compute_aerosol_optical_properties(model_PCW);
+
+    @test aerosol_optics_NAI2 ≈ aerosol_optics_PCW
 
 end

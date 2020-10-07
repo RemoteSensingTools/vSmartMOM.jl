@@ -4,7 +4,7 @@
 
 Reference: Suniti Sanghavi 2014, https://doi.org/10.1016/j.jqsrt.2013.12.015
 
-Compute the aerosol optical properties using the Siewart-NAI2 method
+Compute the aerosol optical properties using the Siewert-NAI2 method
 Input: MieModel, holding all computation and aerosol properties 
 Output: AerosolOptics, holding all Greek coefficients and Cross-Sectional information
 """
