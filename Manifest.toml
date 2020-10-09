@@ -6,6 +6,12 @@ git-tree-sha1 = "051c95d6836228d120f5f4b984dd5aba1624f716"
 uuid = "621f4979-c628-5d54-868e-fcf4e3e8185c"
 version = "0.5.0"
 
+[[AbstractTrees]]
+deps = ["Markdown"]
+git-tree-sha1 = "33e450545eaf7699da1a6e755f9ea65f14077a45"
+uuid = "1520ce14-60c1-5f80-bbc7-55ef81b5835c"
+version = "0.3.3"
+
 [[Adapt]]
 deps = ["LinearAlgebra"]
 git-tree-sha1 = "0fac443759fa829ed8066db6cf1077d888bb6573"
@@ -145,6 +151,12 @@ git-tree-sha1 = "f0464e499ab9973b43c20f8216d088b61fda80c6"
 uuid = "adafc99b-e345-5852-983c-f28acb93d879"
 version = "0.2.2"
 
+[[Cthulhu]]
+deps = ["CodeTracking", "FoldingTrees", "InteractiveUtils", "REPL", "UUIDs", "Unicode"]
+git-tree-sha1 = "34bf82a46f0600727673e3cbed9a5908efff3c0c"
+uuid = "f68482b8-f384-11e8-15f7-abe071a5a75f"
+version = "1.2.0"
+
 [[DataAPI]]
 git-tree-sha1 = "176e23402d80e7743fc26c19c681bfb11246af32"
 uuid = "9a962f9c-6df0-11e9-0e5d-c546b8b5ee8a"
@@ -244,6 +256,12 @@ git-tree-sha1 = "f354b2087a3b01c1d7152c19f45886c8a036fa5e"
 uuid = "5789e2e9-d7fb-5bc7-8068-2c6fae9b9549"
 version = "1.4.0"
 
+[[FilePathsBase]]
+deps = ["Dates", "Mmap", "Printf", "Test", "UUIDs"]
+git-tree-sha1 = "430f22b2fc3363296cf1af2dbbe6c8b96402a969"
+uuid = "48062228-2e41-5def-b9a4-89aafe57970f"
+version = "0.9.4"
+
 [[FileWatching]]
 uuid = "7b1f6079-737a-58dc-b8bc-7a2ca5c1b5ee"
 
@@ -258,6 +276,12 @@ deps = ["Statistics"]
 git-tree-sha1 = "335bfdceacc84c5cdf16aadc768aa5ddfc5383cc"
 uuid = "53c48c17-4a7d-5ca2-90c5-79b7896eea93"
 version = "0.8.4"
+
+[[FoldingTrees]]
+deps = ["AbstractTrees", "REPL"]
+git-tree-sha1 = "9a1e497cba7c33e5951aaffd9a421fa713acba0b"
+uuid = "1eca21be-9b9b-4ed8-839a-6d8ae26b1781"
+version = "1.0.0"
 
 [[ForwardDiff]]
 deps = ["CommonSubexpressions", "DiffResults", "DiffRules", "NaNMath", "Random", "SpecialFunctions", "StaticArrays"]
@@ -747,6 +771,30 @@ git-tree-sha1 = "e032c9df551fb23c9f98ae1064de074111b7bc39"
 uuid = "992d4aef-0814-514b-bc4d-f2e9a6c4116f"
 version = "0.3.1"
 
+[[SnoopCompile]]
+deps = ["Pkg", "Serialization", "SnoopCompileAnalysis", "SnoopCompileBot", "SnoopCompileCore"]
+git-tree-sha1 = "5deb1572b39d1cb90ed2d946f89f63e3f5faa9c5"
+uuid = "aa65fe97-06da-5843-b5b1-d5d13cad87d2"
+version = "1.7.1"
+
+[[SnoopCompileAnalysis]]
+deps = ["Cthulhu", "OrderedCollections", "Serialization"]
+git-tree-sha1 = "75a09b7752e56b82003dacfb2b008ad6b8f960f3"
+uuid = "9ea4277c-da97-4c3a-afb0-537c066769de"
+version = "1.7.1"
+
+[[SnoopCompileBot]]
+deps = ["FilePathsBase", "Pkg", "SnoopCompileAnalysis", "SnoopCompileCore", "YAML"]
+git-tree-sha1 = "2490e6be0ef6f96ca81dfecb628d749da0976e71"
+uuid = "1d5e0e55-7d74-4714-b8d8-efa80e938cf7"
+version = "1.7.1"
+
+[[SnoopCompileCore]]
+deps = ["Serialization"]
+git-tree-sha1 = "8b6462b79ce1949b10ad5aca0d85eebe461c3d16"
+uuid = "e2b509da-e806-4183-be48-004708413034"
+version = "1.7.1"
+
 [[Sockets]]
 uuid = "6462fe0b-24de-5631-8697-dd941f90decc"
 
@@ -890,6 +938,12 @@ deps = ["LinearAlgebra", "SparseArrays"]
 git-tree-sha1 = "28ffe06d28b1ba8fdb2f36ec7bb079fac81bac0d"
 uuid = "efce3f68-66dc-5838-9240-27a6d6f5f9b6"
 version = "0.5.2"
+
+[[YAML]]
+deps = ["Base64", "Dates", "Printf"]
+git-tree-sha1 = "c5e2eaa5ce818c5277388377d592eb4c81f27c00"
+uuid = "ddb6d928-2868-570f-bddf-ab3f9cf99eb6"
+version = "0.4.0"
 
 [[ZMQ]]
 deps = ["FileWatching", "Sockets", "ZeroMQ_jll"]

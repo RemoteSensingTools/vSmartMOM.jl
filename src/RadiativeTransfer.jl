@@ -6,7 +6,8 @@ export Architectures, CPU, GPU,device
 # Export the Cross Section models
 export HitranModel, InterpolationModel
 
-
+using LinearAlgebra
+using Distributions
 using CUDA
 using KernelAbstractions
 
@@ -32,5 +33,8 @@ function __init__()
     end
 end
 
+# Precompile
+include("precompile.jl")
+_precompile_()
 
 end
