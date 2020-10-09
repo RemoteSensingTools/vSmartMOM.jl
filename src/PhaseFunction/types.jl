@@ -44,6 +44,7 @@ abstract type AbstractFourierDecompositionType end
 
 """
     type NAI2
+
 Perform Siewart's numerical integration method, NAI-2, to compute aerosol phase function 
 decomposition. See: http://adsabs.harvard.edu/full/1982A%26A...109..195S
 """
@@ -51,6 +52,7 @@ struct NAI2  <: AbstractFourierDecompositionType end
 
 """
     type PCW
+
 Perform Domke's Precomputed Wigner Symbols method, PCW, to compute aerosol phase function 
 decomposition. See: http://adsabs.harvard.edu/full/1984A%26A...131..237D
 """
@@ -62,6 +64,7 @@ struct PCW <: AbstractFourierDecompositionType end
 
 """
     type AbstractPolarizationType
+
 Abstract Polarization type 
 """
 abstract type AbstractPolarizationType end
@@ -81,11 +84,17 @@ struct Stokes_I <: AbstractPolarizationType end
 
 """
     type AbstractTruncationType
+
 Abstract greek coefficient truncation type 
 """
 abstract type AbstractTruncationType end
 
-"δBGE Method"
+"""
+    type δBGE{FT} <: AbstractTruncationType
+        
+# Fields
+$(DocStringExtensions.FIELDS)
+"""
 struct δBGE{FT} <: AbstractTruncationType
     "Trunction length for legendre terms"
     l_max::Int
@@ -99,7 +108,11 @@ end
 
 """
     type MieModel
+
 Model to hold all Mie computation details for NAI2 and PCW
+
+# Fields
+$(DocStringExtensions.FIELDS)
 """
 @with_kw struct MieModel{FDT<:AbstractFourierDecompositionType}
 

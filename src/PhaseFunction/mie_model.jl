@@ -1,5 +1,9 @@
 
-""" Convenience function to create Mie Model with NAI2 computation type """
+""" 
+    $(FUNCTIONNAME)(computation_type::NAI2, aerosol::AbstractAerosolType, λ::Real, polarization::AbstractPolarizationType, truncation_type::AbstractTruncationType)
+
+Convenience function to create Mie Model with NAI2 computation type 
+"""
 function make_mie_model(computation_type::NAI2, 
                         aerosol::AbstractAerosolType, 
                         λ::Real,
@@ -9,6 +13,8 @@ function make_mie_model(computation_type::NAI2,
 end
 
 """ 
+    $(FUNCTIONNAME)(computation_type::PCW, aerosol::AbstractAerosolType, λ::Real, polarization::AbstractPolarizationType, truncation_type::AbstractTruncationType, wigner_filepath::String)
+
 Convenience function to load Wigner matrices from file and create Mie Model with PCW computation type 
 """
 function make_mie_model(computation_type::PCW, 
@@ -22,6 +28,8 @@ function make_mie_model(computation_type::PCW,
 end
 
 """ 
+    $(FUNCTIONNAME)(computation_type::PCW, aerosol::AbstractAerosolType, λ::Real, polarization::AbstractPolarizationType, truncation_type::AbstractTruncationType, wigner_A, wigner_B)
+    
 Convenience function to take in Wigner matrices and create Mie Model with PCW computation type 
 """
 function make_mie_model(computation_type::PCW, 

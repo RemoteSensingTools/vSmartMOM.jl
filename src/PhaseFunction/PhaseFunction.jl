@@ -38,6 +38,6 @@ export NAI2, PCW, UnivariateAerosol, MieModel, Stokes_IQUV, Stokes_I, Stokes_IQU
 export compute_B, compute_ab, GreekCoefs, comp_ab, compute_mie_π_τ!, 
        compute_wigner_values, save_wigner_values, load_wigner_values, 
        compute_Sl, gausslegendre, compute_aerosol_optical_properties, 
-       ConjugateTransposePairs
+       ConjugateTransposePairs, AbstractAerosolType, AbstractAerosolType
 
 end
