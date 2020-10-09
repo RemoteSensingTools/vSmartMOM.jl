@@ -180,7 +180,7 @@ end
 """
     $(FUNCTIONNAME)(m_max::Integer, n_max::Integer, l_max::Integer)
 
-Compute the Wigner 3j values for all (m, n, l) combinations up to m/n/l_max, for 
+Compute the Wigner 3j values for all (m, n, l) combinations up to m/n/l max, for 
 (m1, m2, m3) = (-1, 1, 0) (wigner_A) and (-1, -1, 2) (wigner_B)
 
 """
@@ -205,6 +205,13 @@ function compute_wigner_values(m_max::Integer, n_max::Integer, l_max::Integer)
 
     return wigner_A, wigner_B
 end
+
+"""
+    $(FUNCTIONNAME)(N_max)
+
+Shorthand for compute_wigner_values(2N_max + 1, N_max + 1, 2N_max + 1)
+"""
+compute_wigner_values(N_max) = compute_wigner_values(2N_max + 1, N_max + 1, 2N_max + 1)
 
 """
     $(FUNCTIONNAME)(filepath, wigner_A, wigner_B)
