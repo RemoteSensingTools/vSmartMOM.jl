@@ -282,9 +282,9 @@ uuid = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
 version = "0.25.1"
 
 [[Example]]
-path = "/home/rjeyaram/.julia/dev/Example"
+git-tree-sha1 = "46e44e869b4d90b96bd8ed1fdcf32244fddfb6cc"
 uuid = "7876af07-990d-54b4-ab0e-23690620f79a"
-version = "0.5.4"
+version = "0.5.3"
 
 [[ExprTools]]
 git-tree-sha1 = "6f0517056812fd6aa3af23d4b70d5325a2ae4e95"
