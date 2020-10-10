@@ -9,15 +9,15 @@ artifact_toml = joinpath(@__DIR__, "Artifacts.toml")
 hitran_hash = artifact_hash("hitran", artifact_toml)
 
 # If the name was not bound, or the hash it was bound to does not exist, create it!
-if hitran_hash == nothing || !artifact_exists(hitran_hash)
+if hitran_hash === nothing || !artifact_exists(hitran_hash)
     # create_artifact() returns the content-hash of the artifact directory once we're finished creating it
     hitran_hash = create_artifact() do artifact_dir
         # We create the artifact by simply downloading a few files into the new artifact directory
         hitran_url_base = "https://hitran.org/lbl/api?numin=0&numax=50000&iso_ids_list="
-        for i=1:130
+        for i = 1:130
             println(i)
             try
-                download(hitran_url_base*string(i), joinpath(artifact_dir, "hitran_global_id_" * string(i)*".par"))
+                download(hitran_url_base * string(i), joinpath(artifact_dir, "hitran_global_id_" * string(i) * ".par"))
             catch
             end
         end
