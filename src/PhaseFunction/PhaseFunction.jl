@@ -12,7 +12,6 @@ using ForwardDiff, DiffResults  # Automatic Differentiation tools
 using LinearAlgebra
 using BenchmarkTools
 using StaticArrays
-using IndexedTables
 
 using ..Architectures: device
 

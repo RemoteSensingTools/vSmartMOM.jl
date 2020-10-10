@@ -90,8 +90,13 @@ end
     truncation_type = δBGE(10, 10)
     model_NAI2 = make_mie_model(NAI2(), aero, λ, polarization_type, truncation_type)
 
-    j_max = 600
-    wigner_A, wigner_B = compute_wigner_values((2j_max + 1), j_max + 1, 2j_max + 1)
+    # Get saved wigner matrices
+    ftp = FTP("ftp://fluo.gps.caltech.edu/XYZT_hitran/")
+    println("Downloading full Wigner values...")
+    download(ftp, "wigner_values.jld", "wigner_values.jld");
+
+    println("Loading full Wigner values...")
+    wigner_A, wigner_B = load_wigner_values("wigner_values.jld")
     model_PCW = make_mie_model(PCW(), aero, λ, polarization_type, truncation_type, wigner_A, wigner_B)
 
     # STEP 3: Perform the Mie Calculations and compare the results
