@@ -10,3 +10,4 @@ packages
 # *.csv
 
 docs/build/*
+Manifest.toml
