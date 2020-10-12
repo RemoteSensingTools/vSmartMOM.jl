@@ -31,7 +31,7 @@ hitran_data = read_hitran(artifact"hitran_molec_id_2_CO2", mol=2, iso=1, ν_min=
 ## 
 
 # These are some example models, but you can create/customize your model however you'd like. 
-# Please make_hitran_model documentation for optional arguments
+# Please see make_hitran_model documentation for optional arguments
 model_doppler = make_hitran_model(hitran_data, Doppler())
 model_lorentz = make_hitran_model(hitran_data, Lorentz())
 model_voigt_CPU = make_hitran_model(hitran_data, Voigt())

@@ -6,15 +6,19 @@ export Architectures, CPU, GPU,device
 # Export the Cross Section models
 export HitranModel, InterpolationModel
 
-
+using LinearAlgebra
+using Distributions
 using CUDA
 using KernelAbstractions
 
 # GPU/CPU Architecture (from Oceanigans)
 include("Architectures.jl")
 
-# Absorption Cross Section stuff:
+# Absorption Cross Section module:
 include("CrossSection/CrossSection.jl")
+
+# Mie Phase Function module:
+include("PhaseFunction/PhaseFunction.jl")
 
 using .Architectures
 using .CrossSection
@@ -29,5 +33,8 @@ function __init__()
     end
 end
 
+# Precompile
+# include("precompile.jl")
+# _precompile_()
 
 end

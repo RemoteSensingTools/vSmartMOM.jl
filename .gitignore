@@ -1,4 +1,3 @@
-#Manifest.toml
 .DS_Store
 logs
 compiled
@@ -6,6 +5,10 @@ artifacts
 prefs
 packages
 *.cpp
+*.f90
+.vscode
+Manifest.toml
 # *.csv
 
 docs/build/*
+Manifest.toml
