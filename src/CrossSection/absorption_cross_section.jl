@@ -41,7 +41,7 @@ function compute_absorption_cross_section(
     grid_idx_interp_high = LinearInterpolation(grid, 1:1:length(grid),extrapolation_bc = length(grid))
 
     # Temporary storage array for output of qoft!. Compiler/speed issues when returning value in qoft
-    rate = zeros(1)
+    rate = zeros(eltype(AbstractFloat(temperature)),1)
 
     # Declare the device being used
     device = devi(architecture)
