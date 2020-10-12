@@ -1,5 +1,5 @@
 """
-    $(FUNCTIONNAME)(model::MieModel{FDT}) where FDT<:NAI2
+    $(FUNCTIONNAME)(model::MieModel{FDT}) where FDT<:PCW
 
 Reference: Suniti Sanghavi 2014, https://doi.org/10.1016/j.jqsrt.2013.12.015
 
