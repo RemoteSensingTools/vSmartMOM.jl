@@ -119,7 +119,7 @@ using RadiativeTransfer
 using RadiativeTransfer.CrossSection
 using LaTeXStrings
 
-# ### Please donwload ftp://fluo.gps.caltech.edu/XYZT_hitran/hitran_molec_id_2_CO2.par into your files folder
+# ### Please download ftp://fluo.gps.caltech.edu/XYZT_hitran/hitran_molec_id_2_CO2.par into your files folder
 
 # In the future, this will become obsolete (downloads should be automatic) but we are still fixing these things. If you are wondering abut molecule and isotope IDs, they are defined for HITRAN [here](https://hitran.org/docs/molec-meta/) and [here](https://hitran.org/docs/iso-meta/)
 
