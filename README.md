@@ -17,7 +17,7 @@
 
 **An end-to-end modular software suite for radiative transfer calculations, written in <a href="https://julialang.org">Julia</a>**
 
-<img src='docs/slider.gif' class='center'></img>
+<img src='docs/images/CrossSectionGIF.gif' class='center'></img>
 
 This project aims to revamp and modernize key atmospheric remote sensing tools. Specifically, it will enable the fast computation of atmospheric optical properties, full-polarized radiative transfer simulations, and commonly-used inversion routines.
 
@@ -33,19 +33,9 @@ By taking advantage of modern software tools, such as GPU acceleration and HPC c
 ## Installation
 
 1. <a href=https://julialang.org/downloads/>Install Julia</a> (1.3+)
-2. Download the RadiativeTransfer.jl project:
+2. Start Julia and run:  
 ```
-$ git clone https://github.com/RupeshJey/RadiativeTransfer.jl
-```
-3. `cd` into the RadiativeTransfer.jl directory and install the required packages:
-```
-$ cd RadiativeTransfer.jl
-$ julia --project -e 'using Pkg; pkg"instantiate"'
-```
-4. Verify your installation using:
-```
-$ cd test
-$ julia --project test/runtests.jl
+] add https://github.com/RupeshJey/RadiativeTransfer.jl
 ```
 
 ## Modules
@@ -63,9 +53,14 @@ For in-depth examples, tutorials, and implementation details, please see the com
   - `make_interpolation_model(hitran::HitranTable, broadening::AbstractBroadeningFunction, )`: Similar to creating a HitranModel, but this will perform the interpolation at the given wavelength, pressure, and temperature grids and store the interpolator in InterpolationModel.
   - `absorption_cross_section(model::AbstractCrossSectionModel, grid::AbstractRange{<:Real}, pressure::Real, temperature::Real, ...)`: Performs an absorption cross-section calculation with the given model (HitranModel or InterpolationModel), at a given wavelength grid, pressure and temperature
 
+- **PhaseFunction**: This module enables scattering phase-function calculation of atmospheric aerosols with different size distributions, incident wavelengths, and refractive indices. It can perform the calculation using either the Siewert NAI-2 or Domke PCW methods ([Suniti Sanghavi 2014](https://www.sciencedirect.com/science/article/pii/S0022407313004962)). <br><br> Key functions:
+
+  - `make_univariate_aerosol(size_distribution::ContinuousUnivariateDistribution, r_max, nquad_radius::Int, nᵣ, nᵢ`: Create an aerosol object with size distribution and complex refractive index. 
+  - `make_mie_model(computation_type::AbstractFourierDecompositionType, aerosol::AbstractAerosolType, λ::Real, polarization::AbstractPolarizationType, truncation_type::AbstractTruncationType, ...)`: Create a MieModel struct that holds all of the model parameters needed to perform a phase function calculation (computation type, aerosol, incident wavelength, etc. )
+  - `compute_aerosol_optical_properties(model::MieModel)`: Compute the aerosol optical properties using the specified model parameters
+
 ### In development:
 
-- **MieScattering**
 - **RTSimulation**
 
 ## Support
