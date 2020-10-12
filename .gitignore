@@ -11,3 +11,4 @@ Manifest.toml
 # *.csv
 
 docs/build/*
+Manifest.toml
