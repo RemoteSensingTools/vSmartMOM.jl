@@ -90,19 +90,27 @@ end
     truncation_type = δBGE(10, 10)
     model_NAI2 = make_mie_model(NAI2(), aero, λ, polarization_type, truncation_type)
 
-    # Get saved wigner matrices
-    ftp = FTP("ftp://fluo.gps.caltech.edu/XYZT_hitran/")
-    println("Downloading full Wigner values...")
-    download(ftp, "wigner_values.jld", "/tmp/wigner_values.jld");
+    ### 
+    ### NOTE: Temporarily removing PCW tests because they are too heavy to run on Travis
+    ### 
 
-    println("Loading full Wigner values...")
-    wigner_A, wigner_B = load_wigner_values("/tmp/wigner_values.jld")
-    model_PCW = make_mie_model(PCW(), aero, λ, polarization_type, truncation_type, wigner_A, wigner_B)
+    # Get saved wigner matrices
+    # ftp = FTP("ftp://fluo.gps.caltech.edu/XYZT_hitran/")
+    # println("Downloading full Wigner values...")
+    # download(ftp, "wigner_values.jld", "/tmp/wigner_values.jld");
+
+    # println("Loading full Wigner values...")
+    # wigner_A, wigner_B = load_wigner_values("/home/rjeyaram/RadiativeTransfer/src/PhaseFunction/wigner_values.jld")
+    # model_PCW = make_mie_model(PCW(), aero, λ, polarization_type, truncation_type, wigner_A, wigner_B)
+
 
     # STEP 3: Perform the Mie Calculations and compare the results
 
     aerosol_optics_NAI2 = compute_aerosol_optical_properties(model_NAI2);
-    aerosol_optics_PCW = compute_aerosol_optical_properties(model_PCW);
+    # aerosol_optics_PCW = compute_aerosol_optical_properties(model_PCW);
+
+    # Load truth values computed from PCW
+    @load "helper/PCW_AerosolOptics.jld" aerosol_optics_PCW
 
     @test aerosol_optics_NAI2 ≈ aerosol_optics_PCW
 
