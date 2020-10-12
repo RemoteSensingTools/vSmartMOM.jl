@@ -63,7 +63,7 @@ aerosol_optics_PCW = compute_aerosol_optical_properties(model_PCW);
 
 ```
 
-## Create the Aerosol
+## Creating the Aerosol
 
 ```@docs
 make_univariate_aerosol
