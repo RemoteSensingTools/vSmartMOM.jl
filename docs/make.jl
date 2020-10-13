@@ -5,7 +5,7 @@ using RadiativeTransfer.CrossSection
 using RadiativeTransfer.PhaseFunction
 using Plots 
 
-ENV["GKSwstype"] = "nul"
+# ENV["GKSwstype"] = "nul"
 
 function build()
 
