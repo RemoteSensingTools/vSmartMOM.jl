@@ -44,7 +44,7 @@ aerosol_optics_NAI2 = compute_aerosol_optical_properties(model_NAI2);
 # simple example of how to use the Documentation, add `?` in front and get the DocStrings of aerosol_optics_NAI2 :
 # 
 
-?aerosol_optics_NAI2
+# ?aerosol_optics_NAI2
 #----------------------------------------------------------------------------
 
 # ---
