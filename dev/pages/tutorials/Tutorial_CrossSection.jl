@@ -117,7 +117,6 @@ using Pkg.Artifacts
 using FTPClient
 using RadiativeTransfer
 using RadiativeTransfer.CrossSection
-using LaTeXStrings
 
 # ### Please download ftp://fluo.gps.caltech.edu/XYZT_hitran/hitran_molec_id_2_CO2.par into your files folder
 
