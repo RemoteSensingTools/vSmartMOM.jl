@@ -42,7 +42,7 @@ By taking advantage of modern software tools, such as GPU acceleration and HPC c
 
 **Note: This section provides only a quick overview of the available modules in RadiativeTransfer.jl.**
 
-For in-depth examples, tutorials, and implementation details, please see the complete <a href="http://tofu.gps.caltech.edu:5055">Documentation</a>.
+For in-depth examples, tutorials, and implementation details, please see the complete <a href="https://rupeshjey.github.io/RadiativeTransfer.jl/dev/">Documentation</a>.
 
 ### Ready to use:
 
