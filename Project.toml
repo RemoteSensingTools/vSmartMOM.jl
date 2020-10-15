@@ -31,7 +31,7 @@ WignerSymbols = "9f57e263-0b3d-5e2e-b1be-24f2bb48858b"
 [compat]
 BenchmarkTools = "0.5"
 CSV = "0.7"
-CUDA = "1.0"
+CUDA = "1.0, 2.0"
 DiffResults = "1.0"
 Distributions = "0.23, 0.24"
 DocStringExtensions = "0.8"
