@@ -178,12 +178,37 @@ test_ht = read_hitran("/home/rjeyaram/RadiativeTransfer/test/helper/CO2.data", �
 model4 = make_hitran_model(test_ht, Voigt(), architecture = Architectures.CPU())
 model4_GPU = make_hitran_model(test_ht, Voigt(), architecture = Architectures.GPU())
 
+ν_grid = 6000:0.01:6400
+pressures = 250:250:1250
+temperatures = 100:75:400
+
+model = make_interpolation_model(test_ht, Voigt(), ν_grid, pressures, temperatures, wing_cutoff = 40, CEF=ErfcHumliErrorFunctionVoigt())
+
+matrix = Array(model.itp)
+
+res = absorption_cross_section(model, 6000:0.01:6400, 1000.1, 296.1)
+
+f(x) = sum(sin, x) + prod(tan, x) * sum(sqrt, x);
+x = rand(4);
+
+result = DiffResults.HessianResult(x)
+result = ForwardDiff.hessian!(result, f, x);
 
 const ν_grid = 6000:0.01:6400
 
-@btime absorption_cross_section(model4, ν_grid, 1000.1, 296.1)
-@btime absorption_cross_section(model4_GPU, ν_grid, 1000.1, 296.1)
+absorption_cross_section(model4, ν_grid, 1000.1, 296.1)
+@btime absorption_cross_section(model4_GPU, )
 
 @time absorption_cross_section(model4_GPU, ν_grid, 1000.1, 296.1)
 
 @code_warntype testReturn(3)
+
+
+x = [1000.1, 296.1]
+result = DiffResults.HessianResult(x)
+
+result = ForwardDiff.hessian!(result, CrossSection.acs_shorthand, x);
+
+x = [0.3, 6.82, 1.3, 0.00001]
+result = DiffResults.JacobianResult(zeros(4568), x)
+ForwardDiff.jacobian!(result, PhaseFunction.phase_shorthand, x);

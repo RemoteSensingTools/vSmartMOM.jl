@@ -7,6 +7,7 @@ using JLD2                      # For saving and loading the interpolator
 using ProgressMeter             # For showing progress, especially in creating the interpolator
 using KernelAbstractions        # For heterogeneous (GPU+CPU) programming
 using CUDA                      # For GPU programming
+using ForwardDiff, DiffResults  # For auto-differentiation
 using ..Architectures: device
 
 include("constants.jl")         # Scientific and mathematical constants
@@ -18,6 +19,7 @@ include("TIPS_2017.jl")         # Partition sums data (TODO: replace with netCDF
 include("partition_sums.jl")    # Partition sums interpolator (TODO: replace with LinearInterpolation)
 include("cross_section_interpolator.jl") # Cross-section interpolator functions
 include("absorption_cross_section.jl")   # Cross-section from HITRAN
+include("cross_section_autodiff.jl")     # Auto-differentiation
 
 # Export the Cross Section models
 export AbstractCrossSectionModel, HitranModel, InterpolationModel
