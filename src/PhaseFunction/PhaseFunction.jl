@@ -24,6 +24,7 @@ include("aerosol.jl")
 include("mie_model.jl")
 include("compute_NAI2.jl")
 include("compute_PCW.jl")
+include("phase_function_autodiff.jl")     # Auto-differentiation
 
 
 # Export make functions/types
