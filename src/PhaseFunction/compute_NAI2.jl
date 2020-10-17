@@ -14,7 +14,7 @@ function compute_aerosol_optical_properties(model::MieModel{FDT}) where FDT<:NAI
     @unpack computation_type, aerosol, λ, polarization_type, truncation_type, wigner_A, wigner_B = model
 
     # Extract variables from aerosol struct:
-    @unpack size_distribution, nquad_radius, nᵣ, nᵢ,r_max =  aerosol
+    @unpack size_distribution, nquad_radius, nᵣ, nᵢ, r_max =  aerosol
     
     # Imaginary part of the refractive index must be ≥ 0
     @assert nᵢ ≥ 0
@@ -144,5 +144,5 @@ function compute_aerosol_optical_properties(model::MieModel{FDT}) where FDT<:NAI
     greek_coefs = GreekCoefs(α, β, γ, δ, ϵ, ζ)
 
     # Return the packaged AerosolOptics object
-    return AerosolOptics(greek_coefs, bulk_C_sca, bulk_C_ext) 
+    return AerosolOptics(greek_coefs=greek_coefs, ω̃=bulk_C_sca, k=bulk_C_ext) 
 end

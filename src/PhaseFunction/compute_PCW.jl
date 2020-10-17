@@ -15,6 +15,9 @@ function compute_aerosol_optical_properties(model::MieModel{FDT}) where FDT<:PCW
     # Extract variables from aerosol struct:
     @unpack size_distribution, nquad_radius, nᵣ, nᵢ,r_max =  aerosol
 
+    # Get the refractive index's real part type
+    FT = eltype(nᵣ);
+
     # Compute radii and weights
     r, wᵣ = gauleg(nquad_radius, 0.0, r_max ; norm=true)
     wₓ = compute_wₓ(size_distribution, wᵣ, r, r_max) 

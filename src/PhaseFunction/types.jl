@@ -169,13 +169,15 @@ A struct which holds all computed aerosol optics
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-struct AerosolOptics{FT}
+@with_kw struct AerosolOptics{FT}
     "Greek matrix"
     greek_coefs::GreekCoefs
     "Single Scattering Albedo"
     ω̃::FT
     "Extinction coefficient"
     k::FT
+    "Derivatives"
+    derivs = zeros(1)
 end
 
 """ Extend Base.isapprox (≈) to compare two AerosolOptics """
