@@ -27,7 +27,8 @@ refractive index. See eq 4.88 in Bohren and Huffman
 The function returns a rounded integer, following conventions by BH, Rooj/Stap, Siewert 
 """
 function compute_mie_ab!(size_param, refractive_idx::Number, an, bn, Dn)
-    FT = typeof(refractive_idx)
+    FT = eltype(refractive_idx)
+    FT2 = eltype(an)
 
     # Compute y
     y = size_param * refractive_idx
@@ -79,14 +80,15 @@ Output: an, bn. Both of shape (aerosol.nquad_radius, N_max) (N_max from aerosol.
 """
 function compute_anbn(aerosol::UnivariateAerosol, λ, radius)
     
-    FT = eltype(radius)
+    FT = eltype(λ)
+    FT2 = eltype(aerosol.nᵣ)
 
     # Find overall N_max from the maximum radius
     N_max = PhaseFunction.get_n_max(2 * π * aerosol.r_max / λ)
 
     # Where to store an, bn, computed over size distribution
-    an = zeros(Complex{Float64}, aerosol.nquad_radius, N_max)
-    bn = zeros(Complex{Float64}, aerosol.nquad_radius, N_max)
+    an = zeros(Complex{FT2}, aerosol.nquad_radius, N_max)
+    bn = zeros(Complex{FT2}, aerosol.nquad_radius, N_max)
 
     # Loop over the size distribution, and compute an, bn, for each size
     for i in 1:aerosol.nquad_radius
@@ -98,7 +100,7 @@ function compute_anbn(aerosol::UnivariateAerosol, λ, radius)
         # Pre-allocate Dn:
         y = size_param * (aerosol.nᵣ - aerosol.nᵢ);
         nmx = round(Int, max(N_max, abs(y)) + 51)
-        Dn = zeros(Complex{FT}, nmx)
+        Dn = zeros(Complex{FT2}, nmx)
 
         # Compute an, bn
         PhaseFunction.compute_mie_ab!(size_param, aerosol.nᵣ + aerosol.nᵢ * im, 
