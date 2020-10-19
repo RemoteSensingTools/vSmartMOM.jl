@@ -66,7 +66,12 @@ function compute_aerosol_optical_properties(model::MieModel ; autodiff=false)
             model.aerosol.nᵣ, 
             model.aerosol.nᵢ]
 
-        result = DiffResults.JacobianResult(zeros(4568), x)
+        # Get length of greek coefs
+        r, wᵣ = gauleg(model.aerosol.nquad_radius, 0.0, model.aerosol.r_max ; norm=true)
+        N_max = get_n_max(2 * π * model.aerosol.r_max/ model.λ)
+        greek_length = 2 * N_max - 1
+
+        result = DiffResults.JacobianResult(zeros(6 * greek_length + 2), x)
         ForwardDiff.jacobian!(result, compute_aerosol_optical_properties_autodiff, x);
         return convert_jacobian_result_to_aerosol_optics(result);
 
