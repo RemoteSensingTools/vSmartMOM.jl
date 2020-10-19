@@ -23,10 +23,10 @@ function compute_absorption_cross_section(
                 architecture::AbstractArchitecture=Architectures.CPU()
                 )
 
-    # Store results here to return
-    # gridC = array_type(architecture)(grid);
+    # Convert T to float type (ex. if Int)
+    temperature = AbstractFloat(temperature)
 
-    # result = similar(gridC);
+    # Store results here to return
     result = array_type(architecture)(zeros(eltype(temperature), length(grid)))
     fill!(result,0);
 
