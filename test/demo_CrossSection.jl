@@ -2,6 +2,8 @@
 ## Using RadiativeTransfer.CrossSection to perform absorption cross-sections
 ## 
 
+using Revise
+using BenchmarkTools
 using RadiativeTransfer
 using RadiativeTransfer.CrossSection
 
@@ -28,5 +30,5 @@ modelGPU = make_hitran_model(hitran_data, Voigt(), wing_cutoff = 40, CEF=Humlice
 ## STEP 3: Calculate the absorption cross section
 ## 
 
-@benchmark absorption_cross_section(modelCPU, 6000:0.01:6400, 1000.1, 296.1)
+value, derivs = absorption_cross_section(modelCPU, 6000:0.01:6400, 1000.1, 296.1, autodiff=true);
 @benchmark absorption_cross_section(modelGPU, 6000:0.001:6400, 1000.1, 296.1)
