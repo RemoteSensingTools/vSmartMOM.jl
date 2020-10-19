@@ -24,9 +24,10 @@ function compute_absorption_cross_section(
                 )
 
     # Store results here to return
-    gridC = array_type(architecture)(grid);
+    # gridC = array_type(architecture)(grid);
 
-    result = similar(gridC);
+    # result = similar(gridC);
+    result = array_type(architecture)(zeros(eltype(temperature), length(grid)))
     fill!(result,0);
 
     # Convert to wavenumber from [nm] space if necessary
@@ -41,7 +42,7 @@ function compute_absorption_cross_section(
     grid_idx_interp_high = LinearInterpolation(grid, 1:1:length(grid),extrapolation_bc = length(grid))
 
     # Temporary storage array for output of qoft!. Compiler/speed issues when returning value in qoft
-    rate = zeros(eltype(AbstractFloat(temperature)),1)
+    rate = zeros(eltype(temperature), 1)
 
     # Declare the device being used
     device = devi(architecture)
@@ -85,7 +86,7 @@ function compute_absorption_cross_section(
             
             # Create views from the result and grid arrays
             result_view   = view(result ,ind_start:ind_stop);
-            grid_view     = view(gridC   ,ind_start:ind_stop);
+            grid_view     = view(grid   ,ind_start:ind_stop);
 
             # Kernel for performing the lineshape calculation
             kernel! = line_shape!(device)
