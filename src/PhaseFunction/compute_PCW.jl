@@ -36,12 +36,12 @@ function compute_aerosol_optical_properties(model::MieModel{FDT}) where FDT<:PCW
     ls = 1:(2 * N_max - 1)
 
     # Where to store the Greek Coefficients
-    greek_coefs = zeros(6, size(ls, 1))
+    greek_coefs = zeros(FT, 6, size(ls, 1))
 
     # Pre-compute anbn averages
     # That is, pre-compute (an✶)am, (an✶)bm, (bn✶)am, (bn✶)bm 
     # So that you can quickly compute (an✶ + bn✶) × (am + bm)
-    FT2 = Complex{Float64}
+    FT2 = Complex{FT}
     mat_anam = LowerTriangular(zeros(FT2, N_max, N_max));
     mat_anbm = LowerTriangular(zeros(FT2, N_max, N_max));
     mat_bnam = LowerTriangular(zeros(FT2, N_max, N_max));
@@ -86,7 +86,7 @@ function compute_aerosol_optical_properties(model::MieModel{FDT}) where FDT<:PCW
                   greek_coefs[2,:], greek_coefs[6,:], greek_coefs[4,:])
 
     # Return the packaged AerosolOptics object
-    return AerosolOptics(greek_coefs, avg_C_scatt, avg_C_ext) 
+    return AerosolOptics(greek_coefs=greek_coefs, ω̃=avg_C_scatt, k=avg_C_ext) 
 end
 
 
