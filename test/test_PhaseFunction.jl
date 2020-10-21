@@ -77,7 +77,7 @@ end
     r_max = 30.0            # Maximum radius
     nquad_radius = 2500     # Number of quadrature points for integrating of size dist.
     nᵣ = 1.3                # Real part of refractive index
-    nᵢ = 0.0                # Imag part of refractive index
+    nᵢ = 0.001              # Imag part of refractive index
     size_distribution = LogNormal(log(μ), log(σ))
 
     # Create the aerosol
