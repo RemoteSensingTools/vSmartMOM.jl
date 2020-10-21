@@ -1,5 +1,5 @@
 
-# Take the JacobianResult output and convert it into the AerosolOptics type
+""" Function used by auto-differentiation to convert a jacobian result to an AerosolOptics type"""
 function convert_jacobian_result_to_aerosol_optics(result)
     
     value = result.value
@@ -22,9 +22,16 @@ function convert_jacobian_result_to_aerosol_optics(result)
     return AerosolOptics(greek_coefs=greek_coefs, ω̃=ω̃, k=k, derivs=derivs) 
 end
 
-# Wanted to define the same autodiff function for both NAI2 and PCW. 
-# If autodiff parameter is defined in function call, the call will come here and do its logic. 
-# If autodiff is false or not defined, it'll dispatch to the original declarations
+"""
+    $(FUNCTIONNAME)(model::MieModel{FDT})
+
+Reference: Suniti Sanghavi 2014, https://doi.org/10.1016/j.jqsrt.2013.12.015
+
+This function enables user to specify whether to perform auto-differentiation (using either computation type)
+Input: MieModel, holding all computation and aerosol properties & autodiff flag (whether to perform 
+auto-differentiation)
+Output: AerosolOptics, holding all Greek coefficients and Cross-Sectional information
+"""
 function compute_aerosol_optical_properties(model::MieModel ; autodiff=false)
 
     # This function takes in the "x-vector" along with the input model so that ForwardDiff will work

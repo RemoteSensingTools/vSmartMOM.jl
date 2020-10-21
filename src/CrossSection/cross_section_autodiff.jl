@@ -1,3 +1,11 @@
+
+"""
+    $(FUNCTIONNAME)(model::HitranModel, grid::AbstractRange{<:Real}, pressure::Real, temperature::Real; wavelength_flag::Bool=false)
+
+Calculate absorption cross-section at the given pressure, temperature, and grid of wavelengths 
+(or wavenumbers), and have the option to perform auto-differentiation
+
+"""
 function absorption_cross_section(model::AbstractCrossSectionModel,          # Model to use 
                                   grid::AbstractRange{<:Real}, # Wavelength [nm] or wavenumber [cm-1] grid 
                                   pressure::Real,              # actual pressure [hPa]
@@ -31,7 +39,7 @@ function absorption_cross_section(model::AbstractCrossSectionModel,          # M
         return (result.value, result.derivs[1]);
 
     else 
-        return absorption_cross_section(model, grid, pressure, temperature)
+        return absorption_cross_section(model, grid, pressure, temperature, wavelength_flag)
     end
 
 end
