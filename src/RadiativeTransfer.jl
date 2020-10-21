@@ -33,8 +33,4 @@ function __init__()
     end
 end
 
-# Precompile
-# include("precompile.jl")
-# _precompile_()
-
 end
