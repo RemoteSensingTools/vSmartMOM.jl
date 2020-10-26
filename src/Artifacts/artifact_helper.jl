@@ -1,2 +1,4 @@
 """ Shorthand for @artifact_str """
-artifact(name) = joinpath(@artifact_str(name), name) * ".par"
+function artifact(path_name::AbstractString) 
+    return joinpath(@artifact_str(path_name), path_name) * ".par"
+end
