@@ -93,7 +93,7 @@ end
     temperatures = 100:75:400 
 
     # Get the test data
-    CO2_file = artifact("hitran_molec_id_2_CO2")
+    CO2_file = artifact("CO2")
     test_ht = CrossSection.read_hitran(CO2_file, iso=1, ν_min=6000, ν_max=6400)
 
     grid = 6000:0.01:6400;
@@ -118,9 +118,9 @@ end
     #### Now test HAPI equivalence with other molecules
     ####
 
-    names = ["H2O", "CO2", "O3", "N2O", "CO"]#, "CH4", "O2", "NO", "SO2", "NO2"]
-    molecules = [1, 2, 3, 4, 5]#, 6, 7, 8, 9, 10]
-    isotopes = [1, 1, 1, 1, 1]#, 2, 1, 2, 1, 1]
+    names = ["H2O", "CO2", "O3", "N2O", "CO"]
+    molecules = [1, 2, 3, 4, 5]
+    isotopes = [1, 1, 1, 1, 1]
 
     # Loop over every temperature/pressure combo and test that the results match HAPI
     # (Doing this for other molecules)
@@ -130,7 +130,7 @@ end
         temp = 250
 
         # Get the test data
-        test_ht = CrossSection.read_hitran("helper/" * name * ".data", ν_min=6000, ν_max=6400)
+        test_ht = CrossSection.read_hitran(artifact(name), iso=1, ν_min=6000, ν_max=6400)
         # Create a HitranModel 
         model = make_hitran_model(test_ht, Voigt(), CEF=ErfcHumliErrorFunctionVoigt())
 
@@ -149,7 +149,7 @@ end
     println("Testing absorption_cross_section_interpolator...")
 
     # Get the test data
-    test_ht = CrossSection.read_hitran("helper/CO2.data", ν_min=6000, ν_max=6400)
+    test_ht = CrossSection.read_hitran(artifact("CO2"), iso=1, ν_min=6000, ν_max=6400)
 
     # Pressure and temperature grids
     pressures = 250:250:1250

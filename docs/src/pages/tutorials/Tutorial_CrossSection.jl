@@ -114,19 +114,12 @@ println("Doppler shift = $(1e7/(v₀-Δ_ν)-1e7/v₀) nm")
 
 using Plots
 using Pkg.Artifacts
-using FTPClient
 using RadiativeTransfer
 using RadiativeTransfer.CrossSection
 
-# ### Please download ftp://fluo.gps.caltech.edu/XYZT_hitran/hitran_molec_id_2_CO2.par into your files folder
-
-# In the future, this will become obsolete (downloads should be automatic) but we are still fixing these things. If you are wondering abut molecule and isotope IDs, they are defined for HITRAN [here](https://hitran.org/docs/molec-meta/) and [here](https://hitran.org/docs/iso-meta/)
-
 #-------------------------
 
-ftp = FTP("ftp://fluo.gps.caltech.edu/XYZT_hitran/")
-download(ftp, "hitran_molec_id_2_CO2.par", "hitran_molec_id_2_CO2.par");
-co2_par = CrossSection.read_hitran("hitran_molec_id_2_CO2.par", mol=2, iso=1, ν_min=6214.4, ν_max=6214.8);
+co2_par = CrossSection.read_hitran(artifact("CO2"), mol=2, iso=1, ν_min=6214.4, ν_max=6214.8);
 line_voigt   = make_hitran_model(co2_par, Voigt())
 line_doppler = make_hitran_model(co2_par, Doppler())
 line_lorentz = make_hitran_model(co2_par, Lorentz())
@@ -174,7 +167,7 @@ xlabel!("Wavenumber (cm⁻¹)")
 
 #-------------------------
 
-co2_par_band = CrossSection.read_hitran("hitran_molec_id_2_CO2.par", mol=2, iso=1, ν_min=6000.0, ν_max=6400.0);
+co2_par_band = CrossSection.read_hitran(artifact("CO2"), mol=2, iso=1, ν_min=6000.0, ν_max=6400.0);
 band_voigt   = make_hitran_model(co2_par_band , Voigt())
 
 #-------------------------
