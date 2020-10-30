@@ -9,6 +9,7 @@ using KernelAbstractions        # For heterogeneous (GPU+CPU) programming
 using CUDA                      # For GPU programming
 using ForwardDiff, DiffResults  # For auto-differentiation
 using ..Architectures: device
+using NetCDF
 
 include("constants.jl")         # Scientific and mathematical constants
 include("types.jl")             # All types used in this module
