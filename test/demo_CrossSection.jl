@@ -11,7 +11,7 @@ using RadiativeTransfer.CrossSection
 ## STEP 1: Get the Hitran data from the transition par file
 ## 
 
-hitran_data = read_hitran("/home/rjeyaram/RadiativeTransfer/test/helper/CO2.data", mol=2, iso=1, ν_min=6000, ν_max=6400)
+hitran_data = read_hitran(artifact("CO2"), mol=2, iso=1, ν_min=6000, ν_max=6400)
 
 ## 
 ## STEP 2: Create a model from parameters
