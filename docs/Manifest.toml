@@ -609,7 +609,7 @@ uuid = "3fa0cd96-eef1-5676-8a61-b3b8758bbffb"
 
 [[RadiativeTransfer]]
 deps = ["BenchmarkTools", "CSV", "CUDA", "DelimitedFiles", "DiffResults", "Distributions", "DocStringExtensions", "FTPClient", "FastGaussQuadrature", "ForwardDiff", "HTTP", "Interpolations", "JLD2", "KernelAbstractions", "LinearAlgebra", "NetCDF", "Parameters", "Pkg", "ProgressMeter", "Random", "SharedArrays", "SpecialFunctions", "StaticArrays", "Statistics", "WignerSymbols"]
-git-tree-sha1 = "077242cf6bb4fceab978184ccb4aa73e57cd6728"
+git-tree-sha1 = "1e08d3999434e7b7465bdadb44388c18912dbe45"
 repo-rev = "master"
 repo-url = ".."
 uuid = "ace8185b-fa20-42f5-912d-1e850dbe6a09"
