@@ -22,8 +22,8 @@ function rt_elemental!(mo::Stokes_IQUV, dτ, ϖ, bb, m, n, ndoubl, scatter)
         else    
             wct=0.25 * ϖ * wt_μ
         end
-        r_elt_mp = diag(1./qp_μ) * p⁻⁺ * diag(wct) * dτ
-        t_elt_pp = I - (diag(1./qp_μ) * (I - p⁺⁺ * diag(wct)) * dτ)
+        r_elt_mp = diag(1 ./ qp_μ) * p⁻⁺ * diag(wct) * dτ
+        t_elt_pp = I - (diag(1 ./ qp_μ) * (I - p⁺⁺ * diag(wct)) * dτ)
         if ndoubl<1
             for iμ in 1:Nquad4; jμ in 1:Nquad4
                 # That "4" and Nquad4 needs to be dynamic, coming from the PolType struct.
