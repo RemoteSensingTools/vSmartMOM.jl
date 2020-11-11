@@ -39,7 +39,7 @@ function read_hitran(filepath::String; mol::Int=-1, iso::Int=-1, ν_min::Real=0,
         for ln in eachline(file)
 
             # Go from a line to a list of values
-            values = [varTypes[i] == String ? ln[(idxRanges[i]+1):idxRanges[i+1]] : tryparse(varTypes[i], ln[(idxRanges[i]+1):idxRanges[i+1]]) for i in 1:(length(varLengths))]
+            values = [varTypes[i] == String ? ln[(idxRanges[i]+1):idxRanges[i+1]] : something(tryparse(varTypes[i], ln[(idxRanges[i]+1):idxRanges[i+1]]), varTypes[i](0)) for i in 1:(length(varLengths))]
 
             # Check that the search criteria are met (molecule, isotope and wavenumber range)
             if((values[1] == mol || mol == -1) && (values[2] == iso || iso == -1) && (ν_min <= values[3] <= ν_max))
