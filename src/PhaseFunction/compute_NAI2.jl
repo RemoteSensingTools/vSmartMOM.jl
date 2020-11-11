@@ -144,5 +144,5 @@ function compute_aerosol_optical_properties(model::MieModel{FDT}) where FDT<:NAI
     greek_coefs = GreekCoefs(α, β, γ, δ, ϵ, ζ)
 
     # Return the packaged AerosolOptics object
-    return AerosolOptics(greek_coefs=greek_coefs, ω̃=bulk_C_sca, k=bulk_C_ext) 
+    return AerosolOptics(greek_coefs=greek_coefs, ω̃=bulk_C_sca/bulk_C_ext, k=bulk_C_ext) 
 end

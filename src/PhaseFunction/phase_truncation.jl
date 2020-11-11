@@ -13,7 +13,7 @@ function truncate_phase(mod::δBGE, aero::AerosolOptics)
     μ, w_μ = gausslegendre(length(β));
 
     # Reconstruct phase matrix elements:
-    f₁₁, f₁₂, f₂₂, f₃₃, f₃₄, f₄₄, P, P² = reconstruct_phase(α, β, γ, δ, ϵ, ζ, μ; returnLeg=true)
+    f₁₁, f₁₂, f₂₂, f₃₃, f₃₄, f₄₄, P, P² = reconstruct_phase(greek_coefs, μ; returnLeg=true)
 
     # Find elements that exclude the peak (if wanted!)
     iμ = findall(x -> x < cosd(Δ_angle), μ)
@@ -44,7 +44,7 @@ function truncate_phase(mod::δBGE, aero::AerosolOptics)
 
     # Integrate truncated function for later renormalization (here: fraction that IS still scattered):
     c₀ = ( w_μ' * (P[:,1:l_max] * cl) ) / 2
-
+    @show c₀
     # Compute truncated greek coefficients:
     βᵗ = cl / c₀                                    # Eq. 38a, B in δ-BGR (β)
     δᵗ = (δ[1:l_max] .- (β[1:l_max] .- cl)) / c₀    # Eq. 38b, derived from β
@@ -57,6 +57,6 @@ function truncate_phase(mod::δBGE, aero::AerosolOptics)
     C_scaᵗ = C_sca * c₀; 
     C_ext  = k - (C_sca - C_scaᵗ);
     
-    return AerosolOptics(greek_coefs, C_scaᵗ / C_ext, C_ext) 
+    return AerosolOptics(greek_coefs = greek_coefs, ω̃=C_scaᵗ / C_ext, k=C_ext) 
 end
 
