@@ -22,3 +22,7 @@ mol_name(mol, iso) = check_exists(names[mol, iso])
 
 # Get molecule number from names
 mol_number(name) = mols[findfirst(x->x==name, mol_names[:,1])]
+
+# Convenience functions to explore available molecule information
+show_molecules() = unique(mol_names)
+search_molecules(search_str) = filter(x->occursin(search_str, x), unique(mol_names)) 
