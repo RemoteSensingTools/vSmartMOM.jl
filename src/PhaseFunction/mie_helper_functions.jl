@@ -341,10 +341,13 @@ construct_B_matrix(mod::Stokes_I, α, β, γ, δ, ϵ, ζ, l::Int) = β[l]
     $(FUNCTIONNAME)(mod::AbstractPolarizationType, μ, α, β, γ, δ, ϵ, ζ, m::Int)
 Compute moments of the phase matrix 
 """
-function compute_Z_moments(mod::AbstractPolarizationType, μ, α, β, γ, δ, ϵ, ζ, m::Int)
+function compute_Z_moments(mod::AbstractPolarizationType, μ, greek_coefs::GreekCoefs, m::Int)
+    @unpack α, β, γ, δ, ϵ, ζ = greek_coefs
     FT = eltype(β)
     n = length(μ)
-    
+    # Change from 0-index to 1-index (i.e. the lowest m is 0 ), 
+    # make more logical later to avoid confusion later (m=0 has a meaning!!)
+    m = m+1
     # Set prefactor for moments (note 1-notation for `m` here):
     fact = (m == 1) ? 0.5 : 1.0
 
@@ -366,8 +369,8 @@ function compute_Z_moments(mod::AbstractPolarizationType, μ, α, β, γ, δ, ϵ
     
     # Create matrices:
     nb = B_dim * n
-    𝐙⁺⁺, 𝐙⁺⁻ = (zeros(FT, nb, nb), zeros(FT, nb, nb))
-    A⁺⁺, A⁺⁻ = (zeros(FT, B_dim, B_dim, n, n), zeros(FT, B_dim, B_dim, n, n))
+    𝐙⁺⁺, 𝐙⁻⁺ = (zeros(FT, nb, nb), zeros(FT, nb, nb))
+    A⁺⁺, A⁻⁺ = (zeros(FT, B_dim, B_dim, n, n), zeros(FT, B_dim, B_dim, n, n))
 
     # Iterate over l
     for l = m:l_max
@@ -384,10 +387,10 @@ function compute_Z_moments(mod::AbstractPolarizationType, μ, α, β, γ, δ, ϵ
         for i in eachindex(μ), j in eachindex(μ)
             if B_dim == 1
                 A⁺⁺[B_dim,B_dim,i,j] += Π[i] * 𝐁 * Π[j]
-                A⁺⁻[B_dim,B_dim,i,j] += Π[i] * 𝐁 * Π⁻[j]
+                A⁻⁺[B_dim,B_dim,i,j] += Π[i] * 𝐁 * Π⁻[j]
             else
                 A⁺⁺[:,:,i,j] += Π[i] * 𝐁 * Π[j]
-                A⁺⁻[:,:,i,j] += Π[i] * 𝐁 * Π⁻[j]
+                A⁻⁺[:,:,i,j] += Π[i] * 𝐁 * Π⁻[j]
             end
         end
     end
@@ -403,15 +406,15 @@ function compute_Z_moments(mod::AbstractPolarizationType, μ, α, β, γ, δ, ϵ
         for i in 1:B_dim, j in 1:B_dim
             𝐙⁺⁺[ii + i,jj + j] = 2fact * A⁺⁺[i,j,imu,jmu]
             if i <= 2 && j >= 3
-                𝐙⁺⁻[ii + i,jj + j] = -2fact * A⁺⁻[i,j,imu,jmu]
+                𝐙⁻⁺[ii + i,jj + j] = -2fact * A⁻⁺[i,j,imu,jmu]
             elseif i >= 3 && j <= 2
-                𝐙⁺⁻[ii + i,jj + j] = -2fact * A⁺⁻[i,j,imu,jmu]
+                𝐙⁻⁺[ii + i,jj + j] = -2fact * A⁻⁺[i,j,imu,jmu]
             else
-                𝐙⁺⁻[ii + i,jj + j] = 2fact * A⁺⁻[i,j,imu,jmu]
+                𝐙⁻⁺[ii + i,jj + j] = 2fact * A⁻⁺[i,j,imu,jmu]
             end
         end
     end
 
     # Return Z-moments
-    return 𝐙⁺⁺, 𝐙⁺⁻
+    return 𝐙⁺⁺, 𝐙⁻⁺
 end
