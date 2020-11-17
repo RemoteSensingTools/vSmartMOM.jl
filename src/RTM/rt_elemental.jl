@@ -50,5 +50,5 @@ function rt_elemental!(mo::Stokes_IQUV, dτ, ϖ, bb, m, n, ndoubl, scatter)
         t_elt_pp = diag{exp(τ./qp_μ)}
         t_elt_mm = diag{exp(τ./qp_μ)}
     end 
-    return nothing
+    return r_elt_mp, t_elt_pp, r_elt_pm, t_elt_mm
 end

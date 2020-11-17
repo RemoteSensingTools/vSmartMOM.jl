@@ -43,8 +43,8 @@ function truncate_phase(mod::δBGE, aero::AerosolOptics)
     ϵᵗ = ((W₃₄ * B) \ (W₃₄ * y₃₄))   # E in δ-BGE (ϵ)
 
     # Integrate truncated function for later renormalization (here: fraction that IS still scattered):
-    c₀ = ( w_μ' * (P[:,1:l_max] * cl) ) / 2
-    @show c₀
+    c₀ = cl[1] # ( w_μ' * (P[:,1:l_max] * cl) ) / 2
+    #@show c₀, cl[1]
     # Compute truncated greek coefficients:
     βᵗ = cl / c₀                                    # Eq. 38a, B in δ-BGR (β)
     δᵗ = (δ[1:l_max] .- (β[1:l_max] .- cl)) / c₀    # Eq. 38b, derived from β
@@ -53,10 +53,11 @@ function truncate_phase(mod::δBGE, aero::AerosolOptics)
 
     # Adjust scattering and extinction cross section!
     greek_coefs = GreekCoefs(αᵗ, βᵗ, γᵗ, δᵗ, ϵᵗ, ζᵗ)
-    C_sca  = (ω̃ * k);
-    C_scaᵗ = C_sca * c₀; 
-    C_ext  = k - (C_sca - C_scaᵗ);
+    #C_sca  = (ω̃ * k);
+    #C_scaᵗ = C_sca * c₀; 
+    #C_ext  = k - (C_sca - C_scaᵗ);
     
-    return AerosolOptics(greek_coefs = greek_coefs, ω̃=C_scaᵗ / C_ext, k=C_ext) 
+    #return AerosolOptics(greek_coefs = greek_coefs, ω̃=C_scaᵗ / C_ext, k=C_ext, fᵗ = 1-c₀) 
+    return AerosolOptics(greek_coefs = greek_coefs, ω̃=ω̃, k=k, fᵗ = 1-c₀) 
 end
 

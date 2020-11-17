@@ -20,6 +20,9 @@ include("CrossSection/CrossSection.jl")
 # Mie Phase Function module:
 include("PhaseFunction/PhaseFunction.jl")
 
+# RTM module:
+include("RTM/RTM.jl")
+
 using .Architectures
 using .CrossSection
 

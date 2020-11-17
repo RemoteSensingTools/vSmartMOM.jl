@@ -83,7 +83,7 @@ function compute_aerosol_optical_properties(model::MieModel{FDT}) where FDT<:NAI
         # Compute Extinction and scattering cross sections: 
         C_sca[i] = 2π/k^2 * (n_' * (abs2.(an) + abs2.(bn)))
         C_ext[i] = 2π/k^2 * (n_' * real(an + bn))
-
+        #@show r[i], x_size_param[i], C_ext[i], C_ext[i]/(4π*r[i]^2), C_ext[i]*1e-8
         # Compute scattering matrix components per size parameter (might change column/row ordering):
         f₁₁[:,i] =  0.5/x_size_param[i]^2  * real(abs2.(S₁[:,i]) + abs2.(S₂[:,i]));
         f₃₃[:,i] =  0.5/x_size_param[i]^2  * real(S₁[:,i] .* conj(S₂[:,i]) + S₂[:,i] .* conj(S₁[:,i]));
