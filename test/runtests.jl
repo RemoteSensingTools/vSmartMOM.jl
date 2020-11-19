@@ -7,7 +7,6 @@ using Statistics
 using ProgressMeter
 using WignerSymbols
 using Distributions
-using FTPClient
 using JLD2
 
 # Test the Cross Section module
