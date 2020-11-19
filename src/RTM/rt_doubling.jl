@@ -1,39 +1,42 @@
 
 "Prototype doubling methods, compute homogenous layer matrices from its elemental layer in `ndoubl` doubling steps"
-function rt_doubling!(mo::Stokes_IQUV, dτ, τ_total, m, ndoubl, r_elt_mp, t_elt_pp, r_elt_pm, t_elt_mm)
-    # # ToDo: Important output doubling applied to elemental layer, using same variables r_elt_pm, r_elt_mp, t_elt_mm, t_elt_pp (can be renamed to t⁺⁺, etc)
+function rt_doubling(dτ, τ_total, ndoubl, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻)
+    # # ToDo: Important output doubling applied to elemental layer, using same variables r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺ (can be renamed to t⁺⁺, etc)
     # Need to check with paper nomenclature. This is basically eqs. 23-28 in vSmartMOM but using simplifications in eq. 29-32)
-    τ_total=dτ
+    Nquad4 = size(r⁻⁺, 1)
     if (ndoubl==0)
-        return
+        @assert (τ_total==dτ*2^ndoubl)
+        return r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻
     end
-
+    τ_total=dτ
     for n = 1:ndoubl
-        M1=int(I-r_elt_mp*r_elt_mp)
-        tr_elt_mp = r_elt_mp + t_elt_pp*r_elt_mp*M1*t_elt_pp
-        tt_elt_pp = t_elt_pp*M1*t_elt_pp
+        M1=inv(I - r⁻⁺ * r⁻⁺)
+        tr⁻⁺ = r⁻⁺ + t⁺⁺ * r⁻⁺ * M1 * t⁺⁺
+        tt⁺⁺ = t⁺⁺ * M1 * t⁺⁺
 
-        r_elt_mp = tr_elt_mp
-        t_elt_pp = tt_elt_pp
+        r⁻⁺ = tr⁻⁺
+        t⁺⁺ = tt⁺⁺
 
         τ_total = 2 * τ_total
     end
-    for iμ = 1:Nquad4; jμ = 1:Nquad4
+    for iμ = 1:Nquad4, jμ = 1:Nquad4
         # That "4" and Nquad4 needs to be dynamic, coming from the PolType struct.
         i=mod(iμ-1,4)
         j=mod(jμ-1,4)
+        #@show i,j
         if (i<=2)
-            r_elt_mp[iμ,jμ] = - r_elt_mp[iμ, jμ]
+            r⁻⁺[iμ,jμ] = - r⁻⁺[iμ, jμ]
         end
         if ((i<=1)&(j<=1)) | ((i>=2)&(j>=2))
-            r_elt_pm[iμ,jμ] = r_elt_mp[iμ,jμ]
-            t_elt_mm[iμ,jμ] = t_elt_pp[iμ,jμ]
+            r⁺⁻[iμ,jμ] = r⁻⁺[iμ,jμ]
+            t⁻⁻[iμ,jμ] = t⁺⁺[iμ,jμ]
         else
-            r_elt_pm[iμ,jμ] = - r_elt_mp[iμ,jμ]
-            t_elt_mm[iμ,jμ] = - t_elt_pp[iμ,jμ]
+            r⁺⁻[iμ,jμ] = - r⁻⁺[iμ,jμ]
+            t⁻⁻[iμ,jμ] = - t⁺⁺[iμ,jμ]
         end
     end 
-    return nothing
+    @assert (τ_total==dτ*2^ndoubl)
+    return r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻
 end
 
 "minimum number of doublings needed to reach an optical depth τ_end, starting with an optical depth dτ.
