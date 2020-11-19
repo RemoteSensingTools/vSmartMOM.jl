@@ -47,9 +47,10 @@ function rt_set_streams(model::RadauQuad, Ltrunc::Int, sza, vza)
 end
 
 # Finds index i of f_array (i) which is nearest point to f
-function nearest_point(Npts, f_array, f)
+function nearest_point(f_array, f)
     d0 = 999.9
-    for i in 1:Npts
+    index = 0
+    for i in 1:length(f_array)
         d = abs(f_array[i]-f)
         if d<d0
             d0=d

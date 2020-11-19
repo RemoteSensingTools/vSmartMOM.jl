@@ -113,7 +113,7 @@ function getAerosolLayerOptProp(total_τ, p₀, σp, p_half)
     return τAer
 end
 #computes the composite single scattering parameters (τ, ϖ, Z⁺⁺, Z⁻⁺) for a given atmospheric layer iz for a given Fourier component m
-function construct_atm_layer(τRayl, τAer, ϖRayl, ϖAer, fᵗ, Zpp_Rayl, Zmp_Rayl, Zpp_Aer, Zmp_Aer)
+function construct_atm_layer(τRayl, τAer, ϖRayl, ϖAer, fᵗ, Rayl𝐙⁺⁺, Rayl𝐙⁻⁺, Aer𝐙⁺⁺, Aer𝐙⁻⁺)
     FT = eltype(τRayl)
     @assert length(τAer) == length(ϖAer) == length(fᵗ) "Sizes don't match"
     
@@ -122,8 +122,8 @@ function construct_atm_layer(τRayl, τAer, ϖRayl, ϖAer, fᵗ, Zpp_Rayl, Zmp_R
     τ = FT(0)
     ϖ = FT(0)
     A = FT(0)
-    Z⁺⁺ = similar(Zpp_Rayl); 
-    Z⁻⁺ = similar(Zpp_Rayl);
+    Z⁺⁺ = similar(Rayl𝐙⁺⁺); 
+    Z⁻⁺ = similar(Rayl𝐙⁺⁺);
     
     if (τRayl + sum(τAer)) < eps(FT)
         fill!(Z⁺⁺,0); fill!(Z⁻⁺,0);
@@ -134,15 +134,15 @@ function construct_atm_layer(τRayl, τAer, ϖRayl, ϖAer, fᵗ, Zpp_Rayl, Zmp_R
     ϖ += τRayl * ϖRayl
     A += τRayl * ϖRayl
 
-    Z⁺⁺ = τRayl * ϖRayl * Zpp_Rayl
-    Z⁻⁺ = τRayl * ϖRayl * Zmp_Rayl
+    Z⁺⁺ = τRayl * ϖRayl * Rayl𝐙⁺⁺
+    Z⁻⁺ = τRayl * ϖRayl * Rayl𝐙⁻⁺
 
     for i = 1:length(τAer)
         τ += τAer[i]
         ϖ += τAer[i] * ϖAer[i]
         A += τAer[i] * ϖAer[i] * (1-fᵗ[i])
-        Z⁺⁺ += τAer[i] * ϖAer[i] * (1-fᵗ[i]) * Zpp_Aer[i]
-        Z⁻⁺ += τAer[i] * ϖAer[i] * (1-fᵗ[i]) * Zmp_Aer[i]
+        Z⁺⁺ += τAer[i] * ϖAer[i] * (1-fᵗ[i]) * Aer𝐙⁺⁺[i]
+        Z⁻⁺ += τAer[i] * ϖAer[i] * (1-fᵗ[i]) * Aer𝐙⁻⁺[i]
     end
     
     Z⁺⁺ /= A
