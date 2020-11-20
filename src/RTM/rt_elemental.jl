@@ -29,8 +29,11 @@ function rt_elemental(dτ, ϖ, Z⁺⁺, Z⁻⁺, m, ndoubl, scatter, qp_μ, wt_�
         else    
             wct=0.25 * ϖ * wt_μ4
         end
+        #@show size(Diagonal(1 ./ qp_μ4)), size(Z⁻⁺), size(Diagonal(wct) * dτ)
         r⁻⁺ = Diagonal(1 ./ qp_μ4) * Z⁻⁺ * Diagonal(wct) * dτ
         t⁺⁺ = I - (Diagonal(1 ./ qp_μ4) * (I - Z⁺⁺ * Diagonal(wct)) * dτ)
+        #test = I - Diagonal(1 ./ qp_μ4) * dτ
+        #@show t⁺⁺[1],  test[1], 1 ./ qp_μ4[1]
         if ndoubl<1
             for iμ = 1:Nquad4, jμ = 1:Nquad4
                 # That "4" and Nquad4 needs to be dynamic, coming from the PolType struct.
@@ -49,7 +52,7 @@ function rt_elemental(dτ, ϖ, Z⁺⁺, Z⁻⁺, m, ndoubl, scatter, qp_μ, wt_�
             for iμ = 1:Nquad4;
                 i=mod(iμ-1,4)    
                 if (i>=2)
-                    r⁺⁻[iμ,:] = - r⁻⁺[iμ,:]
+                    r⁻⁺[iμ,:] = - r⁻⁺[iμ,:]
                 end
             end 
         end

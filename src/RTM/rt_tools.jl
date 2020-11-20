@@ -15,6 +15,11 @@ function run_RTM(polarization_type, sza, vza, vaz, τRayl,ϖRayl, τAer, ϖAer, 
     Nz = length(τRayl)
     Naer = length(aerosol_optics)
     for m=0:Ltrunc
+        if (m==0)
+            weight=0.5
+        else
+            weight=1.0
+        end
         #compute Zmp_Aer, Zpp_Aer, Zmp_Rayl, Zpp_Rayl
         # For m>=3, Rayleigh matrices will be 0, can catch with if statement if wanted 
         Rayl𝐙⁺⁺, Rayl𝐙⁻⁺ = PhaseFunction.compute_Z_moments(polarization_type, qp_μ, GreekRayleigh, m);
@@ -43,7 +48,7 @@ function run_RTM(polarization_type, sza, vza, vaz, τRayl,ϖRayl, τAer, ϖAer, 
         # loop over vertical layers:
         for iz=1:Nz  #Count from TOA to BOA
             τ, ϖ, Z⁺⁺, Z⁻⁺ = construct_atm_layer(τRayl[iz], τAer[iz,:], ϖRayl[iz], ϖAer, fᵗ, Rayl𝐙⁺⁺, Rayl𝐙⁻⁺, Aer𝐙⁺⁺, Aer𝐙⁻⁺)
-            dτ_max = minimum([τ, minimum(qp_μ)/5])
+            dτ_max = minimum([τ, 0.2*minimum(qp_μ)])
             dτ, ndoubl = doubling_number(dτ_max, τ)
             scatter=false
             if (sum(τAer)>1.e-8)
@@ -81,15 +86,22 @@ function run_RTM(polarization_type, sza, vza, vaz, τRayl,ϖRayl, τAer, ϖAer, 
         
         for i = 1:length(vza)
             iμ = nearest_point(qp_μ, cosd(vza[i])) #input vaz, vza as arrays
+            #@show i, vza[i], cosd(vza[i]), iμ, qp_μ[iμ]
             # compute bigCS
             cos_m_phi = cosd(m * vaz[i])
             sin_m_phi = sind(m * vaz[i])
-            bigCS = Diagonal([cos_m_phi cos_m_phi sin_m_phi sin_m_phi])
+            bigCS = Diagonal([cos_m_phi, cos_m_phi, sin_m_phi, sin_m_phi])
             # accumulate Fourier moments after azimuthal weighting
             #Measurement at the TOA
-            R[i,:] += bigCS * (R⁻⁺[iμ:iμ+3, iμ0:iμ0+3]/wt_μ[iμ0]) * I0
+            st_iμ  = (iμ-1)*4+1
+            st_iμ0 = (iμ0-1)*4+1
+            R[i,:] += weight * bigCS * (R⁻⁺[st_iμ:st_iμ+3, st_iμ0:st_iμ0+3]/wt_μ[iμ0]) * I0
             #Measurement at the BOA
-            T[i,:] += bigCS * (R⁻⁺[iμ:iμ+3, iμ0:iμ0+3]/wt_μ[iμ0]) * I0            
+            T[i,:] += weight * bigCS * (T⁺⁺[st_iμ:st_iμ+3, st_iμ0:st_iμ0+3]/wt_μ[iμ0]) * I0     
+            #if m==0
+            #    @show bigCS
+            #    @show m, i, iμ, bigCS[1,1], weight*R⁻⁺[(iμ-1)*4+1, (iμ0-1)*4+1]/wt_μ[iμ0]   
+            #end
         end
     end  #m
     return R, T  
