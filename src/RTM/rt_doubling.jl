@@ -24,7 +24,7 @@ function rt_doubling(dτ, τ_total, ndoubl, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻)
         i=mod(iμ-1,4)
         j=mod(jμ-1,4)
         #@show i,j
-        if (i<=2)
+        if (i>=2)
             r⁻⁺[iμ,jμ] = - r⁻⁺[iμ, jμ]
         end
         if ((i<=1)&(j<=1)) | ((i>=2)&(j>=2))
