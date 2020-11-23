@@ -4,7 +4,8 @@ module Architectures
 export
     @hascuda,
     AbstractArchitecture, CPU, GPU,
-    devi, architecture, array_type
+    devi, array_type, 
+    default_architecture
 
 using CUDA
 
@@ -45,5 +46,7 @@ devi(::GPU) = KernelAbstractions.CUDADevice()
 
          array_type(::CPU) = Array
 @hascuda array_type(::GPU) = CuArray
+
+default_architecture =  CPU()
 
 end

@@ -1,7 +1,7 @@
 using KernelAbstractions
 using CUDA
 using Parameters
-using ..Architectures: devi
+using ..Architectures: devi, default_architecture
 
 """
 Given the hitran data and necessary parameters, calculate an absorption cross-section at the given pressure, 
@@ -14,13 +14,12 @@ function compute_absorption_cross_section(
                 broadening::AbstractBroadeningFunction, # Broadening function to use
                 grid::Array{<:Real,1},        # Wavelength [nm] or wavenumber [cm-1] grid
                 pressure::Real,               # actual pressure [hPa]
-                temperature::Real;            # actual temperature [K] 
-                # Optionals
-                wavelength_flag::Bool=false,  # Use wavelength in nm (true) or wavenumber cm-1 units (false)
-                wing_cutoff::Real=40,         # Wing cutoff [cm -1]
-                vmr::Real=0,                  # VMR of gas [0-1]
-                CEF::AbstractComplexErrorFunction=ErfcErrorFunction(), # Error function to use (if Voigt broadening)
-                architecture::AbstractArchitecture=Architectures.CPU()
+                temperature::Real,            # actual temperature [K] 
+                wavelength_flag::Bool,  # Use wavelength in nm (true) or wavenumber cm-1 units (false)
+                wing_cutoff::Integer,         # Wing cutoff [cm -1]
+                vmr::Real,                  # VMR of gas [0-1]
+                CEF::AbstractComplexErrorFunction, # Error function to use (if Voigt broadening)
+                architecture::AbstractArchitecture
                 )
 
     # Convert T to float type (ex. if Int)
@@ -46,6 +45,8 @@ function compute_absorption_cross_section(
 
     # Declare the device being used
     device = devi(architecture)
+
+    grid = array_type(architecture)(grid)
 
     # Loop through all transition lines:
     for j in eachindex(hitran.Sᵢ)
@@ -120,7 +121,7 @@ function absorption_cross_section(
                 wavelength_flag::Bool=false  # Use wavelength in nm (true) or wavenumber cm-1 units (false)       
                 )
     FT = typeof(AbstractFloat(model.vmr))
-    return compute_absorption_cross_section(model.hitran, model.broadening, collect(grid), pressure, temperature, wavelength_flag=wavelength_flag, wing_cutoff=model.wing_cutoff, vmr=model.vmr, CEF=model.CEF, architecture=model.architecture)
+    return compute_absorption_cross_section(model.hitran, model.broadening, collect(grid), pressure, temperature, wavelength_flag, model.wing_cutoff, model.vmr, model.CEF, model.architecture)
 
 end
 

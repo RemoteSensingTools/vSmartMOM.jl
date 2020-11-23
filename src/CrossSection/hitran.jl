@@ -68,17 +68,17 @@ end
                       wing_cutoff::Real=40, 
                       vmr::Real=0, 
                       CEF::AbstractComplexErrorFunction=HumlicekWeidemann32SDErrorFunction(), 
-                      architecture = Architectures.CPU())
+                      architecture = default_architecture)
 
 Convenience function to make a HitranModel out of the parameters (Matches make_interpolation_model)
 
 """
 function make_hitran_model(hitran::HitranTable, 
                            broadening::AbstractBroadeningFunction; 
-                           wing_cutoff::Real=40, 
+                           wing_cutoff::Integer=40, 
                            vmr::Real=0, 
                            CEF::AbstractComplexErrorFunction=HumlicekWeidemann32SDErrorFunction(), 
-                           architecture = Architectures.CPU())
+                           architecture = default_architecture)
     
     return HitranModel(hitran=hitran, broadening=broadening , wing_cutoff=wing_cutoff , vmr=vmr, CEF=CEF, architecture=architecture)
 end
