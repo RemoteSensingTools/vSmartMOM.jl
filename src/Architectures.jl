@@ -47,6 +47,6 @@ devi(::GPU) = KernelAbstractions.CUDADevice()
          array_type(::CPU) = Array
 @hascuda array_type(::GPU) = CuArray
 
-default_architecture =  CPU()
+default_architecture = has_cuda() ? GPU() : CPU()
 
 end
