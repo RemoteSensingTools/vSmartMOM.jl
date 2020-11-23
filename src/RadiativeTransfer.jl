@@ -3,20 +3,15 @@ using Pkg.Artifacts
 using LinearAlgebra
 using Distributions
 using CUDA
-using KernelAbstractions
 
 # Export Architecture functions
-export Architectures, CPU, GPU, device
-
-# Export the Cross Section models
-export HitranModel, InterpolationModel
+export CPU, GPU, default_architecture, array_type
 
 # Export the artifact convenience function
 export artifact
 
 # GPU/CPU Architecture (from Oceanigans)
 include("Architectures.jl")
-
 using .Architectures
 
 # Artifacts

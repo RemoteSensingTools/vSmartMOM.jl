@@ -12,7 +12,7 @@
                     wing_cutoff::Real=40, 
                     vmr::Real=0, 
                     CEF::AbstractComplexErrorFunction=HumlicekWeidemann32SDErrorFunction(),
-                    architecture::AbstractArchitecture=Architectures.CPU() )
+                    architecture::AbstractArchitecture=default_architecture )
 
 Using a HitranModel, create an InterpolationModel by interpolating the lineshape function 
 at the given pressure and temperature grids
@@ -27,10 +27,10 @@ function make_interpolation_model(
                                   t_grid::AbstractRange{<:Real}; 
                                   # Optionals
                                   wavelength_flag::Bool=false,
-                                  wing_cutoff::Real=40, 
+                                  wing_cutoff::Integer=40, 
                                   vmr::Real=0, 
                                   CEF::AbstractComplexErrorFunction=HumlicekWeidemann32SDErrorFunction(),
-                                  architecture::AbstractArchitecture=Architectures.CPU()     # Computer `Architecture` on which `Model` is run
+                                  architecture::AbstractArchitecture=default_architecture     # Computer `Architecture` on which `Model` is run
                                 )
 
     # Convert from wavelength to wavenumber if necessary
@@ -42,7 +42,7 @@ function make_interpolation_model(
     # Calculate all the cross-sections at the pressure and temperature grids
     @showprogress 1 "Computing Cross Sections for Interpolation..." for i in 1:length(p_grid)
         for j in 1:length(t_grid)
-            cs_matrix[i,j,:] = compute_absorption_cross_section(hitran, broadening, collect(ν_grid), p_grid[i], t_grid[j], wavelength_flag=wavelength_flag, wing_cutoff=wing_cutoff, vmr=vmr, CEF=CEF, architecture=architecture)
+            cs_matrix[i,j,:] = Array(compute_absorption_cross_section(hitran, broadening, collect(ν_grid), p_grid[i], t_grid[j], wavelength_flag, wing_cutoff, vmr, CEF, architecture))
         end
     end
     

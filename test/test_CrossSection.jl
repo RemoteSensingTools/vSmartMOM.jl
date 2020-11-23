@@ -94,21 +94,21 @@ end
 
     # Get the test data
     CO2_file = artifact("CO2")
-    test_ht = CrossSection.read_hitran(CO2_file, iso=1, ν_min=6000, ν_max=6400)
+    test_ht = CrossSection.read_hitran(CO2_file, mol=2, iso=1, ν_min=6000, ν_max=6400)
 
     grid = 6000:0.01:6400;
 
     # Threshold -- our value must be within ϵ of the HAPI value
-    ϵ = 3.5e-27
+    ϵ = 3.6e-27
 
     # Create a HitranModel 
-    model = make_hitran_model(test_ht, Voigt(), CEF=ErfcHumliErrorFunctionVoigt())
+    model = make_hitran_model(test_ht, Voigt(), CEF=HumlicekWeidemann32SDErrorFunction())
 
     # Loop over every temperature/pressure combo and test that the results match HAPI
     @showprogress 1 "Testing HAPI equivalence (On CO2 Band)..." for temp in temperatures
         for pres in pressures
             jl_cs = absorption_cross_section(model, grid, pres, temp)
-            py_cs = readdlm("helper/Voigt_CO2_T" * string(temp) * "_P" * string(pres) * ".csv")
+            py_cs = array_type(default_architecture)(readdlm("helper/Voigt_CO2_T" * string(temp) * "_P" * string(pres) * ".csv"))
             Δcs = abs.(jl_cs - py_cs)
             @test maximum(Δcs) < ϵ
         end
@@ -132,10 +132,10 @@ end
         # Get the test data
         test_ht = CrossSection.read_hitran(artifact(name), iso=1, ν_min=6000, ν_max=6400)
         # Create a HitranModel 
-        model = make_hitran_model(test_ht, Voigt(), CEF=ErfcHumliErrorFunctionVoigt())
+        model = make_hitran_model(test_ht, Voigt(), CEF=HumlicekWeidemann32SDErrorFunction())
 
         jl_cs = absorption_cross_section(model, grid, pres, temp)
-        py_cs = readdlm("helper/Voigt_" * name * "_T250_P1000.csv")
+        py_cs = array_type(default_architecture)(readdlm("helper/Voigt_" * name * "_T250_P1000.csv"))
         Δcs = abs.(jl_cs - py_cs)
         @test maximum(Δcs) < ϵ
     end
@@ -160,10 +160,10 @@ end
 
     # Create the Interpolation Model
     interp_model = make_interpolation_model(test_ht, Voigt(), ν_grid, pressures, 
-                                            temperatures, CEF=ErfcHumliErrorFunctionVoigt()) 
+                                            temperatures, CEF=HumlicekWeidemann32SDErrorFunction()) 
 
     # Threshold -- our value must be within ϵ of the HAPI value
-    ϵ = 3.5e-27
+    ϵ = 3.6e-27
 
     # Loop over every temperature/pressure combo and test that the results match HAPI
     for temp in temperatures
