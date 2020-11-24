@@ -2,6 +2,8 @@
 ##### Functions to deal with a cross-section interpolator
 #####
 
+using ..Architectures: GPU
+
 """
     $(FUNCTIONNAME)(hitran::HitranTable, 
                     broadening::AbstractBroadeningFunction, 
@@ -32,6 +34,11 @@ function make_interpolation_model(
                                   CEF::AbstractComplexErrorFunction=HumlicekWeidemann32SDErrorFunction(),
                                   architecture::AbstractArchitecture=default_architecture     # Computer `Architecture` on which `Model` is run
                                 )
+
+    # Warn user if using incompatible/untested CEF
+    if architecture isa GPU && !(CEF isa HumlicekWeidemann32SDErrorFunction)
+        @warn "Cross-section calculations on GPU may or may not work with this CEF (use HumlicekWeidemann32SDErrorFunction if you encounter issues)"
+    end
 
     # Convert from wavelength to wavenumber if necessary
     ν_grid = wavelength_flag ? reverse(nm_per_m ./ wave_grid) : wave_grid
