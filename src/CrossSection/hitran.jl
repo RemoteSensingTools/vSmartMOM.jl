@@ -10,7 +10,9 @@ using ..Architectures: GPU
 Read/parse a HITRAN data file and return the data in [`HitranTable`](@ref) format
 
 """
-function read_hitran(filepath::String; mol::Int=-1, iso::Int=-1, ν_min::Real=0, ν_max::Real=Inf)
+function read_hitran(filepath::String; mol::Int=-1, iso::Int=-1, 
+                     ν_min::Real=0, ν_max::Real=Inf, 
+                     min_strength::Real=0)
 
     # Infer type from input ν_min
     FT = eltype(AbstractFloat(ν_min))
@@ -43,8 +45,9 @@ function read_hitran(filepath::String; mol::Int=-1, iso::Int=-1, ν_min::Real=0,
             # Go from a line to a list of values
             values = [varTypes[i] == String ? ln[(idxRanges[i]+1):idxRanges[i+1]] : something(tryparse(varTypes[i], ln[(idxRanges[i]+1):idxRanges[i+1]]), varTypes[i](0)) for i in 1:(length(varLengths))]
 
-            # Check that the search criteria are met (molecule, isotope and wavenumber range)
-            if((values[1] == mol || mol == -1) && (values[2] == iso || iso == -1) && (ν_min <= values[3] <= ν_max))
+            # Check that the search criteria are met (molecule, isotope, wavenumber range, and min. line-strength)
+            if((values[1] == mol || mol == -1) && (values[2] == iso || iso == -1) 
+                && (ν_min <= values[3] <= ν_max) && values[4] >= min_strength)
 
                 # Add this row to the list of rows
                 rows = append!(rows, [values])
