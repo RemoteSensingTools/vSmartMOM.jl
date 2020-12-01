@@ -44,12 +44,12 @@ function read_atmos_profile(file::String, lat::Real, lon::Real, timeIndex; g₀=
     iLon = argmin(abs.(lon_ .- lon))
 
     # Temperature profile
-    T    = convert(Array{FT,1}, ds["T"][iLat, iLon, :, timeIndex])
+    T    = convert(Array{FT,1}, ds["T"][iLon,iLat,  :, timeIndex])
     # specific humidity profile
-    q    = convert(Array{FT,1}, ds["QV"][iLat, iLon, :, timeIndex])
+    q    = convert(Array{FT,1}, ds["QV"][iLon, iLat, :, timeIndex])
     
     # Surafce pressure
-    psurf = convert(FT, ds["PS"][iLat, iLon, timeIndex])
+    psurf = convert(FT, ds["PS"][iLon, iLat,timeIndex])
     
     # AK and BK global attributes (important to calculate pressure half-levels)
     ak = ds.attrib["HDF_GLOBAL.ak"][:]
@@ -89,12 +89,14 @@ function getRayleighLayerOptProp(psurf, λ, depol_fct, vcd_dry)
     # Total vertical Rayleigh scattering optical thickness 
     tau_scat = 0.00864 * (psurf/1013.25) * λ^(-3.916 - 0.074*λ - 0.05/λ) 
     tau_scat = tau_scat*(6.0+3.0*depol_fct)/(6.0-7.0*depol_fct)
+    @show psurf, tau_scat, depol_fct
     Nz = length(vcd_dry)
     τRayl = zeros(Nz)
     k = tau_scat/sum(vcd_dry)
     for i = 1:Nz
         τRayl[i] = k * vcd_dry[i]
     end
+
     return τRayl
 end
 
@@ -129,7 +131,7 @@ function construct_atm_layer(τRayl, τAer, ϖRayl, ϖAer, fᵗ, Rayl𝐙⁺⁺,
         fill!(Z⁺⁺,0); fill!(Z⁻⁺,0);
         return FT(0), FT(1), Z⁺⁺, Z⁻⁺
     end
-    
+    # @show τRayl, ϖRayl
     τ += τRayl
     ϖ += τRayl * ϖRayl
     A += τRayl * ϖRayl

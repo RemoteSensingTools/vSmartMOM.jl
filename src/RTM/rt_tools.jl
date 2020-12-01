@@ -14,7 +14,8 @@ function run_RTM(polarization_type, sza, vza, vaz, τRayl,ϖRayl, τAer, ϖAer, 
     #compute Rayleigh SSP
     Nz = length(τRayl)
     Naer = length(aerosol_optics)
-    for m=0:Ltrunc
+    for m=0:Ltrunc-1
+        @show m
         if (m==0)
             weight=0.5
         else
@@ -53,7 +54,7 @@ function run_RTM(polarization_type, sza, vza, vaz, τRayl,ϖRayl, τAer, ϖAer, 
             scatter=false
             if (sum(τAer)>1.e-8)
                 scatter=true
-            elseif (τRayl>1.e-8) & (m<3)
+            elseif (τRayl[iz]>1.e-8) & (m<3)
                 scatter=true
             end        
             if (scatter)
@@ -63,7 +64,7 @@ function run_RTM(polarization_type, sza, vza, vaz, τRayl,ϖRayl, τAer, ϖAer, 
                 r⁻⁺ = 0
                 r⁺⁻ = 0
                 for i = 1:Nquad4
-                    ii=1+floor((i-1)/4)
+                    ii=1+floor(Int,(i-1)/4)
                     t⁺⁺[i,i] = exp(-τ/qp_μ[ii])
                     t⁻⁻[i,i] = exp(-τ/qp_μ[ii])
                 end
@@ -95,6 +96,8 @@ function run_RTM(polarization_type, sza, vza, vaz, τRayl,ϖRayl, τAer, ϖAer, 
             #Measurement at the TOA
             st_iμ  = (iμ-1)*4+1
             st_iμ0 = (iμ0-1)*4+1
+            #@show st_iμ:st_iμ+3, iμ0,st_iμ0:st_iμ0+3
+            #@show size(R⁻⁺)
             R[i,:] += weight * bigCS * (R⁻⁺[st_iμ:st_iμ+3, st_iμ0:st_iμ0+3]/wt_μ[iμ0]) * I0
             #Measurement at the BOA
             T[i,:] += weight * bigCS * (T⁺⁺[st_iμ:st_iμ+3, st_iμ0:st_iμ0+3]/wt_μ[iμ0]) * I0     
