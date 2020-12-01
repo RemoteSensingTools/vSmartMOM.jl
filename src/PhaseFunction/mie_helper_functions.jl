@@ -38,7 +38,7 @@ function compute_mie_ab!(size_param, refractive_idx::Number, an, bn, Dn)
 
     # Make sure downward recurrence starts higher up 
     # (at least 15, check eq. A9 in de Rooij and Stap, 1984, may need to check what is needed)
-    nmx = round(Int, max(n_max, abs(y)) + 50)
+    nmx = length(Dn)
     @assert size(an)[1] >= n_max
     @assert size(an) == size(bn)
     fill!(Dn, 0);
@@ -260,6 +260,7 @@ function compute_wₓ(size_distribution, wᵣ, r, r_max)
     wₓ .*= wᵣ                           # pre multiply with wᵣ to get proper means eventually:
 
     # normalize (could apply a check whether cdf.(size_distribution,r_max) is larger than 0.99:
+    #println("Test")
     @info "Fraction of size distribution cut by max radius: $((1-cdf.(size_distribution,r_max))*100) %"  
     wₓ /= sum(wₓ)
     return wₓ
