@@ -53,9 +53,7 @@ nothing #hide
 ---
 simple example of how to use the Documentation, add `?` in front and get the DocStrings of aerosol_optics_NAI2 :
 
-```@example Tutorial_PhaseFunction
-?aerosol_optics_NAI2
-```
+# ?aerosol_optics_NAI2 # (remove comment)
 
 ---
 ### Let's plot the greek coefficients

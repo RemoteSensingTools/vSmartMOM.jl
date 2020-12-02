@@ -8,7 +8,12 @@ packages
 *.f90
 .vscode
 Manifest.toml
-# *.csv
-
 docs/build/*
-Manifest.toml
+src/CrossSection/local_only
+clones/
+conda/
+registries/
+test/precompile
+wigner_values_sparse.jld
+wigner_values.jld
+*.pyc

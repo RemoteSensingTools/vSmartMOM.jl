@@ -2,13 +2,17 @@
 ##### Function to parse hitran par-file data
 #####
 
+using ..Architectures: GPU
+
 """
     read_hitran(filepath::String, mol::Int=-1, iso::Int=-1, ν_min::Real=0, ν_max::Real=Inf)
 
 Read/parse a HITRAN data file and return the data in [`HitranTable`](@ref) format
 
 """
-function read_hitran(filepath::String; mol::Int=-1, iso::Int=-1, ν_min::Real=0, ν_max::Real=Inf)
+function read_hitran(filepath::String; mol::Int=-1, iso::Int=-1, 
+                     ν_min::Real=0, ν_max::Real=Inf, 
+                     min_strength::Real=0)
 
     # Infer type from input ν_min
     FT = eltype(AbstractFloat(ν_min))
@@ -39,10 +43,11 @@ function read_hitran(filepath::String; mol::Int=-1, iso::Int=-1, ν_min::Real=0,
         for ln in eachline(file)
 
             # Go from a line to a list of values
-            values = [varTypes[i] == String ? ln[(idxRanges[i]+1):idxRanges[i+1]] : tryparse(varTypes[i], ln[(idxRanges[i]+1):idxRanges[i+1]]) for i in 1:(length(varLengths))]
+            values = [varTypes[i] == String ? ln[(idxRanges[i]+1):idxRanges[i+1]] : something(tryparse(varTypes[i], ln[(idxRanges[i]+1):idxRanges[i+1]]), varTypes[i](0)) for i in 1:(length(varLengths))]
 
-            # Check that the search criteria are met (molecule, isotope and wavenumber range)
-            if((values[1] == mol || mol == -1) && (values[2] == iso || iso == -1) && (ν_min <= values[3] <= ν_max))
+            # Check that the search criteria are met (molecule, isotope, wavenumber range, and min. line-strength)
+            if((values[1] == mol || mol == -1) && (values[2] == iso || iso == -1) 
+                && (ν_min <= values[3] <= ν_max) && values[4] >= min_strength)
 
                 # Add this row to the list of rows
                 rows = append!(rows, [values])
@@ -68,17 +73,21 @@ end
                       wing_cutoff::Real=40, 
                       vmr::Real=0, 
                       CEF::AbstractComplexErrorFunction=HumlicekWeidemann32SDErrorFunction(), 
-                      architecture = Architectures.CPU())
+                      architecture = default_architecture)
 
 Convenience function to make a HitranModel out of the parameters (Matches make_interpolation_model)
 
 """
 function make_hitran_model(hitran::HitranTable, 
                            broadening::AbstractBroadeningFunction; 
-                           wing_cutoff::Real=40, 
+                           wing_cutoff::Integer=40, 
                            vmr::Real=0, 
                            CEF::AbstractComplexErrorFunction=HumlicekWeidemann32SDErrorFunction(), 
-                           architecture = Architectures.CPU())
-    
+                           architecture = default_architecture)
+
+    if architecture isa GPU && !(CEF isa HumlicekWeidemann32SDErrorFunction)
+        @warn "Cross-section calculations on GPU may or may not work with this CEF (use HumlicekWeidemann32SDErrorFunction if you encounter issues)"
+    end
+
     return HitranModel(hitran=hitran, broadening=broadening , wing_cutoff=wing_cutoff , vmr=vmr, CEF=CEF, architecture=architecture)
 end
