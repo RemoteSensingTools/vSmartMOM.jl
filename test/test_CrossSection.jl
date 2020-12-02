@@ -8,7 +8,9 @@
     #### especially that molecule/isotope match and ν between ν_min and ν_max)
     ####
 
-    test_ht = CrossSection.read_hitran("helper/testCO2.data", mol=2, iso=1, ν_min=6000, ν_max=6400)
+    CO2_test_file = "helper/testCO2.data"
+
+    test_ht = CrossSection.read_hitran(CO2_test_file, mol=2, iso=1, ν_min=6000, ν_max=6400)
     @test test_ht.mol == [2, 2, 2, 2] && test_ht.mol[1] isa Int64
     @test test_ht.iso == [1, 1, 1, 1] && test_ht.iso[1] isa Int64
     @test test_ht.νᵢ == [6000.542970, 6286.403343, 6317.417493, 6380.824116] && test_ht.νᵢ[1] isa Float64
@@ -34,36 +36,36 @@
     ####
 
     # Not specifying the molecule #
-    test_ht = CrossSection.read_hitran("helper/testCO2.data", iso=1, ν_min=6000, ν_max=6400)
+    test_ht = CrossSection.read_hitran(CO2_test_file, iso=1, ν_min=6000, ν_max=6400)
     @test test_ht.mol == [1, 2, 2, 2, 2]
     @test test_ht.iso == [1, 1, 1, 1, 1]
     @test test_ht.νᵢ == [6286.403343, 6000.542970, 6286.403343, 6317.417493, 6380.824116]
     @test test_ht.g″ == [69.0, 9.0, 69.0, 81.0, 103.0]
 
     # Not specifying the isotope #
-    test_ht = CrossSection.read_hitran("helper/testCO2.data", mol=2, ν_min=6000, ν_max=6400)
+    test_ht = CrossSection.read_hitran(CO2_test_file, mol=2, ν_min=6000, ν_max=6400)
     @test test_ht.mol == [2, 2, 2, 2, 2]
     @test test_ht.iso == [2, 1, 1, 1, 1]
     @test test_ht.νᵢ == [6000.542970, 6000.542970, 6286.403343, 6317.417493, 6380.824116]
     @test test_ht.g″ == [9.0, 9.0, 69.0, 81.0, 103.0]
 
     # Not specifying the molecule # OR isotope #
-    test_ht = CrossSection.read_hitran("helper/testCO2.data", ν_min=6000, ν_max=6400)
+    test_ht = CrossSection.read_hitran(CO2_test_file, ν_min=6000, ν_max=6400)
     @test test_ht.mol == [1, 2, 2, 2, 2, 2]
     @test test_ht.iso == [1, 2, 1, 1, 1, 1]
     @test test_ht.νᵢ == [6286.403343, 6000.542970, 6000.542970, 6286.403343, 6317.417493, 6380.824116]
     @test test_ht.g″ == [69.0, 9.0, 9.0, 69.0, 81.0, 103.0]
 
     # Not specifying ν_min
-    test_ht = CrossSection.read_hitran("helper/testCO2.data", mol=2, iso=1, ν_max=6400)
+    test_ht = CrossSection.read_hitran(CO2_test_file, mol=2, iso=1, ν_max=6400)
     @test length(test_ht.mol) == 9
 
     # Not specifying ν_max
-    test_ht = CrossSection.read_hitran("helper/testCO2.data", mol=2, iso=1, ν_min=6000)
+    test_ht = CrossSection.read_hitran(CO2_test_file, mol=2, iso=1, ν_min=6000)
     @test length(test_ht.mol) == 7
 
     # Not specifying ν_min OR ν_max
-    test_ht = CrossSection.read_hitran("helper/testCO2.data", mol=2, iso=1)
+    test_ht = CrossSection.read_hitran(CO2_test_file, mol=2, iso=1)
     @test length(test_ht.mol) == 12
 
 end
@@ -91,21 +93,22 @@ end
     temperatures = 100:75:400 
 
     # Get the test data
-    test_ht = CrossSection.read_hitran("helper/CO2.data", ν_min=6000, ν_max=6400)
+    CO2_file = artifact("CO2")
+    test_ht = CrossSection.read_hitran(CO2_file, mol=2, iso=1, ν_min=6000, ν_max=6400)
 
     grid = 6000:0.01:6400;
 
     # Threshold -- our value must be within ϵ of the HAPI value
-    ϵ = 3.5e-27
+    ϵ = 3.6e-27
 
     # Create a HitranModel 
-    model = make_hitran_model(test_ht, Voigt(), CEF=ErfcHumliErrorFunctionVoigt())
+    model = make_hitran_model(test_ht, Voigt(), CEF=HumlicekWeidemann32SDErrorFunction())
 
     # Loop over every temperature/pressure combo and test that the results match HAPI
     @showprogress 1 "Testing HAPI equivalence (On CO2 Band)..." for temp in temperatures
         for pres in pressures
             jl_cs = absorption_cross_section(model, grid, pres, temp)
-            py_cs = readdlm("helper/Voigt_CO2_T" * string(temp) * "_P" * string(pres) * ".csv")
+            py_cs = array_type(default_architecture)(readdlm("helper/Voigt_CO2_T" * string(temp) * "_P" * string(pres) * ".csv"))
             Δcs = abs.(jl_cs - py_cs)
             @test maximum(Δcs) < ϵ
         end
@@ -115,9 +118,9 @@ end
     #### Now test HAPI equivalence with other molecules
     ####
 
-    names = ["H2O", "CO2", "O3", "N2O", "CO"]#, "CH4", "O2", "NO", "SO2", "NO2"]
-    molecules = [1, 2, 3, 4, 5]#, 6, 7, 8, 9, 10]
-    isotopes = [1, 1, 1, 1, 1]#, 2, 1, 2, 1, 1]
+    names = ["H2O", "CO2", "O3", "N2O", "CO"]
+    molecules = [1, 2, 3, 4, 5]
+    isotopes = [1, 1, 1, 1, 1]
 
     # Loop over every temperature/pressure combo and test that the results match HAPI
     # (Doing this for other molecules)
@@ -127,12 +130,12 @@ end
         temp = 250
 
         # Get the test data
-        test_ht = CrossSection.read_hitran("helper/" * name * ".data", ν_min=6000, ν_max=6400)
+        test_ht = CrossSection.read_hitran(artifact(name), iso=1, ν_min=6000, ν_max=6400)
         # Create a HitranModel 
-        model = make_hitran_model(test_ht, Voigt(), CEF=ErfcHumliErrorFunctionVoigt())
+        model = make_hitran_model(test_ht, Voigt(), CEF=HumlicekWeidemann32SDErrorFunction())
 
         jl_cs = absorption_cross_section(model, grid, pres, temp)
-        py_cs = readdlm("helper/Voigt_" * name * "_T250_P1000.csv")
+        py_cs = array_type(default_architecture)(readdlm("helper/Voigt_" * name * "_T250_P1000.csv"))
         Δcs = abs.(jl_cs - py_cs)
         @test maximum(Δcs) < ϵ
     end
@@ -146,7 +149,7 @@ end
     println("Testing absorption_cross_section_interpolator...")
 
     # Get the test data
-    test_ht = CrossSection.read_hitran("helper/CO2.data", ν_min=6000, ν_max=6400)
+    test_ht = CrossSection.read_hitran(artifact("CO2"), iso=1, ν_min=6000, ν_max=6400)
 
     # Pressure and temperature grids
     pressures = 250:250:1250
@@ -157,10 +160,10 @@ end
 
     # Create the Interpolation Model
     interp_model = make_interpolation_model(test_ht, Voigt(), ν_grid, pressures, 
-                                            temperatures, CEF=ErfcHumliErrorFunctionVoigt()) 
+                                            temperatures, CEF=HumlicekWeidemann32SDErrorFunction()) 
 
     # Threshold -- our value must be within ϵ of the HAPI value
-    ϵ = 3.5e-27
+    ϵ = 3.6e-27
 
     # Loop over every temperature/pressure combo and test that the results match HAPI
     for temp in temperatures
