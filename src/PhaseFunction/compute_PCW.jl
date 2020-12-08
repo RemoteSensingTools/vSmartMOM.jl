@@ -82,11 +82,15 @@ function compute_aerosol_optical_properties(model::MieModel{FDT}) where FDT<:PCW
     end
 
     # Create GreekCoefs object with α, β, γ, δ, ϵ, ζ (in that order)
-    greek_coefs = GreekCoefs(greek_coefs[3,:], greek_coefs[1,:], greek_coefs[5,:], 
-                  greek_coefs[2,:], greek_coefs[6,:], greek_coefs[4,:])
+    greek_coefs = GreekCoefs(greek_coefs[3,:], 
+                             greek_coefs[1,:], 
+                             greek_coefs[5,:], 
+                             greek_coefs[2,:], 
+                             greek_coefs[6,:], 
+                             greek_coefs[4,:])
 
     # Return the packaged AerosolOptics object
-    return AerosolOptics(greek_coefs=greek_coefs, ω̃=avg_C_scatt, k=avg_C_ext) 
+    return AerosolOptics(greek_coefs=greek_coefs, ω̃=avg_C_scatt/avg_C_ext, k=avg_C_ext) 
 end
 
 
