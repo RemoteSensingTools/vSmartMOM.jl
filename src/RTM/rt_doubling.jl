@@ -1,4 +1,10 @@
 
+function invCUDA(d_A)
+    pivot, info = CUBLAS.getrf_batched!(d_A, true)
+    pivot, info, d_C = CUBLAS.getri_batched(d_A, pivot)
+    return d_C
+end
+
 "Prototype doubling methods, compute homogenous layer matrices from its elemental layer in `ndoubl` doubling steps"
 function rt_doubling(dτ, τ_total, ndoubl, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻)
     # # ToDo: Important output doubling applied to elemental layer, using same variables r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺ (can be renamed to t⁺⁺, etc)
@@ -10,9 +16,11 @@ function rt_doubling(dτ, τ_total, ndoubl, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻)
     end
     τ_total=dτ
     for n = 1:ndoubl
-        M1=inv(I - r⁻⁺ * r⁻⁺)
-        tr⁻⁺ = r⁻⁺ + t⁺⁺ * r⁻⁺ * M1 * t⁺⁺
-        tt⁺⁺ = t⁺⁺ * M1 * t⁺⁺
+        # M1=inv(I - r⁻⁺ * r⁻⁺)
+        # M1 = invCUDA([CuArray(I - r⁻⁺ * r⁻⁺)][1]
+        M1 = (I - r⁻⁺ * r⁻⁺) \ t⁺⁺
+        tr⁻⁺ = r⁻⁺ + t⁺⁺ * r⁻⁺ * M1 # M1 * t⁺⁺
+        tt⁺⁺ = t⁺⁺ * M1 # M1 * t⁺⁺
 
         r⁻⁺ = tr⁻⁺
         t⁺⁺ = tt⁺⁺

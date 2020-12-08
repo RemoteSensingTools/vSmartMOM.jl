@@ -1,5 +1,5 @@
 "Elemental single-scattering layer"
-function rt_elemental(dτ, ϖ, Z⁺⁺, Z⁻⁺, m, ndoubl, scatter, qp_μ, wt_μ)
+function rt_elemental(dτ, ϖ, Z⁺⁺, Z⁻⁺, m, ndoubl, scatter, qp_μ, wt_μ, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻)
     # ToDo: Main output is r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺ (can be renamed to t⁺⁺, etc)
     # Need to check with paper nomenclature. This is basically eqs. 19-20 in vSmartMOM
 
@@ -10,11 +10,11 @@ function rt_elemental(dτ, ϖ, Z⁺⁺, Z⁻⁺, m, ndoubl, scatter, qp_μ, wt_�
     #n: layer of which this is an elemental
     #ndoubl: number of doubling computations needed to progress from the elemental layer to the full homogeneous layer n
     #scatter: flag indicating scattering
-    dims = size(Z⁺⁺)
-    r⁻⁺ = zeros(dims)
-    t⁺⁺ = zeros(dims)
-    r⁺⁻ = zeros(dims)
-    t⁻⁻ = zeros(dims)
+    # dims = size(Z⁺⁺)
+    #  = zeros(dims)
+    #  = zeros(dims)
+    #  = zeros(dims)
+    #  = zeros(dims)
     if scatter
         #TODO: import vector containing quadrature cosines qp_μ of length Nquad4
         #TODO: import vector containing quadrature weights wt_μ of length Nquad4
@@ -24,11 +24,8 @@ function rt_elemental(dτ, ϖ, Z⁺⁺, Z⁻⁺, m, ndoubl, scatter, qp_μ, wt_�
         wt_μ4 = reduce(vcat, (fill.(wt_μ,[4])))
         Nquad4 = length(qp_μ4)
 
-        if m==0
-            wct=0.50 * ϖ * wt_μ4 
-        else    
-            wct=0.25 * ϖ * wt_μ4
-        end
+        wct = m==0 ? 0.50 * ϖ * wt_μ4 : 0.25 * ϖ * wt_μ4
+
         #@show size(Diagonal(1 ./ qp_μ4)), size(Z⁻⁺), size(Diagonal(wct) * dτ)
         r⁻⁺ = Diagonal(1 ./ qp_μ4) * Z⁻⁺ * Diagonal(wct) * dτ
         t⁺⁺ = I - (Diagonal(1 ./ qp_μ4) * (I - Z⁺⁺ * Diagonal(wct)) * dτ)
@@ -39,7 +36,7 @@ function rt_elemental(dτ, ϖ, Z⁺⁺, Z⁻⁺, m, ndoubl, scatter, qp_μ, wt_�
                 # That "4" and Nquad4 needs to be dynamic, coming from the PolType struct.
                 i=mod(iμ-1,4)
                 j=mod(jμ-1,4)
-                if ((i<=1)&(j<=1)) | ((i>=2)&(j>=2))
+                if ((i<=1)&&(j<=1)) || ((i>=2)&&(j>=2))
                     r⁺⁻[iμ,jμ] = r⁻⁺[iμ,jμ]
                     t⁻⁻[iμ,jμ] = t⁺⁺[iμ,jμ]
                 else
