@@ -13,6 +13,11 @@ function rt_interaction(kn, R⁻⁺, T⁺⁺, R⁺⁻, T⁻⁻, r⁻⁺, t⁺⁺
             T⁻⁻[iμ, iμ] = t⁻⁻[iμ, iμ]*T⁻⁻[iμ, iμ]
             T⁺⁺[iμ, iμ] = t⁺⁺[iμ, iμ]*T⁺⁺[iμ, iμ]
         end
+
+        # diag_ind = diagind(T⁻⁻)[1:Nquad4]
+        # T⁻⁻[diag_ind] = t⁻⁻[diag_ind] .* T⁻⁻[diag_ind]
+        # T⁺⁺[diag_ind] = t⁺⁺[diag_ind] .* T⁺⁺[diag_ind]
+
         return R⁻⁺, T⁺⁺, R⁺⁻, T⁻⁻
     elseif kn==2
         # No scattering in inhomogeneous composite layer.
@@ -40,13 +45,17 @@ function rt_interaction(kn, R⁻⁺, T⁺⁺, R⁺⁻, T⁻⁻, r⁻⁺, t⁺⁺
         # scattering in homogeneous layer which is 
         # added to the bottom of the composite layer.
         # Produces a new, scattering composite layer.
-        M1 = inv(I - R⁺⁻ * r⁻⁺)
-        t_R⁻⁺ = R⁻⁺ + T⁻⁻ * r⁻⁺ * M1 * T⁺⁺
-        t_T⁺⁺ = t⁺⁺ * M1 * T⁺⁺
+        # M1 = inv(I - R⁺⁻ * r⁻⁺)
+        M1 = (I - R⁺⁻ * r⁻⁺) \ T⁺⁺
+        t_R⁻⁺ = R⁻⁺ + T⁻⁻ * r⁻⁺ * M1 # M1 * T⁺⁺
+        t_T⁺⁺ = t⁺⁺ * M1 # M1 * T⁺⁺
+
         #repeating for mirror-reflected directions
-        M1 = inv(I - r⁻⁺ * R⁺⁻)
-        t_R⁺⁻ = r⁺⁻ + t⁺⁺ * R⁺⁻ * M1 * t⁻⁻
-        t_T⁻⁻ = T⁺⁺ * M1 * t⁻⁻
+        # M1 = inv(I - r⁻⁺ * R⁺⁻)
+        M1 = (I - r⁻⁺ * R⁺⁻) \ t⁻⁻
+        t_R⁺⁻ = r⁺⁻ + t⁺⁺ * R⁺⁻ * M1 # M1 * t⁻⁻
+        t_T⁻⁻ = T⁺⁺ * M1 # M1 * t⁻⁻
+
         return t_R⁻⁺, t_T⁺⁺, t_R⁺⁻, t_T⁻⁻
     end
 end
