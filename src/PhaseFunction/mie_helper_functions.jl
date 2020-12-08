@@ -346,9 +346,11 @@ function compute_Z_moments(mod::AbstractPolarizationType, μ, greek_coefs::Greek
     @unpack α, β, γ, δ, ϵ, ζ = greek_coefs
     FT = eltype(β)
     n = length(μ)
+
     # Change from 0-index to 1-index (i.e. the lowest m is 0 ), 
     # make more logical later to avoid confusion later (m=0 has a meaning!!)
     m = m+1
+    
     # Set prefactor for moments (note 1-notation for `m` here):
     fact = (m == 1) ? 0.5 : 1.0
 
