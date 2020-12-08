@@ -1,72 +1,53 @@
 
-using NCDatasets
-using ProgressMeter
-
-using Distributions
-using Interpolations
-using Polynomials
-using DelimitedFiles
-
-
-
-
-"Struct for an atmospheric profile"
-struct AtmosphericProfile{FT}
-    lat::FT
-    lon::FT
-    psurf::FT
-    T::Array{FT,1}
-    q::Array{FT,1}
-    p::Array{FT,1}
-    p_levels::Array{FT,1}
-    vmr_h2o::Array{FT,1}
-    vcd_dry::Array{FT,1}
-    vcd_h2o::Array{FT,1}
-end;
-
-
 "Read atmospheric profile (just works for our file, can be generalized"
-function read_atmos_profile(file::String, lat::Real, lon::Real, timeIndex; g₀=9.8196)
-    @assert 1 <= timeIndex <= 4
+function read_atmos_profile(file::String, lat::Real, lon::Real, time_idx::Int; g₀=9.8196)
 
+    # Time index must be ∈ [1, 2, 3, 4]
+    @assert 1 <= time_idx <= 4
+
+    # Load in the atmospheric profile
     ds = Dataset(file)
 
-    # See how easy it is to actually extract data? Note the [:] in the end reads in ALL the data in one step
-    lat_   = ds["YDim"][:]
-    lon_   = ds["XDim"][:]
+    # See how easy it is to actually extract data? 
+    # Note the [:] in the end reads in ALL the data in one step
+    file_lats, file_lons = ds["YDim"][:], ds["XDim"][:]
     
-    FT = eltype(lat_)
-    lat = FT(lat)
-    lon = FT(lon)
+    # Convert the input lat/lon to right type
+    FT = eltype(file_lats)
+    lat, lon = FT(lat), FT(lon)
     
     # Find index (nearest neighbor, one could envision interpolation in space and time!):
-    iLat = argmin(abs.(lat_ .- lat))
-    iLon = argmin(abs.(lon_ .- lon))
+    lat_idx, lon_idx = argmin(abs.(file_lats .- lat)), argmin(abs.(file_lons .- lon))
 
     # Temperature profile
-    T    = convert(Array{FT,1}, ds["T"][iLon,iLat,  :, timeIndex])
-    # specific humidity profile
-    q    = convert(Array{FT,1}, ds["QV"][iLon, iLat, :, timeIndex])
+    T = convert(Array{FT,1}, ds["T"][lon_idx, lat_idx,  :, time_idx])
+
+    # Specific humidity profile
+    q = convert(Array{FT,1}, ds["QV"][lon_idx, lat_idx, :, time_idx])
     
-    # Surafce pressure
-    psurf = convert(FT, ds["PS"][iLon, iLat,timeIndex])
+    # Surface pressure
+    psurf = convert(FT, ds["PS"][lon_idx, lat_idx, time_idx])
     
     # AK and BK global attributes (important to calculate pressure half-levels)
-    ak = ds.attrib["HDF_GLOBAL.ak"][:]
-    bk = ds.attrib["HDF_GLOBAL.bk"][:]
+    ak, bk = ds.attrib["HDF_GLOBAL.ak"][:], ds.attrib["HDF_GLOBAL.bk"][:]
 
+    # Calculate pressure levels
     p_half = (ak + bk * psurf)
     p_full = (p_half[2:end] + p_half[1:end - 1]) / 2
+
+    # Close the file
     close(ds)
     
-    # Avogradro's number:
+    # Avogadro's number:
     Na = 6.0221415e23;
+
     # Dry and wet mass
     dryMass = 28.9647e-3  / Na  # in kg/molec, weighted average for N2 and O2
     wetMass = 18.01528e-3 / Na  # just H2O
     ratio = dryMass / wetMass 
     n_layers = length(T)
-    # also get a VMR vector of H2O (volumetric!)
+
+    # Also get a VMR vector of H2O (volumetric!)
     vmr_h2o = zeros(FT, n_layers, )
     vcd_dry = zeros(FT, n_layers, )
     vcd_h2o = zeros(FT, n_layers, )
@@ -80,10 +61,12 @@ function read_atmos_profile(file::String, lat::Real, lon::Real, timeIndex; g₀=
         vcd_dry[i] = vmr_dry * Δp / (M * g₀ * 100.0^2)   # includes m2->cm2
         vcd_h2o[i] = vmr_h2o[i] * Δp / (M * g₀ * 100^2)
     end
-    return AtmosphericProfile(lat, lon, psurf, T, q, p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o)
-end;
 
-#for terrestrial atmospheres 
+    # Return the atmospheric profile struct
+    return AtmosphericProfile(lat, lon, psurf, T, q, p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o)
+end
+
+# for terrestrial atmospheres 
 # psurf in hPa, λ in μm 
 function getRayleighLayerOptProp(psurf, λ, depol_fct, vcd_dry) 
     # Total vertical Rayleigh scattering optical thickness 
@@ -114,6 +97,7 @@ function getAerosolLayerOptProp(total_τ, p₀, σp, p_half)
     τAer  =  (total_τ/Norm) * ρ
     return τAer
 end
+
 #computes the composite single scattering parameters (τ, ϖ, Z⁺⁺, Z⁻⁺) for a given atmospheric layer iz for a given Fourier component m
 function construct_atm_layer(τRayl, τAer, ϖRayl, ϖAer, fᵗ, Rayl𝐙⁺⁺, Rayl𝐙⁻⁺, Aer𝐙⁺⁺, Aer𝐙⁻⁺)
     FT = eltype(τRayl)
