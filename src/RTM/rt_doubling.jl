@@ -1,33 +1,24 @@
 
-function invCUDA(d_A)
-    pivot, info = CUBLAS.getrf_batched!(d_A, true)
-    pivot, info, d_C = CUBLAS.getri_batched(d_A, pivot)
-    return d_C
-end
-
 "Prototype doubling methods, compute homogenous layer matrices from its elemental layer in `ndoubl` doubling steps"
 function rt_doubling!(dτ, τ_total, ndoubl, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻)
     # # ToDo: Important output doubling applied to elemental layer, using same variables r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺ (can be renamed to t⁺⁺, etc)
     # Need to check with paper nomenclature. This is basically eqs. 23-28 in vSmartMOM but using simplifications in eq. 29-32)
     Nquad4 = size(r⁻⁺, 1)
-    tr⁻⁺ = similar(r⁻⁺)
-    tt⁺⁺ = similar(r⁻⁺)
-    r⁻⁺  = similar(r⁻⁺)
-    t⁺⁺  = similar(r⁻⁺)
     if (ndoubl==0)
         @assert (τ_total==dτ*2^ndoubl)
-        return r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻
+        # println("happens")
+        return nothing #r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻
     end
     τ_total=dτ
-    for n = 1:ndoubl
-        # M1=inv(I - r⁻⁺ * r⁻⁺)
-        # M1 = invCUDA([CuArray(I - r⁻⁺ * r⁻⁺)][1]
-        M1 = (I - r⁻⁺ * r⁻⁺) \ t⁺⁺
-        tr⁻⁺ = r⁻⁺ + t⁺⁺ * r⁻⁺ * M1 # M1 * t⁺⁺
-        tt⁺⁺ = t⁺⁺ * M1 # M1 * t⁺⁺
 
-        r⁻⁺ = tr⁻⁺
-        t⁺⁺ = tt⁺⁺
+    # mult_in_place = similar(t⁺⁺)
+
+    for n = 1:ndoubl
+        M1 = (I - r⁻⁺ * r⁻⁺) \ t⁺⁺
+
+        # mul!(mult_in_place, r⁻⁺, M1)
+        r⁻⁺[:] = r⁻⁺ + t⁺⁺ * r⁻⁺ * M1 # * t⁺⁺
+        t⁺⁺[:] = t⁺⁺ * M1 # * t⁺⁺
 
         τ_total = 2 * τ_total
     end
@@ -48,7 +39,7 @@ function rt_doubling!(dτ, τ_total, ndoubl, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻)
         end
     end 
     @assert (τ_total==dτ*2^ndoubl)
-    #return r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻
+    return nothing # r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻
 end
 
 "minimum number of doublings needed to reach an optical depth τ_end, starting with an optical depth dτ.
