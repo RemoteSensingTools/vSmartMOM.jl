@@ -6,19 +6,31 @@ function rt_doubling!(dτ, τ_total, ndoubl, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻)
     Nquad4 = size(r⁻⁺, 1)
     if (ndoubl==0)
         @assert (τ_total==dτ*2^ndoubl)
-        # println("happens")
-        return nothing #r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻
+        return nothing 
     end
     τ_total=dτ
 
-    # mult_in_place = similar(t⁺⁺)
+    # Create temporary matrices
+    I_static = one(similar(t⁺⁺))
+    aux1 = similar(t⁺⁺)
+    aux2 = similar(t⁺⁺)
+    aux3 = similar(t⁺⁺)
 
     for n = 1:ndoubl
-        M1 = (I - r⁻⁺ * r⁻⁺) \ t⁺⁺
 
-        # mul!(mult_in_place, r⁻⁺, M1)
-        r⁻⁺[:] = r⁻⁺ + t⁺⁺ * r⁻⁺ * M1 # * t⁺⁺
-        t⁺⁺[:] = t⁺⁺ * M1 # * t⁺⁺
+        # M1 = (I - r⁻⁺ * r⁻⁺) \ t⁺⁺
+        mul!(aux1, r⁻⁺, r⁻⁺)            # r⁻⁺ * r⁻⁺
+        @. aux1 = I_static - aux1       # (I - r⁻⁺ * r⁻⁺)
+        ldiv!(aux2, qr!(aux1), t⁺⁺)     # M1 = (I - r⁻⁺ * r⁻⁺) \ t⁺⁺
+
+        # r⁻⁺[:] = r⁻⁺ + t⁺⁺ * r⁻⁺ * M1
+        mul!(aux1, r⁻⁺, aux2)           # r⁻⁺ * M1
+        mul!(aux3, t⁺⁺, aux1)           # t⁺⁺ * r⁻⁺ * M1
+        @. r⁻⁺ = r⁻⁺ + aux3             # r⁻⁺[:] = r⁻⁺ + t⁺⁺ * r⁻⁺ * M1
+
+        # t⁺⁺[:] = t⁺⁺ * M1 
+        mul!(aux1, t⁺⁺, aux2)           # t⁺⁺ * M1 
+        @. t⁺⁺ = aux1                   # t⁺⁺[:] = t⁺⁺ * M1 
 
         τ_total = 2 * τ_total
     end
@@ -39,7 +51,7 @@ function rt_doubling!(dτ, τ_total, ndoubl, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻)
         end
     end 
     @assert (τ_total==dτ*2^ndoubl)
-    return nothing # r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻
+    return nothing 
 end
 
 "minimum number of doublings needed to reach an optical depth τ_end, starting with an optical depth dτ.

@@ -39,11 +39,12 @@ function run_RTM(polarization_type, sza, vza, vaz, τRayl,ϖRayl, τAer, ϖAer, 
         t⁺⁺ = zeros(FT, dims)
         r⁺⁻ = zeros(FT, dims)
         t⁻⁻ = zeros(FT, dims)
+
         # Composite layer R and T matrices
-        R⁻⁺ = zeros(dims)
-        R⁺⁻ = zeros(dims)
-        T⁺⁺ = zeros(dims)
-        T⁻⁻ = zeros(dims)
+        R⁻⁺ = zeros(FT, dims)
+        R⁺⁻ = zeros(FT, dims)
+        T⁺⁺ = zeros(FT, dims)
+        T⁻⁻ = zeros(FT, dims)
 
         kn=0
         # loop over vertical layers:
@@ -72,15 +73,14 @@ function run_RTM(polarization_type, sza, vza, vaz, τRayl,ϖRayl, τAer, ϖAer, 
             kn = get_kn(kn, scatter, iz)
             
             if (iz==1)
-                T⁺⁺ = t⁺⁺
-                T⁻⁻ = t⁻⁻
-                R⁻⁺ = r⁻⁺
-                R⁺⁻ = r⁺⁻
+                T⁺⁺[:] = t⁺⁺
+                T⁻⁻[:] = t⁻⁻
+                R⁻⁺[:] = r⁻⁺
+                R⁺⁻[:] = r⁺⁻
             else
-                @timeit "interaction" R⁻⁺, T⁺⁺, R⁺⁻, T⁻⁻ = rt_interaction(kn, R⁻⁺, T⁺⁺, R⁺⁻, T⁻⁻, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻)
+                @timeit "interaction" rt_interaction!(kn, R⁻⁺, T⁺⁺, R⁺⁻, T⁻⁻, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻)
             end
         end #z
-        
 
         # include surface function
         # TBD
@@ -117,11 +117,7 @@ end
 
 function get_kn(kn, scatter, iz)
     if (iz==1)
-        if (scatter)
-            kn=4
-        else
-            kn=1
-        end
+        kn = scatter ? 4 : 1
     else 
         if (kn==1) & (!scatter)
             kn = 1
