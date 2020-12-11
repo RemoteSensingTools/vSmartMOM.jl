@@ -10,11 +10,11 @@ function rt_elemental!(dτ, ϖ, Z⁺⁺, Z⁻⁺, m, ndoubl, scatter, qp_μ, wt_
     #n: layer of which this is an elemental
     #ndoubl: number of doubling computations needed to progress from the elemental layer to the full homogeneous layer n
     #scatter: flag indicating scattering
-    # dims = size(Z⁺⁺)
-    # r⁻⁺ = zeros(dims)
-    # t⁺⁺ = zeros(dims)
-    # r⁺⁻ = zeros(dims)
-    # t⁻⁻ = zeros(dims)
+
+    # Create temporary matrices
+    I_static = one(similar(Z⁻⁺))
+    aux1 = similar(Z⁻⁺)
+
     if scatter
         #TODO: import vector containing quadrature cosines qp_μ of length Nquad4
         #TODO: import vector containing quadrature weights wt_μ of length Nquad4
@@ -24,14 +24,28 @@ function rt_elemental!(dτ, ϖ, Z⁺⁺, Z⁻⁺, m, ndoubl, scatter, qp_μ, wt_
         wt_μ4 = reduce(vcat, (fill.(wt_μ,[4])))
         Nquad4 = length(qp_μ4)
 
-        if m==0
-            wct=0.50 * ϖ * wt_μ4 
-        else    
-            wct=0.25 * ϖ * wt_μ4
-        end
-        #@show size(Diagonal(1 ./ qp_μ4)), size(Z⁻⁺), size(Diagonal(wct) * dτ)
-        r⁻⁺[:] = Diagonal(1 ./ qp_μ4) * Z⁻⁺ * Diagonal(wct) * dτ
-        t⁺⁺[:] = I - (Diagonal(1 ./ qp_μ4) * (I - Z⁺⁺ * Diagonal(wct)) * dτ)
+        wct = m==0 ? 0.50 * ϖ * wt_μ4  : 0.25 * ϖ * wt_μ4
+
+
+        # The following section performs: 
+        # r⁻⁺[:] = Diagonal(1 ./ qp_μ4) * Z⁻⁺ * Diagonal(wct) * dτ
+        # t⁺⁺[:] = I - (Diagonal(1 ./ qp_μ4) * (I - Z⁺⁺ * Diagonal(wct)) * dτ)
+
+        # Get the diagonal matrices first
+        d_qp = Diagonal(1 ./ qp_μ4)
+        d_wct = Diagonal(wct)
+
+        # Calculate r⁻⁺
+        mul!(aux1, d_qp, Z⁻⁺)        # Diagonal(1 ./ qp_μ4) * Z⁻⁺
+        mul!(r⁻⁺, aux1, d_wct * dτ)  # r⁻⁺ = (Diagonal(1 ./ qp_μ4) * Z⁻⁺) * Diagonal(wct) * dτ
+
+        # Calculate t⁺⁺
+        mul!(aux1, Z⁺⁺, d_wct)      # Z⁺⁺ * Diagonal(wct)
+        @. aux1 = I_static - aux1   # (I - Z⁺⁺ * Diagonal(wct))
+        rmul!(aux1, dτ)             # (I - Z⁺⁺ * Diagonal(wct)) * dτ
+        mul!(aux1, d_qp, aux1)      # (Diagonal(1 ./ qp_μ4) * (I - Z⁺⁺ * Diagonal(wct)) * dτ)
+        @. t⁺⁺ = I_static - aux1    # t⁺⁺ = I - ⤴
+
         #test = I - Diagonal(1 ./ qp_μ4) * dτ
         #@show t⁺⁺[1],  test[1], 1 ./ qp_μ4[1]
         if ndoubl<1
