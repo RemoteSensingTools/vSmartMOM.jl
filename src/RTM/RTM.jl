@@ -10,6 +10,7 @@ using DelimitedFiles
 using ..PhaseFunction
 using FastGaussQuadrature 
 using CUDA
+using TimerOutputs
 
 include("types.jl") 
 include("RTM_main.jl")

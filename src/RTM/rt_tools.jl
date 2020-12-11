@@ -1,10 +1,5 @@
 # atmospheric RTM
-function run_RTM(polarization_type, sza, vza, vaz, τRayl, ϖRayl, τAer, ϖAer, fᵗ, qp_μ, wt_μ, Ltrunc, aerosol_optics, greek_rayleigh)
-
-    total_doubling = 0.0
-    total_interaction = 0.0
-    total_elemental = 0.0
-
+function run_RTM(polarization_type, sza, vza, vaz, τRayl,ϖRayl, τAer, ϖAer, fᵗ, qp_μ, wt_μ, Ltrunc, aerosol_optics, GreekRayleigh)
     FT = eltype(τRayl)
 
     #Output variables: Reflected and transmitted solar irradiation at TOA and BOA respectively
@@ -21,10 +16,14 @@ function run_RTM(polarization_type, sza, vza, vaz, τRayl, ϖRayl, τAer, ϖAer,
     Naer = length(aerosol_optics)
     for m=0:Ltrunc-1
         @show m
-        weight = (m == 0) ? 0.5 : 1.0
+        if (m==0)
+            weight=0.5
+        else
+            weight=1.0
+        end
         #compute Zmp_Aer, Zpp_Aer, Zmp_Rayl, Zpp_Rayl
         # For m>=3, Rayleigh matrices will be 0, can catch with if statement if wanted 
-        Rayl𝐙⁺⁺, Rayl𝐙⁻⁺ = PhaseFunction.compute_Z_moments(polarization_type, qp_μ, greek_rayleigh, m);
+        Rayl𝐙⁺⁺, Rayl𝐙⁻⁺ = PhaseFunction.compute_Z_moments(polarization_type, qp_μ, GreekRayleigh, m);
         dims = size(Rayl𝐙⁺⁺)
         nAer = length(aerosol_optics)
         Nquad4 = dims[1]
@@ -36,11 +35,10 @@ function run_RTM(polarization_type, sza, vza, vaz, τRayl, ϖRayl, τAer, ϖAer,
         end
         
         # Homogenous R and T matrices
-        r⁻⁺ = zeros(dims)
-        t⁺⁺ = zeros(dims)
-        r⁺⁻ = zeros(dims)
-        t⁻⁻ = zeros(dims)
-
+        r⁻⁺ = zeros(FT, dims)
+        t⁺⁺ = zeros(FT, dims)
+        r⁺⁻ = zeros(FT, dims)
+        t⁻⁻ = zeros(FT, dims)
         # Composite layer R and T matrices
         R⁻⁺ = zeros(dims)
         R⁺⁻ = zeros(dims)
@@ -60,9 +58,8 @@ function run_RTM(polarization_type, sza, vza, vaz, τRayl, ϖRayl, τAer, ϖAer,
                 scatter=true
             end        
             if (scatter)
-                dims = size(Z⁺⁺)
-                total_elemental += @elapsed r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻ = rt_elemental(dτ, ϖ, Z⁺⁺, Z⁻⁺, m, ndoubl, scatter,qp_μ, wt_μ, zeros(dims), zeros(dims), zeros(dims), zeros(dims))
-                total_doubling += @elapsed r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻ = rt_doubling(dτ, τ, ndoubl, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻)
+                @timeit "elemental" rt_elemental!(dτ, ϖ, Z⁺⁺, Z⁻⁺, m, ndoubl, scatter,qp_μ, wt_μ, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻)
+                @timeit "doubling" rt_doubling!(dτ, τ, ndoubl, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻)
             else
                 r⁻⁺ = 0
                 r⁺⁻ = 0
@@ -80,7 +77,7 @@ function run_RTM(polarization_type, sza, vza, vaz, τRayl, ϖRayl, τAer, ϖAer,
                 R⁻⁺ = r⁻⁺
                 R⁺⁻ = r⁺⁻
             else
-                total_interaction += @elapsed R⁻⁺, T⁺⁺, R⁺⁻, T⁻⁻ = rt_interaction(kn, R⁻⁺, T⁺⁺, R⁺⁻, T⁻⁻, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻)
+                @timeit "interaction" R⁻⁺, T⁺⁺, R⁺⁻, T⁻⁻ = rt_interaction(kn, R⁻⁺, T⁺⁺, R⁺⁻, T⁻⁻, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻)
             end
         end #z
         
@@ -110,19 +107,31 @@ function run_RTM(polarization_type, sza, vza, vaz, τRayl, ϖRayl, τAer, ϖAer,
             #end
         end
     end  #m
+
     
-    println("Total time spent doubling: ", total_doubling)
-    println("Total time spent interaction: ", total_interaction)
-    println("Total time spent elemental: ", total_elemental)
+    print_timer()
+    reset_timer!()
 
     return R, T  
 end
 
 function get_kn(kn, scatter, iz)
-    if (iz == 1)
-        kn = scatter ? 4 : 1
-    elseif (kn >= 1)
-        kn = (kn == 1) ? (!scatter ? 1 : 2) : (!scatter ? 3 : 4)
+    if (iz==1)
+        if (scatter)
+            kn=4
+        else
+            kn=1
+        end
+    else 
+        if (kn==1) & (!scatter)
+            kn = 1
+        elseif (kn==1) & (scatter)
+            kn = 2
+        elseif (kn>1) & (!scatter)
+            kn = 3
+        elseif (kn>1) & (scatter)
+            kn = 4
+        end 
     end
 
     return kn
