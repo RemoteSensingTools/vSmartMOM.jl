@@ -14,7 +14,7 @@ AB = CuArray(B);
 @btime batched_mul($A, $B);
 @btime batched_mul($AC, $AB);
 
-n = 20
+n = 30
 nSpec = 10000
 elty = Float32
 # generate matrices
@@ -30,9 +30,9 @@ function invGPU(A)
     return collect(d_C)
 end
 
-function invCPU(A)
+function invCPU!(A, C)
     for Cs in 1:length(A)
-        C   = inv(A[Cs])
+        C[Cs]   = inv(A[Cs])
     end
     # return C
 end
