@@ -1,19 +1,20 @@
 #= Main file for RTM =#
 
-
-function rt_set_streams(model::GaussQuadHemisphere, Ltrunc::Int, sza, vza)
+function rt_set_streams(::GaussQuadHemisphere, Ltrunc::Int, sza, vza)
     Nquad=convert(Int,ceil((Ltrunc+1)/2))
     qp_μ, wt_μ = gauleg(Nquad, 0.0, 1.0) #quadrature limits are 0.0-1.0
     return Nquad, qp_μ, wt_μ
 end
 
-function rt_set_streams(model::GaussQuadFullSphere, Ltrunc::Int, sza, vza)
+function rt_set_streams(::GaussQuadFullSphere, Ltrunc::Int, sza, vza)
     Nquad=convert(Int,ceil((Ltrunc+1)/2))
     qp_μ, wt_μ = gausslegendre(2Nquad) #quadrature limits are 0.0-1.0
     return Nquad, qp_μ[Nquad+1:end], wt_μ[Nquad+1:end]
 end
 
-function rt_set_streams(model::RadauQuad, Ltrunc::Int, sza, vza)
+# RT set_streams takes in Geometry (sza, vza) and 
+
+function rt_set_streams(::RadauQuad, Ltrunc::Int, sza, vza)
     FT = eltype(sza)
     #Ltrunc + 1 = number of spherical coefficients considered (+1 for l=0)
     #quadtype = 'r' for Radau (with DNI), 'g' for Gauss (no DNI)

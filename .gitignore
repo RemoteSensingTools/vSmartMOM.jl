@@ -8,6 +8,12 @@ packages
 *.f90
 .vscode
 Manifest.toml
+*.csv
+*.pdf
+*.dat
+*.mpi
+*.gif
+
 docs/build/*
 src/CrossSection/local_only
 clones/
@@ -17,3 +23,5 @@ test/precompile
 wigner_values_sparse.jld
 wigner_values.jld
 *.pyc
+*.dat
+*.hdf.nc4
