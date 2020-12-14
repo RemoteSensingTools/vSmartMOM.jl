@@ -8,7 +8,7 @@ isos = CrossSection.iso_info
 
 hitran_url_base    = "https://hitran.org/lbl/api?numin=0&numax=150000&iso_ids_list="
 local_download_url = "/net/fluo/data1/ftp/XYZT_hitran/"
-ftp_url = "ftp://fluo.gps.caltech.edu/XYZT_hitran/"
+target_url = "http://web.gps.caltech.edu/~cfranken/hitran_2016/"
 # Loop over all current HITRAN molecules:
 for molec=1:49
     if haskey(isos,(molec,1))
@@ -40,7 +40,7 @@ for molec=1:49
             tarball_hash = archive_artifact(hash, joinpath(local_download_url, "$(name).tar.gz"))
 
             # Calculate tarball url
-            tarball_url = ftp_url*name*".tar.gz"
+            tarball_url = target_url*name*".tar.gz"
             # Bind this to an Artifacts.toml file
             @info("Binding $(name) in Artifacts.toml...")
             bind_artifact!(joinpath(@__DIR__, "Artifacts.toml"), name, hash; download_info=[(tarball_url, tarball_hash)], lazy=true, force=true)

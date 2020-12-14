@@ -1,0 +1,20 @@
+name: AutomatedTests
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        julia-version: ['1.3.1', '1.4.1', '1.5.3']
+        os: [ubuntu-latest]
+    
+    steps:
+      - uses: actions/checkout@v2
+      - name: "Set up Julia"
+        uses: julia-actions/setup-julia@latest
+        with:
+          version: ${{ matrix.julia-version }}
+      - uses: julia-actions/julia-buildpkg@latest
+      - uses: julia-actions/julia-runtest@latest
