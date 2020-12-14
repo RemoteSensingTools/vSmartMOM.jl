@@ -8,7 +8,11 @@ packages
 *.f90
 .vscode
 Manifest.toml
-# *.csv
+*.csv
+*.pdf
+*.dat
+*.mpi
+*.gif
 
 docs/build/*
 Manifest.toml
