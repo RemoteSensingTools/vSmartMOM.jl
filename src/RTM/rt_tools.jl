@@ -35,15 +35,16 @@ function run_RTM(polarization_type, sza, vza, vaz, τRayl,ϖRayl, τAer, ϖAer, 
         end
         
         # Homogenous R and T matrices
-        r⁻⁺ = zeros(dims)
-        t⁺⁺ = zeros(dims)
-        r⁺⁻ = zeros(dims)
-        t⁻⁻ = zeros(dims)
+        r⁻⁺ = zeros(FT, dims)
+        t⁺⁺ = zeros(FT, dims)
+        r⁺⁻ = zeros(FT, dims)
+        t⁻⁻ = zeros(FT, dims)
+
         # Composite layer R and T matrices
-        R⁻⁺ = zeros(dims)
-        R⁺⁻ = zeros(dims)
-        T⁺⁺ = zeros(dims)
-        T⁻⁻ = zeros(dims)
+        R⁻⁺ = zeros(FT, dims)
+        R⁺⁻ = zeros(FT, dims)
+        T⁺⁺ = zeros(FT, dims)
+        T⁻⁻ = zeros(FT, dims)
 
         kn=0
         # loop over vertical layers:
@@ -58,8 +59,8 @@ function run_RTM(polarization_type, sza, vza, vaz, τRayl,ϖRayl, τAer, ϖAer, 
                 scatter=true
             end        
             if (scatter)
-                r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻ = rt_elemental(dτ, ϖ, Z⁺⁺, Z⁻⁺, m, ndoubl, scatter,qp_μ, wt_μ)
-                r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻ = rt_doubling(dτ, τ, ndoubl, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻)
+                @timeit "elemental" rt_elemental!(dτ, ϖ, Z⁺⁺, Z⁻⁺, m, ndoubl, scatter,qp_μ, wt_μ, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻)
+                @timeit "doubling" rt_doubling!(dτ, τ, ndoubl, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻)
             else
                 r⁻⁺ = 0
                 r⁺⁻ = 0
@@ -72,15 +73,14 @@ function run_RTM(polarization_type, sza, vza, vaz, τRayl,ϖRayl, τAer, ϖAer, 
             kn = get_kn(kn, scatter, iz)
             
             if (iz==1)
-                T⁺⁺ = t⁺⁺
-                T⁻⁻ = t⁻⁻
-                R⁻⁺ = r⁻⁺
-                R⁺⁻ = r⁺⁻
+                T⁺⁺[:] = t⁺⁺
+                T⁻⁻[:] = t⁻⁻
+                R⁻⁺[:] = r⁻⁺
+                R⁺⁻[:] = r⁺⁻
             else
-                R⁻⁺, T⁺⁺, R⁺⁻, T⁻⁻ = rt_interaction(kn, R⁻⁺, T⁺⁺, R⁺⁻, T⁻⁻, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻)
+                @timeit "interaction" rt_interaction!(kn, R⁻⁺, T⁺⁺, R⁺⁻, T⁻⁻, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻)
             end
         end #z
-        
 
         # include surface function
         # TBD
@@ -107,16 +107,17 @@ function run_RTM(polarization_type, sza, vza, vaz, τRayl,ϖRayl, τAer, ϖAer, 
             #end
         end
     end  #m
+
+    
+    print_timer()
+    reset_timer!()
+
     return R, T  
 end
 
 function get_kn(kn, scatter, iz)
     if (iz==1)
-        if (scatter)
-            kn=4
-        else
-            kn=1
-        end
+        kn = scatter ? 4 : 1
     else 
         if (kn==1) & (!scatter)
             kn = 1

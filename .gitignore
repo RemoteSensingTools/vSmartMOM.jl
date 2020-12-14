@@ -15,4 +15,13 @@ Manifest.toml
 *.gif
 
 docs/build/*
-Manifest.toml
+src/CrossSection/local_only
+clones/
+conda/
+registries/
+test/precompile
+wigner_values_sparse.jld
+wigner_values.jld
+*.pyc
+*.dat
+*.hdf.nc4

@@ -144,13 +144,14 @@ function AtoB(aa,A,B,npt)
 
 end
 
-function qoft!(M, I, T,T_ref, result; TT_=TIPS_2017_ISOT_HASH_CONST, TQ_ = TIPS_2017_ISOQ_HASH_CONST)
+function qoft!(M, I, T,T_ref, result)
 
     # Get temperature grid
-    TT = TT_[(M,I)]
-    TQ = TQ_[(M,I)]
-    Tmin = minimum(TT); Tmax = maximum(TT)
+    TT = get_TT(M, I) #TT_[(M,I)]
+    TQ = get_TQ(M, I)
 
+    Tmin = minimum(TT); Tmax = maximum(TT)
+    
     # Error if out of temperature range
     if T<Tmin || T>Tmax
       error("TIPS2017: T ($T) must be between $Tmin K and $Tmax K.")

@@ -1,21 +1,36 @@
 
 "Prototype doubling methods, compute homogenous layer matrices from its elemental layer in `ndoubl` doubling steps"
-function rt_doubling(dτ, τ_total, ndoubl, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻)
+function rt_doubling!(dτ, τ_total, ndoubl, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻)
     # # ToDo: Important output doubling applied to elemental layer, using same variables r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺ (can be renamed to t⁺⁺, etc)
     # Need to check with paper nomenclature. This is basically eqs. 23-28 in vSmartMOM but using simplifications in eq. 29-32)
     Nquad4 = size(r⁻⁺, 1)
     if (ndoubl==0)
         @assert (τ_total==dτ*2^ndoubl)
-        return r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻
+        return nothing 
     end
     τ_total=dτ
-    for n = 1:ndoubl
-        M1=inv(I - r⁻⁺ * r⁻⁺)
-        tr⁻⁺ = r⁻⁺ + t⁺⁺ * r⁻⁺ * M1 * t⁺⁺
-        tt⁺⁺ = t⁺⁺ * M1 * t⁺⁺
 
-        r⁻⁺ = tr⁻⁺
-        t⁺⁺ = tt⁺⁺
+    # Create temporary matrices
+    I_static = one(similar(t⁺⁺))
+    aux1 = similar(t⁺⁺)
+    aux2 = similar(t⁺⁺)
+    aux3 = similar(t⁺⁺)
+
+    for n = 1:ndoubl
+
+        # M1 = (I - r⁻⁺ * r⁻⁺) \ t⁺⁺
+        mul!(aux1, r⁻⁺, r⁻⁺)            # r⁻⁺ * r⁻⁺
+        @. aux1 = I_static - aux1       # (I - r⁻⁺ * r⁻⁺)
+        ldiv!(aux2, qr!(aux1), t⁺⁺)     # M1 = (I - r⁻⁺ * r⁻⁺) \ t⁺⁺
+
+        # r⁻⁺[:] = r⁻⁺ + t⁺⁺ * r⁻⁺ * M1
+        mul!(aux1, r⁻⁺, aux2)           # r⁻⁺ * M1
+        mul!(aux3, t⁺⁺, aux1)           # t⁺⁺ * r⁻⁺ * M1
+        @. r⁻⁺ = r⁻⁺ + aux3             # r⁻⁺[:] = r⁻⁺ + t⁺⁺ * r⁻⁺ * M1
+
+        # t⁺⁺[:] = t⁺⁺ * M1 
+        mul!(aux1, t⁺⁺, aux2)           # t⁺⁺ * M1 
+        @. t⁺⁺ = aux1                   # t⁺⁺[:] = t⁺⁺ * M1 
 
         τ_total = 2 * τ_total
     end
@@ -36,7 +51,7 @@ function rt_doubling(dτ, τ_total, ndoubl, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻)
         end
     end 
     @assert (τ_total==dτ*2^ndoubl)
-    return r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻
+    return nothing 
 end
 
 "minimum number of doublings needed to reach an optical depth τ_end, starting with an optical depth dτ.
