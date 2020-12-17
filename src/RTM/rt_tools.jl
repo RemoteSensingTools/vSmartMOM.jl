@@ -16,11 +16,9 @@ function run_RTM(polarization_type, sza, vza, vaz, τRayl,ϖRayl, τAer, ϖAer, 
     Naer = length(aerosol_optics)
     for m=0:Ltrunc-1
         @show m
-        if (m==0)
-            weight=0.5
-        else
-            weight=1.0
-        end
+
+        weight = m==0 ? 0.5 : 1.0
+
         #compute Zmp_Aer, Zpp_Aer, Zmp_Rayl, Zpp_Rayl
         # For m>=3, Rayleigh matrices will be 0, can catch with if statement if wanted 
         Rayl𝐙⁺⁺, Rayl𝐙⁻⁺ = PhaseFunction.compute_Z_moments(polarization_type, qp_μ, GreekRayleigh, m);
@@ -118,16 +116,8 @@ end
 function get_kn(kn, scatter, iz)
     if (iz==1)
         kn = scatter ? 4 : 1
-    else 
-        if (kn==1) & (!scatter)
-            kn = 1
-        elseif (kn==1) & (scatter)
-            kn = 2
-        elseif (kn>1) & (!scatter)
-            kn = 3
-        elseif (kn>1) & (scatter)
-            kn = 4
-        end 
+    elseif (kn >= 1)
+        kn = (kn == 1) ? (!scatter ? 1 : 2) : (!scatter ? 3 : 4)
     end
 
     return kn
