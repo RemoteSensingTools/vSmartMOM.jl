@@ -1,6 +1,7 @@
 """ Shorthand for @artifact_str """
 function artifact_helper(name::AbstractString) 
-    joinpath(ensure_artifact_installed(name, find_artifacts_toml(@__DIR__)), name) * ".par"
+    joinpath(ensure_artifact_installed(name, find_artifacts_toml(@__DIR__), 
+                                       quiet_download = true), name) * ".par"
 end
 
 """ Given a molecule name and a database name, retrieve the transition file """
