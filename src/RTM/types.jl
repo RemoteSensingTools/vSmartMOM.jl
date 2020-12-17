@@ -1,5 +1,3 @@
-# Types for describing atmospheric parameters #
-abstract type AbstractObsGeometry end
 
 "Struct for an atmospheric profile"
 struct AtmosphericProfile{FT}
@@ -14,6 +12,9 @@ struct AtmosphericProfile{FT}
     vcd_dry::Array{FT,1}
     vcd_h2o::Array{FT,1}
 end
+
+# Types for describing atmospheric parameters #
+abstract type AbstractObsGeometry end
 
 "Observation Geometry (basics)" 
 struct ObsGeometry{FT} <: AbstractObsGeometry

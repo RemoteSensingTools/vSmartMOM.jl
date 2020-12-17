@@ -13,6 +13,7 @@ using CUDA
 using TimerOutputs
 
 include("types.jl") 
+include("constants.jl")
 include("RTM_main.jl")
 include("atmo_prof.jl")
 include("rt_elemental.jl")

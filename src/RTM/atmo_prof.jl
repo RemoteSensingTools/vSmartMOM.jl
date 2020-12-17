@@ -3,10 +3,10 @@
 function read_atmos_profile(file::String, lat::Real, lon::Real, time_idx::Int; g₀=9.8196)
 
     # Time index must be ∈ [1, 2, 3, 4]
-    @assert 1 <= time_idx <= 4
+    @assert 1 <= time_idx <= 4 "Time index must be ∈ [1, 2, 3, 4]" 
 
     # Load in the atmospheric profile
-    ds = Dataset(file)
+    @timeit "loading file" ds = Dataset(file)
 
     # See how easy it is to actually extract data? 
     # Note the [:] in the end reads in ALL the data in one step
@@ -20,7 +20,7 @@ function read_atmos_profile(file::String, lat::Real, lon::Real, time_idx::Int; g
     lat_idx, lon_idx = argmin(abs.(file_lats .- lat)), argmin(abs.(file_lons .- lon))
 
     # Temperature profile
-    T = convert(Array{FT,1}, ds["T"][lon_idx, lat_idx,  :, time_idx])
+    @timeit "gettinng T" T = convert(Array{FT,1}, ds["T"][lon_idx, lat_idx,  :, time_idx])
 
     # Specific humidity profile
     q = convert(Array{FT,1}, ds["QV"][lon_idx, lat_idx, :, time_idx])
@@ -37,14 +37,11 @@ function read_atmos_profile(file::String, lat::Real, lon::Real, time_idx::Int; g
 
     # Close the file
     close(ds)
-    
-    # Avogadro's number:
-    Na = 6.0221415e23;
 
     # Dry and wet mass
-    dryMass = 28.9647e-3  / Na  # in kg/molec, weighted average for N2 and O2
-    wetMass = 18.01528e-3 / Na  # just H2O
-    ratio = dryMass / wetMass 
+    dry_mass = 28.9647e-3  / Nₐ  # in kg/molec, weighted average for N2 and O2
+    wet_mass = 18.01528e-3 / Nₐ  # just H2O
+    ratio = dry_mass / wet_mass 
     n_layers = length(T)
 
     # Also get a VMR vector of H2O (volumetric!)
@@ -57,7 +54,7 @@ function read_atmos_profile(file::String, lat::Real, lon::Real, time_idx::Int; g
         Δp = p_half[i + 1] - p_half[i]
         vmr_h2o[i] = q[i] * ratio
         vmr_dry = 1 - vmr_h2o[i]
-        M  = vmr_dry * dryMass + vmr_h2o[i] * wetMass
+        M  = vmr_dry * dry_mass + vmr_h2o[i] * wet_mass
         vcd_dry[i] = vmr_dry * Δp / (M * g₀ * 100.0^2)   # includes m2->cm2
         vcd_h2o[i] = vmr_h2o[i] * Δp / (M * g₀ * 100^2)
     end
