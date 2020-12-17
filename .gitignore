@@ -8,6 +8,12 @@ packages
 *.f90
 .vscode
 Manifest.toml
+*.csv
+*.pdf
+*.dat
+*.mpi
+*.gif
+
 docs/build/*
 src/CrossSection/local_only
 clones/
