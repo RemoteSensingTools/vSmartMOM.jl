@@ -140,7 +140,7 @@ See eq 16 in Sanghavi 2014 for details.
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-struct GreekCoefs{FT<:AbstractFloat}
+struct GreekCoefs{FT<:Union{AbstractFloat, ForwardDiff.Dual}}
     "Greek matrix coefficient α, is in B[2,2]"
     α::Array{FT,1}
     "Greek matrix coefficient β, is in B[1,1] (only important one for scalar!)"
@@ -169,7 +169,7 @@ A struct which holds all computed aerosol optics
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-@with_kw struct AerosolOptics{FT<:AbstractFloat}
+@with_kw struct AerosolOptics{FT<:Union{AbstractFloat, ForwardDiff.Dual}}
     "Greek matrix"
     greek_coefs::GreekCoefs
     "Single Scattering Albedo"

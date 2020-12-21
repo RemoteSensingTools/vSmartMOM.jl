@@ -176,3 +176,20 @@ end
     end
 
 end 
+
+# Test that checks whether the cross-section auto-differentiation works
+
+@testset "absorption_cross_section_autodiff" begin
+
+    println("Testing absorption_cross_section_autodiff...")
+    
+    # Load HITRAN data
+    hitran_data = read_hitran(artifact("CO2"), mol=2, iso=1, ν_min=6000, ν_max=6400)
+
+    # Create the model with parameters
+    modelCPU = make_hitran_model(hitran_data, Voigt(), wing_cutoff = 40, CEF=HumlicekWeidemann32SDErrorFunction(), architecture=CPU())
+
+    # Compute the cross-section with autodifferentiation
+    value, derivs = absorption_cross_section(modelCPU, 6000:0.01:6400, 1000.1, 296.1, autodiff=true);
+
+end
