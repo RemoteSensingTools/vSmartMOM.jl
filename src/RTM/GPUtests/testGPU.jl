@@ -4,7 +4,7 @@ using BenchmarkTools
 using KernelAbstractions
 using CUDA
 
-n = 30
+n = 300
 FT = Float32
 
 @kernel function rt_interaction_kernel!(R⁻⁺, T⁺⁺, R⁺⁻, T⁻⁻, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻, M1, M2, M3)
@@ -12,6 +12,14 @@ FT = Float32
     rt_interaction!(R⁻⁺[N], T⁺⁺[N], R⁺⁻[N], T⁻⁻[N], r⁻⁺[N], t⁺⁺[N], r⁺⁻[N], t⁻⁻[N], M1[N], M2[N], M3[N])
     @synchronize
 end
+
+function rt_interaction_stupid!(R⁻⁺, T⁺⁺, R⁺⁻, T⁻⁻, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻, M1, M2, M3)
+    for N = 1:length(R⁻⁺)
+        rt_interaction!(R⁻⁺[N], T⁺⁺[N], R⁺⁻[N], T⁻⁻[N], r⁻⁺[N], t⁺⁺[N], r⁺⁻[N], t⁻⁻[N], M1[N], M2[N], M3[N])
+    end
+    # @synchronize
+end
+
 
 function rt_interaction!(R⁻⁺, T⁺⁺, R⁺⁻, T⁻⁻, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻, M1, M2)
     # ToDo: Important output from this routine is R⁻⁺, R⁺⁻, T⁺⁺, T⁻⁻ (can be renamed to 𝐓⁻⁻, etc later)
@@ -61,34 +69,7 @@ function rt_interaction!(R⁻⁺, T⁺⁺, R⁺⁻, T⁻⁻, r⁻⁺, t⁺⁺, r
     mul!(T⁻⁻, T⁺⁺, aux2)
     return nothing
 end
-dτ = FT(0.001);
-ndoubl = 12;
-τ_total = FT(2^ndoubl * dτ);
 
-if n < 20
-    r⁻⁺ = @SMatrix randn(Float32, n, n);
-    t⁺⁺ = @SMatrix randn(Float32, n, n);
-    r⁺⁻ = @SMatrix randn(Float32, n, n);
-    t⁻⁻ = @SMatrix randn(Float32, n, n);
-
-
-
-    @btime rt_doubling!(dτ, τ_total, ndoubl, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻)
-end
-
-r⁻⁺ = randn(FT, n, n);
-t⁺⁺ = randn(FT, n, n);
-r⁺⁻ = randn(FT, n, n);
-t⁻⁻ = randn(FT, n, n);
-R⁻⁺ = randn(FT, n, n);
-T⁺⁺ = randn(FT, n, n);
-R⁺⁻ = randn(FT, n, n);
-T⁻⁻ = randn(FT, n, n);
-M1 = similar(r⁺⁻);
-M2 = similar(r⁺⁻);
-M3 = similar(r⁺⁻);
-
-@btime rt_doubling!(dτ, τ_total, ndoubl, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻)
 
 r⁻⁺ = CuArray(randn(FT, n, n));
 t⁺⁺ = CuArray(randn(FT, n, n));
@@ -100,20 +81,49 @@ R⁺⁻ = CuArray(randn(FT, n, n));
 T⁻⁻ = CuArray(randn(FT, n, n));
 M1 = similar(r⁺⁻);
 M2 = similar(r⁺⁻);
+M3 = similar(r⁺⁻);
+
+@btime rt_interaction!(R⁻⁺, T⁺⁺, R⁺⁻, T⁻⁻, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻, M1, M2, M3)
 
 nSpec = 1000
-_r⁻⁺ = [r⁻⁺ for i = 1:nSpec]
-_t⁺⁺ = [t⁺⁺ for i = 1:nSpec]
-_r⁺⁻ = [r⁺⁻ for i = 1:nSpec]
-_t⁻⁻ = [t⁻⁻ for i = 1:nSpec]
-_R⁻⁺ = [R⁻⁺ for i = 1:nSpec]
-_T⁺⁺ = [T⁺⁺ for i = 1:nSpec]
-_R⁺⁻ = [R⁺⁻ for i = 1:nSpec]
-_T⁻⁻ = [T⁻⁻ for i = 1:nSpec]
-_M1 = [similar(T⁻⁻) for i = 1:nSpec]
-_M2 = [similar(T⁻⁻) for i = 1:nSpec]
-_M3 = [similar(T⁻⁻) for i = 1:nSpec]
+AA = [CuArray(randn(FT, n, n)) for i = 1:nSpec]
+BB = [CuArray(randn(FT, n, n)) for i = 1:nSpec]
+CC = [CuArray(randn(FT, n, n)) for i = 1:nSpec]
+
+
+_r⁻⁺ = [CuArray(randn(FT, n, n)) for i = 1:nSpec]
+_t⁺⁺ = [CuArray(randn(FT, n, n)) for i = 1:nSpec]
+_r⁺⁻ = [CuArray(randn(FT, n, n)) for i = 1:nSpec]
+_t⁻⁻ = [CuArray(randn(FT, n, n)) for i = 1:nSpec]
+_R⁻⁺ = [CuArray(randn(FT, n, n)) for i = 1:nSpec]
+_T⁺⁺ = [CuArray(randn(FT, n, n)) for i = 1:nSpec]
+_R⁺⁻ = [CuArray(randn(FT, n, n)) for i = 1:nSpec]
+_T⁻⁻ = [CuArray(randn(FT, n, n)) for i = 1:nSpec]
+_M1 = [CuArray(randn(FT, n, n)) for i = 1:nSpec]
+_M2 = [CuArray(randn(FT, n, n)) for i = 1:nSpec]
+_M3 = [CuArray(randn(FT, n, n)) for i = 1:nSpec]
 kernel_inter! = rt_interaction_kernel!(CUDADevice())
 kernel_inter!(_R⁻⁺, _T⁺⁺, _R⁺⁻, _T⁻⁻, _r⁻⁺, _t⁺⁺, _r⁺⁻, _t⁻⁻, _M1, _M2,_M3, ndrange=nSpec)
 
-@btime rt_doubling!(dτ, τ_total, ndoubl, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻)
+@kernel function mulCu!(A, B, C)
+    N = @index(Global)
+    rt_interaction!(R⁻⁺[N], T⁺⁺[N], R⁺⁻[N], T⁻⁻[N], r⁻⁺[N], t⁺⁺[N], r⁺⁻[N], t⁻⁻[N], M1[N], M2[N], M3[N])
+    @synchronize
+end
+
+@kernel function mat_test!(A, B, C)
+    N = @index(Global)
+    @tensor A[i, j,N] = B[i, k, N] * C[k, j,N]
+end
+
+function testGPU!(A, B, C)
+    event = ker!(A, B, C, ndrange=nSpec)
+    wait(CUDADevice(), event)
+    return nothing
+end
+function matCPU_test!(A, B, C)
+    d = size(C, 3)
+    @inbounds for N = 1:d
+        A[:, :,N] = B[:, :, N] * C[:, :,N]
+    end
+end
