@@ -7,8 +7,8 @@ using StaticArrays
 using BenchmarkTools
 
 FT = Float32
-n = 32;
-nSpec = 10000;
+n = 400;
+nSpec = 1000;
 
 array_type = CuArray
 include("src/RTM/matrix_linear_algebra.jl")
@@ -38,7 +38,7 @@ end
 @kernel function mat_inv_multiply!(A, B, X, Y, pivot, n)
     N = @index(Global)
     LU_decomposition!(view(A,:,:,N), view(pivot,:,N), n)
-    LU_solve!(view(A,:,:,N), view(B,:,:,N),view(X,:,:,N), view(Y,:,:,N), view(pivot,:,N), n)
+    #LU_solve!(view(A,:,:,N), view(B,:,:,N),view(X,:,:,N), view(Y,:,:,N), view(pivot,:,N), n)
     #@synchronize    
 end
 
