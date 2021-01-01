@@ -1,5 +1,5 @@
 "Simulates the full atmosphere from n distinct homogeneous layers"
-function rt_interaction!(kn, R⁻⁺, T⁺⁺, R⁺⁻, T⁻⁻, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻)
+function rt_interaction!(kn, R⁻⁺, T⁺⁺, R⁺⁻, T⁻⁻, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻,aux1,aux2,aux3)
                              
     # ToDo: Important output from this routine is R⁻⁺, R⁺⁻, T⁺⁺, T⁻⁻ (can be renamed to 𝐓⁻⁻, etc later)
     # Need to check with paper nomenclature. This is basically eqs. 23-28 in vSmartMOM)
@@ -11,9 +11,9 @@ function rt_interaction!(kn, R⁻⁺, T⁺⁺, R⁺⁻, T⁻⁻, r⁻⁺, t⁺�
 
     # Create temporary matrices
     I_static = one(similar(R⁺⁻))
-    aux1 = similar(R⁺⁻)
-    aux2 = similar(R⁺⁻)
-    aux3 = similar(R⁺⁻)
+    #aux1 = similar(R⁺⁻)
+    #aux2 = similar(R⁺⁻)
+    #aux3 = similar(R⁺⁻)
 
     if kn==1
         # No scattering in either the added layer or the composite layer.
@@ -79,4 +79,40 @@ function rt_interaction!(kn, R⁻⁺, T⁺⁺, R⁺⁻, T⁻⁻, r⁻⁺, t⁺�
                  
         return nothing 
     end
+end
+
+function rt_interaction!(R⁻⁺, T⁺⁺, R⁺⁻, T⁻⁻, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻,aux1,aux2,aux3)
+    # M1 = (I - R⁺⁻ * r⁻⁺) \ T⁺⁺;aux1 = similar(R⁺⁻)
+        #aux2 = similar(R⁺⁻);#I_static = one(similar(R⁺⁻))
+        #aux3 = similar(R⁺⁻); 
+        #aux1 = similar(R⁺⁻)
+        I_static = one(similar(R⁺⁻))
+        mul!(aux1, R⁺⁻, r⁻⁺)        # R⁺⁻ * r⁻⁺
+        @. aux1 = I_static - aux1   # (I - R⁺⁻ * r⁻⁺)
+        ldiv!(aux2, qr!(aux1), T⁺⁺) # M1 = (I - R⁺⁻ * r⁻⁺) \ T⁺⁺
+
+        # t_R⁻⁺ = R⁻⁺ + T⁻⁻ * r⁻⁺ * M1
+        mul!(aux1, r⁻⁺, aux2)   # r⁻⁺ * M1
+        mul!(aux3, T⁻⁻, aux1)   # T⁻⁻ * r⁻⁺ * M1
+        @. R⁻⁺ = R⁻⁺ + aux3     # t_R⁻⁺ = R⁻⁺ + T⁻⁻ * r⁻⁺ * M1
+        
+        # t_T⁺⁺ = t⁺⁺ * M1
+        mul!(T⁺⁺, t⁺⁺, aux2)
+
+        # Repeating for mirror-reflected directions
+
+        # M1 = (I - r⁻⁺ * R⁺⁻) \ t⁻⁻
+        mul!(aux1, r⁻⁺, R⁺⁻)        # r⁻⁺ * R⁺⁻
+        @. aux1 = I_static - aux1   # (I - r⁻⁺ * R⁺⁻)
+        ldiv!(aux2, qr!(aux1), t⁻⁻) # M1 = (I - r⁻⁺ * R⁺⁻) \ t⁻⁻
+
+        # t_R⁺⁻ = r⁺⁻ + t⁺⁺ * R⁺⁻ * M1
+        mul!(aux3, R⁺⁻, aux2)   # R⁺⁻ * M1
+        mul!(aux1, t⁺⁺, aux3)   # t⁺⁺ * R⁺⁻ * M1
+        @. R⁺⁻ = r⁺⁻ + aux1     # t_R⁺⁻ = r⁺⁻ + t⁺⁺ * R⁺⁻ * M1
+
+        # t_T⁻⁻ = T⁺⁺ * M1
+        mul!(T⁻⁻, T⁺⁺, aux2)
+                 
+        return nothing 
 end
