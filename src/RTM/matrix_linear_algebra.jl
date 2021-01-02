@@ -73,7 +73,7 @@ function LU_solve!(LU::AbstractArray{FT,2}, B::AbstractArray{FT,2}, X::AbstractA
 end
 
 @kernel function LU_solve_kernel!(LU, B, X, Y, pivot, n) where {FT}
-    col,batch, = @index(Global,NTuple)
+    col,batch = @index(Global,NTuple)
     #@show batch,col
     fill!(X, 0);
     fill!(Y, 0);
@@ -176,4 +176,20 @@ end
     end
 
     c[i,j] = tmp_sum
+end
+
+"Allocation free matrix multiplication"
+function mat_multiply(C::AbstractArray{FT,2}, B::AbstractArray{FT,2}, A::AbstractArray{FT,2}, ::Val{TBP}) where {FT,TPB}
+    sA = cuda.shared.array(shape=(TPB, TPB), dtype=float32)
+    sB = cuda.shared.array(shape=(TPB, TPB), dtype=float32)
+    @inbounds begin
+        @unroll for i = 1:n # for each column but the last
+            @unroll for j = 1:n
+                out[i,j] = in1[i,1] * in2[1,j];
+                @unroll for k = 2:n
+                    out[i, j] += in1[i, k] * in2[k, j];
+                end
+            end
+        end
+    end
 end
