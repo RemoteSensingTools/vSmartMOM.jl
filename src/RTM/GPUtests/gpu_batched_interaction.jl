@@ -10,9 +10,10 @@ using LinearAlgebra
 using NNlib
 CUDA.allowscalar(false)
 
+# Needs some warning if memory is getting too large !
 FT = Float32
 n = 32
-nSpec = 30000
+nSpec = 20000
 
 # Create CPU Matrices:
 r⁻⁺_ = (randn(FT, n, n, nSpec));
@@ -109,6 +110,22 @@ function getri_strided_batched(A::AbstractArray{Float32,3}, C::AbstractArray{Flo
     Cptrs = CUBLAS.unsafe_strided_batch(C)
     Aptrs = CUBLAS.unsafe_strided_batch(A)
     CUBLAS.cublasSgetriBatched(CUBLAS.handle(), n, Aptrs, lda, pivotArray, Cptrs, ldc, info, size(A, 3))
+    return nothing
+end
+
+# CUDA has no strided batched getri, but we can at least avoid constructing costly views (copied this over from gertf)
+function getri_strided_batched(A::AbstractArray{Float64,3}, C::AbstractArray{Float64,3}, pivotArray::CuMatrix{Cint})
+    m, n = size(A, 1), size(A, 2)
+    if m != n
+        throw(DimensionMismatch("All matrices must be square!"))
+    end
+    n = size(A, 1)
+    ldc = max(1, stride(C, 2))
+    lda = max(1, stride(A, 2))
+    info = CUDA.zeros(Cint, size(A, 3))
+    Cptrs = CUBLAS.unsafe_strided_batch(C)
+    Aptrs = CUBLAS.unsafe_strided_batch(A)
+    CUBLAS.cublasDgetriBatched(CUBLAS.handle(), n, Aptrs, lda, pivotArray, Cptrs, ldc, info, size(A, 3))
     return nothing
 end
 
