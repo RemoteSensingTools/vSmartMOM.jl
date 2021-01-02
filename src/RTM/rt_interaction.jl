@@ -3,7 +3,7 @@ function rt_interaction!(kn, R⁻⁺, T⁺⁺, R⁺⁻, T⁻⁻, r⁻⁺, t⁺�
                              
     # ToDo: Important output from this routine is R⁻⁺, R⁺⁻, T⁺⁺, T⁻⁻ (can be renamed to 𝐓⁻⁻, etc later)
     # Need to check with paper nomenclature. This is basically eqs. 23-28 in vSmartMOM)
-    Nquad4 = size(r⁻⁺, 1)
+    Nquadn = size(r⁻⁺, 1)
     # kn = 1: no scattering in either the added layer or composite layer.
     # kn = 2: composite layer has no scattering but added layer does.
     # kn = 3: composite layer has scattering but added layer does not.
@@ -17,10 +17,9 @@ function rt_interaction!(kn, R⁻⁺, T⁺⁺, R⁺⁻, T⁻⁻, r⁻⁺, t⁺�
 
     if kn==1
         # No scattering in either the added layer or the composite layer.
-        for iμ in 1:Nquad4
-            T⁻⁻[iμ, iμ] = t⁻⁻[iμ, iμ]*T⁻⁻[iμ, iμ]
-            T⁺⁺[iμ, iμ] = t⁺⁺[iμ, iμ]*T⁺⁺[iμ, iμ]
-        end
+        T⁻⁻ = t⁻⁻ * T⁻⁻
+        T⁺⁺ = t⁺⁺ * T⁺⁺
+        
         return nothing 
     elseif kn==2
         # No scattering in inhomogeneous composite layer.

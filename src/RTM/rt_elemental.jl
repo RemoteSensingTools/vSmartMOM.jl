@@ -1,5 +1,5 @@
 "Elemental single-scattering layer"
-function rt_elemental!(dτ, ϖ, Z⁺⁺, Z⁻⁺, m, ndoubl, scatter, qp_μ, wt_μ, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻)
+function rt_elemental!(pol_type, dτ, ϖ, Z⁺⁺, Z⁻⁺, m, ndoubl, scatter, qp_μ, wt_μ, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻, D)
     # ToDo: Main output is r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺ (can be renamed to t⁺⁺, etc)
     # Need to check with paper nomenclature. This is basically eqs. 19-20 in vSmartMOM
 
@@ -20,9 +20,9 @@ function rt_elemental!(dτ, ϖ, Z⁺⁺, Z⁻⁺, m, ndoubl, scatter, qp_μ, wt_
         #TODO: import vector containing quadrature weights wt_μ of length Nquad4
         #TODO: construct composite, post-truncation dτ=τ/2^{ndoubl} , ϖ, p⁺⁺, p⁻⁺ matrices and import them here
         
-        qp_μ4 = reduce(vcat, (fill.(qp_μ,[4])))
-        wt_μ4 = reduce(vcat, (fill.(wt_μ,[4])))
-        Nquad4 = length(qp_μ4)
+        qp_μ4 = reduce(vcat, (fill.(qp_μ,[pol_type.n])))
+        wt_μ4 = reduce(vcat, (fill.(wt_μ,[pol_type.n])))
+        Nquadn = length(qp_μ4)
 
         wct = m==0 ? 0.50 * ϖ * wt_μ4  : 0.25 * ϖ * wt_μ4
 
@@ -48,8 +48,14 @@ function rt_elemental!(dτ, ϖ, Z⁺⁺, Z⁻⁺, m, ndoubl, scatter, qp_μ, wt_
 
         #test = I - Diagonal(1 ./ qp_μ4) * dτ
         #@show t⁺⁺[1],  test[1], 1 ./ qp_μ4[1]
+        
         if ndoubl<1
-            for iμ = 1:Nquad4, jμ = 1:Nquad4
+            mul!(aux1, D, r⁻⁺)
+            mul!(r⁺⁻, aux1, D)
+
+            mul!(aux1, D, t⁺⁺)
+            mul!(t⁻⁻, aux1, D)
+            #=for iμ = 1:Nquad4, jμ = 1:Nquad4
                 # That "4" and Nquad4 needs to be dynamic, coming from the PolType struct.
                 i=mod(iμ-1,4)
                 j=mod(jμ-1,4)
@@ -60,15 +66,17 @@ function rt_elemental!(dτ, ϖ, Z⁺⁺, Z⁻⁺, m, ndoubl, scatter, qp_μ, wt_
                     r⁺⁻[iμ,jμ] = - r⁻⁺[iμ,jμ]
                     t⁻⁻[iμ,jμ] = - t⁺⁺[iμ,jμ]
                 end
-            end 
+            end =#  
         else
             #For doubling, transform R->DR, where D = Diagonal{1,1,-1,-1}
-            for iμ = 1:Nquad4;
+            mul!(aux1, D, r⁻⁺)
+            @. r⁻⁺ = aux1
+            #= for iμ = 1:Nquad4;
                 i=mod(iμ-1,4)    
                 if (i>=2)
                     r⁻⁺[iμ,:] = - r⁻⁺[iμ,:]
                 end
-            end 
+            end =#  
         end
     else
         t⁺⁺[:] = Diagonal{exp(-τ./qp_μ4)}
