@@ -82,5 +82,5 @@ function rt_elemental!(pol_type, dτ, ϖ, Z⁺⁺, Z⁻⁺, m, ndoubl, scatter, 
         t⁺⁺[:] = Diagonal{exp(-τ./qp_μ4)}
         t⁻⁻[:] = Diagonal{exp(-τ./qp_μ4)}
     end 
-    return nothing # r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻
+    return nothing 
 end
