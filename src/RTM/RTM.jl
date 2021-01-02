@@ -12,8 +12,9 @@ using FastGaussQuadrature
 using CUDA
 using TimerOutputs
 
+
 include("types.jl") 
-include("RTM_main.jl")
+include("rt_streams.jl")
 include("atmo_prof.jl")
 include("rt_elemental.jl")
 include("rt_doubling.jl")

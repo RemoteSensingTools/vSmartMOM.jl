@@ -67,16 +67,40 @@ struct PCW <: AbstractFourierDecompositionType end
 
 Abstract Polarization type 
 """
-abstract type AbstractPolarizationType end
+abstract type AbstractPolarizationType  end
 
 "Use full Stokes Vector ([I,Q,U,V])"
-struct Stokes_IQUV <: AbstractPolarizationType end
+@with_kw struct Stokes_IQUV{FT<:AbstractFloat} <: AbstractPolarizationType
+    n::Int = 4
+    D::Array{FT}  = FT[1, 1, -1, -1]
+    I0::Array{FT} = [1, 0, 0, 0] #assuming completely unpolarized incident stellar radiation
+end
 
 "Use part of Stokes Vector ([I,Q,U])"
-struct Stokes_IQU <: AbstractPolarizationType end
+@with_kw struct Stokes_IQU{FT<:AbstractFloat} <: AbstractPolarizationType 
+    n::Int = 3
+    D::Array{FT}  = FT[1, 1, -1]
+    I0::Array{FT} = [1, 0, 0] #assuming linearly unpolarized incident stellar radiation
+end
 
-"Use scalar only ([I]):"
-struct Stokes_I <: AbstractPolarizationType end
+
+
+"""
+    struct Stokes_I{FT<:AbstractFloat}
+
+A struct which define scalar I only RT code
+
+# Fields
+$(DocStringExtensions.FIELDS)
+"""
+@with_kw struct Stokes_I{FT<:AbstractFloat} <: AbstractPolarizationType 
+    "Number of Stokes components (int)"
+    n::Int = 1
+    "Vector of length `n` for ... (see eq in Sanghavi )"
+    D::Array{FT} = FT[1]
+    "Incoming Stokes vector for scalar only"
+    I0::Array{FT} = [1]
+end
 
 #####
 ##### Types of Truncation (for Legendre terms)

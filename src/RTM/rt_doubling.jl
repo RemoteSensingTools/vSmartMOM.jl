@@ -1,9 +1,9 @@
 
 "Prototype doubling methods, compute homogenous layer matrices from its elemental layer in `ndoubl` doubling steps"
-function rt_doubling!(dτ, τ_total, ndoubl, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻)
+function rt_doubling!(dτ, τ_total, ndoubl, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻, D)
     # # ToDo: Important output doubling applied to elemental layer, using same variables r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺ (can be renamed to t⁺⁺, etc)
     # Need to check with paper nomenclature. This is basically eqs. 23-28 in vSmartMOM but using simplifications in eq. 29-32)
-    Nquad4 = size(r⁻⁺, 1)
+    Nquadn = size(r⁻⁺, 1)
     if (ndoubl==0)
         @assert (τ_total==dτ*2^ndoubl)
         return nothing 
@@ -34,7 +34,18 @@ function rt_doubling!(dτ, τ_total, ndoubl, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻)
 
         τ_total = 2 * τ_total
     end
-    for iμ = 1:Nquad4, jμ = 1:Nquad4
+    #After doubling, revert D(DR)->R, where D = Diagonal{1,1,-1,-1}
+    mul!(aux1, D, r⁻⁺)
+    @. r⁻⁺ = aux1
+
+    #Using r⁺⁻ = Dr⁻⁺D
+    mul!(aux1, D, r⁻⁺)
+    mul!(r⁺⁻, aux1, D)
+
+    #Using t⁻⁻ = Dt⁺⁺D
+    mul!(aux1, D, t⁺⁺)
+    mul!(t⁻⁻, aux1, D)
+    #=for iμ = 1:Nquad4, jμ = 1:Nquad4
         # That "4" and Nquad4 needs to be dynamic, coming from the PolType struct.
         i=mod(iμ-1,4)
         j=mod(jμ-1,4)
@@ -49,7 +60,8 @@ function rt_doubling!(dτ, τ_total, ndoubl, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻)
             r⁺⁻[iμ,jμ] = - r⁻⁺[iμ,jμ]
             t⁻⁻[iμ,jμ] = - t⁺⁺[iμ,jμ]
         end
-    end 
+    end =#
+
     @assert (τ_total==dτ*2^ndoubl)
     return nothing 
 end

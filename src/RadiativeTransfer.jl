@@ -3,6 +3,7 @@ using Pkg.Artifacts
 using LinearAlgebra
 using Distributions
 using CUDA
+using Parameters
 
 # Export Architecture functions
 export CPU, GPU, default_architecture, array_type

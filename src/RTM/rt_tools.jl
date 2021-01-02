@@ -1,19 +1,27 @@
 # atmospheric RTM
-function run_RTM(polarization_type, sza, vza, vaz, τRayl,ϖRayl, τAer, ϖAer, fᵗ, qp_μ, wt_μ, Ltrunc, aerosol_optics, GreekRayleigh)
+function run_RTM(pol_type, sza, vza, vaz, τRayl,ϖRayl, τAer, ϖAer, fᵗ, qp_μ, wt_μ, Ltrunc, aerosol_optics, GreekRayleigh)
     FT = eltype(τRayl)
 
     #Output variables: Reflected and transmitted solar irradiation at TOA and BOA respectively
-    R = zeros(length(vza),4)
-    T = zeros(length(vza),4)    
+    R = zeros(length(vza),pol_type.n)
+    T = zeros(length(vza),pol_type.n)    
     μ0 = cosd(sza)
+    @show(μ0)
     iμ0 = nearest_point(qp_μ, μ0) # input μ0 = cos(SZA)
-    I0 = [1, 0, 0, 0] #assuming completely unpolarized incident stellar radiation
+    @show(iμ0)
+    dims = size(qp_μ)
+    @show dims
+    Nquadn = pol_type.n*dims[1]
+    #I0 = [1, 0, 0, 0] #assuming completely unpolarized incident stellar radiation
+    D = Diagonal(repeat(pol_type.D, size(qp_μ)[1]))
+    #@show D
     #get vertical grid
     #get solar+viewing geometry, compute streams
     #compute Aersol SSP
     #compute Rayleigh SSP
     Nz = length(τRayl)
     Naer = length(aerosol_optics)
+    qp_μ4 = reduce(vcat, (fill.(qp_μ,[pol_type.n])))
     for m=0:Ltrunc-1
         @show m
         if (m==0)
@@ -23,15 +31,17 @@ function run_RTM(polarization_type, sza, vza, vaz, τRayl,ϖRayl, τAer, ϖAer, 
         end
         #compute Zmp_Aer, Zpp_Aer, Zmp_Rayl, Zpp_Rayl
         # For m>=3, Rayleigh matrices will be 0, can catch with if statement if wanted 
-        Rayl𝐙⁺⁺, Rayl𝐙⁻⁺ = PhaseFunction.compute_Z_moments(polarization_type, qp_μ, GreekRayleigh, m);
-        dims = size(Rayl𝐙⁺⁺)
+        Rayl𝐙⁺⁺, Rayl𝐙⁻⁺ = PhaseFunction.compute_Z_moments(pol_type, qp_μ, GreekRayleigh, m);
+        @show size(Rayl𝐙⁺⁺)
+
         nAer = length(aerosol_optics)
-        Nquad4 = dims[1]
+        dims = size(Rayl𝐙⁺⁺)
+        
         Aer𝐙⁺⁺ = [zeros(FT,dims) for i in 1:nAer]
         Aer𝐙⁻⁺ = similar(Aer𝐙⁺⁺)
 
         for i = 1:nAer
-            Aer𝐙⁺⁺[i], Aer𝐙⁻⁺[i] = PhaseFunction.compute_Z_moments(polarization_type, qp_μ, aerosol_optics[i].greek_coefs, m)
+            Aer𝐙⁺⁺[i], Aer𝐙⁻⁺[i] = PhaseFunction.compute_Z_moments(pol_type, qp_μ, aerosol_optics[i].greek_coefs, m)
         end
         
         # Homogenous R and T matrices
@@ -59,16 +69,18 @@ function run_RTM(polarization_type, sza, vza, vaz, τRayl,ϖRayl, τAer, ϖAer, 
                 scatter=true
             end        
             if (scatter)
-                @timeit "elemental" rt_elemental!(dτ, ϖ, Z⁺⁺, Z⁻⁺, m, ndoubl, scatter,qp_μ, wt_μ, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻)
-                @timeit "doubling" rt_doubling!(dτ, τ, ndoubl, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻)
+                @timeit "elemental" rt_elemental!(pol_type, dτ, ϖ, Z⁺⁺, Z⁻⁺, m, ndoubl, scatter, qp_μ, wt_μ, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻, D)
+                @timeit "doubling" rt_doubling!(dτ, τ, ndoubl, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻, D)
             else
                 r⁻⁺ = 0
                 r⁺⁻ = 0
-                for i = 1:Nquad4
-                    ii=1+floor(Int,(i-1)/4)
+                t⁺⁺ = Diagonal(exp(-τ/qp_μ4))
+                t⁻⁻ = Diagonal(exp(-τ/qp_μ4))
+                #=for i = 1:Nquadn
+                    ii=1+floor(Int,(i-1)/pol_type.n)
                     t⁺⁺[i,i] = exp(-τ/qp_μ[ii])
                     t⁻⁻[i,i] = exp(-τ/qp_μ[ii])
-                end
+                end =#
             end
             kn = get_kn(kn, scatter, iz)
             
@@ -84,23 +96,35 @@ function run_RTM(polarization_type, sza, vza, vaz, τRayl,ϖRayl, τAer, ϖAer, 
 
         # include surface function
         # TBD
-        
+        st_iμ0 = (iμ0-1)*pol_type.n
+        istart0 = st_iμ0 + 1
+        iend0   = st_iμ0 + pol_type.n
         for i = 1:length(vza)
             iμ = nearest_point(qp_μ, cosd(vza[i])) #input vaz, vza as arrays
             #@show i, vza[i], cosd(vza[i]), iμ, qp_μ[iμ]
             # compute bigCS
             cos_m_phi = cosd(m * vaz[i])
             sin_m_phi = sind(m * vaz[i])
-            bigCS = Diagonal([cos_m_phi, cos_m_phi, sin_m_phi, sin_m_phi])
+            if pol_type.n==4
+                bigCS = Diagonal([cos_m_phi, cos_m_phi, sin_m_phi, sin_m_phi])
+            elseif pol_type.n==3    
+                bigCS = Diagonal([cos_m_phi, cos_m_phi, sin_m_phi])
+            elseif pol_type.n==1
+                bigCS = Diagonal([cos_m_phi])
+            end
             # accumulate Fourier moments after azimuthal weighting
             #Measurement at the TOA
-            st_iμ  = (iμ-1)*4+1
-            st_iμ0 = (iμ0-1)*4+1
-            #@show st_iμ:st_iμ+3, iμ0,st_iμ0:st_iμ0+3
+            st_iμ  = (iμ-1)*pol_type.n
+            istart = st_iμ + 1
+            iend   = st_iμ + pol_type.n
+            #@show st_iμ+1:st_iμ+pol_type.n, iμ0,st_iμ0+1:st_iμ0+pol_type.n
             #@show size(R⁻⁺)
-            R[i,:] += weight * bigCS * (R⁻⁺[st_iμ:st_iμ+3, st_iμ0:st_iμ0+3]/wt_μ[iμ0]) * I0
+            
+            R[i,:] += weight * bigCS * (R⁻⁺[istart:iend, istart0:iend0]/wt_μ[iμ0]) * pol_type.I0
+            @show weight * bigCS * R⁻⁺[istart:iend, istart0:iend0]
+            @show wt_μ[iμ0]
             #Measurement at the BOA
-            T[i,:] += weight * bigCS * (T⁺⁺[st_iμ:st_iμ+3, st_iμ0:st_iμ0+3]/wt_μ[iμ0]) * I0     
+            T[i,:] += weight * bigCS * (T⁺⁺[istart:iend, istart0:iend0]/wt_μ[iμ0]) * pol_type.I0     
             #if m==0
             #    @show bigCS
             #    @show m, i, iμ, bigCS[1,1], weight*R⁻⁺[(iμ-1)*4+1, (iμ0-1)*4+1]/wt_μ[iμ0]   
