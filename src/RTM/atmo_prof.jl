@@ -20,7 +20,7 @@ function read_atmos_profile(file::String, lat::Real, lon::Real, time_idx::Int; g
     lat_idx, lon_idx = argmin(abs.(file_lats .- lat)), argmin(abs.(file_lons .- lon))
 
     # Temperature profile
-    @timeit "gettinng T" T = convert(Array{FT,1}, ds["T"][lon_idx, lat_idx,  :, time_idx])
+    @timeit "getting T" T = convert(Array{FT,1}, ds["T"][lon_idx, lat_idx,  :, time_idx])
 
     # Specific humidity profile
     q = convert(Array{FT,1}, ds["QV"][lon_idx, lat_idx, :, time_idx])
@@ -67,12 +67,12 @@ end
 # psurf in hPa, λ in μm 
 function getRayleighLayerOptProp(psurf, λ, depol_fct, vcd_dry) 
     # Total vertical Rayleigh scattering optical thickness 
-    tau_scat = 0.00864 * (psurf/1013.25) * λ^(-3.916 - 0.074*λ - 0.05/λ) 
-    tau_scat = tau_scat*(6.0+3.0*depol_fct)/(6.0-7.0*depol_fct)
+    tau_scat = 0.00864 * (psurf / 1013.25) * λ^(-3.916 - 0.074 * λ - 0.05 / λ) 
+    tau_scat = tau_scat * (6.0 + 3.0 * depol_fct) / (6.0 - 7.0 * depol_fct)
     @show psurf, tau_scat, depol_fct
     Nz = length(vcd_dry)
     τRayl = zeros(Nz)
-    k = tau_scat/sum(vcd_dry)
+    k = tau_scat / sum(vcd_dry)
     for i = 1:Nz
         τRayl[i] = k * vcd_dry[i]
     end
@@ -80,27 +80,27 @@ function getRayleighLayerOptProp(psurf, λ, depol_fct, vcd_dry)
     return τRayl
 end
 
-#Gaussian distribution on a pressure grid
+# Gaussian distribution on a pressure grid
 function getAerosolLayerOptProp(total_τ, p₀, σp, p_half)
     Nz = length(p_half)
     ρ = zeros(Nz)
     for i = 2:Nz
-        dp = p_half[i]-p_half[i-1]
-        ρ[i] = (1/(σp*sqrt(2π)))*exp(-(p_half[i]-p₀)^2/(2σp^2))*dp
-         #@show ρ[i]  
+        dp = p_half[i] - p_half[i - 1]
+        ρ[i] = (1 / (σp * sqrt(2π))) * exp(-(p_half[i] - p₀)^2 / (2σp^2)) * dp
+         # @show ρ[i]  
     end
     Norm = sum(ρ)
-    #@show Norm
-    τAer  =  (total_τ/Norm) * ρ
+    # @show Norm
+    τAer  =  (total_τ / Norm) * ρ
     return τAer
 end
 
-#computes the composite single scattering parameters (τ, ϖ, Z⁺⁺, Z⁻⁺) for a given atmospheric layer iz for a given Fourier component m
+# computes the composite single scattering parameters (τ, ϖ, Z⁺⁺, Z⁻⁺) for a given atmospheric layer iz for a given Fourier component m
 function construct_atm_layer(τRayl, τAer, ϖRayl, ϖAer, fᵗ, Rayl𝐙⁺⁺, Rayl𝐙⁻⁺, Aer𝐙⁺⁺, Aer𝐙⁻⁺)
     FT = eltype(τRayl)
     @assert length(τAer) == length(ϖAer) == length(fᵗ) "Sizes don't match"
     
-    #@show τRayl , sum(τAer)
+    # @show τRayl , sum(τAer)
 
     τ = FT(0)
     ϖ = FT(0)
@@ -109,7 +109,7 @@ function construct_atm_layer(τRayl, τAer, ϖRayl, ϖAer, fᵗ, Rayl𝐙⁺⁺,
     Z⁻⁺ = similar(Rayl𝐙⁺⁺);
     
     if (τRayl + sum(τAer)) < eps(FT)
-        fill!(Z⁺⁺,0); fill!(Z⁻⁺,0);
+        fill!(Z⁺⁺, 0); fill!(Z⁻⁺, 0);
         return FT(0), FT(1), Z⁺⁺, Z⁻⁺
     end
     # @show τRayl, ϖRayl
@@ -123,9 +123,9 @@ function construct_atm_layer(τRayl, τAer, ϖRayl, ϖAer, fᵗ, Rayl𝐙⁺⁺,
     for i = 1:length(τAer)
         τ += τAer[i]
         ϖ += τAer[i] * ϖAer[i]
-        A += τAer[i] * ϖAer[i] * (1-fᵗ[i])
-        Z⁺⁺ += τAer[i] * ϖAer[i] * (1-fᵗ[i]) * Aer𝐙⁺⁺[i]
-        Z⁻⁺ += τAer[i] * ϖAer[i] * (1-fᵗ[i]) * Aer𝐙⁻⁺[i]
+        A += τAer[i] * ϖAer[i] * (1 - fᵗ[i])
+        Z⁺⁺ += τAer[i] * ϖAer[i] * (1 - fᵗ[i]) * Aer𝐙⁺⁺[i]
+        Z⁻⁺ += τAer[i] * ϖAer[i] * (1 - fᵗ[i]) * Aer𝐙⁻⁺[i]
     end
     
     Z⁺⁺ /= A
@@ -133,9 +133,9 @@ function construct_atm_layer(τRayl, τAer, ϖRayl, ϖAer, fᵗ, Rayl𝐙⁺⁺,
     A /= ϖ
     ϖ /= τ
     
-    #Rescaling composite SSPs according to Eqs. A.3 of Sanghavi et al. (2013) or Eqs.(8) of Sanghavi & Stephens (2015)
-    τ *= (FT(1)-(FT(1)-A)*ϖ)
-    ϖ *= ϖ*A / (1-(1-A)*ϖ)
+    # Rescaling composite SSPs according to Eqs. A.3 of Sanghavi et al. (2013) or Eqs.(8) of Sanghavi & Stephens (2015)
+    τ *= (FT(1) - (FT(1) - A) * ϖ)
+    ϖ *= ϖ * A / (1 - (1 - A) * ϖ)
     return τ, ϖ, Z⁺⁺, Z⁻⁺  
 end
 
