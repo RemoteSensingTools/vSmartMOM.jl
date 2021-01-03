@@ -1,6 +1,8 @@
 "Simulates the full atmosphere from n distinct homogeneous layers"
-function rt_interaction!(kn, R⁻⁺, T⁺⁺, R⁺⁻, T⁻⁻, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻,aux1,aux2,aux3)
-                             
+function rt_interaction!(kn, R⁻⁺, T⁺⁺, R⁺⁻, T⁻⁻, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻)
+    aux2 = similar(R⁺⁻);# I_static = one(similar(R⁺⁻))
+    aux3 = similar(R⁺⁻); 
+    aux1 = similar(R⁺⁻)                     
     # ToDo: Important output from this routine is R⁻⁺, R⁺⁻, T⁺⁺, T⁻⁻ (can be renamed to 𝐓⁻⁻, etc later)
     # Need to check with paper nomenclature. This is basically eqs. 23-28 in vSmartMOM)
     Nquadn = size(r⁻⁺, 1)
@@ -11,29 +13,29 @@ function rt_interaction!(kn, R⁻⁺, T⁺⁺, R⁺⁻, T⁻⁻, r⁻⁺, t⁺�
 
     # Create temporary matrices
     I_static = one(similar(R⁺⁻))
-    #aux1 = similar(R⁺⁻)
-    #aux2 = similar(R⁺⁻)
-    #aux3 = similar(R⁺⁻)
+    # aux1 = similar(R⁺⁻)
+    # aux2 = similar(R⁺⁻)
+    # aux3 = similar(R⁺⁻)
 
-    if kn==1
+    if kn == 1
         # No scattering in either the added layer or the composite layer.
         T⁻⁻ = t⁻⁻ * T⁻⁻
         T⁺⁺ = t⁺⁺ * T⁺⁺
         
         return nothing 
-    elseif kn==2
+    elseif kn == 2
         # No scattering in inhomogeneous composite layer.
         # scattering in homogeneous layer which is added 
         # to the bottom of the composite layer.
         # Produces a new, scattering composite layer.
-        M1=T⁻⁻
-        M2=T⁺⁺
+        M1 = T⁻⁻
+        M2 = T⁺⁺
         R⁻⁺[:] = M1 * r⁻⁺ * M2
         R⁺⁻[:] = r⁺⁻
         T⁺⁺[:] = t⁺⁺ * M2
         T⁻⁻[:] = M1 * t⁻⁻
         return nothing 
-    elseif kn==3
+    elseif kn == 3
         # Scattering in inhomogeneous composite layer.
         # no scattering in homogeneous layer which is 
         # added to the bottom of the composite layer.
@@ -42,7 +44,7 @@ function rt_interaction!(kn, R⁻⁺, T⁺⁺, R⁺⁻, T⁻⁻, r⁻⁺, t⁺�
         T⁻⁻[:] = T⁻⁻ * t⁻⁻
         R⁺⁻[:] = t⁺⁺ * R⁺⁻ * t⁻⁻
         return nothing 
-    elseif kn==4
+    elseif kn == 4
         # Scattering in inhomogeneous composite layer.
         # scattering in homogeneous layer which is 
         # added to the bottom of the composite layer.
@@ -80,11 +82,11 @@ function rt_interaction!(kn, R⁻⁺, T⁺⁺, R⁺⁻, T⁻⁻, r⁻⁺, t⁺�
     end
 end
 
-function rt_interaction!(R⁻⁺, T⁺⁺, R⁺⁻, T⁻⁻, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻,aux1,aux2,aux3)
+function rt_interaction!(R⁻⁺, T⁺⁺, R⁺⁻, T⁻⁻, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻, aux1, aux2, aux3)
     # M1 = (I - R⁺⁻ * r⁻⁺) \ T⁺⁺;aux1 = similar(R⁺⁻)
-        #aux2 = similar(R⁺⁻);#I_static = one(similar(R⁺⁻))
-        #aux3 = similar(R⁺⁻); 
-        #aux1 = similar(R⁺⁻)
+        # aux2 = similar(R⁺⁻);#I_static = one(similar(R⁺⁻))
+        # aux3 = similar(R⁺⁻); 
+        # aux1 = similar(R⁺⁻)
         I_static = one(similar(R⁺⁻))
         mul!(aux1, R⁺⁻, r⁻⁺)        # R⁺⁻ * r⁻⁺
         @. aux1 = I_static - aux1   # (I - R⁺⁻ * r⁻⁺)
