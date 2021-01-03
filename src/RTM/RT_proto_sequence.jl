@@ -17,7 +17,7 @@ truncation_type   = PhaseFunction.δBGE(Ltrunc, 2.0)
 polarization_type = Stokes_IQUV{FT}()
 
 # Quadrature points for RTM
-Nquad, qp_μ, wt_μ = rt_set_streams(RTM.RadauQuad(), Ltrunc, 60.0, [0.0, 15.0, 30., 45., 60.])
+Nquad, qp_μ, wt_μ = rt_set_streams(RTM.RadauQuad(), Ltrunc, FT(60.0), FT[0.0, 15.0, 30., 45., 60.])
 
 # Aerosol particle distribution and properties
 μ            = [0.3] # [0.3,2.0]       # Log mean radius
@@ -85,42 +85,18 @@ profile_caltech = RTM.read_atmos_profile(file, myLat, myLon, timeIndex);
 # τAer_2 = RTM.getAerosolLayerOptProp(0.3, p₀[2], σp[2], profile_caltech.p_levels)
 
 # Can be done with arbitrary length later:
-τAer = 0 * τAer_1 # [τAer_1 τAer_2]
-@show sum(τAer_1)# , sum(τAer_2)
+τAer = 0.1 * τAer_1 # [τAer_1 τAer_2]
+@show sum(τAer)# , sum(τAer_2)
 ϖAer = [aerosol_optics_NAI2_aero1.ω̃] # [aerosol_optics_NAI2_aero1.ω̃ aerosol_optics_NAI2_aero2.ω̃];
 fᵗ   = [aerosol_optics_trunc_aero1.fᵗ] # [aerosol_optics_trunc_aero1.fᵗ aerosol_optics_trunc_aero2.fᵗ];
 
 
-# In[ ]:
 
-
-(τAer[10,:])
-profile_caltech.p_levels[73]
-using StaticArrays
-
-
-# In[ ]:
-
-
-m = 0
-RaylZ⁺⁺, RaylZ⁻⁺     = PhaseFunction.compute_Z_moments(polarization_type, qp_μ, GreekRayleigh, m);
-aero1_Z⁺⁺, aero1_Z⁻⁺ = PhaseFunction.compute_Z_moments(polarization_type, qp_μ, aerosol_optics_trunc_aero1.greek_coefs, m);
-# aero2_Z⁺⁺, aero2_Z⁻⁺ = PhaseFunction.compute_Z_moments(polarization_type, qp_μ, aerosol_optics_trunc_aero2.greek_coefs, m);
 aerosol_optics = [aerosol_optics_trunc_aero1] # [aerosol_optics_trunc_aero1 aerosol_optics_trunc_aero2]
 Aer𝐙⁺⁺ = [aero1_Z⁺⁺] # [aero1_Z⁺⁺, aero2_Z⁺⁺];
 Aer𝐙⁻⁺ = [aero1_Z⁻⁺] # [aero1_Z⁻⁺, aero2_Z⁻⁺];
-@show size(τAer[1])
-iz = 10
-τ, ϖ, Z⁺⁺, Z⁻⁺  = RTM.construct_atm_layer(τRayl[iz], τAer[iz,:], ϖRayl[iz], ϖAer, fᵗ, RaylZ⁺⁺, RaylZ⁻⁺, Aer𝐙⁺⁺, Aer𝐙⁻⁺)
-@show τ, ϖ
-@show τAer[iz], τRayl[iz]
-@show size(aero1_Z⁺⁺)
 
-
-# In[ ]:
-
-
-@time R, T = RTM.run_RTM(polarization_type, sza, vza, vaz, τRayl, ϖRayl, τAer, ϖAer, fᵗ, qp_μ, wt_μ, 3, aerosol_optics, GreekRayleigh)
+@time R, T = RTM.run_RTM(polarization_type, sza, vza, vaz, τRayl, ϖRayl, τAer, ϖAer, fᵗ, qp_μ, wt_μ, 3, aerosol_optics, GreekRayleigh);
 
 
 

@@ -40,7 +40,7 @@ function run_RTM(pol_type, sza, vza, vaz, τRayl, ϖRayl, τAer, ϖAer, fᵗ, qp
         Aer𝐙⁺⁺ = [zeros(FT, dims) for i in 1:nAer]
         Aer𝐙⁻⁺ = similar(Aer𝐙⁺⁺)
 
-        for i = 1:nAer
+        @timeit "Aerosol Z" for i = 1:nAer
             Aer𝐙⁺⁺[i], Aer𝐙⁻⁺[i] = PhaseFunction.compute_Z_moments(pol_type, qp_μ, aerosol_optics[i].greek_coefs, m)
         end
         
