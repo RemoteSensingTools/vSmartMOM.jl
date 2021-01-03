@@ -73,8 +73,8 @@ function LU_solve!(LU::AbstractArray{FT,2}, B::AbstractArray{FT,2}, X::AbstractA
 end
 
 @kernel function LU_solve_kernel!(LU, B, X, Y, pivot, n) where {FT}
-    col,batch = @index(Global,NTuple)
-    #@show batch,col
+    col, batch = @index(Global,NTuple)
+    # @show batch,col
     fill!(X, 0);
     fill!(Y, 0);
     @inbounds begin
@@ -122,7 +122,7 @@ function mat_add!(out::AbstractArray{FT,2}, in::AbstractArray{FT,2}, n) where {F
     end
 end
 
-function mat_add!(out::AbstractArray{FT,2}, in::AbstractArray{FT,2},in2::AbstractArray{FT,2}, n) where {FT}
+function mat_add!(out::AbstractArray{FT,2}, in::AbstractArray{FT,2}, in2::AbstractArray{FT,2}, n) where {FT}
     @inbounds begin
         for i = 1:n # for each column but the last
             for j = 1:n
@@ -133,10 +133,10 @@ function mat_add!(out::AbstractArray{FT,2}, in::AbstractArray{FT,2},in2::Abstrac
 end
 
 "Allocation free matrix multiplication"
-function eye_minus_matrix!(out::AbstractArray{FT,3},n) where {FT}
+function eye_minus_matrix!(out::AbstractArray{FT,3}, n) where {FT}
     @inbounds begin
         for i = 1:n # for each column but the last
-            for j=1:n
+            for j = 1:n
                 out[j,i] = -out[j,i]
             end
             out[i,i] += 1 
@@ -145,26 +145,75 @@ function eye_minus_matrix!(out::AbstractArray{FT,3},n) where {FT}
 end
 
 function mat_multiply!(out::AbstractArray{FT,3}, in1::AbstractArray{FT,3}, in2::AbstractArray{FT,3}) where {FT}
-    @tensor out[i,k,N] = in1[i,j,N]*in2[j,k,N]
+    @tensor out[i,k,N] = in1[i,j,N] * in2[j,k,N]
 end
 
 # Batched Matrix Multiplication
 @macroexpand @kernel function matmul_kernel!(a, b, c, tmp)
     i, j, n = @index(Global, NTuple)
     # creating a temporary sum variable for matrix multiplication
-    @unroll for k = 1:size(a,2)
+    @unroll for k = 1:size(a, 2)
         tmp[n] += a[i,k,n] * b[k, j,n]
     end
     c[i,j,n] = tmp[n]
 end
 
 function matmul!(a, b, c)
-    @assert size(a,2) == size(b,1) "Matrix size mismatch!"
-    for i=1:size(a,3)
-        kernel!(view(a,:,:,i), view(b,:,:,i), view(c,:,:,i), ndrange=size(c[:,:,1]))
+    @assert size(a, 2) == size(b, 1) "Matrix size mismatch!"
+    for i = 1:size(a, 3)
+        kernel!(view(a, :, :, i), view(b, :, :, i), view(c, :, :, i), ndrange=size(c[:,:,1]))
     end
     synchronize() 
+    end
+
+@kernel function applyD!(r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻)
+    I = @index(Global, Cartesian)
+    # @show I
+    if (mod(I[1] - 1, 4) >= 2)
+        r⁻⁺[I] = - r⁻⁺[I]
+    end
+    if ((mod(I[1] - 1, 4) <= 1) & (mod(I[2] - 1, 4) <= 1)) | ((mod(I[1] - 1, 4) >= 2) & (mod(I[2] - 1, 4) >= 2))
+        r⁺⁻[I] = r⁻⁺[I]
+        t⁻⁻[I] = t⁺⁺[I]
+    else
+        r⁺⁻[I] = - r⁻⁺[I]
+        t⁻⁻[I] = - t⁺⁺[I]
+    end
 end
+
+if (mod(iμ - 1, 4) >= 2)
+    r⁻⁺[iμ,jμ,:] = - r⁻⁺[iμ, jμ,:]
+end
+if ((mod(iμ - 1, 4) <= 1) & (mod(jμ - 1, 4) <= 1)) | ((mod(iμ - 1, 4) >= 2) & (mod(jμ - 1, 4) >= 2))
+    r⁺⁻[iμ,jμ,:] = r⁻⁺[iμ,jμ,:]
+    t⁻⁻[iμ,jμ,:] = t⁺⁺[iμ,jμ,:]
+else
+    r⁺⁻[iμ,jμ,:] = - r⁻⁺[iμ,jμ,:]
+    t⁻⁻[iμ,jμ,:] = - t⁺⁺[iμ,jμ,:]
+end
+
+function test(r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻)
+    Nquad4 = size(r⁻⁺, 2)
+
+        for iμ in 1:Nquad4, jμ in 1:Nquad4
+            # That "4" and Nquad4 needs to be dynamic, coming from the PolType struct.
+            i = mod(iμ - 1, 4)
+            j = mod(jμ - 1, 4)
+            # @show i,j
+            if (i >= 2)
+                @views r⁻⁺[iμ,jμ,:] .= - r⁻⁺[iμ, jμ,:]
+            end
+            if ((i <= 1) & (j <= 1)) | ((i >= 2) & (j >= 2))
+                @views r⁺⁻[iμ,jμ,:] .= r⁻⁺[iμ,jμ,:]
+                @views t⁻⁻[iμ,jμ,:] .= t⁺⁺[iμ,jμ,:]
+            else
+                @views r⁺⁻[iμ,jμ,:] .= - r⁻⁺[iμ,jμ,:]
+                @views t⁻⁻[iμ,jμ,:] .= - t⁺⁺[iμ,jμ,:]
+            end
+        end 
+        synchronize()
+end
+
 
 @kernel function matmul_kernel!(a, b, c)
     i, j = @index(Global, NTuple)
@@ -191,5 +240,5 @@ function mat_multiply(C::AbstractArray{FT,2}, B::AbstractArray{FT,2}, A::Abstrac
                 end
             end
         end
-    end
-end
+            end
+        end                
