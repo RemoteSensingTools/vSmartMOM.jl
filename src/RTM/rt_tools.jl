@@ -3,16 +3,16 @@ using ..Architectures: devi, default_architecture
 # atmospheric RTM
 function run_RTM(pol_type, sza, vza, vaz, τRayl, ϖRayl, τAer, ϖAer, fᵗ, qp_μ, wt_μ, Ltrunc, aerosol_optics, GreekRayleigh)
     FT = eltype(τRayl)
-
+    @show FT
     # Output variables: Reflected and transmitted solar irradiation at TOA and BOA respectively
     R = zeros(length(vza), pol_type.n)
     T = zeros(length(vza), pol_type.n)    
     μ0 = cosd(sza)
-    @show(μ0)
+    # @show(μ0)
     iμ0 = nearest_point(qp_μ, μ0) # input μ0 = cos(SZA)
-    @show(iμ0)
+    # @show(iμ0)
     dims = size(qp_μ)
-    @show dims
+    # @show dims
     Nquadn = pol_type.n * dims[1]
     # I0 = [1, 0, 0, 0] #assuming completely unpolarized incident stellar radiation
     D = Diagonal(repeat(pol_type.D, size(qp_μ)[1]))
@@ -25,7 +25,7 @@ function run_RTM(pol_type, sza, vza, vaz, τRayl, ϖRayl, τAer, ϖAer, fᵗ, qp
     Naer = length(aerosol_optics)
     qp_μ4 = reduce(vcat, (fill.(qp_μ, [pol_type.n])))
     for m = 0:Ltrunc - 1
-        @show m
+        # @show m
 
         weight = m == 0 ? 0.5 : 1.0
 
@@ -59,8 +59,9 @@ function run_RTM(pol_type, sza, vza, vaz, τRayl, ϖRayl, τAer, ϖAer, fᵗ, qp
         kn = 0
         # loop over vertical layers:
         for iz = 1:Nz  # Count from TOA to BOA
-            τ, ϖ, Z⁺⁺, Z⁻⁺ = construct_atm_layer(τRayl[iz], τAer[iz,:], ϖRayl[iz], ϖAer, fᵗ, Rayl𝐙⁺⁺, Rayl𝐙⁻⁺, Aer𝐙⁺⁺, Aer𝐙⁻⁺)
+            @timeit "Constructing" τ, ϖ, Z⁺⁺, Z⁻⁺ = construct_atm_layer(τRayl[iz], τAer[iz,:], ϖRayl[iz], ϖAer, fᵗ, Rayl𝐙⁺⁺, Rayl𝐙⁻⁺, Aer𝐙⁺⁺, Aer𝐙⁻⁺)
             dτ_max = minimum([τ, 0.2 * minimum(qp_μ)])
+            # @show dτ_max, τ, 0.2 * minimum(qp_μ)
             dτ, ndoubl = doubling_number(dτ_max, τ)
             scatter = false
             if (sum(τAer) > 1.e-8)
@@ -121,8 +122,8 @@ function run_RTM(pol_type, sza, vza, vaz, τRayl, ϖRayl, τAer, ϖAer, fᵗ, qp
             # @show size(R⁻⁺)
             
             R[i,:] += weight * bigCS * (R⁻⁺[istart:iend, istart0:iend0] / wt_μ[iμ0]) * pol_type.I0
-            @show weight * bigCS * R⁻⁺[istart:iend, istart0:iend0]
-            @show wt_μ[iμ0]
+            # @show weight * bigCS * R⁻⁺[istart:iend, istart0:iend0]
+            # @show wt_μ[iμ0]
             # Measurement at the BOA
             T[i,:] += weight * bigCS * (T⁺⁺[istart:iend, istart0:iend0] / wt_μ[iμ0]) * pol_type.I0     
             # if m==0
