@@ -8,7 +8,10 @@ using BenchmarkTools
 using TensorOperations
 using LinearAlgebra
 using NNlib
-CUDA.allowscalar(false)
+
+if has_cuda_gpu()
+    CUDA.allowscalar(false)
+end
 
 # Needs some warning if memory is getting too large !
 FT = Float32
@@ -36,13 +39,23 @@ R⁺⁻ = CuArray(R⁺⁻_);
 T⁻⁻ = CuArray(T⁻⁻_);
 
 # This is still a bit stupid but noy sure how to make this better...
-I_static_ = zeros(FT, n, n, nSpec);
-for i = 1:nSpec
-    for j = 1:n
-        I_static_[j,j,i] = 1
-    end
+I_static_ = Diagonal{FT}(ones(n))
+I_static  = Diagonal(CuArray(I_static_));
+
+# This should come from poltype later:
+D_IQUV  = FT[1, 1, -1, -1]
+
+# D = Diagonal(repeat(pol_type.D, size(qp_μ)[1]))
+# Needs to be using Architecture framework in rtm main code and pol_type.D as above:
+# Pol numbers:
+nP = 4
+D_ = (zeros(FT, n, n, 1));
+_arr = (repeat(D_IQUV, n ÷ nP));
+for i = 1:n
+    D_[i,i,1] = _arr[i];
 end
-I_static = CuArray(I_static_);
+D = CuArray(D_)
+
 
 function rt_interaction!(R⁻⁺::AbstractArray{FT,3}, 
                          T⁺⁺::AbstractArray{FT,3}, 
@@ -51,13 +64,13 @@ function rt_interaction!(R⁻⁺::AbstractArray{FT,3},
                          r⁻⁺::AbstractArray{FT,3}, 
                          t⁺⁺::AbstractArray{FT,3}, 
                          r⁺⁻::AbstractArray{FT,3}, 
-                         t⁻⁻::AbstractArray{FT,3}, 
-                         I_static::AbstractArray{FT,3}) where {FT}
+                         t⁻⁻::AbstractArray{FT,3},
+                         I_static::AbstractArray) where {FT}
     aux1 = similar(R⁻⁺)
     aux2 = similar(R⁻⁺)
     aux3 = similar(R⁻⁺)
     # Compute M1 = (I - R⁺⁻ * r⁻⁺) \ T⁺⁺
-    aux1 = I_static - R⁺⁻ ⊠ r⁻⁺
+    aux1 = I_static .- R⁺⁻ ⊠ r⁻⁺
     batch_solve!(aux2, aux1, T⁺⁺)
   
     # Compute t_R⁻⁺ = R⁻⁺ + T⁻⁻ * r⁻⁺ * M1
@@ -70,7 +83,7 @@ function rt_interaction!(R⁻⁺::AbstractArray{FT,3},
     
     # Repeating for mirror-reflected directions
     # Compute M1 = (I - r⁻⁺ * R⁺⁻) \ t⁻⁻
-    aux1 = I_static - r⁻⁺ ⊠ R⁺⁻
+    aux1 = I_static .- r⁻⁺ ⊠ R⁺⁻
     batch_solve!(aux2, aux1, t⁻⁻)
 
     # t_R⁺⁻ = r⁺⁻ + t⁺⁺ * R⁺⁻ * M1
@@ -78,7 +91,46 @@ function rt_interaction!(R⁻⁺::AbstractArray{FT,3},
     aux1 = t⁺⁺ ⊠ aux3
     R⁺⁻  = r⁺⁻ + aux1
     T⁻⁻  = T⁺⁺ ⊠ aux2
+    
     # synchronize()
+end
+
+function rt_doubling!(ndoubl::Int, 
+                      r⁻⁺::AbstractArray{FT,3}, 
+                      t⁺⁺::AbstractArray{FT,3}, 
+                      r⁺⁻::AbstractArray{FT,3}, 
+                      t⁻⁻::AbstractArray{FT,3},
+                      D::AbstractArray{FT,3},
+                      I_static::AbstractArray) where {FT}
+    # # ToDo: Important output doubling applied to elemental layer, using same variables r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺ (can be renamed to t⁺⁺, etc)
+    # Need to check with paper nomenclature. This is basically eqs. 23-28 in vSmartMOM but using simplifications in eq. 29-32)
+    
+    aux1 = similar(t⁺⁺)
+    aux2 = similar(t⁺⁺)
+    aux3 = similar(t⁺⁺)
+
+    for n = 1:ndoubl
+
+        # M1 = (I - r⁻⁺ * r⁻⁺) \ t⁺⁺
+        aux1 = I_static .- r⁻⁺ ⊠ r⁻⁺     # (I - r⁻⁺ * r⁻⁺)      
+        batch_solve!(aux2, aux1, t⁺⁺)   # M1 = (I - r⁻⁺ * r⁻⁺) \ t⁺⁺
+
+        # r⁻⁺[:] = r⁻⁺ + t⁺⁺ * r⁻⁺ * M1
+        aux1 = r⁻⁺ ⊠ aux2               # r⁻⁺ * M1
+        aux3 = t⁺⁺ ⊠ aux1               # t⁺⁺ * r⁻⁺ * M1
+        r⁻⁺  = r⁻⁺ + aux3               # r⁻⁺[:] = r⁻⁺ + t⁺⁺ * r⁻⁺ * M1
+
+        # t⁺⁺[:] = t⁺⁺ * M1 
+        aux1 = t⁺⁺ ⊠ aux2           # t⁺⁺ * M1 
+        t⁺⁺  = aux1                   # t⁺⁺[:] = t⁺⁺ * M1 
+    end
+    # After doubling, revert D(DR)->R, where D = Diagonal{1,1,-1,-1}
+    r⁻⁺ = D ⊠ r⁻⁺ ⊠ D
+    # Using r⁺⁻ = Dr⁻⁺D
+    r⁺⁻ = D ⊠ r⁻⁺ ⊠ D
+    # Using t⁻⁻ = Dt⁺⁺D
+    t⁻⁻ = D ⊠ t⁺⁺ ⊠ D
+    return nothing 
 end
 
 # batch Matrix inversion for CPU
@@ -123,7 +175,8 @@ function getri_strided_batched(A::AbstractArray{Float64,3}, C::AbstractArray{Flo
     ldc = max(1, stride(C, 2))
     lda = max(1, stride(A, 2))
     info = CUDA.zeros(Cint, size(A, 3))
-    Cptrs = CUBLAS.unsafe_strided_batch(C)
+    # Cptrs = CUBLAS.unsafe_strided_batch(C)
+    Cptrs = unsafe_strided_batch_fake(C, size(A, 3))
     Aptrs = CUBLAS.unsafe_strided_batch(A)
     CUBLAS.cublasDgetriBatched(CUBLAS.handle(), n, Aptrs, lda, pivotArray, Cptrs, ldc, info, size(A, 3))
     return nothing
@@ -135,10 +188,15 @@ function run_rt_interaction(R⁻⁺, T⁺⁺, R⁺⁻, T⁻⁻, r⁻⁺, t⁺⁺
     synchronize()
 end
 
-# Testing time:
-println("GPU time:")
+function run_rt_doubling(nDoubling, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻, D, I_static)
+    rt_doubling!(nDoubling, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻, D, I_static)
+    synchronize()
+end
+
+# Testing RT Interaction time:
+println("RT Interaction GPU time:")
 @btime run_rt_interaction(R⁻⁺, T⁺⁺, R⁺⁻, T⁻⁻, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻,  I_static)
-println("CPU time (uses multi-threading in LAPACK/BLAS!):")
+println("RT Interaction CPU time (uses multi-threading in LAPACK/BLAS!):")
 @btime run_rt_interaction(R⁻⁺_, T⁺⁺_, R⁺⁻_, T⁻⁻_, r⁻⁺_, t⁺⁺_, r⁺⁻_, t⁻⁻_, I_static_)
 
 @testset "GPU-CPU consistency" begin
@@ -153,3 +211,19 @@ println("CPU time (uses multi-threading in LAPACK/BLAS!):")
         @test Array(matGPU) ≈ matCPU    
     end
 end
+
+nDoubling = 4
+@show nDoubling
+# Testing Doubling:
+println("RT Doubling GPU time:")
+@btime run_rt_doubling(nDoubling, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻, D, I_static)
+println("RT Doubling CPU time:")
+@btime run_rt_doubling(nDoubling, r⁻⁺_, t⁺⁺_, r⁺⁻_, t⁻⁻_, D_, I_static_)
+
+
+# @inline function unsafe_strided_batch_fake(strided::CuArray{T}, batchsize::Int) where {T}
+#    # batchsize = last(size(strided))
+#    stride = prod(size(strided)[1:end - 1])
+#    ptrs = [pointer(strided, stride + 1) for i in 1:batchsize]
+#    return CuArray(ptrs)
+# end

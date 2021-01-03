@@ -1,33 +1,35 @@
+using ..Architectures: devi, default_architecture
+
 # atmospheric RTM
-function run_RTM(pol_type, sza, vza, vaz, τRayl,ϖRayl, τAer, ϖAer, fᵗ, qp_μ, wt_μ, Ltrunc, aerosol_optics, GreekRayleigh)
+function run_RTM(pol_type, sza, vza, vaz, τRayl, ϖRayl, τAer, ϖAer, fᵗ, qp_μ, wt_μ, Ltrunc, aerosol_optics, GreekRayleigh)
     FT = eltype(τRayl)
 
-    #Output variables: Reflected and transmitted solar irradiation at TOA and BOA respectively
-    R = zeros(length(vza),pol_type.n)
-    T = zeros(length(vza),pol_type.n)    
+    # Output variables: Reflected and transmitted solar irradiation at TOA and BOA respectively
+    R = zeros(length(vza), pol_type.n)
+    T = zeros(length(vza), pol_type.n)    
     μ0 = cosd(sza)
     @show(μ0)
     iμ0 = nearest_point(qp_μ, μ0) # input μ0 = cos(SZA)
     @show(iμ0)
     dims = size(qp_μ)
     @show dims
-    Nquadn = pol_type.n*dims[1]
-    #I0 = [1, 0, 0, 0] #assuming completely unpolarized incident stellar radiation
+    Nquadn = pol_type.n * dims[1]
+    # I0 = [1, 0, 0, 0] #assuming completely unpolarized incident stellar radiation
     D = Diagonal(repeat(pol_type.D, size(qp_μ)[1]))
-    #@show D
-    #get vertical grid
-    #get solar+viewing geometry, compute streams
-    #compute Aersol SSP
-    #compute Rayleigh SSP
+    # @show D
+    # get vertical grid
+    # get solar+viewing geometry, compute streams
+    # compute Aersol SSP
+    # compute Rayleigh SSP
     Nz = length(τRayl)
     Naer = length(aerosol_optics)
-    qp_μ4 = reduce(vcat, (fill.(qp_μ,[pol_type.n])))
-    for m=0:Ltrunc-1
+    qp_μ4 = reduce(vcat, (fill.(qp_μ, [pol_type.n])))
+    for m = 0:Ltrunc - 1
         @show m
 
-        weight = m==0 ? 0.5 : 1.0
+        weight = m == 0 ? 0.5 : 1.0
 
-        #compute Zmp_Aer, Zpp_Aer, Zmp_Rayl, Zpp_Rayl
+        # compute Zmp_Aer, Zpp_Aer, Zmp_Rayl, Zpp_Rayl
         # For m>=3, Rayleigh matrices will be 0, can catch with if statement if wanted 
         Rayl𝐙⁺⁺, Rayl𝐙⁻⁺ = PhaseFunction.compute_Z_moments(pol_type, qp_μ, GreekRayleigh, m);
         @show size(Rayl𝐙⁺⁺)
@@ -35,7 +37,7 @@ function run_RTM(pol_type, sza, vza, vaz, τRayl,ϖRayl, τAer, ϖAer, fᵗ, qp_
         nAer = length(aerosol_optics)
         dims = size(Rayl𝐙⁺⁺)
         
-        Aer𝐙⁺⁺ = [zeros(FT,dims) for i in 1:nAer]
+        Aer𝐙⁺⁺ = [zeros(FT, dims) for i in 1:nAer]
         Aer𝐙⁻⁺ = similar(Aer𝐙⁺⁺)
 
         for i = 1:nAer
@@ -54,17 +56,17 @@ function run_RTM(pol_type, sza, vza, vaz, τRayl,ϖRayl, τAer, ϖAer, fᵗ, qp_
         T⁺⁺ = zeros(FT, dims)
         T⁻⁻ = zeros(FT, dims)
 
-        kn=0
+        kn = 0
         # loop over vertical layers:
-        for iz=1:Nz  #Count from TOA to BOA
+        for iz = 1:Nz  # Count from TOA to BOA
             τ, ϖ, Z⁺⁺, Z⁻⁺ = construct_atm_layer(τRayl[iz], τAer[iz,:], ϖRayl[iz], ϖAer, fᵗ, Rayl𝐙⁺⁺, Rayl𝐙⁻⁺, Aer𝐙⁺⁺, Aer𝐙⁻⁺)
-            dτ_max = minimum([τ, 0.2*minimum(qp_μ)])
+            dτ_max = minimum([τ, 0.2 * minimum(qp_μ)])
             dτ, ndoubl = doubling_number(dτ_max, τ)
-            scatter=false
-            if (sum(τAer)>1.e-8)
-                scatter=true
-            elseif (τRayl[iz]>1.e-8) & (m<3)
-                scatter=true
+            scatter = false
+            if (sum(τAer) > 1.e-8)
+                scatter = true
+            elseif (τRayl[iz] > 1.e-8) & (m < 3)
+                scatter = true
             end        
             if (scatter)
                 @timeit "elemental" rt_elemental!(pol_type, dτ, ϖ, Z⁺⁺, Z⁻⁺, m, ndoubl, scatter, qp_μ, wt_μ, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻, D)
@@ -72,9 +74,9 @@ function run_RTM(pol_type, sza, vza, vaz, τRayl,ϖRayl, τAer, ϖAer, fᵗ, qp_
             else
                 r⁻⁺ = 0
                 r⁺⁻ = 0
-                t⁺⁺ = Diagonal(exp(-τ/qp_μ4))
-                t⁻⁻ = Diagonal(exp(-τ/qp_μ4))
-                #=for i = 1:Nquadn
+                t⁺⁺ = Diagonal(exp(-τ / qp_μ4))
+                t⁻⁻ = Diagonal(exp(-τ / qp_μ4))
+                #= for i = 1:Nquadn
                     ii=1+floor(Int,(i-1)/pol_type.n)
                     t⁺⁺[i,i] = exp(-τ/qp_μ[ii])
                     t⁻⁻[i,i] = exp(-τ/qp_μ[ii])
@@ -82,7 +84,7 @@ function run_RTM(pol_type, sza, vza, vaz, τRayl,ϖRayl, τAer, ϖAer, fᵗ, qp_
             end
             kn = get_kn(kn, scatter, iz)
             
-            if (iz==1)
+            if (iz == 1)
                 T⁺⁺[:] = t⁺⁺
                 T⁻⁻[:] = t⁻⁻
                 R⁻⁺[:] = r⁻⁺
@@ -90,45 +92,45 @@ function run_RTM(pol_type, sza, vza, vaz, τRayl,ϖRayl, τAer, ϖAer, fᵗ, qp_
             else
                 @timeit "interaction" rt_interaction!(kn, R⁻⁺, T⁺⁺, R⁺⁻, T⁻⁻, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻)
             end
-        end #z
+        end # z
 
         # include surface function
         # TBD
-        st_iμ0 = (iμ0-1)*pol_type.n
+        st_iμ0 = (iμ0 - 1) * pol_type.n
         istart0 = st_iμ0 + 1
         iend0   = st_iμ0 + pol_type.n
         for i = 1:length(vza)
-            iμ = nearest_point(qp_μ, cosd(vza[i])) #input vaz, vza as arrays
-            #@show i, vza[i], cosd(vza[i]), iμ, qp_μ[iμ]
+            iμ = nearest_point(qp_μ, cosd(vza[i])) # input vaz, vza as arrays
+            # @show i, vza[i], cosd(vza[i]), iμ, qp_μ[iμ]
             # compute bigCS
             cos_m_phi = cosd(m * vaz[i])
             sin_m_phi = sind(m * vaz[i])
-            if pol_type.n==4
+            if pol_type.n == 4
                 bigCS = Diagonal([cos_m_phi, cos_m_phi, sin_m_phi, sin_m_phi])
-            elseif pol_type.n==3    
+            elseif pol_type.n == 3    
                 bigCS = Diagonal([cos_m_phi, cos_m_phi, sin_m_phi])
-            elseif pol_type.n==1
+            elseif pol_type.n == 1
                 bigCS = Diagonal([cos_m_phi])
             end
             # accumulate Fourier moments after azimuthal weighting
-            #Measurement at the TOA
-            st_iμ  = (iμ-1)*pol_type.n
+            # Measurement at the TOA
+            st_iμ  = (iμ - 1) * pol_type.n
             istart = st_iμ + 1
             iend   = st_iμ + pol_type.n
-            #@show st_iμ+1:st_iμ+pol_type.n, iμ0,st_iμ0+1:st_iμ0+pol_type.n
-            #@show size(R⁻⁺)
+            # @show st_iμ+1:st_iμ+pol_type.n, iμ0,st_iμ0+1:st_iμ0+pol_type.n
+            # @show size(R⁻⁺)
             
-            R[i,:] += weight * bigCS * (R⁻⁺[istart:iend, istart0:iend0]/wt_μ[iμ0]) * pol_type.I0
+            R[i,:] += weight * bigCS * (R⁻⁺[istart:iend, istart0:iend0] / wt_μ[iμ0]) * pol_type.I0
             @show weight * bigCS * R⁻⁺[istart:iend, istart0:iend0]
             @show wt_μ[iμ0]
-            #Measurement at the BOA
-            T[i,:] += weight * bigCS * (T⁺⁺[istart:iend, istart0:iend0]/wt_μ[iμ0]) * pol_type.I0     
-            #if m==0
+            # Measurement at the BOA
+            T[i,:] += weight * bigCS * (T⁺⁺[istart:iend, istart0:iend0] / wt_μ[iμ0]) * pol_type.I0     
+            # if m==0
             #    @show bigCS
             #    @show m, i, iμ, bigCS[1,1], weight*R⁻⁺[(iμ-1)*4+1, (iμ0-1)*4+1]/wt_μ[iμ0]   
-            #end
+            # end
         end
-    end  #m
+    end  # m
 
     
     print_timer()
@@ -138,7 +140,7 @@ function run_RTM(pol_type, sza, vza, vaz, τRayl,ϖRayl, τAer, ϖAer, fᵗ, qp_
 end
 
 function get_kn(kn, scatter, iz)
-    if (iz==1)
+    if (iz == 1)
         kn = scatter ? 4 : 1
     elseif (kn >= 1)
         kn = (kn == 1) ? (!scatter ? 1 : 2) : (!scatter ? 3 : 4)
