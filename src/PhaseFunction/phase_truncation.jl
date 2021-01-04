@@ -4,7 +4,7 @@ Returns the truncated aerosol optical properties as [`AerosolOptics`](@ref)
 - `mod` a [`δBGE`](@ref) struct that defines the truncation order (new length of greek parameters) and exclusion angle
 - `aero` a [`AerosolOptics`](@ref) set of aerosol optical properties that is to be truncated
 """
-function truncate_phase(mod::δBGE, aero::AerosolOptics)
+function truncate_phase(mod::δBGE, aero::AerosolOptics; reportFit=false, err_β=nothing,err_ϵ=nothing,err_γ=nothing)
     @unpack greek_coefs, ω̃, k = aero
     @unpack α, β, γ, δ, ϵ, ζ = greek_coefs
     @unpack l_max, Δ_angle =  mod
@@ -41,10 +41,22 @@ function truncate_phase(mod::δBGE, aero::AerosolOptics)
     cl = ((W₁₁ * A) \ (W₁₁ * y₁₁))   # B in δ-BGR (β)
     γᵗ = ((W₁₂ * B) \ (W₁₂ * y₁₂))   # G in δ-BGE (γ)
     ϵᵗ = ((W₃₄ * B) \ (W₃₄ * y₃₄))   # E in δ-BGE (ϵ)
+    if reportFit
+        println("Errors in δ-BGE fits:")
+        mod_y = A * cl
+        mod_γ = B * γᵗ
+        mod_ϵ = B * ϵᵗ
+        # push!(err_β, StatsBase.rmsd(W₁₁ * mod_y, W₁₁ * y₁₁; normalize=true))
+        # push!(err_γ, StatsBase.rmsd(W₁₂ * mod_γ, W₁₂ * y₁₂; normalize=true))
+        # push!(err_ϵ, StatsBase.rmsd(W₃₄ * mod_ϵ, W₃₄ * y₃₄; normalize=true))
+        @show StatsBase.rmsd(mod_y, y₁₁; normalize=true)
+        @show StatsBase.rmsd(mod_γ, y₁₂; normalize=true)
+        @show StatsBase.rmsd(mod_ϵ, y₃₄; normalize=true)
+    end
 
     # Integrate truncated function for later renormalization (here: fraction that IS still scattered):
     c₀ = cl[1] # ( w_μ' * (P[:,1:l_max] * cl) ) / 2
-    #@show c₀, cl[1]
+    # @show c₀, cl[1]
     # Compute truncated greek coefficients:
     βᵗ = cl / c₀                                    # Eq. 38a, B in δ-BGR (β)
     δᵗ = (δ[1:l_max] .- (β[1:l_max] .- cl)) / c₀    # Eq. 38b, derived from β
@@ -53,11 +65,11 @@ function truncate_phase(mod::δBGE, aero::AerosolOptics)
 
     # Adjust scattering and extinction cross section!
     greek_coefs = GreekCoefs(αᵗ, βᵗ, γᵗ, δᵗ, ϵᵗ, ζᵗ)
-    #C_sca  = (ω̃ * k);
-    #C_scaᵗ = C_sca * c₀; 
-    #C_ext  = k - (C_sca - C_scaᵗ);
+    # C_sca  = (ω̃ * k);
+    # C_scaᵗ = C_sca * c₀; 
+    # C_ext  = k - (C_sca - C_scaᵗ);
     
-    #return AerosolOptics(greek_coefs = greek_coefs, ω̃=C_scaᵗ / C_ext, k=C_ext, fᵗ = 1-c₀) 
-    return AerosolOptics(greek_coefs = greek_coefs, ω̃=ω̃, k=k, fᵗ = 1-c₀) 
+    # return AerosolOptics(greek_coefs = greek_coefs, ω̃=C_scaᵗ / C_ext, k=C_ext, fᵗ = 1-c₀) 
+    return AerosolOptics(greek_coefs=greek_coefs, ω̃=ω̃, k=k, fᵗ=1 - c₀) 
 end
 

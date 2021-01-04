@@ -11,6 +11,7 @@ using ..PhaseFunction
 using FastGaussQuadrature 
 using CUDA
 using TimerOutputs
+using StatsBase
 
 
 include("types.jl") 

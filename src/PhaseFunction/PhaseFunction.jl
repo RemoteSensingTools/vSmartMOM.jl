@@ -11,6 +11,7 @@ using Distributions             # Distributions from Julia
 using ForwardDiff, DiffResults  # Automatic Differentiation tools
 using LinearAlgebra
 using StaticArrays
+using StatsBase
 
 using ..Architectures: device
 
