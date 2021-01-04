@@ -33,7 +33,6 @@ function run_RTM(pol_type, sza, vza, vaz, τRayl, ϖRayl, τAer, ϖAer, fᵗ, qp
         # For m>=3, Rayleigh matrices will be 0, can catch with if statement if wanted 
         Rayl𝐙⁺⁺, Rayl𝐙⁻⁺ = PhaseFunction.compute_Z_moments(pol_type, qp_μ, GreekRayleigh, m);
         @show size(Rayl𝐙⁺⁺)
-
         nAer = length(aerosol_optics)
         dims = size(Rayl𝐙⁺⁺)
         
@@ -121,11 +120,19 @@ function run_RTM(pol_type, sza, vza, vaz, τRayl, ϖRayl, τAer, ϖAer, fᵗ, qp
             # @show st_iμ+1:st_iμ+pol_type.n, iμ0,st_iμ0+1:st_iμ0+pol_type.n
             # @show size(R⁻⁺)
             
-            R[i,:] += weight * bigCS * (R⁻⁺[istart:iend, istart0:iend0] / wt_μ[iμ0]) * pol_type.I0
-            # @show weight * bigCS * R⁻⁺[istart:iend, istart0:iend0]
+            Δ = weight * bigCS * (R⁻⁺[istart:iend, istart0:iend0] / wt_μ[iμ0]) * pol_type.I0
+            # @show m, mean(abs.((Δ / R[i,:] * 100)))
+            
+            R[i,:] += Δ
             # @show wt_μ[iμ0]
             # Measurement at the BOA
-            T[i,:] += weight * bigCS * (T⁺⁺[istart:iend, istart0:iend0] / wt_μ[iμ0]) * pol_type.I0     
+            T[i,:] += weight * bigCS * (T⁺⁺[istart:iend, istart0:iend0] / wt_μ[iμ0]) * pol_type.I0
+            # Needs something like this but working :-)
+            # if mean(abs.((Δ / R[i,:] * 100))) < 0.1 # if smaller than 0.1%
+            #    println("Breaking m loop at ", m, "; Max diff is now ",  mean(abs.((Δ / R[i,:] * 100))), "%")
+            #    m = Ltrunc
+                
+            # end     
             # if m==0
             #    @show bigCS
             #    @show m, i, iμ, bigCS[1,1], weight*R⁻⁺[(iμ-1)*4+1, (iμ0-1)*4+1]/wt_μ[iμ0]   

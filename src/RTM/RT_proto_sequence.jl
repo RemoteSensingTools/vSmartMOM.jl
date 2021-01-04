@@ -7,29 +7,29 @@ FT = Float32
 "Generate aerosol optical properties"
 
 # Wavelength (just one for now)
-λ = 0.770       # Incident wavelength
-depol = 0.0
+λ = FT(0.770)       # Incident wavelength
+depol = FT(0.0)
 # Truncation 
-Ltrunc = 20             # Truncation  
-truncation_type   = PhaseFunction.δBGE(Ltrunc, 2.0)
+Ltrunc = 14             # Truncation  
+truncation_type   = PhaseFunction.δBGE{Float32}(Ltrunc, 2.0)
 
 # polarization_type
-polarization_type = Stokes_IQUV{FT}()
+polarization_type = Stokes_IQU{FT}()
 
 # Quadrature points for RTM
 Nquad, qp_μ, wt_μ = rt_set_streams(RTM.RadauQuad(), Ltrunc, FT(60.0), FT[0.0, 15.0, 30., 45., 60.])
 
 # Aerosol particle distribution and properties
-μ            = [0.3] # [0.3,2.0]       # Log mean radius
-σ            = [2.0] # [2.0,1.8]       # Log stddev of radius
-r_max        = [30.0] # [30.0,30.0]     # Maximum radius
-nquad_radius = [2500] # [2500,2500]     # Number of quadrature points for integrating of size dist.
-nᵣ           = [1.3] # [1.3, 1.66]     # Real part of refractive index
-nᵢ           = [0.001] # [0.001,0.0003]  # Imag part of refractive index
+μ            = [1.3]    # [0.3,2.0]       # Log mean radius
+σ            = [2.0]    # [2.0,1.8]       # Log stddev of radius
+r_max        = [30.0]   # [30.0,30.0]     # Maximum radius
+nquad_radius = [2500]   # [2500,2500]     # Number of quadrature points for integrating of size dist.
+nᵣ           = [1.3]    # [1.3, 1.66]     # Real part of refractive index
+nᵢ           = [0.00000001]  # [0.001,0.0003]  # Imag part of refractive index
 
 # Aerosol vertical distribution profiles
-p₀          = [50000.] # [50000., 20000.] # Pressure peak [Pa]
-σp          = [5000.]   # [5000., 2000.]   # Pressure peak width [Pa]
+p₀          = FT[30000.]  # [50000., 20000.] # Pressure peak [Pa]
+σp          = FT[5000.]   # [5000., 2000.]   # Pressure peak width [Pa]
 
 size_distribution = [LogNormal(log(μ[1]), log(σ[1]))] # [LogNormal(log(μ[1]), log(σ[1])), LogNormal(log(μ[2]), log(σ[2]))]
 
@@ -41,7 +41,7 @@ aero1 = make_univariate_aerosol(size_distribution[1], r_max[1], nquad_radius[1],
 model_NAI2_aero1 = make_mie_model(NAI2(), aero1, λ, polarization_type, truncation_type)
 aerosol_optics_NAI2_aero1 = compute_aerosol_optical_properties(model_NAI2_aero1);
 # Truncate:
-aerosol_optics_trunc_aero1 = PhaseFunction.truncate_phase(truncation_type, aerosol_optics_NAI2_aero1)
+aerosol_optics_trunc_aero1 = PhaseFunction.truncate_phase(truncation_type, aerosol_optics_NAI2_aero1; reportFit=true)
 
 # Define some details, run aerosol optics
 # model_NAI2_aero2 = make_mie_model(NAI2(), aero2, λ, polarization_type, truncation_type)
@@ -90,13 +90,12 @@ profile_caltech = RTM.read_atmos_profile(file, myLat, myLon, timeIndex);
 ϖAer = [aerosol_optics_NAI2_aero1.ω̃] # [aerosol_optics_NAI2_aero1.ω̃ aerosol_optics_NAI2_aero2.ω̃];
 fᵗ   = [aerosol_optics_trunc_aero1.fᵗ] # [aerosol_optics_trunc_aero1.fᵗ aerosol_optics_trunc_aero2.fᵗ];
 
-
-
 aerosol_optics = [aerosol_optics_trunc_aero1] # [aerosol_optics_trunc_aero1 aerosol_optics_trunc_aero2]
 Aer𝐙⁺⁺ = [aero1_Z⁺⁺] # [aero1_Z⁺⁺, aero2_Z⁺⁺];
 Aer𝐙⁻⁺ = [aero1_Z⁻⁺] # [aero1_Z⁻⁺, aero2_Z⁻⁺];
 
-@time R, T = RTM.run_RTM(polarization_type, sza, vza, vaz, τRayl, ϖRayl, τAer, ϖAer, fᵗ, qp_μ, wt_μ, 3, aerosol_optics, GreekRayleigh);
+maxM = 5
+@time R, T = RTM.run_RTM(polarization_type, sza, vza, vaz, τRayl, ϖRayl, τAer, ϖAer, fᵗ, qp_μ, wt_μ, maxM, aerosol_optics, GreekRayleigh);
 
 
 

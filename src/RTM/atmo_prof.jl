@@ -98,6 +98,7 @@ end
 # computes the composite single scattering parameters (τ, ϖ, Z⁺⁺, Z⁻⁺) for a given atmospheric layer iz for a given Fourier component m
 function construct_atm_layer(τRayl, τAer, ϖRayl, ϖAer, fᵗ, Rayl𝐙⁺⁺, Rayl𝐙⁻⁺, Aer𝐙⁺⁺, Aer𝐙⁻⁺)
     FT = eltype(τRayl)
+    # @show FT
     @assert length(τAer) == length(ϖAer) == length(fᵗ) "Sizes don't match"
     
     # @show τRayl , sum(τAer)
@@ -123,6 +124,7 @@ function construct_atm_layer(τRayl, τAer, ϖRayl, ϖAer, fᵗ, Rayl𝐙⁺⁺,
     for i = 1:length(τAer)
         τ += τAer[i]
         ϖ += τAer[i] * ϖAer[i]
+        # @show τAer[i], ϖAer[i], (1 - fᵗ[i])
         A += τAer[i] * ϖAer[i] * (1 - fᵗ[i])
         Z⁺⁺ += τAer[i] * ϖAer[i] * (1 - fᵗ[i]) * Aer𝐙⁺⁺[i]
         Z⁻⁺ += τAer[i] * ϖAer[i] * (1 - fᵗ[i]) * Aer𝐙⁻⁺[i]
@@ -134,6 +136,7 @@ function construct_atm_layer(τRayl, τAer, ϖRayl, ϖAer, fᵗ, Rayl𝐙⁺⁺,
     ϖ /= τ
     
     # Rescaling composite SSPs according to Eqs. A.3 of Sanghavi et al. (2013) or Eqs.(8) of Sanghavi & Stephens (2015)
+    # @show A, ϖ
     τ *= (FT(1) - (FT(1) - A) * ϖ)
     ϖ *= ϖ * A / (1 - (1 - A) * ϖ)
     return τ, ϖ, Z⁺⁺, Z⁻⁺  
