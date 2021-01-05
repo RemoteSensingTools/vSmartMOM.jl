@@ -1,3 +1,4 @@
+using RadiativeTransfer.RTM
 using CUDA
 using Test
 # using TensorOperations
@@ -133,6 +134,45 @@ function rt_doubling!(ndoubl::Int,
     return nothing 
 end
 
+function rt_elemental!(pol_type, dτ, ϖ, Z⁺⁺, Z⁻⁺, m, 
+                       ndoubl::Int, qp_μ, wt_μ, 
+                       r⁻⁺::AbstractArray{FT,3}, 
+                       t⁺⁺::AbstractArray{FT,3}, 
+                       r⁺⁻::AbstractArray{FT,3}, 
+                       t⁻⁻::AbstractArray{FT,3}, 
+                       D::AbstractArray{FT,3}, 
+                       I_static::AbstractArray) where {FT}
+
+
+    aux1 = similar(Z⁻⁺)
+
+    qp_μ4 = repeat(qp_μ, 3)
+    wt_μ4 = repeat(wt_μ, 3)
+    # println(typeof(qp_μ4))
+    #  reduce(vcat, (fill.(qp_μ,[pol_type.n])))
+
+    # wt_μ4 = reduce(vcat, (fill.(wt_μ,[pol_type.n])))
+    Nquadn = length(qp_μ4)
+
+    wct = m==0 ? 0.50 * ϖ * wt_μ4  : 0.25 * ϖ * wt_μ4
+
+    d_qp = r⁺⁻ isa CuArray{Float32,3} ? CuArray(Diagonal(1 ./ Array(qp_μ4))) : Diagonal(1 ./ Array(qp_μ4))
+    # d_wct = r⁺⁻ isa CuArray{Float32,3} ? CuArray(Diagonal(1 ./ Array(qp_μ4))) : Diagonal(1 ./ Array(qp_μ4))
+    d_wct = r⁺⁻ isa CuArray{Float32,3} ? CuArray(Diagonal(Array(wct))) : Diagonal(Array(wct))
+
+    aux1 = d_qp ⊠ Z⁻⁺
+    r⁻⁺ = aux1 ⊠ (d_wct * dτ)
+
+    t⁺⁺ = I_static .- (d_qp ⊠ ((I_static .- Z⁺⁺ ⊠ d_wct) * dτ))
+
+    if ndoubl<1
+        r⁺⁻ = D ⊠ r⁻⁺ ⊠ D
+        t⁻⁻ = D ⊠ t⁺⁺ ⊠ D
+    else
+        r⁻⁺ = D ⊠ r⁻⁺
+    end
+end
+
 # batch Matrix inversion for CPU
 function batch_solve!(X::CuArray{FT,3}, A::CuArray{FT,3}, B::CuArray{FT,3}) where {FT}
     temp = similar(A)
@@ -193,6 +233,16 @@ function run_rt_doubling(nDoubling, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻, D, I_sta
     synchronize()
 end
 
+function run_rt_elemental(pol_type, dτ, ϖ, Z⁺⁺, Z⁻⁺, m, 
+                          ndoubl, qp_μ, wt_μ, 
+                          r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻, D, I_static)
+
+    rt_elemental!(pol_type, dτ, ϖ, Z⁺⁺, Z⁻⁺, m, 
+                  ndoubl, qp_μ, wt_μ, 
+                  r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻, D, I_static)
+    synchronize()
+end
+
 # Testing RT Interaction time:
 println("RT Interaction GPU time:")
 @btime run_rt_interaction(R⁻⁺, T⁺⁺, R⁺⁻, T⁻⁻, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻,  I_static)
@@ -219,6 +269,43 @@ println("RT Doubling GPU time:")
 @btime run_rt_doubling(nDoubling, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻, D, I_static)
 println("RT Doubling CPU time:")
 @btime run_rt_doubling(nDoubling, r⁻⁺_, t⁺⁺_, r⁺⁻_, t⁻⁻_, D_, I_static_)
+
+
+pol_type = Stokes_IQU{FT}()
+
+
+m = 0
+ndoubl = 0
+weight = m == 0 ? 0.5 : 1.0
+dτ = 2.458321474082143e-7
+ϖ = 1.0
+Z⁺⁺ = randn(57,57,3)
+Z⁻⁺ = randn(57,57,3)
+vza = [60., 45., 30., 15., 0., 15., 30., 45., 60.]
+vaz = [180., 180., 180., 180., 0., 0., 0., 0., 0.]
+sza = 60.
+Ltrunc = 14
+Nquad, qp_μ, wt_μ = rt_set_streams(RTM.RadauQuad(), Ltrunc, sza, vza);
+I_static_ = Diagonal{FT}(ones(57))
+I_static  = Diagonal(CuArray(I_static_));
+
+n = 57
+D_ = (zeros(FT, n, n, 1));
+_arr = (repeat(D_IQUV, n ÷ nP + 1));
+for i = 1:n
+    D_[i,i,1] = _arr[i];
+end
+D = CuArray(D_)
+
+println("RT Elemental GPU time:")
+@btime run_rt_elemental(pol_type, dτ, ϖ, CuArray(Z⁺⁺), CuArray(Z⁻⁺), m, 
+                        ndoubl, CuArray(qp_μ), CuArray(wt_μ), 
+                        r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻, D, I_static)
+
+println("RT Elemental CPU time:")
+@btime run_rt_elemental(pol_type, dτ, ϖ, Z⁺⁺, Z⁻⁺, m, 
+                        ndoubl, qp_μ, wt_μ, 
+                        r⁻⁺_, t⁺⁺_, r⁺⁻_, t⁻⁻_, D_, I_static_)
 
 
 # @inline function unsafe_strided_batch_fake(strided::CuArray{T}, batchsize::Int) where {T}
