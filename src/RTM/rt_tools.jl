@@ -3,10 +3,10 @@ using ..Architectures: devi, default_architecture
 # atmospheric RTM
 function run_RTM(pol_type, sza, vza, vaz, τRayl, ϖRayl, τAer, ϖAer, fᵗ, qp_μ, wt_μ, Ltrunc, aerosol_optics, GreekRayleigh)
     FT = eltype(τRayl)
-    @show FT
+    # @show FT
     # Output variables: Reflected and transmitted solar irradiation at TOA and BOA respectively
-    R = zeros(length(vza), pol_type.n)
-    T = zeros(length(vza), pol_type.n)    
+    R = zeros(length(vza), pol_type.n, 1)
+    T = zeros(length(vza), pol_type.n, 1)    
     μ0 = cosd(sza)
     # @show(μ0)
     iμ0 = nearest_point(qp_μ, μ0) # input μ0 = cos(SZA)
@@ -32,7 +32,7 @@ function run_RTM(pol_type, sza, vza, vaz, τRayl, ϖRayl, τAer, ϖAer, fᵗ, qp
         # compute Zmp_Aer, Zpp_Aer, Zmp_Rayl, Zpp_Rayl
         # For m>=3, Rayleigh matrices will be 0, can catch with if statement if wanted 
         Rayl𝐙⁺⁺, Rayl𝐙⁻⁺ = PhaseFunction.compute_Z_moments(pol_type, qp_μ, GreekRayleigh, m);
-        @show size(Rayl𝐙⁺⁺)
+        # @show size(Rayl𝐙⁺⁺)
         nAer = length(aerosol_optics)
         dims = size(Rayl𝐙⁺⁺)
         
@@ -43,17 +43,22 @@ function run_RTM(pol_type, sza, vza, vaz, τRayl, ϖRayl, τAer, ϖAer, fᵗ, qp
             Aer𝐙⁺⁺[i], Aer𝐙⁻⁺[i] = PhaseFunction.compute_Z_moments(pol_type, qp_μ, aerosol_optics[i].greek_coefs, m)
         end
         
+        # Note: The following are n x n x 1 now, but need to be n x n x nSpec
+
         # Homogenous R and T matrices
-        r⁻⁺ = zeros(FT, dims)
-        t⁺⁺ = zeros(FT, dims)
-        r⁺⁻ = zeros(FT, dims)
-        t⁻⁻ = zeros(FT, dims)
+        r⁻⁺ = zeros(FT, tuple(dims[1], dims[2], 1))
+        t⁺⁺ = zeros(FT, tuple(dims[1], dims[2], 1))
+        r⁺⁻ = zeros(FT, tuple(dims[1], dims[2], 1))
+        t⁻⁻ = zeros(FT, tuple(dims[1], dims[2], 1))
 
         # Composite layer R and T matrices
-        R⁻⁺ = zeros(FT, dims)
-        R⁺⁻ = zeros(FT, dims)
-        T⁺⁺ = zeros(FT, dims)
-        T⁻⁻ = zeros(FT, dims)
+        R⁻⁺ = zeros(FT, tuple(dims[1], dims[2], 1))
+        R⁺⁻ = zeros(FT, tuple(dims[1], dims[2], 1))
+        T⁺⁺ = zeros(FT, tuple(dims[1], dims[2], 1))
+        T⁻⁻ = zeros(FT, tuple(dims[1], dims[2], 1))
+
+        I_static = Diagonal{FT}(ones(dims[1]))
+        I_static_ = repeat(I_static, 1, 1, 1)
 
         kn = 0
         # loop over vertical layers:
@@ -69,8 +74,12 @@ function run_RTM(pol_type, sza, vza, vaz, τRayl, ϖRayl, τAer, ϖAer, fᵗ, qp
                 scatter = true
             end        
             if (scatter)
-                @timeit "elemental" rt_elemental!(pol_type, dτ, ϖ, Z⁺⁺, Z⁻⁺, m, ndoubl, scatter, qp_μ, wt_μ, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻, D)
-                @timeit "doubling" rt_doubling!(dτ, τ, ndoubl, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻, D)
+                # @timeit "elemental" rt_elemental!(pol_type, dτ, ϖ, Z⁺⁺, Z⁻⁺, m, ndoubl, scatter, qp_μ, wt_μ, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻, D)
+                
+                @timeit "elemental" rt_elemental!(pol_type, dτ, ϖ, Z⁺⁺, Z⁻⁺, m, ndoubl, qp_μ, wt_μ, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻, Array(D), I_static_)
+
+                @timeit "doubling" rt_doubling!(ndoubl, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻, Array(D), I_static_)
+                # @timeit "doubling" rt_doubling!(dτ, τ, ndoubl, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻, D)
             else
                 r⁻⁺ = 0
                 r⁺⁻ = 0
@@ -90,7 +99,10 @@ function run_RTM(pol_type, sza, vza, vaz, τRayl, ϖRayl, τAer, ϖAer, fᵗ, qp
                 R⁻⁺[:] = r⁻⁺
                 R⁺⁻[:] = r⁺⁻
             else
-                @timeit "interaction" rt_interaction!(kn, R⁻⁺, T⁺⁺, R⁺⁻, T⁻⁻, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻)
+                
+                @timeit "interaction" rt_interaction!(R⁻⁺, T⁺⁺, R⁺⁻, T⁻⁻, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻, I_static_)
+                
+                # @timeit "interaction" rt_interaction!(kn, R⁻⁺, T⁺⁺, R⁺⁻, T⁻⁻, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻)
             end
         end # z
 
@@ -120,13 +132,13 @@ function run_RTM(pol_type, sza, vza, vaz, τRayl, ϖRayl, τAer, ϖAer, fᵗ, qp
             # @show st_iμ+1:st_iμ+pol_type.n, iμ0,st_iμ0+1:st_iμ0+pol_type.n
             # @show size(R⁻⁺)
             
-            Δ = weight * bigCS * (R⁻⁺[istart:iend, istart0:iend0] / wt_μ[iμ0]) * pol_type.I0
+            Δ = weight * bigCS * (R⁻⁺[istart:iend, istart0:iend0, 1] / wt_μ[iμ0]) * pol_type.I0
             # @show m, mean(abs.((Δ / R[i,:] * 100)))
             
-            R[i,:] += Δ
+            R[i,:,1] += Δ
             # @show wt_μ[iμ0]
             # Measurement at the BOA
-            T[i,:] += weight * bigCS * (T⁺⁺[istart:iend, istart0:iend0] / wt_μ[iμ0]) * pol_type.I0
+            T[i,:, 1] += weight * bigCS * (T⁺⁺[istart:iend, istart0:iend0, 1] / wt_μ[iμ0]) * pol_type.I0
             # Needs something like this but working :-)
             # if mean(abs.((Δ / R[i,:] * 100))) < 0.1 # if smaller than 0.1%
             #    println("Breaking m loop at ", m, "; Max diff is now ",  mean(abs.((Δ / R[i,:] * 100))), "%")

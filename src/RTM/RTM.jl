@@ -12,7 +12,11 @@ using FastGaussQuadrature
 using CUDA
 using TimerOutputs
 using StatsBase
-
+using KernelAbstractions
+using KernelAbstractions.Extras
+using StaticArrays
+using TensorOperations
+using NNlib
 
 include("types.jl") 
 include("rt_streams.jl")
@@ -21,6 +25,7 @@ include("atmo_prof.jl")
 include("rt_elemental.jl")
 include("rt_doubling.jl")
 include("rt_interaction.jl")
+include("gpu_batched.jl")
 include("rt_tools.jl")
 
 export rt_set_streams
