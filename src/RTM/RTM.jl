@@ -12,6 +12,7 @@ using FastGaussQuadrature
 using CUDA
 using TimerOutputs
 using StatsBase
+using Parameters
 
 
 include("types.jl") 

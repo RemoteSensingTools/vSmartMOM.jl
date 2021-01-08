@@ -54,7 +54,7 @@ function run_RTM(pol_type, sza, vza, vaz, τRayl, ϖRayl, τAer, ϖAer, fᵗ, qp
         R⁺⁻ = zeros(FT, dims)
         T⁺⁺ = zeros(FT, dims)
         T⁻⁻ = zeros(FT, dims)
-
+        
         kn = 0
         # loop over vertical layers:
         for iz = 1:Nz  # Count from TOA to BOA
