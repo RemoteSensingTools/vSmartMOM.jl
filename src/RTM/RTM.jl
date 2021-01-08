@@ -17,6 +17,8 @@ using KernelAbstractions.Extras
 using StaticArrays
 using TensorOperations
 using NNlib
+using Parameters
+
 
 include("types.jl") 
 include("rt_streams.jl")

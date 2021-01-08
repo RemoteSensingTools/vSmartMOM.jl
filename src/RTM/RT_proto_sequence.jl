@@ -12,14 +12,16 @@ FT = Float32
 λ = FT(0.770)       # Incident wavelength
 depol = FT(0.0)
 # Truncation 
-Ltrunc = 14             # Truncation  
-truncation_type   = PhaseFunction.δBGE{Float32}(Ltrunc, 2.0)
+Ltrunc = 8             # Truncation  
+truncation_type   = PhaseFunction.δBGE{Float32}(Ltrunc, 3.0)
 
 # polarization_type
 polarization_type = Stokes_IQU{FT}()
 
 # Quadrature points for RTM
-Nquad, qp_μ, wt_μ = rt_set_streams(RTM.RadauQuad(), Ltrunc, FT(60.0), FT[0.0, 15.0, 30., 45., 60.])
+# Nquad, qp_μ, wt_μ = rt_set_streams(RTM.RadauQuad(), Ltrunc, FT(60.0), FT[0.0, 15.0, 30., 45., 60.])
+# nadir only:
+Nquad, qp_μ, wt_μ = rt_set_streams(RTM.GaussQuadFullSphere(), Ltrunc, FT(60.0), FT[0.0])
 
 # Aerosol particle distribution and properties
 μ            = [1.3]    # [0.3,2.0]       # Log mean radius
@@ -61,8 +63,8 @@ GreekRayleigh = PhaseFunction.get_greek_rayleigh(depol)
 vza = [60., 45., 30., 15., 0., 15., 30., 45., 60.]
 vaz = [180., 180., 180., 180., 0., 0., 0., 0., 0.]
 sza = 60.
-Nquad, qp_μ, wt_μ = rt_set_streams(RTM.RadauQuad(), Ltrunc, sza, vza);
-
+# Nquad, qp_μ, wt_μ = rt_set_streams(RTM.RadauQuad(), Ltrunc, sza, vza);
+Nquad, qp_μ, wt_μ = rt_set_streams(RTM.GaussQuadFullSphere(), Ltrunc, FT(60.0), FT[0.0])
 
 # In[ ]:
 
@@ -76,7 +78,9 @@ myLat = 34.1377;
 myLon = -118.1253;
 
 # Read profile (and generate dry/wet VCDs per layer)
-profile_caltech = RTM.read_atmos_profile(file, myLat, myLon, timeIndex);
+profile_caltech_hr = RTM.read_atmos_profile(file, myLat, myLon, timeIndex);
+# Reduce to 20 layers here (equidistant in p as good as it gets):
+profile_caltech = RTM.reduce_profile(20, profile_caltech_hr)
 
 # Compute layer optical thickness for Rayleigh (surface pressure in hPa) 
 τRayl =  RTM.getRayleighLayerOptProp(profile_caltech.psurf / 100, λ, depol, profile_caltech.vcd_dry);
