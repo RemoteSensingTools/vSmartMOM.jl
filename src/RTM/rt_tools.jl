@@ -76,9 +76,9 @@ function run_RTM(pol_type, sza, vza, vaz, τRayl, ϖRayl, τAer, ϖAer, fᵗ, qp
             if (scatter)
                 # @timeit "elemental" rt_elemental!(pol_type, dτ, ϖ, Z⁺⁺, Z⁻⁺, m, ndoubl, scatter, qp_μ, wt_μ, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻, D)
                 
-                @timeit "elemental" rt_elemental!(pol_type, dτ, ϖ, Z⁺⁺, Z⁻⁺, m, ndoubl, qp_μ, wt_μ, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻, Array(D), I_static_)
+                @timeit "elemental" rt_elemental!(pol_type, dτ, ϖ, Z⁺⁺, Z⁻⁺, m, ndoubl, scatter, qp_μ, wt_μ, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻, Array{Float64,3}(repeat(D, 1, 1, 1)), I_static_)
 
-                @timeit "doubling" rt_doubling!(ndoubl, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻, Array(D), I_static_)
+                @timeit "doubling" rt_doubling!(ndoubl, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻, Array{Float64,3}(repeat(D, 1, 1, 1)), I_static_)
                 # @timeit "doubling" rt_doubling!(dτ, τ, ndoubl, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻, D)
             else
                 r⁻⁺ = 0
@@ -100,7 +100,7 @@ function run_RTM(pol_type, sza, vza, vaz, τRayl, ϖRayl, τAer, ϖAer, fᵗ, qp
                 R⁺⁻[:] = r⁺⁻
             else
                 
-                @timeit "interaction" rt_interaction!(R⁻⁺, T⁺⁺, R⁺⁻, T⁻⁻, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻, I_static_)
+                @timeit "interaction" rt_interaction!(kn, R⁻⁺, T⁺⁺, R⁺⁻, T⁻⁻, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻, I_static_)
                 
                 # @timeit "interaction" rt_interaction!(kn, R⁻⁺, T⁺⁺, R⁺⁻, T⁻⁻, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻)
             end
