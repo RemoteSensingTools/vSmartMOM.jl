@@ -39,8 +39,26 @@ function rt_elemental_helper!(pol_type, dτ, ϖ, Z⁺⁺, Z⁻⁺, m,
         d_wct = Array(Diagonal(wct))
 
         # Calculate r⁻⁺ and t⁺⁺
-        r⁻⁺[:] = d_qp ⊠ Z⁻⁺_ ⊠ (d_wct * dτ)
-        t⁺⁺[:] = I_static .- (d_qp ⊠ ((I_static .- Z⁺⁺_ ⊠ d_wct) * dτ))
+        
+        # Version 1: no absorption in batch mode (like before), need to separate these modes
+        if maximum(dτ) < 0.0001 
+            r⁻⁺[:] = d_qp ⊠ Z⁻⁺_ ⊠ (d_wct * dτ)
+            t⁺⁺[:] = I_static .- (d_qp ⊠ ((I_static .- Z⁺⁺_ ⊠ d_wct) * dτ))
+        else
+        # Version 2: with absorption in batch mode, low tau_scatt but higher tau_total, needs different equations
+        # This is not yet GPU ready as it has element wise operations (should work for CPU )
+            for i = 1,Nquad4, j=1,Nquad4
+                # R^{-+}(\mu_i, \mu_j) = \varpi Z^{-+}(\mu_i, \mu_j) \frac{\mu_j}{\mu_i+\mu_j}\left(1-\exp{\left\{-\tau\left(\frac{1}{\mu_i}+\frac{1}{\mu_j}\right)\right\}}\right) w_j 
+                r⁻⁺[i,j] = (qp_μ4[j]/(qp_μ4[i]+qp_μ4[j])) ⊠ Z⁻⁺_[i,j] ⊠ (d_wct[j] * (1-exp(-dτ*((1/qp_μ4[i])+(1/qp_μ4[j])))))
+                if (i==j)
+                    # T^{++}(\mu_i, \mu_i) &= \varpi Z^{++}(\mu_i, \mu_i) \frac{\tau}{\mu_i}\exp{\left\{-\frac{\tau}{\mu_i}\right\}}w_i 
+                    t⁺⁺[i,j] = (1/qp_μ4[i]) ⊠ ((Z⁺⁺_[i,i] ⊠ d_wct) * dτ * exp(-dτ/qp_μ4[i]))
+                else
+                    # T^{++}(\mu_i, \mu_j) &= \varpi Z^{++}(\mu_i, \mu_j) \frac{\mu_j}{\mu_i-\mu_j}\left(\exp{\left\{-\frac{\tau}{\mu_i}\right\}}-\exp{\left\{-\frac{\tau}{\mu_j}\right\}}\right)w_j  \quad(i\neq j)\\
+                    t⁺⁺[i,j] = (qp_μ4[j]/(qp_μ4[i]-qp_μ4[j])) ⊠ Z⁺⁺_[i,j] ⊠ (d_wct[j] * (exp(-dτ/qp_μ[i])-exp(-dτ/qp_μ[j])))
+                end
+            end
+        end
 
         if ndoubl<1
             r⁺⁻[:] = D ⊠ r⁻⁺ ⊠ D
