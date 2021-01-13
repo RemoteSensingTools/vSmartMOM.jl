@@ -15,9 +15,11 @@ function run_RTM(pol_type,          # Polarization type (IQUV)
     # Get the float-type to use
     FT = eltype(τRayl)
 
+    nSpec = size(τ_abs, 1)
+
     # Output variables: Reflected and transmitted solar irradiation at TOA and BOA respectively
-    R = zeros(length(vza), pol_type.n, 1)
-    T = zeros(length(vza), pol_type.n, 1)    
+    R = zeros(length(vza), pol_type.n, nSpec)
+    T = zeros(length(vza), pol_type.n, nSpec)    
 
     # μ0 defined as cos(θ); θ = sza
     μ0 = cosd(sza)
@@ -31,7 +33,7 @@ function run_RTM(pol_type,          # Polarization type (IQUV)
     # Number of quadrature points (qp_μ array size * Stokes Vector size)
     Nquadn = pol_type.n * dims[1]
 
-    nSpec = size(τ_abs, 1)
+    
 
     # I0 = [1, 0, 0, 0] 
     # assuming completely unpolarized incident stellar radiation
@@ -118,7 +120,7 @@ function run_RTM(pol_type,          # Polarization type (IQUV)
             if (scatter)
                 # @timeit "elemental" rt_elemental!(pol_type, dτ, ϖ, Z⁺⁺, Z⁻⁺, m, ndoubl, scatter, qp_μ, wt_μ, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻, D)
                 
-                @timeit "elemental" rt_elemental!(pol_type, dτ, ϖ_nSpec, Z⁺⁺, Z⁻⁺, m, ndoubl, scatter, qp_μ, wt_μ, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻, Array{Float64,3}(repeat(D, 1, 1, nSpec)), I_static_)
+                @timeit "elemental" rt_elemental!(pol_type, dτ, dτ_max, ϖ_nSpec, ϖ, Z⁺⁺, Z⁻⁺, m, ndoubl, scatter, qp_μ, wt_μ, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻, Array{Float64,3}(repeat(D, 1, 1, nSpec)), I_static)
 
                 @timeit "doubling" rt_doubling!(ndoubl, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻, Array{Float64,3}(repeat(D, 1, 1, nSpec)), I_static_)
                 # @timeit "doubling" rt_doubling!(dτ, τ, ndoubl, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻, D)
@@ -174,13 +176,21 @@ function run_RTM(pol_type,          # Polarization type (IQUV)
             # @show st_iμ+1:st_iμ+pol_type.n, iμ0,st_iμ0+1:st_iμ0+pol_type.n
             # @show size(R⁻⁺)
             
-            Δ = weight * bigCS * (R⁻⁺[istart:iend, istart0:iend0, 1] / wt_μ[iμ0]) * pol_type.I0
+            for s = 1:nSpec
+                Δ = weight * bigCS * (R⁻⁺[istart:iend, istart0:iend0, s] / wt_μ[iμ0]) * pol_type.I0
+                R[i,:,s] += Δ
+                T[i,:,s] += weight * bigCS * (T⁺⁺[istart:iend, istart0:iend0, s] / wt_μ[iμ0]) * pol_type.I0
+            end
+
+            
+
+            
             # @show m, mean(abs.((Δ / R[i,:] * 100)))
             
-            R[i,:,1] += Δ
+            
             # @show wt_μ[iμ0]
             # Measurement at the BOA
-            T[i,:, 1] += weight * bigCS * (T⁺⁺[istart:iend, istart0:iend0, 1] / wt_μ[iμ0]) * pol_type.I0
+            
             # Needs something like this but working :-)
             # if mean(abs.((Δ / R[i,:] * 100))) < 0.1 # if smaller than 0.1%
             #    println("Breaking m loop at ", m, "; Max diff is now ",  mean(abs.((Δ / R[i,:] * 100))), "%")

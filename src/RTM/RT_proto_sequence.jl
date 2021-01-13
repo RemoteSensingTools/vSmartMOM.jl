@@ -124,7 +124,7 @@ function compute_absorption_profile!(grid,
 end
 
 
-grid = range(1e7/780, 1e7/755, length=12501)
+grid = range(1e7/780, 1e7/755, length=101)
 
 absorption = zeros(length(grid), length(profile_caltech.p))
 compute_absorption_profile!(grid, absorption, profile_caltech)
