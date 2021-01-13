@@ -1,5 +1,7 @@
 using Revise
+using Plots
 using RadiativeTransfer
+using RadiativeTransfer.CrossSection
 using RadiativeTransfer.PhaseFunction
 using RadiativeTransfer.RTM
 using Distributions
@@ -12,16 +14,14 @@ FT = Float32
 λ = FT(0.770)       # Incident wavelength
 depol = FT(0.0)
 # Truncation 
-Ltrunc = 8             # Truncation  
-truncation_type   = PhaseFunction.δBGE{Float32}(Ltrunc, 3.0)
+Ltrunc = 14             # Truncation  
+truncation_type   = PhaseFunction.δBGE{Float32}(Ltrunc, 2.0)
 
 # polarization_type
 polarization_type = Stokes_IQU{FT}()
 
 # Quadrature points for RTM
-# Nquad, qp_μ, wt_μ = rt_set_streams(RTM.RadauQuad(), Ltrunc, FT(60.0), FT[0.0, 15.0, 30., 45., 60.])
-# nadir only:
-Nquad, qp_μ, wt_μ = rt_set_streams(RTM.GaussQuadFullSphere(), Ltrunc, FT(60.0), FT[0.0])
+Nquad, qp_μ, wt_μ = rt_set_streams(RTM.RadauQuad(), Ltrunc, FT(60.0), FT[0.0, 15.0, 30., 45., 60.])
 
 # Aerosol particle distribution and properties
 μ            = [1.3]    # [0.3,2.0]       # Log mean radius
@@ -63,8 +63,8 @@ GreekRayleigh = PhaseFunction.get_greek_rayleigh(depol)
 vza = [60., 45., 30., 15., 0., 15., 30., 45., 60.]
 vaz = [180., 180., 180., 180., 0., 0., 0., 0., 0.]
 sza = 60.
-# Nquad, qp_μ, wt_μ = rt_set_streams(RTM.RadauQuad(), Ltrunc, sza, vza);
-Nquad, qp_μ, wt_μ = rt_set_streams(RTM.GaussQuadFullSphere(), Ltrunc, FT(60.0), FT[0.0])
+Nquad, qp_μ, wt_μ = rt_set_streams(RTM.RadauQuad(), Ltrunc, sza, vza);
+
 
 # In[ ]:
 
@@ -78,9 +78,7 @@ myLat = 34.1377;
 myLon = -118.1253;
 
 # Read profile (and generate dry/wet VCDs per layer)
-profile_caltech_hr = RTM.read_atmos_profile(file, myLat, myLon, timeIndex);
-# Reduce to 20 layers here (equidistant in p as good as it gets):
-profile_caltech = RTM.reduce_profile(20, profile_caltech_hr)
+profile_caltech = RTM.read_atmos_profile(file, myLat, myLon, timeIndex);
 
 # Compute layer optical thickness for Rayleigh (surface pressure in hPa) 
 τRayl =  RTM.getRayleighLayerOptProp(profile_caltech.psurf / 100, λ, depol, profile_caltech.vcd_dry);
@@ -102,9 +100,70 @@ aerosol_optics = [aerosol_optics_trunc_aero1] # [aerosol_optics_trunc_aero1 aero
 
 maxM = 5
 
-R, T = RTM.run_RTM(polarization_type, sza, vza, vaz, τRayl, ϖRayl, τAer, ϖAer, fᵗ, qp_μ, wt_μ, maxM, aerosol_optics, GreekRayleigh);
+function compute_absorption_profile!(grid,
+                                     absorption_spectra::Array{Float64,2}, 
+                                     profile::RadiativeTransfer.RTM.AtmosphericProfile)
+
+    @assert size(absorption_spectra)[2] == length(profile_caltech.p)
+
+    hitran_data = read_hitran(artifact("O2"), iso=1)
+    model = make_hitran_model(hitran_data, Voigt(), wing_cutoff = 40, CEF=HumlicekWeidemann32SDErrorFunction(), architecture=CrossSection.GPU())
+
+    for iz in 1:length(profile_caltech.p)
+
+        println(iz)
+
+        p = profile_caltech.p[iz]
+        T = profile_caltech.T[iz]
+
+        absorption_spectra[:,iz] = Array(absorption_cross_section(model, grid, p, T))
+    end
+
+    return nothing
+    
+end
+
+
+grid = range(1e7/780, 1e7/755, length=12501)
+
+absorption = zeros(length(grid), length(profile_caltech.p))
+compute_absorption_profile!(grid, absorption, profile_caltech)
+
+τ_abs = log(10) * absorption
+
+# anim = @animate for i ∈ length(profile_caltech.p):-1:1
+
+#     # l = @layout [a ; b c]
+#     # p1 = plot(...)
+#     # p2 = plot(...)
+#     # p3 = plot(...)
+#     # plot(p1, p2, p3, layout = l)
+
+#     p1 = plot(1:length(absorption[:,i]), absorption[:,i], ylims=(0, 4.5e-22), title=("O2 Absorption"))
+#     p2 = plot(1:length(absorption[:,i]), absorption[:,i], ylims=(0, 1e-23), title=("O2 Absorption (zoomed in)"))
+#     p3 = plot(1:length(profile_caltech.p[end:-1:i]), 
+#               profile_caltech.p[end:-1:i], 
+#               xlims=(0,length(profile_caltech.p)), 
+#               ylims=(1, 100000), 
+#               yaxis=:log,
+#               title=("Pressure (Pa)"))
+
+#     p4 = plot(1:length(profile_caltech.T[end:-1:i]), 
+#               profile_caltech.T[end:-1:i], 
+#               xlims=(0,length(profile_caltech.T)), 
+#               ylims=(150, 300), 
+#               title=("Temperature (K)"))
+#     # p4 = 
+
+#     plot(p1, p2, p3, p4, layout = 4, legend=false)
+# end
+# gif(anim, "anim_fps15.gif", fps = 15)
+
+RTM.run_RTM(polarization_type, sza, vza, vaz, τRayl, ϖRayl, τAer, ϖAer, fᵗ, qp_μ, wt_μ, maxM, aerosol_optics, GreekRayleigh, τ_abs);
+
+# RTM.run_RTM(polarization_type, sza, vza, vaz, τRayl, ϖRayl, τAer, ϖAer, fᵗ, qp_μ, wt_μ, maxM, aerosol_optics, GreekRayleigh, τ_abs);
 
 # R ≈ R_true
 # T ≈ T_true
 
-
+a = 1
