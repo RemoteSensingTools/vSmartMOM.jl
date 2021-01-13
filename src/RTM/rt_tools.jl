@@ -1,41 +1,69 @@
 using ..Architectures: devi, default_architecture
 
-# atmospheric RTM
-function run_RTM(pol_type, sza, vza, vaz, τRayl, ϖRayl, τAer, ϖAer, fᵗ, qp_μ, wt_μ, Ltrunc, aerosol_optics, GreekRayleigh)
+
+function run_RTM(pol_type,          # Polarization type (IQUV)
+                 sza, vza, vaz,     # Solar Zenith, Viewing Zenith, Viewing Azimuthal 
+                 τRayl, ϖRayl,      # Rayleigh optical depth and single-scattering albedo
+                 τAer, ϖAer,        # Aerosol optical depth and single-scattering albedo
+                 fᵗ,                # Truncation factor
+                 qp_μ, wt_μ,        # Quadrature points and weights
+                 Ltrunc,            # Trunction length for legendre terms
+                 aerosol_optics,    # AerosolOptics (greek_coefs, ω̃, k, fᵗ)
+                 GreekRayleigh,     # Greek coefficients of Rayleigh Phase Function
+                 τ_abs)             # nSpec x Nz matrix of absorption
+
+    # Get the float-type to use
     FT = eltype(τRayl)
-    # @show FT
+
     # Output variables: Reflected and transmitted solar irradiation at TOA and BOA respectively
     R = zeros(length(vza), pol_type.n, 1)
     T = zeros(length(vza), pol_type.n, 1)    
+
+    # μ0 defined as cos(θ); θ = sza
     μ0 = cosd(sza)
-    # @show(μ0)
-    iμ0 = nearest_point(qp_μ, μ0) # input μ0 = cos(SZA)
-    # @show(iμ0)
+
+    # Find the closest point to μ0 in qp_μ
+    iμ0 = nearest_point(qp_μ, μ0)
+
+    # Dimensions of quadrature points array
     dims = size(qp_μ)
-    # @show dims
+
+    # Number of quadrature points (qp_μ array size * Stokes Vector size)
     Nquadn = pol_type.n * dims[1]
-    # I0 = [1, 0, 0, 0] #assuming completely unpolarized incident stellar radiation
+
+    nSpec = size(τ_abs, 1)
+
+    # I0 = [1, 0, 0, 0] 
+    # assuming completely unpolarized incident stellar radiation
+    # This should depend on pol_type right? 
     D = Diagonal(repeat(pol_type.D, size(qp_μ)[1]))
-    # @show D
+
+    # Number of vertical slices
+    Nz = length(τRayl)
+
+    # Copy qp_μ "pol_type.n" times
+    qp_μ4 = reduce(vcat, (fill.(qp_μ, [pol_type.n])))
+
     # get vertical grid
     # get solar+viewing geometry, compute streams
     # compute Aersol SSP
     # compute Rayleigh SSP
-    Nz = length(τRayl)
-    Naer = length(aerosol_optics)
-    qp_μ4 = reduce(vcat, (fill.(qp_μ, [pol_type.n])))
-    for m = 0:Ltrunc - 1
-        # @show m
 
+    # Loop over number of truncation terms
+    for m = 0:Ltrunc - 1
+
+        # Azimuthal weighting
         weight = m == 0 ? 0.5 : 1.0
 
-        # compute Zmp_Aer, Zpp_Aer, Zmp_Rayl, Zpp_Rayl
+        # Compute Z-moments of the Rayleigh phase matrix 
         # For m>=3, Rayleigh matrices will be 0, can catch with if statement if wanted 
         Rayl𝐙⁺⁺, Rayl𝐙⁻⁺ = PhaseFunction.compute_Z_moments(pol_type, qp_μ, GreekRayleigh, m);
-        # @show size(Rayl𝐙⁺⁺)
+
+        # Number of aerosols
         nAer = length(aerosol_optics)
         dims = size(Rayl𝐙⁺⁺)
         
+        # Compute aerosol Z-matrices
         Aer𝐙⁺⁺ = [zeros(FT, dims) for i in 1:nAer]
         Aer𝐙⁻⁺ = similar(Aer𝐙⁺⁺)
 
@@ -46,39 +74,53 @@ function run_RTM(pol_type, sza, vza, vaz, τRayl, ϖRayl, τAer, ϖAer, fᵗ, qp
         # Note: The following are n x n x 1 now, but need to be n x n x nSpec
 
         # Homogenous R and T matrices
-        r⁻⁺ = zeros(FT, tuple(dims[1], dims[2], 1))
-        t⁺⁺ = zeros(FT, tuple(dims[1], dims[2], 1))
-        r⁺⁻ = zeros(FT, tuple(dims[1], dims[2], 1))
-        t⁻⁻ = zeros(FT, tuple(dims[1], dims[2], 1))
+        r⁻⁺ = zeros(FT, tuple(dims[1], dims[2], nSpec))
+        t⁺⁺ = zeros(FT, tuple(dims[1], dims[2], nSpec))
+        r⁺⁻ = zeros(FT, tuple(dims[1], dims[2], nSpec))
+        t⁻⁻ = zeros(FT, tuple(dims[1], dims[2], nSpec))
 
         # Composite layer R and T matrices
-        R⁻⁺ = zeros(FT, tuple(dims[1], dims[2], 1))
-        R⁺⁻ = zeros(FT, tuple(dims[1], dims[2], 1))
-        T⁺⁺ = zeros(FT, tuple(dims[1], dims[2], 1))
-        T⁻⁻ = zeros(FT, tuple(dims[1], dims[2], 1))
+        R⁻⁺ = zeros(FT, tuple(dims[1], dims[2], nSpec))
+        R⁺⁻ = zeros(FT, tuple(dims[1], dims[2], nSpec))
+        T⁺⁺ = zeros(FT, tuple(dims[1], dims[2], nSpec))
+        T⁻⁻ = zeros(FT, tuple(dims[1], dims[2], nSpec))
 
         I_static = Diagonal{FT}(ones(dims[1]))
         I_static_ = repeat(I_static, 1, 1, 1)
 
         kn = 0
-        # loop over vertical layers:
+
+        # Loop over vertical layers:
         for iz = 1:Nz  # Count from TOA to BOA
-            @timeit "Constructing" τ, ϖ, Z⁺⁺, Z⁻⁺ = construct_atm_layer(τRayl[iz], τAer[iz,:], ϖRayl[iz], ϖAer, fᵗ, Rayl𝐙⁺⁺, Rayl𝐙⁻⁺, Aer𝐙⁺⁺, Aer𝐙⁻⁺)
-            dτ_max = minimum([τ, 0.2 * minimum(qp_μ)])
-            # @show dτ_max, τ, 0.2 * minimum(qp_μ)
-            dτ, ndoubl = doubling_number(dτ_max, τ)
+
+            @show iz
+
+            # Construct the atmospheric layer
+            # From Rayleigh and aerosol τ, ϖ, compute overall layer τ, ϖ
+            @timeit "Constructing" τ_nSpec, ϖ_nSpec, τ, ϖ, Z⁺⁺, Z⁻⁺ = construct_atm_layer(τRayl[iz], τAer[iz,:], ϖRayl[iz], ϖAer, fᵗ, Rayl𝐙⁺⁺, Rayl𝐙⁻⁺, Aer𝐙⁺⁺, Aer𝐙⁻⁺, τ_abs[:,iz])
+
+            # τ * ϖ should remain constant even though they individually change over wavelength
+            @assert all(i->(i==τ*ϖ), τ_nSpec .* ϖ_nSpec)
+
+            dτ_max = minimum([τ * ϖ, 0.2 * minimum(qp_μ)])
+            dτ_tmp, ndoubl = doubling_number(dτ_max, τ*ϖ)
+
+            dτ = τ_nSpec ./ (2^ndoubl)
+            
             scatter = false
             if (sum(τAer) > 1.e-8)
                 scatter = true
-            elseif (τRayl[iz] > 1.e-8) & (m < 3)
+
+            elseif (τRayl[iz] > 1.e-8) && (m < 3)
                 scatter = true
-            end        
+            end      
+
             if (scatter)
                 # @timeit "elemental" rt_elemental!(pol_type, dτ, ϖ, Z⁺⁺, Z⁻⁺, m, ndoubl, scatter, qp_μ, wt_μ, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻, D)
                 
-                @timeit "elemental" rt_elemental!(pol_type, dτ, ϖ, Z⁺⁺, Z⁻⁺, m, ndoubl, scatter, qp_μ, wt_μ, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻, Array{Float64,3}(repeat(D, 1, 1, 1)), I_static_)
+                @timeit "elemental" rt_elemental!(pol_type, dτ, ϖ_nSpec, Z⁺⁺, Z⁻⁺, m, ndoubl, scatter, qp_μ, wt_μ, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻, Array{Float64,3}(repeat(D, 1, 1, nSpec)), I_static_)
 
-                @timeit "doubling" rt_doubling!(ndoubl, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻, Array{Float64,3}(repeat(D, 1, 1, 1)), I_static_)
+                @timeit "doubling" rt_doubling!(ndoubl, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻, Array{Float64,3}(repeat(D, 1, 1, nSpec)), I_static_)
                 # @timeit "doubling" rt_doubling!(dτ, τ, ndoubl, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻, D)
             else
                 r⁻⁺ = 0

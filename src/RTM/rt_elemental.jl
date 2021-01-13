@@ -1,12 +1,12 @@
 "Elemental single-scattering layer"
 function rt_elemental_helper!(pol_type, dτ, ϖ, Z⁺⁺, Z⁻⁺, m, 
-                       ndoubl::Int, scatter, qp_μ, wt_μ, 
-                       r⁻⁺::AbstractArray{FT,3}, 
-                       t⁺⁺::AbstractArray{FT,3}, 
-                       r⁺⁻::AbstractArray{FT,3}, 
-                       t⁻⁻::AbstractArray{FT,3}, 
-                       D::AbstractArray{FT,3},
-                       I_static::AbstractArray) where {FT}
+                              ndoubl, scatter, qp_μ, wt_μ, 
+                              r⁻⁺::AbstractArray{FT,3}, 
+                              t⁺⁺::AbstractArray{FT,3}, 
+                              r⁺⁻::AbstractArray{FT,3}, 
+                              t⁻⁻::AbstractArray{FT,3}, 
+                              D::AbstractArray{FT,3},
+                              I_static::AbstractArray) where {FT}
 
     # ToDo: Main output is r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺ (can be renamed to t⁺⁺, etc)
     # Need to check with paper nomenclature. This is basically eqs. 19-20 in vSmartMOM
@@ -20,8 +20,10 @@ function rt_elemental_helper!(pol_type, dτ, ϖ, Z⁺⁺, Z⁻⁺, m,
     #         to the full homogeneous layer n
     # scatter: flag indicating scattering
 
-    Z⁺⁺_ = repeat(Z⁺⁺, 1, 1, 1)
-    Z⁻⁺_ = repeat(Z⁻⁺, 1, 1, 1)
+    nSpec = size(r⁻⁺, 3)
+
+    # Z⁺⁺_ = repeat(Z⁺⁺, 1, 1, nSpec)
+    # Z⁻⁺_ = repeat(Z⁻⁺, 1, 1, nSpec)
 
     if scatter
 
@@ -32,7 +34,10 @@ function rt_elemental_helper!(pol_type, dτ, ϖ, Z⁺⁺, Z⁻⁺, m,
         qp_μ4 = reduce(vcat, (fill.(qp_μ,[pol_type.n])))
         wt_μ4 = reduce(vcat, (fill.(wt_μ,[pol_type.n])))
 
-        wct = m==0 ? 0.50 * ϖ * wt_μ4  : 0.25 * ϖ * wt_μ4
+        NquadN = length(qp_μ4)
+
+        # wct = m==0 ? 0.50 * ϖ .* wt_μ4  : 0.25 .* ϖ .* wt_μ4
+        wct = m==0 ? 0.50 * 1 .* wt_μ4  : 0.25 .* 1 .* wt_μ4
 
         # Get the diagonal matrices first
         d_qp = Array(Diagonal(1 ./ qp_μ4)) 
@@ -41,24 +46,33 @@ function rt_elemental_helper!(pol_type, dτ, ϖ, Z⁺⁺, Z⁻⁺, m,
         # Calculate r⁻⁺ and t⁺⁺
         
         # Version 1: no absorption in batch mode (like before), need to separate these modes
-        if maximum(dτ) < 0.0001 
-            r⁻⁺[:] = d_qp ⊠ Z⁻⁺_ ⊠ (d_wct * dτ)
-            t⁺⁺[:] = I_static .- (d_qp ⊠ ((I_static .- Z⁺⁺_ ⊠ d_wct) * dτ))
-        else
+        # if maximum(dτ) < 0.0001 
+        #     r⁻⁺[:] = d_qp ⊠ Z⁻⁺ ⊠ (d_wct * dτ)
+        #     t⁺⁺[:] = I_static .- (d_qp ⊠ ((I_static .- Z⁺⁺ ⊠ d_wct) * dτ))
+        
+        # else    
         # Version 2: with absorption in batch mode, low tau_scatt but higher tau_total, needs different equations
-        # This is not yet GPU ready as it has element wise operations (should work for CPU )
-            for i = 1,Nquad4, j=1,Nquad4
-                # R^{-+}(\mu_i, \mu_j) = \varpi Z^{-+}(\mu_i, \mu_j) \frac{\mu_j}{\mu_i+\mu_j}\left(1-\exp{\left\{-\tau\left(\frac{1}{\mu_i}+\frac{1}{\mu_j}\right)\right\}}\right) w_j 
-                r⁻⁺[i,j] = (qp_μ4[j]/(qp_μ4[i]+qp_μ4[j])) ⊠ Z⁻⁺_[i,j] ⊠ (d_wct[j] * (1-exp(-dτ*((1/qp_μ4[i])+(1/qp_μ4[j])))))
+        # This is not yet GPU ready as it has element wise operations (should work for CPU)
+
+            for i = 1:NquadN, j=1:NquadN
+
+                # 𝐑⁻⁺(μᵢ, μⱼ) = ϖ ̇𝐙⁻⁺(μᵢ, μⱼ) ̇(μⱼ/(μᵢ+μⱼ)) ̇(1 - exp{-τ ̇(1/μᵢ + 1/μⱼ)}) ̇𝑤ⱼ
+                r⁻⁺[i,j,:] = ϖ .* Z⁻⁺[i,j] .* (qp_μ4[j]/(qp_μ4[i]+qp_μ4[j])) .* (1 .- exp.(-dτ .* ((1/qp_μ4[i])+(1/qp_μ4[j])))) .* (wct[j]) 
+
                 if (i==j)
-                    # T^{++}(\mu_i, \mu_i) &= \varpi Z^{++}(\mu_i, \mu_i) \frac{\tau}{\mu_i}\exp{\left\{-\frac{\tau}{\mu_i}\right\}}w_i 
-                    t⁺⁺[i,j] = (1/qp_μ4[i]) ⊠ ((Z⁺⁺_[i,i] ⊠ d_wct) * dτ * exp(-dτ/qp_μ4[i]))
+
+                    # 𝐓⁺⁺(μᵢ, μᵢ) = ϖ ̇𝐙⁺⁺(μᵢ, μᵢ) ̇(τ/μᵢ) ̇exp{-τ/μᵢ} ̇𝑤ᵢ
+                    t⁺⁺[i,j,:] = ϖ .* Z⁺⁺[i,i] .* (dτ ./ qp_μ4[i]) .* exp.(-dτ./qp_μ4[i]) .* wct[i]
+
                 else
-                    # T^{++}(\mu_i, \mu_j) &= \varpi Z^{++}(\mu_i, \mu_j) \frac{\mu_j}{\mu_i-\mu_j}\left(\exp{\left\{-\frac{\tau}{\mu_i}\right\}}-\exp{\left\{-\frac{\tau}{\mu_j}\right\}}\right)w_j  \quad(i\neq j)\\
-                    t⁺⁺[i,j] = (qp_μ4[j]/(qp_μ4[i]-qp_μ4[j])) ⊠ Z⁺⁺_[i,j] ⊠ (d_wct[j] * (exp(-dτ/qp_μ[i])-exp(-dτ/qp_μ[j])))
+
+                    # 𝐓⁺⁺(μᵢ, μⱼ) = ϖ ̇𝐙⁺⁺(μᵢ, μⱼ) ̇(μⱼ/(μᵢ-μⱼ)) ̇(exp{-τ/μᵢ} - exp{-τ/μⱼ}) ̇𝑤ⱼ
+                    # (𝑖 ≠ 𝑗)
+                    t⁺⁺[i,j,:] = ϖ .* Z⁺⁺[i,j] .* (qp_μ4[j]/(qp_μ4[i]-qp_μ4[j])) .* (exp.(-dτ ./qp_μ4[i]) - exp.(-dτ./qp_μ4[j])) .* wct[j]
                 end
             end
-        end
+
+        # end
 
         if ndoubl<1
             r⁺⁻[:] = D ⊠ r⁻⁺ ⊠ D
@@ -75,7 +89,7 @@ function rt_elemental_helper!(pol_type, dτ, ϖ, Z⁺⁺, Z⁻⁺, m,
 end
 
 function rt_elemental!(pol_type, dτ, ϖ, Z⁺⁺, Z⁻⁺, m, 
-                              ndoubl::Int, scatter, qp_μ, wt_μ, 
+                              ndoubl, scatter, qp_μ, wt_μ, 
                               r⁻⁺::AbstractArray{FT,3}, 
                               t⁺⁺::AbstractArray{FT,3}, 
                               r⁺⁻::AbstractArray{FT,3}, 
