@@ -17,6 +17,8 @@ function rt_doubling_helper!(ndoubl::Int,
     # Note: short-circuit evaluation => return nothing evaluated iff ndoubl == 0 
     ndoubl == 0 && return nothing
 
+    println("running!")
+
     # Used to store `inv(I - r⁻⁺ * r⁻⁺) * t⁺⁺`
     tmp_inv = similar(t⁺⁺)
 
