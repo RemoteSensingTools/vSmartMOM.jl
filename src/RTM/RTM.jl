@@ -28,6 +28,7 @@ include("rt_elemental.jl")
 include("rt_doubling.jl")
 include("rt_interaction.jl")
 include("gpu_batched.jl")
+include("rt_utils.jl")
 include("rt_tools.jl")
 
 export rt_set_streams
