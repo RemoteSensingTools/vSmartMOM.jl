@@ -47,33 +47,3 @@ function rt_doubling!(ndoubl::Int,
     rt_doubling_helper!(ndoubl, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻, D, I_static)
     synchronize()
 end
-
-"minimum number of doublings needed to reach an optical depth τ_end, starting with an optical depth dτ.
-#The starting optical depth dτ is also determined from its maximum possible value, τ"
-function doubling_number(dτ_max, τ_end) # check if τ_end can be replaced by τ_end*ϖ for absorbing atmospheres
-    FT = eltype(dτ_max)
-    # @show FT, eltype(τ_end), dτ_max, τ_end
-    # minimum number of doublings needed to reach an optical depth τ_end, starting with an optical depth dτ.
-    # The starting optical depth dτ is also determined from its maximum possible value, dτ_max
-    if τ_end <= dτ_max
-        dτ = τ_end
-        ndoubl = 0
-        return dτ, ndoubl
-    else
-        q1 = log10(2.0)
-        q2 = log10(dτ_max)
-        q3 = log10(τ_end)
-        tlimit = (q3 - q2) / q1
-        nlimit = floor(Int, tlimit)
-        diff = tlimit - nlimit
-        if diff < eps(FT)
-            dτ = dτ_max
-            ndoubl = nlimit
-        else
-            ndoubl = nlimit + 1       
-            x = q3 - q1 * ndoubl
-            dτ = 10.0^x
-        end 
-        return dτ, ndoubl
-    end
-end

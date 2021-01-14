@@ -72,6 +72,8 @@ function rt_interaction_helper!(kn::Int,
 
         R⁺⁻[:] = r⁺⁻ + t⁺⁺ ⊠ R⁺⁻ ⊠ tmp_inv
         T⁻⁻[:] = T⁺⁺ ⊠ tmp_inv
+
+        return nothing
         
     else 
         error("kn is ($kn), must be in (1, 2, 3, 4)")

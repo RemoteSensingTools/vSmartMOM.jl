@@ -12,46 +12,34 @@ function run_RTM(pol_type,          # Polarization type (IQUV)
                  GreekRayleigh,     # Greek coefficients of Rayleigh Phase Function
                  τ_abs)             # nSpec x Nz matrix of absorption
 
-    # Get the float-type to use
-    FT = eltype(τRayl)
 
-    nSpec = size(τ_abs, 1)
+    #=
+    Define types, variables, and static quantities
+    =#
+    
+    FT = eltype(τRayl)                  # Get the float-type to use
+    Nz = length(τRayl)                  # Number of vertical slices
+    nSpec = size(τ_abs, 1)              # Number of spectral points
+    Nquadn = pol_type.n * size(qp_μ)[1] # Number of quadrature points 
+                                        # (qp_μ array size * Stokes Vector size)
+    μ0 = cosd(sza)                      # μ0 defined as cos(θ); θ = sza
+    iμ0 = nearest_point(qp_μ, μ0)       # Find the closest point to μ0 in qp_μ
 
     # Output variables: Reflected and transmitted solar irradiation at TOA and BOA respectively
     R = zeros(length(vza), pol_type.n, nSpec)
     T = zeros(length(vza), pol_type.n, nSpec)    
 
-    # μ0 defined as cos(θ); θ = sza
-    μ0 = cosd(sza)
-
-    # Find the closest point to μ0 in qp_μ
-    iμ0 = nearest_point(qp_μ, μ0)
-
-    # Dimensions of quadrature points array
-    dims = size(qp_μ)
-
-    # Number of quadrature points (qp_μ array size * Stokes Vector size)
-    Nquadn = pol_type.n * dims[1]
-
-    
-
-    # I0 = [1, 0, 0, 0] 
-    # assuming completely unpolarized incident stellar radiation
+    # Assuming completely unpolarized incident stellar radiation
     # This should depend on pol_type right? 
     D = Diagonal(repeat(pol_type.D, size(qp_μ)[1]))
-
-    # Number of vertical slices
-    Nz = length(τRayl)
 
     # Copy qp_μ "pol_type.n" times
     qp_μ4 = reduce(vcat, (fill.(qp_μ, [pol_type.n])))
 
-    # get vertical grid
-    # get solar+viewing geometry, compute streams
-    # compute Aersol SSP
-    # compute Rayleigh SSP
+    #=
+    Loop over number of truncation terms
+    =#
 
-    # Loop over number of truncation terms
     for m = 0:Ltrunc - 1
 
         # Azimuthal weighting
@@ -65,15 +53,15 @@ function run_RTM(pol_type,          # Polarization type (IQUV)
         nAer = length(aerosol_optics)
         dims = size(Rayl𝐙⁺⁺)
         
-        # Compute aerosol Z-matrices
+        # Compute aerosol Z-matrices for all aerosols
         Aer𝐙⁺⁺ = [zeros(FT, dims) for i in 1:nAer]
         Aer𝐙⁻⁺ = similar(Aer𝐙⁺⁺)
 
         @timeit "Aerosol Z" for i = 1:nAer
             Aer𝐙⁺⁺[i], Aer𝐙⁻⁺[i] = PhaseFunction.compute_Z_moments(pol_type, qp_μ, aerosol_optics[i].greek_coefs, m)
         end
-        
-        # Note: The following are n x n x 1 now, but need to be n x n x nSpec
+
+        # Create R and T matrices for this m
 
         # Homogenous R and T matrices
         r⁻⁺ = zeros(FT, tuple(dims[1], dims[2], nSpec))
@@ -95,7 +83,7 @@ function run_RTM(pol_type,          # Polarization type (IQUV)
         # Loop over vertical layers:
         for iz = 1:Nz  # Count from TOA to BOA
 
-            @show iz
+            # @show iz
 
             # Construct the atmospheric layer
             # From Rayleigh and aerosol τ, ϖ, compute overall layer τ, ϖ
@@ -104,60 +92,65 @@ function run_RTM(pol_type,          # Polarization type (IQUV)
             # τ * ϖ should remain constant even though they individually change over wavelength
             @assert all(i->(i==τ*ϖ), τ_nSpec .* ϖ_nSpec)
 
+            # Compute doubling number
             dτ_max = minimum([τ * ϖ, 0.2 * minimum(qp_μ)])
             dτ_tmp, ndoubl = doubling_number(dτ_max, τ*ϖ)
 
             dτ = τ_nSpec ./ (2^ndoubl)
+
+            @show std(dτ)
             
-            scatter = false
-            if (sum(τAer) > 1.e-8)
-                scatter = true
+            # Determine whether there is scattering
+            scatter = (  sum(τAer) > 1.e-8 || 
+                      (( τRayl[iz] > 1.e-8 ) && (m < 3))) ? 
+                      true : false
 
-            elseif (τRayl[iz] > 1.e-8) && (m < 3)
-                scatter = true
-            end      
-
+            # If there is scattering, perform the elemental and doubling steps
             if (scatter)
-                # @timeit "elemental" rt_elemental!(pol_type, dτ, ϖ, Z⁺⁺, Z⁻⁺, m, ndoubl, scatter, qp_μ, wt_μ, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻, D)
                 
                 @timeit "elemental" rt_elemental!(pol_type, dτ, dτ_max, ϖ_nSpec, ϖ, Z⁺⁺, Z⁻⁺, m, ndoubl, scatter, qp_μ, wt_μ, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻, Array{Float64,3}(repeat(D, 1, 1, nSpec)), I_static)
 
                 @timeit "doubling" rt_doubling!(ndoubl, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻, Array{Float64,3}(repeat(D, 1, 1, nSpec)), I_static_)
-                # @timeit "doubling" rt_doubling!(dτ, τ, ndoubl, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻, D)
             else
                 r⁻⁺ = 0
                 r⁺⁻ = 0
                 t⁺⁺ = Diagonal(exp(-τ / qp_μ4))
                 t⁻⁻ = Diagonal(exp(-τ / qp_μ4))
-                #= for i = 1:Nquadn
-                    ii=1+floor(Int,(i-1)/pol_type.n)
-                    t⁺⁺[i,i] = exp(-τ/qp_μ[ii])
-                    t⁻⁻[i,i] = exp(-τ/qp_μ[ii])
-                end =#
             end
+
+            # kn is an index that tells whether there is scattering in the 
+            # added layer, composite layer, neither or both
             kn = get_kn(kn, scatter, iz)
+
+            @assert !any(isnan.(t⁺⁺))
             
+            # If this TOA, just copy the added layer into the composite layer
             if (iz == 1)
+
                 T⁺⁺[:] = t⁺⁺
                 T⁻⁻[:] = t⁻⁻
                 R⁻⁺[:] = r⁻⁺
                 R⁺⁻[:] = r⁺⁻
+            
+            # If this is not the TOA, perform the interaction step
             else
-                
                 @timeit "interaction" rt_interaction!(kn, R⁻⁺, T⁺⁺, R⁺⁻, T⁻⁻, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻, I_static_)
-                
-                # @timeit "interaction" rt_interaction!(kn, R⁻⁺, T⁺⁺, R⁺⁻, T⁻⁻, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻)
             end
         end # z
 
         # include surface function
-        # TBD
+
+        # idx of μ0 = cos(sza)
         st_iμ0 = (iμ0 - 1) * pol_type.n
         istart0 = st_iμ0 + 1
         iend0   = st_iμ0 + pol_type.n
+
+        # Loop over all viewing zenith angles
         for i = 1:length(vza)
+
+            # Find the nearest quadrature point idx
             iμ = nearest_point(qp_μ, cosd(vza[i])) # input vaz, vza as arrays
-            # @show i, vza[i], cosd(vza[i]), iμ, qp_μ[iμ]
+            
             # compute bigCS
             cos_m_phi = cosd(m * vaz[i])
             sin_m_phi = sind(m * vaz[i])
@@ -168,55 +161,24 @@ function run_RTM(pol_type,          # Polarization type (IQUV)
             elseif pol_type.n == 1
                 bigCS = Diagonal([cos_m_phi])
             end
-            # accumulate Fourier moments after azimuthal weighting
-            # Measurement at the TOA
+
+            # Accumulate Fourier moments after azimuthal weighting
+
             st_iμ  = (iμ - 1) * pol_type.n
             istart = st_iμ + 1
             iend   = st_iμ + pol_type.n
-            # @show st_iμ+1:st_iμ+pol_type.n, iμ0,st_iμ0+1:st_iμ0+pol_type.n
-            # @show size(R⁻⁺)
             
             for s = 1:nSpec
                 Δ = weight * bigCS * (R⁻⁺[istart:iend, istart0:iend0, s] / wt_μ[iμ0]) * pol_type.I0
                 R[i,:,s] += Δ
                 T[i,:,s] += weight * bigCS * (T⁺⁺[istart:iend, istart0:iend0, s] / wt_μ[iμ0]) * pol_type.I0
             end
-
             
-
-            
-            # @show m, mean(abs.((Δ / R[i,:] * 100)))
-            
-            
-            # @show wt_μ[iμ0]
-            # Measurement at the BOA
-            
-            # Needs something like this but working :-)
-            # if mean(abs.((Δ / R[i,:] * 100))) < 0.1 # if smaller than 0.1%
-            #    println("Breaking m loop at ", m, "; Max diff is now ",  mean(abs.((Δ / R[i,:] * 100))), "%")
-            #    m = Ltrunc
-                
-            # end     
-            # if m==0
-            #    @show bigCS
-            #    @show m, i, iμ, bigCS[1,1], weight*R⁻⁺[(iμ-1)*4+1, (iμ0-1)*4+1]/wt_μ[iμ0]   
-            # end
         end
-    end  # m
+    end
 
-    
     print_timer()
     reset_timer!()
 
     return R, T  
-end
-
-function get_kn(kn, scatter, iz)
-    if (iz == 1)
-        kn = scatter ? 4 : 1
-    elseif (kn >= 1)
-        kn = (kn == 1) ? (!scatter ? 1 : 2) : (!scatter ? 3 : 4)
-    end
-
-    return kn
 end
