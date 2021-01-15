@@ -180,3 +180,27 @@ function construct_atm_layer(τRayl, τAer, ϖRayl, ϖAer, fᵗ, Rayl𝐙⁺⁺,
     return τ_new, ϖ_new, τ, ϖ, Z⁺⁺, Z⁻⁺  
 end
 
+function compute_absorption_profile!(grid,
+                                     τ_abs::Array{Float64,2}, 
+                                     profile::AtmosphericProfile)
+
+    @assert size(τ_abs)[2] == length(profile.p)
+
+    hitran_data = read_hitran(artifact("O2"), iso=1)
+    model = make_hitran_model(hitran_data, Voigt(), wing_cutoff = 40, CEF=HumlicekWeidemann32SDErrorFunction(), architecture=CrossSection.GPU())
+
+    VMR = 0.21
+
+    for iz in 1:length(profile.p)
+
+        @show iz
+
+        p = profile.p[iz]
+        T = profile.T[iz]
+
+        τ_abs[:,iz] = Array(absorption_cross_section(model, grid, p, T)) * profile.vcd_dry[iz] * VMR
+    end
+
+    return nothing
+    
+end

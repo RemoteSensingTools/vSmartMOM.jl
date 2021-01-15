@@ -2,11 +2,11 @@
 # Prototype doubling methods, compute homogenous layer matrices from its elemental layer in 
 # `ndoubl` doubling steps
 
-function rt_doubling_helper!(ndoubl::Int, 
-                             r⁻⁺::AbstractArray{FT,3}, t⁺⁺::AbstractArray{FT,3}, 
-                             r⁺⁻::AbstractArray{FT,3}, t⁻⁻::AbstractArray{FT,3},
+function rt_doubling_helper!(ndoubl::Int, added_layer::AddedLayer,
                              D::AbstractArray{FT,3},
                              I_static::AbstractArray) where {FT}
+
+    @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺ = added_layer
 
     # # ToDo: Important output doubling applied to elemental layer, using same variables 
     # r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺ (can be renamed to t⁺⁺, etc)
@@ -39,11 +39,9 @@ function rt_doubling_helper!(ndoubl::Int,
     return nothing 
 end
 
-function rt_doubling!(ndoubl::Int, 
-                      r⁻⁺::AbstractArray{FT,3}, t⁺⁺::AbstractArray{FT,3}, 
-                      r⁺⁻::AbstractArray{FT,3}, t⁻⁻::AbstractArray{FT,3},
+function rt_doubling!(ndoubl::Int, added_layer::AddedLayer,
                       D::AbstractArray{FT,3}, I_static::AbstractArray) where {FT}
 
-    rt_doubling_helper!(ndoubl, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻, D, I_static)
+    rt_doubling_helper!(ndoubl, added_layer, D, I_static)
     synchronize()
 end

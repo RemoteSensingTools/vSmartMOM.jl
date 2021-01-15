@@ -1,12 +1,11 @@
 "Elemental single-scattering layer"
 function rt_elemental_helper!(pol_type, dτ_nSpec, dτ, ϖ_nSpec, ϖ, Z⁺⁺, Z⁻⁺, m, 
                               ndoubl, scatter, qp_μ, wt_μ, 
-                              r⁻⁺::AbstractArray{FT,3}, 
-                              t⁺⁺::AbstractArray{FT,3}, 
-                              r⁺⁻::AbstractArray{FT,3}, 
-                              t⁻⁻::AbstractArray{FT,3}, 
+                              added_layer::AddedLayer, 
                               D::AbstractArray{FT,3},
                               I_static::AbstractArray) where {FT}
+    
+    @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺ = added_layer
 
     # ToDo: Main output is r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺ (can be renamed to t⁺⁺, etc)
     # Need to check with paper nomenclature. This is basically eqs. 19-20 in vSmartMOM
@@ -47,7 +46,7 @@ function rt_elemental_helper!(pol_type, dτ_nSpec, dτ, ϖ_nSpec, ϖ, Z⁺⁺, Z
         
         # Version 1: no absorption in batch mode (like before), need to separate these modes
         if maximum(dτ) < 0.0001 
-            @show dτ
+
             r⁻⁺[:,:,:] .= d_qp * Z⁻⁺ * (d_wct * dτ)
             t⁺⁺[:,:,:] .= I_static .- (d_qp * ((I_static .- Z⁺⁺ * d_wct) * dτ))
         
@@ -95,13 +94,10 @@ end
 
 function rt_elemental!(pol_type, dτ_nSpec, dτ, ϖ_nSpec, ϖ, Z⁺⁺, Z⁻⁺, m, 
                               ndoubl, scatter, qp_μ, wt_μ, 
-                              r⁻⁺::AbstractArray{FT,3}, 
-                              t⁺⁺::AbstractArray{FT,3}, 
-                              r⁺⁻::AbstractArray{FT,3}, 
-                              t⁻⁻::AbstractArray{FT,3}, 
+                              added_layer::AddedLayer, 
                               D::AbstractArray{FT,3},
                               I_static::AbstractArray) where {FT}
 
-    rt_elemental_helper!(pol_type, dτ_nSpec, dτ, ϖ_nSpec, ϖ, Z⁺⁺, Z⁻⁺, m, ndoubl, scatter, qp_μ, wt_μ, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻, D, I_static)
+    rt_elemental_helper!(pol_type, dτ_nSpec, dτ, ϖ_nSpec, ϖ, Z⁺⁺, Z⁻⁺, m, ndoubl, scatter, qp_μ, wt_μ, added_layer, D, I_static)
     synchronize()
 end

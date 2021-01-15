@@ -100,36 +100,34 @@ aerosol_optics = [aerosol_optics_trunc_aero1] # [aerosol_optics_trunc_aero1 aero
 
 maxM = 5
 
-function compute_absorption_profile!(grid,
-                                     absorption_spectra::Array{Float64,2}, 
-                                     profile::RadiativeTransfer.RTM.AtmosphericProfile)
+# function compute_absorption_profile!(grid,
+#                                      τ_abs::Array{Float64,2}, 
+#                                      profile::RadiativeTransfer.RTM.AtmosphericProfile)
 
-    @assert size(absorption_spectra)[2] == length(profile_caltech.p)
+#     @assert size(absorption_spectra)[2] == length(profile_caltech.p)
 
-    hitran_data = read_hitran(artifact("O2"), iso=1)
-    model = make_hitran_model(hitran_data, Voigt(), wing_cutoff = 40, CEF=HumlicekWeidemann32SDErrorFunction(), architecture=CrossSection.GPU())
+#     hitran_data = read_hitran(artifact("O2"), iso=1)
+#     model = make_hitran_model(hitran_data, Voigt(), wing_cutoff = 40, CEF=HumlicekWeidemann32SDErrorFunction(), architecture=CrossSection.GPU())
 
-    for iz in 1:length(profile_caltech.p)
+#     for iz in 1:length(profile_caltech.p)
 
-        println(iz)
+#         println(iz)
 
-        p = profile_caltech.p[iz]
-        T = profile_caltech.T[iz]
+#         p = profile_caltech.p[iz]
+#         T = profile_caltech.T[iz]
 
-        absorption_spectra[:,iz] = Array(absorption_cross_section(model, grid, p, T))
-    end
+#         τ_abs[:,iz] = Array(absorption_cross_section(model, grid, p, T))
+#     end
 
-    return nothing
+#     return nothing
     
-end
+# end
 
 
 grid = range(1e7/780, 1e7/755, length=101)
 
-absorption = zeros(length(grid), length(profile_caltech.p))
-compute_absorption_profile!(grid, absorption, profile_caltech)
-
-τ_abs = log(10) * absorption
+τ_abs = zeros(length(grid), length(profile_caltech.p))
+compute_absorption_profile!(grid, τ_abs, profile_caltech)
 
 # anim = @animate for i ∈ length(profile_caltech.p):-1:1
 
@@ -159,7 +157,7 @@ compute_absorption_profile!(grid, absorption, profile_caltech)
 # end
 # gif(anim, "anim_fps15.gif", fps = 15)
 
-RTM.run_RTM(polarization_type, sza, vza, vaz, τRayl, ϖRayl, τAer, ϖAer, fᵗ, qp_μ, wt_μ, maxM, aerosol_optics, GreekRayleigh, τ_abs);
+R, T = RTM.run_RTM(polarization_type, sza, vza, vaz, τRayl, ϖRayl, τAer, ϖAer, fᵗ, qp_μ, wt_μ, maxM, aerosol_optics, GreekRayleigh, τ_abs);
 
 # RTM.run_RTM(polarization_type, sza, vza, vaz, τRayl, ϖRayl, τAer, ϖAer, fᵗ, qp_μ, wt_μ, maxM, aerosol_optics, GreekRayleigh, τ_abs);
 
