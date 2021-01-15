@@ -1,14 +1,10 @@
 "Simulates the full atmosphere from n distinct homogeneous layers"
-function rt_interaction_helper!(kn::Int,
-                                R⁻⁺::AbstractArray{FT,3}, 
-                                T⁺⁺::AbstractArray{FT,3}, 
-                                R⁺⁻::AbstractArray{FT,3}, 
-                                T⁻⁻::AbstractArray{FT,3}, 
-                                r⁻⁺::AbstractArray{FT,3}, 
-                                t⁺⁺::AbstractArray{FT,3}, 
-                                r⁺⁻::AbstractArray{FT,3}, 
-                                t⁻⁻::AbstractArray{FT,3},
+function rt_interaction_helper!(kn::Int, 
+                                composite_layer::CompositeLayer, added_layer::AddedLayer,
                                 I_static::AbstractArray) where {FT}
+
+    @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺ = added_layer
+    @unpack R⁻⁺, R⁺⁻, T⁺⁺, T⁻⁻ = composite_layer
     
     # ToDo: Important output from this routine is R⁻⁺, R⁺⁻, T⁺⁺, T⁻⁻ (can be renamed to 𝐓⁻⁻, etc later)
     # Need to check with paper nomenclature. This is basically eqs. 23-28 in vSmartMOM)
@@ -81,14 +77,10 @@ function rt_interaction_helper!(kn::Int,
 
 end
 
-function rt_interaction!(kn::Int,
-                         R⁻⁺::AbstractArray{FT,3}, T⁺⁺::AbstractArray{FT,3}, 
-                         R⁺⁻::AbstractArray{FT,3}, T⁻⁻::AbstractArray{FT,3}, 
-                         r⁻⁺::AbstractArray{FT,3}, t⁺⁺::AbstractArray{FT,3}, 
-                         r⁺⁻::AbstractArray{FT,3}, t⁻⁻::AbstractArray{FT,3},
+function rt_interaction!(kn::Int, composite_layer::CompositeLayer, added_layer::AddedLayer,
                          I_static::AbstractArray) where {FT}
 
-    rt_interaction_helper!(kn, R⁻⁺, T⁺⁺, R⁺⁻, T⁻⁻, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻, I_static)
+    rt_interaction_helper!(kn, composite_layer, added_layer, I_static)
     synchronize()
 
 end
