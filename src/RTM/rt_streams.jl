@@ -12,7 +12,7 @@ function rt_set_streams(::GaussQuadFullSphere, Ltrunc::Int, sza, vza)
     return Nquad, qp_μ[Nquad + 1:end], wt_μ[Nquad + 1:end]
 end
 
-# RT set_streams takes in Geometry (sza, vza) and 
+# RT set_streams takes in Geometry (sza, vza) and outputs quadrature points
 function rt_set_streams(::RadauQuad, Ltrunc::Int, sza, vza)
     FT = eltype(sza)
     # Ltrunc + 1 = number of spherical coefficients considered (+1 for l=0)
@@ -46,29 +46,3 @@ function rt_set_streams(::RadauQuad, Ltrunc::Int, sza, vza)
     # @show μ₀, Nquad, qp_μ, wt_μ
     return Nquad, qp_μ, wt_μ   
 end
-
-# Finds index i of f_array (i) which is nearest point to f
-function nearest_point(f_array, f)
-    d0 = 999.9
-    index = 0
-    for i in 1:length(f_array)
-        d = abs(f_array[i] - f)
-        if d < d0
-            d0 = d
-            index = i
-        end     
-    end
-    return index
-end
-
-# Assuming a vertical array of SSPs of molecular 
-# (Rayleigh) scattering and <naer> aerosol species, compute
-# composite single scattering properties τ_comp[1:nz], 
-# ϖ_comp[1:nz] and Z matrices      
-# struct params
-#    Nz::Int #Number of vertical layers#
-#
-# end
-# struct atmos
-
-# end

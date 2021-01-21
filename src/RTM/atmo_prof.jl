@@ -129,7 +129,7 @@ function getAerosolLayerOptProp(total_τ, p₀, σp, p_half)
 end
 
 # computes the composite single scattering parameters (τ, ϖ, Z⁺⁺, Z⁻⁺) for a given atmospheric layer iz for a given Fourier component m
-function construct_atm_layer(τRayl, τAer, ϖRayl, ϖAer, fᵗ, Rayl𝐙⁺⁺, Rayl𝐙⁻⁺, Aer𝐙⁺⁺, Aer𝐙⁻⁺)
+function construct_atm_layer(τRayl, τAer, ϖRayl, ϖAer, fᵗ, Rayl𝐙⁺⁺, Rayl𝐙⁻⁺, Aer𝐙⁺⁺, Aer𝐙⁻⁺, τ_abs)
     FT = eltype(τRayl)
     # @show FT
     @assert length(τAer) == length(ϖAer) == length(fᵗ) "Sizes don't match"
@@ -172,7 +172,35 @@ function construct_atm_layer(τRayl, τAer, ϖRayl, ϖAer, fᵗ, Rayl𝐙⁺⁺,
     # @show A, ϖ
     τ *= (FT(1) - (FT(1) - A) * ϖ)
     ϖ *= ϖ * A / (1 - (1 - A) * ϖ)
-    return τ, ϖ, Z⁺⁺, Z⁻⁺  
+
+    # Adding absorption optical depth / albedo:
+    τ_new = τ_abs .+ τ
+    ϖ_new = (τ .* ϖ) ./ τ_new
+    
+    return τ_new, ϖ_new, τ, ϖ, Z⁺⁺, Z⁻⁺  
 end
 
+function compute_absorption_profile!(grid,
+                                     τ_abs::Array{Float64,2}, 
+                                     profile::AtmosphericProfile)
 
+    @assert size(τ_abs)[2] == length(profile.p)
+
+    hitran_data = read_hitran(artifact("O2"), iso=1)
+    model = make_hitran_model(hitran_data, Voigt(), wing_cutoff = 40, CEF=HumlicekWeidemann32SDErrorFunction(), architecture=CrossSection.GPU())
+
+    VMR = 0.21
+
+    for iz in 1:length(profile.p)
+
+        @show iz
+
+        p = profile.p[iz]
+        T = profile.T[iz]
+
+        τ_abs[:,iz] = Array(absorption_cross_section(model, grid, p, T)) * profile.vcd_dry[iz] * VMR
+    end
+
+    return nothing
+    
+end
