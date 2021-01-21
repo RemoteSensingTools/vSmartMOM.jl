@@ -14,7 +14,7 @@ FT = Float32
 λ = FT(0.770)       # Incident wavelength
 depol = FT(0.0)
 # Truncation 
-Ltrunc = 6             # Truncation  
+Ltrunc = 10             # Truncation  
 truncation_type   = PhaseFunction.δBGE{Float32}(Ltrunc, 2.0)
 
 # polarization_type
@@ -32,7 +32,7 @@ nᵣ           = [1.3]    # [1.3, 1.66]     # Real part of refractive index
 nᵢ           = [0.00000001]  # [0.001,0.0003]  # Imag part of refractive index
 
 # Aerosol vertical distribution profiles
-p₀          = FT[30000.]  # [50000., 20000.] # Pressure peak [Pa]
+p₀          = FT[90000.]  # [50000., 20000.] # Pressure peak [Pa]
 σp          = FT[5000.]   # [5000., 2000.]   # Pressure peak width [Pa]
 
 size_distribution = [LogNormal(log(μ[1]), log(σ[1]))] # [LogNormal(log(μ[1]), log(σ[1])), LogNormal(log(μ[2]), log(σ[2]))]
@@ -98,7 +98,7 @@ aerosol_optics = [aerosol_optics_trunc_aero1] # [aerosol_optics_trunc_aero1 aero
 # Aer𝐙⁺⁺ = [aero1_Z⁺⁺] # [aero1_Z⁺⁺, aero2_Z⁺⁺];
 # Aer𝐙⁻⁺ = [aero1_Z⁻⁺] # [aero1_Z⁻⁺, aero2_Z⁻⁺];
 
-maxM = 5
+maxM = 3
 
 # function compute_absorption_profile!(grid,
 #                                      τ_abs::Array{Float64,2}, 
@@ -124,7 +124,7 @@ maxM = 5
 # end
 
 
-grid = range(1e7 / 764, 1e7 / 763, length=500)
+grid = range(1e7 / 765, 1e7 / 763, length=100)
 
 τ_abs = zeros(length(grid), length(profile_caltech.p))
 compute_absorption_profile!(grid, τ_abs, profile_caltech)

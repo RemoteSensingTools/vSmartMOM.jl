@@ -89,7 +89,7 @@ function run_RTM(pol_type,          # Polarization type (IQUV)
             @assert all(i -> (i ≈ τ * ϖ), τ_nSpec .* ϖ_nSpec)
 
             # Compute doubling number
-            dτ_max = minimum([τ * ϖ, 0.2 * minimum(qp_μ)])
+            dτ_max = minimum([τ * ϖ, 0.02 * minimum(qp_μ)])
             dτ_tmp, ndoubl = doubling_number(dτ_max, τ * ϖ)
 
             dτ = τ_nSpec ./ (2^ndoubl)
