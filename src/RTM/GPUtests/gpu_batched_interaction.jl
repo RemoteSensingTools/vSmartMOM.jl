@@ -1,4 +1,6 @@
 using RadiativeTransfer.RTM
+using RadiativeTransfer
+using RadiativeTransfer.PhaseFunction
 using CUDA
 using Test
 # using TensorOperations
@@ -271,6 +273,20 @@ println("RT Doubling CPU time:")
 @btime run_rt_doubling(nDoubling, r⁻⁺_, t⁺⁺_, r⁺⁻_, t⁻⁻_, D_, I_static_)
 
 
+@testset "GPU-CPU consistency" begin
+    for (matGPU, matCPU) in ((R⁻⁺, R⁻⁺_),
+                                (T⁺⁺, T⁺⁺_),
+                                (R⁺⁻, R⁺⁻_), 
+                                (T⁻⁻, T⁻⁻_),
+                                (r⁻⁺, r⁻⁺_),
+                                (t⁺⁺, t⁺⁺_), 
+                                (r⁺⁻, r⁺⁻_), 
+                                (t⁻⁻, t⁻⁻_))
+        @test Array(matGPU) ≈ matCPU    
+    end
+end
+
+
 pol_type = Stokes_IQU{FT}()
 
 
@@ -306,6 +322,19 @@ println("RT Elemental CPU time:")
 @btime run_rt_elemental(pol_type, dτ, ϖ, Z⁺⁺, Z⁻⁺, m, 
                         ndoubl, qp_μ, wt_μ, 
                         r⁻⁺_, t⁺⁺_, r⁺⁻_, t⁻⁻_, D_, I_static_)
+
+@testset "GPU-CPU consistency" begin
+    for (matGPU, matCPU) in ((R⁻⁺, R⁻⁺_),
+                                (T⁺⁺, T⁺⁺_),
+                                (R⁺⁻, R⁺⁻_), 
+                                (T⁻⁻, T⁻⁻_),
+                                (r⁻⁺, r⁻⁺_),
+                                (t⁺⁺, t⁺⁺_), 
+                                (r⁺⁻, r⁺⁻_), 
+                                (t⁻⁻, t⁻⁻_))
+        @test Array(matGPU) ≈ matCPU    
+    end
+end
 
 
 # @inline function unsafe_strided_batch_fake(strided::CuArray{T}, batchsize::Int) where {T}

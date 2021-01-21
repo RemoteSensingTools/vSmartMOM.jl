@@ -1,107 +1,152 @@
 using ..Architectures: devi, default_architecture
 
-# atmospheric RTM
-function run_RTM(pol_type, sza, vza, vaz, τRayl, ϖRayl, τAer, ϖAer, fᵗ, qp_μ, wt_μ, Ltrunc, aerosol_optics, GreekRayleigh)
-    FT = eltype(τRayl)
-    @show FT
-    # Output variables: Reflected and transmitted solar irradiation at TOA and BOA respectively
-    R = zeros(length(vza), pol_type.n)
-    T = zeros(length(vza), pol_type.n)    
-    μ0 = cosd(sza)
-    # @show(μ0)
-    iμ0 = nearest_point(qp_μ, μ0) # input μ0 = cos(SZA)
-    # @show(iμ0)
-    dims = size(qp_μ)
-    # @show dims
-    Nquadn = pol_type.n * dims[1]
-    # I0 = [1, 0, 0, 0] #assuming completely unpolarized incident stellar radiation
-    D = Diagonal(repeat(pol_type.D, size(qp_μ)[1]))
-    # @show D
-    # get vertical grid
-    # get solar+viewing geometry, compute streams
-    # compute Aersol SSP
-    # compute Rayleigh SSP
-    Nz = length(τRayl)
-    Naer = length(aerosol_optics)
-    qp_μ4 = reduce(vcat, (fill.(qp_μ, [pol_type.n])))
-    for m = 0:Ltrunc - 1
-        # @show m
 
+function run_RTM(pol_type,          # Polarization type (IQUV)
+                 sza, vza, vaz,     # Solar Zenith, Viewing Zenith, Viewing Azimuthal 
+                 τRayl, ϖRayl,      # Rayleigh optical depth and single-scattering albedo
+                 τAer, ϖAer,        # Aerosol optical depth and single-scattering albedo
+                 fᵗ,                # Truncation factor
+                 qp_μ, wt_μ,        # Quadrature points and weights
+                 Ltrunc,            # Trunction length for legendre terms
+                 aerosol_optics,    # AerosolOptics (greek_coefs, ω̃, k, fᵗ)
+                 GreekRayleigh,     # Greek coefficients of Rayleigh Phase Function
+                 τ_abs)             # nSpec x Nz matrix of absorption
+
+
+    #=
+    Define types, variables, and static quantities
+    =#
+    
+    FT = eltype(τRayl)                  # Get the float-type to use
+    Nz = length(τRayl)                  # Number of vertical slices
+    nSpec = size(τ_abs, 1)              # Number of spectral points
+    Nquadn = pol_type.n * size(qp_μ)[1] # Number of quadrature points 
+                                        # (qp_μ array size * Stokes Vector size)
+    μ0 = cosd(sza)                      # μ0 defined as cos(θ); θ = sza
+    iμ0 = nearest_point(qp_μ, μ0)       # Find the closest point to μ0 in qp_μ
+
+    # Output variables: Reflected and transmitted solar irradiation at TOA and BOA respectively
+    R = zeros(length(vza), pol_type.n, nSpec)
+    T = zeros(length(vza), pol_type.n, nSpec)    
+
+    # Assuming completely unpolarized incident stellar radiation
+    # This should depend on pol_type right? 
+    D = Diagonal(repeat(pol_type.D, size(qp_μ)[1]))
+
+    # Copy qp_μ "pol_type.n" times
+    qp_μ4 = reduce(vcat, (fill.(qp_μ, [pol_type.n])))
+
+    #=
+    Loop over number of truncation terms
+    =#
+
+    for m = 0:Ltrunc - 1
+
+        @show m
+
+        # Azimuthal weighting
         weight = m == 0 ? 0.5 : 1.0
 
-        # compute Zmp_Aer, Zpp_Aer, Zmp_Rayl, Zpp_Rayl
+        # Compute Z-moments of the Rayleigh phase matrix 
         # For m>=3, Rayleigh matrices will be 0, can catch with if statement if wanted 
         Rayl𝐙⁺⁺, Rayl𝐙⁻⁺ = PhaseFunction.compute_Z_moments(pol_type, qp_μ, GreekRayleigh, m);
-        @show size(Rayl𝐙⁺⁺)
+
+        # Number of aerosols
         nAer = length(aerosol_optics)
         dims = size(Rayl𝐙⁺⁺)
         
+        # Compute aerosol Z-matrices for all aerosols
         Aer𝐙⁺⁺ = [zeros(FT, dims) for i in 1:nAer]
         Aer𝐙⁻⁺ = similar(Aer𝐙⁺⁺)
 
         @timeit "Aerosol Z" for i = 1:nAer
             Aer𝐙⁺⁺[i], Aer𝐙⁻⁺[i] = PhaseFunction.compute_Z_moments(pol_type, qp_μ, aerosol_optics[i].greek_coefs, m)
         end
-        
-        # Homogenous R and T matrices
-        r⁻⁺ = zeros(FT, dims)
-        t⁺⁺ = zeros(FT, dims)
-        r⁺⁻ = zeros(FT, dims)
-        t⁻⁻ = zeros(FT, dims)
 
-        # Composite layer R and T matrices
-        R⁻⁺ = zeros(FT, dims)
-        R⁺⁻ = zeros(FT, dims)
-        T⁺⁺ = zeros(FT, dims)
-        T⁻⁻ = zeros(FT, dims)
-        
+        # Create R and T matrices for this m
+
+        # Homogenous R and T matrices
+
+        default_matrix = zeros(FT, tuple(dims[1], dims[2], nSpec))
+
+        added_layer = AddedLayer(copy(default_matrix), copy(default_matrix), 
+                                 copy(default_matrix), copy(default_matrix))
+
+        composite_layer = CompositeLayer(copy(default_matrix), copy(default_matrix), 
+                                         copy(default_matrix), copy(default_matrix))
+
+        I_static = Diagonal{FT}(ones(dims[1]))
+        I_static_ = repeat(I_static, 1, 1, 1)
+
         kn = 0
-        # loop over vertical layers:
+
+        # Loop over vertical layers:
         for iz = 1:Nz  # Count from TOA to BOA
-            @timeit "Constructing" τ, ϖ, Z⁺⁺, Z⁻⁺ = construct_atm_layer(τRayl[iz], τAer[iz,:], ϖRayl[iz], ϖAer, fᵗ, Rayl𝐙⁺⁺, Rayl𝐙⁻⁺, Aer𝐙⁺⁺, Aer𝐙⁻⁺)
-            dτ_max = minimum([τ, 0.2 * minimum(qp_μ)])
-            # @show dτ_max, τ, 0.2 * minimum(qp_μ)
-            dτ, ndoubl = doubling_number(dτ_max, τ)
-            scatter = false
-            if (sum(τAer) > 1.e-8)
-                scatter = true
-            elseif (τRayl[iz] > 1.e-8) & (m < 3)
-                scatter = true
-            end        
-            if (scatter)
-                @timeit "elemental" rt_elemental!(pol_type, dτ, ϖ, Z⁺⁺, Z⁻⁺, m, ndoubl, scatter, qp_μ, wt_μ, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻, D)
-                @timeit "doubling" rt_doubling!(dτ, τ, ndoubl, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻, D)
-            else
-                r⁻⁺ = 0
-                r⁺⁻ = 0
-                t⁺⁺ = Diagonal(exp(-τ / qp_μ4))
-                t⁻⁻ = Diagonal(exp(-τ / qp_μ4))
-                #= for i = 1:Nquadn
-                    ii=1+floor(Int,(i-1)/pol_type.n)
-                    t⁺⁺[i,i] = exp(-τ/qp_μ[ii])
-                    t⁻⁻[i,i] = exp(-τ/qp_μ[ii])
-                end =#
-            end
-            kn = get_kn(kn, scatter, iz)
+
+            # Construct the atmospheric layer
+            # From Rayleigh and aerosol τ, ϖ, compute overall layer τ, ϖ
+            @timeit "Constructing" τ_nSpec, ϖ_nSpec, τ, ϖ, Z⁺⁺, Z⁻⁺ = construct_atm_layer(τRayl[iz], τAer[iz,:], ϖRayl[iz], ϖAer, fᵗ, Rayl𝐙⁺⁺, Rayl𝐙⁻⁺, Aer𝐙⁺⁺, Aer𝐙⁻⁺, τ_abs[:,iz])
+
+            # τ * ϖ should remain constant even though they individually change over wavelength
+            @assert all(i->(i ≈ τ*ϖ), τ_nSpec .* ϖ_nSpec)
+
+            # Compute doubling number
+            dτ_max = minimum([τ * ϖ, 0.2 * minimum(qp_μ)])
+            dτ_tmp, ndoubl = doubling_number(dτ_max, τ*ϖ)
+
+            dτ = τ_nSpec ./ (2^ndoubl)
             
-            if (iz == 1)
-                T⁺⁺[:] = t⁺⁺
-                T⁻⁻[:] = t⁻⁻
-                R⁻⁺[:] = r⁻⁺
-                R⁺⁻[:] = r⁺⁻
+            # Determine whether there is scattering
+            scatter = (  sum(τAer) > 1.e-8 || 
+                      (( τRayl[iz] > 1.e-8 ) && (m < 3))) ? 
+                      true : false
+
+            # If there is scattering, perform the elemental and doubling steps
+            if (scatter)
+                
+                @timeit "elemental" rt_elemental!(pol_type, dτ, dτ_max, ϖ_nSpec, ϖ, Z⁺⁺, Z⁻⁺, m, ndoubl, scatter, qp_μ, wt_μ, added_layer, Array{Float64,3}(repeat(D, 1, 1, nSpec)), I_static)
+
+                @timeit "doubling" rt_doubling!(ndoubl, added_layer, Array{Float64,3}(repeat(D, 1, 1, nSpec)), I_static_)
             else
-                @timeit "interaction" rt_interaction!(kn, R⁻⁺, T⁺⁺, R⁺⁻, T⁻⁻, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻)
+                added_layer.r⁻⁺ = 0
+                added_layer.r⁺⁻ = 0
+                added_layer.t⁺⁺ = Diagonal(exp(-τ / qp_μ4))
+                added_layer.t⁻⁻ = Diagonal(exp(-τ / qp_μ4))
+            end
+
+            # kn is an index that tells whether there is scattering in the 
+            # added layer, composite layer, neither or both
+            kn = get_kn(kn, scatter, iz)
+
+            @assert !any(isnan.(added_layer.t⁺⁺))
+            
+            # If this TOA, just copy the added layer into the composite layer
+            if (iz == 1)
+
+                composite_layer.T⁺⁺[:] = added_layer.t⁺⁺
+                composite_layer.T⁻⁻[:] = added_layer.t⁻⁻
+                composite_layer.R⁻⁺[:] = added_layer.r⁻⁺
+                composite_layer.R⁺⁻[:] = added_layer.r⁺⁻
+            
+            # If this is not the TOA, perform the interaction step
+            else
+                @timeit "interaction" rt_interaction!(kn, composite_layer, added_layer, I_static_)
             end
         end # z
 
         # include surface function
-        # TBD
+
+        # idx of μ0 = cos(sza)
         st_iμ0 = (iμ0 - 1) * pol_type.n
         istart0 = st_iμ0 + 1
         iend0   = st_iμ0 + pol_type.n
+
+        # Loop over all viewing zenith angles
         for i = 1:length(vza)
+
+            # Find the nearest quadrature point idx
             iμ = nearest_point(qp_μ, cosd(vza[i])) # input vaz, vza as arrays
-            # @show i, vza[i], cosd(vza[i]), iμ, qp_μ[iμ]
+            
             # compute bigCS
             cos_m_phi = cosd(m * vaz[i])
             sin_m_phi = sind(m * vaz[i])
@@ -112,47 +157,24 @@ function run_RTM(pol_type, sza, vza, vaz, τRayl, ϖRayl, τAer, ϖAer, fᵗ, qp
             elseif pol_type.n == 1
                 bigCS = Diagonal([cos_m_phi])
             end
-            # accumulate Fourier moments after azimuthal weighting
-            # Measurement at the TOA
+
+            # Accumulate Fourier moments after azimuthal weighting
+
             st_iμ  = (iμ - 1) * pol_type.n
             istart = st_iμ + 1
             iend   = st_iμ + pol_type.n
-            # @show st_iμ+1:st_iμ+pol_type.n, iμ0,st_iμ0+1:st_iμ0+pol_type.n
-            # @show size(R⁻⁺)
             
-            Δ = weight * bigCS * (R⁻⁺[istart:iend, istart0:iend0] / wt_μ[iμ0]) * pol_type.I0
-            # @show m, mean(abs.((Δ / R[i,:] * 100)))
+            for s = 1:nSpec
+                Δ = weight * bigCS * (composite_layer.R⁻⁺[istart:iend, istart0:iend0, s] / wt_μ[iμ0]) * pol_type.I0
+                R[i,:,s] += Δ
+                T[i,:,s] += weight * bigCS * (composite_layer.T⁺⁺[istart:iend, istart0:iend0, s] / wt_μ[iμ0]) * pol_type.I0
+            end
             
-            R[i,:] += Δ
-            # @show wt_μ[iμ0]
-            # Measurement at the BOA
-            T[i,:] += weight * bigCS * (T⁺⁺[istart:iend, istart0:iend0] / wt_μ[iμ0]) * pol_type.I0
-            # Needs something like this but working :-)
-            # if mean(abs.((Δ / R[i,:] * 100))) < 0.1 # if smaller than 0.1%
-            #    println("Breaking m loop at ", m, "; Max diff is now ",  mean(abs.((Δ / R[i,:] * 100))), "%")
-            #    m = Ltrunc
-                
-            # end     
-            # if m==0
-            #    @show bigCS
-            #    @show m, i, iμ, bigCS[1,1], weight*R⁻⁺[(iμ-1)*4+1, (iμ0-1)*4+1]/wt_μ[iμ0]   
-            # end
         end
-    end  # m
+    end
 
-    
     print_timer()
     reset_timer!()
 
     return R, T  
-end
-
-function get_kn(kn, scatter, iz)
-    if (iz == 1)
-        kn = scatter ? 4 : 1
-    elseif (kn >= 1)
-        kn = (kn == 1) ? (!scatter ? 1 : 2) : (!scatter ? 3 : 4)
-    end
-
-    return kn
 end

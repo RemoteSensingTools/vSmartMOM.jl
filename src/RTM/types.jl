@@ -36,3 +36,24 @@ struct GaussQuadHemisphere <:AbstractQuadratureType end
 struct GaussQuadFullSphere <:AbstractQuadratureType end
 
 
+abstract type AbstractLayer end
+
+@with_kw struct CompositeLayer{FT} <: AbstractLayer 
+
+    # Composite layer R and T matrices
+    R⁻⁺::Array{FT,3}
+    R⁺⁻::Array{FT,3}
+    T⁺⁺::Array{FT,3}
+    T⁻⁻::Array{FT,3}
+
+end
+
+@with_kw struct AddedLayer{FT} <: AbstractLayer 
+    
+    # Added layer R and T matrices
+    r⁻⁺::Array{FT,3}
+    t⁺⁺::Array{FT,3}
+    r⁺⁻::Array{FT,3}
+    t⁻⁻::Array{FT,3}
+
+end
