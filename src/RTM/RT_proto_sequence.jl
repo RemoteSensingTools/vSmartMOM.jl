@@ -14,7 +14,7 @@ FT = Float32
 λ = FT(0.770)       # Incident wavelength
 depol = FT(0.0)
 # Truncation 
-Ltrunc = 14             # Truncation  
+Ltrunc = 6             # Truncation  
 truncation_type   = PhaseFunction.δBGE{Float32}(Ltrunc, 2.0)
 
 # polarization_type
@@ -78,8 +78,8 @@ myLat = 34.1377;
 myLon = -118.1253;
 
 # Read profile (and generate dry/wet VCDs per layer)
-profile_caltech = RTM.read_atmos_profile(file, myLat, myLon, timeIndex);
-
+profile_caltech_hr = RTM.read_atmos_profile(file, myLat, myLon, timeIndex);
+profile_caltech = RTM.reduce_profile(20, profile_caltech_hr)
 # Compute layer optical thickness for Rayleigh (surface pressure in hPa) 
 τRayl =  RTM.getRayleighLayerOptProp(profile_caltech.psurf / 100, λ, depol, profile_caltech.vcd_dry);
 ϖRayl = ones(length(τRayl))
@@ -89,7 +89,7 @@ profile_caltech = RTM.read_atmos_profile(file, myLat, myLon, timeIndex);
 # τAer_2 = RTM.getAerosolLayerOptProp(0.3, p₀[2], σp[2], profile_caltech.p_levels)
 
 # Can be done with arbitrary length later:
-τAer = 0.1 * τAer_1 # [τAer_1 τAer_2]
+τAer = 0.2 * τAer_1 # [τAer_1 τAer_2]
 @show sum(τAer)# , sum(τAer_2)
 ϖAer = [aerosol_optics_NAI2_aero1.ω̃] # [aerosol_optics_NAI2_aero1.ω̃ aerosol_optics_NAI2_aero2.ω̃];
 fᵗ   = [aerosol_optics_trunc_aero1.fᵗ] # [aerosol_optics_trunc_aero1.fᵗ aerosol_optics_trunc_aero2.fᵗ];
@@ -124,7 +124,7 @@ maxM = 5
 # end
 
 
-grid = range(1e7/780, 1e7/755, length=101)
+grid = range(1e7 / 764, 1e7 / 763, length=500)
 
 τ_abs = zeros(length(grid), length(profile_caltech.p))
 compute_absorption_profile!(grid, τ_abs, profile_caltech)

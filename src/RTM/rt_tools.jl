@@ -13,9 +13,8 @@ function run_RTM(pol_type,          # Polarization type (IQUV)
                  τ_abs)             # nSpec x Nz matrix of absorption
 
 
-    #=
-    Define types, variables, and static quantities
-    =#
+    #= 
+    Define types, variables, and static quantities =#
     
     FT = eltype(τRayl)                  # Get the float-type to use
     Nz = length(τRayl)                  # Number of vertical slices
@@ -36,9 +35,8 @@ function run_RTM(pol_type,          # Polarization type (IQUV)
     # Copy qp_μ "pol_type.n" times
     qp_μ4 = reduce(vcat, (fill.(qp_μ, [pol_type.n])))
 
-    #=
-    Loop over number of truncation terms
-    =#
+    #= 
+    Loop over number of truncation terms =#
 
     for m = 0:Ltrunc - 1
 
@@ -81,18 +79,18 @@ function run_RTM(pol_type,          # Polarization type (IQUV)
         kn = 0
 
         # Loop over vertical layers:
-        for iz = 1:Nz  # Count from TOA to BOA
+        @showprogress 1 "Looping over layers ..." for iz = 1:Nz  # Count from TOA to BOA
 
             # Construct the atmospheric layer
             # From Rayleigh and aerosol τ, ϖ, compute overall layer τ, ϖ
             @timeit "Constructing" τ_nSpec, ϖ_nSpec, τ, ϖ, Z⁺⁺, Z⁻⁺ = construct_atm_layer(τRayl[iz], τAer[iz,:], ϖRayl[iz], ϖAer, fᵗ, Rayl𝐙⁺⁺, Rayl𝐙⁻⁺, Aer𝐙⁺⁺, Aer𝐙⁻⁺, τ_abs[:,iz])
 
             # τ * ϖ should remain constant even though they individually change over wavelength
-            @assert all(i->(i ≈ τ*ϖ), τ_nSpec .* ϖ_nSpec)
+            @assert all(i -> (i ≈ τ * ϖ), τ_nSpec .* ϖ_nSpec)
 
             # Compute doubling number
             dτ_max = minimum([τ * ϖ, 0.2 * minimum(qp_μ)])
-            dτ_tmp, ndoubl = doubling_number(dτ_max, τ*ϖ)
+            dτ_tmp, ndoubl = doubling_number(dτ_max, τ * ϖ)
 
             dτ = τ_nSpec ./ (2^ndoubl)
             
