@@ -8,7 +8,7 @@ Given the hitran data and necessary parameters, calculate an absorption cross-se
 temperature, and grid of wavelengths (or wavenumbers)
 """
 function compute_absorption_cross_section(
-                #Required
+                # Required
                 hitran::HitranTable,          # Model to use in this cross section calculation 
                                               # (Calculation from Hitran data vs. using Interpolator)
                 broadening::AbstractBroadeningFunction, # Broadening function to use
@@ -27,7 +27,7 @@ function compute_absorption_cross_section(
 
     # Store results here to return
     result = array_type(architecture)(zeros(eltype(temperature), length(grid)))
-    fill!(result,0);
+    fill!(result, 0);
 
     # Convert to wavenumber from [nm] space if necessary
     grid = wavelength_flag ? reverse(nm_per_m ./ grid) : grid
@@ -37,8 +37,8 @@ function compute_absorption_cross_section(
     grid_min = minimum(grid) - wing_cutoff
 
     # Interpolators from grid bounds to index values
-    grid_idx_interp_low  = LinearInterpolation(grid, 1:1:length(grid),extrapolation_bc = 1)
-    grid_idx_interp_high = LinearInterpolation(grid, 1:1:length(grid),extrapolation_bc = length(grid))
+    grid_idx_interp_low  = LinearInterpolation(grid, 1:1:length(grid), extrapolation_bc=1)
+    grid_idx_interp_high = LinearInterpolation(grid, 1:1:length(grid), extrapolation_bc=length(grid))
 
     # Temporary storage array for output of qoft!. Compiler/speed issues when returning value in qoft
     rate = zeros(eltype(temperature), 1)
@@ -56,28 +56,28 @@ function compute_absorption_cross_section(
         if grid_min < hitran.νᵢ[j] < grid_max
 
             # Apply pressure shift
-            ν   = hitran.νᵢ[j] + pressure/p_ref*hitran.δ_air[j]
+            ν   = hitran.νᵢ[j] + pressure / p_ref * hitran.δ_air[j]
 
             # Compute Lorentzian HWHM
             γ_l = (hitran.γ_air[j] *
-                  (1-vmr)*pressure/p_ref+hitran.γ_self[j] *
-                  vmr*pressure/p_ref) *
-                  (t_ref/temperature)^hitran.n_air[j]
+                  (1 - vmr) * pressure / p_ref + hitran.γ_self[j] *
+                  vmr * pressure / p_ref) *
+                  (t_ref / temperature)^hitran.n_air[j]
 
             # Compute Doppler HWHM
-            γ_d = ((cSqrt2Ln2/cc_)*sqrt(cBolts_/cMassMol)*sqrt(temperature) * 
-            hitran.νᵢ[j]/sqrt(mol_weight(hitran.mol[j],hitran.iso[j])))
+            γ_d = ((cSqrt2Ln2 / cc_) * sqrt(cBolts_ / cMassMol) * sqrt(temperature) * 
+            hitran.νᵢ[j] / sqrt(mol_weight(hitran.mol[j], hitran.iso[j])))
 
             # Ratio of widths
-            y = sqrt(cLn2) * γ_l/γ_d
+            y = sqrt(cLn2) * γ_l / γ_d
 
             # Apply line intensity temperature corrections
             S = hitran.Sᵢ[j]
             if hitran.E″[j] != -1
-                qoft!(hitran.mol[j],hitran.iso[j],temperature,t_ref, rate)
+                qoft!(hitran.mol[j], hitran.iso[j], temperature, t_ref, rate)
                 S = S * rate[1] *
-                        exp(c₂*hitran.E″[j]*(1/t_ref-1/temperature)) *
-                        (1-exp(-c₂*hitran.νᵢ[j]/temperature))/(1-exp(-c₂*hitran.νᵢ[j]/t_ref));
+                        exp(c₂ * hitran.E″[j] * (1 / t_ref - 1 / temperature)) *
+                        (1 - exp(-c₂ * hitran.νᵢ[j] / temperature)) / (1 - exp(-c₂ * hitran.νᵢ[j] / t_ref));
 
             end
 
@@ -86,8 +86,8 @@ function compute_absorption_cross_section(
             ind_stop  = Int64(round(grid_idx_interp_high(ν + wing_cutoff)))
             
             # Create views from the result and grid arrays
-            result_view   = view(result ,ind_start:ind_stop);
-            grid_view     = view(grid   ,ind_start:ind_stop);
+            result_view   = view(result, ind_start:ind_stop);
+            grid_view     = view(grid, ind_start:ind_stop);
 
             # Kernel for performing the lineshape calculation
             kernel! = line_shape!(device)
@@ -96,6 +96,7 @@ function compute_absorption_cross_section(
             # That this, this function adds to each element in result, the contribution from this transition
             event = kernel!(result_view, array_type(architecture)(grid_view), ν, γ_d, γ_l, y, S, broadening, CEF, ndrange=length(grid_view))
             wait(device, event)
+            synchronize()
         end
     end
 
@@ -139,7 +140,7 @@ function absorption_cross_section(
     grid::AbstractRange{<:Real},    # Wavelength [nm] or wavenumber [cm-1] grid
     pressure::Real,                 # actual pressure [hPa]
     temperature::Real,              # actual temperature [K]  
-    #Optionals 
+    # Optionals 
     wavelength_flag::Bool=false,    # Use wavelength in nm (true) or wavenumber cm-1 units (false)            
     )
 
@@ -160,19 +161,19 @@ end
 @kernel function line_shape!(A, @Const(grid), ν, γ_d, γ_l, y, S, ::Doppler, CEF)
     FT = eltype(ν)
     I = @index(Global, Linear)
-    @inbounds A[I] += FT(S) * FT(cSqrtLn2divSqrtPi) * exp(-FT(cLn2) * ((FT(grid[I]) - FT(ν)) / FT(γ_d)) ^2) / FT(γ_d)
+    @inbounds A[I] += FT(S) * FT(cSqrtLn2divSqrtPi) * exp(-FT(cLn2) * ((FT(grid[I]) - FT(ν)) / FT(γ_d))^2) / FT(γ_d)
 end
 
 @kernel function line_shape!(A, @Const(grid), ν, γ_d, γ_l, y, S, ::Lorentz, CEF)
     FT = eltype(ν)
     I = @index(Global, Linear)
-    @inbounds A[I] += FT(S) * FT(γ_l) / (FT(pi) * (FT(γ_l) ^2 + (FT(grid[I]) - FT(ν)) ^ 2))
+    @inbounds A[I] += FT(S) * FT(γ_l) / (FT(pi) * (FT(γ_l)^2 + (FT(grid[I]) - FT(ν))^2))
 end
 
 @kernel function line_shape!(A, @Const(grid), ν, γ_d, γ_l, y, S, ::Voigt, CEF)
     FT = eltype(ν)
     I = @index(Global, Linear)
-    @inbounds A[I] += FT(S) * FT(cSqrtLn2divSqrtPi)/FT(γ_d) * real(w(CEF, FT(cSqrtLn2) / FT(γ_d) * (FT(grid[I]) - FT(ν)) + im * FT(y)))
+    @inbounds A[I] += FT(S) * FT(cSqrtLn2divSqrtPi) / FT(γ_d) * real(w(CEF, FT(cSqrtLn2) / FT(γ_d) * (FT(grid[I]) - FT(ν)) + im * FT(y)))
 end
 
 @kernel function line_shape32!(A, @Const(grid), ν, γ_d, γ_l, y, S, broadening, CEF)
