@@ -17,8 +17,8 @@ hitran_data = read_hitran(artifact("CO2"), mol=2, iso=1, ν_min=6000, ν_max=640
 ## STEP 2: Create a model from parameters
 ## 
 
-modelCPU = make_hitran_model(hitran_data, Voigt(), wing_cutoff = 40, CEF=HumlicekWeidemann32SDErrorFunction(), architecture=Architectures.CPU())
-modelGPU = make_hitran_model(hitran_data, Voigt(), wing_cutoff = 40, CEF=HumlicekWeidemann32SDErrorFunction(), architecture=Architectures.GPU())
+modelCPU = make_hitran_model(hitran_data, Voigt(), wing_cutoff = 40, CEF=HumlicekWeidemann32SDErrorFunction(), architecture=CPU())
+modelGPU = make_hitran_model(hitran_data, Voigt(), wing_cutoff = 40, CEF=HumlicekWeidemann32SDErrorFunction(), architecture=GPU())
 
 # ν_grid = 6000:0.01:6400
 # pressures = 250:250:1250

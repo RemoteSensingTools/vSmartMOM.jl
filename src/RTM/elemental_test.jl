@@ -32,22 +32,22 @@ end
 
 n = 40
 nSpec = 10000
-r⁻⁺, t⁺⁺ = rand(n, n, nSpec), rand(n, n, nSpec);
+r⁻⁺_CPU, t⁺⁺_CPU = rand(n, n, nSpec), rand(n, n, nSpec);
 ϖ, dτ    = rand(nSpec), rand(nSpec);
 μ, w     = rand(n, n), rand(n, n);
 Z⁻⁺, Z⁺⁺ = rand(n, n), rand(n, n);
 
 device = KernelAbstractions.CPU()
 kernel! = get_r!(device)
-kernel!(r⁻⁺, t⁺⁺, ϖ, dτ, Z⁻⁺, Z⁺⁺, μ, w,0, ndrange=size(r⁻⁺));
+kernel!(r⁻⁺_CPU, t⁺⁺_CPU, ϖ, dτ, Z⁻⁺, Z⁺⁺, μ, w,0, ndrange=size(r⁻⁺_CPU));
 
 function test2(r⁻⁺, t⁺⁺, ϖ, dτ, Z⁻⁺, Z⁺⁺, μ, w)
     event = kernel!(r⁻⁺, t⁺⁺, ϖ, dτ, Z⁻⁺, Z⁺⁺, μ, w, 0, ndrange=size(r⁻⁺));
     wait(device, event)
     synchronize();
 end
-@time test2(r⁻⁺, t⁺⁺, ϖ, dτ, Z⁻⁺, Z⁺⁺, μ, w)
-@time test2(r⁻⁺, t⁺⁺, ϖ, dτ, Z⁻⁺, Z⁺⁺, μ, w)
+@time test2(r⁻⁺_CPU, t⁺⁺_CPU, ϖ, dτ, Z⁻⁺, Z⁺⁺, μ, w)
+@time test2(r⁻⁺_CPU, t⁺⁺_CPU, ϖ, dτ, Z⁻⁺, Z⁺⁺, μ, w)
 
 r⁻⁺, t⁺⁺ = CuArray(rand(n, n, nSpec)), CuArray(rand(n, n, nSpec));
 ϖ, dτ    = CuArray(rand(nSpec)), CuArray(rand(nSpec));
