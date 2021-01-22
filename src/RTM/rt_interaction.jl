@@ -56,7 +56,7 @@ function rt_interaction_helper!(kn::Int,
         tmp_inv = similar(t⁺⁺)
 
         # Compute and store `inv(I - R⁺⁻ * r⁻⁺) * T⁺⁺`
-        batch_solve!(tmp_inv, I_static .- R⁺⁻ ⊠ r⁻⁺, T⁺⁺)
+        @timeit "interaction inv1" batch_solve!(tmp_inv, I_static .- R⁺⁻ ⊠ r⁻⁺, T⁺⁺)
 
         R⁻⁺[:] = R⁻⁺ + (T⁻⁻ ⊠ r⁻⁺ ⊠ tmp_inv)
         T⁺⁺[:] = t⁺⁺ ⊠ tmp_inv
@@ -64,7 +64,7 @@ function rt_interaction_helper!(kn::Int,
         # Repeating for mirror-reflected directions
 
         # Compute and store `inv(I - r⁻⁺ * R⁺⁻) * t⁻⁻`
-        batch_solve!(tmp_inv, I_static .- r⁻⁺ ⊠ R⁺⁻, t⁻⁻)
+        @timeit "interaction inv2" batch_solve!(tmp_inv, I_static .- r⁻⁺ ⊠ R⁺⁻, t⁻⁻)
 
         R⁺⁻[:] = r⁺⁻ + t⁺⁺ ⊠ R⁺⁻ ⊠ tmp_inv
         T⁻⁻[:] = T⁺⁺ ⊠ tmp_inv

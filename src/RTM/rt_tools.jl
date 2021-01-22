@@ -1,4 +1,4 @@
-using ..Architectures: devi, default_architecture
+using ..Architectures: devi, default_architecture, AbstractArchitecture
 
 
 function run_RTM(pol_type,          # Polarization type (IQUV)
@@ -10,8 +10,10 @@ function run_RTM(pol_type,          # Polarization type (IQUV)
                  Ltrunc,            # Trunction length for legendre terms
                  aerosol_optics,    # AerosolOptics (greek_coefs, ω̃, k, fᵗ)
                  GreekRayleigh,     # Greek coefficients of Rayleigh Phase Function
-                 τ_abs)             # nSpec x Nz matrix of absorption
+                 τ_abs,             # nSpec x Nz matrix of absorption
+                 architecture::AbstractArchitecture) # Whether to use CPU / GPU
 
+    println(architecture)
 
     #= 
     Define types, variables, and static quantities =#
@@ -24,16 +26,18 @@ function run_RTM(pol_type,          # Polarization type (IQUV)
     μ0 = cosd(sza)                      # μ0 defined as cos(θ); θ = sza
     iμ0 = nearest_point(qp_μ, μ0)       # Find the closest point to μ0 in qp_μ
 
+    arr_type = array_type(architecture)
+
     # Output variables: Reflected and transmitted solar irradiation at TOA and BOA respectively
-    R = zeros(length(vza), pol_type.n, nSpec)
-    T = zeros(length(vza), pol_type.n, nSpec)    
+    R = arr_type(zeros(length(vza), pol_type.n, nSpec))
+    T = arr_type(zeros(length(vza), pol_type.n, nSpec))
 
     # Assuming completely unpolarized incident stellar radiation
     # This should depend on pol_type right? 
-    D = Diagonal(repeat(pol_type.D, size(qp_μ)[1]))
+    D = arr_type(Diagonal(repeat(pol_type.D, size(qp_μ)[1])))
 
     # Copy qp_μ "pol_type.n" times
-    qp_μ4 = reduce(vcat, (fill.(qp_μ, [pol_type.n])))
+    qp_μ4 = arr_type(repeat(qp_μ, pol_type.n)) # reduce(vcat, (fill.(arr_type(qp_μ), [pol_type.n])))
 
     #= 
     Loop over number of truncation terms =#
@@ -48,24 +52,27 @@ function run_RTM(pol_type,          # Polarization type (IQUV)
         # Compute Z-moments of the Rayleigh phase matrix 
         # For m>=3, Rayleigh matrices will be 0, can catch with if statement if wanted 
         Rayl𝐙⁺⁺, Rayl𝐙⁻⁺ = PhaseFunction.compute_Z_moments(pol_type, qp_μ, GreekRayleigh, m);
+        Rayl𝐙⁺⁺, Rayl𝐙⁻⁺ = (arr_type(Rayl𝐙⁺⁺), arr_type(Rayl𝐙⁻⁺))
 
         # Number of aerosols
         nAer = length(aerosol_optics)
         dims = size(Rayl𝐙⁺⁺)
         
         # Compute aerosol Z-matrices for all aerosols
-        Aer𝐙⁺⁺ = [zeros(FT, dims) for i in 1:nAer]
+        # Aer𝐙⁺⁺ = [zeros(FT, dims) for i in 1:nAer]
+        Aer𝐙⁺⁺ = arr_type(zeros(FT, (dims[1], dims[2], nAer)))
         Aer𝐙⁻⁺ = similar(Aer𝐙⁺⁺)
 
         @timeit "Aerosol Z" for i = 1:nAer
-            Aer𝐙⁺⁺[i], Aer𝐙⁻⁺[i] = PhaseFunction.compute_Z_moments(pol_type, qp_μ, aerosol_optics[i].greek_coefs, m)
+            Aer𝐙⁺⁺_curr, Aer𝐙⁻⁺_curr = PhaseFunction.compute_Z_moments(pol_type, qp_μ, aerosol_optics[i].greek_coefs, m)
+            Aer𝐙⁺⁺[:,:,i], Aer𝐙⁻⁺[:,:,i] = (arr_type(Aer𝐙⁺⁺_curr), arr_type(Aer𝐙⁻⁺_curr))
         end
 
         # Create R and T matrices for this m
 
         # Homogenous R and T matrices
 
-        default_matrix = zeros(FT, tuple(dims[1], dims[2], nSpec))
+        default_matrix = arr_type(zeros(FT, tuple(dims[1], dims[2], nSpec)))
 
         added_layer = AddedLayer(copy(default_matrix), copy(default_matrix), 
                                  copy(default_matrix), copy(default_matrix))
@@ -74,7 +81,7 @@ function run_RTM(pol_type,          # Polarization type (IQUV)
                                          copy(default_matrix), copy(default_matrix))
 
         I_static = Diagonal{FT}(ones(dims[1]))
-        I_static_ = repeat(I_static, 1, 1, 1)
+        I_static_ = arr_type(repeat(I_static, 1, 1))
 
         kn = 0
 
@@ -83,16 +90,18 @@ function run_RTM(pol_type,          # Polarization type (IQUV)
 
             # Construct the atmospheric layer
             # From Rayleigh and aerosol τ, ϖ, compute overall layer τ, ϖ
-            @timeit "Constructing" τ_nSpec, ϖ_nSpec, τ, ϖ, Z⁺⁺, Z⁻⁺ = construct_atm_layer(τRayl[iz], τAer[iz,:], ϖRayl[iz], ϖAer, fᵗ, Rayl𝐙⁺⁺, Rayl𝐙⁻⁺, Aer𝐙⁺⁺, Aer𝐙⁻⁺, τ_abs[:,iz])
+            @timeit "Constructing" τ_nSpec, ϖ_nSpec, τ, ϖ, Z⁺⁺, Z⁻⁺ = construct_atm_layer(τRayl[iz], τAer[iz,:], ϖRayl[iz], ϖAer, fᵗ, Rayl𝐙⁺⁺, Rayl𝐙⁻⁺, Aer𝐙⁺⁺, Aer𝐙⁻⁺, τ_abs[:,iz], arr_type)
 
             # τ * ϖ should remain constant even though they individually change over wavelength
-            @assert all(i -> (i ≈ τ * ϖ), τ_nSpec .* ϖ_nSpec)
+            # @assert all(i -> (i ≈ τ * ϖ), τ_nSpec .* ϖ_nSpec)
 
             # Compute doubling number
             dτ_max = minimum([τ * ϖ, 0.02 * minimum(qp_μ)])
             dτ_tmp, ndoubl = doubling_number(dτ_max, τ * ϖ)
 
-            dτ = τ_nSpec ./ (2^ndoubl)
+            # Compute dτ vector
+            # Assert that dτ .* ϖ_nSpec are the same
+            dτ = arr_type(τ_nSpec ./ (2^ndoubl))
             
             # Determine whether there is scattering
             scatter = (  sum(τAer) > 1.e-8 || 
@@ -102,9 +111,9 @@ function run_RTM(pol_type,          # Polarization type (IQUV)
             # If there is scattering, perform the elemental and doubling steps
             if (scatter)
                 
-                @timeit "elemental" rt_elemental!(pol_type, dτ, dτ_max, ϖ_nSpec, ϖ, Z⁺⁺, Z⁻⁺, m, ndoubl, scatter, qp_μ, wt_μ, added_layer, D, I_static)
+                @timeit "elemental" rt_elemental!(pol_type, dτ, dτ_max, ϖ_nSpec, ϖ, Z⁺⁺, Z⁻⁺, m, ndoubl, scatter, qp_μ, wt_μ, added_layer, D, I_static, arr_type, architecture)
 
-                @timeit "doubling" rt_doubling!(ndoubl, added_layer, Array{Float64,3}(repeat(D, 1, 1, nSpec)), I_static_)
+                @timeit "doubling" rt_doubling!(ndoubl, added_layer, arr_type(repeat(D, 1, 1, nSpec)), I_static_)
             else
                 added_layer.r⁻⁺ = 0
                 added_layer.r⁺⁻ = 0
@@ -163,9 +172,11 @@ function run_RTM(pol_type,          # Polarization type (IQUV)
             iend   = st_iμ + pol_type.n
             
             for s = 1:nSpec
-                Δ = weight * bigCS * (composite_layer.R⁻⁺[istart:iend, istart0:iend0, s] / wt_μ[iμ0]) * pol_type.I0
+                Δ = weight * arr_type(copy(bigCS))
+                Δ *= (composite_layer.R⁻⁺[istart:iend, istart0:iend0, s] / wt_μ[iμ0])
+                Δ *= arr_type(copy(pol_type.I0))
                 R[i,:,s] += Δ
-                T[i,:,s] += weight * bigCS * (composite_layer.T⁺⁺[istart:iend, istart0:iend0, s] / wt_μ[iμ0]) * pol_type.I0
+                T[i,:,s] += weight * arr_type(copy(bigCS)) * (composite_layer.T⁺⁺[istart:iend, istart0:iend0, s] / wt_μ[iμ0]) * arr_type(copy(pol_type.I0))
             end
             
         end

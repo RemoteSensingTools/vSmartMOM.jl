@@ -101,68 +101,13 @@ aerosol_optics = [aerosol_optics_trunc_aero1] # [aerosol_optics_trunc_aero1 aero
 
 maxM = 3
 
-# function compute_absorption_profile!(grid,
-#                                      τ_abs::Array{Float64,2}, 
-#                                      profile::RadiativeTransfer.RTM.AtmosphericProfile)
-
-#     @assert size(absorption_spectra)[2] == length(profile_caltech.p)
-
-#     hitran_data = read_hitran(artifact("O2"), iso=1)
-#     model = make_hitran_model(hitran_data, Voigt(), wing_cutoff = 40, CEF=HumlicekWeidemann32SDErrorFunction(), architecture=CrossSection.GPU())
-
-#     for iz in 1:length(profile_caltech.p)
-
-#         println(iz)
-
-#         p = profile_caltech.p[iz]
-#         T = profile_caltech.T[iz]
-
-#         τ_abs[:,iz] = Array(absorption_cross_section(model, grid, p, T))
-#     end
-
-#     return nothing
-    
-# end
-
-
-grid = range(1e7 / 775, 1e7 / 757, length=10000)
+grid = range(1e7 / 765, 1e7 / 763, length=100)
 
 τ_abs = zeros(length(grid), length(profile_caltech.p))
 compute_absorption_profile!(grid, τ_abs, profile_caltech)
 
-# anim = @animate for i ∈ length(profile_caltech.p):-1:1
+R_CPU, T_CPU = RTM.run_RTM(polarization_type, sza, vza, vaz, τRayl, ϖRayl, τAer, ϖAer, fᵗ, qp_μ, wt_μ, maxM, aerosol_optics, GreekRayleigh, τ_abs, CPU());
 
-#     # l = @layout [a ; b c]
-#     # p1 = plot(...)
-#     # p2 = plot(...)
-#     # p3 = plot(...)
-#     # plot(p1, p2, p3, layout = l)
+R_GPU, T_GPU = RTM.run_RTM(polarization_type, sza, vza, vaz, τRayl, ϖRayl, τAer, ϖAer, fᵗ, qp_μ, wt_μ, maxM, aerosol_optics, GreekRayleigh, τ_abs, GPU());
 
-#     p1 = plot(1:length(absorption[:,i]), absorption[:,i], ylims=(0, 4.5e-22), title=("O2 Absorption"))
-#     p2 = plot(1:length(absorption[:,i]), absorption[:,i], ylims=(0, 1e-23), title=("O2 Absorption (zoomed in)"))
-#     p3 = plot(1:length(profile_caltech.p[end:-1:i]), 
-#               profile_caltech.p[end:-1:i], 
-#               xlims=(0,length(profile_caltech.p)), 
-#               ylims=(1, 100000), 
-#               yaxis=:log,
-#               title=("Pressure (Pa)"))
-
-#     p4 = plot(1:length(profile_caltech.T[end:-1:i]), 
-#               profile_caltech.T[end:-1:i], 
-#               xlims=(0,length(profile_caltech.T)), 
-#               ylims=(150, 300), 
-#               title=("Temperature (K)"))
-#     # p4 = 
-
-#     plot(p1, p2, p3, p4, layout = 4, legend=false)
-# end
-# gif(anim, "anim_fps15.gif", fps = 15)
-
-R, T = RTM.run_RTM(polarization_type, sza, vza, vaz, τRayl, ϖRayl, τAer, ϖAer, fᵗ, qp_μ, wt_μ, maxM, aerosol_optics, GreekRayleigh, τ_abs);
-
-# RTM.run_RTM(polarization_type, sza, vza, vaz, τRayl, ϖRayl, τAer, ϖAer, fᵗ, qp_μ, wt_μ, maxM, aerosol_optics, GreekRayleigh, τ_abs);
-
-# R ≈ R_true
-# T ≈ T_true
-
-a = 1
+@assert ((R_CPU, T_CPU) .≈ (Array(R_GPU), Array(T_GPU))) == true

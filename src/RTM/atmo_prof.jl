@@ -129,7 +129,7 @@ function getAerosolLayerOptProp(total_τ, p₀, σp, p_half)
 end
 
 # computes the composite single scattering parameters (τ, ϖ, Z⁺⁺, Z⁻⁺) for a given atmospheric layer iz for a given Fourier component m
-function construct_atm_layer(τRayl, τAer, ϖRayl, ϖAer, fᵗ, Rayl𝐙⁺⁺, Rayl𝐙⁻⁺, Aer𝐙⁺⁺, Aer𝐙⁻⁺, τ_abs)
+function construct_atm_layer(τRayl, τAer, ϖRayl, ϖAer, fᵗ, Rayl𝐙⁺⁺, Rayl𝐙⁻⁺, Aer𝐙⁺⁺, Aer𝐙⁻⁺, τ_abs, arr_type)
     FT = eltype(τRayl)
     # @show FT
     @assert length(τAer) == length(ϖAer) == length(fᵗ) "Sizes don't match"
@@ -159,8 +159,8 @@ function construct_atm_layer(τRayl, τAer, ϖRayl, ϖAer, fᵗ, Rayl𝐙⁺⁺,
         ϖ   += τAer[i] * ϖAer[i]
         # @show τAer[i], ϖAer[i], (1 - fᵗ[i])
         A   += τAer[i] * ϖAer[i] * (1 - fᵗ[i])
-        Z⁺⁺ += τAer[i] * ϖAer[i] * (1 - fᵗ[i]) * Aer𝐙⁺⁺[i]
-        Z⁻⁺ += τAer[i] * ϖAer[i] * (1 - fᵗ[i]) * Aer𝐙⁻⁺[i]
+        Z⁺⁺ += τAer[i] * ϖAer[i] * (1 - fᵗ[i]) * Aer𝐙⁺⁺[:,:,i]
+        Z⁻⁺ += τAer[i] * ϖAer[i] * (1 - fᵗ[i]) * Aer𝐙⁻⁺[:,:,i]
     end
     
     Z⁺⁺ /= A
@@ -177,12 +177,14 @@ function construct_atm_layer(τRayl, τAer, ϖRayl, ϖAer, fᵗ, Rayl𝐙⁺⁺,
     τ_new = τ_abs .+ τ
     ϖ_new = (τ .* ϖ) ./ τ_new
     
-    return τ_new, ϖ_new, τ, ϖ, Z⁺⁺, Z⁻⁺  
+    return arr_type(τ_new), arr_type(ϖ_new), τ, ϖ, Z⁺⁺, Z⁻⁺  
 end
 
 function compute_absorption_profile!(grid,
                                      τ_abs::Array{Float64,2}, 
                                      profile::AtmosphericProfile)
+
+    # pass in the hitran model
 
     @assert size(τ_abs)[2] == length(profile.p)
 

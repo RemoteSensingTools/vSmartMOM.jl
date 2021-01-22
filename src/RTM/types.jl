@@ -41,19 +41,19 @@ abstract type AbstractLayer end
 @with_kw struct CompositeLayer{FT} <: AbstractLayer 
 
     # Composite layer R and T matrices
-    R⁻⁺::Array{FT,3}
-    R⁺⁻::Array{FT,3}
-    T⁺⁺::Array{FT,3}
-    T⁻⁻::Array{FT,3}
+    R⁻⁺::AbstractArray{FT,3}
+    R⁺⁻::AbstractArray{FT,3}
+    T⁺⁺::AbstractArray{FT,3}
+    T⁻⁻::AbstractArray{FT,3}
 
 end
 
 @with_kw struct AddedLayer{FT} <: AbstractLayer 
     
     # Added layer R and T matrices
-    r⁻⁺::Array{FT,3}
-    t⁺⁺::Array{FT,3}
-    r⁺⁻::Array{FT,3}
-    t⁻⁻::Array{FT,3}
+    r⁻⁺::AbstractArray{FT,3}
+    t⁺⁺::AbstractArray{FT,3}
+    r⁺⁻::AbstractArray{FT,3}
+    t⁻⁻::AbstractArray{FT,3}
 
 end
