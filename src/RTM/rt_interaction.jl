@@ -5,7 +5,6 @@ function rt_interaction_helper!(kn::Int,
 
     @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺ = added_layer
     @unpack R⁻⁺, R⁺⁻, T⁺⁺, T⁻⁻ = composite_layer
-    
     # ToDo: Important output from this routine is R⁻⁺, R⁺⁻, T⁺⁺, T⁻⁻ (can be renamed to 𝐓⁻⁻, etc later)
     # Need to check with paper nomenclature. This is basically eqs. 23-28 in vSmartMOM)
 
@@ -46,7 +45,7 @@ function rt_interaction_helper!(kn::Int,
         return nothing 
 
     elseif kn == 4
-
+        
         # Scattering in inhomogeneous composite layer.
         # scattering in homogeneous layer which is 
         # added to the bottom of the composite layer.
@@ -58,16 +57,16 @@ function rt_interaction_helper!(kn::Int,
         # Compute and store `inv(I - R⁺⁻ * r⁻⁺) * T⁺⁺`
         @timeit "interaction inv1" batch_solve!(tmp_inv, I_static .- R⁺⁻ ⊠ r⁻⁺, T⁺⁺)
 
-        R⁻⁺[:] = R⁻⁺ + (T⁻⁻ ⊠ r⁻⁺ ⊠ tmp_inv)
-        T⁺⁺[:] = t⁺⁺ ⊠ tmp_inv
+        composite_layer.R⁻⁺[:] = R⁻⁺ + (T⁻⁻ ⊠ r⁻⁺ ⊠ tmp_inv)
+        composite_layer.T⁺⁺[:] = t⁺⁺ ⊠ tmp_inv
 
         # Repeating for mirror-reflected directions
 
         # Compute and store `inv(I - r⁻⁺ * R⁺⁻) * t⁻⁻`
         @timeit "interaction inv2" batch_solve!(tmp_inv, I_static .- r⁻⁺ ⊠ R⁺⁻, t⁻⁻)
 
-        R⁺⁻[:] = r⁺⁻ + t⁺⁺ ⊠ R⁺⁻ ⊠ tmp_inv
-        T⁻⁻[:] = T⁺⁺ ⊠ tmp_inv
+        composite_layer.R⁺⁻[:] = r⁺⁻ + t⁺⁺ ⊠ R⁺⁻ ⊠ tmp_inv
+        composite_layer.T⁻⁻[:] = T⁺⁺ ⊠ tmp_inv
 
         return nothing
         
@@ -75,7 +74,7 @@ function rt_interaction_helper!(kn::Int,
         error("kn is ($kn), must be in (1, 2, 3, 4)")
     end
 
-end
+    end
 
 function rt_interaction!(kn::Int, composite_layer::CompositeLayer, added_layer::AddedLayer,
                          I_static::AbstractArray) where {FT}
