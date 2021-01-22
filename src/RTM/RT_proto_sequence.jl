@@ -124,7 +124,7 @@ maxM = 3
 # end
 
 
-grid = range(1e7 / 765, 1e7 / 763, length=100)
+grid = range(1e7 / 775, 1e7 / 755, length=20000)
 
 τ_abs = zeros(length(grid), length(profile_caltech.p))
 compute_absorption_profile!(grid, τ_abs, profile_caltech)
