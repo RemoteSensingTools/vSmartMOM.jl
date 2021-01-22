@@ -14,7 +14,7 @@ FT = Float32
 λ = FT(0.770)       # Incident wavelength
 depol = FT(0.0)
 # Truncation 
-Ltrunc = 10             # Truncation  
+Ltrunc = 20             # Truncation  
 truncation_type   = PhaseFunction.δBGE{Float32}(Ltrunc, 2.0)
 
 # polarization_type
@@ -65,6 +65,7 @@ vaz = [180., 180., 180., 180., 0., 0., 0., 0., 0.]
 sza = 60.
 Nquad, qp_μ, wt_μ = rt_set_streams(RTM.RadauQuad(), Ltrunc, sza, vza);
 
+@show Nquad
 
 # In[ ]:
 
@@ -124,7 +125,7 @@ maxM = 3
 # end
 
 
-grid = range(1e7 / 775, 1e7 / 755, length=20000)
+grid = range(1e7 / 775, 1e7 / 757, length=10000)
 
 τ_abs = zeros(length(grid), length(profile_caltech.p))
 compute_absorption_profile!(grid, τ_abs, profile_caltech)
