@@ -1,9 +1,8 @@
 "Elemental single-scattering layer"
 function rt_elemental_helper!(pol_type, dτ_nSpec, dτ, ϖ_nSpec, ϖ, Z⁺⁺, Z⁻⁺, m, 
                               ndoubl, scatter, qp_μ, wt_μ, 
-                              added_layer::AddedLayer, 
-                              D::AbstractArray,
-                              I_static::AbstractArray,
+                              added_layer::AddedLayer{FT}, 
+                              I_static,
                               arr_type,
                               architecture) where {FT}
     
@@ -110,12 +109,11 @@ end
 
 function rt_elemental!(pol_type, dτ_nSpec, dτ, ϖ_nSpec, ϖ, Z⁺⁺, Z⁻⁺, m, 
                               ndoubl, scatter, qp_μ, wt_μ, 
-                              added_layer::AddedLayer, 
-                              D::AbstractArray,
-                              I_static::AbstractArray,
+                              added_layer::AddedLayer{FT}, 
+                              I_static,
                               arr_type,
                               architecture) where {FT}
 
-    rt_elemental_helper!(pol_type, dτ_nSpec, dτ, ϖ_nSpec, ϖ, Z⁺⁺, Z⁻⁺, m, ndoubl, scatter, qp_μ, wt_μ, added_layer, D, I_static, arr_type, architecture)
+    rt_elemental_helper!(pol_type, dτ_nSpec, dτ, ϖ_nSpec, ϖ, Z⁺⁺, Z⁻⁺, m, ndoubl, scatter, qp_μ, wt_μ, added_layer, I_static, arr_type, architecture)
     synchronize()
 end
