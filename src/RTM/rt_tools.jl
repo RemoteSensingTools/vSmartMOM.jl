@@ -13,12 +13,13 @@ function run_RTM(pol_type,          # Polarization type (IQUV)
                  τ_abs,             # nSpec x Nz matrix of absorption
                  architecture::AbstractArchitecture) # Whether to use CPU / GPU
 
-    println(architecture)
+    println("Processing on: ", architecture)
 
     #= 
     Define types, variables, and static quantities =#
     
     FT = eltype(τRayl)                  # Get the float-type to use
+    # FT = Float32
     Nz = length(τRayl)                  # Number of vertical slices
     nSpec = size(τ_abs, 1)              # Number of spectral points
     Nquadn = pol_type.n * size(qp_μ)[1] # Number of quadrature points 
@@ -71,7 +72,7 @@ function run_RTM(pol_type,          # Polarization type (IQUV)
         # Create R and T matrices for this m
 
         # Homogenous R and T matrices
-
+        @show FT
         default_matrix = arr_type(zeros(FT, tuple(dims[1], dims[2], nSpec)))
 
         added_layer = AddedLayer(copy(default_matrix), copy(default_matrix), 
@@ -113,7 +114,7 @@ function run_RTM(pol_type,          # Polarization type (IQUV)
                 
                 @timeit "elemental" rt_elemental!(pol_type, dτ, dτ_max, ϖ_nSpec, ϖ, Z⁺⁺, Z⁻⁺, m, ndoubl, scatter, qp_μ, wt_μ, added_layer, D, I_static, arr_type, architecture)
                 
-                @timeit "doubling" rt_doubling!(ndoubl, added_layer, arr_type(repeat(D, 1, 1, nSpec)), I_static_)
+                @timeit "doubling" rt_doubling!(pol_type, ndoubl, added_layer, arr_type(repeat(D, 1, 1, nSpec)), I_static_, architecture)
             else
                 added_layer.r⁻⁺ = 0
                 added_layer.r⁺⁻ = 0
