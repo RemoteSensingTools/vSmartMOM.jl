@@ -111,5 +111,5 @@ R_GPU, T_GPU = RTM.run_RTM(polarization_type, sza, vza, vaz, τRayl, ϖRayl, τA
 R_CPU, T_CPU = RTM.run_RTM(polarization_type, sza, vza, vaz, τRayl, ϖRayl, τAer, ϖAer, fᵗ, qp_μ, wt_μ, maxM, aerosol_optics, GreekRayleigh, τ_abs, RadiativeTransfer.Architectures.CPU());
 
 
-@assert R_CPU ≈ Array(R_GPU)
-@assert T_CPU ≈ Array(T_GPU)
+@assert R_CPU ≈ (R_GPU)
+@assert T_CPU ≈ (T_GPU)
