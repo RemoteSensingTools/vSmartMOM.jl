@@ -115,25 +115,34 @@ function rt_doubling!(ndoubl::Int,
     for n = 1:ndoubl
 
         # M1 = (I - r⁻⁺ * r⁻⁺) \ t⁺⁺
-        aux1 = I_static .- r⁻⁺ ⊠ r⁻⁺     # (I - r⁻⁺ * r⁻⁺)      
+        aux1[:] = I_static .- r⁻⁺ ⊠ r⁻⁺     # (I - r⁻⁺ * r⁻⁺)      
         batch_solve!(aux2, aux1, t⁺⁺)   # M1 = (I - r⁻⁺ * r⁻⁺) \ t⁺⁺
-
+    
         # r⁻⁺[:] = r⁻⁺ + t⁺⁺ * r⁻⁺ * M1
-        aux1 = r⁻⁺ ⊠ aux2               # r⁻⁺ * M1
-        aux3 = t⁺⁺ ⊠ aux1               # t⁺⁺ * r⁻⁺ * M1
-        r⁻⁺  = r⁻⁺ + aux3               # r⁻⁺[:] = r⁻⁺ + t⁺⁺ * r⁻⁺ * M1
-
+        aux1[:] = r⁻⁺ ⊠ aux2               # r⁻⁺ * M1
+        aux3[:] = t⁺⁺ ⊠ aux1               # t⁺⁺ * r⁻⁺ * M1
+        r⁻⁺[:]  = r⁻⁺ + aux3               # r⁻⁺[:] = r⁻⁺ + t⁺⁺ * r⁻⁺ * M1
+    
         # t⁺⁺[:] = t⁺⁺ * M1 
-        aux1 = t⁺⁺ ⊠ aux2           # t⁺⁺ * M1 
-        t⁺⁺  = aux1                   # t⁺⁺[:] = t⁺⁺ * M1 
+        aux1[:] = t⁺⁺ ⊠ aux2           # t⁺⁺ * M1 
+        t⁺⁺[:]  = aux1                   # t⁺⁺[:] = t⁺⁺ * M1 
     end
+    
     # After doubling, revert D(DR)->R, where D = Diagonal{1,1,-1,-1}
-    r⁻⁺ = D ⊠ r⁻⁺ ⊠ D
+    r⁻⁺[:] = D ⊠ r⁻⁺ ⊠ D
     # Using r⁺⁻ = Dr⁻⁺D
-    r⁺⁻ = D ⊠ r⁻⁺ ⊠ D
+    r⁺⁻[:] = D ⊠ r⁻⁺ ⊠ D
     # Using t⁻⁻ = Dt⁺⁺D
-    t⁻⁻ = D ⊠ t⁺⁺ ⊠ D
+    t⁻⁻[:] = D ⊠ t⁺⁺ ⊠ D
     return nothing 
+end
+
+
+
+for n = 1:ndoubl
+    batch_solve!(tmp_inv, I_static .- r⁻⁺ ⊠ r⁻⁺, t⁺⁺)   
+    r⁻⁺[:]  = r⁻⁺ + (t⁺⁺ ⊠ r⁻⁺ ⊠ tmp_inv)
+    t⁺⁺[:]  = t⁺⁺ ⊠ tmp_inv
 end
 
 function rt_elemental!(pol_type, dτ, ϖ, Z⁺⁺, Z⁻⁺, m, 
@@ -156,7 +165,7 @@ function rt_elemental!(pol_type, dτ, ϖ, Z⁺⁺, Z⁻⁺, m,
     # wt_μ4 = reduce(vcat, (fill.(wt_μ,[pol_type.n])))
     Nquadn = length(qp_μ4)
 
-    wct = m==0 ? 0.50 * ϖ * wt_μ4  : 0.25 * ϖ * wt_μ4
+    wct = m == 0 ? 0.50 * ϖ * wt_μ4  : 0.25 * ϖ * wt_μ4
 
     d_qp = r⁺⁻ isa CuArray{Float32,3} ? CuArray(Diagonal(1 ./ Array(qp_μ4))) : Diagonal(1 ./ Array(qp_μ4))
     # d_wct = r⁺⁻ isa CuArray{Float32,3} ? CuArray(Diagonal(1 ./ Array(qp_μ4))) : Diagonal(1 ./ Array(qp_μ4))
@@ -167,7 +176,7 @@ function rt_elemental!(pol_type, dτ, ϖ, Z⁺⁺, Z⁻⁺, m,
 
     t⁺⁺ = I_static .- (d_qp ⊠ ((I_static .- Z⁺⁺ ⊠ d_wct) * dτ))
 
-    if ndoubl<1
+    if ndoubl < 1
         r⁺⁻ = D ⊠ r⁻⁺ ⊠ D
         t⁻⁻ = D ⊠ t⁺⁺ ⊠ D
     else
@@ -295,8 +304,8 @@ ndoubl = 0
 weight = m == 0 ? 0.5 : 1.0
 dτ = 2.458321474082143e-7
 ϖ = 1.0
-Z⁺⁺ = randn(57,57,3)
-Z⁻⁺ = randn(57,57,3)
+Z⁺⁺ = randn(57, 57, 3)
+Z⁻⁺ = randn(57, 57, 3)
 vza = [60., 45., 30., 15., 0., 15., 30., 45., 60.]
 vaz = [180., 180., 180., 180., 0., 0., 0., 0., 0.]
 sza = 60.

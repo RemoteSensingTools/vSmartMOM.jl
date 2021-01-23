@@ -32,6 +32,7 @@ include("rt_interaction.jl")
 include("gpu_batched.jl")
 include("rt_utils.jl")
 include("rt_tools.jl")
+include("CUDA_getri.jl")
 
 export rt_set_streams, compute_absorption_profile!
 
