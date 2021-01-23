@@ -138,13 +138,6 @@ function rt_doubling!(ndoubl::Int,
 end
 
 
-
-for n = 1:ndoubl
-    batch_solve!(tmp_inv, I_static .- r⁻⁺ ⊠ r⁻⁺, t⁺⁺)   
-    r⁻⁺[:]  = r⁻⁺ + (t⁺⁺ ⊠ r⁻⁺ ⊠ tmp_inv)
-    t⁺⁺[:]  = t⁺⁺ ⊠ tmp_inv
-end
-
 function rt_elemental!(pol_type, dτ, ϖ, Z⁺⁺, Z⁻⁺, m, 
                        ndoubl::Int, qp_μ, wt_μ, 
                        r⁻⁺::AbstractArray{FT,3}, 
@@ -227,7 +220,7 @@ function getri_strided_batched(A::AbstractArray{Float64,3}, C::AbstractArray{Flo
     lda = max(1, stride(A, 2))
     info = CUDA.zeros(Cint, size(A, 3))
     # Cptrs = CUBLAS.unsafe_strided_batch(C)
-    Cptrs = unsafe_strided_batch_fake(C, size(A, 3))
+    Cptrs = CUBLAS.unsafe_strided_batch(C)
     Aptrs = CUBLAS.unsafe_strided_batch(A)
     CUBLAS.cublasDgetriBatched(CUBLAS.handle(), n, Aptrs, lda, pivotArray, Cptrs, ldc, info, size(A, 3))
     return nothing
