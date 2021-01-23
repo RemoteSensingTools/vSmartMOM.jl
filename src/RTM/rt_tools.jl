@@ -112,9 +112,9 @@ function run_RTM(pol_type,          # Polarization type (IQUV)
             # If there is scattering, perform the elemental and doubling steps
             if (scatter)
                 
-                @timeit "elemental" rt_elemental!(pol_type, dτ, dτ_max, ϖ_nSpec, ϖ, Z⁺⁺, Z⁻⁺, m, ndoubl, scatter, qp_μ, wt_μ, added_layer, D, I_static, arr_type, architecture)
+                @timeit "elemental" rt_elemental!(pol_type, dτ, dτ_max, ϖ_nSpec, ϖ, Z⁺⁺, Z⁻⁺, m, ndoubl, scatter, qp_μ, wt_μ, added_layer,  I_static, arr_type, architecture)
                 
-                @timeit "doubling" rt_doubling!(pol_type, ndoubl, added_layer, arr_type(repeat(D, 1, 1, nSpec)), I_static_, architecture)
+                @timeit "doubling" rt_doubling!(pol_type, ndoubl, added_layer, I_static_, architecture)
             else
                 added_layer.r⁻⁺ = 0
                 added_layer.r⁺⁻ = 0

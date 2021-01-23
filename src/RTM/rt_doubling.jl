@@ -3,9 +3,8 @@
 # `ndoubl` doubling steps
 
 function rt_doubling_helper!(pol_type,ndoubl::Int, 
-                            added_layer::AddedLayer,
-                            D::AbstractArray{FT,3},
-                            I_static::AbstractArray, 
+                            added_layer::AddedLayer{FT},
+                            I_static::AbstractArray{FT}, 
                             architecture) where {FT}
 
     @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺ = added_layer
@@ -21,8 +20,8 @@ function rt_doubling_helper!(pol_type,ndoubl::Int,
     # Loop over each step
     for n = 1:ndoubl
         batch_solve!(tmp_inv, I_static .- r⁻⁺ ⊠ r⁻⁺, t⁺⁺)   
-        r⁻⁺[:]  = r⁻⁺ + (t⁺⁺ ⊠ r⁻⁺ ⊠ tmp_inv)
-        t⁺⁺[:]  = t⁺⁺ ⊠ tmp_inv
+        added_layer.r⁻⁺[:]  = r⁻⁺ + (t⁺⁺ ⊠ r⁻⁺ ⊠ tmp_inv)
+        added_layer.t⁺⁺[:]  = t⁺⁺ ⊠ tmp_inv
     end
 
     # After doubling, revert D(DR)->R, where D = Diagonal{1,1,-1,-1}
@@ -31,12 +30,12 @@ function rt_doubling_helper!(pol_type,ndoubl::Int,
     return nothing 
 end
 
-function rt_doubling!(pol_type,ndoubl::Int, added_layer::AddedLayer,
-                    D::AbstractArray{FT,3},
-                    I_static::AbstractArray, 
+function rt_doubling!(pol_type,ndoubl::Int, 
+                    added_layer::AddedLayer{FT},
+                    I_static::AbstractArray{FT}, 
                     architecture) where {FT}
 
-    rt_doubling_helper!(pol_type, ndoubl, added_layer, D, I_static, architecture)
+    rt_doubling_helper!(pol_type, ndoubl, added_layer, I_static, architecture)
     synchronize()
 end
 

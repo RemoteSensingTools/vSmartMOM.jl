@@ -51,10 +51,10 @@ function rt_interaction_helper!(kn::Int,
         # added to the bottom of the composite layer.
         # Produces a new, scattering composite layer.
 
-        # Used to store `inv(I - R⁺⁻ * r⁻⁺) * T⁺⁺`
+        # Used to store `(I - R⁺⁻ * r⁻⁺)⁻¹ * T⁺⁺`
         tmp_inv = similar(t⁺⁺)
 
-        # Compute and store `inv(I - R⁺⁻ * r⁻⁺) * T⁺⁺`
+        # Compute and store `(I - R⁺⁻ * r⁻⁺)⁻¹ * T⁺⁺`
         @timeit "interaction inv1" batch_solve!(tmp_inv, I_static .- R⁺⁻ ⊠ r⁻⁺, T⁺⁺)
 
         composite_layer.R⁻⁺[:] = R⁻⁺ + (T⁻⁻ ⊠ r⁻⁺ ⊠ tmp_inv)
@@ -62,7 +62,7 @@ function rt_interaction_helper!(kn::Int,
 
         # Repeating for mirror-reflected directions
 
-        # Compute and store `inv(I - r⁻⁺ * R⁺⁻) * t⁻⁻`
+        # Compute and store `(I - r⁻⁺ * R⁺⁻)⁻¹ * t⁻⁻`
         @timeit "interaction inv2" batch_solve!(tmp_inv, I_static .- r⁻⁺ ⊠ R⁺⁻, t⁻⁻)
 
         composite_layer.R⁺⁻[:] = r⁺⁻ + t⁺⁺ ⊠ R⁺⁻ ⊠ tmp_inv

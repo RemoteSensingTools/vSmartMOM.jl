@@ -15,11 +15,11 @@ FT = Float32
 λ = FT(0.770)       # Incident wavelength
 depol = FT(0.0)
 # Truncation 
-Ltrunc = 20             # Truncation  
+Ltrunc = 10             # Truncation  
 truncation_type   = PhaseFunction.δBGE{Float32}(Ltrunc, 2.0)
 
 # polarization_type
-polarization_type = Stokes_I{FT}()
+polarization_type = Stokes_IQU{FT}()
 
 # Quadrature points for RTM
 Nquad, qp_μ, wt_μ = rt_set_streams(RTM.RadauQuad(), Ltrunc, FT(60.0), FT[0.0, 15.0, 30., 45., 60.])
@@ -72,7 +72,8 @@ Nquad, qp_μ, wt_μ = rt_set_streams(RTM.RadauQuad(), Ltrunc, sza, vza);
 
 
 " Atmospheric Profiles, basics, needs to be refactore entirely"
-file = "/net/fluo/data1/ftp/XYZT_ESE156/Data/MERRA300.prod.assim.inst6_3d_ana_Nv.20150613.hdf.nc4"   
+file = "/net/fluo/data1/ftp/XYZT_ESE156/Data/MERRA300.prod.assim.inst6_3d_ana_Nv.20150613.hdf.nc4" 
+# file = "MERRA300.prod.assim.inst6_3d_ana_Nv.20150613.hdf.nc4"  
 timeIndex = 2 # There is 00, 06, 12 and 18 in UTC, i.e. 6 hourly data stacked together
 
 # What latitude do we want? 
@@ -81,20 +82,20 @@ myLon = -118.1253;
 
 # Read profile (and generate dry/wet VCDs per layer)
 profile_caltech_hr = RTM.read_atmos_profile(file, myLat, myLon, timeIndex);
-profile_caltech = RTM.reduce_profile(20, profile_caltech_hr)
+profile_caltech = RTM.reduce_profile(20, profile_caltech_hr);
 # Compute layer optical thickness for Rayleigh (surface pressure in hPa) 
 τRayl =  RTM.getRayleighLayerOptProp(profile_caltech.psurf / 100, λ, depol, profile_caltech.vcd_dry);
-ϖRayl = ones(length(τRayl))
+ϖRayl = ones(length(τRayl));
 
 # Compute Naer aerosol optical thickness profiles
 τAer_1 = RTM.getAerosolLayerOptProp(1.0, p₀[1], σp[1], profile_caltech.p_levels)
 # τAer_2 = RTM.getAerosolLayerOptProp(0.3, p₀[2], σp[2], profile_caltech.p_levels)
 
 # Can be done with arbitrary length later:
-τAer = 0.2 * τAer_1 # [τAer_1 τAer_2]
+τAer = 0.2 * τAer_1; # [τAer_1 τAer_2]
 @show sum(τAer)# , sum(τAer_2)
-ϖAer = [aerosol_optics_NAI2_aero1.ω̃] # [aerosol_optics_NAI2_aero1.ω̃ aerosol_optics_NAI2_aero2.ω̃];
-fᵗ   = [aerosol_optics_trunc_aero1.fᵗ] # [aerosol_optics_trunc_aero1.fᵗ aerosol_optics_trunc_aero2.fᵗ];
+ϖAer = [aerosol_optics_NAI2_aero1.ω̃]; # [aerosol_optics_NAI2_aero1.ω̃ aerosol_optics_NAI2_aero2.ω̃];
+fᵗ   = [aerosol_optics_trunc_aero1.fᵗ]; # [aerosol_optics_trunc_aero1.fᵗ aerosol_optics_trunc_aero2.fᵗ];
 
 aerosol_optics = [aerosol_optics_trunc_aero1] # [aerosol_optics_trunc_aero1 aerosol_optics_trunc_aero2]
 # Aer𝐙⁺⁺ = [aero1_Z⁺⁺] # [aero1_Z⁺⁺, aero2_Z⁺⁺];
@@ -102,16 +103,18 @@ aerosol_optics = [aerosol_optics_trunc_aero1] # [aerosol_optics_trunc_aero1 aero
 
 maxM = 3
 
-grid = range(1e7 / 774, 1e7 / 757, length=100)
+grid = range(1e7 / 774, 1e7 / 757, length=1000);
 
-τ_abs = zeros(length(grid), length(profile_caltech.p))
-compute_absorption_profile!(grid, τ_abs, profile_caltech)
-
-@time R_CPU, T_CPU = RTM.run_RTM(polarization_type, sza, vza, vaz, τRayl, ϖRayl, τAer, ϖAer, fᵗ, qp_μ, wt_μ, maxM, aerosol_optics, GreekRayleigh, τ_abs, RadiativeTransfer.Architectures.CPU());
+τ_abs = zeros(length(grid), length(profile_caltech.p));
+compute_absorption_profile!(grid, τ_abs, profile_caltech);
 
 @time R_GPU, T_GPU = RTM.run_RTM(polarization_type, sza, vza, vaz, τRayl, ϖRayl, τAer, ϖAer, fᵗ, qp_μ, wt_μ, maxM, aerosol_optics, GreekRayleigh, τ_abs, RadiativeTransfer.Architectures.GPU());
 
 
+@time R_CPU, T_CPU = RTM.run_RTM(polarization_type, sza, vza, vaz, τRayl, ϖRayl, τAer, ϖAer, fᵗ, qp_μ, wt_μ, maxM, aerosol_optics, GreekRayleigh, τ_abs, RadiativeTransfer.Architectures.CPU());
 
-@test R_CPU ≈ (R_GPU) rtol = 1e-2
-@test T_CPU ≈ (T_GPU) rtol = 1e-2
+
+
+
+@test R_CPU ≈ (R_GPU) 
+@test T_CPU ≈ (T_GPU) 
