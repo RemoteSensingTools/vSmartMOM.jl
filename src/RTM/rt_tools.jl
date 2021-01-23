@@ -29,8 +29,8 @@ function run_RTM(pol_type,          # Polarization type (IQUV)
     arr_type = array_type(architecture)
 
     # Output variables: Reflected and transmitted solar irradiation at TOA and BOA respectively
-    R = arr_type(zeros(length(vza), pol_type.n, nSpec))
-    T = arr_type(zeros(length(vza), pol_type.n, nSpec))
+    R = (zeros(FT, length(vza), pol_type.n, nSpec))
+    T = (zeros(FT, length(vza), pol_type.n, nSpec))
 
     # Assuming completely unpolarized incident stellar radiation
     # This should depend on pol_type right? 
@@ -148,6 +148,8 @@ function run_RTM(pol_type,          # Polarization type (IQUV)
         istart0 = st_iμ0 + 1
         iend0   = st_iμ0 + pol_type.n
 
+        R⁻⁺ = Array(composite_layer.R⁻⁺)
+        T⁺⁺ = Array(composite_layer.T⁺⁺)
         # Loop over all viewing zenith angles
         for i = 1:length(vza)
 
@@ -172,11 +174,11 @@ function run_RTM(pol_type,          # Polarization type (IQUV)
             iend   = st_iμ + pol_type.n
             
             for s = 1:nSpec
-                Δ = weight * arr_type(copy(bigCS))
-                Δ *= (composite_layer.R⁻⁺[istart:iend, istart0:iend0, s] / wt_μ[iμ0])
-                Δ *= arr_type(copy(pol_type.I0))
+                Δ = weight * bigCS
+                Δ *= (R⁻⁺[istart:iend, istart0:iend0, s] / wt_μ[iμ0])
+                Δ *= pol_type.I0
                 R[i,:,s] += Δ
-                T[i,:,s] += weight * arr_type(copy(bigCS)) * (composite_layer.T⁺⁺[istart:iend, istart0:iend0, s] / wt_μ[iμ0]) * arr_type(copy(pol_type.I0))
+                T[i,:,s] += weight * bigCS * (T⁺⁺[istart:iend, istart0:iend0, s] / wt_μ[iμ0]) * pol_type.I0
             end
             
         end
