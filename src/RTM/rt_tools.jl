@@ -72,14 +72,14 @@ function run_RTM(pol_type,          # Polarization type (IQUV)
         # Create R and T matrices for this m
 
         # Homogenous R and T matrices
-        @show FT
+        # @show FT
         default_matrix = arr_type(zeros(FT, tuple(dims[1], dims[2], nSpec)))
 
-        added_layer = AddedLayer(copy(default_matrix), copy(default_matrix), 
-        copy(default_matrix), copy(default_matrix))
+        added_layer = AddedLayer(deepcopy(default_matrix), deepcopy(default_matrix), 
+        deepcopy(default_matrix), deepcopy(default_matrix))
 
-        composite_layer = CompositeLayer(copy(default_matrix), copy(default_matrix), 
-        copy(default_matrix), copy(default_matrix))
+        composite_layer = CompositeLayer(deepcopy(default_matrix), deepcopy(default_matrix), 
+        deepcopy(default_matrix), deepcopy(default_matrix))
 
         I_static = Diagonal{FT}(ones(dims[1]))
         I_static_ = arr_type(repeat(I_static, 1, 1))
@@ -99,7 +99,7 @@ function run_RTM(pol_type,          # Polarization type (IQUV)
             # Compute doubling number
             dτ_max = minimum([τ * ϖ, 0.1 * minimum(qp_μ)])
             dτ_tmp, ndoubl = doubling_number(dτ_max, τ * ϖ)
-
+            # @show ndoubl
             # Compute dτ vector
             # Assert that dτ .* ϖ_nSpec are the same
             dτ = arr_type(τ_nSpec ./ (2^ndoubl))
