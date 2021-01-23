@@ -30,15 +30,15 @@ function rt_doubling_helper!(pol_type,ndoubl::Int,
     end
 
     # After doubling, revert D(DR)->R, where D = Diagonal{1,1,-1,-1}
-    event = apply_D_matrix!(r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻)
+    event = apply_D_matrix!(pol_type.n, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻)
     wait(event)
     # applyD_kernel! = apply_D!(dev)
     # @show pol_type.n
     # event = applyD_kernel!(r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻, ndrange=length(r⁻⁺));
     # wait(event)
     # synchronize()
-    @show r⁻⁺ ≈ r⁺⁻
-    @show t⁺⁺ ≈ t⁻⁻
+    # @show r⁻⁺ ≈ r⁺⁻
+    # @show t⁺⁺ ≈ t⁻⁻
     # 
     # r⁺⁻[:] = r⁻⁺
     # t⁻⁻[:] = t⁺⁺
@@ -63,7 +63,7 @@ function rt_doubling!(pol_type,ndoubl::Int, added_layer::AddedLayer,
     synchronize()
 end
 
-@kernel function apply_D2!(n_stokes::Int,  r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻)
+@kernel function apply_D!(n_stokes::Int,  r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻)
     iμ, jμ, n = @index(Global, NTuple)
     if n_stokes == 1
         r⁺⁻[iμ,jμ,n] = r⁻⁺[iμ,jμ,n]
@@ -92,12 +92,12 @@ end
     t⁻⁻[i,j,n] = t⁺⁺[i,j,n]
 end
 
-function apply_D_matrix!(r⁻⁺::CuArray{FT,3}, t⁺⁺::CuArray{FT,3}, r⁺⁻::CuArray{FT,3}, t⁻⁻::CuArray{FT,3}) where {FT}
+function apply_D_matrix!(n_stokes::Int, r⁻⁺::CuArray{FT,3}, t⁺⁺::CuArray{FT,3}, r⁺⁻::CuArray{FT,3}, t⁻⁻::CuArray{FT,3}) where {FT}
     applyD_kernel! = apply_D!(KernelAbstractions.CUDADevice())
-    applyD_kernel!(r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻, ndrange=size(r⁻⁺));
+    applyD_kernel!(n_stokes, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻, ndrange=size(r⁻⁺));
 end
 
 function apply_D_matrix!(r⁻⁺::Array{FT,3}, t⁺⁺::Array{FT,3}, r⁺⁻::Array{FT,3}, t⁻⁻::Array{FT,3}) where {FT}
     applyD_kernel! = apply_D!(KernelAbstractions.CPU())
-    applyD_kernel!(r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻, ndrange=size(r⁻⁺));
+    applyD_kernel!(n_stokes, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻, ndrange=size(r⁻⁺));
 end
