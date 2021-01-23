@@ -6,6 +6,7 @@ using RadiativeTransfer.PhaseFunction
 using RadiativeTransfer.RTM
 using Distributions
 using BenchmarkTools
+using Test
 
 FT = Float32
 "Generate aerosol optical properties"
@@ -14,11 +15,11 @@ FT = Float32
 λ = FT(0.770)       # Incident wavelength
 depol = FT(0.0)
 # Truncation 
-Ltrunc = 10             # Truncation  
+Ltrunc = 20             # Truncation  
 truncation_type   = PhaseFunction.δBGE{Float32}(Ltrunc, 2.0)
 
 # polarization_type
-polarization_type = Stokes_IQU{FT}()
+polarization_type = Stokes_I{FT}()
 
 # Quadrature points for RTM
 Nquad, qp_μ, wt_μ = rt_set_streams(RTM.RadauQuad(), Ltrunc, FT(60.0), FT[0.0, 15.0, 30., 45., 60.])
@@ -101,15 +102,16 @@ aerosol_optics = [aerosol_optics_trunc_aero1] # [aerosol_optics_trunc_aero1 aero
 
 maxM = 3
 
-grid = range(1e7 / 774, 1e7 / 757, length=10000)
+grid = range(1e7 / 774, 1e7 / 757, length=100)
 
 τ_abs = zeros(length(grid), length(profile_caltech.p))
 compute_absorption_profile!(grid, τ_abs, profile_caltech)
 
-R_GPU, T_GPU = RTM.run_RTM(polarization_type, sza, vza, vaz, τRayl, ϖRayl, τAer, ϖAer, fᵗ, qp_μ, wt_μ, maxM, aerosol_optics, GreekRayleigh, τ_abs, RadiativeTransfer.Architectures.GPU());
+@time R_CPU, T_CPU = RTM.run_RTM(polarization_type, sza, vza, vaz, τRayl, ϖRayl, τAer, ϖAer, fᵗ, qp_μ, wt_μ, maxM, aerosol_optics, GreekRayleigh, τ_abs, RadiativeTransfer.Architectures.CPU());
 
-R_CPU, T_CPU = RTM.run_RTM(polarization_type, sza, vza, vaz, τRayl, ϖRayl, τAer, ϖAer, fᵗ, qp_μ, wt_μ, maxM, aerosol_optics, GreekRayleigh, τ_abs, RadiativeTransfer.Architectures.CPU());
+@time R_GPU, T_GPU = RTM.run_RTM(polarization_type, sza, vza, vaz, τRayl, ϖRayl, τAer, ϖAer, fᵗ, qp_μ, wt_μ, maxM, aerosol_optics, GreekRayleigh, τ_abs, RadiativeTransfer.Architectures.GPU());
 
 
-@assert R_CPU ≈ (R_GPU)
-@assert T_CPU ≈ (T_GPU)
+
+@test R_CPU ≈ (R_GPU) rtol = 1e-2
+@test T_CPU ≈ (T_GPU) rtol = 1e-2
