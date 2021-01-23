@@ -44,7 +44,7 @@ function run_RTM(pol_type,          # Polarization type (IQUV)
 
     for m = 0:Ltrunc - 1
 
-        @show m
+        println("Fourier Moment: ", m)
 
         # Azimuthal weighting
         weight = m == 0 ? 0.5 : 1.0
@@ -74,11 +74,11 @@ function run_RTM(pol_type,          # Polarization type (IQUV)
 
         default_matrix = arr_type(zeros(FT, tuple(dims[1], dims[2], nSpec)))
 
-        added_layer = AddedLayer(deepcopy(default_matrix), deepcopy(default_matrix), 
-        deepcopy(default_matrix), deepcopy(default_matrix))
+        added_layer = AddedLayer(copy(default_matrix), copy(default_matrix), 
+        copy(default_matrix), copy(default_matrix))
 
-        composite_layer = CompositeLayer(deepcopy(default_matrix), deepcopy(default_matrix), 
-        deepcopy(default_matrix), deepcopy(default_matrix))
+        composite_layer = CompositeLayer(copy(default_matrix), copy(default_matrix), 
+        copy(default_matrix), copy(default_matrix))
 
         I_static = Diagonal{FT}(ones(dims[1]))
         I_static_ = arr_type(repeat(I_static, 1, 1))
@@ -96,7 +96,7 @@ function run_RTM(pol_type,          # Polarization type (IQUV)
             # @assert all(i -> (i ≈ τ * ϖ), τ_nSpec .* ϖ_nSpec)
 
             # Compute doubling number
-            dτ_max = minimum([τ * ϖ, 0.002 * minimum(qp_μ)])
+            dτ_max = minimum([τ * ϖ, 0.1 * minimum(qp_μ)])
             dτ_tmp, ndoubl = doubling_number(dτ_max, τ * ϖ)
 
             # Compute dτ vector
@@ -114,13 +114,6 @@ function run_RTM(pol_type,          # Polarization type (IQUV)
                 @timeit "elemental" rt_elemental!(pol_type, dτ, dτ_max, ϖ_nSpec, ϖ, Z⁺⁺, Z⁻⁺, m, ndoubl, scatter, qp_μ, wt_μ, added_layer, D, I_static, arr_type, architecture)
                 
                 @timeit "doubling" rt_doubling!(ndoubl, added_layer, arr_type(repeat(D, 1, 1, nSpec)), I_static_)
-                if iz == 2 && m == 0
-                    @show ndoubl
-                    # @show added_layer.r⁺⁻[:,:,1]
-                    # @show added_layer.r⁻⁺[:,:,1]
-                    # @show added_layer.t⁻⁻[:,:,1]
-                    # @show added_layer.t⁺⁺[:,:,1]
-                end
             else
                 added_layer.r⁻⁺ = 0
                 added_layer.r⁺⁻ = 0
@@ -144,27 +137,7 @@ function run_RTM(pol_type,          # Polarization type (IQUV)
             
             # If this is not the TOA, perform the interaction step
             else
-                if iz == 2 && m == 0
-                    # R⁻⁺, R⁺⁻, T⁺⁺, T⁻⁻ = composite_layer
-                    @show composite_layer.R⁻⁺[1:10,1,1]
-                    @show composite_layer.R⁺⁻[1:10,1,1]
-                    @show composite_layer.T⁺⁺[1:10,1,1]
-                    @show composite_layer.T⁻⁻[1:10,1,1]
-                    @show added_layer.r⁺⁻[1:10,1,1]
-                    @show added_layer.r⁻⁺[1:10,1,1]
-                    @show added_layer.t⁻⁻[1:10,1,1]
-                    @show added_layer.t⁺⁺[1:10,1,1]
-                    # @show I_static_[:,:,1]
-                end
                 @timeit "interaction" rt_interaction!(kn, composite_layer, added_layer, I_static_)
-                if iz == 2 && m == 0
-                    # R⁻⁺, R⁺⁻, T⁺⁺, T⁻⁻ = composite_layer
-                    @show composite_layer.R⁻⁺[1:10,1,1]
-                    @show composite_layer.R⁺⁻[1:10,1,1]
-                    @show composite_layer.T⁺⁺[1:10,1,1]
-                    @show composite_layer.T⁻⁻[1:10,1,1]
-                    # @show I_static_[:,:,1]
-                end
             end
         end # z
 

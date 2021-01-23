@@ -14,7 +14,7 @@ FT = Float32
 λ = FT(0.770)       # Incident wavelength
 depol = FT(0.0)
 # Truncation 
-Ltrunc = 3             # Truncation  
+Ltrunc = 10             # Truncation  
 truncation_type   = PhaseFunction.δBGE{Float32}(Ltrunc, 2.0)
 
 # polarization_type
@@ -101,7 +101,7 @@ aerosol_optics = [aerosol_optics_trunc_aero1] # [aerosol_optics_trunc_aero1 aero
 
 maxM = 3
 
-grid = range(1e7 / 765, 1e7 / 763, length=100)
+grid = range(1e7 / 774, 1e7 / 757, length=10000)
 
 τ_abs = zeros(length(grid), length(profile_caltech.p))
 compute_absorption_profile!(grid, τ_abs, profile_caltech)
@@ -111,4 +111,5 @@ R_GPU, T_GPU = RTM.run_RTM(polarization_type, sza, vza, vaz, τRayl, ϖRayl, τA
 R_CPU, T_CPU = RTM.run_RTM(polarization_type, sza, vza, vaz, τRayl, ϖRayl, τAer, ϖAer, fᵗ, qp_μ, wt_μ, maxM, aerosol_optics, GreekRayleigh, τ_abs, RadiativeTransfer.Architectures.CPU());
 
 
-@assert ((R_CPU, T_CPU) .≈ (Array(R_GPU), Array(T_GPU))) == true
+@assert R_CPU ≈ Array(R_GPU)
+@assert T_CPU ≈ Array(T_GPU)
