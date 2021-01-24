@@ -18,7 +18,7 @@ function run_RTM(pol_type,          # Polarization type (IQUV)
     #= 
     Define types, variables, and static quantities =#
     
-    FT = eltype(τRayl)                  # Get the float-type to use
+    FT = eltype(sza)                  # Get the float-type to use
     # FT = Float32
     Nz = length(τRayl)                  # Number of vertical slices
     nSpec = size(τ_abs, 1)              # Number of spectral points
@@ -35,7 +35,7 @@ function run_RTM(pol_type,          # Polarization type (IQUV)
 
     # Assuming completely unpolarized incident stellar radiation
     # This should depend on pol_type right? 
-    D = arr_type(Diagonal(repeat(pol_type.D, size(qp_μ)[1])))
+    # D = arr_type(Diagonal(repeat(pol_type.D, size(qp_μ)[1])))
 
     # Copy qp_μ "pol_type.n" times
     qp_μ4 = arr_type(repeat(qp_μ, pol_type.n)) # reduce(vcat, (fill.(arr_type(qp_μ), [pol_type.n])))
