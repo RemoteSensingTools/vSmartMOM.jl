@@ -9,7 +9,7 @@ function rt_doubling_helper!(pol_type,ndoubl::Int,
 
     @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺ = added_layer
     dev = devi(architecture)
-
+    # @show FT
     # Note: short-circuit evaluation => return nothing evaluated iff ndoubl == 0 
     ndoubl == 0 && return nothing
 
@@ -55,14 +55,6 @@ end
         r⁺⁻[iμ,jμ,n] = - r⁻⁺[iμ,jμ,n]
         t⁻⁻[iμ,jμ,n] = - t⁺⁺[iμ,jμ,n]
     end
-end
-
-
-
-@kernel function apply_D!(r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻)
-    i, j, n = @index(Global, NTuple)
-    r⁺⁻[i,j,n] = r⁻⁺[i,j,n]
-    t⁻⁻[i,j,n] = t⁺⁺[i,j,n]
 end
 
 function apply_D_matrix!(n_stokes::Int, r⁻⁺::CuArray{FT,3}, t⁺⁺::CuArray{FT,3}, r⁺⁻::CuArray{FT,3}, t⁻⁻::CuArray{FT,3}) where {FT}

@@ -15,7 +15,7 @@ FT = Float32
 λ = FT(0.770)       # Incident wavelength
 depol = FT(0.0)
 # Truncation 
-Ltrunc = 10             # Truncation  
+Ltrunc = 20             # Truncation  
 truncation_type   = PhaseFunction.δBGE{Float32}(Ltrunc, 2.0)
 
 # polarization_type
@@ -61,9 +61,9 @@ GreekRayleigh = PhaseFunction.get_greek_rayleigh(depol)
 # In[ ]:
 
 
-vza = [60., 45., 30., 15., 0., 15., 30., 45., 60.]
-vaz = [180., 180., 180., 180., 0., 0., 0., 0., 0.]
-sza = 60.
+vza = FT[60., 45., 30., 15., 0., 15., 30., 45., 60.]
+vaz = FT[180., 180., 180., 180., 0., 0., 0., 0., 0.]
+sza = FT(60.)
 Nquad, qp_μ, wt_μ = rt_set_streams(RTM.RadauQuad(), Ltrunc, sza, vza);
 
 @show Nquad
@@ -103,7 +103,7 @@ aerosol_optics = [aerosol_optics_trunc_aero1] # [aerosol_optics_trunc_aero1 aero
 
 maxM = 3
 
-grid = range(1e7 / 774, 1e7 / 757, length=1000);
+grid = range(1e7 / 774, 1e7 / 757, length=10000);
 
 τ_abs = zeros(length(grid), length(profile_caltech.p));
 compute_absorption_profile!(grid, τ_abs, profile_caltech);

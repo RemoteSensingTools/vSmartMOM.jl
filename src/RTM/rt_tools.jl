@@ -28,7 +28,7 @@ function run_RTM(pol_type,          # Polarization type (IQUV)
     iμ0 = nearest_point(qp_μ, μ0)       # Find the closest point to μ0 in qp_μ
 
     arr_type = array_type(architecture)
-
+    @show FT
     # Output variables: Reflected and transmitted solar irradiation at TOA and BOA respectively
     R = (zeros(FT, length(vza), pol_type.n, nSpec))
     T = (zeros(FT, length(vza), pol_type.n, nSpec))
