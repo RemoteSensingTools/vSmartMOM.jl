@@ -1,13 +1,23 @@
 "Elemental single-scattering layer"
-function rt_elemental_helper!(pol_type, dτ_nSpec, dτ, ϖ_nSpec, ϖ, Z⁺⁺, Z⁻⁺, m, 
-                              ndoubl, scatter, qp_μ, wt_μ, 
+function rt_elemental_helper!(pol_type, 
+                              dτ_nSpec::AbstractArray{FT,1}, 
+                              dτ::FT, 
+                              ϖ_nSpec::AbstractArray{FT,1}, 
+                              ϖ::FT, 
+                              Z⁺⁺::AbstractArray{FT,2}, 
+                              Z⁻⁺::AbstractArray{FT,2}, 
+                              m::Int, 
+                              ndoubl::Int, 
+                              scatter, 
+                              qp_μ::AbstractArray{FT,1}, 
+                              wt_μ::AbstractArray{FT,1}, 
                               added_layer::AddedLayer{FT}, 
                               I_static,
                               arr_type,
                               architecture) where {FT}
     
     @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺ = added_layer
-
+    # @show FT
     # ToDo: Main output is r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺ (can be renamed to t⁺⁺, etc)
     # Need to check with paper nomenclature. This is basically eqs. 19-20 in vSmartMOM
 
@@ -38,7 +48,7 @@ function rt_elemental_helper!(pol_type, dτ_nSpec, dτ, ϖ_nSpec, ϖ, Z⁺⁺, Z
         # wct = m==0 ? 0.50 * 1 .* wt_μ4  : 0.25 .* 1 .* wt_μ4
 
         # Get the diagonal matrices first
-        d_qp = Diagonal(arr_type(1 ./ qp_μ4))
+        d_qp  = Diagonal(arr_type(1 ./ qp_μ4))
         d_wct = Diagonal(arr_type(wct))
 
         # Calculate r⁻⁺ and t⁺⁺
