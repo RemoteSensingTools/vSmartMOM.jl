@@ -1,7 +1,8 @@
 "Simulates the full atmosphere from n distinct homogeneous layers"
 function rt_interaction_helper!(kn::Int, 
-                                composite_layer::CompositeLayer, added_layer::AddedLayer,
-                                I_static::AbstractArray) where {FT}
+                                composite_layer::CompositeLayer{FT}, 
+                                added_layer::AddedLayer{FT},
+                                I_static::AbstractArray{FT}) where {FT}
 
     @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺ = added_layer
     @unpack R⁻⁺, R⁺⁻, T⁺⁺, T⁻⁻ = composite_layer
@@ -76,8 +77,10 @@ function rt_interaction_helper!(kn::Int,
 
     end
 
-function rt_interaction!(kn::Int, composite_layer::CompositeLayer, added_layer::AddedLayer,
-                         I_static::AbstractArray) where {FT}
+function rt_interaction!(kn::Int, 
+                        composite_layer::CompositeLayer{FT}, 
+                        added_layer::AddedLayer{FT},
+                        I_static::AbstractArray{FT}) where {FT}
 
     rt_interaction_helper!(kn, composite_layer, added_layer, I_static)
     synchronize()
