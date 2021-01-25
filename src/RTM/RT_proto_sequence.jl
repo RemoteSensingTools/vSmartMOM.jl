@@ -8,7 +8,7 @@ using Distributions
 using BenchmarkTools
 using Test
 
-FT = Float32
+FT = Float64
 "Generate aerosol optical properties"
 
 # Wavelength (just one for now)
@@ -22,7 +22,8 @@ truncation_type   = PhaseFunction.δBGE{Float32}(Ltrunc, 2.0)
 polarization_type = Stokes_IQU{FT}()
 
 # Quadrature points for RTM
-Nquad, qp_μ, wt_μ = rt_set_streams(RTM.RadauQuad(), Ltrunc, FT(60.0), FT[0.0, 15.0, 30., 45., 60.])
+# Nquad, qp_μ, wt_μ = rt_set_streams(RTM.RadauQuad(), Ltrunc, FT(60.0), FT[0.0, 15.0, 30., 45., 60.])
+# Nquad, qp_μ, wt_μ = rt_set_streams(RTM.GaussQuadFullSphere(), Ltrunc, FT(60.0), FT[0.0, 15.0, 30., 45., 60.])
 
 # Aerosol particle distribution and properties
 μ            = [1.3]    # [0.3,2.0]       # Log mean radius
@@ -45,6 +46,7 @@ aero1 = make_univariate_aerosol(size_distribution[1], r_max[1], nquad_radius[1],
 # Define some details, run aerosol optics
 model_NAI2_aero1 = make_mie_model(NAI2(), aero1, λ, polarization_type, truncation_type)
 aerosol_optics_NAI2_aero1 = compute_aerosol_optical_properties(model_NAI2_aero1);
+
 # Truncate:
 aerosol_optics_trunc_aero1 = PhaseFunction.truncate_phase(truncation_type, aerosol_optics_NAI2_aero1; reportFit=true)
 
@@ -64,8 +66,9 @@ GreekRayleigh = PhaseFunction.get_greek_rayleigh(depol)
 vza = FT[60., 45., 30., 15., 0., 15., 30., 45., 60.]
 vaz = FT[180., 180., 180., 180., 0., 0., 0., 0., 0.]
 sza = FT(60.)
-Nquad, qp_μ, wt_μ = rt_set_streams(RTM.RadauQuad(), Ltrunc, sza, vza);
 
+Nquad, qp_μ, wt_μ = rt_set_streams(RTM.RadauQuad(), Ltrunc, sza, vza);
+# Nquad, qp_μ, wt_μ = rt_set_streams(RTM.GaussQuadFullSphere(), Ltrunc, sza, vza);
 @show Nquad
 
 # In[ ]:
@@ -109,7 +112,6 @@ grid = range(1e7 / 774, 1e7 / 757, length=10000);
 compute_absorption_profile!(grid, τ_abs, profile_caltech);
 
 @time R_GPU, T_GPU = RTM.run_RTM(polarization_type, sza, vza, vaz, τRayl, ϖRayl, τAer, ϖAer, fᵗ, qp_μ, wt_μ, maxM, aerosol_optics, GreekRayleigh, τ_abs, RadiativeTransfer.Architectures.GPU());
-
 
 @time R_CPU, T_CPU = RTM.run_RTM(polarization_type, sza, vza, vaz, τRayl, ϖRayl, τAer, ϖAer, fᵗ, qp_μ, wt_μ, maxM, aerosol_optics, GreekRayleigh, τ_abs, RadiativeTransfer.Architectures.CPU());
 
