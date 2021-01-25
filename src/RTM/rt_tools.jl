@@ -81,8 +81,9 @@ function run_RTM(pol_type,          # Polarization type (IQUV)
         composite_layer = CompositeLayer(deepcopy(default_matrix), deepcopy(default_matrix), 
         deepcopy(default_matrix), deepcopy(default_matrix))
 
-        I_static = Diagonal{FT}(ones(dims[1]))
-        I_static_ = arr_type(repeat(I_static, 1, 1))
+        I_static  = Diagonal{FT}(ones(dims[1]))
+        I_static_ = Diagonal(arr_type(I_static));
+        # I_static_ = arr_type(repeat(I_static, 1, 1))
 
         kn = 0
 
@@ -157,6 +158,7 @@ function run_RTM(pol_type,          # Polarization type (IQUV)
             # Find the nearest quadrature point idx
             iμ = nearest_point(qp_μ, cosd(vza[i])) # input vaz, vza as arrays
             
+            # TODO: Write as function, make type stable:
             # compute bigCS
             cos_m_phi = cosd(m * vaz[i])
             sin_m_phi = sind(m * vaz[i])
@@ -168,8 +170,8 @@ function run_RTM(pol_type,          # Polarization type (IQUV)
                 bigCS = Diagonal([cos_m_phi])
             end
 
+            # TODO: Write as function, make type stable:
             # Accumulate Fourier moments after azimuthal weighting
-
             st_iμ  = (iμ - 1) * pol_type.n
             istart = st_iμ + 1
             iend   = st_iμ + pol_type.n

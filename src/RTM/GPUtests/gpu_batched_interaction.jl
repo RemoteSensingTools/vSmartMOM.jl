@@ -73,27 +73,27 @@ function rt_interaction!(R⁻⁺::AbstractArray{FT,3},
     aux2 = similar(R⁻⁺)
     aux3 = similar(R⁻⁺)
     # Compute M1 = (I - R⁺⁻ * r⁻⁺) \ T⁺⁺
-    aux1 = I_static .- R⁺⁻ ⊠ r⁻⁺
+    aux1[:] = I_static .- R⁺⁻ ⊠ r⁻⁺
     batch_solve!(aux2, aux1, T⁺⁺)
   
     # Compute t_R⁻⁺ = R⁻⁺ + T⁻⁻ * r⁻⁺ * M1
-    aux1 = r⁻⁺ ⊠ aux2  # r⁻⁺ * M1
-    aux3 = T⁻⁻ ⊠ aux1  # 
-    R⁻⁺  = R⁻⁺ + aux3
+    aux1[:] = r⁻⁺ ⊠ aux2  # r⁻⁺ * M1
+    aux3[:] = T⁻⁻ ⊠ aux1  # 
+    R⁻⁺[:]  = R⁻⁺ + aux3
     
     # T⁺⁺ = t⁺⁺ * M1
-    T⁺⁺ = t⁺⁺ ⊠ aux2
+    T⁺⁺[:] = t⁺⁺ ⊠ aux2
     
     # Repeating for mirror-reflected directions
     # Compute M1 = (I - r⁻⁺ * R⁺⁻) \ t⁻⁻
-    aux1 = I_static .- r⁻⁺ ⊠ R⁺⁻
+    aux1[:] = I_static .- r⁻⁺ ⊠ R⁺⁻
     batch_solve!(aux2, aux1, t⁻⁻)
 
     # t_R⁺⁻ = r⁺⁻ + t⁺⁺ * R⁺⁻ * M1
-    aux3 = R⁺⁻ ⊠ aux2
-    aux1 = t⁺⁺ ⊠ aux3
-    R⁺⁻  = r⁺⁻ + aux1
-    T⁻⁻  = T⁺⁺ ⊠ aux2
+    aux3[:] = R⁺⁻ ⊠ aux2
+    aux1[:] = t⁺⁺ ⊠ aux3
+    R⁺⁻[:]  = r⁺⁻ + aux1
+    T⁻⁻[:]  = T⁺⁺ ⊠ aux2
     
     # synchronize()
 end
@@ -176,15 +176,27 @@ function rt_elemental!(pol_type, dτ, ϖ, Z⁺⁺, Z⁻⁺, m,
         r⁻⁺ = D ⊠ r⁻⁺
     end
 end
-
-# batch Matrix inversion for CPU
 function batch_solve!(X::CuArray{FT,3}, A::CuArray{FT,3}, B::CuArray{FT,3}) where {FT}
     temp = similar(A)
     pivot, info   = CUBLAS.getrf_strided_batched!(A, true);
-    getri_strided_batched(A, temp, pivot) # inv stored in aux1
-    X = temp ⊠ B  # inv(I - R⁺⁻ * r⁻⁺) * T⁺⁺
-    # synchronize()
+    synchronize()
+    getri_strided_batched!(A, temp, pivot); # inv stored in aux1
+    NNlib.batched_mul!(X, temp, B)
+    synchronize()
 end
+
+# batch Matrix inversion for CPU
+# function batch_solve!(X::CuArray{FT,3}, A::CuArray{FT,3}, B::CuArray{FT,3}) where {FT}
+#    temp = similar(A)
+#    pivot, info   = CUBLAS.getrf_strided_batched!(A, true);
+#    synchronize()
+#    getri_strided_batched!(A, temp, pivot); # inv stored in aux1
+#    NNlib.batched_mul!(X, temp, B)
+#    synchronize()
+    # getri_strided_batched(A, temp, pivot) # inv stored in aux1
+    # X[:] = temp ⊠ B  # inv(I - R⁺⁻ * r⁻⁺) * T⁺⁺
+    # synchronize()
+# end
 
 # batch Matrix inversion for CPU
 function batch_solve!(X::AbstractArray{FT,3}, A::AbstractArray{FT,3}, B::AbstractArray{FT,3}) where {FT}
