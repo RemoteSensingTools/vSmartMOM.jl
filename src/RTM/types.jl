@@ -17,7 +17,7 @@ end
 abstract type AbstractObsGeometry end
 
 "Observation Geometry (basics)" 
-struct ObsGeometry{FT} <: AbstractObsGeometry
+@with_kw struct ObsGeometry{FT} <: AbstractObsGeometry
     "altitude of observer `[Pa]`"
     obs_alt::FT
     "solar zenith angle `[Degree]`"
