@@ -1,20 +1,22 @@
-function get_kn(kn, scatter, iz)
+function get_scattering_interface(scattering_interface, scatter, iz)
 
     # First layer (TOA)
     if (iz == 1)
 
         # If scattering, 4. If non-scattering, 1. 
-        kn = scatter ? 4 : 1
+        scattering_interface = scatter ? ScatteringInterface_11() : ScatteringInterface_00()
     
     # Not the first layer (not TOA)
-    elseif (kn >= 1)
+    elseif !(scattering_interface isa ScatteringInterface_00)
 
         # If kn was 1, then toggle between 0/0 and 0/1 
         # Else, toggle between 1/0 and 1/1
-        kn = (kn == 1) ? (!scatter ? 1 : 2) : (!scatter ? 3 : 4)
+        scattering_interface = (scattering_interface isa ScatteringInterface_00) ? 
+                                    (!scatter ? ScatteringInterface_00() : ScatteringInterface_01()) : 
+                                    (!scatter ? ScatteringInterface_10() : ScatteringInterface_11())
     end
 
-    return kn
+    return scattering_interface
 end
 
 "minimum number of doublings needed to reach an optical depth τ_end, starting with an optical depth dτ.

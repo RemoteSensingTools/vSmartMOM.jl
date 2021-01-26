@@ -57,3 +57,9 @@ end
     t⁻⁻::AbstractArray{FT,3}
 
 end
+
+abstract type AbstractScatteringInterface end
+struct ScatteringInterface_00 <: AbstractScatteringInterface end
+struct ScatteringInterface_01 <: AbstractScatteringInterface end
+struct ScatteringInterface_10 <: AbstractScatteringInterface end
+struct ScatteringInterface_11 <: AbstractScatteringInterface end

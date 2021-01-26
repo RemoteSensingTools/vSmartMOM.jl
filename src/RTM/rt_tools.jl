@@ -86,7 +86,7 @@ function run_RTM(pol_type,              # Polarization type (IQUV)
         I_static_ = Diagonal(arr_type(I_static));
         # I_static_ = arr_type(repeat(I_static, 1, 1))
 
-        kn = 0
+        scattering_interface = ScatteringInterface_00()
 
         # Loop over vertical layers:
         @showprogress 1 "Looping over layers ..." for iz = 1:Nz  # Count from TOA to BOA
@@ -126,7 +126,7 @@ function run_RTM(pol_type,              # Polarization type (IQUV)
 
             # kn is an index that tells whether there is scattering in the 
             # added layer, composite layer, neither or both
-            kn = get_kn(kn, scatter, iz)
+            scattering_interface = get_scattering_interface(scattering_interface, scatter, iz)
 
             @assert !any(isnan.(added_layer.t⁺⁺))
             
@@ -140,7 +140,7 @@ function run_RTM(pol_type,              # Polarization type (IQUV)
             
             # If this is not the TOA, perform the interaction step
             else
-                @timeit "interaction" rt_interaction!(kn, composite_layer, added_layer, I_static_)
+                @timeit "interaction" rt_interaction!(scattering_interface, composite_layer, added_layer, I_static_)
             end
         end # z
 
