@@ -34,6 +34,6 @@ include("rt_utils.jl")
 include("rt_tools.jl")
 include("CUDA_getri.jl")
 
-export rt_set_streams, compute_absorption_profile!
+export rt_set_streams, compute_absorption_profile!, ObsGeometry
 
 end

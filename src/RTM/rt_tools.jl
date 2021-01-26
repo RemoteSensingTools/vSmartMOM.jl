@@ -1,16 +1,16 @@
 using ..Architectures: devi, default_architecture, AbstractArchitecture
 
 
-function run_RTM(pol_type,          # Polarization type (IQUV)
-                 sza, vza, vaz,     # Solar Zenith, Viewing Zenith, Viewing Azimuthal 
-                 τRayl, ϖRayl,      # Rayleigh optical depth and single-scattering albedo
-                 τAer, ϖAer,        # Aerosol optical depth and single-scattering albedo
-                 fᵗ,                # Truncation factor
-                 qp_μ, wt_μ,        # Quadrature points and weights
-                 Ltrunc,            # Trunction length for legendre terms
-                 aerosol_optics,    # AerosolOptics (greek_coefs, ω̃, k, fᵗ)
-                 GreekRayleigh,     # Greek coefficients of Rayleigh Phase Function
-                 τ_abs,             # nSpec x Nz matrix of absorption
+function run_RTM(pol_type,              # Polarization type (IQUV)
+                 obs_geom::ObsGeometry, # Solar Zenith, Viewing Zenith, Viewing Azimuthal 
+                 τRayl, ϖRayl,          # Rayleigh optical depth and single-scattering albedo
+                 τAer, ϖAer,            # Aerosol optical depth and single-scattering albedo
+                 fᵗ,                    # Truncation factor
+                 qp_μ, wt_μ,            # Quadrature points and weights
+                 Ltrunc,                # Trunction length for legendre terms
+                 aerosol_optics,        # AerosolOptics (greek_coefs, ω̃, k, fᵗ)
+                 GreekRayleigh,         # Greek coefficients of Rayleigh Phase Function
+                 τ_abs,                 # nSpec x Nz matrix of absorption
                  architecture::AbstractArchitecture) # Whether to use CPU / GPU
 
     println("Processing on: ", architecture)
@@ -18,6 +18,7 @@ function run_RTM(pol_type,          # Polarization type (IQUV)
     #= 
     Define types, variables, and static quantities =#
     
+    @unpack obs_alt, sza, vza, vaz = obs_geom   # Observational geometry properties
     FT = eltype(sza)                  # Get the float-type to use
     # FT = Float32
     Nz = length(τRayl)                  # Number of vertical slices
