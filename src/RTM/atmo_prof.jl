@@ -174,10 +174,10 @@ function construct_atm_layer(τRayl, τAer, ϖRayl, ϖAer, fᵗ, Rayl𝐙⁺⁺,
     ϖ *= ϖ * A / (1 - (1 - A) * ϖ)
 
     # Adding absorption optical depth / albedo:
-    τ_new = τ_abs .+ τ
-    ϖ_new = (τ .* ϖ) ./ τ_new
+    τ_λ = τ_abs .+ τ
+    ϖ_λ = (τ .* ϖ) ./ τ_λ
     
-    return arr_type(τ_new), arr_type(ϖ_new), τ, ϖ, Z⁺⁺, Z⁻⁺  
+    return arr_type(τ_λ), arr_type(ϖ_λ), τ, ϖ, Z⁺⁺, Z⁻⁺  
 end
 
 function compute_absorption_profile!(grid,

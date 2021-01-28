@@ -31,7 +31,7 @@ include("rt_doubling.jl")
 include("rt_interaction.jl")
 include("gpu_batched.jl")
 include("rt_utils.jl")
-include("rt_tools.jl")
+include("rt_run.jl")
 include("CUDA_getri.jl")
 
 export rt_set_streams, compute_absorption_profile!, ObsGeometry

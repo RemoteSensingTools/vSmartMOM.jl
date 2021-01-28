@@ -150,18 +150,18 @@ function rt_elemental!(pol_type, dτ, ϖ, Z⁺⁺, Z⁻⁺, m,
 
     aux1 = similar(Z⁻⁺)
 
-    qp_μ4 = repeat(qp_μ, 3)
-    wt_μ4 = repeat(wt_μ, 3)
-    # println(typeof(qp_μ4))
+    qp_μN = repeat(qp_μ, 3)
+    wt_μN= repeat(wt_μ, 3)
+    # println(typeof(qp_μN))
     #  reduce(vcat, (fill.(qp_μ,[pol_type.n])))
 
     # wt_μ4 = reduce(vcat, (fill.(wt_μ,[pol_type.n])))
-    Nquadn = length(qp_μ4)
+    Nquadn = length(qp_μN)
 
-    wct = m == 0 ? 0.50 * ϖ * wt_μ4  : 0.25 * ϖ * wt_μ4
+    wct = m == 0 ? 0.50 * ϖ * wt_μN  : 0.25 * ϖ * wt_μN
 
-    d_qp = r⁺⁻ isa CuArray{Float32,3} ? CuArray(Diagonal(1 ./ Array(qp_μ4))) : Diagonal(1 ./ Array(qp_μ4))
-    # d_wct = r⁺⁻ isa CuArray{Float32,3} ? CuArray(Diagonal(1 ./ Array(qp_μ4))) : Diagonal(1 ./ Array(qp_μ4))
+    d_qp = r⁺⁻ isa CuArray{Float32,3} ? CuArray(Diagonal(1 ./ Array(qp_μN))) : Diagonal(1 ./ Array(qp_μN))
+    # d_wct = r⁺⁻ isa CuArray{Float32,3} ? CuArray(Diagonal(1 ./ Array(qp_μN))) : Diagonal(1 ./ Array(qp_μN))
     d_wct = r⁺⁻ isa CuArray{Float32,3} ? CuArray(Diagonal(Array(wct))) : Diagonal(Array(wct))
 
     aux1 = d_qp ⊠ Z⁻⁺
