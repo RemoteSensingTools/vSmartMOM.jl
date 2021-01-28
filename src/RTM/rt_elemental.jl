@@ -1,8 +1,8 @@
 "Elemental single-scattering layer"
 function rt_elemental_helper!(pol_type, 
-                              dτ_nSpec::AbstractArray{FT,1}, 
+                              dτ_λ::AbstractArray{FT,1}, 
                               dτ::FT, 
-                              ϖ_nSpec::AbstractArray{FT,1}, 
+                              ϖ_λ::AbstractArray{FT,1}, 
                               ϖ::FT, 
                               Z⁺⁺::AbstractArray{FT,2}, 
                               Z⁻⁺::AbstractArray{FT,2}, 
@@ -30,25 +30,23 @@ function rt_elemental_helper!(pol_type,
     #         to the full homogeneous layer n
     # scatter: flag indicating scattering
 
-    nSpec = size(r⁻⁺, 3)
-
     Z⁺⁺_ = repeat(Z⁺⁺, 1, 1, 1)
     Z⁻⁺_ = repeat(Z⁻⁺, 1, 1, 1)
 
     device = devi(architecture)
 
     if scatter
-        qp_μ4 = arr_type(reduce(vcat, (fill.(qp_μ, [pol_type.n]))))
-        wt_μ4 = arr_type(reduce(vcat, (fill.(wt_μ, [pol_type.n]))))
+        qp_μN = arr_type(reduce(vcat, (fill.(qp_μ, [pol_type.n]))))
+        wt_μN = arr_type(reduce(vcat, (fill.(wt_μ, [pol_type.n]))))
 
-        NquadN = length(qp_μ4)
+        NquadN = length(qp_μN)
 
-        wct = m == 0 ? 0.50 * ϖ * wt_μ4  : 0.25 * ϖ * wt_μ4
-        wct2 = m == 0 ? wt_μ4  : wt_μ4 / 2
+        wct = m == 0 ? 0.50 * ϖ * wt_μN  : 0.25 * ϖ * wt_μN
+        wct2 = m == 0 ? wt_μN  : wt_μN / 2
         # wct = m==0 ? 0.50 * 1 .* wt_μ4  : 0.25 .* 1 .* wt_μ4
 
         # Get the diagonal matrices first
-        d_qp  = Diagonal(arr_type(1 ./ qp_μ4))
+        d_qp  = Diagonal(arr_type(1 ./ qp_μN))
         d_wct = Diagonal(arr_type(wct))
 
         # Calculate r⁻⁺ and t⁺⁺
@@ -64,7 +62,7 @@ function rt_elemental_helper!(pol_type,
         # This is not yet GPU ready as it has element wise operations (should work for CPU)
 
             kernel! = get_r!(device)
-            event = kernel!(r⁻⁺, r⁺⁻, t⁺⁺, t⁻⁻, ϖ_nSpec, dτ_nSpec, Z⁻⁺, Z⁺⁺, qp_μ4, wct2, ndoubl, pol_type.n, ndrange=size(r⁻⁺));
+            event = kernel!(r⁻⁺, r⁺⁻, t⁺⁺, t⁻⁻, ϖ_λ, dτ_λ, Z⁻⁺, Z⁺⁺, qp_μN, wct2, ndoubl, pol_type.n, ndrange=size(r⁻⁺));
             wait(device, event)
             synchronize()
         end
@@ -72,31 +70,31 @@ function rt_elemental_helper!(pol_type,
         
     else 
         # Note: τ is not defined here
-        t⁺⁺[:] = Diagonal{exp(-τ ./ qp_μ4)}
-        t⁻⁻[:] = Diagonal{exp(-τ ./ qp_μ4)}
+        t⁺⁺[:] = Diagonal{exp(-τ ./ qp_μN)}
+        t⁻⁻[:] = Diagonal{exp(-τ ./ qp_μN)}
     end    
 
 end
 
-@kernel function get_r!(r⁻⁺, r⁺⁻, t⁺⁺, t⁻⁻, ϖ_nSpec, dτ_nSpec, Z⁻⁺, Z⁺⁺, qp_μ4, wct2, ndoubl, pol_type_n)
+@kernel function get_r!(r⁻⁺, r⁺⁻, t⁺⁺, t⁻⁻, ϖ_λ, dτ_λ, Z⁻⁺, Z⁺⁺, qp_μ4, wct2, ndoubl, pol_type_n)
     i, j, n = @index(Global, NTuple)
 
     # 𝐑⁻⁺(μᵢ, μⱼ) = ϖ ̇𝐙⁻⁺(μᵢ, μⱼ) ̇(μⱼ/(μᵢ+μⱼ)) ̇(1 - exp{-τ ̇(1/μᵢ + 1/μⱼ)}) ̇𝑤ⱼ
-    r⁻⁺[i,j,n] = ϖ_nSpec[n] * Z⁻⁺[i,j] * (qp_μ4[j] / (qp_μ4[i] + qp_μ4[j])) * (1 - exp.(-dτ_nSpec[n] * ((1 / qp_μ4[i]) + (1 / qp_μ4[j])))) * (wct2[j]) 
+    r⁻⁺[i,j,n] = ϖ_λ[n] * Z⁻⁺[i,j] * (qp_μ4[j] / (qp_μ4[i] + qp_μ4[j])) * (1 - exp.(-dτ_λ[n] * ((1 / qp_μ4[i]) + (1 / qp_μ4[j])))) * (wct2[j]) 
                     
     if (qp_μ4[i] == qp_μ4[j])
 
         # 𝐓⁺⁺(μᵢ, μᵢ) = (exp{-τ/μᵢ} + ϖ ̇𝐙⁺⁺(μᵢ, μᵢ) ̇(τ/μᵢ) ̇exp{-τ/μᵢ}) ̇𝑤ᵢ
         if i == j
-            t⁺⁺[i,j,n] = exp(-dτ_nSpec[n] / qp_μ4[i]) + ϖ_nSpec[n] * Z⁺⁺[i,i] * (dτ_nSpec[n] / qp_μ4[i]) * exp.(-dτ_nSpec[n] / qp_μ4[i]) * wct2[i]
+            t⁺⁺[i,j,n] = exp(-dτ_λ[n] / qp_μ4[i]) + ϖ_λ[n] * Z⁺⁺[i,i] * (dτ_λ[n] / qp_μ4[i]) * exp.(-dτ_λ[n] / qp_μ4[i]) * wct2[i]
         else
-            t⁺⁺[i,j,n] = ϖ_nSpec[n] * Z⁺⁺[i,i] * (dτ_nSpec[n] / qp_μ4[i]) * exp.(-dτ_nSpec[n] / qp_μ4[i]) * wct2[i]
+            t⁺⁺[i,j,n] = ϖ_λ[n] * Z⁺⁺[i,i] * (dτ_λ[n] / qp_μ4[i]) * exp.(-dτ_λ[n] / qp_μ4[i]) * wct2[i]
         end
     else
     
         # 𝐓⁺⁺(μᵢ, μⱼ) = ϖ ̇𝐙⁺⁺(μᵢ, μⱼ) ̇(μⱼ/(μᵢ-μⱼ)) ̇(exp{-τ/μᵢ} - exp{-τ/μⱼ}) ̇𝑤ⱼ
         # (𝑖 ≠ 𝑗)
-        t⁺⁺[i,j,n] = ϖ_nSpec[n] * Z⁺⁺[i,j] * (qp_μ4[j] / (qp_μ4[i] - qp_μ4[j])) * (exp(-dτ_nSpec[n] / qp_μ4[i]) - exp(-dτ_nSpec[n] / qp_μ4[j])) * wct2[j]
+        t⁺⁺[i,j,n] = ϖ_λ[n] * Z⁺⁺[i,j] * (qp_μ4[j] / (qp_μ4[i] - qp_μ4[j])) * (exp(-dτ_λ[n] / qp_μ4[i]) - exp(-dτ_λ[n] / qp_μ4[j])) * wct2[j]
     end
     if ndoubl < 1
         ii = mod(i - 1, pol_type_n)
@@ -117,13 +115,13 @@ end
 
 
 
-function rt_elemental!(pol_type, dτ_nSpec, dτ, ϖ_nSpec, ϖ, Z⁺⁺, Z⁻⁺, m, 
+function rt_elemental!(pol_type, dτ_λ, dτ, ϖ_λ, ϖ, Z⁺⁺, Z⁻⁺, m, 
                               ndoubl, scatter, qp_μ, wt_μ, 
                               added_layer::AddedLayer{FT}, 
                               I_static,
                               arr_type,
                               architecture) where {FT}
 
-    rt_elemental_helper!(pol_type, dτ_nSpec, dτ, ϖ_nSpec, ϖ, Z⁺⁺, Z⁻⁺, m, ndoubl, scatter, qp_μ, wt_μ, added_layer, I_static, arr_type, architecture)
+    rt_elemental_helper!(pol_type, dτ_λ, dτ, ϖ_λ, ϖ, Z⁺⁺, Z⁻⁺, m, ndoubl, scatter, qp_μ, wt_μ, added_layer, I_static, arr_type, architecture)
     synchronize()
 end

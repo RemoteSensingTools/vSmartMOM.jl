@@ -1,17 +1,17 @@
 using ..Architectures: devi, default_architecture, AbstractArchitecture
 
 
-function run_RTM(pol_type,              # Polarization type (IQUV)
-                 obs_geom::ObsGeometry, # Solar Zenith, Viewing Zenith, Viewing Azimuthal 
-                 τRayl, ϖRayl,          # Rayleigh optical depth and single-scattering albedo
-                 τAer, ϖAer,            # Aerosol optical depth and single-scattering albedo
-                 fᵗ,                    # Truncation factor
-                 qp_μ, wt_μ,            # Quadrature points and weights
-                 Ltrunc,                # Trunction length for legendre terms
-                 aerosol_optics,        # AerosolOptics (greek_coefs, ω̃, k, fᵗ)
-                 GreekRayleigh,         # Greek coefficients of Rayleigh Phase Function
-                 τ_abs,                 # nSpec x Nz matrix of absorption
-                 architecture::AbstractArchitecture) # Whether to use CPU / GPU
+function rt_run(pol_type,              # Polarization type (IQUV)
+                obs_geom::ObsGeometry, # Solar Zenith, Viewing Zenith, Viewing Azimuthal 
+                τRayl, ϖRayl,          # Rayleigh optical depth and single-scattering albedo
+                τAer, ϖAer,            # Aerosol optical depth and single-scattering albedo
+                fᵗ,                    # Truncation factor
+                qp_μ, wt_μ,            # Quadrature points and weights
+                Ltrunc,                # Trunction length for legendre terms
+                aerosol_optics,        # AerosolOptics (greek_coefs, ω̃, k, fᵗ)
+                GreekRayleigh,         # Greek coefficients of Rayleigh Phase Function
+                τ_abs,                 # nSpec x Nz matrix of absorption
+                architecture::AbstractArchitecture) # Whether to use CPU / GPU
 
     println("Processing on: ", architecture)
 
@@ -39,7 +39,7 @@ function run_RTM(pol_type,              # Polarization type (IQUV)
     # D = arr_type(Diagonal(repeat(pol_type.D, size(qp_μ)[1])))
 
     # Copy qp_μ "pol_type.n" times
-    qp_μ4 = arr_type(repeat(qp_μ, pol_type.n)) # reduce(vcat, (fill.(arr_type(qp_μ), [pol_type.n])))
+    qp_μN = arr_type(repeat(qp_μ, pol_type.n)) # reduce(vcat, (fill.(arr_type(qp_μ), [pol_type.n])))
 
     #= 
     Loop over number of truncation terms =#
@@ -93,18 +93,18 @@ function run_RTM(pol_type,              # Polarization type (IQUV)
 
             # Construct the atmospheric layer
             # From Rayleigh and aerosol τ, ϖ, compute overall layer τ, ϖ
-            @timeit "Constructing" τ_nSpec, ϖ_nSpec, τ, ϖ, Z⁺⁺, Z⁻⁺ = construct_atm_layer(τRayl[iz], τAer[iz,:], ϖRayl[iz], ϖAer, fᵗ, Rayl𝐙⁺⁺, Rayl𝐙⁻⁺, Aer𝐙⁺⁺, Aer𝐙⁻⁺, τ_abs[:,iz], arr_type)
+            @timeit "Constructing" τ_λ, ϖ_λ, τ, ϖ, Z⁺⁺, Z⁻⁺ = construct_atm_layer(τRayl[iz], τAer[iz,:], ϖRayl[iz], ϖAer, fᵗ, Rayl𝐙⁺⁺, Rayl𝐙⁻⁺, Aer𝐙⁺⁺, Aer𝐙⁻⁺, τ_abs[:,iz], arr_type)
 
             # τ * ϖ should remain constant even though they individually change over wavelength
-            # @assert all(i -> (i ≈ τ * ϖ), τ_nSpec .* ϖ_nSpec)
+            # @assert all(i -> (i ≈ τ * ϖ), τ_λ .* ϖ_λ)
 
             # Compute doubling number
             dτ_max = minimum([τ * ϖ, 0.1 * minimum(qp_μ)])
             dτ_tmp, ndoubl = doubling_number(dτ_max, τ * ϖ)
             # @show ndoubl
             # Compute dτ vector
-            # Assert that dτ .* ϖ_nSpec are the same
-            dτ = arr_type(τ_nSpec ./ (2^ndoubl))
+            # Assert that dτ .* ϖ_λ are the same
+            dτ = arr_type(τ_λ ./ (2^ndoubl))
             
             # Determine whether there is scattering
             scatter = (  sum(τAer) > 1.e-8 || 
@@ -114,14 +114,14 @@ function run_RTM(pol_type,              # Polarization type (IQUV)
             # If there is scattering, perform the elemental and doubling steps
             if (scatter)
                 
-                @timeit "elemental" rt_elemental!(pol_type, dτ, dτ_max, ϖ_nSpec, ϖ, Z⁺⁺, Z⁻⁺, m, ndoubl, scatter, qp_μ, wt_μ, added_layer,  I_static, arr_type, architecture)
+                @timeit "elemental" rt_elemental!(pol_type, dτ, dτ_max, ϖ_λ, ϖ, Z⁺⁺, Z⁻⁺, m, ndoubl, scatter, qp_μ, wt_μ, added_layer,  I_static, arr_type, architecture)
                 
                 @timeit "doubling" rt_doubling!(pol_type, ndoubl, added_layer, I_static_, architecture)
             else
                 added_layer.r⁻⁺ = 0
                 added_layer.r⁺⁻ = 0
-                added_layer.t⁺⁺ = Diagonal(exp(-τ / qp_μ4))
-                added_layer.t⁻⁻ = Diagonal(exp(-τ / qp_μ4))
+                added_layer.t⁺⁺ = Diagonal(exp(-τ / qp_μN))
+                added_layer.t⁻⁻ = Diagonal(exp(-τ / qp_μN))
             end
 
             # kn is an index that tells whether there is scattering in the 
