@@ -45,7 +45,7 @@ for (fname, elty) in
             CUBLAS.unsafe_free!(Cptrs)
             CUBLAS.unsafe_free!(Aptrs)
 
-            pivotArray, info, C
+            return info
         end
     end
 end
@@ -60,6 +60,5 @@ function getri_strided_batched!(A::CuArray{<:Any,3}, C::CuArray{<:Any,3}, pivot:
     lda = max(1, stride(A, 2))
     Cptrs = CUBLAS.unsafe_strided_batch(C)
     Aptrs = CUBLAS.unsafe_strided_batch(A)
-    getri_batched!(n, Aptrs, lda, Cptrs, ldc, pivot)
-    return nothing
+    return getri_batched!(n, Aptrs, lda, Cptrs, ldc, pivot)
 end

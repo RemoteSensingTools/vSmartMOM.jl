@@ -9,6 +9,12 @@ end
 function rt_set_streams(::GaussQuadFullSphere, Ltrunc::Int, ::ObsGeometry)
     Nquad = (Ltrunc + 1) ÷ 2
     qp_μ, wt_μ = gausslegendre(2Nquad) # quadrature limits are [-1,1]
+    μ₀ = cosd.(sza)
+    qp_μ = unique([qp_μ; cosd.(vza)])
+    # Assign zero-weights to remaining camera zenith angles
+    qp_μ = [qp_μ[Nquad + 1:end]; cosd.(vza); μ₀];
+    wt_μ = [wt_μ[Nquad + 1:end]; zeros(FT,length(vza)); FT(0)];
+    Nquad = length(qp_μ);
     return Nquad, qp_μ[Nquad + 1:end], wt_μ[Nquad + 1:end]
 end
 
