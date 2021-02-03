@@ -41,7 +41,7 @@ function rt_elemental_helper!(pol_type,
 
         NquadN = length(qp_μN)
 
-        wct = m == 0 ? 0.50 * ϖ * wt_μN  : 0.25 * ϖ * wt_μN
+        wct = m == 0 ? FT(0.50) * ϖ * wt_μN  : FT(0.25) * ϖ * wt_μN
         wct2 = m == 0 ? wt_μN  : wt_μN / 2
         # wct = m==0 ? 0.50 * 1 .* wt_μ4  : 0.25 .* 1 .* wt_μ4
 

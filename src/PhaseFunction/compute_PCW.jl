@@ -7,7 +7,7 @@ Compute the aerosol optical properties using the Domke-PCW method
 Input: MieModel, holding all computation and aerosol properties 
 Output: AerosolOptics, holding all Greek coefficients and Cross-Sectional information
 """
-function compute_aerosol_optical_properties(model::MieModel{FDT}) where FDT<:PCW
+function compute_aerosol_optical_properties(model::MieModel{FDT}, FT2::Type=Float64) where FDT<:PCW
 
     # Unpack the model
     @unpack computation_type, aerosol, λ, polarization_type, truncation_type, wigner_A, wigner_B = model
@@ -82,15 +82,15 @@ function compute_aerosol_optical_properties(model::MieModel{FDT}) where FDT<:PCW
     end
 
     # Create GreekCoefs object with α, β, γ, δ, ϵ, ζ (in that order)
-    greek_coefs = GreekCoefs(greek_coefs[3,:], 
-                             greek_coefs[1,:], 
-                             greek_coefs[5,:], 
-                             greek_coefs[2,:], 
-                             greek_coefs[6,:], 
-                             greek_coefs[4,:])
+    greek_coefs = GreekCoefs(FT2[greek_coefs[3,:]], 
+                             FT2[greek_coefs[1,:]], 
+                             FT2[greek_coefs[5,:]], 
+                             FT2[greek_coefs[2,:]], 
+                             FT2[greek_coefs[6,:]], 
+                             FT2[greek_coefs[4,:]])
 
     # Return the packaged AerosolOptics object
-    return AerosolOptics(greek_coefs=greek_coefs, ω̃=avg_C_scatt/avg_C_ext, k=avg_C_ext) 
+    return AerosolOptics(greek_coefs=greek_coefs, ω̃=FT2(avg_C_scatt/avg_C_ext), k=FT2(avg_C_ext)) 
 end
 
 

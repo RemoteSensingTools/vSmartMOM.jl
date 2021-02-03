@@ -99,6 +99,7 @@ end;
 # for terrestrial atmospheres 
 # psurf in hPa, λ in μm 
 function getRayleighLayerOptProp(psurf, λ, depol_fct, vcd_dry) 
+    FT = eltype(λ)
     # Total vertical Rayleigh scattering optical thickness 
     tau_scat = 0.00864 * (psurf / 1013.25) * λ^(-3.916 - 0.074 * λ - 0.05 / λ) 
     tau_scat = tau_scat * (6.0 + 3.0 * depol_fct) / (6.0 - 7.0 * depol_fct)
@@ -110,11 +111,12 @@ function getRayleighLayerOptProp(psurf, λ, depol_fct, vcd_dry)
         τRayl[i] = k * vcd_dry[i]
     end
 
-    return τRayl
+    return convert.(FT, τRayl)
 end
 
 # Gaussian distribution on a pressure grid
 function getAerosolLayerOptProp(total_τ, p₀, σp, p_half)
+    FT = eltype(p₀)
     Nz = length(p_half)
     ρ = zeros(Nz)
     for i = 2:Nz
@@ -125,7 +127,7 @@ function getAerosolLayerOptProp(total_τ, p₀, σp, p_half)
     Norm = sum(ρ)
     # @show Norm
     τAer  =  (total_τ / Norm) * ρ
-    return τAer
+    return convert.(FT, τAer)
 end
 
 # computes the composite single scattering parameters (τ, ϖ, Z⁺⁺, Z⁻⁺) for a given atmospheric layer iz for a given Fourier component m
@@ -180,11 +182,11 @@ function construct_atm_layer(τRayl, τAer, ϖRayl, ϖAer, fᵗ, Rayl𝐙⁺⁺,
     return arr_type(τ_λ), arr_type(ϖ_λ), τ, ϖ, Z⁺⁺, Z⁻⁺  
 end
 
-function compute_absorption_profile!(τ_abs::Array{Float64,2}, 
+function compute_absorption_profile!(τ_abs::Array{FT,2}, 
                                      model::AbstractCrossSectionModel,
                                      grid,
                                      profile::AtmosphericProfile,
-                                     )
+                                     ) where FT <: AbstractFloat
 
     # pass in the hitran model
 

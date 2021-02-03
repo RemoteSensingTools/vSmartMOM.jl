@@ -47,7 +47,7 @@ function rt_set_streams(::RadauQuad, Ltrunc::Int, obs_geom::ObsGeometry)
     # Screen out duplicate camera zenith angles
     qp_μ = unique([qp_μ; cosd.(vza)])
     # Assign zero-weights to remaining camera zenith angles
-    wt_μ = [wt_μ; zeros(length(qp_μ) - length(wt_μ))]
+    wt_μ = FT[wt_μ; zeros(length(qp_μ) - length(wt_μ))]
     
     Nquad = length(qp_μ)
     # @show μ₀, Nquad, qp_μ, wt_μ

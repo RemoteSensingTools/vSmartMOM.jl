@@ -8,7 +8,7 @@ Compute the aerosol optical properties using the Siewert-NAI2 method
 Input: MieModel, holding all computation and aerosol properties 
 Output: AerosolOptics, holding all Greek coefficients and Cross-Sectional information
 """
-function compute_aerosol_optical_properties(model::MieModel{FDT}) where FDT <: NAI2
+function compute_aerosol_optical_properties(model::MieModel{FDT}, FT2::Type=Float64) where FDT <: NAI2
 
     # Unpack the model
     @unpack computation_type, aerosol, λ, polarization_type, truncation_type, wigner_A, wigner_B = model
@@ -141,8 +141,13 @@ function compute_aerosol_optical_properties(model::MieModel{FDT}) where FDT <: N
     end
 
     # Create GreekCoefs object with α, β, γ, δ, ϵ, ζ
-    greek_coefs = GreekCoefs(α, β, γ, δ, ϵ, ζ)
+    greek_coefs = GreekCoefs(convert.(FT2, α), 
+                             convert.(FT2, β), 
+                             convert.(FT2, γ), 
+                             convert.(FT2, δ), 
+                             convert.(FT2, ϵ), 
+                             convert.(FT2, ζ))
 
     # Return the packaged AerosolOptics object
-    return AerosolOptics(greek_coefs=greek_coefs, ω̃=bulk_C_sca / bulk_C_ext, k=bulk_C_ext) 
+    return AerosolOptics(greek_coefs=greek_coefs, ω̃=FT2(bulk_C_sca / bulk_C_ext), k=FT2(bulk_C_ext) )
 end
