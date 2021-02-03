@@ -227,17 +227,18 @@ depolarization value.
 - `depol` Depolarization (best use 0 as default )
 """
 function get_greek_rayleigh(depol::Number)
+    FT = eltype(depol)
     # Rayleigh Greek Parameters
     dpl_p = (1 - depol)  / (1 + depol / 2)
     dpl_q = (1 + depol)  / (1 - depol)
     dpl_r = (1 - 2depol) / (1 - depol)
   
-    α  =  [0.0, 0.0,             3dpl_p]
-    β  =  [1.0, 0.0,             0.5 * dpl_p]
-    γ  =  [0.0, 0.0,             dpl_p * sqrt(1.5)] 
-    δ  =  [0.0, dpl_p * dpl_r * 1.5, 0.0] 
-    ϵ  =  [0.0, 0.0,             0.0] 
-    ζ  =  [0.0, 0.0,             0.0]
+    α  =  FT[0.0, 0.0,             3dpl_p]
+    β  =  FT[1.0, 0.0,             0.5 * dpl_p]
+    γ  =  FT[0.0, 0.0,             dpl_p * sqrt(1.5)] 
+    δ  =  FT[0.0, dpl_p * dpl_r * 1.5, 0.0] 
+    ϵ  =  FT[0.0, 0.0,             0.0] 
+    ζ  =  FT[0.0, 0.0,             0.0]
     return GreekCoefs(α, β, γ, δ, ϵ, ζ)
 end
 

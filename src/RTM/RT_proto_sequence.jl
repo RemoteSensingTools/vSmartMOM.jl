@@ -11,7 +11,7 @@ using CUDA
 
 device!(3)
 
-FT = Float64
+FT = Float32
 "Generate aerosol optical properties"
 
 # Wavelength (just one for now)
@@ -48,7 +48,7 @@ aero1 = make_univariate_aerosol(size_distribution[1], r_max[1], nquad_radius[1],
 
 # Define some details, run aerosol optics
 model_NAI2_aero1 = make_mie_model(NAI2(), aero1, λ, polarization_type, truncation_type)
-aerosol_optics_NAI2_aero1 = compute_aerosol_optical_properties(model_NAI2_aero1);
+aerosol_optics_NAI2_aero1 = compute_aerosol_optical_properties(model_NAI2_aero1, FT);
 
 # Truncate:
 aerosol_optics_trunc_aero1 = PhaseFunction.truncate_phase(truncation_type, aerosol_optics_NAI2_aero1; reportFit=true)
@@ -70,7 +70,7 @@ vza = FT[60., 45., 30., 15., 0., 15., 30., 45., 60.]
 vaz = FT[180., 180., 180., 180., 0., 0., 0., 0., 0.]
 sza = FT(60.)
 
-obs_geom = ObsGeometry(1000.0, sza, vza, vaz)
+obs_geom = ObsGeometry(FT(1000.0), sza, vza, vaz)
 
 Nquad, qp_μ, wt_μ = rt_set_streams(RTM.RadauQuad(), Ltrunc, obs_geom);
 # Nquad, qp_μ, wt_μ = rt_set_streams(RTM.GaussQuadFullSphere(), Ltrunc, sza, vza);
@@ -93,17 +93,17 @@ profile_caltech_hr = RTM.read_atmos_profile(file, myLat, myLon, timeIndex);
 profile_caltech = RTM.reduce_profile(20, profile_caltech_hr);
 # Compute layer optical thickness for Rayleigh (surface pressure in hPa) 
 τRayl =  RTM.getRayleighLayerOptProp(profile_caltech.psurf / 100, λ, depol, profile_caltech.vcd_dry);
-ϖRayl = ones(length(τRayl));
+ϖRayl = ones(FT, length(τRayl));
 
 # Compute Naer aerosol optical thickness profiles
 τAer_1 = RTM.getAerosolLayerOptProp(1.0, p₀[1], σp[1], profile_caltech.p_levels)
 # τAer_2 = RTM.getAerosolLayerOptProp(0.3, p₀[2], σp[2], profile_caltech.p_levels)
 
 # Can be done with arbitrary length later:
-τAer = 0.2 * τAer_1; # [τAer_1 τAer_2]
+τAer = FT(0.2) * τAer_1; # [τAer_1 τAer_2]
 @show sum(τAer)# , sum(τAer_2)
-ϖAer = [aerosol_optics_NAI2_aero1.ω̃]; # [aerosol_optics_NAI2_aero1.ω̃ aerosol_optics_NAI2_aero2.ω̃];
-fᵗ   = [aerosol_optics_trunc_aero1.fᵗ]; # [aerosol_optics_trunc_aero1.fᵗ aerosol_optics_trunc_aero2.fᵗ];
+ϖAer = FT[aerosol_optics_NAI2_aero1.ω̃]; # [aerosol_optics_NAI2_aero1.ω̃ aerosol_optics_NAI2_aero2.ω̃];
+fᵗ   = FT[aerosol_optics_trunc_aero1.fᵗ]; # [aerosol_optics_trunc_aero1.fᵗ aerosol_optics_trunc_aero2.fᵗ];
 
 aerosol_optics = [aerosol_optics_trunc_aero1] # [aerosol_optics_trunc_aero1 aerosol_optics_trunc_aero2]
 # Aer𝐙⁺⁺ = [aero1_Z⁺⁺] # [aero1_Z⁺⁺, aero2_Z⁺⁺];
@@ -113,7 +113,7 @@ maxM = 3
 
 grid = range(1e7 / 774, 1e7 / 757, length=10000);
 
-τ_abs = zeros(length(grid), length(profile_caltech.p));
+τ_abs = zeros(FT, length(grid), length(profile_caltech.p));
 
 hitran_data = read_hitran(artifact("O2"), iso=1)
 model = make_hitran_model(hitran_data, Voigt(), wing_cutoff=100, CEF=HumlicekWeidemann32SDErrorFunction(), architecture=CrossSection.GPU(), vmr=0.21)

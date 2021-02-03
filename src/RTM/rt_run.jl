@@ -49,7 +49,7 @@ function rt_run(pol_type,              # Polarization type (IQUV)
         println("Fourier Moment: ", m)
 
         # Azimuthal weighting
-        weight = m == 0 ? 0.5 : 1.0
+        weight = m == 0 ? FT(0.5) : FT(1.0)
 
         # Compute Z-moments of the Rayleigh phase matrix 
         # For m>=3, Rayleigh matrices will be 0, can catch with if statement if wanted 
@@ -99,12 +99,12 @@ function rt_run(pol_type,              # Polarization type (IQUV)
             # @assert all(i -> (i ≈ τ * ϖ), τ_λ .* ϖ_λ)
 
             # Compute doubling number
-            dτ_max = minimum([τ * ϖ, 0.1 * minimum(qp_μ)])
+            dτ_max = minimum([τ * ϖ, FT(0.1) * minimum(qp_μ)])
             dτ_tmp, ndoubl = doubling_number(dτ_max, τ * ϖ)
             # @show ndoubl
             # Compute dτ vector
             # Assert that dτ .* ϖ_λ are the same
-            dτ = arr_type(τ_λ ./ (2^ndoubl))
+            dτ = arr_type(τ_λ ./ (FT(2)^ndoubl))
             
             # Determine whether there is scattering
             scatter = (  sum(τAer) > 1.e-8 || 
