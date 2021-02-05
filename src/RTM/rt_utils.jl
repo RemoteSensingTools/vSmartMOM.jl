@@ -62,3 +62,24 @@ function nearest_point(f_array, f)
     end
     return index
 end
+
+function get_indices(iμ::Integer, pol_type::AbstractPolarizationType) 
+
+    st_iμ = (iμ - 1) * pol_type.n
+    istart = st_iμ + 1
+    iend   = st_iμ + pol_type.n
+
+    return st_iμ, istart, iend
+end
+
+default_matrix(FT, arr_type, dims, nSpec) = arr_type(zeros(FT, tuple(dims[1], dims[2], nSpec)))
+
+make_added_layer(FT, arr_type, dims, nSpec) = AddedLayer(default_matrix(FT, arr_type, dims, nSpec), 
+                                                         default_matrix(FT, arr_type, dims, nSpec), 
+                                                         default_matrix(FT, arr_type, dims, nSpec),
+                                                         default_matrix(FT, arr_type, dims, nSpec))
+
+make_composite_layer(FT, arr_type, dims, nSpec) = CompositeLayer(default_matrix(FT, arr_type, dims, nSpec), 
+                                                                 default_matrix(FT, arr_type, dims, nSpec), 
+                                                                 default_matrix(FT, arr_type, dims, nSpec),
+                                                                 default_matrix(FT, arr_type, dims, nSpec))
