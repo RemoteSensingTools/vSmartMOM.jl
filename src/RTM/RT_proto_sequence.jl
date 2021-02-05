@@ -103,7 +103,7 @@ profile_caltech = RTM.reduce_profile(20, profile_caltech_hr);
 τAer = FT(0.2) * τAer_1; # [τAer_1 τAer_2]
 @show sum(τAer)# , sum(τAer_2)
 ϖAer = FT[aerosol_optics_NAI2_aero1.ω̃]; # [aerosol_optics_NAI2_aero1.ω̃ aerosol_optics_NAI2_aero2.ω̃];
-fᵗ   = FT[aerosol_optics_trunc_aero1.fᵗ]; # [aerosol_optics_trunc_aero1.fᵗ aerosol_optics_trunc_aero2.fᵗ];
+# fᵗ   = FT[aerosol_optics_trunc_aero1.fᵗ]; # [aerosol_optics_trunc_aero1.fᵗ aerosol_optics_trunc_aero2.fᵗ];
 
 aerosol_optics = [aerosol_optics_trunc_aero1] # [aerosol_optics_trunc_aero1 aerosol_optics_trunc_aero2]
 # Aer𝐙⁺⁺ = [aero1_Z⁺⁺] # [aero1_Z⁺⁺, aero2_Z⁺⁺];
@@ -111,7 +111,7 @@ aerosol_optics = [aerosol_optics_trunc_aero1] # [aerosol_optics_trunc_aero1 aero
 
 maxM = 3
 
-grid = range(1e7 / 774, 1e7 / 757, length=10000);
+grid = range(1e7 / 774, 1e7 / 757, length=1000);
 
 τ_abs = zeros(FT, length(grid), length(profile_caltech.p));
 
@@ -120,12 +120,8 @@ model = make_hitran_model(hitran_data, Voigt(), wing_cutoff=100, CEF=HumlicekWei
 
 compute_absorption_profile!(τ_abs, model, grid, profile_caltech);
 
-@time R_GPU, T_GPU = RTM.rt_run(polarization_type, obs_geom, τRayl, ϖRayl, τAer, ϖAer, fᵗ, qp_μ, wt_μ, maxM, aerosol_optics, GreekRayleigh, τ_abs, RadiativeTransfer.Architectures.GPU());
+@time R_GPU, T_GPU = RTM.rt_run(polarization_type, obs_geom, τRayl, ϖRayl, τAer, ϖAer, qp_μ, wt_μ, maxM, aerosol_optics, GreekRayleigh, τ_abs, RadiativeTransfer.Architectures.GPU());
+@time R_CPU, T_CPU = RTM.rt_run(polarization_type, obs_geom, τRayl, ϖRayl, τAer, ϖAer, qp_μ, wt_μ, maxM, aerosol_optics, GreekRayleigh, τ_abs, RadiativeTransfer.Architectures.CPU());
 
-# @time R_CPU, T_CPU = RTM.run_RTM(polarization_type, obs_geom, τRayl, ϖRayl, τAer, ϖAer, fᵗ, qp_μ, wt_μ, maxM, aerosol_optics, GreekRayleigh, τ_abs, RadiativeTransfer.Architectures.CPU());
-
-
-
-
-# @test R_CPU ≈ (R_GPU) 
-# @test T_CPU ≈ (T_GPU) 
+@test R_CPU ≈ (R_GPU) 
+@test T_CPU ≈ (T_GPU) 

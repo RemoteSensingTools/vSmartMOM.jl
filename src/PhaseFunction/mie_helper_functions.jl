@@ -343,7 +343,7 @@ construct_B_matrix(mod::Stokes_I, α, β, γ, δ, ϵ, ζ, l::Int) = β[l]
     $(FUNCTIONNAME)(mod::AbstractPolarizationType, μ, α, β, γ, δ, ϵ, ζ, m::Int)
 Compute moments of the phase matrix 
 """
-function compute_Z_moments(mod::AbstractPolarizationType, μ, greek_coefs::GreekCoefs, m::Int)
+function compute_Z_moments(mod::AbstractPolarizationType, μ, greek_coefs::GreekCoefs, m::Int ; arr_type = Array)
     @unpack α, β, γ, δ, ϵ, ζ = greek_coefs
     FT = eltype(β)
     n = length(μ)
@@ -420,5 +420,5 @@ function compute_Z_moments(mod::AbstractPolarizationType, μ, greek_coefs::Greek
     end
 
     # Return Z-moments
-    return 𝐙⁺⁺, 𝐙⁻⁺
+    return arr_type(𝐙⁺⁺), arr_type(𝐙⁻⁺)
 end
