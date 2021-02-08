@@ -1,6 +1,6 @@
 # Quick testing function:
 using Revise
-using RadiativeTransfer.PhaseFunction
+using RadiativeTransfer.Scattering
 using Distributions
 using FastGaussQuadrature
 using Plots
@@ -16,12 +16,12 @@ wl = 0.55
 FT = Float64
 
 # Generate aerosol:
-aero1 = PhaseFunction.UnivariateAerosol(LogNormal(log(μ), log(σ)), 30.0, 10000,1.3,-1e-6)
+aero1 = Scattering.UnivariateAerosol(LogNormal(log(μ), log(σ)), 30.0, 10000,1.3,-1e-6)
 
 # Obtain Gauss Legendre Quadrature Points:
 x,w = gausslegendre( aero1.nquad_radius )
 maxSizeParam = 2π * aero1.r_max/wl
-n_max = PhaseFunction.get_n_max(maxSizeParam)
+n_max = Scattering.get_n_max(maxSizeParam)
 x_sizeParam  = x*maxSizeParam/2 .+ maxSizeParam/2
 
 #x_sizeParam=
@@ -34,7 +34,7 @@ leg_π = zeros(n_max,n_mu)
 leg_τ = zeros(n_max,n_mu)
 
 # Pre-compute π and τ:
-PhaseFunction.compute_mie_π_τ!(μ, n_max, leg_π, leg_τ)
+Scattering.compute_mie_π_τ!(μ, n_max, leg_π, leg_τ)
 
 function testSiewert(x_sizeParam,leg_π,leg_τ, aero1, λ,μ,w_μ )
     size1 = size(leg_π)[2]
@@ -62,7 +62,7 @@ function testSiewert(x_sizeParam,leg_π,leg_τ, aero1, λ,μ,w_μ )
     @showprogress 1 "Computing PhaseFunctions Siewert NAI-2 style ..." for i = 1:length(x_sizeParam)
         #println(i, " ", x_sizeParam[i])
         # Maximum expansion (see eq. A17 from de Rooij and Stap, 1984)
-        n_max = PhaseFunction.get_n_max(x_sizeParam[i])
+        n_max = Scattering.get_n_max(x_sizeParam[i])
         an = (zeros(Complex{FT},n_max))
         bn = (zeros(Complex{FT},n_max))
         # Weighting for sums of 2n+1
@@ -74,10 +74,10 @@ function testSiewert(x_sizeParam,leg_π,leg_τ, aero1, λ,μ,w_μ )
         nmx = round(Int, max(n_max, abs(y))+25 )
         Dn = zeros(Complex{FT},nmx)
 
-        #PhaseFunction.compute_mie_ab!(x_sizeParam[i],aero1.nᵣ-aero1.nᵢ*im,view(an,1:n_max),view(bn,1:n_max),Dn)
-        #S1[i,:],S2[i,:] = PhaseFunction.compute_mie_S1S2(view(an,1:n_max), view(bn,1:n_max), leg_π, leg_τ)
-        PhaseFunction.compute_mie_ab!(x_sizeParam[i],aero1.nᵣ-aero1.nᵢ*im,an,bn,Dn)
-        S₁[i,:],S₂[i,:] = PhaseFunction.compute_mie_S1S2(an, bn, leg_π, leg_τ)
+        #Scattering.compute_mie_ab!(x_sizeParam[i],aero1.nᵣ-aero1.nᵢ*im,view(an,1:n_max),view(bn,1:n_max),Dn)
+        #S1[i,:],S2[i,:] = Scattering.compute_mie_S1S2(view(an,1:n_max), view(bn,1:n_max), leg_π, leg_τ)
+        Scattering.compute_mie_ab!(x_sizeParam[i],aero1.nᵣ-aero1.nᵢ*im,an,bn,Dn)
+        S₁[i,:],S₂[i,:] = Scattering.compute_mie_S1S2(an, bn, leg_π, leg_τ)
         
         # Compute Extinction and scattering cross sections: 
         C_sca[i] = 2pi/k^2 * (n_' * (abs2.(an) + abs2.(bn)))
@@ -104,7 +104,7 @@ function testSiewert(x_sizeParam,leg_π,leg_τ, aero1, λ,μ,w_μ )
     bulk_f₃₄ /= bulk_C_sca
 
     lMax = length(μ);
-    P, P², R², T² = PhaseFunction.compute_legendre_poly(μ,lMax)
+    P, P², R², T² = Scattering.compute_legendre_poly(μ,lMax)
     # Compute Greek coefficients:
     α = zeros(lMax)
     β = zeros(lMax)
@@ -143,7 +143,7 @@ plot!(size=(400,600))
 # Test single particle:
 function testSingle(index)
     lMax = 750;
-    P⁰, P², R², T² = PhaseFunction.compute_legendre_poly(μ,lMax)
+    P⁰, P², R², T² = Scattering.compute_legendre_poly(μ,lMax)
     ϵ_s = zeros(lMax);
     #index = 100
     for l=0:lMax-1

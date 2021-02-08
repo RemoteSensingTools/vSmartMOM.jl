@@ -1,6 +1,6 @@
 using Revise
 using RadiativeTransfer
-using RadiativeTransfer.PhaseFunction
+using RadiativeTransfer.Scattering
 using RadiativeTransfer.RTM
 using Distributions
 using BenchmarkTools
@@ -11,7 +11,7 @@ using BenchmarkTools
 λ = 0.770       # Incident wavelength
 depol = 0.0
 Ltrunc = 72     # Truncation  
-truncation_type   = PhaseFunction.δBGE(Ltrunc, 2.0)
+truncation_type   = Scattering.δBGE(Ltrunc, 2.0)
 
 # polarization_type
 polarization_type = Stokes_IQUV()
@@ -41,10 +41,10 @@ model_NAI2_aero1 = make_mie_model(NAI2(), aero1, λ, polarization_type, truncati
 aerosol_optics_NAI2_aero1 = compute_aerosol_optical_properties(model_NAI2_aero1);
 
 # Truncate:
-aerosol_optics_trunc_aero1 = PhaseFunction.truncate_phase(truncation_type, aerosol_optics_NAI2_aero1)
+aerosol_optics_trunc_aero1 = Scattering.truncate_phase(truncation_type, aerosol_optics_NAI2_aero1)
 
 # Rayleigh Greek
-GreekRayleigh = PhaseFunction.get_greek_rayleigh(depol)
+GreekRayleigh = Scattering.get_greek_rayleigh(depol)
 
 ###########
 
@@ -86,9 +86,9 @@ fᵗ   = [aerosol_optics_trunc_aero1.fᵗ] #[aerosol_optics_trunc_aero1.fᵗ aer
 profile_caltech.p_levels[73]
 
 m = 0
-RaylZ⁺⁺, RaylZ⁻⁺     = PhaseFunction.compute_Z_moments(polarization_type, qp_μ, GreekRayleigh, m);
-aero1_Z⁺⁺, aero1_Z⁻⁺ = PhaseFunction.compute_Z_moments(polarization_type, qp_μ, aerosol_optics_trunc_aero1.greek_coefs, m);
-#aero2_Z⁺⁺, aero2_Z⁻⁺ = PhaseFunction.compute_Z_moments(polarization_type, qp_μ, aerosol_optics_trunc_aero2.greek_coefs, m);
+RaylZ⁺⁺, RaylZ⁻⁺     = Scattering.compute_Z_moments(polarization_type, qp_μ, GreekRayleigh, m);
+aero1_Z⁺⁺, aero1_Z⁻⁺ = Scattering.compute_Z_moments(polarization_type, qp_μ, aerosol_optics_trunc_aero1.greek_coefs, m);
+#aero2_Z⁺⁺, aero2_Z⁻⁺ = Scattering.compute_Z_moments(polarization_type, qp_μ, aerosol_optics_trunc_aero2.greek_coefs, m);
 aerosol_optics = [aerosol_optics_trunc_aero1] #[aerosol_optics_trunc_aero1 aerosol_optics_trunc_aero2]
 Aer𝐙⁺⁺ = [aero1_Z⁺⁺] #[aero1_Z⁺⁺, aero2_Z⁺⁺];
 Aer𝐙⁻⁺ = [aero1_Z⁻⁺] #[aero1_Z⁻⁺, aero2_Z⁻⁺];

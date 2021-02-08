@@ -1,4 +1,4 @@
-module PhaseFunction
+module Scattering
 
 using Parameters                # 
 using DocStringExtensions       # For simplifying docstring
@@ -15,17 +15,16 @@ using StatsBase
 
 using ..Architectures: device
 
-include("types.jl")                # All types used in this module
-include("mie_helper_functions.jl") # Mie file-related functions
-include("legendre_functions.jl")   # Recursions for associated Legendre Polynomials
+include("Types/types.jl")                # All types used in this module
+include("Mie/mie_helper_functions.jl") # Mie file-related functions
+include("Legendre/legendre_functions.jl")   # Recursions for associated Legendre Polynomials
 # include("mie_computations.jl")     # Functions for Mie calculations over size distribution
-include("phase_truncation.jl")     # Functions for truncation
-include("wigner3j_recursive.jl")   # Recursive Wigner 3j calculations
-include("aerosol.jl")
-include("mie_model.jl")
-include("compute_NAI2.jl")
-include("compute_PCW.jl")
-include("phase_function_autodiff.jl")     # Auto-differentiation
+include("Truncation/phase_truncation.jl")     # Functions for truncation
+include("Mie/wigner3j_recursive.jl")   # Recursive Wigner 3j calculations
+include("Mie/mie_model.jl")
+include("Mie/compute_NAI2.jl")
+include("Mie/compute_PCW.jl")
+include("Mie/phase_function_autodiff.jl")     # Auto-differentiation
 
 
 # Export make functions/types

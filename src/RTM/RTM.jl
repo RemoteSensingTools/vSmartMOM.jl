@@ -7,7 +7,7 @@ using Distributions
 using Interpolations
 using Polynomials
 using DelimitedFiles
-using ..PhaseFunction
+using ..Scattering
 using ..Absorption
 using ...RadiativeTransfer
 using FastGaussQuadrature 

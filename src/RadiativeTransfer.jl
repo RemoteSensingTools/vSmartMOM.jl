@@ -22,7 +22,7 @@ include("Artifacts/artifact_helper.jl")
 include("Absorption/Absorption.jl")
 
 # Mie Phase Function module:
-include("PhaseFunction/PhaseFunction.jl")
+include("Scattering/Scattering.jl")
 
 # RTM module:
 include("RTM/RTM.jl")

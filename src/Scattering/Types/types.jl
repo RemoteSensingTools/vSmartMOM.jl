@@ -30,6 +30,18 @@ struct UnivariateAerosol{FT,FT2} <: AbstractAerosolType
     nᵢ::FT2
 end
 
+""" 
+    $(FUNCTIONNAME)(size_distribution::ContinuousUnivariateDistribution, r_max, nquad_radius::Int, nᵣ, nᵢ)
+
+Convenience function to create a Univariate Aerosol, given the size parameters 
+"""
+function make_univariate_aerosol(size_distribution::ContinuousUnivariateDistribution, 
+                                 r_max, nquad_radius::Int, 
+                                 nᵣ, nᵢ)
+
+    return UnivariateAerosol(size_distribution, r_max, nquad_radius, nᵣ, nᵢ)
+end
+
 # TODO: struct MultivariateAerosol{FT,FT2} <: AbstractAerosolType
 
 #####
@@ -72,15 +84,15 @@ abstract type AbstractPolarizationType  end
 "Use full Stokes Vector ([I,Q,U,V])"
 @with_kw struct Stokes_IQUV{FT<:AbstractFloat} <: AbstractPolarizationType
     n::Int = 4
-    D::Array{FT}  = FT[1, 1, -1, -1]
-    I0::Array{FT} = [1, 0, 0, 0] #assuming completely unpolarized incident stellar radiation
+    D::Array{FT}  = [1.0, 1.0, -1.0, -1.0]
+    I0::Array{FT} = [1.0, 0.0, 0.0, 0.0] #assuming completely unpolarized incident stellar radiation
 end
 
 "Use part of Stokes Vector ([I,Q,U])"
 @with_kw struct Stokes_IQU{FT<:AbstractFloat} <: AbstractPolarizationType 
     n::Int = 3
-    D::Array{FT}  = FT[1, 1, -1]
-    I0::Array{FT} = [1, 0, 0] #assuming linearly unpolarized incident stellar radiation
+    D::Array{FT}  = [1.0, 1.0, -1.0]
+    I0::Array{FT} = [1.0, 0.0, 0.0] #assuming linearly unpolarized incident stellar radiation
 end
 
 
@@ -97,9 +109,9 @@ $(DocStringExtensions.FIELDS)
     "Number of Stokes components (int)"
     n::Int = 1
     "Vector of length `n` for ... (see eq in Sanghavi )"
-    D::Array{FT} = FT[1]
+    D::Array{FT} = [1.0]
     "Incoming Stokes vector for scalar only"
-    I0::Array{FT} = [1]
+    I0::Array{FT} = [1.0]
 end
 
 #####

@@ -45,7 +45,7 @@ function rt_run(pol_type,              # Polarization type (IQUV)
 
         # Compute Z-moments of the Rayleigh phase matrix 
         # For m>=3, Rayleigh matrices will be 0, can catch with if statement if wanted 
-        Rayl𝐙⁺⁺, Rayl𝐙⁻⁺ = PhaseFunction.compute_Z_moments(pol_type, qp_μ, GreekRayleigh, m, arr_type = arr_type);
+        Rayl𝐙⁺⁺, Rayl𝐙⁻⁺ = Scattering.compute_Z_moments(pol_type, qp_μ, GreekRayleigh, m, arr_type = arr_type);
 
         # Number of aerosols
         nAer = length(aerosol_optics)
@@ -56,7 +56,7 @@ function rt_run(pol_type,              # Polarization type (IQUV)
         Aer𝐙⁻⁺ = similar(Aer𝐙⁺⁺)
 
         for i = 1:nAer
-            Aer𝐙⁺⁺[:,:,i], Aer𝐙⁻⁺[:,:,i] = PhaseFunction.compute_Z_moments(pol_type, qp_μ, aerosol_optics[i].greek_coefs, m, arr_type = arr_type)
+            Aer𝐙⁺⁺[:,:,i], Aer𝐙⁻⁺[:,:,i] = Scattering.compute_Z_moments(pol_type, qp_μ, aerosol_optics[i].greek_coefs, m, arr_type = arr_type)
         end
 
         # R and T matrices for Added and Composite Layers for this m

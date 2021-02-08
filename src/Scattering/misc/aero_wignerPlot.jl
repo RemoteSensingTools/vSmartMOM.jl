@@ -10,8 +10,8 @@ function aero_wigner(a, b,   wigner_A, wigner_B)
     maxi = b
 
     # Generate aerosol:
-    aero = PhaseFunction.UnivariateAerosol(size_distribution, maxi, 5, 1.3, 0.0)
-    r, wᵣ = PhaseFunction.gauleg(aero.nquad_radius, a, b ; norm=true)
+    aero = Scattering.UnivariateAerosol(size_distribution, maxi, 5, 1.3, 0.0)
+    r, wᵣ = Scattering.gauleg(aero.nquad_radius, a, b ; norm=true)
     wₓ = pdf.(aero.size_distribution, r)
 
     # pre multiply with wᵣ to get proper means eventually:
@@ -21,13 +21,13 @@ function aero_wigner(a, b,   wigner_A, wigner_B)
     wₓ /= sum(wₓ)
     # @show wₓ, r
     greek_coefs = compute_B(aero, wigner_A, wigner_B, wl, r, wₓ)
-    N_max = PhaseFunction.get_n_max(2 * π * maxi / 0.55)
+    N_max = Scattering.get_n_max(2 * π * maxi / 0.55)
     n_mu = 5 * N_max - 1;
 
-    μ, w_μ = PhaseFunction.gausslegendre(n_mu)
+    μ, w_μ = Scattering.gausslegendre(n_mu)
     
 
-    f₁₁, f₁₂, f₂₂, f₃₃, f₃₄, f₄₄ = PhaseFunction.reconstruct_phase(greek_coefs, μ)
+    f₁₁, f₁₂, f₂₂, f₃₃, f₃₄, f₄₄ = Scattering.reconstruct_phase(greek_coefs, μ)
     # @show greek_coefs.β
     return f₁₁, f₁₂, f₂₂, f₃₃, μ
 end
