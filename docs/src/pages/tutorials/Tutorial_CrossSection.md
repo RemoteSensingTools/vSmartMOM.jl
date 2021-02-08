@@ -122,11 +122,11 @@ Once you dig deeper, there are various other more complex line-shapes (and line-
 using Plots
 using Pkg.Artifacts
 using RadiativeTransfer
-using RadiativeTransfer.CrossSection
+using RadiativeTransfer.Absorption
 ```
 
 ```@example Tutorial_CrossSection
-co2_par = CrossSection.read_hitran(artifact("CO2"), mol=2, iso=1, ν_min=6214.4, ν_max=6214.8);
+co2_par = Absorption.read_hitran(artifact("CO2"), mol=2, iso=1, ν_min=6214.4, ν_max=6214.8);
 line_voigt   = make_hitran_model(co2_par, Voigt())
 line_doppler = make_hitran_model(co2_par, Doppler())
 line_lorentz = make_hitran_model(co2_par, Lorentz())
@@ -176,7 +176,7 @@ xlabel!("Wavenumber (cm⁻¹)")
 Here, we will just compute an entire band of CO$_2$ (a few to be precise) and look at some simple behavior, e.g. the re-distribution of individual lines in the P and R branch with changing temperature.
 
 ```@example Tutorial_CrossSection
-co2_par_band = CrossSection.read_hitran(artifact("CO2"), mol=2, iso=1, ν_min=6000.0, ν_max=6400.0);
+co2_par_band = Absorption.read_hitran(artifact("CO2"), mol=2, iso=1, ν_min=6000.0, ν_max=6400.0);
 band_voigt   = make_hitran_model(co2_par_band , Voigt())
 ```
 

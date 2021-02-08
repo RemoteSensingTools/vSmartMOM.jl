@@ -1,7 +1,7 @@
 using Revise
 using Plots
 using RadiativeTransfer
-using RadiativeTransfer.CrossSection
+using RadiativeTransfer.Absorption
 using RadiativeTransfer.PhaseFunction
 using RadiativeTransfer.RTM
 using Distributions

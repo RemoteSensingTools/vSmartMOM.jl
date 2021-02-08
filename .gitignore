@@ -15,7 +15,7 @@ Manifest.toml
 *.gif
 
 docs/build/*
-src/CrossSection/local_only
+src/Absorption/local_only
 clones/
 conda/
 registries/

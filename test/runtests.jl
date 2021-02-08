@@ -1,6 +1,6 @@
 using RadiativeTransfer
 using RadiativeTransfer.Architectures
-using RadiativeTransfer.CrossSection
+using RadiativeTransfer.Absorption
 using RadiativeTransfer.PhaseFunction
 using Test
 using DelimitedFiles
@@ -15,7 +15,7 @@ using CUDA
 # test_arch = 
 
 # Test the Cross Section module
-@testset "RadiativeTransfer.CrossSection" begin include("test_CrossSection.jl") end
+@testset "RadiativeTransfer.Absorption" begin include("test_Absorption.jl") end
 
 # Test the Phase Function module
 @testset "RadiativeTransfer.PhaseFunction" begin include("test_PhaseFunction.jl") end

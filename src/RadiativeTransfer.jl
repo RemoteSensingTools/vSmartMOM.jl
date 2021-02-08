@@ -19,7 +19,7 @@ using .Architectures
 include("Artifacts/artifact_helper.jl")
 
 # Absorption Cross Section module:
-include("CrossSection/CrossSection.jl")
+include("Absorption/Absorption.jl")
 
 # Mie Phase Function module:
 include("PhaseFunction/PhaseFunction.jl")
@@ -28,7 +28,7 @@ include("PhaseFunction/PhaseFunction.jl")
 include("RTM/RTM.jl")
 
 using .Architectures
-using .CrossSection
+using .Absorption
 
 # Perform some GPU setup when the module is loaded
 function __init__()

@@ -14,7 +14,7 @@ You can calculate an absorption cross-section in three steps:
 
 ```julia
 using RadiativeTransfer
-using RadiativeTransfer.CrossSection
+using RadiativeTransfer.Absorption
 
 ## 
 ## STEP 1: Get the Hitran data
