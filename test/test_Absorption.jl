@@ -10,7 +10,7 @@
 
     CO2_test_file = "helper/testCO2.data"
 
-    test_ht = CrossSection.read_hitran(CO2_test_file, mol=2, iso=1, ν_min=6000, ν_max=6400)
+    test_ht = Absorption.read_hitran(CO2_test_file, mol=2, iso=1, ν_min=6000, ν_max=6400)
     @test test_ht.mol == [2, 2, 2, 2] && test_ht.mol[1] isa Int64
     @test test_ht.iso == [1, 1, 1, 1] && test_ht.iso[1] isa Int64
     @test test_ht.νᵢ == [6000.542970, 6286.403343, 6317.417493, 6380.824116] && test_ht.νᵢ[1] isa Float64
@@ -36,36 +36,36 @@
     ####
 
     # Not specifying the molecule #
-    test_ht = CrossSection.read_hitran(CO2_test_file, iso=1, ν_min=6000, ν_max=6400)
+    test_ht = Absorption.read_hitran(CO2_test_file, iso=1, ν_min=6000, ν_max=6400)
     @test test_ht.mol == [1, 2, 2, 2, 2]
     @test test_ht.iso == [1, 1, 1, 1, 1]
     @test test_ht.νᵢ == [6286.403343, 6000.542970, 6286.403343, 6317.417493, 6380.824116]
     @test test_ht.g″ == [69.0, 9.0, 69.0, 81.0, 103.0]
 
     # Not specifying the isotope #
-    test_ht = CrossSection.read_hitran(CO2_test_file, mol=2, ν_min=6000, ν_max=6400)
+    test_ht = Absorption.read_hitran(CO2_test_file, mol=2, ν_min=6000, ν_max=6400)
     @test test_ht.mol == [2, 2, 2, 2, 2]
     @test test_ht.iso == [2, 1, 1, 1, 1]
     @test test_ht.νᵢ == [6000.542970, 6000.542970, 6286.403343, 6317.417493, 6380.824116]
     @test test_ht.g″ == [9.0, 9.0, 69.0, 81.0, 103.0]
 
     # Not specifying the molecule # OR isotope #
-    test_ht = CrossSection.read_hitran(CO2_test_file, ν_min=6000, ν_max=6400)
+    test_ht = Absorption.read_hitran(CO2_test_file, ν_min=6000, ν_max=6400)
     @test test_ht.mol == [1, 2, 2, 2, 2, 2]
     @test test_ht.iso == [1, 2, 1, 1, 1, 1]
     @test test_ht.νᵢ == [6286.403343, 6000.542970, 6000.542970, 6286.403343, 6317.417493, 6380.824116]
     @test test_ht.g″ == [69.0, 9.0, 9.0, 69.0, 81.0, 103.0]
 
     # Not specifying ν_min
-    test_ht = CrossSection.read_hitran(CO2_test_file, mol=2, iso=1, ν_max=6400)
+    test_ht = Absorption.read_hitran(CO2_test_file, mol=2, iso=1, ν_max=6400)
     @test length(test_ht.mol) == 9
 
     # Not specifying ν_max
-    test_ht = CrossSection.read_hitran(CO2_test_file, mol=2, iso=1, ν_min=6000)
+    test_ht = Absorption.read_hitran(CO2_test_file, mol=2, iso=1, ν_min=6000)
     @test length(test_ht.mol) == 7
 
     # Not specifying ν_min OR ν_max
-    test_ht = CrossSection.read_hitran(CO2_test_file, mol=2, iso=1)
+    test_ht = Absorption.read_hitran(CO2_test_file, mol=2, iso=1)
     @test length(test_ht.mol) == 12
 
 end
@@ -94,7 +94,7 @@ end
 
     # Get the test data
     CO2_file = artifact("CO2")
-    test_ht = CrossSection.read_hitran(CO2_file, mol=2, iso=1, ν_min=6000, ν_max=6400)
+    test_ht = Absorption.read_hitran(CO2_file, mol=2, iso=1, ν_min=6000, ν_max=6400)
 
     grid = 6000:0.01:6400;
 
@@ -130,7 +130,7 @@ end
         temp = 250
 
         # Get the test data
-        test_ht = CrossSection.read_hitran(artifact(name), iso=1, ν_min=6000, ν_max=6400)
+        test_ht = Absorption.read_hitran(artifact(name), iso=1, ν_min=6000, ν_max=6400)
         # Create a HitranModel 
         model = make_hitran_model(test_ht, Voigt(), CEF=HumlicekWeidemann32SDErrorFunction())
 
@@ -149,7 +149,7 @@ end
     println("Testing absorption_cross_section_interpolator...")
 
     # Get the test data
-    test_ht = CrossSection.read_hitran(artifact("CO2"), iso=1, ν_min=6000, ν_max=6400)
+    test_ht = Absorption.read_hitran(artifact("CO2"), iso=1, ν_min=6000, ν_max=6400)
 
     # Pressure and temperature grids
     pressures = 250:250:1250

@@ -1,10 +1,10 @@
 using Pkg.Artifacts
-using RadiativeTransfer.CrossSection
+using RadiativeTransfer.Absorption
 using HTTP
 
 deploy = true
 
-isos = CrossSection.iso_info
+isos = Absorption.iso_info
 
 hitran_url_base    = "https://hitran.org/lbl/api?numin=0&numax=150000&iso_ids_list="
 local_download_url = "/net/fluo/data1/ftp/XYZT_hitran/"

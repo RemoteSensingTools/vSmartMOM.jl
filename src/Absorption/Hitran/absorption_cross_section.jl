@@ -4,8 +4,8 @@ using Parameters
 using ..Architectures: devi, default_architecture
 
 """
-Given the hitran data and necessary parameters, calculate an absorption cross-section at the given pressure, 
-temperature, and grid of wavelengths (or wavenumbers)
+Given the hitran data and necessary parameters, calculate an absorption cross-section at the
+given pressure, temperature, and grid of wavelengths (or wavenumbers)
 """
 function compute_absorption_cross_section(
                 # Required

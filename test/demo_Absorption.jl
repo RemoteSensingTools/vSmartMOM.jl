@@ -1,11 +1,11 @@
 ## 
-## Using RadiativeTransfer.CrossSection to perform absorption cross-sections
+## Using RadiativeTransfer.Absorption to perform absorption cross-sections
 ## 
 
 using Revise
 using BenchmarkTools
 using RadiativeTransfer
-using RadiativeTransfer.CrossSection
+using RadiativeTransfer.Absorption
 
 ## 
 ## STEP 1: Get the Hitran data from the transition par file

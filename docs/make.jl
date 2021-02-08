@@ -1,7 +1,7 @@
 using Documenter
 using Literate
 using RadiativeTransfer
-using RadiativeTransfer.CrossSection
+using RadiativeTransfer.Absorption
 using RadiativeTransfer.PhaseFunction
 using Plots 
 

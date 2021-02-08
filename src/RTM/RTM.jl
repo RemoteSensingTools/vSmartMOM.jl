@@ -8,7 +8,7 @@ using Interpolations
 using Polynomials
 using DelimitedFiles
 using ..PhaseFunction
-using ..CrossSection
+using ..Absorption
 using ...RadiativeTransfer
 using FastGaussQuadrature 
 using CUDA
