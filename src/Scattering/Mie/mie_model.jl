@@ -23,7 +23,7 @@ function make_mie_model(computation_type::PCW,
                         polarization::AbstractPolarizationType, 
                         truncation_type::AbstractTruncationType, 
                         wigner_filepath::String)
-    wigner_A, wigner_B = PhaseFunction.load_wigner_values(wigner_filepath)
+    wigner_A, wigner_B = Scattering.load_wigner_values(wigner_filepath)
     return MieModel(computation_type, aerosol, λ, polarization, truncation_type, wigner_A, wigner_B)
 end
 

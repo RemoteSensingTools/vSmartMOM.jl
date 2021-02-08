@@ -1,10 +1,10 @@
 ## 
-## Using RadiativeTransfer.PhaseFunction to perform Mie computations
+## Using RadiativeTransfer.Scattering to perform Mie computations
 ## 
 
 using Revise
 using RadiativeTransfer
-using RadiativeTransfer.PhaseFunction
+using RadiativeTransfer.Scattering
 
 # ? Should we make a wrapper around LogNormal?
 using Distributions
@@ -34,7 +34,7 @@ aero = make_univariate_aerosol(size_distribution, r_max, nquad_radius, nᵣ, n�
 λ = 0.55   # Incident wavelength
 polarization_type = Stokes_IQUV()
 truncation_type = δBGE(10, 10)
-wigner_file_path = "/home/rjeyaram/RadiativeTransfer/src/PhaseFunction/wigner_values.jld"
+wigner_file_path = "/home/rjeyaram/RadiativeTransfer/src/Scattering/Mie/wigner_values.jld"
 
 model_NAI2 = make_mie_model(NAI2(), aero, λ, polarization_type, truncation_type)
 model_PCW = make_mie_model(PCW(), aero, λ, polarization_type, truncation_type, wigner_file_path)
@@ -47,10 +47,10 @@ model_PCW = make_mie_model(PCW(), aero, λ, polarization_type, truncation_type, 
 # @btime aerosol_optics_PCW = compute_aerosol_optical_properties(model_PCW);
 
 # Compute the derivatives!
-aerosol_optics_NAI2 = compute_aerosol_optical_properties(model_NAI2, autodiff=true);
-aerosol_optics_PCW = compute_aerosol_optical_properties(model_PCW, autodiff=true);
+aerosol_optics_NAI2 = compute_aerosol_optical_properties(model_NAI2);
+aerosol_optics_PCW = compute_aerosol_optical_properties(model_PCW);
 
 # aerosol_optics_NAI2.greek_coefs.α ≈ aerosol_optics_PCW.greek_coefs.α
 
 # aerosol_optics_NAI2.greek_coefs ≈ aerosol_optics_PCW.greek_coefs
-# aerosol_optics_NAI2 ≈ aerosol_optics_PCW
+aerosol_optics_NAI2 ≈ aerosol_optics_PCW

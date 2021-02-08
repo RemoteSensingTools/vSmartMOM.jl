@@ -7,7 +7,7 @@
 # ---
 # First let's use the required packages
 
-using RadiativeTransfer.PhaseFunction
+using RadiativeTransfer.Scattering
 using Distributions
 using Plots
 #----------------------------------------------------------------------------
@@ -66,7 +66,7 @@ xlims!(0,100)
 using FastGaussQuadrature
 μ, w_μ = gausslegendre(1000)
 ## Reconstruct Phase Functions from greek coefficients (overkill for Siewert, mostly for Wigner method)
-f₁₁, f₁₂, f₂₂, f₃₃, f₃₄, f₄₄ = PhaseFunction.reconstruct_phase(aerosol_optics_NAI2.greek_coefs, μ);
+f₁₁, f₁₂, f₂₂, f₃₃, f₃₄, f₄₄ = Scattering.reconstruct_phase(aerosol_optics_NAI2.greek_coefs, μ);
 #----------------------------------------------------------------------------
 
 # ---
@@ -86,7 +86,7 @@ anim = @animate for r = 0.3:0.2:5
     local aero       = make_univariate_aerosol(size_distribution, r_max, n, nᵣ, nᵢ)
     local model_NAI2 = make_mie_model(NAI2(), aero, λ, polarization_type, truncation_type)
     local aerosol_optics_NAI2 = compute_aerosol_optical_properties(model_NAI2);
-    local f₁₁, f₁₂, f₂₂, f₃₃, f₃₄, f₄₄ = PhaseFunction.reconstruct_phase(aerosol_optics_NAI2.greek_coefs, μ);
+    local f₁₁, f₁₂, f₂₂, f₃₃, f₃₄, f₄₄ = Scattering.reconstruct_phase(aerosol_optics_NAI2.greek_coefs, μ);
     ## @show f₁₁[1]
     p1 = plot(μ, f₁₁, yscale=:log10, title="f₁₁", label="r(μm)=$r")
     ylims!(1e-3, 1e3)

@@ -84,7 +84,7 @@ function compute_anbn(aerosol::UnivariateAerosol, λ, radius)
     FT2 = eltype(aerosol.nᵣ)
 
     # Find overall N_max from the maximum radius
-    N_max = PhaseFunction.get_n_max(2 * π * aerosol.r_max / λ)
+    N_max = Scattering.get_n_max(2 * π * aerosol.r_max / λ)
 
     # Where to store an, bn, computed over size distribution
     an = zeros(Complex{FT2}, aerosol.nquad_radius, N_max)
@@ -103,7 +103,7 @@ function compute_anbn(aerosol::UnivariateAerosol, λ, radius)
         Dn = zeros(Complex{FT2}, nmx)
 
         # Compute an, bn
-        PhaseFunction.compute_mie_ab!(size_param, aerosol.nᵣ + aerosol.nᵢ * im, 
+        Scattering.compute_mie_ab!(size_param, aerosol.nᵣ + aerosol.nᵢ * im, 
                                       view(an, i, :), 
                                       view(bn, i, :), Dn)
     end
@@ -362,8 +362,8 @@ function compute_Z_moments(mod::AbstractPolarizationType, μ, greek_coefs::Greek
     @assert all(0 .< μ .≤ 1) "all μ's within compute_Z_moments have to be ∈ ]0,1]"
 
     # Compute legendre Polynomials at μ and up to lmax
-    P, R, T    = PhaseFunction.compute_associated_legendre_PRT(μ, l_max)
-    P⁻, R⁻, T⁻ = PhaseFunction.compute_associated_legendre_PRT(-μ, l_max)
+    P, R, T    = Scattering.compute_associated_legendre_PRT(μ, l_max)
+    P⁻, R⁻, T⁻ = Scattering.compute_associated_legendre_PRT(-μ, l_max)
   
     # Pre-compute all required B matrices
     𝐁_all = [construct_B_matrix(mod, α, β, γ, δ, ϵ, ζ, i) for i in 1:l_max]

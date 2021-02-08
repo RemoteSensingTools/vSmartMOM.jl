@@ -23,7 +23,7 @@ function compute_aerosol_optical_properties(model::MieModel{FDT}, FT2::Type=Floa
     wₓ = compute_wₓ(size_distribution, wᵣ, r, r_max) 
 
     # Find overall N_max from the maximum radius
-    N_max = PhaseFunction.get_n_max(2 * π * r_max/ λ)
+    N_max = Scattering.get_n_max(2 * π * r_max/ λ)
 
     # Compute an, bn values
     an, bn = compute_anbn(aerosol::UnivariateAerosol, λ, r)
@@ -41,18 +41,18 @@ function compute_aerosol_optical_properties(model::MieModel{FDT}, FT2::Type=Floa
     # Pre-compute anbn averages
     # That is, pre-compute (an✶)am, (an✶)bm, (bn✶)am, (bn✶)bm 
     # So that you can quickly compute (an✶ + bn✶) × (am + bm)
-    FT2 = Complex{FT}
-    mat_anam = LowerTriangular(zeros(FT2, N_max, N_max));
-    mat_anbm = LowerTriangular(zeros(FT2, N_max, N_max));
-    mat_bnam = LowerTriangular(zeros(FT2, N_max, N_max));
-    mat_bnbm = LowerTriangular(zeros(FT2, N_max, N_max));
+    ComplexFT = Complex{FT}
+    mat_anam = LowerTriangular(zeros(ComplexFT, N_max, N_max));
+    mat_anbm = LowerTriangular(zeros(ComplexFT, N_max, N_max));
+    mat_bnam = LowerTriangular(zeros(ComplexFT, N_max, N_max));
+    mat_bnbm = LowerTriangular(zeros(ComplexFT, N_max, N_max));
     ab_pairs = (mat_anam, mat_anbm, mat_bnam, mat_bnbm)
 
     # Get the N_max value corresponding to each radius 
-    N_max_ = PhaseFunction.get_n_max.(2π * r/ λ)
+    N_max_ = Scattering.get_n_max.(2π * r/ λ)
 
     # Then pre-compute anbn averages
-    PhaseFunction.compute_avg_anbns!(an, bn, ab_pairs, wₓ, N_max, N_max_)
+    Scattering.compute_avg_anbns!(an, bn, ab_pairs, wₓ, N_max, N_max_)
 
     # Pre-compute |an ± bn|² * w
     an_m_bn = transpose(abs2.(an-bn)) * wₓ
@@ -82,12 +82,12 @@ function compute_aerosol_optical_properties(model::MieModel{FDT}, FT2::Type=Floa
     end
 
     # Create GreekCoefs object with α, β, γ, δ, ϵ, ζ (in that order)
-    greek_coefs = GreekCoefs(FT2[greek_coefs[3,:]], 
-                             FT2[greek_coefs[1,:]], 
-                             FT2[greek_coefs[5,:]], 
-                             FT2[greek_coefs[2,:]], 
-                             FT2[greek_coefs[6,:]], 
-                             FT2[greek_coefs[4,:]])
+    greek_coefs = GreekCoefs(convert.(FT2, greek_coefs[3,:]), 
+                             convert.(FT2, greek_coefs[1,:]), 
+                             convert.(FT2, greek_coefs[5,:]), 
+                             convert.(FT2, greek_coefs[2,:]), 
+                             convert.(FT2, greek_coefs[6,:]), 
+                             convert.(FT2, greek_coefs[4,:]))
 
     # Return the packaged AerosolOptics object
     return AerosolOptics(greek_coefs=greek_coefs, ω̃=FT2(avg_C_scatt/avg_C_ext), k=FT2(avg_C_ext)) 

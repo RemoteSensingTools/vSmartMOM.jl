@@ -1,6 +1,6 @@
 using RadiativeTransfer.RTM
 using RadiativeTransfer
-using RadiativeTransfer.PhaseFunction
+using RadiativeTransfer.Scattering
 using CUDA
 using Test
 # using TensorOperations
