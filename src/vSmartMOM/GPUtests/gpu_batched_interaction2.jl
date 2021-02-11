@@ -1,4 +1,4 @@
-using RadiativeTransfer.RTM
+using RadiativeTransfer.vSmartMOM
 using RadiativeTransfer
 using RadiativeTransfer.Scattering
 using CUDA
@@ -62,7 +62,7 @@ function rt_interaction!(R⁻⁺::AbstractArray{FT,3},
     tmp_inv = similar(t⁺⁺)
 
     # Compute and store `(I - R⁺⁻ * r⁻⁺)⁻¹ * T⁺⁺`
-    RTM.batch_solve!(tmp_inv, I_static .- R⁺⁻ ⊠ r⁻⁺, T⁺⁺)
+    vSmartMOM.batch_solve!(tmp_inv, I_static .- R⁺⁻ ⊠ r⁻⁺, T⁺⁺)
     # synchronize()
     R⁻⁺ += (T⁻⁻ ⊠ r⁻⁺ ⊠ tmp_inv)
     # synchronize()
@@ -72,7 +72,7 @@ function rt_interaction!(R⁻⁺::AbstractArray{FT,3},
 
     # Compute and store `(I - r⁻⁺ * R⁺⁻)⁻¹ * t⁻⁻`
     # synchronize()
-    RTM.batch_solve!(tmp_inv, I_static .- r⁻⁺ ⊠ R⁺⁻, t⁻⁻)
+    vSmartMOM.batch_solve!(tmp_inv, I_static .- r⁻⁺ ⊠ R⁺⁻, t⁻⁻)
     synchronize()
     R⁺⁻ .= r⁺⁻ + t⁺⁺ ⊠ R⁺⁻ ⊠ tmp_inv
     T⁻⁻[:] = tmp_inv

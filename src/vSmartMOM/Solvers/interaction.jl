@@ -1,5 +1,5 @@
 # No scattering in either the added layer or the composite layer.
-function rt_interaction_helper!(::ScatteringInterface_00, 
+function interaction_helper!(::ScatteringInterface_00, 
                                 composite_layer::CompositeLayer{FT}, 
                                 added_layer::AddedLayer{FT}, 
                                 ::AbstractArray{FT}) where {FT}
@@ -11,7 +11,7 @@ end
 # No scattering in inhomogeneous composite layer.
 # Scattering in homogeneous layer, added to bottom of the composite layer.
 # Produces a new, scattering composite layer.
-function rt_interaction_helper!(::ScatteringInterface_01, 
+function interaction_helper!(::ScatteringInterface_01, 
                                 composite_layer::CompositeLayer{FT}, 
                                 added_layer::AddedLayer{FT}, 
                                 ::AbstractArray{FT}) where {FT}
@@ -25,7 +25,7 @@ end
 # no scattering in homogeneous layer which is 
 # added to the bottom of the composite layer.
 # Produces a new, scattering composite layer.
-function rt_interaction_helper!(::ScatteringInterface_10, 
+function interaction_helper!(::ScatteringInterface_10, 
                                 composite_layer::CompositeLayer{FT}, 
                                 added_layer::AddedLayer{FT}, 
                                 I_static::AbstractArray{FT}) where {FT}
@@ -38,7 +38,7 @@ end
 # Scattering in inhomogeneous composite layer.
 # Scattering in homogeneous layer which is added to the bottom of the composite layer.
 # Produces a new, scattering composite layer.
-function rt_interaction_helper!(::ScatteringInterface_11, 
+function interaction_helper!(::ScatteringInterface_11, 
                                 composite_layer::CompositeLayer{FT}, 
                                 added_layer::AddedLayer{FT}, 
                                 I_static::AbstractArray{FT}) where {FT}
@@ -65,12 +65,12 @@ function rt_interaction_helper!(::ScatteringInterface_11,
 end
 
 
-function rt_interaction!(scattering_interface::AbstractScatteringInterface, 
+function interaction!(scattering_interface::AbstractScatteringInterface, 
                         composite_layer::CompositeLayer{FT}, 
                         added_layer::AddedLayer{FT},
                         I_static::AbstractArray{FT}) where {FT}
 
-    rt_interaction_helper!(scattering_interface, composite_layer, added_layer, I_static)
+    interaction_helper!(scattering_interface, composite_layer, added_layer, I_static)
     synchronize()
 
 end

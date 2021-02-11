@@ -3,7 +3,7 @@ using Plots
 using RadiativeTransfer
 using RadiativeTransfer.Absorption
 using RadiativeTransfer.Scattering
-using RadiativeTransfer.RTM
+using RadiativeTransfer.vSmartMOM
 using Distributions
 using BenchmarkTools
 using Test
@@ -25,8 +25,8 @@ truncation_type   = Scattering.δBGE{Float32}(Ltrunc, 2.0)
 polarization_type = Stokes_IQU{FT}()
 
 # Quadrature points for RTM
-# Nquad, qp_μ, wt_μ = rt_set_streams(RTM.RadauQuad(), Ltrunc, FT(60.0), FT[0.0, 15.0, 30., 45., 60.])
-# Nquad, qp_μ, wt_μ = rt_set_streams(RTM.GaussQuadFullSphere(), Ltrunc, FT(60.0), FT[0.0, 15.0, 30., 45., 60.])
+# Nquad, qp_μ, wt_μ = rt_set_streams(vSmartMOM.RadauQuad(), Ltrunc, FT(60.0), FT[0.0, 15.0, 30., 45., 60.])
+# Nquad, qp_μ, wt_μ = rt_set_streams(vSmartMOM.GaussQuadFullSphere(), Ltrunc, FT(60.0), FT[0.0, 15.0, 30., 45., 60.])
 
 # Aerosol particle distribution and properties
 μ            = [1.3]    # [0.3,2.0]       # Log mean radius
@@ -72,8 +72,8 @@ sza = FT(60.)
 
 obs_geom = ObsGeometry(FT(1000.0), sza, vza, vaz)
 
-Nquad, qp_μ, wt_μ = rt_set_streams(RTM.RadauQuad(), Ltrunc, obs_geom);
-# Nquad, qp_μ, wt_μ = rt_set_streams(RTM.GaussQuadFullSphere(), Ltrunc, sza, vza);
+Nquad, qp_μ, wt_μ = rt_set_streams(vSmartMOM.RadauQuad(), Ltrunc, obs_geom);
+# Nquad, qp_μ, wt_μ = rt_set_streams(vSmartMOM.GaussQuadFullSphere(), Ltrunc, sza, vza);
 @show Nquad
 
 # In[ ]:
@@ -89,15 +89,15 @@ myLat = 34.1377;
 myLon = -118.1253;
 
 # Read profile (and generate dry/wet VCDs per layer)
-profile_caltech_hr = RTM.read_atmos_profile(file, myLat, myLon, timeIndex);
-profile_caltech = RTM.reduce_profile(20, profile_caltech_hr);
+profile_caltech_hr = vSmartMOM.read_atmos_profile(file, myLat, myLon, timeIndex);
+profile_caltech = vSmartMOM.reduce_profile(20, profile_caltech_hr);
 # Compute layer optical thickness for Rayleigh (surface pressure in hPa) 
-τRayl =  RTM.getRayleighLayerOptProp(profile_caltech.psurf / 100, λ, depol, profile_caltech.vcd_dry);
+τRayl =  vSmartMOM.getRayleighLayerOptProp(profile_caltech.psurf / 100, λ, depol, profile_caltech.vcd_dry);
 ϖRayl = ones(FT, length(τRayl));
 
 # Compute Naer aerosol optical thickness profiles
-τAer_1 = RTM.getAerosolLayerOptProp(1.0, p₀[1], σp[1], profile_caltech.p_levels)
-# τAer_2 = RTM.getAerosolLayerOptProp(0.3, p₀[2], σp[2], profile_caltech.p_levels)
+τAer_1 = vSmartMOM.getAerosolLayerOptProp(1.0, p₀[1], σp[1], profile_caltech.p_levels)
+# τAer_2 = vSmartMOM.getAerosolLayerOptProp(0.3, p₀[2], σp[2], profile_caltech.p_levels)
 
 # Can be done with arbitrary length later:
 τAer = FT(0.2) * τAer_1; # [τAer_1 τAer_2]
@@ -116,12 +116,12 @@ grid = range(1e7 / 774, 1e7 / 757, length=1000);
 τ_abs = zeros(FT, length(grid), length(profile_caltech.p));
 
 hitran_data = read_hitran(artifact("O2"), iso=1)
-model = make_hitran_model(hitran_data, Voigt(), wing_cutoff=100, CEF=HumlicekWeidemann32SDErrorFunction(), architecture=CrossSection.GPU(), vmr=0.21)
+model = make_hitran_model(hitran_data, Voigt(), wing_cutoff=100, CEF=HumlicekWeidemann32SDErrorFunction(), architecture=GPU(), vmr=0.21)
 
 compute_absorption_profile!(τ_abs, model, grid, profile_caltech);
 
-@time R_GPU, T_GPU = RTM.rt_run(polarization_type, obs_geom, τRayl, ϖRayl, τAer, ϖAer, qp_μ, wt_μ, maxM, aerosol_optics, GreekRayleigh, τ_abs, RadiativeTransfer.Architectures.GPU());
-@time R_CPU, T_CPU = RTM.rt_run(polarization_type, obs_geom, τRayl, ϖRayl, τAer, ϖAer, qp_μ, wt_μ, maxM, aerosol_optics, GreekRayleigh, τ_abs, RadiativeTransfer.Architectures.CPU());
+@time R_GPU, T_GPU = vSmartMOM.rt_run(polarization_type, obs_geom, τRayl, ϖRayl, τAer, ϖAer, qp_μ, wt_μ, maxM, aerosol_optics, GreekRayleigh, τ_abs, RadiativeTransfer.Architectures.GPU());
+@time R_CPU, T_CPU = vSmartMOM.rt_run(polarization_type, obs_geom, τRayl, ϖRayl, τAer, ϖAer, qp_μ, wt_μ, maxM, aerosol_optics, GreekRayleigh, τ_abs, RadiativeTransfer.Architectures.CPU());
 
 @test R_CPU ≈ (R_GPU) 
 @test T_CPU ≈ (T_GPU) 

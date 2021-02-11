@@ -16,9 +16,9 @@ for i = 1:4
     r⁺⁻ = CuArray(r⁺⁻_);
     t⁻⁻ = CuArray(t⁻⁻_);
 
-    RadiativeTransfer.RTM.apply_D_matrix!(i, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻)
+    RadiativeTransfer.vSmartMOM.apply_D_matrix!(i, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻)
    
-    RadiativeTransfer.RTM.apply_D_matrix!(i, r⁻⁺_, t⁺⁺_, r⁺⁻_, t⁻⁻_)
+    RadiativeTransfer.vSmartMOM.apply_D_matrix!(i, r⁻⁺_, t⁺⁺_, r⁺⁻_, t⁻⁻_)
 
 
     @testset "GPU-CPU consistency $i" begin

@@ -24,8 +24,8 @@ include("Absorption/Absorption.jl")
 # Mie Phase Function module:
 include("Scattering/Scattering.jl")
 
-# RTM module:
-include("RTM/RTM.jl")
+# vSmartMOM module:
+include("vSmartMOM/vSmartMOM.jl")
 
 using .Architectures
 using .Absorption

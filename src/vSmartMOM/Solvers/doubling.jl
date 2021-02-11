@@ -2,7 +2,7 @@
 # Prototype doubling methods, compute homogenous layer matrices from its elemental layer in 
 # `ndoubl` doubling steps
 
-function rt_doubling_helper!(pol_type,ndoubl::Int, 
+function doubling_helper!(pol_type,ndoubl::Int, 
                             added_layer::AddedLayer{FT},
                             I_static::AbstractArray{FT}, 
                             architecture) where {FT}
@@ -30,12 +30,12 @@ function rt_doubling_helper!(pol_type,ndoubl::Int,
     return nothing 
 end
 
-function rt_doubling!(pol_type,ndoubl::Int, 
+function doubling!(pol_type,ndoubl::Int, 
                     added_layer::AddedLayer{FT},
                     I_static::AbstractArray{FT}, 
                     architecture) where {FT}
 
-    rt_doubling_helper!(pol_type, ndoubl, added_layer, I_static, architecture)
+    doubling_helper!(pol_type, ndoubl, added_layer, I_static, architecture)
     synchronize()
 end
 

@@ -1,5 +1,5 @@
 "Elemental single-scattering layer"
-function rt_elemental_helper!(pol_type, 
+function elemental_helper!(pol_type, 
                               dτ_λ::AbstractArray{FT,1}, 
                               dτ::FT, 
                               ϖ_λ::AbstractArray{FT,1}, 
@@ -115,13 +115,13 @@ end
 
 
 
-function rt_elemental!(pol_type, dτ_λ, dτ, ϖ_λ, ϖ, Z⁺⁺, Z⁻⁺, m, 
+function elemental!(pol_type, dτ_λ, dτ, ϖ_λ, ϖ, Z⁺⁺, Z⁻⁺, m, 
                               ndoubl, scatter, qp_μ, wt_μ, 
                               added_layer::AddedLayer{FT}, 
                               I_static,
                               arr_type,
                               architecture) where {FT}
 
-    rt_elemental_helper!(pol_type, dτ_λ, dτ, ϖ_λ, ϖ, Z⁺⁺, Z⁻⁺, m, ndoubl, scatter, qp_μ, wt_μ, added_layer, I_static, arr_type, architecture)
+    elemental_helper!(pol_type, dτ_λ, dτ, ϖ_λ, ϖ, Z⁺⁺, Z⁻⁺, m, ndoubl, scatter, qp_μ, wt_μ, added_layer, I_static, arr_type, architecture)
     synchronize()
 end

@@ -1,4 +1,4 @@
-module RTM
+module vSmartMOM
 
 using LinearAlgebra
 using NCDatasets
@@ -22,17 +22,17 @@ using NNlib
 using Parameters
 
 
-include("types.jl") 
-include("rt_streams.jl")
-include("constants.jl")
-include("atmo_prof.jl")
-include("rt_elemental.jl")
-include("rt_doubling.jl")
-include("rt_interaction.jl")
-include("gpu_batched.jl")
-include("rt_utils.jl")
-include("rt_run.jl")
-include("CUDA_getri.jl")
+include("Types/types.jl") 
+include("Utils/rt_streams.jl")
+include("Constants/constants.jl")
+include("Utils/atmo_prof.jl")
+include("Solvers/elemental.jl")
+include("Solvers/doubling.jl")
+include("Solvers/interaction.jl")
+include("GPU/gpu_batched.jl")
+include("Utils/rt_utils.jl")
+include("Solvers/rt_run.jl")
+include("GPU/CUDA_getri.jl")
 
 export rt_set_streams, compute_absorption_profile!, ObsGeometry
 
