@@ -1,4 +1,4 @@
-using RadiativeTransfer.RTM
+using RadiativeTransfer.vSmartMOM
 using RadiativeTransfer
 using RadiativeTransfer.Scattering
 using CUDA
@@ -315,7 +315,7 @@ vza = [60., 45., 30., 15., 0., 15., 30., 45., 60.]
 vaz = [180., 180., 180., 180., 0., 0., 0., 0., 0.]
 sza = 60.
 Ltrunc = 14
-Nquad, qp_μ, wt_μ = rt_set_streams(RTM.RadauQuad(), Ltrunc, sza, vza);
+Nquad, qp_μ, wt_μ = rt_set_streams(vSmartMOM.RadauQuad(), Ltrunc, sza, vza);
 I_static_ = Diagonal{FT}(ones(57))
 I_static  = Diagonal(CuArray(I_static_));
 

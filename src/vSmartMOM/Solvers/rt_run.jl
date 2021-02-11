@@ -92,8 +92,8 @@ function rt_run(pol_type,              # Polarization type (IQUV)
 
             # If there is scattering, perform the elemental and doubling steps
             if (scatter)
-                @timeit "elemental" rt_elemental!(pol_type, dτ, dτ_max, ϖ_λ, ϖ, Z⁺⁺, Z⁻⁺, m, ndoubl, scatter, qp_μ, wt_μ, added_layer,  I_static, arr_type, architecture)
-                @timeit "doubling" rt_doubling!(pol_type, ndoubl, added_layer, I_static, architecture)
+                @timeit "elemental" elemental!(pol_type, dτ, dτ_max, ϖ_λ, ϖ, Z⁺⁺, Z⁻⁺, m, ndoubl, scatter, qp_μ, wt_μ, added_layer,  I_static, arr_type, architecture)
+                @timeit "doubling" doubling!(pol_type, ndoubl, added_layer, I_static, architecture)
 
             # If not, there is no reflectance. Assign r/t appropriately
             else
@@ -113,7 +113,7 @@ function rt_run(pol_type,              # Polarization type (IQUV)
             
             # If this is not the TOA, perform the interaction step
             else
-                @timeit "interaction" rt_interaction!(scattering_interface, composite_layer, added_layer, I_static)
+                @timeit "interaction" interaction!(scattering_interface, composite_layer, added_layer, I_static)
             end
         end 
 
