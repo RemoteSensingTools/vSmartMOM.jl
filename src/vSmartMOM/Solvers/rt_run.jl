@@ -151,3 +151,18 @@ function rt_run(pol_type,              # Polarization type (IQUV)
 
     return R, T  
 end
+
+
+function rt_run(model::vSmartMOM_Model)
+
+    return rt_run(model.params.polarization_type,
+                  model.obs_geom::ObsGeometry,
+                  model.τRayl, model.ϖRayl,
+                  model.τAer, model.ϖAer,
+                  model.qp_μ, model.wt_μ,
+                  model.params.max_m,
+                  [model.aerosol_optics],
+                  model.greek_rayleigh,
+                  model.τ_abs,
+                  model.params.architecture)
+end
