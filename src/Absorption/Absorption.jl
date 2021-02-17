@@ -32,7 +32,7 @@ export compute_absorption_cross_section, absorption_cross_section
 export read_hitran, make_hitran_model
 
 # Export the broadening function types
-export Doppler, Lorentz, Voigt
+export Doppler, Lorentz, Voigt, AbstractBroadeningFunction
 
 # Export the complex error functions
 export AbstractComplexErrorFunction, HumlicekErrorFunction, 

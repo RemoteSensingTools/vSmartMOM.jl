@@ -10,6 +10,7 @@ using DelimitedFiles
 using ..Scattering
 using ..Absorption
 using ...RadiativeTransfer
+using ..Architectures
 using FastGaussQuadrature 
 using CUDA
 using TimerOutputs
@@ -20,6 +21,7 @@ using StaticArrays
 using TensorOperations
 using NNlib
 using Parameters
+using DocStringExtensions
 
 
 include("Types/types.jl") 
@@ -33,7 +35,8 @@ include("GPU/gpu_batched.jl")
 include("Utils/rt_utils.jl")
 include("Solvers/rt_run.jl")
 include("GPU/CUDA_getri.jl")
+include("Utils/default_model.jl")
 
-export rt_set_streams, compute_absorption_profile!, ObsGeometry
+export rt_set_streams, compute_absorption_profile!, ObsGeometry, default_model
 
 end
