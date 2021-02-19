@@ -54,7 +54,7 @@ function compute_aerosol_optical_properties(model::MieModel ; autodiff=false)
         aerosol_x = UnivariateAerosol(LogNormal(log(x[1]), log(x[2])), r_max, nquad_radius, x[3], x[4])
         model_x = MieModel(computation_type, aerosol_x, λ, polarization_type, truncation_type, wigner_A, wigner_B)
     
-        aerosol_optics = compute_aerosol_optical_properties(model_x);
+        aerosol_optics = compute_aerosol_optical_properties(model_x, ForwardDiff.Dual);
     
         return [aerosol_optics.greek_coefs.α 
                 aerosol_optics.greek_coefs.β 
