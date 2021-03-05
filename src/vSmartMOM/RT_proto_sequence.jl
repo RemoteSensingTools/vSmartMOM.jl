@@ -1,5 +1,5 @@
 using Revise
-# using Plots
+ using Plots
 using RadiativeTransfer
 using RadiativeTransfer.Absorption
 using RadiativeTransfer.Scattering
@@ -15,8 +15,11 @@ parameters = vSmartMOM.default_parameters();
 # Generates all the derived attributes from above parameters
 model = default_model(parameters);
 
-@time R_GPU, T_GPU = vSmartMOM.rt_run(model);
+@time R_GPU, T_GPU, R_SFI, T_SFI = vSmartMOM.rt_run(model);
 
+plot(R_GPU[1,1,:])
+plot!(R_SFI[1,1,:])
+#plot(R_GPU[1,1,:]./R_SFI[1,1,:])
 # curr_parameters.
 
 # Quadrature points for RTM

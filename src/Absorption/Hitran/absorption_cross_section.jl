@@ -96,7 +96,8 @@ function compute_absorption_cross_section(
             # That this, this function adds to each element in result, the contribution from this transition
             event = kernel!(result_view, array_type(architecture)(grid_view), ν, γ_d, γ_l, y, S, broadening, CEF, ndrange=length(grid_view))
             wait(device, event)
-            synchronize()
+            ### @Rupesh: synchronize() might be problematic if no GPU is available, just call if GPU architecture
+            #synchronize()
         end
     end
 

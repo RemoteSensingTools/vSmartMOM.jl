@@ -131,12 +131,14 @@ function getAerosolLayerOptProp(total_τ, p₀, σp, p_half)
 end
 
 # computes the composite single scattering parameters (τ, ϖ, Z⁺⁺, Z⁻⁺) for a given atmospheric layer iz for a given Fourier component m
+# τ, ϖ: only Rayleigh scattering and aerosol extinction, no gaseous absorption (no wavelength dependence)
+# τ_λ, ϖ_λ: Rayleigh scattering + aerosol extinction + gaseous absorption (wavelength dependent)
 function construct_atm_layer(τRayl, τAer, ϖRayl, ϖAer, fᵗ, Rayl𝐙⁺⁺, Rayl𝐙⁻⁺, Aer𝐙⁺⁺, Aer𝐙⁻⁺, τ_abs, arr_type)
     FT = eltype(τRayl)
     # @show FT
     @assert length(τAer) == length(ϖAer) == length(fᵗ) "Sizes don't match"
     
-    # @show τRayl , sum(τAer)
+    @show τRayl , sum(τAer)
 
     τ = FT(0)
     ϖ = FT(0)
@@ -173,10 +175,10 @@ function construct_atm_layer(τRayl, τAer, ϖRayl, ϖAer, fᵗ, Rayl𝐙⁺⁺,
     # Rescaling composite SSPs according to Eqs. A.3 of Sanghavi et al. (2013) or Eqs.(8) of Sanghavi & Stephens (2015)
     # @show A, ϖ
     τ *= (FT(1) - (FT(1) - A) * ϖ)
-    ϖ *= ϖ * A / (1 - (1 - A) * ϖ)
+    ϖ *= A / (FT(1) - (FT(1) - A) * ϖ)#Suniti
 
     # Adding absorption optical depth / albedo:
-    τ_λ = τ_abs .+ τ
+    τ_λ = τ_abs .+ τ    
     ϖ_λ = (τ .* ϖ) ./ τ_λ
     
     return arr_type(τ_λ), arr_type(ϖ_λ), τ, ϖ, Z⁺⁺, Z⁻⁺  

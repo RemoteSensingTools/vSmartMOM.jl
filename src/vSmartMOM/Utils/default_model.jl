@@ -16,9 +16,9 @@ function default_parameters(FT::DataType=Float64)
 
     obs_alt = FT(1000.0)
 
-    μ            = FT(1.3)
-    σ            = FT(2.0)
-    r_max        = FT(30.0)
+    μ            = FT(1.3) #characteristic radius [μm]
+    σ            = FT(2.0) #characteristic width
+    r_max        = FT(30.0) #maximum radius in distribution [μm]
     nquad_radius = 2500
     nᵣ           = FT(1.3)
     nᵢ           = FT(0.00000001)
@@ -27,7 +27,7 @@ function default_parameters(FT::DataType=Float64)
     p₀          = FT(90000) # Pressure peak [Pa]
     σp          = FT(5000.) # Pressure peak width [Pa]
 
-    file = "/net/fluo/data1/ftp/XYZT_ESE156/Data/MERRA300.prod.assim.inst6_3d_ana_Nv.20150613.hdf.nc4" 
+    file = "/Users/sanghavi/data/MERRA300.prod.assim.inst6_3d_ana_Nv.20150613.hdf.nc4" 
     timeIndex = 2
 
     lat = 34.1377;
@@ -41,9 +41,10 @@ function default_parameters(FT::DataType=Float64)
 
     architecture = default_architecture;
 
+    SFI = 1 #Suniti: 0:= DNI, 1:= SFI
     grid_start = FT(1e7 / 774)
     grid_end = FT(1e7 / 757)
-    grid_n = 10000
+    grid_n = 100
 
     broadening_function = Voigt()
     wing_cutoff = 100
@@ -122,8 +123,8 @@ function default_model(params::vSmartMOM_Parameters)
     ϖRayl = ones(params.float_type, length(τRayl));
 
     # Compute Naer aerosol optical thickness profiles
-    τAer = params.float_type(0.2) * vSmartMOM.getAerosolLayerOptProp(1.0, params.p₀, params.σp, profile.p_levels)
-
+    τAer = params.float_type(0.0) * vSmartMOM.getAerosolLayerOptProp(1.0, params.p₀, params.σp, profile.p_levels)
+    @show τAer, sum(τAer)
     # Can be done with arbitrary length later:
     # τAer = FT(0.2) * τAer_1; # [τAer_1 τAer_2]
     ϖAer = params.float_type[aerosol_optics.ω̃]; 

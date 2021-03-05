@@ -51,16 +51,7 @@ end
 
 # Finds index i of f_array (i) which is nearest point to f
 function nearest_point(f_array, f)
-    d0 = 999.9
-    index = 0
-    for i in 1:length(f_array)
-        d = abs(f_array[i] - f)
-        if d < d0
-            d0 = d
-            index = i
-        end     
-    end
-    return index
+    return argmin(abs.(f_array.-f))
 end
 
 function get_indices(iμ::Integer, pol_type::AbstractPolarizationType) 
@@ -72,14 +63,21 @@ function get_indices(iμ::Integer, pol_type::AbstractPolarizationType)
     return st_iμ, istart, iend
 end
 
-default_matrix(FT, arr_type, dims, nSpec) = arr_type(zeros(FT, tuple(dims[1], dims[2], nSpec)))
+default_matrix(FT, arr_type, dims, nSpec)   = arr_type(zeros(FT, tuple(dims[1], dims[2], nSpec)))
+default_J_matrix(FT, arr_type, dims, nSpec) = arr_type(zeros(FT, tuple(dims[1], nSpec)))
 
-make_added_layer(FT, arr_type, dims, nSpec) = AddedLayer(default_matrix(FT, arr_type, dims, nSpec), 
+make_added_layer(FT, arr_type, dims, nSpec)     = AddedLayer(default_matrix(FT, arr_type, dims, nSpec), 
                                                          default_matrix(FT, arr_type, dims, nSpec), 
                                                          default_matrix(FT, arr_type, dims, nSpec),
-                                                         default_matrix(FT, arr_type, dims, nSpec))
+                                                         default_matrix(FT, arr_type, dims, nSpec),
+                                                         default_J_matrix(FT, arr_type, dims, nSpec),
+                                                         default_J_matrix(FT, arr_type, dims, nSpec)
+                                                         )
 
 make_composite_layer(FT, arr_type, dims, nSpec) = CompositeLayer(default_matrix(FT, arr_type, dims, nSpec), 
                                                                  default_matrix(FT, arr_type, dims, nSpec), 
                                                                  default_matrix(FT, arr_type, dims, nSpec),
-                                                                 default_matrix(FT, arr_type, dims, nSpec))
+                                                                 default_matrix(FT, arr_type, dims, nSpec),
+                                                                 default_J_matrix(FT, arr_type, dims, nSpec),
+                                                                 default_J_matrix(FT, arr_type, dims, nSpec)
+                                                            )
