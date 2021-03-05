@@ -35,6 +35,12 @@ struct RadauQuad <:AbstractQuadratureType end
 struct GaussQuadHemisphere <:AbstractQuadratureType end
 struct GaussQuadFullSphere <:AbstractQuadratureType end
 
+"Abstract Type for Sourvce Function Integration"
+abstract type AbstractSourceType end
+"Dummy Node Integration"
+struct DNI <:AbstractSourceType end
+"Source Function Integration"
+struct SFI <:AbstractSourceType end
 
 abstract type AbstractLayer end
 
@@ -45,7 +51,8 @@ abstract type AbstractLayer end
     R⁺⁻::AbstractArray{FT,3}
     T⁺⁺::AbstractArray{FT,3}
     T⁻⁻::AbstractArray{FT,3}
-
+    J₀⁺::AbstractArray{FT,2}
+    J₀⁻::AbstractArray{FT,2}
 end
 
 @with_kw struct AddedLayer{FT} <: AbstractLayer 
@@ -55,7 +62,8 @@ end
     t⁺⁺::AbstractArray{FT,3}
     r⁺⁻::AbstractArray{FT,3}
     t⁻⁻::AbstractArray{FT,3}
-
+    J₀⁺::AbstractArray{FT,2}
+    J₀⁻::AbstractArray{FT,2}
 end
 
 abstract type AbstractScatteringInterface end

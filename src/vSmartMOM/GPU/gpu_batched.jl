@@ -23,3 +23,17 @@ function batch_solve!(X::AbstractArray{FT,3}, A::AbstractArray{FT,3}, B::Abstrac
     end
 end
 
+function batch_inv!(X::CuArray{FT,3}, A::CuArray{FT,3}) where {FT}
+    pivot, info   = CUBLAS.getrf_strided_batched!(A, true);
+    synchronize()
+    getri_strided_batched!(A, X, pivot); # inv stored in aux1
+    synchronize()
+    return nothing
+end
+
+# batch Matrix inversion for CPU
+function batch_inv!(X::AbstractArray{FT,3}, A::AbstractArray{FT,3}) where {FT}
+    for i = 1:size(A, 3)
+        @views X[:,:,i] = inv(A[:,:,i]);
+    end
+end

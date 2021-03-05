@@ -81,18 +81,38 @@ Abstract Polarization type
 """
 abstract type AbstractPolarizationType  end
 
-"Use full Stokes Vector ([I,Q,U,V])"
+"""
+    struct Stokes_IQUV{FT<:AbstractFloat}
+
+A struct which defines full Stokes Vector ([I,Q,U,V]) RT code
+
+# Fields
+$(DocStringExtensions.FIELDS)
+"""
 @with_kw struct Stokes_IQUV{FT<:AbstractFloat} <: AbstractPolarizationType
+    "Number of Stokes components (int)"
     n::Int = 4
+    "Vector of length `n` for ... (see eq in Sanghavi )"
     D::Array{FT}  = [1.0, 1.0, -1.0, -1.0]
-    I0::Array{FT} = [1.0, 0.0, 0.0, 0.0] #assuming completely unpolarized incident stellar radiation
+    "Incoming Stokes vector for scalar only"
+    I₀::Array{FT} = [1.0, 0.0, 0.0, 0.0] #assuming completely unpolarized incident stellar radiation
 end
 
-"Use part of Stokes Vector ([I,Q,U])"
-@with_kw struct Stokes_IQU{FT<:AbstractFloat} <: AbstractPolarizationType 
+"""
+    struct Stokes_IQU{FT<:AbstractFloat}
+
+A struct which defines Stokes Vector ([I,Q,U]) RT code
+
+# Fields
+$(DocStringExtensions.FIELDS)
+"""
+@with_kw struct Stokes_IQU{FT<:AbstractFloat} <: AbstractPolarizationType
+    "Number of Stokes components (int)" 
     n::Int = 3
+    "Vector of length `n` for ... (see eq in Sanghavi )"
     D::Array{FT}  = [1.0, 1.0, -1.0]
-    I0::Array{FT} = [1.0, 0.0, 0.0] #assuming linearly unpolarized incident stellar radiation
+    "Incoming Stokes vector for scalar only"
+    I₀::Array{FT} = [1.0, 0.0, 0.0] #assuming linearly unpolarized incident stellar radiation
 end
 
 
@@ -111,7 +131,7 @@ $(DocStringExtensions.FIELDS)
     "Vector of length `n` for ... (see eq in Sanghavi )"
     D::Array{FT} = [1.0]
     "Incoming Stokes vector for scalar only"
-    I0::Array{FT} = [1.0]
+    I₀::Array{FT} = [1.0]
 end
 
 #####

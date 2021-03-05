@@ -14,7 +14,7 @@ function rt_run(pol_type,              # Polarization type (IQUV)
 
     #= 
     Define types, variables, and static quantities =#
-    
+    @show τAer, sum(τAer)
     @unpack obs_alt, sza, vza, vaz = obs_geom   # Observational geometry properties
     FT = eltype(sza)                  # Get the float-type to use
     Nz = length(τRayl)                  # Number of vertical slices
@@ -26,16 +26,20 @@ function rt_run(pol_type,              # Polarization type (IQUV)
     # Output variables: Reflected and transmitted solar irradiation at TOA and BOA respectively
     R = zeros(FT, length(vza), pol_type.n, nSpec)
     T = zeros(FT, length(vza), pol_type.n, nSpec)
+    R_SFI = zeros(FT, length(vza), pol_type.n, nSpec)
+    T_SFI = zeros(FT, length(vza), pol_type.n, nSpec)
 
     # Copy qp_μ "pol_type.n" times
-    qp_μN = arr_type(repeat(qp_μ, pol_type.n))
-
+    qp_μN = arr_type(reshape(transpose(repeat(qp_μ, 1, pol_type.n)),pol_type.n*size(qp_μ)[1],1))
+    #for i = 1:length(qp_μN)
+    #   @show(i,qp_μN[i]) 
+    #end
     println("Processing on: ", architecture)
     println("With FT: ", FT)
 
     #= 
     Loop over number of truncation terms =#
-
+    SFI = true
     for m = 0:Ltrunc - 1
 
         println("Fourier Moment: ", m)
@@ -67,10 +71,18 @@ function rt_run(pol_type,              # Polarization type (IQUV)
         I_static = Diagonal(arr_type(Diagonal{FT}(ones(dims[1]))));
 
         scattering_interface = ScatteringInterface_00()
-
+        τ_sum = zeros(nSpec) #Suniti: declaring τ_sum to be of length nSpec
+        τ_λ = zeros(nSpec)
         # Loop over vertical layers:
         @showprogress 1 "Looping over layers ..." for iz = 1:Nz  # Count from TOA to BOA
-
+            # Suniti: compute sum of optical thicknesses of all layers above the current layer
+            # Suniti: Remember to always place the following if-else statements before the calling construct_atm_layer for the current layer!!
+            if iz==1
+                τ_sum = τ_λ
+            else
+                τ_sum = τ_sum + τ_λ     
+            end
+            @show(iz)
             # Construct the atmospheric layer
             # From Rayleigh and aerosol τ, ϖ, compute overall layer τ, ϖ
             @timeit "Constructing" τ_λ, ϖ_λ, τ, ϖ, Z⁺⁺, Z⁻⁺ = construct_atm_layer(τRayl[iz], τAer[iz,:], ϖRayl[iz], ϖAer, aerosol_optics[1].fᵗ, Rayl𝐙⁺⁺, Rayl𝐙⁻⁺, Aer𝐙⁺⁺, Aer𝐙⁻⁺, τ_abs[:,iz], arr_type)
@@ -80,11 +92,15 @@ function rt_run(pol_type,              # Polarization type (IQUV)
 
             # Compute doubling number
             dτ_max = minimum([τ * ϖ, FT(0.1) * minimum(qp_μ)])
-            _, ndoubl = doubling_number(dτ_max, τ * ϖ)
+            dτ, ndoubl = doubling_number(dτ_max, τ * ϖ) #Suniti
 
             # Compute dτ vector
-            dτ = arr_type(τ_λ ./ (FT(2)^ndoubl))
-            
+            dτ_λ = arr_type(τ_λ ./ (FT(2)^ndoubl))
+            expk = exp.(-dτ_λ /qp_μ[iμ0]) #Suniti
+             # Crude fix
+            #dτ = dτ_λ[1]*ϖ_λ[1]/ϖ #Suniti
+            @show ϖ*dτ, dτ_λ[1]*ϖ_λ[1]
+            #@assert ϖ*dτ ≈ dτ_λ[1]*ϖ_λ[1]
             # Determine whether there is scattering
             scatter = (  sum(τAer) > 1.e-8 || 
                       (( τRayl[iz] > 1.e-8 ) && (m < 3))) ? 
@@ -92,13 +108,21 @@ function rt_run(pol_type,              # Polarization type (IQUV)
 
             # If there is scattering, perform the elemental and doubling steps
             if (scatter)
-                @timeit "elemental" elemental!(pol_type, dτ, dτ_max, ϖ_λ, ϖ, Z⁺⁺, Z⁻⁺, m, ndoubl, scatter, qp_μ, wt_μ, added_layer,  I_static, arr_type, architecture)
-                @timeit "doubling" doubling!(pol_type, ndoubl, added_layer, I_static, architecture)
+                #@timeit "elemental" elemental!(pol_type, SFI, iμ0, τ_sum, dτ, dτ_max, ϖ_λ, ϖ, Z⁺⁺, Z⁻⁺, m, ndoubl, scatter, qp_μ, wt_μ, added_layer,  I_static, arr_type, architecture)
+                @timeit "elemental" elemental!(pol_type, SFI, iμ0, τ_sum, dτ_λ, dτ, ϖ_λ, ϖ, Z⁺⁺, Z⁻⁺, m, ndoubl, scatter, qp_μ, wt_μ, added_layer,  I_static, arr_type, architecture)
+                @timeit "doubling"   doubling!(pol_type, SFI, expk, ndoubl, added_layer, I_static, architecture)
 
             # If not, there is no reflectance. Assign r/t appropriately
             else
-                added_layer.r⁻⁺, added_layer.r⁺⁻ = (0, 0)
-                added_layer.t⁺⁺, added_layer.t⁻⁻ = (Diagonal(exp(-τ / qp_μN)), Diagonal(exp(-τ / qp_μN)))
+                tmpJ₀⁺ = zeros(size(qp_μN))
+                istart = (iμ0-1)*pol_type.n+1
+                iend   = iμ0*pol_type.n
+                for iλ = 1:size(τ_λ)
+                    tmpJ₀⁺ = 0
+                    tmpJ₀⁺[istart:iend] = exp.(-τ_sum[iλ]/qp_μ[iμ0])*I₀
+                    added_layer.r⁻⁺[:,:,iλ], added_layer.r⁺⁻[:,:,iλ], added_layer.J₀⁻[:,iλ] = (0, 0, 0)
+                    added_layer.t⁺⁺[:,:,iλ], added_layer.t⁻⁻[:,:,iλ], added_layer.J₀⁺[:,iλ] = (Diagonal(exp.(-τ_λ[iλ]/qp_μN)), Diagonal(exp.(-τ_λ[iλ]/qp_μN)), tmpJ₀⁺) #Suniti: corrected from τ to τ_λ
+                end
             end
 
             # Whether there is scattering in the added layer, composite layer, neither or both
@@ -110,10 +134,11 @@ function rt_run(pol_type,              # Polarization type (IQUV)
             if (iz == 1)
                 composite_layer.T⁺⁺[:], composite_layer.T⁻⁻[:] = (added_layer.t⁺⁺, added_layer.t⁻⁻)
                 composite_layer.R⁻⁺[:], composite_layer.R⁺⁻[:] = (added_layer.r⁻⁺, added_layer.r⁺⁻)
+                composite_layer.J₀⁺[:], composite_layer.J₀⁻[:] = (added_layer.J₀⁺, added_layer.J₀⁻ )
             
             # If this is not the TOA, perform the interaction step
             else
-                @timeit "interaction" interaction!(scattering_interface, composite_layer, added_layer, I_static)
+                @timeit "interaction" interaction!(scattering_interface, SFI, composite_layer, added_layer, I_static)
             end
         end 
 
@@ -125,7 +150,8 @@ function rt_run(pol_type,              # Polarization type (IQUV)
         # Convert these to Arrays (if CuArrays), so they can be accessed by index
         R⁻⁺ = Array(composite_layer.R⁻⁺)
         T⁺⁺ = Array(composite_layer.T⁺⁺)
-
+        J₀⁺ = Array(composite_layer.J₀⁺)
+        J₀⁻ = Array(composite_layer.J₀⁻)
         # Loop over all viewing zenith angles
         for i = 1:length(vza)
 
@@ -139,8 +165,12 @@ function rt_run(pol_type,              # Polarization type (IQUV)
 
             # Accumulate Fourier moments after azimuthal weighting
             for s = 1:nSpec
-                R[i,:,s] += bigCS * (R⁻⁺[istart:iend, istart0:iend0, s] / wt_μ[iμ0]) * pol_type.I0
-                T[i,:,s] += bigCS * (T⁺⁺[istart:iend, istart0:iend0, s] / wt_μ[iμ0]) * pol_type.I0
+                R[i,:,s] += bigCS * (R⁻⁺[istart:iend, istart0:iend0, s] / wt_μ[iμ0]) * pol_type.I₀
+                T[i,:,s] += bigCS * (T⁺⁺[istart:iend, istart0:iend0, s] / wt_μ[iμ0]) * pol_type.I₀
+                if SFI
+                    R_SFI[i,:,s] += bigCS * J₀⁻[istart:iend, s]
+                    T_SFI[i,:,s] += bigCS * J₀⁺[istart:iend, s]
+                end
             end
             
         end
@@ -149,7 +179,7 @@ function rt_run(pol_type,              # Polarization type (IQUV)
     print_timer()
     reset_timer!()
 
-    return R, T  
+    return R, T, R_SFI, T_SFI  
 end
 
 
