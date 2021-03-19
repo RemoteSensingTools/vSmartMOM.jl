@@ -1,10 +1,11 @@
 using ..Architectures: devi, default_architecture, AbstractArchitecture
-
+using Plots
 
 function rt_run(pol_type,              # Polarization type (IQUV)
                 obs_geom::ObsGeometry, # Solar Zenith, Viewing Zenith, Viewing Azimuthal 
-                τRayl, ϖRayl,          # Rayleigh optical depth and single-scattering albedo
-                τAer, ϖAer,            # Aerosol optical depth and single-scattering albedo
+                τRayl,          # Rayleigh optical depth 
+                #nAer,                 # Number of aerosol species 
+                τAer,                  # Aerosol optical depth and single-scattering albedo
                 qp_μ, wt_μ,            # Quadrature points and weights
                 Ltrunc,                # Trunction length for legendre terms
                 aerosol_optics,        # AerosolOptics (greek_coefs, ω̃, k, fᵗ)
@@ -14,9 +15,9 @@ function rt_run(pol_type,              # Polarization type (IQUV)
 
     #= 
     Define types, variables, and static quantities =#
-    @show τAer, sum(τAer)
+    #@show τAer, sum(τAer), size(τAer)
     @unpack obs_alt, sza, vza, vaz = obs_geom   # Observational geometry properties
-    FT = eltype(sza)                  # Get the float-type to use
+    FT = eltype(sza)                    # Get the float-type to use
     Nz = length(τRayl)                  # Number of vertical slices
     nSpec = size(τ_abs, 1)              # Number of spectral points
     μ0 = cosd(sza)                      # μ0 defined as cos(θ); θ = sza
@@ -52,14 +53,23 @@ function rt_run(pol_type,              # Polarization type (IQUV)
         Rayl𝐙⁺⁺, Rayl𝐙⁻⁺ = Scattering.compute_Z_moments(pol_type, qp_μ, GreekRayleigh, m, arr_type = arr_type);
 
         # Number of aerosols
-        nAer = length(aerosol_optics)
+        #@show size(aerosol_optics)
+        #nBand = length(aerosol_optics)
+        nAer  = length(aerosol_optics)
+
+        # Just for now:
+        iBand = 1
+
+        #nAer, nBand = size(aerosol_optics)
+        @show nAer#, nBand
         dims = size(Rayl𝐙⁺⁺)
         
         # Compute aerosol Z-matrices for all aerosols
         Aer𝐙⁺⁺ = arr_type(zeros(FT, (dims[1], dims[2], nAer)))
         Aer𝐙⁻⁺ = similar(Aer𝐙⁺⁺)
-
+        
         for i = 1:nAer
+            @show aerosol_optics[i,1]
             Aer𝐙⁺⁺[:,:,i], Aer𝐙⁻⁺[:,:,i] = Scattering.compute_Z_moments(pol_type, qp_μ, aerosol_optics[i].greek_coefs, m, arr_type = arr_type)
         end
 
@@ -82,37 +92,50 @@ function rt_run(pol_type,              # Polarization type (IQUV)
             else
                 τ_sum = τ_sum + τ_λ     
             end
-            @show(iz)
+            #@show(iz, Nz)
             # Construct the atmospheric layer
             # From Rayleigh and aerosol τ, ϖ, compute overall layer τ, ϖ
-            @timeit "Constructing" τ_λ, ϖ_λ, τ, ϖ, Z⁺⁺, Z⁻⁺ = construct_atm_layer(τRayl[iz], τAer[iz,:], ϖRayl[iz], ϖAer, aerosol_optics[1].fᵗ, Rayl𝐙⁺⁺, Rayl𝐙⁻⁺, Aer𝐙⁺⁺, Aer𝐙⁻⁺, τ_abs[:,iz], arr_type)
-
+            #@timeit "Constructing" 
+            τ_λ, ϖ_λ, τ, ϖ, Z⁺⁺, Z⁻⁺ = construct_atm_layer(τRayl[iz], τAer[:,iz], aerosol_optics, Rayl𝐙⁺⁺, Rayl𝐙⁻⁺, Aer𝐙⁺⁺, Aer𝐙⁻⁺, τ_abs[:,iz], arr_type)
+            #@show(τ_λ)
+            #@show(ϖ_λ)
+            #@show(τ)
+            #@show(ϖ)
+            #sleep(5)
+            #for i=1:size(Z⁺⁺)[1]
+            #    @show(i,Z⁺⁺[i,:])
+            #end
             # τ * ϖ should remain constant even though they individually change over wavelength
             # @assert all(i -> (i ≈ τ * ϖ), τ_λ .* ϖ_λ)
 
             # Compute doubling number
             dτ_max = minimum([τ * ϖ, FT(0.1) * minimum(qp_μ)])
             dτ, ndoubl = doubling_number(dτ_max, τ * ϖ) #Suniti
-
+            #@show(ndoubl, dτ_max, τ)
             # Compute dτ vector
             dτ_λ = arr_type(τ_λ ./ (FT(2)^ndoubl))
             expk = exp.(-dτ_λ /qp_μ[iμ0]) #Suniti
-             # Crude fix
+            @show(τ_λ, dτ_λ.*FT(2)^ndoubl)
+            @show(τ, dτ*FT(2)^ndoubl)
+            @show(expk)
+            sleep(5)
+            # Crude fix
             #dτ = dτ_λ[1]*ϖ_λ[1]/ϖ #Suniti
-            @show ϖ*dτ, dτ_λ[1]*ϖ_λ[1]
+            #@show ϖ*dτ, dτ_λ[1]*ϖ_λ[1]
             #@assert ϖ*dτ ≈ dτ_λ[1]*ϖ_λ[1]
             # Determine whether there is scattering
-            scatter = (  sum(τAer) > 1.e-8 || 
+            scatter = (  sum(τAer[:,iz]) > 1.e-8 || 
                       (( τRayl[iz] > 1.e-8 ) && (m < 3))) ? 
                       true : false
-
+            #@show(iz, scatter)
             # If there is scattering, perform the elemental and doubling steps
             if (scatter)
                 #@timeit "elemental" elemental!(pol_type, SFI, iμ0, τ_sum, dτ, dτ_max, ϖ_λ, ϖ, Z⁺⁺, Z⁻⁺, m, ndoubl, scatter, qp_μ, wt_μ, added_layer,  I_static, arr_type, architecture)
                 @timeit "elemental" elemental!(pol_type, SFI, iμ0, τ_sum, dτ_λ, dτ, ϖ_λ, ϖ, Z⁺⁺, Z⁻⁺, m, ndoubl, scatter, qp_μ, wt_μ, added_layer,  I_static, arr_type, architecture)
+                #@show(added_layer.t⁺⁺[1,1,1])
                 @timeit "doubling"   doubling!(pol_type, SFI, expk, ndoubl, added_layer, I_static, architecture)
-
-            # If not, there is no reflectance. Assign r/t appropriately
+                #@show(added_layer.t⁺⁺[1,1,1])
+                # If not, there is no reflectance. Assign r/t appropriately
             else
                 tmpJ₀⁺ = zeros(size(qp_μN))
                 istart = (iμ0-1)*pol_type.n+1
@@ -164,6 +187,7 @@ function rt_run(pol_type,              # Polarization type (IQUV)
             bigCS = weight * Diagonal([cos_m_phi, cos_m_phi, sin_m_phi, sin_m_phi][1:pol_type.n])
 
             # Accumulate Fourier moments after azimuthal weighting
+            
             for s = 1:nSpec
                 R[i,:,s] += bigCS * (R⁻⁺[istart:iend, istart0:iend0, s] / wt_μ[iμ0]) * pol_type.I₀
                 T[i,:,s] += bigCS * (T⁺⁺[istart:iend, istart0:iend0, s] / wt_μ[iμ0]) * pol_type.I₀
@@ -171,11 +195,15 @@ function rt_run(pol_type,              # Polarization type (IQUV)
                     R_SFI[i,:,s] += bigCS * J₀⁻[istart:iend, s]
                     T_SFI[i,:,s] += bigCS * J₀⁺[istart:iend, s]
                 end
+                #@show(m,R[i,1,s], R_SFI[i,1,s])
             end
             
         end
     end
-
+    #@show sum(τ_abs[1,:])
+    #for i = 1:100
+    #    @show i,sum(τ_abs[i,:])
+    #end
     print_timer()
     reset_timer!()
 
@@ -187,11 +215,11 @@ function rt_run(model::vSmartMOM_Model)
 
     return rt_run(model.params.polarization_type,
                   model.obs_geom::ObsGeometry,
-                  model.τRayl, model.ϖRayl,
-                  model.τAer, model.ϖAer,
+                  model.τRayl, 
+                  model.τAer, 
                   model.qp_μ, model.wt_μ,
                   model.params.max_m,
-                  [model.aerosol_optics],
+                  model.aerosol_optics,
                   model.greek_rayleigh,
                   model.τ_abs,
                   model.params.architecture)

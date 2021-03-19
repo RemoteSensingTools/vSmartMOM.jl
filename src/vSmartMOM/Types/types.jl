@@ -44,7 +44,7 @@ struct SFI <:AbstractSourceType end
 
 abstract type AbstractLayer end
 
-@with_kw struct CompositeLayer{FT} <: AbstractLayer 
+@with_kw mutable struct CompositeLayer{FT} <: AbstractLayer 
 
     # Composite layer R and T matrices
     R⁻⁺::AbstractArray{FT,3}
@@ -55,7 +55,7 @@ abstract type AbstractLayer end
     J₀⁻::AbstractArray{FT,2}
 end
 
-@with_kw struct AddedLayer{FT} <: AbstractLayer 
+@with_kw mutable struct AddedLayer{FT} <: AbstractLayer 
     
     # Added layer R and T matrices
     r⁻⁺::AbstractArray{FT,3}
@@ -82,7 +82,7 @@ A struct which holds all initial model parameters (before any computations)
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-mutable struct vSmartMOM_Parameters{FT} #<: AbstractvSmartMOMModel
+mutable struct vSmartMOM_Parameters_old{FT} #<: AbstractvSmartMOMModel
 
     "Float type to use in the RT (Float64/Float32)"
     float_type::DataType
@@ -106,22 +106,26 @@ mutable struct vSmartMOM_Parameters{FT} #<: AbstractvSmartMOMModel
     vza::AbstractArray{FT}
     "Viewing azimuthal angles [deg]"
     vaz::AbstractArray{FT}
+    "Number of aerosol species"
+    Naer::Integer
+    "AOD at Reference wavelength"
+    τAer_ref::AbstractArray{FT} #Suniti
     "Log mean radius"
-    μ::FT
+    μ::AbstractArray{FT} #Suniti
     "Log stddev of radius"
-    σ::FT
+    σ::AbstractArray{FT} #Suniti
     "Maximum radius"
     r_max::FT
     "Number of quadrature points for integration of size distribution"
     nquad_radius::Integer
     "Real part of refractive index"
-    nᵣ::FT
+    nᵣ::AbstractArray{FT}
     "Imag part of refractive index"
-    nᵢ::FT
+    nᵢ::AbstractArray{FT}
     "Pressure peak [Pa]"
-    p₀::FT
+    p₀::AbstractArray{FT}
     "Pressure peak width [Pa]"
-    σp::FT
+    σp::AbstractArray{FT}
     "Path to atmospheric profile file"
     file::AbstractString
     "Time index to retrieve from file "
@@ -155,6 +159,92 @@ mutable struct vSmartMOM_Parameters{FT} #<: AbstractvSmartMOMModel
 end
 
 """
+    struct vSmartMOM_Parameters
+
+A struct which holds all initial model parameters (before any computations)
+
+# Fields
+$(DocStringExtensions.FIELDS)
+"""
+mutable struct vSmartMOM_Parameters{FT} #<: AbstractvSmartMOMModel
+
+    "Float type to use in the RT (Float64/Float32)"
+    float_type::DataType
+    "band center wavelength (`nBand`)"
+    λ_band::AbstractArray{FT}
+    "reference wavelength"
+    λ_ref::FT
+    "Depolarization value"
+    depol::FT
+    "Truncation length for legendre terms (scalar for now, can do `nBand` later)"
+    l_trunc::Integer
+    "Exclusion angle for forward peak"
+    Δ_angle::FT
+    "Hard cutoff for maximum number of m iterations"
+    max_m::Integer
+    "Type of polarization (I/IQ/IQU/IQUV)"
+    polarization_type::AbstractPolarizationType
+    "Altitude of observer `[Pa]`"
+    obs_alt::FT
+    "Solar zenith angle [deg]"
+    sza::FT
+    "Viewing zenith angles [deg]"
+    vza::AbstractArray{FT}
+    "Viewing azimuthal angles [deg]"
+    vaz::AbstractArray{FT}
+    "Number of aerosol species"
+    nAer::Integer
+    "AOD at Reference wavelength (`nAer`)"
+    τAer_ref::AbstractArray{FT} #Suniti
+    "Log mean radius (`nAer`)"
+    μ::AbstractArray{FT} #Suniti
+    "Log stddev of radius (`nAer`)"
+    σ::AbstractArray{FT} #Suniti
+    "Maximum radius"
+    r_max::FT
+    "Number of quadrature points for integration of size distribution"
+    nquad_radius::Integer
+    "Real part of refractive index (`nBand,nAer`)"
+    nᵣ::AbstractArray{FT}
+    "Imag part of refractive index (`nBand,nAer`)"
+    nᵢ::AbstractArray{FT}
+    "Pressure peak [Pa] (`nAer`)"
+    p₀::AbstractArray{FT}
+    "Pressure peak width [Pa] (`nAer`)"
+    σp::AbstractArray{FT}
+    "Path to atmospheric profile file"
+    file::AbstractString
+    "Time index to retrieve from file "
+    timeIndex::Integer
+    "Latitude of atmospheric profile"
+    lat::FT
+    "Longitude of atmospheric profile"
+    lon::FT
+    "Length of profile reduction"
+    profile_reduction_n::Integer
+    "Starting wavelength for absorption grid (`nBand`)"
+    spec_grid_start::AbstractArray{FT}
+    "Ending wavelength for absorption grid (`nBand`)"
+    spec_grid_end::AbstractArray{FT}
+    "Number of spectral points in absorption grid (`nBand`)"
+    spec_grid_n::AbstractArray{Integer}
+    "Type of broadening function (Doppler/Lorentz/Voigt)"
+    broadening_function::AbstractBroadeningFunction
+    "Wing cutoff to use in cross-section calculation"
+    wing_cutoff::Integer
+    "Complex Error Function to use in Voigt calculations"
+    CEF::AbstractComplexErrorFunction
+    "Volume mixing ratio (needs to be per profile, gas species and band later)"
+    vmr::FT
+    "Algorithm to use for fourier decomposition (NAI2/PCW)"
+    decomp_type::AbstractFourierDecompositionType
+    "Quadrature type for RT streams (RadauQuad/GaussQuadHemisphere/GaussQuadFullSphere)"
+    quadrature_type::AbstractQuadratureType
+    "Architecture to use for calculations (CPU/GPU)"
+    architecture::AbstractArchitecture
+end
+
+"""
     struct vSmartMOM_Model
 
 A struct which holds all derived model parameters (including any computations)
@@ -166,14 +256,8 @@ mutable struct vSmartMOM_Model <: AbstractvSmartMOMModel
 
     "Struct with all individual parameters"
     params::vSmartMOM_Parameters
-    "Abstract greek coefficient truncation type "
-    truncation_type::AbstractTruncationType
-    "Mie model to use in phase function calculations"
-    mie_model::MieModel
-    "Computed aerosol optics"
-    aerosol_optics::AerosolOptics
-    "Computed aerosol optics (truncated)"
-    aerosol_optics_truncated::AerosolOptics
+    "Truncated aerosol optics"
+    aerosol_optics::AbstractArray #Array{Array{AerosolOptics}}
     "Greek coefs in Rayleigh calculations" 
     greek_rayleigh::GreekCoefs
     "Number of quadrature points"
@@ -182,23 +266,16 @@ mutable struct vSmartMOM_Model <: AbstractvSmartMOMModel
     qp_μ::AbstractArray
     "Quadrature weights"
     wt_μ::AbstractArray
-    "Rayleigh "
-    τRayl::AbstractArray
-    "Rayleigh optical thickness"
-    ϖRayl::AbstractArray
-    "Aerosols optical thickness"
-    τAer::AbstractArray
-    "Aerosols albedo"
-    ϖAer::AbstractArray
-    "Observational Geometry (includes sza, vza, vaz)"
-    obs_geom::ObsGeometry
-    "Aerosol type"
-    aerosol::AbstractAerosolType
-    "Atmospheric profile to use"
-    profile::AtmosphericProfile
-    "Absorption model for computing absorption cross sections"
-    absorption_model::AbstractCrossSectionModel
     "Array to hold cross-sections over entire atmospheric profile"
     τ_abs::AbstractArray
-
+    "Rayleigh optical thickness"
+    τRayl::AbstractArray
+    "Aerosol optical thickness"
+    τAer::AbstractArray
+    "Observational Geometry (includes sza, vza, vaz)"
+    obs_geom::ObsGeometry
+    "Atmospheric profile to use"
+    profile::AtmosphericProfile
+    "Absorption model for computing absorption cross sections (will be an array later, for nGasSpecies,nBand)"
+    #absorption_model::AbstractCrossSectionModel
 end

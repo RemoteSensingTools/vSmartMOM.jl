@@ -149,5 +149,83 @@ function compute_aerosol_optical_properties(model::MieModel{FDT}, FT2::Type=Floa
                              convert.(FT2, ζ))
 
     # Return the packaged AerosolOptics object
-    return AerosolOptics(greek_coefs=greek_coefs, ω̃=FT2(bulk_C_sca / bulk_C_ext), k=FT2(bulk_C_ext) )
+    return AerosolOptics(greek_coefs=greek_coefs, ω̃=FT2(bulk_C_sca / bulk_C_ext), k=FT2(bulk_C_ext), fᵗ=FT2(1) )
+end
+
+function compute_ref_aerosol_extinction(model::MieModel{FDT}, FT2::Type=Float64) where FDT <: NAI2
+
+    # Unpack the model
+    @unpack computation_type, aerosol, λ, polarization_type = model
+
+    # Extract variables from aerosol struct:
+    @unpack size_distribution, nquad_radius, nᵣ, nᵢ, r_max =  aerosol
+    
+    # Imaginary part of the refractive index must be ≥ 0
+    @assert nᵢ ≥ 0
+
+    # Get the refractive index's real part type
+    FT = eltype(nᵣ);
+    @assert FT == Float64 "Aerosol computations require 64bit"
+    # Get radius quadrature points and weights (for mean, thus normalized):
+    r, wᵣ = gauleg(nquad_radius, 0.0, r_max ; norm=true) 
+    
+    # Wavenumber
+    k = 2π / λ  
+
+    # Size parameter
+    x_size_param = k * r # (2πr/λ)
+
+    # Compute n_max for largest size:
+    n_max = get_n_max(maximum(x_size_param))
+
+    # Determine max amount of Gaussian quadrature points for angle dependence of 
+    # phase functions:
+    n_mu = 2n_max - 1;
+
+    # Obtain Gauss-Legendre quadrature points and weights for phase function
+    μ, w_μ = gausslegendre(n_mu)
+
+    # Compute π and τ functions
+    leg_π, leg_τ = compute_mie_π_τ(μ, n_max)
+
+    # Pre-allocate arrays:
+    C_ext = zeros(FT, nquad_radius)
+    C_sca = zeros(FT, nquad_radius)
+
+    # Standardized weights for the size distribution:
+    wₓ = compute_wₓ(size_distribution, wᵣ, r, r_max) 
+    
+    # Loop over size parameters
+    @showprogress 1 "Computing extinction XS at reference wavelength ..." for i = 1:length(x_size_param)
+
+        # Maximum expansion (see eq. A17 from de Rooij and Stap, 1984)
+        n_max = get_n_max(x_size_param[i])
+
+        # In Domke methods, we want to pre-allocate these as 2D outside of this loop.
+        an = (zeros(Complex{FT}, n_max))
+        bn = (zeros(Complex{FT}, n_max))
+
+        # Weighting for sums of 2n+1
+        n_ = collect(FT, 1:n_max);
+        n_ = 2n_ .+ 1
+
+        # Pre-allocate Dn:
+        y = x_size_param[i] * (aerosol.nᵣ - aerosol.nᵢ);
+        nmx = round(Int, max(n_max, abs(y)) + 51)
+        Dn = zeros(Complex{FT}, nmx)
+
+        # Compute an,bn and S₁,S₂
+        compute_mie_ab!(x_size_param[i], aerosol.nᵣ + aerosol.nᵢ * im, an, bn, Dn)
+        
+        # Compute Extinction and scattering cross sections: 
+        C_ext[i] = 2π / k^2 * (n_' * real(an + bn))
+        # @show r[i], x_size_param[i], C_ext[i], C_ext[i]/(4π*r[i]^2), C_ext[i]*1e-8
+    end
+
+    # Calculate bulk extinction coeffitient
+    bulk_C_ext =  sum(wₓ .* C_ext)
+    
+    
+    # Return the bulk extinction coeffitient
+    return bulk_C_ext
 end

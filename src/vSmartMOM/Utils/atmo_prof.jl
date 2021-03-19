@@ -133,23 +133,31 @@ end
 # computes the composite single scattering parameters (τ, ϖ, Z⁺⁺, Z⁻⁺) for a given atmospheric layer iz for a given Fourier component m
 # τ, ϖ: only Rayleigh scattering and aerosol extinction, no gaseous absorption (no wavelength dependence)
 # τ_λ, ϖ_λ: Rayleigh scattering + aerosol extinction + gaseous absorption (wavelength dependent)
-function construct_atm_layer(τRayl, τAer, ϖRayl, ϖAer, fᵗ, Rayl𝐙⁺⁺, Rayl𝐙⁻⁺, Aer𝐙⁺⁺, Aer𝐙⁻⁺, τ_abs, arr_type)
+function construct_atm_layer(τRayl, τAer,  aerosol_optics, Rayl𝐙⁺⁺, Rayl𝐙⁻⁺, Aer𝐙⁺⁺, Aer𝐙⁻⁺, τ_abs, arr_type)
     FT = eltype(τRayl)
+    nAer = length(aerosol_optics)
+    @show(nAer)
+    ϖRayl = FT(1)
     # @show FT
-    @assert length(τAer) == length(ϖAer) == length(fᵗ) "Sizes don't match"
+    @assert length(τAer) == nAer "Sizes don't match"
     
-    @show τRayl , sum(τAer)
+    #@show τRayl , sum(τAer)
 
     τ = FT(0)
     ϖ = FT(0)
     A = FT(0)
     Z⁺⁺ = similar(Rayl𝐙⁺⁺); 
     Z⁻⁺ = similar(Rayl𝐙⁺⁺);
-    
+    @show size(Rayl𝐙⁺⁺)
+    @show Rayl𝐙⁺⁺[1,58]
+    for i = 1: 3: size(Rayl𝐙⁺⁺)[1]
+        @show(i, Rayl𝐙⁺⁺[1,i])
+    end
     if (τRayl + sum(τAer)) < eps(FT)
         fill!(Z⁺⁺, 0); fill!(Z⁻⁺, 0);
         return FT(0), FT(1), Z⁺⁺, Z⁻⁺
     end
+    #sleep(100)
     # @show τRayl, ϖRayl
     τ += τRayl
     ϖ += τRayl * ϖRayl
@@ -158,13 +166,13 @@ function construct_atm_layer(τRayl, τAer, ϖRayl, ϖAer, fᵗ, Rayl𝐙⁺⁺,
     Z⁺⁺ = τRayl * ϖRayl * Rayl𝐙⁺⁺
     Z⁻⁺ = τRayl * ϖRayl * Rayl𝐙⁻⁺
 
-    for i = 1:length(τAer)
+    for i = 1:nAer
         τ   += τAer[i]
-        ϖ   += τAer[i] * ϖAer[i]
-        # @show τAer[i], ϖAer[i], (1 - fᵗ[i])
-        A   += τAer[i] * ϖAer[i] * (1 - fᵗ[i])
-        Z⁺⁺ += τAer[i] * ϖAer[i] * (1 - fᵗ[i]) * Aer𝐙⁺⁺[:,:,i]
-        Z⁻⁺ += τAer[i] * ϖAer[i] * (1 - fᵗ[i]) * Aer𝐙⁻⁺[:,:,i]
+        ϖ   += τAer[i] * aerosol_optics[i].ω̃
+        #@show τAer[i], aerosol_optics[i].ω̃, (1 - aerosol_optics[i].fᵗ)
+        A   += τAer[i] * aerosol_optics[i].ω̃ * (1 - aerosol_optics[i].fᵗ)
+        Z⁺⁺ += τAer[i] * aerosol_optics[i].ω̃ * (1 - aerosol_optics[i].fᵗ) * Aer𝐙⁺⁺[:,:,i]
+        Z⁻⁺ += τAer[i] * aerosol_optics[i].ω̃ * (1 - aerosol_optics[i].fᵗ) * Aer𝐙⁻⁺[:,:,i]
     end
     
     Z⁺⁺ /= A
@@ -192,14 +200,14 @@ function compute_absorption_profile!(τ_abs::Array{FT,2},
 
     # pass in the hitran model
 
-    @assert size(τ_abs)[2] == length(profile.p)
+    @assert size(τ_abs,2) == length(profile.p)
 
     for iz in 1:length(profile.p)
 
         # Pa -> hPa
         p = profile.p[iz] / 100
         T = profile.T[iz]
-
+        # Changed index order
         τ_abs[:,iz] = Array(absorption_cross_section(model, grid, p, T)) * profile.vcd_dry[iz] * model.vmr
     end
 
