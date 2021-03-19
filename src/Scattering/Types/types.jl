@@ -17,7 +17,9 @@ computation
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-struct UnivariateAerosol{FT,FT2} <: AbstractAerosolType
+struct UnivariateAerosol{FT} <: AbstractAerosolType
+    #"Number of aerosol species"
+    #NAer::Integer
     "Univariate size distribution"
     size_distribution::ContinuousUnivariateDistribution
     "Maximum radius `[μm]`"
@@ -25,9 +27,9 @@ struct UnivariateAerosol{FT,FT2} <: AbstractAerosolType
     "Number of quadrature points for integration over size distribution"
     nquad_radius::Int
     "Real part of refractive Index"
-    nᵣ::FT2
+    nᵣ::FT
     "Imaginary part of refractive Index"
-    nᵢ::FT2
+    nᵢ::FT
 end
 
 """ 
@@ -36,8 +38,8 @@ end
 Convenience function to create a Univariate Aerosol, given the size parameters 
 """
 function make_univariate_aerosol(size_distribution::ContinuousUnivariateDistribution, 
-                                 r_max, nquad_radius::Int, 
-                                 nᵣ, nᵢ)
+                                 r_max::FT, nquad_radius::Int, 
+                                 nᵣ::FT, nᵢ::FT) where {FT}
 
     return UnivariateAerosol(size_distribution, r_max, nquad_radius, nᵣ, nᵢ)
 end
@@ -196,9 +198,9 @@ See eq 16 in Sanghavi 2014 for details.
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-struct GreekCoefs{FT<:Union{AbstractFloat, ForwardDiff.Dual}}
+struct GreekCoefs{FT}
     "Greek matrix coefficient α, is in B[2,2]"
-    α::Array{FT,1}
+    α::Array{FT,1} 
     "Greek matrix coefficient β, is in B[1,1] (only important one for scalar!)"
     β::Array{FT,1}
     "Greek matrix coefficient γ, is in B[2,1],B[1,2]"
@@ -225,15 +227,17 @@ A struct which holds all computed aerosol optics
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-@with_kw struct AerosolOptics{FT<:Union{AbstractFloat, ForwardDiff.Dual}}
+@with_kw struct AerosolOptics{FT}
     "Greek matrix"
     greek_coefs::GreekCoefs
     "Single Scattering Albedo"
-    ω̃::FT
-    "Extinction coefficient"
-    k::FT
-    "Truncation factor"
-    fᵗ = 1.0
+    ω̃::FT #Suniti
+    "Extinction cross-section"
+    k::FT #Suniti
+    #"Extinction cross-section at reference wavelength"
+    #k_ref::AbstractArray{FT} #Suniti
+    "Truncation factor" 
+    fᵗ::FT #Suniti
     "Derivatives"
     derivs = zeros(1)
 end

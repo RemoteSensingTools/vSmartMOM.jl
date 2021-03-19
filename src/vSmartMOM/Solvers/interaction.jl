@@ -89,6 +89,8 @@ function interaction_helper!(::ScatteringInterface_11, SFI,
             composite_layer.J₀⁻[:,nλ] = J₀⁻[:,nλ] + T⁻⁻[:,:,nλ] * tmp_inv[:,:,nλ] * (r⁻⁺[:,:,nλ] * J₀⁺[:,nλ] + added_layer.J₀⁻[:,nλ])
         end
     end 
+
+    @pack! composite_layer = R⁻⁺, R⁺⁻, T⁺⁺, T⁻⁻, J₀⁺, J₀⁻
 end
 
 
@@ -99,5 +101,5 @@ function interaction!(scattering_interface::AbstractScatteringInterface, SFI,
 
     interaction_helper!(scattering_interface, SFI, composite_layer, added_layer, I_static)
     ### synchronize()
-
+    
 end

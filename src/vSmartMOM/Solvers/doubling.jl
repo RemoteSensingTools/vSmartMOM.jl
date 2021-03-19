@@ -19,12 +19,13 @@ function doubling_helper!(pol_type, SFI, expk, ndoubl::Int,
     # tmp_inv2[:] = r⁻⁺ ⊠ r⁻⁺
     #expk = exp.(-dτ_λ / qp_μN[j0])
     #assign dimensions (Nquad*pol_type.n, Nquad*pol_type.n,size(dτ_λ)) to E
+    @show(added_layer.t⁺⁺[1,1,1],t⁺⁺[1,1,1])
     # Loop over each step
     for n = 1:ndoubl
         batch_solve!(tmp_inv, I_static .- r⁻⁺ ⊠ r⁻⁺, t⁺⁺)   
         added_layer.r⁻⁺[:]  = r⁻⁺ + (t⁺⁺ ⊠ r⁻⁺ ⊠ tmp_inv)
         added_layer.t⁺⁺[:]  = t⁺⁺ ⊠ tmp_inv
-
+        
         if SFI
             #nλ = @index(Global, NTuple)
             for nλ = 1:size(added_layer.J₀⁺,2)
@@ -40,11 +41,13 @@ function doubling_helper!(pol_type, SFI, expk, ndoubl::Int,
             #dτ_λ = 2*dτ_λ
             expk = expk .* expk
         end
+        #@show(n,added_layer.t⁺⁺[1,1,1],t⁺⁺[1,1,1])
     end
     # After doubling, revert D(DR)->R, where D = Diagonal{1,1,-1,-1}
     # For SFI, after doubling, revert D(DJ₀⁻)->J₀⁻
     ### synchronize()
     apply_D_matrix!(pol_type.n, added_layer.r⁻⁺, added_layer.t⁺⁺, added_layer.r⁺⁻, added_layer.t⁻⁻, added_layer.J₀⁺, added_layer.J₀⁻)
+    @pack! added_layer = r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, J₀⁺, J₀⁻
     return nothing 
 end
 

@@ -116,6 +116,9 @@ function absorption_cross_section(
                 # Required
                 model::HitranModel,          # Model to use in this cross section calculation 
                                              # (Calculation from Hitran data vs. using Interpolator)
+                #grid::AbstractRange{<:FT}, # Wavelength [nm] or wavenumber [cm-1] grid (modify using wavelength_flag)
+                #pressure::FT,              # actual pressure [hPa]
+                #temperature::FT,           # actual temperature [K]    
                 grid::AbstractRange{<:Real}, # Wavelength [nm] or wavenumber [cm-1] grid (modify using wavelength_flag)
                 pressure::Real,              # actual pressure [hPa]
                 temperature::Real,           # actual temperature [K]    
@@ -138,6 +141,9 @@ function absorption_cross_section(
     # Required
     model::InterpolationModel,      # Model to use in this cross section calculation 
                                     # (Calculation from Interpolator vs. Hitran Data)
+    #grid::AbstractRange{<:FT},    # Wavelength [nm] or wavenumber [cm-1] grid
+    #pressure::FT,                 # actual pressure [hPa]
+    #temperature::FT,              # actual temperature [K]  
     grid::AbstractRange{<:Real},    # Wavelength [nm] or wavenumber [cm-1] grid
     pressure::Real,                 # actual pressure [hPa]
     temperature::Real,              # actual temperature [K]  
