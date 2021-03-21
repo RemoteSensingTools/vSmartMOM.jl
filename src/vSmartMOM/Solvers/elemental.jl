@@ -62,8 +62,8 @@ function elemental_helper!(pol_type, SFI, iμ0,
         # Calculate r⁻⁺ and t⁺⁺
         
         # Version 1: no absorption in batch mode (like before), need to separate these modes
-        if false #maximum(dτ_λ) < 0.0001 
-            @show('A')
+        if true #maximum(dτ_λ) < 0.0001 
+            #@show('A')
             r⁻⁺[:,:,:] .= d_qp * Z⁻⁺ * (d_wct * dτ)
             t⁺⁺[:,:,:] .= I_static - (d_qp * ((I_static - Z⁺⁺ * d_wct) * dτ))
             if SFI
@@ -77,9 +77,10 @@ function elemental_helper!(pol_type, SFI, iμ0,
                 #J₀⁺[:,1,:] .*= exp.(-τ_sum/qp_μ[iμ0])
                 #J₀⁻[:,1,:] .*= exp.(-τ_sum/qp_μ[iμ0])
             end
+            @show 'A', r⁻⁺[1,28,1]/(J₀⁻[1,1,1]/50), r⁻⁺[1,28,1], J₀⁻[1,1,1]/50, J₀⁺[1,1,1]/50
             #Suniti: Need to add code to post-process R and J₀⁻ matrices with D  
         else    
-            @show('B')
+            #@show('B')
             # Version 2: with absorption in batch mode, low tau_scatt but higher tau_total, needs different equations
             # This is not yet GPU ready as it has element wise operations (should work for CPU)
             
@@ -92,6 +93,7 @@ function elemental_helper!(pol_type, SFI, iμ0,
                 event = kernel!(J₀⁺, J₀⁻, ϖ_λ, dτ_λ, τ_sum, Z⁻⁺, Z⁺⁺, qp_μN, ndoubl, pol_type, iμ0, D, ndrange=size(J₀⁺))
                 wait(device, event)
             end
+            @show 'B', r⁻⁺[1,28,1]/(J₀⁻[1,1,1]/50), r⁻⁺[1,28,1], J₀⁻[1,1,1]/50, J₀⁺[1,1,1]/50
             
             ### synchronize() # Check for CUDA here, only use with GPU!
         end
