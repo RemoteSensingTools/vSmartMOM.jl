@@ -69,7 +69,7 @@ function rt_run(pol_type,              # Polarization type (IQUV)
         Aer𝐙⁻⁺ = similar(Aer𝐙⁺⁺)
         
         for i = 1:nAer
-            @show aerosol_optics[i,1]
+            #@show aerosol_optics[i,1]
             Aer𝐙⁺⁺[:,:,i], Aer𝐙⁻⁺[:,:,i] = Scattering.compute_Z_moments(pol_type, qp_μ, aerosol_optics[i].greek_coefs, m, arr_type = arr_type)
         end
 
@@ -115,9 +115,9 @@ function rt_run(pol_type,              # Polarization type (IQUV)
             # Compute dτ vector
             dτ_λ = arr_type(τ_λ ./ (FT(2)^ndoubl))
             expk = exp.(-dτ_λ /qp_μ[iμ0]) #Suniti
-            @show(τ_λ, dτ_λ.*FT(2)^ndoubl)
-            @show(τ, dτ*FT(2)^ndoubl)
-            @show(expk)
+            #@show(τ_λ, dτ_λ.*FT(2)^ndoubl)
+            #@show(τ, dτ*FT(2)^ndoubl)
+            #@show(expk)
             #sleep
             # Crude fix
             #dτ = dτ_λ[1]*ϖ_λ[1]/ϖ #Suniti

@@ -109,18 +109,19 @@ end
 # τ * ϖ should remain constant even though they individually change over wavelength
 # @assert all(i -> (i ≈ τ * ϖ), τ_λ .* ϖ_λ)
 # Compute doubling number
-dτ_max = minimum([τ * ϖ, FT(0.1) * minimum(qp_μ)])
+dτ_max = minimum([τ * ϖ, FT(0.01) * minimum(qp_μ)])
 dτ, ndoubl = vSmartMOM.doubling_number(dτ_max, τ * ϖ) #Suniti
 #@show(ndoubl, dτ_max, τ)
 # Compute dτ vector
 dτ_λ = arr_type(τ_λ ./ (FT(2)^ndoubl))
 expk = exp.(-dτ_λ /qp_μ[iμ0]) #Suniti
 @show(τ_λ, dτ_λ.*FT(2)^ndoubl)
-@show(τ, dτ*FT(2)^ndoubl)
-@show(expk)
+@show(τ, dτ*FT(2)^ndoubl,dτ, dτ_λ )
+@show(expk, exp.(-dτ /qp_μ[iμ0]))
+@show τ_sum
 #scatter = true
 vSmartMOM.elemental!(pol_type, SFI, iμ0, τ_sum, dτ_λ, dτ, ϖ_λ, ϖ, Z⁺⁺, Z⁻⁺, m, ndoubl, true, qp_μ, wt_μ, added_layer,  I_static, arr_type, architecture)
-#vSmartMOM.doubling!(pol_type, SFI, expk, ndoubl, added_layer, I_static, architecture)
+vSmartMOM.doubling!(pol_type, SFI, expk, ndoubl, added_layer, I_static, architecture)
 #added_layer_DNI = vSmartMOM.make_added_layer(FT, arr_type, dims, nSpec) 
 #composite_layer_DNI = vSmartMOM.make_composite_layer(FT, arr_type, dims, nSpec)
 #vSmartMOM.elemental!(pol_type, false, iμ0, τ_sum, dτ_λ, dτ, ϖ_λ, ϖ, Z⁺⁺, Z⁻⁺, m, ndoubl, true, qp_μ, wt_μ, added_layer_DNI,  I_static, arr_type, architecture)
