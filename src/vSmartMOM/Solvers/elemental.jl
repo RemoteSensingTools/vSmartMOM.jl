@@ -49,10 +49,10 @@ function elemental_helper!(pol_type, SFI, iμ0,
         #    @show(i, qp_μN[i])
         #end
         NquadN = length(qp_μN)
-        @show ϖ, dτ
-        wct0 = m == 0 ? FT(0.50) * ϖ * dτ : FT(0.25) * ϖ * dτ
-        wct  = m == 0 ? FT(0.50) *ϖ * wt_μN  : FT(0.25) * ϖ * wt_μN
-        wct2 = m == 0 ? wt_μN  : wt_μN / 2
+        # @show ϖ, dτ
+        wct0 = m == 0 ? FT(0.50) * ϖ * dτ     : FT(0.25) * ϖ * dτ
+        wct  = m == 0 ? FT(0.50) * ϖ * wt_μN  : FT(0.25) * ϖ * wt_μN
+        wct2 = m == 0 ? wt_μN                 : wt_μN / 2
         # wct = m==0 ? 0.50 * 1 .* wt_μ4  : 0.25 .* 1 .* wt_μ4
 
         # Get the diagonal matrices first
@@ -62,7 +62,7 @@ function elemental_helper!(pol_type, SFI, iμ0,
         # Calculate r⁻⁺ and t⁺⁺
         
         # Version 1: no absorption in batch mode (like before), need to separate these modes
-        if maximum(dτ_λ) < 0.0001 
+        if true #maximum(dτ_λ) < 0.0001 
             @show('A')
             r⁻⁺[:,:,:] .= d_qp * Z⁻⁺ * (d_wct * dτ)
             t⁺⁺[:,:,:] .= I_static - (d_qp * ((I_static - Z⁺⁺ * d_wct) * dτ))
@@ -84,7 +84,7 @@ function elemental_helper!(pol_type, SFI, iμ0,
             # This is not yet GPU ready as it has element wise operations (should work for CPU)
             
             kernel! = get_elem_rt!(device)
-            event = kernel!(r⁻⁺, t⁺⁺, ϖ_λ, dτ_λ, Z⁻⁺, Z⁺⁺, qp_μN, wct2, ndrange=size(r⁻⁺)); 
+            event = kernel!(r⁻⁺, t⁺⁺, ϖ_λ, dτ_λ, Z⁻⁺, Z⁺⁺, qp_μN, wct, ndrange=size(r⁻⁺)); 
             wait(device, event)
       
             if SFI
@@ -190,26 +190,27 @@ end
     #end
 end
 
-@kernel function get_elem_rt_SFI!(J₀⁺, J₀⁻, ϖ_λ, dτ_λ, τ_sum, Z⁻⁺, Z⁺⁺, qp_μ4, ndoubl, pol_type, iμ0, D)
+@kernel function get_elem_rt_SFI!(J₀⁺, J₀⁻, ϖ_λ, dτ_λ, τ_sum, Z⁻⁺, Z⁺⁺, qp_μN, ndoubl, pol_type, iμ0, D)
     i, _, n = @index(Global, NTuple) ##Suniti: What are Global and Ntuple?
 
     J₀⁺[i, 1, n]=0
     J₀⁻[i, 1, n]=0
     i_start  = pol_type.n*(iμ0-1) + 1 
     i_end    = pol_type.n*iμ0
+    testCF = 1.0
     if (i>=i_start) && (i<=i_end)
         ctr = i-i_start+1
         #J₀⁺[i,n] = exp(-dτ_λ[n] / qp_μ4[i]) * pol_type.I₀[ctr]
         # 𝐓⁺⁺(μᵢ, μᵢ) = (exp{-τ/μᵢ} + ϖ ̇𝐙⁺⁺(μᵢ, μᵢ) ̇(τ/μᵢ) ̇exp{-τ/μᵢ}) ̇𝑤ᵢ
-        J₀⁺[i, 1, n] = ϖ_λ[n] * (Z⁺⁺[i,i_start:i_end]'*pol_type.I₀) * (dτ_λ[n] / qp_μ4[i]) * exp.(-dτ_λ[n] / qp_μ4[i])
+        J₀⁺[i, 1, n] = ϖ_λ[n] * (Z⁺⁺[i,i_start:i_end]'*pol_type.I₀) * (dτ_λ[n] / qp_μN[i]) * exp.(-dτ_λ[n] / qp_μN[i])
     else
-        J₀⁺[i, 1, n] = ϖ_λ[n] * (Z⁺⁺[i,i_start:i_end]'*pol_type.I₀) * (qp_μ4[i_start] / (qp_μ4[i] - qp_μ4[i_start])) * (exp(-dτ_λ[n] / qp_μ4[i]) - exp(-dτ_λ[n] / qp_μ4[i_start]))
+        J₀⁺[i, 1, n] = ϖ_λ[n] * (Z⁺⁺[i,i_start:i_end]'*pol_type.I₀) * (qp_μN[i_start] / (qp_μN[i] - qp_μN[i_start])) * (exp(-dτ_λ[n] / qp_μN[i]) - exp(-dτ_λ[n] / qp_μN[i_start]))
     end
     # 𝐑⁻⁺(μᵢ, μⱼ) = ϖ ̇𝐙⁻⁺(μᵢ, μⱼ) ̇(μⱼ/(μᵢ+μⱼ)) ̇(1 - exp{-τ ̇(1/μᵢ + 1/μⱼ)}) ̇𝑤ⱼ
-    J₀⁻[i, 1, n] = ϖ_λ[n] * (Z⁻⁺[i,i_start:i_end]'*pol_type.I₀) * (qp_μ4[i_start] / (qp_μ4[i] + qp_μ4[i_start])) * (1 - exp.(-dτ_λ[n] * ((1 / qp_μ4[i]) + (1 / qp_μ4[i_start]))))
+    J₀⁻[i, 1, n] = ϖ_λ[n] * (Z⁻⁺[i,i_start:i_end]'*pol_type.I₀) * (qp_μN[i_start] / (qp_μN[i] + qp_μN[i_start])) * (1 - exp.(-dτ_λ[n] * ((1 / qp_μN[i]) + (1 / qp_μN[i_start]))))
 
-    J₀⁺[i, 1, n] *= exp(-τ_sum[n]/qp_μ4[i_start])
-    J₀⁻[i, 1, n] *= exp(-τ_sum[n]/qp_μ4[i_start])
+    J₀⁺[i, 1, n] *= testCF * exp(-τ_sum[n]/qp_μN[i_start])
+    J₀⁻[i, 1, n] *= testCF * exp(-τ_sum[n]/qp_μN[i_start])
     
     if ndoubl >= 1
         J₀⁻[i, 1, n] = D[i,i]*J₀⁻[i, 1, n] #Suniti: define D = Diagonal{1,1,-1,-1,...Nquad times}

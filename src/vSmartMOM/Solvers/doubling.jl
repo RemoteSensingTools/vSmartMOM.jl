@@ -21,7 +21,8 @@ function doubling_helper!(pol_type, SFI, expk, ndoubl::Int,
     J₁⁺ = similar(J₀⁺)
     # Dummy for J
     J₁⁻ = similar(J₀⁻)
-    
+    #J⁺ = copy(J₀⁺)
+    #J⁻ = copy(J₀⁻)
     # tmp_inv2 = similar(t⁺⁺)
     # tmp_inv2[:] = r⁻⁺ ⊠ r⁻⁺
     #expk = exp.(-dτ_λ / qp_μN[j0])
@@ -29,32 +30,20 @@ function doubling_helper!(pol_type, SFI, expk, ndoubl::Int,
     #@show(added_layer.t⁺⁺[1,1,1],t⁺⁺[1,1,1])
     # Loop over each step
     for n = 1:ndoubl
-        batch_inv!(gp_refl, I_static .- r⁻⁺ ⊠ r⁻⁺)   
-        r⁻⁺[:]  = r⁻⁺ + (t⁺⁺ ⊠ gp_refl ⊠ r⁻⁺ ⊠ t⁺⁺)
-        t⁺⁺[:]  = t⁺⁺ ⊠ gp_refl ⊠ t⁺⁺
-        
+        batch_inv!(gp_refl, I_static .- r⁻⁺ ⊠ r⁻⁺)
+        tt⁺⁺_gp_refl = t⁺⁺ ⊠ gp_refl
         # J₁⁺[:,1,:] =  J₀⁺[:,1,:] .* expk'
         if SFI
             J₁⁺[:,1,:] = J₀⁺[:,1,:] .* expk'
             J₁⁻[:,1,:] = J₀⁻[:,1,:] .* expk'
             #@show size(J₀⁺), size(J₁⁺), size((t⁺⁺ ⊠ gp_refl ⊠ (J₀⁺ .+ r⁻⁺ ⊠ J₁⁻)))
-            J₀⁺[:] = J₁⁺ .+ (t⁺⁺ ⊠ gp_refl ⊠ (J₀⁺ .+ r⁻⁺ ⊠ J₁⁻))
-            J₀⁻[:] = J₀⁻ .+ (t⁺⁺ ⊠ gp_refl ⊠ (J₁⁻ .+ r⁻⁺ ⊠ J₀⁺)) 
-
-            #nλ = @index(Global, NTuple)
-            #for nλ = 1:size(added_layer.J₀⁺,2)
-                #E[:,:,nλ]=arr_type(Diagonal(repeat(expk[nλ]*pol_type.I₀,size(Nquad)))) #TODO: Pass exp(-dτ_λ ./ qp_μN[j0]) as an   argument to doubling and square it with every doubling iteration
-            #    added_layer.J₀⁺[:,nλ] = (expk[nλ] .+ added_layer.t⁺⁺[:,:,nλ]) * J₀⁺[:,nλ] + added_layer.r⁻⁺[:,:,nλ] * J₀⁻[:,nλ]
-                #@show size()
-                #_a = added_layer.t⁺⁺[:,:,nλ] * J₀⁺[:,nλ] 
-                #_b = (I_static + expk[nλ] * added_layer.t⁺⁺[:,:,nλ]) * J₀⁻[:,nλ]
-                #@show size(_a), size(_b)
-                #_c = _a + _b
-            #    added_layer.J₀⁻[:,nλ] = added_layer.t⁺⁺[:,:,nλ] * J₀⁺[:,nλ] + (I_static + expk[nλ] * added_layer.t⁺⁺[:,:,nλ]) * J₀⁻[:,nλ]
-            #end
-            #dτ_λ = 2*dτ_λ
-            expk = expk .* expk
-        end
+            J₀⁺[:] = J₁⁺ + (tt⁺⁺_gp_refl ⊠ (J₀⁺ + r⁻⁺ ⊠ J₁⁻))
+            J₀⁻[:] = J₀⁻ + (tt⁺⁺_gp_refl ⊠ (J₁⁻ + r⁻⁺ ⊠ J₀⁺)) 
+            expk = expk.^2
+        end  
+        r⁻⁺[:]  = r⁻⁺ + (tt⁺⁺_gp_refl ⊠ r⁻⁺ ⊠ t⁺⁺)
+        t⁺⁺[:]  = tt⁺⁺_gp_refl ⊠ t⁺⁺
+        @show r⁻⁺[1,28,1]/(J₀⁻[1,1,1]/50), r⁻⁺[1,28,1]
         # @pack! added_layer = r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, J₀⁺, J₀⁻
         #@show(n,added_layer.t⁺⁺[1,1,1],t⁺⁺[1,1,1])
     end

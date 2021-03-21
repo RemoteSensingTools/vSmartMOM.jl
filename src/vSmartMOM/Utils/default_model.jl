@@ -20,7 +20,7 @@ function default_parameters(FT::DataType=Float64)
     obs_alt = FT(1000.0)
     nAer = 1 #Number of aerosol species
 
-    τAer_ref     = FT[0.1] #AOTs at reference wavelength
+    τAer_ref     = FT[0.5] #AOTs at reference wavelength
     μ            = FT[1.3] #characteristic radius [μm]
     σ            = FT[2.0] #characteristic width
     r_max        = FT(30.0) #maximum radius in distribution [μm] #baseline setting
@@ -174,7 +174,7 @@ function default_model(params::vSmartMOM_Parameters)
             aerosol_optics[ib][iaer] = Scattering.truncate_phase(truncation_type, aerosol_optics_raw; reportFit=false)
             # Compute nAer aerosol optical thickness profiles
             τAer[ib][iaer,:] = params.τAer_ref[iaer] * (aerosol_optics[ib][iaer].k/k_ref) * vSmartMOM.getAerosolLayerOptProp(1.0, params.p₀[iaer], params.σp[iaer], profile.p)
-            @show τAer, sum(τAer)
+            # @show τAer, sum(τAer)
             # Can be done with arbitrary length later:
             # τAer = FT(0.2) * τAer_1; # [τAer_1 τAer_2]
             #ϖAer = params.float_type[aerosol_optics[iaer,ib].ω̃]; 
