@@ -32,24 +32,45 @@ function rt_set_streams(::RadauQuad, Ltrunc::Int, obs_geom::ObsGeometry)
     qp_μ₀ = -reverse(tqp_μ₀)
     wt_μ₀ =  reverse(twt_μ₀)
     μ₀ = cosd(sza) # check for degree to radian conversion
-
-    qp_μ = zeros(FT, 2Nquad)
-    wt_μ = zeros(FT, 2Nquad)
-    for i = 1:Nquad
-        qp_μ[i] = (μ₀ + μ₀ * qp_μ₀[i]) / 2
-        wt_μ[i] = μ₀ * wt_μ₀[i] / 2
-        qp_μ[Nquad + i] = ((1 + μ₀) + (1 - μ₀) * qp_μ₀[i]) / 2
-        wt_μ[Nquad + i] = (1 - μ₀) * wt_μ₀[i] / 2
+    if μ₀ in qp_μ₀
+        qp_μ = zeros(FT, Nquad)
+        wt_μ = zeros(FT, Nquad)
+        for i = 1:Nquad
+            qp_μ[i] = (1 + qp_μ₀[i]) / 2
+            wt_μ[i] = wt_μ₀[i] 
+            #qp_μ[Nquad + i] = ((1 + μ₀) + (1 - μ₀) * qp_μ₀[i]) / 2
+            #wt_μ[Nquad + i] = (1 - μ₀) * wt_μ₀[i] / 2
+        end
+        Ncam = length(vza)
+        μ = cosd.(vza) # check for degree to radian conversion
+        
+        # Screen out duplicate camera zenith angles
+        qp_μ = unique([qp_μ; cosd.(vza)])
+        # Assign zero-weights to remaining camera zenith angles
+        wt_μ = FT[wt_μ; zeros(length(qp_μ) - length(wt_μ))]
+        
+        Nquad = length(qp_μ)
+        # @show μ₀, Nquad, qp_μ, wt_μ
+        return Nquad, qp_μ, wt_μ  
+    else
+        qp_μ = zeros(FT, 2Nquad)
+        wt_μ = zeros(FT, 2Nquad)
+        for i = 1:Nquad
+            qp_μ[i] = (μ₀ + μ₀ * qp_μ₀[i]) / 2
+            wt_μ[i] = μ₀ * wt_μ₀[i] / 2
+            qp_μ[Nquad + i] = ((1 + μ₀) + (1 - μ₀) * qp_μ₀[i]) / 2
+            wt_μ[Nquad + i] = (1 - μ₀) * wt_μ₀[i] / 2
+        end
+        Ncam = length(vza)
+        μ = cosd.(vza) # check for degree to radian conversion
+        
+        # Screen out duplicate camera zenith angles
+        qp_μ = unique([qp_μ; cosd.(vza)])
+        # Assign zero-weights to remaining camera zenith angles
+        wt_μ = FT[wt_μ; zeros(length(qp_μ) - length(wt_μ))]
+        
+        Nquad = length(qp_μ)
+        # @show μ₀, Nquad, qp_μ, wt_μ
+        return Nquad, qp_μ, wt_μ   
     end
-    Ncam = length(vza)
-    μ = cosd.(vza) # check for degree to radian conversion
-    
-    # Screen out duplicate camera zenith angles
-    qp_μ = unique([qp_μ; cosd.(vza)])
-    # Assign zero-weights to remaining camera zenith angles
-    wt_μ = FT[wt_μ; zeros(length(qp_μ) - length(wt_μ))]
-    
-    Nquad = length(qp_μ)
-    # @show μ₀, Nquad, qp_μ, wt_μ
-    return Nquad, qp_μ, wt_μ   
 end

@@ -15,12 +15,12 @@ function default_parameters(FT::DataType=Float64)
 
     vza = FT[60., 45., 30., 15., 0., 15., 30., 45., 60.]
     vaz = FT[180., 180., 180., 180., 0., 0., 0., 0., 0.]
-    sza = FT(60.)
+    sza = FT(0.)
 
     obs_alt = FT(1000.0)
     nAer = 1 #Number of aerosol species
 
-    τAer_ref     = FT[0.5] #AOTs at reference wavelength
+    τAer_ref     = FT[0.1] #AOTs at reference wavelength
     μ            = FT[1.3] #characteristic radius [μm]
     σ            = FT[2.0] #characteristic width
     r_max        = FT(30.0) #maximum radius in distribution [μm] #baseline setting
@@ -33,7 +33,7 @@ function default_parameters(FT::DataType=Float64)
     σp          = FT[5000.] # Pressure peak width [Pa]
 
     # Note: We should change the default profile to an ASCII file and have a simple ascii reader...
-    file = "/Users/sanghavi/data/MERRA300.prod.assim.inst6_3d_ana_Nv.20150613.hdf.nc4" 
+    file = "/Users/cfranken/data/MERRA300.prod.assim.inst6_3d_ana_Nv.20150613.hdf.nc4" 
     timeIndex = 2
 
     lat = 34.1377;
@@ -60,7 +60,7 @@ function default_parameters(FT::DataType=Float64)
 
     # This is only a hard-coded quick fix, eventually we need to compute after how many Fourier 
     # components it converges and then stop (and just set a convergence criterion)
-    max_m = 3 #temp
+    max_m = 1 #temp
 
     return vSmartMOM_Parameters(FT,
                                 λ_band, λ_ref,
@@ -143,7 +143,7 @@ function default_model(params::vSmartMOM_Parameters)
                                          architecture = params.architecture, 
                                          vmr = params.vmr)
         #τ_abs = zeros(params.float_type, length(λ), length(spec_grid), length(profile.p)); 
-        compute_absorption_profile!(τ_abs[ib], absorption_model, range(params.spec_grid_start[ib], params.spec_grid_end[ib], length=params.spec_grid_n[ib]), profile);
+        #compute_absorption_profile!(τ_abs[ib], absorption_model, range(params.spec_grid_start[ib], params.spec_grid_end[ib], length=params.spec_grid_n[ib]), profile);
     end
 
     # aerosol_optics[iBand][iAer]

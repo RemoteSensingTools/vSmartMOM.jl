@@ -137,14 +137,21 @@ function rt_run(pol_type,              # Polarization type (IQUV)
                 #@show(added_layer.t⁺⁺[1,1,1])
                 # If not, there is no reflectance. Assign r/t appropriately
             else
-                tmpJ₀⁺ = zeros(size(qp_μN))
-                istart = (iμ0-1)*pol_type.n+1
-                iend   = iμ0*pol_type.n
-                for iλ = 1:size(τ_λ)
-                    tmpJ₀⁺ = 0
-                    tmpJ₀⁺[istart:iend] = exp.(-τ_sum[iλ]/qp_μ[iμ0])*I₀
-                    added_layer.r⁻⁺[:,:,iλ], added_layer.r⁺⁻[:,:,iλ], added_layer.J₀⁻[:,iλ] = (0, 0, 0)
-                    added_layer.t⁺⁺[:,:,iλ], added_layer.t⁻⁻[:,:,iλ], added_layer.J₀⁺[:,iλ] = (Diagonal(exp.(-τ_λ[iλ]/qp_μN)), Diagonal(exp.(-τ_λ[iλ]/qp_μN)), tmpJ₀⁺) #Suniti: corrected from τ to τ_λ
+                added_layer.r⁻⁺[:] .= 0;
+                added_layer.r⁺⁻[:] .= 0;
+                added_layer.J₀⁻[:] .= 0;
+                #tmpJ₀⁺ = zeros(size(qp_μN),1)
+                #istart = (iμ0-1)*pol_type.n+1
+                #iend   = iμ0*pol_type.n
+                #@show size(τ_λ)
+                for iλ = 1:length(τ_λ)
+                    #tmpJ₀⁺ .= 0
+                    #tmpJ₀⁺[istart:iend] = exp.(-τ_sum[iλ]/qp_μ[iμ0])*I₀
+                    @show size(exp.(-τ_λ[iλ]./qp_μN))
+                    temp = Diagonal(exp.(-τ_λ[iλ]./qp_μN)[:,1]);
+                    @show size(temp)
+                    added_layer.t⁺⁺[:,:,iλ] = temp;
+                    added_layer.t⁻⁻[:,:,iλ] = temp;
                 end
             end
 

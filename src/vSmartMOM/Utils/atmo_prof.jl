@@ -101,11 +101,11 @@ end;
 function getRayleighLayerOptProp(psurf, λ, depol_fct, vcd_dry) 
     FT = eltype(λ)
     # Total vertical Rayleigh scattering optical thickness 
-    tau_scat = 0.00864 * (psurf / 1013.25) * λ^(-3.916 - 0.074 * λ - 0.05 / λ) 
-    tau_scat = tau_scat * (6.0 + 3.0 * depol_fct) / (6.0 - 7.0 * depol_fct)
-    @show psurf, tau_scat, depol_fct
+    tau_scat = FT(0.00864) * (psurf / FT(1013.25)) * λ^(-FT(3.916) - FT(0.074) * λ - FT(0.05) / λ) 
+    tau_scat = tau_scat * (FT(6.0) + FT(3.0) * depol_fct) / (FT(6.0)- FT(7.0) * depol_fct)
+    #@show psurf, tau_scat, depol_fct
     Nz = length(vcd_dry)
-    τRayl = zeros(Nz)
+    τRayl = zeros(FT,Nz)
     k = tau_scat / sum(vcd_dry)
     for i = 1:Nz
         τRayl[i] = k * vcd_dry[i]
@@ -136,7 +136,8 @@ end
 function construct_atm_layer(τRayl, τAer,  aerosol_optics, Rayl𝐙⁺⁺, Rayl𝐙⁻⁺, Aer𝐙⁺⁺, Aer𝐙⁻⁺, τ_abs, arr_type)
     FT = eltype(τRayl)
     nAer = length(aerosol_optics)
-    @show(nAer)
+    #@show(nAer)
+    # Fix Rayleigh SSA to 1
     ϖRayl = FT(1)
     # @show FT
     @assert length(τAer) == nAer "Sizes don't match"
@@ -148,17 +149,16 @@ function construct_atm_layer(τRayl, τAer,  aerosol_optics, Rayl𝐙⁺⁺, Ray
     A = FT(0)
     Z⁺⁺ = similar(Rayl𝐙⁺⁺); 
     Z⁻⁺ = similar(Rayl𝐙⁺⁺);
-    @show size(Rayl𝐙⁺⁺)
-    @show Rayl𝐙⁺⁺[1,58]
-    for i = 1: 3: size(Rayl𝐙⁺⁺)[1]
-        @show(i, Rayl𝐙⁺⁺[1,i])
-    end
+    #@show size(Rayl𝐙⁺⁺)
+#    @show Rayl𝐙⁺⁺[1,58]
+    #for i = 1: 3: size(Rayl𝐙⁺⁺)[1]
+    #    @show(i, Rayl𝐙⁺⁺[1,i])
+    #end
     if (τRayl + sum(τAer)) < eps(FT)
         fill!(Z⁺⁺, 0); fill!(Z⁻⁺, 0);
         return FT(0), FT(1), Z⁺⁺, Z⁻⁺
     end
-    #sleep(100)
-    # @show τRayl, ϖRayl
+ 
     τ += τRayl
     ϖ += τRayl * ϖRayl
     A += τRayl * ϖRayl
@@ -169,7 +169,7 @@ function construct_atm_layer(τRayl, τAer,  aerosol_optics, Rayl𝐙⁺⁺, Ray
     for i = 1:nAer
         τ   += τAer[i]
         ϖ   += τAer[i] * aerosol_optics[i].ω̃
-        #@show τAer[i], aerosol_optics[i].ω̃, (1 - aerosol_optics[i].fᵗ)
+        # @show τAer[i], aerosol_optics[i].ω̃, (1 - aerosol_optics[i].fᵗ)
         A   += τAer[i] * aerosol_optics[i].ω̃ * (1 - aerosol_optics[i].fᵗ)
         Z⁺⁺ += τAer[i] * aerosol_optics[i].ω̃ * (1 - aerosol_optics[i].fᵗ) * Aer𝐙⁺⁺[:,:,i]
         Z⁻⁺ += τAer[i] * aerosol_optics[i].ω̃ * (1 - aerosol_optics[i].fᵗ) * Aer𝐙⁻⁺[:,:,i]
