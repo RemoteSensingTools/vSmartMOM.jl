@@ -1,8 +1,8 @@
 using Documenter
 using Literate
 using RadiativeTransfer
-using RadiativeTransfer.CrossSection
-using RadiativeTransfer.PhaseFunction
+using RadiativeTransfer.Absorption
+using RadiativeTransfer.Scattering
 using Plots 
 
 ENV["GKSwstype"] = "nul"

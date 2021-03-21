@@ -14,7 +14,7 @@ You can calculate a phase function in three steps:
 
 ```julia
 using RadiativeTransfer
-using RadiativeTransfer.PhaseFunction
+using RadiativeTransfer.Scattering
 using Distributions
 using BenchmarkTools
 

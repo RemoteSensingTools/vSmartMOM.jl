@@ -115,11 +115,11 @@ println("Doppler shift = $(1e7/(v₀-Δ_ν)-1e7/v₀) nm")
 using Plots
 using Pkg.Artifacts
 using RadiativeTransfer
-using RadiativeTransfer.CrossSection
+using RadiativeTransfer.Absorption
 
 #-------------------------
 
-co2_par = CrossSection.read_hitran(artifact("CO2"), mol=2, iso=1, ν_min=6214.4, ν_max=6214.8);
+co2_par = Absorption.read_hitran(artifact("CO2"), mol=2, iso=1, ν_min=6214.4, ν_max=6214.8);
 line_voigt   = make_hitran_model(co2_par, Voigt())
 line_doppler = make_hitran_model(co2_par, Doppler())
 line_lorentz = make_hitran_model(co2_par, Lorentz())
@@ -167,7 +167,7 @@ xlabel!("Wavenumber (cm⁻¹)")
 
 #-------------------------
 
-co2_par_band = CrossSection.read_hitran(artifact("CO2"), mol=2, iso=1, ν_min=6000.0, ν_max=6400.0);
+co2_par_band = Absorption.read_hitran(artifact("CO2"), mol=2, iso=1, ν_min=6000.0, ν_max=6400.0);
 band_voigt   = make_hitran_model(co2_par_band , Voigt())
 
 #-------------------------

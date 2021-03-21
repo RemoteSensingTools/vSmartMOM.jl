@@ -211,4 +211,4 @@ result = ForwardDiff.hessian!(result, CrossSection.acs_shorthand, x);
 
 x = [0.3, 6.82, 1.3, 0.00001]
 result = DiffResults.JacobianResult(zeros(4568), x)
-ForwardDiff.jacobian!(result, PhaseFunction.phase_shorthand, x);
+ForwardDiff.jacobian!(result, Scattering.phase_shorthand, x);
