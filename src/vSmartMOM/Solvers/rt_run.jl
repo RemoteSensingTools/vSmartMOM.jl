@@ -118,7 +118,7 @@ function rt_run(pol_type,              # Polarization type (IQUV)
             @show(τ_λ, dτ_λ.*FT(2)^ndoubl)
             @show(τ, dτ*FT(2)^ndoubl)
             @show(expk)
-            sleep(5)
+            #sleep
             # Crude fix
             #dτ = dτ_λ[1]*ϖ_λ[1]/ϖ #Suniti
             #@show ϖ*dτ, dτ_λ[1]*ϖ_λ[1]
@@ -192,8 +192,8 @@ function rt_run(pol_type,              # Polarization type (IQUV)
                 R[i,:,s] += bigCS * (R⁻⁺[istart:iend, istart0:iend0, s] / wt_μ[iμ0]) * pol_type.I₀
                 T[i,:,s] += bigCS * (T⁺⁺[istart:iend, istart0:iend0, s] / wt_μ[iμ0]) * pol_type.I₀
                 if SFI
-                    R_SFI[i,:,s] += bigCS * J₀⁻[istart:iend, s]
-                    T_SFI[i,:,s] += bigCS * J₀⁺[istart:iend, s]
+                    R_SFI[i,:,s] += bigCS * J₀⁻[istart:iend,1, s]
+                    T_SFI[i,:,s] += bigCS * J₀⁺[istart:iend,1, s]
                 end
                 #@show(m,R[i,1,s], R_SFI[i,1,s])
             end

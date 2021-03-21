@@ -72,8 +72,8 @@ function interaction_helper!(::ScatteringInterface_11, SFI,
     composite_layer.T⁺⁺[:] = t⁺⁺ ⊠ tmp_inv  ⊠ T⁺⁺ #Suniti
 
     if SFI
-        for nλ=1:size(J₀⁺,2)     
-            composite_layer.J₀⁺[:,nλ] = added_layer.J₀⁺[:,nλ] + t⁺⁺[:,:,nλ] * tmp_inv[:,:,nλ] * (R⁺⁻[:,:,nλ] * added_layer.J₀⁻[:,nλ] + J₀⁺[:,nλ])
+        for nλ=1:size(J₀⁺,3)     
+            composite_layer.J₀⁺[:,1,nλ] = added_layer.J₀⁺[:,1,nλ] + t⁺⁺[:,:,nλ] * tmp_inv[:,:,nλ] * (R⁺⁻[:,:,nλ] * added_layer.J₀⁻[:,1,nλ] + J₀⁺[:,1,nλ])
         end 
     end 
     # Repeating for mirror-reflected directions
@@ -85,8 +85,8 @@ function interaction_helper!(::ScatteringInterface_11, SFI,
     composite_layer.T⁻⁻[:] = T⁺⁺ ⊠ tmp_inv ⊠ t⁻⁻ #Suniti
 
     if SFI
-        for nλ=1:size(J₀⁺,2)
-            composite_layer.J₀⁻[:,nλ] = J₀⁻[:,nλ] + T⁻⁻[:,:,nλ] * tmp_inv[:,:,nλ] * (r⁻⁺[:,:,nλ] * J₀⁺[:,nλ] + added_layer.J₀⁻[:,nλ])
+        for nλ=1:size(J₀⁺,3)
+            composite_layer.J₀⁻[:,1,nλ] = J₀⁻[:,1,nλ] + T⁻⁻[:,:,nλ] * tmp_inv[:,:,nλ] * (r⁻⁺[:,:,nλ] * J₀⁺[:,1,nλ] + added_layer.J₀⁻[:,1,nλ])
         end
     end 
 
