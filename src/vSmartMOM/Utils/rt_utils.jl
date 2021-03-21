@@ -64,7 +64,7 @@ function get_indices(iμ::Integer, pol_type::AbstractPolarizationType)
 end
 
 default_matrix(FT, arr_type, dims, nSpec)   = arr_type(zeros(FT, tuple(dims[1], dims[2], nSpec)))
-default_J_matrix(FT, arr_type, dims, nSpec) = arr_type(zeros(FT, tuple(dims[1], nSpec)))
+default_J_matrix(FT, arr_type, dims, nSpec) = arr_type(zeros(FT, tuple(dims[1], 1, nSpec)))
 #default_test_vector(FT, arr_type,3) = arr_type(zeros(FT, tuple(3)))
 make_added_layer(FT, arr_type, dims, nSpec)     = AddedLayer(default_matrix(FT, arr_type, dims, nSpec), 
                                                          default_matrix(FT, arr_type, dims, nSpec), 

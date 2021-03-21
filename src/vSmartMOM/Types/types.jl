@@ -51,8 +51,8 @@ abstract type AbstractLayer end
     R⁺⁻::AbstractArray{FT,3}
     T⁺⁺::AbstractArray{FT,3}
     T⁻⁻::AbstractArray{FT,3}
-    J₀⁺::AbstractArray{FT,2}
-    J₀⁻::AbstractArray{FT,2}
+    J₀⁺::AbstractArray{FT,3}
+    J₀⁻::AbstractArray{FT,3}
 end
 
 @with_kw mutable struct AddedLayer{FT} <: AbstractLayer 
@@ -62,8 +62,8 @@ end
     t⁺⁺::AbstractArray{FT,3}
     r⁺⁻::AbstractArray{FT,3}
     t⁻⁻::AbstractArray{FT,3}
-    J₀⁺::AbstractArray{FT,2}
-    J₀⁻::AbstractArray{FT,2}
+    J₀⁺::AbstractArray{FT,3}
+    J₀⁻::AbstractArray{FT,3}
 end
 
 abstract type AbstractScatteringInterface end
