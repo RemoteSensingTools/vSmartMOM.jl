@@ -2,9 +2,8 @@
 function interaction_helper!(::ScatteringInterface_00, SFI,
                                 composite_layer::CompositeLayer{FT}, 
                                 added_layer::AddedLayer{FT}, 
-                                ::AbstractArray{FT}) where {FT}
+                                I_static::AbstractArray{FT}) where {FT}
 
-                                J₀⁺::AbstractArray{FT,3}
     if SFI
         composite_layer.J₀⁺ = added_layer.J₀⁺ + added_layer.t⁺⁺ ⊠ composite_layer.J₀⁺
         composite_layer.J₀⁻ = composite_layer.J₀⁻ + composite_layer.T⁻⁻ ⊠ added_layer.J₀⁻
@@ -19,7 +18,7 @@ end
 function interaction_helper!(::ScatteringInterface_01, SFI,
                                 composite_layer::CompositeLayer{FT}, 
                                 added_layer::AddedLayer{FT}, 
-                                ::AbstractArray{FT}) where {FT}
+                                I_static::AbstractArray{FT}) where {FT}
 
     if SFI
        composite_layer.J₀⁻ = composite_layer.T⁻⁻ ⊠ (added_layer.r⁻⁺ ⊠ composite_layer.J₀⁺ + added_layer.J₀⁻) 

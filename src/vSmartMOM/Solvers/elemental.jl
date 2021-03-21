@@ -69,10 +69,13 @@ function elemental_helper!(pol_type, SFI, iμ0,
             if SFI
                 # Reminder: Add equation here what it does
                 #J₀⁺[:,:] .= I₀_NquadN * exp.(-dτ_λ/qp_μ[iμ0])' .+ (d_qp * Z⁺⁺ * I₀_NquadN) * wct0
-                J₀⁺[:,1,:] .= (d_qp * Z⁺⁺ * I₀_NquadN) * wct0
-                J₀⁻[:,1,:] .= (d_qp * Z⁻⁺ * I₀_NquadN) * wct0
-                J₀⁺[:,1,:] *= exp(-τ_sum/qp_μ[iμ0])
-                J₀⁻[:,1,:] *= exp(-τ_sum/qp_μ[iμ0])
+                expk = exp.(-τ_sum/qp_μ[iμ0])
+                #t2 = (d_qp * Z⁺⁺ * I₀_NquadN) * wct0
+                #@show size(expk), size(t2 .* expk'  ), size(J₀⁺)
+                J₀⁺[:,1,:] .= ((d_qp * Z⁺⁺ * I₀_NquadN) * wct0) .* expk'
+                J₀⁻[:,1,:] .= ((d_qp * Z⁻⁺ * I₀_NquadN) * wct0) .* expk'
+                #J₀⁺[:,1,:] .*= exp.(-τ_sum/qp_μ[iμ0])
+                #J₀⁻[:,1,:] .*= exp.(-τ_sum/qp_μ[iμ0])
             end
             #Suniti: Need to add code to post-process R and J₀⁻ matrices with D  
         else    

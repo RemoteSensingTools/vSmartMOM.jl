@@ -359,6 +359,7 @@ function compute_Z_moments(mod::AbstractPolarizationType, μ, greek_coefs::Greek
     l_max = length(β)
 
     # Check that all μ are positive here ([0,1])
+    @show μ
     @assert all(0 .< μ .≤ 1) "all μ's within compute_Z_moments have to be ∈ ]0,1]"
 
     # Compute legendre Polynomials at μ and up to lmax
