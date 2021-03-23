@@ -10,12 +10,12 @@ function default_parameters(FT::DataType=Float64)
     λ_ref = FT(0.770) 
     depol = FT(0.0)
     l_trunc = 20 
-    Δ_angle = FT(2.0)
+    Δ_angle = FT(0.0)
     polarization_type = Stokes_IQU{FT}()
 
     vza = FT[60., 45., 30., 15., 0., 15., 30., 45., 60.]
     vaz = FT[180., 180., 180., 180., 0., 0., 0., 0., 0.]
-    sza = FT(0.)
+    sza = FT(60.)
 
     obs_alt = FT(1000.0)
     nAer = 1 #Number of aerosol species
@@ -33,7 +33,7 @@ function default_parameters(FT::DataType=Float64)
     σp          = FT[5000.] # Pressure peak width [Pa]
 
     # Note: We should change the default profile to an ASCII file and have a simple ascii reader...
-    file = "/Users/cfranken/data/MERRA300.prod.assim.inst6_3d_ana_Nv.20150613.hdf.nc4" 
+    file = "/Users/sanghavi/data/MERRA300.prod.assim.inst6_3d_ana_Nv.20150613.hdf.nc4" 
     timeIndex = 2
 
     lat = 34.1377;
@@ -60,7 +60,7 @@ function default_parameters(FT::DataType=Float64)
 
     # This is only a hard-coded quick fix, eventually we need to compute after how many Fourier 
     # components it converges and then stop (and just set a convergence criterion)
-    max_m = 1 #temp
+    max_m = l_trunc #temp
 
     return vSmartMOM_Parameters(FT,
                                 λ_band, λ_ref,

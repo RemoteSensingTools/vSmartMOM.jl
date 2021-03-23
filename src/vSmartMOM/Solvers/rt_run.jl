@@ -97,32 +97,19 @@ function rt_run(pol_type,              # Polarization type (IQUV)
             # From Rayleigh and aerosol τ, ϖ, compute overall layer τ, ϖ
             #@timeit "Constructing" 
             τ_λ, ϖ_λ, τ, ϖ, Z⁺⁺, Z⁻⁺ = construct_atm_layer(τRayl[iz], τAer[:,iz], aerosol_optics, Rayl𝐙⁺⁺, Rayl𝐙⁻⁺, Aer𝐙⁺⁺, Aer𝐙⁻⁺, τ_abs[:,iz], arr_type)
-            #@show(τ_λ)
-            #@show(ϖ_λ)
-            #@show(τ)
-            #@show(ϖ)
-            #sleep(5)
-            #for i=1:size(Z⁺⁺)[1]
-            #    @show(i,Z⁺⁺[i,:])
-            #end
+         
             # τ * ϖ should remain constant even though they individually change over wavelength
             # @assert all(i -> (i ≈ τ * ϖ), τ_λ .* ϖ_λ)
 
             # Compute doubling number
-            dτ_max = minimum([τ * ϖ, FT(0.1) * minimum(qp_μ)])
+            dτ_max = minimum([τ * ϖ, FT(0.001) * minimum(qp_μ)])
             dτ, ndoubl = doubling_number(dτ_max, τ * ϖ) #Suniti
             #@show(ndoubl, dτ_max, τ)
             # Compute dτ vector
             dτ_λ = arr_type(τ_λ ./ (FT(2)^ndoubl))
             expk = exp.(-dτ_λ /qp_μ[iμ0]) #Suniti
-            #@show(τ_λ, dτ_λ.*FT(2)^ndoubl)
-            #@show(τ, dτ*FT(2)^ndoubl)
-            #@show(expk)
-            #sleep
-            # Crude fix
-            #dτ = dτ_λ[1]*ϖ_λ[1]/ϖ #Suniti
-            #@show ϖ*dτ, dτ_λ[1]*ϖ_λ[1]
-            #@assert ϖ*dτ ≈ dτ_λ[1]*ϖ_λ[1]
+            # @show 'Test', dτ_λ, τ
+            
             # Determine whether there is scattering
             scatter = (  sum(τAer[:,iz]) > 1.e-8 || 
                       (( τRayl[iz] > 1.e-8 ) && (m < 3))) ? 
@@ -140,16 +127,13 @@ function rt_run(pol_type,              # Polarization type (IQUV)
                 added_layer.r⁻⁺[:] .= 0;
                 added_layer.r⁺⁻[:] .= 0;
                 added_layer.J₀⁻[:] .= 0;
-                #tmpJ₀⁺ = zeros(size(qp_μN),1)
-                #istart = (iμ0-1)*pol_type.n+1
-                #iend   = iμ0*pol_type.n
-                #@show size(τ_λ)
+           
                 for iλ = 1:length(τ_λ)
                     #tmpJ₀⁺ .= 0
                     #tmpJ₀⁺[istart:iend] = exp.(-τ_sum[iλ]/qp_μ[iμ0])*I₀
-                    @show size(exp.(-τ_λ[iλ]./qp_μN))
+                    #@show size(exp.(-τ_λ[iλ]./qp_μN))
                     temp = Diagonal(exp.(-τ_λ[iλ]./qp_μN)[:,1]);
-                    @show size(temp)
+                    #@show size(temp)
                     added_layer.t⁺⁺[:,:,iλ] = temp;
                     added_layer.t⁻⁻[:,:,iλ] = temp;
                 end
@@ -207,10 +191,7 @@ function rt_run(pol_type,              # Polarization type (IQUV)
             
         end
     end
-    #@show sum(τ_abs[1,:])
-    #for i = 1:100
-    #    @show i,sum(τ_abs[i,:])
-    #end
+
     print_timer()
     reset_timer!()
 

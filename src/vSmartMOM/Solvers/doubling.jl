@@ -21,15 +21,8 @@ function doubling_helper!(pol_type, SFI, expk, ndoubl::Int,
     J₁⁺ = similar(J₀⁺)
     # Dummy for J
     J₁⁻ = similar(J₀⁻)
-    #J⁺ = copy(J₀⁺)
-    #J⁻ = copy(J₀⁻)
-    # tmp_inv2 = similar(t⁺⁺)
-    # tmp_inv2[:] = r⁻⁺ ⊠ r⁻⁺
-    #expk = exp.(-dτ_λ / qp_μN[j0])
-    #assign dimensions (Nquad*pol_type.n, Nquad*pol_type.n,size(dτ_λ)) to E
-    #@show(added_layer.t⁺⁺[1,1,1],t⁺⁺[1,1,1])
-    # Loop over each step
-    for n = 1:ndoubl
+    
+    for n = 1:ndoubl 
         batch_inv!(gp_refl, I_static .- r⁻⁺ ⊠ r⁻⁺)
         tt⁺⁺_gp_refl = t⁺⁺ ⊠ gp_refl
         # J₁⁺[:,1,:] =  J₀⁺[:,1,:] .* expk'
@@ -37,15 +30,14 @@ function doubling_helper!(pol_type, SFI, expk, ndoubl::Int,
             J₁⁺[:,1,:] = J₀⁺[:,1,:] .* expk'
             J₁⁻[:,1,:] = J₀⁻[:,1,:] .* expk'
             #@show size(J₀⁺), size(J₁⁺), size((t⁺⁺ ⊠ gp_refl ⊠ (J₀⁺ .+ r⁻⁺ ⊠ J₁⁻)))
-            J₀⁺[:] = J₁⁺ + (tt⁺⁺_gp_refl ⊠ (J₀⁺ + r⁻⁺ ⊠ J₁⁻))
             J₀⁻[:] = J₀⁻ + (tt⁺⁺_gp_refl ⊠ (J₁⁻ + r⁻⁺ ⊠ J₀⁺)) 
+            J₀⁺[:] = J₁⁺ + (tt⁺⁺_gp_refl ⊠ (J₀⁺ + r⁻⁺ ⊠ J₁⁻))
             expk = expk.^2
         end  
         r⁻⁺[:]  = r⁻⁺ + (tt⁺⁺_gp_refl ⊠ r⁻⁺ ⊠ t⁺⁺)
         t⁺⁺[:]  = tt⁺⁺_gp_refl ⊠ t⁺⁺
-        @show r⁻⁺[1,28,1]/(J₀⁻[1,1,1]/50), r⁻⁺[1,28,1]
-        # @pack! added_layer = r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, J₀⁺, J₀⁻
-        #@show(n,added_layer.t⁺⁺[1,1,1],t⁺⁺[1,1,1])
+        #@show r⁻⁺[1:3:end,28,1]./(J₀⁻[1:3:end,1,1]*0.005)#, r⁻⁺[1,28,1]
+
     end
     # After doubling, revert D(DR)->R, where D = Diagonal{1,1,-1,-1}
     # For SFI, after doubling, revert D(DJ₀⁻)->J₀⁻
@@ -83,13 +75,6 @@ end
         t⁻⁻[iμ,jμ,n] = - t⁺⁺[iμ,jμ,n]
     end
 
-
-    #Suniti: Alternative version:
-    #D = arr_type(Diagonal(repeat(pol_type.D, size(qp_μ)[1])))
-    #r⁻⁺ = D.*r⁻⁺
-    #J₀⁻ = D.*J₀⁻
-    #r⁺⁻ = D.*r⁻⁺.*D
-    #t⁻⁻ = D.*t⁺⁺.*D
 end
 
 @kernel function apply_D_SFI!(n_stokes::Int, J₀⁻)
@@ -99,13 +84,6 @@ end
     if (i > 2)
         J₀⁻[iμ, 1, n] = - J₀⁻[iμ, 1, n] 
     end
-    
-    #Suniti: Alternative version:
-    #D = arr_type(Diagonal(repeat(pol_type.D, size(qp_μ)[1])))
-    #r⁻⁺ = D.*r⁻⁺
-    #J₀⁻ = D.*J₀⁻
-    #r⁺⁻ = D.*r⁻⁺.*D
-    #t⁻⁻ = D.*t⁺⁺.*D
 end
 
 
