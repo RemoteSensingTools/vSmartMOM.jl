@@ -9,7 +9,7 @@ function default_parameters(FT::DataType=Float64)
     λ_band = FT[0.770] 
     λ_ref = FT(0.770) 
     depol = FT(0.0)
-    l_trunc = 20 
+    l_trunc = 10 
     Δ_angle = FT(0.0)
     polarization_type = Stokes_IQU{FT}()
 
@@ -20,24 +20,25 @@ function default_parameters(FT::DataType=Float64)
     obs_alt = FT(1000.0)
     nAer = 1 #Number of aerosol species
 
-    τAer_ref     = FT[0.5] #AOTs at reference wavelength
-    μ            = FT[1.3] #characteristic radius [μm]
-    σ            = FT[2.0] #characteristic width
-    r_max        = FT(30.0) #maximum radius in distribution [μm] #baseline setting
-    nquad_radius = 2500 #baseline setting
-    nᵣ           = FT[1.3] #TODO: make this a 2D matrix were each species and band has an independent entry
-    nᵢ           = FT[0.00000001] #TODO: same as above
+    τAer_ref     = FT[0.1]  # AOTs at reference wavelength
+    μ            = FT[1.3]  # characteristic radius [μm]
+    σ            = FT[2.0]  # characteristic width
+    r_max        = FT(30.0) # maximum radius in distribution [μm] #baseline setting
+    nquad_radius = 2500     # baseline setting for quadrature points in size distribution
+    nᵣ           = FT[1.3]  # TODO: make this a 2D matrix were each species and band has an independent entry
+    nᵢ           = FT[0.00000001] # TODO: same as above
 
     # Aerosol vertical distribution profiles
     p₀          = FT[90000] # Pressure peak [Pa]
     σp          = FT[5000.] # Pressure peak width [Pa]
 
     # Note: We should change the default profile to an ASCII file and have a simple ascii reader...
-    file = "/Users/sanghavi/data/MERRA300.prod.assim.inst6_3d_ana_Nv.20150613.hdf.nc4" 
+    #file = "/Users/sanghavi/data/MERRA300.prod.assim.inst6_3d_ana_Nv.20150613.hdf.nc4" 
+    file = "/net/fluo/data1/ftp/XYZT_ESE156/Data/MERRA300.prod.assim.inst6_3d_ana_Nv.20150613.hdf.nc4"
     timeIndex = 2
 
-    lat = 34.1377;
-    lon = -118.1253;
+    lat = FT(34.1377);
+    lon = FT(-118.1253);
 
     profile_reduction_n = 20; 
 
@@ -50,18 +51,18 @@ function default_parameters(FT::DataType=Float64)
     SFI = 1 #Suniti: 0:= DNI, 1:= SFI
     spec_grid_start = FT[(1e7 / 777)]
     spec_grid_end = FT[(1e7 / 747)]
-    spec_grid_n = Integer[2]
+    spec_grid_n = Integer[10000]
 
     broadening_function = Voigt()
     wing_cutoff = 100
     CEF=HumlicekWeidemann32SDErrorFunction()
     vmr = FT(0.21)
-    vmr = FT(0.00)
+    #vmr = FT(0.00)
 
     # This is only a hard-coded quick fix, eventually we need to compute after how many Fourier 
     # components it converges and then stop (and just set a convergence criterion)
-    max_m = l_trunc #temp
-
+    #max_m = l_trunc #temp
+    max_m = 3 
     return vSmartMOM_Parameters(FT,
                                 λ_band, λ_ref,
                                 depol,
@@ -143,7 +144,7 @@ function default_model(params::vSmartMOM_Parameters)
                                          architecture = params.architecture, 
                                          vmr = params.vmr)
         #τ_abs = zeros(params.float_type, length(λ), length(spec_grid), length(profile.p)); 
-        #compute_absorption_profile!(τ_abs[ib], absorption_model, range(params.spec_grid_start[ib], params.spec_grid_end[ib], length=params.spec_grid_n[ib]), profile);
+        compute_absorption_profile!(τ_abs[ib], absorption_model, range(params.spec_grid_start[ib], params.spec_grid_end[ib], length=params.spec_grid_n[ib]), profile);
     end
 
     # aerosol_optics[iBand][iAer]

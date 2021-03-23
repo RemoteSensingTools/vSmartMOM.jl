@@ -58,14 +58,14 @@ function elemental_helper!(pol_type, SFI, iμ0,
         # wct = m==0 ? 0.50 * 1 .* wt_μ4  : 0.25 .* 1 .* wt_μ4
 
         # Get the diagonal matrices first
-        d_qp  = arr_type(Diagonal((1 ./ qp_μN)))
-        d_wct = arr_type(Diagonal(arr_type(wct)))
+        d_qp  = Diagonal(1 ./ qp_μN)
+        d_wct = Diagonal(wct)
 
         # Calculate r⁻⁺ and t⁺⁺
         
         # Version 1: no absorption in batch mode (like before), need to separate these modes
         if maximum(dτ_λ) < 0.0001 
-            #@show('A')
+            #@show typeof(τ_sum)
             r⁻⁺[:,:,:] .= d_qp * Z⁻⁺ * (d_wct * dτ)
             t⁺⁺[:,:,:] .= I_static - (d_qp * ((I_static - Z⁺⁺ * d_wct) * dτ))
             if SFI
@@ -90,7 +90,7 @@ function elemental_helper!(pol_type, SFI, iμ0,
       
             if SFI
                 kernel! = get_elem_rt_SFI!(device)
-                event = kernel!(J₀⁺, J₀⁻, ϖ_λ, dτ_λ, τ_sum, Z⁻⁺, Z⁺⁺, qp_μN, ndoubl, wct02, pol_type, iμ0, D, ndrange=size(J₀⁺))
+                event = kernel!(J₀⁺, J₀⁻, ϖ_λ, dτ_λ, τ_sum, Z⁻⁺, Z⁺⁺, qp_μN, ndoubl, wct02, pol_type.n, arr_type(pol_type.I₀), iμ0, D, ndrange=size(J₀⁺))
                 wait(device, event)
             end
             #ii = pol_type.n*(iμ0-1)+1
@@ -153,27 +153,34 @@ end
     
 end
 
-@kernel function get_elem_rt_SFI!(J₀⁺, J₀⁻, ϖ_λ, dτ_λ, τ_sum, Z⁻⁺, Z⁺⁺, qp_μN, ndoubl, wct02, pol_type, iμ0, D)
+@kernel function get_elem_rt_SFI!(J₀⁺, J₀⁻, ϖ_λ, dτ_λ, τ_sum, Z⁻⁺, Z⁺⁺, qp_μN, ndoubl, wct02, nStokes ,I₀, iμ0, D)
     i, _, n = @index(Global, NTuple) ##Suniti: What are Global and Ntuple?
-
+    FT = eltype(I₀)
     J₀⁺[i, 1, n]=0
     J₀⁻[i, 1, n]=0
-    i_start  = pol_type.n*(iμ0-1) + 1 
-    i_end    = pol_type.n*iμ0
-    #testCF = 0.5
+    i_start  = nStokes*(iμ0-1) + 1 
+    i_end    = nStokes*iμ0
+    
+    Z⁺⁺_I₀ = FT(0.0);
+    Z⁻⁺_I₀ = FT(0.0);
+    for ii = i_start:i_end
+        Z⁺⁺_I₀ += Z⁺⁺[i,ii] * I₀[ii-i_start+1]
+        Z⁻⁺_I₀ += Z⁻⁺[i,ii] * I₀[ii-i_start+1] 
+    end
+
     if (i>=i_start) && (i<=i_end)
         ctr = i-i_start+1
         #J₀⁺[i,n] = exp(-dτ_λ[n] / qp_μ4[i]) * pol_type.I₀[ctr]
         # 𝐓⁺⁺(μᵢ, μᵢ) = (exp{-τ/μᵢ} + ϖ ̇𝐙⁺⁺(μᵢ, μᵢ) ̇(τ/μᵢ) ̇exp{-τ/μᵢ}) ̇𝑤ᵢ
         #J₀⁺[i, 1, n] = testCF * ϖ_λ[n] * (Z⁺⁺[i,i_start:i_end]'*pol_type.I₀) * (dτ_λ[n] / qp_μN[i]) * exp.(-dτ_λ[n] / qp_μN[i])
-        J₀⁺[i, 1, n] = wct02 * ϖ_λ[n] * (Z⁺⁺[i,i_start:i_end]'*pol_type.I₀) * (dτ_λ[n] / qp_μN[i]) * exp.(-dτ_λ[n] / qp_μN[i])
+        J₀⁺[i, 1, n] = wct02 * ϖ_λ[n] * Z⁺⁺_I₀ * (dτ_λ[n] / qp_μN[i]) * exp(-dτ_λ[n] / qp_μN[i])
     else
         #J₀⁺[i, 1, n] = testCF * ϖ_λ[n] * (Z⁺⁺[i,i_start:i_end]'*pol_type.I₀) * (qp_μN[i_start] / (qp_μN[i] - qp_μN[i_start])) * (exp(-dτ_λ[n] / qp_μN[i]) - exp(-dτ_λ[n] / qp_μN[i_start]))
-        J₀⁺[i, 1, n] = wct02 * ϖ_λ[n] * (Z⁺⁺[i,i_start:i_end]'*pol_type.I₀) * (qp_μN[i_start] / (qp_μN[i] - qp_μN[i_start])) * (exp(-dτ_λ[n] / qp_μN[i]) - exp(-dτ_λ[n] / qp_μN[i_start]))
+        J₀⁺[i, 1, n] = wct02 * ϖ_λ[n] * Z⁺⁺_I₀ * (qp_μN[i_start] / (qp_μN[i] - qp_μN[i_start])) * (exp(-dτ_λ[n] / qp_μN[i]) - exp(-dτ_λ[n] / qp_μN[i_start]))
     end
     # 𝐑⁻⁺(μᵢ, μⱼ) = ϖ ̇𝐙⁻⁺(μᵢ, μⱼ) ̇(μⱼ/(μᵢ+μⱼ)) ̇(1 - exp{-τ ̇(1/μᵢ + 1/μⱼ)}) ̇𝑤ⱼ
     #J₀⁻[i, 1, n] = ϖ_λ[n] * (Z⁻⁺[i,i_start:i_end]'*pol_type.I₀) * (qp_μN[i_start] / (qp_μN[i] + qp_μN[i_start])) * (1 - exp.(-dτ_λ[n] * ((1 / qp_μN[i]) + (1 / qp_μN[i_start]))))
-    J₀⁻[i, 1, n] = wct02 * ϖ_λ[n] * (Z⁻⁺[i,i_start:i_end]'*pol_type.I₀) * (qp_μN[i_start] / (qp_μN[i] + qp_μN[i_start])) * (1 - exp.(-dτ_λ[n] * ((1 / qp_μN[i]) + (1 / qp_μN[i_start]))))
+    J₀⁻[i, 1, n] = wct02 * ϖ_λ[n] * Z⁻⁺_I₀ * (qp_μN[i_start] / (qp_μN[i] + qp_μN[i_start])) * (1 - exp(-dτ_λ[n] * ((1 / qp_μN[i]) + (1 / qp_μN[i_start]))))
 
     #J₀⁺[i, 1, n] *= testCF * exp(-τ_sum[n]/qp_μN[i_start])
     #J₀⁻[i, 1, n] *= testCF * exp(-τ_sum[n]/qp_μN[i_start])
