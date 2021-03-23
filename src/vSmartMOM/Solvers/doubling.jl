@@ -21,7 +21,7 @@ function doubling_helper!(pol_type, SFI, expk, ndoubl::Int,
     J₁⁺ = similar(J₀⁺)
     # Dummy for J
     J₁⁻ = similar(J₀⁻)
-    
+    #@show typeof(r⁺⁻), typeof(J₀⁺), typeof(expk), typeof(I_static)
     for n = 1:ndoubl 
         batch_inv!(gp_refl, I_static .- r⁻⁺ ⊠ r⁻⁺)
         tt⁺⁺_gp_refl = t⁺⁺ ⊠ gp_refl

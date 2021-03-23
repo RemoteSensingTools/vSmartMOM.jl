@@ -40,7 +40,8 @@ function rt_run(pol_type,              # Polarization type (IQUV)
 
     #= 
     Loop over number of truncation terms =#
-    SFI = true
+    SFI = false# true #true
+    @show SFI
     for m = 0:Ltrunc - 1
 
         println("Fourier Moment: ", m)
@@ -61,7 +62,7 @@ function rt_run(pol_type,              # Polarization type (IQUV)
         iBand = 1
 
         #nAer, nBand = size(aerosol_optics)
-        @show nAer#, nBand
+        #@show nAer#, nBand
         dims = size(Rayl𝐙⁺⁺)
         
         # Compute aerosol Z-matrices for all aerosols
@@ -81,8 +82,8 @@ function rt_run(pol_type,              # Polarization type (IQUV)
         I_static = Diagonal(arr_type(Diagonal{FT}(ones(dims[1]))));
 
         scattering_interface = ScatteringInterface_00()
-        τ_sum = zeros(nSpec) #Suniti: declaring τ_sum to be of length nSpec
-        τ_λ = zeros(nSpec)
+        τ_sum = arr_type(zeros(FT,nSpec)) #Suniti: declaring τ_sum to be of length nSpec
+        τ_λ   = arr_type(zeros(FT,nSpec))
         # Loop over vertical layers:
         @showprogress 1 "Looping over layers ..." for iz = 1:Nz  # Count from TOA to BOA
             # Suniti: compute sum of optical thicknesses of all layers above the current layer
@@ -102,7 +103,7 @@ function rt_run(pol_type,              # Polarization type (IQUV)
             # @assert all(i -> (i ≈ τ * ϖ), τ_λ .* ϖ_λ)
 
             # Compute doubling number
-            dτ_max = minimum([τ * ϖ, FT(0.001) * minimum(qp_μ)])
+            dτ_max = minimum([τ * ϖ, FT(0.01) * minimum(qp_μ)])
             dτ, ndoubl = doubling_number(dτ_max, τ * ϖ) #Suniti
             #@show(ndoubl, dτ_max, τ)
             # Compute dτ vector
@@ -116,7 +117,7 @@ function rt_run(pol_type,              # Polarization type (IQUV)
                       true : false
             #@show(iz, scatter)
             # If there is scattering, perform the elemental and doubling steps
-            if (scatter)
+            if scatter
                 #@timeit "elemental" elemental!(pol_type, SFI, iμ0, τ_sum, dτ, dτ_max, ϖ_λ, ϖ, Z⁺⁺, Z⁻⁺, m, ndoubl, scatter, qp_μ, wt_μ, added_layer,  I_static, arr_type, architecture)
                 @timeit "elemental" elemental!(pol_type, SFI, iμ0, τ_sum, dτ_λ, dτ, ϖ_λ, ϖ, Z⁺⁺, Z⁻⁺, m, ndoubl, scatter, qp_μ, wt_μ, added_layer,  I_static, arr_type, architecture)
                 #@show(added_layer.t⁺⁺[1,1,1])
@@ -127,15 +128,17 @@ function rt_run(pol_type,              # Polarization type (IQUV)
                 added_layer.r⁻⁺[:] .= 0;
                 added_layer.r⁺⁻[:] .= 0;
                 added_layer.J₀⁻[:] .= 0;
-           
+                temp = Array(exp.(-τ_λ./qp_μN'))
+                #added_layer.t⁺⁺, added_layer.t⁻⁻ = (Diagonal(exp(-τ_λ / qp_μN)), Diagonal(exp(-τ_λ / qp_μN)))   
                 for iλ = 1:length(τ_λ)
                     #tmpJ₀⁺ .= 0
                     #tmpJ₀⁺[istart:iend] = exp.(-τ_sum[iλ]/qp_μ[iμ0])*I₀
                     #@show size(exp.(-τ_λ[iλ]./qp_μN))
-                    temp = Diagonal(exp.(-τ_λ[iλ]./qp_μN)[:,1]);
+                    
+                    #temp = Diagonal(exp.(-τ_λ[iλ]./qp_μN)[:,1]);
                     #@show size(temp)
-                    added_layer.t⁺⁺[:,:,iλ] = temp;
-                    added_layer.t⁻⁻[:,:,iλ] = temp;
+                    added_layer.t⁺⁺[:,:,iλ] = Diagonal(temp[iλ,:]);
+                    added_layer.t⁻⁻[:,:,iλ] = Diagonal(temp[iλ,:]);
                 end
             end
 
