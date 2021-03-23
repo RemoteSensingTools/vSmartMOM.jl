@@ -52,7 +52,7 @@ println("With FT: ", FT)
 Loop over number of truncation terms =#
 SFI = true
 
-m = 0
+m = 1
 
 println("Fourier Moment: ", m)
 
@@ -97,6 +97,7 @@ end
 # Construct the atmospheric layer
 # From Rayleigh and aerosol τ, ϖ, compute overall layer τ, ϖ
 #@timeit "Constructing" 
+
 τ_λ, ϖ_λ, τ, ϖ, Z⁺⁺, Z⁻⁺ = vSmartMOM.construct_atm_layer(τRayl[iz], τAer[:,iz], aerosol_optics, Rayl𝐙⁺⁺, Rayl𝐙⁻⁺, Aer𝐙⁺⁺, Aer𝐙⁻⁺, τ_abs[:,iz], arr_type)
 #@show(τ_λ)
 #@show(ϖ_λ)
@@ -115,10 +116,11 @@ dτ, ndoubl = vSmartMOM.doubling_number(dτ_max, τ * ϖ) #Suniti
 # Compute dτ vector
 dτ_λ = arr_type(τ_λ ./ (FT(2)^ndoubl))
 expk = exp.(-dτ_λ /qp_μ[iμ0]) #Suniti
-@show(τ_λ, dτ_λ.*FT(2)^ndoubl)
-@show(τ, dτ*FT(2)^ndoubl,dτ, dτ_λ )
-@show(expk, exp.(-dτ /qp_μ[iμ0]))
-@show τ_sum
+#@show(τ_λ, dτ_λ.*FT(2)^ndoubl)
+#@show(τ, dτ*FT(2)^ndoubl,dτ, dτ_λ )
+#@show(expk, exp.(-dτ /qp_μ[iμ0]))
+#@show τ_sum
+#@show dτ_λ, dτ
 #scatter = true
 vSmartMOM.elemental!(pol_type, SFI, iμ0, τ_sum, dτ_λ, dτ, ϖ_λ, ϖ, Z⁺⁺, Z⁻⁺, m, ndoubl, true, qp_μ, wt_μ, added_layer,  I_static, arr_type, architecture)
 vSmartMOM.doubling!(pol_type, SFI, expk, ndoubl, added_layer, I_static, architecture)
