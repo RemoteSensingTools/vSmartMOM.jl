@@ -1,7 +1,4 @@
 
-
-
-
 function default_parameters(FT::DataType=Float64)
 
     λ = FT(0.770) 
@@ -86,6 +83,120 @@ function default_parameters(FT::DataType=Float64)
                                 wing_cutoff,
                                 CEF,
                                 vmr,
+                                decomp_type,
+                                quadrature_type,
+                                architecture)
+
+end
+
+function parameters_from_yaml(file_path)
+
+    params_dict = YAML.load_file(file_path)
+    broadening_function = eval(Meta.parse(params_dict["absorption"]["broadening"]))
+    CEF = eval(Meta.parse(params_dict["absorption"]["CEF"]))
+
+    polarization_type = eval(Meta.parse(params_dict["scattering"]["polarization_type"]))
+    decomp_type = eval(Meta.parse(params_dict["scattering"]["decomp_type"]))
+
+    quadrature_type = eval(Meta.parse(params_dict["vSmartMOM"]["quadrature_type"]))
+
+    architecture = eval(Meta.parse(params_dict["vSmartMOM"]["architecture"]))
+
+    FT = eval(Meta.parse(params_dict["vSmartMOM"]["float_type"]))
+
+    return vSmartMOM_Parameters(FT,
+                                FT(params_dict["scattering"]["λ"]),
+                                FT(params_dict["scattering"]["depol"]),
+                                params_dict["truncation_type"]["l_trunc"],
+                                FT(params_dict["truncation_type"]["Δ_angle"]),
+                                params_dict["vSmartMOM"]["max_m"],
+                                polarization_type,
+                                FT(params_dict["geometry"]["obs_alt"]),
+                                FT(params_dict["geometry"]["sza"]),
+                                convert.(FT, params_dict["geometry"]["vza"]),
+                                convert.(FT, params_dict["geometry"]["vaz"]),
+                                FT(params_dict["scattering"]["aerosols"][1]["μ"]),
+                                FT(params_dict["scattering"]["aerosols"][1]["σ"]),
+                                FT(params_dict["scattering"]["aerosols"][1]["r_max"]),
+                                params_dict["scattering"]["aerosols"][1]["nquad_radius"],
+                                FT(params_dict["scattering"]["nᵣ"]),
+                                FT(params_dict["scattering"]["nᵢ"]),
+                                FT(params_dict["scattering"]["p₀"]),
+                                FT(params_dict["scattering"]["σp"]),
+                                params_dict["atmospheric_profile"]["file"],
+                                params_dict["atmospheric_profile"]["time_index"],
+                                params_dict["atmospheric_profile"]["lat"],
+                                params_dict["atmospheric_profile"]["lon"],
+                                params_dict["atmospheric_profile"]["profile_reduction"],
+                                FT(params_dict["absorption"]["ν_min"]),
+                                FT(params_dict["absorption"]["ν_max"]),
+                                FT(params_dict["absorption"]["ν_step"]),
+                                broadening_function,
+                                params_dict["absorption"]["wing_cutoff"],
+                                CEF,
+                                FT(params_dict["absorption"]["vmr"]),
+                                decomp_type,
+                                quadrature_type,
+                                architecture)
+end
+
+function parameters_from_json(file_path, FT::DataType=Float64)
+
+    JSON_obj = JSON.parsefile(file_path)
+    # validate_JSON_parameters(JSON_obj)
+
+    polarization_type = JSON_obj["polarization_type"] == "Stokes_I" ? Stokes_I{FT}() : 
+                        JSON_obj["polarization_type"] == "Stokes_IQU" ? Stokes_IQU{FT}() : 
+                        JSON_obj["polarization_type"] == "Stokes_IQUV" ? Stokes_IQUV{FT}() : Stokes_IQU{FT}()
+
+    decomp_type = JSON_obj["decomp_type"] == "NAI2" ? NAI2() : 
+                  JSON_obj["decomp_type"] == "PCW" ? PCW() : NAI2()
+
+    quadrature_type = JSON_obj["quadrature_type"] == "RadauQuad" ? RadauQuad() : 
+                      JSON_obj["quadrature_type"] == "GaussQuadHemisphere" ? GaussQuadHemisphere() : 
+                      JSON_obj["quadrature_type"] == "GaussQuadFullSphere" ? GaussQuadFullSphere() : RadauQuad()
+
+    architecture = JSON_obj["decomp_type"] == "Default" ? default_architecture : 
+                   JSON_obj["decomp_type"] == "GPU" ? GPU : 
+                   JSON_obj["decomp_type"] == "CPU" ? CPU : default_architecture
+
+    broadening_function = JSON_obj["broadening_function"] == "Voigt" ? Voigt() : 
+                          JSON_obj["broadening_function"] == "Doppler" ? Doppler() : 
+                          JSON_obj["broadening_function"] == "Lorentz" ? Lorentz() : Voigt()
+
+    CEF = JSON_obj["CEF"] == "HumlicekWeidemann32SDErrorFunction" ? HumlicekWeidemann32SDErrorFunction() : HumlicekWeidemann32SDErrorFunction()
+
+    return vSmartMOM_Parameters(FT,
+                                FT(JSON_obj["λ"]),
+                                FT(JSON_obj["depol"]),
+                                JSON_obj["l_trunc"],
+                                FT(JSON_obj["Δ_angle"]),
+                                JSON_obj["max_m"],
+                                polarization_type,
+                                FT(JSON_obj["obs_alt"]),
+                                FT(JSON_obj["sza"]),
+                                convert.(FT, JSON_obj["vza"]),
+                                convert.(FT, JSON_obj["vaz"]),
+                                FT(JSON_obj["μ"]),
+                                FT(JSON_obj["σ"]),
+                                FT(JSON_obj["r_max"]),
+                                JSON_obj["nquad_radius"],
+                                FT(JSON_obj["nᵣ"]),
+                                FT(JSON_obj["nᵢ"]),
+                                FT(JSON_obj["p₀"]),
+                                FT(JSON_obj["σp"]),
+                                JSON_obj["file"],
+                                JSON_obj["timeIndex"],
+                                JSON_obj["lat"],
+                                JSON_obj["lon"],
+                                JSON_obj["profile_reduction_n"],
+                                FT(JSON_obj["grid_start"]),
+                                FT(JSON_obj["grid_end"]),
+                                JSON_obj["grid_n"],
+                                broadening_function,
+                                JSON_obj["wing_cutoff"],
+                                CEF,
+                                FT(JSON_obj["vmr"]),
                                 decomp_type,
                                 quadrature_type,
                                 architecture)
