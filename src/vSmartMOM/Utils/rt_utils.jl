@@ -65,6 +65,9 @@ end
 
 default_matrix(FT, arr_type, dims, nSpec)   = arr_type(zeros(FT, tuple(dims[1], dims[2], nSpec)))
 default_J_matrix(FT, arr_type, dims, nSpec) = arr_type(zeros(FT, tuple(dims[1], 1, nSpec)))
+
+default_matrix_rand(FT, arr_type, dims, nSpec)   = arr_type(randn(FT, tuple(dims[1], dims[2], nSpec)))
+default_J_matrix_rand(FT, arr_type, dims, nSpec) = arr_type(randn(FT, tuple(dims[1], 1, nSpec)))
 #default_test_vector(FT, arr_type,3) = arr_type(zeros(FT, tuple(3)))
 make_added_layer(FT, arr_type, dims, nSpec)     = AddedLayer(default_matrix(FT, arr_type, dims, nSpec), 
                                                          default_matrix(FT, arr_type, dims, nSpec), 
@@ -73,6 +76,15 @@ make_added_layer(FT, arr_type, dims, nSpec)     = AddedLayer(default_matrix(FT, 
                                                          default_J_matrix(FT, arr_type, dims, nSpec),
                                                          default_J_matrix(FT, arr_type, dims, nSpec)
                                                          )
+
+make_added_layer_rand(FT, arr_type, dims, nSpec)     = AddedLayer(default_matrix_rand(FT, arr_type, dims, nSpec), 
+                                                         default_matrix_rand(FT, arr_type, dims, nSpec), 
+                                                         default_matrix_rand(FT, arr_type, dims, nSpec),
+                                                         default_matrix_rand(FT, arr_type, dims, nSpec),
+                                                         default_J_matrix_rand(FT, arr_type, dims, nSpec),
+                                                         default_J_matrix_rand(FT, arr_type, dims, nSpec)
+                                                         )
+                                                         
 
 make_composite_layer(FT, arr_type, dims, nSpec) = CompositeLayer(default_matrix(FT, arr_type, dims, nSpec), 
                                                                  default_matrix(FT, arr_type, dims, nSpec), 

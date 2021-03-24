@@ -16,7 +16,9 @@ function doubling_helper!(pol_type, SFI, expk, ndoubl::Int,
     # Used to store `inv(I - r⁻⁺ * r⁻⁺) * t⁺⁺`
     
     # Geometric progression of reflections (1-RR)⁻¹
-    gp_refl  = similar(t⁺⁺)
+    gp_refl      = similar(t⁺⁺)
+    tt⁺⁺_gp_refl = similar(t⁺⁺)
+ 
     if SFI
         # Dummy for source 
         J₁⁺ = similar(J₀⁺)
@@ -24,9 +26,9 @@ function doubling_helper!(pol_type, SFI, expk, ndoubl::Int,
         J₁⁻ = similar(J₀⁻)
     end
     #@show typeof(r⁺⁻), typeof(J₀⁺), typeof(expk), typeof(I_static)
-    for n = 1:ndoubl 
+    for n = 1:ndoubl
         batch_inv!(gp_refl, I_static .- r⁻⁺ ⊠ r⁻⁺)
-        tt⁺⁺_gp_refl = t⁺⁺ ⊠ gp_refl
+        tt⁺⁺_gp_refl[:] = t⁺⁺ ⊠ gp_refl
         # J₁⁺[:,1,:] =  J₀⁺[:,1,:] .* expk'
         if SFI
             J₁⁺[:,1,:] = J₀⁺[:,1,:] .* expk'
@@ -34,7 +36,7 @@ function doubling_helper!(pol_type, SFI, expk, ndoubl::Int,
             #@show size(J₀⁺), size(J₁⁺), size((t⁺⁺ ⊠ gp_refl ⊠ (J₀⁺ .+ r⁻⁺ ⊠ J₁⁻)))
             J₀⁻[:] = J₀⁻ + (tt⁺⁺_gp_refl ⊠ (J₁⁻ + r⁻⁺ ⊠ J₀⁺)) 
             J₀⁺[:] = J₁⁺ + (tt⁺⁺_gp_refl ⊠ (J₀⁺ + r⁻⁺ ⊠ J₁⁻))
-            expk = expk.^2
+            expk[:] = expk.^2
         end  
         r⁻⁺[:]  = r⁻⁺ + (tt⁺⁺_gp_refl ⊠ r⁻⁺ ⊠ t⁺⁺)
         t⁺⁺[:]  = tt⁺⁺_gp_refl ⊠ t⁺⁺

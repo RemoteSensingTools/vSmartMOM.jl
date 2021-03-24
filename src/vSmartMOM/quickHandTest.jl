@@ -52,7 +52,7 @@ println("With FT: ", FT)
 Loop over number of truncation terms =#
 SFI = true
 
-m = 1
+m = 0
 
 println("Fourier Moment: ", m)
 
@@ -85,8 +85,8 @@ added_layer = vSmartMOM.make_added_layer(FT, arr_type, dims, nSpec)
 composite_layer = vSmartMOM.make_composite_layer(FT, arr_type, dims, nSpec)
 I_static = Diagonal(arr_type(Diagonal{FT}(ones(dims[1]))));
 scattering_interface = vSmartMOM.ScatteringInterface_00()
-τ_sum = zeros(nSpec) #Suniti: declaring τ_sum to be of length nSpec
-τ_λ = zeros(nSpec)
+τ_sum = arr_type(zeros(nSpec)) #Suniti: declaring τ_sum to be of length nSpec
+τ_λ = arr_type(zeros(nSpec))
 iz = Nz
 if iz==1
     τ_sum = τ_λ
@@ -122,8 +122,8 @@ expk = exp.(-dτ_λ /qp_μ[iμ0]) #Suniti
 #@show τ_sum
 #@show dτ_λ, dτ
 #scatter = true
-vSmartMOM.elemental!(pol_type, SFI, iμ0, τ_sum, dτ_λ, dτ, ϖ_λ, ϖ, Z⁺⁺, Z⁻⁺, m, ndoubl, true, qp_μ, wt_μ, added_layer,  I_static, arr_type, architecture)
-vSmartMOM.doubling!(pol_type, SFI, expk, ndoubl, added_layer, I_static, architecture)
+@time vSmartMOM.elemental!(pol_type, SFI, iμ0, τ_sum, dτ_λ, dτ, ϖ_λ, ϖ, Z⁺⁺, Z⁻⁺, m, ndoubl, true, qp_μ, wt_μ, added_layer,  I_static, arr_type, architecture)
+@time vSmartMOM.doubling!(pol_type, SFI, expk, ndoubl, added_layer, I_static, architecture)
 #added_layer_DNI = vSmartMOM.make_added_layer(FT, arr_type, dims, nSpec) 
 #composite_layer_DNI = vSmartMOM.make_composite_layer(FT, arr_type, dims, nSpec)
 #vSmartMOM.elemental!(pol_type, false, iμ0, τ_sum, dτ_λ, dτ, ϖ_λ, ϖ, Z⁺⁺, Z⁻⁺, m, ndoubl, true, qp_μ, wt_μ, added_layer_DNI,  I_static, arr_type, architecture)
