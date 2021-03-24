@@ -53,6 +53,7 @@ function rt_run(pol_type,              # Polarization type (IQUV)
         # For m>=3, Rayleigh matrices will be 0, can catch with if statement if wanted 
         Rayl𝐙⁺⁺, Rayl𝐙⁻⁺ = Scattering.compute_Z_moments(pol_type, qp_μ, GreekRayleigh, m, arr_type = arr_type);
 
+        @show size(Rayl𝐙⁺⁺)
         # Number of aerosols
         #@show size(aerosol_optics)
         #nBand = length(aerosol_optics)
@@ -121,6 +122,7 @@ function rt_run(pol_type,              # Polarization type (IQUV)
                 #@timeit "elemental" elemental!(pol_type, SFI, iμ0, τ_sum, dτ, dτ_max, ϖ_λ, ϖ, Z⁺⁺, Z⁻⁺, m, ndoubl, scatter, qp_μ, wt_μ, added_layer,  I_static, arr_type, architecture)
                 @timeit "elemental" elemental!(pol_type, SFI, iμ0, τ_sum, dτ_λ, dτ, ϖ_λ, ϖ, Z⁺⁺, Z⁻⁺, m, ndoubl, scatter, qp_μ, wt_μ, added_layer,  I_static, arr_type, architecture)
                 #@show(added_layer.t⁺⁺[1,1,1])
+                #@show ndoubl, dτ
                 @timeit "doubling"   doubling!(pol_type, SFI, expk, ndoubl, added_layer, I_static, architecture)
                 #@show(added_layer.t⁺⁺[1,1,1])
                 # If not, there is no reflectance. Assign r/t appropriately
