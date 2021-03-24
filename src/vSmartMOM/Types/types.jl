@@ -119,17 +119,17 @@ mutable struct vSmartMOM_Parameters{FT} #<: AbstractvSmartMOMModel
     "Time index to retrieve from file "
     timeIndex::Integer
     "Latitude of atmospheric profile"
-    lat::FT
+    lat::Number
     "Longitude of atmospheric profile"
-    lon::FT
+    lon::Number
     "Length of profile reduction"
     profile_reduction_n::Integer
-    "Starting wavelength for absorption grid"
-    grid_start::FT
-    "Ending wavelength for absorption grid"
-    grid_end::FT
+    "Starting wavenumber for absorption grid"
+    ν_min::FT
+    "Ending wavenumber for absorption grid"
+    ν_max::FT
     "Number of spectral points in absorption grid"
-    grid_n::Integer
+    ν_step::FT
     "Type of broadening function (Doppler/Lorentz/Voigt)"
     broadening_function::AbstractBroadeningFunction
     "Wing cutoff to use in cross-section calculation"
