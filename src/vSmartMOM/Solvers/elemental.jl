@@ -64,7 +64,8 @@ function elemental_helper!(pol_type, SFI, iμ0,
         # Calculate r⁻⁺ and t⁺⁺
         
         # Version 1: no absorption in batch mode (like before), need to separate these modes
-        if maximum(dτ_λ) < 0.0001 
+        if maximum(dτ_λ) < 0.001 
+            #@show "Chose simple elemental"
             #@show typeof(τ_sum)
             r⁻⁺[:,:,:] .= d_qp * Z⁻⁺ * (d_wct * dτ)
             t⁺⁺[:,:,:] .= I_static - (d_qp * ((I_static - Z⁺⁺ * d_wct) * dτ))
@@ -79,7 +80,8 @@ function elemental_helper!(pol_type, SFI, iμ0,
             #ii = pol_type.n*(iμ0-1)+1
             #@show 'A',iμ0,  r⁻⁺[1,ii,1]/(J₀⁻[1,1,1]*wt_μ[iμ0]), r⁻⁺[1,ii,1], J₀⁻[1,1,1]*wt_μ[iμ0], J₀⁺[1,1,1]*wt_μ[iμ0]
     
-        else    
+        else
+            #@show "Chose accurate elemental",  maximum(dτ_λ)   
             #@show('B')
             # Version 2: with absorption in batch mode, low tau_scatt but higher tau_total, needs different equations
             # This is not yet GPU ready as it has element wise operations (should work for CPU)

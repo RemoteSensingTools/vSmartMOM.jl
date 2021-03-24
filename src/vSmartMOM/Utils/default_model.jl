@@ -9,12 +9,14 @@ function default_parameters(FT::DataType=Float64)
     λ_band = FT[0.770] 
     λ_ref = FT(0.770) 
     depol = FT(0.0)
-    l_trunc = 10 
+    l_trunc = 5 
     Δ_angle = FT(0.0)
     polarization_type = Stokes_IQU{FT}()
 
-    vza = FT[60., 45., 30., 15., 0., 15., 30., 45., 60.]
-    vaz = FT[180., 180., 180., 180., 0., 0., 0., 0., 0.]
+    #vza = FT[60., 45., 30., 15., 0., 15., 30., 45., 60.]
+    #vaz = FT[180., 180., 180., 180., 0., 0., 0., 0., 0.]
+    vza = FT[0.]
+    vaz = FT[0.]
     sza = FT(60.)
 
     obs_alt = FT(1000.0)
@@ -51,7 +53,7 @@ function default_parameters(FT::DataType=Float64)
     SFI = 1 #Suniti: 0:= DNI, 1:= SFI
     spec_grid_start = FT[(1e7 / 777)]
     spec_grid_end = FT[(1e7 / 747)]
-    spec_grid_n = Integer[10000]
+    spec_grid_n = Integer[20000]
 
     broadening_function = Voigt()
     wing_cutoff = 100

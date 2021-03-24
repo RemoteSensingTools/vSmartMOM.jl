@@ -17,10 +17,12 @@ function doubling_helper!(pol_type, SFI, expk, ndoubl::Int,
     
     # Geometric progression of reflections (1-RR)⁻¹
     gp_refl  = similar(t⁺⁺)
-    # Dummy for source 
-    J₁⁺ = similar(J₀⁺)
-    # Dummy for J
-    J₁⁻ = similar(J₀⁻)
+    if SFI
+        # Dummy for source 
+        J₁⁺ = similar(J₀⁺)
+        # Dummy for J
+        J₁⁻ = similar(J₀⁻)
+    end
     #@show typeof(r⁺⁻), typeof(J₀⁺), typeof(expk), typeof(I_static)
     for n = 1:ndoubl 
         batch_inv!(gp_refl, I_static .- r⁻⁺ ⊠ r⁻⁺)
@@ -43,7 +45,9 @@ function doubling_helper!(pol_type, SFI, expk, ndoubl::Int,
     # For SFI, after doubling, revert D(DJ₀⁻)->J₀⁻
     ### synchronize()
     apply_D_matrix!(pol_type.n, added_layer.r⁻⁺, added_layer.t⁺⁺, added_layer.r⁺⁻, added_layer.t⁻⁻)
-    apply_D_matrix_SFI!(pol_type.n, added_layer.J₀⁻)
+    if SFI
+        apply_D_matrix_SFI!(pol_type.n, added_layer.J₀⁻)
+    end
     #@pack! added_layer = r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, J₀⁺, J₀⁻
     return nothing 
 end
