@@ -5,7 +5,8 @@ export
     @hascuda,
     AbstractArchitecture, CPU, GPU,
     devi, array_type, 
-    default_architecture
+    default_architecture,
+    synchronize_if_gpu
 
 using CUDA
 
@@ -48,5 +49,7 @@ devi(::GPU) = KernelAbstractions.CUDADevice()
 @hascuda array_type(::GPU) = CuArray
 
 default_architecture = has_cuda() ? GPU() : CPU()
+
+synchronize_if_gpu() = has_cuda() ? synchronize() : nothing
 
 end
