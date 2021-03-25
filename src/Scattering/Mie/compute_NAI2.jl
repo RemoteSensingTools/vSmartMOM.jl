@@ -150,15 +150,12 @@ function compute_aerosol_optical_properties(model::MieModel{FDT}, FT2::Type=Floa
                                  convert.(FT2, ϵ), 
                                  convert.(FT2, ζ))
         # Return the packaged AerosolOptics object
-        return AerosolOptics(greek_coefs=greek_coefs, ω̃=FT2(bulk_C_sca / bulk_C_ext), k=FT2(bulk_C_ext) )
+        return AerosolOptics(greek_coefs=greek_coefs, ω̃=FT2(bulk_C_sca / bulk_C_ext), k=FT2(bulk_C_ext), fᵗ=FT2(1))
 
     else
         greek_coefs = GreekCoefs(α, β, γ,δ,ϵ,ζ)
-        return AerosolOptics(greek_coefs=greek_coefs, ω̃=(bulk_C_sca / bulk_C_ext), k=(bulk_C_ext) )
+        return AerosolOptics(greek_coefs=greek_coefs, ω̃=(bulk_C_sca / bulk_C_ext), k=(bulk_C_ext), fᵗ=FT(1))
     end
-
-    # Return the packaged AerosolOptics object
-    return AerosolOptics(greek_coefs=greek_coefs, ω̃=FT2(bulk_C_sca / bulk_C_ext), k=FT2(bulk_C_ext), fᵗ=FT2(1) )
 end
 
 function compute_ref_aerosol_extinction(model::MieModel{FDT}, FT2::Type=Float64) where FDT <: NAI2
