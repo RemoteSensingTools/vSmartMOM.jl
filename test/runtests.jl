@@ -18,4 +18,4 @@ using CUDA
 @testset "RadiativeTransfer.Absorption" begin include("test_Absorption.jl") end
 
 # Test the Phase Function module
-# @testset "RadiativeTransfer.Scattering" begin include("test_Scattering.jl") end
+@testset "RadiativeTransfer.Scattering" begin include("test_Scattering.jl") end

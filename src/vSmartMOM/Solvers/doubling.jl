@@ -45,7 +45,7 @@ function doubling_helper!(pol_type, SFI, expk, ndoubl::Int,
     end
     # After doubling, revert D(DR)->R, where D = Diagonal{1,1,-1,-1}
     # For SFI, after doubling, revert D(DJ₀⁻)->J₀⁻
-    ### synchronize()
+    synchronize_if_gpu()
     apply_D_matrix!(pol_type.n, added_layer.r⁻⁺, added_layer.t⁺⁺, added_layer.r⁺⁻, added_layer.t⁻⁻)
     if SFI
         apply_D_matrix_SFI!(pol_type.n, added_layer.J₀⁻)
@@ -62,6 +62,7 @@ function doubling!(pol_type, SFI, expk,
 
     doubling_helper!(pol_type, SFI, expk, ndoubl, added_layer, I_static, architecture)
     ### synchronize() #Suniti: does this convert the added layer to the current layer, so that added_layer.M = M?
+    synchronize_if_gpu()
 end
 
 @kernel function apply_D!(n_stokes::Int,  r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻)
@@ -103,7 +104,7 @@ function apply_D_matrix!(n_stokes::Int, r⁻⁺::CuArray{FT,3}, t⁺⁺::CuArray
         applyD_kernel! = apply_D!(KernelAbstractions.CUDADevice())
         event = applyD_kernel!(n_stokes, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻, ndrange=size(r⁻⁺));
         wait(KernelAbstractions.CUDADevice(), event);
-        synchronize();
+        synchronize_if_gpu();
         return nothing
     end
 end
@@ -118,7 +119,6 @@ function apply_D_matrix!(n_stokes::Int, r⁻⁺::Array{FT,3}, t⁺⁺::Array{FT,
         applyD_kernel! = apply_D!(KernelAbstractions.CPU())
         event = applyD_kernel!(n_stokes, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻, ndrange=size(r⁻⁺));
         wait(KernelAbstractions.CPU(), event);
-        ### synchronize();
         return nothing
     end
 end
@@ -143,7 +143,6 @@ function apply_D_matrix_SFI!(n_stokes::Int, J₀⁻::CuArray{FT,3}) where
             applyD_kernel! = apply_D_SFI!(KernelAbstractions.CPU())
             event = applyD_kernel!(n_stokes, J₀⁻, ndrange=size(J₀⁻));
             wait(KernelAbstractions.CPU(), event);
-            ### synchronize();
             return nothing
         end
     end
