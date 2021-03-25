@@ -112,6 +112,6 @@ function interaction!(scattering_interface::AbstractScatteringInterface, SFI,
                         I_static::AbstractArray{FT}) where {FT}
 
     interaction_helper!(scattering_interface, SFI, composite_layer, added_layer, I_static)
-    ### synchronize()
+    synchronize_if_gpu()
     
 end
