@@ -11,7 +11,7 @@ parameters = vSmartMOM.parameters_from_yaml("RadiativeTransfer/src/vSmartMOM/Mod
 # parameters = vSmartMOM.default_parameters();
 
 # Generates all the derived attributes from above parameters
- model = default_model(parameters);
+ model = model_from_parameters(parameters);
 
 # Run RT using the computed model
 @time R_GPU, T_GPU = vSmartMOM.rt_run(model);

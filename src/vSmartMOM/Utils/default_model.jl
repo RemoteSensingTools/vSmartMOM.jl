@@ -204,7 +204,7 @@ function parameters_from_json(file_path, FT::DataType=Float64)
 end
 
 
-function default_model(params::vSmartMOM_Parameters)
+function model_from_parameters(params::vSmartMOM_Parameters)
 
     
     truncation_type = Scattering.δBGE{params.float_type}(params.l_trunc, params.Δ_angle)
@@ -243,7 +243,7 @@ function default_model(params::vSmartMOM_Parameters)
     # aerosol_optics = [aerosol_optics_trunc_aero1] # 
 
 
-    grid = range(params.grid_start, params.grid_end, length=params.grid_n);
+    grid = params.ν_min:params.ν_step:params.ν_max;
     τ_abs = zeros(params.float_type, length(grid), length(profile.p));
 
     hitran_data = read_hitran(artifact("O2"), iso=1)
