@@ -4,8 +4,8 @@ absorption:
   # Complex error function 
   CEF:                HumlicekWeidemann32SDErrorFunction()
   wing_cutoff:        40
-  ν_min:              6000
-  ν_max:              6400
+  ν_min:              12920 # 6000
+  ν_max:              13210 # 6400
   ν_step:             0.1
   vmr:                0.21
   molecules:      
@@ -33,8 +33,7 @@ geometry:
   obs_alt:            1000.0
 
 atmospheric_profile: 
-  file: |         
-    /net/fluo/data1/ftp/XYZT_ESE156/Data/MERRA300.prod.assim.inst6_3d_ana_Nv.20150613.hdf.nc4
+  file: /net/fluo/data1/ftp/XYZT_ESE156/Data/MERRA300.prod.assim.inst6_3d_ana_Nv.20150613.hdf.nc4
   lat:                34.1377
   lon:                -118.1253
   time_index:         2
@@ -48,4 +47,4 @@ vSmartMOM:
   quadrature_type:    RadauQuad()
   max_m:              3
   architecture:       default_architecture
-  float_type:         Float32
+  float_type:         Float64

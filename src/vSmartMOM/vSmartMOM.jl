@@ -41,6 +41,6 @@ include("GPU/CUDA_getri.jl")
 include("Utils/default_model.jl")
 
 export rt_set_streams, compute_absorption_profile!, ObsGeometry, default_model, 
-       default_parameters, parameters_from_json, parameters_from_yaml
+       model_from_parameters, parameters_from_json, parameters_from_yaml
 
 end
