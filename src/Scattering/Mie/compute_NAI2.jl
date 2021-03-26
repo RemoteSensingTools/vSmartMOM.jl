@@ -21,7 +21,7 @@ function compute_aerosol_optical_properties(model::MieModel{FDT}, FT2::Type=Floa
 
     # Get the refractive index's real part type
     FT = eltype(nᵣ);
-    @assert FT == Float64 "Aerosol computations require 64bit"
+    # @assert FT == Float64 "Aerosol computations require 64bit"
     # Get radius quadrature points and weights (for mean, thus normalized):
     r, wᵣ = gauleg(nquad_radius, 0.0, r_max ; norm=true) 
     
@@ -140,16 +140,22 @@ function compute_aerosol_optical_properties(model::MieModel{FDT}, FT2::Type=Floa
         α[l + 1] = fac      * w_μ' * (bulk_f₁₁ .* R²[:,l + 1] + bulk_f₃₃ .* T²[:,l + 1]) 
     end
 
-    # Create GreekCoefs object with α, β, γ, δ, ϵ, ζ
-    greek_coefs = GreekCoefs(convert.(FT2, α), 
-                             convert.(FT2, β), 
-                             convert.(FT2, γ), 
-                             convert.(FT2, δ), 
-                             convert.(FT2, ϵ), 
-                             convert.(FT2, ζ))
+    # Check whether this is a Dual number (if so, don't do any conversions)
+    if FT2 <: AbstractFloat
+        # Create GreekCoefs object with α, β, γ, δ, ϵ, ζ
+        greek_coefs = GreekCoefs(convert.(FT2, α), 
+                                 convert.(FT2, β), 
+                                 convert.(FT2, γ), 
+                                 convert.(FT2, δ), 
+                                 convert.(FT2, ϵ), 
+                                 convert.(FT2, ζ))
+        # Return the packaged AerosolOptics object
+        return AerosolOptics(greek_coefs=greek_coefs, ω̃=FT2(bulk_C_sca / bulk_C_ext), k=FT2(bulk_C_ext), fᵗ=FT2(1))
 
-    # Return the packaged AerosolOptics object
-    return AerosolOptics(greek_coefs=greek_coefs, ω̃=FT2(bulk_C_sca / bulk_C_ext), k=FT2(bulk_C_ext), fᵗ=FT2(1) )
+    else
+        greek_coefs = GreekCoefs(α, β, γ,δ,ϵ,ζ)
+        return AerosolOptics(greek_coefs=greek_coefs, ω̃=(bulk_C_sca / bulk_C_ext), k=(bulk_C_ext), fᵗ=FT(1))
+    end
 end
 
 function compute_ref_aerosol_extinction(model::MieModel{FDT}, FT2::Type=Float64) where FDT <: NAI2

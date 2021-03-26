@@ -98,7 +98,7 @@ function elemental_helper!(pol_type, SFI, iμ0,
             #ii = pol_type.n*(iμ0-1)+1
             #@show 'B',iμ0,  r⁻⁺[1,ii,1]/(J₀⁻[1,1,1]*wt_μ[iμ0]), r⁻⁺[1,ii,1], J₀⁻[1,1,1]*wt_μ[iμ0], J₀⁺[1,1,1]*wt_μ[iμ0]
             
-            ### synchronize() # Check for CUDA here, only use with GPU!
+            synchronize_if_gpu()
         end
         kernel! = apply_D_elemental!(device)
         event = kernel!(ndoubl, pol_type.n, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻, ndrange=size(r⁻⁺));
@@ -231,5 +231,5 @@ function elemental!(pol_type, SFI, iμ0, τ_sum, dτ_λ, dτ, ϖ_λ, ϖ, Z⁺⁺
                               architecture) where {FT}
     
     elemental_helper!(pol_type, SFI, iμ0, τ_sum, dτ_λ, dτ, ϖ_λ, ϖ, Z⁺⁺, Z⁻⁺, m, ndoubl, scatter, qp_μ, wt_μ, added_layer, I_static, arr_type, architecture)
-    ### synchronize()
+    synchronize_if_gpu()
 end
