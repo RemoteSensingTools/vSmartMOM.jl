@@ -47,7 +47,7 @@ model_PCW = make_mie_model(PCW(), aero, λ, polarization_type, truncation_type, 
 # @btime aerosol_optics_PCW = compute_aerosol_optical_properties(model_PCW);
 
 # Compute the derivatives!
-aerosol_optics_NAI2 = compute_aerosol_optical_properties(model_NAI2);
+compute_aerosol_optical_properties(model_NAI2, autodiff=true);
 aerosol_optics_PCW = compute_aerosol_optical_properties(model_PCW);
 
 # aerosol_optics_NAI2.greek_coefs.α ≈ aerosol_optics_PCW.greek_coefs.α

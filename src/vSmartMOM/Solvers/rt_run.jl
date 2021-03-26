@@ -88,6 +88,7 @@ function rt_run(pol_type,              # Polarization type (IQUV)
         I_static = Diagonal(arr_type(Diagonal{FT}(ones(dims[1]))));
 
         scattering_interface = ScatteringInterface_00()
+
         τ_sum = arr_type(zeros(FT,nSpec)) #Suniti: declaring τ_sum to be of length nSpec
         τ_λ   = arr_type(zeros(FT,nSpec))
         # Loop over vertical layers:
@@ -190,7 +191,7 @@ function rt_run(pol_type,              # Polarization type (IQUV)
         #end
 
         # idx of μ0 = cos(sza)
-        st_iμ0, istart0, iend0 = get_indices(iμ0, pol_type)
+        st_iμ0, istart0, iend0 = get_indices(iμ0, pol_type);
 
         # Convert these to Arrays (if CuArrays), so they can be accessed by index
         R⁻⁺ = Array(composite_layer.R⁻⁺)
@@ -201,21 +202,21 @@ function rt_run(pol_type,              # Polarization type (IQUV)
         for i = 1:length(vza)
 
             # Find the nearest quadrature point idx
-            iμ = nearest_point(qp_μ, cosd(vza[i]))
-            st_iμ, istart, iend = get_indices(iμ, pol_type)
+            iμ = nearest_point(qp_μ, cosd(vza[i]));
+            st_iμ, istart, iend = get_indices(iμ, pol_type);
             
             # Compute bigCS
-            cos_m_phi, sin_m_phi = (cosd(m * vaz[i]), sind(m * vaz[i]))
-            bigCS = weight * Diagonal([cos_m_phi, cos_m_phi, sin_m_phi, sin_m_phi][1:pol_type.n])
+            cos_m_phi, sin_m_phi = (cosd(m * vaz[i]), sind(m * vaz[i]));
+            bigCS = weight * Diagonal([cos_m_phi, cos_m_phi, sin_m_phi, sin_m_phi][1:pol_type.n]);
 
             # Accumulate Fourier moments after azimuthal weighting
             
             for s = 1:nSpec
-                R[i,:,s] += bigCS * (R⁻⁺[istart:iend, istart0:iend0, s] / wt_μ[iμ0]) * pol_type.I₀
-                T[i,:,s] += bigCS * (T⁺⁺[istart:iend, istart0:iend0, s] / wt_μ[iμ0]) * pol_type.I₀
+                R[i,:,s] += bigCS * (R⁻⁺[istart:iend, istart0:iend0, s] / wt_μ[iμ0]) * pol_type.I₀;
+                T[i,:,s] += bigCS * (T⁺⁺[istart:iend, istart0:iend0, s] / wt_μ[iμ0]) * pol_type.I₀;
                 if SFI
-                    R_SFI[i,:,s] += bigCS * J₀⁻[istart:iend,1, s]
-                    T_SFI[i,:,s] += bigCS * J₀⁺[istart:iend,1, s]
+                    R_SFI[i,:,s] += bigCS * J₀⁻[istart:iend,1, s];
+                    T_SFI[i,:,s] += bigCS * J₀⁺[istart:iend,1, s];
                 end
                 #@show(m,R[i,1,s], R_SFI[i,1,s])
             end

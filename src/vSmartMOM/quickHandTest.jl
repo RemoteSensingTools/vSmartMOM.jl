@@ -86,8 +86,8 @@ added_layer = vSmartMOM.make_added_layer(FT, arr_type, dims, nSpec)
 composite_layer = vSmartMOM.make_composite_layer(FT, arr_type, dims, nSpec)
 I_static = Diagonal(arr_type(Diagonal{FT}(ones(dims[1]))));
 scattering_interface = vSmartMOM.ScatteringInterface_00()
-τ_sum = zeros(nSpec) #Suniti: declaring τ_sum to be of length nSpec
-τ_λ = zeros(nSpec)
+τ_sum = arr_type(zeros(nSpec)) #Suniti: declaring τ_sum to be of length nSpec
+τ_λ = arr_type(zeros(nSpec))
 iz = Nz
 if iz==1
     τ_sum = τ_λ

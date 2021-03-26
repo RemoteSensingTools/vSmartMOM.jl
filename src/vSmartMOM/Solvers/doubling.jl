@@ -16,7 +16,9 @@ function doubling_helper!(pol_type, SFI, expk, ndoubl::Int,
     # Used to store `inv(I - r⁻⁺ * r⁻⁺) * t⁺⁺`
     
     # Geometric progression of reflections (1-RR)⁻¹
-    gp_refl  = similar(t⁺⁺)
+    gp_refl      = similar(t⁺⁺)
+    tt⁺⁺_gp_refl = similar(t⁺⁺)
+ 
     if SFI
         # Dummy for source 
         J₁⁺ = similar(J₀⁺)
@@ -24,9 +26,9 @@ function doubling_helper!(pol_type, SFI, expk, ndoubl::Int,
         J₁⁻ = similar(J₀⁻)
     end
     #@show typeof(r⁺⁻), typeof(J₀⁺), typeof(expk), typeof(I_static)
-    for n = 1:ndoubl 
+    for n = 1:ndoubl
         batch_inv!(gp_refl, I_static .- r⁻⁺ ⊠ r⁻⁺)
-        tt⁺⁺_gp_refl = t⁺⁺ ⊠ gp_refl
+        tt⁺⁺_gp_refl[:] = t⁺⁺ ⊠ gp_refl
         # J₁⁺[:,1,:] =  J₀⁺[:,1,:] .* expk'
         if SFI
             J₁⁺[:,1,:] = J₀⁺[:,1,:] .* expk'
@@ -34,7 +36,7 @@ function doubling_helper!(pol_type, SFI, expk, ndoubl::Int,
             #@show size(J₀⁺), size(J₁⁺), size((t⁺⁺ ⊠ gp_refl ⊠ (J₀⁺ .+ r⁻⁺ ⊠ J₁⁻)))
             J₀⁻[:] = J₀⁻ + (tt⁺⁺_gp_refl ⊠ (J₁⁻ + r⁻⁺ ⊠ J₀⁺)) 
             J₀⁺[:] = J₁⁺ + (tt⁺⁺_gp_refl ⊠ (J₀⁺ + r⁻⁺ ⊠ J₁⁻))
-            expk = expk.^2
+            expk[:] = expk.^2
         end  
         r⁻⁺[:]  = r⁻⁺ + (tt⁺⁺_gp_refl ⊠ r⁻⁺ ⊠ t⁺⁺)
         t⁺⁺[:]  = tt⁺⁺_gp_refl ⊠ t⁺⁺
@@ -43,7 +45,7 @@ function doubling_helper!(pol_type, SFI, expk, ndoubl::Int,
     end
     # After doubling, revert D(DR)->R, where D = Diagonal{1,1,-1,-1}
     # For SFI, after doubling, revert D(DJ₀⁻)->J₀⁻
-    ### synchronize()
+    synchronize_if_gpu()
     apply_D_matrix!(pol_type.n, added_layer.r⁻⁺, added_layer.t⁺⁺, added_layer.r⁺⁻, added_layer.t⁻⁻)
     if SFI
         apply_D_matrix_SFI!(pol_type.n, added_layer.J₀⁻)
@@ -60,6 +62,7 @@ function doubling!(pol_type, SFI, expk,
 
     doubling_helper!(pol_type, SFI, expk, ndoubl, added_layer, I_static, architecture)
     ### synchronize() #Suniti: does this convert the added layer to the current layer, so that added_layer.M = M?
+    synchronize_if_gpu()
 end
 
 @kernel function apply_D!(n_stokes::Int,  r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻)
@@ -101,7 +104,7 @@ function apply_D_matrix!(n_stokes::Int, r⁻⁺::CuArray{FT,3}, t⁺⁺::CuArray
         applyD_kernel! = apply_D!(KernelAbstractions.CUDADevice())
         event = applyD_kernel!(n_stokes, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻, ndrange=size(r⁻⁺));
         wait(KernelAbstractions.CUDADevice(), event);
-        synchronize();
+        synchronize_if_gpu();
         return nothing
     end
 end
@@ -116,7 +119,6 @@ function apply_D_matrix!(n_stokes::Int, r⁻⁺::Array{FT,3}, t⁺⁺::Array{FT,
         applyD_kernel! = apply_D!(KernelAbstractions.CPU())
         event = applyD_kernel!(n_stokes, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻, ndrange=size(r⁻⁺));
         wait(KernelAbstractions.CPU(), event);
-        ### synchronize();
         return nothing
     end
 end
@@ -141,7 +143,6 @@ function apply_D_matrix_SFI!(n_stokes::Int, J₀⁻::CuArray{FT,3}) where
             applyD_kernel! = apply_D_SFI!(KernelAbstractions.CPU())
             event = applyD_kernel!(n_stokes, J₀⁻, ndrange=size(J₀⁻));
             wait(KernelAbstractions.CPU(), event);
-            ### synchronize();
             return nothing
         end
     end
