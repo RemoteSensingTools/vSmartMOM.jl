@@ -32,6 +32,7 @@ function rt_run(pol_type,              # Polarization type (IQUV)
 
     # Copy qp_μ "pol_type.n" times
     qp_μN = arr_type(reshape(transpose(repeat(qp_μ, 1, pol_type.n)),pol_type.n*size(qp_μ)[1],1))
+    wt_μN = arr_type(reshape(transpose(repeat(wt_μ, 1, pol_type.n)),pol_type.n*size(wt_μ)[1],1))
     #for i = 1:length(qp_μN)
     #   @show(i,qp_μN[i]) 
     #end
@@ -40,7 +41,7 @@ function rt_run(pol_type,              # Polarization type (IQUV)
 
     #= 
     Loop over number of truncation terms =#
-    SFI = false# true #true
+    SFI = true #true
     @show SFI
     for m = 0:Ltrunc - 1
 
@@ -77,8 +78,12 @@ function rt_run(pol_type,              # Polarization type (IQUV)
 
         # R and T matrices for Added and Composite Layers for this m
 
-        added_layer = make_added_layer(FT, arr_type, dims, nSpec) 
-        composite_layer = make_composite_layer(FT, arr_type, dims, nSpec)
+        # For atmosphere:
+        added_layer         = make_added_layer(FT, arr_type, dims, nSpec)
+        # For surface:
+        added_layer_surface = make_added_layer(FT, arr_type, dims, nSpec)
+        # For atmosphere+surface:
+        composite_layer     = make_composite_layer(FT, arr_type, dims, nSpec)
 
         I_static = Diagonal(arr_type(Diagonal{FT}(ones(dims[1]))));
 
@@ -159,9 +164,30 @@ function rt_run(pol_type,              # Polarization type (IQUV)
             else
                 @timeit "interaction" interaction!(scattering_interface, SFI, composite_layer, added_layer, I_static)
             end
+            # At the bottom of the atmosphere, we have to compute total τ_sum (bottom of lowest layer), for the surface interaction later
+            if iz==Nz
+                τ_sum = τ_sum + τ_λ     
+            end
         end 
 
+        surf = vSmartMOM.LambertianSurfaceScalar(0.5)
+        vSmartMOM.create_surface_layer!(surf, added_layer, SFI, m, pol_type, iμ0,qp_μN, wt_μN, τ_sum);
+        @show added_layer.J₀⁻[:,:,1]
+        @timeit "interaction" interaction!(scattering_interface, SFI, composite_layer, added_layer, I_static)
+        # Now we just need to interact with the surface 
+        
         # include surface function
+        #input SFI, τ_sum, a_Lamb, iμ0, pol_type, qp_μN
+        #if Lambertian
+        #    if m==0
+        #    end
+        #else if CoxMunk#
+
+        #else if RossLi
+
+        #else if RPV
+
+        #end
 
         # idx of μ0 = cos(sza)
         st_iμ0, istart0, iend0 = get_indices(iμ0, pol_type)

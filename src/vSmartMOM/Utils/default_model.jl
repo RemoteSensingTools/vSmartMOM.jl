@@ -13,6 +13,9 @@ function default_parameters(FT::DataType=Float64)
     Δ_angle = FT(0.0)
     polarization_type = Stokes_IQU{FT}()
 
+    BRDF_type = 1 #1: Lambertian, 2: Cox Munk, 3: RossLi, 4: RPV
+    a_surf = [0.2] #Lambertian albedo in band λ_band
+    
     #vza = FT[60., 45., 30., 15., 0., 15., 30., 45., 60.]
     #vaz = FT[180., 180., 180., 180., 0., 0., 0., 0., 0.]
     vza = FT[0.]
@@ -22,7 +25,7 @@ function default_parameters(FT::DataType=Float64)
     obs_alt = FT(1000.0)
     nAer = 1 #Number of aerosol species
 
-    τAer_ref     = FT[0.1]  # AOTs at reference wavelength
+    τAer_ref     = FT[0.0]  # AOTs at reference wavelength
     μ            = FT[1.3]  # characteristic radius [μm]
     σ            = FT[2.0]  # characteristic width
     r_max        = FT(30.0) # maximum radius in distribution [μm] #baseline setting
@@ -35,8 +38,8 @@ function default_parameters(FT::DataType=Float64)
     σp          = FT[5000.] # Pressure peak width [Pa]
 
     # Note: We should change the default profile to an ASCII file and have a simple ascii reader...
-    #file = "/Users/sanghavi/data/MERRA300.prod.assim.inst6_3d_ana_Nv.20150613.hdf.nc4" 
-    file = "/net/fluo/data1/ftp/XYZT_ESE156/Data/MERRA300.prod.assim.inst6_3d_ana_Nv.20150613.hdf.nc4"
+    file = "/Users/sanghavi/data/MERRA300.prod.assim.inst6_3d_ana_Nv.20150613.hdf.nc4" 
+    #file = "/net/fluo/data1/ftp/XYZT_ESE156/Data/MERRA300.prod.assim.inst6_3d_ana_Nv.20150613.hdf.nc4"
     timeIndex = 2
 
     lat = FT(34.1377);
@@ -53,7 +56,7 @@ function default_parameters(FT::DataType=Float64)
     SFI = 1 #Suniti: 0:= DNI, 1:= SFI
     spec_grid_start = FT[(1e7 / 777)]
     spec_grid_end = FT[(1e7 / 747)]
-    spec_grid_n = Integer[20000]
+    spec_grid_n = Integer[1000]
 
     broadening_function = Voigt()
     wing_cutoff = 100
@@ -103,6 +106,8 @@ function default_parameters(FT::DataType=Float64)
                                 vmr,
                                 decomp_type,
                                 quadrature_type,
+                                #BRDF_type,
+                                #a_surf,
                                 architecture)
 
 end
@@ -180,7 +185,7 @@ function default_model(params::vSmartMOM_Parameters)
             # @show τAer, sum(τAer)
             # Can be done with arbitrary length later:
             # τAer = FT(0.2) * τAer_1; # [τAer_1 τAer_2]
-            #ϖAer = params.float_type[aerosol_optics[iaer,ib].ω̃]; 
+             #ϖAer = params.float_type[aerosol_optics[iaer,ib].ω̃]; 
             # fᵗ   = FT[aerosol_optics_trunc_aero1.fᵗ]; # [aerosol_optics_trunc_aero1.fᵗ aerosol_optics_trunc_aero2.fᵗ];
             # aerosol_optics = [aerosol_optics_trunc_aero1] #
         end 
@@ -188,6 +193,6 @@ function default_model(params::vSmartMOM_Parameters)
     
     # Just return band 1 for now:
     iBand = 1;
-    return vSmartMOM_Model(params, aerosol_optics[iBand],  greek_rayleigh, Nquad, qp_μ, wt_μ, τ_abs[iBand], τRayl[iBand],τAer[iBand],  obs_geom,profile)
+    return vSmartMOM_Model(params, aerosol_optics[iBand],  greek_rayleigh, Nquad, qp_μ, wt_μ, τ_abs[iBand], τRayl[iBand],τAer[iBand], obs_geom, profile)#, BRDF_type, a_surf[iBand])
 
 end
