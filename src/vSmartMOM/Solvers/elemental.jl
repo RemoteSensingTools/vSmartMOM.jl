@@ -64,7 +64,7 @@ function elemental_helper!(pol_type, SFI, iμ0,
         # Calculate r⁻⁺ and t⁺⁺
         
         # Version 1: no absorption in batch mode (like before), need to separate these modes
-        if maximum(dτ_λ) < 0.001 
+        if false #maximum(dτ_λ) < 0.0001 
             #@show "Chose simple elemental"
             #@show typeof(τ_sum)
             r⁻⁺[:,:,:] .= d_qp * Z⁻⁺ * (d_wct * dτ)
@@ -128,13 +128,12 @@ end
     #D = arr_type(Diagonal(repeat(pol_type.D, size(qp_μ4)[1]/pol_type.n))) #Suniti, #Chr: needs to be outside if using GPU
     if (wct2[j]>1.e-8) 
         # 𝐑⁻⁺(μᵢ, μⱼ) = ϖ ̇𝐙⁻⁺(μᵢ, μⱼ) ̇(μⱼ/(μᵢ+μⱼ)) ̇(1 - exp{-τ ̇(1/μᵢ + 1/μⱼ)}) ̇𝑤ⱼ
-        r⁻⁺[i,j,n] = ϖ_λ[n] * Z⁻⁺[i,j] * (qp_μ4[j] / (qp_μ4[i] + qp_μ4[j])) * (1 - exp.(-dτ_λ[n] * ((1 / qp_μ4[i]) + (1 / qp_μ4[j])))) * (wct2[j]) 
+        r⁻⁺[i,j,n] = ϖ_λ[n] * Z⁻⁺[i,j] * (qp_μ4[j] / (qp_μ4[i] + qp_μ4[j])) * (1 - exp(-dτ_λ[n] * ((1 / qp_μ4[i]) + (1 / qp_μ4[j])))) * (wct2[j]) 
                     
         if (qp_μ4[i] == qp_μ4[j])
-
             # 𝐓⁺⁺(μᵢ, μᵢ) = (exp{-τ/μᵢ} + ϖ ̇𝐙⁺⁺(μᵢ, μᵢ) ̇(τ/μᵢ) ̇exp{-τ/μᵢ}) ̇𝑤ᵢ
             if i == j
-                t⁺⁺[i,j,n] = exp(-dτ_λ[n] / qp_μ4[i]) + ϖ_λ[n] * Z⁺⁺[i,i] * (dτ_λ[n] / qp_μ4[i]) * exp.(-dτ_λ[n] / qp_μ4[i]) * wct2[i]
+                t⁺⁺[i,j,n] = exp(-dτ_λ[n] / qp_μ4[i])*(1 + ϖ_λ[n] * Z⁺⁺[i,i] * (dτ_λ[n] / qp_μ4[i]) * wct2[i])
             else
                 t⁺⁺[i,j,n] = 0.0
             end
