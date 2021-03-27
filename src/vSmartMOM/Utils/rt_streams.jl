@@ -6,16 +6,18 @@ function rt_set_streams(::GaussQuadHemisphere, Ltrunc::Int, ::ObsGeometry)
     return Nquad, qp_μ, wt_μ
 end
 
-function rt_set_streams(::GaussQuadFullSphere, Ltrunc::Int, ::ObsGeometry)
+function rt_set_streams(::GaussQuadFullSphere, Ltrunc::Int, obs_geom::ObsGeometry)
+    @unpack obs_alt, sza, vza, vaz = obs_geom
+    FT = eltype(sza)
     Nquad = (Ltrunc + 1) ÷ 2
     qp_μ, wt_μ = gausslegendre(2Nquad) # quadrature limits are [-1,1]
     μ₀ = cosd.(sza)
-    qp_μ = unique([qp_μ; cosd.(vza)])
+    #qp_μ = unique([qp_μ; cosd.(vza)])
     # Assign zero-weights to remaining camera zenith angles
     qp_μ = [qp_μ[Nquad + 1:end]; cosd.(vza); μ₀];
     wt_μ = [wt_μ[Nquad + 1:end]; zeros(FT,length(vza)); FT(0)];
     Nquad = length(qp_μ);
-    return Nquad, qp_μ[Nquad + 1:end], wt_μ[Nquad + 1:end]
+    return Nquad, qp_μ, wt_μ
 end
 
 # RT set_streams takes in Geometry (sza, vza) and outputs quadrature points
@@ -32,7 +34,7 @@ function rt_set_streams(::RadauQuad, Ltrunc::Int, obs_geom::ObsGeometry)
     qp_μ₀ = -reverse(tqp_μ₀)
     wt_μ₀ =  reverse(twt_μ₀)
     μ₀ = cosd(sza) # check for degree to radian conversion
-    if μ₀ in qp_μ₀
+    if μ₀ ∈ qp_μ₀
         qp_μ = zeros(FT, Nquad)
         wt_μ = zeros(FT, Nquad)
         for i = 1:Nquad

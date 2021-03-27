@@ -15,14 +15,14 @@ function default_parameters(FT::DataType=Float64)
 
     #vza = FT[60., 45., 30., 15., 0., 15., 30., 45., 60.]
     #vaz = FT[180., 180., 180., 180., 0., 0., 0., 0., 0.]
-    vza = FT[0.]
+    vza = FT[10.]
     vaz = FT[0.]
     sza = FT(60.)
 
     obs_alt = FT(1000.0)
     nAer = 1 #Number of aerosol species
 
-    τAer_ref     = FT[0.1]  # AOTs at reference wavelength
+    τAer_ref     = FT[0.12]  # AOTs at reference wavelength
     μ            = FT[1.3]  # characteristic radius [μm]
     σ            = FT[2.0]  # characteristic width
     r_max        = FT(30.0) # maximum radius in distribution [μm] #baseline setting
@@ -47,12 +47,13 @@ function default_parameters(FT::DataType=Float64)
     decomp_type = NAI2()
 
     quadrature_type = RadauQuad() 
+    quadrature_type = GaussQuadFullSphere()
 
     architecture = default_architecture;
 
     SFI = 1 #Suniti: 0:= DNI, 1:= SFI
     spec_grid_start = FT[(1e7 / 777)]
-    spec_grid_end = FT[(1e7 / 747)]
+    spec_grid_end = FT[(1e7 / 757)]
     spec_grid_n = Integer[20000]
 
     broadening_function = Voigt()

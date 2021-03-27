@@ -17,8 +17,8 @@ obs_geom = model.obs_geom::ObsGeometry;  #, # Solar Zenith, Viewing Zenith, View
 τRayl = model.τRayl;        # Rayleigh optical depth 
     #nAer,                 # Number of aerosol species 
 τAer =  model.τAer ;                # Aerosol optical depth and single-scattering albedo
-qp_μ =model.qp_μ;
-wt_μ =   model.wt_μ  ;      # Quadrature points and weights
+qp_μ =  model.qp_μ;
+wt_μ =  model.wt_μ  ;      # Quadrature points and weights
 Ltrunc =  3  ;            # Trunction length for legendre terms
 aerosol_optics = model.aerosol_optics;       # AerosolOptics (greek_coefs, ω̃, k, fᵗ)
 GreekRayleigh =  model.greek_rayleigh ;       # Greek coefficients of Rayleigh Phase Function

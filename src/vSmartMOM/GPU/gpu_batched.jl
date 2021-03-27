@@ -18,7 +18,7 @@ end
 
 # batch Matrix inversion for CPU
 function batch_solve!(X::AbstractArray{FT,3}, A::AbstractArray{FT,3}, B::AbstractArray{FT,3}) where {FT}
-    for i = 1:size(A, 3)
+    Threads.@threads for i = 1:size(A, 3)
         @views ldiv!(X[:,:,i], qr!(A[:,:,i]), B[:,:,i])
     end
 end
@@ -33,7 +33,8 @@ end
 
 # batch Matrix inversion for CPU
 function batch_inv!(X::AbstractArray{FT,3}, A::AbstractArray{FT,3}) where {FT}
-    for i = 1:size(A, 3)
-        @views X[:,:,i] = inv(A[:,:,i]);
+    Threads.@threads for i = 1:size(A, 3)
+        @views X[:,:,i] = A[:,:,i]\I;
+
     end
 end
