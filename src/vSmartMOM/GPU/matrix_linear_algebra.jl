@@ -163,7 +163,7 @@ function matmul!(a, b, c)
     for i = 1:size(a, 3)
         kernel!(view(a, :, :, i), view(b, :, :, i), view(c, :, :, i), ndrange=size(c[:,:,1]))
     end
-    synchronize() 
+    synchronize_if_gpu() 
     end
 
 @kernel function applyD!(r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻)
@@ -211,7 +211,7 @@ function test(r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻)
                 @views t⁻⁻[iμ,jμ,:] .= - t⁺⁺[iμ,jμ,:]
             end
         end 
-        synchronize()
+        synchronize_if_gpu()
 end
 
 

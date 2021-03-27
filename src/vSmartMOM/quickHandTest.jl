@@ -42,6 +42,7 @@ T_SFI = zeros(FT, length(vza), pol_type.n, nSpec)
 
 # Copy qp_μ "pol_type.n" times
 qp_μN = arr_type(reshape(transpose(repeat(qp_μ, 1, pol_type.n)),pol_type.n*size(qp_μ)[1],1))
+wt_μN = arr_type(reshape(transpose(repeat(wt_μ, 1, pol_type.n)),pol_type.n*size(wt_μ)[1],1))
 #for i = 1:length(qp_μN)
 #   @show(i,qp_μN[i]) 
 #end
@@ -122,8 +123,11 @@ expk = exp.(-dτ_λ /qp_μ[iμ0]) #Suniti
 #@show τ_sum
 #@show dτ_λ, dτ
 #scatter = true
-@time vSmartMOM.elemental!(pol_type, SFI, iμ0, τ_sum, dτ_λ, dτ, ϖ_λ, ϖ, Z⁺⁺, Z⁻⁺, m, ndoubl, true, qp_μ, wt_μ, added_layer,  I_static, arr_type, architecture)
-@time vSmartMOM.doubling!(pol_type, SFI, expk, ndoubl, added_layer, I_static, architecture)
+vSmartMOM.elemental!(pol_type, SFI, iμ0, τ_sum, dτ_λ, dτ, ϖ_λ, ϖ, Z⁺⁺, Z⁻⁺, m, ndoubl, true, qp_μ, wt_μ, added_layer,  I_static, arr_type, architecture)
+vSmartMOM.doubling!(pol_type, SFI, expk, ndoubl, added_layer, I_static, architecture)
+
+lambipoo = vSmartMOM.LambertianSurfaceScalar(0.1)
+vSmartMOM.create_surface_layer!(lambipoo, added_layer, SFI, m, pol_type, iμ0,qp_μN, wt_μN, τ_sum);
 #added_layer_DNI = vSmartMOM.make_added_layer(FT, arr_type, dims, nSpec) 
 #composite_layer_DNI = vSmartMOM.make_composite_layer(FT, arr_type, dims, nSpec)
 #vSmartMOM.elemental!(pol_type, false, iμ0, τ_sum, dτ_λ, dτ, ϖ_λ, ϖ, Z⁺⁺, Z⁻⁺, m, ndoubl, true, qp_μ, wt_μ, added_layer_DNI,  I_static, arr_type, architecture)
