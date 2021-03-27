@@ -38,6 +38,7 @@ include("Utils/rt_utils.jl")
 include("Solvers/rt_run.jl")
 include("GPU/CUDA_getri.jl")
 include("Utils/default_model.jl")
+include("Surface/lambertian_surface.jl")
 
 export rt_set_streams, compute_absorption_profile!, ObsGeometry, default_model
 

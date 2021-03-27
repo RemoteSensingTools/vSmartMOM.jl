@@ -71,6 +71,26 @@ struct ScatteringInterface_00 <: AbstractScatteringInterface end
 struct ScatteringInterface_01 <: AbstractScatteringInterface end
 struct ScatteringInterface_10 <: AbstractScatteringInterface end
 struct ScatteringInterface_11 <: AbstractScatteringInterface end
+struct ScatteringInterface_AtmoSurf <: AbstractScatteringInterface end
+
+# Surface types:
+abstract type AbstractSurfaceType end
+
+# Lambertian Surface (scalar per band)
+struct LambertianSurfaceScalar{FT} <: AbstractSurfaceType
+    albedo::FT
+end
+
+# Defined as Array (has to have the same length as the band!)
+struct LambertianSurfaceSpectrum{FT} <: AbstractSurfaceType
+    albedo::AbstractArray{FT,1}
+end
+
+# Defined by polynomial terms as function of λ (degree derived from length of `a_coeff`)
+struct LambertianSurfacePolyFit{FT} <: AbstractSurfaceType
+    # albedo(λ) = a_coeff[1] + a_coeff[2]*λ + a_coeff[3]*λ² + ... 
+    a_coeff::AbstractArray{FT,1}
+end
 
 abstract type AbstractvSmartMOMModel end
 
@@ -236,6 +256,10 @@ mutable struct vSmartMOM_Parameters{FT} #<: AbstractvSmartMOMModel
     CEF::AbstractComplexErrorFunction
     "Volume mixing ratio (needs to be per profile, gas species and band later)"
     vmr::FT
+    "Surface reflectance type (1: Lambertian, 2: Cox Munk, 3: RossLi, 4: RPV)"
+    #BRDF_type::Integer
+    "(Lambertian) albedo"
+    #a_surf::AbstractArray{FT}
     "Algorithm to use for fourier decomposition (NAI2/PCW)"
     decomp_type::AbstractFourierDecompositionType
     "Quadrature type for RT streams (RadauQuad/GaussQuadHemisphere/GaussQuadFullSphere)"

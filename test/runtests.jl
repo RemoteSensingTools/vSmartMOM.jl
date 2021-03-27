@@ -11,11 +11,8 @@ using Distributions
 using JLD2
 using CUDA
 
-# # Determine whether GPU is available
-# test_arch = 
-
 # Test the Cross Section module
-# @testset "RadiativeTransfer.Absorption" begin include("test_Absorption.jl") end
+@testset "RadiativeTransfer.Absorption" begin include("test_Absorption.jl") end
 
 # Test the Phase Function module
 @testset "RadiativeTransfer.Scattering" begin include("test_Scattering.jl") end

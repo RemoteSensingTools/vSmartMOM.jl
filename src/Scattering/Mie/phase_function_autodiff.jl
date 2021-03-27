@@ -19,7 +19,7 @@ function convert_jacobian_result_to_aerosol_optics(result)
     ω̃ = value[end-1]
     k = value[end]
 
-    return AerosolOptics(greek_coefs=greek_coefs, ω̃=ω̃, k=k, derivs=derivs) 
+    return AerosolOptics(greek_coefs=greek_coefs, ω̃=ω̃, k=k, derivs=derivs, fᵗ=eltype(ω̃)(1)) 
 end
 
 """
@@ -51,10 +51,10 @@ function compute_aerosol_optical_properties(model::MieModel ; autodiff=false)
         @unpack computation_type, aerosol, λ, polarization_type, truncation_type, wigner_A, wigner_B = model
         @unpack size_distribution, nquad_radius, nᵣ, nᵢ,r_max =  aerosol
 
-        aerosol_x = UnivariateAerosol(LogNormal(log(x[1]), log(x[2])), r_max, nquad_radius, x[3], x[4])
+        aerosol_x = UnivariateAerosol(LogNormal(log(x[1].value), log(x[2].value)), r_max, nquad_radius, x[3].value, x[4].value)
         model_x = MieModel(computation_type, aerosol_x, λ, polarization_type, truncation_type, wigner_A, wigner_B)
     
-        aerosol_optics = compute_aerosol_optical_properties(model_x);
+        aerosol_optics = compute_aerosol_optical_properties(model_x, ForwardDiff.Dual);
     
         return [aerosol_optics.greek_coefs.α 
                 aerosol_optics.greek_coefs.β 
