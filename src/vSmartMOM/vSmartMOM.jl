@@ -23,6 +23,8 @@ using NNlib
 using Parameters
 using DocStringExtensions
 
+# More threads in LA wasn't really helpful, turn that off now and use Julia threads!
+LinearAlgebra.BLAS.set_num_threads(1)
 
 include("Types/types.jl") 
 include("Utils/rt_streams.jl")

@@ -18,7 +18,7 @@ if has_cuda_gpu()
 end
 
 # Needs some warning if memory is getting too large !
-FT = Float64
+FT = Float32
 n = 32
 nSpec  = 20000
 ndoubl = 5

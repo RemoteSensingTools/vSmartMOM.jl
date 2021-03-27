@@ -40,7 +40,7 @@ function rt_run(pol_type,              # Polarization type (IQUV)
 
     #= 
     Loop over number of truncation terms =#
-    SFI = false# true #true
+    SFI = true# true #true
     @show SFI
     for m = 0:Ltrunc - 1
 
