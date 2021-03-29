@@ -24,8 +24,10 @@ function elemental!(pol_type, SFI::Bool,
     
 
     # Later on, we can have Zs also vary with index, pretty easy here:
-    Z⁺⁺_ = repeat(Z⁺⁺, 1, 1, 1)
-    Z⁻⁺_ = repeat(Z⁻⁺, 1, 1, 1)
+    # Z⁺⁺_ = repeat(Z⁺⁺, 1, 1, 1)
+    Z⁺⁺_ = reshape(Z⁺⁺, (size(Z⁺⁺,1), size(Z⁺⁺,2),1))
+    # Z⁻⁺_ = repeat(Z⁻⁺, 1, 1, 1)
+    Z⁻⁺_ = reshape(Z⁻⁺, (size(Z⁺⁺,1), size(Z⁺⁺,2),1))
 
     D = Diagonal(arr_type(repeat(pol_type.D, size(qp_μ,1))))
     I₀_NquadN = arr_type(zeros(FT,size(qp_μN,1)));
