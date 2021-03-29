@@ -36,14 +36,14 @@ function create_surface_layer!(lambertian::LambertianSurfaceScalar{FT},
             #repeat(repeat(tmp .* exp.(-τ_sum/qp_μN[i_start]), Nquad), 1,1,dim[3])
         end
         R_surf = R_surf * Diagonal(qp_μN.*wt_μN)
-        tmp = ones(pol_type.n*Nquad)
-        T_surf = Array(Diagonal(tmp))
+        tmp    = ones(pol_type.n*Nquad)
+        T_surf = arr_type(Diagonal(tmp))
 
         
-        added_layer.r⁻⁺[:] = repeat(R_surf,1,1,dim[3]);
-        added_layer.r⁻⁺[:] .= 0;
-        added_layer.t⁺⁺[:] = repeat(T_surf,1,1,dim[3]);
-        added_layer.t⁻⁻[:] = repeat(T_surf,1,1,dim[3]);
+        added_layer.r⁻⁺ .= R_surf;
+        added_layer.r⁻⁺ .= 0;
+        added_layer.t⁺⁺ .= T_surf;
+        added_layer.t⁻⁻ .= T_surf;
 
         
     else

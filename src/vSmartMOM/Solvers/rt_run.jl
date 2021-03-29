@@ -54,7 +54,7 @@ function rt_run(pol_type,              # Polarization type (IQUV)
         #nAer, nBand = size(aerosol_optics)
         #@show nAer#, nBand
         dims = size(Rayl𝐙⁺⁺)
-        
+        @show size(Rayl𝐙⁺⁺)
         # Compute aerosol Z-matrices for all aerosols
         Aer𝐙⁺⁺ = arr_type(zeros(FT, (dims[1], dims[2], nAer)))
         Aer𝐙⁻⁺ = similar(Aer𝐙⁺⁺)
