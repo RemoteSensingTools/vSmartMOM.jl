@@ -1,61 +1,50 @@
 "Elemental single-scattering layer"
-function elemental_helper!(pol_type, SFI, iμ0,
+function elemental!(pol_type, SFI::Bool, 
                             τ_sum::AbstractArray{FT,1}, #Suniti
-                            dτ_λ::AbstractArray{FT,1}, 
-                            dτ::FT, 
-                            ϖ_λ::AbstractArray{FT,1}, 
-                            ϖ::FT, 
-                            Z⁺⁺::AbstractArray{FT,2}, 
+                            dτ_λ::AbstractArray{FT,1},  # dτ_λ: total optical depth of elemental layer (per λ)
+                            dτ::FT,                     # dτ:   scattering optical depth of elemental layer (scalar)
+                            ϖ_λ::AbstractArray{FT,1},   # ϖ: single scattering albedo of elemental layer (per λ, absorptions by gases included)
+                            ϖ::FT,                      # ϖ: single scattering albedo of elemental layer (no trace gas included)
+                            Z⁺⁺::AbstractArray{FT,2},   # Z matrix
                             Z⁻⁺::AbstractArray{FT,2}, 
-                            m::Int, 
-                            ndoubl::Int, 
-                            scatter, 
-                            qp_μ::AbstractArray{FT,1}, 
-                            wt_μ::AbstractArray{FT,1}, 
+                            m::Int,                     # m: fourier moment
+                            ndoubl::Int,                # ndoubl: number of doubling computations needed 
+                            scatter::Bool,              # scatter: flag indicating scattering
+                            quadPoints::QuadPoints{FT}, # struct with quadrature points, weights, 
                             added_layer::AddedLayer{FT}, 
                             I_static,
-                            arr_type,
                             architecture) where {FT}
     
     @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, J₀⁺, J₀⁻ = added_layer
+    @unpack qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart, iμ₀ = quadPoints
+    arr_type = array_type(architecture)
     # @show FT
     # ToDo: Main output is r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, J₀⁺, J₀⁻ (can be renamed to t⁺⁺, etc)
     # Need to check with paper nomenclature. This is basically eqs. 19-20 in vSmartMOM
+    
 
-    # dτ: optical depth of elemental layer
-    # ϖ: single scattering albedo of elemental layer
-    # bb: thermal source function at the upper boundary of the elemental layer
-    # m: fourier moment
-    # n: layer of which this is an elemental
-    # ndoubl: number of doubling computations needed to progress from the elemental layer 
-    #         to the full homogeneous layer n
-    # scatter: flag indicating scattering
-
+    # Later on, we can have Zs also vary with index, pretty easy here:
     Z⁺⁺_ = repeat(Z⁺⁺, 1, 1, 1)
     Z⁻⁺_ = repeat(Z⁻⁺, 1, 1, 1)
 
     D = Diagonal(arr_type(repeat(pol_type.D, size(qp_μ,1))))
-    I₀_NquadN = arr_type(zeros(FT,size(qp_μ,1)*pol_type.n));
-    i_start  = pol_type.n*(iμ0-1) + 1 
-    i_end    = pol_type.n*iμ0
-    I₀_NquadN[i_start:i_end] = pol_type.I₀
+    I₀_NquadN = arr_type(zeros(FT,size(qp_μN,1)));
+    i_start   = pol_type.n*(iμ₀-1) + 1 
+    i_end     = pol_type.n*iμ₀
+    I₀_NquadN[iμ₀Nstart:i_end] = pol_type.I₀
 
     device = devi(architecture)
 
+    # If in scattering mode:
     if scatter
-        qp_μN = arr_type(reduce(vcat, (fill.(qp_μ, [pol_type.n]))))
-        wt_μN = arr_type(reduce(vcat, (fill.(wt_μ, [pol_type.n]))))
-        #for i=1:length(qp_μN)
-        #    @show(i, qp_μN[i])
-        #end
+   
         NquadN = length(qp_μN)
-        # @show ϖ, dτ
-        # 
+
+        # Needs explanation still, different weigths:
         wct0  = m == 0 ? FT(0.50) * ϖ * dτ     : FT(0.25) * ϖ * dτ
         wct02 = m == 0 ? FT(0.50)              : FT(0.25)
         wct   = m == 0 ? FT(0.50) * ϖ * wt_μN  : FT(0.25) * ϖ * wt_μN
         wct2  = m == 0 ? wt_μN/2               : wt_μN/4
-        # wct = m==0 ? 0.50 * 1 .* wt_μ4  : 0.25 .* 1 .* wt_μ4
 
         # Get the diagonal matrices first
         d_qp  = Diagonal(1 ./ qp_μN)
@@ -64,7 +53,7 @@ function elemental_helper!(pol_type, SFI, iμ0,
         # Calculate r⁻⁺ and t⁺⁺
         
         # Version 1: no absorption in batch mode (like before), need to separate these modes
-        if false #maximum(dτ_λ) < 0.0001 
+        if maximum(dτ_λ) < 0.0001 
             #@show "Chose simple elemental"
             #@show typeof(τ_sum)
             r⁻⁺[:,:,:] .= d_qp * Z⁻⁺ * (d_wct * dτ)
@@ -89,25 +78,26 @@ function elemental_helper!(pol_type, SFI, iμ0,
             kernel! = get_elem_rt!(device)
             event = kernel!(r⁻⁺, t⁺⁺, ϖ_λ, dτ_λ, Z⁻⁺, Z⁺⁺, qp_μN, wct, ndrange=size(r⁻⁺)); 
             wait(device, event)
-      
+            synchronize_if_gpu()
+
             if SFI
                 kernel! = get_elem_rt_SFI!(device)
-                event = kernel!(J₀⁺, J₀⁻, ϖ_λ, dτ_λ, τ_sum, Z⁻⁺, Z⁺⁺, qp_μN, ndoubl, wct02, pol_type.n, arr_type(pol_type.I₀), iμ0, D, ndrange=size(J₀⁺))
+                event = kernel!(J₀⁺, J₀⁻, ϖ_λ, dτ_λ, τ_sum, Z⁻⁺, Z⁺⁺, qp_μN, ndoubl, wct02, pol_type.n, arr_type(pol_type.I₀), iμ₀, D, ndrange=size(J₀⁺))
                 wait(device, event)
             end
             #ii = pol_type.n*(iμ0-1)+1
             #@show 'B',iμ0,  r⁻⁺[1,ii,1]/(J₀⁻[1,1,1]*wt_μ[iμ0]), r⁻⁺[1,ii,1], J₀⁻[1,1,1]*wt_μ[iμ0], J₀⁺[1,1,1]*wt_μ[iμ0]
-            
             synchronize_if_gpu()
         end
         kernel! = apply_D_elemental!(device)
         event = kernel!(ndoubl, pol_type.n, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻, ndrange=size(r⁻⁺));
         wait(device, event)
-
+        synchronize_if_gpu()
         if SFI
             kernel! = apply_D_elemental_SFI!(device)
             event = kernel!(ndoubl, pol_type.n, J₀⁻, ndrange=size(J₀⁻));
             wait(device, event)
+            synchronize_if_gpu()
         end
         #@show(r⁻⁺[1,1,1], t⁺⁺[1,1,1], J₀⁻[1,1], J₀⁺[1,1])
         
@@ -123,17 +113,17 @@ function elemental_helper!(pol_type, SFI, iμ0,
     @pack! added_layer = r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, J₀⁺, J₀⁻   
 end
 
-@kernel function get_elem_rt!(r⁻⁺, t⁺⁺, ϖ_λ, dτ_λ, Z⁻⁺, Z⁺⁺, qp_μ4, wct2)
+@kernel function get_elem_rt!(r⁻⁺, t⁺⁺, ϖ_λ, dτ_λ, Z⁻⁺, Z⁺⁺, qp_μN, wct2)
     i, j, n = @index(Global, NTuple) ##Suniti: What are Global and Ntuple?
     #D = arr_type(Diagonal(repeat(pol_type.D, size(qp_μ4)[1]/pol_type.n))) #Suniti, #Chr: needs to be outside if using GPU
     if (wct2[j]>1.e-8) 
         # 𝐑⁻⁺(μᵢ, μⱼ) = ϖ ̇𝐙⁻⁺(μᵢ, μⱼ) ̇(μⱼ/(μᵢ+μⱼ)) ̇(1 - exp{-τ ̇(1/μᵢ + 1/μⱼ)}) ̇𝑤ⱼ
-        r⁻⁺[i,j,n] = ϖ_λ[n] * Z⁻⁺[i,j] * (qp_μ4[j] / (qp_μ4[i] + qp_μ4[j])) * (1 - exp(-dτ_λ[n] * ((1 / qp_μ4[i]) + (1 / qp_μ4[j])))) * (wct2[j]) 
+        r⁻⁺[i,j,n] = ϖ_λ[n] * Z⁻⁺[i,j] * (qp_μN[j] / (qp_μN[i] + qp_μN[j])) * (1 - exp(-dτ_λ[n] * ((1 / qp_μN[i]) + (1 / qp_μN[j])))) * (wct2[j]) 
                     
-        if (qp_μ4[i] == qp_μ4[j])
+        if (qp_μN[i] == qp_μN[j])
             # 𝐓⁺⁺(μᵢ, μᵢ) = (exp{-τ/μᵢ} + ϖ ̇𝐙⁺⁺(μᵢ, μᵢ) ̇(τ/μᵢ) ̇exp{-τ/μᵢ}) ̇𝑤ᵢ
             if i == j
-                t⁺⁺[i,j,n] = exp(-dτ_λ[n] / qp_μ4[i])*(1 + ϖ_λ[n] * Z⁺⁺[i,i] * (dτ_λ[n] / qp_μ4[i]) * wct2[i])
+                t⁺⁺[i,j,n] = exp(-dτ_λ[n] / qp_μN[i])*(1 + ϖ_λ[n] * Z⁺⁺[i,i] * (dτ_λ[n] / qp_μN[i]) * wct2[i])
             else
                 t⁺⁺[i,j,n] = 0.0
             end
@@ -141,12 +131,12 @@ end
     
             # 𝐓⁺⁺(μᵢ, μⱼ) = ϖ ̇𝐙⁺⁺(μᵢ, μⱼ) ̇(μⱼ/(μᵢ-μⱼ)) ̇(exp{-τ/μᵢ} - exp{-τ/μⱼ}) ̇𝑤ⱼ
             # (𝑖 ≠ 𝑗)
-            t⁺⁺[i,j,n] = ϖ_λ[n] * Z⁺⁺[i,j] * (qp_μ4[j] / (qp_μ4[i] - qp_μ4[j])) * (exp(-dτ_λ[n] / qp_μ4[i]) - exp(-dτ_λ[n] / qp_μ4[j])) * wct2[j]
+            t⁺⁺[i,j,n] = ϖ_λ[n] * Z⁺⁺[i,j] * (qp_μN[j] / (qp_μN[i] - qp_μN[j])) * (exp(-dτ_λ[n] / qp_μN[i]) - exp(-dτ_λ[n] / qp_μN[j])) * wct2[j]
         end
     else
         r⁻⁺[i,j,n] = 0.0
         if i==j
-            t⁺⁺[i,j,n] = exp(-dτ_λ[n] / qp_μ4[i]) #Suniti
+            t⁺⁺[i,j,n] = exp(-dτ_λ[n] / qp_μN[i]) #Suniti
         else
             t⁺⁺[i,j,n] = 0.0
         end
@@ -155,12 +145,14 @@ end
 end
 
 @kernel function get_elem_rt_SFI!(J₀⁺, J₀⁻, ϖ_λ, dτ_λ, τ_sum, Z⁻⁺, Z⁺⁺, qp_μN, ndoubl, wct02, nStokes ,I₀, iμ0, D)
+    i_start  = nStokes*(iμ0-1) + 1 
+    i_end    = nStokes*iμ0
+    
     i, _, n = @index(Global, NTuple) ##Suniti: What are Global and Ntuple?
     FT = eltype(I₀)
     J₀⁺[i, 1, n]=0
     J₀⁻[i, 1, n]=0
-    i_start  = nStokes*(iμ0-1) + 1 
-    i_end    = nStokes*iμ0
+
     
     Z⁺⁺_I₀ = FT(0.0);
     Z⁻⁺_I₀ = FT(0.0);
@@ -223,13 +215,13 @@ end
     end
 end
 
-function elemental!(pol_type, SFI, iμ0, τ_sum, dτ_λ, dτ, ϖ_λ, ϖ, Z⁺⁺, Z⁻⁺, m, 
-                              ndoubl, scatter, qp_μ, wt_μ, 
-                              added_layer::AddedLayer{FT}, 
-                              I_static,
-                              arr_type,
-                              architecture) where {FT}
-    
-    elemental_helper!(pol_type, SFI, iμ0, τ_sum, dτ_λ, dτ, ϖ_λ, ϖ, Z⁺⁺, Z⁻⁺, m, ndoubl, scatter, qp_μ, wt_μ, added_layer, I_static, arr_type, architecture)
-    synchronize_if_gpu()
-end
+#function elemental!(pol_type, SFI, iμ0, τ_sum, dτ_λ, dτ, ϖ_λ, ϖ, Z⁺⁺, Z⁻⁺, m, 
+#                              ndoubl, scatter, qp_μ, wt_μ, 
+#                              added_layer::AddedLayer{FT}, 
+#                              I_static,
+#                              arr_type,
+#                              architecture) where {FT}
+#    
+#    elemental_helper!(pol_type, SFI, iμ0, τ_sum, dτ_λ, dτ, ϖ_λ, ϖ, Z⁺⁺, Z⁻⁺, m, ndoubl, scatter, qp_μ, wt_μ, added_layer, I_static, arr_type, architecture)
+#    synchronize_if_gpu()
+#end

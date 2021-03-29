@@ -256,16 +256,34 @@ mutable struct vSmartMOM_Parameters{FT} #<: AbstractvSmartMOMModel
     CEF::AbstractComplexErrorFunction
     "Volume mixing ratio (needs to be per profile, gas species and band later)"
     vmr::FT
-    "Surface reflectance type (1: Lambertian, 2: Cox Munk, 3: RossLi, 4: RPV)"
-    #BRDF_type::Integer
-    "(Lambertian) albedo"
-    #a_surf::AbstractArray{FT}
+    "Surface reflectance type"
+    brdf#::AbstractArray{AbstractSurfaceType}
     "Algorithm to use for fourier decomposition (NAI2/PCW)"
     decomp_type::AbstractFourierDecompositionType
     "Quadrature type for RT streams (RadauQuad/GaussQuadHemisphere/GaussQuadFullSphere)"
     quadrature_type::AbstractQuadratureType
     "Architecture to use for calculations (CPU/GPU)"
     architecture::AbstractArchitecture
+end
+
+# Quadrature points, weights, etc: (best to be constant!)
+struct QuadPoints{FT} 
+    "μ₀, cos(SZA)"
+    μ₀::FT
+    "Index in quadrature points with sun"
+    iμ₀::Int
+    "Index in quadrature points with sun (in qp_μN)"
+    iμ₀Nstart::Int
+    "Quadrature points"
+    qp_μ::AbstractArray{FT,1}
+    "Weights of quadrature points"
+    wt_μ::AbstractArray{FT,1}
+    "Quadrature points (repeated for polarizations)"
+    qp_μN::AbstractArray{FT,1}
+    "Weights of quadrature points (repeated for polarizations)"
+    wt_μN::AbstractArray{FT,1}
+    "Number of quadrature points"
+    Nquad::Int
 end
 
 """
@@ -284,12 +302,8 @@ mutable struct vSmartMOM_Model <: AbstractvSmartMOMModel
     aerosol_optics::AbstractArray #Array{Array{AerosolOptics}}
     "Greek coefs in Rayleigh calculations" 
     greek_rayleigh::GreekCoefs
-    "Number of quadrature points"
-    Nquad::Integer
-    "Quadrature points"
-    qp_μ::AbstractArray
-    "Quadrature weights"
-    wt_μ::AbstractArray
+    "Quadrature points/weights, etc"
+    quadPoints::QuadPoints
     "Array to hold cross-sections over entire atmospheric profile"
     τ_abs::AbstractArray
     "Rayleigh optical thickness"
@@ -302,4 +316,7 @@ mutable struct vSmartMOM_Model <: AbstractvSmartMOMModel
     profile::AtmosphericProfile
     "Absorption model for computing absorption cross sections (will be an array later, for nGasSpecies,nBand)"
     #absorption_model::AbstractCrossSectionModel
+    "Surface BRDF"
+    brdf::AbstractSurfaceType
 end
+
