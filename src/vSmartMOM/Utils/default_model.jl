@@ -9,12 +9,14 @@ function default_parameters(FT::DataType=Float64)
     λ_band = FT[0.770] 
     λ_ref = FT(0.770) 
     depol = FT(0.0)
-    l_trunc = 5 
+    l_trunc = 10 
     Δ_angle = FT(0.0)
     polarization_type = Stokes_IQU{FT}()
 
-    BRDF_type = 1 #1: Lambertian, 2: Cox Munk, 3: RossLi, 4: RPV
-    a_surf = [0.2] #Lambertian albedo in band λ_band
+    # Define Surface here (per band, we just use 1 for now!)
+    BRDF = LambertianSurfaceScalar(0.15)
+    BRDF_per_band = [BRDF];
+
     
     #vza = FT[60., 45., 30., 15., 0., 15., 30., 45., 60.]
     #vaz = FT[180., 180., 180., 180., 0., 0., 0., 0., 0.]
@@ -25,21 +27,25 @@ function default_parameters(FT::DataType=Float64)
     obs_alt = FT(1000.0)
     nAer = 1 #Number of aerosol species
 
+    # These are arrays by aerosol type!
     τAer_ref     = FT[0.12]  # AOTs at reference wavelength
     μ            = FT[1.3]  # characteristic radius [μm]
     σ            = FT[2.0]  # characteristic width
-    r_max        = FT(30.0) # maximum radius in distribution [μm] #baseline setting
-    nquad_radius = 2500     # baseline setting for quadrature points in size distribution
     nᵣ           = FT[1.3]  # TODO: make this a 2D matrix were each species and band has an independent entry
     nᵢ           = FT[0.00000001] # TODO: same as above
-
-    # Aerosol vertical distribution profiles
+    # Aerosol vertical distribution profiles (per aerosol type)
     p₀          = FT[90000] # Pressure peak [Pa]
     σp          = FT[5000.] # Pressure peak width [Pa]
 
+    # More global setting!
+    r_max        = FT(30.0) # maximum radius in distribution [μm] #baseline setting
+    nquad_radius = 2500     # baseline setting for quadrature points in size distribution
+
+    
+
     # Note: We should change the default profile to an ASCII file and have a simple ascii reader...
-    file = "/Users/sanghavi/data/MERRA300.prod.assim.inst6_3d_ana_Nv.20150613.hdf.nc4" 
-    #file = "/net/fluo/data1/ftp/XYZT_ESE156/Data/MERRA300.prod.assim.inst6_3d_ana_Nv.20150613.hdf.nc4"
+    #file = "/Users/cfranken/data/MERRA300.prod.assim.inst6_3d_ana_Nv.20150613.hdf.nc4" 
+    file = "/net/fluo/data1/ftp/XYZT_ESE156/Data/MERRA300.prod.assim.inst6_3d_ana_Nv.20150613.hdf.nc4"
     timeIndex = 2
 
     lat = FT(34.1377);
@@ -49,15 +55,15 @@ function default_parameters(FT::DataType=Float64)
 
     decomp_type = NAI2()
 
-    quadrature_type = RadauQuad() 
+    #quadrature_type = RadauQuad() 
     quadrature_type = GaussQuadFullSphere()
 
     architecture = default_architecture;
 
     SFI = 1 #Suniti: 0:= DNI, 1:= SFI
     spec_grid_start = FT[(1e7 / 777)]
-    spec_grid_end = FT[(1e7 / 747)]
-    spec_grid_n = Integer[1000]
+    spec_grid_end   = FT[(1e7 / 757)]
+    spec_grid_n     = Integer[10000]
 
     broadening_function = Voigt()
     wing_cutoff = 100
@@ -105,6 +111,7 @@ function default_parameters(FT::DataType=Float64)
                                 wing_cutoff,
                                 CEF,
                                 vmr,
+                                BRDF_per_band,
                                 decomp_type,
                                 quadrature_type,
                                 #BRDF_type,
@@ -113,13 +120,19 @@ function default_parameters(FT::DataType=Float64)
 
 end
 
-
+"Default model"
 function default_model(params::vSmartMOM_Parameters)
+    
     @unpack λ_band = params
     nBands = length(λ_band)
+
+    # Create observation geometry:
     obs_geom = ObsGeometry(params.obs_alt, params.sza, params.vza, params.vaz)
+
     truncation_type = Scattering.δBGE{params.float_type}(params.l_trunc, params.Δ_angle)
-    Nquad, qp_μ, wt_μ = rt_set_streams(params.quadrature_type, params.l_trunc, obs_geom);
+
+    #Nquad, qp_μ, wt_μ = rt_set_streams(params.quadrature_type, params.l_trunc, obs_geom);
+    quadPoints = rt_set_streams(params.quadrature_type, params.l_trunc, obs_geom, params.polarization_type, array_type(params.architecture))
     # Read profile (and generate dry/wet VCDs per layer)
     profile_hr = vSmartMOM.read_atmos_profile(params.file, params.lat, params.lon, params.timeIndex);
     profile = vSmartMOM.reduce_profile(params.profile_reduction_n, profile_hr);
@@ -135,6 +148,7 @@ function default_model(params::vSmartMOM_Parameters)
 
     # τ_abs[iBand][iSpec,iZ]
     τ_abs     = [zeros(params.float_type,n, length(profile.p)) for n in params.spec_grid_n]
+    
     # Loop over all bands:
     for ib=1:length(λ_band)
         # Compute Rayleigh properties per layer for `ib` band center 
@@ -194,6 +208,6 @@ function default_model(params::vSmartMOM_Parameters)
     
     # Just return band 1 for now:
     iBand = 1;
-    return vSmartMOM_Model(params, aerosol_optics[iBand],  greek_rayleigh, Nquad, qp_μ, wt_μ, τ_abs[iBand], τRayl[iBand],τAer[iBand], obs_geom, profile)#, BRDF_type, a_surf[iBand])
+    return vSmartMOM_Model(params, aerosol_optics[iBand],  greek_rayleigh, quadPoints, τ_abs[iBand], τRayl[iBand],τAer[iBand], obs_geom, profile, params.brdf[iBand])#, BRDF_type, a_surf[iBand])
 
 end

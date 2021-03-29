@@ -3,25 +3,22 @@ using Plots
 
 function rt_run(pol_type,              # Polarization type (IQUV)
                 obs_geom::ObsGeometry, # Solar Zenith, Viewing Zenith, Viewing Azimuthal 
-                τRayl,          # Rayleigh optical depth 
-                #nAer,                 # Number of aerosol species 
+                τRayl,                 # Rayleigh optical depth 
                 τAer,                  # Aerosol optical depth and single-scattering albedo
-                qp_μ, wt_μ,            # Quadrature points and weights
-                Ltrunc,                # Trunction length for legendre terms
+                quadPoints,            # Quadrature points and weights
+                max_m,                 # Max Fourier terms
                 aerosol_optics,        # AerosolOptics (greek_coefs, ω̃, k, fᵗ)
                 GreekRayleigh,         # Greek coefficients of Rayleigh Phase Function
                 τ_abs,                 # nSpec x Nz matrix of absorption
+                brdf,                  # BRDF surface type
                 architecture::AbstractArchitecture) # Whether to use CPU / GPU
 
-    #= 
-    Define types, variables, and static quantities =#
-    #@show τAer, sum(τAer), size(τAer)
     @unpack obs_alt, sza, vza, vaz = obs_geom   # Observational geometry properties
+    @unpack qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart,μ₀, iμ₀ = quadPoints
     FT = eltype(sza)                    # Get the float-type to use
     Nz = length(τRayl)                  # Number of vertical slices
     nSpec = size(τ_abs, 1)              # Number of spectral points
-    μ0 = cosd(sza)                      # μ0 defined as cos(θ); θ = sza
-    iμ0 = nearest_point(qp_μ, μ0)       # Find the closest point to μ0 in qp_μ
+    
     arr_type = array_type(architecture)
 
     # Output variables: Reflected and transmitted solar irradiation at TOA and BOA respectively
@@ -30,20 +27,14 @@ function rt_run(pol_type,              # Polarization type (IQUV)
     R_SFI = zeros(FT, length(vza), pol_type.n, nSpec)
     T_SFI = zeros(FT, length(vza), pol_type.n, nSpec)
 
-    # Copy qp_μ "pol_type.n" times
-    qp_μN = arr_type(reshape(transpose(repeat(qp_μ, 1, pol_type.n)),pol_type.n*size(qp_μ)[1],1))
-    wt_μN = arr_type(reshape(transpose(repeat(wt_μ, 1, pol_type.n)),pol_type.n*size(wt_μ)[1],1))
-    #for i = 1:length(qp_μN)
-    #   @show(i,qp_μN[i]) 
-    #end
     println("Processing on: ", architecture)
     println("With FT: ", FT)
 
     #= 
     Loop over number of truncation terms =#
-    SFI = true# true #true
+    SFI = true # true #true
     @show SFI
-    for m = 0:Ltrunc - 1
+    for m = 0:max_m - 1
 
         println("Fourier Moment: ", m)
 
@@ -52,16 +43,13 @@ function rt_run(pol_type,              # Polarization type (IQUV)
 
         # Compute Z-moments of the Rayleigh phase matrix 
         # For m>=3, Rayleigh matrices will be 0, can catch with if statement if wanted 
-        Rayl𝐙⁺⁺, Rayl𝐙⁻⁺ = Scattering.compute_Z_moments(pol_type, qp_μ, GreekRayleigh, m, arr_type = arr_type);
+        Rayl𝐙⁺⁺, Rayl𝐙⁻⁺ = Scattering.compute_Z_moments(pol_type, Array(qp_μ), GreekRayleigh, m, arr_type = arr_type);
 
-        @show size(Rayl𝐙⁺⁺)
-        # Number of aerosols
-        #@show size(aerosol_optics)
-        #nBand = length(aerosol_optics)
+
         nAer  = length(aerosol_optics)
 
-        # Just for now:
-        iBand = 1
+        # Just for now (will change this later):
+        # iBand = 1
 
         #nAer, nBand = size(aerosol_optics)
         #@show nAer#, nBand
@@ -73,7 +61,7 @@ function rt_run(pol_type,              # Polarization type (IQUV)
         
         for i = 1:nAer
             #@show aerosol_optics[i,1]
-            Aer𝐙⁺⁺[:,:,i], Aer𝐙⁻⁺[:,:,i] = Scattering.compute_Z_moments(pol_type, qp_μ, aerosol_optics[i].greek_coefs, m, arr_type = arr_type)
+            Aer𝐙⁺⁺[:,:,i], Aer𝐙⁻⁺[:,:,i] = Scattering.compute_Z_moments(pol_type, Array(qp_μ), aerosol_optics[i].greek_coefs, m, arr_type = arr_type)
         end
 
         # R and T matrices for Added and Composite Layers for this m
@@ -115,8 +103,7 @@ function rt_run(pol_type,              # Polarization type (IQUV)
             #@show(ndoubl, dτ_max, τ)
             # Compute dτ vector
             dτ_λ = arr_type(τ_λ ./ (FT(2)^ndoubl))
-            expk = exp.(-dτ_λ /qp_μ[iμ0]) #Suniti
-            # @show 'Test', dτ_λ, τ
+            expk = exp.(-dτ_λ /μ₀) #Suniti
             
             # Determine whether there is scattering
             scatter = (  sum(τAer[:,iz]) > 1.e-8 || 
@@ -125,26 +112,16 @@ function rt_run(pol_type,              # Polarization type (IQUV)
             #@show(iz, scatter)
             # If there is scattering, perform the elemental and doubling steps
             if scatter
-                #@timeit "elemental" elemental!(pol_type, SFI, iμ0, τ_sum, dτ, dτ_max, ϖ_λ, ϖ, Z⁺⁺, Z⁻⁺, m, ndoubl, scatter, qp_μ, wt_μ, added_layer,  I_static, arr_type, architecture)
-                @timeit "elemental" elemental!(pol_type, SFI, iμ0, τ_sum, dτ_λ, dτ, ϖ_λ, ϖ, Z⁺⁺, Z⁻⁺, m, ndoubl, scatter, qp_μ, wt_μ, added_layer,  I_static, arr_type, architecture)
-                #@show(added_layer.t⁺⁺[1,1,1])
-                #@show ndoubl, dτ
+                @timeit "elemental" elemental!(pol_type, SFI, τ_sum, dτ_λ, dτ, ϖ_λ, ϖ, Z⁺⁺, Z⁻⁺, m, ndoubl, scatter, quadPoints,  added_layer,  I_static, architecture)
                 @timeit "doubling"   doubling!(pol_type, SFI, expk, ndoubl, added_layer, I_static, architecture)
-                #@show(added_layer.t⁺⁺[1,1,1])
+            else # This might not work yet on GPU!
                 # If not, there is no reflectance. Assign r/t appropriately
-            else
                 added_layer.r⁻⁺[:] .= 0;
                 added_layer.r⁺⁻[:] .= 0;
                 added_layer.J₀⁻[:] .= 0;
                 temp = Array(exp.(-τ_λ./qp_μN'))
                 #added_layer.t⁺⁺, added_layer.t⁻⁻ = (Diagonal(exp(-τ_λ / qp_μN)), Diagonal(exp(-τ_λ / qp_μN)))   
                 for iλ = 1:length(τ_λ)
-                    #tmpJ₀⁺ .= 0
-                    #tmpJ₀⁺[istart:iend] = exp.(-τ_sum[iλ]/qp_μ[iμ0])*I₀
-                    #@show size(exp.(-τ_λ[iλ]./qp_μN))
-                    
-                    #temp = Diagonal(exp.(-τ_λ[iλ]./qp_μN)[:,1]);
-                    #@show size(temp)
                     added_layer.t⁺⁺[:,:,iλ] = Diagonal(temp[iλ,:]);
                     added_layer.t⁻⁻[:,:,iλ] = Diagonal(temp[iλ,:]);
                 end
@@ -171,27 +148,15 @@ function rt_run(pol_type,              # Polarization type (IQUV)
             end
         end 
 
-        surf = vSmartMOM.LambertianSurfaceScalar(0.5)
-        vSmartMOM.create_surface_layer!(surf, added_layer, SFI, m, pol_type, iμ0,qp_μN, wt_μN, τ_sum);
-        @show added_layer.J₀⁻[:,:,1]
+        #surf = LambertianSurfaceScalar(0.5)
+        create_surface_layer!(brdf, added_layer, SFI, m, pol_type, quadPoints, τ_sum, architecture);
+        #@show added_layer.J₀⁻[:,:,1]
         @timeit "interaction" interaction!(scattering_interface, SFI, composite_layer, added_layer, I_static)
-        # Now we just need to interact with the surface 
-        
-        # include surface function
-        #input SFI, τ_sum, a_Lamb, iμ0, pol_type, qp_μN
-        #if Lambertian
-        #    if m==0
-        #    end
-        #else if CoxMunk#
 
-        #else if RossLi
-
-        #else if RPV
-
-        #end
+        # All of this is "postprocessing" now, can move this into a separate function:
 
         # idx of μ0 = cos(sza)
-        st_iμ0, istart0, iend0 = get_indices(iμ0, pol_type);
+        st_iμ0, istart0, iend0 = get_indices(iμ₀, pol_type);
 
         # Convert these to Arrays (if CuArrays), so they can be accessed by index
         R⁻⁺ = Array(composite_layer.R⁻⁺)
@@ -212,8 +177,8 @@ function rt_run(pol_type,              # Polarization type (IQUV)
             # Accumulate Fourier moments after azimuthal weighting
             
             for s = 1:nSpec
-                R[i,:,s] += bigCS * (R⁻⁺[istart:iend, istart0:iend0, s] / wt_μ[iμ0]) * pol_type.I₀;
-                T[i,:,s] += bigCS * (T⁺⁺[istart:iend, istart0:iend0, s] / wt_μ[iμ0]) * pol_type.I₀;
+                R[i,:,s] += bigCS * (R⁻⁺[istart:iend, istart0:iend0, s] / μ₀) * pol_type.I₀;
+                T[i,:,s] += bigCS * (T⁺⁺[istart:iend, istart0:iend0, s] / μ₀) * pol_type.I₀;
                 if SFI
                     R_SFI[i,:,s] += bigCS * J₀⁻[istart:iend,1, s];
                     T_SFI[i,:,s] += bigCS * J₀⁺[istart:iend,1, s];
@@ -230,17 +195,17 @@ function rt_run(pol_type,              # Polarization type (IQUV)
     return R, T, R_SFI, T_SFI  
 end
 
-
 function rt_run(model::vSmartMOM_Model)
 
     return rt_run(model.params.polarization_type,
                   model.obs_geom::ObsGeometry,
                   model.τRayl, 
                   model.τAer, 
-                  model.qp_μ, model.wt_μ,
+                  model.quadPoints,
                   model.params.max_m,
                   model.aerosol_optics,
                   model.greek_rayleigh,
                   model.τ_abs,
+                  model.brdf,
                   model.params.architecture)
 end
