@@ -1,7 +1,4 @@
 
-
-
-
 function default_parameters(FT::DataType=Float64)
 
     # Note, we will need many parameters in Arrays, as we will have `nAer` aerosol types (1 in default)
@@ -120,8 +117,142 @@ function default_parameters(FT::DataType=Float64)
 
 end
 
-"Default model"
-function default_model(params::vSmartMOM_Parameters)
+function parameters_from_yaml(file_path)
+
+    params_dict = YAML.load_file(file_path)
+    broadening_function = eval(Meta.parse(params_dict["absorption"]["broadening"]))
+    CEF = eval(Meta.parse(params_dict["absorption"]["CEF"]))
+
+    polarization_type = eval(Meta.parse(params_dict["scattering"]["polarization_type"]))
+    decomp_type = eval(Meta.parse(params_dict["scattering"]["decomp_type"]))
+
+    quadrature_type = eval(Meta.parse(params_dict["vSmartMOM"]["quadrature_type"]))
+
+    architecture = eval(Meta.parse(params_dict["vSmartMOM"]["architecture"]))
+
+    FT = eval(Meta.parse(params_dict["vSmartMOM"]["float_type"]))
+
+    BRDF_per_band = map(x -> eval(Meta.parse(x)), params_dict["surface"]["BRDFs"]) 
+
+    lengths = convert.(Integer, map(x -> length(collect(eval(Meta.parse(x)))), params_dict["absorption"]["spec_bands"]))
+
+    
+    # print(typeof(reshape(lengths, length(lengths), 1)))
+
+    return vSmartMOM_Parameters(FT,
+                                convert.(FT, params_dict["scattering"]["λ"]),
+                                FT(params_dict["scattering"]["λ_ref"]),
+                                FT(params_dict["scattering"]["depol"]),
+                                params_dict["truncation_type"]["l_trunc"],
+                                FT(params_dict["truncation_type"]["Δ_angle"]),
+                                params_dict["vSmartMOM"]["max_m"],
+                                polarization_type,
+                                FT(params_dict["geometry"]["obs_alt"]),
+                                FT(params_dict["geometry"]["sza"]),
+                                convert.(FT, params_dict["geometry"]["vza"]),
+                                convert.(FT, params_dict["geometry"]["vaz"]),
+                                length(params_dict["scattering"]["aerosols"]), 
+                                convert.(FT, map(x -> x["τ_ref"], params_dict["scattering"]["aerosols"])),
+                                # FT(params_dict["scattering"]["aerosols"][1]["τ_ref"]),
+                                convert.(FT, map(x -> x["μ"], params_dict["scattering"]["aerosols"])),
+                                # FT(params_dict["scattering"]["aerosols"][1]["μ"]),
+                                convert.(FT, map(x -> x["σ"], params_dict["scattering"]["aerosols"])),
+                                # FT(params_dict["scattering"]["aerosols"][1]["σ"]),
+                                FT(params_dict["scattering"]["r_max"]),
+                                params_dict["scattering"]["nquad_radius"],
+                                convert.(FT, map(x -> x["nᵣ"], params_dict["scattering"]["aerosols"])),
+                                convert.(FT, map(x -> x["nᵢ"], params_dict["scattering"]["aerosols"])),
+                                convert.(FT, map(x -> x["p₀"], params_dict["scattering"]["aerosols"])),
+                                convert.(FT, map(x -> x["σp"], params_dict["scattering"]["aerosols"])),
+                                params_dict["atmospheric_profile"]["file"],
+                                params_dict["atmospheric_profile"]["time_index"],
+                                params_dict["atmospheric_profile"]["lat"],
+                                params_dict["atmospheric_profile"]["lon"],
+                                params_dict["atmospheric_profile"]["profile_reduction"],
+                                convert.(FT, map(x -> first(collect(eval(Meta.parse(x)))), params_dict["absorption"]["spec_bands"])),
+                                convert.(FT, map(x -> last(collect(eval(Meta.parse(x)))), params_dict["absorption"]["spec_bands"])),
+                                convert(Array{Integer}, convert.(Integer, map(x -> length(collect(eval(Meta.parse(x)))), params_dict["absorption"]["spec_bands"]))),
+                                # Integer[10000],
+                                # reshape(lengths, length(lengths), 1),
+                                # convert.(Int, map(x -> length(collect(eval(Meta.parse(x)))), params_dict["absorption"]["spec_bands"])),
+                                # FT(params_dict["absorption"]["ν_max"]),
+                                # FT(params_dict["absorption"]["ν_step"]),
+                                broadening_function,
+                                params_dict["absorption"]["wing_cutoff"],
+                                CEF,
+                                FT(params_dict["absorption"]["vmr"]),
+                                BRDF_per_band,
+                                decomp_type,
+                                quadrature_type,
+                                architecture)
+end
+
+function parameters_from_json(file_path, FT::DataType=Float64)
+
+    JSON_obj = JSON.parsefile(file_path)
+    # validate_JSON_parameters(JSON_obj)
+
+    polarization_type = JSON_obj["polarization_type"] == "Stokes_I" ? Stokes_I{FT}() : 
+                        JSON_obj["polarization_type"] == "Stokes_IQU" ? Stokes_IQU{FT}() : 
+                        JSON_obj["polarization_type"] == "Stokes_IQUV" ? Stokes_IQUV{FT}() : Stokes_IQU{FT}()
+
+    decomp_type = JSON_obj["decomp_type"] == "NAI2" ? NAI2() : 
+                  JSON_obj["decomp_type"] == "PCW" ? PCW() : NAI2()
+
+    quadrature_type = JSON_obj["quadrature_type"] == "RadauQuad" ? RadauQuad() : 
+                      JSON_obj["quadrature_type"] == "GaussQuadHemisphere" ? GaussQuadHemisphere() : 
+                      JSON_obj["quadrature_type"] == "GaussQuadFullSphere" ? GaussQuadFullSphere() : RadauQuad()
+
+    architecture = JSON_obj["decomp_type"] == "Default" ? default_architecture : 
+                   JSON_obj["decomp_type"] == "GPU" ? GPU : 
+                   JSON_obj["decomp_type"] == "CPU" ? CPU : default_architecture
+
+    broadening_function = JSON_obj["broadening_function"] == "Voigt" ? Voigt() : 
+                          JSON_obj["broadening_function"] == "Doppler" ? Doppler() : 
+                          JSON_obj["broadening_function"] == "Lorentz" ? Lorentz() : Voigt()
+
+    CEF = JSON_obj["CEF"] == "HumlicekWeidemann32SDErrorFunction" ? HumlicekWeidemann32SDErrorFunction() : HumlicekWeidemann32SDErrorFunction()
+
+    return vSmartMOM_Parameters(FT,
+                                FT(JSON_obj["λ"]),
+                                FT(JSON_obj["depol"]),
+                                JSON_obj["l_trunc"],
+                                FT(JSON_obj["Δ_angle"]),
+                                JSON_obj["max_m"],
+                                polarization_type,
+                                FT(JSON_obj["obs_alt"]),
+                                FT(JSON_obj["sza"]),
+                                convert.(FT, JSON_obj["vza"]),
+                                convert.(FT, JSON_obj["vaz"]),
+                                FT(JSON_obj["μ"]),
+                                FT(JSON_obj["σ"]),
+                                FT(JSON_obj["r_max"]),
+                                JSON_obj["nquad_radius"],
+                                FT(JSON_obj["nᵣ"]),
+                                FT(JSON_obj["nᵢ"]),
+                                FT(JSON_obj["p₀"]),
+                                FT(JSON_obj["σp"]),
+                                JSON_obj["file"],
+                                JSON_obj["timeIndex"],
+                                JSON_obj["lat"],
+                                JSON_obj["lon"],
+                                JSON_obj["profile_reduction_n"],
+                                FT(JSON_obj["grid_start"]),
+                                FT(JSON_obj["grid_end"]),
+                                JSON_obj["grid_n"],
+                                broadening_function,
+                                JSON_obj["wing_cutoff"],
+                                CEF,
+                                FT(JSON_obj["vmr"]),
+                                decomp_type,
+                                quadrature_type,
+                                architecture)
+
+end
+
+
+function model_from_parameters(params::vSmartMOM_Parameters)
+
     
     @unpack λ_band = params
     nBands = length(λ_band)
