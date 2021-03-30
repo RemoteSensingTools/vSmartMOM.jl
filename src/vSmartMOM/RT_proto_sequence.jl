@@ -1,21 +1,22 @@
 using Revise
 using Plots
 using Pkg
-Pkg.activate(".")
+# Pkg.activate(".")
 using RadiativeTransfer
 using RadiativeTransfer.Absorption
 using RadiativeTransfer.Scattering
 using RadiativeTransfer.vSmartMOM
-# using Distributions
-# using BenchmarkTools
-# using Test
-# using CUDA
+
+# Load parameters from file
+parameters = vSmartMOM.parameters_from_yaml("RadiativeTransfer/src/vSmartMOM/ModelParameters/DefaultParameters.yaml")
+
+# default_parameters
 
 # Sets all the "specific" parameters
-parameters = vSmartMOM.default_parameters();
+# parameters = vSmartMOM.default_parameters();
 
 # Generates all the derived attributes from above parameters
-model = default_model(parameters);
+model = model_from_parameters(parameters);
 #model.params.
 model.params.architecture = RadiativeTransfer.Architectures.GPU()
 @time R_GPU, T_GPU, R_SFI, T_SFI = vSmartMOM.rt_run(model);
