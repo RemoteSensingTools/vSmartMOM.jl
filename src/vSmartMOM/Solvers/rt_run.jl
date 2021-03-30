@@ -14,7 +14,7 @@ function rt_run(pol_type,              # Polarization type (IQUV)
                 architecture::AbstractArchitecture) # Whether to use CPU / GPU
 
     @unpack obs_alt, sza, vza, vaz = obs_geom   # Observational geometry properties
-    @unpack qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart,μ₀, iμ₀ = quadPoints
+    @unpack qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart,μ₀, iμ₀,Nquad = quadPoints
     FT = eltype(sza)                    # Get the float-type to use
     Nz = length(τRayl)                  # Number of vertical slices
     nSpec = size(τ_abs, 1)              # Number of spectral points
@@ -34,6 +34,22 @@ function rt_run(pol_type,              # Polarization type (IQUV)
     Loop over number of truncation terms =#
     SFI = true # true #true
     @show SFI
+    print("Creating arrays")
+    NquadN = Nquad * pol_type.n
+    dims = (NquadN,NquadN)
+    @timeit "Creating layers" added_layer         = make_added_layer(FT, arr_type, dims, nSpec)
+    # For surface:
+    @timeit "Creating layers" added_layer_surface = make_added_layer(FT, arr_type, dims, nSpec)
+    # For atmosphere+surface:
+    @timeit "Creating layers" composite_layer     = make_composite_layer(FT, arr_type, dims, nSpec)
+
+    # Compute aerosol Z-matrices for all aerosols
+    nAer  = length(aerosol_optics)
+    @timeit "Creating arrays" Aer𝐙⁺⁺ = arr_type(zeros(FT, (dims[1], dims[2], nAer)))
+    @timeit "Creating arrays" Aer𝐙⁻⁺ = similar(Aer𝐙⁺⁺)
+
+    @timeit "Creating arrays" I_static = Diagonal(arr_type(Diagonal{FT}(ones(dims[1]))));
+    println("...done")
     for m = 0:max_m - 1
 
         println("Fourier Moment: ", m)
@@ -43,56 +59,43 @@ function rt_run(pol_type,              # Polarization type (IQUV)
 
         # Compute Z-moments of the Rayleigh phase matrix 
         # For m>=3, Rayleigh matrices will be 0, can catch with if statement if wanted 
-        Rayl𝐙⁺⁺, Rayl𝐙⁻⁺ = Scattering.compute_Z_moments(pol_type, Array(qp_μ), GreekRayleigh, m, arr_type = arr_type);
-
-
-        nAer  = length(aerosol_optics)
+        @timeit "Z moments" Rayl𝐙⁺⁺, Rayl𝐙⁻⁺ = Scattering.compute_Z_moments(pol_type, Array(qp_μ), GreekRayleigh, m, arr_type = arr_type);
 
         # Just for now (will change this later):
         # iBand = 1
 
         #nAer, nBand = size(aerosol_optics)
         #@show nAer#, nBand
-        dims = size(Rayl𝐙⁺⁺)
+        
         @show size(Rayl𝐙⁺⁺)
-        # Compute aerosol Z-matrices for all aerosols
-        Aer𝐙⁺⁺ = arr_type(zeros(FT, (dims[1], dims[2], nAer)))
-        Aer𝐙⁻⁺ = similar(Aer𝐙⁺⁺)
+
+        # Need to make sure arrays are 0:
+        # TBD here
         
         for i = 1:nAer
             #@show aerosol_optics[i,1]
-            Aer𝐙⁺⁺[:,:,i], Aer𝐙⁻⁺[:,:,i] = Scattering.compute_Z_moments(pol_type, Array(qp_μ), aerosol_optics[i].greek_coefs, m, arr_type = arr_type)
+            @timeit "Z moments"  Aer𝐙⁺⁺[:,:,i], Aer𝐙⁻⁺[:,:,i] = Scattering.compute_Z_moments(pol_type, Array(qp_μ), aerosol_optics[i].greek_coefs, m, arr_type = arr_type)
         end
-
-        # R and T matrices for Added and Composite Layers for this m
-
-        # For atmosphere:
-        added_layer         = make_added_layer(FT, arr_type, dims, nSpec)
-        # For surface:
-        added_layer_surface = make_added_layer(FT, arr_type, dims, nSpec)
-        # For atmosphere+surface:
-        composite_layer     = make_composite_layer(FT, arr_type, dims, nSpec)
-
-        I_static = Diagonal(arr_type(Diagonal{FT}(ones(dims[1]))));
 
         scattering_interface = ScatteringInterface_00()
 
-        τ_sum = arr_type(zeros(FT,nSpec)) #Suniti: declaring τ_sum to be of length nSpec
-        τ_λ   = arr_type(zeros(FT,nSpec))
+        @timeit "Creating arrays" τ_sum = arr_type(zeros(FT,nSpec)) #Suniti: declaring τ_sum to be of length nSpec
+        @timeit "Creating arrays" τ_λ   = arr_type(zeros(FT,nSpec))
+
         # Loop over vertical layers:
         @showprogress 1 "Looping over layers ..." for iz = 1:Nz  # Count from TOA to BOA
             # Suniti: compute sum of optical thicknesses of all layers above the current layer
             # Suniti: Remember to always place the following if-else statements before the calling construct_atm_layer for the current layer!!
             if iz==1
-                τ_sum = τ_λ
+                τ_sum  = τ_λ
             else
-                τ_sum = τ_sum + τ_λ     
+                τ_sum += τ_λ     
             end
             #@show(iz, Nz)
             # Construct the atmospheric layer
             # From Rayleigh and aerosol τ, ϖ, compute overall layer τ, ϖ
             #@timeit "Constructing" 
-            τ_λ, ϖ_λ, τ, ϖ, Z⁺⁺, Z⁻⁺ = construct_atm_layer(τRayl[iz], τAer[:,iz], aerosol_optics, Rayl𝐙⁺⁺, Rayl𝐙⁻⁺, Aer𝐙⁺⁺, Aer𝐙⁻⁺, τ_abs[:,iz], arr_type)
+            @timeit "Constructing" τ_λ, ϖ_λ, τ, ϖ, Z⁺⁺, Z⁻⁺ = construct_atm_layer(τRayl[iz], τAer[:,iz], aerosol_optics, Rayl𝐙⁺⁺, Rayl𝐙⁻⁺, Aer𝐙⁺⁺, Aer𝐙⁻⁺, τ_abs[:,iz], arr_type)
          
             # τ * ϖ should remain constant even though they individually change over wavelength
             # @assert all(i -> (i ≈ τ * ϖ), τ_λ .* ϖ_λ)
