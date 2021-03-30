@@ -9,12 +9,12 @@ function default_parameters(FT::DataType=Float64)
     λ_band = FT[0.770] 
     λ_ref = FT(0.770) 
     depol = FT(0.0)
-    l_trunc = 10 
+    l_trunc = 30 
     Δ_angle = FT(0.0)
     polarization_type = Stokes_IQU{FT}()
 
     # Define Surface here (per band, we just use 1 for now!)
-    BRDF = LambertianSurfaceScalar(0.15)
+    BRDF = LambertianSurfaceScalar(0.35)
     BRDF_per_band = [BRDF];
 
     
@@ -63,7 +63,7 @@ function default_parameters(FT::DataType=Float64)
     SFI = 1 #Suniti: 0:= DNI, 1:= SFI
     spec_grid_start = FT[(1e7 / 777)]
     spec_grid_end   = FT[(1e7 / 757)]
-    spec_grid_n     = Integer[10000]
+    spec_grid_n     = Integer[15000]
 
     broadening_function = Voigt()
     wing_cutoff = 100
