@@ -1,0 +1,63 @@
+
+
+absorption:  
+  # Broadening function (Doppler/Lorentz/Voigt)
+  broadening:         Voigt()
+  # Complex error function 
+  CEF:                HumlicekWeidemann32SDErrorFunction()
+  wing_cutoff:        40
+  ν_min:              12920 # 6000
+  ν_max:              13210 # 6400
+  ν_step:             0.1
+  spec_bands: 
+    - "(1e7/777):0.034:(1e7/757)"
+  vmr:                0.21
+  molecules:      
+    - CO2     
+
+scattering:       
+  
+  aerosols:       
+    - τ_ref:          1.0
+      μ:              1.3
+      σ:              2.0
+      nᵣ:             1.3
+      nᵢ:             0.00000001
+      p₀:             90000
+      σp:             5000.0
+  # These two should be in code (primarily): 
+  r_max:          50.0
+  nquad_radius:   2500
+  # -----
+  λ:                  [0.770]
+  λ_ref:              0.770 
+  depol:              0.0
+  polarization_type:  Stokes_IQU()
+  decomp_type:        NAI2()
+
+geometry: 
+  vza:                [60, 45, 30, 15, 0, 15, 30, 45, 60]
+  vaz:                [180, 180, 180, 180, 0, 0, 0, 0, 0]
+  sza:                60
+  obs_alt:            1000.0
+
+atmospheric_profile: 
+  file: /net/fluo/data1/ftp/XYZT_ESE156/Data/MERRA300.prod.assim.inst6_3d_ana_Nv.20150613.hdf.nc4
+  lat:                34.1377
+  lon:                -118.1253
+  time_index:         2
+  profile_reduction:  20
+
+surface: 
+  BRDFs: 
+    - LambertianSurfaceScalar(0.15)
+
+truncation_type: 
+  l_trunc:            20
+  Δ_angle:            2.0
+
+vSmartMOM: 
+  quadrature_type:    RadauQuad()
+  max_m:              3
+  architecture:       default_architecture
+  float_type:         Float64

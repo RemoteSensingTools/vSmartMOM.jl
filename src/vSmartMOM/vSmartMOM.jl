@@ -10,7 +10,8 @@ using DelimitedFiles
 using ..Scattering
 using ..Absorption
 using ...RadiativeTransfer
-using ..Architectures
+using ...Architectures
+
 using FastGaussQuadrature 
 using CUDA
 using TimerOutputs
@@ -22,6 +23,8 @@ using TensorOperations
 using NNlib
 using Parameters
 using DocStringExtensions
+using JSON
+using YAML
 
 # More threads in LA wasn't really helpful, turn that off now and use Julia threads!
 LinearAlgebra.BLAS.set_num_threads(1)
@@ -40,6 +43,7 @@ include("GPU/CUDA_getri.jl")
 include("Utils/default_model.jl")
 include("Surface/lambertian_surface.jl")
 
-export rt_set_streams, compute_absorption_profile!, ObsGeometry, default_model
+export rt_set_streams, compute_absorption_profile!, ObsGeometry, default_model, 
+       model_from_parameters, parameters_from_json, parameters_from_yaml
 
 end
