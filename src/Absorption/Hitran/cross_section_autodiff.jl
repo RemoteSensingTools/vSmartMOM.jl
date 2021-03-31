@@ -7,10 +7,12 @@ Calculate absorption cross-section at the given pressure, temperature, and grid 
 
 """
 function absorption_cross_section(model::AbstractCrossSectionModel,          # Model to use 
-                                  grid::AbstractRange{<:Real}, # Wavelength [nm] or wavenumber [cm-1] grid 
+                                  grid::Union{AbstractRange{<:Real}, AbstractArray}, # Wavelength [nm] or wavenumber [cm-1] grid 
                                   pressure::Real,              # actual pressure [hPa]
-                                  temperature::Real,           # actual temperature [K]    
-                                  wavelength_flag::Bool=false ; autodiff=false)
+                                  temperature::Real;
+                                  autodiff::Bool=false,           # actual temperature [K]    
+                                  wavelength_flag::Bool=false)
+                                  
 
     # This function takes in the "x-vector" along with the input model so that ForwardDiff will work
     function absorption_cross_section_autodiff(x ; model::AbstractCrossSectionModel = model, grid=grid, pressure=pressure, 
@@ -24,7 +26,7 @@ function absorption_cross_section(model::AbstractCrossSectionModel,          # M
         @assert (pressure== x[1])
         @assert (temperature == x[2])
     
-        cross_section = absorption_cross_section(model, grid, x[1], x[2]);
+        cross_section = compute_absorption_cross_section(model, grid, x[1], x[2], wavelength_flag=wavelength_flag);
     
         return cross_section
     end
@@ -39,7 +41,7 @@ function absorption_cross_section(model::AbstractCrossSectionModel,          # M
         return (result.value, result.derivs[1]);
 
     else 
-        return absorption_cross_section(model, grid, pressure, temperature, wavelength_flag)
+        return compute_absorption_cross_section(model, grid, pressure, temperature, wavelength_flag=wavelength_flag)
     end
 
 end
