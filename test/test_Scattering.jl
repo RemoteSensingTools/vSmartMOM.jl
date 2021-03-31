@@ -71,8 +71,6 @@ end
 
     # STEP 1: Create the Aerosol
 
-    τ
-
     # Aerosol particle distribution and properties 
     μ  = 0.3                # Log mean radius
     σ  = 6.82               # Log stddev of radius

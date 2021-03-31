@@ -11,7 +11,7 @@ absorption:
   ν_step:             0.1
   spec_bands: 
     - 12920:0.1:13210
-    - 14920:0.1:15210
+    # - 14920:0.1:15210
   vmr:                0.21
   molecules:      
     - CO2     
