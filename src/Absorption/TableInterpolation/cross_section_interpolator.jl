@@ -49,7 +49,9 @@ function make_interpolation_model(
     # Calculate all the cross-sections at the pressure and temperature grids
     @showprogress 1 "Computing Cross Sections for Interpolation..." for i in 1:length(p_grid)
         for j in 1:length(t_grid)
-            cs_matrix[i,j,:] = Array(compute_absorption_cross_section(hitran, broadening, collect(ν_grid), p_grid[i], t_grid[j], wavelength_flag, wing_cutoff, vmr, CEF, architecture))
+            # make_hitran_model(hitran_data, Voigt(), wing_cutoff = 40, CEF=HumlicekWeidemann32SDErrorFunction(), architecture=CPU())
+            model = make_hitran_model(hitran, broadening, wing_cutoff=wing_cutoff, CEF=CEF, architecture=architecture)
+            cs_matrix[i,j,:] = Array(compute_absorption_cross_section(model, collect(ν_grid), p_grid[i], t_grid[j], wavelength_flag=wavelength_flag))
         end
     end
     
