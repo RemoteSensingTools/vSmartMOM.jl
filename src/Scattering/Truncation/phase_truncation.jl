@@ -1,3 +1,4 @@
+using DelimitedFiles
 """
 $(FUNCTIONNAME)(mod::δBGE, aero::AerosolOptics))
 Returns the truncated aerosol optical properties as [`AerosolOptics`](@ref) 
@@ -31,20 +32,25 @@ function truncate_phase(mod::δBGE, aero::AerosolOptics; reportFit=false, err_β
     y₁₂ = view(f₁₂, iμ)
     y₃₄ = view(f₃₄, iμ)
     A   = view(P, iμ, 1:l_max)
-    B   = fac' .* view(P², iμ, 1:l_max)
-
+    B   = fac[3:end]' .* view(P², iμ, 3:l_max)
+    writedlm( "FileA.dat",  A, ' ')
+    writedlm( "FileB.dat",  B, ' ')
+    writedlm( "FileP2.dat",  view(P², iμ, 1:l_max), ' ')
     # Weights (also avoid division by 0)
     minY = zeros(length(iμ)) .+ FT(1e-8);
     W₁₁ = Diagonal(w_μ[iμ] ./ max(abs.(y₁₁), minY));
     W₁₂ = Diagonal(w_μ[iμ] ./ max(abs.(y₁₂), minY));
     W₃₄ = Diagonal(w_μ[iμ] ./ max(abs.(y₃₄), minY));
-    
+    # W₁₂ = Diagonal(w_μ[iμ]);
+    # W₃₄ = Diagonal(w_μ[iμ]);
     # Julia backslash operator for least squares (just like Matlab);
     cl = ((W₁₁ * A) \ (W₁₁ * y₁₁))   # B in δ-BGR (β)
     #γᵗ = similar(cl)
     #@show W₁₂, B, y₁₂
+    # inv(B'B)
     γᵗ = ((W₁₂ * B) \ (W₁₂ * y₁₂))   # G in δ-BGE (γ)
     ϵᵗ = ((W₃₄ * B) \ (W₃₄ * y₃₄))   # E in δ-BGE (ϵ)
+    
     if reportFit
         println("Errors in δ-BGE fits:")
         mod_y = convert.(FT, A * cl)
@@ -68,17 +74,13 @@ function truncate_phase(mod::δBGE, aero::AerosolOptics; reportFit=false, err_β
     ζᵗ = (ζ[1:l_max] .- (β[1:l_max] .- cl)) / c₀    # Eq. 38d, derived from β
 
     # Adjust scattering and extinction cross section!
-    greek_coefs = GreekCoefs(convert.(FT, αᵗ), 
-                             convert.(FT, βᵗ), 
-                             convert.(FT, γᵗ), 
-                             convert.(FT, δᵗ), 
-                             convert.(FT, ϵᵗ), 
-                             convert.(FT, ζᵗ))
+    greek_coefs = GreekCoefs(αᵗ, βᵗ, γᵗ, δᵗ, ϵᵗ, ζᵗ  )
+  
     # C_sca  = (ω̃ * k);
     # C_scaᵗ = C_sca * c₀; 
     # C_ext  = k - (C_sca - C_scaᵗ);
     
     # return AerosolOptics(greek_coefs = greek_coefs, ω̃=C_scaᵗ / C_ext, k=C_ext, fᵗ = 1-c₀) 
-    return AerosolOptics(greek_coefs=greek_coefs, ω̃=FT(ω̃), k=FT(k), fᵗ=FT(FT(1) - c₀))
+    return AerosolOptics(greek_coefs=greek_coefs, ω̃=ω̃, k=k, fᵗ=(FT(1) - c₀))
 end
 

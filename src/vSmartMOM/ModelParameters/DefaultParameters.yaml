@@ -18,7 +18,7 @@ absorption:
 scattering:       
   
   aerosols:       
-    - τ_ref:          1.0
+    - τ_ref:          0.1
       μ:              1.3
       σ:              2.0
       nᵣ:             1.3
@@ -32,7 +32,7 @@ scattering:
   λ:                  [0.770]
   λ_ref:              0.770 
   depol:              0.0
-  polarization_type:  Stokes_I()
+  polarization_type:  Stokes_IQU()
   decomp_type:        NAI2()
 
 geometry: 
