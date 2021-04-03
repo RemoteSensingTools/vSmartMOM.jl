@@ -23,7 +23,7 @@ function runner(x, parameters=parameters)
     @show parameters.p₀
     model = model_from_parameters(parameters);
     
-    model.params.architecture = RadiativeTransfer.Architectures.GPU()
+    model.params.architecture = RadiativeTransfer.Architectures.CPU()
     J = vSmartMOM.rt_run(model);
     #@show J
     return J[1,1,:]#; R_SFI[1,1,:]

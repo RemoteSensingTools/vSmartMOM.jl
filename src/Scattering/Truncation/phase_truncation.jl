@@ -45,11 +45,10 @@ function truncate_phase(mod::δBGE, aero::AerosolOptics; reportFit=false, err_β
     # W₃₄ = Diagonal(w_μ[iμ]);
     # Julia backslash operator for least squares (just like Matlab);
     cl = ((W₁₁ * A) \ (W₁₁ * y₁₁))   # B in δ-BGR (β)
-    #γᵗ = similar(cl)
-    #@show W₁₂, B, y₁₂
-    # inv(B'B)
-    γᵗ = ((W₁₂ * B) \ (W₁₂ * y₁₂))   # G in δ-BGE (γ)
-    ϵᵗ = ((W₃₄ * B) \ (W₃₄ * y₃₄))   # E in δ-BGE (ϵ)
+    γᵗ = similar(cl); γᵗ[1:2] .=0
+    ϵᵗ = similar(cl); ϵᵗ[1:2] .=0
+    γᵗ[3:end] = ((W₁₂ * B) \ (W₁₂ * y₁₂))   # G in δ-BGE (γ)
+    ϵᵗ[3:end] = ((W₃₄ * B) \ (W₃₄ * y₃₄))   # E in δ-BGE (ϵ)
     
     if reportFit
         println("Errors in δ-BGE fits:")
