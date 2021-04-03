@@ -49,7 +49,7 @@ function rt_run(pol_type,              # Polarization type (IQUV)
 
     # Compute aerosol Z-matrices for all aerosols
     nAer  = length(aerosol_optics)
-    @timeit "Creating arrays" Aer𝐙⁺⁺ = arr_type(zeros(FT, (dims[1], dims[2], nAer)))
+    @timeit "Creating arrays" Aer𝐙⁺⁺ = arr_type(zeros(FT_dual, (dims[1], dims[2], nAer)))
     @timeit "Creating arrays" Aer𝐙⁻⁺ = similar(Aer𝐙⁺⁺)
 
     @timeit "Creating arrays" I_static = Diagonal(arr_type(Diagonal{FT}(ones(dims[1]))));

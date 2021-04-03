@@ -19,7 +19,7 @@ function runner(x, parameters=parameters)
     parameters.τAer_ref = [x[1]];
     #@show parameters.p₀
     parameters.p₀ = [x[2]];
-    #parameters.nᵣ = [x[3]];
+    parameters.nᵣ = [x[3]];
     @show parameters.p₀
     model = model_from_parameters(parameters);
     
@@ -29,7 +29,8 @@ function runner(x, parameters=parameters)
     return J[1,1,:]#; R_SFI[1,1,:]
 end
 
-x = [0.1,90001.0]
+#x = [0.1,90001.0]
+x = [0.1,90001.0,1.3]
 # Run FW model:
 @time runner(x);
 @time dfdx = ForwardDiff.jacobian(runner, x);
