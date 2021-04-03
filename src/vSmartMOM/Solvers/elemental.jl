@@ -1,6 +1,6 @@
 "Elemental single-scattering layer"
 function elemental!(pol_type, SFI::Bool, 
-                            τ_sum::AbstractArray{FT,1}, #Suniti
+                            τ_sum::AbstractArray,#{FT2,1}, #Suniti
                             dτ_λ::AbstractArray{FT,1},  # dτ_λ: total optical depth of elemental layer (per λ)
                             dτ::FT,                     # dτ:   scattering optical depth of elemental layer (scalar)
                             ϖ_λ::AbstractArray{FT,1},   # ϖ: single scattering albedo of elemental layer (per λ, absorptions by gases included)
@@ -10,10 +10,10 @@ function elemental!(pol_type, SFI::Bool,
                             m::Int,                     # m: fourier moment
                             ndoubl::Int,                # ndoubl: number of doubling computations needed 
                             scatter::Bool,              # scatter: flag indicating scattering
-                            quadPoints::QuadPoints{FT}, # struct with quadrature points, weights, 
+                            quadPoints::QuadPoints{FT2}, # struct with quadrature points, weights, 
                             added_layer::AddedLayer{FT}, 
                             I_static,
-                            architecture) where {FT}
+                            architecture) where {FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2}
     
     @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, J₀⁺, J₀⁻ = added_layer
     @unpack qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart, iμ₀ = quadPoints

@@ -3,7 +3,7 @@
 # `ndoubl` doubling steps
 
 function doubling_helper!(pol_type, SFI, expk, ndoubl::Int, 
-                            added_layer::AddedLayer{FT},
+                            added_layer::AddedLayer,#{FT},
                             I_static::AbstractArray{FT}, 
                             architecture) where {FT}
 
@@ -56,7 +56,7 @@ end
 
 function doubling!(pol_type, SFI, expk,
                     ndoubl::Int, 
-                    added_layer::AddedLayer{FT},
+                    added_layer::AddedLayer,#{FT},
                     I_static::AbstractArray{FT}, 
                     architecture) where {FT}
 

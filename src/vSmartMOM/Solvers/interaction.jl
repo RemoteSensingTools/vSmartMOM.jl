@@ -2,7 +2,7 @@
 function interaction_helper!(::ScatteringInterface_00, SFI,
                                 composite_layer::CompositeLayer{FT}, 
                                 added_layer::AddedLayer{FT}, 
-                                I_static::AbstractArray{FT}) where {FT}
+                                I_static::AbstractArray{FT2}) where {FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2}
 
     if SFI
         J₀⁺, J₀⁻ = similar(composite_layer.J₀⁺), similar(composite_layer.J₀⁺)
@@ -21,7 +21,7 @@ end
 function interaction_helper!(::ScatteringInterface_01, SFI,
                                 composite_layer::CompositeLayer{FT}, 
                                 added_layer::AddedLayer{FT}, 
-                                I_static::AbstractArray{FT}) where {FT}
+                                I_static::AbstractArray{FT2}) where {FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2}
 
     if SFI
         J₀⁺, J₀⁻ = similar(composite_layer.J₀⁺), similar(composite_layer.J₀⁺)
@@ -43,7 +43,7 @@ end
 function interaction_helper!(::ScatteringInterface_10, SFI,
                                 composite_layer::CompositeLayer{FT}, 
                                 added_layer::AddedLayer{FT}, 
-                                I_static::AbstractArray{FT}) where {FT}
+                                I_static::AbstractArray{FT2}) where {FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2}
 
     if SFI
         J₀⁺, J₀⁻ = similar(composite_layer.J₀⁺), similar(composite_layer.J₀⁺)
@@ -63,7 +63,7 @@ end
 function interaction_helper!(::ScatteringInterface_11, SFI,
                                 composite_layer::CompositeLayer{FT}, 
                                 added_layer::AddedLayer{FT}, 
-                                I_static::AbstractArray{FT}) where {FT}
+                                I_static::AbstractArray{FT2}) where {FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2}
     
     @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺ = added_layer
     @unpack R⁻⁺, R⁺⁻, T⁺⁺, T⁻⁻, J₀⁺, J₀⁻ = composite_layer
@@ -109,7 +109,7 @@ end
 function interaction!(scattering_interface::AbstractScatteringInterface, SFI,
                         composite_layer::CompositeLayer{FT}, 
                         added_layer::AddedLayer{FT},
-                        I_static::AbstractArray{FT}) where {FT}
+                        I_static::AbstractArray{FT2}) where {FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2}
 
     interaction_helper!(scattering_interface, SFI, composite_layer, added_layer, I_static)
     synchronize_if_gpu()
