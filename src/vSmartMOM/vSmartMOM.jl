@@ -25,6 +25,8 @@ using Parameters
 using DocStringExtensions
 using JSON
 using YAML
+using ForwardDiff
+import NNlib.batched_mul
 
 # More threads in LA wasn't really helpful, turn that off now and use Julia threads!
 LinearAlgebra.BLAS.set_num_threads(1)
@@ -38,6 +40,7 @@ include("Solvers/doubling.jl")
 include("Solvers/interaction.jl")
 include("GPU/gpu_batched.jl")
 include("Utils/rt_utils.jl")
+include("Utils/forwardDiff_tools.jl")
 include("Solvers/rt_run.jl")
 include("GPU/CUDA_getri.jl")
 include("Utils/default_model.jl")

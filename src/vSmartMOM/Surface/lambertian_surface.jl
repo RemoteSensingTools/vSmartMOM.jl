@@ -1,6 +1,6 @@
 # Create a simple Lambertian albedo layer
 function create_surface_layer!(lambertian::LambertianSurfaceScalar{FT}, 
-                        added_layer::AddedLayer{FT}, 
+                        added_layer::AddedLayer,#{FT}, 
                         SFI,
                         m::Int,    # Fourier Moment
                         pol_type,  # 

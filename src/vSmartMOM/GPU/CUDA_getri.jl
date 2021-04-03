@@ -1,3 +1,5 @@
+# Is included in latest CUBLAS version, can be removed in the future!
+
 ## getriBatched - performs batched matrix inversion
 for (fname, elty) in
     ((:cublasDgetriBatched, :Float64),

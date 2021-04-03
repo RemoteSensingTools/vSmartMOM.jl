@@ -303,8 +303,9 @@ function model_from_parameters(params::vSmartMOM_Parameters)
     # aerosol_optics[iBand][iAer]
     aerosol_optics = [Array{AerosolOptics}(undef, (params.nAer)) for i=1:nBands];
 
+    FT2 = typeof(params.τAer_ref[1])
     # τAer[iBand][iAer,iProfile]
-    τAer = [zeros(params.float_type, params.nAer, length(profile.p)) for i=1:nBands];
+    τAer = [zeros(FT2, params.nAer, length(profile.p)) for i=1:nBands];
 
     # Loop over aerosol type
     for iaer=1:params.nAer
@@ -321,19 +322,15 @@ function model_from_parameters(params::vSmartMOM_Parameters)
             # Create the aerosols:
             mie_model      = make_mie_model(params.decomp_type, aerosol, params.λ_band[ib], params.polarization_type, truncation_type)
             # Compute raw (not truncated) aerosol optical properties (not needed in RT eventually) 
-            aerosol_optics_raw = compute_aerosol_optical_properties(mie_model, params.float_type);
+            aerosol_optics_raw = compute_aerosol_optical_properties(mie_model, FT2);
 
             # Compute truncated aerosol optical properties (phase function and fᵗ), consistent with Ltrunc:
             @show iaer,ib
             aerosol_optics[ib][iaer] = Scattering.truncate_phase(truncation_type, aerosol_optics_raw; reportFit=false)
             # Compute nAer aerosol optical thickness profiles
             τAer[ib][iaer,:] = params.τAer_ref[iaer] * (aerosol_optics[ib][iaer].k/k_ref) * vSmartMOM.getAerosolLayerOptProp(1.0, params.p₀[iaer], params.σp[iaer], profile.p)
-            # @show τAer, sum(τAer)
-            # Can be done with arbitrary length later:
-            # τAer = FT(0.2) * τAer_1; # [τAer_1 τAer_2]
-             #ϖAer = params.float_type[aerosol_optics[iaer,ib].ω̃]; 
-            # fᵗ   = FT[aerosol_optics_trunc_aero1.fᵗ]; # [aerosol_optics_trunc_aero1.fᵗ aerosol_optics_trunc_aero2.fᵗ];
-            # aerosol_optics = [aerosol_optics_trunc_aero1] #
+            
+        
         end 
     end
     

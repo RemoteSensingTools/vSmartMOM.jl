@@ -171,7 +171,8 @@ function compute_ref_aerosol_extinction(model::MieModel{FDT}, FT2::Type=Float64)
 
     # Get the refractive index's real part type
     FT = eltype(nᵣ);
-    @assert FT == Float64 "Aerosol computations require 64bit"
+    #@show FT
+    #@assert FT == Float64 "Aerosol computations require 64bit"
     # Get radius quadrature points and weights (for mean, thus normalized):
     r, wᵣ = gauleg(nquad_radius, 0.0, r_max ; norm=true) 
     

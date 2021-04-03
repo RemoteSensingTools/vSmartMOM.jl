@@ -20,12 +20,14 @@ function rt_run(pol_type,              # Polarization type (IQUV)
     nSpec = size(τ_abs, 1)              # Number of spectral points
     
     arr_type = array_type(architecture)
+    # Need to check this a bit better in the future!
+    FT_dual = typeof(τAer[1])
 
-    # Output variables: Reflected and transmitted solar irradiation at TOA and BOA respectively
-    R = zeros(FT, length(vza), pol_type.n, nSpec)
-    T = zeros(FT, length(vza), pol_type.n, nSpec)
-    R_SFI = zeros(FT, length(vza), pol_type.n, nSpec)
-    T_SFI = zeros(FT, length(vza), pol_type.n, nSpec)
+    # Output variables: Reflected and transmitted solar irradiation at TOA and BOA respectively # Might need Dual later!!
+    R = zeros(FT_dual, length(vza), pol_type.n, nSpec)
+    T = zeros(FT_dual, length(vza), pol_type.n, nSpec)
+    R_SFI = zeros(FT_dual, length(vza), pol_type.n, nSpec)
+    T_SFI = zeros(FT_dual, length(vza), pol_type.n, nSpec)
 
     println("Processing on: ", architecture)
     println("With FT: ", FT)
@@ -37,11 +39,13 @@ function rt_run(pol_type,              # Polarization type (IQUV)
     print("Creating arrays")
     NquadN = Nquad * pol_type.n
     dims = (NquadN,NquadN)
-    @timeit "Creating layers" added_layer         = make_added_layer(FT, arr_type, dims, nSpec)
+    
+    println("Dimensions(n,n,nSpec) = (", NquadN,"," ,NquadN,"," ,nSpec,")")
+    @timeit "Creating layers" added_layer         = make_added_layer(FT_dual, arr_type, dims, nSpec)
     # For surface:
-    @timeit "Creating layers" added_layer_surface = make_added_layer(FT, arr_type, dims, nSpec)
+    @timeit "Creating layers" added_layer_surface = make_added_layer(FT_dual, arr_type, dims, nSpec)
     # For atmosphere+surface:
-    @timeit "Creating layers" composite_layer     = make_composite_layer(FT, arr_type, dims, nSpec)
+    @timeit "Creating layers" composite_layer     = make_composite_layer(FT_dual, arr_type, dims, nSpec)
 
     # Compute aerosol Z-matrices for all aerosols
     nAer  = length(aerosol_optics)
@@ -151,9 +155,9 @@ function rt_run(pol_type,              # Polarization type (IQUV)
             end
         end 
 
-        #surf = LambertianSurfaceScalar(0.5)
+        # Create surface matrices:
         create_surface_layer!(brdf, added_layer, SFI, m, pol_type, quadPoints, τ_sum, architecture);
-        #@show added_layer.J₀⁻[:,:,1]
+        # One last interaction with surface:
         @timeit "interaction" interaction!(scattering_interface, SFI, composite_layer, added_layer, I_static)
 
         # All of this is "postprocessing" now, can move this into a separate function:
@@ -162,10 +166,10 @@ function rt_run(pol_type,              # Polarization type (IQUV)
         st_iμ0, istart0, iend0 = get_indices(iμ₀, pol_type);
 
         # Convert these to Arrays (if CuArrays), so they can be accessed by index
-        R⁻⁺ = Array(composite_layer.R⁻⁺)
-        T⁺⁺ = Array(composite_layer.T⁺⁺)
-        J₀⁺ = Array(composite_layer.J₀⁺)
-        J₀⁻ = Array(composite_layer.J₀⁻)
+        R⁻⁺ = Array(composite_layer.R⁻⁺);
+        T⁺⁺ = Array(composite_layer.T⁺⁺);
+        J₀⁺ = Array(composite_layer.J₀⁺);
+        J₀⁻ = Array(composite_layer.J₀⁻);
         # Loop over all viewing zenith angles
         for i = 1:length(vza)
 
@@ -180,11 +184,13 @@ function rt_run(pol_type,              # Polarization type (IQUV)
             # Accumulate Fourier moments after azimuthal weighting
             
             for s = 1:nSpec
-                R[i,:,s] += bigCS * (R⁻⁺[istart:iend, istart0:iend0, s] / μ₀) * pol_type.I₀;
-                T[i,:,s] += bigCS * (T⁺⁺[istart:iend, istart0:iend0, s] / μ₀) * pol_type.I₀;
+                
                 if SFI
                     R_SFI[i,:,s] += bigCS * J₀⁻[istart:iend,1, s];
                     T_SFI[i,:,s] += bigCS * J₀⁺[istart:iend,1, s];
+                else
+                    R[i,:,s] += bigCS * (R⁻⁺[istart:iend, istart0:iend0, s] / μ₀) * pol_type.I₀;
+                    T[i,:,s] += bigCS * (T⁺⁺[istart:iend, istart0:iend0, s] / μ₀) * pol_type.I₀;
                 end
                 #@show(m,R[i,1,s], R_SFI[i,1,s])
             end
@@ -195,7 +201,13 @@ function rt_run(pol_type,              # Polarization type (IQUV)
     print_timer()
     reset_timer!()
 
-    return R, T, R_SFI, T_SFI  
+    #return R, T, R_SFI, T_SFI;
+    if SFI
+        return R_SFI;  
+    else
+        return R;
+    end
+
 end
 
 function rt_run(model::vSmartMOM_Model)

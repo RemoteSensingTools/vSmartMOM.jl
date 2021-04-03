@@ -10,7 +10,7 @@ absorption:
   ν_max:              13210 # 6400
   ν_step:             0.1
   spec_bands: 
-    - "(1e7/777):0.034:(1e7/757)"
+    - "(1e7/777):0.015:(1e7/757)"
   vmr:                0.21
   molecules:      
     - CO2     
@@ -32,12 +32,12 @@ scattering:
   λ:                  [0.770]
   λ_ref:              0.770 
   depol:              0.0
-  polarization_type:  Stokes_IQU()
+  polarization_type:  Stokes_I()
   decomp_type:        NAI2()
 
 geometry: 
-  vza:                [60, 45, 30, 15, 0, 15, 30, 45, 60]
-  vaz:                [180, 180, 180, 180, 0, 0, 0, 0, 0]
+  vza:                [0] #[60, 45, 30, 15, 0, 15, 30, 45, 60]
+  vaz:                [0] # [180, 180, 180, 180, 0, 0, 0, 0, 0]
   sza:                60
   obs_alt:            1000.0
 
@@ -57,7 +57,7 @@ truncation_type:
   Δ_angle:            2.0
 
 vSmartMOM: 
-  quadrature_type:    RadauQuad()
+  quadrature_type:    GaussQuadFullSphere()
   max_m:              3
   architecture:       default_architecture
   float_type:         Float64

@@ -9,7 +9,7 @@ function truncate_phase(mod::δBGE, aero::AerosolOptics; reportFit=false, err_β
     @unpack α, β, γ, δ, ϵ, ζ = greek_coefs
     @unpack l_max, Δ_angle =  mod
 
-    FT = eltype(ω̃)
+    FT = Float64;#eltype(ω̃)
 
     # Obtain Gauss-Legendre quadrature points and weights for phase function:
     μ, w_μ = gausslegendre(length(β));
@@ -21,7 +21,7 @@ function truncate_phase(mod::δBGE, aero::AerosolOptics; reportFit=false, err_β
     iμ = findall(x -> x < cosd(Δ_angle), μ)
 
     # Prefactor for P2:
-    fac = zeros(l_max);
+    fac = zeros(FT,l_max);
     for l = 2:l_max - 1
         fac[l + 1] = sqrt(FT(1) / ( ( l - FT(1)) * l * (l + FT(1)) * (l + FT(2)) ));
     end
@@ -41,6 +41,8 @@ function truncate_phase(mod::δBGE, aero::AerosolOptics; reportFit=false, err_β
     
     # Julia backslash operator for least squares (just like Matlab);
     cl = ((W₁₁ * A) \ (W₁₁ * y₁₁))   # B in δ-BGR (β)
+    #γᵗ = similar(cl)
+    #@show W₁₂, B, y₁₂
     γᵗ = ((W₁₂ * B) \ (W₁₂ * y₁₂))   # G in δ-BGE (γ)
     ϵᵗ = ((W₃₄ * B) \ (W₃₄ * y₃₄))   # E in δ-BGE (ϵ)
     if reportFit

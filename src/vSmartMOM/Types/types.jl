@@ -186,7 +186,7 @@ A struct which holds all initial model parameters (before any computations)
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-mutable struct vSmartMOM_Parameters{FT} #<: AbstractvSmartMOMModel
+mutable struct vSmartMOM_Parameters{FT<:Union{AbstractFloat, ForwardDiff.Dual}} #<: AbstractvSmartMOMModel
 
     "Float type to use in the RT (Float64/Float32)"
     float_type::DataType
@@ -215,7 +215,7 @@ mutable struct vSmartMOM_Parameters{FT} #<: AbstractvSmartMOMModel
     "Number of aerosol species"
     nAer::Integer
     "AOD at Reference wavelength (`nAer`)"
-    τAer_ref::AbstractArray{FT} #Suniti
+    τAer_ref::AbstractArray#{FT} #Suniti
     "Log mean radius (`nAer`)"
     μ::AbstractArray{FT} #Suniti
     "Log stddev of radius (`nAer`)"
@@ -225,11 +225,11 @@ mutable struct vSmartMOM_Parameters{FT} #<: AbstractvSmartMOMModel
     "Number of quadrature points for integration of size distribution"
     nquad_radius::Integer
     "Real part of refractive index (`nBand,nAer`)"
-    nᵣ::AbstractArray{FT}
+    nᵣ::AbstractArray#{FT}
     "Imag part of refractive index (`nBand,nAer`)"
     nᵢ::AbstractArray{FT}
     "Pressure peak [Pa] (`nAer`)"
-    p₀::AbstractArray{FT}
+    p₀::AbstractArray#{FT}
     "Pressure peak width [Pa] (`nAer`)"
     σp::AbstractArray{FT}
     "Path to atmospheric profile file"
