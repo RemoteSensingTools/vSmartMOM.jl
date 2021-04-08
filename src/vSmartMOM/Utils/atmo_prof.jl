@@ -1,9 +1,67 @@
 
+function compute_atmos_profile_fields(psurf, T, q, ak, bk; g₀=9.8196)
+
+    FT = eltype(T)
+    
+    # Calculate pressure levels
+    p_half = (ak + bk * psurf)
+    p_full = (p_half[2:end] + p_half[1:end - 1]) / 2
+
+    # Dry and wet mass
+    dry_mass = 28.9647e-3  / Nₐ  # in kg/molec, weighted average for N2 and O2
+    wet_mass = 18.01528e-3 / Nₐ  # just H2O
+    ratio = dry_mass / wet_mass 
+    n_layers = length(T)
+
+    # Also get a VMR vector of H2O (volumetric!)
+    vmr_h2o = zeros(FT, n_layers, )
+    vcd_dry = zeros(FT, n_layers, )
+    vcd_h2o = zeros(FT, n_layers, )
+
+    # Now actually compute the layer VCDs
+    for i = 1:n_layers 
+        Δp = p_half[i + 1] - p_half[i]
+        vmr_h2o[i] = q[i] * ratio
+        vmr_dry = 1 - vmr_h2o[i]
+        M  = vmr_dry * dry_mass + vmr_h2o[i] * wet_mass
+        vcd_dry[i] = vmr_dry * Δp / (M * g₀ * 100.0^2)   # includes m2->cm2
+        vcd_h2o[i] = vmr_h2o[i] * Δp / (M * g₀ * 100^2)
+    end
+
+    return p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o
+
+end
+
+function read_atmos_profile(file_path::String)
+
+    # Make sure file is csv type
+    @assert endswith(file_path, ".yaml") "File must be yaml"
+
+    # Read in the data and pass to compute fields
+    params_dict = YAML.load_file(file_path)
+    
+    psurf = convert(Float64, params_dict["psurf"])
+    T     = convert.(Float64, params_dict["T"])
+    q     = convert.(Float64, params_dict["q"])
+    ak    = convert.(Float64, params_dict["ak"])
+    bk    = convert.(Float64, params_dict["bk"])
+
+    # Calculate derived fields
+    p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o = compute_atmos_profile_fields(psurf, T, q, ak, bk)
+
+    # Return the atmospheric profile struct
+    return AtmosphericProfile(nothing, nothing, psurf, T, q, p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o)
+
+end
+
 "Read atmospheric profile (just works for our file, can be generalized"
-function read_atmos_profile(file::String, lat::Real, lon::Real, time_idx::Int; g₀=9.8196)
+function read_atmos_profile(file::String, lat::Real, lon::Real, time_idx::Int)
 
     # Time index must be ∈ [1, 2, 3, 4]
     @assert 1 <= time_idx <= 4 "Time index must be ∈ [1, 2, 3, 4]" 
+
+    # Make sure file is nc type
+    @assert endswith(file, ".nc4") "File must be nc4"
 
     # Load in the atmospheric profile
     @timeit "loading file" ds = Dataset(file)
@@ -31,33 +89,11 @@ function read_atmos_profile(file::String, lat::Real, lon::Real, time_idx::Int; g
     # AK and BK global attributes (important to calculate pressure half-levels)
     ak, bk = ds.attrib["HDF_GLOBAL.ak"][:], ds.attrib["HDF_GLOBAL.bk"][:]
 
-    # Calculate pressure levels
-    p_half = (ak + bk * psurf)
-    p_full = (p_half[2:end] + p_half[1:end - 1]) / 2
-
     # Close the file
     close(ds)
 
-    # Dry and wet mass
-    dry_mass = 28.9647e-3  / Nₐ  # in kg/molec, weighted average for N2 and O2
-    wet_mass = 18.01528e-3 / Nₐ  # just H2O
-    ratio = dry_mass / wet_mass 
-    n_layers = length(T)
-
-    # Also get a VMR vector of H2O (volumetric!)
-    vmr_h2o = zeros(FT, n_layers, )
-    vcd_dry = zeros(FT, n_layers, )
-    vcd_h2o = zeros(FT, n_layers, )
-
-    # Now actually compute the layer VCDs
-    for i = 1:n_layers 
-        Δp = p_half[i + 1] - p_half[i]
-        vmr_h2o[i] = q[i] * ratio
-        vmr_dry = 1 - vmr_h2o[i]
-        M  = vmr_dry * dry_mass + vmr_h2o[i] * wet_mass
-        vcd_dry[i] = vmr_dry * Δp / (M * g₀ * 100.0^2)   # includes m2->cm2
-        vcd_h2o[i] = vmr_h2o[i] * Δp / (M * g₀ * 100^2)
-    end
+    # Calculate derived fields
+    p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o = compute_atmos_profile_fields(psurf, T, q, ak, bk)
 
     # Return the atmospheric profile struct
     return AtmosphericProfile(lat, lon, psurf, T, q, p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o)

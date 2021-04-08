@@ -24,6 +24,7 @@ using NNlib
 using Parameters
 using DocStringExtensions
 using JSON
+using CSV
 using YAML
 using ForwardDiff
 import NNlib.batched_mul

@@ -136,8 +136,17 @@ function parameters_from_yaml(file_path)
 
     lengths = convert.(Integer, map(x -> length(collect(eval(Meta.parse(x)))), params_dict["absorption"]["spec_bands"]))
 
-    
-    # print(typeof(reshape(lengths, length(lengths), 1)))
+    profile_path = params_dict["atmospheric_profile"]["file"]
+
+    if endswith(profile_path, ".yaml")
+        time_index = nothing
+        lat = nothing
+        lon = nothing
+    else
+        time_index = params_dict["atmospheric_profile"]["time_index"]
+        lat = params_dict["atmospheric_profile"]["lat"]
+        lon = params_dict["atmospheric_profile"]["lon"]
+    end
 
     return vSmartMOM_Parameters(FT,
                                 convert.(FT, params_dict["scattering"]["λ"]),
@@ -164,10 +173,10 @@ function parameters_from_yaml(file_path)
                                 convert.(FT, map(x -> x["nᵢ"], params_dict["scattering"]["aerosols"])),
                                 convert.(FT, map(x -> x["p₀"], params_dict["scattering"]["aerosols"])),
                                 convert.(FT, map(x -> x["σp"], params_dict["scattering"]["aerosols"])),
-                                params_dict["atmospheric_profile"]["file"],
-                                params_dict["atmospheric_profile"]["time_index"],
-                                params_dict["atmospheric_profile"]["lat"],
-                                params_dict["atmospheric_profile"]["lon"],
+                                profile_path,
+                                time_index,
+                                lat,
+                                lon,
                                 params_dict["atmospheric_profile"]["profile_reduction"],
                                 convert.(FT, map(x -> first(collect(eval(Meta.parse(x)))), params_dict["absorption"]["spec_bands"])),
                                 convert.(FT, map(x -> last(collect(eval(Meta.parse(x)))), params_dict["absorption"]["spec_bands"])),
@@ -265,7 +274,12 @@ function model_from_parameters(params::vSmartMOM_Parameters)
     #Nquad, qp_μ, wt_μ = rt_set_streams(params.quadrature_type, params.l_trunc, obs_geom);
     quadPoints = rt_set_streams(params.quadrature_type, params.l_trunc, obs_geom, params.polarization_type, array_type(params.architecture))
     # Read profile (and generate dry/wet VCDs per layer)
-    profile_hr = vSmartMOM.read_atmos_profile(params.file, params.lat, params.lon, params.timeIndex);
+    if isnothing(params.timeIndex)
+        profile_hr = vSmartMOM.read_atmos_profile(params.file);
+    else
+        profile_hr = vSmartMOM.read_atmos_profile(params.file, params.lat, params.lon, params.timeIndex);
+    end
+    
     profile = vSmartMOM.reduce_profile(params.profile_reduction_n, profile_hr);
 
     #Rayleigh

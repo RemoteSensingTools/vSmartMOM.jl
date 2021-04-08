@@ -4,13 +4,16 @@ using Pkg
 # Pkg.activate(".")
 using RadiativeTransfer
 using RadiativeTransfer.Absorption
-using RadiativeTransfer.Scattering
+using RadiativeTransfer.Scattering                          
 using RadiativeTransfer.vSmartMOM
 
 # Load parameters from file
-parameters = vSmartMOM.parameters_from_yaml("src/vSmartMOM/ModelParameters/DefaultParameters.yaml")
+parameters = vSmartMOM.parameters_from_yaml("RadiativeTransfer/src/vSmartMOM/ModelParameters/DefaultParameters.yaml")
 
-# default_parameters
+
+# file = "RadiativeTransfer/src/vSmartMOM/ModelParameters/SampleProfile.yaml"
+# profile_nc4 = vSmartMOM.read_atmos_profile(parameters.file, parameters.lat, parameters.lon, parameters.timeIndex);
+# profile_yaml = vSmartMOM.read_atmos_profile(file);
 
 # Sets all the "specific" parameters
 # parameters = vSmartMOM.default_parameters();
