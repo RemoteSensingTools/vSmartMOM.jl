@@ -1,8 +1,8 @@
 
 "Struct for an atmospheric profile"
 struct AtmosphericProfile{FT}
-    lat::FT
-    lon::FT
+    lat
+    lon
     psurf::FT
     T::Array{FT,1}
     q::Array{FT,1}
@@ -149,11 +149,11 @@ mutable struct vSmartMOM_Parameters_old{FT} #<: AbstractvSmartMOMModel
     "Path to atmospheric profile file"
     file::AbstractString
     "Time index to retrieve from file "
-    timeIndex::Integer
+    timeIndex::Union{Integer, Nothing}
     "Latitude of atmospheric profile"
-    lat::Number
+    lat::Union{Number, Nothing}
     "Longitude of atmospheric profile"
-    lon::Number
+    lon::Union{Number, Nothing}
     "Length of profile reduction"
     profile_reduction_n::Integer
     "Starting wavenumber for absorption grid"
@@ -235,11 +235,11 @@ mutable struct vSmartMOM_Parameters{FT<:Union{AbstractFloat, ForwardDiff.Dual}} 
     "Path to atmospheric profile file"
     file::AbstractString
     "Time index to retrieve from file "
-    timeIndex::Integer
+    timeIndex::Union{Integer, Nothing}
     "Latitude of atmospheric profile"
-    lat::FT
+    lat::Union{Number, Nothing}
     "Longitude of atmospheric profile"
-    lon::FT
+    lon::Union{Number, Nothing}
     "Length of profile reduction"
     profile_reduction_n::Integer
     "Starting wavelength for absorption grid (`nBand`)"
