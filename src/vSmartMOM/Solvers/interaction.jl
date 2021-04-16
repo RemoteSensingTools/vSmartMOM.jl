@@ -4,6 +4,7 @@ function interaction_helper!(::ScatteringInterface_00, SFI,
                                 added_layer::AddedLayer{FT}, 
                                 I_static::AbstractArray{FT2}) where {FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2}
 
+    # If SFI, <<Suniti>> What's going on here?
     if SFI
         J₀⁺, J₀⁻ = similar(composite_layer.J₀⁺), similar(composite_layer.J₀⁺)
         J₀⁺ = added_layer.J₀⁺ .+ added_layer.t⁺⁺ ⊠ composite_layer.J₀⁺
@@ -11,6 +12,8 @@ function interaction_helper!(::ScatteringInterface_00, SFI,
         composite_layer.J₀⁺ = J₀⁺
         composite_layer.J₀⁻ = J₀⁻
     end
+
+    # Batched multiplication between added and composite
     composite_layer.T⁻⁻[:] = added_layer.t⁻⁻ ⊠ composite_layer.T⁻⁻
     composite_layer.T⁺⁺[:] = added_layer.t⁺⁺ ⊠ composite_layer.T⁺⁺
 end
@@ -30,6 +33,8 @@ function interaction_helper!(::ScatteringInterface_01, SFI,
         composite_layer.J₀⁺ = J₀⁺
         composite_layer.J₀⁻ = J₀⁻
     end
+
+    # Batched multiplication between added and composite
     composite_layer.R⁻⁺[:] = composite_layer.T⁻⁻ ⊠ added_layer.r⁻⁺ ⊠ composite_layer.T⁺⁺
     composite_layer.R⁺⁻[:] = added_layer.r⁺⁻
     composite_layer.T⁺⁺[:] = added_layer.t⁺⁺ ⊠ composite_layer.T⁺⁺
@@ -52,6 +57,8 @@ function interaction_helper!(::ScatteringInterface_10, SFI,
         composite_layer.J₀⁺ = J₀⁺
         composite_layer.J₀⁻ = J₀⁻
     end
+
+    # Batched multiplication between added and composite
     composite_layer.T⁺⁺[:] = added_layer.t⁺⁺ ⊠ composite_layer.T⁺⁺
     composite_layer.T⁻⁻[:] = composite_layer.T⁻⁻ ⊠ added_layer.t⁻⁻
     composite_layer.R⁺⁻[:] = added_layer.t⁺⁺ ⊠ composite_layer.R⁺⁻ ⊠ added_layer.t⁻⁻
@@ -86,6 +93,7 @@ function interaction_helper!(::ScatteringInterface_11, SFI,
         #J₀₂⁻ = J₀₁⁻ + T₀₁(1-R₂₁R₀₁)⁻¹(R₂₁J₁₀⁺+J₁₂⁻)
         composite_layer.J₀⁻[:] = J₀⁻ .+ T01_inv ⊠ (r⁻⁺ ⊠ J₀⁺ .+ added_layer.J₀⁻) 
     end 
+
     # Repeating for mirror-reflected directions
 
     # Compute and store `(I - r⁻⁺ * R⁺⁻)⁻¹`
@@ -98,14 +106,13 @@ function interaction_helper!(::ScatteringInterface_11, SFI,
     # R₀₂ = R₁₂ + T₂₁(1-R₀₁R₂₁)⁻¹R₀₁T₁₂
     composite_layer.R⁺⁻[:] = r⁺⁻ .+ T21_inv ⊠ R⁺⁻ ⊠ t⁻⁻ #Suniti
     
-
     if SFI
         # J₂₀⁺ = J₂₁⁺ + T₂₁(I-R₀₁R₂₁)⁻¹(J₁₀ + R₀₁J₁₂⁻ )
         composite_layer.J₀⁺[:] = added_layer.J₀⁺ .+ T21_inv ⊠ (J₀⁺ + R⁺⁻ ⊠ added_layer.J₀⁻)
     end 
 end
 
-
+"Compute interaction between composite and added layers"
 function interaction!(scattering_interface::AbstractScatteringInterface, SFI,
                         composite_layer::CompositeLayer{FT}, 
                         added_layer::AddedLayer{FT},

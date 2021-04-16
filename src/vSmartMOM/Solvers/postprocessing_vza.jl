@@ -1,3 +1,4 @@
+"Perform post-processing to azimuthally-weight RT matrices <<Suniti>>"
 function postprocessing_vza!(iμ₀, pol_type, composite_layer, vza, qp_μ, m, vaz, μ₀, weight, nSpec, SFI, R, R_SFI, T, T_SFI)
     # idx of μ0 = cos(sza)
     st_iμ0, istart0, iend0 = get_indices(iμ₀, pol_type);
@@ -20,7 +21,6 @@ function postprocessing_vza!(iμ₀, pol_type, composite_layer, vza, qp_μ, m, v
         bigCS = weight * Diagonal([cos_m_phi, cos_m_phi, sin_m_phi, sin_m_phi][1:pol_type.n]);
 
         # Accumulate Fourier moments after azimuthal weighting
-        
         for s = 1:nSpec
             
             if SFI
@@ -30,7 +30,7 @@ function postprocessing_vza!(iμ₀, pol_type, composite_layer, vza, qp_μ, m, v
                 R[i,:,s] += bigCS * (R⁻⁺[istart:iend, istart0:iend0, s] / μ₀) * pol_type.I₀;
                 T[i,:,s] += bigCS * (T⁺⁺[istart:iend, istart0:iend0, s] / μ₀) * pol_type.I₀;
             end
+            
         end
-        
     end
 end

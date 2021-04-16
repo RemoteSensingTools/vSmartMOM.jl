@@ -1,11 +1,11 @@
 using Revise
-using Plots
+# using Plots
 using Pkg
 # Pkg.activate(".")
 using BenchmarkTools
 using RadiativeTransfer
 using RadiativeTransfer.Absorption
-using RadiativeTransfer.Scattering                          
+using RadiativeTransfer.Scattering
 using RadiativeTransfer.vSmartMOM
 
 # Load parameters from file
@@ -22,6 +22,5 @@ parameters = vSmartMOM.parameters_from_yaml("RadiativeTransfer/src/vSmartMOM/Mod
 # Generates all the derived attributes from above parameters
 model = model_from_parameters(parameters);
 model.params.architecture = RadiativeTransfer.Architectures.GPU();
+
 R = vSmartMOM.rt_run(model);
-
-
