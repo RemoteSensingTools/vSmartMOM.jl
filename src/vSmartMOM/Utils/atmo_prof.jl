@@ -226,7 +226,48 @@ function construct_atm_layer(τRayl, τAer,  aerosol_optics, Rayl𝐙⁺⁺, Ray
     τ_λ = τ_abs .+ τ    
     ϖ_λ = (τ .* ϖ) ./ τ_λ
     
+    return Array(τ_λ), Array(ϖ_λ), τ, ϖ, Array(Z⁺⁺), Array(Z⁻⁺)
+
     return arr_type(τ_λ), arr_type(ϖ_λ), τ, ϖ, Z⁺⁺, Z⁻⁺  
+end
+
+function construct_all_atm_layers(FT, nSpec, Nz, NquadN, τRayl, τAer, aerosol_optics, Rayl𝐙⁺⁺, Rayl𝐙⁻⁺, Aer𝐙⁺⁺, Aer𝐙⁻⁺, τ_abs, arr_type, qp_μ, μ₀, m)
+
+
+    τ_λ_all   = zeros(FT, nSpec, Nz)
+    ϖ_λ_all   = zeros(FT, nSpec, Nz)
+    τ_all     = zeros(FT, Nz)
+    ϖ_all     = zeros(FT, Nz)
+    Z⁺⁺_all   = zeros(FT, NquadN, NquadN, Nz)
+    Z⁻⁺_all   = zeros(FT, NquadN, NquadN, Nz)
+    
+    dτ_max_all  = zeros(FT, Nz)
+    dτ_all      = zeros(FT, Nz)
+    ndoubl_all  = zeros(Int64, Nz)
+    dτ_λ_all    = zeros(FT, nSpec, Nz)
+    expk_all    = zeros(FT, nSpec, Nz)
+    scatter_all = zeros(Bool, Nz)
+
+    Threads.@threads for iz=1:Nz
+        
+        # Construct atmospheric properties
+        τ_λ_all[:, iz], ϖ_λ_all[:, iz], τ_all[iz], ϖ_all[iz], Z⁺⁺_all[:,:,iz], Z⁻⁺_all[:,:,iz] = construct_atm_layer(τRayl[iz], τAer[:,iz], aerosol_optics, Rayl𝐙⁺⁺, Rayl𝐙⁻⁺, Aer𝐙⁺⁺, Aer𝐙⁻⁺, τ_abs[:,iz], arr_type)
+
+        # Compute doubling number
+        dτ_max_all[iz] = minimum([τ_all[iz] * ϖ_all[iz], FT(0.01) * minimum(qp_μ)])
+        dτ_all[iz], ndoubl_all[iz] = doubling_number(dτ_max_all[iz], τ_all[iz] * ϖ_all[iz]) #Suniti
+
+        # Compute dτ vector
+        dτ_λ_all[:, iz] = arr_type(τ_λ_all[:, iz] ./ (FT(2)^ndoubl_all[iz]))
+        expk_all[:, iz] = exp.(-dτ_λ_all[:, iz] /μ₀) #Suniti
+        
+        # Determine whether there is scattering
+        scatter_all[iz] = (  sum(τAer[:,iz]) > 1.e-8 || 
+                          (( τRayl[iz] > 1.e-8 ) && (m < 3))) ? 
+                            true : false
+    end
+
+    return ComputedAtmosphereProperties(τ_λ_all, ϖ_λ_all, τ_all, ϖ_all, Z⁺⁺_all, Z⁻⁺_all, dτ_max_all, dτ_all, ndoubl_all, dτ_λ_all, expk_all, scatter_all)
 end
 
 function compute_absorption_profile!(τ_abs::Array{FT,2}, 

@@ -320,3 +320,37 @@ mutable struct vSmartMOM_Model <: AbstractvSmartMOMModel
     brdf::AbstractSurfaceType
 end
 
+abstract type ComputedProperties end
+@with_kw struct ComputedAtmosphereProperties
+
+    τ_λ_all
+    ϖ_λ_all
+    τ_all
+    ϖ_all
+    Z⁺⁺_all
+    Z⁻⁺_all
+    dτ_max_all
+    dτ_all
+    ndoubl_all
+    dτ_λ_all
+    expk_all
+    scatter_all
+
+end
+
+@with_kw struct ComputedLayerProperties
+
+    τ_λ 
+    ϖ_λ 
+    τ 
+    ϖ  
+    Z⁺⁺ 
+    Z⁻⁺ 
+
+    dτ_max 
+    dτ     
+    ndoubl
+    dτ_λ 
+    expk 
+    scatter 
+end
