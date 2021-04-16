@@ -1,3 +1,5 @@
+# <<Suniti>> it would be helpful to comment through this file (and remove unwanted lines). Thanks! 
+
 "Elemental single-scattering layer"
 function elemental!(pol_type, SFI::Bool, 
                             τ_sum::AbstractArray,#{FT2,1}, #Suniti
@@ -111,7 +113,7 @@ function elemental!(pol_type, SFI::Bool,
         #    J₀⁺ = I₀_NquadN * exp(-τ_sum/qp_μ[iμ0])
         #end
     end    
-    #@show(t⁺⁺[1,1,1,], added_layer.t⁺⁺[1,1,1])
+
     @pack! added_layer = r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, J₀⁺, J₀⁻   
 end
 

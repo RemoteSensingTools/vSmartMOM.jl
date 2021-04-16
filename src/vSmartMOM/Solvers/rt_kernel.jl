@@ -1,7 +1,7 @@
+# Perform the Core RT routines (elemental, doubling, interaction)
+function rt_kernel!(pol_type, SFI, added_layer, composite_layer, computed_layer_properties, m, quadPoints, I_static, architecture, qp_μN, scattering_interface, iz) 
 
-function rt_kernel!(pol_type, SFI, added_layer, composite_layer, τ_sum, computed_layer_properties, m, quadPoints, I_static, architecture, qp_μN, scattering_interface, iz) 
-
-    @unpack τ_λ, ϖ_λ, τ, ϖ, Z⁺⁺, Z⁻⁺, dτ_max, dτ, ndoubl, dτ_λ, expk, scatter = computed_layer_properties
+    @unpack τ_λ, ϖ_λ, τ, ϖ, Z⁺⁺, Z⁻⁺, dτ_max, dτ, ndoubl, dτ_λ, expk, scatter, τ_sum = computed_layer_properties
 
     # If there is scattering, perform the elemental and doubling steps
     if scatter

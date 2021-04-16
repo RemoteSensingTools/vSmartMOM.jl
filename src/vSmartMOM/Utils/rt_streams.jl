@@ -1,4 +1,3 @@
-#= Main file for RTM =#
 "Gauss quadrature points to match [0-1] interval"
 function rt_set_streams(::GaussQuadHemisphere, 
                         Ltrunc::Int, 

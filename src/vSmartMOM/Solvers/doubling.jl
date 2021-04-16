@@ -1,19 +1,22 @@
+# <<Suniti>> it would be helpful to comment through this file. Thanks! 
 
 # Prototype doubling methods, compute homogenous layer matrices from its elemental layer in 
 # `ndoubl` doubling steps
-
 function doubling_helper!(pol_type, SFI, expk, ndoubl::Int, 
-                            added_layer::AddedLayer,#{FT},
-                            I_static::AbstractArray{FT}, 
-                            architecture) where {FT}
+                          added_layer::AddedLayer,
+                          I_static::AbstractArray{FT}, 
+                          architecture) where {FT}
 
+    # Unpack the added layer
     @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, J₀⁺, J₀⁻ = added_layer
+
+    # Device architecture
     dev = devi(architecture)
-    # @show FT
+
     # Note: short-circuit evaluation => return nothing evaluated iff ndoubl == 0 
     ndoubl == 0 && return nothing
+
     #j0 = pol_type.n*(iμ0-1)+1
-    # Used to store `inv(I - r⁻⁺ * r⁻⁺) * t⁺⁺`
     
     # Geometric progression of reflections (1-RR)⁻¹
     gp_refl      = similar(t⁺⁺)
@@ -25,7 +28,8 @@ function doubling_helper!(pol_type, SFI, expk, ndoubl::Int,
         # Dummy for J
         J₁⁻ = similar(J₀⁻)
     end
-    #@show typeof(r⁺⁻), typeof(J₀⁺), typeof(expk), typeof(I_static)
+
+    # Loop over number of doublings
     for n = 1:ndoubl
         batch_inv!(gp_refl, I_static .- r⁻⁺ ⊠ r⁻⁺)
         tt⁺⁺_gp_refl[:] = t⁺⁺ ⊠ gp_refl
@@ -123,26 +127,25 @@ function apply_D_matrix!(n_stokes::Int, r⁻⁺::Array{FT,3}, t⁺⁺::Array{FT,
     end
 end
 
-function apply_D_matrix_SFI!(n_stokes::Int, J₀⁻::CuArray{FT,3}) where 
-    {FT}
-        if n_stokes == 1
-            return nothing
-        else 
-            applyD_kernel! = apply_D_SFI!(KernelAbstractions.CUDADevice())
-            event = applyD_kernel!(n_stokes, J₀⁻, ndrange=size(J₀⁻));
-            wait(KernelAbstractions.CUDADevice(), event);
-            synchronize();
-            return nothing
-        end
+function apply_D_matrix_SFI!(n_stokes::Int, J₀⁻::CuArray{FT,3}) where {FT}
+    if n_stokes == 1
+        return nothing
+    else 
+        applyD_kernel! = apply_D_SFI!(KernelAbstractions.CUDADevice())
+        event = applyD_kernel!(n_stokes, J₀⁻, ndrange=size(J₀⁻));
+        wait(KernelAbstractions.CUDADevice(), event);
+        synchronize();
+        return nothing
     end
+end
     
-    function apply_D_matrix_SFI!(n_stokes::Int, J₀⁻::Array{FT,3}) where {FT}
-        if n_stokes == 1
-            return nothing
-        else 
-            applyD_kernel! = apply_D_SFI!(KernelAbstractions.CPU())
-            event = applyD_kernel!(n_stokes, J₀⁻, ndrange=size(J₀⁻));
-            wait(KernelAbstractions.CPU(), event);
-            return nothing
-        end
+function apply_D_matrix_SFI!(n_stokes::Int, J₀⁻::Array{FT,3}) where {FT}
+    if n_stokes == 1
+        return nothing
+    else 
+        applyD_kernel! = apply_D_SFI!(KernelAbstractions.CPU())
+        event = applyD_kernel!(n_stokes, J₀⁻, ndrange=size(J₀⁻));
+        wait(KernelAbstractions.CPU(), event);
+        return nothing
     end
+end
