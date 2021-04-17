@@ -97,7 +97,7 @@ make_composite_layer(FT, arr_type, dims, nSpec) = CompositeLayer(default_matrix(
 
 function get_layer_properties(computed_atmospheric_properties::ComputedAtmosphereProperties, iz, arr_type)
 
-    @unpack τ_λ_all, ϖ_λ_all, τ_all, ϖ_all, Z⁺⁺_all, Z⁻⁺_all, dτ_max_all, dτ_all, ndoubl_all, dτ_λ_all, expk_all, scatter_all, τ_sum_all = computed_atmospheric_properties
+    @unpack τ_λ_all, ϖ_λ_all, τ_all, ϖ_all, Z⁺⁺_all, Z⁻⁺_all, dτ_max_all, dτ_all, ndoubl_all, dτ_λ_all, expk_all, scatter_all, τ_sum_all, scattering_interfaces_all = computed_atmospheric_properties
 
     τ_λ = arr_type(τ_λ_all[:, iz])
     ϖ_λ = arr_type(ϖ_λ_all[:, iz])
@@ -112,9 +112,11 @@ function get_layer_properties(computed_atmospheric_properties::ComputedAtmospher
     dτ_λ   = arr_type(dτ_λ_all[:, iz])
     expk   = arr_type(expk_all[:, iz])
     scatter = scatter_all[iz]
-
-    @show iz
     τ_sum = arr_type(τ_sum_all[:,iz])
+    scattering_interface = scattering_interfaces_all[iz]
 
-    return ComputedLayerProperties(τ_λ, ϖ_λ, τ, ϖ, Z⁺⁺, Z⁻⁺, dτ_max, dτ, ndoubl, dτ_λ, expk, scatter, τ_sum)
+    # τ * ϖ should remain constant even though they individually change over wavelength
+    # @assert all(i -> (i ≈ τ * ϖ), τ_λ .* ϖ_λ)
+
+    return ComputedLayerProperties(τ_λ, ϖ_λ, τ, ϖ, Z⁺⁺, Z⁻⁺, dτ_max, dτ, ndoubl, dτ_λ, expk, scatter, τ_sum, scattering_interface)
 end

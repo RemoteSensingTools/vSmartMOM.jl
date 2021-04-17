@@ -269,13 +269,21 @@ function construct_all_atm_layers(FT, nSpec, Nz, NquadN, τRayl, τAer, aerosol_
     # Compute sum of optical thicknesses of all layers above the current layer
     τ_sum_all = accumulate(+, τ_λ_all, dims=2)
 
-    # First iz should start with all zeros
+    # First start with all zeros
     # At the bottom of the atmosphere, we have to compute total τ_sum (bottom of lowest layer), for the surface interaction
     τ_sum_all = hcat(zeros(FT, size(τ_sum_all[:,1])), τ_sum_all)
 
-    @show size(τ_sum_all)
+    # Starting scattering interface (None for both added and composite)
+    scattering_interface = ScatteringInterface_00()
+    scattering_interfaces_all = []
 
-    return ComputedAtmosphereProperties(τ_λ_all, ϖ_λ_all, τ_all, ϖ_all, Z⁺⁺_all, Z⁻⁺_all, dτ_max_all, dτ_all, ndoubl_all, dτ_λ_all, expk_all, scatter_all, τ_sum_all)
+    for iz = 1:Nz
+        # Whether there is scattering in the added layer, composite layer, neither or both
+        scattering_interface = get_scattering_interface(scattering_interface, scatter_all[iz], iz)
+        push!(scattering_interfaces_all, scattering_interface)
+    end
+
+    return ComputedAtmosphereProperties(τ_λ_all, ϖ_λ_all, τ_all, ϖ_all, Z⁺⁺_all, Z⁻⁺_all, dτ_max_all, dτ_all, ndoubl_all, dτ_λ_all, expk_all, scatter_all, τ_sum_all, scattering_interfaces_all)
 end
 
 function compute_absorption_profile!(τ_abs::Array{FT,2}, 

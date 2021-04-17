@@ -296,6 +296,8 @@ abstract type ComputedProperties end
     scatter_all
     "Sum of optical thicknesses of all layers above the current layer"
     τ_sum_all
+    "Scattering interface type for each layer"
+    scattering_interfaces_all
 end
 
 "A struct to internally hold the computed single-layer properties <<Suniti>>"
@@ -327,4 +329,6 @@ end
     scatter 
     "Sum of optical thicknesses of all layers above the current layer"
     τ_sum
+    "Scattering interface type for current layer"
+    scattering_interface
 end

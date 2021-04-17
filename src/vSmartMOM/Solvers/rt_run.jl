@@ -76,9 +76,6 @@ function rt_run(pol_type::AbstractPolarizationType,   # Polarization type (IQUV)
             @timeit "Z moments"  Aer𝐙⁺⁺[:,:,i], Aer𝐙⁻⁺[:,:,i] = Scattering.compute_Z_moments(pol_type, Array(qp_μ), aerosol_optics[i].greek_coefs, m, arr_type = arr_type)
         end
 
-        # Starting scattering interface (None for both added and composite)
-        scattering_interface = ScatteringInterface_00()
-
         @timeit "Creating arrays" τ_sum_old = arr_type(zeros(FT, nSpec)) #Suniti: declaring τ_sum to be of length nSpec
         # @timeit "Creating arrays" τ_λ   = arr_type(zeros(FT, nSpec))
 
@@ -92,15 +89,8 @@ function rt_run(pol_type::AbstractPolarizationType,   # Polarization type (IQUV)
             # From Rayleigh and aerosol τ, ϖ, compute overall layer τ, ϖ
             computed_layer_properties = get_layer_properties(computed_atmosphere_properties, iz, arr_type)
 
-            # Whether there is scattering in the added layer, composite layer, neither or both
-            scattering_interface = get_scattering_interface(scattering_interface, computed_layer_properties.scatter, iz)
-
-            # τ * ϖ should remain constant even though they individually change over wavelength
-            # @assert all(i -> (i ≈ τ * ϖ), τ_λ .* ϖ_λ)
-
-            # τ_λ = computed_layer_properties.τ_λ
-            
-            rt_kernel!(pol_type, SFI, added_layer, composite_layer, computed_layer_properties, m, quadPoints, I_static, architecture, qp_μN, scattering_interface, iz) 
+            # Perform Core RT (doubling/elemental/interaction)
+            rt_kernel!(pol_type, SFI, added_layer, composite_layer, computed_layer_properties, m, quadPoints, I_static, architecture, qp_μN, iz) 
         end 
 
         # Create surface matrices:
@@ -108,7 +98,7 @@ function rt_run(pol_type::AbstractPolarizationType,   # Polarization type (IQUV)
         create_surface_layer!(brdf, added_layer, SFI, m, pol_type, quadPoints, arr_type(computed_atmosphere_properties.τ_sum_all[:,end]), architecture);
 
         # One last interaction with surface:
-        @timeit "interaction" interaction!(scattering_interface, SFI, composite_layer, added_layer, I_static)
+        @timeit "interaction" interaction!(computed_atmosphere_properties.scattering_interfaces_all[end], SFI, composite_layer, added_layer, I_static)
 
         # Postprocess and weight according to vza
         postprocessing_vza!(iμ₀, pol_type, composite_layer, vza, qp_μ, m, vaz, μ₀, weight, nSpec, SFI, R, R_SFI, T, T_SFI)
