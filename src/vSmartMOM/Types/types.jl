@@ -249,7 +249,7 @@ mutable struct vSmartMOM_Model
     "Greek coefs in Rayleigh calculations" 
     greek_rayleigh::GreekCoefs
     "Quadrature points/weights, etc"
-    quadPoints::QuadPoints
+    quad_points::QuadPoints
     "Array to hold cross-sections over entire atmospheric profile"
     τ_abs::AbstractArray
     "Rayleigh optical thickness"

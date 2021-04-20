@@ -12,13 +12,13 @@ function elemental!(pol_type, SFI::Bool,
                             m::Int,                     # m: fourier moment
                             ndoubl::Int,                # ndoubl: number of doubling computations needed 
                             scatter::Bool,              # scatter: flag indicating scattering
-                            quadPoints::QuadPoints{FT2}, # struct with quadrature points, weights, 
+                            quad_points::QuadPoints{FT2}, # struct with quadrature points, weights, 
                             added_layer::AddedLayer{FT}, 
                             I_static,
                             architecture) where {FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2}
     
     @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, J₀⁺, J₀⁻ = added_layer
-    @unpack qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart, iμ₀ = quadPoints
+    @unpack qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart, iμ₀ = quad_points
     arr_type = array_type(architecture)
     # @show FT
     # ToDo: Main output is r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, J₀⁺, J₀⁻ (can be renamed to t⁺⁺, etc)

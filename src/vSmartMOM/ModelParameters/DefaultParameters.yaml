@@ -42,10 +42,7 @@ geometry:
   obs_alt:            1000.0
 
 atmospheric_profile: 
-  file: /net/fluo/data1/ftp/XYZT_ESE156/Data/MERRA300.prod.assim.inst6_3d_ana_Nv.20150613.hdf.nc4
-  lat:                34.1377
-  lon:                -118.1253
-  time_index:         2
+  file: "joinpath(dirname(pathof(RadiativeTransfer)), \"vSmartMOM\", \"ModelParameters\", \"SampleProfile.yaml\")"
   profile_reduction:  20
 
 surface: 
