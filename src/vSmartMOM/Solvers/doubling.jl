@@ -1,7 +1,14 @@
-# <<Suniti>> it would be helpful to comment through this file. Thanks! - Is this enough or do we need more documentation?
+"""
+    $(FUNCTIONNAME)(pol_type, 
+    SFI, 
+    expk, 
+    ndoubl::Int, 
+    added_layer::AddedLayer,
+    I_static::AbstractArray{FT}, 
+    architecture) where {FT}
 
-# Prototype doubling methods, compute homogenous layer matrices from its elemental layer in 
-# `ndoubl` doubling steps
+Compute homogenous layer matrices from its elemental layer using Doubling 
+"""
 function doubling_helper!(pol_type, 
     SFI, 
     expk, 
@@ -32,19 +39,18 @@ function doubling_helper!(pol_type,
 
     # Loop over number of doublings
     for n = 1:ndoubl
+        # T⁺⁺(λ)[I - R⁺⁻(λ)R⁻⁺(λ)]⁻¹, for doubling R⁺⁻,R⁻⁺ and T⁺⁺,T⁻⁻ is identical
         batch_inv!(gp_refl, I_static .- r⁻⁺ ⊠ r⁻⁺)
         tt⁺⁺_gp_refl[:] = t⁺⁺ ⊠ gp_refl
-        # J₁⁺[:,1,:] =  J₀⁺[:,1,:] .* expk'
+
         if SFI
             # J⁺₂₁(λ) = J⁺₁₀(λ).exp(-τ(λ)/μ₀)
             J₁⁺[:,1,:] = J₀⁺[:,1,:] .* expk'
-            #J⁻₁₂(λ)  = J⁻₀₁(λ).exp(-τ(λ)/μ₀)
+            # J⁻₁₂(λ)  = J⁻₀₁(λ).exp(-τ(λ)/μ₀)
             J₁⁻[:,1,:] = J₀⁻[:,1,:] .* expk'
-            #@show size(J₀⁺), size(J₁⁺), size((t⁺⁺ ⊠ gp_refl ⊠ (J₀⁺ .+ r⁻⁺ ⊠ J₁⁻)))
-            
-            #J⁻₀₂(λ) = J⁻₀₁(λ) + T⁻⁻₀₁(λ)[I - R⁻⁺₂₁(λ)R⁺⁻₀₁(λ)]⁻¹[J⁻₁₂(λ) + R⁻⁺₂₁(λ)J⁺₁₀(λ)] (see Eqs.8 in Raman paper draft)
+            # J⁻₀₂(λ) = J⁻₀₁(λ) + T⁻⁻₀₁(λ)[I - R⁻⁺₂₁(λ)R⁺⁻₀₁(λ)]⁻¹[J⁻₁₂(λ) + R⁻⁺₂₁(λ)J⁺₁₀(λ)] (see Eqs.8 in Raman paper draft)
             J₀⁻[:] = J₀⁻ + (tt⁺⁺_gp_refl ⊠ (J₁⁻ + r⁻⁺ ⊠ J₀⁺)) 
-            #J⁺₂₀(λ) = J⁺₂₁(λ) + T⁺⁺₂₁(λ)[I - R⁺⁻₀₁(λ)R⁻⁺₂₁(λ)]⁻¹[J⁺₁₀(λ) + R⁺⁻₀₁(λ)J⁻₁₂(λ)] (see Eqs.8 in Raman paper draft)
+            # J⁺₂₀(λ) = J⁺₂₁(λ) + T⁺⁺₂₁(λ)[I - R⁺⁻₀₁(λ)R⁻⁺₂₁(λ)]⁻¹[J⁺₁₀(λ) + R⁺⁻₀₁(λ)J⁻₁₂(λ)] (see Eqs.8 in Raman paper draft)
             J₀⁺[:] = J₁⁺ + (tt⁺⁺_gp_refl ⊠ (J₀⁺ + r⁻⁺ ⊠ J₁⁻))
             expk[:] = expk.^2
         end  
@@ -52,7 +58,6 @@ function doubling_helper!(pol_type,
         r⁻⁺[:]  = r⁻⁺ + (tt⁺⁺_gp_refl ⊠ r⁻⁺ ⊠ t⁺⁺)
         # T⁺⁺₂₀(λ) = T⁺⁺₂₁(λ)[I - R⁺⁻₀₁(λ)R⁻⁺₂₁(λ)]⁻¹T⁺⁺₁₀(λ) (see Eqs.8 in Raman paper draft)
         t⁺⁺[:]  = tt⁺⁺_gp_refl ⊠ t⁺⁺
-        #@show r⁻⁺[1:3:end,28,1]./(J₀⁻[1:3:end,1,1]*0.005)#, r⁻⁺[1,28,1]
     end
     # After doubling, revert D(DR)->R, where D = Diagonal{1,1,-1,-1}
     # For SFI, after doubling, revert D(DJ₀⁻)->J₀⁻

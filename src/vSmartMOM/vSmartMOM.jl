@@ -4,8 +4,6 @@ using LinearAlgebra                # For linear algebra routines
 using NCDatasets                   # For reading netcdf atmospheric profiles
 using ProgressMeter                # Showing progress in for loops
 using Distributions                # Distributions of aerosols
-using Interpolations               # Interpolations? <<Christian>>
-using Polynomials                  # Polynomials? <<Christian>>
 using DelimitedFiles               # For reading ASCII files 
 using ..Scattering                 # Use scattering module
 using ..Absorption                 # Use absorption module
@@ -17,20 +15,18 @@ using CUDA                         # GPU CuArrays and functions
 using KernelAbstractions           # Abstracting code for CPU/GPU
 using KernelAbstractions.Extras
 
-using FastGaussQuadrature          # FastGaussQuadrature? <<Christian>>
+using FastGaussQuadrature          # Computes quadrature points (Gauss, legendre, Radau,...)
 using TimerOutputs                 # For timing sections of the code
-using StatsBase                    # StatsBase? <<Christian>>
-using StaticArrays                 # StaticArrays? <<Christian>>
-using TensorOperations             # TensorOperations? <<Christian>>
+using StatsBase                    # Fit statistics for truncation 
 using Parameters                   # For keyword arguments in structs
 using DocStringExtensions          # For documenting
 using YAML                         # For reading properties files 
 using ForwardDiff                  # Automatic Differentiation
 using NNlib                        # For batched multiplications
-import NNlib.batched_mul           # 
+import NNlib.batched_mul           # Required to overwrite batched_mul for Duals
 
-# More threads in LA wasn't really helpful, turn that off now and use Julia threads!
-LinearAlgebra.BLAS.set_num_threads(1)
+# More threads in LA wasn't really helpful, can be turned off here:
+# LinearAlgebra.BLAS.set_num_threads(1)
 
 # Constants and Types
 include("Constants/constants.jl")         # Scientific constants

@@ -125,7 +125,7 @@ function read_atmos_profile(file::String, lat::Real, lon::Real, time_idx::Int)
     return AtmosphericProfile(lat, lon, psurf, T, q, p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o)
 end
 
-"Reduce profile dimensions by re-averaging"
+"Reduce profile dimensions by re-averaging to near-equidistant pressure grid"
 function reduce_profile(n::Int, profile::AtmosphericProfile{FT}) where {FT}
 
     # Can only reduce the profile, not expand it
@@ -168,9 +168,15 @@ function reduce_profile(n::Int, profile::AtmosphericProfile{FT}) where {FT}
     return AtmosphericProfile(lat, lon, psurf, T, q, p_full, p_levels, vmr_h2o, vcd_dry, vcd_h2o)
 end;
 
-# for terrestrial atmospheres 
-# psurf in hPa, λ in μm 
-# <<Suniti>>
+"""
+$(FUNCTIONNAME)(psurf, λ, depol_fct, vcd_dry)
+Returns the Rayleigh optical thickness per layer at reference wavelength `λ` (N₂,O₂ atmosphere, i.e. terrestrial)
+Input: 
+- `psurf` surface pressure in `[hPa]`
+- `λ` wavelength in `[μm]`
+- `depol_fct` depolarization factor
+- `vcd_dry` dry vertical column (no water) per layer
+"""
 function getRayleighLayerOptProp(psurf, λ, depol_fct, vcd_dry) 
     FT = eltype(λ)
     # Total vertical Rayleigh scattering optical thickness 
@@ -186,8 +192,10 @@ function getRayleighLayerOptProp(psurf, λ, depol_fct, vcd_dry)
     return convert.(FT, τRayl)
 end
 
-# Gaussian distribution on a pressure grid
-# <<Suniti>>
+"""
+$(FUNCTIONNAME)(total_τ, p₀, σp, p_half)
+Returns the aerosol optical depths per layer using a Gaussian distribution function with p₀ and σp on a pressure grid
+"""
 function getAerosolLayerOptProp(total_τ, p₀, σp, p_half)
 
     # Need to make sure we can also differentiate wrt σp (FT can be Dual!)
@@ -204,10 +212,25 @@ function getAerosolLayerOptProp(total_τ, p₀, σp, p_half)
     return convert.(FT, τAer)
 end
 
-# computes the composite single scattering parameters (τ, ϖ, Z⁺⁺, Z⁻⁺) for a given atmospheric layer iz for a given Fourier component m
-# τ, ϖ: only Rayleigh scattering and aerosol extinction, no gaseous absorption (no wavelength dependence)
-# τ_λ, ϖ_λ: Rayleigh scattering + aerosol extinction + gaseous absorption (wavelength dependent)
-# <<Suniti>> could you comment through this function? Thanks! 
+"""
+$(FUNCTIONNAME)(τRayl, τAer,  aerosol_optics, Rayl𝐙⁺⁺, Rayl𝐙⁻⁺, Aer𝐙⁺⁺, Aer𝐙⁻⁺, τ_abs, arr_type)
+Computes the composite layer single scattering parameters (τ, ϖ, Z⁺⁺, Z⁻⁺)
+
+Returns:
+- `τ`, `ϖ`   : only Rayleigh scattering and aerosol extinction, no gaseous absorption (no wavelength dependence)
+- `τ_λ`,`ϖ_λ`: Rayleigh scattering + aerosol extinction + gaseous absorption (wavelength dependent)
+- `Z⁺⁺`,`Z⁻⁺`: Composite Phase matrix (weighted average of Rayleigh and aerosols)
+
+# Arguments
+- `τRay` layer optical depth for Rayleigh
+- `τAer` layer optical depth for Aerosol(s) (vector)
+- `aerosol_optics` array of aerosol optics struct
+- `Rayl𝐙⁺⁺` Rayleigh 𝐙⁺⁺ phase matrix (2D)
+- `Rayl𝐙⁻⁺` Rayleigh 𝐙⁻⁺ phase matrix (2D)
+- `Aer𝐙⁺⁺` Aerosol 𝐙⁺⁺ phase matrix (3D)
+- `Aer𝐙⁻⁺` Aerosol 𝐙⁻⁺ phase matrix (3D)
+- `τ_abs` layer absorption optical depth array (per wavelength) by gaseous absorption
+"""
 function construct_atm_layer(τRayl, τAer,  aerosol_optics, Rayl𝐙⁺⁺, Rayl𝐙⁻⁺, Aer𝐙⁺⁺, Aer𝐙⁻⁺, τ_abs, arr_type)
     FT = eltype(τRayl)
     nAer = length(aerosol_optics)

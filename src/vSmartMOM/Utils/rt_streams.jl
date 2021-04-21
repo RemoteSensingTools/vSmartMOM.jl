@@ -1,6 +1,15 @@
-# <<Christian>> I'm not sure how much more documentation this file needs. A bit more? Enough?
 
-"Gauss quadrature points to match [0-1] interval"
+"""
+$(FUNCTIONNAME)(::GaussQuadHemisphere, 
+                        Ltrunc::Int, 
+                        obs_geom::ObsGeometry, 
+                        pol_type,
+                        arr_type)
+
+Computes hemispheric quadrature points with Gauss method within [0-1] interval
+SZA and all VZAs included with 0 weight
+Returns computed quadrature points as [`QuadPoints`](@ref) 
+"""
 function rt_set_streams(::GaussQuadHemisphere, 
                         Ltrunc::Int, 
                         obs_geom::ObsGeometry, 
@@ -23,7 +32,17 @@ function rt_set_streams(::GaussQuadHemisphere,
     return QuadPoints(μ₀, iμ₀, i_start, arr_type(qp_μ), arr_type(wt_μ), qp_μN, wt_μN, Nquad) 
 end
 
-"Using [-1:1] gauss quadrature points to generate 2Nquad weigths and take the one from [0:1]"
+"""
+$(FUNCTIONNAME)(::GaussQuadFullSphere, 
+                        Ltrunc::Int, 
+                        obs_geom::ObsGeometry, 
+                        pol_type,
+                        arr_type)
+
+Computes hemispheric quadrature points with Gauss method within [-1,1] to generate 2Nquad weigths and take the one from [0,1]
+SZA and all VZAs included with 0 weight
+Returns computed quadrature points as [`QuadPoints`](@ref) 
+"""
 function rt_set_streams(::GaussQuadFullSphere, 
                         Ltrunc::Int, 
                         obs_geom::ObsGeometry, 
@@ -49,7 +68,18 @@ function rt_set_streams(::GaussQuadFullSphere,
     return QuadPoints(μ₀, iμ₀, i_start, arr_type(qp_μ), arr_type(wt_μ), qp_μN, wt_μN, Nquad) 
 end
 
-# RT set_streams takes in Geometry (sza, vza) and outputs quadrature points
+
+"""
+$(FUNCTIONNAME)(::RadauQuad, 
+                        Ltrunc::Int, 
+                        obs_geom::ObsGeometry, 
+                        pol_type,
+                        arr_type)
+
+Computes hemispheric quadrature points with Gauss-Radau method in two intervals between [0,SZA] and [SZA,1] to include SZA as full quadrature point for DNI
+SZA included as full weighted node, VZAs included with 0 weight
+Returns computed quadrature points as [`QuadPoints`](@ref) 
+"""
 function rt_set_streams(::RadauQuad, 
                         Ltrunc::Int, 
                         obs_geom::ObsGeometry{FT}, 

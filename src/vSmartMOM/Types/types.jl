@@ -41,52 +41,71 @@ end
 "Quadrature Types for RT streams"
 abstract type AbstractQuadratureType end
 
-# <<Christian>>
+"""
+    struct RadauQuad
+
+Use Gauss Radau quadrature scheme, which includes the SZA as point (see Sanghavi vSmartMOM)
+
+"""
 struct RadauQuad <:AbstractQuadratureType end
+
+"""
+    struct GaussQuadHemisphere
+
+Use Gauss quadrature scheme, define interval [-1,1] within an hemisphere (90⁰), repeat for both
+
+"""
 struct GaussQuadHemisphere <:AbstractQuadratureType end
+
+"""
+    struct GaussQuadFullSphere
+
+Use Gauss quadrature scheme, define interval [-1,1] for full sphere (180⁰), take half of it (less points near horizon compared to GaussQuadHemisphere)
+
+"""
 struct GaussQuadFullSphere <:AbstractQuadratureType end
 
 "Abstract Type for Source Function Integration"
 abstract type AbstractSourceType end
-"Dummy Node Integration"
+
+"Use Dummy Node Integration (DNI), SZA has to be a full node, Radau required"
 struct DNI <:AbstractSourceType end
-"Source Function Integration"
+
+"Use Source Function Integration (SFI), Solar beam embedded in source term, can work with all quadrature schemes (faster)"
 struct SFI <:AbstractSourceType end
 
-"Abstract Type for Layer R and T matrices"
+"Abstract Type for Layer R,T and J matrices"
 abstract type AbstractLayer end
 
-"Composite Layer Matrices"
+"Composite Layer Matrices (`-/+` defined in τ coordinates, i.e. `-`=outgoing, `+`=incoming"
 @with_kw mutable struct CompositeLayer{FT} <: AbstractLayer 
-
-    "Composite R (Forward) <<Suniti>>"
+    "Composite layer Reflectance matrix R (from + -> -)"
     R⁻⁺::AbstractArray{FT,3}
-    "Composite R (Backward) <<Suniti>>"
+    "Composite layer Reflectance matrix R (from - -> +)"
     R⁺⁻::AbstractArray{FT,3}
-    "Composite T (Forward) <<Suniti>>"
+    "Composite layer transmission matrix T (from + -> +)"
     T⁺⁺::AbstractArray{FT,3}
-    "Composite T (Backward) <<Suniti>>"
+    "Composite layer transmission matrix T (from - -> -)"
     T⁻⁻::AbstractArray{FT,3}
-    "Composite J (Forward) <<Suniti>>"
+    "Composite layer source matrix J (in + direction)"
     J₀⁺::AbstractArray{FT,3}
-    "Composite J (Backward) <<Suniti>>"
+    "Composite layer source matrix J (in - direction)"
     J₀⁻::AbstractArray{FT,3}
 end
 
-"Added (Single) Layer Matrices"
+"Added (Single) Layer Matrices (`-/+` defined in τ coordinates, i.e. `-`=outgoing, `+`=incoming"
 @with_kw mutable struct AddedLayer{FT} <: AbstractLayer 
-    
-    "Added R (Forward) <<Suniti>>"
+    "Added layer Reflectance matrix R (from + -> -)"
     r⁻⁺::AbstractArray{FT,3}
-    "Added T (Forward) <<Suniti>>"
+    "Added layer transmission matrix T (from + -> +)"
     t⁺⁺::AbstractArray{FT,3}
-    "Added R (Backward) <<Suniti>>"
+    "Added layer Reflectance matrix R (from - -> +)"
     r⁺⁻::AbstractArray{FT,3}
-    "Added T (Backward) <<Suniti>>"
+    "Added layer transmission matrix T (from - -> -)"
     t⁻⁻::AbstractArray{FT,3}
-    "Added J (Forward) <<Suniti>>"
+    "Added layer source matrix J (in + direction)"
     J₀⁺::AbstractArray{FT,3}
-    "Added J (Backward) <<Suniti>>"
+    "Added layer source matrix J (in - direction)"
     J₀⁻::AbstractArray{FT,3}
 end
 
@@ -212,7 +231,14 @@ mutable struct vSmartMOM_Parameters{FT<:Union{AbstractFloat, ForwardDiff.Dual}}
     architecture::AbstractArchitecture
 end
 
-"Quadrature points, weights, etc"
+"""
+    struct QuadPoints{FT} 
+
+A struct which holds Quadrature points, weights, etc
+
+# Fields
+$(DocStringExtensions.FIELDS)
+"""
 struct QuadPoints{FT} 
     "μ₀, cos(SZA)"
     μ₀::FT
@@ -266,8 +292,17 @@ mutable struct vSmartMOM_Model
     brdf::AbstractSurfaceType
 end
 
-"A struct to internally hold the computed atmosphere properties <<Suniti>>"
-abstract type ComputedProperties end
+#"A struct to internally hold the computed atmosphere properties <<Suniti>>"
+#abstract type ComputedProperties end
+
+"""
+    struct ComputedAtmosphereProperties
+
+A struct which holds (for the entire atmosphere) all key layer optical properties required for the RT core solver
+
+# Fields
+$(DocStringExtensions.FIELDS)
+"""
 @with_kw struct ComputedAtmosphereProperties
 
     "Absorption optical depth vectors (wavelength dependent)"
@@ -300,7 +335,14 @@ abstract type ComputedProperties end
     scattering_interfaces_all
 end
 
-"A struct to internally hold the computed single-layer properties <<Suniti>>"
+"""
+    struct ComputedLayerProperties
+
+A struct which holds all key layer optical properties required for the RT core solver
+
+# Fields
+$(DocStringExtensions.FIELDS)
+"""
 @with_kw struct ComputedLayerProperties
 
     "Absorption optical depth vector (wavelength dependent)"
