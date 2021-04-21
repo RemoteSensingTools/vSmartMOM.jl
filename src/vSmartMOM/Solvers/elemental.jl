@@ -64,7 +64,7 @@ function elemental!(pol_type, SFI::Bool,
             t⁺⁺[:,:,:] .= I_static - (d_qp * ((I_static - Z⁺⁺ * d_wct) * dτ))
             if SFI
                 # Reminder: Add equation here what it does
-                expk = exp.(-τ_sum/qp_μ[iμ0])
+                expk = exp.(-τ_sum/qp_μ[iμ₀])
 
                 J₀⁺[:,1,:] .= ((d_qp * Z⁺⁺ * I₀_NquadN) * wct0) .* expk'
                 J₀⁻[:,1,:] .= ((d_qp * Z⁻⁺ * I₀_NquadN) * wct0) .* expk'

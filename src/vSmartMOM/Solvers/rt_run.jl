@@ -80,7 +80,7 @@ function rt_run(pol_type::AbstractPolarizationType,   # Polarization type (IQUV)
         # @timeit "Creating arrays" τ_λ   = arr_type(zeros(FT, nSpec))
 
         # Loop over all layers and pre-compute all properties before performing core RT
-        computed_atmosphere_properties = construct_all_atm_layers(FT, nSpec, Nz, NquadN, τRayl, τAer, aerosol_optics, Rayl𝐙⁺⁺, Rayl𝐙⁻⁺, Aer𝐙⁺⁺, Aer𝐙⁻⁺, τ_abs, arr_type, qp_μ, μ₀, m)
+        @timeit "Computing Layer Properties" computed_atmosphere_properties = construct_all_atm_layers(FT, nSpec, Nz, NquadN, τRayl, τAer, aerosol_optics, Rayl𝐙⁺⁺, Rayl𝐙⁻⁺, Aer𝐙⁺⁺, Aer𝐙⁻⁺, τ_abs, arr_type, qp_μ, μ₀, m)
 
         # Loop over vertical layers:
         @showprogress 1 "Looping over layers ..." for iz = 1:Nz  # Count from TOA to BOA
