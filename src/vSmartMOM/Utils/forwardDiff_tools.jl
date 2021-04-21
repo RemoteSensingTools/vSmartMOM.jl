@@ -1,5 +1,4 @@
 
-
 # Define batched matrix multiply for GPU and Duals:
 function batched_mul(A::CuArray{ForwardDiff.Dual{T,V,N},3}, B::CuArray{ForwardDiff.Dual{T,V,N},3}) where {T,V,N}
     # Extract values:
@@ -13,7 +12,6 @@ function batched_mul(A::CuArray{ForwardDiff.Dual{T,V,N},3}, B::CuArray{ForwardDi
     return eltype(A).(Cv,dABdx);
 end
 
-
 # Overload of batch_inv! for Dual numbers
 function batch_inv!(X::CuArray{ForwardDiff.Dual{T,V,N},3}, A::CuArray{ForwardDiff.Dual{T,V,N},3}) where {T,V,N}
     Atemp = ForwardDiff.value.(A)
@@ -21,10 +19,9 @@ function batch_inv!(X::CuArray{ForwardDiff.Dual{T,V,N},3}, A::CuArray{ForwardDif
     # Set invA=A⁻¹
     batch_inv!(invA,Atemp)
     # Compute derivatives ∂A⁻¹/∂x = -A⁻¹ * ∂A/∂x * A⁻¹; using NNlib batched matrix multiply
-    # @show typeof(ForwardDiff.partials.(A,1))
     -invA ⊠ ForwardDiff.partials.(A,1) ⊠ invA
     dAdx = [-invA ⊠ ForwardDiff.partials.(A,i) ⊠ invA for i=1:N];
-    #println("Pack into tuples again")
+    # Pack into tuples again
     dAdx = ForwardDiff.Partials.(tuple.(dAdx...));
     X .= eltype(X).(invA,dAdx);
 

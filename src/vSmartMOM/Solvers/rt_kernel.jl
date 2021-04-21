@@ -1,11 +1,11 @@
 # Perform the Core RT routines (elemental, doubling, interaction)
-function rt_kernel!(pol_type, SFI, added_layer, composite_layer, computed_layer_properties, m, quadPoints, I_static, architecture, qp_μN, iz) 
+function rt_kernel!(pol_type, SFI, added_layer, composite_layer, computed_layer_properties, m, quad_points, I_static, architecture, qp_μN, iz) 
 
     @unpack τ_λ, ϖ_λ, τ, ϖ, Z⁺⁺, Z⁻⁺, dτ_max, dτ, ndoubl, dτ_λ, expk, scatter, τ_sum, scattering_interface = computed_layer_properties
 
     # If there is scattering, perform the elemental and doubling steps
     if scatter
-        @timeit "elemental" elemental!(pol_type, SFI, τ_sum, dτ_λ, dτ, ϖ_λ, ϖ, Z⁺⁺, Z⁻⁺, m, ndoubl, scatter, quadPoints,  added_layer,  I_static, architecture)
+        @timeit "elemental" elemental!(pol_type, SFI, τ_sum, dτ_λ, dτ, ϖ_λ, ϖ, Z⁺⁺, Z⁻⁺, m, ndoubl, scatter, quad_points,  added_layer,  I_static, architecture)
         @timeit "doubling"   doubling!(pol_type, SFI, expk, ndoubl, added_layer, I_static, architecture)
     else # This might not work yet on GPU!
         # If not, there is no reflectance. Assign r/t appropriately

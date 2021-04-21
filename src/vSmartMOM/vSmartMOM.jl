@@ -4,8 +4,8 @@ using LinearAlgebra                # For linear algebra routines
 using NCDatasets                   # For reading netcdf atmospheric profiles
 using ProgressMeter                # Showing progress in for loops
 using Distributions                # Distributions of aerosols
-using Interpolations               # Interpolations? <<Suniti>>
-using Polynomials                  # Polynomials? <<Suniti>>
+using Interpolations               # Interpolations? <<Christian>>
+using Polynomials                  # Polynomials? <<Christian>>
 using DelimitedFiles               # For reading ASCII files 
 using ..Scattering                 # Use scattering module
 using ..Absorption                 # Use absorption module
@@ -17,7 +17,7 @@ using CUDA                         # GPU CuArrays and functions
 using KernelAbstractions           # Abstracting code for CPU/GPU
 using KernelAbstractions.Extras
 
-using FastGaussQuadrature          # FastGaussQuadrature? <<Suniti>>
+using FastGaussQuadrature          # FastGaussQuadrature? <<Christian>>
 using TimerOutputs                 # For timing sections of the code
 using StatsBase                    # StatsBase? <<Christian>>
 using StaticArrays                 # StaticArrays? <<Christian>>
