@@ -1,11 +1,104 @@
 "Generate default set of parameters for Radiative Transfer calculations (from ModelParameters/)"
 default_parameters() = parameters_from_yaml(joinpath(dirname(pathof(RadiativeTransfer)), "vSmartMOM", "ModelParameters", "DefaultParameters.yaml"))
 
+# Check that a field exists in yaml file
+function check_yaml_field(dict::Dict{Any, Any}, full_keys::Array{String}, curr_keys::Array{String}, final_type::Type, valid_options::Array{String})
+
+    # Should have at least one key
+    @assert length(curr_keys) >= 1
+
+    # Only one key (that should exist)
+    if length(curr_keys) == 1
+        @assert curr_keys[1] in keys(dict) "Missing key in parameters yaml: $(join(full_keys, '/'))"
+        @assert dict[curr_keys[1]] isa final_type "Improper type for $(join(full_keys, '/')); must be a $(final_type)" 
+        if length(valid_options) > 0
+            @assert dict[curr_keys[1]] in valid_options "Field $(join(full_keys, '/')) must be one of $(valid_options)"
+        end
+        return true
+    
+    # Recursive case, check sub-dictionary
+    else
+        @assert curr_keys[1] in keys(dict) "Missing key in parameters yaml: $(join(full_keys, '/'))"
+        return check_yaml_field(dict[curr_keys[1]], full_keys, curr_keys[2:end], final_type, valid_options)
+    end
+end
+
+# Given a list of aerosol parameter dictionaries, validate all of them
+function validate_aerosols(aerosols::Array{Dict{Any, Any}})
+    fields = [(["τ_ref"], Real),
+              (["μ"], Real),
+              (["σ"], Real),
+              (["nᵣ"], Real),
+              (["nᵢ"], Real),
+              (["p₀"], Real),
+              (["p₀"], Real)]
+              
+    for aerosol in aerosols
+        for i in 1:length(fields)
+            key, elty = fields[i][1:2]
+            @assert check_yaml_field(aerosol, key, key, elty, Array{String}([])) 
+        end
+    end
+end
+
+"Given a parameter dictionary from a YAML file, validate the dictionary"
+function validate_yaml_parameters(params)
+
+    # All the fields that *should* exist and their types
+    fields = [(["absorption", "broadening"], String, ["Voigt()", "Doppler()", "Lorentz()"]), 
+              (["absorption", "CEF"], String, ["HumlicekWeidemann32SDErrorFunction()"]),
+              (["absorption", "wing_cutoff"], Integer),
+              (["absorption", "spec_bands"], Array{String}),
+              (["absorption", "vmr"], Real),
+              (["absorption", "molecules"], Array{String}),
+              
+              (["scattering", "aerosols"], Array{Dict{Any,Any}}),
+              (["scattering", "r_max"], Real),
+              (["scattering", "nquad_radius"], Real),
+              (["scattering", "λ"], Array{<:Real}),
+              (["scattering", "λ_ref"], Real),
+              (["scattering", "depol"], Real),
+              (["scattering", "polarization_type"], String, ["Stokes_I()", "Stokes_IQ()", "Stokes_IQU()", "Stokes_IQUV()"]),
+              (["scattering", "decomp_type"], String, ["NAI2()", "PCW()"]),
+
+              (["geometry", "vza"], Array{<:Real}),
+              (["geometry", "vaz"], Array{<:Real}),
+              (["geometry", "sza"], Real),
+              (["geometry", "obs_alt"], Real),
+
+              (["atmospheric_profile", "file"], String),
+              (["atmospheric_profile", "profile_reduction"], Integer),
+
+              (["surface", "BRDFs"], Array{String}),
+
+              (["truncation_type", "l_trunc"], Integer),
+              (["truncation_type", "Δ_angle"], Real),
+
+              (["vSmartMOM", "quadrature_type"], String),
+              (["vSmartMOM", "max_m"], Integer),
+              (["vSmartMOM", "architecture"], String),
+              (["vSmartMOM", "float_type"], String)
+              ]
+
+    # Check that every field exists and is correctly typed
+    for i in 1:length(fields)
+        key, elty = fields[i][1:2]
+        valid_options = length(fields[i]) == 3 ? fields[i][3] : Array{String}([])
+        @assert check_yaml_field(params, key, key, elty, valid_options) 
+    end
+
+    # Check the aerosols separately
+    validate_aerosols(params["scattering"]["aerosols"])
+end
+
 "Given a path to a YAML parameters file, load all the parameters into a vSmartMOM_Parameters struct" 
 function parameters_from_yaml(file_path)
 
     # Load the YAML file
     params_dict = YAML.load_file(file_path)
+
+    # Validate to make sure it has all necessary fields
+    validate_yaml_parameters(params_dict)
 
     # Evaluate certain fields to get their proper types
     broadening_function = eval(Meta.parse(params_dict["absorption"]["broadening"]))
@@ -17,8 +110,14 @@ function parameters_from_yaml(file_path)
     FT = eval(Meta.parse(params_dict["vSmartMOM"]["float_type"]))
     BRDF_per_band = map(x -> eval(Meta.parse(x)), params_dict["surface"]["BRDFs"]) 
     lengths = convert.(Integer, map(x -> length(collect(eval(Meta.parse(x)))), params_dict["absorption"]["spec_bands"]))
-    profile_path = eval(Meta.parse(params_dict["atmospheric_profile"]["file"]))
 
+    # Evaluate profile path if it's not a plain string (need to joinpath)
+    if occursin("joinpath", params_dict["atmospheric_profile"]["file"])
+        profile_path = eval(Meta.parse(params_dict["atmospheric_profile"]["file"]))
+    else
+        profile_path = params_dict["atmospheric_profile"]["file"]
+    end
+    
     # If the specified atmospheric profile is YAML, then set time_index/lat/lon to nothing
     if endswith(profile_path, ".yaml")
         time_index = nothing
