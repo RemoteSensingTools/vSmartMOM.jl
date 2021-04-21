@@ -9,7 +9,7 @@ using RadiativeTransfer.Scattering
 using RadiativeTransfer.vSmartMOM
 
 # Load parameters from file
-parameters = vSmartMOM.parameters_from_yaml("RadiativeTransfer/src/vSmartMOM/ModelParameters/DefaultParameters.yaml")
+# parameters = vSmartMOM.parameters_from_yaml("RadiativeTransfer/src/vSmartMOM/ModelParameters/DefaultParameters.yaml")
 
 
 # file = "RadiativeTransfer/src/vSmartMOM/ModelParameters/SampleProfile.yaml"
@@ -17,7 +17,7 @@ parameters = vSmartMOM.parameters_from_yaml("RadiativeTransfer/src/vSmartMOM/Mod
 # profile_yaml = vSmartMOM.read_atmos_profile(file);
 
 # Sets all the "specific" parameters
-# parameters = vSmartMOM.default_parameters();
+parameters = vSmartMOM.default_parameters();
 
 # Generates all the derived attributes from above parameters
 model = model_from_parameters(parameters);

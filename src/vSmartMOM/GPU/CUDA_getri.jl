@@ -1,6 +1,8 @@
 # Is included in latest CUBLAS version, can be removed in the future!
 
 ## getriBatched - performs batched matrix inversion
+
+# Loop over all these CUBLAS functions and create custom overloads of getri_batched!
 for (fname, elty) in
     ((:cublasDgetriBatched, :Float64),
      (:cublasSgetriBatched, :Float32),
@@ -24,6 +26,7 @@ for (fname, elty) in
     end
 end
 
+# Loop over all these CUBLAS functions and create custom overloads of getri_batched!
 for (fname, elty) in
         ((:cublasDgetriBatched, :Float64),
          (:cublasSgetriBatched, :Float32),

@@ -1,3 +1,5 @@
+
+"Given the previous scattering interface and current layer information, return what type of scattering interface is nexts"
 function get_scattering_interface(scattering_interface, scatter, iz)
 
     # First layer (TOA)
@@ -19,11 +21,11 @@ function get_scattering_interface(scattering_interface, scatter, iz)
     return scattering_interface
 end
 
-"minimum number of doublings needed to reach an optical depth τ_end, starting with an optical depth dτ.
-#The starting optical depth dτ is also determined from its maximum possible value, τ"
+"Minimum number of doublings needed to reach an optical depth τ_end, starting with an optical depth dτ.
+The starting optical depth dτ is also determined from its maximum possible value, τ"
 function doubling_number(dτ_max, τ_end) # check if τ_end can be replaced by τ_end*ϖ for absorbing atmospheres
     FT = eltype(dτ_max)
-    # @show FT, eltype(τ_end), dτ_max, τ_end
+
     # minimum number of doublings needed to reach an optical depth τ_end, starting with an optical depth dτ.
     # The starting optical depth dτ is also determined from its maximum possible value, dτ_max
     if τ_end <= dτ_max
@@ -49,11 +51,10 @@ function doubling_number(dτ_max, τ_end) # check if τ_end can be replaced by �
     end
 end
 
-# Finds index i of f_array (i) which is nearest point to f
-function nearest_point(f_array, f)
-    return argmin(abs.(f_array.-f))
-end
+"Finds index i of f_array (i) which is nearest point to f"
+nearest_point(f_array, f) = argmin(abs.(f_array.-f))
 
+"Get indices scaled according to pol_type"
 function get_indices(iμ::Integer, pol_type::AbstractPolarizationType) 
 
     st_iμ = (iμ - 1) * pol_type.n
@@ -63,12 +64,19 @@ function get_indices(iμ::Integer, pol_type::AbstractPolarizationType)
     return st_iμ, istart, iend
 end
 
+"Default matrix in RT calculation (zeros)"
 default_matrix(FT, arr_type, dims, nSpec)   = arr_type(zeros(FT, tuple(dims[1], dims[2], nSpec)))
+
+"Default J matrix in RT calculation (zeros)"
 default_J_matrix(FT, arr_type, dims, nSpec) = arr_type(zeros(FT, tuple(dims[1], 1, nSpec)))
 
+"Default matrix in RT calculation (random)"
 default_matrix_rand(FT, arr_type, dims, nSpec)   = arr_type(randn(FT, tuple(dims[1], dims[2], nSpec)))
+
+"Default J matrix in RT calculation (random)"
 default_J_matrix_rand(FT, arr_type, dims, nSpec) = arr_type(randn(FT, tuple(dims[1], 1, nSpec)))
-#default_test_vector(FT, arr_type,3) = arr_type(zeros(FT, tuple(3)))
+
+"Make an added layer, supplying all default matrices"
 make_added_layer(FT, arr_type, dims, nSpec)     = AddedLayer(default_matrix(FT, arr_type, dims, nSpec), 
                                                          default_matrix(FT, arr_type, dims, nSpec), 
                                                          default_matrix(FT, arr_type, dims, nSpec),
@@ -77,6 +85,7 @@ make_added_layer(FT, arr_type, dims, nSpec)     = AddedLayer(default_matrix(FT, 
                                                          default_J_matrix(FT, arr_type, dims, nSpec)
                                                          )
 
+"Make a random added layer, supplying all random matrices"
 make_added_layer_rand(FT, arr_type, dims, nSpec)     = AddedLayer(default_matrix_rand(FT, arr_type, dims, nSpec), 
                                                          default_matrix_rand(FT, arr_type, dims, nSpec), 
                                                          default_matrix_rand(FT, arr_type, dims, nSpec),
@@ -85,7 +94,7 @@ make_added_layer_rand(FT, arr_type, dims, nSpec)     = AddedLayer(default_matrix
                                                          default_J_matrix_rand(FT, arr_type, dims, nSpec)
                                                          )
                                                          
-
+"Make a composite layer, supplying all default matrices"
 make_composite_layer(FT, arr_type, dims, nSpec) = CompositeLayer(default_matrix(FT, arr_type, dims, nSpec), 
                                                                  default_matrix(FT, arr_type, dims, nSpec), 
                                                                  default_matrix(FT, arr_type, dims, nSpec),
@@ -94,7 +103,7 @@ make_composite_layer(FT, arr_type, dims, nSpec) = CompositeLayer(default_matrix(
                                                                  default_J_matrix(FT, arr_type, dims, nSpec)
                                                             )
 
-
+"Given a ComputedAtmosphereProperties object, extract a ComputedLayerProperties object using data from the iz index of all arrays in the ComputedAtmosphereProperties"
 function get_layer_properties(computed_atmospheric_properties::ComputedAtmosphereProperties, iz, arr_type)
 
     @unpack τ_λ_all, ϖ_λ_all, τ_all, ϖ_all, Z⁺⁺_all, Z⁻⁺_all, dτ_max_all, dτ_all, ndoubl_all, dτ_λ_all, expk_all, scatter_all, τ_sum_all, scattering_interfaces_all = computed_atmospheric_properties

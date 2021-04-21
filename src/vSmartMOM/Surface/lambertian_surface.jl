@@ -1,15 +1,16 @@
 # Create a simple Lambertian albedo layer
+# <<Suniti>> Hi Suniti, could you quickly comment through this file? Thanks! 
 function create_surface_layer!(lambertian::LambertianSurfaceScalar{FT}, 
                         added_layer::AddedLayer,#{FT}, 
                         SFI,
                         m::Int,    # Fourier Moment
                         pol_type,  # 
-                        quadPoints,
+                        quad_points,
                         τ_sum,
                         architecture) where {FT}
     
     if m == 0
-        @unpack qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart, iμ₀, μ₀ = quadPoints
+        @unpack qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart, iμ₀, μ₀ = quad_points
         arr_type = array_type(architecture)
         # Albedo normalized by π (and factor 2 for 0th Fourier Moment)
         ρ = 2lambertian.albedo/FT(π)

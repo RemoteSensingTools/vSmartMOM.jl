@@ -1,5 +1,5 @@
 """
-    $(FUNCTIONNAME)(pol_type, obs_geom::ObsGeometry, τRayl, τAer, quadPoints::QuadPoints, max_m, aerosol_optics, GreekRayleigh, τ_abs, brdf, architecture::AbstractArchitecture)
+    $(FUNCTIONNAME)(pol_type, obs_geom::ObsGeometry, τRayl, τAer, quad_points::QuadPoints, max_m, aerosol_optics, greek_rayleigh, τ_abs, brdf, architecture::AbstractArchitecture)
 
 Perform Radiative Transfer calculations using given parameters
 
@@ -8,16 +8,16 @@ function rt_run(pol_type::AbstractPolarizationType,   # Polarization type (IQUV)
                 obs_geom::ObsGeometry,          # Solar Zenith, Viewing Zenith, Viewing Azimuthal 
                 τRayl,                          # Rayleigh optical depth 
                 τAer,                           # Aerosol optical depth and single-scattering albedo
-                quadPoints::QuadPoints,         # Quadrature points and weights
+                quad_points::QuadPoints,        # Quadrature points and weights
                 max_m,                          # Max Fourier terms
                 aerosol_optics,                 # AerosolOptics (greek_coefs, ω̃, k, fᵗ)
-                GreekRayleigh::GreekCoefs,      # Greek coefficients of Rayleigh Phase Function
+                greek_rayleigh::GreekCoefs,     # Greek coefficients of Rayleigh Phase Function
                 τ_abs,                          # nSpec x Nz matrix of absorption
                 brdf,                           # BRDF surface type
                 architecture::AbstractArchitecture) # Whether to use CPU / GPU
 
     @unpack obs_alt, sza, vza, vaz = obs_geom   # Observational geometry properties
-    @unpack qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart,μ₀, iμ₀,Nquad = quadPoints
+    @unpack qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart,μ₀, iμ₀,Nquad = quad_points # All quadrature points
     FT = eltype(sza)                    # Get the float-type to use
     Nz = length(τRayl)                  # Number of vertical slices
     nSpec = size(τ_abs, 1)              # Number of spectral points
@@ -63,7 +63,7 @@ function rt_run(pol_type::AbstractPolarizationType,   # Polarization type (IQUV)
 
         # Compute Z-moments of the Rayleigh phase matrix 
         # For m>=3, Rayleigh matrices will be 0, can catch with if statement if wanted 
-        @timeit "Z moments" Rayl𝐙⁺⁺, Rayl𝐙⁻⁺ = Scattering.compute_Z_moments(pol_type, Array(qp_μ), GreekRayleigh, m, arr_type = arr_type);
+        @timeit "Z moments" Rayl𝐙⁺⁺, Rayl𝐙⁻⁺ = Scattering.compute_Z_moments(pol_type, Array(qp_μ), greek_rayleigh, m, arr_type = arr_type);
 
         # Just for now (will change this later):
         # iBand = 1
@@ -90,12 +90,12 @@ function rt_run(pol_type::AbstractPolarizationType,   # Polarization type (IQUV)
             computed_layer_properties = get_layer_properties(computed_atmosphere_properties, iz, arr_type)
 
             # Perform Core RT (doubling/elemental/interaction)
-            rt_kernel!(pol_type, SFI, added_layer, composite_layer, computed_layer_properties, m, quadPoints, I_static, architecture, qp_μN, iz) 
+            rt_kernel!(pol_type, SFI, added_layer, composite_layer, computed_layer_properties, m, quad_points, I_static, architecture, qp_μN, iz) 
         end 
 
         # Create surface matrices:
         # arr_type(computed_atmosphere_properties.τ_sum_all[:,end])
-        create_surface_layer!(brdf, added_layer, SFI, m, pol_type, quadPoints, arr_type(computed_atmosphere_properties.τ_sum_all[:,end]), architecture);
+        create_surface_layer!(brdf, added_layer, SFI, m, pol_type, quad_points, arr_type(computed_atmosphere_properties.τ_sum_all[:,end]), architecture);
 
         # One last interaction with surface:
         @timeit "interaction" interaction!(computed_atmosphere_properties.scattering_interfaces_all[end], SFI, composite_layer, added_layer, I_static)
@@ -104,6 +104,7 @@ function rt_run(pol_type::AbstractPolarizationType,   # Polarization type (IQUV)
         postprocessing_vza!(iμ₀, pol_type, composite_layer, vza, qp_μ, m, vaz, μ₀, weight, nSpec, SFI, R, R_SFI, T, T_SFI)
     end
 
+    # Show timing statistics
     print_timer()
     reset_timer!()
 
@@ -129,7 +130,7 @@ function rt_run(model::vSmartMOM_Model)
                   model.obs_geom::ObsGeometry,
                   model.τRayl, 
                   model.τAer, 
-                  model.quadPoints,
+                  model.quad_points,
                   model.params.max_m,
                   model.aerosol_optics,
                   model.greek_rayleigh,

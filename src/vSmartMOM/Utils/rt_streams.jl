@@ -1,3 +1,5 @@
+# <<Christian>> I'm not sure how much more documentation this file needs. A bit more? Enough?
+
 "Gauss quadrature points to match [0-1] interval"
 function rt_set_streams(::GaussQuadHemisphere, 
                         Ltrunc::Int, 
@@ -27,6 +29,7 @@ function rt_set_streams(::GaussQuadFullSphere,
                         obs_geom::ObsGeometry, 
                         pol_type,
                         arr_type)
+                        
     @unpack obs_alt, sza, vza, vaz = obs_geom
     FT = eltype(sza)
     Nquad = (Ltrunc + 1) ÷ 2
@@ -42,6 +45,7 @@ function rt_set_streams(::GaussQuadFullSphere,
     qp_μN = arr_type(reduce(vcat, (fill.(qp_μ, [pol_type.n]))))
     wt_μN = arr_type(reduce(vcat, (fill.(wt_μ, [pol_type.n]))))
     i_start = pol_type.n*(iμ₀-1) + 1
+    
     return QuadPoints(μ₀, iμ₀, i_start, arr_type(qp_μ), arr_type(wt_μ), qp_μN, wt_μN, Nquad) 
 end
 
@@ -66,43 +70,50 @@ function rt_set_streams(::RadauQuad,
     μ₀ = cosd(sza) # check for degree to radian conversion
     
     if μ₀ ∈ qp_μ₀
+
         qp_μ = zeros(FT, Nquad)
         wt_μ = zeros(FT, Nquad)
+
         for i = 1:Nquad
             qp_μ[i] = (1 + qp_μ₀[i]) / 2
             wt_μ[i] = wt_μ₀[i] 
         end
+
         Ncam = length(vza)
         μ = cosd.(vza) # check for degree to radian conversion
         
         # Screen out duplicate camera zenith angles
         qp_μ = unique([qp_μ; cosd.(vza)])
+
         # Assign zero-weights to remaining camera zenith angles
         wt_μ = FT[wt_μ; zeros(length(qp_μ) - length(wt_μ))]
         
         Nquad = length(qp_μ)
         
     else
+
         qp_μ = zeros(FT, 2Nquad)
         wt_μ = zeros(FT, 2Nquad)
+
         for i = 1:Nquad
             qp_μ[i] = (μ₀ + μ₀ * qp_μ₀[i]) / 2
             wt_μ[i] = μ₀ * wt_μ₀[i] / 2
             qp_μ[Nquad + i] = ((1 + μ₀) + (1 - μ₀) * qp_μ₀[i]) / 2
             wt_μ[Nquad + i] = (1 - μ₀) * wt_μ₀[i] / 2
         end
+
         Ncam = length(vza)
         μ = cosd.(vza) # check for degree to radian conversion
         
         # Screen out duplicate camera zenith angles
         qp_μ = unique([qp_μ; cosd.(vza)])
+
         # Assign zero-weights to remaining camera zenith angles
         wt_μ = FT[wt_μ; zeros(length(qp_μ) - length(wt_μ))]
-        
         Nquad = length(qp_μ)
-        # @show μ₀, Nquad, qp_μ, wt_μ
-        # return Nquad, qp_μ, wt_μ   
+
     end
+
     iμ₀ = nearest_point(qp_μ, μ₀);
     qp_μN = arr_type(reduce(vcat, (fill.(qp_μ, [pol_type.n]))))
     wt_μN = arr_type(reduce(vcat, (fill.(wt_μ, [pol_type.n]))))

@@ -1,10 +1,10 @@
+"Compute pressure levels, vmr, vcd for atmospheric profile, given p_half, T, q"
+function compute_atmos_profile_fields(p_half::AbstractArray, T, q; g₀=9.8196)
 
-function compute_atmos_profile_fields(psurf, T, q, ak, bk; g₀=9.8196)
-
+    # Floating type to use
     FT = eltype(T)
     
-    # Calculate pressure levels
-    p_half = (ak + bk * psurf)
+    # Calculate full pressure levels
     p_full = (p_half[2:end] + p_half[1:end - 1]) / 2
 
     # Dry and wet mass
@@ -32,29 +32,54 @@ function compute_atmos_profile_fields(psurf, T, q, ak, bk; g₀=9.8196)
 
 end
 
+"Validate an input atmospheric profile (YAML only)"
+function validate_atmos_profile(params::Dict{Any,Any})
+
+    @assert Set(keys(params)) == Set(["p_surf", "T", "q", "ak", "bk"]) || 
+            Set(keys(params)) == Set(["p_half", "T", "q"]) || 
+            Set(keys(params)) == Set(["p_half", "T"]) "Set of atmospheric profile fields must be one of (p_surf, T, q, ak, bk), (p_half, T, q), or (p_half, T)"
+
+end
+
+"From a yaml file, get the stored fields (psurf, T, q, ak, bk), calculate derived fields, 
+and return an AtmosphericProfile object" 
 function read_atmos_profile(file_path::String)
 
-    # Make sure file is csv type
+    # Make sure file is yaml type
     @assert endswith(file_path, ".yaml") "File must be yaml"
 
     # Read in the data and pass to compute fields
     params_dict = YAML.load_file(file_path)
-    
-    psurf = convert(Float64, params_dict["psurf"])
-    T     = convert.(Float64, params_dict["T"])
-    q     = convert.(Float64, params_dict["q"])
-    ak    = convert.(Float64, params_dict["ak"])
-    bk    = convert.(Float64, params_dict["bk"])
 
+    # Validate the parameters before doing anything else
+    validate_atmos_profile(params_dict)
+
+    T = convert.(Float64, params_dict["T"])
+    
     # Calculate derived fields
-    p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o = compute_atmos_profile_fields(psurf, T, q, ak, bk)
+    if ("ak" in keys(params_dict))
+        psurf = convert(Float64, params_dict["p_surf"])
+        q     = convert.(Float64, params_dict["q"])
+        ak    = convert.(Float64, params_dict["ak"])
+        bk    = convert.(Float64, params_dict["bk"])
+        p_half = (ak + bk * psurf)
+        p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o = compute_atmos_profile_fields(p_half, T, q)
+    elseif ("q" in keys(params_dict))
+        p_half = convert(Float64, params_dict["p_half"])
+        q      = convert.(Float64, params_dict["q"])
+        p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o = compute_atmos_profile_fields(p_half, T, q)
+    else
+        p_half = convert(Float64, params_dict["p_half"])
+        q = zeros(length(T))
+        p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o = compute_atmos_profile_fields(p_half, T, q)
+    end
 
     # Return the atmospheric profile struct
     return AtmosphericProfile(nothing, nothing, psurf, T, q, p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o)
 
 end
 
-"Read atmospheric profile (just works for our file, can be generalized"
+"Read atmospheric profile from netCDF file (ONLY works for FraLab test file)"
 function read_atmos_profile(file::String, lat::Real, lon::Real, time_idx::Int)
 
     # Time index must be ∈ [1, 2, 3, 4]
@@ -93,21 +118,26 @@ function read_atmos_profile(file::String, lat::Real, lon::Real, time_idx::Int)
     close(ds)
 
     # Calculate derived fields
-    p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o = compute_atmos_profile_fields(psurf, T, q, ak, bk)
+    p_half = (ak + bk * psurf)
+    p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o = compute_atmos_profile_fields(p_half, T, q)
 
     # Return the atmospheric profile struct
     return AtmosphericProfile(lat, lon, psurf, T, q, p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o)
 end
 
-"Reduce profile dimensions"
+"Reduce profile dimensions by re-averaging"
 function reduce_profile(n::Int, profile::AtmosphericProfile{FT}) where {FT}
+
+    # Can only reduce the profile, not expand it
     @assert n < length(profile.T)
+
+    # Unpack the profile
     @unpack lat, lon, psurf = profile
+
     # New rough half levels (boundary points)
     a = range(0, maximum(profile.p), length=n + 1)
-    # dims = size(σ_matrix)
-    # FT = eltype(σ_matrix)
-    # σ_matrix_lr = zeros(FT, dims[1], n, dims[3])
+
+    # Matrices to hold new values
     T = zeros(FT, n);
     q = zeros(FT, n);
     p_full = zeros(FT, n);
@@ -116,11 +146,17 @@ function reduce_profile(n::Int, profile::AtmosphericProfile{FT}) where {FT}
     vcd_dry  = zeros(FT, n);
     vcd_h2o  = zeros(FT, n);
 
+    # Loop over target number of layers
     for i = 1:n
+
+        # Get the section of the atmosphere with the i'th section pressure values
         ind = findall(a[i] .< profile.p .<= a[i + 1]);
-        # σ_matrix_lr[:,i,:] = mean(σ_matrix[:,ind,:], dims=2);
+
+        # Set the pressure levels accordingly
         p_levels[i] = profile.p_levels[ind[1]]
         p_levels[i + 1] = profile.p_levels[ind[end]]
+
+        # Re-average the other parameters to produce new layers
         p_full[i] = mean(profile.p_levels[ind])
         T[i] = mean(profile.T[ind])
         q[i] = mean(profile.q[ind])
@@ -134,12 +170,12 @@ end;
 
 # for terrestrial atmospheres 
 # psurf in hPa, λ in μm 
+# <<Suniti>>
 function getRayleighLayerOptProp(psurf, λ, depol_fct, vcd_dry) 
     FT = eltype(λ)
     # Total vertical Rayleigh scattering optical thickness 
     tau_scat = FT(0.00864) * (psurf / FT(1013.25)) * λ^(-FT(3.916) - FT(0.074) * λ - FT(0.05) / λ) 
     tau_scat = tau_scat * (FT(6.0) + FT(3.0) * depol_fct) / (FT(6.0)- FT(7.0) * depol_fct)
-    #@show psurf, tau_scat, depol_fct
     Nz = length(vcd_dry)
     τRayl = zeros(FT,Nz)
     k = tau_scat / sum(vcd_dry)
@@ -151,18 +187,19 @@ function getRayleighLayerOptProp(psurf, λ, depol_fct, vcd_dry)
 end
 
 # Gaussian distribution on a pressure grid
+# <<Suniti>>
 function getAerosolLayerOptProp(total_τ, p₀, σp, p_half)
+
     # Need to make sure we can also differentiate wrt σp (FT can be Dual!)
     FT = eltype(p₀)
     Nz = length(p_half)
     ρ = zeros(FT,Nz)
+
     for i = 2:Nz
         dp = p_half[i] - p_half[i - 1]
         ρ[i] = (1 / (σp * sqrt(2π))) * exp(-(p_half[i] - p₀)^2 / (2σp^2)) * dp
-         # @show ρ[i]  
     end
     Norm = sum(ρ)
-    # @show Norm
     τAer  =  (total_τ / Norm) * ρ
     return convert.(FT, τAer)
 end
@@ -170,27 +207,22 @@ end
 # computes the composite single scattering parameters (τ, ϖ, Z⁺⁺, Z⁻⁺) for a given atmospheric layer iz for a given Fourier component m
 # τ, ϖ: only Rayleigh scattering and aerosol extinction, no gaseous absorption (no wavelength dependence)
 # τ_λ, ϖ_λ: Rayleigh scattering + aerosol extinction + gaseous absorption (wavelength dependent)
+# <<Suniti>> could you comment through this function? Thanks! 
 function construct_atm_layer(τRayl, τAer,  aerosol_optics, Rayl𝐙⁺⁺, Rayl𝐙⁻⁺, Aer𝐙⁺⁺, Aer𝐙⁻⁺, τ_abs, arr_type)
     FT = eltype(τRayl)
     nAer = length(aerosol_optics)
-    #@show(nAer)
+
     # Fix Rayleigh SSA to 1
     ϖRayl = FT(1)
-    # @show FT
+
     @assert length(τAer) == nAer "Sizes don't match"
-    
-    #@show τRayl , sum(τAer)
 
     τ = FT(0)
     ϖ = FT(0)
     A = FT(0)
     Z⁺⁺ = similar(Rayl𝐙⁺⁺); 
     Z⁻⁺ = similar(Rayl𝐙⁺⁺);
-    #@show size(Rayl𝐙⁺⁺)
-#    @show Rayl𝐙⁺⁺[1,58]
-    #for i = 1: 3: size(Rayl𝐙⁺⁺)[1]
-    #    @show(i, Rayl𝐙⁺⁺[1,i])
-    #end
+
     if (τRayl + sum(τAer)) < eps(FT)
         fill!(Z⁺⁺, 0); fill!(Z⁻⁺, 0);
         return FT(0), FT(1), Z⁺⁺, Z⁻⁺
@@ -206,7 +238,6 @@ function construct_atm_layer(τRayl, τAer,  aerosol_optics, Rayl𝐙⁺⁺, Ray
     for i = 1:nAer
         τ   += τAer[i]
         ϖ   += τAer[i] * aerosol_optics[i].ω̃
-        # @show τAer[i], aerosol_optics[i].ω̃, (1 - aerosol_optics[i].fᵗ)
         A   += τAer[i] * aerosol_optics[i].ω̃ * (1 - aerosol_optics[i].fᵗ)
         Z⁺⁺ += τAer[i] * aerosol_optics[i].ω̃ * (1 - aerosol_optics[i].fᵗ) * Aer𝐙⁺⁺[:,:,i]
         Z⁻⁺ += τAer[i] * aerosol_optics[i].ω̃ * (1 - aerosol_optics[i].fᵗ) * Aer𝐙⁻⁺[:,:,i]
@@ -218,7 +249,6 @@ function construct_atm_layer(τRayl, τAer,  aerosol_optics, Rayl𝐙⁺⁺, Ray
     ϖ /= τ
     
     # Rescaling composite SSPs according to Eqs. A.3 of Sanghavi et al. (2013) or Eqs.(8) of Sanghavi & Stephens (2015)
-    # @show A, ϖ
     τ *= (FT(1) - (FT(1) - A) * ϖ)
     ϖ *= A / (FT(1) - (FT(1) - A) * ϖ)#Suniti
 
@@ -227,12 +257,12 @@ function construct_atm_layer(τRayl, τAer,  aerosol_optics, Rayl𝐙⁺⁺, Ray
     ϖ_λ = (τ .* ϖ) ./ τ_λ
     
     return Array(τ_λ), Array(ϖ_λ), τ, ϖ, Array(Z⁺⁺), Array(Z⁻⁺)
-
-    return arr_type(τ_λ), arr_type(ϖ_λ), τ, ϖ, Z⁺⁺, Z⁻⁺  
 end
 
+"When performing RT_run, this function pre-calculates properties for all layers, before any Core RT is performed"
 function construct_all_atm_layers(FT, nSpec, Nz, NquadN, τRayl, τAer, aerosol_optics, Rayl𝐙⁺⁺, Rayl𝐙⁻⁺, Aer𝐙⁺⁺, Aer𝐙⁻⁺, τ_abs, arr_type, qp_μ, μ₀, m)
 
+    # Empty matrices to hold all values
     τ_λ_all   = zeros(FT, nSpec, Nz)
     ϖ_λ_all   = zeros(FT, nSpec, Nz)
     τ_all     = zeros(FT, Nz)
@@ -287,14 +317,15 @@ function construct_all_atm_layers(FT, nSpec, Nz, NquadN, τRayl, τAer, aerosol_
     return ComputedAtmosphereProperties(τ_λ_all, ϖ_λ_all, τ_all, ϖ_all, Z⁺⁺_all, Z⁻⁺_all, dτ_max_all, dτ_all, ndoubl_all, dτ_λ_all, expk_all, scatter_all, τ_sum_all, scattering_interfaces_all)
 end
 
+"Given the CrossSectionModel, the grid, and the AtmosphericProfile, fill up the τ_abs array with the cross section at each layer
+(using pressures/temperatures) from the profile" 
 function compute_absorption_profile!(τ_abs::Array{FT,2}, 
                                      model::AbstractCrossSectionModel,
                                      grid,
                                      profile::AtmosphericProfile,
                                      ) where FT <: AbstractFloat
 
-    # pass in the hitran model
-
+    # The array to store the cross-sections must be same length as number of layers
     @assert size(τ_abs,2) == length(profile.p)
 
     for iz in 1:length(profile.p)
@@ -302,6 +333,7 @@ function compute_absorption_profile!(τ_abs::Array{FT,2},
         # Pa -> hPa
         p = profile.p[iz] / 100
         T = profile.T[iz]
+
         # Changed index order
         τ_abs[:,iz] = Array(absorption_cross_section(model, grid, p, T)) * profile.vcd_dry[iz] * model.vmr
     end
