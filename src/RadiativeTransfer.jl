@@ -26,6 +26,10 @@ include("Scattering/Scattering.jl")
 
 # vSmartMOM module:
 include("vSmartMOM/vSmartMOM.jl")
+using .vSmartMOM
+
+# Export some vSmartMOM functions
+export default_parameters, parameters_from_yaml, model_from_parameters, rt_run
 
 using .Architectures
 using .Absorption
