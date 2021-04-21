@@ -1,11 +1,10 @@
-"Compute pressure levels, vmr, vcd for atmospheric profile, given psurf, T, q, ak, bk"
-function compute_atmos_profile_fields(psurf, T, q, ak, bk; g₀=9.8196)
+"Compute pressure levels, vmr, vcd for atmospheric profile, given p_half, T, q"
+function compute_atmos_profile_fields(p_half::AbstractArray, T, q; g₀=9.8196)
 
     # Floating type to use
     FT = eltype(T)
     
-    # Calculate pressure levels
-    p_half = (ak + bk * psurf)
+    # Calculate full pressure levels
     p_full = (p_half[2:end] + p_half[1:end - 1]) / 2
 
     # Dry and wet mass
@@ -33,6 +32,15 @@ function compute_atmos_profile_fields(psurf, T, q, ak, bk; g₀=9.8196)
 
 end
 
+"Validate an input atmospheric profile (YAML only)"
+function validate_atmos_profile(params::Dict{Any,Any})
+
+    @assert Set(keys(params)) == Set(["p_surf", "T", "q", "ak", "bk"]) || 
+            Set(keys(params)) == Set(["p_half", "T", "q"]) || 
+            Set(keys(params)) == Set(["p_half", "T"]) "Set of atmospheric profile fields must be one of (p_surf, T, q, ak, bk), (p_half, T, q), or (p_half, T)"
+
+end
+
 "From a yaml file, get the stored fields (psurf, T, q, ak, bk), calculate derived fields, 
 and return an AtmosphericProfile object" 
 function read_atmos_profile(file_path::String)
@@ -42,15 +50,29 @@ function read_atmos_profile(file_path::String)
 
     # Read in the data and pass to compute fields
     params_dict = YAML.load_file(file_path)
-    
-    psurf = convert(Float64, params_dict["psurf"])
-    T     = convert.(Float64, params_dict["T"])
-    q     = convert.(Float64, params_dict["q"])
-    ak    = convert.(Float64, params_dict["ak"])
-    bk    = convert.(Float64, params_dict["bk"])
 
+    # Validate the parameters before doing anything else
+    validate_atmos_profile(params_dict)
+
+    T = convert.(Float64, params_dict["T"])
+    
     # Calculate derived fields
-    p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o = compute_atmos_profile_fields(psurf, T, q, ak, bk)
+    if ("ak" in keys(params_dict))
+        psurf = convert(Float64, params_dict["p_surf"])
+        q     = convert.(Float64, params_dict["q"])
+        ak    = convert.(Float64, params_dict["ak"])
+        bk    = convert.(Float64, params_dict["bk"])
+        p_half = (ak + bk * psurf)
+        p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o = compute_atmos_profile_fields(p_half, T, q)
+    elseif ("q" in keys(params_dict))
+        p_half = convert(Float64, params_dict["p_half"])
+        q      = convert.(Float64, params_dict["q"])
+        p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o = compute_atmos_profile_fields(p_half, T, q)
+    else
+        p_half = convert(Float64, params_dict["p_half"])
+        q = zeros(length(T))
+        p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o = compute_atmos_profile_fields(p_half, T, q)
+    end
 
     # Return the atmospheric profile struct
     return AtmosphericProfile(nothing, nothing, psurf, T, q, p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o)
@@ -96,7 +118,8 @@ function read_atmos_profile(file::String, lat::Real, lon::Real, time_idx::Int)
     close(ds)
 
     # Calculate derived fields
-    p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o = compute_atmos_profile_fields(psurf, T, q, ak, bk)
+    p_half = (ak + bk * psurf)
+    p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o = compute_atmos_profile_fields(p_half, T, q)
 
     # Return the atmospheric profile struct
     return AtmosphericProfile(lat, lon, psurf, T, q, p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o)
