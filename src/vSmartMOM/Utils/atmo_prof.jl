@@ -253,11 +253,12 @@ function construct_all_atm_layers(FT, nSpec, Nz, NquadN, τRayl, τAer, aerosol_
         τ_λ_all[:, iz], ϖ_λ_all[:, iz], τ_all[iz], ϖ_all[iz], Z⁺⁺_all[:,:,iz], Z⁻⁺_all[:,:,iz] = construct_atm_layer(τRayl[iz], τAer[:,iz], aerosol_optics, Rayl𝐙⁺⁺, Rayl𝐙⁻⁺, Aer𝐙⁺⁺, Aer𝐙⁻⁺, τ_abs[:,iz], arr_type)
 
         # Compute doubling number
-        dτ_max_all[iz] = minimum([τ_all[iz] * ϖ_all[iz], FT(0.01) * minimum(qp_μ)])
+        dτ_max_all[iz] = minimum([τ_all[iz] * ϖ_all[iz], FT(0.001) * minimum(qp_μ)])
         dτ_all[iz], ndoubl_all[iz] = doubling_number(dτ_max_all[iz], τ_all[iz] * ϖ_all[iz]) #Suniti
 
         # Compute dτ vector
-        dτ_λ_all[:, iz] = arr_type(τ_λ_all[:, iz] ./ (FT(2)^ndoubl_all[iz]))
+        dτ_λ_all[:, iz] = (τ_λ_all[:, iz] ./ (FT(2)^ndoubl_all[iz]))
+        #@show maximum(dτ_λ_all[:,iz])
         expk_all[:, iz] = exp.(-dτ_λ_all[:, iz] /μ₀) #Suniti
         
         # Determine whether there is scattering
