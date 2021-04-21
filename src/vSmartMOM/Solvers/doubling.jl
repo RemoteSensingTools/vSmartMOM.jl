@@ -1,11 +1,14 @@
-# <<Suniti>> it would be helpful to comment through this file. Thanks! 
+# <<Suniti>> it would be helpful to comment through this file. Thanks! - Is this enough or do we need more documentation?
 
 # Prototype doubling methods, compute homogenous layer matrices from its elemental layer in 
 # `ndoubl` doubling steps
-function doubling_helper!(pol_type, SFI, expk, ndoubl::Int, 
-                          added_layer::AddedLayer,
-                          I_static::AbstractArray{FT}, 
-                          architecture) where {FT}
+function doubling_helper!(pol_type, 
+    SFI, 
+    expk, 
+    ndoubl::Int, 
+    added_layer::AddedLayer,
+    I_static::AbstractArray{FT}, 
+    architecture) where {FT}
 
     # Unpack the added layer
     @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, J₀⁺, J₀⁻ = added_layer
@@ -15,8 +18,6 @@ function doubling_helper!(pol_type, SFI, expk, ndoubl::Int,
 
     # Note: short-circuit evaluation => return nothing evaluated iff ndoubl == 0 
     ndoubl == 0 && return nothing
-
-    #j0 = pol_type.n*(iμ0-1)+1
     
     # Geometric progression of reflections (1-RR)⁻¹
     gp_refl      = similar(t⁺⁺)
@@ -35,17 +36,23 @@ function doubling_helper!(pol_type, SFI, expk, ndoubl::Int,
         tt⁺⁺_gp_refl[:] = t⁺⁺ ⊠ gp_refl
         # J₁⁺[:,1,:] =  J₀⁺[:,1,:] .* expk'
         if SFI
+            # J⁺₂₁(λ) = J⁺₁₀(λ).exp(-τ(λ)/μ₀)
             J₁⁺[:,1,:] = J₀⁺[:,1,:] .* expk'
+            #J⁻₁₂(λ)  = J⁻₀₁(λ).exp(-τ(λ)/μ₀)
             J₁⁻[:,1,:] = J₀⁻[:,1,:] .* expk'
             #@show size(J₀⁺), size(J₁⁺), size((t⁺⁺ ⊠ gp_refl ⊠ (J₀⁺ .+ r⁻⁺ ⊠ J₁⁻)))
+            
+            #J⁻₀₂(λ) = J⁻₀₁(λ) + T⁻⁻₀₁(λ)[I - R⁻⁺₂₁(λ)R⁺⁻₀₁(λ)]⁻¹[J⁻₁₂(λ) + R⁻⁺₂₁(λ)J⁺₁₀(λ)] (see Eqs.8 in Raman paper draft)
             J₀⁻[:] = J₀⁻ + (tt⁺⁺_gp_refl ⊠ (J₁⁻ + r⁻⁺ ⊠ J₀⁺)) 
+            #J⁺₂₀(λ) = J⁺₂₁(λ) + T⁺⁺₂₁(λ)[I - R⁺⁻₀₁(λ)R⁻⁺₂₁(λ)]⁻¹[J⁺₁₀(λ) + R⁺⁻₀₁(λ)J⁻₁₂(λ)] (see Eqs.8 in Raman paper draft)
             J₀⁺[:] = J₁⁺ + (tt⁺⁺_gp_refl ⊠ (J₀⁺ + r⁻⁺ ⊠ J₁⁻))
             expk[:] = expk.^2
         end  
+        # R⁻⁺₂₀(λ) = R⁻⁺₁₀(λ) + T⁻⁻₀₁(λ)[I - R⁻⁺₂₁(λ)R⁺⁻₀₁(λ)]⁻¹R⁻⁺₂₁(λ)T⁺⁺₁₀(λ) (see Eqs.8 in Raman paper draft)
         r⁻⁺[:]  = r⁻⁺ + (tt⁺⁺_gp_refl ⊠ r⁻⁺ ⊠ t⁺⁺)
+        # T⁺⁺₂₀(λ) = T⁺⁺₂₁(λ)[I - R⁺⁻₀₁(λ)R⁻⁺₂₁(λ)]⁻¹T⁺⁺₁₀(λ) (see Eqs.8 in Raman paper draft)
         t⁺⁺[:]  = tt⁺⁺_gp_refl ⊠ t⁺⁺
         #@show r⁻⁺[1:3:end,28,1]./(J₀⁻[1:3:end,1,1]*0.005)#, r⁻⁺[1,28,1]
-
     end
     # After doubling, revert D(DR)->R, where D = Diagonal{1,1,-1,-1}
     # For SFI, after doubling, revert D(DJ₀⁻)->J₀⁻
@@ -65,7 +72,6 @@ function doubling!(pol_type, SFI, expk,
                     architecture) where {FT}
 
     doubling_helper!(pol_type, SFI, expk, ndoubl, added_layer, I_static, architecture)
-    ### synchronize() #Suniti: does this convert the added layer to the current layer, so that added_layer.M = M?
     synchronize_if_gpu()
 end
 
