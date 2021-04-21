@@ -4,7 +4,7 @@ function interaction_helper!(::ScatteringInterface_00, SFI,
                                 added_layer::AddedLayer{FT}, 
                                 I_static::AbstractArray{FT2}) where {FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2}
 
-    # If SFI, <<Suniti>> What's going on here?
+    # If SFI, interact source function in no scattering
     if SFI
         J₀⁺, J₀⁻ = similar(composite_layer.J₀⁺), similar(composite_layer.J₀⁺)
         J₀⁺ = added_layer.J₀⁺ .+ added_layer.t⁺⁺ ⊠ composite_layer.J₀⁺

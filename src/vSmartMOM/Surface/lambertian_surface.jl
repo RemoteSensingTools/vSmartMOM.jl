@@ -1,5 +1,14 @@
-# Create a simple Lambertian albedo layer
-# <<Suniti>> Hi Suniti, could you quickly comment through this file? Thanks! 
+"""
+$(FUNCTIONNAME)(lambertian::LambertianSurfaceScalar{FT})
+Computes (in place) surface optical properties for a (scalar) lambertian albedo as [`AddedLayer`](@ref) 
+- `lambertian` a [`LambertianSurfaceScalar`](@ref) struct that defines albedo as scalar
+- `SFI` bool if SFI is used
+- `m` Fourier moment (starting at 0)
+- `pol_type` Polarization type struct
+- `quad_points` Quadrature points struct
+- `τ_sum` total optical thickness from TOA to the surface
+- `architecture` Compute architecture (GPU,CPU)
+""" 
 function create_surface_layer!(lambertian::LambertianSurfaceScalar{FT}, 
                         added_layer::AddedLayer,#{FT}, 
                         SFI,
