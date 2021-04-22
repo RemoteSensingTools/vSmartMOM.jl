@@ -1,5 +1,3 @@
-# <<Suniti>> it would be helpful to comment through this file (and remove unwanted lines). Thanks! 
-
 "Elemental single-scattering layer"
 function elemental!(pol_type, SFI::Bool, 
                             τ_sum::AbstractArray,#{FT2,1}, #Suniti
@@ -20,11 +18,8 @@ function elemental!(pol_type, SFI::Bool,
     @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, J₀⁺, J₀⁻ = added_layer
     @unpack qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart, iμ₀ = quad_points
     arr_type = array_type(architecture)
-    # @show FT
-    # ToDo: Main output is r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, J₀⁺, J₀⁻ (can be renamed to t⁺⁺, etc)
     # Need to check with paper nomenclature. This is basically eqs. 19-20 in vSmartMOM
     
-
     # Later on, we can have Zs also vary with index, pretty easy here:
     # Z⁺⁺_ = repeat(Z⁺⁺, 1, 1, 1)
     Z⁺⁺_ = reshape(Z⁺⁺, (size(Z⁺⁺,1), size(Z⁺⁺,2),1))
@@ -32,7 +27,7 @@ function elemental!(pol_type, SFI::Bool,
     Z⁻⁺_ = reshape(Z⁻⁺, (size(Z⁺⁺,1), size(Z⁺⁺,2),1))
 
     D = Diagonal(arr_type(repeat(pol_type.D, size(qp_μ,1))))
-    I₀_NquadN = arr_type(zeros(FT,size(qp_μN,1)));
+    I₀_NquadN = arr_type(zeros(FT,size(qp_μN,1))); #incident irradiation
     i_start   = pol_type.n*(iμ₀-1) + 1 
     i_end     = pol_type.n*iμ₀
     I₀_NquadN[iμ₀Nstart:i_end] = pol_type.I₀
@@ -56,28 +51,23 @@ function elemental!(pol_type, SFI::Bool,
 
         # Calculate r⁻⁺ and t⁺⁺
         
-        # Version 1: no absorption in batch mode (like before), need to separate these modes
-        if maximum(dτ_λ) < 0.0001 
-            #@show "Chose simple elemental"
-            #@show typeof(τ_sum)
+        # Version 1: no absorption in batch mode (initiation of a single scattering layer with no or low absorption)
+        if maximum(dτ_λ) < 0.0001   
+            # R⁻⁺₀₁(λ) = M⁻¹(0.5ϖₑ(λ)Z⁻⁺C)δ (See Eqs.7 in Raman paper draft)
             r⁻⁺[:,:,:] .= d_qp * Z⁻⁺ * (d_wct * dτ)
+            # T⁺⁺₀₁(λ) = {I-M⁻¹[I - 0.5*ϖₑ(λ)Z⁺⁺C]}δ (See Eqs.7 in Raman paper draft)
             t⁺⁺[:,:,:] .= I_static - (d_qp * ((I_static - Z⁺⁺ * d_wct) * dτ))
             if SFI
                 # Reminder: Add equation here what it does
-                expk = exp.(-τ_sum/qp_μ[iμ₀])
-
+                expk = exp.(-τ_sum/qp_μ[iμ₀]) #exp(-τ(z)/μ₀)
+                # J₀⁺ = 0.5[1+δ(m,0)]M⁻¹ϖₑ(λ)Z⁺⁺τI₀exp(-τ(z)/μ₀)
                 J₀⁺[:,1,:] .= ((d_qp * Z⁺⁺ * I₀_NquadN) * wct0) .* expk'
+                # J₀⁻ = 0.5[1+δ(m,0)]M⁻¹ϖₑ(λ)Z⁻⁺τI₀exp(-τ(z)/μ₀)
                 J₀⁻[:,1,:] .= ((d_qp * Z⁻⁺ * I₀_NquadN) * wct0) .* expk'
               
             end
-            #ii = pol_type.n*(iμ0-1)+1
-            #@show 'A',iμ0,  r⁻⁺[1,ii,1]/(J₀⁻[1,1,1]*wt_μ[iμ0]), r⁻⁺[1,ii,1], J₀⁻[1,1,1]*wt_μ[iμ0], J₀⁺[1,1,1]*wt_μ[iμ0]
-    
-        else
-            #@show "Chose accurate elemental",  maximum(dτ_λ)   
-            #@show('B')
+        else #Version 2: More computationally intensive definition of a single scattering layer with variable (0-∞) absorption
             # Version 2: with absorption in batch mode, low tau_scatt but higher tau_total, needs different equations
-            # This is not yet GPU ready as it has element wise operations (should work for CPU)
             
             kernel! = get_elem_rt!(device)
             event = kernel!(r⁻⁺, t⁺⁺, ϖ_λ, dτ_λ, Z⁻⁺, Z⁺⁺, qp_μN, wct, ndrange=size(r⁻⁺)); 
@@ -109,17 +99,14 @@ function elemental!(pol_type, SFI::Bool,
         # Note: τ is not defined here
         t⁺⁺[:] = Diagonal{exp(-τ ./ qp_μN)}
         t⁻⁻[:] = Diagonal{exp(-τ ./ qp_μN)}
-        #if SFI
-        #    J₀⁺ = I₀_NquadN * exp(-τ_sum/qp_μ[iμ0])
-        #end
     end    
 
     @pack! added_layer = r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, J₀⁺, J₀⁻   
 end
 
 @kernel function get_elem_rt!(r⁻⁺, t⁺⁺, ϖ_λ, dτ_λ, Z⁻⁺, Z⁺⁺, qp_μN, wct2)
-    i, j, n = @index(Global, NTuple) ##Suniti: What are Global and Ntuple?
-    #D = arr_type(Diagonal(repeat(pol_type.D, size(qp_μ4)[1]/pol_type.n))) #Suniti, #Chr: needs to be outside if using GPU
+    i, j, n = @index(Global, NTuple) 
+ 
     if (wct2[j]>1.e-8) 
         # 𝐑⁻⁺(μᵢ, μⱼ) = ϖ ̇𝐙⁻⁺(μᵢ, μⱼ) ̇(μⱼ/(μᵢ+μⱼ)) ̇(1 - exp{-τ ̇(1/μᵢ + 1/μⱼ)}) ̇𝑤ⱼ
         r⁻⁺[i,j,n] = ϖ_λ[n] * Z⁻⁺[i,j] * (qp_μN[j] / (qp_μN[i] + qp_μN[j])) * (1 - exp(-dτ_λ[n] * ((1 / qp_μN[i]) + (1 / qp_μN[j])))) * (wct2[j]) 
@@ -167,25 +154,20 @@ end
 
     if (i>=i_start) && (i<=i_end)
         ctr = i-i_start+1
-        #J₀⁺[i,n] = exp(-dτ_λ[n] / qp_μ4[i]) * pol_type.I₀[ctr]
-        # 𝐓⁺⁺(μᵢ, μᵢ) = (exp{-τ/μᵢ} + ϖ ̇𝐙⁺⁺(μᵢ, μᵢ) ̇(τ/μᵢ) ̇exp{-τ/μᵢ}) ̇𝑤ᵢ
-        #J₀⁺[i, 1, n] = testCF * ϖ_λ[n] * (Z⁺⁺[i,i_start:i_end]'*pol_type.I₀) * (dτ_λ[n] / qp_μN[i]) * exp.(-dτ_λ[n] / qp_μN[i])
+        # J₀⁺ = 0.25*(1+δ(m,0)) * ϖ(λ) * Z⁺⁺ * I₀ * (dτ(λ)/μ₀) * exp(-dτ(λ)/μ₀)
         J₀⁺[i, 1, n] = wct02 * ϖ_λ[n] * Z⁺⁺_I₀ * (dτ_λ[n] / qp_μN[i]) * exp(-dτ_λ[n] / qp_μN[i])
     else
-        #J₀⁺[i, 1, n] = testCF * ϖ_λ[n] * (Z⁺⁺[i,i_start:i_end]'*pol_type.I₀) * (qp_μN[i_start] / (qp_μN[i] - qp_μN[i_start])) * (exp(-dτ_λ[n] / qp_μN[i]) - exp(-dτ_λ[n] / qp_μN[i_start]))
+        # J₀⁺ = 0.25*(1+δ(m,0)) * ϖ(λ) * Z⁺⁺ * I₀ * [μ₀ / (μᵢ - μ₀)] * [exp(-dτ(λ)/μᵢ) - exp(-dτ(λ)/μ₀)]
         J₀⁺[i, 1, n] = wct02 * ϖ_λ[n] * Z⁺⁺_I₀ * (qp_μN[i_start] / (qp_μN[i] - qp_μN[i_start])) * (exp(-dτ_λ[n] / qp_μN[i]) - exp(-dτ_λ[n] / qp_μN[i_start]))
     end
-    # 𝐑⁻⁺(μᵢ, μⱼ) = ϖ ̇𝐙⁻⁺(μᵢ, μⱼ) ̇(μⱼ/(μᵢ+μⱼ)) ̇(1 - exp{-τ ̇(1/μᵢ + 1/μⱼ)}) ̇𝑤ⱼ
-    #J₀⁻[i, 1, n] = ϖ_λ[n] * (Z⁻⁺[i,i_start:i_end]'*pol_type.I₀) * (qp_μN[i_start] / (qp_μN[i] + qp_μN[i_start])) * (1 - exp.(-dτ_λ[n] * ((1 / qp_μN[i]) + (1 / qp_μN[i_start]))))
+    #J₀⁻ = 0.25*(1+δ(m,0)) * ϖ(λ) * Z⁻⁺ * I₀ * [μ₀ / (μᵢ + μ₀)] * [1 - exp{-dτ(λ)(1/μᵢ + 1/μ₀)}]
     J₀⁻[i, 1, n] = wct02 * ϖ_λ[n] * Z⁻⁺_I₀ * (qp_μN[i_start] / (qp_μN[i] + qp_μN[i_start])) * (1 - exp(-dτ_λ[n] * ((1 / qp_μN[i]) + (1 / qp_μN[i_start]))))
 
-    #J₀⁺[i, 1, n] *= testCF * exp(-τ_sum[n]/qp_μN[i_start])
-    #J₀⁻[i, 1, n] *= testCF * exp(-τ_sum[n]/qp_μN[i_start])
     J₀⁺[i, 1, n] *= exp(-τ_sum[n]/qp_μN[i_start])
     J₀⁻[i, 1, n] *= exp(-τ_sum[n]/qp_μN[i_start])
 
     if ndoubl >= 1
-        J₀⁻[i, 1, n] = D[i,i]*J₀⁻[i, 1, n] #Suniti: define D = Diagonal{1,1,-1,-1,...Nquad times}
+        J₀⁻[i, 1, n] = D[i,i]*J₀⁻[i, 1, n] #D = Diagonal{1,1,-1,-1,...Nquad times}
     end        
 end
 
@@ -193,14 +175,14 @@ end
     i, j, n = @index(Global, NTuple)
 
     if ndoubl < 1
-        ii = mod(i, pol_n) #Suniti
-        jj = mod(j, pol_n) #Suniti
-        if ((ii <= 2) & (jj <= 2)) | ((ii > 2) & (jj > 2)) #Suniti
+        ii = mod(i, pol_n) 
+        jj = mod(j, pol_n) 
+        if ((ii <= 2) & (jj <= 2)) | ((ii > 2) & (jj > 2)) 
             r⁺⁻[i,j,n] = r⁻⁺[i,j,n]
             t⁻⁻[i,j,n] = t⁺⁺[i,j,n]
         else
-            r⁺⁻[i,j,n] = -r⁻⁺[i,j,n] #Suniti: added - sign
-            t⁻⁻[i,j,n] = -t⁺⁺[i,j,n] #Suniti: added - sign
+            r⁺⁻[i,j,n] = -r⁻⁺[i,j,n] 
+            t⁻⁻[i,j,n] = -t⁺⁺[i,j,n] 
         end
     else
         if mod(i, pol_n) > 2
@@ -218,14 +200,3 @@ end
         end 
     end
 end
-
-#function elemental!(pol_type, SFI, iμ0, τ_sum, dτ_λ, dτ, ϖ_λ, ϖ, Z⁺⁺, Z⁻⁺, m, 
-#                              ndoubl, scatter, qp_μ, wt_μ, 
-#                              added_layer::AddedLayer{FT}, 
-#                              I_static,
-#                              arr_type,
-#                              architecture) where {FT}
-#    
-#    elemental_helper!(pol_type, SFI, iμ0, τ_sum, dτ_λ, dτ, ϖ_λ, ϖ, Z⁺⁺, Z⁻⁺, m, ndoubl, scatter, qp_μ, wt_μ, added_layer, I_static, arr_type, architecture)
-#    synchronize_if_gpu()
-#end
