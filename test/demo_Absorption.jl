@@ -20,7 +20,7 @@ hitran_data = read_hitran(artifact("CO2"), mol=2, iso=1, ν_min=6000, ν_max=640
 modelCPU = make_hitran_model(hitran_data, Voigt(), wing_cutoff = 40, CEF=HumlicekWeidemann32SDErrorFunction(), architecture=CPU())
 modelGPU = make_hitran_model(hitran_data, Voigt(), wing_cutoff = 40, CEF=HumlicekWeidemann32SDErrorFunction(), architecture=GPU())
 
-# ν_grid = 6000:0.01:6400
+grid = 6000:0.01:6400
 # pressures = 250:250:1250
 # temperatures = 100:75:400
 
@@ -43,3 +43,5 @@ modelCPU = make_hitran_model(hitran_data, Voigt(), wing_cutoff = 40, CEF=Humlice
 
 # Compute the cross-section with autodifferentiation
 value, derivs = absorption_cross_section(modelCPU, 6000:0.01:6400, 1000.1, 296.1, true, wavelength_flag=false);
+
+absorption_cross_section(modelCPU, grid, 1000.1, 296.1) ≈ reverse(absorption_cross_section(modelCPU, reverse(1e7 ./ collect(grid)), 1000.1, 296.1, wavelength_flag=true))

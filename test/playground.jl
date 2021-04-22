@@ -166,49 +166,115 @@
 
 # end
 
-using Revise
-using Profile
-using RadiativeTransfer
-using RadiativeTransfer.CrossSection
+# using Revise
+# using Profile
+# using RadiativeTransfer
+# using RadiativeTransfer.CrossSection
 
-using BenchmarkTools
+# using BenchmarkTools
 
-test_ht = read_hitran("/home/rjeyaram/RadiativeTransfer/test/helper/CO2.data", ν_min=6000, ν_max=6400)
+# test_ht = read_hitran("/home/rjeyaram/RadiativeTransfer/test/helper/CO2.data", ν_min=6000, ν_max=6400)
 
-model4 = make_hitran_model(test_ht, Voigt(), architecture = Architectures.CPU())
-model4_GPU = make_hitran_model(test_ht, Voigt(), architecture = Architectures.GPU())
+# model4 = make_hitran_model(test_ht, Voigt(), architecture = Architectures.CPU())
+# model4_GPU = make_hitran_model(test_ht, Voigt(), architecture = Architectures.GPU())
 
-ν_grid = 6000:0.01:6400
-pressures = 250:250:1250
-temperatures = 100:75:400
+# ν_grid = 6000:0.01:6400
+# pressures = 250:250:1250
+# temperatures = 100:75:400
 
-model = make_interpolation_model(test_ht, Voigt(), ν_grid, pressures, temperatures, wing_cutoff = 40, CEF=ErfcHumliErrorFunctionVoigt())
+# model = make_interpolation_model(test_ht, Voigt(), ν_grid, pressures, temperatures, wing_cutoff = 40, CEF=ErfcHumliErrorFunctionVoigt())
 
-matrix = Array(model.itp)
+# matrix = Array(model.itp)
 
-res = absorption_cross_section(model, 6000:0.01:6400, 1000.1, 296.1)
+# res = absorption_cross_section(model, 6000:0.01:6400, 1000.1, 296.1)
 
-f(x) = sum(sin, x) + prod(tan, x) * sum(sqrt, x);
-x = rand(4);
+# f(x) = sum(sin, x) + prod(tan, x) * sum(sqrt, x);
+# x = rand(4);
 
-result = DiffResults.HessianResult(x)
-result = ForwardDiff.hessian!(result, f, x);
+# result = DiffResults.HessianResult(x)
+# result = ForwardDiff.hessian!(result, f, x);
 
-const ν_grid = 6000:0.01:6400
+# const ν_grid = 6000:0.01:6400
 
-absorption_cross_section(model4, ν_grid, 1000.1, 296.1)
-@btime absorption_cross_section(model4_GPU, )
+# absorption_cross_section(model4, ν_grid, 1000.1, 296.1)
+# @btime absorption_cross_section(model4_GPU, )
 
-@time absorption_cross_section(model4_GPU, ν_grid, 1000.1, 296.1)
+# @time absorption_cross_section(model4_GPU, ν_grid, 1000.1, 296.1)
 
-@code_warntype testReturn(3)
+# @code_warntype testReturn(3)
 
 
-x = [1000.1, 296.1]
-result = DiffResults.HessianResult(x)
+# x = [1000.1, 296.1]
+# result = DiffResults.HessianResult(x)
 
-result = ForwardDiff.hessian!(result, CrossSection.acs_shorthand, x);
+# result = ForwardDiff.hessian!(result, CrossSection.acs_shorthand, x);
 
-x = [0.3, 6.82, 1.3, 0.00001]
-result = DiffResults.JacobianResult(zeros(4568), x)
-ForwardDiff.jacobian!(result, Scattering.phase_shorthand, x);
+# x = [0.3, 6.82, 1.3, 0.00001]
+# result = DiffResults.JacobianResult(zeros(4568), x)
+# ForwardDiff.jacobian!(result, Scattering.phase_shorthand, x);
+
+
+# using Revise
+# using Plots
+# using RadiativeTransfer
+# using RadiativeTransfer.vSmartMOM
+# using CUDA
+# using ForwardDiff
+# n = 20;
+# nSpec = 100;
+# RM = rand(n,n,nSpec)
+# x = [1.0,2.0]
+# function testInv_CPU(x, RM=RM)
+#     temp = x[1]* RM .+ x[2]
+#     B = similar(temp);
+#     vSmartMOM.batch_inv!(B,temp)
+#     @show typeof(B)
+#     return B
+# end
+# function testInv_GPU(x, RM=RM)
+#     temp = CuArray(x[1]* RM .+ x[2])
+#     B = CuArray(similar(temp));
+#     vSmartMOM.batch_inv!(B,temp)
+#     synchronize()
+#     @show typeof(B)
+#     return B
+# end
+
+# dfdx_CPU = ForwardDiff.jacobian(testInv_CPU, x)
+# dfdx_GPU = ForwardDiff.jacobian(testInv_GPU, x)
+
+using RadiativeTransfer, RadiativeTransfer.Absorption, Interpolations, Statistics
+
+function apply_instrument( input_grid::AbstractRange,
+                               input_spectra,
+                           output_grid::Array{<:Real,1})
+    """
+down-scales the co-domain of spectral cross-sections grid to the instrument grid
+"""
+    
+
+
+    
+    itp = interpolate(input_spectra, BSpline(Cubic(Line(OnGrid()))))
+    sitp = scale(itp, input_grid)
+    output_spectra = sitp(output_grid)
+       return output_spectra
+#    return itp(output_spectral_grid)
+end # end of function apply_instrument
+
+
+ν_min, δν, ν_max = 6000, 0.01, 6400
+p, T = 500, 273
+molec_num, iso_num = 1, 1
+filename = "../H2O_S.data"
+
+hitran_table = CrossSection.read_hitran(artifact("CO2"), mol=molec_num, iso=iso_num, ν_min=ν_min, ν_max=ν_max)
+model = make_hitran_model(hitran_table, Voigt(), architecture=GPU());
+grid = ν_min:δν:ν_max;
+cross_sections = absorption_cross_section(model, grid, p, T)
+
+# define the output grid
+out_grid = collect(ν_min:0.1:ν_max)
+#in_grid = collect(grid)
+in_grid = grid;
+out_spectra = apply_instrument(in_grid, cross_sections, out_grid)
