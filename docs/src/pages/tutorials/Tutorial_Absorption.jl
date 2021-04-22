@@ -1,8 +1,8 @@
-# # Cross-Section Module Tutorial: Spectral Line Shapes
+# # Absorption: Spectral Line Shapes
 
 # Part of ESE 156 Remote Sensing Class; 2020; Christian Frankenberg
 
-# The purpose of this tutorial is to learn how to compute line-shapes (in our case mostly of rotational-vibrational transition lines), what processes determine line-shapes and how the dependencies in the line-shape on pressure and temperature could actually be used to our advantage in a retrieval system.
+# The purpose of this tutorial is to demonstrate how to compute line-shapes (in our case mostly of rotational-vibrational transition lines), what processes determine line-shapes and how the dependencies in the line-shape on pressure and temperature could actually be used to our advantage in a retrieval system.
 
 # ### Basic Tools
 
@@ -120,9 +120,9 @@ using RadiativeTransfer.Absorption
 #-------------------------
 
 co2_par = Absorption.read_hitran(artifact("CO2"), mol=2, iso=1, ν_min=6214.4, ν_max=6214.8);
-line_voigt   = make_hitran_model(co2_par, Voigt())
-line_doppler = make_hitran_model(co2_par, Doppler())
-line_lorentz = make_hitran_model(co2_par, Lorentz())
+line_voigt   = make_hitran_model(co2_par, Voigt(), architecture=CPU())
+line_doppler = make_hitran_model(co2_par, Doppler(), architecture=CPU())
+line_lorentz = make_hitran_model(co2_par, Lorentz(), architecture=CPU())
 ## Specify our wavenumber grid
 ν = 6210:0.001:6220;
 
@@ -168,7 +168,7 @@ xlabel!("Wavenumber (cm⁻¹)")
 #-------------------------
 
 co2_par_band = Absorption.read_hitran(artifact("CO2"), mol=2, iso=1, ν_min=6000.0, ν_max=6400.0);
-band_voigt   = make_hitran_model(co2_par_band , Voigt())
+band_voigt   = make_hitran_model(co2_par_band , Voigt(), architecture=CPU())
 
 #-------------------------
 

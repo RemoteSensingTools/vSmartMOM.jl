@@ -5,7 +5,7 @@ using ..Architectures: devi, default_architecture
 
 """
 Given the hitran data and necessary parameters, calculate an absorption cross-section at the
-given pressure, temperature, and grid of wavelengths (or wavenumbers)
+given pressure, temperature, and grid of wavenumbers (or wavelengths)
 """
 function compute_absorption_cross_section(
                 # Required
@@ -113,33 +113,10 @@ function compute_absorption_cross_section(
 end
 
 """
-    $(FUNCTIONNAME)(model::HitranModel, grid::AbstractRange{<:Real}, pressure::Real, temperature::Real; wavelength_flag::Bool=false)
-
-Given a HitranModel, return the calculated absorption cross-section at the given pressure, 
-temperature, and grid of wavelengths (or wavenumbers)
-
-"""
-# function compute_absorption_cross_section(
-#                 # Required
-#                 model::HitranModel,          # Model to use in this cross section calculation 
-#                                              # (Calculation from Hitran data vs. using Interpolator)
-#                 # Wavelength [nm] or wavenumber [cm-1] grid (modify using wavelength_flag)
-#                 grid::Union{AbstractRange{<:Real}, AbstractArray},  # Can be range OR array
-#                 pressure::Real,              # actual pressure [hPa]
-#                 temperature::Real;           # actual temperature [K]    
-#                 # Optionals
-#                 wavelength_flag::Bool=false  # Use wavelength in nm (true) or wavenumber cm-1 units (false)       
-#                 )
-#     FT = typeof(AbstractFloat(model.vmr))
-#     return compute_absorption_cross_section(model.hitran, model.broadening, collect(grid), pressure, temperature, wavelength_flag, model.wing_cutoff, model.vmr, model.CEF, model.architecture)
-
-# end
-
-"""
     $(FUNCTIONNAME)(model::InterpolationModel, grid::AbstractRange{<:Real}, pressure::Real, temperature::Real; wavelength_flag::Bool=false)
 
 Given an Interpolation Model, return the interpolated absorption cross-section at the given pressure, 
-temperature, and grid of wavelengths (or wavenumbers)
+temperature, and grid of wavenumbers (or wavelengths)
 
 """
 function compute_absorption_cross_section(
