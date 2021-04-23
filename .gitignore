@@ -8,6 +8,7 @@ packages
 *.f90
 .vscode
 Manifest.toml
+docs/Manifest.toml
 *.csv
 *.pdf
 *.dat
