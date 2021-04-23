@@ -8,8 +8,8 @@
 [docs-latest-img]: https://img.shields.io/badge/docs-latest-blue.svg
 [docs-latest-url]: https://rupeshjey.github.io/RadiativeTransfer.jl/dev/
 
-[unit-tests-img]: https://travis-ci.org/RupeshJey/RadiativeTransfer.jl.svg?branch=master
-[unit-tests-url]: https://travis-ci.org/github/RupeshJey/RadiativeTransfer.jl
+[unit-tests-img]: https://github.com/RupeshJey/RadiativeTransfer.jl/actions/workflows/AutomatedTests.yml/badge.svg
+[unit-tests-url]: https://github.com/RupeshJey/RadiativeTransfer.jl/actions/workflows/AutomatedTests.yml
 
 [codecov-img]: https://codecov.io/gh/RupeshJey/RadiativeTransfer.jl/branch/master/graph/badge.svg
 [codecov-url]: https://codecov.io/gh/RupeshJey/RadiativeTransfer.jl
@@ -49,7 +49,6 @@ For in-depth examples, tutorials, and implementation details, please see the com
   1. Enables 1D vectorized plane-parallel RT modeling based on the Matrix Operator Method.
   2. Incorporates fast, high fidelity simulations of scattering atmospheres containing haze and clouds – including pressure- and temperature-resolved absorption profiles of gaseous species in the atmosphere. 
   3. Enables GPU-accelerated computations of the resulting hyperspectral reflectances/transmittances.
-  <br>
   
   Key functions: 
 
