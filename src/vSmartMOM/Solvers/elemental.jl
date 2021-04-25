@@ -66,7 +66,8 @@ function elemental!(pol_type, SFI::Bool,
                 J₀⁻[:,1,:] .= ((d_qp * Z⁻⁺ * I₀_NquadN) * wct0) .* expk'
               
             end
-        else #Version 2: More computationally intensive definition of a single scattering layer with variable (0-∞) absorption
+        else 
+            #Version 2: More computationally intensive definition of a single scattering layer with variable (0-∞) absorption
             # Version 2: with absorption in batch mode, low tau_scatt but higher tau_total, needs different equations
             
             kernel! = get_elem_rt!(device)
@@ -83,25 +84,18 @@ function elemental!(pol_type, SFI::Bool,
             #@show 'B',iμ0,  r⁻⁺[1,ii,1]/(J₀⁻[1,1,1]*wt_μ[iμ0]), r⁻⁺[1,ii,1], J₀⁻[1,1,1]*wt_μ[iμ0], J₀⁺[1,1,1]*wt_μ[iμ0]
             synchronize_if_gpu()
         end
-        kernel! = apply_D_elemental!(device)
-        event = kernel!(ndoubl, pol_type.n, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻, ndrange=size(r⁻⁺));
-        wait(device, event)
-        synchronize_if_gpu()
+        # Apply D Matrix
+        apply_D_matrix_elemental!(ndoubl, pol_type.n, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻)
+
         if SFI
-            kernel! = apply_D_elemental_SFI!(device)
-            event = kernel!(ndoubl, pol_type.n, J₀⁻, ndrange=size(J₀⁻));
-            wait(device, event)
-            synchronize_if_gpu()
-        end
-        #@show(r⁻⁺[1,1,1], t⁺⁺[1,1,1], J₀⁻[1,1], J₀⁺[1,1])
-        
+            apply_D_matrix_elemental_SFI!(ndoubl, pol_type.n, J₀⁻)
+        end      
     else 
         # Note: τ is not defined here
         t⁺⁺[:] = Diagonal{exp(-τ ./ qp_μN)}
         t⁻⁻[:] = Diagonal{exp(-τ ./ qp_μN)}
     end    
-
-    @pack! added_layer = r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, J₀⁺, J₀⁻   
+    #@pack! added_layer = r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, J₀⁺, J₀⁻   
 end
 
 @kernel function get_elem_rt!(r⁻⁺, t⁺⁺, ϖ_λ, dτ_λ, Z⁻⁺, Z⁺⁺, qp_μN, wct2)
@@ -198,5 +192,43 @@ end
         if mod(i, pol_n) > 2
             J₀⁻[i, 1, n] = - J₀⁻[i, 1, n]
         end 
+    end
+end
+
+function apply_D_matrix_elemental!(ndoubl::Int, n_stokes::Int, r⁻⁺::CuArray{FT,3}, t⁺⁺::CuArray{FT,3}, r⁺⁻::CuArray{FT,3}, t⁻⁻::CuArray{FT,3}) where {FT}
+    applyD_kernel! = apply_D_elemental!(KernelAbstractions.CUDADevice())
+    event = applyD_kernel!(ndoubl,n_stokes, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻, ndrange=size(r⁻⁺));
+    wait(KernelAbstractions.CUDADevice(), event);
+    synchronize_if_gpu();
+    return nothing
+end
+
+function apply_D_matrix_elemental!(ndoubl::Int, n_stokes::Int, r⁻⁺::Array{FT,3}, t⁺⁺::Array{FT,3}, r⁺⁻::Array{FT,3}, t⁻⁻::Array{FT,3}) where {FT}
+    applyD_kernel! = apply_D_elemental!(KernelAbstractions.CPU())
+    event = applyD_kernel!(ndoubl,n_stokes, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻, ndrange=size(r⁻⁺));
+    wait(KernelAbstractions.CPU(), event);
+    return nothing
+end
+
+function apply_D_matrix_elemental_SFI!(ndoubl::Int, n_stokes::Int, J₀⁻::CuArray{FT,3}) where {FT}
+    if ndoubl > 1
+        return nothing
+    else 
+        applyD_kernel! = apply_D_elemental_SFI!(KernelAbstractions.CUDADevice())
+        event = applyD_kernel!(ndoubl,n_stokes, J₀⁻, ndrange=size(J₀⁻));
+        wait(KernelAbstractions.CUDADevice(), event);
+        synchronize();
+        return nothing
+    end
+end
+    
+function apply_D_matrix_elemental_SFI!(ndoubl::Int, n_stokes::Int, J₀⁻::Array{FT,3}) where {FT}
+    if ndoubl > 1
+        return nothing
+    else 
+        applyD_kernel! = apply_D_elemental_SFI!(KernelAbstractions.CPU())
+        event = applyD_kernel!(ndoubl,n_stokes, J₀⁻, ndrange=size(J₀⁻));
+        wait(KernelAbstractions.CPU(), event);
+        return nothing
     end
 end

@@ -37,10 +37,10 @@ function rt_run(pol_type::AbstractPolarizationType,   # Polarization type (IQUV)
     T_SFI = zeros(FT_dual, length(vza), pol_type.n, nSpec)
 
     # Notify user of processing parameters
-    println("Processing on:\t", architecture)
-    println("With FT:\t", FT)
-    @show SFI
-    println("Dimensions(n,n,nSpec) = (", NquadN,"," ,NquadN,"," ,nSpec,")")
+    @info "Processing on:" architecture
+    @info "With FT:"  FT
+    @info "Source Function Integration " SFI
+    @info "Dimensions " NquadN,NquadN,nSpec
     println("Creating arrays...")
 
     # Create arrays
