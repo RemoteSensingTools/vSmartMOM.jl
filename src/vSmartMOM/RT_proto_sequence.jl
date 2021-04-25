@@ -24,6 +24,6 @@ parameters = vSmartMOM.default_parameters();
 
 # Generates all the derived attributes from above parameters
 model = model_from_parameters(parameters);
-model.params.architecture = RadiativeTransfer.Architectures.GPU();
+#model.params.architecture = RadiativeTransfer.Architectures.GPU();
 
 R = vSmartMOM.rt_run(model)
