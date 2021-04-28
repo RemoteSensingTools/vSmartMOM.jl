@@ -51,11 +51,10 @@ function create_surface_layer!(lambertian::LambertianSurfaceScalar{FT},
 
         
         added_layer.r⁻⁺ .= R_surf;
-        added_layer.r⁻⁺ .= 0;
+        added_layer.r⁺⁻ .= 0;
         added_layer.t⁺⁺ .= T_surf;
         added_layer.t⁻⁻ .= T_surf;
 
-        
     else
         added_layer.r⁻⁺[:] .= 0;
         added_layer.r⁻⁺[:] .= 0;
