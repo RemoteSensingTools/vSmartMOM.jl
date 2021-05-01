@@ -437,10 +437,12 @@ and a wavelength of incoming photon `λ`, it computes the phase function `f` (fo
 
 ## Keywords
 ```
-polarization_type = Stokes_IQUV()   # Polarization type
-l_max = 20 # Trunction length for legendre terms
-Δ_angle = 2 # Exclusion angle for forward peak (in fitting procedure)
-truncation_type = δBGE(20, 2)
+polarization_type = Stokes_IQUV(),   # Polarization type
+l_max = 20, # Trunction length for legendre terms
+Δ_angle = 2, # Exclusion angle for forward peak (in fitting procedure)
+truncation_type = δBGE(20, 2),
+miemethod = NAI2(), # for make_mie_model
+N = 2000, # how many angles in [-π/2, π/2) to calculate over
 ```
 ## Notes
 The phase function returned is
@@ -460,13 +462,16 @@ optical thickness and the single scattering albedo of the scattering particle.
 See Sanghavi and Stephens (2015) for further details.
 """
 function phasefunction(aerosol, λ;
-        polarization_type = Stokes_IQUV()   # Polarization type
-        l_max = 20 # Trunction length for legendre terms
-        Δ_angle = 2 # Exclusion angle for forward peak (in fitting procedure)
-        truncation_type = δBGE(20, 2)
+        polarization_type = Stokes_IQUV(),   # Polarization type
+        l_max = 20, # Trunction length for legendre terms
+        Δ_angle = 2, # Exclusion angle for forward peak (in fitting procedure)
+        truncation_type = δBGE(20, 2),
+        miemethod = NAI2(), # for make_mie_model
+        N = 2000, # how many angles in [-π/2, π/2) to calculate over
     )
-        aerosol_optics_NAI2 = compute_aerosol_optical_properties(model_NAI2);
-    μ, w_μ = gausslegendre(2000)
+    model_NAI2 = make_mie_model(miemethod, aerosol, λ, polarization_type, truncation_type);
+    aerosol_optics_NAI2 = compute_aerosol_optical_properties(model_NAI2);
+    μ, w_μ = gausslegendre(N)
     f₁₁, f₁₂, f₂₂, f₃₃, f₃₄, f₄₄ = Scattering.reconstruct_phase(aerosol_optics_NAI2.greek_coefs, μ);
     f = w_μ .* f₁₁
     return μ, f
