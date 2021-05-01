@@ -40,6 +40,7 @@ export compute_B, compute_ab, GreekCoefs, comp_ab, compute_mie_π_τ!,
        compute_ref_aerosol_extinction,
        ConjugateTransposePairs, AbstractPolarizationType, 
        AbstractAerosolType, AbstractAerosolType, MieModel, 
-       AbstractTruncationType
+       AbstractTruncationType,
+       phasefunction
 
 end
