@@ -10,6 +10,8 @@ You can calculate a phase function in three steps:
 2. Use [`make_mie_model`](@ref) to set up all calculation parameters
 3. Use [`compute_aerosol_optical_properties`](@ref) to perform the phase-function calculation using the defined model settings
 
+Equivalently, you can skip steps 2 and 3 and directly use the function [`phasefunction`](@ref) with your aerosol.
+
 ## Example
 
 ```julia
@@ -99,6 +101,11 @@ make_mie_model
 
 ```@docs
 compute_aerosol_optical_properties
+```
+
+## Phase function
+```@docs
+phasefunction
 ```
 
 ## Types
