@@ -423,3 +423,52 @@ function compute_Z_moments(mod::AbstractPolarizationType, μ, greek_coefs::Greek
     # Return Z-moments
     return arr_type(𝐙⁺⁺), arr_type(𝐙⁻⁺)
 end
+
+"""
+    phasefunction(aerosol, λ; kwargs...) -> μ, f
+Convenience function that given an `aerosol` (output of [`make_univariate_aerosol`](@ref),
+and a wavelength of incoming photon `λ`, it computes the phase function `f` (for the intensity).
+`μ` is the cosine of the angle, so `θ = acos.(μ)`.
+
+`f` is normalized such that 
+```math
+\frac{1}{4\pi}\int_0^{2\pi}d\phi \int_{-1}^1 p(\mu) d\mu  = 1
+```
+
+## Keywords
+```
+polarization_type = Stokes_IQUV()   # Polarization type
+l_max = 20 # Trunction length for legendre terms
+Δ_angle = 2 # Exclusion angle for forward peak (in fitting procedure)
+truncation_type = δBGE(20, 2)
+```
+## Notes
+The phase function returned is
+In general, A phase function represents the spatial distribution of light scattered by a particle.
+It does not have any effect on the amount of light actually scattered by the particle (that quantity
+is determined by the scattering cross section of the particle). As a result, the phase function is
+a normalized distribution, i.e., the integral of the phase function over all scattering angles is 1.
+Truncation is applied to highly forward-peaked phase functions in order to reduce the polynomial
+order required to represent its anisotropy. This is done by assuming that a fraction f of the light
+scattered in the forward direction is light that has not interacted with the particle at all.
+As a result, this fraction no longer contributes to the integral of the phase function over all angles.
+In order to normalize the truncated phase function we divide it by (1-f). Of course,
+this extra factor has to be balanced by a corresponding term in the numerator of the corresponding
+radiative transfer equation. This is done by absorbing the numerator into a modified form for the
+optical thickness and the single scattering albedo of the scattering particle.
+
+See Sanghavi and Stephens (2015) for further details.
+"""
+function phasefunction(aerosol, λ;
+        polarization_type = Stokes_IQUV()   # Polarization type
+        l_max = 20 # Trunction length for legendre terms
+        Δ_angle = 2 # Exclusion angle for forward peak (in fitting procedure)
+        truncation_type = δBGE(20, 2)
+    )
+        aerosol_optics_NAI2 = compute_aerosol_optical_properties(model_NAI2);
+    μ, w_μ = gausslegendre(2000)
+    f₁₁, f₁₂, f₂₂, f₃₃, f₃₄, f₄₄ = Scattering.reconstruct_phase(aerosol_optics_NAI2.greek_coefs, μ);
+    f = w_μ .* f₁₁
+    return μ, f
+end
+
