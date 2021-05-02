@@ -167,7 +167,7 @@ function compute_ref_aerosol_extinction(model::MieModel{FDT}, FT2::Type=Float64)
     @unpack size_distribution, nquad_radius, nᵣ, nᵢ, r_max =  aerosol
     
     # Imaginary part of the refractive index must be ≥ 0
-    @assert nᵢ ≥ 0
+    @assert nᵢ ≥ 0 "Imaginary part of the refractive index must be ≥ 0 (definition)"
 
     # Get the refractive index's real part type
     FT = eltype(nᵣ);
@@ -235,4 +235,162 @@ function compute_ref_aerosol_extinction(model::MieModel{FDT}, FT2::Type=Float64)
     
     # Return the bulk extinction coeffitient
     return bulk_C_ext
+end
+
+"""
+    $(FUNCTIONNAME)(aerosol::UnivariateAerosol, λ)
+
+Compute phase function from aerosol distribution with log-normal mean μ [µm] and σ
+Output: μ, w_μ, P, C_ext, C_sca, g
+"""
+function phase_function(aerosol::UnivariateAerosol, λ) 
+
+    # Extract variables from aerosol struct:
+    @unpack size_distribution, nquad_radius, nᵣ, nᵢ, r_max =  aerosol
+    
+    # Imaginary part of the refractive index must be ≥ 0
+    @assert nᵢ ≥ 0 "Imaginary part of the refractive index must be ≥ 0 (definition)"
+
+    # Get the refractive index's real part type
+    FT = eltype(nᵣ);
+    # @assert FT == Float64 "Aerosol computations require 64bit"
+    # Get radius quadrature points and weights (for mean, thus normalized):
+    r, wᵣ = gauleg(nquad_radius, 0.0, r_max ; norm=true) 
+    
+    # Wavenumber
+    k = 2π / λ  
+
+    # Size parameter
+    x_size_param = k * r # (2πr/λ)
+
+    # Compute n_max for largest size:
+    n_max = get_n_max(maximum(x_size_param))
+
+    # Determine max amount of Gaussian quadrature points for angle dependence of 
+    # phase functions:
+    n_mu = 2n_max - 1;
+
+    # Obtain Gauss-Legendre quadrature points and weights for phase function
+    μ, w_μ = gausslegendre(n_mu)
+
+    # Compute π and τ functions
+    leg_π, leg_τ = compute_mie_π_τ(μ, n_max)
+
+    # Pre-allocate arrays:
+    S₁    = zeros(Complex{FT}, n_mu, nquad_radius)
+    S₂    = zeros(Complex{FT}, n_mu, nquad_radius)
+    f₁₁   = zeros(FT, n_mu, nquad_radius)
+    C_ext = zeros(FT, nquad_radius)
+    C_sca = zeros(FT, nquad_radius)
+
+    # Standardized weights for the size distribution:
+    wₓ = compute_wₓ(size_distribution, wᵣ, r, r_max) 
+    
+    # Loop over size parameters
+    @showprogress 1 "Computing PhaseFunctions Siewert NAI-2 style ..." for i = 1:length(x_size_param)
+
+        # Maximum expansion (see eq. A17 from de Rooij and Stap, 1984)
+        n_max = get_n_max(x_size_param[i])
+
+        # In Domke methods, we want to pre-allocate these as 2D outside of this loop.
+        an = (zeros(Complex{FT}, n_max))
+        bn = (zeros(Complex{FT}, n_max))
+
+        # Weighting for sums of 2n+1
+        n_ = collect(FT, 1:n_max);
+        n_ = 2n_ .+ 1
+
+        # Pre-allocate Dn:
+        y = x_size_param[i] * (aerosol.nᵣ - aerosol.nᵢ);
+        nmx = round(Int, max(n_max, abs(y)) + 51)
+        Dn = zeros(Complex{FT}, nmx)
+
+        # Compute an,bn and S₁,S₂
+        compute_mie_ab!(x_size_param[i], aerosol.nᵣ + aerosol.nᵢ * im, an, bn, Dn)
+        compute_mie_S₁S₂!(an, bn, leg_π, leg_τ, view(S₁, :, i), view(S₂, :, i))
+        
+        # Compute Extinction and scattering cross sections: 
+        C_sca[i] = 2π / k^2 * (n_' * (abs2.(an) + abs2.(bn)))
+        C_ext[i] = 2π / k^2 * (n_' * real(an + bn))
+        # @show r[i], x_size_param[i], C_ext[i], C_ext[i]/(4π*r[i]^2), C_ext[i]*1e-8
+        # Compute scattering matrix components per size parameter (might change column/row ordering):
+        f₁₁[:,i] =  0.5 / x_size_param[i]^2  * real(abs2.(S₁[:,i]) + abs2.(S₂[:,i]));
+    end
+
+    # Calculate bulk scattering and extinction coeffitientcs
+    bulk_C_sca =  sum(wₓ .* C_sca)
+    bulk_C_ext =  sum(wₓ .* C_ext)
+    
+    # Compute bulk scattering 
+    wr = (4π * r.^2 .*  wₓ) 
+    bulk_f₁₁   =  f₁₁ * wr
+
+    # Normalize Phase function with bulk scattering cross section.
+    bulk_f₁₁ /= bulk_C_sca 
+
+    # Assymetry factor g = 0.5\int_{-1}^1 μ P(μ) dμ
+    g = 1/2 * w_μ'*(μ .*  bulk_f₁₁ )
+    return μ, w_μ, bulk_f₁₁, bulk_C_ext, bulk_C_sca, g
+end
+
+"""
+    $(FUNCTIONNAME)(r::FT, λ::FT, nᵣ::FT, nᵢ::FT)
+
+Compute phase function from mono-modal aerosol with radius `r` at wavelength `λ`, both in `[μm]`
+Output: μ, w_μ, P, C_ext, C_sca, g
+"""
+function phase_function(r::FT, λ::FT, nᵣ::FT, nᵢ::FT) where {FT<:AbstractFloat} 
+    # Imaginary part of the refractive index must be ≥ 0 (definition)
+    @assert nᵢ ≥ 0 "Imaginary part of the refractive index must be ≥ 0 (definition)"
+    # Wavenumber
+    k = 2π / λ  
+
+    # Size parameter
+    size_param = k * r # (2πr/λ)
+    
+    # Compute n_max (doubled here to make plots smoother):
+    n_max = 2get_n_max(size_param)
+
+    # Determine max amount of Gaussian quadrature points for angle dependence of 
+    # phase functions:
+    n_mu = 2n_max - 1;
+
+    # Obtain Gauss-Legendre quadrature points and weights for phase function
+    μ, w_μ = gausslegendre(n_mu)
+
+    # Compute π and τ functions
+    leg_π, leg_τ = compute_mie_π_τ(μ, n_max)
+
+    # Pre-allocate arrays:
+    S₁    = zeros(Complex{FT}, n_mu)
+    S₂    = zeros(Complex{FT}, n_mu)
+
+    # In Domke methods, we want to pre-allocate these as 2D outside of this loop.
+    an = (zeros(Complex{FT}, n_max))
+    bn = (zeros(Complex{FT}, n_max))
+
+    # Weighting for sums of 2n+1
+    n_ = collect(FT, 1:n_max);
+    n_ = 2n_ .+ 1
+
+    # Pre-allocate Dn:
+    y = size_param * (nᵣ - nᵢ);
+    nmx = round(Int, max(n_max, abs(y)) + 51)
+    Dn = zeros(Complex{FT}, nmx)
+
+    # Compute an,bn and S₁,S₂
+    compute_mie_ab!(size_param, nᵣ + nᵢ * im, an, bn, Dn)
+    compute_mie_S₁S₂!(an, bn, leg_π, leg_τ, S₁, S₂)
+        
+    # Compute Extinction and scattering cross sections: 
+    C_sca = 2π / k^2 * (n_' * (abs2.(an) + abs2.(bn)))
+    C_ext = 2π / k^2 * (n_' * real(an + bn))
+    # @show r[i], x_size_param[i], C_ext[i], C_ext[i]/(4π*r[i]^2), C_ext[i]*1e-8
+    # Compute scattering matrix components per size parameter (might change column/row ordering):
+    f₁₁ =  0.5 / size_param^2  * real(abs2.(S₁) + abs2.(S₂));
+    f₁₁ *= 4π * r.^2
+    f₁₁ /= C_sca
+    #Assymetry factor g
+    g = 1/2 * w_μ'*(μ .*  f₁₁ )
+    return μ, w_μ, f₁₁, C_ext, C_sca, g
 end

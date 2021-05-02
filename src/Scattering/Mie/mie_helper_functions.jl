@@ -182,10 +182,16 @@ function gauleg(n, xmin, xmax; norm=false)
     return ξ, w
 end
 
-"""
+@doc raw"""
     $(FUNCTIONNAME)(greek_coefs, μ; returnLeg = false)
 Returns the reconstructed elements of the 4x4 scattering matrix at positions 
 f₁₁, f₁₂, f₂₂, f₃₃, f₃₄, f₄₄ from the greek coefficients
+
+f₁₁ represents the phase function p for the Intensity (first Stokes Vector element) and is normalized as follows:
+```math
+\frac{1}{4\pi}\int_0^{2\pi}d\phi \int_{-1}^1 p(\mu) d\mu  = 1
+```
+
 - `greek_coefs` greek coefficients (Domke Type)
 - `returnLeg` if `false` (default), just return `f₁₁, f₁₂, f₂₂, f₃₃, f₃₄, f₄₄`, if `true`, 
 - return `f₁₁, f₁₂, f₂₂, f₃₃, f₃₄, f₄₄, P, P²` (i.e. also the two legendre polynomials as matrices)
