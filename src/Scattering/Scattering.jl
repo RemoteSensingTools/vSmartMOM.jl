@@ -16,7 +16,7 @@ using StatsBase
 using ..Architectures: device
 
 include("Types/types.jl")                # All types used in this module
-include("Mie/mie_helper_functions.jl") # Mie file-related functions
+include("Mie/mie_helper_functions.jl")   # Mie file-related functions
 include("Legendre/legendre_functions.jl")   # Recursions for associated Legendre Polynomials
 # include("mie_computations.jl")     # Functions for Mie calculations over size distribution
 include("Truncation/phase_truncation.jl")     # Functions for truncation
@@ -40,6 +40,6 @@ export compute_B, compute_ab, GreekCoefs, comp_ab, compute_mie_π_τ!,
        compute_ref_aerosol_extinction,
        ConjugateTransposePairs, AbstractPolarizationType, 
        AbstractAerosolType, AbstractAerosolType, MieModel, 
-       AbstractTruncationType
+       AbstractTruncationType, phase_function
 
 end
