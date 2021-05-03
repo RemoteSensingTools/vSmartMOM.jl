@@ -34,7 +34,7 @@ YAML = "ddb6d928-2868-570f-bddf-ab3f9cf99eb6"
 
 [compat]
 BenchmarkTools = "0.5"
-CUDA = "= 1.0.2, 2.3"
+CUDA = "= 1.0.2, 2.3, 3.1"
 DiffResults = "1.0"
 Distributions = "0.23, 0.24"
 DocStringExtensions = "0.8"
