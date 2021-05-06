@@ -55,7 +55,7 @@ end
 build()
 
 deploydocs(
-    repo = "github.com/RupeshJey/RadiativeTransfer.jl.git",
+    repo = "github.com/RadiativeTransfer/RadiativeTransfer.jl.git",
     target = "build",
     push_preview = true,
 )
