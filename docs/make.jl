@@ -39,6 +39,7 @@ function build()
         prettyurls = get(ENV, "CI", nothing) == "true",
         mathengine = mathengine,
         collapselevel = 1,
+        assets = ["assets/favicon.ico"]
     )
 
     # This way it shows warnings of functions that have not been documented
