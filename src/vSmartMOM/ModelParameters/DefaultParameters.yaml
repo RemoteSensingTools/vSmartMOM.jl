@@ -10,11 +10,9 @@ absorption:
   # Spectral bands
   spec_bands: 
     - "(1e7/777):0.015:(1e7/757)"
-  # Volume mixing ratio
-  vmr:                0.21
   # List of molecules
   molecules:
-    - CO2
+    - [O2, CO2]
 
 scattering:
   # List of scattering aerosols and their properties

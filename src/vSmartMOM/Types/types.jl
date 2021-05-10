@@ -21,6 +21,8 @@ struct AtmosphericProfile{FT}
     vcd_dry::Array{FT,1}
     "Vertical Column Density (H2O)"
     vcd_h2o::Array{FT,1}
+    "Volume Mixing Ratio of Constituent Gases"
+    vmr::Dict{String, Union{Real, AbstractArray{Real}}}
 end
 
 "Types for describing atmospheric parameters"
@@ -213,14 +215,14 @@ mutable struct vSmartMOM_Parameters{FT<:Union{AbstractFloat, ForwardDiff.Dual}}
     spec_grid_end::AbstractArray{FT}
     "Number of spectral points in absorption grid (`nBand`)"
     spec_grid_n::AbstractArray{Integer}
+    "Molecules to use for absorption calculations (`nBand, nMolecules`)"
+    molecules::Vector{Vector{String}}
     "Type of broadening function (Doppler/Lorentz/Voigt)"
     broadening_function::AbstractBroadeningFunction
     "Wing cutoff to use in cross-section calculation"
     wing_cutoff::Integer
     "Complex Error Function to use in Voigt calculations"
     CEF::AbstractComplexErrorFunction
-    "Volume mixing ratio (needs to be per profile, gas species and band later)"
-    vmr::FT
     "Surface reflectance type"
     brdf#::AbstractArray{AbstractSurfaceType}
     "Algorithm to use for fourier decomposition (NAI2/PCW)"

@@ -140,7 +140,7 @@ $(DocStringExtensions.FIELDS)
     "Wing cutoff [cm-1]"
     wing_cutoff::Real
     "VMR of gas itself [0-1]"
-    vmr::Real
+    vmr::Union{Real, Vector{Real}}
     "Complex Error Function to Use"
     CEF::AbstractComplexErrorFunction
     "Computer `Architecture` on which `Model` is run"
