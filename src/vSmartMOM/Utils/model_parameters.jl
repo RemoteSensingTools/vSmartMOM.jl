@@ -49,8 +49,7 @@ function validate_yaml_parameters(params)
               (["absorption", "CEF"], String, ["HumlicekWeidemann32SDErrorFunction()"]),
               (["absorption", "wing_cutoff"], Integer),
               (["absorption", "spec_bands"], Array{String}),
-              (["absorption", "vmr"], Real),
-              (["absorption", "molecules"], Array{String}),
+              (["absorption", "molecules"], Array{Array{String, 1}, 1}),
               
               (["scattering", "aerosols"], Array{Dict{Any,Any}}),
               (["scattering", "r_max"], Real),
@@ -161,10 +160,10 @@ function parameters_from_yaml(file_path)
                                 convert.(FT, map(x -> first(collect(eval(Meta.parse(x)))), params_dict["absorption"]["spec_bands"])),
                                 convert.(FT, map(x -> last(collect(eval(Meta.parse(x)))), params_dict["absorption"]["spec_bands"])),
                                 convert(Array{Integer}, convert.(Integer, map(x -> length(collect(eval(Meta.parse(x)))), params_dict["absorption"]["spec_bands"]))),
+                                params_dict["absorption"]["molecules"],
                                 broadening_function,
                                 params_dict["absorption"]["wing_cutoff"],
                                 CEF,
-                                FT(params_dict["absorption"]["vmr"]),
                                 BRDF_per_band,
                                 decomp_type,
                                 quadrature_type,
@@ -216,17 +215,25 @@ function model_from_parameters(params::vSmartMOM_Parameters)
         # Define spectral grid per band
         spec_grid[ib] = range(params.spec_grid_start[ib], params.spec_grid_end[ib], length=params.spec_grid_n[ib]);
         
-        # This has to be more flexible in the future, so that we can have different trace gases per band, Newton's work 
-        # can be checked for that. (ideally a dictionary that defines gases to be used and profiles per band)
-        hitran_data = read_hitran(artifact("O2"), iso=1)
-        absorption_model = make_hitran_model(hitran_data, 
-                                         params.broadening_function, 
-                                         wing_cutoff = params.wing_cutoff, 
-                                         CEF = params.CEF, 
-                                         architecture = params.architecture, 
-                                         vmr = params.vmr)
+        # Loop over all molecules in this band, obtain profile for each, and add them up
+        for molec_i in 1:length(params.molecules[ib])
 
-        compute_absorption_profile!(τ_abs[ib], absorption_model, range(params.spec_grid_start[ib], params.spec_grid_end[ib], length=params.spec_grid_n[ib]), profile);
+            # Obtain hitran data for this molecule
+            hitran_data = read_hitran(artifact(params.molecules[ib][molec_i]), iso=1)
+
+            println("Computing profile for $(params.molecules[ib][molec_i]) with vmr $(profile.vmr[params.molecules[ib][molec_i]])")
+
+            # Create absorption model with parameters
+            absorption_model = make_hitran_model(hitran_data, 
+                                            params.broadening_function, 
+                                            wing_cutoff = params.wing_cutoff, 
+                                            CEF = params.CEF, 
+                                            architecture = params.architecture, 
+                                            vmr = profile.vmr[params.molecules[ib][molec_i]])
+
+            # Calculate absorption profile
+            compute_absorption_profile!(τ_abs[ib], absorption_model, spec_grid[ib], profile);
+        end
     end
 
     # aerosol_optics[iBand][iAer]

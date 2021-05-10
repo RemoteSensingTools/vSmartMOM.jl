@@ -35,9 +35,9 @@ end
 "Validate an input atmospheric profile (YAML only)"
 function validate_atmos_profile(params::Dict{Any,Any})
 
-    @assert Set(keys(params)) == Set(["p_surf", "T", "q", "ak", "bk"]) || 
-            Set(keys(params)) == Set(["p_half", "T", "q"]) || 
-            Set(keys(params)) == Set(["p_half", "T"]) "Set of atmospheric profile fields must be one of (p_surf, T, q, ak, bk), (p_half, T, q), or (p_half, T)"
+    @assert Set(keys(params)) == Set(["p_surf", "T", "q", "ak", "bk", "vmr"]) || 
+            Set(keys(params)) == Set(["p_half", "T", "q", "vmr"]) || 
+            Set(keys(params)) == Set(["p_half", "T", "vmr"]) "Set of atmospheric profile fields must be one of (p_surf, T, q, ak, bk), (p_half, T, q), or (p_half, T)"
 
 end
 
@@ -74,56 +74,59 @@ function read_atmos_profile(file_path::String)
         p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o = compute_atmos_profile_fields(p_half, T, q)
     end
 
+    # Convert vmr to appropriate type
+    vmr = Dict{String, Union{AbstractFloat, AbstractArray{AbstractFloat}}}(params_dict["vmr"])
+
     # Return the atmospheric profile struct
-    return AtmosphericProfile(nothing, nothing, psurf, T, q, p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o)
+    return AtmosphericProfile(nothing, nothing, psurf, T, q, p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o, vmr)
 
 end
 
-"Read atmospheric profile from netCDF file (ONLY works for FraLab test file)"
-function read_atmos_profile(file::String, lat::Real, lon::Real, time_idx::Int)
+# "Read atmospheric profile from netCDF file (ONLY works for FraLab test file)"
+# function read_atmos_profile(file::String, lat::Real, lon::Real, time_idx::Int)
 
-    # Time index must be ∈ [1, 2, 3, 4]
-    @assert 1 <= time_idx <= 4 "Time index must be ∈ [1, 2, 3, 4]" 
+#     # Time index must be ∈ [1, 2, 3, 4]
+#     @assert 1 <= time_idx <= 4 "Time index must be ∈ [1, 2, 3, 4]" 
 
-    # Make sure file is nc type
-    @assert endswith(file, ".nc4") "File must be nc4"
+#     # Make sure file is nc type
+#     @assert endswith(file, ".nc4") "File must be nc4"
 
-    # Load in the atmospheric profile
-    @timeit "loading file" ds = Dataset(file)
+#     # Load in the atmospheric profile
+#     @timeit "loading file" ds = Dataset(file)
 
-    # See how easy it is to actually extract data? 
-    # Note the [:] in the end reads in ALL the data in one step
-    file_lats, file_lons = ds["YDim"][:], ds["XDim"][:]
+#     # See how easy it is to actually extract data? 
+#     # Note the [:] in the end reads in ALL the data in one step
+#     file_lats, file_lons = ds["YDim"][:], ds["XDim"][:]
     
-    # Convert the input lat/lon to right type
-    FT = eltype(file_lats)
-    lat, lon = FT(lat), FT(lon)
+#     # Convert the input lat/lon to right type
+#     FT = eltype(file_lats)
+#     lat, lon = FT(lat), FT(lon)
     
-    # Find index (nearest neighbor, one could envision interpolation in space and time!):
-    lat_idx, lon_idx = argmin(abs.(file_lats .- lat)), argmin(abs.(file_lons .- lon))
+#     # Find index (nearest neighbor, one could envision interpolation in space and time!):
+#     lat_idx, lon_idx = argmin(abs.(file_lats .- lat)), argmin(abs.(file_lons .- lon))
 
-    # Temperature profile
-    @timeit "getting T" T = convert(Array{FT,1}, ds["T"][lon_idx, lat_idx,  :, time_idx])
+#     # Temperature profile
+#     @timeit "getting T" T = convert(Array{FT,1}, ds["T"][lon_idx, lat_idx,  :, time_idx])
 
-    # Specific humidity profile
-    q = convert(Array{FT,1}, ds["QV"][lon_idx, lat_idx, :, time_idx])
+#     # Specific humidity profile
+#     q = convert(Array{FT,1}, ds["QV"][lon_idx, lat_idx, :, time_idx])
     
-    # Surface pressure
-    psurf = convert(FT, ds["PS"][lon_idx, lat_idx, time_idx])
+#     # Surface pressure
+#     psurf = convert(FT, ds["PS"][lon_idx, lat_idx, time_idx])
     
-    # AK and BK global attributes (important to calculate pressure half-levels)
-    ak, bk = ds.attrib["HDF_GLOBAL.ak"][:], ds.attrib["HDF_GLOBAL.bk"][:]
+#     # AK and BK global attributes (important to calculate pressure half-levels)
+#     ak, bk = ds.attrib["HDF_GLOBAL.ak"][:], ds.attrib["HDF_GLOBAL.bk"][:]
 
-    # Close the file
-    close(ds)
+#     # Close the file
+#     close(ds)
 
-    # Calculate derived fields
-    p_half = (ak + bk * psurf)
-    p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o = compute_atmos_profile_fields(p_half, T, q)
+#     # Calculate derived fields
+#     p_half = (ak + bk * psurf)
+#     p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o = compute_atmos_profile_fields(p_half, T, q)
 
-    # Return the atmospheric profile struct
-    return AtmosphericProfile(lat, lon, psurf, T, q, p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o)
-end
+#     # Return the atmospheric profile struct
+#     return AtmosphericProfile(lat, lon, psurf, T, q, p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o)
+# end
 
 "Reduce profile dimensions by re-averaging to near-equidistant pressure grid"
 function reduce_profile(n::Int, profile::AtmosphericProfile{FT}) where {FT}
@@ -165,7 +168,7 @@ function reduce_profile(n::Int, profile::AtmosphericProfile{FT}) where {FT}
         vcd_h2o[i] = sum(profile.vcd_h2o[ind])
     end
 
-    return AtmosphericProfile(lat, lon, psurf, T, q, p_full, p_levels, vmr_h2o, vcd_dry, vcd_h2o)
+    return AtmosphericProfile(lat, lon, psurf, T, q, p_full, p_levels, vmr_h2o, vcd_dry, vcd_h2o, profile.vmr)
 end;
 
 """
@@ -358,7 +361,7 @@ function compute_absorption_profile!(τ_abs::Array{FT,2},
         T = profile.T[iz]
 
         # Changed index order
-        τ_abs[:,iz] = Array(absorption_cross_section(model, grid, p, T)) * profile.vcd_dry[iz] * model.vmr
+        τ_abs[:,iz] += Array(absorption_cross_section(model, grid, p, T)) * profile.vcd_dry[iz] * model.vmr
     end
 
     return nothing
