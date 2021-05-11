@@ -1,5 +1,6 @@
 module vSmartMOM
 
+using Interpolations               # For interpolating the vmr's
 using LinearAlgebra                # For linear algebra routines
 using NCDatasets                   # For reading netcdf atmospheric profiles
 using ProgressMeter                # Showing progress in for loops

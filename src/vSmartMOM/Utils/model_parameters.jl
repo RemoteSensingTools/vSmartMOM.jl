@@ -41,6 +41,14 @@ function validate_aerosols(aerosols::Array{Dict{Any, Any}})
     end
 end
 
+"Check that the vmr's in the atmospheric profile match the molecules in the parameters" 
+function validate_vmrs(params::vSmartMOM_Parameters, profile::AtmosphericProfile)
+    for molec in unique(vcat(params.molecules...))
+        @assert molec in keys(profile.vmr) "$(molec) listed as molecule in parameters yaml, but no vmr given in atmospheric profile"
+        @assert profile.vmr[molec] isa Real || profile.vmr[molec] isa Vector "The vmr for $(molec) in the atmospheric profile must either be a real-valued number, or an array of nodal points from surface to 0hPa (TOA)"
+    end
+end
+
 "Given a parameter dictionary from a YAML file, validate the dictionary"
 function validate_yaml_parameters(params)
 
@@ -191,6 +199,9 @@ function model_from_parameters(params::vSmartMOM_Parameters)
     else
         profile_hr = vSmartMOM.read_atmos_profile(params.file, params.lat, params.lon, params.timeIndex);
     end
+
+    # Validate that the vmr's in the atmospheric profile, match those in the parameters
+    validate_vmrs(params, profile_hr)
     
     # Reduce the profile to the number of target layers
     profile = vSmartMOM.reduce_profile(params.profile_reduction_n, profile_hr);
@@ -221,7 +232,7 @@ function model_from_parameters(params::vSmartMOM_Parameters)
             # Obtain hitran data for this molecule
             hitran_data = read_hitran(artifact(params.molecules[ib][molec_i]), iso=1)
 
-            println("Computing profile for $(params.molecules[ib][molec_i]) with vmr $(profile.vmr[params.molecules[ib][molec_i]])")
+            println("Computing profile for $(params.molecules[ib][molec_i]) with vmr $(profile_hr.vmr[params.molecules[ib][molec_i]])")
 
             # Create absorption model with parameters
             absorption_model = make_hitran_model(hitran_data, 

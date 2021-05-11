@@ -60,7 +60,6 @@ function compute_absorption_cross_section(
     for j in eachindex(hitran.Sᵢ)
 
         # Test that this ν lies within the grid
-        # (Aside: I ♥︎ chained comparisons)
         if grid_min < hitran.νᵢ[j] < grid_max
 
             # Apply pressure shift
