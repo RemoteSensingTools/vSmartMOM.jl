@@ -1,6 +1,6 @@
 
 "Struct for an atmospheric profile"
-struct AtmosphericProfile{FT}
+struct AtmosphericProfile{FT, VMR <: Union{Real, Vector}}
     "Latitude of the AtmosphericProfile"
     lat
     "Longitude of the AtmosphericProfile"
@@ -22,7 +22,7 @@ struct AtmosphericProfile{FT}
     "Vertical Column Density (H2O)"
     vcd_h2o::Array{FT,1}
     "Volume Mixing Ratio of Constituent Gases"
-    vmr::Dict{String, Union{Real, AbstractArray{Real}}}
+    vmr::Dict{String, VMR}
 end
 
 "Types for describing atmospheric parameters"

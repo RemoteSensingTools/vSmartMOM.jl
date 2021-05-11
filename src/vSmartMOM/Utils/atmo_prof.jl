@@ -75,7 +75,7 @@ function read_atmos_profile(file_path::String)
     end
 
     # Convert vmr to appropriate type
-    vmr = Dict{String, Union{AbstractFloat, AbstractArray{AbstractFloat}}}(params_dict["vmr"])
+    vmr = convert(Dict{String, Union{Real, Vector}}, params_dict["vmr"])
 
     # Return the atmospheric profile struct
     return AtmosphericProfile(nothing, nothing, psurf, T, q, p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o, vmr)
@@ -135,7 +135,7 @@ function reduce_profile(n::Int, profile::AtmosphericProfile{FT}) where {FT}
     @assert n < length(profile.T)
 
     # Unpack the profile
-    @unpack lat, lon, psurf = profile
+    @unpack lat, lon, psurf, vmr = profile
 
     # New rough half levels (boundary points)
     a = range(0, maximum(profile.p), length=n + 1)
@@ -168,7 +168,19 @@ function reduce_profile(n::Int, profile::AtmosphericProfile{FT}) where {FT}
         vcd_h2o[i] = sum(profile.vcd_h2o[ind])
     end
 
-    return AtmosphericProfile(lat, lon, psurf, T, q, p_full, p_levels, vmr_h2o, vcd_dry, vcd_h2o, profile.vmr)
+    new_vmr = Dict{String, Union{Real, Vector}}()
+
+    for molec_i in keys(vmr)
+        if profile.vmr[molec_i] isa AbstractArray
+            pressure_grid = collect(range(minimum(p_full), maximum(p_full), length=length(vmr)))
+            interp_linear = LinearInterpolation(pressure_grid, vmr[molec_i])
+            new_vmr[molec_i] = [interp_linear(x) for x in p_full]
+        else
+            new_vmr[molec_i] = profile.vmr[molec_i]
+        end
+    end
+
+    return AtmosphericProfile(lat, lon, psurf, T, q, p_full, p_levels, vmr_h2o, vcd_dry, vcd_h2o, new_vmr)
 end;
 
 """
@@ -360,8 +372,11 @@ function compute_absorption_profile!(τ_abs::Array{FT,2},
         p = profile.p[iz] / 100
         T = profile.T[iz]
 
+        # Either use the current layer's vmr, or use the uniform vmr
+        vmr = model.vmr isa AbstractArray ? model.vmr[iz] : model.vmr
+
         # Changed index order
-        τ_abs[:,iz] += Array(absorption_cross_section(model, grid, p, T)) * profile.vcd_dry[iz] * model.vmr
+        τ_abs[:,iz] += Array(absorption_cross_section(model, grid, p, T)) * profile.vcd_dry[iz] * vmr
     end
 
     return nothing

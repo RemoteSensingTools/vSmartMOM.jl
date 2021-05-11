@@ -81,7 +81,7 @@ Convenience function to make a HitranModel out of the parameters (Matches make_i
 function make_hitran_model(hitran::HitranTable, 
                            broadening::AbstractBroadeningFunction; 
                            wing_cutoff::Integer=40, 
-                           vmr::Real=0, 
+                           vmr::Union{Real, Vector}=0, 
                            CEF::AbstractComplexErrorFunction=HumlicekWeidemann32SDErrorFunction(), 
                            architecture = default_architecture)
 

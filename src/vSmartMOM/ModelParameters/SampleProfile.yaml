@@ -73,6 +73,7 @@ bk: [
   0.963406, 0.984952, 1.0
 ]
 
+# VMR profiles can either be real-valued numbers, or an array of nodal points from surface to TOA
 vmr: 
-  CO2:  0.000385 
+  CO2:  [0.000385, 0.000395]
   O2:   0.21
