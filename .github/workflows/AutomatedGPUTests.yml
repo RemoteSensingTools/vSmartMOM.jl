@@ -18,5 +18,3 @@ jobs:
       - run: export JULIA_DEPOT_PATH="/home/rjeyaram/actions-runner"
       - uses: julia-actions/julia-buildpkg@latest
       - uses: julia-actions/julia-runtest@latest
-        with:
-          project: '@./test/'
