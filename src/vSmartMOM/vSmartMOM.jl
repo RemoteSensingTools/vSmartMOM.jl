@@ -2,10 +2,8 @@ module vSmartMOM
 
 using Interpolations               # For interpolating the vmr's
 using LinearAlgebra                # For linear algebra routines
-using NCDatasets                   # For reading netcdf atmospheric profiles
 using ProgressMeter                # Showing progress in for loops
 using Distributions                # Distributions of aerosols
-using DelimitedFiles               # For reading ASCII files 
 using ..Scattering                 # Use scattering module
 using ..Absorption                 # Use absorption module
 using ...RadiativeTransfer         # Use parent RadiativeTransfer module
@@ -18,7 +16,6 @@ using KernelAbstractions.Extras
 
 using FastGaussQuadrature          # Computes quadrature points (Gauss, legendre, Radau,...)
 using TimerOutputs                 # For timing sections of the code
-using StatsBase                    # Fit statistics for truncation 
 using Parameters                   # For keyword arguments in structs
 using DocStringExtensions          # For documenting
 using YAML                         # For reading properties files 

@@ -6,10 +6,12 @@ using Interpolations            # For interpolating in both lookup tables and qo
 using JLD2                      # For saving and loading the interpolator
 using ProgressMeter             # For showing progress, especially in creating interpolator
 using KernelAbstractions        # For heterogeneous (GPU+CPU) programming
+using CUDAKernels               # Access to CUDADevice
 using CUDA                      # For GPU programming
 using ForwardDiff, DiffResults  # For auto-differentiation
-using ..Architectures           # For GPU/CPU convenience
 using NetCDF                    # For loading NetCDF files with constants
+using ..Architectures           # For GPU/CPU convenience
+using ..Architectures: devi, default_architecture
 
 include("Constants/constants.jl")                   # Scientific and mathematical constants
 include("Types/types.jl")                           # All types used in this module

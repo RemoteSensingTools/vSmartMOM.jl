@@ -91,7 +91,7 @@ A struct which defines full Stokes Vector ([I,Q,U,V]) RT code
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-@with_kw struct Stokes_IQUV{FT<:AbstractFloat} <: AbstractPolarizationType
+Base.@kwdef struct Stokes_IQUV{FT<:AbstractFloat} <: AbstractPolarizationType
     "Number of Stokes components (int)"
     n::Int = 4
     "Vector of length `n` for ... (see eq in Sanghavi )"
@@ -108,7 +108,7 @@ A struct which defines Stokes Vector ([I,Q,U]) RT code
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-@with_kw struct Stokes_IQU{FT<:AbstractFloat} <: AbstractPolarizationType
+Base.@kwdef struct Stokes_IQU{FT<:AbstractFloat} <: AbstractPolarizationType
     "Number of Stokes components (int)" 
     n::Int = 3
     "Vector of length `n` for ... (see eq in Sanghavi )"
@@ -127,7 +127,7 @@ A struct which define scalar I only RT code
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-@with_kw struct Stokes_I{FT<:AbstractFloat} <: AbstractPolarizationType 
+Base.@kwdef struct Stokes_I{FT<:AbstractFloat} <: AbstractPolarizationType 
     "Number of Stokes components (int)"
     n::Int = 1
     "Vector of length `n` for ... (see eq in Sanghavi )"
@@ -172,7 +172,7 @@ Model to hold all Mie computation details for NAI2 and PCW
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-@with_kw struct MieModel{FDT<:AbstractFourierDecompositionType}
+Base.@kwdef struct MieModel{FDT<:AbstractFourierDecompositionType}
 
     computation_type::FDT
     aerosol::AbstractAerosolType
@@ -227,7 +227,7 @@ A struct which holds all computed aerosol optics
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-@with_kw struct AerosolOptics{FT<:Union{AbstractFloat, ForwardDiff.Dual}}
+Base.@kwdef struct AerosolOptics{FT<:Union{AbstractFloat, ForwardDiff.Dual}}
     "Greek matrix"
     greek_coefs::GreekCoefs
     "Single Scattering Albedo"

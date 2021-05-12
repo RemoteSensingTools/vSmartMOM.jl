@@ -1,4 +1,3 @@
-using DelimitedFiles
 """
 $(FUNCTIONNAME)(mod::δBGE, aero::AerosolOptics))
 Returns the truncated aerosol optical properties as [`AerosolOptics`](@ref) 
@@ -33,9 +32,7 @@ function truncate_phase(mod::δBGE, aero::AerosolOptics; reportFit=false, err_β
     y₃₄ = view(f₃₄, iμ)
     A   = view(P, iμ, 1:l_max)
     B   = fac[3:end]' .* view(P², iμ, 3:l_max)
-    writedlm( "FileA.dat",  A, ' ')
-    writedlm( "FileB.dat",  B, ' ')
-    writedlm( "FileP2.dat",  view(P², iμ, 1:l_max), ' ')
+
     # Weights (also avoid division by 0)
     minY = zeros(length(iμ)) .+ FT(1e-8);
     W₁₁ = Diagonal(w_μ[iμ] ./ max(abs.(y₁₁), minY));

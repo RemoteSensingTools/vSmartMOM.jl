@@ -29,7 +29,7 @@ end
 abstract type AbstractObsGeometry end
 
 "Observation Geometry (basics)" 
-@with_kw struct ObsGeometry{FT} <: AbstractObsGeometry
+Base.@kwdef struct ObsGeometry{FT} <: AbstractObsGeometry
     "Altitude of Observer `[Pa]`"
     obs_alt::FT
     "Solar Zenith Angle `[Degree]`"
@@ -80,7 +80,7 @@ struct SFI <:AbstractSourceType end
 abstract type AbstractLayer end
 
 "Composite Layer Matrices (`-/+` defined in τ coordinates, i.e. `-`=outgoing, `+`=incoming"
-@with_kw mutable struct CompositeLayer{FT} <: AbstractLayer 
+Base.@kwdef mutable struct CompositeLayer{FT} <: AbstractLayer 
     "Composite layer Reflectance matrix R (from + -> -)"
     R⁻⁺::AbstractArray{FT,3}
     "Composite layer Reflectance matrix R (from - -> +)"
@@ -96,7 +96,7 @@ abstract type AbstractLayer end
 end
 
 "Added (Single) Layer Matrices (`-/+` defined in τ coordinates, i.e. `-`=outgoing, `+`=incoming"
-@with_kw mutable struct AddedLayer{FT} <: AbstractLayer 
+Base.@kwdef mutable struct AddedLayer{FT} <: AbstractLayer 
     "Added layer Reflectance matrix R (from + -> -)"
     r⁻⁺::AbstractArray{FT,3}
     "Added layer transmission matrix T (from + -> +)"
@@ -305,7 +305,7 @@ A struct which holds (for the entire atmosphere) all key layer optical propertie
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-@with_kw struct ComputedAtmosphereProperties
+Base.@kwdef struct ComputedAtmosphereProperties
 
     "Absorption optical depth vectors (wavelength dependent)"
     τ_λ_all
@@ -345,7 +345,7 @@ A struct which holds all key layer optical properties required for the RT core s
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-@with_kw struct ComputedLayerProperties
+Base.@kwdef struct ComputedLayerProperties
 
     "Absorption optical depth vector (wavelength dependent)"
     τ_λ 
