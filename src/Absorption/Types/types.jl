@@ -3,9 +3,6 @@
 ##### variables. (Currently intended for storing HITRAN database)
 #####
 
-using CUDA
-using ..Architectures
-
 """
     struct HitranTable{FT}
 
@@ -17,7 +14,7 @@ See https://hitran.org/docs/definitions-and-units/ for details
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-@with_kw struct HitranTable{FT<:AbstractFloat} 
+Base.@kwdef struct HitranTable{FT<:AbstractFloat} 
     "The molecular species identification (ID) number"
     mol::Array{Int,1}
     "The isotopologue ID number"
@@ -131,7 +128,7 @@ calculations using HITRAN data
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-@with_kw struct HitranModel <: AbstractCrossSectionModel
+Base.@kwdef struct HitranModel <: AbstractCrossSectionModel
 
     "Struct with hitran data"
     hitran::HitranTable
@@ -169,7 +166,7 @@ calculations using an Interpolator
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-@with_kw struct InterpolationModel <: AbstractCrossSectionModel 
+Base.@kwdef struct InterpolationModel <: AbstractCrossSectionModel 
 
     "The interpolator"
     itp

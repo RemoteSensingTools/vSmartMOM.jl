@@ -10,8 +10,7 @@ using CUDA                      # For GPU programming
 using Distributions             # Distributions from Julia 
 using ForwardDiff, DiffResults  # Automatic Differentiation tools
 using LinearAlgebra
-using StaticArrays
-using StatsBase
+using StatsBase                 # Fit statistics for truncation
 
 using ..Architectures: device
 

@@ -9,7 +9,6 @@ using ProgressMeter
 using WignerSymbols
 using Distributions
 using JLD2
-using CUDA
 
 # Test the Cross Section module
 @testset "RadiativeTransfer.Absorption" begin include("test_Absorption.jl") end

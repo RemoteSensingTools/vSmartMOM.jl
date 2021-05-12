@@ -5,7 +5,7 @@
 #
 #...input:  aa
 #...output: bb
-using Random
+# using Random
 
 function AtoB(aa,A,B,npt)
   for I in 2:(npt+1)
