@@ -172,7 +172,8 @@ function reduce_profile(n::Int, profile::AtmosphericProfile{FT}) where {FT}
 
     for molec_i in keys(vmr)
         if profile.vmr[molec_i] isa AbstractArray
-            pressure_grid = collect(range(minimum(p_full), maximum(p_full), length=length(vmr)))
+            
+            pressure_grid = collect(range(minimum(p_full), maximum(p_full), length=length(profile.vmr[molec_i])))
             interp_linear = LinearInterpolation(pressure_grid, vmr[molec_i])
             new_vmr[molec_i] = [interp_linear(x) for x in p_full]
         else
@@ -358,7 +359,12 @@ end
 "Given the CrossSectionModel, the grid, and the AtmosphericProfile, fill up the τ_abs array with the cross section at each layer
 (using pressures/temperatures) from the profile" 
 function compute_absorption_profile!(τ_abs::Array{FT,2}, 
-                                     model::AbstractCrossSectionModel,
+                                     hitran_data::HitranTable, 
+                                     broadening_function::AbstractBroadeningFunction, 
+                                     wing_cutoff, 
+                                     CEF::AbstractComplexErrorFunction, 
+                                     architecture,
+                                     vmr,
                                      grid,
                                      profile::AtmosphericProfile,
                                      ) where FT <: AbstractFloat
@@ -373,10 +379,18 @@ function compute_absorption_profile!(τ_abs::Array{FT,2},
         T = profile.T[iz]
 
         # Either use the current layer's vmr, or use the uniform vmr
-        vmr = model.vmr isa AbstractArray ? model.vmr[iz] : model.vmr
+        vmr_curr = vmr isa AbstractArray ? vmr[iz] : vmr
+
+        # Create absorption model with parameters
+        absorption_model = make_hitran_model(hitran_data, 
+                                             broadening_function, 
+                                             wing_cutoff = wing_cutoff, 
+                                             CEF = CEF, 
+                                             architecture = architecture, 
+                                             vmr = vmr_curr)
 
         # Changed index order
-        τ_abs[:,iz] += Array(absorption_cross_section(model, grid, p, T)) * profile.vcd_dry[iz] * vmr
+        τ_abs[:,iz] += Array(absorption_cross_section(absorption_model, grid, p, T)) * profile.vcd_dry[iz] * vmr_curr
     end
 
     return nothing

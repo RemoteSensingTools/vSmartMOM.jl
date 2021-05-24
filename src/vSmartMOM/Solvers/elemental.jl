@@ -52,7 +52,7 @@ function elemental!(pol_type, SFI::Bool,
         # Calculate r⁻⁺ and t⁺⁺
         
         # Version 1: no absorption in batch mode (initiation of a single scattering layer with no or low absorption)
-        if maximum(dτ_λ) < 0.0001   
+        if false #maximum(dτ_λ) < 0.0001   
             # R⁻⁺₀₁(λ) = M⁻¹(0.5ϖₑ(λ)Z⁻⁺C)δ (See Eqs.7 in Raman paper draft)
             r⁻⁺[:,:,:] .= d_qp * Z⁻⁺ * (d_wct * dτ)
             # T⁺⁺₀₁(λ) = {I-M⁻¹[I - 0.5*ϖₑ(λ)Z⁺⁺C]}δ (See Eqs.7 in Raman paper draft)
@@ -196,9 +196,9 @@ end
 end
 
 function apply_D_matrix_elemental!(ndoubl::Int, n_stokes::Int, r⁻⁺::CuArray{FT,3}, t⁺⁺::CuArray{FT,3}, r⁺⁻::CuArray{FT,3}, t⁻⁻::CuArray{FT,3}) where {FT}
-    applyD_kernel! = apply_D_elemental!(KernelAbstractions.CUDADevice())
+    applyD_kernel! = apply_D_elemental!(CUDAKernels.CUDADevice())
     event = applyD_kernel!(ndoubl,n_stokes, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻, ndrange=size(r⁻⁺));
-    wait(KernelAbstractions.CUDADevice(), event);
+    wait(CUDAKernels.CUDADevice(), event);
     synchronize_if_gpu();
     return nothing
 end
@@ -214,9 +214,9 @@ function apply_D_matrix_elemental_SFI!(ndoubl::Int, n_stokes::Int, J₀⁻::CuAr
     if ndoubl > 1
         return nothing
     else 
-        applyD_kernel! = apply_D_elemental_SFI!(KernelAbstractions.CUDADevice())
+        applyD_kernel! = apply_D_elemental_SFI!(CUDAKernels.CUDADevice())
         event = applyD_kernel!(ndoubl,n_stokes, J₀⁻, ndrange=size(J₀⁻));
-        wait(KernelAbstractions.CUDADevice(), event);
+        wait(CUDAKernels.CUDADevice(), event);
         synchronize();
         return nothing
     end

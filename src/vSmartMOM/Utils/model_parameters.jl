@@ -234,16 +234,8 @@ function model_from_parameters(params::vSmartMOM_Parameters)
 
             println("Computing profile for $(params.molecules[ib][molec_i]) with vmr $(profile_hr.vmr[params.molecules[ib][molec_i]])")
 
-            # Create absorption model with parameters
-            absorption_model = make_hitran_model(hitran_data, 
-                                            params.broadening_function, 
-                                            wing_cutoff = params.wing_cutoff, 
-                                            CEF = params.CEF, 
-                                            architecture = params.architecture, 
-                                            vmr = profile.vmr[params.molecules[ib][molec_i]])
-
             # Calculate absorption profile
-            compute_absorption_profile!(τ_abs[ib], absorption_model, spec_grid[ib], profile);
+            compute_absorption_profile!(τ_abs[ib], hitran_data, params.broadening_function, params.wing_cutoff, params.CEF, params.architecture, profile.vmr[params.molecules[ib][molec_i]], spec_grid[ib], profile);
         end
     end
 
