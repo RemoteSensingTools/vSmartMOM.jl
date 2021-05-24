@@ -33,7 +33,7 @@ WignerSymbols = "9f57e263-0b3d-5e2e-b1be-24f2bb48858b"
 YAML = "ddb6d928-2868-570f-bddf-ab3f9cf99eb6"
 
 [compat]
-BenchmarkTools = "0.5"
+BenchmarkTools = "0.5, 1.0"
 CUDA = "= 1.0.2, 2.3"
 DiffResults = "1.0"
 Distributions = "0.23, 0.24"
