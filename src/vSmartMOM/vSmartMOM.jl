@@ -13,6 +13,7 @@ using ...Architectures             # Use Architectures module
 using CUDA                         # GPU CuArrays and functions
 using KernelAbstractions           # Abstracting code for CPU/GPU
 using KernelAbstractions.Extras
+using CUDAKernels
 
 using FastGaussQuadrature          # Computes quadrature points (Gauss, legendre, Radau,...)
 using TimerOutputs                 # For timing sections of the code
