@@ -124,17 +124,55 @@ Perform Radiative Transfer calculations using parameters passed in through the
 vSmartMOM_Model struct
 
 """
-function rt_run(model::vSmartMOM_Model)
+function rt_run(model::vSmartMOM_Model; i_band::Integer = -1)
 
-    return rt_run(model.params.polarization_type,
-                  model.obs_geom::ObsGeometry,
-                  model.τRayl, 
-                  model.τAer, 
-                  model.quad_points,
-                  model.params.max_m,
-                  model.aerosol_optics,
-                  model.greek_rayleigh,
-                  model.τ_abs,
-                  model.brdf,
-                  model.params.architecture)
+    # Number of bands total
+    n_bands = length(model.params.spec_grid_start)
+
+    # Check that i_band is valid
+    @assert (i_band == -1 || i_band in collect(1:n_bands)) "i_band is $(i_band) but there are only $(n_bands) bands"
+
+    # User wants a specific band
+    if i_band != -1
+        return rt_run(model.params.polarization_type,
+                      model.obs_geom::ObsGeometry,
+                      model.τRayl[i_band], 
+                      model.τAer[i_band], 
+                      model.quad_points,
+                      model.params.max_m,
+                      model.aerosol_optics[i_band],
+                      model.greek_rayleigh,
+                      model.τ_abs[i_band],
+                      model.params.brdf[i_band],
+                      model.params.architecture)
+
+    # User wants all bands
+    else
+
+        Rs = []
+
+        for i in 1:n_bands
+
+            println("------------------------------")
+            println("Computing R for band #$(i)")
+            println("------------------------------")
+
+            R = rt_run(model.params.polarization_type,
+                       model.obs_geom::ObsGeometry,
+                       model.τRayl[i], 
+                       model.τAer[i], 
+                       model.quad_points,
+                       model.params.max_m,
+                       model.aerosol_optics[i],
+                       model.greek_rayleigh,
+                       model.τ_abs[i],
+                       model.params.brdf[i],
+                       model.params.architecture)
+            push!(Rs, R);
+        end
+
+        return Rs
+    end
+
+    
 end

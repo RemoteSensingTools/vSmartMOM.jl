@@ -273,25 +273,21 @@ mutable struct vSmartMOM_Model
     "Struct with all individual parameters"
     params::vSmartMOM_Parameters
     "Truncated aerosol optics"
-    aerosol_optics::AbstractArray #Array{Array{AerosolOptics}}
+    aerosol_optics::AbstractArray{AbstractArray{AerosolOptics}}
     "Greek coefs in Rayleigh calculations" 
     greek_rayleigh::GreekCoefs
     "Quadrature points/weights, etc"
     quad_points::QuadPoints
     "Array to hold cross-sections over entire atmospheric profile"
-    τ_abs::AbstractArray
+    τ_abs::AbstractArray{AbstractArray}
     "Rayleigh optical thickness"
-    τRayl::AbstractArray
+    τRayl::AbstractArray{AbstractArray}
     "Aerosol optical thickness"
-    τAer::AbstractArray
+    τAer::AbstractArray{AbstractArray}
     "Observational Geometry (includes sza, vza, vaz)"
     obs_geom::ObsGeometry
     "Atmospheric profile to use"
     profile::AtmosphericProfile
-    "Absorption model for computing absorption cross sections (will be an array later, for nGasSpecies,nBand)"
-    #absorption_model::AbstractCrossSectionModel
-    "Surface BRDF"
-    brdf::AbstractSurfaceType
 end
 
 #"A struct to internally hold the computed atmosphere properties <<Suniti>>"
