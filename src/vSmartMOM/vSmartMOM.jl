@@ -24,6 +24,8 @@ using ForwardDiff                  # Automatic Differentiation
 using NNlib                        # For batched multiplications
 import NNlib.batched_mul           # Required to overwrite batched_mul for Duals
 
+import Base.show                   # For overloading show for custom types
+
 # More threads in LA wasn't really helpful, can be turned off here:
 # LinearAlgebra.BLAS.set_num_threads(1)
 
@@ -49,6 +51,7 @@ include("Utils/rt_utils.jl")              # Miscellaneous Utility Functions
 include("Utils/rt_streams.jl")            # Set streams before RT
 include("Utils/forwardDiff_tools.jl")     # Helpers for Forward Differentiation
 include("Utils/model_parameters.jl")      # Handling Model Parameters 
+include("Utils/show_utils.jl")            # Pretty-printing objects
 
 # Surfaces
 include("Surface/lambertian_surface.jl")  # Lambertian Surface 
@@ -58,5 +61,8 @@ export parameters_from_yaml,              # Getting parameters from a file
        model_from_parameters,             # Converting the parameters to model 
        rt_run,                            # Run the RT code
        default_parameters                 # Set of default parameters
+
+# Export types to show easily
+export GaussQuadFullSphere, LambertianSurfaceScalar, LambertianSurfaceSpectrum
 
 end

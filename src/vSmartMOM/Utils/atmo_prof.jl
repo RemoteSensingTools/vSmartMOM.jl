@@ -372,7 +372,7 @@ function compute_absorption_profile!(τ_abs::Array{FT,2},
     # The array to store the cross-sections must be same length as number of layers
     @assert size(τ_abs,2) == length(profile.p)
 
-    for iz in 1:length(profile.p)
+    @showprogress 1 for iz in 1:length(profile.p)
 
         # Pa -> hPa
         p = profile.p[iz] / 100

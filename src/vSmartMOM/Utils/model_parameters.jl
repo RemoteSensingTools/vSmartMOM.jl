@@ -215,7 +215,7 @@ function model_from_parameters(params::vSmartMOM_Parameters)
     spec_grid = [zeros(params.float_type,n) for n in params.spec_grid_n];
 
     # τ_abs[iBand][iSpec,iZ]
-    τ_abs     = [zeros(params.float_type,n, length(profile.p)) for n in params.spec_grid_n]
+    τ_abs     = [zeros(params.float_type, n, length(profile.p)) for n in params.spec_grid_n]
     
     # Loop over all bands:
     for ib=1:length(λ_band)
@@ -232,7 +232,7 @@ function model_from_parameters(params::vSmartMOM_Parameters)
             # Obtain hitran data for this molecule
             hitran_data = read_hitran(artifact(params.molecules[ib][molec_i]), iso=1)
 
-            println("Computing profile for $(params.molecules[ib][molec_i]) with vmr $(profile_hr.vmr[params.molecules[ib][molec_i]])")
+            println("Computing profile for $(params.molecules[ib][molec_i]) with vmr $(profile_hr.vmr[params.molecules[ib][molec_i]]) for band $(range(params.spec_grid_start[ib], params.spec_grid_end[ib], length=params.spec_grid_n[ib]))")
 
             # Calculate absorption profile
             compute_absorption_profile!(τ_abs[ib], hitran_data, params.broadening_function, params.wing_cutoff, params.CEF, params.architecture, profile.vmr[params.molecules[ib][molec_i]], spec_grid[ib], profile);
@@ -244,7 +244,7 @@ function model_from_parameters(params::vSmartMOM_Parameters)
 
     FT2 = typeof(params.τAer_ref[1])
 
-    # τAer[iBand][iAer,iProfile]
+    # τAer[iBand][iAer,iZ]
     τAer = [zeros(FT2, params.nAer, length(profile.p)) for i=1:nBands];
 
     # Loop over aerosol type
@@ -279,8 +279,7 @@ function model_from_parameters(params::vSmartMOM_Parameters)
         end 
     end
     
-    # Just return band 1 for now:
-    iBand = 1;
-    return vSmartMOM_Model(params, aerosol_optics[iBand],  greek_rayleigh, quad_points, τ_abs[iBand], τRayl[iBand],τAer[iBand], obs_geom, profile, params.brdf[iBand])#, BRDF_type, a_surf[iBand])
+    # Return the model 
+    return vSmartMOM_Model(params, aerosol_optics,  greek_rayleigh, quad_points, τ_abs, τRayl, τAer, obs_geom, profile)
 
 end
