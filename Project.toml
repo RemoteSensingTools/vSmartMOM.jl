@@ -1,7 +1,7 @@
 name = "RadiativeTransfer"
 uuid = "ace8185b-fa20-42f5-912d-1e850dbe6a09"
 authors = ["Rupesh Jeyaram <rjeyaram@caltech.edu> and contributors"]
-version = "0.3.1"
+version = "0.3.2"
 
 [deps]
 CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
