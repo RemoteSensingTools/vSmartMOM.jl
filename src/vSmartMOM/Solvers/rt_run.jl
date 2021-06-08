@@ -118,7 +118,7 @@ function rt_run(pol_type::AbstractPolarizationType,   # Polarization type (IQUV)
 end
 
 """
-    $(FUNCTIONNAME)(model::vSmartMOM_Model)
+    $(FUNCTIONNAME)(model::vSmartMOM_Model, i_band::Integer = -1)
 
 Perform Radiative Transfer calculations using parameters passed in through the 
 vSmartMOM_Model struct
