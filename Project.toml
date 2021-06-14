@@ -28,6 +28,7 @@ YAML = "ddb6d928-2868-570f-bddf-ab3f9cf99eb6"
 [compat]
 DiffResults = "1.0"
 Distributions = "0.23, 0.24"
+DocStringExtensions = "0.8"
 FastGaussQuadrature = "0.4"
 ForwardDiff = "0.10"
 Interpolations = "0.12, 0.13"
