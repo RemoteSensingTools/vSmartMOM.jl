@@ -16,6 +16,7 @@ Manifest.toml
 
 docs/build/*
 src/Absorption/local_only
+src/vSmartMOM/RT_FunPlots.jl
 clones/
 conda/
 registries/
