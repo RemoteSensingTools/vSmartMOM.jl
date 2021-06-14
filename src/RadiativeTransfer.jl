@@ -28,6 +28,9 @@ include("Scattering/Scattering.jl")
 include("vSmartMOM/vSmartMOM.jl")
 using .vSmartMOM
 
+# SolarModel module:
+include("SolarModel/SolarModel.jl")
+
 # Export some vSmartMOM functions
 export default_parameters, parameters_from_yaml, model_from_parameters, rt_run
 
