@@ -1,0 +1,7 @@
+{
+    "ILS": {
+        "ils_response": "InstrumentHeader/ils_relative_response",
+        "ils_grid": "InstrumentHeader/ils_delta_lambda",
+        "dispersion": "InstrumentHeader/dispersion_coef_samp"
+    }
+}
