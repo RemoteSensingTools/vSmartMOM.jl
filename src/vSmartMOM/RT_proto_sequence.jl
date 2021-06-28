@@ -7,9 +7,12 @@ using RadiativeTransfer
 using RadiativeTransfer.Absorption
 using RadiativeTransfer.Scattering
 using RadiativeTransfer.vSmartMOM
+using RadiativeTransfer.SolarModel
 using DelimitedFiles
 using Interact
 using Interpolations
+using InstrumentOperator
+using ForwardDiff
 
 # Load parameters from file
 parameters = vSmartMOM.parameters_from_yaml("RadiativeTransfer/test/helper/ThreeBandsParameters.yaml")
@@ -26,53 +29,72 @@ parameters = vSmartMOM.parameters_from_yaml("RadiativeTransfer/test/helper/Three
 # parameters = vSmartMOM.default_parameters();
 
 # Generates all the derived attributes from above parameters
-model = model_from_parameters(parameters);
+
 #model.params.architecture = RadiativeTransfer.Architectures.GPU();
 
-R = vSmartMOM.rt_run(model)
+function run_auto(x)
+    println(x)
+    println(x[1] isa ForwardDiff.Dual)
+    println(x[1])
+    println(typeof(parameters.μ))
+    parameters.μ  = [x[1]]
+    parameters.σ  = [x[2]]
+    parameters.nᵣ = [x[3]]
+    parameters.nᵢ = [x[4]]
+    model = model_from_parameters(parameters);
+    # model.architecture = RadiativeTransfer.Architectures.CPU()
+    model.params.architecture = RadiativeTransfer.Architectures.CPU()
+    R = vSmartMOM.rt_run(model, i_band=1)
+    return R[1,1,:]
+end
+
+x = [1.3, 2.0, 1.3, 0.000001];
+
+# @time run_auto(x)
+@time dfdx = ForwardDiff.jacobian(run_auto, x);
+
+a = 10
+
+# g = x -> ForwardDiff.jacobian(run_auto, x);
+
+# ν_grid = collect((1e7/778):0.015:(1e7/755))
+
+# T = 5777
+# black_body = planck_spectrum(T, ν_grid)
+
+# solar = readdlm("RadiativeTransfer/src/solar_merged_20160127_600_26316_100.out")
+
+# solar_idx_start = argmin(abs.(solar[:, 1] .- minimum(ν_grid)))
+# solar_idx_end   = argmin(abs.(solar[:, 1] .- maximum(ν_grid)))
+
+# solar_new = solar[(solar_idx_start-10):(solar_idx_end+10), :]
+
+# itp = LinearInterpolation(solar_new[:, 1], 
+#                           solar_new[:, 2])
+
+# solar_interpolated = itp.(black_body[:,1])
 
 
-solar_R = readdlm("RadiativeTransfer/src/solar_merged_20160127_600_26316_100.out")
+# plot(black_body[:,1], (solar_interpolated .* black_body[:,2]))
+# plot!(black_body[:,1], black_body[:,2])
 
-T = 5777
+# solar_out = solar_interpolated .* black_body[:,2]
 
-black_body = planck_spectrum(T, collect(1:1500), wavelength_flag=true)
+# earth_out = solar_out .* R[1,1,:]
 
-R1 = planck_spectrum(T, collect((1e7/777):0.015:(1e7/757)))
-R2 = planck_spectrum(T, reverse(1e7 ./ (collect((1e7/777):0.015:(1e7/757)))), wavelength_flag=true)
+# file = "/home/cfranken/oco2_L1bScND_18688a_180105_B8100r_180206190633.h5"
 
+# ils_Δ, ils_in, dispersion = InstrumentOperator.read_ils_table(file, "/home/rjeyaram/RadiativeTransfer/src/vSmartMOM/ils_oco2.json");
 
-# h = 6.626070e-34 # J⋅Hz−1
-# c = 3e8    # m / s
-# k = 1.380649e-23 # J⋅K−1
-# λs = collect(1:1500) .* 1e-9
-# νs = 1 ./ λs 
+# ils_pixel = 
 
-# @manipulate for T in 3000:100:10000
-#     Ls = map(ν-> (2*h*c^2) * (1/((1/ν)^5*(exp(h*c/((1/ν)*k*T)) - 1))) , νs)
-#     plot(λs*1e6, Ls)
-# end
+# oco2_kernel = VariableKernelInstrument(ils_pixel, ν, ind_out)
 
+# plot!(1e6 ./ νs[argmin(abs.((νs ./ 100) .- solar[end,1])):(end-1)], solar_interpolated * 1e13)
 
-peak = λs[argmax(Ls)]
-title!("T=$(T), peak=$(peak*1e6)μm")
+# 1 ./ νs[argmin(abs.((νs ./ 100) .- solar[end,1])):(end-1)]
 
-ν_min = νs[end] / 100
-ν_max = νs[1] / 100
+# a = ones(1500)
+# a[380:(end-1)] .= solar_interpolated
 
-solar_idx_start = argmin(abs.(solar[:, 1] .- ν_min))
-solar_idx_end   = argmin(abs.(solar[:, 1] .- ν_max))
-
-itp = LinearInterpolation(solar[solar_idx_start:solar_idx_end, 1], 
-                          solar[solar_idx_start:solar_idx_end, 2])
-
-solar_interpolated = itp.(νs[argmin(abs.((νs ./ 100) .- solar[end,1])):(end-1)] / 100)
-
-plot!(1e6 ./ νs[argmin(abs.((νs ./ 100) .- solar[end,1])):(end-1)], solar_interpolated * 1e13)
-
-1 ./ νs[argmin(abs.((νs ./ 100) .- solar[end,1])):(end-1)]
-
-a = ones(1500)
-a[380:(end-1)] .= solar_interpolated
-
-plot(1:1500, a .* Ls)
+# plot(1:1500, a .* Ls)
