@@ -232,7 +232,7 @@ function model_from_parameters(params::vSmartMOM_Parameters)
             # Obtain hitran data for this molecule
             hitran_data = read_hitran(artifact(params.molecules[ib][molec_i]), iso=1)
 
-            println("Computing profile for $(params.molecules[ib][molec_i]) with vmr $(profile_hr.vmr[params.molecules[ib][molec_i]]) for band $(range(params.spec_grid_start[ib], params.spec_grid_end[ib], length=params.spec_grid_n[ib]))")
+            println("Computing profile for $(params.molecules[ib][molec_i]) with vmr $(profile_hr.vmr[params.molecules[ib][molec_i]]) for band #$(ib)")
 
             # Calculate absorption profile
             compute_absorption_profile!(τ_abs[ib], hitran_data, params.broadening_function, params.wing_cutoff, params.CEF, params.architecture, profile.vmr[params.molecules[ib][molec_i]], spec_grid[ib], profile);
@@ -242,7 +242,7 @@ function model_from_parameters(params::vSmartMOM_Parameters)
     # aerosol_optics[iBand][iAer]
     aerosol_optics = [Array{AerosolOptics}(undef, (params.nAer)) for i=1:nBands];
 
-    FT2 = typeof(params.τAer_ref[1])
+    FT2 = typeof(params.nᵢ[1])
 
     # τAer[iBand][iAer,iZ]
     τAer = [zeros(FT2, params.nAer, length(profile.p)) for i=1:nBands];
