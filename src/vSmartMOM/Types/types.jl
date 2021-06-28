@@ -184,17 +184,17 @@ mutable struct vSmartMOM_Parameters{FT<:Union{AbstractFloat, ForwardDiff.Dual}}
     "AOD at Reference wavelength (`nAer`)"
     τAer_ref::AbstractArray#{FT} #Suniti
     "Log mean radius (`nAer`)"
-    μ::AbstractArray{FT} #Suniti
+    μ::AbstractArray#{Union{AbstractFloat, ForwardDiff.Dual}} #Suniti
     "Log stddev of radius (`nAer`)"
-    σ::AbstractArray{FT} #Suniti
+    σ::AbstractArray#{Union{AbstractFloat, ForwardDiff.Dual}} #Suniti
     "Maximum radius"
     r_max::FT
     "Number of quadrature points for integration of size distribution"
     nquad_radius::Integer
     "Real part of refractive index (`nBand,nAer`)"
-    nᵣ::AbstractArray#{FT}
+    nᵣ::AbstractArray#{Union{AbstractFloat, ForwardDiff.Dual}}
     "Imag part of refractive index (`nBand,nAer`)"
-    nᵢ::AbstractArray{FT}
+    nᵢ::AbstractArray#{Union{AbstractFloat, ForwardDiff.Dual}}
     "Pressure peak [Pa] (`nAer`)"
     p₀::AbstractArray#{FT}
     "Pressure peak width [Pa] (`nAer`)"

@@ -29,7 +29,7 @@ struct UnivariateAerosol{FT} <: AbstractAerosolType
     "Real part of refractive Index"
     nᵣ#::FT
     "Imaginary part of refractive Index"
-    nᵢ::FT
+    nᵢ#::FT
 end
 
 """ 
@@ -39,7 +39,7 @@ Convenience function to create a Univariate Aerosol, given the size parameters
 """
 function make_univariate_aerosol(size_distribution::ContinuousUnivariateDistribution, 
                                  r_max::FT, nquad_radius::Int, 
-                                 nᵣ, nᵢ::FT) where {FT}
+                                 nᵣ, nᵢ) where {FT}
 
     return UnivariateAerosol(size_distribution, r_max, nquad_radius, nᵣ, nᵢ)
 end
