@@ -28,19 +28,19 @@ end
 """
     $(FUNCTIONNAME)(file_name::String)
 
-Get the solar irradiance from the specified file
+Get the solar transmission from the specified file
 """
-solar_irradiance_from_file(file_name::String) = readdlm(file_name)
+solar_transmission_from_file(file_name::String) = readdlm(file_name)
 
 """
     $(FUNCTIONNAME)(file_name::String, ν_grid::Union{AbstractRange{<:Real}, AbstractArray})
 
-Get the solar irradiance from the specified file, and interpolate to wavenumber grid
+Get the solar transmission from the specified file, and interpolate to wavenumber grid
 """
-function solar_irradiance_from_file(file_name::String, 
+function solar_transmission_from_file(file_name::String, 
                                     ν_grid::Union{AbstractRange{<:Real}, AbstractArray})
 
-    solar = solar_irradiance_from_file(file_name)
+    solar = solar_transmission_from_file(file_name)
 
     solar_idx_start = argmin(abs.(solar[:, 1] .- minimum(ν_grid)))
     solar_idx_end   = argmin(abs.(solar[:, 1] .- maximum(ν_grid)))
@@ -53,6 +53,6 @@ function solar_irradiance_from_file(file_name::String,
     return itp.(ν_grid)
 end
 
-export planck_spectrum, solar_irradiance_from_file
+export planck_spectrum, solar_transmission_from_file
 
 end
