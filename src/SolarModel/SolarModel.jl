@@ -1,6 +1,15 @@
 module SolarModel
 
+using DocStringExtensions       # For simplifying docstring
+using DelimitedFiles            # For easily reading in solar spectrum 
+using Interpolations            # For interpolating solar spectrum
 
+"""
+    $(FUNCTIONNAME)(T::Real, grid::Vector; wavelength_flag=false)
+
+Produce the black-body planck spectrum, given the temperature and calculation grid
+
+"""
 function planck_spectrum(T::Real, grid::Vector; wavelength_flag=false)
 
     h = 6.626070e-34    # J⋅Hz−1
@@ -16,11 +25,34 @@ function planck_spectrum(T::Real, grid::Vector; wavelength_flag=false)
 
 end
 
-function output_irradiance(L_solar, R)
+"""
+    $(FUNCTIONNAME)(file_name::String)
 
-    
+Get the solar irradiance from the specified file
+"""
+solar_irradiance_from_file(file_name::String) = readdlm(file_name)
+
+"""
+    $(FUNCTIONNAME)(file_name::String, ν_grid::Union{AbstractRange{<:Real}, AbstractArray})
+
+Get the solar irradiance from the specified file, and interpolate to wavenumber grid
+"""
+function solar_irradiance_from_file(file_name::String, 
+                                    ν_grid::Union{AbstractRange{<:Real}, AbstractArray})
+
+    solar = solar_irradiance_from_file(file_name)
+
+    solar_idx_start = argmin(abs.(solar[:, 1] .- minimum(ν_grid)))
+    solar_idx_end   = argmin(abs.(solar[:, 1] .- maximum(ν_grid)))
+
+    solar_subset = solar[(solar_idx_start-10):(solar_idx_end+10), :]
+
+    itp = LinearInterpolation(solar_subset[:, 1], 
+                              solar_subset[:, 2])
+
+    return itp.(ν_grid)
 end
 
-export planck_spectrum
+export planck_spectrum, solar_irradiance_from_file
 
 end
