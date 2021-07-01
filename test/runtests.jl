@@ -14,7 +14,7 @@ using JLD2
 # Test the Absorption module
 @testset "RadiativeTransfer.Absorption" begin include("test_Absorption.jl") end
 
-# # Test the Scattering module
+# Test the Scattering module
 @testset "RadiativeTransfer.Scattering" begin include("test_Scattering.jl") end
 
 # Test the SolarModel module
