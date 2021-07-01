@@ -7,22 +7,56 @@ using Interpolations            # For interpolating solar spectrum
 """
     $(FUNCTIONNAME)(T::Real, grid::Vector; wavelength_flag=false)
 
-Produce the black-body planck spectrum, given the temperature and calculation grid
+Produce the black-body planck spectrum (mW/m²-sr-cm⁻¹), given the temperature (K) 
+and calculation grid (ν in cm⁻¹; if wavelength_flag=true, λ in nm)
 
 """
 function planck_spectrum(T::Real, grid::Vector; wavelength_flag=false)
 
-    h = 6.626070e-34    # J⋅Hz−1
-    c = 3e8             # m / s
-    k = 1.380649e-23    # J⋅K−1
-    
-    #    ν?            ν -> λ                 ν: cm⁻¹ to m⁻¹
-    νs = wavelength_flag ? (1 ./ (1e-9 .* grid)) : grid * 100 
+    c1 = 1.1910427 * 10^(-5)    # mW/m²-sr-cm⁻¹
+    c2 = 1.4387752              # K⋅cm
 
-    L = map(ν-> (2*h*c^2) * (1/((1/ν)^5*(exp(h*c/((1/ν)*k*T)) - 1))) , νs)
+    # Convert to wavenumbers if given in wavelengths
+    #    λ?                 λ -> ν            ν
+    νs = wavelength_flag ? (1e7 ./ (grid)) : grid
 
-    return [grid L]
+    # L(ν, T) = c1⋅ν³/(exp(c2⋅ν/T) - 1)
+    radiance = c1 .* (νs.^3) ./ (exp.(c2 * νs / T) .- 1)
 
+    return radiance
+end
+
+"""
+    $(FUNCTIONNAME)(T::Real; stride_length::Integer = 100)
+
+Produce the black-body planck spectrum (mW/m²-sr-cm⁻¹), given the temperature (K). 
+Use a unit calculation grid and check for convergence every `stride_length` cm⁻¹ until the 
+spectrum dies off. 
+
+"""
+function planck_spectrum(T::Real; stride_length::Integer = 100)
+
+    # νs, starting with ν0 = 1.0 cm⁻¹
+    νs = [1.0]
+
+    # radiances corresponding with νs
+    radiances = planck_spectrum(T, νs)
+
+    # Loop until convergence
+    while true 
+        
+        # Add the next ν
+        νs = vcat(νs, collect(νs[end] + 1 : νs[end] + stride_length))
+
+        # Compute the next radiance
+        radiances = vcat(radiances, planck_spectrum(T, νs[(end - stride_length + 1) : end]))
+
+        # Exit if spectrum has died off
+        (radiances[end] < radiances[1]) && break 
+
+    end
+
+    return [νs[1:(end-1)] radiances[1:(end-1)]]
 end
 
 """
