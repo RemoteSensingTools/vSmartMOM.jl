@@ -11,6 +11,7 @@ using Distributions             # Distributions from Julia
 using ForwardDiff, DiffResults  # Automatic Differentiation tools
 using LinearAlgebra
 using StatsBase                 # Fit statistics for truncation
+using StaticArrays
 
 using ..Architectures: device
 

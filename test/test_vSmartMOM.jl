@@ -8,20 +8,20 @@
 
 end
 
-# Test the O2 case
-@testset "O2 RT" begin
+# # Test the O2 case
+# @testset "O2 RT" begin
 
-    println("Testing RT with only O₂...")
+#     println("Testing RT with only O₂...")
 
-    parameters = vSmartMOM.parameters_from_yaml("helper/O2Parameters.yaml")
+#     parameters = vSmartMOM.parameters_from_yaml("helper/O2Parameters.yaml")
 
-end
+# end
 
-# Test 3 bands, 3 profiles case (O₂, CO₂, H₂O)
-@testset "pure_rayleigh" begin
+# # Test 3 bands, 3 profiles case (O₂, CO₂, H₂O)
+# @testset "pure_rayleigh" begin
 
-    println("Testing 3 bands, 3 profiles case (O₂, CO₂, H₂O)")
+#     println("Testing 3 bands, 3 profiles case (O₂, CO₂, H₂O)")
 
-    parameters = vSmartMOM.parameters_from_yaml("helper/ThreeBandsParameters.yaml")
+#     parameters = vSmartMOM.parameters_from_yaml("helper/ThreeBandsParameters.yaml")
 
-end
+# end

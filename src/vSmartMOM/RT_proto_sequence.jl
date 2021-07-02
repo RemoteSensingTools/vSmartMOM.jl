@@ -8,14 +8,16 @@ using RadiativeTransfer.Absorption
 using RadiativeTransfer.Scattering
 using RadiativeTransfer.vSmartMOM
 using RadiativeTransfer.SolarModel
-using DelimitedFiles
-using Interact
-using Interpolations
-using InstrumentOperator
-using ForwardDiff
+# using DelimitedFiles
+# using Interact
+# using Interpolations
+# using InstrumentOperator
+# using ForwardDiff
 
 # Load parameters from file
-parameters = vSmartMOM.parameters_from_yaml("RadiativeTransfer/test/helper/ThreeBandsParameters.yaml")
+parameters = vSmartMOM.parameters_from_yaml("RadiativeTransfer/test/helper/PureRayleighParameters.yaml")
+model = model_from_parameters(parameters);
+R = vSmartMOM.rt_run(model, i_band=1)
 
 # params_dict = YAML.load_file("RadiativeTransfer/src/vSmartMOM/ModelParameters/DefaultParameters.yaml")
 

@@ -116,9 +116,10 @@ function apply_D_matrix!(n_stokes::Int, r⁻⁺::CuArray{FT,3}, t⁺⁺::CuArray
         
         return nothing
     else 
-        applyD_kernel! = apply_D!(KernelAbstractions.CUDADevice())
+        device = devi(architecture(r⁻⁺))
+        applyD_kernel! = apply_D!(device)
         event = applyD_kernel!(n_stokes, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻, ndrange=size(r⁻⁺));
-        wait(KernelAbstractions.CUDADevice(), event);
+        wait(device, event);
         synchronize_if_gpu();
         return nothing
     end
@@ -142,9 +143,10 @@ function apply_D_matrix_SFI!(n_stokes::Int, J₀⁻::CuArray{FT,3}) where {FT}
     if n_stokes == 1
         return nothing
     else 
-        applyD_kernel! = apply_D_SFI!(KernelAbstractions.CUDADevice())
+        device = devi(architecture(J₀⁻))
+        applyD_kernel! = apply_D_SFI!(device)
         event = applyD_kernel!(n_stokes, J₀⁻, ndrange=size(J₀⁻));
-        wait(KernelAbstractions.CUDADevice(), event);
+        wait(device, event);
         synchronize();
         return nothing
     end
@@ -154,9 +156,10 @@ function apply_D_matrix_SFI!(n_stokes::Int, J₀⁻::Array{FT,3}) where {FT}
     if n_stokes == 1
         return nothing
     else 
-        applyD_kernel! = apply_D_SFI!(KernelAbstractions.CPU())
+        device = devi(architecture(J₀⁻))
+        applyD_kernel! = apply_D_SFI!(device)
         event = applyD_kernel!(n_stokes, J₀⁻, ndrange=size(J₀⁻));
-        wait(KernelAbstractions.CPU(), event);
+        wait(device, event);
         return nothing
     end
 end
