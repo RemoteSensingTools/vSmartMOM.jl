@@ -5,6 +5,7 @@ export
     @hascuda,
     AbstractArchitecture, CPU, GPU,
     devi, array_type, 
+    architecture,
     default_architecture,
     synchronize_if_gpu
 

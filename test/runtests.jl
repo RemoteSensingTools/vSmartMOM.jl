@@ -2,6 +2,7 @@ using RadiativeTransfer
 using RadiativeTransfer.Architectures
 using RadiativeTransfer.Absorption
 using RadiativeTransfer.Scattering
+using RadiativeTransfer.vSmartMOM
 using RadiativeTransfer.SolarModel
 using Test
 using DelimitedFiles
@@ -16,6 +17,9 @@ using JLD2
 
 # Test the Scattering module
 @testset "RadiativeTransfer.Scattering" begin include("test_Scattering.jl") end
+
+# Test the vSmartMOM module
+@testset "RadiativeTransfer.vSmartMOM" begin include("test_vSmartMOM.jl") end
 
 # Test the SolarModel module
 @testset "RadiativeTransfer.SolarModel" begin include("test_SolarModel.jl") end

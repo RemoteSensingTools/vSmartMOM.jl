@@ -198,7 +198,7 @@ mutable struct vSmartMOM_Parameters{FT<:Union{AbstractFloat, ForwardDiff.Dual}}
     "Pressure peak [Pa] (`nAer`)"
     p₀::AbstractArray#{FT}
     "Pressure peak width [Pa] (`nAer`)"
-    σp::AbstractArray{FT}
+    σp::AbstractArray#{FT}
     "Path to atmospheric profile file"
     file::AbstractString
     "Time index to retrieve from file "
@@ -216,7 +216,7 @@ mutable struct vSmartMOM_Parameters{FT<:Union{AbstractFloat, ForwardDiff.Dual}}
     "Number of spectral points in absorption grid (`nBand`)"
     spec_grid_n::AbstractArray{Integer}
     "Molecules to use for absorption calculations (`nBand, nMolecules`)"
-    molecules::Vector{Vector{String}}
+    molecules::Vector
     "Type of broadening function (Doppler/Lorentz/Voigt)"
     broadening_function::AbstractBroadeningFunction
     "Wing cutoff to use in cross-section calculation"

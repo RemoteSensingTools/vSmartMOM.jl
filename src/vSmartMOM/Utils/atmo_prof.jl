@@ -66,10 +66,12 @@ function read_atmos_profile(file_path::String)
         p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o = compute_atmos_profile_fields(p_half, T, q)
     elseif ("q" in keys(params_dict))
         p_half = convert(Float64, params_dict["p_half"])
+        psurf = p_half[end]
         q      = convert.(Float64, params_dict["q"])
         p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o = compute_atmos_profile_fields(p_half, T, q)
     else
-        p_half = convert(Float64, params_dict["p_half"])
+        p_half = convert.(Float64, params_dict["p_half"])
+        psurf = p_half[end]
         q = zeros(length(T))
         p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o = compute_atmos_profile_fields(p_half, T, q)
     end

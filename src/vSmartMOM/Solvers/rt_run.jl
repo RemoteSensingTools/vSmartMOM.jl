@@ -28,7 +28,7 @@ function rt_run(pol_type::AbstractPolarizationType,   # Polarization type (IQUV)
     nAer  = length(aerosol_optics)      # Number of aerosols
 
     # Need to check this a bit better in the future!
-    FT_dual = typeof(τAer[1])
+    FT_dual = length(τAer) > 0 ? typeof(τAer[1]) : Float64
 
     # Output variables: Reflected and transmitted solar irradiation at TOA and BOA respectively # Might need Dual later!!
     R = zeros(FT_dual, length(vza), pol_type.n, nSpec)
