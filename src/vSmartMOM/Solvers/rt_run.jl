@@ -146,6 +146,21 @@ function rt_run(model::vSmartMOM_Model; i_band::Integer = -1)
                       model.params.brdf[i_band],
                       model.params.architecture)
 
+    # User doesn't specify band, but there's only one 
+    elseif n_bands == 1
+
+        return rt_run(model.params.polarization_type,
+                      model.obs_geom::ObsGeometry,
+                      model.τRayl[1], 
+                      model.τAer[1], 
+                      model.quad_points,
+                      model.params.max_m,
+                      model.aerosol_optics[1],
+                      model.greek_rayleigh,
+                      model.τ_abs[1],
+                      model.params.brdf[1],
+                      model.params.architecture)
+
     # User wants all bands
     else
 

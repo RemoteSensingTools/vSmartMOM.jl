@@ -8,7 +8,7 @@ absorption:
   wing_cutoff:        40
   # Spectral bands
   spec_bands: 
-    - "(1e7/510):1.0:(1e7/500)"
+    - "[19800.0, 19801.0]"
   # List of molecules
   molecules:
     - []
