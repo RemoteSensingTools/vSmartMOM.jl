@@ -1,7 +1,7 @@
 
 <h1 align="center">
   <br>
-  <a href="http://www.amitmerchant.com/electron-markdownify"><img src="docs/src/assets/logo.png" alt="RadiativeTransfer" width="200"></a>
+  <a href="https://github.com/RadiativeTransfer/RadiativeTransfer.jl"><img src="docs/src/assets/logo.png" alt="RadiativeTransfer" width="200"></a>
   <br>
   RadiativeTransfer.jl
   <br>
