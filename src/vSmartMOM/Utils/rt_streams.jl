@@ -12,20 +12,23 @@ Returns computed quadrature points as [`QuadPoints`](@ref)
 """
 function rt_set_streams(::GaussQuadHemisphere, 
                         Ltrunc::Int, 
-                        obs_geom::ObsGeometry, 
+                        obs_geom::ObsGeometry{FT}, 
                         pol_type,
-                        arr_type)
+                        arr_type) where {FT}
 
-    @unpack obs_alt, sza, vza, vaz = obs_geom
-    FT = eltype(sza)
+    @unpack sza, vza = obs_geom
 
     Nquad = (Ltrunc + 1) ÷ 2
+
     qp_μ, wt_μ = Scattering.gauleg(Nquad, 0.0, 1.0) # quadrature limits are 0.0-1.0
+    # Solar angle
     μ₀ = cosd.(sza)
-    #qp_μ = unique([qp_μ; cosd.(vza)])
+
+    
     # Assign zero-weights to remaining camera zenith angles
-    qp_μ = [qp_μ[Nquad + 1:end]; cosd.(vza); μ₀];
-    wt_μ = [wt_μ[Nquad + 1:end]; zeros(FT,length(vza)); FT(0)];
+    qp_μ = unique(FT[qp_μ; cosd.(vza); μ₀]);
+    n_eff = length(qp_μ) - length(wt_μ);
+    wt_μ = FT[wt_μ; zeros(FT,n_eff)];
     Nquad = length(qp_μ);
     iμ₀ = nearest_point(qp_μ, μ₀);
     qp_μN = arr_type(reduce(vcat, (fill.(qp_μ, [pol_type.n]))))
@@ -47,19 +50,20 @@ Returns computed quadrature points as [`QuadPoints`](@ref)
 """
 function rt_set_streams(::GaussQuadFullSphere, 
                         Ltrunc::Int, 
-                        obs_geom::ObsGeometry, 
+                        obs_geom::ObsGeometry{FT}, 
                         pol_type,
-                        arr_type)
+                        arr_type) where {FT}
                         
-    @unpack obs_alt, sza, vza, vaz = obs_geom
-    FT = eltype(sza)
+    @unpack sza, vza = obs_geom
+
     Nquad = (Ltrunc + 1) ÷ 2
     qp_μ, wt_μ = gausslegendre(2Nquad) # quadrature limits are [-1,1]
     μ₀ = cosd.(sza)
     #qp_μ = unique([qp_μ; cosd.(vza)])
     # Assign zero-weights to remaining camera zenith angles
-    qp_μ = [qp_μ[Nquad + 1:end]; cosd.(vza); μ₀];
-    wt_μ = [wt_μ[Nquad + 1:end]; zeros(FT,length(vza)); FT(0)];
+    qp_μ = unique(FT[qp_μ[Nquad + 1:end]; cosd.(vza); μ₀]);
+    n_eff = length(qp_μ) - length(wt_μ[Nquad + 1:end]);
+    wt_μ = FT[wt_μ[Nquad + 1:end]; zeros(FT,n_eff)];
     Nquad = length(qp_μ);
 
     iμ₀ = nearest_point(qp_μ, μ₀);
