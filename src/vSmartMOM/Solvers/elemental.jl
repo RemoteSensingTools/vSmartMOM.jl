@@ -196,17 +196,19 @@ end
 end
 
 function apply_D_matrix_elemental!(ndoubl::Int, n_stokes::Int, r⁻⁺::CuArray{FT,3}, t⁺⁺::CuArray{FT,3}, r⁺⁻::CuArray{FT,3}, t⁻⁻::CuArray{FT,3}) where {FT}
-    applyD_kernel! = apply_D_elemental!(CUDAKernels.CUDADevice())
+    device = devi(Architectures.GPU())
+    applyD_kernel! = apply_D_elemental!(device)
     event = applyD_kernel!(ndoubl,n_stokes, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻, ndrange=size(r⁻⁺));
-    wait(CUDAKernels.CUDADevice(), event);
+    wait(device, event);
     synchronize_if_gpu();
     return nothing
 end
 
 function apply_D_matrix_elemental!(ndoubl::Int, n_stokes::Int, r⁻⁺::Array{FT,3}, t⁺⁺::Array{FT,3}, r⁺⁻::Array{FT,3}, t⁻⁻::Array{FT,3}) where {FT}
-    applyD_kernel! = apply_D_elemental!(KernelAbstractions.CPU())
+    device = devi(Architectures.CPU())
+    applyD_kernel! = apply_D_elemental!(device)
     event = applyD_kernel!(ndoubl,n_stokes, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻, ndrange=size(r⁻⁺));
-    wait(KernelAbstractions.CPU(), event);
+    wait(device, event);
     return nothing
 end
 
@@ -214,9 +216,10 @@ function apply_D_matrix_elemental_SFI!(ndoubl::Int, n_stokes::Int, J₀⁻::CuAr
     if ndoubl > 1
         return nothing
     else 
-        applyD_kernel! = apply_D_elemental_SFI!(CUDAKernels.CUDADevice())
+        device = devi(Architectures.GPU())
+        applyD_kernel! = apply_D_elemental_SFI!(device)
         event = applyD_kernel!(ndoubl,n_stokes, J₀⁻, ndrange=size(J₀⁻));
-        wait(CUDAKernels.CUDADevice(), event);
+        wait(device, event);
         synchronize();
         return nothing
     end
@@ -226,9 +229,10 @@ function apply_D_matrix_elemental_SFI!(ndoubl::Int, n_stokes::Int, J₀⁻::Arra
     if ndoubl > 1
         return nothing
     else 
-        applyD_kernel! = apply_D_elemental_SFI!(KernelAbstractions.CPU())
+        device = devi(Architectures.CPU())
+        applyD_kernel! = apply_D_elemental_SFI!(device)
         event = applyD_kernel!(ndoubl,n_stokes, J₀⁻, ndrange=size(J₀⁻));
-        wait(KernelAbstractions.CPU(), event);
+        wait(device, event);
         return nothing
     end
 end
