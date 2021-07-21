@@ -9,7 +9,7 @@ using RadiativeTransfer.vSmartMOM
 using ForwardDiff 
 
 # Load parameters from file
-parameters = vSmartMOM.parameters_from_yaml("RadiativeTransfer/test/helper/ThreeBandsParameters.yaml")
+parameters = vSmartMOM.parameters_from_yaml("RadiativeTransfer/test/helper/O2Parameters.yaml")
 
 # default_parameters
 

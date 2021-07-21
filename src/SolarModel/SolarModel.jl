@@ -5,23 +5,37 @@ using DelimitedFiles            # For easily reading in solar spectrum
 using Interpolations            # For interpolating solar spectrum
 
 """
-    $(FUNCTIONNAME)(T::Real, grid::Vector; wavelength_flag=false)
+    $(FUNCTIONNAME)(T::Real, ν_grid::Vector)
 
 Produce the black-body planck spectrum (mW/m²-sr-cm⁻¹), given the temperature (K) 
-and calculation grid (ν in cm⁻¹; if wavelength_flag=true, λ in nm)
+and calculation grid (ν in cm⁻¹)
 
 """
-function planck_spectrum(T::Real, grid::Vector; wavelength_flag=false)
+function planck_spectrum_wn(T::Real, ν_grid::Vector)
 
     c1 = 1.1910427 * 10^(-5)    # mW/m²-sr-cm⁻¹
     c2 = 1.4387752              # K⋅cm
 
-    # Convert to wavenumbers if given in wavelengths
-    #    λ?                 λ -> ν            ν
-    νs = wavelength_flag ? (1e7 ./ (grid)) : grid
+    # L(ν, T) = c1⋅ν³/(exp(c2⋅ν/T) - 1)
+    radiance = c1 .* (ν_grid.^3) ./ (exp.(c2 * ν_grid / T) .- 1)
+
+    return radiance
+end
+
+"""
+    $(FUNCTIONNAME)(T::Real, λ_grid::Vector)
+
+Produce the black-body planck spectrum (W/m²-sr-μm), given the temperature (K) 
+and calculation grid (λ in μm)
+
+"""
+function planck_spectrum_wl(T::Real, λ_grid::Vector)
+
+    c1 = 1.1910427 * 10^8    # W/m²-sr-μm
+    c2 = 1.4387752 * 10^4    # K⋅μm
 
     # L(ν, T) = c1⋅ν³/(exp(c2⋅ν/T) - 1)
-    radiance = c1 .* (νs.^3) ./ (exp.(c2 * νs / T) .- 1)
+    radiance = c1 ./ (λ_grid.^5 .* (exp.(c2 ./ (λ_grid * T)) .- 1))
 
     return radiance
 end
@@ -34,13 +48,13 @@ Use a unit calculation grid and check for convergence every `stride_length` cm�
 spectrum dies off. 
 
 """
-function planck_spectrum(T::Real; stride_length::Integer = 100)
+function planck_spectrum_wn(T::Real; stride_length::Integer = 100)
 
     # νs, starting with ν0 = 1.0 cm⁻¹
     νs = [1.0]
 
     # radiances corresponding with νs
-    radiances = planck_spectrum(T, νs)
+    radiances = planck_spectrum_wn(T, νs)
 
     # Loop until convergence
     while true 
@@ -49,7 +63,7 @@ function planck_spectrum(T::Real; stride_length::Integer = 100)
         νs = vcat(νs, collect(νs[end] + 1 : νs[end] + stride_length))
 
         # Compute the next radiance
-        radiances = vcat(radiances, planck_spectrum(T, νs[(end - stride_length + 1) : end]))
+        radiances = vcat(radiances, planck_spectrum_wn(T, νs[(end - stride_length + 1) : end]))
 
         # Exit if spectrum has died off
         (radiances[end] < radiances[1]) && break 
@@ -87,6 +101,6 @@ function solar_transmission_from_file(file_name::String,
     return itp.(ν_grid)
 end
 
-export planck_spectrum, solar_transmission_from_file
+export planck_spectrum_wn, planck_spectrum_wl, solar_transmission_from_file
 
 end
