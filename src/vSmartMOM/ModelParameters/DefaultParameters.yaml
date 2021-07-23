@@ -54,6 +54,11 @@ atmospheric_profile:
       31.00,   42.07,  56.09,  74.78,  99.69, 131.00,
       176.85, 236.64, 314.58, 418.87, 557.76, 735.00, 
       800.12, 849.00, 912.00, 980.00, 1005.0]
+  # VMR profiles can either be real-valued numbers, or an array of nodal points from TOA to BOA
+  vmr: 
+    CO2:  [0.000385, 0.000395]
+    O2:   0.21
+    H2O:  0.01
   # Reduce profile to n layers
   profile_reduction:  20
 
