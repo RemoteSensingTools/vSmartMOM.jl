@@ -132,9 +132,10 @@ function apply_D_matrix!(n_stokes::Int, r⁻⁺::Array{FT,3}, t⁺⁺::Array{FT,
         
         return nothing
     else 
-        applyD_kernel! = apply_D!(KernelAbstractions.CPU())
+        device = devi(Architectures.CPU())
+        applyD_kernel! = apply_D!(device)
         event = applyD_kernel!(n_stokes, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻, ndrange=size(r⁻⁺));
-        wait(KernelAbstractions.CPU(), event);
+        wait(device, event);
         return nothing
     end
 end
