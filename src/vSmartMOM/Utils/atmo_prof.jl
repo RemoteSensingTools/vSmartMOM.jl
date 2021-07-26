@@ -303,22 +303,28 @@ end
 "When performing RT_run, this function pre-calculates properties for all layers, before any Core RT is performed"
 function construct_all_atm_layers(FT, nSpec, Nz, NquadN, τRayl, τAer, aerosol_optics, Rayl𝐙⁺⁺, Rayl𝐙⁻⁺, Aer𝐙⁺⁺, Aer𝐙⁻⁺, τ_abs, arr_type, qp_μ, μ₀, m)
 
+    FT_ext   = eltype(τAer)
+    FT_phase = eltype(Aer𝐙⁺⁺)
+
+    @show FT_ext
+    @show FT_phase
+
     # Empty matrices to hold all values
-    τ_λ_all   = zeros(FT, nSpec, Nz)
-    ϖ_λ_all   = zeros(FT, nSpec, Nz)
-    τ_all     = zeros(FT, Nz)
-    ϖ_all     = zeros(FT, Nz)
-    Z⁺⁺_all   = zeros(FT, NquadN, NquadN, Nz)
-    Z⁻⁺_all   = zeros(FT, NquadN, NquadN, Nz)
+    τ_λ_all   = zeros(FT_ext, nSpec, Nz)
+    ϖ_λ_all   = zeros(FT_ext, nSpec, Nz)
+    τ_all     = zeros(FT_ext, Nz)
+    ϖ_all     = zeros(FT_ext, Nz)
+    Z⁺⁺_all   = zeros(FT_phase, NquadN, NquadN, Nz)
+    Z⁻⁺_all   = zeros(FT_phase, NquadN, NquadN, Nz)
     
-    dτ_max_all  = zeros(FT, Nz)
-    dτ_all      = zeros(FT, Nz)
+    dτ_max_all  = zeros(FT_ext, Nz)
+    dτ_all      = zeros(FT_ext, Nz)
     ndoubl_all  = zeros(Int64, Nz)
-    dτ_λ_all    = zeros(FT, nSpec, Nz)
-    expk_all    = zeros(FT, nSpec, Nz)
+    dτ_λ_all    = zeros(FT_ext, nSpec, Nz)
+    expk_all    = zeros(FT_ext, nSpec, Nz)
     scatter_all = zeros(Bool, Nz)
 
-    Threads.@threads for iz=1:Nz
+    for iz=1:Nz
         
         # Construct atmospheric properties
         τ_λ_all[:, iz], ϖ_λ_all[:, iz], τ_all[iz], ϖ_all[iz], Z⁺⁺_all[:,:,iz], Z⁻⁺_all[:,:,iz] = construct_atm_layer(τRayl[iz], τAer[:,iz], aerosol_optics, Rayl𝐙⁺⁺, Rayl𝐙⁻⁺, Aer𝐙⁺⁺, Aer𝐙⁻⁺, τ_abs[:,iz], arr_type)

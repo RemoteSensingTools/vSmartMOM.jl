@@ -14,7 +14,7 @@ function elemental!(pol_type, SFI::Bool,
                             added_layer::AddedLayer{FT}, 
                             I_static,
                             architecture) where {FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2}
-    
+
     @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, J₀⁺, J₀⁻ = added_layer
     @unpack qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart, iμ₀ = quad_points
     arr_type = array_type(architecture)
@@ -69,7 +69,6 @@ function elemental!(pol_type, SFI::Bool,
         else 
             #Version 2: More computationally intensive definition of a single scattering layer with variable (0-∞) absorption
             # Version 2: with absorption in batch mode, low tau_scatt but higher tau_total, needs different equations
-            
             kernel! = get_elem_rt!(device)
             event = kernel!(r⁻⁺, t⁺⁺, ϖ_λ, dτ_λ, Z⁻⁺, Z⁺⁺, qp_μN, wct, ndrange=size(r⁻⁺)); 
             wait(device, event)
