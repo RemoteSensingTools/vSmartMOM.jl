@@ -2,7 +2,7 @@ using Revise
 using Plots
 using RadiativeTransfer
 using RadiativeTransfer.Absorption
-using RadiativeTransfer.PhaseFunction
+using RadiativeTransfer.Scattering
 using RadiativeTransfer.RTM
 using Distributions
 using BenchmarkTools
@@ -20,7 +20,7 @@ FT = Float32
 depol = FT(0.0)
 # Truncation 
 Ltrunc = 20             # Truncation  
-truncation_type   = PhaseFunction.δBGE{Float32}(Ltrunc, 2.0)
+truncation_type   = Scattering.δBGE{Float32}(Ltrunc, 2.0)
 
 # polarization_type
 polarization_type = Stokes_IQU{FT}()
@@ -52,7 +52,7 @@ model_NAI2_aero1 = make_mie_model(NAI2(), aero1, λ, polarization_type, truncati
 aerosol_optics_NAI2_aero1 = compute_aerosol_optical_properties(model_NAI2_aero1, FT);
 
 # Truncate:
-aerosol_optics_trunc_aero1 = PhaseFunction.truncate_phase(truncation_type, aerosol_optics_NAI2_aero1; reportFit=true)
+aerosol_optics_trunc_aero1 = Scattering.truncate_phase(truncation_type, aerosol_optics_NAI2_aero1; reportFit=true)
 
 # Define some details, run aerosol optics
 # model_NAI2_aero2 = make_mie_model(NAI2(), aero2, λ, polarization_type, truncation_type)
@@ -61,7 +61,7 @@ aerosol_optics_trunc_aero1 = PhaseFunction.truncate_phase(truncation_type, aeros
 # aerosol_optics_trunc_aero2 = PhaseFunction.truncate_phase(truncation_type, aerosol_optics_NAI2_aero2)
 
 # Rayleigh Greek
-GreekRayleigh = PhaseFunction.get_greek_rayleigh(depol)
+GreekRayleigh = Scattering.get_greek_rayleigh(depol)
 
 
 # In[ ]:
