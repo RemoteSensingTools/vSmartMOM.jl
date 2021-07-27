@@ -30,15 +30,12 @@ end
 function batch_inv!(X::CuArray{FT,3}, A::CuArray{FT,3}) where {FT}
 
     # LU-factorize A
-    pivot, info   = CUBLAS.getrf_strided_batched!(A, true);
-    synchronize()
-
+    @timeit "LR" pivot, info   = CUBLAS.getrf_strided_batched!(A, true);synchronize()
     # Invert LU factorization of A
-    getri_strided_batched!(A, X, pivot); 
-    synchronize()
-
+    @timeit "RI" getri_strided_batched!(A, X, pivot); synchronize()
     return nothing
 end
+
 
 "Given 3D Julia Array A, fill in X[:,:,k] = A[:,:,k] \\ I" 
 function batch_inv!(X::AbstractArray{FT,3}, A::AbstractArray{FT,3}) where {FT}
@@ -49,5 +46,5 @@ end
 
 "Batched matrix multiply (overwrite NNlib definition)"
 function batched_mul(A::CuArray{FT,3}, B::CuArray{FT,3}) where {FT}
-    CUBLAS.gemm_strided_batched('N', 'N', A, B)
+    @timeit "BATchedMul" CUBLAS.gemm_strided_batched('N', 'N', A, B)
 end
