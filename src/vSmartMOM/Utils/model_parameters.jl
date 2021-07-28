@@ -236,12 +236,12 @@ function model_from_parameters(params::vSmartMOM_Parameters)
         for molec_i in 1:length(params.molecules[ib])
 
             # Obtain hitran data for this molecule
-            hitran_data = read_hitran(artifact(params.molecules[ib][molec_i]), iso=1)
+            @timeit "Read HITRAN"  hitran_data = read_hitran(artifact(params.molecules[ib][molec_i]), iso=1)
 
             println("Computing profile for $(params.molecules[ib][molec_i]) with vmr $(profile_hr.vmr[params.molecules[ib][molec_i]]) for band #$(ib)")
 
             # Calculate absorption profile
-            compute_absorption_profile!(τ_abs[ib], hitran_data, params.broadening_function, params.wing_cutoff, params.CEF, params.architecture, profile.vmr[params.molecules[ib][molec_i]], spec_grid[ib], profile);
+            @timeit "Absorption Coeff"  compute_absorption_profile!(τ_abs[ib], hitran_data, params.broadening_function, params.wing_cutoff, params.CEF, params.architecture, profile.vmr[params.molecules[ib][molec_i]], spec_grid[ib], profile);
         end
     end
 
@@ -277,7 +277,7 @@ function model_from_parameters(params::vSmartMOM_Parameters)
                 mie_model      = make_mie_model(params.decomp_type, aerosol, params.λ_band[ib], params.polarization_type, truncation_type)
 
                 # Compute raw (not truncated) aerosol optical properties (not needed in RT eventually) 
-                aerosol_optics_raw = compute_aerosol_optical_properties(mie_model, FT2);
+                @timeit "Mie calc"  aerosol_optics_raw = compute_aerosol_optical_properties(mie_model, FT2);
 
                 # Compute truncated aerosol optical properties (phase function and fᵗ), consistent with Ltrunc:
                 @show iaer,ib
