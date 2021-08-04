@@ -1,96 +1,101 @@
 
 # Overload the show method for vSmartMOM_Parameters
-function Base.show(::IO, x::vSmartMOM_Parameters)
+function Base.show(io::IO, x::vSmartMOM_Parameters)
 
-    println("----------")
-    println("Absorption")
-    println("----------")
-    println("\tBroadening: $(x.broadening_function)")
-    println("\tCEF: $(x.CEF)")
-    println("\tWing Cutoff: $(x.wing_cutoff) cm⁻¹")
-    bands = map(i-> "$(round(x.spec_grid_start[i], digits=2)):$(x.spec_grid_n[i]):$(round(x.spec_grid_end[i], digits=2))", 1:length(x.spec_grid_start))
-    println("\tSpectral Bands (ν₁:n:νₙ, cm⁻¹):")
-    for band in bands
-        println("\t\t- $(band)")
+    println(io, "\n------------------")
+    println(io, "Radiative Transfer")
+    println(io, "------------------")
+    println(io, "\tSpectral Bands (ν₁:n:νₙ, cm⁻¹):")
+    for band in x.spec_bands
+        println(io, "\t\t- $(length(band))-length vector from $(round(band[1], digits=2)) to $(round(band[end], digits=2))")
     end
-    println("\tMolecules")
-    for molecule_band in x.molecules
-        println("\t\t- $(molecule_band)")
-    end
-
-    println("\n----------")
-    println("Scattering")
-    println("----------")
-    println("\tAerosols:")
-    for i in 1:x.nAer
-        println("\t\t- Aerosol #$(i)")
-        println("\t\t  τ_ref: $(x.τAer_ref[i])")
-        println("\t\t  μ: $(x.μ[i]) μm")
-        println("\t\t  σ: $(x.σ[i]) μm")
-        println("\t\t  nᵣ: $(x.nᵣ[i])")
-        println("\t\t  nᵢ: $(x.nᵢ[i])")
-        println("\t\t  p₀: $(x.p₀[i]) Pa") 
-        println("\t\t  σp: $(x.σp[i]) Pa")
-    end
-    println("\tr_max: $(x.r_max) μm")
-    println("\tnquad_radius: $(x.CEF)")
-    println("\tλ_bands:")
-    for λ in x.λ_band
-        println("\t\t- $(λ) μm")
-    end
-    println("\tλ_ref: $(x.λ_ref) μm")
-    println("\tDepolarization: $(x.depol)")
-    println("\tPolarization Type: $(x.polarization_type)")
-    println("\tDecomposition Type: $(x.decomp_type)")
-
-    println("\n--------")
-    println("Geometry")
-    println("--------")
-    println("\tVZA (deg): $(x.vza)")
-    println("\tVAZ (deg): $(x.vaz)")
-    println("\tSZA (deg): $(x.sza)")
-    println("\tObservation Altitude: $(x.obs_alt)")
-
-    println("\n-------------------")
-    println("Atmospheric Profile")
-    println("-------------------")
-    println("\tFile Path: $(x.file)")
-    println("\tProfile Reduction: $(x.profile_reduction_n) layers")
-
-    println("\n--------")
-    println("Surfaces")
-    println("--------")
-    println("\tBRDFs: ")
+    println(io, "\tSurface BRDFs: ")
     for surface in x.brdf
-        println("\t\t- $(surface)")
+        println(io, "\t\t- $(surface)")
+    end
+    println(io, "\tQuadrature Type: $(x.quadrature_type)")
+    println(io, "\tPolarization Type: $(x.polarization_type)")
+    println(io, "\tmax_m: $(x.max_m)")
+    println(io, "\tΔ_angle: $(x.Δ_angle)°")
+    println(io, "\tl_trunc: $(x.l_trunc)")
+    println(io, "\tDepolarization: $(x.depol)")
+    println(io, "\tFloating-point type: $(x.float_type)")
+    println(io, "\tArchitecture: $(x.architecture)")
+
+    println(io, "\n--------")
+    println(io, "Geometry")
+    println(io, "--------")
+    println(io, "\tSZA (deg): $(x.sza)")
+    println(io, "\tVZA (deg): $(x.vza)")
+    println(io, "\tVAZ (deg): $(x.vaz)")
+    println(io, "\tObservation Altitude: $(x.obs_alt)")
+
+    println(io, "\n-------------------")
+    println(io, "Atmospheric Profile")
+    println(io, "-------------------")
+    println(io, "\tTemperature: $(length(x.T))-length array")
+    println(io, "\tPressure: $(length(x.p))-length array")
+    println(io, "\tSpecific humidity: $(length(x.q))-length array")
+    if x.profile_reduction_n == -1
+        println(io, "\tProfile Reduction: None")
+    else
+        println(io, "\tProfile Reduction: $(x.profile_reduction_n) layers")
     end
 
-    println("\n---------------")
-    println("Truncation Type")
-    println("---------------")
-    println("\tl_trunc: $(x.l_trunc)")
-    println("\tΔ_angle: $(x.Δ_angle)°")
-
-    println("\n---------")
-    println("vSmartMOM")
-    println("---------")
-    println("\tquadrature_type: $(x.quadrature_type)")
-    println("\tmax_m: $(x.max_m)")
-    println("\tarchitecture: $(x.architecture)")
-    println("\tfloat_type: $(x.float_type)")
+    println(io, "\n----------")
+    println(io, "Absorption")
+    println(io, "----------")
+    if (!isnothing(x.absorption_params))
+        println(io, "\tMolecules")
+        for molecule_band in x.absorption_params.molecules
+            println(io, "\t\t- $(molecule_band)")
+        end
+        println(io, "\tVMR:")
+        for mol in keys(x.absorption_params.vmr)
+            println(io, "\t\t- $(mol): $(x.absorption_params.vmr[mol])")
+        end
+        println(io, "\tBroadening: $(x.absorption_params.broadening_function)")
+        println(io, "\tCEF: $(x.absorption_params.CEF)")
+        println(io, "\tWing Cutoff: $(x.absorption_params.wing_cutoff) cm⁻¹")
+    else
+        println(io, "(No Absorption Parameters Specified)")
+    end
+    
+    println(io, "\n----------")
+    println(io, "Scattering")
+    println(io, "----------")
+    if (!isnothing(x.scattering_params))
+        println(io, "\tAerosols:")
+        for i in 1:length(x.scattering_params.aerosols)
+            println(io, "\t\t- Aerosol #$(i)")
+            println(io, "\t\t  τ_ref: $(x.scattering_params.aerosols[i].τ_ref)")
+            println(io, "\t\t  μ: $(x.scattering_params.aerosols[i].μ) μm")
+            println(io, "\t\t  σ: $(x.scattering_params.aerosols[i].σ) μm")
+            println(io, "\t\t  nᵣ: $(x.scattering_params.aerosols[i].nᵣ)")
+            println(io, "\t\t  nᵢ: $(x.scattering_params.aerosols[i].nᵢ)")
+            println(io, "\t\t  p₀: $(x.scattering_params.aerosols[i].p₀) Pa") 
+            println(io, "\t\t  σp: $(x.scattering_params.aerosols[i].σp) Pa")
+        end
+        println(io, "\tr_max: $(x.scattering_params.r_max) μm")
+        println(io, "\tnquad_radius: $(x.scattering_params.nquad_radius)")
+        println(io, "\tλ_ref: $(x.scattering_params.λ_ref) μm")
+        print(io, "\tDecomposition Type: $(x.scattering_params.decomp_type)")
+    else
+        print(io, "(No Scattering Parameters Specified)")
+    end
     
 end
 
 # Overload the show method for vSmartMOM_Model
-function Base.show(::IO, x::vSmartMOM_Model)
+function Base.show(io::IO, x::vSmartMOM_Model)
     
-    println("        params| ::vSmartMOM_Parameters")
-    println("aerosol_optics| [iBand][iAer] ($(length(x.aerosol_optics)) x $(length(x.aerosol_optics[1])))")
-    println("greek_rayleigh| ::GreekCoefs")
-    println("   quad_points| ::QuadPoints")
-    println("         τ_abs| [iBand][iSpec,iZ] ($(length(x.τ_abs)) x (nSpec x $(size(x.τ_abs[1])[2])))")
-    println("         τRayl| [iBand][iZ] ($(length(x.τRayl)) x $(length(x.τRayl[1])))")
-    println("          τAer| [iBand][iAer,iZ] ($(length(x.τAer)) x ($(size(x.τAer[1])[1]) x $(size(x.τAer[1])[2])))")
-    println("      obs_geom| ::ObsGeometry")
-    println("       profile| ::AtmosphericProfile")
+    println(io, "        params| ::vSmartMOM_Parameters")
+    println(io, "aerosol_optics| [i_band][i_aer] ($(length(x.aerosol_optics)) x $(length(x.aerosol_optics[1])))")
+    println(io, "greek_rayleigh| ::GreekCoefs")
+    println(io, "   quad_points| ::QuadPoints")
+    println(io, "         τ_abs| [i_band][i_spec,i_z] ($(length(x.τ_abs)) x (n_spec x $(size(x.τ_abs[1])[2])))")
+    println(io, "        τ_rayl| [i_band][i_z] ($(length(x.τ_rayl)) x $(length(x.τ_rayl[1])))")
+    println(io, "         τ_aer| [i_band][i_aer,i_z] ($(length(x.τ_aer)) x ($(size(x.τ_aer[1])[1]) x $(size(x.τ_aer[1])[2])))")
+    println(io, "      obs_geom| ::ObsGeometry")
+    println(io, "       profile| ::AtmosphericProfile")
 end

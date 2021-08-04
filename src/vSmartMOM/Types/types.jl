@@ -1,20 +1,14 @@
 
 "Struct for an atmospheric profile"
 struct AtmosphericProfile{FT, VMR <: Union{Real, Vector}}
-    "Latitude of the AtmosphericProfile"
-    lat
-    "Longitude of the AtmosphericProfile"
-    lon
-    "Surface Pressure"
-    psurf::FT
     "Temperature Profile"
     T::Array{FT,1}
+    "Pressure Profile (Full)"
+    p_full::Array{FT,1}
     "Specific humidity profile"
     q::Array{FT,1}
-    "Pressure Profile"
-    p::Array{FT,1}
     "Pressure Levels"
-    p_levels::Array{FT,1}
+    p_half::Array{FT,1}
     "H2O Volume Mixing Ratio Profile"
     vmr_h2o::Array{FT,1}
     "Vertical Column Density (Dry)"
@@ -30,14 +24,32 @@ abstract type AbstractObsGeometry end
 
 "Observation Geometry (basics)" 
 Base.@kwdef struct ObsGeometry{FT} <: AbstractObsGeometry
-    "Altitude of Observer `[Pa]`"
-    obs_alt::FT
     "Solar Zenith Angle `[Degree]`"
     sza::FT
     "Viewing Zenith Angle(s) `[Degree]`" 
     vza::Array{FT,1}
     "Viewing Azimuth Angle(s) `[Degree]`" 
     vaz::Array{FT,1}
+    "Altitude of Observer `[Pa]`"
+    obs_alt::FT
+end
+
+"Aerosol type with its properties"
+struct Aerosol{FT}
+    "Reference τ"
+    τ_ref::FT
+    "Log mean radius (µm)"
+    μ::FT
+    "Log stddev of radius (µm)"
+    σ::FT
+    "Real part of refractive index"
+    nᵣ::FT
+    "Imag part of refractive index"
+    nᵢ::FT
+    "Pressure peak (Pa)"
+    p₀::FT
+    "Pressure peak width (Pa)"
+    σp::FT
 end
 
 "Quadrature Types for RT streams"
@@ -146,6 +158,44 @@ struct LambertianSurfacePolyFit{FT} <: AbstractSurfaceType
 end
 
 """
+    struct AbsorptionParameters
+
+A struct which holds all absorption-related parameters (before any computations)
+"""
+
+mutable struct AbsorptionParameters
+    "Molecules to use for absorption calculations (`nBand, nMolecules`)"
+    molecules::AbstractArray
+    "Volume-Mixing Ratios"
+    vmr::Dict
+    "Type of broadening function (Doppler/Lorentz/Voigt)"
+    broadening_function::AbstractBroadeningFunction
+    "Complex Error Function to use in Voigt calculations"
+    CEF::AbstractComplexErrorFunction
+    "Wing cutoff to use in cross-section calculation (cm⁻¹)"
+    wing_cutoff::Integer
+end
+
+"""
+    struct ScatteringParameters
+
+A struct which holds all scattering-related parameters (before any computations)
+"""
+
+mutable struct ScatteringParameters{FT<:Union{AbstractFloat, ForwardDiff.Dual}}
+    "List of scattering aerosols and their properties"
+    aerosols::Vector{Aerosol}
+    "Maximum aerosol particle radius for quadrature points/weights (µm)"
+    r_max::FT
+    "Number of quadrature points for integration of size distribution"
+    nquad_radius::Integer
+    "Reference wavelength (µm)"
+    λ_ref::FT
+    "Algorithm to use for fourier decomposition (NAI2/PCW)"
+    decomp_type::AbstractFourierDecompositionType
+end
+
+"""
     struct vSmartMOM_Parameters
 
 A struct which holds all initial model parameters (before any computations)
@@ -155,82 +205,54 @@ $(DocStringExtensions.FIELDS)
 """
 mutable struct vSmartMOM_Parameters{FT<:Union{AbstractFloat, ForwardDiff.Dual}} 
 
-    "Float type to use in the RT (Float64/Float32)"
-    float_type::DataType
-    "band center wavelength (`nBand`)"
-    λ_band::AbstractArray{FT}
-    "reference wavelength"
-    λ_ref::FT
-    "Depolarization value"
-    depol::FT
-    "Truncation length for legendre terms (scalar for now, can do `nBand` later)"
-    l_trunc::Integer
-    "Exclusion angle for forward peak"
-    Δ_angle::FT
-    "Hard cutoff for maximum number of m iterations"
-    max_m::Integer
+    # radiative_transfer group
+    "Spectral bands (`nBand`)"
+    spec_bands::AbstractArray
+    "Surface (Bidirectional Reflectance Distribution Function)"
+    brdf::AbstractArray
+    "Quadrature type for RT streams (RadauQuad/GaussQuadHemisphere/GaussQuadFullSphere)"
+    quadrature_type::AbstractQuadratureType
     "Type of polarization (I/IQ/IQU/IQUV)"
     polarization_type::AbstractPolarizationType
-    "Altitude of observer `[Pa]`"
-    obs_alt::FT
+    "Hard cutoff for maximum number of Fourier moments to loop over"
+    max_m::Integer
+    "Exclusion angle for forward peak [deg]"
+    Δ_angle::FT
+    "Truncation length for legendre terms (scalar for now, can do `nBand` later)"
+    l_trunc::Integer
+    "Depolarization factor"
+    depol::FT    
+    "Float type to use in the RT (Float64/Float32)"
+    float_type::DataType
+    "Architecture to use for calculations (CPU/GPU)"
+    architecture::AbstractArchitecture
+
+    # geometry group
     "Solar zenith angle [deg]"
     sza::FT
     "Viewing zenith angles [deg]"
     vza::AbstractArray{FT}
     "Viewing azimuthal angles [deg]"
     vaz::AbstractArray{FT}
-    "Number of aerosol species"
-    nAer::Integer
-    "AOD at Reference wavelength (`nAer`)"
-    τAer_ref::AbstractArray#{FT} #Suniti
-    "Log mean radius (`nAer`)"
-    μ::AbstractArray#{Union{AbstractFloat, ForwardDiff.Dual}} #Suniti
-    "Log stddev of radius (`nAer`)"
-    σ::AbstractArray#{Union{AbstractFloat, ForwardDiff.Dual}} #Suniti
-    "Maximum radius"
-    r_max::FT
-    "Number of quadrature points for integration of size distribution"
-    nquad_radius::Integer
-    "Real part of refractive index (`nBand,nAer`)"
-    nᵣ::AbstractArray#{Union{AbstractFloat, ForwardDiff.Dual}}
-    "Imag part of refractive index (`nBand,nAer`)"
-    nᵢ::AbstractArray#{Union{AbstractFloat, ForwardDiff.Dual}}
-    "Pressure peak [Pa] (`nAer`)"
-    p₀::AbstractArray#{FT}
-    "Pressure peak width [Pa] (`nAer`)"
-    σp::AbstractArray#{FT}
-    "Path to atmospheric profile file"
-    file::AbstractString
-    "Time index to retrieve from file "
-    timeIndex::Union{Integer, Nothing}
-    "Latitude of atmospheric profile"
-    lat::Union{Number, Nothing}
-    "Longitude of atmospheric profile"
-    lon::Union{Number, Nothing}
+    "Altitude of observer [Pa]"
+    obs_alt::FT
+
+    # atmospheric_profile group
+    "Temperature Profile [K]"
+    T::AbstractArray{FT}
+    "Pressure Profile [hPa]"
+    p::AbstractArray{FT}
+    "Specific humidity profile"
+    q::AbstractArray{FT}
     "Length of profile reduction"
     profile_reduction_n::Integer
-    "Starting wavelength for absorption grid (`nBand`)"
-    spec_grid_start::AbstractArray{FT}
-    "Ending wavelength for absorption grid (`nBand`)"
-    spec_grid_end::AbstractArray{FT}
-    "Number of spectral points in absorption grid (`nBand`)"
-    spec_grid_n::AbstractArray{Integer}
-    "Molecules to use for absorption calculations (`nBand, nMolecules`)"
-    molecules::Vector
-    "Type of broadening function (Doppler/Lorentz/Voigt)"
-    broadening_function::AbstractBroadeningFunction
-    "Wing cutoff to use in cross-section calculation"
-    wing_cutoff::Integer
-    "Complex Error Function to use in Voigt calculations"
-    CEF::AbstractComplexErrorFunction
-    "Surface reflectance type"
-    brdf#::AbstractArray{AbstractSurfaceType}
-    "Algorithm to use for fourier decomposition (NAI2/PCW)"
-    decomp_type::AbstractFourierDecompositionType
-    "Quadrature type for RT streams (RadauQuad/GaussQuadHemisphere/GaussQuadFullSphere)"
-    quadrature_type::AbstractQuadratureType
-    "Architecture to use for calculations (CPU/GPU)"
-    architecture::AbstractArchitecture
+
+    # absorption group
+    absorption_params::Union{AbsorptionParameters, Nothing}
+
+    # scattering group
+    scattering_params::Union{ScatteringParameters, Nothing}
+    
 end
 
 """
@@ -272,18 +294,21 @@ mutable struct vSmartMOM_Model
 
     "Struct with all individual parameters"
     params::vSmartMOM_Parameters
+    
     "Truncated aerosol optics"
     aerosol_optics::AbstractArray{AbstractArray{AerosolOptics}}
     "Greek coefs in Rayleigh calculations" 
     greek_rayleigh::GreekCoefs
     "Quadrature points/weights, etc"
     quad_points::QuadPoints
+
     "Array to hold cross-sections over entire atmospheric profile"
     τ_abs::AbstractArray{AbstractArray}
     "Rayleigh optical thickness"
-    τRayl::AbstractArray{AbstractArray}
+    τ_rayl::AbstractArray{AbstractArray}
     "Aerosol optical thickness"
-    τAer::AbstractArray{AbstractArray}
+    τ_aer::AbstractArray{AbstractArray}
+
     "Observational Geometry (includes sza, vza, vaz)"
     obs_geom::ObsGeometry
     "Atmospheric profile to use"

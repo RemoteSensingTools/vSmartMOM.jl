@@ -1,13 +1,13 @@
 """
-    $(FUNCTIONNAME)(pol_type, obs_geom::ObsGeometry, τRayl, τAer, quad_points::QuadPoints, max_m, aerosol_optics, greek_rayleigh, τ_abs, brdf, architecture::AbstractArchitecture)
+    $(FUNCTIONNAME)(pol_type, obs_geom::ObsGeometry, τ_rayl, τ_aer, quad_points::QuadPoints, max_m, aerosol_optics, greek_rayleigh, τ_abs, brdf, architecture::AbstractArchitecture)
 
 Perform Radiative Transfer calculations using given parameters
 
 """
 function rt_run(pol_type::AbstractPolarizationType,   # Polarization type (IQUV)
                 obs_geom::ObsGeometry,          # Solar Zenith, Viewing Zenith, Viewing Azimuthal 
-                τRayl,                          # Rayleigh optical depth 
-                τAer,                           # Aerosol optical depth and single-scattering albedo
+                τ_rayl,                          # Rayleigh optical depth 
+                τ_aer,                           # Aerosol optical depth and single-scattering albedo
                 quad_points::QuadPoints,        # Quadrature points and weights
                 max_m,                          # Max Fourier terms
                 aerosol_optics,                 # AerosolOptics (greek_coefs, ω̃, k, fᵗ)
@@ -19,7 +19,7 @@ function rt_run(pol_type::AbstractPolarizationType,   # Polarization type (IQUV)
     @unpack obs_alt, sza, vza, vaz = obs_geom   # Observational geometry properties
     @unpack qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart,μ₀, iμ₀,Nquad = quad_points # All quadrature points
     FT = eltype(sza)                    # Get the float-type to use
-    Nz = length(τRayl)                  # Number of vertical slices
+    Nz = length(τ_rayl)                  # Number of vertical slices
     nSpec = size(τ_abs, 1)              # Number of spectral points
     arr_type = array_type(architecture) # Type of array to use
     SFI = true                          # SFI flag
@@ -28,7 +28,7 @@ function rt_run(pol_type::AbstractPolarizationType,   # Polarization type (IQUV)
     nAer  = length(aerosol_optics)      # Number of aerosols
 
     # Need to check this a bit better in the future!
-    FT_dual = length(τAer) > 0 ? typeof(τAer[1]) : Float64
+    FT_dual = length(τ_aer) > 0 ? typeof(τ_aer[1]) : Float64
 
     # Output variables: Reflected and transmitted solar irradiation at TOA and BOA respectively # Might need Dual later!!
     R = zeros(FT_dual, length(vza), pol_type.n, nSpec)
@@ -65,9 +65,6 @@ function rt_run(pol_type::AbstractPolarizationType,   # Polarization type (IQUV)
         # For m>=3, Rayleigh matrices will be 0, can catch with if statement if wanted 
         @timeit "Z moments" Rayl𝐙⁺⁺, Rayl𝐙⁻⁺ = Scattering.compute_Z_moments(pol_type, Array(qp_μ), greek_rayleigh, m, arr_type = arr_type);
 
-        # Just for now (will change this later):
-        # iBand = 1
-
         # Need to make sure arrays are 0:
         # TBD here
         
@@ -80,11 +77,8 @@ function rt_run(pol_type::AbstractPolarizationType,   # Polarization type (IQUV)
         # @timeit "Creating arrays" τ_λ   = arr_type(zeros(FT, nSpec))
 
         # Loop over all layers and pre-compute all properties before performing core RT
-        @timeit "Computing Layer Properties" computed_atmosphere_properties = construct_all_atm_layers(FT, nSpec, Nz, NquadN, τRayl, τAer, aerosol_optics, Rayl𝐙⁺⁺, Rayl𝐙⁻⁺, Aer𝐙⁺⁺, Aer𝐙⁻⁺, τ_abs, arr_type, qp_μ, μ₀, m)
-        # Show timing statistics
-        #print_timer()
-        #reset_timer!()
-        #return computed_atmosphere_properties
+        @timeit "Computing Layer Properties" computed_atmosphere_properties = construct_all_atm_layers(FT, nSpec, Nz, NquadN, τ_rayl, τ_aer, aerosol_optics, Rayl𝐙⁺⁺, Rayl𝐙⁻⁺, Aer𝐙⁺⁺, Aer𝐙⁻⁺, τ_abs, arr_type, qp_μ, μ₀, m)
+
         # Loop over vertical layers:
         @showprogress 1 "Looping over layers ..." for iz = 1:Nz  # Count from TOA to BOA
 
@@ -130,7 +124,7 @@ vSmartMOM_Model struct
 function rt_run(model::vSmartMOM_Model; i_band::Integer = -1)
 
     # Number of bands total
-    n_bands = length(model.params.spec_grid_start)
+    n_bands = length(model.params.spec_bands)
 
     # Check that i_band is valid
     @assert (i_band == -1 || i_band in collect(1:n_bands)) "i_band is $(i_band) but there are only $(n_bands) bands"
@@ -139,8 +133,8 @@ function rt_run(model::vSmartMOM_Model; i_band::Integer = -1)
     if i_band != -1
         return rt_run(model.params.polarization_type,
                       model.obs_geom::ObsGeometry,
-                      model.τRayl[i_band], 
-                      model.τAer[i_band], 
+                      model.τ_rayl[i_band], 
+                      model.τ_aer[i_band], 
                       model.quad_points,
                       model.params.max_m,
                       model.aerosol_optics[i_band],
@@ -154,8 +148,8 @@ function rt_run(model::vSmartMOM_Model; i_band::Integer = -1)
 
         return rt_run(model.params.polarization_type,
                       model.obs_geom::ObsGeometry,
-                      model.τRayl[1], 
-                      model.τAer[1], 
+                      model.τ_rayl[1], 
+                      model.τ_aer[1], 
                       model.quad_points,
                       model.params.max_m,
                       model.aerosol_optics[1],
@@ -177,8 +171,8 @@ function rt_run(model::vSmartMOM_Model; i_band::Integer = -1)
 
             R = rt_run(model.params.polarization_type,
                        model.obs_geom::ObsGeometry,
-                       model.τRayl[i], 
-                       model.τAer[i], 
+                       model.τ_rayl[i], 
+                       model.τ_aer[i], 
                        model.quad_points,
                        model.params.max_m,
                        model.aerosol_optics[i],

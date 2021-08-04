@@ -26,8 +26,7 @@ end
 # Given a list of aerosol parameter dictionaries, validate all of them
 function validate_aerosols(aerosols::Union{Array{Dict{Any, Any}}, Vector{Any}})
 
-    # No validation needed if empty
-    isempty(aerosols) && return 
+    @assert !isempty(aerosols) "Aerosols list shouldn't be empty if scattering block is included"
 
     fields = [(["τ_ref"], Real),
               (["μ"], Real),
@@ -45,11 +44,28 @@ function validate_aerosols(aerosols::Union{Array{Dict{Any, Any}}, Vector{Any}})
     end
 end
 
+function aerosol_params_to_obj(aerosols::Union{Array{Dict{Any, Any}}, Vector{Any}}, FT)
+    # return Aerosol[]
+    aerosol_obj_list = Aerosol[]
+    for aerosol in aerosols
+        new_aerosol_obj = Aerosol(FT(aerosol["τ_ref"]),
+                                  FT(aerosol["μ"]), 
+                                  FT(aerosol["σ"]),
+                                  FT(aerosol["nᵣ"]),
+                                  FT(aerosol["nᵢ"]),
+                                  FT(aerosol["p₀"]),
+                                  FT(aerosol["σp"]))
+        push!(aerosol_obj_list, new_aerosol_obj)
+    end
+
+    return aerosol_obj_list
+end
+
 "Check that the vmr's in the atmospheric profile match the molecules in the parameters" 
-function validate_vmrs(params::vSmartMOM_Parameters, profile::AtmosphericProfile)
-    for molec in unique(vcat(params.molecules...))
-        @assert molec in keys(profile.vmr) "$(molec) listed as molecule in parameters yaml, but no vmr given in atmospheric profile"
-        @assert profile.vmr[molec] isa Real || profile.vmr[molec] isa Vector "The vmr for $(molec) in the atmospheric profile must either be a real-valued number, or an array of nodal points from surface to 0hPa (TOA)"
+function validate_vmrs(molecules::Array, vmr::Dict)
+    for molec in unique(vcat(molecules...))
+        @assert molec in keys(vmr) "$(molec) listed as molecule in parameters yaml, but no vmr given in atmospheric profile"
+        @assert vmr[molec] isa Real || vmr[molec] isa Vector "The vmr for $(molec) in the atmospheric profile must either be a real-valued number, or an array of nodal points from surface to 0hPa (TOA)"
     end
 end
 
@@ -57,49 +73,63 @@ end
 function validate_yaml_parameters(params)
 
     # All the fields that *should* exist and their types
-    fields = [(["absorption", "broadening"], String, ["Voigt()", "Doppler()", "Lorentz()"]), 
+    fields = [
+
+              # radiative_transfer group
+              (["radiative_transfer", "spec_bands"], Array{String}),  
+              (["radiative_transfer", "surface"], Array{String}),   
+              (["radiative_transfer", "quadrature_type"], String), 
+              (["radiative_transfer", "polarization_type"], String),   
+              (["radiative_transfer", "max_m"], Integer), 
+              (["radiative_transfer", "Δ_angle"], Real),
+              (["radiative_transfer", "l_trunc"], Integer),
+              (["radiative_transfer", "depol"], Real),
+              (["radiative_transfer", "float_type"], String),
+              (["radiative_transfer", "architecture"], String),
+
+              # geometry group
+              (["geometry", "sza"], Real),
+              (["geometry", "vza"], Array{<:Real}),
+              (["geometry", "vaz"], Array{<:Real}),
+              (["geometry", "obs_alt"], Real),
+
+              # atmospheric_profile group
+              (["atmospheric_profile", "T"], Array{<:Real}),
+              (["atmospheric_profile", "p"], Array{<:Real}),
+              (["atmospheric_profile", "profile_reduction"], Union{Integer, Nothing}),
+
+              # absorption group
+              (["absorption", "molecules"], Array),
+              (["absorption", "vmr"], Dict),
+              (["absorption", "broadening"], String, ["Voigt()", "Doppler()", "Lorentz()"]), 
               (["absorption", "CEF"], String, ["HumlicekWeidemann32SDErrorFunction()"]),
               (["absorption", "wing_cutoff"], Integer),
-              (["absorption", "spec_bands"], Array{String}),
-              (["absorption", "molecules"], Array),
               
+              # scattering group
               (["scattering", "aerosols"], Array),
               (["scattering", "r_max"], Real),
               (["scattering", "nquad_radius"], Real),
-              (["scattering", "λ"], Array{<:Real}),
               (["scattering", "λ_ref"], Real),
-              (["scattering", "depol"], Real),
-              (["scattering", "polarization_type"], String, ["Stokes_I()", "Stokes_IQ()", "Stokes_IQU()", "Stokes_IQUV()"]),
               (["scattering", "decomp_type"], String, ["NAI2()", "PCW()"]),
-
-              (["geometry", "vza"], Array{<:Real}),
-              (["geometry", "vaz"], Array{<:Real}),
-              (["geometry", "sza"], Real),
-              (["geometry", "obs_alt"], Real),
-
-              (["atmospheric_profile", "file"], String),
-              (["atmospheric_profile", "profile_reduction"], Integer),
-
-              (["surface", "BRDFs"], Array{String}),
-
-              (["truncation_type", "l_trunc"], Integer),
-              (["truncation_type", "Δ_angle"], Real),
-
-              (["vSmartMOM", "quadrature_type"], String),
-              (["vSmartMOM", "max_m"], Integer),
-              (["vSmartMOM", "architecture"], String),
-              (["vSmartMOM", "float_type"], String)
               ]
 
     # Check that every field exists and is correctly typed
     for i in 1:length(fields)
         key, elty = fields[i][1:2]
         valid_options = length(fields[i]) == 3 ? fields[i][3] : Array{String}([])
-        @assert check_yaml_field(params, key, key, elty, valid_options) 
+
+        # Check if the section exists in the YAML file and is an optional section
+        if ("absorption" in keys(params) && key[1] == "absorption") || 
+           ("scattering" in keys(params) && key[1] == "scattering") || 
+           (key[1] != "absorption" && key[1] != "scattering")
+            @assert check_yaml_field(params, key, key, elty, valid_options) 
+        end
     end
 
-    # Check the aerosols separately
-    validate_aerosols(params["scattering"]["aerosols"])
+    # Check the aerosols separately if specified
+    if "scattering" in keys(params)
+        validate_aerosols(params["scattering"]["aerosols"])
+    end
 end
 
 "Given a path to a YAML parameters file, load all the parameters into a vSmartMOM_Parameters struct" 
@@ -111,186 +141,194 @@ function parameters_from_yaml(file_path)
     # Validate to make sure it has all necessary fields
     validate_yaml_parameters(params_dict)
 
-    # Evaluate certain fields to get their proper types
-    broadening_function = eval(Meta.parse(params_dict["absorption"]["broadening"]))
-    CEF = eval(Meta.parse(params_dict["absorption"]["CEF"]))
-    polarization_type = eval(Meta.parse(params_dict["scattering"]["polarization_type"]))
-    decomp_type = eval(Meta.parse(params_dict["scattering"]["decomp_type"]))
-    quadrature_type = eval(Meta.parse(params_dict["vSmartMOM"]["quadrature_type"]))
-    architecture = eval(Meta.parse(params_dict["vSmartMOM"]["architecture"]))
-    FT = eval(Meta.parse(params_dict["vSmartMOM"]["float_type"]))
-    BRDF_per_band = map(x -> eval(Meta.parse(x)), params_dict["surface"]["BRDFs"]) 
-    lengths = convert.(Integer, map(x -> length(collect(eval(Meta.parse(x)))), params_dict["absorption"]["spec_bands"]))
+    # #########################################################
+    # Evaluate type-specifying fields to get their proper types
+    # #########################################################
 
-    # Evaluate profile path if it's not a plain string (need to joinpath)
-    if occursin("joinpath", params_dict["atmospheric_profile"]["file"])
-        profile_path = eval(Meta.parse(params_dict["atmospheric_profile"]["file"]))
-    else
-        profile_path = params_dict["atmospheric_profile"]["file"]
+    # radiative_transfer group
+    spec_bands = convert.(Array, map(x -> collect(eval(Meta.parse(x))), params_dict["radiative_transfer"]["spec_bands"]))
+    BRDF_per_band = map(x -> eval(Meta.parse(x)), params_dict["radiative_transfer"]["surface"]) 
+    quadrature_type = eval(Meta.parse(params_dict["radiative_transfer"]["quadrature_type"]))
+    polarization_type = eval(Meta.parse(params_dict["radiative_transfer"]["polarization_type"]))
+    FT = eval(Meta.parse(params_dict["radiative_transfer"]["float_type"]))
+    architecture = eval(Meta.parse(params_dict["radiative_transfer"]["architecture"]))
+
+    # atmospheric_profile group
+    T = convert.(FT, params_dict["atmospheric_profile"]["T"]) # Level
+    p = convert.(FT, params_dict["atmospheric_profile"]["p"]) # Boundaries
+    q = "q" in keys(params_dict["atmospheric_profile"]) ? # Specific humidity, if it's specified. 
+            convert.(Float64, params_dict["atmospheric_profile"]["q"]) : zeros(length(T)) # Otherwise 0
+
+    # absorption group
+    if "absorption" in keys(params_dict)
+        molecules = Array(params_dict["absorption"]["molecules"])
+        vmr = convert(Dict{String, Union{Real, Vector}}, params_dict["absorption"]["vmr"])
+        validate_vmrs(params_dict["absorption"]["molecules"], vmr)
+        broadening_function = eval(Meta.parse(params_dict["absorption"]["broadening"]))
+        CEF = eval(Meta.parse(params_dict["absorption"]["CEF"]))
+        wing_cutoff = params_dict["absorption"]["wing_cutoff"]
+
+        absorption_params = AbsorptionParameters(molecules, vmr, broadening_function, 
+                                                 CEF, wing_cutoff)
+    else 
+        absorption_params = nothing
     end
     
-    # If the specified atmospheric profile is YAML, then set time_index/lat/lon to nothing
-    if endswith(profile_path, ".yaml")
-        time_index = nothing
-        lat = nothing
-        lon = nothing
+    # scattering group
+    if "scattering" in keys(params_dict)
+        
+        # Get aerosols from types
+        aerosols = aerosol_params_to_obj(params_dict["scattering"]["aerosols"], FT)
+        r_max = FT(params_dict["scattering"]["r_max"])
+        nquad_radius = params_dict["scattering"]["nquad_radius"]
+        λ_ref = FT(params_dict["scattering"]["λ_ref"])
+        decomp_type = eval(Meta.parse(params_dict["scattering"]["decomp_type"]))
 
-    # Otherwise, store them
+        scattering_params = ScatteringParameters(aerosols, r_max, nquad_radius, 
+                                                 λ_ref, decomp_type)
     else
-        time_index = params_dict["atmospheric_profile"]["time_index"]
-        lat = params_dict["atmospheric_profile"]["lat"]
-        lon = params_dict["atmospheric_profile"]["lon"]
+        scattering_params = nothing
     end
 
-    return vSmartMOM_Parameters(FT,
-                                convert.(FT, params_dict["scattering"]["λ"]),
-                                FT(params_dict["scattering"]["λ_ref"]),
-                                FT(params_dict["scattering"]["depol"]),
-                                params_dict["truncation_type"]["l_trunc"],
-                                FT(params_dict["truncation_type"]["Δ_angle"]),
-                                params_dict["vSmartMOM"]["max_m"],
+    return vSmartMOM_Parameters(
+                                # radiative_transfer group
+                                spec_bands, 
+                                BRDF_per_band,
+                                quadrature_type,
                                 polarization_type,
-                                FT(params_dict["geometry"]["obs_alt"]),
+                                params_dict["radiative_transfer"]["max_m"],
+                                FT(params_dict["radiative_transfer"]["Δ_angle"]),
+                                params_dict["radiative_transfer"]["l_trunc"],
+                                FT(params_dict["radiative_transfer"]["depol"]),
+                                FT, 
+                                architecture,
+                                
+                                # geometry group
                                 FT(params_dict["geometry"]["sza"]),
                                 convert.(FT, params_dict["geometry"]["vza"]),
                                 convert.(FT, params_dict["geometry"]["vaz"]),
-                                length(params_dict["scattering"]["aerosols"]), 
-                                convert.(FT, map(x -> x["τ_ref"], params_dict["scattering"]["aerosols"])),
-                                convert.(FT, map(x -> x["μ"], params_dict["scattering"]["aerosols"])),
-                                convert.(FT, map(x -> x["σ"], params_dict["scattering"]["aerosols"])),
-                                FT(params_dict["scattering"]["r_max"]),
-                                params_dict["scattering"]["nquad_radius"],
-                                convert.(FT, map(x -> x["nᵣ"], params_dict["scattering"]["aerosols"])),
-                                convert.(FT, map(x -> x["nᵢ"], params_dict["scattering"]["aerosols"])),
-                                convert.(FT, map(x -> x["p₀"], params_dict["scattering"]["aerosols"])),
-                                convert.(FT, map(x -> x["σp"], params_dict["scattering"]["aerosols"])),
-                                profile_path,
-                                time_index,
-                                lat,
-                                lon,
+                                FT(params_dict["geometry"]["obs_alt"]),
+
+                                # atmospheric_profile group
+                                T, p, q, 
                                 params_dict["atmospheric_profile"]["profile_reduction"],
-                                convert.(FT, map(x -> first(collect(eval(Meta.parse(x)))), params_dict["absorption"]["spec_bands"])),
-                                convert.(FT, map(x -> last(collect(eval(Meta.parse(x)))), params_dict["absorption"]["spec_bands"])),
-                                convert(Array{Integer}, convert.(Integer, map(x -> length(collect(eval(Meta.parse(x)))), params_dict["absorption"]["spec_bands"]))),
-                                params_dict["absorption"]["molecules"],
-                                broadening_function,
-                                params_dict["absorption"]["wing_cutoff"],
-                                CEF,
-                                BRDF_per_band,
-                                decomp_type,
-                                quadrature_type,
-                                architecture)
+
+                                # absorption group
+                                absorption_params,
+
+                                # scattering group
+                                scattering_params
+                                );
 end
 
 "Take the parameters specified in the vSmartMOM_Parameters struct, and calculate derived attributes into a vSmartMOM_Model" 
 function model_from_parameters(params::vSmartMOM_Parameters)
 
-    @unpack λ_band = params
-    nBands = length(λ_band)
+    # Number of total bands and aerosols (for convenience)
+    n_bands = length(params.spec_bands)
+    n_aer = isnothing(params.scattering_params) ? 0 : length(params.scattering_params.aerosols)
 
     # Create observation geometry
-    obs_geom = ObsGeometry(params.obs_alt, params.sza, params.vza, params.vaz)
+    obs_geom = ObsGeometry(params.sza, params.vza, params.vaz, params.obs_alt)
 
     # Create truncation type
     truncation_type = Scattering.δBGE{params.float_type}(params.l_trunc, params.Δ_angle)
 
-    # Set quadrature points
+    # Set quadrature points for streams
     quad_points = rt_set_streams(params.quadrature_type, params.l_trunc, obs_geom, params.polarization_type, array_type(params.architecture))
 
-    # Read profile (and generate dry/wet VCDs per layer)
-    if isnothing(params.timeIndex)
-        profile_hr = vSmartMOM.read_atmos_profile(params.file);
-    else
-        profile_hr = vSmartMOM.read_atmos_profile(params.file, params.lat, params.lon, params.timeIndex);
+    # Get AtmosphericProfile from parameters
+    vmr = isnothing(params.absorption_params) ? Dict() : params.absorption_params.vmr
+    p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o, new_vmr = compute_atmos_profile_fields(params.T, params.p, params.q, vmr)
+    profile = AtmosphericProfile(params.T, p_full, params.q, p_half, vmr_h2o, vcd_dry, vcd_h2o, new_vmr)
+    
+    # Reduce the profile to the number of target layers (if specified)
+    if params.profile_reduction_n != -1
+        profile = vSmartMOM.reduce_profile(params.profile_reduction_n, profile);
     end
 
-    # Validate that the vmr's in the atmospheric profile, match those in the parameters
-    validate_vmrs(params, profile_hr)
-    
-    # Reduce the profile to the number of target layers
-    # println(profile_hr)
-    # profile = profile_hr
-    profile = vSmartMOM.reduce_profile(params.profile_reduction_n, profile_hr);
-
-    #Rayleigh
+    # Rayleigh optical properties calculation
     greek_rayleigh = Scattering.get_greek_rayleigh(params.depol)
-    τRayl = [zeros(params.float_type, length(profile.p)) for i=1:nBands];
-
-    # Create empty array (can be changed later)
-    # spec_grid[iBand][iSpec]
-    spec_grid = [zeros(params.float_type,n) for n in params.spec_grid_n];
+    τ_rayl = [zeros(params.float_type, length(params.T)) for i=1:n_bands];
 
     # τ_abs[iBand][iSpec,iZ]
-    τ_abs     = [zeros(params.float_type, n, length(profile.p)) for n in params.spec_grid_n]
+    τ_abs     = [zeros(params.float_type, length(params.spec_bands[i]), length(profile.p_full)) for i in 1:n_bands]
     
     # Loop over all bands:
-    for ib=1:length(λ_band)
+    for i_band=1:n_bands
 
-        # Compute Rayleigh properties per layer for `ib` band center 
-        τRayl[ib]   = getRayleighLayerOptProp(profile.psurf / 100, λ_band[ib], params.depol, profile.vcd_dry);
+        # i'th spectral band (convert from cm⁻¹ to μm)
+        curr_band_λ = 1e4 ./ params.spec_bands[i_band]
 
-        # Define spectral grid per band
-        spec_grid[ib] = range(params.spec_grid_start[ib], params.spec_grid_end[ib], length=params.spec_grid_n[ib]);
+        # Compute Rayleigh properties per layer for `i_band` band center 
+        τ_rayl[i_band]   = getRayleighLayerOptProp(profile.p_half[end], (maximum(curr_band_λ) + minimum(curr_band_λ)/2), params.depol, profile.vcd_dry);
+
+        # If no absorption, continue to next band
+        isnothing(params.absorption_params) && continue
         
         # Loop over all molecules in this band, obtain profile for each, and add them up
-        for molec_i in 1:length(params.molecules[ib])
+        for molec_i in 1:length(params.absorption_params.molecules[i_band])
 
             # Obtain hitran data for this molecule
-            @timeit "Read HITRAN"  hitran_data = read_hitran(artifact(params.molecules[ib][molec_i]), iso=1)
+            @timeit "Read HITRAN"  hitran_data = read_hitran(artifact(params.absorption_params.molecules[i_band][molec_i]), iso=1)
 
-            println("Computing profile for $(params.molecules[ib][molec_i]) with vmr $(profile_hr.vmr[params.molecules[ib][molec_i]]) for band #$(ib)")
+            println("Computing profile for $(params.absorption_params.molecules[i_band][molec_i]) with vmr $(profile.vmr[params.absorption_params.molecules[i_band][molec_i]]) for band #$(i_band)")
 
             # Calculate absorption profile
-            @timeit "Absorption Coeff"  compute_absorption_profile!(τ_abs[ib], hitran_data, params.broadening_function, params.wing_cutoff, params.CEF, params.architecture, profile.vmr[params.molecules[ib][molec_i]], spec_grid[ib], profile);
+            @timeit "Absorption Coeff"  compute_absorption_profile!(τ_abs[i_band], hitran_data, params.absorption_params.broadening_function, params.absorption_params.wing_cutoff, params.absorption_params.CEF, params.architecture, profile.vmr[params.absorption_params.molecules[i_band][molec_i]], params.spec_bands[i_band], profile);
         end
     end
 
     # aerosol_optics[iBand][iAer]
-    aerosol_optics = [Array{AerosolOptics}(undef, (params.nAer)) for i=1:nBands];
-
-    τAer = [zeros(params.nAer, length(profile.p)) for i=1:nBands]
-
-    if params.nAer > 0
+    aerosol_optics = [Array{AerosolOptics}(undef, (n_aer)) for i=1:length(0)];
         
-        FT2 = typeof(params.τAer_ref[1])
+    FT2 = isnothing(params.scattering_params) ? params.float_type : typeof(params.scattering_params.aerosols[1].τ_ref)
 
-        # τAer[iBand][iAer,iZ]
-        τAer = [zeros(FT2, params.nAer, length(profile.p)) for i=1:nBands];
+    # τ_aer[iBand][iAer,iZ]
+    τ_aer = [zeros(FT2, n_aer, length(profile.p_full)) for i=1:n_bands];
 
-        # Loop over aerosol type
-        for iaer=1:params.nAer
+    # Loop over aerosol type
+    for i_aer=1:n_aer
 
-            # Create Aerosol size distribution for each aerosol species
-            size_distribution = LogNormal(log(params.μ[iaer]), log(params.σ[iaer]))
+        # Get curr_aerosol
+        curr_aerosol = params.scattering_params.aerosols[i_aer]
 
-            # Create a univariate aerosol distribution
-            aerosol = make_univariate_aerosol(size_distribution, params.r_max, params.nquad_radius, params.nᵣ[iaer], params.nᵢ[iaer]) #Suniti: why is the refractive index needed here?
+        # Create Aerosol size distribution for each aerosol species
+        size_distribution = LogNormal(log(curr_aerosol.μ), log(curr_aerosol.σ))
 
-            # Create the aerosol extinction cross-section at the reference wavelength:
-            mie_model      = make_mie_model(params.decomp_type, aerosol, params.λ_ref, params.polarization_type, truncation_type)       
-            k_ref          = compute_ref_aerosol_extinction(mie_model, params.float_type)
+        # Create a univariate aerosol distribution
+        aerosol = make_univariate_aerosol(size_distribution, params.scattering_params.r_max, params.scattering_params.nquad_radius, curr_aerosol.nᵣ, curr_aerosol.nᵢ) #Suniti: why is the refractive index needed here?
 
-            # Loop over bands
-            for ib=1:nBands
+        # Create the aerosol extinction cross-section at the reference wavelength:
+        mie_model      = make_mie_model(params.scattering_params.decomp_type, aerosol, params.scattering_params.λ_ref, params.polarization_type, truncation_type)       
+        k_ref          = compute_ref_aerosol_extinction(mie_model, params.float_type)
 
-                # Create the aerosols:
-                mie_model      = make_mie_model(params.decomp_type, aerosol, params.λ_band[ib], params.polarization_type, truncation_type)
+        # Loop over bands
+        for i_band=1:n_bands
 
-                # Compute raw (not truncated) aerosol optical properties (not needed in RT eventually) 
-                @timeit "Mie calc"  aerosol_optics_raw = compute_aerosol_optical_properties(mie_model, FT2);
+            # i'th spectral band (convert from cm⁻¹ to μm)
+            curr_band_λ = 1e4 ./ params.spec_bands[i_band]
 
-                # Compute truncated aerosol optical properties (phase function and fᵗ), consistent with Ltrunc:
-                @show iaer,ib
-                aerosol_optics[ib][iaer] = Scattering.truncate_phase(truncation_type, aerosol_optics_raw; reportFit=false)
+            # Create the aerosols:
+            mie_model      = make_mie_model(params.scattering_params.decomp_type, aerosol, (maximum(curr_band_λ)+minimum(curr_band_λ))/2, params.polarization_type, truncation_type)
 
-                # Compute nAer aerosol optical thickness profiles
-                τAer[ib][iaer,:] = params.τAer_ref[iaer] * (aerosol_optics[ib][iaer].k/k_ref) * vSmartMOM.getAerosolLayerOptProp(1.0, params.p₀[iaer], params.σp[iaer], profile.p)
-                
-            end 
-        end
+            # Compute raw (not truncated) aerosol optical properties (not needed in RT eventually) 
+            # @show FT2
+            @timeit "Mie calc"  aerosol_optics_raw = compute_aerosol_optical_properties(mie_model, Float64);
+
+            # Compute truncated aerosol optical properties (phase function and fᵗ), consistent with Ltrunc:
+            @show i_aer, i_band
+            aerosol_optics[i_band][i_aer] = Scattering.truncate_phase(truncation_type, aerosol_optics_raw; reportFit=false)
+
+            # Compute nAer aerosol optical thickness profiles
+            τ_aer[i_band][i_aer,:] = params.scattering_params.aerosols[i_aer].τ_ref[] * (aerosol_optics[i_band][i_aer].k/k_ref) * vSmartMOM.getAerosolLayerOptProp(1.0, params.scattering_params.aerosols[i_aer].p₀, params.scattering_params.aerosols[i_aer].σp, profile.p_full)
+            
+        end 
     end
 
+    # Check the floating-type output matches specified FT
+
     # Return the model 
-    return vSmartMOM_Model(params, aerosol_optics,  greek_rayleigh, quad_points, τ_abs, τRayl, τAer, obs_geom, profile)
+    return vSmartMOM_Model(params, aerosol_optics,  greek_rayleigh, quad_points, τ_abs, τ_rayl, τ_aer, obs_geom, profile)
 
 end

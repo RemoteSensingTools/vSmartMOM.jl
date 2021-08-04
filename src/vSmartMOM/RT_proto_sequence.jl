@@ -15,7 +15,9 @@ using RadiativeTransfer.SolarModel
 # using ForwardDiff
 
 # Load parameters from file
-parameters = vSmartMOM.parameters_from_yaml("RadiativeTransfer/test/helper/PureRayleighParameters.yaml")
+# parameters = vSmartMOM.default_parameters()
+parameters = vSmartMOM.parameters_from_yaml("/home/rjeyaram/RadiativeTransfer/test/helper/PureRayleighParameters.yaml");
+
 model = model_from_parameters(parameters);
 R = vSmartMOM.rt_run(model, i_band=1)
 
@@ -35,10 +37,10 @@ R = vSmartMOM.rt_run(model, i_band=1)
 #model.params.architecture = RadiativeTransfer.Architectures.GPU();
 
 function run_auto(x)
-    println(x)
-    println(x[1] isa ForwardDiff.Dual)
-    println(x[1])
-    println(typeof(parameters.μ))
+    (x)
+    (x[1] isa ForwardDiff.Dual)
+    (x[1])
+    (typeof(parameters.μ))
     parameters.μ  = [x[1]]
     parameters.σ  = [x[2]]
     parameters.nᵣ = [x[3]]
