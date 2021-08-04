@@ -18,8 +18,6 @@ computation
 $(DocStringExtensions.FIELDS)
 """
 struct UnivariateAerosol{FT} <: AbstractAerosolType
-    #"Number of aerosol species"
-    #NAer::Integer
     "Univariate size distribution"
     size_distribution::ContinuousUnivariateDistribution
     "Maximum radius `[μm]`"
@@ -176,7 +174,7 @@ Base.@kwdef struct MieModel{FDT<:AbstractFourierDecompositionType}
 
     computation_type::FDT
     aerosol::AbstractAerosolType
-    λ
+    λ::Real
     polarization_type::AbstractPolarizationType
     truncation_type::AbstractTruncationType
 

@@ -1,5 +1,5 @@
 "Compute pressure levels, vmr, vcd for atmospheric profile, given p_half, T, q"
-function compute_atmos_profile_fields(p_half::AbstractArray, T, q; g₀=9.8196)
+function compute_atmos_profile_fields(T, p_half::AbstractArray, q, vmr; g₀=9.8196)
 
     # Floating type to use
     FT = eltype(T)
@@ -28,18 +28,31 @@ function compute_atmos_profile_fields(p_half::AbstractArray, T, q; g₀=9.8196)
         vcd_h2o[i] = vmr_h2o[i] * Δp / (M * g₀ * 100^2)
     end
 
-    return p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o
+    new_vmr = Dict{String, Union{Real, Vector}}()
+
+    for molec_i in keys(vmr)
+        if vmr[molec_i] isa AbstractArray
+            
+            pressure_grid = collect(range(minimum(p_full), maximum(p_full), length=length(vmr[molec_i])))
+            interp_linear = LinearInterpolation(pressure_grid, vmr[molec_i])
+            new_vmr[molec_i] = [interp_linear(x) for x in p_full]
+        else
+            new_vmr[molec_i] = vmr[molec_i]
+        end
+    end
+
+    return p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o, new_vmr
 
 end
 
-"Validate an input atmospheric profile (YAML only)"
-function validate_atmos_profile(params::Dict{Any,Any})
+# "Validate an input atmospheric profile (YAML only)"
+# function validate_atmos_profile(params::Dict{Any,Any})
 
-    @assert Set(keys(params)) == Set(["p_surf", "T", "q", "ak", "bk", "vmr"]) || 
-            Set(keys(params)) == Set(["p_half", "T", "q", "vmr"]) || 
-            Set(keys(params)) == Set(["p_half", "T", "vmr"]) "Set of atmospheric profile fields must be one of (p_surf, T, q, ak, bk), (p_half, T, q), or (p_half, T)"
+#     @assert Set(keys(params)) == Set(["p_surf", "T", "q", "ak", "bk", "vmr"]) || 
+#             Set(keys(params)) == Set(["p_half", "T", "q", "vmr"]) || 
+#             Set(keys(params)) == Set(["p_half", "T", "vmr"]) "Set of atmospheric profile fields must be one of (p_surf, T, q, ak, bk), (p_half, T, q), or (p_half, T)"
 
-end
+# end
 
 "From a yaml file, get the stored fields (psurf, T, q, ak, bk), calculate derived fields, 
 and return an AtmosphericProfile object" 
@@ -52,7 +65,7 @@ function read_atmos_profile(file_path::String)
     params_dict = YAML.load_file(file_path)
 
     # Validate the parameters before doing anything else
-    validate_atmos_profile(params_dict)
+    # validate_atmos_profile(params_dict)
 
     T = convert.(Float64, params_dict["T"])
     
@@ -63,24 +76,24 @@ function read_atmos_profile(file_path::String)
         ak    = convert.(Float64, params_dict["ak"])
         bk    = convert.(Float64, params_dict["bk"])
         p_half = (ak + bk * psurf)
-        p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o = compute_atmos_profile_fields(p_half, T, q)
+        p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o = compute_atmos_profile_fields(T, p_half, q, Dict())
     elseif ("q" in keys(params_dict))
         p_half = convert(Float64, params_dict["p_half"])
         psurf = p_half[end]
         q      = convert.(Float64, params_dict["q"])
-        p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o = compute_atmos_profile_fields(p_half, T, q)
+        p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o = compute_atmos_profile_fields(T, p_half, q, Dict())
     else
         p_half = convert.(Float64, params_dict["p_half"])
         psurf = p_half[end]
         q = zeros(length(T))
-        p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o = compute_atmos_profile_fields(p_half, T, q)
+        p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o = compute_atmos_profile_fields(T, p_half, q, Dict())
     end
 
     # Convert vmr to appropriate type
     vmr = convert(Dict{String, Union{Real, Vector}}, params_dict["vmr"])
 
     # Return the atmospheric profile struct
-    return AtmosphericProfile(nothing, nothing, psurf, T, q, p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o, vmr)
+    return AtmosphericProfile(T, q, p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o, vmr)
 
 end
 
@@ -136,17 +149,17 @@ function reduce_profile(n::Int, profile::AtmosphericProfile{FT}) where {FT}
     # Can only reduce the profile, not expand it
     @assert n < length(profile.T)
 
-    # Unpack the profile
-    @unpack lat, lon, psurf, vmr = profile
+    # Unpack the profile vmr
+    @unpack vmr = profile
 
     # New rough half levels (boundary points)
-    a = range(0, maximum(profile.p), length=n + 1)
+    a = range(0, maximum(profile.p_half), length=n+1)
 
     # Matrices to hold new values
     T = zeros(FT, n);
     q = zeros(FT, n);
     p_full = zeros(FT, n);
-    p_levels = zeros(FT, n + 1);
+    p_half = zeros(FT, n+1);
     vmr_h2o  = zeros(FT, n);
     vcd_dry  = zeros(FT, n);
     vcd_h2o  = zeros(FT, n);
@@ -155,14 +168,14 @@ function reduce_profile(n::Int, profile::AtmosphericProfile{FT}) where {FT}
     for i = 1:n
 
         # Get the section of the atmosphere with the i'th section pressure values
-        ind = findall(a[i] .< profile.p .<= a[i + 1]);
+        ind = findall(a[i] .< profile.p_full .<= a[i+1]);
 
         # Set the pressure levels accordingly
-        p_levels[i] = profile.p_levels[ind[1]]
-        p_levels[i + 1] = profile.p_levels[ind[end]]
+        p_half[i] = profile.p_half[ind[1]]
+        p_half[i+1] = profile.p_half[ind[end]]
 
         # Re-average the other parameters to produce new layers
-        p_full[i] = mean(profile.p_levels[ind])
+        p_full[i] = mean(profile.p_half[ind])
         T[i] = mean(profile.T[ind])
         q[i] = mean(profile.q[ind])
         vmr_h2o[i] = mean(profile.vmr_h2o[ind])
@@ -183,7 +196,7 @@ function reduce_profile(n::Int, profile::AtmosphericProfile{FT}) where {FT}
         end
     end
 
-    return AtmosphericProfile(lat, lon, psurf, T, q, p_full, p_levels, vmr_h2o, vcd_dry, vcd_h2o, new_vmr)
+    return AtmosphericProfile(T, p_full, q, p_half, vmr_h2o, vcd_dry, vcd_h2o, new_vmr)
 end;
 
 """
@@ -306,9 +319,6 @@ function construct_all_atm_layers(FT, nSpec, Nz, NquadN, τRayl, τAer, aerosol_
     FT_ext   = eltype(τAer)
     FT_phase = eltype(Aer𝐙⁺⁺)
 
-    @show FT_ext
-    @show FT_phase
-
     # Empty matrices to hold all values
     τ_λ_all   = zeros(FT_ext, nSpec, Nz)
     ϖ_λ_all   = zeros(FT_ext, nSpec, Nz)
@@ -378,12 +388,12 @@ function compute_absorption_profile!(τ_abs::Array{FT,2},
                                      ) where FT <: AbstractFloat
 
     # The array to store the cross-sections must be same length as number of layers
-    @assert size(τ_abs,2) == length(profile.p)
+    @assert size(τ_abs,2) == length(profile.p_full)
 
-    @showprogress 1 for iz in 1:length(profile.p)
+    @showprogress 1 for iz in 1:length(profile.p_full)
 
         # Pa -> hPa
-        p = profile.p[iz] / 100
+        p = profile.p_full[iz]
         T = profile.T[iz]
 
         # Either use the current layer's vmr, or use the uniform vmr

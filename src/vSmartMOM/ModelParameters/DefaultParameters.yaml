@@ -18,6 +18,8 @@ radiative_transfer:
   Δ_angle:            2.0
   # Trunction length for legendre terms
   l_trunc:            20
+  # Depolarization factor
+  depol:              0.0
   # Floating point type for calculations (Float32, Float64)
   float_type:         Float64
   # Architecture (default_architecture, GPU(), CPU())
@@ -33,7 +35,7 @@ geometry:
   vza:                [60, 45, 30, 15, 0, 15, 30, 45, 60]
   # Viewing azimuth angles (degrees)
   vaz:                [180, 180, 180, 180, 0, 0, 0, 0, 0]
-  # Observation altitude (?)
+  # Observation altitude (Pa)
   obs_alt:            1000.0
 
 # =================================================================
@@ -41,6 +43,7 @@ geometry:
 # =================================================================
 atmospheric_profile: 
   # Temperature Profile (TOA to BOA, in K)
+  # Full-levels, specified at layer centers
   T: [231.62, 244.33, 251.34, 258.09, 264.25, 269.15, 
       272.59, 274.07, 273.30, 269.65, 264.27, 258.11, 
       251.52, 245.22, 239.20, 234.05, 229.71, 225.70, 
@@ -48,20 +51,15 @@ atmospheric_profile:
       218.35, 223.33, 234.19, 249.34, 264.12, 277.20, 
       280.77, 282.60, 284.40, 285.80]
   # Pressure Profile (TOA to BOA at each boundary, in hPa)
-  p: [0.14,     0.22,   0.30,   0.39,   0.53,   0.71,   
-      0.96,     1.28,   1.70,   2.27,   3.03,   4.03,  
-      5.44,     7.26,   9.67,  12.90,  17.23,  23.30,  
-      31.00,   42.07,  56.09,  74.78,  99.69, 131.00,
+  # Half-levels, specified at layer boundaries
+  p: [  0.14,   0.22,   0.30,   0.39,   0.53,   0.71,   
+        0.96,   1.28,   1.70,   2.27,   3.03,   4.03,  
+        5.44,   7.26,   9.67,  12.90,  17.23,  23.30,  
+       31.00,  42.07,  56.09,  74.78,  99.69, 131.00,
       176.85, 236.64, 314.58, 418.87, 557.76, 735.00, 
       800.12, 849.00, 912.00, 980.00, 1005.0]
-  # VMR profiles can either be real-valued numbers, 
-  # or an array of nodal points from TOA to BOA, interpolated in pressure space
-  vmr: 
-    CO2:  [0.000385, 0.000395]
-    O2:   0.21
-    H2O:  0.01
   # Reduce profile to n layers
-  profile_reduction:  20
+  profile_reduction: -1
 
 # =================================================================
 # Absorption-Related Parameters (Optional)
@@ -70,6 +68,12 @@ absorption:
   # List of molecules per spectral band
   molecules:
     - [O2, CO2] # Molecules in Band #1
+  # VMR profiles can either be real-valued numbers, 
+  # or an array of nodal points from TOA to BOA, interpolated in pressure space
+  vmr: 
+    CO2:  [0.000385, 0.000395]
+    O2:   0.21
+    H2O:  0.01
   # Broadening function (Doppler/Lorentz/Voigt)
   broadening:         Voigt()
   # Complex error function for Voigt calculations
@@ -96,7 +100,5 @@ scattering:
   nquad_radius:   2500
   # Reference wavelength (µm)
   λ_ref:              0.770 
-  # Depolarization factor
-  depol:              0.0
   # Decomposition method (NAI2 or PCW)
   decomp_type:        NAI2()
