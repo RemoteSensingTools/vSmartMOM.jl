@@ -10,10 +10,11 @@ Output: AerosolOptics, holding all Greek coefficients and Cross-Sectional inform
 function compute_aerosol_optical_properties(model::MieModel{FDT}, FT2::Type=Float64) where FDT<:PCW
 
     # Unpack the model
-    @unpack computation_type, aerosol, λ, polarization_type, truncation_type, wigner_A, wigner_B = model
+    @unpack computation_type, aerosol, r_max, nquad_radius, λ, polarization_type, truncation_type, wigner_A, wigner_B = model
 
     # Extract variables from aerosol struct:
-    @unpack size_distribution, nquad_radius, nᵣ, nᵢ,r_max =  aerosol
+    # @unpack aerosol, r_max, nquad_radius = mie_aerosol
+    @unpack size_distribution, nᵣ, nᵢ = aerosol
 
     # Get the refractive index's real part type
     FT = eltype(nᵣ);
@@ -26,7 +27,7 @@ function compute_aerosol_optical_properties(model::MieModel{FDT}, FT2::Type=Floa
     N_max = Scattering.get_n_max(2 * π * r_max/ λ)
 
     # Compute an, bn values
-    an, bn = compute_anbn(aerosol::UnivariateAerosol, λ, r)
+    an, bn = compute_anbn(model, λ, r)
 
     # Compute average cross-sectional scattering and extinction
     k = 2π / λ
@@ -90,7 +91,7 @@ function compute_aerosol_optical_properties(model::MieModel{FDT}, FT2::Type=Floa
                              convert.(FT2, greek_coefs[4,:]))
 
     # Return the packaged AerosolOptics object
-    return AerosolOptics(greek_coefs=greek_coefs, ω̃=FT2(avg_C_scatt/avg_C_ext), k=FT2(avg_C_ext)) 
+    return AerosolOptics(greek_coefs=greek_coefs, ω̃=FT2(avg_C_scatt/avg_C_ext), k=FT2(avg_C_ext), fᵗ=FT(1)) 
 end
 
 

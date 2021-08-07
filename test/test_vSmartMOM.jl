@@ -4,7 +4,7 @@
 
     println("Testing pure rayleigh RT...")
 
-    ϵ = 1e-5
+    ϵ = 1e-4
 
     parameters = vSmartMOM.parameters_from_yaml("helper/PureRayleighParameters.yaml")
     model = model_from_parameters(parameters)

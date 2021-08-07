@@ -34,18 +34,11 @@ Base.@kwdef struct ObsGeometry{FT} <: AbstractObsGeometry
     obs_alt::FT
 end
 
-"Aerosol type with its properties"
-struct Aerosol{FT}
+struct RT_Aerosol{FT}
+    "Aerosol"
+    aerosol::Aerosol{FT}
     "Reference τ"
     τ_ref::FT
-    "Log mean radius (µm)"
-    μ::FT
-    "Log stddev of radius (µm)"
-    σ::FT
-    "Real part of refractive index"
-    nᵣ::FT
-    "Imag part of refractive index"
-    nᵢ::FT
     "Pressure peak (Pa)"
     p₀::FT
     "Pressure peak width (Pa)"
@@ -162,7 +155,6 @@ end
 
 A struct which holds all absorption-related parameters (before any computations)
 """
-
 mutable struct AbsorptionParameters
     "Molecules to use for absorption calculations (`nBand, nMolecules`)"
     molecules::AbstractArray
@@ -181,10 +173,9 @@ end
 
 A struct which holds all scattering-related parameters (before any computations)
 """
-
 mutable struct ScatteringParameters{FT<:Union{AbstractFloat, ForwardDiff.Dual}}
     "List of scattering aerosols and their properties"
-    aerosols::Vector{Aerosol}
+    rt_aerosols::Vector{RT_Aerosol}
     "Maximum aerosol particle radius for quadrature points/weights (µm)"
     r_max::FT
     "Number of quadrature points for integration of size distribution"
@@ -248,9 +239,11 @@ mutable struct vSmartMOM_Parameters{FT<:Union{AbstractFloat, ForwardDiff.Dual}}
     profile_reduction_n::Integer
 
     # absorption group
+    "Optional struct that holds all absorption-related parameters"
     absorption_params::Union{AbsorptionParameters, Nothing}
 
     # scattering group
+    "Optional struct that holds all aerosol scattering-related parameters"
     scattering_params::Union{ScatteringParameters, Nothing}
     
 end

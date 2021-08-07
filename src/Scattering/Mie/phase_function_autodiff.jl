@@ -48,11 +48,11 @@ function compute_aerosol_optical_properties(model::MieModel ; autodiff=false)
         @assert (model.aerosol.nᵢ == x[4])
 
         # Unpack the model and aerosol 
-        @unpack computation_type, aerosol, λ, polarization_type, truncation_type, wigner_A, wigner_B = model
-        @unpack size_distribution, nquad_radius, nᵣ, nᵢ,r_max =  aerosol
+        @unpack computation_type, aerosol, λ, polarization_type, truncation_type, r_max, nquad_radius, wigner_A, wigner_B = model
+        @unpack size_distribution, nᵣ, nᵢ = aerosol
 
-        aerosol_x = UnivariateAerosol(LogNormal(log(x[1].value), log(x[2].value)), r_max, nquad_radius, x[3].value, x[4].value)
-        model_x = MieModel(computation_type, aerosol_x, λ, polarization_type, truncation_type, wigner_A, wigner_B)
+        aerosol_x = Aerosol(LogNormal(log(x[1].value), log(x[2].value)), x[3].value, x[4].value)
+        model_x = MieModel(computation_type, aerosol_x, λ, polarization_type, truncation_type, r_max, nquad_radius, wigner_A, wigner_B)
     
         aerosol_optics = compute_aerosol_optical_properties(model_x, ForwardDiff.Dual);
     
@@ -74,8 +74,8 @@ function compute_aerosol_optical_properties(model::MieModel ; autodiff=false)
             model.aerosol.nᵢ]
 
         # Get length of greek coefs
-        r, wᵣ = gauleg(model.aerosol.nquad_radius, 0.0, model.aerosol.r_max ; norm=true)
-        N_max = get_n_max(2 * π * model.aerosol.r_max/ model.λ)
+        r, wᵣ = gauleg(model.nquad_radius, 0.0, model.r_max ; norm=true)
+        N_max = get_n_max(2 * π * model.r_max/ model.λ)
         greek_length = 2 * N_max - 1
 
         result = DiffResults.JacobianResult(zeros(6 * greek_length + 2), x)

@@ -26,7 +26,9 @@ function compute_absorption_cross_section(
     end
 
     # Convert T to float type (ex. if Int)
-    temperature = AbstractFloat(temperature)
+    if !(temperature isa ForwardDiff.Dual)
+        temperature = AbstractFloat(temperature)
+    end
 
     # Store results here to return
     result = array_type(architecture)(zeros(eltype(temperature), length(grid)))

@@ -45,20 +45,23 @@ function validate_aerosols(aerosols::Union{Array{Dict{Any, Any}}, Vector{Any}})
 end
 
 function aerosol_params_to_obj(aerosols::Union{Array{Dict{Any, Any}}, Vector{Any}}, FT)
-    # return Aerosol[]
-    aerosol_obj_list = Aerosol[]
+
+    rt_aerosol_obj_list = RT_Aerosol[]
+
     for aerosol in aerosols
-        new_aerosol_obj = Aerosol(FT(aerosol["τ_ref"]),
-                                  FT(aerosol["μ"]), 
-                                  FT(aerosol["σ"]),
+
+        size_distribution = LogNormal(FT(aerosol["μ"]), FT(aerosol["σ"]))
+
+        new_aerosol_obj = Aerosol(size_distribution,
                                   FT(aerosol["nᵣ"]),
-                                  FT(aerosol["nᵢ"]),
-                                  FT(aerosol["p₀"]),
-                                  FT(aerosol["σp"]))
-        push!(aerosol_obj_list, new_aerosol_obj)
+                                  FT(aerosol["nᵢ"]))
+        
+        new_rt_aerosol_obj = RT_Aerosol(new_aerosol_obj, FT(aerosol["τ_ref"]), FT(aerosol["p₀"]), FT(aerosol["σp"]))
+
+        push!(rt_aerosol_obj_list, new_rt_aerosol_obj)
     end
 
-    return aerosol_obj_list
+    return rt_aerosol_obj_list
 end
 
 "Check that the vmr's in the atmospheric profile match the molecules in the parameters" 
@@ -226,7 +229,7 @@ function model_from_parameters(params::vSmartMOM_Parameters)
 
     # Number of total bands and aerosols (for convenience)
     n_bands = length(params.spec_bands)
-    n_aer = isnothing(params.scattering_params) ? 0 : length(params.scattering_params.aerosols)
+    n_aer = isnothing(params.scattering_params) ? 0 : length(params.scattering_params.rt_aerosols)
 
     # Create observation geometry
     obs_geom = ObsGeometry(params.sza, params.vza, params.vaz, params.obs_alt)
@@ -282,7 +285,7 @@ function model_from_parameters(params::vSmartMOM_Parameters)
     # aerosol_optics[iBand][iAer]
     aerosol_optics = [Array{AerosolOptics}(undef, (n_aer)) for i=1:length(0)];
         
-    FT2 = isnothing(params.scattering_params) ? params.float_type : typeof(params.scattering_params.aerosols[1].τ_ref)
+    FT2 = isnothing(params.scattering_params) ? params.float_type : typeof(params.scattering_params.rt_aerosols[1].τ_ref)
 
     # τ_aer[iBand][iAer,iZ]
     τ_aer = [zeros(FT2, n_aer, length(profile.p_full)) for i=1:n_bands];
@@ -291,16 +294,16 @@ function model_from_parameters(params::vSmartMOM_Parameters)
     for i_aer=1:n_aer
 
         # Get curr_aerosol
-        curr_aerosol = params.scattering_params.aerosols[i_aer]
+        curr_aerosol = params.scattering_params.rt_aerosols[i_aer].aerosol
 
         # Create Aerosol size distribution for each aerosol species
-        size_distribution = LogNormal(log(curr_aerosol.μ), log(curr_aerosol.σ))
+        size_distribution = curr_aerosol.size_distribution
 
         # Create a univariate aerosol distribution
-        aerosol = make_univariate_aerosol(size_distribution, params.scattering_params.r_max, params.scattering_params.nquad_radius, curr_aerosol.nᵣ, curr_aerosol.nᵢ) #Suniti: why is the refractive index needed here?
+        mie_aerosol = make_mie_aerosol(size_distribution, curr_aerosol.nᵣ, curr_aerosol.nᵢ, params.scattering_params.r_max, params.scattering_params.nquad_radius) #Suniti: why is the refractive index needed here?
 
         # Create the aerosol extinction cross-section at the reference wavelength:
-        mie_model      = make_mie_model(params.scattering_params.decomp_type, aerosol, params.scattering_params.λ_ref, params.polarization_type, truncation_type)       
+        mie_model      = make_mie_model(params.scattering_params.decomp_type, mie_aerosol, params.scattering_params.λ_ref, params.polarization_type, truncation_type)       
         k_ref          = compute_ref_aerosol_extinction(mie_model, params.float_type)
 
         # Loop over bands
@@ -310,7 +313,7 @@ function model_from_parameters(params::vSmartMOM_Parameters)
             curr_band_λ = 1e4 ./ params.spec_bands[i_band]
 
             # Create the aerosols:
-            mie_model      = make_mie_model(params.scattering_params.decomp_type, aerosol, (maximum(curr_band_λ)+minimum(curr_band_λ))/2, params.polarization_type, truncation_type)
+            mie_model      = make_mie_model(params.scattering_params.decomp_type, mie_aerosol, (maximum(curr_band_λ)+minimum(curr_band_λ))/2, params.polarization_type, truncation_type)
 
             # Compute raw (not truncated) aerosol optical properties (not needed in RT eventually) 
             # @show FT2
@@ -321,7 +324,7 @@ function model_from_parameters(params::vSmartMOM_Parameters)
             aerosol_optics[i_band][i_aer] = Scattering.truncate_phase(truncation_type, aerosol_optics_raw; reportFit=false)
 
             # Compute nAer aerosol optical thickness profiles
-            τ_aer[i_band][i_aer,:] = params.scattering_params.aerosols[i_aer].τ_ref[] * (aerosol_optics[i_band][i_aer].k/k_ref) * vSmartMOM.getAerosolLayerOptProp(1.0, params.scattering_params.aerosols[i_aer].p₀, params.scattering_params.aerosols[i_aer].σp, profile.p_full)
+            τ_aer[i_band][i_aer,:] = params.scattering_params.rt_aerosols[i_aer].τ_ref[] * (aerosol_optics[i_band][i_aer].k/k_ref) * vSmartMOM.getAerosolLayerOptProp(1.0, params.scattering_params.rt_aerosols[i_aer].p₀, params.scattering_params.rt_aerosols[i_aer].σp, profile.p_full)
             
         end 
     end

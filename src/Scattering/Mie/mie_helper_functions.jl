@@ -73,37 +73,40 @@ function compute_mie_ab!(size_param, refractive_idx::Number, an, bn, Dn)
 end
 
 """ 
-    $(FUNCTIONNAME)(aerosol::UnivariateAerosol, λ, radius)
+    $(FUNCTIONNAME)(model::MieModel, λ, radius)
 Compute all an, bn using compute_mie_ab!
-Input: UnivariateAerosol, wavelength (λ), radius
+Input: MieModel, wavelength (λ), radius
 Output: an, bn. Both of shape (aerosol.nquad_radius, N_max) (N_max from aerosol.r_max)
 """
-function compute_anbn(aerosol::UnivariateAerosol, λ, radius)
+function compute_anbn(model::MieModel, λ, radius)
     
+    @unpack computation_type, aerosol, r_max, nquad_radius, λ, polarization_type, truncation_type, wigner_A, wigner_B = model
+    @unpack size_distribution, nᵣ, nᵢ = aerosol
+
     FT = eltype(λ)
-    FT2 = eltype(aerosol.nᵣ)
+    FT2 = eltype(nᵣ)
 
     # Find overall N_max from the maximum radius
-    N_max = Scattering.get_n_max(2 * π * aerosol.r_max / λ)
+    N_max = Scattering.get_n_max(2 * π * r_max / λ)
 
     # Where to store an, bn, computed over size distribution
-    an = zeros(Complex{FT2}, aerosol.nquad_radius, N_max)
-    bn = zeros(Complex{FT2}, aerosol.nquad_radius, N_max)
+    an = zeros(Complex{FT2}, nquad_radius, N_max)
+    bn = zeros(Complex{FT2}, nquad_radius, N_max)
 
     # Loop over the size distribution, and compute an, bn, for each size
-    for i in 1:aerosol.nquad_radius
+    for i in 1:nquad_radius
 
         # Get current radius and size parameter
         r = radius[i] 
         size_param = 2 * π * r / λ
 
         # Pre-allocate Dn:
-        y = size_param * (aerosol.nᵣ - aerosol.nᵢ);
+        y = size_param * (nᵣ - nᵢ);
         nmx = round(Int, max(N_max, abs(y)) + 51)
         Dn = zeros(Complex{FT2}, nmx)
 
         # Compute an, bn
-        Scattering.compute_mie_ab!(size_param, aerosol.nᵣ + aerosol.nᵢ * im, 
+        Scattering.compute_mie_ab!(size_param, nᵣ + nᵢ * im, 
                                       view(an, i, :), 
                                       view(bn, i, :), Dn)
     end

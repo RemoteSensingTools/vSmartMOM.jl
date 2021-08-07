@@ -16,10 +16,9 @@ using RadiativeTransfer.SolarModel
 
 # Load parameters from file
 # parameters = vSmartMOM.default_parameters()
-parameters = vSmartMOM.parameters_from_yaml("/home/rjeyaram/RadiativeTransfer/test/helper/PureRayleighParameters.yaml");
-
+parameters = vSmartMOM.parameters_from_yaml("RadiativeTransfer/test/helper/PureRayleighParameters.yaml");
 model = model_from_parameters(parameters);
-R = vSmartMOM.rt_run(model, i_band=1)
+R_new4 = vSmartMOM.rt_run(model, i_band=1)
 
 # params_dict = YAML.load_file("RadiativeTransfer/src/vSmartMOM/ModelParameters/DefaultParameters.yaml")
 
