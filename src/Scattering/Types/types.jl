@@ -8,39 +8,42 @@ Abstract aerosol type
 """
 abstract type AbstractAerosolType end
 
-"""
-    struct UnivariateAerosol{FT}
-
-A struct which provides all univariate aerosol parameters needed for Mie 
-computation
-
-# Fields
-$(DocStringExtensions.FIELDS)
-"""
-struct UnivariateAerosol{FT} <: AbstractAerosolType
+"Aerosol type with its properties (size distribution and refractive index)"
+struct Aerosol{FT}
     "Univariate size distribution"
     size_distribution::ContinuousUnivariateDistribution
-    "Maximum radius `[μm]`"
-    r_max::FT
-    "Number of quadrature points for integration over size distribution"
-    nquad_radius::Int
-    "Real part of refractive Index"
-    nᵣ#::FT
-    "Imaginary part of refractive Index"
-    nᵢ#::FT
+    "Real part of refractive index"
+    nᵣ::FT
+    "Imag part of refractive index"
+    nᵢ::FT
 end
 
-""" 
-    $(FUNCTIONNAME)(size_distribution::ContinuousUnivariateDistribution, r_max, nquad_radius::Int, nᵣ, nᵢ)
+# """
+#     struct MieAerosol{FT}
 
-Convenience function to create a Univariate Aerosol, given the size parameters 
-"""
-function make_univariate_aerosol(size_distribution::ContinuousUnivariateDistribution, 
-                                 r_max::FT, nquad_radius::Int, 
-                                 nᵣ, nᵢ) where {FT}
+# A struct which provides an aerosol and related parameters needed for Mie computation
 
-    return UnivariateAerosol(size_distribution, r_max, nquad_radius, nᵣ, nᵢ)
-end
+# # Fields
+# $(DocStringExtensions.FIELDS)
+# """
+# struct MieAerosol{FT}
+#     "Aerosol"
+#     aerosol::Aerosol{FT}
+    
+# end
+
+# """ 
+#     $(FUNCTIONNAME)(size_distribution::ContinuousUnivariateDistribution, r_max, nquad_radius::Int, nᵣ, nᵢ)
+
+# Convenience function to create a Univariate Aerosol, given the size parameters 
+# """
+# function make_mie_aerosol(size_distribution::ContinuousUnivariateDistribution, nᵣ, nᵢ,
+#                                  r_max::FT, nquad_radius::Int) where {FT}
+#     aerosol = Aerosol(size_distribution, nᵣ, nᵢ)
+#     return MieAerosol(aerosol, r_max, nquad_radius)
+# end
+
+make_log_normal_size_dist(μ, σ) = LogNormal(log(μ), log(σ))
 
 # TODO: struct MultivariateAerosol{FT,FT2} <: AbstractAerosolType
 
@@ -170,13 +173,18 @@ Model to hold all Mie computation details for NAI2 and PCW
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-Base.@kwdef struct MieModel{FDT<:AbstractFourierDecompositionType}
+Base.@kwdef struct MieModel{FDT<:AbstractFourierDecompositionType, FT}
 
     computation_type::FDT
-    aerosol::AbstractAerosolType
+    aerosol::Aerosol
     λ::Real
     polarization_type::AbstractPolarizationType
     truncation_type::AbstractTruncationType
+
+    "Maximum radius `[μm]`"
+    r_max::FT
+    "Number of quadrature points for integration over size distribution"
+    nquad_radius::Int
 
     wigner_A = zeros(1, 1, 1)
     wigner_B = zeros(1, 1, 1)

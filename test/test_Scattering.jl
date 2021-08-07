@@ -78,17 +78,18 @@ end
     nquad_radius = 2500     # Number of quadrature points for integrating of size dist.
     nᵣ = 1.3                # Real part of refractive index
     nᵢ = 0.001              # Imag part of refractive index
-    size_distribution = LogNormal(log(μ), log(σ))
+
+    size_distribution = make_log_normal_size_dist(μ, σ)
 
     # Create the aerosol
-    aero = make_univariate_aerosol(size_distribution, r_max, nquad_radius, nᵣ, nᵢ)
+    aero = Aerosol(size_distribution, nᵣ, nᵢ)
 
     # STEP 2: Create the Mie Calculations model
 
     λ = 0.55   # Incident wavelength
     polarization_type = Stokes_IQUV()
     truncation_type = δBGE(10, 10)
-    model_NAI2 = make_mie_model(NAI2(), aero, λ, polarization_type, truncation_type)
+    model_NAI2 = make_mie_model(NAI2(), aero, λ, polarization_type, truncation_type, r_max, nquad_radius)
 
     ### 
     ### NOTE: Temporarily removing PCW tests because they are too heavy to run on Travis

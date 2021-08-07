@@ -5,11 +5,13 @@
 Convenience function to create Mie Model with NAI2 computation type 
 """
 function make_mie_model(computation_type::NAI2, 
-                        aerosol::AbstractAerosolType, 
+                        aerosol::Aerosol, 
                         λ::Real,
                         polarization::AbstractPolarizationType, 
-                        truncation_type::AbstractTruncationType)
-    return MieModel(computation_type, aerosol, λ, polarization, truncation_type, zeros(1, 1, 1), zeros(1, 1, 1))
+                        truncation_type::AbstractTruncationType,
+                        r_max::Real,
+                        nquad_radius::Integer)
+    return MieModel(computation_type, aerosol, λ, polarization, truncation_type, r_max, nquad_radius, zeros(1, 1, 1), zeros(1, 1, 1))
 end
 
 """ 
@@ -18,13 +20,15 @@ end
 Convenience function to load Wigner matrices from file and create Mie Model with PCW computation type 
 """
 function make_mie_model(computation_type::PCW, 
-                        aerosol::AbstractAerosolType, 
+                        aerosol::Aerosol, 
                         λ::Real,
                         polarization::AbstractPolarizationType, 
                         truncation_type::AbstractTruncationType, 
+                        r_max::Real,
+                        nquad_radius::Integer,
                         wigner_filepath::String)
     wigner_A, wigner_B = Scattering.load_wigner_values(wigner_filepath)
-    return MieModel(computation_type, aerosol, λ, polarization, truncation_type, wigner_A, wigner_B)
+    return MieModel(computation_type, aerosol, λ, polarization, truncation_type, r_max, nquad_radius, wigner_A, wigner_B)
 end
 
 """ 
@@ -37,6 +41,8 @@ function make_mie_model(computation_type::PCW,
                         λ::Real,
                         polarization::AbstractPolarizationType, 
                         truncation_type::AbstractTruncationType, 
+                        r_max::Real,
+                        nquad_radius::Integer,
                         wigner_A, wigner_B)
-return MieModel(computation_type, aerosol, λ, polarization, truncation_type, wigner_A, wigner_B)
+return MieModel(computation_type, aerosol, λ, polarization, truncation_type, r_max, nquad_radius, wigner_A, wigner_B)
 end

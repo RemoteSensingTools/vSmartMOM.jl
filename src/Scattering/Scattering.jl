@@ -28,10 +28,10 @@ include("Mie/phase_function_autodiff.jl")     # Auto-differentiation
 
 
 # Export make functions/types
-export make_univariate_aerosol, make_mie_model
+export make_log_normal_size_dist, make_mie_model
 
 # Export types
-export NAI2, PCW, UnivariateAerosol, MieModel, Stokes_IQUV, Stokes_I, Stokes_IQU, 
+export NAI2, PCW, Aerosol, MieModel, Stokes_IQUV, Stokes_I, Stokes_IQU, 
        δBGE, GreekCoefs, AerosolOptics, AbstractFourierDecompositionType
 
 export compute_B, compute_ab, GreekCoefs, comp_ab, compute_mie_π_τ!, 
