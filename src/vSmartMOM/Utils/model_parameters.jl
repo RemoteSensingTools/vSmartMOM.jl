@@ -300,10 +300,11 @@ function model_from_parameters(params::vSmartMOM_Parameters)
         size_distribution = curr_aerosol.size_distribution
 
         # Create a univariate aerosol distribution
-        mie_aerosol = make_mie_aerosol(size_distribution, curr_aerosol.nᵣ, curr_aerosol.nᵢ, params.scattering_params.r_max, params.scattering_params.nquad_radius) #Suniti: why is the refractive index needed here?
+        mie_aerosol = Aerosol(size_distribution, curr_aerosol.nᵣ, curr_aerosol.nᵢ)
+        #mie_aerosol = make_mie_aerosol(size_distribution, curr_aerosol.nᵣ, curr_aerosol.nᵢ, params.scattering_params.r_max, params.scattering_params.nquad_radius) #Suniti: why is the refractive index needed here?
 
         # Create the aerosol extinction cross-section at the reference wavelength:
-        mie_model      = make_mie_model(params.scattering_params.decomp_type, mie_aerosol, params.scattering_params.λ_ref, params.polarization_type, truncation_type)       
+        mie_model      = make_mie_model(params.scattering_params.decomp_type, mie_aerosol, params.scattering_params.λ_ref, params.polarization_type, truncation_type, params.scattering_params.r_max, params.scattering_params.nquad_radius)       
         k_ref          = compute_ref_aerosol_extinction(mie_model, params.float_type)
 
         # Loop over bands
@@ -313,7 +314,7 @@ function model_from_parameters(params::vSmartMOM_Parameters)
             curr_band_λ = 1e4 ./ params.spec_bands[i_band]
 
             # Create the aerosols:
-            mie_model      = make_mie_model(params.scattering_params.decomp_type, mie_aerosol, (maximum(curr_band_λ)+minimum(curr_band_λ))/2, params.polarization_type, truncation_type)
+            mie_model      = make_mie_model(params.scattering_params.decomp_type, mie_aerosol, (maximum(curr_band_λ)+minimum(curr_band_λ))/2, params.polarization_type, truncation_type, params.scattering_params.r_max, params.scattering_params.nquad_radius)
 
             # Compute raw (not truncated) aerosol optical properties (not needed in RT eventually) 
             # @show FT2

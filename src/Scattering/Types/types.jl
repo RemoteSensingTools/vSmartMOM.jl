@@ -9,7 +9,7 @@ Abstract aerosol type
 abstract type AbstractAerosolType end
 
 "Aerosol type with its properties (size distribution and refractive index)"
-struct Aerosol{FT}
+mutable struct Aerosol{FT}
     "Univariate size distribution"
     size_distribution::ContinuousUnivariateDistribution
     "Real part of refractive index"
