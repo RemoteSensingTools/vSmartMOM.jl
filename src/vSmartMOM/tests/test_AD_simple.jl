@@ -16,9 +16,9 @@ FT = Float64
 # Sets all the "specific" parameters
 # parameters = vSmartMOM.default_parameters();
 function runner(x, parameters=parameters)
-    parameters.τAer_ref = [x[1]];
-    parameters.p₀ = [x[2]];
-    parameters.nᵣ = [x[3]];
+    # parameters.scattering_params.rt_aerosols[1].τ_ref = x[1];
+    parameters.scattering_params.rt_aerosols[1].p₀ = x[2];
+    parameters.scattering_params.rt_aerosols[1].aerosol.nᵣ = x[3];
 
     model = model_from_parameters(parameters);
     

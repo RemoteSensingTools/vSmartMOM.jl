@@ -34,7 +34,7 @@ Base.@kwdef struct ObsGeometry{FT} <: AbstractObsGeometry
     obs_alt::FT
 end
 
-struct RT_Aerosol{FT}
+mutable struct RT_Aerosol{FT}
     "Aerosol"
     aerosol::Aerosol{FT}
     "Reference τ"
