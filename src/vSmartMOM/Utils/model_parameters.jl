@@ -318,7 +318,7 @@ function model_from_parameters(params::vSmartMOM_Parameters)
 
             # Compute raw (not truncated) aerosol optical properties (not needed in RT eventually) 
             # @show FT2
-            @timeit "Mie calc"  aerosol_optics_raw = compute_aerosol_optical_properties(mie_model, Float64);
+            @timeit "Mie calc"  aerosol_optics_raw = compute_aerosol_optical_properties(mie_model, FT2);
 
             # Compute truncated aerosol optical properties (phase function and fᵗ), consistent with Ltrunc:
             @show i_aer, i_band

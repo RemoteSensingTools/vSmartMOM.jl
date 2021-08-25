@@ -34,15 +34,15 @@ Base.@kwdef struct ObsGeometry{FT} <: AbstractObsGeometry
     obs_alt::FT
 end
 
-mutable struct RT_Aerosol{FT}
+mutable struct RT_Aerosol{}#FT<:Union{AbstractFloat, ForwardDiff.Dual}}
     "Aerosol"
-    aerosol::Aerosol{FT}
+    aerosol::Aerosol#{FT}
     "Reference τ"
-    τ_ref::FT
+    τ_ref#::FT
     "Pressure peak (Pa)"
-    p₀::FT
+    p₀#::FT
     "Pressure peak width (Pa)"
-    σp::FT
+    σp#::FT
 end
 
 "Quadrature Types for RT streams"
