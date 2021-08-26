@@ -7,7 +7,7 @@ radiative_transfer:
     - (1e7/777):0.015:(1e7/757)
   # Bidirectional Reflectance Distribution Function (BRDF) per band
   surface: 
-    - LambertianSurfaceScalar(0.15)
+    - LambertianSurfaceScalar(0.05)
   # Quadrature-scheme for stream calculations
   quadrature_type:    GaussQuadFullSphere()
   # Polarization type (Stokes_I, Stokes_IQ, Stokes_IQU, Stokes_IQUV)
@@ -30,11 +30,11 @@ radiative_transfer:
 # =================================================================
 geometry: 
   # Solar zenith angle (degrees)
-  sza:                60
+  sza:                32.4436
   # Viewing zenith angles (degrees)
-  vza:                [60, 45, 30, 15, 0, 15, 30, 45, 60]
+  vza:                [0.072]
   # Viewing azimuth angles (degrees)
-  vaz:                [180, 180, 180, 180, 0, 0, 0, 0, 0]
+  vaz:                [0.0]
   # Observation altitude (Pa)
   obs_alt:            1000.0
 
@@ -67,11 +67,10 @@ atmospheric_profile:
 absorption:
   # List of molecules per spectral band
   molecules:
-    - [O2, CO2] # Molecules in Band #1
+    - [O2] # Molecules in Band #1
   # VMR profiles can either be real-valued numbers, 
   # or an array of nodal points from TOA to BOA, interpolated in pressure space
   vmr: 
-    CO2:  [0.000385, 0.000395]
     O2:   0.21
     H2O:  0.01
   # Broadening function (Doppler/Lorentz/Voigt)
@@ -87,7 +86,7 @@ absorption:
 scattering:
   # List of scattering aerosols and their properties
   aerosols:       
-    - τ_ref:          1.0           # Reference τ
+    - τ_ref:          0.05           # Reference τ
       μ:              1.3           # Log mean radius (µm)
       σ:              2.0           # Log stddev of radius (µm)
       nᵣ:             1.3           # Real part of refractive index
