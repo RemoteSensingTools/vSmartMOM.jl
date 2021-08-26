@@ -12,11 +12,12 @@ using Interpolations
 using Polynomials
 using ForwardDiff 
 using Distributions
+using NCDatasets
 
 ## Atmospheric Radiative Transfer
 
 # Load parameters from file
-parameters = vSmartMOM.parameters_from_yaml("RadiativeTransfer/test/helper/O2Parameters.yaml")
+parameters = vSmartMOM.parameters_from_yaml("test/helper/O2Parameters.yaml")
 FT = Float64
 
 # Runner is used to set AD fields as duals
@@ -49,7 +50,7 @@ T = 5777
 black_body = planck_spectrum_wn(T, ν_grid)
 
 # Get solar transmittance spectrum 
-solar_transmission = solar_transmission_from_file("RadiativeTransfer/src/solar_merged_20160127_600_26316_100.out", ν_grid)
+solar_transmission = solar_transmission_from_file("/home/rjeyaram/RadiativeTransfer/src/solar_merged_20160127_600_26316_100.out", ν_grid)
 
 # Get outgoing solar radiation
 sun_out = solar_transmission .* black_body
@@ -69,7 +70,9 @@ res = 0.001
 
 # Just consider the ILS within ± 0.35nm
 grid_x = -0.35e-3:res*1e-3:0.35e-3
-extended_dims = [5,1] # Footprint, band
+fp = 5
+band = 1
+extended_dims = [fp,band] # Footprint, band
 
 # Re-interpolate I from ν_grid to new grid/resolution
 interp_I = CubicSplineInterpolation(range(ν_grid[1], ν_grid[end], length=length(ν_grid)), earth_out);
@@ -77,11 +80,11 @@ wl = 757.5:res:771.0
 I_wl = interp_I(1e7./wl)
 
 # Pixels to be used
-ind_out = collect(1:1016); 
+ind_out = collect(0:1015); 
 
 # Eventual grid of OCO-2 for Band 1, FP 5:
 dispPoly = Polynomial(view(dispersion, :, extended_dims...))
-ν = Float32.(dispPoly.(0:1015))
+ν = Float32.(dispPoly.(1:1016))
 
 # Prepare ILS table:
 ils_pixel   = InstrumentOperator.prepare_ils_table(grid_x, ils_in, ils_Δ,extended_dims)
@@ -89,3 +92,37 @@ oco2_kernel = VariableKernelInstrument(ils_pixel, ν, ind_out)
 
 # Convolve input spectrum with variable kernel
 I_conv = conv_spectra(oco2_kernel, wl./1e3, I_wl)
+
+## Getting an OCO spectrum for fun to fit:
+ocoData = Dataset(oco_file)
+o2AbandSpectra = ocoData.group["SoundingMeasurements"]["radiance_o2"]
+SoundingGeometry = ocoData.group["SoundingGeometry"]
+vza = SoundingGeometry["sounding_zenith"]
+sza = SoundingGeometry["sounding_solar_zenith"]
+lat = SoundingGeometry["sounding_latitude"]
+lon = SoundingGeometry["sounding_longitude"]
+# Pick an index along the orbit track
+iOrbit = 5300
+sza_ = sza[fp,iOrbit]
+vza_ = vza[fp,iOrbit]
+oco2_Aband = o2AbandSpectra[:,fp,iOrbit]
+
+function applyInstrument(Fin)
+    interp_I = CubicSplineInterpolation(range(ν_grid[1], ν_grid[end], length=length(ν_grid)), Fin);
+    conv_spectra(oco2_kernel, wl./1e3,interp_I(1e7./wl))
+end
+
+# Get cludgy Jacobian with convolution
+K = zeros(1016,6)
+for i=1:6
+    K[:,i] = applyInstrument(dfdx[:,i])
+end
+
+# Measurement vector y
+y = oco2_Aband ./ 4.3e15 * 2.02e4;
+
+#F(x)
+Fx = I_conv;
+
+# Regular least squares:
+dx = K \ (y-Fx)

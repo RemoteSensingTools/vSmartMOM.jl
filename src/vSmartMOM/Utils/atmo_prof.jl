@@ -24,8 +24,8 @@ function compute_atmos_profile_fields(T, p_half::AbstractArray, q, vmr; g₀=9.8
         vmr_h2o[i] = q[i] * ratio
         vmr_dry = 1 - vmr_h2o[i]
         M  = vmr_dry * dry_mass + vmr_h2o[i] * wet_mass
-        vcd_dry[i] = vmr_dry * Δp / (M * g₀ * 100.0^2)   # includes m2->cm2
-        vcd_h2o[i] = vmr_h2o[i] * Δp / (M * g₀ * 100^2)
+        vcd_dry[i] = vmr_dry * Δp / (M * g₀ * 100.0^2) * 100  # includes m2->cm2
+        vcd_h2o[i] = vmr_h2o[i] * Δp / (M * g₀ * 100^2) * 100
     end
 
     new_vmr = Dict{String, Union{Real, Vector}}()
@@ -408,6 +408,7 @@ function compute_absorption_profile!(τ_abs::Array{FT,2},
                                              vmr = vmr_curr)
 
         # Changed index order
+        @show p, T, vmr_curr
         τ_abs[:,iz] += Array(absorption_cross_section(absorption_model, grid, p, T)) * profile.vcd_dry[iz] * vmr_curr
     end
 
