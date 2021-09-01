@@ -408,7 +408,6 @@ function compute_absorption_profile!(τ_abs::Array{FT,2},
                                              vmr = vmr_curr)
 
         # Changed index order
-        @show p, T, vmr_curr
         τ_abs[:,iz] += Array(absorption_cross_section(absorption_model, grid, p, T)) * profile.vcd_dry[iz] * vmr_curr
     end
 

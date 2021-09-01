@@ -27,9 +27,9 @@ function create_surface_layer!(lambertian::LambertianSurfaceScalar{FT},
         dim = size(added_layer.r⁻⁺)
         Nquad = dim[1] ÷ pol_type.n
         # Ensure matrices are zero:
-        tmp = zeros(pol_type.n)
+        tmp = zeros(Real, pol_type.n)
         tmp[1] = ρ   
-        R_surf = Array(Diagonal(tmp))
+        R_surf = Array(Diagonal(vcat(ρ, ones(pol_type.n-1))))
         R_surf = repeat(R_surf',Nquad)
         R_surf = repeat(R_surf',Nquad)
         # Move to architecture:
