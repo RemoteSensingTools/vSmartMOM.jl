@@ -40,6 +40,19 @@ function planck_spectrum_wl(T::Real, λ_grid::Vector)
     return radiance
 end
 
+# W/m²-sr-μm to Ph/s-m²-sr-um
+# λ_grid in micron
+function watts_to_photons(λ_grid::Vector, radiance::Vector)
+
+    h = 6.62607015e-34 # J⋅Hz−1
+    c = 299792458 # m/s
+
+    E_per_λ = h * c ./ (λ_grid / 1e6)
+    photons = radiance ./ E_per_λ
+
+    return photons
+end
+
 """
     $(FUNCTIONNAME)(T::Real; stride_length::Integer = 100)
 
