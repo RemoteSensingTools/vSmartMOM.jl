@@ -21,12 +21,19 @@ using NCDatasets
 parameters = vSmartMOM.parameters_from_yaml("RadiativeTransfer/test/helper/O2Parameters.yaml")
 FT = Float64
 
+# oco2_L1bScND_18688a_180105_B8100r_180206190633
+
 oco_file = "/net/fluo/data1/group/oco2/L1bSc/oco2_L1bScGL_15258a_170515_B10003r_200214061601.h5"
 oco_met_file = "/net/fluo/data1/group/oco2/L2Met/oco2_L2MetGL_26777a_190715_B10003r_200429213029.h5"
 ils_file = "/home/rjeyaram/RadiativeTransfer/src/vSmartMOM/ils_oco2.json"
 
 fp = 5
+iOrbit = 4400
 band = 1
+
+sza_ = 32.4436
+vza_ = [0.072]
+
 
 function conv_spectra_local(m::VariableKernelInstrument, ν, spectrum; stride=1)
     # FT = eltype(m.ν_out)
@@ -56,7 +63,8 @@ end;
 # Runner is used to set AD fields as duals
 function runner!(y, x, parameters=parameters, oco_file=oco_file, 
                                               oco_met_file=oco_met_file, 
-                                              ils_file=ils_file)
+                                              ils_file=ils_file, fp=fp, iOrbit=iOrbit,
+                                              sza_=sza_, vza_=vza_)
 
     # Set parameters fields as the dual numbers
     parameters.brdf = [LambertianSurfaceScalar(x[1])]
@@ -81,8 +89,17 @@ function runner!(y, x, parameters=parameters, oco_file=oco_file,
     p_half = vcat(p_half, p_surf);
     q = met.group["Meteorology"]["specific_humidity_profile_met"][:,fp,iOrbit];
     parameters.p = p_half / 100
-    parameters.q = q
+    parameters.q = q # zeros(size(q))
     parameters.T = T_met
+    parameters.sza = sza_
+    parameters.vza = vza_
+
+    @show parameters.sza, parameters.vza
+
+    # @show parameters.sza
+    # plot!(parameters.p)
+    # return 
+
 
     model = model_from_parameters(parameters);
 
@@ -104,11 +121,7 @@ function runner!(y, x, parameters=parameters, oco_file=oco_file,
     # Apply Earth reflectance matrix 
     earth_out = sun_out .* reverse(R[:])
 
-    # y[:] = earth_out[:]
-
     # Set up InstrumentOperator
-    # oco_file = "/home/cfranken/oco2_L1bScND_18688a_180105_B8100r_180206190633.h5"
-    # ils_file = "/home/rjeyaram/RadiativeTransfer/src/vSmartMOM/ils_oco2.json"
     ils_Δ, ils_in, dispersion = InstrumentOperator.read_ils_table(oco_file, ils_file);
 
     # Define model grid:
@@ -142,107 +155,92 @@ function runner!(y, x, parameters=parameters, oco_file=oco_file,
 
 end
 
-x = FT[0.05,
-       0.05,
-       1.3,
-       2.0,
-       1.3,
-       0.00000001,
-       90000,
-       5000.0]
+directory = "/net/fluo/data1/group/oco2/L1bSc/"
+files_list = filter(x->endswith(x, ".h5") && startswith(x, "oco2_L1bScGL_26"), readdir(directory))
 
-# Run FW model:
-# @time runner(x);
-I_conv = zeros(1016)
-@time dfdx = ForwardDiff.jacobian(runner!, I_conv, x);
+met_files_list = filter(x->endswith(x, ".h5"), readdir("/net/fluo/data1/group/oco2/L2Met/"))
 
-# model = model_from_parameters(parameters); 
-# R = rt_run(model);
+I_convs_all = zeros(1016, length(files_list))
+oco2_Abands_all = zeros(1016, length(files_list))
 
-## Solar Model 
+albedos = zeros(length(files_list))
+cloud_levels = zeros(length(files_list))
 
-# Produce black-body in wavenumber range
-# T = 5777
-# λ_grid = reverse(1e4 ./ parameters.spec_bands[1]) #collect(757:0.01:777)
-# black_body_watts = planck_spectrum_wl(T, λ_grid)
-# black_body = SolarModel.watts_to_photons(λ_grid, black_body_watts)
+optimal_x = zeros(8, length(files_list))
 
-# # Get solar transmittance spectrum 
-# solar_transmission = solar_transmission_from_file("/home/rjeyaram/RadiativeTransfer/src/solar_merged_20160127_600_26316_100.out", parameters.spec_bands[1])
+for i in 1:length(files_list)
 
-# # Get outgoing solar radiation
-# sun_out = solar_transmission .* black_body
+    @show i
 
-# ## Apply Earth reflectance matrix 
+    oco_file = files_list[i]
 
-# earth_out = sun_out .* reverse(R[:])
+    # try
+        ocoData = Dataset(directory * oco_file)
 
-## Set up Instrument Operator
-ils_Δ, ils_in, dispersion = InstrumentOperator.read_ils_table(oco_file, ils_file);
+        oco_met_file = "/net/fluo/data1/group/oco2/L2Met/" * filter(x->contains(x, oco_file[14:19]), met_files_list)[1]
 
-# Define model grid:
-res = 0.001
+        oco_file = directory * oco_file
+        # @show oco_file
+        # @show oco_met_file
 
-# Just consider the ILS within ± 0.35nm
-grid_x = -0.35e-3:res*1e-3:0.35e-3
-fp = 5
-band = 1
-extended_dims = [fp,band] # Footprint, band
+        met = Dataset(oco_met_file)
+        cloud_levels[i] = met.group["Meteorology"]["cloud_liquid_water_path_met"][fp,iOrbit]
 
-# # Re-interpolate I from ν_grid to new grid/resolution
-# interp_I = LinearInterpolation(λ_grid, earth_out);
-# wl = 757.5:res:771.0
-# I_wl = interp_I(wl/1000)
+        # println()
 
-# # Pixels to be used
-# ind_out = collect(0:1015); 
+        # continue
 
-# # Eventual grid of OCO-2 for Band 1, FP 5:
-# dispPoly = Polynomial(view(dispersion, :, extended_dims...))
-# ν = Float32.(dispPoly.(1:1016))
+        ## Getting an OCO spectrum for fun to fit:
+        o2AbandSpectra = ocoData.group["SoundingMeasurements"]["radiance_o2"]
+        SoundingGeometry = ocoData.group["SoundingGeometry"]
+        vza = SoundingGeometry["sounding_zenith"]
+        sza = SoundingGeometry["sounding_solar_zenith"]
+        lat = SoundingGeometry["sounding_latitude"]
+        lon = SoundingGeometry["sounding_longitude"]
+        o2AbandSpectra = ocoData.group["SoundingMeasurements"]["radiance_o2"]
+        oco2_Aband = o2AbandSpectra[:,fp,iOrbit]
 
-# # Prepare ILS table:
-# ils_pixel   = InstrumentOperator.prepare_ils_table(grid_x, ils_in, ils_Δ,extended_dims)
-# oco2_kernel = VariableKernelInstrument(ils_pixel, ν, ind_out)
+        println("$(round(Float64(lat[fp,iOrbit]), digits=2)) $(round(Float64(lon[fp,iOrbit]), digits=4))")
+        # continue
 
-# # Convolve input spectrum with variable kernel
-# I_conv = conv_spectra(oco2_kernel, wl./1e3, I_wl)
+        sza_ = sza[fp,iOrbit]
+        vza_ = [vza[fp,iOrbit]]
 
-## Getting an OCO spectrum for fun to fit:
-ocoData = Dataset(oco_file)
-o2AbandSpectra = ocoData.group["SoundingMeasurements"]["radiance_o2"]
-SoundingGeometry = ocoData.group["SoundingGeometry"]
-vza = SoundingGeometry["sounding_zenith"]
-sza = SoundingGeometry["sounding_solar_zenith"]
-lat = SoundingGeometry["sounding_latitude"]
-lon = SoundingGeometry["sounding_longitude"]
-# Pick an index along the orbit track
-iOrbit = 5300
-sza_ = sza[fp,iOrbit]
-vza_ = vza[fp,iOrbit]
-oco2_Aband = o2AbandSpectra[:,fp,iOrbit]
+        x = FT[0.05,
+        0.05,
+        1.3,
+        2.0,
+        1.3,
+        0.00000001,
+        90000,
+        5000.0]
 
-# function applyInstrument(Fin)
-#     interp_I = CubicSplineInterpolation(range(ν_grid[1], ν_grid[end], length=length(ν_grid)), Fin);
-#     conv_spectra(oco2_kernel, wl./1e3,interp_I(1e7./wl))
-# end
+        # Run FW model:
+        # @time runner(x);
+        I_conv = zeros(1016)
+        dfdx = ForwardDiff.jacobian(runner!, I_conv, x);
 
-# Get cludgy Jacobian with convolution
-# K = zeros(1016,6)
-# 101543.37f0
-# for i=1:6
-#     K[:,i] = applyInstrument(dfdx[:,i])
-# end
+        # dfdx[:,2] .= 0;
 
-# Measurement vector y
-# y = oco2_Aband #./ 4.3e15 * 2.02e4;
-# y = oco2_Aband*1.6e4 #oco2_Aband #./ 4.3e15 * 2.02e4;
+        @show size(dfdx)
 
-#F(x)
-y = oco2_Aband;
-Fx = I_conv;
-K = dfdx;
 
-# Regular least squares:
-dx = K \ (y-Fx)
+        y = oco2_Aband;
+        Fx = I_conv;
+        K = dfdx;
 
+        # Regular least squares:
+        dx = K \ (y-Fx)
+
+        I_convs_all[:,i] = I_conv
+        oco2_Abands_all[:,i] = oco2_Aband
+
+        optimal_x[:,i] = x+dx
+        # @show dx, x+dx
+
+    # catch
+    #     println("Error on " * oco_file)
+    #     continue
+    # end
+
+end
