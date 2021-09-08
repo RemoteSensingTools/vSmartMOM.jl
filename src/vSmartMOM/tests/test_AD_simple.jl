@@ -71,13 +71,13 @@ function runner!(y, x, parameters=parameters, oco_file=oco_file,
 
     parameters.scattering_params.rt_aerosols[1].τ_ref = x[2];
 
-    parameters.scattering_params.rt_aerosols[1].aerosol.size_distribution = LogNormal(log(x[3]), log(x[4]), check_args=false)
+    # parameters.scattering_params.rt_aerosols[1].aerosol.size_distribution = LogNormal(log(x[3]), log(x[4]), check_args=false)
 
-    parameters.scattering_params.rt_aerosols[1].aerosol.nᵣ = x[5];
-    parameters.scattering_params.rt_aerosols[1].aerosol.nᵢ = x[6];
+    # parameters.scattering_params.rt_aerosols[1].aerosol.nᵣ = x[5];
+    # parameters.scattering_params.rt_aerosols[1].aerosol.nᵢ = x[6];
 
-    parameters.scattering_params.rt_aerosols[1].p₀ = x[7];
-    parameters.scattering_params.rt_aerosols[1].σp = x[8];
+    # parameters.scattering_params.rt_aerosols[1].p₀ = x[7];
+    # parameters.scattering_params.rt_aerosols[1].σp = x[8];
 
     # Set profiles properly
     met = Dataset(oco_met_file);
@@ -207,20 +207,20 @@ for i in 1:length(files_list)
         vza_ = [vza[fp,iOrbit]]
 
         x = FT[0.05,
-        0.05,
-        1.3,
-        2.0,
-        1.3,
-        0.00000001,
-        90000,
-        5000.0]
+        0.05]#,
+        # 1.3,
+        # 2.0,
+        # 1.3,
+        # 0.00000001,
+        # 90000,
+        # 5000.0]
 
         # Run FW model:
         # @time runner(x);
         I_conv = zeros(1016)
         dfdx = ForwardDiff.jacobian(runner!, I_conv, x);
 
-        # dfdx[:,2] .= 0;
+        dfdx[:,2] .= 0;
 
         @show size(dfdx)
 
@@ -235,7 +235,10 @@ for i in 1:length(files_list)
         I_convs_all[:,i] = I_conv
         oco2_Abands_all[:,i] = oco2_Aband
 
-        optimal_x[:,i] = x+dx
+        # optimal_x[:,i] = x+dx
+        albedos[i] = x[1] + dx[1]
+
+
         # @show dx, x+dx
 
     # catch

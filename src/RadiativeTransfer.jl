@@ -4,6 +4,7 @@ using LinearAlgebra
 using Distributions
 using CUDA
 using Parameters
+using DocStringExtensions
 
 # Export Architecture functions
 export CPU, GPU, default_architecture, array_type

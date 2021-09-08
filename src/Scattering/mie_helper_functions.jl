@@ -225,8 +225,11 @@ function reconstruct_phase(greek_coefs, μ; returnLeg=false)
     f₂₂[:] = R² * (fac .* greek_coefs.α) .+ T² * (fac .* greek_coefs.ζ)  # a₂ in Rooij notation
     f₃₃[:] = R² * (fac .* greek_coefs.ζ) .+ T² * (fac .* greek_coefs.α)  # a₃ in Rooij notation
 
+    # Put elements into a struct
+    scattering_matrix = ScatteringMatrix(f₁₁, f₁₂, f₂₂, f₃₃, f₃₄, f₄₄)
+
     # For truncation in δ-BGE, we need P and P² as well, convenient to return here:
-    return returnLeg ? (f₁₁, f₁₂, f₂₂, f₃₃, f₃₄, f₄₄, P, P²) : (f₁₁, f₁₂, f₂₂, f₃₃, f₃₄, f₄₄)
+    return returnLeg ? (scattering_matrix, P, P²) : scattering_matrix
 end
 
 """

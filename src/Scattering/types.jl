@@ -225,6 +225,25 @@ function Base.:isapprox(greek_coefs_a::GreekCoefs, greek_coefs_b::GreekCoefs)
     return all([getproperty(greek_coefs_a, field) ≈ getproperty(greek_coefs_b, field) for field in field_names])
 end
 
+""" 
+    struct ScatteringMatrix
+
+A struct which holds all computed phase function elements. 
+f₁₁ represents the phase function p for the Intensity (first Stokes Vector element) and is normalized as follows:
+1/4π ∫₀²⁽ᵖⁱ⁾ dϕ ∫₋₁¹ p(μ) dμ  = 1
+    
+# Fields
+$(DocStringExtensions.FIELDS)
+""" 
+struct ScatteringMatrix{FT}
+    f₁₁::FT
+    f₁₂::FT
+    f₂₂::FT
+    f₃₃::FT
+    f₃₄::FT
+    f₄₄::FT
+end
+
 """
     struct AerosolOptics
 
