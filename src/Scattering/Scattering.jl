@@ -1,6 +1,6 @@
 module Scattering
 
-using Parameters                # 
+using Parameters                # For default values in structs
 using DocStringExtensions       # For simplifying docstring
 using FastGaussQuadrature       # For fast Gauss-Legendre quadrature points
 using JLD2                      # For saving and loading 
@@ -9,26 +9,26 @@ using KernelAbstractions        # For heterogeneous (GPU+CPU) programming
 using CUDA                      # For GPU programming
 using Distributions             # Distributions from Julia 
 using ForwardDiff, DiffResults  # Automatic Differentiation tools
-using LinearAlgebra
+using LinearAlgebra             # For calculations
 using StatsBase                 # Fit statistics for truncation
-using StaticArrays
+using StaticArrays              # 
 
 using ..Architectures: device
 
-include("Types/types.jl")                # All types used in this module
-include("Mie/mie_helper_functions.jl")   # Mie file-related functions
-include("Legendre/legendre_functions.jl")   # Recursions for associated Legendre Polynomials
-# include("mie_computations.jl")     # Functions for Mie calculations over size distribution
-include("Truncation/phase_truncation.jl")     # Functions for truncation
-include("Mie/wigner3j_recursive.jl")   # Recursive Wigner 3j calculations
-include("Mie/mie_model.jl")
-include("Mie/compute_NAI2.jl")
-include("Mie/compute_PCW.jl")
-include("Mie/phase_function_autodiff.jl")     # Auto-differentiation
+include("types.jl")                       # All types used in this module
+include("mie_helper_functions.jl")        # Mie file-related functions
+include("legendre_functions.jl")          # Recursions for associated Legendre Polynomials
+include("phase_truncation.jl")            # Functions for truncation
+include("wigner3j_recursive.jl")          # Recursive Wigner 3j calculations
+include("mie_model.jl")                   # Convenience functions to create Mie model
+include("compute_NAI2.jl")                # Compute phase function w/ NAI2
+include("compute_PCW.jl")                 # Compute phase function w/ PCW
+include("phase_function_autodiff.jl")     # Auto-differentiation
+include("show_utils.jl")                  # Pretty-print
 
 
 # Export make functions/types
-export make_log_normal_size_dist, make_mie_model
+export make_log_normal_size_dist, make_mie_model, reconstruct_phase
 
 # Export types
 export NAI2, PCW, Aerosol, MieModel, Stokes_IQUV, Stokes_I, Stokes_IQU, 

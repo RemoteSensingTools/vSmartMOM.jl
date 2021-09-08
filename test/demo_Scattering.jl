@@ -48,11 +48,12 @@ model_PCW = make_mie_model(PCW(), aero, λ, polarization_type, truncation_type, 
 # @btime aerosol_optics_PCW = compute_aerosol_optical_properties(model_PCW);
 
 # Compute the derivatives!
-aerosol_optics_NAI2 = compute_aerosol_optical_properties(model_NAI2, autodiff=true);
+aerosol_optics_NAI2 = compute_aerosol_optical_properties(model_NAI2, autodiff=false);
 aerosol_optics_PCW = compute_aerosol_optical_properties(model_PCW);
 
+# Compute scattering matrix from optical properties
 μ_quad, w_μ = gausslegendre(1000)
-f₁₁, f₁₂, f₂₂, f₃₃, f₃₄, f₄₄ = Scattering.reconstruct_phase(aerosol_optics_NAI2.greek_coefs, μ_quad);
+scattering_matrix = Scattering.reconstruct_phase(aerosol_optics_NAI2.greek_coefs, μ_quad);
 
 # aerosol_optics_NAI2.greek_coefs.α ≈ aerosol_optics_PCW.greek_coefs.α
 

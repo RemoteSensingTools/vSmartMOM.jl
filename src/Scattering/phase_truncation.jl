@@ -14,7 +14,9 @@ function truncate_phase(mod::δBGE, aero::AerosolOptics{FT}; reportFit=false, er
     μ, w_μ = gausslegendre(length(β));
 
     # Reconstruct phase matrix elements:
-    f₁₁, f₁₂, f₂₂, f₃₃, f₃₄, f₄₄, P, P² = reconstruct_phase(greek_coefs, μ; returnLeg=true)
+    scattering_matrix, P, P² = reconstruct_phase(greek_coefs, μ; returnLeg=true)
+
+    @unpack f₁₁, f₁₂, f₂₂, f₃₃, f₃₄, f₄₄ = scattering_matrix
 
     # Find elements that exclude the peak (if wanted!)
     iμ = findall(x -> x < cosd(Δ_angle), μ)

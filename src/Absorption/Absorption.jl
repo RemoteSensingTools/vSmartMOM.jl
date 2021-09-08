@@ -14,15 +14,15 @@ using ..Architectures           # For GPU/CPU convenience
 using ..Architectures: devi, default_architecture
 
 include("Constants/constants.jl")                   # Scientific and mathematical constants
-include("Types/types.jl")                           # All types used in this module
-include("Hitran/hitran.jl")                         # HITRAN file-related functions
-include("LineShapes/complex_error_functions.jl")    # CEFs used in line broadening
 include("Constants/mol_weights.jl")                 # Molecular weights
 include("Constants/TIPS_2017.jl")                   # Partition sums data 
-include("TableInterpolation/partition_sums.jl")     # Partition sums interpolator 
-include("TableInterpolation/cross_section_interpolator.jl") # CS interpolator functions
-include("Hitran/absorption_cross_section.jl")       # Cross-section from HITRAN
-include("Hitran/cross_section_autodiff.jl")         # Auto-differentiation
+include("types.jl")                                 # All types used in this module
+include("hitran.jl")                                # HITRAN file-related functions
+include("complex_error_functions.jl")               # CEFs used in line broadening
+include("partition_sums.jl")                        # Partition sums interpolator 
+include("cross_section_interpolator.jl")            # CS interpolator functions
+include("compute_absorption_cross_section.jl")      # Cross-section from HITRAN
+include("cross_section_autodiff.jl")                # Auto-differentiation
 
 # Export the Cross Section models
 export AbstractCrossSectionModel, HitranModel, InterpolationModel
