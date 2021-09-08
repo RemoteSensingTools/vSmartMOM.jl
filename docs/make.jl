@@ -20,10 +20,26 @@ function build()
     tutorials_md = [joinpath("pages", "tutorials", tutorial[1:end-3]) * ".md" for tutorial in tutorials]
 
     pages = Any[
-        "Home"                  => "index.md",
-        "RadiativeTransfer"     => "pages/RadiativeTransfer.md",
-        "Absorption"            => "pages/Absorption.md",
-        "Scattering"            => "pages/Scattering.md",
+        "Getting Started"       => "index.md",
+        "RadiativeTransfer"     => Any[
+                                    "Overview" => "pages/RadiativeTransfer/Overview.md", 
+                                    "Example" => "pages/RadiativeTransfer/Example.md",
+                                    "User-Defined RT Parameters" => "pages/RadiativeTransfer/InputParametersGuide.md",
+                                    "Methods & Types" => "pages/RadiativeTransfer/Types.md",
+                                    "References" => "pages/RadiativeTransfer/References.md"
+                                    ],
+        "Absorption"            => [
+                                    "Overview" => "pages/Absorption/Overview.md",
+                                    "Example" => "pages/Absorption/Example.md",
+                                    "Methods & Types" => "pages/Absorption/Types.md",
+                                    "References" => "pages/Absorption/References.md"
+                                    ],
+        "Scattering"            => [
+                                    "Overview" => "pages/Scattering/Overview.md",
+                                    "Example" => "pages/Scattering/Example.md",
+                                    "Methods & Types" => "pages/Scattering/Types.md",
+                                    "References" => "pages/Scattering/References.md"
+                                    ],
         "Tutorials"             => tutorials_md
     ]
 
