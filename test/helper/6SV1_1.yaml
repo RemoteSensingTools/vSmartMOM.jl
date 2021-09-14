@@ -19,11 +19,11 @@ radiative_transfer:
   # Trunction length for legendre terms
   l_trunc:            20
   # Depolarization factor
-  depol:              0.0
+  depol:              0.0279
   # Floating point type for calculations (Float32, Float64)
   float_type:         Float64
   # Architecture (default_architecture, GPU(), CPU())
-  architecture:       default_architecture
+  architecture:       Architectures.CPU()
   
 # =================================================================
 # Simulation Geometry
@@ -44,10 +44,10 @@ geometry:
 atmospheric_profile: 
   # Temperature Profile (TOA to BOA, in K)
   # Full-levels, specified at layer centers
-  T: [231.62, 244.33]
+  T: [231.62]
   # Pressure Profile (TOA to BOA at each boundary, in hPa)
   # Half-levels, specified at layer boundaries
-  p: [  0.14,   0.22,   0.30]
+  p: [  0.14,   0.22]
   # Reduce profile to n layers
   profile_reduction: -1
 
