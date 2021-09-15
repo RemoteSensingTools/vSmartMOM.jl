@@ -1,3 +1,16 @@
+#=
+ 
+This file contains functions that perform the core absorption cross section calculations. 
+While `compute_absorption_cross_section` *can* be called directly by users, it's 
+wrapped by `absorption_cross_section`, in autodiff_handler.jl to allow autodiff users
+to call the function seamlessly alike non-autodiff users. 
+
+`compute_absorption_cross_section` is implemented both from scratch (::HitranModel) and as 
+an interpolation (::InterpolationModel). For the former, there are separate line_shape 
+kernel functions that allow the calculation to run in parallel, and a qoft! function to 
+interpolate partition sums. 
+
+=#
 
 """
 Given the hitran data and necessary parameters, calculate an absorption cross-section at the
@@ -138,9 +151,11 @@ function compute_absorption_cross_section(
     return sitp(pressure, temperature, grid)
 end
 
-#####
-##### Lineshape functions that are called by absorption_cross_section
-#####
+#=
+
+Line-shape kernel functions that are called by absorption_cross_section
+
+=# 
 
 @kernel function line_shape!(A, @Const(grid), ν, γ_d, γ_l, y, S, ::Doppler, CEF)
     FT = eltype(ν)
@@ -162,4 +177,31 @@ end
 
 @kernel function line_shape32!(A, @Const(grid), ν, γ_d, γ_l, y, S, broadening, CEF)
     line_shape!(A, grid, Float32(ν), Float32(γ_d), Float32(γ_l), Float32(y), Float32(S), broadening, CEF)
+end
+
+#=
+
+Function to interpolate partition sum for specified isotopologue
+
+=# 
+
+"Given molecule and isotopologue numbers (M, I), target temperature (T), and reference 
+temperature (T_ref), store the ratio of interpolated partition sums in `result`"
+function qoft!(M, I, T, T_ref, result)
+
+    # Get temperature grid
+    TT = get_TT(M, I)
+    TQ = get_TQ(M, I)
+
+    # Error if out of temperature range
+    Tmin = minimum(TT); Tmax = maximum(TT)
+    @assert (Tmin < T < Tmax) "TIPS2017: T ($T) must be between $Tmin K and $Tmax K."
+
+    # Interpolate partition sum for specified isotopologue
+    interp = DI_CS(TQ, TT)
+    Qt = interp(T)
+    Qt2 = interp(T_ref) 
+
+    # Save the ratio result 
+    result[1] = Qt2/Qt
 end

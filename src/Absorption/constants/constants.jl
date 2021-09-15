@@ -1,6 +1,8 @@
-#####
-##### Define all the scientific constants needed in this module here
-#####
+#=
+ 
+Define all the scientific constants needed in this module here
+ 
+=#
 
 const c₂                 = 1.4387769
 const cMassMol           = 1.66053873e-27

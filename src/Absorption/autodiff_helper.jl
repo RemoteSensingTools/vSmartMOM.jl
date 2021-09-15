@@ -1,3 +1,11 @@
+#=
+ 
+This file wraps `compute_absorption_cross_section` so that autodiff users and non-autodiff 
+users can call the same function with just a keyword argument change. 
+
+(Tried doing this with multiple dispatch but ran into keyword argument issues)
+
+=#
 
 """
     $(FUNCTIONNAME)(model::HitranModel, grid::AbstractRange{<:Real}, pressure::Real, temperature::Real; wavelength_flag::Bool=false)
@@ -26,9 +34,7 @@ function absorption_cross_section(model::AbstractCrossSectionModel,          # M
         @assert (pressure== x[1])
         @assert (temperature == x[2])
     
-        cross_section = compute_absorption_cross_section(model, grid, x[1], x[2], wavelength_flag=wavelength_flag);
-    
-        return cross_section
+        return compute_absorption_cross_section(model, grid, x[1], x[2], wavelength_flag=wavelength_flag);
     end
 
     if (autodiff)

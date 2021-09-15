@@ -1,3 +1,10 @@
+#=
+ 
+This file contains helper functions to load and store partition-sum information relevant 
+to absorption cross section calculation
+ 
+=#
+
 const tips_file_path = String(@__DIR__) * "/TIPS_2017.nc"
 const TIPS_2017_ISOT_HASH_CONST = ncread(tips_file_path, "TIPS_2017_T")
 const TIPS_2017_ISOQ_HASH_CONST = ncread(tips_file_path, "TIPS_2017_Q")
