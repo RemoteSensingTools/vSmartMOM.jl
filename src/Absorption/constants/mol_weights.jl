@@ -1,3 +1,10 @@
+#=
+ 
+This file contains helper functions to load and store isotope information relevant 
+to absorption cross section calculation
+ 
+=#
+
 # File that stores all isotope information
 const file_path = String(@__DIR__) * "/iso_info.nc"
 

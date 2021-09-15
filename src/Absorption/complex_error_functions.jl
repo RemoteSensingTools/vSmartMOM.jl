@@ -1,4 +1,13 @@
-using SpecialFunctions
+#=
+ 
+This file contains complex error functions that are to be used in Voigt 
+line-shape calculations. 
+
+The `w(z)` functions near the bottom are those directly called by line_shape in 
+compute_absorption_cross_section.jl. All other functions are helpers for 
+calculating rational approximations. 
+ 
+=#
 
 """
     Humlicek (1982) rational approximation:  region I.
@@ -8,7 +17,6 @@ function humlicek1(z::Complex)
     #t = z.imag-1j*z.real;   w = t * recSqrtPi / (0.5 + t*t)
     w = 1im*FT(1/sqrt(pi)) *z / (z*z-FT(0.5))
 end
-
 
 """
     Humlicek (1982) rational approximation:  region II.
@@ -24,7 +32,7 @@ end
 """
     Humlicek (1982) rational approximation:  region II.
 """
-function Humlicek2(z::Complex)
+function _humlicek2(z::Complex)
     FT = eltype(real(z));
     # this implementation corresponds to Eq. (12) of the manuscript
     zz = z*z

@@ -1,8 +1,13 @@
-#####
-##### Functions to deal with a cross-section interpolator
-#####
+#=
+ 
+This file contains some helper functions for performing cross-section interpolations. 
 
-using ..Architectures: GPU
+`make_interpolation_model` creates a cross-section matrix based on the pressure and 
+temperature grids, and fits an interpolation. 
+
+There are also some save/load convenience functions for the interpolation model. 
+ 
+=#
 
 """
     $(FUNCTIONNAME)(hitran::HitranTable, 
@@ -36,7 +41,7 @@ function make_interpolation_model(
                                 )
 
     # Warn user if using incompatible/untested CEF
-    if architecture isa GPU && !(CEF isa HumlicekWeidemann32SDErrorFunction)
+    if architecture isa Architectures.GPU && !(CEF isa HumlicekWeidemann32SDErrorFunction)
         @warn "Cross-section calculations on GPU may or may not work with this CEF (use HumlicekWeidemann32SDErrorFunction if you encounter issues)"
     end
 
