@@ -3,17 +3,17 @@
 using RadiativeTransfer, RadiativeTransfer.vSmartMOM
 using Plots
 
-include("6SV1_R_trues.jl")
+include("test/6SV1_R_trues.jl")
 R_modeled = zeros(6, 3, 3, 16);
-parameters = parameters_from_yaml("/home/rjeyaram/RadiativeTransfer/test/6SV1_1.yaml");
+parameters = parameters_from_yaml("test/6SV1_1.yaml");
 
 ## Case 1: τ = 0.10, (λ = 530 nm), ρ = 0.0
 
 # sza, az, vza
-azs = [180, 90, 0]
-szas = [23.0739, 53.1301, 78.4630]
-R_deltas = zeros(3, 3, 16)
-R_true = R_trues[1]
+azs = [180, 90, 0];
+szas = [23.0739, 53.1301, 78.4630];
+R_deltas = zeros(3, 3, 16);
+R_true = R_trues[1];
 
 for sza_i in 1:3
     for az_i in 1:3
@@ -47,7 +47,7 @@ for sza_i in 1:3
         parameters.spec_bands = [1e7/530 (1e7/530 +1)]
         parameters.vaz = repeat([azs[az_i]], 16)
         parameters.sza = szas[sza_i]
-        parameters.brdf = [RadiativeTransfer.vSmartMOM.LambertianSurfaceScalar(0.25)]
+        parameters.brdf = [RadiativeTransfer.vSmartMOM.LambertianSurfaceScalar(0.25*π)]
         model = model_from_parameters(parameters);
         model.τ_rayl[1] .= 0.1
         R_modeled[2, sza_i, az_i, :] = vSmartMOM.rt_run(model, i_band=1)[:,1,1] / model.quad_points.μ₀
