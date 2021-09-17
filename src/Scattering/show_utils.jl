@@ -1,4 +1,10 @@
-# Overload the show method for vSmartMOM_Model
+#=
+ 
+This file specifies how to pretty-print Scattering module types
+ 
+=#
+
+# Overload the show method for ScatteringMatrix
 function Base.show(io::IO, x::ScatteringMatrix)
     
     println(io, "  f₁₁| $(length(x.f₁₁))-element vector")

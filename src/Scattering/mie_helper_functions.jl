@@ -1,5 +1,7 @@
 #=
-This file contains short helper functions that are used throughout the module
+
+This file contains helper functions that are used throughout the module
+
 =#
 
 """ Convenience function to perform (-1)^x using x's parity """

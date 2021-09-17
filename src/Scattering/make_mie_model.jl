@@ -1,3 +1,8 @@
+#=
+ 
+This file provides helper functions to create a MieModel object
+
+=#
 
 """ 
     $(FUNCTIONNAME)(computation_type::NAI2, aerosol::AbstractAerosolType, λ::Real, polarization::AbstractPolarizationType, truncation_type::AbstractTruncationType)

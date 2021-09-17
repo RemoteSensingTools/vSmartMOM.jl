@@ -1,4 +1,9 @@
-# ToDo: Enable arrays of aerosols (for μ̄, σ, nᵣ, nᵢ)
+#=
+ 
+This file specifies how to compute aerosol optical properties using the Siewert-NAI2 method
+ 
+=#
+
 """
     $(FUNCTIONNAME)(model::MieModel{FDT}) where FDT<:NAI2
 

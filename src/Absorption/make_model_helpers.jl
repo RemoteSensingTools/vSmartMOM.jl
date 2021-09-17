@@ -1,13 +1,40 @@
 #=
  
-This file contains some helper functions for performing cross-section interpolations. 
+This file contains helper functions for creating calculation models 
+
+`make_hitran_model` creates a HitranModel with all specified parameters. 
 
 `make_interpolation_model` creates a cross-section matrix based on the pressure and 
 temperature grids, and fits an interpolation. 
 
 There are also some save/load convenience functions for the interpolation model. 
- 
+
 =#
+
+"""
+    make_hitran_model(hitran::HitranTable, 
+                      broadening::AbstractBroadeningFunction; 
+                      wing_cutoff::Real=40, 
+                      vmr::Real=0, 
+                      CEF::AbstractComplexErrorFunction=HumlicekWeidemann32SDErrorFunction(), 
+                      architecture = default_architecture)
+
+Convenience function to make a HitranModel out of the parameters (Matches make_interpolation_model)
+
+"""
+function make_hitran_model(hitran::HitranTable, 
+                           broadening::AbstractBroadeningFunction; 
+                           wing_cutoff::Integer=40, 
+                           vmr::Union{Real, Vector}=0, 
+                           CEF::AbstractComplexErrorFunction=HumlicekWeidemann32SDErrorFunction(), 
+                           architecture = default_architecture)
+
+    if architecture isa GPU && !(CEF isa HumlicekWeidemann32SDErrorFunction)
+        @warn "Cross-section calculations on GPU may or may not work with this CEF (use HumlicekWeidemann32SDErrorFunction if you encounter issues)"
+    end
+
+    return HitranModel(hitran=hitran, broadening=broadening , wing_cutoff=wing_cutoff , vmr=vmr, CEF=CEF, architecture=architecture)
+end
 
 """
     $(FUNCTIONNAME)(hitran::HitranTable, 

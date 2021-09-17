@@ -1,5 +1,12 @@
+#=
+ 
+This file specifies how to truncate the AerosolOptics struct, given the truncation type
+ 
+=#
+
 """
-$(FUNCTIONNAME)(mod::δBGE, aero::AerosolOptics))
+    $(FUNCTIONNAME)(mod::δBGE, aero::AerosolOptics))
+    
 Returns the truncated aerosol optical properties as [`AerosolOptics`](@ref) 
 - `mod` a [`δBGE`](@ref) struct that defines the truncation order (new length of greek parameters) and exclusion angle
 - `aero` a [`AerosolOptics`](@ref) set of aerosol optical properties that is to be truncated

@@ -79,7 +79,7 @@ end
     nᵣ = 1.3                # Real part of refractive index
     nᵢ = 0.001              # Imag part of refractive index
 
-    size_distribution = make_log_normal_size_dist(μ, σ)
+    size_distribution = LogNormal(log(μ), log(σ))
 
     # Create the aerosol
     aero = Aerosol(size_distribution, nᵣ, nᵢ)

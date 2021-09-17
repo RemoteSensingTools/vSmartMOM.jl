@@ -1,17 +1,20 @@
-###
-### Compute Wigner 3-j symbols recursively, as specified in paper: 
-###     "Revisiting the Fourier expansion of Mie scattering matrices 
-###      in generalized spherical functions", Suniti Sanghavi, 2014
-###     
-### Note: Minor typos from the paper are corrected in this implementation: 
-###     1. Eqn 25:
-###       -   sqrt(2*m+3) 
-###       +   (2*m+3)
-### 
-###     2. Eqn 31: 
-###       -   sqrt((l-1) * l * (l+1) * (l+2))
-###       +   ((l-1) * l * (l+1) * (l+2)) ^ (-0.5)
-###
+#=
+
+This file specifies how to compute Wigner 3-j symbols recursively, as specified in paper: 
+
+"Revisiting the Fourier expansion of Mie scattering matrices 
+ in generalized spherical functions", Suniti Sanghavi, 2014
+
+Note: Minor typos from the paper are corrected in this implementation: 
+
+1. Eqn 25:
+    -   sqrt(2*m+3) 
+    +   (2*m+3)
+
+2. Eqn 31: 
+    -   sqrt((l-1) * l * (l+1) * (l+2))
+    +   ((l-1) * l * (l+1) * (l+2)) ^ (-0.5)
+=#
 
 """
     $(FUNCTIONNAME)(m::Integer, n::Integer, l::Integer, wigner_A::Array{Float64, 3}, wigner_B::Array{Float64, 3})
