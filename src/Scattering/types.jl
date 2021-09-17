@@ -1,6 +1,16 @@
-#####
-##### Types for describing an aerosol's composition for Mie computation
-#####
+#=
+ 
+This file contains all types that are used in the Scattering module:
+
+- `AbstractAerosolTypes` specify aerosol properties
+- `AbstractFourierDecompositionTypes` specify the decomposition method to use (NAI2 vs PCW)
+- `AbstractPolarizationTypes` specify the polarization type (I/IQU/IQUV)
+- `AbstractTruncationTypes` specify the type of truncation for legendre terms
+- `GreekCoefs` holds all greek coefficients 
+- `ScatteringMatrix` holds all computed phase function elements
+- `AerosolOptics` holds all computed aerosol optical properties
+
+=#
 
 """
     type AbstractAerosolType
@@ -9,47 +19,22 @@ Abstract aerosol type
 abstract type AbstractAerosolType end
 
 "Aerosol type with its properties (size distribution and refractive index)"
-mutable struct Aerosol{}#FT<:Union{AbstractFloat, ForwardDiff.Dual}}
+mutable struct Aerosol{}
     "Univariate size distribution"
     size_distribution::ContinuousUnivariateDistribution
     "Real part of refractive index"
-    nᵣ#::FT
+    nᵣ
     "Imag part of refractive index"
-    nᵢ#::FT
+    nᵢ
 end
-
-# """
-#     struct MieAerosol{FT}
-
-# A struct which provides an aerosol and related parameters needed for Mie computation
-
-# # Fields
-# $(DocStringExtensions.FIELDS)
-# """
-# struct MieAerosol{FT}
-#     "Aerosol"
-#     aerosol::Aerosol{FT}
-    
-# end
-
-# """ 
-#     $(FUNCTIONNAME)(size_distribution::ContinuousUnivariateDistribution, r_max, nquad_radius::Int, nᵣ, nᵢ)
-
-# Convenience function to create a Univariate Aerosol, given the size parameters 
-# """
-# function make_mie_aerosol(size_distribution::ContinuousUnivariateDistribution, nᵣ, nᵢ,
-#                                  r_max::FT, nquad_radius::Int) where {FT}
-#     aerosol = Aerosol(size_distribution, nᵣ, nᵢ)
-#     return MieAerosol(aerosol, r_max, nquad_radius)
-# end
-
-make_log_normal_size_dist(μ, σ) = LogNormal(log(μ), log(σ))
 
 # TODO: struct MultivariateAerosol{FT,FT2} <: AbstractAerosolType
 
-#####
-##### Types of Fourier Decomposition (NAI2 or PCW)
-#####
+#=
+
+Types of Fourier Decomposition (NAI2 or PCW)
+
+=#
 
 """
     type AbstractFourierDecompositionType
@@ -73,9 +58,11 @@ decomposition. See: http://adsabs.harvard.edu/full/1984A%26A...131..237D
 """
 struct PCW <: AbstractFourierDecompositionType end
 
-#####
-##### Types of Polarization (which Stokes vector to use)
-#####
+#=
+
+Types of Polarization (which Stokes vector to use)
+
+=#
 
 """
     type AbstractPolarizationType
@@ -118,8 +105,6 @@ Base.@kwdef struct Stokes_IQU{FT<:AbstractFloat} <: AbstractPolarizationType
     I₀::Array{FT} = [1.0, 0.0, 0.0] #assuming linearly unpolarized incident stellar radiation
 end
 
-
-
 """
     struct Stokes_I{FT<:AbstractFloat}
 
@@ -137,9 +122,11 @@ Base.@kwdef struct Stokes_I{FT<:AbstractFloat} <: AbstractPolarizationType
     I₀::Array{FT} = [1.0]
 end
 
-#####
-##### Types of Truncation (for Legendre terms)
-#####
+#=
+
+Types of Truncation (for Legendre terms)
+
+=#
 
 """
     type AbstractTruncationType
@@ -161,9 +148,11 @@ struct δBGE{FT} <: AbstractTruncationType
     Δ_angle::FT
 end
 
-#####
-##### Model that specifies the Mie computation details 
-#####
+#=
+
+Model that specifies the Mie computation details
+
+=#
 
 """
     type MieModel
@@ -191,9 +180,11 @@ Base.@kwdef struct MieModel{FDT<:AbstractFourierDecompositionType, FT}
 
 end
 
-#####
-##### Types that are needed for the output of the Fourier decomposition
-#####
+#=
+
+Types that are needed for the output of the Fourier decomposition
+
+=#
 
 """
     struct GreekCoefs{FT}
@@ -256,13 +247,11 @@ Base.@kwdef struct AerosolOptics{FT<:Union{AbstractFloat, ForwardDiff.Dual}}
     "Greek matrix"
     greek_coefs::GreekCoefs
     "Single Scattering Albedo"
-    ω̃::FT #Suniti
+    ω̃::FT
     "Extinction cross-section"
-    k::FT #Suniti
-    #"Extinction cross-section at reference wavelength"
-    #k_ref::AbstractArray{FT} #Suniti
+    k::FT
     "Truncation factor" 
-    fᵗ::FT #Suniti
+    fᵗ::FT
     "Derivatives"
     derivs = zeros(1)
 end
@@ -272,11 +261,3 @@ function Base.:isapprox(aerosol_optics_a::AerosolOptics, aerosol_optics_b::Aeros
     field_names = fieldnames(AerosolOptics)
     return all([getproperty(aerosol_optics_a, field) ≈ getproperty(aerosol_optics_b, field) for field in field_names])
 end
-
-
-
-# """
-#     type AbstractQuadratureType
-# Abstract Quadrature type 
-# """
-# abstract type AbstractQuadratureType end

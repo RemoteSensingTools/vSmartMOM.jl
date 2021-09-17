@@ -1,3 +1,9 @@
+#=
+ 
+This file specifies how to compute aerosol optical properties using the Domke-PCW method
+ 
+=#
+
 """
     $(FUNCTIONNAME)(model::MieModel{FDT}) where FDT<:PCW
 

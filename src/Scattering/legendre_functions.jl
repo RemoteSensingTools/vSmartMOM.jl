@@ -1,10 +1,17 @@
+#=
+ 
+This file defines helpful Legendre-related functions
 
+=#
 
 """
-$(FUNCTIONNAME)(μ,Lmax)
-Computes the normalized Π matrix elements with generalized spherical functions (normalized by sqrt((l-m)!/(l+m)!)) ). See eq 15 in Sanghavi 2014
+    $(FUNCTIONNAME)(μ,Lmax)
+
+Computes the normalized Π matrix elements with generalized spherical functions (normalized by sqrt((l-m)!/(l+m)!))). See eq 15 in Sanghavi 2014
+
 - `μ` cos(θ) of angle θ
 - `Lmax` max `l` Polynomial degree to be computed (m adjusted accordingly) 
+
 The function returns matrices containing ``P_l^m(\\mu)``,  ``R_l^m(\\mu)``, ``-T_l^m(\\mu)``, all normalized by ``\\sqrt{\\frac{(l-m)!}{(l+m)!}}``
 """ 
 function compute_associated_legendre_PRT(μ,Lmax)

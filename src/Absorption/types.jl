@@ -1,7 +1,14 @@
-#####
-##### Types for holding input transition states, intensities and related
-##### variables. (Currently intended for storing HITRAN database)
-#####
+#=
+ 
+This file contains all types that are used in the Absorption module:
+
+- `HitranTable` stores HITRAN transition line parameters
+- `AbstractBroadeningFunctions` specify the type of line-shape broadening to perform
+- `AbstractComplexErrorFunctions` specify the error function to use for Voigt calculations
+- `AbstractCrossSectionModel` specify whether to calculate the line-shape from scratch or 
+  using an interpolator. 
+ 
+=#
 
 """
     struct HitranTable{FT}
@@ -55,10 +62,11 @@ Base.@kwdef struct HitranTable{FT<:AbstractFloat}
     g″::Array{FT,1}
 end
 
-#####
-##### Types of Broadening Functions
-##### Currently: Doppler, Lorentz, and Voigt
-#####
+#= 
+
+Types of broadening functions (currently Doppler, Lorentz, and Voigt)
+
+=# 
 
 """
     type AbstractBroadeningFunction
@@ -76,9 +84,11 @@ struct Lorentz <: AbstractBroadeningFunction end
 struct Voigt <: AbstractBroadeningFunction end
 
 
-#####
-##### Types of Complex Error Functions
-#####
+#= 
+
+Types of complex error functions for use in Voigt computations
+
+=# 
 
 """
     type AbstractComplexErrorFunction
@@ -107,10 +117,14 @@ struct ErfcHumliErrorFunctionSD  <: AbstractComplexErrorFunction end
 "erfc Special Function for Voigt"
 struct ErfcErrorFunction  <: AbstractComplexErrorFunction end
 
-#####
-##### Types of models that can be used to calculate an absorption cross-
-##### section. 
-#####
+#= 
+
+Types of models that can be used to calculate an absorption cross-section: 
+
+- HitranModel
+- InterpolationModel
+
+=# 
 
 """
     type AbstractCrossSectionModel
@@ -143,19 +157,6 @@ Base.@kwdef struct HitranModel <: AbstractCrossSectionModel
     "Computer `Architecture` on which `Model` is run"
     architecture::AbstractArchitecture 
 end
-
-# @with_kw struct HitranModel{H, A<:AbstractArchitecture, AB, FT, CF } <: AbstractCrossSectionModel
-#         hitran :: H     # Struct with hitran data
-#     broadening :: AB    # Broadening function (Doppler/Lorentz/Voigt)
-#    wing_cutoff :: FT    # Wing cutoff [cm-1]
-#            vmr :: FT    # VMR of gas itself [0-1]
-#            CEF :: CF    # "Complex Error Function to Use"
-#            mol :: Int   # Molecule number
-#            iso :: Int   # Isotope number 
-#          ν_min :: FT    # min wavenumber (cm-1)
-#          ν_max :: FT    # max wavenumber (cm-1)
-#   architecture :: A     # Computer `Architecture` on which `Model` is run
-# end
 
 """
     struct InterpolationModel{FT}
@@ -196,10 +197,7 @@ Base.@kwdef struct InterpolationModel <: AbstractCrossSectionModel
 
 end
 
-
-#####
-##### Types of Errors that may be thrown
-#####
+# Types of Errors that may be thrown
 
 struct HitranEmptyError <: Exception end
 Base.showerror(io::IO, e::HitranEmptyError) = print(io, e, "No HITRAN records match the parameters")

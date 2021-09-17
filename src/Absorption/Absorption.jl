@@ -20,15 +20,16 @@ using CUDA                      # For GPU programming
 using ForwardDiff, DiffResults  # For auto-differentiation
 using NetCDF                    # For loading NetCDF files with constants
 using ..Architectures           # For GPU/CPU convenience
+using ..Architectures: CPU, GPU # Again for GPU/CPU convenience
 import DataInterpolations: CubicSpline as DI_CS # For use in qoft
 
 include("constants/constants.jl")                   # Scientific and mathematical constants
 include("constants/mol_weights.jl")                 # Molecular weights
 include("constants/TIPS_2017.jl")                   # Partition sums data 
 include("types.jl")                                 # All types used in this module
-include("hitran.jl")                                # HITRAN file-related functions
+include("read_hitran.jl")                                # HITRAN file-related functions
 include("complex_error_functions.jl")               # CEFs used in line broadening
-include("interpolation_helper.jl")                  # CS interpolator functions
+include("make_model_helpers.jl")                  # CS interpolator functions
 include("compute_absorption_cross_section.jl")      # Cross-section from HITRAN
 include("autodiff_helper.jl")                       # Auto-differentiation
 

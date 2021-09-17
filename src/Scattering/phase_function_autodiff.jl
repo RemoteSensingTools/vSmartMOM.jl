@@ -1,3 +1,9 @@
+#=
+ 
+This file wraps `compute_aerosol_optical_properties` so that autodiff users and non-autodiff 
+users can call the same function with just a keyword argument change. 
+
+=#
 
 """ Function used by auto-differentiation to convert a jacobian result to an AerosolOptics type"""
 function convert_jacobian_result_to_aerosol_optics(result)

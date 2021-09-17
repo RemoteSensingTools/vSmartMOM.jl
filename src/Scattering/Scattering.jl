@@ -1,3 +1,11 @@
+#=
+ 
+This file is the entry-point for the Scattering module. 
+
+It includes this module's source files and exports the relevant keywords.  
+ 
+=#
+
 module Scattering
 
 using Parameters                # For default values in structs
@@ -18,9 +26,9 @@ using ..Architectures: device
 include("types.jl")                       # All types used in this module
 include("mie_helper_functions.jl")        # Mie file-related functions
 include("legendre_functions.jl")          # Recursions for associated Legendre Polynomials
-include("phase_truncation.jl")            # Functions for truncation
-include("wigner3j_recursive.jl")          # Recursive Wigner 3j calculations
-include("mie_model.jl")                   # Convenience functions to create Mie model
+include("truncate_phase.jl")              # Functions for truncation
+include("compute_wigner_values.jl")       # Recursive Wigner 3j calculations
+include("make_mie_model.jl")                   # Convenience functions to create Mie model
 include("compute_NAI2.jl")                # Compute phase function w/ NAI2
 include("compute_PCW.jl")                 # Compute phase function w/ PCW
 include("phase_function_autodiff.jl")     # Auto-differentiation
@@ -28,7 +36,7 @@ include("show_utils.jl")                  # Pretty-print
 
 
 # Export make functions/types
-export make_log_normal_size_dist, make_mie_model, reconstruct_phase
+export make_mie_model, reconstruct_phase
 
 # Export types
 export NAI2, PCW, Aerosol, MieModel, Stokes_IQUV, Stokes_I, Stokes_IQU, 
