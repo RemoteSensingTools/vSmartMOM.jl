@@ -21,9 +21,9 @@ function rt_set_streams(::GaussQuadHemisphere,
     Nquad = (Ltrunc + 1) ÷ 2
 
     qp_μ, wt_μ = Scattering.gauleg(Nquad, 0.0, 1.0) # quadrature limits are 0.0-1.0
+    
     # Solar angle
     μ₀ = cosd.(sza)
-
     
     # Assign zero-weights to remaining camera zenith angles
     qp_μ = unique(FT[qp_μ; cosd.(vza); μ₀]);
