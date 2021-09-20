@@ -30,31 +30,31 @@ import Base.show                   # For overloading show for custom types
 # LinearAlgebra.BLAS.set_num_threads(1)
 
 # Constants and Types
-include("Constants/constants.jl")         # Scientific constants
-include("Types/types.jl")                 # All custom types for this module
+include("constants.jl")         # Scientific constants
+include("types.jl")                 # All custom types for this module
 
 # Solvers
-include("Solvers/elemental.jl")           # Elemental 
-include("Solvers/doubling.jl")            # Doubling
-include("Solvers/interaction.jl")         # Interaction
-include("Solvers/rt_kernel.jl")           # Handle Core RT (Elemental/Doubling/Interaction)
-include("Solvers/postprocessing_vza.jl")  # Postprocess (Azimuthal Weighting)
-include("Solvers/rt_run.jl")              # Starting point for RT 
+include("CoreKernel/elemental.jl")           # Elemental 
+include("CoreKernel/doubling.jl")            # Doubling
+include("CoreKernel/interaction.jl")         # Interaction
+include("CoreKernel/rt_kernel.jl")           # Handle Core RT (Elemental/Doubling/Interaction)
+
+include("postprocessing_vza.jl")  # Postprocess (Azimuthal Weighting)
+include("rt_run.jl")              # Starting point for RT 
 
 # GPU
-include("GPU/gpu_batched.jl")             # Batched operations
-include("GPU/CUDA_getri.jl")              # Custom getri_strided_batched!
+include("gpu_batched.jl")             # Batched operations
 
 # Utilities / Helper Functions
-include("Utils/atmo_prof.jl")             # Helper Functions for Hanling Atmospheric Profiles
-include("Utils/rt_utils.jl")              # Miscellaneous Utility Functions
-include("Utils/rt_streams.jl")            # Set streams before RT
-include("Utils/forwardDiff_tools.jl")     # Helpers for Forward Differentiation
-include("Utils/model_parameters.jl")      # Handling Model Parameters 
-include("Utils/show_utils.jl")            # Pretty-printing objects
+include("atmo_prof.jl")             # Helper Functions for Hanling Atmospheric Profiles
+include("rt_utils.jl")              # Miscellaneous Utility Functions
+include("rt_streams.jl")            # Set streams before RT
+include("forwardDiff_tools.jl")     # Helpers for Forward Differentiation
+include("model_parameters.jl")      # Handling Model Parameters 
+include("show_utils.jl")            # Pretty-printing objects
 
 # Surfaces
-include("Surface/lambertian_surface.jl")  # Lambertian Surface 
+include("lambertian_surface.jl")  # Lambertian Surface 
 
 # Functions to export
 export parameters_from_yaml,              # Getting parameters from a file

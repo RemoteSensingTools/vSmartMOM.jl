@@ -1,11 +1,8 @@
+
+
 """
-    $(FUNCTIONNAME)(pol_type, 
-    SFI, 
-    expk, 
-    ndoubl::Int, 
-    added_layer::AddedLayer,
-    I_static::AbstractArray{FT}, 
-    architecture) where {FT}
+    $(FUNCTIONNAME)(pol_type, SFI, expk, ndoubl::Int, added_layer::AddedLayer, I_static::AbstractArray{FT}, 
+                    architecture) where {FT}
 
 Compute homogenous layer matrices from its elemental layer using Doubling 
 """

@@ -231,12 +231,10 @@ function compute_ref_aerosol_extinction(model::MieModel{FDT}, FT2::Type=Float64)
         
         # Compute Extinction and scattering cross sections: 
         C_ext[i] = 2π / k^2 * (n_' * real(an + bn))
-        # @show r[i], x_size_param[i], C_ext[i], C_ext[i]/(4π*r[i]^2), C_ext[i]*1e-8
     end
 
     # Calculate bulk extinction coeffitient
     bulk_C_ext =  sum(wₓ .* C_ext)
-    
     
     # Return the bulk extinction coeffitient
     return bulk_C_ext
@@ -390,12 +388,13 @@ function phase_function(r::FT, λ::FT, nᵣ::FT, nᵢ::FT) where {FT<:AbstractFl
     # Compute Extinction and scattering cross sections: 
     C_sca = 2π / k^2 * (n_' * (abs2.(an) + abs2.(bn)))
     C_ext = 2π / k^2 * (n_' * real(an + bn))
-    # @show r[i], x_size_param[i], C_ext[i], C_ext[i]/(4π*r[i]^2), C_ext[i]*1e-8
+
     # Compute scattering matrix components per size parameter (might change column/row ordering):
     f₁₁ =  0.5 / size_param^2  * real(abs2.(S₁) + abs2.(S₂));
     f₁₁ *= 4π * r.^2
     f₁₁ /= C_sca
-    #Assymetry factor g
+
+    # Asymmetry factor g
     g = 1/2 * w_μ'*(μ .*  f₁₁ )
     return μ, w_μ, f₁₁, C_ext, C_sca, g
 end
