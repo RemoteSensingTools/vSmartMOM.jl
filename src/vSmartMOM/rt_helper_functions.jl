@@ -1,3 +1,8 @@
+#=
+
+This file contains helper functions that are used throughout the vSmartMOM module
+
+=#
 
 "Given the previous scattering interface and current layer information, return what type of scattering interface is nexts"
 function get_scattering_interface(scattering_interface, scatter, iz)

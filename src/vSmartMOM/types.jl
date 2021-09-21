@@ -1,3 +1,20 @@
+#=
+ 
+This file contains all types that are used in the vSmartMOM module:
+
+- `AtmosphericProfile` stores all relevant atmospheric profile information 
+- `AbstractObsGeometry` specifies the RT geometry
+- `RT_Aerosol` holds an Aerosol with additional RT parameters
+- `AbstractQuadratureType` specifies the quadrature type to use
+- `AbstractSourceType` specifies the source type
+- `CompositeLayer` and `AddedLayer` specify the layer properties
+- `AbstractScatteringInterface` specifies the scattering interface type
+- `AbstractSurfaceType` specify the type of surface in the RT simulation
+- `AbsorptionParameters`, `ScatteringParameters`, and `vSmartMOM_Model` hold model parameters
+- `QuadPoints` holds quadrature points, weights, etc. 
+- `ComputedAtmosphereProperties` and `ComputedLayerProperties` hold intermediate computed properties
+
+=#
 
 "Struct for an atmospheric profile"
 struct AtmosphericProfile{FT, VMR <: Union{Real, Vector}}
@@ -307,9 +324,6 @@ mutable struct vSmartMOM_Model
     "Atmospheric profile to use"
     profile::AtmosphericProfile
 end
-
-#"A struct to internally hold the computed atmosphere properties <<Suniti>>"
-#abstract type ComputedProperties end
 
 """
     struct ComputedAtmosphereProperties

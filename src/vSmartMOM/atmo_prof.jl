@@ -1,3 +1,9 @@
+#=
+
+This file contains functions that are related to atmospheric profile calculations
+
+=#
+
 "Compute pressure levels, vmr, vcd for atmospheric profile, given p_half, T, q"
 function compute_atmos_profile_fields(T, p_half::AbstractArray, q, vmr; g₀=9.8196)
 
@@ -145,13 +151,15 @@ function reduce_profile(n::Int, profile::AtmosphericProfile{FT}) where {FT}
 end
 
 """
-$(FUNCTIONNAME)(psurf, λ, depol_fct, vcd_dry)
+    $(FUNCTIONNAME)(psurf, λ, depol_fct, vcd_dry)
+
 Returns the Rayleigh optical thickness per layer at reference wavelength `λ` (N₂,O₂ atmosphere, i.e. terrestrial)
+
 Input: 
-- `psurf` surface pressure in `[hPa]`
-- `λ` wavelength in `[μm]`
-- `depol_fct` depolarization factor
-- `vcd_dry` dry vertical column (no water) per layer
+    - `psurf` surface pressure in `[hPa]`
+    - `λ` wavelength in `[μm]`
+    - `depol_fct` depolarization factor
+    - `vcd_dry` dry vertical column (no water) per layer
 """
 function getRayleighLayerOptProp(psurf, λ, depol_fct, vcd_dry) 
     FT = eltype(λ)
@@ -169,7 +177,8 @@ function getRayleighLayerOptProp(psurf, λ, depol_fct, vcd_dry)
 end
 
 """
-$(FUNCTIONNAME)(total_τ, p₀, σp, p_half)
+    $(FUNCTIONNAME)(total_τ, p₀, σp, p_half)
+    
 Returns the aerosol optical depths per layer using a Gaussian distribution function with p₀ and σp on a pressure grid
 """
 function getAerosolLayerOptProp(total_τ, p₀, σp, p_half)
@@ -189,23 +198,24 @@ function getAerosolLayerOptProp(total_τ, p₀, σp, p_half)
 end
 
 """
-$(FUNCTIONNAME)(τRayl, τAer,  aerosol_optics, Rayl𝐙⁺⁺, Rayl𝐙⁻⁺, Aer𝐙⁺⁺, Aer𝐙⁻⁺, τ_abs, arr_type)
+    $(FUNCTIONNAME)(τRayl, τAer,  aerosol_optics, Rayl𝐙⁺⁺, Rayl𝐙⁻⁺, Aer𝐙⁺⁺, Aer𝐙⁻⁺, τ_abs, arr_type)
+
 Computes the composite layer single scattering parameters (τ, ϖ, Z⁺⁺, Z⁻⁺)
 
 Returns:
-- `τ`, `ϖ`   : only Rayleigh scattering and aerosol extinction, no gaseous absorption (no wavelength dependence)
-- `τ_λ`,`ϖ_λ`: Rayleigh scattering + aerosol extinction + gaseous absorption (wavelength dependent)
-- `Z⁺⁺`,`Z⁻⁺`: Composite Phase matrix (weighted average of Rayleigh and aerosols)
+    - `τ`, `ϖ`   : only Rayleigh scattering and aerosol extinction, no gaseous absorption (no wavelength dependence)
+    - `τ_λ`,`ϖ_λ`: Rayleigh scattering + aerosol extinction + gaseous absorption (wavelength dependent)
+    - `Z⁺⁺`,`Z⁻⁺`: Composite Phase matrix (weighted average of Rayleigh and aerosols)
 
-# Arguments
-- `τRay` layer optical depth for Rayleigh
-- `τAer` layer optical depth for Aerosol(s) (vector)
-- `aerosol_optics` array of aerosol optics struct
-- `Rayl𝐙⁺⁺` Rayleigh 𝐙⁺⁺ phase matrix (2D)
-- `Rayl𝐙⁻⁺` Rayleigh 𝐙⁻⁺ phase matrix (2D)
-- `Aer𝐙⁺⁺` Aerosol 𝐙⁺⁺ phase matrix (3D)
-- `Aer𝐙⁻⁺` Aerosol 𝐙⁻⁺ phase matrix (3D)
-- `τ_abs` layer absorption optical depth array (per wavelength) by gaseous absorption
+Arguments:
+    - `τRay` layer optical depth for Rayleigh
+    - `τAer` layer optical depth for Aerosol(s) (vector)
+    - `aerosol_optics` array of aerosol optics struct
+    - `Rayl𝐙⁺⁺` Rayleigh 𝐙⁺⁺ phase matrix (2D)
+    - `Rayl𝐙⁻⁺` Rayleigh 𝐙⁻⁺ phase matrix (2D)
+    - `Aer𝐙⁺⁺` Aerosol 𝐙⁺⁺ phase matrix (3D)
+    - `Aer𝐙⁻⁺` Aerosol 𝐙⁻⁺ phase matrix (3D)
+    - `τ_abs` layer absorption optical depth array (per wavelength) by gaseous absorption
 """
 function construct_atm_layer(τRayl, τAer,  aerosol_optics, Rayl𝐙⁺⁺, Rayl𝐙⁻⁺, Aer𝐙⁺⁺, Aer𝐙⁻⁺, τ_abs, arr_type)
     FT = eltype(τRayl)
@@ -355,7 +365,5 @@ function compute_absorption_profile!(τ_abs::Array{FT,2},
         # Changed index order
         τ_abs[:,iz] += Array(absorption_cross_section(absorption_model, grid, p, T)) * profile.vcd_dry[iz] * vmr_curr
     end
-
-    return nothing
     
 end

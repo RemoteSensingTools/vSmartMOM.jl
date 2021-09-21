@@ -1,3 +1,9 @@
+#=
+ 
+This file implements rt_kernel!, which performs the core RT routines (elemental, doubling, interaction)
+ 
+=#
+
 # Perform the Core RT routines (elemental, doubling, interaction)
 function rt_kernel!(pol_type, SFI, added_layer, composite_layer, computed_layer_properties, m, quad_points, I_static, architecture, qp_μN, iz) 
 

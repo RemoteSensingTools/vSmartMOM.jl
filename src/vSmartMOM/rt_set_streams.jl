@@ -1,3 +1,14 @@
+#=
+
+This file contains functions that set the quadrature streams for the RT model. 
+
+So far, there are the following quadrature types: 
+
+    - GaussQuadHemisphere
+    - GaussQuadFullSphere
+    - RadauQuad
+
+=#
 
 """
 $(FUNCTIONNAME)(::GaussQuadHemisphere, 

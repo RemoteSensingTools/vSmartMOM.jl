@@ -1,3 +1,9 @@
+#=
+ 
+This file contains RT elemental-related functions
+ 
+=#
+
 "Elemental single-scattering layer"
 function elemental!(pol_type, SFI::Bool, 
                             τ_sum::AbstractArray,#{FT2,1}, #Suniti

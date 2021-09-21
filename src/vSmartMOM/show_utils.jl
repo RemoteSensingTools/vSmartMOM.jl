@@ -1,5 +1,9 @@
+#=
+ 
+This file specifies how to pretty-print vSmartMOM_Parameters module types
+ 
+=#
 
-# Overload the show method for vSmartMOM_Parameters
 function Base.show(io::IO, x::vSmartMOM_Parameters)
 
     println(io, "\n------------------")

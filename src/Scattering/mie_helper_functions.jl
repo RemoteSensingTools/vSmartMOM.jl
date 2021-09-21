@@ -71,7 +71,6 @@ function compute_mie_ab!(size_param, refractive_idx::Number, an, bn, Dn)
         χ₁ = χ
         ξ₁ = FT(ψ₁, -χ₁)
     end
-    return nothing
 end
 
 """ 
@@ -145,7 +144,6 @@ function compute_avg_anbns!(an, bn, ab_pairs, w, Nmax, N_max_)
         @inbounds mat_anbm[m,n] = anbm;
         @inbounds mat_bnam[m,n] = bnam;
     end
-    return nothing
 end
 
 """
@@ -169,7 +167,6 @@ function compute_mie_S₁S₂!(an, bn, π_, τ_, S₁, S₂)
             S₁[iμ] += (2l + 1) / (l * (l + 1)) * (an[l] * τ_[iμ,l] + bn[l] * π_[iμ,l])
             S₂[iμ] += (2l + 1) / (l * (l + 1)) * (an[l] * π_[iμ,l] + bn[l] * τ_[iμ,l])
     end
-    return nothing
 end
 
 """

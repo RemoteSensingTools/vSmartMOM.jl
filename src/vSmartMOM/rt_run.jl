@@ -1,3 +1,12 @@
+#=
+
+This file contains the entry point for running the RT simulation, rt_run. 
+
+There are two implementations: one that accepts the raw parameters, and one that accepts
+the model. The latter should generally be used by users. 
+
+=#
+
 """
     $(FUNCTIONNAME)(pol_type, obs_geom::ObsGeometry, τ_rayl, τ_aer, quad_points::QuadPoints, max_m, aerosol_optics, greek_rayleigh, τ_abs, brdf, architecture::AbstractArchitecture)
 
@@ -5,21 +14,21 @@ Perform Radiative Transfer calculations using given parameters
 
 """
 function rt_run(pol_type::AbstractPolarizationType,   # Polarization type (IQUV)
-                obs_geom::ObsGeometry,          # Solar Zenith, Viewing Zenith, Viewing Azimuthal 
-                τ_rayl,                          # Rayleigh optical depth 
-                τ_aer,                           # Aerosol optical depth and single-scattering albedo
-                quad_points::QuadPoints,        # Quadrature points and weights
-                max_m,                          # Max Fourier terms
-                aerosol_optics,                 # AerosolOptics (greek_coefs, ω̃, k, fᵗ)
-                greek_rayleigh::GreekCoefs,     # Greek coefficients of Rayleigh Phase Function
-                τ_abs,                          # nSpec x Nz matrix of absorption
-                brdf,                           # BRDF surface type
-                architecture::AbstractArchitecture) # Whether to use CPU / GPU
+                obs_geom::ObsGeometry,                # Solar Zenith, Viewing Zenith, Viewing Azimuthal 
+                τ_rayl,                               # Rayleigh optical depth 
+                τ_aer,                                # Aerosol optical depth and single-scattering albedo
+                quad_points::QuadPoints,              # Quadrature points and weights
+                max_m,                                # Max Fourier terms
+                aerosol_optics,                       # AerosolOptics (greek_coefs, ω̃, k, fᵗ)
+                greek_rayleigh::GreekCoefs,           # Greek coefficients of Rayleigh Phase Function
+                τ_abs,                                # nSpec x Nz matrix of absorption
+                brdf,                                 # BRDF surface type
+                architecture::AbstractArchitecture)   # Whether to use CPU / GPU
 
     @unpack obs_alt, sza, vza, vaz = obs_geom   # Observational geometry properties
     @unpack qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart,μ₀, iμ₀,Nquad = quad_points # All quadrature points
     FT = eltype(sza)                    # Get the float-type to use
-    Nz = length(τ_rayl)                  # Number of vertical slices
+    Nz = length(τ_rayl)                 # Number of vertical slices
     nSpec = size(τ_abs, 1)              # Number of spectral points
     arr_type = array_type(architecture) # Type of array to use
     SFI = true                          # SFI flag
@@ -37,11 +46,14 @@ function rt_run(pol_type::AbstractPolarizationType,   # Polarization type (IQUV)
     T_SFI = zeros(FT_dual, length(vza), pol_type.n, nSpec)
 
     # Notify user of processing parameters
-    @info "Processing on:" architecture
-    @info "With FT:"  FT
-    @info "Source Function Integration " SFI
-    @info "Dimensions " NquadN,NquadN,nSpec
-    println("Creating arrays...")
+    msg = 
+    """
+    Processing on: $(architecture)
+    With FT: $(FT)
+    Source Function Integration: $(SFI)
+    Dimensions: $((NquadN, NquadN, nSpec))
+    """
+    @info msg
 
     # Create arrays
     @timeit "Creating layers" added_layer         = make_added_layer(FT_dual, arr_type, dims, nSpec)
@@ -56,7 +68,7 @@ function rt_run(pol_type::AbstractPolarizationType,   # Polarization type (IQUV)
     # Loop over fourier moments
     for m = 0:max_m - 1
 
-        println("Fourier Moment: ", m)
+        println("Fourier Moment: ", m, "/", max_m-1)
 
         # Azimuthal weighting
         weight = m == 0 ? FT(0.5) : FT(1.0)
@@ -73,8 +85,7 @@ function rt_run(pol_type::AbstractPolarizationType,   # Polarization type (IQUV)
             @timeit "Z moments"  Aer𝐙⁺⁺[:,:,i], Aer𝐙⁻⁺[:,:,i] = Scattering.compute_Z_moments(pol_type, Array(qp_μ), aerosol_optics[i].greek_coefs, m, arr_type = arr_type)
         end
 
-        @timeit "Creating arrays" τ_sum_old = arr_type(zeros(FT, nSpec)) #Suniti: declaring τ_sum to be of length nSpec
-        # @timeit "Creating arrays" τ_λ   = arr_type(zeros(FT, nSpec))
+        @timeit "Creating arrays" τ_sum_old = arr_type(zeros(FT, nSpec)) # Suniti: declaring τ_sum to be of length nSpec
 
         # Loop over all layers and pre-compute all properties before performing core RT
         @timeit "Computing Layer Properties" computed_atmosphere_properties = construct_all_atm_layers(FT, nSpec, Nz, NquadN, τ_rayl, τ_aer, aerosol_optics, Rayl𝐙⁺⁺, Rayl𝐙⁻⁺, Aer𝐙⁺⁺, Aer𝐙⁻⁺, τ_abs, arr_type, qp_μ, μ₀, m)
@@ -91,7 +102,6 @@ function rt_run(pol_type::AbstractPolarizationType,   # Polarization type (IQUV)
         end 
 
         # Create surface matrices:
-        # arr_type(computed_atmosphere_properties.τ_sum_all[:,end])
         create_surface_layer!(brdf, added_layer, SFI, m, pol_type, quad_points, arr_type(computed_atmosphere_properties.τ_sum_all[:,end]), architecture);
 
         # One last interaction with surface:
@@ -105,13 +115,8 @@ function rt_run(pol_type::AbstractPolarizationType,   # Polarization type (IQUV)
     print_timer()
     reset_timer!()
 
-    #return R, T, R_SFI, T_SFI;
-    if SFI
-        return R_SFI;  
-    else
-        return R;
-    end
-
+    # Return R_SFI or R, depending on the flag
+    return SFI ? R_SFI : R
 end
 
 """
