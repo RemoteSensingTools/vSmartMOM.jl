@@ -1,3 +1,11 @@
+#=
+ 
+This file is the entry-point for the vSmartMOM module. 
+
+It includes this module's source files and exports the relevant keywords.  
+ 
+=#
+
 module vSmartMOM
 
 using Interpolations               # For interpolating the vmr's
@@ -30,37 +38,37 @@ import Base.show                   # For overloading show for custom types
 # LinearAlgebra.BLAS.set_num_threads(1)
 
 # Constants and Types
-include("constants.jl")         # Scientific constants
-include("types.jl")                 # All custom types for this module
+include("constants.jl")                     # Scientific constants
+include("types.jl")                         # All custom types for this module
 
 # Solvers
-include("CoreKernel/elemental.jl")           # Elemental 
-include("CoreKernel/doubling.jl")            # Doubling
-include("CoreKernel/interaction.jl")         # Interaction
-include("CoreKernel/rt_kernel.jl")           # Handle Core RT (Elemental/Doubling/Interaction)
+include("CoreKernel/elemental.jl")          # Elemental 
+include("CoreKernel/doubling.jl")           # Doubling
+include("CoreKernel/interaction.jl")        # Interaction
+include("CoreKernel/rt_kernel.jl")          # Handle Core RT (Elemental/Doubling/Interaction)
 
-include("postprocessing_vza.jl")  # Postprocess (Azimuthal Weighting)
-include("rt_run.jl")              # Starting point for RT 
+include("postprocessing_vza.jl")            # Postprocess (Azimuthal Weighting)
+include("rt_run.jl")                        # Starting point for RT 
 
 # GPU
-include("gpu_batched.jl")             # Batched operations
+include("gpu_batched.jl")                   # Batched operations
 
 # Utilities / Helper Functions
-include("atmo_prof.jl")             # Helper Functions for Hanling Atmospheric Profiles
-include("rt_utils.jl")              # Miscellaneous Utility Functions
-include("rt_streams.jl")            # Set streams before RT
-include("forwardDiff_tools.jl")     # Helpers for Forward Differentiation
-include("model_parameters.jl")      # Handling Model Parameters 
-include("show_utils.jl")            # Pretty-printing objects
+include("atmo_prof.jl")                     # Helper Functions for Hanling Atmospheric Profiles
+include("rt_helper_functions.jl")           # Miscellaneous Utility Functions
+include("rt_set_streams.jl")                # Set streams before RT
+include("parameters_from_yaml.jl")          # Loading in parameters from YAML file
+include("model_from_parameters.jl")         # Converting parameters to derived model attributes
+include("show_utils.jl")                    # Pretty-printing objects
 
 # Surfaces
-include("lambertian_surface.jl")  # Lambertian Surface 
+include("lambertian_surface.jl")            # Lambertian Surface 
 
 # Functions to export
-export parameters_from_yaml,              # Getting parameters from a file
-       model_from_parameters,             # Converting the parameters to model 
-       rt_run,                            # Run the RT code
-       default_parameters                 # Set of default parameters
+export parameters_from_yaml,                # Getting parameters from a file
+       model_from_parameters,               # Converting the parameters to model 
+       rt_run,                              # Run the RT code
+       default_parameters                   # Set of default parameters
 
 # Export types to show easily
 export GaussQuadFullSphere, LambertianSurfaceScalar, LambertianSurfaceSpectrum

@@ -1,4 +1,10 @@
-# No scattering in either the added layer or the composite layer.
+#=
+ 
+This file contains RT interaction-related functions
+ 
+=#
+
+# No scattering in either the added layer or the composite layer
 function interaction_helper!(::ScatteringInterface_00, SFI,
                                 composite_layer::CompositeLayer{FT}, 
                                 added_layer::AddedLayer{FT}, 

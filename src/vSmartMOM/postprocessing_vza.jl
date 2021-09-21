@@ -1,5 +1,13 @@
-"Perform post-processing to azimuthally-weight RT matrices <<Suniti>>"
+#=
+
+This file contains the function to perform azimuthal-weighting to the RT matrices after all 
+kernel calculations. 
+
+=#
+
+"Perform post-processing to azimuthally-weight RT matrices"
 function postprocessing_vza!(iμ₀, pol_type, composite_layer, vza, qp_μ, m, vaz, μ₀, weight, nSpec, SFI, R, R_SFI, T, T_SFI)
+    
     # idx of μ0 = cos(sza)
     st_iμ0, istart0, iend0 = get_indices(iμ₀, pol_type);
 

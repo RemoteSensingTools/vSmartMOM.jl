@@ -1,22 +1,30 @@
+#=
+
+This file specifies how to create surface layers, given the surface type, and related info
+
+=#
+
 """
-$(FUNCTIONNAME)(lambertian::LambertianSurfaceScalar{FT})
+    $(FUNCTIONNAME)(lambertian::LambertianSurfaceScalar{FT})
+
 Computes (in place) surface optical properties for a (scalar) lambertian albedo as [`AddedLayer`](@ref) 
-- `lambertian` a [`LambertianSurfaceScalar`](@ref) struct that defines albedo as scalar
-- `SFI` bool if SFI is used
-- `m` Fourier moment (starting at 0)
-- `pol_type` Polarization type struct
-- `quad_points` Quadrature points struct
-- `τ_sum` total optical thickness from TOA to the surface
-- `architecture` Compute architecture (GPU,CPU)
+
+    - `lambertian` a [`LambertianSurfaceScalar`](@ref) struct that defines albedo as scalar
+    - `SFI` bool if SFI is used
+    - `m` Fourier moment (starting at 0)
+    - `pol_type` Polarization type struct
+    - `quad_points` Quadrature points struct
+    - `τ_sum` total optical thickness from TOA to the surface
+    - `architecture` Compute architecture (GPU,CPU)
 """ 
 function create_surface_layer!(lambertian::LambertianSurfaceScalar{FT}, 
-                        added_layer::AddedLayer,#{FT}, 
-                        SFI,
-                        m::Int,    # Fourier Moment
-                        pol_type,  # 
-                        quad_points,
-                        τ_sum,
-                        architecture) where {FT}
+                               added_layer::AddedLayer,
+                               SFI,
+                               m::Int,
+                               pol_type,
+                               quad_points,
+                               τ_sum,
+                               architecture) where {FT}
     
     if m == 0
         @unpack qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart, iμ₀, μ₀ = quad_points

@@ -1,3 +1,11 @@
+#=
+ 
+This file is the entry-point for the RadiativeTransfer module. 
+
+It includes this module's source files and exports the relevant keywords.  
+ 
+=#
+
 module RadiativeTransfer
 using Pkg.Artifacts
 using LinearAlgebra

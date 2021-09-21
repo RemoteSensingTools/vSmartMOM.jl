@@ -1,4 +1,8 @@
-# Batched Linear Algebra code
+#=
+
+This file contains implementations of batched linear algebra code
+
+=#
 
 "Given 3D CuArrays A and B, fill in X[:,:,k] = A[:,:,k] \\ B[:,:,k]" 
 function batch_solve!(X::CuArray{FT,3}, A::CuArray{FT,3}, B::CuArray{FT,3}) where {FT}
@@ -33,7 +37,6 @@ function batch_inv!(X::CuArray{FT,3}, A::CuArray{FT,3}) where {FT}
     @timeit "LR" pivot, info   = CUBLAS.getrf_strided_batched!(A, true);synchronize()
     # Invert LU factorization of A
     @timeit "RI" CUBLAS.getri_strided_batched!(A, X, pivot); synchronize()
-    return nothing
 end
 
 
@@ -49,7 +52,7 @@ function batched_mul(A::CuArray{FT,3}, B::CuArray{FT,3}) where {FT}
     @timeit "BATchedMul" CUBLAS.gemm_strided_batched('N', 'N', A, B)
 end
 
-# Define batched matrix multiply for GPU and Duals:
+"Define batched matrix multiply for GPU and Duals"
 function batched_mul(A::CuArray{ForwardDiff.Dual{T,V,N},3}, B::CuArray{ForwardDiff.Dual{T,V,N},3}) where {T,V,N}
     # Extract values:
     Av = ForwardDiff.value.(A)
@@ -62,7 +65,7 @@ function batched_mul(A::CuArray{ForwardDiff.Dual{T,V,N},3}, B::CuArray{ForwardDi
     return eltype(A).(Cv,dABdx);
 end
 
-# Overload of batch_inv! for Dual numbers
+"Overload of batch_inv! for Dual numbers"
 function batch_inv!(X::CuArray{ForwardDiff.Dual{T,V,N},3}, A::CuArray{ForwardDiff.Dual{T,V,N},3}) where {T,V,N}
     @timeit "Partials 1" Atemp = (ForwardDiff.value.(A))
     @timeit "Partials 2" invA = similar(Atemp);
