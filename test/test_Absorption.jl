@@ -8,7 +8,7 @@
     #### especially that molecule/isotope match and ν between ν_min and ν_max)
     ####
 
-    CO2_test_file = "helper/test_profiles/testCO2.data"
+    CO2_test_file = "test_profiles/testCO2.data"
 
     test_ht = Absorption.read_hitran(CO2_test_file, mol=2, iso=1, ν_min=6000, ν_max=6400)
     @test test_ht.mol == [2, 2, 2, 2] && test_ht.mol[1] isa Int64
@@ -108,7 +108,7 @@ end
     @showprogress 1 "Testing HAPI equivalence (On CO2 Band)..." for temp in temperatures
         for pres in pressures
             jl_cs = absorption_cross_section(model, grid, pres, temp)
-            py_cs = array_type(default_architecture)(readdlm("helper/test_profiles/Voigt_CO2_T" * string(temp) * "_P" * string(pres) * ".csv"))
+            py_cs = array_type(default_architecture)(readdlm("test_profiles/Voigt_CO2_T" * string(temp) * "_P" * string(pres) * ".csv"))
             Δcs = abs.(jl_cs - py_cs)
             @test maximum(Δcs) < ϵ
         end
@@ -135,7 +135,7 @@ end
         model = make_hitran_model(test_ht, Voigt(), CEF=HumlicekWeidemann32SDErrorFunction())
 
         jl_cs = absorption_cross_section(model, grid, pres, temp)
-        py_cs = array_type(default_architecture)(readdlm("helper/test_profiles/Voigt_" * name * "_T250_P1000.csv"))
+        py_cs = array_type(default_architecture)(readdlm("test_profiles/Voigt_" * name * "_T250_P1000.csv"))
         Δcs = abs.(jl_cs - py_cs)
         @test maximum(Δcs) < ϵ
     end
@@ -181,7 +181,7 @@ end
     for temp in temperatures
         for pres in pressures
             jl_cs = absorption_cross_section(interp_model, ν_grid, pres, temp)
-            py_cs = readdlm("helper/test_profiles/Voigt_CO2_T" * string(temp) * "_P" * string(pres) * ".csv")
+            py_cs = readdlm("test_profiles/Voigt_CO2_T" * string(temp) * "_P" * string(pres) * ".csv")
             Δcs = abs.(jl_cs - py_cs)
             @test maximum(Δcs) < ϵ
         end
