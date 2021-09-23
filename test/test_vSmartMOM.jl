@@ -6,7 +6,7 @@
 
     ϵ = 1e-4
 
-    parameters = vSmartMOM.parameters_from_yaml("helper/PureRayleighParameters.yaml")
+    parameters = vSmartMOM.parameters_from_yaml("test_parameters/PureRayleighParameters.yaml")
     model = model_from_parameters(parameters)
 
     R_model = rt_run(model)

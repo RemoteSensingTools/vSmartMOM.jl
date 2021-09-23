@@ -111,7 +111,7 @@ end
     # aerosol_optics_PCW = compute_aerosol_optical_properties(model_PCW);
 
     # Load truth values computed from PCW
-    @load "helper/PCW_AerosolOptics.jld" aerosol_optics_PCW
+    @load "test_pcw/PCW_AerosolOptics.jld" aerosol_optics_PCW
 
     @test aerosol_optics_NAI2 ≈ aerosol_optics_PCW
 
