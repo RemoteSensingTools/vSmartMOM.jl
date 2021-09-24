@@ -67,7 +67,7 @@ The RadiativeTransfer module allows end-to-end simulation of radiative transfer 
   - `parameters_from_yaml(filepath::String)`: Load a custom set of RT parameters from a YAML file.
   - `default_parameters()`: Load a default set of RT parameters. 
   - `model_from_parameters(parameters::vSmartMOM_Parameters)`: Using the parameters, calculate derived parameters that will be used in the main RT code. The derived parameters include cross-section profiles, scattering phase functions, etc.  
-  - `rt_run(model::vSmartMOM_Model)`: Used the defined model 
+  - `rt_run(model::vSmartMOM_Model)`: Use the defined model to perform RT simulation.
 
 ### RadiativeTransfer.Absorption
 
