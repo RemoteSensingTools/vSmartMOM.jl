@@ -31,6 +31,7 @@ YAML = "ddb6d928-2868-570f-bddf-ab3f9cf99eb6"
 [compat]
 CUDA = "3"
 CUDAKernels = "0.2, 0.3"
+DataInterpolations = "3.6"
 DiffResults = "1.0"
 Distributions = "0.23, 0.24, 0.25"
 DocStringExtensions = "0.8"
@@ -48,7 +49,7 @@ StaticArrays = "1.2"
 StatsBase = "0.33"
 TimerOutputs = "0.5"
 YAML = "0.4"
-julia = "≥ 1.6"
+julia = "1.6"
 
 [extras]
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
