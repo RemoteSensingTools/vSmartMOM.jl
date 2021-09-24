@@ -1,8 +1,10 @@
 module SolarModel
 
+using ..RadiativeTransfer       # For locating default solar T
 using DocStringExtensions       # For simplifying docstring
 using DelimitedFiles            # For easily reading in solar spectrum 
 using Interpolations            # For interpolating solar spectrum
+using JLD2                      # For loading in default solar spectrum
 
 """
     $(FUNCTIONNAME)(T::Real, ν_grid::Vector)
@@ -87,21 +89,11 @@ function planck_spectrum_wn(T::Real; stride_length::Integer = 100)
 end
 
 """
-    $(FUNCTIONNAME)(file_name::String)
+    $(FUNCTIONNAME)(solar, ν_grid)
 
-Get the solar transmission from the specified file
+Interpolate a solar linelist to the ν_grid
 """
-solar_transmission_from_file(file_name::String) = readdlm(file_name)
-
-"""
-    $(FUNCTIONNAME)(file_name::String, ν_grid::Union{AbstractRange{<:Real}, AbstractArray})
-
-Get the solar transmission from the specified file, and interpolate to wavenumber grid
-"""
-function solar_transmission_from_file(file_name::String, 
-                                    ν_grid::Union{AbstractRange{<:Real}, AbstractArray})
-
-    solar = solar_transmission_from_file(file_name)
+function itp_solar_to_ν_grid(solar, ν_grid)
 
     solar_idx_start = argmin(abs.(solar[:, 1] .- minimum(ν_grid)))
     solar_idx_end   = argmin(abs.(solar[:, 1] .- maximum(ν_grid)))
@@ -114,6 +106,37 @@ function solar_transmission_from_file(file_name::String,
     return itp.(ν_grid)
 end
 
-export planck_spectrum_wn, planck_spectrum_wl, solar_transmission_from_file
+"""
+    $(FUNCTIONNAME)(file_name::String)
+
+Get the solar transmission from the specified file
+"""
+solar_transmission_from_file(file_name::String) = readdlm(file_name)
+
+"""
+    $(FUNCTIONNAME)(file_name::String, ν_grid::Union{AbstractRange{<:Real}, AbstractArray})
+
+Get the solar transmission from the specified file, and interpolate to wavenumber grid
+"""
+function solar_transmission_from_file(file_name::String, 
+                                      ν_grid::Union{AbstractRange{<:Real}, AbstractArray})
+
+    solar = solar_transmission_from_file(file_name)
+    return itp_solar_to_ν_grid(solar, ν_grid)
+end
+
+"""
+    $(FUNCTIONNAME)(ν_grid::Union{AbstractRange{<:Real}, AbstractArray} = 600.0:0.01:26316.0)
+
+Get the default solar transmission and interpolate to wavenumber grid (entire grid if not specified)
+"""
+function default_solar_transmission(ν_grid::Union{AbstractRange{<:Real}, AbstractArray} = 600.0:0.01:26316.0)
+    @info "Using line-list from:\nToon, G. C., Solar line list for GGG2014, TCCON data archive, hosted by the Carbon Dioxide Information Analysis Center, Oak Ridge National Laboratory, Oak Ridge, Tennessee, U.S.A., doi:10. 14291/tccon.ggg2014.solar.R0/1221658, 2014."
+    @info "Found at: https://mark4sun.jpl.nasa.gov/toon/solar/solar_spectrum.html"
+    # Need to change this to artifact
+    return solar_transmission_from_file(joinpath(dirname(pathof(RadiativeTransfer)), "SolarModel", "solar_merged_20160127_600_26316_100.out"))
+end
+
+export planck_spectrum_wn, planck_spectrum_wl, solar_transmission_from_file, default_solar_transmission
 
 end
