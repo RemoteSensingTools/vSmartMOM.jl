@@ -4,7 +4,7 @@ using ..RadiativeTransfer       # For locating default solar T
 using DocStringExtensions       # For simplifying docstring
 using DelimitedFiles            # For easily reading in solar spectrum 
 using Interpolations            # For interpolating solar spectrum
-using JLD2                      # For loading in default solar spectrum
+using Pkg.Artifacts             # For default solar spectrum
 
 """
     $(FUNCTIONNAME)(T::Real, ν_grid::Vector)
@@ -95,10 +95,10 @@ Interpolate a solar linelist to the ν_grid
 """
 function itp_solar_to_ν_grid(solar, ν_grid)
 
-    solar_idx_start = argmin(abs.(solar[:, 1] .- minimum(ν_grid)))
-    solar_idx_end   = argmin(abs.(solar[:, 1] .- maximum(ν_grid)))
+    solar_idx_start = maximum((argmin(abs.(solar[:, 1] .- minimum(ν_grid))) - 10, 1))
+    solar_idx_end   = minimum((argmin(abs.(solar[:, 1] .- maximum(ν_grid))) + 10, length(solar[:,1])))
 
-    solar_subset = solar[(solar_idx_start-10):(solar_idx_end+10), :]
+    solar_subset = solar[solar_idx_start:solar_idx_end, :]
 
     itp = LinearInterpolation(solar_subset[:, 1], 
                               solar_subset[:, 2])
@@ -133,8 +133,11 @@ Get the default solar transmission and interpolate to wavenumber grid (entire gr
 function default_solar_transmission(ν_grid::Union{AbstractRange{<:Real}, AbstractArray} = 600.0:0.01:26316.0)
     @info "Using line-list from:\nToon, G. C., Solar line list for GGG2014, TCCON data archive, hosted by the Carbon Dioxide Information Analysis Center, Oak Ridge National Laboratory, Oak Ridge, Tennessee, U.S.A., doi:10. 14291/tccon.ggg2014.solar.R0/1221658, 2014."
     @info "Found at: https://mark4sun.jpl.nasa.gov/toon/solar/solar_spectrum.html"
-    # Need to change this to artifact
-    return solar_transmission_from_file(joinpath(dirname(pathof(RadiativeTransfer)), "SolarModel", "solar_merged_20160127_600_26316_100.out"))
+
+    filename = joinpath(ensure_artifact_installed("solar", find_artifacts_toml(@__DIR__), quiet_download = false), 
+                        "solar_merged_20160127_600_26316_100.out")
+
+    return hcat(ν_grid, solar_transmission_from_file(filename, ν_grid))
 end
 
 export planck_spectrum_wn, planck_spectrum_wl, solar_transmission_from_file, default_solar_transmission

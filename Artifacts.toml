@@ -368,3 +368,11 @@ lazy = true
     [[hitran_molec_id_9_SO2.download]]
     sha256 = "dc7302251e9aa3347645223945e0213a41014413b5be3ba2adbb6921bf235fda"
     url = "http://web.gps.caltech.edu/~cfranken/hitran_2016/hitran_molec_id_9_SO2.tar.gz"
+
+[solar]
+git-tree-sha1 = "78225e93ccd1af9595e693b38b3c1d92d103d17f"
+lazy = true
+
+    [[solar.download]]
+    sha256 = "981d212afa46750ba6a8e8a1816c60a076e6cbeb71707274387760f9a0f1310c"
+    url = "http://web.gps.caltech.edu/~cfranken/hitran_2016/solar_merged_20160127_600_26316_100.out"
