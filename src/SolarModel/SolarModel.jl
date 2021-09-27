@@ -133,9 +133,10 @@ Get the default solar transmission and interpolate to wavenumber grid (entire gr
 function default_solar_transmission(ν_grid::Union{AbstractRange{<:Real}, AbstractArray} = 600.0:0.01:26316.0)
     @info "Using line-list from:\nToon, G. C., Solar line list for GGG2014, TCCON data archive, hosted by the Carbon Dioxide Information Analysis Center, Oak Ridge National Laboratory, Oak Ridge, Tennessee, U.S.A., doi:10. 14291/tccon.ggg2014.solar.R0/1221658, 2014."
     @info "Found at: https://mark4sun.jpl.nasa.gov/toon/solar/solar_spectrum.html"
-
-    filename = joinpath(ensure_artifact_installed("solar", find_artifacts_toml(@__DIR__), quiet_download = false), 
-                        "solar_merged_20160127_600_26316_100.out")
+    filename = download("http://web.gps.caltech.edu/~cfranken/hitran_2016/solar_merged_20160127_600_26316_100.out", 
+                        joinpath(dirname(pathof(RadiativeTransfer)), "SolarModel", "solar.out"))
+    # filename = joinpath(filepath, 
+                        # "solar_merged_20160127_600_26316_100.out")
 
     return hcat(ν_grid, solar_transmission_from_file(filename, ν_grid))
 end
