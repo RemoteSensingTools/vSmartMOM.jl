@@ -131,14 +131,29 @@ end
 Get the default solar transmission and interpolate to wavenumber grid (entire grid if not specified)
 """
 function default_solar_transmission(ν_grid::Union{AbstractRange{<:Real}, AbstractArray} = 600.0:0.01:26316.0)
+    
     @info "Using line-list from:\nToon, G. C., Solar line list for GGG2014, TCCON data archive, hosted by the Carbon Dioxide Information Analysis Center, Oak Ridge National Laboratory, Oak Ridge, Tennessee, U.S.A., doi:10. 14291/tccon.ggg2014.solar.R0/1221658, 2014."
     @info "Found at: https://mark4sun.jpl.nasa.gov/toon/solar/solar_spectrum.html"
-    filename = download("http://web.gps.caltech.edu/~cfranken/hitran_2016/solar_merged_20160127_600_26316_100.out", 
-                        joinpath(dirname(pathof(RadiativeTransfer)), "SolarModel", "solar.out"))
-    # filename = joinpath(filepath, 
-                        # "solar_merged_20160127_600_26316_100.out")
+
+    filename = joinpath(dirname(pathof(RadiativeTransfer)), "SolarModel", "solar.out")
+    !isfile(filename) && download("http://web.gps.caltech.edu/~cfranken/hitran_2016/solar_merged_20160127_600_26316_100.out", filename)
 
     return hcat(ν_grid, solar_transmission_from_file(filename, ν_grid))
+end
+
+"""
+    $(FUNCTIONNAME)(ν_grid::Union{AbstractRange{<:Real}, AbstractArray} = 600.0:0.01:26316.0)
+
+Get the default solar spectrum and interpolate to wavenumber grid (entire grid if not specified)
+"""
+function default_solar_spectrum_at_earth(ν_grid::Union{AbstractRange{<:Real}, AbstractArray} = 600.0:0.01:26316.0)
+
+    T = 5777 # K
+    λ_grid = reverse(1e4 ./ ν_grid) # Wavenumber to micron
+    black_body = reverse(SolarModel.watts_to_photons(λ_grid, planck_spectrum_wl(T, λ_grid) * 2.1629e-05 * pi))
+    solar_transmission = default_solar_transmission(ν_grid)[:,2]
+
+    return hcat(ν_grid, black_body .* solar_transmission)
 end
 
 export planck_spectrum_wn, planck_spectrum_wl, solar_transmission_from_file, default_solar_transmission
