@@ -1,5 +1,5 @@
 using Revise
-using Plots
+using Plots, Plots.PlotMeasures
 using Pkg
 # Pkg.activate(".")
 using BenchmarkTools
@@ -8,153 +8,63 @@ using RadiativeTransfer.Absorption
 using RadiativeTransfer.Scattering
 using RadiativeTransfer.vSmartMOM
 using RadiativeTransfer.SolarModel
-# using DelimitedFiles
-# using Interact
-# using Interpolations
-# using InstrumentOperator
-# using ForwardDiff
 
-## albedo = 0
+I_modeled_all = zeros(7, 16);
+I_deltas_all  = zeros(7, 16);
+Q_modeled_all = zeros(7, 16);
+Q_deltas_all  = zeros(7, 16);
+U_modeled_all = zeros(7, 16);
+U_deltas_all  = zeros(7, 16);
 
-R_0 = [0.03916, 0.04235, 0.04378, 0.04593, 0.04940, 0.05438, 0.05816, 0.06541, 0.07639, 0.08773, 0.09549, 0.11842, 0.13619, 0.17836, 0.22393, 0.27069]
+μ = [0.02, 0.06, 0.10, 0.16, 0.20, 0.28, 0.32, 0.40, 0.52, 0.64, 0.72, 0.84, 0.92, 0.96, 0.98, 1.00]
+ϕs = collect(0.0:30.0:180.0)
+τ = 0.5
 
-R_90 = [0.03916, 0.03922, 0.03930, 0.03952, 0.04021, 0.04208, 0.04409, 0.04894, 0.05748, 0.06698, 0.07367, 0.09388, 0.10977, 0.14790, 0.18964, 0.23441]
+include("/home/rjeyaram/RadiativeTransfer/test/benchmarks/natraj_trues.jl")
+parameters = parameters_from_yaml("/home/rjeyaram/RadiativeTransfer/test/benchmarks/natraj.yaml");
 
-R_180 = [0.03916, 0.03634, 0.03533, 0.03414, 0.03316, 0.03381, 0.03557, 0.04073, 0.05062, 0.06186, 0.06981, 0.09387, 0.11280, 0.15826, 0.20833, 0.26423]
+parameters.spec_bands = [1e7/360.0 (1e7/360.0 + 1)]
+parameters.vza = acosd.(μ)
+parameters.sza = acosd.(0.2)
 
-## albedo = 0.25
-
-# R_0 = [0.27073, 0.27049, 0.27026, 0.26981, 0.26902, 0.26814, 0.26785, 0.26811, 0.26976, 0.27228, 0.27427, 0.28078, 0.28616, 0.29929, 0.31335, 0.32473]
-
-# R_90 = [0.27073, 0.27049, 0.27026, 0.26981, 0.26902, 0.26814, 0.26785, 0.26811, 0.26976, 0.27228, 0.27427, 0.28078, 0.28616, 0.29929, 0.31335, 0.32473]
-
-# R_180 = [0.27073, 0.27049, 0.27026, 0.26981, 0.26902, 0.26814, 0.26785, 0.26811, 0.26976, 0.27228, 0.27427, 0.28078, 0.28616, 0.29929, 0.31335, 0.32473]
-
-R_trues = [R_0, R_90, R_180]
-
-R_modeled = zeros(16, 3)
-
-for i in 1:3 #[0, 90, 180]
-
-    # Load parameters from file
-    # parameters = vSmartMOM.default_parameters()
-    parameters = vSmartMOM.parameters_from_yaml("/home/rjeyaram/RadiativeTransfer/test/helper/6SV1_1.yaml");
-
-    parameters.vaz = repeat([[0, 90, 180][i]], 16)
-
+for ϕ_i in 1:length(ϕs)
+    parameters.vaz = repeat([ϕs[ϕ_i]], 16)
     model = model_from_parameters(parameters);
+    model.τ_rayl[1] .= τ
 
-    @show model.τ_rayl[1]
-    model.τ_rayl[1] .= 0.1
+    R = vSmartMOM.rt_run(model, i_band=1)
+    @show size(R)
 
-    R_modeled[:,i] = vSmartMOM.rt_run(model, i_band=1)[:,:,1]
+    I_modeled_all[ϕ_i,:] = R[:,1,1]
+    Q_modeled_all[ϕ_i,:] = R[:,2,1]
+    U_modeled_all[ϕ_i,:] = R[:,3,1]
 
+    I_deltas_all[ϕ_i,:] = abs.(I_trues[:,ϕ_i] - I_modeled_all[ϕ_i,:]) ./ I_trues[:,ϕ_i]
+    Q_deltas_all[ϕ_i,:] = abs.(Q_trues[:,ϕ_i] - Q_modeled_all[ϕ_i,:]) ./ Q_trues[:,ϕ_i]
+    U_deltas_all[ϕ_i,:] = abs.(U_trues[:,ϕ_i] - U_modeled_all[ϕ_i,:]) ./ U_trues[:,ϕ_i]
 end
 
-p1 = plot(parameters.vza, R_modeled[:,1], xlabel = "VZA", title = "AZ=0", legend=false)
-p1 = plot!(parameters.vza, R_trues[3])
 
-p2 = plot(parameters.vza, R_modeled[:,2], xlabel = "VZA", title = "AZ=90", legend=false)
-p2 = plot!(parameters.vza, R_trues[2])
-
-p3 = plot(parameters.vza, R_modeled[:,3], xlabel = "VZA", title = "AZ=180", legend=false)
-p3 = plot!(parameters.vza, R_trues[1])
-
-
-p4 = plot(parameters.vza, (R_modeled[:,1]-R_trues[3])./R_trues[3], xlabel = "VZA", title = "AZ=0", legend=false)
-
-p5 = plot(parameters.vza, (R_modeled[:,2]-R_trues[2])./R_trues[2], xlabel = "VZA", title = "AZ=90", legend=false)
-
-p6 = plot(parameters.vza, (R_modeled[:,3]-R_trues[1])./R_trues[1], xlabel = "VZA", title = "AZ=180", legend=false)
-plot(p1, p2, p3, p4, p5, p6, layout=(2,3), size=(1200,900))
-
+plot(parameters.vza, I_modeled_all[1,:])
+plot!(parameters.vza, I_trues[:,1])
 
 ## 
 
-# [0.0000, 11.4783, 16.2602, 23.0739, 32.8599, 43.9455, 50.2082, 58.6677, 66.4218, 71.3371, 73.7398, 78.4630, 80.7931, 84.2608, 86.5602, 88.854]
+plot_phis = [1, 4, 7]
+plot_list = []
+gr(display_type=:inline)
+for i in plot_phis
+    p = plot(parameters.vza, Q_modeled_all[i,:], xlabel = "VZA", title = "Q, VAZ = $(ϕs[i])°", legend=:bottomleft, label="model", left_margin = 10mm)
+    p = plot!(parameters.vza, Q_trues[:,i], label="natraj")
+    push!(plot_list, p)
 
-# "/home/rjeyaram/RadiativeTransfer/test/helper/6SV1_1.yaml"
+    p = plot(parameters.vza, Q_modeled_all[i,:] - Q_trues[:,i], xlabel = "VZA", title = "Model – Natraj", legend=:bottomright, label="diff", ylims=(-0.0005, 0.0005))
 
-# params_dict = YAML.load_file("RadiativeTransfer/src/vSmartMOM/ModelParameters/DefaultParameters.yaml")
+    push!(plot_list, p)
 
-# vSmartMOM.validate_yaml_parameters(params_dict)
+    p = plot(parameters.vza, Q_deltas_all[i,:] * 100, xlabel = "VZA", title = "% Difference", legend=false, label="diff")
 
-# file = "RadiativeTransfer/src/vSmartMOM/ModelParameters/SampleProfile.yaml"
-# profile_nc4 = vSmartMOM.read_atmos_profile(parameters.file, parameters.lat, parameters.lon, parameters.timeIndex);
-# profile_yaml = vSmartMOM.read_atmos_profile(file);
+    push!(plot_list, p)
+end
 
-# Sets all the "specific" parameters
-# parameters = vSmartMOM.default_parameters();
-
-# Generates all the derived attributes from above parameters
-
-#model.params.architecture = RadiativeTransfer.Architectures.GPU();
-
-# function run_auto(x)
-#     (x)
-#     (x[1] isa ForwardDiff.Dual)
-#     (x[1])
-#     (typeof(parameters.μ))
-#     parameters.μ  = [x[1]]
-#     parameters.σ  = [x[2]]
-#     parameters.nᵣ = [x[3]]
-#     parameters.nᵢ = [x[4]]
-#     model = model_from_parameters(parameters);
-#     # model.architecture = RadiativeTransfer.Architectures.CPU()
-#     model.params.architecture = RadiativeTransfer.Architectures.CPU()
-#     R = vSmartMOM.rt_run(model, i_band=1)
-#     return R[1,1,:]
-# end
-
-# x = [1.3, 2.0, 1.3, 0.000001];
-
-# # @time run_auto(x)
-# @time dfdx = ForwardDiff.jacobian(run_auto, x);
-
-# a = 10
-
-# g = x -> ForwardDiff.jacobian(run_auto, x);
-
-# ν_grid = collect((1e7/778):0.015:(1e7/755))
-
-# T = 5777
-# black_body = planck_spectrum(T, ν_grid)
-
-# solar = readdlm("RadiativeTransfer/src/solar_merged_20160127_600_26316_100.out")
-
-# solar_idx_start = argmin(abs.(solar[:, 1] .- minimum(ν_grid)))
-# solar_idx_end   = argmin(abs.(solar[:, 1] .- maximum(ν_grid)))
-
-# solar_new = solar[(solar_idx_start-10):(solar_idx_end+10), :]
-
-# itp = LinearInterpolation(solar_new[:, 1], 
-#                           solar_new[:, 2])
-
-# solar_interpolated = itp.(black_body[:,1])
-
-
-# plot(black_body[:,1], (solar_interpolated .* black_body[:,2]))
-# plot!(black_body[:,1], black_body[:,2])
-
-# solar_out = solar_interpolated .* black_body[:,2]
-
-# earth_out = solar_out .* R[1,1,:]
-
-# file = "/home/cfranken/oco2_L1bScND_18688a_180105_B8100r_180206190633.h5"
-
-# ils_Δ, ils_in, dispersion = InstrumentOperator.read_ils_table(file, "/home/rjeyaram/RadiativeTransfer/src/vSmartMOM/ils_oco2.json");
-
-# ils_pixel = 
-
-# oco2_kernel = VariableKernelInstrument(ils_pixel, ν, ind_out)
-
-# plot!(1e6 ./ νs[argmin(abs.((νs ./ 100) .- solar[end,1])):(end-1)], solar_interpolated * 1e13)
-
-# 1 ./ νs[argmin(abs.((νs ./ 100) .- solar[end,1])):(end-1)]
-
-# a = ones(1500)
-# a[380:(end-1)] .= solar_interpolated
-
-# plot(1:1500, a .* Ls)
-
-# [0.03916, 0.04235, 0.04378, 0.04593, 0.04940, 0.05438, 0.05816, 0.06541, 0.07639, 0.08773, 0.09549, 0.11842, 0.13619, 0.17836, 0.22393, 0.27069]
+plot(plot_list..., layout=(3,3), size=(1200,1200))
