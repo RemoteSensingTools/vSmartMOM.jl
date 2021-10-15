@@ -235,10 +235,11 @@ function compute_legendre_poly(x,nmax)
 
     # 2nd Legendre polynomial, x
     #P¹[2,:] = x;
-    P²[:,3] .= 3   * (1 .- x.^2);
-    R²[:,3] .= sqrt(1.5) * (1 .+ x.^2);
-    T²[:,3] .= sqrt(6) * x;
-
+    if nmax >2
+        P²[:,3] .= 3   * (1 .- x.^2);
+        R²[:,3] .= sqrt(1.5) * (1 .+ x.^2);
+        T²[:,3] .= sqrt(6) * x;
+    end
     for n=2:nmax-1
         for i in eachindex(x)
             l = n-1;
