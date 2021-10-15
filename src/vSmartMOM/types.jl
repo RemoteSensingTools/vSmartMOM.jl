@@ -161,10 +161,10 @@ struct LambertianSurfaceSpectrum{FT} <: AbstractSurfaceType
     albedo::AbstractArray{FT,1}
 end
 
-"Defined by polynomial terms as function of λ (degree derived from length of `a_coeff`)"
-struct LambertianSurfacePolyFit{FT} <: AbstractSurfaceType
-    "albedo(λ) = a_coeff[1] + a_coeff[2]*λ + a_coeff[3]*λ² + ... "
-    a_coeff::AbstractArray{FT,1}
+"Defined by Legendre polynomial terms as function of spectral grid, which is scaled to [-1,1] (degree derived from length of `a_coeff`)"
+struct LambertianSurfaceLegendre{FT} <: AbstractSurfaceType
+    "albedo = legendre_coeff[1] * P₀ + legendre_coeff[2]*P₁ + legendre_coeff[3]*P₂ + ... "
+    legendre_coeff::AbstractArray{FT,1}
 end
 
 """
