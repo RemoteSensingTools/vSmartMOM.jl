@@ -1,3 +1,4 @@
+using NCDatasets
 #=
 
 This file contains the `model_from_parameters` function, which computes all derived information
@@ -55,14 +56,29 @@ function model_from_parameters(params::vSmartMOM_Parameters)
         
         # Loop over all molecules in this band, obtain profile for each, and add them up
         for molec_i in 1:length(params.absorption_params.molecules[i_band])
+            file = "/net/fluo/data2/data/ABSCO_CS_Database/v5.1_final/o2_v51.hdf"
+            a = loadAbsco(file);
+            ν_grid = a.ν[1]:0.01:a.ν[end]
+            pressures = 1:25:1150.0
+            temperatures = 160:10:360.0
+            model_interp = make_interpolation_model(a, Voigt(), ν_grid, pressures, temperatures)
 
             # Obtain hitran data for this molecule
             @timeit "Read HITRAN"  hitran_data = read_hitran(artifact(params.absorption_params.molecules[i_band][molec_i]), iso=1)
 
             println("Computing profile for $(params.absorption_params.molecules[i_band][molec_i]) with vmr $(profile.vmr[params.absorption_params.molecules[i_band][molec_i]]) for band #$(i_band)")
-
+            # Create absorption model with parameters beforehand now:
+            absorption_model = make_hitran_model(hitran_data, 
+                params.absorption_params.broadening_function, 
+                wing_cutoff = params.absorption_params.wing_cutoff, 
+                CEF = params.absorption_params.CEF, 
+                architecture = params.architecture, 
+                vmr = mean(profile.vmr[params.absorption_params.molecules[i_band][molec_i]]))
+            
+            
             # Calculate absorption profile
-            @timeit "Absorption Coeff"  compute_absorption_profile!(τ_abs[i_band], hitran_data, params.absorption_params.broadening_function, params.absorption_params.wing_cutoff, params.absorption_params.CEF, params.architecture, profile.vmr[params.absorption_params.molecules[i_band][molec_i]], params.spec_bands[i_band], profile);
+            # @timeit "Absorption Coeff"  compute_absorption_profile!(τ_abs[i_band], absorption_model, params.spec_bands[i_band],profile.vmr[params.absorption_params.molecules[i_band][molec_i]], profile);
+            compute_absorption_profile!(τ_abs[i_band], model_interp, params.spec_bands[i_band],profile.vmr[params.absorption_params.molecules[i_band][molec_i]], profile);
         end
     end
 
@@ -119,4 +135,18 @@ function model_from_parameters(params::vSmartMOM_Parameters)
     # Return the model 
     return vSmartMOM_Model(params, aerosol_optics,  greek_rayleigh, quad_points, τ_abs, τ_rayl, τ_aer, obs_geom, profile)
 
+end
+
+function loadAbsco(file)
+    absco = Dataset(file)
+    mol = absco["Gas_Index"][1]
+    
+    cs_name = "Gas_"* mol * "_Absorption"
+    # Loading cross sections:
+    σ = absco[cs_name][:]
+    # Temperature
+    T = absco["Temperature"][:]
+    p = absco["Pressure"][:]/100
+    ν = absco["Wavenumber"][:]
+    return Absorption.AbscoTable(parse(Int,mol), -1, ν, σ, p, T )
 end
