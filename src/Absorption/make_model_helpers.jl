@@ -172,3 +172,59 @@ function make_interpolation_model(
     return InterpolationModel(itp, mol, iso,  ν_grid, p_grid, t_grid)
 end
 
+function make_interpolation_model_test(
+    # Required
+    absco::AbscoTable,  
+    wave_grid::AbstractRange{<:Real}, 
+    p_grid::AbstractRange{<:Real},
+    t_grid::AbstractRange{<:Real}; 
+    # Optionals
+    wavelength_flag::Bool=false,
+    architecture::AbstractArchitecture=default_architecture     # Computer `Architecture` on which `Model` is run
+  )
+
+
+    # Convert from wavelength to wavenumber if necessary
+    ν_grid = wavelength_flag ? reverse(nm_per_m ./ wave_grid) : wave_grid
+
+    # Empty matrix to store the calculated cross-sections
+    cs_matrix = zeros(length(ν_grid),length(p_grid), length(t_grid));
+    
+    # Define indices in Absco:
+    T = absco.T
+    dT = mean(diff(T, dims=1))
+    @assert std(diff(T, dims=1))<1e-4 "T-grid too variable in ABSCO!"
+    absco_grid = absco.ν[1]:mean(diff(absco.ν)):absco.ν[end]
+    p = absco.p
+    xs = absco.σ
+
+    index_p = 1:length(p)
+    index_t = 1:size(T,1)
+
+    # Create an array of cubic splines in T (per pressure level in ABSCO)
+    # no H2O broadening for now, can be added later:
+    cs_matrix_temp = zeros(length(absco.ν),length(p), length(t_grid));
+    t_interpolators = [CubicSplineInterpolation((absco_grid,T[1,i]:dT:T[end,i]+0.01),xs[:,1,:,i], extrapolation_bc = Flat()) for i in eachindex(p)]
+    for i in eachindex(p)
+        #@show i, p[i]
+        cs_matrix_temp[:,i,:] = t_interpolators[i](absco.ν,t_grid);
+    end
+    # final interpolation routine on equidistant grid
+    #full_interp = CubicSplineInterpolation((absco_grid,p, t_grid),cs_matrix_temp, extrapolation_bc = Flat());
+    # This only works in Linear interpolation so far for irregular grids, need to update at a certain point:
+    full_interp = LinearInterpolation((absco_grid,p, t_grid),cs_matrix_temp, extrapolation_bc = Flat());
+    cs_matrix[:,:,:] = full_interp(ν_grid, p_grid, t_grid);
+    
+    # Perform the interpolation (can add a switch whether quadratic or cubic later, ideally in the setup file)
+    itp = interpolate(cs_matrix, BSpline(Cubic(Line(OnGrid()))));
+    #itp = interpolate(cs_matrix, BSpline(Quadratic(Line(OnGrid()))))
+    # interpolate(table, (BSpline(Constant()),BSpline(Cubic(Line(OnGrid()))),BSpline(Cubic(Line(OnGrid())))));
+
+    # Get the molecule and isotope numbers from the HitranTable
+    mol = absco.mol;
+    iso = absco.iso;
+
+    # Return the interpolation model with all the proper parameters
+    return InterpolationModel(itp, mol, iso,  ν_grid, p_grid, t_grid)
+end
+
