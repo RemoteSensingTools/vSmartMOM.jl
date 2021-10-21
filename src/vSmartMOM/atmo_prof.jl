@@ -332,13 +332,9 @@ end
 "Given the CrossSectionModel, the grid, and the AtmosphericProfile, fill up the τ_abs array with the cross section at each layer
 (using pressures/temperatures) from the profile" 
 function compute_absorption_profile!(τ_abs::Array{FT,2}, 
-                                     hitran_data::HitranTable, 
-                                     broadening_function::AbstractBroadeningFunction, 
-                                     wing_cutoff, 
-                                     CEF::AbstractComplexErrorFunction, 
-                                     architecture,
-                                     vmr,
+                                     absorption_model, 
                                      grid,
+                                     vmr,
                                      profile::AtmosphericProfile,
                                      ) where FT <: AbstractFloat
 
@@ -354,15 +350,8 @@ function compute_absorption_profile!(τ_abs::Array{FT,2},
         # Either use the current layer's vmr, or use the uniform vmr
         vmr_curr = vmr isa AbstractArray ? vmr[iz] : vmr
 
-        # Create absorption model with parameters
-        absorption_model = make_hitran_model(hitran_data, 
-                                             broadening_function, 
-                                             wing_cutoff = wing_cutoff, 
-                                             CEF = CEF, 
-                                             architecture = architecture, 
-                                             vmr = vmr_curr)
-
         # Changed index order
+        # @show iz,p,T,profile.vcd_dry[iz], vmr_curr
         τ_abs[:,iz] += Array(absorption_cross_section(absorption_model, grid, p, T)) * profile.vcd_dry[iz] * vmr_curr
     end
     
