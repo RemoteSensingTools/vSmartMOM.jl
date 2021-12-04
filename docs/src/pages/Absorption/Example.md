@@ -12,7 +12,8 @@ using RadiativeTransfer.Absorption
 hitran_data = read_hitran("path/to/file", mol=2, iso=1, ν_min=6000, ν_max=6400)
 
 # If you would like to download the file from the hitran database
-hitran_data = read_hitran(artifact"hitran_molec_id_2_CO2", mol=2, iso=1, ν_min=6000, ν_max=6400)
+hitran_data = read_hitran(artifact("CO2"), mol=2, iso=1, ν_min=6000, ν_max=6400)
+# For a list of available molecules, use Absorption.show_molecules()
 
 ## 
 ## STEP 2: Create a model from parameters
