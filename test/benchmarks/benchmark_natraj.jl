@@ -5,6 +5,7 @@ using RadiativeTransfer, RadiativeTransfer.vSmartMOM
 ## 
 
 I_modeled_all = zeros(7, 16);
+I_modeled_all_I = zeros(7, 16);
 I_deltas_all = zeros(7, 16);
 
 Q_modeled_all = zeros(7, 16);
@@ -45,6 +46,27 @@ for ϕ_i in 1:length(ϕs)
     I_deltas_all[ϕ_i,:] = abs.(I_trues[:,ϕ_i] - I_modeled_all[ϕ_i,:]) ./ I_trues[:,ϕ_i]
     Q_deltas_all[ϕ_i,:] = abs.(Q_trues[:,ϕ_i] - Q_modeled_all[ϕ_i,:]) ./ Q_trues[:,ϕ_i]
     U_deltas_all[ϕ_i,:] = abs.(U_trues[:,ϕ_i] - U_modeled_all[ϕ_i,:]) ./ U_trues[:,ϕ_i]
+end
+
+parameters = parameters_from_yaml("test/benchmarks/natraj_I.yaml");
+
+λ = 360.0
+parameters.spec_bands = [1e7/λ (1e7/λ + 1)]
+parameters.vza = acosd.(μ)
+parameters.sza = acosd.(0.2)
+
+τ = 0.5
+
+for ϕ_i in 1:length(ϕs)
+    parameters.vaz = repeat([ϕs[ϕ_i]], 16)
+    model = model_from_parameters(parameters);
+    model.τ_rayl[1] .= τ
+
+    R = vSmartMOM.rt_run(model, i_band=1)
+    @show size(R)
+
+    I_modeled_all_I[ϕ_i,:] = R[:,1,1]
+    
 end
 
 @show maximum(I_deltas_all)

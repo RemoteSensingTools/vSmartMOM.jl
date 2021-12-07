@@ -111,8 +111,7 @@ end
 
 function make_interpolation_model(
     # Required
-    absco::AbscoTable, 
-    broadening::AbstractBroadeningFunction, 
+    absco::AbscoTable,  
     wave_grid::AbstractRange{<:Real}, 
     p_grid::AbstractRange{<:Real},
     t_grid::AbstractRange{<:Real}; 

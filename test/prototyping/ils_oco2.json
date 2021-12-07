@@ -1,7 +1,27 @@
 {
     "ILS": {
         "ils_response": "InstrumentHeader/ils_relative_response",
-        "ils_grid": "InstrumentHeader/ils_delta_lambda",
-        "dispersion": "InstrumentHeader/dispersion_coef_samp"
+        "ils_grid":     "InstrumentHeader/ils_delta_lambda",
+        "dispersion":   "InstrumentHeader/dispersion_coef_samp"
+    },
+    "Geometry":{
+        "lat": "SoundingGeometry/sounding_latitude",
+        "lon": "SoundingGeometry/sounding_longitude",
+        "sza": "SoundingGeometry/sounding_solar_zenith",
+        "vza": "SoundingGeometry/sounding_zenith",
+        "azi": "SoundingGeometry/sounding_solar_azimuth",
+        "ϕ":   "SoundingGeometry/sounding_polarization_angle",
+        "time": "SoundingGeometry/sounding_time_tai93"
+    },
+    "Meteorology":{
+        "q"      :  "Meteorology/specific_humidity_profile_met",
+        "p_surf" :  "Meteorology/surface_pressure_met",
+        "T"      :  "Meteorology/temperature_profile_met",
+        "p_surf" :  "Meteorology/surface_pressure_met"
+    },
+    "Measurement":{
+        "radiance_o2"    :  "SoundingMeasurements/radiance_o2",
+        "radiance_wco2"  :  "SoundingMeasurements/radiance_weak_co2",
+        "radiance_sco2"  :  "SoundingMeasurements/radiance_strong_co2"
     }
 }

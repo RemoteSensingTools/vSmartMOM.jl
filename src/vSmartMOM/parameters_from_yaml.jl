@@ -56,7 +56,7 @@ function aerosol_params_to_obj(aerosols::Union{Array{Dict{Any, Any}}, Vector{Any
 
     for aerosol in aerosols
 
-        size_distribution = LogNormal(FT(aerosol["μ"]), FT(aerosol["σ"]))
+        size_distribution = LogNormal(log(FT(aerosol["μ"])), (FT(aerosol["σ"])))
 
         new_aerosol_obj = Aerosol(size_distribution,
                                   FT(aerosol["nᵣ"]),

@@ -1,0 +1,53 @@
+# =================================================================
+# Top-Level Radiative Transfer Parameters
+# =================================================================
+radiative_transfer: 
+  # Spectral bands (list of ν_start:ν_step:ν_end, in cm⁻¹)
+  spec_bands: 
+    - "[18867.92 18868.92]"
+  # Bidirectional Reflectance Distribution Function (BRDF) per band
+  surface: 
+    - LambertianSurfaceScalar(0.0)
+  # Quadrature-scheme for stream calculations
+  quadrature_type:    RadauQuad()
+  # Polarization type (Stokes_I, Stokes_IQ, Stokes_IQU, Stokes_IQUV)
+  polarization_type:  Stokes_I()
+  # Maximum m (number of Fourier moments to loop over)
+  max_m:              3
+  # Exclusion angle for forward peak in fitting procedure (degrees)
+  Δ_angle:            2.0
+  # Trunction length for legendre terms
+  l_trunc:            20
+  # Depolarization factor
+  depol:              0.0
+  # Floating point type for calculations (Float32, Float64)
+  float_type:         Float64
+  # Architecture (default_architecture, GPU(), CPU())
+  architecture:       Architectures.CPU()
+  
+# =================================================================
+# Simulation Geometry
+# =================================================================
+geometry: 
+  # Solar zenith angle (degrees)
+  sza:                23.0739
+  # Viewing zenith angles (degrees)
+  vza:                [0.0, 11.4783, 16.2602, 23.0739, 32.8599, 43.9455, 50.2082, 58.6677, 66.4218, 71.3371, 73.7398, 78.463, 80.7931, 84.2608, 86.5602, 88.854]
+  # Viewing azimuth angles (degrees)
+  vaz:                [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+  # Observation altitude (Pa)
+  obs_alt:            1000.0
+
+# =================================================================
+# Atmospheric Profile
+# =================================================================
+atmospheric_profile: 
+  # Temperature Profile (TOA to BOA, in K)
+  # Full-levels, specified at layer centers
+  T: [231.62]
+  # Pressure Profile (TOA to BOA at each boundary, in hPa)
+  # Half-levels, specified at layer boundaries
+  p: [  0.14,   0.22]
+  # Reduce profile to n layers
+  profile_reduction: -1
+

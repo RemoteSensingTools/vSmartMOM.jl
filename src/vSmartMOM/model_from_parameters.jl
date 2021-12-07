@@ -28,13 +28,14 @@ function model_from_parameters(params::vSmartMOM_Parameters)
     # Get AtmosphericProfile from parameters
     vmr = isnothing(params.absorption_params) ? Dict() : params.absorption_params.vmr
     p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o, new_vmr = compute_atmos_profile_fields(params.T, params.p, params.q, vmr)
+    #@show p_full, p_half
     profile = AtmosphericProfile(params.T, p_full, params.q, p_half, vmr_h2o, vcd_dry, vcd_h2o, new_vmr)
     
     # Reduce the profile to the number of target layers (if specified)
     if params.profile_reduction_n != -1
         profile = vSmartMOM.reduce_profile(params.profile_reduction_n, profile);
     end
-
+    # @show profile.p_full
     # Rayleigh optical properties calculation
     greek_rayleigh = Scattering.get_greek_rayleigh(params.depol)
     τ_rayl = [zeros(params.float_type, length(params.T)) for i=1:n_bands];
@@ -57,11 +58,11 @@ function model_from_parameters(params::vSmartMOM_Parameters)
         # Loop over all molecules in this band, obtain profile for each, and add them up
         for molec_i in 1:length(params.absorption_params.molecules[i_band])
             file = "/net/fluo/data2/data/ABSCO_CS_Database/v5.1_final/o2_v51.hdf"
-            a = loadAbsco(file);
+            a = loadAbsco(file; scale=1.0);
             ν_grid = a.ν[1]:0.01:a.ν[end]
-            pressures = 1:25:1150.0
+            pressures = 0.0001:25:1150.0
             temperatures = 160:10:360.0
-            model_interp = make_interpolation_model(a, Voigt(), ν_grid, pressures, temperatures)
+            model_interp = make_interpolation_model(a, ν_grid, pressures, temperatures)
 
             # Obtain hitran data for this molecule
             @timeit "Read HITRAN"  hitran_data = read_hitran(artifact(params.absorption_params.molecules[i_band][molec_i]), iso=1)
@@ -137,13 +138,13 @@ function model_from_parameters(params::vSmartMOM_Parameters)
 
 end
 
-function loadAbsco(file)
+function loadAbsco(file; scale=(1.0))
     absco = Dataset(file)
     mol = absco["Gas_Index"][1]
     
     cs_name = "Gas_"* mol * "_Absorption"
     # Loading cross sections:
-    σ = absco[cs_name][:]
+    σ = Float32(scale)*absco[cs_name][:]
     # Temperature
     T = absco["Temperature"][:]
     p = absco["Pressure"][:]/100

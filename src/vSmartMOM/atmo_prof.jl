@@ -5,18 +5,17 @@ This file contains functions that are related to atmospheric profile calculation
 =#
 
 "Compute pressure levels, vmr, vcd for atmospheric profile, given p_half, T, q"
-function compute_atmos_profile_fields(T, p_half::AbstractArray, q, vmr; g₀=9.8196)
-
+function compute_atmos_profile_fields(T, p_half::AbstractArray, q, vmr; g₀=9.8032465)
+    
     # Floating type to use
     FT = eltype(T)
-    
+    Nₐ = FT(6.02214179e+23)
     # Calculate full pressure levels
     p_full = (p_half[2:end] + p_half[1:end - 1]) / 2
 
     # Dry and wet mass
-    dry_mass = 28.9647e-3  / Nₐ  # in kg/molec, weighted average for N2 and O2
-    wet_mass = 18.01528e-3 / Nₐ  # just H2O
-    ratio = dry_mass / wet_mass 
+    dry_mass = FT(28.9644e-3)    # in kg/molec, weighted average for N2 and O2
+    wet_mass = FT(18.01534e-3)   # just H2O
     n_layers = length(T)
 
     # Also get a VMR vector of H2O (volumetric!)
@@ -27,11 +26,12 @@ function compute_atmos_profile_fields(T, p_half::AbstractArray, q, vmr; g₀=9.8
     # Now actually compute the layer VCDs
     for i = 1:n_layers 
         Δp = p_half[i + 1] - p_half[i]
-        vmr_h2o[i] = q[i] * ratio
+        vmr_h2o[i] = dry_mass/(dry_mass-wet_mass*(1-1/q[i]))
         vmr_dry = 1 - vmr_h2o[i]
         M  = vmr_dry * dry_mass + vmr_h2o[i] * wet_mass
-        vcd_dry[i] = vmr_dry * Δp / (M * g₀ * 100.0^2) * 100  # includes m2->cm2
-        vcd_h2o[i] = vmr_h2o[i] * Δp / (M * g₀ * 100^2) * 100
+        vcd = Nₐ * Δp / (M  * g₀ * 100^2) * 100
+        vcd_dry[i] = vmr_dry    * vcd   # includes m2->cm2
+        vcd_h2o[i] = vmr_h2o[i] * vcd
     end
 
     new_vmr = Dict{String, Union{Real, Vector}}()
@@ -120,13 +120,14 @@ function reduce_profile(n::Int, profile::AtmosphericProfile{FT}) where {FT}
 
         # Get the section of the atmosphere with the i'th section pressure values
         ind = findall(a[i] .< profile.p_full .<= a[i+1]);
-
+        @assert length(ind) > 0 "Profile reduction has an empty layer"
+        #@show i, ind, a[i], a[i+1]
         # Set the pressure levels accordingly
-        p_half[i] = profile.p_half[ind[1]]
-        p_half[i+1] = profile.p_half[ind[end]]
+        p_half[i]   = a[i]   # profile.p_half[ind[1]]
+        p_half[i+1] = a[i+1] # profile.p_half[ind[end]]
 
         # Re-average the other parameters to produce new layers
-        p_full[i] = mean(profile.p_half[ind])
+        p_full[i] = mean(profile.p_full[ind])
         T[i] = mean(profile.T[ind])
         q[i] = mean(profile.q[ind])
         vmr_h2o[i] = mean(profile.vmr_h2o[ind])
@@ -187,7 +188,7 @@ function getAerosolLayerOptProp(total_τ, p₀, σp, p_half)
     FT = eltype(p₀)
     Nz = length(p_half)
     ρ = zeros(FT,Nz)
-
+    @show p_half, p₀, σp
     for i = 2:Nz
         dp = p_half[i] - p_half[i - 1]
         ρ[i] = (1 / (σp * sqrt(2π))) * exp(-(p_half[i] - p₀)^2 / (2σp^2)) * dp
