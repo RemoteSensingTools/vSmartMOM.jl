@@ -22,7 +22,7 @@ a = vSmartMOM.loadAbsco("/net/fluo/data2/data/ABSCO_CS_Database/v5.1_final/o2_v5
 pressures = PP-10:10:PP+10.1
 temperatures = TT-10:10:TT+10.1
 
-model_interp = make_interpolation_model(a, Voigt(), ν_grid, pressures, temperatures)
+model_interp = make_interpolation_model(a,  ν_grid, pressures, temperatures)
 abscoInter_cs = absorption_cross_section(model_interp, ν_grid, PP, TT)
 
 @test 1e20*abscoInter_cs ≈ 1e20*cs_table[:,1,i,j]

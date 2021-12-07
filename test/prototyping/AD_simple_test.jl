@@ -19,13 +19,34 @@ using NCDatasets
 
 # Load parameters from file
 parameters = vSmartMOM.parameters_from_yaml("test/test_parameters/O2Parameters.yaml")
+#parameters.architecture = CPU()
 FT = Float64
+
+# Load OCO Data: 
+# File names:
+L1File = "/net/fluo/data1/group/oco2/L1bSc/oco2_L1bScND_26780a_190715_B10003r_200429212407.h5"
+metFile = "/net/fluo/data1/group/oco2/L2Met/oco2_L2MetND_26780a_190715_B10003r_200429212406.h5"
+dictFile = "/home/cfranken/code/gitHub/InstrumentOperator.jl/json/oco2.yaml"
+
+
+# Load L1 file (could just use filenames here as well)
+oco = InstrumentOperator.load_L1(dictFile,L1File, metFile);
 
 # oco2_L1bScND_18688a_180105_B8100r_180206190633
 
 oco_file = "/net/fluo/data1/group/oco2/L1bSc/oco2_L1bScGL_15258a_170515_B10003r_200214061601.h5"
 oco_met_file = "/net/fluo/data1/group/oco2/L2Met/oco2_L2MetGL_26777a_190715_B10003r_200429213029.h5"
 ils_file = "test/prototyping/ils_oco2.json"
+
+# Pick some bands as tuple (or just one)
+bands = (1,);
+# Indices within that band:
+indices = (92:885,);
+# Geo Index (footprint,sounding):
+GeoInd = [5,5000];
+
+# Get data for that sounding:
+oco_sounding = InstrumentOperator.getMeasurement(oco, bands, indices, GeoInd)
 
 fp = 5
 iOrbit = 5000
@@ -119,14 +140,14 @@ bk = [1.000000e+00, 9.849520e-01, 9.634060e-01, 9.418650e-01, 9.203870e-01, 8.98
 0.000000e+00, 0.000000e+00, 0.000000e+00, 0.000000e+00, 0.000000e+00, 0.000000e+00,
 0.000000e+00][end:-1:1]
 
-    p_surf = 1.025*met.group["Meteorology"]["surface_pressure_met"][fp,iOrbit];
+    p_surf = met.group["Meteorology"]["surface_pressure_met"][fp,iOrbit];
     p_half = (ak + bk * p_surf);
     #p_half = vcat(p_half, p_surf);
     q = met.group["Meteorology"]["specific_humidity_profile_met"][:,fp,iOrbit];
     parameters.p = p_half / 100
     parameters.q = q # zeros(size(q))
     parameters.T = T_met 
-    parameters.T[end-30:end] .-= 10
+    #parameters.T[end-30:end] .-= 10
     parameters.sza = sza_
     parameters.vza = vza_
 
@@ -241,7 +262,7 @@ vza_ = [vza[fp,iOrbit]]
 
 # State vector
 x = FT[0.2377,
-        -3, -0.00244, 0]#,
+        -1, -0.00244, 0]#,
 
 
 # Run FW model:
@@ -254,6 +275,7 @@ for i=1:3
     K = dfdx[ind,:];
     dx = K \ (y-Fx)
     x += dx
+    @show x
 end
 runner!(I_conv,x)
 Fx = I_conv[ind];
@@ -268,3 +290,8 @@ dispPoly = Polynomial(view(dispersion, :, extended_dims...));
 plot(ν[ind]*1e3,  y/1e20, label="Meas")
 plot!(ν[ind]*1e3, Fx/1e20, label="Mod")
 plot!(ν[ind]*1e3, (y-Fx)/1e20, label="Meas-mod")
+
+
+function sampleOCO_Orbit(fp,iOrbit,l1,met)
+
+end
