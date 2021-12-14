@@ -28,7 +28,12 @@ function compute_aerosol_optical_properties(model::MieModel{FDT}, FT2::Type=Floa
     FT = eltype(nᵣ);
     # @assert FT == Float64 "Aerosol computations require 64bit"
     # Get radius quadrature points and weights (for mean, thus normalized):
-    r, wᵣ = gauleg(nquad_radius, 0.0, r_max ; norm=true) 
+    # 
+    
+    # Just sample from 0.25%ile to 99.75%ile:
+    start,stop = quantile(size_distribution,[0.0025,0.9975])
+    #r, wᵣ = gauleg(nquad_radius, 0.0, r_max ; norm=true) 
+    r, wᵣ = gauleg(nquad_radius, start, min(stop,r_max) ; norm=true) 
     
     # Wavenumber
     k = 2π / λ  
@@ -76,20 +81,20 @@ function compute_aerosol_optical_properties(model::MieModel{FDT}, FT2::Type=Floa
         n_ = collect(FT, 1:n_max);
         n_ = 2n_ .+ 1
 
-        # Pre-allocate Dn:
+        # Pre-allocate Dₙ  :
         y = x_size_param[i] * (aerosol.nᵣ - aerosol.nᵢ);
         nmx = round(Int, max(n_max, abs(y)) + 51)
-        Dn = zeros(Complex{FT}, nmx)
+        Dₙ  = zeros(Complex{FT}, nmx)
 
-        # Compute an,bn and S₁,S₂
-        compute_mie_ab!(x_size_param[i], aerosol.nᵣ + aerosol.nᵢ * im, an, bn, Dn)
+        # Compute aₙ,bₙ and S₁,S₂
+        compute_mie_ab!(x_size_param[i], aerosol.nᵣ + aerosol.nᵢ * im, an, bn, Dₙ )
         compute_mie_S₁S₂!(an, bn, leg_π, leg_τ, view(S₁, :, i), view(S₂, :, i))
         
         # Compute Extinction and scattering cross sections: 
         C_sca[i] = 2π / k^2 * (n_' * (abs2.(an) + abs2.(bn)))
         C_ext[i] = 2π / k^2 * (n_' * real(an + bn))
-        # @show r[i], x_size_param[i], C_ext[i], C_ext[i]/(4π*r[i]^2), C_ext[i]*1e-8
-        # Compute scattering matrix components per size parameter (might change column/row ordering):
+       
+        # Compute scattering matrix components per size parameter:
         f₁₁[:,i] =  0.5 / x_size_param[i]^2  * real(abs2.(S₁[:,i]) + abs2.(S₂[:,i]));
         f₃₃[:,i] =  0.5 / x_size_param[i]^2  * real(S₁[:,i] .* conj(S₂[:,i]) + S₂[:,i] .* conj(S₁[:,i]));
         f₁₂[:,i] = -0.5 / x_size_param[i]^2  * real(abs2.(S₁[:,i]) - abs2.(S₂[:,i]));

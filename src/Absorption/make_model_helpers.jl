@@ -105,7 +105,7 @@ end
 
 """ Convenience function to load an InterpolationModel from a specified filepath (Using JLD2) """
 function load_interpolation_model(filepath::String)
-    itp_model::InterpolationModel = @load filepath itp_model
+    @load filepath itp_model
     return itp_model
 end
 

@@ -49,7 +49,7 @@ using .Absorption
 # Perform some GPU setup when the module is loaded
 function __init__()
     @hascuda begin
-        @info "CUDA-enabled GPU(s) detected:"
+        @info "CUDA-enabled GPU(s) detected"
         for (gpu, dev) in enumerate(CUDA.devices())
             @info "$dev: $(CUDA.name(dev))"
         end

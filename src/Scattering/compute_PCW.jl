@@ -26,7 +26,10 @@ function compute_aerosol_optical_properties(model::MieModel{FDT}, FT2::Type=Floa
     FT = eltype(nᵣ);
 
     # Compute radii and weights
-    r, wᵣ = gauleg(nquad_radius, 0.0, r_max ; norm=true)
+    start,stop = quantile(size_distribution,[0.0025,0.9975])
+    #r, wᵣ = gauleg(nquad_radius, 0.0, r_max ; norm=true) 
+    r, wᵣ = gauleg(nquad_radius, start, min(stop,r_max) ; norm=true) 
+    #r, wᵣ = gauleg(nquad_radius, 0.0, r_max ; norm=true)
     wₓ = compute_wₓ(size_distribution, wᵣ, r, r_max) 
 
     # Find overall N_max from the maximum radius
