@@ -188,9 +188,10 @@ function getAerosolLayerOptProp(total_τ, p₀, σp, p_half)
     FT = eltype(p₀)
     Nz = length(p_half)
     ρ = zeros(FT,Nz)
-    @show p_half, p₀, σp
+    # @show p_half, p₀, σp
     for i = 2:Nz
         dp = p_half[i] - p_half[i - 1]
+        # Use Distributions here later:
         ρ[i] = (1 / (σp * sqrt(2π))) * exp(-(p_half[i] - p₀)^2 / (2σp^2)) * dp
     end
     Norm = sum(ρ)
@@ -337,7 +338,7 @@ function compute_absorption_profile!(τ_abs::Array{FT,2},
                                      grid,
                                      vmr,
                                      profile::AtmosphericProfile,
-                                     ) where FT <: AbstractFloat
+                                     ) where FT 
 
     # The array to store the cross-sections must be same length as number of layers
     @assert size(τ_abs,2) == length(profile.p_full)

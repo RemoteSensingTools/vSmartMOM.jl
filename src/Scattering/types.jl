@@ -28,6 +28,21 @@ mutable struct Aerosol{}
     nᵢ
 end
 
+function Base.show(io::IO, ::MIME"text/plain", x::Aerosol)
+
+    println(io, "\n------------------")
+    println(io, "Aerosol Struct")
+    println(io, "------------------")
+    println(io, "Size distribution: $(x.size_distribution)")
+    println(io, "Real refractive Index nᵣ: $(x.nᵣ)")
+    println(io, "Imaginary refractive Index nᵣ: $(x.nᵢ)")
+    start,stop = quantile(x.size_distribution,[0.0025,0.9975])
+    x_axis = collect(range(start,stop,20))
+    y = pdf.(x.size_distribution,grid) 
+    print(io, UnicodePlots.lineplot(x_axis, y,title="Aerosol Size Distribution", xlabel="Radius (μm)" , ylabel="Frequency"))
+end
+
+
 # TODO: struct MultivariateAerosol{FT,FT2} <: AbstractAerosolType
 
 #=

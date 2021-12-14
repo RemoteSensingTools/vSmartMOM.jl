@@ -83,7 +83,7 @@ function truncate_phase(mod::δBGE, aero::AerosolOptics{FT}; reportFit=false, er
     # C_sca  = (ω̃ * k);
     # C_scaᵗ = C_sca * c₀; 
     # C_ext  = k - (C_sca - C_scaᵗ);
-    @show typeof(ω̃), typeof(k),typeof(c₀)
+    # @show typeof(ω̃), typeof(k),typeof(c₀)
     # return AerosolOptics(greek_coefs = greek_coefs, ω̃=C_scaᵗ / C_ext, k=C_ext, fᵗ = 1-c₀) 
     return AerosolOptics(greek_coefs=greek_coefs, ω̃=ω̃, k=k, fᵗ=(FT(1) - c₀))
 end
