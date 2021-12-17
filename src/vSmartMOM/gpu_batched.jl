@@ -25,7 +25,7 @@ end
 
 "Given 3D Julia Arrays A and B, fill in X[:,:,k] = A[:,:,k] \\ B[:,:,k]" 
 function batch_solve!(X::AbstractArray{FT,3}, A::AbstractArray{FT,3}, B::AbstractArray{FT,3}) where {FT}
-    Threads.@threads for i = 1:size(A, 3)
+    for i = 1:size(A, 3)
         @views ldiv!(X[:,:,i], qr!(A[:,:,i]), B[:,:,i])
     end
 end
@@ -42,7 +42,7 @@ end
 
 "Given 3D Julia Array A, fill in X[:,:,k] = A[:,:,k] \\ I" 
 function batch_inv!(X::AbstractArray{FT,3}, A::AbstractArray{FT,3}) where {FT}
-    Threads.@threads for i = 1:size(A, 3)
+    for i = 1:size(A, 3)
         @views X[:,:,i] = A[:,:,i]\I;
     end
 end
