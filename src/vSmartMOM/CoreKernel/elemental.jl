@@ -6,13 +6,13 @@ This file contains RT elemental-related functions
 
 "Elemental single-scattering layer"
 function elemental!(pol_type, SFI::Bool, 
-                            τ_sum::AbstractArray,#{FT2,1}, #Suniti
+                            τ_sum::AbstractArray,       #{FT2,1}, #Suniti
                             dτ_λ::AbstractArray{FT,1},  # dτ_λ: total optical depth of elemental layer (per λ)
                             dτ::FT,                     # dτ:   scattering optical depth of elemental layer (scalar)
                             ϖ_λ::AbstractArray{FT,1},   # ϖ: single scattering albedo of elemental layer (per λ, absorptions by gases included)
                             ϖ::FT,                      # ϖ: single scattering albedo of elemental layer (no trace gas included)
                             Z⁺⁺::AbstractArray{FT,2},   # Z matrix
-                            Z⁻⁺::AbstractArray{FT,2}, 
+                            Z⁻⁺::AbstractArray{FT,2},   # Z matrix
                             m::Int,                     # m: fourier moment
                             ndoubl::Int,                # ndoubl: number of doubling computations needed 
                             scatter::Bool,              # scatter: flag indicating scattering
@@ -25,7 +25,7 @@ function elemental!(pol_type, SFI::Bool,
     @unpack qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart, iμ₀ = quad_points
     arr_type = array_type(architecture)
     # Need to check with paper nomenclature. This is basically eqs. 19-20 in vSmartMOM
-    
+    # @show Array(τ_sum)[1], Array(dτ_λ)[1], Array(ϖ_λ)[1], Array(Z⁺⁺)[1,1]
     # Later on, we can have Zs also vary with index, pretty easy here:
     # Z⁺⁺_ = repeat(Z⁺⁺, 1, 1, 1)
     Z⁺⁺_ = reshape(Z⁺⁺, (size(Z⁺⁺,1), size(Z⁺⁺,2),1))
@@ -34,7 +34,6 @@ function elemental!(pol_type, SFI::Bool,
 
     D = Diagonal(arr_type(repeat(pol_type.D, size(qp_μ,1))))
     I₀_NquadN = arr_type(zeros(FT,size(qp_μN,1))); #incident irradiation
-    i_start   = pol_type.n*(iμ₀-1) + 1 
     i_end     = pol_type.n*iμ₀
     I₀_NquadN[iμ₀Nstart:i_end] = pol_type.I₀
 
@@ -73,7 +72,7 @@ function elemental!(pol_type, SFI::Bool,
               
             end
         else 
-            #Version 2: More computationally intensive definition of a single scattering layer with variable (0-∞) absorption
+            # Version 2: More computationally intensive definition of a single scattering layer with variable (0-∞) absorption
             # Version 2: with absorption in batch mode, low tau_scatt but higher tau_total, needs different equations
             kernel! = get_elem_rt!(device)
             event = kernel!(r⁻⁺, t⁺⁺, ϖ_λ, dτ_λ, Z⁻⁺, Z⁺⁺, qp_μN, wct, ndrange=size(r⁻⁺)); 
@@ -84,11 +83,10 @@ function elemental!(pol_type, SFI::Bool,
                 kernel! = get_elem_rt_SFI!(device)
                 event = kernel!(J₀⁺, J₀⁻, ϖ_λ, dτ_λ, τ_sum, Z⁻⁺, Z⁺⁺, qp_μN, ndoubl, wct02, pol_type.n, arr_type(pol_type.I₀), iμ₀, D, ndrange=size(J₀⁺))
                 wait(device, event)
+                synchronize_if_gpu()
             end
-            #ii = pol_type.n*(iμ0-1)+1
-            #@show 'B',iμ0,  r⁻⁺[1,ii,1]/(J₀⁻[1,1,1]*wt_μ[iμ0]), r⁻⁺[1,ii,1], J₀⁻[1,1,1]*wt_μ[iμ0], J₀⁺[1,1,1]*wt_μ[iμ0]
-            synchronize_if_gpu()
         end
+
         # Apply D Matrix
         apply_D_matrix_elemental!(ndoubl, pol_type.n, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻)
 
@@ -146,6 +144,7 @@ end
     
     Z⁺⁺_I₀ = FT(0.0);
     Z⁻⁺_I₀ = FT(0.0);
+    
     for ii = i_start:i_end
         Z⁺⁺_I₀ += Z⁺⁺[i,ii] * I₀[ii-i_start+1]
         Z⁻⁺_I₀ += Z⁻⁺[i,ii] * I₀[ii-i_start+1] 

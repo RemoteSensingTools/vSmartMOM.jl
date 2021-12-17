@@ -20,7 +20,7 @@ function doubling_helper!(pol_type,
 
     # Unpack the added layer
     @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, J₀⁺, J₀⁻ = added_layer
-
+    
     # Device architecture
     dev = devi(architecture)
 

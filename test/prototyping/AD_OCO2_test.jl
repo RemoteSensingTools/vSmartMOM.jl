@@ -18,7 +18,7 @@ using NCDatasets
 ## Atmospheric Radiative Transfer
 
 # Load parameters from file
-parameters = vSmartMOM.parameters_from_yaml("test/test_parameters/O2Parameters.yaml")
+parameters = vSmartMOM.parameters_from_yaml("test/test_parameters/3BandParameters.yaml")
 #parameters.architecture = CPU()
 FT = Float64
 
@@ -33,8 +33,10 @@ oco = InstrumentOperator.load_L1(dictFile,L1File, metFile);
 
 # Pick some bands as tuple (or just one)
 bands = (1,2,3);
+#bands = (1,3);
 # Indices within that band:
-indices = (92:885,50:950,50:950);
+indices = (92:885,114:845,50:916);
+#indices = (92:885,50:916);
 # Geo Index (footprint,sounding):
 GeoInd = [5,5000];
 
@@ -68,21 +70,23 @@ end
 function runner!(y, x, parameters=parameters, oco_sounding= oco_sounding, Tsolar = Tsolar_interp)
 
     # Set parameters fields as the dual numbers
-    parameters.brdf = [vSmartMOM.LambertianSurfaceLegendre([x[1],x[3],x[4],x[5],x[6]]),vSmartMOM.LambertianSurfaceLegendre([x[7],x[8]]),vSmartMOM.LambertianSurfaceLegendre([x[9],x[10]])]
+    parameters.brdf = [vSmartMOM.LambertianSurfaceLegendre([x[1],x[3],x[4]]),vSmartMOM.LambertianSurfaceLegendre([x[7],x[8],x[5]]),vSmartMOM.LambertianSurfaceLegendre([x[9],x[10],x[6]])]
 
     parameters.scattering_params.rt_aerosols[1].τ_ref = exp(x[2]);
     parameters.scattering_params.rt_aerosols[1].p₀    = 800.0; #x[4]
    
     parameters.p   = oco_sounding.p_half
     parameters.q   = oco_sounding.q 
-    parameters.T   = oco_sounding.T .+ 1.0
+    parameters.T   = oco_sounding.T# .+ 1.0 #.+ x[15]
     parameters.sza = oco_sounding.sza
     parameters.vza = [oco_sounding.vza]
-    parameters.absorption_params.vmr["H2O"] = parameters.q*x[11]
-    parameters.absorption_params.vmr["CO2"] = x[12]
+    parameters.absorption_params.vmr["H2O"] = [parameters.q[1:65]*x[11] * 1.8; parameters.q[66:end]*x[15] * 1.8]
+    a1 = zeros(7) .+ x[12]
+    a2 = zeros(7) .+ x[13]
+    a3 = zeros(6) .+ x[14]
+    parameters.absorption_params.vmr["CO2"] = [a1; a2; a3]
     model = model_from_parameters(parameters);
 
-    @show sum(model.τ_rayl[1] )
     for i = 1:length(oco_sounding.BandID)
         println("Modelling band $(i)")
         # Run the model to obtain reflectance matrix
@@ -112,7 +116,7 @@ end
 
 
 # State vector
-x = FT[0.2377, -3, -0.00244, 0, 0,0, 0.4, 0, 0.4, 0,1,400e-6]#,
+x = FT[0.2377, -3, -0.00244, 0, 0,0, 0.4, 0, 0.4, 0,1,400e-6,400e-6,400e-6, 1.0]#,
 
 
 # Run FW model:
@@ -130,8 +134,13 @@ end
 runner!(Fx,x)
 
 ν = oco_sounding.SpectralGrid*1e3
-plot(ν,  y/1e20, label="Meas")
-plot!(ν, Fx/1e20, label="Mod")
-plot!(ν, (y-Fx)/1e20, label="Meas-mod")
+plot(y/1e20, label="Meas")
+plot!(Fx/1e20, label="Mod")
+plot!((y-Fx)/1e20, label="Meas-mod")
 
-end
+a = Dataset("/net/fluo/data1/group/oco2/oco2_L2DiaND_26780a_190715_B10004r_200618191413.h5")
+g = a.group["RetrievalGeometry"]
+s = a.group["SpectralParameters"]
+i = findall(abs.(g["retrieval_latitude"][:].-41.736668).<0.0001)
+fp_meas = s["measured_radiance"][:,i]
+fp_mod  = s["modeled_radiance"][:,i]

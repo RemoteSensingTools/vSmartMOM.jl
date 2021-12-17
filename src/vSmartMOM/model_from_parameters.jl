@@ -43,7 +43,7 @@ function model_from_parameters(params::vSmartMOM_Parameters)
     
     # This is a kludge for now, tau_abs sometimes needs to be a dual. Suniti & us need to rethink this all!!
     # i.e. code the rt core with fixed amount of derivatives as in her paper, then compute chain rule for dtau/dVMr, etc...
-    FT2 = isnothing(params.absorption_params) ? parameters.float_type : typeof(params.absorption_params.vmr["CO2"])
+    FT2 = isnothing(params.absorption_params) ? parameters.float_type : eltype(params.absorption_params.vmr["CO2"])
     τ_abs     = [zeros(FT2, length(params.spec_bands[i]), length(profile.p_full)) for i in 1:n_bands]
     
     # Loop over all bands:

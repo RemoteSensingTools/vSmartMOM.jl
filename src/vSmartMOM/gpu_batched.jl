@@ -34,9 +34,9 @@ end
 function batch_inv!(X::CuArray{FT,3}, A::CuArray{FT,3}) where {FT}
 
     # LU-factorize A
-    @timeit "LR" pivot, info   = CUBLAS.getrf_strided_batched!(A, true);synchronize()
+    pivot, info   = CUBLAS.getrf_strided_batched!(A, true);synchronize()
     # Invert LU factorization of A
-    @timeit "RI" CUBLAS.getri_strided_batched!(A, X, pivot); synchronize()
+    CUBLAS.getri_strided_batched!(A, X, pivot); synchronize()
 end
 
 
@@ -49,7 +49,7 @@ end
 
 "Batched matrix multiply (overwrite NNlib definition)"
 function batched_mul(A::CuArray{FT,3}, B::CuArray{FT,3}) where {FT}
-    @timeit "BATchedMul" CUBLAS.gemm_strided_batched('N', 'N', A, B)
+    CUBLAS.gemm_strided_batched('N', 'N', A, B)
 end
 
 "Define batched matrix multiply for GPU and Duals"
@@ -67,13 +67,23 @@ end
 
 "Overload of batch_inv! for Dual numbers"
 function batch_inv!(X::CuArray{ForwardDiff.Dual{T,V,N},3}, A::CuArray{ForwardDiff.Dual{T,V,N},3}) where {T,V,N}
-    @timeit "Partials 1" Atemp = (ForwardDiff.value.(A))
-    @timeit "Partials 2" invA = similar(Atemp);
-    # Set invA=A⁻¹
+    #@show typeof(ForwardDiff.value.(A))
+    #@show T,V,N
+    Atemp = ForwardDiff.value.(A)
+    invA  = 0 * Atemp;
     
-    @timeit "Partials -2" batch_inv!(invA,Atemp)
+    # Set invA=A⁻¹
+    batch_inv!(invA,Atemp)
+
+    # Find sparsity (brute force)
+    doIt = zeros(Bool,N)
+    K    = [ForwardDiff.partials.(A,i) for i=1:N]
+    doIt = [~all(iszero.(K[i])) for i=1:N]
+    #@show doIt
+    #dummy = 0*similar(K[1])
+
     # Compute derivatives ∂A⁻¹/∂x = -A⁻¹ * ∂A/∂x * A⁻¹; using NNlib batched matrix multiply
-    dAdx = [-invA ⊠ ForwardDiff.partials.(A,i) ⊠ invA for i=1:N];
+    @timeit "InvDerivs" dAdx = [doIt[i] ? -invA ⊠ K[i] ⊠ invA : K[i] for i=1:N];
     # Pack into tuples again
     dAdx = ForwardDiff.Partials.(tuple.(dAdx...));
     X .= eltype(X).(invA,dAdx);
