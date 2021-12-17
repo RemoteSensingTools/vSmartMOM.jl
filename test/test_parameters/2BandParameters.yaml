@@ -6,12 +6,12 @@ radiative_transfer:
   spec_bands: 
     - (1e7/773):0.02:(1e7/757)
     - (1e7/1622):0.02:(1e7/1589)
-    - (1e7/2084):0.02:(1e7/2042)
+  #  - (1e7/2084):0.02:(1e7/2042)
   # Bidirectional Reflectance Distribution Function (BRDF) per band
   surface: 
     - LambertianSurfaceScalar(0.05)
     - LambertianSurfaceScalar(0.05)
-    - LambertianSurfaceScalar(0.05)
+  #  - LambertianSurfaceScalar(0.05)
   # Quadrature-scheme for stream calculations
   quadrature_type:    GaussQuadHemisphere()
   # Polarization type (Stokes_I, Stokes_IQ, Stokes_IQU, Stokes_IQUV)
@@ -23,7 +23,7 @@ radiative_transfer:
   # Trunction length for legendre terms
   l_trunc:            10
   # Depolarization factor
-  depol:              0.028
+  depol:              0.03
   # Floating point type for calculations (Float32, Float64)
   float_type:         Float64
   # Architecture (default_architecture, GPU(), CPU())
@@ -73,12 +73,12 @@ absorption:
   molecules:
     - [O2]       # Molecules in Band #1
     - [H2O,CO2]  # Molecules in Band #2
-    - [H2O,CO2]  # Molecules in Band #3
+  #  - [H2O,CO2]  # Molecules in Band #3
   # LookUpTable files (Interpolation Model saved as JLD2!)
   LUTfiles:
     - ["/net/fluo/data2/data/ABSCO_CS_Database/v5.2_final/o2_v52.jld2"]
     - ["/net/fluo/data2/data/ABSCO_CS_Database/v5.2_final/wh2o_v52.jld2", "/net/fluo/data2/data/ABSCO_CS_Database/v5.2_final/wco2_v52.jld2"]
-    - ["/net/fluo/data2/data/ABSCO_CS_Database/v5.2_final/sh2o_v52.jld2", "/net/fluo/data2/data/ABSCO_CS_Database/v5.2_final/sco2_v52.jld2"]
+  #  - ["/net/fluo/data2/data/ABSCO_CS_Database/v5.2_final/sh2o_v52.jld2", "/net/fluo/data2/data/ABSCO_CS_Database/v5.2_final/sco2_v52.jld2"]
   # VMR profiles can either be real-valued numbers, 
   # or an array of nodal points from TOA to BOA, interpolated in pressure space
   vmr: 
