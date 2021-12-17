@@ -1,10 +1,14 @@
-nij = 24
+using KernelAbstractions
+using CUDAKernels
+using CUDA
+
+nij = 14
 nn1 = 1000
 nn0 = 100
 
 iet⁺⁺ = rand(nij,nij,nn1,nn0);
 ier⁻⁺ = rand(nij,nij,nn1,nn0);
-using KernelAbstractions
+
 
 ϖ_λ₀λ₁ = rand(nn1,nn0);
 dτ₀= rand(1)[1];
@@ -27,6 +31,7 @@ wct2 = rand(nij);
         ier⁻⁺[i,j,n₁,n₀] = ϖ_λ₀λ₁[n₁,n₀] * (dτ₀/dτ₁) * Z⁻⁺_λ₀λ₁[i,j] * (qp_μN[j]*dτ₁ / (qp_μN[i]*dτ₀ + qp_μN[j]*dτ₁)) * (1 - exp(-((dτ_λ[n₁] / qp_μN[i]) + (dτ_λ[n₀] / qp_μN[j])))) * (wct2[j]) 
                     
         if (qp_μN[i] == qp_μN[j])
+            # @show i,j
             # 𝐓⁺⁺(μᵢ, μᵢ) = (exp{-τ/μᵢ} + ϖ ̇𝐙⁺⁺(μᵢ, μᵢ) ̇(τ/μᵢ) ̇exp{-τ/μᵢ}) ̇𝑤ᵢ
             if i == j       
                 if abs(dτ_λ[n₀]-dτ_λ[n₁])>1.e-6
@@ -37,7 +42,8 @@ wct2 = rand(nij);
             else
                 iet⁺⁺[i,j,n₁,n₀] = 0.0
             end
-        else  
+        else
+            #@show  qp_μN[i], qp_μN[j]  
             # 𝐓⁺⁺(μᵢ, μⱼ) = ϖ ̇𝐙⁺⁺(μᵢ, μⱼ) ̇(μⱼ/(μᵢ-μⱼ)) ̇(exp{-τ/μᵢ} - exp{-τ/μⱼ}) ̇𝑤ⱼ
             # (𝑖 ≠ 𝑗)
             iet⁺⁺[i,j,n₁,n₀] = ϖ_λ₀λ₁[n₁,n₀] * (dτ₀/dτ₁) * Z⁺⁺_λ₀λ₁[i,j] * (qp_μN[j]*dτ₁ / (qp_μN[i]*dτ₀ - qp_μN[j]*dτ₁)) * (exp(-dτ_λ[n₁] / qp_μN[i]) - exp(-dτ_λ[n₀] / qp_μN[j])) * wct2[j]
@@ -65,6 +71,7 @@ function get_elem_rt!(ier⁻⁺, iet⁺⁺, ϖ_λ, ϖ_λ₀λ₁, dτ₀, dτ₁
             ier⁻⁺[i,j,n₁,n₀] = ϖ_λ₀λ₁[n₁,n₀] * (dτ₀/dτ₁) * Z⁻⁺_λ₀λ₁[i,j] * (qp_μN[j]*dτ₁ / (qp_μN[i]*dτ₀ + qp_μN[j]*dτ₁)) * (1 - exp(-((dτ_λ[n₁] / qp_μN[i]) + (dτ_λ[n₀] / qp_μN[j])))) * (wct2[j]) 
                         
             if (qp_μN[i] == qp_μN[j])
+                
                 # 𝐓⁺⁺(μᵢ, μᵢ) = (exp{-τ/μᵢ} + ϖ ̇𝐙⁺⁺(μᵢ, μᵢ) ̇(τ/μᵢ) ̇exp{-τ/μᵢ}) ̇𝑤ᵢ
                 if i == j       
                     if abs(dτ_λ[n₀]-dτ_λ[n₁])>1.e-6
@@ -75,7 +82,8 @@ function get_elem_rt!(ier⁻⁺, iet⁺⁺, ϖ_λ, ϖ_λ₀λ₁, dτ₀, dτ₁
                 else
                     iet⁺⁺[i,j,n₁,n₀] = 0.0
                 end
-            else  
+            else 
+                
                 # 𝐓⁺⁺(μᵢ, μⱼ) = ϖ ̇𝐙⁺⁺(μᵢ, μⱼ) ̇(μⱼ/(μᵢ-μⱼ)) ̇(exp{-τ/μᵢ} - exp{-τ/μⱼ}) ̇𝑤ⱼ
                 # (𝑖 ≠ 𝑗)
                 iet⁺⁺[i,j,n₁,n₀] = ϖ_λ₀λ₁[n₁,n₀] * (dτ₀/dτ₁) * Z⁺⁺_λ₀λ₁[i,j] * (qp_μN[j]*dτ₁ / (qp_μN[i]*dτ₀ - qp_μN[j]*dτ₁)) * (exp(-dτ_λ[n₁] / qp_μN[i]) - exp(-dτ_λ[n₀] / qp_μN[j])) * wct2[j]
@@ -90,11 +98,47 @@ function get_elem_rt!(ier⁻⁺, iet⁺⁺, ϖ_λ, ϖ_λ₀λ₁, dτ₀, dτ₁
         end
     end
 end
+
 # Test w/o kernel:
 get_elem_rt!(ier⁻⁺, iet⁺⁺, ϖ_λ, ϖ_λ₀λ₁,dτ₀, dτ₁, dτ_λ, Z⁻⁺_λ₀λ₁, Z⁺⁺_λ₀λ₁, qp_μN, wct2);
+base_ier⁻⁺ = deepcopy(ier⁻⁺);
+base_iet⁺⁺ = deepcopy(iet⁺⁺);
 
+#ier⁻⁺ .= 0; 
+#iet⁺⁺ .= 0;
 # Test CPU kernel version:
 device = CPU()
 kernel! = get_elem_rt!(device)
 event = kernel!(ier⁻⁺, iet⁺⁺, ϖ_λ, ϖ_λ₀λ₁,dτ₀, dτ₁, dτ_λ, Z⁻⁺_λ₀λ₁, Z⁺⁺_λ₀λ₁, qp_μN, wct2, ndrange=size(ier⁻⁺)); 
 wait(device, event)
+
+base_ier⁻⁺ ≈ ier⁻⁺
+base_iet⁺⁺ ≈ iet⁺⁺
+
+# Test GPU kernel version:
+#ier⁻⁺ .= 0; 
+#iet⁺⁺ .= 0;
+if has_cuda()
+    c_ϖ_λ₀λ₁ = CuArray(ϖ_λ₀λ₁);
+    #dτ₀= rand(1)[1];
+    #dτ₁= rand(1)[1];
+    c_dτ_λ= CuArray(dτ_λ);
+    c_Z⁻⁺_λ₀λ₁= CuArray(Z⁻⁺_λ₀λ₁);
+    c_Z⁺⁺_λ₀λ₁= CuArray(Z⁺⁺_λ₀λ₁);
+    c_qp_μN = CuArray(qp_μN);
+    c_wct2 = CuArray(wct2);
+    c_ϖ_λ = CuArray(ϖ_λ);
+    c_iet⁺⁺ = CuArray(iet⁺⁺);
+    c_ier⁻⁺ = CuArray(ier⁻⁺);
+
+    device = CUDAKernels.CUDADevice()
+    kernel! = get_elem_rt!(device)
+    event = kernel!(c_ier⁻⁺, c_iet⁺⁺, c_ϖ_λ, c_ϖ_λ₀λ₁,dτ₀, dτ₁, c_dτ_λ, c_Z⁻⁺_λ₀λ₁, c_Z⁺⁺_λ₀λ₁, c_qp_μN, c_wct2, ndrange=size(c_ier⁻⁺)); 
+    wait(device, event)
+
+    cuda_iet⁺⁺ = Array(c_iet⁺⁺);
+    cuda_ier⁻⁺ = Array(c_ier⁻⁺);
+
+    cuda_iet⁺⁺ ≈ base_iet⁺⁺
+    cuda_ier⁻⁺ ≈ base_ier⁻⁺
+end
