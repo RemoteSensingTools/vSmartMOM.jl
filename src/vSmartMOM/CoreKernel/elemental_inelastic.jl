@@ -4,15 +4,19 @@ This file contains RT elemental-related functions
  
 =#
 
-"Elemental single-scattering layer"
+"Elemental single-scattering layer for RRS"
 function elemental!(pol_type, SFI::Bool, 
                             τ_sum::AbstractArray,#{FT2,1}, #Suniti
                             dτ_λ::AbstractArray{FT,1},  # dτ_λ: total optical depth of elemental layer (per λ)
                             dτ::FT,                     # dτ:   scattering optical depth of elemental layer (scalar)
                             ϖ_λ::AbstractArray{FT,1},   # ϖ_λ: single scattering albedo of elemental layer (per λ, absorptions by gases included)
                             ϖ::FT,                      # ϖ: single scattering albedo of elemental layer (no trace gas absorption included)
+                                                        # Rayleigh_XS/(Raman_XS+Rayleigh_XS)
+                            ϖ_λ₀λ₁::AbstractArray{FT,2},# Raman_XS/(Raman_XS+Rayleigh_XS)
                             Z⁺⁺::AbstractArray{FT,2},   # Z matrix
                             Z⁻⁺::AbstractArray{FT,2}, 
+                            Z⁺⁺_λ₀λ₁::AbstractArray{FT,2},   # Z matrix
+                            Z⁻⁺_λ₀λ₁::AbstractArray{FT,2}, 
                             m::Int,                     # m: fourier moment
                             ndoubl::Int,                # ndoubl: number of doubling computations needed 
                             scatter::Bool,              # scatter: flag indicating scattering
@@ -21,16 +25,16 @@ function elemental!(pol_type, SFI::Bool,
                             I_static,
                             architecture) where {FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2}
 
-    @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, J₀⁺, J₀⁻ = added_layer
+    @unpack ier⁺⁻, ier⁻⁺, iet⁻⁻, iet⁺⁺, ieJ₀⁺, ieJ₀⁻ = added_layer
     @unpack qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart, iμ₀ = quad_points
     arr_type = array_type(architecture)
     # Need to check with paper nomenclature. This is basically eqs. 19-20 in vSmartMOM
     
     # Later on, we can have Zs also vary with index, pretty easy here:
     # Z⁺⁺_ = repeat(Z⁺⁺, 1, 1, 1)
-    Z⁺⁺_ = reshape(Z⁺⁺, (size(Z⁺⁺,1), size(Z⁺⁺,2),1))
+    Z⁺⁺_ = reshape(Z⁺⁺_λ₀λ₁, (size(Z⁺⁺_λ₀λ₁,1), size(Z⁺⁺_λ₀λ₁,2),1))
     # Z⁻⁺_ = repeat(Z⁻⁺, 1, 1, 1)
-    Z⁻⁺_ = reshape(Z⁻⁺, (size(Z⁺⁺,1), size(Z⁺⁺,2),1))
+    Z⁻⁺_ = reshape(Z⁻⁺_λ₀λ₁, (size(Z⁺⁺_λ₀λ₁,1), size(Z⁺⁺_λ₀λ₁,2),1))
 
     D = Diagonal(arr_type(repeat(pol_type.D, size(qp_μ,1))))
     I₀_NquadN = arr_type(zeros(FT,size(qp_μN,1))); #incident irradiation
@@ -48,8 +52,10 @@ function elemental!(pol_type, SFI::Bool,
         # Needs explanation still, different weights: 
         # for m==0, ₀∫²ᵖⁱ cos²(mϕ)dϕ/4π = 0.5, while
         # for m>0,  ₀∫²ᵖⁱ cos²(mϕ)dϕ/4π = 0.25  
-        wct0  = m == 0 ? FT(0.50) * ϖ * dτ     : FT(0.25) * ϖ * dτ
+        # scalars
+        wct0  = m == 0 ? FT(0.50) * ϖ * dτ     : FT(0.25) * ϖ * dτ 
         wct02 = m == 0 ? FT(0.50)              : FT(0.25)
+        # vectors
         wct   = m == 0 ? FT(0.50) * ϖ * wt_μN  : FT(0.25) * ϖ * wt_μN
         wct2  = m == 0 ? wt_μN/2               : wt_μN/4
 
@@ -78,13 +84,13 @@ function elemental!(pol_type, SFI::Bool,
             #Version 2: More computationally intensive definition of a single scattering layer with variable (0-∞) absorption
             # Version 2: with absorption in batch mode, low tau_scatt but higher tau_total, needs different equations
             kernel! = get_elem_rt!(device)
-            event = kernel!(r⁻⁺, t⁺⁺, ϖ_λ, dτ_λ, Z⁻⁺, Z⁺⁺, qp_μN, wct, ndrange=size(r⁻⁺)); 
+            event = kernel!(ier⁻⁺, iet⁺⁺, ϖ_λ, ϖ_λ₀λ₁, dτ_λ, Z⁻⁺_λ₀λ₁, Z⁺⁺_λ₀λ₁, qp_μN, wct2, ndrange=size(ier⁻⁺)); 
             wait(device, event)
             synchronize_if_gpu()
 
             if SFI
                 kernel! = get_elem_rt_SFI!(device)
-                event = kernel!(J₀⁺, J₀⁻, ϖ_λ, dτ_λ, τ_sum, Z⁻⁺, Z⁺⁺, qp_μN, ndoubl, wct02, pol_type.n, arr_type(pol_type.I₀), iμ₀, D, ndrange=size(J₀⁺))
+                event = kernel!(ieJ₀⁺, ieJ₀⁻, ϖ_λ, ϖ_λ₀λ₁, dτ_λ, τ_sum, Z⁻⁺_λ₀λ₁, Z⁺⁺_λ₀λ₁, qp_μN, ndoubl, wct02, pol_type.n, arr_type(pol_type.I₀), iμ₀, D, ndrange=size(J₀⁺))
                 wait(device, event)
             end
             #ii = pol_type.n*(iμ0-1)+1
@@ -92,83 +98,97 @@ function elemental!(pol_type, SFI::Bool,
             synchronize_if_gpu()
         end
         # Apply D Matrix
-        apply_D_matrix_elemental!(ndoubl, pol_type.n, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻)
+        apply_D_matrix_elemental!(ndoubl, pol_type.n, ier⁻⁺, iet⁺⁺, ier⁺⁻, iet⁻⁻)
 
         if SFI
-            apply_D_matrix_elemental_SFI!(ndoubl, pol_type.n, J₀⁻)
+            apply_D_matrix_elemental_SFI!(ndoubl, pol_type.n, ieJ₀⁻)
         end      
     else 
         # Note: τ is not defined here
-        t⁺⁺[:] = Diagonal{exp(-τ ./ qp_μN)}
-        t⁻⁻[:] = Diagonal{exp(-τ ./ qp_μN)}
+        iet⁺⁺[:] = Diagonal{exp(-τ ./ qp_μN)}
+        iet⁻⁻[:] = Diagonal{exp(-τ ./ qp_μN)}
     end    
     #@pack! added_layer = r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, J₀⁺, J₀⁻   
 end
 
-@kernel function get_elem_rt!(r⁻⁺, t⁺⁺, ϖ_λ, dτ_λ, Z⁻⁺, Z⁺⁺, qp_μN, wct2)
-    i, j, n = @index(Global, NTuple) 
- 
+@kernel function get_elem_rt!(ier⁻⁺, iet⁺⁺, ϖ_λ, ϖ_λ₀λ₁, dτ₀, dτ₁, dτ_λ, Z⁻⁺_λ₀λ₁, Z⁺⁺_λ₀λ₁, qp_μN, wct2)
+    i, j, n₀, n₁ = @index(Global, NTuple) 
+    # let n₁ cover the full range of wavelengths, while n₀ only includes wavelengths at intervals 
+    # that contribute significantly enough to inelastic scattering, so that n₀≪n₁ 
     if (wct2[j]>1.e-8) 
+        # dτ₀, dτ₁ are the purely scattering (elastic+inelastic) molecular elemental 
+        # optical thicknesses at wavelengths λ₀ and λ₁
         # 𝐑⁻⁺(μᵢ, μⱼ) = ϖ ̇𝐙⁻⁺(μᵢ, μⱼ) ̇(μⱼ/(μᵢ+μⱼ)) ̇(1 - exp{-τ ̇(1/μᵢ + 1/μⱼ)}) ̇𝑤ⱼ
-        r⁻⁺[i,j,n] = ϖ_λ[n] * Z⁻⁺[i,j] * (qp_μN[j] / (qp_μN[i] + qp_μN[j])) * (1 - exp(-dτ_λ[n] * ((1 / qp_μN[i]) + (1 / qp_μN[j])))) * (wct2[j]) 
+        ier⁻⁺[i,j,n₁,n₀] = ϖ_λ₀λ₁[n₁,n₀] * (dτ₀/dτ₁) * Z⁻⁺_λ₀λ₁[i,j] * (qp_μN[j]*dτ₁ / (qp_μN[i]*dτ₀ + qp_μN[j]*dτ₁)) * (1 - exp(-((dτ_λ[n₁] / qp_μN[i]) + (dτ_λ[n₀] / qp_μN[j])))) * (wct2[j]) 
                     
         if (qp_μN[i] == qp_μN[j])
             # 𝐓⁺⁺(μᵢ, μᵢ) = (exp{-τ/μᵢ} + ϖ ̇𝐙⁺⁺(μᵢ, μᵢ) ̇(τ/μᵢ) ̇exp{-τ/μᵢ}) ̇𝑤ᵢ
-            if i == j
-                t⁺⁺[i,j,n] = exp(-dτ_λ[n] / qp_μN[i])*(1 + ϖ_λ[n] * Z⁺⁺[i,i] * (dτ_λ[n] / qp_μN[i]) * wct2[i])
+            if i == j       
+                if abs(dτ_λ[n₀]-dτ_λ[n₁])>1.e-6
+                    iet⁺⁺[i,j,n₁,n₀] = ((exp(-dτ_λ[n₀] / qp_μN[i]) - exp(-dτ_λ[n₁] / qp_μN[i]))/(dτ_λ[n₁]-dτ_λ[n₀])) * ϖ_λ₀λ₁[n₁,n₀] * dτ₀ * Z⁺⁺[i,i] * wct2[i]
+                else    
+                    iet⁺⁺[i,j,n₁,n₀] = ϖ_λ₀λ₁[n₁,n₀] * dτ₀ * Z⁺⁺[i,i] * wct2[i] * (exp(-dτ_λ[n₀] / qp_μN[j])/ qp_μN[j]
+                end
             else
-                t⁺⁺[i,j,n] = 0.0
+                iet⁺⁺[i,j,n₁,n₀] = 0.0
             end
-        else
-    
+        else  
             # 𝐓⁺⁺(μᵢ, μⱼ) = ϖ ̇𝐙⁺⁺(μᵢ, μⱼ) ̇(μⱼ/(μᵢ-μⱼ)) ̇(exp{-τ/μᵢ} - exp{-τ/μⱼ}) ̇𝑤ⱼ
             # (𝑖 ≠ 𝑗)
-            t⁺⁺[i,j,n] = ϖ_λ[n] * Z⁺⁺[i,j] * (qp_μN[j] / (qp_μN[i] - qp_μN[j])) * (exp(-dτ_λ[n] / qp_μN[i]) - exp(-dτ_λ[n] / qp_μN[j])) * wct2[j]
+            iet⁺⁺[i,j,n₁,n₀] = ϖ_λ₁λ₀[n₁,n₀] * (dτ₀/dτ₁) * Z⁺⁺_λ₀λ₁[i,j] * (qp_μN[j]*dτ₁ / (qp_μN[i]*dτ₀ - qp_μN[j]*dτ₁)) * (exp(-dτ_λ[n₁] / qp_μN[i]) - exp(-dτ_λ[n₀] / qp_μN[j])) * wct2[j]
         end
     else
-        r⁻⁺[i,j,n] = 0.0
+        ier⁻⁺[i,j,n₁,n₀] = 0.0
         if i==j
-            t⁺⁺[i,j,n] = exp(-dτ_λ[n] / qp_μN[i]) #Suniti
+            iet⁺⁺[i,j,n₁,n₀] = 0.0
         else
-            t⁺⁺[i,j,n] = 0.0
+            iet⁺⁺[i,j,n₁,n₀] = 0.0
         end
     end
     
 end
 
+#  TODO: Nov 30, 2021
 @kernel function get_elem_rt_SFI!(J₀⁺, J₀⁻, ϖ_λ, dτ_λ, τ_sum, Z⁻⁺, Z⁺⁺, qp_μN, ndoubl, wct02, nStokes ,I₀, iμ0, D)
     i_start  = nStokes*(iμ0-1) + 1 
     i_end    = nStokes*iμ0
     
-    i, _, n = @index(Global, NTuple) ##Suniti: What are Global and Ntuple?
+    i, _, n₁, n₀ = @index(Global, NTuple) ##Suniti: What are Global and Ntuple?
+    # let n₁ cover the full range of wavelengths, while n₀ only includes wavelengths at intervals 
+    # that contribute significantly enough to inelastic scattering, so that n₀≪n₁ 
     FT = eltype(I₀)
-    J₀⁺[i, 1, n]=0
-    J₀⁻[i, 1, n]=0
+    J₀⁺[i, 1, n₁, n₀]=0
+    J₀⁻[i, 1, n₁, n₀]=0
 
     
     Z⁺⁺_I₀ = FT(0.0);
     Z⁻⁺_I₀ = FT(0.0);
     for ii = i_start:i_end
-        Z⁺⁺_I₀ += Z⁺⁺[i,ii] * I₀[ii-i_start+1]
-        Z⁻⁺_I₀ += Z⁻⁺[i,ii] * I₀[ii-i_start+1] 
+        Z⁺⁺_I₀ += Z⁺⁺_λ₀λ₁[i,ii] * I₀[ii-i_start+1]
+        Z⁻⁺_I₀ += Z⁻⁺_λ₀λ₁[i,ii] * I₀[ii-i_start+1] 
     end
-
+    
     if (i>=i_start) && (i<=i_end)
-        ctr = i-i_start+1
+        #ctr = i-i_start+1
         # J₀⁺ = 0.25*(1+δ(m,0)) * ϖ(λ) * Z⁺⁺ * I₀ * (dτ(λ)/μ₀) * exp(-dτ(λ)/μ₀)
-        J₀⁺[i, 1, n] = wct02 * ϖ_λ[n] * Z⁺⁺_I₀ * (dτ_λ[n] / qp_μN[i]) * exp(-dτ_λ[n] / qp_μN[i])
+        if abs(dτ_λ[n₀]-dτ_λ[n₁])>1.e-6
+            J₀⁺[i, 1, n₁, n₀] = ((exp(-dτ_λ[n₀] / qp_μN[i]) - exp(-dτ_λ[n₁] / qp_μN[i]))/(dτ_λ[n₁]-dτ_λ[n₀])) * ϖ_λ₀λ₁[n₁,n₀] * dτ₀ * Z⁺⁺_I₀ * wct02
+        else
+            J₀⁺[i, 1, n₁, n₀] = wct02 * ϖ_λ₁λ₀[n₁, n₀] * Z⁺⁺_I₀ * (dτ₀[n] / qp_μN[j]) * exp(-dτ_λ[n₀] / qp_μN[j])
+        end
     else
         # J₀⁺ = 0.25*(1+δ(m,0)) * ϖ(λ) * Z⁺⁺ * I₀ * [μ₀ / (μᵢ - μ₀)] * [exp(-dτ(λ)/μᵢ) - exp(-dτ(λ)/μ₀)]
-        J₀⁺[i, 1, n] = wct02 * ϖ_λ[n] * Z⁺⁺_I₀ * (qp_μN[i_start] / (qp_μN[i] - qp_μN[i_start])) * (exp(-dτ_λ[n] / qp_μN[i]) - exp(-dτ_λ[n] / qp_μN[i_start]))
+        J₀⁺[i, 1, n₁, n₀] = wct02 * ϖ_λ₁λ₀[n₁, n₀] * (dτ₀/dτ₁) * Z⁺⁺_I₀ * (qp_μN[i_start]*dτ₁ / (qp_μN[i]*dτ₀ - qp_μN[i_start]*dτ₁)) * (exp(-dτ_λ[n₁] / qp_μN[i]) - exp(-dτ_λ[n₀] / qp_μN[i_start]))
     end
-    #J₀⁻ = 0.25*(1+δ(m,0)) * ϖ(λ) * Z⁻⁺ * I₀ * [μ₀ / (μᵢ + μ₀)] * [1 - exp{-dτ(λ)(1/μᵢ + 1/μ₀)}]
-    J₀⁻[i, 1, n] = wct02 * ϖ_λ[n] * Z⁻⁺_I₀ * (qp_μN[i_start] / (qp_μN[i] + qp_μN[i_start])) * (1 - exp(-dτ_λ[n] * ((1 / qp_μN[i]) + (1 / qp_μN[i_start]))))
+    #TODO
+    #J₀⁻ = 0.25*(1+δ(m,0)) * ϖ(λ) * Z⁻⁺ * I₀ * [μ₀ / (μᵢ + μ₀)] * [1 - exp{-dτ(λ)(1/μᵢ + 1/μ₀)}]                    
+    J₀⁻[i, 1, n₁, n₀] = wct02 * ϖ_λ₁λ₀[n₁, n₀] * (dτ₀/dτ₁) * Z⁻⁺_I₀ * (qp_μN[i_start]*dτ₁ / (qp_μN[i]*dτ₀ + qp_μN[i_start]*dτ₁)) * (1 - exp(-( (dτ_λ[n₁] / qp_μN[i]) + (dτ_λ[n₀] / qp_μN[i_start]) )))
 
-    J₀⁺[i, 1, n] *= exp(-τ_sum[n]/qp_μN[i_start])
-    J₀⁻[i, 1, n] *= exp(-τ_sum[n]/qp_μN[i_start])
+    J₀⁺[i, 1, n₁, n₀] *= exp(-τ_sum[n]/qp_μN[i_start])
+    J₀⁻[i, 1, n₁, n₀] *= exp(-τ_sum[n]/qp_μN[i_start])
 
     if ndoubl >= 1
-        J₀⁻[i, 1, n] = D[i,i]*J₀⁻[i, 1, n] #D = Diagonal{1,1,-1,-1,...Nquad times}
+        J₀⁻[i, 1, n₁, n₀] = D[i,i]*J₀⁻[i, 1, n₁, n₀] #D = Diagonal{1,1,-1,-1,...Nquad times}
     end        
 end
 
@@ -179,15 +199,15 @@ end
         ii = mod(i, pol_n) 
         jj = mod(j, pol_n) 
         if ((ii <= 2) & (jj <= 2)) | ((ii > 2) & (jj > 2)) 
-            r⁺⁻[i,j,n] = r⁻⁺[i,j,n]
-            t⁻⁻[i,j,n] = t⁺⁺[i,j,n]
+            r⁺⁻[i, j, n₁, n₀] = r⁻⁺[i, j, n₁, n₀]
+            t⁻⁻[i, j, n₁, n₀] = t⁺⁺[i, j ,n₁, n₀]
         else
-            r⁺⁻[i,j,n] = -r⁻⁺[i,j,n] 
-            t⁻⁻[i,j,n] = -t⁺⁺[i,j,n] 
+            r⁺⁻[i, j, n₁, n₀] = -r⁻⁺[i, j, n₁, n₀] 
+            t⁻⁻[i, j, n₁, n₀] = -t⁺⁺[i, j, n₁, n₀] 
         end
     else
         if mod(i, pol_n) > 2
-            r⁻⁺[i,j,n] = - r⁻⁺[i,j,n]
+            r⁻⁺[i, j, n₁, n₀] = - r⁻⁺[i, j, n₁, n₀]
         end 
     end
 end
@@ -197,7 +217,7 @@ end
     
     if ndoubl>1
         if mod(i, pol_n) > 2
-            J₀⁻[i, 1, n] = - J₀⁻[i, 1, n]
+            J₀⁻[i, 1, n₁, n₀] = - J₀⁻[i, 1, n₁, n₀]
         end 
     end
 end
