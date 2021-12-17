@@ -54,7 +54,7 @@ include("rt_run.jl")                        # Starting point for RT
 include("gpu_batched.jl")                   # Batched operations
 
 # Utilities / Helper Functions
-include("atmo_prof.jl")                     # Helper Functions for Hanling Atmospheric Profiles
+include("atmo_prof.jl")                     # Helper Functions for Handling Atmospheric Profiles
 include("rt_helper_functions.jl")           # Miscellaneous Utility Functions
 include("rt_set_streams.jl")                # Set streams before RT
 include("parameters_from_yaml.jl")          # Loading in parameters from YAML file
