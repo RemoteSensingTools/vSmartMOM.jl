@@ -7,15 +7,15 @@ using RadiativeTransfer.vSmartMOM
 ## 
 
 # If you would like to load your own parameters from a YAML file
-# (See required format at: https://github.com/RadiativeTransfer/RadiativeTransfer.jl/blob/master/src/vSmartMOM/ModelParameters/DefaultParameters.yaml)
-parameters = parameters_from_yaml(&quot;RadiativeTransfer/src/vSmartMOM/ModelParameters/DefaultParameters.yaml&quot;)
+# (See required format at: https://github.com/RadiativeTransfer/RadiativeTransfer.jl/blob/master/src/vSmartMOM/DefaultParameters.yaml)
+parameters = parameters_from_yaml(&quot;RadiativeTransfer/src/vSmartMOM/DefaultParameters.yaml&quot;)
 
 # OR if you would like to load a default set of parameters
 parameters = default_parameters();
 
 # You can then change any individual fields in parameters (parameters.field = ...)
 # Please see descriptions of each field here: 
-# https://radiativetransfer.github.io/RadiativeTransfer.jl/dev/pages/RadiativeTransfer/InputParametersGuide.html
+# https://radiativetransfer.github.io/RadiativeTransfer.jl/dev/pages/RadiativeTransfer/InputParametersGuide/
 
 ## 
 ## STEP 2: Create a model from parameters
@@ -31,4 +31,4 @@ model = model_from_parameters(parameters);
 ## 
 
 R = rt_run(model)
-</code></pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../Overview/">« Overview</a><a class="docs-footer-nextpage" href="../InputParametersGuide/">User-Defined RT Parameters »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 0.27.6 on <span class="colophon-date" title="Friday 17 December 2021 15:04">Friday 17 December 2021</span>. Using Julia version 1.6.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+</code></pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../Overview/">« Overview</a><a class="docs-footer-nextpage" href="../InputParametersGuide/">User-Defined RT Parameters »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 0.27.6 on <span class="colophon-date" title="Monday 3 January 2022 19:59">Monday 3 January 2022</span>. Using Julia version 1.6.5.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
