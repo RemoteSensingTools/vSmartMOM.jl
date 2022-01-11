@@ -44,7 +44,7 @@ Rather than simply *porting* these codes to a new language, **RadiativeTransfer.
 
 The package has a modular architecture, allowing users to import just the specific module(s) that they need.
 
-![Sample atmospheric reflectance, calculated using RadiativeTransfer.jl](joss_1.png)
+![Sample atmospheric reflectance under default atmospheric parameters, calculated using RadiativeTransfer.jl](joss_1.png)
 
 **RadiativeTransfer.jl** is the top-level module that uses absorption and scattering submodules to compute RT simulations. Specifically, it: 
 - Enables 1D vectorized plane-parallel RT modeling based on the Matrix Operator Method (`@Sanghavi:2013`)
@@ -52,11 +52,11 @@ The package has a modular architecture, allowing users to import just the specif
 - Enables GPU-accelerated computations of the resulting hyperspectral reflectances/transmittances
 - Enables auto-differentiation of the output spectrum with respect to various input parameters
 
-![Sample absorption spectrum of CO2, calculated using Absorption.jl](joss_2.png)
+![Sample absorption spectrum of CO2 with 0.01 step size resolution, calculated using Absorption.jl](joss_2.png)
 
 **Absorption.jl** enables absorption cross-section calculations of atmospheric gases at different pressures, temperatures, wavelengths, and broadeners (Doppler, Lorentzian, Voigt). It uses the HITRAN (`@Gordon:2017`) energy transition database for calculations. While it enables lineshape calculations from scratch, the module also allows users to create and save an interpolator object at specified wavelength, pressure, and temperature grids. The module also supports auto-differentiation (AD) of the profile, with respect to pressure and temperature. Calculations can be computed either on CPU or GPU (CUDA).
 
-![Sample scattering phase functions of aerosols, calculated using Scattering.jl](joss_3.png)
+![Sample scattering phase functions of aerosols, calculated using Scattering.jl (μ = 0.3 , σ = 2.0, nᵣ = 1.3, nᵢ = 0.0, λ = 0.40 μm)](joss_3.png)
 
 **Scattering.jl** is used for calculating Mie scattering phase-functions for aerosols with specified size distributions and refractive indices. This module enables scattering phase-function calculation of atmospheric aerosols with different size distributions, incident wavelengths, and refractive indices. It can perform the calculation using either the Siewert NAI-2 or Domke PCW methods (`@Sanghavi:2017`). The module also supports auto-differentiation (AD) of the phase function, with respect to the aerosol's size distribution parameters and its refractive index. 
 
