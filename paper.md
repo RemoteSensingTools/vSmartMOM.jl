@@ -47,6 +47,7 @@ The package has a modular architecture, allowing users to import just the specif
 ![Sample atmospheric reflectance under default atmospheric parameters, calculated using RadiativeTransfer.jl](joss_1.png)
 
 **RadiativeTransfer.jl** is the top-level module that uses absorption and scattering submodules to compute RT simulations. Specifically, it: 
+
 - Enables 1D vectorized plane-parallel RT modeling based on the Matrix Operator Method (`@Sanghavi:2013`)
 - Incorporates fast, high fidelity simulations of scattering atmospheres containing haze and clouds, including pressure- and temperature-resolved absorption profiles of gaseous species in the atmosphere
 - Enables GPU-accelerated computations of the resulting hyperspectral reflectances/transmittances
@@ -56,7 +57,7 @@ The package has a modular architecture, allowing users to import just the specif
 
 **Absorption.jl** enables absorption cross-section calculations of atmospheric gases at different pressures, temperatures, wavelengths, and broadeners (Doppler, Lorentzian, Voigt). It uses the HITRAN (`@Gordon:2017`) energy transition database for calculations. While it enables lineshape calculations from scratch, the module also allows users to create and save an interpolator object at specified wavelength, pressure, and temperature grids. The module also supports auto-differentiation (AD) of the profile, with respect to pressure and temperature. Calculations can be computed either on CPU or GPU (CUDA).
 
-![Sample scattering phase functions of aerosols, calculated using Scattering.jl ($\mu$ = 0.3 , $\sigma$ = 2.0, $n_r$ = 1.3, $n_i$ = 0.0, $lambda$ = 0.40 $\mu$m)](joss_3.png)
+![Sample scattering phase functions of aerosols, calculated using Scattering.jl ($\mu$ = 0.3 , $\sigma$ = 2.0, $n_r$ = 1.3, $n_i$ = 0.0, $\lambda$ = 0.40 $\mu$m)](joss_3.png)
 
 **Scattering.jl** is used for calculating Mie scattering phase-functions for aerosols with specified size distributions and refractive indices. This module enables scattering phase-function calculation of atmospheric aerosols with different size distributions, incident wavelengths, and refractive indices. It can perform the calculation using either the Siewert NAI-2 or Domke PCW methods (`@Sanghavi:2017`). The module also supports auto-differentiation (AD) of the phase function, with respect to the aerosol's size distribution parameters and its refractive index. 
 
@@ -104,31 +105,31 @@ Standard reference tables from the literature are used to validate **RadiativeTr
 | 1.00  |  **0.0374** <br>  0.0376 |  **0.0187** <br>  0.0188 | **-0.0187** <br> -0.0188 | **-0.0374** <br> -0.0376 | **-0.0187** <br> -0.0188 |  **0.0187** <br>  0.0188 |  **0.0374** <br>  0.0376 |
 : Q (Upwelling at TOA) for $\tau$ = 0.5, $\mu_0$ = 0.2, and A = 0.0
 
-| $\mu$ | $\phi$ = 0°      | $\phi$ = 30°           | $\phi$ = 60°           | $\phi$ = 90°           | $\phi$ = 120°            | $\phi$ = 150°            | $\phi$ = 180°    |
-| :---  | :---             | :---                   | :---                   | :---                   | :---                     | :---                     | :---             |
-| 0.02  | **0.0** <br> 0.0 | **0.0439** <br> 0.0439 | **0.0736** <br> 0.0737 | **0.0812** <br> 0.0813 |  **0.0671** <br>  0.0671 |  **0.0374** <br>  0.0374 | **0.0** <br> 0.0 |
-| 0.06  | **0.0** <br> 0.0 | **0.0442** <br> 0.0443 | **0.0704** <br> 0.0705 | **0.0715** <br> 0.0715 |  **0.0534** <br>  0.0534 |  **0.0272** <br>  0.0272 | **0.0** <br> 0.0 |
-| 0.10  | **0.0** <br> 0.0 | **0.0443** <br> 0.0444 | **0.0676** <br> 0.0676 | **0.0635** <br> 0.0636 |  **0.0425** <br>  0.0425 |  **0.0192** <br>  0.0192 | **0.0** <br> 0.0 |
-| 0.16  | **0.0** <br> 0.0 | **0.0440** <br> 0.0441 | **0.0638** <br> 0.0638 | **0.0539** <br> 0.0540 |  **0.0296** <br>  0.0296 |  **0.0099** <br>  0.0099 | **0.0** <br> 0.0 |
-| 0.20  | **0.0** <br> 0.0 | **0.0437** <br> 0.0437 | **0.0615** <br> 0.0616 | **0.0487** <br> 0.0487 |  **0.0228** <br>  0.0228 |  **0.0050** <br>  0.0050 | **0.0** <br> 0.0 |
-| 0.28  | **0.0** <br> 0.0 | **0.0428** <br> 0.0429 | **0.0575** <br> 0.0576 | **0.0402** <br> 0.0402 |  **0.0121** <br>  0.0121 | **-0.0026** <br> -0.0027 | **0.0** <br> 0.0 |
-| 0.32  | **0.0** <br> 0.0 | **0.0424** <br> 0.0425 | **0.0558** <br> 0.0559 | **0.0367** <br> 0.0368 |  **0.0078** <br>  0.0078 | **-0.0057** <br> -0.0057 | **0.0** <br> 0.0 |
-| 0.40  | **0.0** <br> 0.0 | **0.0415** <br> 0.0416 | **0.0528** <br> 0.0529 | **0.0309** <br> 0.0309 |  **0.0007** <br>  0.0006 | **-0.0106** <br> -0.0107 | **0.0** <br> 0.0 |
-| 0.52  | **0.0** <br> 0.0 | **0.0403** <br> 0.0404 | **0.0491** <br> 0.0492 | **0.0240** <br> 0.0241 | **-0.0074** <br> -0.0075 | **-0.0162** <br> -0.0163 | **0.0** <br> 0.0 |
-| 0.64  | **0.0** <br> 0.0 | **0.0390** <br> 0.0391 | **0.0458** <br> 0.0459 | **0.0185** <br> 0.0186 | **-0.0137** <br> -0.0138 | **-0.0205** <br> -0.0206 | **0.0** <br> 0.0 |
-| 0.72  | **0.0** <br> 0.0 | **0.0382** <br> 0.0383 | **0.0438** <br> 0.0439 | **0.0153** <br> 0.0153 | **-0.0173** <br> -0.0174 | **-0.0229** <br> -0.0230 | **0.0** <br> 0.0 |
-| 0.84  | **0.0** <br> 0.0 | **0.0368** <br> 0.0369 | **0.0406** <br> 0.0407 | **0.0106** <br> 0.0106 | **-0.0223** <br> -0.0224 | **-0.0262** <br> -0.0263 | **0.0** <br> 0.0 |
-| 0.92  | **0.0** <br> 0.0 | **0.0355** <br> 0.0356 | **0.0381** <br> 0.0382 | **0.0071** <br> 0.0071 | **-0.0259** <br> -0.0259 | **-0.0284** <br> -0.0285 | **0.0** <br> 0.0 |
-| 0.96  | **0.0** <br> 0.0 | **0.0347** <br> 0.0348 | **0.0364** <br> 0.0365 | **0.0049** <br> 0.0049 | **-0.0280** <br> -0.0281 | **-0.0298** <br> -0.0299 | **0.0** <br> 0.0 |
-| 0.98  | **0.0** <br> 0.0 | **0.0340** <br> 0.0341 | **0.0353** <br> 0.0354 | **0.0034** <br> 0.0034 | **-0.0294** <br> -0.0295 | **-0.0306** <br> -0.0307 | **0.0** <br> 0.0 |
-| 1.00  | **0.0** <br> 0.0 | **0.0324** <br> 0.0325 | **0.0324** <br> 0.0325 |    **0.0** <br> 0.0    | **-0.0324** <br> -0.0325 | **-0.0324** <br> -0.0325 | **0.0** <br> 0.0 |
+| $\mu$ | $\phi$ = 0°          | $\phi$ = 30°           | $\phi$ = 60°           | $\phi$ = 90°           | $\phi$ = 120°            | $\phi$ = 150°            | $\phi$ = 180°        |
+| :---  | :---                 | :---                   | :---                   | :---                   | :---                     | :---                     | :---                 |
+| 0.02  | **0.0** <br><br> 0.0 | **0.0439** <br> 0.0439 | **0.0736** <br> 0.0737 | **0.0812** <br> 0.0813 |  **0.0671** <br>  0.0671 |  **0.0374** <br>  0.0374 | **0.0** <br><br> 0.0 |
+| 0.06  | **0.0** <br><br> 0.0 | **0.0442** <br> 0.0443 | **0.0704** <br> 0.0705 | **0.0715** <br> 0.0715 |  **0.0534** <br>  0.0534 |  **0.0272** <br>  0.0272 | **0.0** <br><br> 0.0 |
+| 0.10  | **0.0** <br><br> 0.0 | **0.0443** <br> 0.0444 | **0.0676** <br> 0.0676 | **0.0635** <br> 0.0636 |  **0.0425** <br>  0.0425 |  **0.0192** <br>  0.0192 | **0.0** <br><br> 0.0 |
+| 0.16  | **0.0** <br><br> 0.0 | **0.0440** <br> 0.0441 | **0.0638** <br> 0.0638 | **0.0539** <br> 0.0540 |  **0.0296** <br>  0.0296 |  **0.0099** <br>  0.0099 | **0.0** <br><br> 0.0 |
+| 0.20  | **0.0** <br><br> 0.0 | **0.0437** <br> 0.0437 | **0.0615** <br> 0.0616 | **0.0487** <br> 0.0487 |  **0.0228** <br>  0.0228 |  **0.0050** <br>  0.0050 | **0.0** <br><br> 0.0 |
+| 0.28  | **0.0** <br><br> 0.0 | **0.0428** <br> 0.0429 | **0.0575** <br> 0.0576 | **0.0402** <br> 0.0402 |  **0.0121** <br>  0.0121 | **-0.0026** <br> -0.0027 | **0.0** <br><br> 0.0 |
+| 0.32  | **0.0** <br><br> 0.0 | **0.0424** <br> 0.0425 | **0.0558** <br> 0.0559 | **0.0367** <br> 0.0368 |  **0.0078** <br>  0.0078 | **-0.0057** <br> -0.0057 | **0.0** <br><br> 0.0 |
+| 0.40  | **0.0** <br><br> 0.0 | **0.0415** <br> 0.0416 | **0.0528** <br> 0.0529 | **0.0309** <br> 0.0309 |  **0.0007** <br>  0.0006 | **-0.0106** <br> -0.0107 | **0.0** <br><br> 0.0 |
+| 0.52  | **0.0** <br><br> 0.0 | **0.0403** <br> 0.0404 | **0.0491** <br> 0.0492 | **0.0240** <br> 0.0241 | **-0.0074** <br> -0.0075 | **-0.0162** <br> -0.0163 | **0.0** <br><br> 0.0 |
+| 0.64  | **0.0** <br><br> 0.0 | **0.0390** <br> 0.0391 | **0.0458** <br> 0.0459 | **0.0185** <br> 0.0186 | **-0.0137** <br> -0.0138 | **-0.0205** <br> -0.0206 | **0.0** <br><br> 0.0 |
+| 0.72  | **0.0** <br><br> 0.0 | **0.0382** <br> 0.0383 | **0.0438** <br> 0.0439 | **0.0153** <br> 0.0153 | **-0.0173** <br> -0.0174 | **-0.0229** <br> -0.0230 | **0.0** <br><br> 0.0 |
+| 0.84  | **0.0** <br><br> 0.0 | **0.0368** <br> 0.0369 | **0.0406** <br> 0.0407 | **0.0106** <br> 0.0106 | **-0.0223** <br> -0.0224 | **-0.0262** <br> -0.0263 | **0.0** <br><br> 0.0 |
+| 0.92  | **0.0** <br><br> 0.0 | **0.0355** <br> 0.0356 | **0.0381** <br> 0.0382 | **0.0071** <br> 0.0071 | **-0.0259** <br> -0.0259 | **-0.0284** <br> -0.0285 | **0.0** <br><br> 0.0 |
+| 0.96  | **0.0** <br><br> 0.0 | **0.0347** <br> 0.0348 | **0.0364** <br> 0.0365 | **0.0049** <br> 0.0049 | **-0.0280** <br> -0.0281 | **-0.0298** <br> -0.0299 | **0.0** <br><br> 0.0 |
+| 0.98  | **0.0** <br><br> 0.0 | **0.0340** <br> 0.0341 | **0.0353** <br> 0.0354 | **0.0034** <br> 0.0034 | **-0.0294** <br> -0.0295 | **-0.0306** <br> -0.0307 | **0.0** <br><br> 0.0 |
+| 1.00  | **0.0** <br><br> 0.0 | **0.0324** <br> 0.0325 | **0.0324** <br> 0.0325 | **0.0** <br><br> 0.0   | **-0.0324** <br> -0.0325 | **-0.0324** <br> -0.0325 | **0.0** <br><br> 0.0 |
 : U (Upwelling at TOA) for $\tau$ = 0.5, $\mu_0$ = 0.2, and A = 0.0
 
-This validation demonstrates that simulation output using RadiativeTransfer.jl closely matches the published standard values. 
+As seen in Table 1-3, simulation output from RadiativeTransfer.jl closely matches published standard values.
 
 Runtime duration for a given simulation is also compared between using CPU and GPU architectures. (CPU architecture is single-threaded, AMD EPYC 7H12 64-Core Processor; GPU is parallel on an NVIDIA A100 Tensor Core (40Gb))
 
-![](agu_4.png)
+![Runtime comparison between CPU and GPU for sample radiative transfer simulation with varying number of spectral points](agu_4.png)
 
 A nearly 100x speedup is observed when using the GPU architecture on the same simulation, suggesting that RadiativeTransfer.jl has the potential to greatly accelerate the pace of scientific discovery in the remote sensing field. 
 
