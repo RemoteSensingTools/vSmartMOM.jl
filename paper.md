@@ -63,7 +63,7 @@ The package has a modular architecture, allowing users to import just the specif
 
 # Benchmarks
 
-Standard reference tables from the literature are used to validate **RadiativeTransfer.jl** simulation output. 
+Standard reference tables from Natraj (2009) are used to validate **RadiativeTransfer.jl** simulation output. In the tables below, **bold** numbers are RadiativeTransfer.jl output values and non-bold numbers are the published values. 
 
 | $\mu$ | $\phi$ = 0°            | $\phi$ = 30°           | $\phi$ = 60°           | $\phi$ = 90°           | $\phi$ = 120°          | $\phi$ = 150°          | $\phi$ = 180°          |
 | :---  | :---                   | :---                   | :---                   | :---                   | :---                   | :---                   | :---                   |
@@ -125,7 +125,7 @@ Standard reference tables from the literature are used to validate **RadiativeTr
 | 1.00  | **0.0** <br><br> 0.0 | **0.0324** <br> 0.0325 | **0.0324** <br> 0.0325 | **0.0** <br><br> 0.0   | **-0.0324** <br> -0.0325 | **-0.0324** <br> -0.0325 | **0.0** <br><br> 0.0 |
 : U (Upwelling at TOA) for $\tau$ = 0.5, $\mu_0$ = 0.2, and A = 0.0
 
-As seen in Table 1-3, simulation output from RadiativeTransfer.jl closely matches published standard values.
+As seen in **Tables 1-3**, simulated reflectance output from RadiativeTransfer.jl closely matches published standard values, in every case within 0.0005 of the published value. 
 
 Runtime duration for a given simulation is also compared between using CPU and GPU architectures. (CPU architecture is single-threaded, AMD EPYC 7H12 64-Core Processor; GPU is parallel on an NVIDIA A100 Tensor Core (40Gb))
 
