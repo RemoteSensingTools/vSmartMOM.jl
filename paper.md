@@ -138,4 +138,3 @@ A nearly 100x speedup is observed when using the GPU architecture on the same si
 We thank Frankenberg lab members for their enthusiastic support and guidance throughout this project. We also acknowledge support from Caltech’s Schmidt Academy for Software Engineering.
 
 # References
-
