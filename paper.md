@@ -59,7 +59,7 @@ The package has a modular architecture, allowing users to import just the specif
 
 ![Sample scattering phase functions of aerosols (I and the I -> Q transition), calculated using Scattering.jl ($\mu$ = 0.3 , $\sigma$ = 2.0, $n_r$ = 1.3, $n_i$ = 0.0, $\lambda$ = 0.40 $\mu$m)](joss_3.png)
 
-**Scattering.jl** is used for calculating Mie scattering phase-functions for aerosols with specified size distributions and refractive indices. This module enables scattering phase-function calculation of atmospheric aerosols with different size distributions, incident wavelengths, and refractive indices. It can perform the calculation using either the Siewert NAI-2 or Domke PCW methods [@Sanghavi2:2013]. The module also supports auto-differentiation of the phase function, with respect to the aerosol's size distribution parameters and its refractive index. 
+**Scattering.jl** is used for calculating Mie scattering phase-functions for aerosols with specified size distributions and refractive indices. This module enables scattering phase-function calculation of atmospheric aerosols with different size distributions, incident wavelengths, and refractive indices. It can perform the calculation using either the Siewert NAI-2 or Domke PCW methods [@Second:2013]. The module also supports auto-differentiation of the phase function, with respect to the aerosol's size distribution parameters and its refractive index. 
 
 # Benchmarks
 
