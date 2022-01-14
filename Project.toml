@@ -1,7 +1,7 @@
 name = "RadiativeTransfer"
 uuid = "ace8185b-fa20-42f5-912d-1e850dbe6a09"
 authors = ["Rupesh Jeyaram <rjeyaram@caltech.edu> and contributors"]
-version = "0.4.2"
+version = "0.4.3"
 
 [deps]
 CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
@@ -53,7 +53,7 @@ StaticArrays = "1.2"
 StatsBase = "0.33"
 TimerOutputs = "0.5"
 YAML = "0.4"
-julia = "1.6"
+julia = "1.6, 1.7"
 
 [extras]
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
