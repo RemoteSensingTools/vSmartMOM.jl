@@ -120,14 +120,13 @@ function reduce_profile(n::Int, profile::AtmosphericProfile{FT}) where {FT}
 
         # Get the section of the atmosphere with the i'th section pressure values
         ind = findall(a[i] .< profile.p_full .<= a[i+1]);
-        @assert length(ind) > 0 "Profile reduction has an empty layer"
-        #@show i, ind, a[i], a[i+1]
+
         # Set the pressure levels accordingly
-        p_half[i]   = a[i]   # profile.p_half[ind[1]]
-        p_half[i+1] = a[i+1] # profile.p_half[ind[end]]
+        p_half[i] = profile.p_half[ind[1]]
+        p_half[i+1] = profile.p_half[ind[end]]
 
         # Re-average the other parameters to produce new layers
-        p_full[i] = mean(profile.p_full[ind])
+        p_full[i] = mean(profile.p_half[ind])
         T[i] = mean(profile.T[ind])
         q[i] = mean(profile.q[ind])
         vmr_h2o[i] = mean(profile.vmr_h2o[ind])
@@ -177,6 +176,60 @@ function getRayleighLayerOptProp(psurf, λ, depol_fct, vcd_dry)
     return convert.(FT, τRayl)
 end
 
+# TODO_Suniti
+"""
+    $(FUNCTIONNAME)(RS_type, λ, grid_in)
+
+Returns the Raman SSA per layer at reference wavelength `λ` from nearby source wavelengths for RRS and a (currently) single incident wavelength for VRS/RVRS
+(N₂,O₂ atmosphere, i.e. terrestrial)
+
+Input: 
+    - `RS_type` Raman scattering type (RRS/RVRS/VRS)
+    - `λ` wavelength in `[μm]`
+    - `grid_in` wavenumber grid with equidistant gridpoints
+"""
+function getRamanLayerSSA(RS_type::VS_0to1, T, λ, grid_in)
+    @unpack n2,o2 =  RS_type
+    #n2, o2 = getRamanAtmoConstants(1.e7/λ, T)
+    # determine Rayleigh scattering cross-section at single monochromatic wavelength λ of the spectral band (assumed constant throughout the band)
+    compute_optical_Rayl!(atmo_σ_Rayl, λ, n2, o2)
+    # determine RRS cross-sections to λ₀ from nSpecRaman wavelengths around λ₀  
+    compute_optical_VRS_0to1!(grid_in, index_VRSgrid_out, atmo_σ_VRS_0to1, index_RVRSgrid_out, atmo_σ_RVRS_0to1, λ, n2, o2)
+    # declare ϖ_Raman to be a grid of length raman grid
+    ϖ_VRS = atmo_σ_VRS_0to1/atmo_σ_Rayl
+    i_VRS = index_VRSgrid_out
+    ϖ_RVRS = atmo_σ_RVRS_0to1/atmo_σ_Rayl
+    i_RVRS = index_RVRSgrid_out
+    return ϖ_RVRS, i_RVRS, ϖ_VRS, i_VRS 
+end
+function getRamanLayerSSA(RS_type::VS_1to0, T, λ, grid_in)
+    @unpack n2,o2 =  RS_type
+    #n2, o2 = getRamanAtmoConstants(1.e7/λ, T)
+    # determine Rayleigh scattering cross-section at single monochromatic wavelength λ of the spectral band (assumed constant throughout the band)
+    compute_optical_Rayl!(atmo_σ_Rayl, λ, n2, o2)
+    # determine RRS cross-sections to λ₀ from nSpecRaman wavelengths around λ₀  
+    compute_optical_VRS_1to0!(grid_in, index_VRSgrid_out, atmo_σ_VRS_1to0, index_RVRSgrid_out, atmo_σ_RVRS_1to0, λ, n2, o2)
+    # declare ϖ_Raman to be a grid of length raman grid
+    ϖ_VRS = atmo_σ_VRS_1to0/atmo_σ_Rayl
+    i_VRS = index_VRSgrid_out
+    ϖ_RVRS = atmo_σ_RVRS_1to0/atmo_σ_Rayl
+    i_RVRS = index_RVRSgrid_out
+    return ϖ_RVRS, i_RVRS, ϖ_VRS, i_VRS
+end
+
+function getRamanLayerSSA(RS_type::RRS, T, λ, grid_in) 
+    @unpack n2,o2 =  RS_type
+    #n2, o2 = getRamanAtmoConstants(1.e7/λ, T)
+    # determine Rayleigh scattering cross-section at central wavelength λ of the spectral band (assumed constant throughout the band)
+    compute_optical_Rayl!(atmo_σ_Rayl, λ, n2, o2)
+    # determine RRS cross-sections to λ₀ from nSpecRaman wavelengths around λ₀  
+    compute_optical_RRS!(grid_in, index_raman_grid, atmo_σ_RRS, λ, n2, o2)
+    # declare ϖ_Raman to be a grid of length raman grid
+    ϖ_RRS = atmo_σ_RRS[end:-1:1]/atmo_σ_Rayl #the grid gets inverted because the central wavelength is now seen as the recipient of RRS from neighboring source wavelengths
+    i_RRS = index_raman_grid[end:-1:1]
+    return ϖ_RRS, i_RRS
+end
+
 """
     $(FUNCTIONNAME)(total_τ, p₀, σp, p_half)
     
@@ -199,7 +252,7 @@ function getAerosolLayerOptProp(total_τ, p₀, σp, p_half)
 end
 
 """
-    $(FUNCTIONNAME)(τRayl, τAer,  aerosol_optics, Rayl𝐙⁺⁺, Rayl𝐙⁻⁺, Aer𝐙⁺⁺, Aer𝐙⁻⁺, τ_abs, arr_type)
+    $(FUNCTIONNAME)(τRayl, fscattRayl, τAer,  aerosol_optics, Rayl𝐙⁺⁺, Rayl𝐙⁻⁺, Aer𝐙⁺⁺, Aer𝐙⁻⁺, τ_abs, arr_type)
 
 Computes the composite layer single scattering parameters (τ, ϖ, Z⁺⁺, Z⁻⁺)
 
@@ -207,7 +260,7 @@ Returns:
     - `τ`, `ϖ`   : only Rayleigh scattering and aerosol extinction, no gaseous absorption (no wavelength dependence)
     - `τ_λ`,`ϖ_λ`: Rayleigh scattering + aerosol extinction + gaseous absorption (wavelength dependent)
     - `Z⁺⁺`,`Z⁻⁺`: Composite Phase matrix (weighted average of Rayleigh and aerosols)
-    - `fscattRayl`: Rayleigh scattering fraction (needed for Raman computations) 
+    - `fscattRayl` Rayleigh fraction of total scattering optical thickness 
 Arguments:
     - `τRay` layer optical depth for Rayleigh
     - `τAer` layer optical depth for Aerosol(s) (vector)
@@ -218,7 +271,7 @@ Arguments:
     - `Aer𝐙⁻⁺` Aerosol 𝐙⁻⁺ phase matrix (3D)
     - `τ_abs` layer absorption optical depth array (per wavelength) by gaseous absorption
 """
-function construct_atm_layer(τRayl, τAer,  aerosol_optics, Rayl𝐙⁺⁺, Rayl𝐙⁻⁺, Aer𝐙⁺⁺, Aer𝐙⁻⁺, τ_abs, arr_type)
+function construct_atm_layer(τRayl, τAer, aerosol_optics, Rayl𝐙⁺⁺, Rayl𝐙⁻⁺, Aer𝐙⁺⁺, Aer𝐙⁻⁺, τ_abs, arr_type)
     FT = eltype(τRayl)
     nAer = length(aerosol_optics)
 
@@ -261,15 +314,18 @@ function construct_atm_layer(τRayl, τAer,  aerosol_optics, Rayl𝐙⁺⁺, Ray
     # Rescaling composite SSPs according to Eqs. A.3 of Sanghavi et al. (2013) or Eqs.(8) of Sanghavi & Stephens (2015)
     τ *= (FT(1) - (FT(1) - A) * ϖ)
     ϖ *= A / (FT(1) - (FT(1) - A) * ϖ)#Suniti
-
     fscattRayl = τRayl*ϖRayl/τ
     # Adding absorption optical depth / albedo:
     τ_λ = τ_abs .+ τ    
     ϖ_λ = (τ .* ϖ) ./ τ_λ
+
+    #TODO_Suniti
+    # define inelastic SSA of the layer with respect to the total layer optical thickness
     
-    return Array(τ_λ), Array(ϖ_λ), τ, ϖ, Array(Z⁺⁺), Array(Z⁻⁺), fscattRayl
+    return Array(τ_λ), Array(ϖ_λ), τ, ϖ, fscattRay, Array(Z⁺⁺), Array(Z⁻⁺)
 end
 
+#TODO_Suniti
 "When performing RT_run, this function pre-calculates properties for all layers, before any Core RT is performed"
 function construct_all_atm_layers(FT, nSpec, Nz, NquadN, τRayl, τAer, aerosol_optics, Rayl𝐙⁺⁺, Rayl𝐙⁻⁺, Aer𝐙⁺⁺, Aer𝐙⁻⁺, τ_abs, arr_type, qp_μ, μ₀, m)
 
@@ -286,7 +342,6 @@ function construct_all_atm_layers(FT, nSpec, Nz, NquadN, τRayl, τAer, aerosol_
     
     dτ_max_all  = zeros(FT_ext, Nz)
     dτ_all      = zeros(FT_ext, Nz)
-    fscattRayl_all  =  zeros(FT_ext, Nz)
     ndoubl_all  = zeros(Int64, Nz)
     dτ_λ_all    = zeros(FT_ext, nSpec, Nz)
     expk_all    = zeros(FT_ext, nSpec, Nz)
@@ -295,7 +350,7 @@ function construct_all_atm_layers(FT, nSpec, Nz, NquadN, τRayl, τAer, aerosol_
     for iz=1:Nz
         
         # Construct atmospheric properties
-        τ_λ_all[:, iz], ϖ_λ_all[:, iz], τ_all[iz], ϖ_all[iz], Z⁺⁺_all[:,:,iz], Z⁻⁺_all[:,:,iz], fscattRayl_all[iz] = construct_atm_layer(τRayl[iz], τAer[:,iz], aerosol_optics, Rayl𝐙⁺⁺, Rayl𝐙⁻⁺, Aer𝐙⁺⁺, Aer𝐙⁻⁺, τ_abs[:,iz], arr_type)
+        τ_λ_all[:, iz], ϖ_λ_all[:, iz], τ_all[iz], ϖ_all[iz], Z⁺⁺_all[:,:,iz], Z⁻⁺_all[:,:,iz] = construct_atm_layer(τRayl[iz], τAer[:,iz], aerosol_optics, Rayl𝐙⁺⁺, Rayl𝐙⁻⁺, Aer𝐙⁺⁺, Aer𝐙⁻⁺, τ_abs[:,iz], arr_type)
 
         # Compute doubling number
         dτ_max_all[iz] = minimum([τ_all[iz] * ϖ_all[iz], FT(0.001) * minimum(qp_μ)])
@@ -329,7 +384,7 @@ function construct_all_atm_layers(FT, nSpec, Nz, NquadN, τRayl, τAer, aerosol_
         push!(scattering_interfaces_all, scattering_interface)
     end
 
-    return ComputedAtmosphereProperties(τ_λ_all, ϖ_λ_all, τ_all, ϖ_all, Z⁺⁺_all, Z⁻⁺_all, dτ_max_all, dτ_all, ndoubl_all, dτ_λ_all, expk_all, scatter_all, τ_sum_all, fscattRayl_all, scattering_interfaces_all)
+    return ComputedAtmosphereProperties(τ_λ_all, ϖ_λ_all, τ_all, ϖ_all, Z⁺⁺_all, Z⁻⁺_all, dτ_max_all, dτ_all, ndoubl_all, dτ_λ_all, expk_all, scatter_all, τ_sum_all, scattering_interfaces_all)
 end
 
 "Given the CrossSectionModel, the grid, and the AtmosphericProfile, fill up the τ_abs array with the cross section at each layer
@@ -356,6 +411,9 @@ function compute_absorption_profile!(τ_abs::Array{FT,2},
 
         # Either use the current layer's vmr, or use the uniform vmr
         vmr_curr = vmr isa AbstractArray ? vmr[iz] : vmr
+
+
+
 
         # Create absorption model with parameters
         absorption_model = make_hitran_model(hitran_data, 

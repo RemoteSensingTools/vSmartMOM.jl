@@ -34,15 +34,18 @@ import NNlib.batched_mul           # Required to overwrite batched_mul for Duals
 
 import Base.show                   # For overloading show for custom types
 
+using InelasticScattering
+
 # More threads in LA wasn't really helpful, can be turned off here:
 # LinearAlgebra.BLAS.set_num_threads(1)
 
 # Constants and Types
-include("constants.jl")                     # Scientific constants
-include("types.jl")                         # All custom types for this module
+include("constants.jl")                       # Scientific constants
+include("types.jl")                           # All custom types for this module
 
 # Solvers
-include("CoreKernel/elemental.jl")          # Elemental 
+include("CoreKernel/elemental.jl")            # Elemental 
+include("CoreKernel/elemental_inelastic.jl")  # Elemental for inelastic scattering
 include("CoreKernel/doubling.jl")           # Doubling
 include("CoreKernel/interaction.jl")        # Interaction
 include("CoreKernel/rt_kernel.jl")          # Handle Core RT (Elemental/Doubling/Interaction)
@@ -63,6 +66,10 @@ include("show_utils.jl")                    # Pretty-printing objects
 
 # Surfaces
 include("lambertian_surface.jl")            # Lambertian Surface 
+
+# Raman additions
+include("Inelastic/inelastic_helper.jl")
+include("Inelastic/raman_atmo_prop.jl")
 
 # Functions to export
 export parameters_from_yaml,                # Getting parameters from a file

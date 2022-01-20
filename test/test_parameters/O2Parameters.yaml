@@ -4,20 +4,20 @@
 radiative_transfer: 
   # Spectral bands (list of ν_start:ν_step:ν_end, in cm⁻¹)
   spec_bands: 
-    - (1e7/777):0.015:(1e7/757)
+    - (1e7/777):0.05:(1e7/757)
   # Bidirectional Reflectance Distribution Function (BRDF) per band
   surface: 
     - LambertianSurfaceScalar(0.05)
   # Quadrature-scheme for stream calculations
-  quadrature_type:    GaussQuadFullSphere()
+  quadrature_type:    GaussQuadHemisphere()
   # Polarization type (Stokes_I, Stokes_IQ, Stokes_IQU, Stokes_IQUV)
-  polarization_type:  Stokes_I()
+  polarization_type:  Stokes_I() #QU()
   # Maximum m (number of Fourier moments to loop over)
   max_m:              3
   # Exclusion angle for forward peak in fitting procedure (degrees)
   Δ_angle:            2.0
   # Trunction length for legendre terms
-  l_trunc:            20
+  l_trunc:            5
   # Depolarization factor
   depol:              0.0
   # Floating point type for calculations (Float32, Float64)
@@ -58,8 +58,8 @@ atmospheric_profile:
        31.00,  42.07,  56.09,  74.78,  99.69, 131.00,
       176.85, 236.64, 314.58, 418.87, 557.76, 735.00, 
       800.12, 849.00, 912.00, 980.00, 1005.0]
-  # Reduce profile to n layers
-  profile_reduction: -1
+  # Reduce profile to n layers (-1 is default, leave as is)
+  profile_reduction: 5
 
 # =================================================================
 # Absorption-Related Parameters (Optional)
@@ -72,13 +72,12 @@ absorption:
   # or an array of nodal points from TOA to BOA, interpolated in pressure space
   vmr: 
     O2:   0.21
-    H2O:  0.01
   # Broadening function (Doppler/Lorentz/Voigt)
   broadening:         Voigt()
   # Complex error function for Voigt calculations
   CEF:                HumlicekWeidemann32SDErrorFunction()
   # Wing cutoff (cm⁻¹)
-  wing_cutoff:        40
+  wing_cutoff:        20
 
 # =================================================================
 # Scattering-Related Parameters (Optional)
@@ -86,7 +85,7 @@ absorption:
 scattering:
   # List of scattering aerosols and their properties
   aerosols:       
-    - τ_ref:          0.05           # Reference τ
+    - τ_ref:          0.00           # Reference τ
       μ:              1.3           # Log mean radius (µm)
       σ:              2.0           # Log stddev of radius (µm)
       nᵣ:             1.3           # Real part of refractive index
