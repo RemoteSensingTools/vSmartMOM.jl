@@ -8,13 +8,12 @@ the model. The latter should generally be used by users.
 =#
 
 """
-    $(FUNCTIONNAME)(RS_type, pol_type, obs_geom::ObsGeometry, τ_rayl, τ_aer, quad_points::QuadPoints, max_m, aerosol_optics, greek_rayleigh, τ_abs, brdf, architecture::AbstractArchitecture)
+    $(FUNCTIONNAME)(pol_type, obs_geom::ObsGeometry, τ_rayl, τ_aer, quad_points::QuadPoints, max_m, aerosol_optics, greek_rayleigh, τ_abs, brdf, architecture::AbstractArchitecture)
 
 Perform Radiative Transfer calculations using given parameters
 
 """
-function rt_run(RS_type::AbstractRamanType, #Default - no Raman scattering (noRS)
-                pol_type::AbstractPolarizationType,   # Polarization type (IQUV)
+function rt_run(pol_type::AbstractPolarizationType,   # Polarization type (IQUV)
                 obs_geom::ObsGeometry,                # Solar Zenith, Viewing Zenith, Viewing Azimuthal 
                 τ_rayl,                               # Rayleigh optical depth 
                 τ_aer,                                # Aerosol optical depth and single-scattering albedo
@@ -36,7 +35,7 @@ function rt_run(RS_type::AbstractRamanType, #Default - no Raman scattering (noRS
     NquadN = Nquad * pol_type.n         # Nquad (multiplied by Stokes n)
     dims = (NquadN,NquadN)              # nxn dims
     nAer  = length(aerosol_optics)      # Number of aerosols
- 
+
     # Need to check this a bit better in the future!
     FT_dual = length(τ_aer) > 0 ? typeof(τ_aer[1]) : Float64
 
@@ -57,15 +56,13 @@ function rt_run(RS_type::AbstractRamanType, #Default - no Raman scattering (noRS
     @info msg
 
     # Create arrays
-    @timeit "Creating layers" added_layer         = make_added_layer(RS_type,FT_dual, arr_type, dims, nSpec)
-    # Just for now, only use noRS here
-    @timeit "Creating layers" added_layer_surface = make_added_layer(noRS(),FT_dual, arr_type, dims, nSpec)
-    @timeit "Creating layers" composite_layer     = make_composite_layer(RS_type,FT_dual, arr_type, dims, nSpec)
+    # TODO_Suniti: add matrices for Raman scattering
+    @timeit "Creating layers" added_layer         = make_added_layer(FT_dual, arr_type, dims, nSpec)
+    @timeit "Creating layers" added_layer_surface = make_added_layer(FT_dual, arr_type, dims, nSpec)
+    @timeit "Creating layers" composite_layer     = make_composite_layer(FT_dual, arr_type, dims, nSpec)
     @timeit "Creating arrays" Aer𝐙⁺⁺ = arr_type(zeros(FT_dual, (dims[1], dims[2], nAer)))
     @timeit "Creating arrays" Aer𝐙⁻⁺ = similar(Aer𝐙⁺⁺)
     @timeit "Creating arrays" I_static = Diagonal(arr_type(Diagonal{FT}(ones(dims[1]))));
-    #TODO: if RS_type!=noRS, create ϖ_λ₁λ₀, i_λ₁λ₀, fscattRayl, Z⁺⁺_λ₁λ₀, Z⁻⁺_λ₁λ₀ (for input), and ieJ₀⁺, ieJ₀⁻, ieR⁺⁻, ieR⁻⁺, ieT⁻⁻, ieT⁺⁺, ier⁺⁻, ier⁻⁺, iet⁻⁻, iet⁺⁺ (for output)
-    #getRamanSSProp(RS_type, λ, grid_in)
     
     println("Finished initializing arrays")
 
@@ -76,12 +73,16 @@ function rt_run(RS_type::AbstractRamanType, #Default - no Raman scattering (noRS
 
         # Azimuthal weighting
         weight = m == 0 ? FT(0.5) : FT(1.0)
+
         # Compute Z-moments of the Rayleigh phase matrix 
         # For m>=3, Rayleigh matrices will be 0, can catch with if statement if wanted 
         @timeit "Z moments" Rayl𝐙⁺⁺, Rayl𝐙⁻⁺ = Scattering.compute_Z_moments(pol_type, Array(qp_μ), greek_rayleigh, m, arr_type = arr_type);
-        if !(typeof(RS_type) <: vSmartMOM.noRS)
-            @timeit "Z moments" Z⁺⁺_λ₁λ₀, Z⁻⁺_λ₁λ₀ = Scattering.compute_Z_moments(pol_type, Array(qp_μ), RS_type.greek_raman, m, arr_type = arr_type);
-        end
+
+        # TODO_Suniti
+        # Compute Z-moments of the Raman (RRS/RVRS/VRS) phase matrix   
+        # For m>=3, Rayleigh matrices will be 0, can catch with if statement if wanted
+        @timeit "Z moments" Raman𝐙⁺⁺, Raman𝐙⁻⁺ = Scattering.compute_RamanZ_moments(pol_type, Array(qp_μ), greek_raman, m, arr_type = arr_type);
+ 
         # Need to make sure arrays are 0:
         # TBD here
         
@@ -91,31 +92,35 @@ function rt_run(RS_type::AbstractRamanType, #Default - no Raman scattering (noRS
         end
 
         @timeit "Creating arrays" τ_sum_old = arr_type(zeros(FT, nSpec)) # Suniti: declaring τ_sum to be of length nSpec
-
+        # TODO_Suniti   
+        @timeit "Creating arrays" ϖ_Raman = arr_type(zeros(FT, nSpec, nSpecRaman)) # Suniti: declaring ϖ_Raman to denote the SSA of inelastic scattering from nSpecRaman wavelengths to each wavelength of a spectrum of length nSpec (the wavelengths overlap for RRS, and are separate for RVRS/VRS)
+        # TODO_Suniti
         # Loop over all layers and pre-compute all properties before performing core RT
-        @timeit "Computing Layer Properties" computed_atmosphere_properties = construct_all_atm_layers(FT, nSpec, Nz, NquadN, τ_rayl, τ_aer, aerosol_optics, Rayl𝐙⁺⁺, Rayl𝐙⁻⁺, Aer𝐙⁺⁺, Aer𝐙⁻⁺, τ_abs, arr_type, qp_μ, μ₀, m)
+        @timeit "Computing Layer Properties" computed_atmosphere_properties = construct_all_atm_layers(FT, nSpec, Nz, NquadN, τ_rayl, τ_aer, aerosol_optics, Rayl𝐙⁺⁺, Rayl𝐙⁻⁺, Raman𝐙⁺⁺, Raman𝐙⁻⁺, Aer𝐙⁺⁺, Aer𝐙⁻⁺, τ_abs,ϖ_Raman, arr_type, qp_μ, μ₀, m)
 
         # Loop over vertical layers:
         @showprogress 1 "Looping over layers ..." for iz = 1:Nz  # Count from TOA to BOA
 
             # Construct the atmospheric layer
             # From Rayleigh and aerosol τ, ϖ, compute overall layer τ, ϖ
-            # Suniti: modified to return fscattRayl as the last element of  computed_atmosphere_properties
-            # Computing Rayleigh scattering fraction, fscattRayl = τRayl*ϖRayl/τ
+            # TODO_Suniti
             computed_layer_properties = get_layer_properties(computed_atmosphere_properties, iz, arr_type)
 
             # Perform Core RT (doubling/elemental/interaction)
-            rt_kernel!(RS_type, pol_type, SFI, added_layer, composite_layer, computed_layer_properties, m, quad_points, I_static, architecture, qp_μN, iz) 
+            # TODO_Suniti
+            rt_kernel!(pol_type, SFI, added_layer, composite_layer, computed_layer_properties, m, quad_points, I_static, architecture, qp_μN, iz) 
         end 
 
         # Create surface matrices:
+        # TODO_Suniti
         create_surface_layer!(brdf, added_layer, SFI, m, pol_type, quad_points, arr_type(computed_atmosphere_properties.τ_sum_all[:,end]), architecture);
 
         # One last interaction with surface:
-        @timeit "interaction" interaction!(computed_atmosphere_properties.scattering_interfaces_all[end], SFI, composite_layer, added_layer, I_static)
+        #TODO_Suniti
+        @timeit "interaction" interaction_inelastic!(computed_atmosphere_properties.scattering_interfaces_all[end], SFI, composite_layer, added_layer, I_static)
 
         # Postprocess and weight according to vza
-        postprocessing_vza!(RS_type, iμ₀, pol_type, composite_layer, vza, qp_μ, m, vaz, μ₀, weight, nSpec, SFI, R, R_SFI, T, T_SFI)
+        postprocessing_vza!(iμ₀, pol_type, composite_layer, vza, qp_μ, m, vaz, μ₀, weight, nSpec, SFI, R, R_SFI, T, T_SFI)
     end
 
     # Show timing statistics
@@ -144,7 +149,7 @@ function rt_run(model::vSmartMOM_Model; i_band::Integer = -1)
     # User wants a specific band
     if i_band != -1
         return rt_run(model.params.polarization_type,
-                      model.obs_geom,
+                      model.obs_geom::ObsGeometry,
                       model.τ_rayl[i_band], 
                       model.τ_aer[i_band], 
                       model.quad_points,
@@ -159,7 +164,7 @@ function rt_run(model::vSmartMOM_Model; i_band::Integer = -1)
     elseif n_bands == 1
 
         return rt_run(model.params.polarization_type,
-                      model.obs_geom,
+                      model.obs_geom::ObsGeometry,
                       model.τ_rayl[1], 
                       model.τ_aer[1], 
                       model.quad_points,
@@ -182,7 +187,7 @@ function rt_run(model::vSmartMOM_Model; i_band::Integer = -1)
             println("------------------------------")
 
             R = rt_run(model.params.polarization_type,
-                       model.obs_geom,
+                       model.obs_geom::ObsGeometry,
                        model.τ_rayl[i], 
                        model.τ_aer[i], 
                        model.quad_points,

@@ -51,7 +51,7 @@ function elemental!(pol_type, SFI::Bool,
         wct0  = m == 0 ? FT(0.50) * ϖ * dτ     : FT(0.25) * ϖ * dτ
         wct02 = m == 0 ? FT(0.50)              : FT(0.25)
         wct   = m == 0 ? FT(0.50) * ϖ * wt_μN  : FT(0.25) * ϖ * wt_μN
-        wct2  = m == 0 ? wt_μN/2               : wt_μN/4
+        #wct2  = m == 0 ? wt_μN/2               : wt_μN/4
 
         # Get the diagonal matrices first
         d_qp  = Diagonal(1 ./ qp_μN)
@@ -105,17 +105,22 @@ function elemental!(pol_type, SFI::Bool,
     #@pack! added_layer = r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, J₀⁺, J₀⁻   
 end
 
-@kernel function get_elem_rt!(r⁻⁺, t⁺⁺, ϖ_λ, dτ_λ, Z⁻⁺, Z⁺⁺, qp_μN, wct2)
+@kernel function get_elem_rt!(r⁻⁺, t⁺⁺, ϖ_λ, dτ_λ, Z⁻⁺, Z⁺⁺, qp_μN, wct)
     i, j, n = @index(Global, NTuple) 
  
-    if (wct2[j]>1.e-8) 
+    if (wct[j]>1.e-8) 
         # 𝐑⁻⁺(μᵢ, μⱼ) = ϖ ̇𝐙⁻⁺(μᵢ, μⱼ) ̇(μⱼ/(μᵢ+μⱼ)) ̇(1 - exp{-τ ̇(1/μᵢ + 1/μⱼ)}) ̇𝑤ⱼ
-        r⁻⁺[i,j,n] = ϖ_λ[n] * Z⁻⁺[i,j] * (qp_μN[j] / (qp_μN[i] + qp_μN[j])) * (1 - exp(-dτ_λ[n] * ((1 / qp_μN[i]) + (1 / qp_μN[j])))) * (wct2[j]) 
+        r⁻⁺[i,j,n] = 
+            ϖ_λ[n] * Z⁻⁺[i,j] * 
+            (qp_μN[j] / (qp_μN[i] + qp_μN[j])) * wct[j] * 
+            (1 - exp(-dτ_λ[n] * ((1 / qp_μN[i]) + (1 / qp_μN[j])))) 
                     
         if (qp_μN[i] == qp_μN[j])
             # 𝐓⁺⁺(μᵢ, μᵢ) = (exp{-τ/μᵢ} + ϖ ̇𝐙⁺⁺(μᵢ, μᵢ) ̇(τ/μᵢ) ̇exp{-τ/μᵢ}) ̇𝑤ᵢ
             if i == j
-                t⁺⁺[i,j,n] = exp(-dτ_λ[n] / qp_μN[i])*(1 + ϖ_λ[n] * Z⁺⁺[i,i] * (dτ_λ[n] / qp_μN[i]) * wct2[i])
+                t⁺⁺[i,j,n] = 
+                    exp(-dτ_λ[n] / qp_μN[i])*
+                    (1 + ϖ_λ[n] * Z⁺⁺[i,i] * (dτ_λ[n] / qp_μN[i]) * wct[i])
             else
                 t⁺⁺[i,j,n] = 0.0
             end
@@ -123,7 +128,10 @@ end
     
             # 𝐓⁺⁺(μᵢ, μⱼ) = ϖ ̇𝐙⁺⁺(μᵢ, μⱼ) ̇(μⱼ/(μᵢ-μⱼ)) ̇(exp{-τ/μᵢ} - exp{-τ/μⱼ}) ̇𝑤ⱼ
             # (𝑖 ≠ 𝑗)
-            t⁺⁺[i,j,n] = ϖ_λ[n] * Z⁺⁺[i,j] * (qp_μN[j] / (qp_μN[i] - qp_μN[j])) * (exp(-dτ_λ[n] / qp_μN[i]) - exp(-dτ_λ[n] / qp_μN[j])) * wct2[j]
+            t⁺⁺[i,j,n] = 
+                ϖ_λ[n] * Z⁺⁺[i,j] * 
+                (qp_μN[j] / (qp_μN[i] - qp_μN[j])) * wct[j] * 
+                (exp(-dτ_λ[n] / qp_μN[i]) - exp(-dτ_λ[n] / qp_μN[j])) 
         end
     else
         r⁻⁺[i,j,n] = 0.0
