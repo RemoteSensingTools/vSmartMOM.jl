@@ -17,7 +17,7 @@ function elemental!(pol_type, SFI::Bool,
                             ndoubl::Int,                # ndoubl: number of doubling computations needed 
                             scatter::Bool,              # scatter: flag indicating scattering
                             quad_points::QuadPoints{FT2}, # struct with quadrature points, weights, 
-                            added_layer::AddedLayer{FT}, 
+                            added_layer::Union{AddedLayer{FT},AddedLayerRS{FT}}, 
                             I_static,
                             architecture) where {FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2}
 

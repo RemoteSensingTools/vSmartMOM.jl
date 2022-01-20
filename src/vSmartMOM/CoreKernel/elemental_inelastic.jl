@@ -31,7 +31,7 @@ function elemental_inelastic!(RS_type,
                             ndoubl::Int,                # ndoubl: number of doubling computations needed 
                             scatter::Bool,              # scatter: flag indicating scattering
                             quad_points::QuadPoints{FT2}, # struct with quadrature points, weights, 
-                            added_layer::AddedLayer{FT}, 
+                            added_layer::Union{AddedLayer{FT},AddedLayerRS{FT}}, 
                             I_static,
                             architecture) where {FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2}
 
@@ -78,7 +78,10 @@ function elemental_inelastic!(RS_type,
         # Version 2: with absorption in batch mode, low tau_scatt but higher tau_total, needs different equations
         
         kernel! = get_elem_rt!(device)
-
+        @show getKernelDim(RS_type,ier⁻⁺)
+        @show size(qp_μN), size(dτ_λ), size(Z⁻⁺_λ₁λ₀)
+        @unpack ϖ_λ₁λ₀, i_λ₁λ₀, i_ref = RS_type
+        @show size(ϖ_λ₁λ₀), size(i_λ₁λ₀), size(i_ref)
         event = kernel!(RS_type, 
                         ier⁻⁺, iet⁺⁺, 
                         dτ, dτ_λ, 
@@ -95,10 +98,10 @@ function elemental_inelastic!(RS_type,
                             ieJ₀⁺, ieJ₀⁻, 
                             τ_sum, dτ, dτ_λ, 
                             Z⁻⁺_λ₁λ₀, Z⁺⁺_λ₁λ₀, 
-                            qp_μN, wct02, 
+                            qp_μN, ndoubl,wct02, 
                             pol_type.n, 
                             arr_type(pol_type.I₀), 
-                            iμ₀, 
+                            iμ₀, D, 
                             ndrange=getKernelDimSFI(RS_type,ieJ₀⁻));
             wait(device, event)
         end
@@ -107,10 +110,10 @@ function elemental_inelastic!(RS_type,
             synchronize_if_gpu()
 
         # Apply D Matrix
-        apply_D_matrix_elemental!(RS_type, ndoubl, pol_type.n, ier⁻⁺, iet⁺⁺, ier⁺⁻, iet⁻⁻, ndrange=getKernelDim(RS_type,ier⁻⁺))
+        apply_D_matrix_elemental!(RS_type, ndoubl, pol_type.n, ier⁻⁺, iet⁺⁺, ier⁺⁻, iet⁻⁻)
 
         if SFI
-            apply_D_matrix_elemental_SFI!(RS_type, ndoubl, pol_type.n, ieJ₀⁻, getKernelDimSFI(RS_type,ieJ₀⁻))
+            apply_D_matrix_elemental_SFI!(RS_type, ndoubl, pol_type.n, ieJ₀⁻)
         end      
     else 
         # Note: τ is not defined here
@@ -127,17 +130,19 @@ end
                             qp_μN, wct2)
 
     i, j, n₁, Δn = @index(Global, NTuple)
-    @unpack fscattRayl, ϖ_λ₁λ₀, i_λ₁λ₀, i_ref = RS_type 
+    @unpack fscattRayl, ϖ_λ₁λ₀, i_λ₁λ₀, i_ref = RS_type
+    nMax = length(dτ_λ) 
     # n₁ covers the full range of wavelengths, while n₀ = n₁+Δn only includes wavelengths at intervals 
     # that contribute significantly enough to inelastic scattering, so that n₀≪n₁ 
-    n₀  = n₁ + i_RRS[Δn]
-    i_ϖ = i_ref + i_RRS[Δn]  
-    if (wct2[j]>1.e-8) 
+    n₀  = n₁ + i_λ₁λ₀[Δn]
+    i_ϖ = i_ref + i_λ₁λ₀[Δn]
+    #@show   n₀ , i_ϖ 
+    if (wct2[j]>1.e-8) & (1 ≤ n₀ ≤ nMax)
 
         # dτ₀, dτ₁ are the purely scattering (elastic+inelastic) molecular elemental 
         # optical thicknesses at wavelengths λ₀ and λ₁
         # 𝐑⁻⁺(μᵢ, μⱼ) = ϖ ̇𝐙⁻⁺(μᵢ, μⱼ) ̇(μⱼ/(μᵢ+μⱼ)) ̇(1 - exp{-τ ̇(1/μᵢ + 1/μⱼ)}) ̇𝑤ⱼ
-        ier⁻⁺[i,j,n₁,Δn] = fscattRayl * ϖ_λ₁λ₀[i_ϖ] * Z⁻⁺_λ₁λ₀[i,j] * 
+        ier⁻⁺[i,j,n₁,Δn] = fscattRayl * ϖ_λ₁λ₀[Δn] * Z⁻⁺_λ₁λ₀[i,j] * 
             (qp_μN[j] / (qp_μN[i] + qp_μN[j])) * 
             (1 - exp(-((dτ_λ[n₁] / qp_μN[i]) + (dτ_λ[n₀] / qp_μN[j])))) * wct2[j] 
                     
@@ -147,12 +152,12 @@ end
             if i == j       
                 if abs(dτ_λ[n₀]-dτ_λ[n₁])>1.e-6
                     iet⁺⁺[i,j,n₁,Δn] = 
-                        ϖ_λ₁λ₀[i_ϖ] * fscattRayl * dτ * Z⁺⁺_λ₁λ₀[i,i] * wct2[i] *
+                        ϖ_λ₁λ₀[Δn] * fscattRayl * dτ * Z⁺⁺_λ₁λ₀[i,i] * wct2[i] *
                         ((exp(-dτ_λ[n₀] / qp_μN[i]) - exp(-dτ_λ[n₁] / qp_μN[i]))/(dτ_λ[n₁]-dτ_λ[n₀])) 
                         
                 else    
                     iet⁺⁺[i,j,n₁,Δn] = 
-                        ϖ_λ₁λ₀[i_ϖ] * fscattRayl * dτ * Z⁺⁺_λ₁λ₀[i,i] * wct2[i] *
+                        ϖ_λ₁λ₀[Δn] * fscattRayl * dτ * Z⁺⁺_λ₁λ₀[i,i] * wct2[i] *
                         exp(-dτ_λ[n₀] / qp_μN[j])/ qp_μN[j]
                 end
             else
@@ -163,7 +168,7 @@ end
             # 𝐓⁺⁺(μᵢ, μⱼ) = ϖ ̇𝐙⁺⁺(μᵢ, μⱼ) ̇(μⱼ/(μᵢ-μⱼ)) ̇(exp{-τ/μᵢ} - exp{-τ/μⱼ}) ̇𝑤ⱼ
             # (𝑖 ≠ 𝑗)
             iet⁺⁺[i,j,n₁,Δn] = 
-                ϖ_λ₁λ₀[i_ϖ] * fscattRayl * Z⁺⁺_λ₁λ₀[i,j] * 
+                ϖ_λ₁λ₀[Δn] * fscattRayl * Z⁺⁺_λ₁λ₀[i,j] * 
                 (qp_μN[j] / (qp_μN[i] - qp_μN[j])) * wct2[j] * 
                 (exp(-dτ_λ[n₁] / qp_μN[i]) - exp(-dτ_λ[n₀] / qp_μN[j]))
         end
@@ -238,8 +243,8 @@ end
                             ieJ₀⁺, ieJ₀⁻, 
                             τ_sum, dτ₁, dτ_λ, 
                             Z⁻⁺_λ₁λ₀, Z⁺⁺_λ₁λ₀, 
-                            qp_μN, wct02, 
-                            nStokes, I₀, iμ0)
+                            qp_μN, ndoubl,wct02, 
+                            nStokes, I₀, iμ0,D)
     
     i_start  = nStokes*(iμ0-1) + 1 
     i_end    = nStokes*iμ0
@@ -302,58 +307,59 @@ end
     ieJ₀⁺, ieJ₀⁻, 
     τ_sum, dτ, dτ_λ, 
     Z⁻⁺_λ₁λ₀, Z⁺⁺_λ₁λ₀, 
-    qp_μN, 
+    qp_μN, ndoubl,
     wct02, nStokes,
-    I₀, iμ0)
+    I₀, iμ0,D)
 
     @unpack fscattRayl, ϖ_λ₁λ₀, i_λ₁λ₀, i_ref = RS_type 
-
+    
     i_start  = nStokes*(iμ0-1) + 1 
     i_end    = nStokes*iμ0
-
+    nMax = length(dτ_λ)
     i, _, n₁, Δn = @index(Global, NTuple) ##Suniti: What are Global and Ntuple?
     # let n₁ cover the full range of wavelengths, while n₀ only includes wavelengths at intervals 
     # that contribute significantly enough to inelastic scattering, so that n₀≪n₁ 
-    n₀  = n₁ + i_RRS[Δn]
-    i_ϖ = i_ref + i_RRS[Δn]     
+    n₀  = n₁ + i_λ₁λ₀[Δn]
+    i_ϖ = i_ref + i_λ₁λ₀[Δn]     
     FT = eltype(I₀)
-    ieJ₀⁺[i, 1, n₁, n₀]=0
-    ieJ₀⁻[i, 1, n₁, n₀]=    
-    Z⁺⁺_I₀ = FT(0.0);
-    Z⁻⁺_I₀ = FT(0.0);
-    for ii = i_start:i_end
-        Z⁺⁺_I₀ += Z⁺⁺_λ₁λ₀[i,ii] * I₀[ii-i_start+1]
-        Z⁻⁺_I₀ += Z⁻⁺_λ₁λ₀[i,ii] * I₀[ii-i_start+1] 
-    end  
-    if (i>=i_start) && (i<=i_end)
-        #ctr = i-i_start+1
-        # J₀⁺ = 0.25*(1+δ(m,0)) * ϖ(λ) * Z⁺⁺ * I₀ * (dτ(λ)/μ₀) * exp(-dτ(λ)/μ₀)
-        if abs(dτ_λ[n₀]-dτ_λ[n₁])>1.e-6
-            ieJ₀⁺[i, 1, n₁, Δn] = 
-                    ((exp(-dτ_λ[n₀] / qp_μN[i]) - exp(-dτ_λ[n₁] / qp_μN[i]))/(dτ_λ[n₁]-dτ_λ[n₀])) * 
-                    ϖ_λ₁λ₀[i_ϖ] * fscattRayl * dτ * Z⁺⁺_I₀ * wct02
+    if (1 ≤ n₀ ≤ nMax)
+        ieJ₀⁺[i, 1, n₁, Δn]=0
+        ieJ₀⁻[i, 1, n₁, Δn]=0    
+        Z⁺⁺_I₀ = FT(0.0);
+        Z⁻⁺_I₀ = FT(0.0);
+        for ii = i_start:i_end
+            Z⁺⁺_I₀ += Z⁺⁺_λ₁λ₀[i,ii] * I₀[ii-i_start+1]
+            Z⁻⁺_I₀ += Z⁻⁺_λ₁λ₀[i,ii] * I₀[ii-i_start+1] 
+        end  
+        if (i_start ≤ i ≤ i_end)
+            #ctr = i-i_start+1
+            # J₀⁺ = 0.25*(1+δ(m,0)) * ϖ(λ) * Z⁺⁺ * I₀ * (dτ(λ)/μ₀) * exp(-dτ(λ)/μ₀)
+            if abs(dτ_λ[n₀]-dτ_λ[n₁])>1.e-6
+                ieJ₀⁺[i, 1, n₁, Δn] = 
+                        ((exp(-dτ_λ[n₀] / qp_μN[i]) - exp(-dτ_λ[n₁] / qp_μN[i]))/(dτ_λ[n₁]-dτ_λ[n₀])) * 
+                        ϖ_λ₁λ₀[Δn] * fscattRayl * dτ * Z⁺⁺_I₀ * wct02
+            else
+                ieJ₀⁺[i, 1, n₁, Δn] = 
+                        wct02 * ϖ_λ₁λ₀[Δn] * fscattRayl * Z⁺⁺_I₀ * 
+                        (dτ / qp_μN[i_start]) * exp(-dτ_λ[n₀] / qp_μN[i_start])
+            end
         else
+            # J₀⁺ = 0.25*(1+δ(m,0)) * ϖ(λ) * Z⁺⁺ * I₀ * [μ₀ / (μᵢ - μ₀)] * [exp(-dτ(λ)/μᵢ) - exp(-dτ(λ)/μ₀)]
             ieJ₀⁺[i, 1, n₁, Δn] = 
-                    wct02 * ϖ_λ₁λ₀[i_ϖ] * fscattRayl * Z⁺⁺_I₀ * 
-                    (dτ / qp_μN[j]) * exp(-dτ_λ[n₀] / qp_μN[j])
+                    wct02 * ϖ_λ₁λ₀[Δn] * fscattRayl * Z⁺⁺_I₀ * 
+                    (qp_μN[i_start] / (qp_μN[i] - qp_μN[i_start])) * 
+                    (exp(-dτ_λ[n₁] / qp_μN[i]) - exp(-dτ_λ[n₀] / qp_μN[i_start]))
         end
-    else
-        # J₀⁺ = 0.25*(1+δ(m,0)) * ϖ(λ) * Z⁺⁺ * I₀ * [μ₀ / (μᵢ - μ₀)] * [exp(-dτ(λ)/μᵢ) - exp(-dτ(λ)/μ₀)]
-        ieJ₀⁺[i, 1, n₁, Δn] = 
-                wct02 * ϖ_λ₁λ₀[i_ϖ] * fscattRayl * Z⁺⁺_I₀ * 
-                (qp_μN[i_start] / (qp_μN[i] - qp_μN[i_start])) * 
-                (exp(-dτ_λ[n₁] / qp_μN[i]) - exp(-dτ_λ[n₀] / qp_μN[i_start]))
+        #TODO
+        #J₀⁻ = 0.25*(1+δ(m,0)) * ϖ(λ) * Z⁻⁺ * I₀ * [μ₀ / (μᵢ + μ₀)] * [1 - exp{-dτ(λ)(1/μᵢ + 1/μ₀)}]                    
+        ieJ₀⁻[i, 1, n₁, Δn] = wct02 * ϖ_λ₁λ₀[Δn] * fscattRayl * Z⁻⁺_I₀ * 
+                (qp_μN[i_start] / (qp_μN[i] + qp_μN[i_start])) * 
+                (1 - exp(-( (dτ_λ[n₁] / qp_μN[i]) + (dτ_λ[n₀] / qp_μN[i_start]) )))  
+        ieJ₀⁺[i, 1, n₁, Δn] *= exp(-τ_sum[n₀]/qp_μN[i_start]) #correct this to include n₀ap
+        ieJ₀⁻[i, 1, n₁, Δn] *= exp(-τ_sum[n₀]/qp_μN[i_start]) 
     end
-    #TODO
-    #J₀⁻ = 0.25*(1+δ(m,0)) * ϖ(λ) * Z⁻⁺ * I₀ * [μ₀ / (μᵢ + μ₀)] * [1 - exp{-dτ(λ)(1/μᵢ + 1/μ₀)}]                    
-    ieJ₀⁻[i, 1, n₁, Δn] = wct02 * ϖ_λ₁λ₀[i_ϖ] * fscattRayl * Z⁻⁺_I₀ * 
-            (qp_μN[i_start] / (qp_μN[i] + qp_μN[i_start])) * 
-            (1 - exp(-( (dτ_λ[n₁] / qp_μN[i]) + (dτ_λ[n₀] / qp_μN[i_start]) )))  
-    ieJ₀⁺[i, 1, n₁, Δn] *= exp(-τ_sum[n]/qp_μN[i_start])
-    ieJ₀⁻[i, 1, n₁, Δn] *= exp(-τ_sum[n]/qp_μN[i_start]) 
-
     if ndoubl >= 1 #double check to make sure this isnt repeated using apply_D
-        ieJ₀⁻[i, 1, n₁, n₀] = D[i,i] * ieJ₀⁻[i, 1, n₁, n₀] #D = Diagonal{1,1,-1,-1,...Nquad times}
+        ieJ₀⁻[i, 1, n₁, Δn] = D[i,i] * ieJ₀⁻[i, 1, n₁, Δn] #D = Diagonal{1,1,-1,-1,...Nquad times}
     end           
 end
 
@@ -424,44 +430,52 @@ end
     end
 end
 
-#function apply_D_matrix_elemental!(ndoubl::Int, n_stokes::Int, r⁻⁺::CuArray{FT,3}, t⁺⁺::CuArray{FT,3}, r⁺⁻::CuArray{FT,3}, t⁻⁻::CuArray{FT,3}) where {FT}
-#    device = devi(Architectures.GPU())
-#    applyD_kernel! = apply_D_elemental!(device)
-#    event = applyD_kernel!(ndoubl,n_stokes, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻, ndrange=size(r⁻⁺));
-#    wait(device, event);
-#    synchronize_if_gpu();
-#    return nothing
-#end
+function apply_D_matrix_elemental!(RS_type::RRS, ndoubl::Int, n_stokes::Int, 
+                                    ier⁻⁺::CuArray{FT,4}, 
+                                    iet⁺⁺::CuArray{FT,4}, 
+                                    ier⁺⁻::CuArray{FT,4}, 
+                                    iet⁻⁻::CuArray{FT,4}) where {FT}
+    device = devi(Architectures.GPU())
+    applyD_kernel! = apply_D_elemental!(device)
+    event = applyD_kernel!(RS_type, ndoubl,n_stokes, ier⁻⁺, iet⁺⁺, ier⁺⁻, iet⁻⁻, ndrange=size(ier⁻⁺));
+    wait(device, event);
+    synchronize_if_gpu();
+    return nothing
+end
 
-#function apply_D_matrix_elemental!(ndoubl::Int, n_stokes::Int, r⁻⁺::Array{FT,3}, t⁺⁺::Array{FT,3}, r⁺⁻::Array{FT,3}, t⁻⁻::Array{FT,3}) where {FT}
-#    device = devi(Architectures.CPU())
-#    applyD_kernel! = apply_D_elemental!(device)
-#    event = applyD_kernel!(ndoubl,n_stokes, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻, ndrange=size(r⁻⁺));
-#    wait(device, event);
-#    return nothing
-#end
+function apply_D_matrix_elemental!(RS_type::RRS, ndoubl::Int, n_stokes::Int, 
+                                    ier⁻⁺::Array{FT,4}, 
+                                    iet⁺⁺::Array{FT,4}, 
+                                    ier⁺⁻::Array{FT,4}, 
+                                    iet⁻⁻::Array{FT,4}) where {FT}
+    device = devi(Architectures.CPU())
+    applyD_kernel! = apply_D_elemental!(device)
+    event = applyD_kernel!(RS_type, ndoubl,n_stokes, ier⁻⁺, iet⁺⁺, ier⁺⁻, iet⁻⁻, ndrange=size(ier⁻⁺));
+    wait(device, event);
+    return nothing
+end
 
-#function apply_D_matrix_elemental_SFI!(ndoubl::Int, n_stokes::Int, J₀⁻::CuArray{FT,3}) where {FT}
-#    if ndoubl > 1
-#        return nothing
-#    else 
-#        device = devi(Architectures.GPU())
-#        applyD_kernel! = apply_D_elemental_SFI!(device)
-#        event = applyD_kernel!(ndoubl,n_stokes, J₀⁻, ndrange=size(J₀⁻));
-#        wait(device, event);
-#        synchronize();
-#        return nothing
-#    end
-#end
+function apply_D_matrix_elemental_SFI!(RS_type::RRS,ndoubl::Int, n_stokes::Int, J₀⁻::CuArray{FT,4}) where {FT}
+    if ndoubl > 1
+        return nothing
+    else 
+        device = devi(Architectures.GPU())
+        applyD_kernel! = apply_D_elemental_SFI!(device)
+        event = applyD_kernel!(RS_type::RRS,ndoubl,n_stokes, J₀⁻, ndrange=size(J₀⁻));
+        wait(device, event);
+        synchronize();
+        return nothing
+    end
+end
     
-#function apply_D_matrix_elemental_SFI!(ndoubl::Int, n_stokes::Int, J₀⁻::Array{FT,3}) where {FT}
-#    if ndoubl > 1
-#        return nothing
-#    else 
-#        device = devi(Architectures.CPU())
-#        applyD_kernel! = apply_D_elemental_SFI!(device)
-#        event = applyD_kernel!(ndoubl,n_stokes, J₀⁻, ndrange=size(J₀⁻));
-#        wait(device, event);
-#        return nothing
-#    end
-#end
+function apply_D_matrix_elemental_SFI!(RS_type::RRS,ndoubl::Int, n_stokes::Int, J₀⁻::Array{FT,4}) where {FT}
+    if ndoubl > 1
+        return nothing
+    else 
+        device = devi(Architectures.CPU())
+        applyD_kernel! = apply_D_elemental_SFI!(device)
+        event = applyD_kernel!(RS_type::RRS,ndoubl,n_stokes, J₀⁻, ndrange=size(J₀⁻));
+        wait(device, event);
+        return nothing
+    end
+end
