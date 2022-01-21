@@ -110,16 +110,15 @@ function load_interpolation_model(filepath::String)
 end
 
 function make_interpolation_model(
-    # Required
-    absco::AbscoTable,  
-    wave_grid::AbstractRange{<:Real}, 
-    p_grid::AbstractRange{<:Real},
-    t_grid::AbstractRange{<:Real}; 
-    # Optionals
-    wavelength_flag::Bool=false,
-    architecture::AbstractArchitecture=default_architecture     # Computer `Architecture` on which `Model` is run
-  )
-
+        # Required
+        absco::AbscoTable,  
+        wave_grid::AbstractRange{<:Real}, 
+        p_grid::AbstractRange{<:Real},
+        t_grid::AbstractRange{<:Real}; 
+        # Optionals
+        wavelength_flag::Bool=false,
+        architecture::AbstractArchitecture=default_architecture     # Computer `Architecture` on which `Model` is run
+    )
 
     # Convert from wavelength to wavenumber if necessary
     ν_grid = wavelength_flag ? reverse(nm_per_m ./ wave_grid) : wave_grid
@@ -144,7 +143,7 @@ function make_interpolation_model(
         for j in 1:length(t_grid)
             
             t_ref = t_grid[j]
-            # @show p_ref, t_ref
+
             # Cumbersome linear interpolation of non-equidistant grid in ABSCO!
             fractional_index_T_top    = inter_T_top(t_ref)
             fractional_index_T_bottom = inter_T_bottom(t_ref)
@@ -172,16 +171,15 @@ function make_interpolation_model(
 end
 
 function make_interpolation_model_test(
-    # Required
-    absco::AbscoTable,  
-    wave_grid::AbstractRange{<:Real}, 
-    p_grid::AbstractRange{<:Real},
-    t_grid::AbstractRange{<:Real}; 
-    # Optionals
-    wavelength_flag::Bool=false,
-    architecture::AbstractArchitecture=default_architecture     # Computer `Architecture` on which `Model` is run
-  )
-
+        # Required
+        absco::AbscoTable,  
+        wave_grid::AbstractRange{<:Real}, 
+        p_grid::AbstractRange{<:Real},
+        t_grid::AbstractRange{<:Real}; 
+        # Optionals
+        wavelength_flag::Bool=false,
+        architecture::AbstractArchitecture=default_architecture     # Computer `Architecture` on which `Model` is run
+    )
 
     # Convert from wavelength to wavenumber if necessary
     ν_grid = wavelength_flag ? reverse(nm_per_m ./ wave_grid) : wave_grid
