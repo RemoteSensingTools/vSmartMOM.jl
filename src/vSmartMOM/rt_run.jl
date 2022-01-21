@@ -45,7 +45,8 @@ function rt_run(RS_type::AbstractRamanType, #Default - no Raman scattering (noRS
     T = zeros(FT_dual, length(vza), pol_type.n, nSpec)
     R_SFI = zeros(FT_dual, length(vza), pol_type.n, nSpec)
     T_SFI = zeros(FT_dual, length(vza), pol_type.n, nSpec)
-
+    ieR_SFI = zeros(FT_dual, length(vza), pol_type.n, nSpec)
+    ieT_SFI = zeros(FT_dual, length(vza), pol_type.n, nSpec)
     # Notify user of processing parameters
     msg = 
     """
@@ -59,7 +60,7 @@ function rt_run(RS_type::AbstractRamanType, #Default - no Raman scattering (noRS
     # Create arrays
     @timeit "Creating layers" added_layer         = make_added_layer(RS_type,FT_dual, arr_type, dims, nSpec)
     # Just for now, only use noRS here
-    @timeit "Creating layers" added_layer_surface = make_added_layer(noRS(),FT_dual, arr_type, dims, nSpec)
+    @timeit "Creating layers" added_layer_surface = make_added_layer(RS_type,FT_dual, arr_type, dims, nSpec)
     @timeit "Creating layers" composite_layer     = make_composite_layer(RS_type,FT_dual, arr_type, dims, nSpec)
     @timeit "Creating arrays" Aer𝐙⁺⁺ = arr_type(zeros(FT_dual, (dims[1], dims[2], nAer)))
     @timeit "Creating arrays" Aer𝐙⁻⁺ = similar(Aer𝐙⁺⁺)
@@ -80,7 +81,8 @@ function rt_run(RS_type::AbstractRamanType, #Default - no Raman scattering (noRS
         # For m>=3, Rayleigh matrices will be 0, can catch with if statement if wanted 
         @timeit "Z moments" Rayl𝐙⁺⁺, Rayl𝐙⁻⁺ = Scattering.compute_Z_moments(pol_type, Array(qp_μ), greek_rayleigh, m, arr_type = arr_type);
         if !(typeof(RS_type) <: vSmartMOM.noRS)
-            @timeit "Z moments" Z⁺⁺_λ₁λ₀, Z⁻⁺_λ₁λ₀ = Scattering.compute_Z_moments(pol_type, Array(qp_μ), RS_type.greek_raman, m, arr_type = arr_type);
+            @timeit "Z moments" RS_type.Z⁺⁺_λ₁λ₀, RS_type.Z⁻⁺_λ₁λ₀ = Scattering.compute_Z_moments(pol_type, Array(qp_μ), RS_type.greek_raman, m, arr_type = arr_type);
+            @show size(RS_type.Z⁺⁺_λ₁λ₀), size(RS_type.Z⁻⁺_λ₁λ₀)
         end
         # Need to make sure arrays are 0:
         # TBD here
@@ -109,13 +111,13 @@ function rt_run(RS_type::AbstractRamanType, #Default - no Raman scattering (noRS
         end 
 
         # Create surface matrices:
-        create_surface_layer!(brdf, added_layer, SFI, m, pol_type, quad_points, arr_type(computed_atmosphere_properties.τ_sum_all[:,end]), architecture);
+        create_surface_layer!(brdf, added_layer_surface, SFI, m, pol_type, quad_points, arr_type(computed_atmosphere_properties.τ_sum_all[:,end]), architecture);
 
         # One last interaction with surface:
-        @timeit "interaction" interaction!(computed_atmosphere_properties.scattering_interfaces_all[end], SFI, composite_layer, added_layer, I_static)
-
+        #@timeit "interaction" interaction!(computed_atmosphere_properties.scattering_interfaces_all[end], SFI, composite_layer, added_layer_surface, I_static)
+        interaction_inelastic!(RS_type,computed_atmosphere_properties.scattering_interfaces_all[end], SFI, composite_layer, added_layer_surface, I_static)
         # Postprocess and weight according to vza
-        postprocessing_vza!(RS_type, iμ₀, pol_type, composite_layer, vza, qp_μ, m, vaz, μ₀, weight, nSpec, SFI, R, R_SFI, T, T_SFI)
+        postprocessing_vza!(RS_type, iμ₀, pol_type, composite_layer, vza, qp_μ, m, vaz, μ₀, weight, nSpec, SFI, R, R_SFI, T, T_SFI, ieR_SFI, ieT_SFI)
     end
 
     # Show timing statistics
@@ -123,7 +125,7 @@ function rt_run(RS_type::AbstractRamanType, #Default - no Raman scattering (noRS
     reset_timer!()
 
     # Return R_SFI or R, depending on the flag
-    return SFI ? R_SFI : R
+    return SFI ? (R_SFI, ieR_SFI) : R
 end
 
 """

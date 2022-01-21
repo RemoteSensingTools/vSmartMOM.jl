@@ -18,7 +18,7 @@ Computes (in place) surface optical properties for a (scalar) lambertian albedo 
     - `architecture` Compute architecture (GPU,CPU)
 """ 
 function create_surface_layer!(lambertian::LambertianSurfaceScalar{FT}, 
-                               added_layer::AddedLayer,
+                               added_layer::Union{AddedLayer,AddedLayerRS},
                                SFI,
                                m::Int,
                                pol_type,
@@ -77,7 +77,7 @@ function create_surface_layer!(lambertian::LambertianSurfaceScalar{FT},
 end
 
 function create_surface_layer!(lambertian::LambertianSurfaceLegendre{FT}, 
-    added_layer::AddedLayer,
+    added_layer::Union{AddedLayer,AddedLayerRS},
     SFI,
     m::Int,
     pol_type,

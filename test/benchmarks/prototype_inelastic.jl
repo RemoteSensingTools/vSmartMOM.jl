@@ -46,7 +46,7 @@ vSmartMOM.getRamanSSProp!(RS_type, 1e7/ν̃, ν);
 # Add something here, that computes ALL the OP needed for the Raman case.
 #modelRS = ...
 
-R = rt_run(RS_type,
+R,ieR = rt_run(RS_type,
     model.params.polarization_type,
     model.obs_geom,
     model.τ_rayl[1], 
@@ -62,7 +62,7 @@ R = rt_run(RS_type,
 
 #R = vSmartMOM.rt_run(model, i_band=1)
 
-R = rt_run(vSmartMOM.noRS(),
+RnoRS = rt_run(vSmartMOM.noRS(),
             model.params.polarization_type,
             model.obs_geom,
             model.τ_rayl[1], 

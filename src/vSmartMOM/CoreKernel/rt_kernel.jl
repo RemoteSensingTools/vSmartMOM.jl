@@ -56,6 +56,7 @@ function rt_kernel!(RS_type::Union{RRS, VS_0to1, VS_1to0}, pol_type, SFI, added_
                                                 m, ndoubl, scatter, 
                                                 quad_points,  added_layer,  
                                                 I_static, architecture)
+                                                
         @timeit "elemental" elemental!(pol_type, SFI, 
                                     τ_sum, dτ_λ, dτ, 
                                     ϖ_λ, ϖ, 
