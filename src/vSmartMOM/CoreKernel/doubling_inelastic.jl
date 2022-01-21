@@ -66,7 +66,7 @@ function doubling_helper!(RS_type::RRS,
                     n₀  = n₁ + i_λ₁λ₀[Δn]
                     if 1 ≤ n₀ ≤ size(ieJ₁⁺,3)
                         # J⁺₂₀(λ) = J⁺₂₁(λ) + T⁺⁺₂₁(λ)[I - R⁺⁻₀₁(λ)R⁻⁺₂₁(λ)]⁻¹[J⁺₁₀(λ) + R⁺⁻₀₁(λ)J⁻₁₂(λ)] (see Eqs.16 in Raman paper draft)
-                        ieJ₀⁺[:,1,n₁,Δn] = ieJ₁⁺[:,1,n₁,Δn] + 
+                        @inbounds ieJ₀⁺[:,1,n₁,Δn] = ieJ₁⁺[:,1,n₁,Δn] + 
                                 (tt⁺⁺_gp_refl[:,:,n₁] * (ieJ₀⁺[:,1,n₁,Δn] + 
                                 r⁻⁺[:,:,n₁] * ieJ₁⁻[:,1,n₁,Δn] + 
                                 ier⁻⁺[:,:,n₁,Δn] * J₁⁻[:,1,n₀] + 
@@ -77,7 +77,7 @@ function doubling_helper!(RS_type::RRS,
                                 (J₀⁺[:,1,n₀] + r⁻⁺[:,:,n₀] * J₁⁻[:,1,n₀])
 
                         # J⁻₀₂(λ) = J⁻₀₁(λ) + T⁻⁻₀₁(λ)[I - R⁻⁺₂₁(λ)R⁺⁻₀₁(λ)]⁻¹[J⁻₁₂(λ) + R⁻⁺₂₁(λ)J⁺₁₀(λ)] (see Eqs.17 in Raman paper draft)
-                        ieJ₀⁻[:,1,n₁,Δn] = ieJ₀⁻[:,1,n₁,Δn] + 
+                        @inbounds ieJ₀⁻[:,1,n₁,Δn] = ieJ₀⁻[:,1,n₁,Δn] + 
                                 (tt⁺⁺_gp_refl[:,:,n₁] * (ieJ₁⁻[:,1,n₁,Δn] + 
                                 ier⁻⁺[:,:,n₁,Δn] * J₀⁺[:,1,n₀] + 
                                 r⁻⁺[:,:,n₁] * ieJ₀⁺[:,1,n₁,Δn] + 

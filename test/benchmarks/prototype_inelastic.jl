@@ -43,6 +43,13 @@ vSmartMOM.get_greek_raman!(RS_type, n2, o2);
 #RS_type = vSmartMOM.RRS(...)
 # Compute Raman SSA properties:
 vSmartMOM.getRamanSSProp!(RS_type, 1e7/ν̃, ν);
+
+# For now, convert these special cases to the right array type:
+#aType = array_type(model.params.architecture);
+#RS_type.Z⁺⁺_λ₁λ₀ = aType(RS_type.Z⁺⁺_λ₁λ₀);
+#RS_type.ϖ_λ₁λ₀   = aType(RS_type.ϖ_λ₁λ₀);
+#RS_type.i_λ₁λ₀   = aType(RS_type.i_λ₁λ₀)
+#RS_type.Z⁻⁺_λ₁λ₀ = aType(RS_type.Z⁻⁺_λ₁λ₀);
 # Add something here, that computes ALL the OP needed for the Raman case.
 #modelRS = ...
 
