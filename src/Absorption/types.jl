@@ -201,22 +201,12 @@ Base.@kwdef struct InterpolationModel <: AbstractCrossSectionModel
     mol::Int
     "The isotopologue ID number"
     iso::Int
-    "Broadening function (Doppler/Lorentz/Voigt), as a string"
-    #broadening::AbstractBroadeningFunction
     "Wavelength grids"
     ν_grid::AbstractRange{<:Real}
     "Wavelength grids"
     p_grid::AbstractRange{<:Real}
     "Wavelength grids"
     t_grid::AbstractRange{<:Real}
-    "Wing cutoff [cm-1]"
-    #wing_cutoff::Real
-    "VMR of gas itself [0-1]"
-    #vmr::Real
-    "Complex Error Function to Use"
-    #CEF::AbstractComplexErrorFunction
-    "Computer `Architecture` on which `Model` is run"
-    # architecture::AbstractArchitecture     
 
 end
 

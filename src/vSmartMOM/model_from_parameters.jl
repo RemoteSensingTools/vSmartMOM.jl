@@ -1,4 +1,3 @@
-using NCDatasets
 #=
 
 This file contains the `model_from_parameters` function, which computes all derived information
@@ -28,22 +27,21 @@ function model_from_parameters(params::vSmartMOM_Parameters)
     # Get AtmosphericProfile from parameters
     vmr = isnothing(params.absorption_params) ? Dict() : params.absorption_params.vmr
     p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o, new_vmr = compute_atmos_profile_fields(params.T, params.p, params.q, vmr)
-    #@show p_full, p_half
+
     profile = AtmosphericProfile(params.T, p_full, params.q, p_half, vmr_h2o, vcd_dry, vcd_h2o, new_vmr)
     
     # Reduce the profile to the number of target layers (if specified)
     if params.profile_reduction_n != -1
         profile = vSmartMOM.reduce_profile(params.profile_reduction_n, profile);
     end
-    # @show profile.p_full
+
     # Rayleigh optical properties calculation
     greek_rayleigh = Scattering.get_greek_rayleigh(params.depol)
     τ_rayl = [zeros(params.float_type, length(params.T)) for i=1:n_bands];
-
     
     # This is a kludge for now, tau_abs sometimes needs to be a dual. Suniti & us need to rethink this all!!
     # i.e. code the rt core with fixed amount of derivatives as in her paper, then compute chain rule for dtau/dVMr, etc...
-    FT2 = isnothing(params.absorption_params) ? parameters.float_type : eltype(params.absorption_params.vmr["CO2"])
+    FT2 = isnothing(params.absorption_params) ? params.float_type : eltype(params.absorption_params.vmr["CO2"])
     τ_abs     = [zeros(FT2, length(params.spec_bands[i]), length(profile.p_full)) for i in 1:n_bands]
     
     # Loop over all bands:

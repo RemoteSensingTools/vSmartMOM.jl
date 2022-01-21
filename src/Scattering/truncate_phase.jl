@@ -11,7 +11,7 @@ Returns the truncated aerosol optical properties as [`AerosolOptics`](@ref)
 - `mod` a [`δBGE`](@ref) struct that defines the truncation order (new length of greek parameters) and exclusion angle
 - `aero` a [`AerosolOptics`](@ref) set of aerosol optical properties that is to be truncated
 """
-function truncate_phase(mod::δBGE, aero::AerosolOptics{FT}; reportFit=false, err_β=nothing,err_ϵ=nothing,err_γ=nothing) where {FT}
+function truncate_phase(mod::δBGE, aero::AerosolOptics{FT}; reportFit=false) where {FT}
     @unpack greek_coefs, ω̃, k = aero
     @unpack α, β, γ, δ, ϵ, ζ = greek_coefs
     @unpack l_max, Δ_angle =  mod
@@ -60,9 +60,6 @@ function truncate_phase(mod::δBGE, aero::AerosolOptics{FT}; reportFit=false, er
         mod_y = convert.(FT, A * cl)
         mod_γ = convert.(FT, B * γᵗ[3:end])
         mod_ϵ = convert.(FT, B * ϵᵗ[3:end])
-        # push!(err_β, StatsBase.rmsd(W₁₁ * mod_y, W₁₁ * y₁₁; normalize=true))
-        # push!(err_γ, StatsBase.rmsd(W₁₂ * mod_γ, W₁₂ * y₁₂; normalize=true))
-        # push!(err_ϵ, StatsBase.rmsd(W₃₄ * mod_ϵ, W₃₄ * y₃₄; normalize=true))
         @show StatsBase.rmsd(mod_y, y₁₁; normalize=true)
         @show StatsBase.rmsd(mod_γ, y₁₂; normalize=true)
         @show StatsBase.rmsd(mod_ϵ, y₃₄; normalize=true)
@@ -70,7 +67,7 @@ function truncate_phase(mod::δBGE, aero::AerosolOptics{FT}; reportFit=false, er
 
     # Integrate truncated function for later renormalization (here: fraction that IS still scattered):
     c₀ = FT(cl[1]) # ( w_μ' * (P[:,1:l_max] * cl) ) / 2
-    # @show c₀, cl[1]
+    
     # Compute truncated greek coefficients:
     βᵗ = cl / c₀                                    # Eq. 38a, B in δ-BGR (β)
     δᵗ = (δ[1:l_max] .- (β[1:l_max] .- cl)) / c₀    # Eq. 38b, derived from β

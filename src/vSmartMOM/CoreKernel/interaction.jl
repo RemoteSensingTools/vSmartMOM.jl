@@ -80,8 +80,7 @@ function interaction_helper!(::ScatteringInterface_11, SFI,
     
     @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺ = added_layer
     @unpack R⁻⁺, R⁺⁻, T⁺⁺, T⁻⁻, J₀⁺, J₀⁻ = composite_layer
-    #test =  Array(r⁺⁻)
-    #@show ForwardDiff.partials.(test,1)
+    
     # Used to store `(I - R⁺⁻ * r⁻⁺)⁻¹`
     tmp_inv = similar(t⁺⁺)
 

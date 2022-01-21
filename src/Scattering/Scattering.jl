@@ -20,6 +20,7 @@ using ForwardDiff, DiffResults  # Automatic Differentiation tools
 using LinearAlgebra             # For calculations
 using StatsBase                 # Fit statistics for truncation
 using StaticArrays              # 
+# using UnicodePlots              # For plotting aerosol distribution
 
 using ..Architectures: device
 
@@ -28,7 +29,7 @@ include("mie_helper_functions.jl")        # Mie file-related functions
 include("legendre_functions.jl")          # Recursions for associated Legendre Polynomials
 include("truncate_phase.jl")              # Functions for truncation
 include("compute_wigner_values.jl")       # Recursive Wigner 3j calculations
-include("make_mie_model.jl")                   # Convenience functions to create Mie model
+include("make_mie_model.jl")              # Convenience functions to create Mie model
 include("compute_NAI2.jl")                # Compute phase function w/ NAI2
 include("compute_PCW.jl")                 # Compute phase function w/ PCW
 include("phase_function_autodiff.jl")     # Auto-differentiation

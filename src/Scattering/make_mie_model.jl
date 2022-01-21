@@ -42,7 +42,7 @@ end
 Convenience function to take in Wigner matrices and create Mie Model with PCW computation type 
 """
 function make_mie_model(computation_type::PCW, 
-                        aerosol::AbstractAerosolType, 
+                        aerosol::Aerosol, 
                         λ::Real,
                         polarization::AbstractPolarizationType, 
                         truncation_type::AbstractTruncationType, 
