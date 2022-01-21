@@ -14,7 +14,7 @@ function doubling_helper!(pol_type,
                           SFI, 
                           expk, 
                           ndoubl::Int, 
-                          added_layer::AddedLayer,
+                          added_layer::Union{AddedLayer,AddedLayerRS},
                           I_static::AbstractArray{FT}, 
                           architecture) where {FT}
 

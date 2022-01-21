@@ -46,7 +46,7 @@ end
 function postprocessing_vza!(RS_type::Union{RRS, VS_0to1, VS_1to0}, 
         iμ₀, pol_type, composite_layer, 
         vza, qp_μ, m, vaz, μ₀, weight, 
-        nSpec, SFI, R, R_SFI, T, T_SFI)
+        nSpec, SFI, R, R_SFI, T, T_SFI, ieR_SFI, ieT_SFI)
     
     # idx of μ0 = cos(sza)
     st_iμ0, istart0, iend0 = get_indices(iμ₀, pol_type);
@@ -78,7 +78,7 @@ function postprocessing_vza!(RS_type::Union{RRS, VS_0to1, VS_1to0},
             if SFI
                 R_SFI[i,:,s] += bigCS * J₀⁻[istart:iend,1, s];
                 T_SFI[i,:,s] += bigCS * J₀⁺[istart:iend,1, s];
-                for t in eachindex ieJ₀⁺[1,1,1,:]
+                for t =1:size(ieJ₀⁺,4)# in eachindex ieJ₀⁺[1,1,1,:]
                     ieR_SFI[i,:,s] += bigCS * ieJ₀⁻[istart:iend,1, s, t];
                     ieT_SFI[i,:,s] += bigCS * ieJ₀⁺[istart:iend,1, s, t];
                 end

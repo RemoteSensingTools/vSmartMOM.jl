@@ -3,22 +3,6 @@
 This file contains RT doubling-related functions
  
 =#
-function getKernelDim(RS_type::RRS,ier⁻⁺)
-    return size(ier⁻⁺);
-end
-
-function getKernelDim(RS_type::Union{VS_0to1, VS_1to0},ier⁻⁺)
-    return (size(ier⁻⁺,1),size(ier⁻⁺,2), size(RS_type.i_λ₁λ₀));
-end
-
-function getKernelDimSFI(RS_type::RRS,ieJ₀⁻)
-    return size(ieJ₀⁻);
-end
-
-function getKernelDimSFI(RS_type::Union{VS_0to1, VS_1to0},ieJ₀⁻)
-    return (size(ieJ₀⁻,1),size(ieJ₀⁻,2), size(RS_type.i_λ₁λ₀));
-end
-
 
 """
     $(FUNCTIONNAME)(pol_type, SFI, expk, ndoubl::Int, added_layer::AddedLayer, I_static::AbstractArray{FT}, 
@@ -31,7 +15,7 @@ function doubling_helper!(RS_type::RRS,
     SFI, 
     expk, 
     ndoubl::Int, 
-    added_layer::AddedLayer,
+    added_layer::Union{AddedLayer,AddedLayerRS},
     I_static::AbstractArray{FT}, 
     architecture) where {FT}
 
@@ -67,41 +51,42 @@ function doubling_helper!(RS_type::RRS,
         # T⁺⁺(λ)[I - R⁺⁻(λ)R⁻⁺(λ)]⁻¹, for doubling R⁺⁻,R⁻⁺ and T⁺⁺,T⁻⁻ is identical
         batch_inv!(gp_refl, I_static .- r⁻⁺ ⊠ r⁻⁺)
         tt⁺⁺_gp_refl[:] = t⁺⁺ ⊠ gp_refl
-
         if SFI
-
             # J⁺₂₁(λ) = J⁺₁₀(λ).exp(-τ(λ)/μ₀)
             J₁⁺[:,1,:] = J₀⁺[:,1,:] .* expk'
-            ieJ₁⁺[:,1,:] = ieJ₀⁺[:,1,:] .* expk'
+            ieJ₁⁺[:,1,:,:] = ieJ₀⁺[:,1,:,:] .* expk'
 
             # J⁻₁₂(λ)  = J⁻₀₁(λ).exp(-τ(λ)/μ₀)
             J₁⁻[:,1,:] = J₀⁻[:,1,:] .* expk'
-            ieJ₁⁻[:,1,:] = ieJ₀⁻[:,1,:] .* expk'
+            ieJ₁⁻[:,1,:,:] = ieJ₀⁻[:,1,:,:] .* expk'
 
-            for n₁ in eachindex ieJ₁⁺[1,1,:,1]
-                for Δn in eachindex ieJ₁⁺[1,1,1,:]
+            for n₁ = 1:size(ieJ₁⁺,3) # in eachindex ieJ₁⁺[1,1,:,1]
+                for Δn = 1:size(ieJ₁⁺,4) #in eachindex ieJ₁⁺[1,1,1,:]
+
                     n₀  = n₁ + i_λ₁λ₀[Δn]
-                    # J⁺₂₀(λ) = J⁺₂₁(λ) + T⁺⁺₂₁(λ)[I - R⁺⁻₀₁(λ)R⁻⁺₂₁(λ)]⁻¹[J⁺₁₀(λ) + R⁺⁻₀₁(λ)J⁻₁₂(λ)] (see Eqs.16 in Raman paper draft)
-                    ieJ₀⁺[:,1,n₁,Δn] = ieJ₁⁺[:,1,n₁,Δn] + 
-                            (tt⁺⁺_gp_refl[:,:,n₁] * (ieJ₀⁺[:,1,n₁,Δn] + 
-                            r⁻⁺[:,:,n₁] * ieJ₁⁻[:,1,n₁,Δn] + 
-                            ier⁻⁺[:,:,n₁,Δn] * J₁⁻[:,1,n₀] + 
-                            (r⁻⁺[:,:,n₁] * ier⁻⁺[:,:,n₁,Δn] + 
-                            ier⁻⁺[:,:,n₁,Δn] * r⁻⁺[:,:,n₀]) * gp_refl[:,:,n₀] * (J₀⁺[:,1,n₀] + 
-                            r⁻⁺[:,:,n₀] * J₁⁻[:,1,n₀]))) + 
-                            iet⁺⁺[:,:,n₁,Δn] * gp_refl[:,:,n₀] * 
-                            (J₀⁺[:,1,n₀] + r⁻⁺[:,:,n₀] * J₁⁻[:,1,n₀])
+                    if 1 ≤ n₀ ≤ size(ieJ₁⁺,3)
+                        # J⁺₂₀(λ) = J⁺₂₁(λ) + T⁺⁺₂₁(λ)[I - R⁺⁻₀₁(λ)R⁻⁺₂₁(λ)]⁻¹[J⁺₁₀(λ) + R⁺⁻₀₁(λ)J⁻₁₂(λ)] (see Eqs.16 in Raman paper draft)
+                        ieJ₀⁺[:,1,n₁,Δn] = ieJ₁⁺[:,1,n₁,Δn] + 
+                                (tt⁺⁺_gp_refl[:,:,n₁] * (ieJ₀⁺[:,1,n₁,Δn] + 
+                                r⁻⁺[:,:,n₁] * ieJ₁⁻[:,1,n₁,Δn] + 
+                                ier⁻⁺[:,:,n₁,Δn] * J₁⁻[:,1,n₀] + 
+                                (r⁻⁺[:,:,n₁] * ier⁻⁺[:,:,n₁,Δn] + 
+                                ier⁻⁺[:,:,n₁,Δn] * r⁻⁺[:,:,n₀]) * gp_refl[:,:,n₀] * (J₀⁺[:,1,n₀] + 
+                                r⁻⁺[:,:,n₀] * J₁⁻[:,1,n₀]))) + 
+                                iet⁺⁺[:,:,n₁,Δn] * gp_refl[:,:,n₀] * 
+                                (J₀⁺[:,1,n₀] + r⁻⁺[:,:,n₀] * J₁⁻[:,1,n₀])
 
-                    # J⁻₀₂(λ) = J⁻₀₁(λ) + T⁻⁻₀₁(λ)[I - R⁻⁺₂₁(λ)R⁺⁻₀₁(λ)]⁻¹[J⁻₁₂(λ) + R⁻⁺₂₁(λ)J⁺₁₀(λ)] (see Eqs.17 in Raman paper draft)
-                    ieJ₀⁻[:,1,n₁,Δn] = ieJ₀⁻[:,1,n₁,Δn] + 
-                            (tt⁺⁺_gp_refl[:,:,n₁] * (ieJ₁⁻[:,1,n₁,Δn] + 
-                            ier⁻⁺[:,:,n₁,Δn] * J₀⁺[:,1,n₀] + 
-                            r⁻⁺[:,:,n₁] * ieJ₀⁺[:,1,n₁,Δn] + 
-                            (ier⁻⁺[:,:,n₁,Δn] * r⁻⁺[:,:,n₀] + 
-                            r⁻⁺[:,:,n₁] * ier⁻⁺[:,:,n₁,Δn]) * gp_refl[:,:,n₀] * (J₁⁻[:,1,n₀] + 
-                            r⁻⁺[:,:,n₀] * J₀⁺[:,1,n₀]))) +
-                            iet⁻⁻[:,:,n₁,Δn] * gp_refl[:,:,n₀] * (J₁⁻[:,1,n₀] + 
-                            r⁻⁺[:,:,n₀]*J₀⁺[:,1,n₀])
+                        # J⁻₀₂(λ) = J⁻₀₁(λ) + T⁻⁻₀₁(λ)[I - R⁻⁺₂₁(λ)R⁺⁻₀₁(λ)]⁻¹[J⁻₁₂(λ) + R⁻⁺₂₁(λ)J⁺₁₀(λ)] (see Eqs.17 in Raman paper draft)
+                        ieJ₀⁻[:,1,n₁,Δn] = ieJ₀⁻[:,1,n₁,Δn] + 
+                                (tt⁺⁺_gp_refl[:,:,n₁] * (ieJ₁⁻[:,1,n₁,Δn] + 
+                                ier⁻⁺[:,:,n₁,Δn] * J₀⁺[:,1,n₀] + 
+                                r⁻⁺[:,:,n₁] * ieJ₀⁺[:,1,n₁,Δn] + 
+                                (ier⁻⁺[:,:,n₁,Δn] * r⁻⁺[:,:,n₀] + 
+                                r⁻⁺[:,:,n₁] * ier⁻⁺[:,:,n₁,Δn]) * gp_refl[:,:,n₀] * (J₁⁻[:,1,n₀] + 
+                                r⁻⁺[:,:,n₀] * J₀⁺[:,1,n₀]))) +
+                                iet⁻⁻[:,:,n₁,Δn] * gp_refl[:,:,n₀] * (J₁⁻[:,1,n₀] + 
+                                r⁻⁺[:,:,n₀]*J₀⁺[:,1,n₀])
+                    end
                 end
             end 
         
@@ -114,24 +99,26 @@ function doubling_helper!(RS_type::RRS,
             expk[:] = expk.^2
         end  
 
-        for n₁ in eachindex ieJ₁⁺[1,1,:,1]
-            for Δn in eachindex ieJ₁⁺[1,1,1,:]
+        for n₁ = 1:size(ieJ₁⁺,3) #in eachindex ieJ₁⁺[1,1,:,1]
+            for Δn = 1:size(ieJ₁⁺,4) #in eachindex ieJ₁⁺[1,1,1,:]
                 n₀  = n₁ + i_λ₁λ₀[Δn]
                 # (see Eqs.12 in Raman paper draft)
-                iet⁺⁺[:,:,n₁,Δn] = t⁺⁺[:,:,n₁] * gp_refl[:,:,n₁] * 
-                    (iet⁺⁺[:,:,n₁,Δn] + 
-                    (ier⁻⁺[:,:,n₁,Δn] * r⁻⁺[:,:,n₀] + r⁻⁺[:,:,n₁] * ier⁻⁺[:,:,n₁,Δn]) * 
-                    gp_refl[:,:,n₀] * t⁺⁺[:,:,n₀]) + 
-                    iet⁺⁺[:,:,n₁,Δn] * gp_refl[:,:,n₀] * t⁺⁺[:,:,n₀]
+                if 1 ≤ n₀ ≤ size(ieJ₁⁺,3)
+                    iet⁺⁺[:,:,n₁,Δn] = t⁺⁺[:,:,n₁] * gp_refl[:,:,n₁] * 
+                        (iet⁺⁺[:,:,n₁,Δn] + 
+                        (ier⁻⁺[:,:,n₁,Δn] * r⁻⁺[:,:,n₀] + r⁻⁺[:,:,n₁] * ier⁻⁺[:,:,n₁,Δn]) * 
+                        gp_refl[:,:,n₀] * t⁺⁺[:,:,n₀]) + 
+                        iet⁺⁺[:,:,n₁,Δn] * gp_refl[:,:,n₀] * t⁺⁺[:,:,n₀]
 
-                # (see Eqs.14 in Raman paper draft)
-                ier⁻⁺[:,:,n₁,Δn] = ier⁻⁺[:,:,n₁,Δn] + 
-                    t⁺⁺[:,:,n₁] * gp_refl[:,:,n₁] * r⁻⁺[:,:,n₁] * 
-                    (iet⁺⁺[:,:,n₁,Δn] + 
-                    (ier⁻⁺[:,:,n₁,Δn] * r⁻⁺[:,:,n₀] + r⁻⁺[:,:,n₁] * ier⁻⁺[:,:,n₁,Δn]) * 
-                    gp_refl[:,:,n₀] * t⁺⁺[:,:,n₀]) + 
-                    (iet⁺⁺[:,:,n₁,Δn] * gp_refl[:,:,n₀] * r⁻⁺[:,:,n₀] + 
-                    t⁺⁺[:,:,n₁] * gp_refl[:,:,n₁] * ier⁻⁺[:,:,n₁,Δn]) * t⁺⁺[:,:,n₀]
+                    # (see Eqs.14 in Raman paper draft)
+                    ier⁻⁺[:,:,n₁,Δn] = ier⁻⁺[:,:,n₁,Δn] + 
+                        t⁺⁺[:,:,n₁] * gp_refl[:,:,n₁] * r⁻⁺[:,:,n₁] * 
+                        (iet⁺⁺[:,:,n₁,Δn] + 
+                        (ier⁻⁺[:,:,n₁,Δn] * r⁻⁺[:,:,n₀] + r⁻⁺[:,:,n₁] * ier⁻⁺[:,:,n₁,Δn]) * 
+                        gp_refl[:,:,n₀] * t⁺⁺[:,:,n₀]) + 
+                        (iet⁺⁺[:,:,n₁,Δn] * gp_refl[:,:,n₀] * r⁻⁺[:,:,n₀] + 
+                        t⁺⁺[:,:,n₁] * gp_refl[:,:,n₁] * ier⁻⁺[:,:,n₁,Δn]) * t⁺⁺[:,:,n₀]
+                end
             end
         end
         # R⁻⁺₂₀(λ) = R⁻⁺₁₀(λ) + T⁻⁻₀₁(λ)[I - R⁻⁺₂₁(λ)R⁺⁻₀₁(λ)]⁻¹R⁻⁺₂₁(λ)T⁺⁺₁₀(λ) (see Eqs.8 in Raman paper draft)
@@ -231,7 +218,6 @@ function doubling_helper!(RS_type::Union{VS_0to1, VS_1to0},
                         r⁻⁺[:,:,n₀] * J₀⁺[:,1,n₀]))) +
                         iet⁻⁻[:,:,n₁,1] * gp_refl[:,:,n₀] * (J₁⁻[:,1,n₀] + 
                         r⁻⁺[:,:,n₀]*J₀⁺[:,1,n₀])
-                end
             end 
             #end
 
@@ -287,13 +273,12 @@ function doubling_helper!(RS_type::Union{VS_0to1, VS_1to0},
     SFI && apply_D_matrix_SFI_IE!(RS_type, pol_type.n, added_layer.ieJ₀⁻)
     
     return nothing 
-
 end
 
 function doubling_inelastic!(RS_type, 
                     pol_type, SFI, 
                     expk, ndoubl::Int, 
-                    added_layer::AddedLayer,#{FT},
+                    added_layer::Union{AddedLayer,AddedLayerRS},#{FT},
                     I_static::AbstractArray{FT}, 
                     architecture) where {FT}
 
@@ -307,24 +292,24 @@ function doubling_inelastic!(RS_type,
     synchronize_if_gpu()
 end
 
-@kernel function apply_D!(n_stokes::Int,  r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻)
-    iμ, jμ, n = @index(Global, NTuple)
-    i = mod(iμ, n_stokes)
-    j = mod(jμ, n_stokes)
-
-    if (i > 2)
-        r⁻⁺[iμ,jμ,n] = - r⁻⁺[iμ, jμ, n]
-        r⁻⁺[iμ,jμ,n] = - r⁻⁺[iμ, jμ, n]
-    end
-    
-    if ((i <= 2) & (j <= 2)) | ((i > 2) & (j > 2))
-        r⁺⁻[iμ,jμ,n] = r⁻⁺[iμ,jμ,n]
-        t⁻⁻[iμ,jμ,n] = t⁺⁺[iμ,jμ,n]
-    else
-        r⁺⁻[iμ,jμ,n] = - r⁻⁺[iμ,jμ,n]
-        t⁻⁻[iμ,jμ,n] = - t⁺⁺[iμ,jμ,n]
-    end
-end
+#@kernel function apply_D!(n_stokes::Int,  r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻)
+#    iμ, jμ, n = @index(Global, NTuple)
+#    i = mod(iμ, n_stokes)
+#    j = mod(jμ, n_stokes)
+#
+#    if (i > 2)
+#        r⁻⁺[iμ,jμ,n] = - r⁻⁺[iμ, jμ, n]
+#        r⁻⁺[iμ,jμ,n] = - r⁻⁺[iμ, jμ, n]
+#    end
+#    
+#    if ((i <= 2) & (j <= 2)) | ((i > 2) & (j > 2))
+#        r⁺⁻[iμ,jμ,n] = r⁻⁺[iμ,jμ,n]
+#        t⁻⁻[iμ,jμ,n] = t⁺⁺[iμ,jμ,n]
+#    else
+#        r⁺⁻[iμ,jμ,n] = - r⁻⁺[iμ,jμ,n]
+#        t⁻⁻[iμ,jμ,n] = - t⁺⁺[iμ,jμ,n]
+#    end
+#end
 
 @kernel function apply_D_IE!(RS_type::RRS, n_stokes::Int,  
                         ier⁻⁺, iet⁺⁺, ier⁺⁻, iet⁻⁻)
@@ -370,19 +355,19 @@ end
 
 end
 
-@kernel function apply_D_SFI!(n_stokes::Int, J₀⁻)
-    iμ, _, n = @index(Global, NTuple)
-    i = mod(iμ, n_stokes)
-
-    if (i > 2)
-        J₀⁻[iμ, 1, n] = - J₀⁻[iμ, 1, n] 
-    end
-end
+#@kernel function apply_D_SFI!(n_stokes::Int, J₀⁻)
+#    iμ, _, n = @index(Global, NTuple)
+#    i = mod(iμ, n_stokes)
+#
+#    if (i > 2)
+#        J₀⁻[iμ, 1, n] = - J₀⁻[iμ, 1, n] 
+#    end
+#end
 
 @kernel function apply_D_SFI_IE!(RS_type::RRS, n_stokes::Int, ieJ₀⁻)
     iμ, n, Δn = @index(Global, NTuple)
     @unpack i_λ₁λ₀ = RS_type
-    n₀ = n + i_λ₁λ₀[Δn]] 
+    n₀ = n + i_λ₁λ₀[Δn] 
     i = mod(iμ, n_stokes)
 
     if (i > 2)
@@ -394,7 +379,7 @@ end
                                 n_stokes::Int, ieJ₀⁻)
     iμ, _, Δn = @index(Global, NTuple)
     @unpack i_λ₁λ₀ = RS_type
-    n = i_λ₁λ₀[Δn]] 
+    n = i_λ₁λ₀[Δn] 
     i = mod(iμ, n_stokes)
 
     if (i > 2)
@@ -403,24 +388,24 @@ end
 end
 
 #Suniti: is it possible to  use the same kernel for the 3D elastic and 4D inelastic terms or do we need to call two different kernels separately? 
-function apply_D_matrix!(n_stokes::Int, r⁻⁺::CuArray{FT,3}, t⁺⁺::CuArray{FT,3}, r⁺⁻::CuArray{FT,3}, t⁻⁻::CuArray{FT,3}) where {FT}
-    
-    if n_stokes == 1
-        r⁺⁻[:] = r⁻⁺
-        t⁻⁻[:] = t⁺⁺    
-        
-        return nothing
-    else 
-        device = devi(architecture(r⁻⁺))
-        applyD_kernel! = apply_D!(device)
-        event = applyD_kernel!(n_stokes, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻, ndrange=size(r⁻⁺)); #Suniti: is it possible to  use the same kernel for the 3D elastic and 4D inelastic terms or do we need to call two different kernels separately? 
-        wait(device, event);
-        synchronize_if_gpu();
-        return nothing
-    end
-end
+#function apply_D_matrix!(n_stokes::Int, r⁻⁺::CuArray{FT,3}, t⁺⁺::CuArray{FT,3}, r⁺⁻::CuArray{FT,3}, t⁻⁻::CuArray{FT,3}) where {FT}
+#    
+#    if n_stokes == 1
+#        r⁺⁻[:] = r⁻⁺
+#        t⁻⁻[:] = t⁺⁺    
+#        
+#        return nothing
+#    else 
+#        device = devi(architecture(r⁻⁺))
+#        applyD_kernel! = apply_D!(device)
+#        event = applyD_kernel!(n_stokes, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻, ndrange=size(r⁻⁺)); #Suniti: is it possible to  use the same kernel for the 3D elastic and 4D inelastic terms or do we need to call two different kernels separately? 
+#        wait(device, event);
+#        synchronize_if_gpu();
+#        return nothing
+#    end
+#end
 
-function apply_D_matrix_IE!(RS_type, n_stokes::Int, ier⁻⁺::CuArray{FT,4}, iet⁺⁺::CuArray{FT,4}, ier⁺⁻::CuArray{FT,4}, iet⁻⁻::CuArray{FT,4}) where {FT}
+function apply_D_matrix_IE!(RS_type, n_stokes::Int, ier⁻⁺::Array{FT,4}, iet⁺⁺::Array{FT,4}, ier⁺⁻::Array{FT,4}, iet⁻⁻::Array{FT,4}) where {FT}
     if n_stokes == 1
         ier⁺⁻[:] = ier⁻⁺
         iet⁻⁻[:] = iet⁺⁺  
@@ -435,28 +420,56 @@ function apply_D_matrix_IE!(RS_type, n_stokes::Int, ier⁻⁺::CuArray{FT,4}, ie
     end
 end
 
-function apply_D_matrix_SFI!(n_stokes::Int, J₀⁻::CuArray{FT,3}) where {FT}
-
-    n_stokes == 1 && return nothing
-    device = devi(architecture(J₀⁻)) #Suniti: how to do this so that ieJ₀⁻ can also be included?
-    applyD_kernel! = apply_D_SFI!(device)
-    event = applyD_kernel!(n_stokes, J₀⁻, ndrange=size(J₀⁻));
-    wait(device, event);
-    synchronize();
-    
-    return nothing
+function apply_D_matrix_IE!(RS_type, n_stokes::Int, ier⁻⁺::CuArray{FT,4}, iet⁺⁺::CuArray{FT,4}, ier⁺⁻::CuArray{FT,4}, iet⁻⁻::CuArray{FT,4}) where {FT}
+    if n_stokes == 1
+        ier⁺⁻[:] = ier⁻⁺
+        iet⁻⁻[:] = iet⁺⁺  
+        return nothing
+    else 
+        device = devi(Architectures.GPU())
+        applyD_kernel_IE! = apply_D_IE!(device)
+        event = applyD_kernel_IE!(RS_type, n_stokes, 
+            ier⁻⁺, iet⁺⁺, ier⁺⁻, iet⁻⁻, ndrange=getKernelDim(RS_type, ier⁻⁺));
+        wait(device, event);
+        synchronize();
+        return nothing
+    end
 end
+
+#function apply_D_matrix_SFI!(n_stokes::Int, J₀⁻::CuArray{FT,3}) where {FT}
+#
+#    n_stokes == 1 && return nothing
+#    device = devi(architecture(J₀⁻)) #Suniti: how to do this so that ieJ₀⁻ can also be included?
+#    applyD_kernel! = apply_D_SFI!(device)
+#    event = applyD_kernel!(n_stokes, J₀⁻, ndrange=size(J₀⁻));
+#    wait(device, event);
+#    synchronize();
+#    
+#    return nothing
+#end
     
 function apply_D_matrix_SFI_IE!(RS_type, n_stokes::Int, ieJ₀⁻::CuArray{FT,4}) where {FT}
     
     n_stokes == 1 && return nothing
 
-    device = devi(architecture(ieJ₀⁻))
+    device = devi(Architectures.GPU())
     applyD_kernel_IE! = apply_D_SFI_IE!(device)
     event = applyD_kernel_IE!(RS_type, n_stokes, 
                     ieJ₀⁻, ndrange=getKernelDimSFI(RS_type, ieJ₀⁻));
     wait(device, event);
+    synchronize()
+    return nothing
+end
+
+function apply_D_matrix_SFI_IE!(RS_type, n_stokes::Int, ieJ₀⁻::Array{FT,4}) where {FT}
     
+    n_stokes == 1 && return nothing
+
+    device = devi(Architectures.CPU())
+    applyD_kernel_IE! = apply_D_SFI_IE!(device)
+    event = applyD_kernel_IE!(RS_type, n_stokes, 
+                    ieJ₀⁻, ndrange=getKernelDimSFI(RS_type, ieJ₀⁻));
+    wait(device, event);
     return nothing
 end
 

@@ -40,18 +40,20 @@ using InelasticScattering
 # LinearAlgebra.BLAS.set_num_threads(1)
 
 # Constants and Types
-include("constants.jl")                       # Scientific constants
-include("types.jl")                           # All custom types for this module
+include("constants.jl")                        # Scientific constants
+include("types.jl")                            # All custom types for this module
 
 # Solvers
-include("CoreKernel/elemental.jl")            # Elemental 
-include("CoreKernel/elemental_inelastic.jl")  # Elemental for inelastic scattering
-include("CoreKernel/doubling.jl")           # Doubling
-include("CoreKernel/interaction.jl")        # Interaction
-include("CoreKernel/rt_kernel.jl")          # Handle Core RT (Elemental/Doubling/Interaction)
+include("CoreKernel/elemental.jl")             # Elemental 
+include("CoreKernel/elemental_inelastic.jl")   # Elemental for inelastic scattering
+include("CoreKernel/doubling.jl")              # Doubling
+include("CoreKernel/doubling_inelastic.jl")    # Doubling for elastic + inelastic scattering 
+include("CoreKernel/interaction.jl")           # Interaction
+include("CoreKernel/interaction_inelastic.jl") # Interaction for elastic + inelastic scattering 
+include("CoreKernel/rt_kernel.jl")             # Handle Core RT (Elemental/Doubling/Interaction)
 
-include("postprocessing_vza.jl")            # Postprocess (Azimuthal Weighting)
-include("rt_run.jl")                        # Starting point for RT 
+include("postprocessing_vza.jl")               # Postprocess (Azimuthal Weighting)
+include("rt_run.jl")                           # Starting point for RT 
 
 # GPU
 include("gpu_batched.jl")                   # Batched operations
