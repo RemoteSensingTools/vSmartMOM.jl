@@ -23,8 +23,8 @@ radiative_transfer:
   depol:              0.0
   # Floating point type for calculations (Float32, Float64)
   float_type:         Float64
-  # Architecture (default_architecture, GPU(), CPU())
-  architecture:       default_architecture
+  # Architecture (default_architecture, Architectures.GPU(), Architectures.CPU())
+  architecture:       Architectures.CPU() # default_architecture
   
 # =================================================================
 # Simulation Geometry
