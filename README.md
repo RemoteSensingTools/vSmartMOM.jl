@@ -7,7 +7,7 @@
   <br>
 </h1>
 
-<h4 align="center">An end-to-end modular software suite for radiative transfer calculations, written in <a href="https://julialang.org">Julia</a>.</h4>
+<h4 align="center"><bf>vSmartMOM</bf>, vectorized simulated measurements of the atmosphere using radiative transfer based on the Matrix Operator Method. An end-to-end modular software suite for radiative transfer calculations, written in <a href="https://julialang.org">Julia</a>.</h4>
 
 <p align="center">
   <a href="https://github.com/RadiativeTransfer/RadiativeTransfer.jl/actions/workflows/AutomatedTests.yml/">
