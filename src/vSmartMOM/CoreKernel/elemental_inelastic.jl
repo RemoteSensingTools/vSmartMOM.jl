@@ -41,12 +41,10 @@ function elemental_inelastic!(RS_type,
     # Need to check with paper nomenclature. This is basically eqs. 19-20 in vSmartMOM
     
     # Later on, we can have Zs also vary with index, pretty easy here:
-    # Z⁺⁺_ = repeat(Z⁺⁺, 1, 1, 1)
-    Z⁺⁺_ = reshape(Z⁺⁺_λ₁λ₀, (size(Z⁺⁺_λ₁λ₀,1), size(Z⁺⁺_λ₁λ₀,2),1))
-    # Z⁻⁺_ = repeat(Z⁻⁺, 1, 1, 1)
-    Z⁻⁺_ = reshape(Z⁻⁺_λ₁λ₀, (size(Z⁺⁺_λ₁λ₀,1), size(Z⁺⁺_λ₁λ₀,2),1))
+    #Z⁺⁺_ = reshape(Z⁺⁺_λ₁λ₀, (size(Z⁺⁺_λ₁λ₀,1), size(Z⁺⁺_λ₁λ₀,2),1))
+    #Z⁻⁺_ = reshape(Z⁻⁺_λ₁λ₀, (size(Z⁺⁺_λ₁λ₀,1), size(Z⁺⁺_λ₁λ₀,2),1))
 
-    D = Diagonal(arr_type(repeat(pol_type.D, size(qp_μ,1))))
+    D         = Diagonal(arr_type(repeat(pol_type.D, size(qp_μ,1))))
     I₀_NquadN = arr_type(zeros(FT,size(qp_μN,1))); #incident irradiation
     i_start   = pol_type.n*(iμ₀-1) + 1 
     i_end     = pol_type.n*iμ₀
@@ -76,45 +74,19 @@ function elemental_inelastic!(RS_type,
         # Calculate r⁻⁺ and t⁺⁺
         #Version 2: More computationally intensive definition of a single scattering layer with variable (0-∞) absorption
         # Version 2: with absorption in batch mode, low tau_scatt but higher tau_total, needs different equations
+        get_elem_rt!(RS_type, ier⁻⁺, iet⁺⁺, dτ, dτ_λ, Z⁻⁺_λ₁λ₀, Z⁺⁺_λ₁λ₀, qp_μN, wct2)
         
-        kernel! = get_elem_rt!(device)
-        @show getKernelDim(RS_type,ier⁻⁺)
-        @show size(qp_μN), size(dτ_λ), size(Z⁻⁺_λ₁λ₀)
-        @unpack ϖ_λ₁λ₀, i_λ₁λ₀, i_ref = RS_type
-        @show size(ϖ_λ₁λ₀), size(i_λ₁λ₀), size(i_ref)
-        event = kernel!(RS_type, 
-                        ier⁻⁺, iet⁺⁺, 
-                        dτ, dτ_λ, 
-                        Z⁻⁺_λ₁λ₀, Z⁺⁺_λ₁λ₀, 
-                        qp_μN, wct2, 
-                        ndrange=getKernelDim(RS_type,ier⁻⁺)); 
-
-        wait(device, event)
-        synchronize_if_gpu()
-
         if SFI
-            kernel! = get_elem_rt_SFI!(device)
-            event = kernel!(RS_type, 
-                            ieJ₀⁺, ieJ₀⁻, 
-                            τ_sum, dτ, dτ_λ, 
-                            Z⁻⁺_λ₁λ₀, Z⁺⁺_λ₁λ₀, 
-                            qp_μN, ndoubl,wct02, 
-                            pol_type.n, 
-                            arr_type(pol_type.I₀), 
-                            iμ₀, D, 
-                            ndrange=getKernelDimSFI(RS_type,ieJ₀⁻));
-            wait(device, event)
+            get_elem_rt_SFI!(RS_type, ieJ₀⁺, ieJ₀⁻, τ_sum, dτ, dτ_λ, Z⁻⁺_λ₁λ₀, Z⁺⁺_λ₁λ₀, 
+                            qp_μN, ndoubl,wct02, pol_type.n, arr_type(pol_type.I₀), iμ₀, D);
         end
-            #ii = pol_type.n*(iμ0-1)+1
-            #@show 'B',iμ0,  r⁻⁺[1,ii,1]/(J₀⁻[1,1,1]*wt_μ[iμ0]), r⁻⁺[1,ii,1], J₀⁻[1,1,1]*wt_μ[iμ0], J₀⁺[1,1,1]*wt_μ[iμ0]
-            synchronize_if_gpu()
-
         # Apply D Matrix
         apply_D_matrix_elemental!(RS_type, ndoubl, pol_type.n, ier⁻⁺, iet⁺⁺, ier⁺⁻, iet⁻⁻)
-
+        #println("Apply D matrix done")
         if SFI
             apply_D_matrix_elemental_SFI!(RS_type, ndoubl, pol_type.n, ieJ₀⁻)
-        end      
+        end
+        #println("Apply D matrix SFI done")      
     else 
         # Note: τ is not defined here
         iet⁺⁺[:] = Diagonal{exp(-τ ./ qp_μN)}
@@ -122,15 +94,18 @@ function elemental_inelastic!(RS_type,
     end    
     #@pack! added_layer = r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, J₀⁺, J₀⁻   
 end
+
+
 #Suniti: is there a way to pass information like ϖ_λ₁λ₀, i_λ₁λ₀, i_ref, etc. along with RS_type? So that they can be retrieved as RSS.ϖ_λ₁λ₀ for example?
-@kernel function get_elem_rt!(RS_type::RRS, 
+# This one is only for RRS
+@kernel function get_elem_rt_RRS!(fscattRayl, ϖ_λ₁λ₀, i_λ₁λ₀, i_ref,
                             ier⁻⁺, iet⁺⁺, 
                             dτ, dτ_λ, 
                             Z⁻⁺_λ₁λ₀, Z⁺⁺_λ₁λ₀, 
                             qp_μN, wct2)
 
     i, j, n₁, Δn = @index(Global, NTuple)
-    @unpack fscattRayl, ϖ_λ₁λ₀, i_λ₁λ₀, i_ref = RS_type
+    
     nMax = length(dτ_λ) 
     # n₁ covers the full range of wavelengths, while n₀ = n₁+Δn only includes wavelengths at intervals 
     # that contribute significantly enough to inelastic scattering, so that n₀≪n₁ 
@@ -180,6 +155,23 @@ end
             iet⁺⁺[i,j,n₁,Δn] = 0.0
         end
     end
+end
+
+# kernel wrapper:
+function get_elem_rt!(RS_type::RRS, 
+                        ier⁻⁺, iet⁺⁺, 
+                        dτ, dτ_λ, 
+                        Z⁻⁺_λ₁λ₀, Z⁺⁺_λ₁λ₀, 
+                        qp_μN, wct2)
+        @unpack fscattRayl, ϖ_λ₁λ₀, i_λ₁λ₀, i_ref = RS_type
+        device = devi(architecture(ier⁻⁺))
+        aType = array_type(architecture(ier⁻⁺))
+        kernel! = get_elem_rt_RRS!(device)
+        #@show typeof(Z⁻⁺_λ₁λ₀), typeof(Z⁺⁺_λ₁λ₀), typeof(ϖ_λ₁λ₀), typeof(i_λ₁λ₀), typeof(i_ref)
+        event = kernel!(fscattRayl, aType(ϖ_λ₁λ₀), aType(i_λ₁λ₀), i_ref,ier⁻⁺, iet⁺⁺, dτ, dτ_λ, aType(Z⁻⁺_λ₁λ₀), aType(Z⁺⁺_λ₁λ₀), 
+                        qp_μN, wct2, ndrange=getKernelDim(RS_type,ier⁻⁺)); 
+        wait(device, event);
+        synchronize_if_gpu();
 end
 
 @kernel function get_elem_rt!(RS_type::Union{VS_0to1, VS_1to0}, 
@@ -303,7 +295,27 @@ end
 end
 
 #  TODO: Nov 30, 2021
-@kernel function get_elem_rt_SFI!(RS_type::RRS, 
+
+function get_elem_rt_SFI!(RS_type::RRS, 
+                        ieJ₀⁺, ieJ₀⁻, 
+                        τ_sum, dτ, dτ_λ, 
+                        Z⁻⁺_λ₁λ₀, Z⁺⁺_λ₁λ₀, 
+                        qp_μN, ndoubl,
+                        wct02, nStokes,
+                        I₀, iμ0,D)
+    @unpack fscattRayl, ϖ_λ₁λ₀, i_λ₁λ₀, i_ref = RS_type
+    device = devi(architecture(ieJ₀⁺))
+    aType = array_type(architecture(ieJ₀⁺))
+    kernel! = get_elem_rt_SFI_RRS!(device)
+    event = kernel!(fscattRayl, aType(ϖ_λ₁λ₀), aType(i_λ₁λ₀), i_ref, ieJ₀⁺, ieJ₀⁻, τ_sum, dτ, dτ_λ, 
+    aType(Z⁻⁺_λ₁λ₀), aType(Z⁺⁺_λ₁λ₀), qp_μN, ndoubl,wct02, nStokes, I₀, iμ0, D, 
+                            ndrange=getKernelDimSFI(RS_type,ieJ₀⁻));
+    wait(device, event)
+    synchronize_if_gpu();
+end
+
+# only for RRS
+@kernel function get_elem_rt_SFI_RRS!(fscattRayl, ϖ_λ₁λ₀, i_λ₁λ₀, i_ref, 
     ieJ₀⁺, ieJ₀⁻, 
     τ_sum, dτ, dτ_λ, 
     Z⁻⁺_λ₁λ₀, Z⁺⁺_λ₁λ₀, 
@@ -311,7 +323,7 @@ end
     wct02, nStokes,
     I₀, iμ0,D)
 
-    @unpack fscattRayl, ϖ_λ₁λ₀, i_λ₁λ₀, i_ref = RS_type 
+    # 
     
     i_start  = nStokes*(iμ0-1) + 1 
     i_end    = nStokes*iμ0
@@ -363,7 +375,7 @@ end
     end           
 end
 
-@kernel function apply_D_elemental!(RS_type::RRS, ndoubl, pol_n, ier⁻⁺, iet⁺⁺, ier⁺⁻, iet⁻⁻)
+@kernel function apply_D_elemental_RRS!(ndoubl, pol_n, ier⁻⁺, iet⁺⁺, ier⁺⁻, iet⁻⁻)
     i, j, n₁, n₀ = @index(Global, NTuple)
 
     if ndoubl < 1
@@ -430,28 +442,17 @@ end
     end
 end
 
-function apply_D_matrix_elemental!(RS_type::RRS, ndoubl::Int, n_stokes::Int, 
-                                    ier⁻⁺::CuArray{FT,4}, 
-                                    iet⁺⁺::CuArray{FT,4}, 
-                                    ier⁺⁻::CuArray{FT,4}, 
-                                    iet⁻⁻::CuArray{FT,4}) where {FT}
-    device = devi(Architectures.GPU())
-    applyD_kernel! = apply_D_elemental!(device)
-    event = applyD_kernel!(RS_type, ndoubl,n_stokes, ier⁻⁺, iet⁺⁺, ier⁺⁻, iet⁻⁻, ndrange=size(ier⁻⁺));
-    wait(device, event);
-    synchronize_if_gpu();
-    return nothing
-end
 
 function apply_D_matrix_elemental!(RS_type::RRS, ndoubl::Int, n_stokes::Int, 
-                                    ier⁻⁺::Array{FT,4}, 
-                                    iet⁺⁺::Array{FT,4}, 
-                                    ier⁺⁻::Array{FT,4}, 
-                                    iet⁻⁻::Array{FT,4}) where {FT}
-    device = devi(Architectures.CPU())
-    applyD_kernel! = apply_D_elemental!(device)
-    event = applyD_kernel!(RS_type, ndoubl,n_stokes, ier⁻⁺, iet⁺⁺, ier⁺⁻, iet⁻⁻, ndrange=size(ier⁻⁺));
+                                    ier⁻⁺::AbstractArray{FT,4}, 
+                                    iet⁺⁺::AbstractArray{FT,4}, 
+                                    ier⁺⁻::AbstractArray{FT,4}, 
+                                    iet⁻⁻::AbstractArray{FT,4}) where {FT}
+    device = devi(architecture(ier⁻⁺))
+    applyD_kernel! = apply_D_elemental_RRS!(device)
+    event = applyD_kernel!(ndoubl,n_stokes, ier⁻⁺, iet⁺⁺, ier⁺⁻, iet⁻⁻, ndrange=size(ier⁻⁺));
     wait(device, event);
+    synchronize_if_gpu();
     return nothing
 end
 
