@@ -421,6 +421,8 @@ Base.@kwdef struct ComputedAtmosphereProperties
     scatter_all
     "Sum of optical thicknesses of all layers above the current layer"
     τ_sum_all
+    "elastic (Cabannes) scattering fraction of Rayleigh (Cabannes+Raman) scattering per layer"
+    ϖ_Cabannes_all
     "Rayleigh fraction of scattering cross section per layer"
     fscattRayl_all
     "Scattering interface type for each layer"
@@ -473,6 +475,7 @@ Base.@kwdef mutable struct RRS{FT<:AbstractFloat} <: AbstractRamanType
     "Pre-computed optical properties"
     # ramanAtmoProp::RamanAtmosphereProperties
     fscattRayl::FT
+    ϖ_Cabannes::FT #elastic fraction (Cabannes) of Rayleigh (Cabannes+Raman) scattering
     ϖ_λ₁λ₀::Array{FT,1}
     i_λ₁λ₀::Array{Int,1}
     Z⁻⁺_λ₁λ₀::Array{FT,2}
@@ -497,6 +500,7 @@ Base.@kwdef struct VS_0to1{FT<:AbstractFloat} <: AbstractRamanType
     "Pre-computed optical properties"
     #ramanAtmoProp::RamanAtmosphereProperties
     fscattRayl::FT
+    ϖ_Cabannes::FT #elastic fraction (Cabannes) of Rayleigh (Cabannes+Raman) scattering
     ϖ_λ₁λ₀::Array{FT,1}
     i_λ₁λ₀::Array{Int,1}
     Z⁻⁺_λ₁λ₀::Array{FT,2}
@@ -522,6 +526,7 @@ Base.@kwdef struct VS_1to0{FT<:AbstractFloat} <: AbstractRamanType
     greek_raman::GreekCoefs
     "Pre-computed optical properties"
     fscattRayl::FT
+    ϖ_Cabannes::FT #elastic fraction (Cabannes) of Rayleigh (Cabannes+Raman) scattering
     ϖ_λ₁λ₀::Array{FT,1}
     i_λ₁λ₀::Array{Int,1}
     Z⁻⁺_λ₁λ₀::Array{FT,2}
@@ -547,6 +552,7 @@ Base.@kwdef struct RVRS{FT<:AbstractFloat} <: AbstractRamanType
     "Pre-computed optical properties"
     #ramanAtmoProp::RamanAtmosphereProperties
     fscattRayl::FT
+    ϖ_Cabannes::FT #elastic fraction (Cabannes) of Rayleigh (Cabannes+Raman) scattering
     ϖ_λ₁λ₀::Array{FT,1}
     i_λ₁λ₀::Array{Int,1}
     Z⁻⁺_λ₁λ₀::Array{FT,2}
@@ -556,6 +562,7 @@ Base.@kwdef struct RVRS{FT<:AbstractFloat} <: AbstractRamanType
 end
 
 struct noRS <: AbstractRamanType
+    #ϖ_Cabannes::FT == 1 #elastic fraction (Cabannes) of Rayleigh (Cabannes+Raman) scattering
 end
 
 """
@@ -596,6 +603,8 @@ Base.@kwdef struct ComputedLayerProperties
     τ_sum
     "Fraction of scattering caused by Rayleigh"
     fscattRayl
+    "Elastic fraction (Cabannes) of Rayleigh (Cabannes+Raman) scattering"
+    ϖ_Cabannes 
     "Scattering interface type for current layer"
     scattering_interface
 end
