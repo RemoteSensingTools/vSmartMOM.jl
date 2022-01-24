@@ -62,7 +62,7 @@ R,ieR = rt_run(RS_type,
 
 #R = vSmartMOM.rt_run(model, i_band=1)
 
-RnoRS = rt_run(vSmartMOM.noRS(),
+RnoRS, _ = rt_run(vSmartMOM.noRS(),
             model.params.polarization_type,
             model.obs_geom,
             model.τ_rayl[1], 
