@@ -11,10 +11,10 @@ authors:
     affiliation: 1
   - name: Suniti Sanghavi 
     orcid: 0000-0003-0754-9154
-    affiliation: "1, 2"
+    affiliation: 2
   - name: Christian Frankenberg
     orcid: 0000-0002-0546-5857
-    affiliation: 1
+    affiliation: "1, 2"
 affiliations:
  - name: California Institute of Technology 
    index: 1
@@ -26,11 +26,13 @@ bibliography: paper.bib
 
 # Summary
 
-Remote sensing researchers use satellite data and radiative transfer modeling to study Earth's atmospheric and surface properties. The field plays a key role in how scientists understand many aspects of our rapidly changing planet – from climate change and pollution to the carbon and water cycles.
+Remote sensing researchers use radiative transfer modeling to interpret satellite data for studying Earth's atmospheric and surface properties. The field plays a key role in how scientists understand many aspects of our rapidly changing planet – from climate change and pollution to the carbon and water cycles.
 
-**RadiativeTransfer.jl** is a [Julia](https://julialang.org) package that enables the fast computation of full-polarized simulations and atmospheric optical properties, based on the Matrix Operator Method [@Sanghavi:2013a]. Users can fully customize simulation parameters and atmospheric properties, including aerosol distributions, surface reflectance, and quadrature schemes. Independent submodules can also be imported individually; for example, **Absorption.jl** can be used for computing absorption cross-sections and **Scattering.jl** for computing scattering phase-functions. 
 
-The Julia language provides many exciting opportunities to modernize radiative transfer software. Using the ForwardDiff.jl package [@Revels:2016], direct Jacobians can be calculated alongside computations using automatic differentiation, allowing for an elegant and straightforward parameter-fitting interface. Julia's multiple dispatch paradigm enables the software architecture to be clean, flexible and reusable. Additionally, optimized techniques have been implemented to speed up the package’s performance on both CPU and GPU by orders-of-magnitude compared to existing radiative transfer codes. 
+
+**RadiativeTransfer.jl** is a [Julia](https://julialang.org) package that enables the fast computation of atmospheric optical properties and fully-polarized multiple-scattering radiance simulations, based on the Matrix Operator Method [@Sanghavi:2013a]. Users can fully customize simulation parameters and atmospheric properties, including trace-gas profiles, aerosol distributions, surface reflectance, and quadrature schemes. Independent submodules can also be imported individually; for example, **Absorption.jl** can be used for computing gaseous absorption and **Scattering.jl** for computing scattering phase-functions. 
+
+The Julia language provides many exciting opportunities to modernize radiative transfer software. Using the ForwardDiff.jl package [@Revels:2016], Jacobians can be calculated alongside computations using automatic differentiation, allowing for elegant and straightforward parameter-fitting. Julia's multiple dispatch paradigm enables the software architecture to be clean, flexible and reusable. Additionally, optimized techniques have been implemented to speed up the package’s performance on both CPU and GPU by orders-of-magnitude compared to existing radiative transfer codes. 
 
 **RadiativeTransfer.jl** has already been used in research projects, ranging from methane-plume simulation to atmospheric profile fitting. It has also been used in graduate-level remote sensing coursework. Ultimately, **RadiativeTransfer.jl** aims to accelerate the pace of atmospheric research through efficient software while lowering the barrier-of-entry for researchers and students in remote sensing. 
 
@@ -50,16 +52,16 @@ The package has a modular architecture, allowing users to import just the specif
 
 - Enables 1D vectorized plane-parallel RT modeling based on the Matrix Operator Method [@Sanghavi:2013a]
 - Incorporates fast, high fidelity simulations of scattering atmospheres containing haze and clouds, including pressure- and temperature-resolved absorption profiles of gaseous species in the atmosphere
-- Enables GPU-accelerated computations of the resulting hyperspectral reflectances/transmittances
+- Enables GPU-accelerated computations of the resulting hyperspectral multiple-scattering radiative transfer simulations
 - Enables auto-differentiation of the output spectrum with respect to various input parameters, allowing for spectral fitting routines to estimate atmospheric parameters
 
 ![Sample absorption spectrum of CO2 with 0.01 step size resolution, calculated using Absorption.jl](joss_2.png)
 
-**Absorption.jl** enables absorption cross-section calculations of atmospheric gases at different pressures, temperatures, wavelengths, and broadeners (Doppler, Lorentzian, Voigt). It uses the HITRAN [@Gordon:2017] energy transition database for calculations. While it enables lineshape calculations from scratch, the module also allows users to create and save an interpolator object at specified wavelength, pressure, and temperature grids. The module also supports auto-differentiation of the profile, with respect to pressure and temperature. Calculations can be computed either on CPU or GPU (CUDA).
+**Absorption.jl** enables absorption cross-section calculations of atmospheric gases at different pressures, temperatures, and wavelengths. It uses the HITRAN [@Gordon:2017] database for calculations. While it enables lineshape calculations from scratch, the module also allows users to create and save an interpolator object at specified wavelength, pressure, and temperature grids. The module also supports auto-differentiation of the profile, with respect to pressure and temperature. Calculations can be computed either on CPU or GPU (CUDA).
 
 ![Sample scattering phase functions of aerosols (I and the I -> Q transition), calculated using Scattering.jl ($\mu$ = 0.3 , $\sigma$ = 2.0, $n_r$ = 1.3, $n_i$ = 0.0, $\lambda$ = 0.40 $\mu$m)](joss_3.png)
 
-**Scattering.jl** is used for calculating Mie scattering phase-functions for aerosols with specified size distributions and refractive indices. This module enables scattering phase-function calculation of atmospheric aerosols with different size distributions, incident wavelengths, and refractive indices. It can perform the calculation using either the Siewert NAI-2 or Domke PCW methods [@Sanghavi:2013b]. The module also supports auto-differentiation of the phase function, with respect to the aerosol's size distribution parameters and its refractive index. 
+**Scattering.jl** is used for calculating Mie scattering phase-functions for aerosols with specified size distributions and refractive indices. This module enables scattering phase-function calculation of atmospheric aerosols with different size distributions, incident wavelengths, and refractive indices. It can perform the calculation using either the Siewert NAI-2 [@Siewert:1982] or Domke PCW [@Domke:1975] methods with recent corrections [@Sanghavi:2013b]. State-of-the-art methods like $\delta$-truncation [@Hu:2000] and $\delta$-BGE truncation [@Sanghavi:2015] are used for scalar and vector radiative transfer computations, respectively. The module also supports auto-differentiation of the phase function, with respect to the aerosol's size distribution parameters and its complex refractive index. 
 
 # Benchmarks
 
