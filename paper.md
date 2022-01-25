@@ -65,7 +65,25 @@ The package has a modular architecture, allowing users to import just the specif
 
 # Benchmarks
 
-Standard reference tables from the literature [@Natraj:2009] are used to validate **RadiativeTransfer.jl** simulation output. In the tables below, **bold** numbers are RadiativeTransfer.jl output values and non-bold numbers are the published values. 
+Standard reference tables from the literature [@Natraj:2009] are used to validate **RadiativeTransfer.jl** simulation output. The data is available in **Appendix 1**, in **Tables 1-3**. The key result is that simulated reflectance output from RadiativeTransfer.jl closely matches published standard values, in every case within 0.0005 of the published value. 
+
+Runtime duration for a given simulation is also compared between using CPU and GPU architectures. (CPU architecture is single-threaded, AMD EPYC 7H12 64-Core Processor; GPU is parallel on an NVIDIA A100 Tensor Core (40Gb))
+
+![Runtime comparison between CPU and GPU for sample radiative transfer simulation with varying number of spectral points](agu_4.png)
+
+A nearly 100x speedup is observed when using the GPU architecture on the same simulation. 
+
+Hardware acceleration, in addition to algorithmic efficiencies and performance optimizations in **RadiativeTransfer.jl** suggest that this package can greatly accelerate the pace of remote sensing research. 
+
+# Acknowledgements
+
+We thank Frankenberg lab members for their enthusiastic support and guidance throughout this project. We also acknowledge support from Caltech’s Schmidt Academy for Software Engineering.
+
+<div style="page-break-after: always;"></div>
+
+# Appendix 
+
+In the tables below, **bold** numbers are RadiativeTransfer.jl output values and non-bold numbers are the published values from the literature [@Natraj:2009]. 
 
 | $\mu$ | $\phi$ = 0°            | $\phi$ = 30°           | $\phi$ = 60°           | $\phi$ = 90°           | $\phi$ = 120°          | $\phi$ = 150°          | $\phi$ = 180°          |
 | :---  | :---                   | :---                   | :---                   | :---                   | :---                   | :---                   | :---                   |
@@ -126,17 +144,5 @@ Standard reference tables from the literature [@Natraj:2009] are used to validat
 | 0.98  | **0.0** <br> 0.0 | **0.0340** <br> 0.0341 | **0.0353** <br> 0.0354 | **0.0034** <br> 0.0034 | **-0.0294** <br> -0.0295 | **-0.0306** <br> -0.0307 | **0.0** <br> 0.0 |
 | 1.00  | **0.0** <br> 0.0 | **0.0324** <br> 0.0325 | **0.0324** <br> 0.0325 | **0.0**    <br> 0.0    | **-0.0324** <br> -0.0325 | **-0.0324** <br> -0.0325 | **0.0** <br> 0.0 |
 : U (Upwelling at TOA) for $\tau$ = 0.5, $\mu_0$ = 0.2, and A = 0.0
-
-As seen in **Tables 1-3**, simulated reflectance output from RadiativeTransfer.jl closely matches published standard values, in every case within 0.0005 of the published value. 
-
-Runtime duration for a given simulation is also compared between using CPU and GPU architectures. (CPU architecture is single-threaded, AMD EPYC 7H12 64-Core Processor; GPU is parallel on an NVIDIA A100 Tensor Core (40Gb))
-
-![Runtime comparison between CPU and GPU for sample radiative transfer simulation with varying number of spectral points](agu_4.png)
-
-A nearly 100x speedup is observed when using the GPU architecture on the same simulation, suggesting that RadiativeTransfer.jl has the potential to greatly accelerate the pace of scientific discovery in the remote sensing field. 
-
-# Acknowledgements
-
-We thank Frankenberg lab members for their enthusiastic support and guidance throughout this project. We also acknowledge support from Caltech’s Schmidt Academy for Software Engineering.
 
 # References
