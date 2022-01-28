@@ -13,9 +13,9 @@ function rt_kernel!(RS_type::noRS, pol_type, SFI, added_layer, composite_layer, 
     if scatter
         
         @timeit "elemental" elemental!(pol_type, SFI, τ_sum, dτ_λ, dτ, ϖ_λ, ϖ, Z⁺⁺, Z⁻⁺, m, ndoubl, scatter, quad_points,  added_layer,  I_static, architecture)
-        println("Elemental done...")
+        #println("Elemental done...")
         @timeit "doubling"   doubling!(pol_type, SFI, expk, ndoubl, added_layer, I_static, architecture)
-        println("Doubling done...")
+        #println("Doubling done...")
     else # This might not work yet on GPU!
         # If not, there is no reflectance. Assign r/t appropriately
         added_layer.r⁻⁺[:] .= 0;
@@ -52,7 +52,7 @@ function rt_kernel!(RS_type::Union{RRS, VS_0to1, VS_1to0}, pol_type, SFI, added_
     @unpack Z⁺⁺_λ₁λ₀, Z⁻⁺_λ₁λ₀ = RS_type
     # If there is scattering, perform the elemental and doubling steps
     if scatter
-        @show τ, ϖ, RS_type.fscattRayl
+        #@show τ, ϖ, RS_type.fscattRayl
         @timeit "elemental_inelastic" elemental_inelastic!(RS_type, 
                                                 pol_type, SFI, 
                                                 τ_sum, dτ_λ, ϖ_λ, 
@@ -60,7 +60,7 @@ function rt_kernel!(RS_type::Union{RRS, VS_0to1, VS_1to0}, pol_type, SFI, added_
                                                 m, ndoubl, scatter, 
                                                 quad_points,  added_layer,  
                                                 I_static, architecture)
-        println("Elemental inelastic done...")                                        
+        #println("Elemental inelastic done...")                                        
         @timeit "elemental" elemental!(pol_type, SFI, 
                                     τ_sum, dτ_λ, dτ, 
                                     ϖ_λ, ϖ, 
@@ -68,9 +68,9 @@ function rt_kernel!(RS_type::Union{RRS, VS_0to1, VS_1to0}, pol_type, SFI, added_
                                     m, ndoubl, scatter, 
                                     quad_points,  added_layer,  
                                     I_static, architecture)
-        println("Elemental  done...")
+        #println("Elemental  done...")
         @timeit "doubling_inelastic" doubling_inelastic!(RS_type, pol_type, SFI, expk, ndoubl, added_layer, I_static, architecture)
-        println("Doubling done...")
+        #println("Doubling done...")
         #@timeit "doubling"   doubling!(pol_type, SFI, expk, ndoubl, added_layer, I_static, architecture)
     else # This might not work yet on GPU!
         # If not, there is no reflectance. Assign r/t appropriately

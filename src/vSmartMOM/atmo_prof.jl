@@ -319,7 +319,7 @@ function construct_all_atm_layers(
             aerosol_optics, 
             Rayl𝐙⁺⁺, Rayl𝐙⁻⁺, Aer𝐙⁺⁺, Aer𝐙⁻⁺, 
             τ_abs[:,iz], arr_type)
-
+        @show fscattRayl_all[iz]
         # Compute doubling number
         dτ_max_all[iz] = minimum([τ_all[iz] * ϖ_all[iz], FT(0.001) * minimum(qp_μ)])
         dτ_all[iz], ndoubl_all[iz] = doubling_number(dτ_max_all[iz], τ_all[iz] * ϖ_all[iz]) #Suniti
