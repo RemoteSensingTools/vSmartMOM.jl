@@ -11,6 +11,7 @@ function rt_kernel!(RS_type::noRS, pol_type, SFI, added_layer, composite_layer, 
 
     # If there is scattering, perform the elemental and doubling steps
     if scatter
+        
         @timeit "elemental" elemental!(pol_type, SFI, τ_sum, dτ_λ, dτ, ϖ_λ, ϖ, Z⁺⁺, Z⁻⁺, m, ndoubl, scatter, quad_points,  added_layer,  I_static, architecture)
         println("Elemental done...")
         @timeit "doubling"   doubling!(pol_type, SFI, expk, ndoubl, added_layer, I_static, architecture)
@@ -38,7 +39,7 @@ function rt_kernel!(RS_type::noRS, pol_type, SFI, added_layer, composite_layer, 
     
     # If this is not the TOA, perform the interaction step
     else
-        @timeit "interaction" interaction!(scattering_interface, SFI, composite_layer, added_layer, I_static)
+        @timeit "interaction" interaction!(RS_type, scattering_interface, SFI, composite_layer, added_layer, I_static)
     end
 end
 
@@ -51,9 +52,10 @@ function rt_kernel!(RS_type::Union{RRS, VS_0to1, VS_1to0}, pol_type, SFI, added_
     @unpack Z⁺⁺_λ₁λ₀, Z⁻⁺_λ₁λ₀ = RS_type
     # If there is scattering, perform the elemental and doubling steps
     if scatter
+        @show τ, ϖ, RS_type.fscattRayl
         @timeit "elemental_inelastic" elemental_inelastic!(RS_type, 
                                                 pol_type, SFI, 
-                                                τ_sum, dτ_λ, dτ, 
+                                                τ_sum, dτ_λ, ϖ_λ, 
                                                 Z⁺⁺_λ₁λ₀, Z⁻⁺_λ₁λ₀, 
                                                 m, ndoubl, scatter, 
                                                 quad_points,  added_layer,  
@@ -102,6 +104,6 @@ function rt_kernel!(RS_type::Union{RRS, VS_0to1, VS_1to0}, pol_type, SFI, added_
     
     # If this is not the TOA, perform the interaction step
     else
-        @timeit "interaction" interaction_inelastic!(RS_type, scattering_interface, SFI, composite_layer, added_layer, I_static)
+        @timeit "interaction" interaction!(RS_type, scattering_interface, SFI, composite_layer, added_layer, I_static)
     end
 end

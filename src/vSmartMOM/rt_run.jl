@@ -28,6 +28,7 @@ function rt_run(RS_type::AbstractRamanType, #Default - no Raman scattering (noRS
 
     @unpack obs_alt, sza, vza, vaz = obs_geom   # Observational geometry properties
     @unpack qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart, μ₀, iμ₀, Nquad = quad_points # All quadrature points
+    @unpack ϖ_Cabannes = RS_type
     FT = eltype(sza)                    # Get the float-type to use
     Nz = length(τ_rayl)                 # Number of vertical slices
     nSpec = size(τ_abs, 1)              # Number of spectral points
@@ -93,9 +94,14 @@ function rt_run(RS_type::AbstractRamanType, #Default - no Raman scattering (noRS
         end
 
         @timeit "Creating arrays" τ_sum_old = arr_type(zeros(FT, nSpec)) # Suniti: declaring τ_sum to be of length nSpec
-
+        @show RS_type.ϖ_Cabannes, ϖ_Cabannes
         # Loop over all layers and pre-compute all properties before performing core RT
-        @timeit "Computing Layer Properties" computed_atmosphere_properties = construct_all_atm_layers(FT, nSpec, Nz, NquadN, τ_rayl, τ_aer, aerosol_optics, Rayl𝐙⁺⁺, Rayl𝐙⁻⁺, Aer𝐙⁺⁺, Aer𝐙⁻⁺, τ_abs, arr_type, qp_μ, μ₀, m)
+        @timeit "Computing Layer Properties" computed_atmosphere_properties = 
+                construct_all_atm_layers(FT, nSpec, Nz, NquadN, 
+                                        τ_rayl, τ_aer, aerosol_optics, 
+                                        Rayl𝐙⁺⁺, Rayl𝐙⁻⁺, Aer𝐙⁺⁺, Aer𝐙⁻⁺, 
+                                        τ_abs, ϖ_Cabannes,
+                                        arr_type, qp_μ, μ₀, m)
 
         # Loop over vertical layers:
         @showprogress 1 "Looping over layers ..." for iz = 1:Nz  # Count from TOA to BOA
@@ -114,8 +120,11 @@ function rt_run(RS_type::AbstractRamanType, #Default - no Raman scattering (noRS
         create_surface_layer!(brdf, added_layer_surface, SFI, m, pol_type, quad_points, arr_type(computed_atmosphere_properties.τ_sum_all[:,end]), architecture);
 
         # One last interaction with surface:
-        #@timeit "interaction" interaction!(computed_atmosphere_properties.scattering_interfaces_all[end], SFI, composite_layer, added_layer_surface, I_static)
-        interaction_inelastic!(RS_type,computed_atmosphere_properties.scattering_interfaces_all[end], SFI, composite_layer, added_layer_surface, I_static)
+        @timeit "interaction" interaction!(RS_type,
+            computed_atmosphere_properties.scattering_interfaces_all[end], 
+            SFI, composite_layer, added_layer_surface, I_static)
+        #interaction_inelastic!(RS_type,computed_atmosphere_properties.scattering_interfaces_all[end], 
+        #    SFI, composite_layer, added_layer_surface, I_static)
         # Postprocess and weight according to vza
         postprocessing_vza!(RS_type, iμ₀, pol_type, composite_layer, vza, qp_μ, m, vaz, μ₀, weight, nSpec, SFI, R, R_SFI, T, T_SFI, ieR_SFI, ieT_SFI)
     end

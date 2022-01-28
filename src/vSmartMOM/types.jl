@@ -421,8 +421,8 @@ Base.@kwdef struct ComputedAtmosphereProperties
     scatter_all
     "Sum of optical thicknesses of all layers above the current layer"
     τ_sum_all
-    "elastic (Cabannes) scattering fraction of Rayleigh (Cabannes+Raman) scattering per layer"
-    ϖ_Cabannes_all
+    #"elastic (Cabannes) scattering fraction of Rayleigh (Cabannes+Raman) scattering per layer"
+    #ϖ_Cabannes_all
     "Rayleigh fraction of scattering cross section per layer"
     fscattRayl_all
     "Scattering interface type for each layer"
@@ -430,28 +430,28 @@ Base.@kwdef struct ComputedAtmosphereProperties
 end
 
 # TODO SUNITI: write a function to compute these properties and create this structure
-Base.@kwdef struct RamanAtmosphereProperties
-    "band spectral grid"
-    grid_in
-    "inelastic (rotational) scattering SSA"
-    ϖ_λ₀λ₁
-    "inelastic (rotational) scattering index"
-    i_λ₀λ₁
-    "inelastic (vibrational) scattering SSA: split later for each molecule"
-    ϖ_vib_λ₀λ₁
-    "inelastic (vibrational) scattering index: split later for each molecule"
-    i_vib_λ₀λ₁
-    "Greek coefs in Rayleigh calculations" 
-    greek_raman::GreekCoefs
-    "Combined o2 and n2 Z moments for rotational/rovibrational RS  (forward)"
-    Z⁺⁺_RRS #same for rotational and rovibrational scattering
-    "Combined o2 and n2 Z moments for rotational/rovibrational RS  (backward)"
-    Z⁻⁺_RRS #same for rotational and rovibrational scattering
-    "Combined o2 and n2 Z moments for vibrational RS (forward): split later for each molecule"
-    Z⁺⁺_VRS #same for rotational and rovibrational scattering
-    "Combined o2 and n2 Z moments for vibrational RS (backward): split later for each molecule"
-    Z⁻⁺_VRS #same for rotational and rovibrational scattering
-end
+#Base.@kwdef struct RamanAtmosphereProperties
+    #"band spectral grid"
+    #grid_in
+    #"inelastic scattering SSA"
+    #ϖ_λ₀λ₁
+    #"inelastic scattering index"
+    #i_λ₀λ₁
+    #"inelastic (vibrational) scattering SSA: split later for each molecule"
+    #ϖ_vib_λ₀λ₁
+    #"inelastic (vibrational) scattering index: split later for each molecule"
+    #i_vib_λ₀λ₁
+    #"Greek coefs in Rayleigh calculations" 
+    #greek_raman::GreekCoefs
+    #"Combined o2 and n2 Z moments for rotational/rovibrational RS  (forward)"
+    #Z⁺⁺_RRS #same for rotational and rovibrational scattering
+    #"Combined o2 and n2 Z moments for rotational/rovibrational RS  (backward)"
+    #Z⁻⁺_RRS #same for rotational and rovibrational scattering
+    #"Combined o2 and n2 Z moments for vibrational RS (forward): split later for each molecule"
+    #Z⁺⁺_VRS #same for rotational and rovibrational scattering
+    #"Combined o2 and n2 Z moments for vibrational RS (backward): split later for each molecule"
+    #Z⁻⁺_VRS #same for rotational and rovibrational scattering
+#end
 
 """
     type AbstractRamanType
@@ -466,11 +466,11 @@ A struct which defines Rotational Raman Scattering parameters
 $(DocStringExtensions.FIELDS)
 """
 Base.@kwdef mutable struct RRS{FT<:AbstractFloat} <: AbstractRamanType 
-    "Molecular Constant for N2"
+    "Molecular Constants for N2"
     n2::InelasticScattering.MolecularConstants{FT}
-    "Molecular Constant for O2"
+    "Molecular Constants for O2"
     o2::InelasticScattering.MolecularConstants{FT}
-    "Greek coefs in Raman calculations" 
+    "Greek coeffs in Raman calculations" 
     greek_raman::GreekCoefs
     "Pre-computed optical properties"
     # ramanAtmoProp::RamanAtmosphereProperties
@@ -531,7 +531,7 @@ Base.@kwdef struct VS_1to0{FT<:AbstractFloat} <: AbstractRamanType
     i_λ₁λ₀::Array{Int,1}
     Z⁻⁺_λ₁λ₀::Array{FT,2}
     Z⁺⁺_λ₁λ₀::Array{FT,2}
-    τ₀::FT
+    dτ₀::FT
     dτ₀_λ::FT
     k_Rayl_scatt::FT #σ_Rayl(λ_scatt)/σ_Rayl(λ_incident)
     n_Raman::Int
@@ -561,8 +561,8 @@ Base.@kwdef struct RVRS{FT<:AbstractFloat} <: AbstractRamanType
     n_Raman::Int
 end
 
-struct noRS <: AbstractRamanType
-    #ϖ_Cabannes::FT == 1 #elastic fraction (Cabannes) of Rayleigh (Cabannes+Raman) scattering
+Base.@kwdef struct noRS{FT} <: AbstractRamanType
+    ϖ_Cabannes::FT = 1.0 #elastic fraction (Cabannes) of Rayleigh (Cabannes+Raman) scattering
 end
 
 """
@@ -603,8 +603,8 @@ Base.@kwdef struct ComputedLayerProperties
     τ_sum
     "Fraction of scattering caused by Rayleigh"
     fscattRayl
-    "Elastic fraction (Cabannes) of Rayleigh (Cabannes+Raman) scattering"
-    ϖ_Cabannes 
+    #"Elastic fraction (Cabannes) of Rayleigh (Cabannes+Raman) scattering"
+    #ϖ_Cabannes 
     "Scattering interface type for current layer"
     scattering_interface
 end
