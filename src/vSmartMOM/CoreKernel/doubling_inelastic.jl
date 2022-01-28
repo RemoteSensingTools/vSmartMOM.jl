@@ -59,7 +59,26 @@ function doubling_helper!(RS_type::RRS,
             # J⁻₁₂(λ)  = J⁻₀₁(λ).exp(-τ(λ)/μ₀)
             J₁⁻[:,1,:] = J₀⁻[:,1,:] .* expk'
             ieJ₁⁻[:,1,:,:] = ieJ₀⁻[:,1,:,:] .* expk'
-
+            #@show size(ieJ₁⁺)
+            tmp1 = gp_refl ⊠  (J₀⁺ + r⁻⁺ ⊠ J₁⁻)
+            tmp2 = gp_refl ⊠  (J₁⁻ + r⁻⁺ ⊠ J₀⁺)
+            for Δn = 1:size(ieJ₁⁺,4)
+                n₀, n₁ = get_n₀_n₁(ieJ₁⁺,i_λ₁λ₀[Δn])
+                #@show length(n₁), length(n₀), length(n₁_), length(n₀_)
+                @inbounds @views ieJ₀⁺[:,:,n₁,Δn] = ieJ₁⁺[:,:,n₁,Δn] + 
+                                (tt⁺⁺_gp_refl[:,:,n₁] ⊠ 
+                                (ieJ₀⁺[:,:,n₁,Δn] + r⁻⁺[:,:,n₁] ⊠ ieJ₁⁻[:,:,n₁,Δn] + ier⁻⁺[:,:,n₁,Δn] ⊠ J₁⁻[:,:,n₀] + 
+                                (r⁻⁺[:,:,n₁] ⊠ ier⁻⁺[:,:,n₁,Δn] + ier⁻⁺[:,:,n₁,Δn] ⊠ r⁻⁺[:,:,n₀]) ⊠ 
+                                tmp1[:,:,n₀])) + 
+                                iet⁺⁺[:,:,n₁,Δn] ⊠ tmp1[:,:,n₀]
+                @inbounds @views ieJ₀⁻[:,:,n₁,Δn] = ieJ₀⁻[:,:,n₁,Δn] + 
+                                (tt⁺⁺_gp_refl[:,:,n₁] ⊠ 
+                                (ieJ₁⁻[:,:,n₁,Δn] + ier⁻⁺[:,:,n₁,Δn] ⊠ J₀⁺[:,:,n₀] + r⁻⁺[:,:,n₁] ⊠ ieJ₀⁺[:,:,n₁,Δn] + 
+                                (ier⁻⁺[:,:,n₁,Δn] ⊠ r⁻⁺[:,:,n₀] + r⁻⁺[:,:,n₁] ⊠ ier⁻⁺[:,:,n₁,Δn]) ⊠ 
+                                tmp2[:,:,n₀])) +
+                                iet⁻⁻[:,:,n₁,Δn] ⊠ tmp2[:,:,n₀]
+            end
+            #=
             for n₁ = 1:size(ieJ₁⁺,3) # in eachindex ieJ₁⁺[1,1,:,1]
                 for Δn = 1:size(ieJ₁⁺,4) #in eachindex ieJ₁⁺[1,1,1,:]
 
@@ -85,6 +104,7 @@ function doubling_helper!(RS_type::RRS,
                     end
                 end
             end 
+            =#
         
             # J⁻₀₂(λ) = J⁻₀₁(λ) + T⁻⁻₀₁(λ)[I - R⁻⁺₂₁(λ)R⁺⁻₀₁(λ)]⁻¹[J⁻₁₂(λ) + R⁻⁺₂₁(λ)J⁺₁₀(λ)] (see Eqs.8 in Raman paper draft)
             J₀⁻[:] = J₀⁻ + (tt⁺⁺_gp_refl ⊠ (J₁⁻ + r⁻⁺ ⊠ J₀⁺)) 
@@ -94,8 +114,25 @@ function doubling_helper!(RS_type::RRS,
 
             expk[:] = expk.^2
         end  
-
-        for n₁ = 1:size(ieJ₁⁺,3) #in eachindex ieJ₁⁺[1,1,:,1]
+        #println("Doubling part 1 done")
+        for Δn = 1:size(ieJ₁⁺,4)
+                n₀, n₁ = get_n₀_n₁(ieJ₁⁺,i_λ₁λ₀[Δn])
+                #@show n₁, n₀
+                #@show length(n₀)
+                @inbounds @views iet⁺⁺[:,:,n₁,Δn] = t⁺⁺[:,:,n₁] ⊠ gp_refl[:,:,n₁] ⊠ 
+                        (iet⁺⁺[:,:,n₁,Δn] + 
+                        (ier⁻⁺[:,:,n₁,Δn] ⊠ r⁻⁺[:,:,n₀] + r⁻⁺[:,:,n₁] ⊠ ier⁻⁺[:,:,n₁,Δn]) ⊠ 
+                        gp_refl[:,:,n₀] ⊠ t⁺⁺[:,:,n₀]) + 
+                        iet⁺⁺[:,:,n₁,Δn] ⊠ gp_refl[:,:,n₀] ⊠  t⁺⁺[:,:,n₀]
+                @inbounds @views ier⁻⁺[:,:,n₁,Δn] = ier⁻⁺[:,:,n₁,Δn] + 
+                        t⁺⁺[:,:,n₁] ⊠ gp_refl[:,:,n₁] ⊠ r⁻⁺[:,:,n₁] ⊠  
+                        (iet⁺⁺[:,:,n₁,Δn] + 
+                        (ier⁻⁺[:,:,n₁,Δn] ⊠ r⁻⁺[:,:,n₀] + r⁻⁺[:,:,n₁] ⊠ ier⁻⁺[:,:,n₁,Δn]) ⊠ 
+                        gp_refl[:,:,n₀] ⊠ t⁺⁺[:,:,n₀]) + 
+                        (iet⁺⁺[:,:,n₁,Δn] ⊠ gp_refl[:,:,n₀] ⊠ r⁻⁺[:,:,n₀] + 
+                        t⁺⁺[:,:,n₁] ⊠ gp_refl[:,:,n₁] ⊠ ier⁻⁺[:,:,n₁,Δn]) ⊠ t⁺⁺[:,:,n₀]
+        end
+        #=for n₁ = 1:size(ieJ₁⁺,3) #in eachindex ieJ₁⁺[1,1,:,1]
             for Δn = 1:size(ieJ₁⁺,4) #in eachindex ieJ₁⁺[1,1,1,:]
                 n₀  = n₁ + i_λ₁λ₀[Δn]
                 # (see Eqs.12 in Raman paper draft)
@@ -117,6 +154,7 @@ function doubling_helper!(RS_type::RRS,
                 end
             end
         end
+        =#
         # R⁻⁺₂₀(λ) = R⁻⁺₁₀(λ) + T⁻⁻₀₁(λ)[I - R⁻⁺₂₁(λ)R⁺⁻₀₁(λ)]⁻¹R⁻⁺₂₁(λ)T⁺⁺₁₀(λ) (see Eqs.8 in Raman paper draft)
         r⁻⁺[:]  = r⁻⁺ + (tt⁺⁺_gp_refl ⊠ r⁻⁺ ⊠ t⁺⁺)
 

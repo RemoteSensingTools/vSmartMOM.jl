@@ -83,7 +83,7 @@ function rt_run(RS_type::AbstractRamanType, #Default - no Raman scattering (noRS
         @timeit "Z moments" Rayl𝐙⁺⁺, Rayl𝐙⁻⁺ = Scattering.compute_Z_moments(pol_type, Array(qp_μ), greek_rayleigh, m, arr_type = arr_type);
         if !(typeof(RS_type) <: vSmartMOM.noRS)
             @timeit "Z moments" RS_type.Z⁺⁺_λ₁λ₀, RS_type.Z⁻⁺_λ₁λ₀ = Scattering.compute_Z_moments(pol_type, Array(qp_μ), RS_type.greek_raman, m, arr_type = arr_type);
-            @show size(RS_type.Z⁺⁺_λ₁λ₀), size(RS_type.Z⁻⁺_λ₁λ₀)
+            #@show size(RS_type.Z⁺⁺_λ₁λ₀), size(RS_type.Z⁻⁺_λ₁λ₀)
         end
         # Need to make sure arrays are 0:
         # TBD here
