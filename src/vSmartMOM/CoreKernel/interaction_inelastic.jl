@@ -484,7 +484,7 @@ function interaction_helper!(RS_type::Union{VS_0to1, VS_1to0}, ::ScatteringInter
 end
 
 "Compute interaction between composite and added layers"
-function interaction_inelastic!(RS_type, scattering_interface::AbstractScatteringInterface, SFI,
+function interaction!(RS_type::Union{RRS, VS_0to1, VS_1to0}, scattering_interface::AbstractScatteringInterface, SFI,
                         composite_layer::Union{CompositeLayer,CompositeLayerRS}, 
                         added_layer::Union{AddedLayer,AddedLayerRS},
                         I_static::AbstractArray{FT2}) where {FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2}
@@ -492,4 +492,14 @@ function interaction_inelastic!(RS_type, scattering_interface::AbstractScatterin
     interaction_helper!(RS_type, scattering_interface, SFI, composite_layer, added_layer, I_static)
     synchronize_if_gpu()
     
+end
+
+function interaction!(RS_type::noRS, scattering_interface::AbstractScatteringInterface, SFI,
+    composite_layer::Union{CompositeLayer,CompositeLayerRS}, 
+    added_layer::Union{AddedLayer,AddedLayerRS},
+    I_static::AbstractArray{FT2}) where {FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2}
+
+interaction_helper!(scattering_interface, SFI, composite_layer, added_layer, I_static)
+synchronize_if_gpu()
+
 end

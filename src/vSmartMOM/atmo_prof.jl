@@ -218,12 +218,19 @@ Arguments:
     - `Aer𝐙⁻⁺` Aerosol 𝐙⁻⁺ phase matrix (3D)
     - `τ_abs` layer absorption optical depth array (per wavelength) by gaseous absorption
 """
-function construct_atm_layer(τRayl, τAer,  aerosol_optics, Rayl𝐙⁺⁺, Rayl𝐙⁻⁺, Aer𝐙⁺⁺, Aer𝐙⁻⁺, τ_abs, arr_type)
+function construct_atm_layer(τRayl, τAer,  
+    ϖ_Cabannes, #elastic fraction of Rayleigh scattering
+    aerosol_optics, 
+    Rayl𝐙⁺⁺, Rayl𝐙⁻⁺, 
+    Aer𝐙⁺⁺, Aer𝐙⁻⁺, 
+    τ_abs, arr_type)
+    
     FT = eltype(τRayl)
     nAer = length(aerosol_optics)
 
-    # Fix Rayleigh SSA to 1
-    ϖRayl = FT(1)
+    # Fixes Rayleigh SSA to 1 for purely elastic (RS_type = noRS) scattering,
+    # and assumes values less than 1 for Raman scattering
+    ϖRayl = ϖ_Cabannes #FT(1)
 
     @assert length(τAer) == nAer "Sizes don't match"
 
@@ -262,16 +269,22 @@ function construct_atm_layer(τRayl, τAer,  aerosol_optics, Rayl𝐙⁺⁺, Ray
     τ *= (FT(1) - (FT(1) - A) * ϖ)
     ϖ *= A / (FT(1) - (FT(1) - A) * ϖ)#Suniti
 
-    fscattRayl = τRayl*ϖRayl/τ
+    fscattRayl = τRayl/τ
     # Adding absorption optical depth / albedo:
     τ_λ = τ_abs .+ τ    
-    ϖ_λ = (τ .* ϖ) ./ τ_λ
+    ϖ_λ = (τ * ϖ) ./ τ_λ
     
     return Array(τ_λ), Array(ϖ_λ), τ, ϖ, Array(Z⁺⁺), Array(Z⁻⁺), fscattRayl
 end
 
 "When performing RT_run, this function pre-calculates properties for all layers, before any Core RT is performed"
-function construct_all_atm_layers(FT, nSpec, Nz, NquadN, τRayl, τAer, aerosol_optics, Rayl𝐙⁺⁺, Rayl𝐙⁻⁺, Aer𝐙⁺⁺, Aer𝐙⁻⁺, τ_abs, arr_type, qp_μ, μ₀, m)
+function construct_all_atm_layers(
+        FT, nSpec, Nz, NquadN, 
+        τRayl, τAer, aerosol_optics, 
+        Rayl𝐙⁺⁺, Rayl𝐙⁻⁺, Aer𝐙⁺⁺, Aer𝐙⁻⁺, 
+        τ_abs, 
+        ϖ_Cabannes,
+        arr_type, qp_μ, μ₀, m)
 
     FT_ext   = eltype(τAer)
     FT_phase = eltype(Aer𝐙⁺⁺)
@@ -295,7 +308,17 @@ function construct_all_atm_layers(FT, nSpec, Nz, NquadN, τRayl, τAer, aerosol_
     for iz=1:Nz
         
         # Construct atmospheric properties
-        τ_λ_all[:, iz], ϖ_λ_all[:, iz], τ_all[iz], ϖ_all[iz], Z⁺⁺_all[:,:,iz], Z⁻⁺_all[:,:,iz], fscattRayl_all[iz] = construct_atm_layer(τRayl[iz], τAer[:,iz], aerosol_optics, Rayl𝐙⁺⁺, Rayl𝐙⁻⁺, Aer𝐙⁺⁺, Aer𝐙⁻⁺, τ_abs[:,iz], arr_type)
+        τ_λ_all[:, iz], 
+        ϖ_λ_all[:, iz], 
+        τ_all[iz], 
+        ϖ_all[iz], 
+        Z⁺⁺_all[:,:,iz], 
+        Z⁻⁺_all[:,:,iz], 
+        fscattRayl_all[iz] = construct_atm_layer(τRayl[iz], τAer[:,iz], 
+            ϖ_Cabannes,
+            aerosol_optics, 
+            Rayl𝐙⁺⁺, Rayl𝐙⁻⁺, Aer𝐙⁺⁺, Aer𝐙⁻⁺, 
+            τ_abs[:,iz], arr_type)
 
         # Compute doubling number
         dτ_max_all[iz] = minimum([τ_all[iz] * ϖ_all[iz], FT(0.001) * minimum(qp_μ)])

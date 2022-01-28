@@ -23,6 +23,7 @@ function elemental!(pol_type, SFI::Bool,
 
     @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, J₀⁺, J₀⁻ = added_layer
     @unpack qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart, iμ₀ = quad_points
+    #@unpack ϖ_Cabannes = RS_type
     arr_type = array_type(architecture)
     # Need to check with paper nomenclature. This is basically eqs. 19-20 in vSmartMOM
     
@@ -51,7 +52,7 @@ function elemental!(pol_type, SFI::Bool,
         wct0  = m == 0 ? FT(0.50) * ϖ * dτ     : FT(0.25) * ϖ * dτ
         wct02 = m == 0 ? FT(0.50)              : FT(0.25)
         wct   = m == 0 ? FT(0.50) * ϖ * wt_μN  : FT(0.25) * ϖ * wt_μN
-        #wct2  = m == 0 ? wt_μN/2               : wt_μN/4
+        wct2  = m == 0 ? wt_μN/2               : wt_μN/4
 
         # Get the diagonal matrices first
         d_qp  = Diagonal(1 ./ qp_μN)
@@ -78,7 +79,8 @@ function elemental!(pol_type, SFI::Bool,
             #Version 2: More computationally intensive definition of a single scattering layer with variable (0-∞) absorption
             # Version 2: with absorption in batch mode, low tau_scatt but higher tau_total, needs different equations
             kernel! = get_elem_rt!(device)
-            event = kernel!(r⁻⁺, t⁺⁺, ϖ_λ, dτ_λ, Z⁻⁺, Z⁺⁺, qp_μN, wct, ndrange=size(r⁻⁺)); 
+            event = kernel!(r⁻⁺, t⁺⁺, ϖ_λ, dτ_λ, Z⁻⁺, Z⁺⁺, 
+                qp_μN, wct2, ndrange=size(r⁻⁺)); 
             wait(device, event)
             synchronize_if_gpu()
 
@@ -112,6 +114,7 @@ end
         # 𝐑⁻⁺(μᵢ, μⱼ) = ϖ ̇𝐙⁻⁺(μᵢ, μⱼ) ̇(μⱼ/(μᵢ+μⱼ)) ̇(1 - exp{-τ ̇(1/μᵢ + 1/μⱼ)}) ̇𝑤ⱼ
         r⁻⁺[i,j,n] = 
             ϖ_λ[n] * Z⁻⁺[i,j] * 
+            #Z⁻⁺[i,j] * 
             (qp_μN[j] / (qp_μN[i] + qp_μN[j])) * wct[j] * 
             (1 - exp(-dτ_λ[n] * ((1 / qp_μN[i]) + (1 / qp_μN[j])))) 
                     
@@ -119,8 +122,9 @@ end
             # 𝐓⁺⁺(μᵢ, μᵢ) = (exp{-τ/μᵢ} + ϖ ̇𝐙⁺⁺(μᵢ, μᵢ) ̇(τ/μᵢ) ̇exp{-τ/μᵢ}) ̇𝑤ᵢ
             if i == j
                 t⁺⁺[i,j,n] = 
-                    exp(-dτ_λ[n] / qp_μN[i])*
+                    exp(-dτ_λ[n] / qp_μN[i]) *
                     (1 + ϖ_λ[n] * Z⁺⁺[i,i] * (dτ_λ[n] / qp_μN[i]) * wct[i])
+                    #(1 + ϖ_λ[n] * Z⁺⁺[i,i] * (dτ_λ[n] / qp_μN[i]) * wct[i])
             else
                 t⁺⁺[i,j,n] = 0.0
             end
@@ -130,6 +134,7 @@ end
             # (𝑖 ≠ 𝑗)
             t⁺⁺[i,j,n] = 
                 ϖ_λ[n] * Z⁺⁺[i,j] * 
+                #Z⁺⁺[i,j] * 
                 (qp_μN[j] / (qp_μN[i] - qp_μN[j])) * wct[j] * 
                 (exp(-dτ_λ[n] / qp_μN[i]) - exp(-dτ_λ[n] / qp_μN[j])) 
         end
@@ -177,7 +182,10 @@ end
 
     if ndoubl >= 1
         J₀⁻[i, 1, n] = D[i,i]*J₀⁻[i, 1, n] #D = Diagonal{1,1,-1,-1,...Nquad times}
-    end        
+    end  
+    #if (n==840||n==850)    
+    #    @show i, n, J₀⁺[i, 1, n], J₀⁻[i, 1, n]      
+    #end
 end
 
 @kernel function apply_D_elemental!(ndoubl, pol_n, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻)

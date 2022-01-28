@@ -30,6 +30,7 @@ RS_type = vSmartMOM.RRS(
             o2=o2,
             greek_raman = vSmartMOM.Scattering.GreekCoefs([FT(1)], [FT(1)], [FT(1)], [FT(1)], [FT(1)], [FT(1)]),
             fscattRayl=FT(1),
+            ϖ_Cabannes=FT(1), 
             ϖ_λ₁λ₀=zeros(FT,1),
             i_λ₁λ₀=zeros(Int,1), 
             Z⁻⁺_λ₁λ₀=zeros(FT,1,1), 
@@ -37,7 +38,7 @@ RS_type = vSmartMOM.RRS(
             i_ref=i_ref,
             n_Raman=0);
 
-vSmartMOM.get_greek_raman!(RS_type, n2, o2);
+#vSmartMOM.get_greek_raman!(RS_type, n2, o2);
 # now compute other optical parameters for Raman:
 #fscattRayl = ...
 #RS_type = vSmartMOM.RRS(...)
@@ -65,8 +66,6 @@ R,ieR = rt_run(RS_type,
     model.τ_abs[1],
     model.params.brdf[1],
     model.params.architecture);
-
-
 #R = vSmartMOM.rt_run(model, i_band=1)
 
 RnoRS, _ = rt_run(vSmartMOM.noRS(),

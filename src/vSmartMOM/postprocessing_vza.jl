@@ -80,10 +80,14 @@ function postprocessing_vza!(RS_type::Union{RRS, VS_0to1, VS_1to0},
             if SFI
                 R_SFI[i,:,s] += bigCS * J₀⁻[istart:iend,1, s];
                 T_SFI[i,:,s] += bigCS * J₀⁺[istart:iend,1, s];
+                #@show i, s, R_SFI[i,:,s]
+                #@show i, s, ieR_SFI[i,:,s]
                 for t =1:size(ieJ₀⁺,4)# in eachindex ieJ₀⁺[1,1,1,:]
                     ieR_SFI[i,:,s] += bigCS * ieJ₀⁻[istart:iend,1, s, t];
                     ieT_SFI[i,:,s] += bigCS * ieJ₀⁺[istart:iend,1, s, t];
+                    #@show i, s, t, ieR_SFI[i,:,s]
                 end
+                #@show i, s, ieR_SFI[i,:,s]
             else
                 R[i,:,s] += bigCS * (R⁻⁺[istart:iend, istart0:iend0, s] / μ₀) * pol_type.I₀;
                 T[i,:,s] += bigCS * (T⁺⁺[istart:iend, istart0:iend0, s] / μ₀) * pol_type.I₀;
