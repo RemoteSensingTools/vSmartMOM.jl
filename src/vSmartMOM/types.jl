@@ -102,7 +102,7 @@ struct SFI <:AbstractSourceType end
 abstract type AbstractLayer end
 
 "Composite Layer Matrices (`-/+` defined in τ coordinates, i.e. `-`=outgoing, `+`=incoming"
-Base.@kwdef mutable struct CompositeLayer{FT} <: AbstractLayer 
+Base.@kwdef struct CompositeLayer{FT} <: AbstractLayer 
     "Composite layer Reflectance matrix R (from + -> -)"
     R⁻⁺::AbstractArray{FT,3}
     "Composite layer Reflectance matrix R (from - -> +)"
@@ -118,7 +118,7 @@ Base.@kwdef mutable struct CompositeLayer{FT} <: AbstractLayer
 end
 
 "Added (Single) Layer Matrices (`-/+` defined in τ coordinates, i.e. `-`=outgoing, `+`=incoming"
-Base.@kwdef mutable struct AddedLayer{FT} <: AbstractLayer 
+Base.@kwdef struct AddedLayer{FT} <: AbstractLayer 
     "Added layer Reflectance matrix R (from + -> -)"
     r⁻⁺::AbstractArray{FT,3}
     "Added layer transmission matrix T (from + -> +)"
@@ -134,7 +134,7 @@ Base.@kwdef mutable struct AddedLayer{FT} <: AbstractLayer
 end
 
 "Composite Layer Matrices (`-/+` defined in τ coordinates, i.e. `-`=outgoing, `+`=incoming"
-Base.@kwdef mutable struct CompositeLayerRS{FT} <: AbstractLayer 
+struct CompositeLayerRS{FT} <: AbstractLayer 
     "Composite layer Reflectance matrix R (from + -> -)"
     R⁻⁺::AbstractArray{FT,3}
     "Composite layer Reflectance matrix R (from - -> +)"
@@ -164,7 +164,7 @@ Base.@kwdef mutable struct CompositeLayerRS{FT} <: AbstractLayer
 end
 
 "Added (Single) Layer Matrices (`-/+` defined in τ coordinates, i.e. `-`=outgoing, `+`=incoming"
-Base.@kwdef mutable struct AddedLayerRS{FT} <: AbstractLayer 
+struct AddedLayerRS{FT} <: AbstractLayer 
     "Added layer Reflectance matrix R (from + -> -)"
     r⁻⁺::AbstractArray{FT,3}
     "Added layer transmission matrix T (from + -> +)"
@@ -467,9 +467,9 @@ $(DocStringExtensions.FIELDS)
 """
 Base.@kwdef mutable struct RRS{FT<:AbstractFloat} <: AbstractRamanType 
     "Molecular Constants for N2"
-    n2::InelasticScattering.MolecularConstants{FT}
+    n2::InelasticScattering.MolecularConstants{Float64}
     "Molecular Constants for O2"
-    o2::InelasticScattering.MolecularConstants{FT}
+    o2::InelasticScattering.MolecularConstants{Float64}
     "Greek coeffs in Raman calculations" 
     greek_raman::GreekCoefs
     "Pre-computed optical properties"

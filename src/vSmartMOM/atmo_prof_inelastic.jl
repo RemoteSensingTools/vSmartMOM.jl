@@ -321,17 +321,17 @@ function construct_atm_layer(τRayl, τAer, aerosol_optics, Rayl𝐙⁺⁺, Rayl
 
     #TODO_Suniti
     # define inelastic SSA of the layer with respect to the total layer optical thickness
-    
-    return Array(τ_λ), Array(ϖ_λ), τ, ϖ, fscattRay, Array(Z⁺⁺), Array(Z⁻⁺)
+    @show τRayl,ϖRayl,τ, fscattRayl
+    return Array(τ_λ), Array(ϖ_λ), τ, ϖ, fscattRayl, Array(Z⁺⁺), Array(Z⁻⁺)
 end
 
 #TODO_Suniti
 "When performing RT_run, this function pre-calculates properties for all layers, before any Core RT is performed"
 function construct_all_atm_layers(FT, nSpec, Nz, NquadN, τRayl, τAer, aerosol_optics, Rayl𝐙⁺⁺, Rayl𝐙⁻⁺, Aer𝐙⁺⁺, Aer𝐙⁻⁺, τ_abs, arr_type, qp_μ, μ₀, m)
 
-    FT_ext   = eltype(τAer)
-    FT_phase = eltype(Aer𝐙⁺⁺)
-
+    FT_ext   = eltype(τRayl)
+    FT_phase = eltype(Rayl𝐙⁺⁺)
+    @show FT_ext, FT_phase
     # Empty matrices to hold all values
     τ_λ_all   = zeros(FT_ext, nSpec, Nz)
     ϖ_λ_all   = zeros(FT_ext, nSpec, Nz)
