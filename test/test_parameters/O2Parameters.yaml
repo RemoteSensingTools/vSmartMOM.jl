@@ -87,7 +87,7 @@ absorption:
 scattering:
   # List of scattering aerosols and their properties
   aerosols:       
-    - τ_ref:          0.0           # Reference τ
+    - τ_ref:          0.20           # Reference τ
       μ:              0.1 #1.3           # Log mean radius (µm)
       σ:              1.12 #2.0           # Log stddev of radius (µm)
       nᵣ:             1.3           # Real part of refractive index
