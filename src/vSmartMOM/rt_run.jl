@@ -39,7 +39,7 @@ function rt_run(RS_type::AbstractRamanType, #Default - no Raman scattering (noRS
     nAer  = length(aerosol_optics)      # Number of aerosols
  
     # Need to check this a bit better in the future!
-    FT_dual = length(τ_aer) > 0 ? typeof(τ_aer[1]) : Float64
+    FT_dual = length(τ_aer) > 0 ? typeof(τ_rayl[1]) : Float64
 
     # Output variables: Reflected and transmitted solar irradiation at TOA and BOA respectively # Might need Dual later!!
     R = zeros(FT_dual, length(vza), pol_type.n, nSpec)
@@ -93,7 +93,7 @@ function rt_run(RS_type::AbstractRamanType, #Default - no Raman scattering (noRS
             @timeit "Z moments"  Aer𝐙⁺⁺[:,:,i], Aer𝐙⁻⁺[:,:,i] = Scattering.compute_Z_moments(pol_type, Array(qp_μ), aerosol_optics[i].greek_coefs, m, arr_type = arr_type)
         end
 
-        @timeit "Creating arrays" τ_sum_old = arr_type(zeros(FT, nSpec)) # Suniti: declaring τ_sum to be of length nSpec
+        τ_sum_old = arr_type(zeros(FT, nSpec)) # Suniti: declaring τ_sum to be of length nSpec
         @show RS_type.ϖ_Cabannes, ϖ_Cabannes
         # Loop over all layers and pre-compute all properties before performing core RT
         @timeit "Computing Layer Properties" computed_atmosphere_properties = 
