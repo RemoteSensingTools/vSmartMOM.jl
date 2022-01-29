@@ -111,7 +111,8 @@ function rt_run(RS_type::AbstractRamanType, #Default - no Raman scattering (noRS
             # Suniti: modified to return fscattRayl as the last element of  computed_atmosphere_properties
             # Computing Rayleigh scattering fraction, fscattRayl = τRayl*ϖRayl/τ
             computed_layer_properties = get_layer_properties(computed_atmosphere_properties, iz, arr_type)
-
+            @show computed_layer_properties.fscattRayl
+            RS_type.fscattRayl = computed_layer_properties.fscattRayl
             # Perform Core RT (doubling/elemental/interaction)
             rt_kernel!(RS_type, pol_type, SFI, added_layer, composite_layer, computed_layer_properties, m, quad_points, I_static, architecture, qp_μN, iz) 
         end 
