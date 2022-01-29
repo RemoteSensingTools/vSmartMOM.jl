@@ -9,7 +9,7 @@ using RadiativeTransfer.vSmartMOM
 ## 
 
 # If you would like to load your own parameters from a YAML file
-# (See required format at: https://github.com/RadiativeTransfer/RadiativeTransfer.jl/blob/master/src/vSmartMOM/DefaultParameters.yaml)
+# (See required format at: https://github.com/RadiativeTransfer/RadiativeTransfer.jl/blob/main/src/vSmartMOM/DefaultParameters.yaml)
 parameters = parameters_from_yaml("RadiativeTransfer/src/vSmartMOM/DefaultParameters.yaml")
 
 # OR if you would like to load a default set of parameters

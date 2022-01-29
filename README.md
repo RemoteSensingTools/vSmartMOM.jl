@@ -18,11 +18,11 @@
     <img src="https://img.shields.io/badge/docs-latest-blue.svg"
          alt="Docs">
   </a>
-  <a href="https://github.com/RadiativeTransfer/RadiativeTransfer.jl/blob/master/LICENSE">
+  <a href="https://github.com/RadiativeTransfer/RadiativeTransfer.jl/blob/main/LICENSE">
     <img src="https://img.shields.io/github/license/RadiativeTransfer/radiativetransfer.jl"
          alt="License">
   </a>
-  <a href="https://github.com/RadiativeTransfer/RadiativeTransfer.jl/commits/master">
+  <a href="https://github.com/RadiativeTransfer/RadiativeTransfer.jl/commits/main">
     <img src="https://img.shields.io/github/commit-activity/y/RadiativeTransfer/RadiativeTransfer.jl"
          alt="Github Commit Frequency">
   </a>
