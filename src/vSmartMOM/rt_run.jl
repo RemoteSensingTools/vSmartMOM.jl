@@ -134,7 +134,7 @@ function rt_run(RS_type::AbstractRamanType, #Default - no Raman scattering (noRS
     reset_timer!()
 
     # Return R_SFI or R, depending on the flag
-    return SFI ? (R_SFI, ieR_SFI) : R
+    return SFI ? (R_SFI, T_SFI, ieR_SFI, ieT_SFI) : (R, T)
 end
 
 """
