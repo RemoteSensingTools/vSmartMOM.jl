@@ -253,11 +253,13 @@ function construct_atm_layer(τRayl, τAer,
     Z⁻⁺ = τRayl * ϖRayl * Rayl𝐙⁻⁺
 
     for i = 1:nAer
+        #@show τ, ϖ , A, τAer[i]
         τ   += τAer[i]
         ϖ   += τAer[i] * aerosol_optics[i].ω̃
         A   += τAer[i] * aerosol_optics[i].ω̃ * (1 - aerosol_optics[i].fᵗ)
         Z⁺⁺ += τAer[i] * aerosol_optics[i].ω̃ * (1 - aerosol_optics[i].fᵗ) * Aer𝐙⁺⁺[:,:,i]
         Z⁻⁺ += τAer[i] * aerosol_optics[i].ω̃ * (1 - aerosol_optics[i].fᵗ) * Aer𝐙⁻⁺[:,:,i]
+        #@show τ, ϖ , A
     end
     
     Z⁺⁺ /= A
@@ -266,9 +268,10 @@ function construct_atm_layer(τRayl, τAer,
     ϖ /= τ
     
     # Rescaling composite SSPs according to Eqs. A.3 of Sanghavi et al. (2013) or Eqs.(8) of Sanghavi & Stephens (2015)
+    #@show τRayl, τ,A,  ϖ
     τ *= (FT(1) - (FT(1) - A) * ϖ)
     ϖ *= A / (FT(1) - (FT(1) - A) * ϖ)#Suniti
-
+    #@show τRayl, τ
     fscattRayl = τRayl/τ
     # Adding absorption optical depth / albedo:
     τ_λ = τ_abs .+ τ    
@@ -286,8 +289,8 @@ function construct_all_atm_layers(
         ϖ_Cabannes,
         arr_type, qp_μ, μ₀, m)
 
-    FT_ext   = eltype(τAer)
-    FT_phase = eltype(Aer𝐙⁺⁺)
+    FT_ext   = eltype(τRayl)
+    FT_phase = eltype(Rayl𝐙⁺⁺)
 
     # Empty matrices to hold all values
     τ_λ_all   = zeros(FT_ext, nSpec, Nz)

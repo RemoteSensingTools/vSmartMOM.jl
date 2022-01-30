@@ -123,7 +123,7 @@ end
     #end
     #i_ϖ = i_ref + i_λ₁λ₀[Δn]
     #@show   n₀ , i_ϖ 
-    if (wct2[j]>1.e-8) & (1 ≤ n₀ ≤ nMax)
+    if (1 ≤ n₀ ≤ nMax) & (wct2[j]>1.e-8) 
 
         # dτ₀, dτ₁ are the purely scattering (elastic+inelastic) molecular elemental 
         # optical thicknesses at wavelengths λ₀ and λ₁
@@ -327,6 +327,7 @@ function get_elem_rt_SFI!(RS_type::RRS,
                         wct02, nStokes,
                         I₀, iμ0,D)
     @unpack fscattRayl, ϖ_λ₁λ₀, i_λ₁λ₀, i_ref = RS_type
+    @show fscattRayl
     device = devi(architecture(ieJ₀⁺))
     aType = array_type(architecture(ieJ₀⁺))
     kernel! = get_elem_rt_SFI_RRS!(device)
