@@ -70,6 +70,7 @@ function model_from_parameters(params::vSmartMOM_Parameters)
     aerosol_optics = [Array{AerosolOptics}(undef, (n_aer)) for i=1:length(0)];
         
     FT2 = isnothing(params.scattering_params) ? params.float_type : typeof(params.scattering_params.rt_aerosols[1].τ_ref)
+    FT2 =  params.float_type 
 
     # τ_aer[iBand][iAer,iZ]
     τ_aer = [zeros(FT2, n_aer, length(profile.p_full)) for i=1:n_bands];
@@ -79,12 +80,13 @@ function model_from_parameters(params::vSmartMOM_Parameters)
 
         # Get curr_aerosol
         curr_aerosol = params.scattering_params.rt_aerosols[i_aer].aerosol
-
+        
         # Create Aerosol size distribution for each aerosol species
         size_distribution = curr_aerosol.size_distribution
 
         # Create a univariate aerosol distribution
         mie_aerosol = Aerosol(size_distribution, curr_aerosol.nᵣ, curr_aerosol.nᵢ)
+        @show typeof(curr_aerosol.nᵣ)
         #mie_aerosol = make_mie_aerosol(size_distribution, curr_aerosol.nᵣ, curr_aerosol.nᵢ, params.scattering_params.r_max, params.scattering_params.nquad_radius) #Suniti: why is the refractive index needed here?
 
         # Create the aerosol extinction cross-section at the reference wavelength:

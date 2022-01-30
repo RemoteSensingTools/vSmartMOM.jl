@@ -48,10 +48,10 @@ function doubling_helper!(pol_type,
         if SFI
 
             # J⁺₂₁(λ) = J⁺₁₀(λ).exp(-τ(λ)/μ₀)
-            J₁⁺[:,1,:] = J₀⁺[:,1,:] .* expk'
+            @views J₁⁺[:,1,:] = J₀⁺[:,1,:] .* expk'
 
             # J⁻₁₂(λ)  = J⁻₀₁(λ).exp(-τ(λ)/μ₀)
-            J₁⁻[:,1,:] = J₀⁻[:,1,:] .* expk'
+            @views J₁⁻[:,1,:] = J₀⁻[:,1,:] .* expk'
 
             # J⁻₀₂(λ) = J⁻₀₁(λ) + T⁻⁻₀₁(λ)[I - R⁻⁺₂₁(λ)R⁺⁻₀₁(λ)]⁻¹[J⁻₁₂(λ) + R⁻⁺₂₁(λ)J⁺₁₀(λ)] (see Eqs.8 in Raman paper draft)
             J₀⁻[:] = J₀⁻ + (tt⁺⁺_gp_refl ⊠ (J₁⁻ + r⁻⁺ ⊠ J₀⁺)) 
@@ -113,17 +113,15 @@ end
 @kernel function apply_D_SFI!(n_stokes::Int, J₀⁻)
     iμ, _, n = @index(Global, NTuple)
     i = mod(iμ, n_stokes)
-
     if (i > 2)
         J₀⁻[iμ, 1, n] = - J₀⁻[iμ, 1, n] 
     end
 end
 
-function apply_D_matrix!(n_stokes::Int, r⁻⁺::CuArray{FT,3}, t⁺⁺::CuArray{FT,3}, r⁺⁻::CuArray{FT,3}, t⁻⁻::CuArray{FT,3}) where {FT}
+function apply_D_matrix!(n_stokes::Int, r⁻⁺::AbstractArray{FT,3}, t⁺⁺::AbstractArray{FT,3}, r⁺⁻::AbstractArray{FT,3}, t⁻⁻::AbstractArray{FT,3}) where {FT}
     if n_stokes == 1
         r⁺⁻[:] = r⁻⁺
         t⁻⁻[:] = t⁺⁺    
-        
         return nothing
     else 
         device = devi(architecture(r⁻⁺))
@@ -135,7 +133,7 @@ function apply_D_matrix!(n_stokes::Int, r⁻⁺::CuArray{FT,3}, t⁺⁺::CuArray
     end
 end
 
-function apply_D_matrix!(n_stokes::Int, r⁻⁺::Array{FT,3}, t⁺⁺::Array{FT,3}, r⁺⁻::Array{FT,3}, t⁻⁻::Array{FT,3}) where {FT}
+#=function apply_D_matrix!(n_stokes::Int, r⁻⁺::Array{FT,3}, t⁺⁺::Array{FT,3}, r⁺⁻::Array{FT,3}, t⁻⁻::Array{FT,3}) where {FT}
     if n_stokes == 1
         r⁺⁻[:] = r⁻⁺
         t⁻⁻[:] = t⁺⁺
@@ -148,21 +146,19 @@ function apply_D_matrix!(n_stokes::Int, r⁻⁺::Array{FT,3}, t⁺⁺::Array{FT,
         wait(device, event);
         return nothing
     end
-end
+end=#
 
-function apply_D_matrix_SFI!(n_stokes::Int, J₀⁻::CuArray{FT,3}) where {FT}
-
+function apply_D_matrix_SFI!(n_stokes::Int, J₀⁻::AbstractArray{FT,3}) where {FT}
     n_stokes == 1 && return nothing
-
     device = devi(architecture(J₀⁻))
     applyD_kernel! = apply_D_SFI!(device)
     event = applyD_kernel!(n_stokes, J₀⁻, ndrange=size(J₀⁻));
     wait(device, event);
-    synchronize();
-    
-    return nothing
+    synchronize_if_gpu();
+    nothing
 end
-    
+
+#=
 function apply_D_matrix_SFI!(n_stokes::Int, J₀⁻::Array{FT,3}) where {FT}
     
     n_stokes == 1 && return nothing
@@ -173,4 +169,4 @@ function apply_D_matrix_SFI!(n_stokes::Int, J₀⁻::Array{FT,3}) where {FT}
     wait(device, event);
     
     return nothing
-end
+end=#

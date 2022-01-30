@@ -20,7 +20,7 @@ function get_n₀_n₁(ieJ₁⁺,Δ)
     return n₀, n₁
 end
 # Currently assuming same T for all vertical atmospheric layers (so that a uniform Raman wavelength grid can be assumed for rt_interactions)
-function getRamanAtmoConstants(ν̃, T)
+function getRamanAtmoConstants(ν̃::FT, T::FT) where FT
     n2 = InelasticScattering.getMolecularConstants(InelasticScattering.N₂(), (0.8));
     compute_effective_coefficents!(ν̃, T, n2)
     compute_energy_levels!(n2)

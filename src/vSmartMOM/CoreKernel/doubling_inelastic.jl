@@ -327,51 +327,32 @@ function doubling_inelastic!(RS_type,
     synchronize_if_gpu()
 end
 
-#@kernel function apply_D!(n_stokes::Int,  r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻)
-#    iμ, jμ, n = @index(Global, NTuple)
-#    i = mod(iμ, n_stokes)
-#    j = mod(jμ, n_stokes)
-#
-#    if (i > 2)
-#        r⁻⁺[iμ,jμ,n] = - r⁻⁺[iμ, jμ, n]
-#        r⁻⁺[iμ,jμ,n] = - r⁻⁺[iμ, jμ, n]
-#    end
-#    
-#    if ((i <= 2) & (j <= 2)) | ((i > 2) & (j > 2))
-#        r⁺⁻[iμ,jμ,n] = r⁻⁺[iμ,jμ,n]
-#        t⁻⁻[iμ,jμ,n] = t⁺⁺[iμ,jμ,n]
-#    else
-#        r⁺⁻[iμ,jμ,n] = - r⁻⁺[iμ,jμ,n]
-#        t⁻⁻[iμ,jμ,n] = - t⁺⁺[iμ,jμ,n]
-#    end
-#end
-
-@kernel function apply_D_IE!(RS_type::RRS, n_stokes::Int,  
+@kernel function apply_D_IE_RRS!(i_λ₁λ₀,n_stokes,  
                         ier⁻⁺, iet⁺⁺, ier⁺⁻, iet⁻⁻)
     iμ, jμ, n, Δn  = @index(Global, NTuple)
-    @unpack i_λ₁λ₀ = RS_type 
+    #@unpack i_λ₁λ₀ = RS_type 
     n₀  = n + i_λ₁λ₀[Δn]
-    i = mod(iμ, n_stokes)
-    j = mod(jμ, n_stokes)
-
-    if (i > 2)
-        ier⁻⁺[iμ,jμ,n,n₀] = - ier⁻⁺[iμ, jμ, n, n₀]
+    if 1 ≤ n₀ ≤ size(ier⁻⁺,4)
+        i = mod(iμ, n_stokes)
+        j = mod(jμ, n_stokes)
+        if (i > 2)
+            ier⁻⁺[iμ,jμ,n,n₀] = - ier⁻⁺[iμ, jμ, n, n₀]
+        end
+        
+        if ((i <= 2) & (j <= 2)) | ((i > 2) & (j > 2))
+            ier⁺⁻[iμ,jμ,n,n₀] = ier⁻⁺[iμ,jμ,n,n₀]
+            iet⁻⁻[iμ,jμ,n,n₀] = iet⁺⁺[iμ,jμ,n,n₀]
+        else
+            ier⁺⁻[iμ,jμ,n,n₀] = - ier⁻⁺[iμ,jμ,n,n₀]
+            iet⁻⁻[iμ,jμ,n,n₀] = - iet⁺⁺[iμ,jμ,n,n₀]
+        end
     end
-    
-    if ((i <= 2) & (j <= 2)) | ((i > 2) & (j > 2))
-        ier⁺⁻[iμ,jμ,n,n₀] = ier⁻⁺[iμ,jμ,n,n₀]
-        iet⁻⁻[iμ,jμ,n,n₀] = iet⁺⁺[iμ,jμ,n,n₀]
-    else
-        ier⁺⁻[iμ,jμ,n,n₀] = - ier⁻⁺[iμ,jμ,n,n₀]
-        iet⁻⁻[iμ,jμ,n,n₀] = - iet⁺⁺[iμ,jμ,n,n₀]
-    end
-
 end
 
-@kernel function apply_D_IE!(RS_type::Union{VS_0to1, VS_1to0}, n_stokes::Int,  
+@kernel function apply_D_IE_VS!(i_λ₁λ₀, n_stokes,  
                         ier⁻⁺, iet⁺⁺, ier⁺⁻, iet⁻⁻)
     iμ, jμ, Δn  = @index(Global, NTuple)
-    @unpack i_λ₁λ₀ = RS_type 
+    #@unpack i_λ₁λ₀ = RS_type 
     n  = i_λ₁λ₀[Δn]
     i = mod(iμ, n_stokes)
     j = mod(jμ, n_stokes)
@@ -399,21 +380,25 @@ end
 #    end
 #end
 
-@kernel function apply_D_SFI_IE!(RS_type::RRS, n_stokes::Int, ieJ₀⁻)
+# Kernel for RRS
+@kernel function apply_D_SFI_IE_RRS!(i_λ₁λ₀, n_stokes::Int, ieJ₀⁻)
     iμ, n, Δn = @index(Global, NTuple)
-    @unpack i_λ₁λ₀ = RS_type
+    #@unpack i_λ₁λ₀ = RS_type
     n₀ = n + i_λ₁λ₀[Δn] 
-    i = mod(iμ, n_stokes)
+    if 1 ≤ n₀ ≤ size(ieJ₀⁻,4)
+        i = mod(iμ, n_stokes)
 
-    if (i > 2)
-        ieJ₀⁻[iμ, 1, n, n₀] = - ieJ₀⁻[iμ, 1, n, Δn] 
+        if (i > 2)
+            ieJ₀⁻[iμ, 1, n, n₀] = - ieJ₀⁻[iμ, 1, n, Δn] 
+        end
     end
 end
 
-@kernel function apply_D_SFI_IE!(RS_type::Union{VS_0to1, VS_1to0}, 
+# Kernel for VRS
+@kernel function apply_D_SFI_IE_VS!(i_λ₁λ₀, 
                                 n_stokes::Int, ieJ₀⁻)
     iμ, _, Δn = @index(Global, NTuple)
-    @unpack i_λ₁λ₀ = RS_type
+    #@unpack i_λ₁λ₀ = RS_type
     n = i_λ₁λ₀[Δn] 
     i = mod(iμ, n_stokes)
 
@@ -440,30 +425,18 @@ end
 #    end
 #end
 
-function apply_D_matrix_IE!(RS_type, n_stokes::Int, ier⁻⁺::Array{FT,4}, iet⁺⁺::Array{FT,4}, ier⁺⁻::Array{FT,4}, iet⁻⁻::Array{FT,4}) where {FT}
-    if n_stokes == 1
-        ier⁺⁻[:] = ier⁻⁺
-        iet⁻⁻[:] = iet⁺⁺  
-        return nothing
-    else 
-        device = devi(Architectures.CPU())
-        applyD_kernel_IE! = apply_D_IE!(device)
-        event = applyD_kernel_IE!(RS_type, n_stokes, 
-            ier⁻⁺, iet⁺⁺, ier⁺⁻, iet⁻⁻, ndrange=getKernelDim(RS_type, ier⁻⁺));
-        wait(device, event);
-        return nothing
-    end
-end
 
-function apply_D_matrix_IE!(RS_type, n_stokes::Int, ier⁻⁺::CuArray{FT,4}, iet⁺⁺::CuArray{FT,4}, ier⁺⁻::CuArray{FT,4}, iet⁻⁻::CuArray{FT,4}) where {FT}
+
+function apply_D_matrix_IE!(RS_type::RRS, n_stokes::Int, ier⁻⁺::AbstractArray{FT,4}, iet⁺⁺::AbstractArray{FT,4}, ier⁺⁻::AbstractArray{FT,4}, iet⁻⁻::AbstractArray{FT,4}) where {FT}
     if n_stokes == 1
         ier⁺⁻[:] = ier⁻⁺
         iet⁻⁻[:] = iet⁺⁺  
         return nothing
     else 
-        device = devi(Architectures.GPU())
-        applyD_kernel_IE! = apply_D_IE!(device)
-        event = applyD_kernel_IE!(RS_type, n_stokes, 
+        device = devi(architecture(ier⁻⁺))
+        aType = array_type(architecture(ier⁻⁺))
+        applyD_kernel_IE! = apply_D_IE_RRS!(device)
+        event = applyD_kernel_IE!(aType(RS_type.i_λ₁λ₀), n_stokes, 
             ier⁻⁺, iet⁺⁺, ier⁺⁻, iet⁻⁻, ndrange=getKernelDim(RS_type, ier⁻⁺));
         wait(device, event);
         synchronize();
@@ -482,29 +455,30 @@ end
 #    
 #    return nothing
 #end
-    
-function apply_D_matrix_SFI_IE!(RS_type, n_stokes::Int, ieJ₀⁻::CuArray{FT,4}) where {FT}
-    
-    n_stokes == 1 && return nothing
 
-    device = devi(Architectures.GPU())
-    applyD_kernel_IE! = apply_D_SFI_IE!(device)
-    event = applyD_kernel_IE!(RS_type, n_stokes, 
-                    ieJ₀⁻, ndrange=getKernelDimSFI(RS_type, ieJ₀⁻));
+# For RRS
+function apply_D_matrix_SFI_IE!(RS_type::RRS, n_stokes::Int, ieJ₀⁻::AbstractArray{FT,4}) where {FT}
+    n_stokes == 1 && return nothing
+    device = devi(architecture(ieJ₀⁻))
+    aType = array_type(architecture(ieJ₀⁻))
+    applyD_kernel_IE! = apply_D_SFI_IE_RRS!(device)
+    event = applyD_kernel_IE!(aType(RS_type.i_λ₁λ₀),n_stokes, 
+                    ieJ₀⁻, ndrange=(size(ieJ₀⁻,1), size(ieJ₀⁻,3), size(ieJ₀⁻,4)));
     wait(device, event);
-    synchronize()
+    synchronize_if_gpu()
     return nothing
 end
 
-function apply_D_matrix_SFI_IE!(RS_type, n_stokes::Int, ieJ₀⁻::Array{FT,4}) where {FT}
-    
+# For S_0to1 and VS_1to0
+function apply_D_matrix_SFI_IE!(RS_type::Union{VS_0to1, VS_1to0}, n_stokes::Int, ieJ₀⁻::AbstractArray{FT,4}) where {FT}
     n_stokes == 1 && return nothing
-
-    device = devi(Architectures.CPU())
-    applyD_kernel_IE! = apply_D_SFI_IE!(device)
-    event = applyD_kernel_IE!(RS_type, n_stokes, 
+    device = devi(architecture(ieJ₀⁻))
+    aType = array_type(architecture(ieJ₀⁻))
+    applyD_kernel_IE! = apply_D_SFI_IE_VS!(device)
+    event = applyD_kernel_IE!(aType(RS_type.i_λ₁λ₀), n_stokes, 
                     ieJ₀⁻, ndrange=getKernelDimSFI(RS_type, ieJ₀⁻));
     wait(device, event);
+    synchronize_if_gpu()
     return nothing
 end
 
