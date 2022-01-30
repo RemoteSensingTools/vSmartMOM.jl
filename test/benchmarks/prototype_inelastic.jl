@@ -16,7 +16,6 @@ FT = Float64
 ν̃ = mean(ν);
 # Find central reference index for RRS:
 i_ref = argmin(abs.(ν .- ν̃))
-# TODO_VS: incident wavelength for VS
 # TODO_VS: λ_vs_in (get input)
 # TODO_VS: ν_vs_in (convert to wavenumbers)
 # Effective temperature for Raman calculations
@@ -54,7 +53,7 @@ vSmartMOM.getRamanSSProp!(RS_type, 1e7/ν̃, ν);
 # Add something here, that computes ALL the OP needed for the Raman case.
 #modelRS = ...
 
-R,ieR = rt_run(RS_type,
+R, T, ieR, ieT = rt_run(RS_type,
     model.params.polarization_type,
     model.obs_geom,
     model.τ_rayl[1], 
@@ -68,7 +67,7 @@ R,ieR = rt_run(RS_type,
     model.params.architecture);
 #R = vSmartMOM.rt_run(model, i_band=1)
 
-RnoRS, _ = rt_run(vSmartMOM.noRS(),
+RnoRS, TnoRS, _, _ = rt_run(vSmartMOM.noRS(),
             model.params.polarization_type,
             model.obs_geom,
             model.τ_rayl[1], 
