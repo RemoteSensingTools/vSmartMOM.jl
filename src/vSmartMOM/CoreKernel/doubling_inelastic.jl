@@ -28,7 +28,8 @@ function doubling_helper!(RS_type::RRS,
 
     # Note: short-circuit evaluation => return nothing evaluated iff ndoubl == 0 
     ndoubl == 0 && return nothing
-
+    nQuad, _, nSpec = size(r⁺⁻)
+    nRaman = length(i_λ₁λ₀);
     # Geometric progression of reflections (1-RR)⁻¹
     gp_refl      = similar(t⁺⁺)
     tt⁺⁺_gp_refl = similar(t⁺⁺)
@@ -62,7 +63,7 @@ function doubling_helper!(RS_type::RRS,
             #@show size(ieJ₁⁺)
             tmp1 = gp_refl ⊠  (J₀⁺ + r⁻⁺ ⊠ J₁⁻)
             tmp2 = gp_refl ⊠  (J₁⁻ + r⁻⁺ ⊠ J₀⁺)
-            for Δn = 1:size(ieJ₁⁺,4)
+            for Δn = 1:nRaman
                 n₀, n₁ = get_n₀_n₁(ieJ₁⁺,i_λ₁λ₀[Δn])
                 #@show length(n₁), length(n₀), length(n₁_), length(n₀_)
                 @inbounds @views ieJ₀⁺[:,:,n₁,Δn] = ieJ₁⁺[:,:,n₁,Δn] + 
@@ -115,7 +116,7 @@ function doubling_helper!(RS_type::RRS,
             expk[:] = expk.^2
         end  
         #println("Doubling part 1 done")
-        for Δn = 1:size(ieJ₁⁺,4)
+        for Δn = 1:nRaman
                 n₀, n₁ = get_n₀_n₁(ieJ₁⁺,i_λ₁λ₀[Δn])
                 #@show n₁, n₀
                 #@show length(n₀)
