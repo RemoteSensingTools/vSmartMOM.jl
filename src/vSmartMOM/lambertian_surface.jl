@@ -26,14 +26,17 @@ function create_surface_layer!(lambertian::LambertianSurfaceScalar{FT},
                                τ_sum,
                                architecture) where {FT}
     
+    @unpack qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart, iμ₀, μ₀ = quad_points
+    # Get size of added layer
+    Nquad = size(added_layer.r⁻⁺,1) ÷ pol_type.n
+    tmp    = ones(pol_type.n*Nquad)
+    arr_type = array_type(architecture)
+    T_surf = arr_type(Diagonal(tmp))
     if m == 0
-        @unpack qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart, iμ₀, μ₀ = quad_points
-        arr_type = array_type(architecture)
         # Albedo normalized by π (and factor 2 for 0th Fourier Moment)
         ρ = 2lambertian.albedo/FT(π)
-        # Get size of added layer
-        dim = size(added_layer.r⁻⁺)
-        Nquad = dim[1] ÷ pol_type.n
+        
+        
         
         R_surf = Array(Diagonal(vcat(ρ, zeros(FT,pol_type.n-1))))
         R_surf = repeat(R_surf',Nquad)
@@ -41,6 +44,7 @@ function create_surface_layer!(lambertian::LambertianSurfaceScalar{FT},
         
         # Move to architecture:
         R_surf = arr_type(R_surf)
+
         
         # Source function of surface:
         if SFI
@@ -50,15 +54,14 @@ function create_surface_layer!(lambertian::LambertianSurfaceScalar{FT},
             #@show i_start, iμ₀Nstart
             #i_end     = pol_type.n*iμ₀;
             I₀_NquadN[iμ₀Nstart:pol_type.n*iμ₀] = pol_type.I₀;
-        
-            added_layer.J₀⁺[:] .= 0
+            
+            added_layer.J₀⁺[:,1,:] .= I₀_NquadN .* exp.(-τ_sum/μ₀)';
             added_layer.J₀⁻[:,1,:] = μ₀*(R_surf*I₀_NquadN) .* exp.(-τ_sum/μ₀)';
             #@show μ₀*(1.1*R_surf*I₀_NquadN) == μ₀*(R_surf*I₀_NquadN)*1.1  
             #repeat(repeat(tmp .* exp.(-τ_sum/qp_μN[i_start]), Nquad), 1,1,dim[3])
         end
         R_surf = R_surf * Diagonal(qp_μN.*wt_μN)
-        tmp    = ones(pol_type.n*Nquad)
-        T_surf = arr_type(Diagonal(tmp))
+        
 
         @show size(added_layer.r⁻⁺), size(R_surf), size(added_layer.J₀⁻)
         added_layer.r⁻⁺ .= R_surf;
@@ -67,12 +70,12 @@ function create_surface_layer!(lambertian::LambertianSurfaceScalar{FT},
         added_layer.t⁻⁻ .= T_surf;
 
     else
-        added_layer.r⁻⁺[:] .= 0;
-        added_layer.r⁻⁺[:] .= 0;
-        added_layer.t⁺⁺[:] .= 0;
-        added_layer.t⁻⁻[:] .= 0;
-        added_layer.J₀⁺[:] .= 0;
-        added_layer.J₀⁻[:] .= 0;
+        added_layer.r⁻⁺ .= 0;
+        added_layer.r⁻⁺ .= 0;
+        added_layer.t⁺⁺ .= T_surf;
+        added_layer.t⁻⁻ .= T_surf;
+        added_layer.J₀⁺ .= 0;
+        added_layer.J₀⁻ .= 0;
     end
 end
 

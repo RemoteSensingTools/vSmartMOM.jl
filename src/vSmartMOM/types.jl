@@ -561,9 +561,12 @@ Base.@kwdef struct RVRS{FT<:AbstractFloat} <: AbstractRamanType
     n_Raman::Int
 end
 
-Base.@kwdef struct noRS{FT} <: AbstractRamanType
+Base.@kwdef mutable struct noRS{FT} <: AbstractRamanType
+    fscattRayl::FT = 0.0
     ϖ_Cabannes::FT = 1.0 #elastic fraction (Cabannes) of Rayleigh (Cabannes+Raman) scattering
 end
+
+
 
 """
     struct ComputedLayerProperties
