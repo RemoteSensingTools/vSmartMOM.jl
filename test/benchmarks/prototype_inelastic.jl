@@ -79,6 +79,3 @@ RnoRS, TnoRS, _, _ = rt_run(vSmartMOM.noRS(),
             model.τ_abs[1],
             model.params.brdf[1],
             model.params.architecture);
-
-
-

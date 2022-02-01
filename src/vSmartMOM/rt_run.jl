@@ -124,7 +124,8 @@ function rt_run(RS_type::AbstractRamanType, #Default - no Raman scattering (noRS
         @timeit "interaction" interaction!(RS_type,
             computed_atmosphere_properties.scattering_interfaces_all[end], 
             SFI, composite_layer, added_layer_surface, I_static)
-        #interaction_inelastic!(RS_type,computed_atmosphere_properties.scattering_interfaces_all[end], 
+        
+            #interaction_inelastic!(RS_type,computed_atmosphere_properties.scattering_interfaces_all[end], 
         #    SFI, composite_layer, added_layer_surface, I_static)
         # Postprocess and weight according to vza
         postprocessing_vza!(RS_type, iμ₀, pol_type, composite_layer, vza, qp_μ, m, vaz, μ₀, weight, nSpec, SFI, R, R_SFI, T, T_SFI, ieR_SFI, ieT_SFI)

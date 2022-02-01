@@ -446,7 +446,7 @@ function get_greek_raman!(RS_type::Union{VS_0to1, VS_1to0}, n2, o2)
 end
 
 function compute_Rayl_depol(n2, o2)
-    depol = (n2.vmr*n2.effcoeff.rho_depol_Rayl + o2.vmr*o2.effcoeff.rho_depol_Rayl)/(n2.vmr+o2.vmr)
+    depol = (n2.vmr*n2.effCoeff.rho_depol_Rayl + o2.vmr*o2.effCoeff.rho_depol_Rayl)/(n2.vmr+o2.vmr)
     return depol
 end
 
