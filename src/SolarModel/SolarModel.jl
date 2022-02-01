@@ -1,6 +1,6 @@
 module SolarModel
 
-using ..RadiativeTransfer       # For locating default solar T
+using ..vSmartMOM               # For locating default solar T
 using DocStringExtensions       # For simplifying docstring
 using DelimitedFiles            # For easily reading in solar spectrum 
 using Interpolations            # For interpolating solar spectrum
