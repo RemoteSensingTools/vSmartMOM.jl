@@ -65,9 +65,11 @@ include("rt_set_streams.jl")                # Set streams before RT
 include("parameters_from_yaml.jl")          # Loading in parameters from YAML file
 include("model_from_parameters.jl")         # Converting parameters to derived model attributes
 include("show_utils.jl")                    # Pretty-printing objects
+include("LayerOpticalProperties/compEffectiveLayerProperties.jl")
 
 # Surfaces
 include("lambertian_surface.jl")            # Lambertian Surface 
+
 
 # Raman additions
 include("Inelastic/inelastic_helper.jl")

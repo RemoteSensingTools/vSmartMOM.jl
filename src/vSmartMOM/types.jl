@@ -608,3 +608,57 @@ Base.@kwdef struct ComputedLayerProperties
     "Scattering interface type for current layer"
     scattering_interface
 end
+
+abstract type AbstractOpticalProperties end
+
+# Core optical Properties COP
+Base.@kwdef struct CoreScatteringOpticalProperties{FT} <:  AbstractOpticalProperties
+    "Absorption optical depth (scalar or wavelength dependent)"
+    τ::Union{FT, AbstractArray{FT,1}} 
+    "Single scattering albedo"
+    ϖ::Union{FT, AbstractArray{FT,1}}   
+    "Z scattering matrix (forward)"
+    Z⁺⁺::Union{AbstractArray{FT,2}, AbstractArray{FT,3}, Nothing}  
+    "Z scattering matrix (backward)"
+    Z⁻⁺::Union{AbstractArray{FT,2}, AbstractArray{FT,3}, Nothing}
+end
+
+# Adding Core Optical Properties, can have mixed dimensions!
+function Base.:+( x::CoreScatteringOpticalProperties{FT}, y::CoreScatteringOpticalProperties{FT} ) where FT
+    τ  = x.τ .+ y.τ
+    wx = x.τ .* x.ϖ 
+    wy = y.τ .* y.ϖ  
+    w  = wx .+ wy
+    ϖ  =  (w) ./ τ
+    
+    all(wx .== 0.0) ? (return CoreScatteringOpticalProperties(τ, ϖ, y.Z⁺⁺, y.Z⁻⁺)) : nothing
+    all(wy .== 0.0) ? (return CoreScatteringOpticalProperties(τ, ϖ, x.Z⁺⁺, x.Z⁻⁺)) : nothing
+
+    # A bit more tediuous for Z matrices:
+    length(unique(w))  == 1 ? w = unique(w) : nothing
+    length(unique(wx)) == 1 ? wx = unique(wx) : nothing
+    length(unique(wy)) == 1 ? wy = unique(wy) : nothing
+    n = length(w);
+    if n == 1
+        Z⁺⁺ = ((wx .* x.Z⁺⁺) .+ (wy .* y.Z⁺⁺)) ./ w 
+        Z⁻⁺ = ((wx .* x.Z⁻⁺) .+ (wy .* y.Z⁻⁺)) ./ w
+    else
+        nx = length(wx)
+        ny = length(wy)
+        nx > 1 ? wx = reshape(wx,1,1,n) : nothing
+        ny > 1 ? wy = reshape(wy,1,1,n) : nothing
+        w = reshape(w,1,1,n)
+        size(x.Z⁺⁺,3) == 1 ? xZ⁺⁺ = repeat(x.Z⁺⁺,1,1,n) : xZ⁺⁺ = x.Z⁺⁺
+        size(x.Z⁻⁺,3) == 1 ? xZ⁻⁺ = repeat(x.Z⁻⁺,1,1,n) : xZ⁻⁺ = x.Z⁻⁺
+        size(y.Z⁺⁺,3) == 1 ? yZ⁺⁺ = repeat(y.Z⁺⁺,1,1,n) : yZ⁺⁺ = y.Z⁺⁺
+        size(y.Z⁻⁺,3) == 1 ? yZ⁻⁺ = repeat(y.Z⁻⁺,1,1,n) : yZ⁻⁺ = y.Z⁻⁺
+        Z⁺⁺ = (wx .* xZ⁺⁺ .+ wy .* yZ⁺⁺) ./ w 
+        Z⁻⁺ = (wx .* xZ⁻⁺ .+ wy .* yZ⁻⁺) ./ w
+    end
+    CoreScatteringOpticalProperties(τ, ϖ, Z⁺⁺, Z⁻⁺)  
+end
+
+function Base.:*( x::FT, y::CoreScatteringOpticalProperties{FT} ) where FT
+    CoreScatteringOpticalProperties(y.τ * x, y.ϖ, y.Z⁺⁺, y.Z⁻⁺)
+end
+
