@@ -102,6 +102,7 @@ end
 
     # println("Loading full Wigner values...")
     # wigner_A, wigner_B = load_wigner_values("/home/rjeyaram/RadiativeTransfer/src/Scattering/Mie/wigner_values.jld")
+    # wigner_A, wigner_B = load_wigner_values("/home/rjeyaram/vSmartMOM/test/wigner_values.jld")
     # model_PCW = make_mie_model(PCW(), aero, λ, polarization_type, truncation_type, r_max, nquad_radius, wigner_A, wigner_B)
 
 

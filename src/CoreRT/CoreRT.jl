@@ -6,7 +6,7 @@ It includes this module's source files and exports the relevant keywords.
  
 =#
 
-module vSmartMOM
+module CoreRT
 
 using Interpolations               # For interpolating the vmr's
 using LinearAlgebra                # For linear algebra routines
@@ -14,7 +14,7 @@ using ProgressMeter                # Showing progress in for loops
 using Distributions                # Distributions of aerosols
 using ..Scattering                 # Use scattering module
 using ..Absorption                 # Use absorption module
-using ...RadiativeTransfer         # Use parent RadiativeTransfer module
+using ...vSmartMOM         # Use parent RadiativeTransfer module
 using ...Architectures             # Use Architectures module
 
 
