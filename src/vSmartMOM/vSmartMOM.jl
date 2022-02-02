@@ -12,6 +12,7 @@ using Interpolations               # For interpolating the vmr's
 using LinearAlgebra                # For linear algebra routines
 using ProgressMeter                # Showing progress in for loops
 using Distributions                # Distributions of aerosols
+using Parameters
 using ..Scattering                 # Use scattering module
 using ..Absorption                 # Use absorption module
 using ...RadiativeTransfer         # Use parent RadiativeTransfer module

@@ -666,6 +666,15 @@ function Base.:+( x::CoreScatteringOpticalProperties{FT}, y::CoreScatteringOptic
     CoreScatteringOpticalProperties(τ, ϖ, Z⁺⁺, Z⁻⁺)  
 end
 
+# Concatenate Core Optical Properties, can have mixed dimensions!
+function Base.:*( x::CoreScatteringOpticalProperties{FT}, y::CoreScatteringOpticalProperties{FT} ) where FT
+    arr_type  = array_type(architecture(x.τ))
+
+    x = expandOpticalProperties(x,arr_type);
+    y = expandOpticalProperties(y,arr_type);
+    CoreScatteringOpticalProperties([x.τ; y.τ],[x.ϖ; y.ϖ],cat(x.Z⁺⁺,y.Z⁺⁺, dims=3), cat(x.Z⁻⁺,y.Z⁻⁺, dims=3))
+end
+
 function Base.:+( x::CoreScatteringOpticalProperties{FT}, y::CoreAbsorptionOpticalProperties{FT} ) where FT
     τ  = x.τ .+ y.τ
     wx = x.τ .* x.ϖ 
