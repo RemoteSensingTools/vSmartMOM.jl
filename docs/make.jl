@@ -1,9 +1,9 @@
 using Documenter
 using Literate
-using RadiativeTransfer
-using RadiativeTransfer.Absorption
-using RadiativeTransfer.Scattering
-using RadiativeTransfer.vSmartMOM
+using vSmartMOM
+using vSmartMOM.Absorption
+using vSmartMOM.Scattering
+using vSmartMOM.vSmartMOM
 using Plots 
 
 ENV["GKSwstype"] = "nul"
@@ -21,12 +21,12 @@ function build()
 
     pages = Any[
         "Getting Started"       => "index.md",
-        "RadiativeTransfer"     => Any[
-                                    "Overview" => "pages/RadiativeTransfer/Overview.md", 
-                                    "Example" => "pages/RadiativeTransfer/Example.md",
-                                    "User-Defined RT Parameters" => "pages/RadiativeTransfer/InputParametersGuide.md",
-                                    "Methods & Types" => "pages/RadiativeTransfer/Types.md",
-                                    "References" => "pages/RadiativeTransfer/References.md"
+        "vSmartMOM"             => Any[
+                                    "Overview" => "pages/vSmartMOM/Overview.md", 
+                                    "Example" => "pages/vSmartMOM/Example.md",
+                                    "User-Defined RT Parameters" => "pages/vSmartMOM/InputParametersGuide.md",
+                                    "Methods & Types" => "pages/vSmartMOM/Types.md",
+                                    "References" => "pages/vSmartMOM/References.md"
                                     ],
         "Absorption"            => [
                                     "Overview" => "pages/Absorption/Overview.md",
@@ -63,7 +63,7 @@ function build()
         sitename = "Radiative Transfer",
         format = format,
         clean = false,
-        modules = [RadiativeTransfer],
+        modules = [vSmartMOM],
         pages = pages,
     )
 

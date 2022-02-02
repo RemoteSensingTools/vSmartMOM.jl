@@ -3,7 +3,7 @@
   <br>
   <a href="https://github.com/RadiativeTransfer/RadiativeTransfer.jl"><img src="docs/src/assets/logo.png" alt="RadiativeTransfer" width="200"></a>
   <br>
-  RadiativeTransfer.jl
+  vSmartMOM.jl
   <br>
 </h1>
 
