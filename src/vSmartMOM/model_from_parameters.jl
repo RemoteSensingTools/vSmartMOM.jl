@@ -79,7 +79,8 @@ function model_from_parameters(params::vSmartMOM_Parameters)
     for i_aer=1:n_aer
 
         # Get curr_aerosol
-        curr_aerosol = params.scattering_params.rt_aerosols[i_aer].aerosol
+        c_aero = params.scattering_params.rt_aerosols[i_aer]
+        curr_aerosol = c_aero.aerosol
         
         # Create Aerosol size distribution for each aerosol species
         size_distribution = curr_aerosol.size_distribution
@@ -93,9 +94,10 @@ function model_from_parameters(params::vSmartMOM_Parameters)
         mie_model      = make_mie_model(params.scattering_params.decomp_type, mie_aerosol, params.scattering_params.λ_ref, params.polarization_type, truncation_type, params.scattering_params.r_max, params.scattering_params.nquad_radius)       
         k_ref          = compute_ref_aerosol_extinction(mie_model, params.float_type)
 
+        params.scattering_params.rt_aerosols[i_aer].p₀, params.scattering_params.rt_aerosols[i_aer].σp
         # Loop over bands
         for i_band=1:n_bands
-
+            
             # i'th spectral band (convert from cm⁻¹ to μm)
             curr_band_λ = 1e4 ./ params.spec_bands[i_band]
 
@@ -111,7 +113,7 @@ function model_from_parameters(params::vSmartMOM_Parameters)
             aerosol_optics[i_band][i_aer] = Scattering.truncate_phase(truncation_type, aerosol_optics_raw; reportFit=false)
 
             # Compute nAer aerosol optical thickness profiles
-            τ_aer[i_band][i_aer,:] = params.scattering_params.rt_aerosols[i_aer].τ_ref[] * (aerosol_optics[i_band][i_aer].k/k_ref) * vSmartMOM.getAerosolLayerOptProp(1.0, params.scattering_params.rt_aerosols[i_aer].p₀, params.scattering_params.rt_aerosols[i_aer].σp, profile.p_full)
+            τ_aer[i_band][i_aer,:] = params.scattering_params.rt_aerosols[i_aer].τ_ref[] * (aerosol_optics[i_band][i_aer].k/k_ref) * vSmartMOM.getAerosolLayerOptProp(1.0, c_aero.p₀, c_aero.σp, profile.p_full)
             
         end 
     end
