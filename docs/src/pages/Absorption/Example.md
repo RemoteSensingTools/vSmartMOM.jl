@@ -1,8 +1,8 @@
 # Absorption Module Example
 
 ```julia
-using RadiativeTransfer
-using RadiativeTransfer.Absorption
+using vSmartMOM
+using vSmartMOM.Absorption
 
 ## 
 ## STEP 1: Get the Hitran data

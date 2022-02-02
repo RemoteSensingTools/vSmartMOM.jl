@@ -18,16 +18,16 @@ transfer calculations.
 
 First let's use the required packages
 
-```@example Tutorial_Scattering
-using RadiativeTransfer.Scattering
+````@example Tutorial_Scattering
+using vSmartMOM.Scattering
 using Distributions
 using Plots
-```
+````
 
 Now, we define the aerosol size distribution and properties. We only support univariate
 aerosols for now, but will add multivariate aerosols soon.
 
-```@example Tutorial_Scattering
+````@example Tutorial_Scattering
 μ     = 0.3;             ## Log-normal median radius [μm]
 σ     = 2.0;             ## Log-normal stddev of radius
 nᵣ    = 1.3;             ## Real part of refractive index
@@ -38,17 +38,17 @@ nquad_radius  = 2500;    ## Number of quadrature points for integrating of size 
 # Create a Size Distribution (using Julia's Distributions package)
 size_distribution = LogNormal(log(μ), log(σ));
 nothing #hide
-```
+````
 
 Create the aerosol
 
-```@example Tutorial_Scattering
+````@example Tutorial_Scattering
 aero = Aerosol(size_distribution, nᵣ, nᵢ)
-```
+````
 
 Now, we define some scattering and truncation properties:
 
-```@example Tutorial_Scattering
+````@example Tutorial_Scattering
 λ = 0.55;                             ## Incident wavelength [μm]
 polarization_type = Stokes_IQUV();    ## Polarization type
 
@@ -61,24 +61,24 @@ l_max = 20;
 # Truncation type
 truncation_type   = δBGE(l_max, Δ_angle);
 nothing #hide
-```
+````
 
-```@example Tutorial_Scattering
+````@example Tutorial_Scattering
 # Create a Mie model, using the Siewert method NAI2
 model_NAI2 = make_mie_model(NAI2(), aero, λ, polarization_type, truncation_type, r_max, nquad_radius);
 nothing #hide
-```
+````
 
-```@example Tutorial_Scattering
+````@example Tutorial_Scattering
 # Compute aerosol optical properties:
 aerosol_optics_NAI2 = compute_aerosol_optical_properties(model_NAI2);
 nothing #hide
-```
+````
 
 ### Plotting the greek coefficients
 (These are basically giving us the legendre decomposition of the phase matrix components)
 
-```@example Tutorial_Scattering
+````@example Tutorial_Scattering
 using Parameters
 @unpack α,β,γ,δ,ϵ,ζ = aerosol_optics_NAI2.greek_coefs;
 p1 = plot(α,  title="α");
@@ -89,36 +89,36 @@ p5 = plot(ϵ,  title="ϵ");
 p6 = plot(ζ,  title="ζ");
 plot(p1, p2, p3, p4, p5, p6, layout=(3, 2), legend=false)
 xlims!(0,100)
-```
+````
 
 ### Reconstructing the Phase Functions from the greek coefficients
 
-```@example Tutorial_Scattering
+````@example Tutorial_Scattering
 using FastGaussQuadrature
 μ_quad, w_μ = gausslegendre(1000)
 scattering_matrix = Scattering.reconstruct_phase(aerosol_optics_NAI2.greek_coefs, μ_quad);
 @unpack f₁₁, f₁₂, f₂₂, f₃₃, f₃₄, f₄₄ = scattering_matrix
-```
+````
 
 Plot only phase function for I (f₁₁) and the I -> Q transition in the phase matrix (f₁₂) for the Stokes Vector [I,Q,U,V]
 
-```@example Tutorial_Scattering
+````@example Tutorial_Scattering
 p1 = plot(μ_quad, f₁₁, yscale=:log10, title="f₁₁")
 p2 = plot(μ_quad, f₁₂ ./ f₁₁,  title="f₁₂/f₁₁")
 
 plot(p1, p2, layout=(2, 1), legend=false)
 xlabel!("cos(Θ)")
-```
+````
 
-```@example Tutorial_Scattering
+````@example Tutorial_Scattering
 p1 = plot([acos.(μ_quad); -reverse(acos.(μ_quad))], log10.([f₁₁ ; reverse(f₁₁)]), proj=:polar, yscale=:log10, title="f₁₁", lims=(-3,4.2), yaxis=false)
 p2 = plot([acos.(μ_quad); -reverse(acos.(μ_quad))], [f₁₂ ./ f₁₁ ; reverse(f₁₂ ./ f₁₁)], proj=:polar, title="f₁₂/f₁₁", lims=(0,0.6), yaxis=false)
 
 plot(p1, p2, layout=(1, 2), legend=false)
 xlabel!("Θ")
-```
+````
 
-```@example Tutorial_Scattering
+````@example Tutorial_Scattering
 anim = @animate for r = 0.03:0.05:4.3
     @show r
     local size_distribution = LogNormal(log(r), log(σ))
@@ -145,7 +145,7 @@ anim = @animate for r = 0.03:0.05:4.3
 
 end
 gif(anim, fps = 5)
-```
+````
 
 ---
 

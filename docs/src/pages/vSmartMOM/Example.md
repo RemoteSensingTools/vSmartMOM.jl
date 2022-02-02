@@ -1,8 +1,8 @@
-# RadiativeTransfer Module Example
+# vSmartMOM Module Example
 
 ```julia
-using RadiativeTransfer
-using RadiativeTransfer.vSmartMOM
+using vSmartMOM
+using vSmartMOM.CoreRT
 
 ## 
 ## STEP 1: Load / Customize RT parameters
@@ -10,7 +10,7 @@ using RadiativeTransfer.vSmartMOM
 
 # If you would like to load your own parameters from a YAML file
 # (See required format at: https://github.com/RadiativeTransfer/RadiativeTransfer.jl/blob/master/src/vSmartMOM/ModelParameters/DefaultParameters.yaml)
-parameters = parameters_from_yaml("RadiativeTransfer/src/vSmartMOM/ModelParameters/DefaultParameters.yaml")
+parameters = parameters_from_yaml("vSmartMOM/src/CoreRT/ModelParameters/DefaultParameters.yaml")
 
 # OR if you would like to load a default set of parameters
 parameters = default_parameters();

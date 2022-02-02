@@ -1,4 +1,4 @@
-# RadiativeTransfer Module References 
+# vSmartMOM Module References 
 
 ```
 1. Sanghavi, S., Davis, A.B. and Eldering, A., 2014. vSmartMOM: A vector matrix operator 

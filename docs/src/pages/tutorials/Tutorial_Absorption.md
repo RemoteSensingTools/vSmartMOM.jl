@@ -38,7 +38,7 @@ Let us take a simple example with the satellite flying at 7km/s and either stari
 
 ____
 
-```@example Tutorial_Absorption
+````@example Tutorial_Absorption
 # Speed of light (in m/s)
 c = 299792458.0
 
@@ -54,7 +54,7 @@ v₀ = 6250.0
 # Just writing out doppler shift in wavenumbers and wavelengths
 println("Doppler shift = $Δ_ν cm-1")
 println("Doppler shift = $(1e7/(v₀-Δ_ν)-1e7/v₀) nm")
-```
+````
 
 #### Random movements of molecules in gases lead to doppler broadening effects
 
@@ -118,14 +118,14 @@ The Voigt line-shape is the combination of Doppler and Pressure broadening (conv
 
 Once you dig deeper, there are various other more complex line-shapes (and line-mixing effects), which we ignore for now as the Voigt line-shape can provide very reasonable results. See, for instance, [here](https://www.degruyter.com/view/j/pac.2014.86.issue-12/pac-2014-0208/pac-2014-0208.xml)
 
-```@example Tutorial_Absorption
+````@example Tutorial_Absorption
 using Plots
 using Pkg.Artifacts
-using RadiativeTransfer
-using RadiativeTransfer.Absorption
-```
+using vSmartMOM
+using vSmartMOM.Absorption
+````
 
-```@example Tutorial_Absorption
+````@example Tutorial_Absorption
 co2_par = Absorption.read_hitran(artifact("CO2"), mol=2, iso=1, ν_min=6214.4, ν_max=6214.8);
 line_voigt   = make_hitran_model(co2_par, Voigt(), architecture=CPU())
 line_doppler = make_hitran_model(co2_par, Doppler(), architecture=CPU())
@@ -133,9 +133,9 @@ line_lorentz = make_hitran_model(co2_par, Lorentz(), architecture=CPU())
 # Specify our wavenumber grid
 ν = 6210:0.001:6220;
 nothing #hide
-```
+````
 
-```@example Tutorial_Absorption
+````@example Tutorial_Absorption
 cs_co2_1atm   = absorption_cross_section(line_voigt, ν, 1013.0     , 296.0);
 cs_co2_075atm = absorption_cross_section(line_voigt, ν, 0.75*1013.0, 296.0);
 cs_co2_05atm  = absorption_cross_section(line_voigt, ν, 0.5*1013.0 , 296.0);
@@ -147,9 +147,9 @@ cs_co2_01atm    = absorption_cross_section(line_voigt,   ν, 0.1*1013.0 , 296.0)
 cs_co2_doppler  = absorption_cross_section(line_doppler, ν, 0.1*1013.0 , 296.0);
 cs_co2_lorentz  = absorption_cross_section(line_lorentz, ν, 0.1*1013.0 , 296.0);
 nothing #hide
-```
+````
 
-```@example Tutorial_Absorption
+````@example Tutorial_Absorption
 #plotly()
 ff = 1e20;
 plot(ν,  ff*cs_co2_1atm,   label="Voigt, 1atm", yformatter = :scientific)
@@ -159,9 +159,9 @@ plot!(ν, ff*cs_co2_025atm, label="Voigt, 0.25atm")
 
 xlims!((6214,6215.2))
 xlabel!("Wavenumber (cm⁻¹))")
-```
+````
 
-```@example Tutorial_Absorption
+````@example Tutorial_Absorption
 plot( ν, cs_co2_01atm   /maximum(cs_co2_01atm) ,label="Voigt, 296K, 0.1atm")
 plot!(ν, cs_co2_doppler /maximum(cs_co2_01atm) ,label="Doppler, 296K")
 plot!(ν, cs_co2_lorentz /maximum(cs_co2_01atm) ,label="Lorentz, 296K, 0.1atm")
@@ -169,34 +169,34 @@ xlims!((6214.4,6214.8))
 
 ylabel!("σ/max(σ)")
 xlabel!("Wavenumber (cm⁻¹)")
-```
+````
 
 ### From an individual line to a band
 
 Here, we will just compute an entire band of CO$_2$ (a few to be precise) and look at some simple behavior, e.g. the re-distribution of individual lines in the P and R branch with changing temperature.
 
-```@example Tutorial_Absorption
+````@example Tutorial_Absorption
 co2_par_band = Absorption.read_hitran(artifact("CO2"), mol=2, iso=1, ν_min=6000.0, ν_max=6400.0);
 band_voigt   = make_hitran_model(co2_par_band , Voigt(), architecture=CPU())
-```
+````
 
-```@example Tutorial_Absorption
+````@example Tutorial_Absorption
 ν_band = 6300:0.01:6400;
 σ_co2_Voigt220 = absorption_cross_section(band_voigt, ν_band, 1013.0 , 220.0);
 σ_co2_Voigt290 = absorption_cross_section(band_voigt, ν_band, 1013.0 , 290.0);
 nothing #hide
-```
+````
 
-```@example Tutorial_Absorption
+````@example Tutorial_Absorption
 plot( ν_band, ff*σ_co2_Voigt220, alpha=0.5, label="220K")
 plot!(ν_band, ff*σ_co2_Voigt290, alpha=0.5, label="290K")
 xlims!((6300,6380))
-```
+````
 
-```@example Tutorial_Absorption
+````@example Tutorial_Absorption
 plot(ν_band, ff*(σ_co2_Voigt220 - σ_co2_Voigt290), label="220K-290K")
 xlims!((6300,6380))
-```
+````
 
 Think about this temperature dependence!!
 <li> Why is it there?
@@ -206,29 +206,29 @@ Think about this temperature dependence!!
 ---
 ### Some fun stuff
 
-```@example Tutorial_Absorption
+````@example Tutorial_Absorption
 T = 290.0
 @gif for p = 10:10:1100
     σ = absorption_cross_section(band_voigt, ν_band, p , T);
     plot(ν_band, ff*σ, yaxis=:log,label="p=$p")
     ylims!((1e-7, 1e-1))
 end
-```
+````
 
-```@example Tutorial_Absorption
+````@example Tutorial_Absorption
 p = 900.0
 @gif for T = 10:10:320
     σ = absorption_cross_section(band_voigt, ν_band, p , T);
     plot(ν_band, ff*σ, yaxis=:log, label="T=$T")
     ylims!((1e-7, 1e-1))
 end
-```
+````
 
-```@example Tutorial_Absorption
+````@example Tutorial_Absorption
 # More extreme case, let's take 10 atmospheres (10,000hPa)
 σ = absorption_cross_section(band_voigt, ν_band, 10000.0 , 300.0);
 plot(ν_band, ff*σ, label="p=10000.0hPa")
-```
+````
 
 ---
 

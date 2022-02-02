@@ -44,7 +44,7 @@
 
 ## **absorption** group (optional)
 
-**molecules**: Which molecules should be used for absorption calculations in each band. Should be a list of lists of molecule names (outer list over number of bands, inner list to hold molecules). Use `RadiativeTransfer.Absorption.show_molecules()` to see a list of valid molecules. 
+**molecules**: Which molecules should be used for absorption calculations in each band. Should be a list of lists of molecule names (outer list over number of bands, inner list to hold molecules). Use `vSmartMOM.Absorption.show_molecules()` to see a list of valid molecules. 
 
 **vmr**: A dictionary of volume-mixing ratios that match every individual molecule listed in **molecules** to a vmr. A vmr can be either a single number, or an array to interpolate from TOA to BOA, according to the number of layers specified by the p/T grids. 
 

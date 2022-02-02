@@ -1,6 +1,6 @@
-# RadiativeTransfer Module Overview
+# vSmartMOM Module Overview
 
-The RadiativeTransfer module allows end-to-end simulation of radiative transfer (RT) throughout Earth's atmosphere and surface. The model we use is based on the vSmartMOM Specifically, it:
+The vSmartMOM module allows end-to-end simulation of radiative transfer (RT) throughout Earth's atmosphere and surface. The model we use is based on the vSmartMOM Specifically, it:
 
 - Enables 1D vectorized plane-parallel RT modeling based on the Matrix Operator Method
 - Incorporates fast, high fidelity simulations of scattering atmospheres containing haze and clouds, including pressure- and temperature-resolved absorption profiles of gaseous species in the atmosphere
