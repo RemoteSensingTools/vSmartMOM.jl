@@ -137,6 +137,7 @@ function reduce_profile(n::Int, profile::AtmosphericProfile{FT}) where {FT}
 
     new_vmr = Dict{String, Union{Real, Vector}}()
 
+    # need to double check this logic, maybe better to add VCDs?!
     for molec_i in keys(vmr)
         if profile.vmr[molec_i] isa AbstractArray
             
@@ -357,6 +358,8 @@ function construct_all_atm_layers(
 
     return ComputedAtmosphereProperties(τ_λ_all, ϖ_λ_all, τ_all, ϖ_all, Z⁺⁺_all, Z⁻⁺_all, dτ_max_all, dτ_all, ndoubl_all, dτ_λ_all, expk_all, scatter_all, τ_sum_all, fscattRayl_all, scattering_interfaces_all)
 end
+
+
 
 "Given the CrossSectionModel, the grid, and the AtmosphericProfile, fill up the τ_abs array with the cross section at each layer
 (using pressures/temperatures) from the profile" 

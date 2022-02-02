@@ -38,6 +38,7 @@ function elemental_inelastic!(RS_type,
     @unpack ier⁺⁻, ier⁻⁺, iet⁻⁻, iet⁺⁺, ieJ₀⁺, ieJ₀⁻ = added_layer
     @unpack qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart, iμ₀ = quad_points
     arr_type = array_type(architecture)
+    τ_sum = arr_type(τ_sum)
     # Need to check with paper nomenclature. This is basically eqs. 19-20 in vSmartMOM
     
     # Later on, we can have Zs also vary with index, pretty easy here:
@@ -45,31 +46,15 @@ function elemental_inelastic!(RS_type,
     #Z⁻⁺_ = reshape(Z⁻⁺_λ₁λ₀, (size(Z⁺⁺_λ₁λ₀,1), size(Z⁺⁺_λ₁λ₀,2),1))
 
     D         = Diagonal(arr_type(repeat(pol_type.D, size(qp_μ,1))))
-    I₀_NquadN = arr_type(zeros(FT,size(qp_μN,1))); #incident irradiation
-    i_start   = pol_type.n*(iμ₀-1) + 1 
-    i_end     = pol_type.n*iμ₀
-    I₀_NquadN[iμ₀Nstart:i_end] = pol_type.I₀
-
-    device = devi(architecture)
-
+    
     # If in scattering mode:
     if scatter
-   
-        NquadN = length(qp_μN)
-
         # Needs explanation still, different weights: 
         # for m==0, ₀∫²ᵖⁱ cos²(mϕ)dϕ/4π = 0.5, while
         # for m>0,  ₀∫²ᵖⁱ cos²(mϕ)dϕ/4π = 0.25  
-        # scalars
-        #wct0  = m == 0 ? FT(0.50) * ϖ * dτ     : FT(0.25) * ϖ * dτ 
+        
         wct02 = m == 0 ? FT(0.50)              : FT(0.25)
-        # vectors
-        # wct   = m == 0 ? FT(0.50) * ϖ * wt_μN  : FT(0.25) * ϖ * wt_μN
         wct2  = m == 0 ? wt_μN/2               : wt_μN/4
-
-        # Get the diagonal matrices first
-        #d_qp  = Diagonal(1 ./ qp_μN)
-        #d_wct = Diagonal(wct2)
 
         # Calculate r⁻⁺ and t⁺⁺
         #Version 2: More computationally intensive definition of a single scattering layer with variable (0-∞) absorption
@@ -197,6 +182,7 @@ function get_elem_rt!(RS_type::RRS,
         synchronize_if_gpu();
 end
 
+#=
 @kernel function get_elem_rt!(RS_type::Union{VS_0to1, VS_1to0}, 
                             ier⁻⁺, iet⁺⁺, 
                             dτ_λ, ϖ_λ, 
@@ -318,7 +304,7 @@ end
 end
 
 #  TODO: Nov 30, 2021
-
+=#
 function get_elem_rt_SFI!(RS_type::RRS, 
                         ieJ₀⁺, ieJ₀⁻, 
                         τ_sum, dτ_λ, ϖ_λ, 
@@ -331,6 +317,7 @@ function get_elem_rt_SFI!(RS_type::RRS,
     device = devi(architecture(ieJ₀⁺))
     aType = array_type(architecture(ieJ₀⁺))
     kernel! = get_elem_rt_SFI_RRS!(device)
+    #@show typeof(ieJ₀⁺), typeof(τ_sum), typeof(dτ_λ),typeof(wct02), typeof(qp_μN), typeof(dτ_λ) 
     event = kernel!(fscattRayl, aType(ϖ_λ₁λ₀), aType(i_λ₁λ₀), 
                 i_ref, ieJ₀⁺, ieJ₀⁻, 
                 τ_sum, dτ_λ, ϖ_λ,
@@ -406,6 +393,7 @@ end
     #    @show i, n₀, n₁, Δn, ieJ₀⁺[i, 1, n₁, Δn], ieJ₀⁻[i, 1, n₁, Δn]
     #end
 end
+
 @kernel function apply_D_elemental_RRS!(ndoubl, pol_n, ier⁻⁺, iet⁺⁺, ier⁺⁻, iet⁻⁻)
     i, j, n₁, n₀ = @index(Global, NTuple)
 
@@ -487,27 +475,15 @@ function apply_D_matrix_elemental!(RS_type::RRS, ndoubl::Int, n_stokes::Int,
     return nothing
 end
 
-function apply_D_matrix_elemental_SFI!(RS_type::RRS,ndoubl::Int, n_stokes::Int, J₀⁻::CuArray{FT,4}) where {FT}
+function apply_D_matrix_elemental_SFI!(RS_type::RRS,ndoubl::Int, n_stokes::Int, J₀⁻::AbstractArray{FT,4}) where {FT}
     if ndoubl > 1
         return nothing
     else 
-        device = devi(Architectures.GPU())
+        device = devi(architecture(J₀⁻))
         applyD_kernel! = apply_D_elemental_SFI!(device)
-        event = applyD_kernel!(RS_type::RRS,ndoubl,n_stokes, J₀⁻, ndrange=size(J₀⁻));
+        event = applyD_kernel!(RS_type,ndoubl,n_stokes, J₀⁻, ndrange=size(J₀⁻));
         wait(device, event);
         synchronize();
-        return nothing
-    end
-end
-    
-function apply_D_matrix_elemental_SFI!(RS_type::RRS,ndoubl::Int, n_stokes::Int, J₀⁻::Array{FT,4}) where {FT}
-    if ndoubl > 1
-        return nothing
-    else 
-        device = devi(Architectures.CPU())
-        applyD_kernel! = apply_D_elemental_SFI!(device)
-        event = applyD_kernel!(RS_type::RRS,ndoubl,n_stokes, J₀⁻, ndrange=size(J₀⁻));
-        wait(device, event);
         return nothing
     end
 end
