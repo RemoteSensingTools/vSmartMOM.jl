@@ -626,6 +626,11 @@ Base.@kwdef struct CoreScatteringOpticalProperties{FT} <:  AbstractOpticalProper
     Z⁻⁺::Union{AbstractArray{FT,2}, AbstractArray{FT,3}, Nothing}
 end
 
+Base.@kwdef struct CoreAbsorptionOpticalProperties{FT} <:  AbstractOpticalProperties
+    "Absorption optical depth (scalar or wavelength dependent)"
+    τ::Union{FT, AbstractArray{FT,1}} 
+end
+
 # Adding Core Optical Properties, can have mixed dimensions!
 function Base.:+( x::CoreScatteringOpticalProperties{FT}, y::CoreScatteringOpticalProperties{FT} ) where FT
     τ  = x.τ .+ y.τ
@@ -660,6 +665,18 @@ function Base.:+( x::CoreScatteringOpticalProperties{FT}, y::CoreScatteringOptic
     end
     CoreScatteringOpticalProperties(τ, ϖ, Z⁺⁺, Z⁻⁺)  
 end
+
+function Base.:+( x::CoreScatteringOpticalProperties{FT}, y::CoreAbsorptionOpticalProperties{FT} ) where FT
+    τ  = x.τ .+ y.τ
+    wx = x.τ .* x.ϖ 
+    ϖ  = (wx) ./ τ
+    CoreScatteringOpticalProperties(τ, ϖ, x.Z⁺⁺, x.Z⁻⁺)
+end
+
+function Base.:+(  y::CoreAbsorptionOpticalProperties{FT}, x::CoreScatteringOpticalProperties{FT} ) where FT
+    x + y
+end
+
 
 function Base.:*( x::FT, y::CoreScatteringOpticalProperties{FT} ) where FT
     CoreScatteringOpticalProperties(y.τ * x, y.ϖ, y.Z⁺⁺, y.Z⁻⁺)
