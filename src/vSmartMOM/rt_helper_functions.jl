@@ -115,7 +115,7 @@ make_added_layer(RS_type::RRS, FT, arr_type, dims, nSpec)  = AddedLayerRS(
                                                          
 "Make an added layer, supplying all default matrices"
 #Currently RS_type.n_Raman = 1
-make_added_layer(RS_type::Union{VRS_0to1, VRS_1to0}, FT, arr_type, dims, nSpec)  = AddedLayerRS(
+make_added_layer(RS_type::Union{VS_0to1, VS_1to0}, FT, arr_type, dims, nSpec)  = AddedLayerRS(
                                                 default_matrix(FT, arr_type, dims, RS_type.n_Raman), 
                                                 default_matrix(FT, arr_type, dims, RS_type.n_Raman), 
                                                 default_matrix(FT, arr_type, dims, RS_type.n_Raman),
@@ -137,7 +137,7 @@ make_added_layer(RS_type::Union{VRS_0to1, VRS_1to0}, FT, arr_type, dims, nSpec) 
                                                 )
 "Make an added layer, supplying all default matrices"
 #Currently RS_type.n_Raman = 1
-make_added_layer(RS_type::Union{RVRS_0to1, RVRS_1to0}, FT, arr_type, dims, nSpec)  = AddedLayerRS(
+#=make_added_layer(RS_type::Union{RVRS_0to1, RVRS_1to0}, FT, arr_type, dims, nSpec)  = AddedLayerRS(
                                                 default_matrix(FT, arr_type, dims, RS_type.n_Raman), 
                                                 default_matrix(FT, arr_type, dims, RS_type.n_Raman), 
                                                 default_matrix(FT, arr_type, dims, RS_type.n_Raman),
@@ -157,7 +157,7 @@ make_added_layer(RS_type::Union{RVRS_0to1, RVRS_1to0}, FT, arr_type, dims, nSpec
                                                 default_J_matrix_ie(FT, arr_type, dims, nSpec, RS_type.n_Raman),
                                                 default_J_matrix_ie(FT, arr_type, dims, nSpec, RS_type.n_Raman)
                                                 )
-
+=#
 "Make a random added layer, supplying all random matrices"
 make_added_layer_rand(RS_type::noRS, FT, arr_type, dims, nSpec)  = AddedLayer(
                                                         default_matrix_rand(FT, arr_type, dims, nSpec), 
@@ -194,7 +194,7 @@ make_composite_layer(RS_type::RRS, FT, arr_type, dims, nSpec) = CompositeLayerRS
                                                         )
 
 "Make a composite layer, supplying all default matrices"
-make_composite_layer(RS_type::Union{VRS_0to1, VRS_1to0},FT, arr_type, dims, nSpec) = CompositeLayerRS(
+make_composite_layer(RS_type::Union{VS_0to1, VS_1to0},FT, arr_type, dims, nSpec) = CompositeLayerRS(
                                                         default_matrix(FT, arr_type, dims, RS_type.n_Raman), 
                                                         default_matrix(FT, arr_type, dims, RS_type.n_Raman), 
                                                         default_matrix(FT, arr_type, dims, RS_type.n_Raman),
@@ -215,6 +215,7 @@ make_composite_layer(RS_type::Union{VRS_0to1, VRS_1to0},FT, arr_type, dims, nSpe
                                                         default_J_matrix_ie(FT, arr_type, dims, nSpec, RS_type.n_Raman)
                                                         )
 
+                                                        #=
 "Make a composite layer, supplying all default matrices"
 make_composite_layer(RS_type::Union{RVRS_0to1, RVRS_1to0},FT, arr_type, dims, nSpec) = CompositeLayerRS(
                                                         default_matrix(FT, arr_type, dims, RS_type.n_Raman), 
@@ -237,7 +238,7 @@ make_composite_layer(RS_type::Union{RVRS_0to1, RVRS_1to0},FT, arr_type, dims, nS
                                                         default_J_matrix_ie(FT, arr_type, dims, nSpec, RS_type.n_Raman)
                                                         )
 
-                                                        
+=#                                                        
 
 "Given a ComputedAtmosphereProperties object, extract a ComputedLayerProperties object using data from the iz index of all arrays in the ComputedAtmosphereProperties"
 function get_layer_properties(computed_atmospheric_properties::ComputedAtmosphereProperties, iz, arr_type)
