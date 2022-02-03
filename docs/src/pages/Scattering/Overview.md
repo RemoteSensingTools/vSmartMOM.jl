@@ -11,11 +11,11 @@ You can calculate a scattering phase-function in a few short steps:
 3. Use [`compute_aerosol_optical_properties`](@ref) to perform the optical-properties calculations using the defined model settings
 4. Use [`reconstruct_phase`](@ref) to produce the scattering matrix from the computed optical properties
 
-For a full demo of how to use this module, please see the [example](https://radiativetransfer.github.io/RadiativeTransfer.jl/dev/pages/Scattering/Example.html) page. 
+For a full demo of how to use this module, please see the [example](https://remotesensingtools.github.io/vSmartMOM.jl/dev/pages/Scattering/Example.html) page. 
 
 ## Architecture
 
-![ArchitectureDiagram](RadiativeTransferDiagram-PhaseFunction.drawio.png)
+![ArchitectureDiagram](vSmartMOMDiagram-Scattering.drawio.png)
 
 The Scattering.jl architecture closely follows the user's workflow to calculate the scattering phase-function. There are functions for creating an aerosol, defining scattering parameters, calculating aerosol optical properties, and constructing the phase-function from said optical properties. 
 

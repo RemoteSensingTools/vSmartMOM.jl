@@ -20,7 +20,6 @@ using ForwardDiff, DiffResults  # Automatic Differentiation tools
 using LinearAlgebra             # For calculations
 using StatsBase                 # Fit statistics for truncation
 using StaticArrays              # 
-# using UnicodePlots              # For plotting aerosol distribution
 
 using ..Architectures: device
 

@@ -2,7 +2,7 @@
 
 ```julia
 using vSmartMOM
-using vSmartMOM.Scattering
+using vSmartMOMYeah.Scattering
 using Distributions
 using BenchmarkTools
 

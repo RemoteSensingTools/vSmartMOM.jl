@@ -7,9 +7,9 @@ By taking advantage of modern software tools, such as GPU acceleration and HPC c
 ## Installation
 
 1. Install [Julia](https://julialang.org/downloads/) (1.6+)
-2. Start Julia REPL and run:  
+2. Start the Julia REPL, enter the Pkg REPL by pressing `]` and run:  
 ```julia
-] add https://github.com/RupeshJey/RadiativeTransfer.jl
+add vSmartMOM
 ```
 
 ## Submodules
