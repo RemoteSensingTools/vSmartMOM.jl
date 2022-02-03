@@ -1,4 +1,4 @@
-# RadiativeTransfer Module Methods & Types
+# vSmartMOM Module Methods & Types
 
 ## Defining Parameters for RT Simulation
 
@@ -24,35 +24,35 @@ rt_run
 ### Parameters Type
 
 ```@docs
-vSmartMOM.vSmartMOM_Parameters
+CoreRT.vSmartMOM_Parameters
 ```
 
 ### Model Type
 
 ```@docs
-vSmartMOM.vSmartMOM_Model
+CoreRT.vSmartMOM_Model
 ```
 
 ### Surface Types
 
 ```@docs
-vSmartMOM.AbstractSurfaceType
-vSmartMOM.LambertianSurfaceScalar
-vSmartMOM.LambertianSurfaceSpectrum
-vSmartMOM.LambertianSurfacePolyFit
+CoreRT.AbstractSurfaceType
+CoreRT.LambertianSurfaceScalar
+CoreRT.LambertianSurfaceSpectrum
+CoreRT.LambertianSurfacePolyFit
 
 ```
 
 ### Quadrature Types
 ```@docs
-vSmartMOM.AbstractQuadratureType
-vSmartMOM.RadauQuad
-vSmartMOM.GaussQuadHemisphere
-vSmartMOM.GaussQuadFullSphere
+CoreRT.AbstractQuadratureType
+CoreRT.RadauQuad
+CoreRT.GaussQuadHemisphere
+CoreRT.GaussQuadFullSphere
 
 ```
 
 ### Atmospheric Profile Type
 ```@docs
-vSmartMOM.AtmosphericProfile
+CoreRT.AtmosphericProfile
 ```

@@ -1,7 +1,7 @@
 
 <h1 align="center">
   <br>
-  <a href="https://github.com/RadiativeTransfer/RadiativeTransfer.jl"><img src="docs/src/assets/logo.png" alt="RadiativeTransfer" width="200"></a>
+  <a href="https://github.com/RemoteSensingTools/vSmartMOM.jl"><img src="docs/src/assets/logo.png" alt="vSmartMOM" width="200"></a>
   <br>
   vSmartMOM.jl
   <br>
@@ -10,20 +10,20 @@
 <h4 align="center">An end-to-end modular software suite for radiative transfer calculations, written in <a href="https://julialang.org">Julia</a>.</h4>
 
 <p align="center">
-  <a href="https://github.com/RadiativeTransfer/RadiativeTransfer.jl/actions/workflows/AutomatedTests.yml/">
-    <img src="https://github.com/RadiativeTransfer/RadiativeTransfer.jl/actions/workflows/AutomatedTests.yml/badge.svg"
+  <a href="https://github.com/RemoteSensingTools/vSmartMOM.jl/actions/workflows/AutomatedTests.yml/">
+    <img src="https://github.com/RemoteSensingTools/vSmartMOM.jl/actions/workflows/AutomatedTests.yml/badge.svg"
          alt="Tests">
   </a> 
-  <a href="https://radiativetransfer.github.io/RadiativeTransfer.jl/dev/">
+  <a href="https://RemoteSensingTools.github.io/vSmartMOM.jl/dev/">
     <img src="https://img.shields.io/badge/docs-latest-blue.svg"
          alt="Docs">
   </a>
-  <a href="https://github.com/RadiativeTransfer/RadiativeTransfer.jl/blob/master/LICENSE">
-    <img src="https://img.shields.io/github/license/RadiativeTransfer/radiativetransfer.jl"
+  <a href="https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/master/LICENSE">
+    <img src="https://img.shields.io/github/license/RemoteSensingTools/vSmartMOM.jl"
          alt="License">
   </a>
-  <a href="https://github.com/RadiativeTransfer/RadiativeTransfer.jl/commits/master">
-    <img src="https://img.shields.io/github/commit-activity/y/RadiativeTransfer/RadiativeTransfer.jl"
+  <a href="https://github.com/RemoteSensingTools/vSmartMOM.jl/commits/master">
+    <img src="https://img.shields.io/github/commit-activity/y/RemoteSensingTools/vSmartMOM.jl"
          alt="Github Commit Frequency">
   </a>
 </p>
@@ -41,22 +41,22 @@ By taking advantage of modern software tools, such as GPU acceleration and HPC c
 
 ## Installation
 
-RadiativeTransfer can be installed using the Julia package manager. From the Julia REPL, type `]` to enter the Pkg REPL mode and run
+vSmartMOM can be installed using the Julia package manager. From the Julia REPL, type `]` to enter the Pkg REPL mode and run
 
 ```julia
-pkg> add https://github.com/RadiativeTransfer/RadiativeTransfer.jl
+pkg> add https://github.com/RemoteSensingTools/vSmartMOM.jl
 ```
 
 ## Modules
 
-**Note: This section provides only a quick overview of the available modules in RadiativeTransfer.jl.**
+**Note: This section provides only a quick overview of the available modules in vSmartMOM.jl.**
 
-For in-depth examples, tutorials, and implementation details, please see the complete <a href="https://radiativetransfer.github.io/RadiativeTransfer.jl/dev/">Documentation</a>.
+For in-depth examples, tutorials, and implementation details, please see the complete <a href="https://RemoteSensingTools.github.io/vSmartMOM.jl/dev/">Documentation</a>.
 
 
-### RadiativeTransfer
+### vSmartMOM
 
-The RadiativeTransfer module allows end-to-end simulation of radiative transfer (RT) throughout Earth's atmosphere and surface. Specifically, it:
+The vSmartMOM module allows end-to-end simulation of radiative transfer (RT) throughout Earth's atmosphere and surface. Specifically, it:
 
   1. Enables 1D vectorized plane-parallel RT modeling based on the Matrix Operator Method.
   2. Incorporates fast, high fidelity simulations of scattering atmospheres containing haze and clouds – including pressure- and temperature-resolved absorption profiles of gaseous species in the atmosphere. 
@@ -69,7 +69,7 @@ The RadiativeTransfer module allows end-to-end simulation of radiative transfer 
   - `model_from_parameters(parameters::vSmartMOM_Parameters)`: Using the parameters, calculate derived parameters that will be used in the main RT code. The derived parameters include cross-section profiles, scattering phase functions, etc.  
   - `rt_run(model::vSmartMOM_Model)`: Use the defined model to perform RT simulation.
 
-### RadiativeTransfer.Absorption
+### vSmartMOM.Absorption
 
 This module enables absorption cross-section calculations of atmospheric gases at different pressures, temperatures, and broadeners (Doppler, Lorentzian, Voigt). It uses the <a href=https://hitran.org>HITRAN</a> energy transition database for calculations. While it enables lineshape calculations from scratch, it also allows users to create and save an interpolator object at specified wavelength, pressure, and temperature grids. It can perform these computations either on CPU or GPU. <br><img src='docs/src/assets/CrossSectionGIF.gif' class='center'></img><br> Key functions:
 
@@ -78,7 +78,7 @@ This module enables absorption cross-section calculations of atmospheric gases a
   - `make_interpolation_model(hitran::HitranTable, broadening::AbstractBroadeningFunction, )`: Similar to creating a HitranModel, but this will perform the interpolation at the given wavelength, pressure, and temperature grids and store the interpolator in InterpolationModel.
   - `absorption_cross_section(model::AbstractCrossSectionModel, grid::AbstractRange{<:Real}, pressure::Real, temperature::Real, ...)`: Performs an absorption cross-section calculation with the given model (HitranModel or InterpolationModel), at a given wavelength grid, pressure and temperature
 
-### RadiativeTransfer.Scattering
+### vSmartMOM.Scattering
 
 This module enables scattering phase-function calculation of atmospheric aerosols with different size distributions, incident wavelengths, and refractive indices. It can perform the calculation using either the Siewert NAI-2 or Domke PCW methods ([Suniti Sanghavi 2014](https://www.sciencedirect.com/science/article/pii/S0022407313004962)). <br><br><img src='docs/src/assets/ScatteringGIF.gif' class='center'></img><br> Key functions:
 
