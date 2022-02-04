@@ -31,7 +31,7 @@ function model_from_parameters(params::vSmartMOM_Parameters)
     
     # Reduce the profile to the number of target layers (if specified)
     if params.profile_reduction_n != -1
-        profile = vSmartMOM.reduce_profile(params.profile_reduction_n, profile);
+        profile = reduce_profile(params.profile_reduction_n, profile);
     end
 
     # Rayleigh optical properties calculation
