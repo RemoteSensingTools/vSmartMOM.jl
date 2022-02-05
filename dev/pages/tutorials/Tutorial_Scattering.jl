@@ -14,7 +14,7 @@
 
 # First let's use the required packages
 
-using RadiativeTransfer.Scattering
+using vSmartMOM.Scattering
 using Distributions
 using Plots
 #----------------------------------------------------------------------------
