@@ -60,7 +60,7 @@ function build()
 
     # This way it shows warnings of functions that have not been documented
     makedocs(
-        sitename = "Radiative Transfer",
+        sitename = "vSmartMOM",
         format = format,
         clean = false,
         modules = [vSmartMOM],
@@ -72,7 +72,7 @@ end
 build()
 
 deploydocs(
-    repo = "github.com/RadiativeTransfer/RadiativeTransfer.jl.git",
+    repo = "github.com/remotesensingtools/vSmartMOM.jl.git",
     target = "build",
     push_preview = true,
 )
