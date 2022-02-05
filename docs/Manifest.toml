@@ -1652,7 +1652,9 @@ uuid = "3f19e933-33d8-53b3-aaab-bd5110c3b7a0"
 
 [[deps.vSmartMOM]]
 deps = ["CUDA", "CUDAKernels", "DataInterpolations", "DelimitedFiles", "DiffResults", "Distributions", "DocStringExtensions", "FastGaussQuadrature", "ForwardDiff", "InstrumentOperator", "Interpolations", "JLD2", "JSON", "KernelAbstractions", "LinearAlgebra", "NCDatasets", "NNlib", "NetCDF", "Parameters", "Pkg", "Polynomials", "ProgressMeter", "SpecialFunctions", "StaticArrays", "StatsBase", "TimerOutputs", "YAML"]
-path = "/home/rjeyaram/vSmartMOM"
+git-tree-sha1 = "7d66a4cff963bf788e21bb4a1b6666167c440013"
+repo-rev = "main"
+repo-url = "/home/rjeyaram/vSmartMOM"
 uuid = "ace8185b-fa20-42f5-912d-1e850dbe6a09"
 version = "0.4.3"
 
