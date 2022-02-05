@@ -72,7 +72,7 @@ end
 build()
 
 deploydocs(
-    repo = "github.com/remotesensingtools/vSmartMOM.jl.git",
+    repo = "github.com/RemoteSensingTools/vSmartMOM.jl.git",
     target = "build",
     push_preview = true,
 )
