@@ -1,12 +1,12 @@
 #=
  
-This file is the entry-point for the RadiativeTransfer module. 
+This file is the entry-point for the vSmartMOM module. 
 
 It includes this module's source files and exports the relevant keywords.  
  
 =#
 
-module RadiativeTransfer
+module vSmartMOM
 using Pkg.Artifacts
 using LinearAlgebra
 using Distributions
@@ -33,9 +33,9 @@ include("Absorption/Absorption.jl")
 # Mie Phase Function module:
 include("Scattering/Scattering.jl")
 
-# vSmartMOM module:
-include("vSmartMOM/vSmartMOM.jl")
-using .vSmartMOM
+# CoreRT module:
+include("CoreRT/CoreRT.jl")
+using .CoreRT
 
 # SolarModel module:
 include("SolarModel/SolarModel.jl")
@@ -49,7 +49,7 @@ using .Absorption
 # Perform some GPU setup when the module is loaded
 function __init__()
     @hascuda begin
-        @info "CUDA-enabled GPU(s) detected:"
+        @info "CUDA-enabled GPU(s) detected"
         for (gpu, dev) in enumerate(CUDA.devices())
             @info "$dev: $(CUDA.name(dev))"
         end

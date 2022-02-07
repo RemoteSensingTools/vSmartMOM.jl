@@ -2,7 +2,8 @@ name: Documentation
 on:
   push:
     branches:
-      - master
+      - main
+      - develop
     tags: '*'
   pull_request:
 
@@ -14,7 +15,7 @@ jobs:
       - name: Set up Julia
         uses: julia-actions/setup-julia@v1
         with:
-          version: '1.6'
+          version: '1.7'
       - name: Install Dependencies
         run: julia --project=docs/ -e 'using Pkg; Pkg.instantiate();'
       - name: Build and deploy

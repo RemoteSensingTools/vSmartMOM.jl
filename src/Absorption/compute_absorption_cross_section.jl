@@ -145,10 +145,10 @@ function compute_absorption_cross_section(
     grid = wavelength_flag ? reverse(nm_per_m ./ collect(grid)) : collect(grid)
 
     # Scale the interpolation to match the model grids
-    sitp = scale(model.itp, model.p_grid, model.t_grid, model.ν_grid)
+    sitp = scale(model.itp, model.ν_grid, model.p_grid, model.t_grid)
 
     # Perform the interpolation and return the resulting grid
-    return sitp(pressure, temperature, grid)
+    return sitp(grid, pressure, temperature)
 end
 
 #=

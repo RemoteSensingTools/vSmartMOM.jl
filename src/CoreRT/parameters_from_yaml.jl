@@ -55,8 +55,8 @@ function aerosol_params_to_obj(aerosols::Union{Array{Dict{Any, Any}}, Vector{Any
     rt_aerosol_obj_list = RT_Aerosol[]
 
     for aerosol in aerosols
-
-        size_distribution = LogNormal(FT(aerosol["μ"]), FT(aerosol["σ"]))
+        @assert aerosol["σ"] ≥ 1 "Geometric standard deviation has to be ≥ 1"    
+        size_distribution = LogNormal(log(FT(aerosol["μ"])), log(FT(aerosol["σ"])))
 
         new_aerosol_obj = Aerosol(size_distribution,
                                   FT(aerosol["nᵣ"]),
@@ -177,8 +177,24 @@ function parameters_from_yaml(file_path)
         CEF = eval(Meta.parse(params_dict["absorption"]["CEF"]))
         wing_cutoff = params_dict["absorption"]["wing_cutoff"]
 
+        
+        # Option to load lookup tables!
+        luts = []
+        if "LUTfiles" in keys(params_dict["absorption"])
+            files_lut = Array(params_dict["absorption"]["LUTfiles"])
+            @assert size(files_lut) == size(molecules) "Size of LUTfiles has to match molecules"
+            @show size(files_lut)
+            
+            for i in eachindex(files_lut)
+                #@show i, files_lut[i]
+                push!(luts,[Absorption.load_interpolation_model(file) for file in files_lut[i]])
+            end
+        end
         absorption_params = AbsorptionParameters(molecules, vmr, broadening_function, 
-                                                 CEF, wing_cutoff)
+                                                 CEF, wing_cutoff, luts)
+
+
+
     else 
         absorption_params = nothing
     end

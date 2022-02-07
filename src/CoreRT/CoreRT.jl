@@ -6,7 +6,7 @@ It includes this module's source files and exports the relevant keywords.
  
 =#
 
-module vSmartMOM
+module CoreRT
 
 using Interpolations               # For interpolating the vmr's
 using LinearAlgebra                # For linear algebra routines
@@ -14,7 +14,7 @@ using ProgressMeter                # Showing progress in for loops
 using Distributions                # Distributions of aerosols
 using ..Scattering                 # Use scattering module
 using ..Absorption                 # Use absorption module
-using ...RadiativeTransfer         # Use parent RadiativeTransfer module
+using ...vSmartMOM         # Use parent RadiativeTransfer module
 using ...Architectures             # Use Architectures module
 
 
@@ -31,6 +31,7 @@ using YAML                         # For reading properties files
 using ForwardDiff                  # Automatic Differentiation
 using NNlib                        # For batched multiplications
 import NNlib.batched_mul           # Required to overwrite batched_mul for Duals
+using NCDatasets                   # For loading absco lookup tables
 
 import Base.show                   # For overloading show for custom types
 
@@ -54,7 +55,7 @@ include("rt_run.jl")                        # Starting point for RT
 include("gpu_batched.jl")                   # Batched operations
 
 # Utilities / Helper Functions
-include("atmo_prof.jl")                     # Helper Functions for Hanling Atmospheric Profiles
+include("atmo_prof.jl")                     # Helper Functions for Handling Atmospheric Profiles
 include("rt_helper_functions.jl")           # Miscellaneous Utility Functions
 include("rt_set_streams.jl")                # Set streams before RT
 include("parameters_from_yaml.jl")          # Loading in parameters from YAML file

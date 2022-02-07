@@ -26,7 +26,7 @@ function rt_run(pol_type::AbstractPolarizationType,   # Polarization type (IQUV)
                 architecture::AbstractArchitecture)   # Whether to use CPU / GPU
 
     @unpack obs_alt, sza, vza, vaz = obs_geom   # Observational geometry properties
-    @unpack qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart,μ₀, iμ₀,Nquad = quad_points # All quadrature points
+    @unpack qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart, μ₀, iμ₀,Nquad = quad_points # All quadrature points
     FT = eltype(sza)                    # Get the float-type to use
     Nz = length(τ_rayl)                 # Number of vertical slices
     nSpec = size(τ_abs, 1)              # Number of spectral points

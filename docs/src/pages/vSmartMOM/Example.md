@@ -1,23 +1,23 @@
-# RadiativeTransfer Module Example
+# vSmartMOM Module Example
 
 ```julia
-using RadiativeTransfer
-using RadiativeTransfer.vSmartMOM
+using vSmartMOM
+using vSmartMOM.CoreRT
 
 ## 
 ## STEP 1: Load / Customize RT parameters
 ## 
 
 # If you would like to load your own parameters from a YAML file
-# (See required format at: https://github.com/RadiativeTransfer/RadiativeTransfer.jl/blob/master/src/vSmartMOM/DefaultParameters.yaml)
-parameters = parameters_from_yaml("RadiativeTransfer/src/vSmartMOM/DefaultParameters.yaml")
+# (See required format at: https://github.com/remotesensingtools/vSmartMOM.jl/blob/main/src/CoreRT/ModelParameters/DefaultParameters.yaml)
+parameters = parameters_from_yaml("vSmartMOM/src/CoreRT/DefaultParameters.yaml")
 
 # OR if you would like to load a default set of parameters
 parameters = default_parameters();
 
 # You can then change any individual fields in parameters (parameters.field = ...)
 # Please see descriptions of each field here: 
-# https://radiativetransfer.github.io/RadiativeTransfer.jl/dev/pages/RadiativeTransfer/InputParametersGuide/
+# https://remotesensingtools.github.io/vSmartMOM.jl/dev/pages/vSmartMOM/InputParametersGuide.html
 
 ## 
 ## STEP 2: Create a model from parameters

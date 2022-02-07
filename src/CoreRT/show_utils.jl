@@ -4,7 +4,7 @@ This file specifies how to pretty-print vSmartMOM_Parameters module types
  
 =#
 
-function Base.show(io::IO, x::vSmartMOM_Parameters)
+function Base.show(io::IO,::MIME"text/plain", x::vSmartMOM_Parameters)
 
     println(io, "\n------------------")
     println(io, "Radiative Transfer")
@@ -74,8 +74,8 @@ function Base.show(io::IO, x::vSmartMOM_Parameters)
             println(io, "\t\t- Aerosol #$(i)")
             curr_rt_aerosol = x.scattering_params.rt_aerosols[i]
             println(io, "\t\t  τ_ref: $(curr_rt_aerosol.τ_ref)")
-            println(io, "\t\t  μ: $(curr_rt_aerosol.aerosol.size_distribution.μ) μm")
-            println(io, "\t\t  σ: $(curr_rt_aerosol.aerosol.size_distribution.σ) μm")
+            println(io, "\t\t  Size Distribution: $(curr_rt_aerosol.aerosol.size_distribution)")
+            #println(io, "\t\t  σ: $(curr_rt_aerosol.aerosol.size_distribution.σ) μm; geometric standard deviation")
             println(io, "\t\t  nᵣ: $(curr_rt_aerosol.aerosol.nᵣ)")
             println(io, "\t\t  nᵢ: $(curr_rt_aerosol.aerosol.nᵢ)")
             println(io, "\t\t  p₀: $(curr_rt_aerosol.p₀) Pa") 

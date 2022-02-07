@@ -1,8 +1,8 @@
 # Scattering Module Example
 
 ```julia
-using RadiativeTransfer
-using RadiativeTransfer.Scattering
+using vSmartMOM
+using vSmartMOMYeah.Scattering
 using Distributions
 using BenchmarkTools
 

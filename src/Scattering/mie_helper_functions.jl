@@ -241,7 +241,7 @@ function get_greek_rayleigh(depol::Number)
     FT = eltype(depol)
     # Rayleigh Greek Parameters
     dpl_p = (1 - depol)  / (1 + depol / 2)
-    dpl_q = (1 + depol)  / (1 - depol)
+    #dpl_q = (1 + depol)  / (1 - depol)
     dpl_r = (1 - 2depol) / (1 - depol)
   
     α  =  FT[0.0, 0.0,             3dpl_p]

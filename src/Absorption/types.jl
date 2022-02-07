@@ -62,6 +62,29 @@ Base.@kwdef struct HitranTable{FT<:AbstractFloat}
     g″::Array{FT,1}
 end
 
+"""
+    struct AbscoTable{FT}
+
+A struct, which provides all ABSCO tabulated cross section parameters 
+
+# Fields
+$(DocStringExtensions.FIELDS)
+"""
+Base.@kwdef struct AbscoTable{FT<:AbstractFloat} 
+    "The molecular species identification (ID) number"
+    mol::Int
+    "The isotopologue ID number"
+    iso::Int
+    "The wavenumber array (cm⁻¹)"
+    ν::Array{Float64,1}
+    "The 4D cross section table"
+    σ::Array{FT,4}
+    "The pressure coordinates (hPa)"
+    p::Array{FT,1}
+    "The temperature coordinates (K)"
+    T::Array{FT,2}
+end
+
 #= 
 
 Types of broadening functions (currently Doppler, Lorentz, and Voigt)
@@ -178,22 +201,12 @@ Base.@kwdef struct InterpolationModel <: AbstractCrossSectionModel
     mol::Int
     "The isotopologue ID number"
     iso::Int
-    "Broadening function (Doppler/Lorentz/Voigt), as a string"
-    broadening::AbstractBroadeningFunction
     "Wavelength grids"
     ν_grid::AbstractRange{<:Real}
     "Wavelength grids"
     p_grid::AbstractRange{<:Real}
     "Wavelength grids"
     t_grid::AbstractRange{<:Real}
-    "Wing cutoff [cm-1]"
-    wing_cutoff::Real
-    "VMR of gas itself [0-1]"
-    vmr::Real
-    "Complex Error Function to Use"
-    CEF::AbstractComplexErrorFunction
-    "Computer `Architecture` on which `Model` is run"
-    architecture::AbstractArchitecture     
 
 end
 

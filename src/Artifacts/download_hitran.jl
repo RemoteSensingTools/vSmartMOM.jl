@@ -1,5 +1,5 @@
 using Pkg.Artifacts
-using RadiativeTransfer.Absorption
+using vSmartMOM.Absorption
 using HTTP
 
 deploy = true

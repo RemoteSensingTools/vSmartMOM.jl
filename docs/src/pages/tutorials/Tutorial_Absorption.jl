@@ -114,8 +114,8 @@ println("Doppler shift = $(1e7/(v₀-Δ_ν)-1e7/v₀) nm")
 
 using Plots
 using Pkg.Artifacts
-using RadiativeTransfer
-using RadiativeTransfer.Absorption
+using vSmartMOM
+using vSmartMOM.Absorption
 
 #-------------------------
 

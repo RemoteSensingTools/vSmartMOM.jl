@@ -183,6 +183,8 @@ mutable struct AbsorptionParameters
     CEF::AbstractComplexErrorFunction
     "Wing cutoff to use in cross-section calculation (cm⁻¹)"
     wing_cutoff::Integer
+    "Lookup table type"
+    luts::AbstractArray 
 end
 
 """
