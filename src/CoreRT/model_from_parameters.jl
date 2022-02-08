@@ -32,7 +32,7 @@ function model_from_parameters(params::vSmartMOM_Parameters)
     
     # Reduce the profile to the number of target layers (if specified)
     if params.profile_reduction_n != -1
-        profile = vSmartMOM.reduce_profile(params.profile_reduction_n, profile);
+        profile = CoreRT.reduce_profile(params.profile_reduction_n, profile);
     end
 
     # Rayleigh optical properties calculation
@@ -123,7 +123,7 @@ function model_from_parameters(params::vSmartMOM_Parameters)
             aerosol_optics[i_band][i_aer] = Scattering.truncate_phase(truncation_type, aerosol_optics_raw; reportFit=false)
 
             # Compute nAer aerosol optical thickness profiles
-            τ_aer[i_band][i_aer,:] = params.scattering_params.rt_aerosols[i_aer].τ_ref[] * (aerosol_optics[i_band][i_aer].k/k_ref) * vSmartMOM.getAerosolLayerOptProp(1.0, params.scattering_params.rt_aerosols[i_aer].p₀, params.scattering_params.rt_aerosols[i_aer].σp, profile.p_full)
+            τ_aer[i_band][i_aer,:] = params.scattering_params.rt_aerosols[i_aer].τ_ref[] * (aerosol_optics[i_band][i_aer].k/k_ref) * CoreRT.getAerosolLayerOptProp(1.0, params.scattering_params.rt_aerosols[i_aer].p₀, params.scattering_params.rt_aerosols[i_aer].σp, profile.p_full)
             
         end 
     end
