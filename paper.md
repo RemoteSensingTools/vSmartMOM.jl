@@ -1,10 +1,11 @@
 ---
-title: 'RadiativeTransfer.jl: an Open-Source Julia Package for Atmospheric Remote Sensing Tools'
+title: 'vSmartMOM.jl: an Open-Source Julia Package for Atmospheric Radiative Transfer and Remote Sensing Tools'
 
 tags:
   - Julia
   - radiative transfer
   - atmospheric radiation
+  - vSmartMOM
 authors:
   - name: Rupesh Jeyaram
     orcid: 0000-0003-0142-7367
@@ -28,19 +29,17 @@ bibliography: paper.bib
 
 Remote sensing researchers use radiative transfer modeling to interpret satellite data for studying Earth's atmospheric and surface properties. The field plays a key role in how scientists understand many aspects of our rapidly changing planet – from climate change and pollution to the carbon and water cycles.
 
-
-
-**RadiativeTransfer.jl** is a [Julia](https://julialang.org) package that enables the fast computation of atmospheric optical properties and fully-polarized multiple-scattering radiance simulations, based on the Matrix Operator Method [@Sanghavi:2013a]. Users can fully customize simulation parameters and atmospheric properties, including trace-gas profiles, aerosol distributions, surface reflectance, and quadrature schemes. Independent submodules can also be imported individually; for example, **Absorption.jl** can be used for computing gaseous absorption and **Scattering.jl** for computing scattering phase-functions. 
+**vSmartMOM.jl** is a [Julia](https://julialang.org) package that enables the fast computation of atmospheric optical properties and fully-polarized multiple-scattering radiance simulations, based on the Matrix Operator Method [@Sanghavi:2013a]. Users are free to customize simulation parameters and atmospheric properties, including trace-gas profiles, aerosol distributions, surface reflectance, and quadrature schemes. Independent submodules can also be imported individually; for example, **Absorption.jl** can be used for computing gaseous absorption and **Scattering.jl** for computing scattering phase-functions. 
 
 The Julia language provides many exciting opportunities to modernize radiative transfer software. Using the ForwardDiff.jl package [@Revels:2016], Jacobians can be calculated alongside computations using automatic differentiation, allowing for elegant and straightforward parameter-fitting. Julia's multiple dispatch paradigm enables the software architecture to be clean, flexible and reusable. Additionally, optimized techniques have been implemented to speed up the package’s performance on both CPU and GPU by orders-of-magnitude compared to existing radiative transfer codes. 
 
-**RadiativeTransfer.jl** has already been used in research projects, ranging from methane-plume simulation to atmospheric profile fitting. It has also been used in graduate-level remote sensing coursework. Ultimately, **RadiativeTransfer.jl** aims to accelerate the pace of atmospheric research through efficient software while lowering the barrier-of-entry for researchers and students in remote sensing. 
+**vSmartMOM.jl** has already been used in research projects, ranging from methane-plume simulation to atmospheric profile fitting. It has also been used in graduate-level remote sensing coursework. Ultimately, **vSmartMOM.jl** aims to accelerate the pace of atmospheric research through efficient software while lowering the barrier-of-entry for researchers and students in remote sensing. 
 
 # Statement of need
 
 For historical reasons, much of the scientific work in remote sensing is based on legacy code, written in Fortran or C/C++, mixed with “glue languages” such as Python. Researchers who developed these codes also placed greater emphasis on science results than software engineering best practices. As a result, many parts of key codebases are aging, convoluted, and hard to improve by both incoming graduate students and experienced researchers. 
 
-Rather than simply *porting* these codes to a new language, **RadiativeTransfer.jl** entirely redesigns the radiative transfer code from the ground up to include new functionalities like GPU acceleration and automatic differentiation – features that have become computationally feasible and widespread only in the last decade. 
+Rather than simply *porting* these codes to a new language, **vSmartMOM.jl** entirely redesigns the radiative transfer code from the ground up to include new functionalities like GPU acceleration and automatic differentiation – features that have become computationally feasible and widespread only in the last decade. 
 
 # Overview of functionality
 
