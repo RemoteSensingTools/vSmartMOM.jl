@@ -45,13 +45,13 @@ Rather than simply *porting* these codes to a new language, **vSmartMOM.jl** ent
 
 The package has a modular architecture, allowing users to import just the specific module(s) that they need.
 
-![Sample atmospheric reflectance under default atmospheric parameters, calculated using RadiativeTransfer.jl](joss_1.png)
+![Sample atmospheric reflectance under default atmospheric parameters, calculated using vSmartMOM.jl](joss_1.png)
 
-**RadiativeTransfer.jl** is the top-level module that uses absorption and scattering submodules to compute radiative transfer simulations. Specifically, it: 
+**vSmartMOM.jl** is the top-level module that uses absorption and scattering submodules to compute radiative transfer simulations. Specifically, it: 
 
 - Enables 1D vectorized plane-parallel RT modeling based on the Matrix Operator Method [@Sanghavi:2013a]
 - Incorporates fast, high fidelity simulations of scattering atmospheres containing haze and clouds, including pressure- and temperature-resolved absorption profiles of gaseous species in the atmosphere
-- Enables GPU-accelerated computations of the resulting hyperspectral multiple-scattering radiative transfer simulations
+- Enables GPU-accelerated computations of the resulting hyperspectral multiple-scattering radiative transfer
 - Enables auto-differentiation of the output spectrum with respect to various input parameters, allowing for spectral fitting routines to estimate atmospheric parameters
 
 ![Sample absorption spectrum of CO2 with 0.01 step size resolution, calculated using Absorption.jl](joss_2.png)
@@ -64,7 +64,7 @@ The package has a modular architecture, allowing users to import just the specif
 
 # Benchmarks
 
-Standard reference tables from the literature [@Natraj:2009] are used to validate **RadiativeTransfer.jl** simulation output. The data is available in **Appendix 1**, in **Tables 1-3**. The key result is that simulated reflectance output from RadiativeTransfer.jl closely matches published standard values, in every case within 0.0005 of the published value. 
+Standard reference tables from the literature [@Natraj:2009] are used to validate **vSmartMOM.jl** simulation output. The data is available in **Appendix 1**, in **Tables 1-3**. The key result is that simulated reflectance output from vSmartMOM.jl closely matches published standard values, in every case within 0.0005 of the published value. 
 
 Runtime duration for a given simulation is also compared between using CPU and GPU architectures. (CPU architecture is single-threaded, AMD EPYC 7H12 64-Core Processor; GPU is parallel on an NVIDIA A100 Tensor Core (40Gb))
 
@@ -72,7 +72,7 @@ Runtime duration for a given simulation is also compared between using CPU and G
 
 A nearly 100x speedup is observed when using the GPU architecture on the same simulation. 
 
-Hardware acceleration, in addition to algorithmic efficiencies and performance optimizations in **RadiativeTransfer.jl** suggest that this package can greatly accelerate the pace of remote sensing research. 
+Hardware acceleration, in addition to algorithmic efficiencies and performance optimizations in **vSmartMOM.jl** suggest that this package can greatly accelerate the pace of remote sensing research. 
 
 # Acknowledgements
 
@@ -82,7 +82,7 @@ We thank Frankenberg lab members for their enthusiastic support and guidance thr
 
 # Appendix 
 
-In the tables below, **bold** numbers are RadiativeTransfer.jl output values and non-bold numbers are the published values from the literature [@Natraj:2009]. 
+In the tables below, **bold** numbers are vSmartMOM.jl output values and non-bold numbers are the published values from the literature [@Natraj:2009]. 
 
 | $\mu$ | $\phi$ = 0°            | $\phi$ = 30°           | $\phi$ = 60°           | $\phi$ = 90°           | $\phi$ = 120°          | $\phi$ = 150°          | $\phi$ = 180°          |
 | :---  | :---                   | :---                   | :---                   | :---                   | :---                   | :---                   | :---                   |
