@@ -88,7 +88,7 @@ default_J_matrix_rand(FT, arr_type, dims, nSpec) = arr_type(randn(FT, tuple(dims
 
 
 "Make an added layer, supplying all default matrices"
-make_added_layer(RS_type::noRS, FT, arr_type, dims, nSpec) = AddedLayer(
+make_added_layer(RS_type::Union{noRS, noRS_plus}, FT, arr_type, dims, nSpec) = AddedLayer(
                                                         default_matrix(FT, arr_type, dims, nSpec), 
                                                         default_matrix(FT, arr_type, dims, nSpec), 
                                                         default_matrix(FT, arr_type, dims, nSpec),
@@ -98,7 +98,7 @@ make_added_layer(RS_type::noRS, FT, arr_type, dims, nSpec) = AddedLayer(
                                                         )
 
 "Make an added layer, supplying all default matrices"
-make_added_layer(RS_type::RRS, FT, arr_type, dims, nSpec)  = AddedLayerRS(
+make_added_layer(RS_type::Union{RRS, RRS_plus,VS_0to1_plus, VS_1to0_plus}, FT, arr_type, dims, nSpec)  = AddedLayerRS(
                                                 default_matrix(FT, arr_type, dims, nSpec), 
                                                 default_matrix(FT, arr_type, dims, nSpec), 
                                                 default_matrix(FT, arr_type, dims, nSpec),
@@ -113,9 +113,9 @@ make_added_layer(RS_type::RRS, FT, arr_type, dims, nSpec)  = AddedLayerRS(
                                                 default_J_matrix_ie(FT, arr_type, dims, nSpec, RS_type.n_Raman)
                                                 )
                                                          
-"Make an added layer, supplying all default matrices"
+#="Make an added layer, supplying all default matrices"
 #Currently RS_type.n_Raman = 1
-make_added_layer(RS_type::Union{VS_0to1, VS_1to0}, FT, arr_type, dims, nSpec)  = AddedLayerRS(
+make_added_layer(RS_type::Union{VS_0to1_plus, VS_1to0_plus}, FT, arr_type, dims, nSpec)  = AddedLayerRS(
                                                 default_matrix(FT, arr_type, dims, RS_type.n_Raman), 
                                                 default_matrix(FT, arr_type, dims, RS_type.n_Raman), 
                                                 default_matrix(FT, arr_type, dims, RS_type.n_Raman),
@@ -135,6 +135,7 @@ make_added_layer(RS_type::Union{VS_0to1, VS_1to0}, FT, arr_type, dims, nSpec)  =
                                                 default_J_matrix_ie(FT, arr_type, dims, nSpec, RS_type.n_Raman),
                                                 default_J_matrix_ie(FT, arr_type, dims, nSpec, RS_type.n_Raman)
                                                 )
+                                                =#
 "Make an added layer, supplying all default matrices"
 #Currently RS_type.n_Raman = 1
 #=
@@ -160,7 +161,7 @@ make_added_layer(RS_type::Union{RVRS_0to1, RVRS_1to0}, FT, arr_type, dims, nSpec
                                                 )
 =#
 "Make a random added layer, supplying all random matrices"
-make_added_layer_rand(RS_type::noRS, FT, arr_type, dims, nSpec)  = AddedLayer(
+make_added_layer_rand(RS_type::Union{noRS, noRS_plus}, FT, arr_type, dims, nSpec)  = AddedLayer(
                                                         default_matrix_rand(FT, arr_type, dims, nSpec), 
                                                         default_matrix_rand(FT, arr_type, dims, nSpec), 
                                                         default_matrix_rand(FT, arr_type, dims, nSpec),
@@ -170,7 +171,7 @@ make_added_layer_rand(RS_type::noRS, FT, arr_type, dims, nSpec)  = AddedLayer(
                                                         )
                                                          
 "Make a composite layer, supplying all default matrices"
-make_composite_layer(RS_type::noRS,FT, arr_type, dims, nSpec) = CompositeLayer(
+make_composite_layer(RS_type::Union{noRS, noRS_plus}, FT, arr_type, dims, nSpec) = CompositeLayer(
                                                         default_matrix(FT, arr_type, dims, nSpec), 
                                                         default_matrix(FT, arr_type, dims, nSpec), 
                                                         default_matrix(FT, arr_type, dims, nSpec),
@@ -179,7 +180,7 @@ make_composite_layer(RS_type::noRS,FT, arr_type, dims, nSpec) = CompositeLayer(
                                                         default_J_matrix(FT, arr_type, dims, nSpec)
                                                         )
 "Make a composite layer, supplying all default matrices"
-make_composite_layer(RS_type::RRS, FT, arr_type, dims, nSpec) = CompositeLayerRS(
+make_composite_layer(RS_type::Union{RRS, RRS_plus,VS_0to1_plus, VS_1to0_plus}, FT, arr_type, dims, nSpec) = CompositeLayerRS(
                                                         default_matrix(FT, arr_type, dims, nSpec), 
                                                         default_matrix(FT, arr_type, dims, nSpec), 
                                                         default_matrix(FT, arr_type, dims, nSpec),
@@ -193,32 +194,9 @@ make_composite_layer(RS_type::RRS, FT, arr_type, dims, nSpec) = CompositeLayerRS
                                                         default_J_matrix_ie(FT, arr_type, dims, nSpec, RS_type.n_Raman),
                                                         default_J_matrix_ie(FT, arr_type, dims, nSpec, RS_type.n_Raman)
                                                         )
-
-"Make a composite layer, supplying all default matrices"
-make_composite_layer(RS_type::Union{VS_0to1, VS_1to0},FT, arr_type, dims, nSpec) = CompositeLayerRS(
-                                                        default_matrix(FT, arr_type, dims, RS_type.n_Raman), 
-                                                        default_matrix(FT, arr_type, dims, RS_type.n_Raman), 
-                                                        default_matrix(FT, arr_type, dims, RS_type.n_Raman),
-                                                        default_matrix(FT, arr_type, dims, RS_type.n_Raman),
-                                                        default_J_matrix(FT, arr_type, dims, RS_type.n_Raman),
-                                                        default_J_matrix(FT, arr_type, dims, RS_type.n_Raman),
-                                                        default_matrix(FT, arr_type, dims, nSpec), 
-                                                        default_matrix(FT, arr_type, dims, nSpec), 
-                                                        default_matrix(FT, arr_type, dims, nSpec),
-                                                        default_matrix(FT, arr_type, dims, nSpec),
-                                                        default_J_matrix(FT, arr_type, dims, nSpec),
-                                                        default_J_matrix(FT, arr_type, dims, nSpec),
-                                                        default_matrix_ie(FT, arr_type, dims, nSpec, RS_type.n_Raman), 
-                                                        default_matrix_ie(FT, arr_type, dims, nSpec, RS_type.n_Raman), 
-                                                        default_matrix_ie(FT, arr_type, dims, nSpec, RS_type.n_Raman),
-                                                        default_matrix_ie(FT, arr_type, dims, nSpec, RS_type.n_Raman),
-                                                        default_J_matrix_ie(FT, arr_type, dims, nSpec, RS_type.n_Raman),
-                                                        default_J_matrix_ie(FT, arr_type, dims, nSpec, RS_type.n_Raman)
-                                                        )
-
-"Make a composite layer, supplying all default matrices"
 #=
-make_composite_layer(RS_type::Union{RVRS_0to1, RVRS_1to0},FT, arr_type, dims, nSpec) = CompositeLayerRS(
+"Make a composite layer, supplying all default matrices"
+make_composite_layer(RS_type::Union{VS_0to1_plus, VS_1to0_plus},FT, arr_type, dims, nSpec) = CompositeLayerRS(
                                                         default_matrix(FT, arr_type, dims, RS_type.n_Raman), 
                                                         default_matrix(FT, arr_type, dims, RS_type.n_Raman), 
                                                         default_matrix(FT, arr_type, dims, RS_type.n_Raman),
@@ -239,6 +217,7 @@ make_composite_layer(RS_type::Union{RVRS_0to1, RVRS_1to0},FT, arr_type, dims, nS
                                                         default_J_matrix_ie(FT, arr_type, dims, nSpec, RS_type.n_Raman)
                                                         )
 =#
+
                                                         
 
 "Given a ComputedAtmosphereProperties object, extract a ComputedLayerProperties object using data from the iz index of all arrays in the ComputedAtmosphereProperties"
