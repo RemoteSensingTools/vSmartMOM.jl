@@ -453,120 +453,6 @@ end
     #Z⁻⁺_VRS #same for rotational and rovibrational scattering
 #end
 
-"""
-    type AbstractRamanType
-Abstract Raman type 
-"""
-abstract type AbstractRamanType  end
-
-"""
-    struct RRS{FT<:AbstractFloat}
-A struct which defines Rotational Raman Scattering parameters
-# Fields
-$(DocStringExtensions.FIELDS)
-"""
-Base.@kwdef mutable struct RRS{FT<:AbstractFloat} <: AbstractRamanType 
-    "Molecular Constants for N2"
-    n2::InelasticScattering.MolecularConstants{Float64}
-    "Molecular Constants for O2"
-    o2::InelasticScattering.MolecularConstants{Float64}
-    "Greek coeffs in Raman calculations" 
-    greek_raman::GreekCoefs
-    "Pre-computed optical properties"
-    # ramanAtmoProp::RamanAtmosphereProperties
-    fscattRayl::FT
-    ϖ_Cabannes::FT #elastic fraction (Cabannes) of Rayleigh (Cabannes+Raman) scattering
-    ϖ_λ₁λ₀::Array{FT,1}
-    i_λ₁λ₀::Array{Int,1}
-    Z⁻⁺_λ₁λ₀::Array{FT,2}
-    Z⁺⁺_λ₁λ₀::Array{FT,2}
-    i_ref::Int
-    n_Raman::Int
-end
-
-"""
-    struct RRS{FT<:AbstractFloat}
-A struct which defines Rotational Raman Scattering parameters
-# Fields
-$(DocStringExtensions.FIELDS)
-"""
-Base.@kwdef struct VS_0to1{FT<:AbstractFloat} <: AbstractRamanType 
-    "Molecular Constant for N2"
-    n2::InelasticScattering.MolecularConstants{FT}
-    "Molecular Constant for O2"
-    o2::InelasticScattering.MolecularConstants{FT}
-    "Greek coefs in Raman calculations" 
-    greek_raman::GreekCoefs
-    "Pre-computed optical properties"
-    #ramanAtmoProp::RamanAtmosphereProperties
-    fscattRayl::FT
-    ϖ_Cabannes::FT #elastic fraction (Cabannes) of Rayleigh (Cabannes+Raman) scattering
-    ϖ_λ₁λ₀::Array{FT,1}
-    i_λ₁λ₀::Array{Int,1}
-    Z⁻⁺_λ₁λ₀::Array{FT,2}
-    Z⁺⁺_λ₁λ₀::Array{FT,2}
-    dτ₀::FT
-    dτ₀_λ::FT
-    k_Rayl_scatt::FT #σ_Rayl(λ_scatt)/σ_Rayl(λ_incident)
-    n_Raman::Int
-end
-
-"""
-    struct RRS{FT<:AbstractFloat}
-A struct which defines Rotational Raman Scattering parameters
-# Fields
-$(DocStringExtensions.FIELDS)
-"""
-Base.@kwdef struct VS_1to0{FT<:AbstractFloat} <: AbstractRamanType 
-    "Molecular Constant for N2"
-    n2::InelasticScattering.MolecularConstants{FT}
-    "Molecular Constant for O2"
-    o2::InelasticScattering.MolecularConstants{FT}
-    "Greek coefs in Raman calculations" 
-    greek_raman::GreekCoefs
-    "Pre-computed optical properties"
-    fscattRayl::FT
-    ϖ_Cabannes::FT #elastic fraction (Cabannes) of Rayleigh (Cabannes+Raman) scattering
-    ϖ_λ₁λ₀::Array{FT,1}
-    i_λ₁λ₀::Array{Int,1}
-    Z⁻⁺_λ₁λ₀::Array{FT,2}
-    Z⁺⁺_λ₁λ₀::Array{FT,2}
-    dτ₀::FT
-    dτ₀_λ::FT
-    k_Rayl_scatt::FT #σ_Rayl(λ_scatt)/σ_Rayl(λ_incident)
-    n_Raman::Int
-    #ramanAtmoProp::RamanAtmosphereProperties
-end
-
-"""
-    struct RRS{FT<:AbstractFloat}
-A struct which defines Rotational Raman Scattering parameters
-# Fields
-$(DocStringExtensions.FIELDS)
-"""
-Base.@kwdef struct RVRS{FT<:AbstractFloat} <: AbstractRamanType 
-    "Molecular Constant for N2"
-    n2::InelasticScattering.MolecularConstants{FT}
-    "Molecular Constant for O2"
-    o2::InelasticScattering.MolecularConstants{FT}
-    "Pre-computed optical properties"
-    #ramanAtmoProp::RamanAtmosphereProperties
-    fscattRayl::FT
-    ϖ_Cabannes::FT #elastic fraction (Cabannes) of Rayleigh (Cabannes+Raman) scattering
-    ϖ_λ₁λ₀::Array{FT,1}
-    i_λ₁λ₀::Array{Int,1}
-    Z⁻⁺_λ₁λ₀::Array{FT,2}
-    Z⁺⁺_λ₁λ₀::Array{FT,2}
-    τ₀::FT
-    n_Raman::Int
-end
-
-Base.@kwdef mutable struct noRS{FT} <: AbstractRamanType
-    fscattRayl::FT = 0.0
-    ϖ_Cabannes::FT = 1.0 #elastic fraction (Cabannes) of Rayleigh (Cabannes+Raman) scattering
-end
-
-
 
 """
     struct ComputedLayerProperties
@@ -642,7 +528,7 @@ function Base.:+( x::CoreScatteringOpticalProperties{FT}, y::CoreScatteringOptic
     all(wx .== 0.0) ? (return CoreScatteringOpticalProperties(τ, ϖ, y.Z⁺⁺, y.Z⁻⁺)) : nothing
     all(wy .== 0.0) ? (return CoreScatteringOpticalProperties(τ, ϖ, x.Z⁺⁺, x.Z⁻⁺)) : nothing
 
-    # A bit more tediuous for Z matrices:
+    # A bit more tedious for Z matrices:
     length(unique(w))  == 1 ? w = unique(w) : nothing
     length(unique(wx)) == 1 ? wx = unique(wx) : nothing
     length(unique(wy)) == 1 ? wy = unique(wy) : nothing
@@ -678,6 +564,7 @@ end
 function Base.:+( x::CoreScatteringOpticalProperties{FT}, y::CoreAbsorptionOpticalProperties{FT} ) where FT
     τ  = x.τ .+ y.τ
     wx = x.τ .* x.ϖ 
+    @show size(wx), size(τ)
     ϖ  = (wx) ./ τ
     CoreScatteringOpticalProperties(τ, ϖ, x.Z⁺⁺, x.Z⁻⁺)
 end

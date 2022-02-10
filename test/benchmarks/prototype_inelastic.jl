@@ -80,9 +80,9 @@ RnoRS, TnoRS, _, _ = rt_run(vSmartMOM.noRS(),
             model.params.brdf[1],
             model.params.architecture);
 
-RnoRS_test, TnoRS_test, _, _ = vSmartMOM.rt_run_test(vSmartMOM.noRS(),model,1);
+RnoRS_test, TnoRS_test, _, _ = vSmartMOM.rt_run_test(vSmartMOM.noRS(),model,iBand);
 
-R_test, T_test, ieR_test, ieT_test = vSmartMOM.rt_run_test(RS_type,model,1);
+R_test, T_test, ieR_test, ieT_test = vSmartMOM.rt_run_test(RS_type,model,iBand);
 
 # You can now run multiple bands like this (list at the end of band!)
 RnoRS_test, TnoRS_test, _, _ = vSmartMOM.rt_run_test(vSmartMOM.noRS(),model,[1,1]);

@@ -230,13 +230,16 @@ end
     FT = eltype(I₀)
     J₀⁺[i, 1, n]=0
     J₀⁻[i, 1, n]=0
-
+    n2=1
+    if size(Z⁻⁺,3)>1
+        n2 = n
+    end
     
     Z⁺⁺_I₀ = FT(0.0);
     Z⁻⁺_I₀ = FT(0.0);
     for ii = i_start:i_end
-        Z⁺⁺_I₀ += Z⁺⁺[i,ii] * I₀[ii-i_start+1]
-        Z⁻⁺_I₀ += Z⁻⁺[i,ii] * I₀[ii-i_start+1] 
+        Z⁺⁺_I₀ += Z⁺⁺[i,ii,n2] * I₀[ii-i_start+1]
+        Z⁻⁺_I₀ += Z⁻⁺[i,ii,n2] * I₀[ii-i_start+1] 
     end
 
     if (i>=i_start) && (i<=i_end)

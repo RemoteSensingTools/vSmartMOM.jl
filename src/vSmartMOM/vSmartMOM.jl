@@ -15,6 +15,7 @@ using Distributions                # Distributions of aerosols
 using Parameters
 using ..Scattering                 # Use scattering module
 using ..Absorption                 # Use absorption module
+using ..InelasticScattering        # Use InelasticScattering module
 using ...RadiativeTransfer         # Use parent RadiativeTransfer module
 using ...Architectures             # Use Architectures module
 
@@ -35,18 +36,25 @@ import NNlib.batched_mul           # Required to overwrite batched_mul for Duals
 
 import Base.show                   # For overloading show for custom types
 
-using InelasticScattering
+#using InelasticScattering
 
 # More threads in LA wasn't really helpful, can be turned off here:
 # LinearAlgebra.BLAS.set_num_threads(1)
 
 # Constants and Types
 include("constants.jl")                        # Scientific constants
-include("types.jl")                            # All custom types for this module
+include("types.jl")  
+
+# All custom types for this module
+# Raman additions
+#include("Inelastic/types.jl")
+#include("Inelastic/inelastic_helper.jl")
+#include("Inelastic/raman_atmo_prop.jl")
 
 # Solvers
 include("CoreKernel/elemental.jl")             # Elemental 
 include("CoreKernel/elemental_inelastic.jl")   # Elemental for inelastic scattering
+include("CoreKernel/elemental_inelastic_plus.jl")   # Elemental for inelastic scattering
 include("CoreKernel/doubling.jl")              # Doubling
 include("CoreKernel/doubling_inelastic.jl")    # Doubling for elastic + inelastic scattering 
 include("CoreKernel/interaction.jl")           # Interaction
@@ -72,9 +80,7 @@ include("LayerOpticalProperties/compEffectiveLayerProperties.jl")
 include("lambertian_surface.jl")            # Lambertian Surface 
 
 
-# Raman additions
-include("Inelastic/inelastic_helper.jl")
-include("Inelastic/raman_atmo_prop.jl")
+
 
 # Functions to export
 export parameters_from_yaml,                # Getting parameters from a file

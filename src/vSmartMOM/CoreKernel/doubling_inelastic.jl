@@ -66,16 +66,24 @@ function doubling_helper!(RS_type::RRS,
             for Δn = 1:nRaman
                 n₀, n₁ = get_n₀_n₁(ieJ₁⁺,i_λ₁λ₀[Δn])
                 #@show length(n₁), length(n₀), length(n₁_), length(n₀_)
-                @inbounds @views ieJ₀⁺[:,:,n₁,Δn] = ieJ₁⁺[:,:,n₁,Δn] + 
+                @inbounds @views ieJ₀⁺[:,:,n₁,Δn] = 
+                                ieJ₁⁺[:,:,n₁,Δn] + 
                                 (tt⁺⁺_gp_refl[:,:,n₁] ⊠ 
-                                (ieJ₀⁺[:,:,n₁,Δn] + r⁻⁺[:,:,n₁] ⊠ ieJ₁⁻[:,:,n₁,Δn] + ier⁻⁺[:,:,n₁,Δn] ⊠ J₁⁻[:,:,n₀] + 
-                                (r⁻⁺[:,:,n₁] ⊠ ier⁻⁺[:,:,n₁,Δn] + ier⁻⁺[:,:,n₁,Δn] ⊠ r⁻⁺[:,:,n₀]) ⊠ 
+                                (ieJ₀⁺[:,:,n₁,Δn] + 
+                                r⁻⁺[:,:,n₁] ⊠ ieJ₁⁻[:,:,n₁,Δn] + 
+                                ier⁻⁺[:,:,n₁,Δn] ⊠ J₁⁻[:,:,n₀] + 
+                                (r⁻⁺[:,:,n₁] ⊠ ier⁻⁺[:,:,n₁,Δn] + 
+                                ier⁻⁺[:,:,n₁,Δn] ⊠ r⁻⁺[:,:,n₀]) ⊠ 
                                 tmp1[:,:,n₀])) + 
                                 iet⁺⁺[:,:,n₁,Δn] ⊠ tmp1[:,:,n₀]
-                @inbounds @views ieJ₀⁻[:,:,n₁,Δn] = ieJ₀⁻[:,:,n₁,Δn] + 
+                @inbounds @views ieJ₀⁻[:,:,n₁,Δn] = 
+                                ieJ₀⁻[:,:,n₁,Δn] + 
                                 (tt⁺⁺_gp_refl[:,:,n₁] ⊠ 
-                                (ieJ₁⁻[:,:,n₁,Δn] + ier⁻⁺[:,:,n₁,Δn] ⊠ J₀⁺[:,:,n₀] + r⁻⁺[:,:,n₁] ⊠ ieJ₀⁺[:,:,n₁,Δn] + 
-                                (ier⁻⁺[:,:,n₁,Δn] ⊠ r⁻⁺[:,:,n₀] + r⁻⁺[:,:,n₁] ⊠ ier⁻⁺[:,:,n₁,Δn]) ⊠ 
+                                (ieJ₁⁻[:,:,n₁,Δn] + 
+                                ier⁻⁺[:,:,n₁,Δn] ⊠ J₀⁺[:,:,n₀] +
+                                r⁻⁺[:,:,n₁] ⊠ ieJ₀⁺[:,:,n₁,Δn] + 
+                                (ier⁻⁺[:,:,n₁,Δn] ⊠ r⁻⁺[:,:,n₀] + 
+                                r⁻⁺[:,:,n₁] ⊠ ier⁻⁺[:,:,n₁,Δn]) ⊠ 
                                 tmp2[:,:,n₀])) +
                                 iet⁻⁻[:,:,n₁,Δn] ⊠ tmp2[:,:,n₀]
             end
@@ -129,16 +137,16 @@ function doubling_helper!(RS_type::RRS,
 end
 
 
-function doubling_helper!(RS_type::Union{VS_0to1, VS_1to0},
+function doubling_helper!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
                         pol_type, 
                         SFI, 
                         expk, 
                         ndoubl::Int, 
-                        added_layer::AddedLayer,
+                        added_layer::Union{AddedLayer,AddedLayerRS},
                         I_static::AbstractArray{FT}, 
                         architecture) where {FT}
     # Unpack the added layer
-    @unpack i_λ₁λ₀ = RS_type 
+    @unpack i_λ₁λ₀_all = RS_type 
     @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, J₀⁺, J₀⁻ = added_layer
     @unpack ier⁺⁻, ier⁻⁺, iet⁻⁻, iet⁺⁺, ieJ₀⁺, ieJ₀⁻ = added_layer
     # Device architecture
@@ -146,7 +154,7 @@ function doubling_helper!(RS_type::Union{VS_0to1, VS_1to0},
 
     # Note: short-circuit evaluation => return nothing evaluated iff ndoubl == 0 
     ndoubl == 0 && return nothing
-    
+    nQuad, _, nSpec = size(r⁺⁻)
     # Geometric progression of reflections (1-RR)⁻¹
     gp_refl      = similar(t⁺⁺)
     tt⁺⁺_gp_refl = similar(t⁺⁺)
@@ -168,47 +176,50 @@ function doubling_helper!(RS_type::Union{VS_0to1, VS_1to0},
         
         # T⁺⁺(λ)[I - R⁺⁻(λ)R⁻⁺(λ)]⁻¹, for doubling R⁺⁻,R⁻⁺ and T⁺⁺,T⁻⁻ is identical
         batch_inv!(gp_refl, I_static .- r⁻⁺ ⊠ r⁻⁺)
-        tt⁺⁺_gp_refl[:] = t⁺⁺ ⊠ gp_refl
+        @views tt⁺⁺_gp_refl[:] = t⁺⁺ ⊠ gp_refl
 
         if SFI
 
             # J⁺₂₁(λ) = J⁺₁₀(λ).exp(-τ(λ)/μ₀)
-            J₁⁺[:,1,:] = J₀⁺[:,1,:] .* expk'
-            ieJ₁⁺[:,1,:] = ieJ₀⁺[:,1,:] .* expk'
+            @views J₁⁺[:,1,:] = J₀⁺[:,1,:] .* expk'
+            @views ieJ₁⁺[:,1,:] = ieJ₀⁺[:,1,:] .* expk'
 
             # J⁻₁₂(λ)  = J⁻₀₁(λ).exp(-τ(λ)/μ₀)
-            J₁⁻[:,1,:]   = J₀⁻[:,1,:] .* expk'
-            ieJ₁⁻[:,1,:] = ieJ₀⁻[:,1,:] .* expk'
+            @views J₁⁻[:,1,:]   = J₀⁻[:,1,:] .* expk'
+            @views ieJ₁⁻[:,1,:] = ieJ₀⁻[:,1,:] .* expk'
 
+            tmp1 = gp_refl ⊠  (J₀⁺ + r⁻⁺ ⊠ J₁⁻)
+            tmp2 = gp_refl ⊠  (J₁⁻ + r⁻⁺ ⊠ J₀⁺)
             #for n₁ in eachindex ieJ₁⁺[1,1,:,1]
-            for Δn in eachindex ieJ₁⁺[1,1,1,:]
-                n₁  = i_λ₁λ₀[Δn]
-                # TODO: replace all the n₀ indices with ref_r, ref_t, and ref_J
-                # J⁺₂₀(λ) = J⁺₂₁(λ) + T⁺⁺₂₁(λ)[I - R⁺⁻₀₁(λ)R⁻⁺₂₁(λ)]⁻¹[J⁺₁₀(λ) + R⁺⁻₀₁(λ)J⁻₁₂(λ)] (see Eqs.16 in Raman paper draft)
-                ieJ₀⁺[:,1,n₁,1] = ieJ₁⁺[:,1,n₁,1] + 
-                        (tt⁺⁺_gp_refl[:,:,n₁] * (ieJ₀⁺[:,1,n₁,1] + 
-                        r⁻⁺[:,:,n₁] * ieJ₁⁻[:,1,n₁,1] + 
-                        ier⁻⁺[:,:,n₁,1] * J₁⁻[:,1,n₀] + 
-                        (r⁻⁺[:,:,n₁] * ier⁻⁺[:,:,n₁,1] + 
-                        ier⁻⁺[:,:,n₁,1] * r⁻⁺[:,:,n₀]) * gp_refl[:,:,n₀] * (J₀⁺[:,1,n₀] + 
-                        r⁻⁺[:,:,n₀] * J₁⁻[:,1,n₀]))) + 
-                        iet⁺⁺[:,:,n₁,1] * gp_refl[:,:,n₀] * 
-                        (J₀⁺[:,1,n₀] + r⁻⁺[:,:,n₀] * J₁⁻[:,1,n₀])
-        
-                # J⁻₀₂(λ) = J⁻₀₁(λ) + T⁻⁻₀₁(λ)[I - R⁻⁺₂₁(λ)R⁺⁻₀₁(λ)]⁻¹[J⁻₁₂(λ) + R⁻⁺₂₁(λ)J⁺₁₀(λ)] (see Eqs.17 in Raman paper draft)
-                ieJ₀⁻[:,1,n₁,1] = ieJ₀⁻[:,1,n₁,1] + 
-                        (tt⁺⁺_gp_refl[:,:,n₁] * (ieJ₁⁻[:,1,n₁,1] + 
-                        ier⁻⁺[:,:,n₁,1] * J₀⁺[:,1,n₀] + 
-                        r⁻⁺[:,:,n₁] * ieJ₀⁺[:,1,n₁,1] + 
-                        (ier⁻⁺[:,:,n₁,1] * r⁻⁺[:,:,n₀] + 
-                        r⁻⁺[:,:,n₁] * ier⁻⁺[:,:,n₁,1]) * gp_refl[:,:,n₀] * (J₁⁻[:,1,n₀] + 
-                        r⁻⁺[:,:,n₀] * J₀⁺[:,1,n₀]))) +
-                        iet⁻⁻[:,:,n₁,1] * gp_refl[:,:,n₀] * (J₁⁻[:,1,n₀] + 
-                        r⁻⁺[:,:,n₀]*J₀⁺[:,1,n₀])
-            end 
-            #end
-
+            for Δn in length(i_λ₁λ₀_all)
+                n₁ = i_λ₁λ₀_all[Δn]
+                n₀ = 1
+                if n₁>0
+                    # J⁺₂₀(λ) = J⁺₂₁(λ) + T⁺⁺₂₁(λ)[I - R⁺⁻₀₁(λ)R⁻⁺₂₁(λ)]⁻¹[J⁺₁₀(λ) + R⁺⁻₀₁(λ)J⁻₁₂(λ)] (see Eqs.16 in Raman paper draft)
+                    @inbounds @views ieJ₀⁺[:,:,n₁,1] = 
+                            ieJ₁⁺[:,:,n₁,1] + 
+                            (tt⁺⁺_gp_refl[:,:,n₁] * 
+                            (ieJ₀⁺[:,:,n₁,1] + 
+                            r⁻⁺[:,:,n₁] * ieJ₁⁻[:,:,n₁,1] + 
+                            ier⁻⁺[:,:,n₁,1] * J₁⁻[:,:,n₀] + 
+                            (r⁻⁺[:,:,n₁] * ier⁻⁺[:,:,n₁,1] + 
+                            ier⁻⁺[:,:,n₁,1] * r⁻⁺[:,:,n₀]) * 
+                            tmp1[:,:,n₀])) + 
+                            iet⁺⁺[:,:,n₁,1] * tmp1[:,:,n₀];  
             
+                    # J⁻₀₂(λ) = J⁻₀₁(λ) + T⁻⁻₀₁(λ)[I - R⁻⁺₂₁(λ)R⁺⁻₀₁(λ)]⁻¹[J⁻₁₂(λ) + R⁻⁺₂₁(λ)J⁺₁₀(λ)] (see Eqs.17 in Raman paper draft)
+                    @inbounds @views ieJ₀⁻[:,1,n₁,1] = 
+                            ieJ₀⁻[:,1,n₁,1] + 
+                            (tt⁺⁺_gp_refl[:,:,n₁] * 
+                            (ieJ₁⁻[:,1,n₁,1] + 
+                            ier⁻⁺[:,:,n₁,1] * J₀⁺[:,1,n₀] + 
+                            r⁻⁺[:,:,n₁] * ieJ₀⁺[:,1,n₁,1] + 
+                            (ier⁻⁺[:,:,n₁,1] * r⁻⁺[:,:,n₀] + 
+                            r⁻⁺[:,:,n₁] * ier⁻⁺[:,:,n₁,1]) *
+                            tmp2[:,:,n₀])) +
+                            iet⁻⁻[:,:,n₁,1] * tmp2[:,:,n₀]
+                end
+            end            
             # J⁻₀₂(λ) = J⁻₀₁(λ) + T⁻⁻₀₁(λ)[I - R⁻⁺₂₁(λ)R⁺⁻₀₁(λ)]⁻¹[J⁻₁₂(λ) + R⁻⁺₂₁(λ)J⁺₁₀(λ)] (see Eqs.8 in Raman paper draft)
             J₀⁻[:] = J₀⁻ + (tt⁺⁺_gp_refl ⊠ (J₁⁻ + r⁻⁺ ⊠ J₀⁺)) 
 
@@ -219,25 +230,29 @@ function doubling_helper!(RS_type::Union{VS_0to1, VS_1to0},
         end  
 
         #for n₁ in eachindex ieJ₁⁺[1,1,:,1]
-        for Δn in eachindex ieJ₁⁺[1,1,1,:]
-            n₁ = i_λ₁λ₀[Δn]
-            # (see Eqs.12 in Raman paper draft)
-            iet⁺⁺[:,:,n₁,1] = t⁺⁺[:,:,n₁] * gp_refl[:,:,n₁] * 
-                    (iet⁺⁺[:,:,n₁,1] + 
-                    (ier⁻⁺[:,:,n₁,1] * r⁻⁺[:,:,n₀] + 
-                    r⁻⁺[:,:,n₁] * ier⁻⁺[:,:,n₁,1]) * 
-                    gp_refl[:,:,n₀] * t⁺⁺[:,:,n₀]) + 
-                    iet⁺⁺[:,:,n₁,1] * gp_refl[:,:,n₀] * t⁺⁺[:,:,n₀]
+        tmp1 = gp_refl ⊠ t⁺⁺
+        for Δn = 1:length(i_λ₁λ₀_all)
+            n₁ = i_λ₁λ₀_all[Δn]
+            n₀ = 1
+            if n₁>0
+                # (see Eqs.12 in Raman paper draft)
+                @inbounds @views iet⁺⁺[:,:,n₁,1] = tt⁺⁺_gp_refl[:,:,n₁] * 
+                        (iet⁺⁺[:,:,n₁,1] + 
+                        (ier⁻⁺[:,:,n₁,1] * r⁻⁺[:,:,n₀] + 
+                        r⁻⁺[:,:,n₁] * ier⁻⁺[:,:,n₁,1]) * 
+                        tmp1[:,:,n₀]) + 
+                        iet⁺⁺[:,:,n₁,1] * tmp1[:,:,n₀]
 
-            # (see Eqs.14 in Raman paper draft)
-            ier⁻⁺[:,:,n₁,1] = ier⁻⁺[:,:,n₁,1] + 
-                    t⁺⁺[:,:,n₁] * gp_refl[:,:,n₁] * r⁻⁺[:,:,n₁] * 
-                    (iet⁺⁺[:,:,n₁,1] + 
-                    (ier⁻⁺[:,:,n₁,1] * r⁻⁺[:,:,n₀] + 
-                    r⁻⁺[:,:,n₁] * ier⁻⁺[:,:,n₁,1]) * 
-                    gp_refl[:,:,n₀] * t⁺⁺[:,:,n₀]) + 
-                    (iet⁺⁺[:,:,n₁,1] * gp_refl[:,:,n₀] * r⁻⁺[:,:,n₀] + 
-                    t⁺⁺[:,:,n₁] * gp_refl[:,:,n₁] * ier⁻⁺[:,:,n₁,1]) * t⁺⁺[:,:,n₀]
+                # (see Eqs.14 in Raman paper draft)
+                @inbounds @views ier⁻⁺[:,:,n₁,1] = ier⁻⁺[:,:,n₁,1] + 
+                        tt⁺⁺_gp_refl[:,:,n₁] * r⁻⁺[:,:,n₁] * 
+                        (iet⁺⁺[:,:,n₁,1] + 
+                        (ier⁻⁺[:,:,n₁,1] * r⁻⁺[:,:,n₀] + 
+                        r⁻⁺[:,:,n₁] * ier⁻⁺[:,:,n₁,1]) * 
+                        gp_refl[:,:,n₀] * t⁺⁺[:,:,n₀]) + 
+                        (iet⁺⁺[:,:,n₁,1] * gp_refl[:,:,n₀] * r⁻⁺[:,:,n₀] + 
+                        tt⁺⁺_gp_refl[:,:,n₁] * ier⁻⁺[:,:,n₁,1]) * t⁺⁺[:,:,n₀]
+            end
         end
     
         # R⁻⁺₂₀(λ) = R⁻⁺₁₀(λ) + T⁻⁻₀₁(λ)[I - R⁻⁺₂₁(λ)R⁺⁻₀₁(λ)]⁻¹R⁻⁺₂₁(λ)T⁺⁺₁₀(λ) (see Eqs.8 in Raman paper draft)
@@ -301,11 +316,11 @@ end
     end
 end
 
-@kernel function apply_D_IE_VS!(i_λ₁λ₀, n_stokes,  
+@kernel function apply_D_IE_VS!(i_λ₁λ₀_all, n_stokes,  
                         ier⁻⁺, iet⁺⁺, ier⁺⁻, iet⁻⁻)
     iμ, jμ, Δn  = @index(Global, NTuple)
     #@unpack i_λ₁λ₀ = RS_type 
-    n  = i_λ₁λ₀[Δn]
+    n  = i_λ₁λ₀_all[Δn]
     i = mod(iμ, n_stokes)
     j = mod(jμ, n_stokes)
 
@@ -347,11 +362,11 @@ end
 end
 
 # Kernel for VRS
-@kernel function apply_D_SFI_IE_VS!(i_λ₁λ₀, 
+@kernel function apply_D_SFI_IE_VS!(i_λ₁λ₀_all, 
                                 n_stokes::Int, ieJ₀⁻)
     iμ, _, Δn = @index(Global, NTuple)
     #@unpack i_λ₁λ₀ = RS_type
-    n = i_λ₁λ₀[Δn] 
+    n = i_λ₁λ₀_all[Δn] 
     i = mod(iμ, n_stokes)
 
     if (i > 2)
@@ -377,7 +392,22 @@ end
 #    end
 #end
 
-
+function apply_D_matrix_IE!(RS_type::Union{VS_0to1_plus, VS_1to0_plus}, n_stokes::Int, ier⁻⁺::AbstractArray{FT,4}, iet⁺⁺::AbstractArray{FT,4}, ier⁺⁻::AbstractArray{FT,4}, iet⁻⁻::AbstractArray{FT,4}) where {FT}
+    if n_stokes == 1
+        ier⁺⁻[:] = ier⁻⁺
+        iet⁻⁻[:] = iet⁺⁺  
+        return nothing
+    else 
+        device = devi(architecture(ier⁻⁺))
+        aType = array_type(architecture(ier⁻⁺))
+        applyD_kernel_IE! = apply_D_IE_VS!(device)
+        event = applyD_kernel_IE!(aType(RS_type.i_λ₁λ₀_all), n_stokes, 
+            ier⁻⁺, iet⁺⁺, ier⁺⁻, iet⁻⁻, ndrange=getKernelDim(RS_type, ier⁻⁺));
+        wait(device, event);
+        synchronize();
+        return nothing
+    end
+end
 
 function apply_D_matrix_IE!(RS_type::RRS, n_stokes::Int, ier⁻⁺::AbstractArray{FT,4}, iet⁺⁺::AbstractArray{FT,4}, ier⁺⁻::AbstractArray{FT,4}, iet⁻⁻::AbstractArray{FT,4}) where {FT}
     if n_stokes == 1
@@ -422,12 +452,12 @@ function apply_D_matrix_SFI_IE!(RS_type::RRS, n_stokes::Int, ieJ₀⁻::Abstract
 end
 
 # For S_0to1 and VS_1to0
-function apply_D_matrix_SFI_IE!(RS_type::Union{VS_0to1, VS_1to0}, n_stokes::Int, ieJ₀⁻::AbstractArray{FT,4}) where {FT}
+function apply_D_matrix_SFI_IE!(RS_type::Union{VS_0to1_plus, VS_1to0_plus}, n_stokes::Int, ieJ₀⁻::AbstractArray{FT,4}) where {FT}
     n_stokes == 1 && return nothing
     device = devi(architecture(ieJ₀⁻))
     aType = array_type(architecture(ieJ₀⁻))
     applyD_kernel_IE! = apply_D_SFI_IE_VS!(device)
-    event = applyD_kernel_IE!(aType(RS_type.i_λ₁λ₀), n_stokes, 
+    event = applyD_kernel_IE!(aType(RS_type.i_λ₁λ₀_all), n_stokes, 
                     ieJ₀⁻, ndrange=getKernelDimSFI(RS_type, ieJ₀⁻));
     wait(device, event);
     synchronize_if_gpu()

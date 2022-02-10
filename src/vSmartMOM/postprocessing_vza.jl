@@ -45,7 +45,7 @@ function postprocessing_vza!(RS_type::noRS, iμ₀, pol_type,
     end
 end
 
-function postprocessing_vza!(RS_type::Union{RRS, VS_0to1, VS_1to0}, 
+function postprocessing_vza!(RS_type::Union{RRS, VS_0to1_plus, VS_1to0_plus}, 
         iμ₀, pol_type, composite_layer, 
         vza, qp_μ, m, vaz, μ₀, weight, 
         nSpec, SFI, R, R_SFI, T, T_SFI, ieR_SFI, ieT_SFI)
