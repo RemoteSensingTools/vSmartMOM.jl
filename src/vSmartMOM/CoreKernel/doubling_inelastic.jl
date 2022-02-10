@@ -61,10 +61,15 @@ function doubling_helper!(RS_type::RRS,
             @views J₁⁻[:,1,:] = J₀⁻[:,1,:] .* expk'
             @views ieJ₁⁻[:,1,:,:] = ieJ₀⁻[:,1,:,:] .* expk'
             #@show size(ieJ₁⁺)
-            tmp1 = gp_refl ⊠  (J₀⁺ + r⁻⁺ ⊠ J₁⁻)
-            tmp2 = gp_refl ⊠  (J₁⁻ + r⁻⁺ ⊠ J₀⁺)
+            @timeit "precomp" tmp1 = gp_refl ⊠  (J₀⁺ + r⁻⁺ ⊠ J₁⁻)
+            @timeit "precomp" tmp2 = gp_refl ⊠  (J₁⁻ + r⁻⁺ ⊠ J₀⁺)
+            #@timeit "prep"    tmp3 = repeat(r⁻⁺,1,1,1,nRaman) ⊠ reshape(ieJ₁⁻, 
             for Δn = 1:nRaman
                 n₀, n₁ = get_n₀_n₁(ieJ₁⁺,i_λ₁λ₀[Δn])
+                #@timeit "mati" @views tmp3 = ier⁻⁺[:,:,n₁,Δn] ⊠ J₁⁻[:,:,n₀]
+                #@timeit "mati" @views tmp4 = r⁻⁺[:,:,n₁] ⊠ ier⁻⁺[:,:,n₁,Δn] 
+                #@timeit "mati" @views tmp5 = ier⁻⁺[:,:,n₁,Δn] ⊠ r⁻⁺[:,:,n₀]
+                #@show size(tmp3)
                 #@show length(n₁), length(n₀), length(n₁_), length(n₀_)
                 @inbounds @views ieJ₀⁺[:,:,n₁,Δn] = 
                                 ieJ₁⁺[:,:,n₁,Δn] + 
@@ -102,12 +107,12 @@ function doubling_helper!(RS_type::RRS,
                 n₀, n₁ = get_n₀_n₁(ieJ₁⁺,i_λ₁λ₀[Δn])
                 #@show n₁, n₀
                 #@show length(n₀)
-                @inbounds @views iet⁺⁺[:,:,n₁,Δn] = t⁺⁺[:,:,n₁] ⊠ gp_refl[:,:,n₁] ⊠ 
+                @timeit "n loop 2" @inbounds @views iet⁺⁺[:,:,n₁,Δn] = t⁺⁺[:,:,n₁] ⊠ gp_refl[:,:,n₁] ⊠ 
                         (iet⁺⁺[:,:,n₁,Δn] + 
                         (ier⁻⁺[:,:,n₁,Δn] ⊠ r⁻⁺[:,:,n₀] + r⁻⁺[:,:,n₁] ⊠ ier⁻⁺[:,:,n₁,Δn]) ⊠ 
                         gp_refl[:,:,n₀] ⊠ t⁺⁺[:,:,n₀]) + 
                         iet⁺⁺[:,:,n₁,Δn] ⊠ gp_refl[:,:,n₀] ⊠  t⁺⁺[:,:,n₀]
-                @inbounds @views ier⁻⁺[:,:,n₁,Δn] = ier⁻⁺[:,:,n₁,Δn] + 
+                @timeit "n loop 2" @inbounds @views ier⁻⁺[:,:,n₁,Δn] = ier⁻⁺[:,:,n₁,Δn] + 
                         t⁺⁺[:,:,n₁] ⊠ gp_refl[:,:,n₁] ⊠ r⁻⁺[:,:,n₁] ⊠  
                         (iet⁺⁺[:,:,n₁,Δn] + 
                         (ier⁻⁺[:,:,n₁,Δn] ⊠ r⁻⁺[:,:,n₀] + r⁻⁺[:,:,n₁] ⊠ ier⁻⁺[:,:,n₁,Δn]) ⊠ 

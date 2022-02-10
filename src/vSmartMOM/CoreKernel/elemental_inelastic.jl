@@ -371,7 +371,7 @@ function get_elem_rt_SFI!(RS_type::RRS,
                         wct02, nStokes,
                         I₀, iμ0,D)
     @unpack fscattRayl, ϖ_λ₁λ₀, i_λ₁λ₀, i_ref = RS_type
-    @show fscattRayl
+    #@show fscattRayl
     device = devi(architecture(ieJ₀⁺))
     aType = array_type(architecture(ieJ₀⁺))
     kernel! = get_elem_rt_SFI_RRS!(device)

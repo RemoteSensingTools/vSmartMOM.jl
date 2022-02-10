@@ -218,7 +218,7 @@ make_composite_layer(RS_type::Union{VS_0to1_plus, VS_1to0_plus},FT, arr_type, di
                                                         )
 =#
 
-                                                        
+=#                                                        
 
 "Given a ComputedAtmosphereProperties object, extract a ComputedLayerProperties object using data from the iz index of all arrays in the ComputedAtmosphereProperties"
 function get_layer_properties(computed_atmospheric_properties::ComputedAtmosphereProperties, iz, arr_type)
