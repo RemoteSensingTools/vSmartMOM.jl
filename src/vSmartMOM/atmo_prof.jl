@@ -164,6 +164,8 @@ Input:
     - `vcd_dry` dry vertical column (no water) per layer
 """
 function getRayleighLayerOptProp(psurf, λ, depol_fct, vcd_dry) 
+    # TODO: Use noRS/noRS_plus to use n2/o2 molecular constants
+    # to compute tau_scat and depol_fct
     FT = eltype(λ)
     # Total vertical Rayleigh scattering optical thickness 
     tau_scat = FT(0.00864) * (psurf / FT(1013.25)) * λ^(-FT(3.916) - FT(0.074) * λ - FT(0.05) / λ) 

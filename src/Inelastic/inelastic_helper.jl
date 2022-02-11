@@ -40,12 +40,12 @@ function getRamanAtmoConstants(ν̃::FT, T::FT) where FT
     return n2,o2
 end
 
-function compute_ϖ_Cabannes!(RS_type::noRS, λ₀)
+function compute_ϖ_Cabannes(RS_type::noRS, λ₀)
     RS_type.ϖ_Cabannes = 1.0;
-    return nothing;
+    return RS_type.ϖ_Cabannes;
 end
 
-function compute_ϖ_Cabannes!(RS_type::Union{RRS, VS_0to1, VS_1to0}, λ₀, n2, o2)
+function compute_ϖ_Cabannes(RS_type::Union{RRS, VS_0to1, VS_1to0, RRS_plus, VS_0to1_plus, VS_1to0_plus}, λ₀, n2, o2)
     ν₀ = 1e7/λ₀;
 
     σ_elastic =  n2.vmr * n2.effCoeff.σ_Rayl_coeff + o2.vmr * o2.effCoeff.σ_Rayl_coeff 
@@ -72,8 +72,8 @@ function compute_ϖ_Cabannes!(RS_type::Union{RRS, VS_0to1, VS_1to0}, λ₀, n2, 
     σ_VRS += o2.vmr * ((ν₀.+o2.effCoeff.Δν̃_VibRaman_coeff_1to0_hires).^4)' * o2.effCoeff.σ_VibRaman_coeff_1to0_hires    
 
     #RS_type.ϖ_Cabannes = σ_elastic/(σ_VRS+σ_RVRS+σ_RRS+σ_elastic);
-    RS_type.ϖ_Cabannes = σ_elastic/(σ_RRS+σ_elastic);
-    return nothing;
+    ϖ_Cabannes = σ_elastic/(σ_RRS+σ_elastic);
+    return ϖ_Cabannes;
 end
 
 # Note: ν stands for wavenumber in the following (NOT frequency)
@@ -173,9 +173,10 @@ function apply_gridlines!(Δνᵢ, σᵢ,  # discrete transitions
     S_sum = 0.0
     # Loop through all transition lines:
     for j in eachindex(Δνᵢ)
-        #@show(j, Δνᵢ[j])
+        #@show(grid_min, Δνᵢ[j], grid_max)
         # Test that this ν lies within the grid
         if grid_min < Δνᵢ[j] < grid_max
+            
             ν = Δνᵢ[j] + nm_per_m/λ₀#13500.0 #Dummy for now #Suniti
 
             # Compute Doppler HWHM, ν still needs to be supplied, @Suniti?:
@@ -216,20 +217,20 @@ end
 
 
 #function compute_optical_Rayl!(grid_out,atmo_σ_Rayl, λ₀, n2, o2)
-function compute_optical_Rayl!(λ₀, n2, o2)
+function compute_optical_Rayl(λ₀, n2, o2)
     atmo_σ_Rayl = n2.vmr * n2.effCoeff.σ_Rayl_coeff #σ_out #cross section in cm^2
     atmo_σ_Rayl += o2.vmr * o2.effCoeff.σ_Rayl_coeff #cross section in cm^2
     atmo_σ_Rayl *= (nm_per_m/λ₀)^4
     #plot(1.e7/λ₀ .+ grid_out,atmo_σ_Rayl*1.e40)
+    return atmo_σ_Rayl;
 end
 
-function compute_optical_RS!(RS_type::RRS, grid_in, λ₀, n2, o2)
+function compute_optical_RS!(RS_type::Union{RRS, RRS_plus}, grid_in, λ₀, n2, o2)
     #plotly()
     # grid_in is a uniform wavenumber grid covering the entire band spectrum 
     # TMP: grid_in = nm_per_m/λ₀.+collect(-250:0.002:250) #this is a wavenumber grid
-    get_greek_raman!(RS_type, n2, o2)
-    compute_ϖ_Cabannes!(RS_type, λ₀, n2, o2)
-    @show RS_type.ϖ_Cabannes
+    # get_greek_raman!(RS_type, n2, o2)
+    
     σ_out = similar(grid_in);
     atmo_σ_RRS_JtoJp2 = similar(grid_in);
     atmo_σ_RRS_JtoJm2 = similar(grid_in);     
@@ -275,18 +276,18 @@ function compute_optical_RS!(RS_type::RRS, grid_in, λ₀, n2, o2)
 
 end
 
-function compute_optical_RS!(RS_type::VS_0to1, grid_in, λ₀, n2, o2)
+function compute_optical_RS!(RS_type::Union{VS_0to1, VS_0to1_plus}, grid_in, λ₀, n2, o2)
     #plotly()
-    get_greek_raman(RS_type, n2, o2)
-    compute_ϖ_Cabannes!(RS_type, λ₀, n2, o2)
+    #get_greek_raman(RS_type, n2, o2)
+    #compute_ϖ_Cabannes!(RS_type, λ₀, n2, o2)
 
     @show n2.effCoeff.Δν̃_VibRaman_coeff_0to1_hires[0], o2.effCoeff.Δν̃_VibRaman_coeff_0to1_hires[0]
-    νᵣ = 0.5*(n2.effCoeff.Δν̃_VibRaman_coeff_0to1_hires[0] + o2.effCoeff.Δν̃_VibRaman_coeff_0to1_hires[0])
+    #νᵣ = 0.5*(n2.effCoeff.Δν̃_VibRaman_coeff_0to1_hires[0] + o2.effCoeff.Δν̃_VibRaman_coeff_0to1_hires[0])
     
     # TMP: grid_in = nm_per_m/λ₀ .+ collect((νᵣ-750):0.002:(νᵣ+750))
     σ_out = similar(grid_in);
-    atmo_σ_VRS_0to1 = similar(grid_in);
-    atmo_σ_RVRS_0to1 = similar(grid_in);
+    #atmo_σ_VRS_0to1 = similar(grid_in);
+    #atmo_σ_RVRS_0to1 = similar(grid_in);
     σ_tmpVRS = similar(grid_in);
     σ_tmpRVRS = similar(grid_in);
     # N2
@@ -320,13 +321,13 @@ function compute_optical_RS!(RS_type::VS_0to1, grid_in, λ₀, n2, o2)
     yin = o2.effCoeff.σ_VibRaman_coeff_0to1_hires
     #apply_lineshape!(xin, yin, λ₀, collect(grid_out), σ_out, 1, 300.0, 40);
     apply_gridlines!(xin, yin, λ₀, grid_in, σ_out);
-    σ_VRStmp += o2.vmr * σ_out #cross section in cm^2
+    σ_tmpVRS += o2.vmr * σ_out #cross section in cm^2
 
-    atmo_σ_VRS_0to1 .= σ_VRStmp(σ_VRStmp.>0)
+    atmo_σ_VRS_0to1 = σ_tmpVRS[σ_tmpVRS.>0]
     #finding all indices of σ_out (and hence of ν_in) that have finite (non-zero) values
     index_VRSgrid_out = findall(x->x in σ_tmpVRS[σ_tmpVRS.>0],σ_tmpVRS)
 
-    atmo_σ_RVRS_0to1 .= σ_tmpRVRS(σ_RVRStmp.>0)
+    atmo_σ_RVRS_0to1 = σ_tmpRVRS[σ_tmpRVRS.>0]
     #finding all indices of σ_out (and hence of ν_in) that have finite (non-zero) values
     index_RVRSgrid_out = findall(x->x in σ_tmpRVRS[σ_tmpRVRS.>0],σ_tmpRVRS)
     #plot(grid_out, atmo_σ_RRS_JtoJp2, yscale=:log10)
@@ -336,7 +337,7 @@ function compute_optical_RS!(RS_type::VS_0to1, grid_in, λ₀, n2, o2)
 end
 
 
-function compute_optical_RS!(RS_type::VS_1to0, grid_in, λ₀, n2, o2)
+function compute_optical_RS!(RS_type::Union{VS_1to0, VS_1to0_plus}, grid_in, λ₀, n2, o2)
     #plotly()
     get_greek_raman(RS_type, n2, o2)
     compute_ϖ_Cabannes!(RS_type, λ₀, n2, o2)
@@ -406,7 +407,8 @@ function get_greek_raman!(RS_type::noRS, n2, o2)
 end
 
 # the following applies to both rovibrational and rotational Raman scattering (by both N2 and O2)
-function get_greek_raman!(RS_type::RRS, n2, o2)
+function get_greek_raman(RS_type::Union{RRS, RRS_plus, VS_0to1, VS_0to1_plus, VS_1to0, VS_1to0_plus}, 
+                            n2, o2)
     depol = n2.effCoeff.rho_depol_RotRaman
     FT = eltype(depol)
 
@@ -421,14 +423,15 @@ function get_greek_raman!(RS_type::RRS, n2, o2)
     δ  =  FT[0.0, dpl_p * dpl_r * 1.5, 0.0] 
     ϵ  =  FT[0.0, 0.0,             0.0] 
     ζ  =  FT[0.0, 0.0,             0.0]
-    RS_type.greek_raman = GreekCoefs(α, β, γ, δ, ϵ, ζ);
-    return nothing
+    return GreekCoefs(α, β, γ, δ, ϵ, ζ);
+    #return nothing
 end
 
-function get_greek_raman!(RS_type::Union{VS_0to1, VS_1to0}, n2, o2)
+function get_greek_raman_VS(RS_type::Union{VS_0to1, VS_0to1_plus, VS_1to0, VS_1to0_plus}, 
+                            in_molec)
     
-    #crude approximation - introduce separate treatment for n2 and o2 eventually
-    depol = 0.5*(n2.effcoeff.rho_depol_VibRaman + o2.effcoeff.rho_depol_VibRaman)
+    depol = in_molec.effCoeff.rho_depol_VibRaman
+    
     FT = eltype(depol)
     # Rayleigh Greek Parameters
     dpl_p = (1 - depol)  / (1 + depol / 2)
@@ -441,8 +444,8 @@ function get_greek_raman!(RS_type::Union{VS_0to1, VS_1to0}, n2, o2)
     δ  =  FT[0.0, dpl_p * dpl_r * 1.5, 0.0] 
     ϵ  =  FT[0.0, 0.0,             0.0] 
     ζ  =  FT[0.0, 0.0,             0.0]
-    RS_type.greek_raman = GreekCoefs(α, β, γ, δ, ϵ, ζ);
-    return nothing
+    return GreekCoefs(α, β, γ, δ, ϵ, ζ);
+    #return nothing
 end
 
 function compute_Rayl_depol(n2, o2)
