@@ -27,7 +27,7 @@ module InelasticScattering
     export compute_σ_Rayl_coeff!
     export compute_σ_Rayl_VibRaman_coeff_hires!
     export compute_energy_levels!
-    export apply_lineshape!
+    export apply_lineshape!, get_n₀_n₁
 
     #export compute_σ_Raman_coeff!
     export compute_σ_VibRaman_coeff!, compute_σ_RoVibRaman_coeff!

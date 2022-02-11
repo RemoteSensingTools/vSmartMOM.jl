@@ -9,7 +9,7 @@
     parameters = vSmartMOM.parameters_from_yaml("test_parameters/PureRayleighParameters.yaml")
     model = model_from_parameters(parameters)
 
-    R_model = rt_run(model)
+    R_model = rt_run(model)[1]
 
     R_test = [1.6376193549450170E-002  2.1561609277437792E-003  5.5387198966105483E-019 0.0 ; 
               1.2818490637667997E-002  3.7825131902305691E-004  2.0685375352086151E-019 0.0 ;

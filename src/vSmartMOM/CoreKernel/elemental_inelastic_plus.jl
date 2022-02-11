@@ -72,12 +72,11 @@ function elemental_inelastic!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
                 qp_μN, ndoubl,wct02, pol_type.n, 
                 arr_type(pol_type.I₀), iμ₀, D);
         end
-        println("hello 0")
+        
         # Apply D Matrix
         apply_D_matrix_elemental!(RS_type, ndoubl, pol_type.n, 
                                     ier⁻⁺, iet⁺⁺, ier⁺⁻, iet⁻⁻)
         #println("Apply D matrix done")
-        println("hello 1")
         if SFI
             apply_D_matrix_elemental_SFI!(RS_type, ndoubl, pol_type.n, 
                                             ieJ₀⁻)
@@ -208,9 +207,7 @@ function get_elem_rt!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
     aType = array_type(architecture(ier⁻⁺)) 
     #RVRS
     kernel! = get_elem_rt_VS!(device)
-    @show typeof(ier⁻⁺), typeof(dτ), typeof(ϖ), typeof(i_λ₁λ₀), typeof(i_ref)
-    #@show size(fscattRayl), size(ier⁻⁺), getKernelDim(RS_type,ier⁻⁺,i_λ₁λ₀)
-    @show getKernelDim(RS_type,ier⁻⁺,i_λ₁λ₀), size(i_λ₁λ₀)
+
     event = kernel!(aType(fscattRayl), 
         aType(ϖ_λ₁λ₀), aType(i_λ₁λ₀), 
         ier⁻⁺, iet⁺⁺, 
@@ -225,7 +222,6 @@ function get_elem_rt!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
     t_iet⁺⁺  = similar(ier⁻⁺)
     #VS - N2
     kernel! = get_elem_rt_VS!(device)
-    @show size(t_ier⁻⁺), size(ier⁻⁺)
     event = kernel!(fscattRayl, 
         aType(ϖ_λ₁λ₀_VS_n2), aType(i_λ₁λ₀_VS_n2),
         t_ier⁻⁺, t_iet⁺⁺, 
@@ -349,7 +345,6 @@ function get_elem_rt_SFI!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
     device = devi(architecture(ieJ₀⁺))
     aType = array_type(architecture(ieJ₀⁺))
     kernel! = get_elem_rt_SFI_VS!(device)
-    @show getKernelDimSFI(RS_type, ieJ₀⁻, i_λ₁λ₀)
     #@show typeof(ieJ₀⁺), typeof(τ_sum), typeof(dτ_λ),typeof(wct02), typeof(qp_μN), typeof(dτ_λ) 
     event = kernel!(fscattRayl, 
         aType(ϖ_λ₁λ₀), aType(i_λ₁λ₀), 
@@ -365,7 +360,7 @@ function get_elem_rt_SFI!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
     t_ieJ₀⁺ = similar(ieJ₀⁻)
     t_ieJ₀⁻ = similar(ieJ₀⁻)
     
-    println("Hallo1")
+    #println("Hallo1")
     event = kernel!(fscattRayl, 
         aType(ϖ_λ₁λ₀_VS_n2), aType(i_λ₁λ₀_VS_n2), 
         t_ieJ₀⁺, t_ieJ₀⁻, 
@@ -380,7 +375,7 @@ function get_elem_rt_SFI!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
     ieJ₀⁺ += t_ieJ₀⁺
     ieJ₀⁻ += t_ieJ₀⁻
     
-    println("Hallo2")
+    #println("Hallo2")
     event = kernel!(fscattRayl, 
         aType(ϖ_λ₁λ₀_VS_o2), aType(i_λ₁λ₀_VS_o2), 
         t_ieJ₀⁺, t_ieJ₀⁻, 

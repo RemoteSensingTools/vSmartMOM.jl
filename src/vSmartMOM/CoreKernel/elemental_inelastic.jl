@@ -486,8 +486,6 @@ end
                         ndoubl, pol_n, ier⁻⁺, iet⁺⁺, ier⁺⁻, iet⁻⁻)
 
     i, j, n₁, _ = @index(Global, NTuple)
-    # @unpack i_λ₁λ₀ = RS_type
-    # println("hello 0.2")
     #n₁ = i_λ₁λ₀[Δn]
     if ndoubl < 1
         ii = mod(i, pol_n) 
@@ -542,8 +540,6 @@ function apply_D_matrix_elemental!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
     
     device = devi(architecture(ier⁻⁺))
     applyD_kernel! = apply_D_elemental_VS!(device)
-    
-    @show size(ier⁻⁺)
     event = applyD_kernel!(RS_type, ndoubl,n_stokes, ier⁻⁺, iet⁺⁺, ier⁺⁻, iet⁻⁻, ndrange=size(ier⁻⁺));
     wait(device, event);
     synchronize_if_gpu();

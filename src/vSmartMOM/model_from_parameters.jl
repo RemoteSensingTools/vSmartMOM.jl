@@ -137,7 +137,7 @@ function model_from_parameters(params::vSmartMOM_Parameters)
             @timeit "Mie calc"  aerosol_optics_raw = compute_aerosol_optical_properties(mie_model, FT2);
 
             # Compute truncated aerosol optical properties (phase function and fᵗ), consistent with Ltrunc:
-            @show i_aer, i_band
+            #@show i_aer, i_band
             aerosol_optics[i_band][i_aer] = Scattering.truncate_phase(truncation_type, 
                                                     aerosol_optics_raw; reportFit=false)
 

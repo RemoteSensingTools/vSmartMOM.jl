@@ -9,32 +9,9 @@ using Statistics
 #iBand = 1
 n2,o2 = InelasticScattering.getRamanAtmoConstants(1.7/λ₀, 300.);
 FT = Float64
-RS_type = InelasticScattering.VS_0to1_plus(
-            bandSpecLim = [],
-            iBand = [],
-            grid_in = [],
+RS_type = InelasticScattering.VS_0to1_plus{FT}(
             n2=n2,
-            o2=o2,
-            greek_raman = InelasticScattering.GreekCoefs([FT(1)], [FT(1)], [FT(1)], [FT(1)], [FT(1)], [FT(1)]),
-            greek_raman_VS_n2 = InelasticScattering.GreekCoefs([FT(1)], [FT(1)], [FT(1)], [FT(1)], [FT(1)], [FT(1)]),
-            greek_raman_VS_o2 = InelasticScattering.GreekCoefs([FT(1)], [FT(1)], [FT(1)], [FT(1)], [FT(1)], [FT(1)]),
-            fscattRayl  = zeros(FT,1),
-            ϖ_Cabannes  = zeros(FT,1), 
-            ϖ_λ₁λ₀      = zeros(FT,1),
-            i_λ₁λ₀      = zeros(Int,1), 
-            Z⁻⁺_λ₁λ₀    = zeros(FT,1,1), 
-            Z⁺⁺_λ₁λ₀    = zeros(FT,1,1), 
-            ϖ_λ₁λ₀_VS_n2= zeros(FT,1),
-            i_λ₁λ₀_VS_n2= zeros(Int,1), 
-            Z⁻⁺_λ₁λ₀_VS_n2= zeros(FT,1,1), 
-            Z⁺⁺_λ₁λ₀_VS_n2= zeros(FT,1,1), 
-            ϖ_λ₁λ₀_VS_o2= zeros(FT,1),
-            i_λ₁λ₀_VS_o2= zeros(Int,1), 
-            Z⁻⁺_λ₁λ₀_VS_o2= zeros(FT,1,1), 
-            Z⁺⁺_λ₁λ₀_VS_o2= zeros(FT,1,1), 
-            i_λ₁λ₀_all= zeros(Int,1), 
-            i_ref       = 1,
-            n_Raman=1);
+            o2=o2);
 # Load YAML files into parameter struct
 parameters = parameters_from_yaml("test/test_parameters/O2ParametersVS.yaml");
 # Create model struct (precomputes optical properties) from parameters
@@ -88,7 +65,7 @@ R, T, ieR, ieT = vSmartMOM.rt_run_test(RS_type,
     model, RS_type.iBand);
 #R = vSmartMOM.rt_run(model, i_band=1)
 
-RnoRS, TnoRS, _, _ = vSmartMOM.rt_run(vSmartMOM.noRS(),
+RnoRS, TnoRS, _, _ = vSmartMOM.rt_run_test(vSmartMOM.noRS(),
             model,RS_type.iBand);
 
 #RnoRS_test, TnoRS_test, _, _ = vSmartMOM.rt_run_test(vSmartMOM.noRS(),model,iBand);

@@ -32,7 +32,7 @@ function constructCoreOpticalProperties(RS_type, iBand, m, model)
         # Loop over all aerosol types:
         for i=1:nAero
             # Precomute Z matrices per type (constant per layer)
-            @show iB,i
+            #@show iB,i
             AerZ⁺⁺, AerZ⁻⁺ = Scattering.compute_Z_moments(
                                 pol_type, μ, 
                                 aerosol_optics[iB][i].greek_coefs, 

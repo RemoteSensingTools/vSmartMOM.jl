@@ -564,7 +564,6 @@ end
 function Base.:+( x::CoreScatteringOpticalProperties{FT}, y::CoreAbsorptionOpticalProperties{FT} ) where FT
     τ  = x.τ .+ y.τ
     wx = x.τ .* x.ϖ 
-    @show size(wx), size(τ)
     ϖ  = (wx) ./ τ
     CoreScatteringOpticalProperties(τ, ϖ, x.Z⁺⁺, x.Z⁻⁺)
 end
