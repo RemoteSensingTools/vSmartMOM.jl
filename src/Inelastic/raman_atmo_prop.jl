@@ -58,13 +58,13 @@ function getRamanSSProp!(RS_type::RRS, λ, grid_in)
     @unpack n2,o2 =  RS_type
     #n2, o2 = getRamanAtmoConstants(1.e7/λ, T)
     # determine Rayleigh scattering cross-section at central wavelength λ of the spectral band (assumed constant throughout the band)
-    atmo_σ_Rayl = compute_optical_Rayl!(λ, n2, o2)
+    atmo_σ_Rayl = compute_optical_Rayl(λ, n2, o2)
     greek_raman = get_greek_raman(RS_type, n2, o2)
     #get_greek_raman!(RS_type, n2, o2)
-    RS_type.ϖ_Cabannes = compute_ϖ_Cabannes(RS_type, λ₀, n2, o2)
+    RS_type.ϖ_Cabannes = compute_ϖ_Cabannes(RS_type, λ, n2, o2)
     @show RS_type.ϖ_Cabannes
     # determine RRS cross-sections to λ₀ from nSpecRaman wavelengths around λ₀  
-    RS_type.ϖ_Cabannes, index_raman_grid, atmo_σ_RRS = compute_optical_RS!(RS_type, grid_in, λ, n2, o2)
+    index_raman_grid, atmo_σ_RRS = compute_optical_RS!(RS_type, grid_in, λ, n2, o2)
     # declare ϖ_Raman to be a grid of length raman grid
     RS_type.ϖ_λ₁λ₀ = atmo_σ_RRS[end:-1:1]/atmo_σ_Rayl #the grid gets inverted because the central wavelength is now seen as the recipient of RRS from neighboring source wavelengths
     RS_type.i_λ₁λ₀ = index_raman_grid[end:-1:1]
@@ -88,12 +88,11 @@ function getRamanSSProp!(RS_type::RRS_plus)
     ϖ_Cabannes = zeros(FT, nBands) 
     fscattRayl = zeros(FT, nBands)
     n_Raman = 0
+    atmo_σ_Rayl = compute_optical_Rayl(λ, n2, o2)
+    ϖ_Cabannes[iB] = compute_ϖ_Cabannes(RS_type, λ, n2, o2)
     for iB = 1:nBands
         _grid_in = grid_in[iB]
         λ = nm_per_m/(0.5*(_grid_in[1]+_grid_in[end]))
-        atmo_σ_Rayl = compute_optical_Rayl!(λ, n2, o2)
-    
-        ϖ_Cabannes[iB] = compute_ϖ_Cabannes(RS_type, λ, n2, o2)
         @show ϖ_Cabannes
         # determine RRS cross-sections to λ₀ from nSpecRaman wavelengths around λ₀  
         index_raman_grid, atmo_σ_RRS = compute_optical_RS!(RS_type, grid_in, λ, n2, o2)

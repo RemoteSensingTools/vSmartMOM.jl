@@ -111,8 +111,8 @@ function rt_run(RS_type::AbstractRamanType, #Default - no Raman scattering (noRS
             # Suniti: modified to return fscattRayl as the last element of  computed_atmosphere_properties
             # Computing Rayleigh scattering fraction, fscattRayl = τRayl*ϖRayl/τ
             computed_layer_properties = get_layer_properties(computed_atmosphere_properties, iz, arr_type)
-            @show computed_layer_properties.fscattRayl
-            RS_type.fscattRayl = computed_layer_properties.fscattRayl
+            #@show computed_layer_properties.fscattRayl
+            RS_type.fscattRayl .= computed_layer_properties.fscattRayl
             # Perform Core RT (doubling/elemental/interaction)
             rt_kernel!(RS_type, pol_type, SFI, added_layer, composite_layer, computed_layer_properties, m, quad_points, I_static, architecture, qp_μN, iz) 
         end 
@@ -156,7 +156,7 @@ function rt_run(model::vSmartMOM_Model; i_band::Integer = -1)
 
     # User wants a specific band
     if i_band != -1
-        return rt_run(model.params.polarization_type,
+        return rt_run(noRS(),model.params.polarization_type,
                       model.obs_geom,
                       model.τ_rayl[i_band], 
                       model.τ_aer[i_band], 
@@ -171,7 +171,8 @@ function rt_run(model::vSmartMOM_Model; i_band::Integer = -1)
     # User doesn't specify band, but there's only one 
     elseif n_bands == 1
 
-        return rt_run(model.params.polarization_type,
+        return rt_run(noRS(),
+                      model.params.polarization_type,
                       model.obs_geom,
                       model.τ_rayl[1], 
                       model.τ_aer[1], 
@@ -194,7 +195,8 @@ function rt_run(model::vSmartMOM_Model; i_band::Integer = -1)
             println("Computing R for band #$(i)")
             println("------------------------------")
 
-            R = rt_run(model.params.polarization_type,
+            R = rt_run(noRS(),
+                    model.params.polarization_type,
                        model.obs_geom,
                        model.τ_rayl[i], 
                        model.τ_aer[i], 
@@ -291,8 +293,9 @@ function rt_run_test(RS_type::AbstractRamanType,
 
         # Azimuthal weighting
         weight = m == 0 ? FT(0.5) : FT(1.0)
-        
-        if !(typeof(RS_type) <: vSmartMOM.noRS_plus)    
+        InelasticScattering.computeRamanZλ!(RS_type, pol_type,Array(qp_μ), m, arr_type)
+        @show typeof(RS_type) <: Union{noRS_plus, noRS}
+        #=if !(typeof(RS_type) <: Union{noRS_plus, noRS})    
             @timeit "Z moments" RS_type.Z⁺⁺_λ₁λ₀, RS_type.Z⁻⁺_λ₁λ₀ = 
                 Scattering.compute_Z_moments(pol_type, 
                                             Array(qp_μ), 
@@ -316,27 +319,24 @@ function rt_run_test(RS_type::AbstractRamanType,
             #@show size(RS_type.Z⁺⁺_λ₁λ₀), size(RS_type.Z⁻⁺_λ₁λ₀)
         end
 
-        
-        layer_opt_props, fScattRayleigh   = 
-            constructCoreOpticalProperties(RS_type,iBand,m,model);
+        =#
+        layer_opt_props, fScattRayleigh   = constructCoreOpticalProperties(RS_type,iBand,m,model);
         #@show fScattRayleigh[1]
         #layer_opt_props = prod(band_layer_props);
         #fScattRayleigh = band_fScattRayleigh[1]
         #layer_opt_props, fScattRayleigh      = constructCoreOpticalProperties(RS_type,iBand,m,model);
         # Expand Z dimensions if needed
         #@show typeofç(layer_opt_props)
-        scattering_interfaces_all, τ_sum_all = 
-            extractEffectiveProps(layer_opt_props);
+        scattering_interfaces_all, τ_sum_all = extractEffectiveProps(layer_opt_props);
+        @show Nz
         #@show RS_type.ϖ_Cabannes, ϖ_Cabannes
         
-        # Loop over vertical layers:
+        # Loop over vertical layers: 
         @showprogress 1 "Looping over layers ..." for iz = 1:Nz  # Count from TOA to BOA
             
             # Construct the atmospheric layer
             # From Rayleigh and aerosol τ, ϖ, compute overall layer τ, ϖ
             # Suniti: modified to return fscattRayl as the last element of  computed_atmosphere_properties
-            # Computing Rayleigh scattering fraction, fscattRayl = τRayl*ϖRayl/τ
-            #@show fScattRayleigh[iz]
             RS_type.fscattRayl = fScattRayleigh[iz]
             #@show size(RS_type.fscattRayl), 
             #@show arr_type

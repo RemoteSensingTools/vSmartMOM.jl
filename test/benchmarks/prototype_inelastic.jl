@@ -1,6 +1,7 @@
 ##
 using Revise
 using RadiativeTransfer, RadiativeTransfer.vSmartMOM
+using RadiativeTransfer.InelasticScattering
 using Statistics
 
 # Load YAML files into parameter struct
@@ -22,12 +23,13 @@ i_ref = argmin(abs.(ν .- ν̃))
 effT = (model.profile.vcd_dry' * model.profile.T) / sum(model.profile.vcd_dry);
 # Define RS type
 # Compute N2 and O2
-n2,o2 = vSmartMOM.getRamanAtmoConstants(ν̃,effT);
+
+n2,o2 = InelasticScattering.getRamanAtmoConstants(ν̃,effT);
 #greek_raman = get_greek_raman(RS_type, n2, o2);
-RS_type = vSmartMOM.RRS(
+RS_type = InelasticScattering.RRS(
             n2=n2,
             o2=o2,
-            greek_raman = vSmartMOM.Scattering.GreekCoefs([FT(1)], [FT(1)], [FT(1)], [FT(1)], [FT(1)], [FT(1)]),
+            greek_raman = InelasticScattering.GreekCoefs([FT(1)], [FT(1)], [FT(1)], [FT(1)], [FT(1)], [FT(1)]),
             fscattRayl  = FT(1),
             ϖ_Cabannes  = FT(1), 
             ϖ_λ₁λ₀      = zeros(FT,1),

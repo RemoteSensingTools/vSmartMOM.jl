@@ -138,8 +138,9 @@ function apply_lineshape!(Δνᵢ, σᵢ,  # discrete transitions
             end
         end
     end
-    dν = Δν_out[2]-Δν_out[1]   
-    @show S_sum, sum(σ_out)*dν
+    #dν = Δν_out[2]-Δν_out[1] 
+    nothing  
+    #@show S_sum, sum(σ_out)*dν
 end
 
 function apply_gridlines!(Δνᵢ, σᵢ,  # discrete transitions
@@ -211,8 +212,8 @@ function apply_gridlines!(Δνᵢ, σᵢ,  # discrete transitions
             end
         end
     end
-    
-    @show S_sum, sum(σ_out)
+    #@show S_sum, sum(σ_out)
+    nothing
 end
 
 
@@ -240,7 +241,7 @@ function compute_optical_RS!(RS_type::Union{RRS, RRS_plus}, grid_in, λ₀, n2, 
     #apply_lineshape!(n2.effCoeff.Δν̃_RoRaman_coeff_JtoJp2, n2.effCoeff.σ_RoRaman_coeff_JtoJp2,  λ₀, collect(grid_out), σ_out, 1, 300.0, 28);
     apply_gridlines!(n2.effCoeff.Δν̃_RoRaman_coeff_JtoJp2, n2.effCoeff.σ_RoRaman_coeff_JtoJp2,  λ₀, collect(grid_in), σ_out);
     atmo_σ_RRS_JtoJp2 = n2.vmr * σ_out #cross section in cm^2
-    @show length(atmo_σ_RRS_JtoJp2[atmo_σ_RRS_JtoJp2.>0])
+    #@show length(atmo_σ_RRS_JtoJp2[atmo_σ_RRS_JtoJp2.>0])
     #for I in eachindex(grid_out)
     #    @show grid_out[I], σ_out[I]
     #end
@@ -248,17 +249,17 @@ function compute_optical_RS!(RS_type::Union{RRS, RRS_plus}, grid_in, λ₀, n2, 
     #apply_lineshape!(n2.effCoeff.Δν̃_RoRaman_coeff_JtoJm2, n2.effCoeff.σ_RoRaman_coeff_JtoJm2, λ₀, collect(grid_out), σ_out, 1, 300.0, 40);
     apply_gridlines!(n2.effCoeff.Δν̃_RoRaman_coeff_JtoJm2, n2.effCoeff.σ_RoRaman_coeff_JtoJm2, λ₀, collect(grid_in), σ_out);
     atmo_σ_RRS_JtoJm2 = n2.vmr * σ_out #cross section in cm^2
-    @show length(atmo_σ_RRS_JtoJm2[atmo_σ_RRS_JtoJm2.>0])
+    #@show length(atmo_σ_RRS_JtoJm2[atmo_σ_RRS_JtoJm2.>0])
     # O2
     #apply_lineshape!(o2.effCoeff.Δν̃_RoRaman_coeff_JtoJp2, o2.effCoeff.σ_RoRaman_coeff_JtoJp2, λ₀, collect(grid_out), σ_out, 1, 300.0, 28);
     apply_gridlines!(o2.effCoeff.Δν̃_RoRaman_coeff_JtoJp2, o2.effCoeff.σ_RoRaman_coeff_JtoJp2, λ₀, grid_in, σ_out);
     atmo_σ_RRS_JtoJp2 += o2.vmr * σ_out #cross section in cm^2
-    @show length(atmo_σ_RRS_JtoJp2[atmo_σ_RRS_JtoJp2.>0])
+    #@show length(atmo_σ_RRS_JtoJp2[atmo_σ_RRS_JtoJp2.>0])
 
     #apply_lineshape!(o2.effCoeff.Δν̃_RoRaman_coeff_JtoJm2, o2.effCoeff.σ_RoRaman_coeff_JtoJm2, λ₀, collect(grid_out), σ_out, 1, 300.0, 40);
     apply_gridlines!(o2.effCoeff.Δν̃_RoRaman_coeff_JtoJm2, o2.effCoeff.σ_RoRaman_coeff_JtoJm2, λ₀, grid_in, σ_out);
     atmo_σ_RRS_JtoJm2 += o2.vmr * σ_out #cross section in cm^2
-    @show length(atmo_σ_RRS_JtoJm2[atmo_σ_RRS_JtoJm2.>0])
+    #@show length(atmo_σ_RRS_JtoJm2[atmo_σ_RRS_JtoJm2.>0])
 
     σ_tmp .= atmo_σ_RRS_JtoJm2 .+ atmo_σ_RRS_JtoJp2
     atmo_σ_RRS = σ_tmp[σ_tmp.>0]
@@ -273,7 +274,6 @@ function compute_optical_RS!(RS_type::Union{RRS, RRS_plus}, grid_in, λ₀, n2, 
     return index_ramangrid_out, atmo_σ_RRS;
     #plot(grid_out, atmo_σ_RRS_JtoJp2, yscale=:log10)
     #plot(1.e7/λ₀ .+ grid_out, atmo_σ_RRS_plot*1.e40)
-
 end
 
 function compute_optical_RS!(RS_type::Union{VS_0to1, VS_0to1_plus}, grid_in, λ₀, n2, o2)
@@ -281,7 +281,7 @@ function compute_optical_RS!(RS_type::Union{VS_0to1, VS_0to1_plus}, grid_in, λ�
     #get_greek_raman(RS_type, n2, o2)
     #compute_ϖ_Cabannes!(RS_type, λ₀, n2, o2)
 
-    @show n2.effCoeff.Δν̃_VibRaman_coeff_0to1_hires[0], o2.effCoeff.Δν̃_VibRaman_coeff_0to1_hires[0]
+    #@show n2.effCoeff.Δν̃_VibRaman_coeff_0to1_hires[0], o2.effCoeff.Δν̃_VibRaman_coeff_0to1_hires[0]
     #νᵣ = 0.5*(n2.effCoeff.Δν̃_VibRaman_coeff_0to1_hires[0] + o2.effCoeff.Δν̃_VibRaman_coeff_0to1_hires[0])
     
     # TMP: grid_in = nm_per_m/λ₀ .+ collect((νᵣ-750):0.002:(νᵣ+750))
@@ -452,4 +452,42 @@ function compute_Rayl_depol(n2, o2)
     depol = (n2.vmr*n2.effCoeff.rho_depol_Rayl + o2.vmr*o2.effCoeff.rho_depol_Rayl)/(n2.vmr+o2.vmr)
     return depol
 end
+
+
+function computeRamanZλ!(RS_type::RRS_plus, pol_type, qp_μ, m, arr_type)
+    RS_type.Z⁺⁺_λ₁λ₀, RS_type.Z⁻⁺_λ₁λ₀ =  Scattering.compute_Z_moments(pol_type, 
+                                        qp_μ, 
+                                        RS_type.greek_raman, 
+                                        m, 
+                                        arr_type = arr_type);
+    nothing
+end
+
+function computeRamanZλ!(RS_type::Union{noRS_plus, noRS}, pol_type, qp_μ, m, arr_type)
+    nothing
+end
+
+function computeRamanZλ!(RS_type::AbstractRamanType, pol_type, qp_μ, m, arr_type)
+    RS_type.Z⁺⁺_λ₁λ₀, RS_type.Z⁻⁺_λ₁λ₀ = Scattering.compute_Z_moments(pol_type, 
+                                        qp_μ, 
+                                        RS_type.greek_raman, 
+                                        m, 
+                                        arr_type = arr_type);
+    RS_type.Z⁺⁺_λ₁λ₀_VS_n2, RS_type.Z⁻⁺_λ₁λ₀_VS_n2 = 
+                    Scattering.compute_Z_moments(pol_type, 
+                                            Array(qp_μ), 
+                                            RS_type.greek_raman_VS_n2, 
+                                            m, 
+                                            arr_type = arr_type);
+    RS_type.Z⁺⁺_λ₁λ₀_VS_o2, RS_type.Z⁻⁺_λ₁λ₀_VS_o2 = 
+                    Scattering.compute_Z_moments(pol_type, 
+                                        Array(qp_μ), 
+                                        RS_type.greek_raman_VS_o2, 
+                                        m, 
+                                        arr_type = arr_type);      
+    nothing
+end
+
+
+
 
