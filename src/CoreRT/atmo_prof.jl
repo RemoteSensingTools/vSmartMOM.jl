@@ -235,7 +235,7 @@ function construct_atm_layer(τRayl, τAer,
     # Fixes Rayleigh SSA to 1 for purely elastic (RS_type = noRS) scattering,
     # and assumes values less than 1 for Raman scattering
     ϖRayl = ϖ_Cabannes #FT(1)
-
+    @show ϖRayl
     @assert length(τAer) == nAer "Sizes don't match"
 
     τ = FT(0)

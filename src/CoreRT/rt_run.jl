@@ -94,7 +94,7 @@ function rt_run(RS_type::AbstractRamanType, #Default - no Raman scattering (noRS
             @timeit "Z moments"  Aer𝐙⁺⁺[:,:,i], Aer𝐙⁻⁺[:,:,i] = Scattering.compute_Z_moments(pol_type, Array(qp_μ), aerosol_optics[i].greek_coefs, m, arr_type = arr_type)
         end
 
-        #@show RS_type.ϖ_Cabannes, ϖ_Cabannes
+        @show RS_type.ϖ_Cabannes, ϖ_Cabannes
         # Loop over all layers and pre-compute all properties before performing core RT
         @timeit "Computing Layer Properties" computed_atmosphere_properties = 
                 construct_all_atm_layers(FT, nSpec, Nz, NquadN, 
@@ -112,10 +112,11 @@ function rt_run(RS_type::AbstractRamanType, #Default - no Raman scattering (noRS
             # Computing Rayleigh scattering fraction, fscattRayl = τRayl*ϖRayl/τ
             computed_layer_properties = get_layer_properties(computed_atmosphere_properties, iz, arr_type)
             #@show computed_layer_properties.fscattRayl
-            #@show RS_type.fscattRayl
+            @show RS_type.fscattRayl
             if !(typeof(RS_type) <: noRS)
                 RS_type.fscattRayl = [computed_layer_properties.fscattRayl]
             end
+            #@show RS_type.fscattRayl, RS_type.ϖ_Cabannes
             # Perform Core RT (doubling/elemental/interaction)
             rt_kernel!(RS_type, pol_type, SFI, added_layer, composite_layer, computed_layer_properties, m, quad_points, I_static, architecture, qp_μN, iz) 
         end 
