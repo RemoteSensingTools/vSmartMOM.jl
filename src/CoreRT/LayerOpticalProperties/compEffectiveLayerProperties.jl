@@ -21,8 +21,8 @@ function constructCoreOpticalProperties(RS_type, iBand, m, model)
     for iB in iBand
         #@show τ_rayl[iB][:]
         #,  ones(FT, length(RS_type.bandSpecLim[iB]))
-        @show RS_type.ϖ_Cabannes
-        @show τ_rayl
+        #@show RS_type.ϖ_Cabannes
+        #@show τ_rayl
         rayl = CoreScatteringOpticalProperties.(
                 τ_rayl[iB][:], 
                 [RS_type.ϖ_Cabannes[iB]], 
@@ -70,8 +70,8 @@ function constructCoreOpticalProperties(RS_type, iBand, m, model)
     layer_opt = []
     fscat_opt = []
     for iz = 1:nZ
-        push!(layer_opt, prod([band_layer_props[i][iz] for i in iBand]));
-        push!(fscat_opt, expandBandScalars(RS_type,[band_fScattRayleigh[i][iz] for i in iBand]));
+        push!(layer_opt, prod([band_layer_props[i][iz] for i=1:length(iBand)]));
+        push!(fscat_opt, expandBandScalars(RS_type,[band_fScattRayleigh[i][iz] for i=1:length(iBand)]));
     end
     # For now just one band_fScattRayleigh
     return layer_opt, fscat_opt # Suniti: this needs to be modified because Rayleigh scattering fraction varies dramatically with wavelength

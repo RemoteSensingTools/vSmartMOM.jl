@@ -2,7 +2,7 @@ using Revise
 using Plots
 using Pkg
 # Pkg.activate(".")
-using RadiativeTransfer
+using vSmartMOM
 using RadiativeTransfer.Architectures
 using RadiativeTransfer.Absorption
 using RadiativeTransfer.Scattering
