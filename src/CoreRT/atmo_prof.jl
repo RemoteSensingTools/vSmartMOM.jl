@@ -250,7 +250,7 @@ function construct_atm_layer(τRayl, τAer,
     end
  
     τ += τRayl
-    @show τRayl, ϖRayl[1], ϖ
+    #@show τRayl, ϖRayl[1], ϖ
     ϖ += τRayl * ϖRayl[1]
     A += τRayl * ϖRayl[1]
 
@@ -294,8 +294,8 @@ function construct_all_atm_layers(
         ϖ_Cabannes,
         arr_type, qp_μ, μ₀, m)
 
-    FT_ext   = eltype(τRayl)
-    FT_phase = eltype(Rayl𝐙⁺⁺)
+    FT_ext   = eltype(τAer)
+    FT_phase = eltype(τAer)
 
     # Empty matrices to hold all values
     τ_λ_all   = zeros(FT_ext, nSpec, Nz)
@@ -388,6 +388,8 @@ function compute_absorption_profile!(τ_abs::Array{FT,2},
 
         # Changed index order
         # @show iz,p,T,profile.vcd_dry[iz], vmr_curr
+        #@show typeof(τ_abs), typeof(vmr_curr), typeof(profile.vcd_dry[iz]), typeof(p), typeof(T)
+        #@show typeof(absorption_cross_section(absorption_model, grid, p, T))
         τ_abs[:,iz] += Array(absorption_cross_section(absorption_model, grid, p, T)) * profile.vcd_dry[iz] * vmr_curr
     end
     

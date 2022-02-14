@@ -503,15 +503,15 @@ end
 abstract type AbstractOpticalProperties end
 
 # Core optical Properties COP
-Base.@kwdef struct CoreScatteringOpticalProperties{FT} <:  AbstractOpticalProperties
+Base.@kwdef struct CoreScatteringOpticalProperties{FT,FT2,FT3} <:  AbstractOpticalProperties
     "Absorption optical depth (scalar or wavelength dependent)"
     τ::Union{FT, AbstractArray{FT,1}} 
     "Single scattering albedo"
-    ϖ::Union{FT, AbstractArray{FT,1}}   
+    ϖ::Union{FT3, AbstractArray{FT3,1}}   
     "Z scattering matrix (forward)"
-    Z⁺⁺::Union{AbstractArray{FT,2}, AbstractArray{FT,3}, Nothing}  
+    Z⁺⁺::Union{AbstractArray{FT2,2}, AbstractArray{FT2,3}, Nothing}  
     "Z scattering matrix (backward)"
-    Z⁻⁺::Union{AbstractArray{FT,2}, AbstractArray{FT,3}, Nothing}
+    Z⁻⁺::Union{AbstractArray{FT2,2}, AbstractArray{FT2,3}, Nothing}
 end
 
 Base.@kwdef struct CoreAbsorptionOpticalProperties{FT} <:  AbstractOpticalProperties
@@ -520,7 +520,7 @@ Base.@kwdef struct CoreAbsorptionOpticalProperties{FT} <:  AbstractOpticalProper
 end
 
 # Adding Core Optical Properties, can have mixed dimensions!
-function Base.:+( x::CoreScatteringOpticalProperties{FT}, y::CoreScatteringOpticalProperties{FT} ) where FT
+function Base.:+( x::CoreScatteringOpticalProperties, y::CoreScatteringOpticalProperties ) 
     τ  = x.τ .+ y.τ
     wx = x.τ .* x.ϖ 
     wy = y.τ .* y.ϖ  
@@ -555,7 +555,7 @@ function Base.:+( x::CoreScatteringOpticalProperties{FT}, y::CoreScatteringOptic
 end
 
 # Concatenate Core Optical Properties, can have mixed dimensions!
-function Base.:*( x::CoreScatteringOpticalProperties{FT}, y::CoreScatteringOpticalProperties{FT} ) where FT
+function Base.:*( x::CoreScatteringOpticalProperties, y::CoreScatteringOpticalProperties ) 
     arr_type  = array_type(architecture(x.τ))
 
     x = expandOpticalProperties(x,arr_type);

@@ -41,8 +41,8 @@ function model_from_parameters(params::vSmartMOM_Parameters)
     
     # This is a kludge for now, tau_abs sometimes needs to be a dual. Suniti & us need to rethink this all!!
     # i.e. code the rt core with fixed amount of derivatives as in her paper, then compute chain rule for dtau/dVMr, etc...
-    # FT2 = isnothing(params.absorption_params) ? params.float_type : eltype(params.absorption_params.vmr["CO2"])
-    τ_abs     = [zeros(params.float_type, length(params.spec_bands[i]), length(profile.p_full)) for i in 1:n_bands]
+    FT2 = isnothing(params.absorption_params) || !haskey(params.absorption_params.vmr,"CO2") ? params.float_type : eltype(params.absorption_params.vmr["CO2"])
+    τ_abs     = [zeros(FT2, length(params.spec_bands[i]), length(profile.p_full)) for i in 1:n_bands]
     
     # Loop over all bands:
     for i_band=1:n_bands
@@ -86,7 +86,7 @@ function model_from_parameters(params::vSmartMOM_Parameters)
     aerosol_optics = [Array{AerosolOptics}(undef, (n_aer)) for i=1:n_bands];
         
     FT2 = isnothing(params.scattering_params) ? params.float_type : typeof(params.scattering_params.rt_aerosols[1].τ_ref)
-    FT2 =  params.float_type 
+    #FT2 =  params.float_type 
 
     # τ_aer[iBand][iAer,iZ]
     τ_aer = [zeros(FT2, n_aer, length(profile.p_full)) for i=1:n_bands];
