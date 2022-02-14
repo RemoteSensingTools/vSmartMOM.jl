@@ -102,39 +102,7 @@ struct SFI <:AbstractSourceType end
 abstract type AbstractLayer end
 
 "Composite Layer Matrices (`-/+` defined in τ coordinates, i.e. `-`=outgoing, `+`=incoming"
-Base.@kwdef struct CompositeLayer{FT} <: AbstractLayer 
-    "Composite layer Reflectance matrix R (from + -> -)"
-    R⁻⁺::AbstractArray{FT,3}
-    "Composite layer Reflectance matrix R (from - -> +)"
-    R⁺⁻::AbstractArray{FT,3}
-    "Composite layer transmission matrix T (from + -> +)"
-    T⁺⁺::AbstractArray{FT,3}
-    "Composite layer transmission matrix T (from - -> -)"
-    T⁻⁻::AbstractArray{FT,3}
-    "Composite layer source matrix J (in + direction)"
-    J₀⁺::AbstractArray{FT,3}
-    "Composite layer source matrix J (in - direction)"
-    J₀⁻::AbstractArray{FT,3}
-end
-
-"Added (Single) Layer Matrices (`-/+` defined in τ coordinates, i.e. `-`=outgoing, `+`=incoming"
-Base.@kwdef struct AddedLayer{FT} <: AbstractLayer 
-    "Added layer Reflectance matrix R (from + -> -)"
-    r⁻⁺::AbstractArray{FT,3}
-    "Added layer transmission matrix T (from + -> +)"
-    t⁺⁺::AbstractArray{FT,3}
-    "Added layer Reflectance matrix R (from - -> +)"
-    r⁺⁻::AbstractArray{FT,3}
-    "Added layer transmission matrix T (from - -> -)"
-    t⁻⁻::AbstractArray{FT,3}
-    "Added layer source matrix J (in + direction)"
-    J₀⁺::AbstractArray{FT,3}
-    "Added layer source matrix J (in - direction)"
-    J₀⁻::AbstractArray{FT,3}
-end
-
-"Composite Layer Matrices (`-/+` defined in τ coordinates, i.e. `-`=outgoing, `+`=incoming"
-struct CompositeLayerRS{FT} <: AbstractLayer 
+Base.@kwdef mutable struct CompositeLayer{FT} <: AbstractLayer 
     "Composite layer Reflectance matrix R (from + -> -)"
     R⁻⁺::AbstractArray{FT,3}
     "Composite layer Reflectance matrix R (from - -> +)"
@@ -148,23 +116,22 @@ struct CompositeLayerRS{FT} <: AbstractLayer
     "Composite layer source matrix J (in - direction)"
     J₀⁻::AbstractArray{FT,3}
 
-    # Additional Arrays for Raman scattering
-    "Composite layer Reflectance matrix ieR (from + -> -)"
+    "Composite layer Reflectance matrix R (from + -> -)"
     ieR⁻⁺::AbstractArray{FT,4}
-    "Composite layer Reflectance matrix ieR (from - -> +)"
+    "Composite layer Reflectance matrix R (from - -> +)"
     ieR⁺⁻::AbstractArray{FT,4}
-    "Composite layer transmission matrix ieT (from + -> +)"
+    "Composite layer transmission matrix T (from + -> +)"
     ieT⁺⁺::AbstractArray{FT,4}
-    "Composite layer transmission matrix ieT (from - -> -)"
+    "Composite layer transmission matrix T (from - -> -)"
     ieT⁻⁻::AbstractArray{FT,4}
-    "Composite layer source matrix ieJ (in + direction)"
+    "Composite layer source matrix J (in + direction)"
     ieJ₀⁺::AbstractArray{FT,4}
-    "Composite layer source matrix ieJ (in - direction)"
+    "Composite layer source matrix J (in - direction)"
     ieJ₀⁻::AbstractArray{FT,4}
 end
 
 "Added (Single) Layer Matrices (`-/+` defined in τ coordinates, i.e. `-`=outgoing, `+`=incoming"
-struct AddedLayerRS{FT} <: AbstractLayer 
+Base.@kwdef mutable struct AddedLayer{FT} <: AbstractLayer 
     "Added layer Reflectance matrix R (from + -> -)"
     r⁻⁺::AbstractArray{FT,3}
     "Added layer transmission matrix T (from + -> +)"
@@ -178,18 +145,17 @@ struct AddedLayerRS{FT} <: AbstractLayer
     "Added layer source matrix J (in - direction)"
     J₀⁻::AbstractArray{FT,3}
 
-    # Additional Arrays for Raman scattering
-    "Added layer Reflectance matrix ieR (from + -> -)"
+    "Added layer Reflectance matrix R (from + -> -)"
     ier⁻⁺::AbstractArray{FT,4}
-    "Added layer transmission matrix ieT (from + -> +)"
+    "Added layer transmission matrix T (from + -> +)"
     iet⁺⁺::AbstractArray{FT,4}
-    "Added layer Reflectance matrix ieR (from - -> +)"
+    "Added layer Reflectance matrix R (from - -> +)"
     ier⁺⁻::AbstractArray{FT,4}
-    "Added layer transmission matrix ieT (from - -> -)"
+    "Added layer transmission matrix T (from - -> -)"
     iet⁻⁻::AbstractArray{FT,4}
-    "Added layer source matrix ieJ (in + direction)"
+    "Added layer source matrix J (in + direction)"
     ieJ₀⁺::AbstractArray{FT,4}
-    "Added layer source matrix ieJ (in - direction)"
+    "Added layer source matrix J (in - direction)"
     ieJ₀⁻::AbstractArray{FT,4}
 end
 
@@ -243,8 +209,6 @@ mutable struct AbsorptionParameters
     CEF::AbstractComplexErrorFunction
     "Wing cutoff to use in cross-section calculation (cm⁻¹)"
     wing_cutoff::Integer
-    "Lookup table type"
-    luts::AbstractArray 
 end
 
 """
@@ -274,7 +238,10 @@ A struct which holds all initial model parameters (before any computations)
 $(DocStringExtensions.FIELDS)
 """
 mutable struct vSmartMOM_Parameters{FT<:Union{AbstractFloat, ForwardDiff.Dual}} 
-
+    
+    # Type of Raman scattering
+    "Raman Scattering Type (RRS/RVRS/VRS)"
+    ie_type::AbstractRSArray 
     # radiative_transfer group
     "Spectral bands (`nBand`)"
     spec_bands::AbstractArray
@@ -371,6 +338,8 @@ mutable struct vSmartMOM_Model
     aerosol_optics::AbstractArray{AbstractArray{AerosolOptics}}
     "Greek coefs in Rayleigh calculations" 
     greek_rayleigh::GreekCoefs
+    "Greek coefs in Raman calculations" 
+    greek_raman::GreekCoefs
     "Quadrature points/weights, etc"
     quad_points::QuadPoints
 
@@ -380,6 +349,8 @@ mutable struct vSmartMOM_Model
     τ_rayl::AbstractArray{AbstractArray}
     "Aerosol optical thickness"
     τ_aer::AbstractArray{AbstractArray}
+    "Raman SSA"
+    ϖ_Raman::AbstractArray{AbstractArray}
 
     "Observational Geometry (includes sza, vza, vaz)"
     obs_geom::ObsGeometry
@@ -391,12 +362,22 @@ end
     struct ComputedAtmosphereProperties
 
 A struct which holds (for the entire atmosphere) all key layer optical properties required for the RT core solver
-
+    
 # Fields
 $(DocStringExtensions.FIELDS)
 """
+# TODO_Suniti
 Base.@kwdef struct ComputedAtmosphereProperties
-
+    "band spectral grid"
+    grid_in
+    "inelastic (rotational) scattering SSA"
+    ϖ_λ₀λ₁
+    "inelastic (rotational) scattering index"
+    i_λ₀λ₁
+    "inelastic (vibrational) scattering SSA: split later for each molecule"
+    ϖ_vib_λ₀λ₁
+    "inelastic (vibrational) scattering index: split later for each molecule"
+    i_vib_λ₀λ₁
     "Absorption optical depth vectors (wavelength dependent)"
     τ_λ_all
     "Albedo vectors (wavelength dependent)"
@@ -409,6 +390,14 @@ Base.@kwdef struct ComputedAtmosphereProperties
     Z⁺⁺_all
     "Combined Z moments (backward)"
     Z⁻⁺_all
+    "Combined o2 and n2 Z moments for rotational/rovibrational RS  (forward)"
+    Z⁺⁺_RRS #same for rotational and rovibrational scattering
+    "Combined o2 and n2 Z moments for rotational/rovibrational RS  (backward)"
+    Z⁻⁺_RRS #same for rotational and rovibrational scattering
+    "Combined o2 and n2 Z moments for vibrational RS (forward): split later for each molecule"
+    Z⁺⁺_VRS #same for rotational and rovibrational scattering
+    "Combined o2 and n2 Z moments for vibrational RS (backward): split later for each molecule"
+    Z⁻⁺_VRS #same for rotational and rovibrational scattering
     "Maximum dτs"
     dτ_max_all
     "dτs"
@@ -423,38 +412,28 @@ Base.@kwdef struct ComputedAtmosphereProperties
     scatter_all
     "Sum of optical thicknesses of all layers above the current layer"
     τ_sum_all
-    #"elastic (Cabannes) scattering fraction of Rayleigh (Cabannes+Raman) scattering per layer"
-    #ϖ_Cabannes_all
-    "Rayleigh fraction of scattering cross section per layer"
-    fscattRayl_all
     "Scattering interface type for each layer"
     scattering_interfaces_all
 end
 
-# TODO SUNITI: write a function to compute these properties and create this structure
-#Base.@kwdef struct RamanAtmosphereProperties
-    #"band spectral grid"
-    #grid_in
-    #"inelastic scattering SSA"
-    #ϖ_λ₀λ₁
-    #"inelastic scattering index"
-    #i_λ₀λ₁
-    #"inelastic (vibrational) scattering SSA: split later for each molecule"
-    #ϖ_vib_λ₀λ₁
-    #"inelastic (vibrational) scattering index: split later for each molecule"
-    #i_vib_λ₀λ₁
-    #"Greek coefs in Rayleigh calculations" 
-    #greek_raman::GreekCoefs
-    #"Combined o2 and n2 Z moments for rotational/rovibrational RS  (forward)"
-    #Z⁺⁺_RRS #same for rotational and rovibrational scattering
-    #"Combined o2 and n2 Z moments for rotational/rovibrational RS  (backward)"
-    #Z⁻⁺_RRS #same for rotational and rovibrational scattering
-    #"Combined o2 and n2 Z moments for vibrational RS (forward): split later for each molecule"
-    #Z⁺⁺_VRS #same for rotational and rovibrational scattering
-    #"Combined o2 and n2 Z moments for vibrational RS (backward): split later for each molecule"
-    #Z⁻⁺_VRS #same for rotational and rovibrational scattering
-#end
+"""
+    type AbstractRamanType
+Abstract Raman type 
+"""
+abstract type AbstractRamanType  end
 
+"""
+    struct RRS{FT<:AbstractFloat}
+A struct which defines Rotational Raman Scattering parameters
+# Fields
+$(DocStringExtensions.FIELDS)
+"""
+Base.@kwdef struct RRS2{FT<:AbstractFloat} <: AbstractRamanType 
+    "Molecular Constant for N2"
+    n2::InelasticScattering.MolecularConstants{FT}
+    "Molecular Constant for O2"
+    o2::InelasticScattering.MolecularConstants{FT}
+end
 
 """
     struct ComputedLayerProperties
@@ -464,6 +443,7 @@ A struct which holds all key layer optical properties required for the RT core s
 # Fields
 $(DocStringExtensions.FIELDS)
 """
+# TODO_Suniti
 Base.@kwdef struct ComputedLayerProperties
 
     "Absorption optical depth vector (wavelength dependent)"
@@ -492,90 +472,6 @@ Base.@kwdef struct ComputedLayerProperties
     scatter 
     "Sum of optical thicknesses of all layers above the current layer"
     τ_sum
-    "Fraction of scattering caused by Rayleigh"
-    fscattRayl
-    #"Elastic fraction (Cabannes) of Rayleigh (Cabannes+Raman) scattering"
-    #ϖ_Cabannes 
     "Scattering interface type for current layer"
     scattering_interface
 end
-
-abstract type AbstractOpticalProperties end
-
-# Core optical Properties COP
-Base.@kwdef struct CoreScatteringOpticalProperties{FT} <:  AbstractOpticalProperties
-    "Absorption optical depth (scalar or wavelength dependent)"
-    τ::Union{FT, AbstractArray{FT,1}} 
-    "Single scattering albedo"
-    ϖ::Union{FT, AbstractArray{FT,1}}   
-    "Z scattering matrix (forward)"
-    Z⁺⁺::Union{AbstractArray{FT,2}, AbstractArray{FT,3}, Nothing}  
-    "Z scattering matrix (backward)"
-    Z⁻⁺::Union{AbstractArray{FT,2}, AbstractArray{FT,3}, Nothing}
-end
-
-Base.@kwdef struct CoreAbsorptionOpticalProperties{FT} <:  AbstractOpticalProperties
-    "Absorption optical depth (scalar or wavelength dependent)"
-    τ::Union{FT, AbstractArray{FT,1}} 
-end
-
-# Adding Core Optical Properties, can have mixed dimensions!
-function Base.:+( x::CoreScatteringOpticalProperties{FT}, y::CoreScatteringOpticalProperties{FT} ) where FT
-    τ  = x.τ .+ y.τ
-    wx = x.τ .* x.ϖ 
-    wy = y.τ .* y.ϖ  
-    w  = wx .+ wy
-    ϖ  =  (w) ./ τ
-    
-    all(wx .== 0.0) ? (return CoreScatteringOpticalProperties(τ, ϖ, y.Z⁺⁺, y.Z⁻⁺)) : nothing
-    all(wy .== 0.0) ? (return CoreScatteringOpticalProperties(τ, ϖ, x.Z⁺⁺, x.Z⁻⁺)) : nothing
-
-    # A bit more tedious for Z matrices:
-    length(unique(w))  == 1 ? w = unique(w) : nothing
-    length(unique(wx)) == 1 ? wx = unique(wx) : nothing
-    length(unique(wy)) == 1 ? wy = unique(wy) : nothing
-    n = length(w);
-    if n == 1
-        Z⁺⁺ = ((wx .* x.Z⁺⁺) .+ (wy .* y.Z⁺⁺)) ./ w 
-        Z⁻⁺ = ((wx .* x.Z⁻⁺) .+ (wy .* y.Z⁻⁺)) ./ w
-    else
-        nx = length(wx)
-        ny = length(wy)
-        nx > 1 ? wx = reshape(wx,1,1,n) : nothing
-        ny > 1 ? wy = reshape(wy,1,1,n) : nothing
-        w = reshape(w,1,1,n)
-        size(x.Z⁺⁺,3) == 1 ? xZ⁺⁺ = repeat(x.Z⁺⁺,1,1,n) : xZ⁺⁺ = x.Z⁺⁺
-        size(x.Z⁻⁺,3) == 1 ? xZ⁻⁺ = repeat(x.Z⁻⁺,1,1,n) : xZ⁻⁺ = x.Z⁻⁺
-        size(y.Z⁺⁺,3) == 1 ? yZ⁺⁺ = repeat(y.Z⁺⁺,1,1,n) : yZ⁺⁺ = y.Z⁺⁺
-        size(y.Z⁻⁺,3) == 1 ? yZ⁻⁺ = repeat(y.Z⁻⁺,1,1,n) : yZ⁻⁺ = y.Z⁻⁺
-        Z⁺⁺ = (wx .* xZ⁺⁺ .+ wy .* yZ⁺⁺) ./ w 
-        Z⁻⁺ = (wx .* xZ⁻⁺ .+ wy .* yZ⁻⁺) ./ w
-    end
-    CoreScatteringOpticalProperties(τ, ϖ, Z⁺⁺, Z⁻⁺)  
-end
-
-# Concatenate Core Optical Properties, can have mixed dimensions!
-function Base.:*( x::CoreScatteringOpticalProperties{FT}, y::CoreScatteringOpticalProperties{FT} ) where FT
-    arr_type  = array_type(architecture(x.τ))
-
-    x = expandOpticalProperties(x,arr_type);
-    y = expandOpticalProperties(y,arr_type);
-    CoreScatteringOpticalProperties([x.τ; y.τ],[x.ϖ; y.ϖ],cat(x.Z⁺⁺,y.Z⁺⁺, dims=3), cat(x.Z⁻⁺,y.Z⁻⁺, dims=3))
-end
-
-function Base.:+( x::CoreScatteringOpticalProperties{FT}, y::CoreAbsorptionOpticalProperties{FT} ) where FT
-    τ  = x.τ .+ y.τ
-    wx = x.τ .* x.ϖ 
-    ϖ  = (wx) ./ τ
-    CoreScatteringOpticalProperties(τ, ϖ, x.Z⁺⁺, x.Z⁻⁺)
-end
-
-function Base.:+(  y::CoreAbsorptionOpticalProperties{FT}, x::CoreScatteringOpticalProperties{FT} ) where FT
-    x + y
-end
-
-
-function Base.:*( x::FT, y::CoreScatteringOpticalProperties{FT} ) where FT
-    CoreScatteringOpticalProperties(y.τ * x, y.ϖ, y.Z⁺⁺, y.Z⁻⁺)
-end
-
