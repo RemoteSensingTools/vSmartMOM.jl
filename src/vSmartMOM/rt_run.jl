@@ -293,44 +293,13 @@ function rt_run_test(RS_type::AbstractRamanType,
 
         # Azimuthal weighting
         weight = m == 0 ? FT(0.5) : FT(1.0)
+        # Set the Zλᵢλₒ interaction parameters for Raman (or nothing for noRS)
         InelasticScattering.computeRamanZλ!(RS_type, pol_type,Array(qp_μ), m, arr_type)
-        @show typeof(RS_type) <: Union{noRS_plus, noRS}
-        #=if !(typeof(RS_type) <: Union{noRS_plus, noRS})    
-            @timeit "Z moments" RS_type.Z⁺⁺_λ₁λ₀, RS_type.Z⁻⁺_λ₁λ₀ = 
-                Scattering.compute_Z_moments(pol_type, 
-                                            Array(qp_μ), 
-                                            RS_type.greek_raman, 
-                                            m, 
-                                            arr_type = arr_type);
-            if !(typeof(RS_type) <: vSmartMOM.RRS_plus)
-                @timeit "Z moments" RS_type.Z⁺⁺_λ₁λ₀_VS_n2, RS_type.Z⁻⁺_λ₁λ₀_VS_n2 = 
-                    Scattering.compute_Z_moments(pol_type, 
-                                            Array(qp_μ), 
-                                            RS_type.greek_raman_VS_n2, 
-                                            m, 
-                                            arr_type = arr_type);
-                @timeit "Z moments" RS_type.Z⁺⁺_λ₁λ₀_VS_o2, RS_type.Z⁻⁺_λ₁λ₀_VS_o2 = 
-                    Scattering.compute_Z_moments(pol_type, 
-                                        Array(qp_μ), 
-                                        RS_type.greek_raman_VS_o2, 
-                                        m, 
-                                        arr_type = arr_type);                            
-            end
-            #@show size(RS_type.Z⁺⁺_λ₁λ₀), size(RS_type.Z⁻⁺_λ₁λ₀)
-        end
-
-        =#
+        # Compute the core layer optical properties:
         layer_opt_props, fScattRayleigh   = constructCoreOpticalProperties(RS_type,iBand,m,model);
-        #@show fScattRayleigh[1]
-        #layer_opt_props = prod(band_layer_props);
-        #fScattRayleigh = band_fScattRayleigh[1]
-        #layer_opt_props, fScattRayleigh      = constructCoreOpticalProperties(RS_type,iBand,m,model);
-        # Expand Z dimensions if needed
-        #@show typeofç(layer_opt_props)
+        # Determine the scattering interface definitions:
         scattering_interfaces_all, τ_sum_all = extractEffectiveProps(layer_opt_props);
-        @show Nz
-        #@show RS_type.ϖ_Cabannes, ϖ_Cabannes
-        
+
         # Loop over vertical layers: 
         @showprogress 1 "Looping over layers ..." for iz = 1:Nz  # Count from TOA to BOA
             
@@ -338,11 +307,10 @@ function rt_run_test(RS_type::AbstractRamanType,
             # From Rayleigh and aerosol τ, ϖ, compute overall layer τ, ϖ
             # Suniti: modified to return fscattRayl as the last element of  computed_atmosphere_properties
             RS_type.fscattRayl = fScattRayleigh[iz]
-            #@show size(RS_type.fscattRayl), 
-            #@show arr_type
-            #@show layer_opt_props[iz]
+            
+            # Expand all layer optical properties to their full dimension:
             layer_opt = expandOpticalProperties(layer_opt_props[iz], arr_type)
-            #@show typeof(layer_opt.τ)
+
             # Perform Core RT (doubling/elemental/interaction)
             rt_kernel!(RS_type, pol_type, SFI, 
                         #bandSpecLim, 
@@ -374,8 +342,6 @@ function rt_run_test(RS_type::AbstractRamanType,
                                     added_layer_surface, 
                                     I_static)
         
-            #interaction_inelastic!(RS_type,computed_atmosphere_properties.scattering_interfaces_all[end], 
-        #    SFI, composite_layer, added_layer_surface, I_static)
         # Postprocess and weight according to vza
         postprocessing_vza!(RS_type, 
                             iμ₀, pol_type, 
