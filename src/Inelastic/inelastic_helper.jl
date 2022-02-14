@@ -454,7 +454,7 @@ function compute_Rayl_depol(n2, o2)
 end
 
 
-function computeRamanZλ!(RS_type::RRS_plus, pol_type, qp_μ, m, arr_type)
+function computeRamanZλ!(RS_type::Union{RRS_plus,RRS}, pol_type, qp_μ, m, arr_type)
     RS_type.Z⁺⁺_λ₁λ₀, RS_type.Z⁻⁺_λ₁λ₀ =  Scattering.compute_Z_moments(pol_type, 
                                         qp_μ, 
                                         RS_type.greek_raman, 

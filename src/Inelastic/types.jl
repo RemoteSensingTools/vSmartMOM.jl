@@ -28,6 +28,8 @@ Base.@kwdef mutable struct RRS{FT<:AbstractFloat} <: AbstractRamanType
     Z⁺⁺_λ₁λ₀::Array{FT,2}
     i_ref::Int
     n_Raman::Int
+    bandSpecLim = []
+    iBand = 1
 end
 
 """
@@ -155,6 +157,7 @@ Base.@kwdef mutable struct RRS_plus{FT<:AbstractFloat} <: AbstractRamanType
     Z⁺⁺_λ₁λ₀::Array{FT,2}
     i_ref::Int
     n_Raman::Int
+    
 end
 
 """
