@@ -17,12 +17,13 @@ function elemental!(pol_type, SFI::Bool,
                             ndoubl::Int,                # ndoubl: number of doubling computations needed 
                             scatter::Bool,              # scatter: flag indicating scattering
                             quad_points::QuadPoints{FT2}, # struct with quadrature points, weights, 
-                            added_layer::AddedLayer{FT}, 
+                            added_layer::Union{AddedLayer{FT},AddedLayerRS{FT}}, 
                             I_static,
                             architecture) where {FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2}
 
     @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, J₀⁺, J₀⁻ = added_layer
     @unpack qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart, iμ₀ = quad_points
+    #@unpack ϖ_Cabannes = RS_type
     arr_type = array_type(architecture)
     # Need to check with paper nomenclature. This is basically eqs. 19-20 in vSmartMOM
     # @show Array(τ_sum)[1], Array(dτ_λ)[1], Array(ϖ_λ)[1], Array(Z⁺⁺)[1,1]
@@ -77,7 +78,8 @@ function elemental!(pol_type, SFI::Bool,
             # Version 2: More computationally intensive definition of a single scattering layer with variable (0-∞) absorption
             # Version 2: with absorption in batch mode, low tau_scatt but higher tau_total, needs different equations
             kernel! = get_elem_rt!(device)
-            event = kernel!(r⁻⁺, t⁺⁺, ϖ_λ, dτ_λ, Z⁻⁺, Z⁺⁺, qp_μN, wct, ndrange=size(r⁻⁺)); 
+            event = kernel!(r⁻⁺, t⁺⁺, ϖ_λ, dτ_λ, Z⁻⁺, Z⁺⁺, 
+                qp_μN, wct2, ndrange=size(r⁻⁺)); 
             wait(device, event)
             synchronize_if_gpu()
 
@@ -103,17 +105,97 @@ function elemental!(pol_type, SFI::Bool,
     #@pack! added_layer = r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, J₀⁺, J₀⁻   
 end
 
-@kernel function get_elem_rt!(r⁻⁺, t⁺⁺, ϖ_λ, dτ_λ, Z⁻⁺, Z⁺⁺, qp_μN, wct2)
-    i, j, n = @index(Global, NTuple) 
+"Elemental single-scattering layer"
+function elemental!(pol_type, SFI::Bool, 
+                            τ_sum::AbstractArray,#{FT2,1}, #Suniti
+                            dτ::AbstractArray,
+                            computed_layer_properties,
+                            m::Int,                     # m: fourier moment
+                            ndoubl::Int,                # ndoubl: number of doubling computations needed 
+                            scatter::Bool,              # scatter: flag indicating scattering
+                            quad_points::QuadPoints{FT2}, # struct with quadrature points, weights, 
+                            added_layer::Union{AddedLayer{FT},AddedLayerRS{FT}}, 
+                            architecture) where {FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2}
+
+    @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, J₀⁺, J₀⁻ = added_layer
+    @unpack qp_μ, iμ₀, wt_μN, qp_μN = quad_points
+    @unpack τ, ϖ, Z⁺⁺, Z⁻⁺ = computed_layer_properties
+    #@unpack ϖ_Cabannes = RS_type
+    #@show architecture
+    arr_type = array_type(architecture)
+    # Need to check with paper nomenclature. This is basically eqs. 19-20 in vSmartMOM
+    qp_μN = arr_type(qp_μN)
+    wt_μN = arr_type(wt_μN)
+    τ_sum = arr_type(τ_sum)
+    I₀    = arr_type(pol_type.I₀)
+    D = Diagonal(arr_type(repeat(pol_type.D, size(qp_μ,1))))
+
+    device = devi(architecture)
+    #@show typeof(ϖ),typeof(dτ),typeof(Z⁻⁺),typeof(Z⁺⁺) 
+    #ϖ   = arr_type(ϖ);
+    #dτ  = arr_type(dτ);
+    #Z⁻⁺ = arr_type(Z⁻⁺);
+    #Z⁺⁺ = arr_type(Z⁺⁺);
+    #@show size(Z⁻⁺), size(ϖ)
+    # If in scattering mode:
+    if scatter
+   
+        # for m==0, ₀∫²ᵖⁱ cos²(mϕ)dϕ/4π = 0.5, while
+        # for m>0,  ₀∫²ᵖⁱ cos²(mϕ)dϕ/4π = 0.25  
+        wct02 = m == 0 ? FT(0.50)              : FT(0.25)
+        wct2  = m == 0 ? wt_μN/2               : wt_μN/4
  
-    if (wct2[j]>1.e-8) 
+        # More computationally intensive definition of a single scattering layer with variable (0-∞) absorption
+        # with absorption in batch mode, low tau_scatt but higher tau_total, needs exact equations
+        kernel! = get_elem_rt!(device)
+        event = kernel!(r⁻⁺, t⁺⁺, ϖ, dτ, Z⁻⁺, Z⁺⁺, qp_μN, wct2, ndrange=size(r⁻⁺)); 
+        wait(device, event)
+        synchronize_if_gpu()
+
+        if SFI
+            kernel! = get_elem_rt_SFI!(device)
+            event = kernel!(J₀⁺, J₀⁻, ϖ, dτ, arr_type(τ_sum), Z⁻⁺, Z⁺⁺, qp_μN, ndoubl, wct02, pol_type.n, I₀, iμ₀, D, ndrange=size(J₀⁺))
+            wait(device, event)
+        end
+        #ii = pol_type.n*(iμ0-1)+1
+        #@show 'B',iμ0,  r⁻⁺[1,ii,1]/(J₀⁻[1,1,1]*wt_μ[iμ0]), r⁻⁺[1,ii,1], J₀⁻[1,1,1]*wt_μ[iμ0], J₀⁺[1,1,1]*wt_μ[iμ0]
+        synchronize_if_gpu()
+        
+        # Apply D Matrix
+        apply_D_matrix_elemental!(ndoubl, pol_type.n, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻)
+
+        if SFI
+            apply_D_matrix_elemental_SFI!(ndoubl, pol_type.n, J₀⁻)
+        end      
+    else
+        # Note: τ is not defined here
+        t⁺⁺[:] = Diagonal{exp(-τ ./ qp_μN)}
+        t⁻⁻[:] = Diagonal{exp(-τ ./ qp_μN)}
+    end    
+    #@pack! added_layer = r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, J₀⁺, J₀⁻   
+end
+
+@kernel function get_elem_rt!(r⁻⁺, t⁺⁺, ϖ_λ, dτ_λ, Z⁻⁺, Z⁺⁺, qp_μN, wct) 
+    n2 = 1
+    i, j, n = @index(Global, NTuple) 
+    if size(Z⁻⁺,3)>1
+        n2 = n
+    end
+    if (wct[j]>1.e-8) 
         # 𝐑⁻⁺(μᵢ, μⱼ) = ϖ ̇𝐙⁻⁺(μᵢ, μⱼ) ̇(μⱼ/(μᵢ+μⱼ)) ̇(1 - exp{-τ ̇(1/μᵢ + 1/μⱼ)}) ̇𝑤ⱼ
-        r⁻⁺[i,j,n] = ϖ_λ[n] * Z⁻⁺[i,j] * (qp_μN[j] / (qp_μN[i] + qp_μN[j])) * (1 - exp(-dτ_λ[n] * ((1 / qp_μN[i]) + (1 / qp_μN[j])))) * (wct2[j]) 
+        r⁻⁺[i,j,n] = 
+            ϖ_λ[n] * Z⁻⁺[i,j,n2] * 
+            #Z⁻⁺[i,j] * 
+            (qp_μN[j] / (qp_μN[i] + qp_μN[j])) * wct[j] * 
+            (1 - exp(-dτ_λ[n] * ((1 / qp_μN[i]) + (1 / qp_μN[j])))) 
                     
         if (qp_μN[i] == qp_μN[j])
             # 𝐓⁺⁺(μᵢ, μᵢ) = (exp{-τ/μᵢ} + ϖ ̇𝐙⁺⁺(μᵢ, μᵢ) ̇(τ/μᵢ) ̇exp{-τ/μᵢ}) ̇𝑤ᵢ
             if i == j
-                t⁺⁺[i,j,n] = exp(-dτ_λ[n] / qp_μN[i])*(1 + ϖ_λ[n] * Z⁺⁺[i,i] * (dτ_λ[n] / qp_μN[i]) * wct2[i])
+                t⁺⁺[i,j,n] = 
+                    exp(-dτ_λ[n] / qp_μN[i]) *
+                    (1 + ϖ_λ[n] * Z⁺⁺[i,i,n2] * (dτ_λ[n] / qp_μN[i]) * wct[i])
+                    #(1 + ϖ_λ[n] * Z⁺⁺[i,i] * (dτ_λ[n] / qp_μN[i]) * wct[i])
             else
                 t⁺⁺[i,j,n] = 0.0
             end
@@ -121,7 +203,11 @@ end
     
             # 𝐓⁺⁺(μᵢ, μⱼ) = ϖ ̇𝐙⁺⁺(μᵢ, μⱼ) ̇(μⱼ/(μᵢ-μⱼ)) ̇(exp{-τ/μᵢ} - exp{-τ/μⱼ}) ̇𝑤ⱼ
             # (𝑖 ≠ 𝑗)
-            t⁺⁺[i,j,n] = ϖ_λ[n] * Z⁺⁺[i,j] * (qp_μN[j] / (qp_μN[i] - qp_μN[j])) * (exp(-dτ_λ[n] / qp_μN[i]) - exp(-dτ_λ[n] / qp_μN[j])) * wct2[j]
+            t⁺⁺[i,j,n] = 
+                ϖ_λ[n] * Z⁺⁺[i,j,n2] * 
+                #Z⁺⁺[i,j] * 
+                (qp_μN[j] / (qp_μN[i] - qp_μN[j])) * wct[j] * 
+                (exp(-dτ_λ[n] / qp_μN[i]) - exp(-dτ_λ[n] / qp_μN[j])) 
         end
     else
         r⁻⁺[i,j,n] = 0.0
@@ -131,7 +217,7 @@ end
             t⁺⁺[i,j,n] = 0.0
         end
     end
-    
+    nothing
 end
 
 @kernel function get_elem_rt_SFI!(J₀⁺, J₀⁻, ϖ_λ, dτ_λ, τ_sum, Z⁻⁺, Z⁺⁺, qp_μN, ndoubl, wct02, nStokes ,I₀, iμ0, D)
@@ -142,14 +228,17 @@ end
     FT = eltype(I₀)
     J₀⁺[i, 1, n]=0
     J₀⁻[i, 1, n]=0
-
+    n2=1
+    if size(Z⁻⁺,3)>1
+        n2 = n
+    end
     
     Z⁺⁺_I₀ = FT(0.0);
     Z⁻⁺_I₀ = FT(0.0);
     
     for ii = i_start:i_end
-        Z⁺⁺_I₀ += Z⁺⁺[i,ii] * I₀[ii-i_start+1]
-        Z⁻⁺_I₀ += Z⁻⁺[i,ii] * I₀[ii-i_start+1] 
+        Z⁺⁺_I₀ += Z⁺⁺[i,ii,n2] * I₀[ii-i_start+1]
+        Z⁻⁺_I₀ += Z⁻⁺[i,ii,n2] * I₀[ii-i_start+1] 
     end
 
     if (i>=i_start) && (i<=i_end)
@@ -168,7 +257,11 @@ end
 
     if ndoubl >= 1
         J₀⁻[i, 1, n] = D[i,i]*J₀⁻[i, 1, n] #D = Diagonal{1,1,-1,-1,...Nquad times}
-    end        
+    end  
+    #if (n==840||n==850)    
+    #    @show i, n, J₀⁺[i, 1, n], J₀⁻[i, 1, n]      
+    #end
+    nothing
 end
 
 @kernel function apply_D_elemental!(ndoubl, pol_n, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻)
@@ -189,6 +282,7 @@ end
             r⁻⁺[i,j,n] = - r⁻⁺[i,j,n]
         end 
     end
+    nothing
 end
 
 @kernel function apply_D_elemental_SFI!(ndoubl, pol_n, J₀⁻)
@@ -199,10 +293,11 @@ end
             J₀⁻[i, 1, n] = - J₀⁻[i, 1, n]
         end 
     end
+    nothing
 end
 
-function apply_D_matrix_elemental!(ndoubl::Int, n_stokes::Int, r⁻⁺::CuArray{FT,3}, t⁺⁺::CuArray{FT,3}, r⁺⁻::CuArray{FT,3}, t⁻⁻::CuArray{FT,3}) where {FT}
-    device = devi(Architectures.GPU())
+function apply_D_matrix_elemental!(ndoubl::Int, n_stokes::Int, r⁻⁺::AbstractArray{FT,3}, t⁺⁺::AbstractArray{FT,3}, r⁺⁻::AbstractArray{FT,3}, t⁻⁻::AbstractArray{FT,3}) where {FT}
+    device = devi(architecture(r⁻⁺))
     applyD_kernel! = apply_D_elemental!(device)
     event = applyD_kernel!(ndoubl,n_stokes, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻, ndrange=size(r⁻⁺));
     wait(device, event);
@@ -210,35 +305,15 @@ function apply_D_matrix_elemental!(ndoubl::Int, n_stokes::Int, r⁻⁺::CuArray{
     return nothing
 end
 
-function apply_D_matrix_elemental!(ndoubl::Int, n_stokes::Int, r⁻⁺::Array{FT,3}, t⁺⁺::Array{FT,3}, r⁺⁻::Array{FT,3}, t⁻⁻::Array{FT,3}) where {FT}
-    device = devi(Architectures.CPU())
-    applyD_kernel! = apply_D_elemental!(device)
-    event = applyD_kernel!(ndoubl,n_stokes, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻, ndrange=size(r⁻⁺));
-    wait(device, event);
-    return nothing
-end
-
-function apply_D_matrix_elemental_SFI!(ndoubl::Int, n_stokes::Int, J₀⁻::CuArray{FT,3}) where {FT}
+function apply_D_matrix_elemental_SFI!(ndoubl::Int, n_stokes::Int, J₀⁻::AbstractArray{FT,3}) where {FT}
     if ndoubl > 1
         return nothing
     else 
-        device = devi(Architectures.GPU())
+        device = devi(architecture(J₀⁻))
         applyD_kernel! = apply_D_elemental_SFI!(device)
         event = applyD_kernel!(ndoubl,n_stokes, J₀⁻, ndrange=size(J₀⁻));
         wait(device, event);
-        synchronize();
-        return nothing
-    end
-end
-    
-function apply_D_matrix_elemental_SFI!(ndoubl::Int, n_stokes::Int, J₀⁻::Array{FT,3}) where {FT}
-    if ndoubl > 1
-        return nothing
-    else 
-        device = devi(Architectures.CPU())
-        applyD_kernel! = apply_D_elemental_SFI!(device)
-        event = applyD_kernel!(ndoubl,n_stokes, J₀⁻, ndrange=size(J₀⁻));
-        wait(device, event);
+        synchronize_if_gpu();
         return nothing
     end
 end

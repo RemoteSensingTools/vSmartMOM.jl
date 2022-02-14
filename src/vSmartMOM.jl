@@ -13,6 +13,7 @@ using Distributions
 using CUDA
 using Parameters
 using DocStringExtensions
+using UnPack
 
 # Export Architecture functions
 export CPU, GPU, default_architecture, array_type
@@ -36,6 +37,9 @@ include("Scattering/Scattering.jl")
 # CoreRT module:
 include("CoreRT/CoreRT.jl")
 using .CoreRT
+
+# Inelastic Scattering module:
+include("Inelastic/InelasticScattering.jl")
 
 # SolarModel module:
 include("SolarModel/SolarModel.jl")
