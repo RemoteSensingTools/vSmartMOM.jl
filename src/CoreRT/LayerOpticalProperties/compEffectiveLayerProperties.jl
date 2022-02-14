@@ -21,6 +21,8 @@ function constructCoreOpticalProperties(RS_type, iBand, m, model)
     for iB in iBand
         #@show τ_rayl[iB][:]
         #,  ones(FT, length(RS_type.bandSpecLim[iB]))
+        @show RS_type.ϖ_Cabannes
+        @show τ_rayl
         rayl = CoreScatteringOpticalProperties.(
                 τ_rayl[iB][:], 
                 [RS_type.ϖ_Cabannes[iB]], 

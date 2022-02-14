@@ -81,7 +81,7 @@ function rt_run(RS_type::AbstractRamanType, #Default - no Raman scattering (noRS
         # Compute Z-moments of the Rayleigh phase matrix 
         # For m>=3, Rayleigh matrices will be 0, can catch with if statement if wanted 
         @timeit "Z moments" Rayl𝐙⁺⁺, Rayl𝐙⁻⁺ = Scattering.compute_Z_moments(pol_type, Array(qp_μ), greek_rayleigh, m, arr_type = arr_type);
-        if !(typeof(RS_type) <: vSmartMOM.noRS)
+        if !(typeof(RS_type) <: noRS)
             @timeit "Z moments" RS_type.Z⁺⁺_λ₁λ₀, RS_type.Z⁻⁺_λ₁λ₀ = Scattering.compute_Z_moments(pol_type, Array(qp_μ), RS_type.greek_raman, m, arr_type = arr_type);
             #@show size(RS_type.Z⁺⁺_λ₁λ₀), size(RS_type.Z⁻⁺_λ₁λ₀)
         end
@@ -111,7 +111,8 @@ function rt_run(RS_type::AbstractRamanType, #Default - no Raman scattering (noRS
             # Suniti: modified to return fscattRayl as the last element of  computed_atmosphere_properties
             # Computing Rayleigh scattering fraction, fscattRayl = τRayl*ϖRayl/τ
             computed_layer_properties = get_layer_properties(computed_atmosphere_properties, iz, arr_type)
-            #@show computed_layer_properties.fscattRayl
+            @show computed_layer_properties.fscattRayl
+            @show RS_type.fscattRayl
             RS_type.fscattRayl .= computed_layer_properties.fscattRayl
             # Perform Core RT (doubling/elemental/interaction)
             rt_kernel!(RS_type, pol_type, SFI, added_layer, composite_layer, computed_layer_properties, m, quad_points, I_static, architecture, qp_μN, iz) 

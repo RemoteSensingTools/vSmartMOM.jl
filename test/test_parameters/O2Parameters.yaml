@@ -70,13 +70,13 @@ absorption:
   # List of molecules per spectral band
   molecules:
     - [O2]       # Molecules in Band #1
-    - [H2O,CO2]  # Molecules in Band #2
-    - [H2O,CO2]  # Molecules in Band #3
+    #- [H2O,CO2]  # Molecules in Band #2
+    #- [H2O,CO2]  # Molecules in Band #3
   # LookUpTable files (Interpolation Model saved as JLD2!)
-  LUTfiles:
-    - ["/net/fluo/data2/data/ABSCO_CS_Database/v5.2_final/o2_v52.jld2"]
-    - ["/net/fluo/data2/data/ABSCO_CS_Database/v5.2_final/wh2o_v52.jld2", "/net/fluo/data2/data/ABSCO_CS_Database/v5.2_final/wco2_v52.jld2"]
-    - ["/net/fluo/data2/data/ABSCO_CS_Database/v5.2_final/sh2o_v52.jld2", "/net/fluo/data2/data/ABSCO_CS_Database/v5.2_final/sco2_v52.jld2"]
+  #LUTfiles:
+  #  - ["/net/fluo/data2/data/ABSCO_CS_Database/v5.2_final/o2_v52.jld2"]
+    #- ["/net/fluo/data2/data/ABSCO_CS_Database/v5.2_final/wh2o_v52.jld2", "/net/fluo/data2/data/ABSCO_CS_Database/v5.2_final/wco2_v52.jld2"]
+    #- ["/net/fluo/data2/data/ABSCO_CS_Database/v5.2_final/sh2o_v52.jld2", "/net/fluo/data2/data/ABSCO_CS_Database/v5.2_final/sco2_v52.jld2"]
   # VMR profiles can either be real-valued numbers, 
   # or an array of nodal points from TOA to BOA, interpolated in pressure space
   vmr: 

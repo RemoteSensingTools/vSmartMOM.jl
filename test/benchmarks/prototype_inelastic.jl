@@ -1,7 +1,7 @@
 ##
 using Revise
-using RadiativeTransfer, RadiativeTransfer.vSmartMOM
-using RadiativeTransfer.InelasticScattering
+using vSmartMOM, vSmartMOM.CoreRT
+using vSmartMOM.InelasticScattering
 using Statistics
 
 # Load YAML files into parameter struct
@@ -30,8 +30,8 @@ RS_type = InelasticScattering.RRS(
             n2=n2,
             o2=o2,
             greek_raman = InelasticScattering.GreekCoefs([FT(1)], [FT(1)], [FT(1)], [FT(1)], [FT(1)], [FT(1)]),
-            fscattRayl  = FT(1),
-            ϖ_Cabannes  = FT(1), 
+            fscattRayl  = [FT(1)],
+            ϖ_Cabannes  = [FT(1)], 
             ϖ_λ₁λ₀      = zeros(FT,1),
             i_λ₁λ₀      = zeros(Int,1), 
             Z⁻⁺_λ₁λ₀    = zeros(FT,1,1), 
@@ -44,7 +44,7 @@ RS_type = InelasticScattering.RRS(
 #fscattRayl = ...
 #RS_type = vSmartMOM.RRS(...)
 # Compute Raman SSA properties:
-vSmartMOM.getRamanSSProp!(RS_type, 1e7/ν̃, ν);
+CoreRT.getRamanSSProp!(RS_type, 1e7/ν̃, ν);
 
 # For now, convert these special cases to the right array type:
 #aType = array_type(model.params.architecture);
@@ -69,7 +69,7 @@ R, T, ieR, ieT = rt_run(RS_type,
     model.params.architecture);
 #R = vSmartMOM.rt_run(model, i_band=1)
 
-RnoRS, TnoRS, _, _ = rt_run(vSmartMOM.noRS(),
+RnoRS, TnoRS, _, _ = rt_run(noRS(),
             model.params.polarization_type,
             model.obs_geom,
             model.τ_rayl[1], 
@@ -82,12 +82,12 @@ RnoRS, TnoRS, _, _ = rt_run(vSmartMOM.noRS(),
             model.params.brdf[1],
             model.params.architecture);
 
-RnoRS_test, TnoRS_test, _, _ = vSmartMOM.rt_run_test(vSmartMOM.noRS(),model,iBand);
+RnoRS_test, TnoRS_test, _, _ = CoreRT.rt_run_test(noRS(),model,iBand);
 
-R_test, T_test, ieR_test, ieT_test = vSmartMOM.rt_run_test(RS_type,model,iBand);
+R_test, T_test, ieR_test, ieT_test = CoreRT.rt_run_test(RS_type,model,iBand);
 
 # You can now run multiple bands like this (list at the end of band!)
-RnoRS_test, TnoRS_test, _, _ = vSmartMOM.rt_run_test(vSmartMOM.noRS(),model,[1,1]);
+RnoRS_test, TnoRS_test, _, _ = CoreRT.rt_run_test(vSmartMOM.noRS(),model,[1,1]);
 
 
-R_test, T_test, ieR_test, ieT_test = vSmartMOM.rt_run_test(RS_type,model,1);
+R_test, T_test, ieR_test, ieT_test = CoreRT.rt_run_test(RS_type,model,1);
