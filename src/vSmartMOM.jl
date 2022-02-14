@@ -34,12 +34,12 @@ include("Absorption/Absorption.jl")
 # Mie Phase Function module:
 include("Scattering/Scattering.jl")
 
+# Inelastic Scattering module:
+include("Inelastic/InelasticScattering.jl")
+
 # CoreRT module:
 include("CoreRT/CoreRT.jl")
 using .CoreRT
-
-# Inelastic Scattering module:
-include("Inelastic/InelasticScattering.jl")
 
 # SolarModel module:
 include("SolarModel/SolarModel.jl")

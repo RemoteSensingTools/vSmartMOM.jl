@@ -169,9 +169,12 @@ function get_elem_rt!(RS_type::RRS,
         device = devi(architecture(ier⁻⁺))
         aType = array_type(architecture(ier⁻⁺))
         kernel! = get_elem_rt_RRS!(device)
-        #@show typeof(Z⁻⁺_λ₁λ₀), typeof(Z⁺⁺_λ₁λ₀), typeof(ϖ_λ₁λ₀), typeof(i_λ₁λ₀), typeof(i_ref)
-        
-        event = kernel!(fscattRayl, 
+       #@show typeof(i_ref), typeof(ϖ_λ₁λ₀)
+       # @show typeof(dτ_λ), typeof(ϖ_λ)
+       # @show typeof(qp_μN), typeof(wct2)
+       # @show typeof(ier⁻⁺), typeof(iet⁺⁺)
+       # @show typeof(fscattRayl)
+        event = kernel!(fscattRayl[1], 
                     aType(ϖ_λ₁λ₀), aType(i_λ₁λ₀), 
                     i_ref,
                     ier⁻⁺, iet⁺⁺, 
@@ -188,21 +191,21 @@ function get_elem_rt!(RS_type::Union{VS_0to1, VS_1to0},
     dτ_λ, ϖ_λ,
     Z⁻⁺_λ₁λ₀, Z⁺⁺_λ₁λ₀, 
     qp_μN, wct2)
-@unpack fscattRayl, ϖ_λ₁λ₀, i_λ₁λ₀, i_ref = RS_type
-device = devi(architecture(ier⁻⁺))
-aType = array_type(architecture(ier⁻⁺))
-kernel! = get_elem_rt_VS!(device)
-#@show typeof(Z⁻⁺_λ₁λ₀), typeof(Z⁺⁺_λ₁λ₀), typeof(ϖ_λ₁λ₀), typeof(i_λ₁λ₀), typeof(i_ref)
-event = kernel!(fscattRayl, 
-    aType(ϖ_λ₁λ₀), aType(i_λ₁λ₀), 
-    i_ref,
-    ier⁻⁺, iet⁺⁺, 
-    dτ_λ, ϖ_λ, 
-    aType(Z⁻⁺_λ₁λ₀), aType(Z⁺⁺_λ₁λ₀), 
-    qp_μN, wct2, 
-    ndrange=getKernelDim(RS_type,ier⁻⁺)); 
-wait(device, event);
-synchronize_if_gpu();
+    @unpack fscattRayl, ϖ_λ₁λ₀, i_λ₁λ₀, i_ref = RS_type
+    device = devi(architecture(ier⁻⁺))
+    aType = array_type(architecture(ier⁻⁺))
+    kernel! = get_elem_rt_VS!(device)
+    #@show typeof(Z⁻⁺_λ₁λ₀), typeof(Z⁺⁺_λ₁λ₀), typeof(ϖ_λ₁λ₀), typeof(i_λ₁λ₀), typeof(i_ref)
+    event = kernel!(fscattRayl, 
+        aType(ϖ_λ₁λ₀), aType(i_λ₁λ₀), 
+        i_ref,
+        ier⁻⁺, iet⁺⁺, 
+        dτ_λ, ϖ_λ, 
+        aType(Z⁻⁺_λ₁λ₀), aType(Z⁺⁺_λ₁λ₀), 
+        qp_μN, wct2, 
+        ndrange=getKernelDim(RS_type,ier⁻⁺)); 
+    wait(device, event);
+    synchronize_if_gpu();
 end
 
 
@@ -376,7 +379,7 @@ function get_elem_rt_SFI!(RS_type::RRS,
     aType = array_type(architecture(ieJ₀⁺))
     kernel! = get_elem_rt_SFI_RRS!(device)
     #@show typeof(ieJ₀⁺), typeof(τ_sum), typeof(dτ_λ),typeof(wct02), typeof(qp_μN), typeof(dτ_λ) 
-    event = kernel!(fscattRayl, aType(ϖ_λ₁λ₀), aType(i_λ₁λ₀), 
+    event = kernel!(fscattRayl[1], aType(ϖ_λ₁λ₀), aType(i_λ₁λ₀), 
                 i_ref, ieJ₀⁺, ieJ₀⁻, 
                 τ_sum, dτ_λ, ϖ_λ,
                 aType(Z⁻⁺_λ₁λ₀), aType(Z⁺⁺_λ₁λ₀), 

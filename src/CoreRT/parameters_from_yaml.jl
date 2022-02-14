@@ -187,7 +187,8 @@ function parameters_from_yaml(file_path)
             
             for i in eachindex(files_lut)
                 #@show i, files_lut[i]
-                push!(luts,[Absorption.load_interpolation_model(file) for file in files_lut[i]])
+                #@show typeof(load_interpolation_model(files_lut[1]))
+                push!(luts,[load_interpolation_model(file) for file in files_lut[i]])
             end
         end
         absorption_params = AbsorptionParameters(molecules, vmr, broadening_function, 

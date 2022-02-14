@@ -41,8 +41,8 @@ function model_from_parameters(params::vSmartMOM_Parameters)
     
     # This is a kludge for now, tau_abs sometimes needs to be a dual. Suniti & us need to rethink this all!!
     # i.e. code the rt core with fixed amount of derivatives as in her paper, then compute chain rule for dtau/dVMr, etc...
-    FT2 = isnothing(params.absorption_params) ? params.float_type : eltype(params.absorption_params.vmr["CO2"])
-    τ_abs     = [zeros(FT2, length(params.spec_bands[i]), length(profile.p_full)) for i in 1:n_bands]
+    # FT2 = isnothing(params.absorption_params) ? params.float_type : eltype(params.absorption_params.vmr["CO2"])
+    τ_abs     = [zeros(params.float_type, length(params.spec_bands[i]), length(profile.p_full)) for i in 1:n_bands]
     
     # Loop over all bands:
     for i_band=1:n_bands
@@ -145,7 +145,7 @@ function model_from_parameters(params::vSmartMOM_Parameters)
             τ_aer[i_band][i_aer,:] = 
                 params.scattering_params.rt_aerosols[i_aer].τ_ref[] * 
                 (aerosol_optics[i_band][i_aer].k/k_ref) * 
-                vSmartMOM.getAerosolLayerOptProp(1.0, c_aero.p₀, c_aero.σp, profile.p_full)
+                getAerosolLayerOptProp(1.0, c_aero.p₀, c_aero.σp, profile.p_full)
         end 
     end
 
@@ -181,22 +181,22 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
     n_aer = isnothing(params.scattering_params) ? 0 : length(params.scattering_params.rt_aerosols)
 
     # Create observation geometry
-    obs_geom = vSmartMOM.ObsGeometry(params.sza, params.vza, params.vaz, params.obs_alt)
+    obs_geom = ObsGeometry(params.sza, params.vza, params.vaz, params.obs_alt)
 
     # Create truncation type
-    truncation_type = vSmartMOM.Scattering.δBGE{params.float_type}(params.l_trunc, params.Δ_angle)
+    truncation_type = Scattering.δBGE{params.float_type}(params.l_trunc, params.Δ_angle)
 
     # Set quadrature points for streams
-    quad_points = vSmartMOM.rt_set_streams(params.quadrature_type, params.l_trunc, obs_geom, params.polarization_type, array_type(params.architecture))
+    quad_points = rt_set_streams(params.quadrature_type, params.l_trunc, obs_geom, params.polarization_type, array_type(params.architecture))
 
     # Get AtmosphericProfile from parameters
     vmr = isnothing(params.absorption_params) ? Dict() : params.absorption_params.vmr
-    p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o, new_vmr = vSmartMOM.compute_atmos_profile_fields(params.T, params.p, params.q, vmr)
-    profile = vSmartMOM.AtmosphericProfile(params.T, p_full, params.q, p_half, vmr_h2o, vcd_dry, vcd_h2o, new_vmr)
+    p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o, new_vmr = compute_atmos_profile_fields(params.T, params.p, params.q, vmr)
+    profile = AtmosphericProfile(params.T, p_full, params.q, p_half, vmr_h2o, vcd_dry, vcd_h2o, new_vmr)
     
     # Reduce the profile to the number of target layers (if specified)
     if params.profile_reduction_n != -1
-        profile = vSmartMOM.reduce_profile(params.profile_reduction_n, profile);
+        profile = reduce_profile(params.profile_reduction_n, profile);
     end
 
     effT = (profile.vcd_dry' * profile.T) / sum(profile.vcd_dry);
@@ -235,28 +235,25 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
         @show i_band, params.absorption_params.molecules[i_band]
         # Loop over all molecules in this band, obtain profile for each, and add them up
         for molec_i in 1:length(params.absorption_params.molecules[i_band])
+            # This can be precomputed as well later in my mind, providing an absorption_model or an interpolation_model!
+            if isempty(params.absorption_params.luts)
+                # Obtain hitran data for this molecule
+                @timeit "Read HITRAN"  hitran_data = read_hitran(artifact(params.absorption_params.molecules[i_band][molec_i]), iso=1)
 
-            # Obtain hitran data for this molecule
-            @timeit "Read HITRAN"  hitran_data = read_hitran(
-                        artifact(params.absorption_params.molecules[i_band][molec_i]), 
-                        iso=1)
-
-            println("Computing profile for 
-                $(params.absorption_params.molecules[i_band][molec_i]) 
-                with vmr 
-                $(profile.vmr[params.absorption_params.molecules[i_band][molec_i]]) 
-                for band #$(i_band)")
-
-            # Calculate absorption profile
-            @timeit "Absorption Coeff"  compute_absorption_profile!(τ_abs[i_band], 
-                                            hitran_data, 
-                                            params.absorption_params.broadening_function, 
-                                            params.absorption_params.wing_cutoff, 
-                                            params.absorption_params.CEF, 
-                                            params.architecture, 
-                                            profile.vmr[params.absorption_params.molecules[i_band][molec_i]], 
-                                            params.spec_bands[i_band], 
-                                            profile);
+                println("Computing profile for $(params.absorption_params.molecules[i_band][molec_i]) with vmr $(profile.vmr[params.absorption_params.molecules[i_band][molec_i]]) for band #$(i_band)")
+                # Create absorption model with parameters beforehand now:
+                absorption_model = make_hitran_model(hitran_data, 
+                    params.absorption_params.broadening_function, 
+                    wing_cutoff = params.absorption_params.wing_cutoff, 
+                    CEF = params.absorption_params.CEF, 
+                    architecture = params.architecture, 
+                    vmr = 0);#mean(profile.vmr[params.absorption_params.molecules[i_band][molec_i]]))
+                # Calculate absorption profile
+                @timeit "Absorption Coeff"  compute_absorption_profile!(τ_abs[i_band], absorption_model, params.spec_bands[i_band],profile.vmr[params.absorption_params.molecules[i_band][molec_i]], profile);
+            # Use LUT directly
+            else
+                compute_absorption_profile!(τ_abs[i_band], params.absorption_params.luts[i_band][molec_i], params.spec_bands[i_band],profile.vmr[params.absorption_params.molecules[i_band][molec_i]], profile);
+            end
         end
     end
 

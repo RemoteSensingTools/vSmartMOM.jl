@@ -1,7 +1,7 @@
 ##
 using Revise
-using RadiativeTransfer, RadiativeTransfer.vSmartMOM
-using RadiativeTransfer.InelasticScattering
+using vSmartMOM, vSmartMOM.CoreRT
+using vSmartMOM.InelasticScattering
 using Statistics
 
 
@@ -61,11 +61,11 @@ RS_type = vSmartMOM.RRS(
 # Add something here, that computes ALL the OP needed for the Raman case.
 #modelRS = ...
 
-R, T, ieR, ieT = vSmartMOM.rt_run_test(RS_type,
+R, T, ieR, ieT = CoreRT.rt_run_test(RS_type,
     model, RS_type.iBand);
 #R = vSmartMOM.rt_run(model, i_band=1)
 
-RnoRS, TnoRS, _, _ = vSmartMOM.rt_run_test(vSmartMOM.noRS(),
+RnoRS, TnoRS, _, _ = CoreRT.rt_run_test(noRS(),
             model,RS_type.iBand);
 
 #RnoRS_test, TnoRS_test, _, _ = vSmartMOM.rt_run_test(vSmartMOM.noRS(),model,iBand);
