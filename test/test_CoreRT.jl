@@ -44,7 +44,7 @@ end
                 parameters.brdf = [vSmartMOM.CoreRT.LambertianSurfaceScalar(ρ * π)]
                 model = model_from_parameters(parameters);
                 model.τ_rayl[1] .= τ
-                R_modeled[sza_i, az_i, :] = CoreRT.rt_run(model, i_band=1)[:,1,1] / model.quad_points.μ₀
+                R_modeled[sza_i, az_i, :] = CoreRT.rt_run(model, i_band=1)[1][:,1,1] / model.quad_points.μ₀
                 R_deltas[sza_i, az_i, :] = abs.(R_true[sza_i][az_i] - R_modeled[sza_i, az_i, :]) ./ R_true[sza_i][az_i]
             end
         end
@@ -87,7 +87,7 @@ end
         model = model_from_parameters(parameters);
         model.τ_rayl[1] .= τ
 
-        R = CoreRT.rt_run(model, i_band=1)
+        R = CoreRT.rt_run(model, i_band=1)[1]
         @show size(R)
 
         I_modeled_all[ϕ_i,:] = R[:,1,1]
