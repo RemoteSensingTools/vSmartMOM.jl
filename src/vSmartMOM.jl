@@ -13,6 +13,7 @@ using Distributions
 using CUDA
 using Parameters
 using DocStringExtensions
+using UnPack
 
 # Export Architecture functions
 export CPU, GPU, default_architecture, array_type
@@ -32,6 +33,9 @@ include("Absorption/Absorption.jl")
 
 # Mie Phase Function module:
 include("Scattering/Scattering.jl")
+
+# Inelastic Scattering module:
+include("Inelastic/InelasticScattering.jl")
 
 # CoreRT module:
 include("CoreRT/CoreRT.jl")

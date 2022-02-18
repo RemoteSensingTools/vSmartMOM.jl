@@ -155,11 +155,11 @@ function parameters_from_yaml(file_path)
     # #########################################################
 
     # radiative_transfer group
-    spec_bands = convert.(Array, map(x -> collect(eval(Meta.parse(x))), params_dict["radiative_transfer"]["spec_bands"]))
+    FT = eval(Meta.parse(params_dict["radiative_transfer"]["float_type"]))
+    spec_bands = convert.(Array{FT}, map(x -> collect(eval(Meta.parse(x))), params_dict["radiative_transfer"]["spec_bands"]))
     BRDF_per_band = map(x -> eval(Meta.parse(x)), params_dict["radiative_transfer"]["surface"]) 
     quadrature_type = eval(Meta.parse(params_dict["radiative_transfer"]["quadrature_type"]))
     polarization_type = eval(Meta.parse(params_dict["radiative_transfer"]["polarization_type"]))
-    FT = eval(Meta.parse(params_dict["radiative_transfer"]["float_type"]))
     architecture = eval(Meta.parse(params_dict["radiative_transfer"]["architecture"]))
 
     # atmospheric_profile group
@@ -187,7 +187,8 @@ function parameters_from_yaml(file_path)
             
             for i in eachindex(files_lut)
                 #@show i, files_lut[i]
-                push!(luts,[Absorption.load_interpolation_model(file) for file in files_lut[i]])
+                #@show typeof(load_interpolation_model(files_lut[1]))
+                push!(luts,[load_interpolation_model(file) for file in files_lut[i]])
             end
         end
         absorption_params = AbsorptionParameters(molecules, vmr, broadening_function, 
@@ -201,12 +202,13 @@ function parameters_from_yaml(file_path)
     
     # scattering group
     if "scattering" in keys(params_dict)
-        
+        #Force aerosols to be Float64!!
+        FTa = Float64
         # Get aerosols from types
-        aerosols = aerosol_params_to_obj(params_dict["scattering"]["aerosols"], FT)
-        r_max = FT(params_dict["scattering"]["r_max"])
+        aerosols = aerosol_params_to_obj(params_dict["scattering"]["aerosols"], FTa)
+        r_max = FTa(params_dict["scattering"]["r_max"])
         nquad_radius = params_dict["scattering"]["nquad_radius"]
-        λ_ref = FT(params_dict["scattering"]["λ_ref"])
+        λ_ref = FTa(params_dict["scattering"]["λ_ref"])
         decomp_type = eval(Meta.parse(params_dict["scattering"]["decomp_type"]))
 
         scattering_params = ScatteringParameters(aerosols, r_max, nquad_radius, 
@@ -235,7 +237,7 @@ function parameters_from_yaml(file_path)
                                 FT(params_dict["geometry"]["obs_alt"]),
 
                                 # atmospheric_profile group
-                                T, p, q, 
+                                convert.(FT,T), convert.(FT,p), convert.(FT,q), 
                                 params_dict["atmospheric_profile"]["profile_reduction"],
 
                                 # absorption group

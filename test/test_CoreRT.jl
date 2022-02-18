@@ -9,7 +9,7 @@
     parameters = CoreRT.parameters_from_yaml("test_parameters/PureRayleighParameters.yaml")
     model = model_from_parameters(parameters)
 
-    R_model = rt_run(model)
+    R_model = rt_run(model)[1]
 
     R_test = [1.6376193549450170E-002  2.1561609277437792E-003  5.5387198966105483E-019 0.0 ; 
               1.2818490637667997E-002  3.7825131902305691E-004  2.0685375352086151E-019 0.0 ;
@@ -44,7 +44,7 @@ end
                 parameters.brdf = [vSmartMOM.CoreRT.LambertianSurfaceScalar(ρ * π)]
                 model = model_from_parameters(parameters);
                 model.τ_rayl[1] .= τ
-                R_modeled[sza_i, az_i, :] = CoreRT.rt_run(model, i_band=1)[:,1,1] / model.quad_points.μ₀
+                R_modeled[sza_i, az_i, :] = CoreRT.rt_run(model, i_band=1)[1][:,1,1] / model.quad_points.μ₀
                 R_deltas[sza_i, az_i, :] = abs.(R_true[sza_i][az_i] - R_modeled[sza_i, az_i, :]) ./ R_true[sza_i][az_i]
             end
         end
@@ -87,7 +87,7 @@ end
         model = model_from_parameters(parameters);
         model.τ_rayl[1] .= τ
 
-        R = CoreRT.rt_run(model, i_band=1)
+        R = CoreRT.rt_run(model, i_band=1)[1]
         @show size(R)
 
         I_modeled_all[ϕ_i,:] = R[:,1,1]

@@ -3,40 +3,38 @@
 # =================================================================
 radiative_transfer: 
   # Spectral bands (list of ν_start:ν_step:ν_end, in cm⁻¹)
-  spec_bands: 
-    - (1e7/773):0.04:(1e7/757)
-    - (1e7/1622):0.03:(1e7/1589)
-    - (1e7/2084):0.02:(1e7/2042)
+  spec_bands:
+    #- (1e7/750):0.05:(1e7/745)
+    #- (1e7/768):0.05:(1e7/763) 
+    - (1e7/787):0.05:(1e7/747)
   # Bidirectional Reflectance Distribution Function (BRDF) per band
   surface: 
-    - LambertianSurfaceScalar(0.05)
-    - LambertianSurfaceScalar(0.05)
-    - LambertianSurfaceScalar(0.05)
+    - LambertianSurfaceScalar{Float64}(0.0) #(0.2) #(0.05)
   # Quadrature-scheme for stream calculations
   quadrature_type:    GaussQuadHemisphere()
   # Polarization type (Stokes_I, Stokes_IQ, Stokes_IQU, Stokes_IQUV)
-  polarization_type:  Stokes_IQU()
+  polarization_type:  Stokes_IQU() #QU()
   # Maximum m (number of Fourier moments to loop over)
   max_m:              3
   # Exclusion angle for forward peak in fitting procedure (degrees)
   Δ_angle:            2.0
   # Trunction length for legendre terms
-  l_trunc:            10
+  l_trunc:            5 #5
   # Depolarization factor
   depol:              0.03
   # Floating point type for calculations (Float32, Float64)
   float_type:         Float64
-  # Architecture (default_architecture, GPU(), CPU())
-  architecture:       default_architecture #default_architecture
+  # Architecture (default_architecture, Architectures.GPU(), Architectures.CPU())
+  architecture:       Architectures.GPU() # default_architecture
   
 # =================================================================
 # Simulation Geometry
 # =================================================================
 geometry: 
   # Solar zenith angle (degrees)
-  sza:                32.4436
+  sza:                60. #32.4436
   # Viewing zenith angles (degrees)
-  vza:                [0.072]
+  vza:                [0.0] #[32.4436] #[0.072]
   # Viewing azimuth angles (degrees)
   vaz:                [0.0]
   # Observation altitude (Pa)
@@ -62,8 +60,8 @@ atmospheric_profile:
        31.00,  42.07,  56.09,  74.78,  99.69, 131.00,
       176.85, 236.64, 314.58, 418.87, 557.76, 735.00, 
       800.12, 849.00, 912.00, 980.00, 1005.0]
-  # Reduce profile to n layers
-  profile_reduction: 20
+  # Reduce profile to n layers (-1 is default, leave as is)
+  profile_reduction: 5
 
 # =================================================================
 # Absorption-Related Parameters (Optional)
@@ -72,25 +70,23 @@ absorption:
   # List of molecules per spectral band
   molecules:
     - [O2]       # Molecules in Band #1
-    - [H2O,CO2]  # Molecules in Band #2
-    - [H2O,CO2]  # Molecules in Band #3
+    #- [H2O,CO2]  # Molecules in Band #2
+    #- [H2O,CO2]  # Molecules in Band #3
   # LookUpTable files (Interpolation Model saved as JLD2!)
-  LUTfiles:
-    - ["/net/fluo/data2/data/ABSCO_CS_Database/v5.2_final/o2_v52.jld2"]
-    - ["/net/fluo/data2/data/ABSCO_CS_Database/v5.2_final/wh2o_v52.jld2", "/net/fluo/data2/data/ABSCO_CS_Database/v5.2_final/wco2_v52.jld2"]
-    - ["/net/fluo/data2/data/ABSCO_CS_Database/v5.2_final/sh2o_v52.jld2", "/net/fluo/data2/data/ABSCO_CS_Database/v5.2_final/sco2_v52.jld2"]
+  #LUTfiles:
+  #  - ["/net/fluo/data2/data/ABSCO_CS_Database/v5.2_final/o2_v52.jld2"]
+    #- ["/net/fluo/data2/data/ABSCO_CS_Database/v5.2_final/wh2o_v52.jld2", "/net/fluo/data2/data/ABSCO_CS_Database/v5.2_final/wco2_v52.jld2"]
+    #- ["/net/fluo/data2/data/ABSCO_CS_Database/v5.2_final/sh2o_v52.jld2", "/net/fluo/data2/data/ABSCO_CS_Database/v5.2_final/sco2_v52.jld2"]
   # VMR profiles can either be real-valued numbers, 
   # or an array of nodal points from TOA to BOA, interpolated in pressure space
   vmr: 
     O2:   0.21
-    H2O:  0.01
-    CO2:  400e-6
   # Broadening function (Doppler/Lorentz/Voigt)
   broadening:         Voigt()
   # Complex error function for Voigt calculations
   CEF:                HumlicekWeidemann32SDErrorFunction()
   # Wing cutoff (cm⁻¹)
-  wing_cutoff:        10
+  wing_cutoff:        20
 
 # =================================================================
 # Scattering-Related Parameters (Optional)
@@ -98,9 +94,9 @@ absorption:
 scattering:
   # List of scattering aerosols and their properties
   aerosols:       
-    - τ_ref:          0.001         # Reference τ
-      μ:              1.0           # effective radius (µm)
-      σ:              1.5           # geometric standard deviation (µm)
+    - τ_ref:          0.0           # Reference τ
+      μ:              0.01 #1.3           # Log mean radius (µm)
+      σ:              1.12 #2.0           # Log stddev of radius (µm)
       nᵣ:             1.3           # Real part of refractive index
       nᵢ:             0.00000001    # Imag part of refractive index
       p₀:             700.0         # Pressure peak (hPa)

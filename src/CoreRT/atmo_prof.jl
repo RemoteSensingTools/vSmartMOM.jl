@@ -11,7 +11,7 @@ function compute_atmos_profile_fields(T, p_half::AbstractArray, q, vmr; g₀=9.8
     FT = eltype(T)
     Nₐ = FT(6.02214179e+23)
     # Calculate full pressure levels
-    p_full = (p_half[2:end] + p_half[1:end - 1]) / 2
+    p_full = (p_half[2:end] + p_half[1:end-1]) / 2
 
     # Dry and wet mass
     dry_mass = FT(28.9644e-3)    # in kg/molec, weighted average for N2 and O2
@@ -137,6 +137,7 @@ function reduce_profile(n::Int, profile::AtmosphericProfile{FT}) where {FT}
 
     new_vmr = Dict{String, Union{Real, Vector}}()
 
+    # need to double check this logic, maybe better to add VCDs?!
     for molec_i in keys(vmr)
         if profile.vmr[molec_i] isa AbstractArray
             
@@ -163,6 +164,8 @@ Input:
     - `vcd_dry` dry vertical column (no water) per layer
 """
 function getRayleighLayerOptProp(psurf, λ, depol_fct, vcd_dry) 
+    # TODO: Use noRS/noRS_plus to use n2/o2 molecular constants
+    # to compute tau_scat and depol_fct
     FT = eltype(λ)
     # Total vertical Rayleigh scattering optical thickness 
     tau_scat = FT(0.00864) * (psurf / FT(1013.25)) * λ^(-FT(3.916) - FT(0.074) * λ - FT(0.05) / λ) 
@@ -208,7 +211,7 @@ Returns:
     - `τ`, `ϖ`   : only Rayleigh scattering and aerosol extinction, no gaseous absorption (no wavelength dependence)
     - `τ_λ`,`ϖ_λ`: Rayleigh scattering + aerosol extinction + gaseous absorption (wavelength dependent)
     - `Z⁺⁺`,`Z⁻⁺`: Composite Phase matrix (weighted average of Rayleigh and aerosols)
-
+    - `fscattRayl`: Rayleigh scattering fraction (needed for Raman computations) 
 Arguments:
     - `τRay` layer optical depth for Rayleigh
     - `τAer` layer optical depth for Aerosol(s) (vector)
@@ -219,13 +222,20 @@ Arguments:
     - `Aer𝐙⁻⁺` Aerosol 𝐙⁻⁺ phase matrix (3D)
     - `τ_abs` layer absorption optical depth array (per wavelength) by gaseous absorption
 """
-function construct_atm_layer(τRayl, τAer,  aerosol_optics, Rayl𝐙⁺⁺, Rayl𝐙⁻⁺, Aer𝐙⁺⁺, Aer𝐙⁻⁺, τ_abs, arr_type)
+function construct_atm_layer(τRayl, τAer,  
+    ϖ_Cabannes, #elastic fraction of Rayleigh scattering
+    aerosol_optics, 
+    Rayl𝐙⁺⁺, Rayl𝐙⁻⁺, 
+    Aer𝐙⁺⁺, Aer𝐙⁻⁺, 
+    τ_abs, arr_type)
+    
     FT = eltype(τRayl)
     nAer = length(aerosol_optics)
 
-    # Fix Rayleigh SSA to 1
-    ϖRayl = FT(1)
-
+    # Fixes Rayleigh SSA to 1 for purely elastic (RS_type = noRS) scattering,
+    # and assumes values less than 1 for Raman scattering
+    ϖRayl = ϖ_Cabannes #FT(1)
+    @show ϖRayl
     @assert length(τAer) == nAer "Sizes don't match"
 
     τ = FT(0)
@@ -240,18 +250,21 @@ function construct_atm_layer(τRayl, τAer,  aerosol_optics, Rayl𝐙⁺⁺, Ray
     end
  
     τ += τRayl
-    ϖ += τRayl * ϖRayl
-    A += τRayl * ϖRayl
+    #@show τRayl, ϖRayl[1], ϖ
+    ϖ += τRayl * ϖRayl[1]
+    A += τRayl * ϖRayl[1]
 
-    Z⁺⁺ = τRayl * ϖRayl * Rayl𝐙⁺⁺
-    Z⁻⁺ = τRayl * ϖRayl * Rayl𝐙⁻⁺
+    Z⁺⁺ = τRayl * ϖRayl[1] * Rayl𝐙⁺⁺
+    Z⁻⁺ = τRayl * ϖRayl[1] * Rayl𝐙⁻⁺
 
     for i = 1:nAer
+        #@show τ, ϖ , A, τAer[i]
         τ   += τAer[i]
         ϖ   += τAer[i] * aerosol_optics[i].ω̃
         A   += τAer[i] * aerosol_optics[i].ω̃ * (1 - aerosol_optics[i].fᵗ)
         Z⁺⁺ += τAer[i] * aerosol_optics[i].ω̃ * (1 - aerosol_optics[i].fᵗ) * Aer𝐙⁺⁺[:,:,i]
         Z⁻⁺ += τAer[i] * aerosol_optics[i].ω̃ * (1 - aerosol_optics[i].fᵗ) * Aer𝐙⁻⁺[:,:,i]
+        #@show τ, ϖ , A
     end
     
     Z⁺⁺ /= A
@@ -260,21 +273,29 @@ function construct_atm_layer(τRayl, τAer,  aerosol_optics, Rayl𝐙⁺⁺, Ray
     ϖ /= τ
     
     # Rescaling composite SSPs according to Eqs. A.3 of Sanghavi et al. (2013) or Eqs.(8) of Sanghavi & Stephens (2015)
+    #@show τRayl, τ,A,  ϖ
     τ *= (FT(1) - (FT(1) - A) * ϖ)
     ϖ *= A / (FT(1) - (FT(1) - A) * ϖ)#Suniti
-
+    #@show τRayl, τ
+    fscattRayl = τRayl/τ
     # Adding absorption optical depth / albedo:
     τ_λ = τ_abs .+ τ    
-    ϖ_λ = (τ .* ϖ) ./ τ_λ
+    ϖ_λ = (τ * ϖ) ./ τ_λ
     
-    return Array(τ_λ), Array(ϖ_λ), τ, ϖ, Array(Z⁺⁺), Array(Z⁻⁺)
+    return Array(τ_λ), Array(ϖ_λ), τ, ϖ, Array(Z⁺⁺), Array(Z⁻⁺), fscattRayl
 end
 
 "When performing RT_run, this function pre-calculates properties for all layers, before any Core RT is performed"
-function construct_all_atm_layers(FT, nSpec, Nz, NquadN, τRayl, τAer, aerosol_optics, Rayl𝐙⁺⁺, Rayl𝐙⁻⁺, Aer𝐙⁺⁺, Aer𝐙⁻⁺, τ_abs, arr_type, qp_μ, μ₀, m)
+function construct_all_atm_layers(
+        FT, nSpec, Nz, NquadN, 
+        τRayl, τAer, aerosol_optics, 
+        Rayl𝐙⁺⁺, Rayl𝐙⁻⁺, Aer𝐙⁺⁺, Aer𝐙⁻⁺, 
+        τ_abs, 
+        ϖ_Cabannes,
+        arr_type, qp_μ, μ₀, m)
 
     FT_ext   = eltype(τAer)
-    FT_phase = eltype(Aer𝐙⁺⁺)
+    FT_phase = eltype(τAer)
 
     # Empty matrices to hold all values
     τ_λ_all   = zeros(FT_ext, nSpec, Nz)
@@ -286,6 +307,7 @@ function construct_all_atm_layers(FT, nSpec, Nz, NquadN, τRayl, τAer, aerosol_
     
     dτ_max_all  = zeros(FT_ext, Nz)
     dτ_all      = zeros(FT_ext, Nz)
+    fscattRayl_all  =  zeros(FT_ext, Nz)
     ndoubl_all  = zeros(Int64, Nz)
     dτ_λ_all    = zeros(FT_ext, nSpec, Nz)
     expk_all    = zeros(FT_ext, nSpec, Nz)
@@ -294,8 +316,18 @@ function construct_all_atm_layers(FT, nSpec, Nz, NquadN, τRayl, τAer, aerosol_
     for iz=1:Nz
         
         # Construct atmospheric properties
-        τ_λ_all[:, iz], ϖ_λ_all[:, iz], τ_all[iz], ϖ_all[iz], Z⁺⁺_all[:,:,iz], Z⁻⁺_all[:,:,iz] = construct_atm_layer(τRayl[iz], τAer[:,iz], aerosol_optics, Rayl𝐙⁺⁺, Rayl𝐙⁻⁺, Aer𝐙⁺⁺, Aer𝐙⁻⁺, τ_abs[:,iz], arr_type)
-
+        τ_λ_all[:, iz], 
+        ϖ_λ_all[:, iz], 
+        τ_all[iz], 
+        ϖ_all[iz], 
+        Z⁺⁺_all[:,:,iz], 
+        Z⁻⁺_all[:,:,iz], 
+        fscattRayl_all[iz] = construct_atm_layer(τRayl[iz], τAer[:,iz], 
+            ϖ_Cabannes,
+            aerosol_optics, 
+            Rayl𝐙⁺⁺, Rayl𝐙⁻⁺, Aer𝐙⁺⁺, Aer𝐙⁻⁺, 
+            τ_abs[:,iz], arr_type)
+        #@show fscattRayl_all[iz]
         # Compute doubling number
         dτ_max_all[iz] = minimum([τ_all[iz] * ϖ_all[iz], FT(0.001) * minimum(qp_μ)])
         dτ_all[iz], ndoubl_all[iz] = doubling_number(dτ_max_all[iz], τ_all[iz] * ϖ_all[iz]) #Suniti
@@ -328,8 +360,10 @@ function construct_all_atm_layers(FT, nSpec, Nz, NquadN, τRayl, τAer, aerosol_
         push!(scattering_interfaces_all, scattering_interface)
     end
 
-    return ComputedAtmosphereProperties(τ_λ_all, ϖ_λ_all, τ_all, ϖ_all, Z⁺⁺_all, Z⁻⁺_all, dτ_max_all, dτ_all, ndoubl_all, dτ_λ_all, expk_all, scatter_all, τ_sum_all, scattering_interfaces_all)
+    return ComputedAtmosphereProperties(τ_λ_all, ϖ_λ_all, τ_all, ϖ_all, Z⁺⁺_all, Z⁻⁺_all, dτ_max_all, dτ_all, ndoubl_all, dτ_λ_all, expk_all, scatter_all, τ_sum_all, fscattRayl_all, scattering_interfaces_all)
 end
+
+
 
 "Given the CrossSectionModel, the grid, and the AtmosphericProfile, fill up the τ_abs array with the cross section at each layer
 (using pressures/temperatures) from the profile" 
@@ -354,6 +388,8 @@ function compute_absorption_profile!(τ_abs::Array{FT,2},
 
         # Changed index order
         # @show iz,p,T,profile.vcd_dry[iz], vmr_curr
+        #@show typeof(τ_abs), typeof(vmr_curr), typeof(profile.vcd_dry[iz]), typeof(p), typeof(T)
+        #@show typeof(absorption_cross_section(absorption_model, grid, p, T))
         τ_abs[:,iz] += Array(absorption_cross_section(absorption_model, grid, p, T)) * profile.vcd_dry[iz] * vmr_curr
     end
     

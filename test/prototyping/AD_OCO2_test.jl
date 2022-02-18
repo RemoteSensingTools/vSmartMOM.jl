@@ -2,12 +2,12 @@ using Revise
 using Plots
 using Pkg
 # Pkg.activate(".")
-using RadiativeTransfer
-using RadiativeTransfer.Architectures
-using RadiativeTransfer.Absorption
-using RadiativeTransfer.Scattering
-using RadiativeTransfer.vSmartMOM
-using RadiativeTransfer.SolarModel
+using vSmartMOM
+using vSmartMOM.Architectures
+using vSmartMOM.Absorption
+using vSmartMOM.Scattering
+using vSmartMOM.CoreRT
+using vSmartMOM.SolarModel
 using InstrumentOperator
 using Interpolations
 using Polynomials
@@ -18,7 +18,7 @@ using NCDatasets
 ## Atmospheric Radiative Transfer
 
 # Load parameters from file
-parameters = vSmartMOM.parameters_from_yaml("test/test_parameters/3BandParameters.yaml")
+parameters = parameters_from_yaml("test/test_parameters/3BandParameters.yaml")
 #parameters.architecture = CPU()
 FT = Float64
 
@@ -47,7 +47,7 @@ oco_sounding = InstrumentOperator.getMeasurement(oco, bands, indices, GeoInd);
 # Produce black-body in wavenumber range
 
 
-Tsolar = solar_transmission_from_file("/home/rjeyaram/RadiativeTransfer/src/SolarModel/solar.out")
+Tsolar = solar_transmission_from_file("/home/rjeyaram/vSmartMOM/src/SolarModel/solar.out")
 Tsolar_interp = LinearInterpolation(Tsolar[:, 1], Tsolar[:, 2])
 
 function getSolar(grid, Tsolar)
@@ -70,7 +70,7 @@ end
 function runner!(y, x, parameters=parameters, oco_sounding= oco_sounding, Tsolar = Tsolar_interp)
 
     # Set parameters fields as the dual numbers
-    parameters.brdf = [vSmartMOM.LambertianSurfaceLegendre([x[1],x[3],x[4]]),vSmartMOM.LambertianSurfaceLegendre([x[7],x[8],x[5]]),vSmartMOM.LambertianSurfaceLegendre([x[9],x[10],x[6]])]
+    parameters.brdf = [CoreRT.LambertianSurfaceLegendre([x[1],x[3],x[4]]),CoreRT.LambertianSurfaceLegendre([x[7],x[8],x[5]]),CoreRT.LambertianSurfaceLegendre([x[9],x[10],x[6]])]
 
     parameters.scattering_params.rt_aerosols[1].τ_ref = exp(x[2]);
     parameters.scattering_params.rt_aerosols[1].p₀    = 800.0; #x[4]
@@ -90,7 +90,8 @@ function runner!(y, x, parameters=parameters, oco_sounding= oco_sounding, Tsolar
     for i = 1:length(oco_sounding.BandID)
         println("Modelling band $(i)")
         # Run the model to obtain reflectance matrix
-        R = vSmartMOM.rt_run(model, i_band=i);
+        #R = rt_run(model, i_band=i)[1];
+        R = CoreRT.rt_run_test(CoreRT.noRS(), model, i)[1]
         RR = oco_sounding.mueller[1]*R[1,1,:] + oco_sounding.mueller[2]*R[1,2,:] + oco_sounding.mueller[2]*R[1,3,:]
         
         # Get sun:
