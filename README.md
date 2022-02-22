@@ -31,7 +31,7 @@
 
 <p align="center">
   <a href="#installation">Installation</a> •
-  <a href="#modules">Modules</a> (<a href="#radiativetransfer">RT</a>, <a href="#radiativetransferabsorption">Absorption</a>, <a href="#radiativetransferscattering">Scattering</a>) •
+  <a href="#modules">Modules</a> (<a href="#vsmartmom">vSmartMOM</a>, <a href="#vsmartmomabsorption">Absorption</a>, <a href="#vsmartmomscattering">Scattering</a>) •
   <a href="#support">Support</a> •
   <a href="#license">License</a>
 </p>
