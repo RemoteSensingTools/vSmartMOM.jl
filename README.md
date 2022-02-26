@@ -31,7 +31,7 @@
 
 <p align="center">
   <a href="#installation">Installation</a> •
-  <a href="#modules">Modules</a> (<a href="#radiativetransfer">RT</a>, <a href="#radiativetransferabsorption">Absorption</a>, <a href="#radiativetransferscattering">Scattering</a>) •
+  <a href="#modules">Modules</a> (<a href="#vsmartmom">vSmartMOM</a>, <a href="#vsmartmomabsorption">Absorption</a>, <a href="#vsmartmomscattering">Scattering</a>) •
   <a href="#support">Support</a> •
   <a href="#license">License</a>
 </p>
@@ -45,7 +45,7 @@ By taking advantage of modern software tools, such as GPU acceleration and HPC c
 vSmartMOM can be installed using the Julia package manager. From the Julia REPL, type `]` to enter the Pkg REPL mode and run
 
 ```julia
-pkg> add https://github.com/RemoteSensingTools/vSmartMOM.jl
+pkg> add vSmartMOM
 ```
 
 ## Modules
