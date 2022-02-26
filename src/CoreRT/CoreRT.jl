@@ -12,7 +12,7 @@ using Interpolations               # For interpolating the vmr's
 using LinearAlgebra                # For linear algebra routines
 using ProgressMeter                # Showing progress in for loops
 using Distributions                # Distributions of aerosols
-using Parameters
+using Parameters                   # For keyword arguments in structs
 using ..Scattering                 # Use scattering module
 using ..Absorption                 # Use absorption module
 using ..InelasticScattering        # Use Inelastic Scattering module
@@ -25,9 +25,10 @@ using KernelAbstractions           # Abstracting code for CPU/GPU
 using KernelAbstractions.Extras
 using CUDAKernels
 
+using Unitful                      # For parsing 
+using UnitfulEquivalences          # For converting between wavenumber / wavelength
 using FastGaussQuadrature          # Computes quadrature points (Gauss, legendre, Radau,...)
 using TimerOutputs                 # For timing sections of the code
-using Parameters                   # For keyword arguments in structs
 using DocStringExtensions          # For documenting
 using YAML                         # For reading properties files 
 using ForwardDiff                  # Automatic Differentiation

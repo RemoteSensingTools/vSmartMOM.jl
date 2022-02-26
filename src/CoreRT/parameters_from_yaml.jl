@@ -156,7 +156,25 @@ function parameters_from_yaml(file_path)
 
     # radiative_transfer group
     FT = eval(Meta.parse(params_dict["radiative_transfer"]["float_type"]))
-    spec_bands = convert.(Array{FT}, map(x -> collect(eval(Meta.parse(x))), params_dict["radiative_transfer"]["spec_bands"]))
+    # Each spec band can have units in wavenumber/wavelength, or not. Regardless, convert to cm⁻¹
+    spec_bands = []
+    for spec_band in params_dict["radiative_transfer"]["spec_bands"]
+        parsed_band = eval(Meta.parse(spec_band))
+        # If no units, assume cm⁻¹
+        if (all(x-> x == NoUnits, unit.(parsed_band)))
+            wn_band = collect(parsed_band)
+        else
+            # If units but cm⁻¹ already, don't uconvert (issue trying to convert to already existing type)
+            if (all(x-> x == u"cm^-1", unit.(parsed_band)))
+                wn_band = sort(ustrip(collect(parsed_band)))
+            # If units but not cm⁻¹, uconvert to cm⁻¹
+            else
+                wn_band = sort(ustrip(uconvert.( u"cm^-1", collect(parsed_band), Spectral())))
+            end
+        end
+        final_band = convert(Array{FT}, wn_band)
+        push!(spec_bands, final_band)
+    end
     BRDF_per_band = map(x -> eval(Meta.parse(x)), params_dict["radiative_transfer"]["surface"]) 
     quadrature_type = eval(Meta.parse(params_dict["radiative_transfer"]["quadrature_type"]))
     polarization_type = eval(Meta.parse(params_dict["radiative_transfer"]["polarization_type"]))
