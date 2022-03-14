@@ -1,5 +1,6 @@
 ##
 using Revise
+using Plots
 using Statistics
 using vSmartMOM
 using vSmartMOM.Architectures
@@ -7,7 +8,9 @@ using vSmartMOM.Absorption
 using vSmartMOM.Scattering
 using vSmartMOM.CoreRT
 using vSmartMOM.SolarModel
+using vSmartMOM.InelasticScattering
 using InstrumentOperator
+using Interpolations
 
 # Load OCO Data: 
 # File names:
@@ -142,3 +145,10 @@ I_wl = interp_I(wl);
 
 # Convolve input spectrum with variable kernel
 @time I_conv = InstrumentOperator.conv_spectra(oco_sounding.ils[1], wl, I_wl)
+
+l = @layout [a; b]
+p1 = plot(oco_sounding.SpectralGrid*1e3, I_conv, label="Elastic")
+plot!(oco_sounding.SpectralGrid*1e3, I_conv_RS, label="With RRS")
+p2 = plot(oco_sounding.SpectralGrid*1e3, (I_conv_RS - I_conv)/maximum(I_conv) * 100, label="(RRS-NoRS)/max(noRS)*100")
+plot(p1,p2,layout=l)
+savefig("O2_RRS_impact.pdf")

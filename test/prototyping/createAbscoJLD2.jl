@@ -7,7 +7,7 @@ using vSmartMOM.Architectures
 using vSmartMOM.Absorption
 
 
-pressures = 0.0001:25:1150.0
+pressures = 0.01:25:1150.0
 temperatures = 160:10:360.0
 
 # O2 ABSCO:
@@ -55,9 +55,9 @@ save_interpolation_model(model_interp_H2O, file_out)
 file = "/net/fluo/data2/data/ABSCO_CS_Database/v5.2_final/co2_v52.hdf"
 file_out = "/net/fluo/data2/data/ABSCO_CS_Database/v5.2_final/sco2_v52.jld2"
 a = CoreRT.loadAbsco(file; scale=1.0);
-strong = a.ν[a.ν.<6000]
+grid_strong = a.ν[a.ν.<6000]
 
 ν_grid = grid_strong[1]:0.01:grid_strong[end]
 
 model_interp_CO2 = make_interpolation_model(a, ν_grid, pressures, temperatures)
-save_interpolation_model(model_interp_CO2, file_out)
+save_interpolation_model(model_interp_CO2, file_out);
