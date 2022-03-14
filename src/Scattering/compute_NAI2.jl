@@ -25,7 +25,8 @@ function compute_aerosol_optical_properties(model::MieModel{FDT}, FT2::Type=Floa
     @assert nᵢ ≥ 0
 
     # Get the refractive index's real part type
-    FT = eltype(nᵣ);
+    #@show size_distribution.σ  
+    FT = eltype(size_distribution.σ);
     # @assert FT == Float64 "Aerosol computations require 64bit"
     # Get radius quadrature points and weights (for mean, thus normalized):
     # 
@@ -182,7 +183,7 @@ function compute_ref_aerosol_extinction(model::MieModel{FDT}, FT2::Type=Float64)
     # Get the refractive index's real part type
     FT = eltype(nᵣ);
     #@show FT
-    @assert FT == Float64 "Aerosol computations require 64bit"
+    #@assert FT == Float64 "Aerosol computations require 64bit"
     # Get radius quadrature points and weights (for mean, thus normalized):
     r, wᵣ = gauleg(nquad_radius, 0.0, r_max ; norm=true) 
     

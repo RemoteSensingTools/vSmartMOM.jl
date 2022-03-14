@@ -30,8 +30,10 @@ The function returns a rounded integer, following conventions by BH, Rooj/Stap, 
 """
 function compute_mie_ab!(size_param, refractive_idx::Number, an, bn, Dn)
     FT = eltype(refractive_idx)
+    #@show eltype(Dn)
     FT2 = eltype(an)
-
+    #@show FT2
+    # @show eltype(Dn)
     # Compute y
     y = size_param * refractive_idx
 
