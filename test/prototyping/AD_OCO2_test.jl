@@ -70,7 +70,9 @@ end
 function runner!(y, x, parameters=parameters, oco_sounding= oco_sounding, Tsolar = Tsolar_interp)
 
     # Set parameters fields as the dual numbers
-    parameters.brdf = [CoreRT.LambertianSurfaceLegendre([x[1],x[3],x[4]]),CoreRT.LambertianSurfaceLegendre([x[7],x[8],x[5]]),CoreRT.LambertianSurfaceLegendre([x[9],x[10],x[6]])]
+    parameters.brdf =  [CoreRT.LambertianSurfaceLegendre([x[1],x[3],x[4]]),
+                        CoreRT.LambertianSurfaceLegendre([x[7],x[8],x[5]]),
+                        CoreRT.LambertianSurfaceLegendre([x[9],x[10],x[6]])];
 
     parameters.scattering_params.rt_aerosols[1].τ_ref = exp(x[2]);
     parameters.scattering_params.rt_aerosols[1].p₀    = 800.0; #x[4]
@@ -80,7 +82,8 @@ function runner!(y, x, parameters=parameters, oco_sounding= oco_sounding, Tsolar
     parameters.T   = oco_sounding.T# .+ 1.0 #.+ x[15]
     parameters.sza = oco_sounding.sza
     parameters.vza = [oco_sounding.vza]
-    parameters.absorption_params.vmr["H2O"] = [parameters.q[1:65]*x[11] * 1.8; parameters.q[66:end]*x[15] * 1.8]
+    parameters.absorption_params.vmr["H2O"] = [parameters.q[1:65]*x[11] * 1.8; 
+                                               parameters.q[66:end]*x[15] * 1.8];
     a1 = zeros(7) .+ x[12]
     a2 = zeros(7) .+ x[13]
     a3 = zeros(6) .+ x[14]
@@ -92,7 +95,7 @@ function runner!(y, x, parameters=parameters, oco_sounding= oco_sounding, Tsolar
         # Run the model to obtain reflectance matrix
         #R = rt_run(model, i_band=i)[1];
         R = CoreRT.rt_run_test(CoreRT.noRS(), model, i)[1]
-        RR = oco_sounding.mueller[1]*R[1,1,:] + oco_sounding.mueller[2]*R[1,2,:] + oco_sounding.mueller[2]*R[1,3,:]
+        RR = oco_sounding.mueller[1]*R[1,1,:] + oco_sounding.mueller[2]*R[1,2,:] + oco_sounding.mueller[3]*R[1,3,:]
         
         # Get sun:
         @time sun_out = getSolar(parameters.spec_bands[i],Tsolar)
