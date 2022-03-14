@@ -66,12 +66,14 @@ function runner!(y, x, parameters=parameters, oco_sounding= oco_soundings, Tsola
 
             # Convolve input spectrum with variable kernel
             @time I_conv = InstrumentOperator.conv_spectra(oco_sounding[ia].ils[i], wl, I_wl)
-            if ia==1
-                y[oco_sounding[ia].BandID[i]] = I_conv
-            else
-                # not sure this will work!
-                y[oco_sounding[ia].BandID[i]] = vcat(y[oco_sounding.BandID[i]], I_conv)
-            end
+            off = oco_soundings[1].BandID[end][end] * (ia-1)
+            y[oco_sounding[ia].BandID[i] .+ off ] = I_conv
+            #if ia==1
+            #    y[oco_sounding[ia].BandID[i]] = I_conv
+            #else
+            #    # not sure this will work!
+            #    y[oco_sounding[ia].BandID[i]] = vcat(y[oco_sounding.BandID[i]], I_conv)
+            #end
         end
     end
 end
