@@ -37,12 +37,20 @@ function runner!(y, x, parameters=parameters, oco_sounding= oco_soundings, Tsola
     a3 = zeros(6) .+ x[14]
     parameters.absorption_params.vmr["CO2"] = [a1; a2; a3]
     model = model_from_parameters(parameters);
+    R=[];
+    for i = 1:length(oco_sounding[1].BandID)
+        println("Modelling band $(i)")
+        # Run the model to obtain reflectance matrix
+        #R = rt_run(model, i_band=i)[1];
+        tmpR = CoreRT.rt_run_test(CoreRT.noRS(), model, i)[1]
+        push!(R, tmpR);
+    end
     for ia = 1:Nangles
         for i = 1:length(oco_sounding[ia].BandID)
             println("Modelling band $(i)")
             # Run the model to obtain reflectance matrix
             #R = rt_run(model, i_band=i)[1];
-            R = CoreRT.rt_run_test(CoreRT.noRS(), model, i)[1]
+            #R = CoreRT.rt_run_test(CoreRT.noRS(), model, i)[1]
             # Re-interpolate I from ν_grid to new grid/resolution
             λ_grid = reverse(1e4 ./ parameters.spec_bands[i])
             res = 0.001e-3;
@@ -50,9 +58,9 @@ function runner!(y, x, parameters=parameters, oco_sounding= oco_soundings, Tsola
             # Get sun:
             @time sun_out = getSolar(parameters.spec_bands[i],Tsolar)
         
-            RR = oco_sounding[ia].mueller[1]*R[ia,1,:] + 
-                    oco_sounding[ia].mueller[2]*R[ia,2,:] + 
-                    oco_sounding[ia].mueller[3]*R[ia,3,:];        
+            RR = oco_sounding[ia].mueller[1]*R[i][ia,1,:] + 
+                    oco_sounding[ia].mueller[2]*R[i][ia,2,:] + 
+                    oco_sounding[ia].mueller[3]*R[i][ia,3,:];        
         
             # Apply Earth reflectance matrix 
             earth_out = sun_out .* reverse(RR[:])
@@ -66,12 +74,14 @@ function runner!(y, x, parameters=parameters, oco_sounding= oco_soundings, Tsola
 
             # Convolve input spectrum with variable kernel
             @time I_conv = InstrumentOperator.conv_spectra(oco_sounding[ia].ils[i], wl, I_wl)
-            if ia==1
-                y[oco_sounding[ia].BandID[i]] = I_conv
-            else
-                # not sure this will work!
-                y[oco_sounding[ia].BandID[i]] = vcat(y[oco_sounding.BandID[i]], I_conv)
-            end
+            off = oco_soundings[1].BandID[end][end] * (ia-1)
+            y[oco_sounding[ia].BandID[i] .+ off ] = I_conv
+            #if ia==1
+            #    y[oco_sounding[ia].BandID[i]] = I_conv
+            #else
+            #    # not sure this will work!
+            #    y[oco_sounding[ia].BandID[i]] = vcat(y[oco_sounding.BandID[i]], I_conv)
+            #end
         end
     end
 end
