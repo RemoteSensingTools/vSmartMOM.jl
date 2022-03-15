@@ -116,10 +116,12 @@ function reduce_profile(n::Int, profile::AtmosphericProfile{FT}) where {FT}
     vcd_h2o  = zeros(FT, n);
 
     # Loop over target number of layers
+    indices = []
     for i = 1:n
 
         # Get the section of the atmosphere with the i'th section pressure values
         ind = findall(a[i] .< profile.p_full .<= a[i+1]);
+        push!(indices, ind)
         @assert length(ind) > 0 "Profile reduction has an empty layer"
         #@show i, ind, a[i], a[i+1]
         # Set the pressure levels accordingly
@@ -134,6 +136,7 @@ function reduce_profile(n::Int, profile::AtmosphericProfile{FT}) where {FT}
         vcd_dry[i] = sum(profile.vcd_dry[ind])
         vcd_h2o[i] = sum(profile.vcd_h2o[ind])
     end
+    #@show indices
 
     new_vmr = Dict{String, Union{Real, Vector}}()
 
@@ -141,9 +144,9 @@ function reduce_profile(n::Int, profile::AtmosphericProfile{FT}) where {FT}
     for molec_i in keys(vmr)
         if profile.vmr[molec_i] isa AbstractArray
             
-            pressure_grid = collect(range(minimum(p_full), maximum(p_full), length=length(profile.vmr[molec_i])))
-            interp_linear = LinearInterpolation(pressure_grid, vmr[molec_i])
-            new_vmr[molec_i] = [interp_linear(x) for x in p_full]
+            #pressure_grid = collect(range(minimum(p_full), maximum(p_full), length=length(profile.vmr[molec_i])))
+            #interp_linear = LinearInterpolation(pressure_grid, vmr[molec_i])
+            new_vmr[molec_i] = [mean(profile.vmr[molec_i][ind]) for ind in indices]
         else
             new_vmr[molec_i] = profile.vmr[molec_i]
         end
@@ -390,6 +393,8 @@ function compute_absorption_profile!(τ_abs::Array{FT,2},
         # @show iz,p,T,profile.vcd_dry[iz], vmr_curr
         #@show typeof(τ_abs), typeof(vmr_curr), typeof(profile.vcd_dry[iz]), typeof(p), typeof(T)
         #@show typeof(absorption_cross_section(absorption_model, grid, p, T))
+        #temp = Array(absorption_cross_section(absorption_model, grid, p, T)) * profile.vcd_dry[iz] * vmr_curr
+        #@show minimum(temp), p, T, profile.vcd_dry[iz] * vmr_curr
         τ_abs[:,iz] += Array(absorption_cross_section(absorption_model, grid, p, T)) * profile.vcd_dry[iz] * vmr_curr
     end
     
