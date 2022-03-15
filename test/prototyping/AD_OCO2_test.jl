@@ -84,12 +84,12 @@ function runner!(y, x, parameters=parameters, oco_sounding= oco_sounding, Tsolar
     parameters.vza = [oco_sounding.vza]
     parameters.absorption_params.vmr["H2O"] = [parameters.q[1:65]*x[11] * 1.8; 
                                                parameters.q[66:end]*x[15] * 1.8];
-    a1 = zeros(7) .+ x[12]
-    a2 = zeros(7) .+ x[13]
-    a3 = zeros(6) .+ x[14]
+    a1 = zeros(12) .+ x[12]
+    a2 = zeros(12) .+ x[13]
+    a3 = zeros(10) .+ x[14]
     parameters.absorption_params.vmr["CO2"] = [a1; a2; a3]
     model = model_from_parameters(parameters);
-
+    
     for i = 1:length(oco_sounding.BandID)
         println("Modelling band $(i)")
         # Run the model to obtain reflectance matrix
@@ -101,7 +101,14 @@ function runner!(y, x, parameters=parameters, oco_sounding= oco_sounding, Tsolar
         @time sun_out = getSolar(parameters.spec_bands[i],Tsolar)
         # Apply Earth reflectance matrix 
         earth_out = sun_out .* reverse(RR[:])
+        #ii = findall(earth_out .> 1e50)
+        #@show ii
+        #@show ii
+        #if length(ii==1)
+        #    earth_out[ii] =  earth_out[ii+1]
+        #end 
         
+        #@show findall(sun_out .< 0)
         # Re-interpolate I from ν_grid to new grid/resolution
         λ_grid = reverse(1e4 ./ parameters.spec_bands[i])
         @time interp_I = LinearInterpolation(λ_grid, earth_out);
@@ -115,12 +122,27 @@ function runner!(y, x, parameters=parameters, oco_sounding= oco_sounding, Tsolar
         @time I_conv = InstrumentOperator.conv_spectra(oco_sounding.ils[i], wl, I_wl)
         y[oco_sounding.BandID[i]] = I_conv
     end
+    @show xco2 = 1e6*(model.profile.vmr["CO2"]' * model.profile.vcd_dry)/sum(model.profile.vcd_dry)
 
 end
 
 
 # State vector
-x = FT[0.2377, -3, -0.00244, 0, 0,0, 0.4, 0, 0.4, 0,1,400e-6,400e-6,400e-6, 1.0]#,
+x = FT[0.2377, 
+        -3, 
+        -0.00244, 
+        0, 
+        0,
+        0, 
+        0.4, 
+        0, 
+        0.4, 
+        0,
+        1,
+        410e-6,
+        390e-6,
+        400e-6, 
+        1.0]#,
 
 
 # Run FW model:
@@ -148,3 +170,77 @@ s = a.group["SpectralParameters"]
 i = findall(abs.(g["retrieval_latitude"][:].-41.736668).<0.0001)
 fp_meas = s["measured_radiance"][:,i]
 fp_mod  = s["modeled_radiance"][:,i]
+wl = s["wavelength"][:,i][:,1]*1e3
+aod_L2 = a.group["AerosolResults"]["aerosol_aod"][i]
+RR = a.group["RetrievalResults"]
+SV = a.group["RetrievedStateVector"]
+sv_L2 = SV["state_vector_result"][:,i]
+RR["xco2"][i] * 1e6
+
+
+l = @layout [a b c; d e f]
+ii = oco_sounding.BandID[1]
+p1 = plot(ν[ii],y[ii]/1e20, label=nothing)
+plot!(ν[ii],Fx[ii]/1e20, label=nothing)
+p4 = plot(ν[ii],(Fx[ii] - y[ii])/maximum(Fx[ii]) * 100, label=nothing )
+ylims!(-1,1)  
+ii = oco_sounding.BandID[2]
+p2 = plot(ν[ii],y[ii]/1e20 , label=nothing )
+plot!(ν[ii],Fx[ii]/1e20, label=nothing)
+p5 = plot(ν[ii],(Fx[ii] - y[ii])/maximum(Fx[ii]) * 100, label=nothing )
+ylims!(-1,1) 
+ii = oco_sounding.BandID[3]
+p3 = plot(ν[ii],y[ii]/1e20, label="Meas/1e20"  )
+
+plot!(ν[ii],Fx[ii]/1e20, label="Mod/1e20")
+p6 = plot(ν[ii],(Fx[ii] - y[ii])/maximum(Fx[ii]) * 100, label="(Fx-y)/max(Fx)*100")
+ylims!(-1,1)  
+plot(p1, p2, p3, p4,p5,p6,layout = l, size = (1000, 700))
+savefig("co2_fit_vSmartMOM.pdf")
+
+ii = findall((wl .< 800) .&& (wl.>0))
+p1 = plot(wl[ii],fp_meas[ii]/1e20, label=nothing)
+plot!(wl[ii],fp_mod[ii]/1e20, label=nothing)
+p4 = plot(wl[ii],(fp_mod[ii] - fp_meas[ii])/maximum(fp_mod[ii]) * 100, label=nothing )
+ylims!(-1,1)  
+
+ii = findall((wl .> 800) .&& (wl.<1800))
+p2 = plot(wl[ii],fp_meas[ii]/1e20 , label=nothing )
+plot!(wl[ii],fp_mod[ii]/1e20, label=nothing)
+p5 = plot(wl[ii],(fp_mod[ii] - fp_meas[ii])/maximum(fp_mod[ii]) * 100, label=nothing )
+ylims!(-1,1) 
+ii = findall(((wl.>1900)))
+p3 = plot(wl[ii],fp_meas[ii]/1e20, label="Meas/1e20"  )
+
+plot!(wl[ii],fp_mod[ii]/1e20, label="Mod/1e20")
+p6 = plot(wl[ii],(fp_mod[ii] - fp_meas[ii])/maximum(fp_mod[ii]) * 100, label="(Fx-y)/max(Fx)*100")
+ylims!(-1,1)  
+plot(p1, p2, p3, p4,p5,p6,layout = l, size = (1000, 700))
+savefig("co2_fit_JPL.pdf")
+
+# EOF test
+eof_d = Dataset("/home/cfranken/b10-baseline4_eofsC_oceanG_20141127-20190304_alt5_falt1_sorted_L2.h5")
+gg = eof_d.group["Instrument"].group["EmpiricalOrthogonalFunction"].group["Glint"]
+plot(gg["EOF_1_waveform_1"])
+
+l = @layout [a b c]
+ii = oco_sounding.BandID[1]
+
+p1 = plot(ν[ii],(Fx[ii] - y[ii])/maximum(Fx[ii]) * 100, label=nothing )
+plot!(ν[ii],5gg["EOF_1_waveform_1"][indices[1],5], label=nothing)
+plot!(ν[ii],5gg["EOF_2_waveform_1"][indices[1],5], label=nothing)
+
+ii = oco_sounding.BandID[2]
+p2 = plot(ν[ii],(Fx[ii] - y[ii])/maximum(Fx[ii]) * 100, label=nothing )
+plot!(ν[ii],5gg["EOF_1_waveform_2"][indices[2],5], label=nothing)
+plot!(ν[ii],5gg["EOF_2_waveform_2"][indices[2],5], label=nothing)
+
+ii = oco_sounding.BandID[3]
+p3 = plot(ν[ii],(Fx[ii] - y[ii])/maximum(Fx[ii]) * 100, label="(Fx-y)/max(Fx)*100")
+plot!(ν[ii],5gg["EOF_1_waveform_3"][indices[3],5], label="EOF1")
+plot!(ν[ii],5gg["EOF_2_waveform_3"][indices[3],5], label="EOF2")
+plot(p1, p2, p3,layout = l, size = (1000, 500))
+savefig("co2Residual_fit_vSmartMOM.pdf")
+
+
+# Run O2 band again with Raman!
