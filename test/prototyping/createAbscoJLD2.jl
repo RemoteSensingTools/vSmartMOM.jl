@@ -12,7 +12,7 @@ temperatures = 160:10:360.0
 
 # O2 ABSCO:
 file = "/net/fluo/data2/data/ABSCO_CS_Database/v5.2_final/o2_v52.hdf"
-file_out = "/net/fluo/data2/data/ABSCO_CS_Database/v5.2_final/o2_v52.jld2"
+file_out = "/net/fluo/data2/data/ABSCO_CS_Database/v5.2_final/o2_v52_v2.jld2"
 a = CoreRT.loadAbsco(file; scale=1.0);
 
 ν_grid = a.ν[1]:0.01:a.ν[end]
