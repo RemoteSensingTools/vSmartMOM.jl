@@ -2,14 +2,16 @@ function constructCoreOpticalProperties(RS_type, iBand, m, model)
     @unpack τ_rayl, τ_aer, τ_abs, aerosol_optics, greek_rayleigh  = model
     @assert all(iBand .≤ length(τ_rayl)) "iBand exceeded number of bands"
     FT = eltype(τ_rayl)
+    arr_type = array_type(model.params.architecture)
+
     pol_type = model.params.polarization_type
     # Do this in CPU space only first:
-    arr_type = Array
+    
     # Quadrature points:
     μ = Array(model.quad_points.qp_μ )
     # Number of Aerosols:
     nAero = size(τ_aer[iBand[1]],1)
-    nZ    = length(τ_rayl[1][:])
+    nZ    = size(τ_rayl[1],2)
     # Rayleigh Z matrix:
     Rayl𝐙⁺⁺, Rayl𝐙⁻⁺ = Scattering.compute_Z_moments(pol_type, μ, 
                                                     greek_rayleigh, m, 
@@ -17,16 +19,15 @@ function constructCoreOpticalProperties(RS_type, iBand, m, model)
 
     band_layer_props    = [];
     band_fScattRayleigh = [];
-    
+    # @show arr_type
     for iB in iBand
-        #@show τ_rayl[iB][:]
-        #,  ones(FT, length(RS_type.bandSpecLim[iB]))
-        #@show RS_type.ϖ_Cabannes
-        #@show τ_rayl
-        rayl = CoreScatteringOpticalProperties.(
-                τ_rayl[iB][:], 
-                [RS_type.ϖ_Cabannes[iB]], 
-                [Rayl𝐙⁺⁺], [Rayl𝐙⁻⁺])
+        rayl =  [CoreScatteringOpticalProperties(arr_type(τ_rayl[iB][:,i]),RS_type.ϖ_Cabannes[iB], 
+        (Rayl𝐙⁺⁺), (Rayl𝐙⁻⁺)) for i=1:nZ]
+        #CoreScatteringOpticalProperties.(
+        #        τ_rayl[iB], 
+        #        [RS_type.ϖ_Cabannes[iB]], 
+        #        [Rayl𝐙⁺⁺], [Rayl𝐙⁻⁺])
+        
         #@show size(rayl)
         # Initiate combined properties with rayleigh
         combo = rayl
@@ -45,6 +46,8 @@ function constructCoreOpticalProperties(RS_type, iBand, m, model)
                                 [AerZ⁺⁺], [AerZ⁻⁺])
             # Mix with previous Core Optical Properties
             #@show combo[1].ϖ   , aer[1].ϖ
+            #println("Aero combo")
+            #@show size(combo[1].τ), size(aer[1].τ), size(combo[1].Z⁺⁺), size(aer[1].Z⁺⁺)
             combo = combo .+ aer
         end
 
@@ -54,26 +57,32 @@ function constructCoreOpticalProperties(RS_type, iBand, m, model)
         # fScattRayleigh:
         #@show rayl[1].τ * rayl[1].ϖ, combo[1].τ
         # Assume ϖ of 1 for Rayleight here:
-        fScattRayleigh = [rayl[i].τ  / combo[i].τ for i=1:length(combo)]
-        #@show fScattRayleigh
+        #@show size(combo)
+        fScattRayleigh = [rayl[i].τ  ./ combo[i].τ for i=1:nZ]
+        #@show fScattRayleigh, rayl[1].τ, combo[1].τ
         # Create Core Optical Properties merged with trace gas absorptions:
+        #@show size(combo)
+        
         push!(band_layer_props,
                 combo .+ 
-                [CoreAbsorptionOpticalProperties(τ_abs[iB][:,i]) for i=1:length(combo)])
+                [CoreAbsorptionOpticalProperties(arr_type(τ_abs[iB][:,i])) for i=1:nZ])
         push!(band_fScattRayleigh,fScattRayleigh)
         #aType = array_type(model.params.architecture)
         #combo2 = [CoreScatteringOpticalProperties(aType(combo[i].τ),aType(combo[i].ϖ), aType(combo[i].Z⁺⁺), aType(combo[i].Z⁻⁺)) for i in eachindex(combo)]
         # Need to check how to convert to GPU later as well!
         #return combo,fScattRayleigh
     end
-
+    #@show RS_type.bandSpecLim[1]
+    #@show RS_type.iBand
     layer_opt = []
     fscat_opt = []
     for iz = 1:nZ
         push!(layer_opt, prod([band_layer_props[i][iz] for i=1:length(iBand)]));
-        push!(fscat_opt, expandBandScalars(RS_type,[band_fScattRayleigh[i][iz] for i=1:length(iBand)]));
+        #push!(fscat_opt, expandBandScalars(RS_type,[band_fScattRayleigh[i][iz] for i=1:length(iBand)]));
+        push!(fscat_opt, [band_fScattRayleigh[i][iz] for i=1:length(iBand)]);
     end
     # For now just one band_fScattRayleigh
+    #@show typeof(layer_opt[1].τ)
     return layer_opt, fscat_opt # Suniti: this needs to be modified because Rayleigh scattering fraction varies dramatically with wavelength
 end
 
@@ -89,20 +98,21 @@ function extractEffectiveProps(
                                 lods::Array#{CoreScatteringOpticalProperties{FT},1}
                                 ) #where FT
 
-    FT = eltype(lods[1].τ)
+    FT    = eltype(lods[1].τ)
     nSpec = length(lods[1].τ)
     nZ    = length(lods)
     # First the Scattering Interfaces:
     scattering_interface = ScatteringInterface_00()
     scattering_interfaces_all = []
-    τ_sum_all = zeros(FT,nSpec,nZ+1)
-    
+    τ_sum_all = similar(lods[1].τ,(nSpec,nZ+1))
+    τ_sum_all[:,1] .= 0
+    #@show FT
     for iz =1:nZ
         # Need to check max entries in Z matrices here as well later!
         scatter = maximum(lods[iz].τ .* lods[iz].ϖ) > 2eps(FT)
         scattering_interface = get_scattering_interface(scattering_interface, scatter, iz)
         push!(scattering_interfaces_all, scattering_interface)
-        τ_sum_all[:,iz+1] = τ_sum_all[:,iz] + lods[iz].τ 
+        @views τ_sum_all[:,iz+1] = τ_sum_all[:,iz] + lods[iz].τ 
     end
     return scattering_interfaces_all, τ_sum_all
 end
@@ -111,8 +121,8 @@ function expandOpticalProperties(in::CoreScatteringOpticalProperties, arr_type)
     @unpack τ, ϖ, Z⁺⁺, Z⁻⁺ = in 
     @assert length(τ) == length(ϖ) "τ and ϖ sizes need to match"
     if size(Z⁺⁺,3) == 1
-        Z⁺⁺ = repeat(Z⁺⁺,1,1,length(τ))
-        Z⁻⁺ = repeat(Z⁻⁺,1,1,length(τ))
+        Z⁺⁺ = _repeat(Z⁺⁺,1,1,length(τ))
+        Z⁻⁺ = _repeat(Z⁻⁺,1,1,length(τ))
         return CoreScatteringOpticalProperties(arr_type(τ), arr_type(ϖ), arr_type(Z⁺⁺), arr_type(Z⁻⁺)) 
     else
         @assert size(Z⁺⁺,3) ==  length(τ) "Z and τ dimensions need to match "
@@ -121,7 +131,10 @@ function expandOpticalProperties(in::CoreScatteringOpticalProperties, arr_type)
 end
 
 function expandBandScalars(RS_type, x)
-    out = zeros(eltype(x),sum([length(RS_type.bandSpecLim[iB]) for iB in RS_type.iBand]))
+    #test = [length(RS_type.bandSpecLim[iB]) for iB in RS_type.iBand]
+    #@show test, sum(test), size(x[1])
+    #@show eltype(x[1]),sum([length(RS_type.bandSpecLim[iB]) for iB in RS_type.iBand])
+    out = zeros(eltype(x[1]),sum([length(RS_type.bandSpecLim[iB]) for iB in RS_type.iBand]))
     for iB in RS_type.iBand
         out[RS_type.bandSpecLim[iB]] .= expandScalar(x[iB],length(RS_type.bandSpecLim[iB]))
     end

@@ -37,7 +37,9 @@ function model_from_parameters(params::vSmartMOM_Parameters)
 
     # Rayleigh optical properties calculation
     greek_rayleigh = Scattering.get_greek_rayleigh(params.depol)
-    τ_rayl = [zeros(params.float_type, length(params.T)) for i=1:n_bands];
+    # Remove rayleight for testing:
+    #τ_rayl = [zeros(params.float_type,length(params.spec_bands[i]), length(params.T)) for i=1:n_bands];
+    τ_rayl = [zeros(params.float_type,1, length(profile.T)) for i=1:n_bands];
     
     # This is a kludge for now, tau_abs sometimes needs to be a dual. Suniti & us need to rethink this all!!
     # i.e. code the rt core with fixed amount of derivatives as in her paper, then compute chain rule for dtau/dVMr, etc...
@@ -49,10 +51,10 @@ function model_from_parameters(params::vSmartMOM_Parameters)
 
         # i'th spectral band (convert from cm⁻¹ to μm)
         curr_band_λ = 1e4 ./ params.spec_bands[i_band]
-
+        #@show profile.vcd_dry, size(τ_rayl[i_band])
         # Compute Rayleigh properties per layer for `i_band` band center 
-        τ_rayl[i_band]   = getRayleighLayerOptProp(profile.p_half[end], 
-                                (maximum(curr_band_λ) + minimum(curr_band_λ)/2), 
+        τ_rayl[i_band]   .= getRayleighLayerOptProp(profile.p_half[end], 
+                                mean(curr_band_λ), 
                                 params.depol, profile.vcd_dry);
 
         # If no absorption, continue to next band
@@ -74,9 +76,12 @@ function model_from_parameters(params::vSmartMOM_Parameters)
                     architecture = params.architecture, 
                     vmr = 0);#mean(profile.vmr[params.absorption_params.molecules[i_band][molec_i]]))
                 # Calculate absorption profile
+                
                 @timeit "Absorption Coeff"  compute_absorption_profile!(τ_abs[i_band], absorption_model, params.spec_bands[i_band],profile.vmr[params.absorption_params.molecules[i_band][molec_i]], profile);
             # Use LUT directly
             else
+                @show profile.vmr[params.absorption_params.molecules[i_band][molec_i]]
+                @show molec_i
                 compute_absorption_profile!(τ_abs[i_band], params.absorption_params.luts[i_band][molec_i], params.spec_bands[i_band],profile.vmr[params.absorption_params.molecules[i_band][molec_i]], profile);
             end
         end
@@ -103,7 +108,7 @@ function model_from_parameters(params::vSmartMOM_Parameters)
 
         # Create a univariate aerosol distribution
         mie_aerosol = Aerosol(size_distribution, curr_aerosol.nᵣ, curr_aerosol.nᵢ)
-        @show typeof(curr_aerosol.nᵣ)
+        #@show typeof(curr_aerosol.nᵣ)
         #mie_aerosol = make_mie_aerosol(size_distribution, curr_aerosol.nᵣ, curr_aerosol.nᵢ, params.scattering_params.r_max, params.scattering_params.nquad_radius) #Suniti: why is the refractive index needed here?
 
         # Create the aerosol extinction cross-section at the reference wavelength:
