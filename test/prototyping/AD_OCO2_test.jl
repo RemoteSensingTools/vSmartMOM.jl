@@ -84,9 +84,9 @@ function runner!(y, x, parameters=parameters, oco_sounding= oco_sounding, Tsolar
     parameters.vza = [oco_sounding.vza]
     parameters.absorption_params.vmr["H2O"] = [parameters.q[1:65]*x[11] * 1.8; 
                                                parameters.q[66:end]*x[15] * 1.8];
-    a1 = zeros(12) .+ x[12]
-    a2 = zeros(12) .+ x[13]
-    a3 = zeros(10) .+ x[14]
+    a1 = zeros(25) .+ x[12]
+    a2 = zeros(25) .+ x[13]
+    a3 = zeros(22) .+ x[14]
     parameters.absorption_params.vmr["CO2"] = [a1; a2; a3]
     model = model_from_parameters(parameters);
     

@@ -299,7 +299,8 @@ function rt_run_test(RS_type::AbstractRamanType,
         # Set the Zλᵢλₒ interaction parameters for Raman (or nothing for noRS)
         InelasticScattering.computeRamanZλ!(RS_type, pol_type,Array(qp_μ), m, arr_type)
         # Compute the core layer optical properties:
-        layer_opt_props, fScattRayleigh   = constructCoreOpticalProperties(RS_type,iBand,m,model);
+        @timeit "OpticalProps" layer_opt_props, fScattRayleigh   = 
+        constructCoreOpticalProperties(RS_type,iBand,m,model);
         # Determine the scattering interface definitions:
         scattering_interfaces_all, τ_sum_all = extractEffectiveProps(layer_opt_props);
 
@@ -314,7 +315,7 @@ function rt_run_test(RS_type::AbstractRamanType,
             end
             
             # Expand all layer optical properties to their full dimension:
-            layer_opt = expandOpticalProperties(layer_opt_props[iz], arr_type)
+            @timeit "OpticalProps" layer_opt = expandOpticalProperties(layer_opt_props[iz], arr_type)
 
             # Perform Core RT (doubling/elemental/interaction)
             rt_kernel!(RS_type, pol_type, SFI, 

@@ -166,21 +166,19 @@ Input:
     - `depol_fct` depolarization factor
     - `vcd_dry` dry vertical column (no water) per layer
 """
-function getRayleighLayerOptProp(psurf, λ, depol_fct, vcd_dry) 
+function getRayleighLayerOptProp(psurf::FT, λ::Union{Array{FT}, FT}, depol_fct::FT, vcd_dry::Array{FT}) where FT
     # TODO: Use noRS/noRS_plus to use n2/o2 molecular constants
     # to compute tau_scat and depol_fct
-    FT = eltype(λ)
-    # Total vertical Rayleigh scattering optical thickness 
-    tau_scat = FT(0.00864) * (psurf / FT(1013.25)) * λ^(-FT(3.916) - FT(0.074) * λ - FT(0.05) / λ) 
-    tau_scat = tau_scat * (FT(6.0) + FT(3.0) * depol_fct) / (FT(6.0)- FT(7.0) * depol_fct)
     Nz = length(vcd_dry)
-    τRayl = zeros(FT,Nz)
+    τRayl = zeros(FT,size(λ,1),Nz)
+    # Total vertical Rayleigh scattering optical thickness, TODO: enable sub-layers and use VCD based taus
+    tau_scat = FT(0.00864) * (psurf / FT(1013.25)) * (FT(6.0) + FT(3.0) * depol_fct) / (FT(6.0)- FT(7.0) * depol_fct)  
+    tau_scat *= λ.^(-FT(3.916) .- FT(0.074) * λ .- FT(0.05) ./ λ)
     k = tau_scat / sum(vcd_dry)
     for i = 1:Nz
-        τRayl[i] = k * vcd_dry[i]
-    end
-
-    return convert.(FT, τRayl)
+        τRayl[:,i] .= k * vcd_dry[i]
+    end 
+    return τRayl
 end
 
 """
@@ -395,6 +393,7 @@ function compute_absorption_profile!(τ_abs::Array{FT,2},
         #@show typeof(absorption_cross_section(absorption_model, grid, p, T))
         #temp = Array(absorption_cross_section(absorption_model, grid, p, T)) * profile.vcd_dry[iz] * vmr_curr
         #@show minimum(temp), p, T, profile.vcd_dry[iz] * vmr_curr
+        #@show iz, profile.vcd_dry[iz], vmr_curr, p, T
         τ_abs[:,iz] += Array(absorption_cross_section(absorption_model, grid, p, T)) * profile.vcd_dry[iz] * vmr_curr
     end
     

@@ -7,7 +7,7 @@ using vSmartMOM.Architectures
 using vSmartMOM.Absorption
 
 
-pressures = 0.01:25:1150.0
+pressures = 0.01:15:1150.0
 temperatures = 160:10:360.0
 
 # O2 ABSCO:

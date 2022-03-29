@@ -505,52 +505,73 @@ abstract type AbstractOpticalProperties end
 # Core optical Properties COP
 Base.@kwdef struct CoreScatteringOpticalProperties{FT,FT2,FT3} <:  AbstractOpticalProperties
     "Absorption optical depth (scalar or wavelength dependent)"
-    τ::Union{FT, AbstractArray{FT,1}} 
+    τ::FT 
     "Single scattering albedo"
-    ϖ::Union{FT3, AbstractArray{FT3,1}}   
+    ϖ::FT2   
     "Z scattering matrix (forward)"
-    Z⁺⁺::Union{AbstractArray{FT2,2}, AbstractArray{FT2,3}, Nothing}  
+    Z⁺⁺::FT3 
     "Z scattering matrix (backward)"
-    Z⁻⁺::Union{AbstractArray{FT2,2}, AbstractArray{FT2,3}, Nothing}
+    Z⁻⁺::FT3
 end
 
 Base.@kwdef struct CoreAbsorptionOpticalProperties{FT} <:  AbstractOpticalProperties
     "Absorption optical depth (scalar or wavelength dependent)"
-    τ::Union{FT, AbstractArray{FT,1}} 
+    τ::FT 
 end
 
 # Adding Core Optical Properties, can have mixed dimensions!
-function Base.:+( x::CoreScatteringOpticalProperties, y::CoreScatteringOpticalProperties ) 
+function Base.:+( x::CoreScatteringOpticalProperties{xFT, xFT2, xFT3}, 
+                  y::CoreScatteringOpticalProperties{yFT, yFT2, yFT3} 
+                ) where {xFT, xFT2, xFT3, yFT, yFT2, yFT3} 
+    # Predefine some arrays:            
+    xZ⁺⁺ = x.Z⁺⁺
+    xZ⁻⁺ = x.Z⁻⁺
+    yZ⁺⁺ = y.Z⁺⁺
+    yZ⁻⁺ = y.Z⁻⁺
+
     τ  = x.τ .+ y.τ
     wx = x.τ .* x.ϖ 
     wy = y.τ .* y.ϖ  
     w  = wx .+ wy
-    ϖ  =  (w) ./ τ
-    
+    ϖ  =  w ./ τ
+    #@show xFT, xFT2, xFT3
     all(wx .== 0.0) ? (return CoreScatteringOpticalProperties(τ, ϖ, y.Z⁺⁺, y.Z⁻⁺)) : nothing
     all(wy .== 0.0) ? (return CoreScatteringOpticalProperties(τ, ϖ, x.Z⁺⁺, x.Z⁻⁺)) : nothing
 
     # A bit more tedious for Z matrices:
-    length(unique(w))  == 1 ? w = unique(w) : nothing
-    length(unique(wx)) == 1 ? wx = unique(wx) : nothing
-    length(unique(wy)) == 1 ? wy = unique(wy) : nothing
+    #@show size(wx), size(wy), size(w), wy, length(unique(wx))
+    #length(unique(w))  == 1 ? w  = unique(w) : nothing
+    #length(unique(wx)) == 1 ? wx = unique(wx) : nothing
+    #length(unique(wy)) == 1 ? wy = unique(wy) : nothing
     n = length(w);
-    if n == 1
-        Z⁺⁺ = ((wx .* x.Z⁺⁺) .+ (wy .* y.Z⁺⁺)) ./ w 
-        Z⁻⁺ = ((wx .* x.Z⁻⁺) .+ (wy .* y.Z⁻⁺)) ./ w
-    else
-        nx = length(wx)
-        ny = length(wy)
-        nx > 1 ? wx = reshape(wx,1,1,n) : nothing
-        ny > 1 ? wy = reshape(wy,1,1,n) : nothing
-        w = reshape(w,1,1,n)
-        size(x.Z⁺⁺,3) == 1 ? xZ⁺⁺ = repeat(x.Z⁺⁺,1,1,n) : xZ⁺⁺ = x.Z⁺⁺
-        size(x.Z⁻⁺,3) == 1 ? xZ⁻⁺ = repeat(x.Z⁻⁺,1,1,n) : xZ⁻⁺ = x.Z⁻⁺
-        size(y.Z⁺⁺,3) == 1 ? yZ⁺⁺ = repeat(y.Z⁺⁺,1,1,n) : yZ⁺⁺ = y.Z⁺⁺
-        size(y.Z⁻⁺,3) == 1 ? yZ⁻⁺ = repeat(y.Z⁻⁺,1,1,n) : yZ⁻⁺ = y.Z⁻⁺
-        Z⁺⁺ = (wx .* xZ⁺⁺ .+ wy .* yZ⁺⁺) ./ w 
-        Z⁻⁺ = (wx .* xZ⁻⁺ .+ wy .* yZ⁻⁺) ./ w
-    end
+    #@show size(wx), size(wy), size(w)
+    #@show n
+    #if xFT <: AbstractFloat && yFT <: AbstractFloat
+    #    Z⁺⁺ = ((wx .* xZ⁺⁺) .+ (wy .* yZ⁺⁺)) ./ w 
+    #    Z⁻⁺ = ((wx .* xZ⁻⁺) .+ (wy .* yZ⁻⁺)) ./ w
+    #else
+        #@show xFT, yFT, length(wx), length(wy), length(w)
+        #!(xFT <: AbstractFloat) ? wx = reshape(wx,1,1,n) : nothing
+        #!(yFT <: AbstractFloat) ? wy = reshape(wy,1,1,n) : nothing
+        wy = wy ./ w
+        wx = wx ./ w
+        wx = reshape(wx,1,1,n)
+        wy = reshape(wy,1,1,n)
+        
+        #w = reshape(w,1,1,n)
+        #println("Block!")
+        #@show size(wx), size(wy), size(xZ⁺⁺), size(yZ⁺⁺)
+        #(xFT3 <: Matrix)  ? xZ⁺⁺ = _repeat(xZ⁺⁺,1,1,n) : nothing
+        #(xFT3 <: Matrix)  ? xZ⁻⁺ = _repeat(xZ⁻⁺,1,1,n) : nothing
+        #(yFT3 <: Matrix)  ? yZ⁺⁺ = _repeat(yZ⁺⁺,1,1,n) : nothing
+        #(yFT3 <: Matrix)  ? yZ⁻⁺ = _repeat(yZ⁻⁺,1,1,n) : nothing
+        #@show size(wx), size(xZ⁺⁺), size(wy), size(yZ⁺⁺)
+        Z⁺⁺ = (wx .* xZ⁺⁺ .+ wy .* yZ⁺⁺) 
+        Z⁻⁺ = (wx .* xZ⁻⁺ .+ wy .* yZ⁻⁺)
+        #@show size(Z⁺⁺), size(Z⁻⁺)
+        #println("###")
+        
+    #end
     CoreScatteringOpticalProperties(τ, ϖ, Z⁺⁺, Z⁻⁺)  
 end
 
@@ -563,14 +584,14 @@ function Base.:*( x::CoreScatteringOpticalProperties, y::CoreScatteringOpticalPr
     CoreScatteringOpticalProperties([x.τ; y.τ],[x.ϖ; y.ϖ],cat(x.Z⁺⁺,y.Z⁺⁺, dims=3), cat(x.Z⁻⁺,y.Z⁻⁺, dims=3))
 end
 
-function Base.:+( x::CoreScatteringOpticalProperties{FT}, y::CoreAbsorptionOpticalProperties{FT} ) where FT
+function Base.:+( x::CoreScatteringOpticalProperties, y::CoreAbsorptionOpticalProperties ) 
     τ  = x.τ .+ y.τ
     wx = x.τ .* x.ϖ 
     ϖ  = (wx) ./ τ
     CoreScatteringOpticalProperties(τ, ϖ, x.Z⁺⁺, x.Z⁻⁺)
 end
 
-function Base.:+(  y::CoreAbsorptionOpticalProperties{FT}, x::CoreScatteringOpticalProperties{FT} ) where FT
+function Base.:+(  y::CoreAbsorptionOpticalProperties, x::CoreScatteringOpticalProperties ) 
     x + y
 end
 
@@ -579,3 +600,19 @@ function Base.:*( x::FT, y::CoreScatteringOpticalProperties{FT} ) where FT
     CoreScatteringOpticalProperties(y.τ * x, y.ϖ, y.Z⁺⁺, y.Z⁻⁺)
 end
 
+# From https://gist.github.com/mcabbott/80ac43cca3bee8f57809155a5240519f
+function _repeat(x::AbstractArray, counts::Integer...)
+    N = max(ndims(x), length(counts))
+    size_y = ntuple(d -> size(x,d) * get(counts, d, 1), N)
+    size_x2 = ntuple(d -> isodd(d) ? size(x, 1+d÷2) : 1, 2*N)
+
+    ## version without mutation
+    # ignores = ntuple(d -> reshape(Base.OneTo(counts[d]), ntuple(_->1, 2d-1)..., :), length(counts))
+    # y = reshape(broadcast(first∘tuple, reshape(x, size_x2), ignores...), size_y)
+
+    # ## version with mutation
+    size_y2 = ntuple(d -> isodd(d) ? size(x, 1+d÷2) : get(counts, d÷2, 1), 2*N)
+    y = similar(x, size_y)
+    reshape(y, size_y2) .= reshape(x, size_x2)
+    y
+end

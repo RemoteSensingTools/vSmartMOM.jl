@@ -126,12 +126,14 @@ function rt_kernel!(RS_type::noRS{FT},
                     I_static, 
                     architecture, 
                     qp_μN, iz) where {FT}
+    #@show array_type(architecture)
     @unpack qp_μ, μ₀ = quad_points
     # Just unpack core optical properties from 
     @unpack τ, ϖ, Z⁺⁺, Z⁻⁺ = computed_layer_properties
     # SUNITI, check? Also, better to write function here
     dτ_max = minimum([maximum(τ .* ϖ), FT(0.001) * minimum(qp_μ)])
     _, ndoubl = doubling_number(dτ_max, maximum(τ .* ϖ))
+    # @show ndoubl
     scatter = true # edit later
     arr_type = array_type(architecture)
     # Compute dτ vector
