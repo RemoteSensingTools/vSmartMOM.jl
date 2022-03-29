@@ -4,7 +4,7 @@
 radiative_transfer: 
   # Spectral bands (list of ν_start:ν_step:ν_end, in cm⁻¹)
   spec_bands: 
-    - (1e7/773):0.04:(1e7/757)
+    - (1e7/773):0.02:(1e7/757)
     - (1e7/1622):0.03:(1e7/1589)
     - (1e7/2084):0.02:(1e7/2042)
   # Bidirectional Reflectance Distribution Function (BRDF) per band
