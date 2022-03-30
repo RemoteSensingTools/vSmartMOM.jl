@@ -41,7 +41,8 @@ indices = (92:885,114:845,50:916);
 GeoInd = [5,5000];
 
 # Get data for that sounding:
-oco_sounding = InstrumentOperator.getMeasurement(oco, bands, indices, GeoInd);
+oco_sounding = InstrumentOperator.getMeasurement(
+    oco, bands, indices, GeoInd);
 
 ###################################################
 # Produce black-body in wavenumber range
@@ -82,8 +83,9 @@ function runner!(y, x, parameters=parameters, oco_sounding= oco_sounding, Tsolar
     parameters.T   = oco_sounding.T# .+ 1.0 #.+ x[15]
     parameters.sza = oco_sounding.sza
     parameters.vza = [oco_sounding.vza]
-    parameters.absorption_params.vmr["H2O"] = [parameters.q[1:65]*x[11] * 1.8; 
-                                               parameters.q[66:end]*x[15] * 1.8];
+    parameters.absorption_params.vmr["H2O"] = 
+        [parameters.q[1:65]*x[11] * 1.8; 
+        parameters.q[66:end]*x[15] * 1.8];
     a1 = zeros(12) .+ x[12]
     a2 = zeros(12) .+ x[13]
     a3 = zeros(10) .+ x[14]
@@ -151,7 +153,7 @@ y = oco_sounding.SpectralMeasurement;
 Fx = zeros(length(y));
 #ind = 92:885
 
-for i=1:5
+for i=1:3
     K = ForwardDiff.jacobian(runner!, Fx, x);
     dx = K \ (y-Fx);
     x += dx;

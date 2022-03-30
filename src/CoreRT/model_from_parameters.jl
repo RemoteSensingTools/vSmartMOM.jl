@@ -227,7 +227,7 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
 
         # Compute Rayleigh properties per layer for `i_band` band center 
         τ_rayl[i_band]   = getRayleighLayerOptProp(profile.p_half[end], 
-                                (maximum(curr_band_λ) + minimum(curr_band_λ)/2), 
+                                (maximum(curr_band_λ) + minimum(curr_band_λ))/2, 
                                 params.depol, profile.vcd_dry);
 
         # If no absorption, continue to next band
