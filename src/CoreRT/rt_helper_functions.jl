@@ -82,7 +82,9 @@ default_J_matrix_ie(FT, arr_type, dims, nSpec, nRaman) = arr_type(zeros(FT, tupl
 "Default matrix in RT calculation (zeros)"
 default_matrix(FT, arr_type, NSens, dims, nSpec)   = arr_type(zeros(FT, tuple(NSens, dims[1], dims[2], nSpec)))
 "Default matrix in ieRT calculation (zeros)"
-default_matrix_ie(FT, arr_type, NSens, dims, nSpec, nRaman)   = arr_type(zeros(FT, tuple(NSens, dims[1], dims[2], nSpec, nRaman)))
+default_matrix_ie(FT, arr_type, NSens, dims, nSpec, nRaman)   = [zeros(FT, (dims[1], dims[2], nSpec, nRaman)) for i=1:NSens]
+   
+#zeros(FT, tuple(NSens, dims[1], dims[2], nSpec, nRaman)))
 
 "Default J matrix in RT calculation (zeros)"
 default_J_matrix(FT, arr_type, NSens, dims, nSpec) = arr_type(zeros(FT, tuple(NSens, dims[1], 1, nSpec)))
