@@ -30,7 +30,7 @@ end
 The starting optical depth dτ is also determined from its maximum possible value, τ"
 function doubling_number(dτ_max, τ_end) # check if τ_end can be replaced by τ_end*ϖ for absorbing atmospheres
     FT = eltype(dτ_max)
-
+    #@show dτ_max, τ_end
     # minimum number of doublings needed to reach an optical depth τ_end, starting with an optical depth dτ.
     # The starting optical depth dτ is also determined from its maximum possible value, dτ_max
     if τ_end <= dτ_max
