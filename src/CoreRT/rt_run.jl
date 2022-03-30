@@ -13,7 +13,7 @@ the model. The latter should generally be used by users.
 Perform Radiative Transfer calculations using given parameters
 
 """
-function rt_run(RS_type::AbstractRamanType, #Default - no Raman scattering (noRS)
+function rt_run_bck(RS_type::AbstractRamanType, #Default - no Raman scattering (noRS)
                 pol_type::AbstractPolarizationType,   # Polarization type (IQUV)
                 obs_geom::ObsGeometry,                # Solar Zenith, Viewing Zenith, Viewing Azimuthal 
                 τ_rayl,                               # Rayleigh optical depth 
@@ -94,7 +94,7 @@ function rt_run(RS_type::AbstractRamanType, #Default - no Raman scattering (noRS
             @timeit "Z moments"  Aer𝐙⁺⁺[:,:,i], Aer𝐙⁻⁺[:,:,i] = Scattering.compute_Z_moments(pol_type, Array(qp_μ), aerosol_optics[i].greek_coefs, m, arr_type = arr_type)
         end
 
-        @show RS_type.ϖ_Cabannes, ϖ_Cabannes
+        #@show RS_type.ϖ_Cabannes, ϖ_Cabannes
         # Loop over all layers and pre-compute all properties before performing core RT
         @timeit "Computing Layer Properties" computed_atmosphere_properties = 
                 construct_all_atm_layers(FT, nSpec, Nz, NquadN, 
@@ -143,6 +143,7 @@ function rt_run(RS_type::AbstractRamanType, #Default - no Raman scattering (noRS
     return SFI ? (R_SFI, T_SFI, ieR_SFI, ieT_SFI) : (R, T)
 end
 
+
 """
     $(FUNCTIONNAME)(model::vSmartMOM_Model, i_band::Integer = -1)
 
@@ -150,7 +151,7 @@ Perform Radiative Transfer calculations using parameters passed in through the
 vSmartMOM_Model struct
 
 """
-function rt_run(model::vSmartMOM_Model; i_band::Integer = -1)
+function rt_run_bck(model::vSmartMOM_Model; i_band::Integer = -1)
 
     # Number of bands total
     n_bands = length(model.params.spec_bands)
@@ -160,7 +161,7 @@ function rt_run(model::vSmartMOM_Model; i_band::Integer = -1)
 
     # User wants a specific band
     if i_band != -1
-        return rt_run(noRS(),model.params.polarization_type,
+        return rt_run_bck(noRS(),model.params.polarization_type,
                       model.obs_geom,
                       model.τ_rayl[i_band], 
                       model.τ_aer[i_band], 
@@ -175,7 +176,7 @@ function rt_run(model::vSmartMOM_Model; i_band::Integer = -1)
     # User doesn't specify band, but there's only one 
     elseif n_bands == 1
 
-        return rt_run(noRS(),
+        return rt_run_bck(noRS(),
                       model.params.polarization_type,
                       model.obs_geom,
                       model.τ_rayl[1], 
@@ -199,7 +200,7 @@ function rt_run(model::vSmartMOM_Model; i_band::Integer = -1)
             println("Computing R for band #$(i)")
             println("------------------------------")
 
-            R = rt_run(noRS(),
+            R = rt_run_bck(noRS(),
                     model.params.polarization_type,
                        model.obs_geom,
                        model.τ_rayl[i], 
@@ -220,7 +221,17 @@ function rt_run(model::vSmartMOM_Model; i_band::Integer = -1)
     
 end
 
-function rt_run_test(RS_type::AbstractRamanType, 
+# Mockup if no Raman type is chosen:
+function rt_run(model::vSmartMOM_Model; i_band::Integer = 1)
+    rt_run(noRS(), model, i_band)
+end
+
+# Just to make sure we still have it:
+function rt_run_test(RS_type::AbstractRamanType, model::vSmartMOM_Model, iBand)
+    rt_run(RS_type,model,iBand)
+end
+
+function rt_run(RS_type::AbstractRamanType, 
                     model::vSmartMOM_Model, iBand)
     @unpack obs_alt, sza, vza, vaz = model.obs_geom   # Observational geometry properties
     @unpack qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart, μ₀, iμ₀, Nquad = model.quad_points # All quadrature points
@@ -254,8 +265,8 @@ function rt_run_test(RS_type::AbstractRamanType,
     dims = (NquadN,NquadN)              # nxn dims
     
     # Need to check this a bit better in the future!
-    FT_dual = length(model.τ_aer[1][1]) > 0 ? typeof(model.τ_aer[1][1]) : FT
-    
+    #FT_dual = length(model.τ_aer[1][1]) > 0 ? typeof(model.τ_aer[1][1]) : FT
+    FT_dual = FT
     # Output variables: Reflected and transmitted solar irradiation at TOA and BOA respectively # Might need Dual later!!
     #Suniti: consider adding a new dimension (iBand) to these arrays. The assignment of simulated spectra to their specific bands will take place after batch operations, thereby leaving the computational time unaffected 
     R       = zeros(FT_dual, length(vza), pol_type.n, nSpec)
@@ -356,7 +367,7 @@ function rt_run_test(RS_type::AbstractRamanType,
                             weight, nSpec, 
                             SFI, 
                             R, R_SFI, 
-                            T, T_SFI, 
+                            T, T_SFI,
                             ieR_SFI, ieT_SFI)
     end
 

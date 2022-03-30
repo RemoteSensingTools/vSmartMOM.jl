@@ -8,7 +8,7 @@ kernel calculations.
 "Perform post-processing to azimuthally-weight RT matrices"
 function postprocessing_vza!(RS_type::noRS, iμ₀, pol_type, 
         composite_layer, vza, qp_μ, m, vaz, μ₀, weight, 
-        nSpec, SFI, R, R_SFI, T, T_SFI, ieR_SFI, ieT_SFI)
+        nSpec, SFI, R, R_SFI, T, T_SFI,ieR_SFI, ieT_SFI)
     
     # idx of μ0 = cos(sza)
     st_iμ0, istart0, iend0 = get_indices(iμ₀, pol_type);
@@ -18,7 +18,7 @@ function postprocessing_vza!(RS_type::noRS, iμ₀, pol_type,
     T⁺⁺ = Array(composite_layer.T⁺⁺);
     J₀⁺ = Array(composite_layer.J₀⁺);
     J₀⁻ = Array(composite_layer.J₀⁻);
-
+    
     # Loop over all viewing zenith angles
     for i = 1:length(vza)
 
@@ -64,6 +64,8 @@ function postprocessing_vza!(RS_type::Union{RRS, VS_0to1_plus, VS_1to0_plus},
     ieJ₀⁺ = Array(composite_layer.ieJ₀⁺);
     ieJ₀⁻ = Array(composite_layer.ieJ₀⁻);
     # Loop over all viewing zenith angles
+    
+
     for i = 1:length(vza)
 
         # Find the nearest quadrature point idx

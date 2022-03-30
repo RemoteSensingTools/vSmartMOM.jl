@@ -8,7 +8,7 @@ This file implements rt_kernel!, which performs the core RT routines (elemental,
 function rt_kernel!(RS_type::noRS, pol_type, SFI, added_layer, composite_layer, computed_layer_properties, m, quad_points, I_static, architecture, qp_μN, iz) 
 
     @unpack τ_λ, ϖ_λ, τ, ϖ, Z⁺⁺, Z⁻⁺, dτ_max, dτ, ndoubl, dτ_λ, expk, scatter, τ_sum, scattering_interface = computed_layer_properties
-
+    @show τ, ϖ, dτ_max, ndoubl
     # If there is scattering, perform the elemental and doubling steps
     if scatter
         
@@ -131,7 +131,9 @@ function rt_kernel!(RS_type::noRS{FT},
     # Just unpack core optical properties from 
     @unpack τ, ϖ, Z⁺⁺, Z⁻⁺ = computed_layer_properties
     # SUNITI, check? Also, better to write function here
+    #@show τ, ϖ
     dτ_max = minimum([maximum(τ .* ϖ), FT(0.001) * minimum(qp_μ)])
+
     _, ndoubl = doubling_number(dτ_max, maximum(τ .* ϖ))
     # @show ndoubl
     scatter = true # edit later

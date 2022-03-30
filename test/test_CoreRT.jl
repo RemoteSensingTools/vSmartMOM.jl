@@ -1,6 +1,6 @@
 
 # Test the pure Rayleigh case
-@testset "pure_rayleigh" begin
+#=@testset "pure_rayleigh" begin
 
     println("Testing pure rayleigh RT...")
 
@@ -23,7 +23,7 @@
 
     @test isapprox(R_model[:,:,1], R_test, atol=ϵ)
 
-end
+end=#
 
 @testset "compare against 6SV1" begin 
 
@@ -41,7 +41,7 @@ end
                 parameters.spec_bands = [1e7/λ (1e7/λ + 1)]
                 parameters.vaz = repeat([azs[az_i]], 16)
                 parameters.sza = szas[sza_i]
-                parameters.brdf = [vSmartMOM.CoreRT.LambertianSurfaceScalar(ρ * π)]
+                parameters.brdf = [vSmartMOM.CoreRT.LambertianSurfaceScalar(ρ)]
                 model = model_from_parameters(parameters);
                 model.τ_rayl[1] .= τ
                 R_modeled[sza_i, az_i, :] = CoreRT.rt_run(model, i_band=1)[1][:,1,1] / model.quad_points.μ₀

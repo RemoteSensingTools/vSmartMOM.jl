@@ -25,6 +25,8 @@ FT = Float64
 
 # Load OCO Data: 
 # File names:
+
+#= Amazon 
 L1File   = "/net/fluo/data1/group/oco2/L1bSc/oco2_L1bScGL_31185a_200512_B10206r_210427152510.h5"
 metFile  = "/net/fluo/data1/group/oco2/L2Met/oco2_L2MetGL_31185a_200512_B10206r_210425222645.h5"
 dictFile = "/home/cfranken/code/gitHub/InstrumentOperator.jl/json/oco2.yaml"
@@ -42,6 +44,26 @@ indices = (92:682,114:845,50:916);
 #indices = (92:885,114:845,50:916);
 # Geo Index (footprint,sounding):
 GeoInd = [5,2821];
+
+# Get data for that sounding:
+oco_sounding = InstrumentOperator.getMeasurement(oco, bands, indices, GeoInd);
+=#
+
+L1File   = "/net/fluo/data1/group/oco2/L1bSc/oco2_L1bScND_26780a_190715_B10003r_200429212407.h5"
+metFile  = "/net/fluo/data1/group/oco2/L2Met/oco2_L2MetND_26780a_190715_B10003r_200429212406.h5"
+dictFile = "/home/cfranken/code/gitHub/InstrumentOperator.jl/json/oco2.yaml"
+# Load L1 file (could just use filenames here as well)
+oco = InstrumentOperator.load_L1(dictFile,L1File, metFile);
+
+
+# Pick some bands as tuple (or just one)
+bands = (1,2,3);
+#bands = (1,3);
+# Indices within that band:
+indices = (92:885,114:845,50:916);
+#indices = (92:885,50:916);
+# Geo Index (footprint,sounding):
+GeoInd = [5,5000];
 
 # Get data for that sounding:
 oco_sounding = InstrumentOperator.getMeasurement(oco, bands, indices, GeoInd);
@@ -87,11 +109,12 @@ function runner!(y, x, parameters=parameters, oco_sounding= oco_sounding, Tsolar
     parameters.T   = oco_sounding.T# .+ 1.0 #.+ x[15]
     parameters.sza = oco_sounding.sza
     parameters.vza = [oco_sounding.vza]
+    parameters.absorption_params.vmr["O2"] = x[18]
     parameters.absorption_params.vmr["H2O"] = parameters.q*x[14] * 1.8 #[parameters.q[1:65]*x[11] * 1.8; 
                                                #parameters.q[66:end]*x[15] * 1.8];
-    a1 = zeros(12) .+ x[15] * 1e-6
-    a2 = zeros(12) .+ x[16] * 1e-6
-    a3 = zeros(10) .+ x[17] * 1e-6
+    a1 = zeros(25) .+ x[15] * 1e-6
+    a2 = zeros(25) .+ x[16] * 1e-6
+    a3 = zeros(22) .+ x[17] * 1e-6
     parameters.absorption_params.vmr["CO2"] = [a1; a2; a3]
     model = model_from_parameters(parameters);
     
@@ -127,7 +150,7 @@ function runner!(y, x, parameters=parameters, oco_sounding= oco_sounding, Tsolar
 
         # Convolve input spectrum with variable kernel
         @time I_conv = InstrumentOperator.conv_spectra(oco_sounding.ils[i], wl, I_wl)
-        y[oco_sounding.BandID[i]] = I_conv
+        y[oco_sounding.BandID[i]] = I_conv/π
     end
     @show xco2 = 1e6*(model.profile.vmr["CO2"]' * model.profile.vcd_dry)/sum(model.profile.vcd_dry)
 
@@ -138,20 +161,21 @@ end
 xₐ = FT[  0.202,   # Albedo band 1, degree 1
         0,         # Albedo band 1, degree 2       
         0,         # Albedo band 1, degree 3       
-        0.139,      # Albedo band 2, degree 1
+        0.4,#0.139,     # Albedo band 2, degree 1
         0,         # Albedo band 2, degree 2
         0,         # Albedo band 2, degree 3
-        0.0512,     # Albedo band 3, degree 1
+        0.4,#0.0512,    # Albedo band 3, degree 1
         0,         # Albedo band 3, degree 2
         0.00,      # Albedo band 3, degree 3
-        -10.0,      # Log of AOD
+        -1.0,      # log AOD
         800.0,     # Aerosol peak height (hPa)
-        0.0,       # log of size distribution mean (1µm here)
+        -1.0,       # log of size distribution mean (1µm here)
         1.3,       # Real refractive index of aerosol
         1,         # H2O scaling factor for entire profile
         400,    # CO2 Top layers
         400,    # CO2 Middle layers
-        400     # CO2 Bottom layers
+        400,    # CO2 Bottom layers
+        0.2095  # O2 VMR
         ]#,
 
 # Measurement covariance matrix:
@@ -160,25 +184,25 @@ Sₑ = Diagonal(oco_sounding.SpectralNoise.^2);
 n = length(xₐ)
 Sₐ = zeros(n,n)
 # For albedos
-Sₐ[1,1] = 100.2^2
-Sₐ[4,4] = 100.2^2
-Sₐ[7,7] = 100.2^2
-Sₐ[2,2] = 2^2
-Sₐ[5,5] = 2^2
-Sₐ[8,8] = 2^2
-Sₐ[3,3] = 2^2
-Sₐ[6,6] = 2^2
-Sₐ[9,9] = 2^2
+Sₐ[1,1] = 1.2^2
+Sₐ[4,4] = 1.2^2
+Sₐ[7,7] = 1.2^2
+Sₐ[2,2] = 0.2^2
+Sₐ[5,5] = 0.2^2
+Sₐ[8,8] = 0.2^2
+Sₐ[3,3] = 0.2^2
+Sₐ[6,6] = 0.2^2
+Sₐ[9,9] = 0.2^2
 # Aerosols:
-Sₐ[10,10] = 2.5^2  # AOD, 2.5 orders of magnitude
-Sₐ[11,11] = 150.0^2
+Sₐ[10,10] = 0.5^2  # AOD, 2.5 orders of magnitude
+Sₐ[11,11] = 10.0^2
 Sₐ[12,12] = 0.05^2
-Sₐ[13,13] = 0.1^2
+Sₐ[13,13] = 0.05^2
 Sₐ[14,14] = 0.5^2
 Sₐ[15,15] = 100^2
 Sₐ[16,16] = 100^2
 Sₐ[17,17] = 100^2
-
+Sₐ[18,18] = 0.002^2
 
 # Run FW model:
 # @time runner(x);
@@ -186,16 +210,38 @@ y = oco_sounding.SpectralMeasurement;
 Fx = zeros(length(y));
 #ind = 92:885
 x = xₐ
-
-for i=1:4
-    K = ForwardDiff.jacobian(runner!, Fx, x);
-    G = inv(K'inv(Sₑ)K + inv(Sₐ))K'inv(Sₑ)
-    δy = (y-Fx + K*(x-xₐ))
+xᵢ = []
+push!(xᵢ, xₐ)
+# LM parameter only for aerosols: 
+γ = zeros(n,n);
+γ[10,10] = 50;
+γ[11,11] = 50;
+γ[12,12] = 50;
+γ[13,13] = 50;
+γ[end,end] = 50;
+for i=1:15
+    
+    K = ForwardDiff.jacobian(runner!, Fx, xᵢ[end]);
+    res_1 = (y-Fx)' * inv(Sₑ) * (y-Fx)
+    G = inv(K'inv(Sₑ)K + (1.0 .+ γ).*inv(Sₐ))K'inv(Sₑ)
+    δy = (y-Fx + K*(xᵢ[end]-xₐ))
     dx = G * δy
-    x = xₐ + dx;
-    @show x;
+    runner!(Fx,xₐ + dx)
+    res_2 = (y-Fx)' * inv(Sₑ) * (y-Fx)
+    if res_2 < res_1
+        # Reduce γ
+        @show "Reduce γ", i
+        γ *= 0.5
+        push!(xᵢ, xₐ + dx);
+    else
+        #Increase γ
+        @show "Increase γ", i
+        γ *= 2
+    end
+    #@show x;
 end
-runner!(Fx,x)
+Fx2 = similar
+runner!(Fx,xᵢ[end])
 
 ν = oco_sounding.SpectralGrid*1e3
 plot(y/1e20, label="Meas")
