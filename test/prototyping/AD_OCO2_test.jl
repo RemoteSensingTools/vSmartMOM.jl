@@ -70,12 +70,12 @@ end
 function runner!(y, x, parameters=parameters, oco_sounding= oco_sounding, Tsolar = Tsolar_interp)
 
     # Set parameters fields as the dual numbers
-    parameters.brdf =  [CoreRT.LambertianSurfaceLegendre([x[1],x[3],x[4]]),
+    parameters.brdf =  [CoreRT.LambertianSurfaceLegendre([x[1],x[3],x[4],x[16],x[17] ]),
                         CoreRT.LambertianSurfaceLegendre([x[7],x[8],x[5]]),
                         CoreRT.LambertianSurfaceLegendre([x[9],x[10],x[6]])];
 
-    parameters.scattering_params.rt_aerosols[1].τ_ref = exp(x[2]);
-    parameters.scattering_params.rt_aerosols[1].p₀    = 800.0; #x[4]
+    parameters.scattering_params.rt_aerosols[1].τ_ref = 0.1+ 0*(x[2]);
+    parameters.scattering_params.rt_aerosols[1].p₀    = 600.0; #x[4]
    
     parameters.p   = oco_sounding.p_half
     parameters.q   = oco_sounding.q 
@@ -120,7 +120,7 @@ function runner!(y, x, parameters=parameters, oco_sounding= oco_sounding, Tsolar
 
         # Convolve input spectrum with variable kernel
         @time I_conv = InstrumentOperator.conv_spectra(oco_sounding.ils[i], wl, I_wl)
-        y[oco_sounding.BandID[i]] = I_conv
+        y[oco_sounding.BandID[i]] = I_conv/π
     end
     @show xco2 = 1e6*(model.profile.vmr["CO2"]' * model.profile.vcd_dry)/sum(model.profile.vcd_dry)
 
@@ -129,12 +129,12 @@ end
 
 # State vector
 x = FT[0.2377, 
-        -3, 
+        -2, 
         -0.00244, 
         0, 
         0,
         0, 
-        0.4, 
+        0.44, 
         0, 
         0.4, 
         0,
@@ -142,7 +142,7 @@ x = FT[0.2377,
         410e-6,
         390e-6,
         400e-6, 
-        1.0]#,
+        1.0, 0.0, 0.0]#,
 
 
 # Run FW model:
@@ -151,7 +151,7 @@ y = oco_sounding.SpectralMeasurement;
 Fx = zeros(length(y));
 #ind = 92:885
 
-for i=1:5
+for i=1:3
     K = ForwardDiff.jacobian(runner!, Fx, x);
     dx = K \ (y-Fx);
     x += dx;

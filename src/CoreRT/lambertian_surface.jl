@@ -34,7 +34,7 @@ function create_surface_layer!(lambertian::LambertianSurfaceScalar{FT},
     T_surf = arr_type(Diagonal(tmp))
     if m == 0
         # Albedo normalized by π (and factor 2 for 0th Fourier Moment)
-        ρ = 2lambertian.albedo/FT(π)
+        ρ = 2lambertian.albedo#/FT(π)
         
         
         
@@ -94,7 +94,7 @@ function create_surface_layer!(lambertian::LambertianSurfaceLegendre{FT},
         P = Scattering.compute_legendre_poly(x,length(legendre_coeff))[1]
         # Evaluate Polynomial (as matrix multiplication)
         albedo = P * legendre_coeff
-        ρ = arr_type(2albedo/FT(π))
+        ρ = arr_type(2albedo)
         # Get size of added layer
         dim = size(added_layer.r⁻⁺)
         Nquad = dim[1] ÷ pol_type.n
