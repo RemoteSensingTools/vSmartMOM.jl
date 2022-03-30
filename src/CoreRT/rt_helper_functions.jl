@@ -79,6 +79,16 @@ default_J_matrix(FT, arr_type, dims, nSpec) = arr_type(zeros(FT, tuple(dims[1], 
 "Default J matrix in ieRT calculation (zeros)"
 default_J_matrix_ie(FT, arr_type, dims, nSpec, nRaman) = arr_type(zeros(FT, tuple(dims[1], 1, nSpec, nRaman)))
 
+"Default matrix in RT calculation (zeros)"
+default_matrix(FT, arr_type, NSens, dims, nSpec)   = arr_type(zeros(FT, tuple(NSens, dims[1], dims[2], nSpec)))
+"Default matrix in ieRT calculation (zeros)"
+default_matrix_ie(FT, arr_type, NSens, dims, nSpec, nRaman)   = arr_type(zeros(FT, tuple(NSens, dims[1], dims[2], nSpec, nRaman)))
+
+"Default J matrix in RT calculation (zeros)"
+default_J_matrix(FT, arr_type, NSens, dims, nSpec) = arr_type(zeros(FT, tuple(NSens, dims[1], 1, nSpec)))
+"Default J matrix in ieRT calculation (zeros)"
+default_J_matrix_ie(FT, arr_type, NSens, dims, nSpec, nRaman) = arr_type(zeros(FT, tuple(NSens, dims[1], 1, nSpec, nRaman)))
+
 ##### Only for testing, random matrices:
 "Default matrix in RT calculation (random)"
 default_matrix_rand(FT, arr_type, dims, nSpec)   = arr_type(randn(FT, tuple(dims[1], dims[2], nSpec)))
@@ -149,7 +159,49 @@ make_composite_layer(RS_type::Union{RRS, RRS_plus,VS_0to1_plus, VS_1to0_plus}, F
                                                         default_J_matrix_ie(FT, arr_type, dims, nSpec, RS_type.n_Raman)
                                                         )
                                                     
-
+"Make a composite layer, supplying all default matrices"
+make_composite_layer(RS_type::Union{noRS, noRS_plus}, 
+    FT, arr_type, NSens, dims, nSpec) = 
+    CompositeLayerMS(default_matrix(FT, arr_type, NSens, dims, nSpec), 
+                    default_matrix(FT, arr_type, NSens, dims, nSpec), 
+                    default_matrix(FT, arr_type, NSens, dims, nSpec),
+                    default_matrix(FT, arr_type, NSens, dims, nSpec),
+                    default_J_matrix(FT, arr_type, NSens, dims, nSpec),
+                    default_J_matrix(FT, arr_type, NSens, dims, nSpec),
+                    default_matrix(FT, arr_type, NSens, dims, nSpec), 
+                    default_matrix(FT, arr_type, NSens, dims, nSpec), 
+                    default_matrix(FT, arr_type, NSens, dims, nSpec),
+                    default_matrix(FT, arr_type, NSens, dims, nSpec),
+                    default_J_matrix(FT, arr_type, NSens, dims, nSpec),
+                    default_J_matrix(FT, arr_type, NSens, dims, nSpec))
+"Make a composite layer, supplying all default matrices"
+make_composite_layer(RS_type::Union{RRS, RRS_plus, VS_0to1_plus, VS_1to0_plus}, 
+    FT, arr_type, NSens, dims, nSpec) = 
+    CompositeLayerMSRS(default_matrix(FT, arr_type, NSens, dims, nSpec), 
+                    default_matrix(FT, arr_type, NSens, dims, nSpec), 
+                    default_matrix(FT, arr_type, NSens, dims, nSpec),
+                    default_matrix(FT, arr_type, NSens, dims, nSpec),
+                    default_J_matrix(FT, arr_type, NSens, dims, nSpec),
+                    default_J_matrix(FT, arr_type, NSens, dims, nSpec),
+                    default_matrix_ie(FT, arr_type, NSens, dims, nSpec, RS_type.n_Raman), 
+                    default_matrix_ie(FT, arr_type, NSens, dims, nSpec, RS_type.n_Raman), 
+                    default_matrix_ie(FT, arr_type, NSens, dims, nSpec, RS_type.n_Raman),
+                    default_matrix_ie(FT, arr_type, NSens, dims, nSpec, RS_type.n_Raman),
+                    default_J_matrix_ie(FT, arr_type, NSens, dims, nSpec, RS_type.n_Raman),
+                    default_J_matrix_ie(FT, arr_type, NSens, dims, nSpec, RS_type.n_Raman),
+                    default_matrix(FT, arr_type, NSens, dims, nSpec), 
+                    default_matrix(FT, arr_type, NSens, dims, nSpec), 
+                    default_matrix(FT, arr_type, NSens, dims, nSpec),
+                    default_matrix(FT, arr_type, NSens, dims, nSpec),
+                    default_J_matrix(FT, arr_type, NSens, dims, nSpec),
+                    default_J_matrix(FT, arr_type, NSens, dims, nSpec),
+                    default_matrix_ie(FT, arr_type, NSens, dims, nSpec, RS_type.n_Raman), 
+                    default_matrix_ie(FT, arr_type, NSens, dims, nSpec, RS_type.n_Raman), 
+                    default_matrix_ie(FT, arr_type, NSens, dims, nSpec, RS_type.n_Raman),
+                    default_matrix_ie(FT, arr_type, NSens, dims, nSpec, RS_type.n_Raman),
+                    default_J_matrix_ie(FT, arr_type, NSens, dims, nSpec, RS_type.n_Raman),
+                    default_J_matrix_ie(FT, arr_type, NSens, dims, nSpec, RS_type.n_Raman)
+                    )
 "Given a ComputedAtmosphereProperties object, extract a ComputedLayerProperties object using data from the iz index of all arrays in the ComputedAtmosphereProperties"
 function get_layer_properties(computed_atmospheric_properties::ComputedAtmosphereProperties, iz, arr_type)
      @unpack τ_λ_all, ϖ_λ_all, τ_all, ϖ_all, Z⁺⁺_all, Z⁻⁺_all , dτ_max_all, dτ_all, ndoubl_all, dτ_λ_all, expk_all, scatter_all, τ_sum_all, fscattRayl_all,  scattering_interfaces_all = computed_atmospheric_properties

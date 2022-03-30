@@ -25,12 +25,13 @@ function constructCoreOpticalProperties(RS_type, iBand, m, model)
         #@show τ_rayl
         rayl = CoreScatteringOpticalProperties.(
                 τ_rayl[iB][:], 
-                [RS_type.ϖ_Cabannes[iB]], 
+                [RS_type.ϖ_Cabannes],# [RS_type.ϖ_Cabannes[iB]], 
                 [Rayl𝐙⁺⁺], [Rayl𝐙⁻⁺])
         #@show size(rayl)
         # Initiate combined properties with rayleigh
         combo = rayl
-
+        @show combo[1].ϖ
+        @show RS_type.ϖ_Cabannes
         # Loop over all aerosol types:
         for i=1:nAero
             # Precomute Z matrices per type (constant per layer)
@@ -44,8 +45,9 @@ function constructCoreOpticalProperties(RS_type, iBand, m, model)
                                 [aerosol_optics[iB][i]], 
                                 [AerZ⁺⁺], [AerZ⁻⁺])
             # Mix with previous Core Optical Properties
-            #@show combo[1].ϖ   , aer[1].ϖ
+            @show combo[1].ϖ   , aer[1].ϖ
             combo = combo .+ aer
+            @show combo[1].ϖ   , aer[1].ϖ
         end
 
         # Somewhere here we can add canopy later as well!
