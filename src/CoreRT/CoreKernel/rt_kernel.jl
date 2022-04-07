@@ -28,7 +28,11 @@ function rt_kernel!(RS_type::noRS, pol_type, SFI, added_layer, composite_layer, 
             added_layer.t⁻⁻[:,:,iλ] = Diagonal(temp[iλ,:]);
         end
     end
-
+    #M1 = Array(added_layer.t⁺⁺)
+    #M2 = Array(added_layer.r⁺⁻)
+    #M3 = Array(added_layer.J₀⁻)
+    #M4 = Array(added_layer.J₀⁺)
+    #@show M1[1,1,1], M2[1,1,1], M3[1,1,1], M4[1,1,1]
     # @assert !any(isnan.(added_layer.t⁺⁺))
     
     # If this TOA, just copy the added layer into the composite layer
@@ -36,7 +40,7 @@ function rt_kernel!(RS_type::noRS, pol_type, SFI, added_layer, composite_layer, 
         composite_layer.T⁺⁺[:], composite_layer.T⁻⁻[:] = (added_layer.t⁺⁺, added_layer.t⁻⁻)
         composite_layer.R⁻⁺[:], composite_layer.R⁺⁻[:] = (added_layer.r⁻⁺, added_layer.r⁺⁻)
         composite_layer.J₀⁺[:], composite_layer.J₀⁻[:] = (added_layer.J₀⁺, added_layer.J₀⁻ )
-    
+        
     # If this is not the TOA, perform the interaction step
     else
         @timeit "interaction" interaction!(RS_type, scattering_interface, SFI, composite_layer, added_layer, I_static)
@@ -177,10 +181,18 @@ function rt_kernel!(RS_type::noRS{FT},
         composite_layer.T⁺⁺[:], composite_layer.T⁻⁻[:] = (added_layer.t⁺⁺, added_layer.t⁻⁻)
         composite_layer.R⁻⁺[:], composite_layer.R⁺⁻[:] = (added_layer.r⁻⁺, added_layer.r⁺⁻)
         composite_layer.J₀⁺[:], composite_layer.J₀⁻[:] = (added_layer.J₀⁺, added_layer.J₀⁻ )
-    
     # If this is not the TOA, perform the interaction step
     else
         @timeit "interaction" interaction!(RS_type, scattering_interface, SFI, composite_layer, added_layer, I_static)
+        if iz==2
+            M1 = Array(composite_layer.T⁺⁺);
+            M2 = Array(composite_layer.R⁺⁻);
+            M3 = Array(composite_layer.T⁻⁻);
+            M4 = Array(composite_layer.R⁻⁺);
+            M5 = Array(composite_layer.J₀⁻);
+            M6 = Array(composite_layer.J₀⁺);
+            @show M1[1,1,1], M2[1,1,1], M3[1,1,1], M4[1,1,1], M5[1,1,1], M6[1,1,1]
+        end
     end
 end
 

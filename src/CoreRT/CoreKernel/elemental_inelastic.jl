@@ -115,7 +115,7 @@ end
         # dτ₀, dτ₁ are the purely scattering (elastic+inelastic) molecular elemental 
         # optical thicknesses at wavelengths λ₀ and λ₁
         # 𝐑⁻⁺(μᵢ, μⱼ) = ϖ ̇𝐙⁻⁺(μᵢ, μⱼ) ̇(μⱼ/(μᵢ+μⱼ)) ̇(1 - exp{-τ ̇(1/μᵢ + 1/μⱼ)}) ̇𝑤ⱼ
-        ier⁻⁺[i,j,n₁,Δn] = fscattRayl * ϖ_λ₁λ₀[Δn] * ϖ_λ[n₀] * Z⁻⁺_λ₁λ₀[i,j] * 
+        ier⁻⁺[i,j,n₁,Δn] = fscattRayl[n₀] * ϖ_λ₁λ₀[Δn] * ϖ_λ[n₀] * Z⁻⁺_λ₁λ₀[i,j] * 
             (1/( (qp_μN[i] / qp_μN[j]) + (dτ_λ[n₁]/dτ_λ[n₀]) )) * 
             (1 - exp(-((dτ_λ[n₁] / qp_μN[i]) + (dτ_λ[n₀] / qp_μN[j])))) * wct2[j] 
               
@@ -129,12 +129,12 @@ end
             if i == j       
                 if abs(dτ_λ[n₀]-dτ_λ[n₁])>1.e-6
                     iet⁺⁺[i,j,n₁,Δn] = 
-                        ϖ_λ₁λ₀[Δn] * ϖ_λ[n₀] * fscattRayl * Z⁺⁺_λ₁λ₀[i,i] * wct2[i] *
+                        ϖ_λ₁λ₀[Δn] * ϖ_λ[n₀] * fscattRayl[n₀] * Z⁺⁺_λ₁λ₀[i,i] * wct2[i] *
                         (exp(-dτ_λ[n₀] / qp_μN[i]) - exp(-dτ_λ[n₁] / qp_μN[i]))/
                         (1 - (dτ_λ[n₁]/dτ_λ[n₀]))                         
                 else    
                     iet⁺⁺[i,j,n₁,Δn] = 
-                        ϖ_λ₁λ₀[Δn] * ϖ_λ[n₀] * fscattRayl * Z⁺⁺_λ₁λ₀[i,i] * wct2[i] *
+                        ϖ_λ₁λ₀[Δn] * ϖ_λ[n₀] * fscattRayl[n₀] * Z⁺⁺_λ₁λ₀[i,i] * wct2[i] *
                         (1 - exp(-dτ_λ[n₀] / qp_μN[j]))
                 end
             else
@@ -145,7 +145,7 @@ end
             # 𝐓⁺⁺(μᵢ, μⱼ) = ϖ ̇𝐙⁺⁺(μᵢ, μⱼ) ̇(μⱼ/(μᵢ-μⱼ)) ̇(exp{-τ/μᵢ} - exp{-τ/μⱼ}) ̇𝑤ⱼ
             # (𝑖 ≠ 𝑗)
             iet⁺⁺[i,j,n₁,Δn] = 
-                ϖ_λ₁λ₀[Δn] * ϖ_λ[n₀] * fscattRayl * Z⁺⁺_λ₁λ₀[i,j] * 
+                ϖ_λ₁λ₀[Δn] * ϖ_λ[n₀] * fscattRayl[n₀] * Z⁺⁺_λ₁λ₀[i,j] * 
                 (1 / ( (qp_μN[i]/qp_μN[j]) - (dτ_λ[n₁]/dτ_λ[n₀]) )) * wct2[j] * 
                 (exp(-dτ_λ[n₁] / qp_μN[i]) - exp(-dτ_λ[n₀] / qp_μN[j]))
         end
@@ -173,8 +173,10 @@ function get_elem_rt!(RS_type::RRS,
        # @show typeof(dτ_λ), typeof(ϖ_λ)
        # @show typeof(qp_μN), typeof(wct2)
        # @show typeof(ier⁻⁺), typeof(iet⁺⁺)
-       # @show typeof(fscattRayl)
-        event = kernel!(fscattRayl[1], 
+        #@show typeof(fscattRayl), (fscattRayl[1:10]), typeof(aType(ϖ_λ₁λ₀))
+        #exit()
+        #sleep(10)
+        event = kernel!(aType(fscattRayl), 
                     aType(ϖ_λ₁λ₀), aType(i_λ₁λ₀), 
                     i_ref,
                     ier⁻⁺, iet⁺⁺, 
@@ -196,7 +198,7 @@ function get_elem_rt!(RS_type::Union{VS_0to1, VS_1to0},
     aType = array_type(architecture(ier⁻⁺))
     kernel! = get_elem_rt_VS!(device)
     #@show typeof(Z⁻⁺_λ₁λ₀), typeof(Z⁺⁺_λ₁λ₀), typeof(ϖ_λ₁λ₀), typeof(i_λ₁λ₀), typeof(i_ref)
-    event = kernel!(fscattRayl, 
+    event = kernel!(aType(fscattRayl), 
         aType(ϖ_λ₁λ₀), aType(i_λ₁λ₀), 
         i_ref,
         ier⁻⁺, iet⁺⁺, 
@@ -230,7 +232,7 @@ end
         # optical thicknesses at wavelengths λ₀ and λ₁
         # 𝐑⁻⁺(μᵢ, μⱼ) = ϖ ̇𝐙⁻⁺(μᵢ, μⱼ) ̇(μⱼ/(μᵢ+μⱼ)) ̇(1 - exp{-τ ̇(1/μᵢ + 1/μⱼ)}) ̇𝑤ⱼ
         ier⁻⁺[i,j,n₁,1] = 
-                ϖ_λ₁λ₀[Δn] * fscattRayl * Z⁻⁺_λ₁λ₀[i,j] * 
+                ϖ_λ₁λ₀[Δn] * fscattRayl[n₀] * Z⁻⁺_λ₁λ₀[i,j] * 
                 (1/( (qp_μN[i] / qp_μN[j]) + (dτ_λ[n₁]/dτ_λ[n₀]) )) * 
                 (1 - exp(-((dτ_λ[n₁] / qp_μN[i]) + (dτ_λ[n₀] / qp_μN[j])))) * wct2[j] 
                     
@@ -240,12 +242,12 @@ end
             if i == j       
                 if abs(dτ_λ[n₀]-dτ_λ[n₁])>1.e-6
                     iet⁺⁺[i,j,n₁,1] = 
-                        ϖ_λ₁λ₀[Δn] * ϖ_λ[n₀] * fscattRayl * Z⁺⁺_λ₁λ₀[i,i] * wct2[i] *
+                        ϖ_λ₁λ₀[Δn] * ϖ_λ[n₀] * fscattRayl[n₀] * Z⁺⁺_λ₁λ₀[i,i] * wct2[i] *
                         (exp(-dτ_λ[n₀] / qp_μN[i]) - exp(-dτ_λ[n₁] / qp_μN[i]))/
                         (1 - (dτ_λ[n₁]/dτ_λ[n₀]))  
                 else    
                     iet⁺⁺[i,j,n₁,1] = 
-                        ϖ_λ₁λ₀[Δn] * ϖ_λ[n₀] * fscattRayl * Z⁺⁺_λ₁λ₀[i,i] * wct2[i] *
+                        ϖ_λ₁λ₀[Δn] * ϖ_λ[n₀] * fscattRayl[n₀] * Z⁺⁺_λ₁λ₀[i,i] * wct2[i] *
                         (1 - exp(-dτ_λ[n₀] / qp_μN[j]))   
                 end
             else
@@ -256,7 +258,7 @@ end
             # 𝐓⁺⁺(μᵢ, μⱼ) = ϖ ̇𝐙⁺⁺(μᵢ, μⱼ) ̇(μⱼ/(μᵢ-μⱼ)) ̇(exp{-τ/μᵢ} - exp{-τ/μⱼ}) ̇𝑤ⱼ
             # (𝑖 ≠ 𝑗)
             iet⁺⁺[i,j,n₁,1] = 
-                    ϖ_λ₁λ₀[Δn] * ϖ_λ[n₀] * fscattRayl * Z⁺⁺_λ₁λ₀[i,j] * 
+                    ϖ_λ₁λ₀[Δn] * ϖ_λ[n₀] * fscattRayl[n₀] * Z⁺⁺_λ₁λ₀[i,j] * 
                     (1 / ( (qp_μN[i]/qp_μN[j]) - (dτ_λ[n₁]/dτ_λ[n₀]) )) * wct2[j] * 
                     (exp(-dτ_λ[n₁] / qp_μN[i]) - exp(-dτ_λ[n₀] / qp_μN[j]))
         end
@@ -375,11 +377,11 @@ function get_elem_rt_SFI!(RS_type::RRS,
                         I₀, iμ0,D)
     @unpack fscattRayl, ϖ_λ₁λ₀, i_λ₁λ₀, i_ref = RS_type
     #@show fscattRayl
-    device = devi(architecture(ieJ₀⁺))
-    aType = array_type(architecture(ieJ₀⁺))
+    device  = devi(architecture(ieJ₀⁺))
+    aType   = array_type(architecture(ieJ₀⁺))
     kernel! = get_elem_rt_SFI_RRS!(device)
     #@show typeof(ieJ₀⁺), typeof(τ_sum), typeof(dτ_λ),typeof(wct02), typeof(qp_μN), typeof(dτ_λ) 
-    event = kernel!(fscattRayl[1], aType(ϖ_λ₁λ₀), aType(i_λ₁λ₀), 
+    event = kernel!(aType(fscattRayl), aType(ϖ_λ₁λ₀), aType(i_λ₁λ₀), 
                 i_ref, ieJ₀⁺, ieJ₀⁻, 
                 τ_sum, dτ_λ, ϖ_λ,
                 aType(Z⁻⁺_λ₁λ₀), aType(Z⁺⁺_λ₁λ₀), 
@@ -426,22 +428,22 @@ end
                 ieJ₀⁺[i, 1, n₁, Δn] = 
                         (exp(-dτ_λ[n₀] / qp_μN[i]) - exp(-dτ_λ[n₁] / qp_μN[i])) /
                         ((dτ_λ[n₁]/dτ_λ[n₀])-1) * 
-                        ϖ_λ₁λ₀[Δn] * ϖ_λ[n₀] * fscattRayl * Z⁺⁺_I₀ * wct02
+                        ϖ_λ₁λ₀[Δn] * ϖ_λ[n₀] * fscattRayl[n₀] * Z⁺⁺_I₀ * wct02
             else
                 ieJ₀⁺[i, 1, n₁, Δn] = 
-                        wct02 * ϖ_λ₁λ₀[Δn] * ϖ_λ[n₀] * fscattRayl * Z⁺⁺_I₀ * 
+                        wct02 * ϖ_λ₁λ₀[Δn] * ϖ_λ[n₀] * fscattRayl[n₀] * Z⁺⁺_I₀ * 
                         (1 - exp(-dτ_λ[n₀] / qp_μN[i_start]))
             end
         else
             # J₀⁺ = 0.25*(1+δ(m,0)) * ϖ(λ) * Z⁺⁺ * I₀ * [μ₀ / (μᵢ - μ₀)] * [exp(-dτ(λ)/μᵢ) - exp(-dτ(λ)/μ₀)]
             ieJ₀⁺[i, 1, n₁, Δn] = 
-                    wct02 * ϖ_λ₁λ₀[Δn] * ϖ_λ[n₀] * fscattRayl * Z⁺⁺_I₀ * 
+                    wct02 * ϖ_λ₁λ₀[Δn] * ϖ_λ[n₀] * fscattRayl[n₀] * Z⁺⁺_I₀ * 
                     (1 /( (qp_μN[i]/qp_μN[i_start]) - (dτ_λ[n₁]/dτ_λ[n₀]) ) ) * 
                     (exp(-dτ_λ[n₁] / qp_μN[i]) - exp(-dτ_λ[n₀] / qp_μN[i_start]))
         end
         #TODO
         #J₀⁻ = 0.25*(1+δ(m,0)) * ϖ(λ) * Z⁻⁺ * I₀ * [μ₀ / (μᵢ + μ₀)] * [1 - exp{-dτ(λ)(1/μᵢ + 1/μ₀)}]                    
-        ieJ₀⁻[i, 1, n₁, Δn] = wct02 * ϖ_λ₁λ₀[Δn] * ϖ_λ[n₀] * fscattRayl * Z⁻⁺_I₀ * 
+        ieJ₀⁻[i, 1, n₁, Δn] = wct02 * ϖ_λ₁λ₀[Δn] * ϖ_λ[n₀] * fscattRayl[n₀] * Z⁻⁺_I₀ * 
                 (1/( (qp_μN[i] / qp_μN[i_start]) + (dτ_λ[n₁]/dτ_λ[n₀]) )) *
                 (1 - exp(-( (dτ_λ[n₁] / qp_μN[i]) + (dτ_λ[n₀] / qp_μN[i_start]) ) ))  
         ieJ₀⁺[i, 1, n₁, Δn] *= exp(-τ_sum[n₀]/qp_μN[i_start]) #correct this to include n₀ap

@@ -80,16 +80,18 @@ default_J_matrix(FT, arr_type, dims, nSpec) = arr_type(zeros(FT, tuple(dims[1], 
 default_J_matrix_ie(FT, arr_type, dims, nSpec, nRaman) = arr_type(zeros(FT, tuple(dims[1], 1, nSpec, nRaman)))
 
 "Default matrix in RT calculation (zeros)"
-default_matrix(FT, arr_type, NSens, dims, nSpec)   = arr_type(zeros(FT, tuple(NSens, dims[1], dims[2], nSpec)))
+default_matrix(FT, arr_type, NSens, dims, nSpec)   = [zeros(FT, (dims[1], dims[2], nSpec)) for i=1:NSens]
+#arr_type(zeros(FT, tuple(NSens, dims[1], dims[2], nSpec)))
 "Default matrix in ieRT calculation (zeros)"
 default_matrix_ie(FT, arr_type, NSens, dims, nSpec, nRaman)   = [zeros(FT, (dims[1], dims[2], nSpec, nRaman)) for i=1:NSens]
-   
 #zeros(FT, tuple(NSens, dims[1], dims[2], nSpec, nRaman)))
 
 "Default J matrix in RT calculation (zeros)"
-default_J_matrix(FT, arr_type, NSens, dims, nSpec) = arr_type(zeros(FT, tuple(NSens, dims[1], 1, nSpec)))
+default_J_matrix(FT, arr_type, NSens, dims, nSpec) = [zeros(FT, (dims[1], 1, nSpec)) for i=1:NSens]
+#arr_type(zeros(FT, tuple(NSens, dims[1], 1, nSpec)))
 "Default J matrix in ieRT calculation (zeros)"
-default_J_matrix_ie(FT, arr_type, NSens, dims, nSpec, nRaman) = arr_type(zeros(FT, tuple(NSens, dims[1], 1, nSpec, nRaman)))
+default_J_matrix_ie(FT, arr_type, NSens, dims, nSpec, nRaman) = [zeros(FT, (dims[1], 1, nSpec, nRaman)) for i=1:NSens]
+#arr_type(zeros(FT, tuple(NSens, dims[1], 1, nSpec, nRaman)))
 
 ##### Only for testing, random matrices:
 "Default matrix in RT calculation (random)"
@@ -137,7 +139,8 @@ make_added_layer_rand(RS_type::Union{noRS, noRS_plus}, FT, arr_type, dims, nSpec
                                                         )
                                                          
 "Make a composite layer, supplying all default matrices"
-make_composite_layer(RS_type::Union{noRS, noRS_plus}, FT, arr_type, dims, nSpec) = CompositeLayer(
+make_composite_layer(RS_type::Union{noRS, noRS_plus}, 
+    FT, arr_type, dims, nSpec) = CompositeLayer(
                                                         default_matrix(FT, arr_type, dims, nSpec), 
                                                         default_matrix(FT, arr_type, dims, nSpec), 
                                                         default_matrix(FT, arr_type, dims, nSpec),
@@ -146,7 +149,8 @@ make_composite_layer(RS_type::Union{noRS, noRS_plus}, FT, arr_type, dims, nSpec)
                                                         default_J_matrix(FT, arr_type, dims, nSpec)
                                                         )
 "Make a composite layer, supplying all default matrices"
-make_composite_layer(RS_type::Union{RRS, RRS_plus,VS_0to1_plus, VS_1to0_plus}, FT, arr_type, dims, nSpec) = CompositeLayerRS(
+make_composite_layer(RS_type::Union{RRS, RRS_plus,VS_0to1_plus, VS_1to0_plus}, 
+    FT, arr_type, dims, nSpec) = CompositeLayerRS(
                                                         default_matrix(FT, arr_type, dims, nSpec), 
                                                         default_matrix(FT, arr_type, dims, nSpec), 
                                                         default_matrix(FT, arr_type, dims, nSpec),
