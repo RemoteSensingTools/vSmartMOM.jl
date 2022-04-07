@@ -625,40 +625,16 @@ function Base.:+( x::CoreScatteringOpticalProperties{xFT, xFT2, xFT3},
     all(wx .== 0.0) ? (return CoreScatteringOpticalProperties(τ, ϖ, y.Z⁺⁺, y.Z⁻⁺)) : nothing
     all(wy .== 0.0) ? (return CoreScatteringOpticalProperties(τ, ϖ, x.Z⁺⁺, x.Z⁻⁺)) : nothing
 
-    # A bit more tedious for Z matrices:
-    #@show size(wx), size(wy), size(w), wy, length(unique(wx))
-    #length(unique(w))  == 1 ? w  = unique(w) : nothing
-    #length(unique(wx)) == 1 ? wx = unique(wx) : nothing
-    #length(unique(wy)) == 1 ? wy = unique(wy) : nothing
     n = length(w);
-    #@show size(wx), size(wy), size(w)
-    #@show n
-    #if xFT <: AbstractFloat && yFT <: AbstractFloat
-    #    Z⁺⁺ = ((wx .* xZ⁺⁺) .+ (wy .* yZ⁺⁺)) ./ w 
-    #    Z⁻⁺ = ((wx .* xZ⁻⁺) .+ (wy .* yZ⁻⁺)) ./ w
-    #else
-        #@show xFT, yFT, length(wx), length(wy), length(w)
-        #!(xFT <: AbstractFloat) ? wx = reshape(wx,1,1,n) : nothing
-        #!(yFT <: AbstractFloat) ? wy = reshape(wy,1,1,n) : nothing
-        wy = wy ./ w
-        wx = wx ./ w
-        wx = reshape(wx,1,1,n)
-        wy = reshape(wy,1,1,n)
+    
+    wy = wy ./ w
+    wx = wx ./ w
+    wx = reshape(wx,1,1,n)
+    wy = reshape(wy,1,1,n)
         
-        #w = reshape(w,1,1,n)
-        #println("Block!")
-        #@show size(wx), size(wy), size(xZ⁺⁺), size(yZ⁺⁺)
-        #(xFT3 <: Matrix)  ? xZ⁺⁺ = _repeat(xZ⁺⁺,1,1,n) : nothing
-        #(xFT3 <: Matrix)  ? xZ⁻⁺ = _repeat(xZ⁻⁺,1,1,n) : nothing
-        #(yFT3 <: Matrix)  ? yZ⁺⁺ = _repeat(yZ⁺⁺,1,1,n) : nothing
-        #(yFT3 <: Matrix)  ? yZ⁻⁺ = _repeat(yZ⁻⁺,1,1,n) : nothing
-        #@show size(wx), size(xZ⁺⁺), size(wy), size(yZ⁺⁺)
-        Z⁺⁺ = (wx .* xZ⁺⁺ .+ wy .* yZ⁺⁺) 
-        Z⁻⁺ = (wx .* xZ⁻⁺ .+ wy .* yZ⁻⁺)
-        #@show size(Z⁺⁺), size(Z⁻⁺)
-        #println("###")
-        
-    #end
+    Z⁺⁺ = (wx .* xZ⁺⁺ .+ wy .* yZ⁺⁺) 
+    Z⁻⁺ = (wx .* xZ⁻⁺ .+ wy .* yZ⁻⁺)
+
     CoreScatteringOpticalProperties(τ, ϖ, Z⁺⁺, Z⁻⁺)  
 end
 
@@ -674,7 +650,7 @@ end
 function Base.:+( x::CoreScatteringOpticalProperties, y::CoreAbsorptionOpticalProperties ) 
     τ  = x.τ .+ y.τ
     wx = x.τ .* x.ϖ 
-    @show size(wx), size(τ)
+    #@show size(wx), size(τ)
     ϖ  = (wx) ./ τ
     CoreScatteringOpticalProperties(τ, ϖ, x.Z⁺⁺, x.Z⁻⁺)
 end

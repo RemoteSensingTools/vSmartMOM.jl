@@ -84,8 +84,8 @@ function rt_run_test(RS_type::CoreRT.AbstractRamanType,
         #@show sum(𝐙⁻⁺ ), sum(layer_opt_props[1].Z⁻⁺)
         # This basically multiplies with G again, needs to be fixed later (or removed from compute_Z_matrices)
         G1 = 0.5
-        𝐙⁻⁺ *= G1
-        𝐙⁺⁺ *= G1
+        #𝐙⁻⁺ *= G1
+        #𝐙⁺⁺ *= G1
 
         canopyCore = CoreRT.CoreScatteringOpticalProperties(G1*LAI, ϖ_canopy, arr_type(𝐙⁺⁺), arr_type(𝐙⁻⁺))
         @show canopyCore.ϖ
