@@ -26,9 +26,9 @@ FT = Float64
 # Load OCO Data: 
 # File names:
 
-#= Amazon 
-L1File   = "/net/fluo/data1/group/oco2/L1bSc/oco2_L1bScGL_31185a_200512_B10206r_210427152510.h5"
-metFile  = "/net/fluo/data1/group/oco2/L2Met/oco2_L2MetGL_31185a_200512_B10206r_210425222645.h5"
+# Africa
+L1File   = "/net/fluo/data1/group/oco2/L1bSc/oco2_L1bScND_31182a_200512_B10206r_210427151019.h5"
+metFile  = "/net/fluo/data1/group/oco2/L2Met/oco2_L2MetND_31182a_200512_B10206r_210425233338.h5"
 dictFile = "/home/cfranken/code/gitHub/InstrumentOperator.jl/json/oco2.yaml"
 # Load L1 file (could just use filenames here as well)
 oco = InstrumentOperator.load_L1(dictFile,L1File, metFile);
@@ -43,30 +43,13 @@ indices = (92:682,114:845,50:916);
 
 #indices = (92:885,114:845,50:916);
 # Geo Index (footprint,sounding):
-GeoInd = [5,2821];
+GeoInd = [3, 3391];
 
 # Get data for that sounding:
 oco_sounding = InstrumentOperator.getMeasurement(oco, bands, indices, GeoInd);
-=#
-
-L1File   = "/net/fluo/data1/group/oco2/L1bSc/oco2_L1bScND_26780a_190715_B10003r_200429212407.h5"
-metFile  = "/net/fluo/data1/group/oco2/L2Met/oco2_L2MetND_26780a_190715_B10003r_200429212406.h5"
-dictFile = "/home/cfranken/code/gitHub/InstrumentOperator.jl/json/oco2.yaml"
-# Load L1 file (could just use filenames here as well)
-oco = InstrumentOperator.load_L1(dictFile,L1File, metFile);
 
 
-# Pick some bands as tuple (or just one)
-bands = (1,2,3);
-#bands = (1,3);
-# Indices within that band:
-indices = (92:885,114:845,50:916);
-#indices = (92:885,50:916);
-# Geo Index (footprint,sounding):
-GeoInd = [5,5000];
 
-# Get data for that sounding:
-oco_sounding = InstrumentOperator.getMeasurement(oco, bands, indices, GeoInd);
 
 ###################################################
 # Produce black-body in wavenumber range
@@ -158,13 +141,13 @@ end
 
 
 # Prior State vector
-xₐ = FT[  0.202,   # Albedo band 1, degree 1
+xₐ = FT[  0.376,   # Albedo band 1, degree 1
         0,         # Albedo band 1, degree 2       
         0,         # Albedo band 1, degree 3       
-        0.138,#0.139,     # Albedo band 2, degree 1
+        0.251,#0.139,     # Albedo band 2, degree 1
         0,         # Albedo band 2, degree 2
         0,         # Albedo band 2, degree 3
-        0.0512,#0.0512,    # Albedo band 3, degree 1
+        0.1,#0.0512,    # Albedo band 3, degree 1
         0,         # Albedo band 3, degree 2
         0.00,      # Albedo band 3, degree 3
         -1.0,      # log AOD

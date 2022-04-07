@@ -36,7 +36,6 @@ dictFile = "/home/cfranken/code/gitHub/InstrumentOperator.jl/json/oco2.yaml"
 # Load L1 file (could just use filenames here as well)
 oco = InstrumentOperator.load_L1(dictFile,L1File, metFile);
 
-
 # Pick some bands as tuple (or just one)
 bands = (1,2,3);
 #bands = (1,3);
@@ -69,11 +68,11 @@ results_NoCanopyLowP = []
 for Alb = 0.0:0.1:0.6
     for iBand = 1:3
         #iBand = 3
-        lAlb = [0.4,0.236,0.065]
+        lAlb = [0.384,0.211,0.061]
         # Canopy Stuff!
         LD = CanopyOptics.spherical_leaves()
-        LD = CanopyOptics.planophile_leaves2()
-        leaf = LeafProspectProProperties{Float64}();
+        #LD = CanopyOptics.planophile_leaves2()
+        leaf = LeafProspectProProperties{Float64}(Cw=0.006);
         LAI = 5.0
         ν = parameters.spec_bands[iBand]
         range = 1e7/ν[end]:1e7/ν[1];
@@ -88,11 +87,13 @@ for Alb = 0.0:0.1:0.6
         # Run without canopy:
         model3 = deepcopy(model)
         model.params.brdf[iBand] = LambertianSurfaceScalar{Float64}(Alb)
-        model2.params.brdf[iBand]= LambertianSurfaceScalar{Float64}(Alb)
-        model3.params.brdf[iBand]= LambertianSurfaceScalar{Float64}(Alb)
-        R_SFI_noC, T_SFI_noC, _, _ = CoreRT.rt_run_test(RS_type, model2, iBand)
+        R_SFI_C, T_SFI_C, _, _       = rt_run_test(RS_type, model, BiLambMod, LAI, LD, ϖ_canopy, iBand)
+        @show Alb
+        model2.params.brdf[iBand]= LambertianSurfaceScalar{Float64}(lAlb[iBand])
+        R_SFI_noC, T_SFI_noC, _, _   = CoreRT.rt_run_test(RS_type, model2, iBand)
+        model3.params.brdf[iBand]= LambertianSurfaceScalar{Float64}(lAlb[iBand])
         R_SFI_noC2, T_SFI_noC2, _, _ = CoreRT.rt_run_test(RS_type, model3, iBand)
-        R_SFI_C, T_SFI_C, _, _ = rt_run_test(RS_type, model, BiLambMod, LAI, LD, ϖ_canopy, iBand)
+        
         push!(results_canopy,R_SFI_C[1,1,:])
         push!(results_NoCanopySameP, R_SFI_noC2[1,1,:])
         push!(results_NoCanopyLowP , R_SFI_noC[1,1,:])
@@ -115,27 +116,32 @@ for iBand in eachindex(results_canopy)
     @show iBand
 end
 
-iBand = 1
+iAlb = 4
+iBand = 1 + (iAlb-1)*3
 #plot(wl[iBand], results_canopy_conv[iBand], label="Canopy")
 #plot!(wl[iBand], results_NoCanopySameP_conv[iBand],label="No Canopy")
-#r1 = results_canopy_conv[iBand]./results_NoCanopySameP_conv[iBand]
+r1 = results_NoCanopySameP_conv[iBand]./results_NoCanopyLowP_conv[iBand]
 r2 = results_canopy_conv[iBand]./results_NoCanopyLowP_conv[iBand]
-#plot(wl[iBand], r1/mean(r1), label="Canopy/noC_sameP")
-plot(wl[iBand]*1e3, r2/mean(r2), label="Integrated Canopy / No Canopy", lw=2)
+plot(wl[iBand]*1e3, r1./maximum(r1), label="NoC_sameP/noC_lowP", lw=1.5, alpha=0.5)
+plot!(wl[iBand]*1e3, r2./maximum(r2), label="Integrated Canopy / No Canopy", lw=1.5, alpha=0.5)
 xlabel!("Wavelength (nm)")
 savefig("/home/cfranken/pdrdf_O2band.pdf")
 savefig("/home/cfranken/pdrdf_O2band.png")
 
-iBand = 2
+iBand = 2+ (iAlb-1)*3
+r1 = results_NoCanopySameP_conv[iBand]./results_NoCanopyLowP_conv[iBand]
 r2 = results_canopy_conv[iBand]./results_NoCanopyLowP_conv[iBand]
-plot(wl[iBand]*1e3, r2/mean(r2), label="Integrated Canopy / No Canopy", lw=2)
+plot(wl[iBand]*1e3, r1./maximum(r1), label="NoC_sameP/noC_lowP", lw=1.5, alpha=0.5)
+plot!(wl[iBand]*1e3, r2./maximum(r2), label="Integrated Canopy / No Canopy", lw=1.5, alpha=0.5)
 xlabel!("Wavelength (nm)")
 savefig("/home/cfranken/pdrdf_WCO2band.pdf")
 savefig("/home/cfranken/pdrdf_WCO2band.png")
 
-iBand = 3
+iBand = 3+ (iAlb-1)*3
+r1 = results_NoCanopySameP_conv[iBand]./results_NoCanopyLowP_conv[iBand]
 r2 = results_canopy_conv[iBand]./results_NoCanopyLowP_conv[iBand]
-plot(wl[iBand]*1e3, r2/mean(r2), label="Integrated Canopy / No Canopy", lw=2)
+plot(wl[iBand]*1e3, r1./maximum(r1), label="NoC_sameP/noC_lowP", lw=1.5, alpha=0.5)
+plot!(wl[iBand]*1e3, r2./maximum(r2), label="Integrated Canopy / No Canopy", lw=1.5, alpha=0.5)
 xlabel!("Wavelength (nm)")
 savefig("/home/cfranken/pdrdf_SCO2band.pdf")
 savefig("/home/cfranken/pdrdf_SCO2band.png")
