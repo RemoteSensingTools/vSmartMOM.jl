@@ -147,7 +147,7 @@ function model_from_parameters(params::vSmartMOM_Parameters)
 
             # Compute nAer aerosol optical thickness profiles
             τ_aer[i_band][i_aer,:] = 
-                params.scattering_params.rt_aerosols[i_aer].τ_ref[] * 
+                params.scattering_params.rt_aerosols[i_aer].τ_ref * 
                 (aerosol_optics[i_band][i_aer].k/k_ref) * 
                 getAerosolLayerOptProp(1, c_aero.p₀, c_aero.σp, profile.p_half)
         end 
@@ -218,7 +218,7 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
 
     # Rayleigh optical properties calculation
     greek_rayleigh = Scattering.get_greek_rayleigh(params.depol)
-    τ_rayl = [zeros(params.float_type, length(params.T)) for i=1:n_bands];
+    τ_rayl = [zeros(params.float_type,1, length(profile.p_full)) for i=1:n_bands];
 
     # τ_abs[iBand][iSpec,iZ]
     τ_abs     = [zeros(params.float_type, length(params.spec_bands[i]), length(profile.p_full)) for i in 1:n_bands]
@@ -229,10 +229,10 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
         # i'th spectral band (convert from cm⁻¹ to μm)
         curr_band_λ = 1e4 ./ params.spec_bands[i_band]
 
-        # Compute Rayleigh properties per layer for `i_band` band center 
-        τ_rayl[i_band]   = getRayleighLayerOptProp(profile.p_half[end], 
-                                (maximum(curr_band_λ) + minimum(curr_band_λ))/2, 
-                                params.depol, profile.vcd_dry);
+        # Compute Rayleigh properties per layer for `i_band` band center
+        τ_rayl[i_band]   .= getRayleighLayerOptProp(profile.p_half[end], 
+                            (maximum(curr_band_λ) + minimum(curr_band_λ))/2, 
+                            params.depol, profile.vcd_dry);
 
         # If no absorption, continue to next band
         isnothing(params.absorption_params) && continue
@@ -322,9 +322,9 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
 
             # Compute nAer aerosol optical thickness profiles
             τ_aer[i_band][i_aer,:] = 
-                params.scattering_params.rt_aerosols[i_aer].τ_ref[] * 
+                params.scattering_params.rt_aerosols[i_aer].τ_ref * 
                 (aerosol_optics[i_band][i_aer].k/k_ref) * 
-                CoreRT.getAerosolLayerOptProp(1.0, c_aero.p₀, c_aero.σp, profile.p_full)
+                CoreRT.getAerosolLayerOptProp(1.0, c_aero.p₀, c_aero.σp, profile.p_half)
         end 
     end
 

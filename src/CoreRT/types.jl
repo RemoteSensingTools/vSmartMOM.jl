@@ -195,89 +195,89 @@ end
 # Multisensor Composite layers 
 # Elastic
 "Composite Layer Matrices (`-/+` defined in τ coordinates, i.e. `-`=outgoing, `+`=incoming"
-Base.@kwdef struct CompositeLayerMS{FT} <: AbstractLayer 
+Base.@kwdef struct CompositeLayerMS{M} <: AbstractLayer 
     "Composite layer Reflectance matrix R (from + -> -)"
-    topR⁻⁺::AbstractArray{FT,4}
+    topR⁻⁺::M#AbstractArray{FT,4}
     "Composite layer Reflectance matrix R (from - -> +)"
-    topR⁺⁻::AbstractArray{FT,4}
+    topR⁺⁻::M
     "Composite layer transmission matrix T (from + -> +)"
-    topT⁺⁺::AbstractArray{FT,4}
+    topT⁺⁺::M
     "Composite layer transmission matrix T (from - -> -)"
-    topT⁻⁻::AbstractArray{FT,4}
+    topT⁻⁻::M
     "Composite layer source matrix J (in + direction)"
-    topJ₀⁺::AbstractArray{FT,4}
+    topJ₀⁺::M
     "Composite layer source matrix J (in - direction)"
-    topJ₀⁻::AbstractArray{FT,4}
+    topJ₀⁻::M
     "Composite layer Reflectance matrix R (from + -> -)"
-    botR⁻⁺::AbstractArray{FT,4}
+    botR⁻⁺::M
     "Composite layer Reflectance matrix R (from - -> +)"
-    botR⁺⁻::AbstractArray{FT,4}
+    botR⁺⁻::M
     "Composite layer transmission matrix T (from + -> +)"
-    botT⁺⁺::AbstractArray{FT,4}
+    botT⁺⁺::M
     "Composite layer transmission matrix T (from - -> -)"
-    botT⁻⁻::AbstractArray{FT,4}
+    botT⁻⁻::M
     "Composite layer source matrix J (in + direction)"
-    botJ₀⁺::AbstractArray{FT,4}
+    botJ₀⁺::M
     "Composite layer source matrix J (in - direction)"
-    botJ₀⁻::AbstractArray{FT,4}
+    botJ₀⁻::M
 end
 
 # Inelastic
 "Composite Layer Matrices (`-/+` defined in τ coordinates, i.e. `-`=outgoing, `+`=incoming"
-struct CompositeLayerMSRS{FT} <: AbstractLayer 
+Base.@kwdef struct CompositeLayerMSRS{M1, M2} <: AbstractLayer 
     "Composite layer Reflectance matrix R (from + -> -)"
-    topR⁻⁺::AbstractArray{FT,4}
+    topR⁻⁺::M1
     "Composite layer Reflectance matrix R (from - -> +)"
-    topR⁺⁻::AbstractArray{FT,4}
+    topR⁺⁻::M1
     "Composite layer transmission matrix T (from + -> +)"
-    topT⁺⁺::AbstractArray{FT,4}
+    topT⁺⁺::M1
     "Composite layer transmission matrix T (from - -> -)"
-    topT⁻⁻::AbstractArray{FT,4}
+    topT⁻⁻::M1
     "Composite layer source matrix J (in + direction)"
-    topJ₀⁺::AbstractArray{FT,4}
+    topJ₀⁺::M1 
     "Composite layer source matrix J (in - direction)"
-    topJ₀⁻::AbstractArray{FT,4}
+    topJ₀⁻::M1
 
     # Additional Arrays for Raman scattering
     "Composite layer Reflectance matrix ieR (from + -> -)"
-    topieR⁻⁺::AbstractArray{FT,5}
+    topieR⁻⁺::M2
     "Composite layer Reflectance matrix ieR (from - -> +)"
-    topieR⁺⁻::AbstractArray{FT,5}
+    topieR⁺⁻::M2
     "Composite layer transmission matrix ieT (from + -> +)"
-    topieT⁺⁺::AbstractArray{FT,5}
+    topieT⁺⁺::M2
     "Composite layer transmission matrix ieT (from - -> -)"
-    topieT⁻⁻::AbstractArray{FT,5}
+    topieT⁻⁻::M2
     "Composite layer source matrix ieJ (in + direction)"
-    topieJ₀⁺::AbstractArray{FT,5}
+    topieJ₀⁺::M2
     "Composite layer source matrix ieJ (in - direction)"
-    topieJ₀⁻::AbstractArray{FT,5}
+    topieJ₀⁻::M2
 
     "Composite layer Reflectance matrix R (from + -> -)"
-    botR⁻⁺::AbstractArray{FT,4}
+    botR⁻⁺::M1
     "Composite layer Reflectance matrix R (from - -> +)"
-    botR⁺⁻::AbstractArray{FT,4}
+    botR⁺⁻::M1
     "Composite layer transmission matrix T (from + -> +)"
-    botT⁺⁺::AbstractArray{FT,4}
+    botT⁺⁺::M1
     "Composite layer transmission matrix T (from - -> -)"
-    botT⁻⁻::AbstractArray{FT,4}
+    botT⁻⁻::M1
     "Composite layer source matrix J (in + direction)"
-    botJ₀⁺::AbstractArray{FT,4}
+    botJ₀⁺::M1
     "Composite layer source matrix J (in - direction)"
-    botJ₀⁻::AbstractArray{FT,4}
+    botJ₀⁻::M1
 
     # Additional Arrays for Raman scattering
     "Composite layer Reflectance matrix ieR (from + -> -)"
-    botieR⁻⁺::AbstractArray{FT,5}
+    botieR⁻⁺::M2
     "Composite layer Reflectance matrix ieR (from - -> +)"
-    botieR⁺⁻::AbstractArray{FT,5}
+    botieR⁺⁻::M2
     "Composite layer transmission matrix ieT (from + -> +)"
-    botieT⁺⁺::AbstractArray{FT,5}
+    botieT⁺⁺::M2
     "Composite layer transmission matrix ieT (from - -> -)"
-    botieT⁻⁻::AbstractArray{FT,5}
+    botieT⁻⁻::M2
     "Composite layer source matrix ieJ (in + direction)"
-    botieJ₀⁺::AbstractArray{FT,5}
+    botieJ₀⁺::M2
     "Composite layer source matrix ieJ (in - direction)"
-    botieJ₀⁻::AbstractArray{FT,5}
+    botieJ₀⁻::M2
 end
 
 "Abstract Type for Scattering Interfaces" 
@@ -674,7 +674,7 @@ end
 function Base.:+( x::CoreScatteringOpticalProperties, y::CoreAbsorptionOpticalProperties ) 
     τ  = x.τ .+ y.τ
     wx = x.τ .* x.ϖ 
-    @show size(wx), size(τ)
+    #@show size(wx), size(τ)
     ϖ  = (wx) ./ τ
     CoreScatteringOpticalProperties(τ, ϖ, x.Z⁺⁺, x.Z⁻⁺)
 end

@@ -30,15 +30,16 @@ function postprocessing_vza!(RS_type::noRS, iμ₀, pol_type,
         cos_m_phi, sin_m_phi = (cosd(m * vaz[i]), sind(m * vaz[i]));
         bigCS = weight * Diagonal([cos_m_phi, cos_m_phi, sin_m_phi, sin_m_phi][1:pol_type.n]);
 
+        #@show J₀⁻[istart:iend,1, 1], J₀⁺[istart:iend,1, 1]
         # Accumulate Fourier moments after azimuthal weighting
         for s = 1:nSpec
             
             if SFI
-                R_SFI[i,:,s] += bigCS * J₀⁻[istart:iend,1, s];
-                T_SFI[i,:,s] += bigCS * J₀⁺[istart:iend,1, s];
+                R_SFI[i,:,s] .+= bigCS * J₀⁻[istart:iend,1, s];
+                T_SFI[i,:,s] .+= bigCS * J₀⁺[istart:iend,1, s];
             else
-                R[i,:,s] += bigCS * (R⁻⁺[istart:iend, istart0:iend0, s] / μ₀) * pol_type.I₀;
-                T[i,:,s] += bigCS * (T⁺⁺[istart:iend, istart0:iend0, s] / μ₀) * pol_type.I₀;
+                R[i,:,s] .+= bigCS * (R⁻⁺[istart:iend, istart0:iend0, s] / μ₀) * pol_type.I₀;
+                T[i,:,s] .+= bigCS * (T⁺⁺[istart:iend, istart0:iend0, s] / μ₀) * pol_type.I₀;
             end
             
         end
