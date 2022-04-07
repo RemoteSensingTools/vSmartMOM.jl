@@ -227,7 +227,9 @@ function rt_run(model::vSmartMOM_Model; i_band::Integer = 1)
 end
 
 # Just to make sure we still have it:
-function rt_run_test(RS_type::AbstractRamanType, model::vSmartMOM_Model, iBand)
+function rt_run_test(RS_type::AbstractRamanType, 
+        model::vSmartMOM_Model, 
+        iBand)
     rt_run(RS_type,model,iBand)
 end
 
@@ -311,9 +313,10 @@ function rt_run(RS_type::AbstractRamanType,
         InelasticScattering.computeRamanZλ!(RS_type, pol_type,Array(qp_μ), m, arr_type)
         # Compute the core layer optical properties:
         @timeit "OpticalProps" layer_opt_props, fScattRayleigh   = 
-        constructCoreOpticalProperties(RS_type,iBand,m,model);
+            constructCoreOpticalProperties(RS_type,iBand,m,model);
         # Determine the scattering interface definitions:
-        scattering_interfaces_all, τ_sum_all = extractEffectiveProps(layer_opt_props);
+        scattering_interfaces_all, τ_sum_all = 
+            extractEffectiveProps(layer_opt_props);
 
         # Loop over vertical layers: 
         @showprogress 1 "Looping over layers ..." for iz = 1:Nz  # Count from TOA to BOA
@@ -322,11 +325,12 @@ function rt_run(RS_type::AbstractRamanType,
             # From Rayleigh and aerosol τ, ϖ, compute overall layer τ, ϖ
             # Suniti: modified to return fscattRayl as the last element of  computed_atmosphere_properties
             if !(typeof(RS_type) <: noRS)
-                RS_type.fscattRayl = fScattRayleigh[iz]
+                RS_type.fscattRayl = expandBandScalars(RS_type, fScattRayleigh[iz]) 
             end
             
             # Expand all layer optical properties to their full dimension:
-            @timeit "OpticalProps" layer_opt = expandOpticalProperties(layer_opt_props[iz], arr_type)
+            @timeit "OpticalProps" layer_opt = 
+                expandOpticalProperties(layer_opt_props[iz], arr_type)
 
             # Perform Core RT (doubling/elemental/interaction)
             rt_kernel!(RS_type, pol_type, SFI, 

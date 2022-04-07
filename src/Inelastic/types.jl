@@ -20,7 +20,7 @@ Base.@kwdef mutable struct RRS{FT<:AbstractFloat} <: AbstractRamanType
     greek_raman::GreekCoefs
     "Pre-computed optical properties"
     # ramanAtmoProp::RamanAtmosphereProperties
-    fscattRayl::Array{FT,1}
+    fscattRayl#::Array{FT,1}
     ϖ_Cabannes::Array{FT,1} #elastic fraction (Cabannes) of Rayleigh (Cabannes+Raman) scattering
     ϖ_λ₁λ₀::Array{FT,1}
     i_λ₁λ₀::Array{Int,1}

@@ -238,7 +238,7 @@ function get_elem_rt!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
     #VS - O2
     kernel! = get_elem_rt_VS!(device)
     #@show typeof(Z⁻⁺_λ₁λ₀), typeof(Z⁺⁺_λ₁λ₀), typeof(ϖ_λ₁λ₀), typeof(i_λ₁λ₀), typeof(i_ref)
-    event = kernel!(fscattRayl, 
+    event = kernel!(aType(fscattRayl), 
         aType(ϖ_λ₁λ₀_VS_o2), aType(i_λ₁λ₀_VS_o2),
         t_ier⁻⁺, t_iet⁺⁺, 
         dτ, ϖ, 
@@ -346,7 +346,7 @@ function get_elem_rt_SFI!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
     aType = array_type(architecture(ieJ₀⁺))
     kernel! = get_elem_rt_SFI_VS!(device)
     #@show typeof(ieJ₀⁺), typeof(τ_sum), typeof(dτ_λ),typeof(wct02), typeof(qp_μN), typeof(dτ_λ) 
-    event = kernel!(fscattRayl, 
+    event = kernel!(aType(fscattRayl), 
         aType(ϖ_λ₁λ₀), aType(i_λ₁λ₀), 
         ieJ₀⁺, ieJ₀⁻, 
         τ_sum, dτ, ϖ,
@@ -361,7 +361,7 @@ function get_elem_rt_SFI!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
     t_ieJ₀⁻ = similar(ieJ₀⁻)
     
     #println("Hallo1")
-    event = kernel!(fscattRayl, 
+    event = kernel!(aType(fscattRayl), 
         aType(ϖ_λ₁λ₀_VS_n2), aType(i_λ₁λ₀_VS_n2), 
         t_ieJ₀⁺, t_ieJ₀⁻, 
         τ_sum, dτ, ϖ,
@@ -475,7 +475,7 @@ function get_elem_rt_SFI!(RS_type::RRS_plus,
     aType = array_type(architecture(ieJ₀⁺))
     kernel! = get_elem_rt_SFI_RRS!(device)
     #@show typeof(ieJ₀⁺), typeof(τ_sum), typeof(dτ_λ),typeof(wct02), typeof(qp_μN), typeof(dτ_λ) 
-    event = kernel!(fscattRayl, aType(ϖ_λ₁λ₀), aType(i_λ₁λ₀), 
+    event = kernel!(aType(fscattRayl), aType(ϖ_λ₁λ₀), aType(i_λ₁λ₀), 
                 i_ref, ieJ₀⁺, ieJ₀⁻, 
                 τ_sum, dτ_λ, ϖ_λ,
                 aType(Z⁻⁺_λ₁λ₀), aType(Z⁺⁺_λ₁λ₀), 

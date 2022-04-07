@@ -5,7 +5,7 @@ using vSmartMOM.InelasticScattering
 using Statistics
 
 # Load YAML files into parameter struct
-parameters = parameters_from_yaml("test/test_parameters/O2Parameters.yaml");
+parameters = parameters_from_yaml("test/test_parameters/O2Parameters2.yaml");
 # Create model struct (precomputes optical properties) from parameters
 model      = model_from_parameters(parameters);
 
@@ -83,9 +83,13 @@ RnoRS, TnoRS, _, _ = CoreRT.rt_run_ms(noRS(),
             model.τ_abs[1],
             model.params.brdf[1],
             model.params.arhitecture);
-=#
-            
-RnoRS_test, TnoRS_test, _, _ = CoreRT.rt_run_test_ms(noRS([0.0],[1.0], Any[],[1]),[0,3],model,iBand);
+=#            
+#RnoRS_ms, TnoRS_ms, _, _ = CoreRT.rt_run_test_ms(noRS([0.0],[1.0], Any[],[1]),[0,3],model,iBand);
+#RnoRS_test, TnoRS_test, _, _ = CoreRT.rt_run_test_ms(noRS,[0,3],model,iBand);
+#RnoRS, TnoRS, _, _ = CoreRT.rt_run_test(noRS([0.0],[1.0], Any[],[1]),model,iBand);
+
+R_ms, T_ms, ieR_ms, ieTnoRS_ms = CoreRT.rt_run_test_ms(RS_type,[0,3],model,iBand);
+R, T, ieR, ieT = CoreRT.rt_run_test(RS_type,model,iBand);
 #=
 R_test, T_test, ieR_test, ieT_test = CoreRT.rt_run_test(RS_type,model,iBand);
 
