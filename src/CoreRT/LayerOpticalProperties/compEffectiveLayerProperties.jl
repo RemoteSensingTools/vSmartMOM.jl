@@ -48,7 +48,7 @@ function constructCoreOpticalProperties(RS_type, iBand, m, model)
         # fScattRayleigh:
         # Assume ϖ of 1 for Rayleight here:
         #@show size(combo)
-        fScattRayleigh = [rayl[i].τ  ./ combo[i].τ for i=1:nZ]
+        fScattRayleigh = [Array(rayl[i].τ  ./ combo[i].τ) for i=1:nZ]
         #@show fScattRayleigh, rayl[1].τ, combo[1].τ
         # Create Core Optical Properties merged with trace gas absorptions:
         push!(band_layer_props,
@@ -122,4 +122,4 @@ function expandBandScalars(RS_type, x)
     return out
 end
 
-expandScalar(x,n) = x*ones(n);
+expandScalar(x,n) = x.*ones(n);
