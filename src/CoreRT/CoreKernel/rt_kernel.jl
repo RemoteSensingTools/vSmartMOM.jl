@@ -184,15 +184,6 @@ function rt_kernel!(RS_type::noRS{FT},
     # If this is not the TOA, perform the interaction step
     else
         @timeit "interaction" interaction!(RS_type, scattering_interface, SFI, composite_layer, added_layer, I_static)
-        if iz==2
-            M1 = Array(composite_layer.T⁺⁺);
-            M2 = Array(composite_layer.R⁺⁻);
-            M3 = Array(composite_layer.T⁻⁻);
-            M4 = Array(composite_layer.R⁻⁺);
-            M5 = Array(composite_layer.J₀⁻);
-            M6 = Array(composite_layer.J₀⁺);
-            @show M1[1,1,1], M2[1,1,1], M3[1,1,1], M4[1,1,1], M5[1,1,1], M6[1,1,1]
-        end
     end
 end
 
