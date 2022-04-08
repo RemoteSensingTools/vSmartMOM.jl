@@ -270,7 +270,7 @@ function compute_wₓ(size_distribution, wᵣ, r, r_max)
 
     # normalize (could apply a check whether cdf.(size_distribution,r_max) is larger than 0.99:
     #println("Test")
-    @info "Fraction of size distribution cut by max radius: $((1-cdf.(size_distribution,r_max))*100) %"  
+    #@info "Fraction of size distribution cut by max radius: $((1-cdf.(size_distribution,r_max))*100) %"  
     wₓ /= sum(wₓ)
     return wₓ
 end

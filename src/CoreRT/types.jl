@@ -449,29 +449,29 @@ A struct which holds all derived model parameters (including any computations)
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-mutable struct vSmartMOM_Model
+struct vSmartMOM_Model{PA, AE, GR, QP, TAB, TR, TAE, Ogeom, PRO}
 
     "Struct with all individual parameters"
-    params::vSmartMOM_Parameters
+    params::PA # vSmartMOM_Parameters
     
     "Truncated aerosol optics"
-    aerosol_optics::AbstractArray{AbstractArray{AerosolOptics}}
+    aerosol_optics::AE # AbstractArray{AbstractArray{AerosolOptics}}
     "Greek coefs in Rayleigh calculations" 
-    greek_rayleigh::GreekCoefs
+    greek_rayleigh::GR # GreekCoefs
     "Quadrature points/weights, etc"
-    quad_points::QuadPoints
+    quad_points::QP # QuadPoints
 
     "Array to hold cross-sections over entire atmospheric profile"
-    τ_abs::AbstractArray{AbstractArray}
+    τ_abs::TAB # AbstractArray{AbstractArray}
     "Rayleigh optical thickness"
-    τ_rayl::AbstractArray{AbstractArray}
+    τ_rayl::TR # AbstractArray{AbstractArray}
     "Aerosol optical thickness"
-    τ_aer::AbstractArray{AbstractArray}
+    τ_aer::TAE # AbstractArray{AbstractArray}
 
     "Observational Geometry (includes sza, vza, vaz)"
-    obs_geom::ObsGeometry
+    obs_geom::Ogeom # ObsGeometry
     "Atmospheric profile to use"
-    profile::AtmosphericProfile
+    profile::PRO #AtmosphericProfile
 end
 
 """

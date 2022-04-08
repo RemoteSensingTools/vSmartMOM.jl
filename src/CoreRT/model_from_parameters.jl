@@ -90,6 +90,7 @@ function model_from_parameters(params::vSmartMOM_Parameters)
     aerosol_optics = [Array{AerosolOptics}(undef, (n_aer)) for i=1:n_bands];
         
     FT2 = isnothing(params.scattering_params) ? params.float_type : typeof(params.scattering_params.rt_aerosols[1].τ_ref)
+    @show FT2
     #FT2 =  params.float_type 
 
     # τ_aer[iBand][iAer,iZ]
@@ -144,12 +145,13 @@ function model_from_parameters(params::vSmartMOM_Parameters)
             #@show i_aer, i_band
             aerosol_optics[i_band][i_aer] = Scattering.truncate_phase(truncation_type, 
                                                     aerosol_optics_raw; reportFit=false)
-
+            #@show aerosol_optics[i_band][i_aer].fᵗ
             # Compute nAer aerosol optical thickness profiles
             τ_aer[i_band][i_aer,:] = 
                 params.scattering_params.rt_aerosols[i_aer].τ_ref * 
                 (aerosol_optics[i_band][i_aer].k/k_ref) * 
                 getAerosolLayerOptProp(1, c_aero.p₀, c_aero.σp, profile.p_half)
+            @info "AOD at band $i_band : $(sum(τ_aer[i_band][i_aer,:])), truncation factor = $(aerosol_optics[i_band][i_aer].fᵗ)"
         end 
     end
 

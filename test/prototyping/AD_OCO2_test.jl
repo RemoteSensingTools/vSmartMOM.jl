@@ -75,8 +75,8 @@ function runner!(y, x, parameters=parameters, oco_sounding= oco_sounding, Tsolar
                         CoreRT.LambertianSurfaceLegendre([x[7],x[8],x[5]]),
                         CoreRT.LambertianSurfaceLegendre([x[9],x[10],x[6]])];
 
-    parameters.scattering_params.rt_aerosols[1].τ_ref = 0.1+ 0*(x[2]);
-    parameters.scattering_params.rt_aerosols[1].p₀    = 600.0; #x[4]
+    parameters.scattering_params.rt_aerosols[1].τ_ref = exp(x[2]);
+    parameters.scattering_params.rt_aerosols[1].p₀    = 700.0; #x[4]
    
     parameters.p   = oco_sounding.p_half
     parameters.q   = oco_sounding.q 

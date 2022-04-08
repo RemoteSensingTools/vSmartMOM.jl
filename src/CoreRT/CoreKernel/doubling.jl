@@ -29,7 +29,7 @@ function doubling_helper!(pol_type,
     
     # Geometric progression of reflections (1-RR)⁻¹
     gp_refl      = similar(t⁺⁺)
-    tt⁺⁺_gp_refl = similar(t⁺⁺)
+    #tt⁺⁺_gp_refl = similar(t⁺⁺)
  
     if SFI
         # Dummy for source 
@@ -43,7 +43,7 @@ function doubling_helper!(pol_type,
         
         # T⁺⁺(λ)[I - R⁺⁻(λ)R⁻⁺(λ)]⁻¹, for doubling R⁺⁻,R⁻⁺ and T⁺⁺,T⁻⁻ is identical
         batch_inv!(gp_refl, I_static .- r⁻⁺ ⊠ r⁻⁺)
-        tt⁺⁺_gp_refl[:] = t⁺⁺ ⊠ gp_refl
+        tt⁺⁺_gp_refl = t⁺⁺ ⊠ gp_refl
 
         if SFI
 
@@ -54,18 +54,18 @@ function doubling_helper!(pol_type,
             @views J₁⁻[:,1,:] = J₀⁻[:,1,:] .* expk'
 
             # J⁻₀₂(λ) = J⁻₀₁(λ) + T⁻⁻₀₁(λ)[I - R⁻⁺₂₁(λ)R⁺⁻₀₁(λ)]⁻¹[J⁻₁₂(λ) + R⁻⁺₂₁(λ)J⁺₁₀(λ)] (see Eqs.8 in Raman paper draft)
-            J₀⁻[:] = J₀⁻ + (tt⁺⁺_gp_refl ⊠ (J₁⁻ + r⁻⁺ ⊠ J₀⁺)) 
+            J₀⁻ .= J₀⁻ + (tt⁺⁺_gp_refl ⊠ (J₁⁻ + r⁻⁺ ⊠ J₀⁺)) 
 
             # J⁺₂₀(λ) = J⁺₂₁(λ) + T⁺⁺₂₁(λ)[I - R⁺⁻₀₁(λ)R⁻⁺₂₁(λ)]⁻¹[J⁺₁₀(λ) + R⁺⁻₀₁(λ)J⁻₁₂(λ)] (see Eqs.8 in Raman paper draft)
-            J₀⁺[:] = J₁⁺ + (tt⁺⁺_gp_refl ⊠ (J₀⁺ + r⁻⁺ ⊠ J₁⁻))
-            expk[:] = expk.^2
+            J₀⁺ .= J₁⁺ + (tt⁺⁺_gp_refl ⊠ (J₀⁺ + r⁻⁺ ⊠ J₁⁻))
+            expk .= expk.^2
         end  
 
         # R⁻⁺₂₀(λ) = R⁻⁺₁₀(λ) + T⁻⁻₀₁(λ)[I - R⁻⁺₂₁(λ)R⁺⁻₀₁(λ)]⁻¹R⁻⁺₂₁(λ)T⁺⁺₁₀(λ) (see Eqs.8 in Raman paper draft)
-        r⁻⁺[:]  = r⁻⁺ + (tt⁺⁺_gp_refl ⊠ r⁻⁺ ⊠ t⁺⁺)
+        r⁻⁺  .= r⁻⁺ + (tt⁺⁺_gp_refl ⊠ r⁻⁺ ⊠ t⁺⁺)
 
         # T⁺⁺₂₀(λ) = T⁺⁺₂₁(λ)[I - R⁺⁻₀₁(λ)R⁻⁺₂₁(λ)]⁻¹T⁺⁺₁₀(λ) (see Eqs.8 in Raman paper draft)
-        t⁺⁺[:]  = tt⁺⁺_gp_refl ⊠ t⁺⁺
+        t⁺⁺  .= tt⁺⁺_gp_refl ⊠ t⁺⁺
     end
 
     # After doubling, revert D(DR)->R, where D = Diagonal{1,1,-1,-1}
@@ -73,8 +73,10 @@ function doubling_helper!(pol_type,
 
     synchronize_if_gpu()
 
+    # Can we do this in better batch modes?
     apply_D_matrix!(pol_type.n, added_layer.r⁻⁺, added_layer.t⁺⁺, added_layer.r⁺⁻, added_layer.t⁻⁻)
 
+    # Same here?
     SFI && apply_D_matrix_SFI!(pol_type.n, added_layer.J₀⁻)
 
     return nothing 
