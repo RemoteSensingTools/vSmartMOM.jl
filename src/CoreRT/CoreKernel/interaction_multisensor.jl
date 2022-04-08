@@ -46,17 +46,17 @@ function interaction_helper_ms!(::ScatteringInterface_01, SFI,
 
     if SFI
         #J₀⁺, J₀⁻ = similar(composite_layer.J₀⁺), similar(composite_layer.J₀⁺)
-        #J₀⁻ = composite_layer.J₀⁻ .+ composite_layer.T⁻⁻ ⊠ (added_layer.r⁻⁺ ⊠ composite_layer.J₀⁺ .+ added_layer.J₀⁻) 
-        #J₀⁺ = added_layer.J₀⁺ .+ added_layer.t⁺⁺ ⊠ composite_layer.J₀⁺ 
+        #J₀⁻ = composite_layer.J₀⁻ .+ composite_layer.T⁻⁻ ⊠ (added_layer.r⁻⁺ ⊠ composite_layer.J₀⁺ .+ added_layer.j₀⁻) 
+        #J₀⁺ = added_layer.j₀⁺ .+ added_layer.t⁺⁺ ⊠ composite_layer.J₀⁺ 
         J₀⁻[:] = J₀⁻ .+ T⁻⁻ ⊠ (r⁻⁺ ⊠ J₀⁺ .+ j₀⁻)
         J₀⁺[:] = j₀⁺ .+ t⁺⁺ ⊠ J₀⁺ 
     end
 
     # Batched multiplication between added and composite
-    R⁻⁺[:] = T⁻⁻ ⊠ r⁻⁺ ⊠ T⁺⁺
-    R⁺⁻[:] = r⁺⁻
-    T⁺⁺[:] = t⁺⁺ ⊠ T⁺⁺
-    T⁻⁻[:] = T⁻⁻ ⊠ t⁻⁻    
+    R⁻⁺ .= T⁻⁻ ⊠ r⁻⁺ ⊠ T⁺⁺
+    R⁺⁻ .= r⁺⁻
+    T⁺⁺ .= t⁺⁺ ⊠ T⁺⁺
+    T⁻⁻ .= T⁻⁻ ⊠ t⁻⁻    
 end
 
 # Scattering in inhomogeneous composite layer.
@@ -77,8 +77,8 @@ function interaction_helper_ms!(::ScatteringInterface_10, SFI,
 
     if SFI
         #tmpJ₀⁺, tmpJ₀⁻ = similar(J₀⁺), similar(J₀⁺)
-        J₀⁺[:] = j₀⁺ .+ t⁺⁺ ⊠ (J₀⁺ .+ R⁺⁻ ⊠ j₀⁻)
-        J₀⁻[:] = J₀⁻ .+ T⁻⁻ ⊠ j₀⁻
+        J₀⁺ .= j₀⁺ .+ t⁺⁺ ⊠ (J₀⁺ .+ R⁺⁻ ⊠ j₀⁻)
+        J₀⁻ .= J₀⁻ .+ T⁻⁻ ⊠ j₀⁻
     end
 
     # Batched multiplication between added and composite
@@ -164,7 +164,7 @@ function interaction_top!(ims::Int64,
                         I_static::AbstractArray{FT2},
                         arr_type) where {FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2,M}
 
-    @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, J₀⁺, J₀⁻ = added_layer
+    @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻ = added_layer
     @show size(composite_layer.topT⁺⁺)
     #@unpack topR⁻⁺, topR⁺⁻, topT⁺⁺, topT⁻⁻, topJ₀⁺, topJ₀⁻ = composite_layer
     R⁻⁺ = arr_type(composite_layer.topR⁻⁺[ims]) 
@@ -178,7 +178,7 @@ function interaction_top!(ims::Int64,
     
     interaction_helper_ms!(scattering_interface, SFI, #composite_layer, added_layer, 
                         I_static,
-                        r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, J₀⁺, J₀⁻,
+                        r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻,
                         R⁻⁺, R⁺⁻, T⁺⁺, T⁻⁻, compJ₀⁺, compJ₀⁻);
 
     composite_layer.topR⁻⁺[ims][:] = Array(R⁻⁺)
@@ -203,7 +203,7 @@ function interaction_bot!(ims::Int64,
                         added_layer::AddedLayer{FT},
                         I_static::AbstractArray{FT2}, arr_type) where {M,FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2}
 
-    @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, J₀⁺, J₀⁻ = added_layer
+    @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻ = added_layer
     @show scattering_interface
     #@unpack botR⁻⁺, botR⁺⁻, botT⁺⁺, botT⁻⁻, botJ₀⁺, botJ₀⁻ = composite_layer
     R⁻⁺ = arr_type(composite_layer.botR⁻⁺[ims]) 
@@ -217,7 +217,7 @@ function interaction_bot!(ims::Int64,
     
     interaction_helper_ms!(scattering_interface, SFI, #composite_layer, added_layer, 
                         I_static,
-                        r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, J₀⁺, J₀⁻,
+                        r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻,
                         R⁻⁺, R⁺⁻, T⁺⁺, T⁻⁻, compJ₀⁺, compJ₀⁻);
         
     composite_layer.botR⁻⁺[ims][:] = Array(R⁻⁺)
@@ -265,19 +265,16 @@ function interaction_helper_ms!(RS_type, ::ScatteringInterface_00, SFI,
     ieJ₀⁺::AbstractArray{FT}, ieJ₀⁻::AbstractArray{FT}
     ) where {FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2}
 
-    # If SFI, interact source function in no scattering
-    if SFI
+    ieJ₀⁺ .= 0.0 #ieJ₀⁺
+    ieJ₀⁻ .= 0.0 #ieJ₀⁻
+    #tmpJ₀⁺, tmpJ₀⁻ = similar(J₀⁺), similar(J₀⁺)
+    J₀⁺ .= j₀⁺ .+ t⁺⁺ ⊠ J₀⁺
+    J₀⁻ .= J₀⁻ .+ T⁻⁻ ⊠ j₀⁻
 
-        ieJ₀⁺[:] = 0.0 #ieJ₀⁺
-        ieJ₀⁻[:] = 0.0 #ieJ₀⁻
-        #tmpJ₀⁺, tmpJ₀⁻ = similar(J₀⁺), similar(J₀⁺)
-        J₀⁺[:] = j₀⁺ .+ t⁺⁺ ⊠ J₀⁺
-        J₀⁻[:] = J₀⁻ .+ T⁻⁻ ⊠ j₀⁻
-    end
 
     # Batched multiplication between added and composite
-    T⁻⁻[:] = t⁻⁻ ⊠ T⁻⁻
-    T⁺⁺[:] = t⁺⁺ ⊠ T⁺⁺
+    T⁻⁻ .= t⁻⁻ ⊠ T⁻⁻
+    T⁺⁺ .= t⁺⁺ ⊠ T⁺⁺
 end
 
 # No scattering in inhomogeneous composite layer.
@@ -508,9 +505,9 @@ function interaction_helper_ms!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
         end
     end
     # Batched multiplication between added and composite
-    T⁺⁺[:] = t⁺⁺ ⊠ T⁺⁺
-    T⁻⁻[:] = T⁻⁻ ⊠ t⁻⁻
-    R⁺⁻[:] = t⁺⁺ ⊠ R⁺⁻ ⊠ t⁻⁻
+    T⁺⁺ .= t⁺⁺ ⊠ T⁺⁺
+    T⁻⁻ .= T⁻⁻ ⊠ t⁻⁻
+    R⁺⁻ .= t⁺⁺ ⊠ R⁺⁻ ⊠ t⁻⁻
 end
 
 # Scattering in inhomogeneous composite layer.
@@ -579,9 +576,9 @@ function interaction_helper_ms!(RS_type::RRS, ::ScatteringInterface_11, SFI,
             tmp_inv[:,:,n₀] ⊠ t⁻⁻[:,:,n₀]
     end
     # R₂₀ = R₁₀ + T₀₁(I-R₂₁R₀₁)⁻¹ R₂₁T₁₀ 
-    R⁻⁺[:] = R⁻⁺ .+ T01_inv ⊠ r⁻⁺ ⊠ T⁺⁺ #Suniti
+    R⁻⁺ .= R⁻⁺ .+ T01_inv ⊠ r⁻⁺ ⊠ T⁺⁺ #Suniti
     # T₀₂ = T₀₁(1-R₂₁R₀₁)⁻¹T₁₂
-    T⁻⁻[:] = T01_inv ⊠ t⁻⁻ #Suniti
+    T⁻⁻ .= T01_inv ⊠ t⁻⁻ #Suniti
 
 
 
@@ -609,7 +606,7 @@ function interaction_helper_ms!(RS_type::RRS, ::ScatteringInterface_11, SFI,
                             R⁺⁻[:,:,n₀] ⊠ j₀⁻[:,:,n₀])
         end
         # J₂₀⁺ = J₂₁⁺ + T₂₁(I-R₀₁R₂₁)⁻¹(J₁₀ + R₀₁J₁₂⁻ )
-        J₀⁺[:] = j₀⁺ .+ T21_inv ⊠ (J₀⁺ .+ R⁺⁻ ⊠ j₀⁻)
+        J₀⁺ .= j₀⁺ .+ T21_inv ⊠ (J₀⁺ .+ R⁺⁻ ⊠ j₀⁻)
     end 
     for Δn = 1:size(ieJ₀⁺,4)
         n₀, n₁ = get_n₀_n₁(ieJ₀⁺,i_λ₁λ₀[Δn])
@@ -633,10 +630,10 @@ function interaction_helper_ms!(RS_type::RRS, ::ScatteringInterface_11, SFI,
     end
     
     # T₂₀ = T₂₁(I-R₀₁R₂₁)⁻¹T₁₀
-    T⁺⁺[:] = T21_inv  ⊠ T⁺⁺ #Suniti
+    T⁺⁺ .= T21_inv  ⊠ T⁺⁺ #Suniti
 
     # R₀₂ = R₁₂ + T₂₁(1-R₀₁R₂₁)⁻¹R₀₁T₁₂
-    R⁺⁻[:] = r⁺⁻ .+ T21_inv ⊠ R⁺⁻ ⊠ t⁻⁻ #Suniti
+    R⁺⁻ .= r⁺⁻ .+ T21_inv ⊠ R⁺⁻ ⊠ t⁻⁻ #Suniti
 end
 
 function interaction_helper_ms!(RS_type::Union{VS_0to1_plus, VS_1to0_plus}, 
@@ -769,10 +766,10 @@ function interaction_helper_ms!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
     end
     
     # T₂₀ = T₂₁(I-R₀₁R₂₁)⁻¹T₁₀
-    T⁺⁺[:] = T21_inv  ⊠ T⁺⁺ #Suniti
+    T⁺⁺ .= T21_inv  ⊠ T⁺⁺ #Suniti
 
     # R₀₂ = R₁₂ + T₂₁(1-R₀₁R₂₁)⁻¹R₀₁T₁₂
-    R⁺⁻[:] = r⁺⁻ .+ T21_inv ⊠ R⁺⁻ ⊠ t⁻⁻ #Suniti
+    R⁺⁻ .= r⁺⁻ .+ T21_inv ⊠ R⁺⁻ ⊠ t⁻⁻ #Suniti
 end
 
 "Compute interaction between composite and added layers above the sensor"
@@ -785,7 +782,7 @@ added_layer::AddedLayerRS{FT},
 I_static::AbstractArray{FT2},
 arr_type) where {FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2,M}
 
-    @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, J₀⁺, J₀⁻ = added_layer
+    @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻ = added_layer
     @unpack ier⁺⁻, ier⁻⁺, iet⁻⁻, iet⁺⁺, ieJ₀⁺, ieJ₀⁻ = added_layer
     @show size(composite_layer.topT⁺⁺)
     #@unpack topR⁻⁺, topR⁺⁻, topT⁺⁺, topT⁻⁻, topJ₀⁺, topJ₀⁻ = composite_layer
@@ -809,7 +806,7 @@ arr_type) where {FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2,M}
 
     interaction_helper_ms!(RS_type, scattering_interface, SFI, #composite_layer, added_layer, 
                             I_static,
-                            r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, J₀⁺, J₀⁻,
+                            r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻,
                             ier⁺⁻, ier⁻⁺, iet⁻⁻, iet⁺⁺, ieJ₀⁺, ieJ₀⁻,
                             R⁻⁺, R⁺⁻, T⁺⁺, T⁻⁻, compJ₀⁺, compJ₀⁻,
                             ieR⁻⁺, ieR⁺⁻, ieT⁺⁺, ieT⁻⁻, compieJ₀⁺, compieJ₀⁻);
@@ -845,7 +842,7 @@ function interaction_bot!(ims::Int64,
                     added_layer::AddedLayerRS{FT},
                     I_static::AbstractArray{FT2},
                     arr_type) where {FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2,M}
-    @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, J₀⁺, J₀⁻ = added_layer
+    @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻ = added_layer
     @unpack ier⁺⁻, ier⁻⁺, iet⁻⁻, iet⁺⁺, ieJ₀⁺, ieJ₀⁻ = added_layer
     @show scattering_interface
     #@unpack botR⁻⁺, botR⁺⁻, botT⁺⁺, botT⁻⁻, botJ₀⁺, botJ₀⁻ = composite_layer
@@ -869,7 +866,7 @@ function interaction_bot!(ims::Int64,
 
     interaction_helper_ms!(RS_type, scattering_interface, SFI, #composite_layer, added_layer, 
                             I_static,
-                            r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, J₀⁺, J₀⁻,
+                            r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻,
                             ier⁺⁻, ier⁻⁺, iet⁻⁻, iet⁺⁺, ieJ₀⁺, ieJ₀⁻,
                             R⁻⁺, R⁺⁻, T⁺⁺, T⁻⁻, compJ₀⁺, compJ₀⁻,
                             ieR⁻⁺, ieR⁺⁻, ieT⁺⁺, ieT⁻⁻, compieJ₀⁺, compieJ₀⁻);

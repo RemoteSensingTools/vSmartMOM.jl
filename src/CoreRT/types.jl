@@ -128,9 +128,9 @@ Base.@kwdef struct AddedLayer{FT} <: AbstractLayer
     "Added layer transmission matrix T (from - -> -)"
     t⁻⁻::AbstractArray{FT,3}
     "Added layer source matrix J (in + direction)"
-    J₀⁺::AbstractArray{FT,3}
+    j₀⁺::AbstractArray{FT,3}
     "Added layer source matrix J (in - direction)"
-    J₀⁻::AbstractArray{FT,3}
+    j₀⁻::AbstractArray{FT,3}
 end
 
 "Composite Layer Matrices (`-/+` defined in τ coordinates, i.e. `-`=outgoing, `+`=incoming"

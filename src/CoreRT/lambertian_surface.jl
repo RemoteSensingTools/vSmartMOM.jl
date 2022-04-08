@@ -52,13 +52,13 @@ function create_surface_layer!(lambertian::LambertianSurfaceScalar{FT},
             I₀_NquadN[:] .=0;
             I₀_NquadN[iμ₀Nstart:pol_type.n*iμ₀] = pol_type.I₀;
             
-            added_layer.J₀⁺[:,1,:] .= I₀_NquadN .* exp.(-τ_sum/μ₀)';
-            added_layer.J₀⁻[:,1,:] = μ₀*(R_surf*I₀_NquadN) .* exp.(-τ_sum/μ₀)';
+            added_layer.j₀⁺[:,1,:] .= I₀_NquadN .* exp.(-τ_sum/μ₀)';
+            added_layer.j₀⁻[:,1,:] = μ₀*(R_surf*I₀_NquadN) .* exp.(-τ_sum/μ₀)';
         end
         R_surf = R_surf * Diagonal(qp_μN.*wt_μN)
         
 
-        #@show size(added_layer.r⁻⁺), size(R_surf), size(added_layer.J₀⁻)
+        #@show size(added_layer.r⁻⁺), size(R_surf), size(added_layer.j₀⁻)
         added_layer.r⁻⁺ .= R_surf;
         added_layer.r⁺⁻ .= 0;
         added_layer.t⁺⁺ .= T_surf;
@@ -69,8 +69,8 @@ function create_surface_layer!(lambertian::LambertianSurfaceScalar{FT},
         added_layer.r⁻⁺ .= 0;
         added_layer.t⁺⁺ .= T_surf;
         added_layer.t⁻⁻ .= T_surf;
-        added_layer.J₀⁺ .= 0;
-        added_layer.J₀⁻ .= 0;
+        added_layer.j₀⁺ .= 0;
+        added_layer.j₀⁻ .= 0;
     end
 end
 
@@ -111,9 +111,9 @@ function create_surface_layer!(lambertian::LambertianSurfaceLegendre{FT},
             I₀_NquadN = similar(qp_μN);
             I₀_NquadN[:] .=0;
             I₀_NquadN[iμ₀Nstart:pol_type.n*iμ₀] = pol_type.I₀;
-            added_layer.J₀⁺[:] .= 0
+            added_layer.j₀⁺[:] .= 0
             # Suniti double-check
-            added_layer.J₀⁻[:,1,:] = μ₀*(R_surf*I₀_NquadN) .* (ρ .* exp.(-τ_sum/μ₀))';
+            added_layer.j₀⁻[:,1,:] = μ₀*(R_surf*I₀_NquadN) .* (ρ .* exp.(-τ_sum/μ₀))';
         end
         R_surf   = R_surf * Diagonal(qp_μN.*wt_μN)
         siz = size(added_layer.r⁻⁺)
@@ -121,7 +121,7 @@ function create_surface_layer!(lambertian::LambertianSurfaceLegendre{FT},
         tmp    = ones(pol_type.n*Nquad)
         T_surf = arr_type(Diagonal(tmp))
 
-        #@show size(added_layer.r⁻⁺), size(R_surf), size(added_layer.J₀⁻)
+        #@show size(added_layer.r⁻⁺), size(R_surf), size(added_layer.j₀⁻)
         added_layer.r⁻⁺ .= R_surf3D;
         added_layer.r⁺⁻ .= 0;
         added_layer.t⁺⁺ .= T_surf;
@@ -132,7 +132,7 @@ function create_surface_layer!(lambertian::LambertianSurfaceLegendre{FT},
         added_layer.r⁻⁺[:] .= 0;
         added_layer.t⁺⁺[:] .= 0;
         added_layer.t⁻⁻[:] .= 0;
-        added_layer.J₀⁺[:] .= 0;
-        added_layer.J₀⁻[:] .= 0;
+        added_layer.j₀⁺[:] .= 0;
+        added_layer.j₀⁻[:] .= 0;
     end
 end

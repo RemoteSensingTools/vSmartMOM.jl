@@ -20,7 +20,7 @@ function rt_kernel!(RS_type::noRS, pol_type, SFI, added_layer, composite_layer, 
         # If not, there is no reflectance. Assign r/t appropriately
         added_layer.r⁻⁺[:] .= 0;
         added_layer.r⁺⁻[:] .= 0;
-        added_layer.J₀⁻[:] .= 0;
+        added_layer.j₀⁻[:] .= 0;
         temp = Array(exp.(-τ_λ./qp_μN'))
         #added_layer.t⁺⁺, added_layer.t⁻⁻ = (Diagonal(exp(-τ_λ / qp_μN)), Diagonal(exp(-τ_λ / qp_μN)))   
         for iλ = 1:length(τ_λ)
@@ -30,8 +30,8 @@ function rt_kernel!(RS_type::noRS, pol_type, SFI, added_layer, composite_layer, 
     end
     #M1 = Array(added_layer.t⁺⁺)
     #M2 = Array(added_layer.r⁺⁻)
-    #M3 = Array(added_layer.J₀⁻)
-    #M4 = Array(added_layer.J₀⁺)
+    #M3 = Array(added_layer.j₀⁻)
+    #M4 = Array(added_layer.j₀⁺)
     #@show M1[1,1,1], M2[1,1,1], M3[1,1,1], M4[1,1,1]
     # @assert !any(isnan.(added_layer.t⁺⁺))
     
@@ -39,7 +39,7 @@ function rt_kernel!(RS_type::noRS, pol_type, SFI, added_layer, composite_layer, 
     if (iz == 1)
         composite_layer.T⁺⁺[:], composite_layer.T⁻⁻[:] = (added_layer.t⁺⁺, added_layer.t⁻⁻)
         composite_layer.R⁻⁺[:], composite_layer.R⁺⁻[:] = (added_layer.r⁻⁺, added_layer.r⁺⁻)
-        composite_layer.J₀⁺[:], composite_layer.J₀⁻[:] = (added_layer.J₀⁺, added_layer.J₀⁻ )
+        composite_layer.J₀⁺[:], composite_layer.J₀⁻[:] = (added_layer.j₀⁺, added_layer.j₀⁻ )
         
     # If this is not the TOA, perform the interaction step
     else
@@ -80,7 +80,7 @@ function rt_kernel!(RS_type::Union{RRS, VS_0to1, VS_1to0}, pol_type, SFI, added_
         # If not, there is no reflectance. Assign r/t appropriately
         added_layer.r⁻⁺[:] .= 0;
         added_layer.r⁺⁻[:] .= 0;
-        added_layer.J₀⁻[:] .= 0;
+        added_layer.j₀⁻[:] .= 0;
         added_layer.ier⁻⁺[:] .= 0;
         added_layer.ier⁺⁻[:] .= 0;
         added_layer.ieJ₀⁻[:] .= 0;
@@ -101,7 +101,7 @@ function rt_kernel!(RS_type::Union{RRS, VS_0to1, VS_1to0}, pol_type, SFI, added_
     if (iz == 1)
         composite_layer.T⁺⁺[:], composite_layer.T⁻⁻[:] = (added_layer.t⁺⁺, added_layer.t⁻⁻)
         composite_layer.R⁻⁺[:], composite_layer.R⁺⁻[:] = (added_layer.r⁻⁺, added_layer.r⁺⁻)
-        composite_layer.J₀⁺[:], composite_layer.J₀⁻[:] = (added_layer.J₀⁺, added_layer.J₀⁻ )
+        composite_layer.J₀⁺[:], composite_layer.J₀⁻[:] = (added_layer.j₀⁺, added_layer.j₀⁻ )
         composite_layer.ieT⁺⁺[:], composite_layer.ieT⁻⁻[:] = (added_layer.iet⁺⁺, added_layer.iet⁻⁻)
         composite_layer.ieR⁻⁺[:], composite_layer.ieR⁺⁻[:] = (added_layer.ier⁻⁺, added_layer.ier⁺⁻)
         composite_layer.ieJ₀⁺[:], composite_layer.ieJ₀⁻[:] = (added_layer.ieJ₀⁺, added_layer.ieJ₀⁻ )
@@ -165,7 +165,7 @@ function rt_kernel!(RS_type::noRS{FT},
         # If not, there is no reflectance. Assign r/t appropriately
         added_layer.r⁻⁺[:] .= 0;
         added_layer.r⁺⁻[:] .= 0;
-        added_layer.J₀⁻[:] .= 0;
+        added_layer.j₀⁻[:] .= 0;
         temp = Array(exp.(-τ_λ./qp_μN'))
         #added_layer.t⁺⁺, added_layer.t⁻⁻ = (Diagonal(exp(-τ_λ / qp_μN)), Diagonal(exp(-τ_λ / qp_μN)))   
         for iλ = 1:length(τ_λ)
@@ -180,7 +180,7 @@ function rt_kernel!(RS_type::noRS{FT},
     if (iz == 1)
         composite_layer.T⁺⁺[:], composite_layer.T⁻⁻[:] = (added_layer.t⁺⁺, added_layer.t⁻⁻)
         composite_layer.R⁻⁺[:], composite_layer.R⁺⁻[:] = (added_layer.r⁻⁺, added_layer.r⁺⁻)
-        composite_layer.J₀⁺[:], composite_layer.J₀⁻[:] = (added_layer.J₀⁺, added_layer.J₀⁻ )
+        composite_layer.J₀⁺[:], composite_layer.J₀⁻[:] = (added_layer.j₀⁺, added_layer.j₀⁻ )
     # If this is not the TOA, perform the interaction step
     else
         @timeit "interaction" interaction!(RS_type, scattering_interface, SFI, composite_layer, added_layer, I_static)
@@ -222,7 +222,7 @@ function rt_kernel!(RS_type::Union{RRS{FT}, VS_0to1{FT}, VS_1to0{FT}}, pol_type,
         # If not, there is no reflectance. Assign r/t appropriately
         added_layer.r⁻⁺[:] .= 0;
         added_layer.r⁺⁻[:] .= 0;
-        added_layer.J₀⁻[:] .= 0;
+        added_layer.j₀⁻[:] .= 0;
         added_layer.ier⁻⁺[:] .= 0;
         added_layer.ier⁺⁻[:] .= 0;
         added_layer.ieJ₀⁻[:] .= 0;
@@ -243,7 +243,7 @@ function rt_kernel!(RS_type::Union{RRS{FT}, VS_0to1{FT}, VS_1to0{FT}}, pol_type,
     if (iz == 1)
         composite_layer.T⁺⁺[:], composite_layer.T⁻⁻[:] = (added_layer.t⁺⁺, added_layer.t⁻⁻)
         composite_layer.R⁻⁺[:], composite_layer.R⁺⁻[:] = (added_layer.r⁻⁺, added_layer.r⁺⁻)
-        composite_layer.J₀⁺[:], composite_layer.J₀⁻[:] = (added_layer.J₀⁺, added_layer.J₀⁻ )
+        composite_layer.J₀⁺[:], composite_layer.J₀⁻[:] = (added_layer.j₀⁺, added_layer.j₀⁻ )
         composite_layer.ieT⁺⁺[:], composite_layer.ieT⁻⁻[:] = (added_layer.iet⁺⁺, added_layer.iet⁻⁻)
         composite_layer.ieR⁻⁺[:], composite_layer.ieR⁺⁻[:] = (added_layer.ier⁻⁺, added_layer.ier⁺⁻)
         composite_layer.ieJ₀⁺[:], composite_layer.ieJ₀⁻[:] = (added_layer.ieJ₀⁺, added_layer.ieJ₀⁻ )
@@ -297,7 +297,7 @@ function rt_kernel!(
         # If not, there is no reflectance. Assign r/t appropriately
         added_layer.r⁻⁺[:] .= 0;
         added_layer.r⁺⁻[:] .= 0;
-        added_layer.J₀⁻[:] .= 0;
+        added_layer.j₀⁻[:] .= 0;
         added_layer.ier⁻⁺[:] .= 0;
         added_layer.ier⁺⁻[:] .= 0;
         added_layer.ieJ₀⁻[:] .= 0;
@@ -318,7 +318,7 @@ function rt_kernel!(
     if (iz == 1)
         composite_layer.T⁺⁺[:], composite_layer.T⁻⁻[:] = (added_layer.t⁺⁺, added_layer.t⁻⁻)
         composite_layer.R⁻⁺[:], composite_layer.R⁺⁻[:] = (added_layer.r⁻⁺, added_layer.r⁺⁻)
-        composite_layer.J₀⁺[:], composite_layer.J₀⁻[:] = (added_layer.J₀⁺, added_layer.J₀⁻ )
+        composite_layer.J₀⁺[:], composite_layer.J₀⁻[:] = (added_layer.j₀⁺, added_layer.j₀⁻ )
         composite_layer.ieT⁺⁺[:], composite_layer.ieT⁻⁻[:] = (added_layer.iet⁺⁺, added_layer.iet⁻⁻)
         composite_layer.ieR⁻⁺[:], composite_layer.ieR⁺⁻[:] = (added_layer.ier⁻⁺, added_layer.ier⁺⁻)
         composite_layer.ieJ₀⁺[:], composite_layer.ieJ₀⁻[:] = (added_layer.ieJ₀⁺, added_layer.ieJ₀⁻ )
