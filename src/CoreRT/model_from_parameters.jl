@@ -157,6 +157,17 @@ function model_from_parameters(params::vSmartMOM_Parameters)
 
     # Check the floating-type output matches specified FT
 
+    # Plots:
+    
+    plt = lineplot(profile.T, -profile.p_full,#ylim=(1000,0),
+                      title="Temperature Profile", xlabel="Temperature [K]", ylabel="- Pressure [hPa]", canvas = UnicodePlots.DotCanvas, border=:ascii, compact=true)
+    display(plt)
+    plt = lineplot(profile.q, -profile.p_full,
+                      title="Humidity Profile", xlabel="Specific humidity", ylabel="- Pressure [hPa]", canvas = UnicodePlots.DotCanvas, border=:ascii, compact=true)
+    display(plt)
+    plt = lineplot(τ_aer[1][1,:],-profile.p_full,
+                      title="AOD Profile Band 1", xlabel="AOD", ylabel="- Pressure [hPa]", canvas = UnicodePlots.DotCanvas, border=:ascii, compact=true)
+    display(plt)
     # Return the model 
     return vSmartMOM_Model(params, 
                         aerosol_optics,  

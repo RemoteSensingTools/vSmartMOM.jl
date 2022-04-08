@@ -8,6 +8,7 @@ It includes this module's source files and exports the relevant keywords.
 
 module CoreRT
 
+using UnicodePlots
 using Interpolations               # For interpolating the vmr's
 using LinearAlgebra                # For linear algebra routines
 using ProgressMeter                # Showing progress in for loops

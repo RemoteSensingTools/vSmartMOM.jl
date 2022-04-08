@@ -14,6 +14,7 @@ using CUDA
 using Parameters
 using DocStringExtensions
 using UnPack
+using UnicodePlots
 
 # Export Architecture functions
 export CPU, GPU, default_architecture, array_type

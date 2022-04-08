@@ -32,7 +32,6 @@ end
 
 "Given 3D CuArray A, fill in X[:,:,k] = A[:,:,k] \\ I" 
 function batch_inv!(X::CuArray{FT,3}, A::CuArray{FT,3}) where {FT}
-
     # LU-factorize A
     pivot, info   = CUBLAS.getrf_strided_batched!(A, true);synchronize()
     # Invert LU factorization of A
@@ -75,20 +74,21 @@ function batch_inv!(X::CuArray{ForwardDiff.Dual{T,V,N},3}, A::CuArray{ForwardDif
     #@show typeof(ForwardDiff.value.(A))
     #@show T,V,N
     Atemp = ForwardDiff.value.(A)
-    invA  = 0 * Atemp;
+    invA  = similar(Atemp);
     
     # Set invA=A⁻¹
     batch_inv!(invA,Atemp)
 
     # Find sparsity (brute force)
-    doIt = zeros(Bool,N)
+    #doIt = zeros(Bool,N)
     K    = [ForwardDiff.partials.(A,i) for i=1:N]
-    doIt = [~all(iszero.(K[i])) for i=1:N]
+    #doIt = [~all(iszero.(K[i])) for i=1:N]
     #@show doIt
     #dummy = 0*similar(K[1])
 
     # Compute derivatives ∂A⁻¹/∂x = -A⁻¹ * ∂A/∂x * A⁻¹; using NNlib batched matrix multiply
-    @timeit "InvDerivs" dAdx = [doIt[i] ? -invA ⊠ K[i] ⊠ invA : K[i] for i=1:N];
+    #@timeit "InvDerivs" dAdx = [doIt[i] ? -invA ⊠ K[i] ⊠ invA : K[i] for i=1:N];
+    @timeit "InvDerivs" dAdx = [-invA ⊠ K[i] ⊠ invA  for i=1:N];
     # Pack into tuples again
     dAdx = ForwardDiff.Partials.(tuple.(dAdx...));
     X .= eltype(X).(invA,dAdx);
