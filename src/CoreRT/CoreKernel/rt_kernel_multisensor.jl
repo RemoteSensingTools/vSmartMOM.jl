@@ -34,7 +34,7 @@ function rt_kernel_multisensor!(RS_type::noRS,
         # If not, there is no reflectance. Assign r/t appropriately
         added_layer.r⁻⁺[:] .= 0;
         added_layer.r⁺⁻[:] .= 0;
-        added_layer.J₀⁻[:] .= 0;
+        added_layer.j₀⁻[:] .= 0;
         temp = Array(exp.(-τ_λ./qp_μN'))
         #added_layer.t⁺⁺, added_layer.t⁻⁻ = (Diagonal(exp(-τ_λ / qp_μN)), Diagonal(exp(-τ_λ / qp_μN)))   
         for iλ = 1:length(τ_λ)
@@ -54,14 +54,14 @@ function rt_kernel_multisensor!(RS_type::noRS,
                 composite_layer.botR⁻⁺[ims][:], composite_layer.botR⁺⁻[ims][:] = 
                     Array(added_layer.r⁻⁺), Array(added_layer.r⁺⁻)
                 composite_layer.botJ₀⁺[ims][:], composite_layer.botJ₀⁻[ims][:] = 
-                    Array(added_layer.J₀⁺), Array(added_layer.J₀⁻)
+                    Array(added_layer.j₀⁺), Array(added_layer.j₀⁻)
             else
                 composite_layer.topT⁺⁺[ims][:], composite_layer.topT⁻⁻[ims][:] = 
                     Array(added_layer.t⁺⁺), Array(added_layer.t⁻⁻)
                 composite_layer.topR⁻⁺[ims][:], composite_layer.topR⁺⁻[ims][:] = 
                     Array(added_layer.r⁻⁺), Array(added_layer.r⁺⁻)
                 composite_layer.topJ₀⁺[ims][:], composite_layer.topJ₀⁻[ims][:] = 
-                    Array((added_layer.J₀⁺), Array(added_layer.J₀⁻)
+                    Array((added_layer.j₀⁺), Array(added_layer.j₀⁻)
             end
         end
     # If this is not the TOA, perform the interaction step
@@ -74,7 +74,7 @@ function rt_kernel_multisensor!(RS_type::noRS,
                 composite_layer.botR⁻⁺[ims][:], composite_layer.botR⁺⁻[ims][:] = 
                     Array(added_layer.r⁻⁺), Array(added_layer.r⁺⁻)
                 composite_layer.botJ₀⁺[ims][:], composite_layer.botJ₀⁻[ims][:] = 
-                    Array(added_layer.J₀⁺), Array(added_layer.J₀⁻)
+                    Array(added_layer.j₀⁺), Array(added_layer.j₀⁻)
             elseif sensor_levels[ims]>(iz+1) 
                 @timeit "interaction_multisensor" interaction_bot!(ims, 
                                                                 RS_type, 
@@ -145,7 +145,7 @@ function rt_kernel_multisensor!(RS_type::Union{RRS, VS_0to1, VS_1to0},
         # If not, there is no reflectance. Assign r/t appropriately
         added_layer.r⁻⁺[:] .= 0;
         added_layer.r⁺⁻[:] .= 0;
-        added_layer.J₀⁻[:] .= 0;
+        added_layer.j₀⁻[:] .= 0;
         added_layer.ier⁻⁺[:] .= 0;
         added_layer.ier⁺⁻[:] .= 0;
         added_layer.ieJ₀⁻[:] .= 0;
@@ -171,7 +171,7 @@ function rt_kernel_multisensor!(RS_type::Union{RRS, VS_0to1, VS_1to0},
                 composite_layer.botR⁻⁺[ims][:], composite_layer.botR⁺⁻[ims][:] = 
                     Array(added_layer.r⁻⁺), Array(added_layer.r⁺⁻)
                 composite_layer.botJ₀⁺[ims][:], composite_layer.botJ₀⁻[ims][:] = 
-                    Array(added_layer.J₀⁺), Array(added_layer.J₀⁻ )
+                    Array(added_layer.j₀⁺), Array(added_layer.j₀⁻ )
                 composite_layer.botieT⁺⁺[ims][:], composite_layer.botieT⁻⁻[ims][:] = 
                     Array(added_layer.iet⁺⁺), Array(added_layer.iet⁻⁻)
                 composite_layer.botieR⁻⁺[ims][:], composite_layer.botieR⁺⁻[ims][:] = 
@@ -184,7 +184,7 @@ function rt_kernel_multisensor!(RS_type::Union{RRS, VS_0to1, VS_1to0},
                 composite_layer.topR⁻⁺[ims][:], composite_layer.topR⁺⁻[ims][:] = 
                     Array(added_layer.r⁻⁺), Array(added_layer.r⁺⁻)
                 composite_layer.topJ₀⁺[ims][:], composite_layer.topJ₀⁻[ims][:] = 
-                    added_layer.J₀⁺, added_layer.J₀⁻)
+                    added_layer.j₀⁺, added_layer.j₀⁻)
                 composite_layer.topieT⁺⁺[ims][:], composite_layer.topieT⁻⁻[ims][:] = 
                     Array(added_layer.iet⁺⁺), Array(added_layer.iet⁻⁻)
                 composite_layer.topieR⁻⁺[ims][:], composite_layer.topieR⁺⁻[ims][:] = 
@@ -203,7 +203,7 @@ function rt_kernel_multisensor!(RS_type::Union{RRS, VS_0to1, VS_1to0},
                 composite_layer.botR⁻⁺[ims][:], composite_layer.botR⁺⁻[ims][:] = 
                     Array(added_layer.r⁻⁺), Array(added_layer.r⁺⁻)
                 composite_layer.botJ₀⁺[ims][:], composite_layer.botJ₀⁻[ims][:] = 
-                    Array(added_layer.J₀⁺), Array(added_layer.J₀⁻ )
+                    Array(added_layer.j₀⁺), Array(added_layer.j₀⁻ )
                 composite_layer.botieT⁺⁺[ims][:], composite_layer.botieT⁻⁻[ims][:] = 
                     Array(added_layer.iet⁺⁺), Array(added_layer.iet⁻⁻)
                 composite_layer.botieR⁻⁺[ims][:], composite_layer.botieR⁺⁻[ims][:] = 
@@ -279,7 +279,7 @@ function rt_kernel_multisensor!(RS_type::noRS{FT},
         # If not, there is no reflectance. Assign r/t appropriately
         added_layer.r⁻⁺[:] .= 0;
         added_layer.r⁺⁻[:] .= 0;
-        added_layer.J₀⁻[:] .= 0;
+        added_layer.j₀⁻[:] .= 0;
         temp = Array(exp.(-τ_λ./qp_μN'))
         #added_layer.t⁺⁺, added_layer.t⁻⁻ = (Diagonal(exp(-τ_λ / qp_μN)), Diagonal(exp(-τ_λ / qp_μN)))   
         for iλ = 1:length(τ_λ)
@@ -289,8 +289,8 @@ function rt_kernel_multisensor!(RS_type::noRS{FT},
     end
     #M1 = Array(added_layer.t⁺⁺)
     #M2 = Array(added_layer.r⁺⁻)
-    #M3 = Array(added_layer.J₀⁻)
-    #M4 = Array(added_layer.J₀⁺)
+    #M3 = Array(added_layer.j₀⁻)
+    #M4 = Array(added_layer.j₀⁺)
     #@show M1[1,1,1], M2[1,1,1], M3[1,1,1], M4[1,1,1]
     
     # @assert !any(isnan.(added_layer.t⁺⁺))
@@ -305,7 +305,7 @@ function rt_kernel_multisensor!(RS_type::noRS{FT},
                 composite_layer.botR⁻⁺[ims][:], composite_layer.botR⁺⁻[ims][:] = 
                     Array(added_layer.r⁻⁺), Array(added_layer.r⁺⁻)
                 composite_layer.botJ₀⁺[ims][:], composite_layer.botJ₀⁻[ims][:] = 
-                    Array(added_layer.J₀⁺), Array(added_layer.J₀⁻)
+                    Array(added_layer.j₀⁺), Array(added_layer.j₀⁻)
             else
                 #@show sensor_levels[ims], iz, (iz==1)
                 composite_layer.topT⁺⁺[ims][:], composite_layer.topT⁻⁻[ims][:] = 
@@ -313,7 +313,7 @@ function rt_kernel_multisensor!(RS_type::noRS{FT},
                 composite_layer.topR⁻⁺[ims][:], composite_layer.topR⁺⁻[ims][:] = 
                     Array(added_layer.r⁻⁺), Array(added_layer.r⁺⁻)
                 composite_layer.topJ₀⁺[ims][:], composite_layer.topJ₀⁻[ims][:] = 
-                    Array(added_layer.J₀⁺), Array(added_layer.J₀⁻)
+                    Array(added_layer.j₀⁺), Array(added_layer.j₀⁻)
             end
         end
     # If this is not the TOA, perform the interaction step
@@ -338,7 +338,7 @@ function rt_kernel_multisensor!(RS_type::noRS{FT},
                     composite_layer.botR⁻⁺[ims][:], composite_layer.botR⁺⁻[ims][:] = 
                         Array(added_layer.r⁻⁺), Array(added_layer.r⁺⁻)
                     composite_layer.botJ₀⁺[ims][:], composite_layer.botJ₀⁻[ims][:] = 
-                        Array(added_layer.J₀⁺), Array(added_layer.J₀⁻ )
+                        Array(added_layer.j₀⁺), Array(added_layer.j₀⁻ )
                 elseif sensor_levels[ims]<(iz-1) 
                     #@show sensor_levels[ims], iz, (iz>sensor_levels[ims]+1)
                     @timeit "interaction_multisensor" interaction_bot!(ims, 
@@ -424,7 +424,7 @@ function rt_kernel_multisensor!(RS_type::Union{RRS{FT}, RRS_plus{FT}, VS_0to1_pl
         # If not, there is no reflectance. Assign r/t appropriately
         added_layer.r⁻⁺[:] .= 0;
         added_layer.r⁺⁻[:] .= 0;
-        added_layer.J₀⁻[:] .= 0;
+        added_layer.j₀⁻[:] .= 0;
         added_layer.ier⁻⁺[:] .= 0;
         added_layer.ier⁺⁻[:] .= 0;
         added_layer.ieJ₀⁻[:] .= 0;
@@ -451,7 +451,7 @@ function rt_kernel_multisensor!(RS_type::Union{RRS{FT}, RRS_plus{FT}, VS_0to1_pl
                 composite_layer.botR⁻⁺[ims][:], composite_layer.botR⁺⁻[ims][:] = 
                     Array(added_layer.r⁻⁺), Array(added_layer.r⁺⁻)
                 composite_layer.botJ₀⁺[ims][:], composite_layer.botJ₀⁻[ims][:] = 
-                    Array(added_layer.J₀⁺), Array(added_layer.J₀⁻ )
+                    Array(added_layer.j₀⁺), Array(added_layer.j₀⁻ )
                 composite_layer.botieT⁺⁺[ims][:], composite_layer.botieT⁻⁻[ims][:] = 
                     Array(added_layer.iet⁺⁺), Array(added_layer.iet⁻⁻)
                 composite_layer.botieR⁻⁺[ims][:], composite_layer.botieR⁺⁻[ims][:] = 
@@ -464,7 +464,7 @@ function rt_kernel_multisensor!(RS_type::Union{RRS{FT}, RRS_plus{FT}, VS_0to1_pl
                 composite_layer.topR⁻⁺[ims][:], composite_layer.topR⁺⁻[ims][:] = 
                     Array(added_layer.r⁻⁺), Array(added_layer.r⁺⁻)
                 composite_layer.topJ₀⁺[ims][:], composite_layer.topJ₀⁻[ims][:] = 
-                    Array(added_layer.J₀⁺), Array(added_layer.J₀⁻ )
+                    Array(added_layer.j₀⁺), Array(added_layer.j₀⁻ )
                 composite_layer.topieT⁺⁺[ims][:], composite_layer.topieT⁻⁻[ims][:] = 
                     Array(added_layer.iet⁺⁺), Array(added_layer.iet⁻⁻)
                 composite_layer.topieR⁻⁺[ims][:], composite_layer.topieR⁺⁻[ims][:] = 
@@ -483,7 +483,7 @@ function rt_kernel_multisensor!(RS_type::Union{RRS{FT}, RRS_plus{FT}, VS_0to1_pl
                 composite_layer.botR⁻⁺[ims][:], composite_layer.botR⁺⁻[ims][:] = 
                     Array(added_layer.r⁻⁺), Array(added_layer.r⁺⁻)
                 composite_layer.botJ₀⁺[ims][:], composite_layer.botJ₀⁻[ims][:] = 
-                    Array(added_layer.J₀⁺), Array(added_layer.J₀⁻ )
+                    Array(added_layer.j₀⁺), Array(added_layer.j₀⁻ )
                 composite_layer.botieT⁺⁺[ims][:], composite_layer.botieT⁻⁻[ims][:] = 
                     Array(added_layer.iet⁺⁺), Array(added_layer.iet⁻⁻)
                 composite_layer.botieR⁻⁺[ims][:], composite_layer.botieR⁺⁻[ims][:] = 
@@ -564,7 +564,7 @@ function rt_kernel_multisensor!(
         # If not, there is no reflectance. Assign r/t appropriately
         added_layer.r⁻⁺[:] .= 0;
         added_layer.r⁺⁻[:] .= 0;
-        added_layer.J₀⁻[:] .= 0;
+        added_layer.j₀⁻[:] .= 0;
         added_layer.ier⁻⁺[:] .= 0;
         added_layer.ier⁺⁻[:] .= 0;
         added_layer.ieJ₀⁻[:] .= 0;
@@ -590,7 +590,7 @@ function rt_kernel_multisensor!(
                 composite_layer.botR⁻⁺[ims][:], composite_layer.botR⁺⁻[ims][:] = 
                     Array(added_layer.r⁻⁺), Array(added_layer.r⁺⁻)
                 composite_layer.botJ₀⁺[ims][:], composite_layer.botJ₀⁻[ims][:] = 
-                    Array(added_layer.J₀⁺), Array(added_layer.J₀⁻ )
+                    Array(added_layer.j₀⁺), Array(added_layer.j₀⁻ )
                 composite_layer.botieT⁺⁺[ims][:], composite_layer.botieT⁻⁻[ims][:] = 
                     Array(added_layer.iet⁺⁺), Array(added_layer.iet⁻⁻)
                 composite_layer.botieR⁻⁺[ims][:], composite_layer.botieR⁺⁻[ims][:] = 
@@ -603,7 +603,7 @@ function rt_kernel_multisensor!(
                 composite_layer.topR⁻⁺[ims][:], composite_layer.topR⁺⁻[ims][:] = 
                     Array(added_layer.r⁻⁺), Array(added_layer.r⁺⁻)
                 composite_layer.topJ₀⁺[ims][:], composite_layer.topJ₀⁻[ims][:] = 
-                    Array(added_layer.J₀⁺), Array(added_layer.J₀⁻ )
+                    Array(added_layer.j₀⁺), Array(added_layer.j₀⁻ )
                 composite_layer.topieT⁺⁺[ims][:], composite_layer.topieT⁻⁻[ims][:] = 
                     Array(added_layer.iet⁺⁺), Array(added_layer.iet⁻⁻)
                 composite_layer.topieR⁻⁺[ims][:], composite_layer.topieR⁺⁻[ims][:] = 
@@ -621,7 +621,7 @@ function rt_kernel_multisensor!(
                 composite_layer.botR⁻⁺[ims][:], composite_layer.botR⁺⁻[ims][:] = 
                     Array(added_layer.r⁻⁺), Array(added_layer.r⁺⁻)
                 composite_layer.botJ₀⁺[ims][:], composite_layer.botJ₀⁻[ims][:] = 
-                    Array(added_layer.J₀⁺), Array(added_layer.J₀⁻ )
+                    Array(added_layer.j₀⁺), Array(added_layer.j₀⁻ )
                 composite_layer.botieT⁺⁺[ims][:], composite_layer.botieT⁻⁻[ims][:] = 
                     Array(added_layer.iet⁺⁺), Array(added_layer.iet⁻⁻)
                 composite_layer.botieR⁻⁺[ims][:], composite_layer.botieR⁺⁻[ims][:] = 

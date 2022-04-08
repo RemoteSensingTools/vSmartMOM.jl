@@ -169,13 +169,7 @@ function get_elem_rt!(RS_type::RRS,
         device = devi(architecture(ier⁻⁺))
         aType = array_type(architecture(ier⁻⁺))
         kernel! = get_elem_rt_RRS!(device)
-       #@show typeof(i_ref), typeof(ϖ_λ₁λ₀)
-       # @show typeof(dτ_λ), typeof(ϖ_λ)
-       # @show typeof(qp_μN), typeof(wct2)
-       # @show typeof(ier⁻⁺), typeof(iet⁺⁺)
-        #@show typeof(fscattRayl), (fscattRayl[1:10]), typeof(aType(ϖ_λ₁λ₀))
-        #exit()
-        #sleep(10)
+
         event = kernel!(aType(fscattRayl), 
                     aType(ϖ_λ₁λ₀), aType(i_λ₁λ₀), 
                     i_ref,
@@ -296,77 +290,7 @@ function get_elem_rt_SFI!(RS_type::Union{VS_0to1, VS_1to0},
     synchronize_if_gpu();
 end
 
-#  TODO: Nov 30, 2021
-#=
-@kernel function get_elem_rt_SFI_VS!(fscattRayl,
-                            ϖ_λ₁λ₀, i_λ₁λ₀, i_ref,
-                            ieJ₀⁺, ieJ₀⁻, 
-                            τ_sum, dτ_λ, ϖ_λ,
-                            Z⁻⁺_λ₁λ₀, Z⁺⁺_λ₁λ₀, 
-                            qp_μN, ndoubl,
-                            wct02, nStokes, 
-                            I₀, iμ0, D)
-    
-    i_start  = nStokes*(iμ0-1) + 1 
-    i_end    = nStokes*iμ0
 
-    i, _, Δn = @index(Global, NTuple) ##Suniti: What are Global and Ntuple?
-    # let n₁ cover the full range of wavelengths, while n₀ only includes wavelengths at intervals 
-    # that contribute significantly enough to inelastic scattering, so that n₀≪n₁ 
-
-    #Suniti: require that the incident wavelength is always the first element of 1:nSpec, and all the others belong to the same target VS band
-    #Suniti: Then,
-    n₀ = 1    
-    n₁ = n₀ + i_λ₁λ₀[Δn]  
-      
-    #if (wct2[j]>1.e-8) 
-    
-    FT = eltype(I₀)
-    ieJ₀⁺[i, 1, n₁, 1]=0
-    ieJ₀⁻[i, 1, n₁, 1]=0
-    
-    Z⁺⁺_I₀ = FT(0.0);
-    Z⁻⁺_I₀ = FT(0.0);
-    for ii = i_start:i_end
-        Z⁺⁺_I₀ += Z⁺⁺_λ₁λ₀[i,ii] * I₀[ii-i_start+1]
-        Z⁻⁺_I₀ += Z⁻⁺_λ₁λ₀[i,ii] * I₀[ii-i_start+1] 
-    end
-    
-    if (i>=i_start) && (i<=i_end)
-        #ctr = i-i_start+1
-        # J₀⁺ = 0.25*(1+δ(m,0)) * ϖ(λ) * Z⁺⁺ * I₀ * (dτ(λ)/μ₀) * exp(-dτ(λ)/μ₀)
-        if abs(dτ_λ[n₀]-dτ_λ[n₁])>1.e-6
-            ieJ₀⁺[i, 1, n₁, 1] = 
-                    (exp(-dτ_λ[n₀] / qp_μN[i]) - exp(-dτ_λ[n₁] / qp_μN[i])) /
-                    ((dτ_λ[n₁]/dτ_λ[n₀])-1) * 
-                    ϖ_λ₁λ₀[Δn] * ϖ_λ[n₀] * fscattRayl * Z⁺⁺_I₀ * wct02
-        else
-            ieJ₀⁺[i, 1, n₁, 1] = 
-                    wct02 * ϖ_λ₁λ₀[Δn] * ϖ_λ[n₀] * fscattRayl * Z⁺⁺_I₀ * 
-                    (1 - exp(-dτ_λ[n₀] / qp_μN[i_start]))
-        end
-    else
-        # J₀⁺ = 0.25*(1+δ(m,0)) * ϖ(λ) * Z⁺⁺ * I₀ * [μ₀ / (μᵢ - μ₀)] * [exp(-dτ(λ)/μᵢ) - exp(-dτ(λ)/μ₀)]
-        ieJ₀⁺[i, 1, n₁, 1] = 
-                    wct02 * ϖ_λ₁λ₀[Δn] * ϖ_λ[n₀] * fscattRayl * Z⁺⁺_I₀ * 
-                    (1 /( (qp_μN[i]/qp_μN[i_start]) - (dτ_λ[n₁]/dτ_λ[n₀]) ) ) * 
-                    (exp(-dτ_λ[n₁] / qp_μN[i]) - exp(-dτ_λ[n₀] / qp_μN[i_start]))  
-    end
-    #TODO
-    #J₀⁻ = 0.25*(1+δ(m,0)) * ϖ(λ) * Z⁻⁺ * I₀ * [μ₀ / (μᵢ + μ₀)] * [1 - exp{-dτ(λ)(1/μᵢ + 1/μ₀)}]                    
-    ieJ₀⁻[i, 1, n₁, 1] = 
-                wct02 * ϖ_λ₁λ₀[Δn] * ϖ_λ[n₀] * fscattRayl * Z⁻⁺_I₀ * 
-                (1/( (qp_μN[i] / qp_μN[i_start]) + (dτ_λ[n₁]/dτ_λ[n₀]) )) *
-                (1 - exp(-( (dτ_λ[n₁] / qp_μN[i]) + (dτ_λ[n₀] / qp_μN[i_start]) ) ))  
-
-    ieJ₀⁺[i, 1, n₁, 1] *= exp(-τ_sum[n₀]/qp_μN[i_start])
-    ieJ₀⁻[i, 1, n₁, 1] *= exp(-τ_sum[n₀]/qp_μN[i_start])
-
-    if ndoubl >= 1
-        ieJ₀⁻[i, 1, n₁, 1] = D[i,i]*ieJ₀⁻[i, 1, n₁, 1] #D = Diagonal{1,1,-1,-1,...Nquad times}
-    end        
-end
-=#
 #  TODO: Nov 30, 2021
 function get_elem_rt_SFI!(RS_type::RRS, 
                         ieJ₀⁺, ieJ₀⁻, 
