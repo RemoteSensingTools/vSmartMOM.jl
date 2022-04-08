@@ -40,7 +40,7 @@ function doubling_helper!(pol_type,
     for n = 1:ndoubl
         
         # T⁺⁺(λ)[I - R⁺⁻(λ)R⁻⁺(λ)]⁻¹, for doubling R⁺⁻,R⁻⁺ and T⁺⁺,T⁻⁻ is identical
-        batch_inv!(gp_refl, I_static .- r⁻⁺ ⊠ r⁻⁺)
+        @timeit "Batch Inv Doubling" batch_inv!(gp_refl, I_static .- r⁻⁺ ⊠ r⁻⁺)
         tt⁺⁺_gp_refl .= t⁺⁺ ⊠ gp_refl
 
         # J⁺₂₁(λ) = J⁺₁₀(λ).exp(-τ(λ)/μ₀)
@@ -50,17 +50,17 @@ function doubling_helper!(pol_type,
         @inbounds @views j₁⁻[:,1,:] .= j₀⁻[:,1,:] .* expk'
 
         # J⁻₀₂(λ) = J⁻₀₁(λ) + T⁻⁻₀₁(λ)[I - R⁻⁺₂₁(λ)R⁺⁻₀₁(λ)]⁻¹[J⁻₁₂(λ) + R⁻⁺₂₁(λ)J⁺₁₀(λ)] (see Eqs.8 in Raman paper draft)
-        j₀⁻ .= j₀⁻ + (tt⁺⁺_gp_refl ⊠ (j₁⁻ + r⁻⁺ ⊠ j₀⁺)) 
+        @timeit "Batch Doubling" j₀⁻ .= j₀⁻ + (tt⁺⁺_gp_refl ⊠ (j₁⁻ + r⁻⁺ ⊠ j₀⁺)) 
 
         # J⁺₂₀(λ) = J⁺₂₁(λ) + T⁺⁺₂₁(λ)[I - R⁺⁻₀₁(λ)R⁻⁺₂₁(λ)]⁻¹[J⁺₁₀(λ) + R⁺⁻₀₁(λ)J⁻₁₂(λ)] (see Eqs.8 in Raman paper draft)
-        j₀⁺  .= j₁⁺ + (tt⁺⁺_gp_refl ⊠ (j₀⁺ + r⁻⁺ ⊠ j₁⁻))
+        @timeit "Batch Doubling" j₀⁺  .= j₁⁺ + (tt⁺⁺_gp_refl ⊠ (j₀⁺ + r⁻⁺ ⊠ j₁⁻))
         expk .= expk.^2
     
         # R⁻⁺₂₀(λ) = R⁻⁺₁₀(λ) + T⁻⁻₀₁(λ)[I - R⁻⁺₂₁(λ)R⁺⁻₀₁(λ)]⁻¹R⁻⁺₂₁(λ)T⁺⁺₁₀(λ) (see Eqs.8 in Raman paper draft)
-        r⁻⁺  .= r⁻⁺ + (tt⁺⁺_gp_refl ⊠ r⁻⁺ ⊠ t⁺⁺)
+        @timeit "Batch Doubling"  r⁻⁺  .= r⁻⁺ + (tt⁺⁺_gp_refl ⊠ r⁻⁺ ⊠ t⁺⁺)
 
         # T⁺⁺₂₀(λ) = T⁺⁺₂₁(λ)[I - R⁺⁻₀₁(λ)R⁻⁺₂₁(λ)]⁻¹T⁺⁺₁₀(λ) (see Eqs.8 in Raman paper draft)
-        t⁺⁺  .= tt⁺⁺_gp_refl ⊠ t⁺⁺
+        @timeit "Batch Doubling" t⁺⁺  .= tt⁺⁺_gp_refl ⊠ t⁺⁺
     end
 
     # After doubling, revert D(DR)->R, where D = Diagonal{1,1,-1,-1}
