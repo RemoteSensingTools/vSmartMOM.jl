@@ -89,7 +89,7 @@ This module enables scattering phase-function calculation of atmospheric aerosol
 
 ## Support
 
-This project is being developed in the Christian Frankenberg and Paul Wennberg labs at Caltech and Suniti Sanghavi, with support from the Schmidt Academy for Software Engineering (SASE).
+This project is being developed in the Christian Frankenberg and Paul Wennberg labs at Caltech and is largely based on papers and ideas by Suniti Sanghavi from NASA/JPL, with support from the Schmidt Academy for Software Engineering (SASE).
 
 Please <a href="mailto:cfranken@caltech.edu,wennberg@gps.caltech.edu?cc=rjeyaram@caltech.edu"> email us</a> if you have any questions, suggestions, or contributions!
 
