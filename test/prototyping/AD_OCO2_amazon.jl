@@ -14,6 +14,7 @@ using Polynomials
 using ForwardDiff 
 using Distributions
 using NCDatasets
+using LinearAlgebra
 
 ## Atmospheric Radiative Transfer
 
@@ -24,6 +25,30 @@ FT = Float64
 
 # Load OCO Data: 
 # File names:
+
+#= Amazon 
+L1File   = "/net/fluo/data1/group/oco2/L1bSc/oco2_L1bScGL_31185a_200512_B10206r_210427152510.h5"
+metFile  = "/net/fluo/data1/group/oco2/L2Met/oco2_L2MetGL_31185a_200512_B10206r_210425222645.h5"
+dictFile = "/home/cfranken/code/gitHub/InstrumentOperator.jl/json/oco2.yaml"
+# Load L1 file (could just use filenames here as well)
+oco = InstrumentOperator.load_L1(dictFile,L1File, metFile);
+
+
+# Pick some bands as tuple (or just one)
+bands = (1,2,3);
+#bands = (1,3);
+# Indices within that band:
+#ind1 = [collect(92:68);  collect(690:870); collect(875:885)]
+indices = (92:682,114:845,50:916);
+
+#indices = (92:885,114:845,50:916);
+# Geo Index (footprint,sounding):
+GeoInd = [5,2821];
+
+# Get data for that sounding:
+oco_sounding = InstrumentOperator.getMeasurement(oco, bands, indices, GeoInd);
+=#
+
 L1File   = "/net/fluo/data1/group/oco2/L1bSc/oco2_L1bScND_26780a_190715_B10003r_200429212407.h5"
 metFile  = "/net/fluo/data1/group/oco2/L2Met/oco2_L2MetND_26780a_190715_B10003r_200429212406.h5"
 dictFile = "/home/cfranken/code/gitHub/InstrumentOperator.jl/json/oco2.yaml"
@@ -41,8 +66,7 @@ indices = (92:885,114:845,50:916);
 GeoInd = [5,5000];
 
 # Get data for that sounding:
-oco_sounding = InstrumentOperator.getMeasurement(
-    oco, bands, indices, GeoInd);
+oco_sounding = InstrumentOperator.getMeasurement(oco, bands, indices, GeoInd);
 
 ###################################################
 # Produce black-body in wavenumber range
@@ -71,23 +95,26 @@ end
 function runner!(y, x, parameters=parameters, oco_sounding= oco_sounding, Tsolar = Tsolar_interp)
 
     # Set parameters fields as the dual numbers
-    parameters.brdf =  [CoreRT.LambertianSurfaceLegendre([x[1],x[3],x[4],x[16],x[17] ]),
-                        CoreRT.LambertianSurfaceLegendre([x[7],x[8],x[5]]),
-                        CoreRT.LambertianSurfaceLegendre([x[9],x[10],x[6]])];
+    parameters.brdf =  [CoreRT.LambertianSurfaceLegendre([x[1],x[2],x[3]]),
+                        CoreRT.LambertianSurfaceLegendre([x[4],x[5],x[6]]),
+                        CoreRT.LambertianSurfaceLegendre([x[7],x[8],x[9]])];
 
-    parameters.scattering_params.rt_aerosols[1].τ_ref = exp(x[2]);
-    parameters.scattering_params.rt_aerosols[1].p₀    = 700.0; #x[4]
-   
+    parameters.scattering_params.rt_aerosols[1].τ_ref = exp(x[10]);
+    parameters.scattering_params.rt_aerosols[1].p₀    = x[11]
+    size_distribution = LogNormal(x[12], 0.3)
+    parameters.scattering_params.rt_aerosols[1].aerosol.size_distribution =  size_distribution
+    parameters.scattering_params.rt_aerosols[1].aerosol.nᵣ = x[13]
     parameters.p   = oco_sounding.p_half
     parameters.q   = oco_sounding.q 
     parameters.T   = oco_sounding.T# .+ 1.0 #.+ x[15]
     parameters.sza = oco_sounding.sza
     parameters.vza = [oco_sounding.vza]
-    parameters.absorption_params.vmr["H2O"] = [parameters.q[1:65]*x[11] * 1.8; 
-                                               parameters.q[66:end]*x[15] * 1.8];
-    a1 = zeros(25) .+ x[12]
-    a2 = zeros(25) .+ x[13]
-    a3 = zeros(22) .+ x[14]
+    parameters.absorption_params.vmr["O2"] = x[18]
+    parameters.absorption_params.vmr["H2O"] = parameters.q*x[14] * 1.8 #[parameters.q[1:65]*x[11] * 1.8; 
+                                               #parameters.q[66:end]*x[15] * 1.8];
+    a1 = zeros(25) .+ x[15] * 1e-6
+    a2 = zeros(25) .+ x[16] * 1e-6
+    a3 = zeros(22) .+ x[17] * 1e-6
     parameters.absorption_params.vmr["CO2"] = [a1; a2; a3]
     model = model_from_parameters(parameters);
     
@@ -108,10 +135,12 @@ function runner!(y, x, parameters=parameters, oco_sounding= oco_sounding, Tsolar
         #if length(ii==1)
         #    earth_out[ii] =  earth_out[ii+1]
         #end 
-        
+        #f = 0.9999908003445712
         #@show findall(sun_out .< 0)
         # Re-interpolate I from ν_grid to new grid/resolution
-        λ_grid = reverse(1e4 ./ parameters.spec_bands[i])
+
+        # Apply doppler here:
+        λ_grid = reverse(1e4 ./ parameters.spec_bands[i]) .* oco_sounding.doppler
         @time interp_I = LinearInterpolation(λ_grid, earth_out);
         res = 0.001e-3;
         off = 0.5e-3
@@ -128,37 +157,91 @@ function runner!(y, x, parameters=parameters, oco_sounding= oco_sounding, Tsolar
 end
 
 
-# State vector
-x = FT[0.2377, 
-        -2, 
-        -0.00244, 
-        0, 
-        0,
-        0, 
-        0.44, 
-        0, 
-        0.4, 
-        0,
-        1,
-        410e-6,
-        390e-6,
-        400e-6, 
-        1.0, 0.0, 0.0]#,
+# Prior State vector
+xₐ = FT[  0.202,   # Albedo band 1, degree 1
+        0,         # Albedo band 1, degree 2       
+        0,         # Albedo band 1, degree 3       
+        0.138,#0.139,     # Albedo band 2, degree 1
+        0,         # Albedo band 2, degree 2
+        0,         # Albedo band 2, degree 3
+        0.0512,#0.0512,    # Albedo band 3, degree 1
+        0,         # Albedo band 3, degree 2
+        0.00,      # Albedo band 3, degree 3
+        -1.0,      # log AOD
+        800.0,     # Aerosol peak height (hPa)
+        -1.0,       # log of size distribution mean (1µm here)
+        1.3,       # Real refractive index of aerosol
+        1,         # H2O scaling factor for entire profile
+        400,    # CO2 Top layers
+        400,    # CO2 Middle layers
+        400,    # CO2 Bottom layers
+        0.2095  # O2 VMR
+        ]#,
 
+# Measurement covariance matrix:
+Sₑ = Diagonal(oco_sounding.SpectralNoise.^2);
+# Prior covariance matrix
+n = length(xₐ)
+Sₐ = zeros(n,n)
+# For albedos
+Sₐ[1,1] = 1.2^2
+Sₐ[4,4] = 1.2^2
+Sₐ[7,7] = 1.2^2
+Sₐ[2,2] = 0.2^2
+Sₐ[5,5] = 0.2^2
+Sₐ[8,8] = 0.2^2
+Sₐ[3,3] = 0.2^2
+Sₐ[6,6] = 0.2^2
+Sₐ[9,9] = 0.2^2
+# Aerosols:
+Sₐ[10,10] = 0.5^2  # AOD, 2.5 orders of magnitude
+Sₐ[11,11] = 10.0^2
+Sₐ[12,12] = 0.05^2
+Sₐ[13,13] = 0.05^2
+Sₐ[14,14] = 0.5^2
+Sₐ[15,15] = 100^2
+Sₐ[16,16] = 100^2
+Sₐ[17,17] = 100^2
+Sₐ[18,18] = 0.002^2
 
 # Run FW model:
 # @time runner(x);
 y = oco_sounding.SpectralMeasurement;
 Fx = zeros(length(y));
 #ind = 92:885
-
-for i=1:3
-    K = ForwardDiff.jacobian(runner!, Fx, x);
-    dx = K \ (y-Fx);
-    x += dx;
-    @show x;
+x = xₐ
+xᵢ = []
+push!(xᵢ, xₐ)
+# LM parameter only for aerosols: 
+γ = zeros(n,n);
+γ[10,10] = 50;
+γ[11,11] = 50;
+γ[12,12] = 50;
+γ[13,13] = 50;
+γ[end,end] = 50;
+for i=1:15
+    
+    K = ForwardDiff.jacobian(runner!, Fx, xᵢ[end]);
+    res_1 = (y-Fx)' * inv(Sₑ) * (y-Fx)
+    G = inv(K'inv(Sₑ)K + (1.0 .+ γ).*inv(Sₐ))K'inv(Sₑ)
+    δy = (y-Fx + K*(xᵢ[end]-xₐ))
+    dx = G * δy
+    runner!(Fx,xₐ + dx)
+    res_2 = (y-Fx)' * inv(Sₑ) * (y-Fx)
+    if res_2 < res_1
+        # Reduce γ
+        @show "Reduce γ", i
+        γ *= 0.5
+        push!(xᵢ, xₐ + dx);
+    else
+        #Increase γ
+        @show "Increase γ", i
+        γ *= 2
+    end
+    #@show x;
 end
-runner!(Fx,x)
+Fx2 = similar
+runner!(Fx,xᵢ[end])
 
 ν = oco_sounding.SpectralGrid*1e3
 plot(y/1e20, label="Meas")
