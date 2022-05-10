@@ -8,7 +8,7 @@ kernel calculations.
 "Perform post-processing to azimuthally-weight RT matrices"
 function postprocessing_vza!(RS_type::noRS, iμ₀, pol_type, 
         composite_layer, vza, qp_μ, m, vaz, μ₀, weight, 
-        nSpec, SFI, R, R_SFI, T, T_SFI, ieR_SFI, ieT_SFI)
+        nSpec, SFI, R, R_SFI, T, T_SFI,ieR_SFI, ieT_SFI)
     
     # idx of μ0 = cos(sza)
     st_iμ0, istart0, iend0 = get_indices(iμ₀, pol_type);
@@ -18,7 +18,7 @@ function postprocessing_vza!(RS_type::noRS, iμ₀, pol_type,
     T⁺⁺ = Array(composite_layer.T⁺⁺);
     J₀⁺ = Array(composite_layer.J₀⁺);
     J₀⁻ = Array(composite_layer.J₀⁻);
-
+    
     # Loop over all viewing zenith angles
     for i = 1:length(vza)
 
@@ -30,15 +30,16 @@ function postprocessing_vza!(RS_type::noRS, iμ₀, pol_type,
         cos_m_phi, sin_m_phi = (cosd(m * vaz[i]), sind(m * vaz[i]));
         bigCS = weight * Diagonal([cos_m_phi, cos_m_phi, sin_m_phi, sin_m_phi][1:pol_type.n]);
 
+        #@show J₀⁻[istart:iend,1, 1], J₀⁺[istart:iend,1, 1]
         # Accumulate Fourier moments after azimuthal weighting
         for s = 1:nSpec
             
             if SFI
-                R_SFI[i,:,s] += bigCS * J₀⁻[istart:iend,1, s];
-                T_SFI[i,:,s] += bigCS * J₀⁺[istart:iend,1, s];
+                R_SFI[i,:,s] .+= bigCS * J₀⁻[istart:iend,1, s];
+                T_SFI[i,:,s] .+= bigCS * J₀⁺[istart:iend,1, s];
             else
-                R[i,:,s] += bigCS * (R⁻⁺[istart:iend, istart0:iend0, s] / μ₀) * pol_type.I₀;
-                T[i,:,s] += bigCS * (T⁺⁺[istart:iend, istart0:iend0, s] / μ₀) * pol_type.I₀;
+                R[i,:,s] .+= bigCS * (R⁻⁺[istart:iend, istart0:iend0, s] / μ₀) * pol_type.I₀;
+                T[i,:,s] .+= bigCS * (T⁺⁺[istart:iend, istart0:iend0, s] / μ₀) * pol_type.I₀;
             end
             
         end
@@ -64,6 +65,8 @@ function postprocessing_vza!(RS_type::Union{RRS, VS_0to1_plus, VS_1to0_plus},
     ieJ₀⁺ = Array(composite_layer.ieJ₀⁺);
     ieJ₀⁻ = Array(composite_layer.ieJ₀⁻);
     # Loop over all viewing zenith angles
+    
+
     for i = 1:length(vza)
 
         # Find the nearest quadrature point idx

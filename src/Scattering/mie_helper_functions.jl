@@ -29,9 +29,6 @@ refractive index. See eq 4.88 in Bohren and Huffman
 The function returns a rounded integer, following conventions by BH, Rooj/Stap, Siewert 
 """
 function compute_mie_ab!(size_param, refractive_idx::Number, an, bn, Dn)
-    FT = eltype(refractive_idx)
-    FT2 = eltype(an)
-
     # Compute y
     y = size_param * refractive_idx
 
@@ -51,14 +48,14 @@ function compute_mie_ab!(size_param, refractive_idx::Number, an, bn, Dn)
 
     # Get recursion for bessel functions ψ and ξ
     ψ₀, ψ₁, χ₀, χ₁ =  (cos(size_param), sin(size_param), -sin(size_param), cos(size_param))
-    ξ₁ = FT(ψ₁, -χ₁)
+    ξ₁ = ψ₁ -χ₁*im
 
     # This solves Bohren and Huffman eq. 4.88 for an and bn, computing updated ψ and ξ on the fly
     for n = 1:n_max  
-        fn = (2n + 1) / (n * (n + 1))
+        # fn = (2n + 1) / (n * (n + 1))
         ψ  = (2n - 1) * ψ₁ / size_param - ψ₀
         χ  = (2n - 1) * χ₁ / size_param - χ₀
-        ξ   = FT(ψ, -χ)
+        ξ   = ψ -χ*im
         t_a = Dn[n] / refractive_idx + n / size_param
         t_b = Dn[n] * refractive_idx + n / size_param
          
@@ -69,7 +66,7 @@ function compute_mie_ab!(size_param, refractive_idx::Number, an, bn, Dn)
         ψ₁ = ψ
         χ₀ = χ₁
         χ₁ = χ
-        ξ₁ = FT(ψ₁, -χ₁)
+        ξ₁ = ψ₁ -χ₁*im
     end
 end
 
@@ -273,7 +270,7 @@ function compute_wₓ(size_distribution, wᵣ, r, r_max)
 
     # normalize (could apply a check whether cdf.(size_distribution,r_max) is larger than 0.99:
     #println("Test")
-    @info "Fraction of size distribution cut by max radius: $((1-cdf.(size_distribution,r_max))*100) %"  
+    #@info "Fraction of size distribution cut by max radius: $((1-cdf.(size_distribution,r_max))*100) %"  
     wₓ /= sum(wₓ)
     return wₓ
 end

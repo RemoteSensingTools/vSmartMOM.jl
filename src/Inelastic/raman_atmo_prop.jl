@@ -62,7 +62,7 @@ function getRamanSSProp!(RS_type::RRS, λ, grid_in)
     greek_raman = get_greek_raman(RS_type, n2, o2)
     #get_greek_raman!(RS_type, n2, o2)
     RS_type.ϖ_Cabannes .= compute_ϖ_Cabannes(RS_type, λ, n2, o2)
-    @show RS_type.ϖ_Cabannes
+    # @show RS_type.ϖ_Cabannes
     # determine RRS cross-sections to λ₀ from nSpecRaman wavelengths around λ₀  
     index_raman_grid, atmo_σ_RRS = compute_optical_RS!(RS_type, grid_in, λ, n2, o2)
     # declare ϖ_Raman to be a grid of length raman grid

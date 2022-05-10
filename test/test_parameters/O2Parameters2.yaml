@@ -6,10 +6,10 @@ radiative_transfer:
   spec_bands:
     #- (1e7/750):0.05:(1e7/745)
     #- (1e7/768):0.05:(1e7/763) 
-    - (1e7/787):0.05:(1e7/747)
+    - (1e7/782):0.2:(1e7/752)
   # Bidirectional Reflectance Distribution Function (BRDF) per band
   surface: 
-    - LambertianSurfaceScalar{Float64}(0.0) #(0.2) #(0.05)
+    - LambertianSurfaceScalar{Float64}(0.) #(0.2) #(0.05)
   # Quadrature-scheme for stream calculations
   quadrature_type:    GaussQuadHemisphere()
   # Polarization type (Stokes_I, Stokes_IQ, Stokes_IQU, Stokes_IQUV)
@@ -34,7 +34,7 @@ geometry:
   # Solar zenith angle (degrees)
   sza:                60. #32.4436
   # Viewing zenith angles (degrees)
-  vza:                [0.0] #[32.4436] #[0.072]
+  vza:                [45] #[32.4436] #[0.072]
   # Viewing azimuth angles (degrees)
   vaz:                [0.0]
   # Observation altitude (Pa)
@@ -94,10 +94,10 @@ absorption:
 scattering:
   # List of scattering aerosols and their properties
   aerosols:       
-    - τ_ref:          0.0           # Reference τ
+    - τ_ref:          0.5           # Reference τ
       μ:              0.01 #1.3           # Log mean radius (µm)
       σ:              1.12 #2.0           # Log stddev of radius (µm)
-      nᵣ:             1.3           # Real part of refractive index
+      nᵣ:             1.5           # Real part of refractive index
       nᵢ:             0.00000001    # Imag part of refractive index
       p₀:             700.0         # Pressure peak (hPa)
       σp:             50.0          # Pressure peak width (hPa)

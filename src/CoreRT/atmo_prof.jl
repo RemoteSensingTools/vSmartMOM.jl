@@ -116,10 +116,12 @@ function reduce_profile(n::Int, profile::AtmosphericProfile{FT}) where {FT}
     vcd_h2o  = zeros(FT, n);
 
     # Loop over target number of layers
+    indices = []
     for i = 1:n
 
         # Get the section of the atmosphere with the i'th section pressure values
         ind = findall(a[i] .< profile.p_full .<= a[i+1]);
+        push!(indices, ind)
         @assert length(ind) > 0 "Profile reduction has an empty layer"
         #@show i, ind, a[i], a[i+1]
         # Set the pressure levels accordingly
@@ -134,6 +136,7 @@ function reduce_profile(n::Int, profile::AtmosphericProfile{FT}) where {FT}
         vcd_dry[i] = sum(profile.vcd_dry[ind])
         vcd_h2o[i] = sum(profile.vcd_h2o[ind])
     end
+    #@show indices
 
     new_vmr = Dict{String, Union{Real, Vector}}()
 
@@ -141,9 +144,9 @@ function reduce_profile(n::Int, profile::AtmosphericProfile{FT}) where {FT}
     for molec_i in keys(vmr)
         if profile.vmr[molec_i] isa AbstractArray
             
-            pressure_grid = collect(range(minimum(p_full), maximum(p_full), length=length(profile.vmr[molec_i])))
-            interp_linear = LinearInterpolation(pressure_grid, vmr[molec_i])
-            new_vmr[molec_i] = [interp_linear(x) for x in p_full]
+            #pressure_grid = collect(range(minimum(p_full), maximum(p_full), length=length(profile.vmr[molec_i])))
+            #interp_linear = LinearInterpolation(pressure_grid, vmr[molec_i])
+            new_vmr[molec_i] = [mean(profile.vmr[molec_i][ind]) for ind in indices]
         else
             new_vmr[molec_i] = profile.vmr[molec_i]
         end
@@ -163,21 +166,20 @@ Input:
     - `depol_fct` depolarization factor
     - `vcd_dry` dry vertical column (no water) per layer
 """
-function getRayleighLayerOptProp(psurf, λ, depol_fct, vcd_dry) 
+function getRayleighLayerOptProp(psurf::FT, λ::Union{Array{FT}, FT}, depol_fct::FT, vcd_dry::Array{FT}) where FT
     # TODO: Use noRS/noRS_plus to use n2/o2 molecular constants
     # to compute tau_scat and depol_fct
-    FT = eltype(λ)
-    # Total vertical Rayleigh scattering optical thickness 
-    tau_scat = FT(0.00864) * (psurf / FT(1013.25)) * λ^(-FT(3.916) - FT(0.074) * λ - FT(0.05) / λ) 
-    tau_scat = tau_scat * (FT(6.0) + FT(3.0) * depol_fct) / (FT(6.0)- FT(7.0) * depol_fct)
     Nz = length(vcd_dry)
-    τRayl = zeros(FT,Nz)
+    τRayl = zeros(FT,size(λ,1),Nz)
+    # Total vertical Rayleigh scattering optical thickness, TODO: enable sub-layers and use VCD based taus
+    tau_scat = FT(0.00864) * (psurf / FT(1013.25)) *  λ.^(-FT(3.916) .- FT(0.074) * λ .- FT(0.05) ./ λ)  
+    tau_scat = tau_scat * (FT(6.0) + FT(3.0) * depol_fct) / (FT(6.0)- FT(7.0) * depol_fct) 
+    # @show tau_scat, λ
     k = tau_scat / sum(vcd_dry)
     for i = 1:Nz
-        τRayl[i] = k * vcd_dry[i]
-    end
-
-    return convert.(FT, τRayl)
+        τRayl[:,i] .= k * vcd_dry[i]
+    end 
+    return τRayl
 end
 
 """
@@ -189,13 +191,15 @@ function getAerosolLayerOptProp(total_τ, p₀, σp, p_half)
 
     # Need to make sure we can also differentiate wrt σp (FT can be Dual!)
     FT = eltype(p₀)
-    Nz = length(p_half)
+    Nz = length(p_half)-1
     ρ = zeros(FT,Nz)
+
     # @show p_half, p₀, σp
-    for i = 2:Nz
-        dp = p_half[i] - p_half[i - 1]
+    for i = 1:Nz
+        dp = p_half[i+1] - p_half[i]
+        p  = (p_half[i+1] + p_half[i])/2
         # Use Distributions here later:
-        ρ[i] = (1 / (σp * sqrt(2π))) * exp(-(p_half[i] - p₀)^2 / (2σp^2)) * dp
+        ρ[i] = (1 / (σp * sqrt(2π))) * exp(-(p - p₀)^2 / (2σp^2)) * dp
     end
     Norm = sum(ρ)
     τAer  =  (total_τ / Norm) * ρ
@@ -390,6 +394,9 @@ function compute_absorption_profile!(τ_abs::Array{FT,2},
         # @show iz,p,T,profile.vcd_dry[iz], vmr_curr
         #@show typeof(τ_abs), typeof(vmr_curr), typeof(profile.vcd_dry[iz]), typeof(p), typeof(T)
         #@show typeof(absorption_cross_section(absorption_model, grid, p, T))
+        #temp = Array(absorption_cross_section(absorption_model, grid, p, T)) * profile.vcd_dry[iz] * vmr_curr
+        #@show minimum(temp), p, T, profile.vcd_dry[iz] * vmr_curr
+        #@show iz, profile.vcd_dry[iz], vmr_curr, p, T
         τ_abs[:,iz] += Array(absorption_cross_section(absorption_model, grid, p, T)) * profile.vcd_dry[iz] * vmr_curr
     end
     

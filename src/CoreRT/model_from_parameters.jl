@@ -37,7 +37,9 @@ function model_from_parameters(params::vSmartMOM_Parameters)
 
     # Rayleigh optical properties calculation
     greek_rayleigh = Scattering.get_greek_rayleigh(params.depol)
-    τ_rayl = [zeros(params.float_type, length(params.T)) for i=1:n_bands];
+    # Remove rayleight for testing:
+    τ_rayl = [zeros(params.float_type,length(params.spec_bands[i]), length(params.T)) for i=1:n_bands];
+    τ_rayl = [zeros(params.float_type,1,length(profile.T)) for i=1:n_bands];
     
     # This is a kludge for now, tau_abs sometimes needs to be a dual. Suniti & us need to rethink this all!!
     # i.e. code the rt core with fixed amount of derivatives as in her paper, then compute chain rule for dtau/dVMr, etc...
@@ -49,12 +51,13 @@ function model_from_parameters(params::vSmartMOM_Parameters)
 
         # i'th spectral band (convert from cm⁻¹ to μm)
         curr_band_λ = 1e4 ./ params.spec_bands[i_band]
-
-        # Compute Rayleigh properties per layer for `i_band` band center 
-        τ_rayl[i_band]   = getRayleighLayerOptProp(profile.p_half[end], 
-                                (maximum(curr_band_λ) + minimum(curr_band_λ)/2), 
+        # @show profile.vcd_dry, size(τ_rayl[i_band])
+        # Compute Rayleigh properties per layer for `i_band` band center  
+        
+        τ_rayl[i_band]   .= getRayleighLayerOptProp(profile.p_half[end], 
+                                (mean(curr_band_λ)), 
                                 params.depol, profile.vcd_dry);
-
+        #@show τ_rayl[i_band]
         # If no absorption, continue to next band
         isnothing(params.absorption_params) && continue
         
@@ -74,6 +77,7 @@ function model_from_parameters(params::vSmartMOM_Parameters)
                     architecture = params.architecture, 
                     vmr = 0);#mean(profile.vmr[params.absorption_params.molecules[i_band][molec_i]]))
                 # Calculate absorption profile
+                
                 @timeit "Absorption Coeff"  compute_absorption_profile!(τ_abs[i_band], absorption_model, params.spec_bands[i_band],profile.vmr[params.absorption_params.molecules[i_band][molec_i]], profile);
             # Use LUT directly
             else
@@ -86,6 +90,7 @@ function model_from_parameters(params::vSmartMOM_Parameters)
     aerosol_optics = [Array{AerosolOptics}(undef, (n_aer)) for i=1:n_bands];
         
     FT2 = isnothing(params.scattering_params) ? params.float_type : typeof(params.scattering_params.rt_aerosols[1].τ_ref)
+    @show FT2
     #FT2 =  params.float_type 
 
     # τ_aer[iBand][iAer,iZ]
@@ -103,7 +108,7 @@ function model_from_parameters(params::vSmartMOM_Parameters)
 
         # Create a univariate aerosol distribution
         mie_aerosol = Aerosol(size_distribution, curr_aerosol.nᵣ, curr_aerosol.nᵢ)
-        @show typeof(curr_aerosol.nᵣ)
+        #@show typeof(curr_aerosol.nᵣ)
         #mie_aerosol = make_mie_aerosol(size_distribution, curr_aerosol.nᵣ, curr_aerosol.nᵢ, params.scattering_params.r_max, params.scattering_params.nquad_radius) #Suniti: why is the refractive index needed here?
 
         # Create the aerosol extinction cross-section at the reference wavelength:
@@ -140,17 +145,29 @@ function model_from_parameters(params::vSmartMOM_Parameters)
             #@show i_aer, i_band
             aerosol_optics[i_band][i_aer] = Scattering.truncate_phase(truncation_type, 
                                                     aerosol_optics_raw; reportFit=false)
-
+            #@show aerosol_optics[i_band][i_aer].fᵗ
             # Compute nAer aerosol optical thickness profiles
             τ_aer[i_band][i_aer,:] = 
-                params.scattering_params.rt_aerosols[i_aer].τ_ref[] * 
+                params.scattering_params.rt_aerosols[i_aer].τ_ref * 
                 (aerosol_optics[i_band][i_aer].k/k_ref) * 
-                getAerosolLayerOptProp(1.0, c_aero.p₀, c_aero.σp, profile.p_full)
+                getAerosolLayerOptProp(1, c_aero.p₀, c_aero.σp, profile.p_half)
+            @info "AOD at band $i_band : $(sum(τ_aer[i_band][i_aer,:])), truncation factor = $(aerosol_optics[i_band][i_aer].fᵗ)"
         end 
     end
 
     # Check the floating-type output matches specified FT
 
+    # Plots:
+    
+    plt = lineplot(profile.T, -profile.p_full,#ylim=(1000,0),
+                      title="Temperature Profile", xlabel="Temperature [K]", ylabel="- Pressure [hPa]", canvas = UnicodePlots.DotCanvas, border=:ascii, compact=true)
+    display(plt)
+    plt = lineplot(profile.q, -profile.p_full,
+                      title="Humidity Profile", xlabel="Specific humidity", ylabel="- Pressure [hPa]", canvas = UnicodePlots.DotCanvas, border=:ascii, compact=true)
+    display(plt)
+    plt = lineplot(τ_aer[1][1,:],-profile.p_full,
+                      title="AOD Profile Band 1", xlabel="AOD", ylabel="- Pressure [hPa]", canvas = UnicodePlots.DotCanvas, border=:ascii, compact=true)
+    display(plt)
     # Return the model 
     return vSmartMOM_Model(params, 
                         aerosol_optics,  
@@ -214,7 +231,7 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
 
     # Rayleigh optical properties calculation
     greek_rayleigh = Scattering.get_greek_rayleigh(params.depol)
-    τ_rayl = [zeros(params.float_type, length(params.T)) for i=1:n_bands];
+    τ_rayl = [zeros(params.float_type,1, length(profile.p_full)) for i=1:n_bands];
 
     # τ_abs[iBand][iSpec,iZ]
     τ_abs     = [zeros(params.float_type, length(params.spec_bands[i]), length(profile.p_full)) for i in 1:n_bands]
@@ -225,10 +242,10 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
         # i'th spectral band (convert from cm⁻¹ to μm)
         curr_band_λ = 1e4 ./ params.spec_bands[i_band]
 
-        # Compute Rayleigh properties per layer for `i_band` band center 
-        τ_rayl[i_band]   = getRayleighLayerOptProp(profile.p_half[end], 
-                                (maximum(curr_band_λ) + minimum(curr_band_λ)/2), 
-                                params.depol, profile.vcd_dry);
+        # Compute Rayleigh properties per layer for `i_band` band center
+        τ_rayl[i_band]   .= getRayleighLayerOptProp(profile.p_half[end], 
+                            (maximum(curr_band_λ) + minimum(curr_band_λ))/2, 
+                            params.depol, profile.vcd_dry);
 
         # If no absorption, continue to next band
         isnothing(params.absorption_params) && continue
@@ -318,9 +335,9 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
 
             # Compute nAer aerosol optical thickness profiles
             τ_aer[i_band][i_aer,:] = 
-                params.scattering_params.rt_aerosols[i_aer].τ_ref[] * 
+                params.scattering_params.rt_aerosols[i_aer].τ_ref * 
                 (aerosol_optics[i_band][i_aer].k/k_ref) * 
-                CoreRT.getAerosolLayerOptProp(1.0, c_aero.p₀, c_aero.σp, profile.p_full)
+                CoreRT.getAerosolLayerOptProp(1.0, c_aero.p₀, c_aero.σp, profile.p_half)
         end 
     end
 

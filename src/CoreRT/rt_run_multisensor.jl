@@ -1,21 +1,22 @@
-#=
-
-This file contains the entry point for running the RT simulation, rt_run. 
-
-There are two implementations: one that accepts the raw parameters, and one that accepts
-the model. The latter should generally be used by users. 
-
-=#
-
 """
     $(FUNCTIONNAME)(RS_type, pol_type, obs_geom::ObsGeometry, τ_rayl, τ_aer, quad_points::QuadPoints, max_m, aerosol_optics, greek_rayleigh, τ_abs, brdf, architecture::AbstractArchitecture)
 
-Perform Radiative Transfer calculations using given parameters
-
+Perform Radiative Transfer calculations using given parameters 
+for multiple sensors at different atmospheric levels: e.g. TOA (for satellite 
+observations), BOA (for ground-based observations), and (a user-defined number of) 
+intermediate vertical levels for airborne (airplane, balloon, tower, hilltop) 
+measurements.
+Sensors are labeled from TOA->BOA, and each share the same set of viewing angles.
+Upward looking viewing angles are denoted by -90<VZA<0 and downward viewing angles
+are denoted by 0<VZA<90.
 """
-function rt_run_bck(RS_type::AbstractRamanType, #Default - no Raman scattering (noRS)
+#=
+function rt_run_ms(RS_type::AbstractRamanType, #Default - no Raman scattering (noRS)
                 pol_type::AbstractPolarizationType,   # Polarization type (IQUV)
                 obs_geom::ObsGeometry,                # Solar Zenith, Viewing Zenith, Viewing Azimuthal 
+                sensor_levels::Vector{Int64},#::ObsGeometry,           # [0] (R for satellite, T for groundbased, default), 
+                                                      # [Nz] (only groundbased),
+                                                      # [0, (1:Nz-1)] (general case)
                 τ_rayl,                               # Rayleigh optical depth 
                 τ_aer,                                # Aerosol optical depth and single-scattering albedo
                 quad_points::QuadPoints,              # Quadrature points and weights
@@ -43,12 +44,16 @@ function rt_run_bck(RS_type::AbstractRamanType, #Default - no Raman scattering (
     @show FT_dual
 
     # Output variables: Reflected and transmitted solar irradiation at TOA and BOA respectively # Might need Dual later!!
-    R = zeros(FT_dual, length(vza), pol_type.n, nSpec)
-    T = zeros(FT_dual, length(vza), pol_type.n, nSpec)
-    R_SFI = zeros(FT_dual, length(vza), pol_type.n, nSpec)
-    T_SFI = zeros(FT_dual, length(vza), pol_type.n, nSpec)
-    ieR_SFI = zeros(FT_dual, length(vza), pol_type.n, nSpec)
-    ieT_SFI = zeros(FT_dual, length(vza), pol_type.n, nSpec)
+    #R = zeros(FT_dual, length(sensor_levels), length(vza), pol_type.n, nSpec)
+    #T = zeros(FT_dual, length(sensor_levels), length(vza), pol_type.n, nSpec)
+    #R_SFI 
+    uwJ = zeros(FT_dual, length(sensor_levels), length(vza), pol_type.n, nSpec)
+    #T_SFI 
+    dwJ = zeros(FT_dual, length(sensor_levels), length(vza), pol_type.n, nSpec)
+    #ieR_SFI
+    uwieJ = zeros(FT_dual, length(sensor_levels), length(vza), pol_type.n, nSpec)
+    #ieT_SFI
+    dwieJ = zeros(FT_dual, length(sensor_levels), length(vza), pol_type.n, nSpec)
     # Notify user of processing parameters
     msg = 
     """
@@ -63,7 +68,8 @@ function rt_run_bck(RS_type::AbstractRamanType, #Default - no Raman scattering (
     @timeit "Creating layers" added_layer         = make_added_layer(RS_type,FT_dual, arr_type, dims, nSpec)
     # Just for now, only use noRS here
     @timeit "Creating layers" added_layer_surface = make_added_layer(RS_type,FT_dual, arr_type, dims, nSpec)
-    @timeit "Creating layers" composite_layer     = make_composite_layer(RS_type,FT_dual, arr_type, dims, nSpec)
+    @timeit "Creating layers" composite_layer     = 
+            make_composite_layer(RS_type, FT_dual, arr_type, length(sensor_levels), dims, nSpec)
     @timeit "Creating arrays" Aer𝐙⁺⁺ = arr_type(zeros(FT_dual, (dims[1], dims[2], nAer)))
     @timeit "Creating arrays" Aer𝐙⁻⁺ = similar(Aer𝐙⁺⁺)
     @timeit "Creating arrays" I_static = Diagonal(arr_type(Diagonal{FT}(ones(dims[1]))));
@@ -94,7 +100,7 @@ function rt_run_bck(RS_type::AbstractRamanType, #Default - no Raman scattering (
             @timeit "Z moments"  Aer𝐙⁺⁺[:,:,i], Aer𝐙⁻⁺[:,:,i] = Scattering.compute_Z_moments(pol_type, Array(qp_μ), aerosol_optics[i].greek_coefs, m, arr_type = arr_type)
         end
 
-        #@show RS_type.ϖ_Cabannes, ϖ_Cabannes
+        @show RS_type.ϖ_Cabannes, ϖ_Cabannes
         # Loop over all layers and pre-compute all properties before performing core RT
         @timeit "Computing Layer Properties" computed_atmosphere_properties = 
                 construct_all_atm_layers(FT, nSpec, Nz, NquadN, 
@@ -118,21 +124,44 @@ function rt_run_bck(RS_type::AbstractRamanType, #Default - no Raman scattering (
             end
             #@show RS_type.fscattRayl, RS_type.ϖ_Cabannes
             # Perform Core RT (doubling/elemental/interaction)
-            rt_kernel!(RS_type, pol_type, SFI, added_layer, composite_layer, computed_layer_properties, m, quad_points, I_static, architecture, qp_μN, iz) 
+            rt_kernel_multisensor!(RS_type, 
+                sensor_levels, 
+                pol_type, 
+                SFI, added_layer, composite_layer, 
+                computed_layer_properties, m, quad_points, I_static, architecture, qp_μN, iz) 
         end 
 
         # Create surface matrices:
         create_surface_layer!(brdf, added_layer_surface, SFI, m, pol_type, quad_points, arr_type(computed_atmosphere_properties.τ_sum_all[:,end]), architecture);
 
         # One last interaction with surface:
-        @timeit "interaction" interaction!(RS_type,
-            computed_atmosphere_properties.scattering_interfaces_all[end], 
-            SFI, composite_layer, added_layer_surface, I_static)
+        for ims=1:length(sensor_levels)
+            if sensor_levels[ims]==0 #include ims==Nz with ims==0
+                @timeit "interaction_multisensor" interaction_top!(
+                    ims, RS_type, 
+                    scattering_interface, SFI, 
+                    composite_layer, added_layer_surface, I_static)                
+            else
+                @timeit "interaction_multisensor" interaction_bot!(
+                    ims, RS_type, 
+                    scattering_interface, SFI, 
+                    composite_layer, added_layer_surface, I_static)
+            end
+        end
+        #@timeit "interaction" interaction_ms!(RS_type,
+        #    computed_atmosphere_properties.scattering_interfaces_all[end], 
+        #    SFI, composite_layer, added_layer_surface, I_static)
         
             #interaction_inelastic!(RS_type,computed_atmosphere_properties.scattering_interfaces_all[end], 
         #    SFI, composite_layer, added_layer_surface, I_static)
         # Postprocess and weight according to vza
-        postprocessing_vza!(RS_type, iμ₀, pol_type, composite_layer, vza, qp_μ, m, vaz, μ₀, weight, nSpec, SFI, R, R_SFI, T, T_SFI, ieR_SFI, ieT_SFI)
+        postprocessing_vza_ms!(RS_type, 
+            iμ₀, pol_type, 
+            composite_layer, 
+            vza, qp_μ, m, vaz, μ₀, 
+            weight, nSpec, SFI, 
+            uwJ, dwJ, uwieJ, dwieJ,
+            I_static)
     end
 
     # Show timing statistics
@@ -140,117 +169,30 @@ function rt_run_bck(RS_type::AbstractRamanType, #Default - no Raman scattering (
     reset_timer!()
 
     # Return R_SFI or R, depending on the flag
-    return SFI ? (R_SFI, T_SFI, ieR_SFI, ieT_SFI) : (R, T)
+    #return SFI ? (R_SFI, T_SFI, ieR_SFI, ieT_SFI) : (R, T)
+    return uwJ, dwJ, uwieJ, dwieJ
 end
+=#
 
-
-"""
-    $(FUNCTIONNAME)(model::vSmartMOM_Model, i_band::Integer = -1)
-
-Perform Radiative Transfer calculations using parameters passed in through the 
-vSmartMOM_Model struct
-
-"""
-function rt_run_bck(model::vSmartMOM_Model; i_band::Integer = -1)
-
-    # Number of bands total
-    n_bands = length(model.params.spec_bands)
-
-    # Check that i_band is valid
-    @assert (i_band == -1 || i_band in collect(1:n_bands)) "i_band is $(i_band) but there are only $(n_bands) bands"
-
-    # User wants a specific band
-    if i_band != -1
-        return rt_run_bck(noRS(),model.params.polarization_type,
-                      model.obs_geom,
-                      model.τ_rayl[i_band], 
-                      model.τ_aer[i_band], 
-                      model.quad_points,
-                      model.params.max_m,
-                      model.aerosol_optics[i_band],
-                      model.greek_rayleigh,
-                      model.τ_abs[i_band],
-                      model.params.brdf[i_band],
-                      model.params.architecture)
-
-    # User doesn't specify band, but there's only one 
-    elseif n_bands == 1
-
-        return rt_run_bck(noRS(),
-                      model.params.polarization_type,
-                      model.obs_geom,
-                      model.τ_rayl[1], 
-                      model.τ_aer[1], 
-                      model.quad_points,
-                      model.params.max_m,
-                      model.aerosol_optics[1],
-                      model.greek_rayleigh,
-                      model.τ_abs[1],
-                      model.params.brdf[1],
-                      model.params.architecture)
-
-    # User wants all bands
-    else
-
-        Rs = []
-
-        for i in 1:n_bands
-
-            println("------------------------------")
-            println("Computing R for band #$(i)")
-            println("------------------------------")
-
-            R = rt_run_bck(noRS(),
-                    model.params.polarization_type,
-                       model.obs_geom,
-                       model.τ_rayl[i], 
-                       model.τ_aer[i], 
-                       model.quad_points,
-                       model.params.max_m,
-                       model.aerosol_optics[i],
-                       model.greek_rayleigh,
-                       model.τ_abs[i],
-                       model.params.brdf[i],
-                       model.params.architecture)
-            push!(Rs, R);
-        end
-
-        return Rs
-    end
-
-    
-end
-
-# Mockup if no Raman type is chosen:
-function rt_run(model::vSmartMOM_Model; i_band::Integer = 1)
-    rt_run(noRS(), model, i_band)
-end
-
-# Just to make sure we still have it:
-function rt_run_test(RS_type::AbstractRamanType, 
-        model::vSmartMOM_Model, 
-        iBand)
-    rt_run(RS_type,model,iBand)
-end
-
-function rt_run(RS_type::AbstractRamanType, 
-                    model::vSmartMOM_Model, iBand)
+function rt_run_test_ms(RS_type::AbstractRamanType, 
+                        sensor_levels::Vector{Int64},
+                        model::vSmartMOM_Model, iBand)
     @unpack obs_alt, sza, vza, vaz = model.obs_geom   # Observational geometry properties
     @unpack qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart, μ₀, iμ₀, Nquad = model.quad_points # All quadrature points
     pol_type = model.params.polarization_type
     @unpack max_m = model.params
     @unpack quad_points = model
-    
+
     # Also to be changed!!
     brdf = model.params.brdf[iBand[1]]
     @unpack ϖ_Cabannes = RS_type
 
-    
+
     FT = eltype(sza)                    # Get the float-type to use
     Nz = length(model.profile.p_full)   # Number of vertical slices
     # CFRANKEN NEEDS to be changed for concatenated arrays!!
-    
-    
+
+
     RS_type.bandSpecLim = [] # (1:τ_abs[iB])#zeros(Int64, iBand, 2) #Suniti: how to do this?
     #Suniti: make bandSpecLim a part of RS_type (including noRS) so that it can be passed into rt_kernel and elemental/doubling/interaction and postprocessing_vza without major syntax changes
     #put this code in model_from_parameters
@@ -265,26 +207,30 @@ function rt_run(RS_type::AbstractRamanType,
     SFI = true                          # SFI flag
     NquadN = Nquad * pol_type.n         # Nquad (multiplied by Stokes n)
     dims = (NquadN,NquadN)              # nxn dims
-    
+
     # Need to check this a bit better in the future!
-    FT_dual = length(model.τ_aer[1][1]) > 0 ? typeof(model.τ_aer[1][1]) : FT
-    #FT_dual = FT
+    #FT_dual = length(model.τ_aer[1][1]) > 0 ? typeof(model.τ_aer[1][1]) : FT
+    FT_dual = FT
 
     # Output variables: Reflected and transmitted solar irradiation at TOA and BOA respectively # Might need Dual later!!
     #Suniti: consider adding a new dimension (iBand) to these arrays. The assignment of simulated spectra to their specific bands will take place after batch operations, thereby leaving the computational time unaffected 
-    R       = zeros(FT_dual, length(vza), pol_type.n, nSpec)
-    T       = zeros(FT_dual, length(vza), pol_type.n, nSpec)
-    R_SFI   = zeros(FT_dual, length(vza), pol_type.n, nSpec)
-    T_SFI   = zeros(FT_dual, length(vza), pol_type.n, nSpec)
-    ieR_SFI = zeros(FT_dual, length(vza), pol_type.n, nSpec)
-    ieT_SFI = zeros(FT_dual, length(vza), pol_type.n, nSpec)
+    uwJ   = [zeros(FT, (length(vza), pol_type.n, nSpec)) for i=1:length(sensor_levels)]
+    #zeros(FT_dual, length(sensor_levels), length(vza), pol_type.n, nSpec)
+    dwJ   = [zeros(FT, (length(vza), pol_type.n, nSpec)) for i=1:length(sensor_levels)]
+    #zeros(FT_dual, length(sensor_levels), length(vza), pol_type.n, nSpec)
+    #R_SFI   = zeros(FT_dual, length(vza), pol_type.n, nSpec)
+    #T_SFI   = zeros(FT_dual, length(vza), pol_type.n, nSpec)
+    uwieJ = [zeros(FT, (length(vza), pol_type.n, nSpec)) for i=1:length(sensor_levels)]
+    #zeros(FT_dual, length(sensor_levels), length(vza), pol_type.n, nSpec)
+    dwieJ = [zeros(FT, (length(vza), pol_type.n, nSpec)) for i=1:length(sensor_levels)]
+    #zeros(FT_dual, length(sensor_levels), length(vza), pol_type.n, nSpec)
     # Notify user of processing parameters
     msg = 
     """
     Processing on: $(architecture)
     With FT: $(FT)
     Source Function Integration: $(SFI)
-    Dimensions: $((NquadN, NquadN, nSpec))
+    Dimensions: $((length(sensor_levels), NquadN, NquadN, nSpec))
     """
     @info msg
 
@@ -295,12 +241,14 @@ function rt_run(RS_type::AbstractRamanType,
     @timeit "Creating layers" added_layer_surface = 
         make_added_layer(RS_type, FT_dual, arr_type, dims, nSpec)
     @timeit "Creating layers" composite_layer     = 
-        make_composite_layer(RS_type, FT_dual, arr_type, dims, nSpec)
+        make_composite_layer(RS_type, FT_dual, arr_type, length(sensor_levels), dims, nSpec)
+    #@timeit "Creating layers" composite_layer     = 
+    #make_composite_layer(RS_type, FT_dual, arr_type, dims, nSpec)
     @timeit "Creating arrays" I_static = 
         Diagonal(arr_type(Diagonal{FT}(ones(dims[1]))));
     #TODO: if RS_type!=noRS, create ϖ_λ₁λ₀, i_λ₁λ₀, fscattRayl, Z⁺⁺_λ₁λ₀, Z⁻⁺_λ₁λ₀ (for input), and ieJ₀⁺, ieJ₀⁻, ieR⁺⁻, ieR⁻⁺, ieT⁻⁻, ieT⁺⁺, ier⁺⁻, ier⁻⁺, iet⁻⁻, iet⁺⁺ (for output)
     #getRamanSSProp(RS_type, λ, grid_in)
-    
+
     println("Finished initializing arrays")
 
     # Loop over fourier moments
@@ -311,9 +259,10 @@ function rt_run(RS_type::AbstractRamanType,
         # Azimuthal weighting
         weight = m == 0 ? FT(0.5) : FT(1.0)
         # Set the Zλᵢλₒ interaction parameters for Raman (or nothing for noRS)
-        InelasticScattering.computeRamanZλ!(RS_type, pol_type,Array(qp_μ), m, arr_type)
+        InelasticScattering.computeRamanZλ!(RS_type, pol_type, Array(qp_μ), m, arr_type)
         # Compute the core layer optical properties:
-        @timeit "OpticalProps" layer_opt_props, fScattRayleigh   = 
+        @show iBand
+        layer_opt_props, fScattRayleigh   = 
             constructCoreOpticalProperties(RS_type,iBand,m,model);
         # Determine the scattering interface definitions:
         scattering_interfaces_all, τ_sum_all = 
@@ -321,59 +270,78 @@ function rt_run(RS_type::AbstractRamanType,
 
         # Loop over vertical layers: 
         @showprogress 1 "Looping over layers ..." for iz = 1:Nz  # Count from TOA to BOA
-            
+
             # Construct the atmospheric layer
             # From Rayleigh and aerosol τ, ϖ, compute overall layer τ, ϖ
+            # computed_layer_properties = get_layer_properties(computed_atmosphere_properties, iz, arr_type)
+            
             # Suniti: modified to return fscattRayl as the last element of  computed_atmosphere_properties
             if !(typeof(RS_type) <: noRS)
-                RS_type.fscattRayl = expandBandScalars(RS_type, fScattRayleigh[iz]) 
+                #@show fScattRayleigh[iz]
+                RS_type.fscattRayl = expandBandScalars(RS_type, fScattRayleigh[iz]) ; #Array(fScattRayleigh[iz])
             end
-            
-            # Expand all layer optical properties to their full dimension:
-            @timeit "OpticalProps" layer_opt = 
-                expandOpticalProperties(layer_opt_props[iz], arr_type)
 
+            # Expand all layer optical properties to their full dimension:
+            layer_opt = 
+                expandOpticalProperties(layer_opt_props[iz], arr_type) 
+                
             # Perform Core RT (doubling/elemental/interaction)
-            rt_kernel!(RS_type, pol_type, SFI, 
-                        #bandSpecLim, 
-                        added_layer, composite_layer, 
-                        layer_opt,
-                        scattering_interfaces_all[iz], 
-                        τ_sum_all[:,iz], 
-                        m, quad_points, 
-                        I_static, 
-                        model.params.architecture, 
-                        qp_μN, iz) 
+            rt_kernel_multisensor!(RS_type,
+                    sensor_levels, 
+                    pol_type, SFI, 
+                    #bandSpecLim, 
+                    added_layer, composite_layer, 
+                    layer_opt,
+                    scattering_interfaces_all[iz], 
+                    τ_sum_all[:,iz], 
+                    m, quad_points, 
+                    I_static, 
+                    model.params.architecture, 
+                    qp_μN, iz, arr_type) 
         end 
 
         # Create surface matrices:
         create_surface_layer!(brdf, 
-                            added_layer_surface, 
-                            SFI, m, 
-                            pol_type, 
-                            quad_points, 
-                            arr_type(τ_sum_all[:,end]), 
-                            model.params.architecture);
+                    added_layer_surface, 
+                    SFI, m, 
+                    pol_type, 
+                    quad_points, 
+                    arr_type(τ_sum_all[:,end]), 
+                    model.params.architecture);
 
         # One last interaction with surface:
-        @timeit "interaction" interaction!(RS_type,
-                                    #bandSpecLim,
-                                    scattering_interfaces_all[end], 
-                                    SFI, 
-                                    composite_layer, 
-                                    added_layer_surface, 
-                                    I_static)
-        
+        for ims=1:length(sensor_levels)
+            #if sensor_levels[ims]==0 #include ims==Nz with ims==0
+            #    @timeit "interaction_multisensor" interaction_top!(
+            #        ims, RS_type, 
+            #        scattering_interfaces_all[end], 
+            #        SFI, 
+            #        composite_layer, added_layer_surface, I_static, arr_type)                
+            #else
+            @timeit "interaction_multisensor" interaction_bot!(
+                    ims, RS_type, 
+                    scattering_interfaces_all[end], 
+                    SFI, 
+                    composite_layer, added_layer_surface, I_static, arr_type)
+            #end
+        end
+        # @timeit "interaction" interaction_ms!(RS_type,
+        #                    #bandSpecLim,
+        #                    scattering_interfaces_all[end], 
+        #                    SFI, 
+        #                    composite_layer, 
+        #                    added_layer_surface, 
+        #                    I_static)
+
         # Postprocess and weight according to vza
-        postprocessing_vza!(RS_type, 
-                            iμ₀, pol_type, 
-                            composite_layer, 
-                            vza, qp_μ, m, vaz, μ₀, 
-                            weight, nSpec, 
-                            SFI, 
-                            R, R_SFI, 
-                            T, T_SFI,
-                            ieR_SFI, ieT_SFI)
+        postprocessing_vza_ms!(RS_type, 
+                    sensor_levels,
+                    iμ₀, pol_type, 
+                    composite_layer, 
+                    vza, qp_μ, m, vaz, μ₀, 
+                    weight, nSpec, SFI, 
+                    uwJ, dwJ, uwieJ, dwieJ,
+                    I_static, arr_type)
     end
 
     # Show timing statistics
@@ -381,5 +349,5 @@ function rt_run(RS_type::AbstractRamanType,
     reset_timer!()
 
     # Return R_SFI or R, depending on the flag
-    return SFI ? (R_SFI, T_SFI, ieR_SFI, ieT_SFI) : (R, T)
+    return uwJ, dwJ, uwieJ, dwieJ #SFI ? (R_SFI, T_SFI, ieR_SFI, ieT_SFI) : (R, T)
 end

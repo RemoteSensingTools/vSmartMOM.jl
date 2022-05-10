@@ -117,12 +117,13 @@ function elemental!(pol_type, SFI::Bool,
                             added_layer::Union{AddedLayer{FT},AddedLayerRS{FT}}, 
                             architecture) where {FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2}
 
-    @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, J₀⁺, J₀⁻ = added_layer
+    @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻ = added_layer
     @unpack qp_μ, iμ₀, wt_μN, qp_μN = quad_points
     @unpack τ, ϖ, Z⁺⁺, Z⁻⁺ = computed_layer_properties
     #@unpack ϖ_Cabannes = RS_type
     #@show architecture
     arr_type = array_type(architecture)
+
     # Need to check with paper nomenclature. This is basically eqs. 19-20 in vSmartMOM
     qp_μN = arr_type(qp_μN)
     wt_μN = arr_type(wt_μN)
@@ -131,12 +132,7 @@ function elemental!(pol_type, SFI::Bool,
     D = Diagonal(arr_type(repeat(pol_type.D, size(qp_μ,1))))
 
     device = devi(architecture)
-    #@show typeof(ϖ),typeof(dτ),typeof(Z⁻⁺),typeof(Z⁺⁺) 
-    #ϖ   = arr_type(ϖ);
-    #dτ  = arr_type(dτ);
-    #Z⁻⁺ = arr_type(Z⁻⁺);
-    #Z⁺⁺ = arr_type(Z⁺⁺);
-    #@show size(Z⁻⁺), size(ϖ)
+
     # If in scattering mode:
     if scatter
    
@@ -152,27 +148,22 @@ function elemental!(pol_type, SFI::Bool,
         wait(device, event)
         synchronize_if_gpu()
 
-        if SFI
-            kernel! = get_elem_rt_SFI!(device)
-            event = kernel!(J₀⁺, J₀⁻, ϖ, dτ, arr_type(τ_sum), Z⁻⁺, Z⁺⁺, qp_μN, ndoubl, wct02, pol_type.n, I₀, iμ₀, D, ndrange=size(J₀⁺))
-            wait(device, event)
-        end
-        #ii = pol_type.n*(iμ0-1)+1
-        #@show 'B',iμ0,  r⁻⁺[1,ii,1]/(J₀⁻[1,1,1]*wt_μ[iμ0]), r⁻⁺[1,ii,1], J₀⁻[1,1,1]*wt_μ[iμ0], J₀⁺[1,1,1]*wt_μ[iμ0]
+        # SFI part
+        kernel! = get_elem_rt_SFI!(device)
+        event = kernel!(j₀⁺, j₀⁻, ϖ, dτ, arr_type(τ_sum), Z⁻⁺, Z⁺⁺, qp_μN, ndoubl, wct02, pol_type.n, I₀, iμ₀, D, ndrange=size(j₀⁺))
+        wait(device, event)
         synchronize_if_gpu()
         
         # Apply D Matrix
         apply_D_matrix_elemental!(ndoubl, pol_type.n, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻)
 
-        if SFI
-            apply_D_matrix_elemental_SFI!(ndoubl, pol_type.n, J₀⁻)
-        end      
+        # apply D matrix for SFI
+        apply_D_matrix_elemental_SFI!(ndoubl, pol_type.n, j₀⁻)   
     else
         # Note: τ is not defined here
-        t⁺⁺[:] = Diagonal{exp(-τ ./ qp_μN)}
-        t⁻⁻[:] = Diagonal{exp(-τ ./ qp_μN)}
+        t⁺⁺ .= Diagonal{exp(-τ ./ qp_μN)}
+        t⁻⁻ .= Diagonal{exp(-τ ./ qp_μN)}
     end    
-    #@pack! added_layer = r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, J₀⁺, J₀⁻   
 end
 
 @kernel function get_elem_rt!(r⁻⁺, t⁺⁺, ϖ_λ, dτ_λ, Z⁻⁺, Z⁺⁺, qp_μN, wct) 

@@ -19,7 +19,7 @@ function doubling_helper!(pol_type,
                           architecture) where {FT}
 
     # Unpack the added layer
-    @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, J₀⁺, J₀⁻ = added_layer
+    @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻ = added_layer
     
     # Device architecture
     dev = devi(architecture)
@@ -30,42 +30,37 @@ function doubling_helper!(pol_type,
     # Geometric progression of reflections (1-RR)⁻¹
     gp_refl      = similar(t⁺⁺)
     tt⁺⁺_gp_refl = similar(t⁺⁺)
- 
-    if SFI
-        # Dummy for source 
-        J₁⁺ = similar(J₀⁺)
-        # Dummy for J
-        J₁⁻ = similar(J₀⁻)
-    end
+    
+    # Dummy for source 
+    j₁⁺ = similar(j₀⁺)
+    # Dummy for J
+    j₁⁻ = similar(j₀⁻)
 
     # Loop over number of doublings
     for n = 1:ndoubl
         
         # T⁺⁺(λ)[I - R⁺⁻(λ)R⁻⁺(λ)]⁻¹, for doubling R⁺⁻,R⁻⁺ and T⁺⁺,T⁻⁻ is identical
-        batch_inv!(gp_refl, I_static .- r⁻⁺ ⊠ r⁻⁺)
-        tt⁺⁺_gp_refl[:] = t⁺⁺ ⊠ gp_refl
+        @timeit "Batch Inv Doubling" batch_inv!(gp_refl, I_static .- r⁻⁺ ⊠ r⁻⁺)
+        tt⁺⁺_gp_refl .= t⁺⁺ ⊠ gp_refl
 
-        if SFI
+        # J⁺₂₁(λ) = J⁺₁₀(λ).exp(-τ(λ)/μ₀)
+        @inbounds @views j₁⁺[:,1,:] .= j₀⁺[:,1,:] .* expk'
 
-            # J⁺₂₁(λ) = J⁺₁₀(λ).exp(-τ(λ)/μ₀)
-            @views J₁⁺[:,1,:] = J₀⁺[:,1,:] .* expk'
+        # J⁻₁₂(λ)  = J⁻₀₁(λ).exp(-τ(λ)/μ₀)
+        @inbounds @views j₁⁻[:,1,:] .= j₀⁻[:,1,:] .* expk'
 
-            # J⁻₁₂(λ)  = J⁻₀₁(λ).exp(-τ(λ)/μ₀)
-            @views J₁⁻[:,1,:] = J₀⁻[:,1,:] .* expk'
+        # J⁻₀₂(λ) = J⁻₀₁(λ) + T⁻⁻₀₁(λ)[I - R⁻⁺₂₁(λ)R⁺⁻₀₁(λ)]⁻¹[J⁻₁₂(λ) + R⁻⁺₂₁(λ)J⁺₁₀(λ)] (see Eqs.8 in Raman paper draft)
+        @timeit "Batch Doubling" j₀⁻ .= j₀⁻ + (tt⁺⁺_gp_refl ⊠ (j₁⁻ + r⁻⁺ ⊠ j₀⁺)) 
 
-            # J⁻₀₂(λ) = J⁻₀₁(λ) + T⁻⁻₀₁(λ)[I - R⁻⁺₂₁(λ)R⁺⁻₀₁(λ)]⁻¹[J⁻₁₂(λ) + R⁻⁺₂₁(λ)J⁺₁₀(λ)] (see Eqs.8 in Raman paper draft)
-            J₀⁻[:] = J₀⁻ + (tt⁺⁺_gp_refl ⊠ (J₁⁻ + r⁻⁺ ⊠ J₀⁺)) 
-
-            # J⁺₂₀(λ) = J⁺₂₁(λ) + T⁺⁺₂₁(λ)[I - R⁺⁻₀₁(λ)R⁻⁺₂₁(λ)]⁻¹[J⁺₁₀(λ) + R⁺⁻₀₁(λ)J⁻₁₂(λ)] (see Eqs.8 in Raman paper draft)
-            J₀⁺[:] = J₁⁺ + (tt⁺⁺_gp_refl ⊠ (J₀⁺ + r⁻⁺ ⊠ J₁⁻))
-            expk[:] = expk.^2
-        end  
-
+        # J⁺₂₀(λ) = J⁺₂₁(λ) + T⁺⁺₂₁(λ)[I - R⁺⁻₀₁(λ)R⁻⁺₂₁(λ)]⁻¹[J⁺₁₀(λ) + R⁺⁻₀₁(λ)J⁻₁₂(λ)] (see Eqs.8 in Raman paper draft)
+        @timeit "Batch Doubling" j₀⁺  .= j₁⁺ + (tt⁺⁺_gp_refl ⊠ (j₀⁺ + r⁻⁺ ⊠ j₁⁻))
+        expk .= expk.^2
+    
         # R⁻⁺₂₀(λ) = R⁻⁺₁₀(λ) + T⁻⁻₀₁(λ)[I - R⁻⁺₂₁(λ)R⁺⁻₀₁(λ)]⁻¹R⁻⁺₂₁(λ)T⁺⁺₁₀(λ) (see Eqs.8 in Raman paper draft)
-        r⁻⁺[:]  = r⁻⁺ + (tt⁺⁺_gp_refl ⊠ r⁻⁺ ⊠ t⁺⁺)
+        @timeit "Batch Doubling"  r⁻⁺  .= r⁻⁺ + (tt⁺⁺_gp_refl ⊠ r⁻⁺ ⊠ t⁺⁺)
 
         # T⁺⁺₂₀(λ) = T⁺⁺₂₁(λ)[I - R⁺⁻₀₁(λ)R⁻⁺₂₁(λ)]⁻¹T⁺⁺₁₀(λ) (see Eqs.8 in Raman paper draft)
-        t⁺⁺[:]  = tt⁺⁺_gp_refl ⊠ t⁺⁺
+        @timeit "Batch Doubling" t⁺⁺  .= tt⁺⁺_gp_refl ⊠ t⁺⁺
     end
 
     # After doubling, revert D(DR)->R, where D = Diagonal{1,1,-1,-1}
@@ -73,12 +68,13 @@ function doubling_helper!(pol_type,
 
     synchronize_if_gpu()
 
-    apply_D_matrix!(pol_type.n, added_layer.r⁻⁺, added_layer.t⁺⁺, added_layer.r⁺⁻, added_layer.t⁻⁻)
+    # Can we do this in better batch modes?
+    apply_D_matrix!(pol_type.n, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻)
 
-    SFI && apply_D_matrix_SFI!(pol_type.n, added_layer.J₀⁻)
+    # Same here?
+    SFI && apply_D_matrix_SFI!(pol_type.n, j₀⁻)
 
     return nothing 
-
 end
 
 function doubling!(pol_type, SFI, expk,
@@ -120,8 +116,8 @@ end
 
 function apply_D_matrix!(n_stokes::Int, r⁻⁺::AbstractArray{FT,3}, t⁺⁺::AbstractArray{FT,3}, r⁺⁻::AbstractArray{FT,3}, t⁻⁻::AbstractArray{FT,3}) where {FT}
     if n_stokes == 1
-        r⁺⁻[:] = r⁻⁺
-        t⁻⁻[:] = t⁺⁺    
+        r⁺⁻ .= r⁻⁺
+        t⁻⁻ .= t⁺⁺    
         return nothing
     else 
         device = devi(architecture(r⁻⁺))
@@ -133,20 +129,6 @@ function apply_D_matrix!(n_stokes::Int, r⁻⁺::AbstractArray{FT,3}, t⁺⁺::A
     end
 end
 
-#=function apply_D_matrix!(n_stokes::Int, r⁻⁺::Array{FT,3}, t⁺⁺::Array{FT,3}, r⁺⁻::Array{FT,3}, t⁻⁻::Array{FT,3}) where {FT}
-    if n_stokes == 1
-        r⁺⁻[:] = r⁻⁺
-        t⁻⁻[:] = t⁺⁺
-        
-        return nothing
-    else 
-        device = devi(Architectures.CPU())
-        applyD_kernel! = apply_D!(device)
-        event = applyD_kernel!(n_stokes, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻, ndrange=size(r⁻⁺));
-        wait(device, event);
-        return nothing
-    end
-end=#
 
 function apply_D_matrix_SFI!(n_stokes::Int, J₀⁻::AbstractArray{FT,3}) where {FT}
     n_stokes == 1 && return nothing
@@ -157,16 +139,3 @@ function apply_D_matrix_SFI!(n_stokes::Int, J₀⁻::AbstractArray{FT,3}) where 
     synchronize_if_gpu();
     nothing
 end
-
-#=
-function apply_D_matrix_SFI!(n_stokes::Int, J₀⁻::Array{FT,3}) where {FT}
-    
-    n_stokes == 1 && return nothing
-
-    device = devi(architecture(J₀⁻))
-    applyD_kernel! = apply_D_SFI!(device)
-    event = applyD_kernel!(n_stokes, J₀⁻, ndrange=size(J₀⁻));
-    wait(device, event);
-    
-    return nothing
-end=#

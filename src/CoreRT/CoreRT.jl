@@ -8,6 +8,7 @@ It includes this module's source files and exports the relevant keywords.
 
 module CoreRT
 
+using UnicodePlots
 using Interpolations               # For interpolating the vmr's
 using LinearAlgebra                # For linear algebra routines
 using ProgressMeter                # Showing progress in for loops
@@ -61,11 +62,14 @@ include("CoreKernel/doubling.jl")              # Doubling
 include("CoreKernel/doubling_inelastic.jl")    # Doubling for elastic + inelastic scattering 
 include("CoreKernel/interaction.jl")           # Interaction
 include("CoreKernel/interaction_inelastic.jl") # Interaction for elastic + inelastic scattering 
+include("CoreKernel/interaction_multisensor.jl") # Suniti: ms
+include("CoreKernel/interlayer_flux.jl")       # Suniti: ms
 include("CoreKernel/rt_kernel.jl")             # Handle Core RT (Elemental/Doubling/Interaction)
-
+include("CoreKernel/rt_kernel_multisensor.jl") # Suniti: ms
 include("postprocessing_vza.jl")               # Postprocess (Azimuthal Weighting)
+include("postprocessing_vza_ms.jl")
 include("rt_run.jl")                           # Starting point for RT 
-
+include("rt_run_multisensor.jl")  
 # GPU
 include("gpu_batched.jl")                   # Batched operations
 
