@@ -178,8 +178,12 @@ function parameters_from_yaml(file_path)
     end
     BRDF_per_band     = map(x -> eval(Meta.parse(x)), params_dict["radiative_transfer"]["surface"]) 
     quadrature_type   = eval(Meta.parse(params_dict["radiative_transfer"]["quadrature_type"]))
-    #@show params_dict["radiative_transfer"]["polarization_type"]
-    polarization_type = eval(Meta.parse(params_dict["radiative_transfer"]["polarization_type"] *"{$FT}()"))
+    
+    # Make type stable, pol type has to be in the right FT:
+    pol_type = replace(params_dict["radiative_transfer"]["polarization_type"], "()" => "{$FT}()")
+    #@show pol_type
+    polarization_type = eval(Meta.parse(pol_type))
+    
     architecture      = eval(Meta.parse(params_dict["radiative_transfer"]["architecture"]))
     #@show polarization_type, quadrature_type 
     # atmospheric_profile group

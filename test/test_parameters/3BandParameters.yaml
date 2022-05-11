@@ -15,7 +15,7 @@ radiative_transfer:
   # Quadrature-scheme for stream calculations
   quadrature_type:    GaussQuadHemisphere()
   # Polarization type (Stokes_I, Stokes_IQ, Stokes_IQU, Stokes_IQUV)
-  polarization_type:  Stokes_IQU
+  polarization_type:  Stokes_IQU()
   # Maximum m (number of Fourier moments to loop over)
   max_m:              3
   # Exclusion angle for forward peak in fitting procedure (degrees)

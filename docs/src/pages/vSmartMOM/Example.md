@@ -9,7 +9,7 @@ using vSmartMOM.CoreRT
 ## 
 
 # If you would like to load your own parameters from a YAML file
-# (See required format at: https://github.com/remotesensingtools/vSmartMOM.jl/blob/main/src/CoreRT/ModelParameters/DefaultParameters.yaml)
+# (See required format at: https://github.com/remotesensingtools/vSmartMOM.jl/blob/main/src/CoreRT/DefaultParameters.yaml)
 parameters = parameters_from_yaml("vSmartMOM/src/CoreRT/DefaultParameters.yaml")
 
 # OR if you would like to load a default set of parameters

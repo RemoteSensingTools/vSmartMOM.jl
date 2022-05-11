@@ -13,13 +13,13 @@ using Distributions
 using JLD2
 
 # Test the Absorption module
-#@testset "Absorption" begin include("test_Absorption.jl") end
+@testset "Absorption" begin include("test_Absorption.jl") end
 
 # Test the Scattering module
-#@testset "Scattering" begin include("test_Scattering.jl") end
+@testset "Scattering" begin include("test_Scattering.jl") end
 
 # Test the CoreRT module
 @testset "CoreRT" begin include("test_CoreRT.jl") end
 
 # Test the SolarModel module
-#@testset "SolarModel" begin include("test_SolarModel.jl") end
+@testset "SolarModel" begin include("test_SolarModel.jl") end
