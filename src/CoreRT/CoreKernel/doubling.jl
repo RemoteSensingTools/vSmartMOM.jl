@@ -14,13 +14,13 @@ function doubling_helper!(pol_type,
                           SFI, 
                           expk, 
                           ndoubl::Int, 
-                          added_layer::Union{AddedLayer,AddedLayerRS},
+                          added_layer::M,
                           I_static::AbstractArray{FT}, 
-                          architecture) where {FT}
+                          architecture) where {FT,M}
 
     # Unpack the added layer
     @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻ = added_layer
-    
+    #@show typeof(expk), typeof(I_static)
     # Device architecture
     dev = devi(architecture)
 
@@ -40,6 +40,7 @@ function doubling_helper!(pol_type,
     for n = 1:ndoubl
         
         # T⁺⁺(λ)[I - R⁺⁻(λ)R⁻⁺(λ)]⁻¹, for doubling R⁺⁻,R⁻⁺ and T⁺⁺,T⁻⁻ is identical
+        #@show typeof(gp_refl), typeof(I_static), typeof(I_static .- r⁻⁺), typeof(j₁⁺)
         @timeit "Batch Inv Doubling" batch_inv!(gp_refl, I_static .- r⁻⁺ ⊠ r⁻⁺)
         tt⁺⁺_gp_refl .= t⁺⁺ ⊠ gp_refl
 
@@ -50,38 +51,34 @@ function doubling_helper!(pol_type,
         @inbounds @views j₁⁻[:,1,:] .= j₀⁻[:,1,:] .* expk'
 
         # J⁻₀₂(λ) = J⁻₀₁(λ) + T⁻⁻₀₁(λ)[I - R⁻⁺₂₁(λ)R⁺⁻₀₁(λ)]⁻¹[J⁻₁₂(λ) + R⁻⁺₂₁(λ)J⁺₁₀(λ)] (see Eqs.8 in Raman paper draft)
-        @timeit "Batch Doubling" j₀⁻ .= j₀⁻ + (tt⁺⁺_gp_refl ⊠ (j₁⁻ + r⁻⁺ ⊠ j₀⁺)) 
+        j₀⁻ .= j₀⁻ + (tt⁺⁺_gp_refl ⊠ (j₁⁻ + r⁻⁺ ⊠ j₀⁺)) 
 
         # J⁺₂₀(λ) = J⁺₂₁(λ) + T⁺⁺₂₁(λ)[I - R⁺⁻₀₁(λ)R⁻⁺₂₁(λ)]⁻¹[J⁺₁₀(λ) + R⁺⁻₀₁(λ)J⁻₁₂(λ)] (see Eqs.8 in Raman paper draft)
-        @timeit "Batch Doubling" j₀⁺  .= j₁⁺ + (tt⁺⁺_gp_refl ⊠ (j₀⁺ + r⁻⁺ ⊠ j₁⁻))
+        j₀⁺  .= j₁⁺ + (tt⁺⁺_gp_refl ⊠ (j₀⁺ + r⁻⁺ ⊠ j₁⁻))
         expk .= expk.^2
     
         # R⁻⁺₂₀(λ) = R⁻⁺₁₀(λ) + T⁻⁻₀₁(λ)[I - R⁻⁺₂₁(λ)R⁺⁻₀₁(λ)]⁻¹R⁻⁺₂₁(λ)T⁺⁺₁₀(λ) (see Eqs.8 in Raman paper draft)
-        @timeit "Batch Doubling"  r⁻⁺  .= r⁻⁺ + (tt⁺⁺_gp_refl ⊠ r⁻⁺ ⊠ t⁺⁺)
+        r⁻⁺  .= r⁻⁺ + (tt⁺⁺_gp_refl ⊠ r⁻⁺ ⊠ t⁺⁺)
 
         # T⁺⁺₂₀(λ) = T⁺⁺₂₁(λ)[I - R⁺⁻₀₁(λ)R⁻⁺₂₁(λ)]⁻¹T⁺⁺₁₀(λ) (see Eqs.8 in Raman paper draft)
-        @timeit "Batch Doubling" t⁺⁺  .= tt⁺⁺_gp_refl ⊠ t⁺⁺
+        t⁺⁺  .= tt⁺⁺_gp_refl ⊠ t⁺⁺
     end
-
-    # After doubling, revert D(DR)->R, where D = Diagonal{1,1,-1,-1}
-    # For SFI, after doubling, revert D(DJ₀⁻)->J₀⁻
-
     synchronize_if_gpu()
 
-    # Can we do this in better batch modes?
+    # After doubling, revert D(DR)->R, where D = Diagonal{1,1,-1,-1}
     apply_D_matrix!(pol_type.n, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻)
 
-    # Same here?
-    SFI && apply_D_matrix_SFI!(pol_type.n, j₀⁻)
+    # For SFI, after doubling, revert D(DJ₀⁻)->J₀⁻
+    apply_D_matrix_SFI!(pol_type.n, j₀⁻)
 
     return nothing 
 end
 
 function doubling!(pol_type, SFI, expk,
                     ndoubl::Int, 
-                    added_layer::AddedLayer,#{FT},
+                    added_layer::AddedLayer{M},#{FT},
                     I_static::AbstractArray{FT}, 
-                    architecture) where {FT}
+                    architecture) where {FT,M}
 
     doubling_helper!(pol_type, SFI, expk, ndoubl, added_layer, I_static, architecture)
     synchronize_if_gpu()

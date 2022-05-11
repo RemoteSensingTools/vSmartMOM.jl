@@ -69,6 +69,22 @@ function batched_mul(A::CuArray{ForwardDiff.Dual{T,V,N},3}, B::CuArray{ForwardDi
     return eltype(A).(Cv,dABdx);
 end
 
+"Define batched matrix multiply for GPU and Duals"
+function batched_mul_(A::CuArray{ForwardDiff.Dual{T,V,N},3}, B::CuArray{ForwardDiff.Dual{T,V,N},3}) where {T,V,N}
+    # Extract values:
+    Av = ForwardDiff.value.(A)
+    Bv = ForwardDiff.value.(B)
+    # Use strided batch for A*B (defined as gemm_strided_batched):
+    Cv = Av ⊠ Bv
+    # Compute derivatives ∂(AB)/∂x = A * ∂B/∂x + ∂A/∂x * B;
+    dABdx = ntuple(i -> Av ⊠ ForwardDiff.partials.(B,i) + ForwardDiff.partials.(A,i) ⊠ Bv, N);
+    @show size(dABdx[1])
+    #dABdx = ForwardDiff.Partials.(tuple.(dABdx...));
+    return eltype(A).(Cv,ForwardDiff.Partials.(dABdx...));
+end
+
+
+
 "Overload of batch_inv! for Dual numbers"
 function batch_inv!(X::CuArray{ForwardDiff.Dual{T,V,N},3}, A::CuArray{ForwardDiff.Dual{T,V,N},3}) where {T,V,N}
     #@show typeof(ForwardDiff.value.(A))

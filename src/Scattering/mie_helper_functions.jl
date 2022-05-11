@@ -203,7 +203,7 @@ function reconstruct_phase(greek_coefs, μ; returnLeg=false)
 
     # Compute legendre polynomials
     P, P², R², T² = compute_legendre_poly(μ, l_max)
-
+    #@show typeof(P), typeof(μ), typeof(l_max)
     # To stay general, we also don't assume f₂₂=f₁₁ or f₄₄=f₃₃
     # which only holds for spherical
     f₁₁, f₃₃, f₁₂, f₃₄, f₂₂, f₄₄ = (zeros(FT, nμ), zeros(FT, nμ), zeros(FT, nμ), 
