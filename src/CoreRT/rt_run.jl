@@ -240,6 +240,8 @@ function rt_run(RS_type::AbstractRamanType,
     pol_type = model.params.polarization_type
     @unpack max_m = model.params
     @unpack quad_points = model
+
+    n_aer = isnothing(model.params.scattering_params) ? 0 : length(model.params.scattering_params.rt_aerosols)
     
     # Also to be changed!!
     brdf = model.params.brdf[iBand[1]]
@@ -267,7 +269,7 @@ function rt_run(RS_type::AbstractRamanType,
     dims = (NquadN,NquadN)              # nxn dims
     
     # Need to check this a bit better in the future!
-    FT_dual = length(model.τ_aer[1][1]) > 0 ? typeof(model.τ_aer[1][1]) : FT
+    FT_dual = n_aer > 0 ? typeof(model.τ_aer[1][1]) : FT
     #FT_dual = FT
 
     # Output variables: Reflected and transmitted solar irradiation at TOA and BOA respectively # Might need Dual later!!
