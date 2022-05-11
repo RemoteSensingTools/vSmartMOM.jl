@@ -17,27 +17,33 @@ function compute_aerosol_optical_properties(model::MieModel{FDT}, FT2::Type=Floa
 
     # Unpack the model
     @unpack computation_type, aerosol, λ, polarization_type, truncation_type, r_max, nquad_radius, wigner_A, wigner_B = model
-
+    @show nquad_radius, λ
     # Extract variables from aerosol struct:
     @unpack size_distribution, nᵣ, nᵢ = aerosol
-    
+    #@show typeof(size_distribution.σ), typeof(nᵣ)
     # Imaginary part of the refractive index must be ≥ 0
     @assert nᵢ ≥ 0
 
     # Get the refractive index's real part type
     #@show size_distribution.σ  
     FT = eltype(size_distribution.σ);
-    # @assert FT == Float64 "Aerosol computations require 64bit"
+
+    #@show FT, ForwardDiff.valtype(size_distribution.σ)
+    vFT = ForwardDiff.valtype(size_distribution.σ)
+    #@assert FT == Float64 "Aerosol computations require 64bit"
     # Get radius quadrature points and weights (for mean, thus normalized):
     # 
     
     # Just sample from 0.25%ile to 99.75%ile:
-    start,stop = quantile(size_distribution,[0.0025,0.9975])
+    start,stop = quantile(size_distribution,[vFT(0.0025),vFT(0.9975)])
     #r, wᵣ = gauleg(nquad_radius, 0.0, r_max ; norm=true) 
     r, wᵣ = gauleg(nquad_radius, start, min(stop,r_max) ; norm=true) 
-    
+    #@show typeof(r), typeof(wᵣ)
+    #@show typeof(convert.(FT, r))
+    r = convert.(FT, r)
+    wᵣ = convert.(FT, wᵣ)
     # Wavenumber
-    k = 2π / λ  
+    k = vFT(2π) / λ  
 
     # Size parameter
     x_size_param = k * r # (2πr/λ)
@@ -96,10 +102,10 @@ function compute_aerosol_optical_properties(model::MieModel{FDT}, FT2::Type=Floa
         C_ext[i] = 2π / k^2 * (n_' * real(an + bn))
        
         # Compute scattering matrix components per size parameter:
-        f₁₁[:,i] =  0.5 / x_size_param[i]^2  * real(abs2.(S₁[:,i]) + abs2.(S₂[:,i]));
-        f₃₃[:,i] =  0.5 / x_size_param[i]^2  * real(S₁[:,i] .* conj(S₂[:,i]) + S₂[:,i] .* conj(S₁[:,i]));
-        f₁₂[:,i] = -0.5 / x_size_param[i]^2  * real(abs2.(S₁[:,i]) - abs2.(S₂[:,i]));
-        f₃₄[:,i] = -0.5 / x_size_param[i]^2  * imag(S₁[:,i] .* conj(S₂[:,i]) - S₂[:,i] .* conj(S₁[:,i]));
+        f₁₁[:,i] =  vFT(0.5) / x_size_param[i]^2   * real(abs2.(S₁[:,i]) + abs2.(S₂[:,i]));
+        f₃₃[:,i] =  vFT(0.5) / x_size_param[i]^2   * real(S₁[:,i] .* conj(S₂[:,i]) + S₂[:,i] .* conj(S₁[:,i]));
+        f₁₂[:,i] = -vFT(0.5) / x_size_param[i]^2   * real(abs2.(S₁[:,i]) - abs2.(S₂[:,i]));
+        f₃₄[:,i] = -vFT(0.5) / x_size_param[i]^2   * imag(S₁[:,i] .* conj(S₂[:,i]) - S₂[:,i] .* conj(S₁[:,i]));
 
     end
 
@@ -152,7 +158,8 @@ function compute_aerosol_optical_properties(model::MieModel{FDT}, FT2::Type=Floa
     end
 
     # Check whether this is a Dual number (if so, don't do any conversions)
-    if FT2 <: AbstractFloat
+    if FT <: AbstractFloat
+        #@show "Convert greek", FT2
         # Create GreekCoefs object with α, β, γ, δ, ϵ, ζ
         greek_coefs = GreekCoefs(convert.(FT2, α), 
                                  convert.(FT2, β), 
@@ -160,6 +167,7 @@ function compute_aerosol_optical_properties(model::MieModel{FDT}, FT2::Type=Floa
                                  convert.(FT2, δ), 
                                  convert.(FT2, ϵ), 
                                  convert.(FT2, ζ))
+        #@show typeof(convert.(FT2, β)), typeof(greek_coefs)
         # Return the packaged AerosolOptics object
         return AerosolOptics(greek_coefs=greek_coefs, ω̃=FT2(bulk_C_sca / bulk_C_ext), k=FT2(bulk_C_ext), fᵗ=FT2(1))
 
@@ -204,11 +212,11 @@ function compute_ref_aerosol_extinction(model::MieModel{FDT}, FT2::Type=Float64)
     μ, w_μ = gausslegendre(n_mu)
 
     # Compute π and τ functions
-    leg_π, leg_τ = compute_mie_π_τ(μ, n_max)
+    #leg_π, leg_τ = compute_mie_π_τ(μ, n_max)
 
     # Pre-allocate arrays:
     C_ext = zeros(FT, nquad_radius)
-    C_sca = zeros(FT, nquad_radius)
+    #C_sca = zeros(FT, nquad_radius)
 
     # Standardized weights for the size distribution:
     wₓ = compute_wₓ(size_distribution, wᵣ, r, r_max) 

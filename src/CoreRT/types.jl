@@ -518,29 +518,6 @@ Base.@kwdef struct ComputedAtmosphereProperties
     scattering_interfaces_all
 end
 
-# TODO SUNITI: write a function to compute these properties and create this structure
-#Base.@kwdef struct RamanAtmosphereProperties
-    #"band spectral grid"
-    #grid_in
-    #"inelastic scattering SSA"
-    #ϖ_λ₀λ₁
-    #"inelastic scattering index"
-    #i_λ₀λ₁
-    #"inelastic (vibrational) scattering SSA: split later for each molecule"
-    #ϖ_vib_λ₀λ₁
-    #"inelastic (vibrational) scattering index: split later for each molecule"
-    #i_vib_λ₀λ₁
-    #"Greek coefs in Rayleigh calculations" 
-    #greek_raman::GreekCoefs
-    #"Combined o2 and n2 Z moments for rotational/rovibrational RS  (forward)"
-    #Z⁺⁺_RRS #same for rotational and rovibrational scattering
-    #"Combined o2 and n2 Z moments for rotational/rovibrational RS  (backward)"
-    #Z⁻⁺_RRS #same for rotational and rovibrational scattering
-    #"Combined o2 and n2 Z moments for vibrational RS (forward): split later for each molecule"
-    #Z⁺⁺_VRS #same for rotational and rovibrational scattering
-    #"Combined o2 and n2 Z moments for vibrational RS (backward): split later for each molecule"
-    #Z⁻⁺_VRS #same for rotational and rovibrational scattering
-#end
 
 
 """

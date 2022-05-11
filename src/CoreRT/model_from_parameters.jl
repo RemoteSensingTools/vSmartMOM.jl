@@ -10,17 +10,18 @@ default_parameters() = parameters_from_yaml(joinpath(dirname(pathof(vSmartMOM)),
 
 "Take the parameters specified in the vSmartMOM_Parameters struct, and calculate derived attributes into a vSmartMOM_Model" 
 function model_from_parameters(params::vSmartMOM_Parameters)
-
+    FT = params.float_type
+    #@show FT
     # Number of total bands and aerosols (for convenience)
     n_bands = length(params.spec_bands)
     n_aer = isnothing(params.scattering_params) ? 0 : length(params.scattering_params.rt_aerosols)
 
     # Create observation geometry
-    obs_geom = ObsGeometry(params.sza, params.vza, params.vaz, params.obs_alt)
+    obs_geom = ObsGeometry{FT}(params.sza, params.vza, params.vaz, params.obs_alt)
 
     # Create truncation type
-    truncation_type = Scattering.δBGE{params.float_type}(params.l_trunc, params.Δ_angle)
-
+    truncation_type = Scattering.δBGE{FT}(params.l_trunc, params.Δ_angle)
+    #@show truncation_type
     # Set quadrature points for streams
     quad_points = rt_set_streams(params.quadrature_type, params.l_trunc, obs_geom, params.polarization_type, array_type(params.architecture))
 
@@ -36,10 +37,10 @@ function model_from_parameters(params::vSmartMOM_Parameters)
     end
 
     # Rayleigh optical properties calculation
-    greek_rayleigh = Scattering.get_greek_rayleigh(params.depol)
+    greek_rayleigh = Scattering.get_greek_rayleigh(FT(params.depol))
     # Remove rayleight for testing:
-    τ_rayl = [zeros(params.float_type,length(params.spec_bands[i]), length(params.T)) for i=1:n_bands];
-    τ_rayl = [zeros(params.float_type,1,length(profile.T)) for i=1:n_bands];
+    τ_rayl = [zeros(FT,length(params.spec_bands[i]), length(params.T)) for i=1:n_bands];
+    τ_rayl = [zeros(FT,1,length(profile.T)) for i=1:n_bands];
     
     # This is a kludge for now, tau_abs sometimes needs to be a dual. Suniti & us need to rethink this all!!
     # i.e. code the rt core with fixed amount of derivatives as in her paper, then compute chain rule for dtau/dVMr, etc...
@@ -50,7 +51,7 @@ function model_from_parameters(params::vSmartMOM_Parameters)
     for i_band=1:n_bands
 
         # i'th spectral band (convert from cm⁻¹ to μm)
-        curr_band_λ = 1e4 ./ params.spec_bands[i_band]
+        curr_band_λ = FT.(1e4 ./ params.spec_bands[i_band])
         # @show profile.vcd_dry, size(τ_rayl[i_band])
         # Compute Rayleigh properties per layer for `i_band` band center  
         
@@ -90,7 +91,7 @@ function model_from_parameters(params::vSmartMOM_Parameters)
     aerosol_optics = [Array{AerosolOptics}(undef, (n_aer)) for i=1:n_bands];
         
     FT2 = isnothing(params.scattering_params) ? params.float_type : typeof(params.scattering_params.rt_aerosols[1].τ_ref)
-    @show FT2
+    #@show FT2
     #FT2 =  params.float_type 
 
     # τ_aer[iBand][iAer,iZ]
@@ -126,7 +127,7 @@ function model_from_parameters(params::vSmartMOM_Parameters)
         for i_band=1:n_bands
             
             # i'th spectral band (convert from cm⁻¹ to μm)
-            curr_band_λ = 1e4 ./ params.spec_bands[i_band]
+            curr_band_λ = FT.(1e4 ./ params.spec_bands[i_band])
 
             # Create the aerosols:
             mie_model      = make_mie_model(params.scattering_params.decomp_type, 
@@ -138,8 +139,8 @@ function model_from_parameters(params::vSmartMOM_Parameters)
                                             params.scattering_params.nquad_radius)
 
             # Compute raw (not truncated) aerosol optical properties (not needed in RT eventually) 
-            # @show FT2
-            @timeit "Mie calc"  aerosol_optics_raw = compute_aerosol_optical_properties(mie_model, FT2);
+            #@show FT2, FT
+            @timeit "Mie calc"  aerosol_optics_raw = compute_aerosol_optical_properties(mie_model, FT);
 
             # Compute truncated aerosol optical properties (phase function and fᵗ), consistent with Ltrunc:
             #@show i_aer, i_band
@@ -158,7 +159,7 @@ function model_from_parameters(params::vSmartMOM_Parameters)
     # Check the floating-type output matches specified FT
 
     # Plots:
-    
+    #=
     plt = lineplot(profile.T, -profile.p_full,#ylim=(1000,0),
                       title="Temperature Profile", xlabel="Temperature [K]", ylabel="- Pressure [hPa]", canvas = UnicodePlots.DotCanvas, border=:ascii, compact=true)
     display(plt)
@@ -166,11 +167,11 @@ function model_from_parameters(params::vSmartMOM_Parameters)
     plt = lineplot(profile.q, -profile.p_full,
                       title="Humidity Profile", xlabel="Specific humidity", ylabel="- Pressure [hPa]", canvas = UnicodePlots.DotCanvas, border=:ascii, compact=true)
     display(plt)
-    println()
-    plt = lineplot(n_aer == 0 ? zeros(length(profile.p_full)) : τ_aer[1][1,:],-profile.p_full,
+    #=@show typeof(τ_aer[1][1,:])
+    plt = lineplot(τ_aer[1][1,:],-profile.p_full,
                       title="AOD Profile Band 1", xlabel="AOD", ylabel="- Pressure [hPa]", canvas = UnicodePlots.DotCanvas, border=:ascii, compact=true)
-    display(plt)
-    println()
+    display(plt)=#
+    =#
     # Return the model 
     return vSmartMOM_Model(params, 
                         aerosol_optics,  

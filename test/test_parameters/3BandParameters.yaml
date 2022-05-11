@@ -4,7 +4,7 @@
 radiative_transfer: 
   # Spectral bands (list of ν_start:ν_step:ν_end, in cm⁻¹)
   spec_bands: 
-    - (1e7/773):0.04:(1e7/757)
+    - (1e7/773):0.02:(1e7/757)
     - (1e7/1622):0.02:(1e7/1589)
     - (1e7/2084):0.01:(1e7/2042)
   # Bidirectional Reflectance Distribution Function (BRDF) per band
@@ -21,11 +21,11 @@ radiative_transfer:
   # Exclusion angle for forward peak in fitting procedure (degrees)
   Δ_angle:            2.0
   # Trunction length for legendre terms
-  l_trunc:            6
+  l_trunc:            15
   # Depolarization factor
   depol:              0.03
   # Floating point type for calculations (Float32, Float64)
-  float_type:         Float64
+  float_type:         Float32
   # Architecture (default_architecture, GPU(), CPU())
   architecture:       default_architecture #default_architecture
   
