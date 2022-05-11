@@ -19,7 +19,8 @@ function truncate_phase(mod::δBGE, aero::AerosolOptics{FT}; reportFit=false) wh
 
     # Obtain Gauss-Legendre quadrature points and weights for phase function:
     μ, w_μ = gausslegendre(length(β));
-
+    μ = convert.(FT,μ)
+    w_μ = convert.(FT,w_μ)
     # Reconstruct phase matrix elements:
     scattering_matrix, P, P² = reconstruct_phase(greek_coefs, μ; returnLeg=true)
 
@@ -76,6 +77,7 @@ function truncate_phase(mod::δBGE, aero::AerosolOptics{FT}; reportFit=false) wh
 
     # Adjust scattering and extinction cross section!
     greek_coefs = GreekCoefs(αᵗ, βᵗ, γᵗ, δᵗ, ϵᵗ, ζᵗ  )
+    #@show typeof(greek_coefs)
   
     # C_sca  = (ω̃ * k);
     # C_scaᵗ = C_sca * c₀; 
