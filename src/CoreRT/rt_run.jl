@@ -29,6 +29,8 @@ function rt_run(RS_type::AbstractRamanType,
     @unpack max_m = model.params
     @unpack quad_points = model
     FT = model.params.float_type
+
+    n_aer = isnothing(model.params.scattering_params) ? 0 : length(model.params.scattering_params.rt_aerosols)
     
     # Also to be changed if more than 1 band is used!!
     # CFRANKEN NEEDS to be changed for concatenated arrays!!
@@ -57,7 +59,7 @@ function rt_run(RS_type::AbstractRamanType,
     dims   = (NquadN,NquadN)              # nxn dims
     
     # Need to check this a bit better in the future!
-    FT_dual = length(model.τ_aer[1][1]) > 0 ? typeof(model.τ_aer[1][1]) : FT
+    FT_dual = n_aer > 0 ? typeof(model.τ_aer[1][1]) : FT
     #FT_dual = FT
     @show FT_dual
     # Output variables: Reflected and transmitted solar irradiation at TOA and BOA respectively # Might need Dual later!!
