@@ -1,6 +1,6 @@
 using Revise
 using Plots
-using Pkg
+# using Pkg
 # Pkg.activate(".")
 using vSmartMOM
 using vSmartMOM.Architectures
@@ -21,8 +21,8 @@ using LinearAlgebra
 # Load parameters from file
 parameters = parameters_from_yaml("test/test_parameters/3BandParameters.yaml")
 #parameters.architecture = CPU()
-FT = Float64
-
+FT = Float32
+parameters.float_type = FT
 # Load OCO Data: 
 # File names:
 
@@ -84,8 +84,9 @@ function runner!(y, x, parameters=parameters, oco_sounding= oco_sounding, Tsolar
 
     parameters.scattering_params.rt_aerosols[1].τ_ref = exp(x[10]);
     parameters.scattering_params.rt_aerosols[1].p₀    = x[11]
-    size_distribution = LogNormal(x[12], 0.3)
+    size_distribution = LogNormal(x[12], FT(0.3))
     parameters.scattering_params.rt_aerosols[1].aerosol.size_distribution =  size_distribution
+    #@show size_distribution
     parameters.scattering_params.rt_aerosols[1].aerosol.nᵣ = x[13]
     parameters.p   = oco_sounding.p_half
     parameters.q   = oco_sounding.q 
@@ -93,19 +94,20 @@ function runner!(y, x, parameters=parameters, oco_sounding= oco_sounding, Tsolar
     parameters.sza = oco_sounding.sza
     parameters.vza = [oco_sounding.vza]
     parameters.absorption_params.vmr["O2"] = x[18]
-    parameters.absorption_params.vmr["H2O"] = parameters.q*x[14] * 1.8 #[parameters.q[1:65]*x[11] * 1.8; 
+    @show typeof(parameters.absorption_params.vmr["O2"])
+    parameters.absorption_params.vmr["H2O"] = parameters.q*x[14] * FT(1.8) #[parameters.q[1:65]*x[11] * 1.8; 
                                                #parameters.q[66:end]*x[15] * 1.8];
-    a1 = zeros(25) .+ x[15] * 1e-6
-    a2 = zeros(25) .+ x[16] * 1e-6
-    a3 = zeros(22) .+ x[17] * 1e-6
+    a1 = zeros(FT,25) .+ x[15] * FT(1e-6)
+    a2 = zeros(FT,25) .+ x[16] * FT(1e-6)
+    a3 = zeros(FT,22) .+ x[17] * FT(1e-6)
     parameters.absorption_params.vmr["CO2"] = [a1; a2; a3]
     model = model_from_parameters(parameters);
     
     for i = 1:length(oco_sounding.BandID)
         println("Modelling band $(i)")
         # Run the model to obtain reflectance matrix
-        #R = rt_run(model, i_band=i)[1];
-        R = CoreRT.rt_run_test(CoreRT.noRS(), model, i)[1]
+        #R = rt_run(model, i_band=i)[1];oRS{Float32}
+        R = CoreRT.rt_run_test(CoreRT.noRS{Float32}(), model, i)[1]
         RR = oco_sounding.mueller[1]*R[1,1,:] + oco_sounding.mueller[2]*R[1,2,:] + oco_sounding.mueller[3]*R[1,3,:]
         
         # Get sun:
@@ -139,6 +141,71 @@ function runner!(y, x, parameters=parameters, oco_sounding= oco_sounding, Tsolar
 
 end
 
+function runner2(x, parameters=parameters, oco_sounding= oco_sounding, Tsolar = Tsolar_interp)
+
+    # Set parameters fields as the dual numbers
+    parameters.brdf =  [CoreRT.LambertianSurfaceLegendre([x[1],x[2],x[3]]),
+                        CoreRT.LambertianSurfaceLegendre([x[4],x[5],x[6]]),
+                        CoreRT.LambertianSurfaceLegendre([x[7],x[8],x[9]])];
+
+    parameters.scattering_params.rt_aerosols[1].τ_ref = exp(x[10]);
+    parameters.scattering_params.rt_aerosols[1].p₀    = x[11]
+    size_distribution = LogNormal(x[12], FT(0.3))
+    parameters.scattering_params.rt_aerosols[1].aerosol.size_distribution =  size_distribution
+    #@show size_distribution
+    parameters.scattering_params.rt_aerosols[1].aerosol.nᵣ = x[13]
+    parameters.p   = oco_sounding.p_half
+    parameters.q   = oco_sounding.q 
+    parameters.T   = oco_sounding.T# .+ 1.0 #.+ x[15]
+    parameters.sza = oco_sounding.sza
+    parameters.vza = [oco_sounding.vza]
+    parameters.absorption_params.vmr["O2"] = x[18]
+    @show typeof(parameters.absorption_params.vmr["O2"])
+    parameters.absorption_params.vmr["H2O"] = parameters.q*x[14] * FT(1.8) #[parameters.q[1:65]*x[11] * 1.8; 
+                                               #parameters.q[66:end]*x[15] * 1.8];
+    a1 = zeros(FT,25) .+ x[15] * FT(1e-6)
+    a2 = zeros(FT,25) .+ x[16] * FT(1e-6)
+    a3 = zeros(FT,22) .+ x[17] * FT(1e-6)
+    parameters.absorption_params.vmr["CO2"] = [a1; a2; a3]
+    model = model_from_parameters(parameters);
+    
+    for i = 1:length(oco_sounding.BandID)
+        println("Modelling band $(i)")
+        # Run the model to obtain reflectance matrix
+        #R = rt_run(model, i_band=i)[1];oRS{Float32}
+        R = CoreRT.rt_run_test(CoreRT.noRS{Float32}(), model, i)[1]
+        RR = oco_sounding.mueller[1]*R[1,1,:] + oco_sounding.mueller[2]*R[1,2,:] + oco_sounding.mueller[3]*R[1,3,:]
+        
+        # Get sun:
+        @time sun_out = getSolar(parameters.spec_bands[i],Tsolar)
+        # Apply Earth reflectance matrix 
+        earth_out = sun_out .* reverse(RR[:])
+        #ii = findall(earth_out .> 1e50)
+        #@show ii
+        #@show ii
+        #if length(ii==1)
+        #    earth_out[ii] =  earth_out[ii+1]
+        #end 
+        #f = 0.9999908003445712
+        #@show findall(sun_out .< 0)
+        # Re-interpolate I from ν_grid to new grid/resolution
+
+        # Apply doppler here:
+        λ_grid = reverse(1e4 ./ parameters.spec_bands[i]) .* oco_sounding.doppler
+        @time interp_I = LinearInterpolation(λ_grid, earth_out);
+        res = 0.001e-3;
+        off = 0.5e-3
+        wl = oco_sounding.ils[i].ν_out[1]-off:res:oco_sounding.ils[i].ν_out[end]+off;
+        @show wl[1],wl[end], λ_grid[1],λ_grid[end]
+        I_wl = interp_I(wl);
+
+        # Convolve input spectrum with variable kernel
+        @time I_conv = InstrumentOperator.conv_spectra(oco_sounding.ils[i], wl, I_wl)
+        y[oco_sounding.BandID[i]] = I_conv/π
+    end
+    @show xco2 = 1e6*(model.profile.vmr["CO2"]' * model.profile.vcd_dry)/sum(model.profile.vcd_dry)
+    y
+end
 
 # Prior State vector
 xₐ = FT[  0.376,   # Albedo band 1, degree 1
@@ -190,7 +257,7 @@ Sₐ[18,18] = 0.002^2
 # Run FW model:
 # @time runner(x);
 y = oco_sounding.SpectralMeasurement;
-Fx = zeros(length(y));
+Fx = zeros(FT, length(y));
 #ind = 92:885
 x = xₐ
 xᵢ = []

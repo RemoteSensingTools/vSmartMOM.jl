@@ -1,5 +1,6 @@
-function constructCoreOpticalProperties(RS_type, iBand, m, model)
+function constructCoreOpticalProperties(RS_type::AbstractRamanType{FT}, iBand, m, model) where FT
     @unpack τ_rayl, τ_aer, τ_abs, aerosol_optics, greek_rayleigh  = model
+    #@show typeof(τ_rayl[1]), typeof(τ_aer[1]), typeof(τ_abs[1])
     @assert all(iBand .≤ length(τ_rayl)) "iBand exceeded number of bands"
 
     arr_type = array_type(model.params.architecture)
@@ -15,7 +16,7 @@ function constructCoreOpticalProperties(RS_type, iBand, m, model)
     Rayl𝐙⁺⁺, Rayl𝐙⁻⁺ = Scattering.compute_Z_moments(pol_type, μ, 
                                                     greek_rayleigh, m, 
                                                     arr_type = arr_type);
-
+    
     band_layer_props    = [];
     band_fScattRayleigh = [];
     # @show arr_type
@@ -29,31 +30,37 @@ function constructCoreOpticalProperties(RS_type, iBand, m, model)
         # Loop over all aerosol types:
         for i=1:nAero
             # Precomute Z matrices per type (constant per layer)
-            #@show iB,i
+            #@show typeof(aerosol_optics[iB][i].greek_coefs), typeof(pol_type), typeof(μ)
             AerZ⁺⁺, AerZ⁻⁺ = Scattering.compute_Z_moments(
                                 pol_type, μ, 
                                 aerosol_optics[iB][i].greek_coefs, 
                                 m, arr_type=arr_type)
+            #@show typeof(AerZ⁺⁺), typeof(aerosol_optics[iB][i]), typeof(FT.(τ_aer[iB][i,:]))
             # Generate Core optical properties for Aerosols i
             aer   = createAero.(τ_aer[iB][i,:], 
                                 [aerosol_optics[iB][i]], 
                                 [AerZ⁺⁺], [AerZ⁻⁺])
+            #@show typeof(aer), typeof(combo)
             # Mix with previous Core Optical Properties
             combo = combo .+ aer
         end
-
+        #@show typeof(combo)
+        # TODO Type check τ_abs, τ_aer, rayl[i].τ  ./ combo[i].τ
         # Somewhere here we can add canopy later as well!
         ###
 
         # fScattRayleigh:
         # Assume ϖ of 1 for Rayleight here:
         #@show size(combo)
+        #fScattRayleigh = [FT.(Array(rayl[i].τ  ./ combo[i].τ)) for i=1:nZ]
         fScattRayleigh = [Array(rayl[i].τ  ./ combo[i].τ) for i=1:nZ]
         #@show fScattRayleigh, rayl[1].τ, combo[1].τ
         # Create Core Optical Properties merged with trace gas absorptions:
+        #@show typeof(combo.+ 
+        #[CoreAbsorptionOpticalProperties(arr_type((τ_abs[iB][:,i]))) for i=1:nZ])
         push!(band_layer_props,
                 combo .+ 
-                [CoreAbsorptionOpticalProperties(arr_type(τ_abs[iB][:,i])) for i=1:nZ])
+                [CoreAbsorptionOpticalProperties(arr_type((τ_abs[iB][:,i]))) for i=1:nZ])
         push!(band_fScattRayleigh,fScattRayleigh)
     end
 

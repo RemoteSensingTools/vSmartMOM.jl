@@ -5,10 +5,10 @@ This file contains functions that are related to atmospheric profile calculation
 =#
 
 "Compute pressure levels, vmr, vcd for atmospheric profile, given p_half, T, q"
-function compute_atmos_profile_fields(T, p_half::AbstractArray, q, vmr; g₀=9.8032465)
-    
+function compute_atmos_profile_fields(T::AbstractArray{FT,1}, p_half::AbstractArray{FT,1}, q, vmr; g₀=9.8032465) where FT
+    #@show "Atmos",  FT 
     # Floating type to use
-    FT = eltype(T)
+    #FT = eltype(T)
     Nₐ = FT(6.02214179e+23)
     # Calculate full pressure levels
     p_full = (p_half[2:end] + p_half[1:end-1]) / 2
@@ -380,23 +380,14 @@ function compute_absorption_profile!(τ_abs::Array{FT,2},
 
     # The array to store the cross-sections must be same length as number of layers
     @assert size(τ_abs,2) == length(profile.p_full)
-
+    @assert length(vmr) ==1 || length(vmr) == length(profile.p_full)  "Length of VMR array has to match profile size or be uniform"
     @showprogress 1 for iz in 1:length(profile.p_full)
 
         # Pa -> hPa
         p = profile.p_full[iz]
         T = profile.T[iz]
-
         # Either use the current layer's vmr, or use the uniform vmr
         vmr_curr = vmr isa AbstractArray ? vmr[iz] : vmr
-
-        # Changed index order
-        # @show iz,p,T,profile.vcd_dry[iz], vmr_curr
-        #@show typeof(τ_abs), typeof(vmr_curr), typeof(profile.vcd_dry[iz]), typeof(p), typeof(T)
-        #@show typeof(absorption_cross_section(absorption_model, grid, p, T))
-        #temp = Array(absorption_cross_section(absorption_model, grid, p, T)) * profile.vcd_dry[iz] * vmr_curr
-        #@show minimum(temp), p, T, profile.vcd_dry[iz] * vmr_curr
-        #@show iz, profile.vcd_dry[iz], vmr_curr, p, T
         τ_abs[:,iz] += Array(absorption_cross_section(absorption_model, grid, p, T)) * profile.vcd_dry[iz] * vmr_curr
     end
     

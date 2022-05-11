@@ -20,7 +20,7 @@ using NCDatasets
 # Load parameters from file
 parameters = parameters_from_yaml("test/test_parameters/3BandParameters.yaml")
 #parameters.architecture = CPU()
-FT = Float64
+FT = Float32
 
 # Load OCO Data: 
 # File names:

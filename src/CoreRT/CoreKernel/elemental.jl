@@ -109,33 +109,28 @@ end
 function elemental!(pol_type, SFI::Bool, 
                             τ_sum::AbstractArray,#{FT2,1}, #Suniti
                             dτ::AbstractArray,
-                            computed_layer_properties,
+                            computed_layer_properties::M,
                             m::Int,                     # m: fourier moment
                             ndoubl::Int,                # ndoubl: number of doubling computations needed 
                             scatter::Bool,              # scatter: flag indicating scattering
                             quad_points::QuadPoints{FT2}, # struct with quadrature points, weights, 
                             added_layer::Union{AddedLayer{FT},AddedLayerRS{FT}}, 
-                            architecture) where {FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2}
+                            architecture) where {FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2,M}
 
     @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻ = added_layer
     @unpack qp_μ, iμ₀, wt_μN, qp_μN = quad_points
     @unpack τ, ϖ, Z⁺⁺, Z⁻⁺ = computed_layer_properties
-    #@unpack ϖ_Cabannes = RS_type
-    #@show architecture
+    
     arr_type = array_type(architecture)
 
     # Need to check with paper nomenclature. This is basically eqs. 19-20 in vSmartMOM
-    qp_μN = arr_type(qp_μN)
-    wt_μN = arr_type(wt_μN)
-    τ_sum = arr_type(τ_sum)
     I₀    = arr_type(pol_type.I₀)
-    D = Diagonal(arr_type(repeat(pol_type.D, size(qp_μ,1))))
+    D     = Diagonal(arr_type(repeat(pol_type.D, size(qp_μ,1))))
 
     device = devi(architecture)
 
     # If in scattering mode:
     if scatter
-   
         # for m==0, ₀∫²ᵖⁱ cos²(mϕ)dϕ/4π = 0.5, while
         # for m>0,  ₀∫²ᵖⁱ cos²(mϕ)dϕ/4π = 0.25  
         wct02 = m == 0 ? FT(0.50)              : FT(0.25)
