@@ -39,7 +39,7 @@ The Julia language provides many exciting opportunities to modernize radiative t
 
 For historical reasons, much of the scientific work in remote sensing is based on legacy code, written in Fortran or C/C++, mixed with “glue languages” such as Python. Researchers who developed these codes also placed greater emphasis on science results than software engineering best practices. As a result, many parts of key codebases are aging, convoluted, and hard to improve by both incoming graduate students and experienced researchers. 
 
-Rather than simply *porting* these codes to a new language, **vSmartMOM.jl** entirely redesigns the radiative transfer code from the ground up to include new functionalities like GPU acceleration and automatic differentiation – features that have become computationally feasible and widespread only in the last decade. 
+Rather than simply *porting* these codes to a new language, **vSmartMOM.jl** redesigns the radiative transfer code from the ground up to include new functionalities like GPU acceleration and automatic differentiation – features that have become computationally feasible and widespread only in the last decade. 
 
 # Overview of functionality
 
@@ -60,7 +60,7 @@ The package has a modular architecture, allowing users to import just the specif
 
 ![Sample scattering phase functions of aerosols (I $\rightarrow$ I and the I $\rightarrow$ Q transition), calculated using Scattering.jl ($r_m$ = 10.0 $\mu$m, $\sigma$ = 1.1, $n_r$ = 1.3, $n_i$ = 0.0, $\lambda$ = 0.65 $\mu$m)](joss_3.png)
 
-**Scattering.jl** is used for calculating Mie scattering phase-functions for aerosols with specified size distributions and refractive indices. This module enables scattering phase-function calculation of atmospheric aerosols with different size distributions, incident wavelengths, and refractive indices. It can perform the calculation using either the Siewert NAI-2 [@Siewert:1982] or Domke PCW [@Domke:1975] methods with recent corrections [@Sanghavi:2013b]. State-of-the-art methods like $\delta$-truncation [@Hu:2000] and $\delta$-BGE truncation [@Sanghavi:2015] are used for scalar and vector radiative transfer computations, respectively. The module also supports auto-differentiation of the phase function, with respect to the aerosol's size distribution parameters and its complex refractive index. 
+**Scattering.jl** is used for calculating Mie scattering phase-functions for aerosols with specified size distributions and refractive indices. This module enables scattering phase-function calculation of atmospheric aerosols with different size distributions, incident wavelengths, and refractive indices. It can perform the calculation using either numerical integration using quadrature points (NAI-2) [@Siewert:1982] or using precomputed tabulations of Wigner 3-j symbols (PCW) [@Domke:1975] with recent corrections [@Sanghavi:2013b]. State-of-the-art methods like $\delta$-truncation [@Hu:2000] and $\delta$-BGE truncation [@Sanghavi:2015] are used for scalar and vector radiative transfer computations, respectively. The module also supports auto-differentiation of the phase function, with respect to the aerosol's size distribution parameters and its complex refractive index. 
 
 # Benchmarks
 
