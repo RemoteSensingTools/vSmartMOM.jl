@@ -32,7 +32,7 @@ function Base.show(io::IO,::MIME"text/plain", x::vSmartMOM_Parameters)
     println(io, "\tSZA (deg): $(x.sza)")
     println(io, "\tVZA (deg): $(x.vza)")
     println(io, "\tVAZ (deg): $(x.vaz)")
-    println(io, "\tObservation Altitude: $(x.obs_alt)")
+    println(io, "\tObservation Altitude (km): $(x.obs_alt)")
 
     println(io, "\n-------------------")
     println(io, "Atmospheric Profile")

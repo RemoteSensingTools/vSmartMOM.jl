@@ -28,7 +28,7 @@ function rt_run_bck(RS_type::AbstractRamanType, #Default - no Raman scattering (
 
     @unpack obs_alt, sza, vza, vaz = obs_geom   # Observational geometry properties
     @unpack qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart, μ₀, iμ₀, Nquad = quad_points # All quadrature points
-    @unpack ϖ_Cabannes = RS_type
+    @unpack ϖ_Cabannes, F₀ = RS_type
     FT = eltype(sza)                    # Get the float-type to use
     Nz = length(τ_rayl)                 # Number of vertical slices
     nSpec = size(τ_abs, 1)              # Number of spectral points
@@ -122,7 +122,10 @@ function rt_run_bck(RS_type::AbstractRamanType, #Default - no Raman scattering (
         end 
 
         # Create surface matrices:
-        create_surface_layer!(brdf, added_layer_surface, SFI, m, pol_type, quad_points, arr_type(computed_atmosphere_properties.τ_sum_all[:,end]), architecture);
+        create_surface_layer!(brdf, added_layer_surface, 
+                    SFI, m, pol_type, quad_points, 
+                    arr_type(computed_atmosphere_properties.τ_sum_all[:,end]), 
+                    arr_type(F₀), architecture);
 
         # One last interaction with surface:
         @timeit "interaction" interaction!(RS_type,
@@ -240,10 +243,14 @@ function rt_run(RS_type::AbstractRamanType,
     pol_type = model.params.polarization_type
     @unpack max_m = model.params
     @unpack quad_points = model
+
+    if obs_alt != 0
+        return rt_run_test_ms(RS_type, model, iBand)
+    end
     
     # Also to be changed!!
     brdf = model.params.brdf[iBand[1]]
-    @unpack ϖ_Cabannes = RS_type
+    @unpack ϖ_Cabannes, F₀ = RS_type
 
     
     FT = eltype(sza)                    # Get the float-type to use
@@ -352,6 +359,7 @@ function rt_run(RS_type::AbstractRamanType,
                             pol_type, 
                             quad_points, 
                             arr_type(τ_sum_all[:,end]), 
+                            arr_type(F₀),
                             model.params.architecture);
 
         # One last interaction with surface:

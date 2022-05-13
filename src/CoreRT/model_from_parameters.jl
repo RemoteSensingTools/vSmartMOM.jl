@@ -8,6 +8,53 @@ like optical thicknesses, from the input parameters. Produces a vSmartMOM_Model 
 "Generate default set of parameters for Radiative Transfer calculations (from ModelParameters/)"
 default_parameters() = parameters_from_yaml(joinpath(dirname(pathof(vSmartMOM)), "CoreRT", "DefaultParameters.yaml"))
 
+"""
+Given observational altitudes [km], pressure [hPa] and temperature [K] profiles, 
+return new profiles with interpolated layers added and new layer indices for sensors
+"""
+function resize_layers_for_ms(obs_alt, p, T, q)
+    
+    p₀ = 1013.25 # hPa
+    H₀ = 8       # km
+
+    # Convert from km to hPa
+    obs_p = p₀ * exp.(-obs_alt/H₀)
+
+    p_fixed = copy(0.5*(p[2:end].+p[1:(length(p)-1)]))
+
+    new_p = copy(0.5*(p[2:end].+p[1:(length(p)-1)]))
+    new_T = copy(T)
+    new_q = copy(q)
+
+    sensor_idx = []
+
+    filter_out_idx = (obs_alt .<= 500 .&& obs_alt .!= 0)
+    obs_p = obs_p[filter_out_idx]
+
+    if !isempty(filter(x-> x > 500 || x ≈ 0, obs_alt))
+        push!(sensor_idx, 0)
+    end
+    obs_T_int = LinearInterpolation(p_fixed, T)
+    obs_q_int = LinearInterpolation(p_fixed, q)
+    # obs_T = zeros(length(obs_p))
+    for i=1:length(obs_p)
+        obs_T = obs_T_int(obs_p[i]);
+        obs_q = obs_q_int(obs_p[i]);
+        sort!(push!(new_p, obs_p[i]))
+
+        curr_idx = indexin(obs_p[i], new_p)[1]
+        insert!(new_T, curr_idx, obs_T)
+        insert!(new_q, curr_idx, obs_q)
+
+        push!(sensor_idx, curr_idx)
+    end 
+
+    push!(new_p, new_p[end])
+    @show "NOTE: T and q are currently half-levels, but they should be at the boundary"
+
+    return convert(Vector{Int64}, sensor_idx), new_p, new_T, new_q
+end
+
 "Take the parameters specified in the vSmartMOM_Parameters struct, and calculate derived attributes into a vSmartMOM_Model" 
 function model_from_parameters(params::vSmartMOM_Parameters)
 
@@ -15,8 +62,14 @@ function model_from_parameters(params::vSmartMOM_Parameters)
     n_bands = length(params.spec_bands)
     n_aer = isnothing(params.scattering_params) ? 0 : length(params.scattering_params.rt_aerosols)
 
+    
+    # Get new p/T profiles using obs_alt
+    sensor_levels, p, T, q = resize_layers_for_ms(params.obs_alt, params.p, params.T, params.q)
+
+
+    # return sensor_levels
     # Create observation geometry
-    obs_geom = ObsGeometry(params.sza, params.vza, params.vaz, params.obs_alt)
+    obs_geom = ObsGeometry(params.sza, params.vza, params.vaz, params.obs_alt, Array(sensor_levels))
 
     # Create truncation type
     truncation_type = Scattering.δBGE{params.float_type}(params.l_trunc, params.Δ_angle)
@@ -26,9 +79,9 @@ function model_from_parameters(params::vSmartMOM_Parameters)
 
     # Get AtmosphericProfile from parameters
     vmr = isnothing(params.absorption_params) ? Dict() : params.absorption_params.vmr
-    p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o, new_vmr = compute_atmos_profile_fields(params.T, params.p, params.q, vmr)
+    p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o, new_vmr = compute_atmos_profile_fields(T, p, q, vmr)
 
-    profile = AtmosphericProfile(params.T, p_full, params.q, p_half, vmr_h2o, vcd_dry, vcd_h2o, new_vmr)
+    profile = AtmosphericProfile(T, p_full, params.q, p_half, vmr_h2o, vcd_dry, vcd_h2o, new_vmr)
     
     # Reduce the profile to the number of target layers (if specified)
     if params.profile_reduction_n != -1

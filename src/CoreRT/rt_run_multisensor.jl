@@ -175,7 +175,6 @@ end
 =#
 
 function rt_run_test_ms(RS_type::AbstractRamanType, 
-                        sensor_levels::Vector{Int64},
                         model::vSmartMOM_Model, iBand)
     @unpack obs_alt, sza, vza, vaz = model.obs_geom   # Observational geometry properties
     @unpack qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart, μ₀, iμ₀, Nquad = model.quad_points # All quadrature points
@@ -185,8 +184,9 @@ function rt_run_test_ms(RS_type::AbstractRamanType,
 
     # Also to be changed!!
     brdf = model.params.brdf[iBand[1]]
-    @unpack ϖ_Cabannes = RS_type
+    @unpack ϖ_Cabannes, F₀ = RS_type
 
+    sensor_levels = model.obs_geom.sensor_levels
 
     FT = eltype(sza)                    # Get the float-type to use
     Nz = length(model.profile.p_full)   # Number of vertical slices
@@ -278,7 +278,7 @@ function rt_run_test_ms(RS_type::AbstractRamanType,
             # Suniti: modified to return fscattRayl as the last element of  computed_atmosphere_properties
             if !(typeof(RS_type) <: noRS)
                 #@show fScattRayleigh[iz]
-                RS_type.fscattRayl = expandBandScalars(RS_type, fScattRayleigh[iz]) ; #Array(fScattRayleigh[iz])
+                RS_type.fscattRayl = expandBandScalars(RS_type, fScattRayleigh[iz]); #Array(fScattRayleigh[iz])
             end
 
             # Expand all layer optical properties to their full dimension:
@@ -306,7 +306,7 @@ function rt_run_test_ms(RS_type::AbstractRamanType,
                     SFI, m, 
                     pol_type, 
                     quad_points, 
-                    arr_type(τ_sum_all[:,end]), 
+                    arr_type(τ_sum_all[:,end]), arr_type(F₀),
                     model.params.architecture);
 
         # One last interaction with surface:

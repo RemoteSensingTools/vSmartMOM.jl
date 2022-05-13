@@ -13,6 +13,7 @@ function elemental!(pol_type, SFI::Bool,
                             ϖ::FT,                      # ϖ: single scattering albedo of elemental layer (no trace gas absorption included)
                             Z⁺⁺::AbstractArray{FT,2},   # Z matrix
                             Z⁻⁺::AbstractArray{FT,2},   # Z matrix
+                            F₀::AbstractArray{FT,2},    # Stokes vector of solar/stellar irradiance
                             m::Int,                     # m: fourier moment
                             ndoubl::Int,                # ndoubl: number of doubling computations needed 
                             scatter::Bool,              # scatter: flag indicating scattering
@@ -78,14 +79,14 @@ function elemental!(pol_type, SFI::Bool,
             # Version 2: More computationally intensive definition of a single scattering layer with variable (0-∞) absorption
             # Version 2: with absorption in batch mode, low tau_scatt but higher tau_total, needs different equations
             kernel! = get_elem_rt!(device)
-            event = kernel!(r⁻⁺, t⁺⁺, ϖ_λ, dτ_λ, Z⁻⁺, Z⁺⁺, 
+            event = kernel!(r⁻⁺, t⁺⁺, ϖ_λ, dτ_λ, Z⁻⁺, Z⁺⁺, F₀,
                 qp_μN, wct2, ndrange=size(r⁻⁺)); 
             wait(device, event)
             synchronize_if_gpu()
 
             if SFI
                 kernel! = get_elem_rt_SFI!(device)
-                event = kernel!(J₀⁺, J₀⁻, ϖ_λ, dτ_λ, τ_sum, Z⁻⁺, Z⁺⁺, qp_μN, ndoubl, wct02, pol_type.n, arr_type(pol_type.I₀), iμ₀, D, ndrange=size(J₀⁺))
+                event = kernel!(J₀⁺, J₀⁻, ϖ_λ, dτ_λ, τ_sum, Z⁻⁺, Z⁺⁺, F₀, qp_μN, ndoubl, wct02, pol_type.n, arr_type(pol_type.I₀), iμ₀, D, ndrange=size(J₀⁺))
                 wait(device, event)
                 synchronize_if_gpu()
             end
@@ -109,6 +110,7 @@ end
 function elemental!(pol_type, SFI::Bool, 
                             τ_sum::AbstractArray,#{FT2,1}, #Suniti
                             dτ::AbstractArray,
+                            F₀::AbstractArray{FT,2},    # Stokes vector of solar/stellar irradiance
                             computed_layer_properties,
                             m::Int,                     # m: fourier moment
                             ndoubl::Int,                # ndoubl: number of doubling computations needed 
@@ -154,7 +156,8 @@ function elemental!(pol_type, SFI::Bool,
 
         if SFI
             kernel! = get_elem_rt_SFI!(device)
-            event = kernel!(J₀⁺, J₀⁻, ϖ, dτ, arr_type(τ_sum), Z⁻⁺, Z⁺⁺, qp_μN, ndoubl, wct02, pol_type.n, I₀, iμ₀, D, ndrange=size(J₀⁺))
+            event = kernel!(J₀⁺, J₀⁻, ϖ, dτ, arr_type(τ_sum), Z⁻⁺, Z⁺⁺, 
+            arr_type(F₀), qp_μN, ndoubl, wct02, pol_type.n, I₀, iμ₀, D, ndrange=size(J₀⁺))
             wait(device, event)
         end
         #ii = pol_type.n*(iμ0-1)+1
@@ -175,7 +178,10 @@ function elemental!(pol_type, SFI::Bool,
     #@pack! added_layer = r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, J₀⁺, J₀⁻   
 end
 
-@kernel function get_elem_rt!(r⁻⁺, t⁺⁺, ϖ_λ, dτ_λ, Z⁻⁺, Z⁺⁺, qp_μN, wct) 
+@kernel function get_elem_rt!(r⁻⁺, t⁺⁺, 
+                        ϖ_λ, dτ_λ, 
+                        Z⁻⁺, Z⁺⁺, 
+                        qp_μN, wct) 
     n2 = 1
     i, j, n = @index(Global, NTuple) 
     if size(Z⁻⁺,3)>1
@@ -220,7 +226,10 @@ end
     nothing
 end
 
-@kernel function get_elem_rt_SFI!(J₀⁺, J₀⁻, ϖ_λ, dτ_λ, τ_sum, Z⁻⁺, Z⁺⁺, qp_μN, ndoubl, wct02, nStokes ,I₀, iμ0, D)
+@kernel function get_elem_rt_SFI!(J₀⁺, J₀⁻, 
+                ϖ_λ, dτ_λ, τ_sum, Z⁻⁺, Z⁺⁺, F₀,
+                qp_μN, ndoubl, wct02, nStokes,
+                I₀, iμ0, D)
     i_start  = nStokes*(iμ0-1) + 1 
     i_end    = nStokes*iμ0
     
@@ -237,8 +246,8 @@ end
     Z⁻⁺_I₀ = FT(0.0);
     
     for ii = i_start:i_end
-        Z⁺⁺_I₀ += Z⁺⁺[i,ii,n2] * I₀[ii-i_start+1]
-        Z⁻⁺_I₀ += Z⁻⁺[i,ii,n2] * I₀[ii-i_start+1] 
+        Z⁺⁺_I₀ += Z⁺⁺[i,ii,n2] * F₀[ii-i_start+1,n2] #I₀[ii-i_start+1]
+        Z⁻⁺_I₀ += Z⁻⁺[i,ii,n2] * F₀[ii-i_start+1,n2] #I₀[ii-i_start+1] 
     end
 
     if (i>=i_start) && (i<=i_end)

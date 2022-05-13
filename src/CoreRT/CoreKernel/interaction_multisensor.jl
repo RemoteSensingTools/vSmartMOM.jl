@@ -658,6 +658,7 @@ function interaction_helper_ms!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
                         ieJ₀⁺::AbstractArray{FT}, ieJ₀⁻::AbstractArray{FT}
                         ) where {FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2}
     @unpack i_λ₁λ₀_all = RS_type 
+    #@show "hello 100 ms"
     # Used to store `(I - R⁺⁻ * r⁻⁺)⁻¹`
     tmp_inv = similar(t⁺⁺)
 
@@ -849,6 +850,17 @@ function interaction_bot!(ims::Int64,
     @unpack ier⁺⁻, ier⁻⁺, iet⁻⁻, iet⁺⁺, ieJ₀⁺, ieJ₀⁻ = added_layer
     @show scattering_interface
     #@unpack botR⁻⁺, botR⁺⁻, botT⁺⁺, botT⁻⁻, botJ₀⁺, botJ₀⁻ = composite_layer
+    if (ims==1)
+        M1 = composite_layer.botR⁻⁺[ims][1,1,1]
+        M2 = composite_layer.botR⁺⁻[ims][1,1,1]
+        M3 = composite_layer.botT⁺⁺[ims][1,1,1]
+        M4 = composite_layer.botT⁻⁻[ims][1,1,1]
+        M5 = composite_layer.botJ₀⁺[ims][1,1,1]
+        M6 = composite_layer.botJ₀⁻[ims][1,1,1]
+
+        @show M1, M2, M3, M4, M5, M6
+    end
+    
     R⁻⁺ = arr_type(composite_layer.botR⁻⁺[ims]) 
     R⁺⁻ = arr_type(composite_layer.botR⁺⁻[ims]) 
 
@@ -866,7 +878,7 @@ function interaction_bot!(ims::Int64,
 
     compieJ₀⁺ = arr_type(composite_layer.botieJ₀⁺[ims]) 
     compieJ₀⁻ = arr_type(composite_layer.botieJ₀⁻[ims])
-
+    
     interaction_helper_ms!(RS_type, scattering_interface, SFI, #composite_layer, added_layer, 
                             I_static,
                             r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, J₀⁺, J₀⁻,
@@ -891,6 +903,16 @@ function interaction_bot!(ims::Int64,
 
     composite_layer.botieJ₀⁺[ims][:] = Array(compieJ₀⁺) 
     composite_layer.botieJ₀⁻[ims][:] = Array(compieJ₀⁻)
+    if (ims==1)
+        M1 = composite_layer.botR⁻⁺[ims][1,1,1]
+        M2 = composite_layer.botR⁺⁻[ims][1,1,1]
+        M3 = composite_layer.botT⁺⁺[ims][1,1,1]
+        M4 = composite_layer.botT⁻⁻[ims][1,1,1]
+        M5 = composite_layer.botJ₀⁺[ims][1,1,1]
+        M6 = composite_layer.botJ₀⁻[ims][1,1,1]
+
+        @show M1, M2, M3, M4, M5, M6
+    end
 
     synchronize_if_gpu()
     #@pack composite_layer = botR⁻⁺, botR⁺⁻, botT⁺⁺, botT⁻⁻, botJ₀⁺, botJ₀⁻

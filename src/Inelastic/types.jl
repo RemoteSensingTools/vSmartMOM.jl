@@ -30,6 +30,7 @@ Base.@kwdef mutable struct RRS{FT<:AbstractFloat} <: AbstractRamanType
     n_Raman::Int
     bandSpecLim = []
     iBand = 1
+    F₀::Array{FT,2} # Solar/Stellar irradiation Stokes vector of size (pol_type.n, nSpec)
 end
 
 """
@@ -57,6 +58,7 @@ Base.@kwdef struct VS_0to1{FT<:AbstractFloat} <: AbstractRamanType
     dτ₀_λ::FT
     k_Rayl_scatt::FT #σ_Rayl(λ_scatt)/σ_Rayl(λ_incident)
     n_Raman::Int
+    F₀::Array{FT,2} # Solar/Stellar irradiation Stokes vector of size (pol_type.n, nSpec)
 end
 
 """
@@ -83,9 +85,10 @@ Base.@kwdef struct VS_1to0{FT<:AbstractFloat} <: AbstractRamanType
     dτ₀_λ::FT
     k_Rayl_scatt::FT #σ_Rayl(λ_scatt)/σ_Rayl(λ_incident)
     n_Raman::Int
+    F₀::Array{FT,2} # Solar/Stellar irradiation Stokes vector of size (pol_type.n, nSpec)
     #ramanAtmoProp::RamanAtmosphereProperties
 end
-
+#=
 """
     struct RRS{FT<:AbstractFloat}
 A struct which defines Rotational Raman Scattering parameters
@@ -112,12 +115,13 @@ Base.@kwdef mutable struct RVRS{FT<:AbstractFloat} <: AbstractRamanType
     τ₀::FT
     n_Raman::Int
 end
-
+=#
 Base.@kwdef mutable struct noRS{FT} <: AbstractRamanType
     fscattRayl::Array{FT,1} = [0.0]
-    ϖ_Cabannes::Array{FT,1} = [1.0,1.0,1.0] #elastic fraction (Cabannes) of Rayleigh (Cabannes+Raman) scattering
+    ϖ_Cabannes::Array{FT,1} ##= [1.0,1.0,1.0] #elastic fraction (Cabannes) of Rayleigh (Cabannes+Raman) scattering
     bandSpecLim = []
     iBand::Array{Int,1} = [1]
+    F₀::Array{FT,2} # Solar/Stellar irradiation Stokes vector of size (pol_type.n, nSpec)
 end
 
 ############################################################
@@ -157,7 +161,7 @@ Base.@kwdef mutable struct RRS_plus{FT<:AbstractFloat} <: AbstractRamanType
     Z⁺⁺_λ₁λ₀::Array{FT,2}
     i_ref::Int
     n_Raman::Int
-    
+    F₀::Array{FT,2} # Solar/Stellar irradiation Stokes vector of size (pol_type.n, nSpec)
 end
 
 """
@@ -206,6 +210,7 @@ Base.@kwdef mutable struct VS_0to1_plus{FT<:AbstractFloat} <: AbstractRamanType
     i_λ₁λ₀_all::Array{Int,1}    = zeros(Int,1)
     i_ref::Int                  = 1
     n_Raman::Int                = 1
+    F₀::Array{FT,2}             = zeros(FT,1,1) # Solar/Stellar irradiation Stokes vector of size (pol_type.n, nSpec)
 end
 
 """
@@ -257,6 +262,7 @@ Base.@kwdef mutable struct VS_1to0_plus{FT<:AbstractFloat} <: AbstractRamanType
     #dτ₀_λ::FT
     #k_Rayl_scatt::FT #σ_Rayl(λ_scatt)/σ_Rayl(λ_incident)
     n_Raman::Int
+    F₀::Array{FT,2} # Solar/Stellar irradiation Stokes vector of size (pol_type.n, nSpec)
     #ramanAtmoProp::RamanAtmosphereProperties
 end
 
@@ -265,6 +271,7 @@ Base.@kwdef mutable struct noRS_plus{FT} <: AbstractRamanType
     ϖ_Cabannes::FT = 1.0 #elastic fraction (Cabannes) of Rayleigh (Cabannes+Raman) scattering
     bandSpecLim = []
     iBand::Array{Int,1} = []
+    F₀::Array{FT,2} = [] # Solar/Stellar irradiation Stokes vector of size (pol_type.n, nSpec)
 end
 
 

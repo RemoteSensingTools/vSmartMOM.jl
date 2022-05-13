@@ -7,7 +7,8 @@ the input, and producing the output object.
 =#
 
 "Check that a field exists in yaml file"
-function check_yaml_field(dict::Dict{Any, Any}, full_keys::Array{String}, curr_keys::Array{String}, final_type::Type, valid_options::Array{String})
+function check_yaml_field(dict::Dict{Any, Any}, full_keys::Array{String}, 
+    curr_keys::Array{String}, final_type::Type, valid_options::Array{String})
 
     # Should have at least one key
     @assert length(curr_keys) >= 1
@@ -39,7 +40,7 @@ function validate_aerosols(aerosols::Union{Array{Dict{Any, Any}}, Vector{Any}})
               (["nᵣ"], Real),
               (["nᵢ"], Real),
               (["p₀"], Real),
-              (["p₀"], Real)]
+              (["σp"], Real)]
               
     for aerosol in aerosols
         for i in 1:length(fields)
@@ -100,7 +101,7 @@ function validate_yaml_parameters(params)
               (["geometry", "sza"], Real),
               (["geometry", "vza"], Array{<:Real}),
               (["geometry", "vaz"], Array{<:Real}),
-              (["geometry", "obs_alt"], Real),
+              (["geometry", "obs_alt"], Union{Real, Array{<:Real}}),
 
               # atmospheric_profile group
               (["atmospheric_profile", "T"], Array{<:Real}),
@@ -120,6 +121,9 @@ function validate_yaml_parameters(params)
               (["scattering", "nquad_radius"], Real),
               (["scattering", "λ_ref"], Real),
               (["scattering", "decomp_type"], String, ["NAI2()", "PCW()"]),
+
+              ## solar model group
+              #(["solar_model", "irradiance"], String, ["Unity()", "Kurusz()"])
               ]
 
     # Check that every field exists and is correctly typed
@@ -139,9 +143,18 @@ function validate_yaml_parameters(params)
     if "scattering" in keys(params)
         validate_aerosols(params["scattering"]["aerosols"])
     end
+
+    # Check that geometry obs alt is zero if Real
+    if (params["geometry"]["obs_alt"] isa Real)
+        @assert params["geometry"]["obs_alt"] == 0 "If obs_alt is a Real, it must be zero"
+    # Check that obs_alt is descending
+    else
+        @assert issorted(params["geometry"]["obs_alt"], rev=true) "Observational altitudes must be in descending order"
+    end
 end
 
-"Given a path to a YAML parameters file, load all the parameters into a vSmartMOM_Parameters struct" 
+"Given a path to a YAML parameters file, load all the 
+parameters into a vSmartMOM_Parameters struct" 
 function parameters_from_yaml(file_path)
 
     # Load the YAML file
@@ -235,6 +248,12 @@ function parameters_from_yaml(file_path)
         scattering_params = nothing
     end
 
+    if params_dict["geometry"]["obs_alt"] isa Real
+        obs_geom = FT(params_dict["geometry"]["obs_alt"])
+    else
+        obs_geom = convert.(FT, params_dict["geometry"]["obs_alt"])
+    end
+
     return vSmartMOM_Parameters(
                                 # radiative_transfer group
                                 spec_bands, 
@@ -252,7 +271,7 @@ function parameters_from_yaml(file_path)
                                 FT(params_dict["geometry"]["sza"]),
                                 convert.(FT, params_dict["geometry"]["vza"]),
                                 convert.(FT, params_dict["geometry"]["vaz"]),
-                                FT(params_dict["geometry"]["obs_alt"]),
+                                obs_geom,
 
                                 # atmospheric_profile group
                                 convert.(FT,T), convert.(FT,p), convert.(FT,q), 

@@ -23,7 +23,7 @@ function create_surface_layer!(lambertian::LambertianSurfaceScalar{FT},
                                m::Int,
                                pol_type,
                                quad_points,
-                               τ_sum,
+                               τ_sum, F₀,
                                architecture) where {FT}
     
     @unpack qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart, iμ₀, μ₀ = quad_points
@@ -52,8 +52,13 @@ function create_surface_layer!(lambertian::LambertianSurfaceScalar{FT},
             I₀_NquadN[:] .=0;
             I₀_NquadN[iμ₀Nstart:pol_type.n*iμ₀] = pol_type.I₀;
             
-            added_layer.J₀⁺[:,1,:] .= I₀_NquadN .* exp.(-τ_sum/μ₀)';
-            added_layer.J₀⁻[:,1,:] = μ₀*(R_surf*I₀_NquadN) .* exp.(-τ_sum/μ₀)';
+            added_layer.J₀⁺[iμ₀Nstart:pol_type.n*iμ₀,1,:] .= 
+                F₀ .* exp.(-τ_sum/μ₀)';
+            added_layer.J₀⁻[iμ₀Nstart:pol_type.n*iμ₀,1,:] = 
+                μ₀*(R_surf[iμ₀Nstart:pol_type.n*iμ₀, iμ₀Nstart:pol_type.n*iμ₀]*
+                F₀) .* exp.(-τ_sum/μ₀)';
+            # added_layer.J₀⁺[:,1,:] .= I₀_NquadN .* exp.(-τ_sum/μ₀)';
+            # added_layer.J₀⁻[:,1,:] = μ₀*(R_surf*I₀_NquadN) .* exp.(-τ_sum/μ₀)';
         end
         R_surf = R_surf * Diagonal(qp_μN.*wt_μN)
         
@@ -80,7 +85,7 @@ function create_surface_layer!(lambertian::LambertianSurfaceLegendre{FT},
     m::Int,
     pol_type,
     quad_points,
-    τ_sum,
+    τ_sum, F₀,
     architecture) where {FT}
     FT2 = Float64
     if m == 0
@@ -113,7 +118,9 @@ function create_surface_layer!(lambertian::LambertianSurfaceLegendre{FT},
             I₀_NquadN[iμ₀Nstart:pol_type.n*iμ₀] = pol_type.I₀;
             added_layer.J₀⁺[:] .= 0
             # Suniti double-check
-            added_layer.J₀⁻[:,1,:] = μ₀*(R_surf*I₀_NquadN) .* (ρ .* exp.(-τ_sum/μ₀))';
+            # added_layer.J₀⁻[:,1,:] = μ₀*(R_surf*I₀_NquadN) .* (ρ .* exp.(-τ_sum/μ₀))';
+            added_layer.J₀⁻[iμ₀Nstart:pol_type.n*iμ₀,1,:] = 
+                μ₀*(R_surf[iμ₀Nstart:pol_type.n*iμ₀, iμ₀Nstart:pol_type.n*iμ₀]*F₀) .* (ρ .* exp.(-τ_sum/μ₀))';
         end
         R_surf   = R_surf * Diagonal(qp_μN.*wt_μN)
         siz = size(added_layer.r⁻⁺)

@@ -47,8 +47,9 @@ Base.@kwdef struct ObsGeometry{FT} <: AbstractObsGeometry
     vza::Array{FT,1}
     "Viewing Azimuth Angle(s) `[Degree]`" 
     vaz::Array{FT,1}
-    "Altitude of Observer `[Pa]`"
-    obs_alt::FT
+    "Altitude of Observer `[km]`"
+    obs_alt::Union{FT, Array{FT,1}}
+    sensor_levels::Array{Int}
 end
 
 mutable struct RT_Aerosol{}#FT<:Union{AbstractFloat, ForwardDiff.Dual}}
@@ -392,7 +393,8 @@ mutable struct vSmartMOM_Parameters{FT<:Union{AbstractFloat, ForwardDiff.Dual}}
     "Viewing azimuthal angles [deg]"
     vaz::AbstractArray{FT}
     "Altitude of observer [Pa]"
-    obs_alt::FT
+    obs_alt::Union{FT, Array{FT}}
+    
 
     # atmospheric_profile group
     "Temperature Profile [K]"

@@ -66,7 +66,7 @@ function postprocessing_vza!(RS_type::Union{RRS, VS_0to1_plus, VS_1to0_plus},
     ieJ₀⁻ = Array(composite_layer.ieJ₀⁻);
     # Loop over all viewing zenith angles
     
-
+@show size(vza), size(vaz)
     for i = 1:length(vza)
 
         # Find the nearest quadrature point idx

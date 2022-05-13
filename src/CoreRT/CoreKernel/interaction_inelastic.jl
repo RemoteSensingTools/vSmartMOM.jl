@@ -347,10 +347,9 @@ function interaction_helper!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
     I_static::AbstractArray{FT2}) where {FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2}
  
     @unpack i_λ₁λ₀_all = RS_type
-    @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺ = added_layer
-    @unpack R⁻⁺, R⁺⁻, T⁺⁺, T⁻⁻, J₀⁺, J₀⁻ = composite_layer
-    @unpack ier⁺⁻, ier⁻⁺, iet⁻⁻, iet⁺⁺ = added_layer
-    @unpack ieR⁻⁺, ieR⁺⁻, ieT⁺⁺, ieT⁻⁻, ieJ₀⁺, ieJ₀⁻ = composite_layer
+    @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, ier⁺⁻, ier⁻⁺, iet⁻⁻, iet⁺⁺ = added_layer
+    @unpack R⁻⁺, R⁺⁻, T⁺⁺, T⁻⁻, J₀⁺, J₀⁻, ieR⁻⁺, ieR⁺⁻, ieT⁺⁺, ieT⁻⁻, ieJ₀⁺, ieJ₀⁻ = composite_layer
+    #@show "hello 100"
     # Used to store `(I - R⁺⁻ * r⁻⁺)⁻¹`
     tmp_inv = similar(t⁺⁺)
 
@@ -365,17 +364,17 @@ function interaction_helper!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
             n₁ = i_λ₁λ₀_all[Δn]
             n₀ = 1
             if (n₁>0)
-                composite_layer.ieJ₀⁻[:,1,n₁,1] = ieJ₀⁻[:,:,n₁,n₀] + 
+                @inbounds @views composite_layer.ieJ₀⁻[:,1,n₁,n₀] = ieJ₀⁻[:,1,n₁,n₀] + 
                                         T01_inv[:,:,n₁] *
-                                        (ier⁻⁺[:,:,n₁,n₀] * J₀⁺[:,:,n₀] + 
-                                        r⁻⁺[:,:,n₁] * ieJ₀⁺[:,:,n₁,n₀] +
+                                        (ier⁻⁺[:,:,n₁,n₀] * J₀⁺[:,1,n₀] + 
+                                        r⁻⁺[:,:,n₁] * ieJ₀⁺[:,1,n₁,n₀] +
                                         added_layer.ieJ₀⁻[:,1,n₁,n₀]) +
                                         (T01_inv[:,:,n₁] * 
                                         (ier⁻⁺[:,:,n₁,n₀] * R⁺⁻[:,:,n₀] + 
                                         r⁻⁺[:,:,n₁] * ieR⁺⁻[:,:,n₁,n₀]) +
                                         ieT⁻⁻[:,:,n₁,n₀]) *
                                         tmp_inv[:,:,n₀] * 
-                                        (added_layer.J₀⁻[:,:,n₀] + r⁻⁺[:,:,n₀] * J₀⁺[:,:,n₀]) #Suniti: Eq 17 of Raman paper draft
+                                        (added_layer.J₀⁻[:,1,n₀] + r⁻⁺[:,:,n₀] * J₀⁺[:,1,n₀]) #Suniti: Eq 17 of Raman paper draft
             end
         end
         #J₀₂⁻ = J₀₁⁻ + T₀₁(1-R₂₁R₀₁)⁻¹(R₂₁J₁₀⁺+J₁₂⁻)
@@ -386,7 +385,7 @@ function interaction_helper!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
         n₁ = i_λ₁λ₀_all[Δn]
         n₀ = 1
         if (n₁>0)
-            composite_layer.ieR⁻⁺[:,:,n₁,1] = ieR⁻⁺[:,:,n₁,n₀] +
+            @inbounds @views composite_layer.ieR⁻⁺[:,:,n₁,n₀] = ieR⁻⁺[:,:,n₁,n₀] +
                 T01_inv[:,:,n₁] * 
                 (ier⁻⁺[:,:,n₁,n₀] * T⁺⁺[:,:,n₀] + r⁻⁺[:,:,n₁] * ieT⁺⁺[:,:,n₁,n₀]) +    
                 (T01_inv[:,:,n₁] * 
@@ -394,7 +393,7 @@ function interaction_helper!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
                 ieT⁻⁻[:,:,n₁,n₀]) * 
                 tmp_inv[:,:,n₀] * r⁻⁺[:,:,n₀] * T⁺⁺[:,:,n₀] #Suniti: Eq 14 of Raman paper draft
 
-            composite_layer.ieT⁻⁻[:,:,n₁,1] = T01_inv[:,:,n₁] * iet⁻⁻[:,:,n₁,n₀] +  
+            @inbounds @views composite_layer.ieT⁻⁻[:,:,n₁,n₀] = T01_inv[:,:,n₁] * iet⁻⁻[:,:,n₁,n₀] +  
                 (T01_inv[:,:,n₁] * 
                 (ier⁻⁺[:,:,n₁,n₀] * R⁺⁻[:,:,n₀] + r⁻⁺[:,:,n₁] * ieR⁺⁻[:,:,n₁,n₀]) +
                 ieT⁻⁻[:,:,n₁,n₀]) * 
@@ -420,22 +419,22 @@ function interaction_helper!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
             n₁ = i_λ₁λ₀_all[Δn]
             n₀ = 1
             if (n₁>0)
-                composite_layer.ieJ₀⁺[:,1,n₁,n₀] = added_layer.ieJ₀⁺[:,:,n₁,n₀] + 
+                composite_layer.ieJ₀⁺[:,1,n₁,n₀] = added_layer.ieJ₀⁺[:,1,n₁,n₀] + 
                         T21_inv[:,:,n₁] * 
-                        (ieJ₀⁺[:,:,n₁,n₀] + 
-                        ieR⁺⁻[:,:,n₁,n₀] * added_layer.J₀⁻[:,:,n₀] +
+                        (ieJ₀⁺[:,1,n₁,n₀] + 
+                        ieR⁺⁻[:,:,n₁,n₀] * added_layer.J₀⁻[:,1,n₀] +
                         R⁺⁻[:,:,n₁] * added_layer.ieJ₀⁻[:,1,n₁,n₀]) +
                         (T21_inv[:,:,n₁] * 
                         (ieR⁺⁻[:,:,n₁,n₀] * r⁻⁺[:,:,n₀] + 
                         R⁺⁻[:,:,n₁] * ier⁻⁺[:,:,n₁,n₀]) +
                         iet⁺⁺[:,:,n₁,n₀]) * 
-                        tmp_inv[:,:,n₀] * (J₀⁺[:,:,n₀] + 
-                        R⁺⁻[:,:,n₀] * added_layer.J₀⁻[:,:,n₀])
+                        tmp_inv[:,:,n₀] * (J₀⁺[:,1,n₀] + 
+                        R⁺⁻[:,:,n₀] * added_layer.J₀⁻[:,1,n₀])
             end
         end
     # J₂₀⁺ = J₂₁⁺ + T₂₁(I-R₀₁R₂₁)⁻¹(J₁₀ + R₀₁J₁₂⁻ )
-    composite_layer.J₀⁺[:] = added_layer.J₀⁺ 
-        .+ T21_inv ⊠ (J₀⁺ + R⁺⁻ ⊠ added_layer.J₀⁻)
+    composite_layer.J₀⁺[:] = added_layer.J₀⁺ .+ 
+                T21_inv ⊠ (J₀⁺ .+ R⁺⁻ ⊠ added_layer.J₀⁻)
     end 
     for Δn = 1:length(i_λ₁λ₀_all) #Δn in eachindex ieJ₁⁺[1,1,:,1]
         n₁ = i_λ₁λ₀_all[Δn]
@@ -469,8 +468,26 @@ function interaction!(RS_type::Union{RRS, VS_0to1_plus, VS_1to0_plus}, scatterin
                         composite_layer::Union{CompositeLayer,CompositeLayerRS}, 
                         added_layer::Union{AddedLayer,AddedLayerRS},
                         I_static::AbstractArray{FT2}) where {FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2}
+                        
+    #M1 = composite_layer.R⁻⁺[1,1,1]
+    #M2 = composite_layer.R⁺⁻[1,1,1]
+    #M3 = composite_layer.T⁺⁺[1,1,1]
+    #M4 = composite_layer.T⁻⁻[1,1,1]
+    #M5 = composite_layer.J₀⁺[1,1,1]
+    #M6 = composite_layer.J₀⁻[1,1,1]
 
+    #@show M1, M2, M3, M4, M5, M6
+                        
     interaction_helper!(RS_type, scattering_interface, SFI, composite_layer, added_layer, I_static)
+    
+    #M1 = composite_layer.R⁻⁺[1,1,1]
+    #M2 = composite_layer.R⁺⁻[1,1,1]
+    #M3 = composite_layer.T⁺⁺[1,1,1]
+    #M4 = composite_layer.T⁻⁻[1,1,1]
+    #M5 = composite_layer.J₀⁺[1,1,1]
+    #M6 = composite_layer.J₀⁻[1,1,1]
+
+    #@show M1, M2, M3, M4, M5, M6
     synchronize_if_gpu()
     
 end

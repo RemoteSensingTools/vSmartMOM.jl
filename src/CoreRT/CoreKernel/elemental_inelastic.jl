@@ -27,6 +27,7 @@ function elemental_inelastic!(RS_type::Union{RRS, RRS_plus},
                             ϖ_λ::AbstractArray{FT,1},                     # dτ:   scattering optical depth of elemental layer (scalar)
                             Z⁺⁺_λ₁λ₀::AbstractArray{FT,2},   # Z matrix
                             Z⁻⁺_λ₁λ₀::AbstractArray{FT,2}, 
+                            F₀::AbstractArray{FT,2},
                             m::Int,                     # m: fourier moment
                             ndoubl::Int,                # ndoubl: number of doubling computations needed 
                             scatter::Bool,              # scatter: flag indicating scattering
@@ -64,7 +65,8 @@ function elemental_inelastic!(RS_type::Union{RRS, RRS_plus},
         
         if SFI
             get_elem_rt_SFI!(RS_type, ieJ₀⁺, ieJ₀⁻, 
-                τ_sum, dτ_λ, ϖ_λ, Z⁻⁺_λ₁λ₀, Z⁺⁺_λ₁λ₀, 
+                τ_sum, dτ_λ, ϖ_λ, Z⁻⁺_λ₁λ₀, Z⁺⁺_λ₁λ₀,
+                F₀, 
                 qp_μN, ndoubl,wct02, pol_type.n, 
                 arr_type(pol_type.I₀), iμ₀, D);
         end
@@ -275,7 +277,7 @@ end
 function get_elem_rt_SFI!(RS_type::Union{VS_0to1, VS_1to0}, 
                         ieJ₀⁺, ieJ₀⁻, 
                         τ_sum, dτ_λ, ϖ_λ, 
-                        Z⁻⁺_λ₁λ₀, Z⁺⁺_λ₁λ₀, 
+                        Z⁻⁺_λ₁λ₀, Z⁺⁺_λ₁λ₀, F₀,
                         qp_μN, ndoubl,
                         wct02, nStokes,
                         I₀, iμ0,D)
@@ -288,7 +290,7 @@ function get_elem_rt_SFI!(RS_type::Union{VS_0to1, VS_1to0},
     event = kernel!(fscattRayl, aType(ϖ_λ₁λ₀), aType(i_λ₁λ₀), 
     i_ref, ieJ₀⁺, ieJ₀⁻, 
     τ_sum, dτ_λ, ϖ_λ,
-    aType(Z⁻⁺_λ₁λ₀), aType(Z⁺⁺_λ₁λ₀), 
+    aType(Z⁻⁺_λ₁λ₀), aType(Z⁺⁺_λ₁λ₀), aType(F₀),
     qp_μN, ndoubl, wct02, nStokes, 
     I₀, iμ0, D, 
     ndrange=getKernelDimSFI(RS_type,ieJ₀⁻));
@@ -372,6 +374,7 @@ function get_elem_rt_SFI!(RS_type::RRS,
                         ieJ₀⁺, ieJ₀⁻, 
                         τ_sum, dτ_λ, ϖ_λ, 
                         Z⁻⁺_λ₁λ₀, Z⁺⁺_λ₁λ₀, 
+                        F₀,
                         qp_μN, ndoubl,
                         wct02, nStokes,
                         I₀, iμ0,D)
@@ -385,6 +388,7 @@ function get_elem_rt_SFI!(RS_type::RRS,
                 i_ref, ieJ₀⁺, ieJ₀⁻, 
                 τ_sum, dτ_λ, ϖ_λ,
                 aType(Z⁻⁺_λ₁λ₀), aType(Z⁺⁺_λ₁λ₀), 
+                aType(F₀),
                 qp_μN, ndoubl, wct02, nStokes, 
                 I₀, iμ0, D, 
                 ndrange=getKernelDimSFI(RS_type,ieJ₀⁻));
@@ -397,7 +401,7 @@ end
                             ϖ_λ₁λ₀, i_λ₁λ₀, i_ref, 
                             ieJ₀⁺, ieJ₀⁻, 
                             τ_sum, dτ_λ, ϖ_λ, 
-                            Z⁻⁺_λ₁λ₀, Z⁺⁺_λ₁λ₀, 
+                            Z⁻⁺_λ₁λ₀, Z⁺⁺_λ₁λ₀, F₀,
                             qp_μN, ndoubl,
                             wct02, nStokes,
                             I₀, iμ0, D)
@@ -418,8 +422,8 @@ end
         Z⁺⁺_I₀ = FT(0.0);
         Z⁻⁺_I₀ = FT(0.0);
         for ii = i_start:i_end
-            Z⁺⁺_I₀ += Z⁺⁺_λ₁λ₀[i,ii] * I₀[ii-i_start+1]
-            Z⁻⁺_I₀ += Z⁻⁺_λ₁λ₀[i,ii] * I₀[ii-i_start+1] 
+            Z⁺⁺_I₀ += Z⁺⁺_λ₁λ₀[i,ii] * F₀[ii-i_start+1,n₀] #I₀[ii-i_start+1]
+            Z⁻⁺_I₀ += Z⁻⁺_λ₁λ₀[i,ii] * F₀[ii-i_start+1,n₀] #I₀[ii-i_start+1] 
         end  
         if (i_start ≤ i ≤ i_end)
             #ctr = i-i_start+1
