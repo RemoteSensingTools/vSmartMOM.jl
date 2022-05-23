@@ -27,13 +27,13 @@ bibliography: paper.bib
 
 # Summary
 
-Remote sensing researchers use radiative transfer modeling to interpret satellite data for studying Earth's atmospheric and surface properties. The field plays a key role in how scientists understand many aspects of our rapidly changing planet – from climate change and pollution to the carbon and water cycles.
+Remote sensing researchers use radiative transfer modeling to interpret satellite data for studying Earth's atmospheric and surface properties. The field plays a key role in how scientists understand many aspects of our rapidly changing planet – from climate change and pollution to the carbon and water cycles. Astronomers use radiative transfer to study the atmospheres of stars and substellar objects like brown dwarfs and exoplanets. 
 
-**vSmartMOM.jl** is a [Julia](https://julialang.org) package that enables the fast computation of atmospheric optical properties and fully-polarized multiple-scattering radiance simulations, based on the Matrix Operator Method [@Sanghavi:2013a]. Users are free to customize simulation parameters and atmospheric properties, including trace-gas profiles, aerosol distributions, surface reflectance, and quadrature schemes. Independent submodules can also be imported individually; for example, **Absorption.jl** can be used for computing gaseous absorption and **Scattering.jl** for computing scattering phase-functions. 
+**vSmartMOM.jl** is a [Julia](https://julialang.org) package that enables the fast computation of atmospheric optical properties and fully-polarized multiple-scattering radiance simulations, based on the Matrix Operator Method [@Sanghavi:2013a]. Users are free to customize simulation parameters and atmospheric properties, including trace-gas profiles, aerosol distributions, microphysical properties, surface reflectance, and quadrature schemes. Independent submodules can also be imported individually; for example, **Absorption.jl** can be used for computing gaseous absorption and **Scattering.jl** for computing scattering phase-functions. 
 
 The Julia language provides many exciting opportunities to modernize radiative transfer software. Using the ForwardDiff.jl package [@Revels:2016], Jacobians can be calculated alongside computations using automatic differentiation, allowing for elegant and straightforward parameter-fitting. Julia's multiple dispatch paradigm enables the software architecture to be clean, flexible and reusable. Additionally, optimized techniques have been implemented to speed up the package’s performance on both CPU and GPU by orders-of-magnitude compared to existing radiative transfer codes. 
 
-**vSmartMOM.jl** has already been used in research projects, ranging from methane-plume simulation to atmospheric profile fitting. It has also been used in graduate-level remote sensing coursework. Ultimately, **vSmartMOM.jl** aims to accelerate the pace of atmospheric research through efficient software while lowering the barrier-of-entry for researchers and students in remote sensing. 
+**vSmartMOM.jl** has already been used in research projects, ranging from methane-plume simulation to aerosol profile fitting and spectropolarimetric simulations of brown dwarfs and exoplanets. It has also been used in graduate-level remote sensing coursework. Ultimately, **vSmartMOM.jl** aims to accelerate the pace of atmospheric research through efficient software while lowering the barrier-of-entry for researchers and students in remote sensing. 
 
 # Statement of need
 
@@ -47,7 +47,7 @@ The package has a modular architecture, allowing users to import just the specif
 
 ![Sample atmospheric reflectance under default atmospheric parameters, calculated using vSmartMOM.jl](joss_1.png)
 
-**vSmartMOM.jl** is the top-level module that uses absorption and scattering submodules to compute radiative transfer simulations. Specifically, it: 
+**vSmartMOM.jl** is the top-level module that uses absorption and scattering submodules to carry out radiative transfer simulations. Specifically, it: 
 
 - Enables 1D vectorized plane-parallel RT modeling based on the Matrix Operator Method [@Sanghavi:2013a]
 - Incorporates fast, high fidelity simulations of scattering atmospheres containing haze and clouds, including pressure- and temperature-resolved absorption profiles of gaseous species in the atmosphere
@@ -56,15 +56,15 @@ The package has a modular architecture, allowing users to import just the specif
 
 ![Sample absorption spectrum of CO2 with 0.01 step size resolution, calculated using Absorption.jl](joss_2.png)
 
-**Absorption.jl** enables absorption cross-section calculations of atmospheric gases at different pressures, temperatures, and wavelengths. It uses the HITRAN [@Gordon:2017] database for calculations. While it enables lineshape calculations from scratch, the module also allows users to create and save an interpolator object at specified wavelength, pressure, and temperature grids. The module also supports auto-differentiation of the profile, with respect to pressure and temperature. Calculations can be computed either on CPU or GPU (CUDA).
+**Absorption.jl** enables absorption cross-section calculations of atmospheric gases at different pressures, temperatures, and wavelengths. It uses the HITRAN [@Gordon:2017] database for calculations. For exoplanets and brown dwarfs, spectra are obtained from the ExoMOL/HITEMP databases [@yurchenko2012exomol:2012; @rothman2010hitemp:2010]. While it enables lineshape calculations from scratch, the module also allows users to create and save an interpolator object at specified wavelength, pressure, and temperature grids. The module also supports auto-differentiation of the profile, with respect to pressure and temperature. Calculations can be computed either on CPU or GPU (CUDA).
 
-![Sample scattering phase functions of aerosols (I $\rightarrow$ I and the I $\rightarrow$ Q transition), calculated using Scattering.jl ($r_m$ = 10.0 $\mu$m, $\sigma$ = 1.1, $n_r$ = 1.3, $n_i$ = 0.0, $\lambda$ = 0.65 $\mu$m)](joss_3.png)
+![Sample scattering phase functions of aerosols (I $\rightarrow$ I and the I $\rightarrow$ Q transition), calculated using Scattering.jl ($r_m$ = 10.0 $\mu$m, $\sigma$ = 1.1, $n_r$ = 1.3, $n_i$ = 0.0, $\lambda$ = 0.65 $\mu$m). Positive values are <span style="color:green">*green*</span>, and negative values are <span style="color:red">*red*</span>. ](joss_3.png)
 
 **Scattering.jl** is used for calculating Mie scattering phase-functions for aerosols with specified size distributions and refractive indices. This module enables scattering phase-function calculation of atmospheric aerosols with different size distributions, incident wavelengths, and refractive indices. It can perform the calculation using either numerical integration using quadrature points (NAI-2) [@Siewert:1982] or using precomputed tabulations of Wigner 3-j symbols (PCW) [@Domke:1975] with recent corrections [@Sanghavi:2013b]. State-of-the-art methods like $\delta$-truncation [@Hu:2000] and $\delta$-BGE truncation [@Sanghavi:2015] are used for scalar and vector radiative transfer computations, respectively. The module also supports auto-differentiation of the phase function, with respect to the aerosol's size distribution parameters and its complex refractive index. 
 
 # Benchmarks
 
-Standard reference tables from the literature [@Natraj:2009] are used to validate **vSmartMOM.jl** simulation output. The data is available in **Appendix 1**, in **Tables 1-3**. The key result is that simulated reflectance output from vSmartMOM.jl closely matches published standard values, in every case within 0.0005 of the published value. 
+Standard reference tables from the literature [@Natraj:2009] are used to validate **vSmartMOM.jl** simulation output. The data is available in **Appendix 1**, in **Tables 1-3**. The key result is that simulated reflectance output from vSmartMOM.jl closely matches published standard values – always within 0.1% for I, 0.0005 for Q, and 0.0001 for U. 
 
 Runtime duration for a given simulation is also compared between using CPU and GPU architectures. (CPU architecture is single-threaded, AMD EPYC 7H12 64-Core Processor; GPU is parallel on an NVIDIA A100 Tensor Core (40Gb))
 
