@@ -449,7 +449,7 @@ A struct which holds all derived model parameters (including any computations)
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-struct vSmartMOM_Model{PA, AE, GR, QP, TAB, TR, TAE, Ogeom, PRO}
+mutable struct vSmartMOM_Model{PA, AE, GR, QP, TAB, TR, TAE, Ogeom, PRO}
 
     "Struct with all individual parameters"
     params::PA # vSmartMOM_Parameters
