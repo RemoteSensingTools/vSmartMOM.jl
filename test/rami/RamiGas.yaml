@@ -121,6 +121,6 @@ scattering:
   # Number of quadrature points for aerosol radius
   nquad_radius:   1000
   # Reference wavelength (µm)
-  λ_ref:          0.770 
+  λ_ref:          0.55 
   # Decomposition method (NAI2 or PCW)
   decomp_type:        NAI2()

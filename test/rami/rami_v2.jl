@@ -106,7 +106,7 @@ function produce_rami_results(experiment_name::String;
 
         # Need to do the pressure peak more carefully
         # TODO: We need to just put it into 1-2 layers...
-        RT_aerosol = vSmartMOM.CoreRT.RT_Aerosol(aero, 0.550, 89880.0, 5000.0)
+        RT_aerosol = vSmartMOM.CoreRT.RT_Aerosol(aero, 0.550, Uniform(795.0,1013.0))
 
         # Assemble scattering parameters
         scattering_params = vSmartMOM.CoreRT.ScatteringParameters([RT_aerosol], 30.0, 2500, 0.550, vSmartMOM.Scattering.NAI2())

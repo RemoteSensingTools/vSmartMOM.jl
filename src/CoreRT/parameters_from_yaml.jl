@@ -62,7 +62,7 @@ function aerosol_params_to_obj(aerosols::Union{Array{Dict{Any, Any}}, Vector{Any
                                   FT(aerosol["nᵣ"]),
                                   FT(aerosol["nᵢ"]))
         
-        new_rt_aerosol_obj = RT_Aerosol(new_aerosol_obj, FT(aerosol["τ_ref"]), FT(aerosol["p₀"]), FT(aerosol["σp"]))
+        new_rt_aerosol_obj = RT_Aerosol(new_aerosol_obj, FT(aerosol["τ_ref"]), Normal(FT(aerosol["p₀"]), FT(aerosol["σp"])))
 
         push!(rt_aerosol_obj_list, new_rt_aerosol_obj)
     end

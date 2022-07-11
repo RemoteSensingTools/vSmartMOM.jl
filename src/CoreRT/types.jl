@@ -34,6 +34,8 @@ struct AtmosphericProfile{FT, VMR <: Union{Real, Vector}}
     vcd_h2o::Array{FT,1}
     "Volume Mixing Ratio of Constituent Gases"
     vmr::Dict{String, VMR}
+    "Layer height (meters)"
+    Δz::Array{FT,1}
 end
 
 "Types for describing atmospheric parameters"
@@ -56,10 +58,8 @@ mutable struct RT_Aerosol{}#FT<:Union{AbstractFloat, ForwardDiff.Dual}}
     aerosol::Aerosol#{FT}
     "Reference τ"
     τ_ref#::FT
-    "Pressure peak (Pa)"
-    p₀#::FT
-    "Pressure peak width (Pa)"
-    σp#::FT
+    "Vertical distribution as function of p (using Distributions.jl)"
+    profile::Distribution#::FT
 end
 
 "Quadrature Types for RT streams"

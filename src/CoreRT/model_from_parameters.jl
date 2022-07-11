@@ -27,9 +27,9 @@ function model_from_parameters(params::vSmartMOM_Parameters)
 
     # Get AtmosphericProfile from parameters
     vmr = isnothing(params.absorption_params) ? Dict() : params.absorption_params.vmr
-    p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o, new_vmr = compute_atmos_profile_fields(params.T, params.p, params.q, vmr)
+    p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o, new_vmr, Δz = compute_atmos_profile_fields(params.T, params.p, params.q, vmr)
 
-    profile = AtmosphericProfile(params.T, p_full, params.q, p_half, vmr_h2o, vcd_dry, vcd_h2o, new_vmr)
+    profile = AtmosphericProfile(params.T, p_full, params.q, p_half, vmr_h2o, vcd_dry, vcd_h2o, new_vmr,Δz)
     
     # Reduce the profile to the number of target layers (if specified)
     if params.profile_reduction_n != -1
@@ -151,7 +151,7 @@ function model_from_parameters(params::vSmartMOM_Parameters)
             τ_aer[i_band][i_aer,:] = 
                 params.scattering_params.rt_aerosols[i_aer].τ_ref * 
                 (aerosol_optics[i_band][i_aer].k/k_ref) * 
-                getAerosolLayerOptProp(1, c_aero.p₀, c_aero.σp, profile.p_half)
+                getAerosolLayerOptProp(1, c_aero.profile, profile)
             @info "AOD at band $i_band : $(sum(τ_aer[i_band][i_aer,:])), truncation factor = $(aerosol_optics[i_band][i_aer].fᵗ)"
         end 
     end
@@ -212,8 +212,8 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
 
     # Get AtmosphericProfile from parameters
     vmr = isnothing(params.absorption_params) ? Dict() : params.absorption_params.vmr
-    p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o, new_vmr = compute_atmos_profile_fields(params.T, params.p, params.q, vmr)
-    profile = AtmosphericProfile(params.T, p_full, params.q, p_half, vmr_h2o, vcd_dry, vcd_h2o, new_vmr)
+    p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o, new_vmr, Δz = compute_atmos_profile_fields(params.T, params.p, params.q, vmr)
+    profile = AtmosphericProfile(params.T, p_full, params.q, p_half, vmr_h2o, vcd_dry, vcd_h2o, new_vmr,Δz)
     
     # Reduce the profile to the number of target layers (if specified)
     if params.profile_reduction_n != -1
@@ -341,7 +341,7 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
             τ_aer[i_band][i_aer,:] = 
                 params.scattering_params.rt_aerosols[i_aer].τ_ref * 
                 (aerosol_optics[i_band][i_aer].k/k_ref) * 
-                CoreRT.getAerosolLayerOptProp(1.0, c_aero.p₀, c_aero.σp, profile.p_half)
+                CoreRT.getAerosolLayerOptProp(1.0, c_aero.p₀, c_aero.σp, profile)
         end 
     end
 
