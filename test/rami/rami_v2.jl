@@ -4,7 +4,7 @@ using DelimitedFiles
 using Distributions
 
 # TODO: Add proper band limits and resolutions for gases:
-const sentinel_band_to_wn = Dict([("2" , 1e7 ./ reverse(collect(455.0:0.1:534.0))),    # Blue
+const sentinel_band_to_wn = Dict([("2" , 1e7 ./ reverse(collect(455.0:1:534.0))),    # Blue
                                   ("3" , 1e7 ./ [559.8 559.9]),    # Green
                                   ("4" , 1e7 ./ [664.6 664.7]),    # Red
                                   ("8A", 1e7 ./ [864.7 864.8]),    # Narrow NIR 
@@ -29,7 +29,7 @@ US_std_atmos = readdlm(rami_atmos_fn, ' ')
 
 function produce_rami_results(experiment_name::String;
                               rami_json::String = "test/rami/RAMI4ATM_experiments_v1.0.json",
-                              default_params::String = "test/rami/RamiGas.yaml")
+                              default_params::String = "test/rami/RamiNoGas.yaml")
 
     # Get rami scenario from experiment name
     all_scenarios = JSON.parsefile(rami_json);
@@ -65,7 +65,7 @@ function produce_rami_results(experiment_name::String;
         # TODO We still need to check the two fractions of coarse and fine! Right now, only one is
         # 
         if startswith(rami_atmosphere["aerosols"][1]["name"], "D")
-
+            @show "Desert Aerosol"
             μ_fine   = 0.0478666
             σ_fine   = 1.87411
             μ_coarse = 0.604127
@@ -76,11 +76,12 @@ function produce_rami_results(experiment_name::String;
             # (in vSmartMOM, we so far only have one ni/nr per type).
             # See https://rami-benchmark.jrc.ec.europa.eu/_www/RAMI4ATM/down/RAMI4ATM_aerosols_v1.0/refractive_index/continental.txt
             # Need to generalize
-            nᵣ = 1.4434925925925925
-            nᵢ = 0.0015797
+            # 1.477538814814815 
+            nᵣ = 1.477538814814815
+            nᵢ = 0.004342592592592592
 
         elseif startswith(rami_atmosphere["aerosols"][1]["name"], "C")
-
+            @show "Continental Aerosol"
             #TODO: Change, not just one refractice index
             μ_fine   = 0.0807989
             σ_fine   = 1.50180
@@ -106,12 +107,13 @@ function produce_rami_results(experiment_name::String;
 
         # Need to do the pressure peak more carefully
         # TODO: We need to just put it into 1-2 layers...
-        RT_aerosol = vSmartMOM.CoreRT.RT_Aerosol(aero, 0.550, Uniform(795.0,1013.0))
+        RT_aerosol = vSmartMOM.CoreRT.RT_Aerosol(aero, rami_atmosphere["aerosols"][1]["tau_550"], Uniform(795.0,1013.0))
 
         # Assemble scattering parameters
         scattering_params = vSmartMOM.CoreRT.ScatteringParameters([RT_aerosol], 30.0, 2500, 0.550, vSmartMOM.Scattering.NAI2())
 
         params.scattering_params = scattering_params
+        @show params.scattering_params.rt_aerosols[1].τ_ref
 
     end
 

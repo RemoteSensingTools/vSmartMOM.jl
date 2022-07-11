@@ -121,7 +121,7 @@ function model_from_parameters(params::vSmartMOM_Parameters)
                                         params.scattering_params.r_max, 
                                         params.scattering_params.nquad_radius)       
         k_ref          = compute_ref_aerosol_extinction(mie_model, params.float_type)
-
+        @show k_ref
         #params.scattering_params.rt_aerosols[i_aer].p₀, params.scattering_params.rt_aerosols[i_aer].σp
         # Loop over bands
         for i_band=1:n_bands
@@ -138,14 +138,17 @@ function model_from_parameters(params::vSmartMOM_Parameters)
                                             params.scattering_params.r_max, 
                                             params.scattering_params.nquad_radius)
 
+            k = compute_ref_aerosol_extinction(mie_model, params.float_type)
+            @show k
             # Compute raw (not truncated) aerosol optical properties (not needed in RT eventually) 
             #@show FT2, FT
             @timeit "Mie calc"  aerosol_optics_raw = compute_aerosol_optical_properties(mie_model, FT);
-
+            @show aerosol_optics_raw.k
             # Compute truncated aerosol optical properties (phase function and fᵗ), consistent with Ltrunc:
             #@show i_aer, i_band
             aerosol_optics[i_band][i_aer] = Scattering.truncate_phase(truncation_type, 
                                                     aerosol_optics_raw; reportFit=false)
+            @show aerosol_optics[i_band][i_aer].k
             #@show aerosol_optics[i_band][i_aer].fᵗ
             # Compute nAer aerosol optical thickness profiles
             τ_aer[i_band][i_aer,:] = 
