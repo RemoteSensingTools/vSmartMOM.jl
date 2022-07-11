@@ -34,6 +34,7 @@ function compute_atmos_profile_fields(T::AbstractArray{FT,1}, p_half::AbstractAr
         vcd_h2o[i] = vmr_h2o[i] * vcd
     end
 
+    # TODO: This is still a bit clumsy:
     new_vmr = Dict{String, Union{Real, Vector}}()
 
     for molec_i in keys(vmr)
@@ -204,6 +205,25 @@ function getAerosolLayerOptProp(total_τ, p₀, σp, p_half)
     Norm = sum(ρ)
     τAer  =  (total_τ / Norm) * ρ
     return convert.(FT, τAer)
+end
+
+function getAerosolLayerOptProp(total_τ::FT, dist::Distribution, p_half) where FT
+
+    # Need to make sure we can also differentiate wrt σp (FT can be Dual!)
+    Nz = length(p_half)-1
+    ρ = zeros(Nz)
+
+    # @show p_half, p₀, σp
+    for i = 1:Nz
+        dp = p_half[i+1] - p_half[i]
+        p  = (p_half[i+1] + p_half[i])/2
+        # Use Distributions here later:
+        ρ[i] = pdf(dist,p)
+    end
+    @show sum(ρ)
+    Norm = sum(ρ)
+    τAer  =  (total_τ / Norm) * ρ
+    return τAer
 end
 
 """
@@ -381,6 +401,7 @@ function compute_absorption_profile!(τ_abs::Array{FT,2},
     # The array to store the cross-sections must be same length as number of layers
     @assert size(τ_abs,2) == length(profile.p_full)
     @assert length(vmr) ==1 || length(vmr) == length(profile.p_full)  "Length of VMR array has to match profile size or be uniform"
+    #@show grid
     @showprogress 1 for iz in 1:length(profile.p_full)
 
         # Pa -> hPa

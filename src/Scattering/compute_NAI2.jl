@@ -26,10 +26,10 @@ function compute_aerosol_optical_properties(model::MieModel{FDT}, FT2::Type=Floa
 
     # Get the refractive index's real part type
     #@show size_distribution.σ  
-    FT = eltype(size_distribution.σ);
+    FT = eltype(nᵣ);
 
     #@show FT, ForwardDiff.valtype(size_distribution.σ)
-    vFT = ForwardDiff.valtype(size_distribution.σ)
+    vFT = ForwardDiff.valtype(nᵣ)
     #@assert FT == Float64 "Aerosol computations require 64bit"
     # Get radius quadrature points and weights (for mean, thus normalized):
     # 

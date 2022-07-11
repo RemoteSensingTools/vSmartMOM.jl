@@ -4,7 +4,7 @@ using DelimitedFiles
 using Distributions
 
 # TODO: Add proper band limits and resolutions for gases:
-const sentinel_band_to_wn = Dict([("2" , 1e7 ./ [492.4 492.5]),    # Blue
+const sentinel_band_to_wn = Dict([("2" , 1e7 ./ reverse(collect(455.0:0.1:534.0))),    # Blue
                                   ("3" , 1e7 ./ [559.8 559.9]),    # Green
                                   ("4" , 1e7 ./ [664.6 664.7]),    # Red
                                   ("8A", 1e7 ./ [864.7 864.8]),    # Narrow NIR 
@@ -29,14 +29,14 @@ US_std_atmos = readdlm(rami_atmos_fn, ' ')
 
 function produce_rami_results(experiment_name::String;
                               rami_json::String = "test/rami/RAMI4ATM_experiments_v1.0.json",
-                              default_params::String = "test/test_parameters/PureRayleighParameters.yaml")
+                              default_params::String = "test/rami/RamiGas.yaml")
 
     # Get rami scenario from experiment name
-    all_scenarios = JSON.parsefile(rami_json)
-    filter!(x->x["name"] == experiment_name, all_scenarios)
+    all_scenarios = JSON.parsefile(rami_json);
+    filter!(x->x["name"] == experiment_name, all_scenarios);
     @assert length(all_scenarios) ≤ 1 "Multiple matching experiment names!"
     @assert length(all_scenarios) ≥ 1 "Experiment name not found in JSON input"
-    curr_scenario = all_scenarios[1]["observations"][1]
+    curr_scenario = all_scenarios[1]["observations"][1];
 
     # Get a default set of Rayleigh params
     params = vSmartMOM.parameters_from_yaml(default_params)
@@ -147,8 +147,8 @@ function produce_rami_results(experiment_name::String;
     # Spectral bands
     # Can expand to run multiple bands, just one for testing
     spec_bands        = sentinel_band_to_wn[rami_measures[1]["bands"][1]]
-    params.spec_bands = spec_bands
-
+    params.spec_bands = [spec_bands]
+    #@show params.spec_bands
     # ########################################
     # 5. Time
     # ########################################
@@ -161,10 +161,10 @@ function produce_rami_results(experiment_name::String;
     @show 
     model = model_from_parameters(params)
 
-    return rt_run(model)
+    return rt_run(model), model
 end
 
-produce_rami_results("HOM00_WHI_SD2S_M02_z30a000")
+R, models = produce_rami_results("HOM00_WHI_SD2S_M02_z30a000")
 
 ##
 

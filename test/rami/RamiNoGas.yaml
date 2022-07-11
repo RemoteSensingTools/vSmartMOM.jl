@@ -1,0 +1,62 @@
+# =================================================================
+# Top-Level Radiative Transfer Parameters
+# =================================================================
+radiative_transfer: 
+  # Spectral bands (list of ν_start:ν_step:ν_end, in cm⁻¹)
+  spec_bands: 
+    - "[19417.0 19418.0]"
+  # Bidirectional Reflectance Distribution Function (BRDF) per band
+  surface: 
+    - LambertianSurfaceScalar(0.00)
+  # Quadrature-scheme for stream calculations
+  quadrature_type:    RadauQuad()
+  # Polarization type (Stokes_I, Stokes_IQ, Stokes_IQU, Stokes_IQUV)
+  polarization_type:  Stokes_I()
+  # Maximum m (number of Fourier moments to loop over)
+  max_m:              3
+  # Exclusion angle for forward peak in fitting procedure (degrees)
+  Δ_angle:            2.0
+  # Trunction length for legendre terms
+  l_trunc:            20
+  # Depolarization factor
+  depol:              0.029
+  # Floating point type for calculations (Float32, Float64)
+  float_type:         Float64
+  # Architecture (default_architecture, GPU(), CPU())
+  architecture:       default_architecture
+  
+# =================================================================
+# Simulation Geometry
+# =================================================================
+geometry: 
+  # Solar zenith angle (degrees)
+  sza:                30
+  # Viewing zenith angles (degrees)
+  vza:                [60, 45, 30, 15, 0, 15, 30, 45, 60]
+  # Viewing azimuth angles (degrees)
+  vaz:                [180, 180, 180, 180, 0, 0, 0, 0, 0]
+  # Observation altitude (Pa)
+  obs_alt:            1000.0
+
+# =================================================================
+# Atmospheric Profile
+# =================================================================
+atmospheric_profile: 
+  # Temperature Profile (TOA to BOA, in K)
+  # Full-levels, specified at layer centers
+  T: [244.33, 251.34, 258.09, 264.25, 269.15, 
+      272.59, 274.07, 273.30, 269.65, 264.27, 258.11, 
+      251.52, 245.22, 239.20, 234.05, 229.71, 225.70, 
+      222.70, 220.62, 219.32, 217.93, 216.98, 217.10, 
+      218.35, 223.33, 234.19, 249.34, 264.12, 277.20, 
+      280.77, 282.60, 284.40, 285.80]
+  # Pressure Profile (TOA to BOA at each boundary, in hPa)
+  # Half-levels, specified at layer boundaries
+  p: [  0.14,   0.22,   0.30,   0.39,   0.53,   0.71,   
+        0.96,   1.28,   1.70,   2.27,   3.03,   4.03,  
+        5.44,   7.26,   9.67,  12.90,  17.23,  23.30,  
+       31.00,  42.07,  56.09,  74.78,  99.69, 131.00,
+      176.85, 236.64, 314.58, 418.87, 557.76, 735.00, 
+      800.12, 849.00, 912.00, 980.00]
+  # Reduce profile to n layers
+  profile_reduction: -1
