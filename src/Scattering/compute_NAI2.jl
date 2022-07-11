@@ -35,9 +35,10 @@ function compute_aerosol_optical_properties(model::MieModel{FDT}, FT2::Type=Floa
     # 
     
     # Just sample from 0.25%ile to 99.75%ile:
-    start,stop = quantile(size_distribution,[vFT(0.0025),vFT(0.9975)])
+    start,stop = quantile(size_distribution,[vFT(0.0001),vFT(0.99999999)])
     #r, wᵣ = gauleg(nquad_radius, 0.0, r_max ; norm=true) 
-    r, wᵣ = gauleg(nquad_radius, start, min(stop,r_max) ; norm=true) 
+    r, wᵣ = gauleg(nquad_radius, 0.0, min(stop,r_max) ; norm=true) 
+    @show start, stop
     #@show typeof(r), typeof(wᵣ)
     #@show typeof(convert.(FT, r))
     r = convert.(FT, r)
@@ -193,7 +194,8 @@ function compute_ref_aerosol_extinction(model::MieModel{FDT}, FT2::Type=Float64)
     #@show FT
     #@assert FT == Float64 "Aerosol computations require 64bit"
     # Get radius quadrature points and weights (for mean, thus normalized):
-    r, wᵣ = gauleg(nquad_radius, 0.0, r_max ; norm=true) 
+    start,stop = quantile(size_distribution,[0.0001, 0.99999999])
+    r, wᵣ = gauleg(nquad_radius, 0.0, min(stop,r_max) ; norm=true) 
     
     # Wavenumber
     k = 2π / λ  
