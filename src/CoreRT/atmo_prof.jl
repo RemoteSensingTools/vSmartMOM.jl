@@ -5,11 +5,12 @@ This file contains functions that are related to atmospheric profile calculation
 =#
 
 "Compute pressure levels, vmr, vcd for atmospheric profile, given p_half, T, q"
-function compute_atmos_profile_fields(T::AbstractArray{FT,1}, p_half::AbstractArray{FT,1}, q, vmr; g₀=9.8032465) where FT
+function compute_atmos_profile_fields(T::AbstractArray{FT,1}, p_half::AbstractArray{FT,1}, q, vmr; g₀=9.807) where FT
     #@show "Atmos",  FT 
     # Floating type to use
     #FT = eltype(T)
     Nₐ = FT(6.02214179e+23)
+    R  = FT(8.3144598)
     # Calculate full pressure levels
     p_full = (p_half[2:end] + p_half[1:end-1]) / 2
 
@@ -22,7 +23,7 @@ function compute_atmos_profile_fields(T::AbstractArray{FT,1}, p_half::AbstractAr
     vmr_h2o = zeros(FT, n_layers, )
     vcd_dry = zeros(FT, n_layers, )
     vcd_h2o = zeros(FT, n_layers, )
-
+    Δz      = zeros(FT, n_layers)
     # Now actually compute the layer VCDs
     for i = 1:n_layers 
         Δp = p_half[i + 1] - p_half[i]
@@ -32,6 +33,8 @@ function compute_atmos_profile_fields(T::AbstractArray{FT,1}, p_half::AbstractAr
         vcd = Nₐ * Δp / (M  * g₀ * 100^2) * 100
         vcd_dry[i] = vmr_dry    * vcd   # includes m2->cm2
         vcd_h2o[i] = vmr_h2o[i] * vcd
+        Δz[i] =  (log(p_half[i + 1]) - log(p_half[i])) / (g₀ * M  / (R * T[i]) )
+        #@show Δz, T[i], M, Δp
     end
 
     # TODO: This is still a bit clumsy:
@@ -48,7 +51,7 @@ function compute_atmos_profile_fields(T::AbstractArray{FT,1}, p_half::AbstractAr
         end
     end
 
-    return p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o, new_vmr
+    return p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o, new_vmr, Δz
 
 end
 
@@ -74,17 +77,17 @@ function read_atmos_profile(file_path::String)
         ak    = convert.(Float64, params_dict["ak"])
         bk    = convert.(Float64, params_dict["bk"])
         p_half = (ak + bk * psurf)
-        p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o = compute_atmos_profile_fields(T, p_half, q, Dict())
+        p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o, Δz = compute_atmos_profile_fields(T, p_half, q, Dict())
     elseif ("q" in keys(params_dict))
         p_half = convert(Float64, params_dict["p_half"])
         psurf = p_half[end]
         q      = convert.(Float64, params_dict["q"])
-        p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o = compute_atmos_profile_fields(T, p_half, q, Dict())
+        p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o, Δz = compute_atmos_profile_fields(T, p_half, q, Dict())
     else
         p_half = convert.(Float64, params_dict["p_half"])
         psurf = p_half[end]
         q = zeros(length(T))
-        p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o = compute_atmos_profile_fields(T, p_half, q, Dict())
+        p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o, Δz = compute_atmos_profile_fields(T, p_half, q, Dict())
     end
 
     # Convert vmr to appropriate type
@@ -207,23 +210,16 @@ function getAerosolLayerOptProp(total_τ, p₀, σp, p_half)
     return convert.(FT, τAer)
 end
 
-function getAerosolLayerOptProp(total_τ::FT, dist::Distribution, p_half) where FT
-
-    # Need to make sure we can also differentiate wrt σp (FT can be Dual!)
-    Nz = length(p_half)-1
-    ρ = zeros(Nz)
-
-    # @show p_half, p₀, σp
-    for i = 1:Nz
-        dp = p_half[i+1] - p_half[i]
-        p  = (p_half[i+1] + p_half[i])/2
-        # Use Distributions here later:
-        ρ[i] = pdf(dist,p)
-    end
-    @show sum(ρ)
-    Norm = sum(ρ)
-    τAer  =  (total_τ / Norm) * ρ
-    return τAer
+"""
+    $(FUNCTIONNAME)(total_τ, dist, profile)
+    
+Returns the aerosol optical depths per layer using a Distribution function in p
+"""
+function getAerosolLayerOptProp(total_τ::FT, dist::Distribution, profile::AtmosphericProfile) where FT
+    @unpack p_half, p_full, Δz = profile
+    
+    ρ = pdf.(dist,p_full) .* Δz
+    τAer  =  (total_τ / sum(ρ)) * ρ
 end
 
 """
