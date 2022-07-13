@@ -40,7 +40,7 @@ function model_from_parameters(params::vSmartMOM_Parameters)
     greek_rayleigh = Scattering.get_greek_rayleigh(FT(params.depol))
     # Remove rayleight for testing:
     τ_rayl = [zeros(FT,length(params.spec_bands[i]), length(params.T)) for i=1:n_bands];
-    τ_rayl = [zeros(FT,1,length(profile.T)) for i=1:n_bands];
+    #τ_rayl = [zeros(FT,1,length(profile.T)) for i=1:n_bands];
     
     # This is a kludge for now, tau_abs sometimes needs to be a dual. Suniti & us need to rethink this all!!
     # i.e. code the rt core with fixed amount of derivatives as in her paper, then compute chain rule for dtau/dVMr, etc...
@@ -56,7 +56,7 @@ function model_from_parameters(params::vSmartMOM_Parameters)
         # Compute Rayleigh properties per layer for `i_band` band center  
         
         τ_rayl[i_band]   .= getRayleighLayerOptProp(profile.p_half[end], 
-                                (mean(curr_band_λ)), 
+                                curr_band_λ, #(mean(curr_band_λ)), 
                                 params.depol, profile.vcd_dry);
         #@show τ_rayl[i_band]
         # If no absorption, continue to next band

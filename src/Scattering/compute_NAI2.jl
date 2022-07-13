@@ -16,7 +16,7 @@ Output: AerosolOptics, holding all Greek coefficients and Cross-Sectional inform
 function compute_aerosol_optical_properties(model::MieModel{FDT}, FT2::Type=Float64) where FDT <: NAI2
 
     # Unpack the model
-    @unpack computation_type, aerosol, λ, polarization_type, truncation_type, r_max, nquad_radius, wigner_A, wigner_B = model
+    @unpack aerosol, λ, r_max, nquad_radius = model
     @show nquad_radius, λ
     # Extract variables from aerosol struct:
     @unpack size_distribution, nᵣ, nᵢ = aerosol
@@ -26,6 +26,7 @@ function compute_aerosol_optical_properties(model::MieModel{FDT}, FT2::Type=Floa
 
     # Get the refractive index's real part type
     #@show size_distribution.σ  
+    # TODO: This is still very clumsy, the FT conversions are not good here.
     FT = eltype(nᵣ);
 
     #@show FT, ForwardDiff.valtype(size_distribution.σ)
@@ -35,13 +36,13 @@ function compute_aerosol_optical_properties(model::MieModel{FDT}, FT2::Type=Floa
     # 
     
     # Just sample from 0.25%ile to 99.75%ile:
-    start,stop = quantile(size_distribution,[vFT(0.0001),vFT(0.99999999)])
-    #r, wᵣ = gauleg(nquad_radius, 0.0, r_max ; norm=true) 
-    r, wᵣ = gauleg(nquad_radius, 0.0, min(stop,r_max) ; norm=true) 
-    @show start, stop
+    #start,stop = quantile(size_distribution,[vFT(0.0001),vFT(0.99999999)])
+    r, wᵣ = gauleg(nquad_radius, 0.0, r_max ; norm=true) 
+    #r, wᵣ = gauleg(nquad_radius, 0.0, min(stop,r_max) ; norm=true) 
+    #@show start, stop
     #@show typeof(r), typeof(wᵣ)
     #@show typeof(convert.(FT, r))
-    r = convert.(FT, r)
+    r  = convert.(FT, r)
     wᵣ = convert.(FT, wᵣ)
     # Wavenumber
     k = vFT(2π) / λ  
@@ -159,6 +160,7 @@ function compute_aerosol_optical_properties(model::MieModel{FDT}, FT2::Type=Floa
     end
 
     # Check whether this is a Dual number (if so, don't do any conversions)
+    # TODO: Equally clumsy, needs to be fixed.
     if FT <: AbstractFloat
         #@show "Convert greek", FT2
         # Create GreekCoefs object with α, β, γ, δ, ϵ, ζ
@@ -194,8 +196,8 @@ function compute_ref_aerosol_extinction(model::MieModel{FDT}, FT2::Type=Float64)
     #@show FT
     #@assert FT == Float64 "Aerosol computations require 64bit"
     # Get radius quadrature points and weights (for mean, thus normalized):
-    start,stop = quantile(size_distribution,[0.0001, 0.99999999])
-    r, wᵣ = gauleg(nquad_radius, 0.0, min(stop,r_max) ; norm=true) 
+    # start,stop = quantile(size_distribution,[0.0001, 0.99999999])
+    r, wᵣ = gauleg(nquad_radius, 0.0, r_max ; norm=true) 
     
     # Wavenumber
     k = 2π / λ  
