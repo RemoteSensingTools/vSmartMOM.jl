@@ -133,12 +133,15 @@ function reduce_profile(n::Int, profile::AtmosphericProfile{FT}) where {FT}
         p_half[i+1] = a[i+1] # profile.p_half[ind[end]]
 
         # Re-average the other parameters to produce new layers
+
+        
         p_full[i] = mean(profile.p_full[ind])
         T[i] = mean(profile.T[ind])
         q[i] = mean(profile.q[ind])
-        vmr_h2o[i] = mean(profile.vmr_h2o[ind])
+        
         vcd_dry[i] = sum(profile.vcd_dry[ind])
         vcd_h2o[i] = sum(profile.vcd_h2o[ind])
+        vmr_h2o[i] = vcd_h2o[i]/vcd_dry[i]
     end
     #@show indices
 
@@ -147,9 +150,7 @@ function reduce_profile(n::Int, profile::AtmosphericProfile{FT}) where {FT}
     # need to double check this logic, maybe better to add VCDs?!
     for molec_i in keys(vmr)
         if profile.vmr[molec_i] isa AbstractArray
-            
-            #pressure_grid = collect(range(minimum(p_full), maximum(p_full), length=length(profile.vmr[molec_i])))
-            #interp_linear = LinearInterpolation(pressure_grid, vmr[molec_i])
+            # TODO: This needs a VCD_dry weighted average!
             new_vmr[molec_i] = [mean(profile.vmr[molec_i][ind]) for ind in indices]
         else
             new_vmr[molec_i] = profile.vmr[molec_i]

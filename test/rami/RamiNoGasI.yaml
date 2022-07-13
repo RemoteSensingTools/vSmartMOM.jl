@@ -4,12 +4,12 @@
 radiative_transfer: 
   # Spectral bands (list of ν_start:ν_step:ν_end, in cm⁻¹)
   spec_bands: 
-    - collect(455.0:1:534.0)u"nm"
-    - collect(455.0:1:534.0)u"nm"
-    - collect(455.0:1:534.0)u"nm"
-    - collect(455.0:1:534.0)u"nm"
-    - collect(455.0:1:534.0)u"nm"
-    - collect(455.0:1:534.0)u"nm"
+    - collect(456.0:1:533.0)u"nm"
+    - collect(538.0:1:583.0)u"nm"
+    - collect(646.0:1:684.0)u"nm"
+    - collect(837.0:1:881.0)u"nm"
+    - collect(1539.0:1:1682.0)u"nm"
+    - collect(2078.0:1:2320.0)u"nm"
   # Bidirectional Reflectance Distribution Function (BRDF) per band
   surface: 
     - LambertianSurfaceScalar(0.00)
@@ -64,6 +64,7 @@ atmospheric_profile:
       25.49, 29.72, 34.67, 40.47, 47.29, 55.29, 64.67, 75.65, 88.5, 
       103.5, 121.1, 141.7, 165.8, 194.0, 227.0, 265.0, 308.0, 356.5, 
       411.1, 472.2, 540.5, 616.6, 701.2, 795.0, 898.8, 1013.0]
+
   # Reduce profile to n layers
   profile_reduction: -1
 

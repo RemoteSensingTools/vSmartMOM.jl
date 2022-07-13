@@ -2,14 +2,20 @@ using JSON
 using vSmartMOM
 using DelimitedFiles
 using Distributions
-
-# TODO: Add proper band limits and resolutions for gases:
-const sentinel_band_to_wn = Dict([("2" , 1e7 ./ reverse(collect(455.0:1:534.0))),    # Blue
-                                  ("3" , 1e7 ./ [559.8 559.9]),    # Green
-                                  ("4" , 1e7 ./ [664.6 664.7]),    # Red
-                                  ("8A", 1e7 ./ [864.7 864.8]),    # Narrow NIR 
-                                  ("11", 1e7 ./ [1613.7 1613.8]),  # SWIR
-                                  ("12", 1e7 ./ [2202.4 2202.5])]) # SWIR 
+                                  
+const sentinel_band_to_index = Dict([("2" , 1),    # Blue
+                                     ("3" , 2),    # Green
+                                     ("4" , 3),    # Red
+                                     ("8A", 4),    # Narrow NIR 
+                                     ("11", 5),  # SWIR
+                                     ("12", 6)]) # SWIR
+const scenario_yaml_I = Dict([("AtmosphereType.RAYLEIGH"           , "RamiNoGasI.yaml"),    
+                            ("AtmosphereType.ABSORBING"            , "RamiGasI.yaml"),      
+                            ("AtmosphereType.SCATTERING_ABSORBING" , "RamiGasI.yaml"),      
+                            ("AtmosphereType.AEROSOLS"             , "RamiNoGasI.yaml"),     
+                            ("AtmosphereType.SCATTERING_AEROSOLS"  , "RamiNoGasI.yaml"),    
+                            ("AtmosphereType.ABSORBING_AEROSOLS"   , "RamiGasI.yaml"),
+                            ("AtmosphereType.COMPLETE"             , "RamiGasI.yaml" )]) # SWIR
 
 
 ## 
@@ -28,8 +34,7 @@ US_std_atmos = readdlm(rami_atmos_fn, ' ')
 # Starts with HOM45_LAM, HOM25_LAM, or HOM35_LAM for homogeneous discrete with isotropic background
 
 function produce_rami_results(experiment_name::String;
-                              rami_json::String = "test/rami/RAMI4ATM_experiments_v1.0.json",
-                              default_params::String = "test/rami/RamiNoGas.yaml")
+                              rami_json::String = "test/rami/RAMI4ATM_experiments_v1.0.json")
 
     # Get rami scenario from experiment name
     all_scenarios = JSON.parsefile(rami_json);
@@ -37,91 +42,44 @@ function produce_rami_results(experiment_name::String;
     @assert length(all_scenarios) ≤ 1 "Multiple matching experiment names!"
     @assert length(all_scenarios) ≥ 1 "Experiment name not found in JSON input"
     curr_scenario = all_scenarios[1]["observations"][1];
-
-    # Get a default set of Rayleigh params
-    params = vSmartMOM.parameters_from_yaml(default_params)
-
-    # ########################################
-    # Change params fields to match rami input
-    # ########################################
+    band = curr_scenario["measures"][1]["bands"]
 
     # There are 7 rami categories to be mindful of: 
     # atmosphere, name, canopy, illumination, measures, time, surface
 
-    rami_atmosphere = curr_scenario["atmosphere"]
-    rami_name = curr_scenario["name"]
-    rami_canopy = curr_scenario["canopy"]
+    rami_atmosphere   = curr_scenario["atmosphere"]
+    rami_name         = curr_scenario["name"]
+    rami_canopy       = curr_scenario["canopy"]
     rami_illumination = curr_scenario["illumination"]
-    rami_measures = curr_scenario["measures"]
-    rami_time = curr_scenario["time"]
-    rami_surface = curr_scenario["surface"]
+    rami_measures     = curr_scenario["measures"]
+    rami_time         = curr_scenario["time"]
+    rami_surface      = curr_scenario["surface"]
 
+    conc              = rami_atmosphere["concentrations"]
+    atm_type          = rami_atmosphere["atmosphere_type"]
+    @show atm_type
+    
+    # Get a default set of Rayleigh params
+    default_params = "test/rami/" * scenario_yaml_I[atm_type]
+    @show default_params
+    params = vSmartMOM.parameters_from_yaml(default_params)
+
+    
+    # ########################################
+    # Change params fields to match rami input
+    # ########################################
+
+    
     # ########################################
     # 1. Atmosphere
     # ########################################
 
     # aerosols 
-    if length(rami_atmosphere["aerosols"]) > 0
-        # TODO We still need to check the two fractions of coarse and fine! Right now, only one is
-        # 
-        if startswith(rami_atmosphere["aerosols"][1]["name"], "D")
-            @show "Desert Aerosol"
-            μ_fine   = 0.0478666
-            σ_fine   = 1.87411
-            μ_coarse = 0.604127
-            σ_coarse = 1.75172
-            n_coarse = 0.00332189
-            # These refractive indices depend on the band. 
-            # TODO: We need to pull those from the table actually, as they are band dependent 
-            # (in vSmartMOM, we so far only have one ni/nr per type).
-            # See https://rami-benchmark.jrc.ec.europa.eu/_www/RAMI4ATM/down/RAMI4ATM_aerosols_v1.0/refractive_index/continental.txt
-            # Need to generalize
-            # 1.477538814814815 
-            nᵣ = 1.477538814814815
-            nᵢ = 0.004342592592592592
+    add_aerosols!(rami_atmosphere, params)
+    @show params.scattering_params.rt_aerosols[1].τ_ref
 
-        elseif startswith(rami_atmosphere["aerosols"][1]["name"], "C")
-            @show "Continental Aerosol"
-            #TODO: Change, not just one refractice index
-            μ_fine   = 0.0807989
-            σ_fine   = 1.50180
-            μ_coarse = 0.682651
-            σ_coarse = 2.10400
-            n_coarse   = 0.00046373
-            nᵣ = 1.477538814814815
-            nᵢ = 0.004342592592592592
-
-        else
-            println("weird aerosol here")
-        end
-
-        # TODO: Suniti, please double-check
-
-        # size_distribution = LogNormal(log(μ), log(σ))
-        size_distribution = MixtureModel(LogNormal,
-                            [(log(μ_fine), log(σ_fine)), (log(μ_coarse), log(σ_coarse))],
-                            [1-n_coarse, n_coarse])
-
-        # Create the aerosol(s)
-        aero = vSmartMOM.CoreRT.Aerosol(size_distribution, nᵣ, nᵢ)
-
-        # Need to do the pressure peak more carefully
-        # TODO: We need to just put it into 1-2 layers...
-        RT_aerosol = vSmartMOM.CoreRT.RT_Aerosol(aero, rami_atmosphere["aerosols"][1]["tau_550"], Uniform(795.0,1013.0))
-
-        # Assemble scattering parameters
-        scattering_params = vSmartMOM.CoreRT.ScatteringParameters([RT_aerosol], 30.0, 2500, 0.550, vSmartMOM.Scattering.NAI2())
-
-        params.scattering_params = scattering_params
-        @show params.scattering_params.rt_aerosols[1].τ_ref
-
-    end
-
-    # p/T profiles 
-    params.p = reverse(US_std_atmos[:,2])
-    params.T = reverse(US_std_atmos[:,3])
-    params.T = (params.T[1:end-1] + params.T[2:end])/ 2
-    params.q = zero(params.T)
+    # TODO: Fix q from vmr (needs to be that way)
+    params.q = [1.3683608600937127e-7, 1.6171537681996363e-7, 1.92814491391246e-7, 2.301334304285797e-7, 2.923316659193965e-7, 4.322777129669201e-7, 6.779608309202629e-7, 1.0511505175455402e-6, 1.5176378638869645e-6, 1.9685758834495292e-6, 2.3946347910935506e-6, 2.783374862836421e-6, 3.0632678282313282e-6, 3.212544115378091e-6, 3.259192960666205e-6, 3.259192960666205e-6, 3.228093730180227e-6, 3.165895272735097e-6, 3.103696819992401e-6, 3.063267828231329e-6, 3.022838838457035e-6, 2.9699701625192205e-6, 2.8953320375674745e-6, 2.8020343909002165e-6, 2.7149565968900444e-6, 2.643428415848055e-6, 2.5719002410250296e-6, 2.5034819926657405e-6, 2.450613350103426e-6, 2.4101843904364436e-6, 2.388414951438685e-6, 2.388414951438685e-6, 2.425733990073239e-6, 2.783374862836421e-6, 3.3991395124012653e-6, 5.233996504028426e-6, 9.329785263484815e-6, 1.7166886651582844e-5, 3.299681516351052e-5, 7.090902170019672e-5, 0.00016328651918899218, 0.0002920724597408198, 0.00046568540880824054, 0.0007233721407928284, 0.0011078736971087291, 0.0016623702032229144, 0.0024324309812018903, 0.003334347912200177, 0.004309152659531596]
 
     # ########################################
     # 2. Name
@@ -135,21 +93,28 @@ function produce_rami_results(experiment_name::String;
     # ########################################
     # 4. Measures
     # ########################################
+    # Spectral bands
+    iBand        = sentinel_band_to_index[rami_measures[1]["bands"][1]]
+    params.spec_bands = [params.spec_bands[iBand]]
+    @show params.spec_bands
 
-    # Viewing zenith 
-    vza_start = rami_measures[1]["vza_start"]["value"]
-    vza_end   = rami_measures[1]["vza_end"]["value"]
-    vza_step  = rami_measures[1]["vza_step"]["value"]
-    params.vza  = collect(vza_start:vza_step:vza_end)
+    # Viewing zenith angles (#TODO: this needs to be looped, can use hardcoded values!)
+    @show size(rami_measures)
+    for ra in rami_measures
+        @show ra["measure_type"], ra["height"]
+    end
+    vza_start = 1.0  # rami_measures[1]["vza_start"]["value"]
+    vza_end   = 75.0 # rami_measures[1]["vza_end"]["value"]
+    vza_step  = 2.0  # rami_measures[1]["vza_step"]["value"]
+    vzas = collect(vza_start:vza_step:vza_end)
+    params.vza  = [vzas; vzas; vzas; vzas]
+
 
     # Viewing azimuth (TODO: Check definitions!)
-    vaa = rami_measures[1]["delta_vaa"]["value"]
-    params.vaz  = repeat([vaa], length(params.vza))
-
-    # Spectral bands
-    # Can expand to run multiple bands, just one for testing
-    spec_bands        = sentinel_band_to_wn[rami_measures[1]["bands"][1]]
-    params.spec_bands = [spec_bands]
+    # vaa = rami_measures[1]["delta_vaa"]["value"]
+    params.vaz  = [repeat([0.0], length(vzas)); repeat([90.0], length(vzas));repeat([180.0], length(vzas));repeat([270.0], length(vzas)) ]
+    @show params.vaz
+    
     #@show params.spec_bands
     # ########################################
     # 5. Time
@@ -160,6 +125,7 @@ function produce_rami_results(experiment_name::String;
     # ########################################
     @assert rami_surface["name"] in ["WHI", "BLA", "LAM"] && startswith(curr_scenario["name"], "HOM00") "Currently only supporting Lambertian (HOM00) surfaces"
     params.brdf = [vSmartMOM.LambertianSurfaceScalar(rami_surface["surface_parameters"]["reflectance"])]
+    params.brdf = [vSmartMOM.LambertianSurfaceScalar(0.0)]
     @show 
     model = model_from_parameters(params)
 
