@@ -82,7 +82,7 @@ function produce_rami_results(experiment_name::String;
     @show conc, isempty(conc)
     
     # Get a default set of Rayleigh params
-    default_params = "test/rami/RamiGasI_11.yaml" # * scenario_yaml_I[atm_type]
+    default_params = "test/rami/RamiGasI_12.yaml" # * scenario_yaml_I[atm_type]
     @show default_params
     params = vSmartMOM.parameters_from_yaml(default_params)
 
@@ -158,7 +158,7 @@ end
 # R, models = produce_rami_results("HOM00_WHI_SD2S_M02_z30a000")
 #R, models = produce_rami_results("HOM00_LAM_ED2D_M12_z30a000")
 #R, models = produce_rami_results("HOM00_WHI_A00S_M02_z30a000")
-R, models = produce_rami_results("HOM00_WHI_A00S_M11_z30a000")
+R, models = produce_rami_results("HOM00_WHI_A00S_M12_z30a000")
 ##
 
 #=
