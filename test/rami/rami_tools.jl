@@ -1,4 +1,4 @@
-function add_aerosols!(rami_atmosphere, params)# TODO We still need to check the two fractions of coarse and fine! Right now, only one is
+function add_aerosols!(rami_atmosphere, params, band, n_desert, n_continental)# TODO We still need to check the two fractions of coarse and fine! Right now, only one is
     if length(rami_atmosphere["aerosols"]) > 0# 
         if startswith(rami_atmosphere["aerosols"][1]["name"], "D")
             @show "Desert Aerosol"
@@ -16,8 +16,14 @@ function add_aerosols!(rami_atmosphere, params)# TODO We still need to check the
             # Need to generalize
             
             # TODO: Make it wavelength dependent (and reference scenario fixed)
-            nᵣ = 1.477538814814815
-            nᵢ = 0.004342592592592592
+            #nᵣ = 1.477538814814815
+            #nᵢ = 0.004342592592592592
+            @show band[1]
+            iN = sentinel_band_to_LUT[band[1]]
+            nᵣ = n_desert[iN,2]
+            #nᵣ = 1.4220380000000001 
+            nᵢ = n_desert[iN,3]
+            @show nᵣ, nᵢ
 
         elseif startswith(rami_atmosphere["aerosols"][1]["name"], "C")
             @show "Continental Aerosol"
@@ -30,8 +36,13 @@ function add_aerosols!(rami_atmosphere, params)# TODO We still need to check the
             n_coarse   = 0.00046374026257
 
             # TODO: Make it wavelength dependent (and reference scenario fixed)
-            nᵣ = 1.4434925925925925
-            nᵢ = 0.0015797
+            @show band[1]
+            iN = sentinel_band_to_LUT[band[1]]
+            nᵣ = n_continental[iN,2]
+            #nᵣ = 1.4220380000000001 
+            nᵢ = n_continental[iN,3]
+            @show nᵣ, nᵢ
+           
 
         else
             println("weird aerosol here")
@@ -52,12 +63,26 @@ function add_aerosols!(rami_atmosphere, params)# TODO We still need to check the
         RT_aerosol = vSmartMOM.CoreRT.RT_Aerosol(aero, rami_atmosphere["aerosols"][1]["tau_550"], Uniform(795.0,1013.0))
 
         # Assemble scattering parameters
-        scattering_params = vSmartMOM.CoreRT.ScatteringParameters([RT_aerosol], 30.0, 2500, 0.550, vSmartMOM.Scattering.NAI2())
+        scattering_params = vSmartMOM.CoreRT.ScatteringParameters([RT_aerosol], 50.0, 1000, 0.550, vSmartMOM.Scattering.NAI2())
 
         params.scattering_params = scattering_params
         @show params.scattering_params.rt_aerosols[1].τ_ref
     end
 end
 
+function scale_gases!(rami_atmosphere, params)
+    conc = rami_atmosphere["concentrations"]
+    if !isempty(conc)
+        # Reference standrad values kg/m2
+        ref_h2o = 14.274
+        ref_o3  = 0.746e-2
+        h2o = conc["H2O"]["value"]
+        o3  = conc["O3"]["value"]
+        params.absorption_params.vmr["O3"]  .*= h2o/ref_h2o
+        params.absorption_params.vmr["H2O"] .*= o3/ref_o3
+        @show h2o/ref_h2o, o3/ref_o3
+    end
+end
+
 # Get q from vmr:
-q = -1/((dry_mass - dry_mass./vmr_h2o)/wet_mass - 1)
+#q = -1/((dry_mass - dry_mass./vmr_h2o)/wet_mass - 1)

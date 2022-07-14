@@ -64,6 +64,7 @@ function model_from_parameters(params::vSmartMOM_Parameters)
         
         # Loop over all molecules in this band, obtain profile for each, and add them up
         for molec_i in 1:length(params.absorption_params.molecules[i_band])
+            @show params.absorption_params.molecules[i_band][molec_i]
             # This can be precomputed as well later in my mind, providing an absorption_model or an interpolation_model!
             if isempty(params.absorption_params.luts)
                 # Obtain hitran data for this molecule
@@ -148,6 +149,8 @@ function model_from_parameters(params::vSmartMOM_Parameters)
             #@show i_aer, i_band
             aerosol_optics[i_band][i_aer] = Scattering.truncate_phase(truncation_type, 
                                                     aerosol_optics_raw; reportFit=false)
+            #aerosol_optics[i_band][i_aer] =  aerosol_optics_raw
+                                                    
             @show aerosol_optics[i_band][i_aer].k
             #@show aerosol_optics[i_band][i_aer].fᵗ
             # Compute nAer aerosol optical thickness profiles
