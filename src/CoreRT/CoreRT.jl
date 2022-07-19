@@ -36,6 +36,7 @@ using ForwardDiff                  # Automatic Differentiation
 using NNlib                        # For batched multiplications
 import NNlib.batched_mul           # Required to overwrite batched_mul for Duals
 using NCDatasets                   # For loading absco lookup tables
+using QuadGK
 
 import Base.show                   # For overloading show for custom types
 
@@ -83,8 +84,8 @@ include("show_utils.jl")                    # Pretty-printing objects
 include("LayerOpticalProperties/compEffectiveLayerProperties.jl")
 
 # Surfaces
-include("lambertian_surface.jl")            # Lambertian Surface 
-
+include("Surfaces/lambertian_surface.jl")            # Lambertian Surface 
+include("Surfaces/rpv_surface.jl")            # Lambertian Surface 
 
 
 

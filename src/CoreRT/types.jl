@@ -308,6 +308,19 @@ struct LambertianSurfaceSpectrum{FT} <: AbstractSurfaceType
     albedo::AbstractArray{FT,1}
 end
 
+"Defined as Array (has to have the same length as the band!)"
+struct rpvSurfaceScalar{FT} <: AbstractSurfaceType
+    "Overall reflectance level parameter (scalar)"
+    ρ₀::FT
+    "Hotspot function parameter (1.0 = no hotspot)"
+    ρ_c::FT
+    "Anisotropy shape parameter. k < 1.0 (> 1.0) corresponds to a bowl (bell) shape."
+    k::FT
+    "Asymmetry parameter, Θ < 0.0 (> 0.0) corresponds to a predominantly backward (forward) scattering."
+    Θ::FT
+end
+
+
 "Defined by Legendre polynomial terms as function of spectral grid, which is scaled to [-1,1] (degree derived from length of `a_coeff`)"
 struct LambertianSurfaceLegendre{FT} <: AbstractSurfaceType
     "albedo = legendre_coeff[1] * P₀ + legendre_coeff[2]*P₁ + legendre_coeff[3]*P₂ + ... "
@@ -348,6 +361,8 @@ mutable struct ScatteringParameters{FT<:Union{AbstractFloat, ForwardDiff.Dual}}
     nquad_radius::Integer
     "Reference wavelength (µm)"
     λ_ref::FT
+    "Reference refractive index"
+    n_ref::Complex{FT}
     "Algorithm to use for fourier decomposition (NAI2/PCW)"
     decomp_type::AbstractFourierDecompositionType
 end

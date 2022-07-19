@@ -120,7 +120,10 @@ function model_from_parameters(params::vSmartMOM_Parameters)
                                         params.polarization_type, 
                                         truncation_type, 
                                         params.scattering_params.r_max, 
-                                        params.scattering_params.nquad_radius)       
+                                        params.scattering_params.nquad_radius)   
+        mie_model.aerosol.nᵣ = real(params.scattering_params.n_ref)
+        mie_model.aerosol.nᵢ = -imag(params.scattering_params.n_ref)
+        @show params.scattering_params.n_ref
         k_ref          = compute_ref_aerosol_extinction(mie_model, params.float_type)
         @show k_ref
         #params.scattering_params.rt_aerosols[i_aer].p₀, params.scattering_params.rt_aerosols[i_aer].σp
@@ -138,8 +141,8 @@ function model_from_parameters(params::vSmartMOM_Parameters)
                                             truncation_type, 
                                             params.scattering_params.r_max, 
                                             params.scattering_params.nquad_radius)
-
-            k = compute_ref_aerosol_extinction(mie_model, params.float_type)
+            n_ref = params.scattering_params.n_ref
+            k = compute_ref_aerosol_extinction(mie_model,  params.float_type)
             @show k
             # Compute raw (not truncated) aerosol optical properties (not needed in RT eventually) 
             #@show FT2, FT
@@ -315,7 +318,10 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
                                         params.polarization_type, 
                                         truncation_type, 
                                         params.scattering_params.r_max, 
-                                        params.scattering_params.nquad_radius)       
+                                        params.scattering_params.nquad_radius)
+        mie_model.aerosol.nᵣ = real(params.scattering_params.n_ref)
+        mie_model.aerosol.nᵢ = -imag(params.scattering_params.n_ref)
+        @show params.scattering_params.n_ref
         k_ref          = compute_ref_aerosol_extinction(mie_model, params.float_type)
 
         #params.scattering_params.rt_aerosols[i_aer].p₀, params.scattering_params.rt_aerosols[i_aer].σp
