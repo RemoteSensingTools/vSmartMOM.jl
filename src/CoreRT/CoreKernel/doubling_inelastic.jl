@@ -196,7 +196,7 @@ function doubling_helper!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
             tmp1 = gp_refl ⊠  (J₀⁺ + r⁻⁺ ⊠ J₁⁻)
             tmp2 = gp_refl ⊠  (J₁⁻ + r⁻⁺ ⊠ J₀⁺)
             #for n₁ in eachindex ieJ₁⁺[1,1,:,1]
-            for Δn in length(i_λ₁λ₀_all)
+            for Δn = 1:length(i_λ₁λ₀_all)
                 n₁ = i_λ₁λ₀_all[Δn]
                 n₀ = 1
                 if n₁>0
@@ -307,11 +307,12 @@ end
     if 1 ≤ n₀ ≤ size(ier⁻⁺,4)
         i = mod(iμ, n_stokes)
         j = mod(jμ, n_stokes)
-        if (i > 2)
+        if !(1<=i<=2) #(i > 2)
             ier⁻⁺[iμ,jμ,n,n₀] = - ier⁻⁺[iμ, jμ, n, n₀]
         end
         
-        if ((i <= 2) & (j <= 2)) | ((i > 2) & (j > 2))
+        #if ((i <= 2) & (j <= 2)) | ((i > 2) & (j > 2))
+        if (((1<=i<=2) & (1<=j<=2)) | (!(1<=i<=2) & !(1<=j<=2)))
             ier⁺⁻[iμ,jμ,n,n₀] = ier⁻⁺[iμ,jμ,n,n₀]
             iet⁻⁻[iμ,jμ,n,n₀] = iet⁺⁺[iμ,jμ,n,n₀]
         else
@@ -325,22 +326,24 @@ end
                         ier⁻⁺, iet⁺⁺, ier⁺⁻, iet⁻⁻)
     iμ, jμ, Δn  = @index(Global, NTuple)
     #@unpack i_λ₁λ₀ = RS_type 
+    #@show "here 3.1"
     n  = i_λ₁λ₀_all[Δn]
     i = mod(iμ, n_stokes)
     j = mod(jμ, n_stokes)
-
-    if (i > 2)
-        ier⁻⁺[iμ,jμ,n,1] = - ier⁻⁺[iμ, jμ, n, 1]
+    #@show n, i, j
+    if (n>0)
+        if !(1<=i<=2)
+            ier⁻⁺[iμ,jμ,n,1] = - ier⁻⁺[iμ, jμ, n, 1]
+        end
+        
+        if ((1<=i<=2) & (1<=j<=2)) | (!(1<=i<=2) & !(1<=j<=2))
+            ier⁺⁻[iμ,jμ,n,1] = ier⁻⁺[iμ,jμ,n,1]
+            iet⁻⁻[iμ,jμ,n,1] = iet⁺⁺[iμ,jμ,n,1]
+        else
+            ier⁺⁻[iμ,jμ,n,1] = - ier⁻⁺[iμ,jμ,n,1]
+            iet⁻⁻[iμ,jμ,n,1] = - iet⁺⁺[iμ,jμ,n,1]
+        end
     end
-    
-    if ((i <= 2) & (j <= 2)) | ((i > 2) & (j > 2))
-        ier⁺⁻[iμ,jμ,n,1] = ier⁻⁺[iμ,jμ,n,1]
-        iet⁻⁻[iμ,jμ,n,1] = iet⁺⁺[iμ,jμ,n,1]
-    else
-        ier⁺⁻[iμ,jμ,n,1] = - ier⁻⁺[iμ,jμ,n,1]
-        iet⁻⁻[iμ,jμ,n,1] = - iet⁺⁺[iμ,jμ,n,1]
-    end
-
 end
 
 #@kernel function apply_D_SFI!(n_stokes::Int, J₀⁻)
@@ -360,7 +363,7 @@ end
     if 1 ≤ n₀ ≤ size(ieJ₀⁻,4)
         i = mod(iμ, n_stokes)
 
-        if (i > 2)
+        if !(1<=i<=2)
             ieJ₀⁻[iμ, 1, n, n₀] = - ieJ₀⁻[iμ, 1, n, Δn] 
         end
     end
@@ -369,13 +372,16 @@ end
 # Kernel for VRS
 @kernel function apply_D_SFI_IE_VS!(i_λ₁λ₀_all, 
                                 n_stokes::Int, ieJ₀⁻)
-    iμ, _, Δn = @index(Global, NTuple)
+    iμ, Δn = @index(Global, NTuple)
     #@unpack i_λ₁λ₀ = RS_type
+    
     n = i_λ₁λ₀_all[Δn] 
     i = mod(iμ, n_stokes)
 
-    if (i > 2)
-        ieJ₀⁻[iμ, 1, n, 1] = - ieJ₀⁻[iμ, 1, n, 1] 
+    if (n>0)
+        if !(1<=i<=2)
+            ieJ₀⁻[iμ, 1, n, 1] = - ieJ₀⁻[iμ, 1, n, 1] 
+        end
     end
 end
 
@@ -407,7 +413,7 @@ function apply_D_matrix_IE!(RS_type::Union{VS_0to1_plus, VS_1to0_plus}, n_stokes
         aType = array_type(architecture(ier⁻⁺))
         applyD_kernel_IE! = apply_D_IE_VS!(device)
         event = applyD_kernel_IE!(aType(RS_type.i_λ₁λ₀_all), n_stokes, 
-            ier⁻⁺, iet⁺⁺, ier⁺⁻, iet⁻⁻, ndrange=getKernelDim(RS_type, ier⁻⁺));
+            ier⁻⁺, iet⁺⁺, ier⁺⁻, iet⁻⁻, ndrange=getKernelDim(RS_type, ier⁻⁺,(RS_type.i_λ₁λ₀_all)));
         wait(device, event);
         synchronize();
         return nothing
@@ -461,10 +467,18 @@ function apply_D_matrix_SFI_IE!(RS_type::Union{VS_0to1_plus, VS_1to0_plus}, n_st
     n_stokes == 1 && return nothing
     device = devi(architecture(ieJ₀⁻))
     aType = array_type(architecture(ieJ₀⁻))
+    #@show "here 1"
     applyD_kernel_IE! = apply_D_SFI_IE_VS!(device)
-    event = applyD_kernel_IE!(aType(RS_type.i_λ₁λ₀_all), n_stokes, 
-                    ieJ₀⁻, ndrange=getKernelDimSFI(RS_type, ieJ₀⁻));
+    #@show "here 2"
+    event = applyD_kernel_IE!(aType(RS_type.i_λ₁λ₀_all), 
+                    n_stokes, 
+                    ieJ₀⁻, 
+                    ndrange=getKernelDimSFI(RS_type, 
+                            ieJ₀⁻, 
+                            aType(RS_type.i_λ₁λ₀_all)));
+    #@show "here 3"
     wait(device, event);
+    #@show "here 4"
     synchronize_if_gpu()
     return nothing
 end

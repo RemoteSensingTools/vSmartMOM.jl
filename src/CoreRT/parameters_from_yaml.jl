@@ -145,6 +145,7 @@ function validate_yaml_parameters(params)
     end
 
     # Check that geometry obs alt is zero if Real
+    #@show params["geometry"]["obs_alt"]
     if (params["geometry"]["obs_alt"] isa Real)
         @assert params["geometry"]["obs_alt"] == 0 "If obs_alt is a Real, it must be zero"
     # Check that obs_alt is descending

@@ -9,7 +9,7 @@ function rt_kernel!(RS_type::noRS, pol_type, SFI, added_layer, composite_layer, 
 
     @unpack τ_λ, ϖ_λ, τ, ϖ, Z⁺⁺, Z⁻⁺, dτ_max, dτ, ndoubl, dτ_λ, expk, scatter, τ_sum, scattering_interface = computed_layer_properties
     @unpack F₀ = RS_type
-    @show τ, ϖ, dτ_max, ndoubl
+    #@show τ, ϖ, dτ_max, ndoubl
     # If there is scattering, perform the elemental and doubling steps
     if scatter
         
@@ -206,7 +206,7 @@ function rt_kernel!(RS_type::noRS{FT},
             M4 = Array(composite_layer.R⁻⁺);
             M5 = Array(composite_layer.J₀⁻);
             M6 = Array(composite_layer.J₀⁺);
-            @show M1[1,1,1], M2[1,1,1], M3[1,1,1], M4[1,1,1], M5[1,1,1], M6[1,1,1]
+            #@show M1[1,1,1], M2[1,1,1], M3[1,1,1], M4[1,1,1], M5[1,1,1], M6[1,1,1]
         end
     end
 end

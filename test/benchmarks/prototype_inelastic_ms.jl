@@ -143,10 +143,11 @@ R_test, T_test, ieR_test, ieT_test = CoreRT.rt_run_test(RS_type,model,1);
 =#
 
 #===Convolution of hires spectral simulations to instrument grid===#
-ν = (1e7/415):0.3:(1e7/385)
+#x = (1e7/415):0.3:(1e7/385)
 #ν = (1e7/460):0.3:(1e7/420)
 x = -40:0.3:40
-kernel = InstrumentOperator.create_instrument_kernel(Normal(0, 12.5), x) #defining a Gaussian kernel for convulution in wavenumber space
+#kernel = InstrumentOperator.create_instrument_kernel(Normal(0, 12.5), x) #defining a Gaussian kernel for convulution in wavenumber space
+kernel = InstrumentOperator.create_instrument_kernel(Normal(0, 12.5), x)
 #I_conv = InstrumentOperator.conv_spectra(kernel, )
 I_conv_noRS = imfilter(RnoRS[1,1,:], kernel)
 I_conv = imfilter(R[1,1,:], kernel)

@@ -165,7 +165,7 @@ l = @layout [a b]
 i=1
 p1 = plot(oco_sounding.SpectralGrid*1e3, I_conv[i], label="Elastic")
 plot!(oco_sounding.SpectralGrid*1e3, I_conv_RS[i], label="With RRS")
-savefig("O2_RRS_SZA60_VZA45_VAz0_aer0p5_alb0.pdf")
+savefig("O2_RRS_SZA30_VZA45_VAz0_aer0p0_alb0.png")
 p2 = plot(oco_sounding.SpectralGrid*1e3, 
     (I_conv_RS[i] - I_conv[i])/maximum(I_conv[i]) * 100, 
     ylims=(-5,5), 
@@ -175,7 +175,7 @@ p3 = plot(oco_sounding.SpectralGrid*1e3,
     ylims=(-5,5), 
     label="(RRS-NoRS)/noRS*100")
 plot(p2,p3,layout=l)
-savefig("O2_RRS_impact_SZA60_VZA45_VAz0_aer0p5_alb0.pdf")
+savefig("O2_RRS_impact_SZA30_VZA45_VAz0_aer0p0_alb0.png")
 #savefig("CO2W_RRS_impact.pdf")
 #=
 l = @layout [a b c; d e f]

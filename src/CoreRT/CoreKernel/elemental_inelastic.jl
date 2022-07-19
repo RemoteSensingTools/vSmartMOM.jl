@@ -75,10 +75,12 @@ function elemental_inelastic!(RS_type::Union{RRS, RRS_plus},
                                     ier⁻⁺, iet⁺⁺, ier⁺⁻, iet⁻⁻)
         #println("Apply D matrix done")
         if SFI
+            #@show "here 1"
             apply_D_matrix_elemental_SFI!(RS_type, 
                                         ndoubl, 
                                         pol_type.n, 
                                         ieJ₀⁻)
+            #@show "here 2"
         end
         #println("Apply D matrix SFI done")      
     else 
@@ -462,67 +464,77 @@ end
 end
 
 @kernel function apply_D_elemental_RRS!(ndoubl, pol_n, ier⁻⁺, iet⁺⁺, ier⁺⁻, iet⁻⁻)
-    i, j, n₁, n₀ = @index(Global, NTuple)
+    i, j, n₁, Δn = @index(Global, NTuple)
 
     if ndoubl < 1
         ii = mod(i, pol_n) 
         jj = mod(j, pol_n) 
         if ((ii <= 2) & (jj <= 2)) | ((ii > 2) & (jj > 2)) 
-            ier⁺⁻[i, j, n₁, n₀] = ier⁻⁺[i, j, n₁, n₀]
-            iet⁻⁻[i, j, n₁, n₀] = iet⁺⁺[i, j ,n₁, n₀]
+            ier⁺⁻[i, j, n₁, Δn] = ier⁻⁺[i, j, n₁, Δn]
+            iet⁻⁻[i, j, n₁, Δn] = iet⁺⁺[i, j ,n₁, Δn]
         else
-            ier⁺⁻[i, j, n₁, n₀] = -ier⁻⁺[i, j, n₁, n₀] 
-            iet⁻⁻[i, j, n₁, n₀] = -iet⁺⁺[i, j, n₁, n₀] 
+            ier⁺⁻[i, j, n₁, Δn] = -ier⁻⁺[i, j, n₁, Δn] 
+            iet⁻⁻[i, j, n₁, Δn] = -iet⁺⁺[i, j, n₁, Δn] 
         end
     else
-        if mod(i, pol_n) > 2
-            ier⁻⁺[i, j, n₁, n₀] = - ier⁻⁺[i, j, n₁, n₀]
+        if !(1<=mod(i, pol_n)<=2) #mod(i, pol_n) > 2
+            ier⁻⁺[i, j, n₁, Δn] = - ier⁻⁺[i, j, n₁, Δn]
         end 
     end
 end
 
-@kernel function apply_D_elemental_SFI!(RS_type::Union{RRS, RRS_plus}, ndoubl, pol_n, ieJ₀⁻)
-    i, _, n₁, n₀ = @index(Global, NTuple)
-    
+@kernel function apply_D_elemental_VS!(ndoubl, 
+                                pol_n, 
+                                i_λ₁λ₀, 
+                                ier⁻⁺, iet⁺⁺, ier⁺⁻, iet⁻⁻)
+
+    i, j, Δn = @index(Global, NTuple)
+    n₁ = i_λ₁λ₀[Δn]
+    if n₁>0
+        if ndoubl < 1
+            ii = mod(i, pol_n) 
+            jj = mod(j, pol_n) 
+            #if ((ii <= 2) & (jj <= 2)) | ((ii > 2) & (jj > 2)) 
+            if (((1<=ii<=2) & (1<=jj<= 2)) | (!(1<=ii<=2) & !(1<=jj<=2))) 
+                ier⁺⁻[i, j, n₁, 1] = ier⁻⁺[i, j, n₁, 1]
+                iet⁻⁻[i, j, n₁, 1] = iet⁺⁺[i, j ,n₁, 1]
+            else
+                ier⁺⁻[i, j, n₁, 1] = -ier⁻⁺[i, j, n₁, 1] 
+                iet⁻⁻[i, j, n₁, 1] = -iet⁺⁺[i, j, n₁, 1] 
+            end
+        else
+            if !(1<=mod(i, pol_n)<=2) #mod(i, pol_n) > 2
+                ier⁻⁺[i, j, n₁, 1] = - ier⁻⁺[i, j, n₁, 1] 
+            end 
+        end
+    end
+end
+
+@kernel function apply_D_elemental_SFI_RRS!(ndoubl, pol_n, ieJ₀⁻)
+    i, _, n₁, Δn = @index(Global, NTuple)
+          
     if ndoubl>1
-        if mod(i, pol_n) > 2
-            ieJ₀⁻[i, 1, n₁, n₀] = - ieJ₀⁻[i, 1, n₁, n₀]
+        if !(1<=mod(i, pol_n)<=2) #mod(i, pol_n) > 2
+            ieJ₀⁻[i, 1, n₁, Δn] = - ieJ₀⁻[i, 1, n₁, Δn] #this assumes an unpolarized source
         end 
     end
 end
 
-@kernel function apply_D_elemental_VS!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
-                        ndoubl, pol_n, ier⁻⁺, iet⁺⁺, ier⁺⁻, iet⁻⁻)
-
-    i, j, n₁, _ = @index(Global, NTuple)
-    #n₁ = i_λ₁λ₀[Δn]
-    if ndoubl < 1
-        ii = mod(i, pol_n) 
-        jj = mod(j, pol_n) 
-        if ((ii <= 2) & (jj <= 2)) | ((ii > 2) & (jj > 2)) 
-            ier⁺⁻[i, j, n₁, 1] = ier⁻⁺[i, j, n₁, 1]
-            iet⁻⁻[i, j, n₁, 1] = iet⁺⁺[i, j ,n₁, 1]
-        else
-            ier⁺⁻[i, j, n₁, 1] = -ier⁻⁺[i, j, n₁, 1] 
-            iet⁻⁻[i, j, n₁, 1] = -iet⁺⁺[i, j, n₁, 1] 
-        end
-    else
-        if mod(i, pol_n) > 2
-            ier⁻⁺[i, j, n₁, 1] = - ier⁻⁺[i, j, n₁, 1]
-        end 
-    end
-end
-
-@kernel function apply_D_elemental_SFI!(RS_type::Union{VS_0to1, VS_1to0, VS_0to1_plus, VS_1to0_plus}, 
-                        ndoubl, pol_n, ieJ₀⁻)
-    i, _, Δn = @index(Global, NTuple)
-    @unpack i_λ₁λ₀ = RS_type
+@kernel function apply_D_elemental_SFI_VS!(ndoubl, 
+        pol_n, 
+        i_λ₁λ₀, 
+        ieJ₀⁻)
+    i, Δn = @index(Global, NTuple)
+    #@unpack i_λ₁λ₀ = RS_type
     
     n₁ = i_λ₁λ₀[Δn]
+    
     if ndoubl>1
-        if mod(i, pol_n) > 2
-            ieJ₀⁻[i, 1, n₁, 1] = - ieJ₀⁻[i, 1, n₁, 1]
-        end 
+        if (n₁>0)
+            if !(1<=mod(i, pol_n)<=2)
+                ieJ₀⁻[i, 1, n₁, 1] = - ieJ₀⁻[i, 1, n₁, 1]
+            end 
+        end
     end
 end
 
@@ -534,7 +546,10 @@ function apply_D_matrix_elemental!(RS_type::Union{RRS, RRS_plus}, ndoubl::Int, n
                                     iet⁻⁻::AbstractArray{FT,4}) where {FT}
     device = devi(architecture(ier⁻⁺))
     applyD_kernel! = apply_D_elemental_RRS!(device)
-    event = applyD_kernel!(ndoubl,n_stokes, ier⁻⁺, iet⁺⁺, ier⁺⁻, iet⁻⁻, ndrange=size(ier⁻⁺));
+    event = applyD_kernel!(ndoubl,
+        n_stokes, 
+        ier⁻⁺, iet⁺⁺, ier⁺⁻, iet⁻⁻, 
+        ndrange=size(ier⁻⁺));
     wait(device, event);
     synchronize_if_gpu();
     return nothing
@@ -549,20 +564,53 @@ function apply_D_matrix_elemental!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
     
     device = devi(architecture(ier⁻⁺))
     applyD_kernel! = apply_D_elemental_VS!(device)
-    event = applyD_kernel!(RS_type, ndoubl,n_stokes, ier⁻⁺, iet⁺⁺, ier⁺⁻, iet⁻⁻, ndrange=size(ier⁻⁺));
+    event = applyD_kernel!(ndoubl,
+                    n_stokes, RS_type.i_λ₁λ₀_all,
+                    ier⁻⁺, iet⁺⁺, ier⁺⁻, iet⁻⁻, 
+                    ndrange=getKernelDim(RS_type,ier⁻⁺,RS_type.i_λ₁λ₀_all));
     wait(device, event);
     synchronize_if_gpu();
     return nothing
 end
 
-function apply_D_matrix_elemental_SFI!(RS_type::Union{RRS, RRS_plus, VS_0to1_plus, VS_1to0_plus},
+function apply_D_matrix_elemental_SFI!(RS_type::Union{RRS, RRS_plus},
         ndoubl::Int, n_stokes::Int, ieJ₀⁻::AbstractArray{FT,4}) where {FT}
     if ndoubl > 1
         return nothing
     else 
+        #@show "here 1.1"
         device = devi(architecture(ieJ₀⁻))
-        applyD_kernel! = apply_D_elemental_SFI!(device)
-        event = applyD_kernel!(RS_type,ndoubl,n_stokes, ieJ₀⁻, ndrange=size(ieJ₀⁻));
+        #@show "here 1.2"
+        applyD_kernel! = apply_D_elemental_SFI_RRS!(device)
+        #@show "here 1.3", RS_type
+        event = applyD_kernel!(ndoubl,
+                                n_stokes, 
+                                ieJ₀⁻, 
+                                ndrange=size(ieJ₀⁻));
+        #@show "here 1.4"
+        wait(device, event);
+        synchronize();
+        return nothing
+    end
+end
+
+function apply_D_matrix_elemental_SFI!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
+                    ndoubl::Int, n_stokes::Int, ieJ₀⁻::AbstractArray{FT,4}) where {FT}
+    if ndoubl > 1
+        return nothing
+    else 
+        #@show "here 1.1"
+        device = devi(architecture(ieJ₀⁻))
+        #@show "here 1.2"
+        applyD_kernel! = apply_D_elemental_SFI_VS!(device)
+        #@show "here 1.3", RS_type
+        event = applyD_kernel!(ndoubl,
+                            n_stokes, 
+                            RS_type.i_λ₁λ₀_all,    
+                            ieJ₀⁻, 
+                            ndrange = getKernelDimSFI(RS_type,ieJ₀⁻,RS_type.i_λ₁λ₀_all));
+                            #ndrange=size(ieJ₀⁻));
+        #@show "here 1.4"
         wait(device, event);
         synchronize();
         return nothing

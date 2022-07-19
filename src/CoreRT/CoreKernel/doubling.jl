@@ -96,11 +96,12 @@ end
     i = mod(iμ, n_stokes)
     j = mod(jμ, n_stokes)
 
-    if (i > 2)
+    if !(1<=i<=2) #(i > 2)
         r⁻⁺[iμ,jμ,n] = - r⁻⁺[iμ, jμ,n]
     end
     
-    if ((i <= 2) & (j <= 2)) | ((i > 2) & (j > 2))
+    #if ((i <= 2) & (j <= 2)) | ((i > 2) & (j > 2))
+    if (((1<=i<=2) & (1<=j<=2)) | (!(1<=i<=2) & !(1<=j<=2)))
         r⁺⁻[iμ,jμ,n] = r⁻⁺[iμ,jμ,n]
         t⁻⁻[iμ,jμ,n] = t⁺⁺[iμ,jμ,n]
     else
@@ -113,7 +114,7 @@ end
 @kernel function apply_D_SFI!(n_stokes::Int, J₀⁻)
     iμ, _, n = @index(Global, NTuple)
     i = mod(iμ, n_stokes)
-    if (i > 2)
+    if !(1<=i<=2) #(i > 2)
         J₀⁻[iμ, 1, n] = - J₀⁻[iμ, 1, n] 
     end
 end

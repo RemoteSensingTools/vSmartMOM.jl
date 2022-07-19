@@ -156,6 +156,7 @@ function elemental!(pol_type, SFI::Bool,
 
         if SFI
             kernel! = get_elem_rt_SFI!(device)
+            #@show size(F₀)
             event = kernel!(J₀⁺, J₀⁻, ϖ, dτ, arr_type(τ_sum), Z⁻⁺, Z⁺⁺, 
             arr_type(F₀), qp_μN, ndoubl, wct02, pol_type.n, I₀, iμ₀, D, ndrange=size(J₀⁺))
             wait(device, event)
@@ -279,7 +280,8 @@ end
     if ndoubl < 1
         ii = mod(i, pol_n) 
         jj = mod(j, pol_n) 
-        if ((ii <= 2) & (jj <= 2)) | ((ii > 2) & (jj > 2)) 
+        #if ((ii <= 2) & (jj <= 2)) | ((ii > 2) & (jj > 2)) 
+        if (((1<=ii<=2) & (1<=jj<=2)) | (!(1<=ii<=2) & !(1<=jj<=2))) 
             r⁺⁻[i,j,n] = r⁻⁺[i,j,n]
             t⁻⁻[i,j,n] = t⁺⁺[i,j,n]
         else
@@ -287,7 +289,7 @@ end
             t⁻⁻[i,j,n] = -t⁺⁺[i,j,n] 
         end
     else
-        if mod(i, pol_n) > 2
+        if !(1<=mod(i, pol_n)<=2) #mod(i, pol_n) > 2
             r⁻⁺[i,j,n] = - r⁻⁺[i,j,n]
         end 
     end
@@ -298,7 +300,7 @@ end
     i, _, n = @index(Global, NTuple)
     
     if ndoubl>1
-        if mod(i, pol_n) > 2
+        if !(1<=mod(i, pol_n)<=2) #mod(i, pol_n) > 2
             J₀⁻[i, 1, n] = - J₀⁻[i, 1, n]
         end 
     end

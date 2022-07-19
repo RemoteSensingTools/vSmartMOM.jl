@@ -48,8 +48,9 @@ Base.@kwdef struct ObsGeometry{FT} <: AbstractObsGeometry
     "Viewing Azimuth Angle(s) `[Degree]`" 
     vaz::Array{FT,1}
     "Altitude of Observer `[km]`"
-    obs_alt::Union{FT, Array{FT,1}}
-    sensor_levels::Array{Int}
+    # TODO Suniti
+    obs_alt::FT #Union{FT, Array{FT,1}}
+    #sensor_levels::Array{Int}
 end
 
 mutable struct RT_Aerosol{}#FT<:Union{AbstractFloat, ForwardDiff.Dual}}

@@ -261,7 +261,7 @@ function rt_run_test_ms(RS_type::AbstractRamanType,
         # Set the Zλᵢλₒ interaction parameters for Raman (or nothing for noRS)
         InelasticScattering.computeRamanZλ!(RS_type, pol_type, Array(qp_μ), m, arr_type)
         # Compute the core layer optical properties:
-        @show iBand
+        #@show iBand
         layer_opt_props, fScattRayleigh   = 
             constructCoreOpticalProperties(RS_type,iBand,m,model);
         # Determine the scattering interface definitions:

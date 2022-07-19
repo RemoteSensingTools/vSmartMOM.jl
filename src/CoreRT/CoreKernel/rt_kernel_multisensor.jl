@@ -138,7 +138,7 @@ function rt_kernel_multisensor!(RS_type::noRS{FT},
                     M4 = (composite_layer.botR⁻⁺[1]);
                     M5 = (composite_layer.botJ₀⁻[1]);
                     M6 = (composite_layer.botJ₀⁺[1]);
-                    @show M1[1,1,1], M2[1,1,1], M3[1,1,1], M4[1,1,1], M5[1,1,1], M6[1,1,1]
+                    #@show M1[1,1,1], M2[1,1,1], M3[1,1,1], M4[1,1,1], M5[1,1,1], M6[1,1,1]
                 end
             end
         end

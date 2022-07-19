@@ -341,7 +341,7 @@ function compute_optical_RS!(RS_type::Union{VS_1to0, VS_1to0_plus}, grid_in, λ�
     #plotly()
     get_greek_raman(RS_type, n2, o2)
     compute_ϖ_Cabannes!(RS_type, λ₀, n2, o2)
-    @show n2.effCoeff.Δν̃_VibRaman_coeff_1to0_hires[0], o2.effCoeff.Δν̃_VibRaman_coeff_1to0_hires[0]
+    #@show n2.effCoeff.Δν̃_VibRaman_coeff_1to0_hires[0], o2.effCoeff.Δν̃_VibRaman_coeff_1to0_hires[0]
     νᵣ = 0.5*(n2.effCoeff.Δν̃_VibRaman_coeff_1to0_hires[0] + o2.effCoeff.Δν̃_VibRaman_coeff_1to0_hires[0])
         
     # TMP: grid_in = nm_per_m/λ₀ + collect((νᵣ-750):0.002:(νᵣ+750))
@@ -351,7 +351,7 @@ function compute_optical_RS!(RS_type::Union{VS_1to0, VS_1to0_plus}, grid_in, λ�
     σ_tmpVRS = similar(grid_in);
     σ_tmpRVRS = similar(grid_in);
 
-    @show n2.effCoeff.Δν̃_VibRaman_coeff_1to0_hires[1], o2.effCoeff.Δν̃_VibRaman_coeff_1to0_hires[1]
+    #@show n2.effCoeff.Δν̃_VibRaman_coeff_1to0_hires[1], o2.effCoeff.Δν̃_VibRaman_coeff_1to0_hires[1]
     #νᵣ = 0.5*(n2.effCoeff.Δν̃_VibRaman_coeff_1to0_hires[1] + o2.effCoeff.Δν̃_VibRaman_coeff_1to0_hires[1])
     #grid_out = (νᵣ-750):0.002:(νᵣ+750)
     #σ_out = similar(collect(grid_out));

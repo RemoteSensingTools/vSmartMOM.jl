@@ -40,7 +40,7 @@ function rt_run_bck(RS_type::AbstractRamanType, #Default - no Raman scattering (
  
     # Need to check this a bit better in the future!
     FT_dual = length(τ_aer) > 0 ? typeof(τ_aer[1]) : FT
-    @show FT_dual
+    #@show FT_dual
 
     # Output variables: Reflected and transmitted solar irradiation at TOA and BOA respectively # Might need Dual later!!
     R = zeros(FT_dual, length(vza), pol_type.n, nSpec)
@@ -112,7 +112,7 @@ function rt_run_bck(RS_type::AbstractRamanType, #Default - no Raman scattering (
             # Computing Rayleigh scattering fraction, fscattRayl = τRayl*ϖRayl/τ
             computed_layer_properties = get_layer_properties(computed_atmosphere_properties, iz, arr_type)
             #@show computed_layer_properties.fscattRayl
-            @show RS_type.fscattRayl
+            #@show RS_type.fscattRayl
             if !(typeof(RS_type) <: noRS)
                 RS_type.fscattRayl = [computed_layer_properties.fscattRayl]
             end

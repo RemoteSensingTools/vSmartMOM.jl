@@ -14,45 +14,49 @@ return new profiles with interpolated layers added and new layer indices for sen
 """
 function resize_layers_for_ms(obs_alt, p, T, q)
     
-    p₀ = 1013.25 # hPa
-    H₀ = 8       # km
+    if obs_alt==0.0
+        return obs_alt, p, T, q;
+    else
+        p₀ = 1013.25 # hPa
+        H₀ = 8       # km
 
-    # Convert from km to hPa
-    obs_p = p₀ * exp.(-obs_alt/H₀)
+        # Convert from km to hPa
+        obs_p = p₀ * exp.(-obs_alt/H₀)
 
-    p_fixed = copy(0.5*(p[2:end].+p[1:(length(p)-1)]))
+        p_fixed = copy(0.5*(p[2:end].+p[1:(length(p)-1)]))
 
-    new_p = copy(0.5*(p[2:end].+p[1:(length(p)-1)]))
-    new_T = copy(T)
-    new_q = copy(q)
+        new_p = copy(0.5*(p[2:end].+p[1:(length(p)-1)]))
+        new_T = copy(T)
+        new_q = copy(q)
 
-    sensor_idx = []
+        sensor_idx = []
 
-    filter_out_idx = (obs_alt .<= 500 .&& obs_alt .!= 0)
-    obs_p = obs_p[filter_out_idx]
+        filter_out_idx = (obs_alt .<= 500 .&& obs_alt .!= 0)
+        obs_p = obs_p[filter_out_idx]
 
-    if !isempty(filter(x-> x > 500 || x ≈ 0, obs_alt))
-        push!(sensor_idx, 0)
+        if !isempty(filter(x-> x > 500 || x ≈ 0, obs_alt))
+            push!(sensor_idx, 0)
+        end
+        obs_T_int = LinearInterpolation(p_fixed, T)
+        obs_q_int = LinearInterpolation(p_fixed, q)
+        # obs_T = zeros(length(obs_p))
+        for i=1:length(obs_p)
+            obs_T = obs_T_int(obs_p[i]);
+            obs_q = obs_q_int(obs_p[i]);
+            sort!(push!(new_p, obs_p[i]))
+
+            curr_idx = indexin(obs_p[i], new_p)[1]
+            insert!(new_T, curr_idx, obs_T)
+            insert!(new_q, curr_idx, obs_q)
+
+            push!(sensor_idx, curr_idx)
+        end 
+
+        push!(new_p, new_p[end])
+        @show "NOTE: T and q are currently half-levels, but they should be at the boundary"
+
+        return convert(Vector{Int64}, sensor_idx), new_p, new_T, new_q
     end
-    obs_T_int = LinearInterpolation(p_fixed, T)
-    obs_q_int = LinearInterpolation(p_fixed, q)
-    # obs_T = zeros(length(obs_p))
-    for i=1:length(obs_p)
-        obs_T = obs_T_int(obs_p[i]);
-        obs_q = obs_q_int(obs_p[i]);
-        sort!(push!(new_p, obs_p[i]))
-
-        curr_idx = indexin(obs_p[i], new_p)[1]
-        insert!(new_T, curr_idx, obs_T)
-        insert!(new_q, curr_idx, obs_q)
-
-        push!(sensor_idx, curr_idx)
-    end 
-
-    push!(new_p, new_p[end])
-    @show "NOTE: T and q are currently half-levels, but they should be at the boundary"
-
-    return convert(Vector{Int64}, sensor_idx), new_p, new_T, new_q
 end
 
 "Take the parameters specified in the vSmartMOM_Parameters struct, and calculate derived attributes into a vSmartMOM_Model" 
@@ -64,12 +68,16 @@ function model_from_parameters(params::vSmartMOM_Parameters)
 
     
     # Get new p/T profiles using obs_alt
-    sensor_levels, p, T, q = resize_layers_for_ms(params.obs_alt, params.p, params.T, params.q)
+    #Suniti TODO
+    #p, T, q = resize_layers(params.obs_alt, params.p, params.T, params.q)
+    # sensor_levels, p, T, q = resize_layers_for_ms(params.obs_alt, params.p, params.T, params.q)
 
 
     # return sensor_levels
     # Create observation geometry
-    obs_geom = ObsGeometry(params.sza, params.vza, params.vaz, params.obs_alt, Array(sensor_levels))
+    # Suniti TODO
+    obs_geom = ObsGeometry(params.sza, params.vza, params.vaz, params.obs_alt)   
+    # obs_geom = ObsGeometry(params.sza, params.vza, params.vaz, params.obs_alt, Array(sensor_levels))
 
     # Create truncation type
     truncation_type = Scattering.δBGE{params.float_type}(params.l_trunc, params.Δ_angle)
@@ -79,9 +87,9 @@ function model_from_parameters(params::vSmartMOM_Parameters)
 
     # Get AtmosphericProfile from parameters
     vmr = isnothing(params.absorption_params) ? Dict() : params.absorption_params.vmr
-    p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o, new_vmr = compute_atmos_profile_fields(T, p, q, vmr)
+    p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o, new_vmr = compute_atmos_profile_fields(params.T, params.p, params.q, vmr)
 
-    profile = AtmosphericProfile(T, p_full, params.q, p_half, vmr_h2o, vcd_dry, vcd_h2o, new_vmr)
+    profile = AtmosphericProfile(params.T, p_full, params.q, p_half, vmr_h2o, vcd_dry, vcd_h2o, new_vmr)
     
     # Reduce the profile to the number of target layers (if specified)
     if params.profile_reduction_n != -1
@@ -91,7 +99,7 @@ function model_from_parameters(params::vSmartMOM_Parameters)
     # Rayleigh optical properties calculation
     greek_rayleigh = Scattering.get_greek_rayleigh(params.depol)
     # Remove rayleight for testing:
-    τ_rayl = [zeros(params.float_type,length(params.spec_bands[i]), length(params.T)) for i=1:n_bands];
+    #τ_rayl = [zeros(params.float_type,length(params.spec_bands[i]), length(profile.T)) for i=1:n_bands];
     τ_rayl = [zeros(params.float_type,1,length(profile.T)) for i=1:n_bands];
     
     # This is a kludge for now, tau_abs sometimes needs to be a dual. Suniti & us need to rethink this all!!
@@ -232,7 +240,7 @@ Modified version for vibrational Ramnan scattering
 function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus}, 
                     λ₀,
                     params::vSmartMOM_Parameters)
-    @show params.absorption_params.molecules
+    #@show params.absorption_params.molecules
     # Number of total bands and aerosols (for convenience)
     n_bands = 3 #length(params.spec_bands)
     n_aer = isnothing(params.scattering_params) ? 0 : length(params.scattering_params.rt_aerosols)
@@ -261,13 +269,13 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
     # Compute N2 and O2
     RS_type.n2, RS_type.o2 = 
         InelasticScattering.getRamanAtmoConstants(1.e7/λ₀,effT);
-    println("here 0")
+    #println("here 0")
     InelasticScattering.getRamanSSProp!(RS_type, λ₀);
-    println("here 1")
+    #println("here 1")
     n_bands = length(RS_type.iBand)
-    @show RS_type.grid_in
+    #@show RS_type.grid_in
     params.spec_bands = RS_type.grid_in
-    @show params.spec_bands
+    #@show params.spec_bands
 
     # Rayleigh optical properties calculation
     greek_rayleigh = Scattering.get_greek_rayleigh(params.depol)
@@ -275,10 +283,10 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
 
     # τ_abs[iBand][iSpec,iZ]
     τ_abs     = [zeros(params.float_type, length(params.spec_bands[i]), length(profile.p_full)) for i in 1:n_bands]
-    @show params.absorption_params.molecules[2]
+    #@show params.absorption_params.molecules[2]
     # Loop over all bands:
     for i_band=1:n_bands
-        @show params.spec_bands[i_band]
+        #@show params.spec_bands[i_band]
         # i'th spectral band (convert from cm⁻¹ to μm)
         curr_band_λ = 1e4 ./ params.spec_bands[i_band]
 
@@ -289,7 +297,7 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
 
         # If no absorption, continue to next band
         isnothing(params.absorption_params) && continue
-        @show i_band, params.absorption_params.molecules[i_band]
+        #@show i_band, params.absorption_params.molecules[i_band]
         # Loop over all molecules in this band, obtain profile for each, and add them up
         for molec_i in 1:length(params.absorption_params.molecules[i_band])
             # This can be precomputed as well later in my mind, providing an absorption_model or an interpolation_model!
@@ -335,7 +343,7 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
 
         # Create a univariate aerosol distribution
         mie_aerosol = Aerosol(size_distribution, curr_aerosol.nᵣ, curr_aerosol.nᵢ)
-        @show typeof(curr_aerosol.nᵣ)
+        #@show typeof(curr_aerosol.nᵣ)
         #mie_aerosol = make_mie_aerosol(size_distribution, curr_aerosol.nᵣ, curr_aerosol.nᵢ, params.scattering_params.r_max, params.scattering_params.nquad_radius) #Suniti: why is the refractive index needed here?
 
         # Create the aerosol extinction cross-section at the reference wavelength:
@@ -369,7 +377,7 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
             @timeit "Mie calc"  aerosol_optics_raw = compute_aerosol_optical_properties(mie_model, FT2);
 
             # Compute truncated aerosol optical properties (phase function and fᵗ), consistent with Ltrunc:
-            @show i_aer, i_band
+            #@show i_aer, i_band
             aerosol_optics[i_band][i_aer] = Scattering.truncate_phase(truncation_type, 
                                                     aerosol_optics_raw; reportFit=false)
 

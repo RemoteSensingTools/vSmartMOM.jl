@@ -26,7 +26,7 @@ end
 function compute_σ_Rayl_coeff!(mol::MolecularConstants{FT}) where {FT}#ν, molecules::Array{MolecularConstants{FT}}) where {FT}
     @unpack α̅, γ_C_Rayl, σ_Rayl_coeff = mol.effCoeff
     σ_Rayl_coeff = 128π^5 * α̅^2 * (1+2*γ_C_Rayl)/(3-4*γ_C_Rayl)# * ν^4
-    @show σ_Rayl_coeff,  α̅^2 
+    #@show σ_Rayl_coeff,  α̅^2 
     @pack! mol.effCoeff = σ_Rayl_coeff,α̅,γ_C_Rayl
 end
 
@@ -74,7 +74,7 @@ function compute_σ_Rayl_VibRaman_coeff_hires!(T, mol::MolecularConstants{FT}; J
     
         σ_VibRaman_coeff_0to1_hires[Ji] = kᵥ * g_N * (2Ji+1) * Ni_by_N * α_prime^2 * (1+2*γ_C)/(3-4*γ_C)# * νₛ[vi, Ji, vf, Jf]^4
         Δν̃_VibRaman_coeff_0to1_hires[Ji] = Δνₛ
-        @show Ji, α_prime^2, (1+2*γ_C)/(3-4*γ_C), α_prime^2 * (1+2*γ_C)/(3-4*γ_C)
+        #@show Ji, α_prime^2, (1+2*γ_C)/(3-4*γ_C), α_prime^2 * (1+2*γ_C)/(3-4*γ_C)
         # Vib. Raman 1->0
         vi = 1
         vf = 0 
@@ -135,7 +135,7 @@ function compute_σ_VibRaman_coeff!(T, mol::MolecularConstants{FT}; vmax=2, Jmax
     σ_VibRaman_coeff_1to0 = 128π^5 * α_prime^2 * Nvib * (1+2*γ_C_VibRaman)/(3-4*γ_C_VibRaman) 
     Δν̃_VibRaman_coeff_1to0 = Δν̃
 
-    @show σ_VibRaman_coeff_0to1,σ_VibRaman_coeff_1to0  
+    #@show σ_VibRaman_coeff_0to1,σ_VibRaman_coeff_1to0  
     @pack! mol.effCoeff = σ_VibRaman_coeff_0to1, σ_VibRaman_coeff_1to0, Δν̃_VibRaman_coeff_0to1, Δν̃_VibRaman_coeff_1to0
 end
 
@@ -178,7 +178,7 @@ function compute_σ_RoVibRaman_coeff!(T, mol::MolecularConstants{FT}; vmax=2, Jm
         vi = 0
         vf = 0 
         Ni_by_N = exp(-h*c*E_vJ[vi,Ji]/(k_B*T))  
-        @show vi, Ji, Ni_by_N
+        #@show vi, Ji, Ni_by_N
         Z_pf += g_N * (2Ji+1) * (exp(-h*c*E_vJ[0,Ji]/(k_B*T)) + exp(-h*c*E_vJ[1,Ji]/(k_B*T))) #accounting for both the ground- and the first excited vibrational state - depending on the ambient temperature (e.g. on hot exoplanets), more states may have to be accounted for   
         
         Jf=Ji-2
@@ -283,7 +283,7 @@ function compute_σ_RoVibRaman_coeff!(T, mol::MolecularConstants{FT}; vmax=2, Jm
     σ_RoVibRaman_coeff_1to0_JtoJm2 /= Z_pf
     σ_RoVibRaman_coeff_1to0_JtoJp2 /= Z_pf
 
-    @show Z_pf
+    #@show Z_pf
     @pack! mol.effCoeff = σ_RoRaman_coeff_JtoJm2, σ_RoRaman_coeff_JtoJp2,
         σ_RoVibRaman_coeff_0to1_JtoJm2, σ_RoVibRaman_coeff_0to1_JtoJp2, 
         σ_RoVibRaman_coeff_1to0_JtoJm2, σ_RoVibRaman_coeff_1to0_JtoJp2,

@@ -6,7 +6,7 @@ radiative_transfer:
   spec_bands:
     #- (1e7/750):0.05:(1e7/745)
     #- (1e7/768):0.05:(1e7/763) 
-    - (1e7/782):0.2:(1e7/752)
+    - (1e7/783):0.1:(1e7/742)
   # Bidirectional Reflectance Distribution Function (BRDF) per band
   surface: 
     - LambertianSurfaceScalar{Float64}(0.) #(0.2) #(0.05)
@@ -32,13 +32,13 @@ radiative_transfer:
 # =================================================================
 geometry: 
   # Solar zenith angle (degrees)
-  sza:                60. #32.4436
+  sza:                30 #45 #60 #30. #60 #32.4436
   # Viewing zenith angles (degrees)
-  vza:                [15, 30, 45, 60] #[32.4436] #[0.072]
+  vza:                [0, 45, 60] #[15, 30, 45, 60] #[32.4436] #[0.072]
   # Viewing azimuth angles (degrees)
-  vaz:                [0.0, 0.0, 180., 180.]
+  vaz:                [0.0, 0.0, 0.0] #[0.0, 0.0, 180., 180.]
   # Observation altitude (Pa)
-  obs_alt:            1000.0
+  obs_alt:            0 #1000.0
 
 # =================================================================
 # Atmospheric Profile
@@ -94,7 +94,7 @@ absorption:
 scattering:
   # List of scattering aerosols and their properties
   aerosols:       
-    - τ_ref:          0.5           # Reference τ
+    - τ_ref:          0.000001 #0.5           # Reference τ
       μ:              0.01 #1.3           # Log mean radius (µm)
       σ:              1.12 #2.0           # Log stddev of radius (µm)
       nᵣ:             1.5           # Real part of refractive index
@@ -104,7 +104,7 @@ scattering:
   # Maximum aerosol particle radius for quadrature points/weights (µm)
   r_max:          50.0
   # Number of quadrature points for aerosol radius
-  nquad_radius:   1000
+  nquad_radius:   2500
   # Reference wavelength (µm)
   λ_ref:          0.770 
   # Decomposition method (NAI2 or PCW)

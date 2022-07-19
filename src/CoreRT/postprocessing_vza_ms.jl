@@ -103,7 +103,7 @@ function postprocessing_vza_ms!(RS_type::Union{RRS, VS_0to1_plus, VS_1to0_plus},
     
     tuwJ = [zeros(typeof(topJ₀⁺[1][1,1,1]), (length(topJ₀⁺[1][:,1,1]), 1, nSpec)) for i=1:length(sensor_levels)] #similar(topJ₀⁺); #deepcopy(topJ₀⁺)
     tdwJ = [zeros(typeof(topJ₀⁺[1][1,1,1]), (length(topJ₀⁺[1][:,1,1]), 1, nSpec)) for i=1:length(sensor_levels)]#similar(topJ₀⁺); #deepcopy(topJ₀⁺)
-    @show size(tuwJ), size(tdwJ)   
+    #@show size(tuwJ), size(tdwJ)   
     botieR⁻⁺ = (composite_layer.botieR⁻⁺);
     topieR⁺⁻ = (composite_layer.topieR⁺⁻);
     
@@ -116,7 +116,7 @@ function postprocessing_vza_ms!(RS_type::Union{RRS, VS_0to1_plus, VS_1to0_plus},
     #tdwieJ = deepcopy(topieJ₀⁺)
     tuwieJ = [zeros(typeof(topJ₀⁺[1][1,1,1]), (length(topJ₀⁺[1][:,1,1]), 1, nSpec, length(topieJ₀⁺[1][1,1,1,:]))) for i=1:length(sensor_levels)] #similar(topJ₀⁺); #deepcopy(topJ₀⁺)
     tdwieJ = [zeros(typeof(topJ₀⁺[1][1,1,1]), (length(topJ₀⁺[1][:,1,1]), 1, nSpec, length(topieJ₀⁺[1][1,1,1,:]))) for i=1:length(sensor_levels)] #similar(topJ₀⁺); #deepcopy(topJ₀⁺)
-    @show size(tuwieJ), size(tdwieJ)  
+    #@show size(tuwieJ), size(tdwieJ)  
     for ims = 1:length(sensor_levels)
         if(sensor_levels[ims]==0)
             # elastic
