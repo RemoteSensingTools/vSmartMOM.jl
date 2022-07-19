@@ -236,9 +236,13 @@ function parameters_from_yaml(file_path)
         nquad_radius = params_dict["scattering"]["nquad_radius"]
         λ_ref = FTa(params_dict["scattering"]["λ_ref"])
         decomp_type = eval(Meta.parse(params_dict["scattering"]["decomp_type"]))
-
+        if isempty(params_dict["scattering"]["n_ref"])
+            n_ref = aerosols.nᵣ - im*aerosols.nᵢ
+        else
+            n_ref = params_dict["scattering"]["n_ref"]
+        end
         scattering_params = ScatteringParameters(aerosols, r_max, nquad_radius, 
-                                                 λ_ref, decomp_type)
+                                                 λ_ref, n_ref, decomp_type)
     else
         scattering_params = nothing
     end
