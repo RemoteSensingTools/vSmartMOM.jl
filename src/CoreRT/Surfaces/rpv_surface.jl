@@ -96,10 +96,10 @@ function rpvF(Θ::FT, cosg::FT) where FT
     (1 - Θ^2) /  (1 + Θ^2 + 2Θ * cosg)^FT(1.5)
 end
 
-function reflectance(rpv::rpvSurfaceScalar{FT}, μ::Array{FT}, m::Int) where FT
+function reflectance(rpv::rpvSurfaceScalar{FT}, μ::AbstractArray{FT}, m::Int) where FT
     @unpack ρ₀, ρ_c, k, Θ = rpv
-    f(x) = reflectance.([rpv], μ, μ', [x]) * cos(m*x)
-    quadgk(f, 0, π, rtol=1e-2)[1]
+    f(x) = reflectance.((rpv,), μ, μ', x) * cos(m*x)
+    quadgk(f, 0, π, rtol=1e-6)[1]
 end
 
 
