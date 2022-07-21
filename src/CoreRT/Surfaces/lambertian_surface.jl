@@ -53,7 +53,7 @@ function create_surface_layer!(lambertian::LambertianSurfaceScalar{FT},
             I₀_NquadN[iμ₀Nstart:pol_type.n*iμ₀] = pol_type.I₀;
             
             added_layer.j₀⁺[:,1,:] .= I₀_NquadN .* exp.(-τ_sum/μ₀)';
-            added_layer.j₀⁻[:,1,:] = μ₀*(R_surf*I₀_NquadN) .* exp.(-τ_sum/μ₀)';
+            added_layer.j₀⁻[:,1,:] .= μ₀*(R_surf*I₀_NquadN) .* exp.(-τ_sum/μ₀)';
         end
         R_surf = R_surf * Diagonal(qp_μN.*wt_μN)
         
@@ -136,3 +136,10 @@ function create_surface_layer!(lambertian::LambertianSurfaceLegendre{FT},
         added_layer.j₀⁻[:] .= 0;
     end
 end
+
+function reflectance(sur::LambertianSurfaceScalar{FT}, μᵢ::FT, μᵣ::FT, dϕ::FT) where FT
+    return sur.albedo
+end
+
+
+

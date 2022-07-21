@@ -32,28 +32,27 @@ function create_surface_layer!(rpv::rpvSurfaceScalar{FT},
     tmp    = ones(pol_type.n*Nquad)
     arr_type = array_type(architecture)
     T_surf = arr_type(Diagonal(tmp))
-    if m == 0
+    #if m == 0
         # Albedo normalized by π (and factor 2 for 0th Fourier Moment)
-        ρ = 2lambertian.albedo#/FT(π)
-        
-        
-        
-        R_surf = Array(Diagonal(vcat(ρ, zeros(FT,pol_type.n-1))))
-        R_surf = repeat(R_surf',Nquad)
-        R_surf = repeat(R_surf',Nquad)
+        @show rpv
+        if m==0
+            ρ = 2*vSmartMOM.CoreRT.reflectance(rpv, pol_type.n, Array(qp_μ), m)
+        else
+            ρ = vSmartMOM.CoreRT.reflectance(rpv, pol_type.n, Array(qp_μ), m)
+        end
         
         # Move to architecture:
-        R_surf = arr_type(R_surf)
+        R_surf = arr_type(ρ) #arr_type(expandStokes(ρ, pol_type.n))
 
         
         # Source function of surface:
         if SFI
             I₀_NquadN = similar(qp_μN);
-            I₀_NquadN[:] .=0;
+            I₀_NquadN[:] .= 0;
             I₀_NquadN[iμ₀Nstart:pol_type.n*iμ₀] = pol_type.I₀;
             
             added_layer.j₀⁺[:,1,:] .= I₀_NquadN .* exp.(-τ_sum/μ₀)';
-            added_layer.j₀⁻[:,1,:] = μ₀*(R_surf*I₀_NquadN) .* exp.(-τ_sum/μ₀)';
+            added_layer.j₀⁻[:,1,:] .= μ₀*(R_surf*I₀_NquadN) .* exp.(-τ_sum/μ₀)';
         end
         R_surf = R_surf * Diagonal(qp_μN.*wt_μN)
         
@@ -63,25 +62,18 @@ function create_surface_layer!(rpv::rpvSurfaceScalar{FT},
         added_layer.r⁺⁻ .= 0;
         added_layer.t⁺⁺ .= T_surf;
         added_layer.t⁻⁻ .= T_surf;
-
-    else
-        added_layer.r⁻⁺ .= 0;
-        added_layer.r⁻⁺ .= 0;
-        added_layer.t⁺⁺ .= T_surf;
-        added_layer.t⁻⁻ .= T_surf;
-        added_layer.j₀⁺ .= 0;
-        added_layer.j₀⁻ .= 0;
-    end
 end
 
-function reflectance(rpv::rpvSurfaceScalar{FT}, μᵢ::FT, μᵣ::FT, dϕ::FT) where FT
+function reflectance(rpv::rpvSurfaceScalar{FT}, n, μᵢ::FT, μᵣ::FT, dϕ::FT) where FT
     @unpack ρ₀, ρ_c, k, Θ = rpv
-    # TODO: Suniti, stupid calculations here:
+    #@unpack n = pol_type
+    # TODO: Suniti, check stupid calculations here:
     θᵢ   = acos(μᵢ)
     θᵣ   = acos(μᵣ)
     cosg = μᵢ*μᵣ + sin(θᵢ)*sin(θᵣ)*cos(dϕ)
     G    = (tan(θᵢ)^2 + tan(θᵣ)^2 - 2*tan(θᵢ)*tan(θᵣ)*cos(dϕ))^FT(0.5)
-    ρ₀ * rpvM(μᵢ, μᵣ, k) * rpvF(Θ, cosg) * rpvH(ρ_c, G)
+    BRF = ρ₀ * rpvM(μᵢ, μᵣ, k) * rpvF(Θ, cosg) * rpvH(ρ_c, G)
+    #vcat(BRF, zeros(eltype(BRF),n-1))
 end
 
 function rpvM(μᵢ::FT, μᵣ::FT, k::FT) where FT
@@ -96,10 +88,24 @@ function rpvF(Θ::FT, cosg::FT) where FT
     (1 - Θ^2) /  (1 + Θ^2 + 2Θ * cosg)^FT(1.5)
 end
 
-function reflectance(rpv::rpvSurfaceScalar{FT}, μ::AbstractArray{FT}, m::Int) where FT
-    @unpack ρ₀, ρ_c, k, Θ = rpv
-    f(x) = reflectance.((rpv,), μ, μ', x) * cos(m*x)
-    quadgk(f, 0, π, rtol=1e-6)[1]
+function reflectance(rpv::AbstractSurfaceType, n::Int, μ::AbstractArray{FT}, m::Int) where FT
+    f(x) = reflectance.((rpv,),n, μ, μ', x) * cos(m*x)
+    quadgk(f, 0, 2π, rtol=1e-6)[1]
 end
 
+function expandStokes(v::AbstractArray)
+    d1,d2 = size(v)
+    n = size(v[1,1])
+    dn = n - 1
+    M = Matrix{eltype(eltype(v))}(undef, d1*n, d1*n)
+    for i in 1:d1, j in 1:d2
+        ii = (i-1)*n + 1
+        jj = (j-1)*n + 1 
+        M[ii:ii+dn, jj:jj+dn] .= Diagonal(v[i,j])
+    end
+    return M
+end
 
+function expandStokes2(v)
+    return Diagonal(v)
+end
