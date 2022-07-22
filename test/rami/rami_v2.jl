@@ -55,6 +55,7 @@ function produce_rami_results(experiment_name::String;
         @info "Turning off Rayleigh ", atm_type
         model.τ_rayl[1] .= 0.0
     end
+    model.τ_rayl[1] .= 0.00000000001
     ########################################################
 
     # Run model (can think about including the BOA and hemispheric data here as well)
