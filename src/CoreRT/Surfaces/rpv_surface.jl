@@ -68,12 +68,18 @@ function reflectance(rpv::rpvSurfaceScalar{FT}, n, μᵢ::FT, μᵣ::FT, dϕ::FT
     @unpack ρ₀, ρ_c, k, Θ = rpv
     #@unpack n = pol_type
     # TODO: Suniti, check stupid calculations here:
-    θᵢ   = acos(μᵢ)
-    θᵣ   = acos(μᵣ)
-    cosg = μᵢ*μᵣ + sin(θᵢ)*sin(θᵣ)*cos(dϕ)
-    G    = (tan(θᵢ)^2 + tan(θᵣ)^2 - 2*tan(θᵢ)*tan(θᵣ)*cos(dϕ))^FT(0.5)
-    BRF = ρ₀ * rpvM(μᵢ, μᵣ, k) * rpvF(Θ, cosg) * rpvH(ρ_c, G)
-    #vcat(BRF, zeros(eltype(BRF),n-1))
+    if n==1
+        θᵢ   = acos(μᵢ)
+        θᵣ   = acos(μᵣ)
+        cosg = μᵢ*μᵣ + sin(θᵢ)*sin(θᵣ)*cos(dϕ)
+        G    = (tan(θᵢ)^2 + tan(θᵣ)^2 - 2*tan(θᵢ)*tan(θᵣ)*cos(dϕ))^FT(0.5)
+        BRF = ρ₀ * rpvM(μᵢ, μᵣ, k) * rpvF(Θ, cosg) * rpvH(ρ_c, G) 
+        return BRF
+    else
+        return 0.0
+    end
+    # * [1.0,0,0]
+    #(BRF, zeros(eltype(BRF),n-1)...)
 end
 
 function rpvM(μᵢ::FT, μᵣ::FT, k::FT) where FT
@@ -88,24 +94,33 @@ function rpvF(Θ::FT, cosg::FT) where FT
     (1 - Θ^2) /  (1 + Θ^2 + 2Θ * cosg)^FT(1.5)
 end
 
-function reflectance(rpv::AbstractSurfaceType, n::Int, μ::AbstractArray{FT}, m::Int) where FT
-    f(x) = reflectance.((rpv,),n, μ, μ', x) * cos(m*x)
-    quadgk(f, 0, 2π, rtol=1e-6)[1]
-end
-
-function expandStokes(v::AbstractArray)
-    d1,d2 = size(v)
-    n = size(v[1,1])
-    dn = n - 1
-    M = Matrix{eltype(eltype(v))}(undef, d1*n, d1*n)
-    for i in 1:d1, j in 1:d2
-        ii = (i-1)*n + 1
-        jj = (j-1)*n + 1 
-        M[ii:ii+dn, jj:jj+dn] .= Diagonal(v[i,j])
+function reflectance(rpv::AbstractSurfaceType, pol_type, μ::AbstractArray{FT}, m::Int) where FT
+    for n = 1:pol_type.n
+        f(x) = reflectance.((rpv,),n, μ, μ', x) * cos(m*x)
+        quadgk(f, 0, 2π, rtol=1e-6)[1]
     end
-    return M
 end
 
-function expandStokes2(v)
-    return Diagonal(v)
+
+@kernel function applyExpansion!(Rsurf,n_stokes::Int,  v)
+    i, j = @index(Global, NTuple)
+    # get indices:
+    ii = (i-1)*n_stokes 
+    jj = (j-1)*n_stokes 
+    
+    # Fill values:
+    for i_n = 1:n_stokes
+        Rsurf[ii+i_n, jj+i_n] = v[i,j][i_n]
+    end
 end
+
+# 2D expansion:
+function expandSurface!(Rsurf::AbstractArray{FT,2}, n_stokes::Int, v) where {FT}
+    device = devi(architecture(Rsurf))
+    applyExpansion_! = applyExpansion!(device)
+    event = applyExpansion_!(Rsurf, n_stokes, v, ndrange=size(v));
+    wait(device, event);
+    synchronize_if_gpu();
+    return nothing
+end
+

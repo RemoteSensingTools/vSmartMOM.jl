@@ -158,7 +158,7 @@ function rt_run(RS_type::AbstractRamanType,
                                     I_static)
         
         # Postprocess and weight according to vza
-        postprocessing_vza!(RS_type, 
+        @timeit "Postprocessing" postprocessing_vza!(RS_type, 
                             iμ₀, pol_type, 
                             composite_layer, 
                             vza, qp_μ, m, vaz, μ₀, 
