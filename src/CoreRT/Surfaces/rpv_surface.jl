@@ -36,9 +36,9 @@ function create_surface_layer!(rpv::rpvSurfaceScalar{FT},
         # Albedo normalized by π (and factor 2 for 0th Fourier Moment)
         @show rpv
         if m==0
-            ρ = 2*vSmartMOM.CoreRT.reflectance(rpv, pol_type.n, Array(qp_μ), m)
+            ρ = 2*vSmartMOM.CoreRT.reflectance(rpv, pol_type, Array(qp_μ), m)
         else
-            ρ = vSmartMOM.CoreRT.reflectance(rpv, pol_type.n, Array(qp_μ), m)
+            ρ = vSmartMOM.CoreRT.reflectance(rpv, pol_type, Array(qp_μ), m)
         end
         
         # Move to architecture:
@@ -74,7 +74,7 @@ function reflectance(rpv::rpvSurfaceScalar{FT}, n, μᵢ::FT, μᵣ::FT, dϕ::FT
         cosg = μᵢ*μᵣ + sin(θᵢ)*sin(θᵣ)*cos(dϕ)
         G    = (tan(θᵢ)^2 + tan(θᵣ)^2 - 2*tan(θᵢ)*tan(θᵣ)*cos(dϕ))^FT(0.5)
         BRF = ρ₀ * rpvM(μᵢ, μᵣ, k) * rpvF(Θ, cosg) * rpvH(ρ_c, G) 
-        return BRF
+        return [BRF 0.0; 0.0 0.0]
     else
         return 0.0
     end
@@ -95,10 +95,15 @@ function rpvF(Θ::FT, cosg::FT) where FT
 end
 
 function reflectance(rpv::AbstractSurfaceType, pol_type, μ::AbstractArray{FT}, m::Int) where FT
+    ty = array_type(architecture(μ))
+    # Size of Matrix
+    nn = length(μ) * pol_type.n
+    Rsurf = ty(zeros(FT,nn,nn)) 
     for n = 1:pol_type.n
         f(x) = reflectance.((rpv,),n, μ, μ', x) * cos(m*x)
-        quadgk(f, 0, 2π, rtol=1e-6)[1]
+        Rsurf[n:pol_type.n:end,n:pol_type.n:end] .= quadgk(f, 0, π, rtol=1e-6)[1] / π
     end
+    return Rsurf
 end
 
 
