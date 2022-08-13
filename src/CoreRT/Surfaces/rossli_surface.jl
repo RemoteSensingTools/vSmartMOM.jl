@@ -17,7 +17,7 @@ Computes (in place) surface optical properties for a (scalar) lambertian albedo 
     - `τ_sum` total optical thickness from TOA to the surface
     - `architecture` Compute architecture (GPU,CPU)
 """ 
-function create_surface_layer!(rpv::rpvSurfaceScalar{FT}, 
+function create_surface_layer!(rpv::RossLiSurfaceScalar{FT}, 
                                added_layer::Union{AddedLayer,AddedLayerRS},
                                SFI,
                                m::Int,
@@ -34,11 +34,9 @@ function create_surface_layer!(rpv::rpvSurfaceScalar{FT},
     T_surf = arr_type(Diagonal(tmp))
     #if m == 0 
         # Albedo normalized by π (and factor 2 for 0th Fourier Moment)
-        ρ = 2lambertian.albedo#/FT(π)
+        #ρ = 2lambertian.albedo#/FT(π)
         
-        
-        
-        R_surf = Array(Diagonal(vcat(ρ, zeros(FT,pol_type.n-1))))
+        R_surf = Array(Diagonal(vcat(1, zeros(FT,pol_type.n-1))))
         R_surf = repeat(R_surf',Nquad)
         R_surf = repeat(R_surf',Nquad)
         
@@ -76,36 +74,7 @@ function create_surface_layer!(rpv::rpvSurfaceScalar{FT},
     """
 end
 
-#Rahman Pinty Verstraete model
-function reflectance(rpv::rpvSurfaceScalar{FT}, μᵢ::FT, μᵣ::FT, dϕ::FT) where FT
-    @unpack ρ₀, ρ_c, k, Θ = rpv
-    # TODO: Suniti, stupid calculations here:
-    θᵢ   = acos(μᵢ) #assert 0<=θᵢ<=π/2
-    θᵣ   = acos(μᵣ) #assert 0<=θᵣ<=π/2
-    cosg = -μᵢ*μᵣ + sin(θᵢ)*sin(θᵣ)*cos(dϕ) #RAMI form: μᵢ*μᵣ + sin(θᵢ)*sin(θᵣ)*cos(dϕ) (vSmartMOM sign convention is compatible with that of Rahman, Pinty, Verstraete, 1993) 
-    G    = (tan(θᵢ)^2 + tan(θᵣ)^2 + 2*tan(θᵢ)*tan(θᵣ)*cos(dϕ))^FT(0.5) #RAMI form: (tan(θᵢ)^2 + tan(θᵣ)^2 - 2*tan(θᵢ)*tan(θᵣ)*cos(dϕ))^FT(0.5)
-    return ρ₀ * rpvM(μᵢ, μᵣ, k) * rpvF(Θ, cosg) * rpvH(ρ_c, G)
-end
-
-function rpvM(μᵢ::FT, μᵣ::FT, k::FT) where FT
-    return (μᵢ * μᵣ)^(k -1) /  (μᵢ + μᵣ)^(1 - k)
-end
-
-function rpvH(ρ_c::FT, G::FT) where FT
-    return 1 + (1 - ρ_c) / (1 + G)
-end
-
-function rpvF(Θ::FT, cosg::FT) where FT
-    θ = -θ #for RAMI only
-    return (1 - Θ^2) /  (1 + Θ^2 - 2Θ * cos(π-g))^FT(1.5) #RAMI form: (1 - Θ^2) /  (1 + Θ^2 + 2Θ * cosg)^FT(1.5)
-end
-
-function reflectance(rpv::rpvSurfaceScalar{FT}, μ::Array{FT}, m::Int) where FT
-    @unpack ρ₀, ρ_c, k, Θ = rpv
-    f(x) = reflectance.([rpv], μ, μ', [x]) * cos(m*x)
-    return 2*quadgk(f, 0, π, rtol=1e-4)[1]
-end
-
+# Ross Li
 function reflectance(RossLi::RossLiSurfaceScalar{FT}, μᵢ::FT, μᵣ::FT, dϕ::FT) where FT
     @unpack fiso, fvol, fgeo = RossLi
     # TODO: Suniti, stupid calculations here:
@@ -143,7 +112,7 @@ function RossLi_K_geo(θᵢ::FT, θᵣ::FT, dϕ::FT) where FT
     return O - (sec(θᵢᵖ)+sec(θᵣᵖ)) + 0.5*(1+cos(ξᵖ))*sec(θᵢᵖ)*sec(θᵣᵖ)
 end
 
-function reflectance(rpv::AbstractSurfaceType, pol_type, μ::AbstractArray{FT}, m::Int) where FT
+function reflectance(RossLi::AbstractSurfaceType, pol_type, μ::AbstractArray{FT}, m::Int) where FT
     ty = array_type(architecture(μ))
     # Size of Matrix
     nn = length(μ) * pol_type.n
