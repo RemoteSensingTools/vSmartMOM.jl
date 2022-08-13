@@ -207,8 +207,15 @@ end
 # Set surface type (Lambertian for now!)
 function setSurface!(scenario, params)
     rami_surface      = scenario["surface"]
-    @assert rami_surface["name"] in ["WHI", "BLA", "LAM"] && startswith(scenario["name"], "HOM00") "Currently only supporting Lambertian (HOM00) surfaces"
-    params.brdf = [vSmartMOM.LambertianSurfaceScalar(rami_surface["surface_parameters"]["reflectance"])]
+    
+    if rami_surface["name"] ∈ ["WHI", "BLA", "LAM"]
+        params.brdf = [vSmartMOM.LambertianSurfaceScalar(rami_surface["surface_parameters"]["reflectance"])]
+    elseif rami_surface["name"] == "RPV"
+        p = rami_surface["surface_parameters"]
+        params.brdf = [vSmartMOM.CoreRT.rpvSurfaceScalar(p["rho_0"][1],p["rho_c"][1], p["k"][1],p["theta"][1] )]
+    else
+        @assert rami_surface["name"] in ["WHI", "BLA", "LAM", "RPV"] && startswith(scenario["name"], "HOM00") "Currently only supporting Lambertian (HOM00) and RPV surfaces"
+    end
     @info "Surface type: " * rami_surface["name"]
 end
  
