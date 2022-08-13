@@ -32,48 +32,37 @@ function create_surface_layer!(rpv::rpvSurfaceScalar{FT},
     tmp    = ones(pol_type.n*Nquad)
     arr_type = array_type(architecture)
     T_surf = arr_type(Diagonal(tmp))
-    #if m == 0 
-        # Albedo normalized by π (and factor 2 for 0th Fourier Moment)
-        ρ = 2lambertian.albedo#/FT(π)
-        
-        
-        
-        R_surf = Array(Diagonal(vcat(ρ, zeros(FT,pol_type.n-1))))
-        R_surf = repeat(R_surf',Nquad)
-        R_surf = repeat(R_surf',Nquad)
-        
-        # Move to architecture:
-        R_surf = arr_type(R_surf)
-
-        
-        # Source function of surface:
-        if SFI
-            I₀_NquadN = similar(qp_μN);
-            I₀_NquadN[:] .=0;
-            I₀_NquadN[iμ₀Nstart:pol_type.n*iμ₀] = pol_type.I₀;
-            
-            added_layer.j₀⁺[:,1,:] .= I₀_NquadN .* exp.(-τ_sum/μ₀)';
-            added_layer.j₀⁻[:,1,:] = μ₀*(R_surf*I₀_NquadN) .* exp.(-τ_sum/μ₀)';
-        end
-        R_surf = R_surf * Diagonal(qp_μN.*wt_μN)
-        
-
-        #@show size(added_layer.r⁻⁺), size(R_surf), size(added_layer.j₀⁻)
-        added_layer.r⁻⁺ .= R_surf;
-        added_layer.r⁺⁻ .= 0;
-        added_layer.t⁺⁺ .= T_surf;
-        added_layer.t⁻⁻ .= T_surf;
-
-    """
+    
+    # Albedo normalized by π (and factor 2 for 0th Fourier Moment)
+    @show rpv
+    if m==0
+        ρ = 2*vSmartMOM.CoreRT.reflectance(rpv, pol_type, Array(qp_μ), m)
     else
-        added_layer.r⁻⁺ .= 0;
-        added_layer.r⁻⁺ .= 0;
-        added_layer.t⁺⁺ .= T_surf;
-        added_layer.t⁻⁻ .= T_surf;
-        added_layer.j₀⁺ .= 0;
-        added_layer.j₀⁻ .= 0;
+        ρ = vSmartMOM.CoreRT.reflectance(rpv, pol_type, Array(qp_μ), m)
     end
-    """
+    
+    # Move to architecture:
+    R_surf = arr_type(ρ) #arr_type(expandStokes(ρ, pol_type.n))
+
+    
+    # Source function of surface:
+    if SFI
+        I₀_NquadN = similar(qp_μN);
+        I₀_NquadN[:] .= 0;
+        I₀_NquadN[iμ₀Nstart:pol_type.n*iμ₀] = pol_type.I₀;
+        
+        added_layer.j₀⁺[:,1,:] .= I₀_NquadN .* exp.(-τ_sum/μ₀)';
+        added_layer.j₀⁻[:,1,:] .= μ₀*(R_surf*I₀_NquadN) .* exp.(-τ_sum/μ₀)';
+    end
+    R_surf = R_surf * Diagonal(qp_μN.*wt_μN)
+    
+
+    #@show size(added_layer.r⁻⁺), size(R_surf), size(added_layer.j₀⁻)
+    added_layer.r⁻⁺ .= R_surf;
+    added_layer.r⁺⁻ .= 0;
+    added_layer.t⁺⁺ .= T_surf;
+    added_layer.t⁻⁻ .= T_surf;
+
 end
 
 #Rahman Pinty Verstraete model
@@ -139,8 +128,8 @@ function RossLi_K_geo(θᵢ::FT, θᵣ::FT, dϕ::FT) where FT
     ξᵖ = acos(cos(θᵢᵖ)*cos(θᵣᵖ) + sin(θᵢᵖ)*sin(θᵣᵖ)*cos(dϕ))
     D = sqrt(tan^2(θᵢᵖ) + tan^2(θᵣᵖ) - 2tan(θᵢᵖ)*tan(θᵣᵖ)*cos(dϕ))
     t = acos(h_by_b * sqrt(D^2 + (tan(θᵢᵖ)*tan(θᵣᵖ)*sin(dϕ))^2)/(sec(θᵢᵖ)+sec(θᵣᵖ)))
-    O = (1/π)*(t-sin(t)*cos(t))*(sec(θᵢᵖ)+sec(θᵣᵖ))
-    return O - (sec(θᵢᵖ)+sec(θᵣᵖ)) + 0.5*(1+cos(ξᵖ))*sec(θᵢᵖ)*sec(θᵣᵖ)
+    _O = (1/π)*(t-sin(t)*cos(t))*(sec(θᵢᵖ)+sec(θᵣᵖ))
+    return _O - (sec(θᵢᵖ)+sec(θᵣᵖ)) + 0.5*(1+cos(ξᵖ))*sec(θᵢᵖ)*sec(θᵣᵖ)
 end
 
 function reflectance(rpv::AbstractSurfaceType, pol_type, μ::AbstractArray{FT}, m::Int) where FT
@@ -177,5 +166,4 @@ function expandSurface!(Rsurf::AbstractArray{FT,2}, n_stokes::Int, v) where {FT}
     synchronize_if_gpu();
     return nothing
 end
-
 

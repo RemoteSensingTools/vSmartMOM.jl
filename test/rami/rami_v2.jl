@@ -3,7 +3,7 @@ using vSmartMOM
 using DelimitedFiles
 using Distributions
 
-include("rami_tools.jl")
+include("test/rami/rami_tools.jl")
 
 # Read in the standard atmosphere
 
@@ -55,6 +55,7 @@ function produce_rami_results(experiment_name::String;
         @info "Turning off Rayleigh ", atm_type
         model.τ_rayl[1] .= 0.0
     end
+    model.τ_rayl[1] .= 0.00000000001
     ########################################################
 
     # Run model (can think about including the BOA and hemispheric data here as well)
@@ -75,7 +76,8 @@ all_scenarios = JSON.parsefile(rami_json);
 # R, models = produce_rami_results("HOM00_WHI_SD2S_M02_z30a000")
 #R, models = produce_rami_results("HOM00_LAM_ED2D_M12_z30a000")
 #R, models = produce_rami_results("HOM00_WHI_A00S_M02_z30a000")
-BRF, R, model = produce_rami_results("HOM00_WHI_A00S_M12_z30a000")
+#BRF, R, model = produce_rami_results("HOM00_WHI_A00S_M12_z30a000")
+BRF, R, model = produce_rami_results("HOM00_WHI_SD2S_M02_z30a000")
 
 
 ##
