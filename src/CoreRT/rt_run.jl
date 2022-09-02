@@ -70,6 +70,11 @@ function rt_run(RS_type::AbstractRamanType,
     T_SFI   = zeros(FT_dual, length(vza), pol_type.n, nSpec)
     ieR_SFI = zeros(FT_dual, length(vza), pol_type.n, nSpec)
     ieT_SFI = zeros(FT_dual, length(vza), pol_type.n, nSpec)
+    hdr     = zeros(FT_dual, length(vza), pol_type.n, nSpec) # for RAMI
+    bhr_dw     = zeros(FT_dual, pol_type.n, nSpec) # for RAMI
+    bhr_uw     = zeros(FT_dual, pol_type.n, nSpec) # for RAMI
+    hdr_J₀⁻    = zeros(FT_dual, length(vza), pol_type.n, nSpec) # for RAMI
+    #  bhr[i] = bhr_uw[i,:]./bhr_dw[1,:]   
     # Notify user of processing parameters
     msg = 
     """
@@ -156,6 +161,16 @@ function rt_run(RS_type::AbstractRamanType,
                                     composite_layer, 
                                     added_layer_surface, 
                                     I_static)
+        hdr_J₀⁻ = similar(composite_layer.J₀⁻)
+        # One last interaction with surface:
+        @timeit "interaction_HDRF" interaction_hdrf!(#RS_type,
+                                    #bandSpecLim,
+                                    #scattering_interfaces_all[end], 
+                                    SFI, 
+                                    composite_layer, 
+                                    added_layer_surface, 
+                                    m, pol_type, NquadN, wt_μN,
+                                    hdr_J₀⁻, bhr_uw, bhr_dw)
         
         # Postprocess and weight according to vza
         @timeit "Postprocessing" postprocessing_vza!(RS_type, 
@@ -167,6 +182,13 @@ function rt_run(RS_type::AbstractRamanType,
                             R, R_SFI, 
                             T, T_SFI,
                             ieR_SFI, ieT_SFI)
+
+        @timeit "Postprocessing" postprocessing_vza_hdrf!(RS_type, 
+            iμ₀, pol_type, 
+            hdr_J₀⁻, 
+            vza, qp_μ, m, vaz, μ₀, 
+            weight, nSpec, 
+            hdr)
     end
 
     # Show timing statistics
@@ -174,5 +196,9 @@ function rt_run(RS_type::AbstractRamanType,
     reset_timer!()
 
     # Return R_SFI or R, depending on the flag
-    return SFI ? (R_SFI, T_SFI, ieR_SFI, ieT_SFI) : (R, T)
+    #if RAMI
+    return SFI ? (R_SFI, T_SFI, ieR_SFI, ieT_SFI, hdr, bhr_uw, bhr_dw) : (R, T)
+    #else
+    #return SFI ? (R_SFI, T_SFI, ieR_SFI, ieT_SFI) : (R, T)
+    #end
 end

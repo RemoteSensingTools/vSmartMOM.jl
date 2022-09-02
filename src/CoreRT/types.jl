@@ -320,6 +320,14 @@ struct rpvSurfaceScalar{FT} <: AbstractSurfaceType
     Θ::FT
 end
 
+struct RossLiSurfaceScalar{FT} <: AbstractSurfaceType
+    "Volumetric RossThick  fraction"
+    fvol::FT
+    "Geometric LiSparse fraction"
+    fgeo::FT
+    "Isotropic reflectance fraction"
+    fiso::FT
+end
 
 "Defined by Legendre polynomial terms as function of spectral grid, which is scaled to [-1,1] (degree derived from length of `a_coeff`)"
 struct LambertianSurfaceLegendre{FT} <: AbstractSurfaceType
