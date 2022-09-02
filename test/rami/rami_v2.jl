@@ -55,16 +55,17 @@ function produce_rami_results(experiment_name::String;
         @info "Turning off Rayleigh ", atm_type
         model.τ_rayl[1] .= 0.0
     end
-    model.τ_rayl[1] .= 0.00000000001
+    #  model.τ_rayl[1] .= 0.00000000001
     ########################################################
 
     # Run model (can think about including the BOA and hemispheric data here as well)
-    R = rt_run(model)
-
+    #R = rt_run(model)
+    R, _, _, _, hdr, bhr_uw, bhr_dw = rt_run(model)
     # Convolve results:
     BRF = convolve_2_sentinel(model.params.spec_bands[1], R[1], band)
     save_toa_results(BRF, model, experiment_name, "/home/cfranken/rami/")
-    return BRF, R, model
+    return BRF, R, hdr, bhr_uw, bhr_dw, model
+    #return BRF, R, model
 
     # Can do postprocessing here (saving data, convolution, etc)
 end
@@ -77,15 +78,22 @@ all_scenarios = JSON.parsefile(rami_json);
 #R, models = produce_rami_results("HOM00_LAM_ED2D_M12_z30a000")
 #R, models = produce_rami_results("HOM00_WHI_A00S_M02_z30a000")
 #BRF, R, model = produce_rami_results("HOM00_WHI_A00S_M12_z30a000")
-BRF, R, model = produce_rami_results("HOM00_WHI_SD2S_M02_z30a000")
-
+#white lambertian
+BRF1, R1, hdr1, bhr_uw1, bhr_dw1, model = produce_rami_results("HOM00_LAM_S00S_M03_z30a000")#("HOM00_WHI_EC6L_M03_z30a000")
+#BRF1, R, model = produce_rami_results("HOM00_WHI_SD2S_M02_z30a000")
+#RPV
+BRF2, R2, hdr2, bhr_uw2, bhr_dw2, model = produce_rami_results("HOM00_RPV_S00S_M03_z30a000")#("HOM00_RPV_EC6L_M03_z30a000")
+# for RossLi
+BRF3, R3, hdr3, bhr_uw3, bhr_dw3, model = produce_rami_results("HOM00_RLI_S00S_M03_z30a000")#("HOM00_RLI_EC6L_M03_z30a000") 
 
 ##
 
-for i = 1:10:200
+#for i = 1:10:2000
+for i = 1000:1050
     println( i, " ",  all_scenarios[i]["observations"][1]["atmosphere"]["atmosphere_type"], " ", all_scenarios[i]["name"])
 end
 
+#=
 for scenario in all_scenarios
     @info "Processing " * scenario["name"]
     try

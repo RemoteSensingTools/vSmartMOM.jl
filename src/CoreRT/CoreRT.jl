@@ -62,6 +62,7 @@ include("CoreKernel/elemental_inelastic_plus.jl")   # Elemental for inelastic sc
 include("CoreKernel/doubling.jl")              # Doubling
 include("CoreKernel/doubling_inelastic.jl")    # Doubling for elastic + inelastic scattering 
 include("CoreKernel/interaction.jl")           # Interaction
+include("CoreKernel/interaction_hdrf.jl") # Addl. surface interaction for RAMI output
 include("CoreKernel/interaction_inelastic.jl") # Interaction for elastic + inelastic scattering 
 include("CoreKernel/interaction_multisensor.jl") # Suniti: ms
 include("CoreKernel/interlayer_flux.jl")       # Suniti: ms

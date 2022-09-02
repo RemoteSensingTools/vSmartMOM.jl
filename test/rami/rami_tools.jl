@@ -139,6 +139,7 @@ function convolve_2_sentinel(ν, BRF, band)
     ex = Meta.parse("sentinelILS = sr_" * band)
     eval(ex)
     srr = LinearInterpolation(wl_sr, sentinelILS);
+    @show size(BRF)
     d1,d2,d3 = size(BRF)
 
     wl_in = 1e7./ν;
@@ -201,7 +202,7 @@ function setGeometry!(scenario, params)
     vza_step  = 2.0  # rami_measures[1]["vza_step"]["value"]
     vzas = collect(vza_start:vza_step:vza_end)
     params.vza  = [reverse(vzas); vzas; reverse(vzas); vzas]
-    params.vaz  = [repeat([0.0], length(vzas)); repeat([180.0], length(vzas));repeat([-90.0], length(vzas));repeat([90.0], length(vzas)) ]
+    params.vaz  = [repeat([180.0], length(vzas)); repeat([0.0], length(vzas));repeat([90.0], length(vzas));repeat([-90.0], length(vzas)) ]
 end
 
 # Set surface type (Lambertian for now!)
@@ -213,6 +214,9 @@ function setSurface!(scenario, params)
     elseif rami_surface["name"] == "RPV"
         p = rami_surface["surface_parameters"]
         params.brdf = [vSmartMOM.CoreRT.rpvSurfaceScalar(p["rho_0"][1],p["rho_c"][1], p["k"][1],p["theta"][1] )]
+    elseif rami_surface["name"] == "RLI"
+        p = rami_surface["surface_parameters"]
+        params.brdf = [vSmartMOM.CoreRT.RossLiSurfaceScalar(p["f_vol"][1],p["f_geo"][1], p["f_iso"][1])]
     else
         @assert rami_surface["name"] in ["WHI", "BLA", "LAM", "RPV"] && startswith(scenario["name"], "HOM00") "Currently only supporting Lambertian (HOM00) and RPV surfaces"
     end
@@ -225,7 +229,7 @@ function save_toa_results(BRF, model, name, folder)
     open(fileNamePP, "w") do io
         @printf io "%4d    %4d   %.6f \n" 76	5	-1.000000
         for i=1:76
-            @printf io "%.6f    %.6f   %.6f     %.6f    %.6f \n" deg2rad(model.obs_geom.sza) deg2rad(model.obs_geom.vza[i]) deg2rad(model.obs_geom.vaz[i]) BRF[i] -1
+            @printf io "%.6f    %.6f   %.6f     %.6f    %.6f \n" deg2rad(model.obs_geom.sza) deg2rad(model.obs_geom.vza[i]) deg2rad(abs(model.obs_geom.vaz[i]-180.0)) BRF[i] -1
         end
     end;
 
@@ -233,7 +237,7 @@ function save_toa_results(BRF, model, name, folder)
     open(fileNameOP, "w") do io
         @printf io "%4d    %4d   %.6f \n" 76	5	-1.000000
         for i=77:152
-            @printf io "%.6f    %.6f   %.6f     %.6f    %.6f \n" deg2rad(model.obs_geom.sza) deg2rad(model.obs_geom.vza[i]) deg2rad(model.obs_geom.vaz[i]) BRF[i] -1
+            @printf io "%.6f    %.6f   %.6f     %.6f    %.6f \n" deg2rad(model.obs_geom.sza) deg2rad(model.obs_geom.vza[i]) deg2rad(abs(model.obs_geom.vaz[i]-180.0)) BRF[i] -1
         end
     end;
 end
