@@ -62,8 +62,9 @@ function produce_rami_results(experiment_name::String;
     #R = rt_run(model)
     R, _, _, _, hdr, bhr_uw, bhr_dw = rt_run(model)
     # Convolve results:
-    BRF = convolve_2_sentinel(model.params.spec_bands[1], R[1], band)
-    save_toa_results(BRF, model, experiment_name, "/home/cfranken/rami/")
+    @show size(R)
+    BRF = convolve_2_sentinel(model.params.spec_bands[1], R, band)
+    save_toa_results(BRF, model, experiment_name, "/home/cfranken/rami2/")
     return BRF, R, hdr, bhr_uw, bhr_dw, model
     #return BRF, R, model
 
