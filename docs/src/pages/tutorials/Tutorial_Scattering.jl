@@ -22,19 +22,19 @@ using Plots
 # Now, we define the aerosol size distribution and properties. We only support univariate
 # aerosols for now, but will add multivariate aerosols soon. 
 
-μ     = 0.3;             ## Log-normal median radius [μm]
-σ     = 2.0;             ## Log-normal stddev of radius
+rₘ    = 0.3;             ## median radius [μm]
+σ     = 2.0;             ## geometric stddev of radius
 nᵣ    = 1.3;             ## Real part of refractive index
 nᵢ    = 0.0;             ## Imag part of refractive index (sign changed, use only + here)
 r_max = 30.0;            ## Maximum radius [μm]
 nquad_radius  = 2500;    ## Number of quadrature points for integrating of size dist.
 
-## Create a Size Distribution (using Julia's Distributions package)
-size_distribution = LogNormal(log(μ), log(σ));
+## Create a Size Distribution (using Julia's Distributions package), note we have to take the natural log here
+size_distribution = LogNormal(log(rₘ), log(σ));
 
 #----------------------------------------------------------------------------
 
-# Create the aerosol
+# Create the aerosol with distribution and refractive index 
 aero = Aerosol(size_distribution, nᵣ, nᵢ)
 #----------------------------------------------------------------------------
 

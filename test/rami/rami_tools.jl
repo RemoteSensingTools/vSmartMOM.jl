@@ -210,6 +210,7 @@ function setSurface!(scenario, params)
     rami_surface      = scenario["surface"]
     
     if rami_surface["name"] ∈ ["WHI", "BLA", "LAM"]
+        @show rami_surface["surface_parameters"]["reflectance"]
         params.brdf = [vSmartMOM.LambertianSurfaceScalar(rami_surface["surface_parameters"]["reflectance"])]
     elseif rami_surface["name"] == "RPV"
         p = rami_surface["surface_parameters"]
