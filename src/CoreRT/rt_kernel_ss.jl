@@ -1,6 +1,6 @@
 #=
  
-This file implements rt_kernel!, which performs the core RT routines (elemental, doubling, interaction)
+This file implements rt_kernel_ss!, which performs the core RT routines (elemental, doubling, interaction) to compute ONLY the single scattering compoent of the total signal
  
 =#
 #No Raman (default)
