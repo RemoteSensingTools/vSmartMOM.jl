@@ -64,6 +64,7 @@ include("CoreKernel/interaction_inelastic.jl") # Interaction for elastic + inela
 include("CoreKernel/interaction_multisensor.jl") # Suniti: ms
 include("CoreKernel/interlayer_flux.jl")       # Suniti: ms
 include("CoreKernel/rt_kernel.jl")             # Handle Core RT (Elemental/Doubling/Interaction)
+include("CoreKernel/rt_kernel_ss.jl")          # Single scattering only: Handle Core RT (Elemental/Doubling/Interaction)
 include("CoreKernel/rt_kernel_multisensor.jl") # Suniti: ms
 include("postprocessing_vza.jl")               # Postprocess (Azimuthal Weighting)
 include("postprocessing_vza_ms.jl")
@@ -90,7 +91,7 @@ include("lambertian_surface.jl")            # Lambertian Surface
 # Functions to export
 export parameters_from_yaml,                # Getting parameters from a file
        model_from_parameters,               # Converting the parameters to model 
-       rt_run,                              # Run the RT code
+       rt_run, rt_run_ss,                             # Run the RT code
        default_parameters                   # Set of default parameters
 
 # Export types to show easily
