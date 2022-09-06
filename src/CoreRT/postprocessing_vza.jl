@@ -61,7 +61,7 @@ end
 
 "RAMI: Perform post-processing to azimuthally-weight hdr matrices"
 function postprocessing_vza_hdrf!(RS_type::noRS, iμ₀, pol_type, 
-        hdr_J₀⁻, vza, qp_μ, m, vaz, μ₀, weight, 
+        hdr_J₀⁻,  vza, qp_μ, m, vaz, μ₀, weight, 
         nSpec, hdr)
     
     # idx of μ0 = cos(sza)

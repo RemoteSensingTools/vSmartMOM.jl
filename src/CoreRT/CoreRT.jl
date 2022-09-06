@@ -87,7 +87,7 @@ include("LayerOpticalProperties/compEffectiveLayerProperties.jl")
 # Surfaces
 include("Surfaces/lambertian_surface.jl")            # Lambertian Surface 
 include("Surfaces/rpv_surface.jl")            # Lambertian Surface 
-
+include("Surfaces/rossli_surface.jl")
 
 
 # Functions to export
