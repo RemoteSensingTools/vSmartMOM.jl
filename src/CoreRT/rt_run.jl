@@ -152,7 +152,8 @@ function rt_run(RS_type::AbstractRamanType,
                             quad_points, 
                             arr_type(τ_sum_all[:,end]), 
                             model.params.architecture);
-
+        
+        #@show composite_layer.J₀⁺[iμ₀,1,1:3]
         # One last interaction with surface:
         @timeit "interaction" interaction!(RS_type,
                                     #bandSpecLim,
@@ -161,6 +162,7 @@ function rt_run(RS_type::AbstractRamanType,
                                     composite_layer, 
                                     added_layer_surface, 
                                     I_static)
+       #@show composite_layer.J₀⁺[iμ₀,1,1:3]
         hdr_J₀⁻ = similar(composite_layer.J₀⁻)
         # One last interaction with surface:
         @timeit "interaction_HDRF" interaction_hdrf!(#RS_type,
@@ -169,7 +171,7 @@ function rt_run(RS_type::AbstractRamanType,
                                     SFI, 
                                     composite_layer, 
                                     added_layer_surface, 
-                                    m, pol_type, NquadN, wt_μN,
+                                    m, pol_type, quad_points,
                                     hdr_J₀⁻, bhr_uw, bhr_dw)
         
         # Postprocess and weight according to vza
@@ -189,6 +191,7 @@ function rt_run(RS_type::AbstractRamanType,
             vza, qp_μ, m, vaz, μ₀, 
             weight, nSpec, 
             hdr)
+            
     end
 
     # Show timing statistics
@@ -197,6 +200,8 @@ function rt_run(RS_type::AbstractRamanType,
 
     # Return R_SFI or R, depending on the flag
     #if RAMI
+    @show size(hdr), size(bhr_dw)
+    hdr = hdr ./ bhr_dw
     return SFI ? (R_SFI, T_SFI, ieR_SFI, ieT_SFI, hdr, bhr_uw, bhr_dw) : (R, T)
     #else
     #return SFI ? (R_SFI, T_SFI, ieR_SFI, ieT_SFI) : (R, T)
