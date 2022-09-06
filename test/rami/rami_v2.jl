@@ -15,61 +15,7 @@ include("test/rami/rami_tools.jl")
 # Starts with HOM00_RPV, HOM00_RLI for Anisotropic surfaces
 # Starts with HOM45_LAM, HOM25_LAM, or HOM35_LAM for homogeneous discrete with isotropic background
 
-function produce_rami_results(experiment_name::String;
-                        all_scenarios = all_scenarios,
-                        n_desert=n_desert,n_continental=n_continental, sr=sr )
 
-    # Get rami scenario from experiment name
-    # all_scenarios = JSON.parsefile(rami_json);
-    filt_scenario = filter(x->x["name"] == experiment_name, all_scenarios);
-    @assert length(filt_scenario) ≤ 1 "Multiple matching experiment names!"
-    @assert length(filt_scenario) ≥ 1 "Experiment name not found in JSON input"
-    curr_scenario = filt_scenario[1]["observations"][1];
-    #name = curr_scenario["name"]
-    # Band to use    
-    band = curr_scenario["measures"][1]["bands"][1]
-
-    rami_atmosphere   = curr_scenario["atmosphere"]
-    atm_type = rami_atmosphere["atmosphere_type"]
-    @info "Atmosphere type is " * atm_type 
-    
-    params = getParams(curr_scenario)
-    
-    # Add Aerosols: 
-    add_aerosols!(rami_atmosphere, params, band, n_desert, n_continental)
-    
-    # Scale trace gases:
-    scale_gases!(rami_atmosphere, params)
-
-    # Set viewing geometries:
-    setGeometry!(curr_scenario, params)
-
-    # Set surface parameters:
-    setSurface!(curr_scenario, params)
-
-    # Create vSmartMOM model:
-    model = model_from_parameters(params)
-
-    # Turning off Rayleigh scattering for non Rayleigh types (has to be done in model, not params):
-    if atm_type ∈ noRayleighType
-        @info "Turning off Rayleigh ", atm_type
-        model.τ_rayl[1] .= 0.0
-    end
-    #  model.τ_rayl[1] .= 0.00000000001
-    ########################################################
-
-    # Run model (can think about including the BOA and hemispheric data here as well)
-    #R = rt_run(model)
-    R, _, _, _, hdr, bhr_uw, bhr_dw = rt_run(model)
-    # Convolve results:
-    @show size(R)
-    BRF = convolve_2_sentinel(model.params.spec_bands[1], R, band)
-    save_toa_results(BRF, model, experiment_name, "/home/cfranken/rami2/")
-    return BRF, R, hdr, bhr_uw, bhr_dw, model
-    #return BRF, R, model
-
-    # Can do postprocessing here (saving data, convolution, etc)
-end
 
 # Get all scenarios
 rami_json = "test/rami/RAMI4ATM_experiments_v1.0.json";
@@ -80,12 +26,12 @@ all_scenarios = JSON.parsefile(rami_json);
 #R, models = produce_rami_results("HOM00_WHI_A00S_M02_z30a000")
 #BRF, R, model = produce_rami_results("HOM00_WHI_A00S_M12_z30a000")
 #white lambertian
-BRF1, R1, hdr1, bhr_uw1, bhr_dw1, model = produce_rami_results("HOM00_LAM_S00S_M03_z30a000")#("HOM00_WHI_EC6L_M03_z30a000")
+BRF1, R1, hdrf1, bhr1, model = produce_rami_results("HOM00_LAM_S00S_M03_z30a000")#("HOM00_WHI_EC6L_M03_z30a000")
 #BRF1, R, model = produce_rami_results("HOM00_WHI_SD2S_M02_z30a000")
 #RPV
-BRF2, R2, hdr2, bhr_uw2, bhr_dw2, model = produce_rami_results("HOM00_RPV_S00S_M03_z30a000")#("HOM00_RPV_EC6L_M03_z30a000")
+BRF2, R2, hdrf2, bhr2, model = produce_rami_results("HOM00_RPV_S00S_M03_z30a000")#("HOM00_RPV_EC6L_M03_z30a000")
 # for RossLi
-BRF3, R3, hdr3, bhr_uw3, bhr_dw3, model = produce_rami_results("HOM00_RLI_S00S_M03_z30a000")#("HOM00_RLI_EC6L_M03_z30a000") 
+BRF3, R3, hdrf3, bhr3, model = produce_rami_results("HOM00_RLI_S00S_M03_z30a000")#("HOM00_RLI_EC6L_M03_z30a000") 
 
 ##
 
