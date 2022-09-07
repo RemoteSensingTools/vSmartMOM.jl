@@ -87,11 +87,15 @@ This module enables scattering phase-function calculation of atmospheric aerosol
   - `make_mie_model(computation_type::AbstractFourierDecompositionType, aerosol::AbstractAerosolType, λ::Real, polarization::AbstractPolarizationType, truncation_type::AbstractTruncationType, ...)`: Create a MieModel struct that holds all of the model parameters needed to perform a phase function calculation (computation type, aerosol, incident wavelength, etc. )
   - `compute_aerosol_optical_properties(model::MieModel)`: Compute the aerosol optical properties using the specified model parameters
 
-## Support
+## How to Contribute 
+
+vSmartMOM.jl is a growing package and thus feedback from users like you are highly appreciated. To report bugs or suggest new features in vSmartMOM.jl, please create GitHub [Issues](https://github.com/RemoteSensingTools/vSmartMOM.jl/issues). To contribute to the package, please feel free to create a [Pull Request](https://github.com/RemoteSensingTools/vSmartMOM.jl/pulls). 
+
+If you have any questions about the methods used or would like to chat with us, please feel free to shoot us an email <a href="mailto:cfranken@caltech.edu,wennberg@gps.caltech.edu,suniti.sanghavi@gmail.com?cc=rjeyaram@caltech.edu">here</a>. 
+
+## Acknowledgements
 
 This project is being developed in the Christian Frankenberg and Paul Wennberg labs at Caltech and is largely based on papers and ideas by Suniti Sanghavi from NASA/JPL, with support from the Schmidt Academy for Software Engineering (SASE).
-
-Please <a href="mailto:cfranken@caltech.edu,wennberg@gps.caltech.edu,suniti.sanghavi@gmail.com?cc=rjeyaram@caltech.edu"> email us</a> if you have any questions, suggestions, or contributions!
 
 ## Copyright Notice
 
