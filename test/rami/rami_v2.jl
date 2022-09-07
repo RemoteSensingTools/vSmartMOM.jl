@@ -35,8 +35,8 @@ BRF3, R3, hdrf3, bhr3, model = produce_rami_results("HOM00_RLI_S00S_M03_z30a000"
 
 ##
 
-#for i = 1:10:2000
-for i = 1000:1050
+#for i = 1:10:3000
+for i = 1000:10:2050
     println( i, " ",  all_scenarios[i]["observations"][1]["atmosphere"]["atmosphere_type"], " ", all_scenarios[i]["name"])
 end
 
