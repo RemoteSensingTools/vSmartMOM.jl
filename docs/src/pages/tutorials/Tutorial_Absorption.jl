@@ -2,13 +2,13 @@
 
 # Part of ESE 156 Remote Sensing Class; 2020; Christian Frankenberg
 
-# The purpose of this tutorial is to demonstrate how to compute line-shapes (in our case mostly of rotational-vibrational transition lines), what processes determine line-shapes and how the dependencies in the line-shape on pressure and temperature could actually be used to our advantage in a retrieval system.
+# The purpose of this tutorial is to demonstrate how to compute line-shapes (in our case mostly of rotational-vibrational transition lines), what processes determine line-shapes, and how the dependencies in the line-shape on pressure and temperature could actually be used to our advantage in a retrieval system.
 
 # ### Basic Tools
 
-# We are making use of the [HITRAN database](https://www.cfa.harvard.edu/hitran/), see a list of tutorials [here](https://www.youtube.com/playlist?list=PLqOG3cBizTUFQw5lwpkCpQFCVuxHTZgrT)
+# We are making use of the [HITRAN database](https://www.cfa.harvard.edu/hitran/), see a list of tutorials [here](https://www.youtube.com/playlist?list=PLqOG3cBizTUFQw5lwpkCpQFCVuxHTZgrT).
 
-# There are other spectroscopic linelists but we are focusing on HITRAN only here. In addition, there are more complex line-shapes that we are not treating here, including [collisional narrowing](https://journals.aps.org/pr/abstract/10.1103/PhysRev.89.472), [line-mixing](https://aip.scitation.org/doi/abs/10.1063/1.478724), [collision-induced absorption (CIA)](https://www.sciencedirect.com/science/article/abs/pii/S0022407311003773).
+# There are other spectroscopic linelists, but we are focusing on HITRAN only here. In addition, there are more complex line-shapes that we are not treating here, including [collisional narrowing](https://journals.aps.org/pr/abstract/10.1103/PhysRev.89.472) and [line-mixing](https://aip.scitation.org/doi/abs/10.1063/1.478724), [collision-induced absorption (CIA)](https://www.sciencedirect.com/science/article/abs/pii/S0022407311003773).
 
 # ### Line-shape (background covered in class):
 # If we have a line-strength S (in cm$^{-1}$ cm$^2$/molecule) for a specific transition at $\nu_0$, we can compute the cross section as:
@@ -19,7 +19,7 @@
 
 # $\int_{-\infty}^\infty \Phi(\nu-\nu_0) d\nu=1$
 
-# There are several processes that affect the shape and width of $\Phi$ and we will walk through the most important ones here now. 
+# There are several processes that affect the shape and width of $\Phi$, and we will walk through the most important ones here. 
 
 # ##### Doppler Broadening
 # Doppler broadening is caused by a simple doppler shift of emitted and absorbed frequencies, caused by the relative velocities of the molecules along the line of sight. A doppler shifted apparent frequency from the centroid frequency $\nu_0$ can be described as:
@@ -30,7 +30,7 @@
 
 # $$\Delta\nu = \nu_0\frac{v_r}{c}$$
 
-# Let us take a simple example with the satellite flying at 7km/s and either staring into the flight direction (technically, it wouldn't see the atmosphere then but let's ignore this) or looking into the back:
+# Let us take a simple example with the satellite flying at 7km/s and either staring into the flight direction (technically, it wouldn't see the atmosphere then, but let's ignore this) or looking into the back:
 
 # ____
 
@@ -79,7 +79,7 @@ println("Doppler shift = $(1e7/(v₀-Δ_ν)-1e7/v₀) nm")
 # $\Delta \nu_D(290K,CH_4)=0.0110cm^{-1}$
 # $\Delta \nu_D(290K,CH_4)=0.0096cm^{-1}$
 
-# Multitply with about 1.6585 (2$\sqrt{ln(2)}$) to get FWHM
+# Multitply with about 1.6585 (2$\sqrt{ln(2)}$) to get the full-width half-maximum (FWHM) of the spectral line. 
 
 # ----
 
@@ -93,7 +93,7 @@ println("Doppler shift = $(1e7/(v₀-Δ_ν)-1e7/v₀) nm")
 
 # $$\Delta\nu = \frac{h/2\pi}{\tau}$$
 
-# The natural line-width is defined by using the radiative lifetime but this is mostly negligible as the natural lifetime of the upper state is usually much much smaller than the "perturbed" lifetime in the presence of quencher (e.g. through collisions). Again, there are exceptions.
+# The natural line-width is defined by using the radiative lifetime, but this is mostly negligible as the natural lifetime of the upper state is usually much much smaller than the "perturbed" lifetime in the presence of quencher (e.g. through collisions). Again, there are exceptions.
 
 # Collisions between molecules reduce the lifetime of the upper state, thus widening the line width. This behavor gives rise to the so-called Lorentz lineshape.
 
@@ -110,7 +110,7 @@ println("Doppler shift = $(1e7/(v₀-Δ_ν)-1e7/v₀) nm")
 
 # ### Other more complex lineshapes
 
-# Once you dig deeper, there are various other more complex line-shapes (and line-mixing effects), which we ignore for now as the Voigt line-shape can provide very reasonable results. See, for instance, [here](https://www.degruyter.com/view/j/pac.2014.86.issue-12/pac-2014-0208/pac-2014-0208.xml)
+# Once you dig deeper, there are various other more complex line-shapes (and line-mixing effects), which we ignore for now as the Voigt line-shape can provide very reasonable results. See, for instance, [here](https://www.degruyter.com/view/j/pac.2014.86.issue-12/pac-2014-0208/pac-2014-0208.xml).
 
 using Plots
 using Pkg.Artifacts

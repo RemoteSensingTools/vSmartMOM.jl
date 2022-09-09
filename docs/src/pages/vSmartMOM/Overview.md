@@ -3,7 +3,7 @@
 The vSmartMOM module allows end-to-end simulation of radiative transfer (RT) throughout Earth's atmosphere and surface. Specifically, it:
 
 - Enables 1D vectorized plane-parallel RT modeling based on the Matrix Operator Method
-- Incorporates fast, high fidelity simulations of scattering atmospheres containing haze and clouds, including pressure- and temperature-resolved absorption profiles of gaseous species in the atmosphere
+- Incorporates fast, high-fidelity simulations of scattering atmospheres containing haze and clouds, including pressure- and temperature-resolved absorption profiles of gaseous species in the atmosphere
 - Enables GPU-accelerated computations of the resulting hyperspectral reflectances/transmittances
 - Enables auto-differentiation of the output spectrum with respect to various input parameters
 
