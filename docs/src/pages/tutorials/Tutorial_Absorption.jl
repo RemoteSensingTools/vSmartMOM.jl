@@ -68,9 +68,9 @@ println("Doppler shift = $(1e7/(v₀-Δ_ν)-1e7/v₀) nm")
 
 # Let us put in some numbers with R=8.3144598 J/K/mol at 6000cm$^{-1}$:
 
-# <li>T = 220K, 290K
+# - T = 220K, 290K
 
-# <li>M = 16g/mol (CH$4$) or 44g/mol (CO$_2$)
+# - M = 16g/mol (CH$4$) or 44g/mol (CO$_2$)
  
 # ---
 
@@ -168,7 +168,7 @@ xlabel!("Wavenumber (cm⁻¹)")
 #-------------------------
 
 co2_par_band = Absorption.read_hitran(artifact("CO2"), mol=2, iso=1, ν_min=6000.0, ν_max=6400.0);
-band_voigt   = make_hitran_model(co2_par_band , Voigt(), architecture=CPU())
+band_voigt   = make_hitran_model(co2_par_band , Voigt(), architecture=CPU());
 
 #-------------------------
 
@@ -190,9 +190,9 @@ xlims!((6300,6380))
 #-------------------------
 
 # Think about this temperature dependence!!
-# <li> Why is it there? 
-# <li> Can you see the P and R branch? 
-# <li> Can you identify different J levels?
+# - Why is it there? 
+# - Can you see the P and R branch? 
+# - Can you identify different J levels?
 
 # ---
 # ### Some fun stuff
