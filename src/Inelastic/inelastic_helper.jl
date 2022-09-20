@@ -396,6 +396,104 @@ function compute_optical_RS!(RS_type::Union{VS_1to0, VS_1to0_plus}, grid_in, λ�
     #plot!(grid_in, σ_VRStmp*1.e40)
 end
 
+#===========For target grids==========#
+function compute_optical_RVRS!(RS_type::Union{VS_0to1, VS_0to1_plus}, grid_in, λ₀, n2, o2)
+    
+    σ_out = similar(grid_in);
+    #atmo_σ_VRS_0to1 = similar(grid_in);
+    #atmo_σ_RVRS_0to1 = similar(grid_in);
+    #σ_tmpVRS = similar(grid_in);
+    σ_tmpRVRS = similar(grid_in);
+    
+    # N2
+    xin = [n2.effCoeff.Δν̃_RoVibRaman_coeff_0to1_JtoJp2.parent; n2.effCoeff.Δν̃_RoVibRaman_coeff_0to1_JtoJm2.parent]
+    yin = [n2.effCoeff.σ_RoVibRaman_coeff_0to1_JtoJp2.parent; n2.effCoeff.σ_RoVibRaman_coeff_0to1_JtoJm2.parent];
+    #apply_lineshape!(xin, yin, λ₀, collect(grid_out), σ_out, 1, 300.0, 40);
+    apply_gridlines!(xin[abs.(xin).>0], yin[abs.(xin).>0], λ₀, grid_in, σ_out);
+    σ_tmpRVRS = n2.vmr * σ_out #cross section in cm^2
+    
+    # O2
+    xin = [o2.effCoeff.Δν̃_RoVibRaman_coeff_0to1_JtoJp2.parent; o2.effCoeff.Δν̃_RoVibRaman_coeff_0to1_JtoJm2.parent]
+    yin = [o2.effCoeff.σ_RoVibRaman_coeff_0to1_JtoJp2.parent; o2.effCoeff.σ_RoVibRaman_coeff_0to1_JtoJm2.parent];
+    #apply_lineshape!(xin, yin, λ₀, collect(grid_out), σ_out, 1, 300.0, 40);
+    apply_gridlines!(xin[abs.(xin).>0], yin[abs.(xin).>0], λ₀, grid_in, σ_out);
+    σ_tmpRVRS += o2.vmr * σ_out #cross section in cm^2
+    
+    atmo_σ_RVRS_0to1 = σ_tmpRVRS[σ_tmpRVRS.>0]
+    #finding all indices of σ_out (and hence of ν_in) that have finite (non-zero) values
+    index_RVRSgrid_out = findall(x->x in σ_tmpRVRS[σ_tmpRVRS.>0],σ_tmpRVRS)
+    
+    return index_RVRSgrid_out, atmo_σ_RVRS_0to1;
+end
+
+
+function compute_optical_RVRS!(RS_type::Union{VS_1to0, VS_1to0_plus}, grid_in, λ₀, n2, o2)        
+    σ_out = similar(collect(grid_in));        
+    #atmo_σ_VRS_1to0 = similar(grid_in);
+    #atmo_σ_RVRS_1to0 = similar(grid_in);
+    #σ_tmpVRS = similar(grid_in);
+    σ_tmpRVRS = similar(grid_in);
+
+    # N2
+    xin = [n2.effCoeff.Δν̃_RoVibRaman_coeff_1to0_JtoJp2.parent; n2.effCoeff.Δν̃_RoVibRaman_coeff_1to0_JtoJm2.parent]
+    yin = [n2.effCoeff.σ_RoVibRaman_coeff_1to0_JtoJp2.parent; n2.effCoeff.σ_RoVibRaman_coeff_1to0_JtoJm2.parent];
+    #apply_lineshape!(xin, yin, λ₀, collect(grid_out), σ_out, 1, 300.0, 40);
+    apply_gridlines!(xin[abs.(xin).>0], yin[abs.(xin).>0], λ₀, grid_in, σ_out);
+    σ_RVRStmp = n2.vmr * σ_out #cross section in cm^2
+
+    # O2
+    xin = [o2.effCoeff.Δν̃_RoVibRaman_coeff_1to0_JtoJp2.parent; o2.effCoeff.Δν̃_RoVibRaman_coeff_1to0_JtoJm2.parent]
+    yin = [o2.effCoeff.σ_RoVibRaman_coeff_1to0_JtoJp2.parent; o2.effCoeff.σ_RoVibRaman_coeff_1to0_JtoJm2.parent];
+    #apply_lineshape!(xin, yin, λ₀, collect(grid_out), σ_out, 1, 300.0, 40);
+    apply_gridlines!(xin[abs.(xin).>0], yin[abs.(xin).>0], λ₀, grid_in, σ_out);
+    σ_RVRStmp += o2.vmr * σ_out #cross section in cm^2
+    
+    atmo_σ_RVRS_1to0 = σ_tmpRVRS(σ_RVRStmp.>0)
+    #finding all indices of σ_out (and hence of ν_in) that have finite (non-zero) values
+    index_RVRSgrid_out = findall(x->x in σ_tmpRVRS[σ_tmpRVRS.>0],σ_tmpRVRS)
+
+    return index_RVRSgrid_out, atmo_σ_RVRS_1to0;
+end
+
+function compute_optical_VRS!(RS_type::Union{VS_0to1, VS_0to1_plus}, grid_in, λ₀, mol)
+    σ_out = similar(grid_in);
+    σ_tmpVRS = similar(grid_in);
+
+    # mol: N2 OR O2
+    xin = mol.effCoeff.Δν̃_VibRaman_coeff_0to1_hires
+    yin = mol.effCoeff.σ_VibRaman_coeff_0to1_hires
+    #apply_lineshape!(xin, yin, λ₀, collect(grid_out), σ_out, 1, 300.0, 40);
+    apply_gridlines!(xin, yin, λ₀, grid_in, σ_out);
+    σ_tmpVRS = mol.vmr * σ_out #cross section in cm^2
+
+    atmo_σ_VRS_0to1 = σ_tmpVRS[σ_tmpVRS.>0]
+    #finding all indices of σ_out (and hence of ν_in) that have finite (non-zero) values
+    index_VRSgrid_out = findall(x->x in σ_tmpVRS[σ_tmpVRS.>0],σ_tmpVRS)
+
+    return index_VRSgrid_out, atmo_σ_VRS_0to1;
+end
+
+function compute_optical_VRS!(RS_type::Union{VS_1to0, VS_1to0_plus}, grid_in, λ₀, mol)
+    σ_out = similar(grid_in);
+    σ_tmpVRS = similar(grid_in);
+
+    # mol: N2 OR O2
+    xin = mol.effCoeff.Δν̃_VibRaman_coeff_1to0_hires
+    yin = mol.effCoeff.σ_VibRaman_coeff_1to0_hires
+    #apply_lineshape!(xin, yin, λ₀, collect(grid_out), σ_out, 1, 300.0, 40);
+    apply_gridlines!(xin, yin, λ₀, grid_in, σ_out);
+    σ_tmpVRS = mol.vmr * σ_out #cross section in cm^2
+
+    atmo_σ_VRS_1to0 = σ_tmpVRS[σ_tmpVRS.>0]
+    #finding all indices of σ_out (and hence of ν_in) that have finite (non-zero) values
+    index_VRSgrid_out = findall(x->x in σ_tmpVRS[σ_tmpVRS.>0],σ_tmpVRS)
+
+    return index_VRSgrid_out, atmo_σ_VRS_1to0;
+end
+
+
+#=======================================#
+
 """
     $(FUNCTIONNAME)(depol)
 Returns the greek coefficients (as [`GreekCoefs`](@ref)) of the Rayleigh phase function given 
@@ -413,7 +511,7 @@ function get_greek_raman(RS_type::Union{RRS, RRS_plus, VS_0to1, VS_0to1_plus, VS
     FT = eltype(depol)
 
     # Rayleigh Greek Parameters
-    dpl_p = (1 - depol)  / (1 + depol / 2)
+    dpl_p = (1 - depol)  / (1 + depol/2)
     #dpl_q = (1 + depol)  / (1 - depol)
     dpl_r = (1 - 2depol) / (1 - depol)
   

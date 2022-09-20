@@ -62,6 +62,7 @@ include("CoreKernel/doubling_inelastic.jl")    # Doubling for elastic + inelasti
 include("CoreKernel/interaction.jl")           # Interaction
 include("CoreKernel/interaction_inelastic.jl") # Interaction for elastic + inelastic scattering 
 include("CoreKernel/interaction_multisensor.jl") # Suniti: ms
+include("CoreKernel/interaction_ss.jl") #for single scattering contribution only
 include("CoreKernel/interlayer_flux.jl")       # Suniti: ms
 include("CoreKernel/rt_kernel.jl")             # Handle Core RT (Elemental/Doubling/Interaction)
 include("CoreKernel/rt_kernel_ss.jl")          # Single scattering only: Handle Core RT (Elemental/Doubling/Interaction)

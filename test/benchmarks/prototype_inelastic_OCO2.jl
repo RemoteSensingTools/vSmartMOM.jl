@@ -93,6 +93,7 @@ for iBand in length(bands)
     # Add something here, that computes ALL the OP needed for the Raman case.
     #modelRS = ...
     R, T, ieR, ieT =CoreRT.rt_run_test(RS_type, model, iBand)
+    #R_ss, T_ss, ieR_ss, ieT_ss =CoreRT.rt_run_test(RS_type, model, iBand)
     #=R, T, ieR, ieT = rt_run(RS_type,
         model.params.polarization_type,
         model.obs_geom,

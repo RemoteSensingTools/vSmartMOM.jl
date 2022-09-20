@@ -17,7 +17,7 @@ Computes (in place) surface optical properties for a (scalar) lambertian albedo 
     - `τ_sum` total optical thickness from TOA to the surface
     - `architecture` Compute architecture (GPU,CPU)
 """ 
-function create_surface_layer!(lambertian::LambertianSurfaceScalar{FT}, 
+function create_surface_layer!(RS_type, lambertian::LambertianSurfaceScalar{FT}, 
                                added_layer::Union{AddedLayer,AddedLayerRS},
                                SFI,
                                m::Int,
@@ -48,45 +48,56 @@ function create_surface_layer!(lambertian::LambertianSurfaceScalar{FT},
         
         # Source function of surface:
         if SFI
-            I₀_NquadN = similar(qp_μN);
-            I₀_NquadN[:] .=0;
-            I₀_NquadN[iμ₀Nstart:pol_type.n*iμ₀] = pol_type.I₀;
+            F₀_NquadN = arr_type(zeros(length(qp_μN),length(τ_sum)));
+            #F₀_NquadN[:] .=0;
+            #@show size(F₀), size(μ₀), size(R_surf), size(F₀_NquadN), size(added_layer.J₀⁻[:,1,:]), size(F₀ .* (exp.(-τ_sum/μ₀))'), size(F₀_NquadN[iμ₀Nstart:pol_type.n*iμ₀,:])
+            #@show iμ₀Nstart, pol_type.n*iμ₀
+            F₀_NquadN[iμ₀Nstart:pol_type.n*iμ₀,:] .= (F₀ .* (exp.(-τ_sum/μ₀))');
             
-            added_layer.J₀⁺[iμ₀Nstart:pol_type.n*iμ₀,1,:] .= 
-                F₀ .* exp.(-τ_sum/μ₀)';
-            added_layer.J₀⁻[iμ₀Nstart:pol_type.n*iμ₀,1,:] = 
-                μ₀*(R_surf[iμ₀Nstart:pol_type.n*iμ₀, iμ₀Nstart:pol_type.n*iμ₀]*
-                F₀) .* exp.(-τ_sum/μ₀)';
+            added_layer.J₀⁺[:,1,:] .= 0;#F₀_NquadN;
+            added_layer.J₀⁻[:,1,:] .= μ₀*(R_surf*F₀_NquadN)#/FT(π);
+            #added_layer.J₀⁻[:,1,:] = 
+            #    μ₀*(R_surf[iμ₀Nstart:pol_type.n*iμ₀, iμ₀Nstart:pol_type.n*iμ₀]*
+            #    F₀) .* exp.(-τ_sum/μ₀)';
             # added_layer.J₀⁺[:,1,:] .= I₀_NquadN .* exp.(-τ_sum/μ₀)';
             # added_layer.J₀⁻[:,1,:] = μ₀*(R_surf*I₀_NquadN) .* exp.(-τ_sum/μ₀)';
         end
         R_surf = R_surf * Diagonal(qp_μN.*wt_μN)
-        
+        #R_surf = 2R_surf * Diagonal(qp_μN.*wt_μN)
+        #R_surf = R_surf * Diagonal(qp_μN.*wt_μN)/π
 
         #@show size(added_layer.r⁻⁺), size(R_surf), size(added_layer.J₀⁻)
         added_layer.r⁻⁺ .= R_surf;
         added_layer.r⁺⁻ .= 0;
-        added_layer.t⁺⁺ .= T_surf;
-        added_layer.t⁻⁻ .= T_surf;
+        added_layer.t⁺⁺ .= 0.0; #T_surf;
+        added_layer.t⁻⁻ .= 0.0; #T_surf;
 
     else
         added_layer.r⁻⁺ .= 0;
         added_layer.r⁻⁺ .= 0;
-        added_layer.t⁺⁺ .= T_surf;
-        added_layer.t⁻⁻ .= T_surf;
+        added_layer.t⁺⁺ .= 0.0; #T_surf;
+        added_layer.t⁻⁻ .= 0.0; #T_surf;
         added_layer.J₀⁺ .= 0;
         added_layer.J₀⁻ .= 0;
     end
+    if !(typeof(RS_type)<:noRS)
+        added_layer.ier⁻⁺ .= 0;
+        added_layer.ier⁻⁺ .= 0;
+        added_layer.iet⁺⁺ .= 0.0; #T_surf;
+        added_layer.iet⁻⁻ .= 0.0; #T_surf;
+        added_layer.ieJ₀⁺ .= 0;
+        added_layer.ieJ₀⁻ .= 0;
+    end
 end
 
-function create_surface_layer!(lambertian::LambertianSurfaceLegendre{FT}, 
-    added_layer::Union{AddedLayer,AddedLayerRS},
-    SFI,
-    m::Int,
-    pol_type,
-    quad_points,
-    τ_sum, F₀,
-    architecture) where {FT}
+function create_surface_layer!(RS_type, lambertian::LambertianSurfaceLegendre{FT}, 
+        added_layer::Union{AddedLayer,AddedLayerRS},
+        SFI,
+        m::Int,
+        pol_type,
+        quad_points,
+        τ_sum, F₀,
+        architecture) where {FT}
     FT2 = Float64
     if m == 0
         @unpack qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart, iμ₀, μ₀ = quad_points
@@ -99,7 +110,7 @@ function create_surface_layer!(lambertian::LambertianSurfaceLegendre{FT},
         P = Scattering.compute_legendre_poly(x,length(legendre_coeff))[1]
         # Evaluate Polynomial (as matrix multiplication)
         albedo = P * legendre_coeff
-        ρ = arr_type(2albedo)
+        ρ = arr_type(2albedo)#/FT(π))
         # Get size of added layer
         dim = size(added_layer.r⁻⁺)
         Nquad = dim[1] ÷ pol_type.n
@@ -113,14 +124,13 @@ function create_surface_layer!(lambertian::LambertianSurfaceLegendre{FT},
 
         # Source function of surface:
         if SFI
-            I₀_NquadN = similar(qp_μN);
-            I₀_NquadN[:] .=0;
-            I₀_NquadN[iμ₀Nstart:pol_type.n*iμ₀] = pol_type.I₀;
-            added_layer.J₀⁺[:] .= 0
+            F₀_NquadN = zeros(length(qp_μN), length(τ_sum));
+            F₀_NquadN[iμ₀Nstart:pol_type.n*iμ₀,:] = F₀.*exp.(-τ_sum/μ₀);
+            added_layer.J₀⁺ = 0 # F₀_NquadN
             # Suniti double-check
             # added_layer.J₀⁻[:,1,:] = μ₀*(R_surf*I₀_NquadN) .* (ρ .* exp.(-τ_sum/μ₀))';
-            added_layer.J₀⁻[iμ₀Nstart:pol_type.n*iμ₀,1,:] = 
-                μ₀*(R_surf[iμ₀Nstart:pol_type.n*iμ₀, iμ₀Nstart:pol_type.n*iμ₀]*F₀) .* (ρ .* exp.(-τ_sum/μ₀))';
+            added_layer.J₀⁻[:,1,:] = μ₀*(R_surf*F₀_NquadN*ρ)/FT(π); 
+            #μ₀*(R_surf[iμ₀Nstart:pol_type.n*iμ₀, iμ₀Nstart:pol_type.n*iμ₀]*F₀) .* (ρ .* exp.(-τ_sum/μ₀))';
         end
         R_surf   = R_surf * Diagonal(qp_μN.*wt_μN)
         siz = size(added_layer.r⁻⁺)
@@ -131,8 +141,8 @@ function create_surface_layer!(lambertian::LambertianSurfaceLegendre{FT},
         #@show size(added_layer.r⁻⁺), size(R_surf), size(added_layer.J₀⁻)
         added_layer.r⁻⁺ .= R_surf3D;
         added_layer.r⁺⁻ .= 0;
-        added_layer.t⁺⁺ .= T_surf;
-        added_layer.t⁻⁻ .= T_surf;
+        added_layer.t⁺⁺ .= 0.0; #T_surf;
+        added_layer.t⁻⁻ .= 0.0; #T_surf;
 
     else
         added_layer.r⁻⁺[:] .= 0;
@@ -141,5 +151,13 @@ function create_surface_layer!(lambertian::LambertianSurfaceLegendre{FT},
         added_layer.t⁻⁻[:] .= 0;
         added_layer.J₀⁺[:] .= 0;
         added_layer.J₀⁻[:] .= 0;
+    end
+    if !(typeof(RS_type)<:noRS)
+        added_layer.ier⁻⁺ .= 0;
+        added_layer.ier⁻⁺ .= 0;
+        added_layer.iet⁺⁺ .= 0.0; #T_surf;
+        added_layer.iet⁻⁻ .= 0.0; #T_surf;
+        added_layer.ieJ₀⁺ .= 0;
+        added_layer.ieJ₀⁻ .= 0;
     end
 end

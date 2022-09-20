@@ -56,7 +56,14 @@ function rt_kernel_ss!(RS_type::noRS, pol_type, SFI, added_layer, composite_laye
         
     # If this is not the TOA, perform the interaction step
     else
-        @timeit "interaction" interaction!(RS_type, scattering_interface, SFI, composite_layer, added_layer, I_static)
+        interaction_ss!(SFI,
+            composite_layer, 
+            added_layer, 
+            τ_sum,
+            τ_λ,
+            quad_points,
+            architecture)
+        #@timeit "interaction" interaction!(RS_type, scattering_interface, SFI, composite_layer, added_layer, I_static)
     end
 end
 
@@ -125,7 +132,23 @@ function rt_kernel_ss!(RS_type::Union{RRS, VS_0to1, VS_1to0}, pol_type, SFI, add
     
     # If this is not the TOA, perform the interaction step
     else
-        @timeit "interaction" interaction!(RS_type, scattering_interface, SFI, composite_layer, added_layer, I_static)
+        interaction_ss!(SFI,
+            composite_layer, 
+            added_layer, 
+            τ_sum,
+            τ_λ,
+            quad_points,
+            architecture)
+        
+        interaction_inelastic_ss!(RS_type,
+            SFI,
+            composite_layer, 
+            added_layer, 
+            τ_sum,
+            τ_λ,
+            quad_points,
+            architecture)
+        #@timeit "interaction" interaction!(RS_type, scattering_interface, SFI, composite_layer, added_layer, I_static)
     end
 end
 
@@ -178,9 +201,9 @@ function rt_kernel_ss!(RS_type::noRS{FT},
         added_layer.r⁻⁺[:] .= 0;
         added_layer.r⁺⁻[:] .= 0;
         added_layer.J₀⁻[:] .= 0;
-        temp = Array(exp.(-τ_λ./qp_μN'))
+        temp = Array(exp.(-τ./qp_μN'))
         #added_layer.t⁺⁺, added_layer.t⁻⁻ = (Diagonal(exp(-τ_λ / qp_μN)), Diagonal(exp(-τ_λ / qp_μN)))   
-        for iλ = 1:length(τ_λ)
+        for iλ = 1:length(τ)
             added_layer.t⁺⁺[:,:,iλ] = Diagonal(temp[iλ,:]);
             added_layer.t⁻⁻[:,:,iλ] = Diagonal(temp[iλ,:]);
         end
@@ -195,7 +218,15 @@ function rt_kernel_ss!(RS_type::noRS{FT},
         composite_layer.J₀⁺[:], composite_layer.J₀⁻[:] = (added_layer.J₀⁺, added_layer.J₀⁻ )
     # If this is not the TOA, perform the interaction step
     else
-        @timeit "interaction" interaction!(RS_type, scattering_interface, SFI, composite_layer, added_layer, I_static)
+        #@timeit "interaction" interaction!(RS_type, scattering_interface, SFI, composite_layer, added_layer, I_static)
+        interaction_ss!(SFI,
+            composite_layer, 
+            added_layer, 
+            τ_sum,
+            τ,
+            quad_points,
+            architecture)
+        
         if iz==2
             M1 = Array(composite_layer.T⁺⁺);
             M2 = Array(composite_layer.R⁺⁻);
@@ -265,9 +296,9 @@ function rt_kernel_ss!(
         added_layer.iet⁻⁻[:] .= 0;
         added_layer.iet⁺⁺[:] .= 0;
         added_layer.ieJ₀⁺[:] .= 0;
-        temp = Array(exp.(-τ_λ./qp_μN'))
+        temp = Array(exp.(-τ./qp_μN'))
         #added_layer.t⁺⁺, added_layer.t⁻⁻ = (Diagonal(exp(-τ_λ / qp_μN)), Diagonal(exp(-τ_λ / qp_μN)))   
-        for iλ = 1:length(τ_λ)
+        for iλ = 1:length(τ)
             added_layer.t⁺⁺[:,:,iλ] = Diagonal(temp[iλ,:]);
             added_layer.t⁻⁻[:,:,iλ] = Diagonal(temp[iλ,:]);
         end
@@ -286,8 +317,24 @@ function rt_kernel_ss!(
     
     # If this is not the TOA, perform the interaction step
     else
-        @timeit "interaction" interaction!(RS_type, scattering_interface, 
-            SFI, composite_layer, added_layer, I_static)
+        #@timeit "interaction" interaction!(RS_type, scattering_interface, 
+        #    SFI, composite_layer, added_layer, I_static)
+        interaction_ss!(SFI,
+            composite_layer, 
+            added_layer, 
+            τ_sum,
+            τ,
+            quad_points,
+            architecture)
+        
+        interaction_inelastic_ss!(RS_type,
+            SFI,
+            composite_layer, 
+            added_layer, 
+            τ_sum,
+            τ,
+            quad_points,
+            architecture)
     end
 end
 #=

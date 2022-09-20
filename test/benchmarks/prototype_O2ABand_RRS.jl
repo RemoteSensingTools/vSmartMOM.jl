@@ -65,7 +65,7 @@ RS_type.F₀ = zeros(model.params.polarization_type.n, length(P))
 for i=1:length(P)
     sol_trans = Tsolar_interp(ν[i]);
     F₀[i] = sol_trans * P[i];
-    RS_type.F₀[1,i] = 1.0 #F₀[i];
+    RS_type.F₀[1,i] = F₀[i]; #1.0 #
 end 
 
 #solar_transmission_from_file(file_name::String) = readdlm(file_name)
@@ -116,7 +116,7 @@ RnoRS, TnoRS, _, _ = CoreRT.rt_run_ms(noRS(),
     # CoreRT.rt_run_test_ms(RS_type,model,iBand);
 
 R, T, ieR, ieT = CoreRT.rt_run_test(RS_type,model,iBand);
-
+R_ss, T_ss, ieR_ss, ieT_ss = CoreRT.rt_run_test_ss(RS_type,model,iBand);
 
 RS_type = InelasticScattering.noRS(
     fscattRayl  = [FT(1)],
@@ -128,7 +128,7 @@ RS_type.F₀ = zeros(model.params.polarization_type.n, length(P))
 for i=1:length(P)
     #sol_trans = Tsolar_interp(ν[i]);
     #F₀[i] = sol_trans * P[i];
-    RS_type.F₀[1,i] = 1.0 #F₀[i];
+    RS_type.F₀[1,i] = F₀[i]; #F₀
 end 
 
 RnoRS, TnoRS, _, _ = CoreRT.rt_run_test(RS_type,model,iBand);
@@ -173,7 +173,7 @@ p1 = plot!(1e7./ν, (I_conv[1,:].+ieI_conv[1,:]).*convfct, linewidth = 2, lineco
 p1 = plot!(1e7./ν, (I_conv[2,:].+ieI_conv[2,:]).*convfct, linewidth = 2, linecolor=:blue, xlims=(755,775))
 p1 = plot!(1e7./ν, (I_conv[3,:].+ieI_conv[3,:]).*convfct, linewidth = 2, linecolor=:green, xlims=(755,775))
 
-p2 = plot(1e7./ν, (R[1,1,:].-RnoRS[1,1,:].+ieR[1,1,:]).*convfct, linecolor=:black, xlims=(755,775), ylims=(-2e-6, 1.e-5))#, xlabel = "λ [nm]")
+p2 = plot(1e7./ν, (R[1,1,:].-RnoRS[1,1,:].+ieR[1,1,:]).*convfct, linecolor=:black, xlims=(755,775))#, ylims=(-2e-6, 1.e-5))#, xlabel = "λ [nm]")
 p2 = plot!(1e7./ν, (R[2,1,:].-RnoRS[2,1,:].+ieR[2,1,:]).*convfct, linecolor=:black, xlims=(755,775))#, xlabel = "λ [nm]")
 p2 = plot!(1e7./ν, (R[3,1,:].-RnoRS[3,1,:].+ieR[3,1,:]).*convfct, linecolor=:black, xlims=(755,775))#, xlabel = "λ [nm]", xlims=(755,775))
 p2 = plot!(1e7./ν, (I_conv[1,:].-I_conv_noRS[1,:].+ieI_conv[1,:]).*convfct, linewidth = 2, linecolor=:red, xlims=(755,775))
@@ -235,7 +235,7 @@ q3 = plot!(1e7./ν, 100*(Q_conv[3,:].-Q_conv_noRS[3,:].+ieQ_conv[3,:])./(Q_conv[
 #ieQ_conv = imfilter(ieR[3,2,:], kernel)
 
 plot(p1, q1, p2, q2, p3, q3, layout = l, legend = false, title = ["I₁ (with RS)" "Q₁ (with RS)" "I₁-I₀" "Q₁-Q₀" "(1-I₀/I₁) [%]" "(1-Q₀/Q₁) [%]"], titlefont = font(10))
-savefig("RingEffect_O2A_SZA30.png")
+savefig("RingEffect_O2A_SZA30_wF.png")
 
 l = @layout [a1 a2]
 p1 = plot(1e7./ν, ieR[1,1,:]./R[1,1,:].*convfct, linecolor=:black, xlims=(755,775))
@@ -253,4 +253,4 @@ q1 = plot!(1e7./ν, ieQ_conv[2,:]./Q_conv[2,:].*convfct, linewidth = 2, linecolo
 q1 = plot!(1e7./ν, ieQ_conv[3,:]./Q_conv[3,:].*convfct, linewidth = 2, linecolor=:green, xlabel = "λ [nm]", xlims=(755,775))
 
 plot(p1, q1, layout = l, legend = false, title = ["Iᵢ/Iₑ" "Qᵢ/Qₑ"], titlefont = font(10))
-savefig("RingSpectrum_O2A_SZA30.png")
+savefig("RingSpectrum_O2A_SZA30_wF.png")

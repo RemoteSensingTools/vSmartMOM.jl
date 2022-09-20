@@ -4,9 +4,10 @@
 radiative_transfer: 
   # Spectral bands (list of ν_start:ν_step:ν_end, in cm⁻¹)
   spec_bands:
-    - (1e7/750):0.1:(1e7/740)
-    - (1e7/768):0.1:(1e7/763) 
-    - (1e7/787):0.1:(1e7/747)
+    - (1e7/780):0.5:(1e7/750)
+    #- (1e7/768):0.1:(1e7/763) 
+    #- (1e7/787):0.1:(1e7/747)
+    #- (1e7/2050.1):0.5:(1e7/2050.)
   # Bidirectional Reflectance Distribution Function (BRDF) per band
   surface: 
     - LambertianSurfaceScalar{Float64}(0.0) #(0.2) #(0.05)
@@ -70,8 +71,8 @@ absorption:
   # List of molecules per spectral band
   molecules:
     - [O2] # Molecules in Band #1
-    - [O2]
-    - [O2]
+    #- [O2]
+    #- [O2]
   # VMR profiles can either be real-valued numbers, 
   # or an array of nodal points from TOA to BOA, interpolated in pressure space
   vmr: 

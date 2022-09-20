@@ -61,7 +61,14 @@ end
 #
 #Rotational Raman Scattering (default)
 # Perform the Core RT routines (elemental, doubling, interaction)
-function rt_kernel!(RS_type::Union{RRS, VS_0to1, VS_1to0}, pol_type, SFI, added_layer, composite_layer, computed_layer_properties, m, quad_points, I_static, architecture, qp_μN, iz) 
+function rt_kernel!(RS_type::Union{RRS, VS_0to1, VS_1to0}, 
+                    pol_type, SFI, 
+                    added_layer, composite_layer, 
+                    computed_layer_properties, 
+                    m, quad_points, 
+                    I_static, 
+                    architecture, 
+                    qp_μN, iz) 
     
     @unpack τ_λ, ϖ_λ, τ, ϖ, Z⁺⁺, Z⁻⁺, dτ_max, dτ, ndoubl, dτ_λ, expk, scatter, τ_sum, scattering_interface = computed_layer_properties
     @unpack F₀ = RS_type
@@ -69,6 +76,7 @@ function rt_kernel!(RS_type::Union{RRS, VS_0to1, VS_1to0}, pol_type, SFI, added_
     # If there is scattering, perform the elemental and doubling steps
     if scatter
         #@show τ, ϖ, RS_type.fscattRayl
+        
         @timeit "elemental_inelastic" elemental_inelastic!(RS_type, 
                                                 pol_type, SFI, 
                                                 τ_sum, dτ_λ, ϖ_λ, 
@@ -238,7 +246,11 @@ function rt_kernel!(
     # If there is scattering, perform the elemental and doubling steps
     if scatter
         #@show τ, ϖ, RS_type.fscattRayl
-        
+        @show size(Z⁺⁺), size(Z⁺⁺_λ₁λ₀)
+        #@show Z⁺⁺[2:3:15,2:3:15,1]
+        #@show Z⁺⁺_λ₁λ₀[2:3:15,2:3:15]
+        #@show Z⁻⁺[2:3:15,2:3:15,1]
+        #@show Z⁻⁺_λ₁λ₀[2:3:15,2:3:15]
         @timeit "elemental_inelastic" elemental_inelastic!(RS_type, 
                                                 pol_type, SFI, 
                                                 τ_sum, dτ, ϖ, 

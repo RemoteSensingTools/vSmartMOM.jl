@@ -8,7 +8,7 @@ using InstrumentOperator #for convolution of hires spectrum to instrument grid
 using ImageFiltering
 using Distributions
 using Plots
-
+# Benchmarks: http://web.gps.caltech.edu/~vijay/Rayleigh_Scattering_Tables/STOKES/
 ##
 
 # Load YAML files into parameter struct
@@ -116,7 +116,7 @@ RnoRS, TnoRS, _, _ = CoreRT.rt_run_ms(noRS(),
     # CoreRT.rt_run_test_ms(RS_type,model,iBand);
 
 R, T, ieR, ieT = CoreRT.rt_run_test(RS_type,model,iBand);
-
+R_ss, T_ss, ieR_ss, ieT_ss = CoreRT.rt_run_test_ss(RS_type,model,iBand);
 
 RS_type = InelasticScattering.noRS(
     fscattRayl  = [FT(1)],
@@ -173,12 +173,12 @@ q2 = plot!(1e7./ν, (Q_conv.+ieQ_conv).*convfct, linewidth = 3, linecolor=:red)
 q3 = plot(1e7./ν, (R[1,2,:].-RnoRS[1,2,:].+ieR[1,2,:]).*convfct, linecolor=:black, xlabel = "λ [nm]")
 q3 = plot!(1e7./ν, (Q_conv.-Q_conv_noRS.+ieQ_conv).*convfct, linewidth = 3, linecolor=:red)
 plot(p1, q1, p2, q2, p3, q3, layout = l, legend = false, title = ["I₀ (no RS)" "Q₀ (no RS)" "I₁ (with RS)" "Q₁ (with RS)" "I₁-I₀" "Q₁-Q₀"], titlefont = font(10))
-savefig("RingEffect.png")
+savefig("RingEffect63U.png")
 
 l = @layout [a1 a2]
-p1 = plot(1e7./ν, ieR[1,1,:]./R[1,1,:].*convfct, linecolor=:black)
-p1 = plot!(1e7./ν, ieI_conv./I_conv.*convfct, linewidth = 2, linecolor=:red, xlabel = "λ [nm]")
-q1 = plot(1e7./ν, ieR[1,2,:]./R[1,2,:].*convfct, linecolor=:black)
-q1 = plot!(1e7./ν, ieQ_conv./Q_conv.*convfct, linewidth = 2, linecolor=:red, xlabel = "λ [nm]")
-plot(p1, q1, layout = l, legend = false, title = ["Iᵢ/Iₑ" "Qᵢ/Qₑ"], titlefont = font(10))
-savefig("RingSpectrum.png")
+p1 = plot(1e7./ν, 100*ieR[1,1,:]./R[1,1,:].*convfct, linecolor=:black)
+p1 = plot!(1e7./ν, 100*ieI_conv./I_conv.*convfct, linewidth = 2, linecolor=:red, xlabel = "λ [nm]")
+q1 = plot(1e7./ν, 100*ieR[1,2,:]./R[1,2,:].*convfct, linecolor=:black)
+q1 = plot!(1e7./ν, 100*ieQ_conv./Q_conv.*convfct, linewidth = 2, linecolor=:red, xlabel = "λ [nm]")
+plot(p1, q1, layout = l, legend = false, title = ["Iᵢ/Iₑ [%]" "Qᵢ/Qₑ [%]"], titlefont = font(10))
+savefig("RingSpectrum63U.png")
