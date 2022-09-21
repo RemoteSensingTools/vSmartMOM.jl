@@ -104,7 +104,7 @@ println("Doppler shift = $(1e7/(v₀-Δ_ν)-1e7/v₀) nm")
 # ----
 
 # ### Voigt lineshape
-# The Voigt line-shape is the combination of Doppler and Pressure broadening (convolution of the two) but cannot be evaluated analytically. However, there are numerical routines to compute it efficiently.
+# The Voigt line-shape is the combination of Doppler and Lorentzian broadening (convolution of the two) but cannot be evaluated analytically. However, there are numerical routines to compute it efficiently.
 
 # ----
 
