@@ -2,7 +2,7 @@
 
 The vSmartMOM module allows end-to-end simulation of radiative transfer (RT) throughout Earth's atmosphere as well as atmospheres of stars and substellar objects like brown dwarfs and exoplanets. Specifically, the module:
 
-- Enables 1D vectorized plane-parallel RT modeling based on the Matrix Operator Method
+- Enables 1D vectorized plane-parallel RT modeling based on the Matrix Operator Method, also known as Discrete Space Theory (please see the [references](https://remotesensingtools.github.io/vSmartMOM.jl/dev/pages/vSmartMOM/References/) for source papers). 
 - Incorporates fast, high-fidelity simulations of scattering atmospheres containing haze and clouds, including pressure- and temperature-resolved absorption profiles of gaseous species in the atmosphere
 - Enables GPU-accelerated computations of the resulting hyperspectral reflectances/transmittances
 - Enables auto-differentiation of the output spectrum with respect to various input parameters
