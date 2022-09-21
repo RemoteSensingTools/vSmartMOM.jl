@@ -76,6 +76,8 @@ Runtime duration for a given simulation is also compared between using CPU and G
 
 With very small spectral resolution (approximately ten points), the GPU computation is slower than the CPU computation due to the overhead cost of data transfer onto the GPU. However, at higher spectral resolutions (more than one hundred spectral points), we see the computational gains of running these calculations on the GPU. A nearly 100x speedup is observed at higher resolutions beyond ten thousand points. These scenarios are more reflective of real-world scenarios with high-resolution satellite data. 
 
+Different codes use various approximations like the correlated-k method [@goody:1989], principal component based radiative transfer modeling of hyperspectral measurements (PCRTM) [@liu:2016], and low stream approximations [@spurr:2011] in order to avoid the high computational cost of line-by-line spectral computations. GPU acceleration allows vSmartMOM to competitively employ line-by-line computations, achieving a tremendous speed up over CPU-only computations.
+
 Hardware acceleration, in addition to algorithmic efficiencies and performance optimizations in **vSmartMOM.jl**, suggest that this package can greatly accelerate the pace of remote sensing research. 
 
 # Acknowledgements
