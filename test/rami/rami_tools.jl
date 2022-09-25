@@ -1,6 +1,7 @@
 using Interpolations
 using DelimitedFiles
 using Printf
+using CanopyOptics
 
 
 # Read Spectral Response Functions:
@@ -228,6 +229,34 @@ function setGeometry!(scenario, params)
     params.vaz  = [repeat([180.0], length(vzas)); repeat([0.0], length(vzas));repeat([90.0], length(vzas));repeat([-90.0], length(vzas)) ]
 end
 
+function setCanopy!(scenario, params)
+    try
+        canopy = scenario["canopy"]
+        ν      = canopy["distribution_nu"]
+        μ      = canopy["distribution_mu"]
+        LAI    = canopy["leaf_area_index"]
+        leaf_R = canopy["canopy_parameters"]["reflectance"][1]
+        leaf_T = canopy["canopy_parameters"]["transmittance"][1]
+        height = canopy["height"]["value"]
+        leaf_radius = canopy["leaf_radius"]["value"]
+
+        # Bilambertian model for leaves, using 40 quadrature points:
+        BiLambMod = CanopyOptics.BiLambertianCanopyScattering(R=leaf_R,T=leaf_T, nQuad=40)
+        # Leaf Angular Distribution:
+        if canopy["distribution_type"]=="DistributionType.UNIFORM"
+            LAD = CanopyOptics.uniform_leaves()
+        else
+            LAD = CanopyOptics.LeafDistribution(Beta(ν, μ), 2/π);
+        end
+        ϖ_canopy = leaf_T+leaf_R
+
+        return LAD, LAI, BiLambMod, ϖ_canopy #,  height, leaf_radius
+    catch
+        return nothing
+    end 
+end
+
+
 # Set surface type (Lambertian for now!)
 function setSurface!(scenario, params)
     rami_surface      = scenario["surface"]
@@ -321,8 +350,8 @@ function produce_rami_results(experiment_name::String;
 
     # Turning off Rayleigh scattering for non Rayleigh types (has to be done in model, not params):
     if atm_type ∈ noRayleighType
-    @info "Turning off Rayleigh ", atm_type
-    model.τ_rayl[1] .= 0.0
+        @info "Turning off Rayleigh ", atm_type
+        model.τ_rayl[1] .= 0.0
     end
     #  model.τ_rayl[1] .= 0.00000000001
     ########################################################
@@ -339,7 +368,7 @@ function produce_rami_results(experiment_name::String;
     save_toa_results(BRF, model, experiment_name, "/home/cfranken/rami2/")
     save_boa_results(HDRF,BHR,model, experiment_name, "/home/cfranken/rami2/")
 
-    return BRF, R, HDRF, BRF, model
+return BRF, R, HDRF, BRF, model
 #return BRF, R, model
 
 # Can do postprocessing here (saving data, convolution, etc)
