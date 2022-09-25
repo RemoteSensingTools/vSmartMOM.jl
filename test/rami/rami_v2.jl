@@ -27,6 +27,7 @@ all_scenarios = JSON.parsefile(rami_json);
 #BRF, R, model = produce_rami_results("HOM00_WHI_A00S_M12_z30a000")
 #white lambertian
 BRF1, R1, hdrf1, bhr1, model = produce_rami_results("HOM00_LAM_S00S_M03_z30a000")#("HOM00_WHI_EC6L_M03_z30a000")
+BRF11, R11, hdrf11, bhr11, model1 = produce_rami_results("HOM35_LAM_S00S_M03_z30a000")
 #BRF1, R, model = produce_rami_results("HOM00_WHI_SD2S_M02_z30a000")
 #RPV
 BRF2, R2, hdrf2, bhr2, model = produce_rami_results("HOM00_RPV_S00S_M03_z30a000")#("HOM00_RPV_EC6L_M03_z30a000")

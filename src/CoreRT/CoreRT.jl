@@ -37,6 +37,7 @@ using NNlib                        # For batched multiplications
 import NNlib.batched_mul           # Required to overwrite batched_mul for Duals
 using NCDatasets                   # For loading absco lookup tables
 using QuadGK
+using CanopyOptics
 
 import Base.show                   # For overloading show for custom types
 
@@ -59,6 +60,7 @@ include("types.jl")
 include("CoreKernel/elemental.jl")             # Elemental 
 include("CoreKernel/elemental_inelastic.jl")   # Elemental for inelastic scattering
 include("CoreKernel/elemental_inelastic_plus.jl")   # Elemental for inelastic scattering
+include("CoreKernel/elemental_canopy.jl")
 include("CoreKernel/doubling.jl")              # Doubling
 include("CoreKernel/doubling_inelastic.jl")    # Doubling for elastic + inelastic scattering 
 include("CoreKernel/interaction.jl")           # Interaction
@@ -71,7 +73,10 @@ include("CoreKernel/rt_kernel_multisensor.jl") # Suniti: ms
 include("postprocessing_vza.jl")               # Postprocess (Azimuthal Weighting)
 include("postprocessing_vza_ms.jl")
 include("rt_run.jl")                           # Starting point for RT 
-include("rt_run_multisensor.jl")  
+include("rt_run_multisensor.jl") 
+# Temporary:
+include("rt_run_canopy.jl")
+
 # GPU
 include("gpu_batched.jl")                   # Batched operations
 
@@ -88,6 +93,7 @@ include("LayerOpticalProperties/compEffectiveLayerProperties.jl")
 include("Surfaces/lambertian_surface.jl")            # Lambertian Surface 
 include("Surfaces/rpv_surface.jl")            # Lambertian Surface 
 include("Surfaces/rossli_surface.jl")
+
 
 
 # Functions to export
