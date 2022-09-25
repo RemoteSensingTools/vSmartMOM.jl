@@ -1,5 +1,5 @@
 function rt_run_test(RS_type::CoreRT.AbstractRamanType, 
-    model, CanopyMod, LAI, LD, ϖ_canopy, iBand)
+        model, CanopyMod, LAI, LD, ϖ_canopy, iBand)
     @unpack obs_alt, sza, vza, vaz = model.obs_geom   # Observational geometry properties
     @unpack qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart, μ₀, iμ₀, Nquad = model.quad_points # All quadrature points
     pol_type = model.params.polarization_type
@@ -21,9 +21,9 @@ function rt_run_test(RS_type::CoreRT.AbstractRamanType,
     #put this code in model_from_parameters
     nSpec = 0;
     for iB in iBand
-    nSpec0 = nSpec+1;
-    nSpec += size(model.τ_abs[iB], 1); # Number of spectral points
-    push!(RS_type.bandSpecLim,nSpec0:nSpec);                
+        nSpec0 = nSpec+1;
+        nSpec += size(model.τ_abs[iB], 1); # Number of spectral points
+        push!(RS_type.bandSpecLim,nSpec0:nSpec);                
     end
 
     arr_type = array_type(model.params.architecture) # Type of array to use
@@ -95,60 +95,60 @@ function rt_run_test(RS_type::CoreRT.AbstractRamanType,
         # Determine the scattering interface definitions:
         scattering_interfaces_all, τ_sum_all = CoreRT.extractEffectiveProps(layer_opt_props);
 
-    # Loop over vertical layers: 
-    for iz = 1:Nz  # Count from TOA to BOA
+        # Loop over vertical layers: 
+        for iz = 1:Nz  # Count from TOA to BOA
 
-    # Construct the atmospheric layer
-    # From Rayleigh and aerosol τ, ϖ, compute overall layer τ, ϖ
-    # Suniti: modified to return fscattRayl as the last element of  computed_atmosphere_properties
-    if !(typeof(RS_type) <: CoreRT.noRS)
-    RS_type.fscattRayl = fScattRayleigh[iz]
-    end
+            # Construct the atmospheric layer
+            # From Rayleigh and aerosol τ, ϖ, compute overall layer τ, ϖ
+            # Suniti: modified to return fscattRayl as the last element of  computed_atmosphere_properties
+            if !(typeof(RS_type) <: CoreRT.noRS)
+                RS_type.fscattRayl = fScattRayleigh[iz]
+            end
 
-    # Expand all layer optical properties to their full dimension:
-    layer_opt = CoreRT.expandOpticalProperties(layer_opt_props[iz], arr_type)
-    
-    # Perform Core RT (doubling/elemental/interaction)
-    CoreRT.rt_kernel!(RS_type, pol_type, SFI, 
-            #bandSpecLim, 
-            added_layer, composite_layer, 
-            layer_opt,
-            scattering_interfaces_all[iz], 
-            τ_sum_all[:,iz], 
-            m, quad_points, 
-            I_static, 
-            model.params.architecture, 
-            qp_μN, iz) 
-    end 
+            # Expand all layer optical properties to their full dimension:
+            layer_opt = CoreRT.expandOpticalProperties(layer_opt_props[iz], arr_type)
+            
+            # Perform Core RT (doubling/elemental/interaction)
+            CoreRT.rt_kernel!(RS_type, pol_type, SFI, 
+                    #bandSpecLim, 
+                    added_layer, composite_layer, 
+                    layer_opt,
+                    scattering_interfaces_all[iz], 
+                    τ_sum_all[:,iz], 
+                    m, quad_points, 
+                    I_static, 
+                    model.params.architecture, 
+                    qp_μN, iz) 
+        end 
 
-    # Create surface matrices:
-    CoreRT.create_surface_layer!(brdf, 
-                added_layer_surface, 
-                SFI, m, 
-                pol_type, 
-                quad_points, 
-                arr_type(τ_sum_all[:,end]), 
-                model.params.architecture);
+        # Create surface matrices:
+        CoreRT.create_surface_layer!(brdf, 
+                    added_layer_surface, 
+                    SFI, m, 
+                    pol_type, 
+                    quad_points, 
+                    arr_type(τ_sum_all[:,end]), 
+                    model.params.architecture);
 
-    # One last interaction with surface:
-    @timeit "interaction" CoreRT.interaction!(RS_type,
-                        #bandSpecLim,
-                        scattering_interfaces_all[end], 
-                        SFI, 
-                        composite_layer, 
-                        added_layer_surface, 
-                        I_static)
+        # One last interaction with surface:
+        @timeit "interaction" CoreRT.interaction!(RS_type,
+                            #bandSpecLim,
+                            scattering_interfaces_all[end], 
+                            SFI, 
+                            composite_layer, 
+                            added_layer_surface, 
+                            I_static)
 
-    # Postprocess and weight according to vza
-    CoreRT.postprocessing_vza!(RS_type, 
-                iμ₀, pol_type, 
-                composite_layer, 
-                vza, qp_μ, m, vaz, μ₀, 
-                weight, nSpec, 
-                SFI, 
-                R, R_SFI, 
-                T, T_SFI, 
-                ieR_SFI, ieT_SFI)
+        # Postprocess and weight according to vza
+        CoreRT.postprocessing_vza!(RS_type, 
+                    iμ₀, pol_type, 
+                    composite_layer, 
+                    vza, qp_μ, m, vaz, μ₀, 
+                    weight, nSpec, 
+                    SFI, 
+                    R, R_SFI, 
+                    T, T_SFI, 
+                    ieR_SFI, ieT_SFI)
     end
 
     # Show timing statistics

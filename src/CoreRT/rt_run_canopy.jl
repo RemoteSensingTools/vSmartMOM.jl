@@ -10,18 +10,11 @@ the model. The latter should generally be used by users.
 
 
 # Mockup if no Raman type is chosen:
-function rt_run(model::vSmartMOM_Model; i_band::Integer = 1)
-    rt_run(noRS(), model, i_band)
+function rt_run_canopy(model::vSmartMOM_Model; i_band::Integer = 1)
+    rt_run_canopy(noRS(), model, i_band)
 end
 
-# Just to make sure we still have it:
-function rt_run_test(RS_type::AbstractRamanType, 
-        model::vSmartMOM_Model, 
-        iBand)
-    rt_run(RS_type,model,iBand)
-end
-
-function rt_run(RS_type::AbstractRamanType, 
+function rt_run_canopy(RS_type::AbstractRamanType, 
                     model::vSmartMOM_Model, iBand)
     @unpack obs_alt, sza, vza, vaz = model.obs_geom   # Observational geometry properties
     @unpack qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart, μ₀, iμ₀, Nquad = model.quad_points # All quadrature points
@@ -105,7 +98,6 @@ function rt_run(RS_type::AbstractRamanType,
     for m = 0:max_m - 1
 
         println("Fourier Moment: ", m, "/", max_m-1)
-
         # Azimuthal weighting
         weight = m == 0 ? FT(0.5) : FT(1.0)
         # Set the Zλᵢλₒ interaction parameters for Raman (or nothing for noRS)
@@ -113,10 +105,22 @@ function rt_run(RS_type::AbstractRamanType,
         # Compute the core layer optical properties:
         @timeit "OpticalProps" layer_opt_props, fScattRayleigh   = 
             constructCoreOpticalProperties(RS_type,iBand,m,model);
+
+        if(m==0)
+            𝐙⁺⁺, 𝐙⁻⁺ = CanopyOptics.compute_Z_matrices(CanopyMod, μ, LD, m)
+            
+            # This basically multiplies with G again, needs to be fixed later (or removed from compute_Z_matrices)
+            G1 = arr_type(CanopyOptics.G(qp_μN))
+    
+            canopyCore = CoreRT.CoreDirectionalScatteringOpticalProperties(LAI, ϖ_canopy, arr_type(𝐙⁺⁺), arr_type(𝐙⁻⁺), G1)
+            @show canopyCore.ϖ
+            # Add Canopy at the bottom here:
+            layer_opt_props =  [layer_opt_props; canopyCore]
+        end
+        
         # Determine the scattering interface definitions:
         scattering_interfaces_all, τ_sum_all = 
             extractEffectiveProps(layer_opt_props);
-        #@show typeof(layer_opt_props)
 
         # Loop over vertical layers: 
         @showprogress 1 "Looping over layers ..." for iz = 1:Nz  # Count from TOA to BOA
@@ -133,7 +137,7 @@ function rt_run(RS_type::AbstractRamanType,
                 expandOpticalProperties(layer_opt_props[iz], arr_type)
 
             # Perform Core RT (doubling/elemental/interaction)
-            rt_kernel!(RS_type, pol_type, SFI, 
+            rt_kernel_canopy!(RS_type, pol_type, SFI, 
                         #bandSpecLim, 
                         added_layer, composite_layer, 
                         layer_opt,
