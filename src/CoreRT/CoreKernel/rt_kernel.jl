@@ -47,6 +47,50 @@ function rt_kernel!(RS_type::noRS, pol_type, SFI, added_layer, composite_layer, 
     end
 end
 
+#No Raman (default)
+# Perform the Core RT routines (elemental, doubling, interaction)
+function rt_kernel_canopy!(RS_type::noRS, pol_type, SFI, added_layer, composite_layer, computed_layer_properties, m, quad_points, I_static, architecture, qp_μN, iz) 
+
+    @unpack τ_λ, ϖ_λ, τ, ϖ, Z⁺⁺, Z⁻⁺, dτ_max, dτ, ndoubl, dτ_λ, expk, scatter, τ_sum, scattering_interface = computed_layer_properties
+    @show τ, ϖ, dτ_max, ndoubl
+    # If there is scattering, perform the elemental and doubling steps
+    if scatter
+        
+        @timeit "elemental_canopy" elemental_canopy!(pol_type, SFI, τ_sum, dτ_λ, dτ, ϖ_λ, ϖ, Z⁺⁺, Z⁻⁺, m, ndoubl, scatter, quad_points,  added_layer,  I_static, architecture)
+        #println("Elemental done...")
+        @timeit "doubling"   doubling!(pol_type, SFI, expk, ndoubl, added_layer, I_static, architecture)
+        #println("Doubling done...")
+    else # This might not work yet on GPU!
+        # If not, there is no reflectance. Assign r/t appropriately
+        added_layer.r⁻⁺[:] .= 0;
+        added_layer.r⁺⁻[:] .= 0;
+        added_layer.j₀⁻[:] .= 0;
+        temp = Array(exp.(-τ_λ./qp_μN'))
+        #added_layer.t⁺⁺, added_layer.t⁻⁻ = (Diagonal(exp(-τ_λ / qp_μN)), Diagonal(exp(-τ_λ / qp_μN)))   
+        for iλ = 1:length(τ_λ)
+            added_layer.t⁺⁺[:,:,iλ] = Diagonal(temp[iλ,:]);
+            added_layer.t⁻⁻[:,:,iλ] = Diagonal(temp[iλ,:]);
+        end
+    end
+    #M1 = Array(added_layer.t⁺⁺)
+    #M2 = Array(added_layer.r⁺⁻)
+    #M3 = Array(added_layer.j₀⁻)
+    #M4 = Array(added_layer.j₀⁺)
+    #@show M1[1,1,1], M2[1,1,1], M3[1,1,1], M4[1,1,1]
+    # @assert !any(isnan.(added_layer.t⁺⁺))
+    
+    # If this TOA, just copy the added layer into the composite layer
+    if (iz == 1)
+        composite_layer.T⁺⁺[:], composite_layer.T⁻⁻[:] = (added_layer.t⁺⁺, added_layer.t⁻⁻)
+        composite_layer.R⁻⁺[:], composite_layer.R⁺⁻[:] = (added_layer.r⁻⁺, added_layer.r⁺⁻)
+        composite_layer.J₀⁺[:], composite_layer.J₀⁻[:] = (added_layer.j₀⁺, added_layer.j₀⁻ )
+        
+    # If this is not the TOA, perform the interaction step
+    else
+        @timeit "interaction" interaction!(RS_type, scattering_interface, SFI, composite_layer, added_layer, I_static)
+    end
+end
+
 #
 #Rotational Raman Scattering (default)
 # Perform the Core RT routines (elemental, doubling, interaction)

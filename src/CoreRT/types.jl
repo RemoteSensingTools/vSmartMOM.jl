@@ -601,6 +601,20 @@ Base.@kwdef struct CoreScatteringOpticalProperties{FT,FT2,FT3} <:  AbstractOptic
     Z⁻⁺::FT3
 end
 
+# Core optical Properties COP with directional cross section 
+Base.@kwdef struct CoreDirectionalScatteringOpticalProperties{FT,FT2,FT3,FT4} <:  AbstractOpticalProperties
+    "Absorption optical depth (scalar or wavelength dependent)"
+    τ::FT 
+    "Single scattering albedo"
+    ϖ::FT2   
+    "Z scattering matrix (forward)"
+    Z⁺⁺::FT3 
+    "Z scattering matrix (backward)"
+    Z⁻⁺::FT3
+    "Ross kernel; cross section projection factor along µ (G ∈ [0,1], 1 for isotropic σ)"
+    G::FT4
+end
+
 Base.@kwdef struct CoreAbsorptionOpticalProperties{FT} <:  AbstractOpticalProperties
     "Absorption optical depth (scalar or wavelength dependent)"
     τ::FT 
@@ -621,6 +635,7 @@ function Base.:+( x::CoreScatteringOpticalProperties{xFT, xFT2, xFT3},
     wy = y.τ .* y.ϖ  
     w  = wx .+ wy
     ϖ  =  w ./ τ
+    
     #@show xFT, xFT2, xFT3
     all(wx .== 0.0) ? (return CoreScatteringOpticalProperties(τ, ϖ, y.Z⁺⁺, y.Z⁻⁺)) : nothing
     all(wy .== 0.0) ? (return CoreScatteringOpticalProperties(τ, ϖ, x.Z⁺⁺, x.Z⁻⁺)) : nothing
@@ -641,10 +656,9 @@ end
 # Concatenate Core Optical Properties, can have mixed dimensions!
 function Base.:*( x::CoreScatteringOpticalProperties, y::CoreScatteringOpticalProperties ) 
     arr_type  = array_type(architecture(x.τ))
-
     x = expandOpticalProperties(x,arr_type);
     y = expandOpticalProperties(y,arr_type);
-    CoreScatteringOpticalProperties([x.τ; y.τ],[x.ϖ; y.ϖ],cat(x.Z⁺⁺,y.Z⁺⁺, dims=3), cat(x.Z⁻⁺,y.Z⁻⁺, dims=3))
+    CoreScatteringOpticalProperties([x.τ; y.τ],[x.ϖ; y.ϖ],cat(x.Z⁺⁺,y.Z⁺⁺, dims=3), cat(x.Z⁻⁺,y.Z⁻⁺, dims=3) )
 end
 
 function Base.:+( x::CoreScatteringOpticalProperties, y::CoreAbsorptionOpticalProperties ) 
@@ -661,7 +675,7 @@ end
 
 
 function Base.:*( x::FT, y::CoreScatteringOpticalProperties{FT} ) where FT
-    CoreScatteringOpticalProperties(y.τ * x, y.ϖ, y.Z⁺⁺, y.Z⁻⁺)
+    CoreScatteringOpticalProperties(y.τ * x, y.ϖ, y.Z⁺⁺, y.Z⁻⁺, y.G)
 end
 
 # From https://gist.github.com/mcabbott/80ac43cca3bee8f57809155a5240519f

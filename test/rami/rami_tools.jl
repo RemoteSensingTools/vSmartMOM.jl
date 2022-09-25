@@ -242,7 +242,7 @@ function setSurface!(scenario, params)
         p = rami_surface["surface_parameters"]
         params.brdf = [vSmartMOM.CoreRT.RossLiSurfaceScalar(p["f_vol"][1],p["f_geo"][1], p["f_iso"][1])]
     else
-        @assert rami_surface["name"] in ["WHI", "BLA", "LAM", "RPV"] && startswith(scenario["name"], "HOM00") "Currently only supporting Lambertian (HOM00) and RPV surfaces"
+        @assert rami_surface["name"] in ["WHI", "BLA", "LAM", "RPV", "RLI"] && startswith(scenario["name"], "HOM00") "Currently only supporting Lambertian (HOM00), RLI and RPV surfaces"
     end
     @info "Surface type: " * rami_surface["name"]
 end

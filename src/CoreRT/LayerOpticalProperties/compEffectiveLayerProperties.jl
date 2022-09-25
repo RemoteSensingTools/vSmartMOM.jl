@@ -9,6 +9,7 @@ function constructCoreOpticalProperties(RS_type::AbstractRamanType{FT}, iBand, m
     
     # Quadrature points:
     μ = Array(model.quad_points.qp_μ )
+    N = length(model.quad_points.qp_μN)
     # Number of Aerosols:
     nAero = size(τ_aer[iBand[1]],1)
     nZ    = size(τ_rayl[1],2)
@@ -21,8 +22,10 @@ function constructCoreOpticalProperties(RS_type::AbstractRamanType{FT}, iBand, m
     band_fScattRayleigh = [];
     # @show arr_type
     for iB in iBand
+        # Define G here as ones:
+        #G = arr_type(ones(FT,N)
         rayl =  [CoreScatteringOpticalProperties(arr_type(τ_rayl[iB][:,i]),RS_type.ϖ_Cabannes[iB], 
-        (Rayl𝐙⁺⁺), (Rayl𝐙⁻⁺)) for i=1:nZ]
+        Rayl𝐙⁺⁺, Rayl𝐙⁻⁺) for i=1:nZ]
         
         # Initiate combined properties with rayleigh
         combo = rayl
@@ -83,8 +86,8 @@ end
 
 # Extract scattering definitions and integrated absorptions for the source function!
 function extractEffectiveProps(
-                                lods::Array#{CoreScatteringOpticalProperties{FT},1}
-                                ) #where FT
+            lods::Array#{CoreScatteringOpticalProperties{FT},1}
+            ) #where FT
 
     FT    = eltype(lods[1].τ)
     nSpec = length(lods[1].τ)
