@@ -243,8 +243,13 @@ function setCanopy!(scenario, params)
         # Bilambertian model for leaves, using 40 quadrature points:
         BiLambMod = CanopyOptics.BiLambertianCanopyScattering(R=leaf_R,T=leaf_T, nQuad=40)
         # Leaf Angular Distribution:
-        LAD = CanopyOptics.LeafDistribution(Beta(ν, μ), 2/π);
+        if canopy["distribution_type"]=="DistributionType.UNIFORM"
+            LAD = CanopyOptics.uniform_leaves()
+        else
+            LAD = CanopyOptics.LeafDistribution(Beta(ν, μ), 2/π);
+        end
         ϖ_canopy = leaf_T+leaf_R
+
         return LAD, LAI, BiLambMod, ϖ_canopy #,  height, leaf_radius
     catch
         return nothing
