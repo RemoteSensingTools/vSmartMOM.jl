@@ -103,6 +103,7 @@ function extractEffectiveProps(
         scatter = maximum(lods[iz].τ .* lods[iz].ϖ) > 2eps(FT)
         scattering_interface = get_scattering_interface(scattering_interface, scatter, iz)
         push!(scattering_interfaces_all, scattering_interface)
+        #@show typeof(τ_sum_all[:,iz]), typeof(lods[iz].τ)
         @views τ_sum_all[:,iz+1] = τ_sum_all[:,iz] + lods[iz].τ 
     end
     return scattering_interfaces_all, τ_sum_all
@@ -118,6 +119,19 @@ function expandOpticalProperties(in::CoreScatteringOpticalProperties, arr_type)
     else
         @assert size(Z⁺⁺,3) ==  length(τ) "Z and τ dimensions need to match "
         CoreScatteringOpticalProperties(arr_type(τ), arr_type(ϖ), arr_type(Z⁺⁺), arr_type(Z⁻⁺)) 
+    end
+end
+
+function expandOpticalProperties(in::CoreDirectionalScatteringOpticalProperties, arr_type)
+    @unpack τ, ϖ, Z⁺⁺, Z⁻⁺, G = in 
+    @assert length(τ) == length(ϖ) "τ and ϖ sizes need to match"
+    if size(Z⁺⁺,3) == 1
+        Z⁺⁺ = _repeat(Z⁺⁺,1,1,length(τ))
+        Z⁻⁺ = _repeat(Z⁻⁺,1,1,length(τ))
+        return CoreDirectionalScatteringOpticalProperties(arr_type(τ), arr_type(ϖ), arr_type(Z⁺⁺), arr_type(Z⁻⁺), arr_type(G)) 
+    else
+        @assert size(Z⁺⁺,3) ==  length(τ) "Z and τ dimensions need to match "
+        CoreDirectionalScatteringOpticalProperties(arr_type(τ), arr_type(ϖ), arr_type(Z⁺⁺), arr_type(Z⁻⁺), arr_type(G)) 
     end
 end
 

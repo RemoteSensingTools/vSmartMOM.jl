@@ -167,13 +167,13 @@ function rt_kernel!(RS_type::noRS{FT},
                     pol_type, SFI, 
                     added_layer, 
                     composite_layer, 
-                    computed_layer_properties::CoreScatteringOpticalProperties, 
+                    computed_layer_properties::M,# CoreScatteringOpticalProperties, 
                     scattering_interface, 
                     τ_sum, 
                     m, quad_points, 
                     I_static, 
                     architecture, 
-                    qp_μN, iz) where {FT}
+                    qp_μN, iz) where {FT,M}
     #@show array_type(architecture)
     @unpack qp_μ, μ₀ = quad_points
     # Just unpack core optical properties from 
@@ -193,7 +193,7 @@ function rt_kernel!(RS_type::noRS{FT},
 
     # If there is scattering, perform the elemental and doubling steps
     if scatter
-        
+        #@show typeof(computed_layer_properties)
         @timeit "elemental" elemental!(pol_type, SFI, 
                                         τ_sum, dτ, 
                                         computed_layer_properties, 
@@ -202,7 +202,7 @@ function rt_kernel!(RS_type::noRS{FT},
         #println("Elemental done...")
         @timeit "doubling"   doubling!(pol_type, SFI, 
                                         expk, ndoubl, 
-                                        added_layer, 
+                                        added_layer,
                                         I_static, architecture)
         #println("Doubling done...")
     else # This might not work yet on GPU!

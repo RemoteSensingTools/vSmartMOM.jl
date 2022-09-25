@@ -229,7 +229,7 @@ function setGeometry!(scenario, params)
     params.vaz  = [repeat([180.0], length(vzas)); repeat([0.0], length(vzas));repeat([90.0], length(vzas));repeat([-90.0], length(vzas)) ]
 end
 
-function setCanopy!(scenario, params)
+function setCanopy!(scenario)
     try
         canopy = scenario["canopy"]
         ν      = canopy["distribution_nu"]
@@ -345,6 +345,12 @@ function produce_rami_results(experiment_name::String;
     # Set surface parameters:
     setSurface!(curr_scenario, params)
 
+    # TODO: Set canopy
+    Cano =   setCanopy!(curr_scenario)
+    @show Cano
+    #LAD, LAI, BiLambMod, ϖ_canopy  
+    #@show  LAD
+
     # Create vSmartMOM model:
     model = model_from_parameters(params)
 
@@ -358,7 +364,14 @@ function produce_rami_results(experiment_name::String;
 
     # Run model (can think about including the BOA and hemispheric data here as well)
     #R = rt_run(model)
-    R, _, _, _, hdr, bhr_uw, bhr_dw = rt_run(model)
+    if isnothing(Cano)
+        R, _, _, _, hdr, bhr_uw, bhr_dw = rt_run(model)
+    else
+        LAD, LAI, BiLambMod, ϖ_canopy   = Cano
+        @show LAD, LAI, BiLambMod, ϖ_canopy
+        R, _, _, _, hdr, bhr_uw, bhr_dw = vSmartMOM.CoreRT.rt_run_canopy(vSmartMOM.InelasticScattering.noRS(),model, LAD, LAI, BiLambMod, ϖ_canopy,1)
+        @show LAD
+    end
     # Convolve results:
     @show size(R), size(hdr)
     BRF       = convolve_2_sentinel(model.params.spec_bands[1], R, band)
