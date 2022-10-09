@@ -20,7 +20,7 @@ function elemental!(pol_type, SFI::Bool,
     @unpack τ, ϖ, Z⁺⁺, Z⁻⁺, G = computed_layer_properties
     
     arr_type = array_type(architecture)
-
+    
     # Need to check with paper nomenclature. This is basically eqs. 19-20 in vSmartMOM
     I₀    = arr_type(pol_type.I₀)
     D     = Diagonal(arr_type(repeat(pol_type.D, size(qp_μ,1))))

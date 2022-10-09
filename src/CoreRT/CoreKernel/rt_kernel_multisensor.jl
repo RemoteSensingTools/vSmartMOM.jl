@@ -239,13 +239,13 @@ function rt_kernel_multisensor!(RS_type::noRS{FT},
                     pol_type, SFI, 
                     added_layer, 
                     composite_layer, 
-                    computed_layer_properties::CoreScatteringOpticalProperties, 
+                    computed_layer_properties::M, #CoreScatteringOpticalProperties, 
                     scattering_interface, 
                     τ_sum, 
                     m, quad_points, 
                     I_static, 
                     architecture, 
-                    qp_μN, iz, arr_type) where {FT}
+                    qp_μN, iz, arr_type) where {FT, M}
 
     @unpack qp_μ, μ₀ = quad_points
     # Just unpack core optical properties from 
@@ -253,14 +253,14 @@ function rt_kernel_multisensor!(RS_type::noRS{FT},
     # SUNITI, check? Also, better to write function here
     #@show "here", size(τ .* ϖ), size(qp_μ)
     #@show maximum(τ .* ϖ), minimum(qp_μ)
-    dτ_max = minimum([maximum(τ .* ϖ), FT(0.001) * minimum(qp_μ)])
-    _, ndoubl = doubling_number(dτ_max, maximum(τ .* ϖ))
+    #dτ_max = minimum([maximum(τ .* ϖ), FT(0.001) * minimum(qp_μ)])
+    #_, ndoubl = doubling_number(dτ_max, maximum(τ .* ϖ))
     scatter = true # edit later
-    arr_type = array_type(architecture)
+    #arr_type = array_type(architecture)
     # Compute dτ vector
-    dτ = τ ./ 2^ndoubl
-    expk = arr_type(exp.(-dτ /μ₀))
-    
+    #dτ = τ ./ 2^ndoubl
+    #expk = arr_type(exp.(-dτ /μ₀))
+    dτ, ndoubl, expk = init_layer(computed_layer_properties, quad_points, pol_type, architecture)
 
     # If there is scattering, perform the elemental and doubling steps
     if scatter
@@ -360,7 +360,7 @@ function rt_kernel_multisensor!(RS_type::noRS{FT},
                                                                     I_static,
                                                                     arr_type)    
                 end
-                if iz==2
+                #=if iz==2
                     M1 = (composite_layer.botT⁺⁺[1]);
                     M2 = (composite_layer.botR⁺⁻[1]);
                     M3 = (composite_layer.botT⁻⁻[1]);
@@ -368,7 +368,7 @@ function rt_kernel_multisensor!(RS_type::noRS{FT},
                     M5 = (composite_layer.botJ₀⁻[1]);
                     M6 = (composite_layer.botJ₀⁺[1]);
                     #@show M1[1,1,1], M2[1,1,1], M3[1,1,1], M4[1,1,1], M5[1,1,1], M6[1,1,1]
-                end
+                end=#
             end
         end
     end
