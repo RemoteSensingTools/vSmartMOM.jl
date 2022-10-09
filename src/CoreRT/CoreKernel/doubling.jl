@@ -74,13 +74,15 @@ function doubling_helper!(pol_type,
     return nothing 
 end
 
-function doubling!(pol_type, SFI, expk,
+function doubling!(pol_type, SFI, 
+                    expk,
                     ndoubl::Int, 
                     added_layer::AddedLayer{M},#{FT},
                     I_static::AbstractArray{FT}, 
                     architecture) where {FT,M}
 
-    doubling_helper!(pol_type, SFI, expk, ndoubl, added_layer, I_static, architecture)
+    doubling_helper!(pol_type, SFI, 
+                    expk, ndoubl, added_layer, I_static, architecture)
     synchronize_if_gpu()
 end
 

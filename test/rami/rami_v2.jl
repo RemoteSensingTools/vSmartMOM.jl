@@ -22,7 +22,7 @@ rami_json = "test/rami/RAMI4ATM_experiments_v1.0.json";
 all_scenarios = JSON.parsefile(rami_json);
 
 # R, models = produce_rami_results("HOM00_WHI_SD2S_M02_z30a000")
-#R, models = produce_rami_results("HOM00_LAM_ED2D_M12_z30a000")
+#R, models = produce_rami_resplults("HOM00_LAM_ED2D_M12_z30a000")
 #R, models = produce_rami_results("HOM00_WHI_A00S_M02_z30a000")
 #BRF, R, model = produce_rami_results("HOM00_WHI_A00S_M12_z30a000")
 #white lambertian

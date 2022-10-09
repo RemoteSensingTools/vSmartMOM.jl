@@ -165,7 +165,7 @@ function interaction_top!(ims::Int64,
                         arr_type) where {FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2,M}
 
     @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻ = added_layer
-    @show size(composite_layer.topT⁺⁺)
+    #@show size(composite_layer.topT⁺⁺)
     #@unpack topR⁻⁺, topR⁺⁻, topT⁺⁺, topT⁻⁻, topJ₀⁺, topJ₀⁻ = composite_layer
     R⁻⁺ = arr_type(composite_layer.topR⁻⁺[ims]) 
     R⁺⁻ = arr_type(composite_layer.topR⁺⁻[ims]) 
@@ -204,7 +204,7 @@ function interaction_bot!(ims::Int64,
                         I_static::AbstractArray{FT2}, arr_type) where {M,FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2}
 
     @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻ = added_layer
-    @show scattering_interface
+    #@show scattering_interface
     #@unpack botR⁻⁺, botR⁺⁻, botT⁺⁺, botT⁻⁻, botJ₀⁺, botJ₀⁻ = composite_layer
     R⁻⁺ = arr_type(composite_layer.botR⁻⁺[ims]) 
     R⁺⁻ = arr_type(composite_layer.botR⁺⁻[ims]) 

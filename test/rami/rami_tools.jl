@@ -141,7 +141,7 @@ function convolve_2_sentinel(ν, BRF, band)
     eval(ex)
     srr = LinearInterpolation(wl_sr, sentinelILS);
     si = size(BRF)
-    #@show size(BRF)
+    @show size(BRF)
     d1 = si[1]
 
     wl_in = 1e7./ν;
@@ -168,11 +168,12 @@ function convolve_2_sentinel_HDR(ν, HDRF,BOAup,BOAdw, band)
     weight = srr.(wl_in)
     weight = weight/sum(weight)
     HDRF_out = zeros(d1)
-
+    #@show size(BOAdw)
     for i in eachindex(HDRF_out)
         HDRF_out[i] = weight' * (HDRF[i,1,:]./BOAdw)
     end
     BHR = (weight' * BOAup) / (weight' * BOAdw)
+    @show BHR #size(ν), size(HDRF_out), size(BHR)
     return HDRF_out, BHR
 end
 
@@ -366,22 +367,38 @@ function produce_rami_results(experiment_name::String;
     #R = rt_run(model)
     if isnothing(Cano)
         R, _, _, _, hdr, bhr_uw, bhr_dw = rt_run(model)
+        
+        #@show size(R), size(hdr)
+        #print("here 1.1\n")
+        BRF       = convolve_2_sentinel(model.params.spec_bands[1], R, band)
+        HDRF, BHR = convolve_2_sentinel_HDR(model.params.spec_bands[1], hdr,bhr_uw,bhr_dw, band)
+        #print("here 1.2\n")
+
     else
         LAD, LAI, BiLambMod, ϖ_canopy   = Cano
-        @show LAD, LAI, BiLambMod, ϖ_canopy
-        R, _, _, _, hdr, bhr_uw, bhr_dw = vSmartMOM.CoreRT.rt_run_canopy(vSmartMOM.InelasticScattering.noRS(),model, LAD, LAI, BiLambMod, ϖ_canopy,1)
-        @show LAD
+        #@show LAD, LAI, BiLambMod, ϖ_canopy
+        R, _, _, _, hdr, bhr_uw, bhr_dw = 
+            vSmartMOM.CoreRT.rt_run_canopy_ms(
+                vSmartMOM.InelasticScattering.noRS(),
+                [0,1], model, LAD, LAI, BiLambMod, ϖ_canopy,1)
+        #=R, _, _, _, hdr, bhr_uw, bhr_dw = 
+            vSmartMOM.CoreRT.rt_run_canopy(
+                vSmartMOM.InelasticScattering.noRS(),
+                model, LAD, LAI, BiLambMod, ϖ_canopy,1)=#
+        #@show size(bhr_dw), size(bhr_uw)
+        #@show bhr_dw, bhr_uw
+        #@show LAD
+        #@show size(R[1]), size(hdr)
+        #print("here 2.1\n")
+        BRF       = convolve_2_sentinel(model.params.spec_bands[1], R[1], band)
+        HDRF, BHR = convolve_2_sentinel_HDR(model.params.spec_bands[1], hdr,bhr_uw,bhr_dw, band)
+        #print("here 2.2\n")
     end
     # Convolve results:
-    @show size(R), size(hdr)
-    BRF       = convolve_2_sentinel(model.params.spec_bands[1], R, band)
-    HDRF, BHR = convolve_2_sentinel_HDR(model.params.spec_bands[1], hdr,bhr_uw,bhr_dw, band)
-
-
     save_toa_results(BRF, model, experiment_name, "/home/cfranken/rami2/")
     save_boa_results(HDRF,BHR,model, experiment_name, "/home/cfranken/rami2/")
 
-return BRF, R, HDRF, BRF, model
+return BRF, R, HDRF, BHR, model
 #return BRF, R, model
 
 # Can do postprocessing here (saving data, convolution, etc)
