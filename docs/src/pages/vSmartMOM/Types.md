@@ -39,7 +39,6 @@ CoreRT.vSmartMOM_Model
 CoreRT.AbstractSurfaceType
 CoreRT.LambertianSurfaceScalar
 CoreRT.LambertianSurfaceSpectrum
-CoreRT.LambertianSurfacePolyFit
 
 ```
 

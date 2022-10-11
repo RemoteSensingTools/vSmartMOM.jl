@@ -31,7 +31,7 @@
 
 <p align="center">
   <a href="#installation">Installation</a> •
-  <a href="#modules">Modules</a> (<a href="#radiativetransfer">RT</a>, <a href="#radiativetransferabsorption">Absorption</a>, <a href="#radiativetransferscattering">Scattering</a>) •
+  <a href="#modules">Modules</a> (<a href="#vsmartmom">vSmartMOM</a>, <a href="#vsmartmomabsorption">Absorption</a>, <a href="#vsmartmomscattering">Scattering</a>) •
   <a href="#support">Support</a> •
   <a href="#license">License</a>
 </p>
@@ -45,7 +45,7 @@ By taking advantage of modern software tools, such as GPU acceleration and HPC c
 vSmartMOM can be installed using the Julia package manager. From the Julia REPL, type `]` to enter the Pkg REPL mode and run
 
 ```julia
-pkg> add https://github.com/RemoteSensingTools/vSmartMOM.jl
+pkg> add vSmartMOM
 ```
 
 ## Modules
@@ -87,32 +87,18 @@ This module enables scattering phase-function calculation of atmospheric aerosol
   - `make_mie_model(computation_type::AbstractFourierDecompositionType, aerosol::AbstractAerosolType, λ::Real, polarization::AbstractPolarizationType, truncation_type::AbstractTruncationType, ...)`: Create a MieModel struct that holds all of the model parameters needed to perform a phase function calculation (computation type, aerosol, incident wavelength, etc. )
   - `compute_aerosol_optical_properties(model::MieModel)`: Compute the aerosol optical properties using the specified model parameters
 
-## Support
+## How to Contribute 
 
-This project is being developed in the Christian Frankenberg and Paul Wennberg labs at Caltech and Suniti Sanghavi, with support from the Schmidt Academy for Software Engineering (SASE).
+vSmartMOM.jl is a growing package and thus feedback from users like you are highly appreciated. To report bugs or suggest new features in vSmartMOM.jl, please create GitHub [Issues](https://github.com/RemoteSensingTools/vSmartMOM.jl/issues). To contribute to the package, please feel free to create a [Pull Request](https://github.com/RemoteSensingTools/vSmartMOM.jl/pulls). 
 
-Please <a href="mailto:cfranken@caltech.edu,wennberg@gps.caltech.edu?cc=rjeyaram@caltech.edu"> email us</a> if you have any questions, suggestions, or contributions!
+If you have any questions about the methods used or would like to chat with us, please feel free to shoot us an email <a href="mailto:cfranken@caltech.edu,wennberg@gps.caltech.edu,suniti.sanghavi@gmail.com?cc=rjeyaram@caltech.edu">here</a>. 
 
-## License
+## Acknowledgements
 
-MIT License
+This project is being developed in the Christian Frankenberg and Paul Wennberg labs at Caltech and is largely based on papers and ideas by Suniti Sanghavi from NASA/JPL, with support from the Schmidt Academy for Software Engineering (SASE).
 
-Copyright (c) 2020 Rupesh Jeyaram
+## Copyright Notice
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+Apache 2.0 License
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+Copyright 2022, by the California Institute of Technology. ALL RIGHTS RESERVED. United States Government Sponsorship acknowledged. Any commercial use must be negotiated with the Office of Technology Transfer at the California Institute of Technology. This software may be subject to U.S. export control laws. By accepting this software, the user agrees to comply with all applicable U.S. export laws and regulations. User has the responsibility to obtain export licenses, or other export authority as may be required before exporting such information to foreign countries or providing access to foreign persons.

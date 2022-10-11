@@ -9,7 +9,7 @@ using vSmartMOM.CoreRT
 ## 
 
 # If you would like to load your own parameters from a YAML file
-# (See required format at: https://github.com/remotesensingtools/vSmartMOM.jl/blob/main/src/CoreRT/ModelParameters/DefaultParameters.yaml)
+# (See required format at: https://github.com/remotesensingtools/vSmartMOM.jl/blob/main/src/CoreRT/DefaultParameters.yaml)
 parameters = parameters_from_yaml("vSmartMOM/src/CoreRT/DefaultParameters.yaml")
 
 # OR if you would like to load a default set of parameters
@@ -17,7 +17,7 @@ parameters = default_parameters();
 
 # You can then change any individual fields in parameters (parameters.field = ...)
 # Please see descriptions of each field here: 
-# https://remotesensingtools.github.io/vSmartMOM.jl/dev/pages/vSmartMOM/InputParametersGuide.html
+# https://remotesensingtools.github.io/vSmartMOM.jl/dev/pages/vSmartMOM/InputParametersGuide/
 
 ## 
 ## STEP 2: Create a model from parameters

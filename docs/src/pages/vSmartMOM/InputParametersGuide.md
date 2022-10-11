@@ -16,7 +16,7 @@
 
 **l_trunc**: Truncation length for legendre terms. Should be a positive integer. 
 
-**depol**: Depolarization factor to use in Rayleigh calculations. 
+**depol**: Depolarization factor to use in Rayleigh calculations (unitless). 
 
 **float_type**: Float type to use in the RT simulations. Should be one of [`Float64`, `Float32`]. 
 
@@ -57,13 +57,13 @@
 ## **scattering** group (optional)
 
 **aerosols**: A list of scattering aerosols and their properties. Each aerosol should be a dictionary of key-value pairs for the following keys: 
-- **τ_ref**: Reference τ
-- **μ**: Log mean radius (µm)
-- **σ**: Log stddev of radius (µm)
-- **nᵣ**: Real part of refractive index
-- **nᵢ**: Imag part of refractive index
-- **p₀**: Pressure peak (Pa)
-- **σp**: Pressure peak width (Pa)
+- **τ_ref**: Reference τ, in `µm`
+- **μ**: Log mean radius, in `µm`
+- **σ**: Log stddev of radius, in `µm`
+- **nᵣ**: Real part of refractive index (unitless)
+- **nᵢ**: Imaginary part of refractive index (unitless)
+- **p₀**: Pressure peak, in `Pa`
+- **σp**: Pressure peak width, in `Pa`
 
 **r_max**: Maximum aerosol particle radius for quadrature points/weights. Units in `µm`. 
 
