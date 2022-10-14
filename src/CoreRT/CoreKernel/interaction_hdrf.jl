@@ -69,6 +69,9 @@ function interaction_hdrf_canopy!(SFI,
             bhr_J₀⁻[i,:] .= (sum(uwJ[j,1,:].*wt[j].*qp[j], dims=1)')
             #@show size(bhr_J₀⁺[i,:]), size(solJ₀[i,:])
             bhr_J₀⁺[i,:] .= (sum(dwJ[j,1,:].*wt[j].*qp[j], dims=1)') .+ (solJ₀[i,:] .* qp[iμ₀]) #TODO: Use Radau quadrature and include insolation in the quadrature sum
+            direct = (solJ₀[i,:] .* qp[iμ₀])
+            diffuse = (sum(dwJ[j,1,:].*wt[j].*qp[j], dims=1)')
+            @show direct[1], diffuse[1]
             #@show j₀⁺[iμ₀,1,1:3].* qp[iμ₀], J₀⁺[iμ₀,1,1:3] .* qp[iμ₀], bhr_J₀⁺[i,1:3], bhr_J₀⁻[i,1:3]
             #@show Array(sum(J₀⁻[j,1,:].*wt_μN[j].*qp_μN[j], dims=1)')[1], Array(sum(hdr_J₀⁻[j,1,:].*wt_μN[j].*qp_μN[j], dims=1)')[1],Array(sum(j₀⁻[j,1,:].*wt_μN[j].*qp_μN[j], dims=1)')[1]
             #end
