@@ -100,8 +100,8 @@ function rt_run_canopy(RS_type::AbstractRamanType,
             constructCoreOpticalProperties(RS_type,iBand,m,model);
         
         
-        @show BiLambMod
-        𝐙⁺⁺, 𝐙⁻⁺ = CanopyOptics.compute_Z_matrices(BiLambMod, Array(qp_μN), LAD, m)    
+        #@show BiLambMod
+        𝐙⁺⁺, 𝐙⁻⁺ = CanopyOptics.compute_Z_matrices_aniso(BiLambMod, Array(qp_μN), LAD, m)    
         # This basically multiplies with G again, needs to be fixed later (or removed from compute_Z_matrices)
         G1 = arr_type(CanopyOptics.G(Array(qp_μN), LAD))
         #@show G1
@@ -129,7 +129,7 @@ function rt_run_canopy(RS_type::AbstractRamanType,
             # Expand all layer optical properties to their full dimension:
             @timeit "OpticalProps" layer_opt = 
                 expandOpticalProperties(layer_opt_props[iz], arr_type)
-
+            @show layer_opt.τ, layer_opt.ϖ, iz
             # Perform Core RT (doubling/elemental/interaction)
             rt_kernel!(RS_type, pol_type, SFI, 
                         #bandSpecLim, 
@@ -207,21 +207,11 @@ function rt_run_canopy(RS_type::AbstractRamanType,
     #return SFI ? (R_SFI, T_SFI, ieR_SFI, ieT_SFI) : (R, T)
     #end
 end
-function get_solJ_canopy(nSpec, 
-                    pol_type, 
-                    in_τ_sum::AbstractArray{FT}, 
-                    μ₀, arr_type) where {FT, FT2, M} #where {FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2,M}
 
-    solJ₀      = zeros(FT, pol_type.n, nSpec)
-    #@show size(arr_type(pol_type.I₀) .* exp.(-in_τ_sum/μ₀))
-    #@show size(solJ₀), size(pol_type.I₀[1]),  size(in_τ_sum)
-    #for ip=1:pol_type.n
-    #    solJ₀[ip,:] = pol_type.I₀[ip] * exp.(-in_τ_sum/μ₀) #Array(added_layer.j₀⁺[iμ₀:iμ₀+pol_type.n-1,1,:]) 
-    solJ₀ .= Array(arr_type(pol_type.I₀) .* exp.(-in_τ_sum/μ₀))' #Array(added_layer.j₀⁺[iμ₀:iμ₀+pol_type.n-1,1,:]) 
-    
-    #end 
-    
-    return solJ₀;
+function get_solJ_canopy(pol_type, 
+                    in_τ_sum::AbstractArray{FT}, 
+                    μ₀, arr_type) where {FT} 
+    solJ₀ = Array(arr_type(pol_type.I₀) .* exp.(-in_τ_sum/μ₀))' 
 end
 
 #For multisensor use (especially for the computation of TOC parameters)
@@ -310,7 +300,8 @@ function rt_run_canopy_ms(RS_type::AbstractRamanType,
 
     #TODO: if RS_type!=noRS, create ϖ_λ₁λ₀, i_λ₁λ₀, fscattRayl, Z⁺⁺_λ₁λ₀, Z⁻⁺_λ₁λ₀ (for input), and ieJ₀⁺, ieJ₀⁻, ieR⁺⁻, ieR⁻⁺, ieT⁻⁻, ieT⁺⁺, ier⁺⁻, ier⁻⁺, iet⁻⁻, iet⁺⁺ (for output)
     #getRamanSSProp(RS_type, λ, grid_in)
-
+    println("Prepping Canopy")
+    Zup, Zdown = CanopyOptics.precompute_Zazi(BiLambMod, Array(qp_μN), LAD)
     println("Finished initializing arrays")
 
     # Loop over fourier moments
@@ -326,21 +317,23 @@ function rt_run_canopy_ms(RS_type::AbstractRamanType,
         constructCoreOpticalProperties(RS_type,iBand,m,model);
 
 
-        @show BiLambMod
-        𝐙⁺⁺, 𝐙⁻⁺ = CanopyOptics.compute_Z_matrices(BiLambMod, Array(qp_μN), LAD, m)    
+        #@show BiLambMod
+        𝐙⁺⁺, 𝐙⁻⁺ = CanopyOptics.compute_Z_matrices_aniso(BiLambMod, Array(qp_μN), LAD, Zup, Zdown, m)    
         # This basically multiplies with G again, needs to be fixed later (or removed from compute_Z_matrices)
         G1 = arr_type(CanopyOptics.G(Array(qp_μN), LAD))
+        #𝐙⁺⁺ .= 0.0
+        #𝐙⁻⁺ .= 0.0
         #@show G1
         canopyCore = CoreRT.CoreDirectionalScatteringOpticalProperties(arr_type(LAI*ones(FT, nSpec)), arr_type(ϖ_canopy*ones(FT,nSpec)), arr_type(𝐙⁺⁺), arr_type(𝐙⁻⁺), G1)
         #@show canopyCore.ϖ
         # Add Canopy at the bottom here:
         layer_opt_props =  [layer_opt_props; canopyCore]
 
-
         # Determine the scattering interface definitions:
         scattering_interfaces_all, τ_sum_all = 
             extractEffectiveProps(layer_opt_props);
-
+        #@show τ_sum_all[1,:]
+        #@show size(τ_sum_all), Nz
         Nz = length(layer_opt_props)
         sensor_levels = [0,Nz-1] #redefined sensor levels to include TOA, TOC and BOA/BOC
         # Loop over vertical layers: 
@@ -371,15 +364,11 @@ function rt_run_canopy_ms(RS_type::AbstractRamanType,
                     model.params.architecture, 
                     qp_μN, iz, arr_type) 
 
-            if (iz==Nz-1)
-                solJ₀ = get_solJ_canopy(nSpec, 
-                    pol_type, 
-                    arr_type(τ_sum_all[:,iz]), 
-                    μ₀, arr_type)
+            if (iz==Nz)
+                solJ₀ = get_solJ_canopy(pol_type, 
+                                        τ_sum_all[:,iz], 
+                                        μ₀, arr_type)
             end
-            #@show iμ₀, NquadN, pol_type.n
-            
-            #@show solJ₀
         end 
 
         # Create surface matrices:
@@ -402,18 +391,7 @@ function rt_run_canopy_ms(RS_type::AbstractRamanType,
                                 added_layer_surface, 
                                 I_static, arr_type)
         end
-        #@show composite_layer.J₀⁺[iμ₀,1,1:3]
-        # hdr_J₀⁻ = similar(composite_layer.botJ₀⁻[1])
-        # One last interaction with surface:
-        #=@timeit "interaction_HDRF_canopy" interaction_hdrf_canopy!(#RS_type,
-                            #bandSpecLim,
-                            #scattering_interfaces_all[end], 
-                            SFI, 
-                            composite_layer, 
-                            added_layer_surface, 
-                            m, pol_type, quad_points,
-                            hdr_J₀⁻, bhr_uw, bhr_dw)
-        =#
+   
         # Postprocess and weight according to vza
         @timeit "Postprocessing" postprocessing_vza_ms_canopy!(RS_type,
                     sensor_levels, 
@@ -430,9 +408,9 @@ function rt_run_canopy_ms(RS_type::AbstractRamanType,
                     hdr_J₀⁻, bhr_uw, bhr_dw,
                     I_static, arr_type)
         
-        @show size(bhr_dw), size(bhr_uw)
-        @show bhr_dw
-        @show bhr_uw
+        #@show size(bhr_dw), size(bhr_uw)
+        #@show bhr_dw
+        #@show bhr_uw
 
         @timeit "Postprocessing" postprocessing_vza_hdrf!(RS_type, 
                     iμ₀, pol_type, 

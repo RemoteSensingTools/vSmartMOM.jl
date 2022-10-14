@@ -287,13 +287,6 @@ function rt_kernel_multisensor!(RS_type::noRS{FT},
             added_layer.t⁻⁻[:,:,iλ] = Diagonal(temp[iλ,:]);
         end
     end
-    #M1 = Array(added_layer.t⁺⁺)
-    #M2 = Array(added_layer.r⁺⁻)
-    #M3 = Array(added_layer.j₀⁻)
-    #M4 = Array(added_layer.j₀⁺)
-    #@show M1[1,1,1], M2[1,1,1], M3[1,1,1], M4[1,1,1]
-    
-    # @assert !any(isnan.(added_layer.t⁺⁺))
     
     # If this TOA, just copy the added layer into the bottom composite layer
     if (iz == 1)
@@ -360,15 +353,6 @@ function rt_kernel_multisensor!(RS_type::noRS{FT},
                                                                     I_static,
                                                                     arr_type)    
                 end
-                #=if iz==2
-                    M1 = (composite_layer.botT⁺⁺[1]);
-                    M2 = (composite_layer.botR⁺⁻[1]);
-                    M3 = (composite_layer.botT⁻⁻[1]);
-                    M4 = (composite_layer.botR⁻⁺[1]);
-                    M5 = (composite_layer.botJ₀⁻[1]);
-                    M6 = (composite_layer.botJ₀⁺[1]);
-                    #@show M1[1,1,1], M2[1,1,1], M3[1,1,1], M4[1,1,1], M5[1,1,1], M6[1,1,1]
-                end=#
             end
         end
     end
