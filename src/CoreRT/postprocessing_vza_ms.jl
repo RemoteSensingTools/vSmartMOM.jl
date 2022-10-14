@@ -231,16 +231,8 @@ function postprocessing_vza_ms_canopy!(RS_type::noRS,
                 #showp
             end
                                     
-            #tmpR = @timeit "postprocessing_vza inv1" batch_inv!(
-            #        tmp_inv, I_static .- topR⁺⁻[ims,:] ⊠ botR⁻⁺[ims,:]) #Suniti
-            #tdwJ[ims,:] = tmpR ⊠ (topJ₀⁺[ims,:] .+ topR⁺⁻[ims,:]⊠botJ₀⁻[ims,:])
-
-            #tmpR = @timeit "postprocessing_vza inv1" batch_inv!(
-            #        tmp_inv, I_static .- botR⁻⁺[ims,:] ⊠ topR⁺⁻[ims,:]) #Suniti
-            #tuwJ[ims,:] = tmpR ⊠ (botJ₀⁻[ims,:] .+ botR⁻⁺[ims,:]⊠topJ₀⁺[ims,:])
         end
-        #@show "down", tdwJ[ims][:,1,1]
-        #@show "up", tuwJ[ims][:,1,1]
+
     end
     #@show size(bhr_uw), size(bhr_dw)
     interaction_hdrf_canopy!(SFI, tdwJ[2], tuwJ[2], solJ₀,
@@ -248,7 +240,7 @@ function postprocessing_vza_ms_canopy!(RS_type::noRS,
                             hdr_J₀⁻, bhr_uw, bhr_dw)
     
     # Loop over all viewing zenith angles
-    for i = 1:length(vza)
+    for i in eachindex(vza)
 
         # Find the nearest quadrature point idx
         iμ = nearest_point(qp_μ, cosd(vza[i]));

@@ -12,7 +12,7 @@ n_continental = readdlm("test/rami/refractive_aero_continental.txt")
 const sr_2 = sr[:,3]
 const sr_3 = sr[:,4]
 const sr_4 = sr[:,5]
-const sr_8A = sr[:,10]
+const sr_8a = sr[:,10]
 const sr_11 = sr[:,13]
 const sr_12 = sr[:,14]
 const wl_sr = sr[:,1]
@@ -21,7 +21,7 @@ const wl_sr = sr[:,1]
 const sentinel_band_to_index = Dict([("2" , 1),    # Blue
                                      ("3" , 2),    # Green
                                      ("4" , 3),    # Red
-                                     ("8A", 4),    # Narrow NIR 
+                                     ("8a", 4),    # Narrow NIR 
                                      ("11", 5),  # SWIR
                                      ("12", 6)]) # SWIR
 
@@ -168,7 +168,8 @@ function convolve_2_sentinel_HDR(ν, HDRF,BOAup,BOAdw, band)
     weight = srr.(wl_in)
     weight = weight/sum(weight)
     HDRF_out = zeros(d1)
-    #@show size(BOAdw)
+    @show size(BOAdw), size(BOAup)
+    @show BOAdw[1], BOAup[1]
     for i in eachindex(HDRF_out)
         HDRF_out[i] = weight' * (HDRF[i,1,:]./BOAdw)
     end
@@ -249,8 +250,9 @@ function setCanopy!(scenario)
         else
             LAD = CanopyOptics.LeafDistribution(Beta(ν, μ), 2/π);
         end
+        
         ϖ_canopy = leaf_T+leaf_R
-
+        
         return LAD, LAI, BiLambMod, ϖ_canopy #,  height, leaf_radius
     catch
         return nothing
@@ -360,7 +362,7 @@ function produce_rami_results(experiment_name::String;
         @info "Turning off Rayleigh ", atm_type
         model.τ_rayl[1] .= 0.0
     end
-    #  model.τ_rayl[1] .= 0.00000000001
+    # model.τ_rayl[1] .= 0.00000000001
     ########################################################
 
     # Run model (can think about including the BOA and hemispheric data here as well)
@@ -370,17 +372,21 @@ function produce_rami_results(experiment_name::String;
         
         #@show size(R), size(hdr)
         #print("here 1.1\n")
-        BRF       = convolve_2_sentinel(model.params.spec_bands[1], R, band)
+        BRF       = convolve_2_sentinel(model.params.spec_bands[1], R, band) / cosd(params.sza)
         HDRF, BHR = convolve_2_sentinel_HDR(model.params.spec_bands[1], hdr,bhr_uw,bhr_dw, band)
         #print("here 1.2\n")
 
     else
         LAD, LAI, BiLambMod, ϖ_canopy   = Cano
         #@show LAD, LAI, BiLambMod, ϖ_canopy
-        R, _, _, _, hdr, bhr_uw, bhr_dw = 
-            vSmartMOM.CoreRT.rt_run_canopy_ms(
+        #R, _, _, _, hdr, bhr_uw, bhr_dw = vSmartMOM.CoreRT.rt_run_canopy(
+        #        vSmartMOM.InelasticScattering.noRS(),
+        #         model, LAD, LAI, BiLambMod, ϖ_canopy,1)
+        R, _, _, _, hdr, bhr_uw, bhr_dw = vSmartMOM.CoreRT.rt_run_canopy_ms(
                 vSmartMOM.InelasticScattering.noRS(),
                 [0,1], model, LAD, LAI, BiLambMod, ϖ_canopy,1)
+
+        @show bhr_uw,bhr_dw
         #=R, _, _, _, hdr, bhr_uw, bhr_dw = 
             vSmartMOM.CoreRT.rt_run_canopy(
                 vSmartMOM.InelasticScattering.noRS(),
@@ -390,13 +396,14 @@ function produce_rami_results(experiment_name::String;
         #@show LAD
         #@show size(R[1]), size(hdr)
         #print("here 2.1\n")
-        BRF       = convolve_2_sentinel(model.params.spec_bands[1], R[1], band)
+        @show size(R[1])
+        BRF       = convolve_2_sentinel(model.params.spec_bands[1], R[1], band) / cosd(params.sza)
         HDRF, BHR = convolve_2_sentinel_HDR(model.params.spec_bands[1], hdr,bhr_uw,bhr_dw, band)
         #print("here 2.2\n")
     end
     # Convolve results:
-    save_toa_results(BRF, model, experiment_name, "/home/cfranken/rami2/")
-    save_boa_results(HDRF,BHR,model, experiment_name, "/home/cfranken/rami2/")
+    save_toa_results(BRF, model, experiment_name, "/home/cfranken/rami3/")
+    save_boa_results(HDRF,BHR,model, experiment_name, "/home/cfranken/rami3/")
 
 return BRF, R, HDRF, BHR, model
 #return BRF, R, model

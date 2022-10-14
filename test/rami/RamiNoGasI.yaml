@@ -18,7 +18,7 @@ radiative_transfer:
   # Polarization type (Stokes_I, Stokes_IQ, Stokes_IQU, Stokes_IQUV)
   polarization_type:  Stokes_I()
   # Maximum m (number of Fourier moments to loop over)
-  max_m:              20
+  max_m:              15
   # Exclusion angle for forward peak in fitting procedure (degrees)
   Δ_angle:            2.0
   # Trunction length for legendre terms
