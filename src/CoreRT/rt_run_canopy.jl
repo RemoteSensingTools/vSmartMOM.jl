@@ -64,7 +64,7 @@ function rt_run_canopy(RS_type::AbstractRamanType,
     # Notify user of processing parameters
     msg = 
     """
-    Processing on: $(architecture)
+    Processing on: $(model.params.architecture)
     With FT: $(FT)
     Source Function Integration: $(SFI)
     Dimensions: $((NquadN, NquadN, nSpec))
@@ -174,7 +174,7 @@ function rt_run_canopy(RS_type::AbstractRamanType,
                                     hdr_J₀⁻, bhr_uw, bhr_dw)
         
         # Postprocess and weight according to vza
-        @timeit "Postprocessing" postprocessing_vza!(RS_type, 
+        @timeit "Postprocessing VZA" postprocessing_vza!(RS_type, 
                             iμ₀, pol_type, 
                             composite_layer, 
                             vza, qp_μ, m, vaz, μ₀, 
@@ -184,7 +184,7 @@ function rt_run_canopy(RS_type::AbstractRamanType,
                             T, T_SFI,
                             ieR_SFI, ieT_SFI)
 
-        @timeit "Postprocessing" postprocessing_vza_hdrf!(RS_type, 
+        @timeit "Postprocessing HDRF" postprocessing_vza_hdrf!(RS_type, 
             iμ₀, pol_type, 
             hdr_J₀⁻, 
             vza, qp_μ, m, vaz, μ₀, 
@@ -280,7 +280,7 @@ function rt_run_canopy_ms(RS_type::AbstractRamanType,
     # Notify user of processing parameters
     msg = 
     """
-    Processing on: $(architecture)
+    Processing on: $(model.params.architecture)
     With FT: $(FT)
     Source Function Integration: $(SFI)
     Dimensions: $((NquadN, NquadN, nSpec))
@@ -326,6 +326,7 @@ function rt_run_canopy_ms(RS_type::AbstractRamanType,
         #@show G1
         canopyCore = CoreRT.CoreDirectionalScatteringOpticalProperties(arr_type(LAI*ones(FT, nSpec)), arr_type(ϖ_canopy*ones(FT,nSpec)), arr_type(𝐙⁺⁺), arr_type(𝐙⁻⁺), G1)
         #@show canopyCore.ϖ
+        #canopyCore.ϖ .= 0
         # Add Canopy at the bottom here:
         layer_opt_props =  [layer_opt_props; canopyCore]
 
@@ -393,7 +394,7 @@ function rt_run_canopy_ms(RS_type::AbstractRamanType,
         end
    
         # Postprocess and weight according to vza
-        @timeit "Postprocessing" postprocessing_vza_ms_canopy!(RS_type,
+        @timeit "Postprocessing Canopy" postprocessing_vza_ms_canopy!(RS_type,
                     sensor_levels, 
                     quad_points,
                     iμ₀, pol_type, 
@@ -412,7 +413,7 @@ function rt_run_canopy_ms(RS_type::AbstractRamanType,
         #@show bhr_dw
         #@show bhr_uw
 
-        @timeit "Postprocessing" postprocessing_vza_hdrf!(RS_type, 
+        @timeit "Postprocessing HDRF" postprocessing_vza_hdrf!(RS_type, 
                     iμ₀, pol_type, 
                     hdr_J₀⁻, 
                     vza, qp_μ, m, vaz, μ₀, 

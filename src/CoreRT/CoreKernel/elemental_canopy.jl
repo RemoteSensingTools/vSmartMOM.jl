@@ -26,7 +26,7 @@ function elemental!(pol_type, SFI::Bool,
     D     = Diagonal(arr_type(repeat(pol_type.D, size(qp_μ,1))))
 
     device = devi(architecture)
-
+    @show maximum(Array(ϖ)), maximum(Array(dτ))
     # If in scattering mode:
     if scatter
         # for m==0, ₀∫²ᵖⁱ cos²(mϕ)dϕ/4π = 0.5, while
@@ -67,6 +67,7 @@ end
     end
     if (wct[j]>1.e-8) 
         # 𝐑⁻⁺(μᵢ, μⱼ) = ϖ ̇𝐙⁻⁺(μᵢ, μⱼ) ̇(μⱼ/(μᵢ+μⱼ)) ̇(1 - exp{-τ ̇(1/μᵢ + 1/μⱼ)}) ̇𝑤ⱼ
+
         r⁻⁺[i,j,n] = 
             ϖ_λ[n] * G[j] * Z⁻⁺[i,j,n2] * 
             #Z⁻⁺[i,j] * 

@@ -78,7 +78,7 @@ function rt_run(RS_type::AbstractRamanType,
     # Notify user of processing parameters
     msg = 
     """
-    Processing on: $(architecture)
+    Processing on: $(model.params.architecture)
     With FT: $(FT)
     Source Function Integration: $(SFI)
     Dimensions: $((NquadN, NquadN, nSpec))

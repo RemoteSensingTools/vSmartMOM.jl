@@ -252,7 +252,7 @@ function setCanopy!(scenario)
         end
         
         ϖ_canopy = leaf_T+leaf_R
-        
+        #LAI = 0.0000000000
         return LAD, LAI, BiLambMod, ϖ_canopy #,  height, leaf_radius
     catch
         return nothing
@@ -370,38 +370,22 @@ function produce_rami_results(experiment_name::String;
     if isnothing(Cano)
         R, _, _, _, hdr, bhr_uw, bhr_dw = rt_run(model)
         
-        #@show size(R), size(hdr)
-        #print("here 1.1\n")
         BRF       = convolve_2_sentinel(model.params.spec_bands[1], R, band) / cosd(params.sza)
         HDRF, BHR = convolve_2_sentinel_HDR(model.params.spec_bands[1], hdr,bhr_uw,bhr_dw, band)
         #print("here 1.2\n")
 
     else
         LAD, LAI, BiLambMod, ϖ_canopy   = Cano
-        #@show LAD, LAI, BiLambMod, ϖ_canopy
-        #R, _, _, _, hdr, bhr_uw, bhr_dw = vSmartMOM.CoreRT.rt_run_canopy(
-        #        vSmartMOM.InelasticScattering.noRS(),
-        #         model, LAD, LAI, BiLambMod, ϖ_canopy,1)
+        
         R, _, _, _, hdr, bhr_uw, bhr_dw = vSmartMOM.CoreRT.rt_run_canopy_ms(
                 vSmartMOM.InelasticScattering.noRS(),
                 [0,1], model, LAD, LAI, BiLambMod, ϖ_canopy,1)
 
-        @show bhr_uw,bhr_dw
-        #=R, _, _, _, hdr, bhr_uw, bhr_dw = 
-            vSmartMOM.CoreRT.rt_run_canopy(
-                vSmartMOM.InelasticScattering.noRS(),
-                model, LAD, LAI, BiLambMod, ϖ_canopy,1)=#
-        #@show size(bhr_dw), size(bhr_uw)
-        #@show bhr_dw, bhr_uw
-        #@show LAD
-        #@show size(R[1]), size(hdr)
-        #print("here 2.1\n")
-        @show size(R[1])
+        # Convolve results:
         BRF       = convolve_2_sentinel(model.params.spec_bands[1], R[1], band) / cosd(params.sza)
         HDRF, BHR = convolve_2_sentinel_HDR(model.params.spec_bands[1], hdr,bhr_uw,bhr_dw, band)
-        #print("here 2.2\n")
     end
-    # Convolve results:
+    # Save results:
     save_toa_results(BRF, model, experiment_name, "/home/cfranken/rami3/")
     save_boa_results(HDRF,BHR,model, experiment_name, "/home/cfranken/rami3/")
 
