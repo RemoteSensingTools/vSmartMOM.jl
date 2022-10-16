@@ -26,7 +26,7 @@ function elemental!(pol_type, SFI::Bool,
     D     = Diagonal(arr_type(repeat(pol_type.D, size(qp_μ,1))))
 
     device = devi(architecture)
-    @show maximum(Array(ϖ)), maximum(Array(dτ))
+    #@show maximum(Array(ϖ)), maximum(Array(dτ))
     # If in scattering mode:
     if scatter
         # for m==0, ₀∫²ᵖⁱ cos²(mϕ)dϕ/4π = 0.5, while
@@ -132,9 +132,10 @@ end
         J₀⁺[i, 1, n] = wct02 * ϖ_λ[n] * G[i] * Z⁺⁺_I₀ * (dτ_λ[n] / qp_μN[i]) * exp(-dτ_λ[n] *  G[i] / qp_μN[i])
     else
         # J₀⁺ = 0.25*(1+δ(m,0)) * ϖ(λ) * Z⁺⁺ * I₀ * [μ₀ / (μᵢ - μ₀)] * [exp(-dτ(λ)/μᵢ) - exp(-dτ(λ)/μ₀)]
-        J₀⁺[i, 1, n] = wct02 * ϖ_λ[n] * G[i_start] * Z⁺⁺_I₀ * 
-            (qp_μN[i_start] / (qp_μN[i]*G[i_start] - qp_μN[i_start])*G[i]) * 
-            (exp(-dτ_λ[n] * G[i] / qp_μN[i]) - exp(-dτ_λ[n] * G[i_start] / qp_μN[i_start]))
+        J₀⁺[i, 1, n] = 
+        wct02 * ϖ_λ[n] * G[i_start] * Z⁺⁺_I₀ * 
+        (qp_μN[i_start] / (qp_μN[i]*G[i_start] - qp_μN[i_start]*G[i])) * 
+        (exp(-dτ_λ[n] * G[i] / qp_μN[i]) - exp(-dτ_λ[n] * G[i_start] / qp_μN[i_start]))
     end
     #J₀⁻ = 0.25*(1+δ(m,0)) * ϖ(λ) * Z⁻⁺ * I₀ * [μ₀ / (μᵢ + μ₀)] * [1 - exp{-dτ(λ)(1/μᵢ + 1/μ₀)}]
     J₀⁻[i, 1, n] = wct02 * ϖ_λ[n] * G[i_start]  * Z⁻⁺_I₀ * 

@@ -13,9 +13,10 @@ function rt_kernel_multisensor!(RS_type::noRS{FT},
                     architecture, 
                     qp_μN, iz, arr_type) where {FT, M}
 
-    @unpack qp_μ, μ₀ = quad_points
+    @unpack qp_μ, μ₀, wt_μN = quad_points
     # Just unpack core optical properties from 
     @unpack τ, ϖ, Z⁺⁺, Z⁻⁺ = computed_layer_properties
+     
     # SUNITI, check? Also, better to write function here
     #@show "here", size(τ .* ϖ), size(qp_μ)
     #@show maximum(τ .* ϖ), minimum(qp_μ)
@@ -35,7 +36,7 @@ function rt_kernel_multisensor!(RS_type::noRS{FT},
                                         computed_layer_properties, 
                                         m, ndoubl, scatter, quad_points,  
                                         added_layer,  architecture)
-        println("Elemental done...")
+        #println("Elemental done...")
         #@show maximum(added_layer.r⁺⁻[:]), maximum(added_layer.j₀⁺[:] ), maximum(added_layer.t⁺⁺[:] )
         @timeit "doubling"   doubling!(pol_type, SFI, 
                                         expk, ndoubl, 
@@ -145,6 +146,7 @@ function rt_kernel_multisensor!(RS_type::Union{RRS{FT}, RRS_plus{FT}, VS_0to1_pl
     @unpack qp_μ, μ₀ = quad_points
     # Just unpack core optical properties from 
     @unpack τ, ϖ, Z⁺⁺, Z⁻⁺ = computed_layer_properties
+
     # SUNITI, check? Also, better to write function here
     dτ_max = minimum([maximum(τ .* ϖ), FT(0.001) * minimum(qp_μ)])
     _, ndoubl = doubling_number(dτ_max, maximum(τ .* ϖ))
