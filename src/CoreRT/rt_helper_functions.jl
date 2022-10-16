@@ -22,8 +22,8 @@ function get_scattering_interface(scattering_interface,scatter, iz)
                                     (!scatter ? ScatteringInterface_00() : ScatteringInterface_01()) : 
                                     (!scatter ? ScatteringInterface_10() : ScatteringInterface_11())
     end
-    @show scattering_interface
-    return scattering_interface #ScatteringInterface_11() # 
+    #@show scattering_interface
+    return ScatteringInterface_11() # scattering_interface # ScatteringInterface_11() # scattering_interface #ScatteringInterface_11() # 
 end
 
 "Minimum number of doublings needed to reach an optical depth τ_end, starting with an optical depth dτ.
