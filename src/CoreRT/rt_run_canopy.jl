@@ -84,12 +84,15 @@ function rt_run_canopy(RS_type::AbstractRamanType,
     
         #TODO: if RS_type!=noRS, create ϖ_λ₁λ₀, i_λ₁λ₀, fscattRayl, Z⁺⁺_λ₁λ₀, Z⁻⁺_λ₁λ₀ (for input), and ieJ₀⁺, ieJ₀⁻, ieR⁺⁻, ieR⁻⁺, ieT⁻⁻, ieT⁺⁺, ier⁺⁻, ier⁻⁺, iet⁻⁻, iet⁺⁺ (for output)
     #getRamanSSProp(RS_type, λ, grid_in)
-    
+    println("Prepping Canopy")
+    #@show BiLambMod,  Array(qp_μN), LAD
+    Zup, Zdown = CanopyOptics.precompute_Zazi(BiLambMod, Array(qp_μN), LAD)
+    #@show maximum(Zup)
     println("Finished initializing arrays")
 
     # Loop over fourier moments
     for m = 0:max_m - 1
-
+        
         println("Fourier Moment: ", m, "/", max_m-1)
         # Azimuthal weighting
         weight = m == 0 ? FT(0.5) : FT(1.0)
@@ -100,20 +103,39 @@ function rt_run_canopy(RS_type::AbstractRamanType,
             constructCoreOpticalProperties(RS_type,iBand,m,model);
         
         
-        #@show BiLambMod
-        𝐙⁺⁺, 𝐙⁻⁺ = CanopyOptics.compute_Z_matrices_aniso(BiLambMod, Array(qp_μN), LAD, m)    
+        𝐙⁺⁺, 𝐙⁻⁺ = CanopyOptics.compute_Z_matrices_aniso(BiLambMod, Array(qp_μN), LAD, Zup, Zdown, m)    
+        #𝐙⁺⁺, 𝐙⁻⁺ = CanopyOptics.compute_Z_matrices(BiLambMod, Array(qp_μN), LAD,  m)    
+        if m<4
+            @show Array(wt_μN') * 𝐙⁺⁺ + Array(wt_μN') * 𝐙⁻⁺
+        end  
+        
         # This basically multiplies with G again, needs to be fixed later (or removed from compute_Z_matrices)
         G1 = arr_type(CanopyOptics.G(Array(qp_μN), LAD))
+        #G1 .= 0.5# G1 *2
         #@show G1
-        canopyCore = CoreRT.CoreDirectionalScatteringOpticalProperties(arr_type(LAI*ones(FT, nSpec)), arr_type(ϖ_canopy*ones(FT,nSpec)), arr_type(𝐙⁺⁺), arr_type(𝐙⁻⁺), G1)
-        #@show canopyCore.ϖ
+        @time canopyCore = CoreRT.CoreDirectionalScatteringOpticalProperties(arr_type(LAI*ones(FT, nSpec)), arr_type(ϖ_canopy*ones(FT,nSpec)), arr_type(𝐙⁺⁺), arr_type(𝐙⁻⁺), G1)
+        #canopyCore = CoreRT.CoreScatteringOpticalProperties(arr_type(LAI*ones(FT, nSpec)), arr_type(ϖ_canopy*ones(FT,nSpec)), arr_type(𝐙⁺⁺), arr_type(𝐙⁻⁺))
+        #@show canopyCore.ϖ, canopyCore.τ, typeof(canopyCore )
         # Add Canopy at the bottom here:
+        #layer_opt_props =  [layer_opt_props; canopyCore]
+        a = layer_opt_props[end]
+        #a.τ .= 1.5
+        #if m>-1
+        #canopyCore.Z⁺⁺ .= a.Z⁺⁺[:,:,1]
+        #canopyCore.Z⁻⁺ .= a.Z⁻⁺[:,:,1]
+        #end
+        #@show "HAHA"
+        #canopyCore.G .= 1.0
+        #@show canopyCore.G
         layer_opt_props =  [layer_opt_props; canopyCore]
-        
+        #layer_opt_props =  [layer_opt_props; a]
+        @show wt_μN' * a.Z⁺⁺[:,:,1] + wt_μN' * a.Z⁻⁺[:,:,1]
+        @show wt_μN' * canopyCore.Z⁺⁺ + wt_μN' * canopyCore.Z⁻⁺
         
         # Determine the scattering interface definitions:
         scattering_interfaces_all, τ_sum_all = 
             extractEffectiveProps(layer_opt_props);
+        @show scattering_interfaces_all
 
         Nz = length(layer_opt_props)
         # Loop over vertical layers: 
@@ -129,7 +151,12 @@ function rt_run_canopy(RS_type::AbstractRamanType,
             # Expand all layer optical properties to their full dimension:
             @timeit "OpticalProps" layer_opt = 
                 expandOpticalProperties(layer_opt_props[iz], arr_type)
-            @show layer_opt.τ, layer_opt.ϖ, iz
+            #@show wt_μN
+            #@show wt_μN' * layer_opt.Z⁺⁺[:,:,1] + wt_μN' * layer_opt.Z⁻⁺[:,:,1]
+            #if iz > Nz-2
+            #    @show typeof(layer_opt_props[iz]), Array(layer_opt.Z⁻⁺[1:20,1:20,1])
+            #end
+            #@show layer_opt.τ, layer_opt.ϖ, iz
             # Perform Core RT (doubling/elemental/interaction)
             rt_kernel!(RS_type, pol_type, SFI, 
                         #bandSpecLim, 
@@ -144,6 +171,7 @@ function rt_run_canopy(RS_type::AbstractRamanType,
         end 
 
         # Create surface matrices:
+        @show brdf
         create_surface_layer!(brdf, 
                             added_layer_surface, 
                             SFI, m, 
@@ -242,7 +270,7 @@ function rt_run_canopy_ms(RS_type::AbstractRamanType,
     #FT = eltype(sza)                   # Get the float-type to use
     Nz = length(model.profile.p_full)   # Number of vertical slices
 
-
+    #@show "Ha!!"
 
     RS_type.bandSpecLim = [] # (1:τ_abs[iB])#zeros(Int64, iBand, 2) #Suniti: how to do this?
     #Suniti: make bandSpecLim a part of RS_type (including noRS) so that it can be passed into rt_kernel and elemental/doubling/interaction and postprocessing_vza without major syntax changes
@@ -301,7 +329,9 @@ function rt_run_canopy_ms(RS_type::AbstractRamanType,
     #TODO: if RS_type!=noRS, create ϖ_λ₁λ₀, i_λ₁λ₀, fscattRayl, Z⁺⁺_λ₁λ₀, Z⁻⁺_λ₁λ₀ (for input), and ieJ₀⁺, ieJ₀⁻, ieR⁺⁻, ieR⁻⁺, ieT⁻⁻, ieT⁺⁺, ier⁺⁻, ier⁻⁺, iet⁻⁻, iet⁺⁺ (for output)
     #getRamanSSProp(RS_type, λ, grid_in)
     println("Prepping Canopy")
+    @show BiLambMod,  Array(qp_μN), LAD
     Zup, Zdown = CanopyOptics.precompute_Zazi(BiLambMod, Array(qp_μN), LAD)
+    @show maximum(Zup)
     println("Finished initializing arrays")
 
     # Loop over fourier moments
@@ -316,23 +346,36 @@ function rt_run_canopy_ms(RS_type::AbstractRamanType,
         @timeit "OpticalProps" layer_opt_props, fScattRayleigh   = 
         constructCoreOpticalProperties(RS_type,iBand,m,model);
 
+        𝐙⁺⁺, 𝐙⁻⁺ = CanopyOptics.compute_Z_matrices_aniso(BiLambMod, Array(qp_μN), LAD, Zup, Zdown, m) 
+        #𝐙⁺⁺, 𝐙⁻⁺ = CanopyOptics.compute_Z_matrices_aniso(BiLambMod, Array(qp_μN), LAD, m)   
 
-        #@show BiLambMod
-        𝐙⁺⁺, 𝐙⁻⁺ = CanopyOptics.compute_Z_matrices_aniso(BiLambMod, Array(qp_μN), LAD, Zup, Zdown, m)    
-        # This basically multiplies with G again, needs to be fixed later (or removed from compute_Z_matrices)
+        #if m < 5
+        #    @show Array(wt_μN') * 𝐙⁺⁺ + Array(wt_μN') * 𝐙⁻⁺
+        #end
+            # This basically multiplies with G again, needs to be fixed later (or removed from compute_Z_matrices)
         G1 = arr_type(CanopyOptics.G(Array(qp_μN), LAD))
-        #𝐙⁺⁺ .= 0.0
-        #𝐙⁻⁺ .= 0.0
-        #@show G1
-        canopyCore = CoreRT.CoreDirectionalScatteringOpticalProperties(arr_type(LAI*ones(FT, nSpec)), arr_type(ϖ_canopy*ones(FT,nSpec)), arr_type(𝐙⁺⁺), arr_type(𝐙⁻⁺), G1)
+        #G1 .= 0.5
+        # normalizing as doubling causes trouble otherwise.
+        Gref = Array(G1)[iμ₀]
+        G1 = G1 ./ Gref
+        #G1 .= 1.0
+        
+        canopyCore = CoreRT.CoreDirectionalScatteringOpticalProperties(arr_type(Gref * LAI * ones(FT, nSpec)), arr_type(ϖ_canopy*ones(FT,nSpec)), arr_type(𝐙⁺⁺), arr_type(𝐙⁻⁺), G1)
+        #canopyCore = CoreRT.CoreScatteringOpticalProperties(arr_type(0.1*LAI*ones(FT, nSpec)), arr_type(ϖ_canopy*ones(FT,nSpec)), arr_type(𝐙⁺⁺), arr_type(𝐙⁻⁺))
+        
         #@show canopyCore.ϖ
         #canopyCore.ϖ .= 0
         # Add Canopy at the bottom here:
+        a = layer_opt_props[end]
+        #canopyCore.Z⁺⁺ .= a.Z⁺⁺[:,:,1]
+        #canopyCore.Z⁻⁺ .= a.Z⁻⁺[:,:,1]
+
         layer_opt_props =  [layer_opt_props; canopyCore]
 
         # Determine the scattering interface definitions:
         scattering_interfaces_all, τ_sum_all = 
             extractEffectiveProps(layer_opt_props);
+        #@show scattering_interfaces_all
         #@show τ_sum_all[1,:]
         #@show size(τ_sum_all), Nz
         Nz = length(layer_opt_props)
@@ -350,7 +393,10 @@ function rt_run_canopy_ms(RS_type::AbstractRamanType,
             # Expand all layer optical properties to their full dimension:
             @timeit "OpticalProps" layer_opt = 
                 expandOpticalProperties(layer_opt_props[iz], arr_type)
-
+            #if iz > 40
+            #    @show iz, wt_μN' * layer_opt.Z⁺⁺[:,:,1] + wt_μN' * layer_opt.Z⁻⁺[:,:,1]
+                #@show iz, wt_μN' * layer_opt.Z⁺⁺[:,:,1]
+            #end
             # Perform Core RT (doubling/elemental/interaction)
             rt_kernel_multisensor!(RS_type, 
                     sensor_levels,
