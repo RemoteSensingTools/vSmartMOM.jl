@@ -309,10 +309,16 @@ function save_boa_results(HDRF,BHR, model, name, folder)
 
     fileNameOP = folder * name * "-hdrfop_" * "vSmartMOM-JPL.mes" 
     open(fileNameOP, "w") do io
-        @printf io "%.6f   %.6f \n" BHR	-1.000000
+        @printf io "%4d    %4d   %.6f \n" 76	5	-1.000000
+        for i=77:152
+            @printf io "%.6f    %.6f   %.6f     %.6f    %.6f \n" deg2rad(model.obs_geom.sza) deg2rad(model.obs_geom.vza[i]) deg2rad(abs(model.obs_geom.vaz[i]-180.0)) HDRF[i] -1
+        end
     end;
 
-    fileNameBHR = folder * name * "-bhr_" * "vSmartMOM-JPL.mes" 
+    fileNameBHR = folder * name * "-bhr_" * "vSmartMOM-JPL.mes"
+    open(fileNameBHR, "w") do io
+        @printf io "%.6f   %.6f \n" BHR	-1.000000
+    end; 
 end
 
 
@@ -380,11 +386,82 @@ function produce_rami_results(experiment_name::String;
         R, _, _, _, hdr, bhr_uw, bhr_dw = vSmartMOM.CoreRT.rt_run_canopy_ms(
                 vSmartMOM.InelasticScattering.noRS(),
                 [0,1], model, LAD, LAI, BiLambMod, ϖ_canopy,1)
-
+        
         # Convolve results:
         BRF       = convolve_2_sentinel(model.params.spec_bands[1], R[1], band) / cosd(params.sza)
         HDRF, BHR = convolve_2_sentinel_HDR(model.params.spec_bands[1], hdr,bhr_uw,bhr_dw, band)
     end
+    # Save results:
+    save_toa_results(BRF, model, experiment_name, "/home/cfranken/rami3/")
+    save_boa_results(HDRF,BHR,model, experiment_name, "/home/cfranken/rami3/")
+
+return BRF, R, HDRF, BHR, model
+#return BRF, R, model
+
+# Can do postprocessing here (saving data, convolution, etc)
+end
+
+function produce_rami3_results(experiment_name::String, SZA, R, T, Rsoil, LAI, LAD;
+    all_scenarios = all_scenarios,
+    n_desert=n_desert,n_continental=n_continental, sr=sr)
+
+    # Get rami scenario from experiment name
+    # all_scenarios = JSON.parsefile(rami_json);
+    filt_scenario = filter(x->x["name"] == experiment_name, all_scenarios);
+    @assert length(filt_scenario) ≤ 1 "Multiple matching experiment names!"
+    @assert length(filt_scenario) ≥ 1 "Experiment name not found in JSON input"
+    curr_scenario = filt_scenario[1]["observations"][1];
+    #name = curr_scenario["name"]
+    # Band to use    
+    band = curr_scenario["measures"][1]["bands"][1]
+
+    rami_atmosphere   = curr_scenario["atmosphere"]
+    atm_type = rami_atmosphere["atmosphere_type"]
+    @info "Atmosphere type is " * atm_type 
+
+    params = getParams(curr_scenario)
+    # Set viewing geometries:
+    setGeometry!(curr_scenario, params)
+    params.sza = SZA
+
+    # Set surface parameters:
+    params.brdf = [vSmartMOM.LambertianSurfaceScalar(Rsoil)]
+
+    # TODO: Set canopy
+    # Bilambertian model for leaves, using 40 quadrature points:
+    BiLambMod = CanopyOptics.BiLambertianCanopyScattering(R=R,T=T, nQuad=40)
+    ϖ_canopy = T+R
+    Cano =   (LAD, LAI, BiLambMod, ϖ_canopy)
+    @show Cano
+    #LAD, LAI, BiLambMod, ϖ_canopy  
+    #@show  LAD
+
+    # Create vSmartMOM model:
+    model = model_from_parameters(params)
+    model.τ_rayl[1] .= 0.00000000000000000000000001
+    ########################################################
+
+    # Run model (can think about including the BOA and hemispheric data here as well)
+    #R = rt_run(model)
+    
+        LAD, LAI, BiLambMod, ϖ_canopy   = Cano
+        @show LAD, LAI, BiLambMod, ϖ_canopy, params.sza
+        #=
+        R, _, _, _, hdr, bhr_uw, bhr_dw = vSmartMOM.CoreRT.rt_run_canopy_ms(
+                vSmartMOM.InelasticScattering.noRS(),
+                [0,1], model, LAD, LAI, BiLambMod, ϖ_canopy,1)
+
+        =#
+        R, _, _, _, hdr, bhr_uw, bhr_dw = vSmartMOM.CoreRT.rt_run_canopy(
+                vSmartMOM.InelasticScattering.noRS(),
+                model, LAD, LAI, BiLambMod, ϖ_canopy,1)
+        @show R[1][1,1,1]
+        
+        # Convolve results:
+        BRF       = convolve_2_sentinel(model.params.spec_bands[1], R, band) / cosd(params.sza)
+        #BRF       = convolve_2_sentinel(model.params.spec_bands[1], R[1], band) / cosd(params.sza)
+        HDRF, BHR = convolve_2_sentinel_HDR(model.params.spec_bands[1], hdr,bhr_uw,bhr_dw, band)
+    
     # Save results:
     save_toa_results(BRF, model, experiment_name, "/home/cfranken/rami3/")
     save_boa_results(HDRF,BHR,model, experiment_name, "/home/cfranken/rami3/")
