@@ -26,7 +26,7 @@ function elemental!(pol_type, SFI::Bool,
     D     = Diagonal(arr_type(repeat(pol_type.D, size(qp_μ,1))))
 
     device = devi(architecture)
-    #@show maximum(Array(ϖ)), maximum(Array(dτ))
+    @show maximum(Array(ϖ)), maximum(Array(dτ))
     # If in scattering mode:
     if scatter
         # for m==0, ₀∫²ᵖⁱ cos²(mϕ)dϕ/4π = 0.5, while
@@ -59,7 +59,7 @@ function elemental!(pol_type, SFI::Bool,
     end    
 end
 
-@kernel function get_canopy_elem_rt!(r⁻⁺, t⁺⁺, ϖ_λ, dτ_λ, G, Z⁻⁺, Z⁺⁺, qp_μN, wct) 
+@kernel function get_canopy_elem_rt!(r⁻⁺, t⁺⁺, ϖ_λ, dτ_λ, G, Z⁻⁺, Z⁺⁺, μ, wct) 
     n2 = 1
     i, j, n = @index(Global, NTuple) 
     if size(Z⁻⁺,3)>1
@@ -71,16 +71,16 @@ end
         r⁻⁺[i,j,n] = 
             ϖ_λ[n] * G[j] * Z⁻⁺[i,j,n2] * 
             #Z⁻⁺[i,j] * 
-            (qp_μN[j] / (qp_μN[i]*G[j] + qp_μN[j]*G[i])) * wct[j] * 
-            (1 - exp(-dτ_λ[n] * ((G[i] / qp_μN[i]) + (G[j] / qp_μN[j])))) 
+            (μ[j] / (μ[i]*G[j] + μ[j]*G[i])) * wct[j] * 
+            (1 - exp(-dτ_λ[n] * ((G[i] / μ[i]) + (G[j] / μ[j])))) 
                     
-        if (qp_μN[i] == qp_μN[j])
+        if (μ[i] == μ[j])
             # 𝐓⁺⁺(μᵢ, μᵢ) = (exp{-τ/μᵢ} + ϖ ̇𝐙⁺⁺(μᵢ, μᵢ) ̇(τ/μᵢ) ̇exp{-τ/μᵢ}) ̇𝑤ᵢ
             if i == j
                 t⁺⁺[i,j,n] = 
-                    exp(-dτ_λ[n]*G[i] / qp_μN[i]) *
-                    (1 + ϖ_λ[n] * G[i] * Z⁺⁺[i,i,n2] * (dτ_λ[n] / qp_μN[i]) * wct[i])
-                    #(1 + ϖ_λ[n] * Z⁺⁺[i,i] * (dτ_λ[n] / qp_μN[i]) * wct[i])
+                    exp(-dτ_λ[n]*G[i] / μ[i]) *
+                    (1 + ϖ_λ[n] * G[i] * Z⁺⁺[i,i,n2] * (dτ_λ[n] / μ[i]) * wct[i])
+                    #(1 + ϖ_λ[n] * Z⁺⁺[i,i] * (dτ_λ[n] / μ[i]) * wct[i])
             else
                 t⁺⁺[i,j,n] = 0.0
             end
@@ -91,13 +91,13 @@ end
             t⁺⁺[i,j,n] = 
                 ϖ_λ[n] * G[j] * Z⁺⁺[i,j,n2] * 
                 #Z⁺⁺[i,j] * 
-                (qp_μN[j] / (qp_μN[i]*G[j] - qp_μN[j]*G[i])) * wct[j] * 
-                (exp(-dτ_λ[n] * G[i] / qp_μN[i]) - exp(-dτ_λ[n] * G[j] / qp_μN[j])) 
+                (μ[j] / (μ[i]*G[j] - μ[j]*G[i])) * wct[j] * 
+                (exp(-dτ_λ[n] * G[i] / μ[i]) - exp(-dτ_λ[n] * G[j] / μ[j])) 
         end
     else
         r⁻⁺[i,j,n] = 0.0
         if i==j
-            t⁺⁺[i,j,n] = exp(-dτ_λ[n] * G[i] / qp_μN[i]) #Suniti
+            t⁺⁺[i,j,n] = exp(-dτ_λ[n] * G[i] / μ[i]) #Suniti
         else
             t⁺⁺[i,j,n] = 0.0
         end
@@ -105,7 +105,7 @@ end
     nothing
 end
 
-@kernel function get_canopy_elem_rt_SFI!(J₀⁺, J₀⁻, ϖ_λ, dτ_λ, τ_sum, G, Z⁻⁺, Z⁺⁺, qp_μN, ndoubl, wct02, nStokes ,I₀, iμ0, D)
+@kernel function get_canopy_elem_rt_SFI!(J₀⁺, J₀⁻, ϖ_λ, dτ_λ, τ_sum, G, Z⁻⁺, Z⁺⁺, μ, ndoubl, wct02, nStokes ,I₀, iμ0, D)
     i_start  = nStokes*(iμ0-1) + 1 
     i_end    = nStokes*iμ0
     
@@ -129,21 +129,21 @@ end
     if (i>=i_start) && (i<=i_end)
         ctr = i-i_start+1
         # J₀⁺ = 0.25*(1+δ(m,0)) * ϖ(λ) * Z⁺⁺ * I₀ * (dτ(λ)/μ₀) * exp(-dτ(λ)/μ₀)
-        J₀⁺[i, 1, n] = wct02 * ϖ_λ[n] * G[i] * Z⁺⁺_I₀ * (dτ_λ[n] / qp_μN[i]) * exp(-dτ_λ[n] *  G[i] / qp_μN[i])
+        J₀⁺[i, 1, n] = wct02 * ϖ_λ[n] * G[i] * Z⁺⁺_I₀ * (dτ_λ[n] / μ[i]) * exp(-dτ_λ[n] *  G[i] / μ[i])
     else
         # J₀⁺ = 0.25*(1+δ(m,0)) * ϖ(λ) * Z⁺⁺ * I₀ * [μ₀ / (μᵢ - μ₀)] * [exp(-dτ(λ)/μᵢ) - exp(-dτ(λ)/μ₀)]
         J₀⁺[i, 1, n] = 
         wct02 * ϖ_λ[n] * G[i_start] * Z⁺⁺_I₀ * 
-        (qp_μN[i_start] / (qp_μN[i]*G[i_start] - qp_μN[i_start]*G[i])) * 
-        (exp(-dτ_λ[n] * G[i] / qp_μN[i]) - exp(-dτ_λ[n] * G[i_start] / qp_μN[i_start]))
+        (μ[i_start] / (μ[i]*G[i_start] - μ[i_start]*G[i])) * 
+        (exp(-dτ_λ[n] * G[i] / μ[i]) - exp(-dτ_λ[n] * G[i_start] / μ[i_start]))
     end
     #J₀⁻ = 0.25*(1+δ(m,0)) * ϖ(λ) * Z⁻⁺ * I₀ * [μ₀ / (μᵢ + μ₀)] * [1 - exp{-dτ(λ)(1/μᵢ + 1/μ₀)}]
     J₀⁻[i, 1, n] = wct02 * ϖ_λ[n] * G[i_start]  * Z⁻⁺_I₀ * 
-        (qp_μN[i_start] / (qp_μN[i]*G[i_start] + qp_μN[i_start]*G[i])) * 
-        (1 - exp(-dτ_λ[n] * ((G[i] / qp_μN[i]) + (G[i_start] / qp_μN[i_start]))))
+        (μ[i_start] / (μ[i]*G[i_start] + μ[i_start]*G[i])) * 
+        (1 - exp(-dτ_λ[n] * ((G[i] / μ[i]) + (G[i_start] / μ[i_start]))))
 
-    J₀⁺[i, 1, n] *= exp(-τ_sum[n]*G[i_start]/qp_μN[i_start])
-    J₀⁻[i, 1, n] *= exp(-τ_sum[n]*G[i_start]/qp_μN[i_start])
+    J₀⁺[i, 1, n] *= exp(-τ_sum[n]*G[i_start]/μ[i_start])
+    J₀⁻[i, 1, n] *= exp(-τ_sum[n]*G[i_start]/μ[i_start])
 
     if ndoubl >= 1
         J₀⁻[i, 1, n] = D[i,i]*J₀⁻[i, 1, n] #D = Diagonal{1,1,-1,-1,...Nquad times}
