@@ -87,18 +87,8 @@ function postprocessing_vza_hdrf!(RS_type::noRS, iμ₀, pol_type,
         # Accumulate Fourier moments after azimuthal weighting
         for s = 1:nSpec
             dR  = bigCS * hdr_J₀⁻[istart:iend,1, s]
-            dRR = dR ./ hdr[i,:,s]
-            if dRR[1] < minUp 
-                minUp = dRR[1]
-            elseif dRR[1] > maxUp 
-                maxUp = dRR[1]
-            end
             hdr[i,:,s] .+= dR;                
         end
-    end
-    
-    if m>0
-        @info "Radiance Δ range in %: from $(minUp*100) to $(maxUp*100) for m=$(m)" 
     end
 end
 
