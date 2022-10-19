@@ -12,6 +12,7 @@ function constructCoreOpticalProperties(RS_type, iBand, m, model)
     # Number of Aerosols:
     nAero = size(τ_aer[iBand[1]],1)
     nZ    = size(τ_rayl[1],2)
+    #@show greek_rayleigh
     # Rayleigh Z matrix:
     Rayl𝐙⁺⁺, Rayl𝐙⁻⁺ = Scattering.compute_Z_moments(pol_type, μ, 
                                                     greek_rayleigh, m, 

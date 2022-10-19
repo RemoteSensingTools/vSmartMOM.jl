@@ -54,7 +54,7 @@ function create_surface_layer!(RS_type, lambertian::LambertianSurfaceScalar{FT},
             #@show iμ₀Nstart, pol_type.n*iμ₀
             F₀_NquadN[iμ₀Nstart:pol_type.n*iμ₀,:] .= (F₀ .* (exp.(-τ_sum/μ₀))');
             
-            added_layer.J₀⁺[:,1,:] .= 0;#F₀_NquadN;
+            added_layer.J₀⁺[:,1,:] .= F₀_NquadN;#0;#
             added_layer.J₀⁻[:,1,:] .= μ₀*(R_surf*F₀_NquadN)#/FT(π);
             #added_layer.J₀⁻[:,1,:] = 
             #    μ₀*(R_surf[iμ₀Nstart:pol_type.n*iμ₀, iμ₀Nstart:pol_type.n*iμ₀]*
@@ -69,13 +69,13 @@ function create_surface_layer!(RS_type, lambertian::LambertianSurfaceScalar{FT},
         #@show size(added_layer.r⁻⁺), size(R_surf), size(added_layer.J₀⁻)
         added_layer.r⁻⁺ .= R_surf;
         added_layer.r⁺⁻ .= 0;
-        added_layer.t⁺⁺ .= 0.0; #T_surf;
+        added_layer.t⁺⁺ .= 1. #0.0; #T_surf;
         added_layer.t⁻⁻ .= 0.0; #T_surf;
 
     else
         added_layer.r⁻⁺ .= 0;
         added_layer.r⁻⁺ .= 0;
-        added_layer.t⁺⁺ .= 0.0; #T_surf;
+        added_layer.t⁺⁺ .= 1.#0.0; #T_surf;
         added_layer.t⁻⁻ .= 0.0; #T_surf;
         added_layer.J₀⁺ .= 0;
         added_layer.J₀⁻ .= 0;
@@ -129,7 +129,7 @@ function create_surface_layer!(RS_type, lambertian::LambertianSurfaceLegendre{FT
             added_layer.J₀⁺ = 0 # F₀_NquadN
             # Suniti double-check
             # added_layer.J₀⁻[:,1,:] = μ₀*(R_surf*I₀_NquadN) .* (ρ .* exp.(-τ_sum/μ₀))';
-            added_layer.J₀⁻[:,1,:] = μ₀*(R_surf*F₀_NquadN*ρ)/FT(π); 
+            added_layer.J₀⁻[:,1,:] = μ₀*(R_surf*F₀_NquadN*ρ);#/FT(π); 
             #μ₀*(R_surf[iμ₀Nstart:pol_type.n*iμ₀, iμ₀Nstart:pol_type.n*iμ₀]*F₀) .* (ρ .* exp.(-τ_sum/μ₀))';
         end
         R_surf   = R_surf * Diagonal(qp_μN.*wt_μN)
@@ -141,13 +141,13 @@ function create_surface_layer!(RS_type, lambertian::LambertianSurfaceLegendre{FT
         #@show size(added_layer.r⁻⁺), size(R_surf), size(added_layer.J₀⁻)
         added_layer.r⁻⁺ .= R_surf3D;
         added_layer.r⁺⁻ .= 0;
-        added_layer.t⁺⁺ .= 0.0; #T_surf;
+        added_layer.t⁺⁺ .= 1.0; #T_surf;
         added_layer.t⁻⁻ .= 0.0; #T_surf;
 
     else
         added_layer.r⁻⁺[:] .= 0;
         added_layer.r⁻⁺[:] .= 0;
-        added_layer.t⁺⁺[:] .= 0;
+        added_layer.t⁺⁺[:] .= 1.0;
         added_layer.t⁻⁻[:] .= 0;
         added_layer.J₀⁺[:] .= 0;
         added_layer.J₀⁻[:] .= 0;

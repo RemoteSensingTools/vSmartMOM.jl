@@ -374,7 +374,7 @@ function rt_run(RS_type::AbstractRamanType,
                             arr_type(τ_sum_all[:,end]), 
                             arr_type(F₀),
                             model.params.architecture);
-
+        #@show scattering_interfaces_all[end]
         # One last interaction with surface:
         @timeit "interaction" interaction!(RS_type,
                                     #bandSpecLim,
@@ -548,7 +548,7 @@ function rt_run_ss(RS_type::AbstractRamanType,
                     τsurf,
                     quad_points,
                     model.params.architecture)
-        if !(typeof(RS_type) <: noRS)
+        #=if !(typeof(RS_type) <: noRS)
             interaction_inelastic_ss!(RS_type,
                         SFI,
                         composite_layer, 
@@ -557,7 +557,7 @@ function rt_run_ss(RS_type::AbstractRamanType,
                         τsurf,
                         quad_points,
                         model.params.architecture)
-        end
+        end=#
         # Postprocess and weight according to vza
         postprocessing_vza!(RS_type, 
                     iμ₀, pol_type, 

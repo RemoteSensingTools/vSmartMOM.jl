@@ -40,12 +40,26 @@ function getRamanAtmoConstants(ν̃::FT, T::FT) where FT
     return n2,o2
 end
 
-function compute_ϖ_Cabannes(RS_type::noRS, λ₀)
+function compute_ϖ_Cabannes(RS_type::noRS, depol, λ₀)
     RS_type.ϖ_Cabannes = 1.0;
     return RS_type.ϖ_Cabannes;
 end
 
-function compute_ϖ_Cabannes(RS_type::Union{RRS, VS_0to1, VS_1to0, RRS_plus, VS_0to1_plus, VS_1to0_plus}, λ₀, n2, o2)
+function compute_ϖ_Cabannes(
+            RS_type::Union{RRS, VS_0to1, VS_1to0, RRS_plus, VS_0to1_plus, VS_1to0_plus}, 
+            depol, λ₀, n2, o2)
+    ν₀ = 1e7/λ₀;
+
+    
+    #RS_type.ϖ_Cabannes = σ_elastic/(σ_VRS+σ_RVRS+σ_RRS+σ_elastic);
+    ϖ_Cabannes = (4-3*depol)/(4+2*depol)
+    #ϖ_Cabannes = σ_elastic/(σ_RRS+σ_elastic);
+    return ϖ_Cabannes;
+end
+
+function compute_ϖ_Cabannes_(
+            RS_type::Union{RRS, VS_0to1, VS_1to0, RRS_plus, VS_0to1_plus, VS_1to0_plus}, 
+            depol, λ₀, n2, o2)
     ν₀ = 1e7/λ₀;
 
     σ_elastic =  n2.vmr * n2.effCoeff.σ_Rayl_coeff + o2.vmr * o2.effCoeff.σ_Rayl_coeff 
@@ -72,7 +86,8 @@ function compute_ϖ_Cabannes(RS_type::Union{RRS, VS_0to1, VS_1to0, RRS_plus, VS_
     σ_VRS += o2.vmr * ((ν₀.+o2.effCoeff.Δν̃_VibRaman_coeff_1to0_hires).^4)' * o2.effCoeff.σ_VibRaman_coeff_1to0_hires    
 
     #RS_type.ϖ_Cabannes = σ_elastic/(σ_VRS+σ_RVRS+σ_RRS+σ_elastic);
-    ϖ_Cabannes = σ_elastic/(σ_RRS+σ_elastic);
+    ϖ_Cabannes = σ_elastic/(σ_VRS+σ_RVRS+σ_RRS+σ_elastic);
+    #ϖ_Cabannes = σ_elastic/(σ_RRS+σ_elastic);
     return ϖ_Cabannes;
 end
 

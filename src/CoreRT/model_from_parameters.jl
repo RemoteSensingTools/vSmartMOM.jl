@@ -98,6 +98,8 @@ function model_from_parameters(params::vSmartMOM_Parameters)
 
     # Rayleigh optical properties calculation
     greek_rayleigh = Scattering.get_greek_rayleigh(params.depol)
+    @show params.depol
+    @show greek_rayleigh
     # Remove rayleight for testing:
     #τ_rayl = [zeros(params.float_type,length(params.spec_bands[i]), length(profile.T)) for i=1:n_bands];
     τ_rayl = [zeros(params.float_type,1,length(profile.T)) for i=1:n_bands];
@@ -114,11 +116,22 @@ function model_from_parameters(params::vSmartMOM_Parameters)
         curr_band_λ = 1e4 ./ params.spec_bands[i_band]
         # @show profile.vcd_dry, size(τ_rayl[i_band])
         # Compute Rayleigh properties per layer for `i_band` band center  
-        
+        #Suniti: the following two lines are temporary. this Cabannes depolarization applies only to the Earth's atmosphere
+        # It has been added to make sure that the code sees the same Rayleigh cross section, regardless of elastic or inelastic RT 
+        # Needs better (more general) formulation 
+        depol_Cabannes = 0.028
+        τ_rayl[i_band]   .= getRayleighLayerOptProp(profile.p_half[end], 
+            (mean(curr_band_λ)), 
+            depol_Cabannes, profile.vcd_dry);
+
+        #=
+        # Original form
         τ_rayl[i_band]   .= getRayleighLayerOptProp(profile.p_half[end], 
                                 (mean(curr_band_λ)), 
                                 params.depol, profile.vcd_dry);
-        #@show τ_rayl[i_band]
+        =#
+        
+                                #@show τ_rayl[i_band]
         # If no absorption, continue to next band
         isnothing(params.absorption_params) && continue
         
