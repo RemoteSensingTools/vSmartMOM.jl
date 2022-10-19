@@ -354,11 +354,13 @@ function rt_run_canopy_ms(RS_type::AbstractRamanType,
         #end
             # This basically multiplies with G again, needs to be fixed later (or removed from compute_Z_matrices)
         G1 = arr_type(CanopyOptics.G(Array(qp_μN), LAD))
+        Gref = CanopyOptics.G([1.0], LAD)[1]
         #G1 .= 0.5
         # normalizing as doubling causes trouble otherwise.
-        Gref = Array(G1)[iμ₀]
+        #Gref = Array(G1)[iμ₀]
+        #Gref = mean(G1)
+        # This converts vertical LAI coordinate to tau (at μ=1)
         G1 = G1 ./ Gref
-        #G1 .= 1.0
         
         canopyCore = CoreRT.CoreDirectionalScatteringOpticalProperties(arr_type(Gref * LAI * ones(FT, nSpec)), arr_type(ϖ_canopy*ones(FT,nSpec)), arr_type(𝐙⁺⁺), arr_type(𝐙⁻⁺), G1)
         #canopyCore = CoreRT.CoreScatteringOpticalProperties(arr_type(0.1*LAI*ones(FT, nSpec)), arr_type(ϖ_canopy*ones(FT,nSpec)), arr_type(𝐙⁺⁺), arr_type(𝐙⁻⁺))

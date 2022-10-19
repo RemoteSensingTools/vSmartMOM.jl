@@ -176,7 +176,7 @@ function rt_run(RS_type::AbstractRamanType,
                                     hdr_J₀⁻, bhr_uw, bhr_dw)
         
         # Postprocess and weight according to vza
-        @timeit "Postprocessing" postprocessing_vza!(RS_type, 
+        @timeit "Postprocessing VZA" postprocessing_vza!(RS_type, 
                             iμ₀, pol_type, 
                             composite_layer, 
                             vza, qp_μ, m, vaz, μ₀, 
@@ -186,7 +186,7 @@ function rt_run(RS_type::AbstractRamanType,
                             T, T_SFI,
                             ieR_SFI, ieT_SFI)
 
-        @timeit "Postprocessing" postprocessing_vza_hdrf!(RS_type, 
+        @timeit "Postprocessing HDRF" postprocessing_vza_hdrf!(RS_type, 
             iμ₀, pol_type, 
             hdr_J₀⁻, 
             vza, qp_μ, m, vaz, μ₀, 

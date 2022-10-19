@@ -26,6 +26,11 @@ all_scenarios = JSON.parsefile(rami_json);
 #R, models = produce_rami_results("HOM00_WHI_A00S_M02_z30a000")
 #BRF, R, model = produce_rami_results("HOM00_WHI_A00S_M12_z30a000")
 #white lambertian
+
+LAD = CanopyOptics.uniform_leaves()
+
+BRF, R, hdrf, bhr, model = produce_rami3_results("HOM25_LAM_S00S_M03_z30a000", 20.0,0.0546, 0.0149, 0.127, 3.0,LAD )
+
 BRF1, R1, hdrf1, bhr1, model = produce_rami_results("HOM00_LAM_S00S_M03_z30a000")#("HOM00_WHI_EC6L_M03_z30a000")
 BRF25, R25, hdrf25, bhr25, model25 = produce_rami_results("HOM25_LAM_S00S_M03_z30a000")
 BRF35, R35, hdrf35, bhr35, model35 = produce_rami_results("HOM35_LAM_S00S_M03_z30a000")

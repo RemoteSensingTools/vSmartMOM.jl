@@ -229,16 +229,18 @@ end
 
     if (i>=i_start) && (i<=i_end)
         ctr = i-i_start+1
+        # See Eq. 1.54 in Fell
         # J₀⁺ = 0.25*(1+δ(m,0)) * ϖ(λ) * Z⁺⁺ * I₀ * (dτ(λ)/μ₀) * exp(-dτ(λ)/μ₀)
         J₀⁺[i, 1, n] = wct02 * ϖ_λ[n] * Z⁺⁺_I₀ * (dτ_λ[n] / μ[i]) * exp(-dτ_λ[n] / μ[i])
     else
         # J₀⁺ = 0.25*(1+δ(m,0)) * ϖ(λ) * Z⁺⁺ * I₀ * [μ₀ / (μᵢ - μ₀)] * [exp(-dτ(λ)/μᵢ) - exp(-dτ(λ)/μ₀)]
+        # See Eq. 1.53 in Fell
         J₀⁺[i, 1, n] = 
-        wct02 * ϖ_λ[n] * Z⁺⁺_I₀ * 
-        (μ[i_start] / (μ[i] - μ[i_start])) * 
+        wct02 * ϖ_λ[n] * Z⁺⁺_I₀ * (μ[i_start] / (μ[i] - μ[i_start])) * 
         (exp(-dτ_λ[n] / μ[i]) - exp(-dτ_λ[n] / μ[i_start]))
     end
     #J₀⁻ = 0.25*(1+δ(m,0)) * ϖ(λ) * Z⁻⁺ * I₀ * [μ₀ / (μᵢ + μ₀)] * [1 - exp{-dτ(λ)(1/μᵢ + 1/μ₀)}]
+    # See Eq. 1.52 in Fell
     J₀⁻[i, 1, n] = wct02 * ϖ_λ[n] * Z⁻⁺_I₀ * (μ[i_start] / (μ[i] + μ[i_start])) * (1 - exp(-dτ_λ[n] * ((1 / μ[i]) + (1 / μ[i_start]))))
 
     J₀⁺[i, 1, n] *= exp(-τ_sum[n]/μ[i_start])

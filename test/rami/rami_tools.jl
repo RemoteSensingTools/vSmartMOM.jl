@@ -438,7 +438,7 @@ function produce_rami3_results(experiment_name::String, SZA, R, T, Rsoil, LAI, L
 
     # Create vSmartMOM model:
     model = model_from_parameters(params)
-    model.τ_rayl[1] .= 0.00000000000000000000000001
+    model.τ_rayl[1] .= 0.0000000000000001
     ########################################################
 
     # Run model (can think about including the BOA and hemispheric data here as well)
@@ -446,20 +446,20 @@ function produce_rami3_results(experiment_name::String, SZA, R, T, Rsoil, LAI, L
     
         LAD, LAI, BiLambMod, ϖ_canopy   = Cano
         @show LAD, LAI, BiLambMod, ϖ_canopy, params.sza
-        #=
+        
         R, _, _, _, hdr, bhr_uw, bhr_dw = vSmartMOM.CoreRT.rt_run_canopy_ms(
                 vSmartMOM.InelasticScattering.noRS(),
                 [0,1], model, LAD, LAI, BiLambMod, ϖ_canopy,1)
 
-        =#
+        #=
         R, _, _, _, hdr, bhr_uw, bhr_dw = vSmartMOM.CoreRT.rt_run_canopy(
                 vSmartMOM.InelasticScattering.noRS(),
                 model, LAD, LAI, BiLambMod, ϖ_canopy,1)
         @show R[1][1,1,1]
-        
+        =#
         # Convolve results:
-        BRF       = convolve_2_sentinel(model.params.spec_bands[1], R, band) / cosd(params.sza)
-        #BRF       = convolve_2_sentinel(model.params.spec_bands[1], R[1], band) / cosd(params.sza)
+        #BRF       = convolve_2_sentinel(model.params.spec_bands[1], R, band) / cosd(params.sza)
+        BRF       = convolve_2_sentinel(model.params.spec_bands[1], R[1], band) / cosd(params.sza)
         HDRF, BHR = convolve_2_sentinel_HDR(model.params.spec_bands[1], hdr,bhr_uw,bhr_dw, band)
     
     # Save results:
