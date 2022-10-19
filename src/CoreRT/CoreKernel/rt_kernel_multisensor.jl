@@ -36,6 +36,10 @@ function rt_kernel_multisensor!(RS_type::noRS{FT},
                                         computed_layer_properties, 
                                         m, ndoubl, scatter, quad_points,  
                                         added_layer,  architecture)
+        #@show wt_μN' * added_layer.r⁻⁺[:,:,1] #+ wt_μN' * added_layer.r⁺⁺[:,:,1]
+        #@show wt_μN' * added_layer.t⁺⁺[:,:,1]
+        #@show added_layer.j₀⁺[:,1,1]
+        #@show added_layer.j₀⁻[:,1,1]
         #println("Elemental done...")
         #@show maximum(added_layer.r⁺⁻[:]), maximum(added_layer.j₀⁺[:] ), maximum(added_layer.t⁺⁺[:] )
         @timeit "doubling"   doubling!(pol_type, SFI, 

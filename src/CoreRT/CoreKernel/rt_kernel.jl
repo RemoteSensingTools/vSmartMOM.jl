@@ -235,10 +235,21 @@ function rt_kernel!(RS_type::noRS{FT},
 end
 
 
-function get_dtau_ndoubl(computed_layer_properties, quad_points::QuadPoints{FT}) where {FT}
+function get_dtau_ndoubl(computed_layer_properties::CoreScatteringOpticalProperties, quad_points::QuadPoints{FT}) where {FT}
     @unpack qp_μ  = quad_points
     @unpack τ, ϖ  = computed_layer_properties
     dτ_max = minimum([maximum(τ .* ϖ), FT(0.001) * minimum(qp_μ)])
+    _, ndoubl = doubling_number(dτ_max, maximum(τ .* ϖ))
+    # Compute dτ vector
+    dτ = τ ./ 2^ndoubl
+    return dτ, ndoubl
+end
+
+function get_dtau_ndoubl(computed_layer_properties::CoreDirectionalScatteringOpticalProperties, quad_points::QuadPoints{FT}) where {FT}
+    @unpack qp_μ,iμ₀  = quad_points
+    @unpack τ, ϖ, G  = computed_layer_properties
+    gfct = Array(G)[iμ₀]
+    dτ_max = minimum([maximum(gfct * τ .* ϖ), FT(0.001) * minimum(qp_μ)])
     _, ndoubl = doubling_number(dτ_max, maximum(τ .* ϖ))
     # Compute dτ vector
     dτ = τ ./ 2^ndoubl
