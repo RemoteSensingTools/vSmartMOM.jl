@@ -10,7 +10,7 @@ function get_scattering_interface(scattering_interface,scatter, iz)
     # First layer (TOA)
     if (iz == 1)
 
-        # If scattering, 4. If non-scattering, 1. 
+        # If scattering, 11. If non-scattering, 00. 
         scattering_interface = scatter ? ScatteringInterface_11() : ScatteringInterface_00()
     
     # Not the first layer (not TOA)
@@ -23,7 +23,7 @@ function get_scattering_interface(scattering_interface,scatter, iz)
                                     (!scatter ? ScatteringInterface_10() : ScatteringInterface_11())
     end
     #@show scattering_interface
-    return ScatteringInterface_11() # scattering_interface # ScatteringInterface_11() # scattering_interface #ScatteringInterface_11() # 
+    return scattering_interface #ScatteringInterface_11() #  # ScatteringInterface_11() # scattering_interface #ScatteringInterface_11() # 
 end
 
 "Minimum number of doublings needed to reach an optical depth τ_end, starting with an optical depth dτ.

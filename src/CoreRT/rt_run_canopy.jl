@@ -349,9 +349,7 @@ function rt_run_canopy_ms(RS_type::AbstractRamanType,
         𝐙⁺⁺, 𝐙⁻⁺ = CanopyOptics.compute_Z_matrices_aniso(BiLambMod, Array(qp_μN), LAD, Zup, Zdown, m) 
         #𝐙⁺⁺, 𝐙⁻⁺ = CanopyOptics.compute_Z_matrices_aniso(BiLambMod, Array(qp_μN), LAD, m)   
 
-        #if m < 5
-        #    @show Array(wt_μN') * 𝐙⁺⁺ + Array(wt_μN') * 𝐙⁻⁺
-        #end
+
             # This basically multiplies with G again, needs to be fixed later (or removed from compute_Z_matrices)
         G1 = arr_type(CanopyOptics.G(Array(qp_μN), LAD))
         Gref = CanopyOptics.G([1.0], LAD)[1]
@@ -364,15 +362,7 @@ function rt_run_canopy_ms(RS_type::AbstractRamanType,
         G1 = G1 ./ Gref
         #@show G1
         canopyCore = CoreRT.CoreDirectionalScatteringOpticalProperties(arr_type(Gref * LAI * ones(FT, nSpec)), arr_type(ϖ_canopy*ones(FT,nSpec)), arr_type(𝐙⁺⁺)/Gref, arr_type(𝐙⁻⁺)/Gref, G1)
-        @show canopyCore.τ
-        #canopyCore = CoreRT.CoreScatteringOpticalProperties(arr_type(0.1*LAI*ones(FT, nSpec)), arr_type(ϖ_canopy*ones(FT,nSpec)), arr_type(𝐙⁺⁺), arr_type(𝐙⁻⁺))
-        
-        #@show canopyCore.ϖ
-        #canopyCore.ϖ .= 0
-        # Add Canopy at the bottom here:
-        a = layer_opt_props[end]
-        #canopyCore.Z⁺⁺ .= a.Z⁺⁺[:,:,1]
-        #canopyCore.Z⁻⁺ .= a.Z⁻⁺[:,:,1]
+             
 
         layer_opt_props =  [layer_opt_props; canopyCore]
 
@@ -436,7 +426,7 @@ function rt_run_canopy_ms(RS_type::AbstractRamanType,
             @timeit "interaction_multisensor" interaction_bot!(
                                 ims, RS_type,
                                 #bandSpecLim,
-                                scattering_interfaces_all[end], 
+                                ScatteringInterface_11(), 
                                 SFI, 
                                 composite_layer, 
                                 added_layer_surface, 
