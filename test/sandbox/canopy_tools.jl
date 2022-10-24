@@ -79,7 +79,8 @@ function rt_run_test(RS_type::CoreRT.AbstractRamanType,
         # Compute the core layer optical properties:
         layer_opt_props, fScattRayleigh   = CoreRT.constructCoreOpticalProperties(RS_type,iBand,m,model);
         μ = Array(qp_μ)
-        𝐙⁺⁺, 𝐙⁻⁺ = CanopyOptics.compute_Z_matrices(CanopyMod, μ, LD, m)
+        𝐙⁺⁺, 𝐙⁻⁺ = CanopyOptics.compute_Z_matrices_aniso(CanopyMod, μ, LD, m)
+        @show Array(wt_μ)' * 𝐙⁺⁺ + Array(wt_μ)' * 𝐙⁻⁺
         #@show sum(𝐙⁺⁺ ), sum(layer_opt_props[1].Z⁺⁺)
         #@show sum(𝐙⁻⁺ ), sum(layer_opt_props[1].Z⁻⁺)
         # This basically multiplies with G again, needs to be fixed later (or removed from compute_Z_matrices)

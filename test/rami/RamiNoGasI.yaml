@@ -5,7 +5,7 @@ radiative_transfer:
   # Spectral bands (list of ν_start:ν_step:ν_end, in cm⁻¹)
   spec_bands: 
     - collect(456.0:1:533.0)u"nm"
-    - collect(538.0:1:583.0)u"nm"
+    - collect(538.0:100:583.0)u"nm"
     - collect(646.0:1:684.0)u"nm"
     - collect(837.0:1:881.0)u"nm"
     - collect(1539.0:1:1682.0)u"nm"
@@ -18,7 +18,7 @@ radiative_transfer:
   # Polarization type (Stokes_I, Stokes_IQ, Stokes_IQU, Stokes_IQUV)
   polarization_type:  Stokes_I()
   # Maximum m (number of Fourier moments to loop over)
-  max_m:              15
+  max_m:              8
   # Exclusion angle for forward peak in fitting procedure (degrees)
   Δ_angle:            2.0
   # Trunction length for legendre terms

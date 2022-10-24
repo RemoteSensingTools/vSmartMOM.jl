@@ -429,7 +429,7 @@ function produce_rami3_results(experiment_name::String, SZA, R, T, Rsoil, LAI, L
 
     # TODO: Set canopy
     # Bilambertian model for leaves, using 40 quadrature points:
-    BiLambMod = CanopyOptics.BiLambertianCanopyScattering(R=R,T=T, nQuad=40)
+    BiLambMod = CanopyOptics.BiLambertianCanopyScattering(R=R,T=T, nQuad=100)
     ϖ_canopy = T+R
     Cano =   (LAD, LAI, BiLambMod, ϖ_canopy)
     @show Cano

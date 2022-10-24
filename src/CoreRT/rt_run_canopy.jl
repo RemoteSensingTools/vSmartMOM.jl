@@ -329,7 +329,7 @@ function rt_run_canopy_ms(RS_type::AbstractRamanType,
     #TODO: if RS_type!=noRS, create ϖ_λ₁λ₀, i_λ₁λ₀, fscattRayl, Z⁺⁺_λ₁λ₀, Z⁻⁺_λ₁λ₀ (for input), and ieJ₀⁺, ieJ₀⁻, ieR⁺⁻, ieR⁻⁺, ieT⁻⁻, ieT⁺⁺, ier⁺⁻, ier⁻⁺, iet⁻⁻, iet⁺⁺ (for output)
     #getRamanSSProp(RS_type, λ, grid_in)
     println("Prepping Canopy")
-    @show BiLambMod,  Array(qp_μN), LAD
+    #@show BiLambMod,  Array(qp_μN), LAD
     Zup, Zdown = CanopyOptics.precompute_Zazi(BiLambMod, Array(qp_μN), LAD)
     @show maximum(Zup)
     println("Finished initializing arrays")
@@ -358,11 +358,13 @@ function rt_run_canopy_ms(RS_type::AbstractRamanType,
         #G1 .= 0.5
         # normalizing as doubling causes trouble otherwise.
         #Gref = Array(G1)[iμ₀]
+        Gref = 1.0
         #Gref = mean(G1)
         # This converts vertical LAI coordinate to tau (at μ=1)
         G1 = G1 ./ Gref
-        
-        canopyCore = CoreRT.CoreDirectionalScatteringOpticalProperties(arr_type(Gref * LAI * ones(FT, nSpec)), arr_type(ϖ_canopy*ones(FT,nSpec)), arr_type(𝐙⁺⁺), arr_type(𝐙⁻⁺), G1)
+        #@show G1
+        canopyCore = CoreRT.CoreDirectionalScatteringOpticalProperties(arr_type(Gref * LAI * ones(FT, nSpec)), arr_type(ϖ_canopy*ones(FT,nSpec)), arr_type(𝐙⁺⁺)/Gref, arr_type(𝐙⁻⁺)/Gref, G1)
+        @show canopyCore.τ
         #canopyCore = CoreRT.CoreScatteringOpticalProperties(arr_type(0.1*LAI*ones(FT, nSpec)), arr_type(ϖ_canopy*ones(FT,nSpec)), arr_type(𝐙⁺⁺), arr_type(𝐙⁻⁺))
         
         #@show canopyCore.ϖ
@@ -376,7 +378,7 @@ function rt_run_canopy_ms(RS_type::AbstractRamanType,
 
         # Determine the scattering interface definitions:
         scattering_interfaces_all, τ_sum_all = 
-            extractEffectiveProps(layer_opt_props);
+            extractEffectiveProps(layer_opt_props, quad_points);
         #@show scattering_interfaces_all
         #@show τ_sum_all[1,:]
         #@show size(τ_sum_all), Nz
