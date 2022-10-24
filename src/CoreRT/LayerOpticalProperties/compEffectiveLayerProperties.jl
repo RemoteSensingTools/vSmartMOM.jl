@@ -86,10 +86,11 @@ end
 
 # Extract scattering definitions and integrated absorptions for the source function!
 function extractEffectiveProps(
-            lods::Array#{CoreScatteringOpticalProperties{FT},1}
-            ) #where FT
+            lods::Array,#{CoreScatteringOpticalProperties{FT},1}
+            quad_points::QuadPoints{FT}
+            ) where FT
 
-    FT    = eltype(lods[1].τ)
+    #FT    = eltype(lods[1].τ)
     nSpec = length(lods[1].τ)
     nZ    = length(lods)
     # First the Scattering Interfaces:
@@ -104,10 +105,21 @@ function extractEffectiveProps(
         scattering_interface = get_scattering_interface(scattering_interface, scatter, iz)
         push!(scattering_interfaces_all, scattering_interface)
         #@show typeof(τ_sum_all[:,iz]), typeof(lods[iz].τ)
-        @views τ_sum_all[:,iz+1] = τ_sum_all[:,iz] + lods[iz].τ 
+        @views τ_sum_all[:,iz+1] = τ_sum_all[:,iz] + getG_atSun(lods[iz], quad_points) * lods[iz].τ 
     end
     return scattering_interfaces_all, τ_sum_all
 end
+
+function getG_atSun(lod::CoreScatteringOpticalProperties,quad_points::QuadPoints{FT}) where FT
+    FT(1)
+end
+
+function getG_atSun(lod::CoreDirectionalScatteringOpticalProperties,quad_points::QuadPoints{FT}) where FT
+    @unpack iμ₀ = quad_points
+    gfct = Array(lod.G)[iμ₀]
+    return gfct
+end
+
 
 function expandOpticalProperties(in::CoreScatteringOpticalProperties, arr_type)
     @unpack τ, ϖ, Z⁺⁺, Z⁻⁺ = in 
