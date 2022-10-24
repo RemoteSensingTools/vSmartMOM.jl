@@ -17,16 +17,9 @@ function rt_kernel_multisensor!(RS_type::noRS{FT},
     # Just unpack core optical properties from 
     @unpack τ, ϖ, Z⁺⁺, Z⁻⁺ = computed_layer_properties
      
-    # SUNITI, check? Also, better to write function here
-    #@show "here", size(τ .* ϖ), size(qp_μ)
-    #@show maximum(τ .* ϖ), minimum(qp_μ)
-    #dτ_max = minimum([maximum(τ .* ϖ), FT(0.001) * minimum(qp_μ)])
-    #_, ndoubl = doubling_number(dτ_max, maximum(τ .* ϖ))
+    
     scatter = true # edit later
-    #arr_type = array_type(architecture)
-    # Compute dτ vector
-    #dτ = τ ./ 2^ndoubl
-    #expk = arr_type(exp.(-dτ /μ₀))
+    
     dτ, ndoubl, expk = init_layer(computed_layer_properties, quad_points, pol_type, architecture)
 
     # If there is scattering, perform the elemental and doubling steps
@@ -36,18 +29,12 @@ function rt_kernel_multisensor!(RS_type::noRS{FT},
                                         computed_layer_properties, 
                                         m, ndoubl, scatter, quad_points,  
                                         added_layer,  architecture)
-        #@show wt_μN' * added_layer.r⁻⁺[:,:,1] #+ wt_μN' * added_layer.r⁺⁺[:,:,1]
-        #@show wt_μN' * added_layer.t⁺⁺[:,:,1]
-        #@show added_layer.j₀⁺[:,1,1]
-        #@show added_layer.j₀⁻[:,1,1]
-        #println("Elemental done...")
-        #@show maximum(added_layer.r⁺⁻[:]), maximum(added_layer.j₀⁺[:] ), maximum(added_layer.t⁺⁺[:] )
+        
         @timeit "doubling"   doubling!(pol_type, SFI, 
                                         expk, ndoubl, 
                                         added_layer, 
                                         I_static, architecture)
-        #@show maximum(added_layer.r⁺⁻[:]), maximum(added_layer.j₀⁺[:] ), maximum(added_layer.t⁺⁺[:] )
-        #println("Doubling done...")
+        
     else # This might not work yet on GPU!
         # If not, there is no reflectance. Assign r/t appropriately
         added_layer.r⁻⁺[:] .= 0;

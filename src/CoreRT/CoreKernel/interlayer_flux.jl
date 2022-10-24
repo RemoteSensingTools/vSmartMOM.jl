@@ -198,24 +198,24 @@ function compute_interlayer_flux!(RS_type::noRS,
                         otdwJ::AbstractArray{FT}, otuwJ::AbstractArray{FT}, 
                         arr_type) where {FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2}
 
-    topR⁺⁻ = arr_type(itopR⁺⁻) 
+    #=topR⁺⁻ = arr_type(itopR⁺⁻) 
     botR⁻⁺ = arr_type(ibotR⁻⁺)
     topJ₀⁺ = arr_type(itopJ₀⁺) 
     botJ₀⁻ = arr_type(ibotJ₀⁻)
     dwJ    = arr_type(otdwJ)
-    uwJ    = arr_type(otuwJ)
+    uwJ    = arr_type(otuwJ)=#
 
     interlayer_flux_helper!(RS_type, I_static,
-        topR⁺⁻, botR⁻⁺,
-        topJ₀⁺, botJ₀⁻,
-        dwJ, uwJ)
+        itopR⁺⁻, ibotR⁻⁺,
+        itopJ₀⁺, ibotJ₀⁻,
+        otdwJ, otuwJ)
 
-    itopR⁺⁻ .= Array(topR⁺⁻) 
+#=    itopR⁺⁻ .= Array(topR⁺⁻) 
     ibotR⁻⁺ .= Array(botR⁻⁺)
     itopJ₀⁺ .= Array(topJ₀⁺) 
     ibotJ₀⁻ .= Array(botJ₀⁻)
     otdwJ   .= Array(dwJ)
-    otuwJ   .= Array(uwJ)
+    otuwJ   .= Array(uwJ)=#
     
     #scattering_interface, SFI, composite_layer, added_layer, I_static)
     synchronize_if_gpu()

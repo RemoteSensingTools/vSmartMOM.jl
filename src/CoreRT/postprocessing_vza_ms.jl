@@ -200,9 +200,9 @@ function postprocessing_vza_ms_canopy!(RS_type::noRS,
     topJ₀⁻ = composite_layer.topJ₀⁻;
     botJ₀⁺ = composite_layer.botJ₀⁺;
     botJ₀⁻ = composite_layer.botJ₀⁻;
-    
-    tuwJ = [zeros(typeof(topJ₀⁺[1][1,1,1]), (length(topJ₀⁺[1][:,1,1]), 1, nSpec)) for i=1:length(sensor_levels)] #similar(topJ₀⁺); #deepcopy(topJ₀⁺)
-    tdwJ = [zeros(typeof(topJ₀⁺[1][1,1,1]), (length(topJ₀⁺[1][:,1,1]), 1, nSpec)) for i=1:length(sensor_levels)]#similar(topJ₀⁺); #deepcopy(topJ₀⁺)
+    # @show FT2
+    tuwJ = [arr_type(zeros(FT2, (size(topJ₀⁺[1],1), 1, nSpec))) for i=1:length(sensor_levels)] #similar(topJ₀⁺); #deepcopy(topJ₀⁺)
+    tdwJ = [arr_type(zeros(FT2, (size(topJ₀⁺[1],1), 1, nSpec))) for i=1:length(sensor_levels)]#similar(topJ₀⁺); #deepcopy(topJ₀⁺)
     #@show size(tuwJ[1])
     for ims = 1:length(sensor_levels)
         if(sensor_levels[ims]==0)
@@ -222,14 +222,14 @@ function postprocessing_vza_ms_canopy!(RS_type::noRS,
                                     topJ₀⁺[ims], botJ₀⁻[ims],
                                     tdwJ[ims], tuwJ[ims], arr_type);
 
-            if(m==0)
+            #=if(m==0)
                 @show topJ₀⁺[ims][:,1,end]
                 @show tdwJ[ims][:,1,end]
                 @show "========="
                 @show botJ₀⁻[ims][:,1,end]
                 @show tuwJ[ims][:,1,end]
                 #showp
-            end
+            end=#
                                     
         end
 
@@ -253,10 +253,13 @@ function postprocessing_vza_ms_canopy!(RS_type::noRS,
         #@show tuwJ[1][istart:iend,1, 1], tdwJ[1][istart:iend,1, 1]
         # Accumulate Fourier moments after azimuthal weighting
         for ims = 1:length(sensor_levels)
+            _tuwJ = Array(tuwJ[ims])
+            _tdwJ = Array(tdwJ[ims])
             for s = 1:nSpec
                 #if true#SFI
-                uwJ[ims][i,:,s] .+= bigCS * tuwJ[ims][istart:iend,1, s];
-                dwJ[ims][i,:,s] .+= bigCS * tdwJ[ims][istart:iend,1, s];
+                #@show typeof(uwJ[ims]), typeof(tuwJ[ims]), typeof(bigCS)
+                uwJ[ims][i,:,s] .+= bigCS * _tuwJ[istart:iend,1, s];
+                dwJ[ims][i,:,s] .+= bigCS * _tdwJ[istart:iend,1, s];
                 # else
                 #     R[i,:,s] += bigCS * (R⁻⁺[istart:iend, istart0:iend0, s] / μ₀) * pol_type.I₀;
                 #     T[i,:,s] += bigCS * (T⁺⁺[istart:iend, istart0:iend0, s] / μ₀) * pol_type.I₀;
