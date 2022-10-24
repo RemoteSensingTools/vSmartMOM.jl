@@ -103,7 +103,7 @@ function rt_run_test_ms(RS_type::AbstractRamanType,
             constructCoreOpticalProperties(RS_type,iBand,m,model);
         # Determine the scattering interface definitions:
         scattering_interfaces_all, τ_sum_all = 
-            extractEffectiveProps(layer_opt_props);
+            extractEffectiveProps(layer_opt_props, quad_points);
 
         # Loop over vertical layers: 
         @showprogress 1 "Looping over layers ..." for iz = 1:Nz  # Count from TOA to BOA

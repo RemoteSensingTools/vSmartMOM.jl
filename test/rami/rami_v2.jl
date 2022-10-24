@@ -2,6 +2,7 @@ using JSON
 using vSmartMOM
 using DelimitedFiles
 using Distributions
+using Plots
 
 include("test/rami/rami_tools.jl")
 
@@ -27,7 +28,7 @@ all_scenarios = JSON.parsefile(rami_json);
 #BRF, R, model = produce_rami_results("HOM00_WHI_A00S_M12_z30a000")
 #white lambertian
 
-LAD = CanopyOptics.uniform_leaves()
+LAD = CanopyOptics.spherical_leaves()
 
 BRF, R, hdrf, bhr, model = produce_rami3_results("HOM25_LAM_S00S_M03_z30a000", 20.0,0.0546, 0.0149, 0.127, 3.0,LAD )
 

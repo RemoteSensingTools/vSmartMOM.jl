@@ -40,7 +40,7 @@ function elemental!(pol_type, SFI::Bool,
         event = kernel!(r⁻⁺, t⁺⁺, ϖ, dτ, G, Z⁻⁺, Z⁺⁺, qp_μN, wct2, ndrange=size(r⁻⁺)); 
         wait(device, event)
         synchronize_if_gpu()
-
+        @show G
         # SFI part
         kernel! = get_canopy_elem_rt_SFI!(device)
         event = kernel!(j₀⁺, j₀⁻, ϖ, dτ, arr_type(τ_sum), G, Z⁻⁺, Z⁺⁺, qp_μN, ndoubl, wct02, pol_type.n, I₀, iμ₀, D, ndrange=size(j₀⁺))
@@ -70,17 +70,15 @@ end
 
         r⁻⁺[i,j,n] = 
             ϖ_λ[n] *  Z⁻⁺[i,j,n2] * 
-            #Z⁻⁺[i,j] * 
             (μ[j] / (μ[i]*G[j] + μ[j]*G[i])) * wct[j] * 
-            (1 - exp(-dτ_λ[n] * ((G[i] / μ[i]) + (G[j] / μ[j])))) 
-                    
+            (1 - exp(-dτ_λ[n] * ((G[i] / μ[i]) + (G[j] / μ[j]))))
+                      
         if (μ[i] == μ[j])
             # 𝐓⁺⁺(μᵢ, μᵢ) = (exp{-τ/μᵢ} + ϖ ̇𝐙⁺⁺(μᵢ, μᵢ) ̇(τ/μᵢ) ̇exp{-τ/μᵢ}) ̇𝑤ᵢ
             if i == j
                 t⁺⁺[i,j,n] = 
                     exp(-dτ_λ[n]*G[i] / μ[i]) *
                     (1 + ϖ_λ[n]  * Z⁺⁺[i,i,n2] * (dτ_λ[n]  / μ[i]) * wct[i])
-                    #(1 + ϖ_λ[n] * Z⁺⁺[i,i] * (dτ_λ[n] / μ[i]) * wct[i])
             else
                 t⁺⁺[i,j,n] = 0.0
             end
@@ -90,9 +88,9 @@ end
             # (𝑖 ≠ 𝑗)
             t⁺⁺[i,j,n] = 
                 ϖ_λ[n]  * Z⁺⁺[i,j,n2] * 
-                #Z⁺⁺[i,j] * 
                 (μ[j] / (μ[i]*G[j] - μ[j]*G[i])) * wct[j] * 
-                (exp(-dτ_λ[n] * G[i] / μ[i]) - exp(-dτ_λ[n] * G[j] / μ[j])) 
+                (exp(-dτ_λ[n] * G[i] / μ[i]) - exp(-dτ_λ[n] * G[j] / μ[j]))
+                #(exp(-dτ_λ[n] * G[j] / μ[j]) - exp(-dτ_λ[n] * G[i] / μ[i]))  
         end
     else
         r⁻⁺[i,j,n] = 0.0
@@ -130,25 +128,28 @@ end
         ctr = i-i_start+1
         # J₀⁺ = 0.25*(1+δ(m,0)) * ϖ(λ) * Z⁺⁺ * I₀ * (dτ(λ)/μ₀) * exp(-dτ(λ)/μ₀)
         # 1.54 in Fell
-        J₀⁺[i, 1, n] = wct02 * ϖ_λ[n] * Z⁺⁺_I₀ * (dτ_λ[n] / μ[i]) * exp(-dτ_λ[n] *  G[i] / μ[i])
+        J₀⁺[i, 1, n] = wct02 * ϖ_λ[n] * Z⁺⁺_I₀ * (G[i] * dτ_λ[n] / μ[i]) * exp(-dτ_λ[n] *  G[i] / μ[i])
     else
         # J₀⁺ = 0.25*(1+δ(m,0)) * ϖ(λ) * Z⁺⁺ * I₀ * [μ₀ / (μᵢ - μ₀)] * [exp(-dτ(λ)/μᵢ) - exp(-dτ(λ)/μ₀)]
         # 1.53 in Fell; 2.14 in Myneni Book 
         J₀⁺[i, 1, n] = 
-        wct02 * ϖ_λ[n] *  Z⁺⁺_I₀ * 
+        wct02 * ϖ_λ[n]  *  Z⁺⁺_I₀ * 
         (μ[i_start] / (μ[i]*G[i_start] - μ[i_start]*G[i])) * 
         (exp(-dτ_λ[n] * G[i] / μ[i]) - exp(-dτ_λ[n] * G[i_start] / μ[i_start]))
+        #(exp(-dτ_λ[n] * G[i_start] / μ[i_start]) - exp(-dτ_λ[n] * G[i] / μ[i]))
     end
     #J₀⁻ = 0.25*(1+δ(m,0)) * ϖ(λ) * Z⁻⁺ * I₀ * [μ₀ / (μᵢ + μ₀)] * [1 - exp{-dτ(λ)(1/μᵢ + 1/μ₀)}]
     # 1.52 in Fell
-    J₀⁻[i, 1, n] = wct02 * ϖ_λ[n]   * Z⁻⁺_I₀ * 
+    J₀⁻[i, 1, n] = wct02 * ϖ_λ[n] *  Z⁻⁺_I₀ * 
             (μ[i_start] / (μ[i]*G[i_start] + μ[i_start]*G[i])) *
-            (1 - exp(-dτ_λ[n] * ((G[i] / μ[i]) + (G[i_start] / μ[i_start])))) 
+            (1 - exp(-dτ_λ[n] * ((G[i] / μ[i]) + (G[i_start] / μ[i_start]))))
+             
         #(1 - exp(-(dτ_λ[n] * (G[i_start] * μ[i] + G[i] * μ[i_start]))/(μ[i_start] * μ[i])))
         
     # Multiply with incoming:
-    J₀⁺[i, 1, n] *= exp(-τ_sum[n]*G[i_start]/μ[i_start])
-    J₀⁻[i, 1, n] *= exp(-τ_sum[n]*G[i_start]/μ[i_start])
+    #G is now included in tau_sum already!
+    J₀⁺[i, 1, n] *= exp(-τ_sum[n]/μ[i_start])
+    J₀⁻[i, 1, n] *= exp(-τ_sum[n]/μ[i_start])
 
     if ndoubl >= 1
         J₀⁻[i, 1, n] = D[i,i]*J₀⁻[i, 1, n] #D = Diagonal{1,1,-1,-1,...Nquad times}
