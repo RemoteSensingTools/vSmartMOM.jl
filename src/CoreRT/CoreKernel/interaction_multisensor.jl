@@ -167,28 +167,30 @@ function interaction_top!(ims::Int64,
     @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻ = added_layer
     #@show size(composite_layer.topT⁺⁺)
     #@unpack topR⁻⁺, topR⁺⁻, topT⁺⁺, topT⁻⁻, topJ₀⁺, topJ₀⁻ = composite_layer
-    R⁻⁺ = arr_type(composite_layer.topR⁻⁺[ims]) 
-    R⁺⁻ = arr_type(composite_layer.topR⁺⁻[ims]) 
+    #@show typeof(composite_layer.topR⁻⁺[ims])
+    R⁻⁺ = composite_layer.topR⁻⁺[ims] 
+    R⁺⁻ = composite_layer.topR⁺⁻[ims] 
                         
-    T⁺⁺ = arr_type(composite_layer.topT⁺⁺[ims]) 
-    T⁻⁻ = arr_type(composite_layer.topT⁻⁻[ims]) 
+    T⁺⁺ = composite_layer.topT⁺⁺[ims] 
+    T⁻⁻ = composite_layer.topT⁻⁻[ims] 
                         
-    compJ₀⁺ = arr_type(composite_layer.topJ₀⁺[ims]) 
-    compJ₀⁻ = arr_type(composite_layer.topJ₀⁻[ims])
+    compJ₀⁺ = composite_layer.topJ₀⁺[ims] 
+    compJ₀⁻ = composite_layer.topJ₀⁻[ims]
+    #@show typeof(compJ₀⁺), typeof(R⁻⁺)
     
     interaction_helper_ms!(scattering_interface, SFI, #composite_layer, added_layer, 
                         I_static,
                         r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻,
                         R⁻⁺, R⁺⁻, T⁺⁺, T⁻⁻, compJ₀⁺, compJ₀⁻);
 
-    composite_layer.topR⁻⁺[ims][:] = Array(R⁻⁺)
-    composite_layer.topR⁺⁻[ims][:] = Array(R⁺⁻)
+    #composite_layer.topR⁻⁺[ims][:] = Array(R⁻⁺)
+    #composite_layer.topR⁺⁻[ims][:] = Array(R⁺⁻)
                         
-    composite_layer.topT⁺⁺[ims][:] = Array(T⁺⁺)
-    composite_layer.topT⁻⁻[ims][:] = Array(T⁻⁻)
+    #composite_layer.topT⁺⁺[ims][:] = Array(T⁺⁺)
+    #composite_layer.topT⁻⁻[ims][:] = Array(T⁻⁻)
                         
-    composite_layer.topJ₀⁺[ims][:] = Array(compJ₀⁺) 
-    composite_layer.topJ₀⁻[ims][:] = Array(compJ₀⁻)
+    #composite_layer.topJ₀⁺[ims][:] = Array(compJ₀⁺) 
+    #composite_layer.topJ₀⁻[ims][:] = Array(compJ₀⁻)
 
     synchronize_if_gpu()
     #@pack composite_layer = topR⁻⁺, topR⁺⁻, topT⁺⁺, topT⁻⁻, topJ₀⁺, topJ₀⁻   
@@ -206,20 +208,21 @@ function interaction_bot!(ims::Int64,
     @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻ = added_layer
     #@show scattering_interface
     #@unpack botR⁻⁺, botR⁺⁻, botT⁺⁺, botT⁻⁻, botJ₀⁺, botJ₀⁻ = composite_layer
-    R⁻⁺ = arr_type(composite_layer.botR⁻⁺[ims]) 
-    R⁺⁻ = arr_type(composite_layer.botR⁺⁻[ims]) 
+    R⁻⁺ = composite_layer.botR⁻⁺[ims]
+    R⁺⁻ = composite_layer.botR⁺⁻[ims] 
                         
-    T⁺⁺ = arr_type(composite_layer.botT⁺⁺[ims]) 
-    T⁻⁻ = arr_type(composite_layer.botT⁻⁻[ims]) 
+    T⁺⁺ = composite_layer.botT⁺⁺[ims]
+    T⁻⁻ = composite_layer.botT⁻⁻[ims] 
                         
-    compJ₀⁺ = arr_type(composite_layer.botJ₀⁺[ims]) 
-    compJ₀⁻ = arr_type(composite_layer.botJ₀⁻[ims])
+    compJ₀⁺ = composite_layer.botJ₀⁺[ims] 
+    compJ₀⁻ = composite_layer.botJ₀⁻[ims]
     
     interaction_helper_ms!(scattering_interface, SFI, #composite_layer, added_layer, 
                         I_static,
                         r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻,
                         R⁻⁺, R⁺⁻, T⁺⁺, T⁻⁻, compJ₀⁺, compJ₀⁻);
-        
+     
+    #=                    
     composite_layer.botR⁻⁺[ims][:] = Array(R⁻⁺)
     composite_layer.botR⁺⁻[ims][:] = Array(R⁺⁻)
                         
@@ -228,6 +231,7 @@ function interaction_bot!(ims::Int64,
                         
     composite_layer.botJ₀⁺[ims][:] = Array(compJ₀⁺) 
     composite_layer.botJ₀⁻[ims][:] = Array(compJ₀⁻)
+    =#
     
     synchronize_if_gpu()
     #@pack composite_layer = botR⁻⁺, botR⁺⁻, botT⁺⁺, botT⁻⁻, botJ₀⁺, botJ₀⁻

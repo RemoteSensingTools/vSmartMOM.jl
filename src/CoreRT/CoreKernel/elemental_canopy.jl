@@ -26,7 +26,7 @@ function elemental!(pol_type, SFI::Bool,
     D     = Diagonal(arr_type(repeat(pol_type.D, size(qp_μ,1))))
 
     device = devi(architecture)
-    @show maximum(Array(ϖ)), maximum(Array(dτ))
+    #@show maximum(Array(ϖ)), maximum(Array(dτ))
     # If in scattering mode:
     if scatter
         # for m==0, ₀∫²ᵖⁱ cos²(mϕ)dϕ/4π = 0.5, while
@@ -40,7 +40,7 @@ function elemental!(pol_type, SFI::Bool,
         event = kernel!(r⁻⁺, t⁺⁺, ϖ, dτ, G, Z⁻⁺, Z⁺⁺, qp_μN, wct2, ndrange=size(r⁻⁺)); 
         wait(device, event)
         synchronize_if_gpu()
-        @show G
+        #@show G
         # SFI part
         kernel! = get_canopy_elem_rt_SFI!(device)
         event = kernel!(j₀⁺, j₀⁻, ϖ, dτ, arr_type(τ_sum), G, Z⁻⁺, Z⁺⁺, qp_μN, ndoubl, wct02, pol_type.n, I₀, iμ₀, D, ndrange=size(j₀⁺))

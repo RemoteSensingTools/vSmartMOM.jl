@@ -48,7 +48,10 @@ function interaction_hdrf_canopy!(SFI,
     
     wt = Array(wt_μN)
     qp = Array(qp_μN)
-    hdr_J₀⁻ .= uwJ#r⁻⁺ ⊠ J₀⁺ .+ j₀⁻
+    _uwJ = Array(uwJ)
+    _dwJ = Array(dwJ)
+    #@show typeof(hdr_J₀⁻), typeof(uwJ)
+    hdr_J₀⁻ .= Array(uwJ)#r⁻⁺ ⊠ J₀⁺ .+ j₀⁻
     # @show hdr_J₀⁻./ J₀⁺
     
     #@show size(bhr_J₀⁻), size(bhr_J₀⁺)
@@ -56,9 +59,9 @@ function interaction_hdrf_canopy!(SFI,
     #qp = Array(qp_μN)
     if m==0
         
-        @show dwJ[:,1,end]
-        @show "========="
-        @show uwJ[:,1,end]
+        #@show dwJ[:,1,end]
+        #@show "========="
+        #@show uwJ[:,1,end]
         #showp
         for i = 1:pol_type.n
             #bhr_J₀⁻[i,:] .= 0
@@ -66,15 +69,14 @@ function interaction_hdrf_canopy!(SFI,
             #for j=i:pol_type.n:NquadN
             j=i:pol_type.n:NquadN
             #@show typeof(uwJ[j,1,:]),  typeof(wt_μN[j])
-            bhr_J₀⁻[i,:] .= (sum(uwJ[j,1,:].*wt[j].*qp[j], dims=1)')
+            #Array(sum(Array(uwJ[j,1,:]).*wt[j].*qp[j], dims=1)')
+            bhr_J₀⁻[i,:] .= (sum(_uwJ[j,1,:].*wt[j].*qp[j], dims=1)')
             #@show size(bhr_J₀⁺[i,:]), size(solJ₀[i,:])
-            bhr_J₀⁺[i,:] .= (sum(dwJ[j,1,:].*wt[j].*qp[j], dims=1)') .+ (solJ₀[i,:] .* qp[iμ₀]) #TODO: Use Radau quadrature and include insolation in the quadrature sum
-            direct = (solJ₀[i,:] .* qp[iμ₀])
-            diffuse = (sum(dwJ[j,1,:].*wt[j].*qp[j], dims=1)')
+            bhr_J₀⁺[i,:] .= (sum(_dwJ[j,1,:].*wt[j].*qp[j], dims=1)') .+ (solJ₀[i,:] .* qp[iμ₀]) #TODO: Use Radau quadrature and include insolation in the quadrature sum
+            direct = Array(solJ₀[i,:] .* qp[iμ₀])
+            diffuse = (sum(_dwJ[j,1,:].*wt[j].*qp[j], dims=1)')
             @show direct[1], diffuse[1]
-            #@show j₀⁺[iμ₀,1,1:3].* qp[iμ₀], J₀⁺[iμ₀,1,1:3] .* qp[iμ₀], bhr_J₀⁺[i,1:3], bhr_J₀⁻[i,1:3]
-            #@show Array(sum(J₀⁻[j,1,:].*wt_μN[j].*qp_μN[j], dims=1)')[1], Array(sum(hdr_J₀⁻[j,1,:].*wt_μN[j].*qp_μN[j], dims=1)')[1],Array(sum(j₀⁻[j,1,:].*wt_μN[j].*qp_μN[j], dims=1)')[1]
-            #end
+
         end
         @show bhr_J₀⁻./bhr_J₀⁺
         @show solJ₀[1,:]

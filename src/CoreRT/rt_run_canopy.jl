@@ -47,7 +47,7 @@ function rt_run_canopy(RS_type::AbstractRamanType,
     # Need to check this a bit better in the future!
     FT_dual = n_aer > 0 ? typeof(model.τ_aer[1][1]) : FT
     #FT_dual = FT
-    @show FT_dual
+    #@show FT_dual
     # Output variables: Reflected and transmitted solar irradiation at TOA and BOA respectively # Might need Dual later!!
     #Suniti: consider adding a new dimension (iBand) to these arrays. The assignment of simulated spectra to their specific bands will take place after batch operations, thereby leaving the computational time unaffected 
     R       = zeros(FT_dual, length(vza), pol_type.n, nSpec)
@@ -86,7 +86,7 @@ function rt_run_canopy(RS_type::AbstractRamanType,
     #getRamanSSProp(RS_type, λ, grid_in)
     println("Prepping Canopy")
     #@show BiLambMod,  Array(qp_μN), LAD
-    Zup, Zdown = CanopyOptics.precompute_Zazi(BiLambMod, Array(qp_μN), LAD)
+    @timeit "Prepping canopy" Zup, Zdown = CanopyOptics.precompute_Zazi(BiLambMod, Array(qp_μN), LAD)
     #@show maximum(Zup)
     println("Finished initializing arrays")
 
@@ -104,7 +104,7 @@ function rt_run_canopy(RS_type::AbstractRamanType,
         
         
         𝐙⁺⁺, 𝐙⁻⁺ = CanopyOptics.compute_Z_matrices_aniso(BiLambMod, Array(qp_μN), LAD, Zup, Zdown, m)    
-        #𝐙⁺⁺, 𝐙⁻⁺ = CanopyOptics.compute_Z_matrices(BiLambMod, Array(qp_μN), LAD,  m)    
+        #𝐙⁺⁺, 𝐙⁻ = CanopyOptics.compute_Z_matrices(BiLambMod, Array(qp_μN), LAD,  m)    
         if m<4
             @show Array(wt_μN') * 𝐙⁺⁺ + Array(wt_μN') * 𝐙⁻⁺
         end  
@@ -323,6 +323,8 @@ function rt_run_canopy_ms(RS_type::AbstractRamanType,
         make_added_layer(RS_type, FT_dual, arr_type, dims, nSpec)
     @timeit "Creating layers" composite_layer     = 
         make_composite_layer(RS_type, FT_dual, arr_type, length(sensor_levels), dims, nSpec)
+    @show typeof(composite_layer.topR⁻⁺[1])
+    @show arr_type
     @timeit "Creating arrays" I_static = 
         Diagonal(arr_type(Diagonal{FT}(ones(dims[1]))));
 
@@ -330,8 +332,8 @@ function rt_run_canopy_ms(RS_type::AbstractRamanType,
     #getRamanSSProp(RS_type, λ, grid_in)
     println("Prepping Canopy")
     #@show BiLambMod,  Array(qp_μN), LAD
-    Zup, Zdown = CanopyOptics.precompute_Zazi(BiLambMod, Array(qp_μN), LAD)
-    @show maximum(Zup)
+    @timeit "Prepping canopy" Zup, Zdown = CanopyOptics.precompute_Zazi(BiLambMod, Array(qp_μN), LAD)
+    #@show maximum(Zup)
     println("Finished initializing arrays")
 
     # Loop over fourier moments
