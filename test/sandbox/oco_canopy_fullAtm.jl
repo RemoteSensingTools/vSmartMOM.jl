@@ -68,10 +68,11 @@ results_NoCanopySameP = []
 results_NoCanopyLowP = []
 for iBand = 1:3
     #iBand = 3
-    lAlb = [0.4,0.236,0.065]
+    lAlb = [0.3876,0.1627,0.0351]
     # Canopy Stuff!
-    LD = CanopyOptics.spherical_leaves()
+    
     LD = CanopyOptics.planophile_leaves2()
+    LD = CanopyOptics.uniform_leaves()
     leaf = LeafProspectProProperties{Float64}();
     LAI = 5.0
     ν = parameters.spec_bands[iBand]
@@ -110,27 +111,65 @@ for iBand = 1:3
     @show iBand
 end
 
+l = @layout [a  b c]
 iBand = 1
 #plot(wl[iBand], results_canopy_conv[iBand], label="Canopy")
 #plot!(wl[iBand], results_NoCanopySameP_conv[iBand],label="No Canopy")
 #r1 = results_canopy_conv[iBand]./results_NoCanopySameP_conv[iBand]
+r1 = results_NoCanopySameP_conv[iBand]./results_NoCanopyLowP_conv[iBand]
 r2 = results_canopy_conv[iBand]./results_NoCanopyLowP_conv[iBand]
 #plot(wl[iBand], r1/mean(r1), label="Canopy/noC_sameP")
-plot(wl[iBand]*1e3, r2/mean(r2), label="Integrated Canopy / No Canopy", lw=2)
-xlabel!("Wavelength (nm)")
-savefig("/home/cfranken/pdrdf_O2band.pdf")
-savefig("/home/cfranken/pdrdf_O2band.png")
+p1 = plot(wl[iBand]*1e3, r1/maximum(r1), label=nothing, lw=2)
+plot!(wl[iBand]*1e3, r2/maximum(r2), label=nothing, lw=1.5)
+#xlabel!("Wavelength (nm)")
+
 
 iBand = 2
 r2 = results_canopy_conv[iBand]./results_NoCanopyLowP_conv[iBand]
-plot(wl[iBand]*1e3, r2/mean(r2), label="Integrated Canopy / No Canopy", lw=2)
-xlabel!("Wavelength (nm)")
-savefig("/home/cfranken/pdrdf_WCO2band.pdf")
-savefig("/home/cfranken/pdrdf_WCO2band.png")
+r1 = results_NoCanopySameP_conv[iBand]./results_NoCanopyLowP_conv[iBand]
+p2 = plot(wl[iBand]*1e3, r1/maximum(r1), label=nothing, lw=2)
+plot!(wl[iBand]*1e3, r2/maximum(r2), label=nothing, lw=1.5)
+#xlabel!("Wavelength (nm)")
+
 
 iBand = 3
 r2 = results_canopy_conv[iBand]./results_NoCanopyLowP_conv[iBand]
-plot(wl[iBand]*1e3, r2/mean(r2), label="Integrated Canopy / No Canopy", lw=2)
-xlabel!("Wavelength (nm)")
-savefig("/home/cfranken/pdrdf_SCO2band.pdf")
-savefig("/home/cfranken/pdrdf_SCO2band.png")
+r1 = results_NoCanopySameP_conv[iBand]./results_NoCanopyLowP_conv[iBand]
+p3 = plot(wl[iBand]*1e3, r1/maximum(r1), label=nothing, lw=2)
+plot!(wl[iBand]*1e3, r2/maximum(r2), label=nothing, lw=1.5)
+#xlabel!("Wavelength (nm)")
+plot!(size=(800,300))
+plot(p1, p2, p3, layout = l)
+savefig("/home/cfranken/canopy/AllBandsCanopyModelRatio_all.pdf")
+
+l = @layout [a  b c]
+iBand = 1
+#plot(wl[iBand], results_canopy_conv[iBand], label="Canopy")
+#plot!(wl[iBand], results_NoCanopySameP_conv[iBand],label="No Canopy")
+#r1 = results_canopy_conv[iBand]./results_NoCanopySameP_conv[iBand]
+r1 = results_NoCanopySameP_conv[iBand]./results_NoCanopyLowP_conv[iBand]
+r2 = results_canopy_conv[iBand]./results_NoCanopyLowP_conv[iBand]
+#plot(wl[iBand], r1/mean(r1), label="Canopy/noC_sameP")
+p1 = plot(wl[iBand]*1e3, r1/maximum(r1), label=nothing, lw=2)
+#plot!(wl[iBand]*1e3, r2/maximum(r2), label=nothing, lw=1.5)
+#xlabel!("Wavelength (nm)")
+
+
+iBand = 2
+r2 = results_canopy_conv[iBand]./results_NoCanopyLowP_conv[iBand]
+r1 = results_NoCanopySameP_conv[iBand]./results_NoCanopyLowP_conv[iBand]
+p2 = plot(wl[iBand]*1e3, r1/maximum(r1), label=nothing, lw=2)
+#plot!(wl[iBand]*1e3, r2/maximum(r2), label=nothing, lw=1.5)
+#xlabel!("Wavelength (nm)")
+
+
+iBand = 3
+r2 = results_canopy_conv[iBand]./results_NoCanopyLowP_conv[iBand]
+r1 = results_NoCanopySameP_conv[iBand]./results_NoCanopyLowP_conv[iBand]
+p3 = plot(wl[iBand]*1e3, r1/maximum(r1), label=nothing, lw=2)
+#plot!(wl[iBand]*1e3, r2/maximum(r2), label=nothing, lw=1.5)
+#xlabel!("Wavelength (nm)")
+plot!(size=(800,300))
+plot(p1, p2, p3,layout = l)
+
+savefig("/home/cfranken/canopy/AllBandsCanopyModelRatioNoC_P_all.pdf")
