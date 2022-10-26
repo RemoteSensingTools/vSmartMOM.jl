@@ -332,8 +332,10 @@ function rt_run_canopy_ms(RS_type::AbstractRamanType,
     #getRamanSSProp(RS_type, λ, grid_in)
     println("Prepping Canopy")
     #@show BiLambMod,  Array(qp_μN), LAD
-    @timeit "Prepping canopy" Zup, Zdown = CanopyOptics.precompute_Zazi(BiLambMod, Array(qp_μN), LAD)
-    #@show maximum(Zup)
+    # @timeit "Prepping canopy" Zup, Zdown  = CanopyOptics.precompute_Zazi(BiLambMod, Array(qp_μN), LAD)
+    @timeit "Prepping canopy" Zup, Zdown = CanopyOptics.precompute_Zazi_(BiLambMod, qp_μN, LAD)
+    @show (Zup[1,10,1:10])
+    @show qp_μN
     println("Finished initializing arrays")
 
     # Loop over fourier moments
@@ -348,23 +350,15 @@ function rt_run_canopy_ms(RS_type::AbstractRamanType,
         @timeit "OpticalProps" layer_opt_props, fScattRayleigh   = 
         constructCoreOpticalProperties(RS_type,iBand,m,model);
 
-        𝐙⁺⁺, 𝐙⁻⁺ = CanopyOptics.compute_Z_matrices_aniso(BiLambMod, Array(qp_μN), LAD, Zup, Zdown, m) 
+        #𝐙⁺⁺, 𝐙⁻⁺ = CanopyOptics.compute_Z_matrices_aniso(BiLambMod, Array(qp_μN), LAD, Array(Zup), Array(Zdown), m) 
+        𝐙⁺⁺, 𝐙⁻⁺ = CanopyOptics.compute_Z_matrices_aniso(BiLambMod, qp_μN, LAD, Zup, Zdown, m) 
         #𝐙⁺⁺, 𝐙⁻⁺ = CanopyOptics.compute_Z_matrices_aniso(BiLambMod, Array(qp_μN), LAD, m)   
 
 
-            # This basically multiplies with G again, needs to be fixed later (or removed from compute_Z_matrices)
+        # This basically multiplies with G again, needs to be fixed later (or removed from compute_Z_matrices)
         G1 = arr_type(CanopyOptics.G(Array(qp_μN), LAD))
-        Gref = CanopyOptics.G([1.0], LAD)[1]
-        #G1 .= 0.5
-        # normalizing as doubling causes trouble otherwise.
-        #Gref = Array(G1)[iμ₀]
-        Gref = 1.0
-        #Gref = mean(G1)
-        # This converts vertical LAI coordinate to tau (at μ=1)
-        G1 = G1 ./ Gref
-        #@show G1
-        canopyCore = CoreRT.CoreDirectionalScatteringOpticalProperties(arr_type(Gref * LAI * ones(FT, nSpec)), arr_type(ϖ_canopy*ones(FT,nSpec)), arr_type(𝐙⁺⁺)/Gref, arr_type(𝐙⁻⁺)/Gref, G1)
-             
+        
+        canopyCore = CoreRT.CoreDirectionalScatteringOpticalProperties(arr_type(LAI * ones(FT, nSpec)), arr_type(ϖ_canopy*ones(FT,nSpec)), arr_type(𝐙⁺⁺), arr_type(𝐙⁻⁺), G1)
 
         layer_opt_props =  [layer_opt_props; canopyCore]
 
