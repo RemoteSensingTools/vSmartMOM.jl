@@ -180,7 +180,7 @@ canopyCore = CoreRT.CoreScatteringOpticalProperties(G1*LAI, ϖ, 𝐙⁺⁺, 𝐙
 # Add Canopy here:
 layer_opt_props[1] += canopyCore
 # Determine the scattering interface definitions:
-scattering_interfaces_all, τ_sum_all = CoreRT.extractEffectiveProps(layer_opt_props);
+scattering_interfaces_all, τ_sum_all = CoreRT.extractEffectiveProps(layer_opt_props,quad_points);
 
 # Loop over vertical layers: 
 iz = 1  # Count from TOA to BOA
