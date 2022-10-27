@@ -1,6 +1,6 @@
 name = "vSmartMOM"
 uuid = "7ba11eeb-0a61-4a04-a413-bf612cc2007e"
-authors = ["Rupesh Jeyaram <rjeyaram@caltech.edu> and contributors"]
+authors = ["Suniti Sanghavi, Christian Frankenberg, Rupesh Jeyaram"]
 version = "0.5.0"
 
 [deps]
@@ -45,19 +45,19 @@ WignerSymbols = "9f57e263-0b3d-5e2e-b1be-24f2bb48858b"
 YAML = "ddb6d928-2868-570f-bddf-ab3f9cf99eb6"
 
 [compat]
-CanopyOptics = "0.1.2"
+CanopyOptics = "0.1"
 CUDA = "3"
-CUDAKernels = "0.2, 0.3, 0.4"
-DataInterpolations = "3.6"
-DiffResults = "1.0"
-Distributions = "0.23, 0.24, 0.25"
+CUDAKernels = "0.3, 0.4"
+DataInterpolations = "3"
+DiffResults = "1.0, 1.1"
+Distributions = "0.24, 0.25"
 DocStringExtensions = "0.8,0.9"
 FastGaussQuadrature = "0.4"
 ForwardDiff = "0.10"
 Interpolations = "0.12, 0.13"
-JLD2 = "0.1, 0.2, 0.3, 0.4"
+JLD2 = "0.3, 0.4"
 JSON = "0.21"
-KernelAbstractions = "0.6, 0.7, 0.8"
+KernelAbstractions = "0.7, 0.8"
 NNlib = "0.8"
 Parameters = "0.12"
 Polynomials = "2, 3"
@@ -67,7 +67,7 @@ StaticArrays = "1.2"
 StatsBase = "0.33"
 TimerOutputs = "0.5"
 YAML = "0.4"
-julia = "1.6, 1.7"
+julia = "1.7, 1.8"
 
 [extras]
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
