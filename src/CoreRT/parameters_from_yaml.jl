@@ -94,7 +94,7 @@ function validate_yaml_parameters(params)
               (["radiative_transfer", "l_trunc"], Integer),
               (["radiative_transfer", "depol"], Real),
               (["radiative_transfer", "float_type"], String),
-              (["radiative_transfer", "architecture"], String),
+              (["radiative_transfer", "architecture"], String, ["default_architecture", "Architectures.GPU()", "Architectures.CPU()", "GPU()", "CPU()"]),
 
               # geometry group
               (["geometry", "sza"], Real),
@@ -184,7 +184,11 @@ function parameters_from_yaml(file_path)
     #@show pol_type
     polarization_type = eval(Meta.parse(pol_type))
     
-    architecture      = eval(Meta.parse(params_dict["radiative_transfer"]["architecture"]))
+    arch_string = params_dict["radiative_transfer"]["architecture"]
+    arch_string = !startswith(arch_string, "Architectures.") ? "Architectures." * arch_string : arch_string
+
+    architecture = eval(Meta.parse(arch_string))
+
     #@show polarization_type, quadrature_type 
     # atmospheric_profile group
     T = convert.(FT, params_dict["atmospheric_profile"]["T"]) # Level
