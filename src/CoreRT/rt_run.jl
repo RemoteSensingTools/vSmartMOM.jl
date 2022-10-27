@@ -115,7 +115,7 @@ function rt_run(RS_type::AbstractRamanType,
             constructCoreOpticalProperties(RS_type,iBand,m,model);
         # Determine the scattering interface definitions:
         scattering_interfaces_all, τ_sum_all = 
-            extractEffectiveProps(layer_opt_props);
+            extractEffectiveProps(layer_opt_props,quad_points);
         #@show typeof(layer_opt_props)
 
         # Loop over vertical layers: 

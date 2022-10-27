@@ -94,7 +94,7 @@ function rt_run_test(RS_type::CoreRT.AbstractRamanType,
         layer_opt_props[end] += canopyCore
 
         # Determine the scattering interface definitions:
-        scattering_interfaces_all, τ_sum_all = CoreRT.extractEffectiveProps(layer_opt_props);
+        scattering_interfaces_all, τ_sum_all = CoreRT.extractEffectiveProps(layer_opt_props,quad_points);
 
         # Loop over vertical layers: 
         for iz = 1:Nz  # Count from TOA to BOA

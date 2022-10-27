@@ -134,7 +134,7 @@ function rt_run_canopy(RS_type::AbstractRamanType,
         
         # Determine the scattering interface definitions:
         scattering_interfaces_all, τ_sum_all = 
-            extractEffectiveProps(layer_opt_props);
+            extractEffectiveProps(layer_opt_props,quad_points );
         @show scattering_interfaces_all
 
         Nz = length(layer_opt_props)
