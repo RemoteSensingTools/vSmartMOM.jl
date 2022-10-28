@@ -558,7 +558,7 @@ end
                                 #@show ϖ_λ[n₀] 
                                 @show Z⁺⁺_I₀
                                 @show (1 /( (qp_μN[i]/qp_μN[i_start]) - (dτ_λ[n₁]/dτ_λ[n₀]) ) )
-                                (exp(-dτ_λ[n₁] / qp_μN[i]) - exp(-dτ_λ[n₀] / qp_μN[i_start]))
+                                @show (exp(-dτ_λ[n₁] / qp_μN[i]) - exp(-dτ_λ[n₀] / qp_μN[i_start]))
                                 #@show wct2[j]
                                 @show ieJ₀⁺[i, 1, n₁, Δn]
                          end
