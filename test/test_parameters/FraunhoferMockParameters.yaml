@@ -29,7 +29,7 @@ radiative_transfer:
   # Floating point type for calculations (Float32, Float64)
   float_type:         Float64
   # Architecture (default_architecture, Architectures.GPU(), Architectures.CPU())
-  architecture:       Architectures.GPU() # default_architecture
+  architecture:       Architectures.CPU() # default_architecture
   
 # =================================================================
 # Simulation Geometry

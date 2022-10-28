@@ -97,9 +97,9 @@ function model_from_parameters(params::vSmartMOM_Parameters)
     end
 
     # Rayleigh optical properties calculation
-    greek_rayleigh = Scattering.get_greek_rayleigh(params.depol)
-    @show params.depol
-    @show greek_rayleigh
+    greek_cabannes = Vector{vSmartMOM.Scattering.GreekCoefs{Float64}}()
+    greek_rayleigh = Vector{vSmartMOM.Scattering.GreekCoefs{Float64}}()
+    ϖ_Cabannes = zeros(n_bands)
     # Remove rayleight for testing:
     #τ_rayl = [zeros(params.float_type,length(params.spec_bands[i]), length(profile.T)) for i=1:n_bands];
     τ_rayl = [zeros(params.float_type,1,length(profile.T)) for i=1:n_bands];
@@ -119,10 +119,21 @@ function model_from_parameters(params::vSmartMOM_Parameters)
         #Suniti: the following two lines are temporary. this Cabannes depolarization applies only to the Earth's atmosphere
         # It has been added to make sure that the code sees the same Rayleigh cross section, regardless of elastic or inelastic RT 
         # Needs better (more general) formulation 
-        depol_Cabannes = 0.028
+        νₘ = 0.5*(params.spec_bands[i_band][1]+params.spec_bands[i_band][end])
+        λₘ = 1.e7/νₘ
+        @show i_band
+        ϖ_Cabannes[i_band], γ_air_Cabannes, γ_air_Rayleigh = 
+            InelasticScattering.compute_γ_air_Rayleigh!(λₘ)
+        @show ϖ_Cabannes[i_band]
+        depol_air_Cabannes = 2γ_air_Cabannes/(1+γ_air_Cabannes)
+        depol_air_Rayleigh = 2γ_air_Rayleigh/(1+γ_air_Rayleigh)
+        a = Scattering.get_greek_rayleigh(depol_air_Cabannes)
+        push!(greek_cabannes, a)
+        a = Scattering.get_greek_rayleigh(depol_air_Rayleigh)
+        push!(greek_rayleigh, a)
         τ_rayl[i_band]   .= getRayleighLayerOptProp(profile.p_half[end], 
-            (mean(curr_band_λ)), 
-            depol_Cabannes, profile.vcd_dry);
+            λₘ/1000., 
+            depol_air_Rayleigh, profile.vcd_dry);
 
         #=
         # Original form
@@ -228,10 +239,12 @@ function model_from_parameters(params::vSmartMOM_Parameters)
     end
 
     # Check the floating-type output matches specified FT
-
+@show size(ϖ_Cabannes), typeof(ϖ_Cabannes)
     # Return the model 
     return vSmartMOM_Model(params, 
-                        aerosol_optics,  
+                        aerosol_optics, 
+                        ϖ_Cabannes, 
+                        greek_cabannes,  
                         greek_rayleigh, 
                         quad_points, 
                         τ_abs, 
@@ -291,7 +304,11 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
     #@show params.spec_bands
 
     # Rayleigh optical properties calculation
-    greek_rayleigh = Scattering.get_greek_rayleigh(params.depol)
+    #greek_rayleigh = Scattering.get_greek_rayleigh(params.depol)
+    # Rayleigh optical properties calculation
+    ϖ_Cabannes = zeros(n_bands)
+    greek_cabannes = Vector{vSmartMOM.Scattering.GreekCoefs{Float64}}()
+    greek_rayleigh = Vector{vSmartMOM.Scattering.GreekCoefs{Float64}}()
     τ_rayl = [zeros(params.float_type,1, length(profile.p_full)) for i=1:n_bands];
 
     # τ_abs[iBand][iSpec,iZ]
@@ -302,12 +319,27 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
         #@show params.spec_bands[i_band]
         # i'th spectral band (convert from cm⁻¹ to μm)
         curr_band_λ = 1e4 ./ params.spec_bands[i_band]
+        νₘ = 0.5*(params.spec_bands[i_band][1]+params.spec_bands[i_band][end])
+        λₘ = 1.e7/νₘ
+        ϖ_Cabannes[i_band], γ_air_Cabannes, γ_air_Rayleigh = 
+            InelasticScattering.compute_γ_air_Rayleigh!(λₘ)
+        depol_air_Cabannes = 2γ_air_Cabannes/(1+γ_air_Cabannes)
+        depol_air_Rayleigh = 2γ_air_Rayleigh/(1+γ_air_Rayleigh)
+        a = Scattering.get_greek_rayleigh(depol_air_Cabannes)
+        push!(greek_cabannes, a)
+        a = Scattering.get_greek_rayleigh(depol_air_Rayleigh)
+        push!(greek_rayleigh, a)
+        # Compute Rayleigh properties per layer for `i_band` band center
+        τ_rayl[i_band]   .= getRayleighLayerOptProp(profile.p_half[end], 
+            λₘ/1000., 
+            depol_air_Rayleigh, profile.vcd_dry);
 
+        #=
         # Compute Rayleigh properties per layer for `i_band` band center
         τ_rayl[i_band]   .= getRayleighLayerOptProp(profile.p_half[end], 
                             (maximum(curr_band_λ) + minimum(curr_band_λ))/2, 
                             params.depol, profile.vcd_dry);
-
+        =#
         # If no absorption, continue to next band
         isnothing(params.absorption_params) && continue
         #@show i_band, params.absorption_params.molecules[i_band]
@@ -405,7 +437,7 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
     # Check the floating-type output matches specified FT
 
     # Return the model 
-    return vSmartMOM_Model(params, aerosol_optics,  greek_rayleigh, quad_points, τ_abs, τ_rayl, τ_aer, obs_geom, profile)
+    return vSmartMOM_Model(params, aerosol_optics, ϖ_Cabannes, greek_cabannes, greek_rayleigh, quad_points, τ_abs, τ_rayl, τ_aer, obs_geom, profile)
 
 end
 
@@ -455,7 +487,10 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
     #@show params.spec_bands
 
     # Rayleigh optical properties calculation
-    greek_rayleigh = Scattering.get_greek_rayleigh(params.depol)
+    ϖ_Cabannes = zeros(n_bands)
+    greek_cabannes = Vector{vSmartMOM.Scattering.GreekCoefs{Float64}}()
+    greek_rayleigh = Vector{vSmartMOM.Scattering.GreekCoefs{Float64}}()
+    #greek_rayleigh = Scattering.get_greek_rayleigh(params.depol)
     τ_rayl = [zeros(params.float_type,1, length(profile.p_full)) for i=1:n_bands];
 
     # τ_abs[iBand][iSpec,iZ]
@@ -466,12 +501,26 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
         #@show params.spec_bands[i_band]
         # i'th spectral band (convert from cm⁻¹ to μm)
         curr_band_λ = 1e4 ./ params.spec_bands[i_band]
-
+        νₘ = 0.5*(params.spec_bands[i_band][1]+params.spec_bands[i_band][end])
+        λₘ = 1.e7/νₘ
+        ϖ_Cabannes[i_band], γ_air_Cabannes, γ_air_Rayleigh = 
+            InelasticScattering.compute_γ_air_Rayleigh!(λₘ)
+        depol_air_Cabannes = 2γ_air_Cabannes/(1+γ_air_Cabannes)
+        depol_air_Rayleigh = 2γ_air_Rayleigh/(1+γ_air_Rayleigh)
+        a = Scattering.get_greek_rayleigh(depol_air_Cabannes)
+        push!(greek_cabannes, a)
+        a = Scattering.get_greek_rayleigh(depol_air_Rayleigh)
+        push!(greek_rayleigh, a)
+        # Compute Rayleigh properties per layer for `i_band` band center
+        τ_rayl[i_band]   .= getRayleighLayerOptProp(profile.p_half[end], 
+            λₘ/1000., 
+            depol_air_Rayleigh, profile.vcd_dry);
+#=
         # Compute Rayleigh properties per layer for `i_band` band center
         τ_rayl[i_band]   .= getRayleighLayerOptProp(profile.p_half[end], 
                             (minimum(curr_band_λ) + maximum(curr_band_λ))/2, 
                             params.depol, profile.vcd_dry);
-
+=#
         # If no absorption, continue to next band
         isnothing(params.absorption_params) && continue
         #@show i_band, params.absorption_params.molecules[i_band]
@@ -569,7 +618,7 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
     # Check the floating-type output matches specified FT
 
     # Return the model 
-    return vSmartMOM_Model(params, aerosol_optics,  greek_rayleigh, quad_points, τ_abs, τ_rayl, τ_aer, obs_geom, profile)
+    return vSmartMOM_Model(params, aerosol_optics, ϖ_Cabannes, greek_cabannes, greek_rayleigh, quad_points, τ_abs, τ_rayl, τ_aer, obs_geom, profile)
 
 end
 

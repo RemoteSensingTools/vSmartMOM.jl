@@ -47,7 +47,8 @@ function interaction_helper!(RS_type::RRS, ::ScatteringInterface_01, SFI,
             end 
         end
 
-        composite_layer.J₀⁻ = composite_layer.J₀⁻ .+ composite_layer.T⁻⁻ ⊠ (added_layer.r⁻⁺ ⊠ composite_layer.J₀⁺ .+ added_layer.J₀⁻) 
+        composite_layer.J₀⁻ = composite_layer.J₀⁻ .+ composite_layer.T⁻⁻ ⊠ 
+            (added_layer.r⁻⁺ ⊠ composite_layer.J₀⁺ .+ added_layer.J₀⁻) 
         composite_layer.J₀⁺ = added_layer.J₀⁺ .+ added_layer.t⁺⁺ ⊠ composite_layer.J₀⁺ 
     end
 

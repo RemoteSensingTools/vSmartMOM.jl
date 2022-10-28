@@ -336,8 +336,12 @@ mutable struct vSmartMOM_Model
     
     "Truncated aerosol optics"
     aerosol_optics::AbstractArray{AbstractArray{AerosolOptics}}
+    "pure elastic (Cabannes) fraction of Rayleigh scattering"
+    ϖ_Cabannes::AbstractArray{AbstractArray}
+    "Greek coefs for Cabannes (pure elastic) calculations" 
+    greek_cabannes::Vector{GreekCoefs{Float64}}
     "Greek coefs in Rayleigh calculations" 
-    greek_rayleigh::GreekCoefs
+    greek_rayleigh::Vector{GreekCoefs{Float64}}
     "Greek coefs in Raman calculations" 
     greek_raman::GreekCoefs
     "Quadrature points/weights, etc"

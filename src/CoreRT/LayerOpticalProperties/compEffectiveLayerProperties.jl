@@ -1,5 +1,6 @@
 function constructCoreOpticalProperties(RS_type, iBand, m, model)
-    @unpack τ_rayl, τ_aer, τ_abs, aerosol_optics, greek_rayleigh  = model
+    @unpack τ_rayl, τ_aer, τ_abs, aerosol_optics, 
+            greek_rayleigh, greek_cabannes, ϖ_Cabannes = model
     @assert all(iBand .≤ length(τ_rayl)) "iBand exceeded number of bands"
     FT = eltype(τ_rayl)
     arr_type = array_type(model.params.architecture)
@@ -14,17 +15,28 @@ function constructCoreOpticalProperties(RS_type, iBand, m, model)
     nZ    = size(τ_rayl[1],2)
     #@show greek_rayleigh
     # Rayleigh Z matrix:
-    Rayl𝐙⁺⁺, Rayl𝐙⁻⁺ = Scattering.compute_Z_moments(pol_type, μ, 
-                                                    greek_rayleigh, m, 
-                                                    arr_type = arr_type);
-    #@show Rayl𝐙⁺⁺
+    if !(typeof(RS_type)<:Union{RRS,RRS_plus})
+        Rayl𝐙⁺⁺, Rayl𝐙⁻⁺ = Scattering.compute_Z_moments(pol_type, μ, 
+                                                        greek_rayleigh[iBand], m, 
+                                                        arr_type = arr_type);
+    else
+        Rayl𝐙⁺⁺, Rayl𝐙⁻⁺ = Scattering.compute_Z_moments(pol_type, μ, 
+        greek_cabannes[iBand], m, 
+        arr_type = arr_type);
+    end
+                                                        #@show Rayl𝐙⁺⁺
 
     band_layer_props    = [];
     band_fScattRayleigh = [];
     # @show arr_type
     for iB in iBand
-        rayl =  [CoreScatteringOpticalProperties(arr_type(τ_rayl[iB][:,i]),RS_type.ϖ_Cabannes[iB], 
-        (Rayl𝐙⁺⁺), (Rayl𝐙⁻⁺)) for i=1:nZ]
+        if !(typeof(RS_type)<:Union{RRS,RRS_plus})
+            rayl =  [CoreScatteringOpticalProperties(arr_type(τ_rayl[iB][:,i]), 1.0, 
+                (Rayl𝐙⁺⁺), (Rayl𝐙⁻⁺)) for i=1:nZ]
+        else
+            rayl =  [CoreScatteringOpticalProperties(arr_type(τ_rayl[iB][:,i]), ϖ_Cabannes[iB], 
+                (Rayl𝐙⁺⁺), (Rayl𝐙⁻⁺)) for i=1:nZ]
+        end
         #CoreScatteringOpticalProperties.(
         #        τ_rayl[iB], 
         #        [RS_type.ϖ_Cabannes[iB]], 
@@ -33,8 +45,8 @@ function constructCoreOpticalProperties(RS_type, iBand, m, model)
         #@show size(rayl)
         # Initiate combined properties with rayleigh
         combo = rayl
-        #@show combo[1].ϖ
-        #@show RS_type.ϖ_Cabannes
+        @show combo[1].ϖ
+        @show RS_type.ϖ_Cabannes
         # Loop over all aerosol types:
         for i=1:nAero
             # Precomute Z matrices per type (constant per layer)

@@ -81,11 +81,26 @@ function rt_run_bck(RS_type::AbstractRamanType, #Default - no Raman scattering (
         weight = m == 0 ? FT(0.5/π) : FT(1.0/π)
         # Compute Z-moments of the Rayleigh phase matrix 
         # For m>=3, Rayleigh matrices will be 0, can catch with if statement if wanted 
-        @timeit "Z moments" Rayl𝐙⁺⁺, Rayl𝐙⁻⁺ = Scattering.compute_Z_moments(pol_type, Array(qp_μ), greek_rayleigh, m, arr_type = arr_type);
+        @timeit "Z moments" Rayl𝐙⁺⁺, Rayl𝐙⁻⁺ = Scattering.compute_Z_moments(pol_type, Array(qp_μ), greek_rayleigh[1], m, arr_type = arr_type);
         if !(typeof(RS_type) <: noRS)
             @timeit "Z moments" RS_type.Z⁺⁺_λ₁λ₀, RS_type.Z⁻⁺_λ₁λ₀ = Scattering.compute_Z_moments(pol_type, Array(qp_μ), RS_type.greek_raman, m, arr_type = arr_type);
             #@show size(RS_type.Z⁺⁺_λ₁λ₀), size(RS_type.Z⁻⁺_λ₁λ₀)
         end
+        #=
+        aa = RS_type.ϖ_Cabannes*Rayl𝐙⁺⁺+sum(RS_type.ϖ_λ₁λ₀)*RS_type.Z⁺⁺_λ₁λ₀
+        bb = RS_type.ϖ_Cabannes*Rayl𝐙⁻⁺+sum(RS_type.ϖ_λ₁λ₀)*RS_type.Z⁻⁺_λ₁λ₀
+        for ia=1:NquadN
+            for ib=1:NquadN
+                @show ia, ib, aa[ia, ib]
+            end
+        end
+        for ia=1:NquadN
+            for ib=1:NquadN
+                @show ia, ib, bb[ia, ib]
+            end
+        end
+        blabla
+        =#
         # Need to make sure arrays are 0:
         # TBD here
         
@@ -171,7 +186,7 @@ function rt_run_bck(model::vSmartMOM_Model; i_band::Integer = -1)
                       model.quad_points,
                       model.params.max_m,
                       model.aerosol_optics[i_band],
-                      model.greek_rayleigh,
+                      model.greek_rayleigh[i_band],
                       model.τ_abs[i_band],
                       model.params.brdf[i_band],
                       model.params.architecture)
@@ -187,7 +202,7 @@ function rt_run_bck(model::vSmartMOM_Model; i_band::Integer = -1)
                       model.quad_points,
                       model.params.max_m,
                       model.aerosol_optics[1],
-                      model.greek_rayleigh,
+                      model.greek_rayleigh[1],
                       model.τ_abs[1],
                       model.params.brdf[1],
                       model.params.architecture)
@@ -211,7 +226,7 @@ function rt_run_bck(model::vSmartMOM_Model; i_band::Integer = -1)
                        model.quad_points,
                        model.params.max_m,
                        model.aerosol_optics[i],
-                       model.greek_rayleigh,
+                       model.greek_rayleigh[i],
                        model.τ_abs[i],
                        model.params.brdf[i],
                        model.params.architecture)
@@ -263,8 +278,10 @@ function rt_run(RS_type::AbstractRamanType,
     
     # Also to be changed!!
     brdf = model.params.brdf[iBand[1]]
-    @unpack ϖ_Cabannes, F₀ = RS_type
-
+    @unpack F₀ = RS_type
+    if (typeof(RS_type)<:Union{RRS,RRS_plus})
+        RS_type.ϖ_λ₁λ₀ *=  (1. - model.ϖ_Cabannes[iBand[1]])/sum(RS_type.ϖ_λ₁λ₀) 
+    end   
     
     FT = eltype(sza)                    # Get the float-type to use
     Nz = length(model.profile.p_full)   # Number of vertical slices
@@ -278,7 +295,7 @@ function rt_run(RS_type::AbstractRamanType,
     for iB in iBand
         nSpec0 = nSpec+1;
         nSpec += size(model.τ_abs[iB], 1); # Number of spectral points
-        push!(RS_type.bandSpecLim,nSpec0:nSpec);                
+        push!(RS_type.bandSpecLim,nSpec0:nSpec);             
     end
 
     arr_type = array_type(model.params.architecture) # Type of array to use
@@ -337,7 +354,8 @@ function rt_run(RS_type::AbstractRamanType,
         # Determine the scattering interface definitions:
         scattering_interfaces_all, τ_sum_all = 
             extractEffectiveProps(layer_opt_props);
-
+        
+        
         # Loop over vertical layers: 
         @showprogress 1 "Looping over layers ..." for iz = 1:Nz  # Count from TOA to BOA
             
@@ -351,6 +369,26 @@ function rt_run(RS_type::AbstractRamanType,
             # Expand all layer optical properties to their full dimension:
             @timeit "OpticalProps" layer_opt = 
                 expandOpticalProperties(layer_opt_props[iz], arr_type)
+            #@show size(layer_opt.Z⁺⁺[:,:,1]), size(RS_type.Z⁺⁺_λ₁λ₀)
+            #@show typeof(layer_opt.Z⁺⁺[:,:,1]), typeof(RS_type.Z⁺⁺_λ₁λ₀)
+            #aa = Array(layer_opt.Z⁺⁺[:,:,1]) #Array(RS_type.ϖ_Cabannes[1]*layer_opt.Z⁺⁺[:,:,1]) .+ (sum(RS_type.ϖ_λ₁λ₀)*RS_type.Z⁺⁺_λ₁λ₀)
+            #bb = Array(layer_opt.Z⁻⁺[:,:,1]) #Array(RS_type.ϖ_Cabannes[1]*layer_opt.Z⁻⁺[:,:,1]) .+ (sum(RS_type.ϖ_λ₁λ₀)*RS_type.Z⁻⁺_λ₁λ₀)
+            
+            #aa = Array((RS_type.ϖ_Cabannes[1]*layer_opt.Z⁺⁺[:,:,1]) .+ (sum(RS_type.ϖ_λ₁λ₀)*RS_type.Z⁺⁺_λ₁λ₀))[1,:]
+            #=
+            for ia=1:NquadN
+                for ib=1:NquadN
+                    @show ia, ib, aa[ia, ib]
+                end
+            end
+            
+            for ia=1:NquadN
+                for ib=1:NquadN
+                    @show ia, ib, bb[ia, ib]
+                end
+            end
+            bbb
+            =#
 
             # Perform Core RT (doubling/elemental/interaction)
             rt_kernel!(RS_type, pol_type, SFI, 
@@ -419,8 +457,10 @@ function rt_run_ss(RS_type::AbstractRamanType,
 
     # Also to be changed!!
     brdf = model.params.brdf[iBand[1]]
-    @unpack ϖ_Cabannes, F₀ = RS_type
-
+    @unpack F₀ = RS_type
+    if (typeof(RS_type)<:Union{RRS,RRS_plus})
+        RS_type.ϖ_λ₁λ₀ *=  (1. - model.ϖ_Cabannes[iBand[1]])/sum(RS_type.ϖ_λ₁λ₀) 
+    end   
 
     FT = eltype(sza)                    # Get the float-type to use
     Nz = length(model.profile.p_full)   # Number of vertical slices

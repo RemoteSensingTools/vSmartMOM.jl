@@ -18,7 +18,7 @@ using DelimitedFiles
 # Load YAML files into parameter struct
 parameters = 
     parameters_from_yaml("test/test_parameters/FraunhoferMockParameters.yaml");
-parameters.depol = 0.028 #(0.028: Cabannes), (0.1032: Rayleigh) 
+#parameters.depol = 0.041362343961163395 #0.028 #(0.028: Cabannes), (0.1032: Rayleigh) 
     #parameters = parameters_from_yaml("test/test_parameters/O2Parameters2.yaml");
 # Create model struct (precomputes optical properties) from parameters
 model      = model_from_parameters(parameters);
@@ -29,12 +29,13 @@ FT = Float64
 #### Compute all Raman properties
 ν = model.params.spec_bands[iBand]
 ν̃ = mean(ν);
+
 # Find central reference index for RRS:
 i_ref = argmin(abs.(ν .- ν̃))
 # TODO_VS: λ_vs_in (get input)
 # TODO_VS: ν_vs_in (convert to wavenumbers)
 # Effective temperature for Raman calculations
-effT = (model.profile.vcd_dry' * model.profile.T) / sum(model.profile.vcd_dry);
+effT = 300.  #(model.profile.vcd_dry' * model.profile.T) / sum(model.profile.vcd_dry);
 # Define RS type
 # Compute N2 and O2
 
@@ -72,7 +73,11 @@ for i=1:length(P)
     F₀[i] = sol_trans * P[i];
     RS_type.F₀[1,i] = 1.0 #F₀[i];
 end 
+#=
+RS_type.F₀ = zeros(model.params.polarization_type.n, length(ν))
+RS_type.F₀[1,:].=1.
 
+=#
 #RnoRS_ms, TnoRS_ms, _, _ = CoreRT.rt_run_test_ms(noRS([0.0],[1.0], Any[],[1]),[0,3],model,iBand);
 #RnoRS_test, TnoRS_test, _, _ = CoreRT.rt_run_test_ms(noRS,[0,3],model,iBand);
 #RnoRS, TnoRS, _, _ = CoreRT.rt_run_test(noRS([0.0],[1.0], Any[],[1]),model,iBand);
@@ -98,11 +103,11 @@ for i=1:length(P)
     #F₀[i] = sol_trans * P[i];
     RS_type.F₀[1,i] = 1.0; #F₀[i];
 end 
-parameters = 
-    parameters_from_yaml("test/test_parameters/FraunhoferMockParameters.yaml");
+#parameters = 
+#    parameters_from_yaml("test/test_parameters/FraunhoferMockParameters.yaml");
 
-parameters.depol = 0.1032 #(0.028: Cabannes), (0.1032: Rayleigh) 
-model      = model_from_parameters(parameters);
+#parameters.depol = 0.041362343961163395 #0.1032 #(0.028: Cabannes), (0.1032: Rayleigh) 
+#model      = model_from_parameters(parameters);
 
 RnoRS, TnoRS, _, _ = CoreRT.rt_run_test(RS_type,model,iBand);
 RnoRS_ss, TnoRS_ss, _, _ = CoreRT.rt_run_test_ss(RS_type,model,iBand);

@@ -55,11 +55,25 @@ function doubling_helper!(RS_type::RRS,
         if SFI
             # J⁺₂₁(λ) = J⁺₁₀(λ).exp(-τ(λ)/μ₀)
             @views J₁⁺[:,1,:] = J₀⁺[:,1,:] .* expk'
-            @views ieJ₁⁺[:,1,:,:] = ieJ₀⁺[:,1,:,:] .* expk'
-
             # J⁻₁₂(λ)  = J⁻₀₁(λ).exp(-τ(λ)/μ₀)
             @views J₁⁻[:,1,:] = J₀⁻[:,1,:] .* expk'
-            @views ieJ₁⁻[:,1,:,:] = ieJ₀⁻[:,1,:,:] .* expk'
+            #@show  size(expk)
+            
+            for Δn=1:nRaman
+               # @show size(i_λ₁λ₀[1])
+                n₀, n₁ = get_n₀_n₁(ieJ₁⁺,i_λ₁λ₀[Δn])
+               # @show size(n₁), size(n₀), size(expk[n₀])
+              #  @show  size(ieJ₁⁺), size(expk), nRaman
+                #@show ieJ₀⁺[:,1,n₁,Δn]
+                #@show size(ieJ₀⁺[:,1,n₁,Δn]), size(expk[n₀]), size(ieJ₁⁺) 
+                @views ieJ₁⁺[:,1,n₁,Δn] .= ieJ₀⁺[:,1,n₁,Δn] .* (expk[n₀])'            
+                @views ieJ₁⁻[:,1,n₁,Δn] .= ieJ₀⁻[:,1,n₁,Δn] .* (expk[n₀])'   
+                #@show  n, ieJ₀⁺[1:pol_type.n:length(J₀⁻[:,1,1]),1,963,Δn]
+                #@show  n, ieJ₁⁺[1:pol_type.n:length(J₁⁻[:,1,1]),1,963,Δn]
+            end
+        #@show  n, J₁⁺[1:pol_type.n:length(J₁⁻[:,1,1]),1,963]
+        ##@show  n, sum(ieJ₀⁺[1:pol_type.n:length(J₀⁻[:,1,1]),1,963,:], dims=2)
+        #@show  n, sum(ieJ₁⁺[1:pol_type.n:length(J₁⁻[:,1,1]),1,963,:], dims=2)
             #@show size(ieJ₁⁺)
             @timeit "precomp" tmp1 = gp_refl ⊠  (J₀⁺ + r⁻⁺ ⊠ J₁⁻)
             @timeit "precomp" tmp2 = gp_refl ⊠  (J₁⁻ + r⁻⁺ ⊠ J₀⁺)
@@ -127,7 +141,18 @@ function doubling_helper!(RS_type::RRS,
         # T⁺⁺₂₀(λ) = T⁺⁺₂₁(λ)[I - R⁺⁻₀₁(λ)R⁻⁺₂₁(λ)]⁻¹T⁺⁺₁₀(λ) (see Eqs.8 in Raman paper draft)
         t⁺⁺[:]  = tt⁺⁺_gp_refl ⊠ t⁺⁺
     end
-
+    #if m<3
+    #=   
+    for ctr=1:pol_type.n:15  #length(qp_μN)
+            for ctr2=1:pol_type.n:15  #length(qp_μN)
+        @show ctr, ctr2, sum(ieJ₀⁺[ctr,ctr2,963,:])
+        @show ctr, ctr2, sum(ieJ₀⁻[ctr,ctr2,963,:])
+        @show ctr, ctr2, sum(iet⁺⁺[ctr,ctr2,963,:])
+        @show ctr, ctr2, sum(ier⁻⁺[ctr,ctr2,963,:])
+        end
+        end
+        =#
+    #    end
     # After doubling, revert D(DR)->R, where D = Diagonal{1,1,-1,-1}
     # For SFI, after doubling, revert D(DJ₀⁻)->J₀⁻
 

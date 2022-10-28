@@ -90,8 +90,8 @@ function elemental_inelastic!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
         #println("Apply D matrix SFI done")      
     else 
         # Note: τ is not defined here
-        iet⁺⁺[:] = Diagonal{exp(-τ ./ qp_μN)}
-        iet⁻⁻[:] = Diagonal{exp(-τ ./ qp_μN)}
+        iet⁺⁺[:] = 0. #Diagonal{exp(-τ ./ qp_μN)}
+        iet⁻⁻[:] = 0. #Diagonal{exp(-τ ./ qp_μN)}
     end    
     #@pack! added_layer = r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, J₀⁺, J₀⁻   
 end
@@ -217,7 +217,7 @@ function get_elem_rt!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
     event = kernel!(aType(fscattRayl), 
         aType(ϖ_λ₁λ₀), aType(i_λ₁λ₀), 
         ier⁻⁺, iet⁺⁺, 
-        dτ, #ϖ, 
+        dτ, ϖ, 
         aType(Z⁻⁺_λ₁λ₀), aType(Z⁺⁺_λ₁λ₀), 
         qp_μN, wct2, 
         ndrange=getKernelDim(RS_type,ier⁻⁺,i_λ₁λ₀)); 
@@ -237,7 +237,7 @@ function get_elem_rt!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
     event = kernel!(fscattRayl, 
         aType(ϖ_λ₁λ₀_VS_n2), aType(i_λ₁λ₀_VS_n2),
         t_ier⁻⁺, t_iet⁺⁺, 
-        dτ, #ϖ, 
+        dτ, ϖ, 
         aType(Z⁻⁺_λ₁λ₀_VS_n2), aType(Z⁺⁺_λ₁λ₀_VS_n2), 
         qp_μN, wct2, 
         ndrange=getKernelDim(RS_type,ier⁻⁺,i_λ₁λ₀_VS_n2)); 
@@ -257,7 +257,7 @@ function get_elem_rt!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
     event = kernel!(aType(fscattRayl), 
         aType(ϖ_λ₁λ₀_VS_o2), aType(i_λ₁λ₀_VS_o2),
         t_ier⁻⁺, t_iet⁺⁺, 
-        dτ, #ϖ, 
+        dτ, ϖ, 
         aType(Z⁻⁺_λ₁λ₀_VS_o2), aType(Z⁺⁺_λ₁λ₀_VS_o2),
         qp_μN, wct2, 
         ndrange=getKernelDim(RS_type,ier⁻⁺, i_λ₁λ₀_VS_o2)); 
@@ -278,7 +278,7 @@ end
                             #ϖ_λ₁λ₀_VS_n2, i_λ₁λ₀_VS_n2, 
                             #ϖ_λ₁λ₀_VS_o2, i_λ₁λ₀_VS_o2, 
                             ier⁻⁺, iet⁺⁺, 
-                            dτ, 
+                            dτ, ϖ,
                             Z⁻⁺_λ₁λ₀, Z⁺⁺_λ₁λ₀, 
                             #Z⁻⁺_λ₁λ₀_VS_n2, Z⁺⁺_λ₁λ₀_VS_n2, 
                             #Z⁻⁺_λ₁λ₀_VS_o2, Z⁺⁺_λ₁λ₀_VS_o2, 
@@ -307,7 +307,7 @@ end
             #    @show ϖ_λ₁λ₀[Δn], fscattRayl[n₀], Z⁻⁺_λ₁λ₀[i,j], ϖ_λ₁λ₀[Δn] * fscattRayl[n₀] * Z⁻⁺_λ₁λ₀[i,j]
             #end
             ier⁻⁺[i,j,n₁,1] += 
-                    ϖ_λ₁λ₀[Δn] * fscattRayl[n₀] * Z⁻⁺_λ₁λ₀[i,j] * 
+                    ϖ_λ₁λ₀[Δn] * ϖ[n₀] * fscattRayl[n₀] * Z⁻⁺_λ₁λ₀[i,j] * 
                     (1/( (qp_μN[i] / qp_μN[j]) + (dτ[n₁]/dτ[n₀]) )) * 
                     (1 - exp(-((dτ[n₁] / qp_μN[i]) + (dτ[n₀] / qp_μN[j])))) * wct2[j] 
             
@@ -317,13 +317,13 @@ end
                 if i == j       
                     if abs(dτ[n₀]-dτ[n₁])>1.e-6
                         iet⁺⁺[i,j,n₁,1] += 
-                            ϖ_λ₁λ₀[Δn] * fscattRayl[n₀] * Z⁺⁺_λ₁λ₀[i,i] * wct2[i] *
+                            ϖ_λ₁λ₀[Δn] * ϖ[n₀] * fscattRayl[n₀] * Z⁺⁺_λ₁λ₀[i,i] * wct2[i] *
                             (exp(-dτ[n₁] / qp_μN[i]) - exp(-dτ[n₀] / qp_μN[i]))/
                             (1 - (dτ[n₁]/dτ[n₀]))  
                     else    
                         iet⁺⁺[i,j,n₁,1] += 
-                            dτ[n₀] * ϖ_λ₁λ₀[Δn] * fscattRayl[n₀] * Z⁺⁺_λ₁λ₀[i,i] * wct2[i] *
-                            exp(-dτ[n₀] / qp_μN[j])   
+                            (dτ[n₀] / qp_μN[i]) * ϖ_λ₁λ₀[Δn] * fscattRayl[n₀] * Z⁺⁺_λ₁λ₀[i,i] * wct2[i] *
+                            exp(-dτ[n₀] / qp_μN[i])   
                     end
                 else
                     iet⁺⁺[i,j,n₁,1] += 0.0
@@ -333,7 +333,7 @@ end
                 # 𝐓⁺⁺(μᵢ, μⱼ) = ϖ ̇𝐙⁺⁺(μᵢ, μⱼ) ̇(μⱼ/(μᵢ-μⱼ)) ̇(exp{-τ/μᵢ} - exp{-τ/μⱼ}) ̇𝑤ⱼ
                 # (𝑖 ≠ 𝑗)
                 iet⁺⁺[i,j,n₁,1] += 
-                        ϖ_λ₁λ₀[Δn] * fscattRayl[n₀] * Z⁺⁺_λ₁λ₀[i,j] * 
+                        ϖ_λ₁λ₀[Δn] * ϖ[n₀] * fscattRayl[n₀] * Z⁺⁺_λ₁λ₀[i,j] * 
                         (1 / ( (qp_μN[i]/qp_μN[j]) - (dτ[n₁]/dτ[n₀]) )) * 
                         wct2[j] * 
                         (exp(-dτ[n₁] / qp_μN[i]) - exp(-dτ[n₀] / qp_μN[j]))
@@ -373,7 +373,7 @@ function get_elem_rt_SFI!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
     event = kernel!(aType(fscattRayl), 
         aType(ϖ_λ₁λ₀), aType(i_λ₁λ₀), 
         ieJ₀⁺, ieJ₀⁻, 
-        τ_sum, dτ, 
+        τ_sum, dτ, ϖ, 
         aType(Z⁻⁺_λ₁λ₀), aType(Z⁺⁺_λ₁λ₀), aType(F₀),
         qp_μN, ndoubl, wct02, nStokes, 
         I₀, iμ0, D, 
@@ -390,7 +390,7 @@ function get_elem_rt_SFI!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
     event = kernel!(aType(fscattRayl), 
         aType(ϖ_λ₁λ₀_VS_n2), aType(i_λ₁λ₀_VS_n2), 
         t_ieJ₀⁺, t_ieJ₀⁻, 
-        τ_sum, dτ,
+        τ_sum, dτ, ϖ, 
         aType(Z⁻⁺_λ₁λ₀_VS_n2), aType(Z⁺⁺_λ₁λ₀_VS_n2), aType(F₀),
         qp_μN, ndoubl, wct02, nStokes, 
         I₀, iμ0, D, 
@@ -406,7 +406,7 @@ function get_elem_rt_SFI!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
     event = kernel!(fscattRayl, 
         aType(ϖ_λ₁λ₀_VS_o2), aType(i_λ₁λ₀_VS_o2), 
         t_ieJ₀⁺, t_ieJ₀⁻, 
-        τ_sum, dτ,
+        τ_sum, dτ, ϖ, 
         aType(Z⁻⁺_λ₁λ₀_VS_o2), aType(Z⁺⁺_λ₁λ₀_VS_o2), aType(F₀),
         qp_μN, ndoubl, wct02, nStokes, 
         I₀, iμ0, D, 
@@ -422,7 +422,7 @@ end
 @kernel function get_elem_rt_SFI_VS!(fscattRayl,
                             ϖ_λ₁λ₀, i_λ₁λ₀, 
                             ieJ₀⁺, ieJ₀⁻, 
-                            τ_sum, dτ, 
+                            τ_sum, dτ, ϖ, 
                             Z⁻⁺_λ₁λ₀, Z⁺⁺_λ₁λ₀, F₀,
                             qp_μN, ndoubl,
                             wct02, nStokes, 
@@ -457,26 +457,26 @@ end
             # J₀⁺ = 0.25*(1+δ(m,0)) * ϖ(λ) * Z⁺⁺ * I₀ * (dτ(λ)/μ₀) * exp(-dτ(λ)/μ₀)
             if abs(dτ[n₀]-dτ[n₁])>1.e-6
                 ieJ₀⁺[i, 1, n₁, 1] = 
-                        ϖ_λ₁λ₀[Δn] * fscattRayl[n₀] * Z⁺⁺_I₀ * wct02 *
+                        ϖ_λ₁λ₀[Δn] * ϖ[n₀] * fscattRayl[n₀] * Z⁺⁺_I₀ * wct02 *
                         (exp(-dτ[n₁] / qp_μN[i]) - exp(-dτ[n₀] / qp_μN[i])) /
-                        ((1-dτ[n₁]/dτ[n₀])) 
+                        (1-(dτ[n₁]/dτ[n₀])) 
                         
             else
                 ieJ₀⁺[i, 1, n₁, 1] = 
-                        dτ[n₀] *  wct02 * ϖ_λ₁λ₀[Δn] * fscattRayl[n₀] * Z⁺⁺_I₀ * 
+                        (dτ[n₀]/qp_μN[i_start]) *  wct02 * ϖ_λ₁λ₀[Δn] * ϖ[n₀] * fscattRayl[n₀] * Z⁺⁺_I₀ * 
                         exp(-dτ[n₀] / qp_μN[i_start])
             end
         else
             # J₀⁺ = 0.25*(1+δ(m,0)) * ϖ(λ) * Z⁺⁺ * I₀ * [μ₀ / (μᵢ - μ₀)] * [exp(-dτ(λ)/μᵢ) - exp(-dτ(λ)/μ₀)]
             ieJ₀⁺[i, 1, n₁, 1] = 
-                        wct02 * ϖ_λ₁λ₀[Δn] * fscattRayl[n₀] * Z⁺⁺_I₀ * 
+                        wct02 * ϖ_λ₁λ₀[Δn] * ϖ[n₀] * fscattRayl[n₀] * Z⁺⁺_I₀ * 
                         (1 /( (qp_μN[i]/qp_μN[i_start]) - (dτ[n₁]/dτ[n₀]) ) ) * 
                         (exp(-dτ[n₁] / qp_μN[i]) - exp(-dτ[n₀] / qp_μN[i_start]))  
         end
         #TODO
         #J₀⁻ = 0.25*(1+δ(m,0)) * ϖ(λ) * Z⁻⁺ * I₀ * [μ₀ / (μᵢ + μ₀)] * [1 - exp{-dτ(λ)(1/μᵢ + 1/μ₀)}]                    
         ieJ₀⁻[i, 1, n₁, 1] = 
-                    wct02 * ϖ_λ₁λ₀[Δn] * fscattRayl[n₀] * Z⁻⁺_I₀ * 
+                    wct02 * ϖ_λ₁λ₀[Δn] * ϖ[n₀] * fscattRayl[n₀] * Z⁻⁺_I₀ * 
                     (1/( (qp_μN[i] / qp_μN[i_start]) + (dτ[n₁]/dτ[n₀]) )) *
                     (1 - exp(-( (dτ[n₁] / qp_μN[i]) + (dτ[n₀] / qp_μN[i_start]) ) ))  
 
@@ -505,7 +505,7 @@ function get_elem_rt_SFI!(RS_type::RRS_plus,
     #@show typeof(ieJ₀⁺), typeof(τ_sum), typeof(dτ_λ),typeof(wct02), typeof(qp_μN), typeof(dτ_λ) 
     event = kernel!(aType(fscattRayl), aType(ϖ_λ₁λ₀), aType(i_λ₁λ₀), 
                 i_ref, ieJ₀⁺, ieJ₀⁻, 
-                τ_sum, dτ_λ, 
+                τ_sum, dτ_λ, ϖ_λ, 
                 aType(Z⁻⁺_λ₁λ₀), aType(Z⁺⁺_λ₁λ₀), aType(F₀),
                 qp_μN, ndoubl, wct02, nStokes, 
                 I₀, iμ0, D, 

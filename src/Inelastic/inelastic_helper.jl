@@ -47,7 +47,7 @@ end
 
 function compute_ϖ_Cabannes(
             RS_type::Union{RRS, VS_0to1, VS_1to0, RRS_plus, VS_0to1_plus, VS_1to0_plus}, 
-            depol, λ₀, n2, o2)
+            depol, λ₀)
     ν₀ = 1e7/λ₀;
 
     
@@ -57,14 +57,80 @@ function compute_ϖ_Cabannes(
     return ϖ_Cabannes;
 end
 
-function compute_ϖ_Cabannes_(
+function compute_ϖ_Cabannes(
             RS_type::Union{RRS, VS_0to1, VS_1to0, RRS_plus, VS_0to1_plus, VS_1to0_plus}, 
-            depol, λ₀, n2, o2)
+            λ₀)
+    ν₀ = 1e7/λ₀;
+
+    σ_elastic =  RS_type.n2.vmr * RS_type.n2.effCoeff.σ_Rayl_coeff + 
+                RS_type.o2.vmr * RS_type.o2.effCoeff.σ_Rayl_coeff 
+    σ_elastic *= ν₀^4
+    
+    σ_RRS =  RS_type.n2.vmr * 
+            ((ν₀.+RS_type.n2.effCoeff.Δν̃_RoRaman_coeff_JtoJp2).^4)' *
+            RS_type.n2.effCoeff.σ_RoRaman_coeff_JtoJp2
+    σ_RRS += RS_type.n2.vmr * 
+            ((ν₀.+RS_type.n2.effCoeff.Δν̃_RoRaman_coeff_JtoJm2).^4)' * 
+            RS_type.n2.effCoeff.σ_RoRaman_coeff_JtoJm2
+
+    σ_RRS += RS_type.o2.vmr * 
+            ((ν₀.+RS_type.n2.effCoeff.Δν̃_RoRaman_coeff_JtoJp2).^4)' * 
+            RS_type.n2.effCoeff.σ_RoRaman_coeff_JtoJp2
+    σ_RRS += RS_type.o2.vmr * 
+            ((ν₀.+RS_type.n2.effCoeff.Δν̃_RoRaman_coeff_JtoJm2).^4)' * 
+            RS_type.n2.effCoeff.σ_RoRaman_coeff_JtoJm2
+
+    σ_RVRS =  RS_type.n2.vmr * 
+            ((ν₀.+RS_type.n2.effCoeff.Δν̃_RoVibRaman_coeff_0to1_JtoJp2).^4)' * 
+            RS_type.n2.effCoeff.σ_RoVibRaman_coeff_0to1_JtoJp2
+    σ_RVRS += RS_type.n2.vmr * 
+            ((ν₀.+RS_type.n2.effCoeff.Δν̃_RoVibRaman_coeff_0to1_JtoJm2).^4)' * 
+            RS_type.n2.effCoeff.σ_RoVibRaman_coeff_0to1_JtoJm2
+    σ_RVRS += RS_type.n2.vmr * 
+            ((ν₀.+RS_type.n2.effCoeff.Δν̃_RoVibRaman_coeff_1to0_JtoJp2).^4)' * 
+            RS_type.n2.effCoeff.σ_RoVibRaman_coeff_1to0_JtoJp2
+    σ_RVRS += RS_type.n2.vmr * 
+            ((ν₀.+RS_type.n2.effCoeff.Δν̃_RoVibRaman_coeff_1to0_JtoJm2).^4)' * 
+            RS_type.n2.effCoeff.σ_RoVibRaman_coeff_1to0_JtoJm2
+    
+    σ_RVRS += RS_type.o2.vmr * 
+            ((ν₀.+RS_type.o2.effCoeff.Δν̃_RoVibRaman_coeff_0to1_JtoJp2).^4)' * 
+            RS_type.o2.effCoeff.σ_RoVibRaman_coeff_0to1_JtoJp2
+    σ_RVRS += RS_type.o2.vmr * 
+            ((ν₀.+RS_type.o2.effCoeff.Δν̃_RoVibRaman_coeff_0to1_JtoJm2).^4)' * 
+            RS_type.o2.effCoeff.σ_RoVibRaman_coeff_0to1_JtoJm2
+    σ_RVRS += RS_type.o2.vmr * 
+            ((ν₀.+RS_type.o2.effCoeff.Δν̃_RoVibRaman_coeff_1to0_JtoJp2).^4)' * 
+            RS_type.o2.effCoeff.σ_RoVibRaman_coeff_1to0_JtoJp2
+    σ_RVRS += RS_type.o2.vmr * 
+            ((ν₀.+RS_type.o2.effCoeff.Δν̃_RoVibRaman_coeff_1to0_JtoJm2).^4)' * 
+            RS_type.o2.effCoeff.σ_RoVibRaman_coeff_1to0_JtoJm2
+
+    σ_VRS =  RS_type.n2.vmr * 
+            ((ν₀.+RS_type.n2.effCoeff.Δν̃_VibRaman_coeff_0to1_hires).^4)' * 
+            RS_type.n2.effCoeff.σ_VibRaman_coeff_0to1_hires
+    σ_VRS += RS_type.n2.vmr * 
+            ((ν₀.+RS_type.n2.effCoeff.Δν̃_VibRaman_coeff_1to0_hires).^4)' * 
+            RS_type.n2.effCoeff.σ_VibRaman_coeff_1to0_hires
+    σ_VRS += RS_type.o2.vmr * 
+            ((ν₀.+RS_type.o2.effCoeff.Δν̃_VibRaman_coeff_0to1_hires).^4)' * 
+            RS_type.o2.effCoeff.σ_VibRaman_coeff_0to1_hires
+    σ_VRS += RS_type.o2.vmr * 
+            ((ν₀.+RS_type.o2.effCoeff.Δν̃_VibRaman_coeff_1to0_hires).^4)' * 
+            RS_type.o2.effCoeff.σ_VibRaman_coeff_1to0_hires    
+
+    #RS_type.ϖ_Cabannes = σ_elastic/(σ_VRS+σ_RVRS+σ_RRS+σ_elastic);
+    ϖ_Cabannes = σ_elastic/(σ_VRS+σ_RVRS+σ_RRS+σ_elastic);
+    #ϖ_Cabannes = σ_elastic/(σ_RRS+σ_elastic);
+    return ϖ_Cabannes;
+end
+
+function compute_ϖ_Cabannes(λ₀, n2, o2)
     ν₀ = 1e7/λ₀;
 
     σ_elastic =  n2.vmr * n2.effCoeff.σ_Rayl_coeff + o2.vmr * o2.effCoeff.σ_Rayl_coeff 
     σ_elastic *= ν₀^4
-    
+
     σ_RRS =  n2.vmr * ((ν₀.+n2.effCoeff.Δν̃_RoRaman_coeff_JtoJp2).^4)' * n2.effCoeff.σ_RoRaman_coeff_JtoJp2
     σ_RRS += n2.vmr * ((ν₀.+n2.effCoeff.Δν̃_RoRaman_coeff_JtoJm2).^4)' * n2.effCoeff.σ_RoRaman_coeff_JtoJm2
 
@@ -89,6 +155,70 @@ function compute_ϖ_Cabannes_(
     ϖ_Cabannes = σ_elastic/(σ_VRS+σ_RVRS+σ_RRS+σ_elastic);
     #ϖ_Cabannes = σ_elastic/(σ_RRS+σ_elastic);
     return ϖ_Cabannes;
+end
+
+function compute_γ_air_Cabannes!(RS_type::Union{RRS, VS_0to1, VS_1to0, RRS_plus, VS_0to1_plus, VS_1to0_plus})
+                            
+    nN = RS_type.n2.vmr*RS_type.n2.effCoeff.σ_Rayl_coeff*
+        ((RS_type.n2.effCoeff.γ_C_Rayl)/
+            (1+2*RS_type.n2.effCoeff.γ_C_Rayl))
+    nD = RS_type.n2.vmr*RS_type.n2.effCoeff.σ_Rayl_coeff*
+        ((3-4*RS_type.n2.effCoeff.γ_C_Rayl)/
+            (1+2*RS_type.n2.effCoeff.γ_C_Rayl))
+
+    oN = RS_type.o2.vmr*RS_type.o2.effCoeff.σ_Rayl_coeff*
+        ((RS_type.o2.effCoeff.γ_C_Rayl)/
+            (1+2*RS_type.o2.effCoeff.γ_C_Rayl))
+    oD = RS_type.o2.vmr*RS_type.o2.effCoeff.σ_Rayl_coeff*
+        ((3-4*RS_type.o2.effCoeff.γ_C_Rayl)/
+            (1+2*RS_type.o2.effCoeff.γ_C_Rayl))
+
+    x = (nN + oN)/(nD + oD)
+    γ_air_Cabannes =  3x/(1+4x)  
+    
+    return γ_air_Cabannes;
+end
+
+function compute_γ_air_Cabannes!(
+                        n2, o2)
+    
+    #ν̃ =  1e7/λ₀
+    #effT  =  300.; #K assumed constant for Earth atmospheres
+    #n2,o2 = InelasticScattering.getRamanAtmoConstants(ν̃,effT);
+    
+    nN = n2.vmr*n2.effCoeff.σ_Rayl_coeff*
+    ((n2.effCoeff.γ_C_Rayl)/
+    (1+2*n2.effCoeff.γ_C_Rayl))
+    nD = n2.vmr*n2.effCoeff.σ_Rayl_coeff*
+    ((3-4*n2.effCoeff.γ_C_Rayl)/
+    (1+2*n2.effCoeff.γ_C_Rayl))
+
+    oN = o2.vmr*o2.effCoeff.σ_Rayl_coeff*
+    ((o2.effCoeff.γ_C_Rayl)/
+    (1+2*o2.effCoeff.γ_C_Rayl))
+    oD = o2.vmr*o2.effCoeff.σ_Rayl_coeff*
+    ((3-4*o2.effCoeff.γ_C_Rayl)/
+    (1+2*o2.effCoeff.γ_C_Rayl))
+
+    x = (nN + oN)/(nD + oD)
+    γ_air_Cabannes =  3x/(1+4x)  
+
+return γ_air_Cabannes;
+end
+
+function compute_γ_air_Rayleigh!(λ₀::FT) where FT
+    ν̃ =  1.e7/λ₀
+    effT  =  300.; #K assumed constant for Earth atmospheres
+
+    n2,o2 = InelasticScattering.getRamanAtmoConstants(ν̃,effT);
+    #greek_raman = get_greek_raman(RS_type, n2, o2);
+    ϖ_Cabannes = compute_ϖ_Cabannes(λ₀, n2, o2)
+    γ_air_Cabannes = compute_γ_air_Cabannes!(n2, o2)
+
+    tmp = (1/ϖ_Cabannes)*((1+2γ_air_Cabannes)/(3-4γ_air_Cabannes))
+    γ_air_Rayleigh = 0.5*((3*tmp-1)/(2*tmp+1))
+
+    return ϖ_Cabannes, γ_air_Cabannes, γ_air_Rayleigh
 end
 
 # Note: ν stands for wavenumber in the following (NOT frequency)
