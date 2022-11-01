@@ -45,9 +45,9 @@ WignerSymbols = "9f57e263-0b3d-5e2e-b1be-24f2bb48858b"
 YAML = "ddb6d928-2868-570f-bddf-ab3f9cf99eb6"
 
 [compat]
-CanopyOptics = "0.1"
 CUDA = "3"
 CUDAKernels = "0.3, 0.4"
+CanopyOptics = "0.1"
 DataInterpolations = "3"
 DiffResults = "1.0, 1.1"
 Distributions = "0.24, 0.25"

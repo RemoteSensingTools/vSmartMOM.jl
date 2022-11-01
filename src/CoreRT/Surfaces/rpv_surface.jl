@@ -32,9 +32,9 @@ function create_surface_layer!(brdf::AbstractSurfaceType,
     tmp    = ones(pol_type.n*Nquad)
     arr_type = array_type(architecture)
     T_surf = arr_type(Diagonal(tmp))
-    
+    #@show "Creating surface layer"
     # Albedo normalized by π (and factor 2 for 0th Fourier Moment)
-    @show brdf
+    #@show brdf
     if m==0
         @time ρ = 2*vSmartMOM.CoreRT.reflectance(brdf, pol_type, Array(qp_μ), m)
     else
@@ -100,17 +100,34 @@ function reflectance(rpv::rpvSurfaceScalar{FT}, μ::Array{FT}, m::Int) where FT
 end
 
 
-
+# TODO: We need to add the weights for m=1 and m>0 here as well!
 function reflectance(brdf::AbstractSurfaceType, pol_type, μ::AbstractArray{FT}, m::Int) where FT
+    # Hardcoded nQuad for now, needs to go into brdf in the future!
+    nQuad = 100
+
     ty = array_type(architecture(μ))
     # Size of Matrix
     nn = length(μ) * pol_type.n
     Rsurf = ty(zeros(FT,nn,nn)) 
+    ff = m==0 ? FT(1.0) : FT(2.0)
+    #@show ff
     for n = 1:pol_type.n
         f(x) = reflectance.((brdf,),n, μ, μ', x) * cos(m*x)
-        Rsurf[n:pol_type.n:end,n:pol_type.n:end] .= quadgk(f, 0, π, rtol=1e-4)[1] / π
+        ϕ,w  = CanopyOptics.gauleg(nQuad,   FT(0),  FT(π));
+        # more clumsy now with quadrature:
+        # TODO clean this up a bit
+        b = f.(ϕ)
+        c = similar(Rsurf[n:pol_type.n:end,n:pol_type.n:end]) * FT(0)
+        for i in eachindex(b)
+            c += w[i] * b[i]
+        end
+
+        #@show size(c), size(b[1]),  size(reflectance.((brdf,),n, μ, μ', 1.0))
+        Rsurf[n:pol_type.n:end,n:pol_type.n:end] .= c/π
+        # use quadgk before, was a bit slow 
+        # quadgk(f, 0, π, rtol=1e-4)[1] / π
     end
-    return Rsurf
+    return ff * Rsurf
 end
 
 
