@@ -48,7 +48,7 @@ Base.@kwdef struct VS_0to1{FT<:AbstractFloat} <: AbstractRamanType
     greek_raman::GreekCoefs
     "Pre-computed optical properties"
     #ramanAtmoProp::RamanAtmosphereProperties
-    fscattRayl::FT
+    fscattRayl#::FT
     ϖ_Cabannes::FT #elastic fraction (Cabannes) of Rayleigh (Cabannes+Raman) scattering
     ϖ_λ₁λ₀::Array{FT,1}
     i_λ₁λ₀::Array{Int,1}
@@ -75,7 +75,7 @@ Base.@kwdef struct VS_1to0{FT<:AbstractFloat} <: AbstractRamanType
     "Greek coefs in Raman calculations" 
     greek_raman::GreekCoefs
     "Pre-computed optical properties"
-    fscattRayl::FT
+    fscattRayl#::FT
     ϖ_Cabannes::FT #elastic fraction (Cabannes) of Rayleigh (Cabannes+Raman) scattering
     ϖ_λ₁λ₀::Array{FT,1}
     i_λ₁λ₀::Array{Int,1}
@@ -151,7 +151,7 @@ Base.@kwdef mutable struct RRS_plus{FT<:AbstractFloat} <: AbstractRamanType
     "Pre-computed optical properties"
     # ramanAtmoProp::RamanAtmosphereProperties
     #values for each band
-    fscattRayl::Array{FT,1}
+    fscattRayl#::Array{FT,1}
     ϖ_Cabannes::Array{FT,1} #elastic fraction (Cabannes) of Rayleigh (Cabannes+Raman) scattering
     
     ϖ_λ₁λ₀::Array{FT,2} #last index represents the band iB

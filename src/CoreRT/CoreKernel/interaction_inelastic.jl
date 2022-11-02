@@ -240,7 +240,18 @@ function interaction_helper!(RS_type::RRS, ::ScatteringInterface_11, SFI,
     
     # Used to store `(I - R⁺⁻ * r⁻⁺)⁻¹`
     tmp_inv = similar(t⁺⁺)
-
+    tmpieJ₀⁻ = similar(ieJ₀⁻)
+    tmpieJ₀⁺ = similar(ieJ₀⁺)
+    tmpieR⁻⁺ = similar(ieR⁻⁺)
+    tmpieR⁺⁻ = similar(ieR⁺⁻)
+    tmpieT⁻⁻ = similar(ieT⁻⁻)
+    tmpieT⁺⁺ = similar(ieT⁺⁺)
+    tmpJ₀⁻ = similar(J₀⁻)
+    tmpJ₀⁺ = similar(J₀⁺)
+    tmpR⁻⁺ = similar(R⁻⁺)
+    tmpR⁺⁻ = similar(R⁺⁻)
+    tmpT⁻⁻ = similar(T⁻⁻)
+    tmpT⁺⁺ = similar(T⁺⁺)
     # Compute and store `(I - R⁺⁻ * r⁻⁺)⁻¹`
     @timeit "interaction inv1" batch_inv!(tmp_inv, I_static .- r⁻⁺ ⊠ R⁺⁻) #Suniti
     # Temporary arrays:
@@ -249,7 +260,7 @@ function interaction_helper!(RS_type::RRS, ::ScatteringInterface_11, SFI,
     if SFI
         for Δn = 1:size(ieJ₀⁺,4)
             n₀, n₁ = get_n₀_n₁(ieJ₀⁺,i_λ₁λ₀[Δn])
-            @inbounds @views composite_layer.ieJ₀⁻[:,:,n₁,Δn] = 
+            @inbounds @views tmpieJ₀⁻[:,:,n₁,Δn] = 
                     ieJ₀⁻[:,:,n₁,Δn] + 
                     T01_inv[:,:,n₁] ⊠ 
                     (ier⁻⁺[:,:,n₁,Δn] ⊠ J₀⁺[:,:,n₀] + 
@@ -263,18 +274,18 @@ function interaction_helper!(RS_type::RRS, ::ScatteringInterface_11, SFI,
                     (added_layer.J₀⁻[:,:,n₀] + r⁻⁺[:,:,n₀] ⊠ J₀⁺[:,:,n₀]);
         end
         #J₀₂⁻ = J₀₁⁻ + T₀₁(1-R₂₁R₀₁)⁻¹(R₂₁J₁₀⁺+J₁₂⁻)
-        composite_layer.J₀⁻[:] = J₀⁻ .+ T01_inv ⊠ (r⁻⁺ ⊠ J₀⁺ .+ added_layer.J₀⁻) 
+        tmpJ₀⁻[:] = J₀⁻ .+ T01_inv ⊠ (r⁻⁺ ⊠ J₀⁺ .+ added_layer.J₀⁻) 
     end 
     for Δn = 1:size(ier⁻⁺,4)
         n₀, n₁ = get_n₀_n₁(ier⁻⁺,i_λ₁λ₀[Δn])
-        @inbounds @views composite_layer.ieR⁻⁺[:,:,n₁,Δn] = ieR⁻⁺[:,:,n₁,Δn] +
+        @inbounds @views tmpieR⁻⁺[:,:,n₁,Δn] = ieR⁻⁺[:,:,n₁,Δn] +
             T01_inv[:,:,n₁] ⊠   
             (ier⁻⁺[:,:,n₁,Δn] ⊠ T⁺⁺[:,:,n₀] + r⁻⁺[:,:,n₁] ⊠ ieT⁺⁺[:,:,n₁,Δn]) +    
             (T01_inv[:,:,n₁] ⊠ 
             (ier⁻⁺[:,:,n₁,Δn] ⊠ R⁺⁻[:,:,n₀] + r⁻⁺[:,:,n₁] ⊠ ieR⁺⁻[:,:,n₁,Δn]) + 
             ieT⁻⁻[:,:,n₁,Δn]) ⊠ 
             tmp_inv[:,:,n₀] ⊠ r⁻⁺[:,:,n₀] ⊠ T⁺⁺[:,:,n₀]
-        @inbounds @views composite_layer.ieT⁻⁻[:,:,n₁,Δn] = 
+        @inbounds @views tmpieT⁻⁻[:,:,n₁,Δn] = 
             T01_inv[:,:,n₁] ⊠ iet⁻⁻[:,:,n₁,Δn] +  
             (T01_inv[:,:,n₁] ⊠ 
             (ier⁻⁺[:,:,n₁,Δn] ⊠ R⁺⁻[:,:,n₀] + r⁻⁺[:,:,n₁] ⊠ ieR⁺⁻[:,:,n₁,Δn]) +
@@ -283,9 +294,9 @@ function interaction_helper!(RS_type::RRS, ::ScatteringInterface_11, SFI,
     end
     
     # R₂₀ = R₁₀ + T₀₁(I-R₂₁R₀₁)⁻¹ R₂₁T₁₀ 
-    composite_layer.R⁻⁺[:] = R⁻⁺ .+ T01_inv ⊠ r⁻⁺ ⊠ T⁺⁺ #Suniti
+    tmpR⁻⁺[:] = R⁻⁺ .+ T01_inv ⊠ r⁻⁺ ⊠ T⁺⁺ #Suniti
     # T₀₂ = T₀₁(1-R₂₁R₀₁)⁻¹T₁₂
-    composite_layer.T⁻⁻[:] = T01_inv ⊠ t⁻⁻ #Suniti
+    tmpT⁻⁻[:] = T01_inv ⊠ t⁻⁻ #Suniti
 
     # Repeating for mirror-reflected directions
 
@@ -296,7 +307,7 @@ function interaction_helper!(RS_type::RRS, ::ScatteringInterface_11, SFI,
     if SFI
         for Δn = 1:size(ieJ₀⁺,4)
             n₀, n₁ = get_n₀_n₁(ieJ₀⁺,i_λ₁λ₀[Δn])
-            @inbounds @views composite_layer.ieJ₀⁺[:,:,n₁,Δn] = 
+            @inbounds @views tmpieJ₀⁺[:,:,n₁,Δn] = 
                             added_layer.ieJ₀⁺[:,:,n₁,Δn] + 
                             T21_inv[:,:,n₁] ⊠ 
                             (ieJ₀⁺[:,:,n₁,Δn] + 
@@ -310,19 +321,19 @@ function interaction_helper!(RS_type::RRS, ::ScatteringInterface_11, SFI,
                             R⁺⁻[:,:,n₀] ⊠ added_layer.J₀⁻[:,:,n₀])
         end
         # J₂₀⁺ = J₂₁⁺ + T₂₁(I-R₀₁R₂₁)⁻¹(J₁₀ + R₀₁J₁₂⁻ )
-        composite_layer.J₀⁺[:] = added_layer.J₀⁺ .+ 
+        tmpJ₀⁺ = added_layer.J₀⁺ .+ 
             T21_inv ⊠ (J₀⁺ + R⁺⁻ ⊠ added_layer.J₀⁻)
     end 
     for Δn = 1:size(ieJ₀⁺,4)
         n₀, n₁ = get_n₀_n₁(ieJ₀⁺,i_λ₁λ₀[Δn])
         
-        @inbounds @views composite_layer.ieT⁺⁺[:,:,n₁,Δn] = 
+        @inbounds @views tmpieT⁺⁺[:,:,n₁,Δn] = 
                     T21_inv[:,:,n₁] ⊠ ieT⁺⁺[:,:,n₁,Δn] +
                     (T21_inv[:,:,n₁] ⊠ (ieR⁺⁻[:,:,n₁,Δn] ⊠ r⁻⁺[:,:,n₀] + 
                     R⁺⁻[:,:,n₁] ⊠ ier⁻⁺[:,:,n₁,Δn]) +
                     iet⁺⁺[:,:,n₁,Δn]) ⊠ tmp_inv[:,:,n₀] ⊠ T⁺⁺[:,:,n₀] #Suniti: Eq 12 of Raman paper draft
 
-        @inbounds @views composite_layer.ieR⁺⁻[:,:,n₁,Δn] = 
+        @inbounds @views tmpieR⁺⁻[:,:,n₁,Δn] = 
                     ier⁺⁻[:,:,n₁,Δn] + 
                     T21_inv[:,:,n₁] ⊠ 
                     (ieR⁺⁻[:,:,n₁,Δn] ⊠ t⁻⁻[:,:,n₀] +
@@ -335,10 +346,25 @@ function interaction_helper!(RS_type::RRS, ::ScatteringInterface_11, SFI,
     end
     
     # T₂₀ = T₂₁(I-R₀₁R₂₁)⁻¹T₁₀
-    composite_layer.T⁺⁺[:] = T21_inv  ⊠ T⁺⁺ #Suniti
+    tmpT⁺⁺[:] = T21_inv  ⊠ T⁺⁺ #Suniti
     # R₀₂ = R₁₂ + T₂₁(1-R₀₁R₂₁)⁻¹R₀₁T₁₂
-    composite_layer.R⁺⁻[:] = r⁺⁻ .+ T21_inv ⊠ R⁺⁻ ⊠ t⁻⁻ #Suniti
+    tmpR⁺⁻[:] = r⁺⁻ .+ T21_inv ⊠ R⁺⁻ ⊠ t⁻⁻ #Suniti
+
+    composite_layer.J₀⁻[:] = tmpJ₀⁻
+    composite_layer.R⁻⁺[:] = tmpR⁻⁺
+    composite_layer.T⁻⁻[:] = tmpT⁻⁻
+
+    composite_layer.J₀⁺[:] = tmpJ₀⁺
+    composite_layer.T⁺⁺[:] = tmpT⁺⁺
+    composite_layer.R⁺⁻[:] = tmpR⁻⁺
     
+    composite_layer.ieJ₀⁻[:] = tmpieJ₀⁻
+    composite_layer.ieJ₀⁺[:] = tmpieJ₀⁺
+
+    composite_layer.ieT⁻⁻[:] = tmpieT⁻⁻
+    composite_layer.ieR⁻⁺[:] = tmpieR⁻⁺
+    composite_layer.ieT⁺⁺[:] = tmpieT⁺⁺
+    composite_layer.ieR⁺⁻[:] = tmpieR⁺⁻
 end
 
 function interaction_helper!(RS_type::Union{VS_0to1_plus, VS_1to0_plus}, 

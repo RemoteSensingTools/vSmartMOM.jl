@@ -51,6 +51,7 @@ function doubling_helper!(RS_type::RRS,
 
         # T⁺⁺(λ)[I - R⁺⁻(λ)R⁻⁺(λ)]⁻¹, for doubling R⁺⁻,R⁻⁺ and T⁺⁺,T⁻⁻ is identical
         batch_inv!(gp_refl, I_static .- r⁻⁺ ⊠ r⁻⁺)
+        
         @views tt⁺⁺_gp_refl[:] = t⁺⁺ ⊠ gp_refl
         if SFI
             # J⁺₂₁(λ) = J⁺₁₀(λ).exp(-τ(λ)/μ₀)
@@ -71,9 +72,9 @@ function doubling_helper!(RS_type::RRS,
                 #@show  n, ieJ₀⁺[1:pol_type.n:length(J₀⁻[:,1,1]),1,963,Δn]
                 #@show  n, ieJ₁⁺[1:pol_type.n:length(J₁⁻[:,1,1]),1,963,Δn]
             end
-        #@show  n, J₁⁺[1:pol_type.n:length(J₁⁻[:,1,1]),1,963]
-        ##@show  n, sum(ieJ₀⁺[1:pol_type.n:length(J₀⁻[:,1,1]),1,963,:], dims=2)
-        #@show  n, sum(ieJ₁⁺[1:pol_type.n:length(J₁⁻[:,1,1]),1,963,:], dims=2)
+            #@show  n, J₁⁺[1:pol_type.n:length(J₁⁻[:,1,1]),1,963]
+            ##@show  n, sum(ieJ₀⁺[1:pol_type.n:length(J₀⁻[:,1,1]),1,963,:], dims=2)
+            #@show  n, sum(ieJ₁⁺[1:pol_type.n:length(J₁⁻[:,1,1]),1,963,:], dims=2)
             #@show size(ieJ₁⁺)
             @timeit "precomp" tmp1 = gp_refl ⊠  (J₀⁺ + r⁻⁺ ⊠ J₁⁻)
             @timeit "precomp" tmp2 = gp_refl ⊠  (J₁⁻ + r⁻⁺ ⊠ J₀⁺)
@@ -85,7 +86,9 @@ function doubling_helper!(RS_type::RRS,
                 #@timeit "mati" @views tmp5 = ier⁻⁺[:,:,n₁,Δn] ⊠ r⁻⁺[:,:,n₀]
                 #@show size(tmp3)
                 #@show length(n₁), length(n₀), length(n₁_), length(n₀_)
-                @inbounds @views ieJ₀⁺[:,:,n₁,Δn] = 
+
+            
+                @inbounds @views tmp3 = 
                                 ieJ₁⁺[:,:,n₁,Δn] + 
                                 (tt⁺⁺_gp_refl[:,:,n₁] ⊠ 
                                 (ieJ₀⁺[:,:,n₁,Δn] + 
@@ -95,7 +98,7 @@ function doubling_helper!(RS_type::RRS,
                                 ier⁻⁺[:,:,n₁,Δn] ⊠ r⁻⁺[:,:,n₀]) ⊠ 
                                 tmp1[:,:,n₀])) + 
                                 iet⁺⁺[:,:,n₁,Δn] ⊠ tmp1[:,:,n₀]
-                @inbounds @views ieJ₀⁻[:,:,n₁,Δn] = 
+                @inbounds @views tmp4 = 
                                 ieJ₀⁻[:,:,n₁,Δn] + 
                                 (tt⁺⁺_gp_refl[:,:,n₁] ⊠ 
                                 (ieJ₁⁻[:,:,n₁,Δn] + 
@@ -105,6 +108,8 @@ function doubling_helper!(RS_type::RRS,
                                 r⁻⁺[:,:,n₁] ⊠ ier⁻⁺[:,:,n₁,Δn]) ⊠ 
                                 tmp2[:,:,n₀])) +
                                 iet⁻⁻[:,:,n₁,Δn] ⊠ tmp2[:,:,n₀]
+                ieJ₀⁺[:,:,n₁,Δn] = tmp3
+                ieJ₀⁻[:,:,n₁,Δn] = tmp4
             end
             
         
@@ -121,18 +126,23 @@ function doubling_helper!(RS_type::RRS,
                 n₀, n₁ = get_n₀_n₁(ieJ₁⁺,i_λ₁λ₀[Δn])
                 #@show n₁, n₀
                 #@show length(n₀)
-                @timeit "n loop 2" @inbounds @views iet⁺⁺[:,:,n₁,Δn] = t⁺⁺[:,:,n₁] ⊠ gp_refl[:,:,n₁] ⊠ 
+                
+                @timeit "n loop 2" @inbounds @views tmp3 = 
+                        tt⁺⁺_gp_refl[:,:,n₁] ⊠ 
                         (iet⁺⁺[:,:,n₁,Δn] + 
                         (ier⁻⁺[:,:,n₁,Δn] ⊠ r⁻⁺[:,:,n₀] + r⁻⁺[:,:,n₁] ⊠ ier⁻⁺[:,:,n₁,Δn]) ⊠ 
                         gp_refl[:,:,n₀] ⊠ t⁺⁺[:,:,n₀]) + 
                         iet⁺⁺[:,:,n₁,Δn] ⊠ gp_refl[:,:,n₀] ⊠  t⁺⁺[:,:,n₀]
-                @timeit "n loop 2" @inbounds @views ier⁻⁺[:,:,n₁,Δn] = ier⁻⁺[:,:,n₁,Δn] + 
-                        t⁺⁺[:,:,n₁] ⊠ gp_refl[:,:,n₁] ⊠ r⁻⁺[:,:,n₁] ⊠  
-                        (iet⁺⁺[:,:,n₁,Δn] + 
-                        (ier⁻⁺[:,:,n₁,Δn] ⊠ r⁻⁺[:,:,n₀] + r⁻⁺[:,:,n₁] ⊠ ier⁻⁺[:,:,n₁,Δn]) ⊠ 
-                        gp_refl[:,:,n₀] ⊠ t⁺⁺[:,:,n₀]) + 
-                        (iet⁺⁺[:,:,n₁,Δn] ⊠ gp_refl[:,:,n₀] ⊠ r⁻⁺[:,:,n₀] + 
-                        t⁺⁺[:,:,n₁] ⊠ gp_refl[:,:,n₁] ⊠ ier⁻⁺[:,:,n₁,Δn]) ⊠ t⁺⁺[:,:,n₀]
+                @timeit "n loop 2" @inbounds @views tmp4 = ier⁻⁺[:,:,n₁,Δn] + 
+                        (iet⁺⁺[:,:,n₁,Δn] ⊠ gp_refl[:,:,n₀] ⊠ r⁻⁺[:,:,n₀] ⊠ t⁺⁺[:,:,n₀]) +
+                        tt⁺⁺_gp_refl[:,:,n₁] ⊠   
+                            (r⁻⁺[:,:,n₁] ⊠ iet⁺⁺[:,:,n₁,Δn] + 
+                            (ier⁻⁺[:,:,n₁,Δn] +
+                            (ier⁻⁺[:,:,n₁,Δn] ⊠ r⁻⁺[:,:,n₀] + r⁻⁺[:,:,n₁] ⊠ ier⁻⁺[:,:,n₁,Δn]) ⊠ 
+                            gp_refl[:,:,n₀] ⊠ r⁻⁺[:,:,n₀]) ⊠ t⁺⁺[:,:,n₀]) 
+                        
+                iet⁺⁺[:,:,n₁,Δn] = tmp3
+                ier⁻⁺[:,:,n₁,Δn] = tmp4
         end
         
         # R⁻⁺₂₀(λ) = R⁻⁺₁₀(λ) + T⁻⁻₀₁(λ)[I - R⁻⁺₂₁(λ)R⁺⁻₀₁(λ)]⁻¹R⁻⁺₂₁(λ)T⁺⁺₁₀(λ) (see Eqs.8 in Raman paper draft)
@@ -140,18 +150,46 @@ function doubling_helper!(RS_type::RRS,
 
         # T⁺⁺₂₀(λ) = T⁺⁺₂₁(λ)[I - R⁺⁻₀₁(λ)R⁻⁺₂₁(λ)]⁻¹T⁺⁺₁₀(λ) (see Eqs.8 in Raman paper draft)
         t⁺⁺[:]  = tt⁺⁺_gp_refl ⊠ t⁺⁺
+#=
+        @show  n
+        for i=1:pol_type.n:15  #length(qp_μN)
+            if (i%3==1)  
+                for n₁=1:nSpec
+                    for Δn=1:nRaman
+                        if((ieJ₀⁺[i, 1, n₁, Δn]<0) | (ieJ₀⁺[i, 1, n₁, Δn]>1) | (ieJ₀⁻[i, 1, n₁, Δn]<0) | (ieJ₀⁻[i, 1, n₁, Δn]>1)) 
+                            @show i, 1, n₁, Δn, ieJ₀⁺[i, 1, n₁, Δn], ieJ₀⁻[i, 1, n₁, Δn]
+                            @show i, 1, n₁, Δn, ieJ₀⁺[i, 1, 200, 50], ieJ₀⁻[i, 1, 200, 50]
+                        end
+                    end
+                end
+            end
+            for j=1:pol_type.n:15  #length(qp_μN)
+    
+                if (i%3==1) & (j%3==1) 
+                    for n₁=1:nSpec
+                        for Δn=1:nRaman
+                            if((iet⁺⁺[i, j, n₁, Δn]<0) | (iet⁺⁺[i, j, n₁, Δn]>1) | (ier⁻⁺[i, j, n₁, Δn]<0) | (ier⁻⁺[i, j, n₁, Δn]>1)) 
+                                @show i, j, n₁, Δn, iet⁺⁺[i, j, n₁, Δn], ier⁻⁺[i, j, n₁, Δn]
+                                @show i, j, 200, 50, iet⁺⁺[i, j, 200, 50], ier⁻⁺[i, j, 200, 50]
+        #                        bla
+                            end
+                        end
+                    end
+            #@show ctr, ctr2, sum(ieJ₀⁺[ctr,ctr2,963,:])
+            #@show ctr, ctr2, sum(ieJ₀⁻[ctr,ctr2,963,:])
+            #@show ctr, ctr2, sum(iet⁺⁺[ctr,ctr2,963,:])
+            #@show ctr, ctr2, sum(ier⁻⁺[ctr,ctr2,963,:])
+                end
+            end
+        end=#
+
+
     end
+    
     #if m<3
-    #=   
-    for ctr=1:pol_type.n:15  #length(qp_μN)
-            for ctr2=1:pol_type.n:15  #length(qp_μN)
-        @show ctr, ctr2, sum(ieJ₀⁺[ctr,ctr2,963,:])
-        @show ctr, ctr2, sum(ieJ₀⁻[ctr,ctr2,963,:])
-        @show ctr, ctr2, sum(iet⁺⁺[ctr,ctr2,963,:])
-        @show ctr, ctr2, sum(ier⁻⁺[ctr,ctr2,963,:])
-        end
-        end
-        =#
+       
+    
+    #end
     #    end
     # After doubling, revert D(DR)->R, where D = Diagonal{1,1,-1,-1}
     # For SFI, after doubling, revert D(DJ₀⁻)->J₀⁻

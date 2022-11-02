@@ -280,7 +280,7 @@ function rt_run(RS_type::AbstractRamanType,
     brdf = model.params.brdf[iBand[1]]
     @unpack F₀ = RS_type
     if (typeof(RS_type)<:Union{RRS,RRS_plus})
-        RS_type.ϖ_λ₁λ₀ *=  (1. - model.ϖ_Cabannes[iBand[1]])/sum(RS_type.ϖ_λ₁λ₀) 
+        RS_type.ϖ_λ₁λ₀ .*=  (1. - model.ϖ_Cabannes[iBand[1]])/sum(RS_type.ϖ_λ₁λ₀) 
     end   
     
     FT = eltype(sza)                    # Get the float-type to use
@@ -351,7 +351,9 @@ function rt_run(RS_type::AbstractRamanType,
         # Compute the core layer optical properties:
         @timeit "OpticalProps" layer_opt_props, fScattRayleigh   = 
             constructCoreOpticalProperties(RS_type,iBand,m,model);
-        # Determine the scattering interface definitions:
+        #@show size(fScattRayleigh)
+        #@show size(fScattRayleigh[1])
+            # Determine the scattering interface definitions:
         scattering_interfaces_all, τ_sum_all = 
             extractEffectiveProps(layer_opt_props);
         
@@ -413,6 +415,7 @@ function rt_run(RS_type::AbstractRamanType,
                             arr_type(F₀),
                             model.params.architecture);
         #@show scattering_interfaces_all[end]
+        #bla
         # One last interaction with surface:
         @timeit "interaction" interaction!(RS_type,
                                     #bandSpecLim,

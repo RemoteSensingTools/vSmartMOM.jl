@@ -88,12 +88,19 @@ function postprocessing_vza!(RS_type::Union{RRS, VS_0to1_plus, VS_1to0_plus},
                 for t =1:size(ieJ₀⁺,4)# in eachindex ieJ₀⁺[1,1,1,:]
                     ieR_SFI[i,:,s] += bigCS * ieJ₀⁻[istart:iend,1, s, t];
                     ieT_SFI[i,:,s] += bigCS * ieJ₀⁺[istart:iend,1, s, t];
-                    #@show i, s, t, ieR_SFI[i,:,s]
+                    #
+                    if (s==1900) & (i==1)
+                        @show i, s, t, ieR_SFI[i,:,s]
+                    end
                 end
-                if(s==963)
-                    @show i, s, ieR_SFI[i,:,s], sum(ieJ₀⁻[istart:iend,1, s, :], dims=2)
-                    @show i, s, R_SFI[i,:,s], sum(J₀⁻[istart:iend,1, s, :], dims=2)
-                end
+                #if s<907
+                #@show m, s, sum(ieJ₀⁻[istart:iend, 1, s, :], dims=2)
+                #end
+                #if(s==963)
+                #    @show i, s, ieR_SFI[i,:,s], sum(ieJ₀⁻[istart:iend,1, s, :], dims=2)
+                #    @show i, s, R_SFI[i,:,s], sum(J₀⁻[istart:iend,1, s, :], dims=2)
+                #end
+                #writedlm("out_"*string(m)*".dat",  sum(ieJ₀⁻[1,1, :, :], dims=2))
             else
                 R[i,:,s] += bigCS * (R⁻⁺[istart:iend, istart0:iend0, s] / μ₀) * pol_type.I₀;
                 T[i,:,s] += bigCS * (T⁺⁺[istart:iend, istart0:iend0, s] / μ₀) * pol_type.I₀;
@@ -101,5 +108,8 @@ function postprocessing_vza!(RS_type::Union{RRS, VS_0to1_plus, VS_1to0_plus},
             end
             
         end
+        #if m==0
+        #    bla
+        #end
     end
 end

@@ -153,11 +153,11 @@ function create_surface_layer!(RS_type, lambertian::LambertianSurfaceLegendre{FT
         added_layer.J₀⁻[:] .= 0;
     end
     if !(typeof(RS_type)<:noRS)
-        added_layer.ier⁻⁺ .= 0;
-        added_layer.ier⁻⁺ .= 0;
-        added_layer.iet⁺⁺ .= 0.0; #T_surf;
-        added_layer.iet⁻⁻ .= 0.0; #T_surf;
-        added_layer.ieJ₀⁺ .= 0;
-        added_layer.ieJ₀⁻ .= 0;
+        added_layer.ier⁻⁺[:] .= 0;
+        added_layer.ier⁻⁺[:] .= 0;
+        added_layer.iet⁺⁺[:] .= 0.0; #T_surf;
+        added_layer.iet⁻⁻[:] .= 0.0; #T_surf;
+        added_layer.ieJ₀⁺[:] .= 0;
+        added_layer.ieJ₀⁻[:] .= 0;
     end
 end

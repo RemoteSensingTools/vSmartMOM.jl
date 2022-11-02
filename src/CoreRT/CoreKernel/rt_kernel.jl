@@ -95,7 +95,10 @@ function rt_kernel!(RS_type::Union{RRS, VS_0to1, VS_1to0},
                                     quad_points,  added_layer,  
                                     I_static, architecture)
         #println("Elemental  done...")
-        @timeit "doubling_inelastic" doubling_inelastic!(RS_type, pol_type, SFI, expk, ndoubl, added_layer, I_static, architecture)
+        @timeit "doubling_inelastic" doubling_inelastic!(
+            RS_type, pol_type, 
+            SFI, expk, ndoubl, 
+            added_layer, I_static, architecture)
         #println("Doubling done...")
         #@timeit "doubling"   doubling!(pol_type, SFI, expk, ndoubl, added_layer, I_static, architecture)
     else # This might not work yet on GPU!
@@ -133,11 +136,6 @@ function rt_kernel!(RS_type::Union{RRS, VS_0to1, VS_1to0},
         @timeit "interaction" interaction!(RS_type, scattering_interface, SFI, composite_layer, added_layer, I_static)
     end
 end
-
-
-
-
-
 
 
 ### New update:
@@ -264,8 +262,11 @@ function rt_kernel!(
             computed_layer_properties, m, ndoubl, 
             scatter, quad_points, added_layer, architecture)
         #println("Elemental  done...")
-        @timeit "doubling_inelastic" doubling_inelastic!(RS_type, pol_type, 
-                    SFI, expk, ndoubl, added_layer, I_static, architecture)
+        
+        @timeit "doubling_inelastic" doubling_inelastic!(
+            RS_type, pol_type, 
+            SFI, expk, ndoubl, 
+            added_layer, I_static, architecture)
         #println("Doubling done...")
         #@timeit "doubling"   doubling!(pol_type, SFI, expk, ndoubl, added_layer, I_static, architecture)
     else # This might not work yet on GPU!

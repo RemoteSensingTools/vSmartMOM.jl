@@ -72,14 +72,20 @@ function constructCoreOpticalProperties(RS_type, iBand, m, model)
         #@show rayl[1].τ * rayl[1].ϖ, combo[1].τ
         # Assume ϖ of 1 for Rayleight here:
         #@show size(combo)
-        fScattRayleigh = [Array(rayl[i].τ  ./ combo[i].τ) for i=1:nZ]
+        #fScattRayleigh = [Array(rayl[i].τ  ./ combo[i].τ) for i=1:nZ]
         #@show fScattRayleigh, rayl[1].τ, combo[1].τ
         # Create Core Optical Properties merged with trace gas absorptions:
         #@show size(combo)
         
-        push!(band_layer_props,
-                combo .+ 
-                [CoreAbsorptionOpticalProperties(arr_type(τ_abs[iB][:,i])) for i=1:nZ])
+        #@show size(fScattRayleigh)
+        #@show size(combo[1].τ), size(τ_abs[iB][:,1])
+
+        combo2 = combo .+ [CoreAbsorptionOpticalProperties(arr_type(τ_abs[iB][:,i])) for i=1:nZ]
+        #@show size(combo2[1].τ)
+        fScattRayleigh = [Array(rayl[i].τ  ./ combo2[i].τ) for i=1:nZ]
+        #@show fScattRayleigh[1]
+        
+        push!(band_layer_props,combo2 )
         push!(band_fScattRayleigh,fScattRayleigh)
         #aType = array_type(model.params.architecture)
         #combo2 = [CoreScatteringOpticalProperties(aType(combo[i].τ),aType(combo[i].ϖ), aType(combo[i].Z⁺⁺), aType(combo[i].Z⁻⁺)) for i in eachindex(combo)]

@@ -17,7 +17,7 @@ radiative_transfer:
   # Quadrature-scheme for stream calculations
   quadrature_type:    GaussQuadHemisphere()
   # Polarization type (Stokes_I, Stokes_IQ, Stokes_IQU, Stokes_IQUV)
-  polarization_type:  Stokes_IQU() #QU()
+  polarization_type:  Stokes_IQU() #Stokes_I() #Stokes_IQU() #QU()
   # Maximum m (number of Fourier moments to loop over)
   max_m:              3 #7 #3 #9 #3 #3 #9 #3
   # Exclusion angle for forward peak in fitting procedure (degrees)
@@ -25,11 +25,11 @@ radiative_transfer:
   # Trunction length for legendre terms
   l_trunc:            5 #13 #5 #15 #18  #5 #35 #15 #18 #5 #5
   # Depolarization factor
-  depol:              0.028 #(0.028: Cabannes), (0.1032: Rayleigh) 
+  depol:              0.028 
   # Floating point type for calculations (Float32, Float64)
   float_type:         Float64
   # Architecture (default_architecture, Architectures.GPU(), Architectures.CPU())
-  architecture:       Architectures.CPU() # default_architecture
+  architecture:       Architectures.GPU() # default_architecture
   
 # =================================================================
 # Simulation Geometry
