@@ -4,7 +4,7 @@
 radiative_transfer: 
   # Spectral bands (list of ν_start:ν_step:ν_end, in cm⁻¹)
   spec_bands: 
-    - collect(646.0:0.01:684.0)u"nm"
+    - collect(646.0:0.02:684.0)u"nm"
   #  - (1e7/2084):0.02:(1e7/2042)
   # Bidirectional Reflectance Distribution Function (BRDF) per band
   surface: 
@@ -15,11 +15,11 @@ radiative_transfer:
   # Polarization type (Stokes_I, Stokes_IQ, Stokes_IQU, Stokes_IQUV)
   polarization_type:  Stokes_I()
   # Maximum m (number of Fourier moments to loop over)
-  max_m:              5
+  max_m:              20
   # Exclusion angle for forward peak in fitting procedure (degrees)
   Δ_angle:            2.0
   # Trunction length for legendre terms
-  l_trunc:            50
+  l_trunc:            20
   # Depolarization factor
   depol:              0.029
   # Floating point type for calculations (Float32, Float64)

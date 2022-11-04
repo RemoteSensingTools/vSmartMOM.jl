@@ -42,6 +42,7 @@ function rt_set_streams(::GaussQuadHemisphere,
     wt_μ = FT[wt_μ; zeros(FT,n_eff)];
     Nquad = length(qp_μ);
     iμ₀ = nearest_point(qp_μ, μ₀);
+
     qp_μN = arr_type(reduce(vcat, (fill.(qp_μ, [pol_type.n]))))
     wt_μN = arr_type(reduce(vcat, (fill.(wt_μ, [pol_type.n]))))
     i_start = pol_type.n*(iμ₀-1) + 1

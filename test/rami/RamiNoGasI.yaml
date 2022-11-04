@@ -22,7 +22,7 @@ radiative_transfer:
   # Exclusion angle for forward peak in fitting procedure (degrees)
   Δ_angle:            2.0
   # Trunction length for legendre terms
-  l_trunc:            40
+  l_trunc:            20
   # Depolarization factor
   depol:              0.029
   # Floating point type for calculations (Float32, Float64)
