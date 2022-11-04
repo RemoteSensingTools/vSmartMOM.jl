@@ -203,9 +203,11 @@ end
 
 # Determin max amount of fourier moments (to be extended):
 function assignMoment!(params,atm_type)
-
+    # Leave all at 20 for now as the surface can be anisotropic!
     if atm_type == "AtmosphereType.RAYLEIGH"
-        params.max_m = 3
+        params.max_m = 20
+    else
+        params.max_m = 20
     end
 end
 
@@ -366,7 +368,7 @@ function produce_rami_results(experiment_name::String;
     # Turning off Rayleigh scattering for non Rayleigh types (has to be done in model, not params):
     if atm_type ∈ noRayleighType
         @info "Turning off Rayleigh ", atm_type
-        model.τ_rayl[1] .= 0.0
+        model.τ_rayl[1] .= 1e-50
     end
     #model.τ_rayl[1] .= 0.00000000001
     ########################################################
@@ -375,7 +377,7 @@ function produce_rami_results(experiment_name::String;
     #R = rt_run(model)
     if isnothing(Cano)
         R, _, _, _, hdr, bhr_uw, bhr_dw = rt_run(model)
-        
+        @info "No Canopy"
         BRF       = convolve_2_sentinel(model.params.spec_bands[1], R, band) / cosd(params.sza)
         HDRF, BHR = convolve_2_sentinel_HDR(model.params.spec_bands[1], hdr,bhr_uw,bhr_dw, band)
         #print("here 1.2\n")
