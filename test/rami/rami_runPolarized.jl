@@ -17,9 +17,9 @@ for scenario in all_scenarios
         file = folder * scenario["name"] * "-brfpp_" * "vSmartMOM-JPL.mes"
         if !isfile(file)
             #@show file
-            if startswith(scenario["name"],"HOM00")
+            #if startswith(scenario["name"],"HOM00")
                 BRF, R, hdrf, bhr, model = produce_rami_results(scenario["name"], polarized=true, folder=folder)
-            end
+            #end
         end
 
     catch e
