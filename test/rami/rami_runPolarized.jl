@@ -8,7 +8,7 @@ include("rami_tools.jl")
 # Get all scenarios
 rami_json = "test/rami/RAMI4ATM_experiments_v1.0.json";
 all_scenarios = JSON.parsefile(rami_json);
-folder = "/home/cfranken/rami3/"
+folder = "/home/cfranken/rami_IQUV/"
 
 for scenario in all_scenarios
     @info "Processing " * scenario["name"]
@@ -17,7 +17,9 @@ for scenario in all_scenarios
         file = folder * scenario["name"] * "-brfpp_" * "vSmartMOM-JPL.mes"
         if !isfile(file)
             #@show file
-            BRF, R, hdrf, bhr, model = produce_rami_results(scenario["name"], folder=folder)
+            if startswith(scenario["name"],"HOM00")
+                BRF, R, hdrf, bhr, model = produce_rami_results(scenario["name"], polarized=true, folder=folder)
+            end
         end
 
     catch e
