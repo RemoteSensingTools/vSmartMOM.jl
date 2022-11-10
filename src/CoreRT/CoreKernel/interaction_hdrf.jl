@@ -14,11 +14,14 @@ function interaction_hdrf!(SFI,
 
     @unpack r⁻⁺, j₀⁻, j₀⁺ = added_layer     #these are aliases to the respective struct elements  
     @unpack J₀⁺, J₀⁻      = composite_layer #these are aliases to the respective struct elements 
-    @unpack Nquad, wt_μN, iμ₀, qp_μN = quad_points
+    @unpack Nquad, wt_μN, iμ₀, iμ₀Nstart, qp_μN = quad_points
     NquadN =  Nquad * pol_type.n
     hdr_J₀⁻ .= r⁻⁺ ⊠ J₀⁺ .+ j₀⁻
     # @show hdr_J₀⁻./ J₀⁺
-    
+    @show hdr_J₀⁻[1,1,:]
+    @show J₀⁺[1,1,:]
+    @show iμ₀
+    @show j₀⁺[iμ₀Nstart,1,:]
     qp = Array(qp_μN)
     if m==0
 
@@ -28,7 +31,12 @@ function interaction_hdrf!(SFI,
             #for j=i:pol_type.n:NquadN
             j=i:pol_type.n:NquadN
             bhr_J₀⁻[i,:] .= Array(sum(hdr_J₀⁻[j,1,:].*wt_μN[j].*qp_μN[j], dims=1)')
-            bhr_J₀⁺[i,:] .= Array(sum(J₀⁺[j,1,:].*wt_μN[j].*qp_μN[j], dims=1)' .+ j₀⁺[iμ₀,1,:] .* qp[iμ₀]) #TODO: Use Radau quadrature and include insolation in the quadrature sum
+            bhr_J₀⁺[i,:] .= Array(sum(J₀⁺[j,1,:].*wt_μN[j].*qp_μN[j], dims=1)' .+ j₀⁺[iμ₀Nstart,1,:] .* qp[iμ₀Nstart]) 
+            if i==1
+                @show bhr_J₀⁻[i,:], bhr_J₀⁺[i,:]
+            end
+            #TODO: Use Radau quadrature and include insolation in the quadrature sum
+            
             #@show j₀⁺[iμ₀,1,1:3].* qp[iμ₀], J₀⁺[iμ₀,1,1:3] .* qp[iμ₀], bhr_J₀⁺[i,1:3], bhr_J₀⁻[i,1:3]
             #@show Array(sum(J₀⁻[j,1,:].*wt_μN[j].*qp_μN[j], dims=1)')[1], Array(sum(hdr_J₀⁻[j,1,:].*wt_μN[j].*qp_μN[j], dims=1)')[1],Array(sum(j₀⁻[j,1,:].*wt_μN[j].*qp_μN[j], dims=1)')[1]
             #end
