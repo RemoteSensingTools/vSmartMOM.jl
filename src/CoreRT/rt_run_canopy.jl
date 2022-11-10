@@ -239,7 +239,8 @@ end
 function get_solJ_canopy(pol_type, 
                     in_τ_sum::AbstractArray{FT}, 
                     μ₀, arr_type) where {FT} 
-    solJ₀ = Array(arr_type(pol_type.I₀) .* exp.(-in_τ_sum/μ₀))' 
+    @show size(pol_type.I₀), size(exp.(-in_τ_sum/μ₀))
+    solJ₀ = Array(arr_type(pol_type.I₀) .* exp.(-in_τ_sum/μ₀)') 
 end
 
 #For multisensor use (especially for the computation of TOC parameters)
@@ -333,9 +334,9 @@ function rt_run_canopy_ms(RS_type::AbstractRamanType,
     println("Prepping Canopy")
     #@show BiLambMod,  Array(qp_μN), LAD
     # @timeit "Prepping canopy" Zup, Zdown  = CanopyOptics.precompute_Zazi(BiLambMod, Array(qp_μN), LAD)
-    @timeit "Prepping canopy" Zup, Zdown = CanopyOptics.precompute_Zazi_(BiLambMod, qp_μN, LAD)
-    @show (Zup[1,10,1:10])
-    @show qp_μN
+    @timeit "Prepping canopy" Zup, Zdown = CanopyOptics.precompute_Zazi_(BiLambMod, qp_μ, LAD)
+    #@show (Zup[1,10,1:10])
+    #@show qp_μN
     println("Finished initializing arrays")
 
     # Loop over fourier moments
@@ -351,7 +352,19 @@ function rt_run_canopy_ms(RS_type::AbstractRamanType,
         constructCoreOpticalProperties(RS_type,iBand,m,model);
 
         #𝐙⁺⁺, 𝐙⁻⁺ = CanopyOptics.compute_Z_matrices_aniso(BiLambMod, Array(qp_μN), LAD, Array(Zup), Array(Zdown), m) 
-        𝐙⁺⁺, 𝐙⁻⁺ = CanopyOptics.compute_Z_matrices_aniso(BiLambMod, qp_μN, LAD, Zup, Zdown, m) 
+        𝐙⁺⁺, 𝐙⁻⁺ = CanopyOptics.compute_Z_matrices_aniso(BiLambMod, qp_μ, LAD, Zup, Zdown, m) 
+        # Convert Z to include polarization if neeed
+        if pol_type.n > 1
+            @show size(𝐙⁺⁺)
+            _𝐙⁺⁺ = arr_type(zeros(FT,size(𝐙⁺⁺) .*  pol_type.n))
+            _𝐙⁻⁺ = arr_type(zeros(FT,size(𝐙⁺⁺) .*  pol_type.n))
+            @show size(_𝐙⁺⁺)
+            _𝐙⁺⁺[1:pol_type.n:end, 1:pol_type.n:end] .= 𝐙⁺⁺
+            _𝐙⁻⁺[1:pol_type.n:end, 1:pol_type.n:end] .= 𝐙⁻⁺
+            𝐙⁺⁺ = _𝐙⁺⁺
+            𝐙⁻⁺ = _𝐙⁻⁺
+        end
+            
         #𝐙⁺⁺, 𝐙⁻⁺ = CanopyOptics.compute_Z_matrices_aniso(BiLambMod, Array(qp_μN), LAD, m)   
 
 

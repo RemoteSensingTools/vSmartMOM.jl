@@ -40,7 +40,7 @@ const noAbsorptionType = ("AtmosphereType.RAYLEIGH", "AtmosphereType.AEROSOLS", 
 const sentinel_band_to_LUT = Dict([("2" , 2),    # Blue
                             ("3" , 3),    # Green
                             ("4" , 4),    # Red
-                            ("8A", 9),    # Narrow NIR 
+                            ("8a", 9),    # Narrow NIR 
                             ("11", 12),  # SWIR
                             ("12", 13)]) # SWIR
 
@@ -324,7 +324,7 @@ function save_boa_results(HDRF,BHR, model, name, folder)
 end
 
 
-function produce_rami_results(experiment_name::String;
+function produce_rami_results(experiment_name::String; folder="/home/cfranken/rami3/", polarized=false, 
     all_scenarios = all_scenarios,
     n_desert=n_desert,n_continental=n_continental, sr=sr )
 
@@ -343,6 +343,10 @@ function produce_rami_results(experiment_name::String;
     @info "Atmosphere type is " * atm_type 
 
     params = getParams(curr_scenario)
+
+    if (polarized)
+        params.polarization_type = vSmartMOM.Scattering.Stokes_IQU()
+    end
 
     # Add Aerosols: 
     add_aerosols!(rami_atmosphere, params, band, n_desert, n_continental)
@@ -394,8 +398,8 @@ function produce_rami_results(experiment_name::String;
         HDRF, BHR = convolve_2_sentinel_HDR(model.params.spec_bands[1], hdr,bhr_uw,bhr_dw, band)
     end
     # Save results:
-    save_toa_results(BRF, model, experiment_name, "/home/cfranken/rami3/")
-    save_boa_results(HDRF,BHR,model, experiment_name, "/home/cfranken/rami3/")
+    save_toa_results(BRF, model, experiment_name, folder)
+    save_boa_results(HDRF,BHR,model, experiment_name, folder)
 
 return BRF, R, HDRF, BHR, model
 #return BRF, R, model
@@ -473,6 +477,7 @@ return BRF, R, HDRF, BHR, model
 
 # Can do postprocessing here (saving data, convolution, etc)
 end
+
 
 # Get q from vmr:
 # q = -1/((dry_mass - dry_mass./vmr_h2o)/wet_mass - 1)
