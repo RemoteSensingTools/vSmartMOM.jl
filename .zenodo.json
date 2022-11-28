@@ -1,6 +1,10 @@
 {
+    "description": "vSmartMOM.jl is an end-to-end modular software suite for vectorized atmospheric radiative transfer calculations, based on the Matrix Operator Method.", 
+    "license": "Apache 2.0 License", 
     "title": "vSmartMOM.jl: an Open-Source Julia Package for Atmospheric Radiative Transfer and Remote Sensing Tools",
-
+    "version": "v1.0.1", 
+    "upload_type": "software", 
+    "publication_date": "2022-11-28", 
     "creators": [
         {
             "orcid": "0000-0003-0142-7367",
@@ -17,7 +21,19 @@
             "affiliation": "California Institute of Technology",
             "name": "Frankenberg, Christian"
         }
+    ], 
+    "access_right": "open", 
+    "related_identifiers": [
+        {
+            "scheme": "url", 
+            "identifier": "https://github.com/RemoteSensingTools/vSmartMOM.jl/tree/v1.0.1", 
+            "relation": "isSupplementTo"
+        }, 
+        {
+            "scheme": "doi", 
+            "identifier": "10.5281/zenodo.7339526", 
+            "relation": "isVersionOf"
+        }
     ],
-
     "keywords": ["Radiative Transfer", "Atmosphere", "Remote Sensing", "Absorption", "Scattering"]
 }
