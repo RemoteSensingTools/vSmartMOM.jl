@@ -23,17 +23,5 @@
         }
     ], 
     "access_right": "open", 
-    "related_identifiers": [
-        {
-            "scheme": "url", 
-            "identifier": "https://github.com/RemoteSensingTools/vSmartMOM.jl/tree/v1.0.1", 
-            "relation": "isSupplementTo"
-        }, 
-        {
-            "scheme": "doi", 
-            "identifier": "10.5281/zenodo.7339526", 
-            "relation": "isVersionOf"
-        }
-    ],
     "keywords": ["Radiative Transfer", "Atmosphere", "Remote Sensing", "Absorption", "Scattering"]
 }
