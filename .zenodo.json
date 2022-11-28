@@ -1,0 +1,23 @@
+{
+    "title": "vSmartMOM.jl: an Open-Source Julia Package for Atmospheric Radiative Transfer and Remote Sensing Tools",
+
+    "creators": [
+        {
+            "orcid": "0000-0003-0142-7367",
+            "affiliation": "California Institute of Technology",
+            "name": "Jeyaram, Rupesh"
+        },
+        {
+            "orcid": "0000-0003-0754-9154",
+            "affiliation": "NASA Jet Propulsion Laboratory",
+            "name": "Sanghavi, Suniti"
+        },
+        {
+            "orcid": "0000-0002-0546-5857",
+            "affiliation": "California Institute of Technology",
+            "name": "Frankenberg, Christian"
+        }
+    ],
+
+    "keywords": ["Radiative Transfer", "Atmosphere", "Remote Sensing", "Absorption", "Scattering"]
+}
