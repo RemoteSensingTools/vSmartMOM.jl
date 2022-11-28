@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Example · vSmartMOM</title><script data-outdated-warner src="../../../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.039/juliamono-regular.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.13.11/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../../assets/documenter.js"></script><script src="../../../siteinfo.js"></script><script src="../../../../versions.js"></script><script src="../../../../copy.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../../assets/themeswap.js"></script><link href="../../../assets/favicon.ico" rel="icon" type="image/x-icon"/></head><body><div id="documenter"><nav class="docs-sidebar"><a class="docs-logo" href="../../../"><img src="../../../assets/logo.png" alt="vSmartMOM logo"/></a><div class="docs-package-name"><span class="docs-autofit"><a href="../../../">vSmartMOM</a></span></div><form class="docs-search" action="../../../search/"><input class="docs-search-query" id="documenter-search-query" name="q" type="text" placeholder="Search docs"/></form><ul class="docs-menu"><li><a class="tocitem" href="../../../">Getting Started</a></li><li><input class="collapse-toggle" id="menuitem-2" type="checkbox"/><label class="tocitem" for="menuitem-2"><span class="docs-label">vSmartMOM</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../../vSmartMOM/Overview/">Overview</a></li><li><a class="tocitem" href="../../vSmartMOM/Example/">Example</a></li><li><a class="tocitem" href="../../vSmartMOM/InputParametersGuide/">User-Defined RT Parameters</a></li><li><a class="tocitem" href="../../vSmartMOM/Types/">Methods &amp; Types</a></li><li><a class="tocitem" href="../../vSmartMOM/References/">References</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-3" type="checkbox" checked/><label class="tocitem" for="menuitem-3"><span class="docs-label">Absorption</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../Overview/">Overview</a></li><li class="is-active"><a class="tocitem" href>Example</a></li><li><a class="tocitem" href="../Types/">Methods &amp; Types</a></li><li><a class="tocitem" href="../References/">References</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-4" type="checkbox"/><label class="tocitem" for="menuitem-4"><span class="docs-label">Scattering</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../../Scattering/Overview/">Overview</a></li><li><a class="tocitem" href="../../Scattering/Example/">Example</a></li><li><a class="tocitem" href="../../Scattering/Types/">Methods &amp; Types</a></li><li><a class="tocitem" href="../../Scattering/References/">References</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-5" type="checkbox"/><label class="tocitem" for="menuitem-5"><span class="docs-label">Tutorials</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../../tutorials/Tutorial_Absorption/">Absorption: Spectral Line Shapes</a></li><li><a class="tocitem" href="../../tutorials/Tutorial_Scattering/">Scattering: Mie Phase Function Tutorial</a></li></ul></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Absorption</a></li><li class="is-active"><a href>Example</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Example</a></li></ul></nav><div class="docs-right"><a class="docs-edit-link" href="https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/master/docs/src/pages/Absorption/Example.md" title="Edit on GitHub"><span class="docs-icon fab"></span><span class="docs-label is-hidden-touch">Edit on GitHub</span></a><a class="docs-settings-button fas fa-cog" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-sidebar-button fa fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a></div></header><article class="content" id="documenter-page"><h1 id="Absorption-Module-Example"><a class="docs-heading-anchor" href="#Absorption-Module-Example">Absorption Module Example</a><a id="Absorption-Module-Example-1"></a><a class="docs-heading-anchor-permalink" href="#Absorption-Module-Example" title="Permalink"></a></h1><pre><code class="language-julia hljs">using vSmartMOM
+using vSmartMOM.Absorption
+
+## 
+## STEP 1: Get the Hitran data
+## 
+
+# If you have a fixed-width file stored locally
+hitran_data = read_hitran(&quot;path/to/file&quot;, mol=2, iso=1, ν_min=6000, ν_max=6400)
+
+# If you would like to download the file from the hitran database
+hitran_data = read_hitran(artifact(&quot;CO2&quot;), mol=2, iso=1, ν_min=6000, ν_max=6400)
+# For a list of available molecules, use Absorption.show_molecules()
+
+## 
+## STEP 2: Create a model from parameters
+## 
+
+# These are some example models, but you can create/customize your model however you&#39;d like. 
+# Please see make_hitran_model documentation for optional arguments
+model_doppler = make_hitran_model(hitran_data, Doppler())
+model_lorentz = make_hitran_model(hitran_data, Lorentz())
+model_voigt_CPU = make_hitran_model(hitran_data, Voigt())
+model_voigt_GPU = make_hitran_model(hitran_data, Voigt(), architecture=Architectures.GPU())
+
+# If you would prefer to create an interpolation, and then interpolate the cross-section 
+# at other wavelengths/pressures/temperatures, you can use make_interpolation_model as such:
+
+ν_grid = 6000:0.01:6400
+pressures = 250:250:1250
+temperatures = 100:75:400
+
+model_interp = make_interpolation_model(hitran_data, Voigt(), ν_grid, pressures, temperatures)
+
+# Note: please see make_interpolation_model documentation for optional parameters
+
+## 
+## STEP 3: Calculate the absorption cross section with the created model
+## 
+
+# NOTE: Please replace the &quot;model_*&quot; in the following lines with whichever model option you prefer from Step 2
+
+# You can specify the wavelength grid, pressure, and temperature. 
+profile = absorption_cross_section(model_*, 6000:0.01:6400, 1000.1, 296.1)
+
+# You can obtain the derivatives of the cross-section by setting the autodiff parameter to true: 
+profile, derivs = absorption_cross_section(model_*, 6000:0.01:6400, 1000.1, 296.1, autodiff=true);
+</code></pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../Overview/">« Overview</a><a class="docs-footer-nextpage" href="../Types/">Methods &amp; Types »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 0.27.12 on <span class="colophon-date" title="Monday 28 November 2022 18:40">Monday 28 November 2022</span>. Using Julia version 1.7.3.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
