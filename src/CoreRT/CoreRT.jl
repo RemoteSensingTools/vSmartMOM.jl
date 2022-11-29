@@ -36,6 +36,7 @@ using NNlib                        # For batched multiplications
 import NNlib.batched_mul           # Required to overwrite batched_mul for Duals
 using NCDatasets                   # For loading absco lookup tables
 
+using JLD2
 import Base.show                   # For overloading show for custom types
 
 #using InelasticScattering

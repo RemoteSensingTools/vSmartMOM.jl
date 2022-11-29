@@ -204,7 +204,10 @@ end
                     (1 + ϖ_λ[n] * Z⁺⁺[i,i,n2] * (dτ_λ[n] / qp_μN[i]) * wct[i])
                     #(1 + ϖ_λ[n] * Z⁺⁺[i,i] * (dτ_λ[n] / qp_μN[i]) * wct[i])
             else
-                t⁺⁺[i,j,n] = 0.0
+                #t⁺⁺[i,j,n] = 0.0
+                t⁺⁺[i,j,n] = exp(-dτ_λ[n] / qp_μN[j]) *
+                    (ϖ_λ[n] * Z⁺⁺[i,j,n2] * (dτ_λ[n] / qp_μN[i]) * wct[j])
+                    
             end
         else
     

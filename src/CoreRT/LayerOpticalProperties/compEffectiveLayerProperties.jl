@@ -21,8 +21,11 @@ function constructCoreOpticalProperties(RS_type, iBand, m, model)
                                                         arr_type = arr_type);
     else
         Rayl𝐙⁺⁺, Rayl𝐙⁻⁺ = Scattering.compute_Z_moments(pol_type, μ, 
-        greek_cabannes[iBand], m, 
-        arr_type = arr_type);
+                                                        greek_cabannes[iBand], m, 
+                                                        arr_type = arr_type);
+        Rayl2𝐙⁺⁺, Rayl2𝐙⁻⁺ = Scattering.compute_Z_moments(pol_type, μ, 
+                                                        greek_rayleigh[iBand], m, 
+                                                        arr_type = arr_type);
     end
                                                         #@show Rayl𝐙⁺⁺
 
@@ -36,6 +39,8 @@ function constructCoreOpticalProperties(RS_type, iBand, m, model)
         else
             rayl =  [CoreScatteringOpticalProperties(arr_type(τ_rayl[iB][:,i]), ϖ_Cabannes[iB], 
                 (Rayl𝐙⁺⁺), (Rayl𝐙⁻⁺)) for i=1:nZ]
+            rayl2 =  [CoreScatteringOpticalProperties(arr_type(τ_rayl[iB][:,i]), 1.0, 
+                (Rayl2𝐙⁺⁺), (Rayl2𝐙⁻⁺)) for i=1:nZ]
         end
         #CoreScatteringOpticalProperties.(
         #        τ_rayl[iB], 
@@ -91,7 +96,27 @@ function constructCoreOpticalProperties(RS_type, iBand, m, model)
         #combo2 = [CoreScatteringOpticalProperties(aType(combo[i].τ),aType(combo[i].ϖ), aType(combo[i].Z⁺⁺), aType(combo[i].Z⁻⁺)) for i in eachindex(combo)]
         # Need to check how to convert to GPU later as well!
         #return combo,fScattRayleigh
+        #@show rayl[1].τ 
+        #@show rayl[1].ϖ
+        #@show rayl[1].Z⁺⁺
+        #@show typeof(rayl[1].τ)
+        #@show Array(rayl[1].τ)[1] * rayl[1].ϖ * Array(rayl[1].Z⁺⁺)
+        #@show Array(rayl[1].τ)[1] * sum(RS_type.ϖ_λ₁λ₀) * Array(RS_type.Z⁺⁺_λ₁λ₀) 
+        #@show Array(rayl2[1].τ)[1] * rayl2[1].ϖ * Array(rayl2[1].Z⁺⁺)
+    
+        #=@show sum(Array(rayl[1].τ)[1] * rayl[1].ϖ * Array(rayl[1].Z⁺⁺) + 
+        Array(rayl[1].τ)[1] * sum(RS_type.ϖ_λ₁λ₀) * Array(RS_type.Z⁺⁺_λ₁λ₀) - 
+        Array(rayl2[1].τ)[1] * rayl2[1].ϖ * Array(rayl2[1].Z⁺⁺), dims=1)
+        @show sum(Array(rayl[1].τ)[1] * rayl[1].ϖ * Array(rayl[1].Z⁻⁺) + 
+        Array(rayl[1].τ)[1] * sum(RS_type.ϖ_λ₁λ₀) * Array(RS_type.Z⁻⁺_λ₁λ₀) - 
+        Array(rayl2[1].τ)[1] * rayl2[1].ϖ * Array(rayl2[1].Z⁻⁺), dims=1)
+        =#
+        #@show rayl2[1].Z⁺⁺[:,:,1] #.==0
+        #@show rayl[1].Z⁺⁺[:,:,1]
+        #@show RS_type.Z⁺⁺_λ₁λ₀[:,:,1] #.==0
+
     end
+    #bla
     #@show RS_type.bandSpecLim[1]
     #@show RS_type.iBand
     layer_opt = []

@@ -273,6 +273,7 @@ function rt_run(RS_type::AbstractRamanType,
     @unpack quad_points = model
 
     if obs_alt != 0
+        @info "Run ms as height !=0"
         return rt_run_test_ms(RS_type, model, iBand)
     end
     
@@ -414,9 +415,12 @@ function rt_run(RS_type::AbstractRamanType,
                             arr_type(τ_sum_all[:,end]), 
                             arr_type(F₀),
                             model.params.architecture);
-        #@show scattering_interfaces_all[end]
-        #bla
+        @show F₀[:,1]
+        @show scattering_interfaces_all[end]
+                            #@show scattering_interfaces_all[end]
+        #blapl
         # One last interaction with surface:
+        
         @timeit "interaction" interaction!(RS_type,
                                     #bandSpecLim,
                                     scattering_interfaces_all[end], 
@@ -424,6 +428,7 @@ function rt_run(RS_type::AbstractRamanType,
                                     composite_layer, 
                                     added_layer_surface, 
                                     I_static)
+                                    
         
         # Postprocess and weight according to vza
         postprocessing_vza!(RS_type, 
@@ -443,6 +448,7 @@ function rt_run(RS_type::AbstractRamanType,
 
     # Return R_SFI or R, depending on the flag
     return SFI ? (R_SFI, T_SFI, ieR_SFI, ieT_SFI) : (R, T)
+    #return Array(added_layer.ieJ₀⁻), Array(composite_layer.ieJ₀⁻)#
 end
 
 # Single scattering only

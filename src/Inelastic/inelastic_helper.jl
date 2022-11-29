@@ -17,6 +17,7 @@ function get_n₀_n₁(ieJ₁⁺,Δ)
     sub = findall(1 .≤ n₀_ .≤ size(ieJ₁⁺,3));
     n₁ = n₁_[sub[1]]:n₁_[sub[end]]
     n₀ = n₀_[sub[1]]:n₀_[sub[end]]
+    #@show Δ, n₁, n₀
     return n₀, n₁
 end
 # Currently assuming same T for all vertical atmospheric layers (so that a uniform Raman wavelength grid can be assumed for rt_interactions)

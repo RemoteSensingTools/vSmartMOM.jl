@@ -27,7 +27,7 @@ function compute_Z_moments(mod::AbstractPolarizationType, μ, greek_coefs::Greek
   
     # Pre-compute all required B matrices
     𝐁_all = [construct_B_matrix(mod, α, β, γ, δ, ϵ, ζ, i) for i in 1:l_max]
-
+@show 𝐁_all 
     # Get dimension of square matrix (easier for Scalar/Stokes dimensions)
     B_dim = Int(sqrt(length(𝐁_all[1])))
     
@@ -46,7 +46,7 @@ function compute_Z_moments(mod::AbstractPolarizationType, μ, greek_coefs::Greek
         # See eq. 15 in Sanghavi 2014, note that P,R,T are already normalized
         Π  = construct_Π_matrix(mod, P, R, T, l, m)
         Π⁻ = construct_Π_matrix(mod, P⁻, R⁻, T⁻, l, m)
-
+        #@show Π, Π⁻
         # Iterate over angles
         for j in eachindex(μ), i in eachindex(μ)
             if B_dim == 1
@@ -57,6 +57,11 @@ function compute_Z_moments(mod::AbstractPolarizationType, μ, greek_coefs::Greek
                 A⁻⁺[:,:,i,j] += Π[i] * 𝐁 * Π⁻[j]
             end
         end
+        #=for i in eachindex(μ)
+                @show m,l
+                @show A⁺⁺[:,:,i,i] 
+                @show A⁻⁺[:,:,i,i] 
+        end=#
     end
 
     # Now get to the Z part:
@@ -137,7 +142,7 @@ function compute_Z_moments(mod::AbstractPolarizationType, μ, μ₀, greek_coefs
         # See eq. 15 in Sanghavi 2014, note that P,R,T are already normalized
         Π    = construct_Π_matrix(mod, P, R, T, l, m)
         Π⁻   = construct_Π_matrix(mod, P⁻, R⁻, T⁻, l, m)
-        μ₀Π  = construct_Π_matrix(mod, μ₀P, μ₀R, μ₀T, l, m)[1]
+        #μ₀Π  = construct_Π_matrix(mod, μ₀P, μ₀R, μ₀T, l, m)[1]
         #μ₀Π⁻ = construct_Π_matrix(mod, μ₀P⁻, μ₀R⁻, μ₀T⁻, l, m)
         
         i = 1; j=3
@@ -153,7 +158,7 @@ function compute_Z_moments(mod::AbstractPolarizationType, μ, μ₀, greek_coefs
                 A⁻⁺[:,:,i,j] += Π[i] * 𝐁 * Π⁻[j]
             end
         end
-        for j in eachindex(μ)
+        #=for j in eachindex(μ)
             if B_dim == 1
                 #@show μ₀Π * 𝐁 * Π[j]
                 μ₀A⁺⁺[B_dim,B_dim,i] += μ₀Π * 𝐁 * Π[j]
@@ -163,7 +168,7 @@ function compute_Z_moments(mod::AbstractPolarizationType, μ, μ₀, greek_coefs
                 μ₀A⁺⁺[:,:,j] += μ₀Π * 𝐁 * Π[j]
                 μ₀A⁻⁺[:,:,j] += μ₀Π * 𝐁 * Π⁻[j]
             end
-        end
+        end=#
     end
 
     # Now get to the Z part:

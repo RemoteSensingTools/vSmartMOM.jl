@@ -85,6 +85,7 @@ function rt_kernel!(RS_type::Union{RRS, VS_0to1, VS_1to0},
                                                 m, ndoubl, scatter, 
                                                 quad_points,  added_layer,  
                                                 I_static, architecture)
+        #@show m, added_layer.ieJ₀⁺[1:3, 1, 1, 1], added_layer.ieJ₀⁺[1:3, 1, end, end]                                             
         #println("Elemental inelastic done...")                                        
         @timeit "elemental" elemental!(pol_type, SFI, 
                                     τ_sum, dτ_λ, dτ, 
@@ -94,6 +95,7 @@ function rt_kernel!(RS_type::Union{RRS, VS_0to1, VS_1to0},
                                     m, ndoubl, scatter, 
                                     quad_points,  added_layer,  
                                     I_static, architecture)
+        #@show added_layer.J₀⁺[1:3, 1, 1], added_layer.J₀⁺[1:3, 1, end]                                             
         #println("Elemental  done...")
         @timeit "doubling_inelastic" doubling_inelastic!(
             RS_type, pol_type, 
@@ -167,7 +169,7 @@ function rt_kernel!(RS_type::noRS{FT},
     dτ = τ ./ 2^ndoubl
     expk = arr_type(exp.(-dτ /μ₀))
     
-
+    #@show dτ, ndoubl
     # If there is scattering, perform the elemental and doubling steps
     if scatter
         
@@ -176,11 +178,44 @@ function rt_kernel!(RS_type::noRS{FT},
                                         computed_layer_properties, 
                                         m, ndoubl, scatter, quad_points,  
                                         added_layer,  architecture)
+        #=
+        if m==0
+            #m==0 ? 
+            RayJ₀p = Array(added_layer.J₀⁺)
+            RayJ₀m = Array(added_layer.J₀⁻)
+            RayT   = Array(added_layer.t⁺⁺)
+            RayR   = Array(added_layer.r⁻⁺)
+            jldsave("/home/sanghavi/debugRay3.jld2"; RayJ₀p, RayJ₀m, RayT, RayR) 
+        end                                
+        =#
         #println("Elemental done...")
         @timeit "doubling"   doubling!(pol_type, SFI, 
                                         expk, ndoubl, 
                                         added_layer, 
                                         I_static, architecture)
+        
+        if m==0
+            #m==0 ? 
+            RayJ₀p = Array(added_layer.J₀⁺)
+            RayJ₀m = Array(added_layer.J₀⁻)
+            RayT   = Array(added_layer.t⁺⁺)
+            RayR   = Array(added_layer.r⁻⁺)
+            jldsave("/home/sanghavi/debugRay3.jld2"; RayJ₀p, RayJ₀m, RayT, RayR) 
+        end                                
+                                        
+        
+                                        #=if m==0
+            #m==0 ? 
+            RayJ₀p = Array(added_layer.J₀⁺)
+            RayJ₀m = Array(added_layer.J₀⁻)
+            jldsave("/home/sanghavi/debugRay3.jld2"; RayJ₀p, RayJ₀m) 
+        end=#
+        
+                                        #=if m==0
+            #m==0 ? 
+            RayJ₀ = Array(added_layer.J₀⁺)
+            jldsave("/home/sanghavi/debugRay3.jld2"; RayJ₀) 
+        end=#
         #println("Doubling done...")
     else # This might not work yet on GPU!
         # If not, there is no reflectance. Assign r/t appropriately
@@ -215,6 +250,12 @@ function rt_kernel!(RS_type::noRS{FT},
             #@show M1[1,1,1], M2[1,1,1], M3[1,1,1], M4[1,1,1], M5[1,1,1], M6[1,1,1]
         end
     end
+    #=if m==0
+        #m==0 ? 
+        RayJ₀p = Array(composite_layer.J₀⁺)
+        RayJ₀m = Array(composite_layer.J₀⁻)
+        jldsave("/home/sanghavi/debugRay3.jld2"; RayJ₀p, RayJ₀m) 
+    end=#
 end
 
 function rt_kernel!(
@@ -239,7 +280,7 @@ function rt_kernel!(
     # Compute dτ vector
     dτ = τ ./ 2^ndoubl
     expk = arr_type(exp.(-dτ /μ₀))
-
+    #@show dτ, ndoubl
     @unpack Z⁺⁺_λ₁λ₀, Z⁻⁺_λ₁λ₀ = RS_type
     # If there is scattering, perform the elemental and doubling steps
     if scatter
@@ -257,16 +298,87 @@ function rt_kernel!(
                                                 m, ndoubl, scatter, 
                                                 quad_points, added_layer,  
                                                 I_static, architecture)
+    
+        
         #println("Elemental inelastic done...")                                        
         @timeit "elemental" elemental!(pol_type, SFI, τ_sum, dτ, F₀,
             computed_layer_properties, m, ndoubl, 
             scatter, quad_points, added_layer, architecture)
-        #println("Elemental  done...")
+#=
+            if m==0
+                #m==0 ? 
+                CabJ₀p = Array(added_layer.J₀⁺)
+                CabJ₀m = Array(added_layer.J₀⁻)
+                CabT   = Array(added_layer.t⁺⁺)
+                CabR   = Array(added_layer.r⁻⁺)
+                jldsave("/home/sanghavi/debugCab4.jld2"; CabJ₀p, CabJ₀m, CabT, CabR) 
+
+                ieJ₀p = Array(added_layer.ieJ₀⁺)
+                ieJ₀m = Array(added_layer.ieJ₀⁻)
+                ieT   = Array(added_layer.iet⁺⁺)
+                ieR   = Array(added_layer.ier⁻⁺)
+                jldsave("/home/sanghavi/debugRRS4.jld2"; ieJ₀p, ieJ₀m, ieT, ieR) # : nothing
+            end       
+  =#
+            #=if m==0
+            #m==0 ? 
+            ieJ₀p = Array(added_layer.ieJ₀⁺)
+            ieJ₀m = Array(added_layer.ieJ₀⁻)
+            jldsave("/home/sanghavi/debugRRS4.jld2"; ieJ₀p, ieJ₀m) # : nothing
+            
+            CabJ₀p = Array(added_layer.J₀⁺)
+            CabJ₀m = Array(added_layer.J₀⁻)
+            jldsave("/home/sanghavi/debugCab4.jld2"; CabJ₀p, CabJ₀m) 
+        end=#
         
+        #    jldsave("/home/sanghavi/example.jld2"; R)    added_layer.J₀⁺ 
+        #@show m, added_layer.J₀⁺[1:3, 1, 1], added_layer.J₀⁺[1:3, 1, end]                                             
+        
+        #println("Elemental  done...")
+       
         @timeit "doubling_inelastic" doubling_inelastic!(
             RS_type, pol_type, 
             SFI, expk, ndoubl, 
             added_layer, I_static, architecture)
+
+            if m==0
+                #m==0 ? 
+                CabJ₀p = Array(added_layer.J₀⁺)
+                CabJ₀m = Array(added_layer.J₀⁻)
+                CabT   = Array(added_layer.t⁺⁺)
+                CabR   = Array(added_layer.r⁻⁺)
+                jldsave("/home/sanghavi/debugCab4.jld2"; CabJ₀p, CabJ₀m, CabT, CabR) 
+
+                ieJ₀p = Array(added_layer.ieJ₀⁺)
+                ieJ₀m = Array(added_layer.ieJ₀⁻)
+                ieT   = Array(added_layer.iet⁺⁺)
+                ieR   = Array(added_layer.ier⁻⁺)
+                jldsave("/home/sanghavi/debugRRS4.jld2"; ieJ₀p, ieJ₀m, ieT, ieR) # : nothing
+            end   
+            #=if m==0
+                #m==0 ? 
+                ieJ₀p = Array(added_layer.ieJ₀⁺)
+                ieJ₀m = Array(added_layer.ieJ₀⁻)
+                jldsave("/home/sanghavi/debugRRS4.jld2"; ieJ₀p, ieJ₀m) # : nothing
+                
+                CabJ₀p = Array(added_layer.J₀⁺)
+                CabJ₀m = Array(added_layer.J₀⁻)
+                jldsave("/home/sanghavi/debugCab4.jld2"; CabJ₀p, CabJ₀m) 
+            end=#
+        #=if m==0
+            #m==0 ? 
+            ieJ₀ = Array(added_layer.ieJ₀⁺)
+            jldsave("/home/sanghavi/debugRRS4.jld2"; ieJ₀) # : nothing
+            
+            CabJ₀ = Array(added_layer.J₀⁺)
+            jldsave("/home/sanghavi/debugCab4.jld2"; CabJ₀) 
+        end=#
+            
+        #@show m, added_layer.ieJ₀⁺[1:3, 1, 1, 1], added_layer.ieJ₀⁺[1:3, 1, end, end] 
+        #for dctr=1:166                                            
+        #    @show m, dctr, added_layer.ieJ₀⁺[1:3, 1, 469, dctr], added_layer.ieJ₀⁺[1:3, 1, 815, dctr]                                             
+        #end    
+        #@show m, added_layer.J₀⁺[1:3, 1, 1], added_layer.J₀⁺[1:3, 1, end] 
         #println("Doubling done...")
         #@timeit "doubling"   doubling!(pol_type, SFI, expk, ndoubl, added_layer, I_static, architecture)
     else # This might not work yet on GPU!
@@ -304,6 +416,17 @@ function rt_kernel!(
         @timeit "interaction" interaction!(RS_type, scattering_interface, 
             SFI, composite_layer, added_layer, I_static)
     end
+    #=if m==0
+        #m==0 ? 
+        ieJ₀p = Array(composite_layer.ieJ₀⁺)
+        ieJ₀m = Array(composite_layer.ieJ₀⁻)
+        jldsave("/home/sanghavi/debugRRS4.jld2"; ieJ₀p, ieJ₀m) # : nothing
+        
+        CabJ₀p = Array(composite_layer.J₀⁺)
+        CabJ₀m = Array(composite_layer.J₀⁻)
+        jldsave("/home/sanghavi/debugCab4.jld2"; CabJ₀p, CabJ₀m) 
+    end=#
+
 end
 #=
 function rt_kernel!(

@@ -9,11 +9,11 @@ radiative_transfer:
     ##- (1e7/460):0.3:(1e7/420)
     #- (1e7/405):1.:(1e7/315)
     #- (1e7/405):0.6:(1e7/385)
-    - (1e7/410):1.:(1e7/380)
+    - (1e7/400):0.5:(1e7/390) #(1e7/410):1.:(1e7/380)
     #- (1e7/415):0.3:(1e7/385)
   # Bidirectional Reflectance Distribution Function (BRDF) per band
   surface: 
-    - LambertianSurfaceScalar{Float64}(0.05) #(.05) #(0.25) #(0.2) #(0.05)
+    - LambertianSurfaceScalar{Float64}(0.0) #(.05) #(0.25) #(0.2) #(0.05)
   # Quadrature-scheme for stream calculations
   quadrature_type:    GaussQuadHemisphere()
   # Polarization type (Stokes_I, Stokes_IQ, Stokes_IQU, Stokes_IQUV)
@@ -29,7 +29,7 @@ radiative_transfer:
   # Floating point type for calculations (Float32, Float64)
   float_type:         Float64
   # Architecture (default_architecture, Architectures.GPU(), Architectures.CPU())
-  architecture:       Architectures.GPU() # default_architecture
+  architecture:       Architectures.GPU() #Architectures.GPU() # default_architecture
   
 # =================================================================
 # Simulation Geometry
@@ -83,7 +83,7 @@ atmospheric_profile:
   #    800.12, 849.00, 912.00, 980.00, 1005.0]
   #
   # Reduce profile to n layers (-1 is default, leave as is)
-  profile_reduction: 5 #-1
+  profile_reduction: 1 #1 #-1
 
 # =================================================================
 # Absorption-Related Parameters (Optional)

@@ -89,9 +89,9 @@ function postprocessing_vza!(RS_type::Union{RRS, VS_0to1_plus, VS_1to0_plus},
                     ieR_SFI[i,:,s] += bigCS * ieJ₀⁻[istart:iend,1, s, t];
                     ieT_SFI[i,:,s] += bigCS * ieJ₀⁺[istart:iend,1, s, t];
                     #
-                    if (s==1900) & (i==1)
-                        @show i, s, t, ieR_SFI[i,:,s]
-                    end
+                    #if (s==1900) & (i==1)
+                    #    @show i, s, t, ieR_SFI[i,:,s]
+                    #end
                 end
                 #if s<907
                 #@show m, s, sum(ieJ₀⁻[istart:iend, 1, s, :], dims=2)

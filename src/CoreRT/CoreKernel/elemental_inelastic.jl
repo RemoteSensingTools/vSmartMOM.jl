@@ -104,7 +104,6 @@ function elemental_inelastic!(RS_type::Union{RRS, RRS_plus},
     #@pack! added_layer = r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, J₀⁺, J₀⁻   
 end
 
-
 #Suniti: is there a way to pass information like ϖ_λ₁λ₀, i_λ₁λ₀, i_ref, etc. along with RS_type? So that they can be retrieved as RSS.ϖ_λ₁λ₀ for example?
 # This one is only for RRS
 @kernel function get_elem_rt_RRS!(fscattRayl, 
@@ -120,13 +119,9 @@ end
     # n₁ covers the full range of wavelengths, while n₀ = n₁+Δn only includes wavelengths at intervals 
     # that contribute significantly enough to inelastic scattering, so that n₀≪n₁ 
     n₀  = n₁ + i_λ₁λ₀[Δn]
-    #for i in 1:nMax
-    #if ((n₀==840) || (n₀==850))
-    #    @show n₀, dτ_λ[n₀]
-    #end
-    #end
-    #i_ϖ = i_ref + i_λ₁λ₀[Δn]
-    #@show   n₀ , i_ϖ 
+    ier⁻⁺[i,j,n₁,Δn]=0
+    iet⁺⁺[i,j,n₁,Δn]=0
+
     
     if (1 ≤ n₀ ≤ nMax) & (wct2[j]>1.e-8) 
 
@@ -139,78 +134,32 @@ end
             (1 - exp(-((dτ_λ[n₁] / qp_μN[i]) + (dτ_λ[n₀] / qp_μN[j])))) * wct2[j] 
 
 
-            #=
-            if (i%3==1)&(j%3==1)&(n₁==200)  
-    @show i, j, n₁, n₀, Δn
-        @show fscattRayl[n₀]
-        @show ϖ_λ₁λ₀[Δn]
-        @show ϖ_λ[n₀] 
-        @show Z⁻⁺_λ₁λ₀[i,j] 
-        @show (1/( (qp_μN[i] / qp_μN[j]) + (dτ_λ[n₁]/dτ_λ[n₀]) )) 
-        @show (1 - exp(-((dτ_λ[n₁] / qp_μN[i]) + (dτ_λ[n₀] / qp_μN[j])))) 
-        @show wct2[j]
-        @show ier⁻⁺[i,j,n₁,Δn]
- end
- =# 
-        #ier⁻⁺[i,j,n₁,Δn] = fscattRayl[n₀] * ϖ_λ₁λ₀[Δn] * ϖ_λ[n₀] * Z⁻⁺_λ₁λ₀[i,j] * 
-        #    (1/( (qp_μN[i] / qp_μN[j]) + (dτ_λ[n₁]/dτ_λ[n₀]) )) * 
-        #    (1 - exp(-((dτ_λ[n₁] / qp_μN[i]) + (dτ_λ[n₀] / qp_μN[j])))) * wct2[j] 
-        #@show ier⁻⁺[i,j,n₁,Δn]      
-        #bla
-        #if ((n₀==840) || (n₀==850))
-        #    @show n₀, (1/( (qp_μN[i] / qp_μN[j]) + (dτ_λ[n₁]/dτ_λ[n₀]) )),  
-        #    (1 - exp(-((dτ_λ[n₁] / qp_μN[i]) + (dτ_λ[n₀] / qp_μN[j]))))* ϖ_λ[n₀]
-        #end
         if (qp_μN[i] == qp_μN[j])
             # @show i,j
             # 𝐓⁺⁺(μᵢ, μᵢ) = (exp{-τ/μᵢ} + ϖ ̇𝐙⁺⁺(μᵢ, μᵢ) ̇(τ/μᵢ) ̇exp{-τ/μᵢ}) ̇𝑤ᵢ
-            if i == j       
-                if abs(dτ_λ[n₀]-dτ_λ[n₁])>1.e-6
+            #if i == j       
+                if abs(dτ_λ[n₀]-dτ_λ[n₁])>1.e-8
                     iet⁺⁺[i,j,n₁,Δn] = 
-                        ϖ_λ₁λ₀[Δn] * fscattRayl[n₀] * Z⁺⁺_λ₁λ₀[i,i] * wct2[i] *
-                        (exp(-dτ_λ[n₁] / qp_μN[i]) - exp(-dτ_λ[n₀] / qp_μN[i]))/
+                        ϖ_λ₁λ₀[Δn] * fscattRayl[n₀] * Z⁺⁺_λ₁λ₀[i,j] * wct2[j] *
+                        (exp(-dτ_λ[n₁] / qp_μN[i]) - exp(-dτ_λ[n₀] / qp_μN[j]))/
                         (1 - (dτ_λ[n₁]/dτ_λ[n₀]))   
-                    #=
-                        if (i%3==1)&(j%3==1)&(n₁==200)  
-                        @show i, j, n₁, n₀, Δn
-                        #@show fscattRayl[n₀]
-                        @show ϖ_λ₁λ₀[Δn]
-                        #@show ϖ_λ[n₀] 
-                        @show Z⁺⁺_λ₁λ₀[i,j] 
-                        @show (1 / ( 1 - (dτ_λ[n₁]/dτ_λ[n₀]) )) 
-                        @show (exp(-dτ_λ[n₁] / qp_μN[i]) - exp(-dτ_λ[n₀] / qp_μN[j]))
-                        #@show wct2[j]
-                        @show iet⁺⁺[i,j,n₁,Δn]
-                    end                       
-                    =#
+                    
                 else    
                     iet⁺⁺[i,j,n₁,Δn] =  
                         (dτ_λ[n₀]/ qp_μN[i]) * ϖ_λ₁λ₀[Δn] * fscattRayl[n₀] * 
-                        Z⁺⁺_λ₁λ₀[i,i] * wct2[i] *
-                        exp(-dτ_λ[n₀] / qp_μN[i])
-                        #=
-                        if (i%3==1)&(j%3==1)&(n₁==200)  
-                            @show i, j, n₁, n₀, Δn
-                                #@show fscattRayl[n₀]
-                                @show ϖ_λ₁λ₀[Δn]
-                                #@show ϖ_λ[n₀] 
-                                @show Z⁺⁺_λ₁λ₀[i,j] 
-                                @show dτ_λ[n₀]/ qp_μN[i]
-                                @show exp(-dτ_λ[n₀] / qp_μN[j])
-                                #@show wct2[j]
-                                @show iet⁺⁺[i,j,n₁,Δn]
-                         end 
-                         =#
+                        Z⁺⁺_λ₁λ₀[i,j] * wct2[j] *
+                        exp(-dτ_λ[n₀] / qp_μN[j])
+
                 end
-            else
-                iet⁺⁺[i,j,n₁,Δn] =  0.0
-            end
+            #else
+            #    iet⁺⁺[i,j,n₁,Δn] =  0.0
+            #end
         else
             #@show  qp_μN[i], qp_μN[j]  
             # 𝐓⁺⁺(μᵢ, μⱼ) = ϖ ̇𝐙⁺⁺(μᵢ, μⱼ) ̇(μⱼ/(μᵢ-μⱼ)) ̇(exp{-τ/μᵢ} - exp{-τ/μⱼ}) ̇𝑤ⱼ
             # (𝑖 ≠ 𝑗)
 
-            if (abs( (qp_μN[i]/qp_μN[j]) - (dτ_λ[n₁]/dτ_λ[n₀]) ) < 1.e-4)
+            if (abs( (qp_μN[i]/qp_μN[j]) - (dτ_λ[n₁]/dτ_λ[n₀]) ) < 1.e-8)
                 iet⁺⁺[i,j,n₁,Δn] = 
                 (dτ_λ[n₀]/qp_μN[i]) * ϖ_λ₁λ₀[Δn] * fscattRayl[n₀] * Z⁺⁺_λ₁λ₀[i,j] * 
                 wct2[j] * exp(-dτ_λ[n₀] / qp_μN[j])
@@ -244,13 +193,7 @@ end
             iet⁺⁺[i,j,n₁,Δn] = 0.0
         end
     end
-    #=
-    if (i%3==1) & (j%3==1) & ((iet⁺⁺[i, j, n₁, Δn]<0) | (iet⁺⁺[i, j, n₁, Δn]>1) | (ier⁻⁺[i, j, n₁, Δn]<0) | (ier⁻⁺[i, j, n₁, Δn]>1)) 
-        @show i, j, n₁, Δn, iet⁺⁺[i, j, n₁, Δn], ier⁻⁺[i, j, n₁, Δn]
-        bla
-    end
-    =#
-    #@show i,j,n₁,Δn, Array(ier⁻⁺)[i,j,n₁,Δn], Array(iet⁺⁺)[i,j,n₁,Δn]
+
 end
 
 # kernel wrapper:
@@ -522,11 +465,12 @@ end
     # let n₁ cover the full range of wavelengths, while n₀ only includes wavelengths at intervals 
     # that contribute significantly enough to inelastic scattering, so that n₀≪n₁ 
     n₀  = n₁ + i_λ₁λ₀[Δn]
-    #i_ϖ = i_ref + i_λ₁λ₀[Δn]     
+    #i_ϖ = i_ref + i_λ₁λ₀[Δn]
+    ieJ₀⁺[i, 1, n₁, Δn]=0
+    ieJ₀⁻[i, 1, n₁, Δn]=0        
     FT = eltype(I₀)
     if (1 ≤ n₀ ≤ nMax)
-        ieJ₀⁺[i, 1, n₁, Δn]=0
-        ieJ₀⁻[i, 1, n₁, Δn]=0    
+         
         Z⁺⁺_I₀ = FT(0.0);
         Z⁻⁺_I₀ = FT(0.0);
         for ii = i_start:i_end
@@ -536,10 +480,10 @@ end
         if (i_start ≤ i ≤ i_end)
             #ctr = i-i_start+1
             # J₀⁺ = 0.25*(1+δ(m,0)) * ϖ(λ) * Z⁺⁺ * I₀ * (dτ(λ)/μ₀) * exp(-dτ(λ)/μ₀)
-            if abs(dτ_λ[n₀]-dτ_λ[n₁])>1.e-6
+            if abs(dτ_λ[n₀]-dτ_λ[n₁])>1.e-8
                 ieJ₀⁺[i, 1, n₁, Δn] = 
                         ϖ_λ₁λ₀[Δn] * fscattRayl[n₀] * Z⁺⁺_I₀ * wct02 *
-                        (exp(-dτ_λ[n₁] / qp_μN[i]) - exp(-dτ_λ[n₀] / qp_μN[i])) /
+                        (exp(-dτ_λ[n₁] / qp_μN[i]) - exp(-dτ_λ[n₀] / qp_μN[i_start])) /
                         (1 - (dτ_λ[n₁]/dτ_λ[n₀])) 
                         #=
                         if (i%3==1)&(n₁==200)  
@@ -556,7 +500,8 @@ end
                         =#
             else
                 ieJ₀⁺[i, 1, n₁, Δn] = 
-                        (dτ_λ[n₀]/ qp_μN[i_start]) * wct02 * ϖ_λ₁λ₀[Δn] * fscattRayl[n₀] * 
+                        (dτ_λ[n₀]/ qp_μN[i]) * wct02 * ϖ_λ₁λ₀[Δn] * 
+                        fscattRayl[n₀] * 
                         Z⁺⁺_I₀ * 
                         exp(-dτ_λ[n₀] / qp_μN[i_start])
                         #=
@@ -575,7 +520,7 @@ end
             end
         else
             # J₀⁺ = 0.25*(1+δ(m,0)) * ϖ(λ) * Z⁺⁺ * I₀ * [μ₀ / (μᵢ - μ₀)] * [exp(-dτ(λ)/μᵢ) - exp(-dτ(λ)/μ₀)]
-            if (abs( (qp_μN[i]/qp_μN[i_start]) - (dτ_λ[n₁]/dτ_λ[n₀]) ) < 1.e-4)
+            if (abs( (qp_μN[i]/qp_μN[i_start]) - (dτ_λ[n₁]/dτ_λ[n₀]) ) < 1.e-8)
                 ieJ₀⁺[i, 1, n₁, Δn] = 
                 (dτ_λ[n₀]/qp_μN[i]) * wct02 * ϖ_λ₁λ₀[Δn] * fscattRayl[n₀] * Z⁺⁺_I₀ * 
                 exp(-dτ_λ[n₀] / qp_μN[i_start])
@@ -610,6 +555,7 @@ end
             bla
         end
         =#
+        
         ieJ₀⁺[i, 1, n₁, Δn] *= exp(-τ_sum[n₀]/qp_μN[i_start]) #correct this to include n₀ap
         ieJ₀⁻[i, 1, n₁, Δn] *= exp(-τ_sum[n₀]/qp_μN[i_start]) 
     end
