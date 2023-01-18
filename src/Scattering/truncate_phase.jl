@@ -49,7 +49,7 @@ function truncate_phase(mod::δBGE, aero::AerosolOptics{FT}; reportFit=false) wh
     # W₁₂ = Diagonal(w_μ[iμ]);
     # W₃₄ = Diagonal(w_μ[iμ]);
     # Julia backslash operator for least squares (just like Matlab);
-    cl = ((W₁₁ * A) \ (W₁₁ * y₁₁))   # B in δ-BGR (β)
+    cl = ((W₁₁ * A) \ (W₁₁ * y₁₁))   # B in δ-BGE (β)
     γᵗ = similar(cl); γᵗ[1:2] .=0
     ϵᵗ = similar(cl); ϵᵗ[1:2] .=0
     γᵗ[3:end] = ((W₁₂ * B) \ (W₁₂ * y₁₂))   # G in δ-BGE (γ)
@@ -69,7 +69,7 @@ function truncate_phase(mod::δBGE, aero::AerosolOptics{FT}; reportFit=false) wh
     c₀ = FT(cl[1]) # ( w_μ' * (P[:,1:l_max] * cl) ) / 2
     
     # Compute truncated greek coefficients:
-    βᵗ = cl / c₀                                    # Eq. 38a, B in δ-BGR (β)
+    βᵗ = cl / c₀                                    # Eq. 38a, B in δ-BGE (β)
     δᵗ = (δ[1:l_max] .- (β[1:l_max] .- cl)) / c₀    # Eq. 38b, derived from β
     αᵗ = (α[1:l_max] .- (β[1:l_max] .- cl)) / c₀    # Eq. 38c, derived from β
     ζᵗ = (ζ[1:l_max] .- (β[1:l_max] .- cl)) / c₀    # Eq. 38d, derived from β
