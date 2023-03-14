@@ -34,7 +34,7 @@ TimerOutputs = "a759f4b9-e2f1-59dc-863e-4aeb61b1ea8f"
 YAML = "ddb6d928-2868-570f-bddf-ab3f9cf99eb6"
 
 [compat]
-CUDA = "3"
+CUDA = "3, 4"
 CUDAKernels = "0.2, 0.3"
 DataInterpolations = "3.6"
 DiffResults = "1.0"
