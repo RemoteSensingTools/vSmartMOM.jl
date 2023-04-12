@@ -483,7 +483,7 @@ end
             if abs(dτ_λ[n₀]-dτ_λ[n₁])>1.e-8
                 ieJ₀⁺[i, 1, n₁, Δn] = 
                         ϖ_λ₁λ₀[Δn] * fscattRayl[n₀] * Z⁺⁺_I₀ * wct02 *
-                        (exp(-dτ_λ[n₁] / qp_μN[i]) - exp(-dτ_λ[n₀] / qp_μN[i_start])) /
+                        (exp(-dτ_λ[n₁] / qp_μN[i]) - exp(-dτ_λ[n₀] / qp_μN[i])) /
                         (1 - (dτ_λ[n₁]/dτ_λ[n₀])) 
                         #=
                         if (i%3==1)&(n₁==200)  
@@ -503,7 +503,7 @@ end
                         (dτ_λ[n₀]/ qp_μN[i]) * wct02 * ϖ_λ₁λ₀[Δn] * 
                         fscattRayl[n₀] * 
                         Z⁺⁺_I₀ * 
-                        exp(-dτ_λ[n₀] / qp_μN[i_start])
+                        exp(-dτ_λ[n₀] / qp_μN[i])
                         #=
                         if (i%3==1)&(n₁==200)  
                             @show i, n₁, n₀, Δn

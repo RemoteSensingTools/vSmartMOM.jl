@@ -76,6 +76,28 @@ function getRamanSSProp!(RS_type::RRS, depol, λ, grid_in)
     return nothing
 end
 
+function getRamanSSProp!(RS_type::RRS, λ, grid_in) 
+    @unpack n2,o2 =  RS_type
+    #n2, o2 = getRamanAtmoConstants(1.e7/λ, T)
+    # determine Rayleigh scattering cross-section at central wavelength λ of the spectral band (assumed constant throughout the band)
+    atmo_σ_Rayl = compute_optical_Rayl(λ, n2, o2)
+    RS_type.greek_raman = get_greek_raman(RS_type, n2, o2)
+    #get_greek_raman!(RS_type, n2, o2)
+    RS_type.ϖ_Cabannes .= compute_ϖ_Cabannes(RS_type, λ)
+    # @show RS_type.ϖ_Cabannes
+    # determine RRS cross-sections to λ₀ from nSpecRaman wavelengths around λ₀  
+    index_raman_grid, atmo_σ_RRS = compute_optical_RS!(RS_type, grid_in, λ, n2, o2)
+    # declare ϖ_Raman to be a grid of length raman grid
+    #RS_type.ϖ_λ₁λ₀ = atmo_σ_RRS[end:-1:1]/atmo_σ_Rayl * (1-RS_type.ϖ_Cabannes[1])/sum(atmo_σ_RRS[end:-1:1]/atmo_σ_Rayl) #the grid gets inverted because the central wavelength is now seen as the recipient of RRS from neighboring source wavelengths
+    RS_type.ϖ_λ₁λ₀ = (atmo_σ_RRS[end:-1:1]/atmo_σ_Rayl) #the grid gets inverted because the central wavelength is now seen as the recipient of RRS from neighboring source wavelengths
+    @show RS_type.ϖ_λ₁λ₀
+    @show sum(RS_type.ϖ_λ₁λ₀)
+    @show RS_type.ϖ_Cabannes
+    RS_type.i_λ₁λ₀ = index_raman_grid[end:-1:1]
+    RS_type.n_Raman = length(RS_type.ϖ_λ₁λ₀)
+    return nothing
+end 
+
 function getRamanSSProp!(RS_type::RRS_plus, depol) 
     @unpack n2, o2, 
             iBand, grid_in,
@@ -182,11 +204,11 @@ function getRamanSSProp!(
         λ = nm_per_m/(0.5*(_grid_in[1]+_grid_in[end]))
         
         if iB==1
-            @show InelasticScattering.compute_ϖ_Cabannes(RS_type, depol, λ_inc, n2, o2)
-            ϖ_Cabannes[iB] = InelasticScattering.compute_ϖ_Cabannes(RS_type, λ_inc)
-            #@show ϖ_Cabannes
+            #@show InelasticScattering.compute_ϖ_Cabannes(RS_type, depol, λ_inc, n2, o2)
+            ϖ_Cabannes[iB] = 1.    #@show ϖ_Cabannes
         else
-            ϖ_Cabannes[iB] = 1.
+            ϖ_Cabannes[iB] = InelasticScattering.compute_ϖ_Cabannes(RS_type, λ_inc)
+            # 1.
         end
         if iB==1
             t_ϖ_VRS = [0.]

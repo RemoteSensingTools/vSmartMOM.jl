@@ -125,7 +125,8 @@ function doubling_helper!(RS_type::RRS,
                         (ier⁻⁺[:,:,n₁,Δn] ⊠ r⁻⁺[:,:,n₀] + r⁻⁺[:,:,n₁] ⊠ ier⁻⁺[:,:,n₁,Δn]) ⊠ 
                         gp_refl[:,:,n₀] ⊠ t⁺⁺[:,:,n₀]) + 
                         iet⁺⁺[:,:,n₁,Δn] ⊠ gp_refl[:,:,n₀] ⊠  t⁺⁺[:,:,n₀]
-                @timeit "n loop 2" @inbounds @views tmp6 = ier⁻⁺[:,:,n₁,Δn] + 
+                @timeit "n loop 2" @inbounds @views tmp6 = 
+                        ier⁻⁺[:,:,n₁,Δn] + 
                         (iet⁺⁺[:,:,n₁,Δn] ⊠ gp_refl[:,:,n₀] ⊠ r⁻⁺[:,:,n₀] ⊠ t⁺⁺[:,:,n₀]) +
                         tt⁺⁺_gp_refl[:,:,n₁] ⊠   
                             (r⁻⁺[:,:,n₁] ⊠ iet⁺⁺[:,:,n₁,Δn] + 
@@ -188,9 +189,9 @@ function doubling_helper!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
         J₁⁻ = similar(J₀⁻)
 
         # Dummy for source 
-        ieJ₁⁺ = similar(ieJ₀⁺)
+        ieJ₁⁺ = similar(ieJ₀⁺); ieJ₁⁺.=0
         # Dummy for J
-        ieJ₁⁻ = similar(ieJ₀⁻)
+        ieJ₁⁻ = similar(ieJ₀⁻); ieJ₁⁻.=0
     end
 
     # Loop over number of doublings

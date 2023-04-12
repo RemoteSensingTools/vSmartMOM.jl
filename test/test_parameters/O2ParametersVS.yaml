@@ -4,13 +4,15 @@
 radiative_transfer: 
   # Spectral bands (list of ν_start:ν_step:ν_end, in cm⁻¹)
   spec_bands:
-    - (1e7/780):0.5:(1e7/750)
-    #- (1e7/768):0.1:(1e7/763) 
-    #- (1e7/787):0.1:(1e7/747)
+    - (1e7/780):0.1:(1e7/750)
+    - (1e7/768):0.1:(1e7/763) 
+    - (1e7/787):0.1:(1e7/747)
     #- (1e7/2050.1):0.5:(1e7/2050.)
   # Bidirectional Reflectance Distribution Function (BRDF) per band
   surface: 
     - LambertianSurfaceScalar{Float64}(0.0) #(0.2) #(0.05)
+    - LambertianSurfaceScalar{Float64}(0.0)  
+    - LambertianSurfaceScalar{Float64}(0.0)
   # Quadrature-scheme for stream calculations
   quadrature_type:    GaussQuadHemisphere()
   # Polarization type (Stokes_I, Stokes_IQ, Stokes_IQU, Stokes_IQUV)
@@ -22,7 +24,7 @@ radiative_transfer:
   # Trunction length for legendre terms
   l_trunc:            5 #5
   # Depolarization factor
-  depol:              0.03
+  depol:              0.028
   # Floating point type for calculations (Float32, Float64)
   float_type:         Float64
   # Architecture (default_architecture, Architectures.GPU(), Architectures.CPU())
@@ -33,11 +35,11 @@ radiative_transfer:
 # =================================================================
 geometry: 
   # Solar zenith angle (degrees)
-  sza:                30. #32.4436
+  sza:                60. #30. #32.4436
   # Viewing zenith angles (degrees)
-  vza:                [45.] #[60., 60., 30., 30.] #[32.4436] #[0.072]
+  vza:                [60.] #[45.] #[60., 60., 30., 30.] #[32.4436] #[0.072]
   # Viewing azimuth angles (degrees)
-  vaz:                [0.0] #[0.0, 180., 0.0, 180.]
+  vaz:                [180.] #[0.0] #[0.0, 180., 0.0, 180.]
   # Observation altitude (Pa)
   obs_alt:            0 #1000.0
 
@@ -47,22 +49,38 @@ geometry:
 atmospheric_profile: 
   # Temperature Profile (TOA to BOA, in K)
   # Full-levels, specified at layer centers
-  T: [231.62, 244.33, 251.34, 258.09, 264.25, 269.15, 
-      272.59, 274.07, 273.30, 269.65, 264.27, 258.11, 
-      251.52, 245.22, 239.20, 234.05, 229.71, 225.70, 
-      222.70, 220.62, 219.32, 217.93, 216.98, 217.10, 
-      218.35, 223.33, 234.19, 249.34, 264.12, 277.20, 
-      280.77, 282.60, 284.40, 285.80]
+  T: [330.0, 270.0, 224.4, 201.95, 191.75, 187.65, 187.9, 193.75, 
+      203.5, 214.0, 226.45, 240.15, 253.9, 265.75, 270.65, 267.4, 
+      260.75, 253.85000000000002, 246.65, 239.7, 233.25, 228.25, 
+      225.25, 222.8, 221.1, 220.1, 219.1, 218.1, 217.14999999999998, 
+      216.7, 216.7, 216.7, 216.7, 216.7, 216.7, 216.7, 216.7, 216.75, 
+      220.05, 226.5, 232.95, 239.45, 245.95, 252.45, 258.95, 265.45, 271.95, 278.45, 284.95]
   # Pressure Profile (TOA to BOA at each boundary, in hPa)
   # Half-levels, specified at layer boundaries
-  p: [  0.14,   0.22,   0.30,   0.39,   0.53,   0.71,   
-        0.96,   1.28,   1.70,   2.27,   3.03,   4.03,  
-        5.44,   7.26,   9.67,  12.90,  17.23,  23.30,  
-       31.00,  42.07,  56.09,  74.78,  99.69, 131.00,
-      176.85, 236.64, 314.58, 418.87, 557.76, 735.00, 
-      800.12, 849.00, 912.00, 980.00, 1005.0]
+  p: [2.54e-5, 4.01e-5, 7.1e-5, 0.000145, 0.00032, 0.00076, 0.00184, 
+      0.00446, 0.0105, 0.024, 0.0522, 0.109, 0.219, 0.425, 0.7978, 
+      1.09, 1.491, 2.06, 2.871, 4.15, 5.746, 8.01, 11.97, 17.43, 
+      25.49, 29.72, 34.67, 40.47, 47.29, 55.29, 64.67, 75.65, 88.5, 
+      103.5, 121.1, 141.7, 165.8, 194.0, 227.0, 265.0, 308.0, 356.5, 
+      411.1, 472.2, 540.5, 616.6, 701.2, 795.0, 898.8, 1013.0]
+  # Temperature Profile (TOA to BOA, in K)
+  # Full-levels, specified at layer centers
+  #T: [231.62, 244.33, 251.34, 258.09, 264.25, 269.15, 
+  #    272.59, 274.07, 273.30, 269.65, 264.27, 258.11, 
+  #    251.52, 245.22, 239.20, 234.05, 229.71, 225.70, 
+  #    222.70, 220.62, 219.32, 217.93, 216.98, 217.10, 
+  #    218.35, 223.33, 234.19, 249.34, 264.12, 277.20, 
+  #    280.77, 282.60, 284.40, 285.80]
+  # Pressure Profile (TOA to BOA at each boundary, in hPa)
+  # Half-levels, specified at layer boundaries
+  #p: [  0.14,   0.22,   0.30,   0.39,   0.53,   0.71,   
+  #      0.96,   1.28,   1.70,   2.27,   3.03,   4.03,  
+  #      5.44,   7.26,   9.67,  12.90,  17.23,  23.30,  
+  #     31.00,  42.07,  56.09,  74.78,  99.69, 131.00,
+  #    176.85, 236.64, 314.58, 418.87, 557.76, 735.00, 
+  #    800.12, 849.00, 912.00, 980.00, 1005.0]
   # Reduce profile to n layers (-1 is default, leave as is)
-  profile_reduction: 5
+  profile_reduction: -1 #1 #5
 
 # =================================================================
 # Absorption-Related Parameters (Optional)
@@ -70,19 +88,38 @@ atmospheric_profile:
 absorption:
   # List of molecules per spectral band
   molecules:
-    - [O2] # Molecules in Band #1
-    #- [O2]
-    #- [O2]
+    - [O3] # Molecules in Band #1
+    - [O3]
+    - [O3]
+  # VMR profiles can either be real-valued numbers, 
+  # or an array of nodal points from TOA to BOA, interpolated in pressure space
+  LUTfiles:
+    - ["/net/fluo/data2/data/Rami_CS_database/rami_spectroscopy_o3_all_nu.jld2"]
+    - ["/net/fluo/data2/data/Rami_CS_database/rami_spectroscopy_o3_all_nu.jld2"]
+    - ["/net/fluo/data2/data/Rami_CS_database/rami_spectroscopy_o3_all_nu.jld2"]
+  #  - ["/net/fluo/data2/data/ABSCO_CS_Database/v5.2_final/o2_v52.jld2"]
+    #- ["/net/fluo/data2/data/ABSCO_CS_Database/v5.2_final/wh2o_v52.jld2", "/net/fluo/data2/data/ABSCO_CS_Database/v5.2_final/wco2_v52.jld2"]
+    #- ["/net/fluo/data2/data/ABSCO_CS_Database/v5.2_final/sh2o_v52.jld2", "/net/fluo/data2/data/ABSCO_CS_Database/v5.2_final/sco2_v52.jld2"]
   # VMR profiles can either be real-valued numbers, 
   # or an array of nodal points from TOA to BOA, interpolated in pressure space
   vmr: 
-    O2:   0.21
+    #O3:   0. #O2:    0.21
+    O3:  [2.75e-9, 2.75e-8, 1.25e-7, 3.0000000000000004e-7, 5.5e-7, 7.0e-7, 
+          6.0e-7, 4.0000000000000003e-7, 2.75e-7, 2.75e-7, 5.0e-7, 9.000000000000001e-7, 
+          1.45e-6, 2.4500000000000003e-6, 3.6e-6, 4.675e-6, 5.724999999999999e-6, 6.75e-6, 
+          7.55e-6, 7.82e-6, 7.605e-6, 6.96e-6, 6.175e-6, 5.46e-6, 
+          4.875e-6, 4.4e-6, 3.91e-6, 3.3399999999999998e-6, 2.805e-6, 2.3049999999999995e-6, 
+          1.81e-6, 1.39e-6, 1.03e-6, 7.605e-7, 5.769999999999999e-7, 4.44e-7, 
+          3.475e-7, 2.6250000000000003e-7, 1.7299999999999997e-7, 1.1135e-7, 7.570000000000001e-8, 5.49e-8, 
+          4.5600000000000005e-8, 3.9399999999999995e-8, 3.5799999999999996e-8, 3.355e-8, 3.2799999999999996e-8, 3.085e-8, 
+          2.795e-8] 
+  
   # Broadening function (Doppler/Lorentz/Voigt)
   broadening:         Voigt()
   # Complex error function for Voigt calculations
   CEF:                HumlicekWeidemann32SDErrorFunction()
   # Wing cutoff (cm⁻¹)
-  wing_cutoff:        20
+  wing_cutoff:        40
 
 # =================================================================
 # Scattering-Related Parameters (Optional)
@@ -90,7 +127,7 @@ absorption:
 scattering:
   # List of scattering aerosols and their properties
   aerosols:       
-    - τ_ref:          0.0000001           # Reference τ
+    - τ_ref:          0.0 #000001           # Reference τ
       μ:              0.01 #1.3           # Log mean radius (µm)
       σ:              1.12 #2.0           # Log stddev of radius (µm)
       nᵣ:             1.3           # Real part of refractive index

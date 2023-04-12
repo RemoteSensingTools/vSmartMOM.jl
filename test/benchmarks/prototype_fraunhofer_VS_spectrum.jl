@@ -49,21 +49,26 @@ for ictr = 1:3
     FT = Float64
     #λ₀ = 1e7/ν₀[ctr]
     #iBand = 1
-    n2,o2 = InelasticScattering.getRamanAtmoConstants(1.7/λ₀, 300.);
+    if ictr==1
+        n2,o2 = InelasticScattering.getRamanAtmoConstants(1.7/λ₀, 300.);
+    elseif ictr==2
+        n2,o2 = InelasticScattering.getRamanAtmoConstants(1.7/λ₀, 300.,0.0,0.2);
+        #RS_type.ϖ_λ₁λ₀_VS_n2[:].=0.0
+    elseif ictr==3
+        n2,o2 = InelasticScattering.getRamanAtmoConstants(1.7/λ₀, 300.,0.8,0.);        
+        #RS_type.ϖ_λ₁λ₀_VS_o2[:].=0.0
+    end
+    
     RS_type = InelasticScattering.VS_0to1_plus{FT}(
                 n2=n2,
                 o2=o2);
     # Load YAML files into parameter struct
-    parameters = parameters_from_yaml("test/test_parameters/O2ParametersVS.yaml");
+    parameters = parameters_from_yaml("test/test_parameters/O3ParametersVSspectrum.yaml");
     # Create model struct (precomputes optical properties) from parameters
     model      = model_from_parameters(RS_type, λ₀, parameters);
     Fraunhofer=false
     #####TEMPORARY!!#####
-    if ictr==2
-        RS_type.ϖ_λ₁λ₀_VS_n2[:].=0.0
-    elseif ictr==3
-        RS_type.ϖ_λ₁λ₀_VS_o2[:].=0.0
-    end
+    
     #####################
     RS_type.F₀ = zeros(model.params.polarization_type.n, 
         sum(length(RS_type.grid_in[i]) for i in 1:length(RS_type.iBand)))

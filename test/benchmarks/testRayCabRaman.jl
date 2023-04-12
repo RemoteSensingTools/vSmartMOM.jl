@@ -66,7 +66,8 @@ CoreRT.getRamanSSProp!(RS_type, parameters.depol, 1e7/ν̃, ν);
 RS_type.F₀ = zeros(model.params.polarization_type.n, length(ν))
 RS_type.F₀[1,:].=1.
 
-oR, oT, oieR, oieT = CoreRT.rt_run_test(RS_type,model,iBand);
+R, T, ieR, ieT = CoreRT.rt_run_test(RS_type,model,iBand);
+R_ss, T_ss, ieR_ss, ieT_ss = CoreRT.rt_run_test_ss(RS_type,model,iBand);
 
 RS_type = InelasticScattering.noRS(
     fscattRayl  = [FT(1)],
@@ -77,7 +78,8 @@ RS_type = InelasticScattering.noRS(
 RS_type.F₀ = zeros(model.params.polarization_type.n, length(ν))
 RS_type.F₀[1,:].=1.
 
-oRnoRS, oTnoRS, _, _ = CoreRT.rt_run_test(RS_type,model,iBand);
+RnoRS, TnoRS, _, _ = CoreRT.rt_run_test(RS_type,model,iBand);
+RnoRS_ss, TnoRS_ss, _, _ = CoreRT.rt_run_test_ss(RS_type,model,iBand);
 
 #test = jldopen("/home/sanghavi/debugRay2_.jld2")
 #@load "/home/sanghavi/debugRRS2.jld2"
@@ -88,9 +90,10 @@ oRnoRS, oTnoRS, _, _ = CoreRT.rt_run_test(RS_type,model,iBand);
 #CabJ₀ = test["J₀"];
 #RayJ₀[:,:,640] == sum(ieJ₀[:,:,640,:], dims=3) + CabJ₀[:,:,640]
 #RayJ₀[:,:,640] ≈ sum(ieJ₀[:,:,640,:], dims=3) + CabJ₀[:,:,640]
-@load "/home/sanghavi/debugCab4.jld2"
-@load "/home/sanghavi/debugRRS4.jld2"
-@load "/home/sanghavi/debugRay3.jld2"
+
+#@load "/home/sanghavi/debugCab4.jld2"
+#@load "/home/sanghavi/debugRRS4.jld2"
+#@load "/home/sanghavi/debugRay3.jld2"
 
 #=
 a = sum(ieR[:,:,640,:], dims=3) + CabR[:,:,640]

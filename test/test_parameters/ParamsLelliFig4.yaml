@@ -7,17 +7,13 @@ radiative_transfer:
     #- (1e7/755):0.05:(1e7/735)
     ##- (1e7/768):0.05:(1e7/763) 
     ##- (1e7/460):0.3:(1e7/420)
-    - (1e7/415):0.5:(1e7/385)
+    #- (1e7/405):1.:(1e7/315)i
     #- (1e7/405):0.6:(1e7/385)
-    #- (1e7/400):0.5:(1e7/390) #(1e7/410):1.:(1e7/380)
-    #- (1e7/445):0.5:(1e7/395)
-    #- (1e7/445):0.5:(1e7/395)
-    #- (1e7/445):0.5:(1e7/395)
+    - (1e7/410):0.5:(1e7/380) #(1e7/410):1.:(1e7/380)
+    #- (1e7/415):0.5:(1e7/385)
   # Bidirectional Reflectance Distribution Function (BRDF) per band
   surface: 
-    - LambertianSurfaceScalar{Float64}(0.0) #(0.25) #(0.2) #(0.05)
-    #- LambertianSurfaceScalar{Float64}(0.0)
-    #- LambertianSurfaceScalar{Float64}(0.0)
+    - LambertianSurfaceScalar{Float64}(0.05) #(0.25) #(0.2) #(0.05)
   # Quadrature-scheme for stream calculations
   quadrature_type:    GaussQuadHemisphere()
   # Polarization type (Stokes_I, Stokes_IQ, Stokes_IQU, Stokes_IQUV)
@@ -40,11 +36,11 @@ radiative_transfer:
 # =================================================================
 geometry: 
   # Solar zenith angle (degrees)
-  sza:                60. #30.  #45. #70. #63. #85. #63. #70. #70. #10. #63.0 #62.613 #63. #30. #32.4436
+  sza:                10.  #45. #70. #63. #85. #63. #70. #70. #10. #63.0 #62.613 #63. #30. #32.4436
   # Viewing zenith angles (degrees)
-  vza:                [60.] #[45.] #[10.] #[62.6129] #[45] #[60,45,30,30,45,60] #[32.4436] #[0.072]
+  vza:                [10.] #[10.] #[62.6129] #[45] #[60,45,30,30,45,60] #[32.4436] #[0.072]
   # Viewing azimuth angles (degrees)
-  vaz:                [180.] #[0.] #[0] #[0,0,0,180,180,180]
+  vaz:                [120.] #[0] #[0,0,0,180,180,180]
   # Observation altitude (km)
   obs_alt:            0 #[800., 10., 0.2, 0]
 
@@ -87,7 +83,7 @@ atmospheric_profile:
   #    800.12, 849.00, 912.00, 980.00, 1005.0]
   #
   # Reduce profile to n layers (-1 is default, leave as is)
-  profile_reduction: -1 #1 #-1
+  profile_reduction: 1 #1 #-1
 
 # =================================================================
 # Absorption-Related Parameters (Optional)
@@ -96,13 +92,11 @@ absorption:
 # List of molecules per spectral band
   molecules:
     - [O3]       # Molecules in Band #1
-    #- [O3]  # Molecules in Band #2
-    #- [O3]  # Molecules in Band #3
+    #- [H2O,CO2]  # Molecules in Band #2
+    #- [H2O,CO2]  # Molecules in Band #3
   # LookUpTable files (Interpolation Model saved as JLD2!)
   LUTfiles:
     - ["/net/fluo/data2/data/Rami_CS_database/rami_spectroscopy_o3_all_nu.jld2"]
-    #- ["/net/fluo/data2/data/Rami_CS_database/rami_spectroscopy_o3_all_nu.jld2"]
-    #- ["/net/fluo/data2/data/Rami_CS_database/rami_spectroscopy_o3_all_nu.jld2"]
   #  - ["/net/fluo/data2/data/ABSCO_CS_Database/v5.2_final/o2_v52.jld2"]
     #- ["/net/fluo/data2/data/ABSCO_CS_Database/v5.2_final/wh2o_v52.jld2", "/net/fluo/data2/data/ABSCO_CS_Database/v5.2_final/wco2_v52.jld2"]
     #- ["/net/fluo/data2/data/ABSCO_CS_Database/v5.2_final/sh2o_v52.jld2", "/net/fluo/data2/data/ABSCO_CS_Database/v5.2_final/sco2_v52.jld2"]

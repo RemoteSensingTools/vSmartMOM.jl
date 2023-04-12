@@ -15,25 +15,27 @@ function constructCoreOpticalProperties(RS_type, iBand, m, model)
     nZ    = size(τ_rayl[1],2)
     #@show greek_rayleigh
     # Rayleigh Z matrix:
-    if !(typeof(RS_type)<:Union{RRS,RRS_plus})
-        Rayl𝐙⁺⁺, Rayl𝐙⁻⁺ = Scattering.compute_Z_moments(pol_type, μ, 
-                                                        greek_rayleigh[iBand], m, 
-                                                        arr_type = arr_type);
-    else
-        Rayl𝐙⁺⁺, Rayl𝐙⁻⁺ = Scattering.compute_Z_moments(pol_type, μ, 
-                                                        greek_cabannes[iBand], m, 
-                                                        arr_type = arr_type);
-        Rayl2𝐙⁺⁺, Rayl2𝐙⁻⁺ = Scattering.compute_Z_moments(pol_type, μ, 
-                                                        greek_rayleigh[iBand], m, 
-                                                        arr_type = arr_type);
-    end
+    
                                                         #@show Rayl𝐙⁺⁺
 
     band_layer_props    = [];
     band_fScattRayleigh = [];
     # @show arr_type
     for iB in iBand
-        if !(typeof(RS_type)<:Union{RRS,RRS_plus})
+        if (typeof(RS_type)<:noRS) #!(typeof(RS_type)<:Union{RRS,RRS_plus})
+            Rayl𝐙⁺⁺, Rayl𝐙⁻⁺ = Scattering.compute_Z_moments(pol_type, μ, 
+                                                            greek_rayleigh[iB], m, 
+                                                            arr_type = arr_type);
+        else
+            Rayl𝐙⁺⁺, Rayl𝐙⁻⁺ = Scattering.compute_Z_moments(pol_type, μ, 
+                                                            greek_cabannes[iB], m, 
+                                                            arr_type = arr_type);
+            Rayl2𝐙⁺⁺, Rayl2𝐙⁻⁺ = Scattering.compute_Z_moments(pol_type, μ, 
+                                                            greek_rayleigh[iB], m, 
+                                                            arr_type = arr_type);
+        end
+
+        if (typeof(RS_type)<:noRS) #if !(typeof(RS_type)<:Union{RRS,RRS_plus})
             rayl =  [CoreScatteringOpticalProperties(arr_type(τ_rayl[iB][:,i]), 1.0, 
                 (Rayl𝐙⁺⁺), (Rayl𝐙⁻⁺)) for i=1:nZ]
         else

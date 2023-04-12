@@ -127,10 +127,12 @@ function model_from_parameters(params::vSmartMOM_Parameters)
         @show ϖ_Cabannes[i_band]
         depol_air_Cabannes = 2γ_air_Cabannes/(1+γ_air_Cabannes)
         depol_air_Rayleigh = 2γ_air_Rayleigh/(1+γ_air_Rayleigh)
+        
         a = Scattering.get_greek_rayleigh(depol_air_Cabannes)
         push!(greek_cabannes, a)
         a = Scattering.get_greek_rayleigh(depol_air_Rayleigh)
         push!(greek_rayleigh, a)
+
         τ_rayl[i_band]   .= getRayleighLayerOptProp(profile.p_half[end], 
             λₘ/1000., 
             depol_air_Rayleigh, profile.vcd_dry);
@@ -295,8 +297,13 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
     # Compute N2 and O2
     RS_type.n2, RS_type.o2 = 
         InelasticScattering.getRamanAtmoConstants(1.e7/λ₀,effT);
+    ϖ_Cabannes = zeros(n_bands)
+    ϖ_Cabannes[1], γ_air_Cabannes, γ_air_Rayleigh = 
+        InelasticScattering.compute_γ_air_Rayleigh!(λ₀)
+    depol_air_Cabannes = 2γ_air_Cabannes/(1+γ_air_Cabannes)
+    depol_air_Rayleigh = 2γ_air_Rayleigh/(1+γ_air_Rayleigh)
     #println("here 0")
-    InelasticScattering.getRamanSSProp!(RS_type, λ₀);
+    InelasticScattering.getRamanSSProp!(RS_type, depol_air_Rayleigh, λ₀);
     #println("here 1")
     n_bands = length(RS_type.iBand)
     #@show RS_type.grid_in
@@ -306,7 +313,7 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
     # Rayleigh optical properties calculation
     #greek_rayleigh = Scattering.get_greek_rayleigh(params.depol)
     # Rayleigh optical properties calculation
-    ϖ_Cabannes = zeros(n_bands)
+    
     greek_cabannes = Vector{vSmartMOM.Scattering.GreekCoefs{Float64}}()
     greek_rayleigh = Vector{vSmartMOM.Scattering.GreekCoefs{Float64}}()
     τ_rayl = [zeros(params.float_type,1, length(profile.p_full)) for i=1:n_bands];
@@ -323,13 +330,24 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
         λₘ = 1.e7/νₘ
         ϖ_Cabannes[i_band], γ_air_Cabannes, γ_air_Rayleigh = 
             InelasticScattering.compute_γ_air_Rayleigh!(λₘ)
+        if(i_band==1) 
+            ϖ_Cabannes[i_band]=1.
+        end
         depol_air_Cabannes = 2γ_air_Cabannes/(1+γ_air_Cabannes)
         depol_air_Rayleigh = 2γ_air_Rayleigh/(1+γ_air_Rayleigh)
+
+        #ϖ_Cabannes_VS[i_band], γ_air_Cabannes_VS, γ_air_Rayleigh_VS = 
+        #InelasticScattering.compute_γ_air_Rayleigh_VS!(λₘ)
+
+        #depol_air_Cabannes_VS = 2γ_air_Cabannes_VS/(1+γ_air_Cabannes_VS)
+        #depol_air_Rayleigh_VS = 2γ_air_Rayleigh_VS/(1+γ_air_Rayleigh_VS)
+
         a = Scattering.get_greek_rayleigh(depol_air_Cabannes)
         push!(greek_cabannes, a)
         a = Scattering.get_greek_rayleigh(depol_air_Rayleigh)
         push!(greek_rayleigh, a)
         # Compute Rayleigh properties per layer for `i_band` band center
+        # (Using depol_air_Rayleigh here to obtain the same Rayleigh optical thickness as in the case of RS_type::noRS or RS_type::RRS) 
         τ_rayl[i_band]   .= getRayleighLayerOptProp(profile.p_half[end], 
             λₘ/1000., 
             depol_air_Rayleigh, profile.vcd_dry);
