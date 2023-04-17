@@ -43,7 +43,7 @@ end
 
 function getRamanAtmoConstants(ν̃::FT, T::FT, vmr_n2::FT, vmr_o2::FT) where FT
     @assert 0<=vmr_n2+vmr_o2<=1
-    n2 = InelasticScattering.getMolecularConstants(InelasticScattering.N₂(), (vmr_n2));
+    n2 = InelasticScattering.getMolecularConstants(InelasticScattering.N₂(), vmr_n2);
     compute_effective_coefficents!(ν̃, T, n2)
     compute_energy_levels!(n2)
     compute_σ_Rayl_coeff!(n2)
@@ -51,7 +51,7 @@ function getRamanAtmoConstants(ν̃::FT, T::FT, vmr_n2::FT, vmr_o2::FT) where FT
     compute_σ_VibRaman_coeff!(T, n2)
     compute_σ_RoVibRaman_coeff!(T, n2)
 
-    o2 = InelasticScattering.getMolecularConstants(InelasticScattering.O₂(), (vmr_o2));
+    o2 = InelasticScattering.getMolecularConstants(InelasticScattering.O₂(), vmr_o2);
     compute_effective_coefficents!(ν̃, T, o2)
     compute_energy_levels!(o2)
     compute_σ_Rayl_coeff!(o2)

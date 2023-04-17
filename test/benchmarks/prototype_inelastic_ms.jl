@@ -17,7 +17,7 @@ using DelimitedFiles
 
 # Load YAML files into parameter struct
 parameters = 
-    parameters_from_yaml("test/test_parameters/FraunhoferMockParameters.yaml");
+    parameters_from_yaml("test/test_parameters/ParamsRingEffect.yaml");
 #parameters.depol = 0.041362343961163395 #0.028 #(0.028: Cabannes), (0.1032: Rayleigh) 
     #parameters = parameters_from_yaml("test/test_parameters/O2Parameters2.yaml");
 # Create model struct (precomputes optical properties) from parameters
@@ -71,7 +71,7 @@ RS_type.F₀ = zeros(model.params.polarization_type.n, length(P))
 for i=1:length(P)
     sol_trans = Tsolar_interp(ν[i]);
     F₀[i] = sol_trans * P[i];
-    RS_type.F₀[1,i] = 1.0 #F₀[i];
+    RS_type.F₀[1,i] = F₀[i];
 end 
 #=
 RS_type.F₀ = zeros(model.params.polarization_type.n, length(ν))
@@ -99,9 +99,9 @@ RS_type = InelasticScattering.noRS(
     F₀          = zeros(FT,1,1));
 RS_type.F₀ = zeros(model.params.polarization_type.n, length(P))
 for i=1:length(P)
-    #sol_trans = Tsolar_interp(ν[i]);
-    #F₀[i] = sol_trans * P[i];
-    RS_type.F₀[1,i] = 1.0; #F₀[i];
+    sol_trans = Tsolar_interp(ν[i]);
+    F₀[i] = sol_trans * P[i];
+    RS_type.F₀[1,i] = F₀[i];
 end 
 #parameters = 
 #    parameters_from_yaml("test/test_parameters/FraunhoferMockParameters.yaml");
@@ -139,29 +139,29 @@ ieQ_conv = imfilter(ieR[1,2,:], kernel)
 
 convfct = 1e7./ν.^2   # to convert radiance units from mW/m²-str-cm⁻¹ to mW/m²-str-nm
 l = @layout [a1 a2 ; b1 b2; c1 c2]
-p1 = plot(1e7./ν, RnoRS[1,1,:].*convfct, linecolor=:black)
+p1 = plot(1e7./ν, RnoRS[1,1,:].*convfct, linecolor=:black, xlims=[385,415])
 p1 = plot!(1e7./ν, I_conv_noRS.*convfct, linewidth = 3, linecolor=:red)
-p2 = plot(1e7./ν, (R[1,1,:].+ieR[1,1,:]).*convfct, linecolor=:black, ylabel="[mW/m²/str/nm]")
+p2 = plot(1e7./ν, (R[1,1,:].+ieR[1,1,:]).*convfct, linecolor=:black, ylabel="[mW/m²/str/nm]", xlims=[385,415])
 p2 = plot!(1e7./ν, (I_conv.+ieI_conv).*convfct, linewidth = 3, linecolor=:red)
-p3 = plot(1e7./ν, (R[1,1,:].-RnoRS[1,1,:].+ieR[1,1,:]).*convfct, linecolor=:black, xlabel = "λ [nm]")
+p3 = plot(1e7./ν, (R[1,1,:].-RnoRS[1,1,:].+ieR[1,1,:]).*convfct, linecolor=:black, xlabel = "λ [nm]", xlims=[385,415])
 p3 = plot!(1e7./ν, (I_conv.-I_conv_noRS.+ieI_conv).*convfct, linewidth = 3, linecolor=:red)
 
-q1 = plot(1e7./ν, RnoRS[1,2,:].*convfct, linecolor=:black)
+q1 = plot(1e7./ν, RnoRS[1,2,:].*convfct, linecolor=:black, xlims=[385,415])
 q1 = plot!(1e7./ν, Q_conv_noRS.*convfct, linewidth = 3, linecolor=:red)
-q2 = plot(1e7./ν, (R[1,2,:].+ieR[1,2,:]).*convfct, linecolor=:black)
+q2 = plot(1e7./ν, (R[1,2,:].+ieR[1,2,:]).*convfct, linecolor=:black, xlims=[385,415])
 q2 = plot!(1e7./ν, (Q_conv.+ieQ_conv).*convfct, linewidth = 3, linecolor=:red)
-q3 = plot(1e7./ν, (R[1,2,:].-RnoRS[1,2,:].+ieR[1,2,:]).*convfct, linecolor=:black, xlabel = "λ [nm]")
+q3 = plot(1e7./ν, (R[1,2,:].-RnoRS[1,2,:].+ieR[1,2,:]).*convfct, linecolor=:black, xlabel = "λ [nm]", xlims=[385,415])
 q3 = plot!(1e7./ν, (Q_conv.-Q_conv_noRS.+ieQ_conv).*convfct, linewidth = 3, linecolor=:red)
-plot(p1, q1, p2, q2, p3, q3, layout = l, legend = false, title = ["I₀ (no RS)" "Q₀ (no RS)" "I₁ (with RS)" "Q₁ (with RS)" "I₁-I₀" "Q₁-Q₀"], titlefont = font(10))
-#savefig("RingEffect63U.png")
+plot(p1, q1, p2, q2, p3, q3, layout = l, link=:x, legend = false, title = ["I₀ (no RS)" "Q₀ (no RS)" "I₁ (with RS)" "Q₁ (with RS)" "I₁-I₀" "Q₁-Q₀"], titlefont = font(10))
+savefig("RingEffect.png")
 
 l = @layout [a1 a2]
-p1 = plot(1e7./ν, 100*ieR[1,1,:]./R[1,1,:].*convfct, linecolor=:black)
+p1 = plot(1e7./ν, 100*ieR[1,1,:]./R[1,1,:].*convfct, linecolor=:black, xlims=[385,415], ylims=[0,2])
 p1 = plot!(1e7./ν, 100*ieI_conv./I_conv.*convfct, linewidth = 2, linecolor=:red, xlabel = "λ [nm]")
-q1 = plot(1e7./ν, 100*ieR[1,2,:]./R[1,2,:].*convfct, linecolor=:black)
+q1 = plot(1e7./ν, 100*ieR[1,2,:]./R[1,2,:].*convfct, linecolor=:black, xlims=[385,415], ylims=[0,0.025])
 q1 = plot!(1e7./ν, 100*ieQ_conv./Q_conv.*convfct, linewidth = 2, linecolor=:red, xlabel = "λ [nm]")
 plot(p1, q1, layout = l, legend = false, title = ["Iᵢ/Iₑ [%]" "Qᵢ/Qₑ [%]"], titlefont = font(10))
-#savefig("RingSpectrum63U.png")
+savefig("RingSpectrum.png")
 
 using DelimitedFiles
 raylout_rrs = readdlm("out_ray_rrs_385nm_405nm.dat")

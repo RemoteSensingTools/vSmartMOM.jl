@@ -295,8 +295,8 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
     effT = (profile.vcd_dry' * profile.T) / sum(profile.vcd_dry);
     # Define RS type
     # Compute N2 and O2
-    RS_type.n2, RS_type.o2 = 
-        InelasticScattering.getRamanAtmoConstants(1.e7/λ₀,effT);
+    #RS_type.n2, RS_type.o2 = 
+    #    InelasticScattering.getRamanAtmoConstants(1.e7/λ₀,effT);
     ϖ_Cabannes = zeros(n_bands)
     ϖ_Cabannes[1], γ_air_Cabannes, γ_air_Rayleigh = 
         InelasticScattering.compute_γ_air_Rayleigh!(λ₀)
@@ -351,7 +351,7 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
         τ_rayl[i_band]   .= getRayleighLayerOptProp(profile.p_half[end], 
             λₘ/1000., 
             depol_air_Rayleigh, profile.vcd_dry);
-
+        τ_rayl[i_band] *= (RS_type.n2.vmr + RS_type.o2.vmr) #this factor has been added to account for computations of isolated o2 and n2 contributions to VS
         #=
         # Compute Rayleigh properties per layer for `i_band` band center
         τ_rayl[i_band]   .= getRayleighLayerOptProp(profile.p_half[end], 
@@ -494,8 +494,8 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
     effT = (profile.vcd_dry' * profile.T) / sum(profile.vcd_dry);
     # Define RS type
     # Compute N2 and O2
-    RS_type.n2, RS_type.o2 = 
-        InelasticScattering.getRamanAtmoConstants(1.e7/λ₀,effT);
+    #RS_type.n2, RS_type.o2 = 
+    #    InelasticScattering.getRamanAtmoConstants(1.e7/λ₀,effT);
     #println("here 0")
     InelasticScattering.getRamanSSProp!(RS_type, λ₀, target_grid);
     #println("here 1")
@@ -533,6 +533,8 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
         τ_rayl[i_band]   .= getRayleighLayerOptProp(profile.p_half[end], 
             λₘ/1000., 
             depol_air_Rayleigh, profile.vcd_dry);
+        τ_rayl[i_band] *= (RS_type.n2.vmr + RS_type.o2.vmr) #this factor has been added to account for computations of isolated o2 and n2 contributions to VS
+        
 #=
         # Compute Rayleigh properties per layer for `i_band` band center
         τ_rayl[i_band]   .= getRayleighLayerOptProp(profile.p_half[end], 

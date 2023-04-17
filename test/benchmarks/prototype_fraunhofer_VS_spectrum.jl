@@ -40,13 +40,13 @@ I₀_conv = zeros(3,length(ν₀))
 ieI₀_conv = zeros(3,length(ν₀)) 
 Q₀_conv = zeros(3,length(ν₀)) 
 ieQ₀_conv = zeros(3,length(ν₀)) 
+FT = Float64
 for ictr = 1:3
     for i=1:length(ν₀)
         sol_trans = Tsolar_interp(ν₀[i]);
         F₀[i] = sol_trans * P[i];
     end 
         
-    FT = Float64
     #λ₀ = 1e7/ν₀[ctr]
     #iBand = 1
     if ictr==1
