@@ -6,7 +6,7 @@ This file contains helper functions related to downloading/using artifacts
 
 """ Shorthand for @artifact_str """
 function artifact_helper(name::AbstractString) 
-
+    @show @__DIR__
     joinpath(ensure_artifact_installed(name, find_artifacts_toml(@__DIR__), 
                                        quiet_download = true), name) * ".par"
     

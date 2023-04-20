@@ -153,7 +153,7 @@ function model_from_parameters(params::vSmartMOM_Parameters)
             # This can be precomputed as well later in my mind, providing an absorption_model or an interpolation_model!
             if isempty(params.absorption_params.luts)
                 # Obtain hitran data for this molecule
-                @timeit "Read HITRAN"  hitran_data = read_hitran(artifact(params.absorption_params.molecules[i_band][molec_i]), iso=1)
+                @timeit "Read HITRAN" hitran_data = read_hitran(artifact(params.absorption_params.molecules[i_band][molec_i]), iso=1)
 
                 println("Computing profile for $(params.absorption_params.molecules[i_band][molec_i]) with vmr $(profile.vmr[params.absorption_params.molecules[i_band][molec_i]]) for band #$(i_band)")
                 # Create absorption model with parameters beforehand now:
