@@ -1,5 +1,7 @@
 ##
-using Revise
+using CUDA
+device!(1)
+#using Revise
 using vSmartMOM, vSmartMOM.CoreRT, vSmartMOM.SolarModel
 using vSmartMOM.InelasticScattering
 using Statistics
@@ -8,22 +10,39 @@ using InstrumentOperator #for convolution of hires spectrum to instrument grid
 using ImageFiltering
 using Distributions
 using Plots
+using DelimitedFiles
 
 Fraunhofer=true
 Tsolar = solar_transmission_from_file("/home/sanghavi/code/github/vSmartMOM.jl/src/SolarModel/solar.out")
 Tsolar_interp = LinearInterpolation(Tsolar[4:end, 1], Tsolar[4:end, 2])
-        
-ν₀ = (1e7/730.):0.5:(1e7/630.) #Spectral range of sources of VS  
+@show ARGS     
+nsect = parse(Int,ARGS[1]) #values from 1-10
+N_sect = 500
+#outfile = str('out_')+str(nsect)+'.dat'
+ν₀_orig = (1e7/725.):0.1:(1e7/625.) #Spectral range of sources of VS  
+l_orig = length(ν₀_orig)
+Δl_orig = Int(ceil(l_orig/N_sect))
+if length(ARGS)==0
+    ν₀ = (1e7/725.):0.1:(1e7/625.) 
+else
+    if(nsect*Δl_orig<=l_orig)
+        ν₀ = ν₀_orig[((nsect-1)*Δl_orig  + 1):nsect*Δl_orig]
+    else
+        ν₀ = ν₀_orig[((nsect-1)*Δl_orig  + 1):end]
+    end
+end
 #ν₀ = (1e7/750.):0.5:(1e7/731.5) #Spectral range of sources of VS  
 λ₀ = 2e7/(ν₀[1]+ν₀[end]) #400. #nm
 ii₀ = findmin(abs.(1e7./ν₀ .- λ₀))[2]
-νₐ = (1e7/780.):0.5:(1e7/750.) #Target spectral range (O2 A-band)  
+νₐ = (1e7/780.):0.1:(1e7/750.) #Target spectral range (O2 A-band)  
 # Computing Fraunhofer Spectrum 
 T_sun = 5777. # KRS 
 P₀ = planck_spectrum_wn(T_sun, collect(ν₀)) 
 Pₐ = planck_spectrum_wn(T_sun, collect(νₐ))    
 #F₀ = zeros(length(ν₀));
 #ν₀ = 1e7/450.:2.:1e7/375.
+
+
 R₀ = zeros(length(ν₀)) 
 Rₐ = zeros(length(νₐ)) 
 #T₀ = zeros(length(ν₀)) 
@@ -45,6 +64,7 @@ Q₀_conv = zeros(length(ν₀))
 Qₐ_conv = zeros(length(νₐ)) 
 ieQₐ_conv = zeros(length(νₐ)) 
 
+#Code for original VS computations
 #=
 for i=1:length(ν₀)
     #    ##sol_trans = Tsolar_interp(ν₀[i]);
@@ -59,14 +79,16 @@ for i=1:length(ν₀)
                 n2=n2,
                 o2=o2);
     # Load YAML files into parameter struct
-    parameters = parameters_from_yaml("test/test_parameters/O2ParametersVS.yaml");
+    parameters = parameters_from_yaml("/home/sanghavi/code/github/vSmartMOM.jl/test/test_parameters/O2ABandParamsVS.yaml");
     # Create model struct (precomputes optical properties) from parameters
-    model      = model_from_parameters(RS_type, λ₀, parameters, νₐ);
+    model      = model_from_parameters(RS_type, λ₀, parameters);
     @show RS_type.bandSpecLim
     Fraunhofer=true    
     RS_type.F₀ = zeros(model.params.polarization_type.n, 
         sum(length(RS_type.grid_in[j]) for j in 1:length(RS_type.iBand)))
     global t_offset = 0
+    corridx=[]
+    bandidx=[]
     for iB=1:length(RS_type.iBand)
         ν = collect(RS_type.grid_in[iB])
         #global t_offset
@@ -77,7 +99,22 @@ for i=1:length(ν₀)
             if (iB==1)
                 soltmp = sol_trans * P₀[i];         
             else
-                soltmp = sol_trans * Pₐ[iii]
+                if findmin(abs.(νₐ.-ν[iii]))[1]<1
+                    corri=findmin(abs.(νₐ.-ν[iii]))[2]
+                    soltmp = sol_trans * Pₐ[corri]
+                    if length(corridx)==0
+                        corridx=[corri]
+                    else
+                        corridx = [corridx corri]
+                    end
+                    if length(bandidx)==0
+                        bandidx = [iii+t_offset]
+                    else
+                        bandidx = [bandidx iii+t_offset]
+                    end
+                else
+                    soltmp=0
+                end
             end
             #@show iii,  t_offset, soltmp
             RS_type.F₀[1,iii+t_offset] = soltmp; #sol_trans * P[i];#1.0;
@@ -90,40 +127,64 @@ for i=1:length(ν₀)
 
     R₀[i] = R[1,1,1]
     R₀_Q[i] = R[1,2,1]
-    Rₐ[:] = R[1,1,2:end]
-    Rₐ_Q[:] = R[1,2,2:end]
-    ieRₐ[:] += ieR[1,1,2:end]
-    ieRₐ_Q[:] += ieR[1,2,2:end]
+    @show size(Rₐ), size(R[1,1,2:end])
+    
+    Rₐ[corridx] = R[1,1,bandidx]
+    Rₐ_Q[corridx] = R[1,2,bandidx]
+    ieRₐ[corridx] += ieR[1,1,bandidx]
+    ieRₐ_Q[corridx] += ieR[1,2,bandidx]
     @show i, size(ν₀) 
 end
+writedlm("/home/sanghavi/julia_output/out_src_O2Aband_625nm_725nm_" * string(nsect) * ".dat", [ν₀ R₀ R₀_Q])
+writedlm("/home/sanghavi/julia_output/out_VS_625nm_725nm_" * string(nsect) * ".dat", [νₐ Rₐ Rₐ_Q ieRₐ ieRₐ_Q])
+#print("writing /home/sanghavi/julia_output/out_VS_O2Aband_" * string(nsect) * ".dat /home/sanghavi/julia_output/out_src_630nm_730nm_" * string(nsect) * ".dat")
+print("writing " * "/home/sanghavi/julia_output/out_src_O2Aband_625nm_725nm_" * string(nsect) * ".dat " * "/home/sanghavi/julia_output/out_VS_625nm_725nm_" * string(nsect) * ".dat")
 =#
-using DelimitedFiles
-vsout = readdlm("out_VS_O2Aband.dat")
-srcout = readdlm("out_src_630nm_730nm.dat")
-ν₀  =srcout[:,1]
-R₀  =srcout[:,2]
-R₀_Q=srcout[:,3]
-#O2 A-band
-νₐ=vsout[:,1]
-Rₐ    = vsout[:,2]
-Rₐ_Q  = vsout[:,3]
-ieRₐ  = vsout[:,4]
-ieRₐ_Q= vsout[:,5]
+
+
+#using DelimitedFiles
+# Code for VS when precomputed files are already available
+
+tν₀ = []
+tR₀ = []
+tR₀_Q = []
+tνₐ = []
+
+tRₐ = []
+tRₐ_Q = []
+tieRₐ = []
+tieRₐ_Q= []
+
+for nsect=1:499
+    vsout = readdlm("/home/sanghavi/julia_output/out_VS_625nm_725nm_" * string(nsect) * ".dat")#("/home/sanghavi/julia_output/out_VS_O2Aband.dat")
+    srcout = readdlm("/home/sanghavi/julia_output/out_src_O2Aband_625nm_725nm_" * string(nsect) * ".dat") #("/home/sanghavi/julia_output/out_src_630nm_730nm.dat")
+    if nsect==1
+        tν₀  = (srcout[:,1])'
+        tR₀  = (srcout[:,2])'
+        tR₀_Q = (srcout[:,3])'
+    else
+        tν₀  = [tν₀ (srcout[:,1])']
+        tR₀ = [tR₀ (srcout[:,2])']
+        tR₀_Q = [tR₀_Q (srcout[:,3])']
+    end
+
+    #O2 A-band
+    tνₐ = vsout[:,1]
+    Rₐ    = vsout[:,2]
+    Rₐ_Q  = vsout[:,3]
+    ieRₐ  += vsout[:,4]
+    ieRₐ_Q+= vsout[:,5]
+end
+ν₀ = tν₀'
+R₀ = tR₀'
+R₀_Q = tR₀_Q'
+
 
 # =========Computing RRS on O2 A-band  ======== #
-Iₐ_RRS_conv   = zeros(length(νₐ)) 
-Iₐ_RRS_ss_conv= zeros(length(νₐ)) 
-ieIₐ_RRS_conv = zeros(length(νₐ)) 
-ieIₐ_RRS_ss_conv = zeros(length(νₐ))
-Iₐ_noRS_conv  = zeros(length(νₐ))
-Qₐ_RRS_conv   = zeros(length(νₐ)) 
-Qₐ_RRS_ss_conv= zeros(length(νₐ)) 
-ieQₐ_RRS_conv = zeros(length(νₐ)) 
-ieQₐ_RRS_ss_conv = zeros(length(νₐ)) 
-Qₐ_noRS_conv  = zeros(length(νₐ))
 
+#Common part
 parameters = 
-    parameters_from_yaml("test/test_parameters/O2ParametersVS.yaml");
+    parameters_from_yaml("test/test_parameters/O2ABandParamsRRS.yaml");
 #parameters = parameters_from_yaml("test/test_parameters/O2Parameters2.yaml");
 # Create model struct (precomputes optical properties) from parameters
 model      = model_from_parameters(parameters);
@@ -135,6 +196,21 @@ FT = Float64
 ν̃ = mean(ν);
 # Find central reference index for RRS:
 i_ref = argmin(abs.(ν .- ν̃))
+
+Iₐ_RRS_conv   = zeros(length(ν)) 
+Iₐ_RRS_ss_conv= zeros(length(ν)) 
+ieIₐ_RRS_conv = zeros(length(ν)) 
+ieIₐ_RRS_ss_conv = zeros(length(ν))
+Iₐ_noRS_conv  = zeros(length(ν))
+Qₐ_RRS_conv   = zeros(length(ν)) 
+Qₐ_RRS_ss_conv= zeros(length(ν)) 
+ieQₐ_RRS_conv = zeros(length(ν)) 
+ieQₐ_RRS_ss_conv = zeros(length(ν)) 
+Qₐ_noRS_conv  = zeros(length(ν))
+
+#= 
+# Code for original computation of RRS
+
 # TODO_VS: λ_vs_in (get input)
 # TODO_VS: ν_vs_in (convert to wavenumbers)
 # Effective temperature for Raman calculations
@@ -193,8 +269,36 @@ for i=1:length(P)
 end 
 
 RnoRS, TnoRS, _, _ = CoreRT.rt_run_test(RS_type,model,iBand);
+
+writedlm("/home/sanghavi/julia_output/out_RRS_630nm_730nm.dat", [ν R[1,1,:] R[1,2,:] ieR[1,1,:] ieR[1,2,:]])
+writedlm("/home/sanghavi/julia_output/out_noRS_630nm_730nm.dat", [ν RnoRS[1,1,:] RnoRS[1,2,:]])
+
+R_rrs    = R[1,1,:]
+R_rrs_Q  = R[1,2,:]
+ieR_rrs   = ieR[1,1,:]
+ieR_rrs_Q = ieR[1,2,:]
+
+
+=#
+
+# When text output for RRS is already available
+rrsout = readdlm("/home/sanghavi/julia_output/out_RRS_630nm_730nm.dat") #("/home/sanghavi/julia_output/out_VS_O2Aband.dat")
+norsout = readdlm("/home/sanghavi/julia_output/out_noRS_630nm_730nm.dat") #("/home/sanghavi/julia_output/out_src_630nm_730nm.dat")
+
+#O2 A-band
+ν = rrsout[:,1]
+R_rrs    = rrsout[:,2]
+R_rrs_Q  = rrsout[:,3]
+ieR_rrs   = rrsout[:,4]
+ieR_rrs_Q = rrsout[:,5]
+
+R_nors    = norsout[:,2]
+R_nors_Q  = norsout[:,3]
+
+
 # ============================================= #
 
+#Plotting 
 x = -40.:1.:40.
 #kernel = InstrumentOperator.create_instrument_kernel(Normal(0, 12.5), x) #defining a Gaussian kernel for convulution in wavenumber space
 kernel = InstrumentOperator.create_instrument_kernel(Normal(0, 12.5), x)
@@ -203,24 +307,25 @@ kernel = InstrumentOperator.create_instrument_kernel(Normal(0, 12.5), x)
 I₀_conv .= imfilter(R₀, kernel)
 Iₐ_conv .= imfilter(Rₐ, kernel)
 ieIₐ_conv .= imfilter(ieRₐ, kernel)
-Iₐ_RRS_conv .= imfilter(R[1,1,:], kernel)
-Iₐ_RRS_ss_conv .= imfilter(R_ss[1,1,:], kernel)
-ieIₐ_RRS_conv .= imfilter(ieR[1,1,:], kernel)
-ieIₐ_RRS_ss_conv .= imfilter(ieR_ss[1,1,:], kernel)
-Iₐ_noRS_conv .= imfilter(RnoRS[1,1,:], kernel)
+Iₐ_RRS_conv .= imfilter(R_rrs, kernel)
+#Iₐ_RRS_ss_conv .= imfilter(R_ss[1,1,:], kernel)
+ieIₐ_RRS_conv .= imfilter(ieR_rrs, kernel)
+#ieIₐ_RRS_ss_conv .= imfilter(ieR_ss[1,1,:], kernel)
+Iₐ_noRS_conv .= imfilter(R_nors, kernel)
 Q₀_conv .= imfilter(R₀_Q, kernel)
 Qₐ_conv .= imfilter(Rₐ_Q, kernel)
 ieQₐ_conv .= imfilter(ieRₐ_Q, kernel)    
-Qₐ_RRS_conv .= imfilter(R[1,2,:], kernel)
-Qₐ_RRS_ss_conv .= imfilter(R_ss[1,2,:], kernel)
-ieQₐ_RRS_conv .= imfilter(ieR[1,2,:], kernel)
-ieQₐ_RRS_ss_conv .= imfilter(ieR_ss[1,2,:], kernel)
-Qₐ_noRS_conv .= imfilter(RnoRS[1,2,:], kernel)
+Qₐ_RRS_conv .= imfilter(R_rrs_Q, kernel)
+#Qₐ_RRS_ss_conv .= imfilter(R_ss[1,2,:], kernel)
+ieQₐ_RRS_conv .= imfilter(ieR_rrs_Q, kernel)
+#ieQₐ_RRS_ss_conv .= imfilter(ieR_ss[1,2,:], kernel)
+Qₐ_noRS_conv .= imfilter(R_nors_Q, kernel)
 #end
 
 
 convfct0 = 1e7./ν₀.^2   # to convert radiance units from mW/m²-str-cm⁻¹ to mW/m²-str-nm
 convfcta = 1e7./νₐ.^2 
+convfct = 1e7./ν.^2
 
 l = @layout [a1 a2; b1 b2; c1 c2; d1 d2]
 ymax = round(maximum(R₀.*convfct0), sigdigits=2)
@@ -230,12 +335,12 @@ ymax = round(maximum(R₀_Q.*convfct0), sigdigits=1)
 q1 = plot(1e7./ν₀, R₀_Q.*convfct0, linecolor=:grey, yticks=0:(ymax/4):ymax)#, xticks=385:5:415) #, xticks=425:3:430)
 q1 = plot!(1e7./ν₀, Q₀_conv.*convfct0, linecolor=:magenta)#, xticks=385:5:415) #, xticks=425:3:430)
 
-ymax = round(maximum(Rₐ.*convfcta), sigdigits=2)
-p2 = plot(1e7./νₐ, Rₐ.*convfcta, linecolor=:black, yticks=0:(ymax/4):ymax, xlims=(755,775))#)#, xlims=(385,415), xticks=385:5:415, ylabel="[mW/m²/str/nm]")
-p2 = plot!(1e7./νₐ, Iₐ_conv.*convfcta, linecolor=:red)#)#, xlims=(385,415), xticks=385:5:415, ylabel="[mW/m²/str/nm]")
-ymax = round(maximum(Rₐ_Q.*convfcta), sigdigits=1)
-q2 = plot(1e7./νₐ, Rₐ_Q.*convfcta, linecolor=:black, yticks=0:(ymax/4):ymax, xlims=(755,775))#)#, xlims=(385,415), xticks=385:5:415) #, xticks=425:3:430)
-q2 = plot!(1e7./νₐ, Qₐ_conv.*convfcta, linecolor=:red)#)#, xlims=(385,415), xticks=385:5:415) #, xticks=425:3:430)
+ymax = round(maximum(R_rrs.*convfct), sigdigits=2)
+p2 = plot(1e7./ν, R_rrs.*convfct, linecolor=:black, yticks=0:(ymax/4):ymax, xlims=(755,775))#)#, xlims=(385,415), xticks=385:5:415, ylabel="[mW/m²/str/nm]")
+p2 = plot!(1e7./ν, Iₐ_RRS_conv.*convfct, linecolor=:red)#)#, xlims=(385,415), xticks=385:5:415, ylabel="[mW/m²/str/nm]")
+ymax = round(maximum(R_rrs_Q.*convfct), sigdigits=1)
+q2 = plot(1e7./ν, R_rrs_Q.*convfct, linecolor=:black, yticks=0:(ymax/4):ymax, xlims=(755,775))#)#, xlims=(385,415), xticks=385:5:415) #, xticks=425:3:430)
+q2 = plot!(1e7./ν, Qₐ_RRS_conv.*convfct, linecolor=:red)#)#, xlims=(385,415), xticks=385:5:415) #, xticks=425:3:430)
 
 ymax = round(maximum(ieRₐ.*convfcta), sigdigits=2)
 p3 = plot(1e7./νₐ, ieRₐ.*convfcta, linecolor=:black, yticks=0:(ymax/4):ymax, xlims=(755,775))#)#, xlims=(385,415), xticks=385:5:415, ylabel="[mW/m²/str/nm]")
@@ -244,36 +349,46 @@ ymax = round(maximum(ieRₐ_Q.*convfcta), sigdigits=1)
 q3 = plot(1e7./νₐ, ieRₐ_Q.*convfcta, linecolor=:black, yticks=0:(ymax/4):ymax, xlims=(755,775))#)#, xlims=(385,415), xticks=385:5:415) #, xticks=425:3:430)
 q3 = plot!(1e7./νₐ, ieQₐ_conv.*convfcta, linecolor=:red)#)#, xlims=(385,415), xticks=385:5:415) #, xticks=425:3:430)
 
-ymax = round(maximum((ieR[1,1,:].+R[1,1,:].-RnoRS[1,1,:]).*convfcta), sigdigits=2)
-ymin = round(minimum((ieR[1,1,:].+R[1,1,:].-RnoRS[1,1,:]).*convfcta), sigdigits=2)
-p4 = plot(1e7./νₐ, (ieR[1,1,:].+R[1,1,:].-RnoRS[1,1,:]).*convfcta, linecolor=:black, yticks=0:((ymax-ymin)/4):ymax, xlims=(755,775), ylims=(0,ymax))#)#, xlims=(385,415), xticks=385:5:415, ylabel="[mW/m²/str/nm]")
-p4 = plot!(1e7./νₐ, (ieIₐ_RRS_conv.+Iₐ_RRS_conv.-Iₐ_noRS_conv).*convfcta, linecolor=:red)#)#, xlims=(385,415), xticks=385:5:415, ylabel="[mW/m²/str/nm]")
-ymax = round(maximum((ieR[1,2,:].+R[1,2,:].-RnoRS[1,2,:]).*convfcta), sigdigits=2)
-ymin = round(minimum((ieR[1,2,:].+R[1,2,:].-RnoRS[1,2,:]).*convfcta), sigdigits=2)
-q4 = plot(1e7./νₐ, (ieR[1,2,:].+R[1,2,:].-RnoRS[1,2,:]).*convfcta, linecolor=:black, yticks=ymin:((ymax-ymin)/4):ymax, xlims=(755,775), ylims=(ymin,ymax))#)#, xlims=(385,415), xticks=385:5:415) #, xticks=425:3:430)
-q4 = plot!(1e7./νₐ, (ieQₐ_RRS_conv.+Qₐ_RRS_conv.-Qₐ_noRS_conv).*convfcta, linecolor=:red)#)#, xlims=(385,415), xticks=385:5:415) #, xticks=425:3:430)
+ymax = round(maximum((ieR_rrs).*convfct), sigdigits=2)
+ymin = round(minimum((ieR_rrs).*convfct), sigdigits=2)
+p4 = plot(1e7./ν, (ieR_rrs).*convfct, linecolor=:black, yticks=0:((ymax-ymin)/4):ymax, xlims=(755,775), ylims=(0,ymax))#)#, xlims=(385,415), xticks=385:5:415, ylabel="[mW/m²/str/nm]")
+p4 = plot!(1e7./ν, (ieIₐ_RRS_conv).*convfct, linecolor=:red)#)#, xlims=(385,415), xticks=385:5:415, ylabel="[mW/m²/str/nm]")
+ymax = round(maximum((ieR_rrs_Q).*convfct), sigdigits=2)
+ymin = round(minimum((ieR_rrs_Q).*convfct), sigdigits=2)
+q4 = plot(1e7./ν, (ieR_rrs_Q).*convfct, linecolor=:black, yticks=ymin:((ymax-ymin)/4):ymax, xlims=(755,775), ylims=(ymin,ymax))#)#, xlims=(385,415), xticks=385:5:415) #, xticks=425:3:430)
+q4 = plot!(1e7./ν, (ieQₐ_RRS_conv).*convfct, linecolor=:red)#)#, xlims=(385,415), xticks=385:5:415) #, xticks=425:3:430)
+
+#ymax = round(maximum((ieR[1,1,:].+R[1,1,:].-RnoRS[1,1,:]).*convfcta), sigdigits=2)
+#ymin = round(minimum((ieR[1,1,:].+R[1,1,:].-RnoRS[1,1,:]).*convfcta), sigdigits=2)
+#p4 = plot(1e7./νₐ, (ieR[1,1,:].+R[1,1,:].-RnoRS[1,1,:]).*convfcta, linecolor=:black, yticks=0:((ymax-ymin)/4):ymax, xlims=(755,775), ylims=(0,ymax))#)#, xlims=(385,415), xticks=385:5:415, ylabel="[mW/m²/str/nm]")
+#p4 = plot!(1e7./νₐ, (ieIₐ_RRS_conv.+Iₐ_RRS_conv.-Iₐ_noRS_conv).*convfcta, linecolor=:red)#)#, xlims=(385,415), xticks=385:5:415, ylabel="[mW/m²/str/nm]")
+#ymax = round(maximum((ieR[1,2,:].+R[1,2,:].-RnoRS[1,2,:]).*convfcta), sigdigits=2)
+#ymin = round(minimum((ieR[1,2,:].+R[1,2,:].-RnoRS[1,2,:]).*convfcta), sigdigits=2)
+#q4 = plot(1e7./νₐ, (ieR[1,2,:].+R[1,2,:].-RnoRS[1,2,:]).*convfcta, linecolor=:black, yticks=ymin:((ymax-ymin)/4):ymax, xlims=(755,775), ylims=(ymin,ymax))#)#, xlims=(385,415), xticks=385:5:415) #, xticks=425:3:430)
+#q4 = plot!(1e7./νₐ, (ieQₐ_RRS_conv.+Qₐ_RRS_conv.-Qₐ_noRS_conv).*convfcta, linecolor=:red)#)#, xlims=(385,415), xticks=385:5:415) #, xticks=425:3:430)
 
 #q2 = plot(1e7./ν₀, ieR₀₂.*convfct2, linecolor=:black, xlabel = "λ [nm]", xticks=424:2.5:429)
-plot(p1, q1, p2, q2, p3, q3, p4, q4, layout = l, legend = false, title = ["Source, I₀ " "Source, Q₀" "No RS, O₂ A-band, Iₐ" "No RS, O₂ A-band, Qₐ" "VRS+RVRS, O₂ A-band, ΔIᵥ" "VRS+RVRS, O₂ A-band, ΔQᵥ" "RRS, O₂ A-band, ΔIᵣ" "RRS, O₂ A-band, ΔQᵣ"], titlefont = font(8))
+plot(p1, q1, p2, q2, p3, q3, p4, q4, layout = l, legend = false, title = ["Source, I₀ " "Source, Q₀" "Elastic, O₂ A-band, Iₐ" "Elastic, O₂ A-band, Qₐ" "VRS+RVRS, O₂ A-band, Iᵥ" "VRS+RVRS, O₂ A-band, Qᵥ" "RRS, O₂ A-band, Iᵣ" "RRS, O₂ A-band, Qᵣ"], titlefont = font(8))
 savefig("VS_O2Aband_new.png")
 
 
-l = @layout [a1 a2; b1 b2]
 #=
-ymax = round(maximum(R₀.*convfct0), sigdigits=2)
-p1 = plot(1e7./ν₀, R₀.*convfct0, linecolor=:grey, yticks=0:(ymax/4):ymax)
-p1 = plot!(1e7./ν₀, I₀_conv.*convfct0, linecolor=:magenta)#, xticks=385:5:415, ylabel="[mW/m²/str/nm]")
-ymax = round(maximum(R₀_Q.*convfct0), sigdigits=1)
-q1 = plot(1e7./ν₀, R₀_Q.*convfct0, linecolor=:grey, yticks=0:(ymax/4):ymax)#, xticks=385:5:415) #, xticks=425:3:430)
-q1 = plot!(1e7./ν₀, Q₀_conv.*convfct0, linecolor=:magenta)#, xticks=385:5:415) #, xticks=425:3:430)
+l = @layout [a1 a2; b1 b2]
 
-ymax = round(maximum(Rₐ.*convfcta), sigdigits=2)
-p2 = plot(1e7./νₐ, Rₐ.*convfcta, linecolor=:black, yticks=0:(ymax/4):ymax, xlims=(755,775))#)#, xlims=(385,415), xticks=385:5:415, ylabel="[mW/m²/str/nm]")
-p2 = plot!(1e7./νₐ, Iₐ_conv.*convfcta, linecolor=:red)#)#, xlims=(385,415), xticks=385:5:415, ylabel="[mW/m²/str/nm]")
-ymax = round(maximum(Rₐ_Q.*convfcta), sigdigits=1)
-q2 = plot(1e7./νₐ, Rₐ_Q.*convfcta, linecolor=:black, yticks=0:(ymax/4):ymax, xlims=(755,775))#)#, xlims=(385,415), xticks=385:5:415) #, xticks=425:3:430)
-q2 = plot!(1e7./νₐ, Qₐ_conv.*convfcta, linecolor=:red)#)#, xlims=(385,415), xticks=385:5:415) #, xticks=425:3:430)
-=#
+#ymax = round(maximum(R₀.*convfct0), sigdigits=2)
+#p1 = plot(1e7./ν₀, R₀.*convfct0, linecolor=:grey, yticks=0:(ymax/4):ymax)
+#p1 = plot!(1e7./ν₀, I₀_conv.*convfct0, linecolor=:magenta)#, xticks=385:5:415, ylabel="[mW/m²/str/nm]")
+#ymax = round(maximum(R₀_Q.*convfct0), sigdigits=1)
+#q1 = plot(1e7./ν₀, R₀_Q.*convfct0, linecolor=:grey, yticks=0:(ymax/4):ymax)#, xticks=385:5:415) #, xticks=425:3:430)
+#q1 = plot!(1e7./ν₀, Q₀_conv.*convfct0, linecolor=:magenta)#, xticks=385:5:415) #, xticks=425:3:430)
+
+#ymax = round(maximum(Rₐ.*convfcta), sigdigits=2)
+#p2 = plot(1e7./νₐ, Rₐ.*convfcta, linecolor=:black, yticks=0:(ymax/4):ymax, xlims=(755,775))#)#, xlims=(385,415), xticks=385:5:415, ylabel="[mW/m²/str/nm]")
+#p2 = plot!(1e7./νₐ, Iₐ_conv.*convfcta, linecolor=:red)#)#, xlims=(385,415), xticks=385:5:415, ylabel="[mW/m²/str/nm]")
+#ymax = round(maximum(Rₐ_Q.*convfcta), sigdigits=1)
+#q2 = plot(1e7./νₐ, Rₐ_Q.*convfcta, linecolor=:black, yticks=0:(ymax/4):ymax, xlims=(755,775))#)#, xlims=(385,415), xticks=385:5:415) #, xticks=425:3:430)
+#q2 = plot!(1e7./νₐ, Qₐ_conv.*convfcta, linecolor=:red)#)#, xlims=(385,415), xticks=385:5:415) #, xticks=425:3:430)
+#=#
 ymax = round(maximum(100*ieRₐ./Rₐ), sigdigits=2)
 p1 = plot(1e7./νₐ, 100*ieRₐ./Rₐ, linecolor=:black, yticks=0:(ymax/4):ymax, xlims=(755,775))#)#, xlims=(385,415), xticks=385:5:415, ylabel="[mW/m²/str/nm]")
 p1 = plot!(1e7./νₐ, 100*ieIₐ_conv./Iₐ_conv, linecolor=:red)#)#, xlims=(385,415), xticks=385:5:415, ylabel="[mW/m²/str/nm]")
@@ -325,3 +440,4 @@ savefig("RRS_O2Aband_ss_percentages.png")
 
 
 #R_test, T_test, ieR_test, ieT_test = vSmartMOM.rt_run_test(RS_type,model,1);
+=#

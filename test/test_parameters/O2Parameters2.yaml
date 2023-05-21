@@ -6,7 +6,7 @@ radiative_transfer:
   spec_bands:
     #- (1e7/750):0.05:(1e7/745)
     #- (1e7/768):0.05:(1e7/763) 
-    - (1e7/783):0.5:(1e7/742)
+    - (1e7/783):0.15:(1e7/750)
   # Bidirectional Reflectance Distribution Function (BRDF) per band
   surface: 
     - LambertianSurfaceScalar{Float64}(0.) #(0.2) #(0.05)

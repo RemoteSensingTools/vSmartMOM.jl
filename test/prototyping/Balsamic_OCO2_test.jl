@@ -198,8 +198,8 @@ FT = Float64
 # Load OCO Data: 
 # File names:
 
-L1File   = "/net/fluo/data1/group/oco3/L1bSc/oco3_L1bScSC_15935a_220226_B10311_220226124444.h5" #"/net/fluo/data1/group/oco2/L1bSc/oco2_L1bScND_26780a_190715_B10003r_200429212407.h5"
-metFile  = "/net/fluo/data1/group/oco3/L2Met/oco3_L2MetSC_15935a_220226_B10311_220226124455.h5" #"/net/fluo/data1/group/oco2/L2Met/oco2_L2MetND_26780a_190715_B10003r_200429212406.h5"
+L1File   = "/net/fluo/data2/groupMembers/sanghavi/oco3_L1bScSC_04379a_200210_B10305r_211019003131.h5" #"/net/fluo/data1/group/oco3/L1bSc/oco3_L1bScSC_15935a_220226_B10311_220226124444.h5" #"/net/fluo/data1/group/oco2/L1bSc/oco2_L1bScND_26780a_190715_B10003r_200429212407.h5"
+metFile  = "/net/fluo/data2/groupMembers/sanghavi/oco3_L2MetSC_04379a_200210_B10305r_211018214305.h5" #"/net/fluo/data1/group/oco3/L2Met/oco3_L2MetSC_15935a_220226_B10311_220226124455.h5" #"/net/fluo/data1/group/oco2/L2Met/oco2_L2MetND_26780a_190715_B10003r_200429212406.h5"
 dictFile = "/home/cfranken/code/gitHub/InstrumentOperator.jl/json/oco2.yaml"
 # Load L1 file (could just use filenames here as well)
 oco = InstrumentOperator.load_L1(dictFile,L1File, metFile);
@@ -208,7 +208,7 @@ aa = Dataset(L1File)
 bb = aa.group["SoundingGeometry"];
 cc = bb["sounding_pcs_mode"];
 pcs = [cc[grnd_pxl,i] for i=1:size(cc,2)];
-iSam = findall(pcs .== "AM")
+iSam = findall(pcs .== "TG")
 
 # Pick some bands as tuple (or just one)
 bands = (1,2,3);

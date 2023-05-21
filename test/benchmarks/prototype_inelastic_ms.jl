@@ -125,7 +125,7 @@ R_test, T_test, ieR_test, ieT_test = CoreRT.rt_run_test(RS_type,model,1);
 #===Convolution of hires spectral simulations to instrument grid===#
 #x = (1e7/415):0.3:(1e7/385)
 #ν = (1e7/460):0.3:(1e7/420)
-x = -40:0.3:40
+x = -40:0.4:40
 #kernel = InstrumentOperator.create_instrument_kernel(Normal(0, 12.5), x) #defining a Gaussian kernel for convulution in wavenumber space
 kernel = InstrumentOperator.create_instrument_kernel(Normal(0, 12.5), x)
 #I_conv = InstrumentOperator.conv_spectra(kernel, )
@@ -140,26 +140,27 @@ ieQ_conv = imfilter(ieR[1,2,:], kernel)
 convfct = 1e7./ν.^2   # to convert radiance units from mW/m²-str-cm⁻¹ to mW/m²-str-nm
 l = @layout [a1 a2 ; b1 b2; c1 c2]
 p1 = plot(1e7./ν, RnoRS[1,1,:].*convfct, linecolor=:black, xlims=[385,415])
-p1 = plot!(1e7./ν, I_conv_noRS.*convfct, linewidth = 3, linecolor=:red)
-p2 = plot(1e7./ν, (R[1,1,:].+ieR[1,1,:]).*convfct, linecolor=:black, ylabel="[mW/m²/str/nm]", xlims=[385,415])
-p2 = plot!(1e7./ν, (I_conv.+ieI_conv).*convfct, linewidth = 3, linecolor=:red)
-p3 = plot(1e7./ν, (R[1,1,:].-RnoRS[1,1,:].+ieR[1,1,:]).*convfct, linecolor=:black, xlabel = "λ [nm]", xlims=[385,415])
-p3 = plot!(1e7./ν, (I_conv.-I_conv_noRS.+ieI_conv).*convfct, linewidth = 3, linecolor=:red)
+p1 = plot!(1e7./ν, I_conv_noRS.*convfct, linewidth = 3, linecolor=:red, ylabel="[mW/m²/str/nm]", yguidefontsize=8)
+p2 = plot(1e7./ν, (R[1,1,:].-RnoRS[1,1,:].+ieR[1,1,:]).*convfct, linecolor=:black, xlabel = "λ [nm]", xlims=[385,415])
+p2 = plot!(1e7./ν, (I_conv.-I_conv_noRS.+ieI_conv).*convfct, linewidth = 3, linecolor=:red, ylabel="[mW/m²/str/nm]", yguidefontsize=8)
+p3 = plot(1e7./ν, 100*(R[1,1,:].+ieR[1,1,:].-RnoRS[1,1,:])./RnoRS[1,1,:], linecolor=:black, ylabel="[%]", xlims=[385,415], ylims=[-5,150])
+p3 = plot!(1e7./ν, 100*(I_conv.+ieI_conv.-I_conv_noRS)./I_conv_noRS, linewidth = 2,  linecolor=:red)
+
 
 q1 = plot(1e7./ν, RnoRS[1,2,:].*convfct, linecolor=:black, xlims=[385,415])
 q1 = plot!(1e7./ν, Q_conv_noRS.*convfct, linewidth = 3, linecolor=:red)
-q2 = plot(1e7./ν, (R[1,2,:].+ieR[1,2,:]).*convfct, linecolor=:black, xlims=[385,415])
-q2 = plot!(1e7./ν, (Q_conv.+ieQ_conv).*convfct, linewidth = 3, linecolor=:red)
-q3 = plot(1e7./ν, (R[1,2,:].-RnoRS[1,2,:].+ieR[1,2,:]).*convfct, linecolor=:black, xlabel = "λ [nm]", xlims=[385,415])
-q3 = plot!(1e7./ν, (Q_conv.-Q_conv_noRS.+ieQ_conv).*convfct, linewidth = 3, linecolor=:red)
-plot(p1, q1, p2, q2, p3, q3, layout = l, link=:x, legend = false, title = ["I₀ (no RS)" "Q₀ (no RS)" "I₁ (with RS)" "Q₁ (with RS)" "I₁-I₀" "Q₁-Q₀"], titlefont = font(10))
+q2 = plot(1e7./ν, (R[1,2,:].-RnoRS[1,2,:].+ieR[1,2,:]).*convfct, linecolor=:black, xlabel = "λ [nm]", xlims=[385,415])
+q2 = plot!(1e7./ν, (Q_conv.-Q_conv_noRS.+ieQ_conv).*convfct, linewidth = 3, linecolor=:red)
+q3 = plot(1e7./ν, 100*(R[1,2,:].+ieR[1,2,:].-RnoRS[1,2,:])./RnoRS[1,2,:], linecolor=:black, xlims=[385,415])
+q3 = plot!(1e7./ν, 100*(Q_conv.+ieQ_conv.-Q_conv_noRS)./Q_conv_noRS, linewidth = 2, linecolor=:red, ylims=[-0.6,1.5])
+plot(p1, q1, p2, q2, p3, q3, layout = l, link=:x, legend = false, title = ["I₀ (no RS)" "Q₀ (no RS)" "I₁-I₀" "Q₁-Q₀" "(I₁-I₀)/I₀ [%]" "(Q₁-Q₀)/Q₀ [%]"], titlefont = font(10))
 savefig("RingEffect.png")
 
 l = @layout [a1 a2]
-p1 = plot(1e7./ν, 100*ieR[1,1,:]./R[1,1,:].*convfct, linecolor=:black, xlims=[385,415], ylims=[0,2])
-p1 = plot!(1e7./ν, 100*ieI_conv./I_conv.*convfct, linewidth = 2, linecolor=:red, xlabel = "λ [nm]")
-q1 = plot(1e7./ν, 100*ieR[1,2,:]./R[1,2,:].*convfct, linecolor=:black, xlims=[385,415], ylims=[0,0.025])
-q1 = plot!(1e7./ν, 100*ieQ_conv./Q_conv.*convfct, linewidth = 2, linecolor=:red, xlabel = "λ [nm]")
+p1 = plot(1e7./ν, 100*ieR[1,1,:]./R[1,1,:], linecolor=:black, xlims=[385,415], ylims=[-5,150])
+p1 = plot!(1e7./ν, 100*ieI_conv./I_conv, linewidth = 2, linecolor=:red, xlabel = "λ [nm]")
+q1 = plot(1e7./ν, 100*ieR[1,2,:]./R[1,2,:], linecolor=:black, xlims=[385,415], ylims=[-0.1,2])
+q1 = plot!(1e7./ν, 100*ieQ_conv./Q_conv, linewidth = 2, linecolor=:red, xlabel = "λ [nm]")
 plot(p1, q1, layout = l, legend = false, title = ["Iᵢ/Iₑ [%]" "Qᵢ/Qₑ [%]"], titlefont = font(10))
 savefig("RingSpectrum.png")
 

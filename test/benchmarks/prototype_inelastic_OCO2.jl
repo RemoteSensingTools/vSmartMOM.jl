@@ -43,7 +43,7 @@ parameters = parameters_from_yaml("test/test_parameters/O2Parameters2.yaml");
 #parameters = parameters_from_yaml("test/test_parameters/CO2WParameters2.yaml");
 # Create model struct (precomputes optical properties) from parameters
 #parameters.depol = 0.028 #0.1032 #0.028 #ρ_Cabannes
-parameters.depol = 0.028 #0.1032 #0.028 #ρ_Cabannes
+#parameters.depol = 0.028 #0.1032 #0.028 #ρ_Cabannes
 model      = model_from_parameters(parameters);
 
 
@@ -171,7 +171,7 @@ I_wl=[];
     #============================================#
     #================no RS=======================#
     #============================================#
-    parameters.depol = 0.1032 #ρ_molec
+    #parameters.depol = 0.1032 #ρ_molec
     #parameters.depol = 0.028 #ρ_Cabannes
     model      = model_from_parameters(parameters);
 

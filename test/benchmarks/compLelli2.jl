@@ -154,20 +154,25 @@ ieQ_conv = imfilter(ieR[1,2,:], kernel)
 
 convfct = 1e7./ν.^2   # to convert radiance units from mW/m²-str-cm⁻¹ to mW/m²-str-nm
 l = @layout [a1 a2 ; b1 b2; c1 c2]
-p1 = plot(1e7./ν, RnoRS[1,1,:].*convfct, linecolor=:black)
+p1 = plot(1e7./ν, RnoRS[1,1,:].*convfct, linecolor=:black, ylabel="[mW/m²/str/nm]")
 p1 = plot!(1e7./ν, I_conv_noRS.*convfct, linewidth = 3, linecolor=:red)
-p2 = plot(1e7./ν, (R[1,1,:].+ieR[1,1,:]).*convfct, linecolor=:black, ylabel="[mW/m²/str/nm]")
-p2 = plot!(1e7./ν, (I_conv.+ieI_conv).*convfct, linewidth = 3, linecolor=:red)
-p3 = plot(1e7./ν, (R[1,1,:].-RnoRS[1,1,:].+ieR[1,1,:]).*convfct, linecolor=:black, xlabel = "λ [nm]")
-p3 = plot!(1e7./ν, (I_conv.-I_conv_noRS.+ieI_conv).*convfct, linewidth = 3, linecolor=:red)
+#p2 = plot(1e7./ν, (R[1,1,:].+ieR[1,1,:]).*convfct, linecolor=:black, ylabel="[mW/m²/str/nm]")
+#p2 = plot!(1e7./ν, (I_conv.+ieI_conv).*convfct, linewidth = 3, linecolor=:red)
+p2 = plot(1e7./ν, (R[1,1,:].-RnoRS[1,1,:].+ieR[1,1,:]).*convfct, linecolor=:black, xlabel = "λ [nm]", ylabel="[mW/m²/str/nm]")
+p2 = plot!(1e7./ν, (I_conv.-I_conv_noRS.+ieI_conv).*convfct, linewidth = 3, linecolor=:red)
+p3 = plot(1e7./ν, 100.0*(R[1,1,:].-RnoRS[1,1,:].+ieR[1,1,:])./RnoRS[1,1,:], linecolor=:black, xlabel = "λ [nm]")
+p3 = plot!(1e7./ν, 100.0*(I_conv.-I_conv_noRS.+ieI_conv)./I_conv_noRS, linewidth = 3, linecolor=:red)
 
 q1 = plot(1e7./ν, RnoRS[1,2,:].*convfct, linecolor=:black)
 q1 = plot!(1e7./ν, Q_conv_noRS.*convfct, linewidth = 3, linecolor=:red)
-q2 = plot(1e7./ν, (R[1,2,:].+ieR[1,2,:]).*convfct, linecolor=:black)
-q2 = plot!(1e7./ν, (Q_conv.+ieQ_conv).*convfct, linewidth = 3, linecolor=:red)
-q3 = plot(1e7./ν, (R[1,2,:].-RnoRS[1,2,:].+ieR[1,2,:]).*convfct, linecolor=:black, xlabel = "λ [nm]")
-q3 = plot!(1e7./ν, (Q_conv.-Q_conv_noRS.+ieQ_conv).*convfct, linewidth = 3, linecolor=:red)
-plot(p1, q1, p2, q2, p3, q3, layout = l, legend = false, title = ["I₀ (no RS)" "Q₀ (no RS)" "I₁ (with RS)" "Q₁ (with RS)" "I₁-I₀" "Q₁-Q₀"], titlefont = font(10))
+#q2 = plot(1e7./ν, (R[1,2,:].+ieR[1,2,:]).*convfct, linecolor=:black)
+#q2 = plot!(1e7./ν, (Q_conv.+ieQ_conv).*convfct, linewidth = 3, linecolor=:red)
+q2 = plot(1e7./ν, (R[1,2,:].-RnoRS[1,2,:].+ieR[1,2,:]).*convfct, linecolor=:black, xlabel = "λ [nm]")
+q2 = plot!(1e7./ν, (Q_conv.-Q_conv_noRS.+ieQ_conv).*convfct, linewidth = 3, linecolor=:red)
+q3 = plot(1e7./ν, 100.0*(R[1,2,:].-RnoRS[1,2,:].+ieR[1,2,:])./RnoRS[1,2,:], linecolor=:black, xlabel = "λ [nm]")
+q3 = plot!(1e7./ν, 100.0*(Q_conv.-Q_conv_noRS.+ieQ_conv)./Q_conv_noRS, linewidth = 3, linecolor=:red)
+
+plot(p1, q1, p2, q2, p3, q3, layout = l, legend = false, title = ["I₀ (no RS)" "Q₀ (no RS)" "I₁-I₀" "Q₁-Q₀" "(I₁-I₀)/I₀ [%]" "(Q₁-Q₀)/Q₀ [%]"], titlefont = font(10))
 #savefig("RingEffect63U.png")
 
 l = @layout [a1 a2]

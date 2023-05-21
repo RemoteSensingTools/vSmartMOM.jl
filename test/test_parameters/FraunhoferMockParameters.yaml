@@ -100,7 +100,7 @@ absorption:
     #- [O3]  # Molecules in Band #3
   # LookUpTable files (Interpolation Model saved as JLD2!)
   LUTfiles:
-    - ["/net/fluo/data2/data/Rami_CS_database/rami_spectroscopy_o3_all_nu.jld2"]
+    - ["/net/fluo/data3/data/Databases/Rami_CS_database/rami_spectroscopy_o3_all_nu.jld2"]
     #- ["/net/fluo/data2/data/Rami_CS_database/rami_spectroscopy_o3_all_nu.jld2"]
     #- ["/net/fluo/data2/data/Rami_CS_database/rami_spectroscopy_o3_all_nu.jld2"]
   #  - ["/net/fluo/data2/data/ABSCO_CS_Database/v5.2_final/o2_v52.jld2"]

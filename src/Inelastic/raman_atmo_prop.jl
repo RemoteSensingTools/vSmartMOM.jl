@@ -93,7 +93,7 @@ function getRamanSSProp!(RS_type::RRS, λ, grid_in)
     @show RS_type.ϖ_λ₁λ₀
     @show sum(RS_type.ϖ_λ₁λ₀)
     @show RS_type.ϖ_Cabannes
-    RS_type.i_λ₁λ₀ = index_raman_grid[end:-1:1]
+    RS_type.i_λ₁λ₀ = index_raman_grid #index_raman_grid[end:-1:1]
     RS_type.n_Raman = length(RS_type.ϖ_λ₁λ₀)
     return nothing
 end 
@@ -124,7 +124,7 @@ function getRamanSSProp!(RS_type::RRS_plus, depol)
         index_raman_grid, atmo_σ_RRS = compute_optical_RS!(RS_type, grid_in, λ, n2, o2)
         # declare ϖ_λ₁λ₀ to be a grid of length N_raman 
         t_ϖ_λ₁λ₀ = atmo_σ_RRS[end:-1:1]/atmo_σ_Rayl; #the grid gets inverted because the central wavelength is now seen as the recipient of RRS from neighboring source wavelengths
-        t_i_λ₁λ₀ = index_raman_grid[end:-1:1];
+        t_i_λ₁λ₀ = index_raman_grid; #index_raman_grid[end:-1:1];
         push!(t_w, t_ϖ_λ₁λ₀);
         push!(t_i, t_i_λ₁λ₀);
         t_n_Raman = length(t_ϖ_λ₁λ₀);

@@ -94,9 +94,9 @@ absorption:
   # VMR profiles can either be real-valued numbers, 
   # or an array of nodal points from TOA to BOA, interpolated in pressure space
   LUTfiles:
-    - ["/net/fluo/data2/data/Rami_CS_database/rami_spectroscopy_o3_all_nu.jld2"]
-    - ["/net/fluo/data2/data/Rami_CS_database/rami_spectroscopy_o3_all_nu.jld2"]
-    - ["/net/fluo/data2/data/Rami_CS_database/rami_spectroscopy_o3_all_nu.jld2"]
+    - ["/net/fluo/data3/data/Databases/Rami_CS_database/rami_spectroscopy_o3_all_nu.jld2"]
+    - ["/net/fluo/data3/data/Databases/Rami_CS_database/rami_spectroscopy_o3_all_nu.jld2"]
+    - ["/net/fluo/data3/data/Databases/Rami_CS_database/rami_spectroscopy_o3_all_nu.jld2"]
   #  - ["/net/fluo/data2/data/ABSCO_CS_Database/v5.2_final/o2_v52.jld2"]
     #- ["/net/fluo/data2/data/ABSCO_CS_Database/v5.2_final/wh2o_v52.jld2", "/net/fluo/data2/data/ABSCO_CS_Database/v5.2_final/wco2_v52.jld2"]
     #- ["/net/fluo/data2/data/ABSCO_CS_Database/v5.2_final/sh2o_v52.jld2", "/net/fluo/data2/data/ABSCO_CS_Database/v5.2_final/sco2_v52.jld2"]

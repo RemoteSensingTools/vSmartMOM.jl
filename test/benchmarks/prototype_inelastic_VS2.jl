@@ -62,6 +62,45 @@ end
 R, T, ieR, ieT = CoreRT.rt_run_test(RS_type,
            model, RS_type.iBand);
 
+############# VS with polarized laser light ############
+if Fraunhofer
+    T_sun = 5777. # KRS 
+    Tsolar = solar_transmission_from_file("/home/sanghavi/code/github/vSmartMOM.jl/src/SolarModel/solar.out")
+    Tsolar_interp = LinearInterpolation(Tsolar[4:end, 1], Tsolar[4:end, 2])
+    RS_type.F₀ = zeros(model.params.polarization_type.n, 
+                        sum(length(RS_type.grid_in[i]) for i in 1:length(RS_type.iBand)))
+    local i_offset = 0
+    for iB=1:length(RS_type.iBand)
+        ν = collect(RS_type.grid_in[iB])
+        P = planck_spectrum_wn(T_sun, ν)    
+        F₀ = zeros(length(ν));
+        
+        for i=1:length(ν)
+            sol_trans = Tsolar_interp(ν[i]);
+            F₀[i] = sol_trans * P[i];
+            RS_type.F₀[1,i+i_offset] = F₀[i];
+            RS_type.F₀[2,i+i_offset] = -F₀[i];
+        end 
+        i_offset += length(ν)
+    end
+else
+    RS_type.F₀ = zeros(model.params.polarization_type.n, 
+        sum(length(RS_type.grid_in[i]) for i in 1:length(RS_type.iBand)))
+    local i_offset = 0
+    for iB=1:length(RS_type.iBand)
+        ν = collect(RS_type.grid_in[iB])
+
+        for i=1:length(ν)
+            RS_type.F₀[1,i+i_offset] = 1.0;
+            RS_type.F₀[2,i+i_offset] = -1.0;
+        end 
+        i_offset += length(ν)
+    end
+end
+
+Rl, Tl, ieRl, ieTl = CoreRT.rt_run_test(RS_type,
+           model, RS_type.iBand);            
+
 ############# RRS ##############
 parameters2 = 
        parameters_from_yaml("test/test_parameters/FraunhoferMockParameters.yaml");
@@ -119,6 +158,18 @@ RRSidx = findmin(abs.(1e7./ν .- 400.))[2]
 RS_type2.F₀[1,RRSidx] = RS_type.F₀[1]
 #end 
 R_RRS, T_RRS, ieR_RRS, ieT_RRS = CoreRT.rt_run_test(RS_type2,model2,iBand2);
+############# RRS with polarized laser light ############
+RS_type2.F₀ = zeros(model2.params.polarization_type.n, length(ν))
+#for i=1:length(ν)
+#sol_trans = Tsolar_interp(ν[i]);   
+#F₀[i] = sol_trans * P[i];
+RRSidx = findmin(abs.(1e7./ν .- 400.))[2]
+#RRSidx = findmin(abs.(1e7./ν .- 745.))[2]
+#RS_type2.F₀[1,:] .= 1.
+RS_type2.F₀[1,RRSidx] = RS_type.F₀[1]
+RS_type2.F₀[2,RRSidx] = -RS_type.F₀[1]
+R_RRSl, T_RRSl, ieR_RRSl, ieT_RRSl = CoreRT.rt_run_test(RS_type2,model2,iBand2);
+
 ########## RRS w/ Fraunhofer ##########
 T_sun = 5777. # KRS 
 Tsolar = solar_transmission_from_file("/home/sanghavi/code/github/vSmartMOM.jl/src/SolarModel/solar.out")
@@ -141,6 +192,26 @@ for iB=1:length(RS_type2.iBand)
 end
 R_RRS2, T_RRS2, ieR_RRS2, ieT_RRS2 = CoreRT.rt_run_test(RS_type2,model2,iBand2);
 
+
+############# RRS with polarized laser light ############
+RS_type2.F₀ = zeros(model2.params.polarization_type.n, 
+                        sum(length(model2.params.spec_bands[i]) for i in 1:length(RS_type2.iBand)))
+#i_offset = 0
+for iB=1:length(RS_type2.iBand)
+    #ν = collect(RS_type2.grid_in[iB])
+    ν = model2.params.spec_bands[iB]
+    P = planck_spectrum_wn(T_sun, ν)    
+    F₀ = zeros(length(ν));
+        
+    for i=1:length(ν)
+        sol_trans = Tsolar_interp(ν[i]);
+        F₀[i] = sol_trans * P[i];
+        RS_type2.F₀[1,i] = F₀[i];
+        RS_type2.F₀[2,i] = -F₀[i];
+    end 
+    #i_offset += length(ν)
+end
+R_RRS2l, T_RRS2l, ieR_RRS2l, ieT_RRS2l = CoreRT.rt_run_test(RS_type2,model2,iBand2);
 
 ############## Now starting no-ozone computations ########################
 Fraunhofer=true
@@ -191,6 +262,44 @@ else
 end
 
 R0, T0, ieR0, ieT0 = CoreRT.rt_run_test(RS_type,
+           model, RS_type.iBand);
+############# VS with polarized laser light ############
+if Fraunhofer
+    T_sun = 5777. # KRS 
+    Tsolar = solar_transmission_from_file("/home/sanghavi/code/github/vSmartMOM.jl/src/SolarModel/solar.out")
+    Tsolar_interp = LinearInterpolation(Tsolar[4:end, 1], Tsolar[4:end, 2])
+    RS_type.F₀ = zeros(model.params.polarization_type.n, 
+                        sum(length(RS_type.grid_in[i]) for i in 1:length(RS_type.iBand)))
+    local i_offset = 0
+    for iB=1:length(RS_type.iBand)
+        ν = collect(RS_type.grid_in[iB])
+        P = planck_spectrum_wn(T_sun, ν)    
+        F₀ = zeros(length(ν));
+        
+        for i=1:length(ν)
+            sol_trans = Tsolar_interp(ν[i]);
+            F₀[i] = sol_trans * P[i];
+            RS_type.F₀[1,i+i_offset] = F₀[i];
+            RS_type.F₀[2,i+i_offset] = -F₀[i];
+        end 
+        i_offset += length(ν)
+    end
+else
+    RS_type.F₀ = zeros(model.params.polarization_type.n, 
+        sum(length(RS_type.grid_in[i]) for i in 1:length(RS_type.iBand)))
+    local i_offset = 0
+    for iB=1:length(RS_type.iBand)
+        ν = collect(RS_type.grid_in[iB])
+
+        for i=1:length(ν)
+            RS_type.F₀[1,i+i_offset] = 1.0;
+            RS_type.F₀[2,i+i_offset] = -1.0;
+        end 
+        i_offset += length(ν)
+    end
+end
+
+R0l, T0l, ieR0l, ieT0l = CoreRT.rt_run_test(RS_type,
            model, RS_type.iBand);
 
 ############# RRS ##############
@@ -250,6 +359,19 @@ RRSidx = findmin(abs.(1e7./ν .- 400.))[2]
 RS_type2.F₀[1,RRSidx] = RS_type.F₀[1]
 #end 
 R0_RRS, T0_RRS, ieR0_RRS, ieT0_RRS = CoreRT.rt_run_test(RS_type2,model2,iBand2);
+############# RRS with polarized laser light ############
+RS_type2.F₀ = zeros(model2.params.polarization_type.n, length(ν))
+#for i=1:length(ν)
+#sol_trans = Tsolar_interp(ν[i]);   
+#F₀[i] = sol_trans * P[i];
+RRSidx = findmin(abs.(1e7./ν .- 400.))[2]
+#RRSidx = findmin(abs.(1e7./ν .- 745.))[2]
+#RS_type2.F₀[1,:] .= 1.
+RS_type2.F₀[1,RRSidx] = RS_type.F₀[1]
+RS_type2.F₀[2,RRSidx] = -RS_type.F₀[1]
+#end 
+R0_RRSl, T0_RRSl, ieR0_RRSl, ieT0_RRSl = CoreRT.rt_run_test(RS_type2,model2,iBand2);
+
 ########## RRS w/ Fraunhofer ##########
 T_sun = 5777. # KRS 
 Tsolar = solar_transmission_from_file("/home/sanghavi/code/github/vSmartMOM.jl/src/SolarModel/solar.out")
@@ -271,6 +393,26 @@ for iB=1:length(RS_type2.iBand)
     #i_offset += length(ν)
 end
 R0_RRS2, T0_RRS2, ieR0_RRS2, ieT0_RRS2 = CoreRT.rt_run_test(RS_type2,model2,iBand2);
+
+############# RRS with polarized laser light ############
+RS_type2.F₀ = zeros(model2.params.polarization_type.n, 
+                        sum(length(model2.params.spec_bands[i]) for i in 1:length(RS_type2.iBand)))
+#i_offset = 0
+for iB=1:length(RS_type2.iBand)
+    #ν = collect(RS_type2.grid_in[iB])
+    ν = model2.params.spec_bands[iB]
+    P = planck_spectrum_wn(T_sun, ν)    
+    F₀ = zeros(length(ν));
+        
+    for i=1:length(ν)
+        sol_trans = Tsolar_interp(ν[i]);
+        F₀[i] = sol_trans * P[i];
+        RS_type2.F₀[1,i] = F₀[i];
+        RS_type2.F₀[2,i] = -F₀[i];
+    end 
+    #i_offset += length(ν)
+end
+R0_RRS2l, T0_RRS2l, ieR0_RRS2l, ieT0_RRS2l = CoreRT.rt_run_test(RS_type2,model2,iBand2);
 
 ################### End of no-ozone computations ###################
 
@@ -295,6 +437,22 @@ ieQ₀₀ = ieR[1,2,RS_type.bandSpecLim[1]]
 ieQ₀₁ = ieR[1,2,RS_type.bandSpecLim[2]]
 ieQ₀₂ = ieR[1,2,RS_type.bandSpecLim[3]]
 
+# with polarized laser light
+lR₀₀ = Rl[1,1,RS_type.bandSpecLim[1]]
+lR₀₁ = Rl[1,1,RS_type.bandSpecLim[2]]
+lR₀₂ = Rl[1,1,RS_type.bandSpecLim[3]]
+
+lieR₀₀ = ieRl[1,1,RS_type.bandSpecLim[1]]
+lieR₀₁ = ieRl[1,1,RS_type.bandSpecLim[2]]
+lieR₀₂ = ieRl[1,1,RS_type.bandSpecLim[3]]
+
+lQ₀₀ = Rl[1,2,RS_type.bandSpecLim[1]]
+lQ₀₁ = Rl[1,2,RS_type.bandSpecLim[2]]
+lQ₀₂ = Rl[1,2,RS_type.bandSpecLim[3]]
+
+lieQ₀₀ = ieRl[1,2,RS_type.bandSpecLim[1]]
+lieQ₀₁ = ieRl[1,2,RS_type.bandSpecLim[2]]
+lieQ₀₂ = ieRl[1,2,RS_type.bandSpecLim[3]]
 ###### No ozone ######
 
 R0₀₀ = R0[1,1,RS_type.bandSpecLim[1]]
@@ -312,6 +470,23 @@ Q0₀₂ = R0[1,2,RS_type.bandSpecLim[3]]
 ieQ0₀₀ = ieR0[1,2,RS_type.bandSpecLim[1]]
 ieQ0₀₁ = ieR0[1,2,RS_type.bandSpecLim[2]]
 ieQ0₀₂ = ieR0[1,2,RS_type.bandSpecLim[3]]
+
+# With polarized laser light
+lR0₀₀ = R0l[1,1,RS_type.bandSpecLim[1]]
+lR0₀₁ = R0l[1,1,RS_type.bandSpecLim[2]]
+lR0₀₂ = R0l[1,1,RS_type.bandSpecLim[3]]
+
+lieR0₀₀ = ieR0l[1,1,RS_type.bandSpecLim[1]]
+lieR0₀₁ = ieR0l[1,1,RS_type.bandSpecLim[2]]
+lieR0₀₂ = ieR0l[1,1,RS_type.bandSpecLim[3]]
+
+lQ0₀₀ = R0l[1,2,RS_type.bandSpecLim[1]]
+lQ0₀₁ = R0l[1,2,RS_type.bandSpecLim[2]]
+lQ0₀₂ = R0l[1,2,RS_type.bandSpecLim[3]]
+
+lieQ0₀₀ = ieR0l[1,2,RS_type.bandSpecLim[1]]
+lieQ0₀₁ = ieR0l[1,2,RS_type.bandSpecLim[2]]
+lieQ0₀₂ = ieR0l[1,2,RS_type.bandSpecLim[3]]
 
 ######################
 
@@ -333,6 +508,30 @@ q2 = plot(1e7./ν₂, ieR₀₂.*convfct2, linecolor=:black, xlabel = "λ [nm]",
 plot(p1, p2, p3, q1, q2, q3, layout = l, legend = false, title = ["Iₑ (incident)" "Iₑ (O₂)" "Iₑ (N₂)" " Iᵢ (RRS)" "Iᵢ (VRS+RVRS, O₂)" "Iᵢ (VRS+RVRS, N₂)"], titlefont = font(8))
 savefig("RVRS_monochromatic.png")
 
+p1 = plot(1e7./ν, R_RRS2l[1,1,:].*convfct, linecolor=:green, xlims=(395,405), xticks=395:5:405, ylabel="[mW/m²/str/nm]")
+p1 = plot!(1e7./ν, R_RRSl[1,1,:].*convfct, linecolor=:blue, linewidth=2, xlims=(395,405), xticks=395:5:405, ylabel="[mW/m²/str/nm]")
+p1 = plot!(1e7./ν₀, lR₀₀.*convfct0, linecolor=:blue, xlims=(395,405))
+p3 = plot(1e7./ν₁, lR₀₁.*convfct1, linecolor=:green, xlims=(436,446), xticks=436:4:444) #, xticks=425:3:430)
+p2 = plot(1e7./ν₂, lR₀₂.*convfct2, linecolor=:green, xticks=424:2.5:429)
+q1 = plot(1e7./ν, ieR_RRSl[1,1,:].*convfct, linecolor=:blue, xlabel = "λ [nm]", xlims=(395,405), xticks=395:5:405, ylabel="[mW/m²/str/nm]")
+q3 = plot(1e7./ν₁, lieR₀₁.*convfct1, linecolor=:blue, xlabel = "λ [nm]", xlims=(436,446), xticks=436:4:444)
+q2 = plot(1e7./ν₂, lieR₀₂.*convfct2, linecolor=:blue, xlabel = "λ [nm]", xticks=424:2.5:429)
+
+plot(p1, p2, p3, q1, q2, q3, layout = l, legend = false, title = ["Iₑ (incident)" "Iₑ (O₂)" "Iₑ (N₂)" " Iᵢ (RRS)" "Iᵢ (VRS+RVRS, O₂)" "Iᵢ (VRS+RVRS, N₂)"], titlefont = font(8))
+savefig("RVRS_monochromatic_laser.png")
+
+p1 = plot(1e7./ν, R_RRS2[1,1,:].*convfct, linecolor=:grey, xlims=(395,405), xticks=395:5:405, ylabel="[mW/m²/str/nm]")
+p1 = plot!(1e7./ν, R_RRSl[1,1,:].*convfct, linecolor=:black, linewidth=2, xlims=(395,405), xticks=395:5:405, ylabel="[mW/m²/str/nm]")
+#p1 = plot!(1e7./ν₀, lR₀₀.*convfct0, linecolor=:black, xlims=(395,405))
+p3 = plot(1e7./ν₁, R₀₁.*convfct1, linecolor=:grey, xlims=(436,446), xticks=436:4:444) #, xticks=425:3:430)
+p2 = plot(1e7./ν₂, R₀₂.*convfct2, linecolor=:grey, xticks=424:2.5:429)
+q1 = plot(1e7./ν, ieR_RRSl[1,1,:].*convfct, linecolor=:black, xlabel = "λ [nm]", xlims=(395,405), xticks=395:5:405, ylabel="[mW/m²/str/nm]")
+q3 = plot(1e7./ν₁, lieR₀₁.*convfct1, linecolor=:black, xlabel = "λ [nm]", xlims=(436,446), xticks=436:4:444)
+q2 = plot(1e7./ν₂, lieR₀₂.*convfct2, linecolor=:black, xlabel = "λ [nm]", xticks=424:2.5:429)
+
+plot(p1, p2, p3, q1, q2, q3, layout = l, legend = false, title = ["Iₑ (incident)" "Iₑ (O₂)" "Iₑ (N₂)" " Iᵢ (RRS)" "Iᵢ (VRS+RVRS, O₂)" "Iᵢ (VRS+RVRS, N₂)"], titlefont = font(8))
+savefig("RVRS_monochromatic_sunlasercomp_vv.png")
+
 l = @layout [a1 a2 a3; b1 b2 b3]
 
 p1 = plot(1e7./ν, R_RRS2[1,2,:].*convfct, linecolor=:grey, xlims=(395,405), xticks=395:5:405, ylabel="[mW/m²/str/nm]")
@@ -345,6 +544,30 @@ q3 = plot(1e7./ν₁, ieQ₀₁.*convfct1, linecolor=:black, xlabel = "λ [nm]",
 q2 = plot(1e7./ν₂, ieQ₀₂.*convfct2, linecolor=:black, xlabel = "λ [nm]", xticks=424:2.5:429)
 plot(p1, p2, p3, q1, q2, q3, layout = l, legend = false, title = ["Qₑ (incident)" "Qₑ (O₂)" "Qₑ (N₂)" " Qᵢ (RRS)" "Qᵢ (VRS+RVRS, O₂)" "Qᵢ (VRS+RVRS, N₂)"], titlefont = font(8))
 savefig("RVRS_Qmonochromatic.png")
+
+p1 = plot(1e7./ν, R_RRS2l[1,2,:].*convfct, linecolor=:green, xlims=(395,405), xticks=395:5:405, ylabel="[mW/m²/str/nm]")
+p1 = plot!(1e7./ν, R_RRSl[1,2,:].*convfct, linecolor=:blue, linewidth=2, xlims=(395,405), xticks=395:5:405, ylabel="[mW/m²/str/nm]")
+p1 = plot!(1e7./ν₀, lQ₀₀.*convfct0, linecolor=:blue, xlims=(395,405))
+p3 = plot(1e7./ν₁, lQ₀₁.*convfct1, linecolor=:green, xlims=(436,446), xticks=436:4:444) #, xticks=425:3:430)
+p2 = plot(1e7./ν₂, lQ₀₂.*convfct2, linecolor=:green, xticks=424:2.5:429)
+q1 = plot(1e7./ν, ieR_RRSl[1,2,:].*convfct, linecolor=:blue, xlabel = "λ [nm]", xlims=(395,405), xticks=395:5:405, ylabel="[mW/m²/str/nm]")
+q3 = plot(1e7./ν₁, lieQ₀₁.*convfct1, linecolor=:blue, xlabel = "λ [nm]", xlims=(436,446), xticks=436:4:444)
+q2 = plot(1e7./ν₂, lieQ₀₂.*convfct2, linecolor=:blue, xlabel = "λ [nm]", xticks=424:2.5:429)
+
+plot(p1, p2, p3, q1, q2, q3, layout = l, legend = false, title = ["Qₑ (incident)" "Qₑ (O₂)" "Qₑ (N₂)" " Qᵢ (RRS)" "Qᵢ (VRS+RVRS, O₂)" "Qᵢ (VRS+RVRS, N₂)"], titlefont = font(8))
+savefig("RVRS_Qmonochromatic_laser.png")
+
+p1 = plot(1e7./ν, R_RRS2[1,2,:].*convfct, linecolor=:grey, xlims=(395,405), xticks=395:5:405, ylabel="[mW/m²/str/nm]")
+p1 = plot!(1e7./ν, R_RRSl[1,2,:].*convfct, linecolor=:black, linewidth=2, xlims=(395,405), xticks=395:5:405, ylabel="[mW/m²/str/nm]")
+#p1 = plot!(1e7./ν₀, lQ₀₀.*convfct0, linecolor=:black, xlims=(395,405))
+p3 = plot(1e7./ν₁, Q₀₁.*convfct1, linecolor=:grey, xlims=(436,446), xticks=436:4:444) #, xticks=425:3:430)
+p2 = plot(1e7./ν₂, Q₀₂.*convfct2, linecolor=:grey, xticks=424:2.5:429)
+q1 = plot(1e7./ν, ieR_RRSl[1,2,:].*convfct, linecolor=:black, xlabel = "λ [nm]", xlims=(395,405), xticks=395:5:405, ylabel="[mW/m²/str/nm]")
+q3 = plot(1e7./ν₁, lieQ₀₁.*convfct1, linecolor=:black, xlabel = "λ [nm]", xlims=(436,446), xticks=436:4:444)
+q2 = plot(1e7./ν₂, lieQ₀₂.*convfct2, linecolor=:black, xlabel = "λ [nm]", xticks=424:2.5:429)
+
+plot(p1, p2, p3, q1, q2, q3, layout = l, legend = false, title = ["Qₑ (incident)" "Qₑ (O₂)" "Qₑ (N₂)" " Qᵢ (RRS)" "Qᵢ (VRS+RVRS, O₂)" "Qᵢ (VRS+RVRS, N₂)"], titlefont = font(8))
+savefig("RVRS_Qmonochromatic_sunlasercomp_vv.png")
 
 l = @layout [a1 a2 a3; b1 b2 b3]
 
@@ -359,6 +582,17 @@ q2 = plot(1e7./ν₂, (ieR₀₂-ieR0₀₂).*convfct2, linecolor=:black, xlabel
 plot(p1, p2, p3, q1, q2, q3, layout = l, legend = false, title = ["ΔIₑ (incident)" "ΔIₑ (O₂)" "ΔIₑ (N₂)" " ΔIᵢ (RRS)" "ΔIᵢ (VRS+RVRS, O₂)" "ΔIᵢ (VRS+RVRS, N₂)"], titlefont = font(8))
 savefig("DeltaRVRS_monochromatic.png")
 
+p1 = plot(1e7./ν, (R_RRS2[1,1,:]-R0_RRS2[1,1,:]).*convfct, linecolor=:grey, xlims=(395,405), xticks=395:5:405, ylabel="[mW/m²/str/nm]")
+p1 = plot!(1e7./ν, (R_RRSl[1,1,:]-R0_RRSl[1,1,:]).*convfct, linecolor=:black, linewidth=2, xlims=(395,405), xticks=395:5:405, ylabel="[mW/m²/str/nm]")
+#p1 = plot!(1e7./ν₀, (R₀₀-R0₀₀).*convfct0, linecolor=:black, xlims=(395,405))
+p3 = plot(1e7./ν₁, (R₀₁-R0₀₁).*convfct1, linecolor=:grey) #, xticks=425:3:430)
+p2 = plot(1e7./ν₂, (R₀₂-R0₀₂).*convfct2, linecolor=:grey, xticks=424:2.5:429)
+q1 = plot(1e7./ν, (ieR_RRSl[1,1,:]-ieR0_RRSl[1,1,:]).*convfct, linecolor=:black, xlabel = "λ [nm]", xlims=(395,405), xticks=395:5:405, ylabel="[mW/m²/str/nm]")
+q3 = plot(1e7./ν₁, (lieR₀₁-lieR0₀₁).*convfct1, linecolor=:black, xlabel = "λ [nm]")#
+q2 = plot(1e7./ν₂, (lieR₀₂-lieR0₀₂).*convfct2, linecolor=:black, xlabel = "λ [nm]", xticks=424:2.5:429)
+plot(p1, p2, p3, q1, q2, q3, layout = l, legend = false, title = ["ΔIₑ (incident)" "ΔIₑ (O₂)" "ΔIₑ (N₂)" " ΔIᵢ (RRS)" "ΔIᵢ (VRS+RVRS, O₂)" "ΔIᵢ (VRS+RVRS, N₂)"], titlefont = font(8))
+savefig("DeltaRVRS_monochromatic_sunlasercomp_vv.png")
+
 l = @layout [a1 a2 a3; b1 b2 b3]
 
 p1 = plot(1e7./ν, (R_RRS2[1,2,:]-R0_RRS2[1,2,:]).*convfct, linecolor=:grey, xlims=(395,405), xticks=395:5:405, ylabel="[mW/m²/str/nm]")
@@ -371,6 +605,19 @@ q3 = plot(1e7./ν₁, (ieQ₀₁-ieQ0₀₁).*convfct1, linecolor=:black, xlabel
 q2 = plot(1e7./ν₂, (ieQ₀₂-ieQ0₀₂).*convfct2, linecolor=:black, xlabel = "λ [nm]", xticks=424:2.5:429)
 plot(p1, p2, p3, q1, q2, q3, layout = l, legend = false, title = ["ΔQₑ (incident)" "ΔQₑ (O₂)" "ΔQₑ (N₂)" " ΔQᵢ (RRS)" "ΔQᵢ (VRS+RVRS, O₂)" "ΔQᵢ (VRS+RVRS, N₂)"], titlefont = font(8))
 savefig("DeltaRVRS_Qmonochromatic.png")
+
+l = @layout [a1 a2 a3; b1 b2 b3]
+
+p1 = plot(1e7./ν, (R_RRS2[1,2,:]-R0_RRS2[1,2,:]).*convfct, linecolor=:grey, xlims=(395,405), xticks=395:5:405, ylabel="[mW/m²/str/nm]")
+p1 = plot!(1e7./ν, (R_RRSl[1,2,:]-R0_RRSl[1,2,:]).*convfct, linecolor=:black, linewidth=2, xlims=(395,405), xticks=395:5:405, ylabel="[mW/m²/str/nm]")
+#p1 = plot!(1e7./ν₀, (Q₀₀-Q0₀₀).*convfct0, linecolor=:black, xlims=(395,405))
+p3 = plot(1e7./ν₁, (Q₀₁-Q0₀₁).*convfct1, linecolor=:grey) #, xticks=425:3:430)
+p2 = plot(1e7./ν₂, (Q₀₂-Q0₀₂).*convfct2, linecolor=:grey, xticks=424:2.5:429)
+q1 = plot(1e7./ν, (ieR_RRSl[1,2,:]-ieR0_RRSl[1,2,:]).*convfct, linecolor=:black, xlabel = "λ [nm]", xlims=(395,405), xticks=395:5:405, ylabel="[mW/m²/str/nm]")
+q3 = plot(1e7./ν₁, (lieQ₀₁-lieQ0₀₁).*convfct1, linecolor=:black, xlabel = "λ [nm]")#
+q2 = plot(1e7./ν₂, (lieQ₀₂-lieQ0₀₂).*convfct2, linecolor=:black, xlabel = "λ [nm]", xticks=424:2.5:429)
+plot(p1, p2, p3, q1, q2, q3, layout = l, legend = false, title = ["ΔQₑ (incident)" "ΔQₑ (O₂)" "ΔQₑ (N₂)" " ΔQᵢ (RRS)" "ΔQᵢ (VRS+RVRS, O₂)" "ΔQᵢ (VRS+RVRS, N₂)"], titlefont = font(8))
+savefig("DeltaRVRS_Qmonochromatic_sunlasercomp_vv.png")
 
 norm=RS_type.F₀[1]*convfct0
 l = @layout [a1 a2 a3; b1 b2 b3; c1 c2 c3]
@@ -405,6 +652,33 @@ o1 = plot(1e7./ν, (sum(τ_abs2[1], dims=2)).*convfct, linecolor=:red, xlims=(39
 o1 = plot!(1e7./ν, (sum(τ_abs02[1], dims=2)).*convfct, linecolor=:blue, xlims=(395,405), xticks=395:5:405)#, ylabel="\tau_{\mathrm{O}_3}")
 o1 = plot!(1e7./ν₀, (sum(τ_abs[1], dims=2)).*convfct0, linecolor=:red, xlims=(395,405), xticks=395:5:405)
 o1 = plot!(1e7./ν₀, (sum(τ_abs0[1], dims=2)).*convfct0, linecolor=:blue, xlims=(395,405), xticks=395:5:405)
+o3 = plot(1e7./ν₁, (sum(τ_abs[2], dims=2)).*convfct1, linecolor=:red, xlims=(436,446), xticks=436:4:444) #, xticks=425:3:430)
+o3 = plot!(1e7./ν₁, (sum(τ_abs0[2], dims=2)).*convfct1, linecolor=:blue) #, xticks=425:3:430)
+o2 = plot(1e7./ν₂, (sum(τ_abs[3], dims=2)).*convfct2, linecolor=:red, xticks=424:2.5:429)
+o2 = plot!(1e7./ν₂, (sum(τ_abs0[3], dims=2)).*convfct2, linecolor=:blue, xticks=424:2.5:429)
+
+#p1 = plot(1e7./ν, (R_RRS2[1,1,:]-R0_RRS2[1,1,:]).*convfct, linecolor=:grey, xlims=(395,405), xticks=395:5:405, ylabel="[mW/m²/str/nm]")
+#p1 = plot!(1e7./ν, (R_RRS[1,1,:]-R0_RRS[1,1,:]).*convfct, linecolor=:black, linewidth=2, xlims=(395,405), xticks=395:5:405, ylabel="[mW/m²/str/nm]")
+#p1 = plot!(1e7./ν₀, (R₀₀-R0₀₀).*convfct0, linecolor=:black, xlims=(395,405))
+#p3 = plot(1e7./ν₁, (R₀₁-R0₀₁).*convfct1, linecolor=:grey) #, xticks=425:3:430)
+#p2 = plot(1e7./ν₂, (R₀₂-R0₀₂).*convfct2, linecolor=:grey, xticks=424:2.5:429)
+p1 = plot(1e7./ν, (ieR0_RRSl[1,1,:]).*convfct/norm, linecolor=:black, xlabel = "λ [nm]", xlims=(395,405), xticks=395:5:405)#, ylabel="[mW/m²/str/nm]")
+p3 = plot(1e7./ν₁, (lieR0₀₁).*convfct1/norm, linecolor=:black, xlabel = "λ [nm]", xlims=(436,446), xticks=436:4:444)
+p2 = plot(1e7./ν₂, (lieR0₀₂).*convfct2/norm, linecolor=:black, xlabel = "λ [nm]", xticks=424:2.5:429)
+
+
+q1 = plot(1e7./ν, (ieR_RRSl[1,1,:]-ieR0_RRSl[1,1,:]).*convfct/norm, linecolor=:black, xlabel = "λ [nm]", xlims=(395,405), xticks=395:5:405)#, ylabel="[mW/m²/str/nm]")
+q3 = plot(1e7./ν₁, (lieR₀₁-lieR0₀₁).*convfct1/norm, linecolor=:black, xlabel = "λ [nm]", xlims=(436,446), xticks=436:4:444)
+q2 = plot(1e7./ν₂, (lieR₀₂-lieR0₀₂).*convfct2/norm, linecolor=:black, xlabel = "λ [nm]", xticks=424:2.5:429)
+plot(o1, o2, o3, p1, p2, p3, q1, q2, q3, layout = l, legend = false, title = ["" "" "" "Iᵢ/F₀ (RRS)" "Iᵢ/F₀ (VRS+RVRS, O₂)" "Iᵢ/F₀ (VRS+RVRS, N₂)" " ΔIᵢ/F₀ (RRS)" "ΔIᵢ/F₀ (VRS+RVRS, O₂)" "ΔIᵢ/F₀ (VRS+RVRS, N₂)"], titlefont = font(7))
+savefig("DeltaRVRS_monochromaticO3_sunlasercomp_vv.png")
+
+norm=RS_type.F₀[1]*convfct0
+l = @layout [a1 a2 a3; b1 b2 b3; c1 c2 c3]
+o1 = plot(1e7./ν, (sum(τ_abs2[1], dims=2)).*convfct, linecolor=:red, xlims=(395,405), xticks=395:5:405, ylabel="τₐ")
+o1 = plot!(1e7./ν, (sum(τ_abs02[1], dims=2)).*convfct, linecolor=:blue, xlims=(395,405), xticks=395:5:405)#, ylabel="\tau_{\mathrm{O}_3}")
+o1 = plot!(1e7./ν₀, (sum(τ_abs[1], dims=2)).*convfct0, linecolor=:red, xlims=(395,405), xticks=395:5:405)
+o1 = plot!(1e7./ν₀, (sum(τ_abs0[1], dims=2)).*convfct0, linecolor=:blue, xlims=(395,405), xticks=395:5:405)
 o3 = plot(1e7./ν₁, (sum(τ_abs[2], dims=2)).*convfct1, linecolor=:red, xlims=(436,446), xticks=436:4:444)
 o3 = plot!(1e7./ν₁, (sum(τ_abs0[2], dims=2)).*convfct1, linecolor=:blue) #, xticks=425:3:430)
 o2 = plot(1e7./ν₂, (sum(τ_abs[3], dims=2)).*convfct2, linecolor=:red, xticks=424:2.5:429)
@@ -426,6 +700,32 @@ q2 = plot(1e7./ν₂, (ieQ₀₂-ieQ0₀₂).*convfct2/norm, linecolor=:black, x
 plot(o1, o2, o3, p1, p2, p3, q1, q2, q3, layout = l, legend = false, title = ["" "" "" "Qᵢ/F₀ (RRS)" "Qᵢ/F₀ (VRS+RVRS, O₂)" "Qᵢ/F₀ (VRS+RVRS, N₂)" " ΔQᵢ/F₀ (RRS)" "ΔQᵢ/F₀ (VRS+RVRS, O₂)" "ΔQᵢ/F₀ (VRS+RVRS, N₂)"], titlefont = font(7))
 savefig("DeltaRVRS_QmonochromaticO3.png")
 
+norm=RS_type.F₀[1]*convfct0
+l = @layout [a1 a2 a3; b1 b2 b3; c1 c2 c3]
+o1 = plot(1e7./ν, (sum(τ_abs2[1], dims=2)).*convfct, linecolor=:red, xlims=(395,405), xticks=395:5:405, ylabel="τₐ")
+o1 = plot!(1e7./ν, (sum(τ_abs02[1], dims=2)).*convfct, linecolor=:blue, xlims=(395,405), xticks=395:5:405)#, ylabel="\tau_{\mathrm{O}_3}")
+o1 = plot!(1e7./ν₀, (sum(τ_abs[1], dims=2)).*convfct0, linecolor=:red, xlims=(395,405), xticks=395:5:405)
+o1 = plot!(1e7./ν₀, (sum(τ_abs0[1], dims=2)).*convfct0, linecolor=:blue, xlims=(395,405), xticks=395:5:405)
+o3 = plot(1e7./ν₁, (sum(τ_abs[2], dims=2)).*convfct1, linecolor=:red, xlims=(436,446), xticks=436:4:444)
+o3 = plot!(1e7./ν₁, (sum(τ_abs0[2], dims=2)).*convfct1, linecolor=:blue) #, xticks=425:3:430)
+o2 = plot(1e7./ν₂, (sum(τ_abs[3], dims=2)).*convfct2, linecolor=:red, xticks=424:2.5:429)
+o2 = plot!(1e7./ν₂, (sum(τ_abs0[3], dims=2)).*convfct2, linecolor=:blue, xticks=424:2.5:429)
+
+#p1 = plot(1e7./ν, (R_RRS2[1,1,:]-R0_RRS2[1,1,:]).*convfct, linecolor=:grey, xlims=(395,405), xticks=395:5:405, ylabel="[mW/m²/str/nm]")
+#p1 = plot!(1e7./ν, (R_RRS[1,1,:]-R0_RRS[1,1,:]).*convfct, linecolor=:black, linewidth=2, xlims=(395,405), xticks=395:5:405, ylabel="[mW/m²/str/nm]")
+#p1 = plot!(1e7./ν₀, (R₀₀-R0₀₀).*convfct0, linecolor=:black, xlims=(395,405))
+#p3 = plot(1e7./ν₁, (R₀₁-R0₀₁).*convfct1, linecolor=:grey) #, xticks=425:3:430)
+#p2 = plot(1e7./ν₂, (R₀₂-R0₀₂).*convfct2, linecolor=:grey, xticks=424:2.5:429)
+p1 = plot(1e7./ν, (ieR0_RRSl[1,2,:]).*convfct/norm, linecolor=:black, xlabel = "λ [nm]", xlims=(395,405), xticks=395:5:405) #, ylabel="[mW/m²/str/nm]")
+p3 = plot(1e7./ν₁, (lieQ0₀₁).*convfct1/norm, linecolor=:black, xlabel = "λ [nm]", xlims=(436,446), xticks=436:4:444)
+p2 = plot(1e7./ν₂, (lieQ0₀₂).*convfct2/norm, linecolor=:black, xlabel = "λ [nm]", xticks=424:2.5:429)
+
+
+q1 = plot(1e7./ν, (ieR_RRSl[1,2,:]-ieR0_RRSl[1,2,:]).*convfct/norm, linecolor=:black, xlabel = "λ [nm]", xlims=(395,405), xticks=395:5:405) #, ylabel="[mW/m²/str/nm]")
+q3 = plot(1e7./ν₁, (lieQ₀₁-lieQ0₀₁).*convfct1/norm, linecolor=:black, xlabel = "λ [nm]", xlims=(436,446), xticks=436:4:444)
+q2 = plot(1e7./ν₂, (lieQ₀₂-lieQ0₀₂).*convfct2/norm, linecolor=:black, xlabel = "λ [nm]", xticks=424:2.5:429)
+plot(o1, o2, o3, p1, p2, p3, q1, q2, q3, layout = l, legend = false, title = ["" "" "" "Qᵢ/F₀ (RRS)" "Qᵢ/F₀ (VRS+RVRS, O₂)" "Qᵢ/F₀ (VRS+RVRS, N₂)" " ΔQᵢ/F₀ (RRS)" "ΔQᵢ/F₀ (VRS+RVRS, O₂)" "ΔQᵢ/F₀ (VRS+RVRS, N₂)"], titlefont = font(7))
+savefig("DeltaRVRS_QmonochromaticO3_sunlasercomp_vv.png")
 #=
 l = @layout [a1 a2 a3; b1 b2 b3]
 
