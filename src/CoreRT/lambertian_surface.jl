@@ -122,14 +122,20 @@ function create_surface_layer!(RS_type, lambertian::LambertianSurfaceLegendre{FT
         # Move to architecture:
         R_surf = arr_type(R_surf)
 
+        #@show size(F₀), size(τ_sum)
+        #@show size(F₀'.*τ_sum)
         # Source function of surface:
         if SFI
-            F₀_NquadN = zeros(length(qp_μN), length(τ_sum));
-            F₀_NquadN[iμ₀Nstart:pol_type.n*iμ₀,:] = F₀.*exp.(-τ_sum/μ₀);
-            added_layer.J₀⁺ = 0 # F₀_NquadN
+            F₀_NquadN = arr_type(zeros(FT,length(qp_μN), length(τ_sum)));
+            #@show size(F₀_NquadN)
+            @show size(F₀_NquadN[iμ₀Nstart:pol_type.n*iμ₀,:])
+            @show size((F₀'.*exp.(-τ_sum/μ₀))')
+            F₀_NquadN[iμ₀Nstart:pol_type.n*iμ₀,:] .= (F₀'.*exp.(-τ_sum/μ₀))';
+            #added_layer.J₀⁺[:,1,:] .= 0 # F₀_NquadN
+            #added_layer.J₀⁺[:,1,:] .= F₀_NquadN;#0;#
             # Suniti double-check
             # added_layer.J₀⁻[:,1,:] = μ₀*(R_surf*I₀_NquadN) .* (ρ .* exp.(-τ_sum/μ₀))';
-            added_layer.J₀⁻[:,1,:] = μ₀*(R_surf*F₀_NquadN*ρ);#/FT(π); 
+            added_layer.J₀⁻[:,1,:] .= μ₀*(R_surf*F₀_NquadN*ρ);#/FT(π); 
             #μ₀*(R_surf[iμ₀Nstart:pol_type.n*iμ₀, iμ₀Nstart:pol_type.n*iμ₀]*F₀) .* (ρ .* exp.(-τ_sum/μ₀))';
         end
         R_surf   = R_surf * Diagonal(qp_μN.*wt_μN)

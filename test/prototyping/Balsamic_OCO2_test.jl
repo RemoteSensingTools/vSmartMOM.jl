@@ -8,6 +8,7 @@ using vSmartMOM.Absorption
 using vSmartMOM.Scattering
 using vSmartMOM.CoreRT
 using vSmartMOM.SolarModel
+using vSmartMOM.InelasticScattering
 using InstrumentOperator
 using Interpolations
 using Polynomials
@@ -15,6 +16,7 @@ using ForwardDiff
 using Distributions
 using NCDatasets
 using LinearAlgebra
+# using Distances
 include("/home/sanghavi/code/github/vSmartMOM.jl/test/prototyping/runner.jl")
 #---------------------------------------------<Start Functions>---------------------------------------------#
 function getSolar(grid, Tsolar)
@@ -203,11 +205,12 @@ metFile  = "/net/fluo/data2/groupMembers/sanghavi/oco3_L2MetSC_04379a_200210_B10
 dictFile = "/home/cfranken/code/gitHub/InstrumentOperator.jl/json/oco2.yaml"
 # Load L1 file (could just use filenames here as well)
 oco = InstrumentOperator.load_L1(dictFile,L1File, metFile);
-grnd_pxl = 5
+grnd_pxl = 1:8#5
+grnd_pxl_tmp=1
 aa = Dataset(L1File)
 bb = aa.group["SoundingGeometry"];
 cc = bb["sounding_pcs_mode"];
-pcs = [cc[grnd_pxl,i] for i=1:size(cc,2)];
+pcs = [cc[grnd_pxl_tmp,i] for i=1:size(cc,2)];
 iSam = findall(pcs .== "TG")
 
 # Pick some bands as tuple (or just one)
@@ -217,7 +220,8 @@ bands = (1,2,3);
 indices = (92:885,114:845,50:916);
 #indices = (92:885,50:916);
 
-ii = iSam[1:36:end]
+#ii = iSam[1:36:end]
+ii = iSam[1:end]
 #y=[];
 #oco_soundings=[];
 # Get data for that sounding:
@@ -226,21 +230,78 @@ ii = iSam[1:36:end]
 oco_soundings = [];
 tmpy = [];#[];#[oco_soundings[1].SpectralMeasurement];
 Nangles = length(ii)
+lat=[];
+lon=[];
+sza=[];
+vza=[];
+raz=[];
 for i=1:Nangles
-    # Geo Index (footprint,sounding):
-    GeoInd = [grnd_pxl,ii[i]];
-    # Get data for that sounding:
-    oco_sounding = InstrumentOperator.getMeasurement(oco, bands, indices, GeoInd);
-    push!(oco_soundings, oco_sounding)
-    #if i==1    
-    #    #oco_soundings = [oco_sounding];
-    #    y = [oco_soundings[i].SpectralMeasurement];
-    #else
-        #oco_soundings = vcat(oco_soundings, oco_sounding);
-    push!(tmpy, oco_soundings[i].SpectralMeasurement)
-    #end
+    for j=1:length(grnd_pxl)
+        # Geo Index (footprint,sounding):
+        GeoInd = [grnd_pxl[j],ii[i]];
+        # Get data for that sounding:
+        oco_sounding = InstrumentOperator.getMeasurement(oco, bands, indices, GeoInd);
+        push!(oco_soundings, oco_sounding)
+        push!(lat, oco_sounding.latitude)
+        push!(lon, oco_sounding.longitude)
+        push!(sza, oco_sounding.sza)
+        push!(vza, oco_sounding.vza)
+        push!(raz, oco_sounding.vaa-oco_sounding.saa)
+        @show  oco_sounding.latitude, oco_sounding.longitude
+        @show oco_sounding.vza, oco_sounding.vaa-oco_sounding.saa, oco_sounding.sza
+        #if i==1    
+        #    #oco_soundings = [oco_sounding];
+        #    y = [oco_soundings[i].SpectralMeasurement];
+        #else
+            #oco_soundings = vcat(oco_soundings, oco_sounding);
+        push!(tmpy, oco_sounding.SpectralMeasurement)
+    end
 end
-y=reduce(vcat,tmpy);
+
+function dist(p1, p2)
+    Rₑ = 6375
+    dx = Rₑ*cosd(0.5*(p1[1]+p2[1]))*abs(p1[2]-p2[2])*π/180.
+    dy = Rₑ*abs(p1[1]-p2[1])*π/180.
+    d  = sqrt(dx^2+dy^2)
+end
+pts = [lat';lon']
+Npts=length(lat)
+dd=zeros(Npts, Npts)
+for i=1:Npts
+    for j=i:Npts
+        if(i!=j)
+            dd[i,j] = dist(pts[:,i],pts[:,j])
+            dd[j,i] = dd[i,j]
+        end
+    end
+end
+v_Npts = zeros(Int, Npts)
+for i=1:Npts
+    nbr = filter(x -> 0<x<1, dd[i,:])
+    @show nbr
+    j=findall(x-> 0<x<1, dd[i,:])
+    @show i, j, length(j)
+    v_Npts[i]=length(j) 
+end
+max_nbrs = maximum(v_Npts)
+max_Npts = findall(x -> x==max_nbrs, v_Npts)
+select_i=[];
+for i=1:length(max_Npts)
+    @show i
+    push!(select_i, sort([max_Npts[i]; findall(x-> 0<x<1, dd[max_Npts[i],:])]))
+end
+select_i = unique(select_i)
+
+i_ctr=1;
+y=reduce(vcat,tmpy[select_i[i_ctr]]);
+oco_soundings=oco_soundings[select_i[i_ctr]];
+v_vza = vza[select_i[i_ctr]];
+v_raz = raz[select_i[i_ctr]];
+v_sza = mean(sza[select_i[i_ctr]]);
+Nangles = length(v_vza)
+parameters.sza = v_sza
+parameters.vza = v_vza
+parameters.vaz = v_raz
 
 ###################################################
 # Produce black-body in wavenumber range

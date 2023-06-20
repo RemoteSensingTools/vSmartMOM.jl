@@ -172,12 +172,13 @@ function rt_kernel!(RS_type::noRS{FT},
     #@show dτ, ndoubl
     # If there is scattering, perform the elemental and doubling steps
     if scatter
-        
+        #@show F₀
         @timeit "elemental" elemental!(pol_type, SFI, 
                                         τ_sum, dτ, F₀,
                                         computed_layer_properties, 
                                         m, ndoubl, scatter, quad_points,  
                                         added_layer,  architecture)
+        @show "Done"  
         #=
         if m==0
             #m==0 ? 

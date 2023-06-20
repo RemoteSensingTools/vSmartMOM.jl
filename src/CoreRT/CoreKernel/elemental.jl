@@ -110,7 +110,7 @@ end
 function elemental!(pol_type, SFI::Bool, 
                             τ_sum::AbstractArray,#{FT2,1}, #Suniti
                             dτ::AbstractArray,
-                            F₀::AbstractArray{FT,2},    # Stokes vector of solar/stellar irradiance
+                            F₀::AbstractArray,#{FT,2},    # Stokes vector of solar/stellar irradiance
                             computed_layer_properties,
                             m::Int,                     # m: fourier moment
                             ndoubl::Int,                # ndoubl: number of doubling computations needed 
@@ -150,7 +150,9 @@ function elemental!(pol_type, SFI::Bool,
         # More computationally intensive definition of a single scattering layer with variable (0-∞) absorption
         # with absorption in batch mode, low tau_scatt but higher tau_total, needs exact equations
         kernel! = get_elem_rt!(device)
+        @show "Start event",   typeof(wct2)
         event = kernel!(r⁻⁺, t⁺⁺, ϖ, dτ, Z⁻⁺, Z⁺⁺, qp_μN, wct2, ndrange=size(r⁻⁺)); 
+        @show "Stop event"
         wait(device, event)
         synchronize_if_gpu()
 
@@ -188,6 +190,7 @@ end
     if size(Z⁻⁺,3)>1
         n2 = n
     end
+    
     if (wct[j]>1.e-8) 
         # 𝐑⁻⁺(μᵢ, μⱼ) = ϖ ̇𝐙⁻⁺(μᵢ, μⱼ) ̇(μⱼ/(μᵢ+μⱼ)) ̇(1 - exp{-τ ̇(1/μᵢ + 1/μⱼ)}) ̇𝑤ⱼ
         r⁻⁺[i,j,n] = 
