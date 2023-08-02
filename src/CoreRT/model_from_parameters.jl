@@ -237,7 +237,11 @@ function model_from_parameters(params::vSmartMOM_Parameters)
                 params.scattering_params.rt_aerosols[i_aer].τ_ref * 
                 (aerosol_optics[i_band][i_aer].k/k_ref) * 
                 getAerosolLayerOptProp(1, c_aero.p₀, c_aero.σp, profile.p_half)
-        end 
+                @show getAerosolLayerOptProp(1, c_aero.p₀, c_aero.σp, profile.p_half)
+                @show aerosol_optics[i_band][i_aer].k, k_ref
+            @show τ_aer[i_band][i_aer,:]
+            @show params.scattering_params.rt_aerosols[i_aer].τ_ref
+            end 
     end
 
     # Check the floating-type output matches specified FT

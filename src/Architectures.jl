@@ -45,10 +45,12 @@ devi(::CPU) = KernelAbstractions.CPU()
 devi(::GPU) = CUDAKernels.CUDADevice()
 
          architecture(::Array)   = CPU()
-@hascuda architecture(::CuArray) = GPU()
+#@hascuda 
+        architecture(::CuArray) = GPU()
 
          array_type(::CPU) = Array
-@hascuda array_type(::GPU) = CuArray
+#@hascuda 
+        array_type(::GPU) = CuArray
 
 default_architecture = has_cuda() ? GPU() : CPU()
 

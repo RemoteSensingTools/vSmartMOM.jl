@@ -41,7 +41,7 @@ function run_inversion(x,y)
     limlnr₀ = [-2.3,1.6] #r₀ ≈ 0.1, 5.0  
     limp₀ = [100.,1100.]
     limσₚ = [0.05,1.6]
-    for i=1:5
+    for i=1:1#5
         K = ForwardDiff.jacobian(runner!, Fx, x);
         dx = K \ (y-Fx);
         x += dx;
@@ -85,7 +85,7 @@ function run_inversion(x,y)
     end
 end
 
-function run_OE_inversion(x, y, xa, Nangles, spec_lengths)
+function run_OE_inversion(x, y, xa, Nangles, spec_lengths, convfct)
     # State vector box-limits
     limnᵣ = [1.3,1.7]
     limnᵢ = [0.0,0.2]
@@ -116,30 +116,47 @@ function run_OE_inversion(x, y, xa, Nangles, spec_lengths)
          (limp₀[2]-limp₀[1])^2,
          (limσₚ[2]-limσₚ[1])^2]
     Sϵ = zeros(length(y));
-    Imax=[8.82e20, 4.33e20, 1.89e20];
+    #Imax=[8.82e20, 4.33e20, 1.89e20];
     c_ph=[0.0089, 0.0069, 0.0079]; #photon noise
     c_bg=[0.0042, 0.0065, 0.0145]; #background noise
 
-    noise_ph = [];
-    noise_bg = [];
-    for i=1:length(spec_lengths)
-        tmp1 = c_ph[i]^2*ones(spec_lengths[i]);
-        tmp2 = 0.01*Imax[i]*ones(spec_lengths[i])*c_bg[i]^2
-        push!(noise_ph,tmp1);
-        push!(noise_bg,tmp2);
-    end
-    ϵ1=reduce(vcat,noise_ph);
-    ϵ2=reduce(vcat,noise_bg);
     Nwl = sum(spec_lengths)
+    for k=1:Nangles
+        s1 = (k-1)*sum(spec_lengths) + 1
+        e1 = (k-1)*sum(spec_lengths) + spec_lengths[1]
+        I1 = maximum(y[s1:e1])
     
-    for i=1:Nangles
-        Sϵ[(i-1)*Nwl+1 : i*Nwl] .= ϵ1.*y[(i-1)*Nwl+1 : i*Nwl] .+ ϵ2;
+        s2 = s1 + spec_lengths[1]
+        e2 = e1 + spec_lengths[2]
+        I2 = maximum(y[s2:e2])
+    
+        s3 = s2 + spec_lengths[2]
+        e3 = e2 + spec_lengths[3]
+        I3 = maximum(y[s3:e3])
+    
+        Imax = [I1  I2 I3]
+
+        noise_ph = [];
+        noise_bg = [];
+        for i=1:length(spec_lengths)
+            tmp1 = c_ph[i]^2*ones(spec_lengths[i]);
+            tmp2 = 0.01*Imax[i]*ones(spec_lengths[i])*c_bg[i]^2
+            push!(noise_ph,tmp1);
+            push!(noise_bg,tmp2);
+        end
+        ϵ1=reduce(vcat,noise_ph);
+        ϵ2=reduce(vcat,noise_bg);
+    
+        Sϵ[(k-1)*Nwl+1 : k*Nwl] .= ϵ1.*y[(k-1)*Nwl+1 : k*Nwl] .+ ϵ2;
     end
     invŜ = zeros(length(x), length(x));
     dx   = zeros(length(x));
-    for i=1:5
+    for i=1:1 #5
         K = ForwardDiff.jacobian(runner!, Fx, x);
-
+        @show size(K), size(convfct)
+        @show size(Fx)
+        K  = K./convfct
+        Fx = Fx./convfct
         #Computing invŜ 
         invŜ .= Diagonal( 1.0./Sa ) .+ K'*Diagonal( 1.0./Sϵ )*K
 
@@ -294,9 +311,10 @@ select_i = unique(select_i)
 
 i_ctr=1;
 y=reduce(vcat,tmpy[select_i[i_ctr]]);
+
 oco_soundings=oco_soundings[select_i[i_ctr]];
 v_vza = vza[select_i[i_ctr]];
-v_raz = raz[select_i[i_ctr]];
+v_raz = raz[select_i[i_ctr]].+180.;
 v_sza = mean(sza[select_i[i_ctr]]);
 Nangles = length(v_vza)
 parameters.sza = v_sza
@@ -309,22 +327,46 @@ Tsolar = solar_transmission_from_file("/home/rjeyaram/vSmartMOM/src/SolarModel/s
 Tsolar_interp = LinearInterpolation(Tsolar[:, 1], Tsolar[:, 2])
 
 #Initial guess state vector 
-x = FT[0.2377, -3, -0.00244, 0, 0,0, 0.4, 0, 0.4, 0,1,400e-6,400e-6,400e-6, 1.0, 1.5, 0.0, -0.69, 0.3, 690., 0.3]
+x = FT[0.2377,     # 1. Legendre Lambertian Albedo, A-band
+         -3.5,       # log(AOD)
+         -0.00244, # 2. Legendre Lambertian Albedo, A-band
+          0,       # 3. Legendre Lambertian Albedo, A-band
+          0,       # 3. Legendre Lambertian Albedo, W-band
+          0,       # 3. Legendre Lambertian Albedo, S-band
+          0.2,     # 1. Legendre Lambertian Albedo, W-band
+          0,       # 2. Legendre Lambertian Albedo, W-band
+          0.2,     # 1. Legendre Lambertian Albedo, S-band
+          0,       # 2. Legendre Lambertian Albedo, S-band
+          0,       # H2O
+          400e-6,  # CO2 1
+          400e-6,  # CO2 2
+          400e-6,  # CO2 3
+          0,
+          1.33,    # nᵣ
+          0.01,    # nᵢ
+        -1.69,     # lnr₀
+          0.3,     # σ₀
+          690.,    #p₀
+          50.]     #σₚ
 
 
 # Run FW model:
 # @time runner(x);
 #y = oco_sounding.SpectralMeasurement;
 Fx = zeros(length(y));
+λ = oco_soundings[1].SpectralGrid*1e3 #nm
+h = 6.62607015e-34 # J.s
+c = 2.99792458e8 # m/s
+convfct = repeat(h*c*1.e16./λ, Nangles)
 #ind = 92:885
 #run_inversion(x,y)
-run_OE_inversion(x, y, x, Nangles, [length(indices[1]), length(indices[2]), length(indices[3])]);
-runner!(Fx,x)
+run_OE_inversion(x, y, x, Nangles, [length(indices[1]), length(indices[2]), length(indices[3])], convfct);
+#runner!(Fx,x)
+#Fx = Fx./convfct
+plot(y, label="Meas") #Ph sec^{-1} m^{-2} sr^{-1} um^{-1}
+plot!(Fx, label="Mod")# mW/m²-str-cm⁻¹ -> Ph sec^{-1} m^{-2} sr^{-1} um^{-1}
 
-ν = oco_sounding.SpectralGrid*1e3
-plot(y/1e20, label="Meas")
-plot!(Fx/1e20, label="Mod")
-plot!((y-Fx)/1e20, label="Meas-mod")
+plot!((y-Fx), label="Meas-mod")
 #=
 a = Dataset("/net/fluo/data1/group/oco2/oco2_L2DiaND_26780a_190715_B10004r_200618191413.h5")
 g = a.group["RetrievalGeometry"]

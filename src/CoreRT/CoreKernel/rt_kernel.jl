@@ -159,6 +159,7 @@ function rt_kernel!(RS_type::noRS{FT},
     @unpack τ, ϖ, Z⁺⁺, Z⁻⁺ = computed_layer_properties
     # SUNITI, check? Also, better to write function here
     #@show τ, ϖ
+    @show maximum(τ .* ϖ), FT(0.001) * minimum(qp_μ) #τ, ϖ
     dτ_max = minimum([maximum(τ .* ϖ), FT(0.001) * minimum(qp_μ)])
 
     _, ndoubl = doubling_number(dτ_max, maximum(τ .* ϖ))
@@ -178,7 +179,7 @@ function rt_kernel!(RS_type::noRS{FT},
                                         computed_layer_properties, 
                                         m, ndoubl, scatter, quad_points,  
                                         added_layer,  architecture)
-        @show "Done"  
+        #@show "Done"  
         #=
         if m==0
             #m==0 ? 

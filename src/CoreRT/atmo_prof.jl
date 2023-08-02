@@ -194,15 +194,19 @@ function getAerosolLayerOptProp(total_τ, p₀, σp, p_half)
     Nz = length(p_half)-1
     ρ = zeros(FT,Nz)
 
-    # @show p_half, p₀, σp
+    #@show p_half, p₀, σp
     for i = 1:Nz
         dp = p_half[i+1] - p_half[i]
         p  = (p_half[i+1] + p_half[i])/2
         # Use Distributions here later:
         ρ[i] = (1 / (σp * sqrt(2π))) * exp(-(p - p₀)^2 / (2σp^2)) * dp
+        #@show (-(p - p₀)^2 / (2σp^2))
+        #@show (1 / (σp * sqrt(2π))), exp(-(p - p₀)^2 / (2σp^2)), dp
+        #@show i, ρ[i], p, dp
     end
     Norm = sum(ρ)
     τAer  =  (total_τ / Norm) * ρ
+    
     return convert.(FT, τAer)
 end
 

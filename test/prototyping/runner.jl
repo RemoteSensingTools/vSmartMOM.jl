@@ -8,11 +8,15 @@ function runner!(y, x, parameters=parameters, oco_sounding= oco_soundings, Tsola
                         CoreRT.LambertianSurfaceLegendre([x[9],x[10],x[6]])];
 
     parameters.scattering_params.rt_aerosols[1].τ_ref = exp(x[2]);
+    @show  x[2], exp(x[2])
     parameters.scattering_params.rt_aerosols[1].p₀    = x[20]; #800.0; #x[4]
     parameters.scattering_params.rt_aerosols[1].σp    = x[21];
+    @show  x[20], x[21]
     parameters.scattering_params.rt_aerosols[1].aerosol.size_distribution = LogNormal(x[18], x[19]); #x[4]
+    @show  x[18], x[19]
     parameters.scattering_params.rt_aerosols[1].aerosol.nᵣ = x[16]
     parameters.scattering_params.rt_aerosols[1].aerosol.nᵣ = x[17]
+    @show  x[16], x[17]
     #parameters.p   = oco_sounding.p_half
     #parameters.q   = oco_sounding.q 
     #parameters.T   = oco_sounding.T# .+ 1.0 #.+ x[15]
@@ -78,15 +82,16 @@ function runner!(y, x, parameters=parameters, oco_sounding= oco_soundings, Tsola
             res = 0.001e-3;
             off = 0.5e-3
             # Get sun:
-            @time sun_out = getSolar(parameters.spec_bands[i],Tsolar)
+            #@time sun_out = getSolar(parameters.spec_bands[i],Tsolar)
         
             RR = oco_sounding[ia].mueller[1]*R[i][ia,1,:] + 
                     oco_sounding[ia].mueller[2]*R[i][ia,2,:] + 
                     oco_sounding[ia].mueller[3]*R[i][ia,3,:];        
         
             # Apply Earth reflectance matrix 
-            earth_out = sun_out .* reverse(RR[:])
-        
+            #earth_out = sun_out .* reverse(RR[:])
+            earth_out = reverse(RR[:])
+            
             # Re-interpolate I from ν_grid to new grid/resolution
             @time interp_I = LinearInterpolation(λ_grid, earth_out);        
             #The following holds only for the use of a single ground pixel (because the ils changes with ground pixel index)

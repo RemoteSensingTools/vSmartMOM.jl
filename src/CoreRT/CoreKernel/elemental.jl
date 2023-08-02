@@ -150,9 +150,9 @@ function elemental!(pol_type, SFI::Bool,
         # More computationally intensive definition of a single scattering layer with variable (0-∞) absorption
         # with absorption in batch mode, low tau_scatt but higher tau_total, needs exact equations
         kernel! = get_elem_rt!(device)
-        @show "Start event",   typeof(wct2)
+        #@show "Start event",   typeof(wct2)
         event = kernel!(r⁻⁺, t⁺⁺, ϖ, dτ, Z⁻⁺, Z⁺⁺, qp_μN, wct2, ndrange=size(r⁻⁺)); 
-        @show "Stop event"
+        #@show "Stop event"
         wait(device, event)
         synchronize_if_gpu()
 

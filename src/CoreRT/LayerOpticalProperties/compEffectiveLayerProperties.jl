@@ -66,6 +66,7 @@ function constructCoreOpticalProperties(RS_type, iBand, m, model)
             aer   = createAero.(τ_aer[iB][i,:], 
                                 [aerosol_optics[iB][i]], 
                                 [AerZ⁺⁺], [AerZ⁻⁺])
+            @show τ_aer[iB][i,:]
             # Mix with previous Core Optical Properties
             #@show combo[1].ϖ   , aer[1].ϖ
             combo = combo .+ aer
@@ -91,7 +92,9 @@ function constructCoreOpticalProperties(RS_type, iBand, m, model)
         #@show size(combo2[1].τ)
         fScattRayleigh = [Array(rayl[i].τ  ./ combo2[i].τ) for i=1:nZ]
         #@show fScattRayleigh[1]
-        
+        for i=1:nZ
+        @show i, rayl[i].τ, combo[1].τ#,combo2[1].τ
+        end
         push!(band_layer_props,combo2 )
         push!(band_fScattRayleigh,fScattRayleigh)
         #aType = array_type(model.params.architecture)
