@@ -3,7 +3,7 @@ using Literate
 using vSmartMOM
 using vSmartMOM.Absorption
 using vSmartMOM.Scattering
-using vSmartMOM.vSmartMOM
+using vSmartMOM.CoreRT
 using Plots 
 
 ENV["GKSwstype"] = "nul"

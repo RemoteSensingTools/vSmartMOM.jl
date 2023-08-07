@@ -13,7 +13,7 @@ Users can calculate an absorption cross-section in a few simple steps:
 2. Use [`make_hitran_model`](@ref) or [`make_interpolation_model`](@ref) to set up model parameters for the cross-section calculation
 3. Use [`absorption_cross_section`](@ref) to perform the cross-section calculation using the defined model settings
 
-For a full demo of how to use this module, please see the [example](https://remotesensingtools.github.io/vSmartMOM.jl/dev/pages/Absorption/Example.html) page. 
+For a full demo of how to use this module, please see the [example](https://remotesensingtools.github.io/vSmartMOM.jl/dev/pages/Absorption/Example/) page. 
 
 ## Architecture
 

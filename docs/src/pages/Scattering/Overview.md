@@ -11,7 +11,7 @@ You can calculate a scattering phase-function in a few short steps:
 3. Use [`compute_aerosol_optical_properties`](@ref) to perform the optical-properties calculations using the defined model settings
 4. Use [`reconstruct_phase`](@ref) to produce the scattering matrix from the computed optical properties
 
-For a full demo of how to use this module, please see the [example](https://remotesensingtools.github.io/vSmartMOM.jl/dev/pages/Scattering/Example.html) page. 
+For a full demo of how to use this module, please see the [example](https://remotesensingtools.github.io/vSmartMOM.jl/dev/pages/Scattering/Example/) page. 
 
 ## Architecture
 
@@ -19,4 +19,4 @@ For a full demo of how to use this module, please see the [example](https://remo
 
 The Scattering.jl architecture closely follows the user's workflow to calculate the scattering phase-function. There are functions for creating an aerosol, defining scattering parameters, calculating aerosol optical properties, and constructing the phase-function from said optical properties. 
 
-The aerosol optical properties contain computed "Greek Coefficients", which are to be multiplied by matrices composed of generalized spherical functions, in order to produce the phase-functions. Since calculating the Greek Coefficients is the most computationally-intensive part – and the output phase-function can be produced at various resolutions – the [`reconstruct_phase`](@ref) function is separate from [`compute_aerosol_optical_properties`](@ref). 
+The aerosol optical properties contain computed "Greek Coefficients", which are to be multiplied by matrices composed of generalized spherical functions, in order to produce the phase-functions. Since calculating the greek coefficients is the most computationally intensive part – and the output phase-function can be produced at various resolutions – the [`reconstruct_phase`](@ref) function is separate from [`compute_aerosol_optical_properties`](@ref). 

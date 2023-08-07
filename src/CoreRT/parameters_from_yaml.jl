@@ -95,6 +95,7 @@ function validate_yaml_parameters(params)
               (["radiative_transfer", "depol"], Real),
               (["radiative_transfer", "float_type"], String),
               (["radiative_transfer", "architecture"], String, ["default_architecture", "Architectures.GPU()", "Architectures.CPU()", "GPU()", "CPU()"]),
+              (["radiative_transfer", "architecture"], String, ["default_architecture", "Architectures.GPU()", "Architectures.CPU()", "GPU()", "CPU()"]),
 
               # geometry group
               (["geometry", "sza"], Real),
@@ -126,7 +127,8 @@ function validate_yaml_parameters(params)
     for i in 1:length(fields)
         key, elty = fields[i][1:2]
         valid_options = length(fields[i]) == 3 ? fields[i][3] : Array{String}([])
-
+        # @show fields
+        # return 
         # Check if the section exists in the YAML file and is an optional section
         if ("absorption" in keys(params) && key[1] == "absorption") || 
            ("scattering" in keys(params) && key[1] == "scattering") || 

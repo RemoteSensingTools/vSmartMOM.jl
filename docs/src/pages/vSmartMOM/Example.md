@@ -17,7 +17,7 @@ parameters = default_parameters();
 
 # You can then change any individual fields in parameters (parameters.field = ...)
 # Please see descriptions of each field here: 
-# https://remotesensingtools.github.io/vSmartMOM.jl/dev/pages/vSmartMOM/InputParametersGuide.html
+# https://remotesensingtools.github.io/vSmartMOM.jl/dev/pages/vSmartMOM/InputParametersGuide/
 
 ## 
 ## STEP 2: Create a model from parameters
