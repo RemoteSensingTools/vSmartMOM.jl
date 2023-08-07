@@ -172,7 +172,7 @@ Returns the `n` Gauss-Legendre quadrature points and weights with a change of in
 - `n` number of quadrature points
 - `xmin`,`xmax` lower and upper bound of integral
 - `norm`: if `true`, normalizes the weights so that a mean can be computed instead of full integration
-The function returns `n` quadrature points ξ within [xmin,xmax] with associated weightes `w` 
+The function returns `n` quadrature points ξ within [xmin,xmax] with associated weights `w` 
 """
 function gauleg(n, xmin, xmax; norm=false)
     ξ, w = gausslegendre(n)

@@ -20,7 +20,7 @@ using Plots
 #----------------------------------------------------------------------------
 
 # Now, we define the aerosol size distribution and properties. We only support univariate
-# aerosols for now, but will add multivariate aerosols soon. 
+# aerosols for now, but will add multivariate aerosols soon (we can use mixture models easily). 
 
 rₘ    = 0.3;             ## median radius [μm]
 σ     = 2.0;             ## geometric stddev of radius
@@ -49,7 +49,7 @@ l_max = 20;
 ## Exclusion angle for forward peak (in fitting procedure) `[degrees]`
 Δ_angle = 2;
 
-## Truncation type
+## Truncation type 
 truncation_type   = δBGE(l_max, Δ_angle);      
 #----------------------------------------------------------------------------
 
@@ -74,6 +74,7 @@ p5 = plot(ϵ,  title="ϵ");
 p6 = plot(ζ,  title="ζ");
 plot(p1, p2, p3, p4, p5, p6, layout=(3, 2), legend=false)
 xlims!(0,100)
+# Here, we can see the different greek coefficients that will be needed to compute the entire phase matrix at a given Fourier moment (see Sanghavi, Suniti. "Revisiting the Fourier expansion of Mie scattering matrices in generalized spherical functions." Journal of Quantitative Spectroscopy and Radiative Transfer 136 (2014) for details).
 #----------------------------------------------------------------------------
 
 # ### Reconstructing the Phase Functions from the greek coefficients
@@ -91,13 +92,16 @@ p2 = plot(μ_quad, f₁₂ ./ f₁₁,  title="f₁₂/f₁₁")
 
 plot(p1, p2, layout=(2, 1), legend=false)
 xlabel!("cos(Θ)")
+# The top panel represents a more traditional phase function just for intensity, in this case high forward peaked (at μ=1). 
+# The lower panel shows the degree of linear polarization (f₁₂/f₁₁) associated with the scattering direction.
 #----------------------------------------------------------------------------
 
 p1 = plot([acos.(μ_quad); -reverse(acos.(μ_quad))], log10.([f₁₁ ; reverse(f₁₁)]), proj=:polar, yscale=:log10, title="f₁₁", lims=(-3,4.2), yaxis=false)
-p2 = plot([acos.(μ_quad); -reverse(acos.(μ_quad))], [f₁₂ ./ f₁₁ ; reverse(f₁₂ ./ f₁₁)], proj=:polar, title="f₁₂/f₁₁", lims=(0,0.6), yaxis=false)
+p2 = plot([acos.(μ_quad); -reverse(acos.(μ_quad))], [abs.(f₁₂ ./ f₁₁) ; reverse(f₁₂ ./ f₁₁)], proj=:polar, title="f₁₂/f₁₁", lims=(0,0.6), yaxis=false)
 
 plot(p1, p2, layout=(1, 2), legend=false)
 xlabel!("Θ")
+# This figures shows the same as above but as polar plot with Θ=0 being the forward direction, Θ=180 the backward direction. The left panel is in log-scale while the right one show the degree of linear polarization (in absolute terms).  
 
 #----------------------------------------------------------------------------
 
@@ -127,3 +131,4 @@ anim = @animate for r = 0.03:0.05:4.3
 
 end
 gif(anim, fps = 5)
+# This animation shows how the phase function and polarization properties vary with the mean radius of the aerosol distribution (width is fixed).
