@@ -47,7 +47,8 @@ YAML = "ddb6d928-2868-570f-bddf-ab3f9cf99eb6"
 [compat]
 CUDA = "3, 4"
 CUDAKernels = "0.2, 0.3"
-DataInterpolations = "3.6"
+
+DataInterpolations = "3.6, 4"
 DelimitedFiles = "1"
 DiffResults = "1.0"
 Distributions = "0.23, 0.24, 0.25"
