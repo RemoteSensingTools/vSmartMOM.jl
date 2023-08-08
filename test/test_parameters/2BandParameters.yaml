@@ -65,7 +65,7 @@ atmospheric_profile:
   # Reduce profile to n layers
   profile_reduction: 20
 
-# =================================================================
+# ================================a=================================
 # Absorption-Related Parameters (Optional)
 # =================================================================
 absorption:

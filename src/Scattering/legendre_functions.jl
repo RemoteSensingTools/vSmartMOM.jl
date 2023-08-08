@@ -214,14 +214,14 @@ Returns the associated legendre functions Pᵢ, P²ᵢ, R²ᵢ, and T²ᵢ as a 
 - `nmax` max number of legendre terms (depends on size parameter, see [`get_n_max`](@ref))
 The function returns `Pᵢ`, `P²ᵢ`, `R²ᵢ`, and `T²ᵢ`, for a size distribution, this can be pre-computed with nmax derived from the maximum size parameter.
 """
-function compute_legendre_poly(x,nmax)
-    FT = eltype(x)
+function compute_legendre_poly(x::Array{FT},nmax) where FT
+    #FT = eltype(x)
     @assert nmax > 1
     #@assert size(P) == (nmax,length(x))
-    P⁰ = zeros(length(x),nmax);
-    P² = zeros(length(x),nmax);
-    R² = zeros(length(x),nmax);
-    T² = zeros(length(x),nmax);
+    P⁰ = zeros(FT,length(x),nmax);
+    P² = zeros(FT,length(x),nmax);
+    R² = zeros(FT,length(x),nmax);
+    T² = zeros(FT,length(x),nmax);
     # 0th Legendre polynomial, a constant
     P⁰[:,1] .= 1;
     P²[:,1] .= 0;
