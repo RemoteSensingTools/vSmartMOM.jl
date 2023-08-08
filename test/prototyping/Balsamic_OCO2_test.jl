@@ -86,6 +86,7 @@ function run_inversion(x,y)
 end
 
 function run_OE_inversion(x, y, xa, Nangles, spec_lengths, convfct)
+    Fx = zeros(length(y));
     # State vector box-limits
     limnᵣ = [1.3,1.7]
     limnᵢ = [0.0,0.2]
@@ -244,7 +245,7 @@ ii = iSam[1:end]
 # Get data for that sounding:
 #ocal GeoInd = [grnd_pxl,ii[1]];
 #oco_sounding = InstrumentOperator.getMeasurement(oco, bands, indices, GeoInd);
-oco_soundings = [];
+oco_soundings0 = [];
 tmpy = [];#[];#[oco_soundings[1].SpectralMeasurement];
 Nangles = length(ii)
 lat=[];
@@ -258,7 +259,7 @@ for i=1:Nangles
         GeoInd = [grnd_pxl[j],ii[i]];
         # Get data for that sounding:
         oco_sounding = InstrumentOperator.getMeasurement(oco, bands, indices, GeoInd);
-        push!(oco_soundings, oco_sounding)
+        push!(oco_soundings0, oco_sounding)
         push!(lat, oco_sounding.latitude)
         push!(lon, oco_sounding.longitude)
         push!(sza, oco_sounding.sza)
@@ -309,13 +310,28 @@ for i=1:length(max_Npts)
 end
 select_i = unique(select_i)
 
+Nangles_max=1;
 i_ctr=1;
-y=reduce(vcat,tmpy[select_i[i_ctr]]);
+#y=reduce(vcat,tmpy[select_i[i_ctr]]);
+y=reduce(vcat,tmpy[select_i[i_ctr][1]]);
 
-oco_soundings=oco_soundings[select_i[i_ctr]];
-v_vza = vza[select_i[i_ctr]];
-v_raz = raz[select_i[i_ctr]].+180.;
-v_sza = mean(sza[select_i[i_ctr]]);
+oco_soundings=[];
+v_raz=[];
+v_sza=[];
+v_vza=[];
+if Nangles_max==1
+    tmp=[];
+    push!(tmp, oco_soundings0[select_i[i_ctr][1]]);
+    oco_soundings = tmp;
+    v_vza = [vza[select_i[i_ctr][1]]];
+    v_raz = [raz[select_i[i_ctr][1]]].+180.;
+    v_sza = mean(sza[select_i[i_ctr][1]]);
+else
+    oco_soundings=oco_soundings0[select_i[i_ctr]];
+    v_vza = vza[select_i[i_ctr]];
+    v_raz = raz[select_i[i_ctr]].+180.;
+    v_sza = mean(sza[select_i[i_ctr]]);
+end
 Nangles = length(v_vza)
 parameters.sza = v_sza
 parameters.vza = v_vza
@@ -353,14 +369,16 @@ x = FT[0.2377,     # 1. Legendre Lambertian Albedo, A-band
 # Run FW model:
 # @time runner(x);
 #y = oco_sounding.SpectralMeasurement;
-Fx = zeros(length(y));
+
 λ = oco_soundings[1].SpectralGrid*1e3 #nm
+#λ = oco_soundings.SpectralGrid*1e3 #nm
 h = 6.62607015e-34 # J.s
 c = 2.99792458e8 # m/s
 convfct = repeat(h*c*1.e16./λ, Nangles)
 #ind = 92:885
 #run_inversion(x,y)
 run_OE_inversion(x, y, x, Nangles, [length(indices[1]), length(indices[2]), length(indices[3])], convfct);
+#Fx = zeros(length(y));
 #runner!(Fx,x)
 #Fx = Fx./convfct
 plot(y, label="Meas") #Ph sec^{-1} m^{-2} sr^{-1} um^{-1}
