@@ -160,7 +160,10 @@ function make_interpolation_model(
     end
 
     # Perform the interpolation
-    itp = interpolate(cs_matrix, BSpline(Cubic(Line(OnGrid()))))
+    # BSpline(Cubic(Line(OnGrid())))
+    # BSpline(Quadratic(Line(OnGrid())))
+
+    itp = interpolate(cs_matrix,  (BSpline(Linear()),BSpline(Quadratic(Line(OnGrid()))),BSpline(Quadratic(Line(OnGrid())))))
 
     # Get the molecule and isotope numbers from the HitranTable
     mol = absco.mol
