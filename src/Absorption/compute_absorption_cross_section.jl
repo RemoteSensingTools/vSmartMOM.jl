@@ -56,8 +56,10 @@ function compute_absorption_cross_section(
     grid_min, grid_max = wavelength_flag ? (nm_per_m /grid_max, nm_per_m/grid_min) : (grid_min, grid_max)
 
     # Interpolators from grid bounds to index values
-    grid_idx_interp_low  = LinearInterpolation(grid, 1:1:length(grid), extrapolation_bc=1)
-    grid_idx_interp_high = LinearInterpolation(grid, 1:1:length(grid), extrapolation_bc=length(grid))
+    if length(grid)>1
+        grid_idx_interp_low  = LinearInterpolation(grid, 1:1:length(grid), extrapolation_bc=1)
+        grid_idx_interp_high = LinearInterpolation(grid, 1:1:length(grid), extrapolation_bc=length(grid))
+    end
 
     # Temporary storage array for output of qoft!. Compiler/speed issues when returning value in qoft
     rate = zeros(eltype(temperature), 1)
@@ -99,13 +101,18 @@ function compute_absorption_cross_section(
 
             end
 
-            # Calculate index range that this ν impacts
-            ind_start = Int64(round(grid_idx_interp_low(ν - wing_cutoff)))
-            ind_stop  = Int64(round(grid_idx_interp_high(ν + wing_cutoff)))
-            
-            # Create views from the result and grid arrays
-            result_view   = view(result, ind_start:ind_stop);
-            grid_view     = view(grid, ind_start:ind_stop);
+            if length(grid)>1
+                # Calculate index range that this ν impacts
+                ind_start = Int64(round(grid_idx_interp_low(ν - wing_cutoff)))
+                ind_stop  = Int64(round(grid_idx_interp_high(ν + wing_cutoff)))
+                
+                # Create views from the result and grid arrays
+                result_view   = view(result, ind_start:ind_stop);
+                grid_view     = view(grid, ind_start:ind_stop);
+            else
+                result_view   = view(result, 1);
+                grid_view     = view(grid, 1);
+            end
 
             # Kernel for performing the lineshape calculation
             kernel! = line_shape!(device)
