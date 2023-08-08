@@ -69,7 +69,7 @@ Types of Polarization (which Stokes vector to use)
 
 Abstract Polarization type 
 """
-abstract type AbstractPolarizationType  end
+abstract type AbstractPolarizationType{FT}  end
 
 """
     struct Stokes_IQUV{FT<:AbstractFloat}
@@ -79,7 +79,7 @@ A struct which defines full Stokes Vector ([I,Q,U,V]) RT code
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-Base.@kwdef struct Stokes_IQUV{FT<:AbstractFloat} <: AbstractPolarizationType
+Base.@kwdef struct Stokes_IQUV{FT<:AbstractFloat} <: AbstractPolarizationType{FT} 
     "Number of Stokes components (int)"
     n::Int = 4
     "Vector of length `n` for ... (see eq in Sanghavi )"
@@ -96,7 +96,7 @@ A struct which defines Stokes Vector ([I,Q,U]) RT code
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-Base.@kwdef struct Stokes_IQU{FT<:AbstractFloat} <: AbstractPolarizationType
+Base.@kwdef struct Stokes_IQU{FT<:AbstractFloat} <: AbstractPolarizationType{FT} 
     "Number of Stokes components (int)" 
     n::Int = 3
     "Vector of length `n` for ... (see eq in Sanghavi )"
@@ -113,7 +113,7 @@ A struct which define scalar I only RT code
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-Base.@kwdef struct Stokes_I{FT<:AbstractFloat} <: AbstractPolarizationType 
+Base.@kwdef struct Stokes_I{FT<:AbstractFloat} <: AbstractPolarizationType{FT} 
     "Number of Stokes components (int)"
     n::Int = 1
     "Vector of length `n` for ... (see eq in Sanghavi )"

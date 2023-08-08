@@ -1,12 +1,12 @@
 ## Import packages
 
-using RadiativeTransfer, RadiativeTransfer.vSmartMOM
+using vSmartMOM, vSmartMOM.CoreRT
 using Statistics, Plots
 
 include("6SV1_R_trues.jl")
 R_modeled_all = zeros(6, 3, 3, 16);
 R_deltas_all = zeros(6, 3, 3, 16);
-parameters = parameters_from_yaml("/home/rjeyaram/RadiativeTransfer/test/6SV1_1.yaml");
+parameters = parameters_from_yaml("/home/rjeyaram/vSmartMOM/test/6SV1_1.yaml");
 
 ## Function to perform test, given conditions
 
@@ -19,10 +19,10 @@ function test_against_6SV1(case_i, azs, szas, λ, τ, ρ)
             parameters.spec_bands = [1e7/λ (1e7/λ + 1)]
             parameters.vaz = repeat([azs[az_i]], 16)
             parameters.sza = szas[sza_i]
-            parameters.brdf = [RadiativeTransfer.vSmartMOM.LambertianSurfaceScalar(ρ * π)]
+            parameters.brdf = [vSmartMOM.CoreRT.LambertianSurfaceScalar(ρ * π)]
             model = model_from_parameters(parameters);
             model.τ_rayl[1] .= τ
-            R_modeled[sza_i, az_i, :] = vSmartMOM.rt_run(model, i_band=1)[:,1,1] / model.quad_points.μ₀
+            R_modeled[sza_i, az_i, :] = CoreRT.rt_run(model, i_band=1)[:,1,1] / model.quad_points.μ₀
             R_deltas[sza_i, az_i, :] = abs.(R_true[sza_i][az_i] - R_modeled[sza_i, az_i, :]) ./ R_true[sza_i][az_i]
         end
     end
