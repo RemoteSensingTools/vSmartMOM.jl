@@ -57,12 +57,12 @@ function aerosol_params_to_obj(aerosols::Union{Array{Dict{Any, Any}}, Vector{Any
     for aerosol in aerosols
         @assert aerosol["σ"] ≥ 1 "Geometric standard deviation has to be ≥ 1"    
         size_distribution = LogNormal(log(FT(aerosol["μ"])), log(FT(aerosol["σ"])))
-
+        #@show size_distribution
         new_aerosol_obj = Aerosol(size_distribution,
                                   FT(aerosol["nᵣ"]),
                                   FT(aerosol["nᵢ"]))
         
-        new_rt_aerosol_obj = RT_Aerosol(new_aerosol_obj, FT(aerosol["τ_ref"]), FT(aerosol["p₀"]), FT(aerosol["σp"]))
+        new_rt_aerosol_obj = RT_Aerosol(new_aerosol_obj, FT(aerosol["τ_ref"]), Normal(FT(aerosol["p₀"]), FT(aerosol["σp"])))
 
         push!(rt_aerosol_obj_list, new_rt_aerosol_obj)
     end
@@ -94,6 +94,7 @@ function validate_yaml_parameters(params)
               (["radiative_transfer", "l_trunc"], Integer),
               (["radiative_transfer", "depol"], Real),
               (["radiative_transfer", "float_type"], String),
+              (["radiative_transfer", "architecture"], String, ["default_architecture", "Architectures.GPU()", "Architectures.CPU()", "GPU()", "CPU()"]),
               (["radiative_transfer", "architecture"], String, ["default_architecture", "Architectures.GPU()", "Architectures.CPU()", "GPU()", "CPU()"]),
 
               # geometry group
@@ -156,31 +157,57 @@ function parameters_from_yaml(file_path)
     # #########################################################
 
     # radiative_transfer group
-    spec_bands = convert.(Array, map(x -> collect(eval(Meta.parse(x))), params_dict["radiative_transfer"]["spec_bands"]))
-    BRDF_per_band = map(x -> eval(Meta.parse(x)), params_dict["radiative_transfer"]["surface"]) 
-    quadrature_type = eval(Meta.parse(params_dict["radiative_transfer"]["quadrature_type"]))
-    polarization_type = eval(Meta.parse(params_dict["radiative_transfer"]["polarization_type"]))
     FT = eval(Meta.parse(params_dict["radiative_transfer"]["float_type"]))
-
+    # @show params_dict["radiative_transfer"]["float_type"]
+    # Each spec band can have units in wavenumber/wavelength, or not. Regardless, convert to cm⁻¹
+    spec_bands = []
+    for spec_band in params_dict["radiative_transfer"]["spec_bands"]
+        parsed_band = eval(Meta.parse(spec_band))
+        # If no units, assume cm⁻¹
+        if (all(x-> x == NoUnits, unit.(parsed_band)))
+            wn_band = collect(parsed_band)
+        else
+            # If units but cm⁻¹ already, don't uconvert (issue trying to convert to already existing type)
+            if (all(x-> x == u"cm^-1", unit.(parsed_band)))
+                wn_band = sort(ustrip(collect(parsed_band)))
+            # If units but not cm⁻¹, uconvert to cm⁻¹
+            else
+                wn_band = sort(ustrip(uconvert.( u"cm^-1", collect(parsed_band), Spectral())))
+            end
+        end
+        final_band = convert(Array{FT}, wn_band)
+        push!(spec_bands, final_band)
+    end
+    BRDF_per_band     = map(x -> eval(Meta.parse(x)), params_dict["radiative_transfer"]["surface"]) 
+    quadrature_type   = eval(Meta.parse(params_dict["radiative_transfer"]["quadrature_type"]))
+    
+    # Make type stable, pol type has to be in the right FT:
+    pol_type = replace(params_dict["radiative_transfer"]["polarization_type"], "()" => "{$FT}()")
+    #@show pol_type
+    polarization_type = eval(Meta.parse(pol_type))
+    
     arch_string = params_dict["radiative_transfer"]["architecture"]
     arch_string = !startswith(arch_string, "Architectures.") ? "Architectures." * arch_string : arch_string
-    
+
     architecture = eval(Meta.parse(arch_string))
 
+    #@show polarization_type, quadrature_type 
     # atmospheric_profile group
     T = convert.(FT, params_dict["atmospheric_profile"]["T"]) # Level
     p = convert.(FT, params_dict["atmospheric_profile"]["p"]) # Boundaries
     q = "q" in keys(params_dict["atmospheric_profile"]) ? # Specific humidity, if it's specified. 
-            convert.(Float64, params_dict["atmospheric_profile"]["q"]) : zeros(length(T)) # Otherwise 0
+            convert.(FT, params_dict["atmospheric_profile"]["q"]) : zeros(length(T)) # Otherwise 0
 
     # absorption group
     if "absorption" in keys(params_dict)
         molecules = Array(params_dict["absorption"]["molecules"])
+        #@show params_dict["absorption"]["vmr"]
         vmr = convert(Dict{String, Union{Real, Vector}}, params_dict["absorption"]["vmr"])
+
         validate_vmrs(params_dict["absorption"]["molecules"], vmr)
         broadening_function = eval(Meta.parse(params_dict["absorption"]["broadening"]))
         CEF = eval(Meta.parse(params_dict["absorption"]["CEF"]))
-        wing_cutoff = params_dict["absorption"]["wing_cutoff"]
+        wing_cutoff = FT(params_dict["absorption"]["wing_cutoff"])
 
         
         # Option to load lookup tables!
@@ -192,7 +219,8 @@ function parameters_from_yaml(file_path)
             
             for i in eachindex(files_lut)
                 #@show i, files_lut[i]
-                push!(luts,[Absorption.load_interpolation_model(file) for file in files_lut[i]])
+                #@show typeof(load_interpolation_model(files_lut[1]))
+                push!(luts,[load_interpolation_model(file) for file in files_lut[i]])
             end
         end
         absorption_params = AbsorptionParameters(molecules, vmr, broadening_function, 
@@ -206,16 +234,22 @@ function parameters_from_yaml(file_path)
     
     # scattering group
     if "scattering" in keys(params_dict)
-        
+        #Force aerosols to be Float64!!
+        FTa = Float64
         # Get aerosols from types
-        aerosols = aerosol_params_to_obj(params_dict["scattering"]["aerosols"], FT)
-        r_max = FT(params_dict["scattering"]["r_max"])
+        aerosols = aerosol_params_to_obj(params_dict["scattering"]["aerosols"], FTa)
+        r_max = FTa(params_dict["scattering"]["r_max"])
         nquad_radius = params_dict["scattering"]["nquad_radius"]
-        λ_ref = FT(params_dict["scattering"]["λ_ref"])
+        λ_ref = FTa(params_dict["scattering"]["λ_ref"])
         decomp_type = eval(Meta.parse(params_dict["scattering"]["decomp_type"]))
-
+        if !haskey(params_dict["scattering"],"n_ref")
+            n_ref = aerosols[1].aerosol.nᵣ - im*aerosols[1].aerosol.nᵢ
+        else
+            @show params_dict["scattering"]["n_ref"]
+            n_ref = params_dict["scattering"]["n_ref"]
+        end
         scattering_params = ScatteringParameters(aerosols, r_max, nquad_radius, 
-                                                 λ_ref, decomp_type)
+                                                 λ_ref, n_ref, decomp_type)
     else
         scattering_params = nothing
     end
@@ -240,7 +274,7 @@ function parameters_from_yaml(file_path)
                                 FT(params_dict["geometry"]["obs_alt"]),
 
                                 # atmospheric_profile group
-                                T, p, q, 
+                                convert.(FT,T), convert.(FT,p), convert.(FT,q), 
                                 params_dict["atmospheric_profile"]["profile_reduction"],
 
                                 # absorption group
