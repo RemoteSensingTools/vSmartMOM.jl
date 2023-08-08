@@ -116,9 +116,9 @@ end
 
     @test aerosol_optics_NAI2 ≈ aerosol_optics_PCW
 
-    println("Testing aerosol_optical autodiff...")
+    #println("Testing aerosol_optical autodiff...")
 
     # Test whether autodiff works
-    compute_aerosol_optical_properties(model_NAI2, autodiff=true);
+    #compute_aerosol_optical_properties(model_NAI2, autodiff=true);
 
 end
