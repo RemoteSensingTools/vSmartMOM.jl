@@ -27,8 +27,8 @@ function compute_aerosol_optical_properties(model::MieModel{FDT}, FT2::Type=Floa
     # Get the refractive index's real part type
     #@show size_distribution.σ  
     # TODO: This is still very clumsy, the FT conversions are not good here.
-    FT = eltype(nᵣ);
-
+    FT = eltype(size_distribution.σ);
+    #@show FT
     #@show FT, ForwardDiff.valtype(size_distribution.σ)
     vFT = ForwardDiff.valtype(nᵣ)
     #@assert FT == Float64 "Aerosol computations require 64bit"
@@ -161,7 +161,7 @@ function compute_aerosol_optical_properties(model::MieModel{FDT}, FT2::Type=Floa
 
     # Check whether this is a Dual number (if so, don't do any conversions)
     # TODO: Equally clumsy, needs to be fixed.
-    if FT <: AbstractFloat
+    if FT2 <: AbstractFloat
         #@show "Convert greek", FT2
         # Create GreekCoefs object with α, β, γ, δ, ϵ, ζ
         greek_coefs = GreekCoefs(convert.(FT2, α), 

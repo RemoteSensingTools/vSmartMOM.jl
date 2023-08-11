@@ -61,7 +61,7 @@ function rt_run(RS_type::AbstractRamanType,
     # Need to check this a bit better in the future!
     FT_dual = n_aer > 0 ? typeof(model.τ_aer[1][1]) : FT
     #FT_dual = FT
-    @show FT_dual
+    #@show FT_dual
     # Output variables: Reflected and transmitted solar irradiation at TOA and BOA respectively # Might need Dual later!!
     #Suniti: consider adding a new dimension (iBand) to these arrays. The assignment of simulated spectra to their specific bands will take place after batch operations, thereby leaving the computational time unaffected 
     R       = zeros(FT_dual, length(vza), pol_type.n, nSpec)
