@@ -7,27 +7,17 @@
   <br>
 </h1>
 
+<div align="center">
 <h4 align="center">An end-to-end modular software suite for vectorized atmospheric radiative transfer calculations, based on the Matrix Operator Method. </h4>
 <h5 align="center">Written in <a href="https://julialang.org">Julia</a>.</h4>
 
-<p align="center">
-  <a href="https://github.com/RemoteSensingTools/vSmartMOM.jl/actions/workflows/AutomatedTests.yml/">
-    <img src="https://github.com/RemoteSensingTools/vSmartMOM.jl/actions/workflows/AutomatedTests.yml/badge.svg"
-         alt="Tests">
-  </a> 
-  <a href="https://RemoteSensingTools.github.io/vSmartMOM.jl/dev/">
-    <img src="https://img.shields.io/badge/docs-latest-blue.svg"
-         alt="Docs">
-  </a>
-  <a href="https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/master/LICENSE">
-    <img src="https://img.shields.io/github/license/RemoteSensingTools/vSmartMOM.jl"
-         alt="License">
-  </a>
-  <a href="https://github.com/RemoteSensingTools/vSmartMOM.jl/commits/master">
-    <img src="https://img.shields.io/github/commit-activity/y/RemoteSensingTools/vSmartMOM.jl"
-         alt="Github Commit Frequency">
-  </a>
-</p>
+[![version](https://github.com/RemoteSensingTools/vSmartMOM.jl/actions/workflows/AutomatedTests.yml/badge.svg)](https://github.com/RemoteSensingTools/vSmartMOM.jl/actions/workflows/AutomatedTests.yml/)
+  [![](https://img.shields.io/badge/docs-latest-blue)](https://RemoteSensingTools.github.io/vSmartMOM.jl/dev/)
+  [![](https://img.shields.io/github/license/RemoteSensingTools/vSmartMOM.jl)](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/master/LICENSE)
+  [![DOI](https://joss.theoj.org/papers/10.21105/joss.04575/status.svg)](https://doi.org/10.21105/joss.04575)
+  [![](https://img.shields.io/github/commit-activity/y/RemoteSensingTools/vSmartMOM.jl)](https://github.com/RemoteSensingTools/vSmartMOM.jl/commits/master)
+  
+
 
 <p align="center">
   <a href="#installation">Installation</a> •
@@ -35,7 +25,7 @@
   <a href="#support">Support</a> •
   <a href="#license">License</a>
 </p>
-
+</div)
 This project aims to revamp and modernize key atmospheric remote sensing tools. Specifically, it will enable the fast computation of atmospheric optical properties, full-polarized radiative transfer simulations, and commonly-used inversion routines.
 
 By taking advantage of modern software tools, such as GPU acceleration and HPC computing, the software suite significantly accelerates computationally-intensive calculations and models, while keeping the interface easy-to-use for researchers and students.
