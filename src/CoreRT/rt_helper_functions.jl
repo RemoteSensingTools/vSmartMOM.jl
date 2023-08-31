@@ -208,6 +208,197 @@ make_composite_layer(RS_type::Union{RRS, RRS_plus, VS_0to1_plus, VS_1to0_plus},
                     default_J_matrix_ie(FT, arr_type, NSens, dims, nSpec, RS_type.n_Raman),
                     default_J_matrix_ie(FT, arr_type, NSens, dims, nSpec, RS_type.n_Raman)
                     )
+# With linearization
+#=
+"Make an added layer, supplying all default matrices"
+make_added_layer(RS_type::Union{noRS, noRS_plus}, lin::vSmartMOM_lin, FT, arr_type, dims, nSpec) = AddedLayer(
+                                                        default_matrix(FT, arr_type, dims, nSpec), 
+                                                        default_matrix(FT, arr_type, dims, nSpec), 
+                                                        default_matrix(FT, arr_type, dims, nSpec),
+                                                        default_matrix(FT, arr_type, dims, nSpec),
+                                                        default_J_matrix(FT, arr_type, dims, nSpec),
+                                                        default_J_matrix(FT, arr_type, dims, nSpec),
+                                                        default_matrix(FT, arr_type, lin.nparams, dims, nSpec), 
+                                                        default_matrix(FT, arr_type, lin.nparams, dims, nSpec), 
+                                                        default_matrix(FT, arr_type, lin.nparams, dims, nSpec),
+                                                        default_matrix(FT, arr_type, lin.nparams, dims, nSpec),
+                                                        default_J_matrix(FT, arr_type, lin.nparams, dims, nSpec),
+                                                        default_J_matrix(FT, arr_type, lin.nparams, dims, nSpec)
+                                                        )
+
+"Make an added layer, supplying all default matrices"
+make_added_layer(RS_type::Union{RRS, RRS_plus,VS_0to1_plus, VS_1to0_plus}, lin::vSmartMOM_lin, FT, arr_type, dims, nSpec)  = AddedLayerRS(
+                                                default_matrix(FT, arr_type, dims, nSpec), 
+                                                default_matrix(FT, arr_type, dims, nSpec), 
+                                                default_matrix(FT, arr_type, dims, nSpec),
+                                                default_matrix(FT, arr_type, dims, nSpec),
+                                                default_J_matrix(FT, arr_type, dims, nSpec),
+                                                default_J_matrix(FT, arr_type, dims, nSpec),
+                                                default_matrix_ie(FT, arr_type, dims, nSpec, RS_type.n_Raman), 
+                                                default_matrix_ie(FT, arr_type, dims, nSpec, RS_type.n_Raman), 
+                                                default_matrix_ie(FT, arr_type, dims, nSpec, RS_type.n_Raman),
+                                                default_matrix_ie(FT, arr_type, dims, nSpec, RS_type.n_Raman),
+                                                default_J_matrix_ie(FT, arr_type, dims, nSpec, RS_type.n_Raman),
+                                                default_J_matrix_ie(FT, arr_type, dims, nSpec, RS_type.n_Raman),
+                                                default_matrix(FT, arr_type, lin.nparams, dims, nSpec), 
+                                                default_matrix(FT, arr_type, lin.nparams, dims, nSpec), 
+                                                default_matrix(FT, arr_type, lin.nparams, dims, nSpec),
+                                                default_matrix(FT, arr_type, lin.nparams, dims, nSpec),
+                                                default_J_matrix(FT, arr_type, lin.nparams, dims, nSpec),
+                                                default_J_matrix(FT, arr_type, lin.nparams, dims, nSpec),
+                                                default_matrix_ie(FT, arr_type, lin.nparams, dims, nSpec, RS_type.n_Raman), 
+                                                default_matrix_ie(FT, arr_type, lin.nparams, dims, nSpec, RS_type.n_Raman), 
+                                                default_matrix_ie(FT, arr_type, lin.nparams, dims, nSpec, RS_type.n_Raman),
+                                                default_matrix_ie(FT, arr_type, lin.nparams, dims, nSpec, RS_type.n_Raman),
+                                                default_J_matrix_ie(FT, arr_type, lin.nparams, dims, nSpec, RS_type.n_Raman),
+                                                default_J_matrix_ie(FT, arr_type, lin.nparams, dims, nSpec, RS_type.n_Raman)
+                                            )
+                                                         
+
+"Make a random added layer, supplying all random matrices"
+make_added_layer_rand(RS_type::Union{noRS, noRS_plus}, lin::vSmartMOM_lin, FT, arr_type, dims, nSpec)  = AddedLayer(
+                                                        default_matrix_rand(FT, arr_type, dims, nSpec), 
+                                                        default_matrix_rand(FT, arr_type, dims, nSpec), 
+                                                        default_matrix_rand(FT, arr_type, dims, nSpec),
+                                                        default_matrix_rand(FT, arr_type, dims, nSpec),
+                                                        default_J_matrix_rand(FT, arr_type, dims, nSpec),
+                                                        default_J_matrix_rand(FT, arr_type, dims, nSpec),
+                                                        default_matrix_rand(FT, arr_type, lin.nparams, dims, nSpec), 
+                                                        default_matrix_rand(FT, arr_type, lin.nparams, dims, nSpec), 
+                                                        default_matrix_rand(FT, arr_type, lin.nparams, dims, nSpec),
+                                                        default_matrix_rand(FT, arr_type, lin.nparams, dims, nSpec),
+                                                        default_J_matrix_rand(FT, arr_type, lin.nparams, dims, nSpec),
+                                                        default_J_matrix_rand(FT, arr_type, lin.nparams, dims, nSpec)
+                                                        )
+                                                         
+"Make a composite layer, supplying all default matrices"
+make_composite_layer(RS_type::Union{noRS, noRS_plus}, lin::vSmartMOM_lin, 
+    FT, arr_type, dims, nSpec) = CompositeLayer(
+                                            default_matrix(FT, arr_type, dims, nSpec), 
+                                            default_matrix(FT, arr_type, dims, nSpec), 
+                                            default_matrix(FT, arr_type, dims, nSpec),
+                                            default_matrix(FT, arr_type, dims, nSpec),
+                                            default_J_matrix(FT, arr_type, dims, nSpec),
+                                            default_J_matrix(FT, arr_type, dims, nSpec),
+                                            default_matrix(FT, arr_type, lin.nparams, dims, nSpec), 
+                                            default_matrix(FT, arr_type, lin.nparams, dims, nSpec), 
+                                            default_matrix(FT, arr_type, lin.nparams, dims, nSpec),
+                                            default_matrix(FT, arr_type, lin.nparams, dims, nSpec),
+                                            default_J_matrix(FT, arr_type, lin.nparams, dims, nSpec),
+                                            default_J_matrix(FT, arr_type, lin.nparams, dims, nSpec)
+                                            )
+"Make a composite layer, supplying all default matrices"
+make_composite_layer(RS_type::Union{RRS, RRS_plus,VS_0to1_plus, VS_1to0_plus}, lin::vSmartMOM_lin, 
+    FT, arr_type, dims, nSpec) = CompositeLayerRS(
+                                        default_matrix(FT, arr_type, dims, nSpec), 
+                                        default_matrix(FT, arr_type, dims, nSpec), 
+                                        default_matrix(FT, arr_type, dims, nSpec),
+                                        default_matrix(FT, arr_type, dims, nSpec),
+                                        default_J_matrix(FT, arr_type, dims, nSpec),
+                                        default_J_matrix(FT, arr_type, dims, nSpec),
+                                        default_matrix_ie(FT, arr_type, dims, nSpec, RS_type.n_Raman), 
+                                        default_matrix_ie(FT, arr_type, dims, nSpec, RS_type.n_Raman), 
+                                        default_matrix_ie(FT, arr_type, dims, nSpec, RS_type.n_Raman),
+                                        default_matrix_ie(FT, arr_type, dims, nSpec, RS_type.n_Raman),
+                                        default_J_matrix_ie(FT, arr_type, dims, nSpec, RS_type.n_Raman),
+                                        default_J_matrix_ie(FT, arr_type, dims, nSpec, RS_type.n_Raman),
+                                        default_matrix(FT, arr_type, lin.nparams, dims, nSpec), 
+                                        default_matrix(FT, arr_type, lin.nparams, dims, nSpec), 
+                                        default_matrix(FT, arr_type, lin.nparams, dims, nSpec),
+                                        default_matrix(FT, arr_type, lin.nparams, dims, nSpec),
+                                        default_J_matrix(FT, arr_type, lin.nparams, dims, nSpec),
+                                        default_J_matrix(FT, arr_type, lin.nparams, dims, nSpec),
+                                        default_matrix_ie(FT, arr_type, lin.nparams, dims, nSpec, RS_type.n_Raman), 
+                                        default_matrix_ie(FT, arr_type, lin.nparams, dims, nSpec, RS_type.n_Raman), 
+                                        default_matrix_ie(FT, arr_type, lin.nparams, dims, nSpec, RS_type.n_Raman),
+                                        default_matrix_ie(FT, arr_type, lin.nparams, dims, nSpec, RS_type.n_Raman),
+                                        default_J_matrix_ie(FT, arr_type, lin.nparams, dims, nSpec, RS_type.n_Raman),
+                                        default_J_matrix_ie(FT, arr_type, lin.nparams, dims, nSpec, RS_type.n_Raman)
+                                        )
+                                                    
+"Make a composite layer, supplying all default matrices"
+make_composite_layer(RS_type::Union{noRS, noRS_plus}, lin::vSmartMOM_lin, 
+    FT, arr_type, NSens, dims, nSpec) = 
+    CompositeLayerMS(default_matrix(FT, arr_type, NSens, dims, nSpec), 
+                    default_matrix(FT, arr_type, NSens, dims, nSpec), 
+                    default_matrix(FT, arr_type, NSens, dims, nSpec),
+                    default_matrix(FT, arr_type, NSens, dims, nSpec),
+                    default_J_matrix(FT, arr_type, NSens, dims, nSpec),
+                    default_J_matrix(FT, arr_type, NSens, dims, nSpec),
+                    default_matrix(FT, arr_type, NSens, dims, nSpec), 
+                    default_matrix(FT, arr_type, NSens, dims, nSpec), 
+                    default_matrix(FT, arr_type, NSens, dims, nSpec),
+                    default_matrix(FT, arr_type, NSens, dims, nSpec),
+                    default_J_matrix(FT, arr_type, NSens, dims, nSpec),
+                    default_J_matrix(FT, arr_type, NSens, dims, nSpec),
+                    default_matrix(FT, arr_type, lin.nparams, NSens, dims, nSpec), 
+                    default_matrix(FT, arr_type, lin.nparams, NSens, dims, nSpec), 
+                    default_matrix(FT, arr_type, lin.nparams, NSens, dims, nSpec),
+                    default_matrix(FT, arr_type, lin.nparams, NSens, dims, nSpec),
+                    default_J_matrix(FT, arr_type, lin.nparams, NSens, dims, nSpec),
+                    default_J_matrix(FT, arr_type, lin.nparams, NSens, dims, nSpec),
+                    default_matrix(FT, arr_type, lin.nparams, NSens, dims, nSpec), 
+                    default_matrix(FT, arr_type, lin.nparams, NSens, dims, nSpec), 
+                    default_matrix(FT, arr_type, lin.nparams, NSens, dims, nSpec),
+                    default_matrix(FT, arr_type, lin.nparams, NSens, dims, nSpec),
+                    default_J_matrix(FT, arr_type, lin.nparams, NSens, dims, nSpec),
+                    default_J_matrix(FT, arr_type, lin.nparams, NSens, dims, nSpec))
+"Make a composite layer, supplying all default matrices"
+make_composite_layer(RS_type::Union{RRS, RRS_plus, VS_0to1_plus, VS_1to0_plus}, 
+    lin::vSmartMOM_lin, 
+    FT, arr_type, NSens, dims, nSpec) = 
+    CompositeLayerMSRS(default_matrix(FT, arr_type, NSens, dims, nSpec), 
+                    default_matrix(FT, arr_type, NSens, dims, nSpec), 
+                    default_matrix(FT, arr_type, NSens, dims, nSpec),
+                    default_matrix(FT, arr_type, NSens, dims, nSpec),
+                    default_J_matrix(FT, arr_type, NSens, dims, nSpec),
+                    default_J_matrix(FT, arr_type, NSens, dims, nSpec),
+                    default_matrix_ie(FT, arr_type, NSens, dims, nSpec, RS_type.n_Raman), 
+                    default_matrix_ie(FT, arr_type, NSens, dims, nSpec, RS_type.n_Raman), 
+                    default_matrix_ie(FT, arr_type, NSens, dims, nSpec, RS_type.n_Raman),
+                    default_matrix_ie(FT, arr_type, NSens, dims, nSpec, RS_type.n_Raman),
+                    default_J_matrix_ie(FT, arr_type, NSens, dims, nSpec, RS_type.n_Raman),
+                    default_J_matrix_ie(FT, arr_type, NSens, dims, nSpec, RS_type.n_Raman),
+                    default_matrix(FT, arr_type, NSens, dims, nSpec), 
+                    default_matrix(FT, arr_type, NSens, dims, nSpec), 
+                    default_matrix(FT, arr_type, NSens, dims, nSpec),
+                    default_matrix(FT, arr_type, NSens, dims, nSpec),
+                    default_J_matrix(FT, arr_type, NSens, dims, nSpec),
+                    default_J_matrix(FT, arr_type, NSens, dims, nSpec),
+                    default_matrix_ie(FT, arr_type, NSens, dims, nSpec, RS_type.n_Raman), 
+                    default_matrix_ie(FT, arr_type, NSens, dims, nSpec, RS_type.n_Raman), 
+                    default_matrix_ie(FT, arr_type, NSens, dims, nSpec, RS_type.n_Raman),
+                    default_matrix_ie(FT, arr_type, NSens, dims, nSpec, RS_type.n_Raman),
+                    default_J_matrix_ie(FT, arr_type, NSens, dims, nSpec, RS_type.n_Raman),
+                    default_J_matrix_ie(FT, arr_type, NSens, dims, nSpec, RS_type.n_Raman),
+                    default_matrix(FT, arr_type, lin.nparams, NSens, dims, nSpec), 
+                    default_matrix(FT, arr_type, lin.nparams, NSens, dims, nSpec), 
+                    default_matrix(FT, arr_type, lin.nparams, NSens, dims, nSpec),
+                    default_matrix(FT, arr_type, lin.nparams, NSens, dims, nSpec),
+                    default_J_matrix(FT, arr_type, lin.nparams, NSens, dims, nSpec),
+                    default_J_matrix(FT, arr_type, lin.nparams, NSens, dims, nSpec),
+                    default_matrix_ie(FT, arr_type, lin.nparams, NSens, dims, nSpec, RS_type.n_Raman), 
+                    default_matrix_ie(FT, arr_type, lin.nparams, NSens, dims, nSpec, RS_type.n_Raman), 
+                    default_matrix_ie(FT, arr_type, lin.nparams, NSens, dims, nSpec, RS_type.n_Raman),
+                    default_matrix_ie(FT, arr_type, lin.nparams, NSens, dims, nSpec, RS_type.n_Raman),
+                    default_J_matrix_ie(FT, arr_type, lin.nparams, NSens, dims, nSpec, RS_type.n_Raman),
+                    default_J_matrix_ie(FT, arr_type, lin.nparams, NSens, dims, nSpec, RS_type.n_Raman),
+                    default_matrix(FT, arr_type, lin.nparams, NSens, dims, nSpec), 
+                    default_matrix(FT, arr_type, lin.nparams, NSens, dims, nSpec), 
+                    default_matrix(FT, arr_type, lin.nparams, NSens, dims, nSpec),
+                    default_matrix(FT, arr_type, lin.nparams, NSens, dims, nSpec),
+                    default_J_matrix(FT, arr_type, lin.nparams, NSens, dims, nSpec),
+                    default_J_matrix(FT, arr_type, lin.nparams, NSens, dims, nSpec),
+                    default_matrix_ie(FT, arr_type, lin.nparams, NSens, dims, nSpec, RS_type.n_Raman), 
+                    default_matrix_ie(FT, arr_type, lin.nparams, NSens, dims, nSpec, RS_type.n_Raman), 
+                    default_matrix_ie(FT, arr_type, lin.nparams, NSens, dims, nSpec, RS_type.n_Raman),
+                    default_matrix_ie(FT, arr_type, lin.nparams, NSens, dims, nSpec, RS_type.n_Raman),
+                    default_J_matrix_ie(FT, arr_type, lin.nparams, NSens, dims, nSpec, RS_type.n_Raman),
+                    default_J_matrix_ie(FT, arr_type, lin.nparams, NSens, dims, nSpec, RS_type.n_Raman)
+                    )
+=#
+#ending linearization block
+
 "Given a ComputedAtmosphereProperties object, extract a ComputedLayerProperties object using data from the iz index of all arrays in the ComputedAtmosphereProperties"
 function get_layer_properties(computed_atmospheric_properties::ComputedAtmosphereProperties, iz, arr_type)
      @unpack τ_λ_all, ϖ_λ_all, τ_all, ϖ_all, Z⁺⁺_all, Z⁻⁺_all , dτ_max_all, dτ_all, ndoubl_all, dτ_λ_all, expk_all, scatter_all, τ_sum_all, fscattRayl_all,  scattering_interfaces_all = computed_atmospheric_properties
