@@ -105,7 +105,7 @@ function reduce_profile(n::Int, profile::AtmosphericProfile{FT}) where {FT}
     @assert n < length(profile.T)
 
     # Unpack the profile vmr
-    @unpack vmr = profile
+    @unpack vmr, Δz = profile
 
     # New rough half levels (boundary points)
     a = range(0, maximum(profile.p_half), length=n+1)
@@ -113,6 +113,7 @@ function reduce_profile(n::Int, profile::AtmosphericProfile{FT}) where {FT}
     # Matrices to hold new values
     T = zeros(FT, n);
     q = zeros(FT, n);
+    Δz_ = zeros(FT, n);
     p_full = zeros(FT, n);
     p_half = zeros(FT, n+1);
     vmr_h2o  = zeros(FT, n);
@@ -138,7 +139,7 @@ function reduce_profile(n::Int, profile::AtmosphericProfile{FT}) where {FT}
         p_full[i] = mean(profile.p_full[ind])
         T[i] = mean(profile.T[ind])
         q[i] = mean(profile.q[ind])
-        
+        Δz_[i] = sum(Δz[ind])
         vcd_dry[i] = sum(profile.vcd_dry[ind])
         vcd_h2o[i] = sum(profile.vcd_h2o[ind])
         vmr_h2o[i] = vcd_h2o[i]/vcd_dry[i]
@@ -157,7 +158,7 @@ function reduce_profile(n::Int, profile::AtmosphericProfile{FT}) where {FT}
         end
     end
 
-    return AtmosphericProfile(T, p_full, q, p_half, vmr_h2o, vcd_dry, vcd_h2o, new_vmr)
+    return AtmosphericProfile(T, p_full, q, p_half, vmr_h2o, vcd_dry, vcd_h2o, new_vmr,Δz_)
 end
 
 """

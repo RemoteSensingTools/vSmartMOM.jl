@@ -28,7 +28,7 @@ function model_from_parameters(params::vSmartMOM_Parameters)
     # Get AtmosphericProfile from parameters
     vmr = isnothing(params.absorption_params) ? Dict() : params.absorption_params.vmr
     p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o, new_vmr, Δz = compute_atmos_profile_fields(params.T, params.p, params.q, vmr)
-
+    @show  Δz
     profile = AtmosphericProfile(params.T, p_full, params.q, p_half, vmr_h2o, vcd_dry, vcd_h2o, new_vmr,Δz)
     
     # Reduce the profile to the number of target layers (if specified)
@@ -39,7 +39,7 @@ function model_from_parameters(params::vSmartMOM_Parameters)
     # Rayleigh optical properties calculation
     greek_rayleigh = Scattering.get_greek_rayleigh(FT(params.depol))
     # Remove rayleight for testing:
-    τ_rayl = [zeros(FT,length(params.spec_bands[i]), length(params.T)) for i=1:n_bands];
+    τ_rayl = [zeros(FT,length(params.spec_bands[i]), length(profile.T)) for i=1:n_bands];
     #τ_rayl = [zeros(FT,1,length(profile.T)) for i=1:n_bands];
     
     # This is a kludge for now, tau_abs sometimes needs to be a dual. Suniti & us need to rethink this all!!
@@ -54,7 +54,9 @@ function model_from_parameters(params::vSmartMOM_Parameters)
         curr_band_λ = FT.(1e4 ./ params.spec_bands[i_band])
         # @show profile.vcd_dry, size(τ_rayl[i_band])
         # Compute Rayleigh properties per layer for `i_band` band center  
-        
+        @show size(getRayleighLayerOptProp(profile.p_half[end],
+        curr_band_λ, #(mean(curr_band_λ)), 
+        params.depol, profile.vcd_dry)),  size(τ_rayl[i_band])
         τ_rayl[i_band]   .= getRayleighLayerOptProp(profile.p_half[end], 
                                 curr_band_λ, #(mean(curr_band_λ)), 
                                 params.depol, profile.vcd_dry);
@@ -143,10 +145,10 @@ function model_from_parameters(params::vSmartMOM_Parameters)
                                             params.scattering_params.nquad_radius)
             n_ref = params.scattering_params.n_ref
             k = compute_ref_aerosol_extinction(mie_model,  params.float_type)
-            @show k
+            #@show k
             # Compute raw (not truncated) aerosol optical properties (not needed in RT eventually) 
             #@show FT2, FT
-            @timeit "Mie calc"  aerosol_optics_raw = compute_aerosol_optical_properties(mie_model, FT);
+            @timeit "Mie calc"  aerosol_optics_raw = compute_aerosol_optical_properties(mie_model, FT2);
             @show aerosol_optics_raw.k
             # Compute truncated aerosol optical properties (phase function and fᵗ), consistent with Ltrunc:
             #@show i_aer, i_band

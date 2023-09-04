@@ -788,7 +788,7 @@ arr_type) where {FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2,M}
 
     @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻ = added_layer
     @unpack ier⁺⁻, ier⁻⁺, iet⁻⁻, iet⁺⁺, ieJ₀⁺, ieJ₀⁻ = added_layer
-    @show size(composite_layer.topT⁺⁺)
+    #@show size(composite_layer.topT⁺⁺)
     #@unpack topR⁻⁺, topR⁺⁻, topT⁺⁺, topT⁻⁻, topJ₀⁺, topJ₀⁻ = composite_layer
     R⁻⁺ = arr_type(composite_layer.topR⁻⁺[ims]) 
     R⁺⁻ = arr_type(composite_layer.topR⁺⁻[ims]) 

@@ -18,10 +18,10 @@ function interaction_hdrf!(SFI,
     NquadN =  Nquad * pol_type.n
     hdr_J₀⁻ .= r⁻⁺ ⊠ J₀⁺ .+ j₀⁻
     # @show hdr_J₀⁻./ J₀⁺
-    @show hdr_J₀⁻[1,1,:]
-    @show J₀⁺[1,1,:]
-    @show iμ₀
-    @show j₀⁺[iμ₀Nstart,1,:]
+    #@show hdr_J₀⁻[1,1,:]
+    #@show J₀⁺[1,1,:]
+    #@show iμ₀
+    #@show j₀⁺[iμ₀Nstart,1,:]
     qp = Array(qp_μN)
     if m==0
 
@@ -32,9 +32,9 @@ function interaction_hdrf!(SFI,
             j=i:pol_type.n:NquadN
             bhr_J₀⁻[i,:] .= Array(sum(hdr_J₀⁻[j,1,:].*wt_μN[j].*qp_μN[j], dims=1)')
             bhr_J₀⁺[i,:] .= Array(sum(J₀⁺[j,1,:].*wt_μN[j].*qp_μN[j], dims=1)' .+ j₀⁺[iμ₀Nstart,1,:] .* qp[iμ₀Nstart]) 
-            if i==1
-                @show bhr_J₀⁻[i,:], bhr_J₀⁺[i,:]
-            end
+            #if i==1
+            #    @show bhr_J₀⁻[i,:], bhr_J₀⁺[i,:]
+            #end
             #TODO: Use Radau quadrature and include insolation in the quadrature sum
             
             #@show j₀⁺[iμ₀,1,1:3].* qp[iμ₀], J₀⁺[iμ₀,1,1:3] .* qp[iμ₀], bhr_J₀⁺[i,1:3], bhr_J₀⁻[i,1:3]
@@ -86,8 +86,8 @@ function interaction_hdrf_canopy!(SFI,
             @show direct[1], diffuse[1]
 
         end
-        @show bhr_J₀⁻./bhr_J₀⁺
-        @show solJ₀[1,:]
+        #@show bhr_J₀⁻./bhr_J₀⁺
+        #@show solJ₀[1,:]
     end
 
 end

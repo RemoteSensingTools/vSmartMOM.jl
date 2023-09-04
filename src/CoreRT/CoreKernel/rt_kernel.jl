@@ -71,7 +71,7 @@ function rt_kernel_canopy!(RS_type::noRS, pol_type, SFI, added_layer, composite_
         @timeit "elemental_canopy" elemental_canopy!(pol_type, SFI, τ_sum, dτ_λ, dτ, ϖ_λ, ϖ, Z⁺⁺, Z⁻⁺, m, ndoubl, scatter, quad_points,  added_layer,  I_static, architecture)
         #println("Elemental done...")
         @timeit "doubling"   doubling!(pol_type, SFI, expk, ndoubl, added_layer, I_static, architecture)
-        @show added_layer.r⁻⁺[1,1,1], added_layer.r⁺⁻[1,1,1],added_layer.t⁺⁺[1,1,1], added_layer.t⁻⁻[:,:,1] 
+        #@show added_layer.r⁻⁺[1,1,1], added_layer.r⁺⁻[1,1,1],added_layer.t⁺⁺[1,1,1], added_layer.t⁻⁻[:,:,1] 
         #println("Doubling done...")
     else # This might not work yet on GPU!
         # If not, there is no reflectance. Assign r/t appropriately

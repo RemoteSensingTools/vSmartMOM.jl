@@ -88,10 +88,10 @@ function runner!(y, x, parameters=parameters, oco_file=oco_file,
                                               sza_=sza_, vza_=vza_)
 
     # Set parameters fields as the dual numbers
-    parameters.brdf = [vSmartMOM.LambertianSurfaceLegendre([x[1],x[3],x[4]])]
+    parameters.brdf = [vSmartMOM.CoreRT.LambertianSurfaceLegendre([x[1],x[3],x[4]])]
 
     parameters.scattering_params.rt_aerosols[1].τ_ref = exp(x[2]);
-    parameters.scattering_params.rt_aerosols[1].p₀    = 70000.0; #x[4]
+    #parameters.scattering_params.rt_aerosols[1].profile.μ    = 70000.0; #x[4]
     # parameters.scattering_params.rt_aerosols[1].aerosol.size_distribution = LogNormal(log(x[3]), log(x[4]), check_args=false)
 
     # parameters.scattering_params.rt_aerosols[1].aerosol.nᵣ = x[5];

@@ -21,7 +21,7 @@ using LinearAlgebra
 # Load parameters from file
 parameters = parameters_from_yaml("test/test_parameters/3BandParameters.yaml")
 #parameters.architecture = CPU()
-FT = Float32
+FT = Float64
 parameters.float_type = FT
 # Load OCO Data: 
 # File names:
@@ -83,7 +83,7 @@ function runner!(y, x, parameters=parameters, oco_sounding= oco_sounding, Tsolar
                         CoreRT.LambertianSurfaceLegendre([x[7],x[8],x[9]])];
 
     parameters.scattering_params.rt_aerosols[1].τ_ref = exp(x[10]);
-    parameters.scattering_params.rt_aerosols[1].p₀    = x[11]
+    #parameters.scattering_params.rt_aerosols[1].p₀    = x[11]
     size_distribution = LogNormal(x[12], FT(0.3))
     parameters.scattering_params.rt_aerosols[1].aerosol.size_distribution =  size_distribution
     #@show size_distribution
@@ -149,7 +149,7 @@ function runner2(x, parameters=parameters, oco_sounding= oco_sounding, Tsolar = 
                         CoreRT.LambertianSurfaceLegendre([x[7],x[8],x[9]])];
 
     parameters.scattering_params.rt_aerosols[1].τ_ref = exp(x[10]);
-    parameters.scattering_params.rt_aerosols[1].p₀    = x[11]
+    #parameters.scattering_params.rt_aerosols[1].p₀    = x[11]
     size_distribution = LogNormal(x[12], FT(0.3))
     parameters.scattering_params.rt_aerosols[1].aerosol.size_distribution =  size_distribution
     #@show size_distribution

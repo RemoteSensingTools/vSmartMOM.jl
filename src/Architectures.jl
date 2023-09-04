@@ -12,7 +12,7 @@ export
 using CUDA
 
 using KernelAbstractions
-using CUDAKernels
+#using CUDAKernels
 
 """
     AbstractArchitecture
@@ -42,7 +42,7 @@ macro hascuda(expr)
 end
 
 devi(::CPU) = KernelAbstractions.CPU()
-devi(::GPU) = CUDAKernels.CUDADevice()
+devi(::GPU) = CUDA.CUDABackend(; always_inline=true)
 
          architecture(::Array)   = CPU()
 @hascuda architecture(::CuArray) = GPU()
@@ -52,6 +52,6 @@ devi(::GPU) = CUDAKernels.CUDADevice()
 
 default_architecture = has_cuda() ? GPU() : CPU()
 
-synchronize_if_gpu() = has_cuda() ? synchronize() : nothing
+synchronize_if_gpu() = has_cuda() ? CUDA.synchronize() : nothing
 
 end

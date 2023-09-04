@@ -140,13 +140,13 @@ function elemental!(pol_type, SFI::Bool,
         # with absorption in batch mode, low tau_scatt but higher tau_total, needs exact equations
         kernel! = get_elem_rt!(device)
         event = kernel!(r⁻⁺, t⁺⁺, ϖ, dτ, Z⁻⁺, Z⁺⁺, qp_μN, wct2, ndrange=size(r⁻⁺)); 
-        wait(device, event)
+#        wait(device, event)
         synchronize_if_gpu()
 
         # SFI part
         kernel! = get_elem_rt_SFI!(device)
         event = kernel!(j₀⁺, j₀⁻, ϖ, dτ, arr_type(τ_sum), Z⁻⁺, Z⁺⁺, qp_μN, ndoubl, wct02, pol_type.n, I₀, iμ₀, D, ndrange=size(j₀⁺))
-        wait(device, event)
+ #       wait(device, event)
         synchronize_if_gpu()
         
         # Apply D Matrix
@@ -287,8 +287,8 @@ end
 function apply_D_matrix_elemental!(ndoubl::Int, n_stokes::Int, r⁻⁺::AbstractArray{FT,3}, t⁺⁺::AbstractArray{FT,3}, r⁺⁻::AbstractArray{FT,3}, t⁻⁻::AbstractArray{FT,3}) where {FT}
     device = devi(architecture(r⁻⁺))
     applyD_kernel! = apply_D_elemental!(device)
-    event = applyD_kernel!(ndoubl,n_stokes, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻, ndrange=size(r⁻⁺));
-    wait(device, event);
+    applyD_kernel!(ndoubl,n_stokes, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻, ndrange=size(r⁻⁺));
+#    wait(device, event);
     synchronize_if_gpu();
     return nothing
 end
@@ -299,8 +299,8 @@ function apply_D_matrix_elemental_SFI!(ndoubl::Int, n_stokes::Int, J₀⁻::Abst
     else 
         device = devi(architecture(J₀⁻))
         applyD_kernel! = apply_D_elemental_SFI!(device)
-        event = applyD_kernel!(ndoubl,n_stokes, J₀⁻, ndrange=size(J₀⁻));
-        wait(device, event);
+        applyD_kernel!(ndoubl,n_stokes, J₀⁻, ndrange=size(J₀⁻));
+    #    wait(device, event);
         synchronize_if_gpu();
         return nothing
     end

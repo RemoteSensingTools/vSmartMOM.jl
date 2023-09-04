@@ -3,6 +3,8 @@
 This file contains implementations of batched linear algebra code
 
 =#
+using ForwardDiffChainRules, ChainRulesCore
+
 
 "Given 3D CuArrays A and B, fill in X[:,:,k] = A[:,:,k] \\ B[:,:,k]" 
 function batch_solve!(X::CuArray{FT,3}, A::CuArray{FT,3}, B::CuArray{FT,3}) where {FT}
@@ -33,9 +35,9 @@ end
 "Given 3D CuArray A, fill in X[:,:,k] = A[:,:,k] \\ I" 
 function batch_inv!(X::CuArray{FT,3}, A::CuArray{FT,3}) where {FT}
     # LU-factorize A
-    pivot, info   = CUBLAS.getrf_strided_batched!(A, true);synchronize()
+    pivot, info   = CUBLAS.getrf_strided_batched!(A, true);CUDA.synchronize()
     # Invert LU factorization of A
-    CUBLAS.getri_strided_batched!(A, X, pivot); synchronize()
+    CUBLAS.getri_strided_batched!(A, X, pivot); CUDA.synchronize()
 end
 
 
@@ -53,10 +55,34 @@ end
 
 "Batched matrix multiply (overwrite NNlib definition)"
 function batched_mul(A::CuArray{FT,3}, B::CuArray{FT,3}) where {FT}
-    CUBLAS.gemm_strided_batched('N', 'N', A, B)
+    #C = similar(A)
+    C = CUBLAS.gemm_strided_batched('N', 'N', A, B);# CUDA.synchronize()
+    #C
+    #@show "HA"
+    #gemmStridedBatchedEx2!('N', 'N', one(FT), A, B, zero(FT), C);
+    #return C
+    #m = size(A, 1)
+    #k = size(A, 2)
+    #n = size(B, 2)
+    #lda = CUBLAS.stride(A,2)
+    #strideA    = stride(A, 3)
+    #strideB = stride(B, 3)
+    #strideC = stride(C, 3)
+    #batchCount = size(C, 3)
+    #CUBLAS.gemm_strided_batched!('N', 'N', one(FT), A, B, zero(FT), C)
+    #CUBLAS.cublasDgemmStridedBatched(CUBLAS.handle(), 'N', 'N', m, m, m, one(FT), A, lda, strideA, B,
+    #                            lda, strideB, zero(FT), C, lda, strideC, batchCount);
+    #return C
 end
 
-"Define batched matrix multiply for GPU and Duals"
+function ChainRulesCore.frule((_, ΔA, ΔB), ::typeof(batched_mul), A, B)
+    # this could be any code you want of course
+    return (A ⊠ B, ΔA ⊠ B + A ⊠ ΔB)
+ end
+ 
+ #@ForwardDiff_frule batched_mul(A::CuArray{<:ForwardDiff.Dual,3}, B::CuArray{<:ForwardDiff.Dual,3})
+
+ "Define batched matrix multiply for GPU and Duals"
 function batched_mul(A::CuArray{ForwardDiff.Dual{T,V,N},3}, B::CuArray{ForwardDiff.Dual{T,V,N},3}) where {T,V,N}
     # Extract values:
     Av = ForwardDiff.value.(A)
@@ -68,6 +94,7 @@ function batched_mul(A::CuArray{ForwardDiff.Dual{T,V,N},3}, B::CuArray{ForwardDi
     dABdx = ForwardDiff.Partials.(tuple.(dABdx...));
     return eltype(A).(Cv,dABdx);
 end
+
 
 "Define batched matrix multiply for GPU and Duals"
 function batched_mul_(A::CuArray{ForwardDiff.Dual{T,V,N},3}, B::CuArray{ForwardDiff.Dual{T,V,N},3}) where {T,V,N}
