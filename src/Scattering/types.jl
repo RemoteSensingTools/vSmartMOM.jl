@@ -250,6 +250,8 @@ Base.@kwdef struct AerosolOptics{FT<:Union{AbstractFloat, ForwardDiff.Dual}}
     ω̃::FT
     "Extinction cross-section"
     k::FT
+    "Extinction cross-section at reference wavelength"
+    k_ref::FT
     "Truncation factor" 
     fᵗ::FT
     "Derivatives"

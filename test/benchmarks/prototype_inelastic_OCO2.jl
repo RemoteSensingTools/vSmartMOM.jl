@@ -1,16 +1,16 @@
 ##
-using Revise
-using Plots
-using Statistics
-using vSmartMOM
-using vSmartMOM.Architectures
-using vSmartMOM.Absorption
-using vSmartMOM.Scattering
-using vSmartMOM.CoreRT
-using vSmartMOM.SolarModel
-using vSmartMOM.InelasticScattering
 using InstrumentOperator
 using Interpolations
+using Plots
+using Revise
+using Statistics
+using vSmartMOM
+using vSmartMOM.Absorption
+using vSmartMOM.Architectures
+using vSmartMOM.CoreRT
+using vSmartMOM.InelasticScattering
+using vSmartMOM.Scattering
+using vSmartMOM.SolarModel
 
 # Load OCO Data: 
 # File names:

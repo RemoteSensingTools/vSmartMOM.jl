@@ -209,7 +209,7 @@ make_composite_layer(RS_type::Union{RRS, RRS_plus, VS_0to1_plus, VS_1to0_plus},
                     default_J_matrix_ie(FT, arr_type, NSens, dims, nSpec, RS_type.n_Raman)
                     )
 # With linearization
-#=
+
 "Make an added layer, supplying all default matrices"
 make_added_layer(RS_type::Union{noRS, noRS_plus}, lin::vSmartMOM_lin, FT, arr_type, dims, nSpec) = AddedLayer(
                                                         default_matrix(FT, arr_type, dims, nSpec), 
@@ -396,7 +396,7 @@ make_composite_layer(RS_type::Union{RRS, RRS_plus, VS_0to1_plus, VS_1to0_plus},
                     default_J_matrix_ie(FT, arr_type, lin.nparams, NSens, dims, nSpec, RS_type.n_Raman),
                     default_J_matrix_ie(FT, arr_type, lin.nparams, NSens, dims, nSpec, RS_type.n_Raman)
                     )
-=#
+
 #ending linearization block
 
 "Given a ComputedAtmosphereProperties object, extract a ComputedLayerProperties object using data from the iz index of all arrays in the ComputedAtmosphereProperties"

@@ -2,7 +2,7 @@ using CUDA
 device!(1)
 using DelimitedFiles
 using Distributions
-using ImageFiltering
+#using ImageFiltering
 using InstrumentOperator
 using Interpolations
 using JLD2
@@ -28,16 +28,16 @@ n_bands = length(parameters.spec_bands)
 n_aer = isnothing(parameters.scattering_params) ? 0 : length(parameters.scattering_params.rt_aerosols)
 truncation_type = vSmartMOM.Scattering.δBGE{parameters.float_type}(parameters.l_trunc, parameters.Δ_angle)
 
-vmr = isnothing(parameters.absorption_params) ? Dict() : parameters.absorption_params.vmr
-p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o, new_vmr = 
-    vSmartMOM.CoreRT.compute_atmos_profile_fields(parameters.T, parameters.p, parameters.q, vmr)
+#vmr = isnothing(parameters.absorption_params) ? Dict() : parameters.absorption_params.vmr
+#p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o, new_vmr = 
+#    vSmartMOM.CoreRT.compute_atmos_profile_fields(parameters.T, parameters.p, parameters.q, vmr)
 
-profile = vSmartMOM.CoreRT.AtmosphericProfile(parameters.T, p_full, parameters.q, p_half, vmr_h2o, vcd_dry, vcd_h2o, new_vmr)
+#profile = vSmartMOM.CoreRT.AtmosphericProfile(parameters.T, p_full, parameters.q, p_half, vmr_h2o, vcd_dry, vcd_h2o, new_vmr)
     
 # Reduce the profile to the number of target layers (if specified)
-if parameters.profile_reduction_n != -1
-    profile = vSmartMOM.CoreRT.reduce_profile(parameters.profile_reduction_n, profile);
-end
+#if parameters.profile_reduction_n != -1
+#    profile = vSmartMOM.CoreRT.reduce_profile(parameters.profile_reduction_n, profile);
+#end
 
 # aerosol_optics[iBand][iAer]
 aerosol_optics = [Array{vSmartMOM.Scattering.AerosolOptics}(undef, (n_aer)) for i=1:n_bands];
@@ -45,7 +45,7 @@ FT2 = isnothing(parameters.scattering_params) ? parameters.float_type : typeof(p
 #FT2 =  parameters.float_type 
 
 # τ_aer[iBand][iAer,iZ]
-τ_aer = [zeros(FT2, n_aer, length(profile.p_full)) for i=1:n_bands];
+τ_aer = [zeros(FT2, n_aer, length(model.profile.p_full)) for i=1:n_bands];
 
 # Loop over aerosol type
 for i_aer=1:n_aer
@@ -101,8 +101,8 @@ for i_aer=1:n_aer
         τ_aer[i_band][i_aer,:] = 
             parameters.scattering_params.rt_aerosols[i_aer].τ_ref * 
             (aerosol_optics[i_band][i_aer].k/k_ref) * 
-            vSmartMOM.CoreRT.getAerosolLayerOptProp(1, c_aero.p₀, c_aero.σp, profile.p_half)
-        @show vSmartMOM.CoreRT.getAerosolLayerOptProp(1, c_aero.p₀, c_aero.σp, profile.p_half)
+            vSmartMOM.CoreRT.getAerosolLayerOptProp(1, c_aero.profile.μ, c_aero.profile.σ, model.profile.p_half)
+        @show vSmartMOM.CoreRT.getAerosolLayerOptProp(1, c_aero.profile.μ, c_aero.profile.σ, model.profile.p_half)
         @show aerosol_optics[i_band][i_aer].k, k_ref
         @show τ_aer[i_band][i_aer,:]
         @show parameters.scattering_params.rt_aerosols[i_aer].τ_ref

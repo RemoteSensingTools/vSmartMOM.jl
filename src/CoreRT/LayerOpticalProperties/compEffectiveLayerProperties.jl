@@ -1,4 +1,5 @@
-function constructCoreOpticalProperties(RS_type::AbstractRamanType{FT}, iBand, m, model) where FT
+function constructCoreOpticalProperties(RS_type::AbstractRamanType{FT}, 
+                                        iBand, m, model) where FT
     @unpack τ_rayl, τ_aer, τ_abs, aerosol_optics, greek_rayleigh  = model
     #@show typeof(τ_rayl[1]), typeof(τ_aer[1]), typeof(τ_abs[1])
     @assert all(iBand .≤ length(τ_rayl)) "iBand exceeded number of bands"
@@ -38,6 +39,16 @@ function constructCoreOpticalProperties(RS_type::AbstractRamanType{FT}, iBand, m
                                 pol_type, μ, 
                                 aerosol_optics[iB][i].greek_coefs, 
                                 m, arr_type=arr_type)
+            #dAerZ⁺⁺ = zeros(4, size(AerZ⁺⁺,1), size(AerZ⁺⁺,2))                    
+            #dAerZ⁻⁺ = zeros(4, size(AerZ⁺⁺,1), size(AerZ⁺⁺,2))                    
+            
+            #for ctr=1:4
+            #    dAerZ⁺⁺[ctr,:,:], dAerZ⁻⁺[ctr,:,:] = 
+            #                    Scattering.compute_Z_moments(
+            #                    pol_type, μ, 
+            #                    aerosol_optics[iB][i].greek_coefs, 
+            #                    m, arr_type=arr_type)
+            #end
             #@show typeof(AerZ⁺⁺), typeof(aerosol_optics[iB][i]), typeof(FT.(τ_aer[iB][i,:]))
             # Generate Core optical properties for Aerosols i
             aer   = createAero.(τ_aer[iB][i,:], 
@@ -121,7 +132,7 @@ function getG_atSun(lod::CoreDirectionalScatteringOpticalProperties,quad_points:
 end
 
 
-function expandOpticalProperties(in::CoreScatteringOpticalProperties, arr_type)
+function (in::CoreScatteringOpticalProperties, arr_type)
     @unpack τ, ϖ, Z⁺⁺, Z⁻⁺ = in 
     @assert length(τ) == length(ϖ) "τ and ϖ sizes need to match"
     if size(Z⁺⁺,3) == 1

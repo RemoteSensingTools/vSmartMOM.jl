@@ -318,7 +318,8 @@ function compute_aerosol_optical_properties(model::MieModel{FDT}, FT2::Type=Floa
         end
         #@show typeof(convert.(FT2, β)), typeof(greek_coefs)
         # Return the packaged AerosolOptics object
-        return AerosolOptics(greek_coefs=greek_coefs, ω̃=FT2(ω̃), k=FT2(bulk_C_ext), fᵗ=FT2(1)), linAerosolOptics(d_greek_coefs=d_greek_coefs, dω̃=FT2(dω̃), dk=FT2(d_bulk_C_ext), dfᵗ=FT2(1))
+        return AerosolOptics(greek_coefs=greek_coefs, ω̃=FT2(ω̃), k=FT2(bulk_C_ext), k_ref=FT(0), fᵗ=FT2(1)), 
+            dAerosolOptics(d_greek_coefs=d_greek_coefs, dω̃=FT2(dω̃), dk=FT2(d_bulk_C_ext), dk_ref=zeros(FT, 4), dfᵗ=FT2(1))
 
     else
         greek_coefs = GreekCoefs(α,β,γ,δ,ϵ,ζ)
@@ -332,7 +333,8 @@ function compute_aerosol_optical_properties(model::MieModel{FDT}, FT2::Type=Floa
                                         dζ[i,:])
             push!(d_greek_coefs, tmp_greek_coefs);
         end
-        return AerosolOptics(greek_coefs=greek_coefs, ω̃=(bulk_C_sca / bulk_C_ext), k=(bulk_C_ext), fᵗ=FT(1)), , linAerosolOptics(d_greek_coefs=d_greek_coefs, dω̃=dω̃, dk=d_bulk_C_ext, dfᵗ=FT(1))
+        return AerosolOptics(greek_coefs=greek_coefs, ω̃=(bulk_C_sca / bulk_C_ext), k=(bulk_C_ext), k_ref=FT(0), fᵗ=FT(1)),  
+            dAerosolOptics(d_greek_coefs=d_greek_coefs, dω̃=dω̃, dk=d_bulk_C_ext, dk_ref=zeros(FT, 4), dfᵗ=FT(1))
     end
 end
 
