@@ -63,7 +63,7 @@ function create_surface_layer!(lambertian::LambertianSurfaceScalar{FT},
                     lin_added_layer.dxj₀⁻[ctr,:,1,:] .= μ₀*(R_surf*I₀_NquadN) .* exp.(-τ_sum/μ₀)'/lambertian.ρ;
                 else
                     lin_added_layer.dxj₀⁺[ctr,:,1,:] .= 0; #I₀_NquadN .* exp.(-τ_sum/μ₀)'*(-1/μ₀).*lin_τ_sum[ctr,:];
-                    lin_added_layer.dxj₀⁻[ctr,:,1,:] .= μ₀*(R_surf*I₀_NquadN) .* exp.(-τ_sum/μ₀)'*(-1/μ₀).*lin_τ_sum[ctr,:];
+                    lin_added_layer.dxj₀⁻[ctr,:,1,:] .= -(R_surf*I₀_NquadN) .* exp.(-τ_sum/μ₀)'.*lin_τ_sum[ctr,:];
                 end
             end
         end
@@ -149,7 +149,7 @@ function create_surface_layer!(lambertian::LambertianSurfaceLegendre{FT},
                     lin_added_layer.dxj₀⁻[:,1,:] .= 2μ₀*(R_surf*I₀_NquadN) .* P[:,ctr-i_surf[1]+1] .* exp.(-τ_sum/μ₀)';
                 else
                     lin_added_layer.dxj₀⁺[ctr,:,1,:] .= 0; #I₀_NquadN .* exp.(-τ_sum/μ₀)'*(-1/μ₀).*lin_τ_sum[ctr,:];
-                    lin_added_layer.dxj₀⁻[ctr,:,1,:] .= μ₀*(R_surf*I₀_NquadN) .* ρ .* exp.(-τ_sum/μ₀)'*(-1/μ₀).*lin_τ_sum[ctr,:];
+                    lin_added_layer.dxj₀⁻[ctr,:,1,:] .= -(R_surf*I₀_NquadN) .* ρ .* exp.(-τ_sum/μ₀)'.*lin_τ_sum[ctr,:];
                 end
             end
         

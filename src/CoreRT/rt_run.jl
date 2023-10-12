@@ -340,7 +340,8 @@ function rt_run(RS_type::AbstractRamanType,
         scattering_interfaces_all, τ_sum_all, lin_τ_sum_all = 
             extractEffectiveProps(layer_opt_props, lin_layer_opt_props, quad_points);
         #@show typeof(layer_opt_props)
-
+        nparams = length(lin_fScattRayleigh[:,1])
+        speclen = length(RS_type.fscattRayl[1,:])
         # Loop over vertical layers: 
         @showprogress 1 "Looping over layers ..." for iz = 1:Nz  # Count from TOA to BOA
 
@@ -350,8 +351,7 @@ function rt_run(RS_type::AbstractRamanType,
             if !(typeof(RS_type) <: noRS)
                 RS_type.fscattRayl = expandBandScalars(RS_type, fScattRayleigh[iz]) 
 
-                nparams = length(lin_fScattRayleigh[:,1])
-                speclen = length(RS_type.fscattRayl[1,:])
+                
                 RS_type.lin_fscattRayl = zeros(nparams,speclen)
                 for ctr = 1:nparams
                     RS_type.lin_fScattRayleigh[ctr,:] = 
@@ -384,10 +384,13 @@ function rt_run(RS_type::AbstractRamanType,
         # Create surface matrices:
         create_surface_layer!(brdf, 
                     added_layer_surface, 
+                    lin_added_layer_surface,
                     SFI, m, 
                     pol_type, 
                     quad_points, 
-                    arr_type(τ_sum_all[:,end]), 
+                    arr_type(τ_sum_all[:,end]),
+                    arr_type(lin_τ_sum_all[:,end]), 
+                    Nparams, i_surf,
                     model.params.architecture);
 
         #@show composite_layer.J₀⁺[iμ₀,1,1:3]
@@ -397,12 +400,15 @@ function rt_run(RS_type::AbstractRamanType,
                             scattering_interfaces_all[end], 
                             SFI, 
                             composite_layer, 
-                            added_layer_surface, 
+                            lin_composite_layer,
+                            added_layer_surface,
+                            lin_added_layer_surface,
+                            nparams, 
                             I_static)
         #@show composite_layer.J₀⁺[iμ₀,1,1:3]
-        hdr_J₀⁻ = similar(composite_layer.J₀⁻)
+        #hdr_J₀⁻ = similar(composite_layer.J₀⁻)
         # One last interaction with surface:
-        @timeit "interaction_HDRF" interaction_hdrf!(#RS_type,
+        #=@timeit "interaction_HDRF" interaction_hdrf!(#RS_type,
                             #bandSpecLim,
                             #scattering_interfaces_all[end], 
                             SFI, 
@@ -410,24 +416,26 @@ function rt_run(RS_type::AbstractRamanType,
                             added_layer_surface, 
                             m, pol_type, quad_points,
                             hdr_J₀⁻, bhr_uw, bhr_dw)
-
+        =#
         # Postprocess and weight according to vza
-        @timeit "Postprocessing VZA" postprocessing_vza!(RS_type, 
+        @timeit "Postprocessing VZA" postprocessing_vza!(#RS_type, 
                     iμ₀, pol_type, 
                     composite_layer, 
+                    lin_composite_layer,
                     vza, qp_μ, m, vaz, μ₀, 
-                    weight, nSpec, 
+                    weight, nSpec, nparams,
                     SFI, 
-                    R, R_SFI, 
-                    T, T_SFI,
-                    ieR_SFI, ieT_SFI)
-
+                    R_SFI, dR_SFI, 
+                    T_SFI, dT_SFI)#,
+                    #ieR_SFI, ieT_SFI)
+        #=
         @timeit "Postprocessing HDRF" postprocessing_vza_hdrf!(RS_type, 
         iμ₀, pol_type, 
         hdr_J₀⁻, 
         vza, qp_μ, m, vaz, μ₀, 
         weight, nSpec, 
         hdr)
+        =#
     end
 
     # Show timing statistics
@@ -438,7 +446,7 @@ function rt_run(RS_type::AbstractRamanType,
     #if RAMI
     #@show size(hdr), size(bhr_dw)
     #hdr = hdr[:,1,:] ./ bhr_dw[1,:]
-    return SFI ? (R_SFI, T_SFI, ieR_SFI, ieT_SFI, hdr, bhr_uw[1,:], bhr_dw[1,:]) : (R, T)
+    return R_SFI, T_SFI, dR_SFI, dT_SFI
     #else
     #return SFI ? (R_SFI, T_SFI, ieR_SFI, ieT_SFI) : (R, T)
     #end
