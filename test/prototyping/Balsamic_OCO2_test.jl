@@ -3,7 +3,7 @@ using Plots
 using Pkg
 # Pkg.activate(".")
 using vSmartMOM
-using vSmartMOM.Architectures
+c
 using vSmartMOM.Absorption
 using vSmartMOM.Scattering
 using vSmartMOM.CoreRT
