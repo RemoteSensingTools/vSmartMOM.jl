@@ -14,22 +14,38 @@ function model_from_parameters(params::vSmartMOM_Parameters)
     #@show FT
     # Number of total bands and aerosols (for convenience)
     n_bands = length(params.spec_bands)
-    n_aer = isnothing(params.scattering_params) ? 0 : length(params.scattering_params.rt_aerosols)
+    n_aer = isnothing(params.scattering_params) ? 0 : 
+        length(params.scattering_params.rt_aerosols)
 
     # Create observation geometry
-    obs_geom = ObsGeometry{FT}(params.sza, params.vza, params.vaz, params.obs_alt)
+    obs_geom = ObsGeometry{FT}(params.sza, 
+                                params.vza, 
+                                params.vaz, 
+                                params.obs_alt)
 
     # Create truncation type
-    truncation_type = Scattering.δBGE{FT}(params.l_trunc, params.Δ_angle)
+    truncation_type = Scattering.δBGE{FT}(params.l_trunc,
+                                params.Δ_angle)
     #@show truncation_type
     # Set quadrature points for streams
-    quad_points = rt_set_streams(params.quadrature_type, params.l_trunc, obs_geom, params.polarization_type, array_type(params.architecture))
+    quad_points = rt_set_streams(params.quadrature_type, 
+                                params.l_trunc, 
+                                obs_geom, 
+                                params.polarization_type, 
+                                array_type(params.architecture))
 
     # Get AtmosphericProfile from parameters
-    vmr = isnothing(params.absorption_params) ? Dict() : params.absorption_params.vmr
-    p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o, new_vmr, Δz = compute_atmos_profile_fields(params.T, params.p, params.q, vmr)
+    vmr = isnothing(params.absorption_params) ? Dict() : 
+                params.absorption_params.vmr
+    p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o, new_vmr, Δz = 
+        compute_atmos_profile_fields(params.T, params.p, 
+                                params.q, vmr)
     @show  Δz
-    profile = AtmosphericProfile(params.T, p_full, params.q, p_half, vmr_h2o, vcd_dry, vcd_h2o, new_vmr,Δz)
+    profile = AtmosphericProfile(params.T, 
+        p_full, params.q, 
+        p_half, vmr_h2o, 
+        vcd_dry, vcd_h2o, 
+        new_vmr,Δz)
     
     # Reduce the profile to the number of target layers (if specified)
     if params.profile_reduction_n != -1
@@ -39,12 +55,15 @@ function model_from_parameters(params::vSmartMOM_Parameters)
     # Rayleigh optical properties calculation
     greek_rayleigh = Scattering.get_greek_rayleigh(FT(params.depol))
     # Remove rayleight for testing:
-    τ_rayl = [zeros(FT,length(params.spec_bands[i]), length(profile.T)) for i=1:n_bands];
+    τ_rayl = [zeros(FT, length(params.spec_bands[i]), 
+            length(profile.T)) for i=1:n_bands];
     #τ_rayl = [zeros(FT,1,length(profile.T)) for i=1:n_bands];
     
     # This is a kludge for now, tau_abs sometimes needs to be a dual. Suniti & us need to rethink this all!!
     # i.e. code the rt core with fixed amount of derivatives as in her paper, then compute chain rule for dtau/dVMr, etc...
-    FT2 = isnothing(params.absorption_params) || !haskey(params.absorption_params.vmr,"CO2") ? params.float_type : eltype(params.absorption_params.vmr["CO2"])
+    FT2 = isnothing(params.absorption_params) || 
+        !haskey(params.absorption_params.vmr,"CO2") ? 
+        params.float_type : eltype(params.absorption_params.vmr["CO2"])
     τ_abs     = [zeros(FT2, length(params.spec_bands[i]), length(profile.p_full)) for i in 1:n_bands]
     
     # Loop over all bands:

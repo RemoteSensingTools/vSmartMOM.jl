@@ -11,7 +11,7 @@ function runner!(y, x, parameters=parameters, oco_sounding= oco_soundings, Tsola
     parameters.scattering_params.rt_aerosols[1].σp    = x[21];
     parameters.scattering_params.rt_aerosols[1].aerosol.size_distribution = LogNormal(x[18], x[19]); #x[4]
     parameters.scattering_params.rt_aerosols[1].aerosol.nᵣ = x[16]
-    parameters.scattering_params.rt_aerosols[1].aerosol.nᵣ = x[17]
+    parameters.scattering_params.rt_aerosols[1].aerosol.nᵢ = x[17]
     #parameters.p   = oco_sounding.p_half
     #parameters.q   = oco_sounding.q 
     #parameters.T   = oco_sounding.T# .+ 1.0 #.+ x[15]
