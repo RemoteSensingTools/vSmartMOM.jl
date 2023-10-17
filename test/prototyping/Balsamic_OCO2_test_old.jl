@@ -3,12 +3,11 @@ using Plots
 using Pkg
 # Pkg.activate(".")
 using vSmartMOM
-using vSmartMOM.Architectures
+c
 using vSmartMOM.Absorption
 using vSmartMOM.Scattering
 using vSmartMOM.CoreRT
 using vSmartMOM.SolarModel
-using vSmartMOM.InelasticScattering
 using InstrumentOperator
 using Interpolations
 using Polynomials
@@ -16,7 +15,6 @@ using ForwardDiff
 using Distributions
 using NCDatasets
 using LinearAlgebra
-# using Distances
 include("/home/sanghavi/code/github/vSmartMOM.jl/test/prototyping/runner.jl")
 #---------------------------------------------<Start Functions>---------------------------------------------#
 function getSolar(grid, Tsolar)
@@ -41,7 +39,7 @@ function run_inversion(x,y)
     limlnr₀ = [-2.3,1.6] #r₀ ≈ 0.1, 5.0  
     limp₀ = [100.,1100.]
     limσₚ = [0.05,1.6]
-    for i=1:1#5
+    for i=1:5
         K = ForwardDiff.jacobian(runner!, Fx, x);
         dx = K \ (y-Fx);
         x += dx;
@@ -85,8 +83,7 @@ function run_inversion(x,y)
     end
 end
 
-function run_OE_inversion(x, y, xa, Nangles, spec_lengths, convfct)
-    Fx = zeros(length(y));
+function run_OE_inversion(x, y, xa, Nangles, spec_lengths)
     # State vector box-limits
     limnᵣ = [1.3,1.7]
     limnᵢ = [0.0,0.2]
@@ -117,47 +114,30 @@ function run_OE_inversion(x, y, xa, Nangles, spec_lengths, convfct)
          (limp₀[2]-limp₀[1])^2,
          (limσₚ[2]-limσₚ[1])^2]
     Sϵ = zeros(length(y));
-    #Imax=[8.82e20, 4.33e20, 1.89e20];
+    Imax=[8.82e20, 4.33e20, 1.89e20];
     c_ph=[0.0089, 0.0069, 0.0079]; #photon noise
     c_bg=[0.0042, 0.0065, 0.0145]; #background noise
 
+    noise_ph = [];
+    noise_bg = [];
+    for i=1:length(spec_lengths)
+        tmp1 = c_ph[i]^2*ones(spec_lengths[i]);
+        tmp2 = 0.01*Imax[i]*ones(spec_lengths[i])*c_bg[i]^2
+        push!(noise_ph,tmp1);
+        push!(noise_bg,tmp2);
+    end
+    ϵ1=reduce(vcat,noise_ph);
+    ϵ2=reduce(vcat,noise_bg);
     Nwl = sum(spec_lengths)
-    for k=1:Nangles
-        s1 = (k-1)*sum(spec_lengths) + 1
-        e1 = (k-1)*sum(spec_lengths) + spec_lengths[1]
-        I1 = maximum(y[s1:e1])
     
-        s2 = s1 + spec_lengths[1]
-        e2 = e1 + spec_lengths[2]
-        I2 = maximum(y[s2:e2])
-    
-        s3 = s2 + spec_lengths[2]
-        e3 = e2 + spec_lengths[3]
-        I3 = maximum(y[s3:e3])
-    
-        Imax = [I1  I2 I3]
-
-        noise_ph = [];
-        noise_bg = [];
-        for i=1:length(spec_lengths)
-            tmp1 = c_ph[i]^2*ones(spec_lengths[i]);
-            tmp2 = 0.01*Imax[i]*ones(spec_lengths[i])*c_bg[i]^2
-            push!(noise_ph,tmp1);
-            push!(noise_bg,tmp2);
-        end
-        ϵ1=reduce(vcat,noise_ph);
-        ϵ2=reduce(vcat,noise_bg);
-    
-        Sϵ[(k-1)*Nwl+1 : k*Nwl] .= ϵ1.*y[(k-1)*Nwl+1 : k*Nwl] .+ ϵ2;
+    for i=1:Nangles
+        Sϵ[(i-1)*Nwl+1 : i*Nwl] .= ϵ1.*y[(i-1)*Nwl+1 : i*Nwl] .+ ϵ2;
     end
     invŜ = zeros(length(x), length(x));
     dx   = zeros(length(x));
-    for i=1:1 #5
+    for i=1:5
         K = ForwardDiff.jacobian(runner!, Fx, x);
-        @show size(K), size(convfct)
-        @show size(Fx)
-        K  = K./convfct
-        Fx = Fx./convfct
+
         #Computing invŜ 
         invŜ .= Diagonal( 1.0./Sa ) .+ K'*Diagonal( 1.0./Sϵ )*K
 
@@ -218,18 +198,17 @@ FT = Float64
 # Load OCO Data: 
 # File names:
 
-L1File   = "/net/fluo/data2/groupMembers/sanghavi/oco3_L1bScSC_04379a_200210_B10305r_211019003131.h5" #"/net/fluo/data1/group/oco3/L1bSc/oco3_L1bScSC_15935a_220226_B10311_220226124444.h5" #"/net/fluo/data1/group/oco2/L1bSc/oco2_L1bScND_26780a_190715_B10003r_200429212407.h5"
-metFile  = "/net/fluo/data2/groupMembers/sanghavi/oco3_L2MetSC_04379a_200210_B10305r_211018214305.h5" #"/net/fluo/data1/group/oco3/L2Met/oco3_L2MetSC_15935a_220226_B10311_220226124455.h5" #"/net/fluo/data1/group/oco2/L2Met/oco2_L2MetND_26780a_190715_B10003r_200429212406.h5"
+L1File   = "/net/fluo/data1/group/oco3/L1bSc/oco3_L1bScSC_15935a_220226_B10311_220226124444.h5" #"/net/fluo/data1/group/oco2/L1bSc/oco2_L1bScND_26780a_190715_B10003r_200429212407.h5"
+metFile  = "/net/fluo/data1/group/oco3/L2Met/oco3_L2MetSC_15935a_220226_B10311_220226124455.h5" #"/net/fluo/data1/group/oco2/L2Met/oco2_L2MetND_26780a_190715_B10003r_200429212406.h5"
 dictFile = "/home/cfranken/code/gitHub/InstrumentOperator.jl/json/oco2.yaml"
 # Load L1 file (could just use filenames here as well)
 oco = InstrumentOperator.load_L1(dictFile,L1File, metFile);
-grnd_pxl = 1:8#5
-grnd_pxl_tmp=1
+grnd_pxl = 5
 aa = Dataset(L1File)
 bb = aa.group["SoundingGeometry"];
 cc = bb["sounding_pcs_mode"];
-pcs = [cc[grnd_pxl_tmp,i] for i=1:size(cc,2)];
-iSam = findall(pcs .== "TG")
+pcs = [cc[grnd_pxl,i] for i=1:size(cc,2)];
+iSam = findall(pcs .== "AM")
 
 # Pick some bands as tuple (or just one)
 bands = (1,2,3);
@@ -238,104 +217,30 @@ bands = (1,2,3);
 indices = (92:885,114:845,50:916);
 #indices = (92:885,50:916);
 
-#ii = iSam[1:36:end]
-ii = iSam[1:end]
+ii = iSam[1:36:end]
 #y=[];
 #oco_soundings=[];
 # Get data for that sounding:
 #ocal GeoInd = [grnd_pxl,ii[1]];
 #oco_sounding = InstrumentOperator.getMeasurement(oco, bands, indices, GeoInd);
-oco_soundings0 = [];
+oco_soundings = [];
 tmpy = [];#[];#[oco_soundings[1].SpectralMeasurement];
 Nangles = length(ii)
-lat=[];
-lon=[];
-sza=[];
-vza=[];
-raz=[];
 for i=1:Nangles
-    for j=1:length(grnd_pxl)
-        # Geo Index (footprint,sounding):
-        GeoInd = [grnd_pxl[j],ii[i]];
-        # Get data for that sounding:
-        oco_sounding = InstrumentOperator.getMeasurement(oco, bands, indices, GeoInd);
-        push!(oco_soundings0, oco_sounding)
-        push!(lat, oco_sounding.latitude)
-        push!(lon, oco_sounding.longitude)
-        push!(sza, oco_sounding.sza)
-        push!(vza, oco_sounding.vza)
-        push!(raz, oco_sounding.vaa-oco_sounding.saa)
-        @show  oco_sounding.latitude, oco_sounding.longitude
-        @show oco_sounding.vza, oco_sounding.vaa-oco_sounding.saa, oco_sounding.sza
-        #if i==1    
-        #    #oco_soundings = [oco_sounding];
-        #    y = [oco_soundings[i].SpectralMeasurement];
-        #else
-            #oco_soundings = vcat(oco_soundings, oco_sounding);
-        push!(tmpy, oco_sounding.SpectralMeasurement)
-    end
+    # Geo Index (footprint,sounding):
+    GeoInd = [grnd_pxl,ii[i]];
+    # Get data for that sounding:
+    oco_sounding = InstrumentOperator.getMeasurement(oco, bands, indices, GeoInd);
+    push!(oco_soundings, oco_sounding)
+    #if i==1    
+    #    #oco_soundings = [oco_sounding];
+    #    y = [oco_soundings[i].SpectralMeasurement];
+    #else
+        #oco_soundings = vcat(oco_soundings, oco_sounding);
+    push!(tmpy, oco_soundings[i].SpectralMeasurement)
+    #end
 end
-
-function dist(p1, p2)
-    Rₑ = 6375
-    dx = Rₑ*cosd(0.5*(p1[1]+p2[1]))*abs(p1[2]-p2[2])*π/180.
-    dy = Rₑ*abs(p1[1]-p2[1])*π/180.
-    d  = sqrt(dx^2+dy^2)
-end
-pts = [lat';lon']
-Npts=length(lat)
-dd=zeros(Npts, Npts)
-for i=1:Npts
-    for j=i:Npts
-        if(i!=j)
-            dd[i,j] = dist(pts[:,i],pts[:,j])
-            dd[j,i] = dd[i,j]
-        end
-    end
-end
-v_Npts = zeros(Int, Npts)
-for i=1:Npts
-    nbr = filter(x -> 0<x<1, dd[i,:])
-    @show nbr
-    j=findall(x-> 0<x<1, dd[i,:])
-    @show i, j, length(j)
-    v_Npts[i]=length(j) 
-end
-max_nbrs = maximum(v_Npts)
-max_Npts = findall(x -> x==max_nbrs, v_Npts)
-select_i=[];
-for i=1:length(max_Npts)
-    @show i
-    push!(select_i, sort([max_Npts[i]; findall(x-> 0<x<1, dd[max_Npts[i],:])]))
-end
-select_i = unique(select_i)
-
-Nangles_max=1;
-i_ctr=1;
-#y=reduce(vcat,tmpy[select_i[i_ctr]]);
-y=reduce(vcat,tmpy[select_i[i_ctr][1]]);
-
-oco_soundings=[];
-v_raz=[];
-v_sza=[];
-v_vza=[];
-if Nangles_max==1
-    tmp=[];
-    push!(tmp, oco_soundings0[select_i[i_ctr][1]]);
-    oco_soundings = tmp;
-    v_vza = [vza[select_i[i_ctr][1]]];
-    v_raz = [raz[select_i[i_ctr][1]]].+180.;
-    v_sza = mean(sza[select_i[i_ctr][1]]);
-else
-    oco_soundings=oco_soundings0[select_i[i_ctr]];
-    v_vza = vza[select_i[i_ctr]];
-    v_raz = raz[select_i[i_ctr]].+180.;
-    v_sza = mean(sza[select_i[i_ctr]]);
-end
-Nangles = length(v_vza)
-parameters.sza = v_sza
-parameters.vza = v_vza
-parameters.vaz = v_raz
+y=reduce(vcat,tmpy);
 
 ###################################################
 # Produce black-body in wavenumber range
@@ -343,48 +248,22 @@ Tsolar = solar_transmission_from_file("/home/rjeyaram/vSmartMOM/src/SolarModel/s
 Tsolar_interp = LinearInterpolation(Tsolar[:, 1], Tsolar[:, 2])
 
 #Initial guess state vector 
-x = FT[0.2377,     # 1. Legendre Lambertian Albedo, A-band
-         -3.5,       # log(AOD)
-         -0.00244, # 2. Legendre Lambertian Albedo, A-band
-          0,       # 3. Legendre Lambertian Albedo, A-band
-          0,       # 3. Legendre Lambertian Albedo, W-band
-          0,       # 3. Legendre Lambertian Albedo, S-band
-          0.2,     # 1. Legendre Lambertian Albedo, W-band
-          0,       # 2. Legendre Lambertian Albedo, W-band
-          0.2,     # 1. Legendre Lambertian Albedo, S-band
-          0,       # 2. Legendre Lambertian Albedo, S-band
-          0,       # H2O
-          400e-6,  # CO2 1
-          400e-6,  # CO2 2
-          400e-6,  # CO2 3
-          0,
-          1.33,    # nᵣ
-          0.01,    # nᵢ
-        -1.69,     # lnr₀
-          0.3,     # σ₀
-          690.,    #p₀
-          50.]     #σₚ
+x = FT[0.2377, -3, -0.00244, 0, 0,0, 0.4, 0, 0.4, 0,1,400e-6,400e-6,400e-6, 1.0, 1.5, 0.0, -0.69, 0.3, 690., 0.3]
 
 
 # Run FW model:
 # @time runner(x);
 #y = oco_sounding.SpectralMeasurement;
-
-λ = oco_soundings[1].SpectralGrid*1e3 #nm
-#λ = oco_soundings.SpectralGrid*1e3 #nm
-h = 6.62607015e-34 # J.s
-c = 2.99792458e8 # m/s
-convfct = repeat(h*c*1.e16./λ, Nangles)
+Fx = zeros(length(y));
 #ind = 92:885
 #run_inversion(x,y)
-run_OE_inversion(x, y, x, Nangles, [length(indices[1]), length(indices[2]), length(indices[3])], convfct);
-#Fx = zeros(length(y));
-#runner!(Fx,x)
-#Fx = Fx./convfct
-plot(y, label="Meas") #Ph sec^{-1} m^{-2} sr^{-1} um^{-1}
-plot!(Fx, label="Mod")# mW/m²-str-cm⁻¹ -> Ph sec^{-1} m^{-2} sr^{-1} um^{-1}
+run_OE_inversion(x, y, x, Nangles, [length(indices[1]), length(indices[2]), length(indices[3])]);
+runner!(Fx,x)
 
-plot!((y-Fx), label="Meas-mod")
+ν = oco_sounding.SpectralGrid*1e3
+plot(y/1e20, label="Meas")
+plot!(Fx/1e20, label="Mod")
+plot!((y-Fx)/1e20, label="Meas-mod")
 #=
 a = Dataset("/net/fluo/data1/group/oco2/oco2_L2DiaND_26780a_190715_B10004r_200618191413.h5")
 g = a.group["RetrievalGeometry"]
