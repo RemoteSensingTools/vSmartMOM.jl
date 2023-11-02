@@ -9,8 +9,8 @@ function runner!(y, x, parameters=parameters, oco_sounding= oco_soundings, Tsola
 
     parameters.scattering_params.rt_aerosols[1].τ_ref = exp(x[2]);
     @show  x[2], exp(x[2])
-    parameters.scattering_params.rt_aerosols[1].p₀    = x[20]; #800.0; #x[4]
-    parameters.scattering_params.rt_aerosols[1].σp    = x[21];
+    parameters.scattering_params.rt_aerosols[1].profile    = Normal(x[20], x[21]); #800.0; #x[4]
+    #parameters.scattering_params.rt_aerosols[1].profile.σp    = x[21];
     @show  x[20], x[21]
     parameters.scattering_params.rt_aerosols[1].aerosol.size_distribution = LogNormal(x[18], x[19]); #x[4]
     @show  x[18], x[19]

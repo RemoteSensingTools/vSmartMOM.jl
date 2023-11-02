@@ -51,7 +51,7 @@ function interaction_helper!(::ScatteringInterface_01, SFI,
     lin_composite_layer::linCompositeLayer{FT}, 
     added_layer::AddedLayer{FT}, 
     lin_added_layer::linAddedLayer{FT}, 
-    nparams::Int
+    nparams::Int,
     I_static::AbstractArray{FT2}) where {FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2}
     @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻ = added_layer     
     @unpack R⁻⁺, R⁺⁻, T⁺⁺, T⁻⁻, J₀⁺, J₀⁻ = composite_layer 
@@ -160,7 +160,7 @@ function interaction_helper!(::ScatteringInterface_11, SFI,
     # T₁₂(I-R₀₁R₂₁)⁻¹
     T01_inv = T⁻⁻ ⊠ tmp_inv;
 
-    dtmp_inv = zeros(nparams,size(t⁺⁺,1), ,size(t⁺⁺,2), ,size(t⁺⁺,3))
+    dtmp_inv = zeros(nparams, size(t⁺⁺,1), size(t⁺⁺,2), size(t⁺⁺,3))
     dT01_inv = similar(dtmp_inv)
     for ctr=1:nparams
         dtmp_inv[ctr,:,:,:] = tmp_inv ⊠ 

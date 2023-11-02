@@ -31,7 +31,7 @@ function absorption_cross_section(model::AbstractCrossSectionModel,          # M
         end
     
         # Make sure that 𝐱 and parameter match
-        @assert (pressure== x[1])
+        @assert (pressure == x[1])
         @assert (temperature == x[2])
     
         return compute_absorption_cross_section(model, grid, x[1], x[2], wavelength_flag=wavelength_flag);

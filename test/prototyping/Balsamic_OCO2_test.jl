@@ -223,7 +223,7 @@ metFile  = "/net/fluo/data2/groupMembers/sanghavi/oco3_L2MetSC_04379a_200210_B10
 dictFile = "/home/cfranken/code/gitHub/InstrumentOperator.jl/json/oco2.yaml"
 # Load L1 file (could just use filenames here as well)
 oco = InstrumentOperator.load_L1(dictFile,L1File, metFile);
-grnd_pxl = 1:8#5
+grnd_pxl = 1:1 #8#5
 grnd_pxl_tmp=1
 aa = Dataset(L1File)
 bb = aa.group["SoundingGeometry"];
@@ -247,7 +247,7 @@ ii = iSam[1:end]
 #oco_sounding = InstrumentOperator.getMeasurement(oco, bands, indices, GeoInd);
 oco_soundings0 = [];
 tmpy = [];#[];#[oco_soundings[1].SpectralMeasurement];
-Nangles = length(ii)
+Nangles = 1 #length(ii)
 lat=[];
 lon=[];
 sza=[];
@@ -310,7 +310,7 @@ for i=1:length(max_Npts)
 end
 select_i = unique(select_i)
 
-Nangles_max=1;
+Nangles_max=100;
 i_ctr=1;
 #y=reduce(vcat,tmpy[select_i[i_ctr]]);
 y=reduce(vcat,tmpy[select_i[i_ctr][1]]);
@@ -377,14 +377,14 @@ c = 2.99792458e8 # m/s
 convfct = repeat(h*c*1.e16./λ, Nangles)
 #ind = 92:885
 #run_inversion(x,y)
-run_OE_inversion(x, y, x, Nangles, [length(indices[1]), length(indices[2]), length(indices[3])], convfct);
-#Fx = zeros(length(y));
-#runner!(Fx,x)
+#run_OE_inversion(x, y, x, Nangles, [length(indices[1]), length(indices[2]), length(indices[3])], convfct);
+Fx = zeros(length(y));
+runner!(Fx,x)
 #Fx = Fx./convfct
-plot(y, label="Meas") #Ph sec^{-1} m^{-2} sr^{-1} um^{-1}
-plot!(Fx, label="Mod")# mW/m²-str-cm⁻¹ -> Ph sec^{-1} m^{-2} sr^{-1} um^{-1}
+#plot(y, label="Meas") #Ph sec^{-1} m^{-2} sr^{-1} um^{-1}
+#plot!(Fx, label="Mod")# mW/m²-str-cm⁻¹ -> Ph sec^{-1} m^{-2} sr^{-1} um^{-1}
 
-plot!((y-Fx), label="Meas-mod")
+#plot!((y-Fx), label="Meas-mod")
 #=
 a = Dataset("/net/fluo/data1/group/oco2/oco2_L2DiaND_26780a_190715_B10004r_200618191413.h5")
 g = a.group["RetrievalGeometry"]

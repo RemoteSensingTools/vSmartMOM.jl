@@ -118,7 +118,7 @@ function elemental!(pol_type, SFI::Bool,
                             scatter::Bool,              # scatter: flag indicating scattering
                             quad_points::QuadPoints{FT2}, # struct with quadrature points, weights, 
                             added_layer::Union{AddedLayer{FT},AddedLayerRS{FT}}, 
-                            lin_added_layer::Union{linAddedLayer{FT},linAddedLayerRS{FT}}
+                            lin_added_layer::Union{linAddedLayer{FT},linAddedLayerRS{FT}},
                             architecture) where {FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2}
 
     @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻ = added_layer
@@ -173,7 +173,7 @@ function elemental!(pol_type, SFI::Bool,
                                 dr⁻⁺, dt⁺⁺, dr⁺⁻, dt⁻⁻)
 
         # apply D matrix for SFI
-        apply_D_matrix_elemental_SFI!(ndoubl, pol_type.n, j₀⁻, , dj₀⁻)   
+        apply_D_matrix_elemental_SFI!(ndoubl, pol_type.n, j₀⁻, dj₀⁻)   
     else
         # Note: τ is not defined here
         t⁺⁺ .= Diagonal{exp(-τ ./ qp_μN)}
@@ -296,8 +296,8 @@ end
         ctr = i-i_start+1
         # See Eq. 1.54 in Fell
         # J₀⁺ = 0.25*(1+δ(m,0)) * ϖ(λ) * Z⁺⁺ * I₀ * (dτ(λ)/μ₀) * exp(-dτ(λ)/μ₀)
-        J₀⁺[i, 1, n] = wct02 * ϖ_λ[n] * Z⁺⁺_I₀ 
-                * (dτ_λ[n] / μ[i]) * exp(-dτ_λ[n] / μ[i])
+        J₀⁺[i, 1, n] = wct02 * ϖ_λ[n] * Z⁺⁺_I₀ *
+                (dτ_λ[n] / μ[i]) * exp(-dτ_λ[n] / μ[i])
     
         dJ₀⁺[1, i, 1, n] = (J₀⁺[i, 1, n] / dτ_λ[n]) * (1 - dτ_λ[n] / μ[i]) 
         dJ₀⁺[2, i, 1, n] = (J₀⁺[i, 1, n] / ϖ_λ[n])
@@ -321,8 +321,8 @@ end
     J₀⁻[i, 1, n] = wct02 * ϖ_λ[n] * Z⁻⁺_I₀ * 
         (μ[i_start] / (μ[i] + μ[i_start])) * tmpM
     dJ₀⁻[1, i, 1, n] = (J₀⁻[i, 1, n] / tmpM) * 
-        exp(-dτ_λ[n] * ((1 / μ[i]) + (1 / μ[i_start])))
-        * ((1 / μ[i]) + (1 / μ[i_start]))
+        exp(-dτ_λ[n] * ((1 / μ[i]) + (1 / μ[i_start]))) *
+        ((1 / μ[i]) + (1 / μ[i_start]))
     dJ₀⁻[2, i, 1, n] = J₀⁻[i, 1, n] / ϖ_λ[n] 
     dJ₀⁻[3, i, 1, n] = (J₀⁻[i, 1, n] / Z⁻⁺_I₀) * dZ⁻⁺_I₀
 

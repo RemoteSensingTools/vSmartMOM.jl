@@ -53,7 +53,7 @@ Base.@kwdef struct ObsGeometry{FT} <: AbstractObsGeometry
     obs_alt::FT
 end
 =#
-
+#=
 mutable struct RT_Aerosol{}#FT<:Union{AbstractFloat, ForwardDiff.Dual}}
     "Aerosol"
     aerosol::Aerosol#{FT}
@@ -62,6 +62,7 @@ mutable struct RT_Aerosol{}#FT<:Union{AbstractFloat, ForwardDiff.Dual}}
     "Vertical distribution as function of p (using Distributions.jl)"
     profile::Distribution#::FT
 end
+=#
 #=
 "Quadrature Types for RT streams"
 abstract type AbstractQuadratureType end
@@ -516,29 +517,29 @@ A struct which holds all derived model parameters (including any computations)
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-mutable struct vSmartMOM_lin{AE, TAB, TR, TAE, Ogeom, PRO}
+mutable struct vSmartMOM_lin{linAE}#, linTAB, linTR, linTAE, linPRO}
 
     #"Struct with all individual parameters"
     #params::PA # vSmartMOM_Parameters
     
     "Truncated aerosol optics"
-    lin_aerosol_optics::AE # AbstractArray{AbstractArray{AerosolOptics}}
+    lin_aerosol_optics::linAE # AbstractArray{AbstractArray{AerosolOptics}}
     #"Greek coefs in Rayleigh calculations" 
     #greek_rayleigh::GR # GreekCoefs
     #"Quadrature points/weights, etc"
     #quad_points::QP # QuadPoints
 
-    "Array to hold cross-sections over entire atmospheric profile"
-    lin_τ_abs::TAB # AbstractArray{AbstractArray}
+    #"Array to hold cross-sections over entire atmospheric profile"
+    #lin_τ_abs::linTAB # AbstractArray{AbstractArray}
     #"Rayleigh optical thickness"
-    lin_τ_rayl::TR # AbstractArray{AbstractArray}
-    "Aerosol optical thickness"
-    lin_τ_aer::TAE # AbstractArray{AbstractArray}
+    #lin_τ_rayl::linTR # AbstractArray{AbstractArray}
+    #"Aerosol optical thickness"
+    #lin_τ_aer::linTAE # AbstractArray{AbstractArray}
 
     #"Observational Geometry (includes sza, vza, vaz)"
     #obs_geom::Ogeom # ObsGeometry
-    "Atmospheric profile to use"
-    lin_profile::PRO #AtmosphericProfile
+    #"Atmospheric profile to use"
+    #lin_profile::linPRO #AtmosphericProfile
 end
 
 """
@@ -666,7 +667,7 @@ end
 
 # Adding Core Optical Properties, can have mixed dimensions!
 function Base.:+( x::CoreScatteringOpticalProperties{xFT, xFT2, xFT3}, 
-                  y::CoreScatteringOpticalProperties{yFT, yFT2, yFT3} 
+                  y::CoreScatteringOpticalProperties{yFT, yFT2, yFT3}, 
                   dx::linCoreScatteringOpticalProperties{xFT, xFT2, xFT3}, 
                   dy::linCoreScatteringOpticalProperties{yFT, yFT2, yFT3} 
                 ) where {xFT, xFT2, xFT3, yFT, yFT2, yFT3} 
@@ -717,7 +718,7 @@ function Base.:+( x::CoreScatteringOpticalProperties{xFT, xFT2, xFT3},
     lin_Z⁺⁺ = [xlin_Z⁺⁺, ylin_Z⁺⁺]
     lin_Z⁻⁺ = [xlin_Z⁻⁺, ylin_Z⁻⁺]
 
-    CoreScatteringOpticalProperties(τ, ϖ, Z⁺⁺, Z⁻⁺), linCoreScatteringOpticalProperties(lin_τ, lin_ϖ, lin_Z⁺⁺, lin_Z⁻⁺)) 
+    CoreScatteringOpticalProperties(τ, ϖ, Z⁺⁺, Z⁻⁺), linCoreScatteringOpticalProperties(lin_τ, lin_ϖ, lin_Z⁺⁺, lin_Z⁻⁺) 
 end
 
 # Concatenate Core Optical Properties, can have mixed dimensions!

@@ -12,7 +12,7 @@ This file contains all types that are used in the Scattering module:
 Types that are needed for the output of the Fourier decomposition
 
 =#
-
+#=
 """
     struct GreekCoefs{FT}
 
@@ -24,18 +24,19 @@ $(DocStringExtensions.FIELDS)
 """
 struct dGreekCoefs{FT<:Union{AbstractFloat, ForwardDiff.Dual}}
     "Greek matrix coefficient α, is in B[2,2]"
-    dα::Array{FT,1} 
+    dα::Array{FT,2} 
     "Greek matrix coefficient β, is in B[1,1] (only important one for scalar!)"
-    dβ::Array{FT,1}
+    dβ::Array{FT,2}
     "Greek matrix coefficient γ, is in B[2,1],B[1,2]"
-    dγ::Array{FT,1}
+    dγ::Array{FT,2}
     "Greek matrix coefficient δ, is in B[4,4]"
-    dδ::Array{FT,1}
+    dδ::Array{FT,2}
     "Greek matrix coefficient ϵ, is in B[3,4] and - in B[4,3]"
-    dϵ::Array{FT,1}
+    dϵ::Array{FT,2}
     "Greek matrix coefficient ζ, is in B[3,3]"
-    dζ::Array{FT,1}
+    dζ::Array{FT,2}
 end
+
 
 """ Extend Base.isapprox (≈) to compare two GreekCoefs """
 function Base.:isapprox(d_greek_coefs_a::dGreekCoefs, d_greek_coefs_b::dGreekCoefs) 
@@ -43,7 +44,9 @@ function Base.:isapprox(d_greek_coefs_a::dGreekCoefs, d_greek_coefs_b::dGreekCoe
     return all([getproperty(dgreek_coefs_a, field) ≈ getproperty(dgreek_coefs_b, field) for field in field_names])
 end
 
-""" 
+ 
+=#
+"""
     struct ScatteringMatrix
 
 A struct which holds all computed phase function elements. 
@@ -51,15 +54,16 @@ f₁₁ represents the phase function p for the Intensity (first Stokes Vector e
 1/4π ∫₀²⁽ᵖⁱ⁾ dϕ ∫₋₁¹ p(μ) dμ  = 1
     
 # Fields
-$(DocStringExtensions.FIELDS)
-""" 
+$(DocStringExtensions.FIELDS) 
+"""
+
 struct dScatteringMatrix{FT}
-    df₁₁::FT
-    df₁₂::FT
-    df₂₂::FT
-    df₃₃::FT
-    df₃₄::FT
-    df₄₄::FT
+    df₁₁::Array{FT,2}
+    df₁₂::Array{FT,2}
+    df₂₂::Array{FT,2}
+    df₃₃::Array{FT,2}
+    df₃₄::Array{FT,2}
+    df₄₄::Array{FT,2}
 end
 
 """
@@ -70,19 +74,20 @@ A struct which holds all computed aerosol optics
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-Base.@kwdef struct dAerosolOptics{FT<:Union{AbstractFloat, ForwardDiff.Dual}}
+#Base.@kwdef 
+Base.@kwdef mutable struct dAerosolOptics{FT<:AbstractFloat}
     "derivatives of Greek matrix w.r.t nᵣ, nᵢ, r₀ and σ₀"
-    d_greek_coefs::GreekCoefs
+    d_greek_coefs::Vector{GreekCoefs{FT}}
     "derivatives of Single Scattering Albedo w.r.t nᵣ, nᵢ, r₀ and σ₀"
-    dω̃::FT
+    dω̃::Vector{FT}
     "derivatives of Extinction cross-section w.r.t nᵣ, nᵢ, r₀ and σ₀"
-    dk::FT
+    dk::Vector{FT}
     "derivatives of Extinction cross-section at reference wavelength w.r.t nᵣ, nᵢ, r₀ and σ₀"
-    dk_ref::FT
+    dk_ref::Vector{FT}
     "derivatives of Truncation factor w.r.t nᵣ, nᵢ, r₀ and σ₀" 
-    dfᵗ::FT
-    "Derivatives"
-    derivs = zeros(1)
+    dfᵗ::Vector{FT}
+    #d_greek_coefs=d_greek_coefs, dω̃=dω̃, dk=d_bulk_C_ext, dk_ref=zeros(FT, 4), dfᵗ=zeros(FT, 4)
+
 end
 
 """ Extend Base.isapprox (≈) to compare two AerosolOptics """

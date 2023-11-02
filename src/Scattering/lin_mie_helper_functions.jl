@@ -69,7 +69,7 @@ function compute_mie_ab!(size_param, refractive_idx::Number, an, bn, Dn, dan, db
         an[n] = (t_a*ψ - ψ₁) / (t_a*ξ - ξ₁)
         bn[n] = (t_b*ψ - ψ₁) / (t_b*ξ - ξ₁)
         
-        dan[n] = (ξψ₁-ξ₁ψ)
+        dan[n] = (ξ*ψ₁-ξ₁*ψ)
         dbn[n] = dan[n]
 
         dan[n] *= dt_a/(t_a*ξ - ξ₁)^2
@@ -240,8 +240,8 @@ function reconstruct_phase(greek_coefs, dgreek_coefs, μ; returnLeg=false)
     # which only holds for spherical
     f₁₁, f₃₃, f₁₂, f₃₄, f₂₂, f₄₄ = (zeros(FT, nμ), zeros(FT, nμ), zeros(FT, nμ), 
                                     zeros(FT, nμ), zeros(FT, nμ), zeros(FT, nμ))
-    df₁₁, df₃₃, df₁₂, df₃₄, df₂₂, df₄₄ = (zeros(FT, nμ), zeros(FT, nμ), zeros(FT, nμ), 
-                                    zeros(FT, nμ), zeros(FT, nμ), zeros(FT, nμ))
+    df₁₁, df₃₃, df₁₂, df₃₄, df₂₂, df₄₄ = (zeros(FT, 4, nμ), zeros(FT, 4, nμ), zeros(FT, 4, nμ), 
+                                    zeros(FT, 4, nμ), zeros(FT, 4, nμ), zeros(FT, 4, nμ))
 
     # Compute prefactor
     fac = zeros(l_max);
@@ -255,16 +255,18 @@ function reconstruct_phase(greek_coefs, dgreek_coefs, μ; returnLeg=false)
     f₂₂[:] = R² * (fac .* greek_coefs.α) .+ T² * (fac .* greek_coefs.ζ)  # a₂ in Rooij notation
     f₃₃[:] = R² * (fac .* greek_coefs.ζ) .+ T² * (fac .* greek_coefs.α)  # a₃ in Rooij notation
 
-    df₁₁[:] = P * dgreek_coefs.β                                           # a₁ in Rooij notation
-    df₄₄[:] = P * dgreek_coefs.δ                                           # a₄ in Rooij notation
-    df₁₂[:] = P² * (fac .* dgreek_coefs.γ)                                 # b₁ in Rooij notation
-    df₃₄[:] = P² * (fac .* dgreek_coefs.ϵ)                                 # b₂ in Rooij notation
-    df₂₂[:] = R² * (fac .* dgreek_coefs.α) .+ T² * (fac .* dgreek_coefs.ζ)  # a₂ in Rooij notation
-    df₃₃[:] = R² * (fac .* dgreek_coefs.ζ) .+ T² * (fac .* dgreek_coefs.α)  # a₃ in Rooij notation
+    for i=1:4
+        df₁₁[i,:] = P * dgreek_coefs[i].β                                           # a₁ in Rooij notation
+        df₄₄[i,:] = P * dgreek_coefs[i].δ                                           # a₄ in Rooij notation
+        df₁₂[i,:] = P² * (fac .* dgreek_coefs[i].γ)                                 # b₁ in Rooij notation
+        df₃₄[i,:] = P² * (fac .* dgreek_coefs[i].ϵ)                                 # b₂ in Rooij notation
+        df₂₂[i,:] = R² * (fac .* dgreek_coefs[i].α) .+ T² * (fac .* dgreek_coefs[i].ζ)  # a₂ in Rooij notation
+        df₃₃[i,:] = R² * (fac .* dgreek_coefs[i].ζ) .+ T² * (fac .* dgreek_coefs[i].α)  # a₃ in Rooij notation
+    end
 
     # Put elements into a struct
     scattering_matrix = ScatteringMatrix(f₁₁, f₁₂, f₂₂, f₃₃, f₃₄, f₄₄)
-    dscattering_matrix = ScatteringMatrix(df₁₁, df₁₂, df₂₂, df₃₃, df₃₄, df₄₄)
+    dscattering_matrix = dScatteringMatrix(df₁₁, df₁₂, df₂₂, df₃₃, df₃₄, df₄₄)
 
     # For truncation in δ-BGE, we need P and P² as well, convenient to return here:
     return returnLeg ? (scattering_matrix, dscattering_matrix, P, P²) : (scattering_matrix, dscattering_matrix)

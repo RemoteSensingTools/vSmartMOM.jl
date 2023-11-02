@@ -89,11 +89,11 @@ function rt_kernel!(RS_type::noRS{FT},
         for ctr=1:nparams
             lin_composite_layer.dT⁺⁺[ctr,:,:,:] = lin_τ[ctr,:].*lin_added_layer.dt⁺⁺[1,:,:,:] +
                                                 lin_ϖ[ctr]*lin_added_layer.dt⁺⁺[2,:,:,:] + 
-                                                lin_Z⁺⁺[ctr,:,:,:].*lin_added_layer.dt⁺⁺[3,:,:,:] +
+                                                lin_Z⁺⁺[ctr,:,:,:].*lin_added_layer.dt⁺⁺[3,:,:,:] 
     
             lin_composite_layer.dT⁻⁻[ctr,:,:,:] = lin_τ[ctr,:].*lin_added_layer.dt⁻⁻[1,:,:,:] +
                                                 lin_ϖ[ctr]*lin_added_layer.dt⁻⁻[2,:,:,:] + 
-                                                lin_Z⁺⁺[ctr,:,:,:].*lin_added_layer.dt⁻⁻[3,:,:,:] +
+                                                lin_Z⁺⁺[ctr,:,:,:].*lin_added_layer.dt⁻⁻[3,:,:,:] 
 
             lin_composite_layer.dR⁻⁺[ctr,:,:,:] = lin_τ[ctr,:].*lin_added_layer.dr⁻⁺[1,:,:,:] +
                                                 lin_ϖ[ctr]*lin_added_layer.dr⁻⁺[2,:,:,:] +
@@ -118,11 +118,11 @@ function rt_kernel!(RS_type::noRS{FT},
         for ctr=1:nparams
             lin_added_layer.dxt⁺⁺[ctr,:,:,:] = lin_τ[ctr,:].*lin_added_layer.dt⁺⁺[1,:,:,:] +
                                                 lin_ϖ[ctr]*lin_added_layer.dt⁺⁺[2,:,:,:] + 
-                                                lin_Z⁺⁺[ctr,:,:,:].*lin_added_layer.dt⁺⁺[3,:,:,:] +
+                                                lin_Z⁺⁺[ctr,:,:,:].*lin_added_layer.dt⁺⁺[3,:,:,:] 
     
             lin_added_layer.dxt⁻⁻[ctr,:,:,:] = lin_τ[ctr,:].*lin_added_layer.dt⁻⁻[1,:,:,:] +
                                                 lin_ϖ[ctr]*lin_added_layer.dt⁻⁻[2,:,:,:] + 
-                                                lin_Z⁺⁺[ctr,:,:,:].*lin_added_layer.dt⁻⁻[3,:,:,:] +
+                                                lin_Z⁺⁺[ctr,:,:,:].*lin_added_layer.dt⁻⁻[3,:,:,:] 
 
             lin_added_layer.dxr⁻⁺[ctr,:,:,:] = lin_τ[ctr,:].*lin_added_layer.dr⁻⁺[1,:,:,:] +
                                                 lin_ϖ[ctr]*lin_added_layer.dr⁻⁺[2,:,:,:] +

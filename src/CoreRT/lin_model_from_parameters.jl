@@ -90,6 +90,7 @@ function model_from_parameters(params::vSmartMOM_Parameters)
 
     # aerosol_optics[iBand][iAer]
     aerosol_optics = [Array{AerosolOptics}(undef, (n_aer)) for i=1:n_bands];
+    lin_aerosol_optics = [Array{dAerosolOptics}(undef, (n_aer)) for i=1:n_bands];
         
     FT2 = isnothing(params.scattering_params) ? params.float_type : typeof(params.scattering_params.rt_aerosols[1].τ_ref)
     #@show FT2
@@ -150,11 +151,13 @@ function model_from_parameters(params::vSmartMOM_Parameters)
                 compute_aerosol_optical_properties(mie_model, FT);
             @show aerosol_optics_raw.k
             aerosol_optics_raw.k_ref = k_ref
+            @show k_ref, dk_ref
+            @show size(lin_aerosol_optics_raw.dk_ref), size(dk_ref)
             lin_aerosol_optics_raw.dk_ref = dk_ref
             # Compute truncated aerosol optical properties (phase function and fᵗ), consistent with Ltrunc:
             #@show i_aer, i_band
-            aerosol_optics[i_band][i_aer] = Scattering.truncate_phase(truncation_type, 
-                                                    aerosol_optics_raw; reportFit=false)
+            aerosol_optics[i_band][i_aer],lin_aerosol_optics[i_band][i_aer]  = Scattering.truncate_phase(truncation_type, 
+                                                    aerosol_optics_raw, lin_aerosol_optics_raw; reportFit=false)
             #aerosol_optics[i_band][i_aer] =  aerosol_optics_raw
                                                     
             @show aerosol_optics[i_band][i_aer].k

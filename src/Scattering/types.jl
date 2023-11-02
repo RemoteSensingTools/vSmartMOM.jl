@@ -227,12 +227,12 @@ f₁₁ represents the phase function p for the Intensity (first Stokes Vector e
 $(DocStringExtensions.FIELDS)
 """ 
 struct ScatteringMatrix{FT}
-    f₁₁::FT
-    f₁₂::FT
-    f₂₂::FT
-    f₃₃::FT
-    f₃₄::FT
-    f₄₄::FT
+    f₁₁::Array{FT}
+    f₁₂::Array{FT}
+    f₂₂::Array{FT}
+    f₃₃::Array{FT}
+    f₃₄::Array{FT}
+    f₄₄::Array{FT}
 end
 
 """
@@ -243,9 +243,10 @@ A struct which holds all computed aerosol optics
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-Base.@kwdef struct AerosolOptics{FT<:Union{AbstractFloat, ForwardDiff.Dual}}
+#Base.@kwdef 
+Base.@kwdef mutable struct AerosolOptics{FT<:Union{AbstractFloat, ForwardDiff.Dual}}
     "Greek matrix"
-    greek_coefs::GreekCoefs
+    greek_coefs::GreekCoefs{FT}
     "Single Scattering Albedo"
     ω̃::FT
     "Extinction cross-section"
@@ -254,8 +255,8 @@ Base.@kwdef struct AerosolOptics{FT<:Union{AbstractFloat, ForwardDiff.Dual}}
     k_ref::FT
     "Truncation factor" 
     fᵗ::FT
-    "Derivatives"
-    derivs = zeros(1)
+    #"Derivatives"
+    #derivs = zeros(1)
 end
 
 """ Extend Base.isapprox (≈) to compare two AerosolOptics """

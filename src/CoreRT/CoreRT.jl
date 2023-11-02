@@ -49,7 +49,7 @@ import Base.show                   # For overloading show for custom types
 # Constants and Types
 include("constants.jl")                        # Scientific constants
 include("types.jl")  
-
+include("lin_types.jl") #linearization
 # All custom types for this module
 # Raman additions
 #include("Inelastic/types.jl")
@@ -70,7 +70,12 @@ include("CoreKernel/interaction_multisensor.jl") # Suniti: ms
 include("CoreKernel/interlayer_flux.jl")       # Suniti: ms
 include("CoreKernel/rt_kernel.jl")             # Handle Core RT (Elemental/Doubling/Interaction)
 include("CoreKernel/rt_kernel_multisensor.jl") # Suniti: ms
+include("CoreKernel/lin_rt_kernel.jl") #linearization
+include("CoreKernel/lin_elemental.jl") #linearization
+include("CoreKernel/lin_doubling.jl") #linearization
+include("CoreKernel/lin_interaction.jl") #linearization
 include("postprocessing_vza.jl")               # Postprocess (Azimuthal Weighting)
+include("lin_postprocessing_vza.jl") #linearization  
 include("postprocessing_vza_ms.jl")
 include("rt_run.jl")                           # Starting point for RT 
 include("rt_run_multisensor.jl") 
@@ -86,15 +91,16 @@ include("rt_helper_functions.jl")           # Miscellaneous Utility Functions
 include("rt_set_streams.jl")                # Set streams before RT
 include("parameters_from_yaml.jl")          # Loading in parameters from YAML file
 include("model_from_parameters.jl")         # Converting parameters to derived model attributes
+include("lin_model_from_parameters.jl") #linearization
 include("show_utils.jl")                    # Pretty-printing objects
 include("LayerOpticalProperties/compEffectiveLayerProperties.jl")
+include("LayerOpticalProperties/lin_compEffectiveLayerProperties.jl") #linearization
 
 # Surfaces
 include("Surfaces/lambertian_surface.jl")            # Lambertian Surface 
+include("Surfaces/lin_lambertian_surface.jl")            # Lambertian Surface 
 include("Surfaces/rpv_surface.jl")            # Lambertian Surface 
 include("Surfaces/rossli_surface.jl")
-
-
 
 # Functions to export
 export parameters_from_yaml,                # Getting parameters from a file

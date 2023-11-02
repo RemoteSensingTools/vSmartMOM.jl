@@ -21,7 +21,7 @@ function truncate_phase(mod::δBGE, aero::AerosolOptics{FT}, lin::dAerosolOptics
     @unpack greek_coefs, ω̃, k = aero
     @unpack d_greek_coefs, dω̃, dk = lin   
     @unpack α, β, γ, δ, ϵ, ζ = greek_coefs
-    @unpack dα, dβ, dγ, dδ, dϵ, dζ = d_greek_coefs
+    #@unpack dα, dβ, dγ, dδ, dϵ, dζ = d_greek_coefs
     @unpack l_max, Δ_angle =  mod
 
 
@@ -202,25 +202,31 @@ function truncate_phase(mod::δBGE, aero::AerosolOptics{FT}, lin::dAerosolOptics
     αᵗ = (α[1:l_tr] .- (β[1:l_tr] .- cl)) / c₀    # Eq. 38c, derived from β
     ζᵗ = (ζ[1:l_tr] .- (β[1:l_tr] .- cl)) / c₀    # Eq. 38d, derived from β
 
+    dβᵗ = zeros(4, l_tr)
+    dδᵗ = zeros(4, l_tr)
+    dαᵗ = zeros(4, l_tr)
+    dζᵗ = zeros(4, l_tr)
     for ctr = 1:4
         #dβᵗ[ctr,1] = 0.
         for i = 1:l_tr
             dβᵗ[ctr,:] = (dcl[ctr,:] - βᵗ*dcl[ctr,1])/c₀
-            dδᵗ[ctr,:] = (dδ[ctr,1:l_tr] .- (dβ[ctr,1:l_tr] .- dcl[ctr,:]) - δᵗ*dcl[ctr,1]) / c₀    # Eq. 38b, derived from β
-            dαᵗ[ctr,:] = (dα[ctr,1:l_tr] .- (dβ[ctr,1:l_tr] .- dcl[ctr,:]) - αᵗ*dcl[ctr,1]) / c₀    # Eq. 38c, derived from β
-            dζᵗ[ctr,:] = (dζ[ctr,1:l_tr] .- (dβ[ctr,1:l_tr] .- dcl[ctr,:]) - ζᵗ*dcl[ctr,1]) / c₀    # Eq. 38d, derived from β
+            dδᵗ[ctr,:] = (d_greek_coefs[ctr].δ[1:l_tr] .- (d_greek_coefs[ctr].β[1:l_tr] .- dcl[ctr,:]) - δᵗ*dcl[ctr,1]) / c₀    # Eq. 38b, derived from β
+            dαᵗ[ctr,:] = (d_greek_coefs[ctr].α[1:l_tr] .- (d_greek_coefs[ctr].β[1:l_tr] .- dcl[ctr,:]) - αᵗ*dcl[ctr,1]) / c₀    # Eq. 38c, derived from β
+            dζᵗ[ctr,:] = (d_greek_coefs[ctr].ζ[1:l_tr] .- (d_greek_coefs[ctr].β[1:l_tr] .- dcl[ctr,:]) - ζᵗ*dcl[ctr,1]) / c₀    # Eq. 38d, derived from β
         end
     end 
     # Adjust scattering and extinction cross section!
     greek_coefs = GreekCoefs(αᵗ, βᵗ, γᵗ, δᵗ, ϵᵗ, ζᵗ)
-    d_greek_coefs = GreekCoefs(dαᵗ, dβᵗ, dγᵗ, dδᵗ, dϵᵗ, dζᵗ)
+    d_greek_coefs = [GreekCoefs(dαᵗ[i,:], dβᵗ[i,:], dγᵗ[i,:], dδᵗ[i,:], dϵᵗ[i,:], dζᵗ[i,:]) for i=1:4]
     dfᵗ = zeros(4)
     dfᵗ = (FT(1) .- dcl[:,1])
+    dk_ref=zeros(4)
     # C_sca  = (ω̃ * k);
     # C_scaᵗ = C_sca * c₀; 
     # C_ext  = k - (C_sca - C_scaᵗ);
     #@show typeof(ω̃), typeof(k),typeof(c₀)
     # return AerosolOptics(greek_coefs = greek_coefs, ω̃=C_scaᵗ / C_ext, k=C_ext, fᵗ = 1-c₀) 
-    return AerosolOptics(greek_coefs=greek_coefs, ω̃=ω̃, k=k, k_ref=0, fᵗ=(FT(1) - c₀)), dAerosolOptics(d_greek_coefs, dω̃, dk, dk_ref=zeros(4), dfᵗ)
+    return AerosolOptics(greek_coefs=greek_coefs, ω̃=ω̃, k=k, k_ref=FT(0), fᵗ=(FT(1) - c₀)), 
+        dAerosolOptics(d_greek_coefs, dω̃, dk, dk_ref, dfᵗ)
 end
 

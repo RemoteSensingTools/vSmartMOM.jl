@@ -46,7 +46,7 @@ function compute_aerosol_optical_properties(model::MieModel{FDT}, FT2::Type=Floa
     r  = convert.(FT, r)
     wᵣ = convert.(FT, wᵣ)
     # Wavenumber
-    k = vFT(2π) / λ  
+    k = FT(2π) / λ  
 
     # Size parameter
     x_size_param = k * r # (2πr/λ)
@@ -86,8 +86,8 @@ function compute_aerosol_optical_properties(model::MieModel{FDT}, FT2::Type=Floa
     # Standardized weights for the size distribution:
     wₓ = compute_wₓ(size_distribution, wᵣ, r, r_max) 
     dwₓ = zeros(FT, 2, length(wₓ))
-    dwₓ[1,:] = wₓ.*(log.(r)-size_distribution.μ)/(size_distribution.σ)^2
-    dwₓ[2,:] = wₓ.*(((log.(r)-size_distribution.μ)/size_distribution.σ)^2 .- 1)/size_distribution.σ 
+    dwₓ[1,:] = wₓ.*(log.(r).-size_distribution.μ)./(size_distribution.σ).^2
+    dwₓ[2,:] = wₓ.*(((log.(r).-size_distribution.μ)./size_distribution.σ).^2 .- 1)./size_distribution.σ 
     # Loop over size parameters
     @showprogress 1 "Computing PhaseFunctions Siewert NAI-2 style ..." for i = 1:length(x_size_param)
 
@@ -125,7 +125,7 @@ function compute_aerosol_optical_properties(model::MieModel{FDT}, FT2::Type=Floa
         dC_sca[2,i] = 2π / k^2 * 2*(n_' * (real(an).*imag(dan) -
                 real(dan).*imag(an) + 
                 real(bn).*imag(dbn) -
-                reak(dbn).*imag(bn)))
+                real(dbn).*imag(bn)))
 
         dC_ext[1,i] = 2π / k^2 * (n_' * real(dan + dbn))
         dC_ext[2,i] = 2π / k^2 * (n_' * imag(dan + dbn))
@@ -192,12 +192,12 @@ function compute_aerosol_optical_properties(model::MieModel{FDT}, FT2::Type=Floa
     
     for i=1:2
         d_bulk_C_sca[i] =  sum(wₓ .* dC_sca[i,:])
-        d_bulk_C_ext[i] =  sum(wₓ .* dC_ext][i,:])
+        d_bulk_C_ext[i] =  sum(wₓ .* dC_ext[i,:])
     end
     for i=3:4
         ii=i-2
         d_bulk_C_sca[i] =  sum(dwₓ[ii,:] .* C_sca)
-        d_bulk_C_ext[i] =  sum(dwₓ[ii,:] .* C_ext])
+        d_bulk_C_ext[i] =  sum(dwₓ[ii,:] .* C_ext)
     end
     ω̃ = bulk_C_sca/bulk_C_ext
     for i=1:4
@@ -206,8 +206,9 @@ function compute_aerosol_optical_properties(model::MieModel{FDT}, FT2::Type=Floa
     
     # Compute bulk scattering 
     wr = (4π * r.^2 .*  wₓ) 
-    dwr = zeros(FT, 4, length(wr))
-    for i=1:4
+    dwr = zeros(FT, 2, length(wr))
+    #@show size(wr), size(dwr), size(dwₓ)
+    for i=1:2
         dwr[i,:] = (4π * r.^2 .*  dwₓ[i,:]) 
     end
     bulk_f₁₁   =  f₁₁ * wr
@@ -218,22 +219,23 @@ function compute_aerosol_optical_properties(model::MieModel{FDT}, FT2::Type=Floa
     d_bulk_f₁₂ = zeros(FT, 4, n_mu)
     d_bulk_f₃₃ = zeros(FT, 4, n_mu)
     d_bulk_f₃₄ = zeros(FT, 4, n_mu)
-
+#@show size(bulk_f₁₁), size(f₁₁), size(wr)
+#@show size(d_bulk_f₁₁), size(df₁₁), size(wr)
     for i=1:2
         for j=1:n_mu
-            d_bulk_f₁₁[i,j]   =  df₁₁[i,j,:] * wr
-            d_bulk_f₃₃[i,j]   =  df₃₃[i,j,:] * wr
-            d_bulk_f₁₂[i,j]   =  df₁₂[i,j,:] * wr
-            d_bulk_f₃₄[i,j]   =  df₃₄[i,j,:] * wr
+            d_bulk_f₁₁[i,j]   =  (df₁₁[i,j,:])' * wr
+            d_bulk_f₃₃[i,j]   =  (df₃₃[i,j,:])' * wr
+            d_bulk_f₁₂[i,j]   =  (df₁₂[i,j,:])' * wr
+            d_bulk_f₃₄[i,j]   =  (df₃₄[i,j,:])' * wr
         end
     end
     for i=3:4
         ii=i-2
         for j=1:n_mu
-            d_bulk_f₁₁[i,j]   =  f₁₁[j,:] * dwr[ii,:]
-            d_bulk_f₃₃[i,j]   =  f₃₃[j,:] * dwr[ii,:]
-            d_bulk_f₁₂[i,j]   =  f₁₂[j,:] * dwr[ii,:]
-            d_bulk_f₃₄[i,j]   =  f₃₄[j,:] * dwr[ii,:]
+            d_bulk_f₁₁[i,j]   =  (f₁₁[j,:])' * dwr[ii,:]
+            d_bulk_f₃₃[i,j]   =  (f₃₃[j,:])' * dwr[ii,:]
+            d_bulk_f₁₂[i,j]   =  (f₁₂[j,:])' * dwr[ii,:]
+            d_bulk_f₃₄[i,j]   =  (f₃₄[j,:])' * dwr[ii,:]
         end
     end
 
@@ -297,7 +299,7 @@ function compute_aerosol_optical_properties(model::MieModel{FDT}, FT2::Type=Floa
 
     # Check whether this is a Dual number (if so, don't do any conversions)
     # TODO: Equally clumsy, needs to be fixed.
-    if FT <: AbstractFloat
+    #=if FT <: AbstractFloat
         #@show "Convert greek", FT2
         # Create GreekCoefs object with α, β, γ, δ, ϵ, ζ
         greek_coefs = GreekCoefs(convert.(FT2, α), 
@@ -306,36 +308,36 @@ function compute_aerosol_optical_properties(model::MieModel{FDT}, FT2::Type=Floa
                                  convert.(FT2, δ), 
                                  convert.(FT2, ϵ), 
                                  convert.(FT2, ζ))
-        d_greek_coefs=[];
-        for i=1:4
-            tmp_greek_coefs = GreekCoefs(convert.(FT2, dα[i,:]), 
+        #d_greek_coefs=[];
+        #for i=1:4
+        d_greek_coefs = [GreekCoefs(convert.(FT2, dα[i,:]), 
                                         convert.(FT2, dβ[i,:]), 
                                         convert.(FT2, dγ[i,:]), 
                                         convert.(FT2, dδ[i,:]), 
                                         convert.(FT2, dϵ[i,:]), 
-                                        convert.(FT2, dζ[i,:]))
-            push!(d_greek_coefs, tmp_greek_coefs);
-        end
+                                        convert.(FT2, dζ[i,:])) for i=1:4]
+            #push!(d_greek_coefs, tmp_greek_coefs);
+        #end
         #@show typeof(convert.(FT2, β)), typeof(greek_coefs)
         # Return the packaged AerosolOptics object
         return AerosolOptics(greek_coefs=greek_coefs, ω̃=FT2(ω̃), k=FT2(bulk_C_ext), k_ref=FT(0), fᵗ=FT2(1)), 
-            dAerosolOptics(d_greek_coefs=d_greek_coefs, dω̃=FT2(dω̃), dk=FT2(d_bulk_C_ext), dk_ref=zeros(FT, 4), dfᵗ=FT2(1))
+            dAerosolOptics(d_greek_coefs=d_greek_coefs, dω̃=dω̃, dk=d_bulk_C_ext, dk_ref=zeros(FT, 4), dfᵗ=zeros(FT, 4))
 
-    else
+    else =#
         greek_coefs = GreekCoefs(α,β,γ,δ,ϵ,ζ)
-        d_greek_coefs=[];
-        for i=1:4
-            tmp_greek_coefs = GreekCoefs(dα[i,:], 
+        #d_greek_coefs=[];
+        #for i=1:4
+            d_greek_coefs = [GreekCoefs(dα[i,:], 
                                         dβ[i,:], 
                                         dγ[i,:], 
                                         dδ[i,:], 
                                         dϵ[i,:], 
-                                        dζ[i,:])
-            push!(d_greek_coefs, tmp_greek_coefs);
-        end
-        return AerosolOptics(greek_coefs=greek_coefs, ω̃=(bulk_C_sca / bulk_C_ext), k=(bulk_C_ext), k_ref=FT(0), fᵗ=FT(1)),  
-            dAerosolOptics(d_greek_coefs=d_greek_coefs, dω̃=dω̃, dk=d_bulk_C_ext, dk_ref=zeros(FT, 4), dfᵗ=FT(1))
-    end
+                                        dζ[i,:]) for i=1:4]
+            #push!(d_greek_coefs, tmp_greek_coefs);
+        #end
+        return AerosolOptics(greek_coefs=greek_coefs, ω̃=ω̃, k=(bulk_C_ext), k_ref=FT(0), fᵗ=FT(1)),  
+            dAerosolOptics(d_greek_coefs=d_greek_coefs, dω̃=dω̃, dk=d_bulk_C_ext, dk_ref=zeros(FT, 4), dfᵗ=zeros(FT, 4))
+    #end
 end
 
 function compute_ref_aerosol_extinction(model::MieModel{FDT}, FT2::Type=Float64) where FDT <: NAI2
@@ -385,8 +387,8 @@ function compute_ref_aerosol_extinction(model::MieModel{FDT}, FT2::Type=Float64)
     # Standardized weights for the size distribution:
     wₓ = compute_wₓ(size_distribution, wᵣ, r, r_max) 
     dwₓ = zeros(FT, 2, length(wₓ))
-    dwₓ[1,:] = wₓ.*(log.(r)-size_distribution.μ)/(size_distribution.σ)^2
-    dwₓ[2,:] = wₓ.*(((log.(r)-size_distribution.μ)/size_distribution.σ)^2 .- 1)/size_distribution.σ 
+    dwₓ[1,:] = wₓ.*(log.(r).-size_distribution.μ)./(size_distribution.σ).^2
+    dwₓ[2,:] = wₓ.*(((log.(r).-size_distribution.μ)./size_distribution.σ).^2 .- 1)./size_distribution.σ 
     
     # Loop over size parameters
     @showprogress 1 "Computing extinction XS at reference wavelength ..." for i = 1:length(x_size_param)
@@ -554,12 +556,12 @@ function phase_function(aerosol::Aerosol, λ, r_max, nquad_radius)
     
     for i=1:2
         d_bulk_C_sca[i] =  sum(wₓ .* dC_sca[i,:])
-        d_bulk_C_ext[i] =  sum(wₓ .* dC_ext][i,:])
+        d_bulk_C_ext[i] =  sum(wₓ .* dC_ext[i,:])
     end
     for i=3:4
         ii=i-2
         d_bulk_C_sca[i] =  sum(dwₓ[ii,:] .* C_sca)
-        d_bulk_C_ext[i] =  sum(dwₓ[ii,:] .* C_ext])
+        d_bulk_C_ext[i] =  sum(dwₓ[ii,:] .* C_ext)
     end
     #ω̃ = bulk_C_sca/bulk_C_ext
     #for i=1:4
