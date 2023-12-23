@@ -9,7 +9,7 @@ like optical thicknesses, from the input parameters. Produces a vSmartMOM_Model 
 default_parameters() = parameters_from_yaml(joinpath(dirname(pathof(vSmartMOM)), "CoreRT", "DefaultParameters.yaml"))
 
 "Take the parameters specified in the vSmartMOM_Parameters struct, and calculate derived attributes into a vSmartMOM_Model" 
-function model_from_parameters(params::vSmartMOM_Parameters)
+function lin_model_from_parameters(params::vSmartMOM_Parameters)
     FT = params.float_type
     #@show FT
     # Number of total bands and aerosols (for convenience)

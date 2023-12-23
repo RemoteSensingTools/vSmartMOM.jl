@@ -106,45 +106,45 @@ abstract type AbstractLayer end
 "Composite Layer Matrices (`-/+` defined in τ coordinates, i.e. `-`=outgoing, `+`=incoming"
 Base.@kwdef struct linCompositeLayer{FT} <: AbstractLayer 
     "Composite layer Reflectance matrix R (from + -> -)"
-    dR⁻⁺::AbstractArray{FT,3}
+    dR⁻⁺::AbstractArray{FT,4}
     "Composite layer Reflectance matrix R (from - -> +)"
-    dR⁺⁻::AbstractArray{FT,3}
+    dR⁺⁻::AbstractArray{FT,4}
     "Composite layer transmission matrix T (from + -> +)"
-    dT⁺⁺::AbstractArray{FT,3}
+    dT⁺⁺::AbstractArray{FT,4}
     "Composite layer transmission matrix T (from - -> -)"
-    dT⁻⁻::AbstractArray{FT,3}
+    dT⁻⁻::AbstractArray{FT,4}
     "Composite layer source matrix J (in + direction)"
-    dJ₀⁺::AbstractArray{FT,3}
+    dJ₀⁺::AbstractArray{FT,4}
     "Composite layer source matrix J (in - direction)"
-    dJ₀⁻::AbstractArray{FT,3}
+    dJ₀⁻::AbstractArray{FT,4}
 end
 
 "Added (Single) Layer Matrices (`-/+` defined in τ coordinates, i.e. `-`=outgoing, `+`=incoming"
 Base.@kwdef struct linAddedLayer{FT} <: AbstractLayer 
     "Added layer Reflectance matrix R (from + -> -)"
-    dr⁻⁺::AbstractArray{FT,3}
+    dr⁻⁺::AbstractArray{FT,4}
     "Added layer transmission matrix T (from + -> +)"
-    dt⁺⁺::AbstractArray{FT,3}
+    dt⁺⁺::AbstractArray{FT,4}
     "Added layer Reflectance matrix R (from - -> +)"
-    dr⁺⁻::AbstractArray{FT,3}
+    dr⁺⁻::AbstractArray{FT,4}
     "Added layer transmission matrix T (from - -> -)"
-    dt⁻⁻::AbstractArray{FT,3}
+    dt⁻⁻::AbstractArray{FT,4}
     "Added layer source matrix J (in + direction)"
-    dj₀⁺::AbstractArray{FT,3}
+    dj₀⁺::AbstractArray{FT,4}
     "Added layer source matrix J (in - direction)"
-    dj₀⁻::AbstractArray{FT,3}
+    dj₀⁻::AbstractArray{FT,4}
     "Added layer Reflectance matrix R (from + -> -)"
-    dxr⁻⁺::AbstractArray{FT,3}
+    dxr⁻⁺::AbstractArray{FT,4}
     "Added layer transmission matrix T (from + -> +)"
-    dxt⁺⁺::AbstractArray{FT,3}
+    dxt⁺⁺::AbstractArray{FT,4}
     "Added layer Reflectance matrix R (from - -> +)"
-    dxr⁺⁻::AbstractArray{FT,3}
+    dxr⁺⁻::AbstractArray{FT,4}
     "Added layer transmission matrix T (from - -> -)"
-    dxt⁻⁻::AbstractArray{FT,3}
+    dxt⁻⁻::AbstractArray{FT,4}
     "Added layer source matrix J (in + direction)"
-    dxj₀⁺::AbstractArray{FT,3}
+    dxj₀⁺::AbstractArray{FT,4}
     "Added layer source matrix J (in - direction)"
-    dxj₀⁻::AbstractArray{FT,3}
+    dxj₀⁻::AbstractArray{FT,4}
 end
 
 "Composite Layer Matrices (`-/+` defined in τ coordinates, i.e. `-`=outgoing, `+`=incoming"

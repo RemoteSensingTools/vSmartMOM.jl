@@ -30,7 +30,7 @@ function rt_run(RS_type::AbstractRamanType,
     @unpack quad_points = model
     FT = model.params.float_type
 
-    n_aer = isnothing(model.params.scattering_params) ? 0 : length(model.params.scattering_params.rt_aerosols)
+    Naer = isnothing(model.params.scattering_params) ? 0 : length(model.params.scattering_params.rt_aerosols)
     
     # Also to be changed if more than 1 band is used!!
     # CFRANKEN NEEDS to be changed for concatenated arrays!!
@@ -57,7 +57,7 @@ function rt_run(RS_type::AbstractRamanType,
     dims   = (NquadN,NquadN)              # nxn dims
     
     # Need to check this a bit better in the future!
-    FT_dual = n_aer > 0 ? typeof(model.τ_aer[1][1]) : FT
+    FT_dual = Naer > 0 ? typeof(model.τ_aer[1][1]) : FT
     #FT_dual = FT
     #@show FT_dual
     # Output variables: Reflected and transmitted solar irradiation at TOA and BOA respectively # Might need Dual later!!
@@ -85,12 +85,12 @@ function rt_run(RS_type::AbstractRamanType,
 
     # Create arrays
     @timeit "Creating layers" added_layer         = 
-        make_added_layer(RS_type, FT_dual, arr_type, dims, nSpec)
+        make_added_layer(RS_type, lin, FT_dual, arr_type, dims, nSpec)
     # Just for now, only use noRS here
     @timeit "Creating layers" added_layer_surface = 
-        make_added_layer(RS_type, FT_dual, arr_type, dims, nSpec)
+        make_added_layer(RS_type, lin, FT_dual, arr_type, dims, nSpec)
     @timeit "Creating layers" composite_layer     = 
-        make_composite_layer(RS_type, FT_dual, arr_type, dims, nSpec)
+        make_composite_layer(RS_type, lin, FT_dual, arr_type, dims, nSpec)
     @timeit "Creating arrays" I_static = 
         Diagonal(arr_type(Diagonal{FT}(ones(dims[1]))));
     
@@ -110,7 +110,7 @@ function rt_run(RS_type::AbstractRamanType,
         InelasticScattering.computeRamanZλ!(RS_type, pol_type,Array(qp_μ), m, arr_type)
         # Compute the core layer optical properties:
         @timeit "OpticalProps" layer_opt_props, fScattRayleigh   = 
-            constructCoreOpticalProperties(RS_type,iBand,m,model);
+            constructCoreOpticalProperties(RS_type, iBand, m, model, lin);
         # Determine the scattering interface definitions:
         scattering_interfaces_all, τ_sum_all = 
             extractEffectiveProps(layer_opt_props,quad_points);
@@ -128,7 +128,8 @@ function rt_run(RS_type::AbstractRamanType,
             
             # Expand all layer optical properties to their full dimension:
             @timeit "OpticalProps" layer_opt = 
-                expandOpticalProperties(layer_opt_props[iz], arr_type)
+                expandOpticalProperties(layer_opt_props[iz], 
+                    arr_type)
 
             # Perform Core RT (doubling/elemental/interaction)
             rt_kernel!(RS_type, pol_type, SFI, 
@@ -207,9 +208,14 @@ function rt_run(RS_type::AbstractRamanType,
     #end
 end
 
+function rt_run_test(RS_type::AbstractRamanType, 
+    model::vSmartMOM_Model, lin::vSmartMOM_lin, nparams::Int, 
+    iBand)
+    rt_run(RS_type, model, lin, nparams, iBand)
+end
 
 function rt_run(RS_type::AbstractRamanType, 
-    model::vSmartMOM_Model, lin::vSmartMOM_lin, iBand)
+    model::vSmartMOM_Model, lin::vSmartMOM_lin, nparams::Int, iBand)
     @unpack obs_alt, sza, vza, vaz = model.obs_geom   # Observational geometry properties
     @unpack qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart, μ₀, iμ₀, Nquad = model.quad_points # All quadrature points
     pol_type = model.params.polarization_type
@@ -217,8 +223,8 @@ function rt_run(RS_type::AbstractRamanType,
     @unpack quad_points = model
     FT = model.params.float_type
 
-    n_aer = isnothing(model.params.scattering_params) ? 0 : length(model.params.scattering_params.rt_aerosols)
-
+    Naer = isnothing(model.params.scattering_params) ? 0 : length(model.params.scattering_params.rt_aerosols)
+    Nangles = length(vza)    
     # Also to be changed if more than 1 band is used!!
     # CFRANKEN NEEDS to be changed for concatenated arrays!!
     brdf = model.params.brdf[iBand[1]]
@@ -244,7 +250,7 @@ function rt_run(RS_type::AbstractRamanType,
     dims   = (NquadN,NquadN)              # nxn dims
 
     # Need to check this a bit better in the future!
-    FT_dual = n_aer > 0 ? typeof(model.τ_aer[1][1]) : FT
+    FT_dual = Naer > 0 ? typeof(model.τ_aer[1][1]) : FT
     #FT_dual = FT
     @show FT_dual
     # Output variables: Reflected and transmitted solar irradiation at TOA and BOA respectively # Might need Dual later!!
@@ -309,12 +315,23 @@ function rt_run(RS_type::AbstractRamanType,
 
     # Create arrays
     @timeit "Creating layers" added_layer         = 
-        make_added_layer(RS_type, FT_dual, arr_type, lin, dims, nSpec)
-    # Just for now, only use noRS here
+        make_added_layer(RS_type, FT_dual, arr_type, dims, nSpec)
+    @timeit "Creating layers" lin_added_layer     = 
+        make_lin_added_layer(RS_type, lin, FT, arr_type, dims, nSpec, 
+                    nparams, Int64(3), Int64(4))
+    
+        # Just for now, only use noRS here
     @timeit "Creating layers" added_layer_surface = 
-        make_added_layer(RS_type, FT_dual, arr_type, lin, dims, nSpec)
+        make_added_layer(RS_type, FT_dual, arr_type, dims, nSpec)
+    @timeit "Creating layers" lin_added_layer_surface = 
+        make_lin_added_layer(RS_type, lin, FT, arr_type, dims, nSpec, 
+                    nparams, Int64(3), Int64(4))
+    
     @timeit "Creating layers" composite_layer     = 
-        make_composite_layer(RS_type, FT_dual, arr_type, lin, dims, nSpec)
+        make_composite_layer(RS_type, FT_dual, arr_type, dims, nSpec)
+    @timeit "Creating layers" lin_composite_layer     = 
+        make_lin_composite_layer(RS_type, lin, FT_dual, arr_type, dims, nSpec, nparams)
+    
     @timeit "Creating arrays" I_static = 
         Diagonal(arr_type(Diagonal{FT}(ones(dims[1]))));
 

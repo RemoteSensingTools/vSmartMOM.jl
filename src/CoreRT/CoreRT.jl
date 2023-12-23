@@ -107,6 +107,7 @@ export parameters_from_yaml,                # Getting parameters from a file
        model_from_parameters,               # Converting the parameters to model 
        rt_run,                              # Run the RT code
        default_parameters                   # Set of default parameters
+export lin_model_from_parameters
 
 # Export types to show easily
 export GaussQuadFullSphere, LambertianSurfaceScalar, LambertianSurfaceSpectrum

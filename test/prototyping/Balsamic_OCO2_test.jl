@@ -365,7 +365,7 @@ x = FT[0.2377,     # 1. Legendre Lambertian Albedo, A-band
           690.,    #p₀
           50.]     #σₚ
 
-
+nparams=length(x)
 # Run FW model:
 # @time runner(x);
 #y = oco_sounding.SpectralMeasurement;
@@ -379,7 +379,7 @@ convfct = repeat(h*c*1.e16./λ, Nangles)
 #run_inversion(x,y)
 #run_OE_inversion(x, y, x, Nangles, [length(indices[1]), length(indices[2]), length(indices[3])], convfct);
 Fx = zeros(length(y));
-runner!(Fx,x)
+lin_runner!(Fx,x)
 #Fx = Fx./convfct
 #plot(y, label="Meas") #Ph sec^{-1} m^{-2} sr^{-1} um^{-1}
 #plot!(Fx, label="Mod")# mW/m²-str-cm⁻¹ -> Ph sec^{-1} m^{-2} sr^{-1} um^{-1}
