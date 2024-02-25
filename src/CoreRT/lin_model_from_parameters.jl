@@ -9,7 +9,10 @@ like optical thicknesses, from the input parameters. Produces a vSmartMOM_Model 
 default_parameters() = parameters_from_yaml(joinpath(dirname(pathof(vSmartMOM)), "CoreRT", "DefaultParameters.yaml"))
 
 "Take the parameters specified in the vSmartMOM_Parameters struct, and calculate derived attributes into a vSmartMOM_Model" 
-function lin_model_from_parameters(params::vSmartMOM_Parameters)
+function lin_model_from_parameters(params::vSmartMOM_Parameters,
+                    x)#,
+                    #dVMR_CO2,
+                    #dVMR_H2O)
     FT = params.float_type
     #@show FT
     # Number of total bands and aerosols (for convenience)
@@ -27,26 +30,47 @@ function lin_model_from_parameters(params::vSmartMOM_Parameters)
 
     # Get AtmosphericProfile from parameters
     vmr = isnothing(params.absorption_params) ? Dict() : params.absorption_params.vmr
-    p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o, new_vmr, Δz = compute_atmos_profile_fields(params.T, params.p, params.q, vmr)
+    p_full, p_half, vmr_h2o, vcd_dry, 
+    vcd_h2o, vmr_co2, Δz, z, dzdpsurf, dVMR_H2O, dVMR_CO2 = 
+        lin_compute_atmos_profile_fields(params.T, 
+                    params.p, 
+                    params.q, 
+                    vmr,
+                    x)#,
+                    #dVMR_CO2,
+                    #dVMR_H2O)
 
-    profile = AtmosphericProfile(params.T, p_full, params.q, p_half, vmr_h2o, vcd_dry, vcd_h2o, new_vmr,Δz)
+
+    linprofile = linAtmosphericProfile(params.T, 
+        p_full, 
+        params.q, 
+        p_half, 
+        vmr_h2o, 
+        vcd_dry, vcd_h2o, 
+        vmr_co2,
+        Δz, z, dzdpsurf,
+        dVMR_H2O, dVMR_CO2)
     
     # Reduce the profile to the number of target layers (if specified)
     if params.profile_reduction_n != -1
-        profile = reduce_profile(params.profile_reduction_n, profile);
+        linprofile = lin_reduce_profile(params.profile_reduction_n, linprofile);
     end
 
     # Rayleigh optical properties calculation
     greek_rayleigh = Scattering.get_greek_rayleigh(FT(params.depol))
-    # Remove rayleight for testing:
-    τ_rayl = [zeros(FT,length(params.spec_bands[i]), length(params.T)) for i=1:n_bands];
+    # Remove rayleigh for testing:
+    τ_rayl = [zeros(FT,length(params.spec_bands[i]), length(linprofile.T)) for i=1:n_bands];
+    lin_τ_rayl = [zeros(FT,length(params.spec_bands[i]), length(linprofile.T)) for i=1:n_bands];
+    
     #τ_rayl = [zeros(FT,1,length(profile.T)) for i=1:n_bands];
     
     # This is a kludge for now, tau_abs sometimes needs to be a dual. Suniti & us need to rethink this all!!
     # i.e. code the rt core with fixed amount of derivatives as in her paper, then compute chain rule for dtau/dVMr, etc...
-    FT2 = isnothing(params.absorption_params) || !haskey(params.absorption_params.vmr,"CO2") ? params.float_type : eltype(params.absorption_params.vmr["CO2"])
-    τ_abs     = [zeros(FT2, length(params.spec_bands[i]), length(profile.p_full)) for i in 1:n_bands]
-    
+    #FT2 = isnothing(params.absorption_params) || !haskey(params.absorption_params.vmr,"CO2") ? params.float_type : eltype(params.absorption_params.vmr["CO2"])
+    τ_abs     = [zeros(FT, length(params.spec_bands[i]), length(linprofile.p_full)) for i in 1:n_bands]
+    lin_τ_abs     = [zeros(FT, 9, length(params.spec_bands[i]), length(linprofile.p_full)) for i in 1:n_bands]
+    VMR = zeros(FT, length(linprofile.T));
+    dVMR = zeros(FT, 9, length(linprofile.T));
     # Loop over all bands:
     for i_band=1:n_bands
 
@@ -54,14 +78,15 @@ function lin_model_from_parameters(params::vSmartMOM_Parameters)
         curr_band_λ = FT.(1e4 ./ params.spec_bands[i_band])
         # @show profile.vcd_dry, size(τ_rayl[i_band])
         # Compute Rayleigh properties per layer for `i_band` band center  
-        
-        τ_rayl[i_band]   .= getRayleighLayerOptProp(profile.p_half[end], 
+         
+        τ_rayl[i_band], lin_τ_rayl[i_band] = getRayleighLayerOptProp_lin(
+                                linprofile.p_half[end], 
                                 curr_band_λ, #(mean(curr_band_λ)), 
-                                params.depol, profile.vcd_dry);
+                                params.depol, linprofile.vcd_dry);
         #@show τ_rayl[i_band]
         # If no absorption, continue to next band
         isnothing(params.absorption_params) && continue
-        
+        Δp_surf = linprofile.p_half[end] - linprofile.p_half[end-1];
         # Loop over all molecules in this band, obtain profile for each, and add them up
         for molec_i in 1:length(params.absorption_params.molecules[i_band])
             @show params.absorption_params.molecules[i_band][molec_i]
@@ -79,11 +104,40 @@ function lin_model_from_parameters(params::vSmartMOM_Parameters)
                     architecture = params.architecture, 
                     vmr = 0);#mean(profile.vmr[params.absorption_params.molecules[i_band][molec_i]]))
                 # Calculate absorption profile
-                
-                @timeit "Absorption Coeff"  compute_absorption_profile!(τ_abs[i_band], absorption_model, params.spec_bands[i_band],profile.vmr[params.absorption_params.molecules[i_band][molec_i]], profile);
+                if params.absorption_params.modecules[i_band]=="O2"
+                    VMR = linprofile.vmr[params.absorption_params.molecules[i_band][molec_i]]
+                    dVMR .= 0
+                elseif params.absorption_params.modecules[i_band]=="CO2"
+                    VMR = linprofile.vmr_co2
+                    dVMR[1:7,:] .= linprofile.dVMR_CO2
+                    dVMR[8:9,:] .= 0 
+                elseif params.absorption_params.modecules[i_band]=="H2O"
+                    VMR = linprofile.vmr_h2o
+                    dVMR[1:7,:] .= 0
+                    dVMR[8:9,:] .= linprofile.dVMR_H2O 
+                end
+                @timeit "Absorption Coeff"  compute_absorption_profile_lin!(
+                                    τ_abs[i_band], 
+                                    lin_τ_abs[i_band],
+                                    Δp_surf, 
+                                    dVMR,
+                                    absorption_model, 
+                                    params.spec_bands[i_band],
+                                    VMR,
+                                    #profile.vmr[params.absorption_params.molecules[i_band][molec_i]], 
+                                    linprofile);
             # Use LUT directly
             else
-                compute_absorption_profile!(τ_abs[i_band], params.absorption_params.luts[i_band][molec_i], params.spec_bands[i_band],profile.vmr[params.absorption_params.molecules[i_band][molec_i]], profile);
+                compute_absorption_profile_lin!(
+                                    τ_abs[i_band], 
+                                    lin_τ_abs[i_band],
+                                    Δp_surf, 
+                                    dVMR,
+                                    params.absorption_params.luts[i_band][molec_i], 
+                                    params.spec_bands[i_band],
+                                    VMR,
+                                    #profile.vmr[params.absorption_params.molecules[i_band][molec_i]], 
+                                    linprofile);
             end
         end
     end
@@ -97,11 +151,13 @@ function lin_model_from_parameters(params::vSmartMOM_Parameters)
     #FT2 =  params.float_type 
 
     # τ_aer[iBand][iAer,iZ]
-    τ_aer = [zeros(FT2, n_aer, length(profile.p_full)) for i=1:n_bands];
+    τ_aer = [zeros(FT2, n_aer, length(linprofile.p_full)) for i=1:n_bands];
+    lin_τ_aer_psurf = [zeros(FT2, n_aer, length(linprofile.p_full)) for i=1:n_bands];
+    lin_τ_aer_z₀    = [zeros(FT2, n_aer, length(linprofile.p_full)) for i=1:n_bands];
+    lin_τ_aer_σz    = [zeros(FT2, n_aer, length(linprofile.p_full)) for i=1:n_bands];
 
     # Loop over aerosol type
     for i_aer=1:n_aer
-
         # Get curr_aerosol
         c_aero = params.scattering_params.rt_aerosols[i_aer]
         curr_aerosol = c_aero.aerosol
@@ -125,7 +181,8 @@ function lin_model_from_parameters(params::vSmartMOM_Parameters)
         mie_model.aerosol.nᵣ = real(params.scattering_params.n_ref)
         mie_model.aerosol.nᵢ = -imag(params.scattering_params.n_ref)
         @show params.scattering_params.n_ref
-        k_ref, dk_ref          = compute_ref_aerosol_extinction(mie_model, params.float_type)
+        k_ref, dk_ref = compute_ref_aerosol_extinction_lin(mie_model)#, 
+                                                        #params.float_type)
         @show k_ref
         #params.scattering_params.rt_aerosols[i_aer].p₀, params.scattering_params.rt_aerosols[i_aer].σp
         # Loop over bands
@@ -148,7 +205,7 @@ function lin_model_from_parameters(params::vSmartMOM_Parameters)
             # Compute raw (not truncated) aerosol optical properties (not needed in RT eventually) 
             #@show FT2, FT
             @timeit "Mie calc"  aerosol_optics_raw, lin_aerosol_optics_raw = 
-                compute_aerosol_optical_properties(mie_model, FT);
+                compute_aerosol_optical_properties_lin(mie_model, FT);
             @show aerosol_optics_raw.k
             aerosol_optics_raw.k_ref = k_ref
             @show k_ref, dk_ref
@@ -156,17 +213,21 @@ function lin_model_from_parameters(params::vSmartMOM_Parameters)
             lin_aerosol_optics_raw.dk_ref = dk_ref
             # Compute truncated aerosol optical properties (phase function and fᵗ), consistent with Ltrunc:
             #@show i_aer, i_band
-            aerosol_optics[i_band][i_aer],lin_aerosol_optics[i_band][i_aer]  = Scattering.truncate_phase(truncation_type, 
+            aerosol_optics[i_band][i_aer],
+            lin_aerosol_optics[i_band][i_aer]  = Scattering.truncate_phase(truncation_type, 
                                                     aerosol_optics_raw, lin_aerosol_optics_raw; reportFit=false)
             #aerosol_optics[i_band][i_aer] =  aerosol_optics_raw
-                                                    
+            @show lin_aerosol_optics[i_band][i_aer].dω̃                        
             @show aerosol_optics[i_band][i_aer].k
             #@show aerosol_optics[i_band][i_aer].fᵗ
             # Compute nAer aerosol optical thickness profiles
-            τ_aer[i_band][i_aer,:] = 
-                params.scattering_params.rt_aerosols[i_aer].τ_ref * 
-                (aerosol_optics[i_band][i_aer].k/k_ref) * 
-                getAerosolLayerOptProp(1, c_aero.profile, profile)
+            τ_total = params.scattering_params.rt_aerosols[i_aer].τ_ref * 
+                (aerosol_optics[i_band][i_aer].k/k_ref)
+            τ_aer[i_band][i_aer,:], 
+            lin_τ_aer_psurf[i_band][i_aer, :], 
+            lin_τ_aer_z₀[i_band][i_aer,:], 
+            lin_τ_aer_σz[i_band][i_aer,:] = 
+                getAerosolLayerOptProp_lin(τ_total, exp(c_aero.profile.μ), c_aero.profile.σ, linprofile.z, linprofile.dzdpsurf)
             @info "AOD at band $i_band : $(sum(τ_aer[i_band][i_aer,:])), truncation factor = $(aerosol_optics[i_band][i_aer].fᵗ)"
         end 
     end
@@ -196,7 +257,15 @@ function lin_model_from_parameters(params::vSmartMOM_Parameters)
                         τ_rayl, 
                         τ_aer, 
                         obs_geom, 
-                        profile), vSmartMOM_lin(lin_aerosol_optics)
+                        linprofile), 
+            vSmartMOM_lin(lin_aerosol_optics,
+                        lin_τ_rayl,
+                        lin_τ_abs,
+                        lin_τ_aer_psurf,
+                        lin_τ_aer_z₀, 
+                        lin_τ_aer_σz)
+
+    # TODO: add dτ_abs[1] due to O2
 end
 
 

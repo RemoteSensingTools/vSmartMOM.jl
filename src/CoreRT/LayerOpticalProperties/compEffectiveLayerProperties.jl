@@ -132,7 +132,7 @@ function getG_atSun(lod::CoreDirectionalScatteringOpticalProperties,quad_points:
 end
 
 
-function (in::CoreScatteringOpticalProperties, arr_type)
+function expandOpticalProperties(in::CoreScatteringOpticalProperties, arr_type)
     @unpack τ, ϖ, Z⁺⁺, Z⁻⁺ = in 
     @assert length(τ) == length(ϖ) "τ and ϖ sizes need to match"
     if size(Z⁺⁺,3) == 1

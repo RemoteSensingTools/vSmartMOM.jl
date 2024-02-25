@@ -7,7 +7,11 @@ the input, and producing the output object.
 =#
 
 "Check that a field exists in yaml file"
-function check_yaml_field(dict::Dict{Any, Any}, full_keys::Array{String}, curr_keys::Array{String}, final_type::Type, valid_options::Array{String})
+function check_yaml_field(dict::Dict{Any, Any}, 
+                        full_keys::Array{String}, 
+                        curr_keys::Array{String}, 
+                        final_type::Type, 
+                        valid_options::Array{String})
 
     # Should have at least one key
     @assert length(curr_keys) >= 1
@@ -38,8 +42,8 @@ function validate_aerosols(aerosols::Union{Array{Dict{Any, Any}}, Vector{Any}})
               (["σ"], Real),
               (["nᵣ"], Real),
               (["nᵢ"], Real),
-              (["p₀"], Real),
-              (["p₀"], Real)]
+              (["z₀"], Real), # (["p₀"], Real), (Suniti)
+              (["σ₀"], Real)] # (["p₀"], Real)] (Suniti)
               
     for aerosol in aerosols
         for i in 1:length(fields)
@@ -62,8 +66,8 @@ function aerosol_params_to_obj(aerosols::Union{Array{Dict{Any, Any}}, Vector{Any
                                   FT(aerosol["nᵣ"]),
                                   FT(aerosol["nᵢ"]))
         
-        new_rt_aerosol_obj = RT_Aerosol(new_aerosol_obj, FT(aerosol["τ_ref"]), Normal(FT(aerosol["p₀"]), FT(aerosol["σp"])))
-
+        # new_rt_aerosol_obj = RT_Aerosol(new_aerosol_obj, FT(aerosol["τ_ref"]), Normal(FT(aerosol["p₀"]), FT(aerosol["σp"])))
+        new_rt_aerosol_obj = RT_Aerosol(new_aerosol_obj, FT(aerosol["τ_ref"]), LogNormal(FT(aerosol["z₀"]), FT(aerosol["σ₀"]))) # Suniti
         push!(rt_aerosol_obj_list, new_rt_aerosol_obj)
     end
 

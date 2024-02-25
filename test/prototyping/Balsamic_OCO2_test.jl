@@ -214,6 +214,18 @@ end
 parameters = parameters_from_yaml("test/test_parameters/3BandParameters.yaml")
 #parameters.architecture = CPU()
 FT = Float64
+RS_type = InelasticScattering.noRS(
+    fscattRayl  = [FT(1)],
+    ϖ_Cabannes  = [FT(1)], 
+    bandSpecLim = [],
+    iBand       = [1],
+    F₀          = zeros(FT,1,1));
+#RS_type.F₀ = zeros(model.params.polarization_type.n, length(P))
+#for i=1:length(P)
+#    sol_trans = Tsolar_interp(ν[i]);
+#    F₀[i] = sol_trans * P[i];
+#    RS_type.F₀[1,i] = F₀[i];
+#end 
 
 # Load OCO Data: 
 # File names:
@@ -341,29 +353,42 @@ parameters.vaz = v_raz
 # Produce black-body in wavenumber range
 Tsolar = solar_transmission_from_file("/home/rjeyaram/vSmartMOM/src/SolarModel/solar.out")
 Tsolar_interp = LinearInterpolation(Tsolar[:, 1], Tsolar[:, 2])
-
+# New parameter order:
+    # 1: p_surf
+    # (2-7) CO2: VMR₀, VMR₁, VMR₂, HCO2, ln(z₀CO2), σCO2
+    # (8,9) H2O: a1, a2
+    # (10-16) Aerosol1: ln(τ_ref), nᵣ, nᵢ, r₀, σᵣ, z₀, σz
+    # (17-23) Aerosol2: ln(τ_ref), nᵣ, nᵢ, r₀, σᵣ, z₀, σz  
+    # (24-32) Albedo: ρA₁, ρA₂, ρA₃, ρW₁, ρW₂, ρW₃, ρS₁, ρS₂, ρS₃
+    # BRDF: RPV/RossLi/CoxMunk   
+x = FT[mean(oco_soundings[1].p_half[end]), # 1: Psurf (hPa)  - currently assumed to be the mean of all multiangle modes - think of a way to separate them eventually 
+    400.0e-6, 0.0, 0.0, 8.0, log(3.0), 0.62, # (2-7) CO2: VMR₀, VMR₁, VMR₂, HCO2, ln(z₀CO2), σCO2
+    0.0, 0.0, # (8,9) H2O: a1, a2
+    -1.2, 1.42, 0.001, log(0.1), 0.83, log(5), 0.47, # (10-16) Aerosol1: ln(τ_ref), nᵣ, nᵢ, r₀, σᵣ, z₀, σz
+    -2.3, 1.65, 0.001, log(0.5), 0.60, log(3), 0.64, # (17-13) Aerosol1: ln(τ_ref), nᵣ, nᵢ, r₀, σᵣ, z₀, σz
+    0.6, 0.0, 0.0, 0.4, 0.0, 0.0, 0.2, 0.0, 0.0] # (24-32) Albedo: ρA₁, ρA₂, ρA₃, ρW₁, ρW₂, ρW₃, ρS₁, ρS₂, ρS₃
 #Initial guess state vector 
-x = FT[0.2377,     # 1. Legendre Lambertian Albedo, A-band
-         -3.5,       # log(AOD)
-         -0.00244, # 2. Legendre Lambertian Albedo, A-band
-          0,       # 3. Legendre Lambertian Albedo, A-band
-          0,       # 3. Legendre Lambertian Albedo, W-band
-          0,       # 3. Legendre Lambertian Albedo, S-band
-          0.2,     # 1. Legendre Lambertian Albedo, W-band
-          0,       # 2. Legendre Lambertian Albedo, W-band
-          0.2,     # 1. Legendre Lambertian Albedo, S-band
-          0,       # 2. Legendre Lambertian Albedo, S-band
-          0,       # H2O
-          400e-6,  # CO2 1
-          400e-6,  # CO2 2
-          400e-6,  # CO2 3
-          0,
-          1.33,    # nᵣ
-          0.01,    # nᵢ
-        -1.69,     # lnr₀
-          0.3,     # σ₀
-          690.,    #p₀
-          50.]     #σₚ
+#x = FT[0.2377,     # 1. Legendre Lambertian Albedo, A-band
+#         -3.5,       # log(AOD)
+#         -0.00244, # 2. Legendre Lambertian Albedo, A-band
+#          0,       # 3. Legendre Lambertian Albedo, A-band
+#          0,       # 3. Legendre Lambertian Albedo, W-band
+#          0,       # 3. Legendre Lambertian Albedo, S-band
+#          0.2,     # 1. Legendre Lambertian Albedo, W-band
+#          0,       # 2. Legendre Lambertian Albedo, W-band
+#          0.2,     # 1. Legendre Lambertian Albedo, S-band
+#          0,       # 2. Legendre Lambertian Albedo, S-band
+#          0,       # H2O
+#          400e-6,  # CO2 1
+#          400e-6,  # CO2 2
+#          400e-6,  # CO2 3
+#          0,
+#          1.33,    # nᵣ
+#          0.01,    # nᵢ
+#        -1.69,     # lnr₀
+#          0.3,     # σ₀
+#          690.,    #p₀
+#          50.]     #σₚ
 
 nparams=length(x)
 # Run FW model:

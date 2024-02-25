@@ -14,8 +14,8 @@ function rt_kernel!(RS_type::noRS{FT},
                     computed_layer_properties::M, 
                     lin_computed_layer_properties, 
                     scattering_interface, 
-                    τ_sum, 
-                    lin_τ_sum,
+                    τ_sum, μ₀,
+                    #lin_τ_sum,
                     m, quad_points, 
                     I_static, 
                     architecture, 
@@ -105,16 +105,25 @@ function rt_kernel!(RS_type::noRS{FT},
 
             lin_composite_layer.dJ₀⁺[ctr,:,1,:] = lin_τ[ctr,:].*lin_added_layer.dj₀⁺[1,:,1,:] +
                                                 lin_ϖ[ctr]*lin_added_layer.dj₀⁺[2,:,1,:] +
-                                                lin_Z⁺⁺[ctr,:,:,:].*lin_added_layer.dj₀⁺[3,:,1,:] +
-                                                lin_τ_sum[ctr,:,:,:].*lin_added_layer.dj₀⁺[4,:,1,:]
+                                                lin_Z⁺⁺[ctr,:,:,:].*lin_added_layer.dj₀⁺[3,:,1,:] #+
+                                                #lin_τ_sum[ctr,:,:,:].*lin_added_layer.dj₀⁺[4,:,1,:]
     
             lin_composite_layer.dJ₀⁻[ctr,:,1,:] = lin_τ[ctr,:].*lin_added_layer.dj₀⁻[1,:,1,:] +
                                                 lin_ϖ[ctr]*lin_added_layer.dj₀⁻[2,:,1,:] +
-                                                lin_Z⁻⁺[ctr,:,:,:].*lin_added_layer.dj₀⁻[3,:,1,:] +
-                                                lin_τ_sum[ctr,:,:,:].*lin_added_layer.dj₀⁻[4,:,1,:]
+                                                lin_Z⁻⁺[ctr,:,:,:].*lin_added_layer.dj₀⁻[3,:,1,:] #+
+                                                #lin_τ_sum[ctr,:,:,:].*lin_added_layer.dj₀⁻[4,:,1,:]
         end
+        otmpE = exp.(-τ_sum/μ₀)
+        oτ_sum = τ_sum
+        olin_τ = lin_τ
+        odtmpE = 0.0 .* lin_τ
+        olin_τ = lin_τ
         # If this is not the TOA, perform the interaction step
     else        
+        tmpE = exp.(-τ_sum/μ₀)
+        composite_layer.J₀⁺[:], composite_layer.J₀⁻[:] = (added_layer.j₀⁺.*tmpE, added_layer.j₀⁻.*tmpE)
+
+        
         for ctr=1:nparams
             lin_added_layer.dxt⁺⁺[ctr,:,:,:] = lin_τ[ctr,:].*lin_added_layer.dt⁺⁺[1,:,:,:] +
                                                 lin_ϖ[ctr]*lin_added_layer.dt⁺⁺[2,:,:,:] + 
@@ -132,21 +141,31 @@ function rt_kernel!(RS_type::noRS{FT},
                                                 lin_ϖ[ctr]*lin_added_layer.dr⁺⁻[2,:,:,:] +
                                                 lin_Z⁻⁺[ctr,:,:,:].*lin_added_layer.dr⁺⁻[3,:,:,:]
 
+            
+            dtmpE[ctr,:] = exp.(-(τ_sum-oτ_sum)/μ₀) .* (odtmpE[ctr,:] .- otmpE .* olin_τ[ctr,:]./μ₀)
+
             lin_added_layer.dxj₀⁺[ctr,:,1,:] = lin_τ[ctr,:].*lin_added_layer.dj₀⁺[1,:,1,:] +
                                                 lin_ϖ[ctr]*lin_added_layer.dj₀⁺[2,:,1,:] +
-                                                lin_Z⁺⁺[ctr,:,:,:].*lin_added_layer.dj₀⁺[3,:,1,:] +
-                                                lin_τ_sum[ctr,:,:,:].*lin_added_layer.dj₀⁺[4,:,1,:]
-    
+                                                lin_Z⁺⁺[ctr,:,:,:].*lin_added_layer.dj₀⁺[3,:,1,:] #+
+                                                #lin_τ_sum[ctr,:,:,:].*lin_added_layer.dj₀⁺[4,:,1,:]
+            lin_added_layer.dxj₀⁺[ctr,:,1,:] = lin_added_layer.dxj₀⁺[ctr,:,1,:] .* tmpE .+
+                                                added_layer.j₀⁺.* dtmpE[ctr,:]
             lin_added_layer.dxj₀⁻[ctr,:,1,:] = lin_τ[ctr,:].*lin_added_layer.dj₀⁻[1,:,1,:] +
                                                 lin_ϖ[ctr]*lin_added_layer.dj₀⁻[2,:,1,:] +
-                                                lin_Z⁻⁺[ctr,:,:,:].*lin_added_layer.dj₀⁻[3,:,1,:] +
-                                                lin_τ_sum[ctr,:,:,:].*lin_added_layer.dj₀⁻[4,:,1,:]
+                                                lin_Z⁻⁺[ctr,:,:,:].*lin_added_layer.dj₀⁻[3,:,1,:] #+
+                                                #lin_τ_sum[ctr,:,:,:].*lin_added_layer.dj₀⁻[4,:,1,:]
+            lin_added_layer.dxj₀⁻[ctr,:,1,:] = lin_added_layer.dxj₀⁻[ctr,:,1,:] .* tmpE .+
+                                                added_layer.j₀⁻ .* dtmpE[ctr,:]
         end
         @timeit "interaction" interaction!(RS_type, scattering_interface, SFI, composite_layer, lin_composite_layer, added_layer, lin_added_layer, I_static)
+        otmpE = tmpE
+        oτ_sum = τ_sum
+        odtmpE = dtmpE
+        olin_τ = lin_τ
     end
 end
 
-#=
+
 function get_dtau_ndoubl(computed_layer_properties::CoreScatteringOpticalProperties,
         lin_computed_layer_properties::linCoreScatteringOpticalProperties, 
         quad_points::QuadPoints{FT}) where {FT}
@@ -157,7 +176,7 @@ function get_dtau_ndoubl(computed_layer_properties::CoreScatteringOpticalPropert
     _, ndoubl = doubling_number(dτ_max, maximum(τ .* ϖ))
     # Compute dτ vector
     dτ = τ ./ 2^ndoubl
-    lin_dτ = lin_τ / 2^ndoubl
+    lin_dτ = lin_τ ./ 2^ndoubl
 
     return dτ, lin_dτ, ndoubl
 end
@@ -173,7 +192,7 @@ function get_dtau_ndoubl(computed_layer_properties::CoreDirectionalScatteringOpt
     _, ndoubl = doubling_number(dτ_max, maximum(τ .* ϖ))
     # Compute dτ vector
     dτ = τ ./ 2^ndoubl
-    lin_dτ = lin_τ / 2^ndoubl
+    lin_dτ = lin_τ ./ 2^ndoubl
 
     return dτ, lin_dτ, ndoubl
 end
@@ -191,9 +210,9 @@ function init_layer(computed_layer_properties::CoreDirectionalScatteringOpticalP
     gfct = Array(G)[iμ₀]
     expk = exp.(-dτ*gfct/μ₀)
     #lin_expk = -expk.*lin_dτ*gfct/μ₀
-    dexpk_fctr = -gfct/μ₀
+    lin_expk_fctr = -gfct/μ₀ #.+zeros(length(expk))
 
-    return dτ, lin_dτ, ndoubl, arr_type(expk), FT(dexpk_fctr) #arr_type(lin_expk)
+    return dτ, lin_dτ, ndoubl, arr_type(expk), FT(lin_expk_fctr)#, arr_type(lin_expk)
 end
 
 function init_layer(computed_layer_properties::CoreScatteringOpticalProperties, 
@@ -207,12 +226,12 @@ function init_layer(computed_layer_properties::CoreScatteringOpticalProperties,
                             quad_points)
     expk = exp.(-dτ/μ₀)
     #lin_expk = -expk.*lin_dτ/μ₀
-    dexpk_fctr = -1/μ₀
+    lin_expk_fctr = -1/μ₀
 
-    return dτ, lin_dτ, ndoubl, arr_type(expk), FT(dexpk_fctr)#arr_type(lin_expk)
+    return dτ, lin_dτ, ndoubl, arr_type(expk), FT(lin_expk_fctr)#arr_type(lin_expk)
 end
 
-=#
+#=
 function rt_kernel!(RS_type::Union{RRS{FT}, VS_0to1{FT}, VS_1to0{FT}}, 
         pol_type, SFI, 
         added_layer, lin_added_layer,
@@ -409,5 +428,5 @@ function rt_kernel!(
                 added_layer, lin_added_layer, I_static)
     end
 end
-
+=#
 

@@ -209,13 +209,17 @@ function rt_run(RS_type::AbstractRamanType,
 end
 
 function rt_run_test(RS_type::AbstractRamanType, 
-    model::vSmartMOM_Model, lin::vSmartMOM_lin, nparams::Int, 
+    model::vSmartMOM_Model, 
+    lin::vSmartMOM_lin, 
+    nparams::Int, 
     iBand)
     rt_run(RS_type, model, lin, nparams, iBand)
 end
 
 function rt_run(RS_type::AbstractRamanType, 
-    model::vSmartMOM_Model, lin::vSmartMOM_lin, nparams::Int, iBand)
+    model::vSmartMOM_Model, 
+    lin::vSmartMOM_lin, 
+    nparams::Int, iBand)
     @unpack obs_alt, sza, vza, vaz = model.obs_geom   # Observational geometry properties
     @unpack qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart, μ₀, iμ₀, Nquad = model.quad_points # All quadrature points
     pol_type = model.params.polarization_type
@@ -261,7 +265,7 @@ function rt_run(RS_type::AbstractRamanType,
     # β_trunc, and Z. After that, however, it is 
     # necessary to account for all parameters 
     # explicitly using the chain rule to account 
-    # for the varying dependence of τ, ϖ, β_trunc, 
+     # for the varying dependence of τ, ϖ, β_trunc, 
     # and Z on the parameters for different 
     # atmospheric layers. Note: in cases of weak
     # atmospheric absorption, this problem can be 
@@ -275,8 +279,8 @@ function rt_run(RS_type::AbstractRamanType,
     # 4. nᵢ  x Naer
     # 5. r₀  x Naer
     # 6. σ₀  x Naer
-    # 7. Pᵥ  x Naer
-    # 8. σᵥ  x Naer 
+    # 7. z₀  x Naer
+    # 8. σz  x Naer 
     # 9. Psurf
     # 10. VMR1_CO2 (for f₁(P))
     # 11. VMR2_CO2 (for f₂(P))
@@ -316,6 +320,7 @@ function rt_run(RS_type::AbstractRamanType,
     # Create arrays
     @timeit "Creating layers" added_layer         = 
         make_added_layer(RS_type, FT_dual, arr_type, dims, nSpec)
+    @show dims, nSpec, nparams
     @timeit "Creating layers" lin_added_layer     = 
         make_lin_added_layer(RS_type, lin, FT, arr_type, dims, nSpec, 
                     nparams, Int64(3), Int64(4))
@@ -351,13 +356,13 @@ function rt_run(RS_type::AbstractRamanType,
         InelasticScattering.computeRamanZλ!(RS_type, pol_type,Array(qp_μ), m, arr_type)
         # Compute the core layer optical properties:
         @timeit "OpticalProps" layer_opt_props, fScattRayleigh,
-        lin_layer_opt_props, lin_fScattRayleigh   = 
+            lin_layer_opt_props = 
             constructCoreOpticalProperties(RS_type, iBand, m, model, lin);
         # Determine the scattering interface definitions:
         scattering_interfaces_all, τ_sum_all, lin_τ_sum_all = 
             extractEffectiveProps(layer_opt_props, lin_layer_opt_props, quad_points);
         #@show typeof(layer_opt_props)
-        nparams = length(lin_fScattRayleigh[:,1])
+        #nparams = length(lin_fScattRayleigh[:,1])
         speclen = length(RS_type.fscattRayl[1,:])
         # Loop over vertical layers: 
         @showprogress 1 "Looping over layers ..." for iz = 1:Nz  # Count from TOA to BOA
@@ -368,19 +373,18 @@ function rt_run(RS_type::AbstractRamanType,
             if !(typeof(RS_type) <: noRS)
                 RS_type.fscattRayl = expandBandScalars(RS_type, fScattRayleigh[iz]) 
 
-                
-                RS_type.lin_fscattRayl = zeros(nparams,speclen)
-                for ctr = 1:nparams
-                    RS_type.lin_fScattRayleigh[ctr,:] = 
-                        expandBandScalars(RS_type, lin_fScattRayleigh[ctr,iz])                 
-                end
+                #RS_type.lin_fscattRayl = zeros(nparams,speclen)
+                #for ctr = 1:nparams
+                #    RS_type.lin_fScattRayleigh[ctr,:] = 
+                #        expandBandScalars(RS_type, lin_fScattRayleigh[ctr,iz])                 
+                #end
             end
 
             # Expand all layer optical properties to their full dimension:
             @timeit "OpticalProps" layer_opt = 
                 expandOpticalProperties(layer_opt_props[iz], arr_type)
             @timeit "OpticalProps" lin_layer_opt = 
-                expandOpticalProperties(lin_layer_opt_props[iz], arr_type)
+                expandOpticalProperties_lin(lin_layer_opt_props[iz], arr_type)
 
             # Perform Core RT (doubling/elemental/interaction)
             rt_kernel!(RS_type, pol_type, SFI, 
@@ -390,8 +394,8 @@ function rt_run(RS_type::AbstractRamanType,
                     layer_opt,
                     lin_layer_opt,
                     scattering_interfaces_all[iz], 
-                    τ_sum_all[:,iz], 
-                    lin_τ_sum_all[:,:,iz],
+                    τ_sum_all[:,iz], μ₀,
+                    #lin_τ_sum_all[:,:,iz],
                     m, quad_points, 
                     I_static, 
                     model.params.architecture, 

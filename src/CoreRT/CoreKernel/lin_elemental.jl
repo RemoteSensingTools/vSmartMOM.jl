@@ -112,7 +112,7 @@ function elemental!(pol_type, SFI::Bool,
                             dτ::AbstractArray,
                             lin_dτ::AbstractArray,
                             computed_layer_properties::CoreScatteringOpticalProperties,
-                            lin_computed_layer_properties::linCoreScatteringOpticalProperties,
+                            #lin_computed_layer_properties::linCoreScatteringOpticalProperties,
                             m::Int,                     # m: fourier moment
                             ndoubl::Int,                # ndoubl: number of doubling computations needed 
                             scatter::Bool,              # scatter: flag indicating scattering
@@ -183,7 +183,13 @@ function elemental!(pol_type, SFI::Bool,
         dt⁻⁻[1,:,:] .= dt⁺⁺
         dt⁺⁺[2:3,:,:] .= 0
         dt⁻⁻[2:3,:,:] .= 0
-    end    
+    end  
+    dt⁺⁺[1,:,:,:] .*= 2^(-ndoubl)
+    dt⁻⁻[1,:,:,:] .*= 2^(-ndoubl)
+    dr⁻⁺[1,:,:,:] .*= 2^(-ndoubl)
+    dr⁺⁻[1,:,:,:] .*= 2^(-ndoubl)
+    dj₀⁺[1,:,1,:] .*= 2^(-ndoubl)
+    dj₀⁻[1,:,1,:] .*= 2^(-ndoubl)
 end
 
 @kernel function get_elem_rt!(r⁻⁺, t⁺⁺, dr⁻⁺, dt⁺⁺, ϖ_λ, dτ_λ, Z⁻⁺, Z⁺⁺, μ, wct) 
@@ -204,7 +210,7 @@ end
         dr⁻⁺[1,i,j,n] = 
             ϖ_λ[n] * Z⁻⁺[i,j,n2] * 
             (1 / μ[i]) * wct[j] * 
-            tmpM
+            tmpM 
 
         dr⁻⁺[2, i,j,n] = 
             Z⁻⁺[i,j,n2] * 
@@ -263,7 +269,11 @@ end
     nothing
 end
 
-@kernel function get_elem_rt_SFI!(J₀⁺, J₀⁻, dJ₀⁺, dJ₀⁻, ϖ_λ, dτ_λ, τ_sum, Z⁻⁺, Z⁺⁺, μ, ndoubl, wct02, nStokes ,I₀, iμ0, D)
+@kernel function get_elem_rt_SFI!(J₀⁺, J₀⁻, 
+                dJ₀⁺, dJ₀⁻, 
+                ϖ_λ, dτ_λ, τ_sum, Z⁻⁺, Z⁺⁺, 
+                μ, ndoubl, wct02, nStokes,
+                I₀, iμ0, D)
     i_start  = nStokes*(iμ0-1) + 1 
     i_end    = nStokes*iμ0
     
@@ -328,14 +338,14 @@ end
 
     J₀⁺[i, 1, n] *= exp(-τ_sum[n]/μ[i_start]) # how to do this?! Add a fourth derivative to RT kernel elements (only for J terms)
     J₀⁻[i, 1, n] *= exp(-τ_sum[n]/μ[i_start]) # 1: wrt τ, 2: wrt ϖ, 3: wrt Z, 4: wrt τ_sum
-    J₀⁺[4, i, 1, n] = - J₀⁺[i, 1, n]/μ[i_start] 
-    J₀⁻[4, i, 1, n] = - J₀⁻[i, 1, n]/μ[i_start] 
+    #dJ₀⁺[4, i, 1, n] = - J₀⁺[i, 1, n]/μ[i_start] 
+    #dJ₀⁻[4, i, 1, n] = - J₀⁻[i, 1, n]/μ[i_start] 
     if ndoubl >= 1
         J₀⁻[i, 1, n] = D[i,i]*J₀⁻[i, 1, n] #D = Diagonal{1,1,-1,-1,...Nquad times}
         dJ₀⁻[1, i, 1, n] = D[i,i]*dJ₀⁻[1, i, 1, n]
         dJ₀⁻[2, i, 1, n] = D[i,i]*dJ₀⁻[2, i, 1, n]
         dJ₀⁻[3, i, 1, n] = D[i,i]*dJ₀⁻[3, i, 1, n]
-        dJ₀⁻[4, i, 1, n] = D[i,i]*dJ₀⁻[4, i, 1, n]
+        #dJ₀⁻[4, i, 1, n] = D[i,i]*dJ₀⁻[4, i, 1, n]
     end  
     nothing
 end
@@ -374,7 +384,7 @@ end
     if ndoubl>1
         if mod(i, pol_n) > 2
             J₀⁻[i, 1, n] = - J₀⁻[i, 1, n]
-            dJ₀⁻[1:4, i, 1, n] .= - dJ₀⁻[1:4, i, 1, n]
+            dJ₀⁻[1:3, i, 1, n] .= - dJ₀⁻[1:3, i, 1, n]
         end 
     end
     nothing

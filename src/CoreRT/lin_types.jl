@@ -15,9 +15,9 @@ This file contains the linearization of all relevant types that are used in the 
 - `ComputedAtmosphereProperties` and `ComputedLayerProperties` hold intermediate computed properties
 
 =#
-#=
+
 "Struct for an atmospheric profile"
-struct AtmosphericProfile{FT, VMR <: Union{Real, Vector}}
+struct linAtmosphericProfile{FT}#{FT, VMR <: Union{Real, Vector}}
     "Temperature Profile"
     T::Array{FT,1}
     "Pressure Profile (Full)"
@@ -33,11 +33,18 @@ struct AtmosphericProfile{FT, VMR <: Union{Real, Vector}}
     "Vertical Column Density (H2O)"
     vcd_h2o::Array{FT,1}
     "Volume Mixing Ratio of Constituent Gases"
-    vmr::Dict{String, VMR}
+    vmr_co2::Array{FT,1} #Dict{String, VMR}
     "Layer height (meters)"
     Δz::Array{FT,1}
+    "Layer altitude (meters)"
+    z::Array{FT,1}
+    dzdpsurf::Array{FT,1}
+    "Derivative of vmr_h2o with respect to multiplicative factors in the boundary layer and above"
+    dVMR_H2O::Array{FT,2}
+    "Derivative of vmr_co2 with respect to psurf, 3 multiplicative factors for uniform, exponential, and lognormal profiles, and their respective parameters H, z₀, and σ"
+    dVMR_CO2::Array{FT,2}
 end
-
+#=
 "Types for describing atmospheric parameters"
 abstract type AbstractObsGeometry end
 
@@ -510,32 +517,36 @@ struct QuadPoints{FT}
 end
 =#
 """
-    struct vSmartMOM_Model
+    struct vSmartMOM_lin
 
 A struct which holds all derived model parameters (including any computations)
 
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-mutable struct vSmartMOM_lin{linAE}#, linTAB, linTR, linTAE, linPRO}
+mutable struct vSmartMOM_lin #<:Union{Vector{Vector{dAerosolOptics}}, Vector{Array{FT},1}, Vector{Array{FT},3}} where FT#{FT} <: AbstractFloat#{linAE, linTAE, linTAE}#, linTAB, linTR, linTAE, linPRO}
 
     #"Struct with all individual parameters"
     #params::PA # vSmartMOM_Parameters
     
     "Truncated aerosol optics"
-    lin_aerosol_optics::linAE # AbstractArray{AbstractArray{AerosolOptics}}
+    #lin_aerosol_optics::dAerosolOptics{FT}  #::linAE # AbstractArray{AbstractArray{AerosolOptics}}
+    lin_aerosol_optics::Any #Vector{Vector{dAerosolOptics}}
     #"Greek coefs in Rayleigh calculations" 
     #greek_rayleigh::GR # GreekCoefs
     #"Quadrature points/weights, etc"
     #quad_points::QP # QuadPoints
 
     #"Array to hold cross-sections over entire atmospheric profile"
-    #lin_τ_abs::linTAB # AbstractArray{AbstractArray}
+    
     #"Rayleigh optical thickness"
-    #lin_τ_rayl::linTR # AbstractArray{AbstractArray}
+    lin_τ_rayl::Any #Vector{Array{FT},1} #Array{Matrix{FT},1}#linTR # AbstractArray{AbstractArray}
+    #"Molecular absorption"
+    lin_τ_abs::Any #Vector{Array{FT},3} #linTAB # AbstractArray{AbstractArray} 
     #"Aerosol optical thickness"
-    #lin_τ_aer::linTAE # AbstractArray{AbstractArray}
-
+    lin_τ_aer_psurf::Any #Vector{Array{FT},1} #Array{Matrix{FT},1}
+    lin_τ_aer_z₀::Any #Vector{Array{FT},1}#Array{Matrix{FT},1}#::linTAE # AbstractArray{AbstractArray}
+    lin_τ_aer_σz::Any #Vector{Array{FT},1}#Array{Matrix{FT},1}#::linTAE
     #"Observational Geometry (includes sza, vza, vaz)"
     #obs_geom::Ogeom # ObsGeometry
     #"Atmospheric profile to use"
@@ -632,10 +643,10 @@ Base.@kwdef struct linComputedLayerProperties
     #scattering_interface
 end
 
-abstract type AbstractOpticalProperties end
+abstract type linAbstractOpticalProperties end
 
 # Core optical Properties COP
-Base.@kwdef struct linCoreScatteringOpticalProperties{FT,FT2,FT3} <:  AbstractOpticalProperties
+Base.@kwdef struct linCoreScatteringOpticalProperties{FT,FT2,FT3} <:  linAbstractOpticalProperties
     "Absorption optical depth (scalar or wavelength dependent)"
     lin_τ::FT 
     "Single scattering albedo"
@@ -647,7 +658,7 @@ Base.@kwdef struct linCoreScatteringOpticalProperties{FT,FT2,FT3} <:  AbstractOp
 end
 
 # Core optical Properties COP with directional cross section 
-Base.@kwdef struct linCoreDirectionalScatteringOpticalProperties{FT,FT2,FT3,FT4} <:  AbstractOpticalProperties
+Base.@kwdef struct linCoreDirectionalScatteringOpticalProperties{FT,FT2,FT3,FT4} <:  linAbstractOpticalProperties
     "Absorption optical depth (scalar or wavelength dependent)"
     lin_τ::FT 
     "Single scattering albedo"
@@ -660,69 +671,125 @@ Base.@kwdef struct linCoreDirectionalScatteringOpticalProperties{FT,FT2,FT3,FT4}
     lin_G::FT4
 end
 
-Base.@kwdef struct linCoreAbsorptionOpticalProperties{FT} <:  AbstractOpticalProperties
+Base.@kwdef struct linCoreAbsorptionOpticalProperties{FT} <:  linAbstractOpticalProperties
     "Absorption optical depth (scalar or wavelength dependent)"
     lin_τ::FT 
 end
 
+struct paired_xdx
+    x::AbstractOpticalProperties #{xFT, xFT2, xFT3}
+    dx::linAbstractOpticalProperties #{dxFT, dxFT2, dxFT3}
+    #x::Vector{AbstractOpticalProperties} #{xFT, xFT2, xFT3}
+    #dx::Vector{linAbstractOpticalProperties} #{dxFT, dxFT2, dxFT3}
+end
+
+struct scatt_paired_xdx
+    x::CoreScatteringOpticalProperties #{xFT, xFT2, xFT3}
+    dx::linCoreScatteringOpticalProperties #{dxFT, dxFT2, dxFT3}
+    #x::Vector{CoreScatteringOpticalProperties} #{xFT, xFT2, xFT3}
+    #dx::Vector{linCoreScatteringOpticalProperties} #{dxFT, dxFT2, dxFT3}
+end
+
+struct dirscatt_paired_xdx
+    x::CoreDirectionalScatteringOpticalProperties #{xFT, xFT2, xFT3}
+    dx::linCoreDirectionalScatteringOpticalProperties #{dxFT, dxFT2, dxFT3}
+    #x::Vector{CoreDirectionalScatteringOpticalProperties} #{xFT, xFT2, xFT3}
+    #dx::Vector{linCoreDirectionalScatteringOpticalProperties} #{dxFT, dxFT2, dxFT3}
+end
+
+struct abs_paired_xdx
+    x::CoreAbsorptionOpticalProperties #{xFT, xFT2, xFT3}
+    dx::linCoreAbsorptionOpticalProperties #{dxFT, dxFT2, dxFT3}
+    #x::Vector{CoreAbsorptionOpticalProperties} #{xFT, xFT2, xFT3}
+    #dx::Vector{linCoreAbsorptionOpticalProperties} #{dxFT, dxFT2, dxFT3}
+end
+
 # Adding Core Optical Properties, can have mixed dimensions!
-function Base.:+( x::CoreScatteringOpticalProperties{xFT, xFT2, xFT3}, 
-                  y::CoreScatteringOpticalProperties{yFT, yFT2, yFT3}, 
-                  dx::linCoreScatteringOpticalProperties{xFT, xFT2, xFT3}, 
-                  dy::linCoreScatteringOpticalProperties{yFT, yFT2, yFT3} 
-                ) where {xFT, xFT2, xFT3, yFT, yFT2, yFT3} 
-    # Predefine some arrays: 
+function Base.:+(z1::scatt_paired_xdx, 
+    z2::scatt_paired_xdx)# where {xFT, xFT2, xFT3, yFT, yFT2, yFT3}     
+    #( (x::CoreScatteringOpticalProperties{xFT, xFT2, xFT3}, 
+    #              dx::linCoreScatteringOpticalProperties{dxFT, dxFT2, dxFT3}), 
+    #              (y::CoreScatteringOpticalProperties{yFT, yFT2, yFT3}, 
+    #              dy::linCoreScatteringOpticalProperties{dyFT, dyFT2, dyFT3}) 
+    #            ) where {xFT, xFT2, xFT3, yFT, yFT2, yFT3} 
+    # Predefine some arrays:
+    x = z1.x
+    dx = z1.dx 
+    y = z2.x
+    dy = z2.dx 
+
     xZ⁺⁺ = x.Z⁺⁺
     xZ⁻⁺ = x.Z⁻⁺
     yZ⁺⁺ = y.Z⁺⁺
     yZ⁻⁺ = y.Z⁻⁺
 
     τ  = x.τ .+ y.τ
-    wx = x.τ .* x.ϖ 
+    wx = x.τ .* x.ϖ
     wy = y.τ .* y.ϖ  
-    w  = wx .+ wy
-    ϖ  =  w ./ τ
-    
-    #xlin_Z⁺⁺ = dx.lin_Z⁺⁺
-    #xlin_Z⁻⁺ = dx.lin_Z⁻⁺
-    #ylin_Z⁺⁺ = dy.lin_Z⁺⁺
-    #ylin_Z⁻⁺ = dy.lin_Z⁻⁺
+    @show size(wx), size(wy), size(τ)
+    ϖ  =  (wx .+ wy) ./ τ #(wx + wy) ./ τ
 
-    lin_τ  = [dx.lin_τ, dy.lin_τ]
-    lin_wx = (dx.lin_τ .* (x.ϖ -  ϖ) .+ x.τ .* dx.lin_ϖ)./τ 
-    lin_wy = (dy.lin_τ .* (y.ϖ -  ϖ) .+ y.τ .* dy.lin_ϖ)./τ  
-    lin_ϖ  = [lin_wx, lin_wy]
+    @show size(dx.lin_τ), size(dy.lin_τ)
+    nparams = size(dx.lin_τ,2)
+    lin_τ = similar(dx.lin_τ)
+    lin_ϖ = similar(dx.lin_τ)
+    #for i = 1:nparams
+    lin_τ  = dx.lin_τ .+ dy.lin_τ #dx.lin_τ + dy.lin_τ
+    @show size(lin_ϖ), size(dx.lin_τ), size(x.ϖ), size(dx.lin_ϖ * x.τ')
+    @show size(dy.lin_τ * y.ϖ), size(dy.lin_ϖ * y.τ')
+    @show size(lin_τ .* ϖ')
+    lin_ϖ  = ((dx.lin_τ * x.ϖ + 
+                dx.lin_ϖ * x.τ') .+
+            (dy.lin_τ * y.ϖ + 
+            dy.lin_ϖ * y.τ') .- 
+            lin_τ .* ϖ')./τ'
+    #end
     
     #@show xFT, xFT2, xFT3
-    all(wx .== 0.0) ? (return CoreScatteringOpticalProperties(τ, ϖ, y.Z⁺⁺, y.Z⁻⁺), linCoreScatteringOpticalProperties(lin_τ, lin_ϖ, dy.lin_Z⁺⁺, dy.lin_Z⁻⁺)) : nothing
-    all(wy .== 0.0) ? (return CoreScatteringOpticalProperties(τ, ϖ, x.Z⁺⁺, x.Z⁻⁺), linCoreScatteringOpticalProperties(lin_τ, lin_ϖ, dx.lin_Z⁺⁺, dx.lin_Z⁻⁺)) : nothing
+    #all(wx .== 0.0) ? (return CoreScatteringOpticalProperties(τ, ϖ, y.Z⁺⁺, y.Z⁻⁺), linCoreScatteringOpticalProperties(lin_τ, lin_ϖ, dy.lin_Z⁺⁺, dy.lin_Z⁻⁺)) : nothing
+    #all(wy .== 0.0) ? (return CoreScatteringOpticalProperties(τ, ϖ, x.Z⁺⁺, x.Z⁻⁺), linCoreScatteringOpticalProperties(lin_τ, lin_ϖ, dx.lin_Z⁺⁺, dx.lin_Z⁻⁺)) : nothing
 
-    n = length(w);
+    n = length(τ);
     
-    wy = wy ./ w
-    wx = wx ./ w
     wx = reshape(wx,1,1,n)
-    wy = reshape(wy,1,1,n)
+    #wy = reshape(wy,1,1,n)
         
-    Z⁺⁺ = (wx .* xZ⁺⁺ .+ wy .* yZ⁺⁺) 
-    Z⁻⁺ = (wx .* xZ⁻⁺ .+ wy .* yZ⁻⁺)
+    Z⁺⁺ = (xZ⁺⁺ .* wx .+ wy .* yZ⁺⁺)./(wx .+ wy)
+    Z⁻⁺ = (xZ⁻⁺ .* wx .+ wy .* yZ⁻⁺)./(wx .+ wy)
 
-    tmpx1 = (dx.lin_τ.*x.ϖ .+ x.τ.*dx.lin_ϖ)./w
-    tmpy1 = (dy.lin_τ.*y.ϖ .+ y.τ.*dy.lin_ϖ)./w
-    tmpx2 = x.τ.*x.ϖ./w
-    tmpy2 = y.τ.*y.ϖ./w
-    xlin_Z⁺⁺ = tmpx1.*(x.Z⁺⁺.-Z⁺⁺) .+ tmpx2.*dx.dZ⁺⁺ 
-    ylin_Z⁺⁺ = tmpy1.*(y.Z⁺⁺.-Z⁺⁺) .+ tmpy2.*dy.dZ⁺⁺ 
-    xlin_Z⁻⁺ = tmpx1.*(x.Z⁻⁺.-Z⁻⁺) .+ tmpx2.*dx.dZ⁻⁺ 
-    ylin_Z⁻⁺ = tmpy1.*(y.Z⁻⁺.-Z⁻⁺) .+ tmpy2.*dy.dZ⁻⁺ 
-    lin_Z⁺⁺ = [xlin_Z⁺⁺, ylin_Z⁺⁺]
-    lin_Z⁻⁺ = [xlin_Z⁻⁺, ylin_Z⁻⁺]
+    tmpx1 = (dx.lin_τ .* x.ϖ .+ dx.lin_ϖ .* x.τ')
+    tmpy1 = (dy.lin_τ .* y.ϖ .+ dy.lin_ϖ .* y.τ')
+    tmpx2 = reshape(wx, 1,1,1,n)#x.τ * x.ϖ #wx
+    tmpy2 = wy #y.τ * y.ϖ #wy
+    @show size(Z⁺⁺)
+    lin_Z⁺⁺ = zeros(nparams,size(Z⁺⁺,1), size(Z⁺⁺,2), size(Z⁺⁺,3))
+    @show '1'
+    #ylin_Z⁺⁺ = zeros(nparams,size(Z⁺⁺,1), size(Z⁺⁺,2), size(Z⁺⁺,3))
+    #@show '2'
+    lin_Z⁻⁺ = zeros(nparams,size(Z⁺⁺,1), size(Z⁺⁺,2), size(Z⁺⁺,3))
+    @show '3'
+    #ylin_Z⁻⁺ = zeros(nparams,size(Z⁺⁺,1), size(Z⁺⁺,2), size(Z⁺⁺,3))
+    #@show '4'
+    for i = 1:nparams
+        lin_Z⁺⁺[i,:,:,:] = (x.Z⁺⁺ .- Z⁺⁺).*reshape(tmpx1[i,:],1,1,n) .+ 
+                        dx.dZ⁺⁺[i,:,:].*tmpx2 .+ 
+                        y.Z⁺⁺.*reshape(tmpy1[i,:],1,1,n) .+ 
+                        dy.dZ⁺⁺[i,:,:].*tmpy2 
+        lin_Z⁻⁺[i,:,:,:] = (x.Z⁻⁺ .- Z⁻⁺).*reshape(tmpx1[i,:],1,1,n) .+ 
+                        dx.dZ⁻⁺[i,:,:].*tmpx2 .+
+                        y.Z⁻⁺.*reshape(tmpx1[i,:],1,1,n) .+ 
+                        dy.dZ⁻⁺[i,:,:].*tmpy2 
+    end
+    lin_Z⁺⁺ = lin_Z⁺⁺./reshape(wx .+ wy, 1,1,1,n)
+    lin_Z⁻⁺ = lin_Z⁻⁺./reshape(wx .+ wy, 1,1,1,n)
 
-    CoreScatteringOpticalProperties(τ, ϖ, Z⁺⁺, Z⁻⁺), linCoreScatteringOpticalProperties(lin_τ, lin_ϖ, lin_Z⁺⁺, lin_Z⁻⁺) 
+    return scatt_paired_xdx(CoreScatteringOpticalProperties(τ, ϖ, Z⁺⁺, Z⁻⁺), linCoreScatteringOpticalProperties(lin_τ, lin_ϖ, lin_Z⁺⁺, lin_Z⁻⁺)) 
 end
 
 # Concatenate Core Optical Properties, can have mixed dimensions!
-function Base.:*( x::CoreScatteringOpticalProperties, y::CoreScatteringOpticalProperties, dx::linCoreScatteringOpticalProperties, dy::linCoreScatteringOpticalProperties ) 
+# Check with Christian what exactly this is supposed to do
+#=
+function Base.:*(x::CoreScatteringOpticalProperties, y::CoreScatteringOpticalProperties, dx::linCoreScatteringOpticalProperties, dy::linCoreScatteringOpticalProperties) 
     arr_type  = array_type(architecture(x.τ))
     x = expandOpticalProperties(x,arr_type);
     y = expandOpticalProperties(y,arr_type);
@@ -733,55 +800,51 @@ function Base.:*( x::CoreScatteringOpticalProperties, y::CoreScatteringOpticalPr
     CoreScatteringOpticalProperties([x.τ; y.τ],[x.ϖ; y.ϖ],cat(x.Z⁺⁺,y.Z⁺⁺, dims=3), cat(x.Z⁻⁺,y.Z⁻⁺, dims=3) ), 
     linCoreScatteringOpticalProperties(cat(dx.dτ, dy.dτ, dims=2),cat(dx.dϖ, dy.dϖ, dims=2), cat(dx.dZ⁺⁺,dy.dZ⁺⁺, dims=4), cat(dx.dZ⁻⁺,dy.dZ⁻⁺, dims=4) )
 end
+=#
 
-function Base.:+( x::CoreScatteringOpticalProperties, y::CoreAbsorptionOpticalProperties, dx::linCoreScatteringOpticalProperties, dy::linCoreAbsorptionOpticalProperties ) 
+function Base.:+(z1::scatt_paired_xdx, z2::abs_paired_xdx)
+    #(x::CoreScatteringOpticalProperties, dx::linCoreScatteringOpticalProperties, y::CoreAbsorptionOpticalProperties, dy::linCoreAbsorptionOpticalProperties) 
+    # Predefine some arrays: 
+    x = z1.x
+    dx = z1.dx 
+    y = z2.x
+    dy = z2.dx 
+
     τ  = x.τ .+ y.τ
-    wx = x.τ .* x.ϖ 
-    ϖ  = (wx) ./ τ
+    wx = x.τ .* x.ϖ
+    ϖ  =  wx ./ τ
 
-    lin_τ  = [dx.lin_τ, dy.lin_τ]
+    lin_τ  = dx.lin_τ + dy.lin_τ
+    lin_ϖ  = (dx.lin_τ .* x.ϖ + x.τ .* dx.lin_ϖ - 
+            ϖ .* lin_τ)./τ
     
-    lin_wx = (dx.lin_τ .* (x.ϖ - ϖ)  + x.τ .* dx.lin_ϖ)./τ
-    lin_wy = -(dy.lin_τ .* ϖ)./τ     
-    lin_ϖ  = [lin_wx, lin_wy]
-
-    tmpx1 = (dx.lin_τ.*x.ϖ .+ x.τ.*dx.lin_ϖ)./w
-    tmpx2 = x.τ.*x.ϖ./w
     
-    xlin_Z⁺⁺ = tmpx1.*(x.Z⁺⁺.-Z⁺⁺) .+ tmpx2.*dx.dZ⁺⁺ 
-    xlin_Z⁻⁺ = tmpx1.*(x.Z⁻⁺.-Z⁻⁺) .+ tmpx2.*dx.dZ⁻⁺ 
-
-    lin_Z⁺⁺ = [xlin_Z⁺⁺, zeros(shape(Z⁺⁺))] #Check for size
-    lin_Z⁻⁺ = [xlin_Z⁻⁺, zeros(shape(Z⁻⁺))]
+    #@show xFT, xFT2, xFT3
+    #all(wx .== 0.0) ? (return CoreScatteringOpticalProperties(τ, ϖ, y.Z⁺⁺, y.Z⁻⁺), linCoreScatteringOpticalProperties(lin_τ, lin_ϖ, dy.lin_Z⁺⁺, dy.lin_Z⁻⁺)) : nothing
+    #all(wy .== 0.0) ? (return CoreScatteringOpticalProperties(τ, ϖ, x.Z⁺⁺, x.Z⁻⁺), linCoreScatteringOpticalProperties(lin_τ, lin_ϖ, dx.lin_Z⁺⁺, dx.lin_Z⁻⁺)) : nothing
     
-    CoreScatteringOpticalProperties(τ, ϖ, x.Z⁺⁺, x.Z⁻⁺), linCoreScatteringOpticalProperties(lin_τ, lin_ϖ, lin_Z⁺⁺, lin_Z⁻⁺)
+    return scatt_paired_xdx(CoreScatteringOpticalProperties(τ, ϖ, x.Z⁺⁺, x.Z⁻⁺), linCoreScatteringOpticalProperties(lin_τ, lin_ϖ, dx.lin_Z⁺⁺, dx.lin_Z⁻⁺))
 end
 
-function Base.:+(  y::CoreAbsorptionOpticalProperties, x::CoreScatteringOpticalProperties, dy::linCoreAbsorptionOpticalProperties, dx::linCoreScatteringOpticalProperties ) 
+function Base.:+(z2::abs_paired_xdx, z1::scatt_paired_xdx) #(y::CoreAbsorptionOpticalProperties, dy::linCoreAbsorptionOpticalProperties, x::CoreScatteringOpticalProperties, dx::linCoreScatteringOpticalProperties) 
+    x = z1.x
+    dx = z1.dx 
+    y = z2.x
+    dy = z2.dx 
+    
     τ  = x.τ .+ y.τ
-    wx = x.τ .* x.ϖ 
-    ϖ  = (wx) ./ τ
+    wx = x.τ .* x.ϖ
+    ϖ  =  wx ./ τ
 
-    lin_τ  = [dy.lin_τ, dx.lin_τ]
-    
-    lin_wx = (dx.lin_τ .* (x.ϖ - ϖ)  + x.τ .* dx.lin_ϖ)./τ
-    lin_wy = -(dy.lin_τ .* ϖ)./τ     
-    lin_ϖ  = [lin_wy, lin_wx]
+    lin_τ  = dx.lin_τ + dy.lin_τ
+    lin_ϖ  = (dx.lin_τ .* x.ϖ + x.τ .* dx.lin_ϖ - 
+            ϖ .* lin_τ)./τ
 
-    tmpx1 = (dx.lin_τ.*x.ϖ .+ x.τ.*dx.lin_ϖ)./w
-    tmpx2 = x.τ.*x.ϖ./w
-    
-    xlin_Z⁺⁺ = tmpx1.*(x.Z⁺⁺.-Z⁺⁺) .+ tmpx2.*dx.dZ⁺⁺ 
-    xlin_Z⁻⁺ = tmpx1.*(x.Z⁻⁺.-Z⁻⁺) .+ tmpx2.*dx.dZ⁻⁺ 
-
-    lin_Z⁺⁺ = [zeros(shape(Z⁺⁺)), xlin_Z⁺⁺] #Check for size
-    lin_Z⁻⁺ = [zeros(shape(Z⁺⁺)), xlin_Z⁻⁺]
-
-    CoreScatteringOpticalProperties(τ, ϖ, x.Z⁺⁺, x.Z⁻⁺), linCoreScatteringOpticalProperties(lin_τ, lin_ϖ, lin_Z⁺⁺, lin_Z⁻⁺)
+    return scatt_paired_xdx(CoreScatteringOpticalProperties(τ, ϖ, x.Z⁺⁺, x.Z⁻⁺), linCoreScatteringOpticalProperties(lin_τ, lin_ϖ, dx.lin_Z⁺⁺, dx.lin_Z⁻⁺))
 end
 
-
+#=
 function Base.:*( x::FT, y::CoreScatteringOpticalProperties{FT}, dy::linCoreScatteringOpticalProperties{FT} ) where FT
     CoreScatteringOpticalProperties(y.τ * x, y.ϖ, y.Z⁺⁺, y.Z⁻⁺, y.G), linCoreScatteringOpticalProperties(dy.lin_τ * x, dy.lin_ϖ, dy.linZ⁺⁺, dy.linZ⁻⁺, dy.linG)
 end
-
+=#

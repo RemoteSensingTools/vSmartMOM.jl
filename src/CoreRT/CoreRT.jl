@@ -87,6 +87,7 @@ include("gpu_batched.jl")                   # Batched operations
 
 # Utilities / Helper Functions
 include("atmo_prof.jl")                     # Helper Functions for Handling Atmospheric Profiles
+include("lin_atmo_prof.jl")  
 include("rt_helper_functions.jl")           # Miscellaneous Utility Functions
 include("rt_set_streams.jl")                # Set streams before RT
 include("parameters_from_yaml.jl")          # Loading in parameters from YAML file

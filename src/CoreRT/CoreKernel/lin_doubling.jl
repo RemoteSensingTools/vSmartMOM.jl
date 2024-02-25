@@ -62,11 +62,17 @@ function doubling_helper!(pol_type,
         @inbounds @views j₁⁺[:,1,:] .= j₀⁺[:,1,:] .* expk'
         # J⁻₁₂(λ)  = J⁻₀₁(λ).exp(-τ(λ)/μ₀)
         @inbounds @views j₁⁻[:,1,:] .= j₀⁻[:,1,:] .* expk'
-        for ctr=1:4
-            dj₁⁺[ctr,:,1,:] .= (dj₀⁺[ctr,:,1,:] + j₀⁺[:,1,:]*dexpk_fctr) .* expk'
-            # J⁻₁₂(λ)  = J⁻₀₁(λ).exp(-τ(λ)/μ₀)
-            dj₁⁻[ctr,:,1,:] .= (dj₀⁻[ctr,:,1,:] + j₀⁻[:,1,:]*dexpk_fctr) .* expk'
-        
+        for ctr=1:3
+            if (ctr==1)
+                dj₁⁺[ctr,:,1,:] .= (dj₀⁺[ctr,:,1,:] + j₀⁺[:,1,:]*dexpk_fctr) .* expk'
+                # J⁻₁₂(λ)  = J⁻₀₁(λ).exp(-τ(λ)/μ₀)
+                dj₁⁻[ctr,:,1,:] .= (dj₀⁻[ctr,:,1,:] + j₀⁻[:,1,:]*dexpk_fctr) .* expk'
+            else
+                dj₁⁺[ctr,:,1,:] .= (dj₀⁺[ctr,:,1,:]) .* expk'
+                # J⁻₁₂(λ)  = J⁻₀₁(λ).exp(-τ(λ)/μ₀)
+                dj₁⁻[ctr,:,1,:] .= (dj₀⁻[ctr,:,1,:]) .* expk'
+            end
+
             # J⁻₀₂(λ) = J⁻₀₁(λ) + T⁻⁻₀₁(λ)[I - R⁻⁺₂₁(λ)R⁺⁻₀₁(λ)]⁻¹[J⁻₁₂(λ) + R⁻⁺₂₁(λ)J⁺₁₀(λ)] (see Eqs.8 in Raman paper draft)
             dj₀⁻[ctr,:,1,:] .= dj₀⁻[ctr,:,1,:] + 
                 (dtt⁺⁺_gp_refl[ctr,:,:,:] ⊠ (j₁⁻ + r⁻⁺ ⊠ j₀⁺)) +
@@ -169,7 +175,7 @@ end
     i = mod(iμ, n_stokes)
     if (i > 2)
         J₀⁻[iμ, 1, n] = - J₀⁻[iμ, 1, n] 
-        dJ₀⁻[1:4, iμ, 1, n] .= - dJ₀⁻[1:4, iμ, 1, n] 
+        dJ₀⁻[1:3, iμ, 1, n] .= - dJ₀⁻[1:3, iμ, 1, n] 
     end
 end
 

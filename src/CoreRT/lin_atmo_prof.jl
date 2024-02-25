@@ -5,19 +5,25 @@ This file contains functions that are related to atmospheric profile calculation
 =#
 
 "Compute pressure levels, vmr, vcd for atmospheric profile, given p_half, T, q"
-function compute_atmos_profile_fields(T::AbstractArray{FT,1}, 
-        p_half::AbstractArray{FT,1}, 
-        q, vmr; g₀=9.807) where FT
+function lin_compute_atmos_profile_fields(
+            T::AbstractArray{FT,1}, 
+            p_half::AbstractArray{FT,1}, 
+            q, vmr,#,
+            x;#,
+            #dVMR_CO2,
+            #dVMR_H2O; 
+            g₀=9.807) where FT
     #@show "Atmos",  FT 
     # Floating type to use
     #FT = eltype(T)
     Nₐ = FT(6.02214179e+23)
     R  = FT(8.3144598)
+
     # Calculate full pressure levels
     p_full = (p_half[2:end] + p_half[1:end-1]) / 2
 
     # Dry and wet mass
-    dry_mass = FT(28.9644e-3)    # in kg/mol, weighted average for N2 and O2
+    dry_mass = FT(28.9644e-3)    # in kg/molec, weighted average for N2 and O2
     wet_mass = FT(18.01534e-3)   # just H2O
     n_layers = length(T)
 
@@ -26,19 +32,52 @@ function compute_atmos_profile_fields(T::AbstractArray{FT,1},
     vcd_dry = zeros(FT, n_layers, )
     vcd_h2o = zeros(FT, n_layers, )
     Δz      = zeros(FT, n_layers)
+    z       = zeros(FT, n_layers)
+
+    psurf = x[1] 
+    @assert x[1]==p_half[end]
     # Now actually compute the layer VCDs
+    M = FT(0.0)
     for i = 1:n_layers 
         Δp = p_half[i + 1] - p_half[i]
-        vmr_h2o[i] = dry_mass/(dry_mass-wet_mass*(1-1/q[i]))
+        a = (i<=65) ? x[8] : x[9]
+        vmr_h2o[i] = a*dry_mass/(dry_mass-wet_mass*(1-1/q[i]))
         vmr_dry = 1 - vmr_h2o[i]
         M  = vmr_dry * dry_mass + vmr_h2o[i] * wet_mass
         vcd = Nₐ * Δp / (M  * g₀ * 100^2) * 100
         vcd_dry[i] = vmr_dry    * vcd   # includes m2->cm2
         vcd_h2o[i] = vmr_h2o[i] * vcd
-        Δz[i] =  (log(p_half[i + 1]) - log(p_half[i])) / (g₀ * M  / (R * T[i]) )
-        #@show Δz, T[i], M, Δp
+        Δz[i] =  (log(p_half[i + 1]/p_half[i])) / (g₀ * M  / (R * T[i]) )
+        z[1:i] = z[1:i] .+ Δz[i]#@show Δz, T[i], M, Δp
     end
+    #Δp_surf = p_half[end] - p_half[end-1]
+    dΔz0dpsurf = (1 ./ (p_half[end])) / (g₀ * M  / (R * T[end]) )
+    dzdpsurf = zeros(length(z)) .+ dΔz0dpsurf
+    
+    prof  = LogNormal(x[6], x[7])
+    vmr["CO2"] = (x[2].+zeros(length(z))) + 
+                 (x[3] * exp.(-z./x[5])) +
+                 (x[4] * pdf.(prof, z))
+    vmr_co2 = vmr["CO2"] 
+    #dVMR_H2O[1,:] = 0.0
+    #dVMR_H2O[1,end] = dVMR_H2O[end]./Δp_surf
+    dVMR_H2O = zeros(2, length(z))
+    dVMR_CO2 = zeros(7, length(z))
+    dVMR_H2O[1,:] = [vcd_h2o[1:65]/x[8]; vcd_h2o[66:end] * 0.0;] # wrt x[7]
+    dVMR_H2O[2,:] = [vcd_h2o[1:65] * 0.0; vcd_h2o[66:end]/x[9];] # wrt x[8]
 
+    dVMR_CO2[1,:] = (x[3] * exp.(-z./x[5]) * (-1/x[5]) .-
+                    (pdf.(prof,z)./z) .* (1 .+ log.(z)/x[7]^2)) .* dzdpsurf; # wrt x[1] 
+    dVMR_CO2[2,:] = 1.0 .+ zeros(length(z)) # wrt x[2]
+    dVMR_CO2[3,:] = exp.(-z./x[5]) # wrt x[3]
+    dVMR_CO2[4,:] = pdf.(prof, z) # wrt x[4]
+    dVMR_CO2[5,:] = x[3] * exp.(-z./x[5]) .* z./(x[5])^2 # wrt x[5]
+    dVMR_CO2[6,:] = x[4] * pdf.(prof, z) .* (log.(z) .- x[6]) / x[7]^2
+    dVMR_CO2[7,:] = (x[4] * pdf.(prof, z) / x[7]) .* 
+                        (((log.(z) .- x[6]) / x[7]).^2 .- 1)
+
+
+    #=
     # TODO: This is still a bit clumsy:
     new_vmr = Dict{String, Union{Real, Vector}}()
 
@@ -52,11 +91,11 @@ function compute_atmos_profile_fields(T::AbstractArray{FT,1},
             new_vmr[molec_i] = vmr[molec_i]
         end
     end
-
-    return p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o, new_vmr, Δz
-
+    =#
+    #return p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o, new_vmr, Δz, z
+    return p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o, vmr_co2, Δz, z, dzdpsurf, dVMR_H2O, dVMR_CO2
 end
-
+#=
 "From a yaml file, get the stored fields (psurf, T, q, ak, bk), calculate derived fields, 
 and return an AtmosphericProfile object" 
 function read_atmos_profile(file_path::String)
@@ -99,18 +138,19 @@ function read_atmos_profile(file_path::String)
     return AtmosphericProfile(T, q, p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o, vmr)
 
 end
-
+=#
 "Reduce profile dimensions by re-averaging to near-equidistant pressure grid"
-function reduce_profile(n::Int, profile::AtmosphericProfile{FT}) where {FT}
+function lin_reduce_profile(n::Int, linprofile::linAtmosphericProfile{FT}) where {FT}
 
     # Can only reduce the profile, not expand it
-    @assert n < length(profile.T)
+    @assert n < length(linprofile.T)
 
     # Unpack the profile vmr
-    @unpack vmr, Δz = profile
+    #@unpack vmr, Δz = linprofile
+    @unpack Δz = linprofile
 
     # New rough half levels (boundary points)
-    a = range(0, maximum(profile.p_half), length=n+1)
+    a = range(0, maximum(linprofile.p_half), length=n+1)
 
     # Matrices to hold new values
     T = zeros(FT, n);
@@ -118,16 +158,21 @@ function reduce_profile(n::Int, profile::AtmosphericProfile{FT}) where {FT}
     Δz_ = zeros(FT, n);
     p_full = zeros(FT, n);
     p_half = zeros(FT, n+1);
+    z = zeros(FT, n);
     vmr_h2o  = zeros(FT, n);
+    vmr_co2  = zeros(FT, n);
     vcd_dry  = zeros(FT, n);
     vcd_h2o  = zeros(FT, n);
-
+    dzdpsurf = zeros(FT, n);
+    dVMR_H2O = zeros(FT, 2, n); 
+    dVMR_CO2 = zeros(FT, 7, n);
+    
     # Loop over target number of layers
     indices = []
     for i = 1:n
 
         # Get the section of the atmosphere with the i'th section pressure values
-        ind = findall(a[i] .< profile.p_full .<= a[i+1]);
+        ind = findall(a[i] .< linprofile.p_full .<= a[i+1]);
         push!(indices, ind)
         @assert length(ind) > 0 "Profile reduction has an empty layer"
         #@show i, ind, a[i], a[i+1]
@@ -138,16 +183,31 @@ function reduce_profile(n::Int, profile::AtmosphericProfile{FT}) where {FT}
         # Re-average the other parameters to produce new layers
 
         
-        p_full[i] = mean(profile.p_full[ind])
-        T[i] = mean(profile.T[ind])
-        q[i] = mean(profile.q[ind])
+        p_full[i] = mean(linprofile.p_full[ind])
+        T[i] = mean(linprofile.T[ind])
+        q[i] = mean(linprofile.q[ind])
         Δz_[i] = sum(Δz[ind])
-        vcd_dry[i] = sum(profile.vcd_dry[ind])
-        vcd_h2o[i] = sum(profile.vcd_h2o[ind])
-        vmr_h2o[i] = vcd_h2o[i]/vcd_dry[i]
+        z[i] = maximum(linprofile.z[ind])
+        vcd_dry[i] = sum(linprofile.vcd_dry[ind])
+        vcd_h2o[i] = sum(linprofile.vcd_h2o[ind])
+        vmr_h2o[i] = sum(linprofile.vmr_h2o[ind].*linprofile.p_half[ind]./linprofile.T[ind])/
+                sum(linprofile.p_half[ind]./linprofile.T[ind])#vcd_h2o[i]/vcd_dry[i]
+        vmr_co2[i] = sum(linprofile.vmr_co2[ind].*linprofile.p_half[ind]./linprofile.T[ind])/
+                sum(linprofile.p_half[ind]./linprofile.T[ind])
+        dzdpsurf[i] = mean(linprofile.dzdpsurf[ind])
+        for j=1:2
+            dVMR_H2O[j,i] = sum(linprofile.dVMR_H2O[j,ind].*linprofile.p_half[ind]./linprofile.T[ind])/
+            sum(linprofile.p_half[ind]./linprofile.T[ind])
+            dVMR_CO2[j,i] = sum(linprofile.dVMR_CO2[j,ind].*linprofile.p_half[ind]./linprofile.T[ind])/
+                    sum(linprofile.p_half[ind]./linprofile.T[ind]) 
+        end
+        for j=3:7
+            dVMR_CO2[j,i] = sum(linprofile.dVMR_CO2[j,ind].*linprofile.p_half[ind]./linprofile.T[ind])/
+                    sum(linprofile.p_half[ind]./linprofile.T[ind]) 
+        end
     end
     #@show indices
-
+#=
     new_vmr = Dict{String, Union{Real, Vector}}()
 
     # need to double check this logic, maybe better to add VCDs?!
@@ -159,8 +219,8 @@ function reduce_profile(n::Int, profile::AtmosphericProfile{FT}) where {FT}
             new_vmr[molec_i] = profile.vmr[molec_i]
         end
     end
-
-    return AtmosphericProfile(T, p_full, q, p_half, vmr_h2o, vcd_dry, vcd_h2o, new_vmr,Δz_)
+=#
+    return linAtmosphericProfile(T, p_full, q, p_half, vmr_h2o, vcd_dry, vcd_h2o, vmr_co2, Δz_, z, dzdpsurf, dVMR_H2O, dVMR_CO2)
 end
 
 """
@@ -174,11 +234,12 @@ Input:
     - `depol_fct` depolarization factor
     - `vcd_dry` dry vertical column (no water) per layer
 """
-function getRayleighLayerOptProp(psurf::FT, λ::Union{Array{FT}, FT}, depol_fct::FT, vcd_dry::Array{FT}) where FT
+function getRayleighLayerOptProp_lin(psurf::FT, λ::Union{Array{FT}, FT}, depol_fct::FT, vcd_dry::Array{FT}) where FT
     # TODO: Use noRS/noRS_plus to use n2/o2 molecular constants
     # to compute tau_scat and depol_fct
     Nz = length(vcd_dry)
     τRayl = zeros(FT,size(λ,1),Nz)
+    lin_τRayl = zeros(FT,size(λ,1),Nz) # derivative of τRayl wrt psurf
     # Total vertical Rayleigh scattering optical thickness, TODO: enable sub-layers and use VCD based taus
     tau_scat = FT(0.00864) * (psurf / FT(1013.25)) *  λ.^(-FT(3.916) .- FT(0.074) * λ .- FT(0.05) ./ λ)  
     tau_scat = tau_scat * (FT(6.0) + FT(3.0) * depol_fct) / (FT(6.0)- FT(7.0) * depol_fct) 
@@ -186,8 +247,9 @@ function getRayleighLayerOptProp(psurf::FT, λ::Union{Array{FT}, FT}, depol_fct:
     k = tau_scat / sum(vcd_dry)
     for i = 1:Nz
         τRayl[:,i] .= k * vcd_dry[i]
+        lin_τRayl[:,i] .= τRayl[:,i]/psurf 
     end 
-    return τRayl
+    return τRayl, lin_τRayl
 end
 
 
@@ -196,38 +258,33 @@ end
     
 Returns the aerosol optical depths per layer using a Gaussian distribution function with p₀ and σp on a pressure grid
 """
-function getAerosolLayerOptProp(total_τ, p₀, σp, p_half)
+
+function getAerosolLayerOptProp_lin(total_τ, z₀, σz, z, dzdpsurf)#, p_half)
 
     # Need to make sure we can also differentiate wrt σp (FT can be Dual!)
-    FT = eltype(p₀)
-    Nz = length(p_half)-1
-    ρ = zeros(FT,Nz)
-
+    FT = eltype(z₀)
+    Nz = length(z)
+    #ρ = zeros(FT,Nz)
+    #dρdz₀ = zeros(FT,Nz)
+    #dρdσz = zeros(FT,Nz)
     # @show p_half, p₀, σp
-    for i = 1:Nz
-        dp = p_half[i+1] - p_half[i]
-        p  = (p_half[i+1] + p_half[i])/2
-        # Use Distributions here later:
-        ρ[i] = (1 / (σp * sqrt(2π))) * exp(-(p - p₀)^2 / (2σp^2)) * dp
-    end
-    Norm = sum(ρ)
-    τAer  =  (total_τ / Norm) * ρ
-    return convert.(FT, τAer)
-end
 
-"""
-    $(FUNCTIONNAME)(total_τ, dist, profile)
-    
-Returns the aerosol optical depths per layer using a Distribution function in p
-"""
-function getAerosolLayerOptProp(total_τ::FT, dist::Distribution, profile::AtmosphericProfile) where FT
-    @unpack p_half, p_full, Δz = profile
-    
-    ρ = pdf.(dist,p_full) .* Δz
-    τAer  =  (total_τ / sum(ρ)) * ρ
+    prof = LogNormal(log(z₀), σz)
+    τ_aer = total_τ * pdf.(prof, z)
+    lin_τ_aer_psurf =  - τ_aer./z .* 
+            (1 .+ log.(z)/σz^2) .* dzdpsurf
+    lin_τ_aer_z₀ = τ_aer .* (log.(z) .- log(z₀)) / σz^2
+    lin_τ_aer_σz = (τ_aer / σz) .* 
+                        (((log.(z) .- log(z₀)) / σz).^2 .- 1)
+
+    # return convert(FT, τ_aer, lin_τ_aer_psurf, lin_τ_aer_z₀, lin_τ_aer_σz)
+    return τ_aer, lin_τ_aer_psurf, lin_τ_aer_z₀, lin_τ_aer_σz;
+
 end
 
 
+
+#=
 """
     $(FUNCTIONNAME)(τRayl, τAer,  aerosol_optics, Rayl𝐙⁺⁺, Rayl𝐙⁻⁺, Aer𝐙⁺⁺, Aer𝐙⁻⁺, τ_abs, arr_type)
 
@@ -308,27 +365,6 @@ function construct_atm_layer(τRayl, τAer,
     τ_λ = τ_abs .+ τ    
     ϖ_λ = (τ * ϖ) ./ τ_λ
     
-    for i = 1:nAer
-        #@show τ, ϖ , A, τAer[i]
-        τ   += τAer[i]
-        ϖ   += τAer[i] * aerosol_optics[i].ω̃
-        A   += τAer[i] * aerosol_optics[i].ω̃ * (1 - aerosol_optics[i].fᵗ)
-        Z⁺⁺ += τAer[i] * aerosol_optics[i].ω̃ * (1 - aerosol_optics[i].fᵗ) * Aer𝐙⁺⁺[:,:,i]
-        Z⁻⁺ += τAer[i] * aerosol_optics[i].ω̃ * (1 - aerosol_optics[i].fᵗ) * Aer𝐙⁻⁺[:,:,i]
-        #@show τ, ϖ , A
-        #for j=1:4
-        #    ctr = j + (nAer-1)*4
-        #    if(i==1) 
-        #        tmp_lin_τ[ctr] = 1 
-        #        tmp_lin_ϖ[ctr] = τAer[i]
-        #        tmp_lin_A[ctr] =   
-        #end
-        #for j = 1:7
-        #    ctr = j + (nAer-1)*7 
-        #    xlin_τ[ctr] = ...
-
-    end
-
     return Array(τ_λ), Array(ϖ_λ), τ, ϖ, Array(Z⁺⁺), Array(Z⁻⁺), fscattRayl
 end
 
@@ -352,13 +388,13 @@ function construct_all_atm_layers(
     Z⁺⁺_all   = zeros(FT_phase, NquadN, NquadN, Nz)
     Z⁻⁺_all   = zeros(FT_phase, NquadN, NquadN, Nz)
     
-    #dτ_max_all  = zeros(FT_ext, Nz)
-    #dτ_all      = zeros(FT_ext, Nz)
-    #fscattRayl_all  =  zeros(FT_ext, Nz)
-    #ndoubl_all  = zeros(Int64, Nz)
-    #dτ_λ_all    = zeros(FT_ext, nSpec, Nz)
-    #expk_all    = zeros(FT_ext, nSpec, Nz)
-    #scatter_all = zeros(Bool, Nz)
+    dτ_max_all  = zeros(FT_ext, Nz)
+    dτ_all      = zeros(FT_ext, Nz)
+    fscattRayl_all  =  zeros(FT_ext, Nz)
+    ndoubl_all  = zeros(Int64, Nz)
+    dτ_λ_all    = zeros(FT_ext, nSpec, Nz)
+    expk_all    = zeros(FT_ext, nSpec, Nz)
+    scatter_all = zeros(Bool, Nz)
 
     for iz=1:Nz
         
@@ -409,16 +445,20 @@ function construct_all_atm_layers(
 
     return ComputedAtmosphereProperties(τ_λ_all, ϖ_λ_all, τ_all, ϖ_all, Z⁺⁺_all, Z⁻⁺_all, dτ_max_all, dτ_all, ndoubl_all, dτ_λ_all, expk_all, scatter_all, τ_sum_all, fscattRayl_all, scattering_interfaces_all)
 end
+=#
 
-
-
+# TODO:
 "Given the CrossSectionModel, the grid, and the AtmosphericProfile, fill up the τ_abs array with the cross section at each layer
 (using pressures/temperatures) from the profile" 
-function compute_absorption_profile!(τ_abs::Array{FT,2}, 
+function compute_absorption_profile_lin!(τ_abs::Array{FT,2},
+                                     lin_τ_abs::Array{FT,3},
+                                     Δp_surf,
+                                     dVMR,
+                                     #dVMR_CO2,
                                      absorption_model, 
                                      grid,
                                      vmr,
-                                     profile::AtmosphericProfile,
+                                     profile::linAtmosphericProfile,
                                      ) where FT 
 
     # The array to store the cross-sections must be same length as number of layers
@@ -432,7 +472,15 @@ function compute_absorption_profile!(τ_abs::Array{FT,2},
         T = profile.T[iz]
         # Either use the current layer's vmr, or use the uniform vmr
         vmr_curr = vmr isa AbstractArray ? vmr[iz] : vmr
-        τ_abs[:,iz] += Array(absorption_cross_section(absorption_model, grid, p, T)) * profile.vcd_dry[iz] * vmr_curr
+        Δτ = Array(absorption_cross_section(absorption_model, grid, p, T)) * profile.vcd_dry[iz] * vmr_curr
+        τ_abs[:,iz] += Δτ   # Array(absorption_cross_section(absorption_model, grid, p, T)) * profile.vcd_dry[iz] * vmr_curr
+        
+        for ipar in 1:9
+            lin_τ_abs[ipar,:,iz] += Δτ * (dVMR[ipar,iz]./vmr_curr)            
+        end
+        if iz==length(profile.p_full)
+            lin_τ_abs[1,:,iz] += Δτ/Δp_surf  
+        end
     end
     
 end

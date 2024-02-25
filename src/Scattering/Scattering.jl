@@ -55,5 +55,6 @@ export compute_B, compute_ab, GreekCoefs, comp_ab, compute_mie_π_τ!,
        ConjugateTransposePairs, AbstractPolarizationType, 
        AbstractAerosolType, AbstractAerosolType, MieModel, 
        AbstractTruncationType, phase_function
+export compute_ref_aerosol_extinction_lin, compute_aerosol_optical_properties_lin
 
 end

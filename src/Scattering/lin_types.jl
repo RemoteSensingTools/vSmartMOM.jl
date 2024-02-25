@@ -75,7 +75,7 @@ A struct which holds all computed aerosol optics
 $(DocStringExtensions.FIELDS)
 """
 #Base.@kwdef 
-Base.@kwdef mutable struct dAerosolOptics{FT<:AbstractFloat}
+Base.@kwdef mutable struct dAerosolOptics{FT}#<:AbstractFloat}
     "derivatives of Greek matrix w.r.t nᵣ, nᵢ, r₀ and σ₀"
     d_greek_coefs::Vector{GreekCoefs{FT}}
     "derivatives of Single Scattering Albedo w.r.t nᵣ, nᵢ, r₀ and σ₀"

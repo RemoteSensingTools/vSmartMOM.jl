@@ -90,7 +90,7 @@ Compute all an, bn using compute_mie_ab!
 Input: MieModel, wavelength (λ), radius
 Output: an, bn. Both of shape (aerosol.nquad_radius, N_max) (N_max from aerosol.r_max)
 """
-function compute_anbn(model::MieModel, λ, radius)
+function compute_anbn_lin(model::MieModel, λ, radius)
     
     @unpack computation_type, aerosol, r_max, nquad_radius, λ, polarization_type, truncation_type, wigner_A, wigner_B = model
     @unpack size_distribution, nᵣ, nᵢ = aerosol
@@ -136,12 +136,12 @@ end
 From the an, bn matrices, precompute all (an✶)am, (an✶)bm, (bn✶)am, (bn✶)bm 
 This allows quick computation of (an✶ + bn✶) × (am + bm)
 """
-function compute_avg_anbns!(an, bn, ab_pairs, w, Nmax, N_max_)
+function compute_avg_anbns!(an, bn, ab_pairs, dan, dbn, d_ab_pairs, w, Nmax, N_max_)
     FT2 = eltype(an)
 
     # Unpack ab_pairs
     mat_anam, mat_anbm, mat_bnam, mat_bnbm = ab_pairs
-    mat_danam, mat_danbm, mat_dbnam, mat_dbnbm = ab_pairs
+    mat_danam, mat_danbm, mat_dbnam, mat_dbnbm = d_ab_pairs
     # Fill all matrices with 0
     [fill!(mat, 0) for mat in [mat_anam, mat_bnbm, mat_anbm, mat_bnam]]
     [fill!(mat, 0) for mat in [mat_danam, mat_dbnbm, mat_danbm, mat_dbnam]]
@@ -271,7 +271,7 @@ function reconstruct_phase(greek_coefs, dgreek_coefs, μ; returnLeg=false)
     # For truncation in δ-BGE, we need P and P² as well, convenient to return here:
     return returnLeg ? (scattering_matrix, dscattering_matrix, P, P²) : (scattering_matrix, dscattering_matrix)
 end
-
+#=
 """
     $(FUNCTIONNAME)(depol)
 Returns the greek coefficients (as [`GreekCoefs`](@ref)) of the Rayleigh phase function given 
@@ -293,7 +293,7 @@ function get_greek_rayleigh(depol::Number)
     ζ  =  FT[0.0, 0.0,             0.0]
     return GreekCoefs(α, β, γ, δ, ϵ, ζ)
 end
-
+=#
 """ 
     $(FUNCTIONNAME)(k, an, bn, w)
 Calculate the average Scattering and Extinction Cross Section 
@@ -303,10 +303,13 @@ function compute_avg_C_scatt_ext(k, an, bn, dan, dbn, w)
     n_ = collect(1:size(an)[2]);
     n_ = 2n_ .+ 1
     coef = 2π / k^2 * n_'
-    return (coef * (w' * (abs2.(an') + abs2.(bn'))')', coef * (w' * real(an + bn))',
-        2*coef * (w' * (real(an)*real(dan') + real(bn)*real(dbn') + imag(an)*imag(dan') + imag(bn)*imag(dbn'))')', coef * (w' * real(dan + dbn))')
+    return (coef * (w' * (abs2.(an') + abs2.(bn'))')', 
+        coef * (w' * real(an + bn))',
+        2*coef * (w' * (real(an)*real(dan') + real(bn)*real(dbn') + imag(an)*imag(dan') + imag(bn)*imag(dbn'))')', 
+        coef * (w' * real(dan + dbn))')
 end
-
+        
+#=
 """ Compute probability weights of radii """
 function compute_wₓ(size_distribution, wᵣ, r, r_max) 
     
@@ -393,7 +396,7 @@ See Sanghavi 2014, eq. 16
 construct_B_matrix(mod::Stokes_I, α, β, γ, δ, ϵ, ζ, l::Int) = β[l]
 
 
-#=
+
 """
     $(FUNCTIONNAME)(mod::AbstractPolarizationType, μ, α, β, γ, δ, ϵ, ζ, m::Int)
 Compute moments of the phase matrix 

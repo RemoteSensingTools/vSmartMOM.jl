@@ -14,7 +14,7 @@ Input: MieModel, holding all computation and aerosol properties
 Output: AerosolOptics, holding all Greek coefficients and Cross-Sectional information
 """
 #TODO: define linAerosolOptics 
-function compute_aerosol_optical_properties(model::MieModel{FDT}, FT2::Type=Float64) where FDT <: NAI2
+function compute_aerosol_optical_properties_lin(model::MieModel{FDT}, FT2::Type=Float64) where FDT <: NAI2
 
     # Unpack the model
     @unpack aerosol, λ, r_max, nquad_radius = model
@@ -324,23 +324,23 @@ function compute_aerosol_optical_properties(model::MieModel{FDT}, FT2::Type=Floa
             dAerosolOptics(d_greek_coefs=d_greek_coefs, dω̃=dω̃, dk=d_bulk_C_ext, dk_ref=zeros(FT, 4), dfᵗ=zeros(FT, 4))
 
     else =#
-        greek_coefs = GreekCoefs(α,β,γ,δ,ϵ,ζ)
-        #d_greek_coefs=[];
-        #for i=1:4
-            d_greek_coefs = [GreekCoefs(dα[i,:], 
-                                        dβ[i,:], 
-                                        dγ[i,:], 
-                                        dδ[i,:], 
-                                        dϵ[i,:], 
-                                        dζ[i,:]) for i=1:4]
-            #push!(d_greek_coefs, tmp_greek_coefs);
-        #end
-        return AerosolOptics(greek_coefs=greek_coefs, ω̃=ω̃, k=(bulk_C_ext), k_ref=FT(0), fᵗ=FT(1)),  
-            dAerosolOptics(d_greek_coefs=d_greek_coefs, dω̃=dω̃, dk=d_bulk_C_ext, dk_ref=zeros(FT, 4), dfᵗ=zeros(FT, 4))
+    greek_coefs = GreekCoefs(α,β,γ,δ,ϵ,ζ)
+    #d_greek_coefs=[];
+    #for i=1:4
+    d_greek_coefs = [GreekCoefs(dα[i,:], 
+                                dβ[i,:], 
+                                dγ[i,:], 
+                                dδ[i,:], 
+                                dϵ[i,:], 
+                                dζ[i,:]) for i=1:4]
+        #push!(d_greek_coefs, tmp_greek_coefs);
     #end
+    return AerosolOptics(greek_coefs=greek_coefs, ω̃=ω̃, k=(bulk_C_ext), k_ref=FT(0), fᵗ=FT(1)),  
+        dAerosolOptics(d_greek_coefs=d_greek_coefs, dω̃=dω̃, dk=d_bulk_C_ext, dk_ref=zeros(FT, 4), dfᵗ=zeros(FT, 4))
 end
 
-function compute_ref_aerosol_extinction(model::MieModel{FDT}, FT2::Type=Float64) where FDT <: NAI2
+# function compute_ref_aerosol_extinction_lin(model::MieModel{FDT}, FT2::Type=Float64) where FDT <: NAI2
+function compute_ref_aerosol_extinction_lin(model::MieModel)#{FT}, FT) #2::Type=Float64) where FDT <: NAI2
 
     # Unpack the model
     @unpack computation_type, aerosol, λ, polarization_type, r_max, nquad_radius = model
@@ -440,7 +440,7 @@ end
 Compute phase function from aerosol distribution with log-normal mean μ [µm] and σ
 Output: μ, w_μ, P, C_ext, C_sca, g
 """
-function phase_function(aerosol::Aerosol, λ, r_max, nquad_radius) 
+function phase_function_lin(aerosol::Aerosol, λ, r_max, nquad_radius) 
 
     # Extract variables from aerosol struct:
     @unpack size_distribution, nᵣ, nᵢ = aerosol
@@ -610,7 +610,7 @@ end
 Compute phase function from mono-modal aerosol with radius `r` at wavelength `λ`, both in `[μm]`
 Output: μ, w_μ, P, C_ext, C_sca, g
 """
-function phase_function(r::FT, λ::FT, nᵣ::FT, nᵢ::FT) where {FT<:AbstractFloat} 
+function phase_function_lin(r::FT, λ::FT, nᵣ::FT, nᵢ::FT) where {FT<:AbstractFloat} 
     # Imaginary part of the refractive index must be ≥ 0 (definition)
     @assert nᵢ ≥ 0 "Imaginary part of the refractive index must be ≥ 0 (definition)"
     # Wavenumber
