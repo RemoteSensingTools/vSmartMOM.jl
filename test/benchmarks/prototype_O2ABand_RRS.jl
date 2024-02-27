@@ -10,8 +10,8 @@ using InstrumentOperator #for convolution of hires spectrum to instrument grid
 using ImageFiltering
 using Distributions
 using Plots
-
-##
+using DelimitedFiles
+#
 
 # Load YAML files into parameter struct
 parameters = 
@@ -71,7 +71,7 @@ for i=1:length(P)
 end 
 
 R, T, ieR, ieT = CoreRT.rt_run_test(RS_type,model,iBand);
-R_ss, T_ss, ieR_ss, ieT_ss = CoreRT.rt_run_test_ss(RS_type,model,iBand);
+#R_ss, T_ss, ieR_ss, ieT_ss = CoreRT.rt_run_test_ss(RS_type,model,iBand);
 
 RS_type = InelasticScattering.noRS(
     fscattRayl  = [FT(1)],
@@ -87,7 +87,34 @@ for i=1:length(P)
 end 
 
 RnoRS, TnoRS, _, _ = CoreRT.rt_run_test(RS_type,model,iBand);
-RnoRS_ss, TnoRS_ss, _, _ = CoreRT.rt_run_test_ss(RS_type,model,iBand);
+
+#=
+rayl_sza45_vza00_rrs_MOM = [ν R[1,1,:] R[1,2,:] R[1,3,:] ieR[1,1,:] ieR[1,2,:] ieR[1,3,:]]
+rayl_sza45_vza00_nors_MOM = [ν RnoRS[1,1,:] RnoRS[1,2,:] RnoRS[1,3,:]]
+
+
+writedlm("out_ray_sza45_vza00_rrs_MOM.dat", rayl_sza45_vza00_rrs_MOM)
+writedlm("out_ray_sza45_vza00_nors_MOM.dat", rayl_sza45_vza00_nors_MOM)
+
+rayl_sza45_vza00_rrs_MOM = readdlm("out_ray_sza45_vza00_rrs_MOM.dat")
+rayl_sza45_vza00_nors_MOM = readdlm("out_ray_sza45_vza00_nors_MOM.dat")
+=#
+
+MOM60_rrs = readdlm("out_ray_sza60_vza00_rrs_MOM.dat")
+MOM60_nors = readdlm("out_ray_sza60_vza00_nors_MOM.dat")
+MOM45_rrs = readdlm("out_ray_sza45_vza00_rrs_MOM.dat")
+MOM45_nors = readdlm("out_ray_sza45_vza00_nors_MOM.dat")
+MOM30_rrs = readdlm("out_ray_sza30_vza00_rrs_MOM.dat")
+MOM30_nors = readdlm("out_ray_sza30_vza00_nors_MOM.dat")
+
+bin60_rrs = readdlm("out_ray_sza60_vza00_rrs_bin.dat")
+bin60_nors = readdlm("out_ray_sza60_vza00_nors_bin.dat")
+bin45_rrs = readdlm("out_ray_sza45_vza00_rrs_bin.dat")
+bin45_nors = readdlm("out_ray_sza45_vza00_nors_bin.dat")
+bin30_rrs = readdlm("out_ray_sza30_vza00_rrs_bin.dat")
+bin30_nors = readdlm("out_ray_sza30_vza00_nors_bin.dat")
+
+#RnoRS_ss, TnoRS_ss, _, _ = CoreRT.rt_run_test_ss(RS_type,model,iBand);
 
 #=
 R_test, T_test, ieR_test, ieT_test = CoreRT.rt_run_test(RS_type,model,iBand);
@@ -102,11 +129,14 @@ R_test, T_test, ieR_test, ieT_test = CoreRT.rt_run_test(RS_type,model,1);
 #===Convolution of hires spectral simulations to instrument grid===#
 #x = (1e7/415):0.3:(1e7/385)
 #ν = (1e7/460):0.3:(1e7/420)
-x = -40:0.15:40
+#x = -40:0.15:40
+x = -40:0.04:40
+FWHM_OCO = 0.042 #nm
+σOCO = FWHM_OCO/2.355
 #kernel = InstrumentOperator.create_instrument_kernel(Normal(0, 12.5), x) #defining a Gaussian kernel for convolution in wavenumber space
-#kernel = InstrumentOperator.create_instrument_kernel(Normal(0, 12.5), x)
-kernel = InstrumentOperator.create_instrument_kernel(Normal(0, 3.75), x) #SCIAMACHY resolution of σ=0.54 nm in the O2 A-band 
-
+kernel = InstrumentOperator.create_instrument_kernel(Normal(0, σOCO), x)
+#kernel = InstrumentOperator.create_instrument_kernel(Normal(0, 3.75), x) #SCIAMACHY resolution of σ=0.54 nm in the O2 A-band 
+#=
 I_conv_noRS = zeros(3,length(ν))
 I_conv = zeros(3,length(ν))
 ieI_conv = zeros(3,length(ν))
@@ -114,8 +144,8 @@ Q_conv_noRS = zeros(3,length(ν))
 Q_conv = zeros(3,length(ν))
 ieQ_conv = zeros(3,length(ν))
 
-I_conv_noRS_ss = zeros(3,length(ν))
-I_conv_ss = zeros(3,length(ν))
+I_conv_noRS_bin = zeros(3,length(ν))
+I_conv_bin = zeros(3,length(ν))
 ieI_conv_ss = zeros(3,length(ν))
 Q_conv_noRS_ss = zeros(3,length(ν))
 Q_conv_ss = zeros(3,length(ν))
@@ -136,7 +166,6 @@ for ctr=1:3
     Q_conv_ss[ctr,:] .= imfilter(R_ss[ctr,2,:], kernel)
     ieQ_conv_ss[ctr,:] .= imfilter(ieR_ss[ctr,2,:], kernel)
 end
-#I_conv = InstrumentOperator.conv_spectra(kernel, )
 
 convfct = 1e7./ν.^2   # to convert radiance units from mW/m²-str-cm⁻¹ to mW/m²-str-nm
 #convfct = 1.0#./F₀ # to normalize wrt irradiance 
@@ -384,3 +413,174 @@ q3 = plot!(1e7./ν, (R_ss[3,2,:].-RnoRS_ss[3,2,:].+ieR_ss[3,2,:]).*convfct, line
 
 plot(p1, q1, p2, q2, p3, q3, layout = l, legend = false, title = ["I₁ (with RS)" "Q₁ (with RS)" "I₁-I₀" "Q₁-Q₀" "(1-I₀/I₁) [%]" "(1-Q₀/Q₁) [%]"], titlefont = font(10))
 savefig("RingEffect_O2A_SZA30_wF.png")
+
+=#
+
+#for ctr=1:3
+ν = MOM30_nors[:,1] 
+νbin = bin30_nors[:,1] 
+
+#No convolution is carried out in the following because the OCO sampling frequency is higher than the wavelength grid
+I_noRS = zeros(3,length(ν))
+I = zeros(3,length(ν))
+ieI = zeros(3,length(ν))
+Q_noRS = zeros(3,length(ν))
+Q = zeros(3,length(ν))
+ieQ = zeros(3,length(ν))
+
+I_noRS_bin = zeros(3,length(νbin))
+I_bin = zeros(3,length(νbin))
+ieI_bin = zeros(3,length(νbin))
+Q_noRS_bin = zeros(3,length(νbin))
+Q_bin = zeros(3,length(νbin))
+ieQ_bin = zeros(3,length(νbin))
+
+I_noRS[1,:] .= MOM30_nors[:,2]#imfilter(RnoRS[ctr,1,:], kernel)
+Q_noRS[1,:] .= MOM30_nors[:,3]
+I[1,:] .= MOM30_rrs[:,2]#imfilter(R[ctr,1,:], kernel)
+Q[1,:] .= MOM30_rrs[:,3]
+ieI[1,:] .= MOM30_rrs[:,5]#imfilter(ieR[ctr,1,:], kernel)
+ieQ[1,:] .= MOM30_rrs[:,6]
+
+I_noRS[2,:] .= MOM45_nors[:,2]#imfilter(RnoRS[ctr,1,:], kernel)
+Q_noRS[2,:] .= MOM45_nors[:,3]
+I[2,:] .= MOM45_rrs[:,2]#imfilter(R[ctr,1,:], kernel)
+Q[2,:] .= MOM45_rrs[:,3]
+ieI[2,:] .= MOM45_rrs[:,5]#imfilter(ieR[ctr,1,:], kernel)
+ieQ[2,:] .= MOM45_rrs[:,6]
+
+I_noRS[3,:] .= MOM60_nors[:,2]#imfilter(RnoRS[ctr,1,:], kernel)
+Q_noRS[3,:] .= MOM60_nors[:,3]
+I[3,:] .= MOM60_rrs[:,2]#imfilter(R[ctr,1,:], kernel)
+Q[3,:] .= MOM60_rrs[:,3]
+ieI[3,:] .= MOM60_rrs[:,5]#imfilter(ieR[ctr,1,:], kernel)
+ieQ[3,:] .= MOM60_rrs[:,6]
+
+
+I_noRS_bin[1,:] .= bin30_nors[:,2]#imfilter(RnoRS[ctr,1,:], kernel)
+Q_noRS_bin[1,:] .= bin30_nors[:,3]
+I_bin[1,:] .= bin30_rrs[:,2]#imfilter(R[ctr,1,:], kernel)
+Q_bin[1,:] .= bin30_rrs[:,3]
+ieI_bin[1,:] .= bin30_rrs[:,5]#imfilter(ieR[ctr,1,:], kernel)
+ieQ_bin[1,:] .= bin30_rrs[:,6]
+
+I_noRS_bin[2,:] .= bin45_nors[:,2]#imfilter(RnoRS[ctr,1,:], kernel)
+Q_noRS_bin[2,:] .= bin45_nors[:,3]
+I_bin[2,:] .= bin45_rrs[:,2]#imfilter(R[ctr,1,:], kernel)
+Q_bin[2,:] .= bin45_rrs[:,3]
+ieI_bin[2,:] .= bin45_rrs[:,5]#imfilter(ieR[ctr,1,:], kernel)
+ieQ_bin[2,:] .= bin45_rrs[:,6]
+
+I_noRS_bin[3,:] .= bin60_nors[:,2]#imfilter(RnoRS[ctr,1,:], kernel)
+Q_noRS_bin[3,:] .= bin60_nors[:,3]
+I_bin[3,:] .= bin60_rrs[:,2]#imfilter(R[ctr,1,:], kernel)
+Q_bin[3,:] .= bin60_rrs[:,3]
+ieI_bin[3,:] .= bin60_rrs[:,5]#imfilter(ieR[ctr,1,:], kernel)
+ieQ_bin[3,:] .= bin60_rrs[:,6]
+#end
+#I_conv = InstrumentOperator.conv_spectra(kernel, )
+
+convfct = 1e7./ν.^2   # to convert radiance units from mW/m²-str-cm⁻¹ to mW/m²-str-nm
+#convfct = 1.0#./F₀ # to normalize wrt irradiance 
+l = @layout [a1 a2 ; b1 b2; c1 c2]
+p1 = plot(1e7./ν, 100*(I[1,:].-I_noRS[1,:].+ieI[1,:])./(I_noRS[1,:]), linecolor=:black, linewidth=0.8, alpha=0.85, xlabel = "λ [nm]", xlims=(755,775), ylims=(-1,5.5))
+p1 = plot!(1e7./νbin, 100*(I_bin[1,:].-I_noRS_bin[1,:].+ieI_bin[1,:])./(I_noRS_bin[1,:]), linecolor=:red, linewidth=0.8, alpha=0.85, xlabel = "λ [nm]", xlims=(755,775))
+
+p2 = plot(1e7./ν, 100*(I[2,:].-I_noRS[2,:].+ieI[2,:])./(I_noRS[2,:]), linecolor=:black, linewidth=0.8, alpha=0.85, xlabel = "λ [nm]", xlims=(755,775), ylims=(-1,5.5))
+p2 = plot!(1e7./νbin, 100*(I_bin[2,:].-I_noRS_bin[2,:].+ieI_bin[2,:])./(I_noRS_bin[2,:]), linecolor=:red, linewidth=0.8, alpha=0.85, xlabel = "λ [nm]", xlims=(755,775))
+
+p3 = plot(1e7./ν, 100*(I[3,:].-I_noRS[3,:].+ieI[3,:])./(I_noRS[3,:]), linecolor=:black, linewidth=0.8, alpha=0.85, xlabel = "λ [nm]", xlims=(755,775), ylims=(-1,5.5))
+p3 = plot!(1e7./νbin, 100*(I_bin[3,:].-I_noRS_bin[3,:].+ieI_bin[3,:])./(I_noRS_bin[3,:]), linecolor=:red, linewidth=0.8, alpha=0.85, xlabel = "λ [nm]", xlims=(755,775))
+
+q1 = plot(1e7./ν, 100*(Q[1,:].-Q_noRS[1,:].+ieQ[1,:])./(Q_noRS[1,:]), linecolor=:black, linewidth=0.8, alpha=0.85, xlabel = "λ [nm]", xlims=(755,775), ylims=(-0.1,1))
+q1 = plot!(1e7./νbin, 100*(Q_bin[1,:].-Q_noRS_bin[1,:].+ieQ_bin[1,:])./(Q_noRS_bin[1,:]), linecolor=:red, linewidth=0.8, alpha=0.85, xlabel = "λ [nm]", xlims=(755,775))
+
+q2 = plot(1e7./ν, 100*(Q[2,:].-Q_noRS[2,:].+ieQ[2,:])./(Q_noRS[2,:]), linecolor=:black, linewidth=0.8, alpha=0.85, xlabel = "λ [nm]", xlims=(755,775), ylims=(-0.1,1))
+q2 = plot!(1e7./νbin, 100*(Q_bin[2,:].-Q_noRS_bin[2,:].+ieQ_bin[2,:])./(Q_noRS_bin[2,:]), linecolor=:red, linewidth=0.8, alpha=0.85, xlabel = "λ [nm]", xlims=(755,775))
+
+q3 = plot(1e7./ν, 100*(Q[3,:].-Q_noRS[3,:].+ieQ[3,:])./(Q_noRS[3,:]), linecolor=:black, linewidth=0.8, alpha=0.85, xlabel = "λ [nm]", xlims=(755,775), ylims=(-0.1,1))
+q3 = plot!(1e7./νbin, 100*(Q_bin[3,:].-Q_noRS_bin[3,:].+ieQ_bin[3,:])./(Q_noRS_bin[3,:]), linecolor=:red, linewidth=0.8, alpha=0.85, xlabel = "λ [nm]", xlims=(755,775))
+
+
+plot(p1, q1, p2, q2, p3, q3, layout = l, legend = false, title = ["(I₁-I₀)/I₀ [%], SZA=30ᵒ" "(Q₁-Q₀)/Q₀ [%], SZA=30ᵒ" "(I₁-I₀)/I₀ [%], SZA=45ᵒ" "(Q₁-Q₀)/Q₀ [%], SZA=45ᵒ" "(I₁-I₀)/I₀ [%], SZA=60ᵒ" "(Q₁-Q₀)/Q₀ [%], SZA=60ᵒ"], titlefont = font(10))
+#savefig("RingEffect_O2A_SZA30_wF.png")
+savefig("RingEffect_MOM_vs_bin_2.png")
+
+l = @layout [a1; a2]# ; b1 b2; c1 c2]
+p3 = plot(1e7./ν, 100*(I[3,:].-I_noRS[3,:].+ieI[3,:])./(I_noRS[3,:]), linecolor=:black, linewidth=1, alpha=0.85, xlabel = "λ [nm]", xlims=(755,775), ylims=(-1,5.5))
+#p3 = plot!(1e7./νbin, 100*(I_bin[3,:].-I_noRS_bin[3,:].+ieI_bin[3,:])./(I_noRS_bin[3,:]), linecolor=:red, linewidth=1, alpha=0.85, xlabel = "λ [nm]", xlims=(755,775))
+
+q3 = plot(1e7./ν, 100*(Q[3,:].-Q_noRS[3,:].+ieQ[3,:])./(Q_noRS[3,:]), linecolor=:black, linewidth=1, alpha=0.85, xlabel = "λ [nm]", xlims=(755,775), ylims=(-0.1,1))
+#q3 = plot!(1e7./νbin, 100*(Q_bin[3,:].-Q_noRS_bin[3,:].+ieQ_bin[3,:])./(Q_noRS_bin[3,:]), linecolor=:red, linewidth=1, alpha=0.85, xlabel = "λ [nm]", xlims=(755,775))
+
+
+plot(p3, q3, layout = l, legend = false, title = ["(I₁-I₀)/I₀ [%], SZA=60ᵒ" "(Q₁-Q₀)/Q₀ [%], SZA=60ᵒ"], titlefont = font(10))
+#savefig("RingEffect_O2A_SZA30_wF.png")
+savefig("RingEffect_MOM_vs_bin__sza60_1.png")
+
+l = @layout [a1; a2]# ; b1 b2; c1 c2]
+
+p3 = plot(1e7./ν, 100*(I[3,:].-I_noRS[3,:].+ieI[3,:])./(I_noRS[3,:]), linecolor=:black, linewidth=2, alpha=0.85, xlabel = "λ [nm]", xlims=(759,762), ylims=(-1,5.5))
+p3 = plot!(1e7./νbin, 100*(I_bin[3,:].-I_noRS_bin[3,:].+ieI_bin[3,:])./(I_noRS_bin[3,:]), linecolor=:red, linewidth=2, alpha=0.85, xlabel = "λ [nm]", xlims=(759,762))
+
+q3 = plot(1e7./ν, 100*(Q[3,:].-Q_noRS[3,:].+ieQ[3,:])./(Q_noRS[3,:]), linecolor=:black, linewidth=2, alpha=0.85, xlabel = "λ [nm]", xlims=(759,762), ylims=(-0.1,1))
+q3 = plot!(1e7./νbin, 100*(Q_bin[3,:].-Q_noRS_bin[3,:].+ieQ_bin[3,:])./(Q_noRS_bin[3,:]), linecolor=:red, linewidth=2, alpha=0.85, xlabel = "λ [nm]", xlims=(759,762))
+
+plot(p3, q3, layout = l, legend = false, title = ["(I₁-I₀)/I₀ [%], SZA=60ᵒ" "(Q₁-Q₀)/Q₀ [%], SZA=60ᵒ"], titlefont = font(10))
+#savefig("RingEffect_O2A_SZA30_wF.png")
+savefig("RingEffect_MOM_vs_bin_sza60_Rbranch_2.png")
+
+l = @layout [a1; a2]# ; b1 b2; c1 c2]
+
+p3 = plot(1e7./ν, 100*(I[3,:].-I_noRS[3,:].+ieI[3,:])./(I_noRS[3,:]), linecolor=:black, linewidth=2, alpha=0.85, xlabel = "λ [nm]", xlims=(769,772), ylims=(-1,5.5))
+p3 = plot!(1e7./νbin, 100*(I_bin[3,:].-I_noRS_bin[3,:].+ieI_bin[3,:])./(I_noRS_bin[3,:]), linecolor=:red, linewidth=2, alpha=0.85, xlabel = "λ [nm]", xlims=(769,772))
+
+q3 = plot(1e7./ν, 100*(Q[3,:].-Q_noRS[3,:].+ieQ[3,:])./(Q_noRS[3,:]), linecolor=:black, linewidth=2, alpha=0.85, xlabel = "λ [nm]", xlims=(769,772), ylims=(-0.1,1))
+q3 = plot!(1e7./νbin, 100*(Q_bin[3,:].-Q_noRS_bin[3,:].+ieQ_bin[3,:])./(Q_noRS_bin[3,:]), linecolor=:red, linewidth=2, alpha=0.85, xlabel = "λ [nm]", xlims=(769,772))
+
+plot(p3, q3, layout = l, legend = false, title = ["(I₁-I₀)/I₀ [%], SZA=60ᵒ" "(Q₁-Q₀)/Q₀ [%], SZA=60ᵒ"], titlefont = font(10))
+#savefig("RingEffect_O2A_SZA30_wF.png")
+savefig("RingEffect_MOM_vs_bin_sza60_farPbranch_2.png")
+
+l = @layout [a1; a2]# ; b1 b2; c1 c2]
+
+p3 = plot(1e7./ν, 100*(I[3,:].-I_noRS[3,:].+ieI[3,:])./(I_noRS[3,:]), linecolor=:black, linewidth=2, alpha=0.85, xlabel = "λ [nm]", xlims=(762,767), ylims=(-1,5.5))
+p3 = plot!(1e7./νbin, 100*(I_bin[3,:].-I_noRS_bin[3,:].+ieI_bin[3,:])./(I_noRS_bin[3,:]), linecolor=:red, linewidth=2, alpha=0.85, xlabel = "λ [nm]", xlims=(762,767))
+
+q3 = plot(1e7./ν, 100*(Q[3,:].-Q_noRS[3,:].+ieQ[3,:])./(Q_noRS[3,:]), linecolor=:black, linewidth=2, alpha=0.85, xlabel = "λ [nm]", xlims=(762,767), ylims=(-0.1,1))
+q3 = plot!(1e7./νbin, 100*(Q_bin[3,:].-Q_noRS_bin[3,:].+ieQ_bin[3,:])./(Q_noRS_bin[3,:]), linecolor=:red, linewidth=2, alpha=0.85, xlabel = "λ [nm]", xlims=(762,767))
+
+plot(p3, q3, layout = l, legend = false, title = ["(I₁-I₀)/I₀ [%], SZA=60ᵒ" "(Q₁-Q₀)/Q₀ [%], SZA=60ᵒ"], titlefont = font(10))
+#savefig("RingEffect_O2A_SZA30_wF.png")
+savefig("RingEffect_MOM_vs_bin_sza60_Pbranch_2.png")
+
+I_noRS_lp = zeros(length(ν))
+I_lp = zeros(length(ν))
+ieI_lp = zeros(length(ν))
+Q_noRS_lp = zeros(length(ν))
+Q_lp = zeros(length(ν))
+ieQ_lp = zeros(length(ν))
+
+I_noRS_lp[:] .= MOM60_nors_lp[:,2]#imfilter(RnoRS[ctr,1,:], kernel)
+Q_noRS_lp[:] .= MOM60_nors_lp[:,3]
+I_lp[:] .= MOM60_rrs_lp[:,2]#imfilter(R[ctr,1,:], kernel)
+Q_lp[:] .= MOM60_rrs_lp[:,3]
+ieI_lp[:] .= MOM60_rrs_lp[:,5]#imfilter(ieR[ctr,1,:], kernel)
+ieQ_lp[:] .= MOM60_rrs_lp[:,6]
+
+l = @layout [a1; a2]# ; b1 b2; c1 c2]
+p3 = plot(1e7./ν, 100*(I[3,:].-I_noRS[3,:].+ieI[3,:])./(I_noRS[3,:]), linecolor=:black, linewidth=1, alpha=0.85, xlabel = "λ [nm]", xlims=(755,775), ylims=(-1,5.5))
+p3 = plot!(1e7./νbin, 100*(I_bin[3,:].-I_noRS_bin[3,:].+ieI_bin[3,:])./(I_noRS_bin[3,:]), linecolor=:red, linewidth=1, alpha=0.85, xlabel = "λ [nm]", xlims=(755,775))
+p3 = plot!(1e7./ν, 100*(-I_lp .+ I[3,:])./I[3,:], linecolor=:blue, linewidth=1, alpha=0.5, xlabel = "λ [nm]", xlims=(755,775))
+
+q3 = plot(1e7./ν, 100*(Q[3,:].-Q_noRS[3,:].+ieQ[3,:])./(Q_noRS[3,:]), linecolor=:black, linewidth=1, alpha=0.85, xlabel = "λ [nm]", xlims=(755,775), ylims=(-0.1,1))
+#q3 = plot!(1e7./νbin, 100*(Q_bin[3,:].-Q_noRS_bin[3,:].+ieQ_bin[3,:])./(Q_noRS_bin[3,:]), linecolor=:red, linewidth=1, alpha=0.85, xlabel = "λ [nm]", xlims=(755,775))
+
+
+plot(p3, q3, layout = l, legend = false, title = ["(I₁-I₀)/I₀ [%], SZA=60ᵒ" "(Q₁-Q₀)/Q₀ [%], SZA=60ᵒ"], titlefont = font(10))
+
+
+
+
+
+

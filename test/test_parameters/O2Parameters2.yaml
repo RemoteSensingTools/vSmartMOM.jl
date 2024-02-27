@@ -6,7 +6,12 @@ radiative_transfer:
   spec_bands:
     #- (1e7/750):0.05:(1e7/745)
     #- (1e7/768):0.05:(1e7/763) 
-    - (1e7/783):0.15:(1e7/750)
+    #- (1e7/783):0.15:(1e7/750)
+    #- (1e7/780):0.02:(1e7/755)
+    - (1e7/782):0.18:(1e7/750) #dwl = 0.01040 nm
+    #- (1e7/782):1.0:(1e7/750) #dwl = 0.05776 nm  
+    #- (1e7/782):0.002:(1e7/750) --> this works only for noRS, indicating that the max. spectral resolution decreases by a factor of 100 for RRS computations
+    #- (1e7/777):0.08:(1e7/758)
   # Bidirectional Reflectance Distribution Function (BRDF) per band
   surface: 
     - LambertianSurfaceScalar{Float64}(0.) #(0.2) #(0.05)
@@ -32,11 +37,11 @@ radiative_transfer:
 # =================================================================
 geometry: 
   # Solar zenith angle (degrees)
-  sza:                30. #45 #60 #30. #60 #32.4436
+  sza:                60. #45. #60 #30. #60 #32.4436
   # Viewing zenith angles (degrees)
-  vza:                [0, 30, 45, 30] #[15, 30, 45, 60] #[32.4436] #[0.072]
+  vza:                [0] #[0, 30, 60, 30] #[15, 30, 45, 60] #[32.4436] #[0.072]
   # Viewing azimuth angles (degrees)
-  vaz:                [0.0, 0.0, 0.0, 180.] #[0.0, 0.0, 180., 180.]
+  vaz:                [0.0] #, 0.0, 0.0, 180.] #[0.0, 0.0, 180., 180.]
   # Observation altitude (Pa)
   obs_alt:            0 #1000.0
 
@@ -59,7 +64,7 @@ atmospheric_profile:
         5.44,   7.26,   9.67,  12.90,  17.23,  23.30,  
        31.00,  42.07,  56.09,  74.78,  99.69, 131.00,
       176.85, 236.64, 314.58, 418.87, 557.76, 735.00, 
-      800.12, 849.00, 912.00, 980.00, 1005.0]
+      800.12, 849.00, 912.00, 980.00, 990.0] #1005.0]
   # Reduce profile to n layers (-1 is default, leave as is)
   profile_reduction: 1 #5 #-1
 
