@@ -43,7 +43,7 @@ kernel!(r⁻⁺_CPU, t⁺⁺_CPU, ϖ, dτ, Z⁻⁺, Z⁺⁺, μ, w,0, ndrange=si
 
 function test2(r⁻⁺, t⁺⁺, ϖ, dτ, Z⁻⁺, Z⁺⁺, μ, w)
     event = kernel!(r⁻⁺, t⁺⁺, ϖ, dτ, Z⁻⁺, Z⁺⁺, μ, w, 0, ndrange=size(r⁻⁺));
-    wait(device, event)
+    #wait(device, event)
     synchronize();
 end
 @time test2(r⁻⁺_CPU, t⁺⁺_CPU, ϖ, dτ, Z⁻⁺, Z⁺⁺, μ, w)
@@ -59,7 +59,7 @@ kernel! = get_r!(device)
 kernel!(r⁻⁺, t⁺⁺, ϖ, dτ, Z⁻⁺, Z⁺⁺, μ, w,0, ndrange=size(r⁻⁺));
 function test2(r⁻⁺, t⁺⁺, ϖ, dτ, Z⁻⁺, Z⁺⁺, μ, w)
     event = kernel!(r⁻⁺, t⁺⁺, ϖ, dτ, Z⁻⁺, Z⁺⁺, μ, w, 0, ndrange=size(r⁻⁺));
-    wait(device, event)
+    #wait(device, event)
     synchronize();
 end
 @time test2(r⁻⁺, t⁺⁺, ϖ, dτ, Z⁻⁺, Z⁺⁺, μ, w)

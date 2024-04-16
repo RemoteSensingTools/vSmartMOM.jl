@@ -38,13 +38,13 @@ function elemental!(pol_type, SFI::Bool,
         # with absorption in batch mode, low tau_scatt but higher tau_total, needs exact equations
         kernel! = get_canopy_elem_rt!(device)
         event = kernel!(r⁻⁺, t⁺⁺, ϖ, dτ, G, Z⁻⁺, Z⁺⁺, qp_μN, wct2, ndrange=size(r⁻⁺)); 
-        wait(device, event)
+        #wait(device, event)
         synchronize_if_gpu()
         #@show G
         # SFI part
         kernel! = get_canopy_elem_rt_SFI!(device)
         event = kernel!(j₀⁺, j₀⁻, ϖ, dτ, arr_type(τ_sum), G, Z⁻⁺, Z⁺⁺, qp_μN, ndoubl, wct02, pol_type.n, I₀, iμ₀, D, ndrange=size(j₀⁺))
-        wait(device, event)
+        #wait(device, event)
         synchronize_if_gpu()
         
         # Apply D Matrix

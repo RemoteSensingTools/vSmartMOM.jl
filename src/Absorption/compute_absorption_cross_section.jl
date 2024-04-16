@@ -120,7 +120,7 @@ function compute_absorption_cross_section(
             # Run the event on the kernel 
             # That this, this function adds to each element in result, the contribution from this transition
             event = kernel!(result_view, array_type(architecture)(grid_view), ν, γ_d, γ_l, y, S, broadening, CEF, ndrange=length(grid_view))
-            wait(device, event)
+            #wait(device, event)
             synchronize_if_gpu()
         end
     end
