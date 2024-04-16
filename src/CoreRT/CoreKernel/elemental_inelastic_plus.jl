@@ -186,7 +186,7 @@ function get_elem_rt!(RS_type::RRS_plus,
                     aType(Z⁺⁺_λ₁λ₀[:,:,bandSpecLim[iB]]), 
                     qp_μN, wct2, 
                     ndrange=getKernelDim(RS_type,ier⁻⁺[:,:,RS_type.bandSpecLim[iB],:])); 
-        wait(device, event);
+        #wait(device, event);
         synchronize_if_gpu();
     end
 end
@@ -215,7 +215,7 @@ function get_elem_rt!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
         aType(Z⁻⁺_λ₁λ₀), aType(Z⁺⁺_λ₁λ₀), 
         qp_μN, wct2, 
         ndrange=getKernelDim(RS_type,ier⁻⁺,i_λ₁λ₀)); 
-    wait(device, event);
+    #wait(device, event);
     synchronize_if_gpu();
 
     t_ier⁻⁺  = similar(ier⁻⁺)
@@ -229,7 +229,7 @@ function get_elem_rt!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
         aType(Z⁻⁺_λ₁λ₀_VS_n2), aType(Z⁺⁺_λ₁λ₀_VS_n2), 
         qp_μN, wct2, 
         ndrange=getKernelDim(RS_type,ier⁻⁺,i_λ₁λ₀_VS_n2)); 
-    wait(device, event);
+    #wait(device, event);
     synchronize_if_gpu();
 
     ier⁻⁺ += t_ier⁻⁺
@@ -245,7 +245,7 @@ function get_elem_rt!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
         aType(Z⁻⁺_λ₁λ₀_VS_o2), aType(Z⁺⁺_λ₁λ₀_VS_o2), 
         qp_μN, wct2, 
         ndrange=getKernelDim(RS_type,ier⁻⁺, i_λ₁λ₀_VS_o2)); 
-    wait(device, event);
+    #wait(device, event);
     synchronize_if_gpu();
     ier⁻⁺ += t_ier⁻⁺
     iet⁺⁺ += t_iet⁺⁺
@@ -354,7 +354,7 @@ function get_elem_rt_SFI!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
         qp_μN, ndoubl, wct02, nStokes, 
         I₀, iμ0, D, 
         ndrange=getKernelDimSFI(RS_type, ieJ₀⁻, i_λ₁λ₀)); #change this
-    wait(device, event)
+    #wait(device, event)
     synchronize_if_gpu();
 
     t_ieJ₀⁺ = similar(ieJ₀⁻)
@@ -369,7 +369,7 @@ function get_elem_rt_SFI!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
         qp_μN, ndoubl, wct02, nStokes, 
         I₀, iμ0, D, 
         ndrange=getKernelDimSFI(RS_type, ieJ₀⁻, i_λ₁λ₀_VS_n2)); #change this
-    wait(device, event)
+    #wait(device, event)
     synchronize_if_gpu();
     
     ieJ₀⁺ += t_ieJ₀⁺
@@ -384,7 +384,7 @@ function get_elem_rt_SFI!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
         qp_μN, ndoubl, wct02, nStokes, 
         I₀, iμ0, D, 
         ndrange=getKernelDimSFI(RS_type, ieJ₀⁻, i_λ₁λ₀_VS_o2)); #change this
-    wait(device, event)
+    #wait(device, event)
     synchronize_if_gpu();
         
     ieJ₀⁺ += t_ieJ₀⁺
@@ -482,7 +482,7 @@ function get_elem_rt_SFI!(RS_type::RRS_plus,
                 qp_μN, ndoubl, wct02, nStokes, 
                 I₀, iμ0, D, 
                 ndrange=getKernelDimSFI(RS_type,ieJ₀⁻));
-    wait(device, event)
+    #wait(device, event)
     synchronize_if_gpu();
 end
 

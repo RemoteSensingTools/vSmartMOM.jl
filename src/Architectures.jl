@@ -12,7 +12,7 @@ export
 using CUDA
 
 using KernelAbstractions
-using CUDAKernels
+using CUDA.CUDAKernels
 
 """
     AbstractArchitecture

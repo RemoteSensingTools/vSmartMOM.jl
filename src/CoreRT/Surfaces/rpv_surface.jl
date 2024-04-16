@@ -148,7 +148,7 @@ function expandSurface!(Rsurf::AbstractArray{FT,2}, n_stokes::Int, v) where {FT}
     device = devi(architecture(Rsurf))
     applyExpansion_! = applyExpansion!(device)
     event = applyExpansion_!(Rsurf, n_stokes, v, ndrange=size(v));
-    wait(device, event);
+    #wait(device, event);
     synchronize_if_gpu();
     return nothing
 end

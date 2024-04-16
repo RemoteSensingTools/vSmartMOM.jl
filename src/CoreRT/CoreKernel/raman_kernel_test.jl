@@ -1,5 +1,5 @@
 using KernelAbstractions
-using CUDAKernels
+using CUDA.CUDAKernels
 using CUDA
 
 nij = 14
