@@ -40,7 +40,7 @@ end
 abstract type AbstractObsGeometry end
 
 "Observation Geometry (basics)" 
-Base.@kwdef struct ObsGeometry{FT} <: AbstractObsGeometry
+Base.@kwdef mutable struct ObsGeometry{FT} <: AbstractObsGeometry
     "Solar Zenith Angle `[Degree]`"
     sza::FT
     "Viewing Zenith Angle(s) `[Degree]`" 

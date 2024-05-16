@@ -247,9 +247,9 @@ Base.@kwdef struct AerosolOptics{FT<:Union{AbstractFloat, ForwardDiff.Dual}}
     "Greek matrix"
     greek_coefs::GreekCoefs
     "Single Scattering Albedo"
-    ω̃::FT
+    ω̃::Union{FT, AbstractArray{FT}}
     "Extinction cross-section"
-    k::FT
+    k::Union{FT, AbstractArray{FT}}
     "Truncation factor" 
     fᵗ::FT
     "Derivatives"

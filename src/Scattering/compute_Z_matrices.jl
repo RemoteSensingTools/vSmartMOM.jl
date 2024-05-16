@@ -27,7 +27,7 @@ function compute_Z_moments(mod::AbstractPolarizationType, μ, greek_coefs::Greek
   
     # Pre-compute all required B matrices
     𝐁_all = [construct_B_matrix(mod, α, β, γ, δ, ϵ, ζ, i) for i in 1:l_max]
-@show 𝐁_all 
+#@show 𝐁_all 
     # Get dimension of square matrix (easier for Scalar/Stokes dimensions)
     B_dim = Int(sqrt(length(𝐁_all[1])))
     

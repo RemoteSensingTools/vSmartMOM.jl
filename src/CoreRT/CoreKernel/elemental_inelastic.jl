@@ -214,7 +214,7 @@ function get_elem_rt!(RS_type::RRS,
         #exit()
         #sleep(10)
        
-            @show minimum(ϖ_λ₁λ₀), maximum(ϖ_λ₁λ₀)
+            #@show minimum(ϖ_λ₁λ₀), maximum(ϖ_λ₁λ₀)
             
         event = kernel!(aType(fscattRayl), 
                     aType(ϖ_λ₁λ₀), aType(i_λ₁λ₀), 

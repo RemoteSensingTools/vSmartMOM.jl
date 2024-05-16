@@ -32,6 +32,7 @@ function postprocessing_vza!(RS_type::noRS, iμ₀, pol_type,
 
         #@show J₀⁻[istart:iend,1, 1], J₀⁺[istart:iend,1, 1]
         # Accumulate Fourier moments after azimuthal weighting
+        #@show vza[i], vaz[i], J₀⁻[istart:iend,1, 1], J₀⁺[istart:iend,1, 1];
         for s = 1:nSpec
             
             if SFI
@@ -76,13 +77,16 @@ function postprocessing_vza!(RS_type::Union{RRS, VS_0to1_plus, VS_1to0_plus},
         # Compute bigCS
         cos_m_phi, sin_m_phi = (cosd(m * vaz[i]), sind(m * vaz[i]));
         bigCS = weight * Diagonal([cos_m_phi, cos_m_phi, sin_m_phi, sin_m_phi][1:pol_type.n]);
-
+        #@show weight, m, vaz[i], cosd(m * vaz[i]), sind(m * vaz[i])
+        #@show R_SFI[i,:,1], J₀⁻[istart:iend,1,1]
+        #@show bigCS
         # Accumulate Fourier moments after azimuthal weighting
         for s = 1:nSpec
             
             if SFI
                 R_SFI[i,:,s] += bigCS * J₀⁻[istart:iend,1, s];
                 T_SFI[i,:,s] += bigCS * J₀⁺[istart:iend,1, s];
+                
                 #@show i, s, R_SFI[i,:,s]
                 #@show i, s, ieR_SFI[i,:,s]
                 for t =1:size(ieJ₀⁺,4)# in eachindex ieJ₀⁺[1,1,1,:]
@@ -106,8 +110,8 @@ function postprocessing_vza!(RS_type::Union{RRS, VS_0to1_plus, VS_1to0_plus},
                 T[i,:,s] += bigCS * (T⁺⁺[istart:iend, istart0:iend0, s] / μ₀) * pol_type.I₀;
                 #no modification for Raman because SFI will be the only mode used for inelastic computations
             end
-            
         end
+        #@show R_SFI[i,:,1], J₀⁻[istart:iend,1,1]
         #if m==0
         #    bla
         #end

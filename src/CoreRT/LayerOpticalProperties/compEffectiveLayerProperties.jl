@@ -30,20 +30,23 @@ function constructCoreOpticalProperties(RS_type, iBand, m, model)
             Rayl𝐙⁺⁺, Rayl𝐙⁻⁺ = Scattering.compute_Z_moments(pol_type, μ, 
                                                             greek_cabannes[iB], m, 
                                                             arr_type = arr_type);
-            Rayl2𝐙⁺⁺, Rayl2𝐙⁻⁺ = Scattering.compute_Z_moments(pol_type, μ, 
-                                                            greek_rayleigh[iB], m, 
-                                                            arr_type = arr_type);
+            #Rayl2𝐙⁺⁺, Rayl2𝐙⁻⁺ = Scattering.compute_Z_moments(pol_type, μ, 
+            #                                                greek_rayleigh[iB], m, 
+            #                                                arr_type = arr_type);
         end
 
         if (typeof(RS_type)<:noRS) #if !(typeof(RS_type)<:Union{RRS,RRS_plus})
             rayl =  [CoreScatteringOpticalProperties(arr_type(τ_rayl[iB][:,i]), 1.0, 
-                (Rayl𝐙⁺⁺), (Rayl𝐙⁻⁺)) for i=1:nZ]
+                (Rayl𝐙⁺⁺), (Rayl𝐙⁻⁺)) for i=1:nZ]    
         else
             rayl =  [CoreScatteringOpticalProperties(arr_type(τ_rayl[iB][:,i]), ϖ_Cabannes[iB], 
                 (Rayl𝐙⁺⁺), (Rayl𝐙⁻⁺)) for i=1:nZ]
-            rayl2 =  [CoreScatteringOpticalProperties(arr_type(τ_rayl[iB][:,i]), 1.0, 
-                (Rayl2𝐙⁺⁺), (Rayl2𝐙⁻⁺)) for i=1:nZ]
+            #@show τ_rayl[iB][1,i]
+            #rayl2 =  [CoreScatteringOpticalProperties(arr_type(τ_rayl[iB][:,i]), 1.0, 
+            #    (Rayl2𝐙⁺⁺), (Rayl2𝐙⁻⁺)) for i=1:nZ]
         end
+        #@show τ_rayl[iB][1,1], τ_rayl[iB][1,end]
+        #@show τ_aer[iB][1,1,1], τ_aer[iB][1,1,end]
         #CoreScatteringOpticalProperties.(
         #        τ_rayl[iB], 
         #        [RS_type.ϖ_Cabannes[iB]], 
@@ -52,24 +55,55 @@ function constructCoreOpticalProperties(RS_type, iBand, m, model)
         #@show size(rayl)
         # Initiate combined properties with rayleigh
         combo = rayl
-        @show combo[1].ϖ
-        @show RS_type.ϖ_Cabannes
+        # test:
+        # combo = combo .+ rayl
+        # this throws the following error:
+        # ERROR: MethodError: Cannot `convert` an object of type 
+        #  vSmartMOM.CoreRT.CoreScatteringOpticalProperties{CuArray{Float64{},1,CUDA.Mem.DeviceBuffer{}},CuArray{Float64, 1, CUDA.Mem.DeviceBuffer},CuArray{Float64{},3,CUDA.Mem.DeviceBuffer{}}} to an object of type 
+        #  vSmartMOM.CoreRT.CoreScatteringOpticalProperties{CuArray{Float64{},1,CUDA.Mem.DeviceBuffer{}},Float64,CuArray{Float64{},2,CUDA.Mem.DeviceBuffer{}}}
+        # Closest candidates are:
+        #  convert(::Type{T}, ::T) where T
+        #   @ Base Base.jl:64
+        #  (::Type{vSmartMOM.CoreRT.CoreScatteringOpticalProperties{FT, FT2, FT3}} where {FT, FT2, FT3})(::Any, ::Any, ::Any, ::Any)
+        #   @ vSmartMOM ~/code/github/vSmartMOM.jl/src/CoreRT/types.jl:605
+
+        #@show combo[1].τ[1], combo[1].τ[end]
+        #@show combo[1].ϖ
+        #@show RS_type.ϖ_Cabannes
         # Loop over all aerosol types:
-        for i=1:nAero
+        for iaer=1:nAero
             # Precomute Z matrices per type (constant per layer)
             #@show iB,i
             AerZ⁺⁺, AerZ⁻⁺ = Scattering.compute_Z_moments(
                                 pol_type, μ, 
-                                aerosol_optics[iB][i].greek_coefs, 
+                                aerosol_optics[iB][iaer].greek_coefs, 
                                 m, arr_type=arr_type)
-            # Generate Core optical properties for Aerosols i
-            aer   = createAero.(τ_aer[iB][i,:], 
-                                [aerosol_optics[iB][i]], 
-                                [AerZ⁺⁺], [AerZ⁻⁺])
-            @show τ_aer[iB][i,:]
+            # Generate Core optical properties for Aerosols iaer
+            #@show size(τ_aer[iB][iaer,:,:])
+            #aer = Vector{CoreScatteringOpticalProperties}
+            #aer =  [CoreScatteringOpticalProperties(zeros(length(τ_rayl[iB][:,1])), zeros(length(τ_rayl[iB][:,1])), 
+            #    zeros(size(Rayl𝐙⁺⁺)), zeros(size(Rayl𝐙⁻⁺))) for i=1:nZ]
+            #for i=1:nZ   
+                #aer[i]   = createAero(τ_aer[iB][iaer,:,i], 
+                #                aerosol_optics[iB][iaer], 
+                #                AerZ⁺⁺, AerZ⁻⁺)
+            #    push!(aer, createAero(τ_aer[iB][iaer,:,i], 
+            #                    aerosol_optics[iB][iaer], 
+            #                    AerZ⁺⁺, AerZ⁻⁺))                
+            #end
+            aer =  [createAero(arr_type(τ_aer[iB][iaer,:,i]), 
+                        aerosol_optics[iB][iaer], 
+                        AerZ⁺⁺, AerZ⁻⁺, arr_type) for i=1:nZ]
+            #@show aer[1].τ[1], aer[1].τ[end]
+            #@show size(aer[end].τ), aer[end].τ[1], aer[end].τ[end]
+            #@show size(aer[end].ϖ), aer[end].ϖ[1], aer[end].ϖ[end]
+            #@show τ_aer[iB][iaer,:,:]
             # Mix with previous Core Optical Properties
             #@show combo[1].ϖ   , aer[1].ϖ
+            #@show typeof(combo)
+            #@show typeof(aer)
             combo = combo .+ aer
+
             #@show combo[1].ϖ   , aer[1].ϖ
         end
 
@@ -92,9 +126,9 @@ function constructCoreOpticalProperties(RS_type, iBand, m, model)
         #@show size(combo2[1].τ)
         fScattRayleigh = [Array(rayl[i].τ  ./ combo2[i].τ) for i=1:nZ]
         #@show fScattRayleigh[1]
-        for i=1:nZ
-        @show i, rayl[i].τ, combo[1].τ#,combo2[1].τ
-        end
+        #for i=1:nZ
+        #    @show i, rayl[i].τ, combo[1].τ#,combo2[1].τ
+        #end
         push!(band_layer_props,combo2 )
         push!(band_fScattRayleigh,fScattRayleigh)
         #aType = array_type(model.params.architecture)
@@ -136,11 +170,20 @@ function constructCoreOpticalProperties(RS_type, iBand, m, model)
     return layer_opt, fscat_opt # Suniti: this needs to be modified because Rayleigh scattering fraction varies dramatically with wavelength
 end
 
-function createAero(τAer, aerosol_optics, AerZ⁺⁺, AerZ⁻⁺)
-    @unpack fᵗ, ω̃ = aerosol_optics
-    τ_mod = (1-fᵗ * ω̃ ) * τAer;
-    ϖ_mod = (1-fᵗ) * ω̃/(1-fᵗ * ω̃)
-    CoreScatteringOpticalProperties(τ_mod, ϖ_mod,AerZ⁺⁺, AerZ⁻⁺)
+function createAero(τAer, aerosol_optics, AerZ⁺⁺, AerZ⁻⁺, arr_type)
+    @unpack fᵗ = aerosol_optics
+    ω̃ = arr_type(aerosol_optics.ω̃) 
+    #@show typeof(ω̃), typeof(fᵗ)
+    #@show size(fᵗ)
+    #@show size(ω̃)
+    #@show size(τAer), τAer[1], τAer[end]
+    #τ_mod = zeros(size(τAer,1), size(τAer,2))
+    #for iz = 1:size(τAer,1)
+    τ_mod = (1 .- fᵗ * ω̃ ) .* τAer;
+    #@show τ_mod[1], τ_mod[end]  
+    #end
+    ϖ_mod = (1 .- fᵗ) .* ω̃ ./ (1 .- fᵗ * ω̃)
+    CoreScatteringOpticalProperties(τ_mod, ϖ_mod, AerZ⁺⁺, AerZ⁻⁺)
 end
 
 # Extract scattering definitions and integrated absorptions for the source function!

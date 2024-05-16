@@ -187,6 +187,46 @@ end
     
 Returns the aerosol optical depths per layer using a Gaussian distribution function with p₀ and σp on a pressure grid
 """
+function getAerosolLayerOptProp(total_τ, z₀, σ₀, p_half, T)
+    FT = eltype(T[1])
+    R  = FT(8.3144598) # J/mol.K
+    g₀ = 9.807 # m/s^2
+    M₀ = FT(28.9644e-3) #kg/mol
+    H = R*T/(M₀*g₀)
+    Nz = length(p_half)-1
+    dz = zeros(Nz)
+    z = zeros(Nz)
+    dz .= H.*log.(p_half[2:end]./p_half[1:end-1])
+    dz .*= 1.e-3 #m->km
+    z[end] = 0.0#dz[end]./2
+    for i=Nz-1:-1:1
+        z[i] = z[i+1]+dz[i+1]#(dz[i+1]+dz[i])./2 #this has been done to prevent dz=Inf resulting from p_half[1]=0
+    end
+    prof = LogNormal(log(z₀), σ₀)
+    τAer = total_τ * pdf.(prof, z)
+    #=
+    # Need to make sure we can also differentiate wrt σp (FT can be Dual!)
+    FT = eltype(p₀)
+    #Nz = length(p_half)-1
+    #ρ = zeros(FT,Nz)
+
+    #@show p_half, p₀, σp
+    for i = 1:Nz
+        dp = p_half[i+1] - p_half[i]
+        p  = (p_half[i+1] + p_half[i])/2
+        # Use Distributions here later:
+        ρ[i] = (1 / (σp * sqrt(2π))) * exp(-(p - p₀)^2 / (2σp^2)) * dp
+        #@show (-(p - p₀)^2 / (2σp^2))
+        #@show (1 / (σp * sqrt(2π))), exp(-(p - p₀)^2 / (2σp^2)), dp
+        #@show i, ρ[i], p, dp
+    end
+    Norm = sum(ρ)
+    τAer  =  (total_τ / Norm) * ρ
+    =#
+    return convert.(FT, τAer)
+end
+
+#=
 function getAerosolLayerOptProp(total_τ, p₀, σp, p_half)
 
     # Need to make sure we can also differentiate wrt σp (FT can be Dual!)
@@ -209,7 +249,7 @@ function getAerosolLayerOptProp(total_τ, p₀, σp, p_half)
     
     return convert.(FT, τAer)
 end
-
+=#
 """
     $(FUNCTIONNAME)(τRayl, τAer,  aerosol_optics, Rayl𝐙⁺⁺, Rayl𝐙⁻⁺, Aer𝐙⁺⁺, Aer𝐙⁻⁺, τ_abs, arr_type)
 

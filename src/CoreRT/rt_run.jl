@@ -184,7 +184,7 @@ function rt_run_bck(model::vSmartMOM_Model; i_band::Integer = -1)
                       model.τ_rayl[i_band], 
                       model.τ_aer[i_band], 
                       model.quad_points,
-                      model.params.max_m,
+                      model.max_m[i_band], #params.max_m,
                       model.aerosol_optics[i_band],
                       model.greek_rayleigh[i_band],
                       model.τ_abs[i_band],
@@ -200,7 +200,7 @@ function rt_run_bck(model::vSmartMOM_Model; i_band::Integer = -1)
                       model.τ_rayl[1], 
                       model.τ_aer[1], 
                       model.quad_points,
-                      model.params.max_m,
+                      model.max_m[1], #params.max_m,
                       model.aerosol_optics[1],
                       model.greek_rayleigh[1],
                       model.τ_abs[1],
@@ -224,7 +224,7 @@ function rt_run_bck(model::vSmartMOM_Model; i_band::Integer = -1)
                        model.τ_rayl[i], 
                        model.τ_aer[i], 
                        model.quad_points,
-                       model.params.max_m,
+                       model.max_m[i], #params.max_m,
                        model.aerosol_optics[i],
                        model.greek_rayleigh[i],
                        model.τ_abs[i],
@@ -269,19 +269,25 @@ function rt_run(RS_type::AbstractRamanType,
     @unpack obs_alt, sza, vza, vaz = model.obs_geom   # Observational geometry properties
     @unpack qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart, μ₀, iμ₀, Nquad = model.quad_points # All quadrature points
     pol_type = model.params.polarization_type
-    @unpack max_m = model.params
-    @unpack quad_points = model
+    #@unpack max_m = model.max_m #params
+    @unpack quad_points, max_m = model
 
     if obs_alt != 0
         @info "Run ms as height !=0"
         return rt_run_test_ms(RS_type, model, iBand)
     end
-    
+    @show iBand, sza, vza, vaz, model.params.brdf[iBand].albedo
     # Also to be changed!!
-    brdf = model.params.brdf[iBand[1]]
+    #brdf = model.params.brdf[iBand[1]]
+    #@show size(iBand)
+    #@show iBand
+    #@show iBand[1]
+    #@show size(iBand[1])
+    #bla
+    brdf = model.params.brdf[iBand] #brdf = model.params.brdf[iBand[1]]
     @unpack F₀ = RS_type
     if (typeof(RS_type)<:Union{RRS,RRS_plus})
-        RS_type.ϖ_λ₁λ₀ .*=  (1. - model.ϖ_Cabannes[iBand[1]])/sum(RS_type.ϖ_λ₁λ₀) 
+        RS_type.ϖ_λ₁λ₀ .*=  (1. - model.ϖ_Cabannes[iBand])/sum(RS_type.ϖ_λ₁λ₀) # RS_type.ϖ_λ₁λ₀ .*=  (1. - model.ϖ_Cabannes[iBand[1]])/sum(RS_type.ϖ_λ₁λ₀) 
     end   
     
     FT = eltype(sza)                    # Get the float-type to use
@@ -341,9 +347,9 @@ function rt_run(RS_type::AbstractRamanType,
     println("Finished initializing arrays")
 
     # Loop over fourier moments
-    for m = 0:max_m - 1
+    for m = 0:max_m[iBand] - 1
 
-        println("Fourier Moment: ", m, "/", max_m-1)
+        println("Fourier Moment: ", m, "/", max_m[iBand]-1)
 
         # Azimuthal weighting
         weight = m == 0 ? FT(0.5/π) : FT(1.0/π)
@@ -415,12 +421,12 @@ function rt_run(RS_type::AbstractRamanType,
                             arr_type(τ_sum_all[:,end]), 
                             arr_type(F₀),
                             model.params.architecture);
-        @show F₀[:,1]
+        #@show F₀[:,1]
         @show scattering_interfaces_all[end]
                             #@show scattering_interfaces_all[end]
         #blapl
         # One last interaction with surface:
-        
+        #@show composite_layer.J₀⁻[:,1,1] 
         @timeit "interaction" interaction!(RS_type,
                                     #bandSpecLim,
                                     scattering_interfaces_all[end], 
@@ -428,8 +434,8 @@ function rt_run(RS_type::AbstractRamanType,
                                     composite_layer, 
                                     added_layer_surface, 
                                     I_static)
-                                    
-        
+        #@show composite_layer.J₀⁻[:,1,1]                            
+        #bla
         # Postprocess and weight according to vza
         postprocessing_vza!(RS_type, 
                             iμ₀, pol_type, 
@@ -440,8 +446,10 @@ function rt_run(RS_type::AbstractRamanType,
                             R, R_SFI, 
                             T, T_SFI,
                             ieR_SFI, ieT_SFI)
+        #@show R_SFI[:,1,1]
+        #bla
     end
-
+    
     # Show timing statistics
     print_timer()
     reset_timer!()
@@ -457,18 +465,18 @@ function rt_run_ss(RS_type::AbstractRamanType,
     @unpack obs_alt, sza, vza, vaz = model.obs_geom   # Observational geometry properties
     @unpack qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart, μ₀, iμ₀, Nquad = model.quad_points # All quadrature points
     pol_type = model.params.polarization_type
-    @unpack max_m = model.params
-    @unpack quad_points = model
+    #@unpack max_m = model.max_m #params
+    @unpack quad_points, max_m = model
 
     if obs_alt != 0
         return rt_run_test_ms_ss(RS_type, model, iBand)
     end
 
     # Also to be changed!!
-    brdf = model.params.brdf[iBand[1]]
+    brdf = model.params.brdf[iBand] # brdf = model.params.brdf[iBand[1]]
     @unpack F₀ = RS_type
     if (typeof(RS_type)<:Union{RRS,RRS_plus})
-        RS_type.ϖ_λ₁λ₀ *=  (1. - model.ϖ_Cabannes[iBand[1]])/sum(RS_type.ϖ_λ₁λ₀) 
+        RS_type.ϖ_λ₁λ₀ *=  (1. - model.ϖ_Cabannes[iBand])/sum(RS_type.ϖ_λ₁λ₀) # RS_type.ϖ_λ₁λ₀ *=  (1. - model.ϖ_Cabannes[iBand[1]])/sum(RS_type.ϖ_λ₁λ₀) 
     end   
 
     FT = eltype(sza)                    # Get the float-type to use
@@ -528,9 +536,9 @@ function rt_run_ss(RS_type::AbstractRamanType,
     println("Finished initializing arrays")
 
     # Loop over fourier moments
-    for m = 0:max_m - 1
+    for m = 0:max_m[iBand] - 1
 
-        println("Fourier Moment: ", m, "/", max_m-1)
+        println("Fourier Moment: ", m, "/", max_m[iBand]-1)
 
         # Azimuthal weighting
         weight = m == 0 ? FT(0.5/π) : FT(1.0/π)

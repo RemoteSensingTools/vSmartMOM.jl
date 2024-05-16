@@ -31,6 +31,7 @@ Base.@kwdef mutable struct RRS{FT<:AbstractFloat} <: AbstractRamanType
     bandSpecLim = []
     iBand = 1
     F₀::Array{FT,2} # Solar/Stellar irradiation Stokes vector of size (pol_type.n, nSpec)
+    SIF₀::Array{FT,2} # Solar/Stellar irradiation Stokes vector of size (pol_type.n, nSpec)
 end
 
 """
@@ -59,6 +60,7 @@ Base.@kwdef struct VS_0to1{FT<:AbstractFloat} <: AbstractRamanType
     k_Rayl_scatt::FT #σ_Rayl(λ_scatt)/σ_Rayl(λ_incident)
     n_Raman::Int
     F₀::Array{FT,2} # Solar/Stellar irradiation Stokes vector of size (pol_type.n, nSpec)
+    SIF₀::Array{FT,2} # Solar/Stellar irradiation Stokes vector of size (pol_type.n, nSpec)
 end
 
 """
@@ -86,6 +88,7 @@ Base.@kwdef struct VS_1to0{FT<:AbstractFloat} <: AbstractRamanType
     k_Rayl_scatt::FT #σ_Rayl(λ_scatt)/σ_Rayl(λ_incident)
     n_Raman::Int
     F₀::Array{FT,2} # Solar/Stellar irradiation Stokes vector of size (pol_type.n, nSpec)
+    SIF₀::Array{FT,2} # Solar/Stellar irradiation Stokes vector of size (pol_type.n, nSpec)
     #ramanAtmoProp::RamanAtmosphereProperties
 end
 #=
@@ -122,6 +125,7 @@ Base.@kwdef mutable struct noRS{FT} <: AbstractRamanType
     bandSpecLim = []
     iBand::Array{Int,1} = [1]
     F₀::Array{FT,2}  # Solar/Stellar irradiation Stokes vector of size (pol_type.n, nSpec)
+    SIF₀::Array{FT,2} # Solar/Stellar irradiation Stokes vector of size (pol_type.n, nSpec)
 end
 
 ############################################################
@@ -162,6 +166,7 @@ Base.@kwdef mutable struct RRS_plus{FT<:AbstractFloat} <: AbstractRamanType
     i_ref::Int
     n_Raman::Int
     F₀::Array{FT,2} # Solar/Stellar irradiation Stokes vector of size (pol_type.n, nSpec)
+    SIF₀::Array{FT,2} # Solar/Stellar irradiation Stokes vector of size (pol_type.n, nSpec)
 end
 
 """
@@ -211,6 +216,7 @@ Base.@kwdef mutable struct VS_0to1_plus{FT<:AbstractFloat} <: AbstractRamanType
     i_ref::Int                  = 1
     n_Raman::Int                = 1
     F₀::Array{FT,2}             = zeros(FT,1,1) # Solar/Stellar irradiation Stokes vector of size (pol_type.n, nSpec)
+    SIF₀::Array{FT,2} # Solar/Stellar irradiation Stokes vector of size (pol_type.n, nSpec)
 end
 
 """
@@ -263,6 +269,7 @@ Base.@kwdef mutable struct VS_1to0_plus{FT<:AbstractFloat} <: AbstractRamanType
     #k_Rayl_scatt::FT #σ_Rayl(λ_scatt)/σ_Rayl(λ_incident)
     n_Raman::Int
     F₀::Array{FT,2} # Solar/Stellar irradiation Stokes vector of size (pol_type.n, nSpec)
+    SIF₀::Array{FT,2} # Solar/Stellar irradiation Stokes vector of size (pol_type.n, nSpec)
     #ramanAtmoProp::RamanAtmosphereProperties
 end
 
@@ -272,6 +279,7 @@ Base.@kwdef mutable struct noRS_plus{FT} <: AbstractRamanType
     bandSpecLim = []
     iBand::Array{Int,1} = []
     F₀::Array{FT,2} = [] # Solar/Stellar irradiation Stokes vector of size (pol_type.n, nSpec)
+    SIF₀::Array{FT,2} # Solar/Stellar irradiation Stokes vector of size (pol_type.n, nSpec)
 end
 
 

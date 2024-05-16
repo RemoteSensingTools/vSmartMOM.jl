@@ -39,8 +39,8 @@ function validate_aerosols(aerosols::Union{Array{Dict{Any, Any}}, Vector{Any}})
               (["σ"], Real),
               (["nᵣ"], Real),
               (["nᵢ"], Real),
-              (["p₀"], Real),
-              (["σp"], Real)]
+              (["z₀"], Real),
+              (["σ₀"], Real)]
               
     for aerosol in aerosols
         for i in 1:length(fields)
@@ -56,14 +56,14 @@ function aerosol_params_to_obj(aerosols::Union{Array{Dict{Any, Any}}, Vector{Any
     rt_aerosol_obj_list = RT_Aerosol[]
 
     for aerosol in aerosols
-        @assert aerosol["σ"] ≥ 1 "Geometric standard deviation has to be ≥ 1"    
-        size_distribution = LogNormal(log(FT(aerosol["μ"])), log(FT(aerosol["σ"])))
+        #@assert aerosol["σ"] ≥ 1 "Geometric standard deviation has to be ≥ 1"    
+        size_distribution = LogNormal(log(FT(aerosol["μ"])), FT(aerosol["σ"]))
 
         new_aerosol_obj = Aerosol(size_distribution,
                                   FT(aerosol["nᵣ"]),
                                   FT(aerosol["nᵢ"]))
         
-        new_rt_aerosol_obj = RT_Aerosol(new_aerosol_obj, FT(aerosol["τ_ref"]), FT(aerosol["p₀"]), FT(aerosol["σp"]))
+        new_rt_aerosol_obj = RT_Aerosol(new_aerosol_obj, FT(aerosol["τ_ref"]), FT(aerosol["z₀"]), FT(aerosol["σ₀"]))
 
         push!(rt_aerosol_obj_list, new_rt_aerosol_obj)
     end
@@ -215,7 +215,7 @@ function parameters_from_yaml(file_path)
         if "LUTfiles" in keys(params_dict["absorption"])
             files_lut = Array(params_dict["absorption"]["LUTfiles"])
             @assert size(files_lut) == size(molecules) "Size of LUTfiles has to match molecules"
-            @show size(files_lut)
+            #@show size(files_lut)
             
             for i in eachindex(files_lut)
                 #@show i, files_lut[i]

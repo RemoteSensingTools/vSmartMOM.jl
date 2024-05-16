@@ -41,10 +41,10 @@ function doubling_number(dτ_max, τ_end) # check if τ_end can be replaced by �
         q1 = log10(2.0)
         q2 = log10(dτ_max)
         q3 = log10(τ_end)
-        @show q1, q2, q3
+        #@show q1, q2, q3
         tlimit = (q3 - q2) / q1
         nlimit = floor(Int, tlimit)
-@show tlimit, nlimit 
+#@show tlimit, nlimit 
         diff = tlimit - nlimit
         if diff < eps(FT)
             dτ = dτ_max

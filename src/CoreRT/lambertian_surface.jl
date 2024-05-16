@@ -27,6 +27,8 @@ function create_surface_layer!(RS_type, lambertian::LambertianSurfaceScalar{FT},
                                architecture) where {FT}
     
     @unpack qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart, iμ₀, μ₀ = quad_points
+
+    
     # Get size of added layer
     Nquad = size(added_layer.r⁻⁺,1) ÷ pol_type.n
     tmp    = ones(pol_type.n*Nquad)
@@ -35,8 +37,6 @@ function create_surface_layer!(RS_type, lambertian::LambertianSurfaceScalar{FT},
     if m == 0
         # Albedo normalized by π (and factor 2 for 0th Fourier Moment)
         ρ = 2lambertian.albedo#/FT(π)
-        
-        
         
         R_surf = Array(Diagonal(vcat(ρ, zeros(FT,pol_type.n-1))))
         R_surf = repeat(R_surf',Nquad)
@@ -48,20 +48,30 @@ function create_surface_layer!(RS_type, lambertian::LambertianSurfaceScalar{FT},
         
         # Source function of surface:
         if SFI
+            unweight = FT(2*π) #this is multiplied to all non-solar, isotropic source functions to exclude them from the azimuthal weighting applied in the postprocessing step
             F₀_NquadN = arr_type(zeros(length(qp_μN),length(τ_sum)));
             #F₀_NquadN[:] .=0;
             #@show size(F₀), size(μ₀), size(R_surf), size(F₀_NquadN), size(added_layer.J₀⁻[:,1,:]), size(F₀ .* (exp.(-τ_sum/μ₀))'), size(F₀_NquadN[iμ₀Nstart:pol_type.n*iμ₀,:])
             #@show iμ₀Nstart, pol_type.n*iμ₀
+            #@show size(F₀_NquadN[iμ₀Nstart:pol_type.n*iμ₀,:]), size(F₀), size(exp.(-τ_sum/μ₀)')
             F₀_NquadN[iμ₀Nstart:pol_type.n*iμ₀,:] .= (F₀ .* (exp.(-τ_sum/μ₀))');
             
-            added_layer.J₀⁺[:,1,:] .= F₀_NquadN;#0;#
+            added_layer.J₀⁺[:,1,:] .= 0.;#
             added_layer.J₀⁻[:,1,:] .= μ₀*(R_surf*F₀_NquadN)#/FT(π);
+            #@show size(added_layer.J₀⁻[:,1,1])
+        #@show added_layer.J₀⁻[:,1,1]
+        # for SIF
+            #added_layer.J₀⁻[:,1,:] .+= 0.029253057154967992./qp_μN # 0.023795309767477988./qp_μN #
+            # added_layer.J₀⁻[:,1,:] .+= 10.5./qp_μN #8.66./qp_μN #
+            added_layer.J₀⁻[:,1,:] .+= (1/π)*repeat(arr_type(RS_type.SIF₀),Nquad) * unweight
+        #@show added_layer.J₀⁻[:,1,1]
             #added_layer.J₀⁻[:,1,:] = 
             #    μ₀*(R_surf[iμ₀Nstart:pol_type.n*iμ₀, iμ₀Nstart:pol_type.n*iμ₀]*
             #    F₀) .* exp.(-τ_sum/μ₀)';
             # added_layer.J₀⁺[:,1,:] .= I₀_NquadN .* exp.(-τ_sum/μ₀)';
             # added_layer.J₀⁻[:,1,:] = μ₀*(R_surf*I₀_NquadN) .* exp.(-τ_sum/μ₀)';
         end
+
         R_surf = R_surf * Diagonal(qp_μN.*wt_μN)
         #R_surf = 2R_surf * Diagonal(qp_μN.*wt_μN)
         #R_surf = R_surf * Diagonal(qp_μN.*wt_μN)/π
@@ -69,17 +79,21 @@ function create_surface_layer!(RS_type, lambertian::LambertianSurfaceScalar{FT},
         #@show size(added_layer.r⁻⁺), size(R_surf), size(added_layer.J₀⁻)
         added_layer.r⁻⁺ .= R_surf;
         added_layer.r⁺⁻ .= 0;
-        added_layer.t⁺⁺ .= 1. #0.0; #T_surf;
+        added_layer.t⁺⁺ .= T_surf;#1. #0.0; #T_surf;
         added_layer.t⁻⁻ .= 0.0; #T_surf;
 
     else
         added_layer.r⁻⁺ .= 0;
         added_layer.r⁻⁺ .= 0;
-        added_layer.t⁺⁺ .= 1.#0.0; #T_surf;
+        added_layer.t⁺⁺ .= T_surf;
         added_layer.t⁻⁻ .= 0.0; #T_surf;
         added_layer.J₀⁺ .= 0;
         added_layer.J₀⁻ .= 0;
     end
+    #@show size(T_surf), size(R_surf)
+    #@show T_surf
+    #@show R_surf
+    #bla
     if !(typeof(RS_type)<:noRS)
         added_layer.ier⁻⁺ .= 0;
         added_layer.ier⁻⁺ .= 0;
@@ -99,6 +113,7 @@ function create_surface_layer!(RS_type, lambertian::LambertianSurfaceLegendre{FT
         τ_sum, F₀,
         architecture) where {FT}
     FT2 = Float64
+    
     if m == 0
         @unpack qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart, iμ₀, μ₀ = quad_points
         legendre_coeff = lambertian.legendre_coeff
@@ -126,16 +141,22 @@ function create_surface_layer!(RS_type, lambertian::LambertianSurfaceLegendre{FT
         #@show size(F₀'.*τ_sum)
         # Source function of surface:
         if SFI
+            unweight = FT(2*π) #this is multiplied to all non-solar, isotropic source functions to exclude them from the azimuthal weighting applied in the postprocessing step
             F₀_NquadN = arr_type(zeros(FT,length(qp_μN), length(τ_sum)));
             #@show size(F₀_NquadN)
-            @show size(F₀_NquadN[iμ₀Nstart:pol_type.n*iμ₀,:])
-            @show size((F₀'.*exp.(-τ_sum/μ₀))')
+            #@show size(F₀_NquadN[iμ₀Nstart:pol_type.n*iμ₀,:])
+            #@show size((F₀'.*exp.(-τ_sum/μ₀))')
             F₀_NquadN[iμ₀Nstart:pol_type.n*iμ₀,:] .= (F₀'.*exp.(-τ_sum/μ₀))';
-            #added_layer.J₀⁺[:,1,:] .= 0 # F₀_NquadN
+            added_layer.J₀⁺[:,1,:] .= 0 # F₀_NquadN
             #added_layer.J₀⁺[:,1,:] .= F₀_NquadN;#0;#
             # Suniti double-check
             # added_layer.J₀⁻[:,1,:] = μ₀*(R_surf*I₀_NquadN) .* (ρ .* exp.(-τ_sum/μ₀))';
             added_layer.J₀⁻[:,1,:] .= μ₀*(R_surf*F₀_NquadN*ρ);#/FT(π); 
+            # for SIF
+            added_layer.J₀⁻[:,1,:] .+= (1/π)*repeat(arr_type(RS_type.SIF₀),Nquad)*unweight
+            
+            #added_layer.J₀⁻[:,1,:] .+= 0.029253057154967992./qp_μN  #0.023795309767477988./qp_μN ##
+            # added_layer.J₀⁻[:,1,:] .+= 10.5./qp_μN #8.66./qp_μN #
             #μ₀*(R_surf[iμ₀Nstart:pol_type.n*iμ₀, iμ₀Nstart:pol_type.n*iμ₀]*F₀) .* (ρ .* exp.(-τ_sum/μ₀))';
         end
         R_surf   = R_surf * Diagonal(qp_μN.*wt_μN)
@@ -143,17 +164,19 @@ function create_surface_layer!(RS_type, lambertian::LambertianSurfaceLegendre{FT
         R_surf3D = reshape(reduce(hcat,[i*R_surf for i in Array(ρ)]), siz...);
         tmp    = ones(pol_type.n*Nquad)
         T_surf = arr_type(Diagonal(tmp))
-
+        T_surf3D = repeat(T_surf, length(ρ));
+        #@show size(T_surf3D, R_surf3D)
+        #bla
         #@show size(added_layer.r⁻⁺), size(R_surf), size(added_layer.J₀⁻)
         added_layer.r⁻⁺ .= R_surf3D;
         added_layer.r⁺⁻ .= 0;
-        added_layer.t⁺⁺ .= 1.0; #T_surf;
+        added_layer.t⁺⁺ .= T_surf3D;
         added_layer.t⁻⁻ .= 0.0; #T_surf;
 
     else
         added_layer.r⁻⁺[:] .= 0;
         added_layer.r⁻⁺[:] .= 0;
-        added_layer.t⁺⁺[:] .= 1.0;
+        added_layer.t⁺⁺[:] .= T_surf3D; #1.0;
         added_layer.t⁻⁻[:] .= 0;
         added_layer.J₀⁺[:] .= 0;
         added_layer.J₀⁻[:] .= 0;

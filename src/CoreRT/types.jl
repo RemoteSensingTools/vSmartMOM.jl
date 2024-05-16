@@ -40,7 +40,7 @@ end
 abstract type AbstractObsGeometry end
 
 "Observation Geometry (basics)" 
-Base.@kwdef struct ObsGeometry{FT} <: AbstractObsGeometry
+Base.@kwdef mutable struct ObsGeometry{FT} <: AbstractObsGeometry
     "Solar Zenith Angle `[Degree]`"
     sza::FT
     "Viewing Zenith Angle(s) `[Degree]`" 
@@ -58,10 +58,14 @@ mutable struct RT_Aerosol{}#FT<:Union{AbstractFloat, ForwardDiff.Dual}}
     aerosol::Aerosol#{FT}
     "Reference τ"
     τ_ref#::FT
-    "Pressure peak (Pa)"
-    p₀#::FT
-    "Pressure peak width (Pa)"
-    σp#::FT
+    "Mode z (km)"
+    z₀#::FT
+    "Peak width"
+    σ₀#::FT
+    #"Pressure peak (Pa)"
+    #p₀#::FT
+    #"Pressure peak width (Pa)"
+    #σp#::FT
 end
 
 "Quadrature Types for RT streams"
@@ -299,13 +303,13 @@ struct ScatteringInterface_AtmoSurf <: AbstractScatteringInterface end
 abstract type AbstractSurfaceType end
 
 "Lambertian Surface (scalar per band)"
-struct LambertianSurfaceScalar{FT} <: AbstractSurfaceType
+mutable struct LambertianSurfaceScalar{FT} <: AbstractSurfaceType
     "Albedo (scalar)"
     albedo::FT
 end
 
 "Defined as Array (has to have the same length as the band!)"
-struct LambertianSurfaceSpectrum{FT} <: AbstractSurfaceType
+mutable struct LambertianSurfaceSpectrum{FT} <: AbstractSurfaceType
     "Albedo (vector)"
     albedo::AbstractArray{FT,1}
 end
@@ -453,6 +457,8 @@ A struct which holds all derived model parameters (including any computations)
 $(DocStringExtensions.FIELDS)
 """
 mutable struct vSmartMOM_Model
+    max_m::Vector{Int} #for individual band adjusted (in the presence of aerosols) number of fourier iterations 
+    l_max::Vector{Int} #maximum length per band of truncated aerosol Greek coefficients (l_max = 2max_m+1)
 
     "Struct with all individual parameters"
     params::vSmartMOM_Parameters

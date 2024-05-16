@@ -245,8 +245,8 @@ function compute_ϖ_Cabannes(λ₀, n2, o2)
     #RS_type.ϖ_Cabannes = σ_elastic/(σ_VRS+σ_RVRS+σ_RRS+σ_elastic);
     #ϖ_Cabannes = σ_elastic/(σ_VRS+σ_RVRS+σ_RRS+σ_elastic);
     ϖ_Cabannes = σ_elastic/(σ_RRS+σ_elastic);
-    @show σ_elastic
-    @show σ_RRS+σ_elastic
+    #@show σ_elastic
+    #@show σ_RRS+σ_elastic
     return ϖ_Cabannes;
 end
 
@@ -281,8 +281,8 @@ function compute_ϖ_Cabannes_VS(λ₀, n2, o2)
     #RS_type.ϖ_Cabannes = σ_elastic/(σ_VRS+σ_RVRS+σ_RRS+σ_elastic);
     #ϖ_Cabannes = σ_elastic/(σ_VRS+σ_RVRS+σ_RRS+σ_elastic);
     ϖ_Cabannes_VS = σ_elastic/(σ_RVRS+σ_VRS+σ_elastic);
-    @show σ_elastic
-    @show σ_RVRS+σ_VRS+σ_elastic
+    #@show σ_elastic
+    #@show σ_RVRS+σ_VRS+σ_elastic
     return ϖ_Cabannes_VS;
 end
 
@@ -307,8 +307,8 @@ function compute_ϖ_Cabannes(λ₀, mol)
     #RS_type.ϖ_Cabannes = σ_elastic/(σ_VRS+σ_RVRS+σ_RRS+σ_elastic);
     #ϖ_Cabannes = σ_elastic/(σ_VRS+σ_RVRS+σ_RRS+σ_elastic);
     ϖ_Cabannes = σ_elastic/(σ_RRS+σ_elastic);
-    @show σ_elastic
-    @show σ_RRS+σ_elastic
+    #@show σ_elastic
+    #@show σ_RRS+σ_elastic
     return ϖ_Cabannes;
 end
 
@@ -389,7 +389,7 @@ function compute_γ_mol_Rayleigh!(λ₀::FT, mol) where FT
     γ_mol_Rayleigh = 0.5*((3*tmp-1)/(2*tmp+1))
 
     tmp_chk = 0.5*(3*(1+2γ_mol_Cabannes) - ϖ_Cabannes*(3-4γ_mol_Cabannes))/(2*(1+2γ_mol_Cabannes) + ϖ_Cabannes*(3-4γ_mol_Cabannes))
-    @show γ_mol_Rayleigh, tmp_chk
+    #@show γ_mol_Rayleigh, tmp_chk
     return ϖ_Cabannes, γ_mol_Cabannes, γ_mol_Rayleigh
 end
 
