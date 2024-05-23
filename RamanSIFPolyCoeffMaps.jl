@@ -14,6 +14,8 @@ using LaTeXStrings
 using HTTP
 using JSON
 
+path = "/home/sanghavi/RamanSIFgrid/plots/" #for plot output
+
 function get_elevation(lat, lon)
     # Construct the API URL
     url = "https://api.open-elevation.com/api/v1/lookup?locations=$(lat),$(lon)"
@@ -212,7 +214,7 @@ title3b = L"$\rho=0.3, \mathrm{SZA}=46^\circ$"
 
 
 plot(p1, p2, p3, q1, q2, q3, layout = l, legend = false, title = [title1a*"\n"*title1b title2a*"\n"*title2b title3a*"\n"*title3b "" "" ""], titlefont = font(8))
-savefig("ieI_wrt_rho_res.png")
+savefig(path*"ieI_wrt_rho_res.png")
 #Determine scaled mean inelastic component
 I_ie_mean = zeros(length(ind1_hires))
 #ocoI1_ie_mean = zeros(length(ind1))
@@ -329,7 +331,7 @@ for isurf = 1:3 # 1:1 #2:2 #
                         ocoMM[2]*(specRRS0[:,3]+specRRS0[:,6]) +
                         ocoMM[3]*(specRRS0[:,4]+specRRS0[:,7])).* 
                         (1e7./wl.^2) #mW/m^2/s/nm
-            interp_ocoI_0 = LinearInterpolation((wl)*1e-3, (ocoI_tmp_0));  
+            interp_ocoI_0 = LinearInterpolation((wl)*1e-3, (ocoI_0_tmp));  
             # Re-interpolate I from ν_grid to new grid/resolution
             ocoI_0_tmp1 = interp_ocoI_0(oco_wl);
             # Convolve input spectrum with variable kernel
@@ -364,10 +366,10 @@ for isurf = 1:3 # 1:1 #2:2 #
             # Convolve input spectrum with variable kernel
             oco_refF₀_tmp2 = InstrumentOperator.conv_spectra(oco_sounding.ils[iBand], oco_wl, oco_refF₀_tmp1)
             
-            oco_y = oco_tmp2
-            oco_y_corr = oco_corr_tmp2
-            oco_y_0 = oco_0_tmp2
-            oco_y_0_corr = oco_0_corr_tmp2
+            oco_y = ocoI_tmp2
+            oco_y_corr = ocoI_corr_tmp2
+            oco_y_0 = ocoI_0_tmp2
+            oco_y_0_corr = ocoI_0_corr_tmp2
 
             oco_refI₀ = oco_refI₀_tmp2
             oco_refF₀ = oco_refF₀_tmp2
@@ -420,14 +422,14 @@ for isurf = 1:3 # 1:1 #2:2 #
             =#
 
             # Create synthetic noise
-            ocoSig = (oco_y .* oco_sounding.ils[iBand]) / (1e9 * h_Pl * c_l)
+            ocoSig = (oco_y .* oco_sounding.SpectralGrid*1e3) / (1e9 * h_Pl * c_l)
             ocoSNR = sqrt.(100*ocoSig.^2 ./ (MaxMS*(c_bkg^2 * MaxMS/100 .+ c_pht^2*ocoSig)))
             oco_noise = zeros(length(ocoSig))
             for i=1:length(ocoSig)
                 oco_noise[i] = (oco_y[i]/ocoSNR[i])*randn()/coAdd_N
             end
 
-            ocoSig_0 = (oco_y_0 .* oco_sounding.ils[iBand]) / (1e9 * h_Pl * c_l)
+            ocoSig_0 = (oco_y_0 .* oco_sounding.SpectralGrid*1e3) / (1e9 * h_Pl * c_l)
             ocoSNR_0 = sqrt.(100*ocoSig_0.^2 ./ (MaxMS*(c_bkg^2 * MaxMS/100 .+ c_pht^2*ocoSig_0)))
             oco_noise_0 = zeros(length(ocoSig_0))
             for i=1:length(ocoSig_0)
@@ -451,7 +453,11 @@ for isurf = 1:3 # 1:1 #2:2 #
                 # Define polynomial terms
                 poly = Pl.(iLeg,(0:3)');
                 # Multiply polynomial with solar/other reference spectrum
-                K_ = oco_refI₀[win_ind] .* poly 
+                if iwin==1
+                    K_ = oco_refF₀[win_ind] .* poly 
+                elseif iwin==2
+                    K_ = oco_y_0_corr[win_ind] .* poly
+                end 
                 # Add a constant SIF term to the Jacobian (can add Shape later)
                 K0 = [K_ ones(length(win_ind))];
                 #K0 = [K_ ones(length(ind1_hires))];
@@ -461,24 +467,24 @@ for isurf = 1:3 # 1:1 #2:2 #
 
                 # Fit with Least squares:
                 # SIF
-                x0 = K0 \ oco_y[win_ind];
+                x0 = K0 \ oco_y[win_ind]
                 xn0 = K0 \ (oco_y[win_ind]+oco_noise[win_ind])
 
-                x1 = K \ oco_y[win_ind];
-                xn1 = K \ (oco_y[win_ind]+oco_noise[win_ind])
+                x1 = K1 \ oco_y[win_ind]
+                xn1 = K1 \ (oco_y[win_ind]+oco_noise[win_ind])
 
-                x0_corr = K0 \ oco_y_corr[win_ind];
+                x0_corr = K0 \ oco_y_corr[win_ind]
                 xn0_corr = K0 \ (oco_y_corr[win_ind]+oco_noise[win_ind])
 
-                x1_corr = K1 \ oco_y_corr[win_ind];
+                x1_corr = K1 \ oco_y_corr[win_ind]
                 xn1_corr = K1 \ (oco_y_corr[win_ind]+oco_noise[win_ind])
 
                 # No SIF
                 x0_0 = K0 \ oco_y_0[win_ind];
                 xn0_0 = K0 \ (oco_y_0[win_ind]+oco_noise_0[win_ind])
 
-                x1_0 = K \ oco_y_0[win_ind];
-                xn1_0 = K \ (oco_y_0[win_ind]+oco_noise_0[win_ind])
+                x1_0 = K1 \ oco_y_0[win_ind];
+                xn1_0 = K1 \ (oco_y_0[win_ind]+oco_noise_0[win_ind])
 
                 x0_corr_0 = K0 \ oco_y_0_corr[win_ind];
                 xn0_corr_0 = K0 \ (oco_y_0_corr[win_ind]+oco_noise_0[win_ind])
@@ -486,28 +492,25 @@ for isurf = 1:3 # 1:1 #2:2 #
                 x1_corr_0 = K1 \ oco_y_0_corr[win_ind];
                 xn1_corr_0 = K1 \ (oco_y_0_corr[win_ind]+oco_noise_0[win_ind])
 
-                xSIF1[iwin, isurf, iρ, iA] = mean(x1[end].+x1[end-1]*oco_sounding.SpectralGrid[win_ind]*1e3)
-                xnSIF1[iwin, isurf, iρ, iA] = mean(xn1[end].+xn1[end-1]*oco_sounding.SpectralGrid[win_ind]*1e3)
+                xSIF1[iwin, isurf, iρ, iA] = mean(x1[end].+x1[end-1]*oco_sounding.SpectralGrid[win_ind]*1e3)/ocoMM[1]
+                xnSIF1[iwin, isurf, iρ, iA] = mean(xn1[end].+xn1[end-1]*oco_sounding.SpectralGrid[win_ind]*1e3)/ocoMM[1]
+                xSIF1_0[iwin, isurf, iρ, iA] = mean(x1_0[end].+x1_0[end-1]*oco_sounding.SpectralGrid[win_ind]*1e3)/ocoMM[1]
+                xnSIF1_0[iwin, isurf, iρ, iA] = mean(xn1_0[end].+xn1_0[end-1]*oco_sounding.SpectralGrid[win_ind]*1e3)/ocoMM[1]
 
-                xSIF1_0[iwin, isurf, iρ, iA] = mean(x1_0[end].+x1_0[end-1]*oco_sounding.SpectralGrid[win_ind]*1e3)
-                xnSIF1_0[iwin, isurf, iρ, iA] = mean(xn1_0[end].+xn1_0[end-1]*oco_sounding.SpectralGrid[win_ind]*1e3)
+                xSIF1_corr[iwin, isurf, iρ, iA] = mean(x1_corr[end].+x1_corr[end-1]*oco_sounding.SpectralGrid[win_ind]*1e3)/ocoMM[1]
+                xnSIF1_corr[iwin, isurf, iρ, iA] = mean(xn1_corr[end].+xn1_corr[end-1]*oco_sounding.SpectralGrid[win_ind]*1e3)/ocoMM[1]
+                xSIF1_corr_0[iwin, isurf, iρ, iA] = mean(x1_corr_0[end].+x1_corr_0[end-1]*oco_sounding.SpectralGrid[win_ind]*1e3)/ocoMM[1]
+                xnSIF1_corr_0[iwin, isurf, iρ, iA] = mean(xn1_corr_0[end].+xn1_corr_0[end-1]*oco_sounding.SpectralGrid[win_ind]*1e3)/ocoMM[1]
 
-                xSIF1_corr[iwin, isurf, iρ, iA] = mean(x1_corr[end].+x1_corr[end-1]*oco_sounding.SpectralGrid[win_ind]*1e3)
-                xnSIF1_corr[iwin, isurf, iρ, iA] = mean(xn1_corr[end].+xn1_corr[end-1]*oco_sounding.SpectralGrid[win_ind]*1e3)
+                xSIF0[iwin, isurf, iρ, iA] = x0[end]/ocoMM[1]
+                xnSIF0[iwin, isurf, iρ, iA] = xn0[end]/ocoMM[1]
+                xSIF0_0[iwin, isurf, iρ, iA] = x0_0[end]/ocoMM[1]
+                xnSIF0_0[iwin, isurf, iρ, iA] = xn0_0[end]/ocoMM[1]
 
-                xSIF1_corr_0[iwin, isurf, iρ, iA] = mean(x1_corr_0[end].+x1_corr_0[end-1]*oco_sounding.SpectralGrid[win_ind]*1e3)
-                xnSIF1_corr_0[iwin, isurf, iρ, iA] = mean(xn1_corr_0[end].+xn1_corr_0[end-1]*oco_sounding.SpectralGrid[win_ind]*1e3)
-
-                xSIF0[iwin, isurf, iρ, iA] = x0[end]
-                xnSIF0[iwin, isurf, iρ, iA] = xn0[end]
-
-                xSIF0_0[iwin, isurf, iρ, iA] = x0_0[end]
-                xnSIF0_0[iwin, isurf, iρ, iA] = xn0_0[end]
-
-                xSIF0_corr[iwin, isurf, iρ, iA] = x0_corr[end]
-                xnSIF0_corr[iwin, isurf, iρ, iA] = xn0_corr[end]
-                xSIF0_corr_0[iwin, isurf, iρ, iA] = x0_corr_0[end]
-                xnSIF0_corr_0[iwin, isurf, iρ, iA] = xn0_corr_0[end]
+                xSIF0_corr[iwin, isurf, iρ, iA] = x0_corr[end]/ocoMM[1]
+                xnSIF0_corr[iwin, isurf, iρ, iA] = xn0_corr[end]/ocoMM[1]
+                xSIF0_corr_0[iwin, isurf, iρ, iA] = x0_corr_0[end]/ocoMM[1]
+                xnSIF0_corr_0[iwin, isurf, iρ, iA] = xn0_corr_0[end]/ocoMM[1]
             end
         end
     end
@@ -521,15 +524,15 @@ p3 = heatmap(ρ, sza, xSIF0_corr[1,3,:,:]', xlabel="Albedo", ylabel="SZA [ᵒ]")
 p4 = heatmap(ρ, sza, xSIF0_corr[2,3,:,:]', xlabel="Albedo", ylabel="")
 
 title1a = L"$\mathrm{Uncorr.}\,\mathrm{SIF\,\,retr.}$"
-title1b = L"$(\hat{\mathrm{SIF}}=0.34\,\mathrm{W}/\mathrm{m}^2/\mathrm{sr}/\mu\mathrm{m})$"
+title1b = L"$(\hat{\mathrm{SIF}}=0.33\,\mathrm{W}/\mathrm{m}^2/\mathrm{sr}/\mu\mathrm{m})$"
 title2a = L"$\mathrm{Uncorr.}\,\mathrm{SIF\,\,retr.}$"
 title2b = L"$(\hat{\mathrm{SIF}}=0.20\,\mathrm{W}/\mathrm{m}^2/\mathrm{sr}/\mu\mathrm{m})$"
 title3a = L"$\mathrm{Corr.}\,\mathrm{SIF\,\,retr.}$"
-title3b = L"$(\hat{\mathrm{SIF}}=0.34\,\mathrm{W}/\mathrm{m}^2/\mathrm{sr}/\mu\mathrm{m})$"
+title3b = L"$(\hat{\mathrm{SIF}}=0.33\,\mathrm{W}/\mathrm{m}^2/\mathrm{sr}/\mu\mathrm{m})$"
 title4a = L"$\mathrm{Corr.}\,\mathrm{SIF\,\,retr.}$"
 title4b = L"$(\hat{\mathrm{SIF}}=0.20\,\mathrm{W}/\mathrm{m}^2/\mathrm{sr}/\mu\mathrm{m})$"
 plot(p1, p2, p3, p4, layout = l, legend = false, plot_title="Method 0, no noise", title = [title1a*"\n"*title1b title2a*"\n"*title2b title3a*"\n"*title3b title4a*"\n"*title4b], titlefont = font(8))
-savefig("SIF0_retr.png")
+savefig(path*"SIF0_retr.png")
 
 l = @layout [a1 a2; b1 b2]
 p1 = heatmap(ρ, sza, xSIF1[1,3,:,:]', xlabel="", ylabel="SZA [ᵒ]")
@@ -538,15 +541,15 @@ p3 = heatmap(ρ, sza, xSIF1_corr[1,3,:,:]', xlabel="Albedo", ylabel="SZA [ᵒ]")
 p4 = heatmap(ρ, sza, xSIF1_corr[2,3,:,:]', xlabel="Albedo", ylabel="")
 
 title1a = L"$\mathrm{Uncorr.}\,\mathrm{SIF\,\,retr.}$"
-title1b = L"$(\hat{\mathrm{SIF}}=0.34\,\mathrm{W}/\mathrm{m}^2/\mathrm{sr}/\mu\mathrm{m})$"
+title1b = L"$(\hat{\mathrm{SIF}}=0.33\,\mathrm{W}/\mathrm{m}^2/\mathrm{sr}/\mu\mathrm{m})$"
 title2a = L"$\mathrm{Uncorr.}\,\mathrm{SIF\,\,retr.}$"
 title2b = L"$(\hat{\mathrm{SIF}}=0.20\,\mathrm{W}/\mathrm{m}^2/\mathrm{sr}/\mu\mathrm{m})$"
 title3a = L"$\mathrm{Corr.}\,\mathrm{SIF\,\,retr.}$"
-title3b = L"$(\hat{\mathrm{SIF}}=0.34\,\mathrm{W}/\mathrm{m}^2/\mathrm{sr}/\mu\mathrm{m})$"
+title3b = L"$(\hat{\mathrm{SIF}}=0.33\,\mathrm{W}/\mathrm{m}^2/\mathrm{sr}/\mu\mathrm{m})$"
 title4a = L"$\mathrm{Corr.}\,\mathrm{SIF\,\,retr.}$"
 title4b = L"$(\hat{\mathrm{SIF}}=0.20\,\mathrm{W}/\mathrm{m}^2/\mathrm{sr}/\mu\mathrm{m})$"
 plot(p1, p2, p3, p4, layout = l, legend = false, plot_title="Method 1, no noise", title = [title1a*"\n"*title1b title2a*"\n"*title2b title3a*"\n"*title3b title4a*"\n"*title4b], titlefont = font(8))
-savefig("SIF1_retr.png")
+savefig(path*"SIF1_retr.png")
 
 l = @layout [a1 a2; b1 b2]
 p1 = heatmap(ρ, sza, xnSIF0[1,3,:,:]', xlabel="", ylabel="SZA [ᵒ]")
@@ -555,15 +558,15 @@ p3 = heatmap(ρ, sza, xnSIF0_corr[1,3,:,:]', xlabel="Albedo", ylabel="SZA [ᵒ]"
 p4 = heatmap(ρ, sza, xnSIF0_corr[2,3,:,:]', xlabel="Albedo", ylabel="")
 
 title1a = L"$\mathrm{Uncorr.}\,\mathrm{SIF\,\,retr.}$"
-title1b = L"$(\hat{\mathrm{SIF}}=0.34\,\mathrm{W}/\mathrm{m}^2/\mathrm{sr}/\mu\mathrm{m})$"
+title1b = L"$(\hat{\mathrm{SIF}}=0.33\,\mathrm{W}/\mathrm{m}^2/\mathrm{sr}/\mu\mathrm{m})$"
 title2a = L"$\mathrm{Uncorr.}\,\mathrm{SIF\,\,retr.}$"
 title2b = L"$(\hat{\mathrm{SIF}}=0.20\,\mathrm{W}/\mathrm{m}^2/\mathrm{sr}/\mu\mathrm{m})$"
 title3a = L"$\mathrm{Corr.}\,\mathrm{SIF\,\,retr.}$"
-title3b = L"$(\hat{\mathrm{SIF}}=0.34\,\mathrm{W}/\mathrm{m}^2/\mathrm{sr}/\mu\mathrm{m})$"
+title3b = L"$(\hat{\mathrm{SIF}}=0.33\,\mathrm{W}/\mathrm{m}^2/\mathrm{sr}/\mu\mathrm{m})$"
 title4a = L"$\mathrm{Corr.}\,\mathrm{SIF\,\,retr.}$"
 title4b = L"$(\hat{\mathrm{SIF}}=0.20\,\mathrm{W}/\mathrm{m}^2/\mathrm{sr}/\mu\mathrm{m})$"
 plot(p1, p2, p3, p4, layout = l, legend = false, plot_title="Method 0, noisy", title = [title1a*"\n"*title1b title2a*"\n"*title2b title3a*"\n"*title3b title4a*"\n"*title4b], titlefont = font(8))
-savefig("SIF0_noisy_retr.png")
+savefig(path*"SIF0_noisy_retr.png")
 
 l = @layout [a1 a2; b1 b2]
 p1 = heatmap(ρ, sza, xnSIF1[1,3,:,:]', xlabel="", ylabel="SZA [ᵒ]")
@@ -572,15 +575,15 @@ p3 = heatmap(ρ, sza, xnSIF1_corr[1,3,:,:]', xlabel="Albedo", ylabel="SZA [ᵒ]"
 p4 = heatmap(ρ, sza, xnSIF1_corr[2,3,:,:]', xlabel="Albedo", ylabel="")
 
 title1a = L"$\mathrm{Uncorr.}\,\mathrm{SIF\,\,retr.}$"
-title1b = L"$(\hat{\mathrm{SIF}}=0.34\,\mathrm{W}/\mathrm{m}^2/\mathrm{sr}/\mu\mathrm{m})$"
+title1b = L"$(\hat{\mathrm{SIF}}=0.33\,\mathrm{W}/\mathrm{m}^2/\mathrm{sr}/\mu\mathrm{m})$"
 title2a = L"$\mathrm{Uncorr.}\,\mathrm{SIF\,\,retr.}$"
 title2b = L"$(\hat{\mathrm{SIF}}=0.20\,\mathrm{W}/\mathrm{m}^2/\mathrm{sr}/\mu\mathrm{m})$"
 title3a = L"$\mathrm{Corr.}\,\mathrm{SIF\,\,retr.}$"
-title3b = L"$(\hat{\mathrm{SIF}}=0.34\,\mathrm{W}/\mathrm{m}^2/\mathrm{sr}/\mu\mathrm{m})$"
+title3b = L"$(\hat{\mathrm{SIF}}=0.33\,\mathrm{W}/\mathrm{m}^2/\mathrm{sr}/\mu\mathrm{m})$"
 title4a = L"$\mathrm{Corr.}\,\mathrm{SIF\,\,retr.}$"
 title4b = L"$(\hat{\mathrm{SIF}}=0.20\,\mathrm{W}/\mathrm{m}^2/\mathrm{sr}/\mu\mathrm{m})$"
 plot(p1, p2, p3, p4, layout = l, legend = false, plot_title="Method 1, noisy", title = [title1a*"\n"*title1b title2a*"\n"*title2b title3a*"\n"*title3b title4a*"\n"*title4b], titlefont = font(8))
-savefig("SIF1_noisy_retr.png")
+savefig(path*"SIF1_noisy_retr.png")
 
 # No SIF
 l = @layout [a1 a2; b1 b2]
@@ -598,7 +601,7 @@ title3b = L"$(\hat{\mathrm{SIF}}=0.0\,\mathrm{W}/\mathrm{m}^2/\mathrm{sr}/\mu\ma
 title4a = L"$\mathrm{Corr.}\,\mathrm{SIF\,\,retr.}$"
 title4b = L"$(\hat{\mathrm{SIF}}=0.0\,\mathrm{W}/\mathrm{m}^2/\mathrm{sr}/\mu\mathrm{m})$"
 plot(p1, p2, p3, p4, layout = l, legend = false, plot_title="Method 0, no noise", title = [title1a*"\n"*title1b title2a*"\n"*title2b title3a*"\n"*title3b title4a*"\n"*title4b], titlefont = font(8))
-savefig("SIF0_retr_0.png")
+savefig(path*"SIF0_retr_0.png")
 
 l = @layout [a1 a2; b1 b2]
 p1 = heatmap(ρ, sza, xSIF1_0[1,3,:,:]', xlabel="", ylabel="SZA [ᵒ]")
@@ -615,7 +618,7 @@ title3b = L"$(\hat{\mathrm{SIF}}=0.0\,\mathrm{W}/\mathrm{m}^2/\mathrm{sr}/\mu\ma
 title4a = L"$\mathrm{Corr.}\,\mathrm{SIF\,\,retr.}$"
 title4b = L"$(\hat{\mathrm{SIF}}=0.0\,\mathrm{W}/\mathrm{m}^2/\mathrm{sr}/\mu\mathrm{m})$"
 plot(p1, p2, p3, p4, layout = l, legend = false, plot_title="Method 1, no noise", title = [title1a*"\n"*title1b title2a*"\n"*title2b title3a*"\n"*title3b title4a*"\n"*title4b], titlefont = font(8))
-savefig("SIF1_retr_0.png")
+savefig(path*"SIF1_retr_0.png")
 
 l = @layout [a1 a2; b1 b2]
 p1 = heatmap(ρ, sza, xnSIF0_0[1,3,:,:]', xlabel="", ylabel="SZA [ᵒ]")
@@ -632,7 +635,7 @@ title3b = L"$(\hat{\mathrm{SIF}}=0.0\,\mathrm{W}/\mathrm{m}^2/\mathrm{sr}/\mu\ma
 title4a = L"$\mathrm{Corr.}\,\mathrm{SIF\,\,retr.}$"
 title4b = L"$(\hat{\mathrm{SIF}}=0.0\,\mathrm{W}/\mathrm{m}^2/\mathrm{sr}/\mu\mathrm{m})$"
 plot(p1, p2, p3, p4, layout = l, legend = false, plot_title="Method 0, noisy", title = [title1a*"\n"*title1b title2a*"\n"*title2b title3a*"\n"*title3b title4a*"\n"*title4b], titlefont = font(8))
-savefig("SIF0_noisy_retr_0.png")
+savefig(path*"SIF0_noisy_retr_0.png")
 
 l = @layout [a1 a2; b1 b2]
 p1 = heatmap(ρ, sza, xnSIF1_0[1,3,:,:]', xlabel="", ylabel="SZA [ᵒ]")
@@ -649,7 +652,7 @@ title3b = L"$(\hat{\mathrm{SIF}}=0.0\,\mathrm{W}/\mathrm{m}^2/\mathrm{sr}/\mu\ma
 title4a = L"$\mathrm{Corr.}\,\mathrm{SIF\,\,retr.}$"
 title4b = L"$(\hat{\mathrm{SIF}}=0.0\,\mathrm{W}/\mathrm{m}^2/\mathrm{sr}/\mu\mathrm{m})$"
 plot(p1, p2, p3, p4, layout = l, legend = false, plot_title="Method 1, noisy", title = [title1a*"\n"*title1b title2a*"\n"*title2b title3a*"\n"*title3b title4a*"\n"*title4b], titlefont = font(8))
-savefig("SIF1_noisy_retr_0.png")
+savefig(path*"SIF1_noisy_retr_0.png")
 
 
 #=
@@ -732,6 +735,36 @@ for iwin=1:2
 end
 #geoSIF_itp = interpolate((FT(1.0)*psurf', ρ, FT(1.0)*sza), xSIF, BSpline(Linear())); #Gridded(Linear()));
 #geoSIF_noRS_itp = interpolate((FT(1.0)*psurf', ρ, FT(1.0)*sza), xSIF_noRS, BSpline(Linear())); #Gridded(Linear()));
+#Freeing reundant memory
+xSIF0_corr = 0
+xnSIF0_corr = 0
+xSIF1_corr = 0
+xnSIF1_corr = 0
+
+xSIF0 = 0
+xnSIF0 = 0
+xSIF1 = 0
+xnSIF1 = 0
+
+xSIF0_corr_0 = 0
+xnSIF0_corr_0 = 0
+xSIF1_corr_0 = 0
+xnSIF1_corr_0 = 0
+
+xSIF0_0 = 0
+xnSIF0_0 = 0
+xSIF1_0 = 0
+xnSIF1_0 = 0
+
+geo_SIF0_itp = 0
+geo_corr_SIF0_itp = 0
+geo_noSIF0_itp = 0
+geo_corr_noSIF0_itp = 0
+
+geo_SIF1_itp = 0
+geo_corr_SIF1_itp = 0
+geo_noSIF1_itp = 0
+geo_corr_noSIF1_itp = 0
 
 FT = Float64
 param_set = IP.InsolationParameters(FT)
@@ -749,13 +782,15 @@ date = DateTime(2020, 01, 10)
 timezone = +0 # Just take local time
 od = Insolation.OrbitalData()
 
+#=
 datetime = date + Dates.Hour.(hours) + Dates.Minute.(minutes)
+
 S = solar_flux_and_cos_sza.(datetime, date0, [od], lon, lat', [param_set])
 
 # Extract SZAs (can also just take mu):
 SZAs = [rad2deg(acos(tup[2])) for tup in S]
 SZA_interp = LinearInterpolation(lat, SZAs[2,:])
-
+=#
 modis_file = "/net/fluo/data2/DATASERVER/satellite/MODIS/MCD43A4.006/reprocessed/0.0833_lat-lon_8d/global/modis_MCD43A43-006.refl.00833deg_regrid.8d.2020.nc"
 m_data = Dataset(modis_file, "r")
 
@@ -766,67 +801,134 @@ lon = m_data["lon"][:]
 
 # Check out bands: https://developers.google.com/earth-engine/datasets/catalog/MODIS_061_MCD43A3
 alb_850 = m_data["refl_band2"]
-alb_650 = m_data["refl_band1"]
+#alb_650 = m_data["refl_band1"]
 
 # Extract data for the first time step (January)
-alb_850_Jan = alb_850[1,:,:]
-alb_650_Jan = alb_650[1,:,:]
+#alb_850_Jan = alb_850[1,:,:]
+#alb_650_Jan = alb_650[1,:,:]
+for t=1:length(time)
+    a=time[t]
+    date = DateTime(parse(Int32,string(a)[1:4]),parse(Int32,string(a)[6:7]),parse(Int32,string(a)[9:10]),hours[3],minutes[3])
+    tlon = 0.0
+    tlat = -90.0:90.0
+    datetime = date# + Dates.Hour.(hours[3]) + Dates.Minute.(minutes[3])
+    timezone = +0 # Just take local time
+    S = solar_flux_and_cos_sza.(datetime, date0, [od], tlon, tlat', [param_set])
+    # Extract SZAs (can also just take mu):
+    SZAs = [rad2deg(acos(tup[2])) for tup in S]
+    SZA_interp = LinearInterpolation(tlat, SZAs[:])
 
-for ilon=1:size(alb_850_Jan,1)
-    for ilat=1:size(alb_850_Jan,2)
-        alb = alb_850_Jan[ilon,ilat]
-        if !ismissing(alb)
-            if alb>1.0
-                alb_850_Jan[ilon,ilat] = 0.0
-            end
-        end
-    end
-end
-#tSIF = zeros(length(lon),length(lat))
-#tSIF_noRS = zeros(length(lon),length(lat))
-tSIF0 = zeros(2,length(lon),length(lat))
-tSIF0_0 = zeros(2,length(lon),length(lat))
-tSIF1 = zeros(2,length(lon),length(lat))
-tSIF1_0 = zeros(2,length(lon),length(lat))
-tcorrSIF0 = zeros(2,length(lon),length(lat))
-tcorrSIF0_0 = zeros(2,length(lon),length(lat))
-tcorrSIF1 = zeros(2,length(lon),length(lat))
-tcorrSIF1_0 = zeros(2,length(lon),length(lat))
-for i = 1:length(lon)
-    #ind = findall(x -> string(x)!="missing", alb_850_Jan[i,:])
-    ind = findall(x -> !isa(x, Missing) && 0.0<x<0.7, alb_850_Jan[i,:])
-    #@show ind
-    #@show alb_850_Jan[ind,i]
-    #ind = findall(x-> 0.0<x<0.7, alb_850_Jan[ind,i])
-    #@show ind
-    #@show alb_850_Jan[ind,i]
-    if length(ind)>0
-        for ctr=1:length(ind) # = 1:length(lat)
-            j=ind[ctr]
-            @show i,j, alb_850_Jan[i,j]
-            plon = lon[i]
-            plat = lat[j]
-            elevation = get_elevation(plat, plon)
-            ppsurf = 1000.0*exp(-elevation/8000)
-            palb  = alb_850_Jan[i,j]
-            pSZA = SZA_interp(plat);
-            if(cosd(pSZA)>=0.35)
-                #tSIF[i,j] = geoSIF_sitp(1000., palb, cosd(pSZA))
-                #tSIF_noRS[i,j] = geoSIF_noRS_sitp(1000., palb, cosd(pSZA))
-                for ictr=1:2
-                    tSIF0[ictr,i,j] = geo_SIF0_sitp[ictr](ppsurf, palb, cosd(pSZA))
-                    tSIF0_0[ictr,i,j] = geo_noSIF0_sitp[ictr](ppsurf, palb, cosd(pSZA))
-                    tSIF1[ictr,i,j] = geo_SIF1_sitp[ictr](ppsurf, palb, cosd(pSZA))
-                    tSIF1_0[ictr,i,j] = geo_noSIF1_sitp[ictr](ppsurf, palb, cosd(pSZA))
-
-                    tcorrSIF0[ictr,i,j] = geo_corr_SIF0_sitp[ictr](ppsurf, palb, cosd(pSZA))
-                    tcorrSIF0_0[ictr,i,j] = geo_corr_noSIF0_sitp[ictr](ppsurf, palb, cosd(pSZA))
-                    tcorrSIF1[ictr,i,j] = geo_corr_SIF1_sitp[ictr](ppsurf, palb, cosd(pSZA))
-                    tcorrSIF1_0[ictr,i,j] = geo_corr_noSIF1_sitp[ictr](ppsurf, palb, cosd(pSZA))
+    alb_850_t = alb_850[t,:,:]
+    for ilon=1:size(alb_850_t,1)
+        for ilat=1:size(alb_850_t,2)
+            alb = alb_850_t[ilon,ilat]
+            if !ismissing(alb)
+                if alb>1.0
+                    alb_850_t[ilon,ilat] = 0.0
                 end
             end
         end
     end
+
+    tSIF0 = zeros(2,length(lon),length(lat))
+    #tSIF0_0 = zeros(2,length(lon),length(lat))
+    #tSIF1 = zeros(2,length(lon),length(lat))
+    #tSIF1_0 = zeros(2,length(lon),length(lat))
+    tcorrSIF0 = zeros(2,length(lon),length(lat))
+    #tcorrSIF0_0 = zeros(2,length(lon),length(lat))
+    #tcorrSIF1 = zeros(2,length(lon),length(lat))
+    #tcorrSIF1_0 = zeros(2,length(lon),length(lat))
+
+    for i = 1:length(lon)
+        #ind = findall(x -> string(x)!="missing", alb_850_Jan[i,:])
+        ind = findall(x -> (!ismissing(x) && 0.0<=x<0.7), alb_850_t[i,:])
+
+        if length(ind)>0
+            for ctr=1:length(ind) # = 1:length(lat)
+                j=ind[ctr]
+                
+                plon = lon[i]
+                plat = lat[j]
+                #if((i==26 && j==1808)||(i==44 && (j==1816)||(j==1935))||(i==109 && j==1791)||(i==206 && j==1944))
+                #    elevation=0.0
+                #else 
+                try
+                    elevation = get_elevation(plat, plon)
+                catch
+                    elevation=0.0
+                end
+                ppsurf = 1000.0*exp(-elevation/8000)
+                #@show t,i,j, plon,plat, alb_850_t[i,j], ppsurf
+                palb  = alb_850_t[i,j]
+                pSZA = SZA_interp(plat);
+                @show t,i,j, plon,plat, alb_850_t[i,j], ppsurf, pSZA
+                #=
+                if(cosd(pSZA)>=0.35)
+                    #tSIF[i,j] = geoSIF_sitp(1000., palb, cosd(pSZA))
+                    #tSIF_noRS[i,j] = geoSIF_noRS_sitp(1000., palb, cosd(pSZA))
+                    for iwin=1:2
+                        tSIF0[iwin,i,j] = geo_SIF0_sitp[iwin](ppsurf, palb, cosd(pSZA))
+                        #tSIF0_0[iwin,i,j] = geo_noSIF0_sitp[iwin](ppsurf, palb, cosd(pSZA))
+                        #tSIF1[iwin,i,j] = geo_SIF1_sitp[iwin](ppsurf, palb, cosd(pSZA))
+                        #tSIF1_0[iwin,i,j] = geo_noSIF1_sitp[iwin](ppsurf, palb, cosd(pSZA))
+
+                        tcorrSIF0[iwin,i,j] = geo_corr_SIF0_sitp[iwin](ppsurf, palb, cosd(pSZA))
+                        #tcorrSIF0_0[iwin,i,j] = geo_corr_noSIF0_sitp[iwin](ppsurf, palb, cosd(pSZA))
+                        #tcorrSIF1[iwin,i,j] = geo_corr_SIF1_sitp[iwin](ppsurf, palb, cosd(pSZA))
+                        #tcorrSIF1_0[iwin,i,j] = geo_corr_noSIF1_sitp[iwin](ppsurf, palb, cosd(pSZA))
+                    end
+                end
+                =#
+            end
+        end
+    end
+    l = @layout [a1 a2; b1 b2]
+    p1 = heatmap(lon, lat, tSIF0[1,t,:,:]', size=(800,400), grid=true, xlabel="", ylabel="Lon [ᵒ]")
+    # title=L"$\mathrm{Uncorr.}\,\mathrm{SIF\,\,retr.} (\hat{\mathrm{SIF}}=0.34\,\mathrm{W}/\mathrm{m}^2/\mathrm{sr}/\mu\mathrm{m})$")
+    p2 = heatmap(lon, lat, tSIF0[2,t,:,:]', size=(800,400), grid=true, xlabel="", ylabel="")
+    #heatmap(ρ, sza, w2_xnSIF1_0[3,:,:]', xlabel="", ylabel="")
+    # title=L"$\mathrm{Uncorr.}\,\mathrm{SIF\,\,retr.} (\hat{\mathrm{SIF}}=0.20\,\mathrm{W}/\mathrm{m}^2/\mathrm{sr}/\mu\mathrm{m})$")
+    p3 = heatmap(lon, lat, tcorrSIF0[1,t,:,:]', size=(800,400), grid=true, xlabel="Lat [ᵒ]", ylabel="Lon [ᵒ]")
+    #heatmap(ρ, sza, w1_xnSIF1_corr_0[3,:,:]', xlabel="Albedo", ylabel="SZA [ᵒ]") 
+    p4 = heatmap(lon, lat, tcorrSIF0[2,t,:,:]', size=(800,400), grid=true, xlabel="Lat [ᵒ]", ylabel="")
+    #heatmap(ρ, sza, w2_xnSIF1_corr_0[3,:,:]', xlabel="Albedo", ylabel="") 
+            
+    title1a = L"$\mathrm{Uncorr.}\,\mathrm{SIF\,\,retr.}$" 
+    title1b = L"$(\hat{\mathrm{SIF}}=0.33\,\mathrm{W}/\mathrm{m}^2/\mathrm{sr}/\mu\mathrm{m})$"
+    title2a = L"$\mathrm{Uncorr.}\,\mathrm{SIF\,\,retr.}$"
+    title2b = L"$(\hat{\mathrm{SIF}}=0.20\,\mathrm{W}/\mathrm{m}^2/\mathrm{sr}/\mu\mathrm{m})$"
+    title3a = L"$\mathrm{Corr.}\,\mathrm{SIF\,\,retr.}$"
+    title3b = L"$(\hat{\mathrm{SIF}}=0.33\,\mathrm{W}/\mathrm{m}^2/\mathrm{sr}/\mu\mathrm{m})$"
+    title4a = L"$\mathrm{Corr.}\,\mathrm{SIF\,\,retr.}$"
+    title4b = L"$(\hat{\mathrm{SIF}}=0.20\,\mathrm{W}/\mathrm{m}^2/\mathrm{sr}/\mu\mathrm{m})$"
+
+    plot(p1, p2, p3, p4, layout = l, legend = false, title = [title1a*"\n"*title1b title2a*"\n"*title2b title3a*"\n"*title3b title4a*"\n"*title4b], titlefont = font(8))
+    
+    savefig(path*"globmap_SIF0_retr"*string(t)*".png")
+
+    l = @layout [a1 a2; b1 b2]
+    p1 = heatmap(lon, lat, tSIF1[1,t,:,:]', size=(800,400), grid=true, xlabel="", ylabel="Lon [ᵒ]")
+    # title=L"$\mathrm{Uncorr.}\,\mathrm{SIF\,\,retr.} (\hat{\mathrm{SIF}}=0.34\,\mathrm{W}/\mathrm{m}^2/\mathrm{sr}/\mu\mathrm{m})$")
+    p2 = heatmap(lon, lat, tSIF1[2,t,:,:]', size=(800,400), grid=true, xlabel="", ylabel="")
+    #heatmap(ρ, sza, w2_xnSIF1_0[3,:,:]', xlabel="", ylabel="")
+    # title=L"$\mathrm{Uncorr.}\,\mathrm{SIF\,\,retr.} (\hat{\mathrm{SIF}}=0.20\,\mathrm{W}/\mathrm{m}^2/\mathrm{sr}/\mu\mathrm{m})$")
+    p3 = heatmap(lon, lat, tcorrSIF1[1,t,:,:]', size=(800,400), grid=true, xlabel="Lat [ᵒ]", ylabel="Lon [ᵒ]")
+    #heatmap(ρ, sza, w1_xnSIF1_corr_0[3,:,:]', xlabel="Albedo", ylabel="SZA [ᵒ]") 
+    p4 = heatmap(lon, lat, tcorrSIF1[2,t,:,:]', size=(800,400), grid=true, xlabel="Lat [ᵒ]", ylabel="")
+    #heatmap(ρ, sza, w2_xnSIF1_corr_0[3,:,:]', xlabel="Albedo", ylabel="") 
+            
+    title1a = L"$\mathrm{Uncorr.}\,\mathrm{SIF\,\,retr.}$" 
+    title1b = L"$(\hat{\mathrm{SIF}}=0.33\,\mathrm{W}/\mathrm{m}^2/\mathrm{sr}/\mu\mathrm{m})$"
+    title2a = L"$\mathrm{Uncorr.}\,\mathrm{SIF\,\,retr.}$"
+    title2b = L"$(\hat{\mathrm{SIF}}=0.20\,\mathrm{W}/\mathrm{m}^2/\mathrm{sr}/\mu\mathrm{m})$"
+    title3a = L"$\mathrm{Corr.}\,\mathrm{SIF\,\,retr.}$"
+    title3b = L"$(\hat{\mathrm{SIF}}=0.33\,\mathrm{W}/\mathrm{m}^2/\mathrm{sr}/\mu\mathrm{m})$"
+    title4a = L"$\mathrm{Corr.}\,\mathrm{SIF\,\,retr.}$"
+    title4b = L"$(\hat{\mathrm{SIF}}=0.20\,\mathrm{W}/\mathrm{m}^2/\mathrm{sr}/\mu\mathrm{m})$"
+
+    plot(p1, p2, p3, p4, layout = l, legend = false, title = [title1a*"\n"*title1b title2a*"\n"*title2b title3a*"\n"*title3b title4a*"\n"*title4b], titlefont = font(8))
+    path = "/home/sanghavi/RamanSIFgrid/plots/"
+    savefig(path*"globmap_SIF1_retr"*string(t)*".png")
 end
 
 
