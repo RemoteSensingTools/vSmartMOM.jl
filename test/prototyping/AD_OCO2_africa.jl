@@ -21,14 +21,14 @@ using LinearAlgebra
 # Load parameters from file
 parameters = parameters_from_yaml("test/test_parameters/3BandParameters.yaml")
 #parameters.architecture = CPU()
-FT = Float32
+FT = Float64
 parameters.float_type = FT
 # Load OCO Data: 
 # File names:
 
 # Africa
-L1File   = "/net/fluo/data1/group/oco2/L1bSc/oco2_L1bScND_31182a_200512_B10206r_210427151019.h5"
-metFile  = "/net/fluo/data1/group/oco2/L2Met/oco2_L2MetND_31182a_200512_B10206r_210425233338.h5"
+L1File   = "/net/fluo/data3/data/FluoData1/group/oco2/L1bSc/oco2_L1bScND_31182a_200512_B10206r_210427151019.h5"
+metFile  = "/net/fluo/data3/data/FluoData1/group/oco2/L2Met/oco2_L2MetND_31182a_200512_B10206r_210425233338.h5"
 dictFile = "/home/cfranken/code/gitHub/InstrumentOperator.jl/json/oco2.yaml"
 # Load L1 file (could just use filenames here as well)
 oco = InstrumentOperator.load_L1(dictFile,L1File, metFile);
@@ -82,8 +82,8 @@ function runner!(y, x, parameters=parameters, oco_sounding= oco_sounding, Tsolar
                         CoreRT.LambertianSurfaceLegendre([x[4],x[5],x[6]]),
                         CoreRT.LambertianSurfaceLegendre([x[7],x[8],x[9]])];
 
-    parameters.scattering_params.rt_aerosols[1].τ_ref = exp(x[10]);
-    parameters.scattering_params.rt_aerosols[1].p₀    = x[11]
+    parameters.scattering_params.rt_aerosols[1].τ_ref = x[10];
+    #parameters.scattering_params.rt_aerosols[1].profile = Normal(x[11],50.0) 
     size_distribution = LogNormal(x[12], FT(0.3))
     parameters.scattering_params.rt_aerosols[1].aerosol.size_distribution =  size_distribution
     #@show size_distribution
@@ -149,7 +149,7 @@ function runner2(x, parameters=parameters, oco_sounding= oco_sounding, Tsolar = 
                         CoreRT.LambertianSurfaceLegendre([x[7],x[8],x[9]])];
 
     parameters.scattering_params.rt_aerosols[1].τ_ref = exp(x[10]);
-    parameters.scattering_params.rt_aerosols[1].p₀    = x[11]
+    #parameters.scattering_params.rt_aerosols[1].profile.μ    = x[11]
     size_distribution = LogNormal(x[12], FT(0.3))
     parameters.scattering_params.rt_aerosols[1].aerosol.size_distribution =  size_distribution
     #@show size_distribution
@@ -217,9 +217,9 @@ xₐ = FT[  0.376,   # Albedo band 1, degree 1
         0.1,#0.0512,    # Albedo band 3, degree 1
         0,         # Albedo band 3, degree 2
         0.00,      # Albedo band 3, degree 3
-        -1.0,      # log AOD
+        0.02,      # log AOD
         800.0,     # Aerosol peak height (hPa)
-        -1.0,       # log of size distribution mean (1µm here)
+        1.0,       # log of size distribution mean (1µm here)
         1.3,       # Real refractive index of aerosol
         1,         # H2O scaling factor for entire profile
         400,    # CO2 Top layers
