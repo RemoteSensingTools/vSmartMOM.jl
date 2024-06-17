@@ -1,7 +1,7 @@
 name = "vSmartMOM"
 uuid = "7ba11eeb-0a61-4a04-a413-bf612cc2007e"
-authors = ["Christian Frankenberg <cfranken@caltech.edu>, Suniti Sanghavi (suniti.sanghavi@gmail.com), Rupesj Jeyaram and contributors"]
-version = "1.0.2"
+authors = ["Suniti Sanghavi (suniti.sanghavi@gmail.com), Christian Frankenberg <cfranken@caltech.edu>, Rupesh Jeyaram and contributors"]
+version = "1.0.3"
 
 [deps]
 CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"

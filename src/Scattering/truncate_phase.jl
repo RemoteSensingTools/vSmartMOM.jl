@@ -100,7 +100,8 @@ function truncate_phase(mod::δBGE, aero::AerosolOptics{FT}; reportFit=false) wh
     l_tr = l_max
     # Obtain Gauss-Legendre quadrature points and weights for phase function:
     μ, w_μ = gausslegendre(length(β));
-
+    μ = convert.(FT, μ); w_μ = convert.(FT, w_μ);
+    #show μ
     # Reconstruct phase matrix elements:
     scattering_matrix, P, P² = reconstruct_phase(greek_coefs, μ; returnLeg=true)
 
@@ -125,9 +126,9 @@ function truncate_phase(mod::δBGE, aero::AerosolOptics{FT}; reportFit=false) wh
        Aᵢⱼ = ∑ₖ w_μₖ Pᵢ(μₖ)Pⱼ(μₖ)/f₁₁²(μₖ), xᵢ=cᵢ (as in Sanghavi & Stephens 2015), and
        bᵢ  = ∑ₖ w_μₖ Pᵢ(μₖ)/f₁₁(μₖ)
     =#   
-    A = zeros(l_tr, l_tr)
-    x = zeros(l_tr)
-    b = zeros(l_tr)
+    A = zeros(FT,l_tr, l_tr)
+    x = zeros(FT,l_tr)
+    b = zeros(FT,l_tr)
 
     for i = 1:l_tr
         b[i] = sum(w_μ.*P[:,i]./f₁₁)
@@ -150,9 +151,9 @@ function truncate_phase(mod::δBGE, aero::AerosolOptics{FT}; reportFit=false) wh
        Aᵢⱼ = ∑ₖ w_μₖ facᵢP²ᵢ(μₖ)facⱼP²ⱼ(μₖ)/f₁₂²(μₖ), xᵢ=gᵢ (as in Sanghavi & Stephens 2015), and
        bᵢ  = ∑ₖ w_μₖ facᵢP²ᵢ(μₖ)/f₁₂(μₖ)
     =#  
-    A = zeros(l_tr, l_tr)
-    x = zeros(l_tr)
-    b = zeros(l_tr)
+    A = zeros(FT,l_tr, l_tr)
+    x = zeros(FT,l_tr)
+    b = zeros(FT,l_tr)
 
     for i = 3:l_tr
         b[i] = fac[i]*sum(w_μ.*P²[:,i]./f₁₂)
