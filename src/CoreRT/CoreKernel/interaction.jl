@@ -98,6 +98,9 @@ function interaction_helper!(::ScatteringInterface_11, SFI,
     # Repeating for mirror-reflected directions
 
     # Compute and store `(I - r⁻⁺ * R⁺⁻)⁻¹`
+    #handle = CUBLAS.handle()
+    #CUBLAS.math_mode!(handle, CUDA.FAST_MATH)
+    #@show typeof(I_static .- R⁺⁻ ⊠ r⁻⁺)
     @timeit "interaction inv2" batch_inv!(tmp_inv, I_static .- R⁺⁻ ⊠ r⁻⁺) 
     # T₂₁(I-R₀₁R₂₁)⁻¹
     T21_inv = t⁺⁺ ⊠ tmp_inv
