@@ -4,6 +4,8 @@ This file contains implementations of batched linear algebra code
 
 =#
 
+@inline synchronize() = CUDA.synchronize()
+
 "Given 3D CuArrays A and B, fill in X[:,:,k] = A[:,:,k] \\ B[:,:,k]" 
 function batch_solve!(X::CuArray{FT,3}, A::CuArray{FT,3}, B::CuArray{FT,3}) where {FT}
 
@@ -32,6 +34,7 @@ end
 
 "Given 3D CuArray A, fill in X[:,:,k] = A[:,:,k] \\ I" 
 function batch_inv!(X::CuArray{FT,3}, A::CuArray{FT,3}) where {FT}
+    #CUBLAS.math_mode!(CUBLAS.handle(), CUDA.FAST_MATH)
     # LU-factorize A
     pivot, info   = CUBLAS.getrf_strided_batched!(A, true);synchronize()
     # Invert LU factorization of A

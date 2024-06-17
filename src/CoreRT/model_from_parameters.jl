@@ -45,7 +45,7 @@ function model_from_parameters(params::vSmartMOM_Parameters)
     # This is a kludge for now, tau_abs sometimes needs to be a dual. Suniti & us need to rethink this all!!
     # i.e. code the rt core with fixed amount of derivatives as in her paper, then compute chain rule for dtau/dVMr, etc...
     FT2 = isnothing(params.absorption_params) || !haskey(params.absorption_params.vmr,"CO2") ? params.float_type : eltype(params.absorption_params.vmr["CO2"])
-    τ_abs     = [zeros(FT2, length(params.spec_bands[i]), length(profile.p_full)) for i in 1:n_bands]
+    τ_abs     = [zeros(FT, length(params.spec_bands[i]), length(profile.p_full)) for i in 1:n_bands]
     
     # Loop over all bands:
     for i_band=1:n_bands
@@ -54,7 +54,7 @@ function model_from_parameters(params::vSmartMOM_Parameters)
         curr_band_λ = FT.(1e4 ./ params.spec_bands[i_band])
         # @show profile.vcd_dry, size(τ_rayl[i_band])
         # Compute Rayleigh properties per layer for `i_band` band center  
-        
+        #@show τ_rayl[i_band]
         τ_rayl[i_band]   .= getRayleighLayerOptProp(profile.p_half[end], 
                                 curr_band_λ, #(mean(curr_band_λ)), 
                                 params.depol, profile.vcd_dry);
@@ -96,7 +96,8 @@ function model_from_parameters(params::vSmartMOM_Parameters)
     #FT2 =  params.float_type 
 
     # τ_aer[iBand][iAer,iZ]
-    τ_aer = [zeros(FT2, n_aer, length(profile.p_full)) for i=1:n_bands];
+    # Again, be careful with Dual Numbers
+    τ_aer = [zeros(FT, n_aer, length(profile.p_full)) for i=1:n_bands];
 
     # Loop over aerosol type
     for i_aer=1:n_aer
@@ -123,10 +124,9 @@ function model_from_parameters(params::vSmartMOM_Parameters)
                                         params.scattering_params.nquad_radius)   
         mie_model.aerosol.nᵣ = real(params.scattering_params.n_ref)
         mie_model.aerosol.nᵢ = -imag(params.scattering_params.n_ref)
-        @show params.scattering_params.n_ref
+        # k for reference wavelength
         k_ref          = compute_ref_aerosol_extinction(mie_model, params.float_type)
-        @show k_ref
-        #params.scattering_params.rt_aerosols[i_aer].p₀, params.scattering_params.rt_aerosols[i_aer].σp
+        
         # Loop over bands
         for i_band=1:n_bands
             
@@ -143,9 +143,9 @@ function model_from_parameters(params::vSmartMOM_Parameters)
                                             params.scattering_params.nquad_radius)
             n_ref = params.scattering_params.n_ref
             k = compute_ref_aerosol_extinction(mie_model,  params.float_type)
-            @show k
+            
+            #@show k
             # Compute raw (not truncated) aerosol optical properties (not needed in RT eventually) 
-            #@show FT2, FT
             @timeit "Mie calc"  aerosol_optics_raw = compute_aerosol_optical_properties(mie_model, FT);
             @show aerosol_optics_raw.k
             # Compute truncated aerosol optical properties (phase function and fᵗ), consistent with Ltrunc:
@@ -246,9 +246,8 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
     greek_rayleigh = Scattering.get_greek_rayleigh(params.depol)
     τ_rayl = [zeros(params.float_type,1, length(profile.p_full)) for i=1:n_bands];
 
-    # τ_abs[iBand][iSpec,iZ]
+    # Pre-allocated absorption arrays
     τ_abs     = [zeros(params.float_type, length(params.spec_bands[i]), length(profile.p_full)) for i in 1:n_bands]
-    @show params.absorption_params.molecules[2]
     # Loop over all bands:
     for i_band=1:n_bands
         @show params.spec_bands[i_band]
