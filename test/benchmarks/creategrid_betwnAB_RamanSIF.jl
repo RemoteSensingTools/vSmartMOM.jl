@@ -16,7 +16,7 @@ FT = Float64
 
 # Load YAML files into parameter struct
 parameters = 
-    parameters_from_yaml("/home/sanghavi/code/github/vSmartMOM.jl/test/test_parameters/O2_parameters1_SIF_grid.yaml");
+    parameters_from_yaml("/home/sanghavi/code/github/vSmartMOM.jl/test/test_parameters/O2_parameters1p5_SIF_grid.yaml");
 #parameters = parameters_from_yaml("test/test_parameters/O2Parameters2.yaml");
 # Create model struct (precomputes optical properties) from parameters
 model      = model_from_parameters(parameters);
@@ -35,7 +35,6 @@ for iρ = 1:15
     push!(ρ_str, replace(string(round(ρ[iρ], digits=2)),"."=>"p"))
 end
 psurf=[1000 750 500]
-#sif-spectra.csv
 J_SIF = readdlm("/home/sanghavi/code/github/vSmartMOM.jl/src/SIF_emission/sif-spectra.csv", ',') 
 #J_SIF = readdlm("/home/sanghavi/code/github/vSmartMOM.jl/src/SIF_emission/PC1_SIFSpectra_allSpecies.csv", ',') 
 νSIF = reverse(1e7./J_SIF[2:end,1])
@@ -47,7 +46,7 @@ Tsolar_interp = LinearInterpolation(Tsolar[4:end, 1], Tsolar[4:end, 2])
 n_bands = length(parameters.spec_bands);
 T_sun = 5777. # K
 
-for isurf = 2:2 # 1:1 # 3:3 # 
+for isurf = 3:3 # 1:1 # 2:2 #
     for iρ = 1:15 #3 #1:15
         for iA = 1:14
             parameters.sza = 1.0*sza[iA]
@@ -138,32 +137,33 @@ for isurf = 2:2 # 1:1 # 3:3 #
                 CoreRT.getRamanSSProp!(RS_type1, 1e7/mean(ν), ν);
 
                 P = planck_spectrum_wn(T_sun, ν) * 2.1629e-05 * π  # mW/m²-cm⁻¹
+                
                 F₀ = zeros(length(P));
                 SIF₀ = zeros(length(ν))
                 RS_type0.F₀ = zeros(model.params.polarization_type.n, length(P))
                 RS_type1.F₀ = zeros(model.params.polarization_type.n, length(P))
                 RS_type0.SIF₀ = zeros(model.params.polarization_type.n, length(ν))
                 RS_type1.SIF₀ = zeros(model.params.polarization_type.n, length(ν))
-                #=for i=1:length(P)
+                #= for i=1:length(P)
                     sol_trans = Tsolar_interp(ν[i]);
                     F₀[i] = sol_trans * P[i];
-                    SIF₀[i] = SIF_interp(ν[i]);
+                    SIF₀[i] = SIF_interp(ν[i]); #0.0
                     RS_type0.F₀[1,i] = F₀[i]; #1.0 #
                     RS_type1.F₀[1,i] = F₀[i];
                     RS_type0.SIF₀[1,i] = SIF₀[i]; #1.0 #
                     RS_type1.SIF₀[1,i] = SIF₀[i];
-                end=#
+                end =#
                 F₀ = Tsolar_interp.(ν) .* P;
-                SIF₀ .= 0.0 #SIF_interp.(ν); #
+                SIF₀ .= 0.0 #SIF_interp.(ν); #0.0
                 RS_type0.F₀[1,:] = F₀; #1.0 #
                 RS_type1.F₀[1,:] = F₀;
-                RS_type0.SIF₀[1,:] = SIF₀; #1.0 #
-                RS_type1.SIF₀[1,:] = SIF₀; 
+                RS_type0.SIF₀[1,:] = SIF₀; #0.0 #
+                RS_type1.SIF₀[1,:] = SIF₀;
                 #@show iBand, spec_start, spec_end, spec_end - spec_start + 1
                 #@show iBand, n_overlap + 1, length(ν) - n_overlap,  length(ν) - 2*n_overlap
 
-                R1, T1, ieR1, ieT1 = CoreRT.rt_run_test(RS_type1,model,iBand);
-                RnoRS0, TnoRS0, _, _ = CoreRT.rt_run_test(RS_type0,model,iBand);
+                R1, T1, ieR1, ieT1 = CoreRT.rt_run_test(RS_type1, model,iBand);
+                RnoRS0, TnoRS0, _, _ = CoreRT.rt_run_test(RS_type0, model,iBand);
                 tot_ν[spec_start:spec_end] = ν[(n_overlap+1):(end-n_overlap)] 
                 tot_F₀[spec_start:spec_end] = F₀[(n_overlap+1):(end-n_overlap)] 
                 R[:,:,spec_start:spec_end] = R1[:,:,(n_overlap+1):(end-n_overlap)]
@@ -172,30 +172,32 @@ for isurf = 2:2 # 1:1 # 3:3 #
                 #@show R[1,:,1], ieR[1,:,1],RnoRS[1,:,1] 
             end
 
-            rayl_rrs_BBO2 = []
-            rayl_nors_BBO2 = []
+            rayl_rrs_ABO2 = []
+            rayl_nors_ABO2 = []
             
-            rayl_rrs_BBO2 = [tot_ν R[1,1,:] R[1,2,:] R[1,3,:] ieR[1,1,:] ieR[1,2,:] ieR[1,3,:] tot_F₀]
-            rayl_nors_BBO2 = [tot_ν RnoRS[1,1,:] RnoRS[1,2,:] RnoRS[1,3,:] tot_F₀]
+            rayl_rrs_ABO2 = [tot_ν R[1,1,:] R[1,2,:] R[1,3,:] ieR[1,1,:] ieR[1,2,:] ieR[1,3,:] tot_F₀]
+            rayl_nors_ABO2 = [tot_ν RnoRS[1,1,:] RnoRS[1,2,:] RnoRS[1,3,:] tot_F₀]
             #@show rayl_nors_ABO2
             albedo = ρ_str[iρ]
             sza_str = string(sza[iA])
             
-            # With SIF
-            #fname0 = "/home/sanghavi/RamanSIFgrid/raylSIF_sza"*sza_str*"_alb"*albedo*"_psurf"*string(psurf[isurf])*"hpa_nors_BBO2.dat"
-            #fname1 = "/home/sanghavi/RamanSIFgrid/raylSIF_sza"*sza_str*"_alb"*albedo*"_psurf"*string(psurf[isurf])*"hpa_rrs_BBO2.dat"
-            #writedlm(fname0, rayl_nors_BBO2)
-            #writedlm(fname1, rayl_rrs_BBO2)
+            # No SIF
+            fname0 = "/home/sanghavi/RamanSIFgrid/rayl_sza"*sza_str*"_alb"*albedo*"_psurf"*string(psurf[isurf])*"hpa_nors_betwnAB.dat"
+            fname1 = "/home/sanghavi/RamanSIFgrid/rayl_sza"*sza_str*"_alb"*albedo*"_psurf"*string(psurf[isurf])*"hpa_rrs_betwnAB.dat"
 
-            # Without SIF
-            fname0 = "/home/sanghavi/RamanSIFgrid/rayl_sza"*sza_str*"_alb"*albedo*"_psurf"*string(psurf[isurf])*"hpa_nors_BBO2.dat"
-            fname1 = "/home/sanghavi/RamanSIFgrid/rayl_sza"*sza_str*"_alb"*albedo*"_psurf"*string(psurf[isurf])*"hpa_rrs_BBO2.dat"
-            writedlm(fname0, rayl_nors_BBO2)
-            writedlm(fname1, rayl_rrs_BBO2)
+            # With SIF
+            #fname0 = "/home/sanghavi/RamanSIFgrid/raylSIF_sza"*sza_str*"_alb"*albedo*"_psurf"*string(psurf[isurf])*"hpa_nors_betwnAB.dat"
+            #fname1 = "/home/sanghavi/RamanSIFgrid/raylSIF_sza"*sza_str*"_alb"*albedo*"_psurf"*string(psurf[isurf])*"hpa_rrs_betwnAB.dat"
+            
+            # Testing
+            #fname0 = "/home/sanghavi/RamanSIFgrid/testraylSIF_sza"*sza_str*"_alb"*albedo*"_psurf"*string(psurf[isurf])*"hpa_nors_ABO2.dat"
+            #fname1 = "/home/sanghavi/RamanSIFgrid/testraylSIF_sza"*sza_str*"_alb"*albedo*"_psurf"*string(psurf[isurf])*"hpa_rrs_ABO2.dat"
+            
+            writedlm(fname0, rayl_nors_ABO2)
+            writedlm(fname1, rayl_rrs_ABO2)
         end
     end
 end
-
 #=
 rayl_sza70_vza00_nors_ABO2_Δp = [ν RnoRS[1,1,:] RnoRS[1,2,:] RnoRS[1,3,:]]
 rayl_sza70_vza00_nors_ABO2_SIF = [ν RnoRS[1,1,:] RnoRS[1,2,:] RnoRS[1,3,:]]
