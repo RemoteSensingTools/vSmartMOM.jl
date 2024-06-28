@@ -81,6 +81,11 @@ function batch_inv!(X::AbstractArray{FT,3}, A::AbstractArray{FT,3}) where {FT}
     end
 end
 
+"Given 3D Julia Array A, fill in X[:,:,k] = A[:,:,k] \\ I" 
+function batch_inv!(X::AbstractArray{FT,3}, A::AbstractArray{FT,3}, xx::Nothing, yy::Nothing) where {FT}
+    batch_inv!(X, A)
+end
+
 "Batched multiplication for 3D Matrix with 1D vector (i.e. repeated)"
 function batched_mul(A::AbstractArray{FT,3}, B::AbstractArray{FT,1}) where {FT}
     return batched_mul(A,reshape(B,(size(B,1),1)))
