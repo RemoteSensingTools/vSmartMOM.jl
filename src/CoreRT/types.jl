@@ -132,13 +132,13 @@ Base.@kwdef struct AddedLayer{FT} <: AbstractLayer
     "Added layer source matrix J (in - direction)"
     j₀⁻::AbstractArray{FT,3}
     "Added layer temporary space to avoid allocations"
-    temp1::AbstractArray{FT,3}
+    temp1::Union{AbstractArray{FT,3}, Nothing}
     "Added layer temporary space to avoid allocations"
-    temp2::AbstractArray{FT,3}
+    temp2::Union{AbstractArray{FT,3}, Nothing}
     "Pointer to temporary space to avoid allocations"
-    temp1_ptr::CuArray{CuPtr{FT}, 1, CUDA.DeviceMemory}
+    temp1_ptr::Union{CuArray{CuPtr{FT}, 1, CUDA.DeviceMemory}, Nothing}
     "Pointer to temporary space to avoid allocations"
-    temp2_ptr::CuArray{CuPtr{FT}, 1, CUDA.DeviceMemory}
+    temp2_ptr::Union{CuArray{CuPtr{FT}, 1, CUDA.DeviceMemory}, Nothing}
 end
 
 "Composite Layer Matrices (`-/+` defined in τ coordinates, i.e. `-`=outgoing, `+`=incoming"

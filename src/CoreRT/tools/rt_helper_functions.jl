@@ -103,10 +103,10 @@ default_J_matrix_rand(FT, arr_type, dims, nSpec) = arr_type(randn(FT, tuple(dims
 
 "Make an added layer, supplying all default matrices"
 function make_added_layer(RS_type::Union{noRS, noRS_plus}, FT, arr_type, dims, nSpec) 
-    t1 = default_matrix(FT, arr_type, dims, nSpec)
-    t2 = default_matrix(FT, arr_type, dims, nSpec)
-    t1_ptr = CUBLAS.unsafe_strided_batch(t1);
-    t2_ptr = CUBLAS.unsafe_strided_batch(t2);
+    t1 = arr_type == Array ? nothing : default_matrix(FT, arr_type, dims, nSpec)
+    t2 = arr_type == Array ? nothing : default_matrix(FT, arr_type, dims, nSpec)
+    t1_ptr = arr_type == Array ? nothing : CUBLAS.unsafe_strided_batch(t1);
+    t2_ptr = arr_type == Array ? nothing : CUBLAS.unsafe_strided_batch(t2);
     return AddedLayer(
                                                         default_matrix(FT, arr_type, dims, nSpec), 
                                                         default_matrix(FT, arr_type, dims, nSpec), 

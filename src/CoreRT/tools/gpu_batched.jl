@@ -43,13 +43,8 @@ end
 
 "Given 3D CuArray A, fill in X[:,:,k] = A[:,:,k] \\ I" 
 function batch_inv!(X::CuArray{FT,3}, A::CuArray{FT,3}, Xptrs, Aptrs ) where {FT<:Float32}
-    #CUBLAS.math_mode!(CUBLAS.handle(), CUDA.FAST_MATH)
-    # LU-factorize A
-    #@info "Batch Inv: Float32"
     n = size(A,1)
     lda = max(1,stride(A,2))
-    #@timeit "Pointer" Aptrs = CUBLAS.unsafe_strided_batch(A)
-    #Xptrs = CUBLAS.unsafe_strided_batch(X)
 
     batchSize = length(Aptrs)
     @timeit "info" info = CuArray{Cint}(undef, batchSize)
@@ -63,13 +58,8 @@ end
 
 "Given 3D CuArray A, fill in X[:,:,k] = A[:,:,k] \\ I" 
 function batch_inv!(X::CuArray{FT,3}, A::CuArray{FT,3}, Xptrs, Aptrs ) where {FT<:Float64}
-    #CUBLAS.math_mode!(CUBLAS.handle(), CUDA.FAST_MATH)
-    # LU-factorize A
-    #@info "Batch Inv: Float32"
     n = size(A,1)
     lda = max(1,stride(A,2))
-    #@timeit "Pointer" Aptrs = CUBLAS.unsafe_strided_batch(A)
-    #Xptrs = CUBLAS.unsafe_strided_batch(X)
 
     batchSize = length(Aptrs)
     @timeit "info" info = CuArray{Cint}(undef, batchSize)
