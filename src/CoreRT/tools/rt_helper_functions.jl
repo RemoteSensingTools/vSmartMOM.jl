@@ -102,14 +102,24 @@ default_J_matrix_rand(FT, arr_type, dims, nSpec) = arr_type(randn(FT, tuple(dims
 
 
 "Make an added layer, supplying all default matrices"
-make_added_layer(RS_type::Union{noRS, noRS_plus}, FT, arr_type, dims, nSpec) = AddedLayer(
+function make_added_layer(RS_type::Union{noRS, noRS_plus}, FT, arr_type, dims, nSpec) 
+    t1 = default_matrix(FT, arr_type, dims, nSpec)
+    t2 = default_matrix(FT, arr_type, dims, nSpec)
+    t1_ptr = CUBLAS.unsafe_strided_batch(t1);
+    t2_ptr = CUBLAS.unsafe_strided_batch(t2);
+    return AddedLayer(
                                                         default_matrix(FT, arr_type, dims, nSpec), 
                                                         default_matrix(FT, arr_type, dims, nSpec), 
                                                         default_matrix(FT, arr_type, dims, nSpec),
                                                         default_matrix(FT, arr_type, dims, nSpec),
                                                         default_J_matrix(FT, arr_type, dims, nSpec),
-                                                        default_J_matrix(FT, arr_type, dims, nSpec)
+                                                        default_J_matrix(FT, arr_type, dims, nSpec),
+                                                        t1,
+                                                        t2,
+                                                        t1_ptr,
+                                                        t2_ptr
                                                         )
+end
 
 "Make an added layer, supplying all default matrices"
 make_added_layer(RS_type::Union{RRS, RRS_plus,VS_0to1_plus, VS_1to0_plus}, FT, arr_type, dims, nSpec)  = AddedLayerRS(

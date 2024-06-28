@@ -35,6 +35,9 @@ function rt_run(RS_type::AbstractRamanType,
     # Also to be changed if more than 1 band is used!!
     # CFRANKEN NEEDS to be changed for concatenated arrays!!
     brdf = model.params.brdf[iBand[1]]
+    if length(iBand) > 1
+        @info "More than one band has been chosen, be aware that multiple BRDFs are not yet implemented and only the first one will be used!"
+    end
 
     @unpack ϖ_Cabannes = RS_type
 
@@ -64,16 +67,16 @@ function rt_run(RS_type::AbstractRamanType,
     @show FT_dual
     # Output variables: Reflected and transmitted solar irradiation at TOA and BOA respectively # Might need Dual later!!
     #Suniti: consider adding a new dimension (iBand) to these arrays. The assignment of simulated spectra to their specific bands will take place after batch operations, thereby leaving the computational time unaffected 
-    R       = zeros(FT_dual, length(vza), pol_type.n, nSpec)
-    T       = zeros(FT_dual, length(vza), pol_type.n, nSpec)
-    R_SFI   = zeros(FT_dual, length(vza), pol_type.n, nSpec)
-    T_SFI   = zeros(FT_dual, length(vza), pol_type.n, nSpec)
-    ieR_SFI = zeros(FT_dual, length(vza), pol_type.n, nSpec)
-    ieT_SFI = zeros(FT_dual, length(vza), pol_type.n, nSpec)
-    hdr     = zeros(FT_dual, length(vza), pol_type.n, nSpec) # for RAMI
-    bhr_dw     = zeros(FT_dual, pol_type.n, nSpec) # for RAMI
-    bhr_uw     = zeros(FT_dual, pol_type.n, nSpec) # for RAMI
-    hdr_J₀⁻    = zeros(FT_dual, length(vza), pol_type.n, nSpec) # for RAMI
+    @timeit "Arrays"  R       = zeros(FT_dual, length(vza), pol_type.n, nSpec)
+    @timeit "Arrays"  T       = zeros(FT_dual, length(vza), pol_type.n, nSpec)
+    @timeit "Arrays"  R_SFI   = zeros(FT_dual, length(vza), pol_type.n, nSpec)
+    @timeit "Arrays"  T_SFI   = zeros(FT_dual, length(vza), pol_type.n, nSpec)
+    @timeit "Arrays"  ieR_SFI = zeros(FT_dual, length(vza), pol_type.n, nSpec)
+    @timeit "Arrays"  ieT_SFI = zeros(FT_dual, length(vza), pol_type.n, nSpec)
+    @timeit "Arrays"  hdr     = zeros(FT_dual, length(vza), pol_type.n, nSpec) # for RAMI
+    @timeit "Arrays"  bhr_dw     = zeros(FT_dual, pol_type.n, nSpec) # for RAMI
+    @timeit "Arrays"  bhr_uw     = zeros(FT_dual, pol_type.n, nSpec) # for RAMI
+    @timeit "Arrays"  hdr_J₀⁻    = zeros(FT_dual, length(vza), pol_type.n, nSpec) # for RAMI
     #  bhr[i] = bhr_uw[i,:]./bhr_dw[1,:]   
     # Notify user of processing parameters
     msg = 
@@ -109,12 +112,12 @@ function rt_run(RS_type::AbstractRamanType,
         # Azimuthal weighting
         weight = m == 0 ? FT(0.5) : FT(1.0)
         # Set the Zλᵢλₒ interaction parameters for Raman (or nothing for noRS)
-        InelasticScattering.computeRamanZλ!(RS_type, pol_type,Array(qp_μ), m, arr_type)
+        @timeit "IE"  InelasticScattering.computeRamanZλ!(RS_type, pol_type,Array(qp_μ), m, arr_type)
         # Compute the core layer optical properties:
         @timeit "OpticalProps" layer_opt_props, fScattRayleigh   = 
             constructCoreOpticalProperties(RS_type,iBand,m,model);
         # Determine the scattering interface definitions:
-        scattering_interfaces_all, τ_sum_all = 
+        @timeit "Extract Optical Properties" scattering_interfaces_all, τ_sum_all = 
             extractEffectiveProps(layer_opt_props,quad_points);
         #@show typeof(layer_opt_props)
 
@@ -125,7 +128,7 @@ function rt_run(RS_type::AbstractRamanType,
             # From Rayleigh and aerosol τ, ϖ, compute overall layer τ, ϖ
             # Suniti: modified to return fscattRayl as the last element of  computed_atmosphere_properties
             if !(typeof(RS_type) <: noRS)
-                RS_type.fscattRayl = expandBandScalars(RS_type, fScattRayleigh[iz]) 
+                @timeit "Expand Bands" RS_type.fscattRayl = expandBandScalars(RS_type, fScattRayleigh[iz]) 
             end
             
             # Expand all layer optical properties to their full dimension:
@@ -133,7 +136,7 @@ function rt_run(RS_type::AbstractRamanType,
                 expandOpticalProperties(layer_opt_props[iz], arr_type)
 
             # Perform Core RT (doubling/elemental/interaction)
-            rt_kernel!(RS_type, pol_type, SFI, 
+            @timeit "RT Kernel" rt_kernel!(RS_type, pol_type, SFI, 
                         #bandSpecLim, 
                         added_layer, composite_layer, 
                         layer_opt,
@@ -146,7 +149,7 @@ function rt_run(RS_type::AbstractRamanType,
         end 
 
         # Create surface matrices:
-        create_surface_layer!(brdf, 
+        @timeit "Create Surface" create_surface_layer!(brdf, 
                             added_layer_surface, 
                             SFI, m, 
                             pol_type, 
