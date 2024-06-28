@@ -64,29 +64,29 @@ include("CoreKernel/elemental_canopy.jl")
 include("CoreKernel/doubling.jl")              # Doubling
 include("CoreKernel/doubling_inelastic.jl")    # Doubling for elastic + inelastic scattering 
 include("CoreKernel/interaction.jl")           # Interaction
-include("CoreKernel/interaction_hdrf.jl") # Addl. surface interaction for RAMI output
+include("CoreKernel/interaction_hdrf.jl")      # Addl. surface interaction for RAMI output
 include("CoreKernel/interaction_inelastic.jl") # Interaction for elastic + inelastic scattering 
 include("CoreKernel/interaction_multisensor.jl") # Suniti: ms
 include("CoreKernel/interlayer_flux.jl")       # Suniti: ms
 include("CoreKernel/rt_kernel.jl")             # Handle Core RT (Elemental/Doubling/Interaction)
 include("CoreKernel/rt_kernel_multisensor.jl") # Suniti: ms
-include("postprocessing_vza.jl")               # Postprocess (Azimuthal Weighting)
-include("postprocessing_vza_ms.jl")
+include("tools/postprocessing_vza.jl")               # Postprocess (Azimuthal Weighting)
+include("tools/postprocessing_vza_ms.jl")
 include("rt_run.jl")                           # Starting point for RT 
 include("rt_run_multisensor.jl") 
 # Temporary:
 include("rt_run_canopy.jl")
 
 # GPU
-include("gpu_batched.jl")                   # Batched operations
+include("tools/gpu_batched.jl")                   # Batched operations
 
 # Utilities / Helper Functions
-include("atmo_prof.jl")                     # Helper Functions for Handling Atmospheric Profiles
-include("rt_helper_functions.jl")           # Miscellaneous Utility Functions
-include("rt_set_streams.jl")                # Set streams before RT
-include("parameters_from_yaml.jl")          # Loading in parameters from YAML file
-include("model_from_parameters.jl")         # Converting parameters to derived model attributes
-include("show_utils.jl")                    # Pretty-printing objects
+include("tools/atmo_prof.jl")                     # Helper Functions for Handling Atmospheric Profiles
+include("tools/rt_helper_functions.jl")           # Miscellaneous Utility Functions
+include("tools/rt_set_streams.jl")                # Set streams before RT
+include("tools/parameters_from_yaml.jl")          # Loading in parameters from YAML file
+include("tools/model_from_parameters.jl")         # Converting parameters to derived model attributes
+include("tools/show_utils.jl")                    # Pretty-printing objects
 include("LayerOpticalProperties/compEffectiveLayerProperties.jl")
 
 # Surfaces

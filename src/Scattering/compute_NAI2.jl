@@ -172,7 +172,7 @@ function compute_aerosol_optical_properties(model::MieModel{FDT}, FT2::Type=Floa
                                  convert.(FT2, ζ))
         #@show typeof(convert.(FT2, β)), typeof(greek_coefs)
         # Return the packaged AerosolOptics object
-        @show greek_coefs
+        #@show greek_coefs
         return AerosolOptics(greek_coefs=greek_coefs, ω̃=FT2(bulk_C_sca / bulk_C_ext), k=FT2(bulk_C_ext), fᵗ=FT2(1))
 
     #else
