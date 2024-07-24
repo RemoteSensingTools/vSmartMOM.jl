@@ -28,6 +28,16 @@
 </div>
 This project aims to revamp and modernize key atmospheric remote sensing tools. Specifically, it will enable the fast computation of atmospheric optical properties, full-polarized radiative transfer simulations, and commonly-used inversion routines.
 
+The core of the code is based on recent publications:
+
+- Sanghavi, S., Davis, A. B., & Eldering, A. (2014). vSmartMOM: A vector matrix operator method-based radiative transfer model linearized with respect to aerosol properties. Journal of Quantitative Spectroscopy and Radiative Transfer, 133, 412-433. [Download](https://www.sciencedirect.com/science/article/pii/S0022407313003592)
+
+- Sanghavi, S. V., Martonchik, J. V., Davis, A. B., & Diner, D. J. (2013). Linearization of a scalar matrix operator method radiative transfer model with respect to aerosol and surface properties. Journal of Quantitative Spectroscopy and Radiative Transfer, 116, 1-16. [Download](https://www.sciencedirect.com/science/article/pii/S0022407312004633)
+
+- Sanghavi, S., & Natraj, V. (2013). Using analytic derivatives to assess the impact of phase function Fourier decomposition technique on the accuracy of a radiative transfer model. Journal of Quantitative Spectroscopy and Radiative Transfer, 119, 137-149. [Download](https://www.sciencedirect.com/science/article/pii/S0022407313000071)
+
+- Sanghavi, S. (2014). Revisiting the Fourier expansion of Mie scattering matrices in generalized spherical functions. Journal of Quantitative Spectroscopy and Radiative Transfer, 136, 16-27. [Download](https://www.sciencedirect.com/science/article/pii/S0022407313004962)
+
 By taking advantage of modern software tools, such as GPU acceleration and HPC computing, the software suite significantly accelerates computationally-intensive calculations and models, while keeping the interface easy-to-use for researchers and students.
 
 ## Installation
