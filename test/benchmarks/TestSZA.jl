@@ -1,4 +1,4 @@
-using Insolation, Dates, Missings, Statistics,NaNMath, Dates, Plots
+using Insolation, Dates, Missings, Statistics,NaNMath, Dates#, Plots
 import Insolation.Parameters as IP
 import ClimaParams as CP
 FT = Float64
@@ -121,15 +121,15 @@ end
 
 
 # Test stuff out:
-lat = 52.5200; lon = 13.4050 # Berlin
-lat = 7.000;   lon = 20.0    # Sahel zone in Africa (somewhere)
+#lat = 52.5200; lon = 13.4050 # Berlin
+#lat = 7.000;   lon = 20.0    # Sahel zone in Africa (somewhere)
 
-lat_idx = argmin(abs.(modis_lat .- lat));
-lon_idx = argmin(abs.(modis_lon .- lon));
+#lat_idx = argmin(abs.(modis_lat .- lat));
+#lon_idx = argmin(abs.(modis_lon .- lon));
 
 # get timeseries:
-plot(1:12, [raman_per_month[i].sza_1130[lat_idx] for i in 1:12], label="SZA 11:30")
-plot!(1:12, [raman_per_month[i].sza_1330[lat_idx] for i in 1:12], label="SZA 13:30")
-plot!(1:12, [raman_per_month[i].sza_930[lat_idx] for i in 1:12], label="SZA 9:30")
-plot(1:12, [raman_per_month[i].alb_850[lon_idx, lat_idx] for i in 1:12], label="A Band Albedo")
-plot!(1:12, [raman_per_month[i].alb_650[lon_idx, lat_idx] for i in 1:12], label="B Band Albedo")
+#plot(1:12, [raman_per_month[i].sza_1130[lat_idx] for i in 1:12], label="SZA 11:30")
+#plot!(1:12, [raman_per_month[i].sza_1330[lat_idx] for i in 1:12], label="SZA 13:30")
+#plot!(1:12, [raman_per_month[i].sza_930[lat_idx] for i in 1:12], label="SZA 9:30")
+#plot(1:12, [raman_per_month[i].alb_850[lon_idx, lat_idx] for i in 1:12], label="A Band Albedo")
+#plot!(1:12, [raman_per_month[i].alb_650[lon_idx, lat_idx] for i in 1:12], label="B Band Albedo")

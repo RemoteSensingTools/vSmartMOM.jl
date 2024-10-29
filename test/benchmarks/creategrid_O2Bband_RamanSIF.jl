@@ -9,7 +9,7 @@ using Interpolations
 using InstrumentOperator #for convolution of hires spectrum to instrument grid
 using ImageFiltering
 using Distributions
-using Plots
+#using Plots
 using DelimitedFiles
 #
 FT = Float64
@@ -25,9 +25,9 @@ for i=0:20
     push!(a, acosd(i/20))  
 end
 sza=reverse(Int.(ceil.(a[8:21])))
-ρ = zeros(FT,15)
+ρ = zeros(FT,21)
 ρ_str = []
-for iρ = 1:15
+for iρ = 1:21
     ρ[iρ] = (iρ-1)*0.05
     for i=1:length(parameters.spec_bands)
         parameters.brdf[i].albedo = ρ[iρ]
@@ -47,17 +47,18 @@ Tsolar_interp = LinearInterpolation(Tsolar[4:end, 1], Tsolar[4:end, 2])
 n_bands = length(parameters.spec_bands);
 T_sun = 5777. # K
 
-for isurf = 2:2 # 1:1 # 3:3 # 
-    for iρ = 1:15 #3 #1:15
+for isurf = 3:3 # 2:2 # 1:1 # 
+    for iρ = 1:21 #3 #1:15
         for iA = 1:14
             parameters.sza = 1.0*sza[iA]
             model.obs_geom = CoreRT.ObsGeometry(parameters.sza, parameters.vza, parameters.vaz, parameters.obs_alt)
             # Set quadrature points for streams
-            model.quad_points = CoreRT.rt_set_streams(parameters.quadrature_type, 
-                                                parameters.l_trunc, 
-                                                model.obs_geom, 
-                                                parameters.polarization_type, 
-                                                array_type(parameters.architecture))
+            model.quad_points = CoreRT.rt_set_streams(
+                    parameters.quadrature_type, 
+                    parameters.l_trunc, 
+                    model.obs_geom, 
+                    parameters.polarization_type, 
+                    array_type(parameters.architecture))
 
             #model.obs_geom.sza = 0.0;#1.0*sza[iA]
             #@show parameters.sza, sza[iA]
@@ -154,7 +155,7 @@ for isurf = 2:2 # 1:1 # 3:3 #
                     RS_type1.SIF₀[1,i] = SIF₀[i];
                 end=#
                 F₀ = Tsolar_interp.(ν) .* P;
-                SIF₀ .= 0.0 #SIF_interp.(ν); #
+                SIF₀  .= 0.0 # = SIF_interp.(ν); # 
                 RS_type0.F₀[1,:] = F₀; #1.0 #
                 RS_type1.F₀[1,:] = F₀;
                 RS_type0.SIF₀[1,:] = SIF₀; #1.0 #
@@ -182,14 +183,14 @@ for isurf = 2:2 # 1:1 # 3:3 #
             sza_str = string(sza[iA])
             
             # With SIF
-            #fname0 = "/home/sanghavi/RamanSIFgrid/raylSIF_sza"*sza_str*"_alb"*albedo*"_psurf"*string(psurf[isurf])*"hpa_nors_BBO2.dat"
-            #fname1 = "/home/sanghavi/RamanSIFgrid/raylSIF_sza"*sza_str*"_alb"*albedo*"_psurf"*string(psurf[isurf])*"hpa_rrs_BBO2.dat"
-            #writedlm(fname0, rayl_nors_BBO2)
-            #writedlm(fname1, rayl_rrs_BBO2)
+            #fname0 = "/home/sanghavi/data/RamanSIFgrid/raylSIF_sza"*sza_str*"_alb"*albedo*"_psurf"*string(psurf[isurf])*"hpa_nors_BBO2.dat"
+            #fname1 = "/home/sanghavi/data/RamanSIFgrid/raylSIF_sza"*sza_str*"_alb"*albedo*"_psurf"*string(psurf[isurf])*"hpa_rrs_BBO2.dat"
+            
 
             # Without SIF
-            fname0 = "/home/sanghavi/RamanSIFgrid/rayl_sza"*sza_str*"_alb"*albedo*"_psurf"*string(psurf[isurf])*"hpa_nors_BBO2.dat"
-            fname1 = "/home/sanghavi/RamanSIFgrid/rayl_sza"*sza_str*"_alb"*albedo*"_psurf"*string(psurf[isurf])*"hpa_rrs_BBO2.dat"
+            fname0 = "/home/sanghavi/data/RamanSIFgrid/rayl_sza"*sza_str*"_alb"*albedo*"_psurf"*string(psurf[isurf])*"hpa_nors_BBO2.dat"
+            fname1 = "/home/sanghavi/data/RamanSIFgrid/rayl_sza"*sza_str*"_alb"*albedo*"_psurf"*string(psurf[isurf])*"hpa_rrs_BBO2.dat"
+            
             writedlm(fname0, rayl_nors_BBO2)
             writedlm(fname1, rayl_rrs_BBO2)
         end

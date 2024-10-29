@@ -14,7 +14,7 @@ See eq 6 in Sanghavi 2014
 - `size_parameter` size parameter of the aerosol (2πr/λ)
 The function returns a rounded integer, following conventions by BH, Rooj/Stap, Siewert 
 """
-get_n_max(size_parameter) = round(Int, size_parameter + 4.05 * size_parameter^(1/3) + 10)
+get_n_max(size_parameter) = (size_parameter>8.0) ? round(Int, size_parameter + 4.05 * size_parameter^(1/3) + 10) : round(Int, size_parameter + 4.0 * size_parameter^(1/3) + 1)
 
 """
     $(FUNCTIONNAME)(size_parameter,refractive_idx::Number,an,bn,Dn)
@@ -48,14 +48,14 @@ function compute_mie_ab!(size_param, refractive_idx::Number, an, bn, Dn)
 
     # Get recursion for bessel functions ψ and ξ
     ψ₀, ψ₁, χ₀, χ₁ =  (cos(size_param), sin(size_param), -sin(size_param), cos(size_param))
-    ξ₁ = ψ₁ -χ₁*im
+    ξ₁ = ψ₁ + χ₁*im
 
     # This solves Bohren and Huffman eq. 4.88 for an and bn, computing updated ψ and ξ on the fly
     for n = 1:n_max  
         # fn = (2n + 1) / (n * (n + 1))
         ψ  = (2n - 1) * ψ₁ / size_param - ψ₀
         χ  = (2n - 1) * χ₁ / size_param - χ₀
-        ξ   = ψ -χ*im
+        ξ   = ψ + χ*im
         t_a = Dn[n] / refractive_idx + n / size_param
         t_b = Dn[n] * refractive_idx + n / size_param
          
@@ -66,9 +66,127 @@ function compute_mie_ab!(size_param, refractive_idx::Number, an, bn, Dn)
         ψ₁ = ψ
         χ₀ = χ₁
         χ₁ = χ
+        ξ₁ = ψ₁ + χ₁*im
+    end
+end
+
+function compute_mie_ab_new!(size_param, refractive_idx::Number, an, bn, Dn)
+    # Compute y
+    y = size_param * refractive_idx
+
+    # Maximum expansion (see eq. A17 from de Rooij and Stap, 1984)
+    n_max = get_n_max(size_param)
+
+    # Make sure downward recurrence starts higher up 
+    # (at least 15, check eq. A9 in de Rooij and Stap, 1984, may need to check what is needed)
+    nmx = length(Dn)
+    @assert size(an)[1] >= n_max
+    @assert size(an) == size(bn)
+    fill!(Dn, 0);
+
+
+    
+    #Computing ψ using downward recursion
+    N_ = n_max+60
+    
+    ψ = zeros(N_)
+    ψ[end]   = 0.0
+    ψ[end-1] = 1.0
+    for idx=N_-2:-1:1
+        ψ[idx] = (2idx+1)*ψ[idx+1]/size_param - ψ[idx+2];    
+    end
+    
+    
+    #Computing ψ using upward recursion
+    N_ = n_max
+    ψ = zeros(N_)
+    ψ[1] = sin(size_param);
+    if N_>1
+        ψ[2]  = (sin(size_param)/size_param)-cos(size_param);
+        for idx = 3:N_
+            ψ[idx] = (2idx-3)*ψ[idx-1]/size_param - ψ[idx-2];
+        end
+    end
+    #computing χ using upward recursion
+    N_ = n_max
+    χ = zeros(N_)     
+    χ[1] = cos(size_param)
+    if N_>1
+        χ[2] = cos(size_param)/size_param + sin(size_param)            
+        for idx=3:N_
+            χ[idx] = (2idx-3)*χ[idx-1]/size_param - χ[idx-2];
+        end
+    end
+
+    #computing An (Lentz)
+    result = zeros(Complex{FT}, nmx);
+    z=y
+    for n=1:nmx
+        zinv   = 2/z
+        alpha_ = (n + 0.5)*zinv
+        aj     =-(n + 1.5)*zinv
+        alpha_j1 = aj+1/alpha_
+        alpha_j2 = aj
+      
+        ratio = alpha_j1/alpha_j2
+        runratio = alpha_*ratio
+      
+        while abs(abs(ratio)-1) > 1e-20
+            aj=zinv-aj
+            alpha_j1=1/alpha_j1+aj
+            alpha_j2=1/alpha_j2+aj
+            ratio=alpha_j1/alpha_j2
+            
+            epsilon1 = 1.0e-2
+            compare_1 = abs(alpha_j1/aj)
+            compare_2 = abs(alpha_j2/aj)
+
+            if abs(compare_1)<=epsilon1 || abs(compare_2)<=epsilon1   
+                zinv *= -1
+                aj = zinv - aj
+                ratio = (1+aj*alpha_j1)/(1+aj*alpha_j2)
+                alpha_j1 = aj + 1/alpha_j1
+                alpha_j2 = aj + 1/alpha_j2
+            end
+            zinv *= -1;
+            runratio=ratio*runratio;
+        end 
+        result[n] = -n/z;
+        result[n] += runratio;
+    end
+
+    # Dn as in eq 4.88, Bohren and Huffman, to calculate an and bn
+    # Downward Recursion, eq. 4.89, Bohren and Huffman
+    [Dn[n] = ((n+1) / y) - (1 / (Dn[n+1] + (n+1) / y)) for n = (nmx - 1):-1:1]
+
+    # Get recursion for bessel functions ψ and ξ
+    ψ₀, ψ₁, χ₀, χ₁ =  (cos(size_param), sin(size_param), -sin(size_param), cos(size_param))
+    ξ₁ = ψ₁ -χ₁*im
+
+    ψ0 = zeros(N_)
+    χ0 = zeros(N_)
+
+    # This solves Bohren and Huffman eq. 4.88 for an and bn, computing updated ψ and ξ on the fly
+    for n = 1:n_max  
+        # fn = (2n + 1) / (n * (n + 1))
+        ψ  = (2n - 1) * ψ₁ / size_param - ψ₀
+        χ  = (2n - 1) * χ₁ / size_param - χ₀
+        ξ   = ψ -χ*im
+        t_a = Dn[n] / refractive_idx + n / size_param
+        t_b = Dn[n] * refractive_idx + n / size_param
+        ψ0[n] = ψ₁
+        χ0[n] = χ₁
+        an[n] = (t_a * ψ - ψ₁) / (t_a * ξ - ξ₁)
+        bn[n] = (t_b * ψ - ψ₁) / (t_b * ξ - ξ₁)
+
+        ψ₀ = ψ₁
+        ψ₁ = ψ
+        χ₀ = χ₁
+        χ₁ = χ
         ξ₁ = ψ₁ -χ₁*im
     end
 end
+
 
 """ 
     $(FUNCTIONNAME)(model::MieModel, λ, radius)

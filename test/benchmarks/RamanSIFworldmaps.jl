@@ -1432,7 +1432,8 @@ for ctr=1:5
     #push!(geo_coeff_noRS_sitp, scale(geoSIF_noRS_itp[ctr], 500.0:250:1000, 0:0.05:0.7, 0.35:0.05:1.0))
 end
 =#
-include("/home/cfranken/code/gitHub/CarbonI/TestSZA.jl")
+#include("/home/cfranken/code/gitHub/CarbonI/TestSZA.jl")
+include("test/benchmarks/TestSZA.jl")
 
 
 FT = Float64
@@ -1491,14 +1492,26 @@ for imonth = 1:12
 end
 for t=1:12
     l = @layout [a1 a2; b1 b2]
-    p1 = heatmap(lon, lat, 100*(t_w1_geo_SIF0[t,:,:]/0.34 .- 1)', size=(800,400), grid=true, xlabel="", ylabel="Lon [ᵒ]")
+    x = convert(Vector{Float32}, lon)
+    y = convert(Vector{Float32}, lat)
+
+    z = convert(Array{Float32}, 100*(t_w1_geo_SIF0[t,:,:]/0.34 .- 1)')
+    p1 = heatmap(x, y, z, size=(800,400), grid=true, xlabel="", ylabel="Lon [ᵒ]")
+    #p1 = heatmap(lon, lat, 100*(t_w1_geo_SIF0[t,:,:]/0.34 .- 1)', size=(800,400), grid=true, xlabel="", ylabel="Lon [ᵒ]")
+    
     # title=L"$\mathrm{Uncorr.}\,\mathrm{SIF\,\,retr.} (\hat{\mathrm{SIF}}=0.34\,\mathrm{W}/\mathrm{m}^2/\mathrm{sr}/\mu\mathrm{m})$")
-    p2 = heatmap(lon, lat, 100*(t_w2_geo_SIF0[t,:,:]/0.20 .- 1)', size=(800,400), grid=true, xlabel="", ylabel="")
+    z = convert(Array{Float32}, 100*(t_w2_geo_SIF0[t,:,:]/0.2 .- 1)')
+    p2 = heatmap(x, y, z, size=(800,400), grid=true, xlabel="", ylabel="")
+    #p2 = heatmap(lon, lat, 100*(t_w2_geo_SIF0[t,:,:]/0.20 .- 1)', size=(800,400), grid=true, xlabel="", ylabel="")
     #heatmap(ρ, sza, w2_xnSIF1_0[3,:,:]', xlabel="", ylabel="")
     # title=L"$\mathrm{Uncorr.}\,\mathrm{SIF\,\,retr.} (\hat{\mathrm{SIF}}=0.20\,\mathrm{W}/\mathrm{m}^2/\mathrm{sr}/\mu\mathrm{m})$")
+    z = convert(Array{Float32}, 100*(t_w1_geo_corrSIF0[t,:,:]/0.34 .- 1)')
+    p3 = heatmap(x, y, z, size=(800,400), grid=true, xlabel="Lat [ᵒ]", ylabel="Lon [ᵒ]")
     p3 = heatmap(lon, lat, 100*(t_w1_geo_corrSIF0[t,:,:]/0.34 .- 1)', size=(800,400), grid=true, xlabel="Lat [ᵒ]", ylabel="Lon [ᵒ]")
     #heatmap(ρ, sza, w1_xnSIF1_corr_0[3,:,:]', xlabel="Albedo", ylabel="SZA [ᵒ]") 
-    p4 = heatmap(lon, lat, 100*(t_w2_geo_corrSIF0[t,:,:]/0.20 .- 1)', size=(800,400), grid=true, xlabel="Lat [ᵒ]", ylabel="")
+    z = convert(Array{Float32}, 100*(t_w2_geo_corrSIF0[t,:,:]/0.2 .- 1)')
+    p4 = heatmap(x, y, z, size=(800,400), grid=true, xlabel="Lat [ᵒ]", ylabel="")
+    #p4 = heatmap(lon, lat, 100*(t_w2_geo_corrSIF0[t,:,:]/0.20 .- 1)', size=(800,400), grid=true, xlabel="Lat [ᵒ]", ylabel="")
     #heatmap(ρ, sza, w2_xnSIF1_corr_0[3,:,:]', xlabel="Albedo", ylabel="") 
             
     title1a = L"$\mathrm{Uncorr.}\,\Delta\mathrm{SIF\,\,retr.} [\%]$" 

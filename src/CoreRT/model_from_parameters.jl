@@ -138,7 +138,7 @@ function model_from_parameters(params::vSmartMOM_Parameters)
     greek_cabannes = Vector{vSmartMOM.Scattering.GreekCoefs{Float64}}()
     greek_rayleigh = Vector{vSmartMOM.Scattering.GreekCoefs{Float64}}()
     ϖ_Cabannes = zeros(n_bands)
-    # Remove rayleight for testing:
+    # Remove rayleigh for testing:
     τ_rayl = [zeros(params.float_type,length(params.spec_bands[i]), length(profile.T)) for i=1:n_bands];
     #τ_rayl = [zeros(params.float_type,1,length(profile.T)) for i=1:n_bands];
     
@@ -186,33 +186,61 @@ function model_from_parameters(params::vSmartMOM_Parameters)
         =#
         
                                 #@show τ_rayl[i_band]
-        # If no absorption, continue to next band
-        isnothing(params.absorption_params) && continue
-        #@show "hello"
-        #@show params.absorption_params.molecules[i_band]
-        #@show length(params.absorption_params.molecules[i_band])
-        # Loop over all molecules in this band, obtain profile for each, and add them up
-        for molec_i in 1:length(params.absorption_params.molecules[i_band])
-            
-            # This can be precomputed as well later in my mind, providing an absorption_model or an interpolation_model!
-            if isempty(params.absorption_params.luts)
-                # Obtain hitran data for this molecule
-                @timeit "Read HITRAN" hitran_data = read_hitran(artifact(params.absorption_params.molecules[i_band][molec_i]), iso=1)
 
-                println("Computing profile for $(params.absorption_params.molecules[i_band][molec_i]) with vmr $(profile.vmr[params.absorption_params.molecules[i_band][molec_i]]) for band #$(i_band)")
+        # If no absorption, continue to next band
+        (isnothing(params.absorption_params) && isnothing(params.q)) && continue
+
+        if !isnothing(params.q)
+            # Obtain hitran data for this H₂O
+            @timeit "Read HITRAN" hitran_data = read_hitran(artifact("H2O"), iso=1)
+
+            println("Computing profile for water vapor in band #$(i_band)")
                 # Create absorption model with parameters beforehand now:
                 absorption_model = make_hitran_model(hitran_data, 
-                    params.absorption_params.broadening_function, 
-                    wing_cutoff = params.absorption_params.wing_cutoff, 
-                    CEF = params.absorption_params.CEF, 
+                    vSmartMOM.Absorption.Voigt(), 
+                    wing_cutoff = 150, 
+                    CEF = vSmartMOM.Absorption.HumlicekWeidemann32SDErrorFunction(), 
                     architecture = params.architecture, 
                     vmr = 0);#mean(profile.vmr[params.absorption_params.molecules[i_band][molec_i]]))
                 # Calculate absorption profile
                 
-                @timeit "Absorption Coeff"  compute_absorption_profile!(τ_abs[i_band], absorption_model, params.spec_bands[i_band],profile.vmr[params.absorption_params.molecules[i_band][molec_i]], profile);
-            # Use LUT directly
-            else
-                compute_absorption_profile!(τ_abs[i_band], params.absorption_params.luts[i_band][molec_i], params.spec_bands[i_band],profile.vmr[params.absorption_params.molecules[i_band][molec_i]], profile);
+                @timeit "Absorption Coeff"  compute_absorption_profile!(τ_abs[i_band], 
+                    absorption_model, 
+                    params.spec_bands[i_band],
+                    profile.vmr_h2o, 
+                    profile);
+        end
+        #@show "hello"
+        #@show params.absorption_params.molecules[i_band]
+        #@show length(params.absorption_params.molecules[i_band])
+        # Loop over all molecules in this band, obtain profile for each, and add them up
+        if !isnothing(params.absorption_params)
+            for molec_i in 1:length(params.absorption_params.molecules[i_band])
+                
+                # This can be precomputed as well later in my mind, providing an absorption_model or an interpolation_model!
+                if isempty(params.absorption_params.luts)
+                    # Obtain hitran data for this molecule
+                    @timeit "Read HITRAN" hitran_data = read_hitran(artifact(params.absorption_params.molecules[i_band][molec_i]), iso=1)
+
+                    println("Computing profile for $(params.absorption_params.molecules[i_band][molec_i]) with vmr $(profile.vmr[params.absorption_params.molecules[i_band][molec_i]]) for band #$(i_band)")
+                    # Create absorption model with parameters beforehand now:
+                    absorption_model = make_hitran_model(hitran_data, 
+                        params.absorption_params.broadening_function, 
+                        wing_cutoff = params.absorption_params.wing_cutoff, 
+                        CEF = params.absorption_params.CEF, 
+                        architecture = params.architecture, 
+                        vmr = 0);#mean(profile.vmr[params.absorption_params.molecules[i_band][molec_i]]))
+                    # Calculate absorption profile
+                    
+                    @timeit "Absorption Coeff"  compute_absorption_profile!(τ_abs[i_band], 
+                        absorption_model, 
+                            params.spec_bands[i_band],
+                                profile.vmr[params.absorption_params.molecules[i_band][molec_i]], 
+                                profile);
+                # Use LUT directly
+                else
+                    compute_absorption_profile!(τ_abs[i_band], params.absorption_params.luts[i_band][molec_i], params.spec_bands[i_band],profile.vmr[params.absorption_params.molecules[i_band][molec_i]], profile);
+                end
             end
         end
     end

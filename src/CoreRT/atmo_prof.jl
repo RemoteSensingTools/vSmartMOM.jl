@@ -26,7 +26,7 @@ function compute_atmos_profile_fields(T, p_half::AbstractArray, q, vmr; g₀=9.8
     # Now actually compute the layer VCDs
     for i = 1:n_layers 
         Δp = p_half[i + 1] - p_half[i]
-        vmr_h2o[i] = dry_mass/(dry_mass-wet_mass*(1-1/q[i]))
+        vmr_h2o[i] = (dry_mass/wet_mass)*q[i]/(1-q[i])
         vmr_dry = 1 - vmr_h2o[i]
         M  = vmr_dry * dry_mass + vmr_h2o[i] * wet_mass
         vcd = Nₐ * Δp / (M  * g₀ * 100^2) * 100

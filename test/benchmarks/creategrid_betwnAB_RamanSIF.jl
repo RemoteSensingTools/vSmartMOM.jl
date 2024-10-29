@@ -46,9 +46,9 @@ Tsolar_interp = LinearInterpolation(Tsolar[4:end, 1], Tsolar[4:end, 2])
 n_bands = length(parameters.spec_bands);
 T_sun = 5777. # K
 
-for isurf = 3:3 # 1:1 # 2:2 #
-    for iρ = 1:15 #3 #1:15
-        for iA = 1:14
+for isurf = 3:3 #1:1 # 2:2 # 
+    for iρ = 1:15  #1:15
+        for iA = 1:14 #1:14
             parameters.sza = 1.0*sza[iA]
             model.obs_geom = CoreRT.ObsGeometry(parameters.sza, parameters.vza, parameters.vaz, parameters.obs_alt)
             # Set quadrature points for streams
@@ -154,7 +154,7 @@ for isurf = 3:3 # 1:1 # 2:2 #
                     RS_type1.SIF₀[1,i] = SIF₀[i];
                 end =#
                 F₀ = Tsolar_interp.(ν) .* P;
-                SIF₀ .= 0.0 #SIF_interp.(ν); #0.0
+                SIF₀ .= 0.0 # = SIF_interp.(ν); # 
                 RS_type0.F₀[1,:] = F₀; #1.0 #
                 RS_type1.F₀[1,:] = F₀;
                 RS_type0.SIF₀[1,:] = SIF₀; #0.0 #
@@ -182,16 +182,16 @@ for isurf = 3:3 # 1:1 # 2:2 #
             sza_str = string(sza[iA])
             
             # No SIF
-            fname0 = "/home/sanghavi/RamanSIFgrid/rayl_sza"*sza_str*"_alb"*albedo*"_psurf"*string(psurf[isurf])*"hpa_nors_betwnAB.dat"
-            fname1 = "/home/sanghavi/RamanSIFgrid/rayl_sza"*sza_str*"_alb"*albedo*"_psurf"*string(psurf[isurf])*"hpa_rrs_betwnAB.dat"
+            fname0 = "/home/sanghavi/data/RamanSIFgrid/rayl_sza"*sza_str*"_alb"*albedo*"_psurf"*string(psurf[isurf])*"hpa_nors_betwnAB.dat"
+            fname1 = "/home/sanghavi/data/RamanSIFgrid/rayl_sza"*sza_str*"_alb"*albedo*"_psurf"*string(psurf[isurf])*"hpa_rrs_betwnAB.dat"
 
             # With SIF
-            #fname0 = "/home/sanghavi/RamanSIFgrid/raylSIF_sza"*sza_str*"_alb"*albedo*"_psurf"*string(psurf[isurf])*"hpa_nors_betwnAB.dat"
-            #fname1 = "/home/sanghavi/RamanSIFgrid/raylSIF_sza"*sza_str*"_alb"*albedo*"_psurf"*string(psurf[isurf])*"hpa_rrs_betwnAB.dat"
+            #fname0 = "/home/sanghavi/data/RamanSIFgrid/raylSIF_sza"*sza_str*"_alb"*albedo*"_psurf"*string(psurf[isurf])*"hpa_nors_betwnAB.dat"
+            #fname1 = "/home/sanghavi/data/RamanSIFgrid/raylSIF_sza"*sza_str*"_alb"*albedo*"_psurf"*string(psurf[isurf])*"hpa_rrs_betwnAB.dat"
             
             # Testing
-            #fname0 = "/home/sanghavi/RamanSIFgrid/testraylSIF_sza"*sza_str*"_alb"*albedo*"_psurf"*string(psurf[isurf])*"hpa_nors_ABO2.dat"
-            #fname1 = "/home/sanghavi/RamanSIFgrid/testraylSIF_sza"*sza_str*"_alb"*albedo*"_psurf"*string(psurf[isurf])*"hpa_rrs_ABO2.dat"
+            #fname0 = "/home/sanghavi/data/RamanSIFgrid/testraylSIF_sza"*sza_str*"_alb"*albedo*"_psurf"*string(psurf[isurf])*"hpa_nors_ABO2.dat"
+            #fname1 = "/home/sanghavi/data/RamanSIFgrid/testraylSIF_sza"*sza_str*"_alb"*albedo*"_psurf"*string(psurf[isurf])*"hpa_rrs_ABO2.dat"
             
             writedlm(fname0, rayl_nors_ABO2)
             writedlm(fname1, rayl_rrs_ABO2)

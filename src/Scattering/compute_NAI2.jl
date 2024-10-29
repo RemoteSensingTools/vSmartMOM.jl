@@ -83,12 +83,12 @@ function compute_aerosol_optical_properties(model::MieModel{FDT}, FT2::Type=Floa
         n_ = 2n_ .+ 1
 
         # Pre-allocate Dₙ  :
-        y = x_size_param[i] * (aerosol.nᵣ - aerosol.nᵢ);
+        y = x_size_param[i] * (aerosol.nᵣ - im*aerosol.nᵢ);
         nmx = round(Int, max(n_max, abs(y)) + 51)
         Dₙ  = zeros(Complex{FT}, nmx)
 
         # Compute aₙ,bₙ and S₁,S₂
-        compute_mie_ab!(x_size_param[i], aerosol.nᵣ + aerosol.nᵢ * im, an, bn, Dₙ )
+        compute_mie_ab!(x_size_param[i], aerosol.nᵣ - aerosol.nᵢ * im, an, bn, Dₙ )
         compute_mie_S₁S₂!(an, bn, leg_π, leg_τ, view(S₁, :, i), view(S₂, :, i))
         
         # Compute Extinction and scattering cross sections: 
@@ -103,7 +103,7 @@ function compute_aerosol_optical_properties(model::MieModel{FDT}, FT2::Type=Floa
 
     end
 
-    # Calculate bulk scattering and extinction coeffitientcs
+    # Calculate bulk scattering and extinction cross-sections
     bulk_C_sca =  sum(wₓ .* C_sca)
     bulk_C_ext =  sum(wₓ .* C_ext)
     
@@ -404,3 +404,104 @@ function phase_function(r::FT, λ::FT, nᵣ::FT, nᵢ::FT) where {FT<:AbstractFl
     g = 1/2 * w_μ'*(μ .*  f₁₁ )
     return μ, w_μ, f₁₁, C_ext, C_sca, g
 end
+
+# Suniti, Oct 18, 2024
+# Computes only extinction and scattering cross-sections for a given aerosol model (defined by size distribution and complex refractive index)
+function compute_aerosol_XS(aerosol::Aerosol, λ::FT, r_max::FT, nquad_radius::Int64) where {FT<:AbstractFloat} 
+    # Extract variables from aerosol struct:
+    @unpack size_distribution, nᵣ, nᵢ = aerosol
+    
+    # Imaginary part of the refractive index must be ≥ 0
+    @assert nᵢ ≥ 0
+
+    # Get the refractive index's real part type
+    #@show size_distribution.σ  
+    #FT = eltype(size_distribution.σ);
+    # @assert FT == Float64 "Aerosol computations require 64bit"
+    # Get radius quadrature points and weights (for mean, thus normalized):
+    # 
+    
+    # Just sample from 0.25%ile to 99.75%ile:
+    start,stop = 0, r_max #quantile(size_distribution,[0.0025,0.9975])
+    #r, wᵣ = gauleg(nquad_radius, 0.0, r_max ; norm=true) 
+    r, wᵣ = gauleg(nquad_radius, start, min(stop,r_max) ; norm=true) 
+    
+    # Wavenumber
+    k = 2π / λ  
+
+    # Size parameter
+    x_size_param = k * r # (2πr/λ)
+
+    # Compute n_max for largest size:
+    n_max = get_n_max(maximum(x_size_param))
+
+    # Determine max amount of Gaussian quadrature points for angle dependence of 
+    # phase functions:
+    #n_mu = 2n_max - 1;
+
+    # Obtain Gauss-Legendre quadrature points and weights for phase function
+    #μ, w_μ = gausslegendre(n_mu)
+
+    # Compute π and τ functions
+    #leg_π, leg_τ = compute_mie_π_τ(μ, n_max)
+
+    # Pre-allocate arrays:
+    #S₁    = zeros(Complex{FT}, n_mu, nquad_radius)
+    #S₂    = zeros(Complex{FT}, n_mu, nquad_radius)
+    #f₁₁   = zeros(FT, n_mu, nquad_radius)
+    #f₃₃   = zeros(FT, n_mu, nquad_radius)
+    #f₁₂   = zeros(FT, n_mu, nquad_radius)
+    #f₃₄   = zeros(FT, n_mu, nquad_radius)
+    C_ext = zeros(FT, nquad_radius)
+    C_sca = zeros(FT, nquad_radius)
+
+    # Standardized weights for the size distribution:
+    wₓ = compute_wₓ(size_distribution, wᵣ, r, r_max) 
+    
+    # Loop over size parameters
+    @showprogress 1 "Computing PhaseFunctions Siewert NAI-2 style ..." for i = 1:length(x_size_param)
+
+        # Maximum expansion (see eq. A17 from de Rooij and Stap, 1984)
+        n_max = get_n_max(x_size_param[i])
+
+        # In Domke methods, we want to pre-allocate these as 2D outside of this loop.
+        an = (zeros(Complex{FT}, n_max))
+        bn = (zeros(Complex{FT}, n_max))
+
+        # Weighting for sums of 2n+1
+        n_ = collect(FT, 1:n_max);
+        n_ = 2n_ .+ 1
+
+        # Pre-allocate Dₙ  :
+        y = x_size_param[i] * (aerosol.nᵣ - aerosol.nᵢ);
+        nmx = round(Int, max(n_max, abs(y)) + 51)
+        Dₙ  = zeros(Complex{FT}, nmx)
+
+        # Compute aₙ,bₙ and S₁,S₂
+        compute_mie_ab!(x_size_param[i], aerosol.nᵣ - aerosol.nᵢ * im, an, bn, Dₙ )
+        #compute_mie_S₁S₂!(an, bn, leg_π, leg_τ, view(S₁, :, i), view(S₂, :, i))
+        
+        # Compute Extinction and scattering cross sections: 
+        C_sca[i] = 2π / k^2 * (n_' * (abs2.(an) + abs2.(bn)))
+        C_ext[i] = 2π / k^2 * (n_' * real(an + bn))
+       
+        # Compute scattering matrix components per size parameter:
+        #f₁₁[:,i] =  0.5 / x_size_param[i]^2  * real(abs2.(S₁[:,i]) + abs2.(S₂[:,i]));
+        #f₃₃[:,i] =  0.5 / x_size_param[i]^2  * real(S₁[:,i] .* conj(S₂[:,i]) + S₂[:,i] .* conj(S₁[:,i]));
+        #f₁₂[:,i] = -0.5 / x_size_param[i]^2  * real(abs2.(S₁[:,i]) - abs2.(S₂[:,i]));
+        #f₃₄[:,i] = -0.5 / x_size_param[i]^2  * imag(S₁[:,i] .* conj(S₂[:,i]) - S₂[:,i] .* conj(S₁[:,i]));
+
+    end
+
+    # Calculate bulk scattering and extinction cross-sections
+    bulk_XS_sca = sum(wₓ .* C_sca)
+    bulk_XS_ext = sum(wₓ .* C_ext)
+
+    bulk_C_sca =  bulk_XS_sca/(π * sum(wₓ .* r.^2))
+    bulk_C_ext =  bulk_XS_ext/(π * sum(wₓ .* r.^2))
+    
+    #wr = (4π * r.^2 .*  wₓ) 
+    return bulk_XS_ext, bulk_XS_sca, bulk_C_ext, bulk_C_sca 
+
+end
+

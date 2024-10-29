@@ -1,6 +1,6 @@
 ##
 using CUDA
-device!(0)
+device!(1)
 using Revise
 using vSmartMOM, vSmartMOM.CoreRT, vSmartMOM.SolarModel
 using vSmartMOM.InelasticScattering
@@ -25,9 +25,9 @@ for i=0:20
     push!(a, acosd(i/20))  
 end
 sza=reverse(Int.(ceil.(a[8:21])))
-ρ = zeros(FT,15)
+ρ = zeros(FT,21) #ρ = zeros(FT,15)
 ρ_str = []
-for iρ = 1:15
+for iρ = 1:21 #15
     ρ[iρ] = (iρ-1)*0.05
     for i=1:length(parameters.spec_bands)
         parameters.brdf[i].albedo = ρ[iρ]
@@ -46,8 +46,8 @@ Tsolar_interp = LinearInterpolation(Tsolar[4:end, 1], Tsolar[4:end, 2])
 n_bands = length(parameters.spec_bands);
 T_sun = 5777. # K
 
-for isurf = 3:3 # 2:2 # 1:1 #
-    for iρ = 1:15 #3 #1:15
+for isurf = 3:3 # 2:2 # 1:1 # 
+    for iρ = 1:21 #1:15 #3 #1:15
         for iA = 1:14
             parameters.sza = 1.0*sza[iA]
             model.obs_geom = CoreRT.ObsGeometry(parameters.sza, parameters.vza, parameters.vaz, parameters.obs_alt)
@@ -154,7 +154,7 @@ for isurf = 3:3 # 2:2 # 1:1 #
                     RS_type1.SIF₀[1,i] = SIF₀[i];
                 end =#
                 F₀ = Tsolar_interp.(ν) .* P;
-                SIF₀ = SIF_interp.(ν); #0.0
+                SIF₀ = SIF_interp.(ν); # .= 0.0 #
                 RS_type0.F₀[1,:] = F₀; #1.0 #
                 RS_type1.F₀[1,:] = F₀;
                 RS_type0.SIF₀[1,:] = SIF₀; #1.0 #
@@ -172,29 +172,43 @@ for isurf = 3:3 # 2:2 # 1:1 #
                 #@show R[1,:,1], ieR[1,:,1],RnoRS[1,:,1] 
             end
 
-            rayl_rrs_ABO2 = []
-            rayl_nors_ABO2 = []
-            
-            rayl_rrs_ABO2 = [tot_ν R[1,1,:] R[1,2,:] R[1,3,:] ieR[1,1,:] ieR[1,2,:] ieR[1,3,:] tot_F₀]
-            rayl_nors_ABO2 = [tot_ν RnoRS[1,1,:] RnoRS[1,2,:] RnoRS[1,3,:] tot_F₀]
-            #@show rayl_nors_ABO2
+            vza_str = replace(string(round(model.params.vza[1], digits=1)),"."=>"p")
             albedo = ρ_str[iρ]
             sza_str = string(sza[iA])
-            
+            for vctr = 1:length(model.params.vaz)
+                vaz_str = replace(string(round(model.params.vaz[vctr], digits=1)),"."=>"p")
+                
+                # With SIF
+                fname0 = "/home/sanghavi/data/RamanSIFgrid/raylSIF_sza"*sza_str*"_vza"*vza_str*"_vaz"*vaz_str*"_alb"*albedo*"_psurf"*string(psurf[isurf])*"hpa_nors_ABO2.dat"
+                fname1 = "/home/sanghavi/data/RamanSIFgrid/raylSIF_sza"*sza_str*"_vza"*vza_str*"_vaz"*vaz_str*"_alb"*albedo*"_psurf"*string(psurf[isurf])*"hpa_rrs_ABO2.dat"
+                # No SIF
+                #fname0 = "/home/sanghavi/data/RamanSIFgrid/rayl_sza"*sza_str*"_vza"*vza_str*"_vaz"*vaz_str*"_alb"*albedo*"_psurf"*string(psurf[isurf])*"hpa_nors_ABO2.dat"
+                #fname1 = "/home/sanghavi/data/RamanSIFgrid/rayl_sza"*sza_str*"_vza"*vza_str*"_vaz"*vaz_str*"_alb"*albedo*"_psurf"*string(psurf[isurf])*"hpa_rrs_ABO2.dat"
+                
+                rayl_rrs_ABO2 = []
+                rayl_nors_ABO2 = []
+                
+                rayl_rrs_ABO2 = [tot_ν R[vctr,1,:] R[vctr,2,:] R[vctr,3,:] ieR[vctr,1,:] ieR[vctr,2,:] ieR[vctr,3,:] tot_F₀]
+                rayl_nors_ABO2 = [tot_ν RnoRS[vctr,1,:] RnoRS[vctr,2,:] RnoRS[vctr,3,:] tot_F₀]
+
+                writedlm(fname0, rayl_nors_ABO2)
+                writedlm(fname1, rayl_rrs_ABO2)
+                #@show rayl_nors_ABO2
+            end    
             # No SIF
-            #fname0 = "/home/sanghavi/RamanSIFgrid/rayl_sza"*sza_str*"_alb"*albedo*"_psurf"*string(psurf[isurf])*"hpa_nors_ABO2.dat"
-            #fname1 = "/home/sanghavi/RamanSIFgrid/rayl_sza"*sza_str*"_alb"*albedo*"_psurf"*string(psurf[isurf])*"hpa_rrs_ABO2.dat"
+            #fname0 = "/home/sanghavi/data/RamanSIFgrid/rayl_sza"*sza_str*"_alb"*albedo*"_psurf"*string(psurf[isurf])*"hpa_nors_ABO2.dat"
+            #fname1 = "/home/sanghavi/data/RamanSIFgrid/rayl_sza"*sza_str*"_alb"*albedo*"_psurf"*string(psurf[isurf])*"hpa_rrs_ABO2.dat"
 
             # With SIF
-            fname0 = "/home/sanghavi/RamanSIFgrid/raylSIF_sza"*sza_str*"_alb"*albedo*"_psurf"*string(psurf[isurf])*"hpa_nors_ABO2.dat"
-            fname1 = "/home/sanghavi/RamanSIFgrid/raylSIF_sza"*sza_str*"_alb"*albedo*"_psurf"*string(psurf[isurf])*"hpa_rrs_ABO2.dat"
+            #fname0 = "/home/sanghavi/data/RamanSIFgrid/raylSIF_sza"*sza_str*"_alb"*albedo*"_psurf"*string(psurf[isurf])*"hpa_nors_ABO2.dat"
+            #fname1 = "/home/sanghavi/data/RamanSIFgrid/raylSIF_sza"*sza_str*"_alb"*albedo*"_psurf"*string(psurf[isurf])*"hpa_rrs_ABO2.dat"
             
             # Testing
-            #fname0 = "/home/sanghavi/RamanSIFgrid/testraylSIF_sza"*sza_str*"_alb"*albedo*"_psurf"*string(psurf[isurf])*"hpa_nors_ABO2.dat"
-            #fname1 = "/home/sanghavi/RamanSIFgrid/testraylSIF_sza"*sza_str*"_alb"*albedo*"_psurf"*string(psurf[isurf])*"hpa_rrs_ABO2.dat"
+            #fname0 = "/home/sanghavi/data/RamanSIFgrid/test1raylSIF_sza"*sza_str*"_alb"*albedo*"_psurf"*string(psurf[isurf])*"hpa_nors_ABO2.dat"
+            #fname1 = "/home/sanghavi/data/RamanSIFgrid/test1raylSIF_sza"*sza_str*"_alb"*albedo*"_psurf"*string(psurf[isurf])*"hpa_rrs_ABO2.dat"
             
-            writedlm(fname0, rayl_nors_ABO2)
-            writedlm(fname1, rayl_rrs_ABO2)
+            #writedlm(fname0, rayl_nors_ABO2)
+            #writedlm(fname1, rayl_rrs_ABO2)
         end
     end
 end

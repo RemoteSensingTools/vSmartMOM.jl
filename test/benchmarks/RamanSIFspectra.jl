@@ -1,9 +1,9 @@
 using Plots 
 using LegendrePolynomials
 using DelimitedFiles
-using Insolation, Dates
-import Insolation.Parameters as IP
-import ClimaParams as CP
+#using Insolation, Dates
+#import Insolation.Parameters as IP
+#import ClimaParams as CP
 using NCDatasets
 using Interpolations
 using Statistics
