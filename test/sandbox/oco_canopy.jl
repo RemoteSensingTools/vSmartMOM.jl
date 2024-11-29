@@ -29,8 +29,8 @@ FT = Float64
 
 # Load OCO Data: 
 # File names:
-L1File   = "/net/fluo/data1/group/oco2/L1bSc/oco2_L1bScND_26780a_190715_B10003r_200429212407.h5"
-metFile  = "/net/fluo/data1/group/oco2/L2Met/oco2_L2MetND_26780a_190715_B10003r_200429212406.h5"
+L1File   = "/net/squid/data3/data/FluoData1/group/oco2/L1bSc/oco2_L1bScND_26780a_190715_B10003r_200429212407.h5"
+metFile  = "/net/squid/data3/data/FluoData1/group/oco2/L2Met/oco2_L2MetND_26780a_190715_B10003r_200429212406.h5"
 dictFile = "/home/cfranken/code/gitHub/InstrumentOperator.jl/json/oco2.yaml"
 # Load L1 file (could just use filenames here as well)
 oco = InstrumentOperator.load_L1(dictFile,L1File, metFile);

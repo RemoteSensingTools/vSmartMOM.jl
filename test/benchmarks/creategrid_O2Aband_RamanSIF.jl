@@ -12,6 +12,9 @@ using Distributions
 using Plots
 using DelimitedFiles
 #
+## run this code using the following command:
+## /net/fluo/data2/software/Julia/julia-1.9.3/bin/julia --project=/home/sanghavi/code/github/vSmartMOM.jl/ /home/sanghavi/code/github/vSmartMOM.jl/test/benchmarks/creategrid_O2Aband_RamanSIF.jl &
+
 FT = Float64
 
 # Load YAML files into parameter struct
@@ -46,7 +49,7 @@ Tsolar_interp = LinearInterpolation(Tsolar[4:end, 1], Tsolar[4:end, 2])
 n_bands = length(parameters.spec_bands);
 T_sun = 5777. # K
 
-for isurf = 3:3 # 2:2 # 1:1 # 
+for isurf = 2:2 # 3:3 # 2:2 # 1:1 # 
     for iρ = 1:21 #1:15 #3 #1:15
         for iA = 1:14
             parameters.sza = 1.0*sza[iA]
@@ -154,7 +157,7 @@ for isurf = 3:3 # 2:2 # 1:1 #
                     RS_type1.SIF₀[1,i] = SIF₀[i];
                 end =#
                 F₀ = Tsolar_interp.(ν) .* P;
-                SIF₀ = SIF_interp.(ν); # .= 0.0 #
+                SIF₀ .= 0.0 # = SIF_interp.(ν); # 
                 RS_type0.F₀[1,:] = F₀; #1.0 #
                 RS_type1.F₀[1,:] = F₀;
                 RS_type0.SIF₀[1,:] = SIF₀; #1.0 #
@@ -179,11 +182,11 @@ for isurf = 3:3 # 2:2 # 1:1 #
                 vaz_str = replace(string(round(model.params.vaz[vctr], digits=1)),"."=>"p")
                 
                 # With SIF
-                fname0 = "/home/sanghavi/data/RamanSIFgrid/raylSIF_sza"*sza_str*"_vza"*vza_str*"_vaz"*vaz_str*"_alb"*albedo*"_psurf"*string(psurf[isurf])*"hpa_nors_ABO2.dat"
-                fname1 = "/home/sanghavi/data/RamanSIFgrid/raylSIF_sza"*sza_str*"_vza"*vza_str*"_vaz"*vaz_str*"_alb"*albedo*"_psurf"*string(psurf[isurf])*"hpa_rrs_ABO2.dat"
+                #fname0 = "/home/sanghavi/data/RamanSIFgrid/raylSIF_sza"*sza_str*"_vza"*vza_str*"_vaz"*vaz_str*"_alb"*albedo*"_psurf"*string(psurf[isurf])*"hpa_nors_ABO2.dat"
+                #fname1 = "/home/sanghavi/data/RamanSIFgrid/raylSIF_sza"*sza_str*"_vza"*vza_str*"_vaz"*vaz_str*"_alb"*albedo*"_psurf"*string(psurf[isurf])*"hpa_rrs_ABO2.dat"
                 # No SIF
-                #fname0 = "/home/sanghavi/data/RamanSIFgrid/rayl_sza"*sza_str*"_vza"*vza_str*"_vaz"*vaz_str*"_alb"*albedo*"_psurf"*string(psurf[isurf])*"hpa_nors_ABO2.dat"
-                #fname1 = "/home/sanghavi/data/RamanSIFgrid/rayl_sza"*sza_str*"_vza"*vza_str*"_vaz"*vaz_str*"_alb"*albedo*"_psurf"*string(psurf[isurf])*"hpa_rrs_ABO2.dat"
+                fname0 = "/home/sanghavi/data/RamanSIFgrid/rayl_sza"*sza_str*"_vza"*vza_str*"_vaz"*vaz_str*"_alb"*albedo*"_psurf"*string(psurf[isurf])*"hpa_nors_ABO2.dat"
+                fname1 = "/home/sanghavi/data/RamanSIFgrid/rayl_sza"*sza_str*"_vza"*vza_str*"_vaz"*vaz_str*"_alb"*albedo*"_psurf"*string(psurf[isurf])*"hpa_rrs_ABO2.dat"
                 
                 rayl_rrs_ABO2 = []
                 rayl_nors_ABO2 = []
