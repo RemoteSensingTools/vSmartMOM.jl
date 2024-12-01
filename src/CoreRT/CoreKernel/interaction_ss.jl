@@ -36,7 +36,7 @@ function interaction_ss!(SFI::Bool,
                     arr_type(added_layer.J₀⁺), 
                     arr_type(added_layer.J₀⁻),
                     J₀⁺, J₀⁻, ndrange=size(J₀⁻))
-    wait(device, event)
+    #wait(device, event)
     synchronize_if_gpu()
 end
 
@@ -68,7 +68,7 @@ function interaction_inelastic_ss!(RS_type::RRS,
                 atype(added_layer.ieJ₀⁺), atype(added_layer.ieJ₀⁻),
                 ieJ₀⁺, ieJ₀⁻,
                 ndrange=getKernelDimSFI(RS_type, ieJ₀⁻))
-    wait(device, event)
+    #wait(device, event)
     synchronize_if_gpu()
 end
 
@@ -112,7 +112,7 @@ event = kernel!(τ_sum, τ_λ, qp_μN, atype(i_λ₁λ₀_all),
             atype(added_layer.ieJ₀⁺), atype(added_layer.ieJ₀⁻),
             ieJ₀⁺, ieJ₀⁻,
             ndrange = getKernelDimSFI(RS_type,ieJ₀⁻,RS_type.i_λ₁λ₀_all))
-wait(device, event)
+#wait(device, event)
 synchronize_if_gpu()
 end
 

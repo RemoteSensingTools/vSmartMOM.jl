@@ -110,7 +110,7 @@ base_iet⁺⁺ = deepcopy(iet⁺⁺);
 device = CPU()
 kernel! = get_elem_rt!(device)
 event = kernel!(ier⁻⁺, iet⁺⁺, ϖ_λ, ϖ_λ₀λ₁,dτ₀, dτ₁, dτ_λ, Z⁻⁺_λ₀λ₁, Z⁺⁺_λ₀λ₁, qp_μN, wct2, ndrange=size(ier⁻⁺)); 
-wait(device, event)
+#wait(device, event)
 
 base_ier⁻⁺ ≈ ier⁻⁺
 base_iet⁺⁺ ≈ iet⁺⁺
@@ -134,7 +134,7 @@ if has_cuda()
     device = CUDAKernels.CUDADevice()
     kernel! = get_elem_rt!(device)
     event = kernel!(c_ier⁻⁺, c_iet⁺⁺, c_ϖ_λ, c_ϖ_λ₀λ₁,dτ₀, dτ₁, c_dτ_λ, c_Z⁻⁺_λ₀λ₁, c_Z⁺⁺_λ₀λ₁, c_qp_μN, c_wct2, ndrange=size(c_ier⁻⁺)); 
-    wait(device, event)
+    #wait(device, event)
 
     cuda_iet⁺⁺ = Array(c_iet⁺⁺);
     cuda_ier⁻⁺ = Array(c_ier⁻⁺);

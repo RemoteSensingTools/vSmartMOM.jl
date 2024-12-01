@@ -224,7 +224,7 @@ function get_elem_rt!(RS_type::RRS,
                     aType(Z⁻⁺_λ₁λ₀), aType(Z⁺⁺_λ₁λ₀), 
                     qp_μN, wct2, 
                     ndrange=getKernelDim(RS_type,ier⁻⁺)); 
-        wait(device, event);
+        #wait(device, event);
         synchronize_if_gpu();
         #for j=1:1:length(qp_μN)
         #    @show minimum(iet⁺⁺[1:3:end,j,200,50]), minimum(ier⁻⁺[1:3:end,j,200,50]) 
@@ -254,7 +254,7 @@ function get_elem_rt!(RS_type::Union{VS_0to1, VS_1to0},
         aType(Z⁻⁺_λ₁λ₀), aType(Z⁺⁺_λ₁λ₀), 
         qp_μN, wct2, 
         ndrange=getKernelDim(RS_type,ier⁻⁺)); 
-    wait(device, event);
+    #wait(device, event);
     synchronize_if_gpu();
 end
 
@@ -342,7 +342,7 @@ function get_elem_rt_SFI!(RS_type::Union{VS_0to1, VS_1to0},
     qp_μN, ndoubl, wct02, nStokes, 
     I₀, iμ0, D, 
     ndrange=getKernelDimSFI(RS_type,ieJ₀⁻));
-    wait(device, event)
+    #wait(device, event)
     synchronize_if_gpu();
 end
 
@@ -441,7 +441,7 @@ function get_elem_rt_SFI!(RS_type::RRS,
                 I₀, iμ0, D, 
                 ndrange=getKernelDimSFI(RS_type,ieJ₀⁻));
     
-    wait(device, event)
+    #wait(device, event)
     synchronize_if_gpu();
     #@show minimum(ieJ₀⁺[1:3:end,1,200,50]), minimum(ieJ₀⁻[1:3:end,1,200,50]) 
     #@show maximum(ieJ₀⁺[1:3:end,1,200,50]), maximum(ieJ₀⁻[1:3:end,1,200,50]) 
@@ -661,7 +661,7 @@ function apply_D_matrix_elemental!(RS_type::Union{RRS, RRS_plus}, ndoubl::Int, n
         n_stokes, 
         ier⁻⁺, iet⁺⁺, ier⁺⁻, iet⁻⁻, 
         ndrange=size(ier⁻⁺));
-    wait(device, event);
+    #wait(device, event);
     synchronize_if_gpu();
     return nothing
 end
@@ -679,7 +679,7 @@ function apply_D_matrix_elemental!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
                     n_stokes, RS_type.i_λ₁λ₀_all,
                     ier⁻⁺, iet⁺⁺, ier⁺⁻, iet⁻⁻, 
                     ndrange=getKernelDim(RS_type,ier⁻⁺,RS_type.i_λ₁λ₀_all));
-    wait(device, event);
+    #wait(device, event);
     synchronize_if_gpu();
     return nothing
 end
@@ -699,7 +699,7 @@ function apply_D_matrix_elemental_SFI!(RS_type::Union{RRS, RRS_plus},
                                 ieJ₀⁻, 
                                 ndrange=size(ieJ₀⁻));
         #@show "here 1.4"
-        wait(device, event);
+        #wait(device, event);
         synchronize();
         return nothing
     end
@@ -722,7 +722,7 @@ function apply_D_matrix_elemental_SFI!(RS_type::Union{VS_0to1_plus, VS_1to0_plus
                             ndrange = getKernelDimSFI(RS_type,ieJ₀⁻,RS_type.i_λ₁λ₀_all));
                             #ndrange=size(ieJ₀⁻));
         #@show "here 1.4"
-        wait(device, event);
+        #wait(device, event);
         synchronize();
         return nothing
     end

@@ -23,7 +23,7 @@ using ...Architectures             # Use Architectures module
 using CUDA                         # GPU CuArrays and functions
 using KernelAbstractions           # Abstracting code for CPU/GPU
 using KernelAbstractions.Extras
-using CUDAKernels
+using CUDA.CUDAKernels
 
 using Unitful                      # For parsing 
 using UnitfulEquivalences          # For converting between wavenumber / wavelength

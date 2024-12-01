@@ -81,13 +81,13 @@ function elemental!(pol_type, SFI::Bool,
             kernel! = get_elem_rt!(device)
             event = kernel!(r⁻⁺, t⁺⁺, ϖ_λ, dτ_λ, Z⁻⁺, Z⁺⁺, F₀,
                 qp_μN, wct2, ndrange=size(r⁻⁺)); 
-            wait(device, event)
+            #wait(device, event)
             synchronize_if_gpu()
 
             if SFI
                 kernel! = get_elem_rt_SFI!(device)
                 event = kernel!(J₀⁺, J₀⁻, ϖ_λ, dτ_λ, τ_sum, Z⁻⁺, Z⁺⁺, F₀, qp_μN, ndoubl, wct02, pol_type.n, arr_type(pol_type.I₀), iμ₀, D, ndrange=size(J₀⁺))
-                wait(device, event)
+                #wait(device, event)
                 synchronize_if_gpu()
             end
         end
@@ -153,7 +153,7 @@ function elemental!(pol_type, SFI::Bool,
         #@show "Start event",   typeof(wct2)
         event = kernel!(r⁻⁺, t⁺⁺, ϖ, dτ, Z⁻⁺, Z⁺⁺, qp_μN, wct2, ndrange=size(r⁻⁺)); 
         #@show "Stop event"
-        wait(device, event)
+        #wait(device, event)
         synchronize_if_gpu()
 
         if SFI
@@ -161,7 +161,7 @@ function elemental!(pol_type, SFI::Bool,
             #@show size(F₀)
             event = kernel!(J₀⁺, J₀⁻, ϖ, dτ, arr_type(τ_sum), Z⁻⁺, Z⁺⁺, 
             arr_type(F₀), qp_μN, ndoubl, wct02, pol_type.n, I₀, iμ₀, D, ndrange=size(J₀⁺))
-            wait(device, event)
+            #wait(device, event)
         end
         #ii = pol_type.n*(iμ0-1)+1
         #@show 'B',iμ0,  r⁻⁺[1,ii,1]/(J₀⁻[1,1,1]*wt_μ[iμ0]), r⁻⁺[1,ii,1], J₀⁻[1,1,1]*wt_μ[iμ0], J₀⁺[1,1,1]*wt_μ[iμ0]
@@ -317,7 +317,7 @@ function apply_D_matrix_elemental!(ndoubl::Int, n_stokes::Int, r⁻⁺::Abstract
     device = devi(architecture(r⁻⁺))
     applyD_kernel! = apply_D_elemental!(device)
     event = applyD_kernel!(ndoubl,n_stokes, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻, ndrange=size(r⁻⁺));
-    wait(device, event);
+    #wait(device, event);
     synchronize_if_gpu();
     return nothing
 end
@@ -329,7 +329,7 @@ function apply_D_matrix_elemental_SFI!(ndoubl::Int, n_stokes::Int, J₀⁻::Abst
         device = devi(architecture(J₀⁻))
         applyD_kernel! = apply_D_elemental_SFI!(device)
         event = applyD_kernel!(ndoubl,n_stokes, J₀⁻, ndrange=size(J₀⁻));
-        wait(device, event);
+        #wait(device, event);
         synchronize_if_gpu();
         return nothing
     end

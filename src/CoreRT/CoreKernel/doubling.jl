@@ -128,7 +128,7 @@ function apply_D_matrix!(n_stokes::Int, r⁻⁺::AbstractArray{FT,3}, t⁺⁺::A
         device = devi(architecture(r⁻⁺))
         applyD_kernel! = apply_D!(device)
         event = applyD_kernel!(n_stokes, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻, ndrange=size(r⁻⁺));
-        wait(device, event);
+        ##wait(device, event);
         synchronize_if_gpu();
         return nothing
     end
@@ -144,7 +144,7 @@ end
         device = devi(Architectures.CPU())
         applyD_kernel! = apply_D!(device)
         event = applyD_kernel!(n_stokes, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻, ndrange=size(r⁻⁺));
-        wait(device, event);
+        #wait(device, event);
         return nothing
     end
 end=#
@@ -154,7 +154,7 @@ function apply_D_matrix_SFI!(n_stokes::Int, J₀⁻::AbstractArray{FT,3}) where 
     device = devi(architecture(J₀⁻))
     applyD_kernel! = apply_D_SFI!(device)
     event = applyD_kernel!(n_stokes, J₀⁻, ndrange=size(J₀⁻));
-    wait(device, event);
+    ##wait(device, event);
     synchronize_if_gpu();
     nothing
 end
@@ -167,7 +167,7 @@ function apply_D_matrix_SFI!(n_stokes::Int, J₀⁻::Array{FT,3}) where {FT}
     device = devi(architecture(J₀⁻))
     applyD_kernel! = apply_D_SFI!(device)
     event = applyD_kernel!(n_stokes, J₀⁻, ndrange=size(J₀⁻));
-    wait(device, event);
+    #wait(device, event);
     
     return nothing
 end=#

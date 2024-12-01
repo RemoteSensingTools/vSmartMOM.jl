@@ -351,8 +351,8 @@ function model_from_parameters(params::vSmartMOM_Parameters)
                 #@show aerosol_optics_raw_0.k*aerosol_optics_raw_0.ω̃, aerosol_optics_raw_1.k*aerosol_optics_raw_1.ω̃
                 kext_grid = [aerosol_optics_raw_0.k, aerosol_optics_raw_1.k]
                 ksca_grid = [aerosol_optics_raw_0.k*aerosol_optics_raw_0.ω̃, aerosol_optics_raw_1.k*aerosol_optics_raw_1.ω̃] 
-                interp_linear_kext = linear_interpolation(ν_grid, kext_grid)
-                interp_linear_ksca = linear_interpolation(ν_grid, ksca_grid)
+                interp_linear_kext = LinearInterpolation(ν_grid, kext_grid)
+                interp_linear_ksca = LinearInterpolation(ν_grid, ksca_grid)
                 k = zeros(length(curr_band_λ))
                 ω̃ = zeros(length(curr_band_λ))
                 for i = 1:length(curr_band_λ)
@@ -659,8 +659,8 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
                 #@show aerosol_optics_raw_0.k*aerosol_optics_raw_0.ω̃, aerosol_optics_raw_1.k*aerosol_optics_raw_1.ω̃
                 kext_grid = [aerosol_optics_raw_0.k, aerosol_optics_raw_1.k]
                 ksca_grid = [aerosol_optics_raw_0.k*aerosol_optics_raw_0.ω̃, aerosol_optics_raw_1.k*aerosol_optics_raw_1.ω̃] 
-                interp_linear_kext = linear_interpolation(ν_grid, kext_grid)
-                interp_linear_ksca = linear_interpolation(ν_grid, ksca_grid)
+                interp_linear_kext = LinearInterpolation(ν_grid, kext_grid)
+                interp_linear_ksca = LinearInterpolation(ν_grid, ksca_grid)
                 k = zeros(length(curr_band_λ))
                 ω̃ = zeros(length(curr_band_λ))
                 for i = 1:length(curr_band_λ)
@@ -941,8 +941,8 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
                 #@show aerosol_optics_raw_0.k*aerosol_optics_raw_0.ω̃, aerosol_optics_raw_1.k*aerosol_optics_raw_1.ω̃
                 kext_grid = [aerosol_optics_raw_0.k, aerosol_optics_raw_1.k]
                 ksca_grid = [aerosol_optics_raw_0.k*aerosol_optics_raw_0.ω̃, aerosol_optics_raw_1.k*aerosol_optics_raw_1.ω̃] 
-                interp_linear_kext = linear_interpolation(ν_grid, kext_grid)
-                interp_linear_ksca = linear_interpolation(ν_grid, ksca_grid)
+                interp_linear_kext = LinearInterpolation(ν_grid, kext_grid)
+                interp_linear_ksca = LinearInterpolation(ν_grid, ksca_grid)
                 k = zeros(length(curr_band_λ))
                 ω̃ = zeros(length(curr_band_λ))
                 for i = 1:length(curr_band_λ)

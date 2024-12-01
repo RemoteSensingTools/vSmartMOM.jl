@@ -410,7 +410,7 @@ end
 #        device = devi(architecture(r⁻⁺))
 #        applyD_kernel! = apply_D!(device)
 #        event = applyD_kernel!(n_stokes, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻, ndrange=size(r⁻⁺)); #Suniti: is it possible to  use the same kernel for the 3D elastic and 4D inelastic terms or do we need to call two different kernels separately? 
-#        wait(device, event);
+#        #wait(device, event);
 #        synchronize_if_gpu();
 #        return nothing
 #    end
@@ -427,7 +427,7 @@ function apply_D_matrix_IE!(RS_type::Union{VS_0to1_plus, VS_1to0_plus}, n_stokes
         applyD_kernel_IE! = apply_D_IE_VS!(device)
         event = applyD_kernel_IE!(aType(RS_type.i_λ₁λ₀_all), n_stokes, 
             ier⁻⁺, iet⁺⁺, ier⁺⁻, iet⁻⁻, ndrange=getKernelDim(RS_type, ier⁻⁺,(RS_type.i_λ₁λ₀_all)));
-        wait(device, event);
+        ##wait(device, event);
         synchronize();
         return nothing
     end
@@ -444,7 +444,7 @@ function apply_D_matrix_IE!(RS_type::RRS, n_stokes::Int, ier⁻⁺::AbstractArra
         applyD_kernel_IE! = apply_D_IE_RRS!(device)
         event = applyD_kernel_IE!(aType(RS_type.i_λ₁λ₀), n_stokes, 
             ier⁻⁺, iet⁺⁺, ier⁺⁻, iet⁻⁻, ndrange=getKernelDim(RS_type, ier⁻⁺));
-        wait(device, event);
+        ##wait(device, event);
         synchronize();
         return nothing
     end
@@ -456,7 +456,7 @@ end
 #    device = devi(architecture(J₀⁻)) #Suniti: how to do this so that ieJ₀⁻ can also be included?
 #    applyD_kernel! = apply_D_SFI!(device)
 #    event = applyD_kernel!(n_stokes, J₀⁻, ndrange=size(J₀⁻));
-#    wait(device, event);
+#    #wait(device, event);
 #    synchronize();
 #    
 #    return nothing
@@ -470,7 +470,7 @@ function apply_D_matrix_SFI_IE!(RS_type::RRS, n_stokes::Int, ieJ₀⁻::Abstract
     applyD_kernel_IE! = apply_D_SFI_IE_RRS!(device)
     event = applyD_kernel_IE!(aType(RS_type.i_λ₁λ₀),n_stokes, 
                     ieJ₀⁻, ndrange=(size(ieJ₀⁻,1), size(ieJ₀⁻,3), size(ieJ₀⁻,4)));
-    wait(device, event);
+    ##wait(device, event);
     synchronize_if_gpu()
     return nothing
 end
@@ -490,7 +490,7 @@ function apply_D_matrix_SFI_IE!(RS_type::Union{VS_0to1_plus, VS_1to0_plus}, n_st
                             ieJ₀⁻, 
                             aType(RS_type.i_λ₁λ₀_all)));
     #@show "here 3"
-    wait(device, event);
+    ##wait(device, event);
     #@show "here 4"
     synchronize_if_gpu()
     return nothing
