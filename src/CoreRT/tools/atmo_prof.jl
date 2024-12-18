@@ -4,10 +4,40 @@ This file contains functions that are related to atmospheric profile calculation
 
 =#
 
-"Compute pressure levels, vmr, vcd for atmospheric profile, given p_half, T, q"
+"""
+    compute_atmos_profile_fields(T::AbstractArray{FT,1}, p_half::AbstractArray{FT,1}, q, vmr; g₀=9.807) -> Tuple
+
+Computes atmospheric profile fields, including volume mixing ratios (VMR) of H2O, dry and wet volume column densities (VCDs), and layer thicknesses (Δz).
+
+# Arguments
+- `T::AbstractArray{FT,1}`: Temperature profile in Kelvin (K).
+- `p_half::AbstractArray{FT,1}`: Pressure at half-levels in hectopascals (hPa).
+- `q`: Specific humidity in grams of water vapor per kilogram of moist air (g/kg).
+- `vmr`: Dictionary containing volume mixing ratios of various trace gases.
+- `g₀=9.807`: Gravitational acceleration (m/s²), default is 9.807 m/s².
+
+# Returns
+- `p_full`: Pressure at full levels (hPa).
+- `p_half`: Pressure at half levels (hPa), same as input.
+- `vmr_h2o`: Volume mixing ratio of H2O (unitless).
+- `vcd_dry`: Dry volume column density (molec/cm²).
+- `vcd_h2o`: Wet volume column density (molec/cm²).
+- `new_vmr`: Interpolated volume mixing ratios of trace gases (Dictionary).
+- `Δz`: Layer thicknesses (m).
+
+# Description
+This function calculates various atmospheric profile fields given temperature, pressure, specific humidity, and initial volume mixing ratios of trace gases. It computes:
+1. Pressure at full levels.
+2. Volume mixing ratio of H2O from specific humidity.
+3. Dry and wet volume column densities (VCDs).
+4. Layer thicknesses (Δz).
+5. Interpolated volume mixing ratios for other trace gases.
+"""
 function compute_atmos_profile_fields(T::AbstractArray{FT,1}, p_half::AbstractArray{FT,1}, q, vmr; g₀=9.807) where FT
     #@show "Atmos",  FT 
     # Floating type to use
+    # convert q from g/kg to kg/kg
+    q = q ./ FT(1000)
     #FT = eltype(T)
     Nₐ = FT(6.02214179e+23)
     R  = FT(8.3144598)
@@ -17,6 +47,7 @@ function compute_atmos_profile_fields(T::AbstractArray{FT,1}, p_half::AbstractAr
     # Dry and wet mass
     dry_mass = FT(28.9644e-3)    # in kg/molec, weighted average for N2 and O2
     wet_mass = FT(18.01534e-3)   # just H2O
+    ratio = dry_mass / wet_mass
     n_layers = length(T)
 
     # Also get a VMR vector of H2O (volumetric!)
@@ -27,7 +58,7 @@ function compute_atmos_profile_fields(T::AbstractArray{FT,1}, p_half::AbstractAr
     # Now actually compute the layer VCDs
     for i = 1:n_layers 
         Δp = p_half[i + 1] - p_half[i]
-        vmr_h2o[i] = dry_mass/(dry_mass-wet_mass*(1-1/q[i]))
+        vmr_h2o[i] = q[i]/(1-q[i]) * ratio# dry_mass/(dry_mass-wet_mass*(1-1/q[i]))
         vmr_dry = 1 - vmr_h2o[i]
         M  = vmr_dry * dry_mass + vmr_h2o[i] * wet_mass
         vcd = Nₐ * Δp / (M  * g₀ * 100^2) * 100
@@ -42,10 +73,14 @@ function compute_atmos_profile_fields(T::AbstractArray{FT,1}, p_half::AbstractAr
 
     for molec_i in keys(vmr)
         if vmr[molec_i] isa AbstractArray
-            
-            pressure_grid = collect(range(minimum(p_full), maximum(p_full), length=length(vmr[molec_i])))
-            interp_linear = LinearInterpolation(pressure_grid, vmr[molec_i])
-            new_vmr[molec_i] = [interp_linear(x) for x in p_full]
+            if length(vmr[molec_i]) == length(p_full)
+                new_vmr[molec_i] = vmr[molec_i]
+            else
+                @info "Warning, make sure that the VMR is interpolated correctly! Right now, it might be tricky"
+                pressure_grid = collect(range(minimum(p_full), maximum(p_full), length=length(vmr[molec_i])))
+                interp_linear = LinearInterpolation(pressure_grid, vmr[molec_i])
+                new_vmr[molec_i] = [interp_linear(x) for x in p_full]
+            end
         else
             new_vmr[molec_i] = vmr[molec_i]
         end
@@ -407,6 +442,7 @@ function compute_absorption_profile!(τ_abs::Array{FT,2},
         T = profile.T[iz]
         # Either use the current layer's vmr, or use the uniform vmr
         vmr_curr = vmr isa AbstractArray ? vmr[iz] : vmr
+        #@show vmr_curr
         τ_abs[:,iz] += Array(absorption_cross_section(absorption_model, grid, p, T)) * profile.vcd_dry[iz] * vmr_curr
     end
     

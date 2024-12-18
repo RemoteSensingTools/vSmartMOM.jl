@@ -36,10 +36,42 @@ end
 function batch_inv!(X::CuArray{FT,3}, A::CuArray{FT,3}) where {FT}
     #CUBLAS.math_mode!(CUBLAS.handle(), CUDA.FAST_MATH)
     # LU-factorize A
-    pivot, info   = CUBLAS.getrf_strided_batched!(A, true);synchronize()
+    @timeit "getrf_strided" pivot, info   = CUBLAS.getrf_strided_batched!(A, true);synchronize()
     # Invert LU factorization of A
-    CUBLAS.getri_strided_batched!(A, X, pivot); synchronize()
+    @timeit "getri_strided" CUBLAS.getri_strided_batched!(A, X, pivot); synchronize()
 end
+
+"Given 3D CuArray A, fill in X[:,:,k] = A[:,:,k] \\ I" 
+function batch_inv!(X::CuArray{FT,3}, A::CuArray{FT,3}, Xptrs, Aptrs ) where {FT<:Float32}
+    n = size(A,1)
+    lda = max(1,stride(A,2))
+
+    batchSize = length(Aptrs)
+    @timeit "info" info = CuArray{Cint}(undef, batchSize)
+    @timeit "pivot" pivot = CUDA.zeros(Cint, (n, batchSize))
+
+    CUBLAS.cublasSgetrfBatched(CUBLAS.handle(), n, Aptrs, lda, pivot, info, batchSize);synchronize()
+    # Invert LU factorization of A
+    CUBLAS.cublasSgetriBatched(CUBLAS.handle(), n, Aptrs, lda, pivot, Xptrs, lda, info, batchSize); synchronize()
+    
+end
+
+"Given 3D CuArray A, fill in X[:,:,k] = A[:,:,k] \\ I" 
+function batch_inv!(X::CuArray{FT,3}, A::CuArray{FT,3}, Xptrs, Aptrs ) where {FT<:Float64}
+    n = size(A,1)
+    lda = max(1,stride(A,2))
+
+    batchSize = length(Aptrs)
+    @timeit "info" info = CuArray{Cint}(undef, batchSize)
+    @timeit "pivot" pivot = CUDA.zeros(Cint, (n, batchSize))
+
+    CUBLAS.cublasDgetrfBatched(CUBLAS.handle(), n, Aptrs, lda, pivot, info, batchSize);synchronize()
+    # Invert LU factorization of A
+    CUBLAS.cublasDgetriBatched(CUBLAS.handle(), n, Aptrs, lda, pivot, Xptrs, lda, info, batchSize); synchronize()
+    
+end
+
+
 
 
 "Given 3D Julia Array A, fill in X[:,:,k] = A[:,:,k] \\ I" 
@@ -47,6 +79,11 @@ function batch_inv!(X::AbstractArray{FT,3}, A::AbstractArray{FT,3}) where {FT}
     for i = 1:size(A, 3)
         @views X[:,:,i] = A[:,:,i]\I;
     end
+end
+
+"Given 3D Julia Array A, fill in X[:,:,k] = A[:,:,k] \\ I" 
+function batch_inv!(X::AbstractArray{FT,3}, A::AbstractArray{FT,3}, xx::Nothing, yy::Nothing) where {FT}
+    batch_inv!(X, A)
 end
 
 "Batched multiplication for 3D Matrix with 1D vector (i.e. repeated)"
