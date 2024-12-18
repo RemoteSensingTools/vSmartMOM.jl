@@ -9,18 +9,35 @@ the model. The latter should generally be used by users.
 
 
 
-# Mockup if no Raman type is chosen:
+
+"""
+    $(FUNCTIONNAME)(model::vSmartMOM_Model; i_band::Integer = 1)
+
+Perform Radiative Transfer calculations using given parameters if no Raman is used
+
+"""
 function rt_run(model::vSmartMOM_Model; i_band::Integer = 1)
     rt_run(noRS(), model, i_band)
 end
 
-# Just to make sure we still have it:
+"""
+    $(FUNCTIONNAME)(S_type::AbstractRamanType,model::vSmartMOM_Model; i_band::Integer = 1)
+
+Perform Radiative Transfer calculations using given parameters and AbstractRaman type
+
+"""
 function rt_run_test(RS_type::AbstractRamanType, 
         model::vSmartMOM_Model, 
         iBand)
     rt_run(RS_type,model,iBand)
 end
 
+"""
+    $(FUNCTIONNAME)(S_type::AbstractRamanType,model::vSmartMOM_Model; i_band::Integer = 1)
+
+Perform Radiative Transfer calculations using given parameters and AbstractRaman type
+
+"""
 function rt_run(RS_type::AbstractRamanType, 
                     model::vSmartMOM_Model, iBand)
     @unpack obs_alt, sza, vza, vaz = model.obs_geom   # Observational geometry properties
