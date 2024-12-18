@@ -10,7 +10,6 @@ export
     synchronize_if_gpu
 
 using CUDA
-
 using KernelAbstractions
 using CUDA.CUDAKernels
 
