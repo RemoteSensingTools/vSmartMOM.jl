@@ -80,7 +80,7 @@ function interaction_helper!(::ScatteringInterface_11, SFI,
     #tmp_inv = similar(t⁺⁺)
     temp2 .= I_static .- r⁻⁺ ⊠ R⁺⁻
     # Compute and store `(I - R⁺⁻ * r⁻⁺)⁻¹`
-    @timeit "interaction inv1" batch_inv!(temp1, temp2, temp1_ptr, temp2_ptr) 
+    @timeit "interaction inv1 bla" batch_inv!(temp1, temp2, temp1_ptr, temp2_ptr) 
     # Temporary arrays:
     
     # T₁₂(I-R₀₁R₂₁)⁻¹

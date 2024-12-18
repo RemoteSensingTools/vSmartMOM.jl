@@ -223,6 +223,7 @@ function parameters_from_yaml(file_path)
                 push!(luts,[load_interpolation_model(file) for file in files_lut[i]])
             end
         end
+        
         absorption_params = AbsorptionParameters(molecules, vmr, broadening_function, 
                                                  CEF, wing_cutoff, luts)
 
