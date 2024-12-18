@@ -78,7 +78,7 @@ UnitfulEquivalences = "0.2"
 WignerSymbols = "2"
 YAML = "0.4"
 UnicodePlots = "3"
-julia = "1.8,1.9,1.10"
+julia = "1.9, 1.10, 1.11"
 
 [extras]
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
