@@ -71,20 +71,20 @@ function interaction_helper!(::ScatteringInterface_11, SFI,
                                 added_layer::AddedLayer{FT}, 
                                 I_static::AbstractArray{FT2}) where {FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2}
     
-    @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻ = added_layer     #these are aliases to the respective struct elements  
+    @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻,temp1, temp2, temp1_ptr,temp2_ptr = added_layer     #these are aliases to the respective struct elements  
     @unpack R⁻⁺, R⁺⁻, T⁺⁺, T⁻⁻, J₀⁺, J₀⁻ = composite_layer #these are aliases to the respective struct elements 
     
     # X₂₁ refers to added layer, X₁₀ to composite layer!
 
     # Used to store `(I - R⁺⁻ * r⁻⁺)⁻¹`
-    tmp_inv = similar(t⁺⁺)
-
+    #tmp_inv = similar(t⁺⁺)
+    temp2 .= I_static .- r⁻⁺ ⊠ R⁺⁻
     # Compute and store `(I - R⁺⁻ * r⁻⁺)⁻¹`
-    @timeit "interaction inv1" batch_inv!(tmp_inv, I_static .- r⁻⁺ ⊠ R⁺⁻) 
+    @timeit "interaction inv1 bla" batch_inv!(temp1, temp2, temp1_ptr, temp2_ptr) 
     # Temporary arrays:
     
     # T₁₂(I-R₀₁R₂₁)⁻¹
-    T01_inv = T⁻⁻ ⊠ tmp_inv;
+    T01_inv = T⁻⁻ ⊠ temp1;
     
     # J₀₂⁻ = J₀₁⁻ + T₀₁(1-R₂₁R₀₁)⁻¹(R₂₁J₁₀⁺+J₁₂⁻)
     J₀⁻ .= J₀⁻ .+ T01_inv ⊠ (r⁻⁺ ⊠ J₀⁺ .+ j₀⁻) 
@@ -101,9 +101,10 @@ function interaction_helper!(::ScatteringInterface_11, SFI,
     #handle = CUBLAS.handle()
     #CUBLAS.math_mode!(handle, CUDA.FAST_MATH)
     #@show typeof(I_static .- R⁺⁻ ⊠ r⁻⁺)
-    @timeit "interaction inv2" batch_inv!(tmp_inv, I_static .- R⁺⁻ ⊠ r⁻⁺) 
+    temp2 .= I_static .- R⁺⁻ ⊠ r⁻⁺
+    @timeit "interaction inv2" batch_inv!(temp1, temp2, temp1_ptr, temp2_ptr) 
     # T₂₁(I-R₀₁R₂₁)⁻¹
-    T21_inv = t⁺⁺ ⊠ tmp_inv
+    T21_inv = t⁺⁺ ⊠ temp1
 
     # J₂₀⁺ = J₂₁⁺ + T₂₁(I-R₀₁R₂₁)⁻¹(J₁₀ + R₀₁J₁₂⁻ )
     J₀⁺ .= j₀⁺ .+ T21_inv ⊠ (J₀⁺ .+ R⁺⁻ ⊠ j₀⁻)

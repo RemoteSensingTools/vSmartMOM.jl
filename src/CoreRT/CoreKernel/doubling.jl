@@ -19,7 +19,7 @@ function doubling_helper!(pol_type,
                           architecture) where {FT,M}
 
     # Unpack the added layer
-    @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻ = added_layer
+    @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻, temp1, temp2, temp1_ptr,temp2_ptr = added_layer
     #@show typeof(expk), typeof(I_static)
     # Device architecture
     dev = devi(architecture)
@@ -28,21 +28,24 @@ function doubling_helper!(pol_type,
     ndoubl == 0 && return nothing
     
     # Geometric progression of reflections (1-RR)⁻¹
-    gp_refl      = similar(t⁺⁺)
+    #gp_refl      = temp1# similar(t⁺⁺)
     tt⁺⁺_gp_refl = similar(t⁺⁺)
-    
+    #temp = similar(t⁺⁺)
     # Dummy for source 
     j₁⁺ = similar(j₀⁺)
     # Dummy for J
-    j₁⁻ = similar(j₀⁻)
-
+    j₁⁻  = similar(j₀⁻)
+    #temp = similar(t⁺⁺)
+    # Pointers to avoid memory allocation in CUBLAS routines
+    #@timeit "Pointers" gp_ptrs   = CUBLAS.unsafe_strided_batch(gp_refl)
+    #@timeit "Pointers" temp_ptrs = CUBLAS.unsafe_strided_batch(temp)
     # Loop over number of doublings
     for n = 1:ndoubl
-        
+        temp2 .= I_static .- r⁻⁺ ⊠ r⁻⁺
         # T⁺⁺(λ)[I - R⁺⁻(λ)R⁻⁺(λ)]⁻¹, for doubling R⁺⁻,R⁻⁺ and T⁺⁺,T⁻⁻ is identical
         #@show typeof(gp_refl), typeof(I_static), typeof(I_static .- r⁻⁺), typeof(j₁⁺)
-        @timeit "Batch Inv Doubling" batch_inv!(gp_refl, I_static .- r⁻⁺ ⊠ r⁻⁺)
-        tt⁺⁺_gp_refl .= t⁺⁺ ⊠ gp_refl
+        @timeit "Batch Inv Doubling" batch_inv!(temp1, temp2,temp1_ptr, temp2_ptr)
+        tt⁺⁺_gp_refl .= t⁺⁺ ⊠ temp1
 
         # J⁺₂₁(λ) = J⁺₁₀(λ).exp(-τ(λ)/μ₀)
         @inbounds @views j₁⁺[:,1,:] .= j₀⁺[:,1,:] .* expk'
@@ -70,7 +73,8 @@ function doubling_helper!(pol_type,
 
     # For SFI, after doubling, revert D(DJ₀⁻)->J₀⁻
     apply_D_matrix_SFI!(pol_type.n, j₀⁻)
-
+#    CUBLAS.unsafe_free!(temp_ptrs);
+#    CUBLAS.unsafe_free!(gp_ptrs);
     return nothing 
 end
 

@@ -223,6 +223,7 @@ function parameters_from_yaml(file_path)
                 push!(luts,[load_interpolation_model(file) for file in files_lut[i]])
             end
         end
+        
         absorption_params = AbsorptionParameters(molecules, vmr, broadening_function, 
                                                  CEF, wing_cutoff, luts)
 
@@ -245,8 +246,8 @@ function parameters_from_yaml(file_path)
         if !haskey(params_dict["scattering"],"n_ref")
             n_ref = aerosols[1].aerosol.nᵣ - im*aerosols[1].aerosol.nᵢ
         else
-            #@show params_dict["scattering"]["n_ref"]
-            n_ref = params_dict["scattering"]["n_ref"]
+            @show params_dict["scattering"]["n_ref"]
+            n_ref = parse(Complex{FTa},params_dict["scattering"]["n_ref"])
         end
         scattering_params = ScatteringParameters(aerosols, r_max, nquad_radius, 
                                                  λ_ref, n_ref, decomp_type)

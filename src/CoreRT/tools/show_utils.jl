@@ -78,11 +78,13 @@ function Base.show(io::IO,::MIME"text/plain", x::vSmartMOM_Parameters)
             #println(io, "\t\t  σ: $(curr_rt_aerosol.aerosol.size_distribution.σ) μm; geometric standard deviation")
             println(io, "\t\t  nᵣ: $(curr_rt_aerosol.aerosol.nᵣ)")
             println(io, "\t\t  nᵢ: $(curr_rt_aerosol.aerosol.nᵢ)")
+            
             println(io, "\t\t  Vertical profile in p: $(curr_rt_aerosol.profile)") 
         end
         println(io, "\tr_max: $(x.scattering_params.r_max) μm")
         println(io, "\tnquad_radius: $(x.scattering_params.nquad_radius)")
         println(io, "\tλ_ref: $(x.scattering_params.λ_ref) μm")
+        println(io, "\treference n: $(x.scattering_params.n_ref)")
         print(io, "\tDecomposition Type: $(x.scattering_params.decomp_type)")
     else
         print(io, "(No Scattering Parameters Specified)")
