@@ -13,7 +13,7 @@ using Plots
 using DelimitedFiles
 #
 ## run this code using the following command:
-## /net/fluo/data2/software/Julia/julia-1.9.3/bin/julia --project=/home/sanghavi/code/github/vSmartMOM.jl/ /home/sanghavi/code/github/vSmartMOM.jl/test/benchmarks/creategrid_O2Aband_RamanSIF.jl &
+## /net/fluo/data2/software/Julia/julia-1.11.1/bin/julia --project=/home/sanghavi/code/github/vSmartMOM.jl/ /home/sanghavi/code/github/vSmartMOM.jl/test/benchmarks/creategrid_O2Aband_RamanSIF.jl &
 
 FT = Float64
 
@@ -49,7 +49,7 @@ Tsolar_interp = LinearInterpolation(Tsolar[4:end, 1], Tsolar[4:end, 2])
 n_bands = length(parameters.spec_bands);
 T_sun = 5777. # K
 
-for isurf = 2:2 # 3:3 # 2:2 # 1:1 # 
+for isurf = 1:1 # 3:3 # 2:2 # 1:1 # 
     for iρ = 1:21 #1:15 #3 #1:15
         for iA = 1:14
             parameters.sza = 1.0*sza[iA]

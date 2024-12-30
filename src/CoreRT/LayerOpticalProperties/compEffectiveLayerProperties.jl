@@ -91,9 +91,13 @@ function constructCoreOpticalProperties(RS_type, iBand, m, model)
             #                    aerosol_optics[iB][iaer], 
             #                    AerZ⁺⁺, AerZ⁻⁺))                
             #end
+            #aer =  [createAero(arr_type(τ_aer[iB][iaer,:,i]), 
+            #            aerosol_optics[iB][iaer], 
+            #            AerZ⁺⁺, AerZ⁻⁺ ) for i=1:nZ]
             aer =  [createAero(arr_type(τ_aer[iB][iaer,:,i]), 
                         aerosol_optics[iB][iaer], 
                         AerZ⁺⁺, AerZ⁻⁺, arr_type) for i=1:nZ]
+                
             #@show aer[1].τ[1], aer[1].τ[end]
             #@show size(aer[end].τ), aer[end].τ[1], aer[end].τ[end]
             #@show size(aer[end].ϖ), aer[end].ϖ[1], aer[end].ϖ[end]
@@ -170,9 +174,23 @@ function constructCoreOpticalProperties(RS_type, iBand, m, model)
     return layer_opt, fscat_opt # Suniti: this needs to be modified because Rayleigh scattering fraction varies dramatically with wavelength
 end
 
+function createAero(τAer, aerosol_optics, AerZ⁺⁺, AerZ⁻⁺)
+    @unpack fᵗ, ω̃ = aerosol_optics
+    #τ_mod = (1-fᵗ * ω̃ ) * τAer;
+    #ϖ_mod = (1-fᵗ) * ω̃/(1-fᵗ * ω̃)
+    @show typeof(fᵗ), typeof(ω̃)
+    τ_mod = (1 .- fᵗ * ω̃ ) .* τAer;
+    ϖ_mod = (1 .- fᵗ) .* ω̃ ./ (1 .- fᵗ * ω̃)
+    CoreScatteringOpticalProperties(τ_mod, ϖ_mod,AerZ⁺⁺, AerZ⁻⁺)
+end
+
 function createAero(τAer, aerosol_optics, AerZ⁺⁺, AerZ⁻⁺, arr_type)
-    @unpack fᵗ = aerosol_optics
-    ω̃ = arr_type(aerosol_optics.ω̃) 
+    @unpack fᵗ, ω̃ = aerosol_optics
+    if ω̃ isa Number
+        nothing
+    else
+        ω̃ = arr_type(aerosol_optics.ω̃) 
+    end
     #@show typeof(ω̃), typeof(fᵗ)
     #@show size(fᵗ)
     #@show size(ω̃)
@@ -188,8 +206,8 @@ end
 
 # Extract scattering definitions and integrated absorptions for the source function!
 function extractEffectiveProps(
-                                lods::Array#{CoreScatteringOpticalProperties{FT},1}
-                                ) #where FT
+                lods::Array#{CoreScatteringOpticalProperties{FT},1}
+                ) #where FT
 
     FT    = eltype(lods[1].τ)
     nSpec = length(lods[1].τ)
