@@ -5,7 +5,14 @@ This file implements rt_kernel!, which performs the core RT routines (elemental,
 =#
 #No Raman (default)
 # Perform the Core RT routines (elemental, doubling, interaction)
-function rt_kernel!(RS_type::noRS, pol_type, SFI, added_layer, composite_layer, computed_layer_properties, m, quad_points, I_static, architecture, qp_μN, iz) 
+function rt_kernel!(RS_type::noRS, 
+                    pol_type, SFI, 
+                    added_layer, 
+                    composite_layer, 
+                    computed_layer_properties, 
+                    m, quad_points, 
+                    I_static, architecture, 
+                    qp_μN, iz) 
 
     @unpack τ_λ, ϖ_λ, τ, ϖ, Z⁺⁺, Z⁻⁺, dτ_max, dτ, ndoubl, dτ_λ, expk, scatter, τ_sum, scattering_interface = computed_layer_properties
     @unpack F₀ = RS_type
@@ -196,14 +203,14 @@ function rt_kernel!(RS_type::noRS{FT},
                                         added_layer, 
                                         I_static, architecture)
         
-        if m==0
+        #=if m==0
             #m==0 ? 
             RayJ₀p = Array(added_layer.J₀⁺)
             RayJ₀m = Array(added_layer.J₀⁻)
             RayT   = Array(added_layer.t⁺⁺)
             RayR   = Array(added_layer.r⁻⁺)
             jldsave("/home/sanghavi/debugRay3.jld2"; RayJ₀p, RayJ₀m, RayT, RayR) 
-        end                                
+        end=#                                
                                         
         
                                         #=if m==0
@@ -224,9 +231,9 @@ function rt_kernel!(RS_type::noRS{FT},
         added_layer.r⁻⁺[:] .= 0;
         added_layer.r⁺⁻[:] .= 0;
         added_layer.J₀⁻[:] .= 0;
-        temp = Array(exp.(-τ_λ./qp_μN'))
+        temp = Array(exp.(-τ./qp_μN'))
         #added_layer.t⁺⁺, added_layer.t⁻⁻ = (Diagonal(exp(-τ_λ / qp_μN)), Diagonal(exp(-τ_λ / qp_μN)))   
-        for iλ = 1:length(τ_λ)
+        for iλ = 1:length(τ)
             added_layer.t⁺⁺[:,:,iλ] = Diagonal(temp[iλ,:]);
             added_layer.t⁻⁻[:,:,iλ] = Diagonal(temp[iλ,:]);
         end

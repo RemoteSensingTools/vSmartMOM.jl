@@ -75,11 +75,15 @@ end
 default_matrix(FT, arr_type, dims, nSpec)   = arr_type(zeros(FT, tuple(dims[1], dims[2], nSpec)))
 "Default matrix in ieRT calculation (zeros)"
 default_matrix_ie(FT, arr_type, dims, nSpec, nRaman)   = arr_type(zeros(FT, tuple(dims[1], dims[2], nSpec, nRaman)))
+"Default matrix in linRT calculation (zeros)"
+default_matrix_lin(FT, arr_type, Nparams, dims, nSpec)   = arr_type(zeros(FT, tuple(Nparams, dims[1], dims[2], nSpec)))
 
 "Default J matrix in RT calculation (zeros)"
 default_J_matrix(FT, arr_type, dims, nSpec) = arr_type(zeros(FT, tuple(dims[1], 1, nSpec)))
 "Default J matrix in ieRT calculation (zeros)"
 default_J_matrix_ie(FT, arr_type, dims, nSpec, nRaman) = arr_type(zeros(FT, tuple(dims[1], 1, nSpec, nRaman)))
+"Default J matrix in linRT calculation (zeros)"
+default_J_matrix_lin(FT, arr_type, Nparams, dims, nSpec) = arr_type(zeros(FT, tuple(Nparams, dims[1], 1, nSpec)))
 
 "Default matrix in RT calculation (zeros)"
 default_matrix(FT, arr_type, NSens, dims, nSpec)   = [zeros(FT, (dims[1], dims[2], nSpec)) for i=1:NSens]
@@ -112,6 +116,32 @@ make_added_layer(RS_type::Union{noRS, noRS_plus}, FT, arr_type, dims, nSpec) = A
                                                         default_J_matrix(FT, arr_type, dims, nSpec),
                                                         default_J_matrix(FT, arr_type, dims, nSpec)
                                                         )
+"Make an added layer and its linearized counterpart, supplying all default matrices"
+make_added_layer(RS_type::Union{noRS, noRS_plus}, FT, arr_type, Nparams, dims, nSpec) = 
+                                                    AddedLayer(
+                                                        default_matrix(FT, arr_type, dims, nSpec), 
+                                                        default_matrix(FT, arr_type, dims, nSpec), 
+                                                        default_matrix(FT, arr_type, dims, nSpec),
+                                                        default_matrix(FT, arr_type, dims, nSpec),
+                                                        default_J_matrix(FT, arr_type, dims, nSpec),
+                                                        default_J_matrix(FT, arr_type, dims, nSpec)
+                                                    ), 
+                                                    AddedLayerLin(
+                                                        # derivatives wrt τ, ϖ and Z
+                                                        default_matrix_lin(FT, arr_type, 3, dims, nSpec), 
+                                                        default_matrix_lin(FT, arr_type, 3, dims, nSpec), 
+                                                        default_matrix_lin(FT, arr_type, 3, dims, nSpec),
+                                                        default_matrix_lin(FT, arr_type, 3, dims, nSpec),
+                                                        default_J_matrix_lin(FT, arr_type, 3, dims, nSpec),
+                                                        default_J_matrix_lin(FT, arr_type, 3, dims, nSpec),
+                                                        # derivatives wrt all parameters
+                                                        default_matrix_lin(FT, arr_type, Nparams, dims, nSpec), 
+                                                        default_matrix_lin(FT, arr_type, Nparams, dims, nSpec), 
+                                                        default_matrix_lin(FT, arr_type, Nparams, dims, nSpec),
+                                                        default_matrix_lin(FT, arr_type, Nparams, dims, nSpec),
+                                                        default_J_matrix_lin(FT, arr_type, Nparams, dims, nSpec),
+                                                        default_J_matrix_lin(FT, arr_type, Nparams, dims, nSpec)
+                                                    )
 
 "Make an added layer, supplying all default matrices"
 make_added_layer(RS_type::Union{RRS, RRS_plus,VS_0to1_plus, VS_1to0_plus}, FT, arr_type, dims, nSpec)  = AddedLayerRS(
@@ -150,6 +180,27 @@ make_composite_layer(RS_type::Union{noRS, noRS_plus},
                                                         default_J_matrix(FT, arr_type, dims, nSpec),
                                                         default_J_matrix(FT, arr_type, dims, nSpec)
                                                         )
+
+"Make a composite layer and its linearized counterpart, supplying all default matrices"
+make_composite_layer(RS_type::Union{noRS, noRS_plus}, FT, arr_type, Nparams, dims, nSpec) = 
+                                                    CompositeLayer(
+                                                        default_matrix(FT, arr_type, dims, nSpec), 
+                                                        default_matrix(FT, arr_type, dims, nSpec), 
+                                                        default_matrix(FT, arr_type, dims, nSpec),
+                                                        default_matrix(FT, arr_type, dims, nSpec),
+                                                        default_J_matrix(FT, arr_type, dims, nSpec),
+                                                        default_J_matrix(FT, arr_type, dims, nSpec)
+                                                    ), 
+                                                    CompositeLayerLin(
+                                                        # derivatives wrt all parameters
+                                                        default_matrix_lin(FT, arr_type, Nparams, dims, nSpec), 
+                                                        default_matrix_lin(FT, arr_type, Nparams, dims, nSpec), 
+                                                        default_matrix_lin(FT, arr_type, Nparams, dims, nSpec),
+                                                        default_matrix_lin(FT, arr_type, Nparams, dims, nSpec),
+                                                        default_J_matrix_lin(FT, arr_type, Nparams, dims, nSpec),
+                                                        default_J_matrix_lin(FT, arr_type, Nparams, dims, nSpec)
+                                                    )
+
 "Make a composite layer, supplying all default matrices"
 make_composite_layer(RS_type::Union{RRS, RRS_plus,VS_0to1_plus, VS_1to0_plus}, 
     FT, arr_type, dims, nSpec) = CompositeLayerRS(
