@@ -36,8 +36,6 @@ function create_surface_layer!(lambertian::LambertianSurfaceScalar{FT},
         # Albedo normalized by π (and factor 2 for 0th Fourier Moment)
         ρ = 2lambertian.albedo#/FT(π)
         
-        
-        
         R_surf = Array(Diagonal(vcat(ρ, zeros(FT,pol_type.n-1))))
         R_surf = repeat(R_surf',Nquad)
         R_surf = repeat(R_surf',Nquad)
@@ -123,6 +121,62 @@ function create_surface_layer!(lambertian::LambertianSurfaceLegendre{FT},
 
         #@show size(added_layer.r⁻⁺), size(R_surf), size(added_layer.j₀⁻)
         added_layer.r⁻⁺ .= R_surf3D;
+        added_layer.r⁺⁻ .= 0;
+        added_layer.t⁺⁺ .= T_surf;
+        added_layer.t⁻⁻ .= T_surf;
+
+    else
+        added_layer.r⁻⁺[:] .= 0;
+        added_layer.r⁻⁺[:] .= 0;
+        added_layer.t⁺⁺[:] .= 0;
+        added_layer.t⁻⁻[:] .= 0;
+        added_layer.j₀⁺[:] .= 0;
+        added_layer.j₀⁻[:] .= 0;
+    end
+end
+
+function create_surface_layer!(lambertian::LambertianSurfaceSpline{FT}, 
+    added_layer::Union{AddedLayer,AddedLayerRS},
+    SFI,
+    m::Int,
+    pol_type,
+    quad_points,
+    τ_sum,
+    architecture) where {FT}
+    FT2 = Float64
+    if m == 0
+        @unpack qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart, iμ₀, μ₀ = quad_points
+
+        arr_type = array_type(architecture)
+        
+        # EvaluateSpline
+        albedo = lambertian.interpolator(lambertian.wlGrid)
+        ρ = arr_type(2albedo)
+        # Get size of added layer
+        dim = size(added_layer.r⁻⁺)
+        Nquad = dim[1] ÷ pol_type.n
+
+        R_surf = Array(Diagonal(vcat(FT(1), zeros(FT,pol_type.n-1))))
+        R_surf = repeat(R_surf',Nquad)
+        R_surf = repeat(R_surf',Nquad)
+
+        # Move to architecture:
+        R_surf = arr_type(R_surf)
+
+        # Source function of surface:
+        if SFI
+            I₀_NquadN = similar(qp_μN);
+            I₀_NquadN[:] .=0;
+            I₀_NquadN[iμ₀Nstart:pol_type.n*iμ₀] = pol_type.I₀;
+            added_layer.j₀⁺[:] .= 0
+            # Suniti double-check
+            added_layer.j₀⁻[:,1,:] = μ₀*(R_surf*I₀_NquadN) .* (ρ .* exp.(-τ_sum/μ₀))';
+        end
+        R_surf   = R_surf * Diagonal(qp_μN.*wt_μN)
+        
+        tmp    = ones(pol_type.n*Nquad)
+        T_surf = arr_type(Diagonal(tmp))
+        added_layer.r⁻⁺ .= R_surf .* reshape(ρ, 1, 1, :)
         added_layer.r⁺⁻ .= 0;
         added_layer.t⁺⁺ .= T_surf;
         added_layer.t⁻⁻ .= T_surf;

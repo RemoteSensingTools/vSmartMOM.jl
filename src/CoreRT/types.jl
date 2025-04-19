@@ -343,6 +343,12 @@ struct LambertianSurfaceLegendre{FT} <: AbstractSurfaceType
     legendre_coeff::AbstractArray{FT,1}
 end
 
+"Defined by a simple spline from Interpolations.jl"
+struct LambertianSurfaceSpline{FT} <: AbstractSurfaceType
+    interpolator::AbstractInterpolation{FT}
+    wlGrid::AbstractArray{FT,1} # Has to be added here as it won't otherwise be available in the Lambertian Surface Routine
+end
+
 """
     struct AbsorptionParameters
 
