@@ -96,7 +96,8 @@ spec_end = 0
 ν̃ = 0.5*(model.params.spec_bands[1][1]+model.params.spec_bands[end][end])
 
 # Find central reference index for RRS:
-#i_ref = argmin(abs.(ν .- ν̃))
+#i_ref = argmin(abs.(ν .- ν̃))ν̃ = 0.5*(model.params.spec_bands[1][1]+model.params.spec_bands[end][end])
+
 # TODO_VS: λ_vs_in (get input)
 # TODO_VS: ν_vs_in (convert to wavenumbers)
 # Effective temperature for Raman calculations
@@ -149,7 +150,36 @@ RS_type1.F₀[1,:] = F₀;
 RS_type0.SIF₀[1,:] = SIF₀; #1.0 #
 RS_type1.SIF₀[1,:] = SIF₀;
 
+f_CabN2 = "/home/sanghavi/data/RamanSIFgrid/RamanXS/effCoeff_Cabannes_N2.dat" 
+f_CabO2 = "/home/sanghavi/data/RamanSIFgrid/RamanXS/effCoeff_Cabannes_O2.dat" 
+f_RRSN2 = "/home/sanghavi/data/RamanSIFgrid/RamanXS/effCoeff_RRS_N2.dat" 
+f_RRSO2 = "/home/sanghavi/data/RamanSIFgrid/RamanXS/effCoeff_RRS_O2.dat" 
+
+CabN2 = [0 n2.effCoeff.σ_Rayl_coeff]
+CabO2 = [0 o2.effCoeff.σ_Rayl_coeff]
+Δν_N2 = []
+Δν_O2 = []
+kscatt_N2 = []
+kscatt_O2 = []
+
+append!(Δν_N2, n2.effCoeff.Δν̃_RoRaman_coeff_JtoJp2)
+append!(Δν_N2, n2.effCoeff.Δν̃_RoRaman_coeff_JtoJm2)
+append!(kscatt_N2, n2.effCoeff.σ_RoRaman_coeff_JtoJp2)
+append!(kscatt_N2, n2.effCoeff.σ_RoRaman_coeff_JtoJm2)
+
+append!(Δν_O2, o2.effCoeff.Δν̃_RoRaman_coeff_JtoJp2)
+append!(Δν_O2, o2.effCoeff.Δν̃_RoRaman_coeff_JtoJm2)
+append!(kscatt_O2, o2.effCoeff.σ_RoRaman_coeff_JtoJp2)
+append!(kscatt_O2, o2.effCoeff.σ_RoRaman_coeff_JtoJm2)
+
+writedlm(f_CabN2, CabN2)
+writedlm(f_CabO2, CabO2)
+writedlm(f_RRSN2, [Δν_N2 kscatt_N2])
+writedlm(f_RRSO2, [Δν_O2 kscatt_O2])
+
+
 ν₀ = ν̃
+
 plot([ν₀,ν₀], [n2.effCoeff.σ_Rayl_coeff.*ν₀.^4, n2.effCoeff.σ_Rayl_coeff.*ν₀.^4]*1e-3, seriestype=:sticks, lw=2, label="N₂ σₑ(x10⁻³)", color=:red, yformatter=x -> string(@sprintf("%.2e", x)), xlabel="wavenumber [cm⁻¹]", ylabel="Cross sections [cm²]")
 plot!(ν₀.+n2.effCoeff.Δν̃_RoRaman_coeff_JtoJp2, n2.effCoeff.σ_RoRaman_coeff_JtoJp2.*(ν₀.+n2.effCoeff.Δν̃_RoRaman_coeff_JtoJp2).^4, seriestype=:sticks, lw=2, color=:blue, label="", yformatter=x -> string(@sprintf("%.2e", x)))
 plot!(ν₀.+n2.effCoeff.Δν̃_RoRaman_coeff_JtoJm2, n2.effCoeff.σ_RoRaman_coeff_JtoJm2.*(ν₀.+n2.effCoeff.Δν̃_RoRaman_coeff_JtoJm2).^4, seriestype=:sticks, lw=2, color=:blue, label="N₂ σᵢₑ", yformatter=x -> string(@sprintf("%.2e", x)))
