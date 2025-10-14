@@ -84,7 +84,6 @@ include("tools/gpu_batched.jl")                   # Batched operations
 include("tools/atmo_prof.jl")                     # Helper Functions for Handling Atmospheric Profiles
 include("tools/rt_helper_functions.jl")           # Miscellaneous Utility Functions
 include("tools/rt_set_streams.jl")                # Set streams before RT
-include("tools/parameters_from_yaml.jl")          # Loading in parameters from YAML file
 include("tools/model_from_parameters.jl")         # Converting parameters to derived model attributes
 include("tools/show_utils.jl")                    # Pretty-printing objects
 include("LayerOpticalProperties/compEffectiveLayerProperties.jl")
@@ -96,9 +95,8 @@ include("Surfaces/rossli_surface.jl")
 
 
 
-# Functions to export
-export parameters_from_yaml,                # Getting parameters from a file
-       model_from_parameters,               # Converting the parameters to model 
+# Functions to export (parameters_from_yaml now lives in IO; keep legacy include but do not export here)
+export model_from_parameters,               # Converting the parameters to model 
        rt_run,                              # Run the RT code
        default_parameters                   # Set of default parameters
 
