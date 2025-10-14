@@ -45,8 +45,12 @@ using .CoreRT
 # SolarModel module:
 include("SolarModel/SolarModel.jl")
 
+# IO submodule (must come after CoreRT types are defined)
+include("IO/IO.jl")
+using .IO
+
 # Export some vSmartMOM functions
-export default_parameters, parameters_from_yaml, model_from_parameters, rt_run
+export default_parameters, parameters_from_yaml, model_from_parameters, rt_run, read_parameters, read_atmos_profile
 
 using .Architectures
 using .Absorption
