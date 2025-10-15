@@ -45,7 +45,7 @@ const ARCH_MAP = Dict(
     "CPU" => ()->Architectures.CPU(),
     "GPU" => ()->Architectures.GPU(),
     # default_architecture is a value (GPU() or CPU()), not a function
-    "default_architecture" => ()->Architectures.default_architecture
+    "default_architecture" => ()->Architectures.default_architecture()
 )
 
 """
