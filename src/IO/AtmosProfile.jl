@@ -17,7 +17,7 @@ function read_atmos_profile_dict(params_dict::Dict)
         p_half = (ak + bk * psurf)
         p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o, Δz = compute_atmos_profile_fields(T, p_half, q, Dict())
     elseif ("q" in keys(params_dict))
-        p_half = convert(Float64, params_dict["p_half"])
+        p_half = convert.(Float64, params_dict["p_half"])
         psurf = p_half[end]
         q      = convert.(Float64, params_dict["q"])
         p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o, Δz = compute_atmos_profile_fields(T, p_half, q, Dict())
