@@ -17,7 +17,7 @@ There are also some save/load convenience functions for the interpolation model.
                       wing_cutoff::Real=40, 
                       vmr::Real=0, 
                       CEF::AbstractComplexErrorFunction=HumlicekWeidemann32SDErrorFunction(), 
-                      architecture = default_architecture)
+                      architecture::AbstractArchitecture = default_architecture())
 
 Convenience function to make a HitranModel out of the parameters (Matches make_interpolation_model)
 
@@ -27,7 +27,7 @@ function make_hitran_model(hitran::HitranTable,
                            wing_cutoff::Integer=40, 
                            vmr::Union{Real, Vector}=0, 
                            CEF::AbstractComplexErrorFunction=HumlicekWeidemann32SDErrorFunction(), 
-                           architecture = default_architecture)
+                           architecture::AbstractArchitecture = default_architecture())
 
     if architecture isa GPU && !(CEF isa HumlicekWeidemann32SDErrorFunction)
         @warn "Cross-section calculations on GPU may or may not work with this CEF (use HumlicekWeidemann32SDErrorFunction if you encounter issues)"
@@ -46,7 +46,7 @@ end
                     wing_cutoff::Real=40, 
                     vmr::Real=0, 
                     CEF::AbstractComplexErrorFunction=HumlicekWeidemann32SDErrorFunction(),
-                    architecture::AbstractArchitecture=default_architecture )
+                    architecture::AbstractArchitecture = default_architecture())
 
 Using a HitranModel, create an InterpolationModel by interpolating the lineshape function 
 at the given pressure and temperature grids
@@ -64,7 +64,7 @@ function make_interpolation_model(
                                   wing_cutoff::Integer=40, 
                                   vmr::Real=0, 
                                   CEF::AbstractComplexErrorFunction=HumlicekWeidemann32SDErrorFunction(),
-                                  architecture::AbstractArchitecture=default_architecture     # Computer `Architecture` on which `Model` is run
+                                  architecture::AbstractArchitecture = default_architecture()     # Computer `Architecture` on which `Model` is run
                                 )
 
     # Warn user if using incompatible/untested CEF
@@ -117,7 +117,7 @@ function make_interpolation_model(
         t_grid::AbstractRange{<:Real}; 
         # Optionals
         wavelength_flag::Bool=false,
-        architecture::AbstractArchitecture=default_architecture     # Computer `Architecture` on which `Model` is run
+        architecture::AbstractArchitecture = default_architecture()     # Computer `Architecture` on which `Model` is run
     )
 
     # Convert from wavelength to wavenumber if necessary
@@ -181,7 +181,7 @@ function make_interpolation_model_test(
         t_grid::AbstractRange{<:Real}; 
         # Optionals
         wavelength_flag::Bool=false,
-        architecture::AbstractArchitecture=default_architecture     # Computer `Architecture` on which `Model` is run
+        architecture::AbstractArchitecture = default_architecture()     # Computer `Architecture` on which `Model` is run
     )
 
     # Convert from wavelength to wavenumber if necessary

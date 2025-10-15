@@ -20,11 +20,8 @@ using ..InelasticScattering        # Use Inelastic Scattering module
 using ...vSmartMOM                 # Use parent RadiativeTransfer module
 using ...Architectures             # Use Architectures module
 
-
-using CUDA                         # GPU CuArrays and functions
 using KernelAbstractions           # Abstracting code for CPU/GPU
 using KernelAbstractions.Extras
-using CUDA.CUDAKernels
 
 using Unitful                      # For parsing 
 using UnitfulEquivalences          # For converting between wavenumber / wavelength
@@ -77,14 +74,13 @@ include("rt_run_multisensor.jl")
 # Temporary:
 include("rt_run_canopy.jl")
 
-# GPU
-include("tools/gpu_batched.jl")                   # Batched operations
+# CPU batched operations (always available)
+include("tools/cpu_batched.jl")                   # CPU batched linear algebra operations
 
 # Utilities / Helper Functions
 include("tools/atmo_prof.jl")                     # Helper Functions for Handling Atmospheric Profiles
 include("tools/rt_helper_functions.jl")           # Miscellaneous Utility Functions
 include("tools/rt_set_streams.jl")                # Set streams before RT
-include("tools/parameters_from_yaml.jl")          # Loading in parameters from YAML file
 include("tools/model_from_parameters.jl")         # Converting parameters to derived model attributes
 include("tools/show_utils.jl")                    # Pretty-printing objects
 include("LayerOpticalProperties/compEffectiveLayerProperties.jl")
@@ -96,9 +92,8 @@ include("Surfaces/rossli_surface.jl")
 
 
 
-# Functions to export
-export parameters_from_yaml,                # Getting parameters from a file
-       model_from_parameters,               # Converting the parameters to model 
+# Functions to export (parameters_from_yaml now lives in IO; keep legacy include but do not export here)
+export model_from_parameters,               # Converting the parameters to model 
        rt_run,                              # Run the RT code
        default_parameters                   # Set of default parameters
 

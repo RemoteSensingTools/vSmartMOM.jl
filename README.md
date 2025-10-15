@@ -95,7 +95,7 @@ If you have any questions about the methods used or would like to chat with us, 
 
 ## Acknowledgements
 
-This project is being developed in the Christian Frankenberg and Paul Wennberg labs at Caltech and is largely based on papers and ideas by Suniti Sanghavi from NASA/JPL, with support from the Schmidt Academy for Software Engineering (SASE).
+This project is being developed at Caltech/JPL and largely based on papers and ideas by Suniti Sanghavi from NASA/JPL, with initial support from the Schmidt Academy for Software Engineering (SASE).
 
 ## Copyright Notice
 

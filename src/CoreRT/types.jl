@@ -16,6 +16,11 @@ This file contains all types that are used in the vSmartMOM module:
 
 =#
 
+# Conditional type for CUDA pointer arrays (only needed when CUDA is loaded)
+# When CUDA is not loaded, this will just be Nothing
+# When CUDA is loaded, CUDAExt will properly handle CuArray types
+const MaybeCuPtrArray = Union{AbstractArray, Nothing}
+
 "Struct for an atmospheric profile"
 struct AtmosphericProfile{FT, VMR <: Union{Real, Vector}}
     "Temperature Profile"
@@ -135,10 +140,10 @@ Base.@kwdef struct AddedLayer{FT} <: AbstractLayer
     temp1::Union{AbstractArray{FT,3}, Nothing}
     "Added layer temporary space to avoid allocations"
     temp2::Union{AbstractArray{FT,3}, Nothing}
-    "Pointer to temporary space to avoid allocations"
-    temp1_ptr::Union{CuArray{CuPtr{FT}, 1, CUDA.DeviceMemory}, Nothing}
-    "Pointer to temporary space to avoid allocations"
-    temp2_ptr::Union{CuArray{CuPtr{FT}, 1, CUDA.DeviceMemory}, Nothing}
+    "Pointer to temporary space to avoid allocations (CUDA-specific, ignored on CPU)"
+    temp1_ptr::MaybeCuPtrArray
+    "Pointer to temporary space to avoid allocations (CUDA-specific, ignored on CPU)"
+    temp2_ptr::MaybeCuPtrArray
 end
 
 "Composite Layer Matrices (`-/+` defined in τ coordinates, i.e. `-`=outgoing, `+`=incoming"

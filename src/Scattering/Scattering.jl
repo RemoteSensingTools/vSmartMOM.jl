@@ -14,7 +14,6 @@ using FastGaussQuadrature       # For fast Gauss-Legendre quadrature points
 using JLD2                      # For saving and loading 
 using ProgressMeter             # For showing progress
 using KernelAbstractions        # For heterogeneous (GPU+CPU) programming
-using CUDA                      # For GPU programming
 using Distributions             # Distributions from Julia 
 using ForwardDiff, DiffResults  # Automatic Differentiation tools
 using LinearAlgebra             # For calculations

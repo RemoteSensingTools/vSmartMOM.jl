@@ -196,17 +196,17 @@ See eq 16 in Sanghavi 2014 for details.
 $(DocStringExtensions.FIELDS)
 """
 struct GreekCoefs{FT<:Union{AbstractFloat, ForwardDiff.Dual}}
-    "Greek matrix coefficient α, is in B[2,2]"
+    "Greek matrix coefficient α, is in `B[2,2]`"
     α::Array{FT,1} 
-    "Greek matrix coefficient β, is in B[1,1] (only important one for scalar!)"
+    "Greek matrix coefficient β, is in `B[1,1]` (only important one for scalar!)"
     β::Array{FT,1}
-    "Greek matrix coefficient γ, is in B[2,1],B[1,2]"
+    "Greek matrix coefficient γ, is in `B[2,1]`, `B[1,2]`"
     γ::Array{FT,1}
-    "Greek matrix coefficient δ, is in B[4,4]"
+    "Greek matrix coefficient δ, is in `B[4,4]`"
     δ::Array{FT,1}
-    "Greek matrix coefficient ϵ, is in B[3,4] and - in B[4,3]"
+    "Greek matrix coefficient ϵ, is in `B[3,4]` and - in `B[4,3]`"
     ϵ::Array{FT,1}
-    "Greek matrix coefficient ζ, is in B[3,3]"
+    "Greek matrix coefficient ζ, is in `B[3,3]`"
     ζ::Array{FT,1}
 end
 
