@@ -102,13 +102,14 @@ end
     ϵ = 3.6e-27
 
     # Create a HitranModel 
+    architecture=default_architecture()
     model = make_hitran_model(test_ht, Voigt(), CEF=HumlicekWeidemann32SDErrorFunction())
 
     # Loop over every temperature/pressure combo and test that the results match HAPI
     @showprogress 1 "Testing HAPI equivalence (On CO2 Band)..." for temp in temperatures
         for pres in pressures
             jl_cs = absorption_cross_section(model, grid, pres, temp)
-            py_cs = array_type(default_architecture)(readdlm("test_profiles/Voigt_CO2_T" * string(temp) * "_P" * string(pres) * ".csv"))
+            py_cs = array_type(architecture)(readdlm("test_profiles/Voigt_CO2_T" * string(temp) * "_P" * string(pres) * ".csv"))
             Δcs = abs.(jl_cs - py_cs)
             @test maximum(Δcs) < ϵ
         end
@@ -135,7 +136,7 @@ end
         model = make_hitran_model(test_ht, Voigt(), CEF=HumlicekWeidemann32SDErrorFunction())
 
         jl_cs = absorption_cross_section(model, grid, pres, temp)
-        py_cs = array_type(default_architecture)(readdlm("test_profiles/Voigt_" * name * "_T250_P1000.csv"))
+        py_cs = array_type(default_architecture())(readdlm("test_profiles/Voigt_" * name * "_T250_P1000.csv"))
         Δcs = abs.(jl_cs - py_cs)
         @test maximum(Δcs) < ϵ
     end

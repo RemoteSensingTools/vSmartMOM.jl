@@ -7,11 +7,19 @@ export
     devi, array_type, 
     architecture,
     default_architecture,
-    synchronize_if_gpu
+    synchronize_if_gpu,
+    has_cuda
 
-using CUDA
 using KernelAbstractions
-using CUDA.CUDAKernels
+
+# Check if CUDA is available and functional
+# This will be true when the CUDAExt extension is loaded
+const _has_cuda = Ref(false)
+has_cuda() = _has_cuda[]
+
+# Synchronization function reference - will be set by CUDAExt
+const _sync_gpu = Ref{Function}(() -> nothing)
+sync_device() = _sync_gpu[]()
 
 """
     AbstractArchitecture
@@ -40,17 +48,23 @@ macro hascuda(expr)
     return has_cuda() ? :($(esc(expr))) : :(nothing)
 end
 
+# CPU device always available
 devi(::CPU) = KernelAbstractions.CPU()
-devi(::GPU) = CUDA.CUDABackend(; always_inline=true)
 
-         architecture(::Array)   = CPU()
-@hascuda architecture(::CuArray) = GPU()
+# GPU device - will be defined in CUDAExt when CUDA is loaded
+# No fallback method defined to avoid precompilation errors
 
-         array_type(::CPU) = Array
-@hascuda array_type(::GPU) = CuArray
+architecture(::Array) = CPU()
 
-default_architecture = has_cuda() ? GPU() : CPU()
+array_type(::CPU) = Array
 
-synchronize_if_gpu() = has_cuda() ? CUDA.synchronize() : nothing
+# GPU array_type - will be defined in CUDAExt when CUDA is loaded
+# No fallback method defined to avoid precompilation errors
+
+# Default to CPU, GPU support requires CUDA extension
+default_architecture() = has_cuda() ? GPU() : CPU()
+
+# Synchronization - calls the sync function (set by CUDAExt if CUDA is loaded)
+synchronize_if_gpu() = sync_device()
 
 end

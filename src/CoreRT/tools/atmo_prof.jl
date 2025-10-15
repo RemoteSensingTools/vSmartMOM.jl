@@ -90,48 +90,7 @@ function compute_atmos_profile_fields(T::AbstractArray{FT,1}, p_half::AbstractAr
 
 end
 
-"From a yaml file, get the stored fields (psurf, T, q, ak, bk), calculate derived fields, 
-and return an AtmosphericProfile object" 
-function read_atmos_profile(file_path::String)
-
-    # Make sure file is yaml type
-    @assert endswith(file_path, ".yaml") "File must be yaml"
-
-    # Read in the data and pass to compute fields
-    params_dict = YAML.load_file(file_path)
-
-    # Validate the parameters before doing anything else
-    # validate_atmos_profile(params_dict)
-
-    T = convert.(Float64, params_dict["T"])
-    
-    # Calculate derived fields
-    if ("ak" in keys(params_dict))
-        psurf = convert(Float64, params_dict["p_surf"])
-        q     = convert.(Float64, params_dict["q"])
-        ak    = convert.(Float64, params_dict["ak"])
-        bk    = convert.(Float64, params_dict["bk"])
-        p_half = (ak + bk * psurf)
-        p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o, Δz = compute_atmos_profile_fields(T, p_half, q, Dict())
-    elseif ("q" in keys(params_dict))
-        p_half = convert(Float64, params_dict["p_half"])
-        psurf = p_half[end]
-        q      = convert.(Float64, params_dict["q"])
-        p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o, Δz = compute_atmos_profile_fields(T, p_half, q, Dict())
-    else
-        p_half = convert.(Float64, params_dict["p_half"])
-        psurf = p_half[end]
-        q = zeros(length(T))
-        p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o, Δz = compute_atmos_profile_fields(T, p_half, q, Dict())
-    end
-
-    # Convert vmr to appropriate type
-    vmr = convert(Dict{String, Union{Real, Vector}}, params_dict["vmr"])
-
-    # Return the atmospheric profile struct
-    return AtmosphericProfile(T, q, p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o, vmr,Δz)
-
-end
+## IO reader methods moved to src/IO/AtmosProfile.jl to decouple CoreRT from IO.
 
 "Reduce profile dimensions by re-averaging to near-equidistant pressure grid"
 function reduce_profile(n::Int, profile::AtmosphericProfile{FT}) where {FT}

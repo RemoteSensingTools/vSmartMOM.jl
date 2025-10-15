@@ -4,7 +4,6 @@ authors = ["Suniti Sanghavi (suniti.sanghavi@gmail.com), Christian Frankenberg <
 version = "1.1.0"
 
 [deps]
-CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
 CanopyOptics = "a18e34a6-5dbe-4f38-a44b-e5141852e7a7"
 DataInterpolations = "82cc6244-b520-54b8-b5a6-8a565e85f1d0"
 DelimitedFiles = "8bb1440f-4735-579b-a4ab-409b98df4dab"
@@ -41,6 +40,12 @@ Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
 UnitfulEquivalences = "da9c4bc3-91c8-4f02-8a40-6b990d2a7e0c"
 WignerSymbols = "9f57e263-0b3d-5e2e-b1be-24f2bb48858b"
 YAML = "ddb6d928-2868-570f-bddf-ab3f9cf99eb6"
+
+[weakdeps]
+CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
+
+[extensions]
+vSmartMOMCUDAExt = "CUDA"
 
 [compat]
 CUDA = "5.5"
