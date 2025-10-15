@@ -20,11 +20,8 @@ using ..InelasticScattering        # Use Inelastic Scattering module
 using ...vSmartMOM                 # Use parent RadiativeTransfer module
 using ...Architectures             # Use Architectures module
 
-
-using CUDA                         # GPU CuArrays and functions
 using KernelAbstractions           # Abstracting code for CPU/GPU
 using KernelAbstractions.Extras
-using CUDA.CUDAKernels
 
 using Unitful                      # For parsing 
 using UnitfulEquivalences          # For converting between wavenumber / wavelength
@@ -77,8 +74,8 @@ include("rt_run_multisensor.jl")
 # Temporary:
 include("rt_run_canopy.jl")
 
-# GPU
-include("tools/gpu_batched.jl")                   # Batched operations
+# CPU batched operations (always available)
+include("tools/cpu_batched.jl")                   # CPU batched linear algebra operations
 
 # Utilities / Helper Functions
 include("tools/atmo_prof.jl")                     # Helper Functions for Handling Atmospheric Profiles
