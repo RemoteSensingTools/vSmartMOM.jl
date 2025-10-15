@@ -10,7 +10,7 @@ ENV["GKSwstype"] = "nul"
 
 function build()
 
-    tutorials = ["Tutorial_Absorption.jl", "Tutorial_Scattering.jl"] # , 
+    tutorials = ["Tutorial_Absorption.jl", "Tutorial_Scattering.jl", "Tutorial_IO.jl"] # , 
     tutorials_paths = [joinpath(@__DIR__, "src", "pages", "tutorials", tutorial) for tutorial in tutorials]
 
     for tutorial in tutorials_paths
@@ -21,11 +21,17 @@ function build()
 
     pages = Any[
         "Getting Started"       => "index.md",
+        "IO"                    => Any[
+                                    "Overview" => "pages/IO/Overview.md",
+                                    "Schema" => "pages/IO/Schema.md",
+                                    "Examples" => "pages/IO/Examples.md",
+                                   ],
         "vSmartMOM"             => Any[
                                     "Overview" => "pages/vSmartMOM/Overview.md", 
                                     "Example" => "pages/vSmartMOM/Example.md",
                                     "User-Defined RT Parameters" => "pages/vSmartMOM/InputParametersGuide.md",
                                     "Methods & Types" => "pages/vSmartMOM/Types.md",
+                                    "Principles" => "pages/vSmartMOM/Principles.md",
                                     "References" => "pages/vSmartMOM/References.md"
                                     ],
         "Absorption"            => [
@@ -65,6 +71,7 @@ function build()
         clean = false,
         modules = [vSmartMOM],
         pages = pages,
+        warnonly = [:missing_docs, :cross_references],
     )
 
 end

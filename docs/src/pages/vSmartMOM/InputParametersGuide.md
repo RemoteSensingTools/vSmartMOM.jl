@@ -4,11 +4,12 @@
 
 **spec_bands**: List of spectral bands to be included in the computation, written in the form, `ν_start:ν_step:ν_end`. Units in cm⁻¹. 
 
-**surface**: Type of reflectance surface to model at bottom of atmosphere. Currently only supporting Lambertian surface types. Should be written in the form, `LambertianSurfaceScalar(albedo)`. 
+**surface**: Type of reflectance surface at the bottom of the atmosphere. Supported:
+`LambertianSurfaceScalar(albedo)`, `LambertianSurfaceSpectrum([...])`, `LambertianSurfaceLegendre([...])`, `rpvSurfaceScalar(ρ₀, ρ_c, k, Θ)`, `RossLiSurfaceScalar(fvol, fgeo, fiso)`. One string per band.
 
 **quadrature_type**: Quadrature type for RT streams. Should be one among [`RadauQuad`, `GaussQuadHemisphere`, `GaussQuadFullSphere`].
 
-**polarization_type**: Level of polarization to simulate. Should be one among [`I`, `IQ`, `IQU`, `IQUV`].
+**polarization_type**: Level of polarization to simulate. Should be one among [`Stokes_I()`, `Stokes_IQ()`, `Stokes_IQU()`, `Stokes_IQUV()`].
 
 **max_m**: Hard cutoff for maximum number of Fourier moments to loop over. Should be a positive integer. 
 
@@ -30,7 +31,7 @@
 
 **vaz**: List of viewing azimuthal angles, units in `degrees`. Should be same length as **vza**. 
 
-**obs_alt**: Altitude of observer, in `Pascal`. 
+**obs_alt**: Altitude of observer, in `Pascal`. *Note: Currently not used. Only Top Of Atmosphere (TOA/satellite) observations are supported at the moment.*
 
 ## **atmospheric_profile** group
 
