@@ -46,4 +46,10 @@ function parameters_from_yaml(file_path::AbstractString)
     return parameters_from_dict(cfg)
 end
 
+
+"Load parameters from an IOSource using the formats registry"
+function parameters_from_yaml(src::Formats.IOSource)
+    cfg = Formats.load_config(src)
+    return parameters_from_dict(cfg)
+end
 end # module
