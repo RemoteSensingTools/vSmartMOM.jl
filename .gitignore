@@ -26,3 +26,4 @@ wigner_values_sparse.jld
 wigner_values.jld
 *.pyc
 *.hdf.nc4
+GEOSChem.Custom.20190702_0000z.nc4
