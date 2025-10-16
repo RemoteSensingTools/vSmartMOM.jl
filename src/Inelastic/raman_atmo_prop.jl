@@ -79,7 +79,7 @@ end
 function getRamanSSProp!(RS_type::RRS, λ, grid_in) 
     @unpack n2,o2 =  RS_type
     #n2, o2 = getRamanAtmoConstants(1.e7/λ, T)
-    # determine Rayleigh scattering cross-section at central wavelength λ of the spectral band (assumed constant throughout the band)
+    # determine Cabannes (elastic) scattering cross-section at central wavelength λ of the spectral band (assumed constant throughout the band)
     atmo_σ_Rayl = compute_optical_Rayl(λ, n2, o2)
     RS_type.greek_raman = get_greek_raman(RS_type, n2, o2)
     #get_greek_raman!(RS_type, n2, o2)

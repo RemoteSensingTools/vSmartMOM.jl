@@ -3,7 +3,7 @@
 This file contains RT elemental-related functions
  
 =#
-
+#=
 "Elemental single-scattering layer"
 function elemental!(pol_type, SFI::Bool, 
                             τ_sum::AbstractArray,       #{FT2,1}, #Suniti
@@ -153,20 +153,21 @@ function elemental!(pol_type, SFI::Bool,
     end    
     #@pack! added_layer = r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, J₀⁺, J₀⁻   
 end
-
+=#
 "Elemental single-scattering layer"
 function elemental!(pol_type, SFI::Bool, 
-                            τ_sum::AbstractArray,#{FT2,1}, #Suniti
-                            dτ::AbstractArray,
-                            F₀::AbstractArray,#{FT,2},    # Stokes vector of solar/stellar irradiance
-                            computed_layer_properties,
-                            m::Int,                     # m: fourier moment
-                            ndoubl::Int,                # ndoubl: number of doubling computations needed 
-                            scatter::Bool,              # scatter: flag indicating scattering
-                            quad_points::QuadPoints{FT}, # struct with quadrature points, weights, 
-                            added_layer::AddedLayer{FT}, 
-                            added_layer_lin::AddedLayer{FT}, 
-                            architecture) where {FT<:AbstractFloat}
+                τ_sum::AbstractArray,#{FT2,1}, #Suniti
+                τ̇_sum::AbstractArray,
+                dτ::AbstractArray,
+                F₀::AbstractArray,#{FT,2},    # Stokes vector of solar/stellar irradiance
+                computed_layer_properties,
+                m::Int,                     # m: fourier moment
+                ndoubl::Int,                # ndoubl: number of doubling computations needed 
+                scatter::Bool,              # scatter: flag indicating scattering
+                quad_points::QuadPoints{FT}, # struct with quadrature points, weights, 
+                added_layer::AddedLayer{FT}, 
+                added_layer_lin::AddedLayerLin{FT}, 
+                architecture) where {FT<:AbstractFloat}
 
     @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, J₀⁺, J₀⁻ = added_layer
     @unpack ṙ⁺⁻, ṙ⁻⁺, ṫ⁻⁻, ṫ⁺⁺, J̇₀⁺, J̇₀⁻ = added_layer_lin
@@ -179,6 +180,7 @@ function elemental!(pol_type, SFI::Bool,
     qp_μN = arr_type(qp_μN)
     wt_μN = arr_type(wt_μN)
     τ_sum = arr_type(τ_sum)
+    τ̇_sum = arr_type(τ̇_sum)
     I₀    = arr_type(pol_type.I₀)
     D = Diagonal(arr_type(repeat(pol_type.D, size(qp_μ,1))))
 
@@ -196,14 +198,23 @@ function elemental!(pol_type, SFI::Bool,
         # for m>0,  ₀∫²ᵖⁱ cos²(mϕ)dϕ/4π = 0.25  
         wct02 = m == 0 ? FT(0.50)              : FT(0.25)
         wct2  = m == 0 ? wt_μN/2               : wt_μN/4
- 
+        r⁻⁺ .= 0.0 
+        t⁺⁺ .= 0.0
+        ṙ⁻⁺ .= 0.0
+        ṫ⁺⁺ .= 0.0
+        J₀⁺ .= 0.0
+        J₀⁻ .= 0.0
+        J̇₀⁺ .= 0.0
+        J̇₀⁻ .= 0.0
+                        
         # More computationally intensive definition of a single scattering layer with variable (0-∞) absorption
         # with absorption in batch mode, low tau_scatt but higher tau_total, needs exact equations
         kernel! = get_elem_rt!(device)
         #@show "Start event",   typeof(wct2)
         event = kernel!(r⁻⁺, t⁺⁺,
                     ṙ⁻⁺, ṫ⁺⁺, 
-                    ϖ, dτ, Z⁻⁺, Z⁺⁺, qp_μN, wct2, ndrange=size(r⁻⁺)); 
+                    ϖ, dτ, Z⁻⁺, Z⁺⁺, 
+                    qp_μN, wct2, ndrange=size(r⁻⁺)); 
         #@show "Stop event"
         #wait(device, event)
         synchronize_if_gpu()
@@ -213,8 +224,12 @@ function elemental!(pol_type, SFI::Bool,
             #@show size(F₀)
             event = kernel!(J₀⁺, J₀⁻, 
                 J̇₀⁺, J̇₀⁻, 
-                ϖ, dτ, arr_type(τ_sum), Z⁻⁺, Z⁺⁺, 
-                arr_type(F₀), qp_μN, ndoubl, wct02, pol_type.n, I₀, iμ₀, D, ndrange=size(J₀⁺))
+                ϖ, dτ, 
+                arr_type(τ_sum), arr_type(τ̇_sum), 
+                Z⁻⁺, Z⁺⁺, 
+                arr_type(F₀), 
+                qp_μN, ndoubl, wct02, 
+                pol_type.n, I₀, iμ₀, D, ndrange=size(J₀⁺))
             #wait(device, event)
         end
         #ii = pol_type.n*(iμ0-1)+1
@@ -222,9 +237,9 @@ function elemental!(pol_type, SFI::Bool,
         synchronize_if_gpu()
         
         # Apply D Matrix
-        apply_D_matrix_elemental!(ndoubl, pol_type.n,
-                        ṙ⁻⁺, ṫ⁺⁺, ṙ⁺⁻, ṫ⁻⁻,         
-                        r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻)
+        apply_D_matrix_elemental!(ndoubl, pol_type.n,         
+                        r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻,
+                        ṙ⁻⁺, ṫ⁺⁺, ṙ⁺⁻, ṫ⁻⁻)
 
         if SFI
             apply_D_matrix_elemental_SFI!(ndoubl, pol_type.n, J₀⁻, J̇₀⁻)
@@ -328,28 +343,30 @@ end
             ṫ⁺⁺[3,i,j,n] = t⁺⁺[i,j,n] / Z⁺⁺[i,j,n2]
         end
     else
-        r⁻⁺[i,j,n] = 0.0
-        ṙ⁻⁺[1:3,i,j,n] = 0.0
+        #r⁻⁺[i,j,n] = 0.0
+        #ṙ⁻⁺[:,i,j,n] = 0.0
         if i==j
             t⁺⁺[i,j,n] = exp(-dτ_λ[n] / qp_μN[i]) #Suniti
             # derivative wrt τ_λ
             ṫ⁺⁺[1,i,j,n] = -exp(-dτ_λ[n] / qp_μN[i]) / qp_μN[i]
-        else
-            t⁺⁺[i,j,n] = 0.0
+        #else
+        #    t⁺⁺[i,j,n] = 0.0
             # derivative wrt τ_λ
-            ṫ⁺⁺[1,i,j,n] = 0.0
+        #    ṫ⁺⁺[1,i,j,n] = 0.0
         end
         # derivative wrt ϖ_λ
-        ṫ⁺⁺[2,i,j,n] = 0.0
+        #ṫ⁺⁺[2,i,j,n] = 0.0
         # derivative wrt Z
-        ṫ⁺⁺[3,i,j,n] = 0.0
+        #ṫ⁺⁺[3,i,j,n] = 0.0
     end
     nothing
 end
 
 @kernel function get_elem_rt_SFI!(J₀⁺, J₀⁻, 
                 J̇₀⁺, J̇₀⁻, 
-                ϖ_λ, dτ_λ, τ_sum, Z⁻⁺, Z⁺⁺, F₀,
+                ϖ_λ, dτ_λ, 
+                τ_sum, τ̇_sum, 
+                Z⁻⁺, Z⁺⁺, F₀,
                 qp_μN, ndoubl, wct02, nStokes,
                 I₀, iμ0, D)
     i_start  = nStokes*(iμ0-1) + 1 
@@ -357,10 +374,10 @@ end
     
     i, _, n = @index(Global, NTuple) ##Suniti: What are Global and Ntuple?
     FT = eltype(I₀)
-    J₀⁺[i, 1, n]=0
-    J₀⁻[i, 1, n]=0
-    J̇₀⁺[1:3, i, 1, n]=0
-    J̇₀⁻[1:3, i, 1, n]=0
+    #J₀⁺[i, 1, n]=0
+    #J₀⁻[i, 1, n]=0
+    #J̇₀⁺[1:3, i, 1, n]=0
+    #J̇₀⁻[1:3, i, 1, n]=0
     n2=1
     if size(Z⁻⁺,3)>1
         n2 = n
@@ -412,6 +429,20 @@ end
     J₀⁺[i, 1, n] *= exp(-τ_sum[n]/qp_μN[i_start])
     J₀⁻[i, 1, n] *= exp(-τ_sum[n]/qp_μN[i_start])
 
+    J̇₀⁺[1, i, 1, n] = J̇₀⁺[1, i, 1, n]*exp(-τ_sum[n]/qp_μN[i_start]) +
+                        J₀⁺[i, 1, n] * (-τ̇_sum[1,n]/qp_μN[i_start])
+    J̇₀⁻[1, i, 1, n] = J̇₀⁻[1, i, 1, n]*exp(-τ_sum[n]/qp_μN[i_start]) +
+                        J₀⁻[i, 1, n] * (-τ̇_sum[1,n]/qp_μN[i_start])
+    J̇₀⁺[2, i, 1, n] = J̇₀⁺[2, i, 1, n]*exp(-τ_sum[n]/qp_μN[i_start]) #+
+                        #J₀⁺[i, 1, n] * (-τ̇_sum[1,n]/qp_μN[i_start])
+    J̇₀⁻[2, i, 1, n] = J̇₀⁻[2, i, 1, n]*exp(-τ_sum[n]/qp_μN[i_start]) #+
+                        #J₀⁻[i, 1, n] * (-τ̇_sum[1,n]/qp_μN[i_start])
+    J̇₀⁺[3, i, 1, n] = J̇₀⁺[3, i, 1, n]*exp(-τ_sum[n]/qp_μN[i_start]) #+
+                        #J₀⁺[i, 1, n] * (-τ̇_sum[1,n]/qp_μN[i_start])
+    J̇₀⁻[3, i, 1, n] = J̇₀⁻[3, i, 1, n]*exp(-τ_sum[n]/qp_μN[i_start]) #+
+                        #J₀⁻[i, 1, n] * (-τ̇_sum[1,n]/qp_μN[i_start])
+
+
     if ndoubl >= 1
         J₀⁻[i, 1, n] = D[i,i]*J₀⁻[i, 1, n] #D = Diagonal{1,1,-1,-1,...Nquad times}
         J̇₀⁻[1, i, 1, n] = D[i,i]*J̇₀⁻[1, i, 1, n]
@@ -436,18 +467,28 @@ end
         if (((1<=ii<=2) & (1<=jj<=2)) | (!(1<=ii<=2) & !(1<=jj<=2))) 
             r⁺⁻[i,j,n] = r⁻⁺[i,j,n]
             t⁻⁻[i,j,n] = t⁺⁺[i,j,n]
-            ṙ⁺⁻[1:3,i,j,n] = ṙ⁻⁺[:,i,j,n]
-            ṫ⁻⁻[1:3,i,j,n] = ṫ⁺⁺[:,i,j,n]
+            ṙ⁺⁻[1,i,j,n] = ṙ⁻⁺[1,i,j,n]
+            ṙ⁺⁻[2,i,j,n] = ṙ⁻⁺[2,i,j,n]
+            ṙ⁺⁻[3,i,j,n] = ṙ⁻⁺[3,i,j,n]
+            ṫ⁻⁻[1,i,j,n] = ṫ⁺⁺[1,i,j,n]
+            ṫ⁻⁻[2,i,j,n] = ṫ⁺⁺[2,i,j,n]
+            ṫ⁻⁻[3,i,j,n] = ṫ⁺⁺[3,i,j,n]
         else
             r⁺⁻[i,j,n] = -r⁻⁺[i,j,n] 
             t⁻⁻[i,j,n] = -t⁺⁺[i,j,n] 
-            ṙ⁺⁻[1:3,i,j,n] = -ṙ⁻⁺[1:3,i,j,n] 
-            ṫ⁻⁻[1:3,i,j,n] = -ṫ⁺⁺[1:3,i,j,n] 
+            ṙ⁺⁻[1,i,j,n] = -ṙ⁻⁺[1,i,j,n] 
+            ṙ⁺⁻[2,i,j,n] = -ṙ⁻⁺[2,i,j,n] 
+            ṙ⁺⁻[3,i,j,n] = -ṙ⁻⁺[3,i,j,n] 
+            ṫ⁻⁻[1,i,j,n] = -ṫ⁺⁺[1,i,j,n] 
+            ṫ⁻⁻[2,i,j,n] = -ṫ⁺⁺[2,i,j,n] 
+            ṫ⁻⁻[3,i,j,n] = -ṫ⁺⁺[3,i,j,n] 
         end
     else
         if !(1<=mod(i, pol_n)<=2) #mod(i, pol_n) > 2
             r⁻⁺[i,j,n] = - r⁻⁺[i,j,n]
-            ṙ⁻⁺[1:3,i,j,n] = - ṙ⁻⁺[1:3,i,j,n]
+            ṙ⁻⁺[1,i,j,n] = - ṙ⁻⁺[1,i,j,n]
+            ṙ⁻⁺[2,i,j,n] = - ṙ⁻⁺[2,i,j,n]
+            ṙ⁻⁺[3,i,j,n] = - ṙ⁻⁺[3,i,j,n]
         end 
     end
     nothing
@@ -459,7 +500,9 @@ end
     if ndoubl>1
         if !(1<=mod(i, pol_n)<=2) #mod(i, pol_n) > 2
             J₀⁻[i, 1, n] = - J₀⁻[i, 1, n]
-            J̇₀⁻[1:3,i, 1, n] = - J̇₀⁻[1:3,i, 1, n]
+            J̇₀⁻[1,i, 1, n] = - J̇₀⁻[1,i, 1, n]
+            J̇₀⁻[2,i, 1, n] = - J̇₀⁻[2,i, 1, n]
+            J̇₀⁻[3,i, 1, n] = - J̇₀⁻[3,i, 1, n]
         end 
     end
     nothing

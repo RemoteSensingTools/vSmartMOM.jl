@@ -1,6 +1,6 @@
 ##
 using CUDA
-device!(0)
+device!(1)
 using Revise
 using vSmartMOM, vSmartMOM.CoreRT, vSmartMOM.SolarModel
 using vSmartMOM.InelasticScattering
@@ -12,16 +12,23 @@ using Distributions
 using Plots
 using DelimitedFiles
 
+# defining vSmartMOM modes to be used in the following
+fwd_mode = FwdMode() #vSmartMOM.CoreRT.Mode.FwdMode()
+lin_mode = LinMode() #vSmartMOM.CoreRT.Mode.LinMode() 
+
+
 # Benchmarks: http://web.gps.caltech.edu/~vijay/Rayleigh_Scattering_Tables/STOKES/
 ##
-
 # Load YAML files into parameter struct
 parameters = 
     parameters_from_yaml("test/test_parameters/ParamsEMIT.yaml");
+pert_pct = 0.1
+pert_parameters = perturb_parameters(parameters, pert_pct)
 #parameters.depol = 0.041362343961163395 #0.028 #(0.028: Cabannes), (0.1032: Rayleigh) 
     #parameters = parameters_from_yaml("test/test_parameters/O2Parameters2.yaml");
 # Create model struct (precomputes optical properties) from parameters
-model      = model_from_parameters(parameters);
+model, lin_model = model_from_parameters(lin_mode, 
+    parameters);
 
 iBand = 1
 FT = Float64
@@ -53,7 +60,8 @@ for iBand=1:length(model.params.spec_bands)
         ϖ_Cabannes  = [FT(1)], 
         bandSpecLim = [],
         iBand       = [1],
-        F₀          = zeros(FT,1,1));
+        F₀          = zeros(FT,1,1),
+        SIF₀        = zeros(FT,1,1));
 
     P = planck_spectrum_wn(T_sun, ν)
     F₀ = zeros(length(P));
@@ -63,7 +71,11 @@ for iBand=1:length(model.params.spec_bands)
         F₀[i] = sol_trans * P[i];
         RS_type.F₀[1,i] = F₀[i];
     end 
-    R, T, ieR, ieT = CoreRT.rt_run_test(RS_type,model,iBand);
+    NAer = length(model.params.scattering_params.rt_aerosols)
+    NGas = 1+length(model.params.absorption_params.variable_molecules)
+    NSurf = length(model.params.spec_bands) # for spectrally constant Lambertian albedos only (work on this)
+    Nparams = NAer*7 + NGas + NSurf
+    R, T, Ṙ, Ṫ = CoreRT.rt_run_test(RS_type,model,lin_model, NAer, NGas, NSurf, iBand);
     #R_ss, T_ss, ieR_ss, ieT_ss = CoreRT.rt_run_test_ss(RS_type,model,iBand);
 
     #===Convolution of hires spectral simulations to instrument grid===#

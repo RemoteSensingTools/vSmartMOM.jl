@@ -3,7 +3,7 @@
 This file contains functions that are related to atmospheric profile calculations
 
 =#
-
+#=
 "Compute pressure levels, vmr, vcd for atmospheric profile, given p_half, T, q"
 function compute_atmos_profile_fields(T, p_half::AbstractArray, q, vmr; g₀=9.8032465)
     
@@ -189,7 +189,6 @@ Returns the aerosol optical depths per layer using a Gaussian distribution funct
 """
 function getAerosolLayerOptProp(total_τ, z₀, σ₀, p_half, T)
     FT = eltype(T[1])
-    prof = LogNormal(log(z₀), σ₀)
     R  = FT(8.3144598) # J/mol.K
     g₀ = 9.807 # m/s^2
     M₀ = FT(28.9644e-3) #kg/mol
@@ -202,37 +201,9 @@ function getAerosolLayerOptProp(total_τ, z₀, σ₀, p_half, T)
     z[end] = 0.0#dz[end]./2
     for i=Nz-1:-1:1
         z[i] = z[i+1]+dz[i+1]#(dz[i+1]+dz[i])./2 #this has been done to prevent dz=Inf resulting from p_half[1]=0
-        #τAer[i+1] = total_τ * (cdf(prof, z[i]) - cdf(prof, z[i+1])) #pdf.(prof, z)
     end
-    #τAer[1] = total_τ * (1.0 - cdf(prof, z[1]))
-    @assert all(z .>= 0) "z must be strictly positive"
-
-    # prepare u and phi(u)
-    u = (log.(z) .- log(z₀)) ./ σ₀
-    #φ = pdf.(Normal(), u)             # standard normal pdf at u
-    F = cdf.(Normal(), u)             # F(z) = Φ(u)
-
-    # derivatives of F w.r.t parameters
-    #dF_dz₀ = - φ ./ (σ₀ .* z₀)                # ∂F/∂z0
-    #dF_dσ₀ = - φ .* (log.(z) .- log(z₀)) ./ (σ₀.^2)  # ∂F/∂σ0
-
-    Nz = length(z)
-    τAer   = zeros(eltype(z), Nz)
-    #dτdz₀  = similar(τAer)
-    #dτdσ₀  = similar(τAer)
-
-    # vectorized construction (no explicit loop required)
-    if Nz >= 2
-        τAer[2:Nz]  .= total_τ .* (F[1:end-1] .- F[2:end])
-    #    dτdz₀[2:Nz] .= total_τ .* (dF_dz₀[1:end-1] .- dF_dz₀[2:end])
-    #    dτdσ₀[2:Nz] .= total_τ .* (dF_dσ₀[1:end-1] .- dF_dσ₀[2:end])
-    end
-
-    # top layer
-    τAer[1]   = total_τ * (1.0 - F[1])
-    #dτdz₀[1]  = - total_τ * dF_dz₀[1]
-    #dτdσ₀[1]  = - total_τ * dF_dσ₀[1]
-
+    prof = LogNormal(log(z₀), σ₀)
+    τAer = total_τ * pdf.(prof, z)
     #=
     # Need to make sure we can also differentiate wrt σp (FT can be Dual!)
     FT = eltype(p₀)
@@ -439,13 +410,84 @@ function construct_all_atm_layers(
 
     return ComputedAtmosphereProperties(τ_λ_all, ϖ_λ_all, τ_all, ϖ_all, Z⁺⁺_all, Z⁻⁺_all, dτ_max_all, dτ_all, ndoubl_all, dτ_λ_all, expk_all, scatter_all, τ_sum_all, fscattRayl_all, scattering_interfaces_all)
 end
+=#
+"""
+Returns the aerosol optical depths per layer using a Gaussian distribution function with p₀ and σp on a pressure grid
+"""
+function getAerosolLayerOptProp(lin::LinMode, total_τ, z₀, σ₀, p_half, T)
+    FT = eltype(T[1])
+    #prof = LogNormal(log(z₀), σ₀)
+    R  = FT(8.3144598) # J/mol.K
+    g₀ = 9.807 # m/s^2
+    M₀ = FT(28.9644e-3) #kg/mol
+    H = R*T/(M₀*g₀)
+    Nz = length(p_half)-1
+    dz = zeros(Nz)
+    z = zeros(Nz)
+    dz .= H.*log.(p_half[2:end]./p_half[1:end-1])
+    dz .*= 1.e-3 #m->km
+    z[end] = 0.0#dz[end]./2
+    for i=Nz-1:-1:1
+        z[i] = z[i+1]+dz[i+1]#(dz[i+1]+dz[i])./2 #this has been done to prevent dz=Inf resulting from p_half[1]=0
+        @show i, z[i]
+        #    τAer[i+1] = total_τ * (cdf(prof, z[i]) - cdf(prof, z[i+1])) #pdf.(prof, z)
+    end
+    #τAer[1] = total_τ * (1.0 - cdf(prof, z[1]))
+    @assert all(z .>= 0) "z must be strictly positive"
 
+    # prepare u and phi(u)
+    u = (log.(z) .- log(z₀)) ./ σ₀
+    φ = pdf.(Normal(), u)             # standard normal pdf at u
+    F = cdf.(Normal(), u)             # F(z) = Φ(u)
 
+    # derivatives of F w.r.t parameters
+    dF_dz₀ = - φ ./ (σ₀ .* z₀)                # ∂F/∂z0
+    dF_dσ₀ = - φ .* (log.(z) .- log(z₀)) ./ (σ₀.^2)  # ∂F/∂σ0
+
+    Nz = length(z)
+    τAer   = zeros(eltype(z), Nz)
+    dτdz₀  = similar(τAer)
+    dτdσ₀  = similar(τAer)
+
+    # vectorized construction (no explicit loop required)
+    if Nz >= 2
+        τAer[2:Nz]  .= total_τ .* (F[1:end-1] .- F[2:end])
+        dτdz₀[2:Nz] .= total_τ .* (dF_dz₀[1:end-1] .- dF_dz₀[2:end])
+        dτdσ₀[2:Nz] .= total_τ .* (dF_dσ₀[1:end-1] .- dF_dσ₀[2:end])
+    end
+
+    # top layer
+    τAer[1]   = total_τ * (1.0 - F[1])
+    dτdz₀[1]  = - total_τ * dF_dz₀[1]
+    dτdσ₀[1]  = - total_τ * dF_dσ₀[1]
+
+    #=
+    # Need to make sure we can also differentiate wrt σp (FT can be Dual!)
+    FT = eltype(p₀)
+    #Nz = length(p_half)-1
+    #ρ = zeros(FT,Nz)
+
+    #@show p_half, p₀, σp
+    for i = 1:Nz
+        dp = p_half[i+1] - p_half[i]
+        p  = (p_half[i+1] + p_half[i])/2
+        # Use Distributions here later:
+        ρ[i] = (1 / (σp * sqrt(2π))) * exp(-(p - p₀)^2 / (2σp^2)) * dp
+        #@show (-(p - p₀)^2 / (2σp^2))
+        #@show (1 / (σp * sqrt(2π))), exp(-(p - p₀)^2 / (2σp^2)), dp
+        #@show i, ρ[i], p, dp
+    end
+    Norm = sum(ρ)
+    τAer  =  (total_τ / Norm) * ρ
+    =#
+    return convert.(FT, τAer), convert.(FT, dτdz₀), convert.(FT, dτdσ₀)
+end
 
 "Given the CrossSectionModel, the grid, and the AtmosphericProfile, fill up the τ_abs array with the cross section at each layer
 (using pressures/temperatures) from the profile" 
-function compute_absorption_profile!(#::FwdMode, 
-                                    τ_abs::Array{FT,2}, 
+function compute_absorption_profile!(τ_abs::Array{FT,2}, 
+                                    τ̇_abs::Array{FT,3}, 
+                                    jac_idx::Integer,
                                     absorption_model, 
                                     grid,
                                     vmr,
@@ -472,6 +514,7 @@ function compute_absorption_profile!(#::FwdMode,
         #@show minimum(temp), p, T, profile.vcd_dry[iz] * vmr_curr
         #@show iz, profile.vcd_dry[iz], vmr_curr, p, T
         τ_abs[:,iz] += Array(absorption_cross_section(absorption_model, grid, p, T)) * profile.vcd_dry[iz] * vmr_curr
+        τ̇_abs[jac_idx,:,iz] = Array(absorption_cross_section(absorption_model, grid, p, T)) * profile.vcd_dry[iz]
     end
     
 end

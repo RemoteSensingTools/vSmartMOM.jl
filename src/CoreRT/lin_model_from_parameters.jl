@@ -4,7 +4,7 @@ This file contains the `model_from_parameters` function, which computes all deri
 like optical thicknesses, from the input parameters. Produces a vSmartMOM_Model object. 
 
 =#
-
+#=
 "Generate default set of parameters for Radiative Transfer calculations (from ModelParameters/)"
 default_parameters() = parameters_from_yaml(joinpath(dirname(pathof(vSmartMOM)), "CoreRT", "DefaultParameters.yaml"))
 
@@ -96,9 +96,9 @@ function set_uniform_lmax!(lmax::Vector{Int}, aerosol_optics::Vector{Vector{vSma
         end
     end
 end
-
+=#
 "Take the parameters specified in the vSmartMOM_Parameters struct, and calculate derived attributes into a vSmartMOM_Model" 
-function model_from_parameters(#::FwdMode, 
+function model_from_parameters(lin::LinMode, 
     params::vSmartMOM_Parameters)
 
     # Number of total bands and aerosols (for convenience)
@@ -147,6 +147,13 @@ function model_from_parameters(#::FwdMode,
     # i.e. code the rt core with fixed amount of derivatives as in her paper, then compute chain rule for dtau/dVMr, etc...
     FT2 = isnothing(params.absorption_params) || !haskey(params.absorption_params.vmr,"CO2") ? params.float_type : eltype(params.absorption_params.vmr["CO2"])
     τ_abs     = [zeros(FT2, length(params.spec_bands[i]), length(profile.p_full)) for i in 1:n_bands]
+    
+    # Define N_fix_gas as the number of fixed abundance gases (like O2, N2, etc.) - these will not be included in the computation of the Jacobian matrix
+    N_fix_gas = length(unique(Iterators.flatten(params.absorption_params.fixed_molecules)))
+    # Define N_var_gas as the number of variable gases whose abundance is to be determined - these will be included in the Jacobian computation
+    N_var_gas = length(unique(Iterators.flatten(params.absorption_params.variable_molecules)))
+    # dertivatives with respect to gas concentration per layer
+    τ̇_abs     = [zeros(FT2, 1+N_var_gas, length(params.spec_bands[i]), length(profile.p_full)) for i in 1:n_bands] # reserve the first derivative for H2O. When q is not provided, this derivative can be set to zero 
     max_m = zeros(Int, n_bands)
     l_max = zeros(Int, n_bands)
     l_max_aer = zeros(Int, n_aer, n_bands)
@@ -192,34 +199,37 @@ function model_from_parameters(#::FwdMode,
         (isnothing(params.absorption_params) && isnothing(params.q)) && continue
 
         if !isnothing(params.q)
-            # Obtain hitran data for this H₂O
+            # Obtain hitran data for H₂O
             @timeit "Read HITRAN" hitran_data = read_hitran(artifact("H2O"), iso=1)
 
             println("Computing profile for water vapor in band #$(i_band)")
-                # Create absorption model with parameters beforehand now:
-                absorption_model = make_hitran_model(hitran_data, 
-                    vSmartMOM.Absorption.Voigt(), 
-                    wing_cutoff = 150, 
-                    CEF = vSmartMOM.Absorption.HumlicekWeidemann32SDErrorFunction(), 
-                    architecture = params.architecture, 
-                    vmr = 0);#mean(profile.vmr[params.absorption_params.molecules[i_band][molec_i]]))
-                # Calculate absorption profile
-                
-                @timeit "Absorption Coeff"  compute_absorption_profile!(τ_abs[i_band], 
-                    absorption_model, 
-                    params.spec_bands[i_band],
-                    profile.vmr_h2o, 
-                    profile);
+            # Create absorption model with parameters beforehand now:
+            absorption_model = make_hitran_model(hitran_data, 
+                vSmartMOM.Absorption.Voigt(), 
+                wing_cutoff = 150, 
+                CEF = vSmartMOM.Absorption.HumlicekWeidemann32SDErrorFunction(), 
+                architecture = params.architecture, 
+                vmr = 0);#mean(profile.vmr[params.absorption_params.molecules[i_band][molec_i]]))
+            # Calculate absorption profile
+            # TODO: write the following linearized function
+            jac_idx = 1 # first index reserved for H2O
+            @timeit "Absorption Coeff"  compute_absorption_profile!(
+                τ_abs[i_band], τ̇_abs[i_band], jac_idx,
+                absorption_model, 
+                params.spec_bands[i_band],
+                profile.vmr_h2o, 
+                profile);
         end
         #@show "hello"
         #@show params.absorption_params.molecules[i_band]
         #@show length(params.absorption_params.molecules[i_band])
         # Loop over all molecules in this band, obtain profile for each, and add them up
-        if !isnothing(params.absorption_params)
+        if !isnothing(params.absorption_params) 
             if !isempty(params.absorption_params.fixed_molecules[i_band])
                 # fixed abundance molecules
-                for molec_i in 1:length(params.absorption_params.fixed_molecules[i_band])                
-                # This can be precomputed as well later in my mind, providing an absorption_model or an interpolation_model!
+                for molec_i in 1:length(params.absorption_params.fixed_molecules[i_band])
+                    
+                    # This can be precomputed as well later in my mind, providing an absorption_model or an interpolation_model!
                     if isempty(params.absorption_params.luts)
                         # Obtain hitran data for this molecule
                         @timeit "Read HITRAN" hitran_data = 
@@ -234,14 +244,16 @@ function model_from_parameters(#::FwdMode,
                             architecture = params.architecture, 
                             vmr = 0);#mean(profile.vmr[params.absorption_params.molecules[i_band][molec_i]]))
                         # Calculate absorption profile
-                        
-                        @timeit "Absorption Coeff"  compute_absorption_profile!(τ_abs[i_band], 
-                            absorption_model, 
-                            params.spec_bands[i_band],
-                            profile.vmr[params.absorption_params.fixed_molecules[i_band][molec_i]], 
-                            profile);
+                        # TODO: write the following linearized function
+                        @timeit "Absorption Coeff"  compute_absorption_profile!(
+                                τ_abs[i_band], 
+                                absorption_model, 
+                                params.spec_bands[i_band],
+                                profile.vmr[params.absorption_params.fixed_molecules[i_band][molec_i]], 
+                                profile);
                     # Use LUT directly
                     else
+                        # TODO: write the following linearized function
                         compute_absorption_profile!(τ_abs[i_band], 
                             params.absorption_params.luts[i_band][molec_i], 
                             params.spec_bands[i_band],
@@ -250,16 +262,17 @@ function model_from_parameters(#::FwdMode,
                     end
                 end
             end
+            # Variable abundance molecules
             if !isempty(params.absorption_params.variable_molecules[i_band])
-                # variable abundance molecules
-                for molec_i in 1:length(params.absorption_params.variable_molecules[i_band])                
-                # This can be precomputed as well later in my mind, providing an absorption_model or an interpolation_model!
+                for molec_i in 1:length(params.absorption_params.variable_molecules[i_band])
+                    jac_idx = molec_i + 1 # jacobian index for variable abundance molecules
+                    # This can be precomputed as well later in my mind, providing an absorption_model or an interpolation_model!
                     if isempty(params.absorption_params.luts)
                         # Obtain hitran data for this molecule
                         @timeit "Read HITRAN" hitran_data = 
                             read_hitran(artifact(params.absorption_params.variable_molecules[i_band][molec_i]), iso=1)
-
                         println("Computing profile for $(params.absorption_params.variable_molecules[i_band][molec_i]) with vmr $(profile.vmr[params.absorption_params.variable_molecules[i_band][molec_i]]) for band #$(i_band)")
+        
                         # Create absorption model with parameters beforehand now:
                         absorption_model = make_hitran_model(hitran_data, 
                             params.absorption_params.broadening_function, 
@@ -268,15 +281,20 @@ function model_from_parameters(#::FwdMode,
                             architecture = params.architecture, 
                             vmr = 0);#mean(profile.vmr[params.absorption_params.molecules[i_band][molec_i]]))
                         # Calculate absorption profile
-                        
-                        @timeit "Absorption Coeff"  compute_absorption_profile!(τ_abs[i_band], 
-                            absorption_model, 
-                            params.spec_bands[i_band],
-                            profile.vmr[params.absorption_params.variable_molecules[i_band][molec_i]], 
-                            profile);
+                        # TODO: write the following linearized function
+                        @timeit "Absorption Coeff"  compute_absorption_profile!(
+                                τ_abs[i_band], 
+                                τ̇_abs[i_band], 
+                                jac_idx,
+                                absorption_model, 
+                                params.spec_bands[i_band],
+                                profile.vmr[params.absorption_params.variable_molecules[i_band][molec_i]], 
+                                profile);
                     # Use LUT directly
                     else
-                        compute_absorption_profile!(τ_abs[i_band], 
+                        # TODO: write the following linearized function
+                        compute_absorption_profile!(τ_abs[i_band], τ̇_abs[i_band], 
+                            jac_idx,
                             params.absorption_params.luts[i_band][molec_i], 
                             params.spec_bands[i_band],
                             profile.vmr[params.absorption_params.variable_molecules[i_band][molec_i]], 
@@ -289,13 +307,15 @@ function model_from_parameters(#::FwdMode,
 
     # aerosol_optics[iBand][iAer]
     aerosol_optics = [Array{AerosolOptics}(undef, (n_aer)) for i=1:n_bands];
-        
+    lin_aerosol_optics = [Array{linAerosolOptics}(undef, (n_aer)) for i=1:n_bands];
+
     FT2 = isnothing(params.scattering_params) ? params.float_type : typeof(params.scattering_params.rt_aerosols[1].τ_ref)
     FT2 =  params.float_type 
 
     # τ_aer[iBand][iAer,iZ]        
     τ_aer = [zeros(FT2, n_aer, length(params.spec_bands[i]), length(profile.p_full)) for i=1:n_bands];
-
+    τ̇_aer = [zeros(FT2, n_aer, 6, length(params.spec_bands[i]), length(profile.p_full)) for i=1:n_bands];
+    # the 6 parameters include nᵣ, nᵢ, rₚ, σₚ, z₀, σ₀
     # Loop over aerosol type
     for i_aer=1:n_aer
 
@@ -319,7 +339,7 @@ function model_from_parameters(#::FwdMode,
                                         truncation_type, 
                                         params.scattering_params.r_max, 
                                         params.scattering_params.nquad_radius)       
-        k_ref          = compute_ref_aerosol_extinction(mie_model, params.float_type)
+        k_ref, k̇_ref   = compute_ref_aerosol_extinction(lin, mie_model, params.float_type)
 
         #params.scattering_params.rt_aerosols[i_aer].p₀, params.scattering_params.rt_aerosols[i_aer].σp
         # Loop over bands
@@ -338,7 +358,8 @@ function model_from_parameters(#::FwdMode,
                                             params.scattering_params.r_max, 
                                             params.scattering_params.nquad_radius)
                 # Compute raw (not truncated) aerosol optical properties (not needed in RT eventually) 
-                @timeit "Mie calc"  aerosol_optics_raw = compute_aerosol_optical_properties(mie_model, FT2);
+                @timeit "Mie calc"  aerosol_optics_raw, lin_aerosol_optics_raw = 
+                                compute_aerosol_optical_properties(lin, mie_model, FT2);
 
             else
                 # NOTE: in the following, the spectrum is ordered by increasing wavenumber. 
@@ -352,7 +373,8 @@ function model_from_parameters(#::FwdMode,
                                             params.scattering_params.r_max, 
                                             params.scattering_params.nquad_radius)
                 # Compute raw (not truncated) aerosol optical properties (not needed in RT eventually) 
-                @timeit "Mie calc"  aerosol_optics_raw_0 = compute_aerosol_optical_properties(mie_model_0, FT2);
+                @timeit "Mie calc"  aerosol_optics_raw_0, lin_aerosol_optics_raw_0 = 
+                                compute_aerosol_optical_properties(lin, mie_model_0, FT2);
 
                 mie_model_1    = make_mie_model(params.scattering_params.decomp_type, 
                                             mie_aerosol, 
@@ -362,7 +384,8 @@ function model_from_parameters(#::FwdMode,
                                             params.scattering_params.r_max, 
                                             params.scattering_params.nquad_radius)
                 # Compute raw (not truncated) aerosol optical properties (not needed in RT eventually) 
-                @timeit "Mie calc"  aerosol_optics_raw_1 = compute_aerosol_optical_properties(mie_model_1, FT2);
+                @timeit "Mie calc"  aerosol_optics_raw_1, lin_aerosol_optics_raw_1 = 
+                                compute_aerosol_optical_properties(lin, mie_model_1, FT2);
                 Nl = length(aerosol_optics_raw_1.greek_coefs.α)
                 Nl_ = length(aerosol_optics_raw_0.greek_coefs.α)
                 α = zeros(Nl)
@@ -371,6 +394,13 @@ function model_from_parameters(#::FwdMode,
                 δ = zeros(Nl)
                 ϵ = zeros(Nl)
                 ζ = zeros(Nl)
+
+                α̇ = zeros(4,Nl)
+                β̇ = zeros(4,Nl)
+                γ̇ = zeros(4,Nl)
+                δ̇ = zeros(4,Nl)
+                ϵ̇ = zeros(4,Nl)
+                ζ̇ = zeros(4,Nl)
                 
                 α[1:Nl_] = 0.5*(aerosol_optics_raw_0.greek_coefs.α[1:Nl_] + aerosol_optics_raw_1.greek_coefs.α[1:Nl_])
                 β[1:Nl_] = 0.5*(aerosol_optics_raw_0.greek_coefs.β[1:Nl_] + aerosol_optics_raw_1.greek_coefs.β[1:Nl_])
@@ -385,8 +415,23 @@ function model_from_parameters(#::FwdMode,
                 δ[1+Nl_:Nl] = 0.5*(aerosol_optics_raw_1.greek_coefs.δ[1+Nl_:Nl])
                 ϵ[1+Nl_:Nl] = 0.5*(aerosol_optics_raw_1.greek_coefs.ϵ[1+Nl_:Nl])
                 ζ[1+Nl_:Nl] = 0.5*(aerosol_optics_raw_1.greek_coefs.ζ[1+Nl_:Nl])
+
+                α̇[:,1:Nl_] = 0.5*(lin_aerosol_optics_raw_0.lin_greek_coefs.α̇[:,1:Nl_] + lin_aerosol_optics_raw_1.lin_greek_coefs.α̇[:,1:Nl_])
+                β̇[:,1:Nl_] = 0.5*(lin_aerosol_optics_raw_0.lin_greek_coefs.β̇[:,1:Nl_] + lin_aerosol_optics_raw_1.lin_greek_coefs.β̇[:,1:Nl_])
+                γ̇[:,1:Nl_] = 0.5*(lin_aerosol_optics_raw_0.lin_greek_coefs.γ̇[:,1:Nl_] + lin_aerosol_optics_raw_1.lin_greek_coefs.γ̇[:,1:Nl_])
+                δ̇[:,1:Nl_] = 0.5*(lin_aerosol_optics_raw_0.lin_greek_coefs.δ̇[:,1:Nl_] + lin_aerosol_optics_raw_1.lin_greek_coefs.δ̇[:,1:Nl_])
+                ϵ̇[:,1:Nl_] = 0.5*(lin_aerosol_optics_raw_0.lin_greek_coefs.ϵ̇[:,1:Nl_] + lin_aerosol_optics_raw_1.lin_greek_coefs.ϵ̇[:,1:Nl_])
+                ζ̇[:,1:Nl_] = 0.5*(lin_aerosol_optics_raw_0.lin_greek_coefs.ζ̇[:,1:Nl_] + lin_aerosol_optics_raw_1.lin_greek_coefs.ζ̇[:,1:Nl_])
+            
+                α̇[:,1+Nl_:Nl] = 0.5*(lin_aerosol_optics_raw_1.lin_greek_coefs.α̇[:,1+Nl_:Nl])
+                β̇[:,1+Nl_:Nl] = 0.5*(lin_aerosol_optics_raw_1.lin_greek_coefs.β̇[:,1+Nl_:Nl])
+                γ̇[:,1+Nl_:Nl] = 0.5*(lin_aerosol_optics_raw_1.lin_greek_coefs.γ̇[:,1+Nl_:Nl])
+                δ̇[:,1+Nl_:Nl] = 0.5*(lin_aerosol_optics_raw_1.lin_greek_coefs.δ̇[:,1+Nl_:Nl])
+                ϵ̇[:,1+Nl_:Nl] = 0.5*(lin_aerosol_optics_raw_1.lin_greek_coefs.ϵ̇[:,1+Nl_:Nl])
+                ζ̇[:,1+Nl_:Nl] = 0.5*(lin_aerosol_optics_raw_1.lin_greek_coefs.ζ̇[:,1+Nl_:Nl])
                 
                 greek_coeffs = GreekCoefs(α, β, γ, δ, ϵ, ζ)
+                lin_greek_coeffs = linGreekCoefs(α̇, β̇, γ̇, δ̇, ϵ̇, ζ̇)
                 ν_grid = [1e4/curr_band_λ[1], 1e4/curr_band_λ[end]] 
                 #@show 1e4/curr_band_λ[1], 1e4/curr_band_λ[end]
                 #@show aerosol_optics_raw_0.k, aerosol_optics_raw_1.k
@@ -401,7 +446,22 @@ function model_from_parameters(#::FwdMode,
                     k[i] = interp_linear_kext(1e4/curr_band_λ[i])
                     ω̃[i] = interp_linear_ksca(1e4/curr_band_λ[i])/k[i]
                 end
+                k̇ = zeros(4,length(curr_band_λ))
+                ω̃̇ = zeros(4,length(curr_band_λ))
+                for ctr=1:4
+                    k̇ext_grid = [lin_aerosol_optics_raw_0.k̇[ctr], lin_aerosol_optics_raw_1.k̇[ctr]]
+                    k̇sca_grid = [lin_aerosol_optics_raw_0.k̇[ctr]*lin_aerosol_optics_raw_0.ω̃̇[ctr], lin_aerosol_optics_raw_1.k̇[ctr]*lin_aerosol_optics_raw_1.ω̃̇[ctr]] 
+                    interp_linear_k̇ext = LinearInterpolation(ν_grid, k̇ext_grid)
+                    interp_linear_k̇sca = LinearInterpolation(ν_grid, k̇sca_grid)
+                    
+                    for i = 1:length(curr_band_λ)
+                        k̇[ctr,i] = interp_linear_k̇ext(1e4/curr_band_λ[i])
+                        ω̃̇[ctr,i] = interp_linear_k̇sca(1e4/curr_band_λ[i])/k̇[ctr,i]
+                    end
+                end
+
                 aerosol_optics_raw = AerosolOptics(greek_coefs=greek_coeffs, ω̃=ω̃, k=k, fᵗ=0.0)
+                lin_aerosol_optics_raw = linAerosolOptics(lin_greek_coefs=lin_greek_coeffs, ω̃̇=ω̃̇, k̇=k̇, ḟᵗ=zeros(FT2,4))
             end
             
             # Compute truncated aerosol optical properties (phase function and fᵗ), consistent with Ltrunc:
@@ -409,13 +469,15 @@ function model_from_parameters(#::FwdMode,
             #@show length(aerosol_optics_raw.greek_coefs.β), truncation_type.l_max
             
             if length(aerosol_optics_raw.greek_coefs.β) > truncation_type.l_max
-                aerosol_optics[i_band][i_aer] = Scattering.truncate_phase(truncation_type, 
-                                                    aerosol_optics_raw; reportFit=false)
+                aerosol_optics[i_band][i_aer], lin_aerosol_optics[i_band][i_aer] = 
+                    Scattering.truncate_phase(truncation_type, 
+                                aerosol_optics_raw, lin_aerosol_optics_raw; reportFit=false)
                 l_max_aer[i_aer, i_band] = truncation_type.l_max
                 #max_m[i_band] = Int(ceil(l_max[i_band] + 1)/2)                                 
             else
                 #@show truncation_type.l_max
                 aerosol_optics[i_band][i_aer] = aerosol_optics_raw
+                lin_aerosol_optics[i_band][i_aer] = lin_aerosol_optics_raw
                 l_max_aer[i_aer, i_band] = length(aerosol_optics_raw.greek_coefs.β)
                 #max_m[i_band] = Int(ceil(l_max[i_band] + 1)/2)
                 #@show max_m[i_band]
@@ -423,11 +485,27 @@ function model_from_parameters(#::FwdMode,
             #@show size(getAerosolLayerOptProp(1, c_aero.z₀, c_aero.σ₀, profile.p_half, profile.T))
             #@show size(aerosol_optics[i_band][i_aer].k), k_ref
             #@show size(τ_aer[i_band][i_aer,:,:])
+            # Compute aerosol optical thickness profile and its derivatives
+            τₚ, dτₚdz₀, dτₚdσ₀ = getAerosolLayerOptProp(lin, 1, c_aero.z₀, c_aero.σ₀, profile.p_half, profile.T)
+
             # Compute nAer aerosol optical thickness profiles
             τ_aer[i_band][i_aer,:,:] = 
                 (params.scattering_params.rt_aerosols[i_aer].τ_ref/k_ref) * 
                 aerosol_optics[i_band][i_aer].k *
-                (getAerosolLayerOptProp(1, c_aero.z₀, c_aero.σ₀, profile.p_half, profile.T))' 
+                τₚ' 
+            for ctr=1:4
+                τ̇_aer[i_band][i_aer,ctr,:,:] = 
+                    ((params.scattering_params.rt_aerosols[i_aer].τ_ref/k_ref) * 
+                    lin_aerosol_optics[i_band][i_aer].k̇[ctr,:] .- 
+                    (params.scattering_params.rt_aerosols[i_aer].τ_ref/k_ref^2) * 
+                    k̇_ref[ctr])*τₚ'
+            end
+            for ctr=5:6
+                τ̇_aer[i_band][i_aer,ctr,:,:] = 
+                    (params.scattering_params.rt_aerosols[i_aer].τ_ref/k_ref) * 
+                    aerosol_optics[i_band][i_aer].k *
+                    (ctr==5 ? dτₚdz₀' : dτₚdσ₀')
+            end
                              
             #@show size(τ_aer[i_band][i_aer,:,:])
             #@show params.scattering_params.rt_aerosols[i_aer].τ_ref
@@ -444,7 +522,7 @@ function model_from_parameters(#::FwdMode,
     # Check the floating-type output matches specified FT
 #@show size(ϖ_Cabannes), typeof(ϖ_Cabannes)
     # Return the model 
-    return vSmartMOM_Model(
+    return  vSmartMOM_Model(
                         max_m,
                         l_max,
                         params, 
@@ -457,13 +535,15 @@ function model_from_parameters(#::FwdMode,
                         τ_rayl, 
                         τ_aer, 
                         obs_geom, 
-                        profile)
+                        profile), 
+            vSmartMOM_Lin(τ̇_abs, τ̇_aer, lin_aerosol_optics)
 end
 
 #=
 Modified version for only elastic scattering using OCO's 
 operational full physics Rayleigh parameters
 =# 
+#=
 "Take the parameters specified in the vSmartMOM_Parameters struct, and calculate derived attributes into a vSmartMOM_Model" 
 function model_from_parameters(OCO::Bool, params::vSmartMOM_Parameters)
 
@@ -1400,3 +1480,4 @@ function loadAbsco(file; scale=(1.0))
     ν = absco["Wavenumber"][:]
     return Absorption.AbscoTable(parse(Int,mol), -1, ν, σ, p, T )
 end
+=#

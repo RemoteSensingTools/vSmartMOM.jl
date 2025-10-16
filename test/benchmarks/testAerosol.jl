@@ -15,14 +15,37 @@ using vSmartMOM.CoreRT
 using vSmartMOM.InelasticScattering
 using vSmartMOM.SolarModel
 # Benchmarks: http://web.gps.caltech.edu/~vijay/Rayleigh_Scattering_Tables/STOKES/
-##
 
+SSI = 0.7 #"nm"
+FWHM = 1.93
+FWHM_gaussian = 0.65 #, # Instead of 0.65!
+lower_wavelength = 2036.0
+upper_wavelength = 2372.0
+##########################
+##### Solar spectrum #####
+##########################
+#=Tsolar = solar_transmission_from_file("/home/sanghavi/code/github/vSmartMOM.jl/src/SolarModel/solar.out")
+Tsolar_interp = LinearInterpolation(Tsolar[4:end, 1], Tsolar[4:end, 2])
+T_sun = 5777. # K
+ν = collect(1e7 ./ (lower_wavelength:SSI:upper_wavelength))  # cm⁻¹
+P = planck_spectrum_wn(T_sun, ν) * 2.1629e-05 * π  # mW/m²-cm⁻¹
+F₀ = zeros(length(P));
+F₀ = Tsolar_interp.(ν) .* P;
+=#
+
+
+# defining vSmartMOM modes to be used in the following
+fwd_mode = FwdMode() #vSmartMOM.CoreRT.Mode.FwdMode()
+lin_mode = LinMode() #vSmartMOM.CoreRT.Mode.LinMode() 
 # Load YAML files into parameter struct
 #parameters = 
 #    parameters_from_yaml("test/test_parameters/FraunhoferMockParameters.yaml");
+
+
 parameters = 
-    parameters_from_yaml("test/test_parameters/aerosol_parameters.yaml");
-model      = model_from_parameters(parameters);
+    parameters_from_yaml("test/test_parameters/aerosol_parameters2.yaml");
+model      = model_from_parameters(#fwd_mode, 
+    parameters);
 
 n_bands = length(parameters.spec_bands)
 n_aer = isnothing(parameters.scattering_params) ? 0 : length(parameters.scattering_params.rt_aerosols)
@@ -47,6 +70,9 @@ FT2 = isnothing(parameters.scattering_params) ? parameters.float_type : typeof(p
 # τ_aer[iBand][iAer,iZ]
 τ_aer = [zeros(FT2, n_aer, length(profile.p_full)) for i=1:n_bands];
 
+kλ_ref = zeros(FT2, n_aer)  # Extinction cross-section at reference wavelength for each aerosol type
+kλ     = zeros(FT2, n_aer, n_bands)  # Extinction cross-section at band wavelengths for each aerosol type
+ϖλ     = zeros(FT2, n_aer, n_bands)  # Single scattering albedo at band wavelengths for each aerosol type
 # Loop over aerosol type
 for i_aer=1:n_aer
 
@@ -71,7 +97,7 @@ for i_aer=1:n_aer
                                     parameters.scattering_params.r_max, 
                                     parameters.scattering_params.nquad_radius)       
     k_ref          = vSmartMOM.Scattering.compute_ref_aerosol_extinction(mie_model, parameters.float_type)
-
+    kλ_ref[i_aer] = k_ref
     #parameters.scattering_params.rt_aerosols[i_aer].p₀, parameters.scattering_params.rt_aerosols[i_aer].σp
     # Loop over bands
     for i_band=1:n_bands
@@ -91,23 +117,145 @@ for i_aer=1:n_aer
         # Compute raw (not truncated) aerosol optical properties (not needed in RT eventually) 
         # @show FT2
         aerosol_optics_raw = vSmartMOM.Scattering.compute_aerosol_optical_properties(mie_model, FT2);
-
+        kλ[i_aer, i_band] = aerosol_optics_raw.k
+        ϖλ[i_aer, i_band] = aerosol_optics_raw.ω̃
         # Compute truncated aerosol optical properties (phase function and fᵗ), consistent with Ltrunc:
         #@show i_aer, i_band
-        aerosol_optics[i_band][i_aer] = vSmartMOM.Scattering.truncate_phase(truncation_type, 
-                                                aerosol_optics_raw; reportFit=false)
+        ###aerosol_optics[i_band][i_aer] = vSmartMOM.Scattering.truncate_phase(truncation_type, aerosol_optics_raw; reportFit=false)
 
         # Compute nAer aerosol optical thickness profiles
-        τ_aer[i_band][i_aer,:] = 
-            parameters.scattering_params.rt_aerosols[i_aer].τ_ref * 
-            (aerosol_optics[i_band][i_aer].k/k_ref) * 
-            vSmartMOM.CoreRT.getAerosolLayerOptProp(1, c_aero.p₀, c_aero.σp, profile.p_half)
-        @show vSmartMOM.CoreRT.getAerosolLayerOptProp(1, c_aero.p₀, c_aero.σp, profile.p_half)
-        @show aerosol_optics[i_band][i_aer].k, k_ref
-        @show τ_aer[i_band][i_aer,:]
-        @show parameters.scattering_params.rt_aerosols[i_aer].τ_ref
+        #τ_aer[i_band][i_aer,:] = 
+        #    parameters.scattering_params.rt_aerosols[i_aer].τ_ref * 
+        #    (aerosol_optics[i_band][i_aer].k/k_ref) * 
+        #    vSmartMOM.CoreRT.getAerosolLayerOptProp(1, c_aero.p₀, c_aero.σp, profile.p_half)
+        #@show vSmartMOM.CoreRT.getAerosolLayerOptProp(1, c_aero.p₀, c_aero.σp, profile.p_half)
+        #@show aerosol_optics[i_band][i_aer].k, k_ref
+        #@show τ_aer[i_band][i_aer,:]
+        #@show parameters.scattering_params.rt_aerosols[i_aer].τ_ref
     end 
 end
+
+wl = [770., 885., 1000., 1250., 1500., 1750., 2000., 2036., 2120., 2204., 2288., 2372.]
+τ_all = cat(0.3*ones(5,1), 0.3*kλ./kλ_ref, dims=2)
+lstyle = [:solid, :solid, :dash, :dash, :dash]
+
+# Interpolate linearly or with a cubic spline
+
+wl_fine = collect(770:10:2340)
+τ_fine = zeros(5,length(wl_fine)) 
+for ctr = 1:size(τ_all,1)
+    itp = interpolate((wl,), τ_all[ctr, :], Gridded(Linear()))
+    τ_fine[ctr, :] .= itp.(wl_fine)
+end
+
+
+
+
+
+
+using Makie
+using CairoMakie
+using Colors
+
+# Make a figure
+
+#aer_type = ["water", "sulphate", "sea salt", "mineral dust", "organic"]
+aer_type2 = [L"$r_g =0.08\,\mu$m, $\sigma_g=1.6$", L"$r_g =0.13\,\mu$m, $\sigma_g=1.6$", L"$r_g =0.08\,\mu$m, $\sigma_g=1.3$", L"$r_g =0.13\,\mu$m, $\sigma_g=1.3$", L"$r_g =0.20\,\mu$m, $\sigma_g=1.3$"]
+
+#=plt_colors = [
+    RGB(0.230, 0.299, 0.754),   # deep blue
+    RGB(0.865, 0.118, 0.118),   # crimson red
+    RGB(0.000, 0.682, 0.341),   # emerald green
+    RGB(0.992, 0.753, 0.235),   # golden yellow
+    RGB(0.415, 0.239, 0.603)    # violet purple
+]=#
+plt_colors = [
+    :orange,   # deep blue
+    :forestgreen,   # crimson red
+    :orange,   # emerald green
+    :forestgreen,   # golden yellow
+    :royalblue    # violet purple
+]
+
+f = Figure(resolution=(800, 600))
+ax = Axis(f[1, 1], title="Aerosol within the Carbon-I spectral band (τ at 770 nm = 0.3)",
+          xlabel="Wavelength [nm]", ylabel="AOD, τ",
+          xticks = ([770., 2036., 2204., 2372.], ["770", "2036", "2204", "2372"]))
+
+# Plot each row
+for i=1:size(τ_all, 1)
+    lines!(
+    ax,
+    wl_fine[:],
+    τ_fine[i, :];
+    color = plt_colors[i],
+    linestyle = lstyle[i],
+    linewidth = 3,
+    label = aer_type2[i],
+    alpha = 1.0
+)
+    #lines!(ax, wl_fine[:], τ_fine[i,:], linecolor = plt_colors[i], linestyle=lstyle[i], linewidth=3; label=aer_type2[i])#, alpha=0.3)
+    #lines!(ax, wl[8:end], τ_all[i, 8:end], interpolate=true, linecolor = plt_colors[i], linestyle=lstyle[i], label=aer_type2[i], linewidth=2)
+end
+
+axislegend(ax, position=:rt)
+
+f
+save("tau_vs_wl_21_new.png", f)
+
+f = Figure(resolution=(800, 600))
+ax = Axis(f[1, 1], title="Aerosol within the Carbon-I spectral band (τ at 770 nm = 0.3)",
+          xlabel="Wavelength [nm]", ylabel="AOD, τ",
+          xticks = ([770., 2036., 2204., 2372.], ["770", "2036", "2204", "2372"]))
+
+for i=1:size(τ_all, 1)
+    #lines!(ax, wl_fine[:], τ_fine[i,:], linecolor = plt_colors[i], linestyle=lstyle[i], linewidth=3, alpha=0.3)
+    #lines!(ax, wl[8:end], τ_all[i, 8:end], interpolate=true, linecolor = plt_colors[i], linestyle=lstyle[i], label=aer_type2[i], linewidth=3)
+    lines!(
+    ax,
+    wl_fine[:],
+    τ_fine[i, :];
+    color = plt_colors[i],
+    linestyle = lstyle[i],
+    linewidth = 3,
+    label = aer_type2[i],
+    alpha = 0.3)
+
+    lines!(
+    ax,
+    wl[8:end],
+    τ_all[i, 8:end];
+    color = plt_colors[i],
+    linestyle = lstyle[i],
+    linewidth = 3,
+    alpha = 1.0)
+end
+
+axislegend(ax, position=:rt)
+
+f
+save("tau_vs_wl_22_new.png", f)
+
+
+f = Figure(resolution=(800, 600))
+ax = Axis(f[1, 1], title="Aerosol within the Carbon-I spectral band",
+          xlabel="Wavelength [nm]", ylabel="SSA, ϖ")
+
+#aer_type = ["water", "sulphate", "sea salt", "mineral dust", "organic"]
+aer_type2 = [L"$r_g =0.08\,\mu$m, $\sigma_g=1.6$", L"$r_g =0.13\,\mu$m, $\sigma_g=1.6$", L"$r_g =0.08\,\mu$m, $\sigma_g=1.3$", L"$r_g =0.13\,\mu$m, $\sigma_g=1.3$", L"$r_g =0.20\,\mu$m, $\sigma_g=1.3$"]
+
+# Plot each row
+for i=1:size(τ_all, 1)
+    lines!(ax, wl[2:end], ϖλ[i, :], linestyle=lstyle[i], label=aer_type2[i], linewidth=2)
+end
+
+axislegend(ax, position=:lb)
+
+f
+save("ssa_vs_wl_2.png", f)
+
+
+
 
 
 iBand = 1

@@ -47,6 +47,8 @@ import Base.show                   # For overloading show for custom types
 # Constants and Types
 include("constants.jl")                        # Scientific constants
 include("types.jl")  
+include("types_lin.jl")                    # Types for linearized RT
+
 
 # All custom types for this module
 # Raman additions
@@ -56,38 +58,48 @@ include("types.jl")
 
 # Solvers
 include("CoreKernel/elemental.jl")             # Elemental 
+include("CoreKernel/elemental_lin.jl") 
 include("CoreKernel/elemental_inelastic.jl")   # Elemental for inelastic scattering
 include("CoreKernel/elemental_inelastic_plus.jl")   # Elemental for inelastic scattering
 include("CoreKernel/doubling.jl")              # Doubling
+include("CoreKernel/doubling_lin.jl") 
 include("CoreKernel/doubling_inelastic.jl")    # Doubling for elastic + inelastic scattering 
 include("CoreKernel/interaction.jl")           # Interaction
+include("CoreKernel/interaction_lin.jl") 
 include("CoreKernel/interaction_inelastic.jl") # Interaction for elastic + inelastic scattering 
 include("CoreKernel/interaction_multisensor.jl") # Suniti: ms
 include("CoreKernel/interaction_ss.jl") #for single scattering contribution only
 include("CoreKernel/interlayer_flux.jl")       # Suniti: ms
 include("CoreKernel/rt_kernel.jl")             # Handle Core RT (Elemental/Doubling/Interaction)
+include("CoreKernel/rt_kernel_lin.jl")
 include("CoreKernel/rt_kernel_ss.jl")          # Single scattering only: Handle Core RT (Elemental/Doubling/Interaction)
 include("CoreKernel/rt_kernel_multisensor.jl") # Suniti: ms
+include("CoreKernel/lin_added_layer_all_params.jl") # 3 parameters -> all parameters
 include("postprocessing_vza.jl")               # Postprocess (Azimuthal Weighting)
+include("postprocessing_vza_lin.jl") 
 include("postprocessing_vza_ms.jl")
 include("rt_run.jl")                           # Starting point for RT 
+include("rt_run_lin.jl")                        
 include("rt_run_multisensor.jl")  
 # GPU
 include("gpu_batched.jl")                   # Batched operations
 
 # Utilities / Helper Functions
 include("atmo_prof.jl")                     # Helper Functions for Handling Atmospheric Profiles
+include("atmo_prof_lin.jl")
 include("rt_helper_functions.jl")           # Miscellaneous Utility Functions
+include("rt_helper_functions_lin.jl") 
 include("rt_set_streams.jl")                # Set streams before RT
 include("parameters_from_yaml.jl")          # Loading in parameters from YAML file
 include("model_from_parameters.jl")         # Converting parameters to derived model attributes
+include("lin_model_from_parameters.jl")
 include("show_utils.jl")                    # Pretty-printing objects
 include("LayerOpticalProperties/compEffectiveLayerProperties.jl")
+include("LayerOpticalProperties/compEffectiveLayerProperties_lin.jl")
 
 # Surfaces
 include("lambertian_surface.jl")            # Lambertian Surface 
-
-
+include("lambertian_surface_lin.jl") 
 
 
 # Functions to export
@@ -95,7 +107,8 @@ export parameters_from_yaml,                # Getting parameters from a file
        model_from_parameters,               # Converting the parameters to model 
        rt_run, rt_run_ss,                             # Run the RT code
        default_parameters                   # Set of default parameters
-
+export lin_added_layer_all_params  # 3 parameters -> all parameters 
+                   # vSmartMOM Modes
 # Export types to show easily
 export GaussQuadFullSphere, LambertianSurfaceScalar, LambertianSurfaceSpectrum
 

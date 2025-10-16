@@ -4,6 +4,12 @@
 radiative_transfer: 
   # Spectral bands (list of ν_start:ν_step:ν_end, in cm⁻¹)
   spec_bands:
+    - "1e7/885.0:1e7/885.0"
+    - "1e7/1000.0:1e7/1000.0" 
+    - "1e7/1250.0:1e7/1250.0" 
+    - "1e7/1500.0:1e7/1500.0" 
+    - "1e7/1750.0:1e7/1750.0" 
+    - "1e7/2000.0:1e7/2000.0" 
     - "1e7/2036.0:1e7/2036.0" 
     - "1e7/2120.0:1e7/2120.0" 
     - "1e7/2204.0:1e7/2204.0" 
@@ -159,42 +165,42 @@ scattering:
   aerosols:       
   # water
     - τ_ref:          0.3 #12 #0.0000001 #0.13 #5 #0.16 #0.0000001           # Reference τ
-      μ:              0.01 #1.3           # Log mean radius (µm)
+      μ:              0.08 #1.3           # Log mean radius (µm)
       σ:              0.47 #log(1.6) #1.3 #1.12 #2.0           # Log stddev of radius (µm)
-      nᵣ:             1.333           # Real part of refractive index
-      nᵢ:             0.0000001    # Imag part of refractive index
+      nᵣ:             1.37           # Real part of refractive index
+      nᵢ:             0.001    # Imag part of refractive index
       z₀:             3.         # Pressure peak (hPa)
       σ₀:             1.2          # Pressure peak width (hPa)
   # sulphate (NH4SO4)
     - τ_ref:          0.3 #12 #0.0000001 #0.13 #5 #0.16 #0.0000001           # Reference τ
-      μ:              0.05 #0.01 #1.3           # Log mean radius (µm)
+      μ:              0.13 #0.01 #1.3           # Log mean radius (µm)
       σ:              0.47 #log(1.6) #1.3 #1.12 #2.0           # Log stddev of radius (µm)
-      nᵣ:             1.53           # Real part of refractive index
-      nᵢ:             0.0000001    # Imag part of refractive index
+      nᵣ:             1.37           # Real part of refractive index
+      nᵢ:             0.001    # Imag part of refractive index
       z₀:             3.0         # Pressure peak (hPa)
       σ₀:             1.2          # Pressure peak width (hPa)
-  # sea salt  
+   # mineral dust
     - τ_ref:          0.3 #12 #0.0000001 #0.13 #5 #0.16 #0.0000001           # Reference τ
-      μ:              1. #0.01 #1.3           # Log mean radius (µm)
-      σ:              0.59 #log(1.8) #1.3 #1.12 #2.0           # Log stddev of radius (µm)
-      nᵣ:             1.5           # Real part of refractive index
-      nᵢ:             0.0000001    # Imag part of refractive index
-      z₀:             3.0         # Pressure peak (hPa)
-      σ₀:             1.2          # Pressure peak width (hPa)
-  # mineral dust
-    - τ_ref:          0.3 #12 #0.0000001 #0.13 #5 #0.16 #0.0000001           # Reference τ
-      μ:              0.15 #0.01 #1.3           # Log mean radius (µm)
-      σ:              0.41 #log(1.5) #1.3 #1.12 #2.0           # Log stddev of radius (µm)
-      nᵣ:             1.53           # Real part of refractive index
-      nᵢ:             0.005    # Imag part of refractive index
+      μ:              0.08 #0.01 #1.3           # Log mean radius (µm)
+      σ:              0.26 #log(1.5) #1.3 #1.12 #2.0           # Log stddev of radius (µm)
+      nᵣ:             1.81           # Real part of refractive index
+      nᵢ:             0.001    # Imag part of refractive index
       z₀:             3.0         # Pressure peak (hPa)
       σ₀:             1.2          # Pressure peak width (hPa)
   # organic aerosol (brown)
     - τ_ref:          0.3 #12 #0.0000001 #0.13 #5 #0.16 #0.0000001           # Reference τ
-      μ:              0.05 #0.01 #1.3           # Log mean radius (µm)
-      σ:              0.47 #log(1.6) #1.3 #1.12 #2.0           # Log stddev of radius (µm)
-      nᵣ:             1.55           # Real part of refractive index
-      nᵢ:             0.01    # Imag part of refractive index
+      μ:              0.13 #0.01 #1.3           # Log mean radius (µm)
+      σ:              0.26 #log(1.6) #1.3 #1.12 #2.0           # Log stddev of radius (µm)
+      nᵣ:             1.81           # Real part of refractive index
+      nᵢ:             0.001    # Imag part of refractive index
+      z₀:             3.0         # Pressure peak (hPa)
+      σ₀:             1.2          # Pressure peak width (hPa)
+  # sea salt  
+    - τ_ref:          0.3 #12 #0.0000001 #0.13 #5 #0.16 #0.0000001           # Reference τ
+      μ:              0.20 #1. #0.01 #1.3           # Log mean radius (µm)
+      σ:              0.26 #log(1.8) #1.3 #1.12 #2.0           # Log stddev of radius (µm)
+      nᵣ:             1.81           # Real part of refractive index
+      nᵢ:             0.001    # Imag part of refractive index
       z₀:             3.0         # Pressure peak (hPa)
       σ₀:             1.2          # Pressure peak width (hPa)
   # Maximum aerosol particle radius for quadrature points/weights (µm)

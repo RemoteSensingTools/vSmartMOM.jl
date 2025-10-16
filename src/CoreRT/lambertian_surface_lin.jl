@@ -17,11 +17,12 @@ Computes (in place) surface optical properties for a (scalar) lambertian albedo 
     - `τ_sum` total optical thickness from TOA to the surface
     - `architecture` Compute architecture (GPU,CPU)
 """ 
-function create_surface_layer!(RS_type, 
+function create_surface_layer!(RS_type::noRS, 
                             lambertian::LambertianSurfaceScalar{FT}, 
-                            lambertian_lin::LambertianSurfaceScalarLin{FT}, 
+                            #lambertian_lin::LambertianSurfaceScalarLin{FT}, 
                             added_layer::AddedLayer,
                             added_layer_lin::AddedLayerLin,
+                            iparam::Int,
                             SFI,
                             m::Int,
                             pol_type,
@@ -30,14 +31,19 @@ function create_surface_layer!(RS_type,
                             architecture) where {FT}
     
     @unpack qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart, iμ₀, μ₀ = quad_points
-
+    @unpack n = pol_type
+    arr_type = array_type(architecture)
     
+    nparams = size(τ̇_sum,1) # nparams ≠ Nparams (in general)
+    nspec = length(τ_sum)
+@show nparams, nspec
+#@show iμ₀Nstart, iμ₀
     # Get size of added layer
     Nquad = size(added_layer.r⁻⁺,1) ÷ pol_type.n
-    tmp    = ones(pol_type.n*Nquad)
-    arr_type = array_type(architecture)
-    T_surf = arr_type(Diagonal(tmp))
-    
+    tmp = arr_type(ones(pol_type.n*Nquad))
+    T_surf = Diagonal(tmp)
+    i₀ = iμ₀Nstart:iμ₀Nstart+n-1
+    @show i₀
     if m == 0
         # Albedo normalized by π (and factor 2 for 0th Fourier Moment)
         ρ = 2lambertian.albedo#/FT(π)
@@ -45,46 +51,67 @@ function create_surface_layer!(RS_type,
         R_surf = Array(Diagonal(vcat(ρ, zeros(FT,pol_type.n-1))))
         R_surf = repeat(R_surf',Nquad)
         R_surf = repeat(R_surf',Nquad)
+        Ṙ_surf = Array(Diagonal(vcat(2.0, zeros(FT,pol_type.n-1))))
+        Ṙ_surf = repeat(Ṙ_surf',Nquad)
+        Ṙ_surf = repeat(Ṙ_surf',Nquad)
+        #Ṙ_surf = Array{FT}(undef, Nparams, size(R_surf,1), size(R_surf,2))
+        #Ṙ_surf[end,:,:] .= Ṙ_surf_tmp
+        
         
         # Move to architecture:
         R_surf = arr_type(R_surf)
-
+        Ṙ_surf = arr_type(Ṙ_surf)
         
         # Source function of surface:
         if SFI
-            unweight = FT(2*π) #this is multiplied to all non-solar, isotropic source functions to exclude them from the azimuthal weighting applied in the postprocessing step
+            unweight = FT(2π) #this is multiplied to all non-solar, isotropic source functions to exclude them from the azimuthal weighting applied in the postprocessing step
             F₀_NquadN = arr_type(zeros(length(qp_μN),length(τ_sum)));
+            Ḟ₀_NquadN = arr_type(zeros(nparams+1,length(qp_μN),length(τ_sum)));
             #F₀_NquadN[:] .=0;
             #@show size(F₀), size(μ₀), size(R_surf), size(F₀_NquadN), size(added_layer.J₀⁻[:,1,:]), size(F₀ .* (exp.(-τ_sum/μ₀))'), size(F₀_NquadN[iμ₀Nstart:pol_type.n*iμ₀,:])
             #@show iμ₀Nstart, pol_type.n*iμ₀
             #@show size(F₀_NquadN[iμ₀Nstart:pol_type.n*iμ₀,:]), size(F₀), size(exp.(-τ_sum/μ₀)')
-            F₀_NquadN[iμ₀Nstart:pol_type.n*iμ₀,:] .= (F₀ .* (exp.(-τ_sum/μ₀))');
-            
-            added_layer.J₀⁺[:,1,:] .= 0.;#
+            tmpF = (F₀ .* arr_type(exp.(-τ_sum/μ₀))');
+            F₀_NquadN[i₀,:] .= tmpF 
+            #@show size(Ḟ₀_NquadN[:,i₀,:]), size(-reshape(tmpF,1,n,nspec).*reshape(τ̇_sum,nparams, 1, nspec)/μ₀)
+            Ḟ₀_NquadN[1:nparams,i₀,:] .= -reshape(tmpF,1,n,nspec).*reshape(τ̇_sum, nparams, 1, nspec)/μ₀ # , arr_type(zeros(1, n, nspec)); dims=1)
+
+            added_layer.J₀⁺[:,:,:] .= 0.;#
             added_layer.J₀⁻[:,1,:] .= μ₀*(R_surf*F₀_NquadN)#/FT(π);
-            #@show size(added_layer.J₀⁻[:,1,1])
+            #added_layer_lin.J̇₀⁺[:,:,:,:] .= 0.;#
+            
+
+            added_layer_lin.ap_J̇₀⁺[:,:,1,:] .= 0.0
+            for ii=1:nspec
+                for ctr=1:nparams
+                    added_layer_lin.ap_J̇₀⁻[ctr,:,1,ii] .= μ₀*R_surf*Ḟ₀_NquadN[ctr,:,ii]#/FT(π);
+                end
+                added_layer_lin.ap_J̇₀⁻[iparam,:,1,ii]  .= μ₀*Ṙ_surf[:,:]*F₀_NquadN[:,ii]#/FT(π);
+            end    
+                #@show size(added_layer.J₀⁻[:,1,1])
         #@show added_layer.J₀⁻[:,1,1]
         # for SIF
-            #added_layer.J₀⁻[:,1,:] .+= 0.029253057154967992./qp_μN # 0.023795309767477988./qp_μN #
-            # added_layer.J₀⁻[:,1,:] .+= 10.5./qp_μN #8.66./qp_μN #
-            added_layer.J₀⁻[:,1,:] .+= (1/π)*repeat(arr_type(RS_type.SIF₀),Nquad) * unweight
-        #@show added_layer.J₀⁻[:,1,1]
-            #added_layer.J₀⁻[:,1,:] = 
-            #    μ₀*(R_surf[iμ₀Nstart:pol_type.n*iμ₀, iμ₀Nstart:pol_type.n*iμ₀]*
-            #    F₀) .* exp.(-τ_sum/μ₀)';
-            # added_layer.J₀⁺[:,1,:] .= I₀_NquadN .* exp.(-τ_sum/μ₀)';
-            # added_layer.J₀⁻[:,1,:] = μ₀*(R_surf*I₀_NquadN) .* exp.(-τ_sum/μ₀)';
+            #reinstate the following line after linearization works
+            #added_layer.J₀⁻[:,1,:] .+= (1/π)*repeat(arr_type(RS_type.SIF₀),Nquad) * unweight
         end
 
         R_surf = R_surf * Diagonal(qp_μN.*wt_μN)
+        Ṙ_surf[:,:] = Ṙ_surf[:,:] * Diagonal(qp_μN.*wt_μN)
+        
         #R_surf = 2R_surf * Diagonal(qp_μN.*wt_μN)
         #R_surf = R_surf * Diagonal(qp_μN.*wt_μN)/π
 
         #@show size(added_layer.r⁻⁺), size(R_surf), size(added_layer.J₀⁻)
+@show size(added_layer.r⁻⁺), size(R_surf)
         added_layer.r⁻⁺ .= R_surf;
         added_layer.r⁺⁻ .= 0;
         added_layer.t⁺⁺ .= T_surf;#1. #0.0; #T_surf;
         added_layer.t⁻⁻ .= 0.0; #T_surf;
+
+        added_layer_lin.ap_ṙ⁻⁺[iparam,:,:,:] .= Ṙ_surf;
+        added_layer_lin.ap_ṙ⁺⁻ .= 0.0;
+        added_layer_lin.ap_ṫ⁺⁺ .= 0.0;#1. #0.0; #T_surf;
+        added_layer_lin.ap_ṫ⁻⁻ .= 0.0; #T_surf;
 
     else
         added_layer.r⁻⁺ .= 0;
@@ -93,31 +120,31 @@ function create_surface_layer!(RS_type,
         added_layer.t⁻⁻ .= 0.0; #T_surf;
         added_layer.J₀⁺ .= 0;
         added_layer.J₀⁻ .= 0;
+
+        added_layer_lin.ap_ṙ⁻⁺ .= 0.0;
+        added_layer_lin.ap_ṙ⁺⁻ .= 0.0;
+        added_layer_lin.ap_ṫ⁺⁺ .= 0.0;#1. #0.0; #T_surf;
+        added_layer_lin.ap_ṫ⁻⁻ .= 0.0;
+        added_layer_lin.ap_J̇₀⁺ .= 0.0
+        added_layer_lin.ap_J̇₀⁻ .= 0.0
     end
     #@show size(T_surf), size(R_surf)
     #@show T_surf
     #@show R_surf
-    #bla
-    if !(typeof(RS_type)<:noRS)
-        added_layer.ier⁻⁺ .= 0;
-        added_layer.ier⁻⁺ .= 0;
-        added_layer.iet⁺⁺ .= 0.0; #T_surf;
-        added_layer.iet⁻⁻ .= 0.0; #T_surf;
-        added_layer.ieJ₀⁺ .= 0;
-        added_layer.ieJ₀⁻ .= 0;
-    end
+    synchronize_if_gpu()
 end
 
-function create_surface_layer!(RS_type, 
+#=
+function create_surface_layer!(RS_type::no_RS, 
         lambertian::LambertianSurfaceLegendre{FT}, 
-        lambertian_lin::LambertianSurfaceLegendreLin{FT}, 
+        #lambertian_lin::LambertianSurfaceLegendreLin{FT}, 
         added_layer::AddedLayer,
         added_layer_lin::AddedLayerLin,
         SFI,
         m::Int,
         pol_type,
         quad_points,
-        τ_sum, F₀,
+        τ_sum, τ̇_sum, F₀,
         architecture) where {FT}
     FT2 = Float64
     
@@ -188,12 +215,6 @@ function create_surface_layer!(RS_type,
         added_layer.J₀⁺[:] .= 0;
         added_layer.J₀⁻[:] .= 0;
     end
-    if !(typeof(RS_type)<:noRS)
-        added_layer.ier⁻⁺[:] .= 0;
-        added_layer.ier⁻⁺[:] .= 0;
-        added_layer.iet⁺⁺[:] .= 0.0; #T_surf;
-        added_layer.iet⁻⁻[:] .= 0.0; #T_surf;
-        added_layer.ieJ₀⁺[:] .= 0;
-        added_layer.ieJ₀⁻[:] .= 0;
-    end
+    synchronize_if_gpu()
 end
+=#

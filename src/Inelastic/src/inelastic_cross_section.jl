@@ -51,7 +51,8 @@ function compute_σ_Rayl_VibRaman_coeff_hires!(T, mol::MolecularConstants{FT}; J
         # Rayleigh
         vi = 0
         vf = 0 
-        Ni_by_N = exp(-h*c*E_vJ[vi,Ji]/(k_B*T))  
+        #Ni_by_N = exp(-h*c*E_vJ[vi,Ji]/(k_B*T))  
+        Ni_by_N = exp(-h*c*E_vJ[0,Ji]/(k_B*T)) + exp(-h*c*E_vJ[1,Ji]/(k_B*T)) + exp(-h*c*E_vJ[2,Ji]/(k_B*T)) 
         γ_C = 3/(4+45(α̅/(b_JJ*γ̅))^2)
         Z_pf += g_N * (2Ji+1) * (exp(-h*c*E_vJ[0,Ji]/(k_B*T)) + exp(-h*c*E_vJ[1,Ji]/(k_B*T))) #accounting for both the ground- and the first excited vibrational state - depending on the ambient temperature (e.g. on hot exoplanets), more states may have to be accounted for   
         # Molecular energy level

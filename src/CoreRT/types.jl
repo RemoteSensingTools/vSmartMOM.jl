@@ -16,6 +16,10 @@ This file contains all types that are used in the vSmartMOM module:
 
 =#
 
+# abstract type RT_Mode end # defining abstract type to distinguish between forward and linearized modes
+# struct FwdMode <: RT_Mode end # forward model only
+# struct LinMode <: RT_Mode end # forward model with linearization
+
 "Struct for an atmospheric profile"
 struct AtmosphericProfile{FT, VMR <: Union{Real, Vector}}
     "Temperature Profile"
@@ -327,7 +331,9 @@ A struct which holds all absorption-related parameters (before any computations)
 """
 mutable struct AbsorptionParameters
     "Molecules to use for absorption calculations (`nBand, nMolecules`)"
-    molecules::AbstractArray
+    fixed_molecules::AbstractArray # species with constant abundances, e.g. O2, N2, CO2
+    variable_molecules::AbstractArray # species with variable abundances, e.g. H2O, CH4, CO2
+    #molecules::AbstractArray
     "Volume-Mixing Ratios"
     vmr::Dict
     "Type of broadening function (Doppler/Lorentz/Voigt)"
@@ -603,26 +609,26 @@ end
 abstract type AbstractOpticalProperties end
 
 # Core optical Properties COP
-Base.@kwdef struct CoreScatteringOpticalProperties{FT,FT2,FT3} <:  AbstractOpticalProperties
+Base.@kwdef struct CoreScatteringOpticalProperties{FT} <:  AbstractOpticalProperties
     "Absorption optical depth (scalar or wavelength dependent)"
-    τ::FT 
+    τ::Union{FT, AbstractArray{FT,1}}
     "Single scattering albedo"
-    ϖ::FT2   
+    ϖ::Union{FT, AbstractArray{FT,1}}
     "Z scattering matrix (forward)"
-    Z⁺⁺::FT3 
+    Z⁺⁺::Union{AbstractArray{FT,3}, AbstractArray{FT,2}}
     "Z scattering matrix (backward)"
-    Z⁻⁺::FT3
+    Z⁻⁺::Union{AbstractArray{FT,3}, AbstractArray{FT,2}}
 end
 
 Base.@kwdef struct CoreAbsorptionOpticalProperties{FT} <:  AbstractOpticalProperties
     "Absorption optical depth (scalar or wavelength dependent)"
-    τ::FT 
+    τ::Union{FT, AbstractArray{FT,1}} 
 end
 
 # Adding Core Optical Properties, can have mixed dimensions!
-function Base.:+( x::CoreScatteringOpticalProperties{xFT, xFT2, xFT3}, 
-                  y::CoreScatteringOpticalProperties{yFT, yFT2, yFT3} 
-                ) where {xFT, xFT2, xFT3, yFT, yFT2, yFT3} 
+function Base.:+( x::CoreScatteringOpticalProperties{FT}, # {xFT, xFT2, xFT3}, 
+                  y::CoreScatteringOpticalProperties{FT} #{yFT, yFT2, yFT3} 
+                ) where FT #{xFT, xFT2, xFT3, yFT, yFT2, yFT3} 
     # Predefine some arrays:            
     xZ⁺⁺ = x.Z⁺⁺
     xZ⁻⁺ = x.Z⁻⁺

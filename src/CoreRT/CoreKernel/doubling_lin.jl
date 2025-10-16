@@ -15,7 +15,7 @@ function doubling_helper!(pol_type,
                           expk, expk_lin,
                           ndoubl::Int, 
                           added_layer::AddedLayer,
-                          added_layer::AddedLayerLin,
+                          added_layer_lin::AddedLayerLin,
                           I_static::AbstractArray{FT}, 
                           architecture) where {FT}
 
@@ -24,6 +24,7 @@ function doubling_helper!(pol_type,
     @unpack ṙ⁺⁻, ṙ⁻⁺, ṫ⁻⁻, ṫ⁺⁺, J̇₀⁺, J̇₀⁻ = added_layer_lin
     # Device architecture
     dev = devi(architecture)
+    arr_type = array_type(architecture)
 
     # Note: short-circuit evaluation => return nothing evaluated iff ndoubl == 0 
     ndoubl == 0 && return nothing
@@ -31,8 +32,8 @@ function doubling_helper!(pol_type,
     # Geometric progression of reflections (1-RR)⁻¹
     gp_refl      = similar(t⁺⁺)
     tt⁺⁺_gp_refl = similar(t⁺⁺)
-    gp_refl_lin       = zeros(3, size(t⁺⁺)[1], size(t⁺⁺)[2], size(t⁺⁺)[3])
-    tt⁺⁺_gp_refl_lin  = zeros(3, size(t⁺⁺)[1], size(t⁺⁺)[2], size(t⁺⁺)[3])
+    gp_refl_lin       = arr_type(zeros(3, size(t⁺⁺)[1], size(t⁺⁺)[2], size(t⁺⁺)[3]))
+    tt⁺⁺_gp_refl_lin  = arr_type(zeros(3, size(t⁺⁺)[1], size(t⁺⁺)[2], size(t⁺⁺)[3]))
     if SFI
         # Dummy for source 
         J₁⁺ = similar(J₀⁺)
@@ -49,8 +50,8 @@ function doubling_helper!(pol_type,
         batch_inv!(gp_refl, I_static .- r⁻⁺ ⊠ r⁻⁺)
         tt⁺⁺_gp_refl[:] = t⁺⁺ ⊠ gp_refl
         for iparam = 1:3
-            gp_refl_lin[iparam,:] = gp_refl ⊠ (ṙ⁻⁺[iparam,:] ⊠ r⁻⁺ + r⁻⁺ ⊠ ṙ⁻⁺[iparam,:]) ⊠ gp_refl 
-            tt⁺⁺_gp_refl_lin[iparam,:] = ṫ⁺⁺[iparam,:] ⊠ gp_refl + t⁺⁺ ⊠ gp_refl_lin[iparam,:]
+            @views gp_refl_lin[iparam,:,:,:] .= gp_refl ⊠ (ṙ⁻⁺[iparam,:,:,:] ⊠ r⁻⁺ .+ r⁻⁺ ⊠ ṙ⁻⁺[iparam,:,:,:]) ⊠ gp_refl 
+            @views tt⁺⁺_gp_refl_lin[iparam,:,:,:] .= ṫ⁺⁺[iparam,:,:,:] ⊠ gp_refl .+ t⁺⁺ ⊠ gp_refl_lin[iparam,:,:,:]
         end
         if SFI
             # J⁺₂₁(λ) = J⁺₁₀(λ).exp(-τ(λ)/μ₀)
@@ -58,34 +59,40 @@ function doubling_helper!(pol_type,
             # J⁻₁₂(λ)  = J⁻₀₁(λ).exp(-τ(λ)/μ₀)
             @views J₁⁻[:,1,:] = J₀⁻[:,1,:] .* expk'
             for iparam = 1:3
-                J̇₁⁺[iparam,:,1,:] = J̇₀⁺[iparam,:,1,:] .* expk' + J₀⁺[:,1,:] .* expk_lin'[iparam,:]        
-                J̇₁⁻[iparam,:,1,:] = J̇₀⁻[iparam,:,1,:] .* expk' + J₀⁻[:,1,:] .* expk_lin[iparam,:]'
-                J̇₀⁻[iparam,:,1,:] = J̇₀⁻[iparam,:,1,:] + 
-                    (tt⁺⁺_gp_refl_lin[iparam,:] ⊠ (J₁⁻ + r⁻⁺ ⊠ J₀⁺)) +
-                    (tt⁺⁺_gp_refl ⊠ (J̇₁⁻[iparam,:,1,:] + ṙ⁻⁺[iparam,:] ⊠ J₀⁺ + r⁻⁺ ⊠ J̇₀⁺[iparam,:,1,:]))  
-                J̇₀⁺[iparam, :] = J̇₁⁺[iparam,:] + 
-                    (tt⁺⁺_gp_refl_lin[iparam,:] ⊠ (J₀⁺ + r⁻⁺ ⊠ J₁⁻)) +
-                    (tt⁺⁺_gp_refl ⊠ (J̇₀⁺[iparam,:] + ṙ⁻⁺[iparam, :] ⊠ J₁⁻ + r⁻⁺ ⊠ J̇₁⁻[iparam, :]))
-                expk_lin[iparam, :] = 2*expk .* expk_lin[iparam,:]
+                if iparam == 1
+                    @views J̇₁⁺[iparam,:,1,:] .= J̇₀⁺[iparam,:,1,:] .* expk' .+ J₀⁺[:,1,:] .* expk_lin'        
+                    @views J̇₁⁻[iparam,:,1,:] .= J̇₀⁻[iparam,:,1,:] .* expk' .+ J₀⁻[:,1,:] .* expk_lin'
+                    
+                    @views expk_lin .= 2*expk .* expk_lin
+                else
+                    @views J̇₁⁺[iparam,:,1,:] .= J̇₀⁺[iparam,:,1,:] .* expk'         
+                    @views J̇₁⁻[iparam,:,1,:] .= J̇₀⁻[iparam,:,1,:] .* expk' 
+                end
+                @views J̇₀⁻[iparam,:,:,:] .= J̇₀⁻[iparam,:,:,:] .+ 
+                        (tt⁺⁺_gp_refl_lin[iparam,:,:,:] ⊠ (J₁⁻ .+ r⁻⁺ ⊠ J₀⁺)) .+
+                        (tt⁺⁺_gp_refl ⊠ (J̇₁⁻[iparam,:,:,:] .+ ṙ⁻⁺[iparam,:,:,:] ⊠ J₀⁺ .+ r⁻⁺ ⊠ J̇₀⁺[iparam,:,:,:]))  
+                @views J̇₀⁺[iparam,:,:,:] .= J̇₁⁺[iparam,:,:,:] .+ 
+                    (tt⁺⁺_gp_refl_lin[iparam,:,:,:] ⊠ (J₀⁺ .+ r⁻⁺ ⊠ J₁⁻)) .+
+                    (tt⁺⁺_gp_refl ⊠ (J̇₀⁺[iparam,:,:,:] .+ ṙ⁻⁺[iparam, :,:,:] ⊠ J₁⁻ .+ r⁻⁺ ⊠ J̇₁⁻[iparam, :,:,:]))
             end
 
             # J⁻₀₂(λ) = J⁻₀₁(λ) + T⁻⁻₀₁(λ)[I - R⁻⁺₂₁(λ)R⁺⁻₀₁(λ)]⁻¹[J⁻₁₂(λ) + R⁻⁺₂₁(λ)J⁺₁₀(λ)] (see Eqs.8 in Raman paper draft)
-            J₀⁻[:] = J₀⁻ + (tt⁺⁺_gp_refl ⊠ (J₁⁻ + r⁻⁺ ⊠ J₀⁺)) 
+            J₀⁻[:] = J₀⁻ .+ (tt⁺⁺_gp_refl ⊠ (J₁⁻ .+ r⁻⁺ ⊠ J₀⁺)) 
             # J⁺₂₀(λ) = J⁺₂₁(λ) + T⁺⁺₂₁(λ)[I - R⁺⁻₀₁(λ)R⁻⁺₂₁(λ)]⁻¹[J⁺₁₀(λ) + R⁺⁻₀₁(λ)J⁻₁₂(λ)] (see Eqs.8 in Raman paper draft)
-            J₀⁺[:] = J₁⁺ + (tt⁺⁺_gp_refl ⊠ (J₀⁺ + r⁻⁺ ⊠ J₁⁻))
+            J₀⁺[:] = J₁⁺ .+ (tt⁺⁺_gp_refl ⊠ (J₀⁺ .+ r⁻⁺ ⊠ J₁⁻))
             expk[:] = expk.^2
         end  
 
         for iparam = 1:3
-            ṙ⁻⁺[iparam, :]  = ṙ⁻⁺[iparam, :] + 
-                        tt⁺⁺_gp_refl_lin[iparam, :] ⊠ r⁻⁺ ⊠ t⁺⁺ +
-                        tt⁺⁺_gp_refl ⊠ (ṙ⁻⁺[iparam,:] ⊠ t⁺⁺ +
-                        r⁻⁺ ⊠ ṫ⁺⁺[iparam, :])
-            ṫ⁺⁺[iparam, :]  = tt⁺⁺_gp_refl_lin[iparam, :] ⊠ t⁺⁺ + 
-                        tt⁺⁺_gp_refl ⊠ ṫ⁺⁺[iparam, :]
+            ṙ⁻⁺[iparam, :,:,:] .= ṙ⁻⁺[iparam, :,:,:] .+ 
+                        tt⁺⁺_gp_refl_lin[iparam, :,:,:] ⊠ r⁻⁺ ⊠ t⁺⁺ .+
+                        tt⁺⁺_gp_refl ⊠ (ṙ⁻⁺[iparam,:,:,:] ⊠ t⁺⁺ .+
+                        r⁻⁺ ⊠ ṫ⁺⁺[iparam, :,:,:])
+            ṫ⁺⁺[iparam, :,:,:]  = tt⁺⁺_gp_refl_lin[iparam, :,:,:] ⊠ t⁺⁺ .+ 
+                        tt⁺⁺_gp_refl ⊠ ṫ⁺⁺[iparam, :,:,:]
         end
         # R⁻⁺₂₀(λ) = R⁻⁺₁₀(λ) + T⁻⁻₀₁(λ)[I - R⁻⁺₂₁(λ)R⁺⁻₀₁(λ)]⁻¹R⁻⁺₂₁(λ)T⁺⁺₁₀(λ) (see Eqs.8 in Raman paper draft)
-        r⁻⁺[:]  = r⁻⁺ + (tt⁺⁺_gp_refl ⊠ r⁻⁺ ⊠ t⁺⁺)
+        r⁻⁺[:]  = r⁻⁺ .+ (tt⁺⁺_gp_refl ⊠ r⁻⁺ ⊠ t⁺⁺)
 
         # T⁺⁺₂₀(λ) = T⁺⁺₂₁(λ)[I - R⁺⁻₀₁(λ)R⁻⁺₂₁(λ)]⁻¹T⁺⁺₁₀(λ) (see Eqs.8 in Raman paper draft)
         t⁺⁺[:]  = tt⁺⁺_gp_refl ⊠ t⁺⁺
@@ -104,11 +111,11 @@ function doubling_helper!(pol_type,
 
 end
 
-function doubling!(pol_type, SFI, expk, expk_lin
+function doubling!(pol_type, SFI, expk, expk_lin,
                     ndoubl::Int, 
                     added_layer::AddedLayer,#{FT},
                     added_layer_lin::AddedLayerLin,
-                    I_static::AbstractArray{FT}, 
+                    I_static::AbstractArray, 
                     architecture) where {FT}
 
     doubling_helper!(pol_type, SFI, expk, expk_lin, 

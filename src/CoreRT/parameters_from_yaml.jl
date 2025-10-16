@@ -27,6 +27,22 @@ function check_yaml_field(dict::Dict{Any, Any}, full_keys::Array{String},
         @assert curr_keys[1] in keys(dict) "Missing key in parameters yaml: $(join(full_keys, '/'))"
         return check_yaml_field(dict[curr_keys[1]], full_keys, curr_keys[2:end], final_type, valid_options)
     end
+
+    # Instead of checking only "absorption/molecules", check "fixed_molecules" and "variable_molecules"
+    if "absorption" in keys(params)
+        @assert "fixed_molecules" in keys(params["absorption"]) "absorption/fixed_molecules missing"
+        @assert "variable_molecules" in keys(params["absorption"]) "absorption/variable_molecules missing"
+
+        # Validate vmr keys for all molecules listed in both categories
+        all_molecules = vcat(params["absorption"]["fixed_molecules"]..., params["absorption"]["variable_molecules"]...)
+        flat_molecules = unique(vcat(all_molecules...))
+        vmr_dict = params["absorption"]["vmr"]
+        
+        for molec in flat_molecules
+            @assert molec in keys(vmr_dict) "$(molec) listed as molecule in parameters yaml, but no vmr given"
+            @assert vmr_dict[molec] isa Real || vmr_dict[molec] isa Vector "The vmr for $(molec) must be Real or Vector"
+        end
+    end
 end
 
 "Given a list of aerosol parameter dictionaries, validate all of them"
@@ -109,7 +125,8 @@ function validate_yaml_parameters(params)
               (["atmospheric_profile", "profile_reduction"], Union{Integer, Nothing}),
 
               # absorption group
-              (["absorption", "molecules"], Array),
+              (["absorption", "fixed_molecules"], Array),
+              (["absorption", "variable_molecules"], Array),
               (["absorption", "vmr"], Dict),
               (["absorption", "broadening"], String, ["Voigt()", "Doppler()", "Lorentz()"]), 
               (["absorption", "CEF"], String, ["HumlicekWeidemann32SDErrorFunction()"]),
@@ -120,11 +137,11 @@ function validate_yaml_parameters(params)
               (["scattering", "r_max"], Real),
               (["scattering", "nquad_radius"], Real),
               (["scattering", "λ_ref"], Real),
-              (["scattering", "decomp_type"], String, ["NAI2()", "PCW()"]),
+              (["scattering", "decomp_type"], String, ["NAI2()", "PCW()"])#,
 
               ## solar model group
               #(["solar_model", "irradiance"], String, ["Unity()", "Kurusz()"])
-              ]
+    ]
 
     # Check that every field exists and is correctly typed
     for i in 1:length(fields)
@@ -174,6 +191,29 @@ function parameters_from_yaml(file_path)
     spec_bands = []
     for spec_band in params_dict["radiative_transfer"]["spec_bands"]
         parsed_band = eval(Meta.parse(spec_band))
+        wn_band = collect(parsed_band)   # works for both "a:Δ:b" and "a:a"
+
+        # If no units, assume cm⁻¹
+        if all(x -> x == NoUnits, unit.(wn_band))
+            wn_band = wn_band
+        else
+            # If units but cm⁻¹ already, just strip
+            if all(x -> x == u"cm^-1", unit.(wn_band))
+                wn_band = sort(ustrip(wn_band))
+            else
+                wn_band = sort(ustrip(uconvert.(u"cm^-1", wn_band, Spectral())))
+            end
+        end
+
+        # ensure we always have a vector, even for a single wavelength
+        final_band = convert(Vector{FT}, wn_band)
+        push!(spec_bands, final_band)
+    end
+    
+    #=
+    spec_bands = []
+    for spec_band in params_dict["radiative_transfer"]["spec_bands"]
+        parsed_band = eval(Meta.parse(spec_band))
         # If no units, assume cm⁻¹
         if (all(x-> x == NoUnits, unit.(parsed_band)))
             wn_band = collect(parsed_band)
@@ -189,6 +229,7 @@ function parameters_from_yaml(file_path)
         final_band = convert(Array{FT}, wn_band)
         push!(spec_bands, final_band)
     end
+    =#
     BRDF_per_band = map(x -> eval(Meta.parse(x)), params_dict["radiative_transfer"]["surface"]) 
     quadrature_type = eval(Meta.parse(params_dict["radiative_transfer"]["quadrature_type"]))
     polarization_type = eval(Meta.parse(params_dict["radiative_transfer"]["polarization_type"]))
@@ -202,9 +243,18 @@ function parameters_from_yaml(file_path)
 
     # absorption group
     if "absorption" in keys(params_dict)
-        molecules = Array(params_dict["absorption"]["molecules"])
+        #molecules = Array(params_dict["absorption"]["molecules"])
+        fixed_molecules = Array(params_dict["absorption"]["fixed_molecules"])
+        variable_molecules = Array(params_dict["absorption"]["variable_molecules"])
         vmr = convert(Dict{String, Union{Real, Vector}}, params_dict["absorption"]["vmr"])
-        validate_vmrs(params_dict["absorption"]["molecules"], vmr)
+        # Validate vmrs for all molecules
+        all_molecules = vcat(fixed_molecules..., variable_molecules...)
+        validate_vmrs(all_molecules, vmr)
+
+
+        #molecules = [vcat(a, b) for (a, b) in zip(fixed_molecules, variable_molecules)]
+        #vmr = convert(Dict{String, Union{Real, Vector}}, params_dict["absorption"]["vmr"])
+        #validate_vmrs(params_dict["absorption"]["molecules"], vmr)
         broadening_function = eval(Meta.parse(params_dict["absorption"]["broadening"]))
         CEF = eval(Meta.parse(params_dict["absorption"]["CEF"]))
         wing_cutoff = params_dict["absorption"]["wing_cutoff"]
@@ -214,7 +264,7 @@ function parameters_from_yaml(file_path)
         luts = []
         if "LUTfiles" in keys(params_dict["absorption"])
             files_lut = Array(params_dict["absorption"]["LUTfiles"])
-            @assert size(files_lut) == size(molecules) "Size of LUTfiles has to match molecules"
+            @assert size(files_lut) == size(all_molecules) "Size of LUTfiles has to match molecules"
             #@show size(files_lut)
             
             for i in eachindex(files_lut)
@@ -223,8 +273,9 @@ function parameters_from_yaml(file_path)
                 push!(luts,[load_interpolation_model(file) for file in files_lut[i]])
             end
         end
-        absorption_params = AbsorptionParameters(molecules, vmr, broadening_function, 
-                                                 CEF, wing_cutoff, luts)
+        absorption_params = AbsorptionParameters(fixed_molecules, variable_molecules,
+                                                vmr, broadening_function, 
+                                                CEF, wing_cutoff, luts)
 
 
 

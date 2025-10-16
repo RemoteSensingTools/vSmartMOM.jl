@@ -21,12 +21,21 @@ export CPU, GPU, default_architecture, array_type
 # Export the artifact convenience function
 export artifact
 
+abstract type RT_Mode end # defining abstract type to distinguish between forward and linearized modes
+struct FwdMode <: RT_Mode end # forward model only
+struct LinMode <: RT_Mode end # forward model with linearization
+export FwdMode, LinMode  # vSmartMOM Modes
+
 # GPU/CPU Architecture (from Oceanigans)
 include("Architectures.jl")
 using .Architectures
 
+
 # Artifacts
 include("Artifacts/artifact_helper.jl")
+
+
+
 
 # Absorption Cross Section module:
 include("Absorption/Absorption.jl")
@@ -39,13 +48,13 @@ include("Inelastic/InelasticScattering.jl")
 
 # CoreRT module:
 include("CoreRT/CoreRT.jl")
-using .CoreRT
 
 # SolarModel module:
 include("SolarModel/SolarModel.jl")
 
 # Export some vSmartMOM functions
 export default_parameters, parameters_from_yaml, model_from_parameters, rt_run
+
 
 using .Architectures
 using .Absorption

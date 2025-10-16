@@ -258,16 +258,22 @@ function rt_run_bck(model::vSmartMOM_Model, model_lin::vSmartMOM_ModelLin; i_ban
 end
 =#
 # Mockup if no Raman type is chosen:
-function rt_run(model::vSmartMOM_Model; model_lin::vSmartMOM_ModelLin, i_band::Integer = 1)
-    rt_run(noRS(), model, model_lin, i_band)
+function rt_run(model::vSmartMOM_Model, 
+        lin_model::vSmartMOM_Lin,
+        NAer::Int, NGas::Int, NSurf::Int; 
+        i_band::Integer = 1)
+    rt_run(noRS(), model, lin_model, NAer, NGas, NSurf, i_band)
 end
 
 # Just to make sure we still have it:
 function rt_run_test(RS_type::AbstractRamanType, 
         model::vSmartMOM_Model, 
-        model_lin::vSmartMOM_ModelLin,
+        lin_model::vSmartMOM_Lin,
+        NAer, NGas, NSurf,
         iBand)
-    rt_run(RS_type, model, model_lin, iBand)
+    rt_run(RS_type, model, lin_model, 
+        NAer, NGas, NSurf,
+        iBand)
 end
 #=
 # Mockup if no Raman type is chosen:
@@ -285,14 +291,17 @@ end
 # Full multiple scattering
 function rt_run(RS_type::AbstractRamanType, 
                     model::vSmartMOM_Model, 
-                    model_lin::vSmartMOM_ModelLin,
+                    lin_model::vSmartMOM_Lin,
+                    NAer::Int, NGas::Int, NSurf::Int,
                     iBand)
     @unpack obs_alt, sza, vza, vaz = model.obs_geom   # Observational geometry properties
     @unpack qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart, μ₀, iμ₀, Nquad = model.quad_points # All quadrature points
     pol_type = model.params.polarization_type
     #@unpack max_m = model.max_m #params
     @unpack quad_points, max_m = model
-    @unpack Nparams = model_lin
+    @unpack τ̇_abs, τ̇_aer, lin_aerosol_optics = lin_model
+
+    lin = LinMode()
     # Suniti: disabling this for now - can be included when the need arises
     #=
     if obs_alt != 0
@@ -309,7 +318,7 @@ function rt_run(RS_type::AbstractRamanType,
     #@show size(iBand[1])
     #bla
     brdf = model.params.brdf[iBand] #brdf = model.params.brdf[iBand[1]]
-    brdf_lin = model_lin.brdf_lin[iBand]
+    #brdf_lin = model_lin.brdf_lin[iBand]
     @unpack F₀ = RS_type
     # no Raman
     #if (typeof(RS_type)<:Union{RRS,RRS_plus})
@@ -335,7 +344,7 @@ function rt_run(RS_type::AbstractRamanType,
     SFI = true                          # SFI flag
     NquadN = Nquad * pol_type.n         # Nquad (multiplied by Stokes n)
     dims = (NquadN,NquadN)              # nxn dims
-    
+    Nparams = NAer*7 + NGas + NSurf
     # Need to check this a bit better in the future!
     FT_dual = length(model.τ_aer[1][1]) > 0 ? typeof(model.τ_aer[1][1]) : FT
     #FT_dual = FT
@@ -343,12 +352,10 @@ function rt_run(RS_type::AbstractRamanType,
     #Suniti: consider adding a new dimension (iBand) to these arrays. The assignment of simulated spectra to their specific bands will take place after batch operations, thereby leaving the computational time unaffected 
     R       = zeros(FT_dual, length(vza), pol_type.n, nSpec)
     T       = zeros(FT_dual, length(vza), pol_type.n, nSpec)
-    R_SFI   = zeros(FT_dual, length(vza), pol_type.n, nSpec)
-    T_SFI   = zeros(FT_dual, length(vza), pol_type.n, nSpec)
-    R_SFI = zeros(FT_dual, length(vza), pol_type.n, nSpec)
-    T_SFI = zeros(FT_dual, length(vza), pol_type.n, nSpec)
-    Ṙ_SFI   = zeros(FT_dual, Nparams, length(vza), pol_type.n, nSpec)
-    Ṫ_SFI   = zeros(FT_dual, Nparams, length(vza), pol_type.n, nSpec)
+    #R_SFI   = zeros(FT_dual, length(vza), pol_type.n, nSpec)
+    #T_SFI   = zeros(FT_dual, length(vza), pol_type.n, nSpec)
+    Ṙ       = zeros(FT_dual, Nparams, length(vza), pol_type.n, nSpec)
+    Ṫ       = zeros(FT_dual, Nparams, length(vza), pol_type.n, nSpec)
     # Notify user of processing parameters
     msg = 
     """
@@ -361,12 +368,13 @@ function rt_run(RS_type::AbstractRamanType,
 
     # Create arrays
     @timeit "Creating layers" added_layer, added_layer_lin          = 
-        make_added_layer(RS_type, FT_dual, arr_type, Nparams, dims, nSpec)
+        make_added_layer(lin, RS_type, FT_dual, arr_type, Nparams, dims, nSpec)
     # Just for now, only use noRS here
-    @timeit "Creating layers" added_layer_surface, added_layer_surface_lin = 
-        make_added_layer(RS_type, FT_dual, arr_type, Nparams, dims, nSpec)
+
+    @timeit "Creating layers" added_surface_layer, added_surface_layer_lin = 
+        make_added_layer(lin, RS_type, FT_dual, arr_type, Nparams, dims, nSpec)
     @timeit "Creating layers" composite_layer, composite_layer_lin  = 
-        make_composite_layer(RS_type, FT_dual, arr_type, Nparams, dims, nSpec)
+        make_composite_layer(lin, RS_type, FT_dual, arr_type, Nparams, dims, nSpec)
     @timeit "Creating arrays" I_static = 
         Diagonal(arr_type(Diagonal{FT}(ones(dims[1]))));
     #TODO: if RS_type!=noRS, create ϖ_λ₁λ₀, i_λ₁λ₀, fscattRayl, Z⁺⁺_λ₁λ₀, Z⁻⁺_λ₁λ₀ (for input), and ieJ₀⁺, ieJ₀⁻, ieR⁺⁻, ieR⁻⁺, ieT⁻⁻, ieT⁺⁺, ier⁺⁻, ier⁻⁺, iet⁻⁻, iet⁺⁺ (for output)
@@ -385,7 +393,7 @@ function rt_run(RS_type::AbstractRamanType,
         #InelasticScattering.computeRamanZλ!(RS_type, pol_type,Array(qp_μ), m, arr_type)
         # Compute the core layer optical properties:
         @timeit "OpticalProps" layer_opt_props, layer_opt_props_lin, fScattRayleigh   = 
-            constructCoreOpticalProperties(RS_type, iBand, m, model, model_lin);
+            constructCoreOpticalProperties(RS_type, iBand, m, model, lin_model);
         #@show size(fScattRayleigh)
         #@show size(fScattRayleigh[1])
             # Determine the scattering interface definitions:
@@ -410,7 +418,8 @@ function rt_run(RS_type::AbstractRamanType,
             #@show typeof(layer_opt.Z⁺⁺[:,:,1]), typeof(RS_type.Z⁺⁺_λ₁λ₀)
             #aa = Array(layer_opt.Z⁺⁺[:,:,1]) #Array(RS_type.ϖ_Cabannes[1]*layer_opt.Z⁺⁺[:,:,1]) .+ (sum(RS_type.ϖ_λ₁λ₀)*RS_type.Z⁺⁺_λ₁λ₀)
             #bb = Array(layer_opt.Z⁻⁺[:,:,1]) #Array(RS_type.ϖ_Cabannes[1]*layer_opt.Z⁻⁺[:,:,1]) .+ (sum(RS_type.ϖ_λ₁λ₀)*RS_type.Z⁻⁺_λ₁λ₀)
-            
+            #@show iz,(layer_opt), (layer_opt_lin)
+            #@show iz, size(τ_sum_all), size(τ̇_sum_all)
             #aa = Array((RS_type.ϖ_Cabannes[1]*layer_opt.Z⁺⁺[:,:,1]) .+ (sum(RS_type.ϖ_λ₁λ₀)*RS_type.Z⁺⁺_λ₁λ₀))[1,:]
             #=
             for ia=1:NquadN
@@ -425,30 +434,31 @@ function rt_run(RS_type::AbstractRamanType,
                 end
             end
             bbb
-            =#
-            
+            =#           
             # Perform Core RT (doubling/elemental/interaction)
-            rt_kernel!(RS_type, pol_type, SFI, 
+            rt_kernel!(RS_type::noRS, pol_type, SFI, 
                         #bandSpecLim, 
                         added_layer, added_layer_lin, 
                         composite_layer, composite_layer_lin,
                         layer_opt, layer_opt_lin,
                         scattering_interfaces_all[iz], 
-                        τ_sum_all[:,iz], τ̇_sum_all[:,iz], 
+                        τ_sum_all[:,iz], τ̇_sum_all[:,:,iz], 
                         m, quad_points, 
                         I_static, 
                         model.params.architecture, 
                         qp_μN, iz) 
         end 
 
-        @timeit "lin_added_layer_all_params" lin_added_layer_all_params!(SFI, 
+        #=@timeit "lin_added_layer_all_params" lin_added_layer_all_params!(SFI, 
                     computed_layer_properties_lin, 
                     added_layer_lin)
-
+        =#
         # Create surface matrices:
-        create_surface_layer!(RS_type, brdf, brdf_lin,
-                            added_layer_surface, 
-                            added_layer_surface_lin,
+        iparam = NAer*7 + NGas + iBand # parameter index for Lambertian surface
+        create_surface_layer!(RS_type, brdf, #brdf_lin,
+                            added_surface_layer, 
+                            added_surface_layer_lin,
+                            iparam,
                             SFI, m, 
                             pol_type, 
                             quad_points, 
@@ -465,13 +475,13 @@ function rt_run(RS_type::AbstractRamanType,
         # One last interaction with surface:
         #@show composite_layer.J₀⁻[:,1,1] 
         
-        @timeit "interaction" interaction!(RS_type,
+        @timeit "interaction" interaction!(#RS_type,
                                     #bandSpecLim,
                                     scattering_interfaces_all[end], 
                                     SFI, 
-                                    computed_layer_properties, computed_layer_properties_lin, 
+                                    #computed_layer_properties, computed_layer_properties_lin, 
                                     composite_layer, composite_layer_lin,
-                                    added_layer_surface, added_layer_surface_lin,
+                                    added_surface_layer, added_surface_layer_lin,
                                     I_static)
         #@show composite_layer.J₀⁻[:,1,1]                            
         #bla
@@ -479,13 +489,13 @@ function rt_run(RS_type::AbstractRamanType,
         postprocessing_vza!(RS_type, 
                             iμ₀, pol_type, 
                             composite_layer, 
-                            omposite_layer_lin,
+                            composite_layer_lin,
                             vza, qp_μ, m, vaz, μ₀, 
                             weight, nSpec, 
                             SFI, 
-                            R, R_SFI, 
-                            T, T_SFI,
-                            Ṙ_SFI, Ṫ_SFI)
+                            R, 
+                            T,
+                            Ṙ, Ṫ)
         #@show R_SFI[:,1,1]
         #bla
     end
@@ -495,7 +505,7 @@ function rt_run(RS_type::AbstractRamanType,
     reset_timer!()
 
     # Return R_SFI or R, depending on the flag
-    return SFI ? (R_SFI, T_SFI, Ṙ_SFI, Ṫ_SFI) : (R, T)
+    return R, T, Ṙ, Ṫ
     #return Array(added_layer.ieJ₀⁻), Array(composite_layer.ieJ₀⁻)#
 end
 
