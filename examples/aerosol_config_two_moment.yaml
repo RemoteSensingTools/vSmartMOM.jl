@@ -1,0 +1,95 @@
+# Two-Moment Aerosol Configuration
+# GEOSChem with bulk aerosol properties (AOD + effective radius)
+
+aerosol_scheme:
+  type: "TwoMoment"
+  name: "GEOSChem Two-Moment"
+  description: "Lognormal distribution with fixed σ_g and variable radius"
+  
+  # NetCDF file path
+  file: "GEOSChem.Aerosols.20190601_0000z.nc4"
+  
+  # Aerosol species
+  species:
+    so4:
+      aod_var: "AODHyg550nm_SO4"
+      radius_var: "Chem_AeroRadiSULF"
+      sigma_g: 1.6
+      description: "Sulfate aerosol"
+      refractive_index: "sulfate_suso"
+      aod_reference_wavelength: 0.550  # μm
+      
+    ocpi:
+      aod_var: "AODHyg550nm_OCPI"
+      radius_var: "Chem_AeroRadiOC"
+      sigma_g: 1.6
+      description: "Organic carbon (hydrophilic)"
+      refractive_index: "organic_carbon"
+      aod_reference_wavelength: 0.550
+      
+    bcpi:
+      aod_var: "AODHyg550nm_BCPI"
+      radius_var: "Chem_AeroRadiBC"
+      sigma_g: 1.6
+      description: "Black carbon (hydrophilic)"
+      refractive_index: "black_carbon"
+      aod_reference_wavelength: 0.550
+      
+    sala:
+      aod_var: "AODHyg550nm_SALA"
+      radius_var: "Chem_AeroRadiSSA"
+      sigma_g: 1.6
+      description: "Sea salt (accumulation mode)"
+      refractive_index: "seasalt_sscm"
+      aod_reference_wavelength: 0.550
+      
+    salc:
+      aod_var: "AODHyg550nm_SALC"
+      radius_var: "Chem_AeroRadiSSC"
+      sigma_g: 1.6
+      description: "Sea salt (coarse mode)"
+      refractive_index: "seasalt_sscm"
+      aod_reference_wavelength: 0.550
+      
+    dust:
+      aod_var: "AODDust"
+      radius_var: "Chem_AeroRadiDUST"  # May need to add this variable
+      sigma_g: 1.8  # Dust typically has broader distribution
+      description: "Mineral dust"
+      refractive_index: "dust_opac"
+      aod_reference_wavelength: 0.550
+      
+    strat:
+      aod_var: "AODStratLiquidAer550nm"
+      radius_var: null  # May not have radius variable
+      sigma_g: 1.6
+      description: "Stratospheric aerosol"
+      refractive_index: "sulfate_suso"  # Assume sulfate-like
+      aod_reference_wavelength: 0.550
+      effective_radius_default: 0.5  # μm (if not provided)
+  
+  # NetCDF dimension names
+  dimensions:
+    lon: "lon"
+    lat: "lat"
+    lev: "lev"
+    time: "time"
+  
+  # Coordinate variables
+  coordinates:
+    lon: "lon"
+    lat: "lat"
+    lev: "lev"
+    time: "time"
+  
+  # Meteorology variables (if needed)
+  meteorology:
+    temperature: "Met_T"
+    pressure: "lev"
+    tropopause_level: "Met_TropLev"
+    
+  # Processing options
+  options:
+    vertical_flip: false  # Check if needed
+    compute_phase_function: true
+    wavelength_scaling: "power_law"  # or "mie_recalculation"
