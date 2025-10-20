@@ -7,16 +7,17 @@ the actual particle size distribution in TOMAS-15.
 
 Requirements:
     using Pkg
-    Pkg.add(["NCDatasets", "Plots", "Statistics", "LsqFit"])
+    Pkg.add(["NCDatasets", "Plots", "Statistics", "LsqFit", "Distributions"])
 
 Usage:
-    julia test/explore_NK_julia.jl
+    julia src/Aerosols/data_exploration/explore_NK_julia.jl
 """
 
 using NCDatasets
 using Plots
 using Statistics
 using LsqFit
+using Distributions
 using Printf
 
 # Set plot backend
@@ -25,7 +26,7 @@ gr()
 """
     lognormal(r, params)
 
-Log-normal size distribution (number concentration form)
+Log-normal size distribution (number concentration form) using Distributions.jl
 
 Parameters:
 - r: Particle radius [μm]
@@ -39,8 +40,12 @@ Returns:
 """
 function lognormal(r::AbstractVector, p::AbstractVector)
     N_total, r_med, sigma_g = p
-    return @. (N_total / (sqrt(2π) * log(sigma_g))) * 
-              exp(-0.5 * (log(r / r_med) / log(sigma_g))^2)
+    # Create LogNormal distribution with μ=log(r_med), σ=log(sigma_g)
+    dist = LogNormal(log(r_med), log(sigma_g))
+    # LogNormal pdf is per unit r, convert to per log(r):
+    # dN/dlog(r) = dN/dr × dr/dlog(r) = dN/dr × r × ln(10)
+    # For natural log: dN/dln(r) = dN/dr × r
+    return N_total .* pdf.(dist, r) .* r .* log(10)
 end
 
 # Version for single radius value
@@ -68,7 +73,7 @@ end
 """
     fit_lognormal(r_centers, concentrations)
 
-Fit a log-normal distribution to binned concentration data
+Fit a log-normal distribution to binned concentration data using Distributions.jl
 
 Returns (N_total, r_med, sigma_g) or nothing if fit fails
 """
@@ -82,7 +87,8 @@ function fit_lognormal(r_centers::AbstractVector, concentrations::AbstractVector
     r_valid = r_centers[valid]
     c_valid = concentrations[valid]
     
-    # Initial guess
+    # Initial guess using method of moments
+    # For lognormal: E[X] = exp(μ + σ²/2), Var[X] = (exp(σ²)-1)*exp(2μ+σ²)
     r_med_guess = r_valid[argmax(c_valid)]
     N_total_guess = sum(c_valid .* diff([log.(r_valid); log(r_valid[end])*1.1]))
     sigma_g_guess = 2.0
