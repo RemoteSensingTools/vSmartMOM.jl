@@ -1,0 +1,12 @@
+# Ignore output directories
+aerosol_exploration_output/
+
+# Ignore temporary files
+*.pyc
+__pycache__/
+.ipynb_checkpoints/
+
+# Ignore large data files (should be in root)
+*.nc4
+*.nc
+*.hdf5
