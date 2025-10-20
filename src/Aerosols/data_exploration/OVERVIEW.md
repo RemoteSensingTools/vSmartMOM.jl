@@ -5,8 +5,9 @@ This subfolder contains scripts for exploring and validating TOMAS-15 aerosol da
 ## Contents
 
 ### Main Exploration Scripts
-- **`explore_NK_number_distribution.py`** - Python script for comprehensive NK analysis with bimodal fitting
-- **`explore_NK_julia.jl`** - Julia version of the NK exploration script (identical functionality)
+- **`explore_NK_number_distribution.py`** - Python script for comprehensive NK analysis with bimodal fitting (uses scipy)
+- **`explore_NK_julia.jl`** - Julia version of the NK exploration script (identical functionality, uses Distributions.jl)
+- **`test_distributions.jl`** - Test script for verifying Distributions.jl log-normal implementation
 - **`README.md`** - Detailed documentation for the exploration scripts
 
 ### Validation Scripts
