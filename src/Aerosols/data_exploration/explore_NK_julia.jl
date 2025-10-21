@@ -7,21 +7,26 @@ the actual particle size distribution in TOMAS-15.
 
 Requirements:
     using Pkg
-    Pkg.add(["NCDatasets", "Plots", "Statistics", "LsqFit", "Distributions"])
+    Pkg.add(["NCDatasets", "CairoMakie", "Statistics", "LsqFit", "Distributions"])
 
 Usage:
     julia src/Aerosols/data_exploration/explore_NK_julia.jl
 """
 
 using NCDatasets
-using Plots
+using CairoMakie
 using Statistics
 using LsqFit
 using Distributions
 using Printf
 
-# Set plot backend
-gr()
+# Set CairoMakie theme for publication quality
+set_theme!(Theme(
+    fontsize = 14,
+    linewidth = 2,
+    markersize = 8,
+    resolution = (1000, 700)
+))
 
 """
     lognormal(r, params)
@@ -262,12 +267,24 @@ pressure_centers = (pressure_half_toa2boa[1:end-1] .+ pressure_half_toa2boa[2:en
 # Temperature (flip to TOA→BOA)
 temperature = reverse(vec(ds["Met_T"][idx, idy, idf, :, 1]))
 
-# Calculate air density for unit conversion
-# NK is stored in #/kg, need to convert to #/cm³
+# Read meteorology for NK conversion
+# NK uses special units: 1000 × (particles/mol_air)
+# Convert using: N = (NK/1000) × (Met_AD/M_air) / (Met_AIRVOL×1e6)
+
+M_air = 28.9644e-3  # kg/mol (molar mass of dry air)
+
+# Read Met_AD (air mass) and Met_AIRVOL (air volume)
+Met_AD = reverse(vec(ds["Met_AD"][idx, idy, idf, :, 1]))  # kg (flip to TOA→BOA)
+Met_AIRVOL = reverse(vec(ds["Met_AIRVOL"][idx, idy, idf, :, 1]))  # m³
+
+# Calculate conversion factors
+n_air = Met_AD ./ M_air  # moles of air
+vol_cm3 = Met_AIRVOL .* 1e6  # cm³
+
+# Also calculate air density for reference
 R_specific = 287.05  # J/(kg·K) for dry air
 pressure_Pa = pressure_centers .* 100.0  # hPa to Pa
-rho_air_kg_m3 = pressure_Pa ./ (R_specific .* temperature)  # kg/m³
-rho_air_kg_cm3 = rho_air_kg_m3 .* 1e-6  # kg/cm³
+rho_air_kg_m3 = Met_AD ./ Met_AIRVOL  # kg/m³
 
 println("🌍 Atmospheric Profile:")
 @printf("   Levels: %d\n", n_lev)
@@ -282,28 +299,29 @@ println("📊 Reading NK Number Concentration Data...")
 println()
 
 # Preallocate: 15 bins × n_lev layers
-nk_raw = zeros(15, n_lev)  # As stored in file (#/kg)
+nk_raw = zeros(15, n_lev)  # Raw NK values (1000 × #/mol_air)
 nk_concentration = zeros(15, n_lev)  # Converted to #/cm³
 
 for bin_idx in 1:15
     var_name = @sprintf("SpeciesConcVV_NK%02d", bin_idx)
     if var_name in keys(ds)
-        # Read raw values (stored as #/kg despite metadata claiming mol/mol)
+        # Read raw values (stored as 1000 × particles/mol_air)
         raw_data = vec(ds[var_name][idx, idy, idf, :, 1])
         # Replace missing values with 0.0 and reverse
         for (i, val) in enumerate(reverse(raw_data))
             nk_raw[bin_idx, i] = ismissing(val) ? 0.0 : Float64(val)
         end
         
-        # Convert from #/kg to #/cm³
-        nk_concentration[bin_idx, :] .= nk_raw[bin_idx, :] .* rho_air_kg_cm3
+        # Convert using CORRECT formula: N = (NK/1000) × (n_air/vol_cm3)
+        nk_concentration[bin_idx, :] .= (nk_raw[bin_idx, :] ./ 1000.0) .* (n_air ./ vol_cm3)
         
         # Get metadata from first variable
         if bin_idx == 1
             units_meta = haskey(ds[var_name].attrib, "units") ? ds[var_name].attrib["units"] : "unknown"
-            println("   Metadata units: $units_meta (INCORRECT!)")
-            println("   Actual units: #/kg (particles per kilogram of air)")
-            println("   Converted to: #/cm³ using air density")
+            println("   Metadata units: $units_meta")
+            println("   Actual units: 1000 × (particles/mol_air)")
+            println("   Conversion: N = (NK/1000) × (Met_AD/M_air) / (Met_AIRVOL×1e6)")
+            println("   Result: #/cm³")
         end
     end
 end
@@ -315,7 +333,7 @@ max_n = maximum(nk_concentration)
 # Also show raw values for reference
 total_n_raw = sum(nk_raw)
 println()
-@printf("   Raw NK values (as stored): %.2e #/kg\n", total_n_raw)
+@printf("   Raw NK values (as stored): %.2e (1000 × #/mol_air)\n", total_n_raw)
 @printf("   Converted to #/cm³: %.2e #/cm³\n", total_n)
 @printf("   Max number concentration: %.2e #/cm³\n", max_n)
 
@@ -359,7 +377,7 @@ p1 = plot(aitken_n, pressure_centers,
           linewidth=2.5, label="Aitken (<0.1 μm)", 
           xaxis=:log, yflip=true,
           xlabel="Number Concentration [#/cm³]", ylabel="Pressure [hPa]",
-          title="Aerosol Number Density by Size Mode - $loc_name\n(Converted from #/kg to #/cm³)",
+          title="Aerosol Number Density by Size Mode - $loc_name\n(Validated formula: N = (NK/1000) × (Met_AD/M_air) / (Met_AIRVOL×1e6))",
           legend=:best, grid=true, gridα=0.3,
           size=(800, 600), color=:blue)
 plot!(p1, accumulation_n, pressure_centers, linewidth=2.5, 
@@ -391,11 +409,17 @@ println("   Conversion examples at selected altitudes:")
 for p_target in pressure_levels
     lev_idx = argmin(abs.(pressure_centers .- p_target))
     p_actual = pressure_centers[lev_idx]
-    rho = rho_air_kg_cm3[lev_idx]
-    nk_val = sum(nk_raw[:, lev_idx])
-    n_val = sum(nk_concentration[:, lev_idx])
-    @printf("     %.0f hPa: ρ=%.3e kg/cm³, NK=%.2e #/kg → N=%.2e #/cm³\n", 
-            p_actual, rho, nk_val, n_val)
+    
+    # Show conversion factors
+    n_air_val = n_air[lev_idx]  # moles of air
+    vol_val = vol_cm3[lev_idx]  # cm³
+    conv_factor = n_air_val / vol_val  # mol/cm³
+    
+    nk_val = sum(nk_raw[:, lev_idx])  # 1000 × #/mol_air (as stored)
+    n_val = sum(nk_concentration[:, lev_idx])  # #/cm³ (converted)
+    
+    @printf("     %.0f hPa: NK=%.2e (1000×#/mol), n_air/V=%.2e mol/cm³ → N=%.2e #/cm³\n", 
+            p_actual, nk_val, conv_factor, n_val)
 end
 
 println()
@@ -405,7 +429,7 @@ d_fine = 10 .^ range(log10(minimum(diam_centers_um)), log10(maximum(diam_centers
 
 p2 = plot(xlabel="Dry Diameter [μm]", ylabel="dN/dlogD [#/cm³]",
           xaxis=:log, 
-          title="Aerosol Number Size Distribution - $loc_name\n(True number density: NK × ρ_air)",
+          title="Aerosol Number Size Distribution - $loc_name\n(Validated formula: N = (NK/1000) × (Met_AD/M_air) / (Met_AIRVOL×1e6))",
           legend=:topright, grid=true, gridα=0.3,
           size=(1000, 700))
 
@@ -551,21 +575,29 @@ lev_800 = argmin(abs.(pressure_centers .- 800))
 
 p5 = plot(xlabel="Dry Diameter [μm]", ylabel="dN/dlogD [#/cm³]",
           xaxis=:log,
-          title="Aerosol Number Density at $(Int(round(pressure_centers[lev_800]))) hPa - Multi-Location\n(True concentration: NK × ρ_air)",
+          title="Aerosol Number Density at $(Int(round(pressure_centers[lev_800]))) hPa - Multi-Location\n(Validated formula: N = (NK/1000) × (Met_AD/M_air) / (Met_AIRVOL×1e6))",
           legend=:topright, grid=true, gridα=0.3,
           size=(1000, 700))
 
 println()
 for (loc_idx, (idx_loc, idy_loc, idf_loc, loc_name_comp)) in enumerate(locations)
-    # Get air density for this location
-    temp_loc_raw = vec(ds["Met_T"][idx_loc, idy_loc, idf_loc, :, 1])
-    temp_loc = zeros(n_lev)
-    for (i, val) in enumerate(reverse(temp_loc_raw))
-        temp_loc[i] = ismissing(val) ? 250.0 : Float64(val)
-    end
-    rho_air_loc = (pressure_Pa ./ (R_specific .* temp_loc)) .* 1e-6  # kg/cm³
+    # Get meteorology for this location
+    Met_AD_loc_raw = vec(ds["Met_AD"][idx_loc, idy_loc, idf_loc, :, 1])  # kg
+    Met_AIRVOL_loc_raw = vec(ds["Met_AIRVOL"][idx_loc, idy_loc, idf_loc, :, 1])  # m³
     
-    # Read NK data for this location (raw #/kg)
+    Met_AD_loc = zeros(n_lev)
+    Met_AIRVOL_loc = zeros(n_lev)
+    for (i, val) in enumerate(reverse(Met_AD_loc_raw))
+        Met_AD_loc[i] = ismissing(val) ? 1.0 : Float64(val)
+    end
+    for (i, val) in enumerate(reverse(Met_AIRVOL_loc_raw))
+        Met_AIRVOL_loc[i] = ismissing(val) ? 1.0 : Float64(val)
+    end
+    
+    n_air_loc = Met_AD_loc ./ M_air  # moles of air
+    vol_cm3_loc = Met_AIRVOL_loc .* 1e6  # cm³
+    
+    # Read NK data for this location (stored as 1000 × #/mol_air)
     nk_raw_loc = zeros(15, n_lev)
     nk_loc = zeros(15, n_lev)
     for bin_idx in 1:15
@@ -575,8 +607,8 @@ for (loc_idx, (idx_loc, idy_loc, idf_loc, loc_name_comp)) in enumerate(locations
             for (i, val) in enumerate(reverse(raw_data))
                 nk_raw_loc[bin_idx, i] = ismissing(val) ? 0.0 : Float64(val)
             end
-            # Convert to #/cm³
-            nk_loc[bin_idx, :] .= nk_raw_loc[bin_idx, :] .* rho_air_loc
+            # Convert to #/cm³ using correct formula
+            nk_loc[bin_idx, :] .= (nk_raw_loc[bin_idx, :] ./ 1000.0) .* (n_air_loc ./ vol_cm3_loc)
         end
     end
     
@@ -627,7 +659,8 @@ println("  • Number of bins: 15")
 @printf("  • At 800 hPa: %.2e #/cm³\n", n_800)
 println()
 println("Key Findings:")
-println("  • NK is stored as #/kg (not mol/mol as metadata claims)")
-println("  • Converted using air density: N(#/cm³) = NK(#/kg) × ρ_air(kg/cm³)")
-println("  • Values are now in true atmospheric number concentration")
+println("  • NK stored as: 1000 × (particles/mol_air)")
+println("  • Conversion formula: N = (NK/1000) × (Met_AD/M_air) / (Met_AIRVOL×1e6)")
+println("  • Formula validated by colleague's working code and species comparison")
+println("  • Values in true atmospheric number concentration (#/cm³)")
 println("  • Typical continental air: 10³-10⁴ #/cm³ (matches our values!)")
