@@ -426,10 +426,10 @@ function getAerosolLayerOptProp(lin::LinMode, total_τ, z₀, σ₀, p_half, T)
     z = zeros(Nz)
     dz .= H.*log.(p_half[2:end]./p_half[1:end-1])
     dz .*= 1.e-3 #m->km
-    z[end] = 0.0#dz[end]./2
+    z[end] = 1.e-6 #0.0#dz[end]./2
     for i=Nz-1:-1:1
         z[i] = z[i+1]+dz[i+1]#(dz[i+1]+dz[i])./2 #this has been done to prevent dz=Inf resulting from p_half[1]=0
-        @show i, z[i]
+        #@show i, z[i]
         #    τAer[i+1] = total_τ * (cdf(prof, z[i]) - cdf(prof, z[i+1])) #pdf.(prof, z)
     end
     #τAer[1] = total_τ * (1.0 - cdf(prof, z[1]))

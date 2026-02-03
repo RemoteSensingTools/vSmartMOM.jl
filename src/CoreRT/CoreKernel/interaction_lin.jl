@@ -6,8 +6,8 @@ This file contains RT interaction-related functions
 
 # No scattering in either the added layer or the composite layer
 function interaction_helper!(::ScatteringInterface_00, SFI,
-                                computed_layer_properties, 
-                                computed_layer_properties_lin, 
+                                #computed_layer_properties, 
+                                #computed_layer_properties_lin, 
                                 composite_layer::CompositeLayer{FT}, 
                                 composite_layer_lin::CompositeLayerLin{FT}, 
                                 added_layer::AddedLayer{FT}, 
@@ -45,7 +45,9 @@ end
 # Produces a new, scattering composite layer.
 function interaction_helper!(::ScatteringInterface_01, SFI,
                                 composite_layer::CompositeLayer{FT}, 
+                                composite_layer_lin::CompositeLayerLin{FT},
                                 added_layer::AddedLayer{FT}, 
+                                added_layer_lin::AddedLayerLin{FT}, 
                                 I_static::AbstractArray{FT2}) where {FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2}
 
     Nparams = size(composite_layer_lin.Ṫ⁻⁻)[1]

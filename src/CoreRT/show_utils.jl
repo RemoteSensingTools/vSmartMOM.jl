@@ -50,8 +50,12 @@ function Base.show(io::IO,::MIME"text/plain", x::vSmartMOM_Parameters)
     println(io, "Absorption")
     println(io, "----------")
     if (!isnothing(x.absorption_params))
-        println(io, "\tMolecules")
-        for molecule_band in x.absorption_params.molecules
+        println(io, "\tFixed Molecules")
+        for molecule_band in x.absorption_params.fixed_molecules
+            println(io, "\t\t- $(molecule_band)")
+        end
+        println(io, "\tVariable Molecules")
+        for molecule_band in x.absorption_params.variable_molecules
             println(io, "\t\t- $(molecule_band)")
         end
         println(io, "\tVMR:")

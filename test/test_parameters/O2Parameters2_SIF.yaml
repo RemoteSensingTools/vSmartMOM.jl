@@ -73,10 +73,12 @@ atmospheric_profile:
 # =================================================================
 absorption:
   # List of molecules per spectral band
-  molecules:
+  fixed_molecules:
     - [O2]       # Molecules in Band #1
     #- [H2O,CO2]  # Molecules in Band #2
     #- [H2O,CO2]  # Molecules in Band #3
+  variable_molecules:
+    - [] 
   # LookUpTable files (Interpolation Model saved as JLD2!)
   #LUTfiles:
   #  - ["/net/fluo/data2/data/ABSCO_CS_Database/v5.2_final/o2_v52.jld2"]

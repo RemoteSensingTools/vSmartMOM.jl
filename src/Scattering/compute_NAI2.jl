@@ -32,9 +32,9 @@ function compute_aerosol_optical_properties(model::MieModel{FDT}, FT2::Type=Floa
     # 
     
     # Just sample from 0.25%ile to 99.75%ile:
-    start,stop = quantile(size_distribution,[0.0025,0.9975])
-    #r, wᵣ = gauleg(nquad_radius, 0.0, r_max ; norm=true) 
-    r, wᵣ = gauleg(nquad_radius, start, min(stop,r_max) ; norm=true) 
+    #start,stop = quantile(size_distribution,[0.0025,0.9975])
+    r, wᵣ = gauleg(nquad_radius, 0.0, r_max ; norm=false) 
+    #r, wᵣ = gauleg(nquad_radius, start, min(stop,r_max) ; norm=false) 
     
     # Wavenumber
     k = 2π / λ  
@@ -185,8 +185,12 @@ function compute_ref_aerosol_extinction(model::MieModel{FDT}, FT2::Type=Float64)
     #@show FT
     #@assert FT == Float64 "Aerosol computations require 64bit"
     # Get radius quadrature points and weights (for mean, thus normalized):
-    r, wᵣ = gauleg(nquad_radius, 0.0, r_max ; norm=true) 
-    
+    #r, wᵣ = gauleg(nquad_radius, 0.0, r_max ; norm=false) 
+    # Just sample from 0.25%ile to 99.75%ile:
+    #start,stop = quantile(size_distribution,[0.0025,0.9975])
+    r, wᵣ = gauleg(nquad_radius, 0.0, r_max ; norm=false) 
+    #r, wᵣ = gauleg(nquad_radius, start, min(stop,r_max); norm=false) 
+
     # Wavenumber
     k = 2π / λ  
 
@@ -198,17 +202,17 @@ function compute_ref_aerosol_extinction(model::MieModel{FDT}, FT2::Type=Float64)
 
     # Determine max amount of Gaussian quadrature points for angle dependence of 
     # phase functions:
-    n_mu = 2n_max - 1;
+    #n_mu = 2n_max - 1;
 
     # Obtain Gauss-Legendre quadrature points and weights for phase function
-    μ, w_μ = gausslegendre(n_mu)
+    #μ, w_μ = gausslegendre(n_mu)
 
     # Compute π and τ functions
-    leg_π, leg_τ = compute_mie_π_τ(μ, n_max)
+    #leg_π, leg_τ = compute_mie_π_τ(μ, n_max)
 
     # Pre-allocate arrays:
     C_ext = zeros(FT, nquad_radius)
-    C_sca = zeros(FT, nquad_radius)
+    #C_sca = zeros(FT, nquad_radius)
 
     # Standardized weights for the size distribution:
     wₓ = compute_wₓ(size_distribution, wᵣ, r, r_max) 
@@ -228,7 +232,7 @@ function compute_ref_aerosol_extinction(model::MieModel{FDT}, FT2::Type=Float64)
         n_ = 2n_ .+ 1
 
         # Pre-allocate Dn:
-        y = x_size_param[i] * (aerosol.nᵣ - aerosol.nᵢ);
+        y = x_size_param[i] * (aerosol.nᵣ - aerosol.nᵢ * im);
         nmx = round(Int, max(n_max, abs(y)) + 51)
         Dn = zeros(Complex{FT}, nmx)
 

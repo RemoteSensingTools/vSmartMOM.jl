@@ -116,7 +116,7 @@ function doubling!(pol_type, SFI, expk, expk_lin,
                     added_layer::AddedLayer,#{FT},
                     added_layer_lin::AddedLayerLin,
                     I_static::AbstractArray, 
-                    architecture) where {FT}
+                    architecture) #where {FT}
 
     doubling_helper!(pol_type, SFI, expk, expk_lin, 
         ndoubl, added_layer, added_layer_lin, I_static, architecture)

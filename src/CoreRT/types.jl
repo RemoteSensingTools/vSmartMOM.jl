@@ -15,11 +15,6 @@ This file contains all types that are used in the vSmartMOM module:
 - `ComputedAtmosphereProperties` and `ComputedLayerProperties` hold intermediate computed properties
 
 =#
-
-# abstract type RT_Mode end # defining abstract type to distinguish between forward and linearized modes
-# struct FwdMode <: RT_Mode end # forward model only
-# struct LinMode <: RT_Mode end # forward model with linearization
-
 "Struct for an atmospheric profile"
 struct AtmosphericProfile{FT, VMR <: Union{Real, Vector}}
     "Temperature Profile"
@@ -615,9 +610,9 @@ Base.@kwdef struct CoreScatteringOpticalProperties{FT} <:  AbstractOpticalProper
     "Single scattering albedo"
     ϖ::Union{FT, AbstractArray{FT,1}}
     "Z scattering matrix (forward)"
-    Z⁺⁺::Union{AbstractArray{FT,3}, AbstractArray{FT,2}}
+    Z⁺⁺::Union{AbstractArray{FT,2}, AbstractArray{FT,3}}
     "Z scattering matrix (backward)"
-    Z⁻⁺::Union{AbstractArray{FT,3}, AbstractArray{FT,2}}
+    Z⁻⁺::Union{AbstractArray{FT,2}, AbstractArray{FT,3}}
 end
 
 Base.@kwdef struct CoreAbsorptionOpticalProperties{FT} <:  AbstractOpticalProperties

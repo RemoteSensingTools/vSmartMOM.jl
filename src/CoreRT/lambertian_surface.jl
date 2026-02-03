@@ -55,7 +55,8 @@ function create_surface_layer!(RS_type, lambertian::LambertianSurfaceScalar{FT},
             #@show iμ₀Nstart, pol_type.n*iμ₀
             #@show size(F₀_NquadN[iμ₀Nstart:pol_type.n*iμ₀,:]), size(F₀), size(exp.(-τ_sum/μ₀)')
             F₀_NquadN[iμ₀Nstart:pol_type.n*iμ₀,:] .= (F₀ .* (exp.(-τ_sum/μ₀))');
-            
+            #@show F₀_NquadN[iμ₀Nstart:pol_type.n*iμ₀,1], (F₀ .* (exp.(-τ_sum/μ₀))')[:,1]
+            #@show F₀[:,1]
             added_layer.J₀⁺[:,1,:] .= 0.;#
             added_layer.J₀⁻[:,1,:] .= μ₀*(R_surf*F₀_NquadN)#/FT(π);
             #@show size(added_layer.J₀⁻[:,1,1])
@@ -63,6 +64,7 @@ function create_surface_layer!(RS_type, lambertian::LambertianSurfaceScalar{FT},
         # for SIF
             #added_layer.J₀⁻[:,1,:] .+= 0.029253057154967992./qp_μN # 0.023795309767477988./qp_μN #
             # added_layer.J₀⁻[:,1,:] .+= 10.5./qp_μN #8.66./qp_μN #
+            @show size(repeat(arr_type(RS_type.SIF₀),Nquad)), size(added_layer.J₀⁻[:,1,:])
             added_layer.J₀⁻[:,1,:] .+= (1/π)*repeat(arr_type(RS_type.SIF₀),Nquad) * unweight
         #@show added_layer.J₀⁻[:,1,1]
             #added_layer.J₀⁻[:,1,:] = 

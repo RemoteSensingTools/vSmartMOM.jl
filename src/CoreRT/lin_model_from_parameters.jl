@@ -100,7 +100,7 @@ end
 "Take the parameters specified in the vSmartMOM_Parameters struct, and calculate derived attributes into a vSmartMOM_Model" 
 function model_from_parameters(lin::LinMode, 
     params::vSmartMOM_Parameters)
-
+    FT =  params.float_type 
     # Number of total bands and aerosols (for convenience)
     n_bands = length(params.spec_bands)
     n_aer = isnothing(params.scattering_params) ? 0 : length(params.scattering_params.rt_aerosols)
@@ -136,8 +136,8 @@ function model_from_parameters(lin::LinMode,
     end
 
     # Rayleigh optical properties calculation
-    greek_cabannes = Vector{vSmartMOM.Scattering.GreekCoefs{Float64}}()
-    greek_rayleigh = Vector{vSmartMOM.Scattering.GreekCoefs{Float64}}()
+    greek_cabannes = Vector{vSmartMOM.Scattering.GreekCoefs{FT}}()
+    greek_rayleigh = Vector{vSmartMOM.Scattering.GreekCoefs{FT}}()
     ϖ_Cabannes = zeros(n_bands)
     # Remove rayleigh for testing:
     τ_rayl = [zeros(params.float_type,length(params.spec_bands[i]), length(profile.T)) for i=1:n_bands];
@@ -147,7 +147,7 @@ function model_from_parameters(lin::LinMode,
     # i.e. code the rt core with fixed amount of derivatives as in her paper, then compute chain rule for dtau/dVMr, etc...
     FT2 = isnothing(params.absorption_params) || !haskey(params.absorption_params.vmr,"CO2") ? params.float_type : eltype(params.absorption_params.vmr["CO2"])
     τ_abs     = [zeros(FT2, length(params.spec_bands[i]), length(profile.p_full)) for i in 1:n_bands]
-    
+    @show "here1"
     # Define N_fix_gas as the number of fixed abundance gases (like O2, N2, etc.) - these will not be included in the computation of the Jacobian matrix
     N_fix_gas = length(unique(Iterators.flatten(params.absorption_params.fixed_molecules)))
     # Define N_var_gas as the number of variable gases whose abundance is to be determined - these will be included in the Jacobian computation
@@ -161,14 +161,14 @@ function model_from_parameters(lin::LinMode,
     for i_band=1:n_bands
 
         # i'th spectral band (convert from cm⁻¹ to μm)
-        curr_band_λ = 1e4 ./ params.spec_bands[i_band]
+        curr_band_λ = params.float_type(1e4) ./ params.spec_bands[i_band]
         # @show profile.vcd_dry, size(τ_rayl[i_band])
         # Compute Rayleigh properties per layer for `i_band` band center  
         #Suniti: the following two lines are temporary. this Cabannes depolarization applies only to the Earth's atmosphere
         # It has been added to make sure that the code sees the same Rayleigh cross section, regardless of elastic or inelastic RT 
         # Needs better (more general) formulation 
-        νₘ = 0.5*(params.spec_bands[i_band][1]+params.spec_bands[i_band][end])
-        λₘ = 1.e7/νₘ
+        νₘ = FT(0.5)*(params.spec_bands[i_band][1]+params.spec_bands[i_band][end])
+        λₘ = FT(1.e7)/νₘ  # ← FIX: Use params.float_type
         #@show i_band
         ϖ_Cabannes[i_band], γ_air_Cabannes, γ_air_Rayleigh = 
             InelasticScattering.compute_γ_air_Rayleigh!(λₘ)
@@ -214,7 +214,9 @@ function model_from_parameters(lin::LinMode,
             # TODO: write the following linearized function
             jac_idx = 1 # first index reserved for H2O
             @timeit "Absorption Coeff"  compute_absorption_profile!(
-                τ_abs[i_band], τ̇_abs[i_band], jac_idx,
+                τ_abs[i_band], 
+                τ̇_abs[i_band], 
+                jac_idx,
                 absorption_model, 
                 params.spec_bands[i_band],
                 profile.vmr_h2o, 
@@ -293,7 +295,10 @@ function model_from_parameters(lin::LinMode,
                     # Use LUT directly
                     else
                         # TODO: write the following linearized function
-                        compute_absorption_profile!(τ_abs[i_band], τ̇_abs[i_band], 
+                        # The following form of the function does not seem to exist. May still need to write it (also the forward model version)
+                        compute_absorption_profile!(
+                            τ_abs[i_band], 
+                            τ̇_abs[i_band], 
                             jac_idx,
                             params.absorption_params.luts[i_band][molec_i], 
                             params.spec_bands[i_band],
@@ -314,8 +319,8 @@ function model_from_parameters(lin::LinMode,
 
     # τ_aer[iBand][iAer,iZ]        
     τ_aer = [zeros(FT2, n_aer, length(params.spec_bands[i]), length(profile.p_full)) for i=1:n_bands];
-    τ̇_aer = [zeros(FT2, n_aer, 6, length(params.spec_bands[i]), length(profile.p_full)) for i=1:n_bands];
-    # the 6 parameters include nᵣ, nᵢ, rₚ, σₚ, z₀, σ₀
+    τ̇_aer = [zeros(FT2, n_aer, 7, length(params.spec_bands[i]), length(profile.p_full)) for i=1:n_bands];
+    # the 7 parameters include τ_ref, nᵣ, nᵢ, rₚ, σₚ, z₀, σ₀
     # Loop over aerosol type
     for i_aer=1:n_aer
 
@@ -346,7 +351,7 @@ function model_from_parameters(lin::LinMode,
         for i_band=1:n_bands
             
             # i'th spectral band (convert from cm⁻¹ to μm)
-            curr_band_λ = 1e4 ./ params.spec_bands[i_band]
+            curr_band_λ = params.float_type(1e4) ./ params.spec_bands[i_band]
 
             # Create the aerosols:
             if length(curr_band_λ)==1
@@ -442,12 +447,14 @@ function model_from_parameters(lin::LinMode,
                 interp_linear_ksca = LinearInterpolation(ν_grid, ksca_grid)
                 k = zeros(length(curr_band_λ))
                 ω̃ = zeros(length(curr_band_λ))
+                fᵗ = zeros(length(curr_band_λ))
                 for i = 1:length(curr_band_λ)
                     k[i] = interp_linear_kext(1e4/curr_band_λ[i])
                     ω̃[i] = interp_linear_ksca(1e4/curr_band_λ[i])/k[i]
                 end
                 k̇ = zeros(4,length(curr_band_λ))
                 ω̃̇ = zeros(4,length(curr_band_λ))
+                ḟᵗ= zeros(4,length(curr_band_λ))
                 for ctr=1:4
                     k̇ext_grid = [lin_aerosol_optics_raw_0.k̇[ctr], lin_aerosol_optics_raw_1.k̇[ctr]]
                     k̇sca_grid = [lin_aerosol_optics_raw_0.k̇[ctr]*lin_aerosol_optics_raw_0.ω̃̇[ctr], lin_aerosol_optics_raw_1.k̇[ctr]*lin_aerosol_optics_raw_1.ω̃̇[ctr]] 
@@ -460,8 +467,8 @@ function model_from_parameters(lin::LinMode,
                     end
                 end
 
-                aerosol_optics_raw = AerosolOptics(greek_coefs=greek_coeffs, ω̃=ω̃, k=k, fᵗ=0.0)
-                lin_aerosol_optics_raw = linAerosolOptics(lin_greek_coefs=lin_greek_coeffs, ω̃̇=ω̃̇, k̇=k̇, ḟᵗ=zeros(FT2,4))
+                aerosol_optics_raw = AerosolOptics(greek_coefs=greek_coeffs, ω̃=ω̃, k=k, fᵗ=fᵗ)
+                lin_aerosol_optics_raw = linAerosolOptics(lin_greek_coefs=lin_greek_coeffs, ω̃̇=ω̃̇, k̇=k̇, ḟᵗ=ḟᵗ)
             end
             
             # Compute truncated aerosol optical properties (phase function and fᵗ), consistent with Ltrunc:
@@ -473,6 +480,9 @@ function model_from_parameters(lin::LinMode,
                     Scattering.truncate_phase(truncation_type, 
                                 aerosol_optics_raw, lin_aerosol_optics_raw; reportFit=false)
                 l_max_aer[i_aer, i_band] = truncation_type.l_max
+                
+                @show aerosol_optics[i_band][i_aer].fᵗ
+                @show lin_aerosol_optics[i_band][i_aer].ḟᵗ
                 #max_m[i_band] = Int(ceil(l_max[i_band] + 1)/2)                                 
             else
                 #@show truncation_type.l_max
@@ -487,21 +497,28 @@ function model_from_parameters(lin::LinMode,
             #@show size(τ_aer[i_band][i_aer,:,:])
             # Compute aerosol optical thickness profile and its derivatives
             τₚ, dτₚdz₀, dτₚdσ₀ = getAerosolLayerOptProp(lin, 1, c_aero.z₀, c_aero.σ₀, profile.p_half, profile.T)
-
+@show size(τₚ), size(dτₚdz₀), size(dτₚdσ₀)
+@show τₚ
             # Compute nAer aerosol optical thickness profiles
             τ_aer[i_band][i_aer,:,:] = 
                 (params.scattering_params.rt_aerosols[i_aer].τ_ref/k_ref) * 
                 aerosol_optics[i_band][i_aer].k *
                 τₚ' 
+
+            #wrt τ_ref
+            τ̇_aer[i_band][i_aer,1,:,:] .= 
+                (aerosol_optics[i_band][i_aer].k/k_ref) *
+                τₚ'  
+                
             for ctr=1:4
-                τ̇_aer[i_band][i_aer,ctr,:,:] = 
+                τ̇_aer[i_band][i_aer,ctr+1,:,:] = 
                     ((params.scattering_params.rt_aerosols[i_aer].τ_ref/k_ref) * 
                     lin_aerosol_optics[i_band][i_aer].k̇[ctr,:] .- 
                     (params.scattering_params.rt_aerosols[i_aer].τ_ref/k_ref^2) * 
                     k̇_ref[ctr])*τₚ'
             end
             for ctr=5:6
-                τ̇_aer[i_band][i_aer,ctr,:,:] = 
+                τ̇_aer[i_band][i_aer,ctr+1,:,:] = 
                     (params.scattering_params.rt_aerosols[i_aer].τ_ref/k_ref) * 
                     aerosol_optics[i_band][i_aer].k *
                     (ctr==5 ? dτₚdz₀' : dτₚdσ₀')
@@ -550,6 +567,10 @@ function model_from_parameters(OCO::Bool, params::vSmartMOM_Parameters)
     if !OCO
         error("This function is only for OCO RT model, use the other one for full physics RT")
     end
+    
+    # Get the floating point type from parameters
+    FT = params.float_type
+    
     # Number of total bands and aerosols (for convenience)
     n_bands = length(params.spec_bands)
     n_aer = isnothing(params.scattering_params) ? 0 : length(params.scattering_params.rt_aerosols)
@@ -585,8 +606,8 @@ function model_from_parameters(OCO::Bool, params::vSmartMOM_Parameters)
     end
 
     # Rayleigh optical properties calculation
-    greek_cabannes = Vector{vSmartMOM.Scattering.GreekCoefs{Float64}}()
-    greek_rayleigh = Vector{vSmartMOM.Scattering.GreekCoefs{Float64}}()
+    greek_cabannes = Vector{vSmartMOM.Scattering.GreekCoefs{FT}}()
+    greek_rayleigh = Vector{vSmartMOM.Scattering.GreekCoefs{FT}}()
     ϖ_Cabannes = zeros(n_bands)
     # Remove rayleigh for testing:
     τ_rayl = [zeros(params.float_type,length(params.spec_bands[i]), length(profile.T)) for i=1:n_bands];
@@ -603,21 +624,21 @@ function model_from_parameters(OCO::Bool, params::vSmartMOM_Parameters)
     for i_band=1:n_bands
 
         # i'th spectral band (convert from cm⁻¹ to μm)
-        curr_band_λ = 1e4 ./ params.spec_bands[i_band]
+        curr_band_λ = params.float_type(1e4) ./ params.spec_bands[i_band]
         # @show profile.vcd_dry, size(τ_rayl[i_band])
         # Compute Rayleigh properties per layer for `i_band` band center  
         #Suniti: the following two lines are temporary. this Cabannes depolarization applies only to the Earth's atmosphere
         # It has been added to make sure that the code sees the same Rayleigh cross section, regardless of elastic or inelastic RT 
         # Needs better (more general) formulation 
         νₘ = 0.5*(params.spec_bands[i_band][1]+params.spec_bands[i_band][end])
-        λₘ = 1.e7/νₘ
+        λₘ = params.float_type(1.e7)/νₘ
         #@show i_band
         ϖ_Cabannes[i_band] = 1.0
         #, γ_air_Cabannes, γ_air_Rayleigh = 
         #    InelasticScattering.compute_γ_air_Rayleigh!(λₘ)
         #@show ϖ_Cabannes[i_band]
         #depol_air_Cabannes = 2γ_air_Cabannes/(1+γ_air_Cabannes)
-        depol_air_Rayleigh = 0.02790 #2γ_air_Rayleigh/(1+γ_air_Rayleigh)
+        depol_air_Rayleigh = params.float_type(0.02790) #2γ_air_Rayleigh/(1+γ_air_Rayleigh)
         
         #a = Scattering.get_greek_rayleigh(depol_air_Cabannes)
         
@@ -745,7 +766,7 @@ function model_from_parameters(OCO::Bool, params::vSmartMOM_Parameters)
         for i_band=1:n_bands
             
             # i'th spectral band (convert from cm⁻¹ to μm)
-            curr_band_λ = 1e4 ./ params.spec_bands[i_band]
+            curr_band_λ = params.float_type(1e4) ./ params.spec_bands[i_band]
 
             # Create the aerosols:
             if length(curr_band_λ)==1
@@ -893,6 +914,10 @@ and calculate derived attributes into a vSmartMOM_Model"
 function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus}, 
                     λ₀,
                     params::vSmartMOM_Parameters)
+    
+    # Set floating point type for consistency
+    FT = params.float_type
+    
     #@show params.absorption_params.molecules
     # Number of total bands and aerosols (for convenience)
     n_bands = 3 #length(params.spec_bands)
@@ -925,8 +950,8 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
     ϖ_Cabannes = zeros(n_bands)
     ϖ_Cabannes[1], γ_air_Cabannes, γ_air_Rayleigh = 
         InelasticScattering.compute_γ_air_Rayleigh!(λ₀)
-    depol_air_Cabannes = 2γ_air_Cabannes/(1+γ_air_Cabannes)
-    depol_air_Rayleigh = 2γ_air_Rayleigh/(1+γ_air_Rayleigh)
+    depol_air_Cabannes = FT(2)*FT(γ_air_Cabannes)/(FT(1)+FT(γ_air_Cabannes))
+    depol_air_Rayleigh = FT(2)*FT(γ_air_Rayleigh)/(FT(1)+FT(γ_air_Rayleigh))
     #println("here 0")
     InelasticScattering.getRamanSSProp!(RS_type, depol_air_Rayleigh, λ₀);
     #println("here 1")
@@ -939,8 +964,8 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
     #greek_rayleigh = Scattering.get_greek_rayleigh(params.depol)
     # Rayleigh optical properties calculation
     
-    greek_cabannes = Vector{vSmartMOM.Scattering.GreekCoefs{Float64}}()
-    greek_rayleigh = Vector{vSmartMOM.Scattering.GreekCoefs{Float64}}()
+    greek_cabannes = Vector{vSmartMOM.Scattering.GreekCoefs{FT}}()
+    greek_rayleigh = Vector{vSmartMOM.Scattering.GreekCoefs{FT}}()
     τ_rayl = [zeros(params.float_type,length(params.spec_bands[i]), length(profile.T)) for i=1:n_bands];
     #τ_rayl = [zeros(params.float_type,1, length(profile.p_full)) for i=1:n_bands];
 
@@ -954,16 +979,16 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
     for i_band=1:n_bands
         #@show params.spec_bands[i_band]
         # i'th spectral band (convert from cm⁻¹ to μm)
-        curr_band_λ = 1e4 ./ params.spec_bands[i_band]
+        curr_band_λ = params.float_type(1e4) ./ params.spec_bands[i_band]
         νₘ = 0.5*(params.spec_bands[i_band][1]+params.spec_bands[i_band][end])
-        λₘ = 1.e7/νₘ
+        λₘ = params.float_type(1.e7)/νₘ
         ϖ_Cabannes[i_band], γ_air_Cabannes, γ_air_Rayleigh = 
             InelasticScattering.compute_γ_air_Rayleigh!(λₘ)
         if(i_band==1) 
             ϖ_Cabannes[i_band]=1.
         end
-        depol_air_Cabannes = 2γ_air_Cabannes/(1+γ_air_Cabannes)
-        depol_air_Rayleigh = 2γ_air_Rayleigh/(1+γ_air_Rayleigh)
+        depol_air_Cabannes = FT(2)*FT(γ_air_Cabannes)/(FT(1)+FT(γ_air_Cabannes))
+        depol_air_Rayleigh = FT(2)*FT(γ_air_Rayleigh)/(FT(1)+FT(γ_air_Rayleigh))
 
         #ϖ_Cabannes_VS[i_band], γ_air_Cabannes_VS, γ_air_Rayleigh_VS = 
         #InelasticScattering.compute_γ_air_Rayleigh_VS!(λₘ)
@@ -1053,7 +1078,7 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
         for i_band=1:n_bands
             
             # i'th spectral band (convert from cm⁻¹ to μm)
-            curr_band_λ = 1e4 ./ params.spec_bands[i_band]
+            curr_band_λ = params.float_type(1e4) ./ params.spec_bands[i_band]
 
             # Create the aerosols:
             if length(curr_band_λ)==1
@@ -1191,6 +1216,9 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
                     params::vSmartMOM_Parameters, 
                     target_grid::AbstractArray{FT})where {FT<:Union{AbstractFloat, ForwardDiff.Dual}}
     
+    # Set floating point type for consistency
+    FT = params.float_type
+    
     #@show params.absorption_params.molecules
     # Number of total bands and aerosols (for convenience)
     n_bands = 2 #length(params.spec_bands)
@@ -1230,8 +1258,8 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
 
     # Rayleigh optical properties calculation
     ϖ_Cabannes = zeros(n_bands)
-    greek_cabannes = Vector{vSmartMOM.Scattering.GreekCoefs{Float64}}()
-    greek_rayleigh = Vector{vSmartMOM.Scattering.GreekCoefs{Float64}}()
+    greek_cabannes = Vector{vSmartMOM.Scattering.GreekCoefs{FT}}()
+    greek_rayleigh = Vector{vSmartMOM.Scattering.GreekCoefs{FT}}()
     #greek_rayleigh = Scattering.get_greek_rayleigh(params.depol)
     τ_rayl = [zeros(params.float_type,length(params.spec_bands[i]), length(profile.T)) for i=1:n_bands];
     #τ_rayl = [zeros(params.float_type,1, length(profile.p_full)) for i=1:n_bands];
@@ -1246,13 +1274,13 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
     for i_band=1:n_bands
         #@show params.spec_bands[i_band]
         # i'th spectral band (convert from cm⁻¹ to μm)
-        curr_band_λ = 1e4 ./ params.spec_bands[i_band]
+        curr_band_λ = params.float_type(1e4) ./ params.spec_bands[i_band]
         νₘ = 0.5*(params.spec_bands[i_band][1]+params.spec_bands[i_band][end])
-        λₘ = 1.e7/νₘ
+        λₘ = params.float_type(1.e7)/νₘ
         ϖ_Cabannes[i_band], γ_air_Cabannes, γ_air_Rayleigh = 
             InelasticScattering.compute_γ_air_Rayleigh!(λₘ)
-        depol_air_Cabannes = 2γ_air_Cabannes/(1+γ_air_Cabannes)
-        depol_air_Rayleigh = 2γ_air_Rayleigh/(1+γ_air_Rayleigh)
+        depol_air_Cabannes = FT(2)*FT(γ_air_Cabannes)/(FT(1)+FT(γ_air_Cabannes))
+        depol_air_Rayleigh = FT(2)*FT(γ_air_Rayleigh)/(FT(1)+FT(γ_air_Rayleigh))
         a = Scattering.get_greek_rayleigh(depol_air_Cabannes)
         push!(greek_cabannes, a)
         a = Scattering.get_greek_rayleigh(depol_air_Rayleigh)
@@ -1335,7 +1363,7 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
         for i_band=1:n_bands
             
             # i'th spectral band (convert from cm⁻¹ to μm)
-            curr_band_λ = 1e4 ./ params.spec_bands[i_band]
+            curr_band_λ = params.float_type(1e4) ./ params.spec_bands[i_band]
 
             # Create the aerosols:
             if length(curr_band_λ)==1

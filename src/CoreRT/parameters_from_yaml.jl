@@ -239,7 +239,7 @@ function parameters_from_yaml(file_path)
     T = convert.(FT, params_dict["atmospheric_profile"]["T"]) # Level
     p = convert.(FT, params_dict["atmospheric_profile"]["p"]) # Boundaries
     q = "q" in keys(params_dict["atmospheric_profile"]) ? # Specific humidity, if it's specified. 
-            convert.(Float64, params_dict["atmospheric_profile"]["q"]) : zeros(length(T)) # Otherwise 0
+            convert.(FT, params_dict["atmospheric_profile"]["q"]) : zeros(FT, length(T)) # Otherwise 0
 
     # absorption group
     if "absorption" in keys(params_dict)
@@ -285,8 +285,8 @@ function parameters_from_yaml(file_path)
     
     # scattering group
     if "scattering" in keys(params_dict)
-        #Force aerosols to be Float64!!
-        FTa = Float64
+        # Use the same floating point type as the rest of the model
+        FTa = FT  # ← FIXED: Use FT instead of hardcoded Float64
         # Get aerosols from types
         aerosols = aerosol_params_to_obj(params_dict["scattering"]["aerosols"], FTa)
         r_max = FTa(params_dict["scattering"]["r_max"])

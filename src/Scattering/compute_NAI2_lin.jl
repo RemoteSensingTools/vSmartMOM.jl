@@ -32,10 +32,10 @@ function compute_aerosol_optical_properties(lin::LinMode, model::MieModel{FDT}, 
     # 
     
     # Just sample from 0.25%ile to 99.75%ile:
-    start,stop = quantile(size_distribution,[0.0025,0.9975])
-    #r, wᵣ = gauleg(nquad_radius, 0.0, r_max ; norm=true) 
-    r, wᵣ = gauleg(nquad_radius, start, min(stop,r_max) ; norm=true) 
-    
+    #start,stop = quantile(size_distribution,[0.0025,0.9975])
+    r, wᵣ = gauleg(nquad_radius, 0.0, r_max ; norm=false) 
+    #r, wᵣ = gauleg(nquad_radius, start, min(stop,r_max); norm=false) 
+     @show sum(wᵣ)
     # Wavenumber
     k = 2π / λ  
 
@@ -119,11 +119,12 @@ function compute_aerosol_optical_properties(lin::LinMode, model::MieModel{FDT}, 
             leg_π, leg_τ, 
             view(S₁, :, i), view(S₂, :, i), 
             view(Ṡ₁, :, :, i), view(Ṡ₂, :, :, i))
-        
+        #@show size(an), size(bn)
         # Suniti: continue here on 08/14/2025
         # Compute Extinction and scattering cross sections: 
         C_sca[i] = 2π / k^2 * (n_' * (abs2.(an) + abs2.(bn)))
         C_ext[i] = 2π / k^2 * (n_' * real(an + bn))
+        #@show C_sca[i], C_ext[i]
         for ctr=1:2
             Ċ_sca[ctr,i] = 2π / k^2 * (n_' * (
                                         an .* conj.(ȧn[ctr,:]) +
@@ -132,6 +133,7 @@ function compute_aerosol_optical_properties(lin::LinMode, model::MieModel{FDT}, 
                                         ḃn[ctr,:] .* conj.(bn)  
                                     ))
             Ċ_ext[ctr,i] = 2π / k^2 * (n_' * real(ȧn[ctr,:] + ḃn[ctr,:]))
+        #@show Ċ_sca[ctr,i], Ċ_ext[ctr,i]
         end
         # Compute scattering matrix components per size parameter:
         f₁₁[:,i] =  0.5 / x_size_param[i]^2  * real(abs2.(S₁[:,i]) + abs2.(S₂[:,i]));
@@ -167,12 +169,12 @@ function compute_aerosol_optical_properties(lin::LinMode, model::MieModel{FDT}, 
     bulk_C_ext =  sum(wₓ .* C_ext)
 
     for ctr=1:2
-        bulk_Ċ_sca[ctr] =  sum(wₓ .* Ċ_sca[ctr])
-        bulk_Ċ_ext[ctr] =  sum(wₓ .* Ċ_ext[ctr])
+        bulk_Ċ_sca[ctr] =  sum(wₓ .* Ċ_sca[ctr,:])
+        bulk_Ċ_ext[ctr] =  sum(wₓ .* Ċ_ext[ctr,:])
     end
     for ctr=3:4
-        bulk_Ċ_sca[ctr] =  sum(ẇₓ[:,ctr-2] .* C_sca)
-        bulk_Ċ_ext[ctr] =  sum(ẇₓ[:,ctr-2] .* C_ext)
+        bulk_Ċ_sca[ctr] =  sum(ẇₓ[ctr-2, :] .* C_sca)
+        bulk_Ċ_ext[ctr] =  sum(ẇₓ[ctr-2, :] .* C_ext)
     end
     
     bulk_ϖ = bulk_C_sca / bulk_C_ext
@@ -184,7 +186,7 @@ function compute_aerosol_optical_properties(lin::LinMode, model::MieModel{FDT}, 
     ẇr = zeros(FT, 2, length(r))
     
     for ctr=1:2
-        ẇr[ctr,:] = (4π * r.^2 .*  ẇₓ[:,ctr]) 
+        ẇr[ctr,:] = (4π * r.^2 .*  ẇₓ[ctr,:]) 
     end
     bulk_f₁₁   =  f₁₁ * wr
     bulk_f₃₃   =  f₃₃ * wr
@@ -299,9 +301,9 @@ function compute_ref_aerosol_extinction(lin::LinMode, model::MieModel{FDT}, FT2:
     # Get radius quadrature points and weights (for mean, thus normalized):
     #r, wᵣ = gauleg(nquad_radius, 0.0, r_max ; norm=true) 
     # Just sample from 0.25%ile to 99.75%ile:
-    start,stop = quantile(size_distribution,[0.0025,0.9975])
-    #r, wᵣ = gauleg(nquad_radius, 0.0, r_max ; norm=true) 
-    r, wᵣ = gauleg(nquad_radius, start, min(stop,r_max) ; norm=true) 
+    #start,stop = quantile(size_distribution,[0.0025,0.9975])
+    r, wᵣ = gauleg(nquad_radius, 0.0, r_max ; norm=false) 
+    #r, wᵣ = gauleg(nquad_radius, start, min(stop,r_max); norm=false) 
 
     # Wavenumber
     k = 2π / λ  
@@ -331,6 +333,7 @@ function compute_ref_aerosol_extinction(lin::LinMode, model::MieModel{FDT}, FT2:
     #bulk_Ċ_sca = zeros(FT, 4)
     # Standardized weights for the size distribution:
     wₓ, ẇₓ = compute_wₓ(lin, size_distribution, wᵣ, r, r_max) 
+
     #wₓ = compute_wₓ(size_distribution, wᵣ, r, r_max) 
     
     # Loop over size parameters
@@ -366,13 +369,14 @@ function compute_ref_aerosol_extinction(lin::LinMode, model::MieModel{FDT}, FT2:
         end
     end
 
+    #@show size(C_ext), size(wₓ), size(Ċ_ext), size(ẇₓ)
     # Calculate bulk extinction coeffitient
     bulk_C_ext =  sum(wₓ .* C_ext)
     for ctr=1:2
-        bulk_Ċ_ext[ctr] =  sum(wₓ .* Ċ_ext[ctr])
+        bulk_Ċ_ext[ctr] =  sum(wₓ .* Ċ_ext[ctr,:])
     end
     for ctr=3:4
-        bulk_Ċ_ext[ctr] =  sum(ẇₓ[ctr-2] .* C_ext)
+        bulk_Ċ_ext[ctr] =  sum(ẇₓ[ctr-2,:] .* C_ext)
     end
     
     # Return the bulk extinction coeffitient

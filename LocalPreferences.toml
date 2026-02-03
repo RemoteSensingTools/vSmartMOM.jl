@@ -1,0 +1,2 @@
+[CUDA]
+use_bundled_runtime = true

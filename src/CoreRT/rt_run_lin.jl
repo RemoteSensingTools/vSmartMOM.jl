@@ -326,6 +326,7 @@ function rt_run(RS_type::AbstractRamanType,
     #end   
     
     FT = eltype(sza)                    # Get the float-type to use
+
     Nz = length(model.profile.p_full)   # Number of vertical slices
     # CFRANKEN NEEDS to be changed for concatenated arrays!!
     
@@ -346,8 +347,8 @@ function rt_run(RS_type::AbstractRamanType,
     dims = (NquadN,NquadN)              # nxn dims
     Nparams = NAer*7 + NGas + NSurf
     # Need to check this a bit better in the future!
-    FT_dual = length(model.τ_aer[1][1]) > 0 ? typeof(model.τ_aer[1][1]) : FT
-    #FT_dual = FT
+    #FT_dual = length(model.τ_aer[1][1]) > 0 ? typeof(model.τ_aer[1][1]) : FT
+    FT_dual = FT
     # Output variables: Reflected and transmitted solar irradiation at TOA and BOA respectively # Might need Dual later!!
     #Suniti: consider adding a new dimension (iBand) to these arrays. The assignment of simulated spectra to their specific bands will take place after batch operations, thereby leaving the computational time unaffected 
     R       = zeros(FT_dual, length(vza), pol_type.n, nSpec)

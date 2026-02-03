@@ -205,7 +205,8 @@ function model_from_parameters(#::FwdMode,
                     vmr = 0);#mean(profile.vmr[params.absorption_params.molecules[i_band][molec_i]]))
                 # Calculate absorption profile
                 
-                @timeit "Absorption Coeff"  compute_absorption_profile!(τ_abs[i_band], 
+                @timeit "Absorption Coeff"  compute_absorption_profile!(
+                    τ_abs[i_band], 
                     absorption_model, 
                     params.spec_bands[i_band],
                     profile.vmr_h2o, 
@@ -235,7 +236,8 @@ function model_from_parameters(#::FwdMode,
                             vmr = 0);#mean(profile.vmr[params.absorption_params.molecules[i_band][molec_i]]))
                         # Calculate absorption profile
                         
-                        @timeit "Absorption Coeff"  compute_absorption_profile!(τ_abs[i_band], 
+                        @timeit "Absorption Coeff"  compute_absorption_profile!(
+                            τ_abs[i_band], 
                             absorption_model, 
                             params.spec_bands[i_band],
                             profile.vmr[params.absorption_params.fixed_molecules[i_band][molec_i]], 

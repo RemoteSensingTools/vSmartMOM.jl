@@ -251,7 +251,7 @@ Base.@kwdef struct AerosolOptics{FT<:Union{AbstractFloat, ForwardDiff.Dual}}
     "Extinction cross-section"
     k::Union{FT, AbstractArray{FT}}
     "Truncation factor" 
-    fᵗ::FT
+    fᵗ::Union{FT, AbstractArray{FT}}
     "Derivatives"
     derivs = zeros(1)
 end

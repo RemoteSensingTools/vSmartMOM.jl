@@ -212,7 +212,7 @@ Compute all an, bn using compute_mie_ab!
 Input: MieModel, wavelength (λ), radius
 Output: an, bn. Both of shape (aerosol.nquad_radius, N_max) (N_max from aerosol.r_max)
 """
-function compute_anbn(model::MieModel, λ, radius)
+function compute_anbn_lin(model::MieModel, λ, radius)
     
     @unpack computation_type, aerosol, r_max, nquad_radius, λ, polarization_type, truncation_type, wigner_A, wigner_B = model
     @unpack size_distribution, nᵣ, nᵢ = aerosol
@@ -259,6 +259,7 @@ end
 From the an, bn matrices, precompute all (an✶)am, (an✶)bm, (bn✶)am, (bn✶)bm 
 This allows quick computation of (an✶ + bn✶) × (am + bm)
 """
+#=
 function compute_avg_anbns!(an, bn, ab_pairs, w, Nmax, N_max_)
     FT2 = eltype(an)
 
@@ -284,7 +285,7 @@ function compute_avg_anbns!(an, bn, ab_pairs, w, Nmax, N_max_)
         @inbounds mat_bnam[m,n] = bnam;
     end
 end
-
+=#
 """
     $(FUNCTIONNAME)(an, bn, π_, τ_, S₁, S₂)
 Determines the amplitude functions `S₁`,`S₂` in Mie theory
@@ -321,13 +322,14 @@ Returns the `n` Gauss-Legendre quadrature points and weights with a change of in
 - `norm`: if `true`, normalizes the weights so that a mean can be computed instead of full integration
 The function returns `n` quadrature points ξ within [xmin,xmax] with associated weightes `w` 
 """
+#=
 function gauleg(n, xmin, xmax; norm=false)
     ξ, w = gausslegendre(n)
     ξ = (xmax - xmin) / 2 * ξ .+ (xmin + xmax) / 2
     norm ? w /= sum(w) : w *= (xmax - xmin) / 2
     return ξ, w
 end
-
+=#
 @doc raw"""
     $(FUNCTIONNAME)(greek_coefs, μ; returnLeg = false)
 Returns the reconstructed elements of the 4x4 scattering matrix at positions 
@@ -422,10 +424,11 @@ function compute_avg_C_scatt_ext(k, an, bn, w)
 end
 =#
 """ Compute probability weights of radii """
+#=
 function compute_wₓ(lin::LinMode, size_distribution, wᵣ, r, r_max) 
     
     wₓ = pdf.(size_distribution,r)      # Weights from distribution
-    g(p) = pdf.(LogNormal(p[1],p[2]), r)  # Weights from lognormal distribution
+    #g(p) = pdf.(LogNormal(p[1],p[2]), r)  # Weights from lognormal distribution
     ẇₓ = ForwardDiff.jacobian(g, [size_distribution.μ, size_distribution.σ])
     wₓ .*= wᵣ    # pre multiply with wᵣ to get proper means eventually:
     # normalize (could apply a check whether cdf.(size_distribution,r_max) is larger than 0.99:
@@ -434,8 +437,39 @@ function compute_wₓ(lin::LinMode, size_distribution, wᵣ, r, r_max)
     wₓ /= sum(wₓ)
     for ctr = 1:2                               
         ẇₓ[:,ctr] .= ẇₓ[:,ctr] .* wᵣ
-        ẇₓ[:,ctr] .= ẇₓ[:,ctr] ./ sum(wₓ) .- (sum(ẇₓ[:,ctr]) * wₓ) ./ (sum(wₓ)^2)
+        ẇₓ[:,ctr] .= ẇₓ[:,ctr]./sum(wₓ) .- (sum(ẇₓ[:,ctr]) * wₓ)./(sum(wₓ)^2)
     end
+    return wₓ, ẇₓ'
+end
+=#
+function compute_wₓ(lin::LinMode, size_distribution, wᵣ, r, r_max) 
+    
+    wₓ = pdf.(size_distribution,r)      # Weights from distribution
+    # compare wₓ with a = (1.0./r*sd1.σ*sqrt(2π)).*exp.(-0.5*((log.(r).-sd1.μ)/sd1.σ).^2)
+    #g(p) = pdf.(LogNormal(p[1],p[2]), r)  # Weights from lognormal distribution
+    #ẇₓ = ForwardDiff.jacobian(g, [size_distribution.μ, size_distribution.σ])
+    ẇₓ = zeros(2, length(r))                               
+    ẇₓ[1,:] .= ((log.(r).-size_distribution.μ)/size_distribution.σ^2) .* wₓ
+    ẇₓ[2,:] .= (ẇₓ[1,:].*(log.(r).-size_distribution.μ) .- wₓ)/size_distribution.σ
+#@show "before", sum(wᵣ), 
+    #sum(wₓ[1:end-1].*(r[2:end]-r[1:end-1])), 
+    #sum(ẇₓ[1,1:end-1].*(r[2:end]-r[1:end-1])), 
+    #sum(ẇₓ[2,1:end-1].*(r[2:end]-r[1:end-1]))
+
+    wₓ .*= wᵣ
+    ẇₓ[1,:] .*= wᵣ
+    ẇₓ[2,:] .*= wᵣ
+
+    wₓ /= sum(wₓ)
+    for ctr = 1:2                               
+        ẇₓ[ctr,:] .= ẇₓ[ctr,:]./sum(wₓ) .- (sum(ẇₓ[ctr,:]) * wₓ)./(sum(wₓ)^2)
+    end
+#@show "after", sum(wᵣ), 
+#sum(wₓ), 
+#sum(ẇₓ[1,:]), 
+#sum(ẇₓ[2,:])
+     @info "Fraction of size distribution cut by max radius: $((1-cdf.(size_distribution,r_max))*100) %"  
+    
     return wₓ, ẇₓ
 end
 

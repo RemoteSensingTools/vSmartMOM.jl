@@ -1,11 +1,13 @@
-function constructCoreOpticalProperties(RS_type, iBand, m, model, lin_model)
+function constructCoreOpticalProperties(RS_type, iBand, m, model, lin_model) #where {FT<:Union{AbstractFloat, ForwardDiff.Dual}}
     @unpack τ_rayl, τ_aer, τ_abs, aerosol_optics, 
             greek_rayleigh, greek_cabannes, ϖ_Cabannes = model
     @unpack τ̇_aer, τ̇_abs, lin_aerosol_optics = lin_model
     @assert all(iBand .≤ length(τ_rayl)) "iBand exceeded number of bands"
-    FT = eltype(τ_rayl)
+    FT = eltype(τ_rayl[1])
+    
+    # Debug: Check what architecture and array_type we're getting
     arr_type = array_type(model.params.architecture)
-
+    
     pol_type = model.params.polarization_type
     # Do this in CPU space only first:
     
@@ -24,6 +26,7 @@ function constructCoreOpticalProperties(RS_type, iBand, m, model, lin_model)
     band_fScattRayleigh  = [];
     # @show arr_type
     for iB in iBand
+        @show iB
         if (typeof(RS_type)<:noRS) #!(typeof(RS_type)<:Union{RRS,RRS_plus})
             Rayl𝐙⁺⁺, Rayl𝐙⁻⁺ = Scattering.compute_Z_moments(pol_type, μ, 
                                                             greek_rayleigh[iB], m, 
@@ -38,6 +41,19 @@ function constructCoreOpticalProperties(RS_type, iBand, m, model, lin_model)
         end
 
         #if (typeof(RS_type)<:noRS) #if !(typeof(RS_type)<:Union{RRS,RRS_plus})
+        
+        # Debug the exact line that's causing the error
+        #@show arr_type
+        #@show typeof(arr_type)
+        #@show τ_rayl[iB][:,1]  # Check one element to see what we're passing
+        #@show typeof(τ_rayl[iB][:,1]), size(τ_rayl)
+        
+        #@show CuArray(τ_rayl[iB][:,1])  # Convert to CuArray if needed
+        #@show typeof(Rayl𝐙⁺⁺), size(Rayl𝐙⁺⁺)
+        CoreScatteringOpticalProperties(arr_type(τ_rayl[iB][:,1]), FT(1.0), 
+                (Rayl𝐙⁺⁺), (Rayl𝐙⁻⁺))
+
+              
         rayl =  [CoreScatteringOpticalProperties(arr_type(τ_rayl[iB][:,i]), 1.0, 
                 (Rayl𝐙⁺⁺), (Rayl𝐙⁻⁺)) for i=1:nZ]
             #rayl_lin = [CoreScatteringOpticalPropertiesLin(arr_type(τ̇_rayl[iB][:,iz]), 0.0, 
@@ -86,6 +102,8 @@ function constructCoreOpticalProperties(RS_type, iBand, m, model, lin_model)
                                 aerosol_optics[iB][iaer].greek_coefs, 
                                 lin_aerosol_optics[iB][iaer].lin_greek_coefs, 
                                 m, arr_type=arr_type)
+            #@show AerŻ⁺⁺, size(AerŻ⁺⁺)
+            #@show AerŻ⁻⁺, size(AerŻ⁻⁺)
             # Generate Core optical properties for Aerosols iaer
             #@show size(τ_aer[iB][iaer,:,:])
             #aer = Vector{CoreScatteringOpticalProperties}
@@ -117,6 +135,11 @@ function constructCoreOpticalProperties(RS_type, iBand, m, model, lin_model)
                             lin_aerosol_optics[iB][iaer], 
                             arr_type(AerŻ⁺⁺), arr_type(AerŻ⁻⁺), 
                             arr_type) 
+                @show iz, size(t_aer.τ)#, t_aer.τ[1], t_aer.τ[end]
+                @show iz, size(t_aer.ϖ)#, t_aer.ϖ[1], t_aer.ϖ[end]
+
+                @show iz, size(t_lin_aer.ϖ̇)#, t_lin_aer.ϖ̇[1], t_lin_aer.ϖ̇[end]
+                @show iz, size(t_lin_aer.τ̇)#, t_lin_aer.τ̇[1], t_lin_aer.τ̇[end]
                 push!(aer, t_aer)
                 push!(lin_aer, t_lin_aer)
             end 

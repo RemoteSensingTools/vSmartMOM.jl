@@ -21,7 +21,7 @@ parameters =
 model      = model_from_parameters(parameters);
 
 iBand = 1
-FT = Float64
+FT = Float32
 
 #### Compute all Raman properties
 ν = model.params.spec_bands[iBand]
@@ -49,7 +49,8 @@ RS_type = InelasticScattering.RRS(
             Z⁺⁺_λ₁λ₀    = zeros(FT,1,1), 
             i_ref       = i_ref,
             n_Raman     = 0,
-            F₀          = zeros(FT,1,1));
+            F₀          = zeros(FT,1,1),
+            SIF₀        = zeros(FT,1,1));
 
 
 #vSmartMOM.get_greek_raman!(RS_type, n2, o2);
@@ -58,6 +59,12 @@ RS_type = InelasticScattering.RRS(
 #RS_type = vSmartMOM.RRS(...)
 # Compute Raman SSA properties:
 CoreRT.getRamanSSProp!(RS_type, 1e7/ν̃, ν);
+J_SIF = readdlm("/home/sanghavi/code/github/vSmartMOM.jl/src/SIF_emission/sif-spectra.csv", ',') 
+#J_SIF = readdlm("/home/sanghavi/code/github/vSmartMOM.jl/src/SIF_emission/PC1_SIFSpectra_allSpecies.csv", ',') 
+νSIF = reverse(1e7./J_SIF[2:end,1])
+jSIF = reverse(J_SIF[2:end,2]*(0.5*π/maximum(J_SIF[2:end,2]))) # mW/m²/nm
+jSIF .*= 1e7./(νSIF.^2) # mW/m²/cm⁻¹
+SIF_interp = LinearInterpolation(νSIF, jSIF)
 T_sun = 5777. # K
 P = planck_spectrum_wn(T_sun, ν) * 2.1629e-05 * π  # mW/m²-sr-cm⁻¹
 Tsolar = solar_transmission_from_file("/home/sanghavi/code/github/vSmartMOM.jl/src/SolarModel/solar.out")
@@ -78,12 +85,16 @@ RS_type = InelasticScattering.noRS(
     ϖ_Cabannes  = [FT(1)], 
     bandSpecLim = [],
     iBand       = [1],
-    F₀          = zeros(FT,1,1));
+    F₀          = zeros(FT,1,1),
+    SIF₀        = zeros(FT,1,1));
 RS_type.F₀ = zeros(model.params.polarization_type.n, length(P))
+RS_type.SIF₀ = zeros(model.params.polarization_type.n, length(ν))
+                
 for i=1:length(P)
     #sol_trans = Tsolar_interp(ν[i]);
     #F₀[i] = sol_trans * P[i];
     RS_type.F₀[1,i] = F₀[i]; #F₀
+    RS_type.SIF₀[1,i] = SIF_interp(ν[i]); #0.0 #                    
 end 
 
 RnoRS, TnoRS, _, _ = CoreRT.rt_run_test(RS_type,model,iBand);

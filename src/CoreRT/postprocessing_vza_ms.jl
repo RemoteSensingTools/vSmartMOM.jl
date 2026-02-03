@@ -13,8 +13,8 @@ function postprocessing_vza_ms!(RS_type::noRS,
         vza, qp_μ, m, vaz, μ₀, weight, 
         nSpec, SFI, 
         uwJ, dwJ, uwieJ, dwieJ, 
-        I_static::AbstractArray{FT2}, 
-        arr_type) where {FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2}
+        I_static::AbstractArray{FT}, 
+        arr_type) where {FT<:Union{AbstractFloat, ForwardDiff.Dual}}
     
     # idfx of μ0 = cos(sza)
     st_iμ0, istart0, iend0 = get_indices(iμ₀, pol_type);
@@ -87,7 +87,7 @@ function postprocessing_vza_ms!(RS_type::Union{RRS, VS_0to1_plus, VS_1to0_plus},
         nSpec, SFI, 
         uwJ, dwJ, uwieJ, dwieJ,
         I_static,
-        arr_type) where {FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2}
+        arr_type) #where {FT<:Union{AbstractFloat, ForwardDiff.Dual}}
         #R, R_SFI, T, T_SFI, ieR_SFI, ieT_SFI)
     
     # idx of μ0 = cos(sza)

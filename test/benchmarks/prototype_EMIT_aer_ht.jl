@@ -11,38 +11,41 @@ using ImageFiltering
 using Distributions
 using Plots
 using DelimitedFiles
-
+using LinearAlgebra
+include("/home/sanghavi/code/github/vSmartMOM.jl/src/Testing/perturb_parameters.jl")
 # defining vSmartMOM modes to be used in the following
-fwd_mode = FwdMode() #vSmartMOM.CoreRT.Mode.FwdMode()
-lin_mode = LinMode() #vSmartMOM.CoreRT.Mode.LinMode() 
+fwd_mode = FwdMode() #vSmartMOM.CoreRT.RT_Mode.FwdMode()
+lin_mode = LinMode() #vSmartMOM.CoreRT.RT_Mode.LinMode() 
+FT = Float64  # ← KEEP: Using Float32 as requested
 
 
 # Benchmarks: http://web.gps.caltech.edu/~vijay/Rayleigh_Scattering_Tables/STOKES/
 ##
 # Load YAML files into parameter struct
 parameters = 
-    parameters_from_yaml("test/test_parameters/ParamsEMIT.yaml");
-pert_pct = 0.1
+    parameters_from_yaml("/home/sanghavi/code/github/vSmartMOM.jl/test/test_parameters/ParamsEMIT.yaml");
+pert_pct = FT(0.01)
 pert_parameters = perturb_parameters(parameters, pert_pct)
 #parameters.depol = 0.041362343961163395 #0.028 #(0.028: Cabannes), (0.1032: Rayleigh) 
     #parameters = parameters_from_yaml("test/test_parameters/O2Parameters2.yaml");
 # Create model struct (precomputes optical properties) from parameters
 model, lin_model = model_from_parameters(lin_mode, 
     parameters);
-
+#compute_FD_modelJacobian(parameters, pert_pct)
+@show "hello"
 iBand = 1
-FT = Float64
-T_sun = 5777. # K 
+
+T_sun = FT(5777.) # K 
 Tsolar = solar_transmission_from_file("/home/sanghavi/code/github/vSmartMOM.jl/src/SolarModel/solar.out")    
 Tsolar_interp = LinearInterpolation(Tsolar[4:end, 1], Tsolar[4:end, 2])
-x = -40:0.05:40
+x = (-40:0.05:40)
 #kernel = InstrumentOperator.create_instrument_kernel(Normal(0, 12.5), x) #defining a Gaussian kernel for convulution in wavenumber space
-kernel = InstrumentOperator.create_instrument_kernel(Normal(0, 12.5), x)
+kernel = InstrumentOperator.create_instrument_kernel(Normal(0, (12.5)), x)
 I_conv = [];
 λEMIT = [];
 I_EMIT = [];
 λ = [];
-Δλ = 7.0 #[nm] EMIT sampling 
+Δλ = FT(7.0) #[nm] EMIT sampling 
 for iBand=1:length(model.params.spec_bands)
 #### Compute all Raman properties
     ν = model.params.spec_bands[iBand]
@@ -54,7 +57,7 @@ for iBand=1:length(model.params.spec_bands)
     # TODO_VS: λ_vs_in (get input)
     # TODO_VS: ν_vs_in (convert to wavenumbers)
     # Effective temperature for Raman calculations
-    effT = 300.  #(model.profile.vcd_dry' * model.profile.T) / sum(model.profile.vcd_dry);
+    effT = FT(300.)  #(model.profile.vcd_dry' * model.profile.T) / sum(model.profile.vcd_dry);
     RS_type = InelasticScattering.noRS(
         fscattRayl  = [FT(1)],
         ϖ_Cabannes  = [FT(1)], 
@@ -64,11 +67,11 @@ for iBand=1:length(model.params.spec_bands)
         SIF₀        = zeros(FT,1,1));
 
     P = planck_spectrum_wn(T_sun, ν)
-    F₀ = zeros(length(P));
-    RS_type.F₀ = zeros(model.params.polarization_type.n, length(P))
+    F₀ = zeros(FT,length(P));
+    RS_type.F₀ = zeros(FT, model.params.polarization_type.n, length(P))
     for i=1:length(P)
         sol_trans = Tsolar_interp(ν[i]);
-        F₀[i] = sol_trans * P[i];
+        F₀[i] = FT(sol_trans * P[i]);
         RS_type.F₀[1,i] = F₀[i];
     end 
     NAer = length(model.params.scattering_params.rt_aerosols)
