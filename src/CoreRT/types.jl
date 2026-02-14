@@ -491,15 +491,24 @@ A struct which holds all derived model parameters (including any computations)
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-mutable struct vSmartMOM_Model{PA, AE, GR, QP, TAB, TR, TAE, Ogeom, PRO}
+mutable struct vSmartMOM_Model{PA, AE, GC, GR, QP, TAB, TR, TAE, Ogeom, PRO}
+
+    "Per-band adjusted max number of Fourier iterations"
+    max_m::Vector{Int}
+    "Max length per band of truncated aerosol Greek coefficients (l_max = 2max_m+1)"
+    l_max::Vector{Int}
 
     "Struct with all individual parameters"
     params::PA # vSmartMOM_Parameters
     
     "Truncated aerosol optics"
     aerosol_optics::AE # AbstractArray{AbstractArray{AerosolOptics}}
-    "Greek coefs in Rayleigh calculations" 
-    greek_rayleigh::GR # GreekCoefs
+    "Pure elastic (Cabannes) fraction of Rayleigh scattering per band"
+    ϖ_Cabannes::AbstractArray
+    "Greek coefs for Cabannes (pure elastic) Rayleigh per band"
+    greek_cabannes::GC # Vector{GreekCoefs}
+    "Greek coefs in Rayleigh calculations (single or per band)" 
+    greek_rayleigh::GR # GreekCoefs or Vector{GreekCoefs}
     "Quadrature points/weights, etc"
     quad_points::QP # QuadPoints
 

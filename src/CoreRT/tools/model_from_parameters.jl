@@ -42,19 +42,33 @@ function model_from_parameters(params::vSmartMOM_Parameters)
     τ_rayl = [zeros(FT,length(params.spec_bands[i]), length(params.T)) for i=1:n_bands];
     #τ_rayl = [zeros(FT,1,length(profile.T)) for i=1:n_bands];
     
+    # Per-band Cabannes / Rayleigh depolarization (for inelastic scattering support)
+    greek_cabannes = typeof(greek_rayleigh)[]
+    ϖ_Cabannes = zeros(FT, n_bands)
+    
     # This is a kludge for now, tau_abs sometimes needs to be a dual. Suniti & us need to rethink this all!!
     # i.e. code the rt core with fixed amount of derivatives as in her paper, then compute chain rule for dtau/dVMr, etc...
     FT2 = isnothing(params.absorption_params) || !haskey(params.absorption_params.vmr,"CO2") ? params.float_type : eltype(params.absorption_params.vmr["CO2"])
     τ_abs     = [zeros(FT, length(params.spec_bands[i]), length(profile.p_full)) for i in 1:n_bands]
+    
+    # Track per-band l_max from aerosol greek coef lengths
+    l_max_aer = zeros(Int, max(n_aer, 1), n_bands)
     
     # Loop over all bands:
     for i_band=1:n_bands
 
         # i'th spectral band (convert from cm⁻¹ to μm)
         curr_band_λ = FT.(1e4 ./ params.spec_bands[i_band])
-        # @show profile.vcd_dry, size(τ_rayl[i_band])
+        
+        # Compute per-band Cabannes properties for inelastic scattering support
+        νₘ = FT(0.5) * (params.spec_bands[i_band][1] + params.spec_bands[i_band][end])
+        λₘ = FT(1.0e7) / νₘ
+        ϖ_Cab, γ_air_Cab, _ = InelasticScattering.compute_γ_air_Rayleigh!(λₘ)
+        ϖ_Cabannes[i_band] = FT(ϖ_Cab)
+        depol_air_Cab = 2γ_air_Cab / (1 + γ_air_Cab)
+        push!(greek_cabannes, Scattering.get_greek_rayleigh(FT(depol_air_Cab)))
+        
         # Compute Rayleigh properties per layer for `i_band` band center  
-        #@show τ_rayl[i_band]
         τ_rayl[i_band]   .= getRayleighLayerOptProp(profile.p_half[end], 
                                 curr_band_λ, #(mean(curr_band_λ)), 
                                 params.depol, profile.vcd_dry);
@@ -153,6 +167,10 @@ function model_from_parameters(params::vSmartMOM_Parameters)
             aerosol_optics[i_band][i_aer] = Scattering.truncate_phase(truncation_type, 
                                                     aerosol_optics_raw; reportFit=false)
             #aerosol_optics[i_band][i_aer] =  aerosol_optics_raw
+            
+            # Track greek coef length for l_max computation
+            l_max_aer[i_aer, i_band] = min(length(aerosol_optics[i_band][i_aer].greek_coefs.β), 
+                                            truncation_type.l_max)
                                                     
             @show aerosol_optics[i_band][i_aer].k
             #@show aerosol_optics[i_band][i_aer].fᵗ
@@ -165,25 +183,28 @@ function model_from_parameters(params::vSmartMOM_Parameters)
         end 
     end
 
-    # Check the floating-type output matches specified FT
+    # Compute per-band l_max and max_m from aerosol greek coefficient lengths
+    l_max = zeros(Int, n_bands)
+    max_m_bands = zeros(Int, n_bands)
+    for i_band = 1:n_bands
+        if n_aer > 0
+            l_max[i_band] = maximum(l_max_aer[:, i_band])
+        else
+            l_max[i_band] = params.l_trunc
+        end
+        max_m_bands[i_band] = Int(ceil((l_max[i_band] + 1) / 2))
+        # Clamp to user-specified max_m if it's lower (hard cutoff)
+        max_m_bands[i_band] = min(max_m_bands[i_band], params.max_m)
+    end
 
-    # Plots:
-    #=
-    plt = lineplot(profile.T, -profile.p_full,#ylim=(1000,0),
-                      title="Temperature Profile", xlabel="Temperature [K]", ylabel="- Pressure [hPa]", canvas = UnicodePlots.DotCanvas, border=:ascii, compact=true)
-    display(plt)
-    println()
-    plt = lineplot(profile.q, -profile.p_full,
-                      title="Humidity Profile", xlabel="Specific humidity", ylabel="- Pressure [hPa]", canvas = UnicodePlots.DotCanvas, border=:ascii, compact=true)
-    display(plt)
-    #=@show typeof(τ_aer[1][1,:])
-    plt = lineplot(τ_aer[1][1,:],-profile.p_full,
-                      title="AOD Profile Band 1", xlabel="AOD", ylabel="- Pressure [hPa]", canvas = UnicodePlots.DotCanvas, border=:ascii, compact=true)
-    display(plt)=#
-    =#
     # Return the model 
-    return vSmartMOM_Model(params, 
-                        aerosol_optics,  
+    return vSmartMOM_Model(
+                        max_m_bands,
+                        l_max,
+                        params, 
+                        aerosol_optics,
+                        ϖ_Cabannes,
+                        greek_cabannes,  
                         greek_rayleigh, 
                         quad_points, 
                         τ_abs, 
@@ -246,6 +267,12 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
     greek_rayleigh = Scattering.get_greek_rayleigh(params.depol)
     τ_rayl = [zeros(params.float_type,1, length(profile.p_full)) for i=1:n_bands];
 
+    # Per-band Cabannes / Rayleigh depolarization (for inelastic scattering support)
+    FT_vrs = params.float_type
+    greek_cabannes = typeof(greek_rayleigh)[]
+    ϖ_Cabannes = zeros(FT_vrs, n_bands)
+    l_max_aer = zeros(Int, max(n_aer, 1), n_bands)
+
     # Pre-allocated absorption arrays
     τ_abs     = [zeros(params.float_type, length(params.spec_bands[i]), length(profile.p_full)) for i in 1:n_bands]
     # Loop over all bands:
@@ -253,6 +280,14 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
         @show params.spec_bands[i_band]
         # i'th spectral band (convert from cm⁻¹ to μm)
         curr_band_λ = 1e4 ./ params.spec_bands[i_band]
+
+        # Compute per-band Cabannes properties
+        νₘ = 0.5 * (params.spec_bands[i_band][1] + params.spec_bands[i_band][end])
+        λₘ = 1.0e7 / νₘ
+        ϖ_Cab, γ_air_Cab, _ = InelasticScattering.compute_γ_air_Rayleigh!(λₘ)
+        ϖ_Cabannes[i_band] = FT_vrs(ϖ_Cab)
+        depol_air_Cab = 2γ_air_Cab / (1 + γ_air_Cab)
+        push!(greek_cabannes, Scattering.get_greek_rayleigh(FT_vrs(depol_air_Cab)))
 
         # Compute Rayleigh properties per layer for `i_band` band center
         τ_rayl[i_band]   .= getRayleighLayerOptProp(profile.p_half[end], 
@@ -356,10 +391,34 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
         end 
     end
 
-    # Check the floating-type output matches specified FT
+    # Compute per-band l_max and max_m
+    l_max = zeros(Int, n_bands)
+    max_m_bands = zeros(Int, n_bands)
+    for i_band = 1:n_bands
+        if n_aer > 0
+            l_max[i_band] = maximum(l_max_aer[:, i_band])
+        else
+            l_max[i_band] = params.l_trunc
+        end
+        max_m_bands[i_band] = Int(ceil((l_max[i_band] + 1) / 2))
+        max_m_bands[i_band] = min(max_m_bands[i_band], params.max_m)
+    end
 
     # Return the model 
-    return vSmartMOM_Model(params, aerosol_optics,  greek_rayleigh, quad_points, τ_abs, τ_rayl, τ_aer, obs_geom, profile)
+    return vSmartMOM_Model(
+                        max_m_bands,
+                        l_max,
+                        params, 
+                        aerosol_optics,
+                        ϖ_Cabannes,
+                        greek_cabannes,
+                        greek_rayleigh, 
+                        quad_points, 
+                        τ_abs, 
+                        τ_rayl, 
+                        τ_aer, 
+                        obs_geom, 
+                        profile)
 
 end
 

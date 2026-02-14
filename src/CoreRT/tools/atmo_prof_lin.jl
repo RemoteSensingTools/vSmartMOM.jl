@@ -73,24 +73,24 @@ function read_atmos_profile(file_path::String)
         ak    = convert.(Float64, params_dict["ak"])
         bk    = convert.(Float64, params_dict["bk"])
         p_half = (ak + bk * psurf)
-        p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o = compute_atmos_profile_fields(T, p_half, q, Dict())
+        p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o, new_vmr, Δz = compute_atmos_profile_fields(T, p_half, q, Dict())
     elseif ("q" in keys(params_dict))
         p_half = convert(Float64, params_dict["p_half"])
         psurf = p_half[end]
         q      = convert.(Float64, params_dict["q"])
-        p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o = compute_atmos_profile_fields(T, p_half, q, Dict())
+        p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o, new_vmr, Δz = compute_atmos_profile_fields(T, p_half, q, Dict())
     else
         p_half = convert.(Float64, params_dict["p_half"])
         psurf = p_half[end]
         q = zeros(length(T))
-        p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o = compute_atmos_profile_fields(T, p_half, q, Dict())
+        p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o, new_vmr, Δz = compute_atmos_profile_fields(T, p_half, q, Dict())
     end
 
     # Convert vmr to appropriate type
     vmr = convert(Dict{String, Union{Real, Vector}}, params_dict["vmr"])
 
     # Return the atmospheric profile struct
-    return AtmosphericProfile(T, q, p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o, vmr)
+    return AtmosphericProfile(T, p_full, q, p_half, vmr_h2o, vcd_dry, vcd_h2o, vmr, Δz)
 
 end
 
@@ -101,7 +101,7 @@ function reduce_profile(n::Int, profile::AtmosphericProfile{FT}) where {FT}
     @assert n < length(profile.T)
 
     # Unpack the profile vmr
-    @unpack vmr = profile
+    @unpack vmr, Δz = profile
 
     # New rough half levels (boundary points)
     a = range(0, maximum(profile.p_half), length=n+1)
@@ -114,6 +114,7 @@ function reduce_profile(n::Int, profile::AtmosphericProfile{FT}) where {FT}
     vmr_h2o  = zeros(FT, n);
     vcd_dry  = zeros(FT, n);
     vcd_h2o  = zeros(FT, n);
+    Δz_ = zeros(FT, n);
 
     # Loop over target number of layers
     indices = []
@@ -135,6 +136,7 @@ function reduce_profile(n::Int, profile::AtmosphericProfile{FT}) where {FT}
         vmr_h2o[i] = mean(profile.vmr_h2o[ind])
         vcd_dry[i] = sum(profile.vcd_dry[ind])
         vcd_h2o[i] = sum(profile.vcd_h2o[ind])
+        Δz_[i] = sum(Δz[ind])
     end
     #@show indices
 
@@ -152,7 +154,7 @@ function reduce_profile(n::Int, profile::AtmosphericProfile{FT}) where {FT}
         end
     end
 
-    return AtmosphericProfile(T, p_full, q, p_half, vmr_h2o, vcd_dry, vcd_h2o, new_vmr)
+    return AtmosphericProfile(T, p_full, q, p_half, vmr_h2o, vcd_dry, vcd_h2o, new_vmr, Δz_)
 end
 
 """
