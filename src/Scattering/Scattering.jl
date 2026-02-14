@@ -20,7 +20,8 @@ using LinearAlgebra             # For calculations
 using StatsBase                 # Fit statistics for truncation
 using StaticArrays              # 
 
-using ..Architectures: device
+# Architectures used for CPU/GPU dispatch
+using ..Architectures
 using ..vSmartMOM: RT_Mode, FwdMode, LinMode
 
 include("types.jl")                       # All types used in this module

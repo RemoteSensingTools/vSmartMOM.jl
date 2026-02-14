@@ -15,6 +15,12 @@ This file contains all types that are used in the vSmartMOM module:
 - `ComputedAtmosphereProperties` and `ComputedLayerProperties` hold intermediate computed properties
 
 =#
+
+# Conditional type for CUDA pointer arrays (only needed when CUDA is loaded)
+# When CUDA is not loaded, this will just be Nothing
+# When CUDA is loaded, CUDAExt will properly handle CuArray types
+const MaybeCuPtrArray = Union{AbstractArray, Nothing}
+
 "Struct for an atmospheric profile"
 struct AtmosphericProfile{FT, VMR <: Union{Real, Vector}}
     "Temperature Profile"
@@ -33,23 +39,23 @@ struct AtmosphericProfile{FT, VMR <: Union{Real, Vector}}
     vcd_h2o::Array{FT,1}
     "Volume Mixing Ratio of Constituent Gases"
     vmr::Dict{String, VMR}
+    "Layer height (meters)"
+    Δz::Array{FT,1}
 end
 
 "Types for describing atmospheric parameters"
 abstract type AbstractObsGeometry end
 
 "Observation Geometry (basics)" 
-Base.@kwdef mutable struct ObsGeometry{FT} <: AbstractObsGeometry
+Base.@kwdef struct ObsGeometry{FT} <: AbstractObsGeometry
     "Solar Zenith Angle `[Degree]`"
     sza::FT
     "Viewing Zenith Angle(s) `[Degree]`" 
     vza::Array{FT,1}
     "Viewing Azimuth Angle(s) `[Degree]`" 
     vaz::Array{FT,1}
-    "Altitude of Observer `[km]`"
-    # TODO Suniti
-    obs_alt::FT #Union{FT, Array{FT,1}}
-    #sensor_levels::Array{Int}
+    "Altitude of Observer `[Pa]`"
+    obs_alt::FT
 end
 
 mutable struct RT_Aerosol{}#FT<:Union{AbstractFloat, ForwardDiff.Dual}}
@@ -57,14 +63,8 @@ mutable struct RT_Aerosol{}#FT<:Union{AbstractFloat, ForwardDiff.Dual}}
     aerosol::Aerosol#{FT}
     "Reference τ"
     τ_ref#::FT
-    "Mode z (km)"
-    z₀#::FT
-    "Peak width"
-    σ₀#::FT
-    #"Pressure peak (Pa)"
-    #p₀#::FT
-    #"Pressure peak width (Pa)"
-    #σp#::FT
+    "Vertical distribution as function of p (using Distributions.jl)"
+    profile::Distribution#::FT
 end
 
 "Quadrature Types for RT streams"
@@ -133,9 +133,17 @@ Base.@kwdef struct AddedLayer{FT} <: AbstractLayer
     "Added layer transmission matrix T (from - -> -)"
     t⁻⁻::AbstractArray{FT,3}
     "Added layer source matrix J (in + direction)"
-    J₀⁺::AbstractArray{FT,3}
+    j₀⁺::AbstractArray{FT,3}
     "Added layer source matrix J (in - direction)"
-    J₀⁻::AbstractArray{FT,3}
+    j₀⁻::AbstractArray{FT,3}
+    "Added layer temporary space to avoid allocations"
+    temp1::Union{AbstractArray{FT,3}, Nothing}
+    "Added layer temporary space to avoid allocations"
+    temp2::Union{AbstractArray{FT,3}, Nothing}
+    "Pointer to temporary space to avoid allocations (CUDA-specific, ignored on CPU)"
+    temp1_ptr::MaybeCuPtrArray
+    "Pointer to temporary space to avoid allocations (CUDA-specific, ignored on CPU)"
+    temp2_ptr::MaybeCuPtrArray
 end
 
 "Composite Layer Matrices (`-/+` defined in τ coordinates, i.e. `-`=outgoing, `+`=incoming"
@@ -302,21 +310,48 @@ struct ScatteringInterface_AtmoSurf <: AbstractScatteringInterface end
 abstract type AbstractSurfaceType end
 
 "Lambertian Surface (scalar per band)"
-mutable struct LambertianSurfaceScalar{FT} <: AbstractSurfaceType
+struct LambertianSurfaceScalar{FT} <: AbstractSurfaceType
     "Albedo (scalar)"
     albedo::FT
 end
 
 "Defined as Array (has to have the same length as the band!)"
-mutable struct LambertianSurfaceSpectrum{FT} <: AbstractSurfaceType
+struct LambertianSurfaceSpectrum{FT} <: AbstractSurfaceType
     "Albedo (vector)"
     albedo::AbstractArray{FT,1}
+end
+
+"Defined as Array (has to have the same length as the band!)"
+struct rpvSurfaceScalar{FT} <: AbstractSurfaceType
+    "Overall reflectance level parameter (scalar)"
+    ρ₀::FT
+    "Hotspot function parameter (1.0 = no hotspot)"
+    ρ_c::FT
+    "Anisotropy shape parameter. k < 1.0 (> 1.0) corresponds to a bowl (bell) shape."
+    k::FT
+    "Asymmetry parameter, Θ < 0.0 (> 0.0) corresponds to a predominantly backward (forward) scattering."
+    Θ::FT
+end
+
+struct RossLiSurfaceScalar{FT} <: AbstractSurfaceType
+    "Volumetric RossThick  fraction"
+    fvol::FT
+    "Geometric LiSparse fraction"
+    fgeo::FT
+    "Isotropic reflectance fraction"
+    fiso::FT
 end
 
 "Defined by Legendre polynomial terms as function of spectral grid, which is scaled to [-1,1] (degree derived from length of `a_coeff`)"
 struct LambertianSurfaceLegendre{FT} <: AbstractSurfaceType
     "albedo = legendre_coeff[1] * P₀ + legendre_coeff[2]*P₁ + legendre_coeff[3]*P₂ + ... "
     legendre_coeff::AbstractArray{FT,1}
+end
+
+"Defined by a simple spline from Interpolations.jl"
+struct LambertianSurfaceSpline{FT} <: AbstractSurfaceType
+    interpolator::AbstractInterpolation{FT}
+    wlGrid::AbstractArray{FT,1} # Has to be added here as it won't otherwise be available in the Lambertian Surface Routine
 end
 
 """
@@ -326,9 +361,7 @@ A struct which holds all absorption-related parameters (before any computations)
 """
 mutable struct AbsorptionParameters
     "Molecules to use for absorption calculations (`nBand, nMolecules`)"
-    fixed_molecules::AbstractArray # species with constant abundances, e.g. O2, N2, CO2
-    variable_molecules::AbstractArray # species with variable abundances, e.g. H2O, CH4, CO2
-    #molecules::AbstractArray
+    molecules::AbstractArray
     "Volume-Mixing Ratios"
     vmr::Dict
     "Type of broadening function (Doppler/Lorentz/Voigt)"
@@ -355,6 +388,8 @@ mutable struct ScatteringParameters{FT<:Union{AbstractFloat, ForwardDiff.Dual}}
     nquad_radius::Integer
     "Reference wavelength (µm)"
     λ_ref::FT
+    "Reference refractive index"
+    n_ref::Complex{FT}
     "Algorithm to use for fourier decomposition (NAI2/PCW)"
     decomp_type::AbstractFourierDecompositionType
 end
@@ -399,8 +434,7 @@ mutable struct vSmartMOM_Parameters{FT<:Union{AbstractFloat, ForwardDiff.Dual}}
     "Viewing azimuthal angles [deg]"
     vaz::AbstractArray{FT}
     "Altitude of observer [Pa]"
-    obs_alt::Union{FT, Array{FT}}
-    
+    obs_alt::FT
 
     # atmospheric_profile group
     "Temperature Profile [K]"
@@ -457,35 +491,29 @@ A struct which holds all derived model parameters (including any computations)
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-mutable struct vSmartMOM_Model
-    max_m::Vector{Int} #for individual band adjusted (in the presence of aerosols) number of fourier iterations 
-    l_max::Vector{Int} #maximum length per band of truncated aerosol Greek coefficients (l_max = 2max_m+1)
+mutable struct vSmartMOM_Model{PA, AE, GR, QP, TAB, TR, TAE, Ogeom, PRO}
 
     "Struct with all individual parameters"
-    params::vSmartMOM_Parameters
+    params::PA # vSmartMOM_Parameters
     
     "Truncated aerosol optics"
-    aerosol_optics::AbstractArray{AbstractArray{AerosolOptics}}
-    "pure elastic (Cabannes) fraction of Rayleigh scattering"
-    ϖ_Cabannes::AbstractArray
-    "Greek coefs for Cabannes (pure elastic) calculations" 
-    greek_cabannes::Vector{GreekCoefs}#AbstractArray{GreekCoefs}#AbstractArray{AbstractArray{GreekCoefs}}#Vector{GreekCoefs{Float64}}
+    aerosol_optics::AE # AbstractArray{AbstractArray{AerosolOptics}}
     "Greek coefs in Rayleigh calculations" 
-    greek_rayleigh::Vector{GreekCoefs}#AbstractArray{GreekCoefs}#AbstractArray{AbstractArray{GreekCoefs}}#Vector{GreekCoefs{Float64}}
+    greek_rayleigh::GR # GreekCoefs
     "Quadrature points/weights, etc"
-    quad_points::QuadPoints
+    quad_points::QP # QuadPoints
 
     "Array to hold cross-sections over entire atmospheric profile"
-    τ_abs::AbstractArray{AbstractArray}
+    τ_abs::TAB # AbstractArray{AbstractArray}
     "Rayleigh optical thickness"
-    τ_rayl::AbstractArray{AbstractArray}
+    τ_rayl::TR # AbstractArray{AbstractArray}
     "Aerosol optical thickness"
-    τ_aer::AbstractArray{AbstractArray}
+    τ_aer::TAE # AbstractArray{AbstractArray}
 
     "Observational Geometry (includes sza, vza, vaz)"
-    obs_geom::ObsGeometry
+    obs_geom::Ogeom # ObsGeometry
     "Atmospheric profile to use"
-    profile::AtmosphericProfile
+    profile::PRO #AtmosphericProfile
 end
 
 """
@@ -532,29 +560,6 @@ Base.@kwdef struct ComputedAtmosphereProperties
     scattering_interfaces_all
 end
 
-# TODO SUNITI: write a function to compute these properties and create this structure
-#Base.@kwdef struct RamanAtmosphereProperties
-    #"band spectral grid"
-    #grid_in
-    #"inelastic scattering SSA"
-    #ϖ_λ₀λ₁
-    #"inelastic scattering index"
-    #i_λ₀λ₁
-    #"inelastic (vibrational) scattering SSA: split later for each molecule"
-    #ϖ_vib_λ₀λ₁
-    #"inelastic (vibrational) scattering index: split later for each molecule"
-    #i_vib_λ₀λ₁
-    #"Greek coefs in Rayleigh calculations" 
-    #greek_raman::GreekCoefs
-    #"Combined o2 and n2 Z moments for rotational/rovibrational RS  (forward)"
-    #Z⁺⁺_RRS #same for rotational and rovibrational scattering
-    #"Combined o2 and n2 Z moments for rotational/rovibrational RS  (backward)"
-    #Z⁻⁺_RRS #same for rotational and rovibrational scattering
-    #"Combined o2 and n2 Z moments for vibrational RS (forward): split later for each molecule"
-    #Z⁺⁺_VRS #same for rotational and rovibrational scattering
-    #"Combined o2 and n2 Z moments for vibrational RS (backward): split later for each molecule"
-    #Z⁻⁺_VRS #same for rotational and rovibrational scattering
-#end
 
 
 """
@@ -604,26 +609,40 @@ end
 abstract type AbstractOpticalProperties end
 
 # Core optical Properties COP
-Base.@kwdef struct CoreScatteringOpticalProperties{FT} <:  AbstractOpticalProperties
+Base.@kwdef struct CoreScatteringOpticalProperties{FT,FT2,FT3} <:  AbstractOpticalProperties
     "Absorption optical depth (scalar or wavelength dependent)"
-    τ::Union{FT, AbstractArray{FT,1}}
+    τ::FT 
     "Single scattering albedo"
-    ϖ::Union{FT, AbstractArray{FT,1}}
+    ϖ::FT2   
     "Z scattering matrix (forward)"
-    Z⁺⁺::Union{AbstractArray{FT,2}, AbstractArray{FT,3}}
+    Z⁺⁺::FT3 
     "Z scattering matrix (backward)"
-    Z⁻⁺::Union{AbstractArray{FT,2}, AbstractArray{FT,3}}
+    Z⁻⁺::FT3
+end
+
+# Core optical Properties COP with directional cross section 
+Base.@kwdef struct CoreDirectionalScatteringOpticalProperties{FT,FT2,FT3,FT4} <:  AbstractOpticalProperties
+    "Absorption optical depth (scalar or wavelength dependent)"
+    τ::FT 
+    "Single scattering albedo"
+    ϖ::FT2   
+    "Z scattering matrix (forward)"
+    Z⁺⁺::FT3 
+    "Z scattering matrix (backward)"
+    Z⁻⁺::FT3
+    "Ross kernel; cross section projection factor along µ (G ∈ [0,1], 1 for isotropic σ)"
+    G::FT4
 end
 
 Base.@kwdef struct CoreAbsorptionOpticalProperties{FT} <:  AbstractOpticalProperties
     "Absorption optical depth (scalar or wavelength dependent)"
-    τ::Union{FT, AbstractArray{FT,1}} 
+    τ::FT 
 end
 
 # Adding Core Optical Properties, can have mixed dimensions!
-function Base.:+( x::CoreScatteringOpticalProperties{FT}, # {xFT, xFT2, xFT3}, 
-                  y::CoreScatteringOpticalProperties{FT} #{yFT, yFT2, yFT3} 
-                ) where FT #{xFT, xFT2, xFT3, yFT, yFT2, yFT3} 
+function Base.:+( x::CoreScatteringOpticalProperties{xFT, xFT2, xFT3}, 
+                  y::CoreScatteringOpticalProperties{yFT, yFT2, yFT3} 
+                ) where {xFT, xFT2, xFT3, yFT, yFT2, yFT3} 
     # Predefine some arrays:            
     xZ⁺⁺ = x.Z⁺⁺
     xZ⁻⁺ = x.Z⁻⁺
@@ -635,54 +654,30 @@ function Base.:+( x::CoreScatteringOpticalProperties{FT}, # {xFT, xFT2, xFT3},
     wy = y.τ .* y.ϖ  
     w  = wx .+ wy
     ϖ  =  w ./ τ
+    
     #@show xFT, xFT2, xFT3
     all(wx .== 0.0) ? (return CoreScatteringOpticalProperties(τ, ϖ, y.Z⁺⁺, y.Z⁻⁺)) : nothing
     all(wy .== 0.0) ? (return CoreScatteringOpticalProperties(τ, ϖ, x.Z⁺⁺, x.Z⁻⁺)) : nothing
 
-    # A bit more tedious for Z matrices:
-    #@show size(wx), size(wy), size(w), wy, length(unique(wx))
-    #length(unique(w))  == 1 ? w  = unique(w) : nothing
-    #length(unique(wx)) == 1 ? wx = unique(wx) : nothing
-    #length(unique(wy)) == 1 ? wy = unique(wy) : nothing
     n = length(w);
-    #@show size(wx), size(wy), size(w)
-    #@show n
-    #if xFT <: AbstractFloat && yFT <: AbstractFloat
-    #    Z⁺⁺ = ((wx .* xZ⁺⁺) .+ (wy .* yZ⁺⁺)) ./ w 
-    #    Z⁻⁺ = ((wx .* xZ⁻⁺) .+ (wy .* yZ⁻⁺)) ./ w
-    #else
-        #@show xFT, yFT, length(wx), length(wy), length(w)
-        #!(xFT <: AbstractFloat) ? wx = reshape(wx,1,1,n) : nothing
-        #!(yFT <: AbstractFloat) ? wy = reshape(wy,1,1,n) : nothing
-        wy = wy ./ w
-        wx = wx ./ w
-        wx = reshape(wx,1,1,n)
-        wy = reshape(wy,1,1,n)
+    
+    wy = wy ./ w
+    wx = wx ./ w
+    wx = reshape(wx,1,1,n)
+    wy = reshape(wy,1,1,n)
         
-        #w = reshape(w,1,1,n)
-        #println("Block!")
-        #@show size(wx), size(wy), size(xZ⁺⁺), size(yZ⁺⁺)
-        #(xFT3 <: Matrix)  ? xZ⁺⁺ = _repeat(xZ⁺⁺,1,1,n) : nothing
-        #(xFT3 <: Matrix)  ? xZ⁻⁺ = _repeat(xZ⁻⁺,1,1,n) : nothing
-        #(yFT3 <: Matrix)  ? yZ⁺⁺ = _repeat(yZ⁺⁺,1,1,n) : nothing
-        #(yFT3 <: Matrix)  ? yZ⁻⁺ = _repeat(yZ⁻⁺,1,1,n) : nothing
-        #@show size(wx), size(xZ⁺⁺), size(wy), size(yZ⁺⁺)
-        Z⁺⁺ = (wx .* xZ⁺⁺ .+ wy .* yZ⁺⁺) 
-        Z⁻⁺ = (wx .* xZ⁻⁺ .+ wy .* yZ⁻⁺)
-        #@show size(Z⁺⁺), size(Z⁻⁺)
-        #println("###")
-        
-    #end
+    Z⁺⁺ = (wx .* xZ⁺⁺ .+ wy .* yZ⁺⁺) 
+    Z⁻⁺ = (wx .* xZ⁻⁺ .+ wy .* yZ⁻⁺)
+
     CoreScatteringOpticalProperties(τ, ϖ, Z⁺⁺, Z⁻⁺)  
 end
 
 # Concatenate Core Optical Properties, can have mixed dimensions!
 function Base.:*( x::CoreScatteringOpticalProperties, y::CoreScatteringOpticalProperties ) 
     arr_type  = array_type(architecture(x.τ))
-
     x = expandOpticalProperties(x,arr_type);
     y = expandOpticalProperties(y,arr_type);
-    CoreScatteringOpticalProperties([x.τ; y.τ],[x.ϖ; y.ϖ],cat(x.Z⁺⁺,y.Z⁺⁺, dims=3), cat(x.Z⁻⁺,y.Z⁻⁺, dims=3))
+    CoreScatteringOpticalProperties([x.τ; y.τ],[x.ϖ; y.ϖ],cat(x.Z⁺⁺,y.Z⁺⁺, dims=3), cat(x.Z⁻⁺,y.Z⁻⁺, dims=3) )
 end
 
 function Base.:+( x::CoreScatteringOpticalProperties, y::CoreAbsorptionOpticalProperties ) 
@@ -699,7 +694,7 @@ end
 
 
 function Base.:*( x::FT, y::CoreScatteringOpticalProperties{FT} ) where FT
-    CoreScatteringOpticalProperties(y.τ * x, y.ϖ, y.Z⁺⁺, y.Z⁻⁺)
+    CoreScatteringOpticalProperties(y.τ * x, y.ϖ, y.Z⁺⁺, y.Z⁻⁺, y.G)
 end
 
 # From https://gist.github.com/mcabbott/80ac43cca3bee8f57809155a5240519f
@@ -712,27 +707,24 @@ function _repeat(x::AbstractArray, counts::Integer...)
     # ignores = ntuple(d -> reshape(Base.OneTo(counts[d]), ntuple(_->1, 2d-1)..., :), length(counts))
     # y = reshape(broadcast(first∘tuple, reshape(x, size_x2), ignores...), size_y)
 
-    # ## version with mutation
+    #     ## version with mutation
     size_y2 = ntuple(d -> isodd(d) ? size(x, 1+d÷2) : get(counts, d÷2, 1), 2*N)
     y = similar(x, size_y)
     reshape(y, size_y2) .= reshape(x, size_x2)
     y
 end
 
-# ──────────────────────────────────────────────────────────────────────
-# RTWorkspace: Preallocated temporary arrays for GPU memory efficiency
-# ──────────────────────────────────────────────────────────────────────
+# ===========================================================
+# GPU Memory Pre-allocation Workspace (added for unified branch)
+# ===========================================================
 
 """
-    RTWorkspace{FT, AT3, AT4, VI}
+    RTWorkspace{FT, AT3}
 
-Preallocated workspace for RT computations. Eliminates repeated GPU 
-memory allocations in doubling loops, interaction, and batch_inv! calls.
-
-Create once with `make_rt_workspace(...)` and reuse across all Fourier moments and layers.
+Pre-allocated workspace for RT computations to avoid repeated GPU memory allocations.
+Used in the doubling and interaction kernels.
 """
 mutable struct RTWorkspace{FT, AT3<:AbstractArray{FT,3}}
-    # Temporaries for doubling (3D: NquadN × NquadN × nSpec)
     "Geometric progression: (I - R⁺⁻R⁻⁺)⁻¹"
     gp_refl::AT3
     "T⁺⁺ × gp_refl"
@@ -760,8 +752,7 @@ end
 """
     make_rt_workspace(FT, arr_type, NquadN, nSpec)
 
-Create a preallocated workspace for RT computations.
-`arr_type` should be `Array` for CPU or `CuArray` for GPU.
+Create an RTWorkspace with CPU Array-backed temporaries.
 """
 function make_rt_workspace(FT::Type, arr_type, NquadN::Int, nSpec::Int)
     dims3 = (NquadN, NquadN, nSpec)
@@ -772,11 +763,19 @@ function make_rt_workspace(FT::Type, arr_type, NquadN::Int, nSpec::Int)
         arr_type(zeros(FT, dims3)),     # tt_gp
         arr_type(zeros(FT, dims_J)),    # J₁⁺
         arr_type(zeros(FT, dims_J)),    # J₁⁻
-        zeros(Cint, NquadN, nSpec),     # pivot (will be replaced by GPU version if needed)
-        zeros(Cint, nSpec),             # info  (will be replaced by GPU version if needed)
+        zeros(Cint, NquadN, nSpec),     # pivot (replaced by GPU version if needed)
+        zeros(Cint, nSpec),             # info  (replaced by GPU version if needed)
         arr_type(zeros(FT, dims3)),     # tmp_inv
         arr_type(zeros(FT, dims3)),     # T_inv
         arr_type(zeros(FT, dims3)),     # tmp3d_a
         arr_type(zeros(FT, dims3)),     # tmp3d_b
     )
 end
+
+"""
+    make_gpu_rt_workspace(FT, NquadN, nSpec)
+
+Create an RTWorkspace with GPU-backed temporaries. 
+Stub function -- overwritten by the CUDA extension when CUDA is loaded.
+"""
+function make_gpu_rt_workspace end
