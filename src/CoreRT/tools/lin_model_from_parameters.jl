@@ -126,9 +126,9 @@ function model_from_parameters(lin::LinMode,
 
     # Get AtmosphericProfile from parameters
     vmr = isnothing(params.absorption_params) ? Dict() : params.absorption_params.vmr
-    p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o, new_vmr = compute_atmos_profile_fields(params.T, params.p, params.q, vmr)
+    p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o, new_vmr, Δz = compute_atmos_profile_fields(params.T, params.p, params.q, vmr)
 
-    profile = AtmosphericProfile(params.T, p_full, params.q, p_half, vmr_h2o, vcd_dry, vcd_h2o, new_vmr)
+    profile = AtmosphericProfile(params.T, p_full, params.q, p_half, vmr_h2o, vcd_dry, vcd_h2o, new_vmr, Δz)
     
     # Reduce the profile to the number of target layers (if specified)
     if params.profile_reduction_n != -1
@@ -596,9 +596,9 @@ function model_from_parameters(OCO::Bool, params::vSmartMOM_Parameters)
 
     # Get AtmosphericProfile from parameters
     vmr = isnothing(params.absorption_params) ? Dict() : params.absorption_params.vmr
-    p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o, new_vmr = compute_atmos_profile_fields(params.T, params.p, params.q, vmr)
+    p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o, new_vmr, Δz = compute_atmos_profile_fields(params.T, params.p, params.q, vmr)
 
-    profile = AtmosphericProfile(params.T, p_full, params.q, p_half, vmr_h2o, vcd_dry, vcd_h2o, new_vmr)
+    profile = AtmosphericProfile(params.T, p_full, params.q, p_half, vmr_h2o, vcd_dry, vcd_h2o, new_vmr, Δz)
     
     # Reduce the profile to the number of target layers (if specified)
     if params.profile_reduction_n != -1
@@ -934,8 +934,8 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
 
     # Get AtmosphericProfile from parameters
     vmr = isnothing(params.absorption_params) ? Dict() : params.absorption_params.vmr
-    p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o, new_vmr = compute_atmos_profile_fields(params.T, params.p, params.q, vmr)
-    profile = AtmosphericProfile(params.T, p_full, params.q, p_half, vmr_h2o, vcd_dry, vcd_h2o, new_vmr)
+    p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o, new_vmr, Δz = compute_atmos_profile_fields(params.T, params.p, params.q, vmr)
+    profile = AtmosphericProfile(params.T, p_full, params.q, p_half, vmr_h2o, vcd_dry, vcd_h2o, new_vmr, Δz)
     
     # Reduce the profile to the number of target layers (if specified)
     if params.profile_reduction_n != -1
@@ -1235,8 +1235,8 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
 
     # Get AtmosphericProfile from parameters
     vmr = isnothing(params.absorption_params) ? Dict() : params.absorption_params.vmr
-    p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o, new_vmr = compute_atmos_profile_fields(params.T, params.p, params.q, vmr)
-    profile = AtmosphericProfile(params.T, p_full, params.q, p_half, vmr_h2o, vcd_dry, vcd_h2o, new_vmr)
+    p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o, new_vmr, Δz = compute_atmos_profile_fields(params.T, params.p, params.q, vmr)
+    profile = AtmosphericProfile(params.T, p_full, params.q, p_half, vmr_h2o, vcd_dry, vcd_h2o, new_vmr, Δz)
     
     # Reduce the profile to the number of target layers (if specified)
     if params.profile_reduction_n != -1
