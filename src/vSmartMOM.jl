@@ -21,6 +21,12 @@ export CPU, GPU, default_architecture, array_type
 # Export the artifact convenience function
 export artifact
 
+# RT mode types (forward vs linearized)
+abstract type RT_Mode end
+struct FwdMode <: RT_Mode end
+struct LinMode <: RT_Mode end
+export FwdMode, LinMode
+
 # GPU/CPU Architecture (from Oceanigans)
 include("Architectures.jl")
 using .Architectures
@@ -50,6 +56,8 @@ using .IO
 
 # Export some vSmartMOM functions
 export default_parameters, parameters_from_yaml, model_from_parameters, rt_run, read_parameters, read_atmos_profile
+# Export linearized RT functions
+export rt_run_lin, model_from_parameters_lin
 # Export GEOSChem/NetCDF integration
 export GeosChemSource, NetCDFGridSource, NetCDFSource, geoschem_to_dict, read_geoschem_profile
 

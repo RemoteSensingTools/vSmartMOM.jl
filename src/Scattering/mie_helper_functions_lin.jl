@@ -4,8 +4,8 @@ This file contains helper functions that are used throughout the module
 
 =#
 
-""" Convenience function to perform (-1)^x using x's parity """
-exp_m1(x) = iseven(x) ? 1 : -1
+#= """ Convenience function to perform (-1)^x using x's parity """
+ exp_m1(x) = iseven(x) ? 1 : -1
 
 """
     $(FUNCTIONNAME)(size_parameter)
@@ -15,7 +15,7 @@ See eq 6 in Sanghavi 2014
 The function returns a rounded integer, following conventions by BH, Rooj/Stap, Siewert 
 """
 get_n_max(size_parameter) = (size_parameter>8.0) ? round(Int, size_parameter + 4.05 * size_parameter^(1/3) + 10) : round(Int, size_parameter + 4.0 * size_parameter^(1/3) + 1)
-
+=#
 """
     $(FUNCTIONNAME)(size_parameter,refractive_idx::Number,an,bn,Dn)
 Computes Mie coefficients `an` and `bn` as a function of size parameter and complex 
@@ -28,9 +28,12 @@ refractive index. See eq 4.88 in Bohren and Huffman
 
 The function returns a rounded integer, following conventions by BH, Rooj/Stap, Siewert 
 """
-function compute_mie_ab!(size_param, refractive_idx::Number, an, bn, Dn)
+function compute_mie_ab!(size_param, refractive_idx::Number, 
+    an, bn, Dn, ȧn, ḃn, Ḋn)
     # Compute y
     y = size_param * refractive_idx
+    # dy/dnᵣ = size_param
+    # dy/dnᵢ = - im * size_param
 
     # Maximum expansion (see eq. A17 from de Rooij and Stap, 1984)
     n_max = get_n_max(size_param)
@@ -41,10 +44,17 @@ function compute_mie_ab!(size_param, refractive_idx::Number, an, bn, Dn)
     @assert size(an)[1] >= n_max
     @assert size(an) == size(bn)
     fill!(Dn, 0);
+    for i=1:2
+        #@assert size(ȧn)[1] >= n_max
+        #@assert size(ȧn) == size(ḃn)
+        fill!(Ḋn[i,:], 0);
+    end
 
     # Dn as in eq 4.88, Bohren and Huffman, to calculate an and bn
     # Downward Recursion, eq. 4.89, Bohren and Huffman
     [Dn[n] = ((n+1) / y) - (1 / (Dn[n+1] + (n+1) / y)) for n = (nmx - 1):-1:1]
+    [Ḋn[1, n] = (-(n+1)*size_param / y^2) + (1 / (Dn[n+1] + (n+1) / y)^2)*(Ḋn[1, n+1] - (n+1)*size_param / y^2) for n = (nmx - 1):-1:1]
+    [Ḋn[2, n] = ((n+1)*size_param*im / y^2) + (1 / (Dn[n+1] + (n+1) / y)^2)*(Ḋn[2, n+1] + (n+1)*size_param*im / y^2) for n = (nmx - 1):-1:1]
 
     # Get recursion for bessel functions ψ and ξ
     ψ₀, ψ₁, χ₀, χ₁ =  (cos(size_param), sin(size_param), -sin(size_param), cos(size_param))
@@ -62,6 +72,14 @@ function compute_mie_ab!(size_param, refractive_idx::Number, an, bn, Dn)
         an[n] = (t_a * ψ - ψ₁) / (t_a * ξ - ξ₁)
         bn[n] = (t_b * ψ - ψ₁) / (t_b * ξ - ξ₁)
 
+        for i=1:2
+            ṫ_a = Ḋn[i,n] / refractive_idx - (Dn[n] / refractive_idx^2) * (i==1 ? 1 : -im)
+            ṫ_b = Ḋn[i,n] * refractive_idx + Dn[n] * (i==1 ? 1 : -im)
+            
+            ȧn[i,n] = (ṫ_a * ψ) / (t_a * ξ - ξ₁) - (t_a * ψ - ψ₁) * (ṫ_a * ξ) / (t_a * ξ - ξ₁)^2 
+            ḃn[i,n] = (ṫ_b * ψ) / (t_b * ξ - ξ₁) - (t_b * ψ - ψ₁) * (ṫ_b * ξ) / (t_b * ξ - ξ₁)^2
+        end
+
         ψ₀ = ψ₁
         ψ₁ = ψ
         χ₀ = χ₁
@@ -69,7 +87,7 @@ function compute_mie_ab!(size_param, refractive_idx::Number, an, bn, Dn)
         ξ₁ = ψ₁ + χ₁*im
     end
 end
-
+#=
 function compute_mie_ab_new!(size_param, refractive_idx::Number, an, bn, Dn)
     # Compute y
     y = size_param * refractive_idx
@@ -186,7 +204,7 @@ function compute_mie_ab_new!(size_param, refractive_idx::Number, an, bn, Dn)
         ξ₁ = ψ₁ -χ₁*im
     end
 end
-
+=#
 
 """ 
     $(FUNCTIONNAME)(model::MieModel, λ, radius)
@@ -194,7 +212,7 @@ Compute all an, bn using compute_mie_ab!
 Input: MieModel, wavelength (λ), radius
 Output: an, bn. Both of shape (aerosol.nquad_radius, N_max) (N_max from aerosol.r_max)
 """
-function compute_anbn(model::MieModel, λ, radius)
+function compute_anbn_lin(model::MieModel, λ, radius)
     
     @unpack computation_type, aerosol, r_max, nquad_radius, λ, polarization_type, truncation_type, wigner_A, wigner_B = model
     @unpack size_distribution, nᵣ, nᵢ = aerosol
@@ -208,6 +226,8 @@ function compute_anbn(model::MieModel, λ, radius)
     # Where to store an, bn, computed over size distribution
     an = zeros(Complex{FT2}, nquad_radius, N_max)
     bn = zeros(Complex{FT2}, nquad_radius, N_max)
+    ȧn = zeros(Complex{FT2}, 2, nquad_radius, N_max)
+    ḃn = zeros(Complex{FT2}, 2, nquad_radius, N_max)
 
     # Loop over the size distribution, and compute an, bn, for each size
     for i in 1:nquad_radius
@@ -224,7 +244,11 @@ function compute_anbn(model::MieModel, λ, radius)
         # Compute an, bn
         Scattering.compute_mie_ab!(size_param, nᵣ + nᵢ * im, 
                                       view(an, i, :), 
-                                      view(bn, i, :), Dn)
+                                      view(bn, i, :), 
+                                      Dn, 
+                                      view(ȧn, :, i, :), 
+                                      view(ḃn, :, i, :),
+                                      Ḋn)
     end
 
     return an, bn;
@@ -235,6 +259,7 @@ end
 From the an, bn matrices, precompute all (an✶)am, (an✶)bm, (bn✶)am, (bn✶)bm 
 This allows quick computation of (an✶ + bn✶) × (am + bm)
 """
+#=
 function compute_avg_anbns!(an, bn, ab_pairs, w, Nmax, N_max_)
     FT2 = eltype(an)
 
@@ -260,7 +285,7 @@ function compute_avg_anbns!(an, bn, ab_pairs, w, Nmax, N_max_)
         @inbounds mat_bnam[m,n] = bnam;
     end
 end
-
+=#
 """
     $(FUNCTIONNAME)(an, bn, π_, τ_, S₁, S₂)
 Determines the amplitude functions `S₁`,`S₂` in Mie theory
@@ -269,7 +294,10 @@ Determines the amplitude functions `S₁`,`S₂` in Mie theory
 The function returns `S₁`,`S₂` as a function of the cosine of the scattering angle `ξ`. 
 Users need to make sure `an` and `bn`, `π` and `τ` are pre-computed.
 """
-function compute_mie_S₁S₂!(an, bn, π_, τ_, S₁, S₂)
+function compute_mie_S₁S₂!(an, bn, ȧn, ḃn, 
+    π_, τ_, 
+    S₁, S₂, Ṡ₁, Ṡ₂)
+    
     FT = eltype(an)
     nmax = size(an, 1);
     nμ   = size(π_, 1);
@@ -279,8 +307,10 @@ function compute_mie_S₁S₂!(an, bn, π_, τ_, S₁, S₂)
     @assert length(S₁) == nμ
 
     for l in 1:nmax, iμ in 1:nμ 
-            S₁[iμ] += (2l + 1) / (l * (l + 1)) * (an[l] * τ_[iμ,l] + bn[l] * π_[iμ,l])
-            S₂[iμ] += (2l + 1) / (l * (l + 1)) * (an[l] * π_[iμ,l] + bn[l] * τ_[iμ,l])
+            S₁[iμ]   += (2l + 1) / (l * (l + 1)) * (an[l] * τ_[iμ,l] + bn[l] * π_[iμ,l])
+            S₂[iμ]   += (2l + 1) / (l * (l + 1)) * (an[l] * π_[iμ,l] + bn[l] * τ_[iμ,l])
+            Ṡ₁[:,iμ] += (2l + 1) / (l * (l + 1)) * (ȧn[:,l] * τ_[iμ,l] + ḃn[:,l] * π_[iμ,l])
+            Ṡ₂[:,iμ] += (2l + 1) / (l * (l + 1)) * (ȧn[:,l] * π_[iμ,l] + ḃn[:,l] * τ_[iμ,l])
     end
 end
 
@@ -292,13 +322,14 @@ Returns the `n` Gauss-Legendre quadrature points and weights with a change of in
 - `norm`: if `true`, normalizes the weights so that a mean can be computed instead of full integration
 The function returns `n` quadrature points ξ within [xmin,xmax] with associated weightes `w` 
 """
+#=
 function gauleg(n, xmin, xmax; norm=false)
     ξ, w = gausslegendre(n)
     ξ = (xmax - xmin) / 2 * ξ .+ (xmin + xmax) / 2
     norm ? w /= sum(w) : w *= (xmax - xmin) / 2
     return ξ, w
 end
-
+=#
 @doc raw"""
     $(FUNCTIONNAME)(greek_coefs, μ; returnLeg = false)
 Returns the reconstructed elements of the 4x4 scattering matrix at positions 
@@ -313,7 +344,7 @@ f₁₁ represents the phase function p for the Intensity (first Stokes Vector e
 - `returnLeg` if `false` (default), just return `f₁₁, f₁₂, f₂₂, f₃₃, f₃₄, f₄₄`, if `true`, 
 - return `f₁₁, f₁₂, f₂₂, f₃₃, f₃₄, f₄₄, P, P²` (i.e. also the two legendre polynomials as matrices)
 """
-function reconstruct_phase(greek_coefs, μ; returnLeg=false)
+function reconstruct_phase(greek_coefs, lin_greek_coefs, μ; returnLeg=false)
 
     FT = eltype(greek_coefs.α)
     l_max = length(greek_coefs.α);
@@ -326,6 +357,8 @@ function reconstruct_phase(greek_coefs, μ; returnLeg=false)
     # which only holds for spherical
     f₁₁, f₃₃, f₁₂, f₃₄, f₂₂, f₄₄ = (zeros(FT, nμ), zeros(FT, nμ), zeros(FT, nμ), 
                                     zeros(FT, nμ), zeros(FT, nμ), zeros(FT, nμ))
+    ḟ₁₁, ḟ₃₃, ḟ₁₂, ḟ₃₄, ḟ₂₂, ḟ₄₄ = (zeros(FT, 4, nμ), zeros(FT, 4, nμ), zeros(FT, 4, nμ), 
+                                    zeros(FT, 4, nμ), zeros(FT, 4, nμ), zeros(FT, 4, nμ))
 
     # Compute prefactor
     fac = zeros(l_max);
@@ -338,14 +371,24 @@ function reconstruct_phase(greek_coefs, μ; returnLeg=false)
     f₃₄[:] = P² * (fac .* greek_coefs.ϵ)                                 # b₂ in Rooij notation
     f₂₂[:] = R² * (fac .* greek_coefs.α) .+ T² * (fac .* greek_coefs.ζ)  # a₂ in Rooij notation
     f₃₃[:] = R² * (fac .* greek_coefs.ζ) .+ T² * (fac .* greek_coefs.α)  # a₃ in Rooij notation
-
     # Put elements into a struct
     scattering_matrix = ScatteringMatrix(f₁₁, f₁₂, f₂₂, f₃₃, f₃₄, f₄₄)
+    
+    for ctr=1:4
+        ḟ₁₁[ctr, :] = P * lin_greek_coefs.β̇[ctr,:]                                           # a₁ in Rooij notation
+        ḟ₄₄[ctr, :] = P * lin_greek_coefs.δ̇[ctr,:]                                           # a₄ in Rooij notation
+        ḟ₁₂[ctr, :] = P² * (fac .* lin_greek_coefs.γ̇[ctr,:])                                 # b₁ in Rooij notation
+        ḟ₃₄[ctr, :] = P² * (fac .* lin_greek_coefs.ϵ̇[ctr,:])                                 # b₂ in Rooij notation
+        ḟ₂₂[ctr, :] = R² * (fac .* lin_greek_coefs.α̇[ctr,:]) .+ T² * (fac .* lin_greek_coefs.ζ̇[ctr,:])  # a₂ in Rooij notation
+        ḟ₃₃[ctr, :] = R² * (fac .* lin_greek_coefs.ζ̇[ctr,:]) .+ T² * (fac .* lin_greek_coefs.α̇[ctr,:])  # a₃ in Rooij notation
+    end
+    lin_scattering_matrix = linScatteringMatrix(ḟ₁₁, ḟ₁₂, ḟ₂₂, ḟ₃₃, ḟ₃₄, ḟ₄₄)
 
     # For truncation in δ-BGE, we need P and P² as well, convenient to return here:
-    return returnLeg ? (scattering_matrix, P, P²) : scattering_matrix
+    return returnLeg ? (scattering_matrix, lin_scattering_matrix, P, P²) : (scattering_matrix, lin_scattering_matrix, nothing, nothing)
 end
 
+#=
 """
     $(FUNCTIONNAME)(depol)
 Returns the greek coefficients (as [`GreekCoefs`](@ref)) of the Rayleigh phase function given 
@@ -379,24 +422,61 @@ function compute_avg_C_scatt_ext(k, an, bn, w)
     coef = 2π / k^2 * n_'
     return (coef * (w' * (abs2.(an') + abs2.(bn'))')', coef * (w' * real(an + bn))')
 end
-
+=#
 """ Compute probability weights of radii """
-function compute_wₓ(size_distribution, wᵣ, r, r_max) 
+#=
+function compute_wₓ(lin::LinMode, size_distribution, wᵣ, r, r_max) 
     
     wₓ = pdf.(size_distribution,r)      # Weights from distribution
-    wₓ .*= wᵣ                           # pre multiply with wᵣ to get proper means eventually:
-
+    #g(p) = pdf.(LogNormal(p[1],p[2]), r)  # Weights from lognormal distribution
+    ẇₓ = ForwardDiff.jacobian(g, [size_distribution.μ, size_distribution.σ])
+    wₓ .*= wᵣ    # pre multiply with wᵣ to get proper means eventually:
     # normalize (could apply a check whether cdf.(size_distribution,r_max) is larger than 0.99:
     #println("Test")
     @info "Fraction of size distribution cut by max radius: $((1-cdf.(size_distribution,r_max))*100) %"  
     wₓ /= sum(wₓ)
-    return wₓ
+    for ctr = 1:2                               
+        ẇₓ[:,ctr] .= ẇₓ[:,ctr] .* wᵣ
+        ẇₓ[:,ctr] .= ẇₓ[:,ctr]./sum(wₓ) .- (sum(ẇₓ[:,ctr]) * wₓ)./(sum(wₓ)^2)
+    end
+    return wₓ, ẇₓ'
+end
+=#
+function compute_wₓ(lin::LinMode, size_distribution, wᵣ, r, r_max) 
+    
+    wₓ = pdf.(size_distribution,r)      # Weights from distribution
+    # compare wₓ with a = (1.0./r*sd1.σ*sqrt(2π)).*exp.(-0.5*((log.(r).-sd1.μ)/sd1.σ).^2)
+    #g(p) = pdf.(LogNormal(p[1],p[2]), r)  # Weights from lognormal distribution
+    #ẇₓ = ForwardDiff.jacobian(g, [size_distribution.μ, size_distribution.σ])
+    ẇₓ = zeros(2, length(r))                               
+    ẇₓ[1,:] .= ((log.(r).-size_distribution.μ)/size_distribution.σ^2) .* wₓ
+    ẇₓ[2,:] .= (ẇₓ[1,:].*(log.(r).-size_distribution.μ) .- wₓ)/size_distribution.σ
+#@show "before", sum(wᵣ), 
+    #sum(wₓ[1:end-1].*(r[2:end]-r[1:end-1])), 
+    #sum(ẇₓ[1,1:end-1].*(r[2:end]-r[1:end-1])), 
+    #sum(ẇₓ[2,1:end-1].*(r[2:end]-r[1:end-1]))
+
+    wₓ .*= wᵣ
+    ẇₓ[1,:] .*= wᵣ
+    ẇₓ[2,:] .*= wᵣ
+
+    wₓ /= sum(wₓ)
+    for ctr = 1:2                               
+        ẇₓ[ctr,:] .= ẇₓ[ctr,:]./sum(wₓ) .- (sum(ẇₓ[ctr,:]) * wₓ)./(sum(wₓ)^2)
+    end
+#@show "after", sum(wᵣ), 
+#sum(wₓ), 
+#sum(ẇₓ[1,:]), 
+#sum(ẇₓ[2,:])
+     @info "Fraction of size distribution cut by max radius: $((1-cdf.(size_distribution,r_max))*100) %"  
+    
+    return wₓ, ẇₓ
 end
 
 #####
 ##### Π-matrix construction methods (Sanghavi 2014, eq. 15)
 #####
-
+#=
 """
     $(FUNCTIONNAME)(mo::Stokes_IQUV, P, R, T, l::Int, m::Int; sign_change=false)
 Compute Π matrix for all stokes vector elements used in computations of the phase matrix 
@@ -439,11 +519,11 @@ Compute Π matrix for  stokes vector elements I used in computations of the phas
 
 """
 construct_Π_matrix(mod::Stokes_I, P, R, T, l::Int, m::Int; sign_change=false) = sign_change ? -P[:,l,m] : P[:,l,m]
-
+=#
 #####
 ##### B-matrix construction methods (Sanghavi 2014, eq. 16)
 #####
-
+#=
 """
     $(FUNCTIONNAME)(mod::Stokes_IQUV, α, β, γ, δ, ϵ, ζ, l::Int)
 Compute B matrix for all stokes vector elements used in computations of the phase matrix 
@@ -464,15 +544,20 @@ Compute Π matrix for stokes vector elements I used in computations of the phase
 See Sanghavi 2014, eq. 16 
 """
 construct_B_matrix(mod::Stokes_I, α, β, γ, δ, ϵ, ζ, l::Int) = β[l]
+=#
 
 
-#=
 """
     $(FUNCTIONNAME)(mod::AbstractPolarizationType, μ, α, β, γ, δ, ϵ, ζ, m::Int)
 Compute moments of the phase matrix 
 """
-function compute_Z_moments(mod::AbstractPolarizationType, μ, greek_coefs::GreekCoefs, m::Int ; arr_type = Array)
+function compute_Z_moments(mod::AbstractPolarizationType, 
+            μ, 
+            greek_coefs::GreekCoefs, 
+            lin_greek_coefs::linGreekCoefs,
+            m::Int ; arr_type = Array)
     @unpack α, β, γ, δ, ϵ, ζ = greek_coefs
+    @unpack α̇, β̇, γ̇, δ̇, ϵ̇, ζ̇ = lin_greek_coefs
     FT = eltype(β)
     n = length(μ)
 
@@ -495,21 +580,23 @@ function compute_Z_moments(mod::AbstractPolarizationType, μ, greek_coefs::Greek
     P⁻, R⁻, T⁻ = Scattering.compute_associated_legendre_PRT(-μ, l_max)
   
     # Pre-compute all required B matrices
-    𝐁_all = [construct_B_matrix(mod, α, β, γ, δ, ϵ, ζ, i) for i in 1:l_max]
-
+    B_all = [construct_B_matrix(mod, α, β, γ, δ, ϵ, ζ, i) for i in 1:l_max]
+    Ḃ_all = [construct_B_matrix(mod, α̇[ctr,:], β̇[ctr,:], γ̇[ctr,:], δ̇[ctr,:], ϵ̇[ctr,:], ζ̇[ctr,:], i) for ctr in 1:4, i in 1:l_max] 
     # Get dimension of square matrix (easier for Scalar/Stokes dimensions)
-    B_dim = Int(sqrt(length(𝐁_all[1])))
+    B_dim = Int(sqrt(length(B_all[1])))
     
     # Create matrices:
     nb = B_dim * n
-    𝐙⁺⁺, 𝐙⁻⁺ = (zeros(FT, nb, nb), zeros(FT, nb, nb))
+    Z⁺⁺, Z⁻⁺ = (zeros(FT, nb, nb), zeros(FT, nb, nb))
+    Ż⁺⁺, Ż⁻⁺ = (zeros(FT, 4, nb, nb), zeros(FT, 4, nb, nb))
     A⁺⁺, A⁻⁺ = (zeros(FT, B_dim, B_dim, n, n), zeros(FT, B_dim, B_dim, n, n))
-
+    Ȧ⁺⁺, Ȧ⁻⁺ = (zeros(FT, 4, B_dim, B_dim, n, n), zeros(FT, 4, B_dim, B_dim, n, n))
+    
     # Iterate over l
     for l = m:l_max
 
         # B matrix for l
-        𝐁 = 𝐁_all[l];
+        B = B_all[l];
 
         # Construct Π matrix for l,m pair (change to in place later!)
         # See eq. 15 in Sanghavi 2014, note that P,R,T are already normalized
@@ -519,11 +606,25 @@ function compute_Z_moments(mod::AbstractPolarizationType, μ, greek_coefs::Greek
         # Iterate over angles
         for i in eachindex(μ), j in eachindex(μ)
             if B_dim == 1
-                A⁺⁺[B_dim,B_dim,i,j] += Π[i] * 𝐁 * Π[j]
-                A⁻⁺[B_dim,B_dim,i,j] += Π[i] * 𝐁 * Π⁻[j]
+                A⁺⁺[B_dim,B_dim,i,j] += Π[i] * B * Π[j]
+                A⁻⁺[B_dim,B_dim,i,j] += Π[i] * B * Π⁻[j]
             else
-                A⁺⁺[:,:,i,j] += Π[i] * 𝐁 * Π[j]
-                A⁻⁺[:,:,i,j] += Π[i] * 𝐁 * Π⁻[j]
+                A⁺⁺[:,:,i,j] += Π[i] * B * Π[j]
+                A⁻⁺[:,:,i,j] += Π[i] * B * Π⁻[j]
+            end
+        end
+
+        for ctr=1:4
+            Ḃ = Ḃ_all[ctr, l];
+            # Iterate over angles
+            for i in eachindex(μ), j in eachindex(μ)
+                if B_dim == 1
+                    Ȧ⁺⁺[ctr,B_dim,B_dim,i,j] += Π[i] * Ḃ * Π[j]
+                    Ȧ⁻⁺[ctr,B_dim,B_dim,i,j] += Π[i] * Ḃ * Π⁻[j]
+                else
+                    Ȧ⁺⁺[ctr,:,:,i,j] += Π[i] * Ḃ * Π[j]
+                    Ȧ⁻⁺[ctr,:,:,i,j] += Π[i] * Ḃ * Π⁻[j]
+                end
             end
         end
     end
@@ -537,18 +638,30 @@ function compute_Z_moments(mod::AbstractPolarizationType, μ, greek_coefs::Greek
         # This is equivalent to Z̄ = 1/(1+δ) * C̄m+S̄m = 1/(1+δ) * (A+DAD+AD-DA) 
         # (see eq 11 in Sanghavi et al, 2013)
         for i in 1:B_dim, j in 1:B_dim
-            𝐙⁺⁺[ii + i,jj + j] = 2fact * A⁺⁺[i,j,imu,jmu]
+            Z⁺⁺[ii + i,jj + j] = 2fact * A⁺⁺[i,j,imu,jmu]
             if i <= 2 && j >= 3
-                𝐙⁻⁺[ii + i,jj + j] = -2fact * A⁻⁺[i,j,imu,jmu]
+                Z⁻⁺[ii + i,jj + j] = -2fact * A⁻⁺[i,j,imu,jmu]
             elseif i >= 3 && j <= 2
-                𝐙⁻⁺[ii + i,jj + j] = -2fact * A⁻⁺[i,j,imu,jmu]
+                Z⁻⁺[ii + i,jj + j] = -2fact * A⁻⁺[i,j,imu,jmu]
             else
-                𝐙⁻⁺[ii + i,jj + j] = 2fact * A⁻⁺[i,j,imu,jmu]
+                Z⁻⁺[ii + i,jj + j] = 2fact * A⁻⁺[i,j,imu,jmu]
+            end
+        end
+
+        for ctr=1:4
+            for i in 1:B_dim, j in 1:B_dim
+                Ż⁺⁺[ctr,ii + i,jj + j] = 2fact * Ȧ⁺⁺[ctr,i,j,imu,jmu]
+                if i <= 2 && j >= 3
+                    Ż⁻⁺[ctr,ii + i,jj + j] = -2fact * Ȧ⁻⁺[ctr,i,j,imu,jmu]
+                elseif i >= 3 && j <= 2
+                    Ż⁻⁺[ctr,ii + i,jj + j] = -2fact * Ȧ⁻⁺[ctr,i,j,imu,jmu]
+                else
+                    Ż⁻⁺[ctr,ii + i,jj + j] = 2fact * Ȧ⁻⁺[ctr,i,j,imu,jmu]
+                end
             end
         end
     end
 
     # Return Z-moments
-    return arr_type(𝐙⁺⁺), arr_type(𝐙⁻⁺)
+    return arr_type(Z⁺⁺), arr_type(Z⁻⁺), arr_type(Ż⁺⁺), arr_type(Ż⁻⁺)
 end
-=#

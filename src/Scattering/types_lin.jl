@@ -11,13 +11,14 @@ This file contains all types that are used in the Scattering module:
 - `AerosolOptics` holds all computed aerosol optical properties
 
 =#
-
+#=
 """
     type AbstractAerosolType
 Abstract aerosol type 
 """
 abstract type AbstractAerosolType end
-
+=#
+#=
 "Aerosol type with its properties (size distribution and refractive index)"
 mutable struct Aerosol{}
     "Univariate size distribution"
@@ -27,7 +28,7 @@ mutable struct Aerosol{}
     "Imag part of refractive index"
     nᵢ
 end
-
+=#
 # TODO: struct MultivariateAerosol{FT,FT2} <: AbstractAerosolType
 
 #=
@@ -40,7 +41,7 @@ Types of Fourier Decomposition (NAI2 or PCW)
     type AbstractFourierDecompositionType
 Abstract aerosol Fourier Decomposition computation type (NAI2 and PCW)
 """
-abstract type AbstractFourierDecompositionType end
+# abstract type AbstractFourierDecompositionType end
 
 """
     type NAI2
@@ -48,7 +49,7 @@ abstract type AbstractFourierDecompositionType end
 Perform Siewart's numerical integration method, NAI-2, to compute aerosol phase function 
 decomposition. See: http://adsabs.harvard.edu/full/1982A%26A...109..195S
 """
-struct NAI2  <: AbstractFourierDecompositionType end
+# struct NAI2  <: AbstractFourierDecompositionType end
 
 """
     type PCW
@@ -56,14 +57,14 @@ struct NAI2  <: AbstractFourierDecompositionType end
 Perform Domke's Precomputed Wigner Symbols method, PCW, to compute aerosol phase function 
 decomposition. See: http://adsabs.harvard.edu/full/1984A%26A...131..237D
 """
-struct PCW <: AbstractFourierDecompositionType end
+# struct PCW <: AbstractFourierDecompositionType end
 
 #=
 
 Types of Polarization (which Stokes vector to use)
 
 =#
-
+#=
 """
     type AbstractPolarizationType
 
@@ -121,13 +122,13 @@ Base.@kwdef struct Stokes_I{FT<:AbstractFloat} <: AbstractPolarizationType
     "Incoming Stokes vector for scalar only"
     I₀::Array{FT} = [1.0]
 end
-
+=#
 #=
 
 Types of Truncation (for Legendre terms)
 
 =#
-
+#=
 """
     type AbstractTruncationType
 
@@ -147,13 +148,13 @@ struct δBGE{FT} <: AbstractTruncationType
     "Exclusion angle for forward peak (in fitting procedure) `[degrees]`"
     Δ_angle::FT
 end
-
+=#
 #=
 
 Model that specifies the Mie computation details
 
 =#
-
+#=
 """
     type MieModel
 
@@ -179,7 +180,7 @@ Base.@kwdef struct MieModel{FDT<:AbstractFourierDecompositionType, FT}
     wigner_B = zeros(1, 1, 1)
 
 end
-
+=#
 #=
 
 Types that are needed for the output of the Fourier decomposition
@@ -195,27 +196,27 @@ See eq 16 in Sanghavi 2014 for details.
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-mutable struct GreekCoefs{FT<:Union{AbstractFloat, ForwardDiff.Dual}}
+mutable struct linGreekCoefs{FT<:AbstractFloat}
     "Greek matrix coefficient α, is in B[2,2]"
-    α::Array{FT,1} 
+    α̇::Array{FT,2} 
     "Greek matrix coefficient β, is in B[1,1] (only important one for scalar!)"
-    β::Array{FT,1}
+    β̇::Array{FT,2}
     "Greek matrix coefficient γ, is in B[2,1],B[1,2]"
-    γ::Array{FT,1}
+    γ̇::Array{FT,2}
     "Greek matrix coefficient δ, is in B[4,4]"
-    δ::Array{FT,1}
+    δ̇::Array{FT,2}
     "Greek matrix coefficient ϵ, is in B[3,4] and - in B[4,3]"
-    ϵ::Array{FT,1}
+    ϵ̇::Array{FT,2}
     "Greek matrix coefficient ζ, is in B[3,3]"
-    ζ::Array{FT,1}
+    ζ̇::Array{FT,2}
 end
-
+#=
 """ Extend Base.isapprox (≈) to compare two GreekCoefs """
 function Base.:isapprox(greek_coefs_a::GreekCoefs, greek_coefs_b::GreekCoefs) 
     field_names = fieldnames(GreekCoefs)
     return all([getproperty(greek_coefs_a, field) ≈ getproperty(greek_coefs_b, field) for field in field_names])
 end
-
+=#
 """ 
     struct ScatteringMatrix
 
@@ -226,13 +227,13 @@ f₁₁ represents the phase function p for the Intensity (first Stokes Vector e
 # Fields
 $(DocStringExtensions.FIELDS)
 """ 
-struct ScatteringMatrix{FT}
-    f₁₁::FT
-    f₁₂::FT
-    f₂₂::FT
-    f₃₃::FT
-    f₃₄::FT
-    f₄₄::FT
+struct linScatteringMatrix{FT<:AbstractFloat}
+    ḟ₁₁::AbstractArray{FT}
+    ḟ₁₂::AbstractArray{FT}
+    ḟ₂₂::AbstractArray{FT}
+    ḟ₃₃::AbstractArray{FT}
+    ḟ₃₄::AbstractArray{FT}
+    ḟ₄₄::AbstractArray{FT}
 end
 
 """
@@ -243,21 +244,21 @@ A struct which holds all computed aerosol optics
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-Base.@kwdef struct AerosolOptics{FT<:Union{AbstractFloat, ForwardDiff.Dual}}
+Base.@kwdef struct linAerosolOptics{FT<:AbstractFloat}
     "Greek matrix"
-    greek_coefs::GreekCoefs
+    lin_greek_coefs::linGreekCoefs
     "Single Scattering Albedo"
-    ω̃::Union{FT, AbstractArray{FT}}
+    ω̃̇::AbstractArray{FT}
     "Extinction cross-section"
-    k::Union{FT, AbstractArray{FT}}
+    k̇::AbstractArray{FT}
     "Truncation factor" 
-    fᵗ::Union{FT, AbstractArray{FT}}
-    "Derivatives"
-    derivs = zeros(1)
+    ḟᵗ::AbstractArray{FT}
+    #"Derivatives"
+    #derivs = zeros(1)
 end
-
+#=
 """ Extend Base.isapprox (≈) to compare two AerosolOptics """
 function Base.:isapprox(aerosol_optics_a::AerosolOptics, aerosol_optics_b::AerosolOptics) 
     field_names = fieldnames(AerosolOptics)
     return all([getproperty(aerosol_optics_a, field) ≈ getproperty(aerosol_optics_b, field) for field in field_names])
-end
+end=#

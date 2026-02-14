@@ -6,6 +6,8 @@ using DelimitedFiles            # For easily reading in solar spectrum
 using Interpolations            # For interpolating solar spectrum
 using Pkg.Artifacts             # For default solar spectrum
 
+
+
 """
     $(FUNCTIONNAME)(T::Real, ν_grid::Vector)
 

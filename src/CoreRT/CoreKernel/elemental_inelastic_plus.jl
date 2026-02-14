@@ -16,7 +16,8 @@ function getKernelDimSFI(RS_type::RRS_plus,ieJ₀⁻)
     return size(ieJ₀⁻);
 end
 
-function getKernelDimSFI(RS_type::Union{VS_0to1_plus, VS_1to0_plus},ieJ₀⁻,i_λ₁λ₀)
+function getKernelDimSFI(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
+                        ieJ₀⁻,i_λ₁λ₀)
     return (size(ieJ₀⁻,1), size(i_λ₁λ₀,1));
 end
 
@@ -28,6 +29,7 @@ function elemental_inelastic!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
                             ϖ::AbstractArray{FT,1},                     # dτ:   scattering optical depth of elemental layer (scalar)
                             Z⁺⁺_λ₁λ₀::AbstractArray{FT,2},   # Z matrix
                             Z⁻⁺_λ₁λ₀::AbstractArray{FT,2}, 
+                            F₀::AbstractArray{FT,2},
                             m::Int,                     # m: fourier moment
                             ndoubl::Int,                # ndoubl: number of doubling computations needed 
                             scatter::Bool,              # scatter: flag indicating scattering
@@ -60,15 +62,19 @@ function elemental_inelastic!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
         # Calculate r⁻⁺ and t⁺⁺
         #Version 2: More computationally intensive definition of a single scattering layer with variable (0-∞) absorption
         # Version 2: with absorption in batch mode, low tau_scatt but higher tau_total, needs different equations
+        ier⁻⁺.=0.0 
+        iet⁺⁺.=0.0
         get_elem_rt!(RS_type, ier⁻⁺, iet⁺⁺, 
             dτ, ϖ, 
             Z⁻⁺_λ₁λ₀, Z⁺⁺_λ₁λ₀, 
             qp_μN, wct2)
         
         if SFI
+            ieJ₀⁺.=0.0
+            ieJ₀⁻.=0.0
             get_elem_rt_SFI!(RS_type, ieJ₀⁺, ieJ₀⁻, 
                 τ_sum, dτ, ϖ, 
-                Z⁻⁺_λ₁λ₀, Z⁺⁺_λ₁λ₀, 
+                Z⁻⁺_λ₁λ₀, Z⁺⁺_λ₁λ₀, F₀,
                 qp_μN, ndoubl,wct02, pol_type.n, 
                 arr_type(pol_type.I₀), iμ₀, D);
         end
@@ -84,8 +90,8 @@ function elemental_inelastic!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
         #println("Apply D matrix SFI done")      
     else 
         # Note: τ is not defined here
-        iet⁺⁺[:] = Diagonal{exp(-τ ./ qp_μN)}
-        iet⁻⁻[:] = Diagonal{exp(-τ ./ qp_μN)}
+        iet⁺⁺[:] = 0. #Diagonal{exp(-τ ./ qp_μN)}
+        iet⁻⁻[:] = 0. #Diagonal{exp(-τ ./ qp_μN)}
     end    
     #@pack! added_layer = r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, J₀⁺, J₀⁻   
 end
@@ -166,7 +172,7 @@ end
 # kernel wrapper:
 function get_elem_rt!(RS_type::RRS_plus, 
                         ier⁻⁺, iet⁺⁺, 
-                        dτ, ϖ,
+                        dτ, ϖ, 
                         #Z⁻⁺_λ₁λ₀, Z⁺⁺_λ₁λ₀, 
                         qp_μN, wct2)
     @unpack fscattRayl, ϖ_λ₁λ₀, i_λ₁λ₀, i_ref, iBand, bandSpecLim = RS_type
@@ -181,7 +187,7 @@ function get_elem_rt!(RS_type::RRS_plus,
                     ier⁻⁺[:,:,bandSpecLim[iB],:], 
                     iet⁺⁺[:,:,bandSpecLim[iB],:], 
                     dτ[bandSpecLim[iB]], 
-                    ϖ[bandSpecLim[iB]], 
+                    #ϖ[bandSpecLim[iB]], 
                     aType(Z⁻⁺_λ₁λ₀[:,:,bandSpecLim[iB]]), 
                     aType(Z⁺⁺_λ₁λ₀[:,:,bandSpecLim[iB]]), 
                     qp_μN, wct2, 
@@ -207,7 +213,7 @@ function get_elem_rt!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
     aType = array_type(architecture(ier⁻⁺)) 
     #RVRS
     kernel! = get_elem_rt_VS!(device)
-
+    #@show "RVS", fscattRayl[1] * Z⁻⁺_λ₁λ₀[1,1]   
     event = kernel!(aType(fscattRayl), 
         aType(ϖ_λ₁λ₀), aType(i_λ₁λ₀), 
         ier⁻⁺, iet⁺⁺, 
@@ -217,11 +223,17 @@ function get_elem_rt!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
         ndrange=getKernelDim(RS_type,ier⁻⁺,i_λ₁λ₀)); 
     #wait(device, event);
     synchronize_if_gpu();
-
+    #@show size(i_λ₁λ₀), size(i_λ₁λ₀_VS_n2), size(i_λ₁λ₀_VS_o2)
+    #@show "RVS", t_ier⁻⁺[1,1,i_λ₁λ₀[findall(i_λ₁λ₀.>0)]]
+    #@show(ier⁻⁺[1,1,:])
     t_ier⁻⁺  = similar(ier⁻⁺)
     t_iet⁺⁺  = similar(ier⁻⁺)
+    t_ier⁻⁺  .= 0.0 
+    t_iet⁺⁺  .= 0.0 
+    #@show(t_ier⁻⁺[1,1,:])
     #VS - N2
     kernel! = get_elem_rt_VS!(device)
+    #@show "VS N2", fscattRayl[1] * Z⁻⁺_λ₁λ₀_VS_n2[1,1]
     event = kernel!(fscattRayl, 
         aType(ϖ_λ₁λ₀_VS_n2), aType(i_λ₁λ₀_VS_n2),
         t_ier⁻⁺, t_iet⁺⁺, 
@@ -231,25 +243,33 @@ function get_elem_rt!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
         ndrange=getKernelDim(RS_type,ier⁻⁺,i_λ₁λ₀_VS_n2)); 
     #wait(device, event);
     synchronize_if_gpu();
-
-    ier⁻⁺ += t_ier⁻⁺
-    iet⁺⁺ += t_iet⁺⁺
-
+    #@show "VS N2", t_ier⁻⁺[1,1,i_λ₁λ₀_VS_n2[findall(i_λ₁λ₀_VS_n2.>0)]]
+    ier⁻⁺ .+= t_ier⁻⁺
+    iet⁺⁺ .+= t_iet⁺⁺
+    #@show "VS N2", ier⁻⁺[1,1,i_λ₁λ₀_VS_n2[findall(i_λ₁λ₀_VS_n2.>0)]]
+    t_ier⁻⁺  .= 0.0 
+    t_iet⁺⁺  .= 0.0 
+    #@show(t_ier⁻⁺[1,1,:])
     #VS - O2
     kernel! = get_elem_rt_VS!(device)
+    #@show "VS O2", fscattRayl[1] * Z⁻⁺_λ₁λ₀_VS_o2[1,1]
     #@show typeof(Z⁻⁺_λ₁λ₀), typeof(Z⁺⁺_λ₁λ₀), typeof(ϖ_λ₁λ₀), typeof(i_λ₁λ₀), typeof(i_ref)
     event = kernel!(aType(fscattRayl), 
         aType(ϖ_λ₁λ₀_VS_o2), aType(i_λ₁λ₀_VS_o2),
         t_ier⁻⁺, t_iet⁺⁺, 
         dτ, ϖ, 
-        aType(Z⁻⁺_λ₁λ₀_VS_o2), aType(Z⁺⁺_λ₁λ₀_VS_o2), 
+        aType(Z⁻⁺_λ₁λ₀_VS_o2), aType(Z⁺⁺_λ₁λ₀_VS_o2),
         qp_μN, wct2, 
         ndrange=getKernelDim(RS_type,ier⁻⁺, i_λ₁λ₀_VS_o2)); 
     #wait(device, event);
     synchronize_if_gpu();
-    ier⁻⁺ += t_ier⁻⁺
-    iet⁺⁺ += t_iet⁺⁺
-
+    #@show "VS O2", t_ier⁻⁺[1,1,i_λ₁λ₀_VS_o2[findall(i_λ₁λ₀_VS_o2.>0)]]
+    ier⁻⁺ .+= t_ier⁻⁺
+    iet⁺⁺ .+= t_iet⁺⁺
+    #@show "VS O2", ier⁻⁺[1,1,i_λ₁λ₀_VS_o2[findall(i_λ₁λ₀_VS_o2.>0)]]
+    #t_ier⁻⁺  .= 0.0 
+    #t_iet⁺⁺  .= 0.0 
+    #@show(t_ier⁻⁺[1,1,:])
 end
 
 
@@ -258,7 +278,7 @@ end
                             #ϖ_λ₁λ₀_VS_n2, i_λ₁λ₀_VS_n2, 
                             #ϖ_λ₁λ₀_VS_o2, i_λ₁λ₀_VS_o2, 
                             ier⁻⁺, iet⁺⁺, 
-                            dτ, ϖ, 
+                            dτ, ϖ,
                             Z⁻⁺_λ₁λ₀, Z⁺⁺_λ₁λ₀, 
                             #Z⁻⁺_λ₁λ₀_VS_n2, Z⁺⁺_λ₁λ₀_VS_n2, 
                             #Z⁻⁺_λ₁λ₀_VS_o2, Z⁺⁺_λ₁λ₀_VS_o2, 
@@ -283,43 +303,55 @@ end
             # 𝐑⁻⁺(μᵢ, μⱼ) = ϖ ̇𝐙⁻⁺(μᵢ, μⱼ) ̇(μⱼ/(μᵢ+μⱼ)) ̇(1 - exp{-τ ̇(1/μᵢ + 1/μⱼ)}) ̇𝑤ⱼ
             #@show i,j,n₁, size(ier⁻⁺)
             #@show ier⁻⁺[i,j,n₁,1]
-            ier⁻⁺[i,j,n₁,1] = 
+            #if(i==j==1)
+            #    @show ϖ_λ₁λ₀[Δn], fscattRayl[n₀], Z⁻⁺_λ₁λ₀[i,j], ϖ_λ₁λ₀[Δn] * fscattRayl[n₀] * Z⁻⁺_λ₁λ₀[i,j]
+            #end
+            ier⁻⁺[i,j,n₁,1] += 
                     ϖ_λ₁λ₀[Δn] * fscattRayl[n₀] * Z⁻⁺_λ₁λ₀[i,j] * 
                     (1/( (qp_μN[i] / qp_μN[j]) + (dτ[n₁]/dτ[n₀]) )) * 
                     (1 - exp(-((dτ[n₁] / qp_μN[i]) + (dτ[n₀] / qp_μN[j])))) * wct2[j] 
-                        
+            
             if (qp_μN[i] == qp_μN[j])
                 # @show i,j
                 # 𝐓⁺⁺(μᵢ, μᵢ) = (exp{-τ/μᵢ} + ϖ ̇𝐙⁺⁺(μᵢ, μᵢ) ̇(τ/μᵢ) ̇exp{-τ/μᵢ}) ̇𝑤ᵢ
-                if i == j       
-                    if abs(dτ[n₀]-dτ[n₁])>1.e-6
-                        iet⁺⁺[i,j,n₁,1] = 
-                            ϖ_λ₁λ₀[Δn] * ϖ[n₀] * fscattRayl[n₀] * Z⁺⁺_λ₁λ₀[i,i] * wct2[i] *
-                            (exp(-dτ[n₀] / qp_μN[i]) - exp(-dτ[n₁] / qp_μN[i]))/
-                            (1 - (dτ[n₁]/dτ[n₀]))  
-                    else    
-                        iet⁺⁺[i,j,n₁,1] = 
-                            ϖ_λ₁λ₀[Δn] * ϖ[n₀] * fscattRayl[n₀] * Z⁺⁺_λ₁λ₀[i,i] * wct2[i] *
-                            (1 - exp(-dτ[n₀] / qp_μN[j]))   
+                #if i == j       
+                if abs(dτ[n₀]-dτ[n₁])>1.e-8
+                    iet⁺⁺[i,j,n₁,1] += 
+                        ϖ_λ₁λ₀[Δn] * fscattRayl[n₀] * Z⁺⁺_λ₁λ₀[i,j] * wct2[j] *
+                        (exp(-dτ[n₁] / qp_μN[i]) - exp(-dτ[n₀] / qp_μN[j]))/
+                        (1 - (dτ[n₁]/dτ[n₀]))  
+                else    
+                    iet⁺⁺[i,j,n₁,1] += 
+                        (dτ[n₀] / qp_μN[i]) * ϖ_λ₁λ₀[Δn] * fscattRayl[n₀] * 
+                        Z⁺⁺_λ₁λ₀[i,j] * wct2[j] *
+                        exp(-dτ[n₀] / qp_μN[j])   
                     end
-                else
-                    iet⁺⁺[i,j,n₁,1] = 0.0
-                end
+                #else
+                #    iet⁺⁺[i,j,n₁,1] += 0.0
+                #end
             else
                 #@show  qp_μN[i], qp_μN[j]  
                 # 𝐓⁺⁺(μᵢ, μⱼ) = ϖ ̇𝐙⁺⁺(μᵢ, μⱼ) ̇(μⱼ/(μᵢ-μⱼ)) ̇(exp{-τ/μᵢ} - exp{-τ/μⱼ}) ̇𝑤ⱼ
                 # (𝑖 ≠ 𝑗)
-                iet⁺⁺[i,j,n₁,1] = 
-                        ϖ_λ₁λ₀[Δn] * ϖ[n₀] * fscattRayl[n₀] * Z⁺⁺_λ₁λ₀[i,j] * 
-                        (1 / ( (qp_μN[i]/qp_μN[j]) - (dτ[n₁]/dτ[n₀]) )) * wct2[j] * 
-                        (exp(-dτ[n₁] / qp_μN[i]) - exp(-dτ[n₀] / qp_μN[j]))
+                if (abs( (qp_μN[i]/qp_μN[j]) - (dτ[n₁]/dτ[n₀]) ) < 1.e-8)
+                    iet⁺⁺[i,j,n₁,1] = 
+                        (dτ[n₀]/qp_μN[i]) * ϖ_λ₁λ₀[Δn] * fscattRayl[n₀] * 
+                        Z⁺⁺_λ₁λ₀[i,j] * 
+                        wct2[j] * exp(-dτ[n₀] / qp_μN[j])
+                else
+                    iet⁺⁺[i,j,n₁,1] += 
+                            ϖ_λ₁λ₀[Δn] * fscattRayl[n₀] * Z⁺⁺_λ₁λ₀[i,j] * 
+                            (1 / ( (qp_μN[i]/qp_μN[j]) - (dτ[n₁]/dτ[n₀]) )) * 
+                            wct2[j] * 
+                            (exp(-dτ[n₁] / qp_μN[i]) - exp(-dτ[n₀] / qp_μN[j]))
+                end
             end
         else
-            ier⁻⁺[i,j,n₁,1] = 0.0
+            ier⁻⁺[i,j,n₁,1] += 0.0
             if i==j
-                iet⁺⁺[i,j,n₁,1] = 0.0
+                iet⁺⁺[i,j,n₁,1] += 0.0
             else
-                iet⁺⁺[i,j,n₁,1] = 0.0
+                iet⁺⁺[i,j,n₁,1] += 0.0
             end
         end
     end
@@ -329,7 +361,7 @@ function get_elem_rt_SFI!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
                         ieJ₀⁺, ieJ₀⁻, 
                         τ_sum, 
                         dτ, ϖ, 
-                        Z⁻⁺_λ₁λ₀, Z⁺⁺_λ₁λ₀, 
+                        Z⁻⁺_λ₁λ₀, Z⁺⁺_λ₁λ₀, F₀,
                         qp_μN, ndoubl,
                         wct02, nStokes,
                         I₀, iμ0,D)
@@ -349,8 +381,8 @@ function get_elem_rt_SFI!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
     event = kernel!(aType(fscattRayl), 
         aType(ϖ_λ₁λ₀), aType(i_λ₁λ₀), 
         ieJ₀⁺, ieJ₀⁻, 
-        τ_sum, dτ, ϖ,
-        aType(Z⁻⁺_λ₁λ₀), aType(Z⁺⁺_λ₁λ₀), 
+        τ_sum, dτ, ϖ, 
+        aType(Z⁻⁺_λ₁λ₀), aType(Z⁺⁺_λ₁λ₀), aType(F₀),
         qp_μN, ndoubl, wct02, nStokes, 
         I₀, iμ0, D, 
         ndrange=getKernelDimSFI(RS_type, ieJ₀⁻, i_λ₁λ₀)); #change this
@@ -359,44 +391,47 @@ function get_elem_rt_SFI!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
 
     t_ieJ₀⁺ = similar(ieJ₀⁻)
     t_ieJ₀⁻ = similar(ieJ₀⁻)
+    t_ieJ₀⁻.= 0.0 
+    t_ieJ₀⁺.= 0.0 
     
     #println("Hallo1")
     event = kernel!(aType(fscattRayl), 
         aType(ϖ_λ₁λ₀_VS_n2), aType(i_λ₁λ₀_VS_n2), 
         t_ieJ₀⁺, t_ieJ₀⁻, 
-        τ_sum, dτ, ϖ,
-        aType(Z⁻⁺_λ₁λ₀_VS_n2), aType(Z⁺⁺_λ₁λ₀_VS_n2), 
+        τ_sum, dτ, ϖ, 
+        aType(Z⁻⁺_λ₁λ₀_VS_n2), aType(Z⁺⁺_λ₁λ₀_VS_n2), aType(F₀),
         qp_μN, ndoubl, wct02, nStokes, 
         I₀, iμ0, D, 
         ndrange=getKernelDimSFI(RS_type, ieJ₀⁻, i_λ₁λ₀_VS_n2)); #change this
     #wait(device, event)
     synchronize_if_gpu();
     
-    ieJ₀⁺ += t_ieJ₀⁺
-    ieJ₀⁻ += t_ieJ₀⁻
-    
+    ieJ₀⁺ .+= t_ieJ₀⁺
+    ieJ₀⁻ .+= t_ieJ₀⁻
+    t_ieJ₀⁻ .= 0.0 
+    t_ieJ₀⁺ .= 0.0 
     #println("Hallo2")
     event = kernel!(fscattRayl, 
         aType(ϖ_λ₁λ₀_VS_o2), aType(i_λ₁λ₀_VS_o2), 
         t_ieJ₀⁺, t_ieJ₀⁻, 
-        τ_sum, dτ, ϖ,
-        aType(Z⁻⁺_λ₁λ₀_VS_o2), aType(Z⁺⁺_λ₁λ₀_VS_o2), 
+        τ_sum, dτ, ϖ, 
+        aType(Z⁻⁺_λ₁λ₀_VS_o2), aType(Z⁺⁺_λ₁λ₀_VS_o2), aType(F₀),
         qp_μN, ndoubl, wct02, nStokes, 
         I₀, iμ0, D, 
         ndrange=getKernelDimSFI(RS_type, ieJ₀⁻, i_λ₁λ₀_VS_o2)); #change this
     #wait(device, event)
     synchronize_if_gpu();
         
-    ieJ₀⁺ += t_ieJ₀⁺
-    ieJ₀⁻ += t_ieJ₀⁻
+    ieJ₀⁺ .+= t_ieJ₀⁺
+    ieJ₀⁻ .+= t_ieJ₀⁻ 
 end
 
 #  TODO: Nov 30, 2021
 @kernel function get_elem_rt_SFI_VS!(fscattRayl,
                             ϖ_λ₁λ₀, i_λ₁λ₀, 
                             ieJ₀⁺, ieJ₀⁻, 
-                            τ_sum, dτ, ϖ,
-                            Z⁻⁺_λ₁λ₀, Z⁺⁺_λ₁λ₀, 
+                            τ_sum, dτ, ϖ, 
+                            Z⁻⁺_λ₁λ₀, Z⁺⁺_λ₁λ₀, F₀,
                             qp_μN, ndoubl,
                             wct02, nStokes, 
                             I₀, iμ0, D)
@@ -421,34 +456,43 @@ end
         Z⁺⁺_I₀ = FT(0.0);
         Z⁻⁺_I₀ = FT(0.0);
         for ii = i_start:i_end
-            Z⁺⁺_I₀ += Z⁺⁺_λ₁λ₀[i,ii] * I₀[ii-i_start+1]
-            Z⁻⁺_I₀ += Z⁻⁺_λ₁λ₀[i,ii] * I₀[ii-i_start+1] 
+            Z⁺⁺_I₀ += Z⁺⁺_λ₁λ₀[i,ii] * F₀[ii-i_start+1, n₀] #I₀[ii-i_start+1]
+            Z⁻⁺_I₀ += Z⁻⁺_λ₁λ₀[i,ii] * F₀[ii-i_start+1, n₀] #I₀[ii-i_start+1] 
         end
         
-        if (i>=i_start) && (i<=i_end)
+        if (i_start ≤ i ≤ i_end)
             #ctr = i-i_start+1
             # J₀⁺ = 0.25*(1+δ(m,0)) * ϖ(λ) * Z⁺⁺ * I₀ * (dτ(λ)/μ₀) * exp(-dτ(λ)/μ₀)
-            if abs(dτ[n₀]-dτ[n₁])>1.e-6
+            if abs(dτ[n₀]-dτ[n₁])>1.e-8
                 ieJ₀⁺[i, 1, n₁, 1] = 
-                        (exp(-dτ[n₀] / qp_μN[i]) - exp(-dτ[n₁] / qp_μN[i])) /
-                        ((dτ[n₁]/dτ[n₀])-1) * 
-                        ϖ_λ₁λ₀[Δn] * ϖ[n₀] * fscattRayl[n₀] * Z⁺⁺_I₀ * wct02
+                        ϖ_λ₁λ₀[Δn] * fscattRayl[n₀] * Z⁺⁺_I₀ * wct02 *
+                        (exp(-dτ[n₁] / qp_μN[i]) - exp(-dτ[n₀] / qp_μN[i])) /
+                        (1-(dτ[n₁]/dτ[n₀])) 
+                        
             else
                 ieJ₀⁺[i, 1, n₁, 1] = 
-                        wct02 * ϖ_λ₁λ₀[Δn] * ϖ[n₀] * fscattRayl[n₀] * Z⁺⁺_I₀ * 
-                        (1 - exp(-dτ[n₀] / qp_μN[i_start]))
+                        (dτ[n₀]/qp_μN[i]) *  wct02 * ϖ_λ₁λ₀[Δn] * 
+                        fscattRayl[n₀] * Z⁺⁺_I₀ * 
+                        exp(-dτ[n₀] / qp_μN[i])
             end
         else
             # J₀⁺ = 0.25*(1+δ(m,0)) * ϖ(λ) * Z⁺⁺ * I₀ * [μ₀ / (μᵢ - μ₀)] * [exp(-dτ(λ)/μᵢ) - exp(-dτ(λ)/μ₀)]
+            if (abs( (qp_μN[i]/qp_μN[i_start]) - (dτ[n₁]/dτ[n₀]) ) < 1.e-8)
+                ieJ₀⁺[i, 1, n₁, 1] = 
+                    (dτ[n₀]/qp_μN[i]) * wct02 * ϖ_λ₁λ₀[Δn] * fscattRayl[n₀] * 
+                    Z⁺⁺_I₀ * 
+                    exp(-dτ[n₀] / qp_μN[i_start])
+            else
             ieJ₀⁺[i, 1, n₁, 1] = 
-                        wct02 * ϖ_λ₁λ₀[Δn] * ϖ[n₀] * fscattRayl[n₀] * Z⁺⁺_I₀ * 
+                        wct02 * ϖ_λ₁λ₀[Δn] * fscattRayl[n₀] * Z⁺⁺_I₀ * 
                         (1 /( (qp_μN[i]/qp_μN[i_start]) - (dτ[n₁]/dτ[n₀]) ) ) * 
                         (exp(-dτ[n₁] / qp_μN[i]) - exp(-dτ[n₀] / qp_μN[i_start]))  
+            end
         end
         #TODO
         #J₀⁻ = 0.25*(1+δ(m,0)) * ϖ(λ) * Z⁻⁺ * I₀ * [μ₀ / (μᵢ + μ₀)] * [1 - exp{-dτ(λ)(1/μᵢ + 1/μ₀)}]                    
         ieJ₀⁻[i, 1, n₁, 1] = 
-                    wct02 * ϖ_λ₁λ₀[Δn] * ϖ[n₀] * fscattRayl[n₀] * Z⁻⁺_I₀ * 
+                    wct02 * ϖ_λ₁λ₀[Δn] * fscattRayl[n₀] * Z⁻⁺_I₀ * 
                     (1/( (qp_μN[i] / qp_μN[i_start]) + (dτ[n₁]/dτ[n₀]) )) *
                     (1 - exp(-( (dτ[n₁] / qp_μN[i]) + (dτ[n₀] / qp_μN[i_start]) ) ))  
 
@@ -465,7 +509,7 @@ end
 function get_elem_rt_SFI!(RS_type::RRS_plus, 
                         ieJ₀⁺, ieJ₀⁻, 
                         τ_sum, dτ_λ, ϖ_λ, 
-                        Z⁻⁺_λ₁λ₀, Z⁺⁺_λ₁λ₀, 
+                        Z⁻⁺_λ₁λ₀, Z⁺⁺_λ₁λ₀, F₀,
                         qp_μN, ndoubl,
                         wct02, nStokes,
                         I₀, iμ0,D)
@@ -477,8 +521,8 @@ function get_elem_rt_SFI!(RS_type::RRS_plus,
     #@show typeof(ieJ₀⁺), typeof(τ_sum), typeof(dτ_λ),typeof(wct02), typeof(qp_μN), typeof(dτ_λ) 
     event = kernel!(aType(fscattRayl), aType(ϖ_λ₁λ₀), aType(i_λ₁λ₀), 
                 i_ref, ieJ₀⁺, ieJ₀⁻, 
-                τ_sum, dτ_λ, ϖ_λ,
-                aType(Z⁻⁺_λ₁λ₀), aType(Z⁺⁺_λ₁λ₀), 
+                τ_sum, dτ_λ, ϖ_λ, 
+                aType(Z⁻⁺_λ₁λ₀), aType(Z⁺⁺_λ₁λ₀), aType(F₀),
                 qp_μN, ndoubl, wct02, nStokes, 
                 I₀, iμ0, D, 
                 ndrange=getKernelDimSFI(RS_type,ieJ₀⁻));
@@ -629,7 +673,7 @@ function apply_D_matrix_elemental!(RS_type::RRS_plus, ndoubl::Int, n_stokes::Int
     device = devi(architecture(ier⁻⁺))
     applyD_kernel! = apply_D_elemental_RRS!(device)
     event = applyD_kernel!(ndoubl,n_stokes, ier⁻⁺, iet⁺⁺, ier⁺⁻, iet⁻⁻, ndrange=size(ier⁻⁺));
-    wait(device, event);
+    #wait(device, event);
     synchronize_if_gpu();
     return nothing
 end
@@ -642,7 +686,7 @@ function apply_D_matrix_elemental_SFI!(RS_type::Union{RRS_plus, VS_0to1_plus, VS
         device = devi(architecture(ieJ₀⁻))
         applyD_kernel! = apply_D_elemental_SFI!(device)
         event = applyD_kernel!(RS_type,ndoubl,n_stokes, ieJ₀⁻, ndrange=size(ieJ₀⁻));
-        wait(device, event);
+        #wait(device, event);
         synchronize();
         return nothing
     end
