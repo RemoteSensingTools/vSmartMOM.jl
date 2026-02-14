@@ -13,7 +13,7 @@ Compute the aerosol optical properties using the Siewert-NAI2 method
 Input: MieModel, holding all computation and aerosol properties 
 Output: AerosolOptics, holding all Greek coefficients and Cross-Sectional information
 """
-function compute_aerosol_optical_properties(model::MieModel{FDT}, FT2::Type=Float64) where FDT <: NAI2
+function compute_aerosol_optical_properties(lin::LinMode, model::MieModel{FDT}, FT2::Type=Float64) where FDT <: NAI2
 
     # Unpack the model
     @unpack computation_type, aerosol, λ, polarization_type, truncation_type, r_max, nquad_radius, wigner_A, wigner_B = model
@@ -34,8 +34,8 @@ function compute_aerosol_optical_properties(model::MieModel{FDT}, FT2::Type=Floa
     # Just sample from 0.25%ile to 99.75%ile:
     #start,stop = quantile(size_distribution,[0.0025,0.9975])
     r, wᵣ = gauleg(nquad_radius, 0.0, r_max ; norm=false) 
-    #r, wᵣ = gauleg(nquad_radius, start, min(stop,r_max) ; norm=false) 
-    
+    #r, wᵣ = gauleg(nquad_radius, start, min(stop,r_max); norm=false) 
+     @show sum(wᵣ)
     # Wavenumber
     k = 2π / λ  
 
@@ -65,8 +65,28 @@ function compute_aerosol_optical_properties(model::MieModel{FDT}, FT2::Type=Floa
     C_ext = zeros(FT, nquad_radius)
     C_sca = zeros(FT, nquad_radius)
 
+    # derivatives with respect to nᵣ, nᵢ, respectively
+    Ṡ₁    = zeros(Complex{FT}, 2, n_mu, nquad_radius)
+    Ṡ₂    = zeros(Complex{FT}, 2, n_mu, nquad_radius)
+    
+    ḟ₁₁   = zeros(FT, 2, n_mu, nquad_radius)
+    ḟ₃₃   = zeros(FT, 2, n_mu, nquad_radius)
+    ḟ₁₂   = zeros(FT, 2, n_mu, nquad_radius)
+    ḟ₃₄   = zeros(FT, 2, n_mu, nquad_radius)
+    Ċ_ext = zeros(FT, 2, nquad_radius)
+    Ċ_sca = zeros(FT, 2, nquad_radius)
+
+    # derivatives with respect to nᵣ, nᵢ, rₚ, σₚ, respectively
+    bulk_Ċ_ext = zeros(FT, 4)
+    bulk_Ċ_sca = zeros(FT, 4)
+    bulk_ϖ̇     = zeros(FT, 4)
+    bulk_ḟ₁₁   = zeros(FT, 4, n_mu)
+    bulk_ḟ₃₃   = zeros(FT, 4, n_mu)
+    bulk_ḟ₁₂   = zeros(FT, 4, n_mu)
+    bulk_ḟ₃₄   = zeros(FT, 4, n_mu) 
+
     # Standardized weights for the size distribution:
-    wₓ = compute_wₓ(size_distribution, wᵣ, r, r_max) 
+    wₓ, ẇₓ = compute_wₓ(lin, size_distribution, wᵣ, r, r_max) 
     
     # Loop over size parameters
     @showprogress 1 "Computing PhaseFunctions Siewert NAI-2 style ..." for i = 1:length(x_size_param)
@@ -77,6 +97,9 @@ function compute_aerosol_optical_properties(model::MieModel{FDT}, FT2::Type=Floa
         # In Domke methods, we want to pre-allocate these as 2D outside of this loop.
         an = (zeros(Complex{FT}, n_max))
         bn = (zeros(Complex{FT}, n_max))
+        # derivatives with respect to nᵣ, nᵢ, respectively
+        ȧn = (zeros(Complex{FT}, 2, n_max))
+        ḃn = (zeros(Complex{FT}, 2, n_max))
 
         # Weighting for sums of 2n+1
         n_ = collect(FT, 1:n_max);
@@ -86,29 +109,85 @@ function compute_aerosol_optical_properties(model::MieModel{FDT}, FT2::Type=Floa
         y = x_size_param[i] * (aerosol.nᵣ - im*aerosol.nᵢ);
         nmx = round(Int, max(n_max, abs(y)) + 51)
         Dₙ  = zeros(Complex{FT}, nmx)
-
-        # Compute aₙ,bₙ and S₁,S₂
-        compute_mie_ab!(x_size_param[i], aerosol.nᵣ - aerosol.nᵢ * im, an, bn, Dₙ )
-        compute_mie_S₁S₂!(an, bn, leg_π, leg_τ, view(S₁, :, i), view(S₂, :, i))
+        # derivatives with respect to nᵣ, nᵢ, respectively
+        Ḋₙ  = zeros(Complex{FT}, 2, nmx)
         
+        # Compute aₙ,bₙ and S₁,S₂
+        compute_mie_ab!(x_size_param[i], aerosol.nᵣ - aerosol.nᵢ * im, an, bn, Dₙ, ȧn, ḃn, Ḋₙ)
+        compute_mie_S₁S₂!(an, bn, 
+            ȧn, ḃn, 
+            leg_π, leg_τ, 
+            view(S₁, :, i), view(S₂, :, i), 
+            view(Ṡ₁, :, :, i), view(Ṡ₂, :, :, i))
+        #@show size(an), size(bn)
+        # Suniti: continue here on 08/14/2025
         # Compute Extinction and scattering cross sections: 
         C_sca[i] = 2π / k^2 * (n_' * (abs2.(an) + abs2.(bn)))
         C_ext[i] = 2π / k^2 * (n_' * real(an + bn))
-       
+        #@show C_sca[i], C_ext[i]
+        for ctr=1:2
+            Ċ_sca[ctr,i] = 2π / k^2 * (n_' * (
+                                        an .* conj.(ȧn[ctr,:]) +
+                                        ȧn[ctr,:] .* conj.(an) + 
+                                        bn .* conj.(ḃn[ctr,:]) +    
+                                        ḃn[ctr,:] .* conj.(bn)  
+                                    ))
+            Ċ_ext[ctr,i] = 2π / k^2 * (n_' * real(ȧn[ctr,:] + ḃn[ctr,:]))
+        #@show Ċ_sca[ctr,i], Ċ_ext[ctr,i]
+        end
         # Compute scattering matrix components per size parameter:
         f₁₁[:,i] =  0.5 / x_size_param[i]^2  * real(abs2.(S₁[:,i]) + abs2.(S₂[:,i]));
         f₃₃[:,i] =  0.5 / x_size_param[i]^2  * real(S₁[:,i] .* conj(S₂[:,i]) + S₂[:,i] .* conj(S₁[:,i]));
         f₁₂[:,i] = -0.5 / x_size_param[i]^2  * real(abs2.(S₁[:,i]) - abs2.(S₂[:,i]));
         f₃₄[:,i] = -0.5 / x_size_param[i]^2  * imag(S₁[:,i] .* conj(S₂[:,i]) - S₂[:,i] .* conj(S₁[:,i]));
-
+        for ctr=1:2
+            ḟ₁₁[ctr,:,i] =  0.5 / x_size_param[i]^2  * real(
+                                                Ṡ₁[ctr,:,i].*conj.(S₁[:,i]) + 
+                                                S₁[:,i].*conj.(Ṡ₁[ctr,:,i]) +
+                                                Ṡ₂[ctr,:,i].*conj.(S₂[:,i]) +
+                                                S₂[:,i].*conj.(Ṡ₂[ctr,:,i]));
+            ḟ₃₃[ctr,:,i] =  0.5 / x_size_param[i]^2  * real(
+                                                Ṡ₁[ctr,:,i] .* conj(S₂[:,i]) + 
+                                                S₁[:,i] .* conj(Ṡ₂[ctr,:,i]) + 
+                                                Ṡ₂[ctr,:,i] .* conj(S₁[:,i]) +
+                                                S₂[:,i] .* conj(Ṡ₁[ctr,:,i]));
+            ḟ₁₂[ctr,:,i] = -0.5 / x_size_param[i]^2  * real(
+                                                Ṡ₁[ctr,:,i].*conj.(S₁[:,i]) + 
+                                                S₁[:,i].*conj.(Ṡ₁[ctr,:,i]) -
+                                                Ṡ₂[ctr,:,i].*conj.(S₂[:,i]) -
+                                                S₂[:,i].*conj.(Ṡ₂[ctr,:,i]));
+            ḟ₃₄[ctr,:,i] = -0.5 / x_size_param[i]^2  * imag(
+                                                Ṡ₁[ctr,:,i] .* conj(S₂[:,i]) + 
+                                                S₁[:,i] .* conj(Ṡ₂[ctr,:,i]) - 
+                                                Ṡ₂[ctr,:,i] .* conj(S₁[:,i]) -
+                                                S₂[:,i] .* conj(Ṡ₁[ctr,:,i]));    
+        end
     end
 
     # Calculate bulk scattering and extinction cross-sections
     bulk_C_sca =  sum(wₓ .* C_sca)
     bulk_C_ext =  sum(wₓ .* C_ext)
+
+    for ctr=1:2
+        bulk_Ċ_sca[ctr] =  sum(wₓ .* Ċ_sca[ctr,:])
+        bulk_Ċ_ext[ctr] =  sum(wₓ .* Ċ_ext[ctr,:])
+    end
+    for ctr=3:4
+        bulk_Ċ_sca[ctr] =  sum(ẇₓ[ctr-2, :] .* C_sca)
+        bulk_Ċ_ext[ctr] =  sum(ẇₓ[ctr-2, :] .* C_ext)
+    end
     
+    bulk_ϖ = bulk_C_sca / bulk_C_ext
+    for ctr=1:4
+        bulk_ϖ̇[ctr] = (bulk_Ċ_sca[ctr] - bulk_ϖ * bulk_Ċ_ext[ctr]) / bulk_C_ext
+    end
     # Compute bulk scattering 
     wr = (4π * r.^2 .*  wₓ) 
+    ẇr = zeros(FT, 2, length(r))
+    
+    for ctr=1:2
+        ẇr[ctr,:] = (4π * r.^2 .*  ẇₓ[ctr,:]) 
+    end
     bulk_f₁₁   =  f₁₁ * wr
     bulk_f₃₃   =  f₃₃ * wr
     bulk_f₁₂   =  f₁₂ * wr
@@ -119,7 +198,18 @@ function compute_aerosol_optical_properties(model::MieModel{FDT}, FT2::Type=Floa
     bulk_f₃₃ /= bulk_C_sca
     bulk_f₁₂ /= bulk_C_sca
     bulk_f₃₄ /= bulk_C_sca
-    
+    for ctr=1:2
+        bulk_ḟ₁₁[ctr,:] = (ḟ₁₁[ctr,:,:] * wr - bulk_f₁₁ * bulk_Ċ_sca[ctr]) / bulk_C_sca
+        bulk_ḟ₃₃[ctr,:] = (ḟ₃₃[ctr,:,:] * wr - bulk_f₃₃ * bulk_Ċ_sca[ctr]) / bulk_C_sca
+        bulk_ḟ₁₂[ctr,:] = (ḟ₁₂[ctr,:,:] * wr - bulk_f₁₂ * bulk_Ċ_sca[ctr]) / bulk_C_sca
+        bulk_ḟ₃₄[ctr,:] = (ḟ₃₄[ctr,:,:] * wr - bulk_f₃₄ * bulk_Ċ_sca[ctr]) / bulk_C_sca
+    end
+    for ctr=3:4
+        bulk_ḟ₁₁[ctr,:] = (f₁₁ * ẇr[ctr-2,:] - bulk_f₁₁ * bulk_Ċ_sca[ctr]) / bulk_C_sca
+        bulk_ḟ₃₃[ctr,:] = (f₃₃ * ẇr[ctr-2,:] - bulk_f₃₃ * bulk_Ċ_sca[ctr]) / bulk_C_sca
+        bulk_ḟ₁₂[ctr,:] = (f₁₂ * ẇr[ctr-2,:] - bulk_f₁₂ * bulk_Ċ_sca[ctr]) / bulk_C_sca
+        bulk_ḟ₃₄[ctr,:] = (f₃₄ * ẇr[ctr-2,:] - bulk_f₃₄ * bulk_Ċ_sca[ctr]) / bulk_C_sca
+    end
     # Range of l-values
     l_max = length(μ);
 
@@ -133,6 +223,13 @@ function compute_aerosol_optical_properties(model::MieModel{FDT}, FT2::Type=Floa
     γ = zeros(FT, l_max)
     ϵ = zeros(FT, l_max)
     ζ = zeros(FT, l_max)
+
+    α̇ = zeros(FT, 4, l_max)
+    β̇ = zeros(FT, 4, l_max)
+    δ̇ = zeros(FT, 4, l_max)
+    γ̇ = zeros(FT, 4, l_max)
+    ϵ̇ = zeros(FT, 4, l_max)
+    ζ̇ = zeros(FT, 4, l_max)
     
     # Compute Greek coefficients from bulk scattering matrix elements (spherical only here!)
     for l = 0:length(β) - 1
@@ -145,10 +242,19 @@ function compute_aerosol_optical_properties(model::MieModel{FDT}, FT2::Type=Floa
 
         δ[l + 1] = (2l + 1) / 2 * w_μ' * (bulk_f₃₃ .* P[:,l + 1])
         β[l + 1] = (2l + 1) / 2 * w_μ' * (bulk_f₁₁ .* P[:,l + 1])
-        γ[l + 1] = fac      * w_μ' * (bulk_f₁₂ .* P²[:,l + 1])
-        ϵ[l + 1] = fac      * w_μ' * (bulk_f₃₄ .* P²[:,l + 1])
-        ζ[l + 1] = fac      * w_μ' * (bulk_f₃₃ .* R²[:,l + 1] + bulk_f₁₁ .* T²[:,l + 1]) 
-        α[l + 1] = fac      * w_μ' * (bulk_f₁₁ .* R²[:,l + 1] + bulk_f₃₃ .* T²[:,l + 1]) 
+        γ[l + 1] = fac          * w_μ' * (bulk_f₁₂ .* P²[:,l + 1])
+        ϵ[l + 1] = fac          * w_μ' * (bulk_f₃₄ .* P²[:,l + 1])
+        ζ[l + 1] = fac          * w_μ' * (bulk_f₃₃ .* R²[:,l + 1] + bulk_f₁₁ .* T²[:,l + 1]) 
+        α[l + 1] = fac          * w_μ' * (bulk_f₁₁ .* R²[:,l + 1] + bulk_f₃₃ .* T²[:,l + 1]) 
+
+        for ctr=1:4
+            δ̇[ctr,l + 1] = (2l + 1) / 2 * w_μ' * (bulk_ḟ₃₃[ctr,:] .* P[:,l + 1])
+            β̇[ctr,l + 1] = (2l + 1) / 2 * w_μ' * (bulk_ḟ₁₁[ctr,:] .* P[:,l + 1])
+            γ̇[ctr,l + 1] = fac          * w_μ' * (bulk_ḟ₁₂[ctr,:] .* P²[:,l + 1])
+            ϵ̇[ctr,l + 1] = fac          * w_μ' * (bulk_ḟ₃₄[ctr,:] .* P²[:,l + 1])
+            ζ̇[ctr,l + 1] = fac          * w_μ' * (bulk_ḟ₃₃[ctr,:] .* R²[:,l + 1] + bulk_ḟ₁₁[ctr,:] .* T²[:,l + 1]) 
+            α̇[ctr,l + 1] = fac          * w_μ' * (bulk_ḟ₁₁[ctr,:] .* R²[:,l + 1] + bulk_ḟ₃₃[ctr,:] .* T²[:,l + 1]) 
+        end    
     end
 
     # Check whether this is a Dual number (if so, don't do any conversions)
@@ -160,16 +266,24 @@ function compute_aerosol_optical_properties(model::MieModel{FDT}, FT2::Type=Floa
                                  convert.(FT2, δ), 
                                  convert.(FT2, ϵ), 
                                  convert.(FT2, ζ))
+        lin_greek_coefs = linGreekCoefs(convert.(FT2, α̇), 
+                                         convert.(FT2, β̇), 
+                                         convert.(FT2, γ̇), 
+                                         convert.(FT2, δ̇), 
+                                         convert.(FT2, ϵ̇), 
+                                         convert.(FT2, ζ̇))
         # Return the packaged AerosolOptics object
-        return AerosolOptics(greek_coefs=greek_coefs, ω̃=FT2(bulk_C_sca / bulk_C_ext), k=FT2(bulk_C_ext), fᵗ=FT2(1))
-
+        return AerosolOptics(greek_coefs=greek_coefs, ω̃=FT2(bulk_ϖ), k=FT2(bulk_C_ext), fᵗ=FT2(1)),
+            linAerosolOptics(lin_greek_coefs=lin_greek_coefs, ω̃̇=convert.(FT2, bulk_ϖ̇), k̇=convert.(FT2, bulk_Ċ_ext), ḟᵗ=FT2(0.0) .*convert.(FT2, bulk_Ċ_ext))# zeros(FT2,4))
     else
         greek_coefs = GreekCoefs(α, β, γ, δ, ϵ, ζ)
-        return AerosolOptics(greek_coefs=greek_coefs, ω̃=(bulk_C_sca / bulk_C_ext), k=(bulk_C_ext), fᵗ=FT(1))
+        lin_greek_coefs = linGreekCoefs(α̇, β̇, γ̇, δ̇, ϵ̇, ζ̇)
+        return AerosolOptics(greek_coefs=greek_coefs, ω̃=(bulk_C_sca / bulk_C_ext), k=(bulk_C_ext), fᵗ=FT(1)),
+            linAerosolOptics(lin_greek_coefs=lin_greek_coefs, ω̃̇=bulk_ϖ̇, k̇=bulk_Ċ_ext, ḟᵗ=FT2(0.0) .*convert.(FT2, bulk_Ċ_ext))# zeros(FT,4))
     end
 end
 
-function compute_ref_aerosol_extinction(model::MieModel{FDT}, FT2::Type=Float64) where FDT <: NAI2
+function compute_ref_aerosol_extinction(lin::LinMode, model::MieModel{FDT}, FT2::Type=Float64) where FDT <: NAI2
 
     # Unpack the model
     @unpack computation_type, aerosol, λ, polarization_type, r_max, nquad_radius = model
@@ -185,7 +299,7 @@ function compute_ref_aerosol_extinction(model::MieModel{FDT}, FT2::Type=Float64)
     #@show FT
     #@assert FT == Float64 "Aerosol computations require 64bit"
     # Get radius quadrature points and weights (for mean, thus normalized):
-    #r, wᵣ = gauleg(nquad_radius, 0.0, r_max ; norm=false) 
+    #r, wᵣ = gauleg(nquad_radius, 0.0, r_max ; norm=true) 
     # Just sample from 0.25%ile to 99.75%ile:
     #start,stop = quantile(size_distribution,[0.0025,0.9975])
     r, wᵣ = gauleg(nquad_radius, 0.0, r_max ; norm=false) 
@@ -213,9 +327,14 @@ function compute_ref_aerosol_extinction(model::MieModel{FDT}, FT2::Type=Float64)
     # Pre-allocate arrays:
     C_ext = zeros(FT, nquad_radius)
     #C_sca = zeros(FT, nquad_radius)
-
+    Ċ_ext = zeros(FT, 2, nquad_radius)
+    #Ċ_sca = zeros(FT, 2, nquad_radius)
+    bulk_Ċ_ext = zeros(FT, 4)
+    #bulk_Ċ_sca = zeros(FT, 4)
     # Standardized weights for the size distribution:
-    wₓ = compute_wₓ(size_distribution, wᵣ, r, r_max) 
+    wₓ, ẇₓ = compute_wₓ(lin, size_distribution, wᵣ, r, r_max) 
+
+    #wₓ = compute_wₓ(size_distribution, wᵣ, r, r_max) 
     
     # Loop over size parameters
     @showprogress 1 "Computing extinction XS at reference wavelength ..." for i = 1:length(x_size_param)
@@ -226,6 +345,8 @@ function compute_ref_aerosol_extinction(model::MieModel{FDT}, FT2::Type=Float64)
         # In Domke methods, we want to pre-allocate these as 2D outside of this loop.
         an = (zeros(Complex{FT}, n_max))
         bn = (zeros(Complex{FT}, n_max))
+        ȧn = (zeros(Complex{FT}, 2, n_max))
+        ḃn = (zeros(Complex{FT}, 2, n_max))
 
         # Weighting for sums of 2n+1
         n_ = collect(FT, 1:n_max);
@@ -234,22 +355,35 @@ function compute_ref_aerosol_extinction(model::MieModel{FDT}, FT2::Type=Float64)
         # Pre-allocate Dn:
         y = x_size_param[i] * (aerosol.nᵣ - aerosol.nᵢ * im);
         nmx = round(Int, max(n_max, abs(y)) + 51)
-        Dn = zeros(Complex{FT}, nmx)
-
+        Dₙ = zeros(Complex{FT}, nmx)
+        # derivatives with respect to nᵣ, nᵢ, respectively
+        Ḋₙ  = zeros(Complex{FT}, 2, nmx)
+        
         # Compute an,bn and S₁,S₂
-        compute_mie_ab!(x_size_param[i], aerosol.nᵣ - aerosol.nᵢ * im, an, bn, Dn)
+        compute_mie_ab!(x_size_param[i], aerosol.nᵣ - aerosol.nᵢ * im, an, bn, Dₙ, ȧn, ḃn, Ḋₙ)
         
         # Compute Extinction and scattering cross sections: 
         C_ext[i] = 2π / k^2 * (n_' * real(an + bn))
+        for ctr=1:2
+            Ċ_ext[ctr,i] = 2π / k^2 * (n_' * real(ȧn[ctr,:] + ḃn[ctr,:]))
+        end
     end
 
+    #@show size(C_ext), size(wₓ), size(Ċ_ext), size(ẇₓ)
     # Calculate bulk extinction coeffitient
     bulk_C_ext =  sum(wₓ .* C_ext)
+    for ctr=1:2
+        bulk_Ċ_ext[ctr] =  sum(wₓ .* Ċ_ext[ctr,:])
+    end
+    for ctr=3:4
+        bulk_Ċ_ext[ctr] =  sum(ẇₓ[ctr-2,:] .* C_ext)
+    end
     
     # Return the bulk extinction coeffitient
-    return bulk_C_ext
+    return bulk_C_ext, convert.(FT2, bulk_Ċ_ext)
 end
 
+#=
 """
     $(FUNCTIONNAME)(aerosol::Aerosol, λ)
 
@@ -314,7 +448,7 @@ function phase_function(aerosol::Aerosol, λ, r_max, nquad_radius)
         n_ = 2n_ .+ 1
 
         # Pre-allocate Dn:
-        y = x_size_param[i] * (aerosol.nᵣ - aerosol.nᵢ);
+        y = x_size_param[i] * (aerosol.nᵣ - aerosol.nᵢ * im);
         nmx = round(Int, max(n_max, abs(y)) + 51)
         Dn = zeros(Complex{FT}, nmx)
 
@@ -477,7 +611,7 @@ function compute_aerosol_XS(aerosol::Aerosol, λ::FT, r_max::FT, nquad_radius::I
         n_ = 2n_ .+ 1
 
         # Pre-allocate Dₙ  :
-        y = x_size_param[i] * (aerosol.nᵣ - aerosol.nᵢ);
+        y = x_size_param[i] * (aerosol.nᵣ - aerosol.nᵢ * im);
         nmx = round(Int, max(n_max, abs(y)) + 51)
         Dₙ  = zeros(Complex{FT}, nmx)
 
@@ -509,3 +643,4 @@ function compute_aerosol_XS(aerosol::Aerosol, λ::FT, r_max::FT, nquad_radius::I
 
 end
 
+=#
