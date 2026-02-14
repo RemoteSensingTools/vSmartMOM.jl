@@ -48,8 +48,9 @@ include("constants.jl")                        # Scientific constants
 include("types.jl")  
 include("types_lin.jl")                        # Types for linearized RT
 
-# Raman type additions
-include("types_inelastic.jl")
+# Note: Raman types (AbstractRamanType, noRS, RRS, etc.) come from 
+# InelasticScattering module via `using ..InelasticScattering` above.
+# Inelastic layer types (CompositeLayerRS, AddedLayerRS) are in types.jl.
 
 # Solvers -- Elemental
 include("CoreKernel/elemental.jl")             # Elemental (elastic)
@@ -87,7 +88,7 @@ include("tools/postprocessing_vza_ms.jl")
 # RT Run entry points
 include("rt_run.jl")                           # Starting point for RT 
 include("rt_run_lin.jl")                       # Linearized RT run
-include("rt_run_bck.jl")                       # Backup RT run
+# rt_run_bck.jl not included: rt_run_bck is already defined in rt_run.jl
 include("rt_run_multisensor.jl") 
 # Temporary:
 include("rt_run_canopy.jl")
