@@ -38,6 +38,22 @@ function vSmartMOM.CoreRT.batch_inv!(X::CuArray{FT,3}, A::CuArray{FT,3}) where {
     vSmartMOM.CoreRT.synchronize()
 end
 
+"""
+    batch_inv!(X, A, ws::RTWorkspace)
+
+Workspace-aware batch inversion using pre-allocated pivot/info arrays.
+Eliminates repeated GPU memory allocations in tight loops.
+"""
+function vSmartMOM.CoreRT.batch_inv!(X::CuArray{FT,3}, A::CuArray{FT,3}, 
+                                      ws::vSmartMOM.CoreRT.RTWorkspace) where {FT}
+    # LU-factorize A using pre-allocated pivot/info
+    pivot, info = CUDA.CUBLAS.getrf_strided_batched!(A, true)
+    vSmartMOM.CoreRT.synchronize()
+    # Invert LU factorization of A using pre-allocated output
+    CUDA.CUBLAS.getri_strided_batched!(A, X, pivot)
+    vSmartMOM.CoreRT.synchronize()
+end
+
 "Given 3D CuArray A with pointers, fill in X[:,:,k] = A[:,:,k] \\ I (Float32 version)" 
 function vSmartMOM.CoreRT.batch_inv!(X::CuArray{FT,3}, A::CuArray{FT,3}, Xptrs, Aptrs) where {FT<:Float32}
     n = size(A,1)
@@ -70,6 +86,29 @@ function vSmartMOM.CoreRT.batch_inv!(X::CuArray{FT,3}, A::CuArray{FT,3}, Xptrs, 
     # Invert LU factorization of A
     CUDA.CUBLAS.cublasDgetriBatched(CUDA.CUBLAS.handle(), n, Aptrs, lda, pivot, Xptrs, lda, info, batchSize)
     vSmartMOM.CoreRT.synchronize()
+end
+
+"""
+    make_gpu_rt_workspace(FT, NquadN, nSpec)
+
+Create an RTWorkspace with CuArray-backed temporaries for GPU computation.
+"""
+function vSmartMOM.CoreRT.make_gpu_rt_workspace(FT::Type, NquadN::Int, nSpec::Int)
+    dims3 = (NquadN, NquadN, nSpec)
+    dims_J = (NquadN, 1, nSpec)
+    
+    vSmartMOM.CoreRT.RTWorkspace(
+        CuArray(zeros(FT, dims3)),      # gp_refl
+        CuArray(zeros(FT, dims3)),      # tt_gp
+        CuArray(zeros(FT, dims_J)),     # J₁⁺
+        CuArray(zeros(FT, dims_J)),     # J₁⁻
+        CUDA.zeros(Cint, NquadN, nSpec), # pivot
+        CUDA.zeros(Cint, nSpec),         # info
+        CuArray(zeros(FT, dims3)),      # tmp_inv
+        CuArray(zeros(FT, dims3)),      # T_inv
+        CuArray(zeros(FT, dims3)),      # tmp3d_a
+        CuArray(zeros(FT, dims3)),      # tmp3d_b
+    )
 end
 
 "Batched matrix multiply using CUBLAS (overwrite NNlib definition)"

@@ -6,9 +6,10 @@ This file contains RT doubling-related functions
 
 """
     $(FUNCTIONNAME)(pol_type, SFI, expk, ndoubl::Int, added_layer::AddedLayer, I_static::AbstractArray{FT}, 
-                    architecture) where {FT}
+                    architecture; ws=nothing) where {FT}
 
-Compute homogenous layer matrices from its elemental layer using Doubling 
+Compute homogenous layer matrices from its elemental layer using Doubling.
+If `ws::RTWorkspace` is provided, uses preallocated temporaries (critical for GPU performance).
 """
 function doubling_helper!(pol_type, 
                           SFI, 
@@ -16,7 +17,8 @@ function doubling_helper!(pol_type,
                           ndoubl::Int, 
                           added_layer::Union{AddedLayer,AddedLayerRS},
                           I_static::AbstractArray{FT}, 
-                          architecture) where {FT}
+                          architecture;
+                          ws::Union{RTWorkspace, Nothing}=nothing) where {FT}
 
     # Unpack the added layer
     @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, J₀⁺, J₀⁻ = added_layer
@@ -27,42 +29,49 @@ function doubling_helper!(pol_type,
     # Note: short-circuit evaluation => return nothing evaluated iff ndoubl == 0 
     ndoubl == 0 && return nothing
     
-    # Geometric progression of reflections (1-RR)⁻¹
-    gp_refl      = similar(t⁺⁺)
-    tt⁺⁺_gp_refl = similar(t⁺⁺)
- 
-    if SFI
-        # Dummy for source 
-        J₁⁺ = similar(J₀⁺)
-        # Dummy for J
-        J₁⁻ = similar(J₀⁻)
+    # Use workspace temporaries if available; otherwise allocate (CPU fallback)
+    if ws !== nothing
+        gp_refl      = ws.gp_refl
+        tt⁺⁺_gp_refl = ws.tt_gp
+        J₁⁺          = ws.J₁⁺
+        J₁⁻          = ws.J₁⁻
+    else
+        gp_refl      = similar(t⁺⁺)
+        tt⁺⁺_gp_refl = similar(t⁺⁺)
+        J₁⁺          = similar(J₀⁺)
+        J₁⁻          = similar(J₀⁻)
     end
 
     # Loop over number of doublings
     for n = 1:ndoubl
         
         # T⁺⁺(λ)[I - R⁺⁻(λ)R⁻⁺(λ)]⁻¹, for doubling R⁺⁻,R⁻⁺ and T⁺⁺,T⁻⁻ is identical
-        batch_inv!(gp_refl, I_static .- r⁻⁺ ⊠ r⁻⁺)
-        tt⁺⁺_gp_refl[:] = t⁺⁺ ⊠ gp_refl
+        if ws !== nothing
+            ws.tmp3d_a .= I_static .- r⁻⁺ ⊠ r⁻⁺
+            batch_inv!(gp_refl, ws.tmp3d_a, ws)
+        else
+            batch_inv!(gp_refl, I_static .- r⁻⁺ ⊠ r⁻⁺)
+        end
+        tt⁺⁺_gp_refl .= t⁺⁺ ⊠ gp_refl
 
         if SFI
 
             # J⁺₂₁(λ) = J⁺₁₀(λ).exp(-τ(λ)/μ₀)
-            @views J₁⁺[:,1,:] = J₀⁺[:,1,:] .* expk'
+            @views J₁⁺[:,1,:] .= J₀⁺[:,1,:] .* expk'
 
             # J⁻₁₂(λ)  = J⁻₀₁(λ).exp(-τ(λ)/μ₀)
-            @views J₁⁻[:,1,:] = J₀⁻[:,1,:] .* expk'
+            @views J₁⁻[:,1,:] .= J₀⁻[:,1,:] .* expk'
 
             # J⁻₀₂(λ) = J⁻₀₁(λ) + T⁻⁻₀₁(λ)[I - R⁻⁺₂₁(λ)R⁺⁻₀₁(λ)]⁻¹[J⁻₁₂(λ) + R⁻⁺₂₁(λ)J⁺₁₀(λ)] (see Eqs.8 in Raman paper draft)
-            J₀⁻[:] = J₀⁻ + (tt⁺⁺_gp_refl ⊠ (J₁⁻ + r⁻⁺ ⊠ J₀⁺)) 
+            J₀⁻[:] = J₀⁻ .+ (tt⁺⁺_gp_refl ⊠ (J₁⁻ .+ r⁻⁺ ⊠ J₀⁺)) 
 
             # J⁺₂₀(λ) = J⁺₂₁(λ) + T⁺⁺₂₁(λ)[I - R⁺⁻₀₁(λ)R⁻⁺₂₁(λ)]⁻¹[J⁺₁₀(λ) + R⁺⁻₀₁(λ)J⁻₁₂(λ)] (see Eqs.8 in Raman paper draft)
-            J₀⁺[:] = J₁⁺ + (tt⁺⁺_gp_refl ⊠ (J₀⁺ + r⁻⁺ ⊠ J₁⁻))
-            expk[:] = expk.^2
+            J₀⁺[:] = J₁⁺ .+ (tt⁺⁺_gp_refl ⊠ (J₀⁺ .+ r⁻⁺ ⊠ J₁⁻))
+            expk .= expk.^2
         end  
 
         # R⁻⁺₂₀(λ) = R⁻⁺₁₀(λ) + T⁻⁻₀₁(λ)[I - R⁻⁺₂₁(λ)R⁺⁻₀₁(λ)]⁻¹R⁻⁺₂₁(λ)T⁺⁺₁₀(λ) (see Eqs.8 in Raman paper draft)
-        r⁻⁺[:]  = r⁻⁺ + (tt⁺⁺_gp_refl ⊠ r⁻⁺ ⊠ t⁺⁺)
+        r⁻⁺[:]  = r⁻⁺ .+ (tt⁺⁺_gp_refl ⊠ r⁻⁺ ⊠ t⁺⁺)
 
         # T⁺⁺₂₀(λ) = T⁺⁺₂₁(λ)[I - R⁺⁻₀₁(λ)R⁻⁺₂₁(λ)]⁻¹T⁺⁺₁₀(λ) (see Eqs.8 in Raman paper draft)
         t⁺⁺[:]  = tt⁺⁺_gp_refl ⊠ t⁺⁺
@@ -81,13 +90,19 @@ function doubling_helper!(pol_type,
 
 end
 
+"""
+    doubling!(pol_type, SFI, expk, ndoubl, added_layer, I_static, architecture; ws=nothing)
+
+Public interface: doubling with optional workspace preallocation.
+"""
 function doubling!(pol_type, SFI, expk,
                     ndoubl::Int, 
                     added_layer::AddedLayer,#{FT},
                     I_static::AbstractArray{FT}, 
-                    architecture) where {FT}
+                    architecture;
+                    ws::Union{RTWorkspace, Nothing}=nothing) where {FT}
 
-    doubling_helper!(pol_type, SFI, expk, ndoubl, added_layer, I_static, architecture)
+    doubling_helper!(pol_type, SFI, expk, ndoubl, added_layer, I_static, architecture; ws=ws)
     synchronize_if_gpu()
 end
 

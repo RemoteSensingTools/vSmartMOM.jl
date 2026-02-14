@@ -718,3 +718,65 @@ function _repeat(x::AbstractArray, counts::Integer...)
     reshape(y, size_y2) .= reshape(x, size_x2)
     y
 end
+
+# ──────────────────────────────────────────────────────────────────────
+# RTWorkspace: Preallocated temporary arrays for GPU memory efficiency
+# ──────────────────────────────────────────────────────────────────────
+
+"""
+    RTWorkspace{FT, AT3, AT4, VI}
+
+Preallocated workspace for RT computations. Eliminates repeated GPU 
+memory allocations in doubling loops, interaction, and batch_inv! calls.
+
+Create once with `make_rt_workspace(...)` and reuse across all Fourier moments and layers.
+"""
+mutable struct RTWorkspace{FT, AT3<:AbstractArray{FT,3}}
+    # Temporaries for doubling (3D: NquadN × NquadN × nSpec)
+    "Geometric progression: (I - R⁺⁻R⁻⁺)⁻¹"
+    gp_refl::AT3
+    "T⁺⁺ × gp_refl"
+    tt_gp::AT3
+    "Temporary source J₁⁺"
+    J₁⁺::AT3
+    "Temporary source J₁⁻"
+    J₁⁻::AT3
+    # Temporaries for batch_inv! (pivot and info arrays)
+    "Pivot array for CUBLAS LU factorization"
+    pivot::AbstractMatrix{Cint}
+    "Info array for CUBLAS LU factorization"
+    info::AbstractVector{Cint}
+    # Temporaries for interaction (3D: NquadN × NquadN × nSpec)
+    "Interaction temporary: (I - R⁺⁻r⁻⁺)⁻¹"
+    tmp_inv::AT3
+    "Interaction temporary: T × tmp_inv"
+    T_inv::AT3
+    "General purpose 3D temporary"
+    tmp3d_a::AT3
+    "General purpose 3D temporary"
+    tmp3d_b::AT3
+end
+
+"""
+    make_rt_workspace(FT, arr_type, NquadN, nSpec)
+
+Create a preallocated workspace for RT computations.
+`arr_type` should be `Array` for CPU or `CuArray` for GPU.
+"""
+function make_rt_workspace(FT::Type, arr_type, NquadN::Int, nSpec::Int)
+    dims3 = (NquadN, NquadN, nSpec)
+    dims_J = (NquadN, 1, nSpec)
+    
+    RTWorkspace(
+        arr_type(zeros(FT, dims3)),     # gp_refl
+        arr_type(zeros(FT, dims3)),     # tt_gp
+        arr_type(zeros(FT, dims_J)),    # J₁⁺
+        arr_type(zeros(FT, dims_J)),    # J₁⁻
+        zeros(Cint, NquadN, nSpec),     # pivot (will be replaced by GPU version if needed)
+        zeros(Cint, nSpec),             # info  (will be replaced by GPU version if needed)
+        arr_type(zeros(FT, dims3)),     # tmp_inv
+        arr_type(zeros(FT, dims3)),     # T_inv
+        arr_type(zeros(FT, dims3)),     # tmp3d_a
+        arr_type(zeros(FT, dims3)),     # tmp3d_b
+    )
+end
