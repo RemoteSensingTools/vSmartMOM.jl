@@ -1,17 +1,71 @@
 #=
 
-This file contains the entry point for running the RT simulation, rt_run. 
+This file contains the entry point for running the linearized RT simulation, `rt_run`.
+
+The linearized RT computes both the forward radiance and its analytic Jacobians with
+respect to physical parameters (aerosol properties, gas absorption, surface albedo)
+using the Matrix Operator Method (MOM) of Plass, Hansen & Kattawar (1973) with the
+linearization approach of Sanghavi & Stephens (2013), Sanghavi, Davis & Eldering (2014).
+
+**References:**
+- Sanghavi, S. & Stephens, G. (2013). "Adaptation of the delta-M and Successive
+  Order of Scattering methods to the matrix operator method." *JQSRT*, 117, 1–12.
+- Sanghavi, S., Davis, A. & Eldering, A. (2014). "vSmartMOM: A linearized discrete 
+  ordinate radiative transfer implementation." *JQSRT*, 146, 182–207.
+- de Haan, J.F., Bosma, P.B. & Hovenier, J.W. (1987). "The adding method for
+  multiple scattering calculations of polarized light." *A&A*, 183, 371–391.
 
 There are two implementations: one that accepts the raw parameters, and one that accepts
-the model. The latter should generally be used by users. 
+the model. The latter should generally be used by users.
 
 =#
 
 """
-    $(FUNCTIONNAME)(RS_type, pol_type, obs_geom::ObsGeometry, τ_rayl, τ_aer, quad_points::QuadPoints, max_m, aerosol_optics, greek_rayleigh, τ_abs, brdf, architecture::AbstractArchitecture)
+    rt_run(model::vSmartMOM_Model, lin_model::vSmartMOM_Lin, NAer, NGas, NSurf; i_band=1)
 
-Perform Radiative Transfer calculations using given parameters
+Perform linearized Radiative Transfer and return both radiances and their Jacobians.
 
+Computes the reflected and transmitted Stokes vectors at the top and bottom of the
+atmosphere, along with their analytic derivatives with respect to `Nparams = NAer×7 + NGas + NSurf`
+physical parameters via the linearized Matrix Operator Method.
+
+# Arguments
+- `model::vSmartMOM_Model`: Forward model containing optical properties, geometry, etc.
+- `lin_model::vSmartMOM_Lin`: Linearized model containing derivatives of optical properties.
+- `NAer::Int`: Number of aerosol types.
+- `NGas::Int`: Number of trace gas species with variable VMR.
+- `NSurf::Int`: Number of surface parameters (typically 1 for Lambertian albedo).
+- `i_band::Integer=1`: Spectral band index.
+
+# Returns
+- `R`: Reflected Stokes vector `[nVZA × nStokes × nSpec]`
+- `T`: Transmitted Stokes vector `[nVZA × nStokes × nSpec]`
+- `dR`: Jacobian of R, `[Nparams × nVZA × nStokes × nSpec]`
+- `dT`: Jacobian of T, `[Nparams × nVZA × nStokes × nSpec]`
+
+# Parameter Layout in `dR` / `dT`
+The `Nparams` derivative dimension is ordered as:
+1. **Aerosol sub-parameters** (7 per aerosol type):
+   `[τ_ref, nᵣ, nᵢ, rₘ, σᵣ, p₀, σp]` for each aerosol, so indices `1:7*NAer`
+2. **Gas VMR parameters**: indices `7*NAer+1 : 7*NAer+NGas`
+3. **Surface parameters**: indices `7*NAer+NGas+1 : Nparams`
+
+# Theory
+The forward model solves the vector radiative transfer equation via the discrete ordinate
+method with the Matrix Operator Method (MOM). For each atmospheric layer ``k``, the
+elemental reflection ``\\mathbf{r}`` and transmission ``\\mathbf{t}`` matrices are computed
+from single-scattering, then doubled ``n_d`` times to obtain the full-layer matrices.
+Layers are then combined via the adding (interaction) method from TOA to surface.
+
+The linearized version simultaneously propagates derivatives with respect to three core
+optical properties per layer:
+```math
+\\frac{\\partial \\mathbf{R}}{\\partial p_j} = 
+  \\frac{\\partial \\mathbf{R}}{\\partial \\tau_k} \\frac{\\partial \\tau_k}{\\partial p_j} +
+  \\frac{\\partial \\mathbf{R}}{\\partial \\varpi_k} \\frac{\\partial \\varpi_k}{\\partial p_j} +
+  \\frac{\\partial \\mathbf{R}}{\\partial \\mathbf{Z}_k} \\frac{\\partial \\mathbf{Z}_k}{\\partial p_j}
+```
+where ``p_j`` is any physical parameter in the state vector.
 """
 #=
 function rt_run_bck(RS_type::AbstractRamanType, #Default - no Raman scattering (noRS)
@@ -328,9 +382,9 @@ function rt_run(RS_type::AbstractRamanType,
     FT = eltype(sza)                    # Get the float-type to use
 
     Nz = length(model.profile.p_full)   # Number of vertical slices
-    # CFRANKEN NEEDS to be changed for concatenated arrays!!
-    
-    
+
+    # For noRS: F₀ is the solar irradiance Stokes vector per spectral point.
+    # Initialize to ones (unit solar flux, Stokes I only) if still at default 1×1 size.
     RS_type.bandSpecLim = [] # (1:τ_abs[iB])#zeros(Int64, iBand, 2) #Suniti: how to do this?
     #Suniti: make bandSpecLim a part of RS_type (including noRS) so that it can be passed into rt_kernel and elemental/doubling/interaction and postprocessing_vza without major syntax changes
     #put this code in model_from_parameters
@@ -346,7 +400,15 @@ function rt_run(RS_type::AbstractRamanType,
     NquadN = Nquad * pol_type.n         # Nquad (multiplied by Stokes n)
     dims = (NquadN,NquadN)              # nxn dims
     Nparams = NAer*7 + NGas + NSurf
-    # Need to check this a bit better in the future!
+
+    # For noRS: F₀ should be the solar irradiance Stokes vector per spectral point.
+    # If still at its default 1×1 size, initialize to unit solar flux (Stokes I only).
+    if size(F₀) != (pol_type.n, nSpec)
+        F₀ = zeros(FT, pol_type.n, nSpec)
+        F₀[1,:] .= 1.0  # Only Stokes I = 1
+        RS_type.F₀ = F₀
+    end
+
     #FT_dual = length(model.τ_aer[1][1]) > 0 ? typeof(model.τ_aer[1][1]) : FT
     FT_dual = FT
     # Output variables: Reflected and transmitted solar irradiation at TOA and BOA respectively # Might need Dual later!!
@@ -470,7 +532,7 @@ function rt_run(RS_type::AbstractRamanType,
         
         
         #@show F₀[:,1]
-        @show scattering_interfaces_all[end]
+        #@show scattering_interfaces_all[end]
                             #@show scattering_interfaces_all[end]
         #blapl
         # One last interaction with surface:

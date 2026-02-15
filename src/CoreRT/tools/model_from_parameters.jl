@@ -38,9 +38,8 @@ function model_from_parameters(params::vSmartMOM_Parameters)
 
     # Rayleigh optical properties calculation
     greek_rayleigh = Scattering.get_greek_rayleigh(FT(params.depol))
-    # Remove rayleight for testing:
-    τ_rayl = [zeros(FT,length(params.spec_bands[i]), length(params.T)) for i=1:n_bands];
-    #τ_rayl = [zeros(FT,1,length(profile.T)) for i=1:n_bands];
+    # Rayleigh optical depth per spectral point per layer (uses reduced profile size)
+    τ_rayl = [zeros(FT,length(params.spec_bands[i]), length(profile.p_full)) for i=1:n_bands];
     
     # Per-band Cabannes / Rayleigh depolarization (for inelastic scattering support)
     greek_cabannes = typeof(greek_rayleigh)[]
@@ -78,7 +77,7 @@ function model_from_parameters(params::vSmartMOM_Parameters)
         
         # Loop over all molecules in this band, obtain profile for each, and add them up
         for molec_i in 1:length(params.absorption_params.molecules[i_band])
-            @show params.absorption_params.molecules[i_band][molec_i]
+            #@show params.absorption_params.molecules[i_band][molec_i]
             # This can be precomputed as well later in my mind, providing an absorption_model or an interpolation_model!
             if isempty(params.absorption_params.luts)
                 # Obtain hitran data for this molecule

@@ -357,11 +357,17 @@ end
 """
     struct AbsorptionParameters
 
-A struct which holds all absorption-related parameters (before any computations)
+A struct which holds all absorption-related parameters (before any computations).
+`molecules` is the full list per band; `fixed_molecules` and `variable_molecules`
+partition it for analytic Jacobians (fixed = no derivative, variable = derivative computed).
 """
 mutable struct AbsorptionParameters
     "Molecules to use for absorption calculations (`nBand, nMolecules`)"
     molecules::AbstractArray
+    "Fixed-abundance molecules per band (no Jacobian computed)"
+    fixed_molecules::AbstractArray
+    "Variable-abundance molecules per band (Jacobian computed w.r.t. VMR)"
+    variable_molecules::AbstractArray
     "Volume-Mixing Ratios"
     vmr::Dict
     "Type of broadening function (Doppler/Lorentz/Voigt)"
