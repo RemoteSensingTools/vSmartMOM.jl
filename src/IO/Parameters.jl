@@ -174,7 +174,8 @@ end
 Parse a surface spec like "LambertianSurfaceScalar(0.1)" into a CoreRT surface instance, without eval.
 """
 function parse_surface_str(s::AbstractString, FT)
-    name_args = match(r"^(\w+)\((.*)\)$", strip(String(s)))
+    # Match "Name(args)" or "Name{Type}(args)" -- strip optional type parameter
+    name_args = match(r"^(\w+)(?:\{[^}]*\})?\((.*)\)$", strip(String(s)))
     @assert name_args !== nothing "Invalid surface specification: '$(s)'"
     name = name_args.captures[1]
     args_raw = name_args.captures[2]
@@ -361,7 +362,24 @@ function _parse_absorption(params_dict::Dict, FT)
             push!(luts, [load_interpolation_model(file) for file in files_lut[i]])
         end
     end
-    return AbsorptionParameters(molecules, vmr, broadening_function, CEF, wing_cutoff, luts)
+    # Partition molecules into fixed (no Jacobian) and variable (Jacobian computed).
+    # Default: all molecules are fixed unless explicitly listed as variable in YAML.
+    if haskey(params_dict["absorption"], "variable_molecules")
+        variable_molecules = Array(params_dict["absorption"]["variable_molecules"])
+        # Fixed = molecules minus variable per band
+        fixed_molecules = [setdiff(molecules[i], 
+            i <= length(variable_molecules) ? variable_molecules[i] : String[]) 
+            for i in 1:length(molecules)]
+        # Pad variable_molecules to match n_bands if shorter
+        while length(variable_molecules) < length(molecules)
+            push!(variable_molecules, String[])
+        end
+    else
+        # No linearization requested: all molecules are fixed, none variable
+        fixed_molecules = deepcopy(molecules)
+        variable_molecules = [String[] for _ in 1:length(molecules)]
+    end
+    return AbsorptionParameters(molecules, fixed_molecules, variable_molecules, vmr, broadening_function, CEF, wing_cutoff, luts)
 end
 
 function _parse_scattering(params_dict::Dict)

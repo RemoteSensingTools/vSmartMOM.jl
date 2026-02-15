@@ -1,3 +1,27 @@
+"""
+    constructCoreOpticalProperties(RS_type, iBand, m, model, lin_model)
+
+Construct the combined effective layer optical properties and their linearized derivatives
+for all atmospheric layers, merging Rayleigh scattering, aerosol scattering (with δ-M
+truncation), and trace gas absorption.
+
+For each atmospheric layer, this function:
+1. Creates Rayleigh scattering properties (τ_rayl, ϖ=1, Z_rayl).
+2. For each aerosol type, computes δ-M scaled optical properties via [`createAero`](@ref),
+   combining Mie scattering with the aerosol vertical profile.
+3. Adds Rayleigh and aerosol properties using the `+` operator on
+   `UmbrellaCoreScatteringOpticalProperties`, which correctly propagates derivatives through
+   the mixing formulas for combined ϖ and Z.
+4. Adds gas absorption via `UmbrellaCoreAbsorptionOpticalProperties`, updating ϖ and τ.
+
+The output derivative dimension has `Nparams = 7×NAer + NGas` entries per layer
+(surface parameters are handled separately in the interaction step).
+
+# Returns
+- `layer_opt`: Array of `CoreScatteringOpticalProperties` (one per layer).
+- `layer_opt_lin`: Array of `CoreScatteringOpticalPropertiesLin` (derivatives, one per layer).
+- `fscat_opt`: Rayleigh scattering fraction per layer (for inelastic scattering weight).
+"""
 function constructCoreOpticalProperties(RS_type, iBand, m, model, lin_model) #where {FT<:Union{AbstractFloat, ForwardDiff.Dual}}
     @unpack τ_rayl, τ_aer, τ_abs, aerosol_optics, 
             greek_rayleigh, greek_cabannes, ϖ_Cabannes = model
@@ -26,7 +50,7 @@ function constructCoreOpticalProperties(RS_type, iBand, m, model, lin_model) #wh
     band_fScattRayleigh  = [];
     # @show arr_type
     for iB in iBand
-        @show iB
+        #@show iB
         if (typeof(RS_type)<:noRS) #!(typeof(RS_type)<:Union{RRS,RRS_plus})
             Rayl𝐙⁺⁺, Rayl𝐙⁻⁺ = Scattering.compute_Z_moments(pol_type, μ, 
                                                             greek_rayleigh[iB], m, 
@@ -135,11 +159,11 @@ function constructCoreOpticalProperties(RS_type, iBand, m, model, lin_model) #wh
                             lin_aerosol_optics[iB][iaer], 
                             arr_type(AerŻ⁺⁺), arr_type(AerŻ⁻⁺), 
                             arr_type) 
-                @show iz, size(t_aer.τ)#, t_aer.τ[1], t_aer.τ[end]
-                @show iz, size(t_aer.ϖ)#, t_aer.ϖ[1], t_aer.ϖ[end]
+                #@show iz, size(t_aer.τ)
+                #@show iz, size(t_aer.ϖ)
 
-                @show iz, size(t_lin_aer.ϖ̇)#, t_lin_aer.ϖ̇[1], t_lin_aer.ϖ̇[end]
-                @show iz, size(t_lin_aer.τ̇)#, t_lin_aer.τ̇[1], t_lin_aer.τ̇[end]
+                #@show iz, size(t_lin_aer.ϖ̇)
+                #@show iz, size(t_lin_aer.τ̇)
                 push!(aer, t_aer)
                 push!(lin_aer, t_lin_aer)
             end 
@@ -253,7 +277,7 @@ function createAero(τAer, aerosol_optics, AerZ⁺⁺, AerZ⁻⁺)
     @unpack fᵗ, ω̃ = aerosol_optics
     #τ_mod = (1-fᵗ * ω̃ ) * τAer;
     #ϖ_mod = (1-fᵗ) * ω̃/(1-fᵗ * ω̃)
-    @show typeof(fᵗ), typeof(ω̃)
+    #@show typeof(fᵗ), typeof(ω̃)
     τ_mod = (1 .- fᵗ * ω̃ ) .* τAer;
     ϖ_mod = (1 .- fᵗ) .* ω̃ ./ (1 .- fᵗ * ω̃)
     CoreScatteringOpticalProperties(τ_mod, ϖ_mod,AerZ⁺⁺, AerZ⁻⁺)
@@ -302,6 +326,45 @@ function createAero(τAer, aerosol_optics, AerZ⁺⁺, AerZ⁻⁺,
         CoreScatteringOpticalPropertiesLin(τ̇_mod, ϖ̇_mod, Ż⁺⁺_mod, Ż⁻⁺_mod)
 end
 
+"""
+    createAero(τAer, aerosol_optics, AerZ⁺⁺, AerZ⁻⁺, τ̇Aer, lin_aerosol_optics, AerŻ⁺⁺, AerŻ⁻⁺, arr_type)
+
+Compute **δ-M scaled** aerosol optical properties and their derivatives for one aerosol
+type in one atmospheric layer.
+
+Applies the δ-M truncation correction (Nakajima & Tanaka, 1988; Sanghavi & Stephens, 2013)
+to the aerosol optical depth and single-scattering albedo, and computes derivatives with
+respect to 7 aerosol sub-parameters: `[τ_ref, nᵣ, nᵢ, rₘ, σᵣ, p₀, σp]`.
+
+# δ-M scaling formulas
+
+```math
+\\tau_\\text{mod} = (1 - f^t \\tilde{\\omega}) \\cdot \\tau_\\text{aer}
+```
+```math
+\\varpi_\\text{mod} = \\frac{(1 - f^t) \\tilde{\\omega}}{1 - f^t \\tilde{\\omega}}
+```
+
+# Derivative chain rule
+
+For each physical parameter ``p_j``:
+```math
+\\frac{\\partial \\tau_\\text{mod}}{\\partial p_j} = 
+  (1 - f^t \\tilde{\\omega}) \\frac{\\partial \\tau_\\text{aer}}{\\partial p_j}
+  - \\tau_\\text{aer} \\left(f^t \\frac{\\partial \\tilde{\\omega}}{\\partial p_j} + 
+    \\tilde{\\omega} \\frac{\\partial f^t}{\\partial p_j}\\right)
+```
+
+For `τ_ref, p₀, σp`: only the `τ_aer` chain contributes (Mie properties are independent).
+
+!!! note "Bug 18 fix"
+    Corrected index mapping: `τ̇Aer[k,:]` now correctly maps to parameter `k`
+    (was previously off-by-one, mixing τ_ref with Mie parameter derivatives).
+
+# Returns
+- `CoreScatteringOpticalProperties`: Forward δ-M scaled properties.
+- `CoreScatteringOpticalPropertiesLin`: Linearized properties (7 sub-params).
+"""
 #=function createAero(τAer, aerosol_optics, AerZ⁺⁺, AerZ⁻⁺, arr_type)
     @unpack fᵗ, ω̃ = aerosol_optics
     if ω̃ isa Number
@@ -390,8 +453,8 @@ function createAero(τAer, aerosol_optics, AerZ⁺⁺, AerZ⁻⁺,
     τ̇_mod = arr_type(zeros(7,n)) #similar(τ̇Aer)
     ϖ̇_mod = arr_type(zeros(7,n)) #similar(ω̃̇)
 
-    #Derivatives with respect to τAer
-    τ̇_mod[1,:] = (1 .- fᵗ * ω̃ )
+    # Bug 18 fix: derivatives w.r.t. 7 aerosol sub-params [τ_ref, nᵣ, nᵢ, rₘ, σᵣ, p₀, σp]
+    τ̇_mod[1,:] .= (1 .- fᵗ * ω̃) .* τ̇Aer[1,:]
     ϖ̇_mod[1,:] .= 0.0
     # Vectorized form over iparam dimension
     # Dimensions: iparam × spectral
@@ -399,11 +462,11 @@ function createAero(τAer, aerosol_optics, AerZ⁺⁺, AerZ⁻⁺,
     tmp = fᵗ * ω̃̇[2:5,:] .+ ḟᵗ[2:5] * ω̃'  # (iparam, :)
     #@show size(tmp), size(τ̇Aer), size(τAer)
     #@show size((1 .- fᵗ * ω̃)' .* τ̇Aer), size(tmp .* τAer')
-    τ̇_mod[2:5,:] .= (1 .- fᵗ * ω̃)' .* τ̇Aer[1:4,:] .- tmp .* τAer'
+    τ̇_mod[2:5,:] .= (1 .- fᵗ * ω̃)' .* τ̇Aer[2:5,:] .- tmp .* τAer'
     #@show size(ω̃̇ * (1 - fᵗ)), size(ḟᵗ * (ω̃ .* (1 .- ω̃))'), size((1 .- fᵗ * ω̃)'.^2)
     ϖ̇_mod[2:5,:] .= (ω̃̇[2:5] * (1 - fᵗ) .- ḟᵗ[2:5] .* (ω̃ .* (1 .- ω̃))') ./ (1 .- fᵗ * ω̃)'.^2
 
-    τ̇_mod[6:7,:] .= (1 .- fᵗ * ω̃)' .* τ̇Aer[5:6,:]
+    τ̇_mod[6:7,:] .= (1 .- fᵗ * ω̃)' .* τ̇Aer[6:7,:]
     #@show size(ω̃̇ * (1 - fᵗ)), size(ḟᵗ * (ω̃ .* (1 .- ω̃))'), size((1 .- fᵗ * ω̃)'.^2)
     ϖ̇_mod[6:7,:] .= 0.0
 
@@ -422,6 +485,20 @@ end
 
 
 # Extract scattering definitions and integrated absorptions for the source function!
+"""
+    extractEffectiveProps(lods, lods_lin)
+
+Extract effective scattering properties from combined layer optical property arrays.
+
+Computes the cumulative optical depth sums and determines scattering interfaces for
+each layer. The scattering interface type (`ScatteringInterface_00`, `01`, `10`, `11`)
+controls which adding method variant is dispatched during the interaction step.
+
+# Returns
+- `scattering_interfaces_all`: Array of `ScatteringInterface` types per layer.
+- `τ_sum_all`: Cumulative optical depth `[nSpec × (Nz+1)]`.
+- `τ̇_sum_all`: Cumulative τ derivative `[Nparams × nSpec × (Nz+1)]`.
+"""
 function extractEffectiveProps(
                 lods::Array,#{CoreScatteringOpticalProperties{FT},1}
                 lods_lin::Array) #where FT
@@ -444,13 +521,22 @@ function extractEffectiveProps(
         scattering_interface = get_scattering_interface(scattering_interface, scatter, iz)
         push!(scattering_interfaces_all, scattering_interface)
         @views τ_sum_all[:,iz+1] = τ_sum_all[:,iz] + lods[iz].τ 
-        for ip=nParams
+        for ip=1:nParams
             τ̇_sum_all[ip,:,iz+1] = τ̇_sum_all[ip,:,iz] + lods_lin[iz].τ̇[ip,:] 
         end
     end
     return scattering_interfaces_all, τ_sum_all, τ̇_sum_all
 end
 
+"""
+    expandOpticalProperties(in, in_lin, arr_type)
+
+Expand optical properties and their derivatives to full spectral resolution by
+replicating Z matrices along the spectral dimension if they are spectrally constant.
+
+Ensures that `Z[nμ, nμ, nSpec]` and `Ż[Nparams, nμ, nμ, nSpec]` have matching
+spectral dimensions with `τ` and `ϖ`.
+"""
 function expandOpticalProperties(in::CoreScatteringOpticalProperties, in_lin::CoreScatteringOpticalPropertiesLin,  arr_type)
     @unpack τ, ϖ, Z⁺⁺, Z⁻⁺ = in 
     @unpack τ̇, ϖ̇, Ż⁺⁺, Ż⁻⁺ = in_lin 

@@ -12,14 +12,19 @@ default_J_matrix(FT, lin::LinMode, arr_type, Nparams, dims, nSpec) = arr_type(ze
 
 
 "Make an added layer and its linearized counterpart, supplying all default matrices"
-make_added_layer(lin::LinMode, RS_type::Union{noRS, noRS_plus}, FT, arr_type, Nparams, dims, nSpec) = 
-    AddedLayer(
+function make_added_layer(lin::LinMode, RS_type::Union{noRS, noRS_plus}, FT, arr_type, Nparams, dims, nSpec) 
+    t1 = default_matrix(FT, arr_type, dims, nSpec)
+    t2 = default_matrix(FT, arr_type, dims, nSpec)
+    t1_ptr = arr_type == Array ? nothing : CUBLAS.unsafe_strided_batch(t1)
+    t2_ptr = arr_type == Array ? nothing : CUBLAS.unsafe_strided_batch(t2)
+    return AddedLayer(
         default_matrix(FT, arr_type, dims, nSpec), 
         default_matrix(FT, arr_type, dims, nSpec), 
         default_matrix(FT, arr_type, dims, nSpec),
         default_matrix(FT, arr_type, dims, nSpec),
         default_J_matrix(FT, arr_type, dims, nSpec),
-        default_J_matrix(FT, arr_type, dims, nSpec)
+        default_J_matrix(FT, arr_type, dims, nSpec),
+        t1, t2, t1_ptr, t2_ptr
     ), 
     AddedLayerLin(
         # derivatives wrt τ, ϖ and Z
@@ -37,6 +42,7 @@ make_added_layer(lin::LinMode, RS_type::Union{noRS, noRS_plus}, FT, arr_type, Np
         default_J_matrix(FT, lin, arr_type, Nparams, dims, nSpec),
         default_J_matrix(FT, lin, arr_type, Nparams, dims, nSpec)
     )
+end
 
 "Make a composite layer and its linearized counterpart, supplying all default matrices"
 make_composite_layer(lin::LinMode, RS_type::Union{noRS, noRS_plus}, FT, arr_type, Nparams, dims, nSpec) = 

@@ -485,6 +485,42 @@ function getAerosolLayerOptProp(lin::LinMode, total_τ, z₀, σ₀, p_half, T)
     return convert.(FT, τAer), convert.(FT, dτdz₀), convert.(FT, dτdσ₀)
 end
 
+"""
+    getAerosolLayerOptProp(lin::LinMode, total_τ, p₀, σp, p_half)
+
+Pressure-based aerosol vertical profile with analytic Jacobians w.r.t. p₀ (layer center 
+pressure) and σp (layer width in pressure).  Returns `(τAer, dτ_dp₀, dτ_dσp)`.
+Uses a Gaussian in pressure space, normalized so that `sum(τAer) == total_τ`.
+"""
+function getAerosolLayerOptProp(lin::LinMode, total_τ, p₀, σp, p_half)
+    FT = eltype(p₀)
+    Nz = length(p_half) - 1
+    ρ      = zeros(FT, Nz)
+    dρ_dp₀ = zeros(FT, Nz)
+    dρ_dσp = zeros(FT, Nz)
+
+    for i = 1:Nz
+        dp = p_half[i+1] - p_half[i]
+        p  = (p_half[i+1] + p_half[i]) / 2
+        gauss = (1 / (σp * sqrt(2π))) * exp(-(p - p₀)^2 / (2σp^2))
+        ρ[i] = gauss * dp
+        # ∂ρ/∂p₀  = ρ * (p-p₀)/σp²
+        dρ_dp₀[i] = ρ[i] * (p - p₀) / σp^2
+        # ∂ρ/∂σp  = ρ * ((p-p₀)²/σp³ - 1/σp)
+        dρ_dσp[i] = ρ[i] * ((p - p₀)^2 / σp^3 - 1 / σp)
+    end
+
+    Norm   = sum(ρ)
+    S_dp₀  = sum(dρ_dp₀)
+    S_dσp  = sum(dρ_dσp)
+
+    τAer   = (total_τ / Norm) .* ρ
+    dτ_dp₀ = (total_τ / Norm) .* (dρ_dp₀ .- ρ .* (S_dp₀ / Norm))
+    dτ_dσp = (total_τ / Norm) .* (dρ_dσp .- ρ .* (S_dσp / Norm))
+
+    return convert.(FT, τAer), convert.(FT, dτ_dp₀), convert.(FT, dτ_dσp)
+end
+
 "Given the CrossSectionModel, the grid, and the AtmosphericProfile, fill up the τ_abs array with the cross section at each layer
 (using pressures/temperatures) from the profile" 
 function compute_absorption_profile!(τ_abs::Array{FT,2}, 

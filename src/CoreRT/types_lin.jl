@@ -160,11 +160,17 @@ end
 """
     struct AbsorptionParameters
 
-A struct which holds all absorption-related parameters (before any computations)
+A struct which holds all absorption-related parameters (before any computations).
+`molecules` is the full list per band; `fixed_molecules` and `variable_molecules`
+partition it for analytic Jacobians (fixed = no derivative, variable = derivative computed).
 """
 mutable struct AbsorptionParameters
     "Molecules to use for absorption calculations (`nBand, nMolecules`)"
     molecules::AbstractArray
+    "Fixed-abundance molecules per band (no Jacobian computed)"
+    fixed_molecules::AbstractArray
+    "Variable-abundance molecules per band (Jacobian computed w.r.t. VMR)"
+    variable_molecules::AbstractArray
     "Volume-Mixing Ratios"
     vmr::Dict
     "Type of broadening function (Doppler/Lorentz/Voigt)"
@@ -371,14 +377,14 @@ Base.@kwdef struct CoreAbsorptionOpticalPropertiesLin{FT} <:  AbstractOpticalPro
     τ̇::Union{AbstractArray{FT,1}, AbstractArray{FT,2}}
 end
 
-Base.@kwdef struct UmbrellaCoreScatteringOpticalProperties{FT} <:  AbstractOpticalPropertiesLin
-    fwd::CoreScatteringOpticalProperties{FT}
-    lin::Union{Nothing, CoreScatteringOpticalPropertiesLin{FT}}
+Base.@kwdef struct UmbrellaCoreScatteringOpticalProperties{FWD <: CoreScatteringOpticalProperties, LIN} <:  AbstractOpticalPropertiesLin
+    fwd::FWD
+    lin::LIN  # Union{Nothing, CoreScatteringOpticalPropertiesLin}
 end
 
-Base.@kwdef struct UmbrellaCoreAbsorptionOpticalProperties{FT} <:  AbstractOpticalPropertiesLin
-    fwd::CoreAbsorptionOpticalProperties{FT}
-    lin::Union{Nothing, CoreAbsorptionOpticalPropertiesLin{FT}}
+Base.@kwdef struct UmbrellaCoreAbsorptionOpticalProperties{FWD <: CoreAbsorptionOpticalProperties, LIN} <:  AbstractOpticalPropertiesLin
+    fwd::FWD
+    lin::LIN  # Union{Nothing, CoreAbsorptionOpticalPropertiesLin}
 end
 #=
 function include_rayl!(combo::CoreScatteringOpticalProperties{xFT, xFT2, xFT3}, 
@@ -436,6 +442,24 @@ end
 
 
 # Adding Core Optical Properties, can have mixed dimensions!
+"""
+    Base.:+(a::UmbrellaCoreScatteringOpticalProperties, b::UmbrellaCoreScatteringOpticalProperties)
+
+Combine two scattering layers' optical properties and propagate linearized derivatives.
+
+When combining Rayleigh (with `lin=nothing`) and aerosol optical properties, or two
+scattering components, this operator computes the mixed effective properties:
+
+```math
+\\tau = \\tau_a + \\tau_b, \\quad
+\\varpi = \\frac{\\tau_a \\varpi_a + \\tau_b \\varpi_b}{\\tau}, \\quad
+\\mathbf{Z} = \\frac{\\tau_a \\varpi_a \\mathbf{Z}_a + \\tau_b \\varpi_b \\mathbf{Z}_b}{\\tau \\varpi}
+```
+
+The derivatives are propagated via the quotient/product rule. When `a.lin === nothing`
+(e.g., Rayleigh without derivatives), only the derivatives from `b` are retained.
+When both have derivatives, they are `vcat`-ed along the parameter dimension.
+"""
 function Base.:+(a::UmbrellaCoreScatteringOpticalProperties,
                  b::UmbrellaCoreScatteringOpticalProperties)
 
@@ -577,6 +601,21 @@ function Base.:+(a::UmbrellaCoreScatteringOpticalProperties,
     return UmbrellaCoreScatteringOpticalProperties(CoreScatteringOpticalProperties(τ, ϖ, Z⁺⁺, Z⁻⁺), CoreScatteringOpticalPropertiesLin(τ̇, ϖ̇, Ż⁺⁺, Ż⁻⁺))    
 end
 
+"""
+    Base.:+(a::UmbrellaCoreScatteringOpticalProperties, b::UmbrellaCoreAbsorptionOpticalProperties)
+
+Add gas absorption to combined scattering optical properties and propagate derivatives.
+
+Gas absorption only contributes to the total optical depth (no scattering):
+```math
+\\tau = \\tau_\\text{scat} + \\tau_\\text{gas}, \\quad
+\\varpi = \\frac{\\tau_\\text{scat} \\varpi_\\text{scat}}{\\tau}, \\quad
+\\mathbf{Z} = \\mathbf{Z}_\\text{scat}
+```
+
+The gas VMR derivative enters ``\\dot{\\varpi}`` as ``-\\varpi \\dot{\\tau}_\\text{gas}/\\tau``
+(diluting the scattering fraction), while ``\\dot{\\mathbf{Z}}_\\text{gas} = 0``.
+"""
 function Base.:+(a::UmbrellaCoreScatteringOpticalProperties,
                  b::UmbrellaCoreAbsorptionOpticalProperties)
 

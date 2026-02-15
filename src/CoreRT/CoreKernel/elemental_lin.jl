@@ -30,7 +30,7 @@ function elemental!(pol_type, SFI::Bool,
                             I_static,
                             architecture) where {FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2}
 
-    @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, J₀⁺, J₀⁻ = added_layer
+    @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻ = added_layer
     @unpack ṙ⁺⁻, ṙ⁻⁺, ṫ⁻⁻, ṫ⁺⁺, J̇₀⁺, J̇₀⁻ = added_layer_lin
     @unpack qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart, iμ₀ = quad_points
     #@unpack ϖ_Cabannes = RS_type
@@ -99,14 +99,14 @@ function elemental!(pol_type, SFI::Bool,
                 expk = exp.(-τ_sum/qp_μ[iμ₀]) #exp(-τ(z)/μ₀)
                 # derivative with respect to dτ only
                 expk_lin = exp.(-τ_sum/qp_μ[iμ₀]) * (-1/qp_μ[iμ₀]) 
-                # J₀⁺ = 0.5[1+δ(m,0)]M⁻¹ϖₑ(λ)Z⁺⁺τI₀exp(-τ(z)/μ₀)
-                J₀⁺[:,1,:]   .= (d_qp * Z⁺⁺ * I₀_NquadN * wct0) .* expk'
+                # j₀⁺ = 0.5[1+δ(m,0)]M⁻¹ϖₑ(λ)Z⁺⁺τI₀exp(-τ(z)/μ₀)
+                j₀⁺[:,1,:]   .= (d_qp * Z⁺⁺ * I₀_NquadN * wct0) .* expk'
                 J̇₀⁺[1,:,1,:] .= d_qp * Z⁺⁺ * I₀_NquadN * 
                                 (wct0_lin[1] .* expk' + wct0 .* expk_lin')
                 J̇₀⁺[2,:,1,:] .= (d_qp * Z⁺⁺ * I₀_NquadN * wct0_lin[2]) .* expk'
                 J̇₀⁺[3,:,1,:] .= (d_qp * I₀_NquadN * wct0) .* expk'
-                # J₀⁻ = 0.5[1+δ(m,0)]M⁻¹ϖₑ(λ)Z⁻⁺τI₀exp(-τ(z)/μ₀)
-                J₀⁻[:,1,:]   .= (d_qp * Z⁻⁺ * I₀_NquadN * wct0) .* expk'
+                # j₀⁻ = 0.5[1+δ(m,0)]M⁻¹ϖₑ(λ)Z⁻⁺τI₀exp(-τ(z)/μ₀)
+                j₀⁻[:,1,:]   .= (d_qp * Z⁻⁺ * I₀_NquadN * wct0) .* expk'
                 J̇₀⁻[1,:,1,:] .= d_qp * Z⁻⁺ * I₀_NquadN * 
                                 (wct0_lin[1] .* expk' + wct0 .* expk_lin')
                 J̇₀⁻[2,:,1,:] .= (d_qp * Z⁻⁺ * I₀_NquadN * wct0_lin[2]) .* expk'
@@ -125,12 +125,12 @@ function elemental!(pol_type, SFI::Bool,
 
             if SFI
                 kernel! = get_elem_rt_SFI!(device)
-                event = kernel!(J₀⁺, J₀⁻, 
+                event = kernel!(j₀⁺, j₀⁻, 
                     J̇₀⁺, J̇₀⁻, 
                     ϖ_λ, dτ_λ, 
                     τ_sum, Z⁻⁺, Z⁺⁺, F₀, 
                     qp_μN, ndoubl, wct02, 
-                    pol_type.n, arr_type(pol_type.I₀), iμ₀, D, ndrange=size(J₀⁺))
+                    pol_type.n, arr_type(pol_type.I₀), iμ₀, D, ndrange=size(j₀⁺))
                 #wait(device, event)
                 synchronize_if_gpu()
             end
@@ -141,7 +141,7 @@ function elemental!(pol_type, SFI::Bool,
                                 r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻,
                                 ṙ⁻⁺, ṫ⁺⁺, ṙ⁺⁻, ṫ⁻⁻)
         if SFI
-            apply_D_matrix_elemental_SFI!(ndoubl, pol_type.n, J₀⁻, J̇₀⁻)
+            apply_D_matrix_elemental_SFI!(ndoubl, pol_type.n, j₀⁻, J̇₀⁻)
         end      
     else 
         # Note: τ is not defined here
@@ -151,10 +151,59 @@ function elemental!(pol_type, SFI::Bool,
         ṫ⁺⁺[1, :] = Diagonal{exp(-τ ./ qp_μN).*(-1 ./ qp_μN)}
         ṫ⁻⁻[1, :] = Diagonal{exp(-τ ./ qp_μN).*(-1 ./ qp_μN)}
     end    
-    #@pack! added_layer = r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, J₀⁺, J₀⁻   
+    #@pack! added_layer = r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻   
 end
 =#
-"Elemental single-scattering layer"
+"""
+    elemental!(pol_type, SFI, τ_sum, τ̇_sum, dτ, F₀, computed_layer_properties,
+               m, ndoubl, scatter, quad_points, added_layer, added_layer_lin, architecture)
+
+Compute the elemental (single-scattering) layer reflection and transmission matrices
+and their derivatives with respect to the 3 core optical parameters ``(\\tau, \\varpi, \\mathbf{Z})``.
+
+The elemental layer has optical depth ``d\\tau = \\tau / 2^{n_d}`` where ``n_d`` is the number
+of doublings needed to build the full layer.
+
+# Single-scattering formulas (Sanghavi & Stephens 2013, Eqs. 19–20)
+
+**Reflection matrix:**
+```math
+\\mathbf{r}^{-+}(\\mu_i, \\mu_j) = \\varpi \\, \\mathbf{Z}^{-+}(\\mu_i, \\mu_j) 
+  \\frac{\\mu_j}{\\mu_i + \\mu_j} \\left(1 - e^{-d\\tau(1/\\mu_i + 1/\\mu_j)}\\right) w_j
+```
+
+**Transmission matrix:**
+```math
+\\mathbf{t}^{++}(\\mu_i, \\mu_j) = \\delta_{ij} e^{-d\\tau/\\mu_i} + 
+  \\varpi \\, \\mathbf{Z}^{++}(\\mu_i, \\mu_j) 
+  \\frac{\\mu_j}{\\mu_i - \\mu_j} \\left(e^{-d\\tau/\\mu_i} - e^{-d\\tau/\\mu_j}\\right) w_j
+```
+
+# Core derivatives (3 per matrix element)
+For each matrix ``\\mathbf{M} \\in \\{\\mathbf{r}^{-+}, \\mathbf{t}^{++}, \\ldots\\}``:
+- ``\\dot{\\mathbf{M}}[1]``: ``\\partial \\mathbf{M}/\\partial(d\\tau)`` — optical depth derivative
+- ``\\dot{\\mathbf{M}}[2]``: ``\\partial \\mathbf{M}/\\partial\\varpi`` — single-scattering albedo derivative
+- ``\\dot{\\mathbf{M}}[3]``: ``\\partial \\mathbf{M}/\\partial\\mathbf{Z}`` — phase matrix derivative
+
+When `SFI=true`, the source function vectors ``\\mathbf{j}_0^+, \\mathbf{j}_0^-`` and their
+derivatives are also computed for the solar beam contribution.
+
+# Arguments
+- `pol_type`: Polarization type (I, IQU, or IQUV).
+- `SFI::Bool`: Whether to compute Source Function Integration terms.
+- `τ_sum`: Cumulative optical depth above this layer `[nSpec]`.
+- `τ̇_sum`: Derivative of cumulative τ w.r.t. parameters `[Nparams × nSpec]`.
+- `dτ`: Elemental optical depth ``\\tau/2^{n_d}`` `[nSpec]`.
+- `F₀`: Solar irradiance Stokes vector `[nStokes × nSpec]`.
+- `computed_layer_properties`: Forward optical properties ``(\\tau, \\varpi, \\mathbf{Z}^{++}, \\mathbf{Z}^{-+})``.
+- `m::Int`: Fourier moment index.
+- `ndoubl::Int`: Number of doublings.
+- `scatter::Bool`: Whether the layer scatters.
+- `quad_points`: Quadrature points and weights.
+- `added_layer`: Output: forward RT matrices (modified in-place).
+- `added_layer_lin`: Output: linearized RT matrices (modified in-place).
+- `architecture`: CPU or GPU.
+"""
 function elemental!(pol_type, SFI::Bool, 
                 τ_sum::AbstractArray,#{FT2,1}, #Suniti
                 τ̇_sum::AbstractArray,
@@ -169,7 +218,7 @@ function elemental!(pol_type, SFI::Bool,
                 added_layer_lin::AddedLayerLin{FT}, 
                 architecture) where {FT<:AbstractFloat}
 
-    @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, J₀⁺, J₀⁻ = added_layer
+    @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻ = added_layer
     @unpack ṙ⁺⁻, ṙ⁻⁺, ṫ⁻⁻, ṫ⁺⁺, J̇₀⁺, J̇₀⁻ = added_layer_lin
     @unpack qp_μ, iμ₀, wt_μN, qp_μN = quad_points
     @unpack τ, ϖ, Z⁺⁺, Z⁻⁺ = computed_layer_properties
@@ -202,8 +251,8 @@ function elemental!(pol_type, SFI::Bool,
         t⁺⁺ .= 0.0
         ṙ⁻⁺ .= 0.0
         ṫ⁺⁺ .= 0.0
-        J₀⁺ .= 0.0
-        J₀⁻ .= 0.0
+        j₀⁺ .= 0.0
+        j₀⁻ .= 0.0
         J̇₀⁺ .= 0.0
         J̇₀⁻ .= 0.0
                         
@@ -222,18 +271,18 @@ function elemental!(pol_type, SFI::Bool,
         if SFI
             kernel! = get_elem_rt_SFI!(device)
             #@show size(F₀)
-            event = kernel!(J₀⁺, J₀⁻, 
+            event = kernel!(j₀⁺, j₀⁻, 
                 J̇₀⁺, J̇₀⁻, 
                 ϖ, dτ, 
                 arr_type(τ_sum), arr_type(τ̇_sum), 
                 Z⁻⁺, Z⁺⁺, 
                 arr_type(F₀), 
                 qp_μN, ndoubl, wct02, 
-                pol_type.n, I₀, iμ₀, D, ndrange=size(J₀⁺))
+                pol_type.n, I₀, iμ₀, D, ndrange=size(j₀⁺))
             #wait(device, event)
         end
         #ii = pol_type.n*(iμ0-1)+1
-        #@show 'B',iμ0,  r⁻⁺[1,ii,1]/(J₀⁻[1,1,1]*wt_μ[iμ0]), r⁻⁺[1,ii,1], J₀⁻[1,1,1]*wt_μ[iμ0], J₀⁺[1,1,1]*wt_μ[iμ0]
+        #@show 'B',iμ0,  r⁻⁺[1,ii,1]/(j₀⁻[1,1,1]*wt_μ[iμ0]), r⁻⁺[1,ii,1], j₀⁻[1,1,1]*wt_μ[iμ0], j₀⁺[1,1,1]*wt_μ[iμ0]
         synchronize_if_gpu()
         
         # Apply D Matrix
@@ -242,7 +291,7 @@ function elemental!(pol_type, SFI::Bool,
                         ṙ⁻⁺, ṫ⁺⁺, ṙ⁺⁻, ṫ⁻⁻)
 
         if SFI
-            apply_D_matrix_elemental_SFI!(ndoubl, pol_type.n, J₀⁻, J̇₀⁻)
+            apply_D_matrix_elemental_SFI!(ndoubl, pol_type.n, j₀⁻, J̇₀⁻)
         end      
     else
         # Note: τ is not defined here
@@ -251,7 +300,7 @@ function elemental!(pol_type, SFI::Bool,
         ṫ⁺⁺[1, :] = Diagonal{exp(-τ ./ qp_μN).*(-1 ./ qp_μN)}
         ṫ⁻⁻[1, :] = Diagonal{exp(-τ ./ qp_μN).*(-1 ./ qp_μN)}
     end    
-    #@pack! added_layer = r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, J₀⁺, J₀⁻   
+    #@pack! added_layer = r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻   
 end
 
 @kernel function get_elem_rt!(r⁻⁺, t⁺⁺,
@@ -281,9 +330,12 @@ end
             (1/qp_μN[i]) * wct[j] * 
             exp(-dτ_λ[n] * ((1 / qp_μN[i]) + (1 / qp_μN[j]))) 
         # derivative wrt ϖ
-        ṙ⁻⁺[2,i,j,n] = r⁻⁺[i,j,n] / ϖ_λ[n]
+        ṙ⁻⁺[2, i, j, n] = ϖ_λ[n] == 0 ? FT(0) : r⁻⁺[i, j, n] / ϖ_λ[n]
         # derivative wrt Z
-        ṙ⁻⁺[3,i,j,n] = r⁻⁺[i,j,n] / Z⁻⁺[i,j,n2] 
+        # derivative wrt Z: direct formula avoids 0/0 when Z=0
+        ṙ⁻⁺[3,i,j,n] = ϖ_λ[n] * 
+            (qp_μN[j] / (qp_μN[i] + qp_μN[j])) * wct[j] * 
+            (1 - exp(-dτ_λ[n] * ((1 / qp_μN[i]) + (1 / qp_μN[j]))))
                     
         if (qp_μN[i] == qp_μN[j])
             # 𝐓⁺⁺(μᵢ, μᵢ) = (exp{-τ/μᵢ}(1 + ϖ ̇𝐙⁺⁺(μᵢ, μᵢ) ̇(τ/μᵢ))) ̇𝑤ᵢ
@@ -318,9 +370,11 @@ end
                         ϖ_λ[n] * Z⁺⁺[i,j,n2] / qp_μN[i]) * 
                         (1 - dτ_λ[n] / qp_μN[j]) * wct[j]
                 # derivative wrt ϖ_λ
-                ṫ⁺⁺[2,i,j,n] = t⁺⁺[i,j,n] / ϖ_λ[n]
+                ṫ⁺⁺[2, i, j, n] = ϖ_λ[n] == 0 ? FT(0) : t⁺⁺[i, j, n] / ϖ_λ[n]
                 # derivative wrt Z
-                ṫ⁺⁺[3,i,j,n] = t⁺⁺[i,j,n] / Z⁺⁺[i,j,n2]
+                # derivative wrt Z: direct formula avoids 0/0
+                ṫ⁺⁺[3,i,j,n] = exp(-dτ_λ[n] / qp_μN[j]) *
+                    ϖ_λ[n] * (dτ_λ[n] / qp_μN[i]) * wct[j]
             end
         else
     
@@ -338,9 +392,12 @@ end
                 (exp(-dτ_λ[n] / qp_μN[i])/ qp_μN[i] - 
                 exp(-dτ_λ[n] / qp_μN[j])/ qp_μN[j]) 
             # derivative wrt ϖ_λ
-            ṫ⁺⁺[2,i,j,n] = t⁺⁺[i,j,n] / ϖ_λ[n]
+            ṫ⁺⁺[2, i, j, n] = ϖ_λ[n] == 0 ? FT(0) : t⁺⁺[i, j, n] / ϖ_λ[n]
             # derivative wrt Z
-            ṫ⁺⁺[3,i,j,n] = t⁺⁺[i,j,n] / Z⁺⁺[i,j,n2]
+            # derivative wrt Z: direct formula avoids 0/0
+            ṫ⁺⁺[3,i,j,n] = ϖ_λ[n] * 
+                (qp_μN[j] / (qp_μN[i] - qp_μN[j])) * wct[j] * 
+                (exp(-dτ_λ[n] / qp_μN[i]) - exp(-dτ_λ[n] / qp_μN[j]))
         end
     else
         #r⁻⁺[i,j,n] = 0.0
@@ -398,9 +455,9 @@ end
         # derivative wrt τ
         J̇₀⁺[1, i, 1, n] = J₀⁺[i, 1, n]*(1/dτ_λ[n] - 1/qp_μN[i])
         # derivative wrt ϖ
-        J̇₀⁺[2, i, 1, n] = J₀⁺[i, 1, n] / ϖ_λ[n]
-        # derivative wrt Z
-        J̇₀⁺[3, i, 1, n] = J₀⁺[i, 1, n] / Z⁺⁺_I₀ # check this
+        J̇₀⁺[2, i, 1, n] = ϖ_λ[n] == 0 ? FT(0) : J₀⁺[i, 1, n] / ϖ_λ[n]
+        # derivative wrt Z (safe division: 0/0 → 0)
+        J̇₀⁺[3, i, 1, n] = Z⁺⁺_I₀ == 0 ? FT(0) : J₀⁺[i, 1, n] / Z⁺⁺_I₀
     else
         # J₀⁺ = 0.25*(1+δ(m,0)) * ϖ(λ) * Z⁺⁺ * I₀ * [μ₀ / (μᵢ - μ₀)] * [exp(-dτ(λ)/μᵢ) - exp(-dτ(λ)/μ₀)]
         J₀⁺[i, 1, n] = wct02 * ϖ_λ[n] * Z⁺⁺_I₀ * 
@@ -409,9 +466,9 @@ end
         J̇₀⁺[1, i, 1, n] = - wct02 * ϖ_λ[n] * Z⁺⁺_I₀ * (qp_μN[i_start] / (qp_μN[i] - qp_μN[i_start])) * 
             (exp(-dτ_λ[n] / qp_μN[i]) / qp_μN[i] - exp(-dτ_λ[n] / qp_μN[i_start]) / qp_μN[i_start])
         # derivative wrt ϖ
-        J̇₀⁺[2, i, 1, n] = J₀⁺[i, 1, n] / ϖ_λ[n]
-        # derivative wrt Z
-        J̇₀⁺[3, i, 1, n] = J₀⁺[i, 1, n] / Z⁺⁺_I₀ # check this
+        J̇₀⁺[2, i, 1, n] = ϖ_λ[n] == 0 ? FT(0) : J₀⁺[i, 1, n] / ϖ_λ[n]
+        # derivative wrt Z (safe division: 0/0 → 0)
+        J̇₀⁺[3, i, 1, n] = Z⁺⁺_I₀ == 0 ? FT(0) : J₀⁺[i, 1, n] / Z⁺⁺_I₀
     end
     #J₀⁻ = 0.25*(1+δ(m,0)) * ϖ(λ) * Z⁻⁺ * I₀ * [μ₀ / (μᵢ + μ₀)] * [1 - exp{-dτ(λ)(1/μᵢ + 1/μ₀)}]
     J₀⁻[i, 1, n] = wct02 * ϖ_λ[n] * Z⁻⁺_I₀ * (qp_μN[i_start] / (qp_μN[i] + qp_μN[i_start])) * 
@@ -421,9 +478,9 @@ end
             exp(-dτ_λ[n] * ((1 / qp_μN[i]) + (1 / qp_μN[i_start]))) *
             ((1 / qp_μN[i]) + (1 / qp_μN[i_start]))
     # derivative wrt ϖ
-    J̇₀⁻[2, i, 1, n] = J₀⁻[i, 1, n] / ϖ_λ[n]
-    # derivative wrt Z
-    J̇₀⁻[3, i, 1, n] = J₀⁻[i, 1, n] / Z⁺⁺_I₀ # check this
+    J̇₀⁻[2, i, 1, n] = ϖ_λ[n] == 0 ? FT(0) : J₀⁻[i, 1, n] / ϖ_λ[n]
+    # derivative wrt Z (safe division: 0/0 → 0)
+    J̇₀⁻[3, i, 1, n] = Z⁻⁺_I₀ == 0 ? FT(0) : J₀⁻[i, 1, n] / Z⁻⁺_I₀
 
     # TODO: Move this out until after doubling (it is not necessary to consider this here already if Raman scattering is not involved)
     J₀⁺[i, 1, n] *= exp(-τ_sum[n]/qp_μN[i_start])
