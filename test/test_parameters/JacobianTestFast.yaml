@@ -8,13 +8,13 @@ radiative_transfer:
   surface: 
     - LambertianSurfaceScalar{Float64}(0.05)
   quadrature_type:    GaussQuadHemisphere()
-  polarization_type:  Stokes_IQU()
+  polarization_type:  Stokes_I()
   max_m:              3
   Δ_angle:            2.0
   l_trunc:            5
   depol:              0.03
   float_type:         Float64
-  architecture:       default_architecture
+  architecture:       CPU()
 
 geometry: 
   sza:                45.0
@@ -56,6 +56,6 @@ scattering:
       p₀:             700.0
       σp:             50.0
   r_max:          50.0
-  nquad_radius:   1000
+  nquad_radius:   100
   λ_ref:          0.770 
   decomp_type:        NAI2()

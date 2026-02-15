@@ -129,24 +129,27 @@ end
 
 Core RT kernel for a single atmospheric layer `iz` in the linearized mode.
 
-Orchestrates the three fundamental steps of the Matrix Operator Method for layer `iz`:
+Orchestrates the four fundamental steps of the Matrix Operator Method for layer `iz`:
 1. **Elemental**: Compute single-scattering reflection/transmission matrices and their
    derivatives w.r.t. the 3 core optical parameters ``(\\tau, \\varpi, \\mathbf{Z})``.
-2. **Doubling**: Build full-layer matrices from the elemental layer by repeated doubling.
-3. **Chain Rule** (`lin_added_layer_all_params!`): Map the 3 core derivatives to
-   `Nparams` physical parameter derivatives via:
-   ```math
-   \\frac{\\partial \\mathbf{r}}{\\partial p_j} = 
-     \\dot{\\mathbf{r}}_\\tau \\cdot \\dot{\\tau}_j +
-     \\dot{\\mathbf{r}}_\\varpi \\cdot \\dot{\\varpi}_j +
-     \\dot{\\mathbf{r}}_Z \\cdot \\dot{\\mathbf{Z}}_j
-   ```
+2. **Chain Rule** (`lin_added_layer_all_params!`): Map the 3 core derivatives to
+   `Nparams` physical parameter derivatives at the **elemental** level, where the
+   Z chain rule is correctly element-wise (Bug 19 fix).
+3. **Doubling** (`doubling_allparams!`): Build full-layer matrices from the elemental 
+   layer by repeated doubling, propagating all `Nparams` derivatives using proper 
+   matrix products.
 4. **Interaction** (Adding): Combine the current layer with the composite layer above 
    using the appropriate `ScatteringInterface` dispatch (00, 01, 10, or 11).
 
-At the TOA layer (`iz == 1`), the chain rule is applied inline and the composite layer
-is initialized directly. For subsequent layers, the adding method accumulates results
+At the TOA layer (`iz == 1`), the composite layer is initialized directly from the
+doubled `ap_*` derivatives. For subsequent layers, the adding method accumulates results
 from TOA downward.
+
+!!! note "Bug 19: Z chain rule must be applied before doubling"
+    The Z derivative ``\\partial\\mathbf{r}/\\partial\\mathbf{Z}`` is a 4th-rank tensor that is
+    diagonal at the elemental level (each ``r_{ij}`` depends only on ``Z_{ij}``). After doubling,
+    matrix products mix all indices, so the element-wise chain rule ``\\dot{r}[3] .* \\dot{Z}``
+    becomes incorrect. The fix applies the chain rule BEFORE doubling.
 
 # Dispatch
 - `noRS`: Elastic scattering only (no Raman).
@@ -214,15 +217,52 @@ function rt_kernel!(RS_type::noRS{FT},
             end
         end
         
-        @timeit "doubling"   doubling!(pol_type, SFI, 
-                                        expk, expk_lin, 
+        # Bug 19 fix: Apply chain rule BEFORE doubling.
+        # At the elemental level, ∂r/∂Z is element-wise (diagonal 4th-rank tensor),
+        # so the element-wise chain rule Ż.*ṫ[3] is correct here.
+        # After doubling, matrix products mix all (i,j) indices, making
+        # element-wise multiplication wrong for the Z term.
+        @timeit "chain_rule" lin_added_layer_all_params!(
+                    RS_type, pol_type,
+                    SFI, quad_points, 
+                    computed_layer_properties_lin, 
+                    added_layer_lin, architecture, ndoubl)
+
+        # Bug 22 fix: Add per-parameter τ̇_sum beam attenuation contribution to SFI.
+        # The beam attenuation exp(-τ_sum/μ₀) derivative w.r.t. physical parameter p_j is:
+        #   J₀⁺ * (-τ̇_sum[j,:] / μ₀)
+        # This was previously (incorrectly) baked into J̇₀⁺[1] using only τ̇_sum[1,:].
+        # Now it's applied per-parameter after the chain rule.
+        if SFI
+            nparams_τ_sum = size(τ̇_sum, 1)
+            nspec_here = size(added_layer.j₀⁺, 3)
+            for iparam = 1:nparams_τ_sum
+                @views added_layer_lin.ap_J̇₀⁺[iparam,:,1,:] .+= 
+                    added_layer.j₀⁺[:,1,:] .* reshape(-τ̇_sum[iparam,:] ./ μ₀, 1, nspec_here)
+                @views added_layer_lin.ap_J̇₀⁻[iparam,:,1,:] .+= 
+                    added_layer.j₀⁻[:,1,:] .* reshape(-τ̇_sum[iparam,:] ./ μ₀, 1, nspec_here)
+            end
+        end
+
+        # Compute per-parameter elemental τ̇ for beam attenuation in doubling.
+        # Pad to full Nparams (ap_* array size) — surface params have zero dτ̇.
+        Nparams_ap = size(added_layer_lin.ap_ṙ⁻⁺, 1)
+        nparams_τ  = size(τ̇, 1)
+        nspec_τ    = size(τ̇, 2)
+        dτ̇_allparams = arr_type(zeros(FT, Nparams_ap, nspec_τ))
+        dτ̇_allparams[1:nparams_τ, :] .= τ̇ ./ FT(2^ndoubl)
+        
+        @timeit "doubling" doubling_allparams!(pol_type, SFI, 
+                                        expk,
                                         ndoubl, 
                                         added_layer, 
                                         added_layer_lin, 
-                                        I_static, architecture)
+                                        I_static, architecture,
+                                        dτ̇_allparams, μ₀)
         
-        if any(isnan, added_layer_lin.ṙ⁻⁺) || any(isnan, added_layer_lin.ṫ⁺⁺) || any(isnan, added_layer_lin.J̇₀⁺) || any(isnan, added_layer_lin.J̇₀⁻)
+        if any(isnan, added_layer_lin.ap_ṙ⁻⁺) || any(isnan, added_layer_lin.ap_ṫ⁺⁺)
         end
+        
     else # This might not work yet on GPU!
         # If not, there is no reflectance. Assign r/t appropriately
         added_layer.r⁻⁺[:] .= 0;
@@ -253,85 +293,30 @@ function rt_kernel!(RS_type::noRS{FT},
         composite_layer.J₀⁺ .= added_layer.j₀⁺
         composite_layer.J₀⁻ .= added_layer.j₀⁻
 
-        fill!(composite_layer_lin.Ṫ⁺⁺, 0)
-        fill!(composite_layer_lin.Ṫ⁻⁻, 0)
-        fill!(composite_layer_lin.Ṙ⁻⁺, 0)
-        fill!(composite_layer_lin.Ṙ⁺⁻, 0)
-        fill!(composite_layer_lin.J̇₀⁺, 0)
-        fill!(composite_layer_lin.J̇₀⁻, 0)
-
-        nspec = size(added_layer.t⁺⁺,3)
-        nparams = size(τ̇)[1]
-        nbigD = size(bigD,1)
-        i₀ = iμ₀Nstart:iμ₀Nstart+n-1
-
-        Ż⁺⁺_I₀ = arr_type(zeros(nbigD, nspec))
-        Ż⁻⁺_I₀ = arr_type(zeros(nbigD, nspec))
-        Ż⁺⁺ = arr_type(Ż⁺⁺)
-        Ż⁻⁺ = arr_type(Ż⁻⁺)
-        F₀ = arr_type(F₀)
-        for iparam = 1:nparams
-            for ii = 1:nspec
-                Ż⁺⁺_I₀[:,ii] = Ż⁺⁺[iparam,:,i₀,ii] * F₀[:,ii]
-                Ż⁻⁺_I₀[:,ii] = Ż⁻⁺[iparam,:,i₀,ii] * F₀[:,ii]
-            end
-
-            @views composite_layer_lin.Ṫ⁺⁺[iparam,:,:,:] .= added_layer_lin.ṫ⁺⁺[1,:,:,:].*reshape(dτ̇[iparam,:],1,1,nspec) .+ 
-                                                added_layer_lin.ṫ⁺⁺[2,:,:,:].*reshape(ϖ̇[iparam,:],1,1,nspec) .+ 
-                                                added_layer_lin.ṫ⁺⁺[3,:,:,:].*Ż⁺⁺[iparam,:,:,:] 
-            @views composite_layer_lin.Ṫ⁻⁻[iparam,:,:,:] .= added_layer_lin.ṫ⁻⁻[1,:,:,:].*reshape(dτ̇[iparam,:],1,1,nspec) .+ 
-                                                added_layer_lin.ṫ⁻⁻[2,:,:,:].*reshape(ϖ̇[iparam,:],1,1,nspec) .+ 
-                                                added_layer_lin.ṫ⁻⁻[3,:,:,:].*(reshape(bigD,nbigD,nbigD,1).*Ż⁺⁺[iparam,:,:,:].*reshape(bigD,nbigD,nbigD,1))
-
-            @views composite_layer_lin.Ṙ⁻⁺[iparam,:,:,:] .= added_layer_lin.ṙ⁻⁺[1,:,:,:].*reshape(dτ̇[iparam,:],1,1,nspec) .+ 
-                                                added_layer_lin.ṙ⁻⁺[2,:,:,:].*reshape(ϖ̇[iparam,:],1,1,nspec) .+ 
-                                                added_layer_lin.ṙ⁻⁺[3,:,:,:].*Ż⁻⁺[iparam,:,:,:]  
-            @views composite_layer_lin.Ṙ⁺⁻[iparam,:,:,:] .= added_layer_lin.ṙ⁺⁻[1,:,:,:].*reshape(dτ̇[iparam,:],1,1,nspec) .+ 
-                                                added_layer_lin.ṙ⁺⁻[2,:,:,:].*reshape(ϖ̇[iparam,:],1,1,nspec) .+ 
-                                                added_layer_lin.ṙ⁺⁻[3,:,:,:].*(reshape(bigD,nbigD,nbigD,1).*Ż⁻⁺[iparam,:,:,:].*reshape(bigD,nbigD,nbigD,1)) 
-
-            @views composite_layer_lin.J̇₀⁺[iparam,:,1,:] .= added_layer_lin.J̇₀⁺[1,:,1,:].*reshape(dτ̇[iparam,:],1,nspec) .+ 
-                                                added_layer_lin.J̇₀⁺[2,:,1,:].*reshape(ϖ̇[iparam,:],1,nspec) .+ 
-                                                added_layer_lin.J̇₀⁺[3,:,1,:].*Ż⁺⁺_I₀
-            @views composite_layer_lin.J̇₀⁻[iparam,:,1,:] .= added_layer_lin.J̇₀⁻[1,:,1,:].*reshape(dτ̇[iparam,:],1,nspec) .+ 
-                                                added_layer_lin.J̇₀⁻[2,:,1,:].*reshape(ϖ̇[iparam,:],1,nspec) .+ 
-                                                added_layer_lin.J̇₀⁻[3,:,1,:].*Ż⁻⁺_I₀
-        end
-        if any(isnan, composite_layer_lin.Ṙ⁻⁺) || any(isnan, composite_layer_lin.Ṫ⁺⁺)
-            for ip in 1:nparams
-                rn = any(isnan, @view composite_layer_lin.Ṙ⁻⁺[ip,:,:,:])
-                tn = any(isnan, @view composite_layer_lin.Ṫ⁺⁺[ip,:,:,:])
-                if rn || tn
-                    println("    param $ip: Ṙ⁻⁺_nan=$rn, Ṫ⁺⁺_nan=$tn")
-                end
+        # Bug 19 fix: Copy N-parameter derivatives directly from ap_* fields.
+        # Chain rule was applied BEFORE doubling (where Z term is element-wise correct),
+        # and doubling_allparams! propagated them using proper matrix products.
+        # ap_* arrays include all Nparams (layer + surface); they were zeroed before
+        # chain rule, so surface params are correctly zero.
+        Nparams_comp = size(composite_layer_lin.Ṫ⁺⁺, 1)
+        for iparam = 1:Nparams_comp
+            @views composite_layer_lin.Ṫ⁺⁺[iparam,:,:,:] .= added_layer_lin.ap_ṫ⁺⁺[iparam,:,:,:]
+            @views composite_layer_lin.Ṫ⁻⁻[iparam,:,:,:] .= added_layer_lin.ap_ṫ⁻⁻[iparam,:,:,:]
+            @views composite_layer_lin.Ṙ⁻⁺[iparam,:,:,:] .= added_layer_lin.ap_ṙ⁻⁺[iparam,:,:,:]
+            @views composite_layer_lin.Ṙ⁺⁻[iparam,:,:,:] .= added_layer_lin.ap_ṙ⁺⁻[iparam,:,:,:]
+            if SFI
+                @views composite_layer_lin.J̇₀⁺[iparam,:,:,:] .= added_layer_lin.ap_J̇₀⁺[iparam,:,:,:]
+                @views composite_layer_lin.J̇₀⁻[iparam,:,:,:] .= added_layer_lin.ap_J̇₀⁻[iparam,:,:,:]
             end
         end
     # If this is not the TOA, perform the interaction step
     else
-        @timeit "lin_added_layer_all_params" lin_added_layer_all_params!(
-                    RS_type::noRS, pol_type,
-                    SFI, quad_points, 
-                    computed_layer_properties_lin, 
-                    added_layer_lin, architecture, ndoubl)
-
-        if any(isnan, added_layer_lin.ap_ṙ⁻⁺) || any(isnan, added_layer_lin.ap_ṫ⁺⁺) || any(isnan, added_layer_lin.ap_J̇₀⁺)
-            nparams_check = size(added_layer_lin.ap_ṙ⁻⁺, 1)
-            for ip in 1:nparams_check
-                rn = any(isnan, @view added_layer_lin.ap_ṙ⁻⁺[ip,:,:,:])
-                tn = any(isnan, @view added_layer_lin.ap_ṫ⁺⁺[ip,:,:,:])
-                if rn || tn
-                    println("    param $ip: ap_ṙ⁻⁺_nan=$rn, ap_ṫ⁺⁺_nan=$tn")
-                end
-            end
-        end
-
+        # Bug 19 fix: Chain rule already applied before doubling, so ap_* fields
+        # are ready for the interaction step. No need to call lin_added_layer_all_params! here.
         @timeit "interaction" interaction!(scattering_interface, 
                     SFI, 
                     composite_layer, composite_layer_lin, 
                     added_layer, added_layer_lin, 
                     I_static)
-        
-        if any(isnan, composite_layer_lin.Ṙ⁻⁺) || any(isnan, composite_layer_lin.Ṙ⁺⁻) || any(isnan, composite_layer_lin.Ṫ⁺⁺)
-        end
     end
 end
