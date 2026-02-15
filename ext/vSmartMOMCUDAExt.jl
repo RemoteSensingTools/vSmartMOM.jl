@@ -10,6 +10,7 @@ module vSmartMOMCUDAExt
 
 using vSmartMOM
 using vSmartMOM.Architectures
+using vSmartMOM.CoreRT
 using CUDA
 using KernelAbstractions
 
@@ -41,6 +42,8 @@ function __init__()
     
     if CUDA.functional()
         try
+            # Make CUBLAS available to CoreRT for batched GPU operations (make_added_layer, doubling)
+            CoreRT.CUBLAS_ref[] = CUDA.CUBLAS
             # Additional safety check: try to actually use CUDA
             # This catches edge cases where CUDA.functional() returns true
             # but operations fail due to version mismatches

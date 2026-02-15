@@ -59,7 +59,9 @@ function elemental!(pol_type, SFI::Bool,
 
         # Calculate r⁻⁺ and t⁺⁺
         
-        # Version 1: no absorption in batch mode (initiation of a single scattering layer with no or low absorption)
+        # Version 1: no absorption in batch mode (initiation of a single-scattering layer with very small dτ).
+        # This is the first-order thin-layer limit and is consistent with Fell (1997) Eq. 1.55-1.56 style
+        # source scaling (linear in optical thickness).
         if false #maximum(dτ_λ) < 0.0001   
             # R⁻⁺₀₁(λ) = M⁻¹(0.5ϖₑ(λ)Z⁻⁺C)δ (See Eqs.7 in Raman paper draft)
             r⁻⁺[:,:,:] .= d_qp * Z⁻⁺ * (d_wct * dτ)

@@ -13,7 +13,7 @@ radiative_transfer:
   l_trunc:            5
   depol:              0.03
   float_type:         Float64
-  architecture:       default_architecture
+  architecture:       CPU()
 
 geometry: 
   sza:                45.0
