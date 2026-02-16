@@ -81,9 +81,17 @@ build()
 
 # Deploy only in CI contexts; local docs builds should not attempt git deployment.
 if get(ENV, "CI", "false") == "true"
+    # Keep main as the canonical dev docs, but allow branch-specific dev deployment
+    # for unified-vsmartmom so pushes to that branch publish docs as well.
+    ref_name = get(ENV, "GITHUB_REF_NAME", "")
+    deploy_devbranch = ref_name == "unified-vsmartmom" ? "unified-vsmartmom" : "main"
+    deploy_devurl = ref_name == "unified-vsmartmom" ? "unified-vsmartmom" : "dev"
+
     deploydocs(
         repo = "github.com/RemoteSensingTools/vSmartMOM.jl.git",
         target = "build",
         push_preview = true,
+        devbranch = deploy_devbranch,
+        devurl = deploy_devurl,
     )
 end
