@@ -4,12 +4,18 @@ This file specifies how to truncate the AerosolOptics struct, given the truncati
  
 =#
 
-"""
-    $(FUNCTIONNAME)(mod::δBGE, aero::AerosolOptics))
-    
-Returns the truncated aerosol optical properties as [`AerosolOptics`](@ref) 
-- `mod` a [`δBGE`](@ref) struct that defines the truncation order (new length of greek parameters) and exclusion angle
-- `aero` a [`AerosolOptics`](@ref) set of aerosol optical properties that is to be truncated
+@doc raw"""
+    truncate_phase_lowconf(mod::δBGE, aero::AerosolOptics; reportFit=false) -> AerosolOptics
+
+Legacy/low-confidence δ-BGE truncation variant.
+
+Fits truncated coefficients outside the forward exclusion cone (`Δ_angle`) and
+rescales by retained scattering fraction ``c_0``. The returned truncation factor
+is:
+
+```math
+f^t = 1 - c_0.
+```
 """
 function truncate_phase_lowconf(mod::δBGE, aero::AerosolOptics{FT}; reportFit=false) where {FT}
     @unpack greek_coefs, ω̃, k = aero
@@ -85,12 +91,24 @@ function truncate_phase_lowconf(mod::δBGE, aero::AerosolOptics{FT}; reportFit=f
     return AerosolOptics(greek_coefs=greek_coefs, ω̃=ω̃, k=k, fᵗ=(FT(1) - c₀))
 end
 
-"""
-$(FUNCTIONNAME)(mod::δBGE, aero::AerosolOptics))
-    
-Returns the truncated aerosol optical properties as [`AerosolOptics`](@ref) 
-- `mod` a [`δBGE`](@ref) struct that defines the truncation order (new length of greek parameters) and exclusion angle
-- `aero` a [`AerosolOptics`](@ref) set of aerosol optical properties that is to be truncated
+@doc raw"""
+    truncate_phase(mod::δBGE, aero::AerosolOptics; reportFit=false) -> AerosolOptics
+
+Apply δ-BGE truncation to aerosol Greek coefficients.
+
+The method removes/approximates the forward peak using a least-squares fit over
+angles outside `Δ_angle`, then renormalizes with retained scattering fraction
+``c_0``:
+
+```math
+\beta^t = \frac{c}{c_0},\qquad
+\delta^t,\alpha^t,\zeta^t \text{ adjusted consistently from } \beta^t,
+\qquad
+f^t = 1-c_0.
+```
+
+Returns a new [`AerosolOptics`](@ref) with truncated coefficients and updated
+`fᵗ`.
 """
 function truncate_phase(mod::δBGE, aero::AerosolOptics{FT}; reportFit=false) where {FT}
     @unpack greek_coefs, ω̃, k = aero
@@ -217,4 +235,3 @@ function truncate_phase(mod::δBGE, aero::AerosolOptics{FT}; reportFit=false) wh
     # return AerosolOptics(greek_coefs = greek_coefs, ω̃=C_scaᵗ / C_ext, k=C_ext, fᵗ = 1-c₀) 
     return AerosolOptics(greek_coefs=greek_coefs, ω̃=ω̃, k=k, fᵗ=(FT(1) - c₀))
 end
-

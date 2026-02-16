@@ -4,14 +4,26 @@ This file specifies how to compute aerosol optical properties using the Domke-PC
  
 =#
 
-"""
-    $(FUNCTIONNAME)(model::MieModel{FDT}) where FDT<:PCW
+@doc raw"""
+    compute_aerosol_optical_properties(model::MieModel{<:PCW}, FT2::Type=Float64) -> AerosolOptics
 
-Reference: Suniti Sanghavi 2014, https://doi.org/10.1016/j.jqsrt.2013.12.015
+Compute bulk aerosol optical properties with the Domke PCW formulation
+(Sanghavi, 2014), using precomputed Wigner tables.
 
-Compute the aerosol optical properties using the Domke-PCW method 
-Input: MieModel, holding all computation and aerosol properties 
-Output: AerosolOptics, holding all Greek coefficients and Cross-Sectional information
+Reference:
+- S. Sanghavi, *Revisiting the Fourier expansion of Mie scattering matrices in generalized spherical functions*, JQSRT 136 (2014), 16-27. https://doi.org/10.1016/j.jqsrt.2013.12.015
+
+The method evaluates ``S_l^{\nu_1\nu_2}`` terms (Eq. 22 in Sanghavi, 2014),
+maps them to Greek coefficients (Eq. 24), and returns
+[`AerosolOptics`](@ref) with:
+
+```math
+\tilde{\omega} = \bar{C}_{\mathrm{sca}} / \bar{C}_{\mathrm{ext}},\qquad
+k = \bar{C}_{\mathrm{ext}},\qquad f^t = 1.
+```
+
+Use [`make_mie_model`](@ref) with `PCW()` and Wigner inputs before calling
+this function.
 """
 function compute_aerosol_optical_properties(model::MieModel{FDT}, FT2::Type=Float64) where FDT<:PCW
 
@@ -105,14 +117,12 @@ end
 
 
 """
-    $(FUNCTIONNAME)(l, ν₁, ν₂, ν₂_positive_flag, k, N_max, ab_pairs, an_m_bn, an_p_bn, wigner_A, wigner_B)
+    compute_Sl(l, ν₁, ν₂, ν₂_positive_flag, k, N_max, ab_pairs, an_m_bn, an_p_bn, wigner_A, wigner_B)
 
-Reference: Suniti Sanghavi 2014, https://doi.org/10.1016/j.jqsrt.2013.12.015
+Internal helper for PCW computation (Sanghavi, 2014, Eq. (22)).
 
-Compute Sl_νν, given by Eq 22
-Input: l, ν₁, ν₂, ν₂_positive_flag (to differentiate b/w 0 and -0), 
-k, N_max, ab_pairs (precomputed), an_m_bn, an_p_bn, wigner_A, wigner_B, 
-Output: Complex{Float64}
+Evaluates the complex ``S_l^{\nu_1\nu_2}`` quantity used in the Domke/Sanghavi
+Greek-coefficient formulation.
 """
 function compute_Sl(l::Integer, ν₁::Integer, ν₂::Integer, ν₂_positive_flag::Bool, 
                     k, N_max, ab_pairs, an_m_bn, an_p_bn, wigner_A, wigner_B)
