@@ -300,18 +300,38 @@ function gauleg(n, xmin, xmax; norm=false)
 end
 
 @doc raw"""
-    $(FUNCTIONNAME)(greek_coefs, μ; returnLeg = false)
-Returns the reconstructed elements of the 4x4 scattering matrix at positions 
-f₁₁, f₁₂, f₂₂, f₃₃, f₃₄, f₄₄ from the greek coefficients
+    reconstruct_phase(greek_coefs, μ; returnLeg = false)
 
-f₁₁ represents the phase function p for the Intensity (first Stokes Vector element) and is normalized as follows:
+Reconstruct angle-space scattering-matrix elements from Greek coefficients.
+
+Reference: Sanghavi (2014), Fourier/Greek framework around Eq. (17).
+
+`f₁₁` represents the scalar phase function and is normalized as:
 ```math
 \frac{1}{4\pi}\int_0^{2\pi}d\phi \int_{-1}^1 p(\mu) d\mu  = 1
 ```
 
-- `greek_coefs` greek coefficients (Domke Type)
-- `returnLeg` if `false` (default), just return `f₁₁, f₁₂, f₂₂, f₃₃, f₃₄, f₄₄`, if `true`, 
-- return `f₁₁, f₁₂, f₂₂, f₃₃, f₃₄, f₄₄, P, P²` (i.e. also the two legendre polynomials as matrices)
+Using Legendre basis matrices computed at `μ`, this function evaluates:
+
+```math
+f_{11} = P\beta,\quad f_{44}=P\delta,\quad
+f_{12}=P^2(\mathrm{fac}\odot\gamma),\quad
+f_{34}=P^2(\mathrm{fac}\odot\epsilon),
+```
+
+```math
+f_{22}=R^2(\mathrm{fac}\odot\alpha)+T^2(\mathrm{fac}\odot\zeta),\quad
+f_{33}=R^2(\mathrm{fac}\odot\zeta)+T^2(\mathrm{fac}\odot\alpha).
+```
+
+# Arguments
+- `greek_coefs`: [`GreekCoefs`](@ref) coefficients.
+- `μ`: cosine of scattering angles where the matrix should be reconstructed.
+- `returnLeg`: if `true`, also return `(P, P²)`.
+
+# Returns
+- `ScatteringMatrix` when `returnLeg=false`.
+- `(ScatteringMatrix, P, P²)` when `returnLeg=true`.
 """
 function reconstruct_phase(greek_coefs, μ; returnLeg=false)
 

@@ -62,8 +62,11 @@ cd vSmartMOM.jl
 git checkout unified-vsmartmom
 julia --project=. -e 'using Pkg; Pkg.instantiate()'
 julia --project=. test/test_jacobians_unit.jl    # ~5 min, @testset-based
+julia --project=. test/test_jacobians_AD_compare.jl  # Analytic vs FD (central); timing
+julia --project=. test/test_jacobians_GPU.jl     # GPU run + GPU vs CPU (if CUDA available)
 julia --project=. test/test_mie_jacobians.jl     # ~15 min, FD convergence for nᵣ, nᵢ, μ, σ
 ```
+Full test workflow (order, options, limitations): **`docs/JACOBIAN_TEST_WORKFLOW.md`**
 
 ### Priority 2: Fix Bug 19 — Z Chain Rule After Doubling
 This is the **root cause of the remaining ~10% error** for all aerosol parameters.

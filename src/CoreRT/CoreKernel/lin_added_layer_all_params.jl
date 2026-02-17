@@ -64,6 +64,16 @@ function lin_added_layer_all_params_helper!(RS_type::noRS{FT},
     nbigD = size(bigD,1)
     i₀ = iμ₀Nstart:iμ₀Nstart+n-1
 
+    # Zero the ap_* arrays — essential because Nparams_ap (total state params including
+    # surface) may exceed nparams (layer optical params without surface), and
+    # doubling_allparams! will iterate over all Nparams_ap entries.
+    ap_ṫ⁺⁺ .= 0
+    ap_ṫ⁻⁻ .= 0
+    ap_ṙ⁻⁺ .= 0
+    ap_ṙ⁺⁻ .= 0
+    ap_J̇₀⁺ .= 0
+    ap_J̇₀⁻ .= 0
+
     # Compute elemental τ̇: core derivatives are w.r.t. dτ = τ/2^ndoubl
     dτ̇ = τ̇ ./ FT(2^ndoubl)
 

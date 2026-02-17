@@ -10,7 +10,7 @@ ENV["GKSwstype"] = "nul"
 
 function build()
 
-    tutorials = ["Tutorial_Absorption.jl", "Tutorial_Scattering.jl", "Tutorial_IO.jl"] # , 
+    tutorials = ["Tutorial_Absorption.jl", "Tutorial_Scattering.jl", "Tutorial_IO.jl", "Tutorial_CoreRT.jl"] # ,
     tutorials_paths = [joinpath(@__DIR__, "src", "pages", "tutorials", tutorial) for tutorial in tutorials]
 
     for tutorial in tutorials_paths
@@ -32,6 +32,7 @@ function build()
                                     "User-Defined RT Parameters" => "pages/vSmartMOM/InputParametersGuide.md",
                                     "Methods & Types" => "pages/vSmartMOM/Types.md",
                                     "Principles" => "pages/vSmartMOM/Principles.md",
+                                    "Core RT Theory (Doubling/Adding)" => "pages/vSmartMOM/CoreRTTheory.md",
                                     "References" => "pages/vSmartMOM/References.md"
                                     ],
         "Absorption"            => [
@@ -78,9 +79,19 @@ end
 
 build()
 
-deploydocs(
-    repo = "github.com/RemoteSensingTools/vSmartMOM.jl.git",
-    target = "build",
-    push_preview = true,
-)
+# Deploy only in CI contexts; local docs builds should not attempt git deployment.
+if get(ENV, "CI", "false") == "true"
+    # Keep main as the canonical dev docs, but allow branch-specific dev deployment
+    # for unified-vsmartmom so pushes to that branch publish docs as well.
+    ref_name = get(ENV, "GITHUB_REF_NAME", "")
+    deploy_devbranch = ref_name == "unified-vsmartmom" ? "unified-vsmartmom" : "main"
+    deploy_devurl = ref_name == "unified-vsmartmom" ? "unified-vsmartmom" : "dev"
 
+    deploydocs(
+        repo = "github.com/RemoteSensingTools/vSmartMOM.jl.git",
+        target = "build",
+        push_preview = true,
+        devbranch = deploy_devbranch,
+        devurl = deploy_devurl,
+    )
+end

@@ -15,6 +15,8 @@ You can perform an RT simulation in a few short steps:
 
 For a full demo of how to use this module, please see the [example](https://remotesensingtools.github.io/vSmartMOM.jl/dev/pages/vSmartMOM/Example/) page. 
 
+For equation-level details of the core solver workflow (`elemental`, `doubling`, and `interaction`), see the **Core RT Theory (Doubling/Adding)** page in this section.
+
 ## Architecture
 
 ![ArchitectureDiagram](vSmartMOMDiagram-vSmartMOM.drawio.png)
