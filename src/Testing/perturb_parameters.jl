@@ -1,6 +1,6 @@
 # Import necessary modules
 using vSmartMOM, vSmartMOM.CoreRT
-using Distributions: LogNormal
+using Distributions: LogNormal, Normal, mean, std
 
 # defining vSmartMOM modes to be used in the following
 fwd_mode = FwdMode() #vSmartMOM.CoreRT.Mode.FwdMode()
@@ -76,14 +76,16 @@ function perturb_parameters(params::vSmartMOM.CoreRT.vSmartMOM_Parameters, ppct)
             LogNormal(μ, incr_fct*σ)
         push!(pert_params, tmp_params)  
 
-        # z₀
-        tmp_params = deepcopy(params)  # ← CRITICAL FIX: Use deepcopy
-        tmp_params.scattering_params.rt_aerosols[iaer].z₀ *= incr_fct
-        push!(pert_params, tmp_params)  
+        # p₀ (profile mean pressure)
+        tmp_params = deepcopy(params)
+        prof = tmp_params.scattering_params.rt_aerosols[iaer].profile
+        tmp_params.scattering_params.rt_aerosols[iaer].profile = Normal(incr_fct * mean(prof), std(prof))
+        push!(pert_params, tmp_params)
 
-        # σ₀
-        tmp_params = deepcopy(params)  # ← CRITICAL FIX: Use deepcopy
-        tmp_params.scattering_params.rt_aerosols[iaer].σ₀ *= incr_fct
+        # σp (profile pressure width)
+        tmp_params = deepcopy(params)
+        prof = tmp_params.scattering_params.rt_aerosols[iaer].profile
+        tmp_params.scattering_params.rt_aerosols[iaer].profile = Normal(mean(prof), incr_fct * std(prof))
         push!(pert_params, tmp_params)  
     end
     
@@ -92,7 +94,8 @@ function perturb_parameters(params::vSmartMOM.CoreRT.vSmartMOM_Parameters, ppct)
     for iband=1:Nbands
         tmp_params = deepcopy(params)  # ← CRITICAL FIX: Use deepcopy
         albedo_val = tmp_params.brdf[iband].albedo
-        tmp_params.brdf[iband].albedo = (albedo_val == 0) ? 0.01 : incr_fct * albedo_val  # ← FIX: Actually assign the value
+        new_albedo = (albedo_val == 0) ? 0.01 : incr_fct * albedo_val
+        tmp_params.brdf[iband] = vSmartMOM.CoreRT.LambertianSurfaceScalar(new_albedo)
         push!(pert_params, tmp_params)
     end
     
@@ -141,7 +144,7 @@ function compute_FD_modelJacobian(params::vSmartMOM.CoreRT.vSmartMOM_Parameters,
         Δτ_ref = pert_params[idx].scattering_params.rt_aerosols[iaer].τ_ref - params.scattering_params.rt_aerosols[iaer].τ_ref
         pert_model = model_from_parameters(pert_params[idx])
         
-        for iband=1:Nband
+        for iband=1:Nbands
             # tau_aer [iband][iaer]
             K_FD = (pert_model.τ_aer[iband][iaer,:,:] .- model.τ_aer[iband][iaer,:,:])/Δτ_ref
             K_lin = lin_model.τ̇_aer[iband][iaer, i_aerprop,:,:]
@@ -154,7 +157,7 @@ function compute_FD_modelJacobian(params::vSmartMOM.CoreRT.vSmartMOM_Parameters,
         Δnᵣ = pert_params[idx].scattering_params.rt_aerosols[iaer].aerosol.nᵣ - params.scattering_params.rt_aerosols[iaer].aerosol.nᵣ  
         pert_model = model_from_parameters(pert_params[idx])
         
-        for iband=1:Nband
+        for iband=1:Nbands
             # tau_aer [iband][iaer]
             K_FD = (pert_model.τ_aer[iband][iaer,:,:] .- model.τ_aer[iband][iaer,:,:])./Δnᵣ
             K_lin = lin_model.τ̇_aer[iband][iaer, i_aerprop,:,:]
@@ -213,7 +216,7 @@ function compute_FD_modelJacobian(params::vSmartMOM.CoreRT.vSmartMOM_Parameters,
         Δnᵢ = pert_params[idx].scattering_params.rt_aerosols[iaer].aerosol.nᵢ - params.scattering_params.rt_aerosols[iaer].aerosol.nᵢ  
         pert_model = model_from_parameters(pert_params[idx])
         
-        for iband=1:Nband
+        for iband=1:Nbands
             # tau_aer [iband][iaer]
             K_FD = (pert_model.τ_aer[iband][iaer,:,:] .- model.τ_aer[iband][iaer,:,:])./Δnᵢ
             K_lin = lin_model.τ̇_aer[iband][iaer, i_aerprop,:,:]
@@ -273,7 +276,7 @@ function compute_FD_modelJacobian(params::vSmartMOM.CoreRT.vSmartMOM_Parameters,
         #K_FD = (pert_model.τ_aer .- model.τ_aer)./Δμ
         #@assert K_FD ≈ lin_model.τ̇_aer[idx]
         
-        for iband=1:Nband
+        for iband=1:Nbands
             # tau_aer [iband][iaer]
             K_FD = (pert_model.τ_aer[iband][iaer,:,:] .- model.τ_aer[iband][iaer,:,:])./Δμ
             K_lin = lin_model.τ̇_aer[iband][iaer, i_aerprop,:,:]
@@ -333,7 +336,7 @@ function compute_FD_modelJacobian(params::vSmartMOM.CoreRT.vSmartMOM_Parameters,
         #K_FD = (pert_model.τ_aer .- model.τ_aer)./Δσ
         #@assert K_FD ≈ lin_model.τ̇_aer[idx]
         
-        for iband=1:Nband
+        for iband=1:Nbands
         # tau_aer [iband][iaer]
             K_FD = (pert_model.τ_aer[iband][iaer,:,:] .- model.τ_aer[iband][iaer,:,:])./Δσ
             K_lin = lin_model.τ̇_aer[iband][iaer, i_aerprop,:,:]
@@ -385,27 +388,27 @@ function compute_FD_modelJacobian(params::vSmartMOM.CoreRT.vSmartMOM_Parameters,
             lin_model.lin_aerosol_optics[iband][iaer].lin_greek_coefs.ζ̇[4,:]
         end
 
-        # z₀
+        # p₀ (profile mean pressure)
         i_aerprop = 6
         idx = 1 + Nmol + 7*(iaer-1) + i_aerprop
-        Δz₀ = pert_params[idx].scattering_params.rt_aerosols[iaer].z₀ - params.scattering_params.rt_aerosols[iaer].z₀
+        Δp₀ = mean(pert_params[idx].scattering_params.rt_aerosols[iaer].profile) - mean(params.scattering_params.rt_aerosols[iaer].profile)
         pert_model = model_from_parameters(pert_params[idx])
                 
-        for iband=1:Nband
+        for iband=1:Nbands
             # tau_aer [iband][iaer]
-            K_FD = (pert_model.τ_aer[iband][iaer,:,:] .- model.τ_aer[iband][iaer,:,:])/Δz₀
+            K_FD = (pert_model.τ_aer[iband][iaer,:,:] .- model.τ_aer[iband][iaer,:,:])/Δp₀
             K_lin = lin_model.τ̇_aer[iband][iaer, i_aerprop,:,:]
             @assert K_FD ≈ K_lin
         end
 
-        # σ₀
+        # σp (profile pressure width)
         i_aerprop = 7
         idx = 1 + Nmol + 7*(iaer-1) + i_aerprop
-        Δσ₀ = pert_params[idx].scattering_params.rt_aerosols[iaer].σ₀ - params.scattering_params.rt_aerosols[iaer].σ₀
+        Δσp = std(pert_params[idx].scattering_params.rt_aerosols[iaer].profile) - std(params.scattering_params.rt_aerosols[iaer].profile)
         pert_model = model_from_parameters(pert_params[idx])    
-        for iband=1:Nband
+        for iband=1:Nbands
             # tau_aer [iband][iaer]
-            K_FD = (pert_model.τ_aer[iband][iaer,:,:] .- model.τ_aer[iband][iaer,:,:])/Δσ₀
+            K_FD = (pert_model.τ_aer[iband][iaer,:,:] .- model.τ_aer[iband][iaer,:,:])/Δσp
             K_lin = lin_model.τ̇_aer[iband][iaer, i_aerprop,:,:]
             @assert K_FD ≈ K_lin
         end 

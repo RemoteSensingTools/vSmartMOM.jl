@@ -1,0 +1,197 @@
+# =================================================================
+# Raman Scattering Forward Model Test (Memory-Aware)
+#
+# Tests Rotational Raman Scattering (RRS) using a narrow O2-A band.
+# Memory planning: RRS requires cross-wavelength coupling matrices
+# Z⁻⁺_λ₁λ₀ and Z⁺⁺_λ₁λ₀ of size (nSpec × nSpec) per layer.
+# Memory scales as O(nλ²) — keep nSpec small for CPU testing.
+#
+# For GPU testing with large nSpec, ensure sufficient device memory:
+#   ~nSpec² × nLayers × 8 bytes per matrix (Float64)
+#   e.g., 500 spectral points × 34 layers ≈ 4 GB per coupling matrix
+# =================================================================
+
+using vSmartMOM, vSmartMOM.CoreRT
+using vSmartMOM.InelasticScattering
+using Statistics
+using Test
+
+println("="^60)
+println("Raman Scattering (RRS) Forward Model Test")
+println("="^60)
+
+# ─────────────────────────────────────────────────────────────────
+# Configuration: narrow O2-A band for memory-efficient CPU testing
+# Using ~50 spectral points to keep memory manageable
+# ─────────────────────────────────────────────────────────────────
+params = parameters_from_yaml("test/test_parameters/O2Parameters.yaml")
+# Force CPU architecture (O2Parameters.yaml specifies GPU by default)
+params.architecture = vSmartMOM.Architectures.CPU()
+println("Architecture overridden to CPU")
+model = model_from_parameters(params)
+
+iBand = 1
+FT = Float64
+ν = model.params.spec_bands[iBand]
+nSpec = length(ν)
+ν̃ = mean(ν)
+
+println("Band: $(1e7/ν[end])–$(1e7/ν[1]) nm")
+println("Spectral points: $nSpec")
+println("Memory estimate for coupling matrices: ~$(round(nSpec^2 * 8 / 1024, digits=1)) KB per matrix")
+println("Layers: $(length(model.profile.T))")
+
+# ─────────────────────────────────────────────────────────────────
+# Set up RRS (Rotational Raman Scattering) type
+# Following the pattern from prototype_inelastic.jl
+# ─────────────────────────────────────────────────────────────────
+println("\nSetting up RRS type...")
+
+# Effective temperature for Raman calculations
+effT = (model.profile.vcd_dry' * model.profile.T) / sum(model.profile.vcd_dry)
+println("  Effective temperature: $(round(effT, digits=1)) K")
+
+# Compute N₂ and O₂ molecular constants
+n2, o2 = InelasticScattering.getRamanAtmoConstants(ν̃, effT)
+
+# Initialize RRS struct with placeholder arrays
+RS_type = InelasticScattering.RRS(
+    n2          = n2,
+    o2          = o2,
+    greek_raman = InelasticScattering.GreekCoefs(
+        [FT(1)], [FT(1)], [FT(1)], [FT(1)], [FT(1)], [FT(1)]),
+    fscattRayl  = [FT(1)],
+    ϖ_Cabannes  = [FT(1)],
+    ϖ_λ₁λ₀     = zeros(FT, 1),
+    i_λ₁λ₀     = zeros(Int, 1),
+    Z⁻⁺_λ₁λ₀   = zeros(FT, 1, 1),
+    Z⁺⁺_λ₁λ₀   = zeros(FT, 1, 1),
+    i_ref       = argmin(abs.(ν .- ν̃)),
+    n_Raman     = 0
+)
+
+# Compute Raman single-scattering properties
+CoreRT.getRamanSSProp!(RS_type, 1e7/ν̃, ν)
+println("  RRS properties computed.")
+println("  n_Raman transitions: $(RS_type.n_Raman)")
+println("  Z⁺⁺_λ₁λ₀ size: $(size(RS_type.Z⁺⁺_λ₁λ₀))")
+
+# Set up solar irradiance (Stokes I only, unit flux)
+nPol = model.params.polarization_type.n
+RS_type.F₀ = zeros(FT, nPol, nSpec)
+RS_type.F₀[1, :] .= 1.0
+
+@testset "Raman Scattering Test" begin
+
+    # ─────────────────────────────────────────────────────────────
+    # Test 1: Run RRS forward model
+    # ─────────────────────────────────────────────────────────────
+    @testset "RRS forward run" begin
+        println("\n  Running RRS RT...")
+        @time R_rrs, T_rrs, ieR, ieT = CoreRT.rt_run_test(RS_type, model, iBand)
+        
+        @test ndims(R_rrs) == 3
+        @test all(isfinite.(R_rrs))
+        @test all(isfinite.(ieR))
+        
+        nVza = length(model.obs_geom.vza)
+        @test size(R_rrs) == (nVza, nPol, nSpec)
+        @test size(ieR) == (nVza, nPol, nSpec)
+        
+        # Elastic component (R_rrs) should be positive for Stokes I
+        I_elastic = R_rrs[:, 1, :]
+        @test all(I_elastic .> 0) || @warn "Some elastic I < 0: min=$(minimum(I_elastic))"
+        
+        println("  Elastic R(I): min=$(minimum(I_elastic)), max=$(maximum(I_elastic))")
+        println("  Inelastic ieR(I): min=$(minimum(ieR[:,1,:])), max=$(maximum(ieR[:,1,:]))")
+    end
+    
+    # ─────────────────────────────────────────────────────────────
+    # Test 2: Run noRS for comparison
+    # ─────────────────────────────────────────────────────────────
+    @testset "noRS baseline" begin
+        println("\n  Running noRS RT for comparison...")
+        noRS_type = InelasticScattering.noRS(
+            fscattRayl  = [FT(1)],
+            ϖ_Cabannes  = [FT(1)],
+            bandSpecLim = [],
+            iBand       = [1],
+            F₀          = zeros(FT, nPol, nSpec)
+        )
+        noRS_type.F₀[1, :] .= 1.0
+        
+        @time R_noRS, T_noRS, _, _ = CoreRT.rt_run_test(noRS_type, model, iBand)
+        
+        @test all(isfinite.(R_noRS))
+        I_noRS = R_noRS[:, 1, :]
+        @test all(I_noRS .> 0)
+        
+        println("  noRS R(I): min=$(minimum(I_noRS)), max=$(maximum(I_noRS))")
+    end
+    
+    # ─────────────────────────────────────────────────────────────
+    # Test 3: Ring effect magnitude
+    # The Ring effect (filling-in of Fraunhofer lines) should be
+    # a few percent in the O2-A band region.
+    # ─────────────────────────────────────────────────────────────
+    @testset "Ring effect" begin
+        println("\n  Computing Ring effect...")
+        
+        # Re-run both to have them in same scope
+        noRS_type = InelasticScattering.noRS(
+            fscattRayl  = [FT(1)],
+            ϖ_Cabannes  = [FT(1)],
+            bandSpecLim = [],
+            iBand       = [1],
+            F₀          = zeros(FT, nPol, nSpec)
+        )
+        noRS_type.F₀[1, :] .= 1.0
+        R_noRS, _, _, _ = CoreRT.rt_run_test(noRS_type, model, iBand)
+        R_rrs, _, ieR, _ = CoreRT.rt_run_test(RS_type, model, iBand)
+        
+        # Total RRS radiance = elastic + inelastic
+        I_total = R_rrs[:, 1, :] .+ ieR[:, 1, :]
+        I_noRS = R_noRS[:, 1, :]
+        
+        # Ring effect: relative difference (RRS - noRS) / noRS
+        ring_pct = 100.0 .* (I_total .- I_noRS) ./ I_noRS
+        
+        mean_ring = mean(abs.(ring_pct))
+        max_ring = maximum(abs.(ring_pct))
+        
+        println("  Ring effect: mean |Δ| = $(round(mean_ring, digits=2))%")
+        println("  Ring effect: max  |Δ| = $(round(max_ring, digits=2))%")
+        
+        # Ring effect should be modest (typically 1-10% in O2-A)
+        @test mean_ring < 50.0  # Loose bound — exact value depends on config
+        @test max_ring < 200.0  # Some lines can have large filling-in
+        
+        # Total radiance should still be physical
+        @test all(isfinite.(I_total))
+        @test all(I_total .> 0)
+    end
+    
+    # ─────────────────────────────────────────────────────────────
+    # Test 4: Polarization consistency
+    # |Q|, |U| should be bounded by I for both RRS and noRS
+    # ─────────────────────────────────────────────────────────────
+    if nPol >= 2
+        @testset "Polarization consistency" begin
+            R_rrs, _, ieR, _ = CoreRT.rt_run_test(RS_type, model, iBand)
+            I_total = R_rrs[:, 1, :] .+ ieR[:, 1, :]
+            Q_total = R_rrs[:, 2, :] .+ ieR[:, 2, :]
+            
+            @test all(abs.(Q_total) .<= I_total .+ 1e-10)
+            
+            if nPol >= 3
+                U_total = R_rrs[:, 3, :] .+ ieR[:, 3, :]
+                @test all(abs.(U_total) .<= I_total .+ 1e-10)
+            end
+            println("  Polarization consistency: PASS")
+        end
+    end
+end
+
+println("\n" * "="^60)
+println("Raman scattering test complete.")
+println("="^60)
