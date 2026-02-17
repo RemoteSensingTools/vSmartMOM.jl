@@ -1,64 +1,87 @@
 # Scattering Module Example
 
+This example shows a complete NAI2 workflow, optional PCW setup, and AD usage.
+
 ```julia
-using vSmartMOM
-using vSmartMOMYeah.Scattering
+using vSmartMOM.Scattering
 using Distributions
-using BenchmarkTools
+using FastGaussQuadrature
+using Parameters
 
-## 
-## STEP 1: Create the Aerosol
-## 
+#
+# STEP 1: Define aerosol size distribution and refractive index
+#
+r_m = 0.30               # median radius [um]
+sigma_r = 2.0            # geometric stddev [-]
+n_r = 1.30               # real refractive index
+n_i = 0.001              # imaginary refractive index (use positive convention)
+r_max = 30.0             # [um]
+nquad_radius = 1500      # quadrature points for size integration
 
-# Aerosol particle distribution and properties 
-μ  = 0.3                # Log mean radius (μm)
-σ  = 6.82               # Log stddev of radius (μm)
-r_max = 30.0            # Maximum radius (μm)
-nquad_radius = 2500     # Number of quadrature points for integrating of size dist.
-nᵣ = 1.3                # Real part of refractive index
-nᵢ = 0.0                # Imag part of refractive index
+size_distribution = LogNormal(log(r_m), log(sigma_r))
+aero = Aerosol(size_distribution, n_r, n_i)
 
-size_distribution = LogNormal(log(μ), log(σ))
+#
+# STEP 2: Build Mie model settings
+#
+lambda_um = 0.55
+polarization = Stokes_IQUV()
+truncation = δBGE(20, 2.0)   # l_max = 20, exclusion angle = 2 deg
 
-# Create the aerosol
-aero = Aerosol(size_distribution, nᵣ, nᵢ)
+model_NAI2 = make_mie_model(
+    NAI2(),
+    aero,
+    lambda_um,
+    polarization,
+    truncation,
+    r_max,
+    nquad_radius,
+)
 
-## 
-## STEP 2: Create the Mie Calculations model
-## 
+#
+# STEP 3: Compute aerosol optical properties
+#
+aerosol_optics = compute_aerosol_optical_properties(model_NAI2)
 
-λ = 0.55        # Incident wavelength (μm)
-polarization_type = Stokes_IQUV()  
-l_max = 10      # Trunction length for legendre terms
-Δ_angle = 2     # Exclusion angle for forward peak (in fitting procedure) `[degrees]`
-truncation_type = δBGE(l_max, Δ_angle)
+println("omega_tilde = ", aerosol_optics.ω̃)
+println("k_ext       = ", aerosol_optics.k)
+println("f_t         = ", aerosol_optics.fᵗ)
 
-# NAI2 Method
-model_NAI2 = make_mie_model(NAI2(), aero, λ, polarization_type, truncation_type, r_max, nquad_radius)
+@unpack α, β, γ, δ, ϵ, ζ = aerosol_optics.greek_coefs
+println("Greek coefficient length = ", length(β))
 
-# PCW Method with saved/loaded Wigner tables
-wigner_file_path = "PATH_TO_SAVED_WIGNER_MATRIX"
-model_PCW = make_mie_model(PCW(), aero, λ, polarization_type, truncation_type, r_max, nquad_radius, wigner_file_path)
+#
+# STEP 4: Reconstruct phase-matrix elements on a custom angular grid
+#
+mu_quad, _ = gausslegendre(500)
+scattering_matrix = reconstruct_phase(aerosol_optics.greek_coefs, mu_quad)
+println("f11 at forward angle = ", scattering_matrix.f₁₁[end])
 
-# PCW Method with newly computed Wigner tables
-wigner_A, wigner_B = compute_wigner_values(600) # Specify N_max
-model_PCW_computed_wigner = make_mie_model(PCW(), aero, λ, polarization_type, truncation_type, wigner_A, wigner_B)
+#
+# STEP 5: Optional AD run (returns ONE AerosolOptics object; Jacobian in `.derivs`)
+#
+aerosol_optics_ad = compute_aerosol_optical_properties(model_NAI2; autodiff=true)
+println("AD derivative array size = ", size(aerosol_optics_ad.derivs))
 
-## 
-## STEP 3: Perform the Mie Calculations
-## 
+#
+# STEP 6: Convenience APIs for cross-sections / phase function
+#
+mu_pf, w_mu_pf, p11, C_ext, C_sca, g = phase_function(aero, lambda_um, r_max, nquad_radius)
+println("phase_function: C_ext = ", C_ext, ", C_sca = ", C_sca, ", g = ", g)
 
-aerosol_optics_NAI2 = compute_aerosol_optical_properties(model_NAI2);
-aerosol_optics_PCW = compute_aerosol_optical_properties(model_PCW);
+XS_ext, XS_sca, Cext_eff, Csca_eff = compute_aerosol_XS(aero, lambda_um, r_max, nquad_radius)
+println("compute_aerosol_XS: XS_ext = ", XS_ext, ", XS_sca = ", XS_sca)
+println("compute_aerosol_XS: Cext_eff = ", Cext_eff, ", Csca_eff = ", Csca_eff)
 
-# To perform auto-differentiation w.r.t. μ, σ, nᵣ, nᵢ
-aerosol_optics_NAI2_AD, derivs = compute_aerosol_optical_properties(model_NAI2, autodiff=true);
-
-## 
-## STEP 4: Obtain Scattering Matrix
-## 
-
-μ_quad, w_μ = gausslegendre(1000); # Quadrature points/weights
-scattering_matrix = reconstruct_phase(aerosol_optics_NAI2.greek_coefs, μ_quad);
-
+#
+# OPTIONAL: PCW model setup
+# - Provide precomputed Wigner matrices from file:
+#     model_PCW = make_mie_model(PCW(), aero, lambda_um, polarization, truncation,
+#                                r_max, nquad_radius, "path/to/wigner_values.jld")
+#
+# - Or compute Wigner matrices directly (expensive for large N_max):
+#     N_max = 120
+#     wigner_A, wigner_B = compute_wigner_values(N_max)
+#     model_PCW = make_mie_model(PCW(), aero, lambda_um, polarization, truncation,
+#                                r_max, nquad_radius, wigner_A, wigner_B)
 ```

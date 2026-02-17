@@ -116,6 +116,21 @@ function vSmartMOM.CoreRT.batched_mul(A::CuArray{FT,3}, B::CuArray{FT,3}) where 
     CUDA.CUBLAS.gemm_strided_batched('N', 'N', A, B)
 end
 
+"Batched multiply for 3D CuArray views (materialize to contiguous CuArray first)."
+@inline _as_cuarray3(A::SubArray{FT,3,<:CuArray}) where {FT} = copy(A)
+
+function vSmartMOM.CoreRT.batched_mul(A::SubArray{FT,3,<:CuArray}, B::CuArray{FT,3}) where {FT}
+    CUDA.CUBLAS.gemm_strided_batched('N', 'N', _as_cuarray3(A), B)
+end
+
+function vSmartMOM.CoreRT.batched_mul(A::CuArray{FT,3}, B::SubArray{FT,3,<:CuArray}) where {FT}
+    CUDA.CUBLAS.gemm_strided_batched('N', 'N', A, _as_cuarray3(B))
+end
+
+function vSmartMOM.CoreRT.batched_mul(A::SubArray{FT,3,<:CuArray}, B::SubArray{FT,3,<:CuArray}) where {FT}
+    CUDA.CUBLAS.gemm_strided_batched('N', 'N', _as_cuarray3(A), _as_cuarray3(B))
+end
+
 "Define batched matrix multiply for GPU and Duals"
 function vSmartMOM.CoreRT.batched_mul(A::CuArray{ForwardDiff.Dual{T,V,N},3}, B::CuArray{ForwardDiff.Dual{T,V,N},3}) where {T,V,N}
     # Extract values:

@@ -308,6 +308,7 @@ end
                         ϖ_λ, dτ_λ, 
                         Z⁻⁺, Z⁺⁺, 
                         qp_μN, wct) 
+    FT = eltype(r⁻⁺)
     n2 = 1
     i, j, n = @index(Global, NTuple) 
     if size(Z⁻⁺,3)>1
@@ -349,7 +350,7 @@ end
                 # derivative wrt τ_λ
                 ṫ⁺⁺[1,i,j,n] = 
                     exp(-dτ_λ[n] / qp_μN[i]) * (1 / qp_μN[i]) *
-                    (-1 + ϖ_λ[n] * Z⁺⁺[i,i,n2] * (1 - dτ_λ[n] / qp_μN[i])) * wct[i]
+                    (-1 + ϖ_λ[n] * Z⁺⁺[i,i,n2] * wct[i] * (1 - dτ_λ[n] / qp_μN[i]))
                 # derivative wrt ϖ_λ
                 ṫ⁺⁺[2,i,j,n] = 
                     exp(-dτ_λ[n] / qp_μN[i]) *
@@ -486,10 +487,12 @@ end
     J₀⁺[i, 1, n] *= exp(-τ_sum[n]/qp_μN[i_start])
     J₀⁻[i, 1, n] *= exp(-τ_sum[n]/qp_μN[i_start])
 
-    J̇₀⁺[1, i, 1, n] = J̇₀⁺[1, i, 1, n]*exp(-τ_sum[n]/qp_μN[i_start]) +
-                        J₀⁺[i, 1, n] * (-τ̇_sum[1,n]/qp_μN[i_start])
-    J̇₀⁻[1, i, 1, n] = J̇₀⁻[1, i, 1, n]*exp(-τ_sum[n]/qp_μN[i_start]) +
-                        J₀⁻[i, 1, n] * (-τ̇_sum[1,n]/qp_μN[i_start])
+    # Bug 22 fix: Remove τ̇_sum[1,n] contribution from core derivative.
+    # The τ̇_sum beam attenuation derivative is per-physical-parameter and must be
+    # added AFTER the chain rule (in rt_kernel!), not here in the 3-core framework.
+    # Old code used τ̇_sum[1,n] which only captured parameter 1's contribution.
+    J̇₀⁺[1, i, 1, n] = J̇₀⁺[1, i, 1, n]*exp(-τ_sum[n]/qp_μN[i_start])
+    J̇₀⁻[1, i, 1, n] = J̇₀⁻[1, i, 1, n]*exp(-τ_sum[n]/qp_μN[i_start])
     J̇₀⁺[2, i, 1, n] = J̇₀⁺[2, i, 1, n]*exp(-τ_sum[n]/qp_μN[i_start]) #+
                         #J₀⁺[i, 1, n] * (-τ̇_sum[1,n]/qp_μN[i_start])
     J̇₀⁻[2, i, 1, n] = J̇₀⁻[2, i, 1, n]*exp(-τ_sum[n]/qp_μN[i_start]) #+

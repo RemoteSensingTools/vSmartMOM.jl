@@ -17,6 +17,8 @@ This page summarizes the core ideas behind vSmartMOM (vector Smart Matrix-Operat
 - Compose layers via matrix-operator doubling/adding into a composite medium, preserving polarization.
 - Couple to surfaces via BRDF models (Lambertian, RPV, Ross–Li) in a vector-consistent way.
 
+For equation-level details and code mapping of `elemental`, `doubling`, and `interaction`, see `Core RT Theory (Doubling/Adding)`.
+
 ## Truncation strategies and accuracy
 
 - δ-m and δ-fit approaches are used to remove/approximate strong forward peaks in scattering, improving convergence at low order.

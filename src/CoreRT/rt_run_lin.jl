@@ -546,8 +546,7 @@ function rt_run(RS_type::AbstractRamanType,
                                     composite_layer, composite_layer_lin,
                                     added_surface_layer, added_surface_layer_lin,
                                     I_static)
-        #@show composite_layer.J₀⁻[:,1,1]                            
-        #bla
+
         # Postprocess and weight according to vza
         postprocessing_vza!(RS_type, 
                             iμ₀, pol_type, 
