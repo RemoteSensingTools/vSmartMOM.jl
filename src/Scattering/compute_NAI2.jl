@@ -44,10 +44,10 @@ matrix moments (Sanghavi, 2014).
 function compute_aerosol_optical_properties(model::MieModel{FDT}, FT2::Type=Float64) where FDT <: NAI2
 
     # Unpack the model
-    @unpack computation_type, aerosol, λ, polarization_type, truncation_type, r_max, nquad_radius, wigner_A, wigner_B = model
+    (; computation_type, aerosol, λ, polarization_type, truncation_type, r_max, nquad_radius, wigner_A, wigner_B) = model
 
     # Extract variables from aerosol struct:
-    @unpack size_distribution, nᵣ, nᵢ = aerosol
+    (; size_distribution, nᵣ, nᵢ) = aerosol
     
     # Imaginary part of the refractive index must be ≥ 0
     @assert nᵢ ≥ 0
@@ -216,10 +216,10 @@ Reference: Sanghavi (2014), Eq. (1) for `C_ext(r)`.
 function compute_ref_aerosol_extinction(model::MieModel{FDT}, FT2::Type=Float64) where FDT <: NAI2
 
     # Unpack the model
-    @unpack computation_type, aerosol, λ, polarization_type, r_max, nquad_radius = model
+    (; computation_type, aerosol, λ, polarization_type, r_max, nquad_radius) = model
 
     # Extract variables from aerosol struct:
-    @unpack size_distribution, nᵣ, nᵢ = aerosol
+    (; size_distribution, nᵣ, nᵢ) = aerosol
     
     # Imaginary part of the refractive index must be ≥ 0
     @assert nᵢ ≥ 0 "Imaginary part of the refractive index must be ≥ 0 (definition)"
@@ -318,7 +318,7 @@ Reference: Sanghavi (2014), Mie-amplitude/cross-section setup from Eq. (1), with
 function phase_function(aerosol::Aerosol, λ, r_max, nquad_radius) 
 
     # Extract variables from aerosol struct:
-    @unpack size_distribution, nᵣ, nᵢ = aerosol
+    (; size_distribution, nᵣ, nᵢ) = aerosol
     
     # Imaginary part of the refractive index must be ≥ 0
     @assert nᵢ ≥ 0 "Imaginary part of the refractive index must be ≥ 0 (definition)"
@@ -492,7 +492,7 @@ Reference: Sanghavi (2014), Eq. (1) for particle-level `C_ext`/`C_sca`.
 """
 function compute_aerosol_XS(aerosol::Aerosol, λ::FT, r_max::FT, nquad_radius::Int64) where {FT<:AbstractFloat} 
     # Extract variables from aerosol struct:
-    @unpack size_distribution, nᵣ, nᵢ = aerosol
+    (; size_distribution, nᵣ, nᵢ) = aerosol
     
     # Imaginary part of the refractive index must be ≥ 0
     @assert nᵢ ≥ 0

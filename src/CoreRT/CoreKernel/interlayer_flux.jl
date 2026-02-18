@@ -26,7 +26,7 @@ function interlayer_flux_helper!(RS_type::RRS,
         itopieR⁺⁻::AbstractArray{FT}, ibotieR⁻⁺::AbstractArray{FT},
         itopieJ₀⁺::AbstractArray{FT}, ibotieJ₀⁻::AbstractArray{FT},
         otdwieJ::AbstractArray{FT}, otuwieJ::AbstractArray{FT}) where {FT<:Real,FT2}
-    @unpack i_λ₁λ₀ = RS_type
+    (; i_λ₁λ₀) = RS_type
     tmpR = similar(itopR⁺⁻)
     # elastic
     #@show size(itopR⁺⁻)
@@ -35,7 +35,7 @@ function interlayer_flux_helper!(RS_type::RRS,
     otdwJ[:] = tmpR ⊠ (itopJ₀⁺ .+ itopR⁺⁻ ⊠ ibotJ₀⁻)
     # inelastic
     #RRS
-    @unpack i_λ₁λ₀ = RS_type
+    (; i_λ₁λ₀) = RS_type
     for Δn=1:size(itopieJ₀⁺,4)
     #for n₁ = 1:size(itopieJ₀⁺,3)
         #for Δn=1:size(itopieJ₀⁺,4) #eachindex itopieJ₀⁺[1,1,1,:]
@@ -85,7 +85,7 @@ function interlayer_flux_helper!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
         itopieJ₀⁺::AbstractArray{FT}, ibotieJ₀⁻::AbstractArray{FT},
         otdwieJ::AbstractArray{FT}, otuwieJ::AbstractArray{FT}) where {FT<:Real,FT2}
     
-    @unpack i_λ₁λ₀_all = RS_type
+    (; i_λ₁λ₀_all) = RS_type
     
     tmpR = similar(itopR⁺⁻)
     # elastic

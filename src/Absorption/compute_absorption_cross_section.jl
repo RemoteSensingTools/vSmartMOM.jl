@@ -28,7 +28,7 @@ function compute_absorption_cross_section(
                 wavelength_flag::Bool=false  # Use wavelength in nm (true) or wavenumber cm-1 units (false)    
                 )
     
-    @unpack hitran, broadening, wing_cutoff, vmr, CEF, architecture = model
+    (; hitran, broadening, wing_cutoff, vmr, CEF, architecture) = model
 
     # Notify user of wavelength grid
     if (wavelength_flag)

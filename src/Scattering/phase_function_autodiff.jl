@@ -68,8 +68,8 @@ function compute_aerosol_optical_properties(model::MieModel ; autodiff=false)
         @assert (model.aerosol.nᵢ == x[4])
 
         # Unpack the model and aerosol 
-        @unpack computation_type, aerosol, λ, polarization_type, truncation_type, r_max, nquad_radius, wigner_A, wigner_B = model
-        @unpack size_distribution, nᵣ, nᵢ = aerosol
+        (; computation_type, aerosol, λ, polarization_type, truncation_type, r_max, nquad_radius, wigner_A, wigner_B) = model
+        (; size_distribution, nᵣ, nᵢ) = aerosol
 
         aerosol_x = Aerosol(LogNormal(log(x[1].value), log(x[2].value)), x[3].value, x[4].value)
         model_x = MieModel(computation_type, aerosol_x, λ, polarization_type, truncation_type, r_max, nquad_radius, wigner_A, wigner_B)

@@ -67,10 +67,10 @@ function elemental!(pol_type, SFI::Bool,
                 added_layer_lin::AddedLayerLin{FT}, 
                 architecture) where {FT<:AbstractFloat}
 
-    @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻ = added_layer
-    @unpack ṙ⁺⁻, ṙ⁻⁺, ṫ⁻⁻, ṫ⁺⁺, J̇₀⁺, J̇₀⁻ = added_layer_lin
-    @unpack qp_μ, iμ₀, wt_μN, qp_μN = quad_points
-    @unpack τ, ϖ, Z⁺⁺, Z⁻⁺ = computed_layer_properties
+    (; r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻) = added_layer
+    (; ṙ⁺⁻, ṙ⁻⁺, ṫ⁻⁻, ṫ⁺⁺, J̇₀⁺, J̇₀⁻) = added_layer_lin
+    (; qp_μ, iμ₀, wt_μN, qp_μN) = quad_points
+    (; τ, ϖ, Z⁺⁺, Z⁻⁺) = computed_layer_properties
     #@unpack ϖ_Cabannes = RS_type
     #@show architecture
     arr_type = array_type(architecture)

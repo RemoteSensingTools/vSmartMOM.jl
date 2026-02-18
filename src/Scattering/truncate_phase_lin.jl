@@ -11,11 +11,11 @@ Returns the truncated aerosol optical properties as [`AerosolOptics`](@ref)
 - `aero` a [`AerosolOptics`](@ref) set of aerosol optical properties that is to be truncated
 """
 function truncate_phase(mod::δBGE, aero::AerosolOptics{FT}, lin_aero::linAerosolOptics{FT}; reportFit=false) where {FT}
-    @unpack greek_coefs, ω̃, k = aero
-    @unpack α, β, γ, δ, ϵ, ζ = greek_coefs
-    @unpack lin_greek_coefs, ω̃̇, k̇ = lin_aero
-    @unpack α̇, β̇, γ̇, δ̇, ϵ̇, ζ̇ = lin_greek_coefs
-    @unpack l_max, Δ_angle =  mod
+    (; greek_coefs, ω̃, k) = aero
+    (; α, β, γ, δ, ϵ, ζ) = greek_coefs
+    (; lin_greek_coefs, ω̃̇, k̇) = lin_aero
+    (; α̇, β̇, γ̇, δ̇, ϵ̇, ζ̇) = lin_greek_coefs
+    (; l_max, Δ_angle) = mod
 
     l_tr = l_max
     # Obtain Gauss-Legendre quadrature points and weights for phase function:
@@ -24,8 +24,8 @@ function truncate_phase(mod::δBGE, aero::AerosolOptics{FT}, lin_aero::linAeroso
     # Reconstruct phase matrix elements:
     scattering_matrix, lin_scattering_matrix, P, P² = reconstruct_phase(greek_coefs, lin_greek_coefs, μ; returnLeg=true)
 
-    @unpack f₁₁, f₁₂, f₂₂, f₃₃, f₃₄, f₄₄ = scattering_matrix
-    @unpack ḟ₁₁, ḟ₁₂, ḟ₂₂, ḟ₃₃, ḟ₃₄, ḟ₄₄ = lin_scattering_matrix
+    (; f₁₁, f₁₂, f₂₂, f₃₃, f₃₄, f₄₄) = scattering_matrix
+    (; ḟ₁₁, ḟ₁₂, ḟ₂₂, ḟ₃₃, ḟ₃₄, ḟ₄₄) = lin_scattering_matrix
     # Find elements that exclude the peak (if wanted!)
     iμ = findall(x -> x < cosd(Δ_angle), μ)
 

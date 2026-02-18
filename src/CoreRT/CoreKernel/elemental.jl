@@ -51,8 +51,8 @@ function elemental!(pol_type, SFI::Bool,
                             I_static,
                             architecture) where {FT<:Real,FT2}
 
-    @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, J₀⁺, J₀⁻ = added_layer
-    @unpack qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart, iμ₀ = quad_points
+    (; r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, J₀⁺, J₀⁻) = added_layer
+    (; qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart, iμ₀) = quad_points
     #@unpack ϖ_Cabannes = RS_type
     arr_type = array_type(architecture)
     # Need to check with paper nomenclature. This is basically eqs. 19-20 in vSmartMOM
@@ -156,11 +156,11 @@ function elemental!(pol_type, SFI::Bool,
                             added_layer::Union{AddedLayer{FT},AddedLayerRS{FT}}, 
                             architecture) where {FT<:Real,FT2}
 
-    @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺ = added_layer
+    (; r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺) = added_layer
     j₀⁺ = added_layer.j₀⁺
     j₀⁻ = added_layer.j₀⁻
-    @unpack qp_μ, iμ₀, wt_μN, qp_μN = quad_points
-    @unpack τ, ϖ, Z⁺⁺, Z⁻⁺ = computed_layer_properties
+    (; qp_μ, iμ₀, wt_μN, qp_μN) = quad_points
+    (; τ, ϖ, Z⁺⁺, Z⁻⁺) = computed_layer_properties
     #@show M
     arr_type = array_type(architecture)
 

@@ -27,7 +27,7 @@ function rt_set_streams(::GaussQuadHemisphere,
                         pol_type,
                         arr_type) where {FT}
 
-    @unpack sza, vza = obs_geom
+    (; sza, vza) = obs_geom
 
     Nquad = (Ltrunc + 1) ÷ 2
 
@@ -66,7 +66,7 @@ function rt_set_streams(::GaussQuadFullSphere,
                         pol_type,
                         arr_type) where {FT}
                         
-    @unpack sza, vza = obs_geom
+    (; sza, vza) = obs_geom
 
     Nquad = (Ltrunc + 1) ÷ 2
     qp_μ, wt_μ = gausslegendre(2Nquad) # quadrature limits are [-1,1]
@@ -104,7 +104,7 @@ function rt_set_streams(::RadauQuad,
                         pol_type,
                         arr_type) where {FT}
     
-    @unpack obs_alt, sza, vza, vaz = obs_geom
+    (; obs_alt, sza, vza, vaz) = obs_geom
     
     # Ltrunc + 1 = number of spherical coefficients considered (+1 for l=0)
     # quadtype = 'r' for Radau (with DNI), 'g' for Gauss (no DNI)

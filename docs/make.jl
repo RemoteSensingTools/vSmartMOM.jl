@@ -10,7 +10,7 @@ ENV["GKSwstype"] = "nul"
 
 function build()
 
-    tutorials = ["Tutorial_Absorption.jl", "Tutorial_Scattering.jl", "Tutorial_IO.jl", "Tutorial_CoreRT.jl"] # ,
+    tutorials = ["Tutorial_Absorption.jl", "Tutorial_Scattering.jl", "Tutorial_IO.jl", "Tutorial_CoreRT.jl", "Tutorial_Jacobians.jl", "Tutorial_GPU.jl"]
     tutorials_paths = [joinpath(@__DIR__, "src", "pages", "tutorials", tutorial) for tutorial in tutorials]
 
     for tutorial in tutorials_paths

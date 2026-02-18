@@ -31,8 +31,8 @@ function elemental_inelastic!(RS_type::Union{RRS, RRS_plus},
                             I_static,
                             architecture) where {FT<:Real,FT2}
 
-    @unpack ier⁺⁻, ier⁻⁺, iet⁻⁻, iet⁺⁺, ieJ₀⁺, ieJ₀⁻ = added_layer
-    @unpack qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart, iμ₀ = quad_points
+    (; ier⁺⁻, ier⁻⁺, iet⁻⁻, iet⁺⁺, ieJ₀⁺, ieJ₀⁻) = added_layer
+    (; qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart, iμ₀) = quad_points
     arr_type = array_type(architecture)
     τ_sum = arr_type(τ_sum)
     # Need to check with paper nomenclature. This is basically eqs. 19-20 in vSmartMOM
@@ -172,7 +172,7 @@ function get_elem_rt!(RS_type::RRS,
                         dτ_λ, ϖ_λ,
                         Z⁻⁺_λ₁λ₀, Z⁺⁺_λ₁λ₀, 
                         qp_μN, wct2)
-        @unpack fscattRayl, ϖ_λ₁λ₀, i_λ₁λ₀, i_ref = RS_type
+        (; fscattRayl, ϖ_λ₁λ₀, i_λ₁λ₀, i_ref) = RS_type
         device = devi(architecture(ier⁻⁺))
         aType = array_type(architecture(ier⁻⁺))
         kernel! = get_elem_rt_RRS!(device)
@@ -211,7 +211,7 @@ function get_elem_rt!(RS_type::Union{VS_0to1, VS_1to0},
     dτ_λ, ϖ_λ,
     Z⁻⁺_λ₁λ₀, Z⁺⁺_λ₁λ₀, 
     qp_μN, wct2)
-    @unpack fscattRayl, ϖ_λ₁λ₀, i_λ₁λ₀, i_ref = RS_type
+    (; fscattRayl, ϖ_λ₁λ₀, i_λ₁λ₀, i_ref) = RS_type
     device = devi(architecture(ier⁻⁺))
     aType = array_type(architecture(ier⁻⁺))
     kernel! = get_elem_rt_VS!(device)
@@ -299,7 +299,7 @@ function get_elem_rt_SFI!(RS_type::Union{VS_0to1, VS_1to0},
                         qp_μN, ndoubl,
                         wct02, nStokes,
                         I₀, iμ0,D)
-    @unpack fscattRayl, ϖ_λ₁λ₀, i_λ₁λ₀, i_ref = RS_type
+    (; fscattRayl, ϖ_λ₁λ₀, i_λ₁λ₀, i_ref) = RS_type
     #@show fscattRayl
     device = devi(architecture(ieJ₀⁺))
     aType = array_type(architecture(ieJ₀⁺))
@@ -325,7 +325,7 @@ function get_elem_rt_SFI!(RS_type::RRS,
                         qp_μN, ndoubl,
                         wct02, nStokes,
                         I₀, iμ0,D)
-    @unpack fscattRayl, ϖ_λ₁λ₀, i_λ₁λ₀, i_ref = RS_type
+    (; fscattRayl, ϖ_λ₁λ₀, i_λ₁λ₀, i_ref) = RS_type
     #@show fscattRayl
     device  = devi(architecture(ieJ₀⁺))
     aType   = array_type(architecture(ieJ₀⁺))

@@ -14,9 +14,9 @@ function doubling_helper!(RS_type::RRS,
     architecture) where {FT}
 
     # Unpack the added layer
-    @unpack i_λ₁λ₀ = RS_type 
-    @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻ = added_layer
-    @unpack  ier⁻⁺, iet⁺⁺, ieJ₀⁺, ieJ₀⁻ = added_layer
+    (; i_λ₁λ₀) = RS_type 
+    (; r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻) = added_layer
+    (; ier⁻⁺, iet⁺⁺, ieJ₀⁺, ieJ₀⁻) = added_layer
     # Device architecture
     dev = devi(architecture)
 
@@ -150,9 +150,9 @@ function doubling_helper!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
                         I_static::AbstractArray{FT}, 
                         architecture) where {FT}
     # Unpack the added layer
-    @unpack i_λ₁λ₀_all = RS_type 
-    @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻ = added_layer
-    @unpack ier⁺⁻, ier⁻⁺, iet⁻⁻, iet⁺⁺, ieJ₀⁺, ieJ₀⁻ = added_layer
+    (; i_λ₁λ₀_all) = RS_type 
+    (; r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻) = added_layer
+    (; ier⁺⁻, ier⁻⁺, iet⁻⁻, iet⁺⁺, ieJ₀⁺, ieJ₀⁻) = added_layer
     # Device architecture
     dev = devi(architecture)
 

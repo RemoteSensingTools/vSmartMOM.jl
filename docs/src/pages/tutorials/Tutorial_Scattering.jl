@@ -79,7 +79,7 @@ println("fᵗ = ", aerosol_optics_NAI2.fᵗ)
 #
 # ### Inspect Greek coefficients
 
-@unpack α, β, γ, δ, ϵ, ζ = aerosol_optics_NAI2.greek_coefs
+(; α, β, γ, δ, ϵ, ζ) = aerosol_optics_NAI2.greek_coefs
 
 if HAS_PLOTS
     p1 = plot(α, title="α")
@@ -103,7 +103,7 @@ end
 
 μ_quad, _ = gausslegendre(500)
 scattering_matrix = reconstruct_phase(aerosol_optics_NAI2.greek_coefs, μ_quad)
-@unpack f₁₁, f₁₂, f₂₂, f₃₃, f₃₄, f₄₄ = scattering_matrix
+(; f₁₁, f₁₂, f₂₂, f₃₃, f₃₄, f₄₄) = scattering_matrix
 
 if HAS_PLOTS
     p1 = plot(μ_quad, f₁₁, yscale=:log10, title="f₁₁")

@@ -14,15 +14,15 @@ are denoted by 0<VZA<90.
 function rt_run_test_ms(RS_type::AbstractRamanType, 
                         sensor_levels::Vector{Int64},
                         model::vSmartMOM_Model, iBand)
-    @unpack obs_alt, sza, vza, vaz = model.obs_geom   # Observational geometry properties
-    @unpack qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart, μ₀, iμ₀, Nquad = model.quad_points # All quadrature points
+    (; obs_alt, sza, vza, vaz) = model.obs_geom   # Observational geometry properties
+    (; qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart, μ₀, iμ₀, Nquad) = model.quad_points # All quadrature points
     pol_type = model.params.polarization_type
-    @unpack max_m = model.params
-    @unpack quad_points = model
+    (; max_m) = model.params
+    (; quad_points) = model
 
     # Also to be changed!!
     brdf = model.params.brdf[iBand[1]]
-    @unpack ϖ_Cabannes = RS_type
+    (; ϖ_Cabannes) = RS_type
 
 
     FT = eltype(sza)                    # Get the float-type to use

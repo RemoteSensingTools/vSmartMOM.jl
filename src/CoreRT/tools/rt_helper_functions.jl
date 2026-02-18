@@ -4,8 +4,8 @@ This file contains helper functions that are used throughout the vSmartMOM modul
 
 =#
 
-"Given the previous scattering interface and current layer information, return what type of scattering interface is nexts"
-function get_scattering_interface(scattering_interface,scatter, iz)
+"Given the previous scattering interface and current layer information, return what type of scattering interface is next"
+@inline function get_scattering_interface(scattering_interface, scatter, iz)
 
     # First layer (TOA)
     if (iz == 1)
@@ -22,76 +22,63 @@ function get_scattering_interface(scattering_interface,scatter, iz)
                                     (!scatter ? ScatteringInterface_00() : ScatteringInterface_01()) : 
                                     (!scatter ? ScatteringInterface_10() : ScatteringInterface_11())
     end
-    #@show scattering_interface
-    return scattering_interface #ScatteringInterface_11() #  # ScatteringInterface_11() # scattering_interface #ScatteringInterface_11() # 
+    return scattering_interface
 end
 
 "Minimum number of doublings needed to reach an optical depth τ_end, starting with an optical depth dτ.
 The starting optical depth dτ is also determined from its maximum possible value, τ"
-function doubling_number(dτ_max, τ_end) # check if τ_end can be replaced by τ_end*ϖ for absorbing atmospheres
+@inline function doubling_number(dτ_max, τ_end)
     FT = eltype(dτ_max)
-    #@show dτ_max, τ_end
-    # minimum number of doublings needed to reach an optical depth τ_end, starting with an optical depth dτ.
-    # The starting optical depth dτ is also determined from its maximum possible value, dτ_max
     if τ_end <= dτ_max
-        dτ = τ_end
-        ndoubl = 0
-        return dτ, ndoubl
+        return τ_end, 0
     else
-        q1 = log10(2.0)
+        q1 = log10(FT(2))
         q2 = log10(dτ_max)
         q3 = log10(τ_end)
         tlimit = (q3 - q2) / q1
         nlimit = floor(Int, tlimit)
         diff = tlimit - nlimit
         if diff < eps(FT)
-            dτ = dτ_max
-            ndoubl = nlimit
+            return dτ_max, nlimit
         else
             ndoubl = nlimit + 1       
             x = q3 - q1 * ndoubl
-            dτ = 10.0^x
+            dτ = FT(10)^x
+            return dτ, ndoubl
         end 
-        return dτ, ndoubl
     end
 end
 
 "Finds index i of f_array (i) which is nearest point to f"
-nearest_point(f_array, f) = argmin(abs.(f_array.-f))
+@inline nearest_point(f_array, f) = argmin(abs.(f_array.-f))
 
 "Get indices scaled according to pol_type"
-function get_indices(iμ::Integer, pol_type::AbstractPolarizationType) 
-
+@inline function get_indices(iμ::Integer, pol_type::AbstractPolarizationType) 
     st_iμ = (iμ - 1) * pol_type.n
     istart = st_iμ + 1
     iend   = st_iμ + pol_type.n
-
     return st_iμ, istart, iend
 end
 
 "Default matrix in RT calculation (zeros)"
-default_matrix(FT, arr_type, dims, nSpec)   = arr_type(zeros(FT, tuple(dims[1], dims[2], nSpec)))
+@inline default_matrix(FT, arr_type, dims, nSpec) = arr_type(zeros(FT, (dims[1], dims[2], nSpec)))
 "Default matrix in ieRT calculation (zeros)"
-default_matrix_ie(FT, arr_type, dims, nSpec, nRaman)   = arr_type(zeros(FT, tuple(dims[1], dims[2], nSpec, nRaman)))
+@inline default_matrix_ie(FT, arr_type, dims, nSpec, nRaman) = arr_type(zeros(FT, (dims[1], dims[2], nSpec, nRaman)))
 
 "Default J matrix in RT calculation (zeros)"
-default_J_matrix(FT, arr_type, dims, nSpec) = arr_type(zeros(FT, tuple(dims[1], 1, nSpec)))
+@inline default_J_matrix(FT, arr_type, dims, nSpec) = arr_type(zeros(FT, (dims[1], 1, nSpec)))
 "Default J matrix in ieRT calculation (zeros)"
-default_J_matrix_ie(FT, arr_type, dims, nSpec, nRaman) = arr_type(zeros(FT, tuple(dims[1], 1, nSpec, nRaman)))
+@inline default_J_matrix_ie(FT, arr_type, dims, nSpec, nRaman) = arr_type(zeros(FT, (dims[1], 1, nSpec, nRaman)))
 
-"Default matrix in RT calculation (zeros)"
-default_matrix(FT, arr_type, NSens, dims, nSpec)   = [arr_type(zeros(FT, (dims[1], dims[2], nSpec))) for i=1:NSens]
-#arr_type(zeros(FT, tuple(NSens, dims[1], dims[2], nSpec)))
-"Default matrix in ieRT calculation (zeros)"
-default_matrix_ie(FT, arr_type, NSens, dims, nSpec, nRaman)   = [zeros(FT, (dims[1], dims[2], nSpec, nRaman)) for i=1:NSens]
-#zeros(FT, tuple(NSens, dims[1], dims[2], nSpec, nRaman)))
+"Default matrix in RT calculation (zeros) — multi-sensor variant"
+@inline default_matrix(FT, arr_type, NSens, dims, nSpec) = [arr_type(zeros(FT, (dims[1], dims[2], nSpec))) for _ in 1:NSens]
+"Default matrix in ieRT calculation (zeros) — multi-sensor variant"
+@inline default_matrix_ie(FT, arr_type, NSens, dims, nSpec, nRaman) = [zeros(FT, (dims[1], dims[2], nSpec, nRaman)) for _ in 1:NSens]
 
-"Default J matrix in RT calculation (zeros)"
-default_J_matrix(FT, arr_type, NSens, dims, nSpec) = [arr_type(zeros(FT, (dims[1], 1, nSpec))) for i=1:NSens]
-#arr_type(zeros(FT, tuple(NSens, dims[1], 1, nSpec)))
-"Default J matrix in ieRT calculation (zeros)"
-default_J_matrix_ie(FT, arr_type, NSens, dims, nSpec, nRaman) = [zeros(FT, (dims[1], 1, nSpec, nRaman)) for i=1:NSens]
-#arr_type(zeros(FT, tuple(NSens, dims[1], 1, nSpec, nRaman)))
+"Default J matrix in RT calculation (zeros) — multi-sensor variant"
+@inline default_J_matrix(FT, arr_type, NSens, dims, nSpec) = [arr_type(zeros(FT, (dims[1], 1, nSpec))) for _ in 1:NSens]
+"Default J matrix in ieRT calculation (zeros) — multi-sensor variant"
+@inline default_J_matrix_ie(FT, arr_type, NSens, dims, nSpec, nRaman) = [zeros(FT, (dims[1], 1, nSpec, nRaman)) for _ in 1:NSens]
 
 ##### Only for testing, random matrices:
 "Default matrix in RT calculation (random)"
@@ -220,7 +207,7 @@ make_composite_layer(RS_type::Union{RRS, RRS_plus, VS_0to1_plus, VS_1to0_plus},
                     )
 "Given a ComputedAtmosphereProperties object, extract a ComputedLayerProperties object using data from the iz index of all arrays in the ComputedAtmosphereProperties"
 function get_layer_properties(computed_atmospheric_properties::ComputedAtmosphereProperties, iz, arr_type)
-     @unpack τ_λ_all, ϖ_λ_all, τ_all, ϖ_all, Z⁺⁺_all, Z⁻⁺_all , dτ_max_all, dτ_all, ndoubl_all, dτ_λ_all, expk_all, scatter_all, τ_sum_all, fscattRayl_all,  scattering_interfaces_all = computed_atmospheric_properties
+     (; τ_λ_all, ϖ_λ_all, τ_all, ϖ_all, Z⁺⁺_all, Z⁻⁺_all , dτ_max_all, dτ_all, ndoubl_all, dτ_λ_all, expk_all, scatter_all, τ_sum_all, fscattRayl_all,  scattering_interfaces_all) = computed_atmospheric_properties
 
     τ_λ = arr_type(τ_λ_all[:, iz])
     ϖ_λ = arr_type(ϖ_λ_all[:, iz])

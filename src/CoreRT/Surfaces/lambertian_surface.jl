@@ -26,7 +26,7 @@ function create_surface_layer!(lambertian::LambertianSurfaceScalar{FT},
                                τ_sum,
                                architecture) where {FT}
     
-    @unpack qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart, iμ₀, μ₀ = quad_points
+    (; qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart, iμ₀, μ₀) = quad_points
     j₀⁺ = added_layer.j₀⁺
     j₀⁻ = added_layer.j₀⁻
     # Get size of added layer
@@ -84,7 +84,7 @@ function create_surface_layer!(lambertian::LambertianSurfaceLegendre{FT},
     j₀⁺ = added_layer.j₀⁺
     j₀⁻ = added_layer.j₀⁻
     if m == 0
-        @unpack qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart, iμ₀, μ₀ = quad_points
+        (; qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart, iμ₀, μ₀) = quad_points
         legendre_coeff = lambertian.legendre_coeff
         arr_type = array_type(architecture)
         # Albedo normalized by π (and factor 2 for 0th Fourier Moment)
@@ -148,7 +148,7 @@ function create_surface_layer!(lambertian::LambertianSurfaceSpline{FT},
     j₀⁺ = added_layer.j₀⁺
     j₀⁻ = added_layer.j₀⁻
     if m == 0
-        @unpack qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart, iμ₀, μ₀ = quad_points
+        (; qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart, iμ₀, μ₀) = quad_points
 
         arr_type = array_type(architecture)
         

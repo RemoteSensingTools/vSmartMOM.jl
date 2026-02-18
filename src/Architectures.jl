@@ -49,14 +49,14 @@ macro hascuda(expr)
 end
 
 # CPU device always available
-devi(::CPU) = KernelAbstractions.CPU()
+@inline devi(::CPU) = KernelAbstractions.CPU()
 
 # GPU device - will be defined in CUDAExt when CUDA is loaded
 # No fallback method defined to avoid precompilation errors
 
-architecture(::Array) = CPU()
+@inline architecture(::Array) = CPU()
 
-array_type(::CPU) = Array
+@inline array_type(::CPU) = Array
 
 # GPU array_type - will be defined in CUDAExt when CUDA is loaded
 # No fallback method defined to avoid precompilation errors

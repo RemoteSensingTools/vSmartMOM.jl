@@ -40,11 +40,11 @@ Perform Radiative Transfer calculations using given parameters and AbstractRaman
 """
 function rt_run(RS_type::AbstractRamanType, 
                     model::vSmartMOM_Model, iBand)
-    @unpack obs_alt, sza, vza, vaz = model.obs_geom   # Observational geometry properties
-    @unpack qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart, μ₀, iμ₀, Nquad = model.quad_points # All quadrature points
+    (; obs_alt, sza, vza, vaz) = model.obs_geom   # Observational geometry properties
+    (; qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart, μ₀, iμ₀, Nquad) = model.quad_points # All quadrature points
     pol_type = model.params.polarization_type
-    @unpack max_m = model.params
-    @unpack quad_points = model
+    (; max_m) = model.params
+    (; quad_points) = model
     FT = model.params.float_type
 
     n_aer = isnothing(model.params.scattering_params) ? 0 : length(model.params.scattering_params.rt_aerosols)
@@ -56,7 +56,7 @@ function rt_run(RS_type::AbstractRamanType,
         @info "More than one band has been chosen, be aware that multiple BRDFs are not yet implemented and only the first one will be used!"
     end
 
-    @unpack ϖ_Cabannes = RS_type
+    (; ϖ_Cabannes) = RS_type
 
     #FT = eltype(sza)                   # Get the float-type to use
     Nz = length(model.profile.p_full)   # Number of vertical slices

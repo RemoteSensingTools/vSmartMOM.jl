@@ -1,7 +1,7 @@
 function compute_effective_coefficents!(ν_eff, T, mol::MolecularConstants{FT}) where {FT}#molecules::Array{MolecularConstants{FT}}) where {FT}   
     #@unpack Y = mol
-    @unpack α̅,  γ̅, α_prime, γ_prime, ϵ, ϵ_prime = mol.effCoeff
-    @unpack α̅₀₀, γ̅₀₀, ω₀, α_b, α_c, α₀₀_prime, γ₀₀_prime = mol.PolTensor
+    (; α̅, γ̅, α_prime, γ_prime, ϵ, ϵ_prime) = mol.effCoeff
+    (; α̅₀₀, γ̅₀₀, ω₀, α_b, α_c, α₀₀_prime, γ₀₀_prime) = mol.PolTensor
     #Computing α̅
     α̅ = α̅₀₀*(1 + α_b*T + α_c*T^2)/(1-(2π*c*ν_eff/ω₀)^2)
     γ̅ = γ̅₀₀
@@ -24,7 +24,7 @@ end
 
 #Compute elastic scattering cross-section (Cabannes line)
 function compute_σ_Rayl_coeff!(mol::MolecularConstants{FT}) where {FT}#ν, molecules::Array{MolecularConstants{FT}}) where {FT}
-    @unpack α̅, γ_C_Rayl, σ_Rayl_coeff = mol.effCoeff
+    (; α̅, γ_C_Rayl, σ_Rayl_coeff) = mol.effCoeff
     σ_Rayl_coeff = 128π^5 * α̅^2 * (1+2*γ_C_Rayl)/(3-4*γ_C_Rayl)# * ν^4
     #@show σ_Rayl_coeff,  α̅^2 
     @pack! mol.effCoeff = σ_Rayl_coeff,α̅,γ_C_Rayl
@@ -32,8 +32,8 @@ end
 
 #Compute elastic scattering cross-section (Cabannes line)
 function compute_σ_Rayl_VibRaman_coeff_hires!(T, mol::MolecularConstants{FT}; Jmax=30) where {FT}#ν, molecules::Array{MolecularConstants{FT}}) where {FT}
-    @unpack α̅, γ̅, α_prime, γ_prime, E_vJ, σ_Rayl_coeff_hires, σ_VibRaman_coeff_0to1_hires, σ_VibRaman_coeff_1to0_hires, Δν̃_Rayl_coeff_hires, Δν̃_VibRaman_coeff_0to1_hires, Δν̃_VibRaman_coeff_1to0_hires = mol.effCoeff
-    @unpack gₛ = mol
+    (; α̅, γ̅, α_prime, γ_prime, E_vJ, σ_Rayl_coeff_hires, σ_VibRaman_coeff_0to1_hires, σ_VibRaman_coeff_1to0_hires, Δν̃_Rayl_coeff_hires, Δν̃_VibRaman_coeff_0to1_hires, Δν̃_VibRaman_coeff_1to0_hires) = mol.effCoeff
+    (; gₛ) = mol
     σ_Rayl_coeff_hires = OffsetArray(zeros(FT, Jmax+1), 0:Jmax);
     Δν̃_Rayl_coeff_hires = OffsetArray(zeros(FT, Jmax+1), 0:Jmax);
     σ_VibRaman_coeff_0to1_hires = OffsetArray(zeros(FT, Jmax+1), 0:Jmax);
@@ -99,8 +99,8 @@ end
 #Compute energy levels [in wavenumbers [cm^{-1}]] corresponding to v={0, 1, 2} and J={0, 1, 2,..., 10}
 function compute_energy_levels!(mol::MolecularConstants{FT}; vmax=2, Jmax=30) where {FT}#molecules::Array{MolecularConstants{FT}}) where {FT}
     #for mol in molecules
-        @unpack E_vJ = mol.effCoeff
-        @unpack Y = mol
+        (; E_vJ) = mol.effCoeff
+        (; Y) = mol
         E_vJ = OffsetArray(zeros(FT, vmax+1,Jmax+1), 0:vmax, 0:Jmax);
         for v in 0:vmax, J in 0:Jmax
             E₁ = J*(J+1)
@@ -118,7 +118,7 @@ end
 
 #Compute vibrational Raman scattering coefficient (for Δν=±1)
 function compute_σ_VibRaman_coeff!(T, mol::MolecularConstants{FT}; vmax=2, Jmax=30) where {FT}#ν, molecules::Array{MolecularConstants{FT}}) where {FT}
-    @unpack α_prime, γ_C_VibRaman, E_vJ,σ_VibRaman_coeff_0to1,σ_VibRaman_coeff_1to0, Δν̃_VibRaman_coeff_0to1, Δν̃_VibRaman_coeff_1to0 = mol.effCoeff
+    (; α_prime, γ_C_VibRaman, E_vJ, σ_VibRaman_coeff_0to1, σ_VibRaman_coeff_1to0, Δν̃_VibRaman_coeff_0to1, Δν̃_VibRaman_coeff_1to0) = mol.effCoeff
     
     #σ_Rayl_coeff = (128/3)π^5 * α̅^2 * F_King# * ν^4
     #Stokes
@@ -143,14 +143,14 @@ end
 function compute_σ_RoVibRaman_coeff!(T, mol::MolecularConstants{FT}; vmax=2, Jmax=30) where {FT}#molecules::Array{MolecularConstants{FT}}) where {FT}
     kᵥ = (256/27)*π^5
     #for mol in molecules
-    @unpack γ̅, γ_prime,
-        E_vJ, σ_RoRaman_coeff_JtoJm2,σ_RoRaman_coeff_JtoJp2,
-        σ_RoVibRaman_coeff_0to1_JtoJm2,σ_RoVibRaman_coeff_0to1_JtoJp2, 
-        σ_RoVibRaman_coeff_1to0_JtoJm2,σ_RoVibRaman_coeff_1to0_JtoJp2,
+    (; γ̅, γ_prime,
+        E_vJ, σ_RoRaman_coeff_JtoJm2, σ_RoRaman_coeff_JtoJp2,
+        σ_RoVibRaman_coeff_0to1_JtoJm2, σ_RoVibRaman_coeff_0to1_JtoJp2, 
+        σ_RoVibRaman_coeff_1to0_JtoJm2, σ_RoVibRaman_coeff_1to0_JtoJp2,
         Δν̃_RoRaman_coeff_JtoJm2, Δν̃_RoRaman_coeff_JtoJp2,
         Δν̃_RoVibRaman_coeff_0to1_JtoJm2, Δν̃_RoVibRaman_coeff_0to1_JtoJp2,
-        Δν̃_RoVibRaman_coeff_1to0_JtoJm2, Δν̃_RoVibRaman_coeff_1to0_JtoJp2 = mol.effCoeff
-    @unpack gₛ = mol 
+        Δν̃_RoVibRaman_coeff_1to0_JtoJm2, Δν̃_RoVibRaman_coeff_1to0_JtoJp2) = mol.effCoeff
+    (; gₛ) = mol 
     
     #σ_VibRaman_coeff = OffsetArray(zeros(FT, vmax+1,vmax+1), 0:vmax, 0:vmax); 
     σ_RoVibRaman_coeff_0to1_JtoJm2 = OffsetArray(zeros(FT, Jmax+1), 0:Jmax); #zeros(3, 11, 3, 11) #(vi, ji, vf, jf)

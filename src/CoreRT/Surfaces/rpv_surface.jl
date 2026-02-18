@@ -26,7 +26,7 @@ function create_surface_layer!(brdf::AbstractSurfaceType,
                                τ_sum,
                                architecture)
     
-    @unpack qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart, iμ₀, μ₀ = quad_points
+    (; qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart, iμ₀, μ₀) = quad_points
     # Get size of added layer
     Nquad = size(added_layer.r⁻⁺,1) ÷ pol_type.n
     tmp    = ones(pol_type.n*Nquad)
@@ -67,7 +67,7 @@ end
 
 #Rahman Pinty Verstraete model
 function reflectance(rpv::rpvSurfaceScalar{FT},  n, μᵢ::FT, μᵣ::FT, dϕ::FT) where FT
-    @unpack ρ₀, ρ_c, k, Θ = rpv
+    (; ρ₀, ρ_c, k, Θ) = rpv
     # TODO: Suniti, stupid calculations here:
     if n==1
         θᵢ   = acos(μᵢ) #assert 0<=θᵢ<=π/2
@@ -94,7 +94,7 @@ function rpvF(θ::FT, cosg::FT) where FT
 end
 
 function reflectance(rpv::rpvSurfaceScalar{FT}, μ::Array{FT}, m::Int) where FT
-    @unpack ρ₀, ρ_c, k, Θ = rpv
+    (; ρ₀, ρ_c, k, Θ) = rpv
     f(x) = reflectance.([rpv], μ, μ', [x]) * cos(m*x)
     return 2*quadgk(f, 0, π, rtol=1e-4)[1]
 end

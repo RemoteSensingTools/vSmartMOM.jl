@@ -17,9 +17,9 @@ function rt_run_bck(RS_type::AbstractRamanType, #Default - no Raman scattering (
                 brdf,                                 # BRDF surface type
                 architecture::AbstractArchitecture)   # Whether to use CPU / GPU
 
-    @unpack obs_alt, sza, vza, vaz = obs_geom   # Observational geometry properties
-    @unpack qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart, μ₀, iμ₀, Nquad = quad_points # All quadrature points
-    @unpack ϖ_Cabannes = RS_type
+    (; obs_alt, sza, vza, vaz) = obs_geom   # Observational geometry properties
+    (; qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart, μ₀, iμ₀, Nquad) = quad_points # All quadrature points
+    (; ϖ_Cabannes) = RS_type
     FT = eltype(sza)                    # Get the float-type to use
     Nz = length(τ_rayl)                 # Number of vertical slices
     nSpec = size(τ_abs, 1)              # Number of spectral points

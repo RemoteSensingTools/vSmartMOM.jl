@@ -32,7 +32,7 @@ function interaction_helper!(RS_type::RRS, ::ScatteringInterface_01, SFI,
                                 added_layer::AddedLayer{FT}, 
                                 I_static::AbstractArray{FT2}) where {FT<:Real,FT2}
 
-    @unpack i_λ₁λ₀ = RS_type     
+    (; i_λ₁λ₀) = RS_type     
     
     if SFI   
         for n₁ in eachindex ieJ₁⁺[1,1,:,1]
@@ -85,7 +85,7 @@ function interaction_helper!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
                         added_layer::AddedLayer{FT}, 
                         I_static::AbstractArray{FT2}) where {FT<:Real,FT2}
 
-    @unpack i_λ₁λ₀_all = RS_type                             
+    (; i_λ₁λ₀_all) = RS_type                             
     if SFI
         for Δn = 1:length(i_λ₁λ₀_all)
             n₁ = i_λ₁λ₀_all[Δn]
@@ -142,7 +142,7 @@ function interaction_helper!(RS_type::RRS, ::ScatteringInterface_10, SFI,
                                 composite_layer::CompositeLayer{FT}, 
                                 added_layer::AddedLayer{FT}, 
                                 I_static::AbstractArray{FT2}) where {FT<:Real,FT2}
-    @unpack i_λ₁λ₀ = RS_type 
+    (; i_λ₁λ₀) = RS_type 
 
     if SFI
         for n₁ in eachindex ieJ₁⁺[1,1,:,1]
@@ -191,7 +191,7 @@ function interaction_helper!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
     composite_layer::CompositeLayer{FT}, 
     added_layer::AddedLayer{FT}, 
     I_static::AbstractArray{FT2}) where {FT<:Real,FT2}
-    @unpack i_λ₁λ₀_all = RS_type 
+    (; i_λ₁λ₀_all) = RS_type 
     if SFI
         for Δn = 1:length(i_λ₁λ₀_all)
             n₁ = i_λ₁λ₀_all[Δn]
@@ -245,11 +245,11 @@ function interaction_helper!(RS_type::RRS, ::ScatteringInterface_11, SFI,
                                 composite_layer::Union{CompositeLayer, CompositeLayerRS}, 
                                 added_layer::Union{AddedLayer,AddedLayerRS}, 
                                 I_static::AbstractArray{FT}) where {FT<:Real}
-    @unpack i_λ₁λ₀ = RS_type
-    @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺ = added_layer
-    @unpack R⁻⁺, R⁺⁻, T⁺⁺, T⁻⁻, J₀⁺, J₀⁻ = composite_layer
-    @unpack ier⁺⁻, ier⁻⁺, iet⁻⁻, iet⁺⁺ = added_layer
-    @unpack ieR⁻⁺, ieR⁺⁻, ieT⁺⁺, ieT⁻⁻, ieJ₀⁺, ieJ₀⁻ = composite_layer
+    (; i_λ₁λ₀) = RS_type
+    (; r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺) = added_layer
+    (; R⁻⁺, R⁺⁻, T⁺⁺, T⁻⁻, J₀⁺, J₀⁻) = composite_layer
+    (; ier⁺⁻, ier⁻⁺, iet⁻⁻, iet⁺⁺) = added_layer
+    (; ieR⁻⁺, ieR⁺⁻, ieT⁺⁺, ieT⁻⁻, ieJ₀⁺, ieJ₀⁻) = composite_layer
     
     # Used to store `(I - R⁺⁻ * r⁻⁺)⁻¹`
     tmp_inv  = similar(t⁺⁺); tmp_inv.=0;
@@ -386,9 +386,9 @@ function interaction_helper!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
     added_layer::Union{AddedLayer,AddedLayerRS}, 
     I_static::AbstractArray{FT}) where {FT<:Real}
  
-    @unpack i_λ₁λ₀_all = RS_type
-    @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, ier⁺⁻, ier⁻⁺, iet⁻⁻, iet⁺⁺ = added_layer
-    @unpack R⁻⁺, R⁺⁻, T⁺⁺, T⁻⁻, J₀⁺, J₀⁻, ieR⁻⁺, ieR⁺⁻, ieT⁺⁺, ieT⁻⁻, ieJ₀⁺, ieJ₀⁻ = composite_layer
+    (; i_λ₁λ₀_all) = RS_type
+    (; r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, ier⁺⁻, ier⁻⁺, iet⁻⁻, iet⁺⁺) = added_layer
+    (; R⁻⁺, R⁺⁻, T⁺⁺, T⁻⁻, J₀⁺, J₀⁻, ieR⁻⁺, ieR⁺⁻, ieT⁺⁺, ieT⁻⁻, ieJ₀⁺, ieJ₀⁻) = composite_layer
     #@show "hello 100"
     # Used to store `(I - R⁺⁻ * r⁻⁺)⁻¹`
     tmp_inv = similar(t⁺⁺); tmp_inv.=0;

@@ -19,7 +19,7 @@ function doubling_helper!(pol_type,
                           architecture) where {FT,M}
 
     # Unpack the added layer
-    @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻, temp1, temp2, temp1_ptr,temp2_ptr = added_layer
+    (; r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻, temp1, temp2, temp1_ptr, temp2_ptr) = added_layer
     #@show typeof(expk), typeof(I_static)
     # Device architecture
     dev = devi(architecture)
@@ -41,30 +41,9 @@ function doubling_helper!(pol_type,
     #@timeit "Pointers" temp_ptrs = CUBLAS.unsafe_strided_batch(temp)
     # Loop over number of doublings
     for n = 1:ndoubl
-        temp2 .= I_static .- r⁻⁺ ⊠ r⁻⁺
-        # T⁺⁺(λ)[I - R⁺⁻(λ)R⁻⁺(λ)]⁻¹, for doubling R⁺⁻,R⁻⁺ and T⁺⁺,T⁻⁻ is identical
-        #@show typeof(gp_refl), typeof(I_static), typeof(I_static .- r⁻⁺), typeof(j₁⁺)
-        @timeit "Batch Inv Doubling" batch_inv!(temp1, temp2,temp1_ptr, temp2_ptr)
-        tt⁺⁺_gp_refl .= t⁺⁺ ⊠ temp1
-
-        # J⁺₂₁(λ) = J⁺₁₀(λ).exp(-τ(λ)/μ₀)
-        @inbounds @views j₁⁺[:,1,:] .= j₀⁺[:,1,:] .* expk'
-
-        # J⁻₁₂(λ)  = J⁻₀₁(λ).exp(-τ(λ)/μ₀)
-        @inbounds @views j₁⁻[:,1,:] .= j₀⁻[:,1,:] .* expk'
-
-        # J⁻₀₂(λ) = J⁻₀₁(λ) + T⁻⁻₀₁(λ)[I - R⁻⁺₂₁(λ)R⁺⁻₀₁(λ)]⁻¹[J⁻₁₂(λ) + R⁻⁺₂₁(λ)J⁺₁₀(λ)] (see Eqs.8 in Raman paper draft)
-        j₀⁻ .= j₀⁻ + (tt⁺⁺_gp_refl ⊠ (j₁⁻ + r⁻⁺ ⊠ j₀⁺)) 
-
-        # J⁺₂₀(λ) = J⁺₂₁(λ) + T⁺⁺₂₁(λ)[I - R⁺⁻₀₁(λ)R⁻⁺₂₁(λ)]⁻¹[J⁺₁₀(λ) + R⁺⁻₀₁(λ)J⁻₁₂(λ)] (see Eqs.8 in Raman paper draft)
-        j₀⁺  .= j₁⁺ + (tt⁺⁺_gp_refl ⊠ (j₀⁺ + r⁻⁺ ⊠ j₁⁻))
-        expk .= expk.^2
-    
-        # R⁻⁺₂₀(λ) = R⁻⁺₁₀(λ) + T⁻⁻₀₁(λ)[I - R⁻⁺₂₁(λ)R⁺⁻₀₁(λ)]⁻¹R⁻⁺₂₁(λ)T⁺⁺₁₀(λ) (see Eqs.8 in Raman paper draft)
-        r⁻⁺  .= r⁻⁺ + (tt⁺⁺_gp_refl ⊠ r⁻⁺ ⊠ t⁺⁺)
-
-        # T⁺⁺₂₀(λ) = T⁺⁺₂₁(λ)[I - R⁺⁻₀₁(λ)R⁻⁺₂₁(λ)]⁻¹T⁺⁺₁₀(λ) (see Eqs.8 in Raman paper draft)
-        t⁺⁺  .= tt⁺⁺_gp_refl ⊠ t⁺⁺
+        @timeit "Batch Inv Doubling" compute_geometric_progression!(temp1, tt⁺⁺_gp_refl, r⁻⁺, t⁺⁺, I_static, temp2, temp1_ptr, temp2_ptr)
+        doubling_source_update!(j₀⁺, j₀⁻, j₁⁺, j₁⁻, r⁻⁺, tt⁺⁺_gp_refl, expk)
+        doubling_rt_update!(r⁻⁺, t⁺⁺, tt⁺⁺_gp_refl, expk)
     end
     synchronize_if_gpu()
 
