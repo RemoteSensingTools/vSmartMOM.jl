@@ -164,8 +164,8 @@ function postprocessing_vza_ms_canopy!(RS_type::noRS,
     for i in eachindex(vza)
         istart, iend, w = vza_info[i]
         for ims in eachindex(sensor_levels)
-            _tuwJ = collect(tuwJ[ims])
-            _tdwJ = collect(tdwJ[ims])
+            _tuwJ = _to_cpu(tuwJ[ims])
+            _tdwJ = _to_cpu(tdwJ[ims])
             for s = 1:nSpec
                 uwJ[ims][i,:,s] .+= w * _tuwJ[istart:iend, 1, s]
                 dwJ[ims][i,:,s] .+= w * _tdwJ[istart:iend, 1, s]
