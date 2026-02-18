@@ -91,7 +91,7 @@ function doubling_helper!(pol_type,
     end
 
     # Loop over number of doublings
-    for n = 1:ndoubl
+    @inbounds for n = 1:ndoubl
         
         # T⁺⁺(λ)[I - R⁺⁻(λ)R⁻⁺(λ)]⁻¹, for doubling R⁺⁻,R⁻⁺ and T⁺⁺,T⁻⁻ is identical
         batch_inv!(gp_refl, I_static .- r⁻⁺ ⊠ r⁻⁺)

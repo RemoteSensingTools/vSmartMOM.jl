@@ -49,15 +49,16 @@ function compute_mie_ab!(size_param, refractive_idx::Number, an, bn, Dn)
 
     # Dn as in eq 4.88, Bohren and Huffman, to calculate an and bn
     # Downward Recursion, eq. 4.89, Bohren and Huffman
-    [Dn[n] = ((n+1) / y) - (1 / (Dn[n+1] + (n+1) / y)) for n = (nmx - 1):-1:1]
+    @inbounds for n = (nmx - 1):-1:1
+        Dn[n] = ((n+1) / y) - (1 / (Dn[n+1] + (n+1) / y))
+    end
 
     # Get recursion for bessel functions ψ and ξ
     ψ₀, ψ₁, χ₀, χ₁ =  (cos(size_param), sin(size_param), -sin(size_param), cos(size_param))
     ξ₁ = ψ₁ + χ₁*im
 
     # This solves Bohren and Huffman eq. 4.88 for an and bn, computing updated ψ and ξ on the fly
-    for n = 1:n_max  
-        # fn = (2n + 1) / (n * (n + 1))
+    @inbounds for n = 1:n_max  
         ψ  = (2n - 1) * ψ₁ / size_param - ψ₀
         χ  = (2n - 1) * χ₁ / size_param - χ₀
         ξ   = ψ + χ*im
@@ -169,7 +170,9 @@ function compute_mie_ab_new!(size_param, refractive_idx::Number, an, bn, Dn)
 
     # Dn as in eq 4.88, Bohren and Huffman, to calculate an and bn
     # Downward Recursion, eq. 4.89, Bohren and Huffman
-    [Dn[n] = ((n+1) / y) - (1 / (Dn[n+1] + (n+1) / y)) for n = (nmx - 1):-1:1]
+    @inbounds for n = (nmx - 1):-1:1
+        Dn[n] = ((n+1) / y) - (1 / (Dn[n+1] + (n+1) / y))
+    end
 
     # Get recursion for bessel functions ψ and ξ
     ψ₀, ψ₁, χ₀, χ₁ =  (cos(size_param), sin(size_param), -sin(size_param), cos(size_param))
@@ -179,8 +182,7 @@ function compute_mie_ab_new!(size_param, refractive_idx::Number, an, bn, Dn)
     χ0 = zeros(N_)
 
     # This solves Bohren and Huffman eq. 4.88 for an and bn, computing updated ψ and ξ on the fly
-    for n = 1:n_max  
-        # fn = (2n + 1) / (n * (n + 1))
+    @inbounds for n = 1:n_max  
         ψ  = (2n - 1) * ψ₁ / size_param - ψ₀
         χ  = (2n - 1) * χ₁ / size_param - χ₀
         ξ   = ψ -χ*im
@@ -300,7 +302,7 @@ function compute_mie_S₁S₂!(an, bn, π_, τ_, S₁, S₂)
     @assert size(S₁) == size(S₂)
     @assert length(S₁) == nμ
 
-    for l in 1:nmax, iμ in 1:nμ 
+    @inbounds for l in 1:nmax, iμ in 1:nμ 
             S₁[iμ] += (2l + 1) / (l * (l + 1)) * (an[l] * τ_[iμ,l] + bn[l] * π_[iμ,l])
             S₂[iμ] += (2l + 1) / (l * (l + 1)) * (an[l] * π_[iμ,l] + bn[l] * τ_[iμ,l])
     end
@@ -576,7 +578,7 @@ function compute_Z_moments(mod::AbstractPolarizationType, μ, greek_coefs::Greek
     A⁺⁺, A⁻⁺ = (zeros(FT, B_dim, B_dim, n, n), zeros(FT, B_dim, B_dim, n, n))
 
     # Iterate over l
-    for l = m:l_max
+    @inbounds for l = m:l_max
 
         # B matrix for l
         𝐁 = 𝐁_all[l];
@@ -599,7 +601,7 @@ function compute_Z_moments(mod::AbstractPolarizationType, μ, greek_coefs::Greek
     end
 
     # Now get to the Z part:
-    for imu in eachindex(μ), jmu in eachindex(μ)
+    @inbounds for imu in eachindex(μ), jmu in eachindex(μ)
         
         # Indices adjusted for size of A
         ii, jj = ((imu - 1) * B_dim, (jmu - 1) * B_dim)
