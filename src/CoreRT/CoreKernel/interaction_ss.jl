@@ -31,8 +31,8 @@ function interaction_ss!(SFI::Bool,
 
     kernel! = get_interaction_ss!(device)
     event = kernel!(τ_sum, τ_λ, qp_μN, 
-                    arr_type(added_layer.J₀⁺), 
-                    arr_type(added_layer.J₀⁻),
+                    arr_type(added_layer.j₀⁺), 
+                    arr_type(added_layer.j₀⁻),
                     J₀⁺, J₀⁻, ndrange=size(J₀⁻))
     #wait(device, event)
     synchronize_if_gpu()

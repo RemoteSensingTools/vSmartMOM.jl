@@ -223,10 +223,10 @@ struct AddedLayerRS{FT} <: AbstractLayer
     r⁺⁻::AbstractArray{FT,3}
     "Added layer transmission matrix T (from - -> -)"
     t⁻⁻::AbstractArray{FT,3}
-    "Added layer source matrix J (in + direction)"
-    J₀⁺::AbstractArray{FT,3}
-    "Added layer source matrix J (in - direction)"
-    J₀⁻::AbstractArray{FT,3}
+    "Added layer source matrix j (in + direction)"
+    j₀⁺::AbstractArray{FT,3}
+    "Added layer source matrix j (in - direction)"
+    j₀⁻::AbstractArray{FT,3}
 
     # Additional Arrays for Raman scattering
     "Added layer Reflectance matrix ieR (from + -> -)"

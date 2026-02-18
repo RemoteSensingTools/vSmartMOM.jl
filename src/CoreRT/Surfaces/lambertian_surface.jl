@@ -27,8 +27,8 @@ function create_surface_layer!(lambertian::LambertianSurfaceScalar{FT},
                                architecture) where {FT}
     
     @unpack qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart, iμ₀, μ₀ = quad_points
-    j₀⁺ = added_layer isa AddedLayerRS ? added_layer.J₀⁺ : added_layer.j₀⁺
-    j₀⁻ = added_layer isa AddedLayerRS ? added_layer.J₀⁻ : added_layer.j₀⁻
+    j₀⁺ = added_layer.j₀⁺
+    j₀⁻ = added_layer.j₀⁻
     # Get size of added layer
     Nquad = size(added_layer.r⁻⁺,1) ÷ pol_type.n
     tmp    = ones(pol_type.n*Nquad)
@@ -81,8 +81,8 @@ function create_surface_layer!(lambertian::LambertianSurfaceLegendre{FT},
     quad_points,
     τ_sum,
     architecture) where {FT}
-    j₀⁺ = added_layer isa AddedLayerRS ? added_layer.J₀⁺ : added_layer.j₀⁺
-    j₀⁻ = added_layer isa AddedLayerRS ? added_layer.J₀⁻ : added_layer.j₀⁻
+    j₀⁺ = added_layer.j₀⁺
+    j₀⁻ = added_layer.j₀⁻
     if m == 0
         @unpack qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart, iμ₀, μ₀ = quad_points
         legendre_coeff = lambertian.legendre_coeff
@@ -145,8 +145,8 @@ function create_surface_layer!(lambertian::LambertianSurfaceSpline{FT},
     quad_points,
     τ_sum,
     architecture) where {FT}
-    j₀⁺ = added_layer isa AddedLayerRS ? added_layer.J₀⁺ : added_layer.j₀⁺
-    j₀⁻ = added_layer isa AddedLayerRS ? added_layer.J₀⁻ : added_layer.j₀⁻
+    j₀⁺ = added_layer.j₀⁺
+    j₀⁻ = added_layer.j₀⁻
     if m == 0
         @unpack qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart, iμ₀, μ₀ = quad_points
 
