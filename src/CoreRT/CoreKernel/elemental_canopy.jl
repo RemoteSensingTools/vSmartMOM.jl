@@ -14,7 +14,6 @@ function elemental!(pol_type, SFI::Bool,
                             quad_points::QuadPoints{FT2}, # struct with quadrature points, weights, 
                             added_layer::Union{AddedLayer{FT},AddedLayerRS{FT}}, 
                             architecture) where {FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2,M}
-    @show "RT elemental Canopy is running!"
     @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻ = added_layer
     @unpack qp_μ, iμ₀, wt_μN, qp_μN = quad_points
     @unpack τ, ϖ, Z⁺⁺, Z⁻⁺, G = computed_layer_properties

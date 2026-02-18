@@ -21,7 +21,6 @@ function interaction_ss!(SFI::Bool,
     #@unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺ = added_layer #these are aliases to the respective struct elements  
     @unpack J₀⁺, J₀⁻ = composite_layer #these are aliases to the respective struct elements 
     @unpack qp_μN = quad_points
-    @show architecture
     arr_type = array_type(architecture)
     device = devi(architecture)
     qp_μN = arr_type(qp_μN)
@@ -29,7 +28,6 @@ function interaction_ss!(SFI::Bool,
     τ_λ = arr_type(τ_λ)
     J₀⁺ = arr_type(J₀⁺)
     J₀⁻ = arr_type(J₀⁻)
-    @show size(J₀⁻)
 
     kernel! = get_interaction_ss!(device)
     event = kernel!(τ_sum, τ_λ, qp_μN, 
@@ -62,7 +60,6 @@ function interaction_inelastic_ss!(RS_type::RRS,
     ieJ₀⁺ = atype(ieJ₀⁺)
     ieJ₀⁻ = atype(ieJ₀⁻)
     aa = getKernelDimSFI(RS_type, ieJ₀⁻)
-    @show aa,  size(i_λ₁λ₀)
     kernel! = get_interaction_ss_RRS!(device)
     event = kernel!(τ_sum, τ_λ, qp_μN, atype(i_λ₁λ₀),
                 atype(added_layer.ieJ₀⁺), atype(added_layer.ieJ₀⁻),

@@ -3,96 +3,6 @@
 This file contains functions that are related to atmospheric profile calculations
 
 =#
-#=
-"Compute pressure levels, vmr, vcd for atmospheric profile, given p_half, T, q"
-function compute_atmos_profile_fields(T, p_half::AbstractArray, q, vmr; g₀=9.8032465)
-    
-    # Floating type to use
-    FT = eltype(T)
-    Nₐ = FT(6.02214179e+23)
-    # Calculate full pressure levels
-    p_full = (p_half[2:end] + p_half[1:end-1]) / 2
-
-    # Dry and wet mass
-    dry_mass = FT(28.9644e-3)    # in kg/molec, weighted average for N2 and O2
-    wet_mass = FT(18.01534e-3)   # just H2O
-    n_layers = length(T)
-
-    # Also get a VMR vector of H2O (volumetric!)
-    vmr_h2o = zeros(FT, n_layers, )
-    vcd_dry = zeros(FT, n_layers, )
-    vcd_h2o = zeros(FT, n_layers, )
-
-    # Now actually compute the layer VCDs
-    for i = 1:n_layers 
-        Δp = p_half[i + 1] - p_half[i]
-        vmr_h2o[i] = (dry_mass/wet_mass)*q[i]/(1-q[i])
-        vmr_dry = 1 - vmr_h2o[i]
-        M  = vmr_dry * dry_mass + vmr_h2o[i] * wet_mass
-        vcd = Nₐ * Δp / (M  * g₀ * 100^2) * 100
-        vcd_dry[i] = vmr_dry    * vcd   # includes m2->cm2
-        vcd_h2o[i] = vmr_h2o[i] * vcd
-    end
-
-    new_vmr = Dict{String, Union{Real, Vector}}()
-
-    for molec_i in keys(vmr)
-        if vmr[molec_i] isa AbstractArray
-            
-            pressure_grid = collect(range(minimum(p_full), maximum(p_full), length=length(vmr[molec_i])))
-            interp_linear = LinearInterpolation(pressure_grid, vmr[molec_i])
-            new_vmr[molec_i] = [interp_linear(x) for x in p_full]
-        else
-            new_vmr[molec_i] = vmr[molec_i]
-        end
-    end
-
-    return p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o, new_vmr
-
-end
-
-"From a yaml file, get the stored fields (psurf, T, q, ak, bk), calculate derived fields, 
-and return an AtmosphericProfile object" 
-function read_atmos_profile(file_path::String)
-
-    # Make sure file is yaml type
-    @assert endswith(file_path, ".yaml") "File must be yaml"
-
-    # Read in the data and pass to compute fields
-    params_dict = YAML.load_file(file_path)
-
-    # Validate the parameters before doing anything else
-    # validate_atmos_profile(params_dict)
-
-    T = convert.(Float64, params_dict["T"])
-    
-    # Calculate derived fields
-    if ("ak" in keys(params_dict))
-        psurf = convert(Float64, params_dict["p_surf"])
-        q     = convert.(Float64, params_dict["q"])
-        ak    = convert.(Float64, params_dict["ak"])
-        bk    = convert.(Float64, params_dict["bk"])
-        p_half = (ak + bk * psurf)
-        p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o, new_vmr, Δz = compute_atmos_profile_fields(T, p_half, q, Dict())
-    elseif ("q" in keys(params_dict))
-        p_half = convert(Float64, params_dict["p_half"])
-        psurf = p_half[end]
-        q      = convert.(Float64, params_dict["q"])
-        p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o, new_vmr, Δz = compute_atmos_profile_fields(T, p_half, q, Dict())
-    else
-        p_half = convert.(Float64, params_dict["p_half"])
-        psurf = p_half[end]
-        q = zeros(length(T))
-        p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o, new_vmr, Δz = compute_atmos_profile_fields(T, p_half, q, Dict())
-    end
-
-    # Convert vmr to appropriate type
-    vmr = convert(Dict{String, Union{Real, Vector}}, params_dict["vmr"])
-
-    # Return the atmospheric profile struct
-    return AtmosphericProfile(T, p_full, q, p_half, vmr_h2o, vcd_dry, vcd_h2o, vmr, Δz)
-
-end
 
 "Reduce profile dimensions by re-averaging to near-equidistant pressure grid"
 function reduce_profile(n::Int, profile::AtmosphericProfile{FT}) where {FT}
@@ -206,52 +116,9 @@ function getAerosolLayerOptProp(total_τ, z₀, σ₀, p_half, T)
     end
     prof = LogNormal(log(z₀), σ₀)
     τAer = total_τ * pdf.(prof, z)
-    #=
-    # Need to make sure we can also differentiate wrt σp (FT can be Dual!)
-    FT = eltype(p₀)
-    #Nz = length(p_half)-1
-    #ρ = zeros(FT,Nz)
-
-    #@show p_half, p₀, σp
-    for i = 1:Nz
-        dp = p_half[i+1] - p_half[i]
-        p  = (p_half[i+1] + p_half[i])/2
-        # Use Distributions here later:
-        ρ[i] = (1 / (σp * sqrt(2π))) * exp(-(p - p₀)^2 / (2σp^2)) * dp
-        #@show (-(p - p₀)^2 / (2σp^2))
-        #@show (1 / (σp * sqrt(2π))), exp(-(p - p₀)^2 / (2σp^2)), dp
-        #@show i, ρ[i], p, dp
-    end
-    Norm = sum(ρ)
-    τAer  =  (total_τ / Norm) * ρ
-    =#
     return convert.(FT, τAer)
 end
 
-#=
-function getAerosolLayerOptProp(total_τ, p₀, σp, p_half)
-
-    # Need to make sure we can also differentiate wrt σp (FT can be Dual!)
-    FT = eltype(p₀)
-    Nz = length(p_half)-1
-    ρ = zeros(FT,Nz)
-
-    #@show p_half, p₀, σp
-    for i = 1:Nz
-        dp = p_half[i+1] - p_half[i]
-        p  = (p_half[i+1] + p_half[i])/2
-        # Use Distributions here later:
-        ρ[i] = (1 / (σp * sqrt(2π))) * exp(-(p - p₀)^2 / (2σp^2)) * dp
-        #@show (-(p - p₀)^2 / (2σp^2))
-        #@show (1 / (σp * sqrt(2π))), exp(-(p - p₀)^2 / (2σp^2)), dp
-        #@show i, ρ[i], p, dp
-    end
-    Norm = sum(ρ)
-    τAer  =  (total_τ / Norm) * ρ
-    
-    return convert.(FT, τAer)
-end
-=#
 """
     $(FUNCTIONNAME)(τRayl, τAer,  aerosol_optics, Rayl𝐙⁺⁺, Rayl𝐙⁻⁺, Aer𝐙⁺⁺, Aer𝐙⁻⁺, τ_abs, arr_type)
 
@@ -335,84 +202,6 @@ function construct_atm_layer(τRayl, τAer,
     return Array(τ_λ), Array(ϖ_λ), τ, ϖ, Array(Z⁺⁺), Array(Z⁻⁺), fscattRayl
 end
 
-"When performing RT_run, this function pre-calculates properties for all layers, before any Core RT is performed"
-function construct_all_atm_layers(
-        FT, nSpec, Nz, NquadN, 
-        τRayl, τAer, aerosol_optics, 
-        Rayl𝐙⁺⁺, Rayl𝐙⁻⁺, Aer𝐙⁺⁺, Aer𝐙⁻⁺, 
-        τ_abs, 
-        ϖ_Cabannes,
-        arr_type, qp_μ, μ₀, m)
-
-    FT_ext   = eltype(τAer)
-    FT_phase = eltype(τAer)
-
-    # Empty matrices to hold all values
-    τ_λ_all   = zeros(FT_ext, nSpec, Nz)
-    ϖ_λ_all   = zeros(FT_ext, nSpec, Nz)
-    τ_all     = zeros(FT_ext, Nz)
-    ϖ_all     = zeros(FT_ext, Nz)
-    Z⁺⁺_all   = zeros(FT_phase, NquadN, NquadN, Nz)
-    Z⁻⁺_all   = zeros(FT_phase, NquadN, NquadN, Nz)
-    
-    dτ_max_all  = zeros(FT_ext, Nz)
-    dτ_all      = zeros(FT_ext, Nz)
-    fscattRayl_all  =  zeros(FT_ext, Nz)
-    ndoubl_all  = zeros(Int64, Nz)
-    dτ_λ_all    = zeros(FT_ext, nSpec, Nz)
-    expk_all    = zeros(FT_ext, nSpec, Nz)
-    scatter_all = zeros(Bool, Nz)
-
-    for iz=1:Nz
-        
-        # Construct atmospheric properties
-        τ_λ_all[:, iz], 
-        ϖ_λ_all[:, iz], 
-        τ_all[iz], 
-        ϖ_all[iz], 
-        Z⁺⁺_all[:,:,iz], 
-        Z⁻⁺_all[:,:,iz], 
-        fscattRayl_all[iz] = construct_atm_layer(τRayl[iz], τAer[:,iz], 
-            ϖ_Cabannes,
-            aerosol_optics, 
-            Rayl𝐙⁺⁺, Rayl𝐙⁻⁺, Aer𝐙⁺⁺, Aer𝐙⁻⁺, 
-            τ_abs[:,iz], arr_type)
-        #@show fscattRayl_all[iz]
-        # Compute doubling number
-        dτ_max_all[iz] = minimum([τ_all[iz] * ϖ_all[iz], FT(0.001) * minimum(qp_μ)])
-        dτ_all[iz], ndoubl_all[iz] = doubling_number(dτ_max_all[iz], τ_all[iz] * ϖ_all[iz]) #Suniti
-
-        # Compute dτ vector
-        dτ_λ_all[:, iz] = (τ_λ_all[:, iz] ./ (FT(2)^ndoubl_all[iz]))
-        #@show maximum(dτ_λ_all[:,iz])
-        expk_all[:, iz] = exp.(-dτ_λ_all[:, iz] /μ₀) #Suniti
-        
-        # Determine whether there is scattering
-        scatter_all[iz] = (  sum(τAer[:,iz]) > 1.e-8 || 
-                          (( τRayl[iz] > 1.e-8 ) && (m < 3))) ? 
-                            true : false
-    end
-
-    # Compute sum of optical thicknesses of all layers above the current layer
-    τ_sum_all = accumulate(+, τ_λ_all, dims=2)
-
-    # First start with all zeros
-    # At the bottom of the atmosphere, we have to compute total τ_sum (bottom of lowest layer), for the surface interaction
-    τ_sum_all = hcat(zeros(FT, size(τ_sum_all[:,1])), τ_sum_all)
-
-    # Starting scattering interface (None for both added and composite)
-    scattering_interface = ScatteringInterface_00()
-    scattering_interfaces_all = []
-
-    for iz = 1:Nz
-        # Whether there is scattering in the added layer, composite layer, neither or both
-        scattering_interface = get_scattering_interface(scattering_interface, scatter_all[iz], iz)
-        push!(scattering_interfaces_all, scattering_interface)
-    end
-
-    return ComputedAtmosphereProperties(τ_λ_all, ϖ_λ_all, τ_all, ϖ_all, Z⁺⁺_all, Z⁻⁺_all, dτ_max_all, dτ_all, ndoubl_all, dτ_λ_all, expk_all, scatter_all, τ_sum_all, fscattRayl_all, scattering_interfaces_all)
-end
-=#
 """
 Returns the aerosol optical depths per layer using a Gaussian distribution function with p₀ and σp on a pressure grid
 """
@@ -463,25 +252,6 @@ function getAerosolLayerOptProp(lin::LinMode, total_τ, z₀, σ₀, p_half, T)
     dτdz₀[1]  = - total_τ * dF_dz₀[1]
     dτdσ₀[1]  = - total_τ * dF_dσ₀[1]
 
-    #=
-    # Need to make sure we can also differentiate wrt σp (FT can be Dual!)
-    FT = eltype(p₀)
-    #Nz = length(p_half)-1
-    #ρ = zeros(FT,Nz)
-
-    #@show p_half, p₀, σp
-    for i = 1:Nz
-        dp = p_half[i+1] - p_half[i]
-        p  = (p_half[i+1] + p_half[i])/2
-        # Use Distributions here later:
-        ρ[i] = (1 / (σp * sqrt(2π))) * exp(-(p - p₀)^2 / (2σp^2)) * dp
-        #@show (-(p - p₀)^2 / (2σp^2))
-        #@show (1 / (σp * sqrt(2π))), exp(-(p - p₀)^2 / (2σp^2)), dp
-        #@show i, ρ[i], p, dp
-    end
-    Norm = sum(ρ)
-    τAer  =  (total_τ / Norm) * ρ
-    =#
     return convert.(FT, τAer), convert.(FT, dτdz₀), convert.(FT, dτdσ₀)
 end
 
