@@ -21,15 +21,15 @@ function postprocessing_vza!(RS_type::noRS,
     
     
     # Convert these to Arrays (if CuArrays), so they can be accessed by index
-    #R⁻⁺ = Array(composite_layer.R⁻⁺);
-    #T⁺⁺ = Array(composite_layer.T⁺⁺);
-    J₀⁺ = Array(composite_layer.J₀⁺);
-    J₀⁻ = Array(composite_layer.J₀⁻);
+    #R⁻⁺ = collect(composite_layer.R⁻⁺);
+    #T⁺⁺ = collect(composite_layer.T⁺⁺);
+    J₀⁺ = collect(composite_layer.J₀⁺);
+    J₀⁻ = collect(composite_layer.J₀⁻);
 
-    #Ṙ⁻⁺ = Array(composite_layer_lin.Ṙ⁻⁺);
-    #Ṫ⁺⁺ = Array(composite_layer_lin.Ṫ⁺⁺);
-    J̇₀⁺ = Array(composite_layer_lin.J̇₀⁺);
-    J̇₀⁻ = Array(composite_layer_lin.J̇₀⁻);
+    #Ṙ⁻⁺ = collect(composite_layer_lin.Ṙ⁻⁺);
+    #Ṫ⁺⁺ = collect(composite_layer_lin.Ṫ⁺⁺);
+    J̇₀⁺ = collect(composite_layer_lin.J̇₀⁺);
+    J̇₀⁻ = collect(composite_layer_lin.J̇₀⁻);
     
     Nparams = size(J̇₀⁻,1)
     # Loop over all viewing zenith angles

@@ -76,10 +76,10 @@ function create_surface_layer!(RS_type::noRS,
         # Albedo normalized by π (and factor 2 for 0th Fourier Moment)
         ρ = 2lambertian.albedo#/FT(π)
         
-        R_surf = Array(Diagonal(vcat(ρ, zeros(FT,pol_type.n-1))))
+        R_surf = Matrix(Diagonal(vcat(ρ, zeros(FT,pol_type.n-1))))
         R_surf = repeat(R_surf',Nquad)
         R_surf = repeat(R_surf',Nquad)
-        Ṙ_surf = Array(Diagonal(vcat(2.0, zeros(FT,pol_type.n-1))))
+        Ṙ_surf = Matrix(Diagonal(vcat(FT(2), zeros(FT,pol_type.n-1))))
         Ṙ_surf = repeat(Ṙ_surf',Nquad)
         Ṙ_surf = repeat(Ṙ_surf',Nquad)
         #Ṙ_surf = Array{FT}(undef, Nparams, size(R_surf,1), size(R_surf,2))

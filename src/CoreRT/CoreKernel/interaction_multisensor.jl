@@ -15,7 +15,7 @@ function interaction_helper_ms!(::ScatteringInterface_00, SFI,
                                 R⁻⁺::AbstractArray{FT}, R⁺⁻::AbstractArray{FT}, 
                                 T⁺⁺::AbstractArray{FT}, T⁻⁻::AbstractArray{FT}, 
                                 J₀⁺::AbstractArray{FT}, J₀⁻::AbstractArray{FT}
-                                ) where {FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2}
+                                ) where {FT<:Real,FT2}
 
     # If SFI, interact source function in no scattering
     if SFI
@@ -42,7 +42,7 @@ function interaction_helper_ms!(::ScatteringInterface_01, SFI,
                                 R⁻⁺::AbstractArray{FT}, R⁺⁻::AbstractArray{FT}, 
                                 T⁺⁺::AbstractArray{FT}, T⁻⁻::AbstractArray{FT}, 
                                 J₀⁺::AbstractArray{FT}, J₀⁻::AbstractArray{FT}
-                                ) where {FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2}
+                                ) where {FT<:Real,FT2}
 
     if SFI
         #J₀⁺, J₀⁻ = similar(composite_layer.J₀⁺), similar(composite_layer.J₀⁺)
@@ -73,7 +73,7 @@ function interaction_helper_ms!(::ScatteringInterface_10, SFI,
                                 R⁻⁺::AbstractArray{FT}, R⁺⁻::AbstractArray{FT}, 
                                 T⁺⁺::AbstractArray{FT}, T⁻⁻::AbstractArray{FT}, 
                                 J₀⁺::AbstractArray{FT}, J₀⁻::AbstractArray{FT}
-                                ) where {FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2}
+                                ) where {FT<:Real,FT2}
 
     if SFI
         #tmpJ₀⁺, tmpJ₀⁻ = similar(J₀⁺), similar(J₀⁺)
@@ -100,7 +100,7 @@ function interaction_helper_ms!(::ScatteringInterface_11, SFI,
                                 R⁻⁺::AbstractArray{FT}, R⁺⁻::AbstractArray{FT}, 
                                 T⁺⁺::AbstractArray{FT}, T⁻⁻::AbstractArray{FT}, 
                                 J₀⁺::AbstractArray{FT}, J₀⁻::AbstractArray{FT}
-                                ) where {FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2}
+                                ) where {FT<:Real,FT2}
     
     #@unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺ = added_layer
     #@unpack R⁻⁺, R⁺⁻, T⁺⁺, T⁻⁻, J₀⁺, J₀⁻ = composite_layer
@@ -162,7 +162,7 @@ function interaction_top!(ims::Int64,
                         composite_layer::CompositeLayerMS{M}, 
                         added_layer::AddedLayer{FT},
                         I_static::AbstractArray{FT2},
-                        arr_type) where {FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2,M}
+                        arr_type) where {FT<:Real,FT2,M}
 
     @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, J₀⁺, J₀⁻ = added_layer
     #@unpack topR⁻⁺, topR⁺⁻, topT⁺⁺, topT⁻⁻, topJ₀⁺, topJ₀⁻ = composite_layer
@@ -180,14 +180,14 @@ function interaction_top!(ims::Int64,
                         r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, J₀⁺, J₀⁻,
                         R⁻⁺, R⁺⁻, T⁺⁺, T⁻⁻, compJ₀⁺, compJ₀⁻);
 
-    composite_layer.topR⁻⁺[ims][:] = Array(R⁻⁺)
-    composite_layer.topR⁺⁻[ims][:] = Array(R⁺⁻)
+    composite_layer.topR⁻⁺[ims][:] = collect(R⁻⁺)
+    composite_layer.topR⁺⁻[ims][:] = collect(R⁺⁻)
                         
-    composite_layer.topT⁺⁺[ims][:] = Array(T⁺⁺)
-    composite_layer.topT⁻⁻[ims][:] = Array(T⁻⁻)
+    composite_layer.topT⁺⁺[ims][:] = collect(T⁺⁺)
+    composite_layer.topT⁻⁻[ims][:] = collect(T⁻⁻)
                         
-    composite_layer.topJ₀⁺[ims][:] = Array(compJ₀⁺) 
-    composite_layer.topJ₀⁻[ims][:] = Array(compJ₀⁻)
+    composite_layer.topJ₀⁺[ims][:] = collect(compJ₀⁺) 
+    composite_layer.topJ₀⁻[ims][:] = collect(compJ₀⁻)
 
     synchronize_if_gpu()
     #@pack composite_layer = topR⁻⁺, topR⁺⁻, topT⁺⁺, topT⁻⁻, topJ₀⁺, topJ₀⁻   
@@ -200,7 +200,7 @@ function interaction_bot!(ims::Int64,
                         SFI,
                         composite_layer::CompositeLayerMS{M}, 
                         added_layer::AddedLayer{FT},
-                        I_static::AbstractArray{FT2}, arr_type) where {M,FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2}
+                        I_static::AbstractArray{FT2}, arr_type) where {M,FT<:Real,FT2}
 
     @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, J₀⁺, J₀⁻ = added_layer
     #@unpack botR⁻⁺, botR⁺⁻, botT⁺⁺, botT⁻⁻, botJ₀⁺, botJ₀⁻ = composite_layer
@@ -218,14 +218,14 @@ function interaction_bot!(ims::Int64,
                         r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, J₀⁺, J₀⁻,
                         R⁻⁺, R⁺⁻, T⁺⁺, T⁻⁻, compJ₀⁺, compJ₀⁻);
         
-    composite_layer.botR⁻⁺[ims][:] = Array(R⁻⁺)
-    composite_layer.botR⁺⁻[ims][:] = Array(R⁺⁻)
+    composite_layer.botR⁻⁺[ims][:] = collect(R⁻⁺)
+    composite_layer.botR⁺⁻[ims][:] = collect(R⁺⁻)
                         
-    composite_layer.botT⁺⁺[ims][:] = Array(T⁺⁺)
-    composite_layer.botT⁻⁻[ims][:] = Array(T⁻⁻)
+    composite_layer.botT⁺⁺[ims][:] = collect(T⁺⁺)
+    composite_layer.botT⁻⁻[ims][:] = collect(T⁻⁻)
                         
-    composite_layer.botJ₀⁺[ims][:] = Array(compJ₀⁺) 
-    composite_layer.botJ₀⁻[ims][:] = Array(compJ₀⁻)
+    composite_layer.botJ₀⁺[ims][:] = collect(compJ₀⁺) 
+    composite_layer.botJ₀⁻[ims][:] = collect(compJ₀⁻)
     
     synchronize_if_gpu()
     #@pack composite_layer = botR⁻⁺, botR⁺⁻, botT⁺⁺, botT⁻⁻, botJ₀⁺, botJ₀⁻
@@ -261,7 +261,7 @@ function interaction_helper_ms!(RS_type, ::ScatteringInterface_00, SFI,
     ieR⁻⁺::AbstractArray{FT}, ieR⁺⁻::AbstractArray{FT}, 
     ieT⁺⁺::AbstractArray{FT}, ieT⁻⁻::AbstractArray{FT}, 
     ieJ₀⁺::AbstractArray{FT}, ieJ₀⁻::AbstractArray{FT}
-    ) where {FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2}
+    ) where {FT<:Real,FT2}
 
     # If SFI, interact source function in no scattering
     if SFI
@@ -297,7 +297,7 @@ function interaction_helper_ms!(RS_type::RRS, ::ScatteringInterface_01, SFI,
     ieR⁻⁺::AbstractArray{FT}, ieR⁺⁻::AbstractArray{FT}, 
     ieT⁺⁺::AbstractArray{FT}, ieT⁻⁻::AbstractArray{FT}, 
     ieJ₀⁺::AbstractArray{FT}, ieJ₀⁻::AbstractArray{FT}
-    ) where {FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2}
+    ) where {FT<:Real,FT2}
     @unpack i_λ₁λ₀ = RS_type 
     if SFI
         for n₁ in eachindex ieJ₁⁺[1,1,:,1]
@@ -356,7 +356,7 @@ function interaction_helper_ms!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
                 ieR⁻⁺::AbstractArray{FT}, ieR⁺⁻::AbstractArray{FT}, 
                 ieT⁺⁺::AbstractArray{FT}, ieT⁻⁻::AbstractArray{FT}, 
                 ieJ₀⁺::AbstractArray{FT}, ieJ₀⁻::AbstractArray{FT}
-                ) where {FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2}
+                ) where {FT<:Real,FT2}
     @unpack i_λ₁λ₀_all = RS_type 
     if SFI
         for Δn = 1:length(i_λ₁λ₀_all)
@@ -420,7 +420,7 @@ function interaction_helper_ms!(RS_type::RRS, ::ScatteringInterface_10, SFI,
     ieR⁻⁺::AbstractArray{FT}, ieR⁺⁻::AbstractArray{FT}, 
     ieT⁺⁺::AbstractArray{FT}, ieT⁻⁻::AbstractArray{FT}, 
     ieJ₀⁺::AbstractArray{FT}, ieJ₀⁻::AbstractArray{FT}
-    ) where {FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2}
+    ) where {FT<:Real,FT2}
     @unpack i_λ₁λ₀ = RS_type 
     if SFI
         for n₁ in eachindex ieJ₁⁺[1,1,:,1]
@@ -473,7 +473,7 @@ function interaction_helper_ms!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
                             ieR⁻⁺::AbstractArray{FT}, ieR⁺⁻::AbstractArray{FT}, 
                             ieT⁺⁺::AbstractArray{FT}, ieT⁻⁻::AbstractArray{FT}, 
                             ieJ₀⁺::AbstractArray{FT}, ieJ₀⁻::AbstractArray{FT}
-                            ) where {FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2}
+                            ) where {FT<:Real,FT2}
     @unpack i_λ₁λ₀_all = RS_type 
     if SFI
         for Δn = 1:length(i_λ₁λ₀_all)
@@ -530,7 +530,7 @@ function interaction_helper_ms!(RS_type::RRS, ::ScatteringInterface_11, SFI,
     ieR⁻⁺::AbstractArray{FT}, ieR⁺⁻::AbstractArray{FT}, 
     ieT⁺⁺::AbstractArray{FT}, ieT⁻⁻::AbstractArray{FT}, 
     ieJ₀⁺::AbstractArray{FT}, ieJ₀⁻::AbstractArray{FT}
-    ) where {FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2}
+    ) where {FT<:Real,FT2}
     @unpack i_λ₁λ₀ = RS_type 
     # Used to store `(I - R⁺⁻ * r⁻⁺)⁻¹`
     tmp_inv = similar(t⁺⁺)
@@ -654,7 +654,7 @@ function interaction_helper_ms!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
                         ieR⁻⁺::AbstractArray{FT}, ieR⁺⁻::AbstractArray{FT}, 
                         ieT⁺⁺::AbstractArray{FT}, ieT⁻⁻::AbstractArray{FT}, 
                         ieJ₀⁺::AbstractArray{FT}, ieJ₀⁻::AbstractArray{FT}
-                        ) where {FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2}
+                        ) where {FT<:Real,FT2}
     @unpack i_λ₁λ₀_all = RS_type 
     #@show "hello 100 ms"
     # Used to store `(I - R⁺⁻ * r⁻⁺)⁻¹`
@@ -782,7 +782,7 @@ SFI,
 composite_layer::CompositeLayerMSRS{M}, 
 added_layer::AddedLayerRS{FT},
 I_static::AbstractArray{FT2},
-arr_type) where {FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2,M}
+arr_type) where {FT<:Real,FT2,M}
 
     @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, J₀⁺, J₀⁻ = added_layer
     @unpack ier⁺⁻, ier⁻⁺, iet⁻⁻, iet⁺⁺, ieJ₀⁺, ieJ₀⁻ = added_layer
@@ -812,23 +812,23 @@ arr_type) where {FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2,M}
                             R⁻⁺, R⁺⁻, T⁺⁺, T⁻⁻, compJ₀⁺, compJ₀⁻,
                             ieR⁻⁺, ieR⁺⁻, ieT⁺⁺, ieT⁻⁻, compieJ₀⁺, compieJ₀⁻);
 
-    composite_layer.topR⁻⁺[ims][:] = Array(R⁻⁺)
-    composite_layer.topR⁺⁻[ims][:] = Array(R⁺⁻)
+    composite_layer.topR⁻⁺[ims][:] = collect(R⁻⁺)
+    composite_layer.topR⁺⁻[ims][:] = collect(R⁺⁻)
 
-    composite_layer.topT⁺⁺[ims][:] = Array(T⁺⁺)
-    composite_layer.topT⁻⁻[ims][:] = Array(T⁻⁻)
+    composite_layer.topT⁺⁺[ims][:] = collect(T⁺⁺)
+    composite_layer.topT⁻⁻[ims][:] = collect(T⁻⁻)
 
-    composite_layer.topJ₀⁺[ims][:] = Array(compJ₀⁺) 
-    composite_layer.topJ₀⁻[ims][:] = Array(compJ₀⁻)
+    composite_layer.topJ₀⁺[ims][:] = collect(compJ₀⁺) 
+    composite_layer.topJ₀⁻[ims][:] = collect(compJ₀⁻)
 
-    composite_layer.topieR⁻⁺[ims][:] = Array(ieR⁻⁺)
-    composite_layer.topieR⁺⁻[ims][:] = Array(ieR⁺⁻)
+    composite_layer.topieR⁻⁺[ims][:] = collect(ieR⁻⁺)
+    composite_layer.topieR⁺⁻[ims][:] = collect(ieR⁺⁻)
 
-    composite_layer.topieT⁺⁺[ims][:] = Array(ieT⁺⁺)
-    composite_layer.topieT⁻⁻[ims][:] = Array(ieT⁻⁻)
+    composite_layer.topieT⁺⁺[ims][:] = collect(ieT⁺⁺)
+    composite_layer.topieT⁻⁻[ims][:] = collect(ieT⁻⁻)
 
-    composite_layer.topieJ₀⁺[ims][:] = Array(compieJ₀⁺) 
-    composite_layer.topieJ₀⁻[ims][:] = Array(compieJ₀⁻)
+    composite_layer.topieJ₀⁺[ims][:] = collect(compieJ₀⁺) 
+    composite_layer.topieJ₀⁻[ims][:] = collect(compieJ₀⁻)
 
     synchronize_if_gpu()
     #@pack composite_layer = topR⁻⁺, topR⁺⁻, topT⁺⁺, topT⁻⁻, topJ₀⁺, topJ₀⁻   
@@ -842,7 +842,7 @@ function interaction_bot!(ims::Int64,
                     composite_layer::CompositeLayerMSRS{M}, 
                     added_layer::AddedLayerRS{FT},
                     I_static::AbstractArray{FT2},
-                    arr_type) where {FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2,M}
+                    arr_type) where {FT<:Real,FT2,M}
     @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, J₀⁺, J₀⁻ = added_layer
     @unpack ier⁺⁻, ier⁻⁺, iet⁻⁻, iet⁺⁺, ieJ₀⁺, ieJ₀⁻ = added_layer
     #@unpack botR⁻⁺, botR⁺⁻, botT⁺⁺, botT⁻⁻, botJ₀⁺, botJ₀⁻ = composite_layer
@@ -871,23 +871,23 @@ function interaction_bot!(ims::Int64,
                             R⁻⁺, R⁺⁻, T⁺⁺, T⁻⁻, compJ₀⁺, compJ₀⁻,
                             ieR⁻⁺, ieR⁺⁻, ieT⁺⁺, ieT⁻⁻, compieJ₀⁺, compieJ₀⁻);
 
-    composite_layer.botR⁻⁺[ims][:] = Array(R⁻⁺)
-    composite_layer.botR⁺⁻[ims][:] = Array(R⁺⁻)
+    composite_layer.botR⁻⁺[ims][:] = collect(R⁻⁺)
+    composite_layer.botR⁺⁻[ims][:] = collect(R⁺⁻)
 
-    composite_layer.botT⁺⁺[ims][:] = Array(T⁺⁺)
-    composite_layer.botT⁻⁻[ims][:] = Array(T⁻⁻)
+    composite_layer.botT⁺⁺[ims][:] = collect(T⁺⁺)
+    composite_layer.botT⁻⁻[ims][:] = collect(T⁻⁻)
 
-    composite_layer.botJ₀⁺[ims][:] = Array(compJ₀⁺) 
-    composite_layer.botJ₀⁻[ims][:] = Array(compJ₀⁻)
+    composite_layer.botJ₀⁺[ims][:] = collect(compJ₀⁺) 
+    composite_layer.botJ₀⁻[ims][:] = collect(compJ₀⁻)
 
-    composite_layer.botieR⁻⁺[ims][:] = Array(ieR⁻⁺)
-    composite_layer.botieR⁺⁻[ims][:] = Array(ieR⁺⁻)
+    composite_layer.botieR⁻⁺[ims][:] = collect(ieR⁻⁺)
+    composite_layer.botieR⁺⁻[ims][:] = collect(ieR⁺⁻)
 
-    composite_layer.botieT⁺⁺[ims][:] = Array(ieT⁺⁺)
-    composite_layer.botieT⁻⁻[ims][:] = Array(ieT⁻⁻)
+    composite_layer.botieT⁺⁺[ims][:] = collect(ieT⁺⁺)
+    composite_layer.botieT⁻⁻[ims][:] = collect(ieT⁻⁻)
 
-    composite_layer.botieJ₀⁺[ims][:] = Array(compieJ₀⁺) 
-    composite_layer.botieJ₀⁻[ims][:] = Array(compieJ₀⁻)
+    composite_layer.botieJ₀⁺[ims][:] = collect(compieJ₀⁺) 
+    composite_layer.botieJ₀⁻[ims][:] = collect(compieJ₀⁻)
 
     synchronize_if_gpu()
     #@pack composite_layer = botR⁻⁺, botR⁺⁻, botT⁺⁺, botT⁻⁻, botJ₀⁺, botJ₀⁻

@@ -29,17 +29,13 @@ function rt_run_bck(RS_type::AbstractRamanType, #Default - no Raman scattering (
     dims = (NquadN,NquadN)              # nxn dims
     nAer  = length(aerosol_optics)      # Number of aerosols
  
-    # Need to check this a bit better in the future!
-    FT_dual = length(τ_aer) > 0 ? typeof(τ_aer[1]) : FT
-    #@show FT_dual
-
-    # Output variables: Reflected and transmitted solar irradiation at TOA and BOA respectively # Might need Dual later!!
-    R = zeros(FT_dual, length(vza), pol_type.n, nSpec)
-    T = zeros(FT_dual, length(vza), pol_type.n, nSpec)
-    R_SFI = zeros(FT_dual, length(vza), pol_type.n, nSpec)
-    T_SFI = zeros(FT_dual, length(vza), pol_type.n, nSpec)
-    ieR_SFI = zeros(FT_dual, length(vza), pol_type.n, nSpec)
-    ieT_SFI = zeros(FT_dual, length(vza), pol_type.n, nSpec)
+    # Output arrays for reflected and transmitted solar irradiation
+    R = zeros(FT, length(vza), pol_type.n, nSpec)
+    T = zeros(FT, length(vza), pol_type.n, nSpec)
+    R_SFI = zeros(FT, length(vza), pol_type.n, nSpec)
+    T_SFI = zeros(FT, length(vza), pol_type.n, nSpec)
+    ieR_SFI = zeros(FT, length(vza), pol_type.n, nSpec)
+    ieT_SFI = zeros(FT, length(vza), pol_type.n, nSpec)
     # Notify user of processing parameters
     msg = 
     """
@@ -51,11 +47,11 @@ function rt_run_bck(RS_type::AbstractRamanType, #Default - no Raman scattering (
     @info msg
 
     # Create arrays
-    @timeit "Creating layers" added_layer         = make_added_layer(RS_type,FT_dual, arr_type, dims, nSpec)
+    @timeit "Creating layers" added_layer         = make_added_layer(RS_type,FT, arr_type, dims, nSpec)
     # Just for now, only use noRS here
-    @timeit "Creating layers" added_layer_surface = make_added_layer(RS_type,FT_dual, arr_type, dims, nSpec)
-    @timeit "Creating layers" composite_layer     = make_composite_layer(RS_type,FT_dual, arr_type, dims, nSpec)
-    @timeit "Creating arrays" Aer𝐙⁺⁺ = arr_type(zeros(FT_dual, (dims[1], dims[2], nAer)))
+    @timeit "Creating layers" added_layer_surface = make_added_layer(RS_type,FT, arr_type, dims, nSpec)
+    @timeit "Creating layers" composite_layer     = make_composite_layer(RS_type,FT, arr_type, dims, nSpec)
+    @timeit "Creating arrays" Aer𝐙⁺⁺ = arr_type(zeros(FT, (dims[1], dims[2], nAer)))
     @timeit "Creating arrays" Aer𝐙⁻⁺ = similar(Aer𝐙⁺⁺)
     @timeit "Creating arrays" I_static = Diagonal(arr_type(Diagonal{FT}(ones(dims[1]))));
     #TODO: if RS_type!=noRS, create ϖ_λ₁λ₀, i_λ₁λ₀, fscattRayl, Z⁺⁺_λ₁λ₀, Z⁻⁺_λ₁λ₀ (for input), and ieJ₀⁺, ieJ₀⁻, ieR⁺⁻, ieR⁻⁺, ieT⁻⁻, ieT⁺⁺, ier⁺⁻, ier⁻⁺, iet⁻⁻, iet⁺⁺ (for output)
@@ -72,9 +68,9 @@ function rt_run_bck(RS_type::AbstractRamanType, #Default - no Raman scattering (
         weight = m == 0 ? FT(0.5) : FT(1.0)
         # Compute Z-moments of the Rayleigh phase matrix 
         # For m>=3, Rayleigh matrices will be 0, can catch with if statement if wanted 
-        @timeit "Z moments" Rayl𝐙⁺⁺, Rayl𝐙⁻⁺ = Scattering.compute_Z_moments(pol_type, Array(qp_μ), greek_rayleigh, m, arr_type = arr_type);
+        @timeit "Z moments" Rayl𝐙⁺⁺, Rayl𝐙⁻⁺ = Scattering.compute_Z_moments(pol_type, collect(qp_μ), greek_rayleigh, m, arr_type = arr_type);
         if !(typeof(RS_type) <: noRS)
-            @timeit "Z moments" RS_type.Z⁺⁺_λ₁λ₀, RS_type.Z⁻⁺_λ₁λ₀ = Scattering.compute_Z_moments(pol_type, Array(qp_μ), RS_type.greek_raman, m, arr_type = arr_type);
+            @timeit "Z moments" RS_type.Z⁺⁺_λ₁λ₀, RS_type.Z⁻⁺_λ₁λ₀ = Scattering.compute_Z_moments(pol_type, collect(qp_μ), RS_type.greek_raman, m, arr_type = arr_type);
             #@show size(RS_type.Z⁺⁺_λ₁λ₀), size(RS_type.Z⁻⁺_λ₁λ₀)
         end
         # Need to make sure arrays are 0:
@@ -82,7 +78,7 @@ function rt_run_bck(RS_type::AbstractRamanType, #Default - no Raman scattering (
         
         # Compute aerosol Z-matrices for all aerosols
         for i = 1:nAer
-            @timeit "Z moments"  Aer𝐙⁺⁺[:,:,i], Aer𝐙⁻⁺[:,:,i] = Scattering.compute_Z_moments(pol_type, Array(qp_μ), aerosol_optics[i].greek_coefs, m, arr_type = arr_type)
+            @timeit "Z moments"  Aer𝐙⁺⁺[:,:,i], Aer𝐙⁻⁺[:,:,i] = Scattering.compute_Z_moments(pol_type, collect(qp_μ), aerosol_optics[i].greek_coefs, m, arr_type = arr_type)
         end
 
         #@show RS_type.ϖ_Cabannes, ϖ_Cabannes

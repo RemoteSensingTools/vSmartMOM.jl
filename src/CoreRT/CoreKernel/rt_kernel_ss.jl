@@ -34,7 +34,7 @@ function rt_kernel_ss!(RS_type::noRS, pol_type, SFI, added_layer, composite_laye
         added_layer.r⁻⁺[:] .= 0;
         added_layer.r⁺⁻[:] .= 0;
         added_layer.J₀⁻[:] .= 0;
-        temp = Array(exp.(-τ_λ./qp_μN'))
+        temp = collect(exp.(-τ_λ./qp_μN'))
         #added_layer.t⁺⁺, added_layer.t⁻⁻ = (Diagonal(exp(-τ_λ / qp_μN)), Diagonal(exp(-τ_λ / qp_μN)))   
         for iλ = 1:length(τ_λ)
             added_layer.t⁺⁺[:,:,iλ] = Diagonal(temp[iλ,:]);
@@ -111,7 +111,7 @@ function rt_kernel_ss!(RS_type::Union{RRS, VS_0to1, VS_1to0}, pol_type, SFI, add
         added_layer.iet⁻⁻[:] .= 0;
         added_layer.iet⁺⁺[:] .= 0;
         added_layer.ieJ₀⁺[:] .= 0;
-        temp = Array(exp.(-τ_λ./qp_μN'))
+        temp = collect(exp.(-τ_λ./qp_μN'))
         #added_layer.t⁺⁺, added_layer.t⁻⁻ = (Diagonal(exp(-τ_λ / qp_μN)), Diagonal(exp(-τ_λ / qp_μN)))   
         for iλ = 1:length(τ_λ)
             added_layer.t⁺⁺[:,:,iλ] = Diagonal(temp[iλ,:]);
@@ -201,7 +201,7 @@ function rt_kernel_ss!(RS_type::noRS{FT},
         added_layer.r⁻⁺[:] .= 0;
         added_layer.r⁺⁻[:] .= 0;
         added_layer.J₀⁻[:] .= 0;
-        temp = Array(exp.(-τ./qp_μN'))
+        temp = collect(exp.(-τ./qp_μN'))
         #added_layer.t⁺⁺, added_layer.t⁻⁻ = (Diagonal(exp(-τ_λ / qp_μN)), Diagonal(exp(-τ_λ / qp_μN)))   
         for iλ = 1:length(τ)
             added_layer.t⁺⁺[:,:,iλ] = Diagonal(temp[iλ,:]);
@@ -228,12 +228,12 @@ function rt_kernel_ss!(RS_type::noRS{FT},
             architecture)
         
         if iz==2
-            M1 = Array(composite_layer.T⁺⁺);
-            M2 = Array(composite_layer.R⁺⁻);
-            M3 = Array(composite_layer.T⁻⁻);
-            M4 = Array(composite_layer.R⁻⁺);
-            M5 = Array(composite_layer.J₀⁻);
-            M6 = Array(composite_layer.J₀⁺);
+            M1 = collect(composite_layer.T⁺⁺);
+            M2 = collect(composite_layer.R⁺⁻);
+            M3 = collect(composite_layer.T⁻⁻);
+            M4 = collect(composite_layer.R⁻⁺);
+            M5 = collect(composite_layer.J₀⁻);
+            M6 = collect(composite_layer.J₀⁺);
             #@show M1[1,1,1], M2[1,1,1], M3[1,1,1], M4[1,1,1], M5[1,1,1], M6[1,1,1]
         end
     end
@@ -296,7 +296,7 @@ function rt_kernel_ss!(
         added_layer.iet⁻⁻[:] .= 0;
         added_layer.iet⁺⁺[:] .= 0;
         added_layer.ieJ₀⁺[:] .= 0;
-        temp = Array(exp.(-τ./qp_μN'))
+        temp = collect(exp.(-τ./qp_μN'))
         #added_layer.t⁺⁺, added_layer.t⁻⁻ = (Diagonal(exp(-τ_λ / qp_μN)), Diagonal(exp(-τ_λ / qp_μN)))   
         for iλ = 1:length(τ)
             added_layer.t⁺⁺[:,:,iλ] = Diagonal(temp[iλ,:]);
@@ -391,7 +391,7 @@ function rt_kernel!(
         added_layer.iet⁻⁻[:] .= 0;
         added_layer.iet⁺⁺[:] .= 0;
         added_layer.ieJ₀⁺[:] .= 0;
-        temp = Array(exp.(-τ./qp_μN'))
+        temp = collect(exp.(-τ./qp_μN'))
         #added_layer.t⁺⁺, added_layer.t⁻⁻ = (Diagonal(exp(-τ_λ / qp_μN)), Diagonal(exp(-τ_λ / qp_μN)))   
         for iλ = 1:length(τ)
             added_layer.t⁺⁺[:,:,iλ] = Diagonal(temp[iλ,:]);

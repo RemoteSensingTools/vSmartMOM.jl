@@ -51,7 +51,7 @@ Base.@kwdef mutable struct ObsGeometry{FT} <: AbstractObsGeometry
     obs_alt::FT
 end
 
-mutable struct RT_Aerosol{}#FT<:Union{AbstractFloat, ForwardDiff.Dual}}
+mutable struct RT_Aerosol{}#FT<:Real}
     "Aerosol"
     aerosol::Aerosol#{FT}
     "Reference τ"
@@ -216,7 +216,7 @@ end
 
 A struct which holds all scattering-related parameters (before any computations)
 """
-mutable struct ScatteringParameters{FT<:Union{AbstractFloat, ForwardDiff.Dual}}
+mutable struct ScatteringParameters{FT<:Real}
     "List of scattering aerosols and their properties"
     rt_aerosols::Vector{RT_Aerosol}
     "Maximum aerosol particle radius for quadrature points/weights (µm)"
@@ -237,7 +237,7 @@ A struct which holds all initial model parameters (before any computations)
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-mutable struct vSmartMOM_Parameters{FT<:Union{AbstractFloat, ForwardDiff.Dual}} 
+mutable struct vSmartMOM_Parameters{FT<:Real} 
     
     # Type of Raman scattering
     "Raman Scattering Type (RRS/RVRS/VRS)"

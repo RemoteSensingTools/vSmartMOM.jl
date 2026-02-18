@@ -906,13 +906,13 @@ function computeRamanZλ!(RS_type::AbstractRamanType, pol_type, qp_μ, m, arr_ty
                                         arr_type = arr_type);
     RS_type.Z⁺⁺_λ₁λ₀_VS_n2, RS_type.Z⁻⁺_λ₁λ₀_VS_n2 = 
                     Scattering.compute_Z_moments(pol_type, 
-                                            Array(qp_μ), 
+                                            collect(qp_μ), 
                                             RS_type.greek_raman_VS_n2, 
                                             m, 
                                             arr_type = arr_type);
     RS_type.Z⁺⁺_λ₁λ₀_VS_o2, RS_type.Z⁻⁺_λ₁λ₀_VS_o2 = 
                     Scattering.compute_Z_moments(pol_type, 
-                                        Array(qp_μ), 
+                                        collect(qp_μ), 
                                         RS_type.greek_raman_VS_o2, 
                                         m, 
                                         arr_type = arr_type);      

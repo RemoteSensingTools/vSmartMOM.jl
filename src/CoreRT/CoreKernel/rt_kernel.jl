@@ -3,6 +3,22 @@
 This file implements rt_kernel!, which performs the core RT routines (elemental, doubling, interaction)
  
 =#
+
+"""
+    _set_transmission_noscat!(t⁺⁺, t⁻⁻, τ_vals, qp_μN)
+
+Set transmission matrices for non-scattering layers using Beer's law.
+Constructs batch diagonal matrices: `t[j,j,iλ] = exp(-τ[iλ]/μ[j])`.
+Works on both CPU and GPU arrays (uses `collect` for CPU-side Diagonal construction).
+"""
+function _set_transmission_noscat!(t⁺⁺, t⁻⁻, τ_vals, qp_μN)
+    temp = collect(exp.(-τ_vals ./ qp_μN'))
+    for iλ in axes(temp, 1)
+        d = Diagonal(temp[iλ,:])
+        t⁺⁺[:,:,iλ] = d
+        t⁻⁻[:,:,iλ] = d
+    end
+end
 #No Raman (default)
 # Perform the Core RT routines (elemental, doubling, interaction)
 function rt_kernel!(RS_type::noRS, 
@@ -29,12 +45,7 @@ function rt_kernel!(RS_type::noRS,
         added_layer.r⁻⁺[:] .= 0;
         added_layer.r⁺⁻[:] .= 0;
         (added_layer isa AddedLayerRS ? added_layer.J₀⁻ : added_layer.j₀⁻)[:] .= 0;
-        temp = Array(exp.(-τ_λ./qp_μN'))
-        #added_layer.t⁺⁺, added_layer.t⁻⁻ = (Diagonal(exp(-τ_λ / qp_μN)), Diagonal(exp(-τ_λ / qp_μN)))   
-        for iλ = 1:length(τ_λ)
-            added_layer.t⁺⁺[:,:,iλ] = Diagonal(temp[iλ,:]);
-            added_layer.t⁻⁻[:,:,iλ] = Diagonal(temp[iλ,:]);
-        end
+        _set_transmission_noscat!(added_layer.t⁺⁺, added_layer.t⁻⁻, τ_λ, qp_μN)
     end
     #M1 = Array(added_layer.t⁺⁺)
     #M2 = Array(added_layer.r⁺⁻)
@@ -72,12 +83,7 @@ function rt_kernel_canopy!(RS_type::noRS, pol_type, SFI, added_layer, composite_
         added_layer.r⁻⁺[:] .= 0;
         added_layer.r⁺⁻[:] .= 0;
         (added_layer isa AddedLayerRS ? added_layer.J₀⁻ : added_layer.j₀⁻)[:] .= 0;
-        temp = Array(exp.(-τ_λ./qp_μN'))
-        #added_layer.t⁺⁺, added_layer.t⁻⁻ = (Diagonal(exp(-τ_λ / qp_μN)), Diagonal(exp(-τ_λ / qp_μN)))   
-        for iλ = 1:length(τ_λ)
-            added_layer.t⁺⁺[:,:,iλ] = Diagonal(temp[iλ,:]);
-            added_layer.t⁻⁻[:,:,iλ] = Diagonal(temp[iλ,:]);
-        end
+        _set_transmission_noscat!(added_layer.t⁺⁺, added_layer.t⁻⁻, τ_λ, qp_μN)
     end
     #M1 = Array(added_layer.t⁺⁺)
     #M2 = Array(added_layer.r⁺⁻)
@@ -139,12 +145,7 @@ function rt_kernel!(RS_type::Union{RRS, VS_0to1, VS_1to0}, pol_type, SFI, added_
         added_layer.iet⁻⁻[:] .= 0;
         added_layer.iet⁺⁺[:] .= 0;
         added_layer.ieJ₀⁺[:] .= 0;
-        temp = Array(exp.(-τ_λ./qp_μN'))
-        #added_layer.t⁺⁺, added_layer.t⁻⁻ = (Diagonal(exp(-τ_λ / qp_μN)), Diagonal(exp(-τ_λ / qp_μN)))   
-        for iλ = 1:length(τ_λ)
-            added_layer.t⁺⁺[:,:,iλ] = Diagonal(temp[iλ,:]);
-            added_layer.t⁻⁻[:,:,iλ] = Diagonal(temp[iλ,:]);
-        end
+        _set_transmission_noscat!(added_layer.t⁺⁺, added_layer.t⁻⁻, τ_λ, qp_μN)
     end
 
     # @assert !any(isnan.(added_layer.t⁺⁺))
@@ -208,12 +209,7 @@ function rt_kernel!(RS_type::noRS{FT},
         added_layer.r⁻⁺[:] .= 0;
         added_layer.r⁺⁻[:] .= 0;
         (added_layer isa AddedLayerRS ? added_layer.J₀⁻ : added_layer.j₀⁻)[:] .= 0;
-        temp = Array(exp.(-τ_λ./qp_μN'))
-        #added_layer.t⁺⁺, added_layer.t⁻⁻ = (Diagonal(exp(-τ_λ / qp_μN)), Diagonal(exp(-τ_λ / qp_μN)))   
-        for iλ = 1:length(τ_λ)
-            added_layer.t⁺⁺[:,:,iλ] = Diagonal(temp[iλ,:]);
-            added_layer.t⁻⁻[:,:,iλ] = Diagonal(temp[iλ,:]);
-        end
+        _set_transmission_noscat!(added_layer.t⁺⁺, added_layer.t⁻⁻, τ_λ, qp_μN)
     end
 
     # @assert !any(isnan.(added_layer.t⁺⁺))
@@ -243,7 +239,7 @@ end
 function get_dtau_ndoubl(computed_layer_properties::CoreDirectionalScatteringOpticalProperties, quad_points::QuadPoints{FT}) where {FT}
     @unpack qp_μ,iμ₀  = quad_points
     @unpack τ, ϖ, G  = computed_layer_properties
-    gfct = Array(G)[iμ₀]
+    gfct = collect(G)[iμ₀]  # CPU scalar extraction from G factor
     dτ_max = minimum([maximum(gfct * τ .* ϖ), FT(0.001) * minimum(qp_μ)])
     _, ndoubl = doubling_number(dτ_max, maximum(τ .* ϖ))
     # Compute dτ vector
@@ -256,7 +252,7 @@ function init_layer(computed_layer_properties::CoreDirectionalScatteringOpticalP
     @unpack μ₀, iμ₀ = quad_points
     @unpack G = computed_layer_properties
     dτ, ndoubl = get_dtau_ndoubl(computed_layer_properties, quad_points)
-    gfct = Array(G)[iμ₀]
+    gfct = collect(G)[iμ₀]  # CPU scalar extraction from G factor
     expk = exp.(-dτ*gfct/μ₀)
     return dτ, ndoubl, arr_type(expk)
 end
@@ -313,12 +309,7 @@ function rt_kernel!(RS_type::Union{RRS{FT}, VS_0to1{FT}, VS_1to0{FT}}, pol_type,
         added_layer.iet⁻⁻[:] .= 0;
         added_layer.iet⁺⁺[:] .= 0;
         added_layer.ieJ₀⁺[:] .= 0;
-        temp = Array(exp.(-τ_λ./qp_μN'))
-        #added_layer.t⁺⁺, added_layer.t⁻⁻ = (Diagonal(exp(-τ_λ / qp_μN)), Diagonal(exp(-τ_λ / qp_μN)))   
-        for iλ = 1:length(τ_λ)
-            added_layer.t⁺⁺[:,:,iλ] = Diagonal(temp[iλ,:]);
-            added_layer.t⁻⁻[:,:,iλ] = Diagonal(temp[iλ,:]);
-        end
+        _set_transmission_noscat!(added_layer.t⁺⁺, added_layer.t⁻⁻, τ_λ, qp_μN)
     end
 
     # @assert !any(isnan.(added_layer.t⁺⁺))
@@ -391,12 +382,7 @@ function rt_kernel!(
         added_layer.iet⁻⁻[:] .= 0;
         added_layer.iet⁺⁺[:] .= 0;
         added_layer.ieJ₀⁺[:] .= 0;
-        temp = Array(exp.(-τ./qp_μN'))
-        #added_layer.t⁺⁺, added_layer.t⁻⁻ = (Diagonal(exp(-τ_λ / qp_μN)), Diagonal(exp(-τ_λ / qp_μN)))   
-        for iλ = 1:length(τ)
-            added_layer.t⁺⁺[:,:,iλ] = Diagonal(temp[iλ,:]);
-            added_layer.t⁻⁻[:,:,iλ] = Diagonal(temp[iλ,:]);
-        end
+        _set_transmission_noscat!(added_layer.t⁺⁺, added_layer.t⁻⁻, τ, qp_μN)
     end
 
     # @assert !any(isnan.(added_layer.t⁺⁺))

@@ -199,7 +199,7 @@ function construct_atm_layer(τRayl, τAer,
     τ_λ = τ_abs .+ τ    
     ϖ_λ = (τ * ϖ) ./ τ_λ
     
-    return Array(τ_λ), Array(ϖ_λ), τ, ϖ, Array(Z⁺⁺), Array(Z⁻⁺), fscattRayl
+    return collect(τ_λ), collect(ϖ_λ), τ, ϖ, collect(Z⁺⁺), collect(Z⁻⁺), fscattRayl
 end
 
 """
@@ -318,11 +318,11 @@ function compute_absorption_profile!(τ_abs::Array{FT,2},
         # @show iz,p,T,profile.vcd_dry[iz], vmr_curr
         #@show typeof(τ_abs), typeof(vmr_curr), typeof(profile.vcd_dry[iz]), typeof(p), typeof(T)
         #@show typeof(absorption_cross_section(absorption_model, grid, p, T))
-        #temp = Array(absorption_cross_section(absorption_model, grid, p, T)) * profile.vcd_dry[iz] * vmr_curr
+        #temp = collect(absorption_cross_section(absorption_model, grid, p, T)) * profile.vcd_dry[iz] * vmr_curr
         #@show minimum(temp), p, T, profile.vcd_dry[iz] * vmr_curr
         #@show iz, profile.vcd_dry[iz], vmr_curr, p, T
-        τ_abs[:,iz] += Array(absorption_cross_section(absorption_model, grid, p, T)) * profile.vcd_dry[iz] * vmr_curr
-        τ̇_abs[jac_idx,:,iz] = Array(absorption_cross_section(absorption_model, grid, p, T)) * profile.vcd_dry[iz]
+        τ_abs[:,iz] += collect(absorption_cross_section(absorption_model, grid, p, T)) * profile.vcd_dry[iz] * vmr_curr
+        τ̇_abs[jac_idx,:,iz] = collect(absorption_cross_section(absorption_model, grid, p, T)) * profile.vcd_dry[iz]
     end
     
 end

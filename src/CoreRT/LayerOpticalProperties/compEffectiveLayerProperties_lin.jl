@@ -22,7 +22,7 @@ The output derivative dimension has `Nparams = 7×NAer + NGas` entries per layer
 - `layer_opt_lin`: Array of `CoreScatteringOpticalPropertiesLin` (derivatives, one per layer).
 - `fscat_opt`: Rayleigh scattering fraction per layer (for inelastic scattering weight).
 """
-function constructCoreOpticalProperties(RS_type, iBand, m, model, lin_model) #where {FT<:Union{AbstractFloat, ForwardDiff.Dual}}
+function constructCoreOpticalProperties(RS_type, iBand, m, model, lin_model) #where {FT<:Real}
     @unpack τ_rayl, τ_aer, τ_abs, aerosol_optics, 
             greek_rayleigh, greek_cabannes, ϖ_Cabannes = model
     @unpack τ̇_aer, τ̇_abs, lin_aerosol_optics = lin_model
@@ -36,7 +36,7 @@ function constructCoreOpticalProperties(RS_type, iBand, m, model, lin_model) #wh
     # Do this in CPU space only first:
     
     # Quadrature points:
-    μ = Array(model.quad_points.qp_μ )
+    μ = collect(model.quad_points.qp_μ )
     # Number of Aerosols:
     nAero = size(τ_aer[iBand[1]],1)
     nZ    = size(τ_rayl[1],2)
@@ -72,7 +72,7 @@ function constructCoreOpticalProperties(RS_type, iBand, m, model, lin_model) #wh
         #@show τ_rayl[iB][:,1]  # Check one element to see what we're passing
         #@show typeof(τ_rayl[iB][:,1]), size(τ_rayl)
         
-        #@show CuArray(τ_rayl[iB][:,1])  # Convert to CuArray if needed
+        #@show Cucollect(τ_rayl[iB][:,1])  # Convert to CuArray if needed
         #@show typeof(Rayl𝐙⁺⁺), size(Rayl𝐙⁺⁺)
         CoreScatteringOpticalProperties(arr_type(τ_rayl[iB][:,1]), FT(1.0), 
                 (Rayl𝐙⁺⁺), (Rayl𝐙⁻⁺))
@@ -195,7 +195,7 @@ function constructCoreOpticalProperties(RS_type, iBand, m, model, lin_model) #wh
         #@show rayl[1].τ * rayl[1].ϖ, combo[1].τ
         # Assume ϖ of 1 for Rayleight here:
         #@show size(combo)
-        #fScattRayleigh = [Array(rayl[i].τ  ./ combo[i].τ) for i=1:nZ]
+        #fScattRayleigh = [collect(rayl[i].τ  ./ combo[i].τ) for i=1:nZ]
         #@show fScattRayleigh, rayl[1].τ, combo[1].τ
         # Create Core Optical Properties merged with trace gas absorptions:
         #@show size(combo)
@@ -209,8 +209,8 @@ function constructCoreOpticalProperties(RS_type, iBand, m, model, lin_model) #wh
         tmp = combrella .+ gas_combrella            
         combrella = tmp
         #@show size(combo2[1].τ)
-        #fScattRayleigh = [Array(rayl[iz].τ  ./ combo2[iz].τ) for iz=1:nZ] 
-        fScattRayleigh = [Array(rayl[iz].τ  ./ combrella[iz].fwd.τ) for iz=1:nZ] 
+        #fScattRayleigh = [collect(rayl[iz].τ  ./ combo2[iz].τ) for iz=1:nZ] 
+        fScattRayleigh = [collect(rayl[iz].τ  ./ combrella[iz].fwd.τ) for iz=1:nZ] 
         
         #@show fScattRayleigh[1]
         #for i=1:nZ
@@ -240,9 +240,9 @@ function constructCoreOpticalProperties(RS_type, iBand, m, model, lin_model) #wh
         #@show rayl[1].ϖ
         #@show rayl[1].Z⁺⁺
         #@show typeof(rayl[1].τ)
-        #@show Array(rayl[1].τ)[1] * rayl[1].ϖ * Array(rayl[1].Z⁺⁺)
-        #@show Array(rayl[1].τ)[1] * sum(RS_type.ϖ_λ₁λ₀) * Array(RS_type.Z⁺⁺_λ₁λ₀) 
-        #@show Array(rayl2[1].τ)[1] * rayl2[1].ϖ * Array(rayl2[1].Z⁺⁺)
+        #@show collect(rayl[1].τ)[1] * rayl[1].ϖ * collect(rayl[1].Z⁺⁺)
+        #@show collect(rayl[1].τ)[1] * sum(RS_type.ϖ_λ₁λ₀) * collect(RS_type.Z⁺⁺_λ₁λ₀) 
+        #@show collect(rayl2[1].τ)[1] * rayl2[1].ϖ * collect(rayl2[1].Z⁺⁺)
     
         #@show rayl2[1].Z⁺⁺[:,:,1] #.==0
         #@show rayl[1].Z⁺⁺[:,:,1]

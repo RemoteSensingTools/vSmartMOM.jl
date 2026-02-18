@@ -8,7 +8,7 @@ function constructCoreOpticalProperties(RS_type::AbstractRamanType{FT}, iBand, m
     pol_type = model.params.polarization_type
     
     # Quadrature points:
-    μ = Array(model.quad_points.qp_μ )
+    μ = collect(model.quad_points.qp_μ)
     N = length(model.quad_points.qp_μN)
     # Number of Aerosols:
     nAero = size(τ_aer[iBand[1]],1)
@@ -116,7 +116,7 @@ end
 
 function getG_atSun(lod::CoreDirectionalScatteringOpticalProperties,quad_points::QuadPoints{FT}) where FT
     @unpack iμ₀ = quad_points
-    gfct = Array(lod.G)[iμ₀]
+    gfct = collect(lod.G)[iμ₀]
     return gfct
 end
 

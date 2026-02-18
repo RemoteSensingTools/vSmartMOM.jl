@@ -2,7 +2,7 @@
 function interaction_helper!(RS_type,::ScatteringInterface_00, SFI,
                                 composite_layer::CompositeLayer{FT}, 
                                 added_layer::AddedLayer{FT}, 
-                                I_static::AbstractArray{FT2}) where {FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2}
+                                I_static::AbstractArray{FT2}) where {FT<:Real,FT2}
 
     # If SFI, interact source function in no scattering
     if SFI
@@ -30,7 +30,7 @@ end
 function interaction_helper!(RS_type::RRS, ::ScatteringInterface_01, SFI,
                                 composite_layer::CompositeLayer{FT}, 
                                 added_layer::AddedLayer{FT}, 
-                                I_static::AbstractArray{FT2}) where {FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2}
+                                I_static::AbstractArray{FT2}) where {FT<:Real,FT2}
 
     @unpack i_λ₁λ₀ = RS_type     
     
@@ -83,7 +83,7 @@ function interaction_helper!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
                         ::ScatteringInterface_01, SFI,
                         composite_layer::CompositeLayer{FT}, 
                         added_layer::AddedLayer{FT}, 
-                        I_static::AbstractArray{FT2}) where {FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2}
+                        I_static::AbstractArray{FT2}) where {FT<:Real,FT2}
 
     @unpack i_λ₁λ₀_all = RS_type                             
     if SFI
@@ -141,7 +141,7 @@ end
 function interaction_helper!(RS_type::RRS, ::ScatteringInterface_10, SFI,
                                 composite_layer::CompositeLayer{FT}, 
                                 added_layer::AddedLayer{FT}, 
-                                I_static::AbstractArray{FT2}) where {FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2}
+                                I_static::AbstractArray{FT2}) where {FT<:Real,FT2}
     @unpack i_λ₁λ₀ = RS_type 
 
     if SFI
@@ -190,7 +190,7 @@ function interaction_helper!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
     ::ScatteringInterface_10, SFI,
     composite_layer::CompositeLayer{FT}, 
     added_layer::AddedLayer{FT}, 
-    I_static::AbstractArray{FT2}) where {FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2}
+    I_static::AbstractArray{FT2}) where {FT<:Real,FT2}
     @unpack i_λ₁λ₀_all = RS_type 
     if SFI
         for Δn = 1:length(i_λ₁λ₀_all)
@@ -244,7 +244,7 @@ end
 function interaction_helper!(RS_type::RRS, ::ScatteringInterface_11, SFI,
                                 composite_layer::Union{CompositeLayer, CompositeLayerRS}, 
                                 added_layer::Union{AddedLayer,AddedLayerRS}, 
-                                I_static::AbstractArray{FT}) where {FT<:Union{AbstractFloat, ForwardDiff.Dual}}
+                                I_static::AbstractArray{FT}) where {FT<:Real}
     @unpack i_λ₁λ₀ = RS_type
     @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺ = added_layer
     @unpack R⁻⁺, R⁺⁻, T⁺⁺, T⁻⁻, J₀⁺, J₀⁻ = composite_layer
@@ -384,7 +384,7 @@ function interaction_helper!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
     ::ScatteringInterface_11, SFI,
     composite_layer::Union{CompositeLayer, CompositeLayerRS}, 
     added_layer::Union{AddedLayer,AddedLayerRS}, 
-    I_static::AbstractArray{FT}) where {FT<:Union{AbstractFloat, ForwardDiff.Dual}}
+    I_static::AbstractArray{FT}) where {FT<:Real}
  
     @unpack i_λ₁λ₀_all = RS_type
     @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, ier⁺⁻, ier⁻⁺, iet⁻⁻, iet⁺⁺ = added_layer
@@ -532,7 +532,7 @@ end
 function interaction!(RS_type::Union{RRS, VS_0to1_plus, VS_1to0_plus}, scattering_interface::AbstractScatteringInterface, SFI,
                         composite_layer::Union{CompositeLayer,CompositeLayerRS}, 
                         added_layer::Union{AddedLayer,AddedLayerRS},
-                        I_static::AbstractArray{FT}) where {FT<:Union{AbstractFloat, ForwardDiff.Dual}}
+                        I_static::AbstractArray{FT}) where {FT<:Real}
                         
     interaction_helper!(RS_type, scattering_interface, SFI, composite_layer, added_layer, I_static)
     synchronize_if_gpu()
@@ -542,7 +542,7 @@ end
 function interaction!(RS_type::noRS, scattering_interface::AbstractScatteringInterface, SFI,
     composite_layer::Union{CompositeLayer,CompositeLayerRS}, 
     added_layer::Union{AddedLayer,AddedLayerRS},
-    I_static::AbstractArray{FT}) where {FT<:Union{AbstractFloat, ForwardDiff.Dual}}
+    I_static::AbstractArray{FT}) where {FT<:Real}
     
     interaction_helper!(scattering_interface, SFI, composite_layer, added_layer, I_static)
     synchronize_if_gpu()

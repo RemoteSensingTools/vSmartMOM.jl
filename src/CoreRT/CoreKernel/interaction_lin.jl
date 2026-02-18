@@ -45,7 +45,7 @@ function interaction_helper!(::ScatteringInterface_00, SFI,
                                 composite_layer_lin::CompositeLayerLin{FT}, 
                                 added_layer::AddedLayer{FT}, 
                                 added_layer_lin::AddedLayerLin{FT}, 
-                                I_static::AbstractArray{FT2}) where {FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2}
+                                I_static::AbstractArray{FT2}) where {FT<:Real,FT2}
 
     Nparams = size(composite_layer_lin.Ṫ⁻⁻)[1]
     
@@ -85,7 +85,7 @@ function interaction_helper!(::ScatteringInterface_01, SFI,
                                 composite_layer_lin::CompositeLayerLin{FT},
                                 added_layer::AddedLayer{FT}, 
                                 added_layer_lin::AddedLayerLin{FT}, 
-                                I_static::AbstractArray{FT2}) where {FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2}
+                                I_static::AbstractArray{FT2}) where {FT<:Real,FT2}
 
     Nparams = size(composite_layer_lin.Ṫ⁻⁻)[1]
     if SFI
@@ -140,7 +140,7 @@ function interaction_helper!(::ScatteringInterface_10, SFI,
                                 composite_layer_lin::CompositeLayerLin{FT}, 
                                 added_layer::AddedLayer{FT}, 
                                 added_layer_lin::AddedLayerLin{FT}, 
-                                I_static::AbstractArray{FT2}) where {FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2}
+                                I_static::AbstractArray{FT2}) where {FT<:Real,FT2}
 
     Nparams = size(composite_layer_lin.Ṫ⁻⁻)[1]
     if SFI
@@ -203,7 +203,7 @@ function interaction_helper!(::ScatteringInterface_11, SFI,
                                 composite_layer_lin::CompositeLayerLin{FT}, 
                                 added_layer::AddedLayer{FT}, 
                                 added_layer_lin::AddedLayerLin{FT}, 
-                                I_static::AbstractArray{FT2}) where {FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2}
+                                I_static::AbstractArray{FT2}) where {FT<:Real,FT2}
     
     @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺ = added_layer #these are aliases to the respective struct elements  
     @unpack R⁻⁺, R⁺⁻, T⁺⁺, T⁻⁻, J₀⁺, J₀⁻ = composite_layer #these are aliases to the respective struct elements 
@@ -323,7 +323,7 @@ function interaction!(scattering_interface::AbstractScatteringInterface,
         composite_layer_lin::CompositeLayerLin{FT}, 
         added_layer::AddedLayer{FT},
         added_layer_lin::AddedLayerLin{FT},
-        I_static::AbstractArray{FT2}) where {FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2}
+        I_static::AbstractArray{FT2}) where {FT<:Real,FT2}
     
     #@show A1[1,1,1], A2[1,1,1]
     interaction_helper!(scattering_interface, SFI, 
