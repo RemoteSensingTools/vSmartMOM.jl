@@ -110,6 +110,7 @@ include("tools/model_from_parameters.jl")         # Converting parameters to der
 include("tools/lin_model_from_parameters.jl")     # Linearized model from parameters
 include("tools/show_utils.jl")                    # Pretty-printing objects
 include("LayerOpticalProperties/compEffectiveLayerProperties.jl")
+include("LayerOpticalProperties/delta_m_truncation.jl")         # δ-M truncation + chain rule
 include("LayerOpticalProperties/compEffectiveLayerProperties_lin.jl")
 
 # Surfaces
@@ -124,6 +125,8 @@ export model_from_parameters,               # Converting the parameters to model
        default_parameters                   # Set of default parameters
 export lin_added_layer_all_params,            # 3 params -> all params chain rule
        OpticalPropertyJacobian,               # AD boundary struct alias
+       RawAerosolJacobian,                    # AD boundary for raw aerosol derivatives
+       delta_m_forward, delta_m_truncation_lin, # δ-M truncation functions
        ParameterLayout,                       # Jacobian parameter layout descriptor
        n_total, aerosol_range, gas_range,     # ParameterLayout accessors
        surface_range, surface_index,

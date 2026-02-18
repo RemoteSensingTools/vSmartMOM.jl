@@ -329,6 +329,11 @@ end
 """
     createAero(τAer, aerosol_optics, AerZ⁺⁺, AerZ⁻⁺, τ̇Aer, lin_aerosol_optics, AerŻ⁺⁺, AerŻ⁻⁺, arr_type)
 
+!!! note "Legacy function"
+    Consider using [`delta_m_truncation_lin`](@ref) directly for new code.
+    It provides the same δ-M chain rule in a cleaner, composable form
+    with explicit `RawAerosolJacobian` as the AD boundary.
+
 Compute **δ-M scaled** aerosol optical properties and their derivatives for one aerosol
 type in one atmospheric layer.
 
