@@ -23,10 +23,6 @@ catch
     false
 end
 
-println("="^60)
-println("Raman Scattering (RRS) Forward Model Test")
-println("="^60)
-
 # ─────────────────────────────────────────────────────────────────
 # Configuration: narrow O2-A band. Use smaller wavelength range on GPU
 # to avoid OOM (RRS coupling matrices scale as nSpec²).
@@ -34,11 +30,9 @@ println("="^60)
 if USE_GPU_RAMAN
     params = parameters_from_yaml("test/test_parameters/O2Parameters_GPU.yaml")
     params.architecture = vSmartMOM.Architectures.GPU()
-    println("Architecture: GPU (CUDA) — Raman runs on device (small band for GPU memory)")
 else
     params = parameters_from_yaml("test/test_parameters/O2Parameters.yaml")
     params.architecture = vSmartMOM.Architectures.CPU()
-    println("Architecture: CPU (no CUDA or not functional)")
 end
 model = model_from_parameters(params)
 
@@ -48,20 +42,13 @@ FT = Float64
 nSpec = length(ν)
 ν̃ = mean(ν)
 
-println("Band: $(1e7/ν[end])–$(1e7/ν[1]) nm")
-println("Spectral points: $nSpec")
-println("Memory estimate for coupling matrices: ~$(round(nSpec^2 * 8 / 1024, digits=1)) KB per matrix")
-println("Layers: $(length(model.profile.T))")
-
 # ─────────────────────────────────────────────────────────────────
 # Set up RRS (Rotational Raman Scattering) type
 # Following the pattern from prototype_inelastic.jl
 # ─────────────────────────────────────────────────────────────────
-println("\nSetting up RRS type...")
 
 # Effective temperature for Raman calculations
 effT = (model.profile.vcd_dry' * model.profile.T) / sum(model.profile.vcd_dry)
-println("  Effective temperature: $(round(effT, digits=1)) K")
 
 # Compute N₂ and O₂ molecular constants
 n2, o2 = InelasticScattering.getRamanAtmoConstants(ν̃, effT)
@@ -92,9 +79,6 @@ RS_type = InelasticScattering.RRS(
 
 # Compute Raman single-scattering properties
 CoreRT.getRamanSSProp!(RS_type, 1e7/ν̃, ν)
-println("  RRS properties computed.")
-println("  n_Raman transitions: $(RS_type.n_Raman)")
-println("  Z⁺⁺_λ₁λ₀ size: $(size(RS_type.Z⁺⁺_λ₁λ₀))")
 
 @testset "Raman Scattering Test" begin
 
@@ -102,7 +86,6 @@ println("  Z⁺⁺_λ₁λ₀ size: $(size(RS_type.Z⁺⁺_λ₁λ₀))")
     # Test 1: Run RRS forward model
     # ─────────────────────────────────────────────────────────────
     @testset "RRS forward run" begin
-        println("\n  Running RRS RT...")
         @time R_rrs, T_rrs, ieR, ieT = CoreRT.rt_run_test(RS_type, model, iBand)
         
         @test ndims(R_rrs) == 3
@@ -116,16 +99,12 @@ println("  Z⁺⁺_λ₁λ₀ size: $(size(RS_type.Z⁺⁺_λ₁λ₀))")
         # Elastic component (R_rrs) should be positive for Stokes I
         I_elastic = R_rrs[:, 1, :]
         @test all(I_elastic .> 0) || @warn "Some elastic I < 0: min=$(minimum(I_elastic))"
-        
-        println("  Elastic R(I): min=$(minimum(I_elastic)), max=$(maximum(I_elastic))")
-        println("  Inelastic ieR(I): min=$(minimum(ieR[:,1,:])), max=$(maximum(ieR[:,1,:]))")
     end
     
     # ─────────────────────────────────────────────────────────────
     # Test 2: Run noRS for comparison
     # ─────────────────────────────────────────────────────────────
     @testset "noRS baseline" begin
-        println("\n  Running noRS RT for comparison...")
         noRS_type = InelasticScattering.noRS(
             fscattRayl  = [FT(1)],
             ϖ_Cabannes  = [FT(1)],
@@ -140,8 +119,6 @@ println("  Z⁺⁺_λ₁λ₀ size: $(size(RS_type.Z⁺⁺_λ₁λ₀))")
         @test all(isfinite.(R_noRS))
         I_noRS = R_noRS[:, 1, :]
         @test all(I_noRS .> 0)
-        
-        println("  noRS R(I): min=$(minimum(I_noRS)), max=$(maximum(I_noRS))")
     end
     
     # ─────────────────────────────────────────────────────────────
@@ -150,8 +127,6 @@ println("  Z⁺⁺_λ₁λ₀ size: $(size(RS_type.Z⁺⁺_λ₁λ₀))")
     # a few percent in the O2-A band region.
     # ─────────────────────────────────────────────────────────────
     @testset "Ring effect" begin
-        println("\n  Computing Ring effect...")
-        
         # Re-run both to have them in same scope
         noRS_type = InelasticScattering.noRS(
             fscattRayl  = [FT(1)],
@@ -173,9 +148,6 @@ println("  Z⁺⁺_λ₁λ₀ size: $(size(RS_type.Z⁺⁺_λ₁λ₀))")
         
         mean_ring = mean(abs.(ring_pct))
         max_ring = maximum(abs.(ring_pct))
-        
-        println("  Ring effect: mean |Δ| = $(round(mean_ring, digits=2))%")
-        println("  Ring effect: max  |Δ| = $(round(max_ring, digits=2))%")
         
         # Ring effect should be modest (typically 1-10% in O2-A)
         @test mean_ring < 50.0  # Loose bound — exact value depends on config
@@ -202,11 +174,6 @@ println("  Z⁺⁺_λ₁λ₀ size: $(size(RS_type.Z⁺⁺_λ₁λ₀))")
                 U_total = R_rrs[:, 3, :] .+ ieR[:, 3, :]
                 @test all(abs.(U_total) .<= I_total .+ 1e-10)
             end
-            println("  Polarization consistency: PASS")
         end
     end
 end
-
-println("\n" * "="^60)
-println("Raman scattering test complete.")
-println("="^60)

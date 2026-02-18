@@ -12,14 +12,14 @@ using WignerSymbols
 using Distributions
 using JLD2
 
-# Test the Absorption module
+# Core module tests
 @testset "Absorption" begin include("test_Absorption.jl") end
-
-# Test the Scattering module
 @testset "Scattering" begin include("test_Scattering.jl") end
-
-# Test the CoreRT module
 @testset "CoreRT" begin include("test_CoreRT.jl") end
-
-# Test the SolarModel module
 @testset "SolarModel" begin include("test_SolarModel.jl") end
+
+# Forward model tests (these require YAML parameter files + data)
+@testset "Forward noRS" begin include("test_forward_noRS.jl") end
+
+# Jacobian unit tests
+@testset "Jacobian Unit" begin include("test_jacobians_unit.jl") end
