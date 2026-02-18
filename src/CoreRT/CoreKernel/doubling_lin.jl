@@ -375,23 +375,25 @@ end
     iμ, jμ, n = @index(Global, NTuple)
     i = mod(iμ, n_stokes)
     j = mod(jμ, n_stokes)
+    i12 = (i == 1) || (i == 2)
+    j12 = (j == 1) || (j == 2)
+    nparams = size(ṙ⁻⁺, 1)
 
-    if !(1<=i<=2) #(i > 2)
-        r⁻⁺[iμ,jμ,n]     = - r⁻⁺[iμ, jμ,n]
-        ṙ⁻⁺[1:3,iμ,jμ,n] = - ṙ⁻⁺[1:3,iμ, jμ,n]
+    if !i12
+        r⁻⁺[iμ, jμ, n] = -r⁻⁺[iμ, jμ, n]
+        for iparam = 1:nparams
+            ṙ⁻⁺[iparam, iμ, jμ, n] = -ṙ⁻⁺[iparam, iμ, jμ, n]
+        end
     end
-    
-    #if ((i <= 2) & (j <= 2)) | ((i > 2) & (j > 2))
-    if (((1<=i<=2) & (1<=j<=2)) | (!(1<=i<=2) & !(1<=j<=2)))
-        r⁺⁻[iμ,jμ,n] = r⁻⁺[iμ,jμ,n]
-        t⁻⁻[iμ,jμ,n] = t⁺⁺[iμ,jμ,n]
-        ṙ⁺⁻[1:3,iμ,jμ,n] = ṙ⁻⁺[1:3,iμ,jμ,n]
-        ṫ⁻⁻[1:3,iμ,jμ,n] = ṫ⁺⁺[1:3,iμ,jμ,n]
-    else
-        r⁺⁻[iμ,jμ,n] = - r⁻⁺[iμ,jμ,n]
-        t⁻⁻[iμ,jμ,n] = - t⁺⁺[iμ,jμ,n]
-        ṙ⁺⁻[1:3,iμ,jμ,n] = - ṙ⁻⁺[1:3,iμ,jμ,n]
-        ṫ⁻⁻[1:3,iμ,jμ,n] = - ṫ⁺⁺[1:3,iμ,jμ,n]
+
+    same_block = (i12 && j12) || (!i12 && !j12)
+    s = ifelse(same_block, one(eltype(r⁻⁺)), -one(eltype(r⁻⁺)))
+
+    r⁺⁻[iμ, jμ, n] = s * r⁻⁺[iμ, jμ, n]
+    t⁻⁻[iμ, jμ, n] = s * t⁺⁺[iμ, jμ, n]
+    for iparam = 1:nparams
+        ṙ⁺⁻[iparam, iμ, jμ, n] = s * ṙ⁻⁺[iparam, iμ, jμ, n]
+        ṫ⁻⁻[iparam, iμ, jμ, n] = s * ṫ⁺⁺[iparam, iμ, jμ, n]
     end
 
 end
@@ -399,9 +401,12 @@ end
 @kernel function apply_D_SFI!(n_stokes::Int, J₀⁻, J̇₀⁻)
     iμ, _, n = @index(Global, NTuple)
     i = mod(iμ, n_stokes)
-    if !(1<=i<=2) #(i > 2)
+    i12 = (i == 1) || (i == 2)
+    if !i12
         J₀⁻[iμ, 1, n] = - J₀⁻[iμ, 1, n] 
-        J̇₀⁻[1:3, iμ, 1, n] = - J̇₀⁻[1:3, iμ, 1, n] 
+        for iparam = 1:size(J̇₀⁻, 1)
+            J̇₀⁻[iparam, iμ, 1, n] = -J̇₀⁻[iparam, iμ, 1, n]
+        end
     end
 end
 

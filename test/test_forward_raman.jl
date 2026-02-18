@@ -2,13 +2,12 @@
 # Raman Scattering Forward Model Test (Memory-Aware)
 #
 # Tests Rotational Raman Scattering (RRS) using a narrow O2-A band.
-# Memory planning: RRS requires cross-wavelength coupling matrices
-# Z⁻⁺_λ₁λ₀ and Z⁺⁺_λ₁λ₀ of size (nSpec × nSpec) per layer.
-# Memory scales as O(nλ²) — keep nSpec small for CPU testing.
+# RRS requires cross-wavelength coupling matrices (nSpec × nSpec) per layer;
+# memory scales as O(nλ²).
 #
-# For GPU testing with large nSpec, ensure sufficient device memory:
-#   ~nSpec² × nLayers × 8 bytes per matrix (Float64)
-#   e.g., 500 spectral points × 34 layers ≈ 4 GB per coupling matrix
+# - GPU: uses O2Parameters_GPU.yaml (small wavelength range, ~60 points)
+#   so forward Raman fits in device memory.
+# - CPU: uses O2Parameters.yaml (finer resolution, ~6800 points).
 # =================================================================
 
 using vSmartMOM, vSmartMOM.CoreRT
@@ -16,18 +15,31 @@ using vSmartMOM.InelasticScattering
 using Statistics
 using Test
 
+# Use GPU when CUDA is available (Raman is much faster on GPU)
+const USE_GPU_RAMAN = try
+    using CUDA
+    CUDA.functional()
+catch
+    false
+end
+
 println("="^60)
 println("Raman Scattering (RRS) Forward Model Test")
 println("="^60)
 
 # ─────────────────────────────────────────────────────────────────
-# Configuration: narrow O2-A band for memory-efficient CPU testing
-# Using ~50 spectral points to keep memory manageable
+# Configuration: narrow O2-A band. Use smaller wavelength range on GPU
+# to avoid OOM (RRS coupling matrices scale as nSpec²).
 # ─────────────────────────────────────────────────────────────────
-params = parameters_from_yaml("test/test_parameters/O2Parameters.yaml")
-# Force CPU architecture (O2Parameters.yaml specifies GPU by default)
-params.architecture = vSmartMOM.Architectures.CPU()
-println("Architecture overridden to CPU")
+if USE_GPU_RAMAN
+    params = parameters_from_yaml("test/test_parameters/O2Parameters_GPU.yaml")
+    params.architecture = vSmartMOM.Architectures.GPU()
+    println("Architecture: GPU (CUDA) — Raman runs on device (small band for GPU memory)")
+else
+    params = parameters_from_yaml("test/test_parameters/O2Parameters.yaml")
+    params.architecture = vSmartMOM.Architectures.CPU()
+    println("Architecture: CPU (no CUDA or not functional)")
+end
 model = model_from_parameters(params)
 
 iBand = 1
@@ -54,6 +66,12 @@ println("  Effective temperature: $(round(effT, digits=1)) K")
 # Compute N₂ and O₂ molecular constants
 n2, o2 = InelasticScattering.getRamanAtmoConstants(ν̃, effT)
 
+# Solar irradiance (Stokes I only, unit flux) — required by RRS and noRS constructors
+nPol = model.params.polarization_type.n
+F₀ = zeros(FT, nPol, nSpec)
+F₀[1, :] .= 1.0
+SIF₀ = zeros(FT, nPol, nSpec)
+
 # Initialize RRS struct with placeholder arrays
 RS_type = InelasticScattering.RRS(
     n2          = n2,
@@ -67,7 +85,9 @@ RS_type = InelasticScattering.RRS(
     Z⁻⁺_λ₁λ₀   = zeros(FT, 1, 1),
     Z⁺⁺_λ₁λ₀   = zeros(FT, 1, 1),
     i_ref       = argmin(abs.(ν .- ν̃)),
-    n_Raman     = 0
+    n_Raman     = 0,
+    F₀          = F₀,
+    SIF₀        = SIF₀
 )
 
 # Compute Raman single-scattering properties
@@ -75,11 +95,6 @@ CoreRT.getRamanSSProp!(RS_type, 1e7/ν̃, ν)
 println("  RRS properties computed.")
 println("  n_Raman transitions: $(RS_type.n_Raman)")
 println("  Z⁺⁺_λ₁λ₀ size: $(size(RS_type.Z⁺⁺_λ₁λ₀))")
-
-# Set up solar irradiance (Stokes I only, unit flux)
-nPol = model.params.polarization_type.n
-RS_type.F₀ = zeros(FT, nPol, nSpec)
-RS_type.F₀[1, :] .= 1.0
 
 @testset "Raman Scattering Test" begin
 
