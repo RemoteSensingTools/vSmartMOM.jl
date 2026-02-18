@@ -4,7 +4,37 @@ This file contains RT elemental-related functions
  
 =#
 
-"Elemental single-scattering layer"
+"""
+    elemental!(pol_type, SFI, τ_sum, dτ_λ, dτ, ϖ_λ, ϖ, Z⁺⁺, Z⁻⁺, m, ndoubl, scatter, quad_points, added_layer, I_static, architecture)
+
+Build the thin single-scattering elemental layer matrices (r, t, j) for a
+homogeneous slab with optical depth `dτ`.
+
+Uses exact single-scattering formulas (Fell 1997, Eqs. 1.52--1.56) that
+remain numerically stable for arbitrary absorption.  GPU kernels are
+dispatched via KernelAbstractions.  The `D`-matrix symmetry relation is
+applied at the end to fill `r⁺⁻` and `t⁻⁻` from `r⁻⁺` and `t⁺⁺`.
+
+When `SFI == true`, the solar source terms `J₀⁺` and `J₀⁻` are computed;
+otherwise they are left untouched.
+
+# Arguments
+- `pol_type`: polarization type (Stokes_I, Stokes_IQU, or Stokes_IQUV)
+- `SFI::Bool`: use Source Function Integration for the solar beam
+- `τ_sum`: cumulative optical depth above the current layer (per λ)
+- `dτ_λ`: elemental-layer total optical depth (per λ, including gas absorption)
+- `dτ`: elemental-layer scattering optical depth (scalar)
+- `ϖ_λ`: single-scattering albedo per λ (with gas absorption)
+- `ϖ`: single-scattering albedo (scattering only, no gas absorption)
+- `Z⁺⁺`, `Z⁻⁺`: forward/backward scattering phase-matrix expansions
+- `m::Int`: Fourier azimuth moment index
+- `ndoubl::Int`: number of subsequent doublings (affects `D`-matrix application)
+- `scatter::Bool`: whether the layer scatters
+- `quad_points`: [`QuadPoints`](@ref) with quadrature angles and weights
+- `added_layer`: [`AddedLayer`](@ref) or `AddedLayerRS` to fill in-place
+- `I_static`: pre-allocated identity matrix (batched)
+- `architecture`: CPU or GPU architecture selector
+"""
 function elemental!(pol_type, SFI::Bool, 
                             τ_sum::AbstractArray,       #{FT2,1}, #Suniti
                             dτ_λ::AbstractArray{FT,1},  # dτ_λ: total optical depth of elemental layer (per λ)
@@ -107,7 +137,14 @@ function elemental!(pol_type, SFI::Bool,
     #@pack! added_layer = r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, J₀⁺, J₀⁻   
 end
 
-"Elemental single-scattering layer"
+"""
+    elemental!(pol_type, SFI, τ_sum, dτ, computed_layer_properties, m, ndoubl, scatter, quad_points, added_layer, architecture)
+
+Variant of [`elemental!`](@ref) that accepts a
+[`CoreScatteringOpticalProperties`](@ref) bundle instead of individual
+`ϖ_λ`, `Z⁺⁺`, `Z⁻⁺` arrays.  Optical properties are unpacked internally
+and the same GPU-accelerated single-scattering formulas are applied.
+"""
 function elemental!(pol_type, SFI::Bool, 
                             τ_sum::AbstractArray,#{FT2,1}, #Suniti
                             dτ::AbstractArray,

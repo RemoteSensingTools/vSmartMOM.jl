@@ -155,9 +155,16 @@ Model that specifies the Mie computation details
 =#
 
 """
-    type MieModel
+    MieModel{FDT<:AbstractFourierDecompositionType, FT}
 
-Model to hold all Mie computation details for NAI2 and PCW
+Configuration for a Lorenz–Mie scattering computation.  Specifies the aerosol
+(size distribution + refractive index), wavelength, polarization type,
+truncation strategy, and integration parameters.  The `computation_type`
+selects between NAI-2 (Siewert) and PCW (Domke) Fourier decomposition
+algorithms.
+
+Pre-computed Wigner symbol tables (`wigner_A`, `wigner_B`) can be supplied
+for PCW; they default to trivial placeholders when unused.
 
 # Fields
 $(DocStringExtensions.FIELDS)
@@ -187,10 +194,16 @@ Types that are needed for the output of the Fourier decomposition
 =#
 
 """
-    struct GreekCoefs{FT}
+    GreekCoefs{FT<:Real}
 
-A struct which holds all Greek coefficient lists (over l) in one object. 
-See eq 16 in Sanghavi 2014 for details. 
+Expansion coefficients of the 4×4 scattering (phase) matrix in generalised
+spherical functions (the "Greek" coefficients).  Six independent coefficient
+vectors (`α, β, γ, δ, ϵ, ζ`) fully describe the azimuthal Fourier
+decomposition of the scattering matrix **B** for a given particle or mixture.
+See Eq. 16 in Sanghavi (2014) for the mapping to **B** elements.
+
+For scalar (intensity-only) RT, only `β` (the phase-function expansion) is
+used.
 
 # Fields
 $(DocStringExtensions.FIELDS)
@@ -236,9 +249,11 @@ struct ScatteringMatrix{FT}
 end
 
 """
-    struct AerosolOptics
+    AerosolOptics{FT<:Real}
 
-A struct which holds all computed aerosol optics
+Computed aerosol single-scattering optical properties for one aerosol type
+at one (or more) wavelengths.  Produced by integrating the Mie solution over
+the particle size distribution.
 
 # Fields
 $(DocStringExtensions.FIELDS)

@@ -5,6 +5,28 @@ This file implements rt_kernel!, which performs the core RT routines (elemental,
 =#
 
 """
+    rt_kernel!
+
+Core radiative-transfer kernel that processes a single atmospheric layer.
+
+For each layer (indexed by `iz` from top-of-atmosphere downward):
+
+1. **Elemental** – builds the thin single-scattering layer matrices (r, t, j).
+2. **Doubling** – doubles the elemental layer `ndoubl` times to obtain the
+   full homogeneous layer.
+3. **Interaction** – combines the newly doubled (added) layer with the
+   accumulated composite layer from above.
+
+At the first layer (`iz == 1`) the added-layer matrices are simply copied
+into the composite layer.  For non-scattering layers, Beer-law transmission
+is assigned directly.
+
+Multiple methods are dispatched on the Raman-scattering type (`noRS`, `RRS`,
+`VS_0to1`, etc.) and on the optical-property container type
+(`CoreScatteringOpticalProperties` vs. pre-unpacked fields).
+"""
+
+"""
     _set_transmission_noscat!(t⁺⁺, t⁻⁻, τ_vals, qp_μN)
 
 Set transmission matrices for non-scattering layers using Beer's law.

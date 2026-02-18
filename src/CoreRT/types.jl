@@ -106,7 +106,25 @@ struct SFI <:AbstractSourceType end
 "Abstract Type for Layer R,T and J matrices"
 abstract type AbstractLayer end
 
-"Composite Layer Matrices (`-/+` defined in τ coordinates, i.e. `-`=outgoing, `+`=incoming"
+"""
+    CompositeLayer{FT} <: AbstractLayer
+
+Accumulated (composite) layer matrices produced by the interaction step of the
+adding/doubling RT method.  Stores the reflectance (`R`), transmission (`T`),
+and source (`J`) matrices for the combined atmospheric slab from the top of
+atmosphere down to the current layer.
+
+Sign convention: `−` = outgoing (upward, decreasing τ), `+` = incoming
+(downward, increasing τ).
+
+# Fields
+- `R⁻⁺::AbstractArray{FT,3}`: reflectance from incoming (+) to outgoing (−)
+- `R⁺⁻::AbstractArray{FT,3}`: reflectance from outgoing (−) to incoming (+)
+- `T⁺⁺::AbstractArray{FT,3}`: transmission in the incoming (+) direction
+- `T⁻⁻::AbstractArray{FT,3}`: transmission in the outgoing (−) direction
+- `J₀⁺::AbstractArray{FT,3}`: source in the incoming (+) direction
+- `J₀⁻::AbstractArray{FT,3}`: source in the outgoing (−) direction
+"""
 Base.@kwdef struct CompositeLayer{FT} <: AbstractLayer 
     "Composite layer Reflectance matrix R (from + -> -)"
     R⁻⁺::AbstractArray{FT,3}
@@ -122,7 +140,26 @@ Base.@kwdef struct CompositeLayer{FT} <: AbstractLayer
     J₀⁻::AbstractArray{FT,3}
 end
 
-"Added (Single) Layer Matrices (`-/+` defined in τ coordinates, i.e. `-`=outgoing, `+`=incoming"
+"""
+    AddedLayer{FT} <: AbstractLayer
+
+Single homogeneous layer matrices produced by the elemental/doubling steps of
+the RT solver.  After doubling, these represent a full atmospheric layer that
+is subsequently combined with the composite layer via the interaction step.
+
+Lower-case field names (`r`, `t`, `j`) distinguish added-layer quantities from
+composite-layer quantities (`R`, `T`, `J`).
+
+# Fields
+- `r⁻⁺::AbstractArray{FT,3}`: reflectance from incoming (+) to outgoing (−)
+- `t⁺⁺::AbstractArray{FT,3}`: transmission in the incoming (+) direction
+- `r⁺⁻::AbstractArray{FT,3}`: reflectance from outgoing (−) to incoming (+)
+- `t⁻⁻::AbstractArray{FT,3}`: transmission in the outgoing (−) direction
+- `j₀⁺::AbstractArray{FT,3}`: source in the incoming (+) direction
+- `j₀⁻::AbstractArray{FT,3}`: source in the outgoing (−) direction
+- `temp1`, `temp2`: pre-allocated workspace arrays to avoid allocations
+- `temp1_ptr`, `temp2_ptr`: CUDA pointer arrays (ignored on CPU)
+"""
 Base.@kwdef struct AddedLayer{FT} <: AbstractLayer 
     "Added layer Reflectance matrix R (from + -> -)"
     r⁻⁺::AbstractArray{FT,3}
@@ -401,9 +438,13 @@ mutable struct ScatteringParameters{FT<:Real}
 end
 
 """
-    struct vSmartMOM_Parameters
+    vSmartMOM_Parameters{FT<:Real}
 
-A struct which holds all initial model parameters (before any computations)
+Top-level container for all user-specified model parameters **before** any
+derived quantities are computed.  Groups radiative-transfer settings
+(spectral bands, BRDF, quadrature, polarization), observation geometry
+(SZA, VZA, VAZ), the atmospheric profile (T, p, q), and optional
+absorption/scattering sub-parameter structs.
 
 # Fields
 $(DocStringExtensions.FIELDS)
@@ -463,9 +504,11 @@ mutable struct vSmartMOM_Parameters{FT<:Real}
 end
 
 """
-    struct QuadPoints{FT} 
+    QuadPoints{FT}
 
-A struct which holds Quadrature points, weights, etc
+Gauss or Gauss-Radau quadrature points and weights used for the angular
+discretisation of the radiative transfer equation.  Also stores the cosine
+of the solar zenith angle (`μ₀`) and its index within the quadrature grid.
 
 # Fields
 $(DocStringExtensions.FIELDS)
@@ -490,9 +533,14 @@ struct QuadPoints{FT}
 end
 
 """
-    struct vSmartMOM_Model
+    vSmartMOM_Model
 
-A struct which holds all derived model parameters (including any computations)
+Central model state produced after preprocessing the user-supplied
+[`vSmartMOM_Parameters`](@ref).  Holds the original parameters together with
+all derived quantities needed by the RT solver: truncated aerosol optics,
+Greek coefficients for Rayleigh/Cabannes scattering, quadrature points,
+and per-band optical-depth arrays for absorption, Rayleigh, and aerosol
+contributions.
 
 # Fields
 $(DocStringExtensions.FIELDS)
@@ -623,7 +671,22 @@ end
 
 abstract type AbstractOpticalProperties end
 
-# Core optical Properties COP
+"""
+    CoreScatteringOpticalProperties{FT,FT2,FT3} <: AbstractOpticalProperties
+
+Core optical properties for a single atmospheric layer used by the RT solver.
+Bundles the optical depth, single-scattering albedo, and the forward/backward
+scattering phase-matrix expansion (`Z` matrices).
+
+Multiple `CoreScatteringOpticalProperties` can be combined with `+` (mixing
+Rayleigh and aerosol) or `*` (vertical concatenation).
+
+# Fields
+- `τ::FT`: layer optical depth (scalar or per-wavelength vector)
+- `ϖ::FT2`: single-scattering albedo
+- `Z⁺⁺::FT3`: forward-scattering Z matrix
+- `Z⁻⁺::FT3`: backward-scattering Z matrix
+"""
 Base.@kwdef struct CoreScatteringOpticalProperties{FT,FT2,FT3} <:  AbstractOpticalProperties
     "Absorption optical depth (scalar or wavelength dependent)"
     τ::FT 

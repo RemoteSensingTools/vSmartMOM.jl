@@ -4,7 +4,13 @@ This file contains RT interaction-related functions
  
 =#
 
-# No scattering in either the added layer or the composite layer
+"""
+    interaction_helper!(::ScatteringInterface_00, SFI, composite_layer, added_layer, I_static)
+
+Non-scattering interaction: neither the composite nor the added layer
+scatters.  Transmission matrices are simply multiplied and source terms
+are propagated without any reflectance coupling.
+"""
 function interaction_helper!(::ScatteringInterface_00, SFI,
                                 composite_layer::CompositeLayer{FT}, 
                                 added_layer::AddedLayer{FT}, 
@@ -21,9 +27,13 @@ function interaction_helper!(::ScatteringInterface_00, SFI,
     T⁺⁺  .= t⁺⁺ ⊠ T⁺⁺
 end
 
-# No scattering in inhomogeneous composite layer.
-# Scattering in homogeneous layer, added to bottom of the composite layer.
-# Produces a new, scattering composite layer.
+"""
+    interaction_helper!(::ScatteringInterface_01, SFI, composite_layer, added_layer, I_static)
+
+Interaction when only the added (homogeneous) layer scatters.  The composite
+layer above is non-scattering, so `R⁻⁺` is built from the added layer's `r⁻⁺`
+transported through the composite transmission.
+"""
 function interaction_helper!(::ScatteringInterface_01, SFI,
                                 composite_layer::CompositeLayer{FT}, 
                                 added_layer::AddedLayer{FT}, 
@@ -42,10 +52,13 @@ function interaction_helper!(::ScatteringInterface_01, SFI,
     T⁻⁻ .= T⁻⁻ ⊠ t⁻⁻    
 end
 
-# Scattering in inhomogeneous composite layer.
-# no scattering in homogeneous layer which is 
-# added to the bottom of the composite layer.
-# Produces a new, scattering composite layer.
+"""
+    interaction_helper!(::ScatteringInterface_10, SFI, composite_layer, added_layer, I_static)
+
+Interaction when only the composite layer scatters and the added layer is
+non-scattering.  The composite `R⁺⁻` is transported through the added
+layer's transmission without requiring a matrix inversion.
+"""
 function interaction_helper!(::ScatteringInterface_10, SFI,
                                 composite_layer::CompositeLayer{FT}, 
                                 added_layer::AddedLayer{FT}, 
@@ -63,9 +76,15 @@ function interaction_helper!(::ScatteringInterface_10, SFI,
     R⁺⁻ .= t⁺⁺ ⊠ R⁺⁻ ⊠ t⁻⁻
 end
 
-# Scattering in inhomogeneous composite layer.
-# Scattering in homogeneous layer which is added to the bottom of the composite layer.
-# Produces a new, scattering composite layer.
+"""
+    interaction_helper!(::ScatteringInterface_11, SFI, composite_layer, added_layer, I_static)
+
+Full-scattering interaction: both the composite and added layers scatter.
+Requires two batched matrix inversions — `(I − r⁻⁺R⁺⁻)⁻¹` and
+`(I − R⁺⁻r⁻⁺)⁻¹` — to account for the geometric series of inter-layer
+reflections.  Updates all six composite-layer fields (R⁻⁺, R⁺⁻, T⁺⁺,
+T⁻⁻, J₀⁺, J₀⁻) in-place.
+"""
 function interaction_helper!(::ScatteringInterface_11, SFI,
                                 composite_layer::CompositeLayer{FT}, 
                                 added_layer::AddedLayer{FT}, 
@@ -116,7 +135,16 @@ function interaction_helper!(::ScatteringInterface_11, SFI,
     R⁺⁻ .= r⁺⁻ .+ T21_inv ⊠ R⁺⁻ ⊠ t⁻⁻  
 end
 
-"Compute interaction between composite and added layers"
+"""
+    interaction!(scattering_interface, SFI, composite_layer, added_layer, I_static)
+
+Combine the accumulated [`CompositeLayer`](@ref) (from above) with a newly
+doubled [`AddedLayer`](@ref) (below) using the adding equations.
+
+Dispatches to the appropriate [`interaction_helper!`](@ref) based on the
+`scattering_interface` type (`ScatteringInterface_00`, `_01`, `_10`, or
+`_11`), then issues a GPU synchronisation barrier.
+"""
 function interaction!(scattering_interface::AbstractScatteringInterface, SFI,
                         composite_layer::CompositeLayer{FT}, 
                         added_layer::AddedLayer{FT},
