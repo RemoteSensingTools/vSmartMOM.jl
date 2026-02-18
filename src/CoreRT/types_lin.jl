@@ -1,7 +1,22 @@
 "Abstract Type for Layer Ṙ,Ṫ and J̇ matrices"
 abstract type AbstractLayerLin end
 
-"Composite Layer Matrices (`-/+` defined in τ coordinates, i.e. `-`=outgoing, `+`=incoming"
+"""
+    CompositeLayerLin{FT} <: AbstractLayerLin
+
+Linearized (Jacobian) counterpart of [`CompositeLayer`](@ref).  Each field
+is a 4-D array whose extra (first) dimension spans the number of retrieval
+parameters, storing ∂R/∂x, ∂T/∂x, and ∂J/∂x for the accumulated composite
+layer.
+
+# Fields
+- `Ṙ⁻⁺::AbstractArray{FT,4}`: ∂R⁻⁺/∂x
+- `Ṙ⁺⁻::AbstractArray{FT,4}`: ∂R⁺⁻/∂x
+- `Ṫ⁺⁺::AbstractArray{FT,4}`: ∂T⁺⁺/∂x
+- `Ṫ⁻⁻::AbstractArray{FT,4}`: ∂T⁻⁻/∂x
+- `J̇₀⁺::AbstractArray{FT,4}`: ∂J₀⁺/∂x
+- `J̇₀⁻::AbstractArray{FT,4}`: ∂J₀⁻/∂x
+"""
 Base.@kwdef struct CompositeLayerLin{FT} <: AbstractLayerLin 
     "Composite layer Reflectance matrix R (from + -> -)"
     Ṙ⁻⁺::AbstractArray{FT,4}
@@ -17,7 +32,22 @@ Base.@kwdef struct CompositeLayerLin{FT} <: AbstractLayerLin
     J̇₀⁻::AbstractArray{FT,4}
 end
 
-"Added (Single) Layer Matrices (`-/+` defined in τ coordinates, i.e. `-`=outgoing, `+`=incoming"
+"""
+    AddedLayerLin{FT} <: AbstractLayerLin
+
+Linearized (Jacobian) counterpart of [`AddedLayer`](@ref).  Stores
+derivatives of the single-layer reflectance, transmission, and source
+matrices with respect to two groups of parameters:
+
+1. **Layer-intrinsic** derivatives (`ṙ`, `ṫ`, `J̇`) w.r.t. the layer's own
+   τ, ϖ, and Z.
+2. **All-parameter** derivatives (`ap_ṙ`, `ap_ṫ`, `ap_J̇`) w.r.t. the full
+   state vector (surface albedo, VMR profiles, aerosol parameters, etc.).
+
+# Fields
+- `ṙ⁻⁺`, `ṫ⁺⁺`, `ṙ⁺⁻`, `ṫ⁻⁻`, `J̇₀⁺`, `J̇₀⁻`: layer-intrinsic Jacobians (4-D)
+- `ap_ṙ⁻⁺`, `ap_ṫ⁺⁺`, `ap_ṙ⁺⁻`, `ap_ṫ⁻⁻`, `ap_J̇₀⁺`, `ap_J̇₀⁻`: full state-vector Jacobians (4-D)
+"""
 Base.@kwdef struct AddedLayerLin{FT} <: AbstractLayerLin 
     # Derivatives with respect to (layer) τ, ϖ and Z only
     "Added layer Reflectance matrix R (from + -> -)"

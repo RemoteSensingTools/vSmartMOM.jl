@@ -78,6 +78,26 @@ function doubling_helper!(pol_type,
     return nothing 
 end
 
+"""
+    doubling!(pol_type, SFI, expk, ndoubl, added_layer, I_static, architecture)
+
+Double the elemental layer `ndoubl` times to build the full homogeneous-layer
+reflectance, transmission, and source matrices stored in `added_layer`.
+
+Delegates to [`doubling_helper!`](@ref), which iteratively applies the
+adding equations (see Eqs. 8 in the Raman paper draft) and then restores
+the `D`-matrix symmetry.  After completion a GPU synchronisation barrier
+is issued.
+
+# Arguments
+- `pol_type`: polarization type (determines `D`-matrix structure)
+- `SFI`: whether Source Function Integration is active
+- `expk`: `exp(-dτ/μ₀)` attenuation factor (doubled each iteration)
+- `ndoubl::Int`: number of doubling steps
+- `added_layer`: [`AddedLayer`](@ref) whose `r`, `t`, `j` fields are updated in-place
+- `I_static`: pre-allocated batched identity matrix
+- `architecture`: CPU or GPU selector
+"""
 function doubling!(pol_type, SFI, 
                     expk,
                     ndoubl::Int, 

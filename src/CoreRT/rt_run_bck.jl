@@ -57,12 +57,8 @@ function rt_run_bck(RS_type::AbstractRamanType, #Default - no Raman scattering (
     #TODO: if RS_type!=noRS, create ϖ_λ₁λ₀, i_λ₁λ₀, fscattRayl, Z⁺⁺_λ₁λ₀, Z⁻⁺_λ₁λ₀ (for input), and ieJ₀⁺, ieJ₀⁻, ieR⁺⁻, ieR⁻⁺, ieT⁻⁻, ieT⁺⁺, ier⁺⁻, ier⁻⁺, iet⁻⁻, iet⁺⁺ (for output)
     #getRamanSSProp(RS_type, λ, grid_in)
     
-    println("Finished initializing arrays")
-
     # Loop over fourier moments
     for m = 0:max_m - 1
-
-        println("Fourier Moment: ", m, "/", max_m-1)
 
         # Azimuthal weighting
         weight = m == 0 ? FT(0.5) : FT(1.0)
@@ -182,10 +178,6 @@ function rt_run_bck(model::vSmartMOM_Model; i_band::Integer = -1)
         Rs = []
 
         for i in 1:n_bands
-
-            println("------------------------------")
-            println("Computing R for band #$(i)")
-            println("------------------------------")
 
             R = rt_run_bck(noRS(),
                     model.params.polarization_type,
