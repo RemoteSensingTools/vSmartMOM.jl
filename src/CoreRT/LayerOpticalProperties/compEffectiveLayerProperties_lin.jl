@@ -1,3 +1,21 @@
+#=
+AD Architecture Boundary
+========================
+This file is the interface between the "physical parameter → optical property" chain rule
+and the "optical property → TOA radiance" adding-doubling propagation.
+
+Physical parameters (VMR, aerosol τ_ref/n_r/n_i/size/profile, surface albedo) produce
+derivatives ∂(τ,ϖ,Z)/∂x_phys via Mie theory (ForwardDiff), Beer-Lambert law, and
+mixing rules (quotient rule). These derivatives are computed HERE and stored in
+`CoreScatteringOpticalPropertiesLin`.
+
+The RT kernel (elemental!, doubling!, interaction!) then only needs to propagate
+w.r.t. the 3 core variables (τ, ϖ, Z) using the chain rule:
+    ∂R/∂x = ∂R/∂τ · ∂τ/∂x + ∂R/∂ϖ · ∂ϖ/∂x + ∂R/∂Z · ∂Z/∂x
+This clean separation makes it straightforward to add new physical parameters
+without touching the RT propagation code.
+=#
+
 """
     constructCoreOpticalProperties(RS_type, iBand, m, model, lin_model)
 

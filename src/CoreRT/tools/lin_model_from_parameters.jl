@@ -57,7 +57,6 @@ function model_from_parameters(lin::LinMode,
 
     
     # Get new p/T profiles using obs_alt
-    #Suniti TODO
     #p, T, q = resize_layers(params.obs_alt, params.p, params.T, params.q)
     # sensor_levels, p, T, q = resize_layers_for_ms(params.obs_alt, params.p, params.T, params.q)
 
@@ -97,7 +96,6 @@ function model_from_parameters(lin::LinMode,
     # i.e. code the rt core with fixed amount of derivatives as in her paper, then compute chain rule for dtau/dVMr, etc...
     FT2 = isnothing(params.absorption_params) || !haskey(params.absorption_params.vmr,"CO2") ? params.float_type : eltype(params.absorption_params.vmr["CO2"])
     τ_abs     = [zeros(FT2, length(params.spec_bands[i]), length(profile.p_full)) for i in 1:n_bands]
-    #@show "here1"
     # Define N_fix_gas as the number of fixed abundance gases (like O2, N2, etc.) - these will not be included in the computation of the Jacobian matrix
     N_fix_gas = length(unique(Iterators.flatten(params.absorption_params.fixed_molecules)))
     # Define N_var_gas as the number of variable gases whose abundance is to be determined - these will be included in the Jacobian computation
@@ -112,17 +110,13 @@ function model_from_parameters(lin::LinMode,
 
         # i'th spectral band (convert from cm⁻¹ to μm)
         curr_band_λ = params.float_type(1e4) ./ params.spec_bands[i_band]
-        # @show profile.vcd_dry, size(τ_rayl[i_band])
         # Compute Rayleigh properties per layer for `i_band` band center  
-        #Suniti: the following two lines are temporary. this Cabannes depolarization applies only to the Earth's atmosphere
         # It has been added to make sure that the code sees the same Rayleigh cross section, regardless of elastic or inelastic RT 
         # Needs better (more general) formulation 
         νₘ = FT(0.5)*(params.spec_bands[i_band][1]+params.spec_bands[i_band][end])
         λₘ = FT(1.e7)/νₘ  # ← FIX: Use params.float_type
-        #@show i_band
         ϖ_Cabannes[i_band], γ_air_Cabannes, γ_air_Rayleigh = 
             InelasticScattering.compute_γ_air_Rayleigh!(λₘ)
-        #@show ϖ_Cabannes[i_band]
         depol_air_Cabannes = 2γ_air_Cabannes/(1+γ_air_Cabannes)
         depol_air_Rayleigh = 2γ_air_Rayleigh/(1+γ_air_Rayleigh)
         
@@ -136,7 +130,6 @@ function model_from_parameters(lin::LinMode,
                                 curr_band_λ, 
                                 params.depol, profile.vcd_dry);
         
-                                #@show τ_rayl[i_band]
 
         # If no absorption, continue to next band
         (isnothing(params.absorption_params) && isnothing(params.q)) && continue
@@ -165,9 +158,6 @@ function model_from_parameters(lin::LinMode,
                 profile.vmr_h2o, 
                 profile);
         end
-        #@show "hello"
-        #@show params.absorption_params.molecules[i_band]
-        #@show length(params.absorption_params.molecules[i_band])
         # Loop over all molecules in this band, obtain profile for each, and add them up
         if !isnothing(params.absorption_params) 
             if !isempty(params.absorption_params.fixed_molecules[i_band])
@@ -276,8 +266,6 @@ function model_from_parameters(lin::LinMode,
 
         # Create a univariate aerosol distribution
         mie_aerosol = Aerosol(size_distribution, curr_aerosol.nᵣ, curr_aerosol.nᵢ)
-        #@show typeof(curr_aerosol.nᵣ)
-        #mie_aerosol = make_mie_aerosol(size_distribution, curr_aerosol.nᵣ, curr_aerosol.nᵢ, params.scattering_params.r_max, params.scattering_params.nquad_radius) #Suniti: why is the refractive index needed here?
 
         # Create the aerosol extinction cross-section at the reference wavelength:
         mie_model      = make_mie_model(params.scattering_params.decomp_type, 
@@ -381,9 +369,6 @@ function model_from_parameters(lin::LinMode,
                 greek_coeffs = GreekCoefs(α, β, γ, δ, ϵ, ζ)
                 lin_greek_coeffs = linGreekCoefs(α̇, β̇, γ̇, δ̇, ϵ̇, ζ̇)
                 ν_grid = [1e4/curr_band_λ[1], 1e4/curr_band_λ[end]] 
-                #@show 1e4/curr_band_λ[1], 1e4/curr_band_λ[end]
-                #@show aerosol_optics_raw_0.k, aerosol_optics_raw_1.k
-                #@show aerosol_optics_raw_0.k*aerosol_optics_raw_0.ω̃, aerosol_optics_raw_1.k*aerosol_optics_raw_1.ω̃
                 kext_grid = [aerosol_optics_raw_0.k, aerosol_optics_raw_1.k]
                 ksca_grid = [aerosol_optics_raw_0.k*aerosol_optics_raw_0.ω̃, aerosol_optics_raw_1.k*aerosol_optics_raw_1.ω̃] 
                 interp_linear_kext = LinearInterpolation(ν_grid, kext_grid)
@@ -422,8 +407,6 @@ function model_from_parameters(lin::LinMode,
             end
             
             # Compute truncated aerosol optical properties (phase function and fᵗ), consistent with Ltrunc:
-            #@show i_aer, i_band
-            #@show length(aerosol_optics_raw.greek_coefs.β), truncation_type.l_max
             
             if length(aerosol_optics_raw.greek_coefs.β) > truncation_type.l_max
                 aerosol_optics[i_band][i_aer], lin_aerosol_optics[i_band][i_aer] = 
@@ -431,16 +414,12 @@ function model_from_parameters(lin::LinMode,
                                 aerosol_optics_raw, lin_aerosol_optics_raw; reportFit=false)
                 l_max_aer[i_aer, i_band] = truncation_type.l_max
                 
-                #@show aerosol_optics[i_band][i_aer].fᵗ
-                #@show lin_aerosol_optics[i_band][i_aer].ḟᵗ
                 #max_m[i_band] = Int(ceil(l_max[i_band] + 1)/2)                                 
             else
-                #@show truncation_type.l_max
                 aerosol_optics[i_band][i_aer] = aerosol_optics_raw
                 lin_aerosol_optics[i_band][i_aer] = lin_aerosol_optics_raw
                 l_max_aer[i_aer, i_band] = length(aerosol_optics_raw.greek_coefs.β)
                 #max_m[i_band] = Int(ceil(l_max[i_band] + 1)/2)
-                #@show max_m[i_band]
             end
             # Extract p₀ and σp from the aerosol's vertical distribution (Normal(p₀, σp))
             aer_p₀ = mean(c_aero.profile)
@@ -478,8 +457,6 @@ function model_from_parameters(lin::LinMode,
                     (ctr==5 ? dτₚdp₀' : dτₚdσp')
             end
                              
-            #@show size(τ_aer[i_band][i_aer,:,:])
-            #@show params.scattering_params.rt_aerosols[i_aer].τ_ref
         end                  
     end
     for i_band = 1:n_bands
@@ -487,11 +464,8 @@ function model_from_parameters(lin::LinMode,
         max_m[i_band] = Int(ceil(l_max[i_band] + 1)/2)  
     end
     set_uniform_lmax!(l_max, aerosol_optics)
-#@show typeof(τ_aer)
-#@show typeof(τ_rayl)
 
     # Check the floating-type output matches specified FT
-#@show size(ϖ_Cabannes), typeof(ϖ_Cabannes)
     # Return the model 
     return  vSmartMOM_Model(
                         max_m,

@@ -78,45 +78,39 @@ Base.@kwdef struct AddedLayerLin{FT} <: AbstractLayerLin
 end
 
 """
-    struct vSmartMOM_Lin
+    struct vSmartMOM_Lin{A,B,C}
 
-A struct which holds all derived model parameters 
+Holds linearized (Jacobian) model parameters: derivatives of optical depths
+and aerosol properties w.r.t. physical state-vector elements.
 
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-mutable struct vSmartMOM_Lin
-    #"Struct with all individual parameters"
-    #params_lin::vSmartMOM_Lin_Parameters # for example to include information like 
-                                         # whether and which gases/aerosols are to 
-                                         # be linearized, Nparams, etc.
-    "Array to hold cross-sections over entire atmospheric profile"
-    τ̇_abs::AbstractArray{AbstractArray} # w.r.t. psurf, mol. conc.
-    #"Rayleigh optical thickness"
-    #τ̇_rayl::AbstractArray{AbstractArray} # w.r.t. psurf
-    #"Aerosol optical thickness"
-    τ̇_aer::AbstractArray{AbstractArray} # w.r.t. τ_ref, nᵣ, nᵢ, r₀, σᵣ, z₀, σz        
-    "Truncated aerosol optics"
-    lin_aerosol_optics::AbstractArray{AbstractArray{linAerosolOptics}}
-    #Nparams::Int16 # total number of state parameters (also consider surface parameters)
+mutable struct vSmartMOM_Lin{A,B,C}
+    "∂τ_abs/∂x per band: Vector of arrays [NGas × nSpec × nLayers]"
+    τ̇_abs::A
+    "∂τ_aer/∂x per band: Vector of arrays [NAer × 7 × nSpec × nLayers]"
+    τ̇_aer::B
+    "Linearized aerosol optics per band per aerosol: Vector{Vector{linAerosolOptics}}"
+    lin_aerosol_optics::C
 end
 abstract type AbstractOpticalPropertiesLin end
 
 # Core optical Properties COP
-Base.@kwdef struct CoreScatteringOpticalPropertiesLin{FT} <:  AbstractOpticalPropertiesLin
-    "Absorption optical depth (scalar or wavelength dependent)"
-    τ̇::Union{AbstractArray{FT,1}, AbstractArray{FT,2}}#FT3 
-    "Single scattering albedo"
-    ϖ̇::Union{AbstractArray{FT,1}, AbstractArray{FT,2}}#FT4   
-    "Z scattering matrix (forward)"
-    Ż⁺⁺::Union{AbstractArray{FT,3}, AbstractArray{FT,4}}#FT5 
-    "Z scattering matrix (backward)"
-    Ż⁻⁺::Union{AbstractArray{FT,3}, AbstractArray{FT,4}}#FT5
+Base.@kwdef struct CoreScatteringOpticalPropertiesLin{T1,T2,T3} <: AbstractOpticalPropertiesLin
+    "∂τ/∂x — [Nparams] or [Nparams × nSpec]"
+    τ̇::T1
+    "∂ϖ/∂x — [Nparams] or [Nparams × nSpec]"
+    ϖ̇::T2
+    "∂Z⁺⁺/∂x — [nμ × nμ × nSpec] or [Nparams × nμ × nμ × nSpec]"
+    Ż⁺⁺::T3
+    "∂Z⁻⁺/∂x — [nμ × nμ × nSpec] or [Nparams × nμ × nμ × nSpec]"
+    Ż⁻⁺::T3
 end
 
-Base.@kwdef struct CoreAbsorptionOpticalPropertiesLin{FT} <:  AbstractOpticalPropertiesLin
-    "Absorption optical depth (scalar or wavelength dependent)"
-    τ̇::Union{AbstractArray{FT,1}, AbstractArray{FT,2}}
+Base.@kwdef struct CoreAbsorptionOpticalPropertiesLin{T1} <: AbstractOpticalPropertiesLin
+    "∂τ/∂x — [Nparams] or [Nparams × nSpec]"
+    τ̇::T1
 end
 
 Base.@kwdef struct UmbrellaCoreScatteringOpticalProperties{FWD <: CoreScatteringOpticalProperties, LIN} <:  AbstractOpticalPropertiesLin
@@ -169,9 +163,6 @@ function Base.:+(a::UmbrellaCoreScatteringOpticalProperties,
         ϖ  =  w ./ τ
 
         ϖ̇ = (ẏ.τ̇.*y.ϖ' .+ y.τ'.*ẏ.ϖ̇ .- ϖ'.*ẏ.τ̇)./τ'#vcat((ẋ.τ̇.*x.ϖ' .+ x.τ'.*ẋ.ϖ̇ .- ϖ'.*ẋ.τ̇)./τ', 
-            #        (ẏ.τ̇.*y.ϖ' .+ y.τ'.*ẏ.ϖ̇ .- ϖ'.*ẏ.τ̇)./τ')
-        #all(wx .== 0.0) ? (return CoreScatteringOpticalProperties(τ, ϖ, y.Z⁺⁺, y.Z⁻⁺)), nothing : nothing, nothing
-        #all(wy .== 0.0) ? (return CoreScatteringOpticalProperties(τ, ϖ, x.Z⁺⁺, x.Z⁻⁺)), nothing : nothing, nothing
 
         n = length(w);
         
@@ -213,8 +204,6 @@ function Base.:+(a::UmbrellaCoreScatteringOpticalProperties,
 
         ϖ̇ = vcat((ẋ.τ̇.*x.ϖ' .+ x.τ'.*ẋ.ϖ̇ .- ϖ'.*ẋ.τ̇)./τ', 
                     (ẏ.τ̇.*y.ϖ' .+ y.τ'.*ẏ.ϖ̇ .- ϖ'.*ẏ.τ̇)./τ')
-        #all(wx .== 0.0) ? (return CoreScatteringOpticalProperties(τ, ϖ, y.Z⁺⁺, y.Z⁻⁺)), nothing : nothing, nothing
-        #all(wy .== 0.0) ? (return CoreScatteringOpticalProperties(τ, ϖ, x.Z⁺⁺, x.Z⁻⁺)), nothing : nothing, nothing
 
         n = length(w);
         
@@ -266,8 +255,6 @@ function Base.:+(a::UmbrellaCoreScatteringOpticalProperties,
 
     xZ⁺⁺ = x.Z⁺⁺
     xZ⁻⁺ = x.Z⁻⁺
-    #yZ⁺⁺ = y.Z⁺⁺
-    #yZ⁻⁺ = y.Z⁻⁺
 
     if ẋ==nothing # Rayleigh    
         τ  = x.τ .+ y.τ
@@ -278,9 +265,6 @@ function Base.:+(a::UmbrellaCoreScatteringOpticalProperties,
         ϖ  =  w ./ τ
 
         ϖ̇ = (- ϖ'.*ẏ.τ̇)./τ'#vcat((ẋ.τ̇.*x.ϖ' .+ x.τ'.*ẋ.ϖ̇ .- ϖ'.*ẋ.τ̇)./τ', 
-            #        (ẏ.τ̇.*y.ϖ' .+ y.τ'.*ẏ.ϖ̇ .- ϖ'.*ẏ.τ̇)./τ')
-        #all(wx .== 0.0) ? (return CoreScatteringOpticalProperties(τ, ϖ, y.Z⁺⁺, y.Z⁻⁺)), nothing : nothing, nothing
-        #all(wy .== 0.0) ? (return CoreScatteringOpticalProperties(τ, ϖ, x.Z⁺⁺, x.Z⁻⁺)), nothing : nothing, nothing
 
         n = length(w);
         
@@ -303,8 +287,6 @@ function Base.:+(a::UmbrellaCoreScatteringOpticalProperties,
 
         ϖ̇ = vcat((ẋ.τ̇.*x.ϖ' .+ x.τ'.*ẋ.ϖ̇ .- ϖ'.*ẋ.τ̇)./τ', 
                 (- ϖ'.*ẏ.τ̇)./τ')
-        #all(wx .== 0.0) ? (return CoreScatteringOpticalProperties(τ, ϖ, y.Z⁺⁺, y.Z⁻⁺)), nothing : nothing, nothing
-        #all(wy .== 0.0) ? (return CoreScatteringOpticalProperties(τ, ϖ, x.Z⁺⁺, x.Z⁻⁺)), nothing : nothing, nothing
 
         n = length(w);
         

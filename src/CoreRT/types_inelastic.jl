@@ -208,7 +208,7 @@ mutable struct AbsorptionParameters
     "Complex Error Function to use in Voigt calculations"
     CEF::AbstractComplexErrorFunction
     "Wing cutoff to use in cross-section calculation (cm⁻¹)"
-    wing_cutoff::Integer
+    wing_cutoff::Real
 end
 
 """
