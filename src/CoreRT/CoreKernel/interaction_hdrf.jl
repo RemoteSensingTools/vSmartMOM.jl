@@ -10,8 +10,8 @@ function interaction_hdrf!(SFI,
     r⁻⁺ = added_layer.r⁻⁺
     j₀⁻ = added_layer.j₀⁻
     j₀⁺ = added_layer.j₀⁺
-    @unpack J₀⁺, J₀⁻ = composite_layer 
-    @unpack Nquad, wt_μN, iμ₀, iμ₀Nstart, qp_μN = quad_points
+    (; J₀⁺, J₀⁻) = composite_layer 
+    (; Nquad, wt_μN, iμ₀, iμ₀Nstart, qp_μN) = quad_points
     NquadN =  Nquad * pol_type.n
     hdr_J₀⁻ .= r⁻⁺ ⊠ J₀⁺ .+ j₀⁻
     # @show hdr_J₀⁻./ J₀⁺
@@ -48,7 +48,7 @@ function interaction_hdrf_canopy!(SFI,
     hdr_J₀⁻, bhr_J₀⁻, bhr_J₀⁺)
 
     #@unpack topJ₀⁺, botJ₀⁻      = composite_layer #these are aliases to the respective struct elements 
-    @unpack Nquad, wt_μN, iμ₀, qp_μN = quad_points
+    (; Nquad, wt_μN, iμ₀, qp_μN) = quad_points
     NquadN =  Nquad * pol_type.n
     
     wt = collect(wt_μN)

@@ -3,7 +3,7 @@
 Compute moments of the phase matrix 
 """
 function compute_Z_moments(mod::AbstractPolarizationType, μ, greek_coefs::GreekCoefs, m::Int ; arr_type = Array)
-    @unpack α, β, γ, δ, ϵ, ζ = greek_coefs
+    (; α, β, γ, δ, ϵ, ζ) = greek_coefs
     FT = eltype(β)
     n = length(μ)
 
@@ -93,7 +93,7 @@ end
 Compute moments of the phase matrix 
 """
 function compute_Z_moments(mod::AbstractPolarizationType, μ, μ₀, greek_coefs::GreekCoefs, m::Int ; arr_type = Array)
-    @unpack α, β, γ, δ, ϵ, ζ = greek_coefs
+    (; α, β, γ, δ, ϵ, ζ) = greek_coefs
     FT = eltype(β)
     n = length(μ)
 

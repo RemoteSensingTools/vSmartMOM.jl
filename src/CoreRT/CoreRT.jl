@@ -121,7 +121,8 @@ include("Surfaces/rossli_surface.jl")                # Ross-Li Surface
 export model_from_parameters,               # Converting the parameters to model 
        rt_run, rt_run_lin, rt_run_ss,       # Run the RT code (forward, linearized, single scatter)
        default_parameters                   # Set of default parameters
-export lin_added_layer_all_params            # 3 params -> all params chain rule
+export lin_added_layer_all_params,            # 3 params -> all params chain rule
+       OpticalPropertyJacobian                # AD boundary struct alias
 
 # Export types to show easily
 export GaussQuadFullSphere, LambertianSurfaceScalar, LambertianSurfaceSpectrum

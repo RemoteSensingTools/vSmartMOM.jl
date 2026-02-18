@@ -19,8 +19,8 @@ function interaction_ss!(SFI::Bool,
             architecture) where {FT<:Real, FT2}
     
     #@unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺ = added_layer #these are aliases to the respective struct elements  
-    @unpack J₀⁺, J₀⁻ = composite_layer #these are aliases to the respective struct elements 
-    @unpack qp_μN = quad_points
+    (; J₀⁺, J₀⁻) = composite_layer #these are aliases to the respective struct elements 
+    (; qp_μN) = quad_points
     arr_type = array_type(architecture)
     device = devi(architecture)
     qp_μN = arr_type(qp_μN)
@@ -48,9 +48,9 @@ function interaction_inelastic_ss!(RS_type::RRS,
     architecture) where {FT<:Real, FT2}
 
     #@unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺ = added_layer #these are aliases to the respective struct elements  
-    @unpack i_λ₁λ₀ = RS_type
-    @unpack ieJ₀⁺, ieJ₀⁻ = composite_layer #these are aliases to the respective struct elements 
-    @unpack qp_μN = quad_points
+    (; i_λ₁λ₀) = RS_type
+    (; ieJ₀⁺, ieJ₀⁻) = composite_layer #these are aliases to the respective struct elements 
+    (; qp_μN) = quad_points
 
     atype = array_type(architecture)
     device = devi(architecture)
@@ -92,9 +92,9 @@ function interaction_inelastic_ss!(
     quad_points::QuadPoints{FT2},
     architecture) where {FT<:Real, FT2}
 
-@unpack i_λ₁λ₀_all = RS_type
-@unpack ieJ₀⁺, ieJ₀⁻ = composite_layer #these are aliases to the respective struct elements 
-@unpack qp_μN = quad_points
+(; i_λ₁λ₀_all) = RS_type
+(; ieJ₀⁺, ieJ₀⁻) = composite_layer #these are aliases to the respective struct elements 
+(; qp_μN) = quad_points
 
 atype = array_type(architecture)
 device = devi(architecture)

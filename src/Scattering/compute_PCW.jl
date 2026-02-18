@@ -28,11 +28,11 @@ this function.
 function compute_aerosol_optical_properties(model::MieModel{FDT}, FT2::Type=Float64) where FDT<:PCW
 
     # Unpack the model
-    @unpack computation_type, aerosol, r_max, nquad_radius, λ, polarization_type, truncation_type, wigner_A, wigner_B = model
+    (; computation_type, aerosol, r_max, nquad_radius, λ, polarization_type, truncation_type, wigner_A, wigner_B) = model
 
     # Extract variables from aerosol struct:
     # @unpack aerosol, r_max, nquad_radius = mie_aerosol
-    @unpack size_distribution, nᵣ, nᵢ = aerosol
+    (; size_distribution, nᵣ, nᵢ) = aerosol
 
     # Get the refractive index's real part type
     FT = eltype(nᵣ);

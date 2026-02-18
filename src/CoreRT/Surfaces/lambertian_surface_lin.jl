@@ -58,8 +58,8 @@ function create_surface_layer!(RS_type::noRS,
                             τ_sum, τ̇_sum, F₀,
                             architecture) where {FT}
     
-    @unpack qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart, iμ₀, μ₀ = quad_points
-    @unpack n = pol_type
+    (; qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart, iμ₀, μ₀) = quad_points
+    (; n) = pol_type
     arr_type = array_type(architecture)
     
     nparams = size(τ̇_sum,1) # nparams ≠ Nparams (in general)

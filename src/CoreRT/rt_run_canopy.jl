@@ -9,11 +9,11 @@ the model. The latter should generally be used by users.
 
 function rt_run_canopy(RS_type::AbstractRamanType, 
                     model::vSmartMOM_Model, LAD, LAI, BiLambMod, ϖ_canopy, iBand)
-    @unpack obs_alt, sza, vza, vaz = model.obs_geom   # Observational geometry properties
-    @unpack qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart, μ₀, iμ₀, Nquad = model.quad_points # All quadrature points
+    (; obs_alt, sza, vza, vaz) = model.obs_geom   # Observational geometry properties
+    (; qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart, μ₀, iμ₀, Nquad) = model.quad_points # All quadrature points
     pol_type = model.params.polarization_type
-    @unpack max_m = model.params
-    @unpack quad_points = model
+    (; max_m) = model.params
+    (; quad_points) = model
     FT = model.params.float_type
 
     n_aer = isnothing(model.params.scattering_params) ? 0 : length(model.params.scattering_params.rt_aerosols)
@@ -22,7 +22,7 @@ function rt_run_canopy(RS_type::AbstractRamanType,
     # CFRANKEN NEEDS to be changed for concatenated arrays!!
     brdf = model.params.brdf[iBand[1]]
 
-    @unpack ϖ_Cabannes = RS_type
+    (; ϖ_Cabannes) = RS_type
 
     #FT = eltype(sza)                   # Get the float-type to use
     Nz = length(model.profile.p_full)   # Number of vertical slices
@@ -237,11 +237,11 @@ function rt_run_canopy_ms(RS_type::AbstractRamanType,
                             ϖ_canopy, 
                             iBand)
 
-    @unpack obs_alt, sza, vza, vaz = model.obs_geom   # Observational geometry properties
-    @unpack qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart, μ₀, iμ₀, Nquad = model.quad_points # All quadrature points
+    (; obs_alt, sza, vza, vaz) = model.obs_geom   # Observational geometry properties
+    (; qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart, μ₀, iμ₀, Nquad) = model.quad_points # All quadrature points
     pol_type = model.params.polarization_type
-    @unpack max_m = model.params
-    @unpack quad_points = model
+    (; max_m) = model.params
+    (; quad_points) = model
     FT = model.params.float_type
     sensor_levels = [0,1] #dummy to be redefined to [0, Nz-1] when all layers including canopy layer are defined
     n_aer = isnothing(model.params.scattering_params) ? 0 : length(model.params.scattering_params.rt_aerosols)
@@ -250,7 +250,7 @@ function rt_run_canopy_ms(RS_type::AbstractRamanType,
     # CFRANKEN NEEDS to be changed for concatenated arrays!!
     brdf = model.params.brdf[iBand[1]]
 
-    @unpack ϖ_Cabannes = RS_type
+    (; ϖ_Cabannes) = RS_type
 
     #FT = eltype(sza)                   # Get the float-type to use
     Nz = length(model.profile.p_full)   # Number of vertical slices

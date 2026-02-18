@@ -21,7 +21,7 @@ Input:
 end=#
 
 function getRamanSSProp!(RS_type::Union{sol_VS_0to1, sol_VS_1to0}, depol, λ, grid_in)
-    @unpack h2 =  RS_type
+    (; h2) = RS_type
     #n2, o2 = getRamanAtmoConstants(1.e7/λ, T)
     λ_scatt = 2.e7/(grid_in[1]+grid_in[end])     
     #determine Rayleigh scattering cross-section at mean scattered wavelength
@@ -59,7 +59,7 @@ end
 
 
 function getRamanSSProp!(RS_type::sol_RRS, λ, grid_in) 
-    @unpack h2 =  RS_type
+    (; h2) = RS_type
     #n2, o2 = getRamanAtmoConstants(1.e7/λ, T)
     # determine Rayleigh scattering cross-section at central wavelength λ of the spectral band (assumed constant throughout the band)
     solar_σ_Rayl = compute_stellar_Rayl(λ, h2)
@@ -81,7 +81,7 @@ function getRamanSSProp!(RS_type::sol_RRS, λ, grid_in)
 end
 #=
 function getRamanSSProp!(RS_type::sol_RRS, λ, grid_in) 
-    @unpack h2 =  RS_type
+    (; h2) = RS_type
     #n2, o2 = getRamanAtmoConstants(1.e7/λ, T)
     # determine Rayleigh scattering cross-section at central wavelength λ of the spectral band (assumed constant throughout the band)
     atmo_σ_Rayl = compute_optical_Rayl(λ, n2, o2)
@@ -106,13 +106,13 @@ end
 function getRamanSSProp!(
             RS_type::sol_VS_0to1_plus, λ_inc)
 
-    @unpack h2,
+    (; h2,
             iBand, grid_in, bandSpecLim, 
             greek_raman, greek_raman_VS,
             ϖ_Cabannes, fscattRayl,
             ϖ_λ₁λ₀, i_λ₁λ₀,
             ϖ_λ₁λ₀_VS, i_λ₁λ₀_VS,
-            i_λ₁λ₀_all =  RS_type
+            i_λ₁λ₀_all) = RS_type
     #n2, o2 = getRamanAtmoConstants(1.e7/λ, T)
     iBand = []
     grid_in = []
@@ -236,13 +236,13 @@ end
 function getRamanSSProp!(
     RS_type::sol_VS_1to0_plus, λ_inc)
 
-    @unpack h2,
+    (; h2,
         iBand, grid_in, bandSpecLim, 
         greek_raman, greek_raman_VS,
         ϖ_Cabannes, fscattRayl,
         ϖ_λ₁λ₀, i_λ₁λ₀,
         ϖ_λ₁λ₀_VS, i_λ₁λ₀_VS,
-        i_λ₁λ₀_all =  RS_type
+        i_λ₁λ₀_all) = RS_type
     #n2, o2 = getRamanAtmoConstants(1.e7/λ, T)
     iBand = []
     grid_in = []
@@ -363,13 +363,13 @@ end
 function getRamanSSProp!(
     RS_type::Union{sol_VS_0to1_plus, sol_VS_1to0_plus}, λ_inc,  target_grid)
 
-    @unpack h2,
+    (; h2,
         iBand, grid_in, bandSpecLim, 
         greek_raman, greek_raman_VS,
         ϖ_Cabannes, fscattRayl,
         ϖ_λ₁λ₀, i_λ₁λ₀,
         ϖ_λ₁λ₀_VS, i_λ₁λ₀_VS,
-        i_λ₁λ₀_all =  RS_type
+        i_λ₁λ₀_all) = RS_type
     #n2, o2 = getRamanAtmoConstants(1.e7/λ, T)
     iBand = []
     grid_in = []

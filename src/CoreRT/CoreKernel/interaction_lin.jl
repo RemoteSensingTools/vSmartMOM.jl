@@ -205,10 +205,10 @@ function interaction_helper!(::ScatteringInterface_11, SFI,
                                 added_layer_lin::AddedLayerLin{FT}, 
                                 I_static::AbstractArray{FT2}) where {FT<:Real,FT2}
     
-    @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺ = added_layer #these are aliases to the respective struct elements  
-    @unpack R⁻⁺, R⁺⁻, T⁺⁺, T⁻⁻, J₀⁺, J₀⁻ = composite_layer #these are aliases to the respective struct elements 
-    @unpack ap_ṙ⁺⁻, ap_ṙ⁻⁺, ap_ṫ⁻⁻, ap_ṫ⁺⁺, ap_J̇₀⁺, ap_J̇₀⁻  = added_layer_lin #these are aliases to the respective struct elements  
-    @unpack Ṙ⁻⁺, Ṙ⁺⁻, Ṫ⁺⁺, Ṫ⁻⁻, J̇₀⁺, J̇₀⁻ = composite_layer_lin #these are aliases to the respective struct elements 
+    (; r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺) = added_layer #these are aliases to the respective struct elements  
+    (; R⁻⁺, R⁺⁻, T⁺⁺, T⁻⁻, J₀⁺, J₀⁻) = composite_layer #these are aliases to the respective struct elements 
+    (; ap_ṙ⁺⁻, ap_ṙ⁻⁺, ap_ṫ⁻⁻, ap_ṫ⁺⁺, ap_J̇₀⁺, ap_J̇₀⁻) = added_layer_lin #these are aliases to the respective struct elements  
+    (; Ṙ⁻⁺, Ṙ⁺⁻, Ṫ⁺⁺, Ṫ⁻⁻, J̇₀⁺, J̇₀⁻) = composite_layer_lin #these are aliases to the respective struct elements 
     
     Nparams = size(composite_layer_lin.Ṫ⁻⁻)[1]
     # Used to store `(I - R⁺⁻ * r⁻⁺)⁻¹`

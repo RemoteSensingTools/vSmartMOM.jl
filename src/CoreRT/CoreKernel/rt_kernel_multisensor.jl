@@ -17,10 +17,10 @@ function rt_kernel_multisensor!(RS_type::noRS{FT},
                     architecture, 
                     qp_μN, iz, arr_type) where {FT}
 
-    @unpack qp_μ, μ₀ = quad_points
-    @unpack F₀ = RS_type
+    (; qp_μ, μ₀) = quad_points
+    (; F₀) = RS_type
     # Just unpack core optical properties from 
-    @unpack τ, ϖ, Z⁺⁺, Z⁻⁺ = computed_layer_properties
+    (; τ, ϖ, Z⁺⁺, Z⁻⁺) = computed_layer_properties
     # SUNITI, check? Also, better to write function here
     #@show "here", size(τ .* ϖ), size(qp_μ)
     #@show maximum(τ .* ϖ), minimum(qp_μ)
@@ -161,9 +161,9 @@ function rt_kernel_multisensor!(RS_type::Union{RRS{FT}, RRS_plus{FT}, VS_0to1_pl
                                 qp_μN, 
                                 iz, 
                                 arr_type)  where {FT}
-    @unpack qp_μ, μ₀ = quad_points
+    (; qp_μ, μ₀) = quad_points
     # Just unpack core optical properties from 
-    @unpack τ, ϖ, Z⁺⁺, Z⁻⁺ = computed_layer_properties
+    (; τ, ϖ, Z⁺⁺, Z⁻⁺) = computed_layer_properties
     # SUNITI, check? Also, better to write function here
     dτ_max = minimum([maximum(τ .* ϖ), FT(0.001) * minimum(qp_μ)])
     _, ndoubl = doubling_number(dτ_max, maximum(τ .* ϖ))
@@ -173,7 +173,7 @@ function rt_kernel_multisensor!(RS_type::Union{RRS{FT}, RRS_plus{FT}, VS_0to1_pl
     dτ = τ ./ 2^ndoubl
     expk = arr_type(exp.(-dτ /μ₀))
 
-    @unpack Z⁺⁺_λ₁λ₀, Z⁻⁺_λ₁λ₀, F₀ = RS_type
+    (; Z⁺⁺_λ₁λ₀, Z⁻⁺_λ₁λ₀, F₀) = RS_type
     # If there is scattering, perform the elemental and doubling steps
     if scatter
         #@show τ, ϖ, RS_type.fscattRayl

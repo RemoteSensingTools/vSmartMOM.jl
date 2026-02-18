@@ -55,12 +55,12 @@ function rt_kernel!(RS_type::noRS{FT},
                     I_static, 
                     architecture, 
                     qp_μN, iz) where {FT}
-    @unpack qp_μ, μ₀, Nquad, iμ₀Nstart = quad_points
-    @unpack F₀ = RS_type
+    (; qp_μ, μ₀, Nquad, iμ₀Nstart) = quad_points
+    (; F₀) = RS_type
     # Just unpack core optical properties from 
-    @unpack τ, ϖ, Z⁺⁺, Z⁻⁺ = computed_layer_properties
-    @unpack τ̇, ϖ̇, Ż⁺⁺, Ż⁻⁺ = computed_layer_properties_lin
-    @unpack D, n = pol_type
+    (; τ, ϖ, Z⁺⁺, Z⁻⁺) = computed_layer_properties
+    (; τ̇, ϖ̇, Ż⁺⁺, Ż⁻⁺) = computed_layer_properties_lin
+    (; D, n) = pol_type
 
     arr_type = array_type(architecture)
     

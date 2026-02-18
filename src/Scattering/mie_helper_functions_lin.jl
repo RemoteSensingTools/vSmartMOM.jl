@@ -214,8 +214,8 @@ Output: an, bn. Both of shape (aerosol.nquad_radius, N_max) (N_max from aerosol.
 """
 function compute_anbn_lin(model::MieModel, λ, radius)
     
-    @unpack computation_type, aerosol, r_max, nquad_radius, λ, polarization_type, truncation_type, wigner_A, wigner_B = model
-    @unpack size_distribution, nᵣ, nᵢ = aerosol
+    (; computation_type, aerosol, r_max, nquad_radius, λ, polarization_type, truncation_type, wigner_A, wigner_B) = model
+    (; size_distribution, nᵣ, nᵢ) = aerosol
 
     FT = eltype(λ)
     FT2 = eltype(nᵣ)
@@ -556,8 +556,8 @@ function compute_Z_moments(mod::AbstractPolarizationType,
             greek_coefs::GreekCoefs, 
             lin_greek_coefs::linGreekCoefs,
             m::Int ; arr_type = Array)
-    @unpack α, β, γ, δ, ϵ, ζ = greek_coefs
-    @unpack α̇, β̇, γ̇, δ̇, ϵ̇, ζ̇ = lin_greek_coefs
+    (; α, β, γ, δ, ϵ, ζ) = greek_coefs
+    (; α̇, β̇, γ̇, δ̇, ϵ̇, ζ̇) = lin_greek_coefs
     FT = eltype(β)
     n = length(μ)
 

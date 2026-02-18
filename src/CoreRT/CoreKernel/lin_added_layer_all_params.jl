@@ -47,11 +47,11 @@ function lin_added_layer_all_params_helper!(RS_type::noRS{FT},
                                 computed_layer_properties_lin, 
                                 added_layer_lin::AddedLayerLin{FT},
                                 architecture, ndoubl::Int) where {FT<:Real}
-    @unpack ap_ṙ⁺⁻, ap_ṙ⁻⁺, ap_ṫ⁻⁻, ap_ṫ⁺⁺, ap_J̇₀⁺, ap_J̇₀⁻ = added_layer_lin
-    @unpack τ̇, ϖ̇, Ż⁺⁺, Ż⁻⁺ = computed_layer_properties_lin
-    @unpack D, n = pol_type
-    @unpack qp_μ, μ₀, Nquad, iμ₀Nstart = quad_points
-    @unpack F₀ = RS_type
+    (; ap_ṙ⁺⁻, ap_ṙ⁻⁺, ap_ṫ⁻⁻, ap_ṫ⁺⁺, ap_J̇₀⁺, ap_J̇₀⁻) = added_layer_lin
+    (; τ̇, ϖ̇, Ż⁺⁺, Ż⁻⁺) = computed_layer_properties_lin
+    (; D, n) = pol_type
+    (; qp_μ, μ₀, Nquad, iμ₀Nstart) = quad_points
+    (; F₀) = RS_type
 
     arr_type = array_type(architecture)
 

@@ -7,8 +7,8 @@ This file implements rt_kernel_ss!, which performs the core RT routines (element
 # Perform the Core RT routines (elemental, doubling, interaction)
 function rt_kernel_ss!(RS_type::noRS, pol_type, SFI, added_layer, composite_layer, computed_layer_properties, m, quad_points, I_static, architecture, qp_μN, iz) 
 
-    @unpack τ_λ, ϖ_λ, τ, ϖ, Z⁺⁺, Z⁻⁺, dτ_max, dτ, ndoubl, dτ_λ, expk, scatter, τ_sum, scattering_interface = computed_layer_properties
-    @unpack F₀ = RS_type
+    (; τ_λ, ϖ_λ, τ, ϖ, Z⁺⁺, Z⁻⁺, dτ_max, dτ, ndoubl, dτ_λ, expk, scatter, τ_sum, scattering_interface) = computed_layer_properties
+    (; F₀) = RS_type
 
     ndoubl_ss = Int(0)
     #@show τ, ϖ, dτ_max, ndoubl
@@ -72,9 +72,9 @@ end
 # Perform the Core RT routines (elemental, doubling, interaction)
 function rt_kernel_ss!(RS_type::Union{RRS, VS_0to1, VS_1to0}, pol_type, SFI, added_layer, composite_layer, computed_layer_properties, m, quad_points, I_static, architecture, qp_μN, iz) 
     
-    @unpack τ_λ, ϖ_λ, τ, ϖ, Z⁺⁺, Z⁻⁺, dτ_max, dτ, ndoubl, dτ_λ, expk, scatter, τ_sum, scattering_interface = computed_layer_properties
-    @unpack F₀ = RS_type
-    @unpack Z⁺⁺_λ₁λ₀, Z⁻⁺_λ₁λ₀ = RS_type
+    (; τ_λ, ϖ_λ, τ, ϖ, Z⁺⁺, Z⁻⁺, dτ_max, dτ, ndoubl, dτ_λ, expk, scatter, τ_sum, scattering_interface) = computed_layer_properties
+    (; F₀) = RS_type
+    (; Z⁺⁺_λ₁λ₀, Z⁻⁺_λ₁λ₀) = RS_type
     # If there is scattering, perform the elemental and doubling steps
     ndoubl_ss = Int(0)
     if scatter
@@ -165,10 +165,10 @@ function rt_kernel_ss!(RS_type::noRS{FT},
                     architecture, 
                     qp_μN, iz) where {FT}
     #@show array_type(architecture)
-    @unpack qp_μ, μ₀ = quad_points
-    @unpack F₀ = RS_type
+    (; qp_μ, μ₀) = quad_points
+    (; F₀) = RS_type
     # Just unpack core optical properties from 
-    @unpack τ, ϖ, Z⁺⁺, Z⁻⁺ = computed_layer_properties
+    (; τ, ϖ, Z⁺⁺, Z⁻⁺) = computed_layer_properties
     # SUNITI, check? Also, better to write function here
     #@show τ, ϖ
     dτ_max = minimum([maximum(τ .* ϖ), FT(0.001) * minimum(qp_μ)])
@@ -249,10 +249,10 @@ function rt_kernel_ss!(
             scattering_interface, 
             τ_sum, m, quad_points, 
             I_static, architecture, qp_μN, iz)  where {FT}
-    @unpack qp_μ, μ₀ = quad_points
-    @unpack F₀ = RS_type
+    (; qp_μ, μ₀) = quad_points
+    (; F₀) = RS_type
     # Just unpack core optical properties from 
-    @unpack τ, ϖ, Z⁺⁺, Z⁻⁺ = computed_layer_properties
+    (; τ, ϖ, Z⁺⁺, Z⁻⁺) = computed_layer_properties
     # SUNITI, check? Also, better to write function here
     dτ_max = minimum([maximum(τ .* ϖ), FT(0.001) * minimum(qp_μ)])
     _, ndoubl = doubling_number(dτ_max, maximum(τ .* ϖ))
@@ -262,7 +262,7 @@ function rt_kernel_ss!(
     dτ = τ ./ 2^ndoubl
     expk = arr_type(exp.(-dτ /μ₀))
 
-    @unpack Z⁺⁺_λ₁λ₀, Z⁻⁺_λ₁λ₀ = RS_type
+    (; Z⁺⁺_λ₁λ₀, Z⁻⁺_λ₁λ₀) = RS_type
     ndoubl_ss = Int(0)
     # If there is scattering, perform the elemental and doubling steps
     if scatter

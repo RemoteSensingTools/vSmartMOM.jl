@@ -96,7 +96,29 @@ mutable struct vSmartMOM_Lin{A,B,C}
 end
 abstract type AbstractOpticalPropertiesLin end
 
-# Core optical Properties COP
+"""
+    CoreScatteringOpticalPropertiesLin{T1,T2,T3}
+
+Per-layer Jacobian of the four core optical properties `(τ, ϖ, Z⁺⁺, Z⁻⁺)`
+with respect to the retrieval state vector `x`.
+
+This struct is the **AD boundary**: everything upstream of it (Mie code,
+absorption cross-sections, atmospheric profiles) may use `ForwardDiff.Dual`
+numbers, but by the time values reach the RT kernels they are extracted
+into plain `Float64`/`Float32` arrays stored here.
+
+The chain rule `lin_added_layer_all_params!` maps these derivatives into
+the full `∂R/∂x` via:
+
+```math
+\\frac{\\partial R}{\\partial x_j} =
+  \\frac{\\partial R}{\\partial \\tau} \\frac{\\partial \\tau}{\\partial x_j} +
+  \\frac{\\partial R}{\\partial \\varpi} \\frac{\\partial \\varpi}{\\partial x_j} +
+  \\frac{\\partial R}{\\partial \\mathbf{Z}} \\frac{\\partial \\mathbf{Z}}{\\partial x_j}
+```
+
+See also: [`OpticalPropertyJacobian`](@ref) (alias).
+"""
 Base.@kwdef struct CoreScatteringOpticalPropertiesLin{T1,T2,T3} <: AbstractOpticalPropertiesLin
     "∂τ/∂x — [Nparams] or [Nparams × nSpec]"
     τ̇::T1
@@ -107,6 +129,15 @@ Base.@kwdef struct CoreScatteringOpticalPropertiesLin{T1,T2,T3} <: AbstractOptic
     "∂Z⁻⁺/∂x — [nμ × nμ × nSpec] or [Nparams × nμ × nμ × nSpec]"
     Ż⁻⁺::T3
 end
+
+"""
+    OpticalPropertyJacobian
+
+Type alias for [`CoreScatteringOpticalPropertiesLin`](@ref).  Use this name
+in new code to emphasise the physical meaning: the Jacobian of the four
+core optical properties `(τ, ϖ, Z⁺⁺, Z⁻⁺)` w.r.t. the state vector.
+"""
+const OpticalPropertyJacobian = CoreScatteringOpticalPropertiesLin
 
 Base.@kwdef struct CoreAbsorptionOpticalPropertiesLin{T1} <: AbstractOpticalPropertiesLin
     "∂τ/∂x — [Nparams] or [Nparams × nSpec]"

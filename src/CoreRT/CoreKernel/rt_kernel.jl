@@ -54,7 +54,7 @@ function rt_kernel!(RS_type::noRS,
             architecture, 
             qp_μN, iz) 
 
-    @unpack τ_λ, ϖ_λ, τ, ϖ, Z⁺⁺, Z⁻⁺, dτ_max, dτ, ndoubl, dτ_λ, expk, scatter, τ_sum, scattering_interface = computed_layer_properties
+    (; τ_λ, ϖ_λ, τ, ϖ, Z⁺⁺, Z⁻⁺, dτ_max, dτ, ndoubl, dτ_λ, expk, scatter, τ_sum, scattering_interface) = computed_layer_properties
     # If there is scattering, perform the elemental and doubling steps
     if scatter
         
@@ -92,7 +92,7 @@ end
 # Perform the Core RT routines (elemental, doubling, interaction)
 function rt_kernel_canopy!(RS_type::noRS, pol_type, SFI, added_layer, composite_layer, computed_layer_properties, m, quad_points, I_static, architecture, qp_μN, iz) 
 
-    @unpack τ_λ, ϖ_λ, τ, ϖ, Z⁺⁺, Z⁻⁺, dτ_max, dτ, ndoubl, dτ_λ, expk, scatter, τ_sum, scattering_interface = computed_layer_properties
+    (; τ_λ, ϖ_λ, τ, ϖ, Z⁺⁺, Z⁻⁺, dτ_max, dτ, ndoubl, dτ_λ, expk, scatter, τ_sum, scattering_interface) = computed_layer_properties
     # If there is scattering, perform the elemental and doubling steps
     if scatter
         
@@ -131,8 +131,8 @@ end
 # Perform the Core RT routines (elemental, doubling, interaction)
 function rt_kernel!(RS_type::Union{RRS, VS_0to1, VS_1to0}, pol_type, SFI, added_layer, composite_layer, computed_layer_properties, m, quad_points, I_static, architecture, qp_μN, iz) 
     
-    @unpack τ_λ, ϖ_λ, τ, ϖ, Z⁺⁺, Z⁻⁺, dτ_max, dτ, ndoubl, dτ_λ, expk, scatter, τ_sum, scattering_interface = computed_layer_properties
-    @unpack Z⁺⁺_λ₁λ₀, Z⁻⁺_λ₁λ₀ = RS_type
+    (; τ_λ, ϖ_λ, τ, ϖ, Z⁺⁺, Z⁻⁺, dτ_max, dτ, ndoubl, dτ_λ, expk, scatter, τ_sum, scattering_interface) = computed_layer_properties
+    (; Z⁺⁺_λ₁λ₀, Z⁻⁺_λ₁λ₀) = RS_type
     # If there is scattering, perform the elemental and doubling steps
     if scatter
         #@show τ, ϖ, RS_type.fscattRayl
@@ -201,9 +201,9 @@ function rt_kernel!(RS_type::noRS{FT},
                     qp_μN, iz) where {FT,M}
     #@show array_type(architecture)
     
-    @unpack qp_μ, μ₀ = quad_points
+    (; qp_μ, μ₀) = quad_points
     # Just unpack core optical properties from 
-    @unpack τ, ϖ, Z⁺⁺, Z⁻⁺ = computed_layer_properties
+    (; τ, ϖ, Z⁺⁺, Z⁻⁺) = computed_layer_properties
     
     # @show ndoubl
     scatter = true # edit later
@@ -249,8 +249,8 @@ end
 
 
 function get_dtau_ndoubl(computed_layer_properties::CoreScatteringOpticalProperties, quad_points::QuadPoints{FT}) where {FT}
-    @unpack qp_μ  = quad_points
-    @unpack τ, ϖ  = computed_layer_properties
+    (; qp_μ) = quad_points
+    (; τ, ϖ) = computed_layer_properties
     dτ_max = minimum([maximum(τ .* ϖ), FT(0.001) * minimum(qp_μ)])
     _, ndoubl = doubling_number(dτ_max, maximum(τ .* ϖ))
     # Compute dτ vector
@@ -259,8 +259,8 @@ function get_dtau_ndoubl(computed_layer_properties::CoreScatteringOpticalPropert
 end
 
 function get_dtau_ndoubl(computed_layer_properties::CoreDirectionalScatteringOpticalProperties, quad_points::QuadPoints{FT}) where {FT}
-    @unpack qp_μ,iμ₀  = quad_points
-    @unpack τ, ϖ, G  = computed_layer_properties
+    (; qp_μ, iμ₀) = quad_points
+    (; τ, ϖ, G) = computed_layer_properties
     gfct = collect(G)[iμ₀]  # CPU scalar extraction from G factor
     dτ_max = minimum([maximum(gfct * τ .* ϖ), FT(0.001) * minimum(qp_μ)])
     _, ndoubl = doubling_number(dτ_max, maximum(τ .* ϖ))
@@ -271,8 +271,8 @@ end
 
 function init_layer(computed_layer_properties::CoreDirectionalScatteringOpticalProperties, quad_points, pol_type, architecture)
     arr_type = array_type(architecture) 
-    @unpack μ₀, iμ₀ = quad_points
-    @unpack G = computed_layer_properties
+    (; μ₀, iμ₀) = quad_points
+    (; G) = computed_layer_properties
     dτ, ndoubl = get_dtau_ndoubl(computed_layer_properties, quad_points)
     gfct = collect(G)[iμ₀]  # CPU scalar extraction from G factor
     expk = exp.(-dτ*gfct/μ₀)
@@ -281,7 +281,7 @@ end
 
 function init_layer(computed_layer_properties::CoreScatteringOpticalProperties, quad_points, pol_type, architecture)
     arr_type = array_type(architecture)
-    @unpack μ₀ = quad_points
+    (; μ₀) = quad_points
     dτ, ndoubl = get_dtau_ndoubl(computed_layer_properties, quad_points)
     expk = exp.(-dτ/μ₀)
     return dτ, ndoubl, arr_type(expk)
@@ -289,9 +289,9 @@ end
 
 
 function rt_kernel!(RS_type::Union{RRS{FT}, VS_0to1{FT}, VS_1to0{FT}}, pol_type, SFI, added_layer, composite_layer, computed_layer_properties::CoreScatteringOpticalProperties, scattering_interface, τ_sum,m, quad_points, I_static, architecture, qp_μN, iz)  where {FT}
-    @unpack qp_μ, μ₀ = quad_points
+    (; qp_μ, μ₀) = quad_points
     # Just unpack core optical properties from 
-    @unpack τ, ϖ, Z⁺⁺, Z⁻⁺ = computed_layer_properties
+    (; τ, ϖ, Z⁺⁺, Z⁻⁺) = computed_layer_properties
     # SUNITI, check? Also, better to write function here
     dτ_max = minimum([maximum(τ .* ϖ), FT(0.001) * minimum(qp_μ)])
     _, ndoubl = doubling_number(dτ_max, maximum(τ .* ϖ))
@@ -301,7 +301,7 @@ function rt_kernel!(RS_type::Union{RRS{FT}, VS_0to1{FT}, VS_1to0{FT}}, pol_type,
     dτ = τ ./ 2^ndoubl
     expk = arr_type(exp.(-dτ /μ₀))
     
-    @unpack Z⁺⁺_λ₁λ₀, Z⁻⁺_λ₁λ₀ = RS_type
+    (; Z⁺⁺_λ₁λ₀, Z⁻⁺_λ₁λ₀) = RS_type
     # If there is scattering, perform the elemental and doubling steps
     if scatter
         #@show τ, ϖ, RS_type.fscattRayl
@@ -362,9 +362,9 @@ function rt_kernel!(
             scattering_interface, 
             τ_sum,m, quad_points, 
             I_static, architecture, qp_μN, iz)  where {FT}
-    @unpack qp_μ, μ₀ = quad_points
+    (; qp_μ, μ₀) = quad_points
     # Just unpack core optical properties from 
-    @unpack τ, ϖ, Z⁺⁺, Z⁻⁺ = computed_layer_properties
+    (; τ, ϖ, Z⁺⁺, Z⁻⁺) = computed_layer_properties
     # SUNITI, check? Also, better to write function here
     dτ_max = minimum([maximum(τ .* ϖ), FT(0.001) * minimum(qp_μ)])
     _, ndoubl = doubling_number(dτ_max, maximum(τ .* ϖ))
@@ -374,7 +374,7 @@ function rt_kernel!(
     dτ = τ ./ 2^ndoubl
     expk = arr_type(exp.(-dτ /μ₀))
 
-    @unpack Z⁺⁺_λ₁λ₀, Z⁻⁺_λ₁λ₀ = RS_type
+    (; Z⁺⁺_λ₁λ₀, Z⁻⁺_λ₁λ₀) = RS_type
     # If there is scattering, perform the elemental and doubling steps
     if scatter
         #@show τ, ϖ, RS_type.fscattRayl

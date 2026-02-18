@@ -99,7 +99,7 @@ function reduce_profile(n::Int, profile::AtmosphericProfile{FT}) where {FT}
     @assert n < length(profile.T)
 
     # Unpack the profile vmr
-    @unpack vmr, Δz = profile
+    (; vmr, Δz) = profile
 
     # New rough half levels (boundary points)
     a = range(0, maximum(profile.p_half), length=n+1)
@@ -212,7 +212,7 @@ end
 Returns the aerosol optical depths per layer using a Distribution function in p
 """
 function getAerosolLayerOptProp(total_τ::FT, dist::Distribution, profile::AtmosphericProfile) where FT
-    @unpack p_half, p_full, Δz = profile
+    (; p_half, p_full, Δz) = profile
     
     ρ = pdf.(dist,p_full) .* Δz
     τAer  =  (total_τ / sum(ρ)) * ρ

@@ -164,7 +164,7 @@ function interaction_top!(ims::Int64,
                         I_static::AbstractArray{FT2},
                         arr_type) where {FT<:Real,FT2,M}
 
-    @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻ = added_layer
+    (; r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻) = added_layer
     #@unpack topR⁻⁺, topR⁺⁻, topT⁺⁺, topT⁻⁻, topJ₀⁺, topJ₀⁻ = composite_layer
     R⁻⁺ = arr_type(composite_layer.topR⁻⁺[ims]) 
     R⁺⁻ = arr_type(composite_layer.topR⁺⁻[ims]) 
@@ -202,7 +202,7 @@ function interaction_bot!(ims::Int64,
                         added_layer::AddedLayer{FT},
                         I_static::AbstractArray{FT2}, arr_type) where {M,FT<:Real,FT2}
 
-    @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻ = added_layer
+    (; r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻) = added_layer
     #@unpack botR⁻⁺, botR⁺⁻, botT⁺⁺, botT⁻⁻, botJ₀⁺, botJ₀⁻ = composite_layer
     R⁻⁺ = arr_type(composite_layer.botR⁻⁺[ims]) 
     R⁺⁻ = arr_type(composite_layer.botR⁺⁻[ims]) 
@@ -298,7 +298,7 @@ function interaction_helper_ms!(RS_type::RRS, ::ScatteringInterface_01, SFI,
     ieT⁺⁺::AbstractArray{FT}, ieT⁻⁻::AbstractArray{FT}, 
     ieJ₀⁺::AbstractArray{FT}, ieJ₀⁻::AbstractArray{FT}
     ) where {FT<:Real,FT2}
-    @unpack i_λ₁λ₀ = RS_type 
+    (; i_λ₁λ₀) = RS_type 
     if SFI
         for n₁ in eachindex ieJ₁⁺[1,1,:,1]
             for Δn in eachindex ieJ₁⁺[1,1,1,:]
@@ -357,7 +357,7 @@ function interaction_helper_ms!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
                 ieT⁺⁺::AbstractArray{FT}, ieT⁻⁻::AbstractArray{FT}, 
                 ieJ₀⁺::AbstractArray{FT}, ieJ₀⁻::AbstractArray{FT}
                 ) where {FT<:Real,FT2}
-    @unpack i_λ₁λ₀_all = RS_type 
+    (; i_λ₁λ₀_all) = RS_type 
     if SFI
         for Δn = 1:length(i_λ₁λ₀_all)
             n₁ = i_λ₁λ₀_all[Δn]
@@ -421,7 +421,7 @@ function interaction_helper_ms!(RS_type::RRS, ::ScatteringInterface_10, SFI,
     ieT⁺⁺::AbstractArray{FT}, ieT⁻⁻::AbstractArray{FT}, 
     ieJ₀⁺::AbstractArray{FT}, ieJ₀⁻::AbstractArray{FT}
     ) where {FT<:Real,FT2}
-    @unpack i_λ₁λ₀ = RS_type 
+    (; i_λ₁λ₀) = RS_type 
     if SFI
         for n₁ in eachindex ieJ₁⁺[1,1,:,1]
             for Δn in eachindex ieJ₁⁺[1,1,1,:]
@@ -474,7 +474,7 @@ function interaction_helper_ms!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
                             ieT⁺⁺::AbstractArray{FT}, ieT⁻⁻::AbstractArray{FT}, 
                             ieJ₀⁺::AbstractArray{FT}, ieJ₀⁻::AbstractArray{FT}
                             ) where {FT<:Real,FT2}
-    @unpack i_λ₁λ₀_all = RS_type 
+    (; i_λ₁λ₀_all) = RS_type 
     if SFI
         for Δn = 1:length(i_λ₁λ₀_all)
             n₁ = i_λ₁λ₀_all[Δn]
@@ -531,7 +531,7 @@ function interaction_helper_ms!(RS_type::RRS, ::ScatteringInterface_11, SFI,
     ieT⁺⁺::AbstractArray{FT}, ieT⁻⁻::AbstractArray{FT}, 
     ieJ₀⁺::AbstractArray{FT}, ieJ₀⁻::AbstractArray{FT}
     ) where {FT<:Real,FT2}
-    @unpack i_λ₁λ₀ = RS_type 
+    (; i_λ₁λ₀) = RS_type 
     # Used to store `(I - R⁺⁻ * r⁻⁺)⁻¹`
     tmp_inv = similar(t⁺⁺)
 
@@ -655,7 +655,7 @@ function interaction_helper_ms!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
                         ieT⁺⁺::AbstractArray{FT}, ieT⁻⁻::AbstractArray{FT}, 
                         ieJ₀⁺::AbstractArray{FT}, ieJ₀⁻::AbstractArray{FT}
                         ) where {FT<:Real,FT2}
-    @unpack i_λ₁λ₀_all = RS_type 
+    (; i_λ₁λ₀_all) = RS_type 
     #@show "hello 100 ms"
     # Used to store `(I - R⁺⁻ * r⁻⁺)⁻¹`
     tmp_inv = similar(t⁺⁺)
@@ -784,8 +784,8 @@ added_layer::AddedLayerRS{FT},
 I_static::AbstractArray{FT2},
 arr_type) where {FT<:Real,FT2,M}
 
-    @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻ = added_layer
-    @unpack ier⁺⁻, ier⁻⁺, iet⁻⁻, iet⁺⁺, ieJ₀⁺, ieJ₀⁻ = added_layer
+    (; r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻) = added_layer
+    (; ier⁺⁻, ier⁻⁺, iet⁻⁻, iet⁺⁺, ieJ₀⁺, ieJ₀⁻) = added_layer
     #@unpack topR⁻⁺, topR⁺⁻, topT⁺⁺, topT⁻⁻, topJ₀⁺, topJ₀⁻ = composite_layer
     R⁻⁺ = arr_type(composite_layer.topR⁻⁺[ims]) 
     R⁺⁻ = arr_type(composite_layer.topR⁺⁻[ims]) 
@@ -843,8 +843,8 @@ function interaction_bot!(ims::Int64,
                     added_layer::AddedLayerRS{FT},
                     I_static::AbstractArray{FT2},
                     arr_type) where {FT<:Real,FT2,M}
-    @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻ = added_layer
-    @unpack ier⁺⁻, ier⁻⁺, iet⁻⁻, iet⁺⁺, ieJ₀⁺, ieJ₀⁻ = added_layer
+    (; r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻) = added_layer
+    (; ier⁺⁻, ier⁻⁺, iet⁻⁻, iet⁺⁺, ieJ₀⁺, ieJ₀⁻) = added_layer
     #@unpack botR⁻⁺, botR⁺⁻, botT⁺⁺, botT⁻⁻, botJ₀⁺, botJ₀⁻ = composite_layer
     R⁻⁺ = arr_type(composite_layer.botR⁻⁺[ims]) 
     R⁺⁻ = arr_type(composite_layer.botR⁺⁻[ims]) 

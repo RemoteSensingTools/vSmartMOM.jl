@@ -93,12 +93,12 @@ function rt_run(RS_type::AbstractRamanType,
                     lin_model::vSmartMOM_Lin,
                     NAer::Int, NGas::Int, NSurf::Int,
                     iBand)
-    @unpack obs_alt, sza, vza, vaz = model.obs_geom   # Observational geometry properties
-    @unpack qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart, μ₀, iμ₀, Nquad = model.quad_points # All quadrature points
+    (; obs_alt, sza, vza, vaz) = model.obs_geom   # Observational geometry properties
+    (; qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart, μ₀, iμ₀, Nquad) = model.quad_points # All quadrature points
     pol_type = model.params.polarization_type
     #@unpack max_m = model.max_m #params
-    @unpack quad_points, max_m = model
-    @unpack τ̇_abs, τ̇_aer, lin_aerosol_optics = lin_model
+    (; quad_points, max_m) = model
+    (; τ̇_abs, τ̇_aer, lin_aerosol_optics) = lin_model
 
     lin = LinMode()
     #@show iBand, sza, vza, vaz, model.params.brdf[iBand].albedo
@@ -111,7 +111,7 @@ function rt_run(RS_type::AbstractRamanType,
     #bla
     brdf = model.params.brdf[iBand] #brdf = model.params.brdf[iBand[1]]
     #brdf_lin = model_lin.brdf_lin[iBand]
-    @unpack F₀ = RS_type
+    (; F₀) = RS_type
     # no Raman
     #if (typeof(RS_type)<:Union{RRS,RRS_plus})
     #    RS_type.ϖ_λ₁λ₀ .*=  (1. - model.ϖ_Cabannes[iBand])/sum(RS_type.ϖ_λ₁λ₀) # RS_type.ϖ_λ₁λ₀ .*=  (1. - model.ϖ_Cabannes[iBand[1]])/sum(RS_type.ϖ_λ₁λ₀) 

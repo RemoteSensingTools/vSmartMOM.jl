@@ -196,8 +196,8 @@ Output: an, bn. Both of shape (aerosol.nquad_radius, N_max) (N_max from aerosol.
 """
 function compute_anbn(model::MieModel, λ, radius)
     
-    @unpack computation_type, aerosol, r_max, nquad_radius, λ, polarization_type, truncation_type, wigner_A, wigner_B = model
-    @unpack size_distribution, nᵣ, nᵢ = aerosol
+    (; computation_type, aerosol, r_max, nquad_radius, λ, polarization_type, truncation_type, wigner_A, wigner_B) = model
+    (; size_distribution, nᵣ, nᵢ) = aerosol
 
     FT = eltype(λ)
     FT2 = eltype(nᵣ)

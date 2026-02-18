@@ -169,13 +169,77 @@ Key functions:
 
 ## Linearized RT and Jacobian Workflow
 
-The linearized path computes analytic derivatives of TOA radiance with respect to the 3 core optical parameters (τ, ϖ, Z) per layer. The chain rule then maps these to physical state vector parameters:
+### The AD Boundary
+
+The codebase enforces a clean boundary between two worlds:
+
+```
+                     AD Zone                           Pure Float Zone
+           ┌───────────────────────────┐    ┌──────────────────────────────────┐
+           │  ForwardDiff.Dual allowed │    │  FT ∈ {Float32, Float64} only   │
+           │                           │    │                                  │
+           │  Mie cross-sections       │    │  elemental!, doubling!,          │
+           │  Gas absorption           │    │  interaction!, rt_kernel!        │
+           │  Atmospheric profiles     │    │                                  │
+           │  Surface BRDF params      │    │  Analytic ∂R/∂(τ,ϖ,Z)           │
+           └──────────┬────────────────┘    └──────────────┬───────────────────┘
+                      │                                    │
+                      ▼                                    ▼
+           OpticalPropertyJacobian            lin_added_layer_all_params!
+           ∂(τ,ϖ,Z⁺⁺,Z⁻⁺)/∂xⱼ      ──────>  Chain rule: ∂R/∂xⱼ
+```
+
+The `OpticalPropertyJacobian` (alias for `CoreScatteringOpticalPropertiesLin`) is the handoff struct. It contains `(τ̇, ϖ̇, Ż⁺⁺, Ż⁻⁺)` — the derivatives of the four core optical properties with respect to each retrieval parameter.
+
+### Chain Rule
+
+The chain rule `lin_added_layer_all_params!` maps per-layer optical property derivatives to radiance derivatives:
 
 ```
 ∂R/∂x_j = Σ_layers [ ∂R/∂τ · ∂τ/∂x_j + ∂R/∂ϖ · ∂ϖ/∂x_j + ∂R/∂Z · ∂Z/∂x_j ]
 ```
 
-This is implemented in `lin_added_layer_all_params.jl`. The Mie code provides analytic `∂(ϖ,Z)/∂(nᵣ,nᵢ,r_m,σ_g)` and the atmospheric profile code provides `∂τ/∂(p₀,σ_p,τ_ref)`.
+The RT kernels compute `∂R/∂τ`, `∂R/∂ϖ`, `∂R/∂Z` analytically (stored in `AddedLayerLin.ṫ⁺⁺[1:3,...]`). The optical property code provides `∂τ/∂x_j`, `∂ϖ/∂x_j`, `∂Z/∂x_j` either analytically or via ForwardDiff.
+
+### Current Parameter Layout
+
+For `Nparams = 7 × NAer + NGas + NSurf`:
+
+| Index range           | Parameter                                       | Method   |
+|-----------------------|-------------------------------------------------|----------|
+| `1..7` per aerosol    | `τ_ref, nᵣ, nᵢ, rₘ, σ_g, p₀, σ_p`              | Analytic |
+| `7*NAer+1..+NGas`     | Gas VMR scaling factors                         | Analytic |
+| `7*NAer+NGas+1`       | Surface albedo                                  | Analytic |
+
+### Adding New Parameters
+
+To add derivatives with respect to a new parameter `θ`:
+
+1. **Analytic path**: Compute `∂τ/∂θ`, `∂ϖ/∂θ`, `∂Z/∂θ` analytically in `constructCoreOpticalProperties` and add to the `OpticalPropertyJacobian` arrays.
+
+2. **ForwardDiff path**: Wrap the optical property generation in `ForwardDiff.jacobian`:
+   ```julia
+   function optical_props_wrt_theta(θ_vec)
+       # ... compute τ, ϖ as functions of θ_vec ...
+       return [τ; ϖ]
+   end
+   J = ForwardDiff.jacobian(optical_props_wrt_theta, θ₀)
+   # Extract ∂τ/∂θ, ∂ϖ/∂θ from J, fill OpticalPropertyJacobian
+   ```
+
+### Strategy by Parameter Type
+
+| Parameter          | Recommended Method | Reason                                    |
+|--------------------|--------------------|-------------------------------------------|
+| Albedo             | Analytic           | Trivial derivative, already implemented   |
+| RPV/RossLi BRDF    | ForwardDiff        | Low-dimensional, simple surface code      |
+| τ_ref (aerosol OD) | Analytic           | Trivial: `∂τ/∂τ_ref = τ/τ_ref`           |
+| p₀, σ_p (height)   | Analytic           | Already in `atmo_prof_lin.jl`             |
+| nᵣ, nᵢ (refr. idx) | Analytic Mie       | Mie series is AD-hostile                  |
+| rₘ, σ_g (size dist) | Analytic Mie      | Same reason                               |
+| Gas VMR            | Analytic           | `∂τ_abs/∂VMR = cross_section`             |
+| Surface pressure   | ForwardDiff        | Affects many paths (Rayleigh, absorption) |
+| Temperature        | ForwardDiff        | Future; affects absorption cross-sections |
 
 ## Directory Layout
 

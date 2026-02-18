@@ -41,9 +41,9 @@ The output derivative dimension has `Nparams = 7×NAer + NGas` entries per layer
 - `fscat_opt`: Rayleigh scattering fraction per layer (for inelastic scattering weight).
 """
 function constructCoreOpticalProperties(RS_type, iBand, m, model, lin_model) #where {FT<:Real}
-    @unpack τ_rayl, τ_aer, τ_abs, aerosol_optics, 
-            greek_rayleigh, greek_cabannes, ϖ_Cabannes = model
-    @unpack τ̇_aer, τ̇_abs, lin_aerosol_optics = lin_model
+    (; τ_rayl, τ_aer, τ_abs, aerosol_optics, 
+            greek_rayleigh, greek_cabannes, ϖ_Cabannes) = model
+    (; τ̇_aer, τ̇_abs, lin_aerosol_optics) = lin_model
     @assert all(iBand .≤ length(τ_rayl)) "iBand exceeded number of bands"
     FT = eltype(τ_rayl[1])
     
@@ -286,8 +286,8 @@ end
  
 function createAero(τAer, aerosol_optics, AerZ⁺⁺, AerZ⁻⁺,
                     τ̇Aer, lin_aerosol_optics, AerŻ⁺⁺, AerŻ⁻⁺)
-    @unpack fᵗ, ω̃ = aerosol_optics
-    @unpack ḟᵗ, ω̃̇ = lin_aerosol_optics
+    (; fᵗ, ω̃) = aerosol_optics
+    (; ḟᵗ, ω̃̇) = lin_aerosol_optics
     #τ_mod = (1-fᵗ * ω̃ ) * τAer;
     #ϖ_mod = (1-fᵗ) * ω̃/(1-fᵗω̃)
     #τ̇_mod = (1-fᵗ * ω̃ ) * τ̇Aer - (ḟᵗϖ+fᵗϖ̇) * τAer;
@@ -369,8 +369,8 @@ function createAero(τAer, aerosol_optics, AerZ⁺⁺, AerZ⁻⁺,
                     τ̇Aer, lin_aerosol_optics, AerŻ⁺⁺, AerŻ⁻⁺,
                     arr_type)
 
-    @unpack fᵗ, ω̃ = aerosol_optics
-    @unpack ḟᵗ, ω̃̇ = lin_aerosol_optics
+    (; fᵗ, ω̃) = aerosol_optics
+    (; ḟᵗ, ω̃̇) = lin_aerosol_optics
 
     n  = size(τAer,1)
     #fᵗ = arr_type(fᵗ)
@@ -492,8 +492,8 @@ Ensures that `Z[nμ, nμ, nSpec]` and `Ż[Nparams, nμ, nμ, nSpec]` have matchi
 spectral dimensions with `τ` and `ϖ`.
 """
 function expandOpticalProperties(in::CoreScatteringOpticalProperties, in_lin::CoreScatteringOpticalPropertiesLin,  arr_type)
-    @unpack τ, ϖ, Z⁺⁺, Z⁻⁺ = in 
-    @unpack τ̇, ϖ̇, Ż⁺⁺, Ż⁻⁺ = in_lin 
+    (; τ, ϖ, Z⁺⁺, Z⁻⁺) = in 
+    (; τ̇, ϖ̇, Ż⁺⁺, Ż⁻⁺) = in_lin 
     @assert length(τ) == length(ϖ) "τ and ϖ sizes need to match"
     @assert length(τ̇) == length(ϖ̇) "τ̇ and ϖ̇ sizes need to match"
 

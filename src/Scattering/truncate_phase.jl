@@ -18,9 +18,9 @@ f^t = 1 - c_0.
 ```
 """
 function truncate_phase_lowconf(mod::δBGE, aero::AerosolOptics{FT}; reportFit=false) where {FT}
-    @unpack greek_coefs, ω̃, k = aero
-    @unpack α, β, γ, δ, ϵ, ζ = greek_coefs
-    @unpack l_max, Δ_angle =  mod
+    (; greek_coefs, ω̃, k) = aero
+    (; α, β, γ, δ, ϵ, ζ) = greek_coefs
+    (; l_max, Δ_angle) = mod
 
 
     # Obtain Gauss-Legendre quadrature points and weights for phase function:
@@ -29,7 +29,7 @@ function truncate_phase_lowconf(mod::δBGE, aero::AerosolOptics{FT}; reportFit=f
     # Reconstruct phase matrix elements:
     scattering_matrix, P, P² = reconstruct_phase(greek_coefs, μ; returnLeg=true)
 
-    @unpack f₁₁, f₁₂, f₂₂, f₃₃, f₃₄, f₄₄ = scattering_matrix
+    (; f₁₁, f₁₂, f₂₂, f₃₃, f₃₄, f₄₄) = scattering_matrix
 
     # Find elements that exclude the peak (if wanted!)
     iμ = findall(x -> x < cosd(Δ_angle), μ)
@@ -111,9 +111,9 @@ Returns a new [`AerosolOptics`](@ref) with truncated coefficients and updated
 `fᵗ`.
 """
 function truncate_phase(mod::δBGE, aero::AerosolOptics{FT}; reportFit=false) where {FT}
-    @unpack greek_coefs, ω̃, k = aero
-    @unpack α, β, γ, δ, ϵ, ζ = greek_coefs
-    @unpack l_max, Δ_angle =  mod
+    (; greek_coefs, ω̃, k) = aero
+    (; α, β, γ, δ, ϵ, ζ) = greek_coefs
+    (; l_max, Δ_angle) = mod
 
     l_tr = l_max
     # Obtain Gauss-Legendre quadrature points and weights for phase function:
@@ -122,7 +122,7 @@ function truncate_phase(mod::δBGE, aero::AerosolOptics{FT}; reportFit=false) wh
     # Reconstruct phase matrix elements:
     scattering_matrix, P, P² = reconstruct_phase(greek_coefs, μ; returnLeg=true)
 
-    @unpack f₁₁, f₁₂, f₂₂, f₃₃, f₃₄, f₄₄ = scattering_matrix
+    (; f₁₁, f₁₂, f₂₂, f₃₃, f₃₄, f₄₄) = scattering_matrix
 
     # Find elements that exclude the peak (if wanted!)
     iμ = findall(x -> x < cosd(Δ_angle), μ)

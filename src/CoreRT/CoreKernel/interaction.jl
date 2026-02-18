@@ -15,8 +15,8 @@ function interaction_helper!(::ScatteringInterface_00, SFI,
                                 composite_layer::CompositeLayer{FT}, 
                                 added_layer::AddedLayer{FT}, 
                                 I_static::AbstractArray{FT2}) where {FT<:Real,FT2}
-    @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻ = added_layer     
-    @unpack R⁻⁺, R⁺⁻, T⁺⁺, T⁻⁻, J₀⁺, J₀⁻ = composite_layer 
+    (; r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻) = added_layer     
+    (; R⁻⁺, R⁺⁻, T⁺⁺, T⁻⁻, J₀⁺, J₀⁻) = composite_layer 
 
     # Source Function
     J₀⁺ .= j₀⁺ .+ t⁺⁺ ⊠ J₀⁺
@@ -38,8 +38,8 @@ function interaction_helper!(::ScatteringInterface_01, SFI,
                                 composite_layer::CompositeLayer{FT}, 
                                 added_layer::AddedLayer{FT}, 
                                 I_static::AbstractArray{FT2}) where {FT<:Real,FT2}
-    @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻ = added_layer     
-    @unpack R⁻⁺, R⁺⁻, T⁺⁺, T⁻⁻, J₀⁺, J₀⁻ = composite_layer 
+    (; r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻) = added_layer     
+    (; R⁻⁺, R⁺⁻, T⁺⁺, T⁻⁻, J₀⁺, J₀⁻) = composite_layer 
 
     # Source Function
     J₀⁻ .= J₀⁻ .+ T⁻⁻ ⊠ (r⁻⁺ ⊠ J₀⁺ .+ j₀⁻)
@@ -63,8 +63,8 @@ function interaction_helper!(::ScatteringInterface_10, SFI,
                                 composite_layer::CompositeLayer{FT}, 
                                 added_layer::AddedLayer{FT}, 
                                 I_static::AbstractArray{FT2}) where {FT<:Real,FT2}
-    @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻ = added_layer     
-    @unpack R⁻⁺, R⁺⁻, T⁺⁺, T⁻⁻, J₀⁺, J₀⁻ = composite_layer 
+    (; r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻) = added_layer     
+    (; R⁻⁺, R⁺⁻, T⁺⁺, T⁻⁻, J₀⁺, J₀⁻) = composite_layer 
 
     # Source Function
     J₀⁺ .= j₀⁺ .+ t⁺⁺ ⊠ (J₀⁺ .+ R⁺⁻ ⊠ j₀⁻)
@@ -90,8 +90,8 @@ function interaction_helper!(::ScatteringInterface_11, SFI,
                                 added_layer::AddedLayer{FT}, 
                                 I_static::AbstractArray{FT2}) where {FT<:Real,FT2}
     
-    @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻,temp1, temp2, temp1_ptr,temp2_ptr = added_layer     #these are aliases to the respective struct elements  
-    @unpack R⁻⁺, R⁺⁻, T⁺⁺, T⁻⁻, J₀⁺, J₀⁻ = composite_layer #these are aliases to the respective struct elements 
+    (; r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻, temp1, temp2, temp1_ptr, temp2_ptr) = added_layer     #these are aliases to the respective struct elements  
+    (; R⁻⁺, R⁺⁻, T⁺⁺, T⁻⁻, J₀⁺, J₀⁻) = composite_layer #these are aliases to the respective struct elements 
     
     # X₂₁ refers to added layer, X₁₀ to composite layer!
 
