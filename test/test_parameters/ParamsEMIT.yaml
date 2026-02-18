@@ -107,7 +107,7 @@ atmospheric_profile:
   #    800.12, 849.00, 912.00, 980.00, 1005.0]
   #
   # Reduce profile to n layers (-1 is default, leave as is)
-  profile_reduction: -1 #5 #-1 #1 #-1
+  profile_reduction: 1 #-1 #5 #-1 #1 #-1
 
 # =================================================================
 # Absorption-Related Parameters (Optional)

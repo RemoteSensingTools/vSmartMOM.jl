@@ -392,7 +392,7 @@ function rt_run(RS_type::AbstractRamanType,
         weight = m == 0 ? FT(0.5/π) : FT(1.0/π)
         # Set the Zλᵢλₒ interaction parameters for Raman (or nothing for noRS)
         #InelasticScattering.computeRamanZλ!(RS_type, pol_type,Array(qp_μ), m, arr_type)
-        # Compute the core layer optical properties:
+        # Compute the core layer optical properties: derivatives are in the following order - Naer aerosols (τ_ref, nᵣ, nᵢ, r₀, σ₀, zₚ, σₚ), vmr_H2O, VMRs of other variable gases
         @timeit "OpticalProps" layer_opt_props, layer_opt_props_lin, fScattRayleigh   = 
             constructCoreOpticalProperties(RS_type, iBand, m, model, lin_model);
         #@show size(fScattRayleigh)

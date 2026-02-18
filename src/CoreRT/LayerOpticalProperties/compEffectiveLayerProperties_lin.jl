@@ -135,11 +135,11 @@ function constructCoreOpticalProperties(RS_type, iBand, m, model, lin_model) #wh
                             lin_aerosol_optics[iB][iaer], 
                             arr_type(AerŻ⁺⁺), arr_type(AerŻ⁻⁺), 
                             arr_type) 
-                @show iz, size(t_aer.τ)#, t_aer.τ[1], t_aer.τ[end]
-                @show iz, size(t_aer.ϖ)#, t_aer.ϖ[1], t_aer.ϖ[end]
+                #@show iz, size(t_aer.τ)#, t_aer.τ[1], t_aer.τ[end]
+                #@show iz, size(t_aer.ϖ)#, t_aer.ϖ[1], t_aer.ϖ[end]
 
-                @show iz, size(t_lin_aer.ϖ̇)#, t_lin_aer.ϖ̇[1], t_lin_aer.ϖ̇[end]
-                @show iz, size(t_lin_aer.τ̇)#, t_lin_aer.τ̇[1], t_lin_aer.τ̇[end]
+                #@show iz, size(t_lin_aer.ϖ̇)#, t_lin_aer.ϖ̇[1], t_lin_aer.ϖ̇[end]
+                #@show iz, size(t_lin_aer.τ̇)#, t_lin_aer.τ̇[1], t_lin_aer.τ̇[end]
                 push!(aer, t_aer)
                 push!(lin_aer, t_lin_aer)
             end 
@@ -155,7 +155,7 @@ function constructCoreOpticalProperties(RS_type, iBand, m, model, lin_model) #wh
             #@show typeof(aer)
             #combo = combo .+ aer
             #combrella = combrella .+ aer_combrella
-            tmp = combrella[1]+aer_combrella[1]
+            #tmp = combrella[1]+aer_combrella[1]
             #@show 2.1
             tmp = [combrella[i]+aer_combrella[i] for i=1:nZ]
             #@show 3
@@ -263,7 +263,9 @@ end
 function createAero(τAer, aerosol_optics, AerZ⁺⁺, AerZ⁻⁺,
                     τ̇Aer, lin_aerosol_optics, AerŻ⁺⁺, AerŻ⁻⁺)
     @unpack fᵗ, ω̃ = aerosol_optics
-    @unpack ḟᵗ, ω̃̇ = lin_aerosol_optics
+    @unpack ḟᵗ, ω̃̇ = lin_aerosol_optics #Note: lin_aerosol_optics contains derivatives with respect to nᵣ, nᵢ, r, σᵣ separately for each aerosol type
+    # Note: τ̇Aer on the other hand contains derivatives with respect to τ_ref, nᵣ, nᵢ, r, σᵣ separately for each aerosol type
+ 
     #τ_mod = (1-fᵗ * ω̃ ) * τAer;
     #ϖ_mod = (1-fᵗ) * ω̃/(1-fᵗω̃)
     #τ̇_mod = (1-fᵗ * ω̃ ) * τ̇Aer - (ḟᵗϖ+fᵗϖ̇) * τAer;
@@ -272,16 +274,16 @@ function createAero(τAer, aerosol_optics, AerZ⁺⁺, AerZ⁻⁺,
     
     τ_mod = (1 .- fᵗ * ω̃ ) .* τAer;
     ϖ_mod = (1 .- fᵗ) .* ω̃ ./ (1 .- fᵗ * ω̃)
-    τ̇_mod = similar(7, length(τAer))
-    ϖ̇_mod = similar(7, length(ω̃))
-    Ż⁺⁺_mod = similar(7, size(AerZ⁺⁺,1), size(AerZ⁺⁺,2))
-    Ż⁻⁺_mod = similar(7, size(AerZ⁻⁺,1), size(AerZ⁻⁺,2))
+    τ̇_mod = similar(ω̃, 7, length(τAer))
+    ϖ̇_mod = similar(ω̃, 7, length(ω̃))
+    Ż⁺⁺_mod = similar(ω̃, 7, size(AerZ⁺⁺,1), size(AerZ⁺⁺,2))
+    Ż⁻⁺_mod = similar(ω̃, 7, size(AerZ⁻⁺,1), size(AerZ⁻⁺,2))
     #Derivatives with respect to τAer
-    τ̇_mod[1,:] = (1 .- fᵗ * ω̃ )
+    τ̇_mod[1,:] = (1 .- fᵗ * ω̃ ) .* τ̇Aer[1,:]; #dτ/dτ_ref
     for iparam=1:4
         tmp = fᵗ.*ω̃̇[iparam,:] .+ ḟᵗ[iparam,:].*ω̃
 
-        τ̇_mod[1+iparam,:] = (1 .- fᵗ .* ω̃ ) .* τ̇Aer[iparam,:];
+        τ̇_mod[1+iparam,:] = (1 .- fᵗ .* ω̃ ) .* τ̇Aer[1+iparam,:];
         τ̇_mod[1+iparam,:] .-= tmp .* τAer
         ϖ̇_mod[1+iparam,:] = (ω̃̇[iparam,:].*(1 .- fᵗ) .- ḟᵗ[iparam,:].*ω̃.*(1 .- ω̃))
         ϖ̇_mod[1+iparam,:] ./= (1 .- fᵗ * ω̃).^2
@@ -290,7 +292,7 @@ function createAero(τAer, aerosol_optics, AerZ⁺⁺, AerZ⁻⁺,
     end
     for iparam=5:6
         #tmp = 0 #fᵗ.*ω̃̇[iparam,:] .+ ḟᵗ[iparam,:].*ω̃
-        τ̇_mod[1+iparam,:] = (1 .- fᵗ .* ω̃ ) .* τ̇Aer[iparam,:];
+        τ̇_mod[1+iparam,:] = (1 .- fᵗ .* ω̃ ) .* τ̇Aer[1+iparam,:];
         ϖ̇_mod[1+iparam,:] .= 0
         Ż⁺⁺_mod[1+iparam,:,:] .= 0
         Ż⁻⁺_mod[1+iparam,:,:] .= 0
@@ -391,7 +393,7 @@ function createAero(τAer, aerosol_optics, AerZ⁺⁺, AerZ⁻⁺,
     ϖ̇_mod = arr_type(zeros(7,n)) #similar(ω̃̇)
 
     #Derivatives with respect to τAer
-    τ̇_mod[1,:] = (1 .- fᵗ * ω̃ )
+    τ̇_mod[1,:] = (1 .- fᵗ * ω̃ ) .* τ̇Aer[1,:]; #dτ/dτ_ref
     ϖ̇_mod[1,:] .= 0.0
     # Vectorized form over iparam dimension
     # Dimensions: iparam × spectral
@@ -399,11 +401,11 @@ function createAero(τAer, aerosol_optics, AerZ⁺⁺, AerZ⁻⁺,
     tmp = fᵗ * ω̃̇[2:5,:] .+ ḟᵗ[2:5] * ω̃'  # (iparam, :)
     #@show size(tmp), size(τ̇Aer), size(τAer)
     #@show size((1 .- fᵗ * ω̃)' .* τ̇Aer), size(tmp .* τAer')
-    τ̇_mod[2:5,:] .= (1 .- fᵗ * ω̃)' .* τ̇Aer[1:4,:] .- tmp .* τAer'
+    τ̇_mod[2:5,:] .= (1 .- fᵗ * ω̃)' .* τ̇Aer[2:5,:] .- tmp .* τAer'
     #@show size(ω̃̇ * (1 - fᵗ)), size(ḟᵗ * (ω̃ .* (1 .- ω̃))'), size((1 .- fᵗ * ω̃)'.^2)
     ϖ̇_mod[2:5,:] .= (ω̃̇[2:5] * (1 - fᵗ) .- ḟᵗ[2:5] .* (ω̃ .* (1 .- ω̃))') ./ (1 .- fᵗ * ω̃)'.^2
 
-    τ̇_mod[6:7,:] .= (1 .- fᵗ * ω̃)' .* τ̇Aer[5:6,:]
+    τ̇_mod[6:7,:] .= (1 .- fᵗ * ω̃)' .* τ̇Aer[6:7,:]
     #@show size(ω̃̇ * (1 - fᵗ)), size(ḟᵗ * (ω̃ .* (1 .- ω̃))'), size((1 .- fᵗ * ω̃)'.^2)
     ϖ̇_mod[6:7,:] .= 0.0
 

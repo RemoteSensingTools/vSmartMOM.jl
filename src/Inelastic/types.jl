@@ -216,7 +216,7 @@ Base.@kwdef mutable struct VS_0to1_plus{FT<:AbstractFloat} <: AbstractRamanType
     i_ref::Int                  = 1
     n_Raman::Int                = 1
     F₀::Array{FT,2}             = zeros(FT,1,1) # Solar/Stellar irradiation Stokes vector of size (pol_type.n, nSpec)
-    SIF₀::Array{FT,2} # Solar/Stellar irradiation Stokes vector of size (pol_type.n, nSpec)
+    SIF₀::Array{FT,2}           = zeros(FT,1,1)# Solar/Stellar irradiation Stokes vector of size (pol_type.n, nSpec)
 end
 
 """

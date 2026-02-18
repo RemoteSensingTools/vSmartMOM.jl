@@ -276,7 +276,7 @@ function rt_run(RS_type::AbstractRamanType,
         @info "Run ms as height !=0"
         return rt_run_test_ms(RS_type, model, iBand)
     end
-    @show iBand, sza, vza, vaz, model.params.brdf[iBand].albedo
+    @show iBand, sza, vza, vaz, model.params.brdf[iBand[1]].albedo
     # Also to be changed!!
     #brdf = model.params.brdf[iBand[1]]
     #@show size(iBand)
@@ -284,10 +284,10 @@ function rt_run(RS_type::AbstractRamanType,
     #@show iBand[1]
     #@show size(iBand[1])
     #bla
-    brdf = model.params.brdf[iBand] #brdf = model.params.brdf[iBand[1]]
+    brdf = model.params.brdf[iBand[1]] #brdf = model.params.brdf[iBand[1]]
     @unpack F₀ = RS_type
     if (typeof(RS_type)<:Union{RRS,RRS_plus})
-        RS_type.ϖ_λ₁λ₀ .*=  (1. - model.ϖ_Cabannes[iBand])/sum(RS_type.ϖ_λ₁λ₀) # RS_type.ϖ_λ₁λ₀ .*=  (1. - model.ϖ_Cabannes[iBand[1]])/sum(RS_type.ϖ_λ₁λ₀) 
+        RS_type.ϖ_λ₁λ₀ .*=  (1. - model.ϖ_Cabannes[iBand[1]])/sum(RS_type.ϖ_λ₁λ₀) # RS_type.ϖ_λ₁λ₀ .*=  (1. - model.ϖ_Cabannes[iBand[1]])/sum(RS_type.ϖ_λ₁λ₀) 
     end   
     
     FT = eltype(sza)                    # Get the float-type to use
@@ -347,9 +347,9 @@ function rt_run(RS_type::AbstractRamanType,
     println("Finished initializing arrays")
 
     # Loop over fourier moments
-    for m = 0:max_m[iBand] - 1
+    for m = 0:max_m[iBand[1]] - 1
 
-        println("Fourier Moment: ", m, "/", max_m[iBand]-1)
+        println("Fourier Moment: ", m, "/", max_m[iBand[1]]-1)
 
         # Azimuthal weighting
         weight = m == 0 ? FT(0.5/π) : FT(1.0/π)
@@ -473,10 +473,10 @@ function rt_run_ss(RS_type::AbstractRamanType,
     end
 
     # Also to be changed!!
-    brdf = model.params.brdf[iBand] # brdf = model.params.brdf[iBand[1]]
+    brdf = model.params.brdf[iBand[1]] # brdf = model.params.brdf[iBand[1]]
     @unpack F₀ = RS_type
     if (typeof(RS_type)<:Union{RRS,RRS_plus})
-        RS_type.ϖ_λ₁λ₀ *=  (1. - model.ϖ_Cabannes[iBand])/sum(RS_type.ϖ_λ₁λ₀) # RS_type.ϖ_λ₁λ₀ *=  (1. - model.ϖ_Cabannes[iBand[1]])/sum(RS_type.ϖ_λ₁λ₀) 
+        RS_type.ϖ_λ₁λ₀ *=  (1. - model.ϖ_Cabannes[iBand[1]])/sum(RS_type.ϖ_λ₁λ₀) # RS_type.ϖ_λ₁λ₀ *=  (1. - model.ϖ_Cabannes[iBand[1]])/sum(RS_type.ϖ_λ₁λ₀) 
     end   
 
     FT = eltype(sza)                    # Get the float-type to use
@@ -536,9 +536,9 @@ function rt_run_ss(RS_type::AbstractRamanType,
     println("Finished initializing arrays")
 
     # Loop over fourier moments
-    for m = 0:max_m[iBand] - 1
+    for m = 0:max_m[iBand[1]] - 1
 
-        println("Fourier Moment: ", m, "/", max_m[iBand]-1)
+        println("Fourier Moment: ", m, "/", max_m[iBand[1]]-1)
 
         # Azimuthal weighting
         weight = m == 0 ? FT(0.5/π) : FT(1.0/π)
