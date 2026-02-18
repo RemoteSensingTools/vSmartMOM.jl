@@ -9,7 +9,7 @@
 using vSmartMOM, vSmartMOM.CoreRT
 using Test
 
-yaml = joinpath(@__DIR__, "..", "sandbox", "rami", "RamiNoGas.yaml")
+yaml = "../sandbox/rami/RamiNoGas.yaml"
 
 @testset "RAMI Smoke Test" begin
     params = parameters_from_yaml(yaml)

@@ -60,7 +60,7 @@ function run_forward_noRS_smoke(params)
 end
 
 # Load EMIT-style fast configuration
-params_default = parameters_from_yaml("test/test_parameters/ParamsEMIT_fast.yaml")
+params_default = parameters_from_yaml("test_parameters/ParamsEMIT_fast.yaml")
 params_default.architecture = vSmartMOM.Architectures.CPU()
 Nbands = length(params_default.spec_bands)
 println("Configuration loaded: $(Nbands) band(s)")
@@ -151,7 +151,7 @@ end
 if CAN_USE_GPU
     @testset "Forward noRS on GPU" begin
         println("\nBuilding forward model (GPU)...")
-        params_gpu = parameters_from_yaml("test/test_parameters/ParamsEMIT_fast.yaml")
+        params_gpu = parameters_from_yaml("test_parameters/ParamsEMIT_fast.yaml")
         params_gpu.architecture = vSmartMOM.Architectures.GPU()
         @time run_forward_noRS_smoke(params_gpu)
         println("  GPU forward noRS smoke: PASS")

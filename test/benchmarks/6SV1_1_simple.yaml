@@ -1,0 +1,53 @@
+# =================================================================
+# Top-Level Radiative Transfer Parameters
+# =================================================================
+radiative_transfer: 
+  # Spectral bands (list of ν_start:ν_step:ν_end, in cm⁻¹)
+  spec_bands: 
+    - "[18867.92 18868.92]"
+  # Bidirectional Reflectance Distribution Function (BRDF) per band
+  surface: 
+    - LambertianSurfaceScalar(0.0)
+  # Quadrature-scheme for stream calculations
+  quadrature_type:    RadauQuad()
+  # Polarization type (Stokes_I, Stokes_IQ, Stokes_IQU, Stokes_IQUV)
+  polarization_type:  Stokes_IQUV()
+  # Maximum m (number of Fourier moments to loop over)
+  max_m:              3
+  # Exclusion angle for forward peak in fitting procedure (degrees)
+  Δ_angle:            2.0
+  # Trunction length for legendre terms
+  l_trunc:            5
+  # Depolarization factor
+  depol:              0.0
+  # Floating point type for calculations (Float32, Float64)
+  float_type:         Float64
+  # Architecture (default_architecture, GPU(), CPU())
+  architecture:       Architectures.CPU()
+  
+# =================================================================
+# Simulation Geometry
+# =================================================================
+geometry: 
+  # Solar zenith angle (degrees)
+  sza:                62.612892
+  # Viewing zenith angles (degrees)
+  vza:                [0.0, 45.5729959991943]
+  # Viewing azimuth angles (degrees)
+  vaz:                [0.0, 0.0]
+  # Observation altitude (Pa)
+  obs_alt:            1000.0
+
+# =================================================================
+# Atmospheric Profile
+# =================================================================
+atmospheric_profile: 
+  # Temperature Profile (TOA to BOA, in K)
+  # Full-levels, specified at layer centers
+  T: [231.62]
+  # Pressure Profile (TOA to BOA at each boundary, in hPa)
+  # Half-levels, specified at layer boundaries
+  p: [  0.14,   0.22]
+  # Reduce profile to n layers
+  profile_reduction: -1
+

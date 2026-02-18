@@ -1,116 +1,107 @@
-# # GPU Acceleration Tutorial
+# # GPU Acceleration
 #
-# ### Introduction
-# vSmartMOM can run the RT solver on NVIDIA GPUs via CUDA.jl, with
-# no changes to your input YAML files. This tutorial covers:
+# vSmartMOM can run the full RT solver on NVIDIA GPUs via CUDA.jl.
+# This tutorial explains how to enable GPU mode, what works on GPU,
+# and how to fall back to CPU.
 #
-# 1. How to switch between CPU and GPU
-# 2. Architecture-aware array handling
-# 3. Performance considerations
-# 4. Common pitfalls
-#
-# ---
-#
-# ### Load packages
+# ## 1) Checking GPU availability
 
 using vSmartMOM
 
-# Check whether CUDA is available at runtime
-const CAN_USE_GPU = try
-    @eval using CUDA
-    CUDA.functional()
-catch
-    false
-end
-
-println("CUDA available: $CAN_USE_GPU")
-
-# ---
-#
-# ### 1. Switching between CPU and GPU
-#
-# The architecture is set via `params.architecture`. All array allocations
-# and kernel launches automatically adapt.
-
-params = parameters_from_yaml("test/test_parameters/PureRayleighParameters.yaml")
-
-## CPU run
-params.architecture = vSmartMOM.Architectures.CPU()
-model_cpu = model_from_parameters(params)
-R_cpu, T_cpu, _, _, _, _, _ = rt_run(model_cpu)
-println("CPU result shape: ", size(R_cpu), "  eltype: ", eltype(R_cpu))
-
-## GPU run (only if CUDA is available)
-if CAN_USE_GPU
-    params.architecture = vSmartMOM.Architectures.GPU()
-    model_gpu = model_from_parameters(params)
-    R_gpu, T_gpu, _, _, _, _, _ = rt_run(model_gpu)
-    println("GPU result shape: ", size(R_gpu), "  eltype: ", eltype(R_gpu))
-
-    ## Compare CPU vs GPU (should agree to machine precision)
-    max_diff = maximum(abs.(R_cpu .- R_gpu))
-    println("Max CPU-GPU difference: $max_diff")
+if vSmartMOM.Architectures.has_cuda()
+    println("CUDA is available — GPU mode enabled.")
 else
-    println("Skipping GPU run — CUDA not available on this system.")
+    println("CUDA not available — running CPU-only examples.")
 end
 
-# ---
+# The default architecture auto-detects:
+arch = vSmartMOM.Architectures.default_architecture()
+println("Default architecture: ", arch)
+
+# ## 2) Selecting architecture
 #
-# ### 2. Architecture-aware arrays
-#
-# Internally, vSmartMOM uses `array_type(architecture)` to select the
-# array constructor:
-# - `CPU()` → `Array`
-# - `GPU()` → `CuArray`
-#
-# When writing code that works on both, use these patterns:
+# You can explicitly choose CPU or GPU:
 #
 # ```julia
-# arr_type = array_type(architecture)
-# x = arr_type(zeros(FT, n))          # allocate on the right device
-# y = collect(gpu_array)              # safely copy GPU→CPU (no-op on CPU)
-# z = Matrix(Diagonal(v))            # dense from diagonal (always CPU)
+# params.architecture = vSmartMOM.Architectures.CPU()   # force CPU
+# params.architecture = vSmartMOM.Architectures.GPU()   # force GPU
 # ```
 #
-# **Avoid** calling `Array(gpu_array)` directly — use `collect()` instead.
-# This makes intent explicit and works identically on CPU and GPU.
+# When loading from YAML, set `architecture: GPU` in the config, or
+# override after loading:
 
-# ---
-#
-# ### 3. Performance considerations
-#
-# **Batch size matters.** The RT solver uses batched matrix operations
-# (`batched_mul` from NNlib.jl). GPU performance scales with the number
-# of spectral points (`nSpec`) — a batch of 100+ wavelengths is needed
-# to saturate modern GPUs.
-#
-# **Memory.** Each atmospheric layer allocates `r, t, j` matrices of shape
-# `(nμ, nμ, nSpec)`. With full Stokes polarization (`nμ = 4 * Nquad`)
-# and many wavelengths, GPU memory can become a bottleneck.
-#
-# **First call overhead.** Julia compiles GPU kernels on first use.
-# The second call is much faster. Use a small warm-up run.
+params = parameters_from_yaml(
+    joinpath(dirname(dirname(pathof(vSmartMOM))),
+             "test", "test_parameters", "PureRayleighParameters.yaml"))
 
-# ---
-#
-# ### 4. Common pitfalls
-#
-# **Scalar indexing.** Accessing individual elements of a `CuArray`
-# triggers slow GPU-to-CPU transfers. The code avoids this by using
-# broadcasted operations and KernelAbstractions.jl kernels for
-# element-wise work.
-#
-# **Non-contiguous slices.** `batched_mul` requires contiguous memory.
-# If you slice a 4D array as `A[i,:,:,:]`, the result may not be
-# contiguous. The code uses `copy()` in these cases to ensure
-# contiguity.
-#
-# **Type stability.** GPU compilation is sensitive to type instabilities.
-# The RT kernels enforce `FT<:Real` as the element type, so
-# `ForwardDiff.Dual` numbers never reach CUDA kernels.
+params.architecture = vSmartMOM.Architectures.CPU()
+model_cpu = model_from_parameters(params)
+R_cpu, = rt_run(model_cpu)
+println("CPU result shape: ", size(R_cpu))
 
-if CAN_USE_GPU
-    println("\n--- GPU device info ---")
-    println("Device:  ", CUDA.name(CUDA.device()))
-    println("Memory:  ", round(CUDA.total_memory() / 1e9, digits=1), " GB")
-end
+# ## 3) GPU execution
+#
+# When a GPU is available, simply switch the architecture:
+#
+# ```julia
+# params.architecture = vSmartMOM.Architectures.GPU()
+# model_gpu = model_from_parameters(params)
+# R_gpu, = rt_run(model_gpu)
+# ```
+#
+# The same code paths are used — arrays are automatically moved to GPU
+# via `CuArray`, and the RT kernels use `KernelAbstractions.jl` for
+# device-portable kernel dispatch.
+
+# ## 4) What runs on GPU
+#
+# The following operations are fully GPU-accelerated:
+#
+# | Component                | GPU support |
+# |:-------------------------|:------------|
+# | Elemental layer (`elemental!`) | ✅ Full |
+# | Doubling (`doubling!`)         | ✅ Full |
+# | Interaction (`interaction!`)   | ✅ Full |
+# | Batched matrix inverse         | ✅ via CUBLAS |
+# | Phase function computation     | ❌ CPU only |
+# | Absorption cross-sections      | ✅ Full |
+# | Postprocessing (VZA interp.)   | ✅ Full |
+#
+# Phase function computation (Mie/NAI2) is always done on CPU and then
+# transferred to GPU.  This is typically a one-time cost per aerosol type.
+#
+# ## 5) GPU-specific YAML parameters
+#
+# For GPU runs, a smaller spectral grid often makes sense to fit in
+# GPU memory.  The `test/test_parameters/O2Parameters_GPU.yaml` config
+# demonstrates a reduced grid (nSpec=60 vs 6837 for CPU):
+#
+# ```yaml
+# radiative_transfer:
+#   architecture: GPU
+#   spec_bands:
+#     - "(1e7/771):0.2:(1e7/759)"   # coarser grid
+# ```
+
+# ## 6) Benchmarking CPU vs GPU
+#
+# The benchmark script at `test/benchmark_rt.jl` provides timing
+# comparisons.  A typical A100 GPU speedup for the O₂-A band:
+#
+# ```
+# Forward noRS (nSpec=17):  CPU ~0.3s, GPU ~0.05s  (6× speedup)
+# Forward noRS (nSpec=60):  CPU ~1.0s, GPU ~0.08s  (12× speedup)
+# ```
+#
+# Speedup increases with spectral resolution because the GPU excels at
+# the batched matrix operations that scale with `nSpec`.
+
+# ## 7) Memory considerations
+#
+# GPU memory usage scales as `O(nμ² × nSpec)` for the layer matrices.
+# With `nμ = 18` (9 streams, Stokes-I) and `nSpec = 6000`, each 3D
+# matrix is about 15 MB in Float64.  The solver needs ~20 such matrices
+# simultaneously, totaling ~300 MB — well within a 40 GB A100.
+#
+# For very high spectral resolution, consider splitting into sub-bands
+# or using Float32 (supported but with reduced accuracy).

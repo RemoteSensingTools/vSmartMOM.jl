@@ -13,7 +13,7 @@ using Test
 using vSmartMOM, vSmartMOM.CoreRT
 using Distributions, Statistics
 
-const YAML_FAST = "test/test_parameters/JacobianTestFast.yaml"
+const YAML_FAST = "test_parameters/JacobianTestFast.yaml"
 
 # Load CUDA at top level if available; then check device
 CUDA_LOADED = false

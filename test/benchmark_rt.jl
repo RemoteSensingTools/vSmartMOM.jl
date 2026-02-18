@@ -24,7 +24,7 @@ catch
     false
 end
 
-function benchmark_forward_noRS(arch; yaml="test/test_parameters/PureRayleighParameters.yaml", nruns=3)
+function benchmark_forward_noRS(arch; yaml="test_parameters/PureRayleighParameters.yaml", nruns=3)
     params = parameters_from_yaml(yaml)
     params.architecture = arch
 
@@ -42,7 +42,7 @@ function benchmark_forward_noRS(arch; yaml="test/test_parameters/PureRayleighPar
     return (model_build=median(t_model), rt_run=median(t_rt))
 end
 
-function benchmark_raman(arch; yaml="test/test_parameters/O2Parameters_GPU.yaml", nruns=3)
+function benchmark_raman(arch; yaml="test_parameters/O2Parameters_GPU.yaml", nruns=3)
     params = parameters_from_yaml(yaml)
     params.architecture = arch
     FT = Float64
@@ -81,7 +81,7 @@ function benchmark_raman(arch; yaml="test/test_parameters/O2Parameters_GPU.yaml"
     return (rt_run=median(t_rt), nSpec=nSpec)
 end
 
-function benchmark_linearized(arch; yaml="test/test_parameters/ParamsEMIT_fast.yaml", nruns=3)
+function benchmark_linearized(arch; yaml="test_parameters/ParamsEMIT_fast.yaml", nruns=3)
     params = parameters_from_yaml(yaml)
     params.architecture = arch
 
