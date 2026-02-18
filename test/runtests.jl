@@ -23,3 +23,6 @@ using JLD2
 
 # Jacobian unit tests
 @testset "Jacobian Unit" begin include("test_jacobians_unit.jl") end
+
+# Type stability tests (no external data)
+@testset "Type Stability" begin include("test_type_stability.jl") end

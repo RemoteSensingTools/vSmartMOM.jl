@@ -13,7 +13,7 @@ function elemental!(pol_type, SFI::Bool,
                             scatter::Bool,              # scatter: flag indicating scattering
                             quad_points::QuadPoints{FT2}, # struct with quadrature points, weights, 
                             added_layer::Union{AddedLayer{FT},AddedLayerRS{FT}}, 
-                            architecture) where {FT<:Real,FT2,M}
+                            architecture) where {FT<:Real,FT2}
     @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻ = added_layer
     @unpack qp_μ, iμ₀, wt_μN, qp_μN = quad_points
     @unpack τ, ϖ, Z⁺⁺, Z⁻⁺, G = computed_layer_properties
