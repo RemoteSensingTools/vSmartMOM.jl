@@ -8,8 +8,8 @@ function interaction_hdrf!(SFI,
     hdr_J₀⁻, bhr_J₀⁻, bhr_J₀⁺)
 
     r⁻⁺ = added_layer.r⁻⁺
-    j₀⁻ = hasproperty(added_layer, :j₀⁻) ? added_layer.j₀⁻ : added_layer.J₀⁻
-    j₀⁺ = hasproperty(added_layer, :j₀⁺) ? added_layer.j₀⁺ : added_layer.J₀⁺
+    j₀⁻ = added_layer.j₀⁻
+    j₀⁺ = added_layer.j₀⁺
     @unpack J₀⁺, J₀⁻ = composite_layer 
     @unpack Nquad, wt_μN, iμ₀, iμ₀Nstart, qp_μN = quad_points
     NquadN =  Nquad * pol_type.n

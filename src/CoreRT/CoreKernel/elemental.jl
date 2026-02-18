@@ -157,9 +157,8 @@ function elemental!(pol_type, SFI::Bool,
                             architecture) where {FT<:Real,FT2}
 
     @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺ = added_layer
-    # AddedLayer has j₀⁺/j₀⁻, AddedLayerRS has J₀⁺/J₀⁻ (same role)
-    j₀⁺ = added_layer isa AddedLayerRS ? added_layer.J₀⁺ : added_layer.j₀⁺
-    j₀⁻ = added_layer isa AddedLayerRS ? added_layer.J₀⁻ : added_layer.j₀⁻
+    j₀⁺ = added_layer.j₀⁺
+    j₀⁻ = added_layer.j₀⁻
     @unpack qp_μ, iμ₀, wt_μN, qp_μN = quad_points
     @unpack τ, ϖ, Z⁺⁺, Z⁻⁺ = computed_layer_properties
     #@show M

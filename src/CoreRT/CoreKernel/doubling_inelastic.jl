@@ -15,8 +15,7 @@ function doubling_helper!(RS_type::RRS,
 
     # Unpack the added layer
     @unpack i_λ₁λ₀ = RS_type 
-    @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, J₀⁺, J₀⁻ = added_layer
-    #@unpack ier⁺⁻, ier⁻⁺, iet⁻⁻, iet⁺⁺, ieJ₀⁺, ieJ₀⁻ = added_layer
+    @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻ = added_layer
     @unpack  ier⁻⁺, iet⁺⁺, ieJ₀⁺, ieJ₀⁻ = added_layer
     # Device architecture
     dev = devi(architecture)
@@ -31,35 +30,25 @@ function doubling_helper!(RS_type::RRS,
 
     if SFI
         # Dummy for source 
-        J₁⁺ = similar(J₀⁺)
-        # Dummy for J
-        J₁⁻ = similar(J₀⁻)
+        J₁⁺ = similar(j₀⁺)
+        J₁⁻ = similar(j₀⁻)
 
-        # Dummy for source 
         ieJ₁⁺ = similar(ieJ₀⁺); ieJ₁⁺.=0
-        # Dummy for J
         ieJ₁⁻ = similar(ieJ₀⁻); ieJ₁⁻.=0
     end
-    #ndoubl = 0
-    # Loop over number of doublings
+
     for n = 1:ndoubl
 
-        # T⁺⁺(λ)[I - R⁺⁻(λ)R⁻⁺(λ)]⁻¹, for doubling R⁺⁻,R⁻⁺ and T⁺⁺,T⁻⁻ is identical
         batch_inv!(gp_refl, I_static .- r⁻⁺ ⊠ r⁻⁺)
         
         @views tt⁺⁺_gp_refl[:] = t⁺⁺ ⊠ gp_refl
         
-        #@show size(expk), expk[1:2], expk[(end-2):end]
         if SFI
-            # J⁺₂₁(λ) = J⁺₁₀(λ).exp(-τ(λ)/μ₀)
-            @views J₁⁺[:,1,:] = J₀⁺[:,1,:] .* expk'
-            # J⁻₁₂(λ)  = J⁻₀₁(λ).exp(-τ(λ)/μ₀)
-            @views J₁⁻[:,1,:] = J₀⁻[:,1,:] .* expk'
-            #@show  size(expk)
+            @views J₁⁺[:,1,:] = j₀⁺[:,1,:] .* expk'
+            @views J₁⁻[:,1,:] = j₀⁻[:,1,:] .* expk'
             
-            
-            @timeit "precomp" tmp1 = gp_refl ⊠  (J₀⁺ + r⁻⁺ ⊠ J₁⁻)
-            @timeit "precomp" tmp2 = gp_refl ⊠  (J₁⁻ + r⁻⁺ ⊠ J₀⁺)
+            @timeit "precomp" tmp1 = gp_refl ⊠  (j₀⁺ + r⁻⁺ ⊠ J₁⁻)
+            @timeit "precomp" tmp2 = gp_refl ⊠  (J₁⁻ + r⁻⁺ ⊠ j₀⁺)
             #@timeit "prep"    tmp3 = repeat(r⁻⁺,1,1,1,nRaman) ⊠ reshape(ieJ₁⁻, 
             for Δn = 1:nRaman
                 n₀, n₁ = get_n₀_n₁(ieJ₁⁺,i_λ₁λ₀[Δn])
@@ -81,7 +70,7 @@ function doubling_helper!(RS_type::RRS,
                                 ieJ₀⁻[:,:,n₁,Δn] + 
                                 (tt⁺⁺_gp_refl[:,:,n₁] ⊠ 
                                 (ieJ₁⁻[:,:,n₁,Δn] + 
-                                ier⁻⁺[:,:,n₁,Δn] ⊠ J₀⁺[:,:,n₀] +
+                                ier⁻⁺[:,:,n₁,Δn] ⊠ j₀⁺[:,:,n₀] +
                                 r⁻⁺[:,:,n₁] ⊠ ieJ₀⁺[:,:,n₁,Δn] + 
                                 (ier⁻⁺[:,:,n₁,Δn] ⊠ r⁻⁺[:,:,n₀] + 
                                 r⁻⁺[:,:,n₁] ⊠ ier⁻⁺[:,:,n₁,Δn]) ⊠ 
@@ -99,14 +88,12 @@ function doubling_helper!(RS_type::RRS,
             
         #bla
             # J⁻₀₂(λ) = J⁻₀₁(λ) + T⁻⁻₀₁(λ)[I - R⁻⁺₂₁(λ)R⁺⁻₀₁(λ)]⁻¹[J⁻₁₂(λ) + R⁻⁺₂₁(λ)J⁺₁₀(λ)] (see Eqs.8 in Raman paper draft)
-            J₀⁻[:] = J₀⁻ + (tt⁺⁺_gp_refl ⊠ (J₁⁻ + r⁻⁺ ⊠ J₀⁺)) 
+            j₀⁻[:] = j₀⁻ + (tt⁺⁺_gp_refl ⊠ (J₁⁻ + r⁻⁺ ⊠ j₀⁺)) 
 
-            # J⁺₂₀(λ) = J⁺₂₁(λ) + T⁺⁺₂₁(λ)[I - R⁺⁻₀₁(λ)R⁻⁺₂₁(λ)]⁻¹[J⁺₁₀(λ) + R⁺⁻₀₁(λ)J⁻₁₂(λ)] (see Eqs.8 in Raman paper draft)
-            J₀⁺[:] = J₁⁺ + (tt⁺⁺_gp_refl ⊠ (J₀⁺ + r⁻⁺ ⊠ J₁⁻))
+            j₀⁺[:] = J₁⁺ + (tt⁺⁺_gp_refl ⊠ (j₀⁺ + r⁻⁺ ⊠ J₁⁻))
 
-            expk .= expk.^2 #expk[:] = expk.^2
-        end  
-        #println("Doubling part 1 done")
+            expk .= expk.^2
+        end
         for Δn = 1:nRaman
                 n₀, n₁ = get_n₀_n₁(ieJ₁⁺,i_λ₁λ₀[Δn])
                 #@show n₁, n₀
@@ -147,7 +134,7 @@ function doubling_helper!(RS_type::RRS,
 
     apply_D_matrix!(pol_type.n, added_layer.r⁻⁺, added_layer.t⁺⁺, added_layer.r⁺⁻, added_layer.t⁻⁻)
     apply_D_matrix_IE!(RS_type, pol_type.n, added_layer.ier⁻⁺, added_layer.iet⁺⁺, added_layer.ier⁺⁻, added_layer.iet⁻⁻)
-    SFI && apply_D_matrix_SFI!(pol_type.n, added_layer.J₀⁻)
+    SFI && apply_D_matrix_SFI!(pol_type.n, added_layer.j₀⁻)
     SFI && apply_D_matrix_SFI_IE!(RS_type, pol_type.n, added_layer.ieJ₀⁻)
 
     return nothing 
@@ -164,7 +151,7 @@ function doubling_helper!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
                         architecture) where {FT}
     # Unpack the added layer
     @unpack i_λ₁λ₀_all = RS_type 
-    @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, J₀⁺, J₀⁻ = added_layer
+    @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻ = added_layer
     @unpack ier⁺⁻, ier⁻⁺, iet⁻⁻, iet⁺⁺, ieJ₀⁺, ieJ₀⁻ = added_layer
     # Device architecture
     dev = devi(architecture)
@@ -178,35 +165,28 @@ function doubling_helper!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
  
     if SFI
         # Dummy for source 
-        J₁⁺ = similar(J₀⁺)
-        # Dummy for J
-        J₁⁻ = similar(J₀⁻)
+        J₁⁺ = similar(j₀⁺)
+        J₁⁻ = similar(j₀⁻)
 
-        # Dummy for source 
         ieJ₁⁺ = similar(ieJ₀⁺); ieJ₁⁺.=0
-        # Dummy for J
         ieJ₁⁻ = similar(ieJ₀⁻); ieJ₁⁻.=0
     end
 
-    # Loop over number of doublings
     for n = 1:ndoubl
         
-        # T⁺⁺(λ)[I - R⁺⁻(λ)R⁻⁺(λ)]⁻¹, for doubling R⁺⁻,R⁻⁺ and T⁺⁺,T⁻⁻ is identical
         batch_inv!(gp_refl, I_static .- r⁻⁺ ⊠ r⁻⁺)
         @views tt⁺⁺_gp_refl[:] = t⁺⁺ ⊠ gp_refl
 
         if SFI
 
-            # J⁺₂₁(λ) = J⁺₁₀(λ).exp(-τ(λ)/μ₀)
-            @views J₁⁺[:,1,:] = J₀⁺[:,1,:] .* expk'
+            @views J₁⁺[:,1,:] = j₀⁺[:,1,:] .* expk'
             @views ieJ₁⁺[:,1,:] = ieJ₀⁺[:,1,:] .* expk'
 
-            # J⁻₁₂(λ)  = J⁻₀₁(λ).exp(-τ(λ)/μ₀)
-            @views J₁⁻[:,1,:]   = J₀⁻[:,1,:] .* expk'
+            @views J₁⁻[:,1,:]   = j₀⁻[:,1,:] .* expk'
             @views ieJ₁⁻[:,1,:] = ieJ₀⁻[:,1,:] .* expk'
 
-            tmp1 = gp_refl ⊠  (J₀⁺ + r⁻⁺ ⊠ J₁⁻)
-            tmp2 = gp_refl ⊠  (J₁⁻ + r⁻⁺ ⊠ J₀⁺)
+            tmp1 = gp_refl ⊠  (j₀⁺ + r⁻⁺ ⊠ J₁⁻)
+            tmp2 = gp_refl ⊠  (J₁⁻ + r⁻⁺ ⊠ j₀⁺)
             #for n₁ in eachindex ieJ₁⁺[1,1,:,1]
             for Δn = 1:length(i_λ₁λ₀_all)
                 n₁ = i_λ₁λ₀_all[Δn]
@@ -229,7 +209,7 @@ function doubling_helper!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
                             ieJ₀⁻[:,1,n₁,1] + 
                             (tt⁺⁺_gp_refl[:,:,n₁] * 
                             (ieJ₁⁻[:,1,n₁,1] + 
-                            ier⁻⁺[:,:,n₁,1] * J₀⁺[:,1,n₀] + 
+                            ier⁻⁺[:,:,n₁,1] * j₀⁺[:,1,n₀] + 
                             r⁻⁺[:,:,n₁] * ieJ₀⁺[:,1,n₁,1] + 
                             (ier⁻⁺[:,:,n₁,1] * r⁻⁺[:,:,n₀] + 
                             r⁻⁺[:,:,n₁] * ier⁻⁺[:,:,n₁,1]) *
@@ -238,10 +218,9 @@ function doubling_helper!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
                 end
             end            
             # J⁻₀₂(λ) = J⁻₀₁(λ) + T⁻⁻₀₁(λ)[I - R⁻⁺₂₁(λ)R⁺⁻₀₁(λ)]⁻¹[J⁻₁₂(λ) + R⁻⁺₂₁(λ)J⁺₁₀(λ)] (see Eqs.8 in Raman paper draft)
-            J₀⁻[:] = J₀⁻ + (tt⁺⁺_gp_refl ⊠ (J₁⁻ + r⁻⁺ ⊠ J₀⁺)) 
+            j₀⁻[:] = j₀⁻ + (tt⁺⁺_gp_refl ⊠ (J₁⁻ + r⁻⁺ ⊠ j₀⁺)) 
 
-            # J⁺₂₀(λ) = J⁺₂₁(λ) + T⁺⁺₂₁(λ)[I - R⁺⁻₀₁(λ)R⁻⁺₂₁(λ)]⁻¹[J⁺₁₀(λ) + R⁺⁻₀₁(λ)J⁻₁₂(λ)] (see Eqs.8 in Raman paper draft)
-            J₀⁺[:] = J₁⁺ + (tt⁺⁺_gp_refl ⊠ (J₀⁺ + r⁻⁺ ⊠ J₁⁻))
+            j₀⁺[:] = J₁⁺ + (tt⁺⁺_gp_refl ⊠ (j₀⁺ + r⁻⁺ ⊠ J₁⁻))
              
             expk[:] = expk.^2
         end  
@@ -288,7 +267,7 @@ function doubling_helper!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
         added_layer.r⁻⁺, added_layer.t⁺⁺, added_layer.r⁺⁻, added_layer.t⁻⁻)
     apply_D_matrix_IE!(RS_type, pol_type.n, 
         added_layer.ier⁻⁺, added_layer.iet⁺⁺, added_layer.ier⁺⁻, added_layer.iet⁻⁻)
-    SFI && apply_D_matrix_SFI!(pol_type.n, added_layer.J₀⁻)
+    SFI && apply_D_matrix_SFI!(pol_type.n, added_layer.j₀⁻)
     SFI && apply_D_matrix_SFI_IE!(RS_type, pol_type.n, added_layer.ieJ₀⁻)
     
     return nothing 

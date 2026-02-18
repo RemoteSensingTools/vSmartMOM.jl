@@ -46,8 +46,8 @@ function interaction_helper_ms!(::ScatteringInterface_01, SFI,
 
     if SFI
         #J₀⁺, J₀⁻ = similar(composite_layer.J₀⁺), similar(composite_layer.J₀⁺)
-        #J₀⁻ = composite_layer.J₀⁻ .+ composite_layer.T⁻⁻ ⊠ (added_layer.r⁻⁺ ⊠ composite_layer.J₀⁺ .+ added_layer.J₀⁻) 
-        #J₀⁺ = added_layer.J₀⁺ .+ added_layer.t⁺⁺ ⊠ composite_layer.J₀⁺ 
+        #J₀⁻ = composite_layer.J₀⁻ .+ composite_layer.T⁻⁻ ⊠ (added_layer.r⁻⁺ ⊠ composite_layer.J₀⁺ .+ added_layer.j₀⁻) 
+        #J₀⁺ = added_layer.j₀⁺ .+ added_layer.t⁺⁺ ⊠ composite_layer.J₀⁺ 
         J₀⁻[:] = J₀⁻ .+ T⁻⁻ ⊠ (r⁻⁺ ⊠ J₀⁺ .+ j₀⁻)
         J₀⁺[:] = j₀⁺ .+ t⁺⁺ ⊠ J₀⁺ 
     end
@@ -164,7 +164,7 @@ function interaction_top!(ims::Int64,
                         I_static::AbstractArray{FT2},
                         arr_type) where {FT<:Real,FT2,M}
 
-    @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, J₀⁺, J₀⁻ = added_layer
+    @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻ = added_layer
     #@unpack topR⁻⁺, topR⁺⁻, topT⁺⁺, topT⁻⁻, topJ₀⁺, topJ₀⁻ = composite_layer
     R⁻⁺ = arr_type(composite_layer.topR⁻⁺[ims]) 
     R⁺⁻ = arr_type(composite_layer.topR⁺⁻[ims]) 
@@ -177,7 +177,7 @@ function interaction_top!(ims::Int64,
     
     interaction_helper_ms!(scattering_interface, SFI, #composite_layer, added_layer, 
                         I_static,
-                        r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, J₀⁺, J₀⁻,
+                        r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻,
                         R⁻⁺, R⁺⁻, T⁺⁺, T⁻⁻, compJ₀⁺, compJ₀⁻);
 
     composite_layer.topR⁻⁺[ims][:] = collect(R⁻⁺)
@@ -202,7 +202,7 @@ function interaction_bot!(ims::Int64,
                         added_layer::AddedLayer{FT},
                         I_static::AbstractArray{FT2}, arr_type) where {M,FT<:Real,FT2}
 
-    @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, J₀⁺, J₀⁻ = added_layer
+    @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻ = added_layer
     #@unpack botR⁻⁺, botR⁺⁻, botT⁺⁺, botT⁻⁻, botJ₀⁺, botJ₀⁻ = composite_layer
     R⁻⁺ = arr_type(composite_layer.botR⁻⁺[ims]) 
     R⁺⁻ = arr_type(composite_layer.botR⁺⁻[ims]) 
@@ -215,7 +215,7 @@ function interaction_bot!(ims::Int64,
     
     interaction_helper_ms!(scattering_interface, SFI, #composite_layer, added_layer, 
                         I_static,
-                        r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, J₀⁺, J₀⁻,
+                        r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻,
                         R⁻⁺, R⁺⁻, T⁺⁺, T⁻⁻, compJ₀⁺, compJ₀⁻);
         
     composite_layer.botR⁻⁺[ims][:] = collect(R⁻⁺)
@@ -784,7 +784,7 @@ added_layer::AddedLayerRS{FT},
 I_static::AbstractArray{FT2},
 arr_type) where {FT<:Real,FT2,M}
 
-    @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, J₀⁺, J₀⁻ = added_layer
+    @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻ = added_layer
     @unpack ier⁺⁻, ier⁻⁺, iet⁻⁻, iet⁺⁺, ieJ₀⁺, ieJ₀⁻ = added_layer
     #@unpack topR⁻⁺, topR⁺⁻, topT⁺⁺, topT⁻⁻, topJ₀⁺, topJ₀⁻ = composite_layer
     R⁻⁺ = arr_type(composite_layer.topR⁻⁺[ims]) 
@@ -807,7 +807,7 @@ arr_type) where {FT<:Real,FT2,M}
 
     interaction_helper_ms!(RS_type, scattering_interface, SFI, #composite_layer, added_layer, 
                             I_static,
-                            r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, J₀⁺, J₀⁻,
+                            r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻,
                             ier⁺⁻, ier⁻⁺, iet⁻⁻, iet⁺⁺, ieJ₀⁺, ieJ₀⁻,
                             R⁻⁺, R⁺⁻, T⁺⁺, T⁻⁻, compJ₀⁺, compJ₀⁻,
                             ieR⁻⁺, ieR⁺⁻, ieT⁺⁺, ieT⁻⁻, compieJ₀⁺, compieJ₀⁻);
@@ -843,7 +843,7 @@ function interaction_bot!(ims::Int64,
                     added_layer::AddedLayerRS{FT},
                     I_static::AbstractArray{FT2},
                     arr_type) where {FT<:Real,FT2,M}
-    @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, J₀⁺, J₀⁻ = added_layer
+    @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻ = added_layer
     @unpack ier⁺⁻, ier⁻⁺, iet⁻⁻, iet⁺⁺, ieJ₀⁺, ieJ₀⁻ = added_layer
     #@unpack botR⁻⁺, botR⁺⁻, botT⁺⁺, botT⁻⁻, botJ₀⁺, botJ₀⁻ = composite_layer
     R⁻⁺ = arr_type(composite_layer.botR⁻⁺[ims]) 
@@ -866,7 +866,7 @@ function interaction_bot!(ims::Int64,
     
     interaction_helper_ms!(RS_type, scattering_interface, SFI, #composite_layer, added_layer, 
                             I_static,
-                            r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, J₀⁺, J₀⁻,
+                            r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻,
                             ier⁺⁻, ier⁻⁺, iet⁻⁻, iet⁺⁺, ieJ₀⁺, ieJ₀⁻,
                             R⁻⁺, R⁺⁻, T⁺⁺, T⁻⁻, compJ₀⁺, compJ₀⁻,
                             ieR⁻⁺, ieR⁺⁻, ieT⁺⁺, ieT⁻⁻, compieJ₀⁺, compieJ₀⁻);
