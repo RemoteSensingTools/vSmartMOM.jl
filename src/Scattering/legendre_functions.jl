@@ -32,7 +32,7 @@ function compute_associated_legendre_PRT(μ,Lmax)
     T = (zeros(FT,length(μ),Lmax,Lmax));
     
     # Following Suniti Sanghavi code, looks somewhat different than Siewert as normalization is built in. 
-    for  m=0:Lmax-1
+    @inbounds for  m=0:Lmax-1
         for l=m:Lmax-1
             for iμ in eachindex(μ)
                 smu = sqrt(1.0 - μ[iμ]^2)
@@ -204,11 +204,10 @@ function compute_mie_π_τ(μ, nmax)
     τ_[:,1] .= μ;
     # This is equivalent to 3*cos(2*acos(μ))
     τ_[:,2] .= 6μ.^2 .-3;
-    for n=2:nmax-1
+    @inbounds for n=2:nmax-1
         for i in eachindex(μ)
             π_[i,n+1] = ((2n + 1) * μ[i] * π_[i,n] - (n+1) * π_[i,n-1]) / n 
             τ_[i,n+1] = (n+1) * μ[i] * π_[i,n+1] - (n+2)*π_[i,n]
-            # @show n+1,μ[i], π_[n+1,i], τ_[n+1,i], π_[n,i]
         end
     end
     return π_, τ_
@@ -247,7 +246,7 @@ function compute_legendre_poly(x::Array{FT},nmax) where FT
         R²[:,3] .= sqrt(1.5) * (1 .+ x.^2);
         T²[:,3] .= sqrt(6) * x;
     end
-    for n=2:nmax-1
+    @inbounds for n=2:nmax-1
         for i in eachindex(x)
             l = n-1;
             P⁰[i,n+1] = ((2l + 1) * x[i] * P⁰[i,n] - l * P⁰[i,n-1])/(l+1)
@@ -293,7 +292,7 @@ function compute_legendre_P(μ , Lmax)
         temp = SQRT3DIV2 * sintheta * temp
         da[2,2] = temp
 
-        for l=2:Lmax
+        @inbounds for l=2:Lmax
             il = l+1
             for m=0:l-2
                 im = m+1

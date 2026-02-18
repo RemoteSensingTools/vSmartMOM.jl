@@ -223,7 +223,7 @@ function interaction_helper!(::ScatteringInterface_11, SFI,
     # Temporary arrays:
     # T₁₂(I-R₀₁R₂₁)⁻¹
     T01_inv = T⁻⁻ ⊠ tmp_inv;
-    for iparam=1:Nparams
+    @inbounds for iparam=1:Nparams
         tmp_inv_lin[iparam,:,:,:] .= tmp_inv ⊠ (ap_ṙ⁻⁺[iparam,:,:,:] ⊠ R⁺⁻ .+ r⁻⁺ ⊠ Ṙ⁺⁻[iparam,:,:,:]) ⊠ tmp_inv
         T01_inv_lin[iparam,:,:,:] .= Ṫ⁻⁻[iparam,:,:,:] ⊠ tmp_inv .+ T⁻⁻ ⊠ tmp_inv_lin[iparam,:,:,:]
         # R₂₀ = R₁₀ + T₀₁(I-R₂₁R₀₁)⁻¹ R₂₁T₁₀
@@ -239,7 +239,7 @@ function interaction_helper!(::ScatteringInterface_11, SFI,
     if SFI
         #J₀₂⁻ = J₀₁⁻ + T₀₁(1-R₂₁R₀₁)⁻¹(R₂₁J₁₀⁺+J₁₂⁻)
         tmpJ₀⁻ = J₀⁻ .+ T01_inv ⊠ (r⁻⁺ ⊠ J₀⁺ .+ added_layer.j₀⁻) 
-        for iparam=1:Nparams
+        @inbounds for iparam=1:Nparams
             #@show size(tmpap_J̇₀⁻), size(ap_J̇₀⁻)
             #@show size(T01_inv_lin), size(r⁻⁺)
             #@show size(J₀⁺), size(added_layer.j₀⁻)
@@ -264,7 +264,7 @@ function interaction_helper!(::ScatteringInterface_11, SFI,
     @timeit "interaction inv2" batch_inv!(tmp_inv, I_static .- R⁺⁻ ⊠ r⁻⁺) 
     # T₂₁(I-R₀₁R₂₁)⁻¹
     T21_inv = t⁺⁺ ⊠ tmp_inv
-    for iparam=1:Nparams
+    @inbounds for iparam=1:Nparams
         tmp_inv_lin[iparam,:,:,:] .= tmp_inv ⊠ (R⁺⁻ ⊠ ap_ṙ⁻⁺[iparam,:,:,:] .+ Ṙ⁺⁻[iparam,:,:,:] ⊠ r⁻⁺) ⊠ tmp_inv
         T21_inv_lin[iparam,:,:,:] .= ap_ṫ⁺⁺[iparam,:,:,:] ⊠ tmp_inv .+ t⁺⁺ ⊠ tmp_inv_lin[iparam,:,:,:]
 
@@ -276,7 +276,7 @@ function interaction_helper!(::ScatteringInterface_11, SFI,
                                     T21_inv ⊠ (Ṙ⁺⁻[iparam,:,:,:] ⊠ t⁻⁻ .+ R⁺⁻ ⊠ ap_ṫ⁻⁻[iparam,:,:,:])  
     end
     if SFI
-        for iparam=1:Nparams
+        @inbounds for iparam=1:Nparams
             tmpap_J̇₀⁺[iparam,:,:,:] .= added_layer_lin.ap_J̇₀⁺[iparam,:,:,:] .+ 
                 T21_inv_lin[iparam,:,:,:] ⊠ (J₀⁺ .+ R⁺⁻ ⊠ added_layer.j₀⁻) .+
                 T21_inv ⊠ (J̇₀⁺[iparam,:,:,:] .+ 
@@ -298,7 +298,7 @@ function interaction_helper!(::ScatteringInterface_11, SFI,
         composite_layer.J₀⁺[:] = tmpJ₀⁺
         composite_layer.J₀⁻[:] = tmpJ₀⁻
         
-        for iparam=1:Nparams
+        @inbounds for iparam=1:Nparams
             #@show size(tmpap_J̇₀⁺), size(composite_layer_lin.J̇₀⁺)
             #@show size(tmpap_J̇₀⁻), size(composite_layer_lin.J̇₀⁻)
             composite_layer_lin.J̇₀⁺[iparam,:,:,:] .= tmpap_J̇₀⁺[iparam,:,:,:]
