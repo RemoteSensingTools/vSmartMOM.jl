@@ -55,7 +55,7 @@ function postprocessing_vza!(RS_type::noRS, iμ₀, pol_type,
 end
 
 "RAMI: Perform post-processing to azimuthally-weight hdr matrices"
-function postprocessing_vza_hdrf!(RS_type::noRS, iμ₀, pol_type,
+function postprocessing_vza_hdrf!(RS_type, iμ₀, pol_type,
         hdr_J₀⁻, vza, qp_μ, m, vaz, μ₀, weight, nSpec, hdr)
 
     vza_info = _precompute_vza_weights(vza, vaz, qp_μ, pol_type, m, weight)

@@ -2,13 +2,15 @@
 # Scattering in homogeneous layer which is added to the bottom of the composite layer.
 # Produces a new, scattering composite layer.
 function interaction_hdrf!(SFI,
-    composite_layer::CompositeLayer{FT}, 
-    added_layer::AddedLayer{FT}, 
+    composite_layer::AbstractLayer, 
+    added_layer::AbstractLayer, 
     m, pol_type, quad_points,
-    hdr_J₀⁻, bhr_J₀⁻, bhr_J₀⁺) where {FT}
+    hdr_J₀⁻, bhr_J₀⁻, bhr_J₀⁺)
 
-    @unpack r⁻⁺, j₀⁻, j₀⁺ = added_layer     #these are aliases to the respective struct elements  
-    @unpack J₀⁺, J₀⁻      = composite_layer #these are aliases to the respective struct elements 
+    r⁻⁺ = added_layer.r⁻⁺
+    j₀⁻ = hasproperty(added_layer, :j₀⁻) ? added_layer.j₀⁻ : added_layer.J₀⁻
+    j₀⁺ = hasproperty(added_layer, :j₀⁺) ? added_layer.j₀⁺ : added_layer.J₀⁺
+    @unpack J₀⁺, J₀⁻ = composite_layer 
     @unpack Nquad, wt_μN, iμ₀, iμ₀Nstart, qp_μN = quad_points
     NquadN =  Nquad * pol_type.n
     hdr_J₀⁻ .= r⁻⁺ ⊠ J₀⁺ .+ j₀⁻
