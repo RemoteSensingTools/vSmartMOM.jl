@@ -25,10 +25,10 @@ function postprocessing_vza!(RS_type::noRS,
 
     vza_info = _precompute_vza_weights(vza, vaz, qp_μ, pol_type, m, weight)
 
-    J₀⁺ = collect(composite_layer.J₀⁺)
-    J₀⁻ = collect(composite_layer.J₀⁻)
-    J̇₀⁺ = collect(composite_layer_lin.J̇₀⁺)
-    J̇₀⁻ = collect(composite_layer_lin.J̇₀⁻)
+    J₀⁺ = Array(composite_layer.J₀⁺)
+    J₀⁻ = Array(composite_layer.J₀⁻)
+    J̇₀⁺ = Array(composite_layer_lin.J̇₀⁺)
+    J̇₀⁻ = Array(composite_layer_lin.J̇₀⁻)
 
     Nparams = size(J̇₀⁻, 1)
 

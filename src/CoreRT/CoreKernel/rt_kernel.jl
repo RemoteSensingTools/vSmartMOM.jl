@@ -31,14 +31,16 @@ Multiple methods are dispatched on the Raman-scattering type (`noRS`, `RRS`,
 
 Set transmission matrices for non-scattering layers using Beer's law.
 Constructs batch diagonal matrices: `t[j,j,iλ] = exp(-τ[iλ]/μ[j])`.
-Works on both CPU and GPU arrays (uses `collect` for CPU-side Diagonal construction).
+Works on both CPU and GPU arrays without device transfers.
 """
 @inline function _set_transmission_noscat!(t⁺⁺, t⁻⁻, τ_vals, qp_μN)
-    temp = collect(exp.(-τ_vals ./ qp_μN'))
-    for iλ in axes(temp, 1)
-        d = Diagonal(temp[iλ,:])
-        t⁺⁺[:,:,iλ] = d
-        t⁻⁻[:,:,iλ] = d
+    fill!(t⁺⁺, 0)
+    fill!(t⁻⁻, 0)
+    temp = exp.(-τ_vals ./ qp_μN')
+    nμ = size(temp, 2)
+    for j in 1:nμ
+        @views t⁺⁺[j,j,:] .= temp[:, j]
+        @views t⁻⁻[j,j,:] .= temp[:, j]
     end
 end
 #No Raman (default)
@@ -255,7 +257,7 @@ direction when computing `dτ_max` for the doubling criterion.
 @inline function get_dtau_ndoubl(computed_layer_properties::CoreDirectionalScatteringOpticalProperties, quad_points::QuadPoints{FT}) where {FT}
     (; qp_μ, iμ₀) = quad_points
     (; τ, ϖ, G) = computed_layer_properties
-    gfct = collect(G)[iμ₀]  # CPU scalar extraction from G factor
+    gfct = Array(G)[iμ₀]
     dτ_max = minimum([maximum(gfct * τ .* ϖ), FT(0.001) * minimum(qp_μ)])
     _, ndoubl = doubling_number(dτ_max, maximum(τ .* ϖ))
     # Compute dτ vector
@@ -279,7 +281,7 @@ and beam attenuation factor ``e^{-d\\tau/\\mu_0}`` (or ``e^{-d\\tau \\cdot G/\\m
     (; μ₀, iμ₀) = quad_points
     (; G) = computed_layer_properties
     dτ, ndoubl = get_dtau_ndoubl(computed_layer_properties, quad_points)
-    gfct = collect(G)[iμ₀]  # CPU scalar extraction from G factor
+    gfct = Array(G)[iμ₀]
     expk = exp.(-dτ*gfct/μ₀)
     return dτ, ndoubl, arr_type(expk)
 end

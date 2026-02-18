@@ -49,10 +49,10 @@ function postprocessing_vza!(RS_type::noRS, iμ₀, pol_type,
     _, istart0, iend0 = get_indices(iμ₀, pol_type)
     vza_info = _precompute_vza_weights(vza, vaz, qp_μ, pol_type, m, weight)
 
-    R⁻⁺ = collect(composite_layer.R⁻⁺)
-    T⁺⁺ = collect(composite_layer.T⁺⁺)
-    J₀⁺ = collect(composite_layer.J₀⁺)
-    J₀⁻ = collect(composite_layer.J₀⁻)
+    R⁻⁺ = Array(composite_layer.R⁻⁺)
+    T⁺⁺ = Array(composite_layer.T⁺⁺)
+    J₀⁺ = Array(composite_layer.J₀⁺)
+    J₀⁻ = Array(composite_layer.J₀⁻)
 
     for i in eachindex(vza)
         istart, iend, w = vza_info[i]
@@ -79,7 +79,7 @@ function postprocessing_vza_hdrf!(RS_type, iμ₀, pol_type,
         hdr_J₀⁻, vza, qp_μ, m, vaz, μ₀, weight, nSpec, hdr)
 
     vza_info = _precompute_vza_weights(vza, vaz, qp_μ, pol_type, m, weight)
-    hdr_J₀⁻ = collect(hdr_J₀⁻)
+    hdr_J₀⁻ = Array(hdr_J₀⁻)
 
     for i in eachindex(vza)
         istart, iend, w = vza_info[i]
@@ -105,12 +105,12 @@ function postprocessing_vza!(RS_type::Union{RRS, VS_0to1_plus, VS_1to0_plus},
     _, istart0, iend0 = get_indices(iμ₀, pol_type)
     vza_info = _precompute_vza_weights(vza, vaz, qp_μ, pol_type, m, weight)
 
-    R⁻⁺ = collect(composite_layer.R⁻⁺)
-    T⁺⁺ = collect(composite_layer.T⁺⁺)
-    J₀⁺ = collect(composite_layer.J₀⁺)
-    J₀⁻ = collect(composite_layer.J₀⁻)
-    ieJ₀⁺ = collect(composite_layer.ieJ₀⁺)
-    ieJ₀⁻ = collect(composite_layer.ieJ₀⁻)
+    R⁻⁺ = Array(composite_layer.R⁻⁺)
+    T⁺⁺ = Array(composite_layer.T⁺⁺)
+    J₀⁺ = Array(composite_layer.J₀⁺)
+    J₀⁻ = Array(composite_layer.J₀⁻)
+    ieJ₀⁺ = Array(composite_layer.ieJ₀⁺)
+    ieJ₀⁻ = Array(composite_layer.ieJ₀⁻)
 
     n_raman = size(ieJ₀⁺, 4)
 
