@@ -398,23 +398,23 @@ A struct which holds all absorption-related parameters (before any computations)
 `molecules` is the full list per band; `fixed_molecules` and `variable_molecules`
 partition it for analytic Jacobians (fixed = no derivative, variable = derivative computed).
 """
-mutable struct AbsorptionParameters
+mutable struct AbsorptionParameters{M,FM,VM,V,BF,CE,LT}
     "Molecules to use for absorption calculations (`nBand, nMolecules`)"
-    molecules::AbstractArray
+    molecules::M
     "Fixed-abundance molecules per band (no Jacobian computed)"
-    fixed_molecules::AbstractArray
+    fixed_molecules::FM
     "Variable-abundance molecules per band (Jacobian computed w.r.t. VMR)"
-    variable_molecules::AbstractArray
+    variable_molecules::VM
     "Volume-Mixing Ratios"
-    vmr::Dict
+    vmr::V
     "Type of broadening function (Doppler/Lorentz/Voigt)"
-    broadening_function::AbstractBroadeningFunction
+    broadening_function::BF
     "Complex Error Function to use in Voigt calculations"
-    CEF::AbstractComplexErrorFunction
+    CEF::CE
     "Wing cutoff to use in cross-section calculation (cm⁻¹)"
-    wing_cutoff::Integer
+    wing_cutoff::Real
     "Lookup table type"
-    luts::AbstractArray 
+    luts::LT
 end
 
 """

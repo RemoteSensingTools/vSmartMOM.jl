@@ -94,8 +94,8 @@ function elemental!(pol_type, SFI::Bool,
    
         # for m==0, ₀∫²ᵖⁱ cos²(mϕ)dϕ/4π = 0.5, while
         # for m>0,  ₀∫²ᵖⁱ cos²(mϕ)dϕ/4π = 0.25  
-        wct02 = m == 0 ? FT(0.50)              : FT(0.25)
-        wct2  = m == 0 ? wt_μN/2               : wt_μN/4
+        wct02 = fourier_weight(m, FT)
+        wct2  = scaled_weights(m, wt_μN)
         r⁻⁺ .= 0.0 
         t⁺⁺ .= 0.0
         ṙ⁻⁺ .= 0.0

@@ -26,3 +26,9 @@ using JLD2
 
 # Type stability tests (no external data)
 @testset "Type Stability" begin include("test_type_stability.jl") end
+
+# Float32 consistency tests
+@testset "Float32 Consistency" begin include("test_float32.jl") end
+
+# RAMI smoke test (no gas absorption, bypasses sandbox scripts)
+@testset "RAMI Smoke" begin include("test_rami_smoke.jl") end

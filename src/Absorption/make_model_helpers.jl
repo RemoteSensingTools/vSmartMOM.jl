@@ -24,7 +24,7 @@ Convenience function to make a HitranModel out of the parameters (Matches make_i
 """
 function make_hitran_model(hitran::HitranTable, 
                            broadening::AbstractBroadeningFunction; 
-                           wing_cutoff::Integer=40, 
+                           wing_cutoff::Real=40, 
                            vmr::Union{Real, Vector}=0, 
                            CEF::AbstractComplexErrorFunction=HumlicekWeidemann32SDErrorFunction(), 
                            architecture::AbstractArchitecture = default_architecture())
@@ -61,7 +61,7 @@ function make_interpolation_model(
                                   t_grid::AbstractRange{<:Real}; 
                                   # Optionals
                                   wavelength_flag::Bool=false,
-                                  wing_cutoff::Integer=40, 
+                                  wing_cutoff::Real=40, 
                                   vmr::Real=0, 
                                   CEF::AbstractComplexErrorFunction=HumlicekWeidemann32SDErrorFunction(),
                                   architecture::AbstractArchitecture = default_architecture()     # Computer `Architecture` on which `Model` is run

@@ -382,11 +382,11 @@ function _parse_absorption(params_dict::Dict, FT)
     return AbsorptionParameters(molecules, fixed_molecules, variable_molecules, vmr, broadening_function, CEF, wing_cutoff, luts)
 end
 
-function _parse_scattering(params_dict::Dict)
+function _parse_scattering(params_dict::Dict, FT::Type{<:AbstractFloat}=Float64)
     if !haskey(params_dict, "scattering")
         return nothing
     end
-    FTa = Float64
+    FTa = FT
     aerosols = aerosol_params_to_obj(params_dict["scattering"]["aerosols"], FTa)
     r_max = FTa(params_dict["scattering"]["r_max"])
     nquad_radius = params_dict["scattering"]["nquad_radius"]
@@ -419,7 +419,7 @@ function parameters_from_dict(params_dict::Dict)
     architecture = _parse_architecture(params_dict)
     T, p, q, profile_reduction = _parse_atmosphere(params_dict, FT)
     absorption_params = _parse_absorption(params_dict, FT)
-    scattering_params = _parse_scattering(params_dict)
+    scattering_params = _parse_scattering(params_dict, FT)
 
     return vSmartMOM_Parameters(
         spec_bands, BRDF_per_band, quadrature_type, polarization_type,

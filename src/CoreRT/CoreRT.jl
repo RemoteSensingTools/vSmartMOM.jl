@@ -52,6 +52,9 @@ include("types_lin.jl")                        # Types for linearized RT
 # InelasticScattering module via `using ..InelasticScattering` above.
 # Inelastic layer types (CompositeLayerRS, AddedLayerRS) are in types.jl.
 
+# Shared helpers
+include("CoreKernel/rt_helpers.jl")
+
 # Solvers -- Elemental
 include("CoreKernel/elemental.jl")             # Elemental (elastic)
 include("CoreKernel/elemental_lin.jl")         # Elemental (linearized)
