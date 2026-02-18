@@ -65,7 +65,21 @@ function create_surface_layer!(brdf::AbstractSurfaceType,
 
 end
 
-#Rahman Pinty Verstraete model
+"""
+    reflectance(rpv::rpvSurfaceScalar, n, μᵢ, μᵣ, dϕ)
+
+RPV (Rahman-Pinty-Verstraete) BRDF model for scalar (n=1) reflectance.
+
+The RPV model (Rahman et al., 1993) parameterizes the bidirectional reflectance as:
+``\\rho = \\rho_0 \\, M(\\mu_i, \\mu_r, k) \\, F(\\Theta, \\cos g) \\, H(\\rho_c, G)``
+
+- **ρ₀**: Overall amplitude (isotropic scaling).
+- **k**: Minnaert limb-darkening exponent (controls angular distribution).
+- **Θ**: Hot-spot parameter (controls backscatter peak width).
+- **ρ_c**: Geometric term amplitude (controls bowl shape).
+
+For polarized RT (n>1), returns zero. See Rahman, Pinty & Verstraete (1993), JGR.
+"""
 function reflectance(rpv::rpvSurfaceScalar{FT},  n, μᵢ::FT, μᵣ::FT, dϕ::FT) where FT
     (; ρ₀, ρ_c, k, Θ) = rpv
     # TODO: Suniti, stupid calculations here:
@@ -80,19 +94,28 @@ function reflectance(rpv::rpvSurfaceScalar{FT},  n, μᵢ::FT, μᵣ::FT, dϕ::F
     end
 end
 
+"""Minnaert term: ``M = (\\mu_i \\mu_r)^{k-1} / (\\mu_i + \\mu_r)^{1-k}``"""
 function rpvM(μᵢ::FT, μᵣ::FT, k::FT) where FT
     return (μᵢ * μᵣ)^(k -1) /  (μᵢ + μᵣ)^(1 - k)
 end
 
+"""Geometric term: ``H = 1 + (1 - \\rho_c) / (1 + G)``, with ``G`` the phase angle."""
 function rpvH(ρ_c::FT, G::FT) where FT
     return 1 + (1 - ρ_c) / (1 + G)
 end
 
+"""Hot-spot term: ``F = (1 - \\Theta^2) / (1 + \\Theta^2 + 2\\Theta \\cos g)^{1.5}``"""
 function rpvF(θ::FT, cosg::FT) where FT
     θ = -θ #for RAMI only
     return (1 - θ^2) /  (1 + θ^2 + 2θ * cosg)^FT(1.5) #RAMI form: (1 - Θ^2) /  (1 + Θ^2 + 2Θ * cosg)^FT(1.5)
 end
 
+"""
+    reflectance(rpv::rpvSurfaceScalar, μ, m)
+
+Fourier moment `m` of the RPV BRDF integrated over azimuth.
+Returns ``2 \\int_0^\\pi \\rho(\\mu, \\mu', \\phi) \\cos(m\\phi) \\, d\\phi`` for m=0.
+"""
 function reflectance(rpv::rpvSurfaceScalar{FT}, μ::Array{FT}, m::Int) where FT
     (; ρ₀, ρ_c, k, Θ) = rpv
     f(x) = reflectance.([rpv], μ, μ', [x]) * cos(m*x)
@@ -100,7 +123,14 @@ function reflectance(rpv::rpvSurfaceScalar{FT}, μ::Array{FT}, m::Int) where FT
 end
 
 
-# TODO: We need to add the weights for m=1 and m>0 here as well!
+"""
+    reflectance(brdf::AbstractSurfaceType, pol_type, μ, m)
+
+Fourier moment `m` of the BRDF reflectance matrix for quadrature directions `μ`.
+
+Computes ``R_{ij} = (f/\\pi) \\int_0^\\pi \\rho(n, \\mu_i, \\mu_j, \\phi) \\cos(m\\phi) \\, d\\phi``
+with `f = 2` for m=0, `f = 1` otherwise. Returns `[nμ·n_stokes, nμ·n_stokes]` matrix.
+"""
 function reflectance(brdf::AbstractSurfaceType, pol_type, μ::AbstractArray{FT}, m::Int) where FT
     # Hardcoded nQuad for now, needs to go into brdf in the future!
     nQuad = 100

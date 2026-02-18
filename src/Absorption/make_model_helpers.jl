@@ -109,6 +109,24 @@ function load_interpolation_model(filepath::String)
     return itp_model
 end
 
+"""
+    make_interpolation_model(absco::AbscoTable, wave_grid, p_grid, t_grid; 
+                             wavelength_flag=false, architecture=default_architecture())
+
+Create an InterpolationModel from ABSCO tabulated cross-section data.
+
+Linearly interpolates the pre-computed cross-sections onto the specified pressure and
+temperature grids. Uses the ABSCO format (ν, p, T) for the lookup table.
+
+# Arguments
+- `absco::AbscoTable`: ABSCO table with cross-sections σ(ν, p, T)
+- `wave_grid`: Wavenumber [cm⁻¹] or wavelength [nm] grid (see wavelength_flag)
+- `p_grid`: Pressure grid (hPa)
+- `t_grid`: Temperature grid (K)
+
+# Returns
+- `InterpolationModel`: Interpolator for absorption cross-sections
+"""
 function make_interpolation_model(
         # Required
         absco::AbscoTable,  
@@ -173,6 +191,22 @@ function make_interpolation_model(
     return InterpolationModel(itp, mol, iso,  ν_grid, p_grid, t_grid)
 end
 
+"""
+    make_interpolation_model_test(absco::AbscoTable, wave_grid, p_grid, t_grid; 
+                                  wavelength_flag=false, architecture=default_architecture())
+
+Alternative InterpolationModel from ABSCO using cubic spline interpolation in temperature.
+
+Uses cubic splines per pressure level for smoother T-interpolation, then linear
+interpolation on the combined (ν, p, T) grid. Assumes equidistant T-grid in ABSCO.
+
+# Arguments
+- `absco::AbscoTable`: ABSCO table with cross-sections
+- `wave_grid`, `p_grid`, `t_grid`: Output grids (same as make_interpolation_model)
+
+# Returns
+- `InterpolationModel`: Interpolator for absorption cross-sections
+"""
 function make_interpolation_model_test(
         # Required
         absco::AbscoTable,  

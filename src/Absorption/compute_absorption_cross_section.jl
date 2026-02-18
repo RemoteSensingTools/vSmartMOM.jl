@@ -13,8 +13,22 @@ interpolate partition sums.
 =#
 
 """
-Given the hitran data and necessary parameters, calculate an absorption cross-section at the
-given pressure, temperature, and grid of wavenumbers (or wavelengths)
+    compute_absorption_cross_section(model::HitranModel, grid, pressure, temperature; wavelength_flag=false)
+
+Compute absorption cross-section from HITRAN line-by-line data.
+
+Sums Voigt (or Doppler/Lorentz) line shapes over all transitions in the HITRAN table
+within the grid range. Supports CPU and GPU architectures.
+
+# Arguments
+- `model::HitranModel`: Model with HITRAN data, broadening, wing_cutoff, CEF
+- `grid`: Wavenumber [cm⁻¹] or wavelength [nm] grid
+- `pressure::Real`: Pressure (hPa)
+- `temperature::Real`: Temperature (K)
+- `wavelength_flag::Bool=false`: If true, grid is wavelength in nm
+
+# Returns
+- `Array`: Absorption cross-section (cm²/molecule) at each grid point
 """
 function compute_absorption_cross_section(
                 # Required
@@ -130,11 +144,21 @@ function compute_absorption_cross_section(
 end
 
 """
-    $(FUNCTIONNAME)(model::InterpolationModel, grid::AbstractRange{<:Real}, pressure::Real, temperature::Real; wavelength_flag::Bool=false)
+    compute_absorption_cross_section(model::InterpolationModel, grid, pressure, temperature; wavelength_flag=false)
 
-Given an Interpolation Model, return the interpolated absorption cross-section at the given pressure, 
-temperature, and grid of wavenumbers (or wavelengths)
+Compute absorption cross-section by interpolating a pre-computed lookup table.
 
+Uses BSpline interpolation over (ν, p, T). Faster than line-by-line for repeated calls.
+
+# Arguments
+- `model::InterpolationModel`: Pre-computed interpolator with ν_grid, p_grid, t_grid
+- `grid`: Wavenumber [cm⁻¹] or wavelength [nm] grid
+- `pressure::Real`: Pressure (hPa)
+- `temperature::Real`: Temperature (K)
+- `wavelength_flag::Bool=false`: If true, grid is wavelength in nm
+
+# Returns
+- `Array`: Interpolated absorption cross-section (cm²/molecule) at each grid point
 """
 function compute_absorption_cross_section(
     # Required
@@ -160,28 +184,33 @@ end
 
 #=
 
-Line-shape kernel functions that are called by absorption_cross_section
+Line-shape kernel functions that are called by absorption_cross_section.
+Each kernel adds the contribution of a single spectral line to the result array A.
 
-=# 
+=#
 
+"""Gaussian (Doppler) line-shape kernel. Adds S × (Gaussian) to A at each grid point."""
 @kernel function line_shape!(A, @Const(grid), ν, γ_d, γ_l, y, S, ::Doppler, CEF)
     FT = eltype(ν)
     I = @index(Global, Linear)
     @inbounds A[I] += FT(S) * FT(cSqrtLn2divSqrtPi) * exp(-FT(cLn2) * ((FT(grid[I]) - FT(ν)) / FT(γ_d))^2) / FT(γ_d)
 end
 
+"""Lorentz (collision) line-shape kernel. Adds S × (Lorentzian) to A at each grid point."""
 @kernel function line_shape!(A, @Const(grid), ν, γ_d, γ_l, y, S, ::Lorentz, CEF)
     FT = eltype(ν)
     I = @index(Global, Linear)
     @inbounds A[I] += FT(S) * FT(γ_l) / (FT(pi) * (FT(γ_l)^2 + (FT(grid[I]) - FT(ν))^2))
 end
 
+"""Voigt (convolution of Doppler + Lorentz) line-shape kernel. Uses CEF for complex error function."""
 @kernel function line_shape!(A, @Const(grid), ν, γ_d, γ_l, y, S, ::Voigt, CEF)
     FT = eltype(ν)
     I = @index(Global, Linear)
     @inbounds A[I] += FT(S) * FT(cSqrtLn2divSqrtPi) / FT(γ_d) * real(w(CEF, FT(cSqrtLn2) / FT(γ_d) * (FT(grid[I]) - FT(ν)) + im * FT(y)))
 end
 
+"""Float32 variant of line_shape! for GPU compatibility. Casts inputs to Float32 before kernel call."""
 @kernel function line_shape32!(A, @Const(grid), ν, γ_d, γ_l, y, S, broadening, CEF)
     line_shape!(A, grid, Float32(ν), Float32(γ_d), Float32(γ_l), Float32(y), Float32(S), broadening, CEF)
 end
@@ -192,8 +221,24 @@ Function to interpolate partition sum for specified isotopologue
 
 =# 
 
-"Given molecule and isotopologue numbers (M, I), target temperature (T), and reference 
-temperature (T_ref), store the ratio of interpolated partition sums in `result`"
+"""
+    qoft!(M, I, T, T_ref, result)
+
+Compute partition sum ratio Q(T_ref)/Q(T) for temperature corrections.
+
+Uses TIPS 2017 partition function data. Interpolates Q(T) and Q(T_ref) for the given
+molecule and isotopologue, then stores Q(T_ref)/Q(T) in result[1].
+
+# Arguments
+- `M::Int`: HITRAN molecule ID
+- `I::Int`: HITRAN isotopologue ID
+- `T`: Target temperature (K)
+- `T_ref`: Reference temperature (K)
+- `result`: Vector of length 1; result[1] is overwritten with Q(T_ref)/Q(T)
+
+# Throws
+- `AssertionError`: If T is outside the TIPS 2017 temperature range for (M, I)
+"""
 function qoft!(M, I, T, T_ref, result)
 
     # Get temperature grid

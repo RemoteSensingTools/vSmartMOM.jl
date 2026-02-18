@@ -354,7 +354,14 @@ end
     doubling_allparams!(pol_type, SFI, expk, ndoubl, added_layer, added_layer_lin,
                         I_static, architecture, dτ̇, μ₀)
 
-Wrapper for `doubling_allparams_helper!`. See that function for documentation.
+Propagate N physical-parameter derivatives through the doubling method (linearized RT).
+
+Wrapper that calls `doubling_allparams_helper!` and synchronizes GPU if needed.
+Requires the chain rule (`lin_added_layer_all_params!`) to be applied *before* calling,
+so that `ap_ṙ⁻⁺`, `ap_ṫ⁺⁺`, etc. contain per-parameter derivatives at the elemental level.
+
+See Sanghavi & Stephens (2013) for the doubling method; Sanghavi, Davis & Eldering (2014)
+for the linearization framework.
 """
 function doubling_allparams!(pol_type, SFI, expk,
                     ndoubl::Int, 

@@ -83,8 +83,12 @@ function rt_kernel!(RS_type::noRS,
     end
 end
 
-#No Raman (default)
-# Perform the Core RT routines (elemental, doubling, interaction)
+"""
+    rt_kernel_canopy!(RS_type::noRS, pol_type, SFI, added_layer, composite_layer, ...)
+
+RT kernel for canopy layers: uses `elemental_canopy!` instead of `elemental!` for
+directional scattering (G factor). Otherwise identical to `rt_kernel!`.
+"""
 function rt_kernel_canopy!(RS_type::noRS, pol_type, SFI, added_layer, composite_layer, computed_layer_properties, m, quad_points, I_static, architecture, qp_μN, iz) 
 
     (; τ_λ, ϖ_λ, τ, ϖ, Z⁺⁺, Z⁻⁺, dτ_max, dτ, ndoubl, dτ_λ, expk, scatter, τ_sum, scattering_interface) = computed_layer_properties
@@ -219,6 +223,19 @@ function rt_kernel!(RS_type::noRS{FT},
 end
 
 
+"""
+    get_dtau_ndoubl(computed_layer_properties, quad_points)
+
+Compute elemental optical depth `dτ` and doubling count `ndoubl` for the adding-doubling method.
+
+The elemental layer optical depth is ``d\\tau = \\tau / 2^{n_d}``, where `ndoubl` is chosen so that
+``d\\tau \\cdot \\varpi`` is sufficiently small for accurate single-scattering (typically < 0.001).
+Uses `doubling_number` to determine `ndoubl` from the maximum allowed `dτ_max`.
+
+# Returns
+- `dτ`: Elemental optical depth vector `[nSpec]`.
+- `ndoubl`: Number of doubling iterations.
+"""
 @inline function get_dtau_ndoubl(computed_layer_properties::CoreScatteringOpticalProperties, quad_points::QuadPoints{FT}) where {FT}
     (; qp_μ) = quad_points
     (; τ, ϖ) = computed_layer_properties
@@ -229,6 +246,12 @@ end
     return dτ, ndoubl
 end
 
+"""
+    get_dtau_ndoubl(computed_layer_properties::CoreDirectionalScatteringOpticalProperties, quad_points)
+
+Variant for directional scattering: uses `G[iμ₀]` to scale optical depth for the solar beam
+direction when computing `dτ_max` for the doubling criterion.
+"""
 @inline function get_dtau_ndoubl(computed_layer_properties::CoreDirectionalScatteringOpticalProperties, quad_points::QuadPoints{FT}) where {FT}
     (; qp_μ, iμ₀) = quad_points
     (; τ, ϖ, G) = computed_layer_properties
@@ -240,6 +263,17 @@ end
     return dτ, ndoubl
 end
 
+"""
+    init_layer(computed_layer_properties, quad_points, pol_type, architecture)
+
+Initialize layer quantities for the doubling step: elemental `dτ`, doubling count `ndoubl`,
+and beam attenuation factor ``e^{-d\\tau/\\mu_0}`` (or ``e^{-d\\tau \\cdot G/\\mu_0}`` for directional scattering).
+
+# Returns
+- `dτ`: Elemental optical depth.
+- `ndoubl`: Number of doubling iterations.
+- `expk`: Beam attenuation factor ``e^{-d\\tau/\\mu_0}`` `[nSpec]`, on the correct architecture.
+"""
 @inline function init_layer(computed_layer_properties::CoreDirectionalScatteringOpticalProperties, quad_points, pol_type, architecture)
     arr_type = array_type(architecture) 
     (; μ₀, iμ₀) = quad_points

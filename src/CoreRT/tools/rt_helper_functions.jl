@@ -4,7 +4,14 @@ This file contains helper functions that are used throughout the vSmartMOM modul
 
 =#
 
-"Given the previous scattering interface and current layer information, return what type of scattering interface is next"
+"""
+    get_scattering_interface(scattering_interface, scatter, iz)
+
+Determine the `ScatteringInterface` type for layer `iz` based on previous interface and current scattering.
+
+- **iz == 1**: TOA → `ScatteringInterface_11` (scattering) or `00` (non-scattering).
+- **iz > 1**: Toggles between 00↔01 or 10↔11 depending on whether the composite layer scatters.
+"""
 @inline function get_scattering_interface(scattering_interface, scatter, iz)
 
     # First layer (TOA)
@@ -25,8 +32,20 @@ This file contains helper functions that are used throughout the vSmartMOM modul
     return scattering_interface
 end
 
-"Minimum number of doublings needed to reach an optical depth τ_end, starting with an optical depth dτ.
-The starting optical depth dτ is also determined from its maximum possible value, τ"
+"""
+    doubling_number(dτ_max, τ_end)
+
+Compute elemental optical depth and doubling count for the adding-doubling method.
+
+Finds the smallest `ndoubl` such that ``d\\tau = \\tau_{\\text{end}} / 2^{n_d} \\leq d\\tau_{\\text{max}}``.
+Ensures the elemental layer is optically thin enough for accurate single-scattering.
+
+# Returns
+- `dτ`: Elemental optical depth.
+- `ndoubl`: Number of doubling iterations.
+
+See Sanghavi & Stephens (2013).
+"""
 @inline function doubling_number(dτ_max, τ_end)
     FT = eltype(dτ_max)
     if τ_end <= dτ_max
@@ -49,10 +68,19 @@ The starting optical depth dτ is also determined from its maximum possible valu
     end
 end
 
-"Finds index i of f_array (i) which is nearest point to f"
+"""
+    nearest_point(f_array, f)
+
+Index of `f_array` whose value is closest to `f`. Used to map VZA to quadrature points.
+"""
 @inline nearest_point(f_array, f) = argmin(abs.(f_array.-f))
 
-"Get indices scaled according to pol_type"
+"""
+    get_indices(iμ, pol_type)
+
+Stokes-scaled indices for quadrature point `iμ`. Returns `(st_iμ, istart, iend)` where
+`istart:iend` spans the Stokes components for that direction.
+"""
 @inline function get_indices(iμ::Integer, pol_type::AbstractPolarizationType) 
     st_iμ = (iμ - 1) * pol_type.n
     istart = st_iμ + 1
@@ -60,7 +88,7 @@ end
     return st_iμ, istart, iend
 end
 
-"Default matrix in RT calculation (zeros)"
+"""Allocate zero matrix for RT reflection/transmission: `[nμ, nμ, nSpec]`."""
 @inline default_matrix(FT, arr_type, dims, nSpec) = arr_type(zeros(FT, (dims[1], dims[2], nSpec)))
 "Default matrix in ieRT calculation (zeros)"
 @inline default_matrix_ie(FT, arr_type, dims, nSpec, nRaman) = arr_type(zeros(FT, (dims[1], dims[2], nSpec, nRaman)))
@@ -88,7 +116,11 @@ default_matrix_rand(FT, arr_type, dims, nSpec)   = arr_type(randn(FT, tuple(dims
 default_J_matrix_rand(FT, arr_type, dims, nSpec) = arr_type(randn(FT, tuple(dims[1], 1, nSpec)))
 
 
-"Make an added layer, supplying all default matrices"
+"""
+    make_added_layer(RS_type, FT, arr_type, dims, nSpec)
+
+Construct an `AddedLayer` with zero-initialized R, T, J₀ matrices for elastic RT.
+"""
 function make_added_layer(RS_type::Union{noRS, noRS_plus}, FT, arr_type, dims, nSpec) 
     t1 = default_matrix(FT, arr_type, dims, nSpec)
     t2 = default_matrix(FT, arr_type, dims, nSpec)
@@ -108,7 +140,7 @@ function make_added_layer(RS_type::Union{noRS, noRS_plus}, FT, arr_type, dims, n
                                                         )
 end
 
-"Make an added layer, supplying all default matrices"
+"""Construct an `AddedLayerRS` with inelastic (Raman) matrices for Raman scattering."""
 make_added_layer(RS_type::Union{RRS, RRS_plus,VS_0to1_plus, VS_1to0_plus}, FT, arr_type, dims, nSpec)  = AddedLayerRS(
                                                 default_matrix(FT, arr_type, dims, nSpec), 
                                                 default_matrix(FT, arr_type, dims, nSpec), 
@@ -135,8 +167,8 @@ make_added_layer_rand(RS_type::Union{noRS, noRS_plus}, FT, arr_type, dims, nSpec
                                                         default_J_matrix_rand(FT, arr_type, dims, nSpec)
                                                         )
                                                          
-"Make a composite layer, supplying all default matrices"
-make_composite_layer(RS_type::Union{noRS, noRS_plus}, 
+"""Construct a `CompositeLayer` with zero-initialized R, T, J₀ for elastic RT."""
+make_composite_layer(RS_type::Union{noRS, noRS_plus},
     FT, arr_type, dims, nSpec) = CompositeLayer(
                                                         default_matrix(FT, arr_type, dims, nSpec), 
                                                         default_matrix(FT, arr_type, dims, nSpec), 
@@ -145,7 +177,7 @@ make_composite_layer(RS_type::Union{noRS, noRS_plus},
                                                         default_J_matrix(FT, arr_type, dims, nSpec),
                                                         default_J_matrix(FT, arr_type, dims, nSpec)
                                                         )
-"Make a composite layer, supplying all default matrices"
+"""Construct a `CompositeLayerRS` with inelastic matrices for Raman scattering."""
 make_composite_layer(RS_type::Union{RRS, RRS_plus,VS_0to1_plus, VS_1to0_plus}, 
     FT, arr_type, dims, nSpec) = CompositeLayerRS(
                                                         default_matrix(FT, arr_type, dims, nSpec), 
@@ -205,7 +237,14 @@ make_composite_layer(RS_type::Union{RRS, RRS_plus, VS_0to1_plus, VS_1to0_plus},
                     default_J_matrix_ie(FT, arr_type, NSens, dims, nSpec, RS_type.n_Raman),
                     default_J_matrix_ie(FT, arr_type, NSens, dims, nSpec, RS_type.n_Raman)
                     )
-"Given a ComputedAtmosphereProperties object, extract a ComputedLayerProperties object using data from the iz index of all arrays in the ComputedAtmosphereProperties"
+"""
+    get_layer_properties(computed_atmospheric_properties, iz, arr_type)
+
+Extract layer `iz` optical properties from `ComputedAtmosphereProperties`.
+
+Returns a `ComputedLayerProperties` with τ, ϖ, Z⁺⁺, Z⁻⁺, dτ, ndoubl, expk, scatter,
+τ_sum, and scattering_interface for the specified layer.
+"""
 function get_layer_properties(computed_atmospheric_properties::ComputedAtmosphereProperties, iz, arr_type)
      (; τ_λ_all, ϖ_λ_all, τ_all, ϖ_all, Z⁺⁺_all, Z⁻⁺_all , dτ_max_all, dτ_all, ndoubl_all, dτ_λ_all, expk_all, scatter_all, τ_sum_all, fscattRayl_all,  scattering_interfaces_all) = computed_atmospheric_properties
 

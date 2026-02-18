@@ -4,7 +4,12 @@ This file contains helper functions that are used throughout the module
 
 =#
 
-""" Convenience function to perform (-1)^x using x's parity """
+"""
+    exp_m1(x)
+
+Convenience function returning ``(-1)^x`` using the parity of `x` (1 if `x` is even, -1 if odd).
+Used in Mie/PCW summations for sign alternation. Name reflects common notation in scattering literature.
+"""
 exp_m1(x) = iseven(x) ? 1 : -1
 
 """
@@ -70,6 +75,13 @@ function compute_mie_ab!(size_param, refractive_idx::Number, an, bn, Dn)
     end
 end
 
+"""
+    $(FUNCTIONNAME)(size_param, refractive_idx, an, bn, Dn)
+
+Alternative implementation of Mie coefficients ``a_n``, ``b_n`` using upward recursion for ψ and χ
+and Lentz's continued-fraction method for the logarithmic derivative. See Bohren & Huffman eq. 4.88.
+Modifies `an`, `bn`, and `Dn` in-place. Same interface as [`compute_mie_ab!`](@ref).
+"""
 function compute_mie_ab_new!(size_param, refractive_idx::Number, an, bn, Dn)
     # Compute y
     y = size_param * refractive_idx
@@ -232,8 +244,18 @@ end
 
 """
     $(FUNCTIONNAME)(an, bn, ab_pairs, w, Nmax, N_max_)
-From the an, bn matrices, precompute all (an✶)am, (an✶)bm, (bn✶)am, (bn✶)bm 
-This allows quick computation of (an✶ + bn✶) × (am + bm)
+
+Precompute size-averaged Mie coefficient products for PCW Greek-coefficient evaluation.
+
+Fills `ab_pairs` with ``\\langle a_n^* a_m \\rangle``, ``\\langle a_n^* b_m \\rangle``, etc.,
+enabling fast evaluation of ``(a_n^* \\pm b_n^*)(a_m \\pm b_m)`` in Sanghavi (2014) Eq. 22.
+
+# Arguments
+- `an`, `bn`: Mie coefficients, shape `(nquad_radius, N_max)`
+- `ab_pairs`: tuple of 4 matrices `(mat_anam, mat_anbm, mat_bnam, mat_bnbm)` to fill
+- `w`: probability weights for each radius
+- `Nmax`: maximum expansion order
+- `N_max_`: per-radius truncation indices (length `nquad_radius`)
 """
 function compute_avg_anbns!(an, bn, ab_pairs, w, Nmax, N_max_)
     FT2 = eltype(an)
@@ -388,11 +410,22 @@ function get_greek_rayleigh(depol::Number)
     return GreekCoefs(α, β, γ, δ, ϵ, ζ)
 end
 
-""" 
+"""
     $(FUNCTIONNAME)(k, an, bn, w)
-Calculate the average Scattering and Extinction Cross Section 
-Eqn. 1, averaged over size distribution 
-""" 
+
+Compute size-averaged scattering and extinction cross sections from Mie coefficients.
+
+Uses Bohren & Huffman eq. 4.61: ``C_{\\mathrm{sca}} = \\frac{2\\pi}{k^2}\\sum_n (2n+1)(|a_n|^2+|b_n|^2)``
+and eq. 4.62 for extinction. Averaging is over the size distribution with weights `w`.
+
+# Arguments
+- `k`: wavenumber (2π/λ)
+- `an`, `bn`: Mie coefficients, shape `(nquad_radius, N_max)`
+- `w`: probability weights for each radius
+
+# Returns
+- `(C_sca, C_ext)`: tuple of scattering and extinction cross sections
+"""
 function compute_avg_C_scatt_ext(k, an, bn, w)
     n_ = collect(1:size(an)[2]);
     n_ = 2n_ .+ 1
@@ -400,7 +433,24 @@ function compute_avg_C_scatt_ext(k, an, bn, w)
     return (coef * (w' * (abs2.(an') + abs2.(bn'))')', coef * (w' * real(an + bn))')
 end
 
-""" Compute probability weights of radii """
+"""
+    $(FUNCTIONNAME)(size_distribution, wᵣ, r, r_max)
+
+Compute probability weights for radii in the size distribution quadrature.
+
+Combines PDF values at quadrature points with Gauss-Legendre weights `wᵣ`, then normalizes.
+Used for averaging Mie properties over the size distribution. Logs the fraction of the
+distribution cut by `r_max`.
+
+# Arguments
+- `size_distribution`: distribution object (e.g. from Distributions.jl)
+- `wᵣ`: quadrature weights for radius points
+- `r`: radius quadrature points
+- `r_max`: maximum radius (truncation)
+
+# Returns
+- Normalized weights summing to 1
+"""
 function compute_wₓ(size_distribution, wᵣ, r, r_max) 
     
     wₓ = pdf.(size_distribution,r)      # Weights from distribution

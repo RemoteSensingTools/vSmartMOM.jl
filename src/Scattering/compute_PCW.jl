@@ -116,13 +116,25 @@ function compute_aerosol_optical_properties(model::MieModel{FDT}, FT2::Type=Floa
 end
 
 
-"""
+@doc raw"""
     compute_Sl(l, ν₁, ν₂, ν₂_positive_flag, k, N_max, ab_pairs, an_m_bn, an_p_bn, wigner_A, wigner_B)
 
-Internal helper for PCW computation (Sanghavi, 2014, Eq. (22)).
+Evaluate ``S_l^{\nu_1\nu_2}`` for the Domke PCW Greek-coefficient formulation (Sanghavi 2014, Eq. 22).
 
-Evaluates the complex ``S_l^{\nu_1\nu_2}`` quantity used in the Domke/Sanghavi
-Greek-coefficient formulation.
+Sums over Mie indices ``n,m`` with Wigner d-matrix elements. Valid ``(ν₁, ν₂)`` pairs:
+(0,0), (2,2), (2,-2), (0,2). Used to compute α, β, γ, δ, ϵ, ζ via Eq. 24.
+
+# Arguments
+- `l`: expansion index (1-based, corresponds to ``l-1`` in Eq. 22)
+- `ν₁`, `ν₂`: Fourier indices; `ν₂_positive_flag` selects sign convention for ``ν₂ = \pm 2``
+- `k`: wavenumber
+- `N_max`: maximum Mie expansion order
+- `ab_pairs`: precomputed ``⟨a_n^* a_m⟩`` etc. from [`compute_avg_anbns!`](@ref)
+- `an_m_bn`, `an_p_bn`: ``|a_n - b_n|^2`` and ``|a_n + b_n|^2`` weighted by size distribution
+- `wigner_A`, `wigner_B`: Wigner d-matrix tables for ``ν=0`` and ``ν=2``
+
+# Returns
+- Complex ``S_l^{\nu_1\nu_2}`` value
 """
 function compute_Sl(l::Integer, ν₁::Integer, ν₂::Integer, ν₂_positive_flag::Bool, 
                     k, N_max, ab_pairs, an_m_bn, an_p_bn, wigner_A, wigner_B)

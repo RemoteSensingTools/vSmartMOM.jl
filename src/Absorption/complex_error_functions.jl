@@ -10,7 +10,11 @@ calculating rational approximations.
 =#
 
 """
-    Humlicek (1982) rational approximation:  region I.
+    humlicek1(z::Complex)
+
+Humlicek (1982) rational approximation for region I (|x|+y > 15).
+
+Fast asymptotic approximation for the complex error function w(z).
 """
 function humlicek1(z::Complex)
     FT = eltype(real(z));
@@ -30,7 +34,11 @@ function humlicek2(z::Complex)
 end
 
 """
-    Humlicek (1982) rational approximation:  region II.
+    _humlicek2(z::Complex)
+
+Humlicek (1982) rational approximation region II — Eq. (12) formulation.
+
+Alternate implementation for the same region as humlicek2.
 """
 function _humlicek2(z::Complex)
     FT = eltype(real(z));
@@ -50,7 +58,11 @@ function humlicek3(z::Complex)
 end
 
 """
-    Humlicek (1982) rational approximation:  region IV.
+    humlicek4(z::Complex)
+
+Humlicek (1982) rational approximation for region IV.
+
+Used when imag(z) < 0.195|real(z)| - 0.176 within the |x|+y ≤ 5.5 region.
 """
 function humlicek4(z::Complex)
     FT = eltype(real(z));
@@ -83,7 +95,11 @@ end
 
 
 """
-    Humlicek (1979) complex probability function:  rational approximation for y>0.85 OR |x|<18.1*y+1.65.
+    cpf12a(z::Complex)
+
+Humlicek (1979) CPF12 rational approximation for y > 0.85 or |x| < 18.1y + 1.65.
+
+Part of the CPF12ErrorFunction implementation.
 """
 function cpf12a(z::Complex)
     FT = eltype(real(z));
@@ -121,7 +137,11 @@ function cpf12a(z::Complex)
 end
 
 """
-    Humlicek (1979) complex probability function:  rational approximation for y<0.85 AND |x|>18.1*y+1.65.
+    cpf12b(z::Complex)
+
+Humlicek (1979) CPF12 rational approximation for y < 0.85 and |x| > 18.1y + 1.65.
+
+Part of the CPF12ErrorFunction implementation. Uses exp(-x²) + correction terms.
 """
 function cpf12b(z::Complex)
     FT = eltype(real(z));
@@ -165,7 +185,12 @@ function cpf12b(z::Complex)
 end
 
 """
-    Complex error function --- J.A.C. Weideman: SIAM J. Num. Anal. 31 1497-1518 (1994); equation (38.I) and table I.
+    weideman32a(z::Complex)
+
+Weideman (1994) complex error function — 32-term rational approximation.
+
+SIAM J. Numer. Anal. 31, 1497-1518. Equation (38.I) and table I.
+Used in HumlicekWeidemann32 CEF variants when |x|+y ≤ 8 or 15.
 """
 function weideman32a(z::Complex)
     FT = eltype(real(z));
@@ -190,7 +215,11 @@ function weideman32a(z::Complex)
 end
 
 """
-    Humlicek (1979) complex probability function w(z): a single rational approximation.
+    w(::CPF12ErrorFunction, z)
+
+CPF12 complex error function — Humlicek (1979) single rational approximation.
+
+Dispatches to cpf12a or cpf12b based on |x| and y = imag(z).
 """
 function w(::CPF12ErrorFunction, z::Complex)
     FT = eltype(real(z));

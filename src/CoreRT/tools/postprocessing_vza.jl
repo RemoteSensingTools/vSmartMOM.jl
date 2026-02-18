@@ -7,9 +7,15 @@ R_SFI, T_SFI (and their inelastic counterparts for Raman).
 """
     _precompute_vza_weights(vza, vaz, qp_μ, pol_type, m, weight)
 
-Precompute per-VZA index ranges and azimuthal weight matrices/scalars.
-Returns a vector of `(istart, iend, w)` tuples where `w` is either a
-scalar (n_stokes==1) or a Diagonal matrix.
+Precompute per-VZA index ranges and azimuthal weight matrices for postprocessing.
+
+For each view zenith angle (VZA), finds the nearest quadrature point, Stokes indices
+`(istart, iend)`, and azimuthal weight ``w = \\text{weight} \\cdot \\cos(m \\phi)`` (or
+``\\sin(m \\phi)`` for Stokes 3,4). For scalar RT, `w` is a scalar; for polarized RT,
+`w` is a Diagonal matrix over Stokes components.
+
+# Returns
+- Vector of `(istart, iend, w)` tuples, one per VZA.
 """
 function _precompute_vza_weights(vza, vaz, qp_μ, pol_type, m, weight)
     n = pol_type.n
@@ -27,7 +33,15 @@ function _precompute_vza_weights(vza, vaz, qp_μ, pol_type, m, weight)
     end
 end
 
-"Perform post-processing to azimuthally-weight RT matrices (elastic, no Raman)"
+"""
+    postprocessing_vza!(RS_type::noRS, iμ₀, pol_type, composite_layer, vza, qp_μ, m, vaz, μ₀, weight, nSpec, SFI, R, R_SFI, T, T_SFI, ieR_SFI, ieT_SFI)
+
+Azimuthally-weight RT matrices for elastic (no Raman) scattering.
+
+Accumulates cos(m·φ)-weighted reflectance/transmittance from the composite layer
+into `R`, `T` (collimated) or `R_SFI`, `T_SFI` (source function integration).
+Uses quadrature indices for solar direction `iμ₀` and view directions `vza`, `vaz`.
+"""
 function postprocessing_vza!(RS_type::noRS, iμ₀, pol_type,
         composite_layer, vza, qp_μ, m, vaz, μ₀, weight,
         nSpec, SFI, R, R_SFI, T, T_SFI, ieR_SFI, ieT_SFI)
@@ -54,7 +68,13 @@ function postprocessing_vza!(RS_type::noRS, iμ₀, pol_type,
     end
 end
 
-"RAMI: Perform post-processing to azimuthally-weight hdr matrices"
+"""
+    postprocessing_vza_hdrf!(RS_type, iμ₀, pol_type, hdr_J₀⁻, vza, qp_μ, m, vaz, μ₀, weight, nSpec, hdr)
+
+RAMI benchmark: azimuthally-weight hemispherical-directional reflectance (HDR) matrices.
+
+Accumulates weighted `hdr_J₀⁻` (downwelling source at surface) into `hdr` for each VZA.
+"""
 function postprocessing_vza_hdrf!(RS_type, iμ₀, pol_type,
         hdr_J₀⁻, vza, qp_μ, m, vaz, μ₀, weight, nSpec, hdr)
 
@@ -69,7 +89,14 @@ function postprocessing_vza_hdrf!(RS_type, iμ₀, pol_type,
     end
 end
 
-"Perform post-processing to azimuthally-weight RT matrices (Raman / inelastic)"
+"""
+    postprocessing_vza!(RS_type::Union{RRS, VS_0to1_plus, VS_1to0_plus}, ...)
+
+Azimuthally-weight RT matrices for Raman/inelastic scattering.
+
+Same as elastic `postprocessing_vza!` but also accumulates inelastic source terms
+`ieJ₀⁺`, `ieJ₀⁻` into `ieR_SFI`, `ieT_SFI` for each Raman shift.
+"""
 function postprocessing_vza!(RS_type::Union{RRS, VS_0to1_plus, VS_1to0_plus},
         iμ₀, pol_type, composite_layer,
         vza, qp_μ, m, vaz, μ₀, weight,

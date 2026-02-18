@@ -316,7 +316,17 @@ function interaction_helper!(::ScatteringInterface_11, SFI,
     composite_layer_lin.Ṫ⁺⁺[:] = tmpṪ⁺⁺
 end
 
-"Compute interaction between composite and added layers"
+"""
+    interaction!(scattering_interface, SFI, composite_layer, composite_layer_lin,
+                 added_layer, added_layer_lin, I_static)
+
+Linearized Adding Method: combine composite and added layers, propagating N parameter derivatives.
+
+Dispatches to `interaction_helper!` based on `ScatteringInterface` (00, 01, 10, or 11).
+The forward matrices (R, T, J₀) and their derivatives (Ṙ, Ṫ, J̇₀) are updated in-place
+in `composite_layer` and `composite_layer_lin`. Uses the Adding equations of
+de Haan, Bosma & Hovenier (1987).
+"""
 function interaction!(scattering_interface::AbstractScatteringInterface, 
         SFI,
         composite_layer::CompositeLayer{FT}, 

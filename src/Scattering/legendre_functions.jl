@@ -4,16 +4,23 @@ This file defines helpful Legendre-related functions
 
 =#
 
+@doc raw"""
+    $(FUNCTIONNAME)(μ, Lmax)
+
+Compute normalized generalized spherical functions P, R, T for the Π-matrix (Sanghavi 2014, eq. 15).
+
+Uses the normalization convention ``\sqrt{(l-m)!/(l+m)!}`` for associated Legendre functions,
+consistent with de Rooij & Stap (1984) and Siewert. The returned ``R_l^m`` and ``T_l^m`` are
+generalized spherical functions related to derivatives of ``P_l^m``; the third return is ``-T_l^m``.
+
+# Arguments
+- `μ`: cosine of scattering angle(s), ``\cos\theta \in [-1,1]``
+- `Lmax`: maximum degree ``l`` (indices 0:Lmax-1)
+
+# Returns
+- `(P, R, -T)`: three arrays of shape `(length(μ), Lmax, Lmax)` containing
+  ``P_l^m(\mu)``, ``R_l^m(\mu)``, and ``-T_l^m(\mu)``
 """
-    $(FUNCTIONNAME)(μ,Lmax)
-
-Computes the normalized Π matrix elements with generalized spherical functions (normalized by sqrt((l-m)!/(l+m)!))). See eq 15 in Sanghavi 2014
-
-- `μ` cos(θ) of angle θ
-- `Lmax` max `l` Polynomial degree to be computed (m adjusted accordingly) 
-
-The function returns matrices containing ``P_l^m(\\mu)``,  ``R_l^m(\\mu)``, ``-T_l^m(\\mu)``, all normalized by ``\\sqrt{\\frac{(l-m)!}{(l+m)!}}``
-""" 
 function compute_associated_legendre_PRT(μ,Lmax)
      # Note: P_l^m(μ) double-checked against Matlab, really hard to find other benchmarks for R and T!
      # Can probably be sped up but it can be pre-computed anyhow as angles μ and Lmax will be fixed per run
@@ -258,7 +265,21 @@ function compute_legendre_poly(x::Array{FT},nmax) where FT
     return P⁰, P², R², T²
 end
 
-# Following Milthorpe, 2014, includes the Condon–Shortley phase
+"""
+    $(FUNCTIONNAME)(μ, Lmax)
+
+Compute fully normalized associated Legendre functions ``P_l^m(\\mu)`` with Condon–Shortley phase.
+
+Uses the spherical harmonic normalization ``\\sqrt{(2l+1)/(4\\pi)}``. Following Milthorpe (2014).
+Returns a matrix `da` of size `(Lmax+1, Lmax+1)` where `da[l+1, m+1]` corresponds to ``P_l^m(\\mu)``.
+
+# Arguments
+- `μ`: scalar cosine of angle
+- `Lmax`: maximum degree
+
+# Returns
+- Matrix of normalized ``P_l^m`` values
+"""
 function compute_legendre_P(μ , Lmax)
     FT = eltype(μ)
     da = zeros(FT,Lmax+1,Lmax+1)

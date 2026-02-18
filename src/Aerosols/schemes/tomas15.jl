@@ -1,8 +1,19 @@
 """
     TOMAS-15 aerosol scheme reader
-    
-    Reads size-resolved aerosol concentrations from GEOSChem NetCDF files
-    with 15 logarithmically-spaced size bins (10 nm - 10 μm dry diameter).
+
+# Physical model
+
+TOMAS (TwO-Moment Aerosol Sectional) is a size-resolved microphysics scheme that
+discretizes the aerosol size distribution into 15 logarithmically-spaced bins
+(typically 10 nm to 10 μm dry diameter). Each bin tracks particle number and
+mass of each chemical species (sulfate, organic carbon, dust, sea salt, etc.).
+
+This enables accurate representation of:
+- Nucleation, condensation, coagulation, and deposition
+- Size-dependent optical properties via Mie theory
+- CCN activation and cloud-aerosol interactions
+
+The scheme is commonly used in GEOS-Chem and similar CTMs.
 """
 
 """
