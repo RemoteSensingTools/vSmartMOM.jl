@@ -3,8 +3,8 @@ using Test
 
 @testset "Float32 Consistency" begin
 
-    yaml64 = "test/test_parameters/PureRayleighParameters.yaml"
-    yaml32 = "test/test_parameters/PureRayleighParameters_f32.yaml"
+    yaml64 = "test_parameters/PureRayleighParameters.yaml"
+    yaml32 = "test_parameters/PureRayleighParameters_f32.yaml"
 
     @testset "Float64 baseline" begin
         params64 = vSmartMOM.parameters_from_yaml(yaml64)

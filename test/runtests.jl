@@ -7,6 +7,7 @@ using vSmartMOM.SolarModel
 using Test
 using DelimitedFiles
 using Statistics
+using LinearAlgebra
 using ProgressMeter
 using WignerSymbols
 using Distributions

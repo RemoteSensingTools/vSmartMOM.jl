@@ -1,108 +1,103 @@
-# # Jacobians: Linearized RT Tutorial
+# # Jacobians: Linearized Radiative Transfer
 #
-# ### Introduction
-# This tutorial demonstrates how to compute analytic Jacobians
-# (derivatives of radiance with respect to physical state parameters)
-# using vSmartMOM's linearized RT solver.
+# This tutorial shows how to compute analytic Jacobians (derivatives of
+# top-of-atmosphere radiance with respect to atmospheric and surface parameters)
+# using the linearized RT mode in vSmartMOM.
 #
-# You will learn:
-# 1. How to set up a linearized model
-# 2. How to extract Jacobians from the output
-# 3. How to interpret the parameter ordering
-# 4. How to compare analytic Jacobians with finite differences
+# The linearized mode propagates derivatives through the adding-doubling
+# solver alongside the forward radiance, producing exact Jacobians in a
+# single RT pass — no finite differences needed.
 #
-# ---
-#
-# ### Load packages
+# ## 1) Setup: load a test case
 
 using vSmartMOM
 using vSmartMOM.CoreRT
 
-# ---
-#
-# ### 1. Build a linearized model
-#
-# The linearized RT requires a `LinMode()` marker when building the model.
-# This tells `model_from_parameters` to also precompute the derivative
-# quantities (∂τ/∂x, ∂ω/∂x, ∂Z/∂x) needed by the chain rule.
+params = parameters_from_yaml(
+    joinpath(dirname(dirname(pathof(vSmartMOM))),
+             "test", "test_parameters", "ParamsEMIT_fast.yaml"))
+params.architecture = vSmartMOM.Architectures.CPU()
 
-params = parameters_from_yaml("test/test_parameters/JacobianTestFast.yaml")
+# ## 2) Build the linearized model
+#
+# `LinMode()` tells the constructor to compute both the forward model and
+# the derivative containers (`vSmartMOM_Lin`).
+
 model, lin_model = model_from_parameters(LinMode(), params)
 
-# `model` is the usual forward model (optical properties, geometry, etc.).
-# `lin_model` is a `vSmartMOM_Lin` struct holding the linearized optical
-# properties w.r.t. state-vector elements.
+# `model` is the same forward model as `model_from_parameters(params)`.
+# `lin_model` holds pre-computed ∂τ/∂x arrays for gases, aerosols, and
+# aerosol optics.
 
-# ---
-#
-# ### 2. Run the linearized solver
-#
-# Count the number of aerosol, gas, and surface parameters:
+println("τ̇_abs bands: ", length(lin_model.τ̇_abs),
+        "  shape[1]: ", size(lin_model.τ̇_abs[1]))
+println("τ̇_aer bands: ", length(lin_model.τ̇_aer),
+        "  shape[1]: ", size(lin_model.τ̇_aer[1]))
 
-NAer = length(params.scattering_params.rt_aerosols)   # number of aerosol types
-NGas = size(lin_model.τ̇_abs[1], 1)                     # number of gas species
-NSurf = 1                                              # surface albedo
+# ## 3) Run linearized RT
+#
+# The linearized `rt_run` returns `(R, T, dR, dT)`:
+# - `R`  — reflected Stokes field  `[nVZA × nStokes × nSpec]`
+# - `T`  — transmitted field
+# - `dR` — Jacobian of R w.r.t. all parameters  `[nParams × nVZA × nStokes × nSpec]`
+# - `dT` — Jacobian of T
+
+NAer  = length(params.scattering_params.rt_aerosols)
+NGas  = size(lin_model.τ̇_abs[1], 1)
+NSurf = 1
 
 R, T, dR, dT = rt_run(model, lin_model, NAer, NGas, NSurf)
 
-# `R` is the reflected radiance: `(nVZA, nStokes, nSpec)`
-# `dR` contains the Jacobians: `(nVZA, nStokes, nSpec, Nparams)`
-# where `Nparams = NAer * 7 + NGas + NSurf`
+println("R  shape: ", size(R))
+println("dR shape: ", size(dR))
 
-println("Reflected radiance shape: ", size(R))
-println("Jacobian shape:           ", size(dR))
-
-# ---
+# ## 4) Interpret the Jacobian layout
 #
-# ### 3. Parameter ordering
+# The derivative dimension of `dR` is ordered as:
 #
-# The last dimension of `dR` corresponds to the following parameters
-# (for each aerosol type, 7 derivatives):
+# | Index range                | Parameter                        |
+# |:---------------------------|:---------------------------------|
+# | `1 : NAer*7`               | Aerosol properties (7 per type)  |
+# | `NAer*7+1 : NAer*7+NGas`   | Gas VMRs (per variable molecule) |
+# | `NAer*7+NGas+1 : end`      | Surface albedo                   |
 #
-# | Index range           | Parameter                                |
-# |-----------------------|------------------------------------------|
-# | 1..7                  | Aerosol 1: τ_ref, nᵣ, nᵢ, rₘ, σ_g, p₀, σ_p |
-# | 8..7*NAer             | Aerosol 2..NAer (same 7 per aerosol)     |
-# | 7*NAer+1..7*NAer+NGas | Gas VMR scaling factors                  |
-# | 7*NAer+NGas+1         | Surface albedo                           |
-#
+# For this test case:
 
 Nparams = NAer * 7 + NGas + NSurf
-@assert size(dR, 4) == Nparams
+println("Total Jacobian parameters: ", Nparams,
+        " (NAer×7=", NAer*7, ", NGas=", NGas, ", NSurf=", NSurf, ")")
 
-# Extract Jacobian w.r.t. surface albedo (last parameter):
-dR_dalb = dR[:, :, :, end]
-println("dR/d(albedo) max value: ", maximum(abs.(dR_dalb)))
-
-# Extract Jacobian w.r.t. aerosol reference optical depth (first parameter):
-dR_dtau = dR[:, :, :, 1]
-println("dR/d(τ_ref)  max value: ", maximum(abs.(dR_dtau)))
-
-# ---
+# ## 5) Inspect individual derivatives
 #
-# ### 4. Quick finite-difference comparison
-#
-# To verify analytic Jacobians, perturb a parameter and compare.
-# Here we perturb the surface albedo.
+# Surface albedo Jacobian (last parameter, first VZA, Stokes-I):
 
-ε = 1e-5
-alb_base = params.brdf[1].albedo
+dR_albedo = dR[end, :, 1, :]
+println("dR/d(albedo) at nadir, first 5 spectral points: ",
+        round.(dR_albedo[1, 1:min(5,end)], digits=6))
 
-# Perturbed run (forward only — no need for linearized solver)
-params_pert = deepcopy(params)
-params_pert.brdf[1] = vSmartMOM.CoreRT.LambertianSurfaceScalar{Float64}(alb_base + ε)
+# Gas VMR Jacobians:
 
-model_pert = model_from_parameters(params_pert)
-R_pert, _, _, _, _, _, _ = rt_run(model_pert)
-
-# Finite-difference Jacobian
-dR_fd = (R_pert .- R) ./ ε
-
-# Compare at first VZA, Stokes I, all wavelengths
-println("\n--- Surface albedo Jacobian comparison (VZA 1, Stokes I) ---")
-for iλ in axes(R, 3)
-    analytic = dR_dalb[1, 1, iλ]
-    fd       = dR_fd[1, 1, iλ]
-    relerr   = abs(analytic - fd) / max(abs(fd), 1e-15)
-    println("  λ[$iλ]: analytic=$(round(analytic, sigdigits=6)), FD=$(round(fd, sigdigits=6)), rel_err=$(round(relerr, sigdigits=3))")
+if NGas > 0
+    igas_start = NAer * 7 + 1
+    dR_gas1 = dR[igas_start, :, 1, :]
+    println("dR/d(gas₁ VMR) at nadir, first 5 points: ",
+            round.(dR_gas1[1, 1:min(5,end)], digits=6))
 end
+
+# ## 6) Verify against finite differences (optional)
+#
+# For validation, one can perturb a parameter by ε and compare:
+#
+# ```julia
+# ε = 1e-4
+# params_pert = deepcopy(params)
+# # e.g. perturb surface albedo
+# # ... modify params_pert ...
+# model_pert = model_from_parameters(params_pert)
+# R_pert, = rt_run(model_pert)
+# K_fd = (R_pert .- R) ./ ε
+# # Compare K_fd with dR[end, :, :, :]
+# ```
+#
+# The test suite in `test/test_forward_lin.jl` performs this comparison
+# systematically for all parameter types.

@@ -9,7 +9,7 @@ using vSmartMOM
 using vSmartMOM.Aerosols
 
 # Test data directory
-const TEST_DATA_DIR = joinpath(@__DIR__, "..")
+const TEST_DATA_DIR = ".."
 const TOMAS_FILE = joinpath(TEST_DATA_DIR, "GEOSChem.Custom.20190702_0000z.nc4")
 const TOMAS_CONFIG = joinpath(TEST_DATA_DIR, "examples", "aerosol_config_tomas15.yaml")
 const TWOMOM_CONFIG = joinpath(TEST_DATA_DIR, "examples", "aerosol_config_two_moment.yaml")

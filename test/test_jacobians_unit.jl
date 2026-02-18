@@ -21,7 +21,7 @@ using vSmartMOM.CoreRT: RT_Aerosol
 using Distributions, Statistics
 using LinearAlgebra
 
-const YAML_FAST = "test/test_parameters/JacobianTestFast.yaml"
+const YAML_FAST = "test_parameters/JacobianTestFast.yaml"
 
 # ---------------------------------------------------------------
 # Shared helpers

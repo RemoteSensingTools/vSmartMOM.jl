@@ -8,7 +8,7 @@
 # =================================================================
 
 include("test_helpers.jl")
-include(joinpath(@__DIR__, "..", "src", "Testing", "perturb_parameters.jl"))
+include("../src/Testing/perturb_parameters.jl")
 using Printf
 
 println("="^70)
@@ -16,7 +16,7 @@ println("Analytic Jacobians vs Finite-Difference Validation (EMIT-style)")
 println("="^70)
 
 # Load fast EMIT config
-params = parameters_from_yaml("test/test_parameters/ParamsEMIT_fast.yaml")
+params = parameters_from_yaml("test_parameters/ParamsEMIT_fast.yaml")
 Nbands = length(params.spec_bands)
 NAer_expected = length(params.scattering_params.rt_aerosols)
 println("Config: $(Nbands) band(s), $(NAer_expected) aerosol(s)")

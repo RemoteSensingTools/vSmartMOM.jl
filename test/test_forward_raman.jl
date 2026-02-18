@@ -28,10 +28,10 @@ end
 # to avoid OOM (RRS coupling matrices scale as nSpec²).
 # ─────────────────────────────────────────────────────────────────
 if USE_GPU_RAMAN
-    params = parameters_from_yaml("test/test_parameters/O2Parameters_GPU.yaml")
+    params = parameters_from_yaml("test_parameters/O2Parameters_GPU.yaml")
     params.architecture = vSmartMOM.Architectures.GPU()
 else
-    params = parameters_from_yaml("test/test_parameters/O2Parameters.yaml")
+    params = parameters_from_yaml("test_parameters/O2Parameters.yaml")
     params.architecture = vSmartMOM.Architectures.CPU()
 end
 model = model_from_parameters(params)
