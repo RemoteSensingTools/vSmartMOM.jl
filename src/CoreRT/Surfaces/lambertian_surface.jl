@@ -27,6 +27,8 @@ function create_surface_layer!(lambertian::LambertianSurfaceScalar{FT},
                                architecture) where {FT}
     
     @unpack qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart, iμ₀, μ₀ = quad_points
+    j₀⁺ = added_layer isa AddedLayerRS ? added_layer.J₀⁺ : added_layer.j₀⁺
+    j₀⁻ = added_layer isa AddedLayerRS ? added_layer.J₀⁻ : added_layer.j₀⁻
     # Get size of added layer
     Nquad = size(added_layer.r⁻⁺,1) ÷ pol_type.n
     tmp    = ones(pol_type.n*Nquad)
@@ -50,13 +52,13 @@ function create_surface_layer!(lambertian::LambertianSurfaceScalar{FT},
             I₀_NquadN[:] .=0;
             I₀_NquadN[iμ₀Nstart:pol_type.n*iμ₀] = pol_type.I₀;
             
-            added_layer.j₀⁺[:,1,:] .= I₀_NquadN .* exp.(-τ_sum/μ₀)';
-            added_layer.j₀⁻[:,1,:] .= μ₀*(R_surf*I₀_NquadN) .* exp.(-τ_sum/μ₀)';
+            j₀⁺[:,1,:] .= I₀_NquadN .* exp.(-τ_sum/μ₀)';
+            j₀⁻[:,1,:] .= μ₀*(R_surf*I₀_NquadN) .* exp.(-τ_sum/μ₀)';
         end
         R_surf = R_surf * Diagonal(qp_μN.*wt_μN)
         
 
-        #@show size(added_layer.r⁻⁺), size(R_surf), size(added_layer.j₀⁻)
+        #@show size(added_layer.r⁻⁺), size(R_surf), size(j₀⁻)
         added_layer.r⁻⁺ .= R_surf;
         added_layer.r⁺⁻ .= 0;
         added_layer.t⁺⁺ .= T_surf;
@@ -67,8 +69,8 @@ function create_surface_layer!(lambertian::LambertianSurfaceScalar{FT},
         added_layer.r⁻⁺ .= 0;
         added_layer.t⁺⁺ .= T_surf;
         added_layer.t⁻⁻ .= T_surf;
-        added_layer.j₀⁺ .= 0;
-        added_layer.j₀⁻ .= 0;
+        j₀⁺ .= 0;
+        j₀⁻ .= 0;
     end
 end
 
@@ -81,6 +83,8 @@ function create_surface_layer!(lambertian::LambertianSurfaceLegendre{FT},
     τ_sum,
     architecture) where {FT}
     FT2 = Float64
+    j₀⁺ = added_layer isa AddedLayerRS ? added_layer.J₀⁺ : added_layer.j₀⁺
+    j₀⁻ = added_layer isa AddedLayerRS ? added_layer.J₀⁻ : added_layer.j₀⁻
     if m == 0
         @unpack qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart, iμ₀, μ₀ = quad_points
         legendre_coeff = lambertian.legendre_coeff
@@ -109,9 +113,9 @@ function create_surface_layer!(lambertian::LambertianSurfaceLegendre{FT},
             I₀_NquadN = similar(qp_μN);
             I₀_NquadN[:] .=0;
             I₀_NquadN[iμ₀Nstart:pol_type.n*iμ₀] = pol_type.I₀;
-            added_layer.j₀⁺[:] .= 0
+            j₀⁺[:] .= 0
             # Suniti double-check
-            added_layer.j₀⁻[:,1,:] = μ₀*(R_surf*I₀_NquadN) .* (ρ .* exp.(-τ_sum/μ₀))';
+            j₀⁻[:,1,:] = μ₀*(R_surf*I₀_NquadN) .* (ρ .* exp.(-τ_sum/μ₀))';
         end
         R_surf   = R_surf * Diagonal(qp_μN.*wt_μN)
         siz = size(added_layer.r⁻⁺)
@@ -130,8 +134,8 @@ function create_surface_layer!(lambertian::LambertianSurfaceLegendre{FT},
         added_layer.r⁻⁺[:] .= 0;
         added_layer.t⁺⁺[:] .= 0;
         added_layer.t⁻⁻[:] .= 0;
-        added_layer.j₀⁺[:] .= 0;
-        added_layer.j₀⁻[:] .= 0;
+        j₀⁺[:] .= 0;
+        j₀⁻[:] .= 0;
     end
 end
 
@@ -144,6 +148,8 @@ function create_surface_layer!(lambertian::LambertianSurfaceSpline{FT},
     τ_sum,
     architecture) where {FT}
     FT2 = Float64
+    j₀⁺ = added_layer isa AddedLayerRS ? added_layer.J₀⁺ : added_layer.j₀⁺
+    j₀⁻ = added_layer isa AddedLayerRS ? added_layer.J₀⁻ : added_layer.j₀⁻
     if m == 0
         @unpack qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart, iμ₀, μ₀ = quad_points
 
@@ -168,9 +174,9 @@ function create_surface_layer!(lambertian::LambertianSurfaceSpline{FT},
             I₀_NquadN = similar(qp_μN);
             I₀_NquadN[:] .=0;
             I₀_NquadN[iμ₀Nstart:pol_type.n*iμ₀] = pol_type.I₀;
-            added_layer.j₀⁺[:] .= 0
+            j₀⁺[:] .= 0
             # Suniti double-check
-            added_layer.j₀⁻[:,1,:] = μ₀*(R_surf*I₀_NquadN) .* (ρ .* exp.(-τ_sum/μ₀))';
+            j₀⁻[:,1,:] = μ₀*(R_surf*I₀_NquadN) .* (ρ .* exp.(-τ_sum/μ₀))';
         end
         R_surf   = R_surf * Diagonal(qp_μN.*wt_μN)
         
@@ -186,8 +192,8 @@ function create_surface_layer!(lambertian::LambertianSurfaceSpline{FT},
         added_layer.r⁻⁺[:] .= 0;
         added_layer.t⁺⁺[:] .= 0;
         added_layer.t⁻⁻[:] .= 0;
-        added_layer.j₀⁺[:] .= 0;
-        added_layer.j₀⁻[:] .= 0;
+        j₀⁺[:] .= 0;
+        j₀⁻[:] .= 0;
     end
 end
 
