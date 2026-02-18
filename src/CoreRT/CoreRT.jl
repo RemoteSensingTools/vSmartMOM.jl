@@ -46,6 +46,7 @@ import Base.show                   # For overloading show for custom types
 # Constants and Types
 include("constants.jl")                        # Scientific constants
 include("types.jl")  
+include("parameter_layout.jl")                 # ParameterLayout struct for Jacobian indexing
 include("types_lin.jl")                        # Types for linearized RT
 
 # Note: Raman types (AbstractRamanType, noRS, RRS, etc.) come from 
@@ -122,7 +123,11 @@ export model_from_parameters,               # Converting the parameters to model
        rt_run, rt_run_lin, rt_run_ss,       # Run the RT code (forward, linearized, single scatter)
        default_parameters                   # Set of default parameters
 export lin_added_layer_all_params,            # 3 params -> all params chain rule
-       OpticalPropertyJacobian                # AD boundary struct alias
+       OpticalPropertyJacobian,               # AD boundary struct alias
+       ParameterLayout,                       # Jacobian parameter layout descriptor
+       n_total, aerosol_range, gas_range,     # ParameterLayout accessors
+       surface_range, surface_index,
+       n_layer_params
 
 # Export types to show easily
 export GaussQuadFullSphere, LambertianSurfaceScalar, LambertianSurfaceSpectrum
