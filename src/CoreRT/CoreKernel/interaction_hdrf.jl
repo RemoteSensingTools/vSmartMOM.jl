@@ -5,7 +5,7 @@ function interaction_hdrf!(SFI,
     composite_layer::CompositeLayer{FT}, 
     added_layer::AddedLayer{FT}, 
     m, pol_type, quad_points,
-    hdr_J₀⁻, bhr_J₀⁻, bhr_J₀⁺) where {FT<:Real,FT2}
+    hdr_J₀⁻, bhr_J₀⁻, bhr_J₀⁺) where {FT}
 
     @unpack r⁻⁺, j₀⁻, j₀⁺ = added_layer     #these are aliases to the respective struct elements  
     @unpack J₀⁺, J₀⁻      = composite_layer #these are aliases to the respective struct elements 
@@ -43,7 +43,7 @@ function interaction_hdrf_canopy!(SFI,
     #composite_layer::CompositeLayer{FT}, 
     dwJ, uwJ, solJ₀,
     m, pol_type, quad_points,
-    hdr_J₀⁻, bhr_J₀⁻, bhr_J₀⁺) where {FT<:Real,FT2}
+    hdr_J₀⁻, bhr_J₀⁻, bhr_J₀⁺)
 
     #@unpack topJ₀⁺, botJ₀⁻      = composite_layer #these are aliases to the respective struct elements 
     @unpack Nquad, wt_μN, iμ₀, qp_μN = quad_points

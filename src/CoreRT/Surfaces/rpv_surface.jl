@@ -24,7 +24,7 @@ function create_surface_layer!(brdf::AbstractSurfaceType,
                                pol_type,
                                quad_points,
                                τ_sum,
-                               architecture) where {FT}
+                               architecture)
     
     @unpack qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart, iμ₀, μ₀ = quad_points
     # Get size of added layer
