@@ -28,7 +28,7 @@ Base.@kwdef mutable struct RRS{FT<:AbstractFloat} <: AbstractRamanType{FT}
     Z⁺⁺_λ₁λ₀::Array{FT,2}
     i_ref::Int
     n_Raman::Int
-    bandSpecLim = []
+    bandSpecLim::Vector{UnitRange{Int}} = UnitRange{Int}[]
     iBand = 1
     F₀::Array{FT,2} # Solar/Stellar irradiation Stokes vector of size (pol_type.n, nSpec)
     SIF₀::Array{FT,2} # Solar/Stellar irradiation Stokes vector of size (pol_type.n, nSpec)
@@ -104,8 +104,8 @@ Base.@kwdef mutable struct RVRS{FT<:AbstractFloat} <: AbstractRamanType{FT}
     "Molecular Constant for O2"
     o2::InelasticScattering.MolecularConstants{FT}
 
-    bandSpecLim = []
-    iBand::Array{Int,1} = [1]
+    bandSpecLim::Vector{UnitRange{Int}} = UnitRange{Int}[]
+    iBand::Vector{Int} = Int[1]
 
     "Pre-computed optical properties"
     #ramanAtmoProp::RamanAtmosphereProperties
@@ -122,8 +122,8 @@ end
 Base.@kwdef mutable struct noRS{FT} <: AbstractRamanType{FT}
     fscattRayl::Array{FT,1} = [0.0]
     ϖ_Cabannes::Array{FT,1} = [1.0, 1.0, 1.0] #elastic fraction (Cabannes) of Rayleigh (Cabannes+Raman) scattering
-    bandSpecLim = []
-    iBand::Array{Int,1} = [1]
+    bandSpecLim::Vector{UnitRange{Int}} = UnitRange{Int}[]
+    iBand::Vector{Int} = Int[1]
     F₀ = zeros(Float64, 1, 1)  # Solar/Stellar irradiation Stokes vector of size (pol_type.n, nSpec)
     SIF₀ = zeros(Float64, 1, 1) # Solar/Stellar irradiation Stokes vector of size (pol_type.n, nSpec)
 end
@@ -177,9 +177,9 @@ $(DocStringExtensions.FIELDS)
 """
 Base.@kwdef mutable struct VS_0to1_plus{FT<:AbstractFloat} <: AbstractRamanType{FT} 
     "Concatenated indices of band limits"
-    bandSpecLim::Vector{Any} = []#Array{UnitRange{Int64},1}
-    iBand::Vector{Any}       = []   #Array{Int,1} 
-    grid_in::Vector{Any}     = []#Vector{StepRangeLen{Float64, Base.TwicePrecision{Float64}, Base.TwicePrecision{Float64}, Int64}}#AbstractRange{<:Real}#Vector{StepRangeLen{FT}} 
+    bandSpecLim::Vector{UnitRange{Int}} = UnitRange{Int}[]
+    iBand::Vector{Int}       = Int[]
+    grid_in::Vector{AbstractRange{Float64}} = AbstractRange{Float64}[] 
 
     "Molecular Constant for N2"
     n2::InelasticScattering.MolecularConstants{FT}
@@ -229,7 +229,7 @@ Base.@kwdef mutable struct VS_1to0_plus{FT<:AbstractFloat} <: AbstractRamanType{
     
     "Concatenated indices of band limits"
     bandSpecLim = Array{UnitRange{Int64},1}
-    iBand::Array{Int,1} = []
+    iBand::Vector{Int} = Int[]
     grid_in::Array{StepRangeLen{FT},1} 
 
     "Molecular Constant for N2"
@@ -276,9 +276,9 @@ end
 Base.@kwdef mutable struct noRS_plus{FT} <: AbstractRamanType{FT}
     fscattRayl::Array{FT,1} = [0.0]
     ϖ_Cabannes::FT = 1.0 #elastic fraction (Cabannes) of Rayleigh (Cabannes+Raman) scattering
-    bandSpecLim = []
-    iBand::Array{Int,1} = []
-    F₀::Array{FT,2} = [] # Solar/Stellar irradiation Stokes vector of size (pol_type.n, nSpec)
+    bandSpecLim::Vector{UnitRange{Int}} = UnitRange{Int}[]
+    iBand::Vector{Int} = Int[]
+    F₀::Array{FT,2} = zeros(FT, 1, 1) # Solar/Stellar irradiation Stokes vector of size (pol_type.n, nSpec)
     SIF₀::Array{FT,2} # Solar/Stellar irradiation Stokes vector of size (pol_type.n, nSpec)
 end
 
@@ -303,7 +303,7 @@ Base.@kwdef mutable struct sol_RRS{FT<:AbstractFloat} <: AbstractRamanType{FT}
     Z⁺⁺_λ₁λ₀::Array{FT,2}
     i_ref::Int
     n_Raman::Int
-    bandSpecLim = []
+    bandSpecLim::Vector{UnitRange{Int}} = UnitRange{Int}[]
     iBand = 1
     F₀::Array{FT,2} # Solar/Stellar irradiation Stokes vector of size (pol_type.n, nSpec)
     #SIF₀::Array{FT,2} # Solar/Stellar irradiation Stokes vector of size (pol_type.n, nSpec)
@@ -375,8 +375,8 @@ Base.@kwdef mutable struct RVRS{FT<:AbstractFloat} <: AbstractRamanType{FT}
     "Molecular Constant for O2"
     o2::InelasticScattering.MolecularConstants{FT}
 
-    bandSpecLim = []
-    iBand::Array{Int,1} = [1]
+    bandSpecLim::Vector{UnitRange{Int}} = UnitRange{Int}[]
+    iBand::Vector{Int} = Int[1]
 
     "Pre-computed optical properties"
     #ramanAtmoProp::RamanAtmosphereProperties
@@ -441,9 +441,9 @@ $(DocStringExtensions.FIELDS)
 """
 Base.@kwdef mutable struct sol_VS_0to1_plus{FT<:AbstractFloat} <: AbstractRamanType{FT} 
     "Concatenated indices of band limits"
-    bandSpecLim::Vector{Any} = []#Array{UnitRange{Int64},1}
-    iBand::Vector{Any}       = []   #Array{Int,1} 
-    grid_in::Vector{Any}     = []#Vector{StepRangeLen{Float64, Base.TwicePrecision{Float64}, Base.TwicePrecision{Float64}, Int64}}#AbstractRange{<:Real}#Vector{StepRangeLen{FT}} 
+    bandSpecLim::Vector{UnitRange{Int}} = UnitRange{Int}[]
+    iBand::Vector{Int}       = Int[]
+    grid_in::Vector{AbstractRange{Float64}} = AbstractRange{Float64}[] 
 
     "Molecular Constant for H2"
     h2::InelasticScattering.MolecularConstants{FT}
@@ -485,7 +485,7 @@ Base.@kwdef mutable struct sol_VS_1to0_plus{FT<:AbstractFloat} <: AbstractRamanT
     
     "Concatenated indices of band limits"
     bandSpecLim = Array{UnitRange{Int64},1}
-    iBand::Array{Int,1} = []
+    iBand::Vector{Int} = Int[]
     grid_in::Array{StepRangeLen{FT},1} 
 
     "Molecular Constant for H2"

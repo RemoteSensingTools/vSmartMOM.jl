@@ -18,8 +18,8 @@ function constructCoreOpticalProperties(RS_type::AbstractRamanType{FT}, iBand, m
                                                     greek_rayleigh, m, 
                                                     arr_type = arr_type);
     
-    band_layer_props    = [];
-    band_fScattRayleigh = [];
+    band_layer_props    = Vector{Any}();
+    band_fScattRayleigh = Vector{Any}();
     # @show arr_type
     for iB in iBand
         # Define G here as ones:
