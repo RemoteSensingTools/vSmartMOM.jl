@@ -116,7 +116,7 @@ end
     end
 end
 
-function apply_D_matrix!(n_stokes::Int, r⁻⁺::AbstractArray{FT,3}, t⁺⁺::AbstractArray{FT,3}, r⁺⁻::AbstractArray{FT,3}, t⁻⁻::AbstractArray{FT,3}) where {FT}
+@inline function apply_D_matrix!(n_stokes::Int, r⁻⁺::AbstractArray{FT,3}, t⁺⁺::AbstractArray{FT,3}, r⁺⁻::AbstractArray{FT,3}, t⁻⁻::AbstractArray{FT,3}) where {FT}
     if n_stokes == 1
         r⁺⁻ .= r⁻⁺
         t⁻⁻ .= t⁺⁺    
@@ -132,7 +132,7 @@ function apply_D_matrix!(n_stokes::Int, r⁻⁺::AbstractArray{FT,3}, t⁺⁺::A
 end
 
 
-function apply_D_matrix_SFI!(n_stokes::Int, J₀⁻::AbstractArray{FT,3}) where {FT}
+@inline function apply_D_matrix_SFI!(n_stokes::Int, J₀⁻::AbstractArray{FT,3}) where {FT}
     n_stokes == 1 && return nothing
     device = devi(architecture(J₀⁻))
     applyD_kernel! = apply_D_SFI!(device)

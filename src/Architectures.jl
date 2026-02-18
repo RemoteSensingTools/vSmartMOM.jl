@@ -65,6 +65,6 @@ end
 default_architecture() = has_cuda() ? GPU() : CPU()
 
 # Synchronization - calls the sync function (set by CUDAExt if CUDA is loaded)
-synchronize_if_gpu() = sync_device()
+@inline synchronize_if_gpu() = sync_device()
 
 end

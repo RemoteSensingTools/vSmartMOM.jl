@@ -33,7 +33,7 @@ Set transmission matrices for non-scattering layers using Beer's law.
 Constructs batch diagonal matrices: `t[j,j,iλ] = exp(-τ[iλ]/μ[j])`.
 Works on both CPU and GPU arrays (uses `collect` for CPU-side Diagonal construction).
 """
-function _set_transmission_noscat!(t⁺⁺, t⁻⁻, τ_vals, qp_μN)
+@inline function _set_transmission_noscat!(t⁺⁺, t⁻⁻, τ_vals, qp_μN)
     temp = collect(exp.(-τ_vals ./ qp_μN'))
     for iλ in axes(temp, 1)
         d = Diagonal(temp[iλ,:])
@@ -248,7 +248,7 @@ function rt_kernel!(RS_type::noRS{FT},
 end
 
 
-function get_dtau_ndoubl(computed_layer_properties::CoreScatteringOpticalProperties, quad_points::QuadPoints{FT}) where {FT}
+@inline function get_dtau_ndoubl(computed_layer_properties::CoreScatteringOpticalProperties, quad_points::QuadPoints{FT}) where {FT}
     (; qp_μ) = quad_points
     (; τ, ϖ) = computed_layer_properties
     dτ_max = minimum([maximum(τ .* ϖ), FT(0.001) * minimum(qp_μ)])
@@ -258,7 +258,7 @@ function get_dtau_ndoubl(computed_layer_properties::CoreScatteringOpticalPropert
     return dτ, ndoubl
 end
 
-function get_dtau_ndoubl(computed_layer_properties::CoreDirectionalScatteringOpticalProperties, quad_points::QuadPoints{FT}) where {FT}
+@inline function get_dtau_ndoubl(computed_layer_properties::CoreDirectionalScatteringOpticalProperties, quad_points::QuadPoints{FT}) where {FT}
     (; qp_μ, iμ₀) = quad_points
     (; τ, ϖ, G) = computed_layer_properties
     gfct = collect(G)[iμ₀]  # CPU scalar extraction from G factor
@@ -269,7 +269,7 @@ function get_dtau_ndoubl(computed_layer_properties::CoreDirectionalScatteringOpt
     return dτ, ndoubl
 end
 
-function init_layer(computed_layer_properties::CoreDirectionalScatteringOpticalProperties, quad_points, pol_type, architecture)
+@inline function init_layer(computed_layer_properties::CoreDirectionalScatteringOpticalProperties, quad_points, pol_type, architecture)
     arr_type = array_type(architecture) 
     (; μ₀, iμ₀) = quad_points
     (; G) = computed_layer_properties
@@ -279,7 +279,7 @@ function init_layer(computed_layer_properties::CoreDirectionalScatteringOpticalP
     return dτ, ndoubl, arr_type(expk)
 end
 
-function init_layer(computed_layer_properties::CoreScatteringOpticalProperties, quad_points, pol_type, architecture)
+@inline function init_layer(computed_layer_properties::CoreScatteringOpticalProperties, quad_points, pol_type, architecture)
     arr_type = array_type(architecture)
     (; μ₀) = quad_points
     dτ, ndoubl = get_dtau_ndoubl(computed_layer_properties, quad_points)
