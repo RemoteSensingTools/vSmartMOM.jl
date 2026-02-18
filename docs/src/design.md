@@ -201,21 +201,31 @@ The chain rule `lin_added_layer_all_params!` maps per-layer optical property der
 
 The RT kernels compute `∂R/∂τ`, `∂R/∂ϖ`, `∂R/∂Z` analytically (stored in `AddedLayerLin.ṫ⁺⁺[1:3,...]`). The optical property code provides `∂τ/∂x_j`, `∂ϖ/∂x_j`, `∂Z/∂x_j` either analytically or via ForwardDiff.
 
-### Current Parameter Layout
+### Parameter Layout via `ParameterLayout`
 
-For `Nparams = 7 × NAer + NGas + NSurf`:
+Instead of hardcoding `7*NAer + NGas + NSurf`, the codebase uses a `ParameterLayout` struct
+(defined in `src/CoreRT/parameter_layout.jl`):
 
-| Index range           | Parameter                                       | Method   |
-|-----------------------|-------------------------------------------------|----------|
-| `1..7` per aerosol    | `τ_ref, nᵣ, nᵢ, rₘ, σ_g, p₀, σ_p`              | Analytic |
-| `7*NAer+1..+NGas`     | Gas VMR scaling factors                         | Analytic |
-| `7*NAer+NGas+1`       | Surface albedo                                  | Analytic |
+```julia
+layout = ParameterLayout(aerosol_params=7, n_aerosols=NAer,
+                         n_gases=NGas, n_surface=NSurf)
+n_total(layout)              # total Nparams
+aerosol_range(layout, iaer)  # indices for aerosol iaer
+gas_range(layout)            # indices for gas VMRs
+surface_index(layout, iBand) # surface param for band iBand
+```
+
+| Index range               | Parameter                                       | Method   |
+|---------------------------|------------------------------------------------ |----------|
+| `aerosol_range(layout, i)` | `τ_ref, nᵣ, nᵢ, rₘ, σ_g, p₀, σ_p` per aerosol | Analytic |
+| `gas_range(layout)`        | Gas VMR scaling factors                         | Analytic |
+| `surface_range(layout)`    | Surface albedo / BRDF parameters                | Analytic |
 
 ### Adding New Parameters
 
 To add derivatives with respect to a new parameter `θ`:
 
-1. **Analytic path**: Compute `∂τ/∂θ`, `∂ϖ/∂θ`, `∂Z/∂θ` analytically in `constructCoreOpticalProperties` and add to the `OpticalPropertyJacobian` arrays.
+1. **Analytic path**: Compute `∂τ/∂θ`, `∂ϖ/∂θ`, `∂Z/∂θ` analytically in `constructCoreOpticalProperties` and add to the `OpticalPropertyJacobian` arrays. Extend `ParameterLayout` to include the new parameter block.
 
 2. **ForwardDiff path**: Wrap the optical property generation in `ForwardDiff.jacobian`:
    ```julia
@@ -226,6 +236,11 @@ To add derivatives with respect to a new parameter `θ`:
    J = ForwardDiff.jacobian(optical_props_wrt_theta, θ₀)
    # Extract ∂τ/∂θ, ∂ϖ/∂θ from J, fill OpticalPropertyJacobian
    ```
+
+3. **Hybrid path** (recommended for new parameters): Use `ForwardDiff.Dual` for the
+   "outer" derivatives (parameter → raw optical properties) and retain the analytic
+   RT kernel for the "inner" derivatives (optical properties → radiance). The boundary
+   is the `OpticalPropertyJacobian` struct.
 
 ### Strategy by Parameter Type
 
@@ -241,6 +256,27 @@ To add derivatives with respect to a new parameter `θ`:
 | Surface pressure   | ForwardDiff        | Affects many paths (Rayleigh, absorption) |
 | Temperature        | ForwardDiff        | Future; affects absorption cross-sections |
 
+### Planned: 4 Core Variables with δ-M Truncation
+
+Currently, the RT kernel differentiates with respect to 3 core variables `(τ, ϖ, Z)`,
+and the δ-M truncation factor `fᵗ` is folded into these variables by `createAero` before
+they enter the kernel. This means `createAero` must manually expand the chain rule for
+δ-M truncation with respect to each aerosol sub-parameter.
+
+The planned design promotes `fᵗ` to a **4th core variable**:
+
+```
+Current:   createAero → (τ_mod, ϖ_mod, Z) → RT kernel(3 core vars)
+Planned:   Mie/profile → (τ_raw, ω̃, fᵗ, Z_raw) → RT kernel(4 core vars, δ-M inside)
+```
+
+This change:
+- Moves δ-M truncation from the AD boundary into the analytic RT kernel
+- Simplifies the chain rule: no manual δ-M derivative expansion in `createAero`
+- Defines a `RawOpticalPropertyJacobian` at the AD boundary holding `∂(τ_raw, ω̃, fᵗ, Z_raw)/∂x`
+- Makes it trivial to add new aerosol parameters or switch between analytic and ForwardDiff
+  for the outer derivatives
+
 ## Directory Layout
 
 ```
@@ -251,6 +287,7 @@ src/
 │   ├── CoreRT.jl             Module entry point
 │   ├── types.jl              Forward RT types
 │   ├── types_lin.jl          Linearized RT types
+│   ├── parameter_layout.jl   ParameterLayout for Jacobian indexing
 │   ├── types_inelastic.jl    Inelastic RT types
 │   ├── rt_run.jl             Forward RT entry point
 │   ├── rt_run_lin.jl         Linearized RT entry point
