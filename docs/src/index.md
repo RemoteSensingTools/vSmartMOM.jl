@@ -1,12 +1,26 @@
 ## Introduction
 
-vSmartMOM.jl aims to revamp and modernize key atmospheric remote sensing tools. Specifically, it will enable the fast computation of atmospheric optical properties, full-polarized radiative transfer simulations, and commonly-used inversion routines. 
+vSmartMOM.jl is a polarized radiative transfer solver that uses the adding-doubling method to compute reflectance and transmittance for atmospheric remote sensing. It supports gas absorption, aerosol scattering, and analytic Jacobians for inversion. The interface is designed for researchers and students, with optional GPU acceleration via CUDA.jl.
 
-By taking advantage of modern software tools, such as GPU acceleration and HPC computing, the software suite significantly accelerates computationally intensive calculations and models, while keeping the interface easy to use for researchers and students.
+## System requirements
+
+- **Julia** 1.8 or later
+- **Optional:** NVIDIA GPU with CUDA for `vSmartMOM.Architectures.GPU()` support
+
+## Quick example
+
+```julia
+using vSmartMOM
+params = parameters_from_yaml("path/to/your/params.yaml")
+model = model_from_parameters(params)
+R, T = rt_run(model)   # R = TOA reflectance, T = BOA transmittance
+```
+
+See [Tutorial: Quick Start](pages/tutorials/Tutorial_QuickStart.md) for a complete walkthrough.
 
 ## Installation
 
-1. Install [Julia](https://julialang.org/downloads/) (1.6+)
+1. Install [Julia](https://julialang.org/downloads/) (1.8+)
 2. Start the Julia REPL, enter the Pkg REPL by pressing `]`, and run:  
 ```julia
 add vSmartMOM
