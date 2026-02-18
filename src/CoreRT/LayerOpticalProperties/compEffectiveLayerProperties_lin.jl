@@ -270,9 +270,9 @@ function constructCoreOpticalProperties(RS_type, iBand, m, model, lin_model) #wh
     #bla
     #@show RS_type.bandSpecLim[1]
     #@show RS_type.iBand
-    layer_opt = []
-    layer_opt_lin = []
-    fscat_opt = []
+    layer_opt = Vector{Any}()
+    layer_opt_lin = Vector{Any}()
+    fscat_opt = Vector{Any}()
     for iz = 1:nZ
         push!(layer_opt, prod([band_layer_props[i][iz] for i=1:length(iBand)])); #Is this intentional?? Why prod?
         push!(layer_opt_lin, prod([band_layer_props_lin[i][iz] for i=1:length(iBand)])); #Is this intentional?? Why prod?
