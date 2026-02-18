@@ -1,8 +1,3 @@
-#=
- 
-This file contains RT interaction-related functions
- 
-=#
 # Scattering in inhomogeneous composite layer.
 # Scattering in homogeneous layer which is added to the bottom of the composite layer.
 # Produces a new, scattering composite layer.
@@ -83,29 +78,9 @@ function interaction_hdrf_canopy!(SFI,
             bhr_J₀⁺[i,:] .= (sum(_dwJ[j,1,:].*wt[j].*qp[j], dims=1)') .+ (solJ₀[i,:] .* qp[iμ₀]) #TODO: Use Radau quadrature and include insolation in the quadrature sum
             direct = Array(solJ₀[i,:] .* qp[iμ₀])
             diffuse = (sum(_dwJ[j,1,:].*wt[j].*qp[j], dims=1)')
-            @show direct[1], diffuse[1]
-
         end
-        @show bhr_J₀⁻./bhr_J₀⁺
-        @show solJ₀[1,:]
     end
 
 end
 
 "Compute interaction between composite and added layers"
-#==function interaction_hdrf!(SFI,
-                        composite_layer::CompositeLayer{FT}, 
-                        added_layer::AddedLayer{FT},
-                        m, pol_type, NquadN, wt_μN,
-                        hdr_J₀⁻::AbstractArray{FT2}, 
-                        bhr_J₀⁻::AbstractArray{FT2}, 
-                        bhr_J₀⁺::AbstractArray{FT2}) where {FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2}
-
-    interaction_hdrf_helper!(SFI, 
-                composite_layer, added_layer, 
-                m, pol_type, NquadN, wt_μN,
-                hdr_J₀⁻, bhr_J₀⁻, bhr_J₀⁺)
-    
-    synchronize_if_gpu()
-end
-==#

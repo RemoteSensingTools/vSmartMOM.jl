@@ -17,15 +17,12 @@ function rt_kernel!(RS_type::noRS,
             qp_μN, iz) 
 
     @unpack τ_λ, ϖ_λ, τ, ϖ, Z⁺⁺, Z⁻⁺, dτ_max, dτ, ndoubl, dτ_λ, expk, scatter, τ_sum, scattering_interface = computed_layer_properties
-    @show τ, ϖ, dτ_max, ndoubl
     # If there is scattering, perform the elemental and doubling steps
-    @show "Ha"
     if scatter
         
         @timeit "elemental" elemental!(pol_type, SFI, τ_sum, dτ_λ, dτ, ϖ_λ, ϖ, Z⁺⁺, Z⁻⁺, m, ndoubl, scatter, quad_points,  added_layer,  I_static, architecture)
         #println("Elemental done...")
         @timeit "doubling"   doubling!(pol_type, SFI, expk, ndoubl, added_layer, I_static, architecture)
-        @show added_layer.r⁻⁺[1,1,1], added_layer.r⁺⁻[1,1,1],added_layer.t⁺⁺[1,1,1], added_layer.t⁻⁻[:,:,1] 
         #println("Doubling done...")
     else # This might not work yet on GPU!
         # If not, there is no reflectance. Assign r/t appropriately
@@ -63,15 +60,12 @@ end
 function rt_kernel_canopy!(RS_type::noRS, pol_type, SFI, added_layer, composite_layer, computed_layer_properties, m, quad_points, I_static, architecture, qp_μN, iz) 
 
     @unpack τ_λ, ϖ_λ, τ, ϖ, Z⁺⁺, Z⁻⁺, dτ_max, dτ, ndoubl, dτ_λ, expk, scatter, τ_sum, scattering_interface = computed_layer_properties
-    @show τ, ϖ, dτ_max, ndoubl
-    @show "Ha2"
     # If there is scattering, perform the elemental and doubling steps
     if scatter
         
         @timeit "elemental_canopy" elemental_canopy!(pol_type, SFI, τ_sum, dτ_λ, dτ, ϖ_λ, ϖ, Z⁺⁺, Z⁻⁺, m, ndoubl, scatter, quad_points,  added_layer,  I_static, architecture)
         #println("Elemental done...")
         @timeit "doubling"   doubling!(pol_type, SFI, expk, ndoubl, added_layer, I_static, architecture)
-        @show added_layer.r⁻⁺[1,1,1], added_layer.r⁺⁻[1,1,1],added_layer.t⁺⁺[1,1,1], added_layer.t⁻⁻[:,:,1] 
         #println("Doubling done...")
     else # This might not work yet on GPU!
         # If not, there is no reflectance. Assign r/t appropriately

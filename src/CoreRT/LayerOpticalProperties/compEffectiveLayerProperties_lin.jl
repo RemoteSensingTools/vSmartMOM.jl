@@ -244,13 +244,6 @@ function constructCoreOpticalProperties(RS_type, iBand, m, model, lin_model) #wh
         #@show Array(rayl[1].τ)[1] * sum(RS_type.ϖ_λ₁λ₀) * Array(RS_type.Z⁺⁺_λ₁λ₀) 
         #@show Array(rayl2[1].τ)[1] * rayl2[1].ϖ * Array(rayl2[1].Z⁺⁺)
     
-        #=@show sum(Array(rayl[1].τ)[1] * rayl[1].ϖ * Array(rayl[1].Z⁺⁺) + 
-        Array(rayl[1].τ)[1] * sum(RS_type.ϖ_λ₁λ₀) * Array(RS_type.Z⁺⁺_λ₁λ₀) - 
-        Array(rayl2[1].τ)[1] * rayl2[1].ϖ * Array(rayl2[1].Z⁺⁺), dims=1)
-        @show sum(Array(rayl[1].τ)[1] * rayl[1].ϖ * Array(rayl[1].Z⁻⁺) + 
-        Array(rayl[1].τ)[1] * sum(RS_type.ϖ_λ₁λ₀) * Array(RS_type.Z⁻⁺_λ₁λ₀) - 
-        Array(rayl2[1].τ)[1] * rayl2[1].ϖ * Array(rayl2[1].Z⁻⁺), dims=1)
-        =#
         #@show rayl2[1].Z⁺⁺[:,:,1] #.==0
         #@show rayl[1].Z⁺⁺[:,:,1]
         #@show RS_type.Z⁺⁺_λ₁λ₀[:,:,1] #.==0
@@ -272,17 +265,6 @@ function constructCoreOpticalProperties(RS_type, iBand, m, model, lin_model) #wh
     #@show typeof(layer_opt[1].τ)
     return layer_opt, layer_opt_lin, fscat_opt # Suniti: this needs to be modified because Rayleigh scattering fraction varies dramatically with wavelength
 end
-#=
-function createAero(τAer, aerosol_optics, AerZ⁺⁺, AerZ⁻⁺)
-    @unpack fᵗ, ω̃ = aerosol_optics
-    #τ_mod = (1-fᵗ * ω̃ ) * τAer;
-    #ϖ_mod = (1-fᵗ) * ω̃/(1-fᵗ * ω̃)
-    #@show typeof(fᵗ), typeof(ω̃)
-    τ_mod = (1 .- fᵗ * ω̃ ) .* τAer;
-    ϖ_mod = (1 .- fᵗ) .* ω̃ ./ (1 .- fᵗ * ω̃)
-    CoreScatteringOpticalProperties(τ_mod, ϖ_mod,AerZ⁺⁺, AerZ⁻⁺)
-end
-=#
  
 function createAero(τAer, aerosol_optics, AerZ⁺⁺, AerZ⁻⁺,
                     τ̇Aer, lin_aerosol_optics, AerŻ⁺⁺, AerŻ⁻⁺)
@@ -365,26 +347,6 @@ For `τ_ref, p₀, σp`: only the `τ_aer` chain contributes (Mie properties are
 - `CoreScatteringOpticalProperties`: Forward δ-M scaled properties.
 - `CoreScatteringOpticalPropertiesLin`: Linearized properties (7 sub-params).
 """
-#=function createAero(τAer, aerosol_optics, AerZ⁺⁺, AerZ⁻⁺, arr_type)
-    @unpack fᵗ, ω̃ = aerosol_optics
-    if ω̃ isa Number
-        nothing
-    else
-        ω̃ = arr_type(aerosol_optics.ω̃) 
-    end
-    #@show typeof(ω̃), typeof(fᵗ)
-    #@show size(fᵗ)
-    #@show size(ω̃)
-    #@show size(τAer), τAer[1], τAer[end]
-    #τ_mod = zeros(size(τAer,1), size(τAer,2))
-    #for iz = 1:size(τAer,1)
-    τ_mod = (1 .- fᵗ * ω̃ ) .* τAer;
-    #@show τ_mod[1], τ_mod[end]  
-    #end
-    ϖ_mod = (1 .- fᵗ) .* ω̃ ./ (1 .- fᵗ * ω̃)
-    CoreScatteringOpticalProperties(τ_mod, ϖ_mod, AerZ⁺⁺, AerZ⁻⁺)
-end
-=#
 function createAero(τAer, aerosol_optics, AerZ⁺⁺, AerZ⁻⁺, 
                     τ̇Aer, lin_aerosol_optics, AerŻ⁺⁺, AerŻ⁻⁺,
                     arr_type)
@@ -399,17 +361,8 @@ function createAero(τAer, aerosol_optics, AerZ⁺⁺, AerZ⁻⁺,
     #ω̃̇  = arr_type(ω̃̇)
 
     sz = size(AerŻ⁺⁺)
-    #@show sz, size(AerZ⁺⁺)
-    #=if ndims(AerŻ⁺⁺) == 3
-        tmpŻ⁺⁺ = reshape(AerŻ⁺⁺, sz..., 1) .* ones(eltype(AerŻ⁺⁺), 1,1,1,n)
-        tmpŻ⁻⁺ = reshape(AerŻ⁻⁺, sz..., 1) .* ones(eltype(AerŻ⁻⁺), 1,1,1,n) 
-    elseif ndims(AerŻ⁺⁺) == 4 && sz[4] == 1
-        tmpŻ⁺⁺ = AerŻ⁺⁺ .* ones(eltype(AerŻ⁺⁺), 1,1,1,n)
-        tmpŻ⁻⁺ = AerŻ⁻⁺ .* ones(eltype(AerŻ⁻⁺), 1,1,1,n)
-    else=#
     tmpŻ⁺⁺ = AerŻ⁺⁺
     tmpŻ⁻⁺ = AerŻ⁻⁺
-    #end
     AerŻ⁺⁺ = arr_type(zeros(7, size(AerZ⁺⁺,1), size(AerZ⁺⁺,2)))#, n)
     AerŻ⁻⁺ = arr_type(zeros(7, size(AerZ⁻⁺,1), size(AerZ⁻⁺,2)))#, n)
     AerŻ⁺⁺[2:5,:,:] .= tmpŻ⁺⁺
@@ -433,15 +386,7 @@ function createAero(τAer, aerosol_optics, AerZ⁺⁺, AerZ⁻⁺,
     ω̃̇ = arr_type(zeros(7,n))
     ω̃̇[2:5,:] .= tmpω̃̇
     
-    #=
-    sz = size(ḟᵗ)
-    if ndims(ḟᵗ) == 1
-        tmpḟᵗ = reshape(ḟᵗ, sz..., 1) .* ones(eltype(ḟᵗ), 1,n)        
-    elseif ndims(ḟᵗ) == 2 && sz[2] == 1
-        tmpḟᵗ = ḟᵗ .* ones(eltype(ḟᵗ), 1,n)
-    else=#
     tmpḟᵗ = ḟᵗ
-    #end
     ḟᵗ = arr_type(zeros(7,n))
     ḟᵗ[2:5] = tmpḟᵗ
 
@@ -469,15 +414,6 @@ function createAero(τAer, aerosol_optics, AerZ⁺⁺, AerZ⁻⁺,
     τ̇_mod[6:7,:] .= (1 .- fᵗ * ω̃)' .* τ̇Aer[6:7,:]
     #@show size(ω̃̇ * (1 - fᵗ)), size(ḟᵗ * (ω̃ .* (1 .- ω̃))'), size((1 .- fᵗ * ω̃)'.^2)
     ϖ̇_mod[6:7,:] .= 0.0
-
-    #=for iparam=1:4
-        tmp = fᵗ*ω̃̇[iparam,:] .+ ḟᵗ[iparam]*ω̃
-
-        τ̇_mod[iparam,:] = (1 .- fᵗ * ω̃ ) .* τ̇Aer[iparam,:];
-        τ̇_mod[iparam,:] .-= tmp .* τAer
-        ϖ̇_mod[iparam,:] = (ω̃̇[iparam,:].*(1 - fᵗ) .- ḟᵗ[iparam]*ω̃.*(1 .- ω̃))
-        ϖ̇_mod[iparam,:] ./= (1 .- fᵗ * ω̃).^2
-    end=#
     
     return CoreScatteringOpticalProperties(τ_mod, ϖ_mod, AerZ⁺⁺, AerZ⁻⁺), 
         CoreScatteringOpticalPropertiesLin(τ̇_mod, ϖ̇_mod, AerŻ⁺⁺, AerŻ⁻⁺)
@@ -557,23 +493,3 @@ function expandOpticalProperties(in::CoreScatteringOpticalProperties, in_lin::Co
             CoreScatteringOpticalPropertiesLin(arr_type(τ̇), arr_type(ϖ̇), arr_type(Ż⁺⁺), arr_type(Ż⁻⁺))       
     end
 end
-
-#=
-function expandBandScalars(RS_type, x, x_lin)
-    #test = [length(RS_type.bandSpecLim[iB]) for iB in RS_type.iBand]
-    #@show test, sum(test), size(x[1])
-    #@show eltype(x[1]),sum([length(RS_type.bandSpecLim[iB]) for iB in RS_type.iBand])
-    nParams = length(x_lin)
-    out = zeros(eltype(x[1]),sum([length(RS_type.bandSpecLim[iB]) for iB in RS_type.iBand]))
-    out_lin = zeros(eltype(x[1]),(nParams, sum([length(RS_type.bandSpecLim[iB]) for iB in RS_type.iBand])))
-    for iB in RS_type.iBand
-        out[RS_type.bandSpecLim[iB]] .= expandScalar(x[iB],length(RS_type.bandSpecLim[iB]))
-        for ip=1:nParams
-            out_lin[ip, RS_type.bandSpecLim[iB]] .= expandScalar(x_lin[ip,iB],length(RS_type.bandSpecLim[iB]))
-        end
-    end
-    return out
-end
-
-#expandScalar(x,n) = x.*ones(n);
-=#

@@ -1,9 +1,3 @@
-#=
- 
-This file contains RT doubling-related functions
- 
-=#
-
 """
     $(FUNCTIONNAME)(pol_type, SFI, expk, ndoubl::Int, added_layer::AddedLayer, I_static::AbstractArray{FT}, 
                     architecture) where {FT}

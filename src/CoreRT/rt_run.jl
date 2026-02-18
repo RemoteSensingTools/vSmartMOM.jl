@@ -81,7 +81,6 @@ function rt_run(RS_type::AbstractRamanType,
     # Need to check this a bit better in the future!
     FT_dual = n_aer > 0 ? typeof(model.τ_aer[1][1]) : FT
     #FT_dual = FT
-    @show FT_dual
     # Output variables: Reflected and transmitted solar irradiation at TOA and BOA respectively # Might need Dual later!!
     #Suniti: consider adding a new dimension (iBand) to these arrays. The assignment of simulated spectra to their specific bands will take place after batch operations, thereby leaving the computational time unaffected 
     @timeit "Arrays"  R       = zeros(FT_dual, length(vza), pol_type.n, nSpec)
@@ -118,13 +117,9 @@ function rt_run(RS_type::AbstractRamanType,
     
         #TODO: if RS_type!=noRS, create ϖ_λ₁λ₀, i_λ₁λ₀, fscattRayl, Z⁺⁺_λ₁λ₀, Z⁻⁺_λ₁λ₀ (for input), and ieJ₀⁺, ieJ₀⁻, ieR⁺⁻, ieR⁻⁺, ieT⁻⁻, ieT⁺⁺, ier⁺⁻, ier⁻⁺, iet⁻⁻, iet⁺⁺ (for output)
     #getRamanSSProp(RS_type, λ, grid_in)
-    
-    println("Finished initializing arrays")
 
     # Loop over fourier moments
     for m = 0:max_m - 1
-
-        println("Fourier Moment: ", m, "/", max_m-1)
 
         # Azimuthal weighting
         weight = m == 0 ? FT(0.5) : FT(1.0)

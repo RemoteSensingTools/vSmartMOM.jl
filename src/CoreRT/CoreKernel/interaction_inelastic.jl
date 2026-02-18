@@ -1,9 +1,3 @@
-#=
- 
-This file contains RT interaction-related functions
- 
-=#
-
 # No scattering in either the added layer or the composite layer
 function interaction_helper!(RS_type,::ScatteringInterface_00, SFI,
                                 composite_layer::CompositeLayer{FT}, 
@@ -11,7 +5,6 @@ function interaction_helper!(RS_type,::ScatteringInterface_00, SFI,
                                 I_static::AbstractArray{FT2}) where {FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2}
 
     # If SFI, interact source function in no scattering
-    @show "interaction 00"
     if SFI
         composite_layer.ieJ₀⁺[:] = 0.0 #ieJ₀⁺
         composite_layer.ieJ₀⁻[:] = 0.0 #ieJ₀⁻
@@ -41,7 +34,6 @@ function interaction_helper!(RS_type::RRS, ::ScatteringInterface_01, SFI,
 
     @unpack i_λ₁λ₀ = RS_type     
     
-    @show "interaction 01"
     if SFI   
         for n₁ in eachindex ieJ₁⁺[1,1,:,1]
             for Δn in eachindex ieJ₁⁺[1,1,1,:]
@@ -152,7 +144,6 @@ function interaction_helper!(RS_type::RRS, ::ScatteringInterface_10, SFI,
                                 I_static::AbstractArray{FT2}) where {FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2}
     @unpack i_λ₁λ₀ = RS_type 
 
-    @show "interaction 10"
     if SFI
         for n₁ in eachindex ieJ₁⁺[1,1,:,1]
             for Δn in eachindex ieJ₁⁺[1,1,1,:]
@@ -260,7 +251,6 @@ function interaction_helper!(RS_type::RRS, ::ScatteringInterface_11, SFI,
     @unpack ier⁺⁻, ier⁻⁺, iet⁻⁻, iet⁺⁺ = added_layer
     @unpack ieR⁻⁺, ieR⁺⁻, ieT⁺⁺, ieT⁻⁻, ieJ₀⁺, ieJ₀⁻ = composite_layer
     
-    @show "interaction 11"
     # Used to store `(I - R⁺⁻ * r⁻⁺)⁻¹`
     tmp_inv  = similar(t⁺⁺); tmp_inv.=0;
     tmpieJ₀⁻ = similar(ieJ₀⁻); tmpieJ₀⁻.=0;
@@ -544,25 +534,7 @@ function interaction!(RS_type::Union{RRS, VS_0to1_plus, VS_1to0_plus}, scatterin
                         added_layer::Union{AddedLayer,AddedLayerRS},
                         I_static::AbstractArray{FT}) where {FT<:Union{AbstractFloat, ForwardDiff.Dual}}
                         
-    #M1 = composite_layer.R⁻⁺[1,1,1]
-    #M2 = composite_layer.R⁺⁻[1,1,1]
-    #M3 = composite_layer.T⁺⁺[1,1,1]
-    #M4 = composite_layer.T⁻⁻[1,1,1]
-    #M5 = composite_layer.J₀⁺[1,1,1]
-    #M6 = composite_layer.J₀⁻[1,1,1]
-
-    #@show M1, M2, M3, M4, M5, M6
-                        
     interaction_helper!(RS_type, scattering_interface, SFI, composite_layer, added_layer, I_static)
-    
-    #M1 = composite_layer.R⁻⁺[1,1,1]
-    #M2 = composite_layer.R⁺⁻[1,1,1]
-    #M3 = composite_layer.T⁺⁺[1,1,1]
-    #M4 = composite_layer.T⁻⁻[1,1,1]
-    #M5 = composite_layer.J₀⁺[1,1,1]
-    #M6 = composite_layer.J₀⁻[1,1,1]
-
-    #@show M1, M2, M3, M4, M5, M6
     synchronize_if_gpu()
     
 end

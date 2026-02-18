@@ -160,7 +160,6 @@ function model_from_parameters(params::vSmartMOM_Parameters)
             #@show k
             # Compute raw (not truncated) aerosol optical properties (not needed in RT eventually) 
             @timeit "Mie calc"  aerosol_optics_raw = compute_aerosol_optical_properties(mie_model, FT);
-            @show aerosol_optics_raw.k
             # Compute truncated aerosol optical properties (phase function and fᵗ), consistent with Ltrunc:
             #@show i_aer, i_band
             aerosol_optics[i_band][i_aer] = Scattering.truncate_phase(truncation_type, 
@@ -170,8 +169,7 @@ function model_from_parameters(params::vSmartMOM_Parameters)
             # Track greek coef length for l_max computation
             l_max_aer[i_aer, i_band] = min(length(aerosol_optics[i_band][i_aer].greek_coefs.β), 
                                             truncation_type.l_max)
-                                                    
-            @show aerosol_optics[i_band][i_aer].k
+
             #@show aerosol_optics[i_band][i_aer].fᵗ
             # Compute nAer aerosol optical thickness profiles
             τ_aer[i_band][i_aer,:] = 
@@ -225,7 +223,6 @@ Modified version for vibrational Ramnan scattering
 function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus}, 
                     λ₀,
                     params::vSmartMOM_Parameters)
-    @show params.absorption_params.molecules
     # Number of total bands and aerosols (for convenience)
     n_bands = 3 #length(params.spec_bands)
     n_aer = isnothing(params.scattering_params) ? 0 : length(params.scattering_params.rt_aerosols)
@@ -254,13 +251,9 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
     # Compute N2 and O2
     RS_type.n2, RS_type.o2 = 
         InelasticScattering.getRamanAtmoConstants(1.e7/λ₀,effT);
-    println("here 0")
     InelasticScattering.getRamanSSProp!(RS_type, λ₀);
-    println("here 1")
     n_bands = length(RS_type.iBand)
-    @show RS_type.grid_in
     params.spec_bands = RS_type.grid_in
-    @show params.spec_bands
 
     # Rayleigh optical properties calculation
     greek_rayleigh = Scattering.get_greek_rayleigh(params.depol)
@@ -276,7 +269,6 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
     τ_abs     = [zeros(params.float_type, length(params.spec_bands[i]), length(profile.p_full)) for i in 1:n_bands]
     # Loop over all bands:
     for i_band=1:n_bands
-        @show params.spec_bands[i_band]
         # i'th spectral band (convert from cm⁻¹ to μm)
         curr_band_λ = 1e4 ./ params.spec_bands[i_band]
 
@@ -295,7 +287,6 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
 
         # If no absorption, continue to next band
         isnothing(params.absorption_params) && continue
-        @show i_band, params.absorption_params.molecules[i_band]
         # Loop over all molecules in this band, obtain profile for each, and add them up
         for molec_i in 1:length(params.absorption_params.molecules[i_band])
             # This can be precomputed as well later in my mind, providing an absorption_model or an interpolation_model!
@@ -341,7 +332,6 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
 
         # Create a univariate aerosol distribution
         mie_aerosol = Aerosol(size_distribution, curr_aerosol.nᵣ, curr_aerosol.nᵢ)
-        @show typeof(curr_aerosol.nᵣ)
         #mie_aerosol = make_mie_aerosol(size_distribution, curr_aerosol.nᵣ, curr_aerosol.nᵢ, params.scattering_params.r_max, params.scattering_params.nquad_radius) #Suniti: why is the refractive index needed here?
 
         # Create the aerosol extinction cross-section at the reference wavelength:
@@ -354,7 +344,6 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
                                         params.scattering_params.nquad_radius)
         mie_model.aerosol.nᵣ = real(params.scattering_params.n_ref)
         mie_model.aerosol.nᵢ = -imag(params.scattering_params.n_ref)
-        @show params.scattering_params.n_ref
         k_ref          = compute_ref_aerosol_extinction(mie_model, params.float_type)
 
         #params.scattering_params.rt_aerosols[i_aer].p₀, params.scattering_params.rt_aerosols[i_aer].σp
@@ -378,7 +367,6 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
             @timeit "Mie calc"  aerosol_optics_raw = compute_aerosol_optical_properties(mie_model, FT2);
 
             # Compute truncated aerosol optical properties (phase function and fᵗ), consistent with Ltrunc:
-            @show i_aer, i_band
             aerosol_optics[i_band][i_aer] = Scattering.truncate_phase(truncation_type, 
                                                     aerosol_optics_raw; reportFit=false)
 
