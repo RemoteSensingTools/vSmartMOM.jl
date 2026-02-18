@@ -38,11 +38,10 @@ function create_surface_layer!(lambertian::LambertianSurfaceScalar{FT},
         # Albedo normalized by π (and factor 2 for 0th Fourier Moment)
         ρ = 2lambertian.albedo#/FT(π)
         
-        R_surf = Array(Diagonal(vcat(ρ, zeros(FT,pol_type.n-1))))
+        # Construct dense surface reflectance matrix and move to device
+        R_surf = Matrix(Diagonal(vcat(ρ, zeros(FT,pol_type.n-1))))
         R_surf = repeat(R_surf',Nquad)
         R_surf = repeat(R_surf',Nquad)
-        
-        # Move to architecture:
         R_surf = arr_type(R_surf)
 
         
@@ -82,7 +81,6 @@ function create_surface_layer!(lambertian::LambertianSurfaceLegendre{FT},
     quad_points,
     τ_sum,
     architecture) where {FT}
-    FT2 = Float64
     j₀⁺ = added_layer isa AddedLayerRS ? added_layer.J₀⁺ : added_layer.j₀⁺
     j₀⁻ = added_layer isa AddedLayerRS ? added_layer.J₀⁻ : added_layer.j₀⁻
     if m == 0
@@ -90,8 +88,8 @@ function create_surface_layer!(lambertian::LambertianSurfaceLegendre{FT},
         legendre_coeff = lambertian.legendre_coeff
         arr_type = array_type(architecture)
         # Albedo normalized by π (and factor 2 for 0th Fourier Moment)
-        # a) Define range for legendre polymonial:
-        x = collect(range(FT2(-1), FT2(1), length=length(τ_sum)));
+        # a) Define range for legendre polynomial:
+        x = collect(range(FT(-1), FT(1), length=length(τ_sum)));
         # Legendre Polynomial basis functions:
         P = Scattering.compute_legendre_poly(x,length(legendre_coeff))[1]
         # Evaluate Polynomial (as matrix multiplication)
@@ -101,7 +99,7 @@ function create_surface_layer!(lambertian::LambertianSurfaceLegendre{FT},
         dim = size(added_layer.r⁻⁺)
         Nquad = dim[1] ÷ pol_type.n
 
-        R_surf = Array(Diagonal(vcat(FT(1), zeros(FT,pol_type.n-1))))
+        R_surf = Matrix(Diagonal(vcat(FT(1), zeros(FT,pol_type.n-1))))
         R_surf = repeat(R_surf',Nquad)
         R_surf = repeat(R_surf',Nquad)
 
@@ -119,7 +117,7 @@ function create_surface_layer!(lambertian::LambertianSurfaceLegendre{FT},
         end
         R_surf   = R_surf * Diagonal(qp_μN.*wt_μN)
         siz = size(added_layer.r⁻⁺)
-        R_surf3D = reshape(reduce(hcat,[i*R_surf for i in Array(ρ)]), siz...);
+        R_surf3D = reshape(reduce(hcat,[i*R_surf for i in collect(ρ)]), siz...);
         tmp    = ones(pol_type.n*Nquad)
         T_surf = arr_type(Diagonal(tmp))
 
@@ -147,7 +145,6 @@ function create_surface_layer!(lambertian::LambertianSurfaceSpline{FT},
     quad_points,
     τ_sum,
     architecture) where {FT}
-    FT2 = Float64
     j₀⁺ = added_layer isa AddedLayerRS ? added_layer.J₀⁺ : added_layer.j₀⁺
     j₀⁻ = added_layer isa AddedLayerRS ? added_layer.J₀⁻ : added_layer.j₀⁻
     if m == 0
@@ -155,14 +152,14 @@ function create_surface_layer!(lambertian::LambertianSurfaceSpline{FT},
 
         arr_type = array_type(architecture)
         
-        # EvaluateSpline
+        # Evaluate spline
         albedo = lambertian.interpolator(lambertian.wlGrid)
         ρ = arr_type(2albedo)
         # Get size of added layer
         dim = size(added_layer.r⁻⁺)
         Nquad = dim[1] ÷ pol_type.n
 
-        R_surf = Array(Diagonal(vcat(FT(1), zeros(FT,pol_type.n-1))))
+        R_surf = Matrix(Diagonal(vcat(FT(1), zeros(FT,pol_type.n-1))))
         R_surf = repeat(R_surf',Nquad)
         R_surf = repeat(R_surf',Nquad)
 

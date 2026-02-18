@@ -46,7 +46,7 @@ function lin_added_layer_all_params_helper!(RS_type::noRS{FT},
                                 pol_type, SFI, quad_points, 
                                 computed_layer_properties_lin, 
                                 added_layer_lin::AddedLayerLin{FT},
-                                architecture, ndoubl::Int) where {FT<:Union{AbstractFloat, ForwardDiff.Dual}}
+                                architecture, ndoubl::Int) where {FT<:Real}
     @unpack ap_ṙ⁺⁻, ap_ṙ⁻⁺, ap_ṫ⁻⁻, ap_ṫ⁺⁺, ap_J̇₀⁺, ap_J̇₀⁻ = added_layer_lin
     @unpack τ̇, ϖ̇, Ż⁺⁺, Ż⁻⁺ = computed_layer_properties_lin
     @unpack D, n = pol_type
@@ -115,7 +115,7 @@ end
 function lin_added_layer_all_params!(RS_type::noRS{FT}, 
     pol_type, SFI, quad_points,
     computed_layer_properties_lin, 
-    added_layer_lin::AddedLayerLin{FT}, architecture, ndoubl::Int) where {FT<:Union{AbstractFloat, ForwardDiff.Dual}}
+    added_layer_lin::AddedLayerLin{FT}, architecture, ndoubl::Int) where {FT<:Real}
     
     lin_added_layer_all_params_helper!(RS_type, pol_type, 
                     SFI, quad_points,

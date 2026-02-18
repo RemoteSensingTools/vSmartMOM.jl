@@ -45,9 +45,6 @@ function model_from_parameters(params::vSmartMOM_Parameters)
     greek_cabannes = typeof(greek_rayleigh)[]
     ϖ_Cabannes = zeros(FT, n_bands)
     
-    # This is a kludge for now, tau_abs sometimes needs to be a dual. Suniti & us need to rethink this all!!
-    # i.e. code the rt core with fixed amount of derivatives as in her paper, then compute chain rule for dtau/dVMr, etc...
-    FT2 = isnothing(params.absorption_params) || !haskey(params.absorption_params.vmr,"CO2") ? params.float_type : eltype(params.absorption_params.vmr["CO2"])
     τ_abs     = [zeros(FT, length(params.spec_bands[i]), length(profile.p_full)) for i in 1:n_bands]
     
     # Track per-band l_max from aerosol greek coef lengths
@@ -104,12 +101,7 @@ function model_from_parameters(params::vSmartMOM_Parameters)
     # aerosol_optics[iBand][iAer]
     aerosol_optics = [Array{AerosolOptics}(undef, (n_aer)) for i=1:n_bands];
         
-    FT2 = isnothing(params.scattering_params) ? params.float_type : typeof(params.scattering_params.rt_aerosols[1].τ_ref)
-    #@show FT2
-    #FT2 =  params.float_type 
-
     # τ_aer[iBand][iAer,iZ]
-    # Again, be careful with Dual Numbers
     τ_aer = [zeros(FT, n_aer, length(profile.p_full)) for i=1:n_bands];
 
     # Loop over aerosol type
@@ -314,11 +306,8 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
     # aerosol_optics[iBand][iAer]
     aerosol_optics = [Array{AerosolOptics}(undef, (n_aer)) for i=1:n_bands];
         
-    FT2 = isnothing(params.scattering_params) ? params.float_type : typeof(params.scattering_params.rt_aerosols[1].τ_ref)
-    FT2 =  params.float_type 
-
     # τ_aer[iBand][iAer,iZ]
-    τ_aer = [zeros(FT2, n_aer, length(profile.p_full)) for i=1:n_bands];
+    τ_aer = [zeros(FT, n_aer, length(profile.p_full)) for i=1:n_bands];
 
     # Loop over aerosol type
     for i_aer=1:n_aer
@@ -363,7 +352,7 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
                                             params.scattering_params.nquad_radius)
 
             # Compute raw (not truncated) aerosol optical properties (not needed in RT eventually) 
-            # @show FT2
+
             @timeit "Mie calc"  aerosol_optics_raw = compute_aerosol_optical_properties(mie_model, FT2);
 
             # Compute truncated aerosol optical properties (phase function and fᵗ), consistent with Ltrunc:

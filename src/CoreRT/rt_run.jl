@@ -78,21 +78,17 @@ function rt_run(RS_type::AbstractRamanType,
     NquadN =  Nquad * pol_type.n         # Nquad (multiplied by Stokes n)
     dims   = (NquadN,NquadN)              # nxn dims
     
-    # Need to check this a bit better in the future!
-    FT_dual = n_aer > 0 ? typeof(model.τ_aer[1][1]) : FT
-    #FT_dual = FT
-    # Output variables: Reflected and transmitted solar irradiation at TOA and BOA respectively # Might need Dual later!!
-    #Suniti: consider adding a new dimension (iBand) to these arrays. The assignment of simulated spectra to their specific bands will take place after batch operations, thereby leaving the computational time unaffected 
-    @timeit "Arrays"  R       = zeros(FT_dual, length(vza), pol_type.n, nSpec)
-    @timeit "Arrays"  T       = zeros(FT_dual, length(vza), pol_type.n, nSpec)
-    @timeit "Arrays"  R_SFI   = zeros(FT_dual, length(vza), pol_type.n, nSpec)
-    @timeit "Arrays"  T_SFI   = zeros(FT_dual, length(vza), pol_type.n, nSpec)
-    @timeit "Arrays"  ieR_SFI = zeros(FT_dual, length(vza), pol_type.n, nSpec)
-    @timeit "Arrays"  ieT_SFI = zeros(FT_dual, length(vza), pol_type.n, nSpec)
-    @timeit "Arrays"  hdr     = zeros(FT_dual, length(vza), pol_type.n, nSpec) # for RAMI
-    @timeit "Arrays"  bhr_dw     = zeros(FT_dual, pol_type.n, nSpec) # for RAMI
-    @timeit "Arrays"  bhr_uw     = zeros(FT_dual, pol_type.n, nSpec) # for RAMI
-    @timeit "Arrays"  hdr_J₀⁻    = zeros(FT_dual, length(vza), pol_type.n, nSpec) # for RAMI
+    # Output arrays for reflected and transmitted solar irradiation at TOA and BOA
+    @timeit "Arrays"  R       = zeros(FT, length(vza), pol_type.n, nSpec)
+    @timeit "Arrays"  T       = zeros(FT, length(vza), pol_type.n, nSpec)
+    @timeit "Arrays"  R_SFI   = zeros(FT, length(vza), pol_type.n, nSpec)
+    @timeit "Arrays"  T_SFI   = zeros(FT, length(vza), pol_type.n, nSpec)
+    @timeit "Arrays"  ieR_SFI = zeros(FT, length(vza), pol_type.n, nSpec)
+    @timeit "Arrays"  ieT_SFI = zeros(FT, length(vza), pol_type.n, nSpec)
+    @timeit "Arrays"  hdr     = zeros(FT, length(vza), pol_type.n, nSpec)
+    @timeit "Arrays"  bhr_dw     = zeros(FT, pol_type.n, nSpec)
+    @timeit "Arrays"  bhr_uw     = zeros(FT, pol_type.n, nSpec)
+    @timeit "Arrays"  hdr_J₀⁻    = zeros(FT, length(vza), pol_type.n, nSpec)
     #  bhr[i] = bhr_uw[i,:]./bhr_dw[1,:]   
     # Notify user of processing parameters
     msg = 
@@ -106,12 +102,12 @@ function rt_run(RS_type::AbstractRamanType,
 
     # Create arrays
     @timeit "Creating layers" added_layer         = 
-        make_added_layer(RS_type, FT_dual, arr_type, dims, nSpec)
+        make_added_layer(RS_type, FT, arr_type, dims, nSpec)
     # Just for now, only use noRS here
     @timeit "Creating layers" added_layer_surface = 
-        make_added_layer(RS_type, FT_dual, arr_type, dims, nSpec)
+        make_added_layer(RS_type, FT, arr_type, dims, nSpec)
     @timeit "Creating layers" composite_layer     = 
-        make_composite_layer(RS_type, FT_dual, arr_type, dims, nSpec)
+        make_composite_layer(RS_type, FT, arr_type, dims, nSpec)
     @timeit "Creating arrays" I_static = 
         Diagonal(arr_type(Diagonal{FT}(ones(dims[1]))));
     
@@ -124,7 +120,7 @@ function rt_run(RS_type::AbstractRamanType,
         # Azimuthal weighting
         weight = m == 0 ? FT(0.5) : FT(1.0)
         # Set the Zλᵢλₒ interaction parameters for Raman (or nothing for noRS)
-        @timeit "IE"  InelasticScattering.computeRamanZλ!(RS_type, pol_type,Array(qp_μ), m, arr_type)
+        @timeit "IE"  InelasticScattering.computeRamanZλ!(RS_type, pol_type,collect(qp_μ), m, arr_type)
         # Compute the core layer optical properties:
         @timeit "OpticalProps" layer_opt_props, fScattRayleigh   = 
             constructCoreOpticalProperties(RS_type,iBand,m,model);

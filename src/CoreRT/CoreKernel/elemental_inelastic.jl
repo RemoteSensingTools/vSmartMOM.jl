@@ -29,7 +29,7 @@ function elemental_inelastic!(RS_type::Union{RRS, RRS_plus},
                             quad_points::QuadPoints{FT2}, # struct with quadrature points, weights, 
                             added_layer::Union{AddedLayer{FT},AddedLayerRS{FT}}, 
                             I_static,
-                            architecture) where {FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2}
+                            architecture) where {FT<:Real,FT2}
 
     @unpack ier⁺⁻, ier⁻⁺, iet⁻⁻, iet⁺⁺, ieJ₀⁺, ieJ₀⁻ = added_layer
     @unpack qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart, iμ₀ = quad_points

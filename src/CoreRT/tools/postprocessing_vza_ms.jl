@@ -14,7 +14,7 @@ function postprocessing_vza_ms!(RS_type::noRS,
         nSpec, SFI, 
         uwJ, dwJ, uwieJ, dwieJ, 
         I_static::AbstractArray{FT2}, 
-        arr_type) where {FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2}
+        arr_type) where {FT<:Real,FT2}
     
     # idfx of μ0 = cos(sza)
     st_iμ0, istart0, iend0 = get_indices(iμ₀, pol_type);
@@ -87,7 +87,7 @@ function postprocessing_vza_ms!(RS_type::Union{RRS, VS_0to1_plus, VS_1to0_plus},
         nSpec, SFI, 
         uwJ, dwJ, uwieJ, dwieJ,
         I_static,
-        arr_type) where {FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2}
+        arr_type) where {FT<:Real,FT2}
         #R, R_SFI, T, T_SFI, ieR_SFI, ieT_SFI)
     
     # idx of μ0 = cos(sza)
@@ -188,7 +188,7 @@ function postprocessing_vza_ms_canopy!(RS_type::noRS,
         uwJ, dwJ, uwieJ, dwieJ, 
         hdr_J₀⁻, bhr_uw, bhr_dw,
         I_static::AbstractArray{FT2}, 
-        arr_type) where {FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2}
+        arr_type) where {FT<:Real,FT2}
     
     # idfx of μ0 = cos(sza)
     st_iμ0, istart0, iend0 = get_indices(iμ₀, pol_type);
@@ -200,7 +200,7 @@ function postprocessing_vza_ms_canopy!(RS_type::noRS,
     topJ₀⁻ = composite_layer.topJ₀⁻;
     botJ₀⁺ = composite_layer.botJ₀⁺;
     botJ₀⁻ = composite_layer.botJ₀⁻;
-    # @show FT2
+
     tuwJ = [arr_type(zeros(FT2, (size(topJ₀⁺[1],1), 1, nSpec))) for i=1:length(sensor_levels)] #similar(topJ₀⁺); #deepcopy(topJ₀⁺)
     tdwJ = [arr_type(zeros(FT2, (size(topJ₀⁺[1],1), 1, nSpec))) for i=1:length(sensor_levels)]#similar(topJ₀⁺); #deepcopy(topJ₀⁺)
     #@show size(tuwJ[1])
@@ -253,8 +253,8 @@ function postprocessing_vza_ms_canopy!(RS_type::noRS,
         #@show tuwJ[1][istart:iend,1, 1], tdwJ[1][istart:iend,1, 1]
         # Accumulate Fourier moments after azimuthal weighting
         for ims = 1:length(sensor_levels)
-            _tuwJ = Array(tuwJ[ims])
-            _tdwJ = Array(tdwJ[ims])
+            _tuwJ = collect(tuwJ[ims])
+            _tdwJ = collect(tdwJ[ims])
             for s = 1:nSpec
                 #if true#SFI
                 #@show typeof(uwJ[ims]), typeof(tuwJ[ims]), typeof(bigCS)

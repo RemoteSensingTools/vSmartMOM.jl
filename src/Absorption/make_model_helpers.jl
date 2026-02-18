@@ -83,7 +83,7 @@ function make_interpolation_model(
         for j in 1:length(t_grid)
             # make_hitran_model(hitran_data, Voigt(), wing_cutoff = 40, CEF=HumlicekWeidemann32SDErrorFunction(), architecture=CPU())
             model = make_hitran_model(hitran, broadening, wing_cutoff=wing_cutoff, CEF=CEF, architecture=architecture)
-            cs_matrix[:,i,j] = Array(compute_absorption_cross_section(model, collect(ν_grid), p_grid[i], t_grid[j], wavelength_flag=wavelength_flag))
+            cs_matrix[:,i,j] = collect(compute_absorption_cross_section(model, collect(ν_grid), p_grid[i], t_grid[j], wavelength_flag=wavelength_flag))
         end
     end
     
@@ -155,7 +155,7 @@ function make_interpolation_model(
             a1 = ceil(fractional_index_p)-fractional_index_p
             xs_interp = a1*xs_interp_p2+(1-a1)*xs_interp_p1 
             interp_xs = LinearInterpolation(absco.ν, xs_interp, extrapolation_bc = Flat())
-            cs_matrix[:,i,j] = Array(interp_xs(ν_grid))
+            cs_matrix[:,i,j] = collect(interp_xs(ν_grid))
         end
     end
 

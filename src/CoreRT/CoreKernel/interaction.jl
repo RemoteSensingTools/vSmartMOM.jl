@@ -8,7 +8,7 @@ This file contains RT interaction-related functions
 function interaction_helper!(::ScatteringInterface_00, SFI,
                                 composite_layer::CompositeLayer{FT}, 
                                 added_layer::AddedLayer{FT}, 
-                                I_static::AbstractArray{FT2}) where {FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2}
+                                I_static::AbstractArray{FT2}) where {FT<:Real,FT2}
     @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻ = added_layer     
     @unpack R⁻⁺, R⁺⁻, T⁺⁺, T⁻⁻, J₀⁺, J₀⁻ = composite_layer 
 
@@ -27,7 +27,7 @@ end
 function interaction_helper!(::ScatteringInterface_01, SFI,
                                 composite_layer::CompositeLayer{FT}, 
                                 added_layer::AddedLayer{FT}, 
-                                I_static::AbstractArray{FT2}) where {FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2}
+                                I_static::AbstractArray{FT2}) where {FT<:Real,FT2}
     @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻ = added_layer     
     @unpack R⁻⁺, R⁺⁻, T⁺⁺, T⁻⁻, J₀⁺, J₀⁻ = composite_layer 
 
@@ -49,7 +49,7 @@ end
 function interaction_helper!(::ScatteringInterface_10, SFI,
                                 composite_layer::CompositeLayer{FT}, 
                                 added_layer::AddedLayer{FT}, 
-                                I_static::AbstractArray{FT2}) where {FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2}
+                                I_static::AbstractArray{FT2}) where {FT<:Real,FT2}
     @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻ = added_layer     
     @unpack R⁻⁺, R⁺⁻, T⁺⁺, T⁻⁻, J₀⁺, J₀⁻ = composite_layer 
 
@@ -69,7 +69,7 @@ end
 function interaction_helper!(::ScatteringInterface_11, SFI,
                                 composite_layer::CompositeLayer{FT}, 
                                 added_layer::AddedLayer{FT}, 
-                                I_static::AbstractArray{FT2}) where {FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2}
+                                I_static::AbstractArray{FT2}) where {FT<:Real,FT2}
     
     @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻,temp1, temp2, temp1_ptr,temp2_ptr = added_layer     #these are aliases to the respective struct elements  
     @unpack R⁻⁺, R⁺⁻, T⁺⁺, T⁻⁻, J₀⁺, J₀⁻ = composite_layer #these are aliases to the respective struct elements 
@@ -120,7 +120,7 @@ end
 function interaction!(scattering_interface::AbstractScatteringInterface, SFI,
                         composite_layer::CompositeLayer{FT}, 
                         added_layer::AddedLayer{FT},
-                        I_static::AbstractArray{FT2}) where {FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2}
+                        I_static::AbstractArray{FT2}) where {FT<:Real,FT2}
 
     interaction_helper!(scattering_interface, SFI, composite_layer, added_layer, I_static)
     synchronize_if_gpu()

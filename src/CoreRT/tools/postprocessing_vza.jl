@@ -14,10 +14,10 @@ function postprocessing_vza!(RS_type::noRS, iμ₀, pol_type,
     st_iμ0, istart0, iend0 = get_indices(iμ₀, pol_type);
 
     # Convert these to Arrays (if CuArrays), so they can be accessed by index
-    R⁻⁺ = Array(composite_layer.R⁻⁺);
-    T⁺⁺ = Array(composite_layer.T⁺⁺);
-    J₀⁺ = Array(composite_layer.J₀⁺);
-    J₀⁻ = Array(composite_layer.J₀⁻);
+    R⁻⁺ = collect(composite_layer.R⁻⁺);
+    T⁺⁺ = collect(composite_layer.T⁺⁺);
+    J₀⁺ = collect(composite_layer.J₀⁺);
+    J₀⁻ = collect(composite_layer.J₀⁻);
     
     minUp = 0.0;
     maxUp = 0.0;
@@ -68,7 +68,7 @@ function postprocessing_vza_hdrf!(RS_type::noRS, iμ₀, pol_type,
     st_iμ0, istart0, iend0 = get_indices(iμ₀, pol_type);
 
     # Convert these to Arrays (if CuArrays), so they can be accessed by index
-    hdr_J₀⁻ = Array(hdr_J₀⁻);
+    hdr_J₀⁻ = collect(hdr_J₀⁻);
     
     minUp = 0.0;
     maxUp = 0.0;
@@ -101,15 +101,15 @@ function postprocessing_vza!(RS_type::Union{RRS, VS_0to1_plus, VS_1to0_plus},
     st_iμ0, istart0, iend0 = get_indices(iμ₀, pol_type);
 
     # Convert these to Arrays (if CuArrays), so they can be accessed by index
-    R⁻⁺ = Array(composite_layer.R⁻⁺);
-    T⁺⁺ = Array(composite_layer.T⁺⁺);
-    J₀⁺ = Array(composite_layer.J₀⁺);
-    J₀⁻ = Array(composite_layer.J₀⁻);
+    R⁻⁺ = collect(composite_layer.R⁻⁺);
+    T⁺⁺ = collect(composite_layer.T⁺⁺);
+    J₀⁺ = collect(composite_layer.J₀⁺);
+    J₀⁻ = collect(composite_layer.J₀⁻);
 
-    #ieR⁻⁺ = Array(composite_layer.ieR⁻⁺);
-    #ieT⁺⁺ = Array(composite_layer.ieT⁺⁺);
-    ieJ₀⁺ = Array(composite_layer.ieJ₀⁺);
-    ieJ₀⁻ = Array(composite_layer.ieJ₀⁻);
+    #ieR⁻⁺ = collect(composite_layer.ieR⁻⁺);
+    #ieT⁺⁺ = collect(composite_layer.ieT⁺⁺);
+    ieJ₀⁺ = collect(composite_layer.ieJ₀⁺);
+    ieJ₀⁻ = collect(composite_layer.ieJ₀⁻);
     # Loop over all viewing zenith angles
     
 

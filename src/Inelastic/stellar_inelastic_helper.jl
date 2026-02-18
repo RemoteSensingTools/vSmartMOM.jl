@@ -748,7 +748,7 @@ function computeRamanZλ!(RS_type::Union{sol_RRS,
                                         arr_type = arr_type);
     RS_type.Z⁺⁺_λ₁λ₀_VS_h2, RS_type.Z⁻⁺_λ₁λ₀_VS_h2 = 
                     Scattering.compute_Z_moments(pol_type, 
-                                            Array(qp_μ), 
+                                            collect(qp_μ), 
                                             RS_type.greek_raman_VS, 
                                             m, 
                                             arr_type = arr_type);

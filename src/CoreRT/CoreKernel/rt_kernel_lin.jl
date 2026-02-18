@@ -147,18 +147,14 @@ function rt_kernel!(RS_type::noRS{FT},
         added_layer.r⁻⁺[:] .= 0;
         added_layer.r⁺⁻[:] .= 0;
         added_layer.j₀⁻[:] .= 0;
-        temp = Array(exp.(-τ./qp_μN'))
+        _set_transmission_noscat!(added_layer.t⁺⁺, added_layer.t⁻⁻, τ, qp_μN)
         added_layer_lin.ṙ⁻⁺[:] .= 0;
         added_layer_lin.ṙ⁺⁻[:] .= 0;
         added_layer_lin.J̇₀⁻[:] .= 0;
-        temp_lin = Array(exp.(-τ./qp_μN') .* (-1 ./ qp_μN'))
+        temp_lin = collect(exp.(-τ./qp_μN') .* (-1 ./ qp_μN'))
         for iλ = 1:length(τ)
-            added_layer.t⁺⁺[:,:,iλ] = Diagonal(temp[iλ,:]);
-            added_layer.t⁻⁻[:,:,iλ] = Diagonal(temp[iλ,:]);
-
             added_layer_lin.ṫ⁺⁺[1,:,:,iλ] = Diagonal(temp_lin[iλ,:])
             added_layer_lin.ṫ⁻⁻[1,:,:,iλ] = Diagonal(temp_lin[iλ,:])
-            
         end
     end
     # @assert !any(isnan.(added_layer.t⁺⁺))

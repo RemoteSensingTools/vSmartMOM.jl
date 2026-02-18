@@ -45,22 +45,11 @@ function rt_run_test_ms(RS_type::AbstractRamanType,
     NquadN = Nquad * pol_type.n         # Nquad (multiplied by Stokes n)
     dims = (NquadN,NquadN)              # nxn dims
 
-    # Need to check this a bit better in the future!
-    #FT_dual = length(model.τ_aer[1][1]) > 0 ? typeof(model.τ_aer[1][1]) : FT
-    FT_dual = FT
-
-    # Output variables: Reflected and transmitted solar irradiation at TOA and BOA respectively # Might need Dual later!!
-    #Suniti: consider adding a new dimension (iBand) to these arrays. The assignment of simulated spectra to their specific bands will take place after batch operations, thereby leaving the computational time unaffected 
+    # Output arrays for up/downwelling flux at each sensor level
     uwJ   = [zeros(FT, (length(vza), pol_type.n, nSpec)) for i=1:length(sensor_levels)]
-    #zeros(FT_dual, length(sensor_levels), length(vza), pol_type.n, nSpec)
     dwJ   = [zeros(FT, (length(vza), pol_type.n, nSpec)) for i=1:length(sensor_levels)]
-    #zeros(FT_dual, length(sensor_levels), length(vza), pol_type.n, nSpec)
-    #R_SFI   = zeros(FT_dual, length(vza), pol_type.n, nSpec)
-    #T_SFI   = zeros(FT_dual, length(vza), pol_type.n, nSpec)
     uwieJ = [zeros(FT, (length(vza), pol_type.n, nSpec)) for i=1:length(sensor_levels)]
-    #zeros(FT_dual, length(sensor_levels), length(vza), pol_type.n, nSpec)
     dwieJ = [zeros(FT, (length(vza), pol_type.n, nSpec)) for i=1:length(sensor_levels)]
-    #zeros(FT_dual, length(sensor_levels), length(vza), pol_type.n, nSpec)
     # Notify user of processing parameters
     msg = 
     """
@@ -73,14 +62,14 @@ function rt_run_test_ms(RS_type::AbstractRamanType,
 
     # Create arrays
     @timeit "Creating layers" added_layer         = 
-        make_added_layer(RS_type, FT_dual, arr_type, dims, nSpec)
+        make_added_layer(RS_type, FT, arr_type, dims, nSpec)
     # Just for now, only use noRS here
     @timeit "Creating layers" added_layer_surface = 
-        make_added_layer(RS_type, FT_dual, arr_type, dims, nSpec)
+        make_added_layer(RS_type, FT, arr_type, dims, nSpec)
     @timeit "Creating layers" composite_layer     = 
-        make_composite_layer(RS_type, FT_dual, arr_type, length(sensor_levels), dims, nSpec)
+        make_composite_layer(RS_type, FT, arr_type, length(sensor_levels), dims, nSpec)
     #@timeit "Creating layers" composite_layer     = 
-    #make_composite_layer(RS_type, FT_dual, arr_type, dims, nSpec)
+    #make_composite_layer(RS_type, FT, arr_type, dims, nSpec)
     @timeit "Creating arrays" I_static = 
         Diagonal(arr_type(Diagonal{FT}(ones(dims[1]))));
     #TODO: if RS_type!=noRS, create ϖ_λ₁λ₀, i_λ₁λ₀, fscattRayl, Z⁺⁺_λ₁λ₀, Z⁻⁺_λ₁λ₀ (for input), and ieJ₀⁺, ieJ₀⁻, ieR⁺⁻, ieR⁻⁺, ieT⁻⁻, ieT⁺⁺, ier⁺⁻, ier⁻⁺, iet⁻⁻, iet⁺⁺ (for output)
@@ -92,7 +81,7 @@ function rt_run_test_ms(RS_type::AbstractRamanType,
         # Azimuthal weighting
         weight = m == 0 ? FT(0.5) : FT(1.0)
         # Set the Zλᵢλₒ interaction parameters for Raman (or nothing for noRS)
-        InelasticScattering.computeRamanZλ!(RS_type, pol_type, Array(qp_μ), m, arr_type)
+        InelasticScattering.computeRamanZλ!(RS_type, pol_type, collect(qp_μ), m, arr_type)
         # Compute the core layer optical properties:
         layer_opt_props, fScattRayleigh   = 
             constructCoreOpticalProperties(RS_type,iBand,m,model);

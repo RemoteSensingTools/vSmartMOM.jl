@@ -147,16 +147,16 @@ function rt_run(RS_type::AbstractRamanType,
         RS_type.F₀ = F₀
     end
 
-    #FT_dual = length(model.τ_aer[1][1]) > 0 ? typeof(model.τ_aer[1][1]) : FT
-    FT_dual = FT
+    #FT = length(model.τ_aer[1][1]) > 0 ? typeof(model.τ_aer[1][1]) : FT
+    # RT kernels always use pure FT (Float32/Float64), never Dual types
     # Output variables: Reflected and transmitted solar irradiation at TOA and BOA respectively # Might need Dual later!!
     #Suniti: consider adding a new dimension (iBand) to these arrays. The assignment of simulated spectra to their specific bands will take place after batch operations, thereby leaving the computational time unaffected 
-    R       = zeros(FT_dual, length(vza), pol_type.n, nSpec)
-    T       = zeros(FT_dual, length(vza), pol_type.n, nSpec)
-    #R_SFI   = zeros(FT_dual, length(vza), pol_type.n, nSpec)
-    #T_SFI   = zeros(FT_dual, length(vza), pol_type.n, nSpec)
-    Ṙ       = zeros(FT_dual, Nparams, length(vza), pol_type.n, nSpec)
-    Ṫ       = zeros(FT_dual, Nparams, length(vza), pol_type.n, nSpec)
+    R       = zeros(FT, length(vza), pol_type.n, nSpec)
+    T       = zeros(FT, length(vza), pol_type.n, nSpec)
+    #R_SFI   = zeros(FT, length(vza), pol_type.n, nSpec)
+    #T_SFI   = zeros(FT, length(vza), pol_type.n, nSpec)
+    Ṙ       = zeros(FT, Nparams, length(vza), pol_type.n, nSpec)
+    Ṫ       = zeros(FT, Nparams, length(vza), pol_type.n, nSpec)
     # Notify user of processing parameters
     msg = 
     """
@@ -169,13 +169,13 @@ function rt_run(RS_type::AbstractRamanType,
 
     # Create arrays
     @timeit "Creating layers" added_layer, added_layer_lin          = 
-        make_added_layer(lin, RS_type, FT_dual, arr_type, Nparams, dims, nSpec)
+        make_added_layer(lin, RS_type, FT, arr_type, Nparams, dims, nSpec)
     # Just for now, only use noRS here
 
     @timeit "Creating layers" added_surface_layer, added_surface_layer_lin = 
-        make_added_layer(lin, RS_type, FT_dual, arr_type, Nparams, dims, nSpec)
+        make_added_layer(lin, RS_type, FT, arr_type, Nparams, dims, nSpec)
     @timeit "Creating layers" composite_layer, composite_layer_lin  = 
-        make_composite_layer(lin, RS_type, FT_dual, arr_type, Nparams, dims, nSpec)
+        make_composite_layer(lin, RS_type, FT, arr_type, Nparams, dims, nSpec)
     @timeit "Creating arrays" I_static = 
         Diagonal(arr_type(Diagonal{FT}(ones(dims[1]))));
     #TODO: if RS_type!=noRS, create ϖ_λ₁λ₀, i_λ₁λ₀, fscattRayl, Z⁺⁺_λ₁λ₀, Z⁻⁺_λ₁λ₀ (for input), and ieJ₀⁺, ieJ₀⁻, ieR⁺⁻, ieR⁻⁺, ieT⁻⁻, ieT⁺⁺, ier⁺⁻, ier⁻⁺, iet⁻⁻, iet⁺⁺ (for output)
