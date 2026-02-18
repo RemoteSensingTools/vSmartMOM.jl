@@ -3,7 +3,16 @@ Azimuthal weighting for linearized (Jacobian) RT matrices.
 Uses the same precomputed VZA weights as the forward postprocessing.
 =#
 
-"Perform post-processing to azimuthally-weight linearized RT matrices"
+"""
+    postprocessing_vza!(RS_type::noRS, iμ₀, pol_type, composite_layer, composite_layer_lin,
+                        vza, qp_μ, m, vaz, μ₀, weight, nSpec, SFI, R_SFI, T_SFI, Ṙ_SFI, Ṫ_SFI)
+
+Azimuthally-weight linearized RT matrices (Jacobians).
+
+Accumulates forward source terms `J₀⁺`, `J₀⁻` into `R_SFI`, `T_SFI`, and their
+per-parameter derivatives `J̇₀⁺`, `J̇₀⁻` into `Ṙ_SFI`, `Ṫ_SFI`. Uses the same
+`_precompute_vza_weights` as the forward postprocessing.
+"""
 function postprocessing_vza!(RS_type::noRS,
                     iμ₀, pol_type,
                     composite_layer,

@@ -1,8 +1,18 @@
 """
     Two-moment aerosol scheme reader
-    
-    Reads bulk aerosol optical properties (AOD, effective radius) from GEOSChem 
-    files assuming lognormal size distributions with fixed geometric standard deviations.
+
+# Physical model
+
+The two-moment scheme characterizes each aerosol species by two moments of the
+size distribution: total optical depth (AOD) and effective radius. It assumes
+a lognormal size distribution with fixed geometric standard deviation σ_g.
+
+This bulk approach is computationally efficient compared to size-resolved schemes:
+- AOD at reference wavelength (e.g. 550 nm) scales via Ångström exponent
+- Effective radius r_eff and σ_g define the full dN/dr distribution
+- Optical properties computed by integrating Mie theory over the lognormal
+
+Common in climate models (e.g. CAM, ECHAM) and satellite retrieval algorithms.
 """
 
 """

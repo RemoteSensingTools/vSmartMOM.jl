@@ -6,10 +6,26 @@ produce a HitranTable struct.
 =#
 
 """
-    read_hitran(filepath::String, mol::Int=-1, iso::Int=-1, ν_min::Real=0, ν_max::Real=Inf)
+    read_hitran(filepath; mol=-1, iso=-1, ν_min=0, ν_max=Inf, min_strength=0)
 
-Read/parse a HITRAN data file and return the data in [`HitranTable`](@ref) format
+Read and parse a HITRAN line-by-line data file into a HitranTable.
 
+Filters lines by molecule, isotopologue, wavenumber range, and minimum line strength.
+Uses fixed-width column parsing per the HITRAN format specification.
+
+# Arguments
+- `filepath::String`: Path to HITRAN .par or .hitran file
+- `mol::Int=-1`: Filter by molecule ID (-1 = all)
+- `iso::Int=-1`: Filter by isotopologue ID (-1 = all)
+- `ν_min::Real=0`: Minimum wavenumber (cm⁻¹)
+- `ν_max::Real=Inf`: Maximum wavenumber (cm⁻¹)
+- `min_strength::Real=0`: Minimum line intensity at 296 K
+
+# Returns
+- `HitranTable`: Struct with line parameters (νᵢ, Sᵢ, γ_air, γ_self, E″, etc.)
+
+# Throws
+- `HitranEmptyError`: If no lines match the filter criteria
 """
 function read_hitran(filepath::String; mol::Int=-1, iso::Int=-1, 
                      ν_min::Real=0, ν_max::Real=Inf, 

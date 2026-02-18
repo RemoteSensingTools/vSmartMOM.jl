@@ -21,5 +21,34 @@ for M in 1:size(TIPS_2017_ISOT_HASH_CONST)[1]
     end
 end
 
+"""
+    get_TT(M, I)
+
+Get temperature grid for partition sum interpolation.
+
+Returns the temperature array (K) for molecule M and isotopologue I from TIPS 2017.
+
+# Arguments
+- `M::Int`: HITRAN molecule ID
+- `I::Int`: HITRAN isotopologue ID
+
+# Returns
+- `Vector`: Temperature values (K) where partition sums are tabulated
+"""
 get_TT(M, I) = TIPS_2017_ISOT_HASH_CONST[M, I, 1:T_end_idxs[M,I]]
+
+"""
+    get_TQ(M, I)
+
+Get partition sum values for interpolation.
+
+Returns the partition function Q(T) array for molecule M and isotopologue I from TIPS 2017.
+
+# Arguments
+- `M::Int`: HITRAN molecule ID
+- `I::Int`: HITRAN isotopologue ID
+
+# Returns
+- `Vector`: Partition sum Q(T) at each temperature in get_TT(M, I)
+"""
 get_TQ(M, I) = TIPS_2017_ISOQ_HASH_CONST[M, I, 1:Q_end_idxs[M,I]]

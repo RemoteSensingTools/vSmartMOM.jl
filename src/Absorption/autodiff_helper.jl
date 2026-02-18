@@ -8,11 +8,24 @@ users can call the same function with just a keyword argument change.
 =#
 
 """
-    $(FUNCTIONNAME)(model::HitranModel, grid::AbstractRange{<:Real}, pressure::Real, temperature::Real; wavelength_flag::Bool=false)
+    absorption_cross_section(model, grid, pressure, temperature; autodiff=false, wavelength_flag=false)
 
-Calculate absorption cross-section at the given pressure, temperature, and grid of wavelengths 
-(or wavenumbers), and have the option to perform auto-differentiation
+Calculate absorption cross-section with optional auto-differentiation support.
 
+Unified interface for both autodiff and non-autodiff users. When `autodiff=true`, returns
+the Jacobian of cross-section with respect to (pressure, temperature) via ForwardDiff.
+
+# Arguments
+- `model::AbstractCrossSectionModel`: HitranModel or InterpolationModel
+- `grid`: Wavelength [nm] or wavenumber [cm⁻¹] grid (see wavelength_flag)
+- `pressure::Real`: Pressure (hPa)
+- `temperature::Real`: Temperature (K)
+- `autodiff::Bool=false`: If true, compute Jacobian ∂σ/∂(p,T)
+- `wavelength_flag::Bool=false`: If true, grid is wavelength in nm; else wavenumber in cm⁻¹
+
+# Returns
+- Without autodiff: `Vector` of absorption cross-sections at each grid point
+- With autodiff: `Tuple` of (cross_sections, Jacobian_matrix)
 """
 function absorption_cross_section(model::AbstractCrossSectionModel,          # Model to use 
                                   grid::Union{AbstractRange{<:Real}, AbstractArray}, # Wavelength [nm] or wavenumber [cm-1] grid 

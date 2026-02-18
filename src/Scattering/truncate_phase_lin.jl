@@ -4,11 +4,22 @@ This file specifies how to truncate the AerosolOptics struct, given the truncati
  
 =#
 """
-$(FUNCTIONNAME)(mod::δBGE, aero::AerosolOptics))
-    
-Returns the truncated aerosol optical properties as [`AerosolOptics`](@ref) 
-- `mod` a [`δBGE`](@ref) struct that defines the truncation order (new length of greek parameters) and exclusion angle
-- `aero` a [`AerosolOptics`](@ref) set of aerosol optical properties that is to be truncated
+    $(FUNCTIONNAME)(mod::δBGE, aero::AerosolOptics, lin_aero::linAerosolOptics; reportFit=false)
+
+Apply δ-BGE truncation to aerosol optics and their linearized derivatives (Jacobians).
+
+Performs the same least-squares fit as [`truncate_phase`](@ref)(mod::δBGE, aero) for β, γ, ϵ,
+then propagates derivatives through the truncation to obtain truncated Greek-coefficient
+Jacobians. Reference: Sanghavi & Stephens (2015).
+
+# Arguments
+- `mod`: [`δBGE`](@ref) with `l_max` and `Δ_angle`
+- `aero`: [`AerosolOptics`](@ref) to truncate
+- `lin_aero`: [`linAerosolOptics`](@ref) with derivatives w.r.t. state (e.g. nᵣ, nᵢ, r)
+- `reportFit`: if `true`, print RMS fit errors
+
+# Returns
+- `(AerosolOptics, linAerosolOptics)`: truncated optics and their derivatives
 """
 function truncate_phase(mod::δBGE, aero::AerosolOptics{FT}, lin_aero::linAerosolOptics{FT}; reportFit=false) where {FT}
     (; greek_coefs, ω̃, k) = aero
