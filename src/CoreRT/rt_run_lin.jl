@@ -137,7 +137,9 @@ function rt_run(RS_type::AbstractRamanType,
     SFI = true                          # SFI flag
     NquadN = Nquad * pol_type.n         # Nquad (multiplied by Stokes n)
     dims = (NquadN,NquadN)              # nxn dims
-    Nparams = NAer*7 + NGas + NSurf
+    layout = ParameterLayout(aerosol_params=7, n_aerosols=NAer,
+                              n_gases=NGas, n_surface=NSurf)
+    Nparams = n_total(layout)
 
     # For noRS: F₀ should be the solar irradiance Stokes vector per spectral point.
     # If still at its default 1×1 size, initialize to unit solar flux (Stokes I only).
@@ -232,7 +234,7 @@ function rt_run(RS_type::AbstractRamanType,
         end 
 
         # Create surface matrices:
-        iparam = NAer*7 + NGas + iBand # parameter index for Lambertian surface
+        iparam = surface_index(layout, iBand)
         create_surface_layer!(RS_type, brdf, #brdf_lin,
                             added_surface_layer, 
                             added_surface_layer_lin,
