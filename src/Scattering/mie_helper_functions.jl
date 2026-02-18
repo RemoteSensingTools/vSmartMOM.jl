@@ -223,6 +223,11 @@ function compute_anbn(model::MieModel, λ, radius)
     an = zeros(Complex{FT2}, nquad_radius, N_max)
     bn = zeros(Complex{FT2}, nquad_radius, N_max)
 
+    # Pre-allocate Dn buffer for max size parameter (from r_max)
+    y_max = (2 * π * r_max / λ) * abs(nᵣ - nᵢ)
+    nmx_max = round(Int, max(N_max, y_max) + 51)
+    Dn = zeros(Complex{FT2}, nmx_max)
+
     # Loop over the size distribution, and compute an, bn, for each size
     for i in 1:nquad_radius
 
@@ -230,12 +235,7 @@ function compute_anbn(model::MieModel, λ, radius)
         r = radius[i] 
         size_param = 2 * π * r / λ
 
-        # Pre-allocate Dn:
-        y = size_param * (nᵣ - nᵢ);
-        nmx = round(Int, max(N_max, abs(y)) + 51)
-        Dn = zeros(Complex{FT2}, nmx)
-
-        # Compute an, bn
+        # Compute an, bn (Dn is zeroed inside compute_mie_ab!)
         Scattering.compute_mie_ab!(size_param, nᵣ + nᵢ * im, 
                                       view(an, i, :), 
                                       view(bn, i, :), Dn)
