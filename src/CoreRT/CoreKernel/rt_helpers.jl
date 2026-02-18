@@ -66,3 +66,59 @@ Applies `R₂₀ = R₁₀ + T₀₁·(I-R₂₁R₀₁)⁻¹·R₂₁·T₁₀`
     expk .= expk .^ 2
     return nothing
 end
+
+"""
+    zero_added_noscat!(added_layer, τ_λ, qp_μN)
+
+Zero out reflectance/source fields and set Beer-law transmission for a
+non-scattering layer.  Replaces the repeated pattern in `rt_kernel!` methods.
+"""
+@inline function zero_added_noscat!(added_layer, τ_λ, qp_μN)
+    added_layer.r⁻⁺[:] .= 0
+    added_layer.r⁺⁻[:] .= 0
+    added_layer.j₀⁻[:] .= 0
+    _set_transmission_noscat!(added_layer.t⁺⁺, added_layer.t⁻⁻, τ_λ, qp_μN)
+    return nothing
+end
+
+"""
+    zero_added_noscat_ie!(added_layer, τ_λ, qp_μN)
+
+Like `zero_added_noscat!` but also zeros the inelastic fields
+(`ier⁻⁺`, `ier⁺⁻`, `ieJ₀⁻`, `iet⁻⁻`, `iet⁺⁺`, `ieJ₀⁺`).
+"""
+@inline function zero_added_noscat_ie!(added_layer, τ_λ, qp_μN)
+    zero_added_noscat!(added_layer, τ_λ, qp_μN)
+    added_layer.ier⁻⁺[:] .= 0
+    added_layer.ier⁺⁻[:] .= 0
+    added_layer.ieJ₀⁻[:] .= 0
+    added_layer.iet⁻⁻[:] .= 0
+    added_layer.iet⁺⁺[:] .= 0
+    added_layer.ieJ₀⁺[:] .= 0
+    return nothing
+end
+
+"""
+    copy_added_to_composite!(composite_layer, added_layer)
+
+Copy all fields from an `AddedLayer` into the `CompositeLayer` (for TOA, iz==1).
+"""
+@inline function copy_added_to_composite!(composite_layer, added_layer)
+    composite_layer.T⁺⁺[:], composite_layer.T⁻⁻[:] = (added_layer.t⁺⁺, added_layer.t⁻⁻)
+    composite_layer.R⁻⁺[:], composite_layer.R⁺⁻[:] = (added_layer.r⁻⁺, added_layer.r⁺⁻)
+    composite_layer.J₀⁺[:], composite_layer.J₀⁻[:] = (added_layer.j₀⁺, added_layer.j₀⁻)
+    return nothing
+end
+
+"""
+    copy_added_to_composite_ie!(composite_layer, added_layer)
+
+Like `copy_added_to_composite!` but also copies inelastic fields.
+"""
+@inline function copy_added_to_composite_ie!(composite_layer, added_layer)
+    copy_added_to_composite!(composite_layer, added_layer)
+    composite_layer.ieT⁺⁺[:], composite_layer.ieT⁻⁻[:] = (added_layer.iet⁺⁺, added_layer.iet⁻⁻)
+    composite_layer.ieR⁻⁺[:], composite_layer.ieR⁺⁻[:] = (added_layer.ier⁻⁺, added_layer.ier⁺⁻)
+    composite_layer.ieJ₀⁺[:], composite_layer.ieJ₀⁻[:] = (added_layer.ieJ₀⁺, added_layer.ieJ₀⁻)
+    return nothing
+end

@@ -64,10 +64,7 @@ function rt_kernel!(RS_type::noRS,
         #println("Doubling done...")
     else # This might not work yet on GPU!
         # If not, there is no reflectance. Assign r/t appropriately
-        added_layer.r⁻⁺[:] .= 0;
-        added_layer.r⁺⁻[:] .= 0;
-        added_layer.j₀⁻[:] .= 0;
-        _set_transmission_noscat!(added_layer.t⁺⁺, added_layer.t⁻⁻, τ_λ, qp_μN)
+        zero_added_noscat!(added_layer, τ_λ, qp_μN)
     end
     #M1 = Array(added_layer.t⁺⁺)
     #M2 = Array(added_layer.r⁺⁻)
@@ -78,9 +75,7 @@ function rt_kernel!(RS_type::noRS,
     
     # If this TOA, just copy the added layer into the composite layer
     if (iz == 1)
-        composite_layer.T⁺⁺[:], composite_layer.T⁻⁻[:] = (added_layer.t⁺⁺, added_layer.t⁻⁻)
-        composite_layer.R⁻⁺[:], composite_layer.R⁺⁻[:] = (added_layer.r⁻⁺, added_layer.r⁺⁻)
-        composite_layer.J₀⁺[:], composite_layer.J₀⁻[:] = (added_layer.j₀⁺, added_layer.j₀⁻)
+        copy_added_to_composite!(composite_layer, added_layer)
         
     # If this is not the TOA, perform the interaction step
     else
@@ -102,10 +97,7 @@ function rt_kernel_canopy!(RS_type::noRS, pol_type, SFI, added_layer, composite_
         #println("Doubling done...")
     else # This might not work yet on GPU!
         # If not, there is no reflectance. Assign r/t appropriately
-        added_layer.r⁻⁺[:] .= 0;
-        added_layer.r⁺⁻[:] .= 0;
-        added_layer.j₀⁻[:] .= 0;
-        _set_transmission_noscat!(added_layer.t⁺⁺, added_layer.t⁻⁻, τ_λ, qp_μN)
+        zero_added_noscat!(added_layer, τ_λ, qp_μN)
     end
     #M1 = Array(added_layer.t⁺⁺)
     #M2 = Array(added_layer.r⁺⁻)
@@ -116,9 +108,7 @@ function rt_kernel_canopy!(RS_type::noRS, pol_type, SFI, added_layer, composite_
     
     # If this TOA, just copy the added layer into the composite layer
     if (iz == 1)
-        composite_layer.T⁺⁺[:], composite_layer.T⁻⁻[:] = (added_layer.t⁺⁺, added_layer.t⁻⁻)
-        composite_layer.R⁻⁺[:], composite_layer.R⁺⁻[:] = (added_layer.r⁻⁺, added_layer.r⁺⁻)
-        composite_layer.J₀⁺[:], composite_layer.J₀⁻[:] = (added_layer.j₀⁺, added_layer.j₀⁻)
+        copy_added_to_composite!(composite_layer, added_layer)
         
     # If this is not the TOA, perform the interaction step
     else
@@ -158,28 +148,14 @@ function rt_kernel!(RS_type::Union{RRS, VS_0to1, VS_1to0}, pol_type, SFI, added_
         #@timeit "doubling"   doubling!(pol_type, SFI, expk, ndoubl, added_layer, I_static, architecture)
     else # This might not work yet on GPU!
         # If not, there is no reflectance. Assign r/t appropriately
-        added_layer.r⁻⁺[:] .= 0;
-        added_layer.r⁺⁻[:] .= 0;
-        added_layer.j₀⁻[:] .= 0;
-        added_layer.ier⁻⁺[:] .= 0;
-        added_layer.ier⁺⁻[:] .= 0;
-        added_layer.ieJ₀⁻[:] .= 0;
-        added_layer.iet⁻⁻[:] .= 0;
-        added_layer.iet⁺⁺[:] .= 0;
-        added_layer.ieJ₀⁺[:] .= 0;
-        _set_transmission_noscat!(added_layer.t⁺⁺, added_layer.t⁻⁻, τ_λ, qp_μN)
+        zero_added_noscat_ie!(added_layer, τ_λ, qp_μN)
     end
 
     # @assert !any(isnan.(added_layer.t⁺⁺))
     
     # If this TOA, just copy the added layer into the composite layer
     if (iz == 1)
-        composite_layer.T⁺⁺[:], composite_layer.T⁻⁻[:] = (added_layer.t⁺⁺, added_layer.t⁻⁻)
-        composite_layer.R⁻⁺[:], composite_layer.R⁺⁻[:] = (added_layer.r⁻⁺, added_layer.r⁺⁻)
-        composite_layer.J₀⁺[:], composite_layer.J₀⁻[:] = (added_layer.j₀⁺, added_layer.j₀⁻)
-        composite_layer.ieT⁺⁺[:], composite_layer.ieT⁻⁻[:] = (added_layer.iet⁺⁺, added_layer.iet⁻⁻)
-        composite_layer.ieR⁻⁺[:], composite_layer.ieR⁺⁻[:] = (added_layer.ier⁻⁺, added_layer.ier⁺⁻)
-        composite_layer.ieJ₀⁺[:], composite_layer.ieJ₀⁻[:] = (added_layer.ieJ₀⁺, added_layer.ieJ₀⁻ )
+        copy_added_to_composite_ie!(composite_layer, added_layer)
     
     # If this is not the TOA, perform the interaction step
     else
@@ -228,19 +204,14 @@ function rt_kernel!(RS_type::noRS{FT},
     #println("Doubling done...")
     else # This might not work yet on GPU!
         # If not, there is no reflectance. Assign r/t appropriately
-        added_layer.r⁻⁺[:] .= 0;
-        added_layer.r⁺⁻[:] .= 0;
-        added_layer.j₀⁻[:] .= 0;
-        _set_transmission_noscat!(added_layer.t⁺⁺, added_layer.t⁻⁻, τ_λ, qp_μN)
+        zero_added_noscat!(added_layer, τ_λ, qp_μN)
     end
 
     # @assert !any(isnan.(added_layer.t⁺⁺))
 
     # If this TOA, just copy the added layer into the composite layer
     if (iz == 1)
-        composite_layer.T⁺⁺[:], composite_layer.T⁻⁻[:] = (added_layer.t⁺⁺, added_layer.t⁻⁻)
-        composite_layer.R⁻⁺[:], composite_layer.R⁺⁻[:] = (added_layer.r⁻⁺, added_layer.r⁺⁻)
-        composite_layer.J₀⁺[:], composite_layer.J₀⁻[:] = (added_layer.j₀⁺, added_layer.j₀⁻)
+        copy_added_to_composite!(composite_layer, added_layer)
         # If this is not the TOA, perform the interaction step
     else
         @timeit "interaction" interaction!(RS_type, scattering_interface, SFI, composite_layer, added_layer, I_static)
@@ -322,28 +293,14 @@ function rt_kernel!(RS_type::Union{RRS{FT}, VS_0to1{FT}, VS_1to0{FT}}, pol_type,
         #@timeit "doubling"   doubling!(pol_type, SFI, expk, ndoubl, added_layer, I_static, architecture)
     else # This might not work yet on GPU!
         # If not, there is no reflectance. Assign r/t appropriately
-        added_layer.r⁻⁺[:] .= 0;
-        added_layer.r⁺⁻[:] .= 0;
-        added_layer.j₀⁻[:] .= 0;
-        added_layer.ier⁻⁺[:] .= 0;
-        added_layer.ier⁺⁻[:] .= 0;
-        added_layer.ieJ₀⁻[:] .= 0;
-        added_layer.iet⁻⁻[:] .= 0;
-        added_layer.iet⁺⁺[:] .= 0;
-        added_layer.ieJ₀⁺[:] .= 0;
-        _set_transmission_noscat!(added_layer.t⁺⁺, added_layer.t⁻⁻, τ_λ, qp_μN)
+        zero_added_noscat_ie!(added_layer, τ_λ, qp_μN)
     end
 
     # @assert !any(isnan.(added_layer.t⁺⁺))
     
     # If this TOA, just copy the added layer into the composite layer
     if (iz == 1)
-        composite_layer.T⁺⁺[:], composite_layer.T⁻⁻[:] = (added_layer.t⁺⁺, added_layer.t⁻⁻)
-        composite_layer.R⁻⁺[:], composite_layer.R⁺⁻[:] = (added_layer.r⁻⁺, added_layer.r⁺⁻)
-        composite_layer.J₀⁺[:], composite_layer.J₀⁻[:] = (added_layer.j₀⁺, added_layer.j₀⁻)
-        composite_layer.ieT⁺⁺[:], composite_layer.ieT⁻⁻[:] = (added_layer.iet⁺⁺, added_layer.iet⁻⁻)
-        composite_layer.ieR⁻⁺[:], composite_layer.ieR⁺⁻[:] = (added_layer.ier⁻⁺, added_layer.ier⁺⁻)
-        composite_layer.ieJ₀⁺[:], composite_layer.ieJ₀⁻[:] = (added_layer.ieJ₀⁺, added_layer.ieJ₀⁻ )
+        copy_added_to_composite_ie!(composite_layer, added_layer)
     
     # If this is not the TOA, perform the interaction step
     else
@@ -395,28 +352,14 @@ function rt_kernel!(
         #@timeit "doubling"   doubling!(pol_type, SFI, expk, ndoubl, added_layer, I_static, architecture)
     else # This might not work yet on GPU!
         # If not, there is no reflectance. Assign r/t appropriately
-        added_layer.r⁻⁺[:] .= 0;
-        added_layer.r⁺⁻[:] .= 0;
-        added_layer.j₀⁻[:] .= 0;
-        added_layer.ier⁻⁺[:] .= 0;
-        added_layer.ier⁺⁻[:] .= 0;
-        added_layer.ieJ₀⁻[:] .= 0;
-        added_layer.iet⁻⁻[:] .= 0;
-        added_layer.iet⁺⁺[:] .= 0;
-        added_layer.ieJ₀⁺[:] .= 0;
-        _set_transmission_noscat!(added_layer.t⁺⁺, added_layer.t⁻⁻, τ, qp_μN)
+        zero_added_noscat_ie!(added_layer, τ, qp_μN)
     end
 
     # @assert !any(isnan.(added_layer.t⁺⁺))
     
     # If this TOA, just copy the added layer into the composite layer
     if (iz == 1)
-        composite_layer.T⁺⁺[:], composite_layer.T⁻⁻[:] = (added_layer.t⁺⁺, added_layer.t⁻⁻)
-        composite_layer.R⁻⁺[:], composite_layer.R⁺⁻[:] = (added_layer.r⁻⁺, added_layer.r⁺⁻)
-        composite_layer.J₀⁺[:], composite_layer.J₀⁻[:] = (added_layer.j₀⁺, added_layer.j₀⁻)
-        composite_layer.ieT⁺⁺[:], composite_layer.ieT⁻⁻[:] = (added_layer.iet⁺⁺, added_layer.iet⁻⁻)
-        composite_layer.ieR⁻⁺[:], composite_layer.ieR⁺⁻[:] = (added_layer.ier⁻⁺, added_layer.ier⁺⁻)
-        composite_layer.ieJ₀⁺[:], composite_layer.ieJ₀⁻[:] = (added_layer.ieJ₀⁺, added_layer.ieJ₀⁻ )
+        copy_added_to_composite_ie!(composite_layer, added_layer)
     
     # If this is not the TOA, perform the interaction step
     else
