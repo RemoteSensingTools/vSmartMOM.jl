@@ -118,9 +118,11 @@ include("Surfaces/lambertian_surface.jl")            # Lambertian Surface
 include("Surfaces/lambertian_surface_lin.jl")        # Linearized Lambertian Surface
 include("Surfaces/rpv_surface.jl")                   # RPV Surface 
 include("Surfaces/rossli_surface.jl")                # Ross-Li Surface
+include("Surfaces/canopy_surface.jl")                # Canopy + soil composite surface
 
 # Functions to export
-export model_from_parameters,               # Converting the parameters to model 
+export model_from_parameters,               # Converting the parameters to model
+       model_from_parameters_lin,           # Convenience alias for linearized model
        rt_run, rt_run_lin, rt_run_ss,       # Run the RT code (forward, linearized, single scatter)
        default_parameters                   # Set of default parameters
 export lin_added_layer_all_params,            # 3 params -> all params chain rule
@@ -130,9 +132,10 @@ export lin_added_layer_all_params,            # 3 params -> all params chain rul
        ParameterLayout,                       # Jacobian parameter layout descriptor
        n_total, aerosol_range, gas_range,     # ParameterLayout accessors
        surface_range, surface_index,
-       n_layer_params
+       canopy_range, n_layer_params
 
 # Export types to show easily
-export GaussQuadFullSphere, LambertianSurfaceScalar, LambertianSurfaceSpectrum
+export GaussQuadFullSphere, LambertianSurfaceScalar, LambertianSurfaceSpectrum,
+       CanopySurface, invalidate_canopy_cache!
 
 end

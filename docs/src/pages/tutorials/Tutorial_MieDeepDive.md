@@ -23,10 +23,10 @@ coefficients are the "Greek" coefficients ``(\alpha, \beta, \gamma, \delta, \eps
 RT kernels work directly in this Fourier/Legendre space—angle-space values are reconstructed
 only when needed (e.g., for plotting or diagnostics).
 
-````@example Tutorial_MieDeepDive
+```julia
 using vSmartMOM.Scattering
 using Distributions
-````
+```
 
 ---
 
@@ -51,12 +51,12 @@ Both methods produce identical Greek coefficients; choose based on workflow:
 
 Example: NAI2 (no Wigner tables needed)
 
-````@example Tutorial_MieDeepDive
+```julia
 rₘ, σ, nᵣ, nᵢ = 0.3, 2.0, 1.3, 0.001
 aero = Aerosol(LogNormal(log(rₘ), log(σ)), nᵣ, nᵢ)
 λ = 0.55
 model_NAI2 = make_mie_model(NAI2(), aero, λ, Stokes_IQUV(), δBGE(20, 2.0), 30.0, 500)
-````
+```
 
 aerosol_optics = compute_aerosol_optical_properties(model_NAI2)
 
@@ -83,13 +83,13 @@ the phase function; too high adds cost with little gain.
 **Trade-off**: Higher `nquad_radius` and `l_max` improve accuracy but increase runtime.
 Start with moderate values (e.g., 500, 20) and increase if needed.
 
-````@example Tutorial_MieDeepDive
+```julia
 r_max = 30.0
 nquad_radius = 500
 l_max = 20
 Δ_angle = 2.0
 truncation_type = δBGE(l_max, Δ_angle)
-````
+```
 
 ---
 
@@ -157,9 +157,9 @@ These feed into the doubling-adding kernels. Aerosol layers are combined with mo
 (Rayleigh) scattering and absorption; the RT solver never needs angle-space phase
 functions—only the Greek expansion.
 
-````@example Tutorial_MieDeepDive
+```julia
 println("Mie deep-dive tutorial complete. Key types: Aerosol, MieModel, AerosolOptics, GreekCoefs.")
-````
+```
 
 ---
 

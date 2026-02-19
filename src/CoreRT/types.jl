@@ -370,6 +370,7 @@ struct rpvSurfaceScalar{FT} <: AbstractSurfaceType
     Θ::FT
 end
 
+"Ross-Li BRDF surface model with volumetric (RossThick), geometric (LiSparse), and isotropic components"
 struct RossLiSurfaceScalar{FT} <: AbstractSurfaceType
     "Volumetric RossThick  fraction"
     fvol::FT
@@ -388,7 +389,64 @@ end
 "Defined by a simple spline from Interpolations.jl"
 struct LambertianSurfaceSpline{FT} <: AbstractSurfaceType
     interpolator::AbstractInterpolation{FT}
-    wlGrid::AbstractArray{FT,1} # Has to be added here as it won't otherwise be available in the Lambertian Surface Routine
+    wlGrid::AbstractArray{FT,1}
+end
+
+"""
+    CanopySurface{FT} <: AbstractSurfaceType
+
+Composite lower boundary: a vegetation canopy (one or more scattering layers)
+backed by a soil BRDF. When used as the surface in `rt_run`, the canopy
+sub-layers are processed internally via the adding-doubling method before
+interacting with the soil, producing an effective canopy+soil reflectance.
+
+Requires `CanopyOptics.jl` for leaf-angle distribution and scattering models.
+"""
+mutable struct CanopySurface{FT} <: AbstractSurfaceType
+    "Soil BRDF (any AbstractSurfaceType, e.g. LambertianSurfaceScalar)"
+    soil::AbstractSurfaceType
+    "Total leaf area index"
+    LAI::FT
+    "Number of canopy sub-layers (1 = big-leaf)"
+    n_layers::Int
+    "Leaf angle distribution (from CanopyOptics, e.g. spherical_leaves())"
+    LAD
+    "Canopy scattering model (e.g. BiLambertianCanopyScattering)"
+    canopy_scattering
+    "Leaf reflectance (scalar or spectral vector)"
+    leaf_reflectance::Union{FT, Vector{FT}}
+    "Leaf transmittance (scalar or spectral vector)"
+    leaf_transmittance::Union{FT, Vector{FT}}
+    "Include within-canopy atmospheric absorption between sub-layers"
+    include_atm::Bool
+    "Per-sub-layer LAI fractions (nothing = uniform); must sum to 1"
+    lai_fractions::Union{Nothing, Vector{FT}}
+    "Within-canopy atmospheric τ per sub-layer gap (set by rt_run for include_atm=true)"
+    _within_canopy_τ::Union{Nothing, Vector{FT}}
+    "Lazily-initialized cache (Zup, Zdown, working arrays); set on first use"
+    _cache::Any
+end
+
+function CanopySurface(; soil::AbstractSurfaceType,
+                        LAI, n_layers::Int=1, LAD=nothing,
+                        canopy_scattering=nothing,
+                        leaf_reflectance=0.4, leaf_transmittance=0.05,
+                        include_atm::Bool=false,
+                        lai_fractions=nothing)
+    FT = typeof(float(LAI))
+    if LAD === nothing
+        LAD = CanopyOptics.spherical_leaves()
+    end
+    if canopy_scattering === nothing
+        canopy_scattering = CanopyOptics.BiLambertianCanopyScattering(
+            R=leaf_reflectance isa Number ? FT(leaf_reflectance) : FT(0.4),
+            T=leaf_transmittance isa Number ? FT(leaf_transmittance) : FT(0.05))
+    end
+    lr = leaf_reflectance isa Number ? FT(leaf_reflectance) : convert(Vector{FT}, leaf_reflectance)
+    lt = leaf_transmittance isa Number ? FT(leaf_transmittance) : convert(Vector{FT}, leaf_transmittance)
+    lf = lai_fractions === nothing ? nothing : convert(Vector{FT}, lai_fractions)
+    CanopySurface{FT}(soil, FT(LAI), n_layers, LAD, canopy_scattering,
+                      lr, lt, include_atm, lf, nothing, nothing)
 end
 
 """

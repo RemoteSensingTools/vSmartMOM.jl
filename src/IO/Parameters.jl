@@ -128,6 +128,48 @@ const BRDF_MAP = Dict{String, Function}(
     end,
 )
 
+"""
+    _parse_canopy_section(canopy_dict, FT, brdf_list)
+
+Parse the optional `canopy:` YAML section and wrap each band's existing BRDF
+in a `CanopySurface`, replacing the `brdf_list` entries in-place.
+
+Expected YAML keys:
+- `LAI`: total leaf area index (required)
+- `n_layers`: number of canopy sub-layers (default 1)
+- `leaf_reflectance`: scalar or list (default 0.4)
+- `leaf_transmittance`: scalar or list (default 0.05)
+- `include_atm`: bool (default false)
+- `soil`: a BRDF string *or* "from_surface" to reuse the band's existing BRDF
+"""
+function _parse_canopy_section(canopy_dict::Dict, FT, brdf_list::Vector)
+    LAI       = FT(get(canopy_dict, "LAI", 3.0))
+    n_layers  = get(canopy_dict, "n_layers", 1)
+    leaf_R    = get(canopy_dict, "leaf_reflectance", 0.4)
+    leaf_T    = get(canopy_dict, "leaf_transmittance", 0.05)
+    incl_atm  = get(canopy_dict, "include_atm", false)
+
+    lr = leaf_R isa AbstractVector ? convert(Vector{FT}, leaf_R) : FT(leaf_R)
+    lt = leaf_T isa AbstractVector ? convert(Vector{FT}, leaf_T) : FT(leaf_T)
+
+    soil_spec = get(canopy_dict, "soil", "from_surface")
+
+    for (i, existing_brdf) in enumerate(brdf_list)
+        if soil_spec == "from_surface"
+            soil = existing_brdf
+        else
+            soil = _parse_brdf_string(soil_spec, FT)
+        end
+        brdf_list[i] = CoreRT.CanopySurface(;
+            soil=soil, LAI=LAI, n_layers=n_layers,
+            leaf_reflectance=lr, leaf_transmittance=lt,
+            include_atm=incl_atm)
+    end
+    return brdf_list
+end
+
+_parse_brdf_string(s::AbstractString, FT) = parse_surface_str(s, FT)
+
 "Split a comma-separated argument string into top-level arguments while respecting brackets"
 function _split_args(args_str::AbstractString)
     args = String[]
@@ -311,7 +353,8 @@ function _parse_spec_bands(params_dict::Dict, FT)
 end
 
 function _parse_surfaces(params_dict::Dict, FT)
-    return [parse_surface_str(String(s), FT) for s in params_dict["radiative_transfer"]["surface"]]
+    surfs = CoreRT.AbstractSurfaceType[parse_surface_str(String(s), FT) for s in params_dict["radiative_transfer"]["surface"]]
+    return surfs
 end
 
 function _parse_quadrature(params_dict::Dict)
@@ -420,6 +463,10 @@ function parameters_from_dict(params_dict::Dict)
     T, p, q, profile_reduction = _parse_atmosphere(params_dict, FT)
     absorption_params = _parse_absorption(params_dict, FT)
     scattering_params = _parse_scattering(params_dict, FT)
+
+    if haskey(params_dict, "canopy")
+        _parse_canopy_section(params_dict["canopy"], FT, BRDF_per_band)
+    end
 
     return vSmartMOM_Parameters(
         spec_bands, BRDF_per_band, quadrature_type, polarization_type,

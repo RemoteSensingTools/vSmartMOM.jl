@@ -22,15 +22,16 @@ struct ParameterLayout
     n_aerosols::Int
     n_gases::Int
     n_surface::Int
+    n_canopy::Int
 end
 
 ParameterLayout(; aerosol_params::Int=7, n_aerosols::Int=0, n_gases::Int=0,
-                  n_surface::Int=1) =
-    ParameterLayout(aerosol_params, n_aerosols, n_gases, n_surface)
+                  n_surface::Int=1, n_canopy::Int=0) =
+    ParameterLayout(aerosol_params, n_aerosols, n_gases, n_surface, n_canopy)
 
 "Total number of retrieval parameters."
 @inline n_total(pl::ParameterLayout) =
-    pl.aerosol_params * pl.n_aerosols + pl.n_gases + pl.n_surface
+    pl.aerosol_params * pl.n_aerosols + pl.n_gases + pl.n_surface + pl.n_canopy
 
 "Index range for aerosol `iaer` (1-based)."
 @inline function aerosol_range(pl::ParameterLayout, iaer::Int)
@@ -54,6 +55,12 @@ end
 @inline surface_index(pl::ParameterLayout, i::Int=1) =
     pl.aerosol_params * pl.n_aerosols + pl.n_gases + i
 
-"Number of layer-level parameters (aerosol + gas, excluding surface)."
+"Number of layer-level parameters (aerosol + gas, excluding surface and canopy)."
 @inline n_layer_params(pl::ParameterLayout) =
     pl.aerosol_params * pl.n_aerosols + pl.n_gases
+
+"""Index range for canopy parameters (LAI, leaf_R, leaf_T, ...)."""
+@inline function canopy_range(pl::ParameterLayout)
+    start = pl.aerosol_params * pl.n_aerosols + pl.n_gases + pl.n_surface + 1
+    return start:(start + pl.n_canopy - 1)
+end

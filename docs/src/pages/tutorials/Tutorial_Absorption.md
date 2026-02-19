@@ -36,7 +36,7 @@ Let us take a simple example with the satellite flying at 7km/s and either stari
 
 ____
 
-````@example Tutorial_Absorption
+```julia
 # Speed of light (in m/s)
 c = 299792458.0
 
@@ -52,7 +52,7 @@ v₀ = 6250.0
 # Just writing out doppler shift in wavenumbers and wavelengths
 println("Doppler shift = $Δ_ν cm-1")
 println("Doppler shift = $(1e7/(v₀-Δ_ν)-1e7/v₀) nm")
-````
+```
 
 #### Random movements of molecules in gases lead to doppler broadening effects
 
@@ -123,64 +123,64 @@ Once you dig deeper, there are various other more complex line-shapes (and line-
 
 Import the required tools:
 
-````@example Tutorial_Absorption
+```julia
 using Plots
 using Pkg.Artifacts
 using vSmartMOM
 using vSmartMOM.Absorption
-````
+```
 
 Read the HITRAN database for CO$_2$, using artifacts in Julia:
 
-````@example Tutorial_Absorption
+```julia
 co2_par      = Absorption.read_hitran(artifact("CO2"), mol=2, iso=1, ν_min=6214.4, ν_max=6214.8);
 nothing #hide
-````
+```
 
 Create a Voigt model (all in CPU mode)
 
-````@example Tutorial_Absorption
+```julia
 line_voigt   = make_hitran_model(co2_par, Voigt(), architecture=CPU())
-````
+```
 
 Create a Doppler model
 
-````@example Tutorial_Absorption
+```julia
 line_doppler = make_hitran_model(co2_par, Doppler(), architecture=CPU())
-````
+```
 
 Create a Lorentz model
 
-````@example Tutorial_Absorption
+```julia
 line_lorentz = make_hitran_model(co2_par, Lorentz(), architecture=CPU())
 # Specify our wavenumber grid
 ν = 6210:0.001:6220;
 nothing #hide
-````
+```
 
 Here we compute the cross sections at different pressures (in hPa, 3rd argument) and temperatures (in K, 4th argument)
 
-````@example Tutorial_Absorption
+```julia
 cs_co2_1atm   = absorption_cross_section(line_voigt, ν, 1013.0     , 296.0);
 cs_co2_075atm = absorption_cross_section(line_voigt, ν, 0.75*1013.0, 296.0);
 cs_co2_05atm  = absorption_cross_section(line_voigt, ν, 0.5*1013.0 , 296.0);
 cs_co2_025atm = absorption_cross_section(line_voigt, ν, 0.25*1013.0, 296.0);
 cs_co2_01atm  = absorption_cross_section(line_voigt, ν, 0.1*1013.0 , 296.0);
 nothing #hide
-````
+```
 
 Get some more line-shapes just for Doppler and Voigt to better compare the different line shapes
 
-````@example Tutorial_Absorption
+```julia
 cs_co2_01atm    = absorption_cross_section(line_voigt,   ν, 0.1*1013.0 , 296.0);
 cs_co2_doppler  = absorption_cross_section(line_doppler, ν, 0.1*1013.0 , 296.0);
 cs_co2_lorentz  = absorption_cross_section(line_lorentz, ν, 0.1*1013.0 , 296.0);
 nothing #hide
-````
+```
 
 Using a scaling factor as Julia plots sometimes have issues with very small numbers!
 
-````@example Tutorial_Absorption
+```julia
 ff = 1e20;
 plot(ν,  ff*cs_co2_1atm,   label="Voigt, 1atm", yformatter = :scientific)
 plot!(ν, ff*cs_co2_075atm, label="Voigt, 0.75atm")
@@ -190,11 +190,11 @@ plot!(ν, ff*cs_co2_025atm, label="Voigt, 0.25atm")
 xlims!((6214,6215.2))
 xlabel!("Wavenumber (cm⁻¹))")
 ylabel!("Absorption cross section (10⁻²⁰ cm²/molecule)")
-````
+```
 
 From these figures we can see how strongly the line-witdth is impacted by pressure broadening at ranges from about 250hPa to 1013hPa. Especially the line wings are substantially widened, which is typical of Lorentz line-shapes.
 
-````@example Tutorial_Absorption
+```julia
 plot( ν, cs_co2_01atm   /maximum(cs_co2_01atm) ,label="Voigt, 296K, 0.1atm")
 plot!(ν, cs_co2_doppler /maximum(cs_co2_01atm) ,label="Doppler, 296K")
 plot!(ν, cs_co2_lorentz /maximum(cs_co2_01atm) ,label="Lorentz, 296K, 0.1atm")
@@ -203,7 +203,7 @@ xlims!((6214.4,6214.8))
 ylabel!("σ/max(σ)")
 xlabel!("Wavenumber (cm⁻¹)")
 ylabel!("normalized absorption cross section")
-````
+```
 
 We can see the individual impacts of Doppler and Pressure broadening at about 100hPa, at which Doppler broadening becomes important too.
 Most of the shape of the wings is still dominated by pressure broadening but the center has substantial contributions from Doppler broadening as well.
@@ -215,40 +215,40 @@ Here, we will compute an entire band of CO$_2$ (a few to be precise) and look at
 
 Load a wider spectral range
 
-````@example Tutorial_Absorption
+```julia
 co2_par_band = Absorption.read_hitran(artifact("CO2"), mol=2, iso=1, ν_min=6000.0, ν_max=6400.0);
 nothing #hide
-````
+```
 
 Create a Voigt model for that
 
-````@example Tutorial_Absorption
+```julia
 band_voigt   = make_hitran_model(co2_par_band , Voigt(), architecture=CPU());
 nothing #hide
-````
+```
 
 Define the wavenumber grid and compute cross sections at the same pressure but different temperature:
 
-````@example Tutorial_Absorption
+```julia
 ν_band = 6300:0.01:6400;
 σ_co2_Voigt220 = absorption_cross_section(band_voigt, ν_band, 1013.0 , 220.0);
 σ_co2_Voigt290 = absorption_cross_section(band_voigt, ν_band, 1013.0 , 290.0);
 nothing #hide
-````
+```
 
-````@example Tutorial_Absorption
+```julia
 plot( ν_band, ff*σ_co2_Voigt220, alpha=0.5, label="220K")
 plot!(ν_band, ff*σ_co2_Voigt290, alpha=0.5, label="290K")
 xlims!((6300,6380))
-````
+```
 
 This is still a bit hard to see as the differences are relatively subtle. However, we can already see that absorptions near the band center are stronger at lower temperatures, which the opposite is true at higher rotational states.
 This behavior is cause by the distribution of lower rotational states, which only occupy higher Js at higher temperatures. This picture becomes more clear if we look at differences.
 
-````@example Tutorial_Absorption
+```julia
 plot(ν_band, ff*(σ_co2_Voigt220 - σ_co2_Voigt290), label="220K-290K")
 xlims!((6300,6380))
-````
+```
 
 Now we can clearly see how the change in the distibution of the lower rotational state leads to a redistribution of cross sections (a shift from lower to higher ground states with higher T)
 
@@ -256,29 +256,29 @@ Now we can clearly see how the change in the distibution of the lower rotational
 ### Some fun stuff
 ## We can make use of advanced animation tools (@gif, @animate) in Julia to quickly create animations to show the impact of pressure and temperature:
 
-````@example Tutorial_Absorption
+```julia
 T = 290.0
 @gif for p = 10:10:1100
     σ = absorption_cross_section(band_voigt, ν_band, p , T);
     plot(ν_band, ff*σ, yaxis=:log,label="p=$p")
     ylims!((1e-7, 1e-1))
 end
-````
+```
 
-````@example Tutorial_Absorption
+```julia
 p = 900.0
 @gif for T = 10:10:320
     σ = absorption_cross_section(band_voigt, ν_band, p , T);
     plot(ν_band, ff*σ, yaxis=:log, label="T=$T")
     ylims!((1e-7, 1e-1))
 end
-````
+```
 
-````@example Tutorial_Absorption
+```julia
 # More extreme case, let's take 10 atmospheres (10,000hPa)
 σ = absorption_cross_section(band_voigt, ν_band, 10000.0 , 300.0);
 plot(ν_band, ff*σ, label="p=10000.0hPa")
-````
+```
 
 We can see that individual lines can be blurred at very high pressures once the broadening becomes wider than the line spacing.
 

@@ -547,9 +547,8 @@ function apply_D_matrix_elemental_SFI!(RS_type::Union{RRS, RRS_plus},
                                 n_stokes, 
                                 ieJ₀⁻, 
                                 ndrange=size(ieJ₀⁻));
-        #@show "here 1.4"
         #wait(device, event);
-        synchronize();
+        synchronize_if_gpu();
         return nothing
     end
 end
@@ -559,20 +558,14 @@ function apply_D_matrix_elemental_SFI!(RS_type::Union{VS_0to1_plus, VS_1to0_plus
     if ndoubl > 1
         return nothing
     else 
-        #@show "here 1.1"
         device = devi(architecture(ieJ₀⁻))
-        #@show "here 1.2"
         applyD_kernel! = apply_D_elemental_SFI_VS!(device)
-        #@show "here 1.3", RS_type
         event = applyD_kernel!(ndoubl,
                             n_stokes, 
                             RS_type.i_λ₁λ₀_all,    
                             ieJ₀⁻, 
                             ndrange = getKernelDimSFI(RS_type,ieJ₀⁻,RS_type.i_λ₁λ₀_all));
-                            #ndrange=size(ieJ₀⁻));
-        #@show "here 1.4"
-        #wait(device, event);
-        synchronize();
+        synchronize_if_gpu();
         return nothing
     end
 end

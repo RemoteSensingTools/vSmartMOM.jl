@@ -37,6 +37,9 @@ using JLD2
 # Hybrid AD tests (ForwardDiff Mie + linearized RT)
 @testset "Hybrid AD" begin include("test_hybrid_ad.jl") end
 
+# Canopy surface tests (CanopySurface composable surface type)
+@testset "Canopy Surface" begin include("test_canopy.jl") end
+
 # GPU-specific tests (conditional on CUDA availability)
 CUDA_AVAILABLE = try
     using CUDA

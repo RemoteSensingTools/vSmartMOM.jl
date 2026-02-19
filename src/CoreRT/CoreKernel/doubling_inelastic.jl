@@ -401,7 +401,7 @@ function apply_D_matrix_IE!(RS_type::Union{VS_0to1_plus, VS_1to0_plus}, n_stokes
         event = applyD_kernel_IE!(aType(RS_type.i_λ₁λ₀_all), n_stokes, 
             ier⁻⁺, iet⁺⁺, ier⁺⁻, iet⁻⁻, ndrange=getKernelDim(RS_type, ier⁻⁺,(RS_type.i_λ₁λ₀_all)));
         ##wait(device, event);
-        synchronize();
+        synchronize_if_gpu();
         return nothing
     end
 end
@@ -418,7 +418,7 @@ function apply_D_matrix_IE!(RS_type::RRS, n_stokes::Int, ier⁻⁺::AbstractArra
         event = applyD_kernel_IE!(aType(RS_type.i_λ₁λ₀), n_stokes, 
             ier⁻⁺, iet⁺⁺, ier⁺⁻, iet⁻⁻, ndrange=getKernelDim(RS_type, ier⁻⁺));
         ##wait(device, event);
-        synchronize();
+        synchronize_if_gpu();
         return nothing
     end
 end

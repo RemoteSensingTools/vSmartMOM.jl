@@ -484,3 +484,12 @@ function model_from_parameters(lin::LinMode,
             vSmartMOM_Lin(τ̇_abs, τ̇_aer, lin_aerosol_optics)
 end
 
+"""
+    model_from_parameters_lin(params)
+
+Convenience alias for `model_from_parameters(LinMode(), params)`.
+Returns `(model, lin_model)`.
+"""
+model_from_parameters_lin(params::vSmartMOM_Parameters) =
+    model_from_parameters(LinMode(), params)
+
