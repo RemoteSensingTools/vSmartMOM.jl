@@ -33,3 +33,18 @@ using JLD2
 
 # RAMI smoke test (no gas absorption, bypasses sandbox scripts)
 @testset "RAMI Smoke" begin include("test_rami_smoke.jl") end
+
+# Hybrid AD tests (ForwardDiff Mie + linearized RT)
+@testset "Hybrid AD" begin include("test_hybrid_ad.jl") end
+
+# GPU-specific tests (conditional on CUDA availability)
+CUDA_AVAILABLE = try
+    using CUDA
+    CUDA.functional()
+catch
+    false
+end
+
+if CUDA_AVAILABLE
+    @testset "Raman GPU" begin include("test_forward_raman_gpu.jl") end
+end
