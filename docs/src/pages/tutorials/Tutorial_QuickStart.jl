@@ -10,7 +10,7 @@ using vSmartMOM
 # ## 2) Load parameters from YAML
 #
 # Parameters define the atmosphere, surface, geometry, and spectral bands.
-# See the [IO Schema](pages/IO/Schema.md) for the full YAML format.
+# See the IO Schema documentation for the full YAML format.
 
 yaml_path = joinpath(dirname(dirname(pathof(vSmartMOM))),
                      "test", "test_parameters", "ParamsEMIT_fast.yaml")
@@ -49,7 +49,7 @@ NSurf = 1
 R_lin, T_lin, dR, dT = rt_run(model_lin, lin_model, NAer, NGas, NSurf)
 
 # `dR` has shape `[nParams × nVZA × nStokes × nSpec]` — derivatives w.r.t. aerosols,
-# gas VMRs, and surface albedo. See [Tutorial: Jacobians](pages/tutorials/Tutorial_Jacobians.md) for details.
+# gas VMRs, and surface albedo.
 
 println("dR shape (Jacobian): ", size(dR))
 
@@ -57,4 +57,4 @@ println("dR shape (Jacobian): ", size(dR))
 #
 # For NVIDIA GPUs with CUDA.jl, set `params.architecture = vSmartMOM.Architectures.GPU()`
 # before building the model. The same `model_from_parameters` and `rt_run` calls apply.
-# See [Tutorial: GPU](pages/tutorials/Tutorial_GPU.md) for more.
+# See the GPU tutorial for more.

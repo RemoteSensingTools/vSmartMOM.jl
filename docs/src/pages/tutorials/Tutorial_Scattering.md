@@ -17,7 +17,7 @@ This tutorial shows the standard Mie workflow in `vSmartMOM.Scattering`:
 
 ### Load packages
 
-````@example Tutorial_Scattering
+```julia
 using vSmartMOM.Scattering
 using Distributions
 using FastGaussQuadrature
@@ -35,13 +35,13 @@ end
 if !HAS_PLOTS
     @info "Plots.jl not available; plotting sections in this tutorial are skipped."
 end
-````
+```
 
 ---
 
 ### Define aerosol properties
 
-````@example Tutorial_Scattering
+```julia
 rₘ = 0.3                 # median radius [μm]
 σ = 2.0                  # geometric stddev [-]
 nᵣ = 1.3                 # real refractive index
@@ -51,13 +51,13 @@ nquad_radius = 1500      # size quadrature points
 
 size_distribution = LogNormal(log(rₘ), log(σ))
 aero = Aerosol(size_distribution, nᵣ, nᵢ)
-````
+```
 
 ---
 
 ### Create model settings
 
-````@example Tutorial_Scattering
+```julia
 λ = 0.55                               # wavelength [μm]
 polarization_type = Stokes_IQUV()
 l_max = 20
@@ -73,26 +73,26 @@ model_NAI2 = make_mie_model(
     r_max,
     nquad_radius,
 )
-````
+```
 
 ---
 
 ### Compute aerosol optical properties
 
-````@example Tutorial_Scattering
+```julia
 aerosol_optics_NAI2 = compute_aerosol_optical_properties(model_NAI2)
 
 println("ω̃ = ", aerosol_optics_NAI2.ω̃)
 println("k  = ", aerosol_optics_NAI2.k)
 println("fᵗ = ", aerosol_optics_NAI2.fᵗ)
-````
+```
 
 ---
 
 ### Inspect Greek coefficients
 
-````@example Tutorial_Scattering
-@unpack α, β, γ, δ, ϵ, ζ = aerosol_optics_NAI2.greek_coefs
+```julia
+(; α, β, γ, δ, ϵ, ζ) = aerosol_optics_NAI2.greek_coefs
 
 if HAS_PLOTS
     p1 = plot(α, title="α")
@@ -106,7 +106,7 @@ if HAS_PLOTS
 else
     println("Skipping Greek-coefficient plots (Plots.jl not installed).")
 end
-````
+```
 
 These coefficients are Fourier-space quantities used by RT kernels.
 Reconstruct angle-dependent phase-matrix elements only when needed.
@@ -115,10 +115,10 @@ Reconstruct angle-dependent phase-matrix elements only when needed.
 
 ### Reconstruct phase matrix elements
 
-````@example Tutorial_Scattering
+```julia
 μ_quad, _ = gausslegendre(500)
 scattering_matrix = reconstruct_phase(aerosol_optics_NAI2.greek_coefs, μ_quad)
-@unpack f₁₁, f₁₂, f₂₂, f₃₃, f₃₄, f₄₄ = scattering_matrix
+(; f₁₁, f₁₂, f₂₂, f₃₃, f₃₄, f₄₄) = scattering_matrix
 
 if HAS_PLOTS
     p1 = plot(μ_quad, f₁₁, yscale=:log10, title="f₁₁")
@@ -149,7 +149,7 @@ if HAS_PLOTS
 else
     println("Skipping phase-matrix plots (Plots.jl not installed).")
 end
-````
+```
 
 ---
 
@@ -159,23 +159,23 @@ end
 The Jacobian is stored in `derivs` with columns corresponding to:
 `[rₘ, σ, nᵣ, nᵢ]`.
 
-````@example Tutorial_Scattering
+```julia
 aerosol_optics_ad = compute_aerosol_optical_properties(model_NAI2; autodiff=true)
 println("AD derivs size: ", size(aerosol_optics_ad.derivs))
-````
+```
 
 ---
 
 ### Convenience APIs for cross-sections and scalar phase function
 
-````@example Tutorial_Scattering
+```julia
 μ_pf, w_μ_pf, p11, C_ext, C_sca, g = phase_function(aero, λ, r_max, nquad_radius)
 println("phase_function C_ext = ", C_ext, ", C_sca = ", C_sca, ", g = ", g)
 
 XS_ext, XS_sca, Cext_eff, Csca_eff = compute_aerosol_XS(aero, λ, r_max, nquad_radius)
 println("compute_aerosol_XS XS_ext = ", XS_ext, ", XS_sca = ", XS_sca)
 println("compute_aerosol_XS Cext_eff = ", Cext_eff, ", Csca_eff = ", Csca_eff)
-````
+```
 
 ---
 
@@ -206,7 +206,7 @@ aerosol_optics_PCW = compute_aerosol_optical_properties(model_PCW)
 
 Set `ENV["VSMARTMOM_RUN_HEAVY_DOCS"]="true"` before execution to enable.
 
-````@example Tutorial_Scattering
+```julia
 if get(ENV, "VSMARTMOM_RUN_HEAVY_DOCS", "false") == "true"
     if HAS_PLOTS
         anim = Plots.Animation()
@@ -229,7 +229,7 @@ if get(ENV, "VSMARTMOM_RUN_HEAVY_DOCS", "false") == "true"
         @warn "Skipping heavy animation because Plots.jl is not installed."
     end
 end
-````
+```
 
 ---
 

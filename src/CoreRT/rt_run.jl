@@ -114,6 +114,12 @@ function rt_run(RS_type::AbstractRamanType,
         #TODO: if RS_type!=noRS, create ϖ_λ₁λ₀, i_λ₁λ₀, fscattRayl, Z⁺⁺_λ₁λ₀, Z⁻⁺_λ₁λ₀ (for input), and ieJ₀⁺, ieJ₀⁻, ieR⁺⁻, ieR⁻⁺, ieT⁻⁻, ieT⁺⁺, ier⁺⁻, ier⁻⁺, iet⁻⁻, iet⁺⁺ (for output)
     #getRamanSSProp(RS_type, λ, grid_in)
 
+    # Pre-initialize canopy cache before the Fourier loop (Zazi precomputation is expensive)
+    if brdf isa CanopySurface && brdf._cache === nothing
+        @timeit "Canopy cache init" _init_canopy_cache!(
+            brdf, added_layer_surface, pol_type, quad_points, model.params.architecture)
+    end
+
     # Loop over fourier moments
     for m = 0:max_m - 1
 

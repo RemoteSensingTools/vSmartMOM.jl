@@ -1,11 +1,32 @@
 #=
 
-This file contains the entry point for running the RT simulation, rt_run. 
+This file contains the DEPRECATED entry point for canopy RT.
 
-There are two implementations: one that accepts the raw parameters, and one that accepts
-the model. The latter should generally be used by users. 
+Use `CanopySurface` as the surface BRDF in `rt_run()` instead.
+`CanopySurface` integrates canopy sub-layers directly into the standard
+`rt_run()` flow via `create_surface_layer!` dispatch, supporting:
+  - Single-layer (big-leaf) and multi-layer canopies
+  - Optional within-canopy atmospheric absorption
+  - YAML configuration
+  - Linearized RT (Jacobians w.r.t. LAI, leaf R/T, soil albedo)
+
+Example migration:
+
+    # Old:
+    R_SFI, T_SFI, ... = rt_run_canopy(RS_type, model, LAD, LAI, BiLambMod, ω, iBand)
+
+    # New:
+    model.params.brdf[1] = CanopySurface(;
+        soil = LambertianSurfaceScalar(soil_albedo),
+        LAI  = LAI, n_layers = 1,
+        leaf_reflectance = leaf_R, leaf_transmittance = leaf_T)
+    R_SFI, T_SFI, ... = rt_run(RS_type, model, iBand)
 
 =#
+
+Base.depwarn(
+    "`rt_run_canopy` is deprecated. Use `CanopySurface` as the surface type in `rt_run()` instead.",
+    :rt_run_canopy)
 
 function rt_run_canopy(RS_type::AbstractRamanType, 
                     model::vSmartMOM_Model, LAD, LAI, BiLambMod, ϖ_canopy, iBand)

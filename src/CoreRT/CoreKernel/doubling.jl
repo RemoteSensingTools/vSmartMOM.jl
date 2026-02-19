@@ -27,14 +27,11 @@ function doubling_helper!(pol_type,
     # Note: short-circuit evaluation => return nothing evaluated iff ndoubl == 0 
     ndoubl == 0 && return nothing
     
-    # Geometric progression of reflections (1-RR)⁻¹
-    #gp_refl      = temp1# similar(t⁺⁺)
+    @timeit "doubling_allocs" begin
     tt⁺⁺_gp_refl = similar(t⁺⁺)
-    #temp = similar(t⁺⁺)
-    # Dummy for source 
     j₁⁺ = similar(j₀⁺)
-    # Dummy for J
     j₁⁻  = similar(j₀⁻)
+    end
     #temp = similar(t⁺⁺)
     # Pointers to avoid memory allocation in CUBLAS routines
     #@timeit "Pointers" gp_ptrs   = CUBLAS.unsafe_strided_batch(gp_refl)
@@ -42,16 +39,15 @@ function doubling_helper!(pol_type,
     # Loop over number of doublings
     for n = 1:ndoubl
         @timeit "Batch Inv Doubling" compute_geometric_progression!(temp1, tt⁺⁺_gp_refl, r⁻⁺, t⁺⁺, I_static, temp2, temp1_ptr, temp2_ptr)
-        doubling_source_update!(j₀⁺, j₀⁻, j₁⁺, j₁⁻, r⁻⁺, tt⁺⁺_gp_refl, expk)
-        doubling_rt_update!(r⁻⁺, t⁺⁺, tt⁺⁺_gp_refl, expk)
+        @timeit "source_update" doubling_source_update!(j₀⁺, j₀⁻, j₁⁺, j₁⁻, r⁻⁺, tt⁺⁺_gp_refl, expk)
+        @timeit "rt_update" doubling_rt_update!(r⁻⁺, t⁺⁺, tt⁺⁺_gp_refl, expk)
     end
-    synchronize_if_gpu()
+    @timeit "sync_doubling" synchronize_if_gpu()
 
-    # After doubling, revert D(DR)->R, where D = Diagonal{1,1,-1,-1}
+    @timeit "apply_D_matrix" begin
     apply_D_matrix!(pol_type.n, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻)
-
-    # For SFI, after doubling, revert D(DJ₀⁻)->J₀⁻
     apply_D_matrix_SFI!(pol_type.n, j₀⁻)
+    end
 #    CUBLAS.unsafe_free!(temp_ptrs);
 #    CUBLAS.unsafe_free!(gp_ptrs);
     return nothing 

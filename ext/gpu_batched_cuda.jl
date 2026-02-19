@@ -18,24 +18,24 @@ function vSmartMOM.CoreRT.batch_solve!(X::CuArray{FT,3}, A::CuArray{FT,3}, B::Cu
 
     # LU-factorize A
     pivot, info = CUDA.CUBLAS.getrf_strided_batched!(A, true)
-    vSmartMOM.CoreRT.synchronize()
+    vSmartMOM.Architectures.synchronize_if_gpu()
 
     # Invert LU factorization of A
     CUDA.CUBLAS.getri_strided_batched!(A, temp, pivot)
 
     # X = inv(A) * B
     NNlib.batched_mul!(X, temp, B)
-    vSmartMOM.CoreRT.synchronize()
+    vSmartMOM.Architectures.synchronize_if_gpu()
 end
 
 "Given 3D CuArray A, fill in X[:,:,k] = A[:,:,k] \\ I" 
 function vSmartMOM.CoreRT.batch_inv!(X::CuArray{FT,3}, A::CuArray{FT,3}) where {FT}
     # LU-factorize A
     @timeit "getrf_strided" pivot, info = CUDA.CUBLAS.getrf_strided_batched!(A, true)
-    vSmartMOM.CoreRT.synchronize()
+    vSmartMOM.Architectures.synchronize_if_gpu()
     # Invert LU factorization of A
     @timeit "getri_strided" CUDA.CUBLAS.getri_strided_batched!(A, X, pivot)
-    vSmartMOM.CoreRT.synchronize()
+    vSmartMOM.Architectures.synchronize_if_gpu()
 end
 
 """
@@ -48,10 +48,10 @@ function vSmartMOM.CoreRT.batch_inv!(X::CuArray{FT,3}, A::CuArray{FT,3},
                                       ws::vSmartMOM.CoreRT.RTWorkspace) where {FT}
     # LU-factorize A using pre-allocated pivot/info
     pivot, info = CUDA.CUBLAS.getrf_strided_batched!(A, true)
-    vSmartMOM.CoreRT.synchronize()
+    vSmartMOM.Architectures.synchronize_if_gpu()
     # Invert LU factorization of A using pre-allocated output
     CUDA.CUBLAS.getri_strided_batched!(A, X, pivot)
-    vSmartMOM.CoreRT.synchronize()
+    vSmartMOM.Architectures.synchronize_if_gpu()
 end
 
 "Given 3D CuArray A with pointers, fill in X[:,:,k] = A[:,:,k] \\ I (Float32 version)" 
@@ -64,11 +64,11 @@ function vSmartMOM.CoreRT.batch_inv!(X::CuArray{FT,3}, A::CuArray{FT,3}, Xptrs, 
     @timeit "pivot" pivot = CUDA.zeros(Cint, (n, batchSize))
 
     CUDA.CUBLAS.cublasSgetrfBatched(CUDA.CUBLAS.handle(), n, Aptrs, lda, pivot, info, batchSize)
-    vSmartMOM.CoreRT.synchronize()
+    vSmartMOM.Architectures.synchronize_if_gpu()
     
     # Invert LU factorization of A
     CUDA.CUBLAS.cublasSgetriBatched(CUDA.CUBLAS.handle(), n, Aptrs, lda, pivot, Xptrs, lda, info, batchSize)
-    vSmartMOM.CoreRT.synchronize()
+    vSmartMOM.Architectures.synchronize_if_gpu()
 end
 
 "Given 3D CuArray A with pointers, fill in X[:,:,k] = A[:,:,k] \\ I (Float64 version)" 
@@ -81,11 +81,11 @@ function vSmartMOM.CoreRT.batch_inv!(X::CuArray{FT,3}, A::CuArray{FT,3}, Xptrs, 
     @timeit "pivot" pivot = CUDA.zeros(Cint, (n, batchSize))
 
     CUDA.CUBLAS.cublasDgetrfBatched(CUDA.CUBLAS.handle(), n, Aptrs, lda, pivot, info, batchSize)
-    vSmartMOM.CoreRT.synchronize()
+    vSmartMOM.Architectures.synchronize_if_gpu()
     
     # Invert LU factorization of A
     CUDA.CUBLAS.cublasDgetriBatched(CUDA.CUBLAS.handle(), n, Aptrs, lda, pivot, Xptrs, lda, info, batchSize)
-    vSmartMOM.CoreRT.synchronize()
+    vSmartMOM.Architectures.synchronize_if_gpu()
 end
 
 """

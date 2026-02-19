@@ -56,12 +56,21 @@ end
 
 @inline architecture(::Array) = CPU()
 
+"""
+    array_type(arch::AbstractArchitecture)
+
+Return the array constructor for the given architecture (`Array` for CPU, `CuArray` for GPU).
+"""
 @inline array_type(::CPU) = Array
 
 # GPU array_type - will be defined in CUDAExt when CUDA is loaded
 # No fallback method defined to avoid precompilation errors
 
-# Default to CPU, GPU support requires CUDA extension
+"""
+    default_architecture()
+
+Return `GPU()` if CUDA is available, otherwise `CPU()`.
+"""
 default_architecture() = has_cuda() ? GPU() : CPU()
 
 # Synchronization - calls the sync function (set by CUDAExt if CUDA is loaded)

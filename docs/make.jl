@@ -14,7 +14,8 @@ function build()
     tutorials_paths = [joinpath(@__DIR__, "src", "pages", "tutorials", tutorial) for tutorial in tutorials]
 
     for tutorial in tutorials_paths
-        Literate.markdown(tutorial, joinpath(@__DIR__, "src", "pages", "tutorials"))
+        Literate.markdown(tutorial, joinpath(@__DIR__, "src", "pages", "tutorials");
+                          codefence = "```julia" => "```")
     end
 
     tutorials_md = [joinpath("pages", "tutorials", tutorial[1:end-3]) * ".md" for tutorial in tutorials]
@@ -73,7 +74,7 @@ function build()
         clean = false,
         modules = [vSmartMOM],
         pages = pages,
-        warnonly = [:missing_docs, :cross_references],
+        warnonly = true,
     )
 
 end

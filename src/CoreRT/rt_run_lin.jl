@@ -76,6 +76,16 @@ function rt_run(model::vSmartMOM_Model,
     rt_run(noRS(), model, lin_model, NAer, NGas, NSurf, i_band)
 end
 
+"""
+    rt_run_lin(model, lin_model, NAer, NGas, NSurf; i_band=1)
+
+Convenience alias for the linearized `rt_run` overload.  Equivalent to
+`rt_run(model, lin_model, NAer, NGas, NSurf; i_band)`.
+"""
+rt_run_lin(model::vSmartMOM_Model, lin_model::vSmartMOM_Lin,
+           NAer::Int, NGas::Int, NSurf::Int; i_band::Integer = 1) =
+    rt_run(model, lin_model, NAer, NGas, NSurf; i_band)
+
 # Just to make sure we still have it:
 function rt_run_test(RS_type::AbstractRamanType, 
         model::vSmartMOM_Model, 

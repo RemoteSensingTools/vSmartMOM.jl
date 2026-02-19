@@ -125,10 +125,10 @@ end
 
 using vSmartMOM.Scattering
 
-aer = params.scattering_params.rt_aerosols[1]
+rt_aer = params.scattering_params.rt_aerosols[1]
 truncation_type = Scattering.δBGE{Float64}(params.l_trunc, params.Δ_angle)
 mie_model = make_mie_model(params.scattering_params.decomp_type,
-                            aer, params.scattering_params.λ_ref,
+                            rt_aer.aerosol, params.scattering_params.λ_ref,
                             params.polarization_type,
                             truncation_type,
                             params.scattering_params.r_max,

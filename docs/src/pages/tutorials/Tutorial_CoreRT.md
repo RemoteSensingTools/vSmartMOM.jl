@@ -13,34 +13,35 @@ This tutorial is intentionally lightweight. It shows:
 
 ## 1) Minimal run
 
-````@example Tutorial_CoreRT
+```julia
 using vSmartMOM
 using vSmartMOM.CoreRT
-````
+```
 
-Start from package defaults and make small runtime choices.
+Load a simple pure-Rayleigh test case (no aerosols, no gas absorption).
 
-````@example Tutorial_CoreRT
-params = default_parameters()
+```julia
+params = parameters_from_yaml(
+    joinpath(dirname(dirname(pathof(vSmartMOM))),
+             "test", "test_parameters", "PureRayleighParameters.yaml"))
+params.architecture = vSmartMOM.Architectures.CPU()
 params.max_m = 2
 params.l_trunc = 20
-params.vza = [0.0, 30.0, 60.0]
-params.vaz = [0.0, 0.0, 0.0]
-````
+```
 
-Build the model and run one spectral band.
+Build the model and run.
 
-````@example Tutorial_CoreRT
+```julia
 model = model_from_parameters(params)
-result = rt_run(model, i_band = 1)
-````
+R, T = rt_run(model)
+```
 
-result[1] is top-of-atmosphere reflected field (SFI branch).
+R is the top-of-atmosphere reflected Stokes field [nVZA × nStokes × nSpec].
 
-````@example Tutorial_CoreRT
-R_SFI = result[1]
-size(R_SFI)
-````
+```julia
+println("R shape: ", size(R))
+println("R(nadir, I, λ₁) = ", R[1, 1, 1])
+```
 
 ## 2) What happens internally
 
