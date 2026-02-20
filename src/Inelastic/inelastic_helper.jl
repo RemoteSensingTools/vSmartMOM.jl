@@ -1,14 +1,4 @@
-const c₂                 = 1.4387769
-const cMassMol           = 1.66053873e-27 #grams per molecule for unit molec. mass
-const cSqrtLn2divSqrtPi  = 0.469718639319144059835 #√(ln2/π)
-const cLn2               = 0.6931471805599 #ln2
-const cSqrtLn2           = 0.8325546111577 #√(ln2)
-const cSqrt2Ln2          = 1.1774100225 #√(2ln2)
-const cc_                = 2.99792458e8 #speed of light [m/s]
-const cBolts_            = 1.3806503e-23 #Boltzmann const. [J/K]
-const p_ref              = 1013.25  # reference pressure [hPa]
-const t_ref              = 296.0    # reference temperature [K]
-const nm_per_m           = 1.0e7
+# Physical constants (p_ref, t_ref, nm_per_m, cMassMol, etc.) are defined in raman_constants.jl
 
 function get_n₀_n₁(ieJ₁⁺,Δ)
     n₁_ = 1:size(ieJ₁⁺,3);
@@ -17,7 +7,6 @@ function get_n₀_n₁(ieJ₁⁺,Δ)
     sub = findall(1 .≤ n₀_ .≤ size(ieJ₁⁺,3));
     n₁ = n₁_[sub[1]]:n₁_[sub[end]]
     n₀ = n₀_[sub[1]]:n₀_[sub[end]]
-    #@show Δ, n₁, n₀
     return n₀, n₁
 end
 # Currently assuming same T for all vertical atmospheric layers (so that a uniform Raman wavelength grid can be assumed for rt_interactions)
@@ -225,8 +214,8 @@ function compute_ϖ_Cabannes(λ₀, n2, o2)
     σ_RRS =  n2.vmr * ((ν₀.+n2.effCoeff.Δν̃_RoRaman_coeff_JtoJp2).^4)' * n2.effCoeff.σ_RoRaman_coeff_JtoJp2
     σ_RRS += n2.vmr * ((ν₀.+n2.effCoeff.Δν̃_RoRaman_coeff_JtoJm2).^4)' * n2.effCoeff.σ_RoRaman_coeff_JtoJm2
 
-    σ_RRS += o2.vmr * ((ν₀.+n2.effCoeff.Δν̃_RoRaman_coeff_JtoJp2).^4)' * n2.effCoeff.σ_RoRaman_coeff_JtoJp2
-    σ_RRS += o2.vmr * ((ν₀.+n2.effCoeff.Δν̃_RoRaman_coeff_JtoJm2).^4)' * n2.effCoeff.σ_RoRaman_coeff_JtoJm2
+    σ_RRS += o2.vmr * ((ν₀.+o2.effCoeff.Δν̃_RoRaman_coeff_JtoJp2).^4)' * o2.effCoeff.σ_RoRaman_coeff_JtoJp2
+    σ_RRS += o2.vmr * ((ν₀.+o2.effCoeff.Δν̃_RoRaman_coeff_JtoJm2).^4)' * o2.effCoeff.σ_RoRaman_coeff_JtoJm2
 
     #σ_RVRS =  n2.vmr * ((ν₀.+n2.effCoeff.Δν̃_RoVibRaman_coeff_0to1_JtoJp2).^4)' * n2.effCoeff.σ_RoVibRaman_coeff_0to1_JtoJp2
     #σ_RVRS += n2.vmr * ((ν₀.+n2.effCoeff.Δν̃_RoVibRaman_coeff_0to1_JtoJm2).^4)' * n2.effCoeff.σ_RoVibRaman_coeff_0to1_JtoJm2
@@ -245,8 +234,6 @@ function compute_ϖ_Cabannes(λ₀, n2, o2)
     #RS_type.ϖ_Cabannes = σ_elastic/(σ_VRS+σ_RVRS+σ_RRS+σ_elastic);
     #ϖ_Cabannes = σ_elastic/(σ_VRS+σ_RVRS+σ_RRS+σ_elastic);
     ϖ_Cabannes = σ_elastic/(σ_RRS+σ_elastic);
-    #@show σ_elastic
-    #@show σ_RRS+σ_elastic
     return ϖ_Cabannes;
 end
 
@@ -281,8 +268,6 @@ function compute_ϖ_Cabannes_VS(λ₀, n2, o2)
     #RS_type.ϖ_Cabannes = σ_elastic/(σ_VRS+σ_RVRS+σ_RRS+σ_elastic);
     #ϖ_Cabannes = σ_elastic/(σ_VRS+σ_RVRS+σ_RRS+σ_elastic);
     ϖ_Cabannes_VS = σ_elastic/(σ_RVRS+σ_VRS+σ_elastic);
-    #@show σ_elastic
-    #@show σ_RVRS+σ_VRS+σ_elastic
     return ϖ_Cabannes_VS;
 end
 
@@ -307,8 +292,6 @@ function compute_ϖ_Cabannes(λ₀, mol)
     #RS_type.ϖ_Cabannes = σ_elastic/(σ_VRS+σ_RVRS+σ_RRS+σ_elastic);
     #ϖ_Cabannes = σ_elastic/(σ_VRS+σ_RVRS+σ_RRS+σ_elastic);
     ϖ_Cabannes = σ_elastic/(σ_RRS+σ_elastic);
-    #@show σ_elastic
-    #@show σ_RRS+σ_elastic
     return ϖ_Cabannes;
 end
 
@@ -389,7 +372,6 @@ function compute_γ_mol_Rayleigh!(λ₀::FT, mol) where FT
     γ_mol_Rayleigh = 0.5*((3*tmp-1)/(2*tmp+1))
 
     tmp_chk = 0.5*(3*(1+2γ_mol_Cabannes) - ϖ_Cabannes*(3-4γ_mol_Cabannes))/(2*(1+2γ_mol_Cabannes) + ϖ_Cabannes*(3-4γ_mol_Cabannes))
-    #@show γ_mol_Rayleigh, tmp_chk
     return ϖ_Cabannes, γ_mol_Cabannes, γ_mol_Rayleigh
 end
 
@@ -448,10 +430,9 @@ function apply_lineshape!(Δνᵢ, σᵢ,  # discrete transitions
             # Compute Doppler HWHM, ν still needs to be supplied, @Suniti?:
             γ_d = ((cSqrt2Ln2 / cc_) * sqrt(cBolts_ / cMassMol) * sqrt(temperature) * ν / sqrt(molMass))
 
-            # line intensity 
+            # line intensity
             S = σᵢ[j] *  ν^4 #Suniti
             S_sum += S
-            #@show γ_d, Δνᵢ[j], S, ν, λ₀, cMassMol
 
             wing_cutoff = 2γ_d 
 
@@ -467,13 +448,11 @@ function apply_lineshape!(Δνᵢ, σᵢ,  # discrete transitions
             for I in eachindex(grid_view)
                 # If we undersample the line-width, we have to make sure the integral is conserved (almost), TBD
                 @inbounds result_view[I] += S * cSqrtLn2divSqrtPi * exp(-cLn2 * (((grid_view[I]) - Δνᵢ[j]) / γ_d)^2) / γ_d
-                #@show grid_view[I], result_view[I]
             end
         end
     end
     #dν = Δν_out[2]-Δν_out[1] 
-    nothing  
-    #@show S_sum, sum(σ_out)*dν
+    nothing
 end
 
 function apply_gridlines!(Δνᵢ, σᵢ,  # discrete transitions
@@ -507,7 +486,6 @@ function apply_gridlines!(Δνᵢ, σᵢ,  # discrete transitions
     S_sum = 0.0
     # Loop through all transition lines:
     for j in eachindex(Δνᵢ)
-        #@show(grid_min, Δνᵢ[j], grid_max)
         # Test that this ν lies within the grid
         if grid_min < Δνᵢ[j] < grid_max
             
@@ -517,11 +495,9 @@ function apply_gridlines!(Δνᵢ, σᵢ,  # discrete transitions
             #γ_d = ((cSqrt2Ln2 / cc_) * sqrt(cBolts_ / cMassMol) * sqrt(temperature) * ν / sqrt(molMass))
             # line intensity 
             S = σᵢ[j] *  ν^4 #Suniti
-            #@show γ_d, Δνᵢ[j], S, ν, λ₀, cMassMol
             S_sum += S
             #wing_cutoff = 2γ_d 
             i=argmin(abs.(Δνᵢ[j].-Δν_in))
-            #@show i, Δνᵢ[j]-Δν_in[i]    
             if Δν_in[i]<Δνᵢ[j]
                 ind_start = i
                 ind_stop  = i+1
@@ -541,11 +517,9 @@ function apply_gridlines!(Δνᵢ, σᵢ,  # discrete transitions
             for I in eachindex(grid_view)
                 # If we undersample the line-width, we have to make sure the integral is conserved (almost), TBD
                 @inbounds result_view[I] += S/2.# * cSqrtLn2divSqrtPi * exp(-cLn2 * (((grid_view[I]) - Δνᵢ[j]) / γ_d)^2) / γ_d
-                #@show grid_view[I], result_view[I]
             end
         end
     end
-    #@show S_sum, sum(σ_out)
     nothing
 end
 
@@ -574,7 +548,6 @@ function compute_optical_RS!(RS_type::Union{RRS, RRS_plus}, grid_in, λ₀, n2, 
     #apply_lineshape!(n2.effCoeff.Δν̃_RoRaman_coeff_JtoJp2, n2.effCoeff.σ_RoRaman_coeff_JtoJp2,  λ₀, collect(grid_out), σ_out, 1, 300.0, 28);
     apply_gridlines!(n2.effCoeff.Δν̃_RoRaman_coeff_JtoJp2, n2.effCoeff.σ_RoRaman_coeff_JtoJp2,  λ₀, collect(grid_in), σ_out);
     atmo_σ_RRS_JtoJp2 = n2.vmr * σ_out #cross section in cm^2
-    #@show length(atmo_σ_RRS_JtoJp2[atmo_σ_RRS_JtoJp2.>0])
     #for I in eachindex(grid_out)
     #    @show grid_out[I], σ_out[I]
     #end
@@ -582,17 +555,14 @@ function compute_optical_RS!(RS_type::Union{RRS, RRS_plus}, grid_in, λ₀, n2, 
     #apply_lineshape!(n2.effCoeff.Δν̃_RoRaman_coeff_JtoJm2, n2.effCoeff.σ_RoRaman_coeff_JtoJm2, λ₀, collect(grid_out), σ_out, 1, 300.0, 40);
     apply_gridlines!(n2.effCoeff.Δν̃_RoRaman_coeff_JtoJm2, n2.effCoeff.σ_RoRaman_coeff_JtoJm2, λ₀, collect(grid_in), σ_out);
     atmo_σ_RRS_JtoJm2 = n2.vmr * σ_out #cross section in cm^2
-    #@show length(atmo_σ_RRS_JtoJm2[atmo_σ_RRS_JtoJm2.>0])
     # O2
     #apply_lineshape!(o2.effCoeff.Δν̃_RoRaman_coeff_JtoJp2, o2.effCoeff.σ_RoRaman_coeff_JtoJp2, λ₀, collect(grid_out), σ_out, 1, 300.0, 28);
     apply_gridlines!(o2.effCoeff.Δν̃_RoRaman_coeff_JtoJp2, o2.effCoeff.σ_RoRaman_coeff_JtoJp2, λ₀, grid_in, σ_out);
     atmo_σ_RRS_JtoJp2 += o2.vmr * σ_out #cross section in cm^2
-    #@show length(atmo_σ_RRS_JtoJp2[atmo_σ_RRS_JtoJp2.>0])
 
     #apply_lineshape!(o2.effCoeff.Δν̃_RoRaman_coeff_JtoJm2, o2.effCoeff.σ_RoRaman_coeff_JtoJm2, λ₀, collect(grid_out), σ_out, 1, 300.0, 40);
     apply_gridlines!(o2.effCoeff.Δν̃_RoRaman_coeff_JtoJm2, o2.effCoeff.σ_RoRaman_coeff_JtoJm2, λ₀, grid_in, σ_out);
     atmo_σ_RRS_JtoJm2 += o2.vmr * σ_out #cross section in cm^2
-    #@show length(atmo_σ_RRS_JtoJm2[atmo_σ_RRS_JtoJm2.>0])
 
     σ_tmp .= atmo_σ_RRS_JtoJm2 .+ atmo_σ_RRS_JtoJp2
     atmo_σ_RRS = σ_tmp[σ_tmp.>0]
@@ -601,9 +571,6 @@ function compute_optical_RS!(RS_type::Union{RRS, RRS_plus}, grid_in, λ₀, n2, 
     if (nm_per_m/λ₀>grid_in[1] && nm_per_m/λ₀<grid_in[end])
         index_ramangrid_out .-= argmin(abs.(grid_in .- nm_per_m/λ₀))
     end 
-    #for I in eachindex(atmo_σ_RRS)
-    #    @show grid_in[argmin(abs.(grid_in .- nm_per_m/λ₀))+index_ramangrid_out[I]], index_ramangrid_out[I], atmo_σ_RRS[I]
-    #end    
     return index_ramangrid_out, atmo_σ_RRS;
     #plot(grid_out, atmo_σ_RRS_JtoJp2, yscale=:log10)
     #plot(1.e7/λ₀ .+ grid_out, atmo_σ_RRS_plot*1.e40)
@@ -613,8 +580,6 @@ function compute_optical_RS!(RS_type::Union{VS_0to1, VS_0to1_plus}, grid_in, λ�
     #plotly()
     #get_greek_raman(RS_type, n2, o2)
     #compute_ϖ_Cabannes!(RS_type, λ₀, n2, o2)
-
-    #@show n2.effCoeff.Δν̃_VibRaman_coeff_0to1_hires[0], o2.effCoeff.Δν̃_VibRaman_coeff_0to1_hires[0]
     #νᵣ = 0.5*(n2.effCoeff.Δν̃_VibRaman_coeff_0to1_hires[0] + o2.effCoeff.Δν̃_VibRaman_coeff_0to1_hires[0])
     
     # TMP: grid_in = nm_per_m/λ₀ .+ collect((νᵣ-750):0.002:(νᵣ+750))
@@ -674,17 +639,11 @@ function compute_optical_RS!(RS_type::Union{VS_1to0, VS_1to0_plus}, grid_in, λ�
     #plotly()
     get_greek_raman(RS_type, n2, o2)
     compute_ϖ_Cabannes!(RS_type, λ₀, n2, o2)
-    #@show n2.effCoeff.Δν̃_VibRaman_coeff_1to0_hires[0], o2.effCoeff.Δν̃_VibRaman_coeff_1to0_hires[0]
     νᵣ = 0.5*(n2.effCoeff.Δν̃_VibRaman_coeff_1to0_hires[0] + o2.effCoeff.Δν̃_VibRaman_coeff_1to0_hires[0])
         
     # TMP: grid_in = nm_per_m/λ₀ + collect((νᵣ-750):0.002:(νᵣ+750))
     σ_out = similar(collect(grid_in));        
-    atmo_σ_VRS_1to0 = similar(grid_in);
-    atmo_σ_RVRS_1to0 = similar(grid_in);
-    σ_tmpVRS = similar(grid_in);
-    σ_tmpRVRS = similar(grid_in);
 
-    #@show n2.effCoeff.Δν̃_VibRaman_coeff_1to0_hires[1], o2.effCoeff.Δν̃_VibRaman_coeff_1to0_hires[1]
     #νᵣ = 0.5*(n2.effCoeff.Δν̃_VibRaman_coeff_1to0_hires[1] + o2.effCoeff.Δν̃_VibRaman_coeff_1to0_hires[1])
     #grid_out = (νᵣ-750):0.002:(νᵣ+750)
     #σ_out = similar(collect(grid_out));
@@ -715,13 +674,13 @@ function compute_optical_RS!(RS_type::Union{VS_1to0, VS_1to0_plus}, grid_in, λ�
     apply_gridlines!(xin, yin, λ₀, grid_in, σ_out);
     σ_VRStmp += o2.vmr * σ_out #cross section in cm^2
 
-    atmo_σ_VRS_1to0 .= σ_tmpVRS(σ_VRStmp.>0)
+    atmo_σ_VRS_1to0 = σ_VRStmp[σ_VRStmp.>0]
     #finding all indices of σ_out (and hence of ν_in) that have finite (non-zero) values
-    index_VRSgrid_out = findall(x->x in σ_tmpVRS[σ_tmpVRS.>0],σ_tmpVRS)
+    index_VRSgrid_out = findall(x->x in σ_VRStmp[σ_VRStmp.>0],σ_VRStmp)
 
-    atmo_σ_RVRS_1to0 .= σ_tmpRVRS(σ_RVRStmp.>0)
+    atmo_σ_RVRS_1to0 = σ_RVRStmp[σ_RVRStmp.>0]
     #finding all indices of σ_out (and hence of ν_in) that have finite (non-zero) values
-    index_RVRSgrid_out = findall(x->x in σ_tmpRVRS[σ_tmpRVRS.>0],σ_tmpRVRS)
+    index_RVRSgrid_out = findall(x->x in σ_RVRStmp[σ_RVRStmp.>0],σ_RVRStmp)
 
     return index_VRSgrid_out, atmo_σ_VRS_1to0, index_RVRSgrid_out, atmo_σ_RVRS_1to0;
     #plot(grid_out, atmo_σ_RRS_JtoJp2, yscale=:log10)

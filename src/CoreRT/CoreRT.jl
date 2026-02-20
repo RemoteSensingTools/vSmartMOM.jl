@@ -14,6 +14,8 @@ using LinearAlgebra                # For linear algebra routines
 using ProgressMeter                # Showing progress in for loops
 using Distributions                # Distributions of aerosols
 using Parameters                   # For keyword arguments in structs
+using Unitful                      # For unit-aware conversions
+using UnitfulEquivalences          # For spectral equivalences (nm ↔ cm⁻¹)
 using ..Scattering                 # Use scattering module
 using ..Absorption                 # Use absorption module
 using ..InelasticScattering        # Use Inelastic Scattering module
@@ -23,8 +25,6 @@ using ...Architectures             # Use Architectures module
 using KernelAbstractions           # Abstracting code for CPU/GPU
 using KernelAbstractions.Extras
 
-using Unitful                      # For parsing 
-using UnitfulEquivalences          # For converting between wavenumber / wavelength
 using FastGaussQuadrature          # Computes quadrature points (Gauss, legendre, Radau,...)
 using TimerOutputs                 # For timing sections of the code
 using DocStringExtensions          # For documenting
@@ -136,6 +136,6 @@ export lin_added_layer_all_params,            # 3 params -> all params chain rul
 
 # Export types to show easily
 export GaussQuadFullSphere, LambertianSurfaceScalar, LambertianSurfaceSpectrum,
-       CanopySurface, invalidate_canopy_cache!
+       CanopySurface, CanopySurface_from_prospect, invalidate_canopy_cache!
 
 end

@@ -31,7 +31,7 @@ function rt_set_streams(::GaussQuadHemisphere,
 
     Nquad = (Ltrunc + 1) ÷ 2
 
-    qp_μ, wt_μ = Scattering.gauleg(Nquad, 0.0, 1.0) # quadrature limits are 0.0-1.0
+    qp_μ, wt_μ = Scattering.gauleg(Nquad, zero(FT), one(FT)) # quadrature limits are 0.0-1.0
     
     # Solar angle
     μ₀ = cosd.(sza)

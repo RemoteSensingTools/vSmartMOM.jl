@@ -74,7 +74,7 @@ function create_surface_layer!(RS_type::noRS,
     #@show i₀
     if m == 0
         # Albedo normalized by π (and factor 2 for 0th Fourier Moment)
-        ρ = 2lambertian.albedo#/FT(π)
+        ρ = FT(2) * lambertian.albedo#/FT(π)
         
         R_surf = Matrix(Diagonal(vcat(ρ, zeros(FT,pol_type.n-1))))
         R_surf = repeat(R_surf',Nquad)
@@ -104,12 +104,12 @@ function create_surface_layer!(RS_type::noRS,
             #@show size(Ḟ₀_NquadN[:,i₀,:]), size(-reshape(tmpF,1,n,nspec).*reshape(τ̇_sum,nparams, 1, nspec)/μ₀)
             Ḟ₀_NquadN[1:nparams,i₀,:] .= -reshape(tmpF,1,n,nspec).*reshape(τ̇_sum, nparams, 1, nspec)/μ₀ # , arr_type(zeros(1, n, nspec)); dims=1)
 
-            added_layer.j₀⁺[:,:,:] .= 0.;#
+            added_layer.j₀⁺[:,:,:] .= zero(FT);#
             added_layer.j₀⁻[:,1,:] .= μ₀*(R_surf*F₀_NquadN)#/FT(π);
             #added_layer_lin.J̇₀⁺[:,:,:,:] .= 0.;#
             
 
-            added_layer_lin.ap_J̇₀⁺[:,:,1,:] .= 0.0
+            added_layer_lin.ap_J̇₀⁺[:,:,1,:] .= zero(FT)
             for ii=1:nspec
                 for ctr=1:nparams
                     added_layer_lin.ap_J̇₀⁻[ctr,:,1,ii] .= μ₀*R_surf*Ḟ₀_NquadN[ctr,:,ii]#/FT(π);
@@ -132,29 +132,29 @@ function create_surface_layer!(RS_type::noRS,
         #@show size(added_layer.r⁻⁺), size(R_surf), size(added_layer.j₀⁻)
         #@show size(added_layer.r⁻⁺), size(R_surf)
         added_layer.r⁻⁺ .= R_surf;
-        added_layer.r⁺⁻ .= 0;
+        added_layer.r⁺⁻ .= zero(FT);
         added_layer.t⁺⁺ .= T_surf;#1. #0.0; #T_surf;
-        added_layer.t⁻⁻ .= 0.0; #T_surf;
+        added_layer.t⁻⁻ .= zero(FT); #T_surf;
 
         added_layer_lin.ap_ṙ⁻⁺[iparam,:,:,:] .= Ṙ_surf;
-        added_layer_lin.ap_ṙ⁺⁻ .= 0.0;
-        added_layer_lin.ap_ṫ⁺⁺ .= 0.0;#1. #0.0; #T_surf;
-        added_layer_lin.ap_ṫ⁻⁻ .= 0.0; #T_surf;
+        added_layer_lin.ap_ṙ⁺⁻ .= zero(FT);
+        added_layer_lin.ap_ṫ⁺⁺ .= zero(FT);#1. #0.0; #T_surf;
+        added_layer_lin.ap_ṫ⁻⁻ .= zero(FT); #T_surf;
 
     else
-        added_layer.r⁻⁺ .= 0;
-        added_layer.r⁻⁺ .= 0;
+        added_layer.r⁻⁺ .= zero(FT);
+        added_layer.r⁻⁺ .= zero(FT);
         added_layer.t⁺⁺ .= T_surf;
-        added_layer.t⁻⁻ .= 0.0; #T_surf;
-        added_layer.j₀⁺ .= 0;
-        added_layer.j₀⁻ .= 0;
+        added_layer.t⁻⁻ .= zero(FT); #T_surf;
+        added_layer.j₀⁺ .= zero(FT);
+        added_layer.j₀⁻ .= zero(FT);
 
-        added_layer_lin.ap_ṙ⁻⁺ .= 0.0;
-        added_layer_lin.ap_ṙ⁺⁻ .= 0.0;
-        added_layer_lin.ap_ṫ⁺⁺ .= 0.0;#1. #0.0; #T_surf;
-        added_layer_lin.ap_ṫ⁻⁻ .= 0.0;
-        added_layer_lin.ap_J̇₀⁺ .= 0.0
-        added_layer_lin.ap_J̇₀⁻ .= 0.0
+        added_layer_lin.ap_ṙ⁻⁺ .= zero(FT);
+        added_layer_lin.ap_ṙ⁺⁻ .= zero(FT);
+        added_layer_lin.ap_ṫ⁺⁺ .= zero(FT);#1. #0.0; #T_surf;
+        added_layer_lin.ap_ṫ⁻⁻ .= zero(FT);
+        added_layer_lin.ap_J̇₀⁺ .= zero(FT)
+        added_layer_lin.ap_J̇₀⁻ .= zero(FT)
     end
     #@show size(T_surf), size(R_surf)
     #@show T_surf

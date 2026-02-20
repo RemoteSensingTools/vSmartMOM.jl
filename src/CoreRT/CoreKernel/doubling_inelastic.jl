@@ -78,12 +78,6 @@ function doubling_helper!(RS_type::RRS,
                                 iet⁺⁺[:,:,n₁,Δn] ⊠ tmp2[:,:,n₀]
                 ieJ₀⁺[:,:,n₁,Δn] .= tmp3
                 ieJ₀⁻[:,:,n₁,Δn] .= tmp4
-                #if (n==ndoubl)
-                #@show Δn, J₀⁺[1:3,1,642], tmp2[1:3,1,642]
-                #@show Δn, J₀⁺[1:3,1,end], tmp2[1:3,1,end]
-                #@show Δn, ieJ₀⁺[1:3,1,642,Δn], ieJ₀⁻[1:3,1,642,Δn]
-                #@show Δn, ieJ₀⁺[1:3,1,642,nRaman-Δn+1], ieJ₀⁻[1:3,1,642,nRaman-Δn+1]
-                #end
             end
             
         #bla
@@ -96,10 +90,7 @@ function doubling_helper!(RS_type::RRS,
         end
         for Δn = 1:nRaman
                 n₀, n₁ = get_n₀_n₁(ieJ₁⁺,i_λ₁λ₀[Δn])
-                #@show n₁, n₀
-                
-                #@show Δn, length(n₀), length(n₁), n₀[1], n₀[end], n₁[1], n₁[end]
-                
+
                 @timeit "n loop 2" @inbounds @views tmp5 = 
                         tt⁺⁺_gp_refl[:,:,n₁] ⊠ 
                         (iet⁺⁺[:,:,n₁,Δn] + 
@@ -314,12 +305,9 @@ end
 @kernel function apply_D_IE_VS!(i_λ₁λ₀_all, n_stokes,  
                         ier⁻⁺, iet⁺⁺, ier⁺⁻, iet⁻⁻)
     iμ, jμ, Δn  = @index(Global, NTuple)
-    #@unpack i_λ₁λ₀ = RS_type 
-    #@show "here 3.1"
     n  = i_λ₁λ₀_all[Δn]
     i = mod(iμ, n_stokes)
     j = mod(jμ, n_stokes)
-    #@show n, i, j
     if (n>0)
         if !(1<=i<=2)
             ier⁻⁺[iμ,jμ,n,1] = - ier⁻⁺[iμ, jμ, n, 1]
@@ -453,18 +441,13 @@ function apply_D_matrix_SFI_IE!(RS_type::Union{VS_0to1_plus, VS_1to0_plus}, n_st
     n_stokes == 1 && return nothing
     device = devi(architecture(ieJ₀⁻))
     aType = array_type(architecture(ieJ₀⁻))
-    #@show "here 1"
     applyD_kernel_IE! = apply_D_SFI_IE_VS!(device)
-    #@show "here 2"
     event = applyD_kernel_IE!(aType(RS_type.i_λ₁λ₀_all), 
                     n_stokes, 
                     ieJ₀⁻, 
                     ndrange=getKernelDimSFI(RS_type, 
                             ieJ₀⁻, 
                             aType(RS_type.i_λ₁λ₀_all)));
-    #@show "here 3"
-    ##wait(device, event);
-    #@show "here 4"
     synchronize_if_gpu()
     return nothing
 end

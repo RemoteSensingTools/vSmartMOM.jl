@@ -66,15 +66,11 @@ function getRamanSSProp!(RS_type::sol_RRS, λ, grid_in)
     RS_type.greek_raman = get_greek_raman(RS_type, h2)
     #get_greek_raman!(RS_type, n2, o2)
     RS_type.ϖ_Cabannes .= compute_ϖ_Cabannes(RS_type, λ)
-    # @show RS_type.ϖ_Cabannes
     # determine RRS cross-sections to λ₀ from nSpecRaman wavelengths around λ₀  
     index_raman_grid, solar_σ_RRS = compute_stellar_RS!(RS_type, grid_in, λ, h2)
     # declare ϖ_Raman to be a grid of length raman grid
     #RS_type.ϖ_λ₁λ₀ = atmo_σ_RRS[end:-1:1]/atmo_σ_Rayl * (1-RS_type.ϖ_Cabannes[1])/sum(atmo_σ_RRS[end:-1:1]/atmo_σ_Rayl) #the grid gets inverted because the central wavelength is now seen as the recipient of RRS from neighboring source wavelengths
     RS_type.ϖ_λ₁λ₀ = (solar_σ_RRS[end:-1:1]/solar_σ_Rayl) #the grid gets inverted because the central wavelength is now seen as the recipient of RRS from neighboring source wavelengths
-    #@show RS_type.ϖ_λ₁λ₀
-    #@show sum(RS_type.ϖ_λ₁λ₀)
-    #@show RS_type.ϖ_Cabannes
     RS_type.i_λ₁λ₀ = index_raman_grid[end:-1:1]
     RS_type.n_Raman = length(RS_type.ϖ_λ₁λ₀)
     return nothing
@@ -115,8 +111,8 @@ function getRamanSSProp!(
             i_λ₁λ₀_all) = RS_type
     #n2, o2 = getRamanAtmoConstants(1.e7/λ, T)
     iBand = []
-    grid_in = []
-    bandSpecLim = []
+    grid_in = AbstractRange{Float64}[]
+    bandSpecLim = UnitRange{Int}[]
 
     nm_per_m = 1.e7;
     greek_raman = get_greek_raman(RS_type, h2)
@@ -164,11 +160,9 @@ function getRamanSSProp!(
         λ = nm_per_m/(0.5*(_grid_in[1]+_grid_in[end]))
         
         if iB==1
-            #@show InelasticScattering.compute_ϖ_Cabannes(RS_type, depol, λ_inc, n2, o2)
             ϖ_Cabannes[iB] = InelasticScattering.compute_ϖ_Cabannes(RS_type, λ_inc)
-            # 1.
         else
-            ϖ_Cabannes[iB] = 1.    #@show ϖ_Cabannes
+            ϖ_Cabannes[iB] = 1.
         end
         if iB==1
             t_ϖ_VRS = [0.]
@@ -195,8 +189,7 @@ function getRamanSSProp!(
         
     end
     n_Raman = 1;
-    bandSpecLim = [] # (1:τ_abs[iB])#zeros(Int64, iBand, 2) #Suniti: how to do this?
-    #Suniti: make bandSpecLim a part of RS_type (including noRS) so that it can be passed into rt_kernel and elemental/doubling/interaction and postprocessing_vza without major syntax changes
+    bandSpecLim = UnitRange{Int}[]
     nSpec = 0;
     for iB in iBand
         nSpec0 = nSpec+1;
@@ -245,8 +238,8 @@ function getRamanSSProp!(
         i_λ₁λ₀_all) = RS_type
     #n2, o2 = getRamanAtmoConstants(1.e7/λ, T)
     iBand = []
-    grid_in = []
-    bandSpecLim = []
+    grid_in = AbstractRange{Float64}[]
+    bandSpecLim = UnitRange{Int}[]
 
     nm_per_m = 1.e7;
     greek_raman = get_greek_raman(RS_type, h2)
@@ -294,7 +287,6 @@ function getRamanSSProp!(
 
     if iB==1
         ϖ_Cabannes[iB] = InelasticScattering.compute_ϖ_Cabannes(RS_type, λ_inc)
-        #@show ϖ_Cabannes
     else
         ϖ_Cabannes[iB] = 1.
     end
@@ -323,8 +315,7 @@ function getRamanSSProp!(
 
     end
     n_Raman = 1;
-    bandSpecLim = [] # (1:τ_abs[iB])#zeros(Int64, iBand, 2) #Suniti: how to do this?
-    #Suniti: make bandSpecLim a part of RS_type (including noRS) so that it can be passed into rt_kernel and elemental/doubling/interaction and postprocessing_vza without major syntax changes
+    bandSpecLim = UnitRange{Int}[]
     nSpec = 0;
     for iB in iBand
     nSpec0 = nSpec+1;
@@ -372,8 +363,8 @@ function getRamanSSProp!(
         i_λ₁λ₀_all) = RS_type
     #n2, o2 = getRamanAtmoConstants(1.e7/λ, T)
     iBand = []
-    grid_in = []
-    bandSpecLim = []
+    grid_in = AbstractRange{Float64}[]
+    bandSpecLim = UnitRange{Int}[]
 
     nm_per_m = 1.e7;
     greek_raman = get_greek_raman(RS_type, h2)
@@ -424,9 +415,7 @@ function getRamanSSProp!(
         #λ = nm_per_m/(0.5*(_grid_in[1]+_grid_in[end]))
 
         if iB==1
-            #@show InelasticScattering.compute_ϖ_Cabannes(RS_type, λ_inc)
             ϖ_Cabannes[iB] = InelasticScattering.compute_ϖ_Cabannes(RS_type, λ_inc)
-            #@show ϖ_Cabannes
         else
             ϖ_Cabannes[iB] = 1.
         end
@@ -457,8 +446,7 @@ function getRamanSSProp!(
 
     end
     n_Raman = 1;
-    bandSpecLim = [] # (1:τ_abs[iB])#zeros(Int64, iBand, 2) #Suniti: how to do this?
-    #Suniti: make bandSpecLim a part of RS_type (including noRS) so that it can be passed into rt_kernel and elemental/doubling/interaction and postprocessing_vza without major syntax changes
+    bandSpecLim = UnitRange{Int}[]
     nSpec = 0;
     for iB in iBand
         nSpec0 = nSpec+1;

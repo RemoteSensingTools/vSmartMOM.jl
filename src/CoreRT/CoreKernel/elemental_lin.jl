@@ -96,14 +96,14 @@ function elemental!(pol_type, SFI::Bool,
         # for m>0,  ₀∫²ᵖⁱ cos²(mϕ)dϕ/4π = 0.25  
         wct02 = fourier_weight(m, FT)
         wct2  = scaled_weights(m, wt_μN)
-        r⁻⁺ .= 0.0 
-        t⁺⁺ .= 0.0
-        ṙ⁻⁺ .= 0.0
-        ṫ⁺⁺ .= 0.0
-        j₀⁺ .= 0.0
-        j₀⁻ .= 0.0
-        J̇₀⁺ .= 0.0
-        J̇₀⁻ .= 0.0
+        r⁻⁺ .= zero(FT)
+        t⁺⁺ .= zero(FT)
+        ṙ⁻⁺ .= zero(FT)
+        ṫ⁺⁺ .= zero(FT)
+        j₀⁺ .= zero(FT)
+        j₀⁻ .= zero(FT)
+        J̇₀⁺ .= zero(FT)
+        J̇₀⁻ .= zero(FT)
                         
         # More computationally intensive definition of a single scattering layer with variable (0-∞) absorption
         # with absorption in batch mode, low tau_scatt but higher tau_total, needs exact equations
@@ -164,7 +164,7 @@ end
         n2 = n
     end
     
-    if (wct[j]>1.e-8) 
+    if (wct[j] > eps(FT)) 
         # 𝐑⁻⁺(μᵢ, μⱼ) = ϖ ̇𝐙⁻⁺(μᵢ, μⱼ) ̇(μⱼ/(μᵢ+μⱼ)) ̇(1 - exp{-τ ̇(1/μᵢ + 1/μⱼ)}) ̇𝑤ⱼ
         # d𝐑⁻⁺(μᵢ, μⱼ)/dτ = ϖ ̇𝐙⁻⁺(μᵢ, μⱼ) ̇(1/μᵢ) ̇exp{-τ ̇(1/μᵢ + 1/μⱼ)}  ̇𝑤ⱼ
         # d𝐑⁻⁺(μᵢ, μⱼ)/dϖ = 𝐙⁻⁺(μᵢ, μⱼ) ̇(μⱼ/(μᵢ+μⱼ)) ̇(1 - exp{-τ ̇(1/μᵢ + 1/μⱼ)}) ̇𝑤ⱼ

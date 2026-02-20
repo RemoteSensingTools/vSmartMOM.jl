@@ -26,7 +26,7 @@ Base.@kwdef mutable struct sol_RRS{FT<:AbstractFloat} <: AbstractRamanType
     Z⁺⁺_λ₁λ₀::Array{FT,2}
     i_ref::Int
     n_Raman::Int
-    bandSpecLim = []
+    bandSpecLim = UnitRange{Int}[]
     iBand = 1
     F₀::Array{FT,2} # Solar/Stellar irradiation Stokes vector of size (pol_type.n, nSpec)
     #SIF₀::Array{FT,2} # Solar/Stellar irradiation Stokes vector of size (pol_type.n, nSpec)
@@ -98,7 +98,7 @@ Base.@kwdef mutable struct RVRS{FT<:AbstractFloat} <: AbstractRamanType
     "Molecular Constant for O2"
     o2::InelasticScattering.MolecularConstants{FT}
 
-    bandSpecLim = []
+    bandSpecLim = UnitRange{Int}[]
     iBand::Array{Int,1} = [1]
 
     "Pre-computed optical properties"
@@ -259,7 +259,7 @@ Base.@kwdef mutable struct sol_RRS{FT<:AbstractFloat} <: AbstractRamanType
     Z⁺⁺_λ₁λ₀::Array{FT,2}
     i_ref::Int
     n_Raman::Int
-    bandSpecLim = []
+    bandSpecLim = UnitRange{Int}[]
     iBand = 1
     F₀::Array{FT,2}
     #SIF₀::Array{FT,2}

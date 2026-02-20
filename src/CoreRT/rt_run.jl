@@ -63,8 +63,7 @@ function rt_run(RS_type::AbstractRamanType,
     
     
     
-    RS_type.bandSpecLim = UnitRange{Int}[] # (1:τ_abs[iB])#zeros(Int64, iBand, 2) #Suniti: how to do this?
-    #Suniti: make bandSpecLim a part of RS_type (including noRS) so that it can be passed into rt_kernel and elemental/doubling/interaction and postprocessing_vza without major syntax changes
+    RS_type.bandSpecLim = UnitRange{Int}[]
     #put this code in model_from_parameters
     nSpec = 0;
     for iB in iBand
@@ -114,10 +113,22 @@ function rt_run(RS_type::AbstractRamanType,
         #TODO: if RS_type!=noRS, create ϖ_λ₁λ₀, i_λ₁λ₀, fscattRayl, Z⁺⁺_λ₁λ₀, Z⁻⁺_λ₁λ₀ (for input), and ieJ₀⁺, ieJ₀⁻, ieR⁺⁻, ieR⁻⁺, ieT⁻⁻, ieT⁺⁺, ier⁺⁻, ier⁻⁺, iet⁻⁻, iet⁺⁺ (for output)
     #getRamanSSProp(RS_type, λ, grid_in)
 
+    # Build concatenated wavenumber grid for canopy spectral features
+    _canopy_spec_wn = nothing
+    if brdf isa CanopySurface
+        _canopy_spec_wn = vcat([model.params.spec_bands[iB] for iB in iBand]...)
+    end
+
     # Pre-initialize canopy cache before the Fourier loop (Zazi precomputation is expensive)
     if brdf isa CanopySurface && brdf._cache === nothing
         @timeit "Canopy cache init" _init_canopy_cache!(
-            brdf, added_layer_surface, pol_type, quad_points, model.params.architecture)
+            brdf, added_layer_surface, pol_type, quad_points, model.params.architecture;
+            spec_bands_wn=_canopy_spec_wn, max_m=max_m)
+    end
+
+    # Pre-compute within-canopy atmospheric optical depth if requested
+    if brdf isa CanopySurface && brdf.include_atm && brdf.canopy_dp !== nothing
+        @timeit "Canopy atm tau" _compute_canopy_atm_tau!(brdf, model, _canopy_spec_wn)
     end
 
     # Loop over fourier moments
@@ -163,13 +174,25 @@ function rt_run(RS_type::AbstractRamanType,
         end 
 
         # Create surface matrices:
-        @timeit "Create Surface" create_surface_layer!(brdf, 
-                            added_layer_surface, 
-                            SFI, m, 
-                            pol_type, 
-                            quad_points, 
-                            arr_type(τ_sum_all[:,end]), 
-                            model.params.architecture);
+        if brdf isa CanopySurface
+            @timeit "Create Surface" create_surface_layer!(brdf, 
+                                added_layer_surface, 
+                                SFI, m, 
+                                pol_type, 
+                                quad_points, 
+                                arr_type(τ_sum_all[:,end]), 
+                                model.params.architecture;
+                                spec_bands_wn=_canopy_spec_wn,
+                                max_m=max_m)
+        else
+            @timeit "Create Surface" create_surface_layer!(brdf, 
+                                added_layer_surface, 
+                                SFI, m, 
+                                pol_type, 
+                                quad_points, 
+                                arr_type(τ_sum_all[:,end]), 
+                                model.params.architecture)
+        end
         
         #@show composite_layer.J₀⁺[iμ₀,1,1:3]
         # One last interaction with surface:

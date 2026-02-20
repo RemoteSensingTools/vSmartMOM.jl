@@ -1,4 +1,11 @@
-# No scattering in either the added layer or the composite layer
+"""
+    interaction_helper!(RS_type, ::ScatteringInterface_00, SFI, composite_layer, added_layer, I_static)
+
+No scattering in either the added layer or the composite layer.
+
+Updates composite layer transmission (T⁺⁺, T⁻⁻) and source terms (J₀⁺, J₀⁻) when adding a non-scattering layer.
+Inelastic terms (ieR⁻⁺, ieR⁺⁻, ieT⁺⁺, ieT⁻⁻, ieJ₀⁺, ieJ₀⁻) are zeroed.
+"""
 function interaction_helper!(RS_type,::ScatteringInterface_00, SFI,
                                 composite_layer::CompositeLayer{FT}, 
                                 added_layer::AddedLayer{FT}, 
@@ -24,9 +31,14 @@ function interaction_helper!(RS_type,::ScatteringInterface_00, SFI,
 
 end
 
-# No scattering in inhomogeneous composite layer.
-# Scattering in homogeneous layer, added to bottom of the composite layer.
-# Produces a new, scattering composite layer.
+"""
+    interaction_helper!(RS_type::RRS, ::ScatteringInterface_01, SFI, composite_layer, added_layer, I_static)
+
+No scattering in composite layer; scattering in homogeneous layer added to bottom.
+
+Implements adding equations for RRS when composite has no scatterer and added layer scatters.
+Corresponds to Eqs. 8 in Sanghavi et al. Raman paper draft for R⁻⁺, T⁺⁺, T⁻⁻, R⁺⁻.
+"""
 function interaction_helper!(RS_type::RRS, ::ScatteringInterface_01, SFI,
                                 composite_layer::CompositeLayer{FT}, 
                                 added_layer::AddedLayer{FT}, 
@@ -79,6 +91,14 @@ function interaction_helper!(RS_type::RRS, ::ScatteringInterface_01, SFI,
     composite_layer.T⁻⁻[:] = composite_layer.T⁻⁻ ⊠ added_layer.t⁻⁻    
 end
 
+"""
+    interaction_helper!(RS_type::Union{VS_0to1_plus, VS_1to0_plus}, ::ScatteringInterface_01, SFI, composite_layer, added_layer, I_static)
+
+No scattering in composite layer; scattering in homogeneous VS layer added to bottom.
+
+Implements adding equations for Vibrational Raman Scattering (VS) when composite has no scatterer.
+Corresponds to Eqs. 8 in Sanghavi et al. Raman paper draft.
+"""
 function interaction_helper!(RS_type::Union{VS_0to1_plus, VS_1to0_plus}, 
                         ::ScatteringInterface_01, SFI,
                         composite_layer::CompositeLayer{FT}, 
@@ -134,10 +154,14 @@ function interaction_helper!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
     composite_layer.T⁻⁻[:] = composite_layer.T⁻⁻ ⊠ added_layer.t⁻⁻    
 end
 
-# Scattering in inhomogeneous composite layer.
-# no scattering in homogeneous layer which is 
-# added to the bottom of the composite layer.
-# Produces a new, scattering composite layer.
+"""
+    interaction_helper!(RS_type::RRS, ::ScatteringInterface_10, SFI, composite_layer, added_layer, I_static)
+
+Scattering in composite layer; no scattering in homogeneous layer added to bottom.
+
+Implements adding equations for RRS when composite scatters and added layer does not.
+Corresponds to Eqs. 8 in Sanghavi et al. Raman paper draft.
+"""
 function interaction_helper!(RS_type::RRS, ::ScatteringInterface_10, SFI,
                                 composite_layer::CompositeLayer{FT}, 
                                 added_layer::AddedLayer{FT}, 
@@ -186,6 +210,14 @@ function interaction_helper!(RS_type::RRS, ::ScatteringInterface_10, SFI,
     composite_layer.R⁺⁻[:] = added_layer.t⁺⁺ ⊠ composite_layer.R⁺⁻ ⊠ added_layer.t⁻⁻
 end
 
+"""
+    interaction_helper!(RS_type::Union{VS_0to1_plus, VS_1to0_plus}, ::ScatteringInterface_10, SFI, composite_layer, added_layer, I_static)
+
+Scattering in composite layer; no scattering in homogeneous VS layer added to bottom.
+
+Implements adding equations for Vibrational Raman Scattering (VS).
+Corresponds to Eqs. 8 in Sanghavi et al. Raman paper draft.
+"""
 function interaction_helper!(RS_type::Union{VS_0to1_plus, VS_1to0_plus}, 
     ::ScatteringInterface_10, SFI,
     composite_layer::CompositeLayer{FT}, 
@@ -238,9 +270,14 @@ function interaction_helper!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
     composite_layer.R⁺⁻[:] = added_layer.t⁺⁺ ⊠ composite_layer.R⁺⁻ ⊠ added_layer.t⁻⁻
 end
 
-# Scattering in inhomogeneous composite layer.
-# Scattering in homogeneous layer which is added to the bottom of the composite layer.
-# Produces a new, scattering composite layer.
+"""
+    interaction_helper!(RS_type::RRS, ::ScatteringInterface_11, SFI, composite_layer, added_layer, I_static)
+
+Scattering in both composite and added layers (full adding-doubling for RRS).
+
+Implements the full interaction equations when both layers scatter.
+Corresponds to Eqs. 8, 12, 13, 14, 15 in Sanghavi et al. Raman paper draft.
+"""
 function interaction_helper!(RS_type::RRS, ::ScatteringInterface_11, SFI,
                                 composite_layer::Union{CompositeLayer, CompositeLayerRS}, 
                                 added_layer::Union{AddedLayer,AddedLayerRS}, 
@@ -380,6 +417,14 @@ function interaction_helper!(RS_type::RRS, ::ScatteringInterface_11, SFI,
     composite_layer.ieR⁺⁻ .= tmpieR⁺⁻
 end
 
+"""
+    interaction_helper!(RS_type::Union{VS_0to1_plus, VS_1to0_plus}, ::ScatteringInterface_11, SFI, composite_layer, added_layer, I_static)
+
+Scattering in both composite and added VS layers (full adding-doubling for Vibrational Raman).
+
+Implements the full interaction equations when both layers scatter.
+Corresponds to Eqs. 12, 13, 14, 15, 16, 17 in Sanghavi et al. Raman paper draft.
+"""
 function interaction_helper!(RS_type::Union{VS_0to1_plus, VS_1to0_plus}, 
     ::ScatteringInterface_11, SFI,
     composite_layer::Union{CompositeLayer, CompositeLayerRS}, 
@@ -389,7 +434,6 @@ function interaction_helper!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
     (; i_λ₁λ₀_all) = RS_type
     (; r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, ier⁺⁻, ier⁻⁺, iet⁻⁻, iet⁺⁺) = added_layer
     (; R⁻⁺, R⁺⁻, T⁺⁺, T⁻⁻, J₀⁺, J₀⁻, ieR⁻⁺, ieR⁺⁻, ieT⁺⁺, ieT⁻⁻, ieJ₀⁺, ieJ₀⁻) = composite_layer
-    #@show "hello 100"
     # Used to store `(I - R⁺⁻ * r⁻⁺)⁻¹`
     tmp_inv = similar(t⁺⁺); tmp_inv.=0;
     tmpieJ₀⁻ = similar(ieJ₀⁻); tmpieJ₀⁻.=0;

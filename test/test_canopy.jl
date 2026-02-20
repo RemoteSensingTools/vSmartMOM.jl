@@ -138,6 +138,71 @@ end
     @test canopy_range(layout0) == 2:1  # empty range
 end
 
+@testset "Spectral leaf optics construction" begin
+    soil = LambertianSurfaceScalar(0.1)
+
+    λ_grid = [550.0, 660.0, 680.0, 750.0, 780.0]
+    R_leaf = [0.05, 0.08, 0.10, 0.45, 0.48]
+    T_leaf = [0.02, 0.03, 0.05, 0.40, 0.42]
+
+    canopy = CanopySurface(; soil=soil, LAI=3.0,
+                            leaf_reflectance=R_leaf,
+                            leaf_transmittance=T_leaf,
+                            leaf_optics_grid=λ_grid,
+                            grid_unit=:nm)
+    @test canopy.leaf_optics_grid ≈ λ_grid
+    @test canopy.grid_unit == :nm
+    @test canopy.canopy_dp === nothing
+    @test canopy.leaf_reflectance ≈ R_leaf
+    @test canopy.leaf_transmittance ≈ T_leaf
+
+    canopy_wn = CanopySurface(; soil=soil, LAI=3.0,
+                               leaf_reflectance=R_leaf,
+                               leaf_transmittance=T_leaf,
+                               leaf_optics_grid=1e7 ./ reverse(λ_grid),
+                               grid_unit=:cm_inv)
+    @test canopy_wn.grid_unit == :cm_inv
+    println("  Spectral canopy construction: OK")
+end
+
+@testset "Spectral canopy with canopy_dp" begin
+    soil = LambertianSurfaceScalar(0.1)
+
+    canopy = CanopySurface(; soil=soil, LAI=5.0, n_layers=3,
+                            leaf_reflectance=0.45,
+                            leaf_transmittance=0.05,
+                            include_atm=true,
+                            canopy_dp=3.0)
+    @test canopy.canopy_dp ≈ 3.0
+    @test canopy.include_atm == true
+    println("  Canopy with atmospheric column: OK")
+end
+
+@testset "PROSPECT-based CanopySurface" begin
+    leaf = CanopyOptics.LeafProspectProProperties(
+        N=1.4, Ccab=40.0, Ccar=8.0, Canth=0.0, Cbrown=0.0,
+        Cw=0.01, Cm=0.009, Cprot=0.0, Ccbc=0.0)
+
+    canopy = CanopySurface_from_prospect(
+        leaf, 400.0:5.0:2500.0;
+        soil=LambertianSurfaceScalar(0.1),
+        LAI=3.0, n_layers=2)
+    @test canopy.leaf_optics_grid !== nothing
+    @test canopy.grid_unit == :nm
+    @test length(canopy.leaf_reflectance) == length(canopy.leaf_optics_grid)
+    @test length(canopy.leaf_transmittance) == length(canopy.leaf_optics_grid)
+    @test all(0 .<= canopy.leaf_reflectance .<= 1)
+    @test all(0 .<= canopy.leaf_transmittance .<= 1)
+    println("  PROSPECT-based canopy: $(length(canopy.leaf_optics_grid)) spectral points")
+end
+
+@testset "YAML parsing with canopy_dp" begin
+    params = parameters_from_yaml("test_parameters/CanopyTest.yaml")
+    @test params.brdf[1] isa CanopySurface
+    @test params.brdf[1].canopy_dp === nothing
+    println("  YAML canopy_dp parsing: OK")
+end
+
 println("\n" * "="^60)
 println("Canopy surface tests complete.")
 println("="^60)
