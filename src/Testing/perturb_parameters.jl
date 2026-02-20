@@ -60,20 +60,31 @@ function perturb_parameters(params::vSmartMOM.CoreRT.vSmartMOM_Parameters, ppct)
         tmp_params.scattering_params.rt_aerosols[iaer].aerosol.nᵢ = (nᵢ == 0) ? 0.0001 : incr_fct*nᵢ
         push!(pert_params, tmp_params)    
 
-        # log normal μ
+        # log normal μ  
+        # NOTE: LogNormal(μ,σ) uses log-parameters where μ=log(median), σ=log(scale)
+        # To perturb the actual median by incr_fct, we need: log(median * incr_fct) = log(median) + log(incr_fct) = μ + log(incr_fct)
         tmp_params = deepcopy(params)  # ← CRITICAL FIX: Use deepcopy
         μ = tmp_params.scattering_params.rt_aerosols[iaer].aerosol.size_distribution.μ
         σ = tmp_params.scattering_params.rt_aerosols[iaer].aerosol.size_distribution.σ
+        # Convert to actual median, perturb, then convert back to log-parameter
+        actual_median = exp(μ)
+        new_median = actual_median == 0 ? 0.01 : incr_fct * actual_median
+        new_μ = log(new_median)
         tmp_params.scattering_params.rt_aerosols[iaer].aerosol.size_distribution = 
-            LogNormal(μ == 0 ? 0.01 : incr_fct*μ, σ)
+            LogNormal(new_μ, σ)
         push!(pert_params, tmp_params)
 
         # log normal σ
+        # NOTE: Similarly for σ, we need to perturb the actual scale parameter  
         tmp_params = deepcopy(params)  # ← CRITICAL FIX: Use deepcopy
         μ = tmp_params.scattering_params.rt_aerosols[iaer].aerosol.size_distribution.μ
         σ = tmp_params.scattering_params.rt_aerosols[iaer].aerosol.size_distribution.σ
+        # Convert to actual scale, perturb, then convert back to log-parameter
+        actual_scale = exp(σ)
+        new_scale = incr_fct * actual_scale
+        new_σ = log(new_scale)
         tmp_params.scattering_params.rt_aerosols[iaer].aerosol.size_distribution = 
-            LogNormal(μ, incr_fct*σ)
+            LogNormal(μ, new_σ)
         push!(pert_params, tmp_params)  
 
         # z₀

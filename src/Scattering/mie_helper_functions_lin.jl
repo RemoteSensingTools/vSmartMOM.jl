@@ -448,9 +448,12 @@ function compute_wₓ(lin::LinMode, size_distribution, wᵣ, r, r_max)
     # compare wₓ with a = (1.0./r*sd1.σ*sqrt(2π)).*exp.(-0.5*((log.(r).-sd1.μ)/sd1.σ).^2)
     #g(p) = pdf.(LogNormal(p[1],p[2]), r)  # Weights from lognormal distribution
     #ẇₓ = ForwardDiff.jacobian(g, [size_distribution.μ, size_distribution.σ])
-    ẇₓ = zeros(2, length(r))                               
-    ẇₓ[1,:] .= ((log.(r).-size_distribution.μ)/size_distribution.σ^2) .* wₓ
-    ẇₓ[2,:] .= (ẇₓ[1,:].*(log.(r).-size_distribution.μ) .- wₓ)/size_distribution.σ
+    ẇₓ = zeros(2, length(r)) 
+    tmp1 = wₓ ./ size_distribution.σ
+    tmp2 = (log.(r).-size_distribution.μ)/size_distribution.σ
+
+    ẇₓ[1,:] .= tmp1.*tmp2 #((log.(r).-size_distribution.μ)/size_distribution.σ^2) .* wₓ
+    ẇₓ[2,:] .= tmp1.*(tmp2.^2 .- 1) #(ẇₓ[1,:].*(log.(r).-size_distribution.μ) .- wₓ)/size_distribution.σ
 #@show "before", sum(wᵣ), 
     #sum(wₓ[1:end-1].*(r[2:end]-r[1:end-1])), 
     #sum(ẇₓ[1,1:end-1].*(r[2:end]-r[1:end-1])), 
@@ -462,7 +465,7 @@ function compute_wₓ(lin::LinMode, size_distribution, wᵣ, r, r_max)
 
     wₓ /= sum(wₓ)
     for ctr = 1:2                               
-        ẇₓ[ctr,:] .= ẇₓ[ctr,:]./sum(wₓ) .- (sum(ẇₓ[ctr,:]) * wₓ)./(sum(wₓ)^2)
+        ẇₓ[ctr,:] .= (ẇₓ[ctr,:] .- sum(ẇₓ[ctr,:])*wₓ)/sum(wₓ)
     end
 #@show "after", sum(wᵣ), 
 #sum(wₓ), 
