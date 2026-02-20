@@ -2,10 +2,9 @@
 
 # Bring needed names into scope
 using YAML
+using Distributions
 using Unitful
 using UnitfulEquivalences
-using Distributions
-using Parameters: @unpack
 using ..CoreRT: vSmartMOM_Parameters, AbsorptionParameters, ScatteringParameters, RT_Aerosol, AtmosphericProfile
 using ..Absorption: AbstractBroadeningFunction, AbstractComplexErrorFunction, load_interpolation_model
 using ..Scattering: AbstractFourierDecompositionType, Aerosol
@@ -139,7 +138,10 @@ Expected YAML keys:
 - `n_layers`: number of canopy sub-layers (default 1)
 - `leaf_reflectance`: scalar or list (default 0.4)
 - `leaf_transmittance`: scalar or list (default 0.05)
+- `leaf_optics_grid`: wavelength/wavenumber grid for spectral leaf R/T (optional)
+- `grid_unit`: "nm" or "cm_inv" (default "nm")
 - `include_atm`: bool (default false)
+- `canopy_dp`: pressure thickness of canopy air column in hPa (optional)
 - `soil`: a BRDF string *or* "from_surface" to reuse the band's existing BRDF
 """
 function _parse_canopy_section(canopy_dict::Dict, FT, brdf_list::Vector)
@@ -148,9 +150,15 @@ function _parse_canopy_section(canopy_dict::Dict, FT, brdf_list::Vector)
     leaf_R    = get(canopy_dict, "leaf_reflectance", 0.4)
     leaf_T    = get(canopy_dict, "leaf_transmittance", 0.05)
     incl_atm  = get(canopy_dict, "include_atm", false)
+    dp_raw    = get(canopy_dict, "canopy_dp", nothing)
+    dp        = dp_raw === nothing ? nothing : FT(dp_raw)
 
     lr = leaf_R isa AbstractVector ? convert(Vector{FT}, leaf_R) : FT(leaf_R)
     lt = leaf_T isa AbstractVector ? convert(Vector{FT}, leaf_T) : FT(leaf_T)
+
+    lg_raw = get(canopy_dict, "leaf_optics_grid", nothing)
+    lg = lg_raw === nothing ? nothing : convert(Vector{FT}, lg_raw)
+    gu = Symbol(get(canopy_dict, "grid_unit", "nm"))
 
     soil_spec = get(canopy_dict, "soil", "from_surface")
 
@@ -163,7 +171,8 @@ function _parse_canopy_section(canopy_dict::Dict, FT, brdf_list::Vector)
         brdf_list[i] = CoreRT.CanopySurface(;
             soil=soil, LAI=LAI, n_layers=n_layers,
             leaf_reflectance=lr, leaf_transmittance=lt,
-            include_atm=incl_atm)
+            leaf_optics_grid=lg, grid_unit=gu,
+            include_atm=incl_atm, canopy_dp=dp)
     end
     return brdf_list
 end
@@ -256,7 +265,7 @@ end
 
 "Convert the input dictionary of aerosols into a list of RT_aerosols"
 function aerosol_params_to_obj(aerosols, FT)
-    rt_aerosol_obj_list = RT_Aerosol[]
+    rt_aerosol_obj_list = RT_Aerosol{FT}[]
     for aerosol in aerosols
         @assert aerosol["σ"] ≥ 1 "Geometric standard deviation has to be ≥ 1"    
         size_distribution = LogNormal(log(FT(aerosol["μ"])), log(FT(aerosol["σ"])))
@@ -334,18 +343,105 @@ function _parse_float_type(params_dict::Dict)
     return FLOAT_MAP[key]
 end
 
+"""
+    _safe_parse_number(s) -> Float64
+
+Parse a numeric expression that may contain division, e.g. "1e7/775".
+Supports integers, floats, scientific notation, and a single `/` operator.
+"""
+function _safe_parse_number(s::AbstractString)
+    s = strip(s)
+    if occursin('/', s)
+        parts = split(s, '/'; limit=2)
+        return parse(Float64, strip(parts[1])) / parse(Float64, strip(parts[2]))
+    else
+        return parse(Float64, s)
+    end
+end
+
+"""
+    _safe_parse_spec_band(s) -> Vector{Float64}
+
+Parse a spectral band string without `eval`. Supported formats:
+- Range: `"(1e7/775):0.05:(1e7/755)"` or `"start:step:stop"`
+- Explicit list: `"[19417.0 19418.0]"` or `"[19417.0, 19418.0]"`
+"""
+function _safe_parse_spec_band(s::AbstractString)
+    s = strip(s)
+    # Strip outer quotes if present
+    if startswith(s, '"') && endswith(s, '"')
+        s = s[2:end-1]
+    end
+
+    # Handle collect(...)u"nm" or collect(...)u"cm_inv" wrapper
+    unit = :cm_inv
+    m = match(r"^collect\((.+)\)\s*u\"(nm|cm_inv)\"$", s)
+    if m !== nothing
+        s = m.captures[1]
+        unit = Symbol(m.captures[2])
+    elseif startswith(s, "collect(") && endswith(s, ")")
+        s = s[9:end-1]  # strip collect(...)
+    end
+
+    # Bracket list: [val1 val2 ...] or [val1, val2, ...]
+    if startswith(s, '[') && endswith(s, ']')
+        inner = strip(s[2:end-1])
+        tokens = split(inner, r"[,\s]+"; keepempty=false)
+        vals = [parse(Float64, strip(t)) for t in tokens]
+        if unit == :nm
+            vals = sort(1e7 ./ vals)
+        end
+        return vals
+    end
+
+    # Range: expr:step:expr or (expr):step:(expr)
+    # Split on ':' that is NOT inside parentheses
+    range_parts = String[]
+    buf = IOBuffer()
+    depth = 0
+    for c in s
+        if c == '('
+            depth += 1; print(buf, c)
+        elseif c == ')'
+            depth -= 1; print(buf, c)
+        elseif c == ':' && depth == 0
+            push!(range_parts, String(take!(buf)))
+        else
+            print(buf, c)
+        end
+    end
+    push!(range_parts, String(take!(buf)))
+
+    local vals::Vector{Float64}
+    if length(range_parts) == 3
+        start = _safe_parse_number(strip(range_parts[1], ['(', ')']))
+        step  = _safe_parse_number(strip(range_parts[2], ['(', ')']))
+        stop  = _safe_parse_number(strip(range_parts[3], ['(', ')']))
+        vals = collect(start:step:stop)
+    elseif length(range_parts) == 2
+        start = _safe_parse_number(strip(range_parts[1], ['(', ')']))
+        stop  = _safe_parse_number(strip(range_parts[2], ['(', ')']))
+        vals = collect(start:stop)
+    else
+        vals = [_safe_parse_number(s)]
+    end
+
+    if unit == :nm
+        vals = sort(1e7 ./ vals)
+    end
+    return vals
+end
+
 function _parse_spec_bands(params_dict::Dict, FT)
     spec_bands = Vector{Vector{FT}}()
     for spec_band in params_dict["radiative_transfer"]["spec_bands"]
         parsed_band = eval(Meta.parse(spec_band))
-        if (all(x-> x == NoUnits, unit.(parsed_band)))
+        if all(x -> x == Unitful.NoUnits, unit.(parsed_band))
             wn_band = collect(parsed_band)
+        elseif all(x -> x == u"cm^-1", unit.(parsed_band))
+            wn_band = sort(ustrip(collect(parsed_band)))
         else
-            if (all(x-> x == u"cm^-1", unit.(parsed_band)))
-                wn_band = sort(ustrip(collect(parsed_band)))
-            else
-                wn_band = sort(ustrip(uconvert.( u"cm^-1", collect(parsed_band), Spectral())))
-            end
+            wn_band = sort(ustrip(uconvert.(u"cm^-1", collect(parsed_band), Spectral())))
         end
         push!(spec_bands, convert.(FT, vec(wn_band)))
     end

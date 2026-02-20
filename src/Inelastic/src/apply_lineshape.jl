@@ -1,14 +1,4 @@
-const c₂                 = 1.4387769
-const cMassMolIE           = 1.66053873e-30 #kilograms per molecule for unit molec. mass
-const cSqrtLn2divSqrtPi  = 0.469718639319144059835 #√(ln2/π)
-const cLn2               = 0.6931471805599 #ln2
-const cSqrtLn2           = 0.8325546111577 #√(ln2)
-const cSqrt2Ln2          = 1.1774100225 #√(2ln2)
-const cc_                = 2.99792458e8 #speed of light [m/s]
-const cBolts_            = 1.3806503e-23 #Boltzmann const. [J/K]
-const p_ref              = 1013.25  # reference pressure [hPa]
-const t_ref              = 296.0    # reference temperature [K]
-const nm_per_m           = 1.0e7
+# Physical constants (p_ref, t_ref, nm_per_m, cMassMolIE, etc.) are defined in raman_constants.jl
 # Note: ν stands for wavenumber in the following (NOT frequency)
 function apply_lineshape_!(Δνᵢ, σᵢ,  # discrete transitions
                 λ₀,                 # incident  wavelength [nm]
@@ -47,8 +37,6 @@ function apply_lineshape_!(Δνᵢ, σᵢ,  # discrete transitions
 
             # Compute Doppler HWHM, ν still needs to be supplied, @Suniti?:
             γ_d = ((cSqrt2Ln2 / cc_) * sqrt(cBolts_ / cMassMolIE) * sqrt(temperature) * ν / sqrt(molMass))
-
-            @show γ_d, Δνᵢ[j]
 
             # line intensity 
             S = σᵢ[j] *  ν^4 #Suniti

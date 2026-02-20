@@ -13,7 +13,7 @@
                 R_true = R_trues[case_i]
                 R_modeled = view(R_modeled_all, case_i, :, :, :)
                 R_deltas = view(R_deltas_all, case_i, :, :, :)
-                parameters.spec_bands = [1e7/λ (1e7/λ + 1)]
+                parameters.spec_bands = [[1e7/λ, 1e7/λ + 1]]
                 parameters.vaz = repeat([azs[az_i]], 16)
                 parameters.sza = szas[sza_i]
                 parameters.brdf = [vSmartMOM.CoreRT.LambertianSurfaceScalar(ρ)]
@@ -53,7 +53,7 @@ end
     include("benchmarks/natraj_trues.jl")
     parameters = parameters_from_yaml("benchmarks/natraj.yaml");
 
-    parameters.spec_bands = [1e7/360.0 (1e7/360.0 + 1)]
+    parameters.spec_bands = [[1e7/360.0, 1e7/360.0 + 1]]
     parameters.vza = acosd.(μ)
     parameters.sza = acosd.(0.2)
 

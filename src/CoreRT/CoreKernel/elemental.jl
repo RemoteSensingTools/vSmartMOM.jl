@@ -203,12 +203,13 @@ function elemental!(pol_type, SFI::Bool,
 end
 
 @kernel function get_elem_rt!(r⁻⁺, t⁺⁺, ϖ_λ, dτ_λ, Z⁻⁺, Z⁺⁺, μ, wct) 
+    FT = eltype(r⁻⁺)
     n2 = 1
     i, j, n = @index(Global, NTuple) 
     if size(Z⁻⁺,3)>1
         n2 = n
     end
-    if (wct[j]>1.e-8) 
+    if (wct[j] > eps(FT)) 
         # 𝐑⁻⁺(μᵢ, μⱼ) = ϖ ̇𝐙⁻⁺(μᵢ, μⱼ) ̇(μⱼ/(μᵢ+μⱼ)) ̇(1 - exp{-τ ̇(1/μᵢ + 1/μⱼ)}) ̇𝑤ⱼ
         r⁻⁺[i,j,n] = 
             ϖ_λ[n] * Z⁻⁺[i,j,n2] * 
@@ -224,7 +225,7 @@ end
                     (1 + ϖ_λ[n] * Z⁺⁺[i,i,n2] * (dτ_λ[n] / μ[i]) * wct[i])
                     #(1 + ϖ_λ[n] * Z⁺⁺[i,i] * (dτ_λ[n] / μ[i]) * wct[i])
             else
-                t⁺⁺[i,j,n] = 0.0
+                t⁺⁺[i,j,n] = zero(FT)
             end
         else
     
@@ -237,11 +238,11 @@ end
                 (exp(-dτ_λ[n] / μ[i]) - exp(-dτ_λ[n] / μ[j])) 
         end
     else
-        r⁻⁺[i,j,n] = 0.0
+        r⁻⁺[i,j,n] = zero(FT)
         if i==j
             t⁺⁺[i,j,n] = exp(-dτ_λ[n] / μ[i]) #Suniti
         else
-            t⁺⁺[i,j,n] = 0.0
+            t⁺⁺[i,j,n] = zero(FT)
         end
     end
     nothing
@@ -253,8 +254,8 @@ end
     
     i, _, n = @index(Global, NTuple) ##Suniti: What are Global and Ntuple?
     FT = eltype(I₀)
-    J₀⁺[i, 1, n]=0
-    J₀⁻[i, 1, n]=0
+    J₀⁺[i, 1, n] = zero(FT)
+    J₀⁻[i, 1, n] = zero(FT)
     n2=1
     if size(Z⁻⁺,3)>1
         n2 = n

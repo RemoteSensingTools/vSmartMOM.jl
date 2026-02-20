@@ -133,8 +133,7 @@ function rt_run(RS_type::AbstractRamanType,
 
     # For noRS: F₀ is the solar irradiance Stokes vector per spectral point.
     # Initialize to ones (unit solar flux, Stokes I only) if still at default 1×1 size.
-    RS_type.bandSpecLim = UnitRange{Int}[] # (1:τ_abs[iB])#zeros(Int64, iBand, 2) #Suniti: how to do this?
-    #Suniti: make bandSpecLim a part of RS_type (including noRS) so that it can be passed into rt_kernel and elemental/doubling/interaction and postprocessing_vza without major syntax changes
+    RS_type.bandSpecLim = UnitRange{Int}[]
     #put this code in model_from_parameters
     nSpec = 0;
     for iB in iBand
@@ -155,7 +154,7 @@ function rt_run(RS_type::AbstractRamanType,
     # If still at its default 1×1 size, initialize to unit solar flux (Stokes I only).
     if size(F₀) != (pol_type.n, nSpec)
         F₀ = zeros(FT, pol_type.n, nSpec)
-        F₀[1,:] .= 1.0  # Only Stokes I = 1
+        F₀[1,:] .= one(FT)  # Only Stokes I = 1
         RS_type.F₀ = F₀
     end
 

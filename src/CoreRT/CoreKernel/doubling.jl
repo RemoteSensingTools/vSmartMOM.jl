@@ -18,19 +18,16 @@ function doubling_helper!(pol_type,
                           I_static::AbstractArray{FT}, 
                           architecture) where {FT,M}
 
-    # Unpack the added layer
-    (; r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻, temp1, temp2, temp1_ptr, temp2_ptr) = added_layer
-    #@show typeof(expk), typeof(I_static)
-    # Device architecture
+    (; r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻, temp1, temp2, temp1_ptr, temp2_ptr,
+       dbl_gp_refl, dbl_j₁⁺, dbl_j₁⁻) = added_layer
     dev = devi(architecture)
 
-    # Note: short-circuit evaluation => return nothing evaluated iff ndoubl == 0 
     ndoubl == 0 && return nothing
     
     @timeit "doubling_allocs" begin
-    tt⁺⁺_gp_refl = similar(t⁺⁺)
-    j₁⁺ = similar(j₀⁺)
-    j₁⁻  = similar(j₀⁻)
+    tt⁺⁺_gp_refl = dbl_gp_refl === nothing ? similar(t⁺⁺) : dbl_gp_refl
+    j₁⁺ = dbl_j₁⁺ === nothing ? similar(j₀⁺) : dbl_j₁⁺
+    j₁⁻ = dbl_j₁⁻ === nothing ? similar(j₀⁻) : dbl_j₁⁻
     end
     #temp = similar(t⁺⁺)
     # Pointers to avoid memory allocation in CUBLAS routines

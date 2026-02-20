@@ -58,13 +58,19 @@ Base.@kwdef struct ObsGeometry{FT} <: AbstractObsGeometry
     obs_alt::FT
 end
 
-mutable struct RT_Aerosol{}#FT<:Real}
-    "Aerosol"
-    aerosol::Aerosol#{FT}
-    "Reference τ"
-    τ_ref#::FT
-    "Vertical distribution as function of p (using Distributions.jl)"
-    profile::Distribution#::FT
+"""
+    RT_Aerosol{FT}
+
+An aerosol species combined with its RT-relevant parameters: reference optical
+depth (`τ_ref`) and the vertical pressure distribution (`profile`).
+"""
+mutable struct RT_Aerosol{FT<:Real}
+    "Aerosol optical/microphysical properties"
+    aerosol::Aerosol
+    "Reference optical depth at λ_ref"
+    τ_ref::FT
+    "Vertical distribution as function of pressure (from Distributions.jl)"
+    profile::Distribution
 end
 
 "Quadrature Types for RT streams"
@@ -181,6 +187,12 @@ Base.@kwdef struct AddedLayer{FT} <: AbstractLayer
     temp1_ptr::MaybeCuPtrArray
     "Pointer to temporary space to avoid allocations (CUDA-specific, ignored on CPU)"
     temp2_ptr::MaybeCuPtrArray
+    "Doubling workspace: geometric-progression reflectance (same shape as t⁺⁺)"
+    dbl_gp_refl::Union{AbstractArray{FT,3}, Nothing} = nothing
+    "Doubling workspace: source temp +"
+    dbl_j₁⁺::Union{AbstractArray{FT,3}, Nothing} = nothing
+    "Doubling workspace: source temp -"
+    dbl_j₁⁻::Union{AbstractArray{FT,3}, Nothing} = nothing
 end
 
 "Composite Layer Matrices (`-/+` defined in τ coordinates, i.e. `-`=outgoing, `+`=incoming"
@@ -413,40 +425,69 @@ mutable struct CanopySurface{FT} <: AbstractSurfaceType
     LAD
     "Canopy scattering model (e.g. BiLambertianCanopyScattering)"
     canopy_scattering
-    "Leaf reflectance (scalar or spectral vector)"
+    "Leaf reflectance (scalar or spectral vector on leaf_optics_grid)"
     leaf_reflectance::Union{FT, Vector{FT}}
-    "Leaf transmittance (scalar or spectral vector)"
+    "Leaf transmittance (scalar or spectral vector on leaf_optics_grid)"
     leaf_transmittance::Union{FT, Vector{FT}}
+    "Wavelength/wavenumber grid for spectral leaf R/T (nothing if scalar)"
+    leaf_optics_grid::Union{Nothing, Vector{FT}}
+    "Unit of leaf_optics_grid: :nm (wavelength) or :cm_inv (wavenumber)"
+    grid_unit::Symbol
     "Include within-canopy atmospheric absorption between sub-layers"
     include_atm::Bool
+    "Pressure thickness of within-canopy air column in hPa (e.g. 3 hPa ≈ 30 m canopy); nothing = no canopy atmosphere"
+    canopy_dp::Union{Nothing, FT}
     "Per-sub-layer LAI fractions (nothing = uniform); must sum to 1"
     lai_fractions::Union{Nothing, Vector{FT}}
-    "Within-canopy atmospheric τ per sub-layer gap (set by rt_run for include_atm=true)"
+    "Within-canopy atmospheric τ (spectral, set by rt_run for include_atm=true)"
     _within_canopy_τ::Union{Nothing, Vector{FT}}
     "Lazily-initialized cache (Zup, Zdown, working arrays); set on first use"
-    _cache::Any
+    _cache  # Union{Nothing, CanopyCache} — typed at first init
 end
 
 function CanopySurface(; soil::AbstractSurfaceType,
                         LAI, n_layers::Int=1, LAD=nothing,
                         canopy_scattering=nothing,
                         leaf_reflectance=0.4, leaf_transmittance=0.05,
+                        leaf_optics_grid=nothing, grid_unit::Symbol=:nm,
                         include_atm::Bool=false,
+                        canopy_dp=nothing,
                         lai_fractions=nothing)
     FT = typeof(float(LAI))
     if LAD === nothing
         LAD = CanopyOptics.spherical_leaves()
     end
     if canopy_scattering === nothing
+        R_scalar = leaf_reflectance isa Number ? FT(leaf_reflectance) :
+                   FT(sum(leaf_reflectance) / length(leaf_reflectance))
+        T_scalar = leaf_transmittance isa Number ? FT(leaf_transmittance) :
+                   FT(sum(leaf_transmittance) / length(leaf_transmittance))
         canopy_scattering = CanopyOptics.BiLambertianCanopyScattering(
-            R=leaf_reflectance isa Number ? FT(leaf_reflectance) : FT(0.4),
-            T=leaf_transmittance isa Number ? FT(leaf_transmittance) : FT(0.05))
+            R=R_scalar, T=T_scalar)
     end
     lr = leaf_reflectance isa Number ? FT(leaf_reflectance) : convert(Vector{FT}, leaf_reflectance)
     lt = leaf_transmittance isa Number ? FT(leaf_transmittance) : convert(Vector{FT}, leaf_transmittance)
+
+    # Accept Unitful grid (e.g. collect(400:2500) .* u"nm") or plain floats + grid_unit
+    if leaf_optics_grid !== nothing && eltype(leaf_optics_grid) <: Unitful.Quantity
+        u_grid = unit(first(leaf_optics_grid))
+        if u_grid == u"nm"
+            grid_unit = :nm
+        elseif u_grid == u"cm^-1"
+            grid_unit = :cm_inv
+        else
+            error("Unsupported leaf_optics_grid unit: $u_grid; expected u\"nm\" or u\"cm^-1\"")
+        end
+        lg = convert(Vector{FT}, ustrip.(leaf_optics_grid))
+    else
+        lg = leaf_optics_grid === nothing ? nothing : convert(Vector{FT}, leaf_optics_grid)
+    end
+    @assert grid_unit in (:nm, :cm_inv) "grid_unit must be :nm or :cm_inv"
+
+    dp = canopy_dp === nothing ? nothing : FT(canopy_dp)
     lf = lai_fractions === nothing ? nothing : convert(Vector{FT}, lai_fractions)
     CanopySurface{FT}(soil, FT(LAI), n_layers, LAD, canopy_scattering,
-                      lr, lt, include_atm, lf, nothing, nothing)
+                      lr, lt, lg, grid_unit, include_atm, dp, lf, nothing, nothing)
 end
 
 """
@@ -482,7 +523,7 @@ A struct which holds all scattering-related parameters (before any computations)
 """
 mutable struct ScatteringParameters{FT<:Real}
     "List of scattering aerosols and their properties"
-    rt_aerosols::Vector{RT_Aerosol}
+    rt_aerosols::Vector{RT_Aerosol{FT}}
     "Maximum aerosol particle radius for quadrature points/weights (µm)"
     r_max::FT
     "Number of quadrature points for integration of size distribution"
@@ -510,10 +551,10 @@ $(DocStringExtensions.FIELDS)
 mutable struct vSmartMOM_Parameters{FT<:Real} 
 
     # radiative_transfer group
-    "Spectral bands (`nBand`)"
-    spec_bands::AbstractArray
+    "Spectral bands — Vector of wavenumber grids, one per band"
+    spec_bands::Vector{Vector{FT}}
     "Surface (Bidirectional Reflectance Distribution Function)"
-    brdf::AbstractArray
+    brdf::Vector{<:AbstractSurfaceType}
     "Quadrature type for RT streams (RadauQuad/GaussQuadHemisphere/GaussQuadFullSphere)"
     quadrature_type::AbstractQuadratureType
     "Type of polarization (I/IQ/IQU/IQUV)"

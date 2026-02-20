@@ -1,6 +1,5 @@
 using CUDA
 using LinearAlgebra
-using BenchmarkTools
 using Printf
 
 function batch_inv_nosync!(X::CuArray{FT,3}, A::CuArray{FT,3}) where {FT}
@@ -11,7 +10,8 @@ end
 
 matrix_sizes = [12, 24, 36]
 batch_sizes  = [6837, 10000, 50000]
-num_iters    = 20
+num_warmup   = 5
+num_iters    = 50
 
 println("Julia CUDA batched operations benchmark")
 println("GPU: ", CUDA.name(CUDA.device()))
@@ -30,15 +30,16 @@ for FT in [Float64, Float32]
             A = CUDA.randn(FT, n, n, nBatch)
             B = CUDA.randn(FT, n, n, nBatch)
             C = similar(A)
-            CUDA.CUBLAS.gemm_strided_batched!('N', 'N', one(FT), A, B, zero(FT), C)
+
+            for _ in 1:num_warmup
+                CUDA.CUBLAS.gemm_strided_batched!('N', 'N', one(FT), A, B, zero(FT), C)
+            end
             CUDA.synchronize()
 
             mul_times = Float64[]
             for _ in 1:num_iters
-                CUDA.synchronize()
-                t = @elapsed begin
+                t = CUDA.@elapsed begin
                     CUDA.CUBLAS.gemm_strided_batched!('N', 'N', one(FT), A, B, zero(FT), C)
-                    CUDA.synchronize()
                 end
                 push!(mul_times, t)
             end
@@ -52,17 +53,19 @@ for FT in [Float64, Float32]
             for k in 1:nBatch
                 A_cpu[:,:,k] .+= FT(n) * FT.(I(n))
             end
-            A_gpu = CuArray(A_cpu)
-            X_gpu = similar(A_gpu)
+            A_src = CuArray(A_cpu)
+            X_gpu = similar(A_src)
 
-            A_tmp = copy(A_gpu)
-            batch_inv_nosync!(X_gpu, A_tmp)
+            for _ in 1:num_warmup
+                A_tmp = copy(A_src)
+                batch_inv_nosync!(X_gpu, A_tmp)
+            end
 
             inv_times = Float64[]
             for _ in 1:num_iters
-                A_tmp = copy(A_gpu)
+                A_tmp = copy(A_src)
                 CUDA.synchronize()
-                t = @elapsed begin
+                t = CUDA.@elapsed begin
                     batch_inv_nosync!(X_gpu, A_tmp)
                 end
                 push!(inv_times, t)
@@ -74,7 +77,7 @@ for FT in [Float64, Float32]
                     mul_med, mul_med * 1000 / nBatch,
                     inv_med, inv_med * 1000 / nBatch)
 
-            A_gpu = nothing; X_gpu = nothing
+            A_src = nothing; X_gpu = nothing
             GC.gc(); CUDA.reclaim()
         end
     end

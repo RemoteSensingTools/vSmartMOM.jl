@@ -36,7 +36,7 @@ function create_surface_layer!(lambertian::LambertianSurfaceScalar{FT},
     T_surf = arr_type(Diagonal(tmp))
     if m == 0
         # Albedo normalized by π (and factor 2 for 0th Fourier Moment)
-        ρ = 2lambertian.albedo#/FT(π)
+        ρ = FT(2) * lambertian.albedo#/FT(π)
         
         # Construct dense surface reflectance matrix and move to device
         R_surf = Matrix(Diagonal(vcat(ρ, zeros(FT,pol_type.n-1))))
@@ -48,7 +48,7 @@ function create_surface_layer!(lambertian::LambertianSurfaceScalar{FT},
         # Source function of surface:
         if SFI
             I₀_NquadN = similar(qp_μN);
-            I₀_NquadN[:] .=0;
+            I₀_NquadN[:] .= zero(FT);
             I₀_NquadN[iμ₀Nstart:pol_type.n*iμ₀] = pol_type.I₀;
             
             j₀⁺[:,1,:] .= I₀_NquadN .* exp.(-τ_sum/μ₀)';
@@ -59,17 +59,17 @@ function create_surface_layer!(lambertian::LambertianSurfaceScalar{FT},
 
         #@show size(added_layer.r⁻⁺), size(R_surf), size(j₀⁻)
         added_layer.r⁻⁺ .= R_surf;
-        added_layer.r⁺⁻ .= 0;
+        added_layer.r⁺⁻ .= zero(FT);
         added_layer.t⁺⁺ .= T_surf;
         added_layer.t⁻⁻ .= T_surf;
 
     else
-        added_layer.r⁻⁺ .= 0;
-        added_layer.r⁻⁺ .= 0;
+        added_layer.r⁻⁺ .= zero(FT);
+        added_layer.r⁻⁺ .= zero(FT);
         added_layer.t⁺⁺ .= T_surf;
         added_layer.t⁻⁻ .= T_surf;
-        j₀⁺ .= 0;
-        j₀⁻ .= 0;
+        j₀⁺ .= zero(FT);
+        j₀⁻ .= zero(FT);
     end
 end
 
@@ -94,7 +94,7 @@ function create_surface_layer!(lambertian::LambertianSurfaceLegendre{FT},
         P = Scattering.compute_legendre_poly(x,length(legendre_coeff))[1]
         # Evaluate Polynomial (as matrix multiplication)
         albedo = P * legendre_coeff
-        ρ = arr_type(2albedo)
+        ρ = arr_type(FT(2) .* albedo)
         # Get size of added layer
         dim = size(added_layer.r⁻⁺)
         Nquad = dim[1] ÷ pol_type.n
@@ -109,9 +109,9 @@ function create_surface_layer!(lambertian::LambertianSurfaceLegendre{FT},
         # Source function of surface:
         if SFI
             I₀_NquadN = similar(qp_μN);
-            I₀_NquadN[:] .=0;
+            I₀_NquadN[:] .= zero(FT);
             I₀_NquadN[iμ₀Nstart:pol_type.n*iμ₀] = pol_type.I₀;
-            j₀⁺[:] .= 0
+            j₀⁺[:] .= zero(FT)
             # Suniti double-check
             j₀⁻[:,1,:] = μ₀*(R_surf*I₀_NquadN) .* (ρ .* exp.(-τ_sum/μ₀))';
         end
@@ -123,17 +123,17 @@ function create_surface_layer!(lambertian::LambertianSurfaceLegendre{FT},
 
         #@show size(added_layer.r⁻⁺), size(R_surf), size(added_layer.j₀⁻)
         added_layer.r⁻⁺ .= R_surf3D;
-        added_layer.r⁺⁻ .= 0;
+        added_layer.r⁺⁻ .= zero(FT);
         added_layer.t⁺⁺ .= T_surf;
         added_layer.t⁻⁻ .= T_surf;
 
     else
-        added_layer.r⁻⁺[:] .= 0;
-        added_layer.r⁻⁺[:] .= 0;
-        added_layer.t⁺⁺[:] .= 0;
-        added_layer.t⁻⁻[:] .= 0;
-        j₀⁺[:] .= 0;
-        j₀⁻[:] .= 0;
+        added_layer.r⁻⁺[:] .= zero(FT);
+        added_layer.r⁻⁺[:] .= zero(FT);
+        added_layer.t⁺⁺[:] .= zero(FT);
+        added_layer.t⁻⁻[:] .= zero(FT);
+        j₀⁺[:] .= zero(FT);
+        j₀⁻[:] .= zero(FT);
     end
 end
 
@@ -154,7 +154,7 @@ function create_surface_layer!(lambertian::LambertianSurfaceSpline{FT},
         
         # Evaluate spline
         albedo = lambertian.interpolator(lambertian.wlGrid)
-        ρ = arr_type(2albedo)
+        ρ = arr_type(FT(2) .* albedo)
         # Get size of added layer
         dim = size(added_layer.r⁻⁺)
         Nquad = dim[1] ÷ pol_type.n
@@ -169,9 +169,9 @@ function create_surface_layer!(lambertian::LambertianSurfaceSpline{FT},
         # Source function of surface:
         if SFI
             I₀_NquadN = similar(qp_μN);
-            I₀_NquadN[:] .=0;
+            I₀_NquadN[:] .= zero(FT);
             I₀_NquadN[iμ₀Nstart:pol_type.n*iμ₀] = pol_type.I₀;
-            j₀⁺[:] .= 0
+            j₀⁺[:] .= zero(FT)
             # Suniti double-check
             j₀⁻[:,1,:] = μ₀*(R_surf*I₀_NquadN) .* (ρ .* exp.(-τ_sum/μ₀))';
         end
@@ -180,17 +180,17 @@ function create_surface_layer!(lambertian::LambertianSurfaceSpline{FT},
         tmp    = ones(pol_type.n*Nquad)
         T_surf = arr_type(Diagonal(tmp))
         added_layer.r⁻⁺ .= R_surf .* reshape(ρ, 1, 1, :)
-        added_layer.r⁺⁻ .= 0;
+        added_layer.r⁺⁻ .= zero(FT);
         added_layer.t⁺⁺ .= T_surf;
         added_layer.t⁻⁻ .= T_surf;
 
     else
-        added_layer.r⁻⁺[:] .= 0;
-        added_layer.r⁻⁺[:] .= 0;
-        added_layer.t⁺⁺[:] .= 0;
-        added_layer.t⁻⁻[:] .= 0;
-        j₀⁺[:] .= 0;
-        j₀⁻[:] .= 0;
+        added_layer.r⁻⁺[:] .= zero(FT);
+        added_layer.r⁻⁺[:] .= zero(FT);
+        added_layer.t⁺⁺[:] .= zero(FT);
+        added_layer.t⁻⁻[:] .= zero(FT);
+        j₀⁺[:] .= zero(FT);
+        j₀⁻[:] .= zero(FT);
     end
 end
 

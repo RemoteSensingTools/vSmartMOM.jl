@@ -30,8 +30,7 @@ function rt_run_test_ms(RS_type::AbstractRamanType,
     # CFRANKEN NEEDS to be changed for concatenated arrays!!
 
 
-    RS_type.bandSpecLim = [] # (1:τ_abs[iB])#zeros(Int64, iBand, 2) #Suniti: how to do this?
-    #Suniti: make bandSpecLim a part of RS_type (including noRS) so that it can be passed into rt_kernel and elemental/doubling/interaction and postprocessing_vza without major syntax changes
+    RS_type.bandSpecLim = UnitRange{Int}[]
     #put this code in model_from_parameters
     nSpec = 0;
     for iB in iBand

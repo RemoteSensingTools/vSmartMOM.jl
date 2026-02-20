@@ -8,6 +8,7 @@ module InelasticScattering
     using UnPack
     #import PhysicalConstants.CODATA2018:c_0, h, k_B
 
+    include("raman_constants.jl")
     include("src/raman_constants.jl")
     include("src/molecular_constructors.jl")
     include("src/inelastic_cross_section.jl")

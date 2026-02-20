@@ -16,7 +16,7 @@ using vSmartMOM
 ## 2) Load parameters from YAML
 
 Parameters define the atmosphere, surface, geometry, and spectral bands.
-See the [IO Schema](@ref) for the full YAML format.
+See the IO Schema documentation for the full YAML format.
 
 ```julia
 yaml_path = joinpath(dirname(dirname(pathof(vSmartMOM))),
