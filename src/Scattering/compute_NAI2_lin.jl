@@ -35,7 +35,6 @@ function compute_aerosol_optical_properties(lin::LinMode, model::MieModel{FDT}, 
     #start,stop = quantile(size_distribution,[0.0025,0.9975])
     r, wᵣ = gauleg(nquad_radius, 0.0, r_max ; norm=false) 
     #r, wᵣ = gauleg(nquad_radius, start, min(stop,r_max); norm=false) 
-     @show sum(wᵣ)
     # Wavenumber
     k = 2π / λ  
 
@@ -89,78 +88,78 @@ function compute_aerosol_optical_properties(lin::LinMode, model::MieModel{FDT}, 
     wₓ, ẇₓ = compute_wₓ(lin, size_distribution, wᵣ, r, r_max) 
     
     # Loop over size parameters
-    @showprogress 1 "Computing PhaseFunctions Siewert NAI-2 style ..." for i = 1:length(x_size_param)
+    # Pre-allocate buffers for the inner loop (sized for the largest particle)
+    m_ref = aerosol.nᵣ - aerosol.nᵢ * im
+    y_max = maximum(x_size_param) * abs(m_ref)
+    nmx_max = round(Int, max(n_max, y_max) + 51)
+    an  = zeros(Complex{FT}, n_max)
+    bn  = zeros(Complex{FT}, n_max)
+    ȧn  = zeros(Complex{FT}, 2, n_max)
+    ḃn  = zeros(Complex{FT}, 2, n_max)
+    Dₙ  = zeros(Complex{FT}, nmx_max)
+    Ḋₙ  = zeros(Complex{FT}, 2, nmx_max)
+    n_  = FT.(2 .* collect(1:n_max) .+ 1)
 
-        # Maximum expansion (see eq. A17 from de Rooij and Stap, 1984)
-        n_max = get_n_max(x_size_param[i])
+    # Loop over size parameters
+    for i = 1:length(x_size_param)
 
-        # In Domke methods, we want to pre-allocate these as 2D outside of this loop.
-        an = (zeros(Complex{FT}, n_max))
-        bn = (zeros(Complex{FT}, n_max))
-        # derivatives with respect to nᵣ, nᵢ, respectively
-        ȧn = (zeros(Complex{FT}, 2, n_max))
-        ḃn = (zeros(Complex{FT}, 2, n_max))
+        n_max_i = get_n_max(x_size_param[i])
 
-        # Weighting for sums of 2n+1
-        n_ = collect(FT, 1:n_max);
-        n_ = 2n_ .+ 1
-
-        # Pre-allocate Dₙ  :
-        y = x_size_param[i] * (aerosol.nᵣ - im*aerosol.nᵢ);
-        nmx = round(Int, max(n_max, abs(y)) + 51)
-        Dₙ  = zeros(Complex{FT}, nmx)
-        # derivatives with respect to nᵣ, nᵢ, respectively
-        Ḋₙ  = zeros(Complex{FT}, 2, nmx)
+        # Zero the views that will be used
+        an_v = view(an, 1:n_max_i)
+        bn_v = view(bn, 1:n_max_i)
+        ȧn_v = view(ȧn, :, 1:n_max_i)
+        ḃn_v = view(ḃn, :, 1:n_max_i)
+        fill!(an_v, 0); fill!(bn_v, 0)
+        fill!(ȧn_v, 0); fill!(ḃn_v, 0)
+        fill!(Dₙ, 0);   fill!(Ḋₙ, 0)
         
         # Compute aₙ,bₙ and S₁,S₂
-        compute_mie_ab!(x_size_param[i], aerosol.nᵣ - aerosol.nᵢ * im, an, bn, Dₙ, ȧn, ḃn, Ḋₙ)
-        compute_mie_S₁S₂!(an, bn, 
-            ȧn, ḃn, 
+        compute_mie_ab!(x_size_param[i], m_ref, an_v, bn_v, Dₙ, ȧn_v, ḃn_v, Ḋₙ)
+        compute_mie_S₁S₂!(an_v, bn_v, 
+            ȧn_v, ḃn_v, 
             leg_π, leg_τ, 
             view(S₁, :, i), view(S₂, :, i), 
             view(Ṡ₁, :, :, i), view(Ṡ₂, :, :, i))
-        #@show size(an), size(bn)
-        # Suniti: continue here on 08/14/2025
-        # Compute Extinction and scattering cross sections: 
-        C_sca[i] = 2π / k^2 * (n_' * (abs2.(an) + abs2.(bn)))
-        C_ext[i] = 2π / k^2 * (n_' * real(an + bn))
-        #@show C_sca[i], C_ext[i]
-        for ctr=1:2
-            Ċ_sca[ctr,i] = 2π / k^2 * (n_' * (
-                                        an .* conj.(ȧn[ctr,:]) +
-                                        ȧn[ctr,:] .* conj.(an) + 
-                                        bn .* conj.(ḃn[ctr,:]) +    
-                                        ḃn[ctr,:] .* conj.(bn)  
-                                    ))
-            Ċ_ext[ctr,i] = 2π / k^2 * (n_' * real(ȧn[ctr,:] + ḃn[ctr,:]))
-        #@show Ċ_sca[ctr,i], Ċ_ext[ctr,i]
+
+        # Compute Extinction and scattering cross sections using pre-allocated n_
+        n_v = view(n_, 1:n_max_i)
+        coef = 2π / k^2
+        @inbounds C_sca[i] = coef * dot(n_v, abs2.(an_v) .+ abs2.(bn_v))
+        @inbounds C_ext[i] = coef * dot(n_v, real.(an_v .+ bn_v))
+
+        @inbounds for ctr=1:2
+            cs = zero(FT)
+            ce = zero(FT)
+            for n in 1:n_max_i
+                cs += n_[n] * real(an_v[n] * conj(ȧn[ctr,n]) + ȧn[ctr,n] * conj(an_v[n]) +
+                                  bn_v[n] * conj(ḃn[ctr,n]) + ḃn[ctr,n] * conj(bn_v[n]))
+                ce += n_[n] * real(ȧn[ctr,n] + ḃn[ctr,n])
+            end
+            Ċ_sca[ctr,i] = coef * cs
+            Ċ_ext[ctr,i] = coef * ce
         end
-        # Compute scattering matrix components per size parameter:
-        f₁₁[:,i] =  0.5 / x_size_param[i]^2  * real(abs2.(S₁[:,i]) + abs2.(S₂[:,i]));
-        f₃₃[:,i] =  0.5 / x_size_param[i]^2  * real(S₁[:,i] .* conj(S₂[:,i]) + S₂[:,i] .* conj(S₁[:,i]));
-        f₁₂[:,i] = -0.5 / x_size_param[i]^2  * real(abs2.(S₁[:,i]) - abs2.(S₂[:,i]));
-        f₃₄[:,i] = -0.5 / x_size_param[i]^2  * imag(S₁[:,i] .* conj(S₂[:,i]) - S₂[:,i] .* conj(S₁[:,i]));
-        for ctr=1:2
-            ḟ₁₁[ctr,:,i] =  0.5 / x_size_param[i]^2  * real(
-                                                Ṡ₁[ctr,:,i].*conj.(S₁[:,i]) + 
-                                                S₁[:,i].*conj.(Ṡ₁[ctr,:,i]) +
-                                                Ṡ₂[ctr,:,i].*conj.(S₂[:,i]) +
-                                                S₂[:,i].*conj.(Ṡ₂[ctr,:,i]));
-            ḟ₃₃[ctr,:,i] =  0.5 / x_size_param[i]^2  * real(
-                                                Ṡ₁[ctr,:,i] .* conj(S₂[:,i]) + 
-                                                S₁[:,i] .* conj(Ṡ₂[ctr,:,i]) + 
-                                                Ṡ₂[ctr,:,i] .* conj(S₁[:,i]) +
-                                                S₂[:,i] .* conj(Ṡ₁[ctr,:,i]));
-            ḟ₁₂[ctr,:,i] = -0.5 / x_size_param[i]^2  * real(
-                                                Ṡ₁[ctr,:,i].*conj.(S₁[:,i]) + 
-                                                S₁[:,i].*conj.(Ṡ₁[ctr,:,i]) -
-                                                Ṡ₂[ctr,:,i].*conj.(S₂[:,i]) -
-                                                S₂[:,i].*conj.(Ṡ₂[ctr,:,i]));
-            ḟ₃₄[ctr,:,i] = -0.5 / x_size_param[i]^2  * imag(
-                                                Ṡ₁[ctr,:,i] .* conj(S₂[:,i]) + 
-                                                S₁[:,i] .* conj(Ṡ₂[ctr,:,i]) - 
-                                                Ṡ₂[ctr,:,i] .* conj(S₁[:,i]) -
-                                                S₂[:,i] .* conj(Ṡ₁[ctr,:,i]));    
+
+        # Compute scattering matrix components per size parameter (in-place)
+        inv_x2 = FT(0.5) / x_size_param[i]^2
+        @inbounds for iμ in 1:n_mu
+            s1 = S₁[iμ, i]; s2 = S₂[iμ, i]
+            f₁₁[iμ, i] =  inv_x2 * real(abs2(s1) + abs2(s2))
+            f₃₃[iμ, i] =  inv_x2 * real(s1 * conj(s2) + s2 * conj(s1))
+            f₁₂[iμ, i] = -inv_x2 * real(abs2(s1) - abs2(s2))
+            f₃₄[iμ, i] = -inv_x2 * imag(s1 * conj(s2) - s2 * conj(s1))
+
+            for ctr in 1:2
+                ds1 = Ṡ₁[ctr, iμ, i]; ds2 = Ṡ₂[ctr, iμ, i]
+                ḟ₁₁[ctr,iμ,i] =  inv_x2 * real(ds1*conj(s1) + s1*conj(ds1) +
+                                                  ds2*conj(s2) + s2*conj(ds2))
+                ḟ₃₃[ctr,iμ,i] =  inv_x2 * real(ds1*conj(s2) + s1*conj(ds2) +
+                                                  ds2*conj(s1) + s2*conj(ds1))
+                ḟ₁₂[ctr,iμ,i] = -inv_x2 * real(ds1*conj(s1) + s1*conj(ds1) -
+                                                  ds2*conj(s2) - s2*conj(ds2))
+                ḟ₃₄[ctr,iμ,i] = -inv_x2 * imag(ds1*conj(s2) + s1*conj(ds2) -
+                                                  ds2*conj(s1) - s2*conj(ds1))
+            end
         end
     end
 
@@ -168,11 +167,11 @@ function compute_aerosol_optical_properties(lin::LinMode, model::MieModel{FDT}, 
     bulk_C_sca =  sum(wₓ .* C_sca)
     bulk_C_ext =  sum(wₓ .* C_ext)
 
-    for ctr=1:2
+    @views for ctr=1:2
         bulk_Ċ_sca[ctr] =  sum(wₓ .* Ċ_sca[ctr,:])
         bulk_Ċ_ext[ctr] =  sum(wₓ .* Ċ_ext[ctr,:])
     end
-    for ctr=3:4
+    @views for ctr=3:4
         bulk_Ċ_sca[ctr] =  sum(ẇₓ[ctr-2, :] .* C_sca)
         bulk_Ċ_ext[ctr] =  sum(ẇₓ[ctr-2, :] .* C_ext)
     end
@@ -185,7 +184,7 @@ function compute_aerosol_optical_properties(lin::LinMode, model::MieModel{FDT}, 
     wr = (4π * r.^2 .*  wₓ) 
     ẇr = zeros(FT, 2, length(r))
     
-    for ctr=1:2
+    @views for ctr=1:2
         ẇr[ctr,:] = (4π * r.^2 .*  ẇₓ[ctr,:]) 
     end
     bulk_f₁₁   =  f₁₁ * wr
@@ -198,13 +197,13 @@ function compute_aerosol_optical_properties(lin::LinMode, model::MieModel{FDT}, 
     bulk_f₃₃ /= bulk_C_sca
     bulk_f₁₂ /= bulk_C_sca
     bulk_f₃₄ /= bulk_C_sca
-    for ctr=1:2
+    @views for ctr=1:2
         bulk_ḟ₁₁[ctr,:] = (ḟ₁₁[ctr,:,:] * wr - bulk_f₁₁ * bulk_Ċ_sca[ctr]) / bulk_C_sca
         bulk_ḟ₃₃[ctr,:] = (ḟ₃₃[ctr,:,:] * wr - bulk_f₃₃ * bulk_Ċ_sca[ctr]) / bulk_C_sca
         bulk_ḟ₁₂[ctr,:] = (ḟ₁₂[ctr,:,:] * wr - bulk_f₁₂ * bulk_Ċ_sca[ctr]) / bulk_C_sca
         bulk_ḟ₃₄[ctr,:] = (ḟ₃₄[ctr,:,:] * wr - bulk_f₃₄ * bulk_Ċ_sca[ctr]) / bulk_C_sca
     end
-    for ctr=3:4
+    @views for ctr=3:4
         bulk_ḟ₁₁[ctr,:] = (f₁₁ * ẇr[ctr-2,:] - bulk_f₁₁ * bulk_Ċ_sca[ctr]) / bulk_C_sca
         bulk_ḟ₃₃[ctr,:] = (f₃₃ * ẇr[ctr-2,:] - bulk_f₃₃ * bulk_Ċ_sca[ctr]) / bulk_C_sca
         bulk_ḟ₁₂[ctr,:] = (f₁₂ * ẇr[ctr-2,:] - bulk_f₁₂ * bulk_Ċ_sca[ctr]) / bulk_C_sca
@@ -247,13 +246,13 @@ function compute_aerosol_optical_properties(lin::LinMode, model::MieModel{FDT}, 
         ζ[l + 1] = fac          * w_μ' * (bulk_f₃₃ .* R²[:,l + 1] + bulk_f₁₁ .* T²[:,l + 1]) 
         α[l + 1] = fac          * w_μ' * (bulk_f₁₁ .* R²[:,l + 1] + bulk_f₃₃ .* T²[:,l + 1]) 
 
-        for ctr=1:4
-            δ̇[ctr,l + 1] = (2l + 1) / 2 * w_μ' * (bulk_ḟ₃₃[ctr,:] .* P[:,l + 1])
-            β̇[ctr,l + 1] = (2l + 1) / 2 * w_μ' * (bulk_ḟ₁₁[ctr,:] .* P[:,l + 1])
-            γ̇[ctr,l + 1] = fac          * w_μ' * (bulk_ḟ₁₂[ctr,:] .* P²[:,l + 1])
-            ϵ̇[ctr,l + 1] = fac          * w_μ' * (bulk_ḟ₃₄[ctr,:] .* P²[:,l + 1])
-            ζ̇[ctr,l + 1] = fac          * w_μ' * (bulk_ḟ₃₃[ctr,:] .* R²[:,l + 1] + bulk_ḟ₁₁[ctr,:] .* T²[:,l + 1]) 
-            α̇[ctr,l + 1] = fac          * w_μ' * (bulk_ḟ₁₁[ctr,:] .* R²[:,l + 1] + bulk_ḟ₃₃[ctr,:] .* T²[:,l + 1]) 
+        @views for ctr=1:4
+            δ̇[ctr,l + 1] = (2l + 1) / 2 * dot(w_μ, bulk_ḟ₃₃[ctr,:] .* P[:,l + 1])
+            β̇[ctr,l + 1] = (2l + 1) / 2 * dot(w_μ, bulk_ḟ₁₁[ctr,:] .* P[:,l + 1])
+            γ̇[ctr,l + 1] = fac          * dot(w_μ, bulk_ḟ₁₂[ctr,:] .* P²[:,l + 1])
+            ϵ̇[ctr,l + 1] = fac          * dot(w_μ, bulk_ḟ₃₄[ctr,:] .* P²[:,l + 1])
+            ζ̇[ctr,l + 1] = fac          * dot(w_μ, bulk_ḟ₃₃[ctr,:] .* R²[:,l + 1] .+ bulk_ḟ₁₁[ctr,:] .* T²[:,l + 1])
+            α̇[ctr,l + 1] = fac          * dot(w_μ, bulk_ḟ₁₁[ctr,:] .* R²[:,l + 1] .+ bulk_ḟ₃₃[ctr,:] .* T²[:,l + 1])
         end    
     end
 
@@ -336,36 +335,44 @@ function compute_ref_aerosol_extinction(lin::LinMode, model::MieModel{FDT}, FT2:
 
     #wₓ = compute_wₓ(size_distribution, wᵣ, r, r_max) 
     
+    # Pre-allocate buffers outside the loop (sized for largest particle)
+    m_ref = aerosol.nᵣ - aerosol.nᵢ * im
+    y_max = maximum(x_size_param) * abs(m_ref)
+    nmx_max = round(Int, max(n_max, y_max) + 51)
+    an  = zeros(Complex{FT}, n_max)
+    bn  = zeros(Complex{FT}, n_max)
+    ȧn  = zeros(Complex{FT}, 2, n_max)
+    ḃn  = zeros(Complex{FT}, 2, n_max)
+    Dₙ  = zeros(Complex{FT}, nmx_max)
+    Ḋₙ  = zeros(Complex{FT}, 2, nmx_max)
+    n_  = FT.(2 .* collect(1:n_max) .+ 1)
+
     # Loop over size parameters
-    @showprogress 1 "Computing extinction XS at reference wavelength ..." for i = 1:length(x_size_param)
+    for i = 1:length(x_size_param)
 
-        # Maximum expansion (see eq. A17 from de Rooij and Stap, 1984)
-        n_max = get_n_max(x_size_param[i])
+        n_max_i = get_n_max(x_size_param[i])
 
-        # In Domke methods, we want to pre-allocate these as 2D outside of this loop.
-        an = (zeros(Complex{FT}, n_max))
-        bn = (zeros(Complex{FT}, n_max))
-        ȧn = (zeros(Complex{FT}, 2, n_max))
-        ḃn = (zeros(Complex{FT}, 2, n_max))
-
-        # Weighting for sums of 2n+1
-        n_ = collect(FT, 1:n_max);
-        n_ = 2n_ .+ 1
-
-        # Pre-allocate Dn:
-        y = x_size_param[i] * (aerosol.nᵣ - aerosol.nᵢ * im);
-        nmx = round(Int, max(n_max, abs(y)) + 51)
-        Dₙ = zeros(Complex{FT}, nmx)
-        # derivatives with respect to nᵣ, nᵢ, respectively
-        Ḋₙ  = zeros(Complex{FT}, 2, nmx)
+        # Zero the views
+        an_v = view(an, 1:n_max_i)
+        bn_v = view(bn, 1:n_max_i)
+        ȧn_v = view(ȧn, :, 1:n_max_i)
+        ḃn_v = view(ḃn, :, 1:n_max_i)
+        fill!(an_v, 0); fill!(bn_v, 0)
+        fill!(ȧn_v, 0); fill!(ḃn_v, 0)
+        fill!(Dₙ, 0); fill!(Ḋₙ, 0)
         
-        # Compute an,bn and S₁,S₂
-        compute_mie_ab!(x_size_param[i], aerosol.nᵣ - aerosol.nᵢ * im, an, bn, Dₙ, ȧn, ḃn, Ḋₙ)
+        compute_mie_ab!(x_size_param[i], m_ref, an_v, bn_v, Dₙ, ȧn_v, ḃn_v, Ḋₙ)
         
-        # Compute Extinction and scattering cross sections: 
-        C_ext[i] = 2π / k^2 * (n_' * real(an + bn))
-        for ctr=1:2
-            Ċ_ext[ctr,i] = 2π / k^2 * (n_' * real(ȧn[ctr,:] + ḃn[ctr,:]))
+        # Compute Extinction cross sections
+        n_v = view(n_, 1:n_max_i)
+        coef = 2π / k^2
+        @inbounds C_ext[i] = coef * dot(n_v, real.(an_v .+ bn_v))
+        @inbounds for ctr=1:2
+            ce = zero(FT)
+            for n in 1:n_max_i
+                ce += n_[n] * real(ȧn[ctr,n] + ḃn[ctr,n])
+            end
+            Ċ_ext[ctr,i] = coef * ce
         end
     end
 
@@ -434,7 +441,7 @@ function phase_function(aerosol::Aerosol, λ, r_max, nquad_radius)
     wₓ = compute_wₓ(size_distribution, wᵣ, r, r_max) 
     
     # Loop over size parameters
-    @showprogress 1 "Computing PhaseFunctions Siewert NAI-2 style ..." for i = 1:length(x_size_param)
+    for i = 1:length(x_size_param)
 
         # Maximum expansion (see eq. A17 from de Rooij and Stap, 1984)
         n_max = get_n_max(x_size_param[i])
@@ -597,7 +604,7 @@ function compute_aerosol_XS(aerosol::Aerosol, λ::FT, r_max::FT, nquad_radius::I
     wₓ = compute_wₓ(size_distribution, wᵣ, r, r_max) 
     
     # Loop over size parameters
-    @showprogress 1 "Computing PhaseFunctions Siewert NAI-2 style ..." for i = 1:length(x_size_param)
+    for i = 1:length(x_size_param)
 
         # Maximum expansion (see eq. A17 from de Rooij and Stap, 1984)
         n_max = get_n_max(x_size_param[i])

@@ -137,7 +137,7 @@ function rt_kernel!(RS_type::noRS{FT},
                                         added_layer, 
                                         added_layer_lin, 
                                         I_static, architecture,
-                                        dτ̇_allparams, μ₀)
+                                        dτ̇_allparams, μ₀; N_active=nparams_τ)
         
         if any(isnan, added_layer_lin.ap_ṙ⁻⁺) || any(isnan, added_layer_lin.ap_ṫ⁺⁺)
         end
