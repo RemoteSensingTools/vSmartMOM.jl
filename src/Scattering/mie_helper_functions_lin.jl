@@ -43,18 +43,18 @@ function compute_mie_ab!(size_param, refractive_idx::Number,
     nmx = length(Dn)
     @assert size(an)[1] >= n_max
     @assert size(an) == size(bn)
-    fill!(Dn, 0);
-    for i=1:2
-        #@assert size(ȧn)[1] >= n_max
-        #@assert size(ȧn) == size(ḃn)
-        fill!(Ḋn[i,:], 0);
-    end
-
     # Dn as in eq 4.88, Bohren and Huffman, to calculate an and bn
-    # Downward Recursion, eq. 4.89, Bohren and Huffman
-    [Dn[n] = ((n+1) / y) - (1 / (Dn[n+1] + (n+1) / y)) for n = (nmx - 1):-1:1]
-    [Ḋn[1, n] = (-(n+1)*size_param / y^2) + (1 / (Dn[n+1] + (n+1) / y)^2)*(Ḋn[1, n+1] - (n+1)*size_param / y^2) for n = (nmx - 1):-1:1]
-    [Ḋn[2, n] = ((n+1)*size_param*im / y^2) + (1 / (Dn[n+1] + (n+1) / y)^2)*(Ḋn[2, n+1] + (n+1)*size_param*im / y^2) for n = (nmx - 1):-1:1]
+    # Downward Recursion, eq. 4.89, Bohren and Huffman (in-place, no allocations)
+    @inbounds for n = (nmx - 1):-1:1
+        ratio = (n + 1) / y
+        denom_inv = 1 / (Dn[n+1] + ratio)
+        Dn[n] = ratio - denom_inv
+        denom_inv2 = denom_inv^2
+        Ḋn[1, n] = (-ratio * size_param / y) + denom_inv2 * (Ḋn[1, n+1] - ratio * size_param / y)
+
+        Ḋn[2, n] = (ratio * size_param * im / y) + denom_inv2 * (Ḋn[2, n+1] + ratio * size_param * im / y)
+
+    end
 
     # Get recursion for bessel functions ψ and ξ
     ψ₀, ψ₁, χ₀, χ₁ =  (cos(size_param), sin(size_param), -sin(size_param), cos(size_param))
@@ -306,11 +306,19 @@ function compute_mie_S₁S₂!(an, bn, ȧn, ḃn,
     @assert size(S₁) == size(S₂)
     @assert length(S₁) == nμ
 
-    for l in 1:nmax, iμ in 1:nμ 
-            S₁[iμ]   += (2l + 1) / (l * (l + 1)) * (an[l] * τ_[iμ,l] + bn[l] * π_[iμ,l])
-            S₂[iμ]   += (2l + 1) / (l * (l + 1)) * (an[l] * π_[iμ,l] + bn[l] * τ_[iμ,l])
-            Ṡ₁[:,iμ] += (2l + 1) / (l * (l + 1)) * (ȧn[:,l] * τ_[iμ,l] + ḃn[:,l] * π_[iμ,l])
-            Ṡ₂[:,iμ] += (2l + 1) / (l * (l + 1)) * (ȧn[:,l] * π_[iμ,l] + ḃn[:,l] * τ_[iμ,l])
+    nderiv = size(ȧn, 1)
+    @inbounds for l in 1:nmax
+        coef = (2l + 1) / (l * (l + 1))
+        for iμ in 1:nμ
+            τ_val = τ_[iμ,l]
+            π_val = π_[iμ,l]
+            S₁[iμ] += coef * (an[l] * τ_val + bn[l] * π_val)
+            S₂[iμ] += coef * (an[l] * π_val + bn[l] * τ_val)
+            for ctr in 1:nderiv
+                Ṡ₁[ctr,iμ] += coef * (ȧn[ctr,l] * τ_val + ḃn[ctr,l] * π_val)
+                Ṡ₂[ctr,iμ] += coef * (ȧn[ctr,l] * π_val + ḃn[ctr,l] * τ_val)
+            end
+        end
     end
 end
 

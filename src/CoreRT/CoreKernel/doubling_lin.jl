@@ -197,7 +197,8 @@ function doubling_allparams_helper!(pol_type,
                           I_static::AbstractArray{FT}, 
                           architecture,
                           dτ̇::AbstractArray,
-                          μ₀::FT) where {FT}
+                          μ₀::FT;
+                          N_active::Int=0) where {FT}
 
     # Unpack the added layer (forward)
     (; r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻) = added_layer
@@ -209,7 +210,7 @@ function doubling_allparams_helper!(pol_type,
     
     ndoubl == 0 && return nothing
     
-    Nparams = size(ap_ṙ⁻⁺, 1)
+    Nparams = N_active > 0 ? N_active : size(ap_ṙ⁻⁺, 1)
     nμ   = size(t⁺⁺, 1)
     nSpec = size(t⁺⁺, 3)
     
@@ -234,6 +235,13 @@ function doubling_allparams_helper!(pol_type,
         end
     end
 
+    # Precompute hoisted temporaries for SFI (reused across params each step)
+    if SFI
+        J1m_plus_r_j0p = similar(j₀⁻)
+        j0p_plus_r_J1m = similar(j₀⁺)
+    end
+    r_times_t = similar(t⁺⁺)
+
     # Loop over number of doublings
     for n = 1:ndoubl
         
@@ -252,33 +260,37 @@ function doubling_allparams_helper!(pol_type,
             @views J₁⁺[:,1,:] = j₀⁺[:,1,:] .* expk'
             @views J₁⁻[:,1,:] = j₀⁻[:,1,:] .* expk'
             
+            # Hoist param-independent source terms
+            J1m_plus_r_j0p .= J₁⁻ .+ r⁻⁺ ⊠ j₀⁺
+            j0p_plus_r_J1m .= j₀⁺ .+ r⁻⁺ ⊠ J₁⁻
+
             for iparam = 1:Nparams
-                # Each parameter has its own beam attenuation derivative
                 @views ap_J̇₁⁺[iparam,:,1,:] .= ap_J̇₀⁺[iparam,:,1,:] .* expk' .+ j₀⁺[:,1,:] .* ap_expk_lin[iparam,:]'
                 @views ap_J̇₁⁻[iparam,:,1,:] .= ap_J̇₀⁻[iparam,:,1,:] .* expk' .+ j₀⁻[:,1,:] .* ap_expk_lin[iparam,:]'
                 
-                # Update per-param expk_lin for next doubling: d(expk²)/dp = 2*expk*d(expk)/dp
                 @views ap_expk_lin[iparam,:] .= 2 .* expk .* ap_expk_lin[iparam,:]
                 
-                # Source function doubling (same structure as core, but with ap_ fields)
                 @views ap_J̇₀⁻[iparam,:,:,:] .= ap_J̇₀⁻[iparam,:,:,:] .+ 
-                        (tt⁺⁺_gp_refl_lin[iparam,:,:,:] ⊠ (J₁⁻ .+ r⁻⁺ ⊠ j₀⁺)) .+
+                        (tt⁺⁺_gp_refl_lin[iparam,:,:,:] ⊠ J1m_plus_r_j0p) .+
                         (tt⁺⁺_gp_refl ⊠ (ap_J̇₁⁻[iparam,:,:,:] .+ ap_ṙ⁻⁺[iparam,:,:,:] ⊠ j₀⁺ .+ r⁻⁺ ⊠ ap_J̇₀⁺[iparam,:,:,:]))
                 @views ap_J̇₀⁺[iparam,:,:,:] .= ap_J̇₁⁺[iparam,:,:,:] .+ 
-                    (tt⁺⁺_gp_refl_lin[iparam,:,:,:] ⊠ (j₀⁺ .+ r⁻⁺ ⊠ J₁⁻)) .+
+                    (tt⁺⁺_gp_refl_lin[iparam,:,:,:] ⊠ j0p_plus_r_J1m) .+
                     (tt⁺⁺_gp_refl ⊠ (ap_J̇₀⁺[iparam,:,:,:] .+ ap_ṙ⁻⁺[iparam,:,:,:] ⊠ J₁⁻ .+ r⁻⁺ ⊠ ap_J̇₁⁻[iparam,:,:,:]))
             end
             
-            # Forward source function updates
-            j₀⁻[:] = j₀⁻ .+ (tt⁺⁺_gp_refl ⊠ (J₁⁻ .+ r⁻⁺ ⊠ j₀⁺))
-            j₀⁺[:] = J₁⁺ .+ (tt⁺⁺_gp_refl ⊠ (j₀⁺ .+ r⁻⁺ ⊠ J₁⁻))
+            # Forward source function updates (use precomputed hoisted terms)
+            j₀⁻[:] = j₀⁻ .+ (tt⁺⁺_gp_refl ⊠ J1m_plus_r_j0p)
+            j₀⁺[:] = J₁⁺ .+ (tt⁺⁺_gp_refl ⊠ j0p_plus_r_J1m)
             expk[:] = expk.^2
         end
         
+        # Hoist param-independent R*T product
+        r_times_t .= r⁻⁺ ⊠ t⁺⁺
+
         # Linearized R and T doubling (N params)
         for iparam = 1:Nparams
             ap_ṙ⁻⁺[iparam,:,:,:] .= ap_ṙ⁻⁺[iparam,:,:,:] .+ 
-                        tt⁺⁺_gp_refl_lin[iparam,:,:,:] ⊠ r⁻⁺ ⊠ t⁺⁺ .+
+                        tt⁺⁺_gp_refl_lin[iparam,:,:,:] ⊠ r_times_t .+
                         tt⁺⁺_gp_refl ⊠ (ap_ṙ⁻⁺[iparam,:,:,:] ⊠ t⁺⁺ .+
                         r⁻⁺ ⊠ ap_ṫ⁺⁺[iparam,:,:,:])
             ap_ṫ⁺⁺[iparam,:,:,:] = tt⁺⁺_gp_refl_lin[iparam,:,:,:] ⊠ t⁺⁺ .+ 
@@ -286,66 +298,17 @@ function doubling_allparams_helper!(pol_type,
         end
         
         # Forward R and T doubling
-        r⁻⁺[:]  = r⁻⁺ .+ (tt⁺⁺_gp_refl ⊠ r⁻⁺ ⊠ t⁺⁺)
+        r⁻⁺[:]  = r⁻⁺ .+ (tt⁺⁺_gp_refl ⊠ r_times_t)
         t⁺⁺[:]  = tt⁺⁺_gp_refl ⊠ t⁺⁺
     end
 
-    # After doubling, apply D matrix to forward quantities
+    # After doubling, apply D matrix to both forward and derivative quantities
+    # Uses GPU kernels (apply_D! / apply_D_SFI!) when arrays are on device
     synchronize_if_gpu()
-    apply_D_matrix!(pol_type.n, added_layer.r⁻⁺, added_layer.t⁺⁺, added_layer.r⁺⁻, added_layer.t⁻⁻)
-    SFI && apply_D_matrix_SFI!(pol_type.n, added_layer.j₀⁻)
-    
-    # Apply D matrix to all-params derivatives  
-    # For n_stokes=1: ap_ṙ⁺⁻ = ap_ṙ⁻⁺, ap_ṫ⁻⁻ = ap_ṫ⁺⁺
-    # For n_stokes>1: need proper D transformation (sign flips based on Stokes indices)
-    if pol_type.n == 1
-        ap_ṙ⁺⁻[:] = ap_ṙ⁻⁺
-        ap_ṫ⁻⁻[:] = ap_ṫ⁺⁺
-    else
-        # General Stokes case: apply D transformation per parameter
-        n_stokes = pol_type.n
-        nD = div(nμ, n_stokes)
-        for iparam = 1:Nparams
-            for iSpec = 1:nSpec
-                for jμ = 1:nμ
-                    j_s = mod1(jμ, n_stokes)
-                    for iμ = 1:nμ
-                        i_s = mod1(iμ, n_stokes)
-                        # First negate r⁻⁺ for rows with i_s > 2
-                        r_val = ap_ṙ⁻⁺[iparam, iμ, jμ, iSpec]
-                        if i_s > 2
-                            r_val = -r_val
-                        end
-                        # Set r⁺⁻ and t⁻⁻ with appropriate sign
-                        if (i_s <= 2 && j_s <= 2) || (i_s > 2 && j_s > 2)
-                            ap_ṙ⁺⁻[iparam, iμ, jμ, iSpec] = r_val
-                            ap_ṫ⁻⁻[iparam, iμ, jμ, iSpec] = ap_ṫ⁺⁺[iparam, iμ, jμ, iSpec]
-                        else
-                            ap_ṙ⁺⁻[iparam, iμ, jμ, iSpec] = -r_val
-                            ap_ṫ⁻⁻[iparam, iμ, jμ, iSpec] = -ap_ṫ⁺⁺[iparam, iμ, jμ, iSpec]
-                        end
-                        # Also update ap_ṙ⁻⁺ with the negation for i_s > 2
-                        if i_s > 2
-                            ap_ṙ⁻⁺[iparam, iμ, jμ, iSpec] = -ap_ṙ⁻⁺[iparam, iμ, jμ, iSpec]
-                        end
-                    end
-                end
-            end
-        end
-        # SFI: apply D to ap_J̇₀⁻
-        if SFI
-            for iparam = 1:Nparams
-                for iSpec = 1:nSpec
-                    for iμ = 1:nμ
-                        i_s = mod1(iμ, n_stokes)
-                        if i_s > 2
-                            ap_J̇₀⁻[iparam, iμ, 1, iSpec] = -ap_J̇₀⁻[iparam, iμ, 1, iSpec]
-                        end
-                    end
-                end
-            end
-        end
-    end
+    apply_D_matrix!(pol_type.n,
+        added_layer.r⁻⁺, added_layer.t⁺⁺, added_layer.r⁺⁻, added_layer.t⁻⁻,
+        ap_ṙ⁻⁺, ap_ṫ⁺⁺, ap_ṙ⁺⁻, ap_ṫ⁻⁻)
+    SFI && apply_D_matrix_SFI!(pol_type.n, added_layer.j₀⁻, ap_J̇₀⁻)
 
     return nothing
 end
@@ -368,10 +331,10 @@ function doubling_allparams!(pol_type, SFI, expk,
                     added_layer::AddedLayer,
                     added_layer_lin::AddedLayerLin,
                     I_static::AbstractArray, 
-                    architecture, dτ̇, μ₀)
+                    architecture, dτ̇, μ₀; N_active::Int=0)
 
     doubling_allparams_helper!(pol_type, SFI, expk,
-        ndoubl, added_layer, added_layer_lin, I_static, architecture, dτ̇, μ₀)
+        ndoubl, added_layer, added_layer_lin, I_static, architecture, dτ̇, μ₀; N_active=N_active)
     synchronize_if_gpu()
 end
 

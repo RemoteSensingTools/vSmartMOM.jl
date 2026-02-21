@@ -223,12 +223,14 @@ function interaction_helper!(::ScatteringInterface_11, SFI,
     # Temporary arrays:
     # T₁₂(I-R₀₁R₂₁)⁻¹
     T01_inv = T⁻⁻ ⊠ tmp_inv;
+    # Hoist param-independent product
+    r_times_T = r⁻⁺ ⊠ T⁺⁺
     @inbounds for iparam=1:Nparams
         tmp_inv_lin[iparam,:,:,:] .= tmp_inv ⊠ (ap_ṙ⁻⁺[iparam,:,:,:] ⊠ R⁺⁻ .+ r⁻⁺ ⊠ Ṙ⁺⁻[iparam,:,:,:]) ⊠ tmp_inv
         T01_inv_lin[iparam,:,:,:] .= Ṫ⁻⁻[iparam,:,:,:] ⊠ tmp_inv .+ T⁻⁻ ⊠ tmp_inv_lin[iparam,:,:,:]
         # R₂₀ = R₁₀ + T₀₁(I-R₂₁R₀₁)⁻¹ R₂₁T₁₀
         tmpṘ⁻⁺[iparam,:,:,:] .= Ṙ⁻⁺[iparam,:,:,:] .+ 
-                        T01_inv_lin[iparam,:,:,:] ⊠ r⁻⁺ ⊠ T⁺⁺ .+
+                        T01_inv_lin[iparam,:,:,:] ⊠ r_times_T .+
                         T01_inv ⊠ (ap_ṙ⁻⁺[iparam,:,:,:] ⊠ T⁺⁺ .+ 
                         r⁻⁺ ⊠ Ṫ⁺⁺[iparam,:,:,:])
     
@@ -238,19 +240,20 @@ function interaction_helper!(::ScatteringInterface_11, SFI,
     
     if SFI
         #J₀₂⁻ = J₀₁⁻ + T₀₁(1-R₂₁R₀₁)⁻¹(R₂₁J₁₀⁺+J₁₂⁻)
-        tmpJ₀⁻ = J₀⁻ .+ T01_inv ⊠ (r⁻⁺ ⊠ J₀⁺ .+ added_layer.j₀⁻) 
+        r_J0p_plus_j0m = r⁻⁺ ⊠ J₀⁺ .+ added_layer.j₀⁻
+        tmpJ₀⁻ = J₀⁻ .+ T01_inv ⊠ r_J0p_plus_j0m 
         @inbounds for iparam=1:Nparams
             #@show size(tmpap_J̇₀⁻), size(ap_J̇₀⁻)
             #@show size(T01_inv_lin), size(r⁻⁺)
             #@show size(J₀⁺), size(added_layer.j₀⁻)
             tmpap_J̇₀⁻[iparam,:,:,:] .= J̇₀⁻[iparam,:,:,:] .+ 
-                T01_inv_lin[iparam,:,:,:] ⊠ (r⁻⁺ ⊠ J₀⁺ .+ added_layer.j₀⁻) .+
+                T01_inv_lin[iparam,:,:,:] ⊠ r_J0p_plus_j0m .+
                 T01_inv ⊠ (ap_ṙ⁻⁺[iparam,:,:,:] ⊠ J₀⁺ .+ r⁻⁺ ⊠ J̇₀⁺[iparam,:,:,:] .+ ap_J̇₀⁻[iparam,:,:,:])  
         end
     end 
 
     # R₂₀ = R₁₀ + T₀₁(I-R₂₁R₀₁)⁻¹ R₂₁T₁₀
-    tmpR⁻⁺ = R⁻⁺ .+ T01_inv ⊠ r⁻⁺ ⊠ T⁺⁺
+    tmpR⁻⁺ = R⁻⁺ .+ T01_inv ⊠ r_times_T
     
     # T₀₂ = T₀₁(1-R₂₁R₀₁)⁻¹T₁₂
     tmpT⁻⁻ = T01_inv ⊠ t⁻⁻ 
@@ -264,6 +267,8 @@ function interaction_helper!(::ScatteringInterface_11, SFI,
     @timeit "interaction inv2" batch_inv!(tmp_inv, I_static .- R⁺⁻ ⊠ r⁻⁺) 
     # T₂₁(I-R₀₁R₂₁)⁻¹
     T21_inv = t⁺⁺ ⊠ tmp_inv
+    # Hoist param-independent product
+    R_times_t = R⁺⁻ ⊠ t⁻⁻
     @inbounds for iparam=1:Nparams
         tmp_inv_lin[iparam,:,:,:] .= tmp_inv ⊠ (R⁺⁻ ⊠ ap_ṙ⁻⁺[iparam,:,:,:] .+ Ṙ⁺⁻[iparam,:,:,:] ⊠ r⁻⁺) ⊠ tmp_inv
         T21_inv_lin[iparam,:,:,:] .= ap_ṫ⁺⁺[iparam,:,:,:] ⊠ tmp_inv .+ t⁺⁺ ⊠ tmp_inv_lin[iparam,:,:,:]
@@ -272,27 +277,28 @@ function interaction_helper!(::ScatteringInterface_11, SFI,
         tmpṪ⁺⁺[iparam,:,:,:] .= T21_inv_lin[iparam,:,:,:] ⊠ T⁺⁺ .+ T21_inv ⊠ Ṫ⁺⁺[iparam,:,:,:] 
     
         # R₀₂ = R₁₂ + T₂₁(1-R₀₁R₂₁)⁻¹R₀₁T₁₂
-        tmpṘ⁺⁻[iparam,:,:,:] .= ap_ṙ⁺⁻[iparam,:,:,:] .+ T21_inv_lin[iparam,:,:,:] ⊠ R⁺⁻ ⊠ t⁻⁻ .+ 
+        tmpṘ⁺⁻[iparam,:,:,:] .= ap_ṙ⁺⁻[iparam,:,:,:] .+ T21_inv_lin[iparam,:,:,:] ⊠ R_times_t .+ 
                                     T21_inv ⊠ (Ṙ⁺⁻[iparam,:,:,:] ⊠ t⁻⁻ .+ R⁺⁻ ⊠ ap_ṫ⁻⁻[iparam,:,:,:])  
     end
     if SFI
+        J0p_plus_R_j0m = J₀⁺ .+ R⁺⁻ ⊠ added_layer.j₀⁻
         @inbounds for iparam=1:Nparams
             tmpap_J̇₀⁺[iparam,:,:,:] .= added_layer_lin.ap_J̇₀⁺[iparam,:,:,:] .+ 
-                T21_inv_lin[iparam,:,:,:] ⊠ (J₀⁺ .+ R⁺⁻ ⊠ added_layer.j₀⁻) .+
+                T21_inv_lin[iparam,:,:,:] ⊠ J0p_plus_R_j0m .+
                 T21_inv ⊠ (J̇₀⁺[iparam,:,:,:] .+ 
                     Ṙ⁺⁻[iparam,:,:,:] ⊠ added_layer.j₀⁻ .+ 
                     R⁺⁻ ⊠ added_layer_lin.ap_J̇₀⁻[iparam,:,:,:])
         end
         # J₂₀⁺ = J₂₁⁺ + T₂₁(I-R₀₁R₂₁)⁻¹(J₁₀ + R₀₁J₁₂⁻ )
         tmpJ₀⁺ = added_layer.j₀⁺ .+ T21_inv ⊠ 
-            (J₀⁺ .+ R⁺⁻ ⊠ added_layer.j₀⁻)
+            J0p_plus_R_j0m
     end
 
     # T₂₀ = T₂₁(I-R₀₁R₂₁)⁻¹T₁₀
     tmpT⁺⁺ = T21_inv  ⊠ T⁺⁺ 
     
     # R₀₂ = R₁₂ + T₂₁(1-R₀₁R₂₁)⁻¹R₀₁T₁₂
-    tmpR⁺⁻ = r⁺⁻ .+ T21_inv ⊠ R⁺⁻ ⊠ t⁻⁻  
+    tmpR⁺⁻ = r⁺⁻ .+ T21_inv ⊠ R_times_t  
 
     if SFI
         composite_layer.J₀⁺[:] = tmpJ₀⁺
