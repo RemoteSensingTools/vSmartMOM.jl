@@ -10,7 +10,7 @@ exp_m1(x) = iseven(x) ? 1 : -1
 """
     $(FUNCTIONNAME)(size_parameter)
 Computes the number of required Legendre functions  for a given size parameter. 
-See eq 6 in Sanghavi 2014
+See eq A17 in de Rooij and van der Stap 1984
 - `size_parameter` size parameter of the aerosol (2πr/λ)
 The function returns a rounded integer, following conventions by BH, Rooj/Stap, Siewert 
 """
