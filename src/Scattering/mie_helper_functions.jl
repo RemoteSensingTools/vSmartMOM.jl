@@ -21,17 +21,23 @@ The function returns a rounded integer, following conventions by BH, Rooj/Stap, 
 """
 get_n_max(size_parameter) = (size_parameter>8.0) ? round(Int, size_parameter + 4.05 * size_parameter^(1/3) + 10) : round(Int, size_parameter + 4.0 * size_parameter^(1/3) + 1)
 
-"""
-    $(FUNCTIONNAME)(size_parameter,refractive_idx::Number,an,bn,Dn)
-Computes Mie coefficients `an` and `bn` as a function of size parameter and complex 
-refractive index. See eq 4.88 in Bohren and Huffman
-- `size_parameter` size parameter of the aerosol (2πr/λ)
-- `refractive_idx` refractive index of the aerosol (complex number)
-- `an` and `bn` pre-allocated arrays, need to match at least n_max for the given size parameter
-- `Dn` pre-allocated array for the logarithmic derivative (see BH, eq 4.88) 
-(need to check whether Dn can be created internally without causing too many allocations)
+@doc raw"""
+    $(FUNCTIONNAME)(size_param, refractive_idx::Number, an, bn, Dn)
 
-The function returns a rounded integer, following conventions by BH, Rooj/Stap, Siewert 
+Compute Mie coefficients ``a_n`` and ``b_n`` from the size parameter and complex
+refractive index (Bohren & Huffman, eq. 4.88).
+
+The logarithmic derivative ``D_n(y)`` is obtained via downward recursion
+(BH eq. 4.89; de Rooij & Stap 1984, eq. A9).  This recursion is **always
+performed in Float64** regardless of the element type of `Dn`, because the
+cancellation-prone continued-fraction form loses significant digits in Float32
+for ``|y| \gtrsim 50``.
+
+# Arguments
+- `size_param`: size parameter ``x = 2\pi r/\lambda``
+- `refractive_idx`: complex refractive index of the particle
+- `an`, `bn`: pre-allocated arrays (length ≥ `n_max(x)`) for the Mie coefficients
+- `Dn`: pre-allocated array for the logarithmic derivative (length chosen by caller)
 """
 function compute_mie_ab!(size_param, refractive_idx::Number, an, bn, Dn)
     # Compute y
@@ -40,7 +46,7 @@ function compute_mie_ab!(size_param, refractive_idx::Number, an, bn, Dn)
     # Maximum expansion (see eq. A17 from de Rooij and Stap, 1984)
     n_max = get_n_max(size_param)
 
-    # Make sure downward recurrence starts higher up 
+    # Make sure downward recurrence starts higher up
     # (at least 15, check eq. A9 in de Rooij and Stap, 1984, may need to check what is needed)
     nmx = length(Dn)
     @assert size(an)[1] >= n_max
@@ -49,8 +55,13 @@ function compute_mie_ab!(size_param, refractive_idx::Number, an, bn, Dn)
 
     # Dn as in eq 4.88, Bohren and Huffman, to calculate an and bn
     # Downward Recursion, eq. 4.89, Bohren and Huffman
+    # Always performed in Float64 for numerical stability
+    y64 = Complex{Float64}(y)
+    Dn_prev = Complex{Float64}(0)
     @inbounds for n = (nmx - 1):-1:1
-        Dn[n] = ((n+1) / y) - (1 / (Dn[n+1] + (n+1) / y))
+        ratio = (n + 1) / y64
+        Dn_prev = ratio - 1 / (Dn_prev + ratio)
+        Dn[n] = Dn_prev
     end
 
     # Get recursion for bessel functions ψ and ξ
@@ -321,6 +332,50 @@ function gauleg(n, xmin, xmax; norm=false)
     ξ = (xmax - xmin) / 2 * ξ .+ (xmin + xmax) / 2
     norm ? w /= sum(w) : w *= (xmax - xmin) / 2
     return ξ, w
+end
+
+@doc raw"""
+    gauleg_log(n, r_min, r_max; norm=false)
+
+Gauss-Legendre quadrature with nodes equidistant in ``\ln r``.
+
+For a log-normal size distribution
+
+```math
+n(r) = \frac{1}{r\,\ln\sigma\,\sqrt{2\pi}}
+       \exp\!\Bigl[-\frac{(\ln r - \ln r_m)^2}{2\ln^2\sigma}\Bigr],
+```
+
+the substitution ``u = \ln r`` gives ``dr = r\,du`` and transforms the
+integrand into a Gaussian in ``u``.  Placing Gauss-Legendre nodes in
+``[\ln r_{\min},\,\ln r_{\max}]`` concentrates points where the
+distribution has significant mass.
+
+The returned weights include the Jacobian ``r = e^u``:
+
+```math
+w_i^{\text{log}} = w_i^{\text{GL}}\;\cdot r_i\;\cdot
+                    \frac{\ln r_{\max} - \ln r_{\min}}{2}.
+```
+
+# Arguments
+- `n`: number of quadrature points
+- `r_min`, `r_max`: integration bounds in radius space (both > 0)
+- `norm`: if `true`, normalize weights to sum to 1 (for computing means)
+
+# Returns
+`(r, w)` — radius nodes and corresponding weights
+"""
+function gauleg_log(n, r_min, r_max; norm=false)
+    ξ, w = gausslegendre(n)
+    ln_min, ln_max = log(r_min), log(r_max)
+    ln_r = (ln_max - ln_min) / 2 * ξ .+ (ln_max + ln_min) / 2
+    r = exp.(ln_r)
+    w = w .* r .* (ln_max - ln_min) / 2
+    if norm
+        w ./= sum(w)
+    end
+    return r, w
 end
 
 @doc raw"""

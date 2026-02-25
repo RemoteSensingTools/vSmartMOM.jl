@@ -28,15 +28,11 @@ function compute_aerosol_optical_properties(lin::LinMode, model::MieModel{FDT}, 
     #@show size_distribution.σ  
     FT = eltype(size_distribution.σ);
     # @assert FT == Float64 "Aerosol computations require 64bit"
-    # Get radius quadrature points and weights (for mean, thus normalized):
-    # 
-    
-    # Just sample from 0.25%ile to 99.75%ile:
-    #start,stop = quantile(size_distribution,[0.0025,0.9975])
-    r, wᵣ = gauleg(nquad_radius, 0.0, r_max ; norm=false) 
-    #r, wᵣ = gauleg(nquad_radius, start, min(stop,r_max); norm=false) 
+    # Get radius quadrature points and weights using log-space quadrature
+    r_min = max(quantile(size_distribution, 1e-8), 1e-6 * r_max)
+    r, wᵣ = gauleg_log(nquad_radius, r_min, r_max; norm=false)
     # Wavenumber
-    k = 2π / λ  
+    k = 2π / λ
 
     # Size parameter
     x_size_param = k * r # (2πr/λ)
@@ -297,15 +293,12 @@ function compute_ref_aerosol_extinction(lin::LinMode, model::MieModel{FDT}, FT2:
     FT = eltype(nᵣ);
     #@show FT
     #@assert FT == Float64 "Aerosol computations require 64bit"
-    # Get radius quadrature points and weights (for mean, thus normalized):
-    #r, wᵣ = gauleg(nquad_radius, 0.0, r_max ; norm=true) 
-    # Just sample from 0.25%ile to 99.75%ile:
-    #start,stop = quantile(size_distribution,[0.0025,0.9975])
-    r, wᵣ = gauleg(nquad_radius, 0.0, r_max ; norm=false) 
-    #r, wᵣ = gauleg(nquad_radius, start, min(stop,r_max); norm=false) 
+    # Get radius quadrature points and weights using log-space quadrature
+    r_min = max(quantile(size_distribution, 1e-8), 1e-6 * r_max)
+    r, wᵣ = gauleg_log(nquad_radius, r_min, r_max; norm=false)
 
     # Wavenumber
-    k = 2π / λ  
+    k = 2π / λ
 
     # Size parameter
     x_size_param = k * r # (2πr/λ)
