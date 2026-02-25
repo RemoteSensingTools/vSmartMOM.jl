@@ -32,7 +32,7 @@ function postprocessing_vza!(RS_type::noRS,
     J̇₀⁺ = _to_cpu(composite_layer_lin.J̇₀⁺)
     J̇₀⁻ = _to_cpu(composite_layer_lin.J̇₀⁻)
 
-    Nparams = size(J̇₀⁻, 1)
+    Nparams = size(J̇₀⁻, 4)
 
     @inbounds for i in eachindex(vza)
         istart, iend, w = vza_info[i]
@@ -40,8 +40,8 @@ function postprocessing_vza!(RS_type::noRS,
             R_SFI[i,:,s] .+= w * J₀⁻[istart:iend, 1, s]
             T_SFI[i,:,s] .+= w * J₀⁺[istart:iend, 1, s]
             for iparam = 1:Nparams
-                Ṙ_SFI[iparam,i,:,s] .+= w * J̇₀⁻[iparam, istart:iend, 1, s]
-                Ṫ_SFI[iparam,i,:,s] .+= w * J̇₀⁺[iparam, istart:iend, 1, s]
+                Ṙ_SFI[i,:,s,iparam] .+= w * J̇₀⁻[istart:iend, 1, s, iparam]
+                Ṫ_SFI[i,:,s,iparam] .+= w * J̇₀⁺[istart:iend, 1, s, iparam]
             end
         end
     end

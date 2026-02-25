@@ -48,7 +48,7 @@ NSurf = 1
 
 R_lin, T_lin, dR, dT = rt_run(model_lin, lin_model, NAer, NGas, NSurf)
 
-# `dR` has shape `[nParams × nVZA × nStokes × nSpec]` — derivatives w.r.t. aerosols,
+# `dR` has shape `[nVZA × nStokes × nSpec × nParams]` — derivatives w.r.t. aerosols,
 # gas VMRs, and surface albedo.
 
 println("dR shape (Jacobian): ", size(dR))

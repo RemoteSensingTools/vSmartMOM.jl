@@ -37,7 +37,7 @@ mismatch errors at runtime.
 
 **File:** `src/CoreRT/CoreKernel/elemental_lin.jl`  
 **Line:** ~426  
-**Symptom:** The Z-derivative of the downward source function `J̇₀⁻[3,i,1,n]`
+**Symptom:** The Z-derivative of the downward source function `J̇₀⁻[i,1,n,3]`
 was computed as `J₀⁻[i,1,n] / Z⁺⁺_I₀` instead of `J₀⁻[i,1,n] / Z⁻⁺_I₀`.  
 **Root cause:** Typo — `Z⁺⁺_I₀` was used where `Z⁻⁺_I₀` is required.  
 The downward source `J₀⁻` depends on Z⁻⁺ (not Z⁺⁺), so the derivative
@@ -177,8 +177,8 @@ or spectral points with zero single-scattering albedo), these produce `0/0 = NaN
 or `X/0 = Inf`.  
 **Fix:** Added safe division guards:
 ```julia
-J̇₀⁺[3, i, 1, n] = Z⁺⁺_I₀ == 0 ? FT(0) : J₀⁺[i, 1, n] / Z⁺⁺_I₀
-J̇₀⁺[2, i, 1, n] = ϖ_λ[n] == 0 ? FT(0) : J₀⁺[i, 1, n] / ϖ_λ[n]
+J̇₀⁺[i, 1, n, 3] = Z⁺⁺_I₀ == 0 ? FT(0) : J₀⁺[i, 1, n] / Z⁺⁺_I₀
+J̇₀⁺[i, 1, n, 2] = ϖ_λ[n] == 0 ? FT(0) : J₀⁺[i, 1, n] / ϖ_λ[n]
 ```
 Applied to all 9 affected locations.  
 **Impact:** `NaN` propagation through doubling and interaction, corrupting all
@@ -226,7 +226,7 @@ factor of 2^ndoubl) for non-TOA layers. Combined with already-large Mie
 parameter derivatives (O(10⁸–10¹¹)), this can cause numerical overflow and `NaN`.  
 
 **Root cause:** After the elemental + doubling steps, the core derivatives
-(`ṫ⁺⁺[1,:,:,:]`, `ṙ⁻⁺[1,:,:,:]`, etc.) are derivatives with respect to the
+(`ṫ⁺⁺[:,:,:,1]`, `ṙ⁻⁺[:,:,:,1]`, etc.) are derivatives with respect to the
 **elemental** optical depth `dτ = τ / 2^ndoubl`. The chain rule to physical
 parameters therefore requires:
 
@@ -241,7 +241,7 @@ The **TOA code** in `rt_kernel_lin.jl` (line 230) correctly uses `dτ̇`:
 ```julia
 dτ̇ = τ̇ ./ 2^ndoubl   # line 155
 ...
-composite_layer_lin.Ṫ⁺⁺[iparam,:,:,:] .= added_layer_lin.ṫ⁺⁺[1,:,:,:] .* reshape(dτ̇[iparam,:], ...)
+composite_layer_lin.Ṫ⁺⁺[:,:,:,iparam] .= added_layer_lin.ṫ⁺⁺[:,:,:,1] .* reshape(dτ̇[:,iparam], ...)
 ```
 
 But `lin_added_layer_all_params!` (used for **all non-TOA layers**) incorrectly
@@ -262,7 +262,7 @@ function lin_added_layer_all_params_helper!(..., ndoubl::Int) where ...
     ...
     dτ̇ = τ̇ ./ FT(2^ndoubl)
     ...
-    ap_ṫ⁺⁺[iparam,:,:,:] .= ṫ⁺⁺[1,:,:,:] .* reshape(dτ̇[iparam,:], ...) .+ ...
+    ap_ṫ⁺⁺[:,:,:,iparam] .= ṫ⁺⁺[:,:,:,1] .* reshape(dτ̇[:,iparam], ...) .+ ...
 ```
 Updated the call site in `rt_kernel_lin.jl` to pass `ndoubl`.
 
@@ -291,7 +291,7 @@ explicit type parameters.
 
 **File:** `src/CoreRT/CoreKernel/elemental_lin.jl`  
 **Lines:** ~286, ~323, ~343  
-**Symptom:** NaN in `ṙ⁻⁺[3,:,:,:]` and `ṫ⁺⁺[3,:,:,:]` (core derivative 3 = Z-derivative)
+**Symptom:** NaN in `ṙ⁻⁺[:,:,:,3]` and `ṫ⁺⁺[:,:,:,3]` (core derivative 3 = Z-derivative)
 at every layer (iz=1 through iz=5), propagating through doubling and interaction
 to corrupt all final Jacobians.  
 
@@ -322,14 +322,14 @@ that avoid division entirely. Since `r = ϖ·Z·f(τ,μ)`, the derivative
 
 ```julia
 # Line 286: was r⁻⁺[i,j,n] / Z⁻⁺[i,j,n2]
-ṙ⁻⁺[3,i,j,n] = ϖ_λ[n] * (qp_μN[j]/(qp_μN[i]+qp_μN[j])) * wct[j] *
+ṙ⁻⁺[i,j,n,3] = ϖ_λ[n] * (qp_μN[j]/(qp_μN[i]+qp_μN[j])) * wct[j] *
                  (1 - exp(-dτ_λ[n] * (1/qp_μN[i] + 1/qp_μN[j])))
 
 # Line 323 (i≠j, same μ): was t⁺⁺[i,j,n] / Z⁺⁺[i,j,n2]
-ṫ⁺⁺[3,i,j,n] = exp(-dτ_λ[n]/qp_μN[j]) * ϖ_λ[n] * (dτ_λ[n]/qp_μN[i]) * wct[j]
+ṫ⁺⁺[i,j,n,3] = exp(-dτ_λ[n]/qp_μN[j]) * ϖ_λ[n] * (dτ_λ[n]/qp_μN[i]) * wct[j]
 
 # Line 343 (i≠j, different μ): was t⁺⁺[i,j,n] / Z⁺⁺[i,j,n2]
-ṫ⁺⁺[3,i,j,n] = ϖ_λ[n] * (qp_μN[j]/(qp_μN[i]-qp_μN[j])) * wct[j] *
+ṫ⁺⁺[i,j,n,3] = ϖ_λ[n] * (qp_μN[j]/(qp_μN[i]-qp_μN[j])) * wct[j] *
                  (exp(-dτ_λ[n]/qp_μN[i]) - exp(-dτ_λ[n]/qp_μN[j]))
 ```
 
@@ -366,13 +366,13 @@ Line 225: Same bug pattern for the upwelling equation (J̇₀⁺).
 **Fix:** Replaced three instances:
 ```julia
 # Line 189: was ap_J̇₀⁻, now J̇₀⁻
-tmpap_J̇₀⁻[iparam,...] .= J̇₀⁻[iparam,...] .+ ...
+tmpap_J̇₀⁻[...,iparam] .= J̇₀⁻[...,iparam] .+ ...
 
-# Line 191: was ap_J̇₀⁺, now J̇₀⁺  
-T01_inv ⊠ (... .+ r⁻⁺ ⊠ J̇₀⁺[iparam,...] .+ ...)
+# Line 191: was ap_J̇₀⁺, now J̇₀⁺
+T01_inv ⊠ (... .+ r⁻⁺ ⊠ J̇₀⁺[...,iparam] .+ ...)
 
 # Line 225: was ap_J̇₀⁺, now J̇₀⁺
-T21_inv ⊠ (J̇₀⁺[iparam,...] .+ ...)
+T21_inv ⊠ (J̇₀⁺[...,iparam] .+ ...)
 ```
 
 **Impact:** This affected ALL Jacobian parameters through the surface interaction
@@ -443,12 +443,12 @@ elemental! → doubling! → lin_added_layer_all_params! (chain rule) → intera
 
 The chain rule for the Z term uses element-wise multiplication:
 ```julia
-ap_ṫ⁺⁺[iparam,:,:,:] .= ṫ⁺⁺[1,:,:,:] .* dτ̇[iparam,:] .+
-                          ṫ⁺⁺[2,:,:,:] .* ϖ̇[iparam,:] .+
-                          ṫ⁺⁺[3,:,:,:] .* Ż⁺⁺[iparam,:,:,:]   ← ELEMENT-WISE
+ap_ṫ⁺⁺[:,:,:,iparam] .= ṫ⁺⁺[:,:,:,1] .* dτ̇[:,iparam] .+
+                          ṫ⁺⁺[:,:,:,2] .* ϖ̇[:,iparam] .+
+                          ṫ⁺⁺[:,:,:,3] .* Ż⁺⁺[:,:,:,iparam]   ← ELEMENT-WISE
 ```
 
-At the **elemental** level, `ṫ⁺⁺[3,i,j]` = ∂t_ij/∂Z_ij is correct because each t_ij
+At the **elemental** level, `ṫ⁺⁺[i,j,:,3]` = ∂t_ij/∂Z_ij is correct because each t_ij
 depends linearly on Z_ij only (the 4th-rank derivative tensor ∂t_ij/∂Z_kl is diagonal).
 
 After **doubling**, the matrix products `T_doubled = T · G · T` mix all (i,j) indices:
@@ -456,8 +456,8 @@ After **doubling**, the matrix products `T_doubled = T · G · T` mix all (i,j) 
 ∂T_doubled_ij/∂Z_kl ≠ 0  for (k,l) ≠ (i,j)
 ```
 
-So `ṫ_doubled[3,i,j]` is NOT `∂T_ij/∂Z_ij` anymore — it contains mixed contributions
-from all Z elements. The element-wise multiplication with Ż[iparam,i,j] then gives the
+So `ṫ_doubled[i,j,:,3]` is NOT `∂T_ij/∂Z_ij` anymore — it contains mixed contributions
+from all Z elements. The element-wise multiplication with Ż[i,j,:,iparam] then gives the
 wrong result, ignoring all off-diagonal terms.
 
 **Evidence:**
@@ -596,8 +596,8 @@ optical depth derivative. This is wrong because:
 2. **Added** per-parameter τ̇_sum beam attenuation in `rt_kernel_lin.jl` AFTER the chain rule:
 ```julia
 for iparam = 1:nparams_τ_sum
-    ap_J̇₀⁺[iparam,:,1,:] .+= j₀⁺[:,1,:] .* reshape(-τ̇_sum[iparam,:] ./ μ₀, 1, nspec)
-    ap_J̇₀⁻[iparam,:,1,:] .+= j₀⁻[:,1,:] .* reshape(-τ̇_sum[iparam,:] ./ μ₀, 1, nspec)
+    ap_J̇₀⁺[:,1,:,iparam] .+= j₀⁺[:,1,:] .* reshape(-τ̇_sum[:,iparam] ./ μ₀, 1, nspec)
+    ap_J̇₀⁻[:,1,:,iparam] .+= j₀⁻[:,1,:] .* reshape(-τ̇_sum[:,iparam] ./ μ₀, 1, nspec)
 end
 ```
 
@@ -737,7 +737,7 @@ exp(-dτ/μ) * (1/μ) * (-1 + ϖ*Z*wct*(1 - dτ/μ))
 **Status:** FIXED  
 **Files:**
 - `ext/gpu_batched_cuda.jl` (new `batched_mul` overloads for CuArray views)
-- Trigger site: `src/CoreRT/CoreKernel/doubling_lin.jl` (view slices like `ap_ṙ⁻⁺[iparam,:,:,:]`)
+- Trigger site: `src/CoreRT/CoreKernel/doubling_lin.jl` (view slices like `ap_ṙ⁻⁺[:,:,:,iparam]`)
 
 **Symptom:** GPU Jacobian run failed with:
 - "Scalar indexing is disallowed"
