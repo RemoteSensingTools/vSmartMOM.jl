@@ -44,16 +44,29 @@ function compute_mie_ab!(size_param, refractive_idx::Number,
     @assert size(an)[1] >= n_max
     @assert size(an) == size(bn)
     # Dn as in eq 4.88, Bohren and Huffman, to calculate an and bn
-    # Downward Recursion, eq. 4.89, Bohren and Huffman (in-place, no allocations)
+    # Downward Recursion, eq. 4.89, Bohren and Huffman (in-place)
+    # Always performed in Float64 for numerical stability
+    y64 = Complex{Float64}(y)
+    sp64 = Float64(size_param)
+    Dn_prev = Complex{Float64}(0)
+    Ḋn1_prev = Complex{Float64}(0)
+    Ḋn2_prev = Complex{Float64}(0)
     @inbounds for n = (nmx - 1):-1:1
-        ratio = (n + 1) / y
-        denom_inv = 1 / (Dn[n+1] + ratio)
-        Dn[n] = ratio - denom_inv
+        ratio = (n + 1) / y64
+        denom_inv = 1 / (Dn_prev + ratio)
+        Dn_cur = ratio - denom_inv
         denom_inv2 = denom_inv^2
-        Ḋn[1, n] = (-ratio * size_param / y) + denom_inv2 * (Ḋn[1, n+1] - ratio * size_param / y)
+        dratio_dnr = -ratio * sp64 / y64
+        dratio_dni =  ratio * sp64 * im / y64
+        Ḋn1_cur = dratio_dnr + denom_inv2 * (Ḋn1_prev + dratio_dnr)
+        Ḋn2_cur = dratio_dni + denom_inv2 * (Ḋn2_prev + dratio_dni)
 
-        Ḋn[2, n] = (ratio * size_param * im / y) + denom_inv2 * (Ḋn[2, n+1] + ratio * size_param * im / y)
-
+        Dn[n] = Dn_cur
+        Ḋn[1, n] = Ḋn1_cur
+        Ḋn[2, n] = Ḋn2_cur
+        Dn_prev = Dn_cur
+        Ḋn1_prev = Ḋn1_cur
+        Ḋn2_prev = Ḋn2_cur
     end
 
     # Get recursion for bessel functions ψ and ξ
