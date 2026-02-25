@@ -1,11 +1,11 @@
-"Abstract Type for Layer Ṙ,Ṫ and J̇ matrices"
+"Abstract Type for Layer Ṙ,Ṫ and J̇ matrices"
 abstract type AbstractLayerLin end
 
 """
     CompositeLayerLin{FT} <: AbstractLayerLin
 
 Linearized (Jacobian) counterpart of [`CompositeLayer`](@ref).  Each field
-is a 4-D array whose extra (first) dimension spans the number of retrieval
+is a 4-D array whose extra (last) dimension spans the number of retrieval
 parameters, storing ∂R/∂x, ∂T/∂x, and ∂J/∂x for the accumulated composite
 layer.
 
@@ -19,13 +19,13 @@ layer.
 """
 Base.@kwdef struct CompositeLayerLin{FT} <: AbstractLayerLin 
     "Composite layer Reflectance matrix R (from + -> -)"
-    Ṙ⁻⁺::AbstractArray{FT,4}
+    Ṙ⁻⁺::AbstractArray{FT,4}
     "Composite layer Reflectance matrix R (from - -> +)"
-    Ṙ⁺⁻::AbstractArray{FT,4}
+    Ṙ⁺⁻::AbstractArray{FT,4}
     "Composite layer transmission matrix T (from + -> +)"
-    Ṫ⁺⁺::AbstractArray{FT,4}
+    Ṫ⁺⁺::AbstractArray{FT,4}
     "Composite layer transmission matrix T (from - -> -)"
-    Ṫ⁻⁻::AbstractArray{FT,4}
+    Ṫ⁻⁻::AbstractArray{FT,4}
     "Composite layer source matrix J (in + direction)"
     J̇₀⁺::AbstractArray{FT,4}
     "Composite layer source matrix J (in - direction)"
@@ -51,30 +51,49 @@ matrices with respect to two groups of parameters:
 Base.@kwdef struct AddedLayerLin{FT} <: AbstractLayerLin 
     # Derivatives with respect to (layer) τ, ϖ and Z only
     "Added layer Reflectance matrix R (from + -> -)"
-    ṙ⁻⁺::AbstractArray{FT,4}
+    ṙ⁻⁺::AbstractArray{FT,4}
     "Added layer transmission matrix T (from + -> +)"
-    ṫ⁺⁺::AbstractArray{FT,4}
+    ṫ⁺⁺::AbstractArray{FT,4}
     "Added layer Reflectance matrix R (from - -> +)"
-    ṙ⁺⁻::AbstractArray{FT,4}
+    ṙ⁺⁻::AbstractArray{FT,4}
     "Added layer transmission matrix T (from - -> -)"
-    ṫ⁻⁻::AbstractArray{FT,4}
+    ṫ⁻⁻::AbstractArray{FT,4}
     "Added layer source matrix J (in + direction)"
     J̇₀⁺::AbstractArray{FT,4}
     "Added layer source matrix J (in - direction)"
     J̇₀⁻::AbstractArray{FT,4}
     # Derivatives with respect to all state parameters:
     "Added layer Reflectance matrix R (from + -> -)"
-    ap_ṙ⁻⁺::AbstractArray{FT,4}
+    ap_ṙ⁻⁺::AbstractArray{FT,4}
     "Added layer transmission matrix T (from + -> +)"
-    ap_ṫ⁺⁺::AbstractArray{FT,4}
+    ap_ṫ⁺⁺::AbstractArray{FT,4}
     "Added layer Reflectance matrix R (from - -> +)"
-    ap_ṙ⁺⁻::AbstractArray{FT,4}
+    ap_ṙ⁺⁻::AbstractArray{FT,4}
     "Added layer transmission matrix T (from - -> -)"
-    ap_ṫ⁻⁻::AbstractArray{FT,4}
+    ap_ṫ⁻⁻::AbstractArray{FT,4}
     "Added layer source matrix J (in + direction)"
     ap_J̇₀⁺::AbstractArray{FT,4}
     "Added layer source matrix J (in - direction)"
     ap_J̇₀⁻::AbstractArray{FT,4}
+    # Doubling workspace (pre-allocated, reused across layers to avoid per-call allocations)
+    "Doubling workspace: linearized geometric-progression reflectance [nμ × nμ × nSpec × Nparams]"
+    dbl_gp_refl_lin::Union{AbstractArray{FT,4}, Nothing} = nothing
+    "Doubling workspace: linearized T⁺⁺·gp_refl product [nμ × nμ × nSpec × Nparams]"
+    dbl_tt_gp_refl_lin::Union{AbstractArray{FT,4}, Nothing} = nothing
+    "Doubling workspace: per-parameter beam attenuation derivative [nSpec × Nparams]"
+    dbl_ap_expk_lin::Union{AbstractArray{FT,2}, Nothing} = nothing
+    "Doubling workspace: forward source temp J₁⁺ [nμ × 1 × nSpec]"
+    dbl_J₁⁺::Union{AbstractArray{FT,3}, Nothing} = nothing
+    "Doubling workspace: forward source temp J₁⁻ [nμ × 1 × nSpec]"
+    dbl_J₁⁻::Union{AbstractArray{FT,3}, Nothing} = nothing
+    "Doubling workspace: linearized source temp J̇₁⁺ [nμ × 1 × nSpec × Nparams]"
+    dbl_ap_J̇₁⁺::Union{AbstractArray{FT,4}, Nothing} = nothing
+    "Doubling workspace: linearized source temp J̇₁⁻ [nμ × 1 × nSpec × Nparams]"
+    dbl_ap_J̇₁⁻::Union{AbstractArray{FT,4}, Nothing} = nothing
+    "Doubling workspace: geometric progression (forward) [nμ × nμ × nSpec]"
+    dbl_gp_refl::Union{AbstractArray{FT,3}, Nothing} = nothing
+    "Doubling workspace: T⁺⁺·gp_refl (forward) [nμ × nμ × nSpec]"
+    dbl_tt_gp_refl::Union{AbstractArray{FT,3}, Nothing} = nothing
 end
 
 """
@@ -120,13 +139,13 @@ the full `∂R/∂x` via:
 See also: [`OpticalPropertyJacobian`](@ref) (alias).
 """
 Base.@kwdef struct CoreScatteringOpticalPropertiesLin{T1,T2,T3} <: AbstractOpticalPropertiesLin
-    "∂τ/∂x — [Nparams] or [Nparams × nSpec]"
+    "∂τ/∂x — [Nparams] or [nSpec × Nparams]"
     τ̇::T1
-    "∂ϖ/∂x — [Nparams] or [Nparams × nSpec]"
+    "∂ϖ/∂x — [Nparams] or [nSpec × Nparams]"
     ϖ̇::T2
-    "∂Z⁺⁺/∂x — [nμ × nμ × nSpec] or [Nparams × nμ × nμ × nSpec]"
+    "∂Z⁺⁺/∂x — [nμ × nμ × nSpec] or [nμ × nμ × nSpec × Nparams]"
     Ż⁺⁺::T3
-    "∂Z⁻⁺/∂x — [nμ × nμ × nSpec] or [Nparams × nμ × nμ × nSpec]"
+    "∂Z⁻⁺/∂x — [nμ × nμ × nSpec] or [nμ × nμ × nSpec × Nparams]"
     Ż⁻⁺::T3
 end
 
@@ -172,28 +191,28 @@ scattering components, this operator computes the mixed effective properties:
 
 The derivatives are propagated via the quotient/product rule. When `a.lin === nothing`
 (e.g., Rayleigh without derivatives), only the derivatives from `b` are retained.
-When both have derivatives, they are `vcat`-ed along the parameter dimension.
+When both have derivatives, they are `hcat`/`cat`-ed along the parameter dimension.
 """
 function Base.:+(a::UmbrellaCoreScatteringOpticalProperties,
                  b::UmbrellaCoreScatteringOpticalProperties)
 
-    x, ẋ = a.fwd, a.lin
-    y, ẏ = b.fwd, b.lin
+    x, ẋ = a.fwd, a.lin
+    y, ẏ = b.fwd, b.lin
 
     xZ⁺⁺ = x.Z⁺⁺
     xZ⁻⁺ = x.Z⁻⁺
     yZ⁺⁺ = y.Z⁺⁺
     yZ⁻⁺ = y.Z⁻⁺
 
-    if ẋ==nothing # Rayleigh    
+    if ẋ==nothing # Rayleigh    
         τ  = x.τ .+ y.τ
-        τ̇  = ẏ.τ̇ #vcat(ẋ.τ̇, ẏ.τ̇)
+        τ̇  = ẏ.τ̇ #vcat(ẋ.τ̇, ẏ.τ̇)
         wx = x.τ .* x.ϖ 
         wy = y.τ .* y.ϖ  
         w  = wx .+ wy
         ϖ  =  w ./ τ
 
-        ϖ̇ = (ẏ.τ̇.*y.ϖ' .+ y.τ'.*ẏ.ϖ̇ .- ϖ'.*ẏ.τ̇)./τ'#vcat((ẋ.τ̇.*x.ϖ' .+ x.τ'.*ẋ.ϖ̇ .- ϖ'.*ẋ.τ̇)./τ', 
+        ϖ̇ = (ẏ.τ̇.*y.ϖ .+ y.τ.*ẏ.ϖ̇ .- ϖ.*ẏ.τ̇)./τ#vcat((ẋ.τ̇.*x.ϖ .+ x.τ.*ẋ.ϖ̇ .- ϖ.*ẋ.τ̇)./τ, 
 
         n = length(w);
         
@@ -207,34 +226,34 @@ function Base.:+(a::UmbrellaCoreScatteringOpticalProperties,
     
         nμ = size(xZ⁺⁺,1)
         n1 = 0
-        n2 = size(ẏ.τ̇,1)
+        n2 = size(ẏ.τ̇,2)
 
-        Ż⁺⁺ = (reshape(ẏ.τ̇.*y.ϖ' .+ y.τ'.*ẏ.ϖ̇, n2, 1, 1, n).*
-            reshape(yZ⁺⁺,1, nμ, nμ, 1) .+ 
-            reshape(y.τ.*y.ϖ, 1, 1, 1, n).*
-            reshape(ẏ.Ż⁺⁺, n2, nμ, nμ, 1) .- 
-            reshape(τ'.*ϖ̇ .+ τ̇.*ϖ', n2, 1, 1, n).*
-            reshape(Z⁺⁺,1, nμ, nμ, n))./
-            reshape(τ.*ϖ, 1, 1, 1, n)
+        Ż⁺⁺ = (reshape(ẏ.τ̇.*y.ϖ .+ y.τ.*ẏ.ϖ̇, 1, 1, n, n2).*
+            reshape(yZ⁺⁺, nμ, nμ, 1, 1) .+ 
+            reshape(y.τ.*y.ϖ, 1, 1, n, 1).*
+            reshape(ẏ.Ż⁺⁺, nμ, nμ, 1, n2) .- 
+            reshape(τ.*ϖ̇ .+ τ̇.*ϖ, 1, 1, n, n2).*
+            reshape(Z⁺⁺, nμ, nμ, n, 1))./
+            reshape(τ.*ϖ, 1, 1, n, 1)
 
-        Ż⁻⁺ = (reshape(ẏ.τ̇.*y.ϖ' .+ y.τ'.*ẏ.ϖ̇, n2, 1, 1, n).*
-            reshape(yZ⁻⁺, 1, nμ, nμ, 1) .+ 
-            reshape(y.τ.*y.ϖ, 1, 1, 1, n).*
-            reshape(ẏ.Ż⁻⁺, n2, nμ, nμ, 1) .- 
-            reshape(τ'.*ϖ̇ .+ τ̇.*ϖ', n2, 1, 1, n).*
-            reshape(Z⁻⁺, 1, nμ, nμ, n))./
-            reshape(τ.*ϖ, 1, 1, 1, n)
+        Ż⁻⁺ = (reshape(ẏ.τ̇.*y.ϖ .+ y.τ.*ẏ.ϖ̇, 1, 1, n, n2).*
+            reshape(yZ⁻⁺, nμ, nμ, 1, 1) .+ 
+            reshape(y.τ.*y.ϖ, 1, 1, n, 1).*
+            reshape(ẏ.Ż⁻⁺, nμ, nμ, 1, n2) .- 
+            reshape(τ.*ϖ̇ .+ τ̇.*ϖ, 1, 1, n, n2).*
+            reshape(Z⁻⁺, nμ, nμ, n, 1))./
+            reshape(τ.*ϖ, 1, 1, n, 1)
 
     else
         τ  = x.τ .+ y.τ
-        τ̇  = vcat(ẋ.τ̇, ẏ.τ̇)
+        τ̇  = hcat(ẋ.τ̇, ẏ.τ̇)
         wx = x.τ .* x.ϖ 
         wy = y.τ .* y.ϖ  
         w  = wx .+ wy
         ϖ  =  w ./ τ
 
-        ϖ̇ = vcat((ẋ.τ̇.*x.ϖ' .+ x.τ'.*ẋ.ϖ̇ .- ϖ'.*ẋ.τ̇)./τ', 
-                    (ẏ.τ̇.*y.ϖ' .+ y.τ'.*ẏ.ϖ̇ .- ϖ'.*ẏ.τ̇)./τ')
+        ϖ̇ = hcat((ẋ.τ̇.*x.ϖ .+ x.τ.*ẋ.ϖ̇ .- ϖ.*ẋ.τ̇)./τ, 
+                    (ẏ.τ̇.*y.ϖ .+ y.τ.*ẏ.ϖ̇ .- ϖ.*ẏ.τ̇)./τ)
 
         n = length(w);
         
@@ -247,20 +266,20 @@ function Base.:+(a::UmbrellaCoreScatteringOpticalProperties,
         Z⁻⁺ = (wx .* xZ⁻⁺ .+ wy .* yZ⁻⁺)
     
         nμ = size(xZ⁺⁺,1)
-        n1 = size(ẋ.τ̇,1)
-        n2 = size(ẏ.τ̇,1)
-        Ż⁺⁺ = (vcat(
-            reshape(ẋ.τ̇.*x.ϖ' .+ x.τ'.*ẋ.ϖ̇, n1, 1, 1, n).*reshape(xZ⁺⁺,1,nμ,nμ,1) .+ reshape(x.τ.*x.ϖ,1,1,1,n).*reshape(ẋ.Ż⁺⁺,n1,nμ,nμ,1),
-            reshape(ẏ.τ̇.*y.ϖ' .+ y.τ'.*ẏ.ϖ̇, n2, 1, 1, n).*reshape(yZ⁺⁺,1,nμ,nμ,1) .+ reshape(y.τ.*y.ϖ,1,1,1,n).*reshape(ẏ.Ż⁺⁺,n2,nμ,nμ,1)
-            ) .- reshape(τ'.*ϖ̇ .+ τ̇.*ϖ' ,n1+n2,1,1,n).*reshape(Z⁺⁺,1,nμ,nμ,n))./reshape(τ.*ϖ,1,1,1,n)
+        n1 = size(ẋ.τ̇,2)
+        n2 = size(ẏ.τ̇,2)
+        Ż⁺⁺ = (cat(
+            reshape(ẋ.τ̇.*x.ϖ .+ x.τ.*ẋ.ϖ̇, 1, 1, n, n1).*reshape(xZ⁺⁺,nμ,nμ,1,1) .+ reshape(x.τ.*x.ϖ,1,1,n,1).*reshape(ẋ.Ż⁺⁺,nμ,nμ,1,n1),
+            reshape(ẏ.τ̇.*y.ϖ .+ y.τ.*ẏ.ϖ̇, 1, 1, n, n2).*reshape(yZ⁺⁺,nμ,nμ,1,1) .+ reshape(y.τ.*y.ϖ,1,1,n,1).*reshape(ẏ.Ż⁺⁺,nμ,nμ,1,n2),
+                dims=4) .- reshape(τ.*ϖ̇ .+ τ̇.*ϖ, 1, 1, n, n1+n2).*reshape(Z⁺⁺,nμ,nμ,n,1))./reshape(τ.*ϖ,1,1,n,1)
 
 
-        Ż⁻⁺ = (vcat(
-            reshape(ẋ.τ̇.*x.ϖ' .+ x.τ'.*ẋ.ϖ̇, n1, 1, 1, n).*reshape(xZ⁻⁺,1,nμ,nμ,1) .+ reshape(x.τ.*x.ϖ,1,1,1,n).*reshape(ẋ.Ż⁻⁺,n1,nμ,nμ,1),
-            reshape(ẏ.τ̇.*y.ϖ' .+ y.τ'.*ẏ.ϖ̇, n2, 1, 1, n).*reshape(yZ⁻⁺,1,nμ,nμ,1) .+ reshape(y.τ.*y.ϖ,1,1,1,n).*reshape(ẏ.Ż⁻⁺,n2,nμ,nμ,1)
-            ) .- reshape(τ'.*ϖ̇ .+ τ̇.*ϖ' ,n1+n2,1,1,n).*reshape(Z⁻⁺,1,nμ,nμ,n))./reshape(τ.*ϖ,1,1,1,n)
+        Ż⁻⁺ = (cat(
+            reshape(ẋ.τ̇.*x.ϖ .+ x.τ.*ẋ.ϖ̇, 1, 1, n, n1).*reshape(xZ⁻⁺,nμ,nμ,1,1) .+ reshape(x.τ.*x.ϖ,1,1,n,1).*reshape(ẋ.Ż⁻⁺,nμ,nμ,1,n1),
+            reshape(ẏ.τ̇.*y.ϖ .+ y.τ.*ẏ.ϖ̇, 1, 1, n, n2).*reshape(yZ⁻⁺,nμ,nμ,1,1) .+ reshape(y.τ.*y.ϖ,1,1,n,1).*reshape(ẏ.Ż⁻⁺,nμ,nμ,1,n2),
+                dims=4) .- reshape(τ.*ϖ̇ .+ τ̇.*ϖ, 1, 1, n, n1+n2).*reshape(Z⁻⁺,nμ,nμ,n,1))./reshape(τ.*ϖ,1,1,n,1)
     end
-    return UmbrellaCoreScatteringOpticalProperties(CoreScatteringOpticalProperties(τ, ϖ, Z⁺⁺, Z⁻⁺), CoreScatteringOpticalPropertiesLin(τ̇, ϖ̇, Ż⁺⁺, Ż⁻⁺))    
+    return UmbrellaCoreScatteringOpticalProperties(CoreScatteringOpticalProperties(τ, ϖ, Z⁺⁺, Z⁻⁺), CoreScatteringOpticalPropertiesLin(τ̇, ϖ̇, Ż⁺⁺, Ż⁻⁺))    
 end
 
 """
@@ -281,21 +300,21 @@ The gas VMR derivative enters ``\\dot{\\varpi}`` as ``-\\varpi \\dot{\\tau}_\\te
 function Base.:+(a::UmbrellaCoreScatteringOpticalProperties,
                  b::UmbrellaCoreAbsorptionOpticalProperties)
 
-    x, ẋ = a.fwd, a.lin
-    y, ẏ = b.fwd, b.lin
+    x, ẋ = a.fwd, a.lin
+    y, ẏ = b.fwd, b.lin
 
     xZ⁺⁺ = x.Z⁺⁺
     xZ⁻⁺ = x.Z⁻⁺
 
-    if ẋ==nothing # Rayleigh    
+    if ẋ==nothing # Rayleigh    
         τ  = x.τ .+ y.τ
-        τ̇  = ẏ.τ̇ #vcat(ẋ.τ̇, ẏ.τ̇)
+        τ̇  = ẏ.τ̇ #vcat(ẋ.τ̇, ẏ.τ̇)
         wx = x.τ #.* x.ϖ 
         wy = zero(wx) #y.τ .* y.ϖ  
         w  = wx .+ wy
         ϖ  =  w ./ τ
 
-        ϖ̇ = (- ϖ'.*ẏ.τ̇)./τ'#vcat((ẋ.τ̇.*x.ϖ' .+ x.τ'.*ẋ.ϖ̇ .- ϖ'.*ẋ.τ̇)./τ', 
+        ϖ̇ = (- ϖ.*ẏ.τ̇)./τ#vcat((ẋ.τ̇.*x.ϖ .+ x.τ.*ẋ.ϖ̇ .- ϖ.*ẋ.τ̇)./τ, 
 
         n = length(w);
         
@@ -304,20 +323,20 @@ function Base.:+(a::UmbrellaCoreScatteringOpticalProperties,
     
         nμ = size(xZ⁺⁺,1)
         n1 = 0
-        n2 = size(ẏ.τ̇,1)
-        Ż⁺⁺ = zeros(n2, nμ, nμ, n)
-        Ż⁻⁺ = zeros(n2, nμ, nμ, n)
+        n2 = size(ẏ.τ̇,2)
+        Ż⁺⁺ = zeros(nμ, nμ, n, n2)
+        Ż⁻⁺ = zeros(nμ, nμ, n, n2)
 
     else
         τ  = x.τ .+ y.τ
-        τ̇  = vcat(ẋ.τ̇, ẏ.τ̇)
+        τ̇  = hcat(ẋ.τ̇, ẏ.τ̇)
         wx = x.τ .* x.ϖ 
         wy = zero(wx) #y.τ .* y.ϖ
         w  = wx .+ wy
         ϖ  =  w ./ τ
 
-        ϖ̇ = vcat((ẋ.τ̇.*x.ϖ' .+ x.τ'.*ẋ.ϖ̇ .- ϖ'.*ẋ.τ̇)./τ', 
-                (- ϖ'.*ẏ.τ̇)./τ')
+        ϖ̇ = hcat((ẋ.τ̇.*x.ϖ .+ x.τ.*ẋ.ϖ̇ .- ϖ.*ẋ.τ̇)./τ, 
+                (- ϖ.*ẏ.τ̇)./τ)
 
         n = length(w);
         
@@ -330,34 +349,34 @@ function Base.:+(a::UmbrellaCoreScatteringOpticalProperties,
         Z⁻⁺ = xZ⁻⁺ 
     
         nμ = size(xZ⁺⁺,1)
-        n1 = size(ẋ.τ̇,1)
-        n2 = size(ẏ.τ̇,1)
+        n1 = size(ẋ.τ̇,2)
+        n2 = size(ẏ.τ̇,2)
         
-        Ż⁺⁺ = (vcat(
-            reshape(ẋ.τ̇ .* x.ϖ' .+ x.τ'.*ẋ.ϖ̇, n1, 1, 1, n).*reshape(xZ⁺⁺,1,nμ,nμ,n) .+ reshape(x.τ.*x.ϖ,1,1,1,n).*ẋ.Ż⁺⁺,
-            zeros(n2, nμ, nμ, n)
-            ) .- reshape(τ'.*ϖ̇ .+ τ̇.*ϖ' ,n1+n2,1,1,n).*reshape(Z⁺⁺,1,nμ,nμ,n))./reshape(τ.*ϖ,1,1,1,n)
+        Ż⁺⁺ = (cat(
+            reshape(ẋ.τ̇ .* x.ϖ .+ x.τ.*ẋ.ϖ̇, 1, 1, n, n1).*reshape(xZ⁺⁺,nμ,nμ,n,1) .+ reshape(x.τ.*x.ϖ,1,1,n,1).*ẋ.Ż⁺⁺,
+            zeros(nμ, nμ, n, n2),
+                dims=4) .- reshape(τ.*ϖ̇ .+ τ̇.*ϖ, 1, 1, n, n1+n2).*reshape(Z⁺⁺,nμ,nμ,n,1))./reshape(τ.*ϖ,1,1,n,1)
 
-        Ż⁻⁺ = (vcat(
-            reshape(ẋ.τ̇ .* x.ϖ' .+ x.τ'.*ẋ.ϖ̇, n1, 1, 1, n).*reshape(xZ⁻⁺,1,nμ,nμ,n) .+ reshape(x.τ.*x.ϖ,1,1,1,n).*ẋ.Ż⁻⁺,
-            zeros(n2, nμ, nμ, n)
-            ) .- reshape(τ'.*ϖ̇ .+ τ̇.*ϖ' ,n1+n2,1,1,n).*reshape(Z⁻⁺,1,nμ,nμ,n))./reshape(τ.*ϖ,1,1,1,n)
+        Ż⁻⁺ = (cat(
+            reshape(ẋ.τ̇ .* x.ϖ .+ x.τ.*ẋ.ϖ̇, 1, 1, n, n1).*reshape(xZ⁻⁺,nμ,nμ,n,1) .+ reshape(x.τ.*x.ϖ,1,1,n,1).*ẋ.Ż⁻⁺,
+            zeros(nμ, nμ, n, n2),
+                dims=4) .- reshape(τ.*ϖ̇ .+ τ̇.*ϖ, 1, 1, n, n1+n2).*reshape(Z⁻⁺,nμ,nμ,n,1))./reshape(τ.*ϖ,1,1,n,1)
     end
-    return UmbrellaCoreScatteringOpticalProperties(CoreScatteringOpticalProperties(τ, ϖ, Z⁺⁺, Z⁻⁺), CoreScatteringOpticalPropertiesLin(τ̇, ϖ̇, Ż⁺⁺, Ż⁻⁺))
+    return UmbrellaCoreScatteringOpticalProperties(CoreScatteringOpticalProperties(τ, ϖ, Z⁺⁺, Z⁻⁺), CoreScatteringOpticalPropertiesLin(τ̇, ϖ̇, Ż⁺⁺, Ż⁻⁺))
 end
 
 
 
 # Concatenate Core Optical Properties, can have mixed dimensions!
-function Base.:*(ẋ::CoreScatteringOpticalPropertiesLin, ẏ::CoreScatteringOpticalPropertiesLin) 
-    arr_type  = array_type(architecture(ẋ.τ̇))
+function Base.:*(ẋ::CoreScatteringOpticalPropertiesLin, ẏ::CoreScatteringOpticalPropertiesLin) 
+    arr_type  = array_type(architecture(ẋ.τ̇))
 
-    ẋ = expandOpticalProperties(ẋ, arr_type);
-    ẏ = expandOpticalProperties(ẏ, arr_type);
-    CoreScatteringOpticalPropertiesLin([ẋ.τ̇; ẏ.τ̇],
-        [ẋ.ϖ̇; ẏ.ϖ̇],
-        cat(ẋ.Ż⁺⁺,ẏ.Ż⁺⁺, dims=3), 
-        cat(ẋ.Ż⁻⁺,ẏ.Ż⁻⁺, dims=3))
+    ẋ = expandOpticalProperties(ẋ, arr_type);
+    ẏ = expandOpticalProperties(ẏ, arr_type);
+    CoreScatteringOpticalPropertiesLin([ẋ.τ̇; ẏ.τ̇],
+        [ẋ.ϖ̇; ẏ.ϖ̇],
+        cat(ẋ.Ż⁺⁺,ẏ.Ż⁺⁺, dims=3), 
+        cat(ẋ.Ż⁻⁺,ẏ.Ż⁻⁺, dims=3))
 end
 
 function Base.:+(a::UmbrellaCoreAbsorptionOpticalProperties,

@@ -40,8 +40,8 @@ physical parameters via the linearized Matrix Operator Method.
 # Returns
 - `R`: Reflected Stokes vector `[nVZA × nStokes × nSpec]`
 - `T`: Transmitted Stokes vector `[nVZA × nStokes × nSpec]`
-- `dR`: Jacobian of R, `[Nparams × nVZA × nStokes × nSpec]`
-- `dT`: Jacobian of T, `[Nparams × nVZA × nStokes × nSpec]`
+- `dR`: Jacobian of R, `[nVZA × nStokes × nSpec × Nparams]`
+- `dT`: Jacobian of T, `[nVZA × nStokes × nSpec × Nparams]`
 
 # Parameter Layout in `dR` / `dT`
 The `Nparams` derivative dimension is ordered as:
@@ -166,8 +166,8 @@ function rt_run(RS_type::AbstractRamanType,
     T       = zeros(FT, length(vza), pol_type.n, nSpec)
     #R_SFI   = zeros(FT, length(vza), pol_type.n, nSpec)
     #T_SFI   = zeros(FT, length(vza), pol_type.n, nSpec)
-    Ṙ       = zeros(FT, Nparams, length(vza), pol_type.n, nSpec)
-    Ṫ       = zeros(FT, Nparams, length(vza), pol_type.n, nSpec)
+    Ṙ       = zeros(FT, length(vza), pol_type.n, nSpec, Nparams)
+    Ṫ       = zeros(FT, length(vza), pol_type.n, nSpec, Nparams)
     # Notify user of processing parameters
     msg = 
     """

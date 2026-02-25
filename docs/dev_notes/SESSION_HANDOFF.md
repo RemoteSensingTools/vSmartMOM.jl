@@ -163,16 +163,16 @@ AddedLayer: r⁻⁺, r⁺⁻, t⁺⁺, t⁻⁻, j₀⁺, j₀⁻  # [nμ × nμ 
 
 # Linearized: 3-core + N all-params
 AddedLayerLin:
-  ṙ⁻⁺, ṫ⁺⁺, ...        # [3 × nμ × nμ × nSpec] — core (τ, ϖ, Z)
-  ap_ṙ⁻⁺, ap_ṫ⁺⁺, ...  # [Nparams × nμ × nμ × nSpec] — physical params
+  ṙ⁻⁺, ṫ⁺⁺, ...        # [nμ × nμ × nSpec × 3] — core (τ, ϖ, Z)
+  ap_ṙ⁻⁺, ap_ṫ⁺⁺, ...  # [nμ × nμ × nSpec × Nparams] — physical params
 
 # Per-layer optical properties and their derivatives
 CoreScatteringOpticalProperties: τ, ϖ, Z⁺⁺, Z⁻⁺
-CoreScatteringOpticalPropertiesLin: τ̇, ϖ̇, Ż⁺⁺, Ż⁻⁺  # [Nparams × ...]
+CoreScatteringOpticalPropertiesLin: τ̇, ϖ̇, Ż⁺⁺, Ż⁻⁺  # [... × Nparams]
 ```
 
 ## Parameter Indexing in dR Array
-`dR[param_idx, vza, stokes, wavelength]` where:
+`dR[vza, stokes, wavelength, param_idx]` where:
 - `1` = τ_ref
 - `2` = nᵣ (real refractive index)
 - `3` = nᵢ (imaginary refractive index)

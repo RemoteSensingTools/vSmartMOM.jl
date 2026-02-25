@@ -68,7 +68,7 @@ p0_base    = mean(params_base.scattering_params.rt_aerosols[1].profile)
 sd_base    = params_base.scattering_params.rt_aerosols[1].aerosol.size_distribution
 
 println("  R: $(size(R_base)), dR: $(size(dR_base)), Nparams=$Nparams")
-println("  nλ=$(size(R_base,3)), nVZA=$(size(R_base,1)), nStokes=$(size(R_base,2))")
+println("  nλ=$(size(R_base,3)), nVZA=$(size(R_base,1)), nStokes=$(size(R_base,2)), Nparams=$(size(dR_base,4))")
 
 # =====================================================================
 @testset "Jacobian Unit Tests" begin
@@ -108,7 +108,7 @@ end
     albedo_base = 0.05
     δ = 1e-4
     
-    analytic = dR_base[Nparams, :, :, :]  # last param = surface
+    analytic = dR_base[:, :, :, Nparams]  # last param = surface
     
     params_pert = parameters_from_yaml(YAML_FAST)
     params_pert.brdf = [LambertianSurfaceScalar(albedo_base + δ)]
@@ -128,7 +128,7 @@ end
     # createAero → constructCoreOpticalProperties → RT kernel
     δ = τ_ref_base * 1e-3
     
-    analytic = dR_base[1, :, :, :]  # param 1 = τ_ref
+    analytic = dR_base[:, :, :, 1]  # param 1 = τ_ref
     
     params_pert = parameters_from_yaml(YAML_FAST)
     params_pert.scattering_params.rt_aerosols[1].τ_ref = τ_ref_base + δ
@@ -147,7 +147,7 @@ end
     # Profile parameter — bypasses Mie, tests profile derivatives + RT
     δ = p0_base * 1e-2
     
-    analytic = dR_base[6, :, :, :]  # param 6 = p₀
+    analytic = dR_base[:, :, :, 6]  # param 6 = p₀
     
     params_pert = parameters_from_yaml(YAML_FAST)
     params_pert.scattering_params.rt_aerosols[1].profile = Normal(p0_base + δ, σp_base)
@@ -174,7 +174,7 @@ end
     # Mie → interpolation (Bug 20 fix) → τ̇_aer (Bug 21 fix) → createAero → RT
     δ = 1e-3
     
-    analytic = dR_base[2, :, :, :]  # param 2 = nᵣ
+    analytic = dR_base[:, :, :, 2]  # param 2 = nᵣ
     
     params_pert = parameters_from_yaml(YAML_FAST)
     params_pert.scattering_params.rt_aerosols[1].aerosol.nᵣ = nᵣ_base + δ
@@ -193,7 +193,7 @@ end
     # Size distribution width — exercises Mie derivatives via ẇₓ
     δ = sd_base.σ * 1e-2
     
-    analytic = dR_base[5, :, :, :]  # param 5 = σ of LogNormal
+    analytic = dR_base[:, :, :, 5]  # param 5 = σ of LogNormal
     
     params_pert = parameters_from_yaml(YAML_FAST)
     params_pert.scattering_params.rt_aerosols[1].aerosol.size_distribution = 

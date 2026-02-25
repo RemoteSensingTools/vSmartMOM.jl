@@ -165,7 +165,7 @@ function constructCoreOpticalProperties(RS_type, iBand, m, model, lin_model) #wh
         #fScattRayleigh = [collect(rayl[i].τ  ./ combo[i].τ) for i=1:nZ]
         # Create Core Optical Properties merged with trace gas absorptions:
         gas = [CoreAbsorptionOpticalProperties(arr_type(τ_abs[iB][:,iz])) for iz=1:nZ]
-        lin_gas = [CoreAbsorptionOpticalPropertiesLin(arr_type(τ̇_abs[iB][:,:,iz])) for iz=1:nZ] 
+        lin_gas = [CoreAbsorptionOpticalPropertiesLin(arr_type(collect(τ̇_abs[iB][:,:,iz]'))) for iz=1:nZ] 
         #combo2 = combo .+ gas
         gas_combrella = [UmbrellaCoreAbsorptionOpticalProperties(gas[iz],lin_gas[iz]) for iz=1:nZ]   
         tmp = combrella .+ gas_combrella            
@@ -293,6 +293,7 @@ function createAero(τAer, aerosol_optics, AerZ⁺⁺, AerZ⁻⁺,
     (; ḟᵗ, ω̃̇) = lin_aerosol_optics
 
     n  = size(τAer,1)
+    τ̇Aer = arr_type(collect(τ̇Aer'))  # (7, n) → (n, 7) — transpose upstream input
     #fᵗ = arr_type(fᵗ)
     #ω̃  = arr_type(ω̃)
     #ḟᵗ = arr_type(ḟᵗ)
@@ -301,10 +302,10 @@ function createAero(τAer, aerosol_optics, AerZ⁺⁺, AerZ⁻⁺,
     sz = size(AerŻ⁺⁺)
     tmpŻ⁺⁺ = AerŻ⁺⁺
     tmpŻ⁻⁺ = AerŻ⁻⁺
-    AerŻ⁺⁺ = arr_type(zeros(7, size(AerZ⁺⁺,1), size(AerZ⁺⁺,2)))#, n)
-    AerŻ⁻⁺ = arr_type(zeros(7, size(AerZ⁻⁺,1), size(AerZ⁻⁺,2)))#, n)
-    AerŻ⁺⁺[2:5,:,:] .= tmpŻ⁺⁺
-    AerŻ⁻⁺[2:5,:,:] .= tmpŻ⁻⁺
+    AerŻ⁺⁺ = arr_type(zeros(size(AerZ⁺⁺,1), size(AerZ⁺⁺,2), 7))#, n)
+    AerŻ⁻⁺ = arr_type(zeros(size(AerZ⁻⁺,1), size(AerZ⁻⁺,2), 7))#, n)
+    AerŻ⁺⁺[:,:,2:5] .= permutedims(tmpŻ⁺⁺, (2, 3, 1))
+    AerŻ⁻⁺[:,:,2:5] .= permutedims(tmpŻ⁻⁺, (2, 3, 1))
 
     # Ensure arrays are in the right memory space (CPU or GPU)
     ω̃  = (ω̃ isa Number) ? arr_type(fill(ω̃,n)) : arr_type(ω̃)
@@ -321,32 +322,34 @@ function createAero(τAer, aerosol_optics, AerZ⁺⁺, AerZ⁻⁺,
     else
         tmpω̃̇ = ω̃̇
     end
-    ω̃̇ = arr_type(zeros(7,n))
-    ω̃̇[2:5,:] .= tmpω̃̇
+    ω̃̇ = arr_type(zeros(n,7))
+    ω̃̇[:,2:5] .= arr_type(collect(tmpω̃̇'))
     
-    tmpḟᵗ = ḟᵗ
-    ḟᵗ = arr_type(zeros(7,n))
-    ḟᵗ[2:5] = tmpḟᵗ
+    ḟᵗ_vec = collect(ḟᵗ)  # keep as 4-element vector from Mie
+    ḟᵗ = arr_type(zeros(n,7))
+    for k in eachindex(ḟᵗ_vec)
+        ḟᵗ[:,1+k] .= ḟᵗ_vec[k]
+    end
 
     # Forward modified properties
     τ_mod = (1 .- fᵗ * ω̃) .* τAer
     ϖ_mod = (1 .- fᵗ) .* ω̃ ./ (1 .- fᵗ * ω̃)
 
     # Allocate linearized outputs
-    τ̇_mod = arr_type(zeros(7,n)) #similar(τ̇Aer)
-    ϖ̇_mod = arr_type(zeros(7,n)) #similar(ω̃̇)
+    τ̇_mod = arr_type(zeros(n,7)) #similar(τ̇Aer)
+    ϖ̇_mod = arr_type(zeros(n,7)) #similar(ω̃̇)
 
     # Bug 18 fix: derivatives w.r.t. 7 aerosol sub-params [τ_ref, nᵣ, nᵢ, rₘ, σᵣ, p₀, σp]
-    τ̇_mod[1,:] .= (1 .- fᵗ * ω̃) .* τ̇Aer[1,:]
-    ϖ̇_mod[1,:] .= 0.0
+    τ̇_mod[:,1] .= (1 .- fᵗ * ω̃) .* τ̇Aer[:,1]
+    ϖ̇_mod[:,1] .= 0.0
     # Vectorized form over iparam dimension
     # Dimensions: iparam × spectral
-    tmp = fᵗ * ω̃̇[2:5,:] .+ ḟᵗ[2:5] * ω̃'  # (iparam, :)
-    τ̇_mod[2:5,:] .= (1 .- fᵗ * ω̃)' .* τ̇Aer[2:5,:] .- tmp .* τAer'
-    ϖ̇_mod[2:5,:] .= (ω̃̇[2:5] * (1 - fᵗ) .- ḟᵗ[2:5] .* (ω̃ .* (1 .- ω̃))') ./ (1 .- fᵗ * ω̃)'.^2
+    tmp = fᵗ .* ω̃̇[:,2:5] .+ ω̃ .* ḟᵗ[:,2:5]  # (nSpec, iparam)
+    τ̇_mod[:,2:5] .= (1 .- fᵗ * ω̃) .* τ̇Aer[:,2:5] .- tmp .* τAer  # (nSpec, iparam)
+    ϖ̇_mod[:,2:5] .= (ω̃̇[:,2:5] .* (1 - fᵗ) .- ḟᵗ[:,2:5] .* (ω̃ .* (1 .- ω̃))) ./ (1 .- fᵗ * ω̃).^2
 
-    τ̇_mod[6:7,:] .= (1 .- fᵗ * ω̃)' .* τ̇Aer[6:7,:]
-    ϖ̇_mod[6:7,:] .= 0.0
+    τ̇_mod[:,6:7] .= (1 .- fᵗ * ω̃) .* τ̇Aer[:,6:7]
+    ϖ̇_mod[:,6:7] .= 0.0
     
     return CoreScatteringOpticalProperties(τ_mod, ϖ_mod, AerZ⁺⁺, AerZ⁻⁺), 
         CoreScatteringOpticalPropertiesLin(τ̇_mod, ϖ̇_mod, AerŻ⁺⁺, AerŻ⁻⁺)
@@ -366,7 +369,7 @@ controls which adding method variant is dispatched during the interaction step.
 # Returns
 - `scattering_interfaces_all`: Array of `ScatteringInterface` types per layer.
 - `τ_sum_all`: Cumulative optical depth `[nSpec × (Nz+1)]`.
-- `τ̇_sum_all`: Cumulative τ derivative `[Nparams × nSpec × (Nz+1)]`.
+- `τ̇_sum_all`: Cumulative τ derivative `[nSpec × Nparams × (Nz+1)]`.
 """
 function extractEffectiveProps(
                 lods::Array,#{CoreScatteringOpticalProperties{FT},1}
@@ -375,13 +378,13 @@ function extractEffectiveProps(
     FT    = eltype(lods[1].τ)
     nSpec = length(lods[1].τ)
     nZ    = length(lods)
-    nParams = size(lods_lin[1].τ̇)[1]
+    nParams = size(lods_lin[1].τ̇, 2)
     # First the Scattering Interfaces:
     scattering_interface = ScatteringInterface_00()
     scattering_interfaces_all = []
     τ_sum_all = similar(lods[1].τ,(nSpec,nZ+1))
     τ_sum_all[:,1] .= 0
-    τ̇_sum_all = similar(lods_lin[1].τ̇,(nParams,nSpec,nZ+1))
+    τ̇_sum_all = similar(lods_lin[1].τ̇,(nSpec,nParams,nZ+1))
     τ̇_sum_all[:,:,1] .= 0
     for iz =1:nZ
         # Need to check max entries in Z matrices here as well later!
@@ -390,7 +393,7 @@ function extractEffectiveProps(
         push!(scattering_interfaces_all, scattering_interface)
         @views τ_sum_all[:,iz+1] = τ_sum_all[:,iz] + lods[iz].τ 
         for ip=1:nParams
-            τ̇_sum_all[ip,:,iz+1] = τ̇_sum_all[ip,:,iz] + lods_lin[iz].τ̇[ip,:] 
+            τ̇_sum_all[:,ip,iz+1] = τ̇_sum_all[:,ip,iz] + lods_lin[iz].τ̇[:,ip] 
         end
     end
     return scattering_interfaces_all, τ_sum_all, τ̇_sum_all
@@ -402,7 +405,7 @@ end
 Expand optical properties and their derivatives to full spectral resolution by
 replicating Z matrices along the spectral dimension if they are spectrally constant.
 
-Ensures that `Z[nμ, nμ, nSpec]` and `Ż[Nparams, nμ, nμ, nSpec]` have matching
+Ensures that `Z[nμ, nμ, nSpec]` and `Ż[nμ, nμ, nSpec, Nparams]` have matching
 spectral dimensions with `τ` and `ϖ`.
 """
 function expandOpticalProperties(in::CoreScatteringOpticalProperties, in_lin::CoreScatteringOpticalPropertiesLin,  arr_type)
@@ -415,8 +418,8 @@ function expandOpticalProperties(in::CoreScatteringOpticalProperties, in_lin::Co
     if size(Z⁺⁺,3) == 1
         Z⁺⁺ = _repeat(Z⁺⁺,1,1,length(τ))
         Z⁻⁺ = _repeat(Z⁻⁺,1,1,length(τ))
-        Ż⁺⁺ = _repeat(Ż⁺⁺,1,1,1,length(τ))
-        Ż⁻⁺ = _repeat(Ż⁻⁺,1,1,1,length(τ))
+        Ż⁺⁺ = _repeat(reshape(Ż⁺⁺, size(Ż⁺⁺,1), size(Ż⁺⁺,2), 1, size(Ż⁺⁺,3)), 1, 1, length(τ), 1)
+        Ż⁻⁺ = _repeat(reshape(Ż⁻⁺, size(Ż⁻⁺,1), size(Ż⁻⁺,2), 1, size(Ż⁻⁺,3)), 1, 1, length(τ), 1)
         return CoreScatteringOpticalProperties(arr_type(τ), arr_type(ϖ), arr_type(Z⁺⁺), arr_type(Z⁻⁺)), 
             CoreScatteringOpticalPropertiesLin(arr_type(τ̇), arr_type(ϖ̇), arr_type(Ż⁺⁺), arr_type(Ż⁻⁺))      
     else
