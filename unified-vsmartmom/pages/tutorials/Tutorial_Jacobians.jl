@@ -39,7 +39,7 @@ println("τ̇_aer bands: ", length(lin_model.τ̇_aer),
 # The linearized `rt_run` returns `(R, T, dR, dT)`:
 # - `R`  — reflected Stokes field  `[nVZA × nStokes × nSpec]`
 # - `T`  — transmitted field
-# - `dR` — Jacobian of R w.r.t. all parameters  `[nParams × nVZA × nStokes × nSpec]`
+# - `dR` — Jacobian of R w.r.t. all parameters  `[nVZA × nStokes × nSpec × nParams]`
 # - `dT` — Jacobian of T
 
 NAer  = length(params.scattering_params.rt_aerosols)
@@ -71,7 +71,7 @@ println("Total Jacobian parameters: ", Nparams,
 #
 # Surface albedo Jacobian (last parameter, first VZA, Stokes-I):
 
-dR_albedo = dR[end, :, 1, :]
+dR_albedo = dR[:, 1, :, end]
 println("dR/d(albedo) at nadir, first 5 spectral points: ",
         round.(dR_albedo[1, 1:min(5,end)], digits=6))
 
@@ -79,7 +79,7 @@ println("dR/d(albedo) at nadir, first 5 spectral points: ",
 
 if NGas > 0
     igas_start = NAer * 7 + 1
-    dR_gas1 = dR[igas_start, :, 1, :]
+    dR_gas1 = dR[:, 1, :, igas_start]
     println("dR/d(gas₁ VMR) at nadir, first 5 points: ",
             round.(dR_gas1[1, 1:min(5,end)], digits=6))
 end
@@ -96,7 +96,7 @@ end
 # model_pert = model_from_parameters(params_pert)
 # R_pert, = rt_run(model_pert)
 # K_fd = (R_pert .- R) ./ ε
-# # Compare K_fd with dR[end, :, :, :]
+# # Compare K_fd with dR[:, :, :, end]
 # ```
 #
 # The test suite in `test/test_forward_lin.jl` performs this comparison
