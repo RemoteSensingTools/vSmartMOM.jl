@@ -73,7 +73,7 @@ end
 
     # Aerosol particle distribution and properties 
     μ  = 0.3                # Log mean radius
-    σ  = 6.82               # Log stddev of radius
+    σ  = 2.1               # Log stddev of radius
     r_max = 30.0            # Maximum radius
     nquad_radius = 2500     # Number of quadrature points for integrating of size dist.
     nᵣ = 1.3                # Real part of refractive index
@@ -101,7 +101,6 @@ end
     # download(ftp, "wigner_values.jld", "/tmp/wigner_values.jld");
 
     # println("Loading full Wigner values...")
-    # wigner_A, wigner_B = load_wigner_values("/home/rjeyaram/RadiativeTransfer/src/Scattering/Mie/wigner_values.jld")
     # wigner_A, wigner_B = load_wigner_values("/home/rjeyaram/vSmartMOM/test/wigner_values.jld")
     # model_PCW = make_mie_model(PCW(), aero, λ, polarization_type, truncation_type, r_max, nquad_radius, wigner_A, wigner_B)
 
@@ -109,10 +108,10 @@ end
     # STEP 3: Perform the Mie Calculations and compare the results
 
     aerosol_optics_NAI2 = compute_aerosol_optical_properties(model_NAI2);
-    # aerosol_optics_PCW = compute_aerosol_optical_properties(model_PCW);
+    #aerosol_optics_PCW = compute_aerosol_optical_properties(model_PCW);
 
     # Load truth values computed from PCW
-    @load "test_pcw/PCW_AerosolOptics.jld" aerosol_optics_PCW
+    @load "test_pcw/PCW_AerosolOptics_v2.jld" aerosol_optics_PCW
 
     # NOTE:
     # The ε Greek coefficient (B[3,4], -B[4,3]) is convention-sensitive

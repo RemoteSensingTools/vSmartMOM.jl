@@ -255,7 +255,7 @@ function compute_anbn_lin(model::MieModel, λ, radius)
         Dn = zeros(Complex{FT2}, nmx)
 
         # Compute an, bn
-        Scattering.compute_mie_ab!(size_param, nᵣ + nᵢ * im, 
+        Scattering.compute_mie_ab!(size_param, nᵣ - nᵢ * im,
                                       view(an, i, :), 
                                       view(bn, i, :), 
                                       Dn, 
