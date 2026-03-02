@@ -87,11 +87,12 @@ end
 
 Compute elemental layer inelastic reflectance (ier⁻⁺) and transmittance (iet⁺⁺) for Rotational Raman Scattering (RRS).
 
-Implements the thin-layer limit for RRS:
-- **𝐑⁻⁺**: Eq. 7 in Sanghavi et al. Raman paper draft
-- **𝐓⁺⁺**: Eq. 7 in Sanghavi et al. Raman paper draft (diagonal and off-diagonal cases)
+Implements the thin-layer (elemental) R and T for inelastic scattering:
+- **R⁻⁺(μᵢ,μⱼ; λ→λᵣ)**: Eq. 14 in Sanghavi & Frankenberg (2023), JQSRT 311, 108791
+- **T⁺⁺(μᵢ,μⱼ; λ→λᵣ)**: Eq. 14, with L'Hôpital limit when μᵢ/μⱼ ≈ Δτ(λᵣ)/Δτ(λ)
 
-`n₁` indexes the scattered wavelength, `n₀ = n₁ + i_λ₁λ₀[Δn]` indexes the incident wavelength.
+Variable mapping: `n₀` = incident wavelength index (λ), `n₁` = scattered wavelength index (λᵣ),
+`n₀ = n₁ + i_λ₁λ₀[Δn]`.
 """
 @kernel function get_elem_rt_RRS!(fscattRayl, 
                             ϖ_λ₁λ₀, i_λ₁λ₀, i_ref,
@@ -215,9 +216,9 @@ end
 
 Compute elemental layer inelastic reflectance (ier⁻⁺) and transmittance (iet⁺⁺) for Vibrational Raman Scattering (VS).
 
-Implements the thin-layer limit for VS (v=0→1 or v=1→0):
-- **𝐑⁻⁺**: Eq. 7 in Sanghavi et al. Raman paper draft
-- **𝐓⁺⁺**: Eq. 7 in Sanghavi et al. Raman paper draft
+Implements the thin-layer (elemental) R and T for inelastic scattering:
+- **R⁻⁺(μᵢ,μⱼ; λ→λᵣ)**: Eq. 14 in Sanghavi & Frankenberg (2023), JQSRT 311, 108791
+- **T⁺⁺(μᵢ,μⱼ; λ→λᵣ)**: Eq. 14, with L'Hôpital limit when μᵢ/μⱼ ≈ Δτ(λᵣ)/Δτ(λ)
 
 For VS, incident wavelength is always at `n₀ = 1`; `n₁` indexes the scattered wavelength in the target band.
 """
@@ -329,8 +330,15 @@ function get_elem_rt_SFI!(RS_type::RRS,
     synchronize_if_gpu();
 end
 
-# only for RRS
-@kernel function get_elem_rt_SFI_RRS!(fscattRayl, 
+"""
+    get_elem_rt_SFI_RRS!(...)
+
+Compute elemental layer inelastic source functions J⁺(λ→λᵣ) and J⁻(λ→λᵣ) for RRS.
+Implements Eq. 15 in Sanghavi & Frankenberg (2023), JQSRT 311, 108791.
+Includes solar beam attenuation via exp(−τ_sum/μ₀).
+Variable mapping: `n₀` = incident wavelength index (λ), `n₁` = scattered wavelength index (λᵣ).
+"""
+@kernel function get_elem_rt_SFI_RRS!(fscattRayl,
                             ϖ_λ₁λ₀, i_λ₁λ₀, i_ref, 
                             ieJ₀⁺, ieJ₀⁻, 
                             τ_sum, dτ_λ, ϖ_λ,
