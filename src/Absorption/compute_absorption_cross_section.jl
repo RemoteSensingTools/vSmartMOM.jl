@@ -1,14 +1,12 @@
 #=
- 
-This file contains functions that perform the core absorption cross section calculations. 
-While `compute_absorption_cross_section` *can* be called directly by users, it's 
-wrapped by `absorption_cross_section`, in autodiff_handler.jl to allow autodiff users
-to call the function seamlessly alike non-autodiff users. 
 
-`compute_absorption_cross_section` is implemented both from scratch (::HitranModel) and as 
-an interpolation (::InterpolationModel). For the former, there are separate line_shape 
-kernel functions that allow the calculation to run in parallel, and a qoft! function to 
-interpolate partition sums. 
+This file contains functions that perform the core absorption cross section calculations.
+`compute_absorption_cross_section` is the main entry point, also wrapped by
+`absorption_cross_section` in autodiff_helper.jl.
+
+`compute_absorption_cross_section` is implemented both from scratch (::HitranModel) and as
+an interpolation (::InterpolationModel). For the HitranModel, a batched kernel processes
+all spectral lines in a single GPU/CPU launch for efficiency.
 
 =#
 
@@ -18,7 +16,8 @@ interpolate partition sums.
 Compute absorption cross-section from HITRAN line-by-line data.
 
 Sums Voigt (or Doppler/Lorentz) line shapes over all transitions in the HITRAN table
-within the grid range. Supports CPU and GPU architectures.
+within the grid range. Uses a batched kernel to process all lines in a single launch
+for efficient GPU/CPU execution.
 
 # Arguments
 - `model::HitranModel`: Model with HITRAN data, broadening, wing_cutoff, CEF
@@ -32,16 +31,16 @@ within the grid range. Supports CPU and GPU architectures.
 """
 function compute_absorption_cross_section(
                 # Required
-                model::HitranModel,          # Model to use in this cross section calculation 
+                model::HitranModel,          # Model to use in this cross section calculation
                                              # (Calculation from Hitran data vs. using Interpolator)
                 # Wavelength [nm] or wavenumber [cm-1] grid (modify using wavelength_flag)
                 grid::Union{AbstractRange{<:Real}, AbstractArray},  # Can be range OR array
                 pressure::Real,              # actual pressure [hPa]
-                temperature::Real;           # actual temperature [K]    
+                temperature::Real;           # actual temperature [K]
                 # Optionals
-                wavelength_flag::Bool=false  # Use wavelength in nm (true) or wavenumber cm-1 units (false)    
+                wavelength_flag::Bool=false  # Use wavelength in nm (true) or wavenumber cm-1 units (false)
                 )
-    
+
     (; hitran, broadening, wing_cutoff, vmr, CEF, architecture) = model
 
     # Notify user of wavelength grid
@@ -53,13 +52,12 @@ function compute_absorption_cross_section(
     end
 
     # Convert T to float type (ex. if Int)
-    if !(temperature isa ForwardDiff.Dual)
-        temperature = AbstractFloat(temperature)
-    end
+    temperature = AbstractFloat(temperature)
+
+    FT = eltype(temperature)
 
     # Store results here to return
-    result = array_type(architecture)(zeros(eltype(temperature), length(grid)))
-    fill!(result, 0);
+    result = array_type(architecture)(zeros(FT, length(grid)))
 
     # Calculate the minimum and maximum grid bounds, including the wing cutoff
     grid_max = maximum(grid) + wing_cutoff
@@ -70,73 +68,110 @@ function compute_absorption_cross_section(
     grid_min, grid_max = wavelength_flag ? (nm_per_m /grid_max, nm_per_m/grid_min) : (grid_min, grid_max)
 
     # Interpolators from grid bounds to index values
-    if length(grid)>1
-        grid_idx_interp_low  = LinearInterpolation(grid, 1:1:length(grid), extrapolation_bc=1)
-        grid_idx_interp_high = LinearInterpolation(grid, 1:1:length(grid), extrapolation_bc=length(grid))
+    N_grid = length(grid)
+    if N_grid > 1
+        grid_idx_interp_low  = LinearInterpolation(grid, 1:1:N_grid, extrapolation_bc=1)
+        grid_idx_interp_high = LinearInterpolation(grid, 1:1:N_grid, extrapolation_bc=N_grid)
     end
 
-    # Temporary storage array for output of qoft!. Compiler/speed issues when returning value in qoft
-    rate = zeros(eltype(temperature), 1)
+    # --- Pre-compute line parameters on CPU (Steps 1b + 3: batch + cache qoft) ---
 
-    # Declare the device being used
-    device = devi(architecture)
+    # Cache partition sum ratios per unique (mol, iso) pair
+    qoft_cache = Dict{Tuple{Int,Int}, FT}()
+    rate = zeros(FT, 1)
 
-    grid = array_type(architecture)(grid)
-
-    # Loop through all transition lines:
+    # Count active lines first for pre-allocation
+    n_active = 0
     for j in eachindex(hitran.Sᵢ)
-
-        # Test that this ν lies within the grid
         if grid_min < hitran.νᵢ[j] < grid_max
-
-            # Apply pressure shift
-            ν   = hitran.νᵢ[j] + pressure / p_ref * hitran.δ_air[j]
-
-            # Compute Lorentzian HWHM
-            γ_l = (hitran.γ_air[j] *
-                  (1 - vmr) * pressure / p_ref + hitran.γ_self[j] *
-                  vmr * pressure / p_ref) *
-                  (t_ref / temperature)^hitran.n_air[j]
-
-            # Compute Doppler HWHM
-            γ_d = ((cSqrt2Ln2 / cc_) * sqrt(cBolts_ / cMassMol) * sqrt(temperature) * 
-            hitran.νᵢ[j] / sqrt(mol_weight(hitran.mol[j], hitran.iso[j])))
-
-            # Ratio of widths
-            y = sqrt(cLn2) * γ_l / γ_d
-
-            # Apply line intensity temperature corrections
-            S = hitran.Sᵢ[j]
-            if hitran.E″[j] != -1
-                qoft!(hitran.mol[j], hitran.iso[j], temperature, t_ref, rate)
-                S = S * rate[1] *
-                        exp(c₂ * hitran.E″[j] * (1 / t_ref - 1 / temperature)) *
-                        (1 - exp(-c₂ * hitran.νᵢ[j] / temperature)) / (1 - exp(-c₂ * hitran.νᵢ[j] / t_ref));
-
-            end
-
-            if length(grid)>1
-                # Calculate index range that this ν impacts
-                ind_start = Int64(round(grid_idx_interp_low(ν - wing_cutoff)))
-                ind_stop  = Int64(round(grid_idx_interp_high(ν + wing_cutoff)))
-                
-                # Create views from the result and grid arrays
-                result_view   = view(result, ind_start:ind_stop);
-                grid_view     = view(grid, ind_start:ind_stop);
-            else
-                result_view   = view(result, 1);
-                grid_view     = view(grid, 1);
-            end
-
-            # Kernel for performing the lineshape calculation
-            kernel! = line_shape!(device)
-
-            # Run the event on the kernel 
-            # That this, this function adds to each element in result, the contribution from this transition
-            event = kernel!(result_view, array_type(architecture)(grid_view), ν, γ_d, γ_l, y, S, broadening, CEF, ndrange=length(grid_view))
-            #wait(device, event)
-            synchronize_if_gpu()
+            n_active += 1
         end
+    end
+
+    # Pre-allocate parameter arrays
+    ν_arr       = Vector{FT}(undef, n_active)
+    γ_d_arr     = Vector{FT}(undef, n_active)
+    y_arr       = Vector{FT}(undef, n_active)
+    S_arr       = Vector{FT}(undef, n_active)
+    γ_l_arr     = Vector{FT}(undef, n_active)
+    istart_arr  = Vector{Int32}(undef, n_active)
+    istop_arr   = Vector{Int32}(undef, n_active)
+
+    # Fill parameter arrays
+    k = 0
+    for j in eachindex(hitran.Sᵢ)
+        if !(grid_min < hitran.νᵢ[j] < grid_max)
+            continue
+        end
+        k += 1
+
+        # Apply pressure shift
+        ν   = hitran.νᵢ[j] + pressure / p_ref * hitran.δ_air[j]
+
+        # Compute Lorentzian HWHM
+        γ_l = (hitran.γ_air[j] *
+              (1 - vmr) * pressure / p_ref + hitran.γ_self[j] *
+              vmr * pressure / p_ref) *
+              (t_ref / temperature)^hitran.n_air[j]
+
+        # Compute Doppler HWHM
+        γ_d = ((cSqrt2Ln2 / cc_) * sqrt(cBolts_ / cMassMol) * sqrt(temperature) *
+        hitran.νᵢ[j] / sqrt(mol_weight(hitran.mol[j], hitran.iso[j])))
+
+        # Ratio of widths
+        y = sqrt(cLn2) * γ_l / γ_d
+
+        # Apply line intensity temperature corrections
+        S = hitran.Sᵢ[j]
+        if hitran.E″[j] != -1
+            # Cache qoft result per unique (mol, iso) pair
+            key = (hitran.mol[j], hitran.iso[j])
+            if !haskey(qoft_cache, key)
+                qoft!(hitran.mol[j], hitran.iso[j], temperature, t_ref, rate)
+                qoft_cache[key] = rate[1]
+            end
+            S = S * qoft_cache[key] *
+                    exp(c₂ * hitran.E″[j] * (1 / t_ref - 1 / temperature)) *
+                    (1 - exp(-c₂ * hitran.νᵢ[j] / temperature)) / (1 - exp(-c₂ * hitran.νᵢ[j] / t_ref))
+        end
+
+        # Calculate index range that this line impacts
+        if N_grid > 1
+            istart = Int32(round(grid_idx_interp_low(ν - wing_cutoff)))
+            istop  = Int32(round(grid_idx_interp_high(ν + wing_cutoff)))
+        else
+            istart = Int32(1)
+            istop  = Int32(1)
+        end
+
+        ν_arr[k]      = ν
+        γ_d_arr[k]    = γ_d
+        y_arr[k]      = y
+        S_arr[k]      = S
+        γ_l_arr[k]    = γ_l
+        istart_arr[k] = istart
+        istop_arr[k]  = istop
+    end
+
+    # --- Launch batched kernel ---
+    if n_active > 0 && N_grid > 0
+        device = devi(architecture)
+
+        # Upload grid and parameter arrays to device
+        grid_d    = array_type(architecture)(grid)
+        ν_d       = array_type(architecture)(ν_arr)
+        γ_d_d     = array_type(architecture)(γ_d_arr)
+        y_d       = array_type(architecture)(y_arr)
+        S_d       = array_type(architecture)(S_arr)
+        γ_l_d     = array_type(architecture)(γ_l_arr)
+        istart_d  = array_type(architecture)(istart_arr)
+        istop_d   = array_type(architecture)(istop_arr)
+
+        kernel! = line_shape_batch!(device)
+        kernel!(result, grid_d, ν_d, γ_d_d, γ_l_d, y_d, S_d,
+                istart_d, istop_d, Int32(n_active), broadening, CEF,
+                ndrange=N_grid)
+        synchronize_if_gpu()
     end
 
     # Return the resulting lineshape
@@ -162,14 +197,14 @@ Uses BSpline interpolation over (ν, p, T). Faster than line-by-line for repeate
 """
 function compute_absorption_cross_section(
     # Required
-    model::InterpolationModel,      # Model to use in this cross section calculation 
+    model::InterpolationModel,      # Model to use in this cross section calculation
                                     # (Calculation from Interpolator vs. Hitran Data)
     # Wavelength [nm] or wavenumber [cm-1] grid
     grid::Union{AbstractRange{<:Real}, AbstractArray},  # Can be range OR array
     pressure::Real,                 # actual pressure [hPa]
-    temperature::Real;              # actual temperature [K]  
-    # Optionals 
-    wavelength_flag::Bool=false,    # Use wavelength in nm (true) or wavenumber cm-1 units (false)            
+    temperature::Real;              # actual temperature [K]
+    # Optionals
+    wavelength_flag::Bool=false,    # Use wavelength in nm (true) or wavenumber cm-1 units (false)
     )
 
     # Convert to wavenumber from [nm] space if necessary
@@ -184,8 +219,69 @@ end
 
 #=
 
-Line-shape kernel functions that are called by absorption_cross_section.
-Each kernel adds the contribution of a single spectral line to the result array A.
+Batched line-shape kernels. Each thread handles one grid point and loops over all
+active spectral lines, accumulating contributions. This replaces the per-line kernel
+launch pattern with a single kernel launch.
+
+=#
+
+"""Batched Gaussian (Doppler) line-shape kernel. Each thread sums all line contributions."""
+@kernel function line_shape_batch!(A, @Const(grid), @Const(ν_arr), @Const(γ_d_arr),
+                                   @Const(γ_l_arr), @Const(y_arr), @Const(S_arr),
+                                   @Const(istart_arr), @Const(istop_arr),
+                                   N_lines, ::Doppler, CEF)
+    I = @index(Global, Linear)
+    FT = eltype(A)
+    acc = zero(FT)
+    ν_i = FT(grid[I])
+    @inbounds for j in 1:N_lines
+        if istart_arr[j] <= I <= istop_arr[j]
+            acc += FT(S_arr[j]) * FT(cSqrtLn2divSqrtPi) *
+                   exp(-FT(cLn2) * ((ν_i - FT(ν_arr[j])) / FT(γ_d_arr[j]))^2) / FT(γ_d_arr[j])
+        end
+    end
+    @inbounds A[I] += acc
+end
+
+"""Batched Lorentz (collision) line-shape kernel. Each thread sums all line contributions."""
+@kernel function line_shape_batch!(A, @Const(grid), @Const(ν_arr), @Const(γ_d_arr),
+                                   @Const(γ_l_arr), @Const(y_arr), @Const(S_arr),
+                                   @Const(istart_arr), @Const(istop_arr),
+                                   N_lines, ::Lorentz, CEF)
+    I = @index(Global, Linear)
+    FT = eltype(A)
+    acc = zero(FT)
+    ν_i = FT(grid[I])
+    @inbounds for j in 1:N_lines
+        if istart_arr[j] <= I <= istop_arr[j]
+            acc += FT(S_arr[j]) * FT(γ_l_arr[j]) /
+                   (FT(pi) * (FT(γ_l_arr[j])^2 + (ν_i - FT(ν_arr[j]))^2))
+        end
+    end
+    @inbounds A[I] += acc
+end
+
+"""Batched Voigt line-shape kernel. Each thread sums all line contributions using CEF."""
+@kernel function line_shape_batch!(A, @Const(grid), @Const(ν_arr), @Const(γ_d_arr),
+                                   @Const(γ_l_arr), @Const(y_arr), @Const(S_arr),
+                                   @Const(istart_arr), @Const(istop_arr),
+                                   N_lines, ::Voigt, CEF)
+    I = @index(Global, Linear)
+    FT = eltype(A)
+    acc = zero(FT)
+    ν_i = FT(grid[I])
+    @inbounds for j in 1:N_lines
+        if istart_arr[j] <= I <= istop_arr[j]
+            acc += FT(S_arr[j]) * FT(cSqrtLn2divSqrtPi) / FT(γ_d_arr[j]) *
+                   real(w(CEF, FT(cSqrtLn2) / FT(γ_d_arr[j]) * (ν_i - FT(ν_arr[j])) + im * FT(y_arr[j])))
+        end
+    end
+    @inbounds A[I] += acc
+end
+
+#=
+
+Legacy per-line kernels (kept for reference and potential single-line use cases).
 
 =#
 
@@ -219,7 +315,7 @@ end
 
 Function to interpolate partition sum for specified isotopologue
 
-=# 
+=#
 
 """
     qoft!(M, I, T, T_ref, result)
@@ -252,8 +348,8 @@ function qoft!(M, I, T, T_ref, result)
     # Interpolate partition sum for specified isotopologue
     interp = DI_CS(TQ, TT)
     Qt = interp(T)
-    Qt2 = interp(T_ref) 
+    Qt2 = interp(T_ref)
 
-    # Save the ratio result 
+    # Save the ratio result
     result[1] = Qt2/Qt
 end

@@ -43,10 +43,7 @@ model_interp = make_interpolation_model(hitran_data, Voigt(), ν_grid, pressures
 
 # NOTE: Please replace the "model_*" in the following lines with whichever model option you prefer from Step 2
 
-# You can specify the wavelength grid, pressure, and temperature. 
+# You can specify the wavelength grid, pressure, and temperature.
 profile = absorption_cross_section(model_*, 6000:0.01:6400, 1000.1, 296.1)
-
-# You can obtain the derivatives of the cross-section by setting the autodiff parameter to true: 
-profile, derivs = absorption_cross_section(model_*, 6000:0.01:6400, 1000.1, 296.1, autodiff=true);
 
 ```

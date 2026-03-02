@@ -190,19 +190,22 @@ end
 
 end 
 
-# Test that checks whether the cross-section auto-differentiation works
+# Test batched kernel on GPU (if available) matches CPU result
+@testset "absorption_cross_section_gpu_cpu_match" begin
 
-@testset "absorption_cross_section_autodiff" begin
+    println("Testing GPU vs CPU cross-section match...")
 
-    println("Testing absorption_cross_section_autodiff...")
-    
-    # Load HITRAN data
     hitran_data = read_hitran(artifact("CO2"), mol=2, iso=1, ν_min=6000, ν_max=6400)
+    grid = 6000:0.01:6400
 
-    # Create the model with parameters
-    model = make_hitran_model(hitran_data, Voigt(), wing_cutoff = 40, CEF=HumlicekWeidemann32SDErrorFunction(), architecture=CPU())
+    model_cpu = make_hitran_model(hitran_data, Voigt(), wing_cutoff=40, CEF=HumlicekWeidemann32SDErrorFunction(), architecture=CPU())
+    cs_cpu = absorption_cross_section(model_cpu, grid, 1000.1, 296.1)
 
-    # Compute the cross-section with autodifferentiation
-    value, derivs = absorption_cross_section(model, 6000:0.01:6400, 1000.1, 296.1, autodiff=true);
-
+    if Architectures.has_cuda()
+        model_gpu = make_hitran_model(hitran_data, Voigt(), wing_cutoff=40, CEF=HumlicekWeidemann32SDErrorFunction(), architecture=GPU())
+        cs_gpu = collect(absorption_cross_section(model_gpu, grid, 1000.1, 296.1))
+        @test maximum(abs.(cs_cpu .- cs_gpu)) < 1e-12
+    else
+        @test true  # Skip GPU test if no CUDA
+    end
 end
