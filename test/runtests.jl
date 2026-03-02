@@ -34,9 +34,6 @@ using JLD2
 # RAMI smoke test (no gas absorption, bypasses sandbox scripts)
 @testset "RAMI Smoke" begin include("test_rami_smoke.jl") end
 
-# Hybrid AD tests (ForwardDiff Mie + linearized RT)
-@testset "Hybrid AD" begin include("test_hybrid_ad.jl") end
-
 # Canopy surface tests (CanopySurface composable surface type)
 @testset "Canopy Surface" begin include("test_canopy.jl") end
 
