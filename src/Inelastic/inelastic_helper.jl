@@ -51,6 +51,17 @@ function getRamanAtmoConstants(ν̃::FT, T::FT, vmr_n2::FT, vmr_o2::FT) where FT
     return n2,o2
 end
 
+"""
+    compute_ϖ_Cabannes(RS_type, depol, λ₀)
+    compute_ϖ_Cabannes(RS_type, λ₀)
+
+Compute the Cabannes fraction ω_Cab = σ_elastic / (σ_elastic + Σσ_inelastic).
+
+For RRS: ω_Cab = σ_e / (σ_RRS + σ_e)
+For VS:  ω_Cab = σ_e / (σ_VRS + σ_RVRS + σ_e)
+
+See Part II, Eq. 26 in Sanghavi & Frankenberg (2023), JQSRT 311, 108791.
+"""
 function compute_ϖ_Cabannes(RS_type::noRS, depol, λ₀)
     RS_type.ϖ_Cabannes = 1.0;
     return RS_type.ϖ_Cabannes;
@@ -295,6 +306,15 @@ function compute_ϖ_Cabannes(λ₀, mol)
     return ϖ_Cabannes;
 end
 
+"""
+    compute_γ_air_Cabannes!(RS_type)
+    compute_γ_air_Cabannes!(n2, o2)
+
+Compute the effective Cabannes depolarization parameter γ_C for air as a VMR-weighted
+combination of N₂ and O₂ contributions.
+
+See Part II, Eqs. 27-28 in Sanghavi & Frankenberg (2023), JQSRT 311, 108791.
+"""
 function compute_γ_air_Cabannes!(RS_type::Union{RRS, VS_0to1, VS_1to0, RRS_plus, VS_0to1_plus, VS_1to0_plus})
                             
     nN = RS_type.n2.vmr*RS_type.n2.effCoeff.σ_Rayl_coeff*
@@ -796,8 +816,16 @@ function get_greek_raman!(RS_type::noRS, n2, o2)
     return nothing
 end
 
-# the following applies to both rovibrational and rotational Raman scattering (by both N2 and O2)
-function get_greek_raman(RS_type::Union{RRS, RRS_plus, VS_0to1, VS_0to1_plus, VS_1to0, VS_1to0_plus}, 
+"""
+    get_greek_raman(RS_type, n2, o2)
+
+Compute Greek coefficients for the inelastic scattering phase matrix Z_x, parameterized
+by the depolarization ratio γ_C,x.
+
+See Part II, Eq. 23 in Sanghavi & Frankenberg (2023), JQSRT 311, 108791.
+For rotational Raman and rovibrational Raman, uses γ_C = 3/4 (isotropic limit).
+"""
+function get_greek_raman(RS_type::Union{RRS, RRS_plus, VS_0to1, VS_0to1_plus, VS_1to0, VS_1to0_plus},
                             n2, o2)
     depol = n2.effCoeff.rho_depol_RotRaman
     FT = eltype(depol)

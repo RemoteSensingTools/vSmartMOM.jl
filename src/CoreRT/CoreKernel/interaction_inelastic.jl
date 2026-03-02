@@ -37,7 +37,7 @@ end
 No scattering in composite layer; scattering in homogeneous layer added to bottom.
 
 Implements adding equations for RRS when composite has no scatterer and added layer scatters.
-Corresponds to Eqs. 8 in Sanghavi et al. Raman paper draft for R⁻⁺, T⁺⁺, T⁻⁻, R⁺⁻.
+Simplified case of Eqs. 16-19 in Sanghavi & Frankenberg (2023), JQSRT 311, 108791.
 """
 function interaction_helper!(RS_type::RRS, ::ScatteringInterface_01, SFI,
                                 composite_layer::CompositeLayer{FT}, 
@@ -97,7 +97,7 @@ end
 No scattering in composite layer; scattering in homogeneous VS layer added to bottom.
 
 Implements adding equations for Vibrational Raman Scattering (VS) when composite has no scatterer.
-Corresponds to Eqs. 8 in Sanghavi et al. Raman paper draft.
+Simplified case of Eqs. 16-19 in Sanghavi & Frankenberg (2023), JQSRT 311, 108791.
 """
 function interaction_helper!(RS_type::Union{VS_0to1_plus, VS_1to0_plus}, 
                         ::ScatteringInterface_01, SFI,
@@ -160,7 +160,7 @@ end
 Scattering in composite layer; no scattering in homogeneous layer added to bottom.
 
 Implements adding equations for RRS when composite scatters and added layer does not.
-Corresponds to Eqs. 8 in Sanghavi et al. Raman paper draft.
+Simplified case of Eqs. 16-19 in Sanghavi & Frankenberg (2023), JQSRT 311, 108791.
 """
 function interaction_helper!(RS_type::RRS, ::ScatteringInterface_10, SFI,
                                 composite_layer::CompositeLayer{FT}, 
@@ -216,7 +216,7 @@ end
 Scattering in composite layer; no scattering in homogeneous VS layer added to bottom.
 
 Implements adding equations for Vibrational Raman Scattering (VS).
-Corresponds to Eqs. 8 in Sanghavi et al. Raman paper draft.
+Simplified case of Eqs. 16-19 in Sanghavi & Frankenberg (2023), JQSRT 311, 108791.
 """
 function interaction_helper!(RS_type::Union{VS_0to1_plus, VS_1to0_plus}, 
     ::ScatteringInterface_10, SFI,
@@ -276,7 +276,8 @@ end
 Scattering in both composite and added layers (full adding-doubling for RRS).
 
 Implements the full interaction equations when both layers scatter.
-Corresponds to Eqs. 8, 12, 13, 14, 15 in Sanghavi et al. Raman paper draft.
+Eqs. 16-21 in Sanghavi & Frankenberg (2023), JQSRT 311, 108791.
+Variable mapping: n₀ = incident wavelength index (λ), n₁ = scattered wavelength index (λᵣ).
 """
 function interaction_helper!(RS_type::RRS, ::ScatteringInterface_11, SFI,
                                 composite_layer::Union{CompositeLayer, CompositeLayerRS}, 
@@ -315,7 +316,7 @@ function interaction_helper!(RS_type::RRS, ::ScatteringInterface_11, SFI,
                     T01_inv[:,:,n₁] ⊠ 
                     (ier⁻⁺[:,:,n₁,Δn] ⊠ J₀⁺[:,:,n₀] + 
                     r⁻⁺[:,:,n₁] ⊠ ieJ₀⁺[:,:,n₁,Δn] +
-                    added_layer.ieJ₀⁻[:,:,n₁,Δn]) + # Somewhere nbehind here is the BUGGGGGG
+                    added_layer.ieJ₀⁻[:,:,n₁,Δn]) + # Part II, Eq. 21: J⁻₀₂(λ→λᵣ)
                     (T01_inv[:,:,n₁] ⊠ 
                     (ier⁻⁺[:,:,n₁,Δn] ⊠ R⁺⁻[:,:,n₀] + 
                     r⁻⁺[:,:,n₁] ⊠ ieR⁺⁻[:,:,n₁,Δn]) +
@@ -381,7 +382,7 @@ function interaction_helper!(RS_type::RRS, ::ScatteringInterface_11, SFI,
                     T21_inv[:,:,n₁] ⊠ ieT⁺⁺[:,:,n₁,Δn] +
                     (T21_inv[:,:,n₁] ⊠ (ieR⁺⁻[:,:,n₁,Δn] ⊠ r⁻⁺[:,:,n₀] + 
                     R⁺⁻[:,:,n₁] ⊠ ier⁻⁺[:,:,n₁,Δn]) +
-                    iet⁺⁺[:,:,n₁,Δn]) ⊠ tmp_inv[:,:,n₀] ⊠ T⁺⁺[:,:,n₀] #Suniti: Eq 12 of Raman paper draft
+                    iet⁺⁺[:,:,n₁,Δn]) ⊠ tmp_inv[:,:,n₀] ⊠ T⁺⁺[:,:,n₀] # Part II, Eq. 16: T⁺⁺₂₀(λ→λᵣ)
 
         @inbounds @views tmpieR⁺⁻[:,:,n₁,Δn] = 
                     ier⁺⁻[:,:,n₁,Δn] + 
@@ -406,8 +407,8 @@ function interaction_helper!(RS_type::RRS, ::ScatteringInterface_11, SFI,
 
     composite_layer.J₀⁺ .= tmpJ₀⁺
     composite_layer.T⁺⁺ .= tmpT⁺⁺
-    composite_layer.R⁺⁻ .= tmpR⁻⁺
-    
+    composite_layer.R⁺⁻ .= tmpR⁺⁻  # Bug fix: was tmpR⁻⁺, should be tmpR⁺⁻ (Part II, Eq. 19)
+
     composite_layer.ieJ₀⁻ .= tmpieJ₀⁻
     composite_layer.ieJ₀⁺ .= tmpieJ₀⁺
 
@@ -423,7 +424,8 @@ end
 Scattering in both composite and added VS layers (full adding-doubling for Vibrational Raman).
 
 Implements the full interaction equations when both layers scatter.
-Corresponds to Eqs. 12, 13, 14, 15, 16, 17 in Sanghavi et al. Raman paper draft.
+Eqs. 16-21 in Sanghavi & Frankenberg (2023), JQSRT 311, 108791.
+Variable mapping: n₀ = incident wavelength index (λ), n₁ = scattered wavelength index (λᵣ).
 """
 function interaction_helper!(RS_type::Union{VS_0to1_plus, VS_1to0_plus}, 
     ::ScatteringInterface_11, SFI,
@@ -469,7 +471,7 @@ function interaction_helper!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
                                         r⁻⁺[:,:,n₁] * ieR⁺⁻[:,:,n₁,n₀]) +
                                         ieT⁻⁻[:,:,n₁,n₀]) *
                                         tmp_inv[:,:,n₀] * 
-                                        (added_layer.j₀⁻[:,1,n₀] + r⁻⁺[:,:,n₀] * J₀⁺[:,1,n₀]) #Suniti: Eq 17 of Raman paper draft
+                                        (added_layer.j₀⁻[:,1,n₀] + r⁻⁺[:,:,n₀] * J₀⁺[:,1,n₀]) # Part II, Eq. 21: J⁻₀₂(λ→λᵣ)
             end
         end
         #J₀₂⁻ = J₀₁⁻ + T₀₁(1-R₂₁R₀₁)⁻¹(R₂₁J₁₀⁺+J₁₂⁻)
@@ -486,13 +488,13 @@ function interaction_helper!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
                     (T01_inv[:,:,n₁] * 
                     (ier⁻⁺[:,:,n₁,n₀] * R⁺⁻[:,:,n₀] + r⁻⁺[:,:,n₁] * ieR⁺⁻[:,:,n₁,n₀]) + 
                     ieT⁻⁻[:,:,n₁,n₀]) * 
-                    tmp_inv[:,:,n₀] * r⁻⁺[:,:,n₀] * T⁺⁺[:,:,n₀] #Suniti: Eq 14 of Raman paper draft
+                    tmp_inv[:,:,n₀] * r⁻⁺[:,:,n₀] * T⁺⁺[:,:,n₀] # Part II, Eq. 18: R⁻⁺₂₀(λ→λᵣ)
 
             @inbounds @views tmpieT⁻⁻[:,:,n₁,n₀] = T01_inv[:,:,n₁] * iet⁻⁻[:,:,n₁,n₀] +  
                     (T01_inv[:,:,n₁] * 
                     (ier⁻⁺[:,:,n₁,n₀] * R⁺⁻[:,:,n₀] + r⁻⁺[:,:,n₁] * ieR⁺⁻[:,:,n₁,n₀]) +
                     ieT⁻⁻[:,:,n₁,n₀]) * 
-                    tmp_inv[:,:,n₀] * t⁻⁻[:,:,n₀] #Suniti: Eq 13 of Raman paper draft
+                    tmp_inv[:,:,n₀] * t⁻⁻[:,:,n₀] # Part II, Eq. 17: T⁻⁻₀₂(λ→λᵣ)
         end
     end
 
@@ -536,7 +538,7 @@ function interaction_helper!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
             tmpieT⁺⁺[:,:,n₁,n₀] = T21_inv[:,:,n₁] * ieT⁺⁺[:,:,n₁,n₀] +
                     (T21_inv[:,:,n₁] * (ieR⁺⁻[:,:,n₁,n₀] * r⁻⁺[:,:,n₀] + 
                     R⁺⁻[:,:,n₁] * ier⁻⁺[:,:,n₁,n₀]) +
-                    iet⁺⁺[:,:,n₁,n₀]) * tmp_inv[:,:,n₀] * T⁺⁺[:,:,n₀] #Suniti: Eq 12 of Raman paper draft
+                    iet⁺⁺[:,:,n₁,n₀]) * tmp_inv[:,:,n₀] * T⁺⁺[:,:,n₀] # Part II, Eq. 16: T⁺⁺₂₀(λ→λᵣ)
 
             tmpieR⁺⁻[:,:,n₁,n₀] = ier⁺⁻[:,:,n₁,n₀] + 
                     T21_inv[:,:,n₁] *
@@ -546,7 +548,7 @@ function interaction_helper!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
                     (ieR⁺⁻[:,:,n₁,n₀] * r⁻⁺[:,:,n₀] + 
                     R⁺⁻[:,:,n₁] * ier⁻⁺[:,:,n₁,n₀]) + 
                     iet⁺⁺[:,:,n₁,n₀]) *
-                    tmp_inv[:,:,n₀] * R⁺⁻[:,:,n₀] * t⁻⁻[:,:,n₀] #Suniti: Eq 15 of Raman paper draft
+                    tmp_inv[:,:,n₀] * R⁺⁻[:,:,n₀] * t⁻⁻[:,:,n₀] # Part II, Eq. 19: R⁺⁻₀₂(λ→λᵣ)
         end
     end
     # T₂₀ = T₂₁(I-R₀₁R₂₁)⁻¹T₁₀
@@ -560,8 +562,8 @@ function interaction_helper!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
 
     composite_layer.J₀⁺ .= tmpJ₀⁺
     composite_layer.T⁺⁺ .= tmpT⁺⁺
-    composite_layer.R⁺⁻ .= tmpR⁻⁺
-    
+    composite_layer.R⁺⁻ .= tmpR⁺⁻  # Bug fix: was tmpR⁻⁺, should be tmpR⁺⁻ (Part II, Eq. 19)
+
     composite_layer.ieJ₀⁻ .= tmpieJ₀⁻
     composite_layer.ieJ₀⁺ .= tmpieJ₀⁺
 

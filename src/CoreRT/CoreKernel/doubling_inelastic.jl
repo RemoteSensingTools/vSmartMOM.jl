@@ -1,8 +1,11 @@
 """
-    $(FUNCTIONNAME)(pol_type, SFI, expk, ndoubl::Int, added_layer::AddedLayer, I_static::AbstractArray{FT}, 
+    $(FUNCTIONNAME)(pol_type, SFI, expk, ndoubl::Int, added_layer::AddedLayer, I_static::AbstractArray{FT},
                     architecture) where {FT}
 
-Compute homogenous layer matrices from its elemental layer using Doubling 
+Compute homogeneous layer matrices from elemental layer using doubling.
+Implements Eqs. 16-21 (special case: both layers identical) from
+Sanghavi & Frankenberg (2023), JQSRT 311, 108791.
+Variable mapping: n₀ = incident wavelength index (λ), n₁ = scattered wavelength index (λᵣ).
 """
 function doubling_helper!(RS_type::RRS,
     pol_type, 
@@ -81,7 +84,7 @@ function doubling_helper!(RS_type::RRS,
             end
             
         #bla
-            # J⁻₀₂(λ) = J⁻₀₁(λ) + T⁻⁻₀₁(λ)[I - R⁻⁺₂₁(λ)R⁺⁻₀₁(λ)]⁻¹[J⁻₁₂(λ) + R⁻⁺₂₁(λ)J⁺₁₀(λ)] (see Eqs.8 in Raman paper draft)
+            # J⁻₀₂(λ) = J⁻₀₁(λ) + T⁻⁻₀₁(λ)[I - R⁻⁺₂₁(λ)R⁺⁻₀₁(λ)]⁻¹[J⁻₁₂(λ) + R⁻⁺₂₁(λ)J⁺₁₀(λ)] (Part II, Eq. 12; Sanghavi & Frankenberg 2023)
             j₀⁻[:] = j₀⁻ + (tt⁺⁺_gp_refl ⊠ (J₁⁻ + r⁻⁺ ⊠ j₀⁺)) 
 
             j₀⁺[:] = J₁⁺ + (tt⁺⁺_gp_refl ⊠ (j₀⁺ + r⁻⁺ ⊠ J₁⁻))
@@ -110,10 +113,10 @@ function doubling_helper!(RS_type::RRS,
                 ier⁻⁺[:,:,n₁,Δn] = tmp6
         end
         
-        # R⁻⁺₂₀(λ) = R⁻⁺₁₀(λ) + T⁻⁻₀₁(λ)[I - R⁻⁺₂₁(λ)R⁺⁻₀₁(λ)]⁻¹R⁻⁺₂₁(λ)T⁺⁺₁₀(λ) (see Eqs.8 in Raman paper draft)
+        # R⁻⁺₂₀(λ) = R⁻⁺₁₀(λ) + T⁻⁻₀₁(λ)[I - R⁻⁺₂₁(λ)R⁺⁻₀₁(λ)]⁻¹R⁻⁺₂₁(λ)T⁺⁺₁₀(λ) (Part II, Eq. 12; Sanghavi & Frankenberg 2023)
         r⁻⁺[:]  = r⁻⁺ + (tt⁺⁺_gp_refl ⊠ r⁻⁺ ⊠ t⁺⁺)
 
-        # T⁺⁺₂₀(λ) = T⁺⁺₂₁(λ)[I - R⁺⁻₀₁(λ)R⁻⁺₂₁(λ)]⁻¹T⁺⁺₁₀(λ) (see Eqs.8 in Raman paper draft)
+        # T⁺⁺₂₀(λ) = T⁺⁺₂₁(λ)[I - R⁺⁻₀₁(λ)R⁻⁺₂₁(λ)]⁻¹T⁺⁺₁₀(λ) (Part II, Eq. 12; Sanghavi & Frankenberg 2023)
         t⁺⁺[:]  = tt⁺⁺_gp_refl ⊠ t⁺⁺
 
     end
@@ -183,7 +186,7 @@ function doubling_helper!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
                 n₁ = i_λ₁λ₀_all[Δn]
                 n₀ = 1
                 if n₁>0
-                    # J⁺₂₀(λ) = J⁺₂₁(λ) + T⁺⁺₂₁(λ)[I - R⁺⁻₀₁(λ)R⁻⁺₂₁(λ)]⁻¹[J⁺₁₀(λ) + R⁺⁻₀₁(λ)J⁻₁₂(λ)] (see Eqs.16 in Raman paper draft)
+                    # J⁺₂₀(λ) = J⁺₂₁(λ) + T⁺⁺₂₁(λ)[I - R⁺⁻₀₁(λ)R⁻⁺₂₁(λ)]⁻¹[J⁺₁₀(λ) + R⁺⁻₀₁(λ)J⁻₁₂(λ)] (Part II, Eq. 20: J⁺₂₀(λ→λᵣ); Sanghavi & Frankenberg 2023)
                     @inbounds @views ieJ₀⁺[:,:,n₁,1] = 
                             ieJ₁⁺[:,:,n₁,1] + 
                             (tt⁺⁺_gp_refl[:,:,n₁] * 
@@ -195,7 +198,7 @@ function doubling_helper!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
                             tmp1[:,:,n₀])) + 
                             iet⁺⁺[:,:,n₁,1] * tmp1[:,:,n₀];  
             
-                    # J⁻₀₂(λ) = J⁻₀₁(λ) + T⁻⁻₀₁(λ)[I - R⁻⁺₂₁(λ)R⁺⁻₀₁(λ)]⁻¹[J⁻₁₂(λ) + R⁻⁺₂₁(λ)J⁺₁₀(λ)] (see Eqs.17 in Raman paper draft)
+                    # J⁻₀₂(λ) = J⁻₀₁(λ) + T⁻⁻₀₁(λ)[I - R⁻⁺₂₁(λ)R⁺⁻₀₁(λ)]⁻¹[J⁻₁₂(λ) + R⁻⁺₂₁(λ)J⁺₁₀(λ)] (Part II, Eq. 21: J⁻₀₂(λ→λᵣ); Sanghavi & Frankenberg 2023)
                     @inbounds @views ieJ₀⁻[:,1,n₁,1] = 
                             ieJ₀⁻[:,1,n₁,1] + 
                             (tt⁺⁺_gp_refl[:,:,n₁] * 
@@ -208,7 +211,7 @@ function doubling_helper!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
                             iet⁻⁻[:,:,n₁,1] * tmp2[:,:,n₀]
                 end
             end            
-            # J⁻₀₂(λ) = J⁻₀₁(λ) + T⁻⁻₀₁(λ)[I - R⁻⁺₂₁(λ)R⁺⁻₀₁(λ)]⁻¹[J⁻₁₂(λ) + R⁻⁺₂₁(λ)J⁺₁₀(λ)] (see Eqs.8 in Raman paper draft)
+            # J⁻₀₂(λ) = J⁻₀₁(λ) + T⁻⁻₀₁(λ)[I - R⁻⁺₂₁(λ)R⁺⁻₀₁(λ)]⁻¹[J⁻₁₂(λ) + R⁻⁺₂₁(λ)J⁺₁₀(λ)] (Part II, Eq. 12; Sanghavi & Frankenberg 2023)
             j₀⁻[:] = j₀⁻ + (tt⁺⁺_gp_refl ⊠ (J₁⁻ + r⁻⁺ ⊠ j₀⁺)) 
 
             j₀⁺[:] = J₁⁺ + (tt⁺⁺_gp_refl ⊠ (j₀⁺ + r⁻⁺ ⊠ J₁⁻))
@@ -222,7 +225,7 @@ function doubling_helper!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
             n₁ = i_λ₁λ₀_all[Δn]
             n₀ = 1
             if n₁>0
-                # (see Eqs.12 in Raman paper draft)
+                # Part II, Eq. 16: T⁺⁺₂₀(λ→λᵣ) (Sanghavi & Frankenberg 2023)
                 @inbounds @views iet⁺⁺[:,:,n₁,1] = tt⁺⁺_gp_refl[:,:,n₁] * 
                         (iet⁺⁺[:,:,n₁,1] + 
                         (ier⁻⁺[:,:,n₁,1] * r⁻⁺[:,:,n₀] + 
@@ -230,7 +233,7 @@ function doubling_helper!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
                         tmp1[:,:,n₀]) + 
                         iet⁺⁺[:,:,n₁,1] * tmp1[:,:,n₀]
 
-                # (see Eqs.14 in Raman paper draft)
+                # Part II, Eq. 18: R⁻⁺₂₀(λ→λᵣ) (Sanghavi & Frankenberg 2023)
                 @inbounds @views ier⁻⁺[:,:,n₁,1] = ier⁻⁺[:,:,n₁,1] + 
                         tt⁺⁺_gp_refl[:,:,n₁] * r⁻⁺[:,:,n₁] * 
                         (iet⁺⁺[:,:,n₁,1] + 
@@ -242,10 +245,10 @@ function doubling_helper!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
             end
         end
     
-        # R⁻⁺₂₀(λ) = R⁻⁺₁₀(λ) + T⁻⁻₀₁(λ)[I - R⁻⁺₂₁(λ)R⁺⁻₀₁(λ)]⁻¹R⁻⁺₂₁(λ)T⁺⁺₁₀(λ) (see Eqs.8 in Raman paper draft)
+        # R⁻⁺₂₀(λ) = R⁻⁺₁₀(λ) + T⁻⁻₀₁(λ)[I - R⁻⁺₂₁(λ)R⁺⁻₀₁(λ)]⁻¹R⁻⁺₂₁(λ)T⁺⁺₁₀(λ) (Part II, Eq. 12; Sanghavi & Frankenberg 2023)
         r⁻⁺[:]  = r⁻⁺ + (tt⁺⁺_gp_refl ⊠ r⁻⁺ ⊠ t⁺⁺)
 
-        # T⁺⁺₂₀(λ) = T⁺⁺₂₁(λ)[I - R⁺⁻₀₁(λ)R⁻⁺₂₁(λ)]⁻¹T⁺⁺₁₀(λ) (see Eqs.8 in Raman paper draft)
+        # T⁺⁺₂₀(λ) = T⁺⁺₂₁(λ)[I - R⁺⁻₀₁(λ)R⁻⁺₂₁(λ)]⁻¹T⁺⁺₁₀(λ) (Part II, Eq. 12; Sanghavi & Frankenberg 2023)
         t⁺⁺[:]  = tt⁺⁺_gp_refl ⊠ t⁺⁺
     end
 
