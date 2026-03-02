@@ -40,6 +40,9 @@ using JLD2
 # Canopy surface tests (CanopySurface composable surface type)
 @testset "Canopy Surface" begin include("test_canopy.jl") end
 
+# Cox-Munk ocean surface tests
+@testset "Cox-Munk Surface" begin include("test_coxmunk.jl") end
+
 # GPU-specific tests (conditional on CUDA availability)
 CUDA_AVAILABLE = try
     using CUDA

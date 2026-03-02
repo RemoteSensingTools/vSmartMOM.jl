@@ -392,6 +392,30 @@ struct RossLiSurfaceScalar{FT} <: AbstractSurfaceType
     fiso::FT
 end
 
+"""
+    CoxMunkSurface{FT} <: AbstractSurfaceType
+
+Cox-Munk (1954) ocean surface: Fresnel reflection from wind-roughened wave facets.
+Supports full polarization (Mueller matrix) and optional Lambertian whitecap contribution.
+
+Isotropic slope distribution: σ² = 0.003 + 0.00512·U.
+
+# Fields
+$(DocStringExtensions.FIELDS)
+"""
+Base.@kwdef struct CoxMunkSurface{FT} <: AbstractSurfaceType
+    "10-m wind speed [m/s]"
+    wind_speed::FT
+    "Complex refractive index of water; nothing → built-in Segelstein 1981 lookup"
+    n_water::Union{Nothing, Complex{FT}, Vector{Complex{FT}}} = nothing
+    "Whitecap Lambertian albedo (Koepke 1984)"
+    whitecap_albedo::FT = 0.22
+    "Include whitecap contribution"
+    include_whitecaps::Bool = true
+    "Include Smith (1967) shadow masking"
+    shadowing::Bool = true
+end
+
 "Defined by Legendre polynomial terms as function of spectral grid, which is scaled to [-1,1] (degree derived from length of `a_coeff`)"
 struct LambertianSurfaceLegendre{FT} <: AbstractSurfaceType
     "albedo = legendre_coeff[1] * P₀ + legendre_coeff[2]*P₁ + legendre_coeff[3]*P₂ + ... "

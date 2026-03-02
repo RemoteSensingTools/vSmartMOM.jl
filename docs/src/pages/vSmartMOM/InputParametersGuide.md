@@ -5,7 +5,7 @@
 **spec_bands**: List of spectral bands to be included in the computation, written in the form, `ν_start:ν_step:ν_end`. Units in cm⁻¹. 
 
 **surface**: Type of reflectance surface at the bottom of the atmosphere. Supported:
-`LambertianSurfaceScalar(albedo)`, `LambertianSurfaceSpectrum([...])`, `LambertianSurfaceLegendre([...])`, `rpvSurfaceScalar(ρ₀, ρ_c, k, Θ)`, `RossLiSurfaceScalar(fvol, fgeo, fiso)`. One string per band.
+`LambertianSurfaceScalar(albedo)`, `LambertianSurfaceSpectrum([...])`, `LambertianSurfaceLegendre([...])`, `rpvSurfaceScalar(ρ₀, ρ_c, k, Θ)`, `RossLiSurfaceScalar(fvol, fgeo, fiso)`, `CoxMunkSurface(wind_speed=U)`. One string per band. For `CoxMunkSurface`, optional keyword arguments include `n_water` (complex refractive index of water), `whitecap_albedo` (default 0.22), `include_whitecaps` (default true), and `shadowing` (default true). Note: Cox-Munk supports full polarization (Mueller matrix BRDF). For canopy-coupled surfaces, use the `canopy` YAML section (see the Canopy Tutorial), which wraps the `surface` entry as the soil BRDF inside a `CanopySurface`.
 
 **quadrature_type**: Quadrature type for RT streams. Should be one among [`RadauQuad`, `GaussQuadHemisphere`, `GaussQuadFullSphere`].
 

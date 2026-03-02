@@ -103,6 +103,7 @@ Supported:
 - LambertianSurfaceLegendre([coefficients])
 - rpvSurfaceScalar(ρ₀, ρ_c, k, Θ)
 - RossLiSurfaceScalar(fvol, fgeo, fiso)
+- CoxMunkSurface(wind_speed=U) or CoxMunkSurface(U)
 """
 const BRDF_MAP = Dict{String, Function}(
     "LambertianSurfaceScalar" => (FT, args)-> begin
@@ -124,6 +125,26 @@ const BRDF_MAP = Dict{String, Function}(
     "RossLiSurfaceScalar" => (FT, args)-> begin
         @assert length(args) == 3 "RossLiSurfaceScalar expects 3 arguments (fvol, fgeo, fiso)."
         CoreRT.RossLiSurfaceScalar(FT(args[1]), FT(args[2]), FT(args[3]))
+    end,
+    "CoxMunkSurface" => (FT, args)-> begin
+        # Called with kwargs dict as first positional arg (from parse_surface_str)
+        # or with a single positional wind_speed
+        if length(args) == 1 && args[1] isa Dict
+            kw = args[1]
+            ws = FT(kw[:wind_speed])
+            n_raw = get(kw, :n_water, nothing)
+            n_water = n_raw === nothing ? nothing : Complex{FT}(n_raw)
+            wc_alb = FT(get(kw, :whitecap_albedo, FT(0.22)))
+            inc_wc = Bool(get(kw, :include_whitecaps, true))
+            shad   = Bool(get(kw, :shadowing, true))
+            CoreRT.CoxMunkSurface(wind_speed=ws, n_water=n_water,
+                                  whitecap_albedo=wc_alb,
+                                  include_whitecaps=inc_wc,
+                                  shadowing=shad)
+        else
+            @assert length(args) == 1 "CoxMunkSurface expects 1 argument (wind_speed) or keyword arguments."
+            CoreRT.CoxMunkSurface(wind_speed=FT(args[1]))
+        end
     end,
 )
 
@@ -204,11 +225,17 @@ function _split_args(args_str::AbstractString)
     return args
 end
 
-"Parse a single argument into a number or a vector of numbers (no eval)"
+"Parse a single argument into a number, boolean, or a vector of numbers (no eval)"
 function _parse_arg(arg::AbstractString, FT)
     a = strip(arg)
     if isempty(a)
         return nothing
+    end
+    # Boolean literals
+    if lowercase(a) == "true"
+        return true
+    elseif lowercase(a) == "false"
+        return false
     end
     if startswith(a, "[") && endswith(a, "]")
         inner = strip(a[2:end-1])
@@ -222,7 +249,12 @@ function _parse_arg(arg::AbstractString, FT)
 end
 
 """
-Parse a surface spec like "LambertianSurfaceScalar(0.1)" into a CoreRT surface instance, without eval.
+Parse a surface spec like "LambertianSurfaceScalar(0.1)" or
+"CoxMunkSurface(wind_speed=5.0)" into a CoreRT surface instance, without eval.
+
+Supports both positional arguments and keyword arguments (key=value syntax).
+When keyword arguments are detected, a `Dict{Symbol,Any}` is passed as the
+sole element of the args list to the BRDF_MAP constructor.
 """
 function parse_surface_str(s::AbstractString, FT)
     # Match "Name(args)" or "Name{Type}(args)" -- strip optional type parameter
@@ -230,9 +262,32 @@ function parse_surface_str(s::AbstractString, FT)
     @assert name_args !== nothing "Invalid surface specification: '$(s)'"
     name = name_args.captures[1]
     args_raw = name_args.captures[2]
-    args_list = isempty(strip(args_raw)) ? Any[] : [_parse_arg(x, FT) for x in _split_args(args_raw)]
     @assert haskey(BRDF_MAP, name) "Unknown surface type $(name)."
-    return BRDF_MAP[name](FT, args_list)
+
+    if isempty(strip(args_raw))
+        return BRDF_MAP[name](FT, Any[])
+    end
+
+    raw_parts = _split_args(args_raw)
+
+    # Detect keyword arguments (key=value, excluding vector args like [1=...])
+    has_kwargs = any(p -> occursin('=', p) && !startswith(strip(p), "["), raw_parts)
+
+    if has_kwargs
+        # Pack keyword arguments into a Dict passed as args[1]
+        kwargs = Dict{Symbol,Any}()
+        for part in raw_parts
+            p = strip(part)
+            if occursin('=', p) && !startswith(p, "[")
+                kv = split(p, '='; limit=2)
+                kwargs[Symbol(strip(kv[1]))] = _parse_arg(strip(kv[2]), FT)
+            end
+        end
+        return BRDF_MAP[name](FT, Any[kwargs])
+    else
+        args_list = [_parse_arg(x, FT) for x in raw_parts]
+        return BRDF_MAP[name](FT, args_list)
+    end
 end
 
 "Check that a field exists in yaml file"

@@ -1,0 +1,63 @@
+# =================================================================
+# Ocean Scene with Cox-Munk Surface
+# =================================================================
+#
+# This example simulates a pure Rayleigh atmosphere over the ocean
+# using the Cox-Munk (1954) wind-roughened surface model.  The
+# Cox-Munk surface provides:
+#   - Full polarization support (Mueller-matrix BRDF)
+#   - Wind-dependent slope distribution (isotropic Gaussian)
+#   - Optional whitecap contribution (Monahan & O'Muircheartaigh 1980)
+#   - Smith (1967) shadow masking
+#   - Built-in water refractive index (Segelstein 1981)
+#
+# Usage:
+#   using vSmartMOM
+#   params = parameters_from_yaml("config/ocean_coxmunk.yaml")
+#   model  = model_from_parameters(params)
+#   R, T   = rt_run(model)
+#
+# For linearized RT (Jacobians w.r.t. wind speed):
+#   model_lin = model_from_parameters_lin(params)
+#   R, T, dR  = rt_run_lin(model_lin)
+
+radiative_transfer:
+  # Visible band (~515 nm, green)
+  spec_bands:
+    - "[19417.0 19418.0]"
+
+  # Cox-Munk ocean surface with 5 m/s wind
+  # The built-in Segelstein (1981) table provides n_water automatically.
+  # Set include_whitecaps=false to disable the whitecap contribution.
+  surface:
+    - CoxMunkSurface(wind_speed=5.0)
+
+  quadrature_type:    RadauQuad()
+  polarization_type:  Stokes_IQUV()
+  max_m:              20          # Ocean BRDF needs more Fourier moments
+  Δ_angle:            2.0
+  l_trunc:            20
+  depol:              0.029
+  float_type:         Float64
+  architecture:       default_architecture
+
+geometry:
+  sza:     30
+  vza:     [60, 45, 30, 15, 0, 15, 30, 45, 60]
+  vaz:     [180, 180, 180, 180, 0, 0, 0, 0, 0]
+  obs_alt: 1000.0
+
+atmospheric_profile:
+  T: [244.33, 251.34, 258.09, 264.25, 269.15,
+      272.59, 274.07, 273.30, 269.65, 264.27, 258.11,
+      251.52, 245.22, 239.20, 234.05, 229.71, 225.70,
+      222.70, 220.62, 219.32, 217.93, 216.98, 217.10,
+      218.35, 223.33, 234.19, 249.34, 264.12, 277.20,
+      280.77, 282.60, 284.40, 285.80]
+  p: [  0.14,   0.22,   0.30,   0.39,   0.53,   0.71,
+        0.96,   1.28,   1.70,   2.27,   3.03,   4.03,
+        5.44,   7.26,   9.67,  12.90,  17.23,  23.30,
+       31.00,  42.07,  56.09,  74.78,  99.69, 131.00,
+      176.85, 236.64, 314.58, 418.87, 557.76, 735.00,
+      800.12, 849.00, 912.00, 980.00]
+  profile_reduction: -1

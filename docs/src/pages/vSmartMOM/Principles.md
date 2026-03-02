@@ -15,7 +15,7 @@ This page summarizes the core ideas behind vSmartMOM (vector Smart Matrix-Operat
 - Expand the vector phase matrix into Fourier series over azimuth and into Legendre polynomials over polar angle; use a truncation strategy.
 - Build per-layer single-scattering properties (optical thickness τ, single-scattering albedo ϖ, and polarized phase matrices Z⁺⁺, Z⁻⁺).
 - Compose layers via matrix-operator doubling/adding into a composite medium, preserving polarization.
-- Couple to surfaces via BRDF models (Lambertian, RPV, Ross–Li) in a vector-consistent way.
+- Couple to surfaces via BRDF models (Lambertian, RPV, Ross-Li, Cox-Munk, Canopy) in a vector-consistent way.  The Cox-Munk ocean surface provides full polarization support via Mueller-matrix Fresnel reflection from wind-roughened wave facets; the Canopy surface couples a multi-layer vegetation canopy with a soil BRDF via internal adding-doubling.
 
 For equation-level details and code mapping of `elemental`, `doubling`, and `interaction`, see `Core RT Theory (Doubling/Adding)`.
 
@@ -49,6 +49,9 @@ For equation-level details and code mapping of `elemental`, `doubling`, and `int
 ## Surface interaction and HDRF
 
 - Surfaces are modeled via BRDFs; interaction terms are included in the boundary condition and in HDRF post-processing.
+- **Scalar surfaces** (Lambertian, RPV, Ross-Li) populate only the (1,1) Stokes block of the surface reflectance matrix.
+- **Polarized surfaces** (Cox-Munk) fill the full Mueller-matrix blocks (I-Q, U-V coupling), requiring numerical azimuthal integration with polarized Fourier kernels and a TMS single-scattering correction for the specular sun-glint peak.
+- **Canopy surfaces** internally solve canopy sub-layers via adding-doubling before presenting an effective reflectance to the atmospheric RT.
 - The HDRF and VZA postprocessing utilities provide azimuthal averaging and RAMI-style outputs.
 
 ## Practical setup tips
