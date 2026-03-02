@@ -35,6 +35,8 @@ import NNlib.batched_mul           # Required to overwrite batched_mul for Duals
 using NCDatasets                   # For loading absco lookup tables
 using QuadGK
 using CanopyOptics
+using SpecialFunctions: erfc         # For Smith (1967) shadowing in Cox-Munk
+using StaticArrays                   # For Fresnel/Cox-Munk Mueller matrices
 
 import Base.show                   # For overloading show for custom types
 
@@ -119,6 +121,10 @@ include("Surfaces/lambertian_surface_lin.jl")        # Linearized Lambertian Sur
 include("Surfaces/rpv_surface.jl")                   # RPV Surface 
 include("Surfaces/rossli_surface.jl")                # Ross-Li Surface
 include("Surfaces/canopy_surface.jl")                # Canopy + soil composite surface
+include("Surfaces/fresnel.jl")                       # Fresnel reflection utilities
+include("Surfaces/water_refraction.jl")              # Built-in water refractive index
+include("Surfaces/coxmunk_surface.jl")               # Cox-Munk ocean surface
+include("Surfaces/coxmunk_surface_lin.jl")           # Linearized Cox-Munk (Jacobians)
 
 # Functions to export
 export model_from_parameters,               # Converting the parameters to model
@@ -136,6 +142,7 @@ export lin_added_layer_all_params,            # 3 params -> all params chain rul
 
 # Export types to show easily
 export GaussQuadFullSphere, LambertianSurfaceScalar, LambertianSurfaceSpectrum,
-       CanopySurface, CanopySurface_from_prospect, invalidate_canopy_cache!
+       CanopySurface, CanopySurface_from_prospect, invalidate_canopy_cache!,
+       CoxMunkSurface, water_refractive_index
 
 end

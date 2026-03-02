@@ -131,6 +131,9 @@ function rt_run(RS_type::AbstractRamanType,
         @timeit "Canopy atm tau" _compute_canopy_atm_tau!(brdf, model, _canopy_spec_wn)
     end
 
+    # Cumulative optical depth (m-independent, saved for TMS correction)
+    τ_sum_all = nothing
+
     # Loop over fourier moments
     for m = 0:max_m - 1
 
@@ -233,6 +236,13 @@ function rt_run(RS_type::AbstractRamanType,
             weight, nSpec, 
             hdr)
             
+    end
+
+    # Single-scattering correction for Cox-Munk specular hotspot (TMS)
+    if brdf isa CoxMunkSurface && SFI
+        @timeit "SS Correction" apply_ss_correction!(
+            R_SFI, brdf, pol_type, vza, vaz, μ₀,
+            Array(τ_sum_all[:,end]), max_m, nSpec)
     end
 
     # Show timing statistics

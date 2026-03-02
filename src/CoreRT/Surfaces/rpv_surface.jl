@@ -36,9 +36,9 @@ function create_surface_layer!(brdf::AbstractSurfaceType,
     # Albedo normalized by π (and factor 2 for 0th Fourier Moment)
     #@show brdf
     if m==0
-        @time ρ = 2*vSmartMOM.CoreRT.reflectance(brdf, pol_type, collect(qp_μ), m)
+        ρ = 2*vSmartMOM.CoreRT.reflectance(brdf, pol_type, collect(qp_μ), m)
     else
-        @time ρ = vSmartMOM.CoreRT.reflectance(brdf, pol_type, collect(qp_μ), m)
+        ρ = vSmartMOM.CoreRT.reflectance(brdf, pol_type, collect(qp_μ), m)
     end
     
     # Move to architecture:

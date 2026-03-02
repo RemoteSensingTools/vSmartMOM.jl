@@ -39,7 +39,14 @@ CoreRT.vSmartMOM_Model
 CoreRT.AbstractSurfaceType
 CoreRT.LambertianSurfaceScalar
 CoreRT.LambertianSurfaceSpectrum
-
+CoreRT.LambertianSurfaceLegendre
+CoreRT.LambertianSurfaceSpline
+CoreRT.rpvSurfaceScalar
+CoreRT.RossLiSurfaceScalar
+CoreRT.CoxMunkSurface
+CoreRT.CanopySurface
+CoreRT.CanopySurface_from_prospect
+CoreRT.invalidate_canopy_cache!
 ```
 
 ### Quadrature Types
