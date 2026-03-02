@@ -15,7 +15,7 @@ using Interpolations            # For interpolating in lookup tables and interpo
 using JLD2                      # For saving and loading the interpolator
 using ProgressMeter             # For showing progress, especially in creating interpolator
 using KernelAbstractions        # For heterogeneous (GPU+CPU) programming
-using ForwardDiff, DiffResults  # For auto-differentiation
+# ForwardDiff/DiffResults removed — autodiff wrapper was unused in the RT pipeline
 using NetCDF                    # For loading NetCDF files with constants
 using ..Architectures           # For GPU/CPU convenience
 using ..Architectures: CPU, GPU # Again for GPU/CPU convenience
