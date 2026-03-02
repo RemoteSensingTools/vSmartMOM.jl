@@ -247,8 +247,8 @@ function compute_anbn(model::MieModel, λ, radius)
         size_param = 2 * π * r / λ
 
         # Compute an, bn (Dn is zeroed inside compute_mie_ab!)
-        Scattering.compute_mie_ab!(size_param, nᵣ + nᵢ * im, 
-                                      view(an, i, :), 
+        Scattering.compute_mie_ab!(size_param, nᵣ - nᵢ * im,
+                                      view(an, i, :),
                                       view(bn, i, :), Dn)
     end
 

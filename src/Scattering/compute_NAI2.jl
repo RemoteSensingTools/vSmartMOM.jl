@@ -450,7 +450,7 @@ function phase_function(r::FT, λ::FT, nᵣ::FT, nᵢ::FT) where {FT<:AbstractFl
     Dn = zeros(Complex{FT}, nmx)
 
     # Compute an,bn and S₁,S₂
-    compute_mie_ab!(size_param, nᵣ + nᵢ * im, an, bn, Dn)
+    compute_mie_ab!(size_param, nᵣ - nᵢ * im, an, bn, Dn)
     compute_mie_S₁S₂!(an, bn, leg_π, leg_τ, S₁, S₂)
         
     # Compute Extinction and scattering cross sections: 
