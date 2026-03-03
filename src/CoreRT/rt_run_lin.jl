@@ -190,8 +190,8 @@ function rt_run(RS_type::AbstractRamanType,
         make_composite_layer(lin, RS_type, FT, arr_type, Nparams, dims, nSpec)
     @timeit "Creating arrays" I_static = 
         Diagonal(arr_type(Diagonal{FT}(ones(dims[1]))));
-    #TODO: if RS_type!=noRS, create ϖ_λ₁λ₀, i_λ₁λ₀, fscattRayl, Z⁺⁺_λ₁λ₀, Z⁻⁺_λ₁λ₀ (for input), and ieJ₀⁺, ieJ₀⁻, ieR⁺⁻, ieR⁻⁺, ieT⁻⁻, ieT⁺⁺, ier⁺⁻, ier⁻⁺, iet⁻⁻, iet⁺⁺ (for output)
-    #getRamanSSProp(RS_type, λ, grid_in)
+    # Known limitation: Raman Jacobians are not yet implemented.
+    # Linearized RT currently supports RS_type = noRS() only.
 
     # Loop over fourier moments
     for m = 0:max_m[iBand] - 1

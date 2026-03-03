@@ -45,7 +45,7 @@ YAML file  ──>  parameters_from_yaml()  ──>  vSmartMOM_Parameters
 ### 2. Model Construction
 
 ```
-vSmartMOM_Parameters  ──>  model_from_parameters()  ──>  vSmartMOM_Model
+vSmartMOM_Parameters  ──>  model_from_parameters()  ──>  RTModel
 ```
 
 This step:
@@ -55,12 +55,12 @@ This step:
 - Computes gas absorption cross-sections (HITRAN or ABSCO lookup)
 - Sets up quadrature points for the discrete ordinate method
 
-For the linearized model, `model_from_parameters(LinMode(), params)` additionally returns a `vSmartMOM_Lin` struct with analytic derivatives of optical properties.
+For the linearized model, `model_from_parameters(LinMode(), params)` additionally returns an `RTModelLin` struct with analytic derivatives of optical properties.
 
 ### 3. Optical Property Assembly
 
 ```
-vSmartMOM_Model  ──>  constructCoreOpticalProperties()  ──>  CoreScatteringOpticalProperties[]
+RTModel  ──>  constructCoreOpticalProperties()  ──>  CoreScatteringOpticalProperties[]
 ```
 
 Per Fourier moment `m`, per layer `iz`, this combines Rayleigh + aerosol + gas absorption into:
@@ -288,7 +288,7 @@ src/
 │   ├── types.jl              Forward RT types
 │   ├── types_lin.jl          Linearized RT types
 │   ├── parameter_layout.jl   ParameterLayout for Jacobian indexing
-│   ├── types_inelastic.jl    Inelastic RT types
+│   ├── constants.jl          Scientific constants
 │   ├── rt_run.jl             Forward RT entry point
 │   ├── rt_run_lin.jl         Linearized RT entry point
 │   ├── CoreKernel/           Elemental, doubling, interaction solvers

@@ -6,7 +6,7 @@
 #   2. YAML-based construction with canopy: section
 #   3. Forward RT with CanopySurface vs Lambertian baseline
 #   4. Multi-layer canopy consistency
-#   5. Comparison with legacy rt_run_canopy() (when available)
+#   5. Multi-band canopy RT
 # =================================================================
 
 using vSmartMOM, vSmartMOM.CoreRT

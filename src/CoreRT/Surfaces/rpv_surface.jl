@@ -82,7 +82,7 @@ For polarized RT (n>1), returns zero. See Rahman, Pinty & Verstraete (1993), JGR
 """
 function reflectance(rpv::rpvSurfaceScalar{FT},  n, μᵢ::FT, μᵣ::FT, dϕ::FT) where FT
     (; ρ₀, ρ_c, k, Θ) = rpv
-    # TODO: Suniti, stupid calculations here:
+    # Convert cosines to angles for RPV formula
     if n==1
         θᵢ   = acos(μᵢ) #assert 0<=θᵢ<=π/2
         θᵣ   = acos(μᵣ) #assert 0<=θᵣ<=π/2

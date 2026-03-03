@@ -95,8 +95,6 @@ include("tools/postprocessing_vza_ms.jl")
 include("rt_run.jl")                           # Starting point for RT 
 include("rt_run_lin.jl")                       # Linearized RT run
 include("rt_run_multisensor.jl")
-# Temporary:
-include("rt_run_canopy.jl")
 
 # CPU batched operations (always available)
 include("tools/cpu_batched.jl")                   # CPU batched linear algebra operations
@@ -141,7 +139,8 @@ export lin_added_layer_all_params,            # 3 params -> all params chain rul
 
 # Export new hierarchical model types
 export AbstractRTModel, RTModel,
-       SolverConfig, Atmosphere, RayleighScattering, AerosolState, Optics, OpticsLin
+       SolverConfig, Atmosphere, RayleighScattering, AerosolState, Optics, OpticsLin,
+       RTModelLin
 
 # Export types to show easily
 export GaussQuadFullSphere, LambertianSurfaceScalar, LambertianSurfaceSpectrum,

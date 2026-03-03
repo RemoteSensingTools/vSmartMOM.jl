@@ -305,8 +305,7 @@ function get_elem_rt_SFI!(RS_type::Union{VS_0to1, VS_1to0},
     synchronize_if_gpu();
 end
 
-#  TODO: Nov 30, 2021
-function get_elem_rt_SFI!(RS_type::RRS, 
+function get_elem_rt_SFI!(RS_type::RRS,
                         ieJ₀⁺, ieJ₀⁻, 
                         τ_sum, dτ_λ, ϖ_λ, 
                         Z⁻⁺_λ₁λ₀, Z⁺⁺_λ₁λ₀, 
@@ -396,8 +395,7 @@ Variable mapping: `n₀` = incident wavelength index (λ), `n₁` = scattered wa
             end
         end
         
-        #TODO
-        #J₀⁻ = 0.25*(1+δ(m,0)) * ϖ(λ) * Z⁻⁺ * I₀ * [μ₀ / (μᵢ + μ₀)] * [1 - exp{-dτ(λ)(1/μᵢ + 1/μ₀)}]                    
+        # J₀⁻ = 0.25*(1+δ(m,0)) * ϖ(λ) * Z⁻⁺ * I₀ * [μ₀ / (μᵢ + μ₀)] * [1 - exp{-dτ(λ)(1/μᵢ + 1/μ₀)}]
         ieJ₀⁻[i, 1, n₁, Δn] = wct02 * ϖ_λ₁λ₀[Δn] * fscattRayl[n₀] * Z⁻⁺_I₀ * 
                 (1/( (qp_μN[i] / qp_μN[i_start]) + (dτ_λ[n₁]/dτ_λ[n₀]) )) *
                 (1 - exp(-( (dτ_λ[n₁] / qp_μN[i]) + (dτ_λ[n₀] / qp_μN[i_start]) ) ))  

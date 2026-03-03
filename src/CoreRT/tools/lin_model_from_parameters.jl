@@ -21,7 +21,7 @@ end
 """
     model_from_parameters(::LinMode, params::vSmartMOM_Parameters)
 
-Construct both the forward `RTModel` and the linearized `vSmartMOM_Lin` objects
+Construct both the forward `RTModel` and the linearized `RTModelLin` objects
 from the input parameters, for use in linearized (Jacobian) RT computations.
 
 This is the **linearized** counterpart of `model_from_parameters(params)`. It computes:
@@ -40,7 +40,7 @@ This is the **linearized** counterpart of `model_from_parameters(params)`. It co
 
 # Returns
 - `model::RTModel`: Forward model (optical properties, geometry, quadrature).
-- `lin_model::vSmartMOM_Lin`: Linearized model (all derivative arrays).
+- `lin_model::RTModelLin`: Linearized model (all derivative arrays).
 
 # Notes
 - The atmospheric profile may be truncated to the observer altitude for tower/airborne sensors.
@@ -373,7 +373,7 @@ function model_from_parameters(lin::LinMode,
     aerosols_s = AerosolState(aerosol_optics, τ_aer)
     optics = Optics(rayleigh_s, aerosols_s, τ_abs, τ_rayl)
     model = RTModel(params.architecture, solver, obs_geom, quad_points, atm, optics, params.brdf)
-    return model, vSmartMOM_Lin(τ̇_abs, τ̇_aer, lin_aerosol_optics)
+    return model, RTModelLin(τ̇_abs, τ̇_aer, lin_aerosol_optics)
 end
 
 """
