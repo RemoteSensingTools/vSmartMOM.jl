@@ -1,6 +1,6 @@
 #=
  
-This file specifies how to pretty-print vSmartMOM_Parameters module types
+This file specifies how to pretty-print vSmartMOM_Parameters and RTModel types
  
 =#
 
@@ -91,16 +91,15 @@ function Base.show(io::IO,::MIME"text/plain", x::vSmartMOM_Parameters)
     end
 end
 
-# Overload the show method for vSmartMOM_Model
-function Base.show(io::IO, x::vSmartMOM_Model)
-    
-    println(io, "        params| ::vSmartMOM_Parameters")
-    println(io, "aerosol_optics| [i_band][i_aer] ($(length(x.aerosol_optics)) x $(length(x.aerosol_optics[1])))")
-    println(io, "greek_rayleigh| ::GreekCoefs")
-    println(io, "   quad_points| ::QuadPoints")
-    println(io, "         τ_abs| [i_band][i_spec,i_z] ($(length(x.τ_abs)) x (n_spec x $(size(x.τ_abs[1])[2])))")
-    println(io, "        τ_rayl| [i_band][i_z] ($(length(x.τ_rayl)) x $(length(x.τ_rayl[1])))")
-    println(io, "         τ_aer| [i_band][i_aer,i_z] ($(length(x.τ_aer)) x ($(size(x.τ_aer[1])[1]) x $(size(x.τ_aer[1])[2])))")
-    println(io, "      obs_geom| ::ObsGeometry")
-    println(io, "       profile| ::AtmosphericProfile")
+# Pretty-print RTModel
+function Base.show(io::IO, x::RTModel)
+    nBands = length(x.atmosphere.spec_bands)
+    nAer = n_aerosols(x)
+    println(io, "RTModel{$(typeof(x.architecture)), $(float_type(x))}")
+    println(io, "  architecture| $(x.architecture)")
+    println(io, "        solver| $(typeof(x.solver.polarization_type)), Nquad=$(x.quad_points.Nquad), max_m=$(x.solver.max_m)")
+    println(io, "      geometry| SZA=$(x.geometry.sza)°, VZA=$(x.geometry.vza)°")
+    println(io, "    atmosphere| $(nBands) band(s), $(length(x.atmosphere.profile.p_full)) levels")
+    println(io, "       optics | τ_abs: $(nBands) band(s), $(nAer) aerosol(s)")
+    println(io, "     surfaces | $(nBands) BRDF(s): $(join([typeof(s).name.name for s in x.surfaces], ", "))")
 end

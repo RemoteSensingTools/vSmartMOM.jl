@@ -2,9 +2,9 @@ function constructCoreOpticalProperties(RS_type::AbstractRamanType{FT}, iBand, m
     (; τ_rayl, τ_aer, τ_abs, aerosol_optics, greek_rayleigh) = model
     @assert all(iBand .≤ length(τ_rayl)) "iBand exceeded number of bands"
 
-    arr_type = array_type(model.params.architecture)
+    arr_type = CoreRT.array_type(model)
 
-    pol_type = model.params.polarization_type
+    pol_type = CoreRT.polarization_type(model)
     
     # Quadrature points:
     μ = collect(model.quad_points.qp_μ)

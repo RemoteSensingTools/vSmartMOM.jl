@@ -21,7 +21,7 @@ end
 """
     model_from_parameters(::LinMode, params::vSmartMOM_Parameters)
 
-Construct both the forward `vSmartMOM_Model` and the linearized `vSmartMOM_Lin` objects
+Construct both the forward `RTModel` and the linearized `vSmartMOM_Lin` objects
 from the input parameters, for use in linearized (Jacobian) RT computations.
 
 This is the **linearized** counterpart of `model_from_parameters(params)`. It computes:
@@ -39,7 +39,7 @@ This is the **linearized** counterpart of `model_from_parameters(params)`. It co
      w.r.t. Mie parameters `[nᵣ, nᵢ, rₘ, σᵣ]`.
 
 # Returns
-- `model::vSmartMOM_Model`: Forward model (optical properties, geometry, quadrature).
+- `model::RTModel`: Forward model (optical properties, geometry, quadrature).
 - `lin_model::vSmartMOM_Lin`: Linearized model (all derivative arrays).
 
 # Notes
@@ -357,21 +357,23 @@ function model_from_parameters(lin::LinMode,
     end
     set_uniform_lmax!(l_max, aerosol_optics)
 
-    return  vSmartMOM_Model(
-                        max_m,
-                        l_max,
-                        params,
-                        aerosol_optics,
-                        ϖ_Cabannes,
-                        greek_cabannes,
-                        greek_rayleigh,
-                        quad_points,
-                        τ_abs,
-                        τ_rayl,
-                        τ_aer,
-                        obs_geom,
-                        profile),
-            vSmartMOM_Lin(τ̇_abs, τ̇_aer, lin_aerosol_optics)
+    # Build the hierarchical RTModel
+    solver = SolverConfig{FT, typeof(params.polarization_type), typeof(params.quadrature_type)}(
+        params.polarization_type,
+        params.quadrature_type,
+        params.max_m,
+        max_m,
+        l_max,
+        params.l_trunc,
+        FT(params.Δ_angle),
+        FT(params.depol),
+    )
+    atm = Atmosphere(profile, params.spec_bands)
+    rayleigh_s = RayleighScattering(greek_rayleigh, greek_cabannes, FT.(ϖ_Cabannes))
+    aerosols_s = AerosolState(aerosol_optics, τ_aer)
+    optics = Optics(rayleigh_s, aerosols_s, τ_abs, τ_rayl)
+    model = RTModel(params.architecture, solver, obs_geom, quad_points, atm, optics, params.brdf)
+    return model, vSmartMOM_Lin(τ̇_abs, τ̇_aer, lin_aerosol_optics)
 end
 
 """

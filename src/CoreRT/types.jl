@@ -10,7 +10,7 @@ This file contains all types that are used in the vSmartMOM module:
 - `CompositeLayer` and `AddedLayer` specify the layer properties
 - `AbstractScatteringInterface` specifies the scattering interface type
 - `AbstractSurfaceType` specify the type of surface in the RT simulation
-- `AbsorptionParameters`, `ScatteringParameters`, and `vSmartMOM_Model` hold model parameters
+- `AbsorptionParameters`, `ScatteringParameters`, and `RTModel` hold model parameters
 - `QuadPoints` holds quadrature points, weights, etc. 
 - `ComputedAtmosphereProperties` and `ComputedLayerProperties` hold intermediate computed properties
 
@@ -655,52 +655,215 @@ struct QuadPoints{FT}
     Nquad::Int
 end
 
-"""
-    vSmartMOM_Model
+# ============================================================================
+# New hierarchical model types (Oceananigans-inspired)
+# ============================================================================
 
-Central model state produced after preprocessing the user-supplied
-[`vSmartMOM_Parameters`](@ref).  Holds the original parameters together with
-all derived quantities needed by the RT solver: truncated aerosol optics,
-Greek coefficients for Rayleigh/Cabannes scattering, quadrature points,
-and per-band optical-depth arrays for absorption, Rayleigh, and aerosol
-contributions.
+"Abstract base type for all RT models"
+abstract type AbstractRTModel{ARCH<:AbstractArchitecture, FT<:AbstractFloat} end
+
+"""
+    SolverConfig{FT, PT, QT}
+
+Immutable RT solver configuration: polarization mode, quadrature scheme,
+Fourier truncation, and Legendre truncation. Fixed after model construction;
+never differentiated.
 
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-mutable struct vSmartMOM_Model{PA, AE, GC, GR, QP, TAB, TR, TAE, Ogeom, PRO}
-
-    "Per-band adjusted max number of Fourier iterations"
-    max_m::Vector{Int}
-    "Max length per band of truncated aerosol Greek coefficients (l_max = 2max_m+1)"
+struct SolverConfig{FT<:AbstractFloat, PT<:AbstractPolarizationType, QT<:AbstractQuadratureType}
+    "Type of polarization (Stokes_I / IQU / IQUV)"
+    polarization_type::PT
+    "Quadrature type (RadauQuad / GaussQuadHemisphere / GaussQuadFullSphere)"
+    quadrature_type::QT
+    "Hard cutoff for maximum number of Fourier moments (scalar, user-specified)"
+    max_m::Int
+    "Per-band adjusted max Fourier iterations (derived from aerosol greek coef lengths)"
+    max_m_bands::Vector{Int}
+    "Per-band max truncated Legendre index"
     l_max::Vector{Int}
-
-    "Struct with all individual parameters"
-    params::PA # vSmartMOM_Parameters
-    
-    "Truncated aerosol optics"
-    aerosol_optics::AE # AbstractArray{AbstractArray{AerosolOptics}}
-    "Pure elastic (Cabannes) fraction of Rayleigh scattering per band"
-    ϖ_Cabannes::AbstractArray
-    "Greek coefs for Cabannes (pure elastic) Rayleigh per band"
-    greek_cabannes::GC # Vector{GreekCoefs}
-    "Greek coefs in Rayleigh calculations (single or per band)" 
-    greek_rayleigh::GR # GreekCoefs or Vector{GreekCoefs}
-    "Quadrature points/weights, etc"
-    quad_points::QP # QuadPoints
-
-    "Array to hold cross-sections over entire atmospheric profile"
-    τ_abs::TAB # AbstractArray{AbstractArray}
-    "Rayleigh optical thickness"
-    τ_rayl::TR # AbstractArray{AbstractArray}
-    "Aerosol optical thickness"
-    τ_aer::TAE # AbstractArray{AbstractArray}
-
-    "Observational Geometry (includes sza, vza, vaz)"
-    obs_geom::Ogeom # ObsGeometry
-    "Atmospheric profile to use"
-    profile::PRO #AtmosphericProfile
+    "Legendre truncation order (user-specified)"
+    l_trunc::Int
+    "Exclusion angle for forward peak [deg]"
+    Δ_angle::FT
+    "Depolarization factor"
+    depol::FT
 end
+
+"""
+    Atmosphere{FT, VMR}
+
+The atmospheric column: profile data plus spectral grid definitions.
+
+# Fields
+$(DocStringExtensions.FIELDS)
+"""
+struct Atmosphere{FT<:AbstractFloat, VMR}
+    "Atmospheric profile (T, p, q, vmr, vcd, etc.)"
+    profile::AtmosphericProfile{FT, VMR}
+    "Spectral bands — Vector of wavenumber grids, one per band"
+    spec_bands::Vector{Vector{FT}}
+end
+
+"""
+    RayleighScattering{FT, GC}
+
+Precomputed Rayleigh and Cabannes (elastic) scattering properties.
+Derived from the depolarization ratio; fixed for a given spectral band.
+
+# Fields
+$(DocStringExtensions.FIELDS)
+"""
+struct RayleighScattering{FT<:AbstractFloat, GC<:Scattering.GreekCoefs}
+    "Greek coefficients for total Rayleigh scattering (single set or per-band)"
+    greek_rayleigh::Union{GC, Vector{GC}}
+    "Greek coefficients for Cabannes (pure elastic) Rayleigh per band"
+    greek_cabannes::Vector{GC}
+    "Pure elastic (Cabannes) fraction of Rayleigh scattering per band"
+    ϖ_Cabannes::Vector{FT}
+end
+
+"""
+    AerosolState{FT, AO}
+
+Per-band aerosol scattering optics and optical depth profiles.
+Primary differentiable state for aerosol retrievals.
+
+# Fields
+$(DocStringExtensions.FIELDS)
+"""
+struct AerosolState{FT<:AbstractFloat, AO, AT<:AbstractArray{FT}}
+    "Truncated aerosol optics: aerosol_optics[iBand][iAer]"
+    aerosol_optics::Vector{Vector{AO}}
+    "Aerosol optical depth profiles: τ_aer[iBand][iAer, iLayer] (or [iAer, nSpec, iLayer] for lin)"
+    τ_aer::Vector{AT}
+end
+
+"""
+    Optics{FT, RS, AS}
+
+Container for all precomputed optical properties that feed into the RT solver.
+Groups Rayleigh scattering, aerosol scattering, absorption optical depths,
+and Rayleigh optical depths.
+
+**AD boundary**: `aerosols` and `τ_abs` hold differentiable state;
+`rayleigh` and `τ_rayl` are typically fixed.
+
+# Fields
+$(DocStringExtensions.FIELDS)
+"""
+struct Optics{FT<:AbstractFloat, RS<:RayleighScattering, AS<:AerosolState}
+    "Rayleigh/Cabannes scattering properties"
+    rayleigh::RS
+    "Aerosol scattering optics and optical depths"
+    aerosols::AS
+    "Absorption optical depth: τ_abs[iBand][nSpec × nLayers]"
+    τ_abs::Vector{Matrix{FT}}
+    "Rayleigh optical depth: τ_rayl[iBand][nSpec × nLayers]"
+    τ_rayl::Vector{Matrix{FT}}
+end
+
+"""
+    RTModel{ARCH, FT} <: AbstractRTModel{ARCH, FT}
+
+Central model state for vSmartMOM radiative transfer.
+
+Only two type parameters:
+- `ARCH`: compute architecture (`CPU` or `GPU`)
+- `FT`: floating-point precision (`Float32` or `Float64`)
+
+All physics sub-components are organized hierarchically:
+- `solver`: RT solver configuration (polarization, quadrature, truncation)
+- `geometry`: observation geometry (SZA, VZA, VAZ, observer altitude)
+- `quad_points`: precomputed quadrature points and weights
+- `atmosphere`: atmospheric state (profile + spectral bands)
+- `optics`: all precomputed optical properties (Rayleigh, aerosol, absorption)
+- `surfaces`: per-band surface BRDF models
+
+# Fields
+$(DocStringExtensions.FIELDS)
+"""
+struct RTModel{ARCH<:AbstractArchitecture, FT<:AbstractFloat} <: AbstractRTModel{ARCH, FT}
+    "Compute architecture (CPU/GPU)"
+    architecture::ARCH
+    "RT solver configuration"
+    solver::SolverConfig{FT}
+    "Observation geometry"
+    geometry::ObsGeometry{FT}
+    "Quadrature points and weights"
+    quad_points::QuadPoints{FT}
+    "Atmospheric state (profile + spectral bands)"
+    atmosphere::Atmosphere{FT}
+    "Precomputed optical properties"
+    optics::Optics{FT}
+    "Surface models, one per spectral band"
+    surfaces::Vector{<:AbstractSurfaceType}
+end
+
+# ── Accessor functions (Oceananigans-style) ───────────────────────────────
+
+"Return the compute architecture of the model"
+Architectures.architecture(m::AbstractRTModel) = m.architecture
+"Return the float type of the model"
+float_type(::AbstractRTModel{ARCH, FT}) where {ARCH, FT} = FT
+"Return the array constructor for the model's architecture"
+Architectures.array_type(m::AbstractRTModel) = Architectures.array_type(m.architecture)
+"Return the polarization type"
+polarization_type(m::AbstractRTModel) = m.solver.polarization_type
+"Number of aerosol species"
+n_aerosols(m::RTModel) = isempty(m.optics.aerosols.aerosol_optics) ? 0 :
+    length(first(m.optics.aerosols.aerosol_optics))
+"Per-band max Fourier moments"
+max_m_bands(m::RTModel, iBand::Int) = m.solver.max_m_bands[iBand]
+
+# ── RTModel accessors ─────────────────────────────────────────────────────
+get_surface(m::RTModel, iBand) = m.surfaces[iBand]
+get_surfaces(m::RTModel) = m.surfaces
+get_spec_bands(m::RTModel) = m.atmosphere.spec_bands
+get_max_m(m::RTModel) = m.solver.max_m
+
+# ── Convenience property forwarding ──────────────────────────────────────
+# Allows shorthand access (model.τ_abs, model.profile, model.obs_geom, etc.)
+# on RTModel, forwarding to the appropriate sub-struct field.
+
+function Base.getproperty(m::RTModel, s::Symbol)
+    s === :τ_abs && return m.optics.τ_abs
+    s === :τ_rayl && return m.optics.τ_rayl
+    s === :τ_aer && return m.optics.aerosols.τ_aer
+    s === :aerosol_optics && return m.optics.aerosols.aerosol_optics
+    s === :greek_rayleigh && return m.optics.rayleigh.greek_rayleigh
+    s === :greek_cabannes && return m.optics.rayleigh.greek_cabannes
+    s === :ϖ_Cabannes && return m.optics.rayleigh.ϖ_Cabannes
+    s === :obs_geom && return m.geometry
+    s === :profile && return m.atmosphere.profile
+    s === :max_m && return m.solver.max_m_bands
+    s === :l_max && return m.solver.l_max
+    return getfield(m, s)
+end
+
+# ── Linearized optics ────────────────────────────────────────────────────
+
+"""
+    OpticsLin{FT}
+
+Linearized (Jacobian) counterpart of [`Optics`](@ref). Each field stores
+derivatives of the corresponding forward-model field with respect to the
+physical state vector.
+
+# Fields
+$(DocStringExtensions.FIELDS)
+"""
+struct OpticsLin{A, B, C}
+    "∂τ_abs/∂x per band: Vector of arrays [NGas × nSpec × nLayers]"
+    τ̇_abs::A
+    "∂τ_aer/∂x per band: Vector of arrays [NAer × 7 × nSpec × nLayers]"
+    τ̇_aer::B
+    "Linearized aerosol optics per band per aerosol"
+    lin_aerosol_optics::C
+end
+
+# =========================================================================
 
 """
     struct ComputedAtmosphereProperties

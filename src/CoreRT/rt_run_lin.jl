@@ -21,7 +21,7 @@ the model. The latter should generally be used by users.
 =#
 
 """
-    rt_run(model::vSmartMOM_Model, lin_model::vSmartMOM_Lin, NAer, NGas, NSurf; i_band=1)
+    rt_run(model::RTModel, lin_model, NAer, NGas, NSurf; i_band=1)
 
 Perform linearized Radiative Transfer and return both radiances and their Jacobians.
 
@@ -30,8 +30,8 @@ atmosphere, along with their analytic derivatives with respect to `Nparams = NAe
 physical parameters via the linearized Matrix Operator Method.
 
 # Arguments
-- `model::vSmartMOM_Model`: Forward model containing optical properties, geometry, etc.
-- `lin_model::vSmartMOM_Lin`: Linearized model containing derivatives of optical properties.
+- `model::RTModel`: Forward model containing optical properties, geometry, etc.
+- `lin_model`: Linearized model containing derivatives of optical properties.
 - `NAer::Int`: Number of aerosol types.
 - `NGas::Int`: Number of trace gas species with variable VMR.
 - `NSurf::Int`: Number of surface parameters (typically 1 for Lambertian albedo).
@@ -69,9 +69,9 @@ where ``p_j`` is any physical parameter in the state vector.
 """
 
 # Mockup if no Raman type is chosen:
-function rt_run(model::vSmartMOM_Model, 
-        lin_model::vSmartMOM_Lin,
-        NAer::Int, NGas::Int, NSurf::Int; 
+function rt_run(model,
+        lin_model,
+        NAer::Int, NGas::Int, NSurf::Int;
         i_band::Integer = 1)
     rt_run(noRS(), model, lin_model, NAer, NGas, NSurf, i_band)
 end
@@ -82,32 +82,33 @@ end
 Convenience alias for the linearized `rt_run` overload.  Equivalent to
 `rt_run(model, lin_model, NAer, NGas, NSurf; i_band)`.
 """
-rt_run_lin(model::vSmartMOM_Model, lin_model::vSmartMOM_Lin,
+rt_run_lin(model, lin_model,
            NAer::Int, NGas::Int, NSurf::Int; i_band::Integer = 1) =
     rt_run(model, lin_model, NAer, NGas, NSurf; i_band)
 
 # Just to make sure we still have it:
-function rt_run_test(RS_type::AbstractRamanType, 
-        model::vSmartMOM_Model, 
-        lin_model::vSmartMOM_Lin,
+function rt_run_test(RS_type::AbstractRamanType,
+        model,
+        lin_model,
         NAer, NGas, NSurf,
         iBand)
-    rt_run(RS_type, model, lin_model, 
+    rt_run(RS_type, model, lin_model,
         NAer, NGas, NSurf,
         iBand)
 end
 
 # Full multiple scattering
-function rt_run(RS_type::AbstractRamanType, 
-                    model::vSmartMOM_Model, 
-                    lin_model::vSmartMOM_Lin,
+function rt_run(RS_type::AbstractRamanType,
+                    model,
+                    lin_model,
                     NAer::Int, NGas::Int, NSurf::Int,
                     iBand)
     (; obs_alt, sza, vza, vaz) = model.obs_geom   # Observational geometry properties
     (; qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart, μ₀, iμ₀, Nquad) = model.quad_points # All quadrature points
-    pol_type = model.params.polarization_type
+    pol_type = CoreRT.polarization_type(model)
     #@unpack max_m = model.max_m #params
-    (; quad_points, max_m) = model
+    quad_points = model.quad_points
+    max_m = model.max_m
     (; τ̇_abs, τ̇_aer, lin_aerosol_optics) = lin_model
 
     lin = LinMode()
@@ -119,7 +120,7 @@ function rt_run(RS_type::AbstractRamanType,
     #@show iBand[1]
     #@show size(iBand[1])
     #bla
-    brdf = model.params.brdf[iBand] #brdf = model.params.brdf[iBand[1]]
+    brdf = get_surface(model, iBand)
     #brdf_lin = model_lin.brdf_lin[iBand]
     (; F₀) = RS_type
     # no Raman
@@ -142,7 +143,7 @@ function rt_run(RS_type::AbstractRamanType,
         push!(RS_type.bandSpecLim,nSpec0:nSpec);             
     end
 
-    arr_type = array_type(model.params.architecture) # Type of array to use
+    arr_type = CoreRT.array_type(model) # Type of array to use
     SFI = true                          # SFI flag
     NquadN = Nquad * pol_type.n         # Nquad (multiplied by Stokes n)
     dims = (NquadN,NquadN)              # nxn dims
@@ -238,7 +239,7 @@ function rt_run(RS_type::AbstractRamanType,
                         τ_sum_all[:,iz], τ̇_sum_all[:,:,iz], 
                         m, quad_points, 
                         I_static, 
-                        model.params.architecture, 
+                        CoreRT.architecture(model), 
                         qp_μN, iz) 
         end 
 
@@ -254,7 +255,7 @@ function rt_run(RS_type::AbstractRamanType,
                             arr_type(τ_sum_all[:,end]),
                             arr_type(τ̇_sum_all[:,:,end]), 
                             arr_type(F₀),
-                            model.params.architecture);
+                            CoreRT.architecture(model));
         
         
         #@show F₀[:,1]

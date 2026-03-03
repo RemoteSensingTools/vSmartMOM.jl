@@ -58,6 +58,8 @@ using .IO
 export default_parameters, parameters_from_yaml, model_from_parameters, rt_run, read_parameters, read_atmos_profile
 # Export linearized RT functions
 export rt_run_lin, model_from_parameters_lin
+# Export new hierarchical model types
+export RTModel, AbstractRTModel, SolverConfig, Atmosphere, RayleighScattering, AerosolState, Optics, OpticsLin
 # Export GEOSChem/NetCDF integration
 export GeosChemSource, NetCDFGridSource, NetCDFSource, geoschem_to_dict, read_geoschem_profile
 

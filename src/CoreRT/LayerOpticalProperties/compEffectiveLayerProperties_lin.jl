@@ -47,10 +47,9 @@ function constructCoreOpticalProperties(RS_type, iBand, m, model, lin_model) #wh
     @assert all(iBand .≤ length(τ_rayl)) "iBand exceeded number of bands"
     FT = eltype(τ_rayl[1])
     
-    # Debug: Check what architecture and array_type we're getting
-    arr_type = array_type(model.params.architecture)
-    
-    pol_type = model.params.polarization_type
+    arr_type = CoreRT.array_type(model)
+
+    pol_type = CoreRT.polarization_type(model)
     # Do this in CPU space only first:
     
     # Quadrature points:
