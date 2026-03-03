@@ -24,6 +24,7 @@
 using vSmartMOM
 using vSmartMOM.CoreRT
 using CanopyOptics
+using CairoMakie
 
 # ## 2) Scalar leaf optics (simplest setup)
 #
@@ -130,6 +131,17 @@ R_bare, T_bare = rt_run(model2)
 println("R(nadir, I) bare soil:   ", R_bare[1, 1, 1])
 println("Canopy effect on TOA R:  ",
     round((R_canopy[1,1,1] - R_bare[1,1,1]) / R_bare[1,1,1] * 100, digits=1), "%")
+
+# Compare the reflectance spectra:
+
+fig = Figure(size=(700, 450))
+ax = Axis(fig[1,1],
+    xlabel = "Spectral index",
+    ylabel = "TOA Reflectance (Stokes I)")
+lines!(ax, R_canopy[1, 1, :], label="Canopy (LAI=3)")
+lines!(ax, R_bare[1, 1, :],   label="Bare soil (α=0.1)")
+axislegend(ax, position=:rt)
+fig
 
 # ## 7) Effect of within-canopy atmosphere
 #

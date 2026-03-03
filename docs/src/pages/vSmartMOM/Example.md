@@ -1,37 +1,64 @@
 # vSmartMOM Module Example
 
+## Forward RT
+
 ```julia
 using vSmartMOM
 using vSmartMOM.CoreRT
 
-## 
 ## STEP 1: Load / Customize RT parameters
-## 
 
-# If you would like to load your own parameters from a YAML file
-# (See required format at: https://github.com/remotesensingtools/vSmartMOM.jl/blob/main/src/CoreRT/DefaultParameters.yaml)
-parameters = parameters_from_yaml("vSmartMOM/src/CoreRT/DefaultParameters.yaml")
-
-# OR if you would like to load a default set of parameters
+# Load a default set of parameters
 parameters = default_parameters();
 
-# You can then change any individual fields in parameters (parameters.field = ...)
-# Please see descriptions of each field here: 
+# Or load from a YAML file (see format at:
+# https://github.com/remotesensingtools/vSmartMOM.jl/blob/main/src/CoreRT/DefaultParameters.yaml)
+# parameters = parameters_from_yaml("path/to/your/params.yaml")
+
+# You can modify any field in parameters (it is a mutable struct):
+# parameters.max_m = 5
+# See the parameters guide for field descriptions:
 # https://remotesensingtools.github.io/vSmartMOM.jl/dev/pages/vSmartMOM/InputParametersGuide/
 
-## 
 ## STEP 2: Create a model from parameters
-## 
 
-# Creating this model will use the parameters object to calculate derived fields and attributes
+# This computes all derived fields (absorption profiles, scattering phase functions,
+# quadrature points, etc.) and returns an RTModel:
 model = model_from_parameters(parameters);
 
-# Again, you can then change any derived field in model (model.field = ...)
+# The RTModel is a hierarchical struct with sub-structs:
+#   model.solver      — SolverConfig (polarization, quadrature, truncation)
+#   model.geometry    — ObsGeometry (SZA, VZA, VAZ)
+#   model.quad_points — QuadPoints (μ, weights)
+#   model.atmosphere  — Atmosphere (profile, spec_bands)
+#   model.optics      — Optics (rayleigh, aerosol, τ_abs, τ_rayl)
+#   model.surfaces    — Vector{AbstractSurfaceType}
 
-## 
 ## STEP 3: Run the RT simulation
-## 
 
-R = rt_run(model)
-
+R, T = rt_run(model)
+# R: TOA reflectance array (n_stokes × n_vza × n_spectral)
+# T: BOA transmittance array (same shape)
 ```
+
+## Linearized RT (Jacobians)
+
+```julia
+using vSmartMOM
+
+parameters = default_parameters();
+
+# Build both forward and linearized models:
+model, lin_model = model_from_parameters(LinMode(), parameters);
+
+# Determine Jacobian dimensions:
+NAer  = length(parameters.scattering_params.rt_aerosols)
+NGas  = size(lin_model.tau_dot_abs[1], 1)
+NSurf = 1
+
+# Run linearized RT:
+R, T, dR, dT = rt_run(model, lin_model, NAer, NGas, NSurf)
+# dR, dT contain analytic Jacobians with respect to aerosol, gas, and surface parameters
+```
+
+See the [Jacobians tutorial](../tutorials/Tutorial_Jacobians.md) for a detailed walkthrough of the Jacobian layout.

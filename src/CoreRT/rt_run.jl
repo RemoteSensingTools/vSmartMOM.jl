@@ -11,9 +11,44 @@ the model. The latter should generally be used by users.
 
 
 """
-    rt_run(model; i_band=1)
+    rt_run(model::RTModel; i_band=1) -> (R, T, ...)
 
-Perform Radiative Transfer calculations using given parameters if no Raman is used.
+Run the forward radiative transfer solver for one or more spectral bands.
+
+Performs polarized adding-doubling RT through the atmosphere defined in `model`,
+computing top-of-atmosphere (TOA) reflectance and bottom-of-atmosphere (BOA)
+transmittance.  The solver iterates over azimuthal Fourier moments
+`m = 0, …, max_m-1`, building layer R/T/J matrices via elemental → doubling →
+interaction steps, then applies surface coupling and postprocessing.
+
+Equivalent to `rt_run(noRS(), model, i_band)` (no Raman scattering).
+
+# Arguments
+- `model::RTModel`: Pre-built model from [`model_from_parameters`](@ref).
+- `i_band::Integer=1`: Spectral band index (or vector of indices) to compute.
+
+# Returns
+A tuple `(R_SFI, T_SFI, ieR_SFI, ieT_SFI, hdr, bhr_uw, bhr_dw)` when using
+source-function integration (default), where:
+- `R_SFI::Array{FT,3}`: TOA reflectance `[nVZA × nStokes × nSpec]`
+- `T_SFI::Array{FT,3}`: BOA transmittance `[nVZA × nStokes × nSpec]`
+
+For most use cases, only the first two elements are needed:
+```julia
+R, T = rt_run(model)
+```
+
+# Example
+```julia
+params = parameters_from_yaml("config/my_scene.yaml")
+model = model_from_parameters(params)
+R, T = rt_run(model)
+R[1, 1, :]  # Stokes-I reflectance at first VZA across the spectrum
+```
+
+# See also
+- [`rt_run(model, lin_model, NAer, NGas, NSurf)`](@ref) for linearized RT with Jacobians.
+- [`model_from_parameters`](@ref) to build the model from parameters.
 """
 function rt_run(model; i_band::Integer = 1)
     rt_run(noRS(), model, i_band)

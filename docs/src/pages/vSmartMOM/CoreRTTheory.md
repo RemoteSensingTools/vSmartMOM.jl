@@ -9,6 +9,92 @@ This page maps the core radiative transfer operators in `vSmartMOM` to their mat
 3. Sanghavi and Stephens (2015, JQSRT 159): vector truncation (`delta-m`, `delta-fit`, `delta-BGE`).
 4. Fell (1997 thesis, German): source-function expressions used in code comments for SFI terms.
 
+## Mathematical Foundation
+
+### Vector Radiative Transfer Equation
+
+The vector RTE for a plane-parallel atmosphere illuminated by a collimated beam is (Sanghavi et al. 2014, Eq. 2):
+
+```math
+\mu\frac{d\mathbf{L}(\tau,\mu,\phi;\mu_0,\phi_0)}{d\tau} = -\mathbf{L}(\tau,\mu,\phi;\mu_0,\phi_0) + (1-\varpi_0)\mathbf{B}(T) + \frac{\varpi_0}{4\pi}\mathbf{Z}(\mu,\phi;\mu_0,\phi_0)\mathbf{S}_0\exp(-\tau/\mu_0) + \frac{\varpi_0}{4\pi}\int_0^{2\pi}\int_{-1}^{1}\mathbf{Z}(\mu,\phi;\mu',\phi')\mathbf{L}(\tau,\mu',\phi';\mu_0,\phi_0)\,d\mu'\,d\phi'
+```
+
+where ``\mathbf{L}`` is the Stokes vector, ``\varpi_0`` the single-scattering albedo, ``\mathbf{Z}`` the phase matrix, and ``\mathbf{S}_0`` the solar Stokes vector.
+
+### Matrix Operator Geometric Series
+
+The core insight of the matrix operator method is that multiple reflections between adjacent layers form a geometric series (Sanghavi et al. 2013, Eq. 1; 2014, Eq. 1):
+
+```math
+(\mathbf{E}-\mathbf{X})^{-1} - \mathbf{E} = \mathbf{X} + \mathbf{X}^2 + \mathbf{X}^3 + \cdots
+```
+
+where ``\mathbf{X}`` is a matrix of consecutive reflections between layers and ``\mathbf{E}`` is the identity matrix.
+
+### Discretized Layer System
+
+After Fourier decomposition in azimuth and quadrature discretization in polar angle, the coupled system for upward (``\mathbf{l}_m^+``) and downward (``\mathbf{l}_m^-``) diffuse radiation in Fourier moment ``m`` is (Sanghavi et al. 2014, Eq. 14):
+
+```math
+\frac{d}{d\tau}\begin{bmatrix}\mathbf{l}_m^+\\\mathbf{l}_m^-\end{bmatrix}
+= \begin{bmatrix}
+  g_m\varpi_0\mathbf{M}^{-1}\overline{\mathbf{P}}_m^{(+,+)}\mathbf{C}-\mathbf{M}^{-1} & g_m\varpi_0\mathbf{M}^{-1}\overline{\mathbf{P}}_m^{(+,-)}\mathbf{C} \\
+  -g_m\varpi_0\mathbf{M}^{-1}\overline{\mathbf{P}}_m^{(-,+)}\mathbf{C} & -g_m\varpi_0\mathbf{M}^{-1}\overline{\mathbf{P}}_m^{(+,+)}\mathbf{C}+\mathbf{M}^{-1}
+\end{bmatrix}\begin{bmatrix}\mathbf{l}_m^+\\\mathbf{l}_m^-\end{bmatrix}
+```
+
+where ``\mathbf{M} = \mathrm{diag}(\mu_1,\ldots,\mu_{N_\mathrm{quad}})`` and ``\mathbf{C} = \mathrm{diag}(c_1,\ldots,c_{N_\mathrm{quad}})`` are quadrature matrices, and ``g_m = 2 - \delta_{0m}``.
+
+### Elemental Layer Operators
+
+For an optically thin sub-layer of thickness ``\delta``, the transmission and reflection operators are (Sanghavi et al. 2014, Eqs. 19–20):
+
+```math
+\mathbb{T}_{\delta 0} = \mathbf{E} + \left(-\mathbf{M}^{-1} + \frac{\varpi_0}{2}\mathbf{M}^{-1}\overline{\mathbf{Z}}^{(+,+)}\mathbf{C}\right)\cdot\delta
+```
+```math
+\mathbb{R}_{\delta 0} = \frac{\varpi_0}{2}\mathbf{M}^{-1}\overline{\mathbf{Z}}^{(+,-)}\mathbf{C}\cdot\delta
+```
+
+The stability bound on the sub-layer thickness is (Eq. 22):
+
+```math
+0 < \delta < \frac{\min_i\{\mu_i\}}{1 - \varpi_0/2}
+```
+
+### Adding Equations
+
+When combining a composite layer (0–1) with an added layer (1–2), the resulting operators are (Sanghavi et al. 2014, Eqs. 23–28):
+
+```math
+\mathbb{T}_{02} = \mathbb{T}_{12}(\mathbf{E}-\mathbb{R}_{01}\mathbb{R}_{21})^{-1}\mathbb{T}_{01}
+```
+```math
+\mathbb{R}_{20} = \mathbb{R}_{10} + \mathbb{T}_{01}(\mathbf{E}-\mathbb{R}_{21}\mathbb{R}_{01})^{-1}\mathbb{R}_{21}\mathbb{T}_{10}
+```
+```math
+\mathbb{T}_{20} = \mathbb{T}_{10}(\mathbf{E}-\mathbb{R}_{01}\mathbb{R}_{21})^{-1}\mathbb{T}_{12}
+```
+```math
+\mathbb{R}_{02} = \mathbb{R}_{12} + \mathbb{T}_{21}(\mathbf{E}-\mathbb{R}_{01}\mathbb{R}_{21})^{-1}\mathbb{R}_{01}\mathbb{T}_{12}
+```
+```math
+\mathbb{J}_{20} = \mathbb{J}_{21} + \mathbb{T}_{21}(\mathbf{E}-\mathbb{R}_{01}\mathbb{R}_{21})^{-1}(\mathbb{J}_{10}+\mathbb{R}_{01}\mathbb{J}_{12})
+```
+```math
+\mathbb{J}_{02} = \mathbb{J}_{01} + \mathbb{T}_{01}(\mathbf{E}-\mathbb{R}_{21}\mathbb{R}_{01})^{-1}(\mathbb{J}_{12}+\mathbb{R}_{21}\mathbb{J}_{10})
+```
+
+### D-Matrix Symmetry
+
+For homogeneous layers, the polarization symmetry matrix ``\mathbf{D} = \mathrm{diag}(1,1,-1,-1)`` (per stream) relates forward and reverse operators (Sanghavi et al. 2014, Eqs. 29–32):
+
+```math
+\mathbb{T}_{ab} = \mathbf{D}\,\mathbb{T}_{ba}\,\mathbf{D},\quad \mathbb{R}_{ab} = \mathbf{D}\,\mathbb{R}_{ba}^*\,\mathbf{D}
+```
+
+This symmetry halves the number of independent operators, which is exploited in `apply_D_matrix!` after doubling.
+
 ## Layer operator form
 
 The core layer system is represented as

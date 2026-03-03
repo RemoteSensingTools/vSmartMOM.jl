@@ -21,11 +21,44 @@ For equation-level details and code mapping of `elemental`, `doubling`, and `int
 
 ## Truncation strategies and accuracy
 
-- δ-m and δ-fit approaches are used to remove/approximate strong forward peaks in scattering, improving convergence at low order.
-- vSmartMOM applies these truncations consistently to the vector phase matrix, following Sanghavi & Stephens (2015).
-- Practical guidance:
-  - Choose L_trunc consistent with aerosol phase function complexity and desired accuracy.
-  - Use Radau or Gauss full-sphere quadrature depending on hemispheric symmetry and source configuration.
+δ-m and δ-fit approaches are used to remove/approximate strong forward peaks in scattering, improving convergence at low order. vSmartMOM applies these truncations consistently to the vector phase matrix, following Sanghavi & Stephens (2015).
+
+### Truncation factor
+
+The truncation factor removes the forward-scattering peak contribution (Sanghavi & Stephens 2015, Eq. 26):
+
+```math
+f_\text{tr} = \frac{\beta_{L_\text{tr}}}{2L_\text{tr}+1}
+```
+
+### Modified Greek coefficients
+
+The truncated Greek coefficients are (Sanghavi & Stephens 2015, Eqs. 27a–27d):
+
+```math
+\beta_l^* = \frac{\beta_l - \frac{2l+1}{2L_\text{tr}+1}\beta_{L_\text{tr}}}{1 - f_\text{tr}},\quad
+\delta_l^* = \frac{\delta_l - \frac{2l+1}{2L_\text{tr}+1}\beta_{L_\text{tr}}}{1 - f_\text{tr}}
+```
+```math
+\gamma_l^* = \frac{\gamma_l}{1 - f_\text{tr}},\quad
+\epsilon_l^* = \frac{\epsilon_l}{1 - f_\text{tr}}
+```
+
+### Modified optical properties
+
+The layer optical properties are rescaled accordingly (Sanghavi & Stephens 2015, Sec. 2.3):
+
+```math
+\tau^* = \tau(1-f_\text{tr}\varpi_0),\quad
+\varpi_0^* = \frac{\varpi_0(1-f_\text{tr})}{1-f_\text{tr}\varpi_0}
+```
+
+This rescaling preserves the total extinction while transferring the truncated forward-scattering energy into the direct beam.
+
+### Practical guidance
+
+- Choose `L_trunc` consistent with aerosol phase function complexity and desired accuracy.
+- Use Radau or Gauss full-sphere quadrature depending on hemispheric symmetry and source configuration.
 
 ## Polarization handling
 
@@ -34,8 +67,15 @@ For equation-level details and code mapping of `elemental`, `doubling`, and `int
 
 ## Linearization (aerosol Jacobians)
 
-- The matrix-operator formalism enables analytic derivatives with respect to aerosol properties (e.g., τ_ref, phase function parameters) by differentiating the composed operators.
-- vSmartMOM exposes aerosol optical property construction (Mie-based) and truncation, enabling efficient sensitivity calculations.
+The matrix-operator formalism enables analytic derivatives with respect to aerosol properties (e.g., τ_ref, phase function parameters) by differentiating the composed operators.
+
+> "This 'linearization' is an exact method that allows for an accurate and speedy computation of the Jacobian matrix, which is key to most optimization-based retrieval methods." -- Sanghavi et al. (2013)
+
+The linearized adding equations propagate derivatives alongside the forward operators through the layer-by-layer composition, avoiding the need for finite differences or full AD through the RT solver. This provides exact Jacobians with respect to aerosol optical depth, gas VMR profiles, and surface parameters at a computational cost roughly proportional to the number of parameters times the forward model cost.
+
+> "The information content for the full Stokes vector remains practically constant for all azimuthal planes, while that associated with intensity-only measurements falls as we approach the plane perpendicular to the principal plane." -- Sanghavi et al. (2014)
+
+This motivates the support for polarized Jacobians in vSmartMOM, as polarization measurements carry additional information content for aerosol retrievals.
 
 ## Layer optics and composition
 

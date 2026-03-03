@@ -259,14 +259,14 @@ params = parameters_from_dict(config)
 
 ## Benefits
 
-✅ **Type Safety**: IOSource types catch errors at compile time  
-✅ **Extensibility**: Easy to add WRF, GCHP, CLM, etc.  
-✅ **Clean Separation**: I/O logic separated from RT logic  
-✅ **No Duplication**: Reuses existing parameter system  
-✅ **Idiomatic Julia**: Multiple dispatch, clear abstractions  
-✅ **Backwards Compatible**: Old code still works  
-✅ **Well Documented**: Types, functions, examples  
-✅ **Testable**: Easy to mock sources for testing  
+- **Type Safety**: IOSource types catch errors at compile time
+- **Extensibility**: Easy to add WRF, GCHP, CLM, etc.
+- **Clean Separation**: I/O logic separated from RT logic
+- **No Duplication**: Reuses existing parameter system
+- **Idiomatic Julia**: Multiple dispatch, clear abstractions
+- **Backwards Compatible**: Old code still works
+- **Well Documented**: Types, functions, examples
+- **Testable**: Easy to mock sources for testing  
 
 ## Dependencies
 

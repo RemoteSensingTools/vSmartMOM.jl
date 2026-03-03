@@ -21,7 +21,23 @@ This file contains all types that are used in the vSmartMOM module:
 # When CUDA is loaded, CUDAExt will properly handle CuArray types
 const MaybeCuPtrArray = Union{AbstractArray, Nothing}
 
-"Struct for an atmospheric profile"
+"""
+    AtmosphericProfile{FT, VMR}
+
+Vertical atmospheric state on a pressure grid, ordered from TOA to BOA.
+
+Stores temperature, pressure (full levels and half levels), humidity,
+dry and wet vertical column densities, and volume mixing ratios for
+trace gases.  Constructed internally by [`model_from_parameters`](@ref)
+from the raw arrays in [`vSmartMOM_Parameters`](@ref).
+
+`p_full` has `N` levels; `p_half` has `N-1` layer-boundary pressures.
+`T`, `q`, `vmr_h2o`, `vcd_dry`, `vcd_h2o`, and `Δz` are layer quantities
+of length `N`.
+
+# Fields
+$(DocStringExtensions.FIELDS)
+"""
 struct AtmosphericProfile{FT, VMR <: Union{Real, Vector}}
     "Temperature Profile"
     T::Array{FT,1}
@@ -358,19 +374,48 @@ struct ScatteringInterface_AtmoSurf <: AbstractScatteringInterface end
 "Abstract Type for Surface Types" 
 abstract type AbstractSurfaceType end
 
-"Lambertian Surface (scalar per band)"
+"""
+    LambertianSurfaceScalar{FT} <: AbstractSurfaceType
+
+Isotropic Lambertian surface with a single scalar albedo `α` shared across
+all spectral points in a band.  The BRDF is `ρ = α/π`, independent of
+viewing and illumination angles.  Only the `m = 0` Fourier moment is nonzero.
+
+Supports analytical Jacobians with respect to albedo in linearized RT.
+
+# Fields
+- `albedo::FT`: hemispherical albedo ∈ [0, 1].
+"""
 struct LambertianSurfaceScalar{FT} <: AbstractSurfaceType
     "Albedo (scalar)"
     albedo::FT
 end
 
-"Defined as Array (has to have the same length as the band!)"
+"""
+    LambertianSurfaceSpectrum{FT} <: AbstractSurfaceType
+
+Isotropic Lambertian surface with a per-spectral-point albedo vector.
+The vector length must match the number of spectral points in the band.
+
+# Fields
+- `albedo::AbstractArray{FT,1}`: spectral albedo vector, one value per grid point.
+"""
 struct LambertianSurfaceSpectrum{FT} <: AbstractSurfaceType
     "Albedo (vector)"
     albedo::AbstractArray{FT,1}
 end
 
-"Defined as Array (has to have the same length as the band!)"
+"""
+    rpvSurfaceScalar{FT} <: AbstractSurfaceType
+
+Rahman-Pinty-Verstraete (1993) four-parameter empirical BRDF model.
+Combines a Minnaert angular shape, a Henyey-Greenstein-like hot-spot
+function, and a geometric bowl/bell correction.  Scalar only (Stokes-I);
+no built-in linearization.
+
+# Fields
+$(DocStringExtensions.FIELDS)
+"""
 struct rpvSurfaceScalar{FT} <: AbstractSurfaceType
     "Overall reflectance level parameter (scalar)"
     ρ₀::FT
@@ -382,7 +427,18 @@ struct rpvSurfaceScalar{FT} <: AbstractSurfaceType
     Θ::FT
 end
 
-"Ross-Li BRDF surface model with volumetric (RossThick), geometric (LiSparse), and isotropic components"
+"""
+    RossLiSurfaceScalar{FT} <: AbstractSurfaceType
+
+Ross-Li kernel-based BRDF (Lucht, Schaaf & Strahler, 2000).  Decomposes
+the surface reflectance into three semi-physical kernels: isotropic,
+RossThick (volumetric canopy scattering), and LiSparse (geometric
+mutual shadowing).  Standard MODIS/RAMI parameterization.  Scalar only
+(Stokes-I); no built-in linearization.
+
+# Fields
+$(DocStringExtensions.FIELDS)
+"""
 struct RossLiSurfaceScalar{FT} <: AbstractSurfaceType
     "Volumetric RossThick  fraction"
     fvol::FT

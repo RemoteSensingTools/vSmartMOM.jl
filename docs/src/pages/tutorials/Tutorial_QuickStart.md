@@ -11,6 +11,7 @@ This 5-minute tutorial runs a forward RT simulation and computes Jacobians.
 
 ```julia
 using vSmartMOM
+using CairoMakie
 ```
 
 ## 2) Load parameters from YAML
@@ -45,6 +46,18 @@ println("T shape: ", size(T))
 println("R(nadir, I, λ₁) = ", R[1, 1, 1])
 ```
 
+Plot the reflectance spectrum at nadir (Stokes-I):
+
+```julia
+fig = Figure(size=(700, 400))
+ax = Axis(fig[1,1], xlabel="Spectral index", ylabel="TOA Reflectance (Stokes I)")
+for ivza in 1:min(size(R, 1), 4)
+    lines!(ax, R[ivza, 1, :], label="VZA #$(ivza)")
+end
+axislegend(ax, position=:rt)
+fig
+```
+
 ## 5) Linearized RT for Jacobians
 
 Use `model_from_parameters(LinMode(), params)` and `rt_run` to get analytic
@@ -67,6 +80,19 @@ gas VMRs, and surface albedo.
 
 ```julia
 println("dR shape (Jacobian): ", size(dR))
+```
+
+Visualize the Jacobian as a heatmap (spectral × parameter):
+
+```julia
+fig = Figure(size=(700, 450))
+ax = Axis(fig[1,1],
+    xlabel = "Parameter index",
+    ylabel = "Spectral index",
+    title  = "dR/dx at nadir (Stokes I)")
+hm = heatmap!(ax, dR[1, 1, :, :]')
+Colorbar(fig[1,2], hm, label="dR/dx")
+fig
 ```
 
 ## 6) GPU support
