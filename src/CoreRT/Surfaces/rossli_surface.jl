@@ -15,7 +15,7 @@ function reflectance(RossLi::RossLiSurfaceScalar{FT},n, μᵢ::FT, μᵣ::FT, d�
     (; fiso, fvol, fgeo) = RossLi
     # Function was defined for RAMI definition, have to reverse here:
     dϕ = π - dϕ
-    # TODO: Suniti, stupid calculations here:
+    # Convert cosines to angles for Ross-Li kernels
     θᵢ   = acos(μᵢ) #assert 0<=θᵢ<=π/2
     θᵣ   = acos(μᵣ) #assert 0<=θᵣ<=π/2
 

@@ -97,7 +97,7 @@ Base.@kwdef struct AddedLayerLin{FT} <: AbstractLayerLin
 end
 
 """
-    struct vSmartMOM_Lin{A,B,C}
+    struct RTModelLin{A,B,C}
 
 Holds linearized (Jacobian) model parameters: derivatives of optical depths
 and aerosol properties w.r.t. physical state-vector elements.
@@ -105,7 +105,7 @@ and aerosol properties w.r.t. physical state-vector elements.
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-mutable struct vSmartMOM_Lin{A,B,C}
+mutable struct RTModelLin{A,B,C}
     "∂τ_abs/∂x per band: Vector of arrays [NGas × nSpec × nLayers]"
     τ̇_abs::A
     "∂τ_aer/∂x per band: Vector of arrays [NAer × 7 × nSpec × nLayers]"

@@ -490,14 +490,7 @@ end
 function _parse_spec_bands(params_dict::Dict, FT)
     spec_bands = Vector{Vector{FT}}()
     for spec_band in params_dict["radiative_transfer"]["spec_bands"]
-        parsed_band = eval(Meta.parse(spec_band))
-        if all(x -> x == Unitful.NoUnits, unit.(parsed_band))
-            wn_band = collect(parsed_band)
-        elseif all(x -> x == u"cm^-1", unit.(parsed_band))
-            wn_band = sort(ustrip(collect(parsed_band)))
-        else
-            wn_band = sort(ustrip(uconvert.(u"cm^-1", collect(parsed_band), Spectral())))
-        end
+        wn_band = _safe_parse_spec_band(spec_band)
         push!(spec_bands, convert.(FT, vec(wn_band)))
     end
     return spec_bands

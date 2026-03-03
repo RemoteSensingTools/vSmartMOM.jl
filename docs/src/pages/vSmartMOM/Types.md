@@ -30,7 +30,7 @@ CoreRT.vSmartMOM_Parameters
 ### Model Type
 
 ```@docs
-CoreRT.vSmartMOM_Model
+CoreRT.RTModel
 ```
 
 ### Surface Types

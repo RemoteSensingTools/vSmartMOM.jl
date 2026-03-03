@@ -315,7 +315,6 @@ function get_elem_rt_SFI!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
     ieJ₀⁻ .+= t_ieJ₀⁻ 
 end
 
-#  TODO: Nov 30, 2021
 @kernel function get_elem_rt_SFI_VS!(fscattRayl,
                             ϖ_λ₁λ₀, i_λ₁λ₀, 
                             ieJ₀⁺, ieJ₀⁻, 
@@ -378,8 +377,7 @@ end
                         (exp(-dτ[n₁] / qp_μN[i]) - exp(-dτ[n₀] / qp_μN[i_start]))  
             end
         end
-        #TODO
-        #J₀⁻ = 0.25*(1+δ(m,0)) * ϖ(λ) * Z⁻⁺ * I₀ * [μ₀ / (μᵢ + μ₀)] * [1 - exp{-dτ(λ)(1/μᵢ + 1/μ₀)}]                    
+        # J₀⁻ = 0.25*(1+δ(m,0)) * ϖ(λ) * Z⁻⁺ * I₀ * [μ₀ / (μᵢ + μ₀)] * [1 - exp{-dτ(λ)(1/μᵢ + 1/μ₀)}]
         ieJ₀⁻[i, 1, n₁, 1] = 
                     wct02 * ϖ_λ₁λ₀[Δn] * fscattRayl[n₀] * Z⁻⁺_I₀ * 
                     (1/( (qp_μN[i] / qp_μN[i_start]) + (dτ[n₁]/dτ[n₀]) )) *
@@ -394,8 +392,7 @@ end
     end    
 end
 
-#  TODO: Nov 30, 2021
-function get_elem_rt_SFI!(RS_type::RRS_plus, 
+function get_elem_rt_SFI!(RS_type::RRS_plus,
                         ieJ₀⁺, ieJ₀⁻, 
                         τ_sum, dτ_λ, ϖ_λ, 
                         Z⁻⁺_λ₁λ₀, Z⁺⁺_λ₁λ₀, F₀,

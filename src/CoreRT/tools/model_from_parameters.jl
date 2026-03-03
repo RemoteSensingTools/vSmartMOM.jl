@@ -8,7 +8,28 @@ like optical thicknesses, from the input parameters. Produces an RTModel object.
 "Generate default set of parameters for Radiative Transfer calculations (from ModelParameters/)"
 default_parameters() = vSmartMOM.IO.parameters_from_yaml(joinpath(dirname(pathof(vSmartMOM)), "CoreRT", "DefaultParameters.yaml"))
 
-"Take the parameters specified in the vSmartMOM_Parameters struct, and calculate derived attributes into an RTModel" 
+"""
+    model_from_parameters(params::vSmartMOM_Parameters) -> RTModel
+
+Construct an [`RTModel`](@ref) from user-supplied [`vSmartMOM_Parameters`](@ref).
+
+Computes all derived quantities needed by the RT solver:
+- Observation geometry and quadrature points
+- Rayleigh scattering coefficients (Greek/Cabannes)
+- Aerosol optics via Mie theory with δ-M truncation
+- Gas absorption cross-sections and optical depth profiles
+- Per-band Fourier truncation limits
+
+# Arguments
+- `params::vSmartMOM_Parameters`: Configuration struct (typically from `parameters_from_yaml`).
+
+# Returns
+- `model::RTModel{ARCH, FT}`: Hierarchical model ready for `rt_run(model)`.
+
+# See also
+- `model_from_parameters(LinMode(), params)` for the linearized (Jacobian) variant.
+- `parameters_from_yaml(path)` to load parameters from a YAML file.
+"""
 function model_from_parameters(params::vSmartMOM_Parameters)
     FT = params.float_type
     #@show FT

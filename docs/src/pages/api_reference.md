@@ -64,7 +64,7 @@ vSmartMOM.CoreRT.stokes_rotation_matrix
 
 ```@docs
 vSmartMOM.CoreRT.vSmartMOM_Parameters
-vSmartMOM.CoreRT.vSmartMOM_Model
+vSmartMOM.CoreRT.RTModel
 vSmartMOM.CoreRT.AtmosphericProfile
 vSmartMOM.CoreRT.ObsGeometry
 vSmartMOM.CoreRT.QuadPoints

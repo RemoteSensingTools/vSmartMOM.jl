@@ -1,5 +1,5 @@
-# Test the wigner 3-j symbol calculations (commented out — takes ~60s)
-#=
+# Test the wigner 3-j symbol calculations (slow — ~60s, gated behind VSMARTMOM_FULL_TESTS)
+if get(ENV, "VSMARTMOM_FULL_TESTS", "") == "true"
 @testset "wigner3j" begin
 
     # Meta-parameters
@@ -23,17 +23,17 @@
     # Loop until we see N non-zeros Wigner values
     while count < N
 
-        # Random inputs 
+        # Random inputs
         m = rand(1:j_max)
         n = rand(1:j_max)
         l = rand(1:j_max)
 
-        # Result from PhaseFunction module 
+        # Result from PhaseFunction module
         push!(phase_function_results_A, wigner_A[m, n, l])
         push!(phase_function_results_B, wigner_B[m, n, l])
 
         # Result from external Wigner Symbols package
-        # If there's a domain error, replace with 0.0. 
+        # If there's a domain error, replace with 0.0.
         # (The 3j symbol *should* be zero outside the domain)
         try
             push!(wigner_symbols_results_A, Float64(wigner3j(m, n, l-1, -1, 1, 0)))
@@ -47,8 +47,8 @@
             push!(wigner_symbols_results_B, 0.0)
         end
 
-        # If a discrepancy ever pops up, print the discrepancy so it can be reproduced: 
-        if (phase_function_results_A[end] ≉ wigner_symbols_results_A[end] || 
+        # If a discrepancy ever pops up, print the discrepancy so it can be reproduced:
+        if (phase_function_results_A[end] ≉ wigner_symbols_results_A[end] ||
             phase_function_results_B[end] ≉ wigner_symbols_results_B[end])
             println("Error with: ", (m, n, l))
             println("PhaseFunction output: ", (phase_function_results_A[end], phase_function_results_B[end]))
@@ -64,7 +64,7 @@
     @test phase_function_results_A ≈ wigner_symbols_results_A
     @test phase_function_results_B ≈ wigner_symbols_results_B
 end
-=#
+end
 
 # Test the Aerosol Optics calculations (both NAI2 and Siewert)
 @testset "aerosol_optics" begin
@@ -73,7 +73,7 @@ end
 
     # STEP 1: Create the Aerosol
 
-    # Aerosol particle distribution and properties 
+    # Aerosol particle distribution and properties
     μ  = 0.3                # Log mean radius
     σ  = 2.1               # Log stddev of radius
     r_max = 30.0            # Maximum radius
@@ -93,24 +93,9 @@ end
     truncation_type = δBGE(10, 10)
     model_NAI2 = make_mie_model(NAI2(), aero, λ, polarization_type, truncation_type, r_max, nquad_radius)
 
-    ### 
-    ### NOTE: Temporarily removing PCW tests because they are too heavy to run on Travis
-    ### 
-
-    # Get saved wigner matrices
-    # ftp = FTP("ftp://fluo.gps.caltech.edu/XYZT_hitran/")
-    # println("Downloading full Wigner values...")
-    # download(ftp, "wigner_values.jld", "/tmp/wigner_values.jld");
-
-    # println("Loading full Wigner values...")
-    # wigner_A, wigner_B = load_wigner_values("/home/rjeyaram/vSmartMOM/test/wigner_values.jld")
-    # model_PCW = make_mie_model(PCW(), aero, λ, polarization_type, truncation_type, r_max, nquad_radius, wigner_A, wigner_B)
-
-
-    # STEP 3: Perform the Mie Calculations and compare the results
+    # STEP 3: Perform the Mie Calculations and compare against saved PCW reference
 
     aerosol_optics_NAI2 = compute_aerosol_optical_properties(model_NAI2);
-    #aerosol_optics_PCW = compute_aerosol_optical_properties(model_PCW);
 
     # Load truth values computed from PCW
     @load "test_pcw/PCW_AerosolOptics_v2.jld" aerosol_optics_PCW
@@ -128,10 +113,5 @@ end
     @test aerosol_optics_NAI2.ω̃ ≈ aerosol_optics_PCW.ω̃
     @test aerosol_optics_NAI2.k ≈ aerosol_optics_PCW.k
     @test aerosol_optics_NAI2.fᵗ ≈ aerosol_optics_PCW.fᵗ
-
-    #println("Testing aerosol_optical autodiff...")
-
-    # Test whether autodiff works
-    #compute_aerosol_optical_properties(model_NAI2, autodiff=true);
 
 end

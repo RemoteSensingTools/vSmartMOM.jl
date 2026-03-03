@@ -21,7 +21,7 @@ params.architecture = vSmartMOM.Architectures.CPU()
 # ## 2) Build the linearized model
 #
 # `LinMode()` tells the constructor to compute both the forward model and
-# the derivative containers (`vSmartMOM_Lin`).
+# the derivative containers (`RTModelLin`).
 
 model, lin_model = model_from_parameters(LinMode(), params)
 

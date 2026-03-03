@@ -99,8 +99,8 @@ function rt_run(RS_type::AbstractRamanType, model, iBand)
     @timeit "Creating arrays" I_static =
         Diagonal(arr_type(Diagonal{FT}(ones(dims[1]))));
 
-        #TODO: if RS_type!=noRS, create ϖ_λ₁λ₀, i_λ₁λ₀, fscattRayl, Z⁺⁺_λ₁λ₀, Z⁻⁺_λ₁λ₀ (for input), and ieJ₀⁺, ieJ₀⁻, ieR⁺⁻, ieR⁻⁺, ieT⁻⁻, ieT⁺⁺, ier⁺⁻, ier⁻⁺, iet⁻⁻, iet⁺⁺ (for output)
-    #getRamanSSProp(RS_type, λ, grid_in)
+        # Note: Raman SS properties (ϖ_λ₁λ₀, Z matrices, etc.) are set up
+    # in model_from_parameters when RS_type != noRS.
 
     # Build concatenated wavenumber grid for canopy spectral features
     _canopy_spec_wn = nothing

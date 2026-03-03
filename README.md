@@ -63,12 +63,14 @@ The vSmartMOM module allows end-to-end simulation of radiative transfer (RT) thr
   2. Incorporates fast, high fidelity simulations of scattering atmospheres containing haze and clouds – including pressure- and temperature-resolved absorption profiles of gaseous species in the atmosphere. 
   3. Enables GPU-accelerated computations of the resulting hyperspectral reflectances/transmittances.
   
-  Key functions: 
+  Key functions:
 
   - `parameters_from_yaml(filepath::String)`: Load a custom set of RT parameters from a YAML file.
-  - `default_parameters()`: Load a default set of RT parameters. 
-  - `model_from_parameters(parameters::vSmartMOM_Parameters)`: Using the parameters, calculate derived parameters that will be used in the main RT code. The derived parameters include cross-section profiles, scattering phase functions, etc.  
-  - `rt_run(model::vSmartMOM_Model)`: Use the defined model to perform RT simulation.
+  - `default_parameters()`: Load a default set of RT parameters.
+  - `model_from_parameters(params::vSmartMOM_Parameters)`: Build an `RTModel` with all derived optical properties (cross-section profiles, scattering phase functions, etc.) ready for simulation.
+  - `rt_run(model::RTModel)`: Perform forward RT simulation, returning reflectance and transmittance.
+  - `model_from_parameters(LinMode(), params)`: Build both an `RTModel` and an `RTModelLin` for analytic Jacobian computation.
+  - `rt_run(model, lin_model, NAer, NGas, NSurf)`: Linearized RT returning `(R, T, dR, dT)` with exact Jacobians.
 
 ### vSmartMOM.Absorption
 

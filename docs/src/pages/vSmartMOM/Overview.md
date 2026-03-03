@@ -10,7 +10,7 @@ The vSmartMOM module allows end-to-end simulation of radiative transfer (RT) thr
 You can perform an RT simulation in a few short steps: 
 
 1. Use [`parameters_from_yaml`](@ref) or [`default_parameters`](@ref) to load a set of RT input parameters. You can modify any parameter in the returning [`CoreRT.vSmartMOM_Parameters`](@ref) struct (it is mutable). Please see the parameters [guide](https://remotesensingtools.github.io/vSmartMOM.jl/dev/pages/vSmartMOM/InputParametersGuide/) for more information on what each field specifies. 
-2. Use [`model_from_parameters`](@ref) to calculate derived fields (ex. aerosol optical parameters, quadrature points, etc.). Again, any parameter in the output [`CoreRT.vSmartMOM_Model`](@ref) can be modified after the struct is created. 
+2. Use [`model_from_parameters`](@ref) to calculate derived fields (ex. aerosol optical parameters, quadrature points, etc.). The output [`CoreRT.RTModel`](@ref) contains hierarchical sub-structs for solver configuration, atmosphere, optics, and surfaces.
 3. Use [`rt_run`](@ref) to perform the radiative transfer calculation using the defined model settings. 
 
 For a full demo of how to use this module, please see the [example](https://remotesensingtools.github.io/vSmartMOM.jl/dev/pages/vSmartMOM/Example/) page. 
