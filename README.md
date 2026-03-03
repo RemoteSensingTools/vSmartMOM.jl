@@ -74,7 +74,7 @@ The vSmartMOM module allows end-to-end simulation of radiative transfer (RT) thr
 
 ### vSmartMOM.Absorption
 
-This module enables absorption cross-section calculations of atmospheric gases at different pressures, temperatures, and broadeners (Doppler, Lorentzian, Voigt). It uses the <a href=https://hitran.org>HITRAN</a> energy transition database for calculations. While it enables lineshape calculations from scratch, it also allows users to create and save an interpolator object at specified wavelength, pressure, and temperature grids. It can perform these computations either on CPU or GPU. <br><img src='docs/src/assets/CrossSectionGIF.gif' class='center'></img><br> Key functions:
+This module enables absorption cross-section calculations of atmospheric gases at different pressures, temperatures, and broadeners (Doppler, Lorentzian, Voigt). It uses the <a href="https://hitran.org">HITRAN</a> energy transition database for calculations. While it enables lineshape calculations from scratch, it also allows users to create and save an interpolator object at specified wavelength, pressure, and temperature grids. It can perform these computations either on CPU or GPU. <br><img src="docs/src/assets/CrossSectionGIF.gif" alt="Absorption cross-section" /><br> Key functions:
 
   - `read_hitran(filepath::String)`: Creates a HitranTable struct from the fixed-width HITRAN file with transitions.
   - `make_hitran_model(hitran::HitranTable, broadening::AbstractBroadeningFunction, ...)`: Create a HitranModel struct that holds all of the model parameters needed to perform a absorption cross-section (transitions, broadening type, wing_cutoff, etc.)
@@ -83,7 +83,7 @@ This module enables absorption cross-section calculations of atmospheric gases a
 
 ### vSmartMOM.Scattering
 
-This module enables scattering phase-function calculation of atmospheric aerosols with different size distributions, incident wavelengths, and refractive indices. It can perform the calculation using either the Siewert NAI-2 or Domke PCW methods ([Suniti Sanghavi 2014](https://www.sciencedirect.com/science/article/pii/S0022407313004962)). <br><br><img src='docs/src/assets/ScatteringGIF.gif' class='center'></img><br> Key functions:
+This module enables scattering phase-function calculation of atmospheric aerosols with different size distributions, incident wavelengths, and refractive indices. It can perform the calculation using either the Siewert NAI-2 or Domke PCW methods ([Suniti Sanghavi 2014](https://www.sciencedirect.com/science/article/pii/S0022407313004962)). <br><br><img src="docs/src/assets/ScatteringGIF.gif" alt="Scattering phase function" /><br> Key functions:
 
   - `make_univariate_aerosol(size_distribution::ContinuousUnivariateDistribution, r_max, nquad_radius::Int, nᵣ, nᵢ`: Create an aerosol object with size distribution and complex refractive index. 
   - `make_mie_model(computation_type::AbstractFourierDecompositionType, aerosol::AbstractAerosolType, λ::Real, polarization::AbstractPolarizationType, truncation_type::AbstractTruncationType, ...)`: Create a MieModel struct that holds all of the model parameters needed to perform a phase function calculation (computation type, aerosol, incident wavelength, etc. )
