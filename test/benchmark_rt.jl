@@ -49,14 +49,14 @@ function benchmark_raman(arch; yaml="test_parameters/O2Parameters_GPU.yaml", nru
 
     model = model_from_parameters(params)
     iBand = 1
-    ν = model.params.spec_bands[iBand]
+    ν = model.atmosphere.spec_bands[iBand]
     nSpec = length(ν)
     ν̃ = mean(ν)
 
     effT = (model.profile.vcd_dry' * model.profile.T) / sum(model.profile.vcd_dry)
     n2, o2 = InelasticScattering.getRamanAtmoConstants(ν̃, effT)
 
-    nPol = model.params.polarization_type.n
+    nPol = CoreRT.polarization_type(model).n
     F₀ = zeros(FT, nPol, nSpec); F₀[1, :] .= 1.0
     SIF₀ = zeros(FT, nPol, nSpec)
 

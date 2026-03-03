@@ -11,17 +11,17 @@ Upward looking viewing angles are denoted by -90<VZA<0 and downward viewing angl
 are denoted by 0<VZA<90.
 """
 
-function rt_run_test_ms(RS_type::AbstractRamanType, 
+function rt_run_test_ms(RS_type::AbstractRamanType,
                         sensor_levels::Vector{Int64},
-                        model::vSmartMOM_Model, iBand)
+                        model, iBand)
     (; obs_alt, sza, vza, vaz) = model.obs_geom   # Observational geometry properties
     (; qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart, μ₀, iμ₀, Nquad) = model.quad_points # All quadrature points
-    pol_type = model.params.polarization_type
-    (; max_m) = model.params
-    (; quad_points) = model
+    pol_type = CoreRT.polarization_type(model)
+    max_m = get_max_m(model)
+    quad_points = model.quad_points
 
     # Also to be changed!!
-    brdf = model.params.brdf[iBand[1]]
+    brdf = get_surface(model, iBand[1])
     (; ϖ_Cabannes) = RS_type
 
 
@@ -39,7 +39,8 @@ function rt_run_test_ms(RS_type::AbstractRamanType,
         push!(RS_type.bandSpecLim,nSpec0:nSpec);                
     end
 
-    arr_type = array_type(model.params.architecture) # Type of array to use
+    arr_type = CoreRT.array_type(model) # Type of array to use
+    arch = CoreRT.architecture(model)
     SFI = true                          # SFI flag
     NquadN = Nquad * pol_type.n         # Nquad (multiplied by Stokes n)
     dims = (NquadN,NquadN)              # nxn dims
@@ -50,9 +51,9 @@ function rt_run_test_ms(RS_type::AbstractRamanType,
     uwieJ = [zeros(FT, (length(vza), pol_type.n, nSpec)) for i=1:length(sensor_levels)]
     dwieJ = [zeros(FT, (length(vza), pol_type.n, nSpec)) for i=1:length(sensor_levels)]
     # Notify user of processing parameters
-    msg = 
+    msg =
     """
-    Processing on: $(model.params.architecture)
+    Processing on: $(arch)
     With FT: $(FT)
     Source Function Integration: $(SFI)
     Dimensions: $((length(sensor_levels), NquadN, NquadN, nSpec))
@@ -116,7 +117,7 @@ function rt_run_test_ms(RS_type::AbstractRamanType,
                     τ_sum_all[:,iz], 
                     m, quad_points, 
                     I_static, 
-                    model.params.architecture, 
+                    arch, 
                     qp_μN, iz, arr_type) 
         end 
 
@@ -127,7 +128,7 @@ function rt_run_test_ms(RS_type::AbstractRamanType,
                     pol_type, 
                     quad_points, 
                     arr_type(τ_sum_all[:,end]), 
-                    model.params.architecture);
+                    arch);
 
         # One last interaction with surface:
         for ims=1:length(sensor_levels)

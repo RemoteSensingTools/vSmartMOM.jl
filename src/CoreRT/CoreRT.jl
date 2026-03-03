@@ -94,8 +94,7 @@ include("tools/postprocessing_vza_ms.jl")
 # RT Run entry points
 include("rt_run.jl")                           # Starting point for RT 
 include("rt_run_lin.jl")                       # Linearized RT run
-# rt_run_bck.jl not included: rt_run_bck is already defined in rt_run.jl
-include("rt_run_multisensor.jl") 
+include("rt_run_multisensor.jl")
 # Temporary:
 include("rt_run_canopy.jl")
 
@@ -139,6 +138,10 @@ export lin_added_layer_all_params,            # 3 params -> all params chain rul
        n_total, aerosol_range, gas_range,     # ParameterLayout accessors
        surface_range, surface_index,
        canopy_range, n_layer_params
+
+# Export new hierarchical model types
+export AbstractRTModel, RTModel,
+       SolverConfig, Atmosphere, RayleighScattering, AerosolState, Optics, OpticsLin
 
 # Export types to show easily
 export GaussQuadFullSphere, LambertianSurfaceScalar, LambertianSurfaceSpectrum,

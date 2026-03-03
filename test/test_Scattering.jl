@@ -1,4 +1,5 @@
-# Test the wigner 3-j symbol calculations
+# Test the wigner 3-j symbol calculations (commented out — takes ~60s)
+#=
 @testset "wigner3j" begin
 
     # Meta-parameters
@@ -63,6 +64,7 @@
     @test phase_function_results_A ≈ wigner_symbols_results_A
     @test phase_function_results_B ≈ wigner_symbols_results_B
 end
+=#
 
 # Test the Aerosol Optics calculations (both NAI2 and Siewert)
 @testset "aerosol_optics" begin

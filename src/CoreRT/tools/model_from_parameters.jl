@@ -1,14 +1,14 @@
 #=
 
 This file contains the `model_from_parameters` function, which computes all derived information
-like optical thicknesses, from the input parameters. Produces a vSmartMOM_Model object. 
+like optical thicknesses, from the input parameters. Produces an RTModel object.
 
 =#
 
 "Generate default set of parameters for Radiative Transfer calculations (from ModelParameters/)"
 default_parameters() = vSmartMOM.IO.parameters_from_yaml(joinpath(dirname(pathof(vSmartMOM)), "CoreRT", "DefaultParameters.yaml"))
 
-"Take the parameters specified in the vSmartMOM_Parameters struct, and calculate derived attributes into a vSmartMOM_Model" 
+"Take the parameters specified in the vSmartMOM_Parameters struct, and calculate derived attributes into an RTModel" 
 function model_from_parameters(params::vSmartMOM_Parameters)
     FT = params.float_type
     #@show FT
@@ -186,33 +186,35 @@ function model_from_parameters(params::vSmartMOM_Parameters)
         max_m_bands[i_band] = min(max_m_bands[i_band], params.max_m)
     end
 
-    # Return the model 
-    return vSmartMOM_Model(
-                        max_m_bands,
-                        l_max,
-                        params, 
-                        aerosol_optics,
-                        ϖ_Cabannes,
-                        greek_cabannes,  
-                        greek_rayleigh, 
-                        quad_points, 
-                        τ_abs, 
-                        τ_rayl, 
-                        τ_aer, 
-                        obs_geom, 
-                        profile)
+    # Build the hierarchical RTModel
+    FT_ = FT
+    solver = SolverConfig{FT_, typeof(params.polarization_type), typeof(params.quadrature_type)}(
+        params.polarization_type,
+        params.quadrature_type,
+        params.max_m,
+        max_m_bands,
+        l_max,
+        params.l_trunc,
+        FT_(params.Δ_angle),
+        FT_(params.depol),
+    )
+    atm = Atmosphere(profile, params.spec_bands)
+    rayleigh = RayleighScattering(greek_rayleigh, greek_cabannes, FT_.(ϖ_Cabannes))
+    aerosols_s = AerosolState(aerosol_optics, τ_aer)
+    optics = Optics(rayleigh, aerosols_s, τ_abs, τ_rayl)
+    return RTModel(params.architecture, solver, obs_geom, quad_points, atm, optics, params.brdf)
 end
 
 
 #=
 
-Modified version for vibrational Ramnan scattering
+Modified version for vibrational Raman scattering
 
 =#
 
 
-"Take the parameters specified in the vSmartMOM_Parameters struct, and calculate derived attributes into a vSmartMOM_Model" 
-function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus}, 
+"Take the parameters specified in the vSmartMOM_Parameters struct, and calculate derived attributes into an RTModel"
+function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
                     λ₀,
                     params::vSmartMOM_Parameters)
     # Number of total bands and aerosols (for convenience)
@@ -380,22 +382,23 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
         max_m_bands[i_band] = min(max_m_bands[i_band], params.max_m)
     end
 
-    # Return the model 
-    return vSmartMOM_Model(
-                        max_m_bands,
-                        l_max,
-                        params, 
-                        aerosol_optics,
-                        ϖ_Cabannes,
-                        greek_cabannes,
-                        greek_rayleigh, 
-                        quad_points, 
-                        τ_abs, 
-                        τ_rayl, 
-                        τ_aer, 
-                        obs_geom, 
-                        profile)
-
+    # Build the hierarchical RTModel
+    FT_vrs2 = params.float_type
+    solver = SolverConfig{FT_vrs2, typeof(params.polarization_type), typeof(params.quadrature_type)}(
+        params.polarization_type,
+        params.quadrature_type,
+        params.max_m,
+        max_m_bands,
+        l_max,
+        params.l_trunc,
+        FT_vrs2(params.Δ_angle),
+        FT_vrs2(params.depol),
+    )
+    atm = Atmosphere(profile, params.spec_bands)
+    rayleigh_s = RayleighScattering(greek_rayleigh, greek_cabannes, FT_vrs2.(ϖ_Cabannes))
+    aerosols_s = AerosolState(aerosol_optics, τ_aer)
+    optics = Optics(rayleigh_s, aerosols_s, τ_abs, τ_rayl)
+    return RTModel(params.architecture, solver, obs_geom, quad_points, atm, optics, params.brdf)
 end
 
 function loadAbsco(file; scale=(1.0))

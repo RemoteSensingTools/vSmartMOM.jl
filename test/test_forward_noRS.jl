@@ -23,7 +23,7 @@ function run_forward_noRS_smoke(params)
     Nbands = length(params.spec_bands)
     model = model_from_parameters(params)
     @test !isnothing(model)
-    @test length(model.params.spec_bands) == Nbands
+    @test length(model.atmosphere.spec_bands) == Nbands
     @test all(isfinite.(model.profile.T))
     @test all(model.profile.p_full .> 0)
     for ib in 1:Nbands
@@ -32,12 +32,12 @@ function run_forward_noRS_smoke(params)
         @test all(isfinite.(model.τ_rayl[ib]))
         @test all(model.τ_rayl[ib] .>= 0)
     end
-    nStokes = model.params.polarization_type.n
+    nStokes = CoreRT.polarization_type(model).n
     nVza = length(model.obs_geom.vza)
     for ib in 1:Nbands
         result = rt_run(model; i_band=ib)
         R = result isa Tuple ? result[1] : result
-        nSpec = length(model.params.spec_bands[ib])
+        nSpec = length(model.atmosphere.spec_bands[ib])
         @test ndims(R) == 3
         @test size(R, 1) == nVza
         @test size(R, 2) == nStokes
@@ -76,7 +76,7 @@ println("  Quadrature points: $(model.quad_points.Nquad)")
 
     @testset "Model construction" begin
         @test !isnothing(model)
-        @test length(model.params.spec_bands) == Nbands
+        @test length(model.atmosphere.spec_bands) == Nbands
         @test all(isfinite.(model.profile.T))
         @test all(model.profile.p_full .> 0)
         
@@ -95,9 +95,9 @@ println("  Quadrature points: $(model.quad_points.Nquad)")
         # rt_run returns a tuple: (R, T, ieR, ieT, ...) — extract reflectance
         R = result isa Tuple ? result[1] : result
 
-        nStokes = model.params.polarization_type.n
+        nStokes = CoreRT.polarization_type(model).n
         nVza = length(model.obs_geom.vza)
-        nSpec = length(model.params.spec_bands[ib])
+        nSpec = length(model.atmosphere.spec_bands[ib])
         println("  Output shape: ($(size(R)))")
         println("  nStokes=$nStokes, nVza=$nVza, nSpec=$nSpec")
 

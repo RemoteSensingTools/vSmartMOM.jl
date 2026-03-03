@@ -16,7 +16,7 @@ Example migration:
     R_SFI, T_SFI, ... = rt_run_canopy(RS_type, model, LAD, LAI, BiLambMod, ω, iBand)
 
     # New:
-    model.params.brdf[1] = CanopySurface(;
+    model.surfaces[1] = CanopySurface(;
         soil = LambertianSurfaceScalar(soil_albedo),
         LAI  = LAI, n_layers = 1,
         leaf_reflectance = leaf_R, leaf_transmittance = leaf_T)
@@ -28,20 +28,20 @@ Base.depwarn(
     "`rt_run_canopy` is deprecated. Use `CanopySurface` as the surface type in `rt_run()` instead.",
     :rt_run_canopy)
 
-function rt_run_canopy(RS_type::AbstractRamanType, 
-                    model::vSmartMOM_Model, LAD, LAI, BiLambMod, ϖ_canopy, iBand)
+function rt_run_canopy(RS_type::AbstractRamanType,
+                    model, LAD, LAI, BiLambMod, ϖ_canopy, iBand)
     (; obs_alt, sza, vza, vaz) = model.obs_geom   # Observational geometry properties
     (; qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart, μ₀, iμ₀, Nquad) = model.quad_points # All quadrature points
-    pol_type = model.params.polarization_type
-    (; max_m) = model.params
-    (; quad_points) = model
-    FT = model.params.float_type
+    pol_type = CoreRT.polarization_type(model)
+    max_m = get_max_m(model)
+    quad_points = model.quad_points
+    FT = CoreRT.float_type(model)
 
-    n_aer = isnothing(model.params.scattering_params) ? 0 : length(model.params.scattering_params.rt_aerosols)
-    
+    n_aer = CoreRT.n_aerosols(model)
+
     # Also to be changed if more than 1 band is used!!
     # CFRANKEN NEEDS to be changed for concatenated arrays!!
-    brdf = model.params.brdf[iBand[1]]
+    brdf = get_surface(model, iBand[1])
 
     (; ϖ_Cabannes) = RS_type
 
@@ -59,11 +59,12 @@ function rt_run_canopy(RS_type::AbstractRamanType,
         push!(RS_type.bandSpecLim,nSpec0:nSpec);                
     end
 
-    arr_type = array_type(model.params.architecture) # Type of array to use
+    arr_type = CoreRT.array_type(model) # Type of array to use
+    arch = CoreRT.architecture(model)
     SFI = true                          # SFI flag
     NquadN =  Nquad * pol_type.n         # Nquad (multiplied by Stokes n)
     dims   = (NquadN,NquadN)              # nxn dims
-    
+
     # Output arrays for reflected and transmitted solar irradiation
     R       = zeros(FT, length(vza), pol_type.n, nSpec)
     T       = zeros(FT, length(vza), pol_type.n, nSpec)
@@ -75,11 +76,11 @@ function rt_run_canopy(RS_type::AbstractRamanType,
     bhr_dw     = zeros(FT, pol_type.n, nSpec) # for RAMI
     bhr_uw     = zeros(FT, pol_type.n, nSpec) # for RAMI
     hdr_J₀⁻    = zeros(FT, length(vza), pol_type.n, nSpec) # for RAMI
-    #  bhr[i] = bhr_uw[i,:]./bhr_dw[1,:]   
+    #  bhr[i] = bhr_uw[i,:]./bhr_dw[1,:]
     # Notify user of processing parameters
-    msg = 
+    msg =
     """
-    Processing on: $(model.params.architecture)
+    Processing on: $(arch)
     With FT: $(FT)
     Source Function Integration: $(SFI)
     Dimensions: $((NquadN, NquadN, nSpec))
@@ -171,19 +172,19 @@ function rt_run_canopy(RS_type::AbstractRamanType,
                         scattering_interfaces_all[iz], 
                         τ_sum_all[:,iz], 
                         m, quad_points, 
-                        I_static, 
-                        model.params.architecture, 
-                        qp_μN, iz) 
-        end 
+                        I_static,
+                        arch,
+                        qp_μN, iz)
+        end
 
         # Create surface matrices:
-        create_surface_layer!(brdf, 
-                            added_layer_surface, 
-                            SFI, m, 
-                            pol_type, 
-                            quad_points, 
-                            arr_type(τ_sum_all[:,end]), 
-                            model.params.architecture);
+        create_surface_layer!(brdf,
+                            added_layer_surface,
+                            SFI, m,
+                            pol_type,
+                            quad_points,
+                            arr_type(τ_sum_all[:,end]),
+                            arch);
         
         #@show composite_layer.J₀⁺[iμ₀,1,1:3]
         # One last interaction with surface:
@@ -250,25 +251,25 @@ end
 #For multisensor use (especially for the computation of TOC parameters)
 
 function rt_run_canopy_ms(RS_type::AbstractRamanType,
-                            sensor_levels::Vector{Int64}, 
-                            model::vSmartMOM_Model, 
-                            LAD, LAI, 
-                            BiLambMod, 
-                            ϖ_canopy, 
+                            sensor_levels::Vector{Int64},
+                            model,
+                            LAD, LAI,
+                            BiLambMod,
+                            ϖ_canopy,
                             iBand)
 
     (; obs_alt, sza, vza, vaz) = model.obs_geom   # Observational geometry properties
     (; qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart, μ₀, iμ₀, Nquad) = model.quad_points # All quadrature points
-    pol_type = model.params.polarization_type
-    (; max_m) = model.params
-    (; quad_points) = model
-    FT = model.params.float_type
+    pol_type = CoreRT.polarization_type(model)
+    max_m = get_max_m(model)
+    quad_points = model.quad_points
+    FT = CoreRT.float_type(model)
     sensor_levels = [0,1] #dummy to be redefined to [0, Nz-1] when all layers including canopy layer are defined
-    n_aer = isnothing(model.params.scattering_params) ? 0 : length(model.params.scattering_params.rt_aerosols)
+    n_aer = CoreRT.n_aerosols(model)
 
     # Also to be changed if more than 1 band is used!!
     # CFRANKEN NEEDS to be changed for concatenated arrays!!
-    brdf = model.params.brdf[iBand[1]]
+    brdf = get_surface(model, iBand[1])
 
     (; ϖ_Cabannes) = RS_type
 
@@ -286,7 +287,8 @@ function rt_run_canopy_ms(RS_type::AbstractRamanType,
         push!(RS_type.bandSpecLim,nSpec0:nSpec);                
     end
 
-    arr_type = array_type(model.params.architecture) # Type of array to use
+    arr_type = CoreRT.array_type(model) # Type of array to use
+    arch = CoreRT.architecture(model)
     SFI = true                          # SFI flag
     NquadN =  Nquad * pol_type.n         # Nquad (multiplied by Stokes n)
     dims   = (NquadN,NquadN)              # nxn dims
@@ -311,7 +313,7 @@ function rt_run_canopy_ms(RS_type::AbstractRamanType,
     # Notify user of processing parameters
     msg = 
     """
-    Processing on: $(model.params.architecture)
+    Processing on: $(arch)
     With FT: $(FT)
     Source Function Integration: $(SFI)
     Dimensions: $((NquadN, NquadN, nSpec))
@@ -319,14 +321,14 @@ function rt_run_canopy_ms(RS_type::AbstractRamanType,
     @info msg
 
     # Create arrays
-    @timeit "Creating layers" added_layer         = 
+    @timeit "Creating layers" added_layer         =
         make_added_layer(RS_type, FT, arr_type, dims, nSpec)
     # Just for now, only use noRS here
-    @timeit "Creating layers" added_layer_surface = 
+    @timeit "Creating layers" added_layer_surface =
         make_added_layer(RS_type, FT, arr_type, dims, nSpec)
-    @timeit "Creating layers" composite_layer     = 
+    @timeit "Creating layers" composite_layer     =
         make_composite_layer(RS_type, FT, arr_type, length(sensor_levels), dims, nSpec)
-    @timeit "Creating arrays" I_static = 
+    @timeit "Creating arrays" I_static =
         Diagonal(arr_type(Diagonal{FT}(ones(dims[1]))));
 
     #TODO: if RS_type!=noRS, create ϖ_λ₁λ₀, i_λ₁λ₀, fscattRayl, Z⁺⁺_λ₁λ₀, Z⁻⁺_λ₁λ₀ (for input), and ieJ₀⁺, ieJ₀⁻, ieR⁺⁻, ieR⁻⁺, ieT⁻⁻, ieT⁺⁺, ier⁺⁻, ier⁻⁺, iet⁻⁻, iet⁺⁺ (for output)
@@ -406,7 +408,7 @@ function rt_run_canopy_ms(RS_type::AbstractRamanType,
                     τ_sum_all[:,iz], 
                     m, quad_points, 
                     I_static, 
-                    model.params.architecture, 
+                    arch, 
                     qp_μN, iz, arr_type) 
 
             if (iz==Nz)
@@ -423,7 +425,7 @@ function rt_run_canopy_ms(RS_type::AbstractRamanType,
                     pol_type, 
                     quad_points, 
                     arr_type(τ_sum_all[:,end]), 
-                    model.params.architecture);
+                    arch);
 
         for ims=1:length(sensor_levels)
             # One last interaction with surface:

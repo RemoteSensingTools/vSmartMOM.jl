@@ -58,14 +58,14 @@ end
 
     model = model_from_parameters(params)
     @test !isnothing(model)
-    @test model.params.brdf[1] isa CanopySurface
+    @test model.surfaces[1] isa CanopySurface
 
     result = rt_run(model; i_band=1)
     R = result isa Tuple ? result[1] : result
 
     nVza = length(model.obs_geom.vza)
-    nStokes = model.params.polarization_type.n
-    nSpec = length(model.params.spec_bands[1])
+    nStokes = CoreRT.polarization_type(model).n
+    nSpec = length(model.atmosphere.spec_bands[1])
 
     @test ndims(R) == 3
     @test size(R, 1) == nVza
@@ -92,7 +92,7 @@ end
     model_lamb   = model_from_parameters(params_lamb)
 
     R_canopy = rt_run(model_canopy; i_band=1)[1]
-    invalidate_canopy_cache!(model_canopy.params.brdf[1])
+    invalidate_canopy_cache!(model_canopy.surfaces[1])
     R_lamb   = rt_run(model_lamb; i_band=1)[1]
 
     @test all(isfinite.(R_canopy))
@@ -113,12 +113,12 @@ end
     params.brdf[1] = CanopySurface(; soil=soil, LAI=LAI, n_layers=1)
     model1 = model_from_parameters(params)
     R1 = rt_run(model1; i_band=1)[1]
-    invalidate_canopy_cache!(model1.params.brdf[1])
+    invalidate_canopy_cache!(model1.surfaces[1])
 
     params.brdf[1] = CanopySurface(; soil=soil, LAI=LAI, n_layers=4)
     model4 = model_from_parameters(params)
     R4 = rt_run(model4; i_band=1)[1]
-    invalidate_canopy_cache!(model4.params.brdf[1])
+    invalidate_canopy_cache!(model4.surfaces[1])
 
     @test all(isfinite.(R1))
     @test all(isfinite.(R4))
