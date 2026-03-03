@@ -22,19 +22,7 @@ using vSmartMOM.Scattering
 using Distributions
 using FastGaussQuadrature
 using Parameters
-
-const HAS_PLOTS = let
-    try
-        @eval using Plots
-        true
-    catch
-        false
-    end
-end
-
-if !HAS_PLOTS
-    @info "Plots.jl not available; plotting sections in this tutorial are skipped."
-end
+using CairoMakie
 ```
 
 ---
@@ -94,18 +82,16 @@ println("fᵗ = ", aerosol_optics_NAI2.fᵗ)
 ```julia
 (; α, β, γ, δ, ϵ, ζ) = aerosol_optics_NAI2.greek_coefs
 
-if HAS_PLOTS
-    p1 = plot(α, title="α")
-    p2 = plot(β, title="β")
-    p3 = plot(γ, title="γ")
-    p4 = plot(δ, title="δ")
-    p5 = plot(ϵ, title="ϵ")
-    p6 = plot(ζ, title="ζ")
-    plot(p1, p2, p3, p4, p5, p6, layout=(3, 2), legend=false)
-    xlims!(0, 100)
-else
-    println("Skipping Greek-coefficient plots (Plots.jl not installed).")
+fig = Figure(size=(700, 700))
+coef_names = ["α", "β", "γ", "δ", "ϵ", "ζ"]
+coef_data  = [α, β, γ, δ, ϵ, ζ]
+for i in 1:6
+    row, col = fldmod1(i, 2)
+    ax = Axis(fig[row, col], title=coef_names[i], xlabel="l")
+    lines!(ax, coef_data[i])
+    xlims!(ax, 0, 100)
 end
+fig
 ```
 
 These coefficients are Fourier-space quantities used by RT kernels.
@@ -119,36 +105,41 @@ Reconstruct angle-dependent phase-matrix elements only when needed.
 μ_quad, _ = gausslegendre(500)
 scattering_matrix = reconstruct_phase(aerosol_optics_NAI2.greek_coefs, μ_quad)
 (; f₁₁, f₁₂, f₂₂, f₃₃, f₃₄, f₄₄) = scattering_matrix
+```
 
-if HAS_PLOTS
-    p1 = plot(μ_quad, f₁₁, yscale=:log10, title="f₁₁")
-    p2 = plot(μ_quad, f₁₂ ./ f₁₁, title="f₁₂/f₁₁")
-    plot(p1, p2, layout=(2, 1), legend=false)
-    xlabel!("cos(Θ)")
+Plot the phase function and degree of linear polarization as a function of scattering angle:
 
-    # Polar view (Θ = 0: forward direction)
-    p1 = plot(
-        [acos.(μ_quad); -reverse(acos.(μ_quad))],
-        log10.([f₁₁; reverse(f₁₁)]),
-        proj=:polar,
-        yscale=:log10,
-        title="f₁₁",
-        lims=(-3, 4.2),
-        yaxis=false,
-    )
-    p2 = plot(
-        [acos.(μ_quad); -reverse(acos.(μ_quad))],
-        [abs.(f₁₂ ./ f₁₁); reverse(f₁₂ ./ f₁₁)],
-        proj=:polar,
-        title="f₁₂/f₁₁",
-        lims=(0, 0.6),
-        yaxis=false,
-    )
-    plot(p1, p2, layout=(1, 2), legend=false)
-    xlabel!("Θ")
-else
-    println("Skipping phase-matrix plots (Plots.jl not installed).")
-end
+```julia
+Θ = rad2deg.(acos.(μ_quad))
+
+fig = Figure(size=(700, 600))
+ax1 = Axis(fig[1,1], ylabel="f₁₁", yscale=log10)
+lines!(ax1, Θ, f₁₁)
+
+ax2 = Axis(fig[2,1], ylabel="f₁₂ / f₁₁", xlabel="Scattering angle (°)")
+lines!(ax2, Θ, f₁₂ ./ f₁₁)
+fig
+```
+
+The forward peak in f₁₁ is characteristic of Mie scattering by particles larger than the wavelength.
+The f₁₂/f₁₁ ratio gives the degree of linear polarization for unpolarized incident light.
+
+Polar view of the phase function and polarization ratio:
+
+```julia
+fig = Figure(size=(800, 400))
+θ_rad = acos.(μ_quad)
+θ_full = vcat(θ_rad, .-reverse(θ_rad))
+f₁₁_full = vcat(f₁₁, reverse(f₁₁))
+ratio = f₁₂ ./ f₁₁
+ratio_full = vcat(abs.(ratio), reverse(abs.(ratio)))
+
+ax1 = PolarAxis(fig[1,1], title="log₁₀(f₁₁)")
+lines!(ax1, θ_full, log10.(f₁₁_full))
+
+ax2 = PolarAxis(fig[1,2], title="|f₁₂/f₁₁|")
+lines!(ax2, θ_full, ratio_full)
+fig
 ```
 
 ---
@@ -208,28 +199,26 @@ Set `ENV["VSMARTMOM_RUN_HEAVY_DOCS"]="true"` before execution to enable.
 
 ```julia
 if get(ENV, "VSMARTMOM_RUN_HEAVY_DOCS", "false") == "true"
-    if HAS_PLOTS
-        anim = Plots.Animation()
-        for r = 0.03:0.10:4.3
-            local size_distribution_i = LogNormal(log(r), log(σ))
-            local aero_i = Aerosol(size_distribution_i, nᵣ, nᵢ)
-            local model_i = make_mie_model(NAI2(), aero_i, λ, polarization_type, truncation_type, r_max, nquad_radius)
-            local optics_i = compute_aerosol_optical_properties(model_i)
-            local smat_i = reconstruct_phase(optics_i.greek_coefs, μ_quad)
-
-            local p1_i = plot(μ_quad, smat_i.f₁₁, yscale=:log10, title="f₁₁, r = $(round(r, digits=2)) μm")
-            ylims!(1e-3, 1e3)
-            local p2_i = plot(μ_quad, smat_i.f₁₂ ./ smat_i.f₁₁, title="f₁₂/f₁₁")
-            ylims!(-1.1, 1.1)
-            local p = plot(p1_i, p2_i, layout=(2, 1), legend=false, size=(600, 700))
-            Plots.frame(anim, p)
-        end
-        Plots.gif(anim, fps=5)
-    else
-        @warn "Skipping heavy animation because Plots.jl is not installed."
+    fig = Figure(size=(600, 700))
+    ax1 = Axis(fig[1,1], yscale=log10, ylabel="f₁₁", xlabel="cos(Θ)")
+    ax2 = Axis(fig[2,1], ylabel="f₁₂/f₁₁", xlabel="cos(Θ)")
+    record(fig, joinpath(@__DIR__, "scattering_radius_sweep.gif"), 0.03:0.10:4.3; framerate=5) do r
+        empty!(ax1); empty!(ax2)
+        local size_distribution_i = LogNormal(log(r), log(σ))
+        local aero_i = Aerosol(size_distribution_i, nᵣ, nᵢ)
+        local model_i = make_mie_model(NAI2(), aero_i, λ, polarization_type, truncation_type, r_max, nquad_radius)
+        local optics_i = compute_aerosol_optical_properties(model_i)
+        local smat_i = reconstruct_phase(optics_i.greek_coefs, μ_quad)
+        lines!(ax1, μ_quad, smat_i.f₁₁)
+        ylims!(ax1, 1e-3, 1e3)
+        ax1.title = "f₁₁, r = $(round(r, digits=2)) μm"
+        lines!(ax2, μ_quad, smat_i.f₁₂ ./ smat_i.f₁₁)
+        ylims!(ax2, -1.1, 1.1)
     end
 end
 ```
+
+![Scattering phase function radius sweep](scattering_radius_sweep.gif)
 
 ---
 

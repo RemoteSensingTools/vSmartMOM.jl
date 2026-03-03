@@ -30,6 +30,7 @@ include("complex_error_functions.jl")               # CEFs used in line broadeni
 include("make_model_helpers.jl")                  # CS interpolator functions
 include("compute_absorption_cross_section.jl")      # Cross-section from HITRAN
 include("autodiff_helper.jl")                       # Auto-differentiation
+include("show_utils.jl")                             # Pretty-printing
 
 # Export the Cross Section models
 export AbstractCrossSectionModel, HitranModel, InterpolationModel

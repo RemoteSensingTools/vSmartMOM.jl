@@ -52,6 +52,6 @@ params2 = read_parameters(cfg)
 - Decomposition: `NAI2`, `PCW`
 - Broadening: `Voigt`, `Lorentz`, `Doppler`
 - Complex error function: `HumlicekWeidemann32SDErrorFunction`
-- Surfaces (BRDF): LambertianSurfaceScalar, LambertianSurfaceSpectrum, LambertianSurfaceLegendre, rpvSurfaceScalar, RossLiSurfaceScalar
+- Surfaces (BRDF): LambertianSurfaceScalar, LambertianSurfaceSpectrum, LambertianSurfaceLegendre, LambertianSurfaceSpline, rpvSurfaceScalar, RossLiSurfaceScalar, CoxMunkSurface, CanopySurface
 
 All are passed in as strings in the YAML and mapped safely (without eval, except for spec_bands range expressions).

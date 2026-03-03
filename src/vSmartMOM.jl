@@ -68,26 +68,7 @@ using .Absorption
 
 # Module initialization - GPU setup happens in CUDAExt when CUDA is loaded
 function __init__()
-    # Small delay to let CUDA extension initialize first if it's loading
-    sleep(0.05)
-    
-    # Only show CPU message if CUDA is truly not available
-    # (CUDAExt will show its own message if GPU is available)
-    if !has_cuda()
-        # Pretty startup message for CPU-only mode
-        println()
-        println("┌─────────────────────────────────────────────────────────")
-        println("│ ⚡ vSmartMOM Radiative Transfer")
-        println("├─────────────────────────────────────────────────────────")
-        println("│  Execution Mode: CPU")
-        println("│  Backend:        KernelAbstractions.CPU()")
-        println("│")
-        println("│  💡 For GPU acceleration:")
-        println("│     julia> using Pkg; Pkg.add(\"CUDA\")")
-        println("│     (Requires NVIDIA GPU with compatible drivers)")
-        println("└─────────────────────────────────────────────────────────")
-        println()
-    end
+    # Nothing to do here; GPU detection is handled by the CUDA extension
 end
 
 end

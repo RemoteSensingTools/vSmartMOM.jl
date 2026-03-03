@@ -60,6 +60,49 @@ If you are coming from `miepython`, this is the closest functional mapping:
 
 This module is oriented toward atmospheric RT pipelines where Fourier moments (Greek coefficients) are the main interface.
 
+## Mathematical Background
+
+### Mie Cross-Sections
+
+The extinction and scattering cross-sections for a single sphere are computed from the Mie coefficients ``a_n`` and ``b_n`` (Sanghavi 2014, Eq. 1):
+
+```math
+C_\text{ext} = \frac{2\pi}{k^2}\sum_{n=1}^{\infty}(2n+1)\,\text{Re}(a_n+b_n)
+```
+```math
+C_\text{scat} = \frac{2\pi}{k^2}\sum_{n=1}^{\infty}(2n+1)(|a_n|^2+|b_n|^2)
+```
+
+where ``k = 2\pi/\lambda`` and the sum is truncated at a size-parameter-dependent ``n_\text{max}``.
+
+### Scattering Matrix
+
+The 4x4 scattering matrix ``\mathbf{F}(\xi)`` for a single sphere has the form (Sanghavi 2014, Eq. 2):
+
+```math
+\mathbf{F}(\xi) = \begin{pmatrix}f_{11} & f_{12} & 0 & 0\\f_{12} & f_{22} & 0 & 0\\0 & 0 & f_{33} & f_{34}\\0 & 0 & -f_{34} & f_{44}\end{pmatrix}
+```
+
+For spherical particles, ``f_{11} = f_{22}`` and ``f_{33} = f_{44}``, leaving four independent elements.
+
+### Greek Coefficient Matrix
+
+The Greek matrix ``\mathbf{B}_l`` provides the Fourier-space representation of the scattering matrix (Sanghavi 2014, Eq. 16):
+
+```math
+\mathbf{B}_l = \begin{pmatrix}\beta_l & \gamma_l & 0 & 0\\\gamma_l & \alpha_l & 0 & 0\\0 & 0 & \zeta_l & -\epsilon_l\\0 & 0 & \epsilon_l & \delta_l\end{pmatrix}
+```
+
+The six Greek coefficients ``(\alpha, \beta, \gamma, \delta, \epsilon, \zeta)`` are the compact representation stored in `GreekCoefs` and used by the RT kernels.
+
+### NAI2 vs PCW Performance
+
+The two decomposition methods have different computational trade-offs:
+
+> "For polydispersions over a finite range of particle sizes, PCW is found to be at least 6--8 times faster for size parameters ranging from ~0 to beyond 900." -- Sanghavi (2014)
+
+NAI2 is the default due to its simplicity and lower memory footprint (no precomputed Wigner tables required). PCW becomes advantageous for large size parameters or when many repeated computations amortize the Wigner table precomputation.
+
 ## Conventions
 
 - Refractive index input uses `n_r` and `n_i >= 0`

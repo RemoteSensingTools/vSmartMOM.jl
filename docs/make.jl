@@ -4,9 +4,7 @@ using vSmartMOM
 using vSmartMOM.Absorption
 using vSmartMOM.Scattering
 using vSmartMOM.CoreRT
-using Plots 
-
-ENV["GKSwstype"] = "nul"
+using CairoMakie
 
 function build()
 
@@ -22,14 +20,15 @@ function build()
 
     pages = Any[
         "Getting Started"       => "index.md",
-        "API Reference"        => "pages/api_reference.md",
+        "Architecture & Design" => "design.md",
+        "API Reference"         => "pages/api_reference.md",
         "IO"                    => Any[
                                     "Overview" => "pages/IO/Overview.md",
                                     "Schema" => "pages/IO/Schema.md",
                                     "Examples" => "pages/IO/Examples.md",
                                    ],
         "vSmartMOM"             => Any[
-                                    "Overview" => "pages/vSmartMOM/Overview.md", 
+                                    "Overview" => "pages/vSmartMOM/Overview.md",
                                     "Example" => "pages/vSmartMOM/Example.md",
                                     "User-Defined RT Parameters" => "pages/vSmartMOM/InputParametersGuide.md",
                                     "Methods & Types" => "pages/vSmartMOM/Types.md",
@@ -49,6 +48,7 @@ function build()
                                     "Methods & Types" => "pages/Scattering/Types.md",
                                     "References" => "pages/Scattering/References.md"
                                     ],
+        "GEOSChem Integration"  => "pages/geoschem_integration.md",
         "Tutorials"             => tutorials_md
     ]
 

@@ -29,6 +29,7 @@ polarized Cox-Munk ocean surface.
 ```julia
 using vSmartMOM
 using vSmartMOM.CoreRT
+using CairoMakie
 ```
 
 ## 1) Overview
@@ -404,6 +405,19 @@ params2.brdf[1] = LambertianSurfaceScalar(0.06)
 model2 = model_from_parameters(params2)
 R2, T2 = rt_run(model2)
 println("R(nadir, I) Lambertian 0.06: ", R2[1, 1, 1])
+```
+
+Compare the reflectance spectra from the two surface types:
+
+```julia
+fig = Figure(size=(700, 450))
+ax = Axis(fig[1,1],
+    xlabel = "Spectral index",
+    ylabel = "TOA Reflectance (Stokes I)")
+lines!(ax, R[1, 1, :],  label="Cox-Munk (U=5 m/s)")
+lines!(ax, R2[1, 1, :], label="Lambertian (α=0.06)")
+axislegend(ax, position=:rt)
+fig
 ```
 
 ---

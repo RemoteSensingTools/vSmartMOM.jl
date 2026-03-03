@@ -33,14 +33,33 @@ export geoschem_to_dict, read_geoschem_profile
 """
     parameters_from_yaml(path::AbstractString) -> vSmartMOM_Parameters
 
-Load a YAML configuration file into a `vSmartMOM_Parameters` object.
+Load a YAML configuration file and return a fully populated
+[`vSmartMOM_Parameters`](@ref) object.
 
-- Dispatches to the formats registry based on file extension (currently YAML).
-- Validates required keys and types; supports optional absorption and scattering blocks.
-- See docs: vSmartMOM → User-Defined RT Parameters and IO Guide for schema and examples.
+Parses the `radiative_transfer`, `geometry`, `atmospheric_profile`,
+`absorption`, and `scattering` YAML sections.  Surface types are resolved
+via `BRDF_MAP`; quadrature, polarization, and broadening via their
+respective maps in `Parameters.jl`.
+
+# Arguments
+- `path::AbstractString`: Path to the YAML configuration file.
+
+# Returns
+- `params::vSmartMOM_Parameters{FT}`: Parsed parameter struct ready for
+  [`model_from_parameters`](@ref).
+
+# Example
+```julia
+using vSmartMOM
+params = parameters_from_yaml("config/my_scene.yaml")
+params.architecture = vSmartMOM.Architectures.CPU()
+model = model_from_parameters(params)
+```
+
+# See also
+- [`parameters_from_dict`](@ref) for loading from an in-memory Dict.
+- [`model_from_parameters`](@ref) to build the RT model.
 """
-
-"Load parameters from a file path using the formats registry"
 function parameters_from_yaml(file_path::AbstractString)
     cfg = Formats.load_config(Formats.FileSource(String(file_path)))
     return parameters_from_dict(cfg)

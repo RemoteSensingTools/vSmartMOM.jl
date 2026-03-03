@@ -18,7 +18,27 @@ Abstract aerosol type
 """
 abstract type AbstractAerosolType end
 
-"Aerosol type with its properties (size distribution and refractive index)"
+"""
+    Aerosol
+
+Aerosol microphysical properties: particle size distribution and complex
+refractive index.  Used as input to [`MieModel`](@ref) for computing
+single-scattering optical properties via Lorenz-Mie theory.
+
+The refractive index convention is `n = nᵣ - i·nᵢ`, where positive `nᵢ`
+indicates absorption.
+
+# Fields
+- `size_distribution::ContinuousUnivariateDistribution`: Particle radius distribution (e.g., `LogNormal`). Units: μm.
+- `nᵣ`: Real part of the refractive index (relative to air).
+- `nᵢ`: Imaginary part of the refractive index (absorption).
+
+# Example
+```julia
+using Distributions
+aer = Aerosol(LogNormal(log(0.3), 0.4), 1.3, 0.01)
+```
+"""
 mutable struct Aerosol{}
     "Univariate size distribution"
     size_distribution::ContinuousUnivariateDistribution

@@ -17,6 +17,7 @@ single RT pass — no finite differences needed.
 ```julia
 using vSmartMOM
 using vSmartMOM.CoreRT
+using CairoMakie
 
 params = parameters_from_yaml(
     joinpath(dirname(dirname(pathof(vSmartMOM))),
@@ -63,6 +64,16 @@ println("R  shape: ", size(R))
 println("dR shape: ", size(dR))
 ```
 
+Plot the forward reflectance spectrum:
+
+```julia
+fig = Figure(size=(700, 400))
+ax = Axis(fig[1,1], xlabel="Spectral index", ylabel="TOA Reflectance (Stokes I)")
+lines!(ax, R[1, 1, :], label="Nadir")
+axislegend(ax, position=:rt)
+fig
+```
+
 ## 4) Interpret the Jacobian layout
 
 The derivative dimension of `dR` is ordered as:
@@ -100,6 +111,39 @@ if NGas > 0
     println("dR/d(gas₁ VMR) at nadir, first 5 points: ",
             round.(dR_gas1[1, 1:min(5,end)], digits=6))
 end
+```
+
+Plot spectral Jacobians for the main parameter types:
+
+```julia
+fig = Figure(size=(700, 500))
+ax = Axis(fig[1,1],
+    xlabel = "Spectral index",
+    ylabel = "dR/dx (Stokes I, nadir)",
+    title  = "Spectral Jacobians")
+
+lines!(ax, dR[1, 1, :, end], label="dR/d(albedo)")
+if NGas > 0
+    lines!(ax, dR[1, 1, :, NAer * 7 + 1], label="dR/d(gas₁ VMR)")
+end
+if NAer > 0
+    lines!(ax, dR[1, 1, :, 1], label="dR/d(aer₁ param₁)")
+end
+axislegend(ax, position=:rt)
+fig
+```
+
+Jacobian heatmap (all parameters):
+
+```julia
+fig = Figure(size=(700, 450))
+ax = Axis(fig[1,1],
+    xlabel = "Parameter index",
+    ylabel = "Spectral index",
+    title  = "Full Jacobian matrix dR/dx")
+hm = heatmap!(ax, dR[1, 1, :, :]')
+Colorbar(fig[1,2], hm, label="dR/dx")
+fig
 ```
 
 ## 6) Verify against finite differences (optional)
