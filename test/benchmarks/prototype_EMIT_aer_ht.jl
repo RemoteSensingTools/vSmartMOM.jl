@@ -31,11 +31,24 @@ pert_parameters = perturb_parameters(parameters, pert_pct)
 # Create model struct (precomputes optical properties) from parameters
 model, lin_model = model_from_parameters(lin_mode, 
     parameters);
-#compute_FD_modelJacobian(parameters, pert_pct)
+#=
+model1, lin_model1 = model_from_parameters(lin_mode, 
+    pert_parameters[1]);
+model2, lin_model2 = model_from_parameters(lin_mode, 
+    pert_parameters[2]);
+model3, lin_model3 = model_from_parameters(lin_mode, 
+    pert_parameters[3]);
+model4, lin_model4 = model_from_parameters(lin_mode, 
+    pert_parameters[4]);
+model5, lin_model5 = model_from_parameters(lin_mode, 
+    pert_parameters[5]);
+model6, lin_model6 = model_from_parameters(lin_mode, 
+    pert_parameters[6]);=#
+    #compute_FD_modelJacobian(parameters, pert_pct)
 @show "hello"
 iBand = 1
 
-T_sun = FT(5777.) # K 
+T_sun = FT(5777.) # K K6
 Tsolar = solar_transmission_from_file("/home/sanghavi/code/github/vSmartMOM.jl/src/SolarModel/solar.out")    
 Tsolar_interp = LinearInterpolation(Tsolar[4:end, 1], Tsolar[4:end, 2])
 x = (-40:0.05:40)
@@ -68,11 +81,13 @@ for iBand=1:length(model.params.spec_bands)
 
     P = planck_spectrum_wn(T_sun, ν)
     F₀ = zeros(FT,length(P));
+    RS_type.SIF₀ = zeros(FT, model.params.polarization_type.n, length(P));
     RS_type.F₀ = zeros(FT, model.params.polarization_type.n, length(P))
     for i=1:length(P)
         sol_trans = Tsolar_interp(ν[i]);
         F₀[i] = FT(sol_trans * P[i]);
         RS_type.F₀[1,i] = F₀[i];
+        #RS_type.SIF₀[1,i] = 0.0;
     end 
     NAer = length(model.params.scattering_params.rt_aerosols)
     NGas = 1+length(model.params.absorption_params.variable_molecules)

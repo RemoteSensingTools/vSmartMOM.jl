@@ -22,7 +22,7 @@ function compute_Z_moments(mod::AbstractPolarizationType, μ, greek_coefs::Greek
     @assert all(0 .< μ .≤ 1) "all μ's within compute_Z_moments have to be ∈ ]0,1]"
 
     # Compute legendre Polynomials at μ and up to lmax
-    P, R, T    = compute_associated_legendre_PRT(μ, l_max)
+    P, R, T    = compute_associated_legendre_PRT( μ, l_max)
     P⁻, R⁻, T⁻ = compute_associated_legendre_PRT(-μ, l_max)
   
     # Pre-compute all required B matrices

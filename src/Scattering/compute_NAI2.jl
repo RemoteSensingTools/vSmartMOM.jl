@@ -83,7 +83,7 @@ function compute_aerosol_optical_properties(model::MieModel{FDT}, FT2::Type=Floa
         n_ = 2n_ .+ 1
 
         # Pre-allocate Dₙ  :
-        y = x_size_param[i] * (aerosol.nᵣ - im*aerosol.nᵢ);
+        y = x_size_param[i] * (aerosol.nᵣ - im*aerosol.nᵢ * im);
         nmx = round(Int, max(n_max, abs(y)) + 51)
         Dₙ  = zeros(Complex{FT}, nmx)
 
@@ -106,7 +106,8 @@ function compute_aerosol_optical_properties(model::MieModel{FDT}, FT2::Type=Floa
     # Calculate bulk scattering and extinction cross-sections
     bulk_C_sca =  sum(wₓ .* C_sca)
     bulk_C_ext =  sum(wₓ .* C_ext)
-    
+    bulk_ϖ = bulk_C_sca / bulk_C_ext
+
     # Compute bulk scattering 
     wr = (4π * r.^2 .*  wₓ) 
     bulk_f₁₁   =  f₁₁ * wr
@@ -161,11 +162,11 @@ function compute_aerosol_optical_properties(model::MieModel{FDT}, FT2::Type=Floa
                                  convert.(FT2, ϵ), 
                                  convert.(FT2, ζ))
         # Return the packaged AerosolOptics object
-        return AerosolOptics(greek_coefs=greek_coefs, ω̃=FT2(bulk_C_sca / bulk_C_ext), k=FT2(bulk_C_ext), fᵗ=FT2(1))
+        return AerosolOptics(greek_coefs=greek_coefs, ω̃=FT2(bulk_ϖ), k=FT2(bulk_C_ext), fᵗ=FT2(1))
 
     else
         greek_coefs = GreekCoefs(α, β, γ, δ, ϵ, ζ)
-        return AerosolOptics(greek_coefs=greek_coefs, ω̃=(bulk_C_sca / bulk_C_ext), k=(bulk_C_ext), fᵗ=FT(1))
+        return AerosolOptics(greek_coefs=greek_coefs, ω̃=(bulk_ϖ), k=(bulk_C_ext), fᵗ=FT(1))
     end
 end
 

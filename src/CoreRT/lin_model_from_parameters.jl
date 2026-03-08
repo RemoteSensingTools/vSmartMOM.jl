@@ -512,10 +512,9 @@ function model_from_parameters(lin::LinMode,
                 
             for ctr=1:4
                 τ̇_aer[i_band][i_aer,ctr+1,:,:] = 
-                    ((params.scattering_params.rt_aerosols[i_aer].τ_ref/k_ref) * 
-                    lin_aerosol_optics[i_band][i_aer].k̇[ctr,:] .- 
-                    (params.scattering_params.rt_aerosols[i_aer].τ_ref/k_ref^2) * 
-                    k̇_ref[ctr])*τₚ'
+                    (params.scattering_params.rt_aerosols[i_aer].τ_ref/k_ref) * 
+                    (lin_aerosol_optics[i_band][i_aer].k̇[ctr,:] .- aerosol_optics[i_band][i_aer].k * k̇_ref[ctr]/k_ref) * 
+                    τₚ'
             end
             for ctr=5:6
                 τ̇_aer[i_band][i_aer,ctr+1,:,:] = 

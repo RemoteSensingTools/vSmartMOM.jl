@@ -156,8 +156,6 @@ end
 =#
 "Elemental single-scattering layer"
 function elemental!(pol_type, SFI::Bool, 
-                τ_sum::AbstractArray,#{FT2,1}, #Suniti
-                τ̇_sum::AbstractArray,
                 dτ::AbstractArray,
                 F₀::AbstractArray,#{FT,2},    # Stokes vector of solar/stellar irradiance
                 computed_layer_properties,
@@ -179,10 +177,12 @@ function elemental!(pol_type, SFI::Bool,
     # Need to check with paper nomenclature. This is basically eqs. 19-20 in vSmartMOM
     qp_μN = arr_type(qp_μN)
     wt_μN = arr_type(wt_μN)
-    τ_sum = arr_type(τ_sum)
-    τ̇_sum = arr_type(τ̇_sum)
+    #τ_sum = arr_type(τ_sum)
+    #τ̇_sum = arr_type(τ̇_sum)
     I₀    = arr_type(pol_type.I₀)
     D = Diagonal(arr_type(repeat(pol_type.D, size(qp_μ,1))))
+
+    elem_fct = FT(1.0 / 2^ndoubl)
 
     device = devi(architecture)
     #@show typeof(ϖ),typeof(dτ),typeof(Z⁻⁺),typeof(Z⁺⁺) 
@@ -191,6 +191,16 @@ function elemental!(pol_type, SFI::Bool,
     #Z⁻⁺ = arr_type(Z⁻⁺);
     #Z⁺⁺ = arr_type(Z⁺⁺);
     #@show size(Z⁻⁺), size(ϖ)
+    
+    r⁻⁺ .= FT(0.0) 
+    t⁺⁺ .= FT(0.0)
+    ṙ⁻⁺ .= FT(0.0)
+    ṫ⁺⁺ .= FT(0.0)
+    J₀⁺ .= FT(0.0)
+    J₀⁻ .= FT(0.0)
+    J̇₀⁺ .= FT(0.0)
+    J̇₀⁻ .= FT(0.0)
+
     # If in scattering mode:
     if scatter
    
@@ -198,14 +208,6 @@ function elemental!(pol_type, SFI::Bool,
         # for m>0,  ₀∫²ᵖⁱ cos²(mϕ)dϕ/4π = 0.25  
         wct02 = m == 0 ? FT(0.50)              : FT(0.25)
         wct2  = m == 0 ? wt_μN/2               : wt_μN/4
-        r⁻⁺ .= 0.0 
-        t⁺⁺ .= 0.0
-        ṙ⁻⁺ .= 0.0
-        ṫ⁺⁺ .= 0.0
-        J₀⁺ .= 0.0
-        J₀⁻ .= 0.0
-        J̇₀⁺ .= 0.0
-        J̇₀⁻ .= 0.0
                         
         # More computationally intensive definition of a single scattering layer with variable (0-∞) absorption
         # with absorption in batch mode, low tau_scatt but higher tau_total, needs exact equations
@@ -214,7 +216,9 @@ function elemental!(pol_type, SFI::Bool,
         event = kernel!(r⁻⁺, t⁺⁺,
                     ṙ⁻⁺, ṫ⁺⁺, 
                     ϖ, dτ, Z⁻⁺, Z⁺⁺, 
-                    qp_μN, wct2, ndrange=size(r⁻⁺)); 
+                    qp_μN, wct2, elem_fct, ndrange=size(r⁻⁺)); 
+        #@show t⁺⁺, any(isnan, t⁺⁺)
+
         #@show "Stop event"
         #wait(device, event)
         synchronize_if_gpu()
@@ -225,10 +229,10 @@ function elemental!(pol_type, SFI::Bool,
             event = kernel!(J₀⁺, J₀⁻, 
                 J̇₀⁺, J̇₀⁻, 
                 ϖ, dτ, 
-                arr_type(τ_sum), arr_type(τ̇_sum), 
+                #arr_type(τ_sum), arr_type(τ̇_sum), 
                 Z⁻⁺, Z⁺⁺, 
                 arr_type(F₀), 
-                qp_μN, ndoubl, wct02, 
+                qp_μN, ndoubl, wct02, elem_fct,
                 pol_type.n, I₀, iμ₀, D, ndrange=size(J₀⁺))
             #wait(device, event)
         end
@@ -248,8 +252,8 @@ function elemental!(pol_type, SFI::Bool,
         # Note: τ is not defined here
         t⁺⁺[:] = Diagonal{exp(-τ ./ qp_μN)}
         t⁻⁻[:] = Diagonal{exp(-τ ./ qp_μN)}
-        ṫ⁺⁺[1, :] = Diagonal{exp(-τ ./ qp_μN).*(-1 ./ qp_μN)}
-        ṫ⁻⁻[1, :] = Diagonal{exp(-τ ./ qp_μN).*(-1 ./ qp_μN)}
+        ṫ⁺⁺[1, :] = Diagonal{exp(-τ ./ qp_μN).*(-1 ./ qp_μN)}*elem_fct
+        ṫ⁻⁻[1, :] = Diagonal{exp(-τ ./ qp_μN).*(-1 ./ qp_μN)}*elem_fct
     end    
     #@pack! added_layer = r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, J₀⁺, J₀⁻   
 end
@@ -258,7 +262,7 @@ end
                         ṙ⁻⁺, ṫ⁺⁺, 
                         ϖ_λ, dτ_λ, 
                         Z⁻⁺, Z⁺⁺, 
-                        qp_μN, wct) 
+                        qp_μN, wct, elem_fct) 
     n2 = 1
     i, j, n = @index(Global, NTuple) 
     if size(Z⁻⁺,3)>1
@@ -270,94 +274,160 @@ end
         # d𝐑⁻⁺(μᵢ, μⱼ)/dτ = ϖ ̇𝐙⁻⁺(μᵢ, μⱼ) ̇(1/μᵢ) ̇exp{-τ ̇(1/μᵢ + 1/μⱼ)}  ̇𝑤ⱼ
         # d𝐑⁻⁺(μᵢ, μⱼ)/dϖ = 𝐙⁻⁺(μᵢ, μⱼ) ̇(μⱼ/(μᵢ+μⱼ)) ̇(1 - exp{-τ ̇(1/μᵢ + 1/μⱼ)}) ̇𝑤ⱼ
         # d𝐑⁻⁺(μᵢ, μⱼ)/dZ = ϖ ̇(μⱼ/(μᵢ+μⱼ)) ̇(1 - exp{-τ ̇(1/μᵢ + 1/μⱼ)}) ̇𝑤ⱼ
-        r⁻⁺[i,j,n] = 
-            ϖ_λ[n] * Z⁻⁺[i,j,n2] * 
-            #Z⁻⁺[i,j] * 
-            (qp_μN[j] / (qp_μN[i] + qp_μN[j])) * wct[j] * 
+        tmpF = (qp_μN[j] / (qp_μN[i] + qp_μN[j])) * wct[j] * 
             (1 - exp(-dτ_λ[n] * ((1 / qp_μN[i]) + (1 / qp_μN[j])))) 
+        r⁻⁺[i,j,n] = 
+            ϖ_λ[n] * Z⁻⁺[i,j,n2] * tmpF
+            #Z⁻⁺[i,j] * 
+            
         # derivative wrt τ_λ
         ṙ⁻⁺[1,i,j,n] = 
-            ϖ_λ[n] * Z⁻⁺[i,j,n2] * 
+            ϖ_λ[n] * Z⁻⁺[i,j,n2] * elem_fct *
             (1/qp_μN[i]) * wct[j] * 
             exp(-dτ_λ[n] * ((1 / qp_μN[i]) + (1 / qp_μN[j]))) 
         # derivative wrt ϖ
-        ṙ⁻⁺[2,i,j,n] = r⁻⁺[i,j,n] / ϖ_λ[n]
+        ṙ⁻⁺[2,i,j,n] = Z⁻⁺[i,j,n2] * tmpF
+            #Z⁻⁺[i,j] * 
+            
         # derivative wrt Z
-        ṙ⁻⁺[3,i,j,n] = r⁻⁺[i,j,n] / Z⁻⁺[i,j,n2] 
+        ṙ⁻⁺[3,i,j,n] = ϖ_λ[n] * tmpF
                     
-        if (qp_μN[i] == qp_μN[j])
+        #if (qp_μN[i] == qp_μN[j])
             # 𝐓⁺⁺(μᵢ, μᵢ) = (exp{-τ/μᵢ}(1 + ϖ ̇𝐙⁺⁺(μᵢ, μᵢ) ̇(τ/μᵢ))) ̇𝑤ᵢ
             # d𝐓⁺⁺(μᵢ, μᵢ)/dτ_λ = (exp{-τ/μⱼ}/μᵢ)⋅(ϖ ̇𝐙⁺⁺(μᵢ, μᵢ)⋅(1-τ/μⱼ)-1) ̇𝑤ⱼ  
             # d𝐓⁺⁺(μᵢ, μᵢ)/dϖ_λ = 𝐙⁺⁺(μᵢ, μᵢ)⋅(τ/μᵢ) ̇exp{-τ/μᵢ} ̇𝑤ᵢ
             # d𝐓⁺⁺(μᵢ, μᵢ)/dZ   = ϖ ̇(τ/μᵢ) ̇exp{-τ/μᵢ} ̇𝑤ᵢ
-            if i == j
+        if qp_μN[i] == qp_μN[j]
+            if i==j
                 t⁺⁺[i,j,n] = 
                     exp(-dτ_λ[n] / qp_μN[i]) *
                     (1 + ϖ_λ[n] * Z⁺⁺[i,i,n2] * (dτ_λ[n] / qp_μN[i]) * wct[i])
                 # derivative wrt τ_λ
                 ṫ⁺⁺[1,i,j,n] = 
-                    exp(-dτ_λ[n] / qp_μN[i]) * (1 / qp_μN[i]) *
-                    (-1 + ϖ_λ[n] * Z⁺⁺[i,i,n2] * (1 - dτ_λ[n] / qp_μN[i])) * wct[i]
+                    exp(-dτ_λ[n] / qp_μN[i]) * (-1 / qp_μN[i]) * 
+                    (1 + ϖ_λ[n] * Z⁺⁺[i,i,n2] * wct[i] * (dτ_λ[n] / qp_μN[i] - 1)) *
+                    elem_fct
                 # derivative wrt ϖ_λ
-                ṫ⁺⁺[2,i,j,n] = 
-                    exp(-dτ_λ[n] / qp_μN[i]) *
-                    Z⁺⁺[i,i,n2] * (dτ_λ[n] / qp_μN[i]) * wct[i]    
+                ṫ⁺⁺[2,i,j,n] = exp(-dτ_λ[n] / qp_μN[i]) *
+                    (Z⁺⁺[i,i,n2] * (dτ_λ[n] / qp_μN[i]) * wct[i])
+                    
                 # derivative wrt Z
                 ṫ⁺⁺[3,i,j,n] = 
                     exp(-dτ_λ[n] / qp_μN[i]) *
-                    ϖ_λ[n] * (dτ_λ[n] / qp_μN[i]) * wct[i]
+                    (ϖ_λ[n] * (dτ_λ[n] / qp_μN[i]) * wct[i])
             else
-                # 𝐓⁺⁺(μᵢ, μⱼ) = (exp{-τ/μⱼ}(ϖ ̇𝐙⁺⁺(μᵢ, μⱼ) ̇(τ/μᵢ))) ̇𝑤ⱼ        
-                # d𝐓⁺⁺(μᵢ, μⱼ)/dτ_λ = (exp{-τ/μⱼ}⋅ϖ ̇𝐙⁺⁺(μᵢ, μᵢ)/μᵢ)⋅(1 - τ/μⱼ) ̇𝑤ⱼ
-                # d𝐓⁺⁺(μᵢ, μᵢ)/dϖ_λ = 𝐙⁺⁺(μᵢ, μᵢ)⋅(τ/μᵢ) ̇exp{-τ/μᵢ} ̇𝑤ᵢ
-                # d𝐓⁺⁺(μᵢ, μᵢ)/dZ   = ϖ ̇(τ/μᵢ) ̇exp{-τ/μᵢ} ̇𝑤ᵢ
-                t⁺⁺[i,j,n] = exp(-dτ_λ[n] / qp_μN[j]) *
-                    (ϖ_λ[n] * Z⁺⁺[i,j,n2] * (dτ_λ[n] / qp_μN[i]) * wct[j])
+                tmpF = exp(-dτ_λ[n] / qp_μN[i]) *
+                    (dτ_λ[n] / qp_μN[i]) * wct[j]
+
+                t⁺⁺[i,j,n] = 
+                    ϖ_λ[n] * Z⁺⁺[i,j,n2] * tmpF
                 # derivative wrt τ_λ
-                ṫ⁺⁺[1,i,j,n] = (exp(-dτ_λ[n] / qp_μN[j]) *
-                        ϖ_λ[n] * Z⁺⁺[i,j,n2] / qp_μN[i]) * 
-                        (1 - dτ_λ[n] / qp_μN[j]) * wct[j]
+                ṫ⁺⁺[1,i,j,n] = 
+                    exp(-dτ_λ[n] / qp_μN[i]) * (-1 / qp_μN[i]) * 
+                    (ϖ_λ[n] * Z⁺⁺[i,j,n2] * wct[j] * (dτ_λ[n] / qp_μN[i] - 1)) *
+                    elem_fct
                 # derivative wrt ϖ_λ
-                ṫ⁺⁺[2,i,j,n] = t⁺⁺[i,j,n] / ϖ_λ[n]
+                ṫ⁺⁺[2,i,j,n] = 
+                    Z⁺⁺[i,j,n2] * tmpF   
                 # derivative wrt Z
-                ṫ⁺⁺[3,i,j,n] = t⁺⁺[i,j,n] / Z⁺⁺[i,j,n2]
+                ṫ⁺⁺[3,i,j,n] = 
+                    ϖ_λ[n] * tmpF
             end
+            #    # 𝐓⁺⁺(μᵢ, μⱼ) = (exp{-τ/μⱼ}(ϖ ̇𝐙⁺⁺(μᵢ, μⱼ) ̇(τ/μᵢ))) ̇𝑤ⱼ        
+            #    # d𝐓⁺⁺(μᵢ, μⱼ)/dτ_λ = (exp{-τ/μⱼ}⋅ϖ ̇𝐙⁺⁺(μᵢ, μᵢ)/μᵢ)⋅(1 - τ/μⱼ) ̇𝑤ⱼ
+            #    # d𝐓⁺⁺(μᵢ, μᵢ)/dϖ_λ = 𝐙⁺⁺(μᵢ, μᵢ)⋅(τ/μᵢ) ̇exp{-τ/μᵢ} ̇𝑤ᵢ
+            #    # d𝐓⁺⁺(μᵢ, μᵢ)/dZ   = ϖ ̇(τ/μᵢ) ̇exp{-τ/μᵢ} ̇𝑤ᵢ
+            #    t⁺⁺[i,j,n] = exp(-dτ_λ[n] / qp_μN[j]) *
+            #        (ϖ_λ[n] * Z⁺⁺[i,j,n2] * (dτ_λ[n] / qp_μN[i]) * wct[j])
+            #    # derivative wrt τ_λ
+            #    ṫ⁺⁺[1,i,j,n] = (exp(-dτ_λ[n] / qp_μN[j]) *
+            #            ϖ_λ[n] * Z⁺⁺[i,j,n2] / qp_μN[i]) * 
+            #            (1 - dτ_λ[n] / qp_μN[j]) * wct[j]
+            #    # derivative wrt ϖ_λ
+            #    ṫ⁺⁺[2,i,j,n] = t⁺⁺[i,j,n] / ϖ_λ[n]
+            #    # derivative wrt Z
+            #    ṫ⁺⁺[3,i,j,n] = t⁺⁺[i,j,n] / Z⁺⁺[i,j,n2]
+            #end
         else
     
             # 𝐓⁺⁺(μᵢ, μⱼ) = ϖ ̇𝐙⁺⁺(μᵢ, μⱼ) ̇(μⱼ/(μᵢ-μⱼ)) ̇(exp{-τ/μᵢ} - exp{-τ/μⱼ}) ̇𝑤ⱼ
             # d𝐓⁺⁺(μᵢ, μⱼ)/dτ_λ = -ϖ ̇𝐙⁺⁺(μᵢ, μⱼ) ̇(μⱼ/(μᵢ-μⱼ)) ̇(exp{-τ/μᵢ}/μᵢ - exp{-τ/μⱼ}/μⱼ) ̇𝑤ⱼ
             # (𝑖 ≠ 𝑗)
+            tmpF = (qp_μN[j] / (qp_μN[i] - qp_μN[j])) * wct[j] * 
+                (exp(-dτ_λ[n] / qp_μN[i]) - exp(-dτ_λ[n] / qp_μN[j]))
             t⁺⁺[i,j,n] = 
-                ϖ_λ[n] * Z⁺⁺[i,j,n2] * 
-                #Z⁺⁺[i,j] * 
-                (qp_μN[j] / (qp_μN[i] - qp_μN[j])) * wct[j] * 
-                (exp(-dτ_λ[n] / qp_μN[i]) - exp(-dτ_λ[n] / qp_μN[j])) 
+                ϖ_λ[n] * Z⁺⁺[i,j,n2] * tmpF
+            #if n==1
+            #    @show i, j, n, t⁺⁺[i,j,n], qp_μN[i], qp_μN[j]
+            #end
             # derivative wrt τ_λ
             ṫ⁺⁺[1,i,j,n] = -ϖ_λ[n] * Z⁺⁺[i,j,n2] * 
-                (qp_μN[j] / (qp_μN[i] - qp_μN[j])) * wct[j] * 
+                (qp_μN[j] / (qp_μN[i] - qp_μN[j])) * wct[j] * elem_fct *
                 (exp(-dτ_λ[n] / qp_μN[i])/ qp_μN[i] - 
                 exp(-dτ_λ[n] / qp_μN[j])/ qp_μN[j]) 
             # derivative wrt ϖ_λ
-            ṫ⁺⁺[2,i,j,n] = t⁺⁺[i,j,n] / ϖ_λ[n]
+            ṫ⁺⁺[2,i,j,n] = Z⁺⁺[i,j,n2] * tmpF
             # derivative wrt Z
-            ṫ⁺⁺[3,i,j,n] = t⁺⁺[i,j,n] / Z⁺⁺[i,j,n2]
+            ṫ⁺⁺[3,i,j,n] = ϖ_λ[n] * tmpF
         end
     else
-        #r⁻⁺[i,j,n] = 0.0
-        #ṙ⁻⁺[:,i,j,n] = 0.0
-        if i==j
-            t⁺⁺[i,j,n] = exp(-dτ_λ[n] / qp_μN[i]) #Suniti
-            # derivative wrt τ_λ
-            ṫ⁺⁺[1,i,j,n] = -exp(-dτ_λ[n] / qp_μN[i]) / qp_μN[i]
-        #else
-        #    t⁺⁺[i,j,n] = 0.0
-            # derivative wrt τ_λ
-        #    ṫ⁺⁺[1,i,j,n] = 0.0
-        end
-        # derivative wrt ϖ_λ
-        #ṫ⁺⁺[2,i,j,n] = 0.0
+    
+        r⁻⁺[i,j,n] = 0.0
+        # derivative wrt τ_λ
+        ṙ⁻⁺[1,i,j,n] = 0.0
+        # derivative wrt ϖ
+        ṙ⁻⁺[2,i,j,n] = 0.0
         # derivative wrt Z
-        #ṫ⁺⁺[3,i,j,n] = 0.0
+        ṙ⁻⁺[3,i,j,n] = 0.0
+                    
+        #if (qp_μN[i] == qp_μN[j])
+            # 𝐓⁺⁺(μᵢ, μᵢ) = (exp{-τ/μᵢ}(1 + ϖ ̇𝐙⁺⁺(μᵢ, μᵢ) ̇(τ/μᵢ))) ̇𝑤ᵢ
+            # d𝐓⁺⁺(μᵢ, μᵢ)/dτ_λ = (exp{-τ/μⱼ}/μᵢ)⋅(ϖ ̇𝐙⁺⁺(μᵢ, μᵢ)⋅(1-τ/μⱼ)-1) ̇𝑤ⱼ  
+            # d𝐓⁺⁺(μᵢ, μᵢ)/dϖ_λ = 𝐙⁺⁺(μᵢ, μᵢ)⋅(τ/μᵢ) ̇exp{-τ/μᵢ} ̇𝑤ᵢ
+            # d𝐓⁺⁺(μᵢ, μᵢ)/dZ   = ϖ ̇(τ/μᵢ) ̇exp{-τ/μᵢ} ̇𝑤ᵢ
+        if i==j
+            t⁺⁺[i,j,n] = 
+                exp(-dτ_λ[n] / qp_μN[i]) 
+            # derivative wrt τ_λ
+            ṫ⁺⁺[1,i,j,n] = 
+                 t⁺⁺[i,j,n] * (-1 / qp_μN[i]) * 
+                elem_fct
+            # derivative wrt ϖ_λ
+            ṫ⁺⁺[2,i,j,n] = 
+                0.0  
+            # derivative wrt Z
+            ṫ⁺⁺[3,i,j,n] = 
+                0.0
+            #else
+            #    # 𝐓⁺⁺(μᵢ, μⱼ) = (exp{-τ/μⱼ}(ϖ ̇𝐙⁺⁺(μᵢ, μⱼ) ̇(τ/μᵢ))) ̇𝑤ⱼ        
+            #    # d𝐓⁺⁺(μᵢ, μⱼ)/dτ_λ = (exp{-τ/μⱼ}⋅ϖ ̇𝐙⁺⁺(μᵢ, μᵢ)/μᵢ)⋅(1 - τ/μⱼ) ̇𝑤ⱼ
+            #    # d𝐓⁺⁺(μᵢ, μᵢ)/dϖ_λ = 𝐙⁺⁺(μᵢ, μᵢ)⋅(τ/μᵢ) ̇exp{-τ/μᵢ} ̇𝑤ᵢ
+            #    # d𝐓⁺⁺(μᵢ, μᵢ)/dZ   = ϖ ̇(τ/μᵢ) ̇exp{-τ/μᵢ} ̇𝑤ᵢ
+            #    t⁺⁺[i,j,n] = exp(-dτ_λ[n] / qp_μN[j]) *
+            #        (ϖ_λ[n] * Z⁺⁺[i,j,n2] * (dτ_λ[n] / qp_μN[i]) * wct[j])
+            #    # derivative wrt τ_λ
+            #    ṫ⁺⁺[1,i,j,n] = (exp(-dτ_λ[n] / qp_μN[j]) *
+            #            ϖ_λ[n] * Z⁺⁺[i,j,n2] / qp_μN[i]) * 
+            #            (1 - dτ_λ[n] / qp_μN[j]) * wct[j]
+            #    # derivative wrt ϖ_λ
+            #    ṫ⁺⁺[2,i,j,n] = t⁺⁺[i,j,n] / ϖ_λ[n]
+            #    # derivative wrt Z
+            #    ṫ⁺⁺[3,i,j,n] = t⁺⁺[i,j,n] / Z⁺⁺[i,j,n2]
+            #end
+        else
+    
+            # 𝐓⁺⁺(μᵢ, μⱼ) = ϖ ̇𝐙⁺⁺(μᵢ, μⱼ) ̇(μⱼ/(μᵢ-μⱼ)) ̇(exp{-τ/μᵢ} - exp{-τ/μⱼ}) ̇𝑤ⱼ
+            # d𝐓⁺⁺(μᵢ, μⱼ)/dτ_λ = -ϖ ̇𝐙⁺⁺(μᵢ, μⱼ) ̇(μⱼ/(μᵢ-μⱼ)) ̇(exp{-τ/μᵢ}/μᵢ - exp{-τ/μⱼ}/μⱼ) ̇𝑤ⱼ
+            # (𝑖 ≠ 𝑗)
+            t⁺⁺[i,j,n] = 0.0
+                
+            # derivative wrt τ_λ
+            ṫ⁺⁺[1,i,j,n] = 0.0
+            # derivative wrt ϖ_λ
+            ṫ⁺⁺[2,i,j,n] = 0.0
+            # derivative wrt Z
+            ṫ⁺⁺[3,i,j,n] = 0.0
+        end
     end
     nothing
 end
@@ -365,83 +435,100 @@ end
 @kernel function get_elem_rt_SFI!(J₀⁺, J₀⁻, 
                 J̇₀⁺, J̇₀⁻, 
                 ϖ_λ, dτ_λ, 
-                τ_sum, τ̇_sum, 
+                #τ_sum, τ̇_sum, 
                 Z⁻⁺, Z⁺⁺, F₀,
-                qp_μN, ndoubl, wct02, nStokes,
+                qp_μN, ndoubl, wct02, elem_fct,
+                nStokes,
                 I₀, iμ0, D)
+    
     i_start  = nStokes*(iμ0-1) + 1 
     i_end    = nStokes*iμ0
     
     i, _, n = @index(Global, NTuple) ##Suniti: What are Global and Ntuple?
     FT = eltype(I₀)
-    #J₀⁺[i, 1, n]=0
-    #J₀⁻[i, 1, n]=0
-    #J̇₀⁺[1:3, i, 1, n]=0
-    #J̇₀⁻[1:3, i, 1, n]=0
+    J₀⁺[i, 1, n]=0
+    J₀⁻[i, 1, n]=0
+    J̇₀⁺[1:3, i, 1, n].=0
+    J̇₀⁻[1:3, i, 1, n].=0
     n2=1
     if size(Z⁻⁺,3)>1
         n2 = n
     end
     
-    Z⁺⁺_I₀ = FT(0.0);
-    Z⁻⁺_I₀ = FT(0.0);
-    
-    for ii = i_start:i_end
-        Z⁺⁺_I₀ += Z⁺⁺[i,ii,n2] * F₀[ii-i_start+1,n2] #I₀[ii-i_start+1]
-        Z⁻⁺_I₀ += Z⁻⁺[i,ii,n2] * F₀[ii-i_start+1,n2] #I₀[ii-i_start+1] 
-    end
+    #if scatter 
+        Z⁺⁺_I₀ = FT(0.0);
+        Z⁻⁺_I₀ = FT(0.0);
+        
+        for ii = i_start:i_end
+            Z⁺⁺_I₀ += Z⁺⁺[i,ii,n2] * F₀[ii-i_start+1,n2] #I₀[ii-i_start+1]
+            Z⁻⁺_I₀ += Z⁻⁺[i,ii,n2] * F₀[ii-i_start+1,n2] #I₀[ii-i_start+1] 
+        end
 
-    if (i>=i_start) && (i<=i_end)
-        ctr = i-i_start+1
-        # J₀⁺ = 0.25*(1+δ(m,0)) * ϖ(λ) * Z⁺⁺ * I₀ * (dτ(λ)/μ₀) * exp(-dτ(λ)/μ₀)
-        J₀⁺[i, 1, n] = wct02 * ϖ_λ[n] * Z⁺⁺_I₀ * (dτ_λ[n] / qp_μN[i]) * exp(-dτ_λ[n] / qp_μN[i])
-        # derivative wrt τ
-        J̇₀⁺[1, i, 1, n] = J₀⁺[i, 1, n]*(1/dτ_λ[n] - 1/qp_μN[i])
-        # derivative wrt ϖ
-        J̇₀⁺[2, i, 1, n] = J₀⁺[i, 1, n] / ϖ_λ[n]
-        # derivative wrt Z
-        J̇₀⁺[3, i, 1, n] = J₀⁺[i, 1, n] / Z⁺⁺_I₀ # check this
-    else
-        # J₀⁺ = 0.25*(1+δ(m,0)) * ϖ(λ) * Z⁺⁺ * I₀ * [μ₀ / (μᵢ - μ₀)] * [exp(-dτ(λ)/μᵢ) - exp(-dτ(λ)/μ₀)]
-        J₀⁺[i, 1, n] = wct02 * ϖ_λ[n] * Z⁺⁺_I₀ * 
-            (qp_μN[i_start] / (qp_μN[i] - qp_μN[i_start])) * (exp(-dτ_λ[n] / qp_μN[i]) - exp(-dτ_λ[n] / qp_μN[i_start]))
-        # derivative wrt τ
-        J̇₀⁺[1, i, 1, n] = - wct02 * ϖ_λ[n] * Z⁺⁺_I₀ * (qp_μN[i_start] / (qp_μN[i] - qp_μN[i_start])) * 
-            (exp(-dτ_λ[n] / qp_μN[i]) / qp_μN[i] - exp(-dτ_λ[n] / qp_μN[i_start]) / qp_μN[i_start])
-        # derivative wrt ϖ
-        J̇₀⁺[2, i, 1, n] = J₀⁺[i, 1, n] / ϖ_λ[n]
-        # derivative wrt Z
-        J̇₀⁺[3, i, 1, n] = J₀⁺[i, 1, n] / Z⁺⁺_I₀ # check this
-    end
-    #J₀⁻ = 0.25*(1+δ(m,0)) * ϖ(λ) * Z⁻⁺ * I₀ * [μ₀ / (μᵢ + μ₀)] * [1 - exp{-dτ(λ)(1/μᵢ + 1/μ₀)}]
-    J₀⁻[i, 1, n] = wct02 * ϖ_λ[n] * Z⁻⁺_I₀ * (qp_μN[i_start] / (qp_μN[i] + qp_μN[i_start])) * 
+        if (i>=i_start) && (i<=i_end)
+            ctr = i-i_start+1
+            # J₀⁺ = 0.25*(1+δ(m,0)) * ϖ(λ) * Z⁺⁺ * I₀ * (dτ(λ)/μ₀) * exp(-dτ(λ)/μ₀)
+            tmpF = wct02 * (dτ_λ[n] / qp_μN[i]) * exp(-dτ_λ[n] / qp_μN[i])
+            J₀⁺[i, 1, n] = ϖ_λ[n] * Z⁺⁺_I₀ * tmpF
+            # derivative wrt τ
+            J̇₀⁺[1, i, 1, n] = exp(-dτ_λ[n] / qp_μN[i]) * (1 / qp_μN[i]) * 
+                    ϖ_λ[n] * Z⁺⁺_I₀ * (1 - dτ_λ[n] / qp_μN[i]) *
+                    wct02 * elem_fct
+            # derivative wrt ϖ
+            J̇₀⁺[2, i, 1, n] = Z⁺⁺_I₀ * tmpF
+            # derivative wrt Z
+            J̇₀⁺[3, i, 1, n] = ϖ_λ[n] * F₀[1,n2] * tmpF #Suniti: if the incident starlight were polarized, the third index of J₀ would be 3 for I, Q, and U (or 4 including V) components of F₀ instead of 1
+        else
+            # J₀⁺ = 0.25*(1+δ(m,0)) * ϖ(λ) * Z⁺⁺ * I₀ * [μ₀ / (μᵢ - μ₀)] * [exp(-dτ(λ)/μᵢ) - exp(-dτ(λ)/μ₀)]
+            tmpF = wct02 *  
+                (qp_μN[i_start] / (qp_μN[i] - qp_μN[i_start])) * 
+                (exp(-dτ_λ[n] / qp_μN[i]) - exp(-dτ_λ[n] / qp_μN[i_start]))
+            J₀⁺[i, 1, n] = ϖ_λ[n] * Z⁺⁺_I₀ * tmpF 
+
+            # derivative wrt τ
+            J̇₀⁺[1, i, 1, n] = - wct02 * ϖ_λ[n] * Z⁺⁺_I₀ * elem_fct *
+                (qp_μN[i_start] / (qp_μN[i] - qp_μN[i_start])) * 
+                (exp(-dτ_λ[n] / qp_μN[i]) / qp_μN[i] - exp(-dτ_λ[n] / qp_μN[i_start]) / qp_μN[i_start])
+            # derivative wrt ϖ
+            J̇₀⁺[2, i, 1, n] = Z⁺⁺_I₀ * tmpF
+            # derivative wrt Z
+            J̇₀⁺[3, i, 1, n] = ϖ_λ[n] * F₀[1,n2] * tmpF #Suniti: if the incident starlight were polarized, the third index of J₀ would be 3 for I, Q, and U (or 4 including V) components of F₀ instead of 1
+        end
+        #J₀⁻ = 0.25*(1+δ(m,0)) * ϖ(λ) * Z⁻⁺ * I₀ * [μ₀ / (μᵢ + μ₀)] * [1 - exp{-dτ(λ)(1/μᵢ + 1/μ₀)}]
+        tmpF = wct02 * 
+            (qp_μN[i_start] / (qp_μN[i] + qp_μN[i_start])) * 
             (1 - exp(-dτ_λ[n] * ((1 / qp_μN[i]) + (1 / qp_μN[i_start]))))
-    # derivative wrt τ
-    J̇₀⁻[1, i, 1, n] = wct02 * ϖ_λ[n] * Z⁻⁺_I₀ * (qp_μN[i_start] / (qp_μN[i] + qp_μN[i_start])) * 
-            exp(-dτ_λ[n] * ((1 / qp_μN[i]) + (1 / qp_μN[i_start]))) *
-            ((1 / qp_μN[i]) + (1 / qp_μN[i_start]))
-    # derivative wrt ϖ
-    J̇₀⁻[2, i, 1, n] = J₀⁻[i, 1, n] / ϖ_λ[n]
-    # derivative wrt Z
-    J̇₀⁻[3, i, 1, n] = J₀⁻[i, 1, n] / Z⁺⁺_I₀ # check this
+        J₀⁻[i, 1, n] = ϖ_λ[n] * Z⁻⁺_I₀ * tmpF
+        # derivative wrt τ
+        J̇₀⁻[1, i, 1, n] = wct02 * ϖ_λ[n] * Z⁻⁺_I₀ * elem_fct *
+                (1 / qp_μN[i]) * 
+                exp(-dτ_λ[n] * ((1 / qp_μN[i]) + (1 / qp_μN[i_start])))
+        # derivative wrt ϖ
+        J̇₀⁻[2, i, 1, n] = Z⁻⁺_I₀ * tmpF
+        # derivative wrt Z
+        J̇₀⁻[3, i, 1, n] = ϖ_λ[n] * F₀[1,n2] * tmpF #Suniti: if the incident starlight were polarized, the third index of J₀ would be 3 for I, Q, and U (or 4 including V) components of F₀ instead of 1
+    #else
+    #       J̇₀⁺[1:3, i, 1, n] .= 0.0
+    #       J̇₀⁻[1:3, i, 1, n] .= 0.0
+    #       J₀⁺[i, 1, n] = 0.0
+    #       J₀⁻[i, 1, n] = 0.0
+    #end
+    ## Suniti: start here after lunch on 02/25/26    
+    ## TODO: Move this out until after doubling (it is not necessary to consider this here already if Raman scattering is not involved)
+    #J₀⁺[i, 1, n] *= exp(-τ_sum[n]/qp_μN[i_start])
+    #J₀⁻[i, 1, n] *= exp(-τ_sum[n]/qp_μN[i_start])
 
-    # TODO: Move this out until after doubling (it is not necessary to consider this here already if Raman scattering is not involved)
-    J₀⁺[i, 1, n] *= exp(-τ_sum[n]/qp_μN[i_start])
-    J₀⁻[i, 1, n] *= exp(-τ_sum[n]/qp_μN[i_start])
-
-    J̇₀⁺[1, i, 1, n] = J̇₀⁺[1, i, 1, n]*exp(-τ_sum[n]/qp_μN[i_start]) +
-                        J₀⁺[i, 1, n] * (-τ̇_sum[1,n]/qp_μN[i_start])
-    J̇₀⁻[1, i, 1, n] = J̇₀⁻[1, i, 1, n]*exp(-τ_sum[n]/qp_μN[i_start]) +
-                        J₀⁻[i, 1, n] * (-τ̇_sum[1,n]/qp_μN[i_start])
-    J̇₀⁺[2, i, 1, n] = J̇₀⁺[2, i, 1, n]*exp(-τ_sum[n]/qp_μN[i_start]) #+
-                        #J₀⁺[i, 1, n] * (-τ̇_sum[1,n]/qp_μN[i_start])
-    J̇₀⁻[2, i, 1, n] = J̇₀⁻[2, i, 1, n]*exp(-τ_sum[n]/qp_μN[i_start]) #+
-                        #J₀⁻[i, 1, n] * (-τ̇_sum[1,n]/qp_μN[i_start])
-    J̇₀⁺[3, i, 1, n] = J̇₀⁺[3, i, 1, n]*exp(-τ_sum[n]/qp_μN[i_start]) #+
-                        #J₀⁺[i, 1, n] * (-τ̇_sum[1,n]/qp_μN[i_start])
-    J̇₀⁻[3, i, 1, n] = J̇₀⁻[3, i, 1, n]*exp(-τ_sum[n]/qp_μN[i_start]) #+
-                        #J₀⁻[i, 1, n] * (-τ̇_sum[1,n]/qp_μN[i_start])
-
+    #J̇₀⁺[1, i, 1, n] = J̇₀⁺[1, i, 1, n]*exp(-τ_sum[n]/qp_μN[i_start]) +
+    #                    J₀⁺[i, 1, n] * (-τ̇_sum[1,n]/qp_μN[i_start])
+    #J̇₀⁻[1, i, 1, n] = J̇₀⁻[1, i, 1, n]*exp(-τ_sum[n]/qp_μN[i_start]) +
+    #                    J₀⁻[i, 1, n] * (-τ̇_sum[1,n]/qp_μN[i_start])
+    #J̇₀⁺[2, i, 1, n] = J̇₀⁺[2, i, 1, n]*exp(-τ_sum[n]/qp_μN[i_start]) #+
+    #                    #J₀⁺[i, 1, n] * (-τ̇_sum[1,n]/qp_μN[i_start])
+    #J̇₀⁻[2, i, 1, n] = J̇₀⁻[2, i, 1, n]*exp(-τ_sum[n]/qp_μN[i_start]) #+
+    #                    #J₀⁻[i, 1, n] * (-τ̇_sum[1,n]/qp_μN[i_start])
+    #J̇₀⁺[3, i, 1, n] = J̇₀⁺[3, i, 1, n]*exp(-τ_sum[n]/qp_μN[i_start]) #+
+    #                    #J₀⁺[i, 1, n] * (-τ̇_sum[1,n]/qp_μN[i_start])
+    #J̇₀⁻[3, i, 1, n] = J̇₀⁻[3, i, 1, n]*exp(-τ_sum[n]/qp_μN[i_start]) #+
+    #                    #J₀⁻[i, 1, n] * (-τ̇_sum[1,n]/qp_μN[i_start])
 
     if ndoubl >= 1
         J₀⁻[i, 1, n] = D[i,i]*J₀⁻[i, 1, n] #D = Diagonal{1,1,-1,-1,...Nquad times}

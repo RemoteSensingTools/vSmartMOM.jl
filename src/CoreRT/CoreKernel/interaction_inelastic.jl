@@ -379,7 +379,7 @@ function interaction_helper!(RS_type::RRS, ::ScatteringInterface_11, SFI,
 
     composite_layer.J₀⁺ .= tmpJ₀⁺
     composite_layer.T⁺⁺ .= tmpT⁺⁺
-    composite_layer.R⁺⁻ .= tmpR⁻⁺
+    composite_layer.R⁺⁻ .= tmpR⁺⁻
     
     composite_layer.ieJ₀⁻ .= tmpieJ₀⁻
     composite_layer.ieJ₀⁺ .= tmpieJ₀⁺
@@ -526,7 +526,7 @@ function interaction_helper!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
 
     composite_layer.J₀⁺ .= tmpJ₀⁺
     composite_layer.T⁺⁺ .= tmpT⁺⁺
-    composite_layer.R⁺⁻ .= tmpR⁻⁺
+    composite_layer.R⁺⁻ .= tmpR⁺⁻
     
     composite_layer.ieJ₀⁻ .= tmpieJ₀⁻
     composite_layer.ieJ₀⁺ .= tmpieJ₀⁺

@@ -35,7 +35,7 @@ function compute_aerosol_optical_properties(lin::LinMode, model::MieModel{FDT}, 
     #start,stop = quantile(size_distribution,[0.0025,0.9975])
     r, wᵣ = gauleg(nquad_radius, 0.0, r_max ; norm=false) 
     #r, wᵣ = gauleg(nquad_radius, start, min(stop,r_max); norm=false) 
-     @show sum(wᵣ)
+    #@show sum(wᵣ)
     # Wavenumber
     k = 2π / λ  
 
@@ -106,7 +106,7 @@ function compute_aerosol_optical_properties(lin::LinMode, model::MieModel{FDT}, 
         n_ = 2n_ .+ 1
 
         # Pre-allocate Dₙ  :
-        y = x_size_param[i] * (aerosol.nᵣ - im*aerosol.nᵢ);
+        y = x_size_param[i] * (aerosol.nᵣ - im*aerosol.nᵢ * im);
         nmx = round(Int, max(n_max, abs(y)) + 51)
         Dₙ  = zeros(Complex{FT}, nmx)
         # derivatives with respect to nᵣ, nᵢ, respectively
@@ -278,7 +278,7 @@ function compute_aerosol_optical_properties(lin::LinMode, model::MieModel{FDT}, 
     else
         greek_coefs = GreekCoefs(α, β, γ, δ, ϵ, ζ)
         lin_greek_coefs = linGreekCoefs(α̇, β̇, γ̇, δ̇, ϵ̇, ζ̇)
-        return AerosolOptics(greek_coefs=greek_coefs, ω̃=(bulk_C_sca / bulk_C_ext), k=(bulk_C_ext), fᵗ=FT(1)),
+        return AerosolOptics(greek_coefs=greek_coefs, ω̃=(bulk_ϖ), k=(bulk_C_ext), fᵗ=FT(1)),
             linAerosolOptics(lin_greek_coefs=lin_greek_coefs, ω̃̇=bulk_ϖ̇, k̇=bulk_Ċ_ext, ḟᵗ=FT2(0.0) .*convert.(FT2, bulk_Ċ_ext))# zeros(FT,4))
     end
 end

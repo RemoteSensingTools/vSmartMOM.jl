@@ -68,11 +68,28 @@ function lin_added_layer_all_params_helper!(RS_type::noRS{FT},
             @views ap_J̇₀⁻[iparam,:,1,:] .= added_layer_lin.J̇₀⁻[1,:,1,:].*reshape(τ̇[iparam,:],1,nspec) + 
                                 added_layer_lin.J̇₀⁻[2,:,1,:].*reshape(ϖ̇[iparam,:],1,nspec) + 
                                 added_layer_lin.J̇₀⁻[3,:,1,:].*Ż⁻⁺_I₀ 
+
+            # Use the following between doubling and interaction steps to account for the fact that the added layer is not at the TOA. This is needed because the added layer is not at the TOA, so the derivatives of the added layer properties with respect to τ, ϖ and Z need to be scaled by exp(-τ_sum/μ₀) to account for the fact that the added layer is not at the TOA. This is done in the following lines of code.                    
+            ##if SFI
+            #J₀⁺[:, 1, :] .*= (exp.(-τ_sum[:]/μ₀))' #writing i_start:i_start to avoid scalar indexing errors with GPUArrays
+            #J₀⁻[:, 1, :] .*= (exp.(-τ_sum[:]/μ₀))'
+
+
+            #ap_J̇₀⁺[iparam, :, 1, :] = ap_J̇₀⁺[iparam, :, 1, :].*(exp.(-τ_sum[:]/μ₀))' +
+            #                J₀⁺[:, 1, :] .* ((-1/μ₀) .* @view(τ̇_sum[iparam,:]))'
+            #ap_J̇₀⁻[iparam, :, 1, :] = ap_J̇₀⁻[iparam, :, 1, :].*(exp.(-τ_sum[:]/μ₀))' +
+            #                J₀⁻[:, 1, :] .* ((-1/μ₀) .* @view(τ̇_sum[iparam,:]))'
+            
+            ##    J̇₀⁺[2, :, 1, :] = J̇₀⁺[2, :, 1, :].*(exp.(-τ_sum[:]/μ₀))' 
+            ##    J̇₀⁻[2, :, 1, :] = J̇₀⁻[2, :, 1, :].*(exp.(-τ_sum[:]/μ₀))' 
+            ##    J̇₀⁺[3, :, 1, :] = J̇₀⁺[3, :, 1, :].*(exp.(-τ_sum[:]/μ₀))' 
+            ##    J̇₀⁻[3, :, 1, :] = J̇₀⁻[3, :, 1, :].*(exp.(-τ_sum[:]/μ₀))' 
+            #end
         end
     end
 end
 
-"Compute interaction between composite and added layers"
+# Expands from derivatives of added layer properties with respect to layer properties τ, ϖ and Z to derivatives with respect to the state vector
 function lin_added_layer_all_params!(RS_type::noRS{FT}, 
     pol_type, SFI, quad_points,
     computed_layer_properties_lin, 

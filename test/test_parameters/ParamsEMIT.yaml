@@ -8,7 +8,7 @@ radiative_transfer:
     #- (1e7/697.5):0.05:(1e7/672.5) #- (1e7/690):0.5:(1e7/680)
     #- (1e7/782.5):0.05:(1e7/747.5) #- (1e7/775):0.5:(1e7/755) 
     #- (1e7/2160):0.05:(1e7/1960)
-    - (1e7/2400):0.5:(1e7/2390) #(1e7/2200)
+    - (1e7/2400):0.5:(1e7/2395) #(1e7/2200)
     #- (1e7/1753.11):0.1:(1e7/1603.77) #- (1e7/1745.61):0.5:(1e7/1611.27)
     #- (1e7/415):0.5:(1e7/385)
     #- (1e7/420):0.4:(1e7/380)
@@ -39,7 +39,7 @@ radiative_transfer:
   # Floating point type for calculations (Float32, Float64)
   float_type:         Float64
   # Architecture (default_architecture, Architectures.GPU(), Architectures.CPU())
-  architecture:       Architectures.GPU() #Architectures.GPU() # default_architecture
+  architecture:       Architectures.CPU() #Architectures.GPU() #Architectures.GPU() # default_architecture
   
 # =================================================================
 # Simulation Geometry

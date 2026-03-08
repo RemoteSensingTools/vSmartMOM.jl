@@ -14,7 +14,7 @@ function get_scattering_interface(scattering_interface,scatter, iz)
         scattering_interface = scatter ? ScatteringInterface_11() : ScatteringInterface_00()
     
     # Not the first layer (not TOA)
-    elseif !(scattering_interface isa ScatteringInterface_00)
+    else # if !(scattering_interface isa ScatteringInterface_00)
 
         # If kn was 1, then toggle between 0/0 and 0/1 
         # Else, toggle between 1/0 and 1/1
