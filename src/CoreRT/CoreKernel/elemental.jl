@@ -43,11 +43,12 @@ function elemental!(pol_type, SFI::Bool,
                             ϖ::FT,                      # ϖ: single scattering albedo of elemental layer (no trace gas absorption included)
                             Z⁺⁺::AbstractArray{FT,2},   # Z matrix
                             Z⁻⁺::AbstractArray{FT,2},   # Z matrix
+                            F₀::AbstractArray,          # F₀: solar irradiance Stokes vector (nStokes, nSpec)
                             m::Int,                     # m: fourier moment
-                            ndoubl::Int,                # ndoubl: number of doubling computations needed 
+                            ndoubl::Int,                # ndoubl: number of doubling computations needed
                             scatter::Bool,              # scatter: flag indicating scattering
-                            quad_points::QuadPoints{FT2}, # struct with quadrature points, weights, 
-                            added_layer::Union{AddedLayer{FT},AddedLayerRS{FT}}, 
+                            quad_points::QuadPoints{FT2}, # struct with quadrature points, weights,
+                            added_layer::Union{AddedLayer{FT},AddedLayerRS{FT}},
                             I_static,
                             architecture) where {FT<:Real,FT2}
 
@@ -117,7 +118,7 @@ function elemental!(pol_type, SFI::Bool,
 
             if SFI
                 kernel! = get_elem_rt_SFI!(device)
-                event = kernel!(J₀⁺, J₀⁻, ϖ_λ, dτ_λ, τ_sum, Z⁻⁺, Z⁺⁺, qp_μN, ndoubl, wct02, pol_type.n, arr_type(pol_type.I₀), iμ₀, D, ndrange=size(J₀⁺))
+                event = kernel!(J₀⁺, J₀⁻, ϖ_λ, dτ_λ, τ_sum, Z⁻⁺, Z⁺⁺, arr_type(F₀), qp_μN, ndoubl, wct02, pol_type.n, arr_type(pol_type.I₀), iμ₀, D, ndrange=size(J₀⁺))
                 #wait(device, event)
                 synchronize_if_gpu()
             end
@@ -145,9 +146,10 @@ Variant of [`elemental!`](@ref) that accepts a
 `ϖ_λ`, `Z⁺⁺`, `Z⁻⁺` arrays.  Optical properties are unpacked internally
 and the same GPU-accelerated single-scattering formulas are applied.
 """
-function elemental!(pol_type, SFI::Bool, 
+function elemental!(pol_type, SFI::Bool,
                             τ_sum::AbstractArray,#{FT2,1}, #Suniti
                             dτ::AbstractArray,
+                            F₀::AbstractArray,          # F₀: solar irradiance Stokes vector (nStokes, nSpec)
                             computed_layer_properties::CoreScatteringOpticalProperties,
                             m::Int,                     # m: fourier moment
                             ndoubl::Int,                # ndoubl: number of doubling computations needed 
@@ -186,7 +188,7 @@ function elemental!(pol_type, SFI::Bool,
 
         # SFI part
         kernel! = get_elem_rt_SFI!(device)
-        event = kernel!(j₀⁺, j₀⁻, ϖ, dτ, arr_type(τ_sum), Z⁻⁺, Z⁺⁺, qp_μN, ndoubl, wct02, pol_type.n, I₀, iμ₀, D, ndrange=size(j₀⁺))
+        event = kernel!(j₀⁺, j₀⁻, ϖ, dτ, arr_type(τ_sum), Z⁻⁺, Z⁺⁺, arr_type(F₀), qp_μN, ndoubl, wct02, pol_type.n, I₀, iμ₀, D, ndrange=size(j₀⁺))
         #wait(device, event)
         synchronize_if_gpu()
         
@@ -225,7 +227,8 @@ end
                     (1 + ϖ_λ[n] * Z⁺⁺[i,i,n2] * (dτ_λ[n] / μ[i]) * wct[i])
                     #(1 + ϖ_λ[n] * Z⁺⁺[i,i] * (dτ_λ[n] / μ[i]) * wct[i])
             else
-                t⁺⁺[i,j,n] = zero(FT)
+                t⁺⁺[i,j,n] = exp(-dτ_λ[n] / μ[j]) *
+                    (ϖ_λ[n] * Z⁺⁺[i,j,n2] * (dτ_λ[n] / μ[i]) * wct[j])
             end
         else
     
@@ -248,7 +251,7 @@ end
     nothing
 end
 
-@kernel function get_elem_rt_SFI!(J₀⁺, J₀⁻, ϖ_λ, dτ_λ, τ_sum, Z⁻⁺, Z⁺⁺, μ, ndoubl, wct02, nStokes ,I₀, iμ0, D)
+@kernel function get_elem_rt_SFI!(J₀⁺, J₀⁻, ϖ_λ, dτ_λ, τ_sum, Z⁻⁺, Z⁺⁺, F₀, μ, ndoubl, wct02, nStokes, I₀, iμ0, D)
     i_start  = nStokes*(iμ0-1) + 1 
     i_end    = nStokes*iμ0
     
@@ -265,8 +268,8 @@ end
     Z⁻⁺_I₀ = FT(0.0);
     
     for ii = i_start:i_end
-        Z⁺⁺_I₀ += Z⁺⁺[i,ii,n2] * I₀[ii-i_start+1]
-        Z⁻⁺_I₀ += Z⁻⁺[i,ii,n2] * I₀[ii-i_start+1] 
+        Z⁺⁺_I₀ += Z⁺⁺[i,ii,n2] * F₀[ii-i_start+1,n2]
+        Z⁻⁺_I₀ += Z⁻⁺[i,ii,n2] * F₀[ii-i_start+1,n2]
     end
 
     if (i>=i_start) && (i<=i_end)
@@ -298,28 +301,28 @@ end
     i, j, n = @index(Global, NTuple)
 
     if ndoubl < 1
-        ii = mod(i, pol_n) 
-        jj = mod(j, pol_n) 
-        if ((ii <= 2) & (jj <= 2)) | ((ii > 2) & (jj > 2)) 
+        ii = mod1(i, pol_n)
+        jj = mod1(j, pol_n)
+        if ((ii <= 2) & (jj <= 2)) | ((ii > 2) & (jj > 2))
             r⁺⁻[i,j,n] = r⁻⁺[i,j,n]
             t⁻⁻[i,j,n] = t⁺⁺[i,j,n]
         else
-            r⁺⁻[i,j,n] = -r⁻⁺[i,j,n] 
-            t⁻⁻[i,j,n] = -t⁺⁺[i,j,n] 
+            r⁺⁻[i,j,n] = -r⁻⁺[i,j,n]
+            t⁻⁻[i,j,n] = -t⁺⁺[i,j,n]
         end
     else
-        if mod(i, pol_n) > 2
+        if mod1(i, pol_n) > 2
             r⁻⁺[i,j,n] = - r⁻⁺[i,j,n]
-        end 
+        end
     end
     nothing
 end
 
 @kernel function apply_D_elemental_SFI!(ndoubl, pol_n, J₀⁻)
     i, _, n = @index(Global, NTuple)
-    
+
     if ndoubl>1
-        if mod(i, pol_n) > 2
+        if mod1(i, pol_n) > 2
             J₀⁻[i, 1, n] = - J₀⁻[i, 1, n]
         end 
     end
