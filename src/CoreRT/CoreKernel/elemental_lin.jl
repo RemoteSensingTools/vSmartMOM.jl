@@ -666,10 +666,9 @@ end
     i, j, n = @index(Global, NTuple) #how best to do this for linearization? Is : okay, or should I use an iparam index?
 
     if ndoubl < 1
-        ii = mod(i, pol_n) 
-        jj = mod(j, pol_n) 
-        #if ((ii <= 2) & (jj <= 2)) | ((ii > 2) & (jj > 2)) 
-        if (((1<=ii<=2) & (1<=jj<=2)) | (!(1<=ii<=2) & !(1<=jj<=2))) 
+        ii = mod1(i, pol_n)
+        jj = mod1(j, pol_n)
+        if ((ii <= 2) & (jj <= 2)) | ((ii > 2) & (jj > 2)) 
             r⁺⁻[i,j,n] = r⁻⁺[i,j,n]
             t⁻⁻[i,j,n] = t⁺⁺[i,j,n]
             ṙ⁺⁻[i,j,n,1] = ṙ⁻⁺[i,j,n,1]
@@ -689,7 +688,7 @@ end
             ṫ⁻⁻[i,j,n,3] = -ṫ⁺⁺[i,j,n,3] 
         end
     else
-        if !(1<=mod(i, pol_n)<=2) #mod(i, pol_n) > 2
+        if mod1(i, pol_n) > 2
             r⁻⁺[i,j,n] = - r⁻⁺[i,j,n]
             ṙ⁻⁺[i,j,n,1] = - ṙ⁻⁺[i,j,n,1]
             ṙ⁻⁺[i,j,n,2] = - ṙ⁻⁺[i,j,n,2]
@@ -703,7 +702,7 @@ end
     i, _, n = @index(Global, NTuple)
     
     if ndoubl>1
-        if !(1<=mod(i, pol_n)<=2) #mod(i, pol_n) > 2
+        if mod1(i, pol_n) > 2
             J₀⁻[i, 1, n] = - J₀⁻[i, 1, n]
             J̇₀⁻[i, 1, n, 1] = - J̇₀⁻[i, 1, n, 1]
             J̇₀⁻[i, 1, n, 2] = - J̇₀⁻[i, 1, n, 2]
