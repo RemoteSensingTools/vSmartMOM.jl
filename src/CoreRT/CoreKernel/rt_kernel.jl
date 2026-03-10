@@ -57,10 +57,11 @@ function rt_kernel!(RS_type::noRS,
             qp_μN, iz) 
 
     (; τ_λ, ϖ_λ, τ, ϖ, Z⁺⁺, Z⁻⁺, dτ_max, dτ, ndoubl, dτ_λ, expk, scatter, τ_sum, scattering_interface) = computed_layer_properties
+    (; F₀) = RS_type
     # If there is scattering, perform the elemental and doubling steps
     if scatter
-        
-        @timeit "elemental" elemental!(pol_type, SFI, τ_sum, dτ_λ, dτ, ϖ_λ, ϖ, Z⁺⁺, Z⁻⁺, m, ndoubl, scatter, quad_points,  added_layer,  I_static, architecture)
+
+        @timeit "elemental" elemental!(pol_type, SFI, τ_sum, dτ_λ, dτ, ϖ_λ, ϖ, Z⁺⁺, Z⁻⁺, F₀, m, ndoubl, scatter, quad_points,  added_layer,  I_static, architecture)
         #println("Elemental done...")
         @timeit "doubling"   doubling!(pol_type, SFI, expk, ndoubl, added_layer, I_static, architecture)
         #println("Doubling done...")
@@ -141,12 +142,13 @@ function rt_kernel!(RS_type::Union{RRS, VS_0to1, VS_1to0}, pol_type, SFI, added_
                                                 quad_points,  added_layer,  
                                                 I_static, architecture)
         #println("Elemental inelastic done...")                                        
-        @timeit "elemental" elemental!(pol_type, SFI, 
-                                    τ_sum, dτ_λ, dτ, 
-                                    ϖ_λ, ϖ, 
-                                    Z⁺⁺, Z⁻⁺, 
-                                    m, ndoubl, scatter, 
-                                    quad_points,  added_layer,  
+        @timeit "elemental" elemental!(pol_type, SFI,
+                                    τ_sum, dτ_λ, dτ,
+                                    ϖ_λ, ϖ,
+                                    Z⁺⁺, Z⁻⁺,
+                                    RS_type.F₀,
+                                    m, ndoubl, scatter,
+                                    quad_points,  added_layer,
                                     I_static, architecture)
         #println("Elemental  done...")
         @timeit "doubling_inelastic" doubling_inelastic!(RS_type, pol_type, SFI, expk, ndoubl, added_layer, I_static, architecture)
@@ -184,21 +186,22 @@ function rt_kernel!(RS_type::noRS{FT},
     #@show array_type(architecture)
     
     (; qp_μ, μ₀) = quad_points
-    # Just unpack core optical properties from 
+    (; F₀) = RS_type
+    # Just unpack core optical properties from
     (; τ, ϖ, Z⁺⁺, Z⁻⁺) = computed_layer_properties
-    
+
     # @show ndoubl
     scatter = true # edit later
-    
+
     dτ, ndoubl, expk = init_layer(computed_layer_properties, quad_points, pol_type, architecture)
 
     # If there is scattering, perform the elemental and doubling steps
     if scatter
         #@show typeof(computed_layer_properties)
-        @timeit "elemental" elemental!(pol_type, SFI, 
-                                τ_sum, dτ, 
-                                computed_layer_properties, 
-                                m, ndoubl, scatter, quad_points,  
+        @timeit "elemental" elemental!(pol_type, SFI,
+                                τ_sum, dτ, F₀,
+                                computed_layer_properties,
+                                m, ndoubl, scatter, quad_points,
                                 added_layer,  architecture)
         #println("Elemental done...")
         @timeit "doubling"   doubling!(pol_type, SFI, 
@@ -321,8 +324,8 @@ function rt_kernel!(RS_type::Union{RRS{FT}, VS_0to1{FT}, VS_1to0{FT}}, pol_type,
                                                 m, ndoubl, scatter, 
                                                 quad_points,  added_layer,  
                                                 I_static, architecture)
-        #println("Elemental inelastic done...")                                        
-        @timeit "elemental" elemental!(pol_type, SFI, τ_sum, dτ, computed_layer_properties, m, ndoubl, scatter, quad_points,  added_layer,  architecture)
+        #println("Elemental inelastic done...")
+        @timeit "elemental" elemental!(pol_type, SFI, τ_sum, dτ, RS_type.F₀, computed_layer_properties, m, ndoubl, scatter, quad_points,  added_layer,  architecture)
         #println("Elemental  done...")
         @timeit "doubling_inelastic" doubling_inelastic!(RS_type, pol_type, SFI, expk, ndoubl, added_layer, I_static, architecture)
         #println("Doubling done...")
@@ -378,10 +381,10 @@ function rt_kernel!(
                                                 Z⁺⁺_λ₁λ₀, Z⁻⁺_λ₁λ₀, 
                                                 RS_type.F₀,
                                                 m, ndoubl, scatter, 
-                                                quad_points,  added_layer,  
+                                                quad_points,  added_layer,
                                                 I_static, architecture)
-        #println("Elemental inelastic done...")                                        
-        @timeit "elemental" elemental!(pol_type, SFI, τ_sum, dτ, computed_layer_properties, m, ndoubl, scatter, quad_points,  added_layer,  architecture)
+        #println("Elemental inelastic done...")
+        @timeit "elemental" elemental!(pol_type, SFI, τ_sum, dτ, RS_type.F₀, computed_layer_properties, m, ndoubl, scatter, quad_points,  added_layer,  architecture)
         #println("Elemental  done...")
         @timeit "doubling_inelastic" doubling_inelastic!(RS_type, pol_type, SFI, expk, ndoubl, added_layer, I_static, architecture)
         #println("Doubling done...")
@@ -392,7 +395,7 @@ function rt_kernel!(
     end
 
     # @assert !any(isnan.(added_layer.t⁺⁺))
-    
+
     # If this TOA, just copy the added layer into the composite layer
     if (iz == 1)
         copy_added_to_composite_ie!(composite_layer, added_layer)
