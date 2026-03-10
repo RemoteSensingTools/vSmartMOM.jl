@@ -155,6 +155,15 @@ function rt_run(RS_type::AbstractRamanType, model, iBand)
         @timeit "Canopy atm tau" _compute_canopy_atm_tau!(brdf, model, _canopy_spec_wn)
     end
 
+    # Initialize F₀ (solar irradiance Stokes vector) if still at default size.
+    # Default: unit Stokes I across all spectral points; users can set actual
+    # solar spectral irradiance for broadband instruments.
+    if size(RS_type.F₀) != (pol_type.n, nSpec)
+        F₀ = zeros(FT, pol_type.n, nSpec)
+        F₀[1,:] .= one(FT)  # Only Stokes I = 1
+        RS_type.F₀ = F₀
+    end
+
     # Cumulative optical depth (m-independent, saved for TMS correction)
     τ_sum_all = nothing
 
