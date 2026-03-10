@@ -106,8 +106,10 @@ atmospheric_profile:
 # =================================================================
 absorption:
 # List of molecules per spectral band
-  molecules:
+  fixed_molecules:
     - [O2, H2O]  # Molecules in Band #2
+  variable_molecules:
+    - []
     #- [O2, H2O]  # Molecules in Band #2
     #- [O2, H2O]  # Molecules in Band #2
     #- [O2, H2O]  # Molecules in Band #2

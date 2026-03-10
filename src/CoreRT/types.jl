@@ -322,14 +322,22 @@ end
 """
     struct AbsorptionParameters
 
-A struct which holds all absorption-related parameters (before any computations)
+A struct which holds all absorption-related parameters (before any computations).
+
+## LUT vs HITRAN per-molecule dispatch
+
+The `luts` field is a `Dict{String, Any}` mapping molecule names (e.g. "O2") to their
+pre-computed `InterpolationModel` lookup tables. At runtime, each molecule is looked up
+by name: if present in `luts`, the LUT is used for fast cross-section interpolation;
+otherwise, HITRAN line-by-line computation is performed. This allows mixing LUT-based
+and HITRAN-based molecules within the same band or across bands.
 """
 mutable struct AbsorptionParameters
-    "Molecules to use for absorption calculations (`nBand, nMolecules`)"
-    fixed_molecules::AbstractArray # species with constant abundances, e.g. O2, N2, CO2
-    variable_molecules::AbstractArray # species with variable abundances, e.g. H2O, CH4, CO2
-    #molecules::AbstractArray
-    "Volume-Mixing Ratios"
+    "Fixed-abundance molecules per band (`nBand` arrays, e.g. O2, N2, CO2)"
+    fixed_molecules::AbstractArray
+    "Variable-abundance molecules per band (`nBand` arrays, e.g. H2O, CH4)"
+    variable_molecules::AbstractArray
+    "Volume-Mixing Ratios (molecule name => scalar or profile vector)"
     vmr::Dict
     "Type of broadening function (Doppler/Lorentz/Voigt)"
     broadening_function::AbstractBroadeningFunction
@@ -337,8 +345,8 @@ mutable struct AbsorptionParameters
     CEF::AbstractComplexErrorFunction
     "Wing cutoff to use in cross-section calculation (cm⁻¹)"
     wing_cutoff::Integer
-    "Lookup table type"
-    luts::AbstractArray 
+    "Per-molecule lookup tables: Dict mapping molecule name => InterpolationModel. Molecules absent from this dict use HITRAN line-by-line."
+    luts::Dict
 end
 
 """

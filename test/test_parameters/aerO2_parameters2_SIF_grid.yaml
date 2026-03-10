@@ -153,7 +153,7 @@ atmospheric_profile:
 # =================================================================
 absorption:
   # List of molecules per spectral band
-  molecules:
+  fixed_molecules:
     - [O2]       # Molecules in Band #1
     - [O2]       # Molecules in Band #2
     - [O2]       # Molecules in Band #3
@@ -172,32 +172,30 @@ absorption:
     - [O2]       # Molecules in Band #3
     - [O2]       # Molecules in Band #4
     - [O2]       # Molecules in Band #1
+  variable_molecules:
+    - []
+    - []
+    - []
+    - []
+    - []
+    - []
+    - []
+    - []
+    - []
+    - []
+    - []
+    - []
+    - []
+    - []
+    - []
+    - []
+    - []
+    - []
     
     #- [H2O,CO2]  # Molecules in Band #3
   # LookUpTable files (Interpolation Model saved as JLD2!)
   LUTfiles:
-    - ["/net/fluo/data3/data/Databases/ABSCO_CS_Database/v5.2_final/o2_v52_extra.jld2"]
-    - ["/net/fluo/data3/data/Databases/ABSCO_CS_Database/v5.2_final/o2_v52_extra.jld2"]
-    - ["/net/fluo/data3/data/Databases/ABSCO_CS_Database/v5.2_final/o2_v52_extra.jld2"]
-    - ["/net/fluo/data3/data/Databases/ABSCO_CS_Database/v5.2_final/o2_v52_extra.jld2"]
-    - ["/net/fluo/data3/data/Databases/ABSCO_CS_Database/v5.2_final/o2_v52_extra.jld2"]
-    - ["/net/fluo/data3/data/Databases/ABSCO_CS_Database/v5.2_final/o2_v52_extra.jld2"]
-    - ["/net/fluo/data3/data/Databases/ABSCO_CS_Database/v5.2_final/o2_v52_extra.jld2"]
-    - ["/net/fluo/data3/data/Databases/ABSCO_CS_Database/v5.2_final/o2_v52_extra.jld2"]
-    - ["/net/fluo/data3/data/Databases/ABSCO_CS_Database/v5.2_final/o2_v52_extra.jld2"]
-    - ["/net/fluo/data3/data/Databases/ABSCO_CS_Database/v5.2_final/o2_v52_extra.jld2"]
-    - ["/net/fluo/data3/data/Databases/ABSCO_CS_Database/v5.2_final/o2_v52_extra.jld2"]
-    - ["/net/fluo/data3/data/Databases/ABSCO_CS_Database/v5.2_final/o2_v52_extra.jld2"]
-    - ["/net/fluo/data3/data/Databases/ABSCO_CS_Database/v5.2_final/o2_v52_extra.jld2"]
-    - ["/net/fluo/data3/data/Databases/ABSCO_CS_Database/v5.2_final/o2_v52_extra.jld2"]
-    - ["/net/fluo/data3/data/Databases/ABSCO_CS_Database/v5.2_final/o2_v52_extra.jld2"]
-    - ["/net/fluo/data3/data/Databases/ABSCO_CS_Database/v5.2_final/o2_v52_extra.jld2"]
-    - ["/net/fluo/data3/data/Databases/ABSCO_CS_Database/v5.2_final/o2_v52_extra.jld2"]
-    - ["/net/fluo/data3/data/Databases/ABSCO_CS_Database/v5.2_final/o2_v52_extra.jld2"]
-    #- ["/net/fluo/data2/data/ABSCO_CS_Database/v5.2_final/wh2o_v52.jld2", "/net/fluo/data2/data/ABSCO_CS_Database/v5.2_final/wco2_v52.jld2"]
-    #- ["/net/fluo/data2/data/ABSCO_CS_Database/v5.2_final/sh2o_v52.jld2", "/net/fluo/data2/data/ABSCO_CS_Database/v5.2_final/sco2_v52.jld2"]
-  # VMR profiles can either be real-valued numbers, 
-  # or an array of nodal points from TOA to BOA, interpolated in pressure space
+    O2: "/net/fluo/data3/data/Databases/ABSCO_CS_Database/v5.2_final/o2_v52_extra.jld2"
   vmr: 
     O2:   0.21
   # Broadening function (Doppler/Lorentz/Voigt)

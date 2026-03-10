@@ -68,8 +68,10 @@ atmospheric_profile:
 # =================================================================
 absorption:
   # List of molecules per spectral band
-  molecules:
+  fixed_molecules:
     - [CO2]       # Molecules in Band #1
+  variable_molecules:
+    - []
     #- [H2O,CO2]  # Molecules in Band #2
     #- [H2O,CO2]  # Molecules in Band #3
   # LookUpTable files (Interpolation Model saved as JLD2!)

@@ -31,7 +31,7 @@ function postprocessing_vza!(RS_type::noRS,
     J̇₀⁺ = Array(composite_layer_lin.J̇₀⁺);
     J̇₀⁻ = Array(composite_layer_lin.J̇₀⁻);
     
-    Nparams = size(J̇₀⁻,1)
+    Nparams = size(J̇₀⁻,4)
     # Loop over all viewing zenith angles
     for i = 1:length(vza)
 
@@ -53,8 +53,8 @@ function postprocessing_vza!(RS_type::noRS,
             T_SFI[i,:,s] .+= bigCS * J₀⁺[istart:iend,1, s];
 
             for iparam = 1:Nparams
-                Ṙ_SFI[iparam,i,:,s] .+= bigCS * J̇₀⁻[iparam, istart:iend,1, s];
-                Ṫ_SFI[iparam,i,:,s] .+= bigCS * J̇₀⁺[iparam, istart:iend,1, s];
+                Ṙ_SFI[i,:,s,iparam] .+= bigCS * J̇₀⁻[istart:iend,1, s, iparam];
+                Ṫ_SFI[i,:,s,iparam] .+= bigCS * J̇₀⁺[istart:iend,1, s, iparam];
             end
             #else
             #    R[i,:,s] .+= bigCS * (R⁻⁺[istart:iend, istart0:iend0, s] / μ₀) * pol_type.I₀;

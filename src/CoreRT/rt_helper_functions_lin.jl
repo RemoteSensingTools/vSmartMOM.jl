@@ -4,10 +4,10 @@ This file contains helper functions that are used throughout the linearized vSma
 
 =#
 "Default matrix in linRT calculation (zeros)"
-default_matrix(FT, lin::LinMode, arr_type, Nparams, dims, nSpec)   = arr_type(zeros(FT, tuple(Nparams, dims[1], dims[2], nSpec)))
+default_matrix(FT, lin::LinMode, arr_type, Nparams, dims, nSpec)   = arr_type(zeros(FT, tuple(dims[1], dims[2], nSpec, Nparams)))
 
 "Default J matrix in linRT calculation (zeros)"
-default_J_matrix(FT, lin::LinMode, arr_type, Nparams, dims, nSpec) = arr_type(zeros(FT, tuple(Nparams, dims[1], 1, nSpec)))
+default_J_matrix(FT, lin::LinMode, arr_type, Nparams, dims, nSpec) = arr_type(zeros(FT, tuple(dims[1], 1, nSpec, Nparams)))
 
 
 

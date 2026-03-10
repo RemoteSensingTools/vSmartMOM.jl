@@ -32,8 +32,8 @@ pert_parameters = perturb_parameters(parameters, pert_pct)
 model, lin_model = model_from_parameters(lin_mode, 
     parameters);
 #=
-model1, lin_model1 = model_from_parameters(lin_mode, 
-    pert_parameters[1]);
+model1, lin_model1 = model_from_parameters(lin_mod
+e, pert_parameters[1]);
 model2, lin_model2 = model_from_parameters(lin_mode, 
     pert_parameters[2]);
 model3, lin_model3 = model_from_parameters(lin_mode, 
@@ -59,6 +59,8 @@ I_conv = [];
 I_EMIT = [];
 λ = [];
 Δλ = FT(7.0) #[nm] EMIT sampling 
+allband_R = []
+allband_Ṙ = []
 for iBand=1:length(model.params.spec_bands)
 #### Compute all Raman properties
     ν = model.params.spec_bands[iBand]
@@ -94,8 +96,12 @@ for iBand=1:length(model.params.spec_bands)
     NSurf = length(model.params.spec_bands) # for spectrally constant Lambertian albedos only (work on this)
     Nparams = NAer*7 + NGas + NSurf
     R, T, Ṙ, Ṫ = CoreRT.rt_run_test(RS_type,model,lin_model, NAer, NGas, NSurf, iBand);
+    push!(allband_R, R)
+    push!(allband_Ṙ, Ṙ)
     #R_ss, T_ss, ieR_ss, ieT_ss = CoreRT.rt_run_test_ss(RS_type,model,iBand);
+end
 
+#=
     #===Convolution of hires spectral simulations to instrument grid===#
     #I_conv = InstrumentOperator.conv_spectra(kernel, )
     #I_conv_noRS = imfilter(RnoRS[1,1,:], kernel)
@@ -854,3 +860,5 @@ q3 = plot!(1e7./ν, 100*((U70_conv.+ieU70_ss_conv)./U70_conv_noRS.-1), linewidth
 
 plot(p1, q1, p2, q2, p3, q3, layout = l, link=:y, legend = false, title = ["SZA=10ᵒ" "SZA=70ᵒ" "" "" "" ""], titlefont = font(10))
 savefig("abc.png")
+
+=#

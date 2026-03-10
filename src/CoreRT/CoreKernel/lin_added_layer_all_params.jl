@@ -14,60 +14,60 @@ function lin_added_layer_all_params_helper!(RS_type::noRS{FT},
     @unpack τ̇, ϖ̇, Ż⁺⁺, Ż⁻⁺ = computed_layer_properties_lin
     @unpack D, n = pol_type
     @unpack qp_μ, μ₀, Nquad, iμ₀Nstart = quad_points
-    @unpack F₀ = RS_type
+    #@unpack F₀ = RS_type
 
     arr_type = array_type(architecture)
 
-    nD=Int(size(Ż⁺⁺,2)/n)
+    nD=Int(size(Ż⁺⁺,1)/n)
     D_diag = repeat(arr_type(D), nD)             # full diagonal entries
     bigD = Diagonal(D_diag)                     # D-matrix
     
-    nparams = size(computed_layer_properties_lin.τ̇)[1]
+    nparams = size(computed_layer_properties_lin.τ̇, 2)
     #ap_ṙ⁺⁻ = zeros(Nparams, size(added_layer_lin.ṙ⁺⁻)[2], size(added_layer_lin.ṙ⁺⁻)[3], size(added_layer_lin.ṙ⁺⁻)[4])
     #ap_ṙ⁻⁺ = zeros(Nparams, size(added_layer_lin.ṙ⁺⁻)[2], size(added_layer_lin.ṙ⁺⁻)[3], size(added_layer_lin.ṙ⁺⁻)[4])
     #ap_ṫ⁺⁺ = zeros(Nparams, size(added_layer_lin.ṙ⁺⁻)[2], size(added_layer_lin.ṙ⁺⁻)[3], size(added_layer_lin.ṙ⁺⁻)[4])
     #ap_ṫ⁻⁻ = zeros(Nparams, size(added_layer_lin.ṙ⁺⁻)[2], size(added_layer_lin.ṙ⁺⁻)[3], size(added_layer_lin.ṙ⁺⁻)[4])
     #ap_J̇₀⁺ = zeros(Nparams, size(added_layer_lin.J̇₀⁺)[2], size(added_layer_lin.J̇₀⁺)[3], size(added_layer_lin.J̇₀⁺)[4])
     #ap_J̇₀⁻ = zeros(Nparams, size(added_layer_lin.J̇₀⁻)[2], size(added_layer_lin.J̇₀⁻)[3], size(added_layer_lin.J̇₀⁻)[4])   
-    nspec = size(computed_layer_properties_lin.τ̇)[2]
+    nspec = size(computed_layer_properties_lin.τ̇, 1)
     nbigD = size(bigD,1)
     #@show nD, n, nbigD
     i₀ = iμ₀Nstart:iμ₀Nstart+n-1
     #@show i₀
-    Ż⁺⁺_I₀ = arr_type(zeros(nbigD, nspec))
-    Ż⁻⁺_I₀ = arr_type(zeros(nbigD, nspec))
+    #Ż⁺⁺_I₀ = arr_type(zeros(nbigD, nspec))
+    #Ż⁻⁺_I₀ = arr_type(zeros(nbigD, nspec))
     Ż⁺⁺ = arr_type(Ż⁺⁺)
     Ż⁻⁺ = arr_type(Ż⁻⁺)
     #@show size(Ż⁺⁺), size(Ż⁺⁺_I₀), size(F₀)
-    F₀ = arr_type(F₀)
+    #F₀ = arr_type(F₀)
     for iparam=1:nparams 
         # the following is placeholder code: check later for 
         # 1. use of dτ̇_λ/dϖ̇_λ vs. dτ̇/dϖ̇
         # 2. dimensions
-        for ii = 1:nspec
-            Ż⁺⁺_I₀[:,ii] = Ż⁺⁺[iparam,:,i₀,ii] * F₀[:,ii] #I₀[ii-i_start+1]
-            Ż⁻⁺_I₀[:,ii] = Ż⁻⁺[iparam,:,i₀,ii] * F₀[:,ii] #I₀[ii-i_start+1] 
-        end
-        @views ap_ṫ⁺⁺[iparam,:,:,:] .= added_layer_lin.ṫ⁺⁺[1,:,:,:].*reshape(τ̇[iparam,:],1,1,nspec) .+ 
-                            added_layer_lin.ṫ⁺⁺[2,:,:,:].*reshape(ϖ̇[iparam,:],1,1,nspec) .+ 
-                            added_layer_lin.ṫ⁺⁺[3,:,:,:].*Ż⁺⁺[iparam,:,:,:] 
-        @views ap_ṫ⁻⁻[iparam,:,:,:] .= added_layer_lin.ṫ⁻⁻[1,:,:,:].*reshape(τ̇[iparam,:],1,1,nspec) .+ 
-                            added_layer_lin.ṫ⁻⁻[2,:,:,:].*reshape(ϖ̇[iparam,:],1,1,nspec) .+ 
-                            added_layer_lin.ṫ⁻⁻[3,:,:,:].*(reshape(bigD,nbigD,nbigD,1).*Ż⁺⁺[iparam,:,:,:].*reshape(bigD,nbigD,nbigD,1)) #Ż⁻⁻[iparam,:,:,:] 
+        #for ii = 1:nspec
+        #    Ż⁺⁺_I₀[:,ii] = Ż⁺⁺[iparam,:,i₀,ii] * F₀[:,ii] #I₀[ii-i_start+1]
+        #    Ż⁻⁺_I₀[:,ii] = Ż⁻⁺[iparam,:,i₀,ii] * F₀[:,ii] #I₀[ii-i_start+1] 
+        #end
+        @views ap_ṫ⁺⁺[:,:,:,iparam] .= added_layer_lin.ṫ⁺⁺[:,:,:,1].*reshape(τ̇[:,iparam],1,1,nspec) .+ 
+                            added_layer_lin.ṫ⁺⁺[:,:,:,2].*reshape(ϖ̇[:,iparam],1,1,nspec) .+ 
+                            added_layer_lin.ṫ⁺⁺[:,:,:,3].*Ż⁺⁺[:,:,:,iparam] 
+        @views ap_ṫ⁻⁻[:,:,:,iparam] .= added_layer_lin.ṫ⁻⁻[:,:,:,1].*reshape(τ̇[:,iparam],1,1,nspec) .+ 
+                            added_layer_lin.ṫ⁻⁻[:,:,:,2].*reshape(ϖ̇[:,iparam],1,1,nspec) .+ 
+                            added_layer_lin.ṫ⁻⁻[:,:,:,3].*(reshape(bigD,nbigD,nbigD,1).*Ż⁺⁺[:,:,:,iparam].*reshape(bigD,nbigD,nbigD,1)) #Ż⁻⁻[iparam,:,:,:] 
 
-        @views ap_ṙ⁻⁺[iparam,:,:,:] .= added_layer_lin.ṙ⁻⁺[1,:,:,:].*reshape(τ̇[iparam,:],1,1,nspec) .+ 
-                            added_layer_lin.ṙ⁻⁺[2,:,:,:].*reshape(ϖ̇[iparam,:],1,1,nspec) .+ 
-                            added_layer_lin.ṙ⁻⁺[3,:,:,:].*Ż⁻⁺[iparam,:,:,:]  
-        @views ap_ṙ⁺⁻[iparam,:,:,:] .= added_layer_lin.ṙ⁺⁻[1,:,:,:].*reshape(τ̇[iparam,:],1,1,nspec) .+ 
-                            added_layer_lin.ṙ⁺⁻[2,:,:,:].*reshape(ϖ̇[iparam,:],1,1,nspec) .+ 
-                            added_layer_lin.ṙ⁺⁻[3,:,:,:].*(reshape(bigD,nbigD,nbigD,1).*Ż⁻⁺[iparam,:,:,:].*reshape(bigD,nbigD,nbigD,1)) #Ż⁺⁻[iparam,:,:,:] 
-        if SFI
-            @views ap_J̇₀⁺[iparam,:,1,:] .= added_layer_lin.J̇₀⁺[1,:,1,:].*reshape(τ̇[iparam,:],1,nspec) + 
-                                added_layer_lin.J̇₀⁺[2,:,1,:].*reshape(ϖ̇[iparam,:],1,nspec) + 
-                                added_layer_lin.J̇₀⁺[3,:,1,:].*Ż⁺⁺_I₀
-            @views ap_J̇₀⁻[iparam,:,1,:] .= added_layer_lin.J̇₀⁻[1,:,1,:].*reshape(τ̇[iparam,:],1,nspec) + 
-                                added_layer_lin.J̇₀⁻[2,:,1,:].*reshape(ϖ̇[iparam,:],1,nspec) + 
-                                added_layer_lin.J̇₀⁻[3,:,1,:].*Ż⁻⁺_I₀ 
+        @views ap_ṙ⁻⁺[:,:,:,iparam] .= added_layer_lin.ṙ⁻⁺[:,:,:,1].*reshape(τ̇[:,iparam],1,1,nspec) .+ 
+                            added_layer_lin.ṙ⁻⁺[:,:,:,2].*reshape(ϖ̇[:,iparam],1,1,nspec) .+ 
+                            added_layer_lin.ṙ⁻⁺[:,:,:,3].*Ż⁻⁺[:,:,:,iparam]  
+        @views ap_ṙ⁺⁻[:,:,:,iparam] .= added_layer_lin.ṙ⁺⁻[:,:,:,1].*reshape(τ̇[:,iparam],1,1,nspec) .+ 
+                            added_layer_lin.ṙ⁺⁻[:,:,:,2].*reshape(ϖ̇[:,iparam],1,1,nspec) .+ 
+                            added_layer_lin.ṙ⁺⁻[:,:,:,3].*(reshape(bigD,nbigD,nbigD,1).*Ż⁻⁺[:,:,:,iparam].*reshape(bigD,nbigD,nbigD,1)) #Ż⁺⁻[iparam,:,:,:] 
+        if SFI # 2-3 new components will have to be added for polarized insolation (e.g., J₀⁺[:,1,:]-->J₀⁺[iparam,:,1:4,:]). The following is true for unpolarized solar insolation.
+            @views ap_J̇₀⁺[:,1,:,iparam] .= added_layer_lin.J̇₀⁺[:,1,:,1].*reshape(τ̇[:,iparam],1,nspec) + 
+                                added_layer_lin.J̇₀⁺[:,1,:,2].*reshape(ϖ̇[:,iparam],1,nspec) + 
+                                added_layer_lin.J̇₀⁺[:,1,:,3].*Ż⁺⁺[:,iμ₀Nstart,:,iparam] 
+            @views ap_J̇₀⁻[:,1,:,iparam] .= added_layer_lin.J̇₀⁻[:,1,:,1].*reshape(τ̇[:,iparam],1,nspec) + 
+                                added_layer_lin.J̇₀⁻[:,1,:,2].*reshape(ϖ̇[:,iparam],1,nspec) + 
+                                added_layer_lin.J̇₀⁻[:,1,:,3].*Ż⁻⁺[:,iμ₀Nstart,:,iparam] 
 
             # Use the following between doubling and interaction steps to account for the fact that the added layer is not at the TOA. This is needed because the added layer is not at the TOA, so the derivatives of the added layer properties with respect to τ, ϖ and Z need to be scaled by exp(-τ_sum/μ₀) to account for the fact that the added layer is not at the TOA. This is done in the following lines of code.                    
             ##if SFI

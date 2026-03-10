@@ -226,83 +226,77 @@ function model_from_parameters(lin::LinMode,
         #@show params.absorption_params.molecules[i_band]
         #@show length(params.absorption_params.molecules[i_band])
         # Loop over all molecules in this band, obtain profile for each, and add them up
-        if !isnothing(params.absorption_params) 
+        if !isnothing(params.absorption_params)
+            # --- Fixed-abundance molecules for this band ---
             if !isempty(params.absorption_params.fixed_molecules[i_band])
-                # fixed abundance molecules
                 for molec_i in 1:length(params.absorption_params.fixed_molecules[i_band])
-                    
-                    # This can be precomputed as well later in my mind, providing an absorption_model or an interpolation_model!
-                    if isempty(params.absorption_params.luts)
-                        # Obtain hitran data for this molecule
-                        @timeit "Read HITRAN" hitran_data = 
-                            read_hitran(artifact(params.absorption_params.fixed_molecules[i_band][molec_i]), iso=1)
-
-                        println("Computing profile for $(params.absorption_params.fixed_molecules[i_band][molec_i]) with vmr $(profile.vmr[params.absorption_params.fixed_molecules[i_band][molec_i]]) for band #$(i_band)")
-                        # Create absorption model with parameters beforehand now:
-                        absorption_model = make_hitran_model(hitran_data, 
-                            params.absorption_params.broadening_function, 
-                            wing_cutoff = params.absorption_params.wing_cutoff, 
-                            CEF = params.absorption_params.CEF, 
-                            architecture = params.architecture, 
-                            vmr = 0);#mean(profile.vmr[params.absorption_params.molecules[i_band][molec_i]]))
-                        # Calculate absorption profile
-                        # TODO: write the following linearized function
+                    # Per-molecule dispatch: use LUT if available, otherwise HITRAN line-by-line
+                    mol_name = params.absorption_params.fixed_molecules[i_band][molec_i]
+                    if !haskey(params.absorption_params.luts, mol_name)
+                        # No LUT for this molecule → compute from HITRAN database
+                        @timeit "Read HITRAN" hitran_data =
+                            read_hitran(artifact(mol_name), iso=1)
+                        println("Computing HITRAN profile for $(mol_name) (fixed, band #$(i_band), vmr=$(profile.vmr[mol_name]))")
+                        absorption_model = make_hitran_model(hitran_data,
+                            params.absorption_params.broadening_function,
+                            wing_cutoff = params.absorption_params.wing_cutoff,
+                            CEF = params.absorption_params.CEF,
+                            architecture = params.architecture,
+                            vmr = 0);
                         @timeit "Absorption Coeff"  compute_absorption_profile!(
-                                τ_abs[i_band], 
-                                absorption_model, 
+                                τ_abs[i_band],
+                                absorption_model,
                                 params.spec_bands[i_band],
-                                profile.vmr[params.absorption_params.fixed_molecules[i_band][molec_i]], 
+                                profile.vmr[mol_name],
                                 profile);
-                    # Use LUT directly
                     else
-                        # TODO: write the following linearized function
-                        compute_absorption_profile!(τ_abs[i_band], 
-                            params.absorption_params.luts[i_band][molec_i], 
+                        # LUT available → use pre-computed InterpolationModel
+                        println("Using LUT for $(mol_name) (fixed, band #$(i_band))")
+                        compute_absorption_profile!(τ_abs[i_band],
+                            params.absorption_params.luts[mol_name],
                             params.spec_bands[i_band],
-                            profile.vmr[params.absorption_params.fixed_molecules[i_band][molec_i]], 
+                            profile.vmr[mol_name],
                             profile);
                     end
                 end
             end
-            # Variable abundance molecules
+            # --- Variable-abundance molecules for this band (with Jacobian) ---
             if !isempty(params.absorption_params.variable_molecules[i_band])
                 for molec_i in 1:length(params.absorption_params.variable_molecules[i_band])
                     jac_idx = molec_i + 1 # jacobian index for variable abundance molecules
-                    # This can be precomputed as well later in my mind, providing an absorption_model or an interpolation_model!
-                    if isempty(params.absorption_params.luts)
-                        # Obtain hitran data for this molecule
-                        @timeit "Read HITRAN" hitran_data = 
-                            read_hitran(artifact(params.absorption_params.variable_molecules[i_band][molec_i]), iso=1)
-                        println("Computing profile for $(params.absorption_params.variable_molecules[i_band][molec_i]) with vmr $(profile.vmr[params.absorption_params.variable_molecules[i_band][molec_i]]) for band #$(i_band)")
-        
-                        # Create absorption model with parameters beforehand now:
-                        absorption_model = make_hitran_model(hitran_data, 
-                            params.absorption_params.broadening_function, 
-                            wing_cutoff = params.absorption_params.wing_cutoff, 
-                            CEF = params.absorption_params.CEF, 
-                            architecture = params.architecture, 
-                            vmr = 0);#mean(profile.vmr[params.absorption_params.molecules[i_band][molec_i]]))
-                        # Calculate absorption profile
+                    # Per-molecule dispatch: use LUT if available, otherwise HITRAN line-by-line
+                    mol_name = params.absorption_params.variable_molecules[i_band][molec_i]
+                    if !haskey(params.absorption_params.luts, mol_name)
+                        # No LUT for this molecule → compute from HITRAN database
+                        @timeit "Read HITRAN" hitran_data =
+                            read_hitran(artifact(mol_name), iso=1)
+                        println("Computing HITRAN profile for $(mol_name) (variable, band #$(i_band), vmr=$(profile.vmr[mol_name]))")
+                        absorption_model = make_hitran_model(hitran_data,
+                            params.absorption_params.broadening_function,
+                            wing_cutoff = params.absorption_params.wing_cutoff,
+                            CEF = params.absorption_params.CEF,
+                            architecture = params.architecture,
+                            vmr = 0);
                         # TODO: write the following linearized function
                         @timeit "Absorption Coeff"  compute_absorption_profile!(
-                                τ_abs[i_band], 
-                                τ̇_abs[i_band], 
+                                τ_abs[i_band],
+                                τ̇_abs[i_band],
                                 jac_idx,
-                                absorption_model, 
+                                absorption_model,
                                 params.spec_bands[i_band],
-                                profile.vmr[params.absorption_params.variable_molecules[i_band][molec_i]], 
+                                profile.vmr[mol_name],
                                 profile);
-                    # Use LUT directly
                     else
-                        # TODO: write the following linearized function
-                        # The following form of the function does not seem to exist. May still need to write it (also the forward model version)
+                        # LUT available → use pre-computed InterpolationModel
+                        # TODO: linearized LUT absorption profile function may still need to be written
+                        println("Using LUT for $(mol_name) (variable, band #$(i_band))")
                         compute_absorption_profile!(
-                            τ_abs[i_band], 
-                            τ̇_abs[i_band], 
+                            τ_abs[i_band],
+                            τ̇_abs[i_band],
                             jac_idx,
-                            params.absorption_params.luts[i_band][molec_i], 
+                            params.absorption_params.luts[mol_name],
                             params.spec_bands[i_band],
-                            profile.vmr[params.absorption_params.variable_molecules[i_band][molec_i]], 
+                            profile.vmr[mol_name],
                             profile);
                     end
                 end
@@ -694,33 +688,31 @@ function model_from_parameters(OCO::Bool, params::vSmartMOM_Parameters)
         #@show "hello"
         #@show params.absorption_params.molecules[i_band]
         #@show length(params.absorption_params.molecules[i_band])
-        # Loop over all molecules in this band, obtain profile for each, and add them up
+        # Per-molecule dispatch: use LUT if molecule has entry in luts dict, otherwise HITRAN
         if !isnothing(params.absorption_params)
-            for molec_i in 1:length(params.absorption_params.molecules[i_band])
-                
-                # This can be precomputed as well later in my mind, providing an absorption_model or an interpolation_model!
-                if isempty(params.absorption_params.luts)
-                    # Obtain hitran data for this molecule
-                    @timeit "Read HITRAN" hitran_data = read_hitran(artifact(params.absorption_params.molecules[i_band][molec_i]), iso=1)
-
-                    println("Computing profile for $(params.absorption_params.molecules[i_band][molec_i]) with vmr $(profile.vmr[params.absorption_params.molecules[i_band][molec_i]]) for band #$(i_band)")
-                    # Create absorption model with parameters beforehand now:
-                    absorption_model = make_hitran_model(hitran_data, 
-                        params.absorption_params.broadening_function, 
-                        wing_cutoff = params.absorption_params.wing_cutoff, 
-                        CEF = params.absorption_params.CEF, 
-                        architecture = params.architecture, 
-                        vmr = 0);#mean(profile.vmr[params.absorption_params.molecules[i_band][molec_i]]))
-                    # Calculate absorption profile
-                    
-                    @timeit "Absorption Coeff"  compute_absorption_profile!(τ_abs[i_band], 
-                        absorption_model, 
+            all_band_molecules = vcat(
+                params.absorption_params.fixed_molecules[i_band],
+                params.absorption_params.variable_molecules[i_band])
+            for mol_name in all_band_molecules
+                if !haskey(params.absorption_params.luts, mol_name)
+                    # No LUT → compute from HITRAN database
+                    @timeit "Read HITRAN" hitran_data = read_hitran(artifact(mol_name), iso=1)
+                    println("Computing HITRAN profile for $(mol_name) (band #$(i_band), vmr=$(profile.vmr[mol_name]))")
+                    absorption_model = make_hitran_model(hitran_data,
+                        params.absorption_params.broadening_function,
+                        wing_cutoff = params.absorption_params.wing_cutoff,
+                        CEF = params.absorption_params.CEF,
+                        architecture = params.architecture,
+                        vmr = 0);
+                    @timeit "Absorption Coeff"  compute_absorption_profile!(τ_abs[i_band],
+                        absorption_model,
                             params.spec_bands[i_band],
-                                profile.vmr[params.absorption_params.molecules[i_band][molec_i]], 
+                                profile.vmr[mol_name],
                                 profile);
-                # Use LUT directly
                 else
-                    compute_absorption_profile!(τ_abs[i_band], params.absorption_params.luts[i_band][molec_i], params.spec_bands[i_band],profile.vmr[params.absorption_params.molecules[i_band][molec_i]], profile);
+                    # LUT available → use pre-computed InterpolationModel
+                    println("Using LUT for $(mol_name) (band #$(i_band))")
+                    compute_absorption_profile!(τ_abs[i_band], params.absorption_params.luts[mol_name], params.spec_bands[i_band], profile.vmr[mol_name], profile);
                 end
             end
         end
@@ -728,11 +720,11 @@ function model_from_parameters(OCO::Bool, params::vSmartMOM_Parameters)
 
     # aerosol_optics[iBand][iAer]
     aerosol_optics = [Array{AerosolOptics}(undef, (n_aer)) for i=1:n_bands];
-        
-    FT2 = isnothing(params.scattering_params) ? params.float_type : typeof(params.scattering_params.rt_aerosols[1].τ_ref)
-    FT2 =  params.float_type 
 
-    # τ_aer[iBand][iAer,iZ]        
+    FT2 = isnothing(params.scattering_params) ? params.float_type : typeof(params.scattering_params.rt_aerosols[1].τ_ref)
+    FT2 =  params.float_type
+
+    # τ_aer[iBand][iAer,iZ]
     τ_aer = [zeros(FT2, n_aer, length(params.spec_bands[i]), length(profile.p_full)) for i=1:n_bands];
 
     # Loop over aerosol type
@@ -1007,42 +999,41 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
         τ_rayl[i_band] *= (RS_type.n2.vmr + RS_type.o2.vmr) #this factor has been added to account for computations of isolated o2 and n2 contributions to VS
         #=
         # Compute Rayleigh properties per layer for `i_band` band center
-        τ_rayl[i_band]   .= getRayleighLayerOptProp(profile.p_half[end], 
-                            (maximum(curr_band_λ) + minimum(curr_band_λ))/2, 
+        τ_rayl[i_band]   .= getRayleighLayerOptProp(profile.p_half[end],
+                            (maximum(curr_band_λ) + minimum(curr_band_λ))/2,
                             params.depol, profile.vcd_dry);
         =#
         # If no absorption, continue to next band
         isnothing(params.absorption_params) && continue
-        #@show i_band, params.absorption_params.molecules[i_band]
-        # Loop over all molecules in this band, obtain profile for each, and add them up
-        for molec_i in 1:length(params.absorption_params.molecules[i_band])
-            # This can be precomputed as well later in my mind, providing an absorption_model or an interpolation_model!
-            if isempty(params.absorption_params.luts)
-                # Obtain hitran data for this molecule
-                @timeit "Read HITRAN"  hitran_data = read_hitran(artifact(params.absorption_params.molecules[i_band][molec_i]), iso=1)
-
-                println("Computing profile for $(params.absorption_params.molecules[i_band][molec_i]) with vmr $(profile.vmr[params.absorption_params.molecules[i_band][molec_i]]) for band #$(i_band)")
-                # Create absorption model with parameters beforehand now:
-                absorption_model = make_hitran_model(hitran_data, 
-                    params.absorption_params.broadening_function, 
-                    wing_cutoff = params.absorption_params.wing_cutoff, 
-                    CEF = params.absorption_params.CEF, 
-                    architecture = params.architecture, 
-                    vmr = 0);#mean(profile.vmr[params.absorption_params.molecules[i_band][molec_i]]))
-                # Calculate absorption profile
-                @timeit "Absorption Coeff"  compute_absorption_profile!(τ_abs[i_band], absorption_model, params.spec_bands[i_band],profile.vmr[params.absorption_params.molecules[i_band][molec_i]], profile);
-            # Use LUT directly
+        # Per-molecule dispatch: use LUT if molecule has entry in luts dict, otherwise HITRAN
+        all_band_molecules = vcat(
+            params.absorption_params.fixed_molecules[i_band],
+            params.absorption_params.variable_molecules[i_band])
+        for mol_name in all_band_molecules
+            if !haskey(params.absorption_params.luts, mol_name)
+                # No LUT → compute from HITRAN database
+                @timeit "Read HITRAN"  hitran_data = read_hitran(artifact(mol_name), iso=1)
+                println("Computing HITRAN profile for $(mol_name) (band #$(i_band), vmr=$(profile.vmr[mol_name]))")
+                absorption_model = make_hitran_model(hitran_data,
+                    params.absorption_params.broadening_function,
+                    wing_cutoff = params.absorption_params.wing_cutoff,
+                    CEF = params.absorption_params.CEF,
+                    architecture = params.architecture,
+                    vmr = 0);
+                @timeit "Absorption Coeff"  compute_absorption_profile!(τ_abs[i_band], absorption_model, params.spec_bands[i_band], profile.vmr[mol_name], profile);
             else
-                compute_absorption_profile!(τ_abs[i_band], params.absorption_params.luts[i_band][molec_i], params.spec_bands[i_band],profile.vmr[params.absorption_params.molecules[i_band][molec_i]], profile);
+                # LUT available → use pre-computed InterpolationModel
+                println("Using LUT for $(mol_name) (band #$(i_band))")
+                compute_absorption_profile!(τ_abs[i_band], params.absorption_params.luts[mol_name], params.spec_bands[i_band], profile.vmr[mol_name], profile);
             end
         end
     end
 
     # aerosol_optics[iBand][iAer]
     aerosol_optics = [Array{AerosolOptics}(undef, (n_aer)) for i=1:n_bands];
-        
+
     FT2 = isnothing(params.scattering_params) ? params.float_type : typeof(params.scattering_params.rt_aerosols[1].τ_ref)
-    FT2 =  params.float_type 
+    FT2 =  params.float_type
 
     # τ_aer[iBand][iAer,iZ]
     τ_aer = [zeros(FT2, n_aer, length(profile.p_full)) for i=1:n_bands];
@@ -1292,42 +1283,41 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
         
 #=
         # Compute Rayleigh properties per layer for `i_band` band center
-        τ_rayl[i_band]   .= getRayleighLayerOptProp(profile.p_half[end], 
-                            (minimum(curr_band_λ) + maximum(curr_band_λ))/2, 
+        τ_rayl[i_band]   .= getRayleighLayerOptProp(profile.p_half[end],
+                            (minimum(curr_band_λ) + maximum(curr_band_λ))/2,
                             params.depol, profile.vcd_dry);
 =#
         # If no absorption, continue to next band
         isnothing(params.absorption_params) && continue
-        #@show i_band, params.absorption_params.molecules[i_band]
-        # Loop over all molecules in this band, obtain profile for each, and add them up
-        for molec_i in 1:length(params.absorption_params.molecules[i_band])
-            # This can be precomputed as well later in my mind, providing an absorption_model or an interpolation_model!
-            if isempty(params.absorption_params.luts)
-                # Obtain hitran data for this molecule
-                @timeit "Read HITRAN"  hitran_data = read_hitran(artifact(params.absorption_params.molecules[i_band][molec_i]), iso=1)
-
-                println("Computing profile for $(params.absorption_params.molecules[i_band][molec_i]) with vmr $(profile.vmr[params.absorption_params.molecules[i_band][molec_i]]) for band #$(i_band)")
-                # Create absorption model with parameters beforehand now:
-                absorption_model = make_hitran_model(hitran_data, 
-                    params.absorption_params.broadening_function, 
-                    wing_cutoff = params.absorption_params.wing_cutoff, 
-                    CEF = params.absorption_params.CEF, 
-                    architecture = params.architecture, 
-                    vmr = 0);#mean(profile.vmr[params.absorption_params.molecules[i_band][molec_i]]))
-                # Calculate absorption profile
-                @timeit "Absorption Coeff"  compute_absorption_profile!(τ_abs[i_band], absorption_model, params.spec_bands[i_band],profile.vmr[params.absorption_params.molecules[i_band][molec_i]], profile);
-            # Use LUT directly
+        # Per-molecule dispatch: use LUT if molecule has entry in luts dict, otherwise HITRAN
+        all_band_molecules = vcat(
+            params.absorption_params.fixed_molecules[i_band],
+            params.absorption_params.variable_molecules[i_band])
+        for mol_name in all_band_molecules
+            if !haskey(params.absorption_params.luts, mol_name)
+                # No LUT → compute from HITRAN database
+                @timeit "Read HITRAN"  hitran_data = read_hitran(artifact(mol_name), iso=1)
+                println("Computing HITRAN profile for $(mol_name) (band #$(i_band), vmr=$(profile.vmr[mol_name]))")
+                absorption_model = make_hitran_model(hitran_data,
+                    params.absorption_params.broadening_function,
+                    wing_cutoff = params.absorption_params.wing_cutoff,
+                    CEF = params.absorption_params.CEF,
+                    architecture = params.architecture,
+                    vmr = 0);
+                @timeit "Absorption Coeff"  compute_absorption_profile!(τ_abs[i_band], absorption_model, params.spec_bands[i_band], profile.vmr[mol_name], profile);
             else
-                compute_absorption_profile!(τ_abs[i_band], params.absorption_params.luts[i_band][molec_i], params.spec_bands[i_band],profile.vmr[params.absorption_params.molecules[i_band][molec_i]], profile);
+                # LUT available → use pre-computed InterpolationModel
+                println("Using LUT for $(mol_name) (band #$(i_band))")
+                compute_absorption_profile!(τ_abs[i_band], params.absorption_params.luts[mol_name], params.spec_bands[i_band], profile.vmr[mol_name], profile);
             end
         end
     end
 
     # aerosol_optics[iBand][iAer]
     aerosol_optics = [Array{AerosolOptics}(undef, (n_aer)) for i=1:n_bands];
-        
+
     FT2 = isnothing(params.scattering_params) ? params.float_type : typeof(params.scattering_params.rt_aerosols[1].τ_ref)
-    FT2 =  params.float_type 
+    FT2 =  params.float_type
 
     # τ_aer[iBand][iAer,iZ]
     τ_aer = [zeros(FT2, n_aer, length(profile.p_full)) for i=1:n_bands];

@@ -87,21 +87,18 @@ atmospheric_profile:
 # =================================================================
 absorption:
   # List of molecules per spectral band
-  molecules:
+  fixed_molecules:
     - [O3] # Molecules in Band #1
     - [O3]
     - [O3]
+  variable_molecules:
+    - []
+    - []
+    - []
   # VMR profiles can either be real-valued numbers, 
   # or an array of nodal points from TOA to BOA, interpolated in pressure space
   LUTfiles:
-    - ["/net/fluo/data2/data/Rami_CS_database/rami_spectroscopy_o3_all_nu.jld2"]
-    - ["/net/fluo/data2/data/Rami_CS_database/rami_spectroscopy_o3_all_nu.jld2"]
-    - ["/net/fluo/data2/data/Rami_CS_database/rami_spectroscopy_o3_all_nu.jld2"]
-  #  - ["/net/fluo/data2/data/ABSCO_CS_Database/v5.2_final/o2_v52.jld2"]
-    #- ["/net/fluo/data2/data/ABSCO_CS_Database/v5.2_final/wh2o_v52.jld2", "/net/fluo/data2/data/ABSCO_CS_Database/v5.2_final/wco2_v52.jld2"]
-    #- ["/net/fluo/data2/data/ABSCO_CS_Database/v5.2_final/sh2o_v52.jld2", "/net/fluo/data2/data/ABSCO_CS_Database/v5.2_final/sco2_v52.jld2"]
-  # VMR profiles can either be real-valued numbers, 
-  # or an array of nodal points from TOA to BOA, interpolated in pressure space
+    O3: "/net/fluo/data2/data/Rami_CS_database/rami_spectroscopy_o3_all_nu.jld2"
   vmr: 
     #O3:   0. #O2:    0.21
     O3:  [2.75e-9, 2.75e-8, 1.25e-7, 3.0000000000000004e-7, 5.5e-7, 7.0e-7, 

@@ -29,15 +29,15 @@ function doubling_helper!(pol_type,
     # Device architecture
     dev = devi(architecture)
     arr_type = array_type(architecture)
-    Nparams = size(expk_lin,1)
+    Nparams = size(expk_lin,2)
     # Note: short-circuit evaluation => return nothing evaluated iff ndoubl == 0 
     ndoubl == 0 && return nothing
     
     # Geometric progression of reflections (1-RR)⁻¹
     gp_refl      = similar(t⁺⁺)
     tt⁺⁺_gp_refl = similar(t⁺⁺)
-    gp_refl_lin       = arr_type(zeros(Nparams, size(t⁺⁺)[1], size(t⁺⁺)[2], size(t⁺⁺)[3]))
-    tt⁺⁺_gp_refl_lin  = arr_type(zeros(Nparams, size(t⁺⁺)[1], size(t⁺⁺)[2], size(t⁺⁺)[3]))
+    gp_refl_lin       = arr_type(zeros(size(t⁺⁺)[1], size(t⁺⁺)[2], size(t⁺⁺)[3], Nparams))
+    tt⁺⁺_gp_refl_lin  = arr_type(zeros(size(t⁺⁺)[1], size(t⁺⁺)[2], size(t⁺⁺)[3], Nparams))
     if SFI
         # Dummy for source 
         J₁⁺ = similar(J₀⁺)
@@ -60,8 +60,8 @@ function doubling_helper!(pol_type,
         #@show n, tt⁺⁺_gp_refl, any(isnan, tt⁺⁺_gp_refl)
         
         for iparam = 1:Nparams
-            @views gp_refl_lin[iparam,:,:,:] .= gp_refl ⊠ (ap_ṙ⁻⁺[iparam,:,:,:] ⊠ r⁻⁺ .+ r⁻⁺ ⊠ ap_ṙ⁻⁺[iparam,:,:,:]) ⊠ gp_refl 
-            @views tt⁺⁺_gp_refl_lin[iparam,:,:,:] .= ap_ṫ⁺⁺[iparam,:,:,:] ⊠ gp_refl .+ t⁺⁺ ⊠ gp_refl_lin[iparam,:,:,:]
+            @views gp_refl_lin[:,:,:,iparam] .= gp_refl ⊠ (ap_ṙ⁻⁺[:,:,:,iparam] ⊠ r⁻⁺ .+ r⁻⁺ ⊠ ap_ṙ⁻⁺[:,:,:,iparam]) ⊠ gp_refl
+            @views tt⁺⁺_gp_refl_lin[:,:,:,iparam] .= ap_ṫ⁺⁺[:,:,:,iparam] ⊠ gp_refl .+ t⁺⁺ ⊠ gp_refl_lin[:,:,:,iparam]
         end
         if SFI
             # J⁺₂₁(λ) = J⁺₁₀(λ).exp(-τ(λ)/μ₀)
@@ -70,20 +70,19 @@ function doubling_helper!(pol_type,
             @views J₁⁻[:,1,:] = J₀⁻[:,1,:] .* reshape(expk, 1, :)
             for iparam = 1:Nparams
                 #if iparam == 1
-                    @views ap_J̇₁⁺[iparam,:,1,:] .= ap_J̇₀⁺[iparam,:,1,:] .* reshape(expk, 1, :) .+ J₀⁺[:,1,:] .* reshape(expk_lin[iparam,:], 1, :)        
-                    @views ap_J̇₁⁻[iparam,:,1,:] .= ap_J̇₀⁻[iparam,:,1,:] .* reshape(expk, 1, :) .+ J₀⁻[:,1,:] .* reshape(expk_lin[iparam,:], 1, :)
-                    
-                    @views expk_lin .= 2* reshape(expk, 1, length(expk)) .* expk_lin
+                    @views ap_J̇₁⁺[:,1,:,iparam] .= ap_J̇₀⁺[:,1,:,iparam] .* reshape(expk, 1, :) .+ J₀⁺[:,1,:] .* reshape(expk_lin[:,iparam], 1, :)        
+                    @views ap_J̇₁⁻[:,1,:,iparam] .= ap_J̇₀⁻[:,1,:,iparam] .* reshape(expk, 1, :) .+ J₀⁻[:,1,:] .* reshape(expk_lin[:,iparam], 1, :)        
+                    @views expk_lin[:,iparam] .= 2* expk .* expk_lin[:,iparam]
                 #else
                 #    @views ap_J̇₁⁺[iparam,:,1,:] .= ap_J̇₀⁺[iparam,:,1,:] .* reshape(expk, 1, :)         
                 #    @views ap_J̇₁⁻[iparam,:,1,:] .= ap_J̇₀⁻[iparam,:,1,:] .* reshape(expk, 1, :) 
                 #end
-                @views ap_J̇₀⁻[iparam,:,:,:] .= ap_J̇₀⁻[iparam,:,:,:] .+ 
-                        (tt⁺⁺_gp_refl_lin[iparam,:,:,:] ⊠ (J₁⁻ .+ r⁻⁺ ⊠ J₀⁺)) .+
-                        (tt⁺⁺_gp_refl ⊠ (ap_J̇₁⁻[iparam,:,:,:] .+ ap_ṙ⁻⁺[iparam,:,:,:] ⊠ J₀⁺ .+ r⁻⁺ ⊠ ap_J̇₀⁺[iparam,:,:,:]))  
-                @views ap_J̇₀⁺[iparam,:,:,:] .= ap_J̇₁⁺[iparam,:,:,:] .+ 
-                    (tt⁺⁺_gp_refl_lin[iparam,:,:,:] ⊠ (J₀⁺ .+ r⁻⁺ ⊠ J₁⁻)) .+
-                    (tt⁺⁺_gp_refl ⊠ (ap_J̇₀⁺[iparam,:,:,:] .+ ap_ṙ⁻⁺[iparam, :,:,:] ⊠ J₁⁻ .+ r⁻⁺ ⊠ ap_J̇₁⁻[iparam, :,:,:]))
+                @views ap_J̇₀⁻[:,:,:,iparam] .= ap_J̇₀⁻[:,:,:,iparam] .+ 
+                        (tt⁺⁺_gp_refl_lin[:,:,:,iparam] ⊠ (J₁⁻ .+ r⁻⁺ ⊠ J₀⁺)) .+
+                        (tt⁺⁺_gp_refl ⊠ (ap_J̇₁⁻[:,:,:,iparam] .+ ap_ṙ⁻⁺[:,:,:,iparam] ⊠ J₀⁺ .+ r⁻⁺ ⊠ ap_J̇₀⁺[:,:,:,iparam]))  
+                @views ap_J̇₀⁺[:,:,:,iparam] .= ap_J̇₁⁺[:,:,:,iparam] .+ 
+                    (tt⁺⁺_gp_refl_lin[:,:,:,iparam] ⊠ (J₀⁺ .+ r⁻⁺ ⊠ J₁⁻)) .+
+                    (tt⁺⁺_gp_refl ⊠ (ap_J̇₀⁺[:,:,:,iparam] .+ ap_ṙ⁻⁺[:,:,:,iparam] ⊠ J₁⁻ .+ r⁻⁺ ⊠ ap_J̇₁⁻[:,:,:,iparam]))
             end
 
             # J⁻₀₂(λ) = J⁻₀₁(λ) + T⁻⁻₀₁(λ)[I - R⁻⁺₂₁(λ)R⁺⁻₀₁(λ)]⁻¹[J⁻₁₂(λ) + R⁻⁺₂₁(λ)J⁺₁₀(λ)] (see Eqs.8 in Raman paper draft)
@@ -94,12 +93,12 @@ function doubling_helper!(pol_type,
         end  
 
         for iparam = 1:Nparams
-            ap_ṙ⁻⁺[iparam, :,:,:] .= ap_ṙ⁻⁺[iparam, :,:,:] .+ 
-                        tt⁺⁺_gp_refl_lin[iparam, :,:,:] ⊠ r⁻⁺ ⊠ t⁺⁺ .+
-                        tt⁺⁺_gp_refl ⊠ (ap_ṙ⁻⁺[iparam,:,:,:] ⊠ t⁺⁺ .+
-                        r⁻⁺ ⊠ ap_ṫ⁺⁺[iparam, :,:,:])
-            ap_ṫ⁺⁺[iparam, :,:,:]  = tt⁺⁺_gp_refl_lin[iparam, :,:,:] ⊠ t⁺⁺ .+ 
-                        tt⁺⁺_gp_refl ⊠ ap_ṫ⁺⁺[iparam, :,:,:]
+            ap_ṙ⁻⁺[:,:,:,iparam] .= ap_ṙ⁻⁺[:,:,:,iparam] .+ 
+                        tt⁺⁺_gp_refl_lin[:,:,:,iparam] ⊠ r⁻⁺ ⊠ t⁺⁺ .+
+                        tt⁺⁺_gp_refl ⊠ (ap_ṙ⁻⁺[:,:,:,iparam] ⊠ t⁺⁺ .+
+                        r⁻⁺ ⊠ ap_ṫ⁺⁺[:,:,:,iparam])
+            ap_ṫ⁺⁺[:,:,:,iparam]  = tt⁺⁺_gp_refl_lin[:,:,:,iparam] ⊠ t⁺⁺ .+ 
+                        tt⁺⁺_gp_refl ⊠ ap_ṫ⁺⁺[:,:,:,iparam]
         end
         # R⁻⁺₂₀(λ) = R⁻⁺₁₀(λ) + T⁻⁻₀₁(λ)[I - R⁻⁺₂₁(λ)R⁺⁻₀₁(λ)]⁻¹R⁻⁺₂₁(λ)T⁺⁺₁₀(λ) (see Eqs.8 in Raman paper draft)
         r⁻⁺[:]  = r⁻⁺ .+ (tt⁺⁺_gp_refl ⊠ r⁻⁺ ⊠ t⁺⁺)
@@ -166,13 +165,13 @@ end
     iμ, jμ, n = @index(Global, NTuple)
     i = mod(iμ, n_stokes)
     j = mod(jμ, n_stokes)
+    Np = size(ṙ⁻⁺, 4)
 
     if !(1<=i<=2) #(i > 2)
         r⁻⁺[iμ,jμ,n] = - r⁻⁺[iμ, jμ,n]
-        # Unroll the 1:3 indexing to avoid GPU kernel issues
-        ṙ⁻⁺[1,iμ,jμ,n] = - ṙ⁻⁺[1,iμ, jμ,n]
-        ṙ⁻⁺[2,iμ,jμ,n] = - ṙ⁻⁺[2,iμ, jμ,n]
-        ṙ⁻⁺[3,iμ,jμ,n] = - ṙ⁻⁺[3,iμ, jμ,n]
+        for ip = 1:Np
+            ṙ⁻⁺[iμ,jμ,n,ip] = - ṙ⁻⁺[iμ,jμ,n,ip]
+        end
     end
     
     #if ((i <= 2) & (j <= 2)) | ((i > 2) & (j > 2))
@@ -180,22 +179,18 @@ end
         r⁺⁻[iμ,jμ,n] = r⁻⁺[iμ,jμ,n]
         t⁻⁻[iμ,jμ,n] = t⁺⁺[iμ,jμ,n]
         # Unroll the 1:3 indexing to avoid GPU kernel issues
-        ṙ⁺⁻[1,iμ,jμ,n] = ṙ⁻⁺[1,iμ,jμ,n]
-        ṙ⁺⁻[2,iμ,jμ,n] = ṙ⁻⁺[2,iμ,jμ,n]
-        ṙ⁺⁻[3,iμ,jμ,n] = ṙ⁻⁺[3,iμ,jμ,n]
-        ṫ⁻⁻[1,iμ,jμ,n] = ṫ⁺⁺[1,iμ,jμ,n]
-        ṫ⁻⁻[2,iμ,jμ,n] = ṫ⁺⁺[2,iμ,jμ,n]
-        ṫ⁻⁻[3,iμ,jμ,n] = ṫ⁺⁺[3,iμ,jμ,n]
+        for ip = 1:Np
+            ṙ⁺⁻[iμ,jμ,n,ip] = ṙ⁻⁺[iμ,jμ,n,ip]
+            ṫ⁻⁻[iμ,jμ,n,ip] = ṫ⁺⁺[iμ,jμ,n,ip]
+        end
     else
         r⁺⁻[iμ,jμ,n] = - r⁻⁺[iμ,jμ,n]
         t⁻⁻[iμ,jμ,n] = - t⁺⁺[iμ,jμ,n]
         # Unroll the 1:3 indexing to avoid GPU kernel issues
-        ṙ⁺⁻[1,iμ,jμ,n] = - ṙ⁻⁺[1,iμ,jμ,n]
-        ṙ⁺⁻[2,iμ,jμ,n] = - ṙ⁻⁺[2,iμ,jμ,n]
-        ṙ⁺⁻[3,iμ,jμ,n] = - ṙ⁻⁺[3,iμ,jμ,n]
-        ṫ⁻⁻[1,iμ,jμ,n] = - ṫ⁺⁺[1,iμ,jμ,n]
-        ṫ⁻⁻[2,iμ,jμ,n] = - ṫ⁺⁺[2,iμ,jμ,n]
-        ṫ⁻⁻[3,iμ,jμ,n] = - ṫ⁺⁺[3,iμ,jμ,n]
+        for ip = 1:Np
+            ṙ⁺⁻[iμ,jμ,n,ip] = - ṙ⁻⁺[iμ,jμ,n,ip]
+            ṫ⁻⁻[iμ,jμ,n,ip] = - ṫ⁺⁺[iμ,jμ,n,ip]
+        end
     end
 
 end
@@ -205,10 +200,9 @@ end
     i = mod(iμ, n_stokes)
     if !(1<=i<=2) #(i > 2)
         J₀⁻[iμ, 1, n] = - J₀⁻[iμ, 1, n] 
-        # Unroll the 1:3 indexing to avoid GPU kernel issues
-        J̇₀⁻[1, iμ, 1, n] = - J̇₀⁻[1, iμ, 1, n]
-        J̇₀⁻[2, iμ, 1, n] = - J̇₀⁻[2, iμ, 1, n]
-        J̇₀⁻[3, iμ, 1, n] = - J̇₀⁻[3, iμ, 1, n]
+        for ip = 1:size(J̇₀⁻, 4)
+            J̇₀⁻[iμ, 1, n, ip] = - J̇₀⁻[iμ, 1, n, ip]
+        end
     end
 end
 

@@ -14,27 +14,27 @@ function interaction_helper!(::ScatteringInterface_00, SFI,
                                 added_layer_lin::AddedLayerLin{FT}, 
                                 I_static::AbstractArray{FT2}) where {FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2}
 
-    Nparams = size(composite_layer_lin.Ṫ⁻⁻)[1]
+    Nparams = size(composite_layer_lin.Ṫ⁻⁻)[end]
     
     # If SFI, interact source function in no scattering
     if SFI
         for iparam=1:Nparams 
-            composite_layer_lin.J̇₀⁺[iparam,:] .= added_layer_lin.ap_J̇₀⁺[iparam,:] .+ 
-                added_layer.t⁺⁺ ⊠ composite_layer_lin.J̇₀⁺[iparam,:] .+ 
-                added_layer_lin.ap_ṫ⁺⁺[iparam,:] ⊠ composite_layer.J₀⁺
-            composite_layer_lin.J̇₀⁻[iparam,:] .= composite_layer_lin.J̇₀⁻[iparam,:] .+ 
-                composite_layer.T⁻⁻ ⊠ added_layer_lin.ap_J̇₀⁻[iparam,:] .+ 
-                composite_layer_lin.Ṫ⁻⁻[iparam,:] ⊠ added_layer.J₀⁻
+            composite_layer_lin.J̇₀⁺[:,:,:,iparam] .= added_layer_lin.ap_J̇₀⁺[:,:,:,iparam] .+ 
+                added_layer.t⁺⁺ ⊠ composite_layer_lin.J̇₀⁺[:,:,:,iparam] .+ 
+                added_layer_lin.ap_ṫ⁺⁺[:,:,:,iparam] ⊠ composite_layer.J₀⁺
+            composite_layer_lin.J̇₀⁻[:,:,:,iparam] .= composite_layer_lin.J̇₀⁻[:,:,:,iparam] .+ 
+                composite_layer.T⁻⁻ ⊠ added_layer_lin.ap_J̇₀⁻[:,:,:,iparam] .+ 
+                composite_layer_lin.Ṫ⁻⁻[:,:,:,iparam] ⊠ added_layer.J₀⁻
         end
         composite_layer.J₀⁺ .= added_layer.J₀⁺ .+ added_layer.t⁺⁺ ⊠ composite_layer.J₀⁺
         composite_layer.J₀⁻ .= composite_layer.J₀⁻ .+ composite_layer.T⁻⁻ ⊠ added_layer.J₀⁻
     end
     # Batched multiplication between added and composite
     for iparam=1:Nparams 
-        composite_layer_lin.Ṫ⁻⁻[iparam,:] = added_layer_lin.ap_ṫ⁻⁻[iparam,:] ⊠ composite_layer.T⁻⁻ .+
-                                added_layer.t⁻⁻ ⊠ composite_layer_lin.Ṫ⁻⁻[iparam,:] 
-        composite_layer_lin.Ṫ⁺⁺[iparam,:] = added_layer_lin.ap_ṫ⁺⁺[iparam,:] ⊠ composite_layer.T⁺⁺ .+
-                                added_layer.t⁺⁺ ⊠ composite_layer_lin.Ṫ⁺⁺[iparam,:]
+        composite_layer_lin.Ṫ⁻⁻[:,:,:,iparam] = added_layer_lin.ap_ṫ⁻⁻[:,:,:,iparam] ⊠ composite_layer.T⁻⁻ .+
+                                added_layer.t⁻⁻ ⊠ composite_layer_lin.Ṫ⁻⁻[:,:,:,iparam] 
+        composite_layer_lin.Ṫ⁺⁺[:,:,:,iparam] = added_layer_lin.ap_ṫ⁺⁺[:,:,:,iparam] ⊠ composite_layer.T⁺⁺ .+
+                                added_layer.t⁺⁺ ⊠ composite_layer_lin.Ṫ⁺⁺[:,:,:,iparam]
     end
     composite_layer.T⁻⁻[:] = added_layer.t⁻⁻ ⊠ composite_layer.T⁻⁻
     composite_layer.T⁺⁺[:] = added_layer.t⁺⁺ ⊠ composite_layer.T⁺⁺
@@ -50,22 +50,22 @@ function interaction_helper!(::ScatteringInterface_01, SFI,
                                 added_layer_lin::AddedLayerLin{FT}, 
                                 I_static::AbstractArray{FT2}) where {FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2}
 
-    Nparams = size(composite_layer_lin.Ṫ⁻⁻)[1]
+    Nparams = size(composite_layer_lin.Ṫ⁻⁻)[end]
     if SFI
         #J₀⁺, J₀⁻ = similar(composite_layer.J₀⁺), similar(composite_layer.J₀⁺)
         #J₀⁻ = composite_layer.J₀⁻ .+ composite_layer.T⁻⁻ ⊠ (added_layer.r⁻⁺ ⊠ composite_layer.J₀⁺ .+ added_layer.J₀⁻) 
         #J₀⁺ = added_layer.J₀⁺ .+ added_layer.t⁺⁺ ⊠ composite_layer.J₀⁺ 
         for iparam=1:Nparams
-            composite_layer_lin.J̇₀⁻[iparam,:] .= composite_layer_lin.J̇₀⁻[iparam,:] .+ 
-                composite_layer_lin.Ṫ⁻⁻[iparam,:] ⊠ 
+            composite_layer_lin.J̇₀⁻[:,:,:,iparam] .= composite_layer_lin.J̇₀⁻[:,:,:,iparam] .+ 
+                composite_layer_lin.Ṫ⁻⁻[:,:,:,iparam] ⊠ 
                 (added_layer.r⁻⁺ ⊠ composite_layer.J₀⁺ .+ added_layer.J₀⁻) .+
                 composite_layer.T⁻⁻ ⊠ 
-                (added_layer_lin.ap_ṙ⁻⁺[iparam,:] ⊠ composite_layer.J₀⁺ .+ 
-                added_layer.r⁻⁺ ⊠ composite_layer_lin.J̇₀⁺[iparam,:] .+ 
-                added_layer_lin.ap_J̇₀⁻[iparam,:])
-            composite_layer_lin.J̇₀⁺[iparam,:] .= added_layer_lin.ap_J̇₀⁺[iparam,:] .+ 
-                added_layer_lin.ap_ṫ⁺⁺[iparam,:] ⊠ composite_layer.J₀⁺ .+
-                added_layer.t⁺⁺ ⊠ composite_layer_lin.J̇₀⁺[iparam,:]  
+                (added_layer_lin.ap_ṙ⁻⁺[:,:,:,iparam] ⊠ composite_layer.J₀⁺ .+ 
+                added_layer.r⁻⁺ ⊠ composite_layer_lin.J̇₀⁺[:,:,:,iparam] .+ 
+                added_layer_lin.ap_J̇₀⁻[:,:,:,iparam])
+            composite_layer_lin.J̇₀⁺[:,:,:,iparam] .= added_layer_lin.ap_J̇₀⁺[:,:,:,iparam] .+ 
+                added_layer_lin.ap_ṫ⁺⁺[:,:,:,iparam] ⊠ composite_layer.J₀⁺ .+
+                added_layer.t⁺⁺ ⊠ composite_layer_lin.J̇₀⁺[:,:,:,iparam]  
         end
         composite_layer.J₀⁻ .= composite_layer.J₀⁻ .+ 
             composite_layer.T⁻⁻ ⊠ 
@@ -76,14 +76,14 @@ function interaction_helper!(::ScatteringInterface_01, SFI,
 
     # Batched multiplication between added and composite
     for iparam = 1:Nparams
-        composite_layer_lin.Ṙ⁻⁺[iparam,:] = composite_layer_lin.Ṫ⁻⁻[iparam,:] ⊠ added_layer.r⁻⁺ ⊠ composite_layer.T⁺⁺ .+
-                                    composite_layer.T⁻⁻ ⊠ added_layer_lin.ap_ṙ⁻⁺[iparam,:] ⊠ composite_layer.T⁺⁺ .+
-                                    composite_layer.T⁻⁻ ⊠ added_layer.r⁻⁺ ⊠ composite_layer_lin.Ṫ⁺⁺[iparam,:]
-        composite_layer_lin.Ṙ⁺⁻[iparam,:] = added_layer_lin.ap_ṙ⁺⁻[iparam,:]
-        composite_layer_lin.Ṫ⁺⁺[iparam,:] = added_layer_lin.ap_ṫ⁺⁺[iparam,:] ⊠ composite_layer.T⁺⁺ .+
-                                    added_layer.t⁺⁺ ⊠ composite_layer_lin.Ṫ⁺⁺[iparam,:]
-        composite_layer_lin.Ṫ⁻⁻[iparam,:] = composite_layer_lin.Ṫ⁻⁻[iparam,:] ⊠ added_layer.t⁻⁻ .+
-                                    composite_layer.T⁻⁻ ⊠ added_layer_lin.ap_ṫ⁻⁻[iparam,:]  
+        composite_layer_lin.Ṙ⁻⁺[:,:,:,iparam] = composite_layer_lin.Ṫ⁻⁻[:,:,:,iparam] ⊠ added_layer.r⁻⁺ ⊠ composite_layer.T⁺⁺ .+
+                                    composite_layer.T⁻⁻ ⊠ added_layer_lin.ap_ṙ⁻⁺[:,:,:,iparam] ⊠ composite_layer.T⁺⁺ .+
+                                    composite_layer.T⁻⁻ ⊠ added_layer.r⁻⁺ ⊠ composite_layer_lin.Ṫ⁺⁺[:,:,:,iparam]
+        composite_layer_lin.Ṙ⁺⁻[:,:,:,iparam] = added_layer_lin.ap_ṙ⁺⁻[:,:,:,iparam]
+        composite_layer_lin.Ṫ⁺⁺[:,:,:,iparam] = added_layer_lin.ap_ṫ⁺⁺[:,:,:,iparam] ⊠ composite_layer.T⁺⁺ .+
+                                    added_layer.t⁺⁺ ⊠ composite_layer_lin.Ṫ⁺⁺[:,:,:,iparam]
+        composite_layer_lin.Ṫ⁻⁻[:,:,:,iparam] = composite_layer_lin.Ṫ⁻⁻[:,:,:,iparam] ⊠ added_layer.t⁻⁻ .+
+                                    composite_layer.T⁻⁻ ⊠ added_layer_lin.ap_ṫ⁻⁻[:,:,:,iparam]  
     end
     composite_layer.R⁻⁺[:] = composite_layer.T⁻⁻ ⊠ added_layer.r⁻⁺ ⊠ composite_layer.T⁺⁺
     composite_layer.R⁺⁻[:] = added_layer.r⁺⁻
@@ -102,19 +102,19 @@ function interaction_helper!(::ScatteringInterface_10, SFI,
                                 added_layer_lin::AddedLayerLin{FT}, 
                                 I_static::AbstractArray{FT2}) where {FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2}
 
-    Nparams = size(composite_layer_lin.Ṫ⁻⁻)[1]
+    Nparams = size(composite_layer_lin.Ṫ⁻⁻)[end]
     if SFI
         for iparam=1:Nparams
-            composite_layer_lin.J̇₀⁺[iparam,:] .= added_layer_lin.ap_J̇₀⁺[iparam,:] .+ 
-                added_layer_lin.ap_ṫ⁺⁺[iparam,:] ⊠ 
+            composite_layer_lin.J̇₀⁺[:,:,:,iparam] .= added_layer_lin.ap_J̇₀⁺[:,:,:,iparam] .+ 
+                added_layer_lin.ap_ṫ⁺⁺[:,:,:,iparam] ⊠ 
                 (composite_layer.J₀⁺ .+ composite_layer.R⁺⁻ ⊠ added_layer.J₀⁻) .+
                 added_layer.t⁺⁺ ⊠ 
-                (composite_layer_lin.J̇₀⁺[iparam,:] .+ 
-                composite_layer_lin.Ṙ⁺⁻[iparam,:] ⊠ added_layer.J₀⁻ .+ 
-                composite_layer.R⁺⁻ ⊠ added_layer_lin.ap_J̇₀⁻[iparam,:])
-            composite_layer_lin.J̇₀⁻[iparam,:] .= composite_layer_lin.J̇₀⁻[iparam,:] .+ 
-                composite_layer_lin.Ṫ⁻⁻[iparam,:] ⊠ added_layer.J₀⁻ .+
-                composite_layer.T⁻⁻ ⊠ added_layer_lin.ap_J̇₀⁻[iparam,:] 
+                (composite_layer_lin.J̇₀⁺[:,:,:,iparam] .+ 
+                composite_layer_lin.Ṙ⁺⁻[:,:,:,iparam] ⊠ added_layer.J₀⁻ .+ 
+                composite_layer.R⁺⁻ ⊠ added_layer_lin.ap_J̇₀⁻[:,:,:,iparam])
+            composite_layer_lin.J̇₀⁻[:,:,:,iparam] .= composite_layer_lin.J̇₀⁻[:,:,:,iparam] .+ 
+                composite_layer_lin.Ṫ⁻⁻[:,:,:,iparam] ⊠ added_layer.J₀⁻ .+
+                composite_layer.T⁻⁻ ⊠ added_layer_lin.ap_J̇₀⁻[:,:,:,iparam] 
         end
         composite_layer.J₀⁺ .= added_layer.J₀⁺ .+ 
             added_layer.t⁺⁺ ⊠ 
@@ -125,13 +125,13 @@ function interaction_helper!(::ScatteringInterface_10, SFI,
 
     # Batched multiplication between added and composite
     for iparam=1:Nparams
-        composite_layer_lin.Ṫ⁺⁺[iparam,:] = added_layer_lin.ap_ṫ⁺⁺[iparam,:] ⊠ composite_layer.T⁺⁺ .+
-                                        added_layer.t⁺⁺ ⊠ composite_layer_lin.Ṫ⁺⁺[iparam,:]
-        composite_layer_lin.Ṫ⁻⁻[iparam,:] = composite_layer_lin.Ṫ⁻⁻[iparam,:] ⊠ added_layer.t⁻⁻ .+
-                                        composite_layer.T⁻⁻ ⊠ added_layer_lin.ap_ṫ⁻⁻[iparam,:]
-        composite_layer_lin.Ṙ⁺⁻[iparam,:] = added_layer_lin.ap_ṫ⁺⁺[iparam,:] ⊠ composite_layer.R⁺⁻ ⊠ added_layer.t⁻⁻ .+
-                                            added_layer.t⁺⁺ ⊠ composite_layer_lin.Ṙ⁺⁻[iparam,:] ⊠ added_layer.t⁻⁻ .+
-                                            added_layer.t⁺⁺ ⊠ composite_layer.R⁺⁻ ⊠ added_layer_lin.ap_ṫ⁻⁻[iparam,:]
+        composite_layer_lin.Ṫ⁺⁺[:,:,:,iparam] = added_layer_lin.ap_ṫ⁺⁺[:,:,:,iparam] ⊠ composite_layer.T⁺⁺ .+
+                                        added_layer.t⁺⁺ ⊠ composite_layer_lin.Ṫ⁺⁺[:,:,:,iparam]
+        composite_layer_lin.Ṫ⁻⁻[:,:,:,iparam] = composite_layer_lin.Ṫ⁻⁻[:,:,:,iparam] ⊠ added_layer.t⁻⁻ .+
+                                        composite_layer.T⁻⁻ ⊠ added_layer_lin.ap_ṫ⁻⁻[:,:,:,iparam]
+        composite_layer_lin.Ṙ⁺⁻[:,:,:,iparam] = added_layer_lin.ap_ṫ⁺⁺[:,:,:,iparam] ⊠ composite_layer.R⁺⁻ ⊠ added_layer.t⁻⁻ .+
+                                            added_layer.t⁺⁺ ⊠ composite_layer_lin.Ṙ⁺⁻[:,:,:,iparam] ⊠ added_layer.t⁻⁻ .+
+                                            added_layer.t⁺⁺ ⊠ composite_layer.R⁺⁻ ⊠ added_layer_lin.ap_ṫ⁻⁻[:,:,:,iparam]
     end
     composite_layer.T⁺⁺[:] = added_layer.t⁺⁺ ⊠ composite_layer.T⁺⁺
     composite_layer.T⁻⁻[:] = composite_layer.T⁻⁻ ⊠ added_layer.t⁻⁻
@@ -153,7 +153,7 @@ function interaction_helper!(::ScatteringInterface_11, SFI,
     @unpack ap_ṙ⁺⁻, ap_ṙ⁻⁺, ap_ṫ⁻⁻, ap_ṫ⁺⁺, ap_J̇₀⁺, ap_J̇₀⁻  = added_layer_lin #these are aliases to the respective struct elements  
     @unpack Ṙ⁻⁺, Ṙ⁺⁻, Ṫ⁺⁺, Ṫ⁻⁻, J̇₀⁺, J̇₀⁻ = composite_layer_lin #these are aliases to the respective struct elements 
     
-    Nparams = size(composite_layer_lin.Ṫ⁻⁻)[1]
+    Nparams = size(composite_layer_lin.Ṫ⁻⁻)[end]
     # Used to store `(I - R⁺⁻ * r⁻⁺)⁻¹`
     tmp_inv = similar(t⁺⁺)
     tmp_inv_lin = similar(Ṫ⁺⁺)
@@ -167,16 +167,16 @@ function interaction_helper!(::ScatteringInterface_11, SFI,
     # T₁₂(I-R₀₁R₂₁)⁻¹
     T01_inv = T⁻⁻ ⊠ tmp_inv;
     for iparam=1:Nparams
-        tmp_inv_lin[iparam,:,:,:] .= tmp_inv ⊠ (ap_ṙ⁻⁺[iparam,:,:,:] ⊠ R⁺⁻ .+ r⁻⁺ ⊠ Ṙ⁺⁻[iparam,:,:,:]) ⊠ tmp_inv
-        T01_inv_lin[iparam,:,:,:] .= Ṫ⁻⁻[iparam,:,:,:] ⊠ tmp_inv .+ T⁻⁻ ⊠ tmp_inv_lin[iparam,:,:,:]
+        tmp_inv_lin[:,:,:,iparam] .= tmp_inv ⊠ (ap_ṙ⁻⁺[:,:,:,iparam] ⊠ R⁺⁻ .+ r⁻⁺ ⊠ Ṙ⁺⁻[:,:,:,iparam]) ⊠ tmp_inv
+        T01_inv_lin[:,:,:,iparam] .= Ṫ⁻⁻[:,:,:,iparam] ⊠ tmp_inv .+ T⁻⁻ ⊠ tmp_inv_lin[:,:,:,iparam]
         # R₂₀ = R₁₀ + T₀₁(I-R₂₁R₀₁)⁻¹ R₂₁T₁₀
-        tmpṘ⁻⁺[iparam,:,:,:] .= Ṙ⁻⁺[iparam,:,:,:] .+ 
-                        T01_inv_lin[iparam,:,:,:] ⊠ r⁻⁺ ⊠ T⁺⁺ .+
-                        T01_inv ⊠ (ap_ṙ⁻⁺[iparam,:,:,:] ⊠ T⁺⁺ .+ 
-                        r⁻⁺ ⊠ Ṫ⁺⁺[iparam,:,:,:])
+        tmpṘ⁻⁺[:,:,:,iparam] .= Ṙ⁻⁺[:,:,:,iparam] .+ 
+                        T01_inv_lin[:,:,:,iparam] ⊠ r⁻⁺ ⊠ T⁺⁺ .+
+                        T01_inv ⊠ (ap_ṙ⁻⁺[:,:,:,iparam] ⊠ T⁺⁺ .+ 
+                        r⁻⁺ ⊠ Ṫ⁺⁺[:,:,:,iparam])
     
         # T₀₂ = T₀₁(1-R₂₁R₀₁)⁻¹T₁₂
-        tmpṪ⁻⁻[iparam,:,:,:] .= T01_inv_lin[iparam,:,:,:] ⊠ t⁻⁻ .+ T01_inv ⊠ ap_ṫ⁻⁻[iparam,:,:,:] 
+        tmpṪ⁻⁻[:,:,:,iparam] .= T01_inv_lin[:,:,:,iparam] ⊠ t⁻⁻ .+ T01_inv ⊠ ap_ṫ⁻⁻[:,:,:,iparam] 
     end
     
     if SFI
@@ -186,9 +186,9 @@ function interaction_helper!(::ScatteringInterface_11, SFI,
             #@show size(tmpap_J̇₀⁻), size(ap_J̇₀⁻)
             #@show size(T01_inv_lin), size(r⁻⁺)
             #@show size(J₀⁺), size(added_layer.J₀⁻)
-            tmpap_J̇₀⁻[iparam,:,:,:] .= ap_J̇₀⁻[iparam,:,:,:] .+ 
-                T01_inv_lin[iparam,:,:,:] ⊠ (r⁻⁺ ⊠ J₀⁺ .+ added_layer.J₀⁻) .+
-                T01_inv ⊠ (ap_ṙ⁻⁺[iparam,:,:,:] ⊠ J₀⁺ .+ r⁻⁺ ⊠ ap_J̇₀⁺[iparam,:,:,:] .+ ap_J̇₀⁻[iparam,:,:,:])  
+            tmpap_J̇₀⁻[:,:,:,iparam] .= J̇₀⁻[:,:,:,iparam] .+
+                T01_inv_lin[:,:,:,iparam] ⊠ (r⁻⁺ ⊠ J₀⁺ .+ added_layer.J₀⁻) .+
+                T01_inv ⊠ (ap_ṙ⁻⁺[:,:,:,iparam] ⊠ J₀⁺ .+ r⁻⁺ ⊠ J̇₀⁺[:,:,:,iparam] .+ ap_J̇₀⁻[:,:,:,iparam])
         end
     end 
 
@@ -208,23 +208,23 @@ function interaction_helper!(::ScatteringInterface_11, SFI,
     # T₂₁(I-R₀₁R₂₁)⁻¹
     T21_inv = t⁺⁺ ⊠ tmp_inv
     for iparam=1:Nparams
-        tmp_inv_lin[iparam,:,:,:] .= tmp_inv ⊠ (R⁺⁻ ⊠ ap_ṙ⁻⁺[iparam,:,:,:] .+ Ṙ⁺⁻[iparam,:,:,:] ⊠ r⁻⁺) ⊠ tmp_inv
-        T21_inv_lin[iparam,:,:,:] .= ap_ṫ⁺⁺[iparam,:,:,:] ⊠ tmp_inv .+ t⁺⁺ ⊠ tmp_inv_lin[iparam,:,:,:]
+        tmp_inv_lin[:,:,:,iparam] .= tmp_inv ⊠ (R⁺⁻ ⊠ ap_ṙ⁻⁺[:,:,:,iparam] .+ Ṙ⁺⁻[:,:,:,iparam] ⊠ r⁻⁺) ⊠ tmp_inv
+        T21_inv_lin[:,:,:,iparam] .= ap_ṫ⁺⁺[:,:,:,iparam] ⊠ tmp_inv .+ t⁺⁺ ⊠ tmp_inv_lin[:,:,:,iparam]
 
         # T₂₀ = T₂₁(I-R₀₁R₂₁)⁻¹T₁₀
-        tmpṪ⁺⁺[iparam,:,:,:] .= T21_inv_lin[iparam,:,:,:] ⊠ T⁺⁺ .+ T21_inv ⊠ Ṫ⁺⁺[iparam,:,:,:] 
+        tmpṪ⁺⁺[:,:,:,iparam] .= T21_inv_lin[:,:,:,iparam] ⊠ T⁺⁺ .+ T21_inv ⊠ Ṫ⁺⁺[:,:,:,iparam] 
     
         # R₀₂ = R₁₂ + T₂₁(1-R₀₁R₂₁)⁻¹R₀₁T₁₂
-        tmpṘ⁺⁻[iparam,:,:,:] .= ap_ṙ⁺⁻[iparam,:,:,:] .+ T21_inv_lin[iparam,:,:,:] ⊠ R⁺⁻ ⊠ t⁻⁻ .+ 
-                                    T21_inv ⊠ (Ṙ⁺⁻[iparam,:,:,:] ⊠ t⁻⁻ .+ R⁺⁻ ⊠ ap_ṫ⁻⁻[iparam,:,:,:])  
+        tmpṘ⁺⁻[:,:,:,iparam] .= ap_ṙ⁺⁻[:,:,:,iparam] .+ T21_inv_lin[:,:,:,iparam] ⊠ R⁺⁻ ⊠ t⁻⁻ .+ 
+                                    T21_inv ⊠ (Ṙ⁺⁻[:,:,:,iparam] ⊠ t⁻⁻ .+ R⁺⁻ ⊠ ap_ṫ⁻⁻[:,:,:,iparam])  
     end
     if SFI
         for iparam=1:Nparams
-            tmpap_J̇₀⁺[iparam,:,:,:] .= added_layer_lin.ap_J̇₀⁺[iparam,:,:,:] .+ 
-                T21_inv_lin[iparam,:,:,:] ⊠ (J₀⁺ .+ R⁺⁻ ⊠ added_layer.J₀⁻) .+
-                T21_inv ⊠ (ap_J̇₀⁺[iparam,:,:,:] .+ 
-                    Ṙ⁺⁻[iparam,:,:,:] ⊠ added_layer.J₀⁻ .+ 
-                    R⁺⁻ ⊠ added_layer_lin.ap_J̇₀⁻[iparam,:,:,:])
+            tmpap_J̇₀⁺[:,:,:,iparam] .= added_layer_lin.ap_J̇₀⁺[:,:,:,iparam] .+ 
+                T21_inv_lin[:,:,:,iparam] ⊠ (J₀⁺ .+ R⁺⁻ ⊠ added_layer.J₀⁻) .+
+                T21_inv ⊠ (J̇₀⁺[:,:,:,iparam] .+ 
+                    Ṙ⁺⁻[:,:,:,iparam] ⊠ added_layer.J₀⁻ .+ 
+                    R⁺⁻ ⊠ added_layer_lin.ap_J̇₀⁻[:,:,:,iparam])
         end
         # J₂₀⁺ = J₂₁⁺ + T₂₁(I-R₀₁R₂₁)⁻¹(J₁₀ + R₀₁J₁₂⁻ )
         tmpJ₀⁺ = added_layer.J₀⁺ .+ T21_inv ⊠ 
@@ -244,8 +244,8 @@ function interaction_helper!(::ScatteringInterface_11, SFI,
         for iparam=1:Nparams
             #@show size(tmpap_J̇₀⁺), size(composite_layer_lin.J̇₀⁺)
             #@show size(tmpap_J̇₀⁻), size(composite_layer_lin.J̇₀⁻)
-            composite_layer_lin.J̇₀⁺[iparam,:,:,:] .= tmpap_J̇₀⁺[iparam,:,:,:]
-            composite_layer_lin.J̇₀⁻[iparam,:,:,:] .= tmpap_J̇₀⁻[iparam,:,:,:]
+            composite_layer_lin.J̇₀⁺[:,:,:,iparam] .= tmpap_J̇₀⁺[:,:,:,iparam]
+            composite_layer_lin.J̇₀⁻[:,:,:,iparam] .= tmpap_J̇₀⁻[:,:,:,iparam]
         end
     end
     composite_layer.R⁺⁻[:] = tmpR⁺⁻

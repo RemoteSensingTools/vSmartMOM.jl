@@ -260,17 +260,25 @@ function parameters_from_yaml(file_path)
         wing_cutoff = params_dict["absorption"]["wing_cutoff"]
 
         
-        # Option to load lookup tables!
-        luts = []
+        # Per-molecule lookup tables (LUTs).
+        # LUTfiles is a YAML dictionary mapping molecule names to file paths, e.g.:
+        #   LUTfiles:
+        #     O2: "/path/to/o2_lut.jld2"
+        #     CO2: "/path/to/co2_lut.jld2"
+        # Molecules listed in fixed_molecules/variable_molecules but absent from
+        # LUTfiles will be computed via HITRAN line-by-line instead. This allows
+        # mixing LUT-based and HITRAN-based species freely across bands.
+        luts = Dict{String, Any}()
         if "LUTfiles" in keys(params_dict["absorption"])
-            files_lut = Array(params_dict["absorption"]["LUTfiles"])
-            @assert size(files_lut) == size(all_molecules) "Size of LUTfiles has to match molecules"
-            #@show size(files_lut)
-            
-            for i in eachindex(files_lut)
-                #@show i, files_lut[i]
-                #@show typeof(load_interpolation_model(files_lut[1]))
-                push!(luts,[load_interpolation_model(file) for file in files_lut[i]])
+            lut_entries = params_dict["absorption"]["LUTfiles"]
+            # LUTfiles may be null/nothing if all entries are commented out — skip gracefully
+            if !isnothing(lut_entries)
+                @assert lut_entries isa Dict "LUTfiles must be a YAML dictionary mapping molecule names to file paths, e.g. {O2: \"/path/to/o2.jld2\"}"
+                for (mol_name, file_path) in lut_entries
+                    @assert mol_name in keys(vmr) "LUTfiles references molecule '$(mol_name)' which has no vmr entry"
+                    println("Loading LUT for $(mol_name) from $(file_path)")
+                    luts[mol_name] = load_interpolation_model(file_path)
+                end
             end
         end
         absorption_params = AbsorptionParameters(fixed_molecules, variable_molecules,

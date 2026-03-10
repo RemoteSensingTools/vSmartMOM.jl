@@ -87,10 +87,14 @@ atmospheric_profile:
 # =================================================================
 absorption:
   # List of molecules per spectral band
-  molecules:
+  fixed_molecules:
     - [O2] # Molecules in Band #1
     - [O2]
     - [O2]
+  variable_molecules:
+    - []
+    - []
+    - []
   # VMR profiles can either be real-valued numbers, 
   # or an array of nodal points from TOA to BOA, interpolated in pressure space
   #LUTfiles:

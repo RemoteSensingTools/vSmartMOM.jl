@@ -87,8 +87,10 @@ atmospheric_profile:
 # =================================================================
 absorption:
   # List of molecules per spectral band
-  molecules:
+  fixed_molecules:
     - [O2] # Molecules in Band #1
+  variable_molecules:
+    - []
     #- [O2]
     #- [O2]
   # VMR profiles can either be real-valued numbers, 

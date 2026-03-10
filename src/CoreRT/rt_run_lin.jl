@@ -355,8 +355,8 @@ function rt_run(RS_type::AbstractRamanType,
     T       = zeros(FT_dual, length(vza), pol_type.n, nSpec)
     #R_SFI   = zeros(FT_dual, length(vza), pol_type.n, nSpec)
     #T_SFI   = zeros(FT_dual, length(vza), pol_type.n, nSpec)
-    Ṙ       = zeros(FT_dual, Nparams, length(vza), pol_type.n, nSpec)
-    Ṫ       = zeros(FT_dual, Nparams, length(vza), pol_type.n, nSpec)
+    Ṙ       = zeros(FT_dual, length(vza), pol_type.n, nSpec, Nparams)
+    Ṫ       = zeros(FT_dual, length(vza), pol_type.n, nSpec, Nparams)
     # Notify user of processing parameters
     msg = 
     """
@@ -443,7 +443,7 @@ function rt_run(RS_type::AbstractRamanType,
                         composite_layer, composite_layer_lin,
                         layer_opt, layer_opt_lin,
                         scattering_interfaces_all[iz], 
-                        τ_sum_all[:,iz], τ̇_sum_all[:,:,iz], 
+                        τ_sum_all[:,iz], τ̇_sum_all[:,iz,:],
                         m, quad_points, 
                         I_static, 
                         model.params.architecture, 
@@ -464,7 +464,7 @@ function rt_run(RS_type::AbstractRamanType,
                             pol_type, 
                             quad_points, 
                             arr_type(τ_sum_all[:,end]),
-                            arr_type(τ̇_sum_all[:,:,end]), 
+                            arr_type(τ̇_sum_all[:,end,:]),
                             arr_type(F₀),
                             model.params.architecture);
         

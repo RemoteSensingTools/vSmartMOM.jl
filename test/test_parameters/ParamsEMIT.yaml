@@ -6,7 +6,7 @@ radiative_transfer:
   spec_bands:
     #- (1e7/407.5):0.05:(1e7/372.5) #- (1e7/400):0.5:(1e7/380)
     #- (1e7/697.5):0.05:(1e7/672.5) #- (1e7/690):0.5:(1e7/680)
-    #- (1e7/782.5):0.05:(1e7/747.5) #- (1e7/775):0.5:(1e7/755) 
+    - (1e7/767.5):0.05:(1e7/762.5) #- (1e7/782.5):0.05:(1e7/747.5) #- (1e7/775):0.5:(1e7/755) 
     #- (1e7/2160):0.05:(1e7/1960)
     - (1e7/2400):0.5:(1e7/2395) #(1e7/2200)
     #- (1e7/1753.11):0.1:(1e7/1603.77) #- (1e7/1745.61):0.5:(1e7/1611.27)
@@ -19,7 +19,7 @@ radiative_transfer:
     #- (1e7/445):0.5:(1e7/395)
   # Bidirectional Reflectance Distribution Function (BRDF) per band
   surface: 
-    #- LambertianSurfaceScalar{Float64}(0.1) #(0.5) #(0.25) #(0.2) #(0.05)
+    - LambertianSurfaceScalar{Float64}(0.3) #(0.5) #(0.25) #(0.2) #(0.05)
     #- LambertianSurfaceScalar{Float64}(0.1) #(0.5)
     #- LambertianSurfaceScalar{Float64}(0.6) #(0.5)
     #- LambertianSurfaceScalar{Float64}(0.2)
@@ -39,7 +39,7 @@ radiative_transfer:
   # Floating point type for calculations (Float32, Float64)
   float_type:         Float64
   # Architecture (default_architecture, Architectures.GPU(), Architectures.CPU())
-  architecture:       Architectures.CPU() #Architectures.GPU() #Architectures.GPU() # default_architecture
+  architecture:       Architectures.GPU() #Architectures.GPU() #Architectures.GPU() # default_architecture
   
 # =================================================================
 # Simulation Geometry
@@ -107,7 +107,7 @@ atmospheric_profile:
   #    800.12, 849.00, 912.00, 980.00, 1005.0]
   #
   # Reduce profile to n layers (-1 is default, leave as is)
-  profile_reduction: 1 #-1 #5 #-1 #1 #-1
+  profile_reduction: -1 #5 #-1 #1 #-1
 
 # =================================================================
 # Absorption-Related Parameters (Optional)
@@ -115,26 +115,26 @@ atmospheric_profile:
 absorption:
 # List of molecules per spectral band
   fixed_molecules:
-    #- [O2]
+    - [O2]
     #- [O2]       # Molecules in Band #1
     #- [O2]  # Molecules in Band #2
     #- [CO2]
     - []  # Molecules in Band #3
   variable_molecules:
-    #- []
+    - []
     #- []       # Molecules in Band #1
     #- []  # Molecules in Band #2
     #- []
     - [CH4]  # Molecules in Band #3
   # LookUpTable files (Interpolation Model saved as JLD2!)
-  #LUTfiles:
-    #- ["/net/fluo/data3/data/Databases/Rami_CS_database/rami_spectroscopy_o3_all_nu.jld2"]
-    #- ["/net/fluo/data2/data/Rami_CS_database/rami_spectroscopy_o3_all_nu.jld2"]
-    #- ["/net/fluo/data2/data/Rami_CS_database/rami_spectroscopy_o3_all_nu.jld2"]
-    #- ["/net/fluo/data2/data/Rami_CS_database/rami_spectroscopy_o3_all_nu.jld2"]
-  #  - ["/net/fluo/data2/data/ABSCO_CS_Database/v5.2_final/o2_v52.jld2"]
-    #- ["/net/fluo/data2/data/ABSCO_CS_Database/v5.2_final/wh2o_v52.jld2", "/net/fluo/data2/data/ABSCO_CS_Database/v5.2_final/wco2_v52.jld2"]
-    #- ["/net/fluo/data2/data/ABSCO_CS_Database/v5.2_final/sh2o_v52.jld2", "/net/fluo/data2/data/ABSCO_CS_Database/v5.2_final/sco2_v52.jld2"]
+  # LUTfiles is a dictionary mapping molecule names to their pre-computed LUT file paths.
+  # Only molecules listed here will use LUT interpolation; all others (e.g. CH4 below)
+  # are computed via HITRAN line-by-line. This allows mixing LUT and HITRAN species freely.
+  LUTfiles:
+    O2: "/net/fluo/data1/ABSCO_CS_Database/v5.2_final/o2_v52_v2.jld2"
+    #O3: "/net/fluo/data2/data/Rami_CS_database/rami_spectroscopy_o3_all_nu.jld2"
+    #H2O: "/net/fluo/data2/data/ABSCO_CS_Database/v5.2_final/wh2o_v52.jld2"
+    #CO2: "/net/fluo/data2/data/ABSCO_CS_Database/v5.2_final/wco2_v52.jld2"
   # VMR profiles can either be real-valued numbers, 
   # or an array of nodal points from TOA to BOA, interpolated in pressure space
   vmr:
@@ -167,7 +167,7 @@ absorption:
     #      3.475e-7, 2.6250000000000003e-7, 1.7299999999999997e-7, 1.1135e-7, 7.570000000000001e-8, 5.49e-8, 
     #      4.5600000000000005e-8, 3.9399999999999995e-8, 3.5799999999999996e-8, 3.355e-8, 3.2799999999999996e-8, 3.085e-8, 
     #      2.795e-8] 
-    #O2:   0.21
+    O2:   0.21
     #CO2:  4.0e-4
     CH4:  [9.0e-7, 9.0e-7, 9.0e-7, 9.0e-7, 9.0e-7, 9.0e-7, 9.0e-7, 
       9.0e-7, 9.0e-7, 9.0e-7, 9.0e-7, 9.0e-7, 9.0e-7, 9.0e-7, 9.0e-7, 

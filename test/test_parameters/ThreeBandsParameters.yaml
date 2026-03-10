@@ -12,10 +12,14 @@ absorption:
     - "(1e7/1628):0.015:(1e7/1593)"
     - "(1e7/2088):0.015:(1e7/2043)" 
   # List of molecules
-  molecules:
+  fixed_molecules:
     - [O2, CO2]
     - [CO2, H2O]
     - [CO2, H2O]
+  variable_molecules:
+    - []
+    - []
+    - []
 
 scattering:
   # List of scattering aerosols and their properties

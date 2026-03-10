@@ -17,7 +17,7 @@ function rt_kernel!(RS_type::noRS, pol_type, SFI,
     @unpack τ̇_λ, ϖ̇_λ, τ̇, ϖ̇, Ż⁺⁺, Ż⁻⁺, dτ̇, dτ̇_λ, expk_lin, τ̇_sum = computed_layer_properties_lin
     @unpack F₀ = RS_type
 
-    Nparams = size(τ̇_λ)[1]
+    Nparams = size(τ̇_λ, 2)
     #@show τ, ϖ, dτ_max, ndoubl
     # If there is scattering, perform the elemental and doubling steps
     if scatter  
@@ -85,24 +85,24 @@ function rt_kernel!(RS_type::noRS, pol_type, SFI,
             # the following is placeholder code: check later for 
             # 1. use of dτ̇_λ/dϖ̇_λ vs. dτ̇/dϖ̇
             # 2. dimensions
-            composite_layer_lin.Ṫ⁺⁺[iparam,:] += added_layer_lin.ṫ⁺⁺[1,:,:,:].*dτ̇_λ[iparam] + 
-                                                added_layer_lin.ṫ⁺⁺[2,:,:,:].*dϖ̇_λ[iparam] + 
-                                                added_layer_lin.ṫ⁺⁺[3,:,:,:].*dŻ⁺⁺[iparam] 
-            composite_layer_lin.Ṫ⁻⁻[iparam,:] += added_layer_lin.ṫ⁻⁻[1,:,:,:].*dτ̇_λ[iparam] + 
-                                                added_layer_lin.ṫ⁻⁻[2,:,:,:].*dϖ̇_λ[iparam] + 
-                                                added_layer_lin.ṫ⁻⁻[3,:,:,:].*dŻ⁻⁻[iparam] 
+            composite_layer_lin.Ṫ⁺⁺[iparam,:] += added_layer_lin.ṫ⁺⁺[:,:,:,1].*dτ̇_λ[iparam] + 
+                                                added_layer_lin.ṫ⁺⁺[:,:,:,2].*dϖ̇_λ[iparam] + 
+                                                added_layer_lin.ṫ⁺⁺[:,:,:,3].*dŻ⁺⁺[iparam] 
+            composite_layer_lin.Ṫ⁻⁻[iparam,:] += added_layer_lin.ṫ⁻⁻[:,:,:,1].*dτ̇_λ[iparam] + 
+                                                added_layer_lin.ṫ⁻⁻[:,:,:,2].*dϖ̇_λ[iparam] + 
+                                                added_layer_lin.ṫ⁻⁻[:,:,:,3].*dŻ⁻⁻[iparam] 
 
-            composite_layer_lin.Ṙ⁻⁺[iparam,:] += added_layer_lin.ṙ⁻⁺[1,:,:,:].*dτ̇_λ[iparam] + 
-                                                added_layer_lin.ṙ⁻⁺[2,:,:,:].*dϖ̇_λ[iparam] + 
-                                                added_layer_lin.ṙ⁻⁺[3,:,:,:].*dŻ⁻⁺[iparam]  
-            composite_layer_lin.Ṙ⁺⁻[iparam,:] += added_layer_lin.ṙ⁺⁻[1,:,:,:].*dτ̇_λ[iparam] + 
-                                                added_layer_lin.ṙ⁺⁻[2,:,:,:].*dϖ̇_λ[iparam] + 
-                                                added_layer_lin.ṙ⁺⁻[3,:,:,:].*dŻ⁺⁻[iparam] 
+            composite_layer_lin.Ṙ⁻⁺[iparam,:] += added_layer_lin.ṙ⁻⁺[:,:,:,1].*dτ̇_λ[iparam] + 
+                                                added_layer_lin.ṙ⁻⁺[:,:,:,2].*dϖ̇_λ[iparam] + 
+                                                added_layer_lin.ṙ⁻⁺[:,:,:,3].*dŻ⁻⁺[iparam]  
+            composite_layer_lin.Ṙ⁺⁻[iparam,:] += added_layer_lin.ṙ⁺⁻[:,:,:,1].*dτ̇_λ[iparam] + 
+                                                added_layer_lin.ṙ⁺⁻[:,:,:,2].*dϖ̇_λ[iparam] + 
+                                                added_layer_lin.ṙ⁺⁻[:,:,:,3].*dŻ⁺⁻[iparam] 
 
-            composite_layer_lin.J̇₀⁺[iparam,:] += added_layer_lin.J̇₀⁺[1,:,:,:].*dτ̇_λ[iparam] + 
+            composite_layer_lin.J̇₀⁺[:,iparam] += added_layer_lin.J̇₀⁺[1,:,:,:].*dτ̇_λ[iparam] + 
                                                 added_layer_lin.J̇₀⁺[2,:,:,:].*dϖ̇_λ[iparam] + 
                                                 added_layer_lin.J̇₀⁺[3,:,:,:].*dŻ⁺⁺[iparam] 
-            composite_layer_lin.J̇₀⁻[iparam,:] += added_layer_lin.J̇₀⁻[1,:,:,:].*dτ̇_λ[iparam] + 
+            composite_layer_lin.J̇₀⁻[:,iparam] += added_layer_lin.J̇₀⁻[1,:,:,:].*dτ̇_λ[iparam] + 
                                                 added_layer_lin.J̇₀⁻[2,:,:,:].*dϖ̇_λ[iparam] + 
                                                 added_layer_lin.J̇₀⁻[3,:,:,:].*dŻ⁻⁺[iparam] 
         end
@@ -160,8 +160,8 @@ function rt_kernel!(RS_type::noRS{FT},
     dτ̇ = τ̇ ./ 2^ndoubl
 
     expk = arr_type(exp.(-dτ /μ₀))
-    expk_lin = arr_type(reshape(exp.(-dτ /μ₀)*(-1/μ₀), 1, length(dτ)) .* dτ̇)
-    Nparams = size(τ̇)[1]
+    expk_lin = arr_type(reshape(exp.(-dτ /μ₀)*(-1/μ₀), length(dτ), 1) .* dτ̇)
+    Nparams = size(τ̇, 2)
 #@show size(expk), size(expk_lin)
     #@show dτ, ndoubl
     # If there is scattering, perform the elemental and doubling steps
@@ -218,10 +218,10 @@ function rt_kernel!(RS_type::noRS{FT},
             added_layer.J₀⁻[:, 1, :] .*= (exp.(-τ_sum[:]/μ₀))'
 
             for iparam=1:Nparams
-                added_layer_lin.ap_J̇₀⁺[iparam, :, 1, :] = added_layer_lin.ap_J̇₀⁺[iparam, :, 1, :].*(exp.(-τ_sum[:]/μ₀))' +
-                            added_layer.J₀⁺[:, 1, :] .* ((-1/μ₀) .* @view(τ̇_sum[iparam,:]))'
-                added_layer_lin.ap_J̇₀⁻[iparam, :, 1, :] = added_layer_lin.ap_J̇₀⁻[iparam, :, 1, :].*(exp.(-τ_sum[:]/μ₀))' +
-                            added_layer.J₀⁻[:, 1, :] .* ((-1/μ₀) .* @view(τ̇_sum[iparam,:]))'
+                added_layer_lin.ap_J̇₀⁺[:, 1, :, iparam] = added_layer_lin.ap_J̇₀⁺[:, 1, :, iparam].*(exp.(-τ_sum[:]/μ₀))' +
+                            added_layer.J₀⁺[:, 1, :] .* ((-1/μ₀) .* @view(τ̇_sum[:,iparam]))'
+                added_layer_lin.ap_J̇₀⁻[:, 1, :, iparam] = added_layer_lin.ap_J̇₀⁻[:, 1, :, iparam].*(exp.(-τ_sum[:]/μ₀))' +
+                            added_layer.J₀⁻[:, 1, :] .* ((-1/μ₀) .* @view(τ̇_sum[:,iparam]))'
             end
         ##    J̇₀⁺[2, :, 1, :] = J̇₀⁺[2, :, 1, :].*(exp.(-τ_sum[:]/μ₀))' 
         ##    J̇₀⁻[2, :, 1, :] = J̇₀⁻[2, :, 1, :].*(exp.(-τ_sum[:]/μ₀))' 
@@ -247,22 +247,20 @@ function rt_kernel!(RS_type::noRS{FT},
         added_layer.r⁻⁺[:] .= 0;
         added_layer.r⁺⁻[:] .= 0;
         added_layer.J₀⁻[:] .= 0;
-        temp = Array(exp.(-τ./qp_μN'))
-        added_layer_lin.ṙ⁻⁺[:] .= 0;
-        added_layer_lin.ṙ⁺⁻[:] .= 0;
-        added_layer_lin.J̇₀⁻[:] .= 0;
-        temp_lin = Array(exp.(-τ./qp_μN') * (-1 ./ qp_μN))
+        temp = Array(exp.(-τ'./qp_μN))
+        added_layer_lin.ap_ṙ⁻⁺[:] .= 0;
+        added_layer_lin.ap_ṙ⁺⁻[:] .= 0;
+        added_layer_lin.ap_J̇₀⁻[:] .= 0;
+        temp_lin = Array(reshape(1, length(qp_μN), length(τ), exp.(-τ'./qp_μN)) .* reshape(1, length(qp_μN), 1, -1 ./ qp_μN) .* reshape(τ̇, 1, length(τ), Nparams)) 
         #added_layer.t⁺⁺, added_layer.t⁻⁻ = (Diagonal(exp(-τ_λ / qp_μN)), Diagonal(exp(-τ_λ / qp_μN)))   
         for iλ = 1:length(τ_λ)
-            added_layer.t⁺⁺[:,:,iλ] = Diagonal(temp[iλ,:]);
-            added_layer.t⁻⁻[:,:,iλ] = Diagonal(temp[iλ,:]);
-
-            added_layer_lin.ṫ⁺⁺[1,:,:,iλ] = Diagonal(temp_lin[iλ,:])
-            added_layer_lin.ṫ⁻⁻[1,:,:,iλ] = Diagonal(temp_lin[iλ,:])
-            added_layer_lin.ṫ⁺⁺[2,:,:,iλ] .= 0.0
-            added_layer_lin.ṫ⁻⁻[2,:,:,iλ] .= 0.0
-            added_layer_lin.ṫ⁺⁺[3,:,:,iλ] .= 0.0
-            added_layer_lin.ṫ⁻⁻[3,:,:,iλ] .= 0.0
+            added_layer.t⁺⁺[:,:,iλ] = Diagonal(temp[:,iλ]);
+            added_layer.t⁻⁻[:,:,iλ] = Diagonal(temp[:,iλ]);
+            
+            for iparam=1:Nparams
+                added_layer_lin.ṫ⁺⁺[:,:,iλ,iparam] = Diagonal(temp_lin[:, iλ, iparam])
+                added_layer_lin.ṫ⁻⁻[:,:,iλ,iparam] = Diagonal(temp_lin[:, iλ, iparam])
+            end
         end
     end
     #@show 4
@@ -308,44 +306,44 @@ function rt_kernel!(RS_type::noRS{FT},
         #F₀ = arr_type(F₀)
         for iparam = 1:Nparams
         
-            @views composite_layer_lin.Ṫ⁺⁺[iparam,:,:,:] .= added_layer_lin.ap_ṫ⁺⁺[iparam,:,:,:]
-            @views composite_layer_lin.Ṫ⁻⁻[iparam,:,:,:] .= added_layer_lin.ap_ṫ⁻⁻[iparam,:,:,:]
-            @views composite_layer_lin.Ṙ⁻⁺[iparam,:,:,:] .= added_layer_lin.ap_ṙ⁻⁺[iparam,:,:,:]
-            @views composite_layer_lin.Ṙ⁺⁻[iparam,:,:,:] .= added_layer_lin.ap_ṙ⁺⁻[iparam,:,:,:]
+            @views composite_layer_lin.Ṫ⁺⁺[:,:,:,iparam] .= added_layer_lin.ap_ṫ⁺⁺[:,:,:,iparam]
+            @views composite_layer_lin.Ṫ⁻⁻[:,:,:,iparam] .= added_layer_lin.ap_ṫ⁻⁻[:,:,:,iparam]
+            @views composite_layer_lin.Ṙ⁻⁺[:,:,:,iparam] .= added_layer_lin.ap_ṙ⁻⁺[:,:,:,iparam]
+            @views composite_layer_lin.Ṙ⁺⁻[:,:,:,iparam] .= added_layer_lin.ap_ṙ⁺⁻[:,:,:,iparam]
             
-            @views composite_layer_lin.J̇₀⁺[iparam,:,1,:] .= added_layer_lin.ap_J̇₀⁺[iparam,:,1,:]
-            @views composite_layer_lin.J̇₀⁻[iparam,:,1,:] .= added_layer_lin.ap_J̇₀⁻[iparam,:,1,:]
+            @views composite_layer_lin.J̇₀⁺[:,1,:,iparam] .= added_layer_lin.ap_J̇₀⁺[:,1,:,iparam]
+            @views composite_layer_lin.J̇₀⁻[:,1,:,iparam] .= added_layer_lin.ap_J̇₀⁻[:,1,:,iparam]
             # the following is placeholder code: check later for 
             # 1. use of dτ̇_λ/dϖ̇_λ vs. dτ̇/dϖ̇
             # 2. dimensions
             #for ii = 1:nspec
-            #    Ż⁺⁺_I₀[:,ii] = Ż⁺⁺[iparam,:,i₀,ii] * F₀[:,ii] #I₀[ii-i_start+1]
-            #    Ż⁻⁺_I₀[:,ii] = Ż⁻⁺[iparam,:,i₀,ii] * F₀[:,ii] #I₀[ii-i_start+1] 
+            #    Ż⁺⁺_I₀[:,ii] = Ż⁺⁺[:,i₀,ii,iparam] * F₀[:,ii] #I₀[ii-i_start+1]
+            #    Ż⁻⁺_I₀[:,ii] = Ż⁻⁺[:,i₀,ii,iparam] * F₀[:,ii] #I₀[ii-i_start+1] 
             #end
             #=
-            @views composite_layer_lin.Ṫ⁺⁺[iparam,:,:,:] .= added_layer_lin.ṫ⁺⁺[1,:,:,:].*reshape(τ̇[iparam,:],1,1,nspec) .+ 
-                                                added_layer_lin.ṫ⁺⁺[2,:,:,:].*reshape(ϖ̇[iparam,:],1,1,nspec) .+ 
-                                                added_layer_lin.ṫ⁺⁺[3,:,:,:].*Ż⁺⁺[iparam,:,:,:] 
-            @views composite_layer_lin.Ṫ⁻⁻[iparam,:,:,:] .= added_layer_lin.ṫ⁻⁻[1,:,:,:].*reshape(τ̇[iparam,:],1,1,nspec) .+ 
-                                                added_layer_lin.ṫ⁻⁻[2,:,:,:].*reshape(ϖ̇[iparam,:],1,1,nspec) .+ 
-                                                added_layer_lin.ṫ⁻⁻[3,:,:,:].*(reshape(bigD,nbigD,nbigD,1).*Ż⁺⁺[iparam,:,:,:].*reshape(bigD,nbigD,nbigD,1))
+            @views composite_layer_lin.Ṫ⁺⁺[:,:,:,iparam] .= added_layer_lin.ṫ⁺⁺[:,:,:,1].*reshape(τ̇[:,iparam],1,1,nspec) .+ 
+                                                added_layer_lin.ṫ⁺⁺[:,:,:,2].*reshape(ϖ̇[:,iparam],1,1,nspec) .+ 
+                                                added_layer_lin.ṫ⁺⁺[:,:,:,3].*Ż⁺⁺[:,:,:,iparam] 
+            @views composite_layer_lin.Ṫ⁻⁻[:,:,:,iparam] .= added_layer_lin.ṫ⁻⁻[:,:,:,1].*reshape(τ̇[:,iparam],1,1,nspec) .+ 
+                                                added_layer_lin.ṫ⁻⁻[:,:,:,2].*reshape(ϖ̇[:,iparam],1,1,nspec) .+ 
+                                                added_layer_lin.ṫ⁻⁻[:,:,:,3].*(reshape(bigD,nbigD,nbigD,1).*Ż⁺⁺[:,:,:,iparam].*reshape(bigD,nbigD,nbigD,1))
 
-            @views composite_layer_lin.Ṙ⁻⁺[iparam,:,:,:] .= added_layer_lin.ṙ⁻⁺[1,:,:,:].*reshape(τ̇[iparam,:],1,1,nspec) .+ 
-                                                added_layer_lin.ṙ⁻⁺[2,:,:,:].*reshape(ϖ̇[iparam,:],1,1,nspec) .+ 
-                                                added_layer_lin.ṙ⁻⁺[3,:,:,:].*Ż⁻⁺[iparam,:,:,:]  
-            @views composite_layer_lin.Ṙ⁺⁻[iparam,:,:,:] .= added_layer_lin.ṙ⁺⁻[1,:,:,:].*reshape(τ̇[iparam,:],1,1,nspec) .+ 
-                                                added_layer_lin.ṙ⁺⁻[2,:,:,:].*reshape(ϖ̇[iparam,:],1,1,nspec) .+ 
-                                                added_layer_lin.ṙ⁺⁻[3,:,:,:].*(reshape(bigD,nbigD,nbigD,1).*Ż⁻⁺[iparam,:,:,:].*reshape(bigD,nbigD,nbigD,1)) 
+            @views composite_layer_lin.Ṙ⁻⁺[:,:,:,iparam] .= added_layer_lin.ṙ⁻⁺[:,:,:,1].*reshape(τ̇[:,iparam],1,1,nspec) .+ 
+                                                added_layer_lin.ṙ⁻⁺[:,:,:,2].*reshape(ϖ̇[:,iparam],1,1,nspec) .+ 
+                                                added_layer_lin.ṙ⁻⁺[:,:,:,3].*Ż⁻⁺[:,:,:,iparam]  
+            @views composite_layer_lin.Ṙ⁺⁻[:,:,:,iparam] .= added_layer_lin.ṙ⁺⁻[:,:,:,1].*reshape(τ̇[:,iparam],1,1,nspec) .+ 
+                                                added_layer_lin.ṙ⁺⁻[:,:,:,2].*reshape(ϖ̇[:,iparam],1,1,nspec) .+ 
+                                                added_layer_lin.ṙ⁺⁻[:,:,:,3].*(reshape(bigD,nbigD,nbigD,1).*Ż⁻⁺[:,:,:,iparam].*reshape(bigD,nbigD,nbigD,1)) 
 
                                                 #@show size(composite_layer_lin.J̇₀⁺), 
                                                 #    size(added_layer_lin.J̇₀⁺), 
                                                 #    size(dτ̇), size(ϖ̇), size(Ż⁺⁺)
-            @views composite_layer_lin.J̇₀⁺[iparam,:,1,:] .= added_layer_lin.J̇₀⁺[1,:,1,:].*reshape(τ̇[iparam,:],1,nspec) .+ 
-                                                added_layer_lin.J̇₀⁺[2,:,1,:].*reshape(ϖ̇[iparam,:],1,nspec) .+ 
-                                                added_layer_lin.J̇₀⁺[3,:,1,:].*Ż⁺⁺_I₀
-            @views composite_layer_lin.J̇₀⁻[iparam,:,1,:] .= added_layer_lin.J̇₀⁻[1,:,1,:].*reshape(τ̇[iparam,:],1,nspec) .+ 
-                                                added_layer_lin.J̇₀⁻[2,:,1,:].*reshape(ϖ̇[iparam,:],1,nspec) .+ 
-                                                added_layer_lin.J̇₀⁻[3,:,1,:].*Ż⁻⁺_I₀
+            @views composite_layer_lin.J̇₀⁺[:,1,:,iparam] .= added_layer_lin.J̇₀⁺[:,1,:,1].*reshape(τ̇[:,iparam],1,nspec) .+ 
+                                                added_layer_lin.J̇₀⁺[:,1,:,2].*reshape(ϖ̇[:,iparam],1,nspec) .+ 
+                                                added_layer_lin.J̇₀⁺[:,1,:,3].*Ż⁺⁺_I₀
+            @views composite_layer_lin.J̇₀⁻[:,1,:,iparam] .= added_layer_lin.J̇₀⁻[:,1,:,1].*reshape(τ̇[:,iparam],1,nspec) .+ 
+                                                added_layer_lin.J̇₀⁻[:,1,:,2].*reshape(ϖ̇[:,iparam],1,nspec) .+ 
+                                                added_layer_lin.J̇₀⁻[:,1,:,3].*Ż⁻⁺_I₀
             =#
         end
     # If this is not the TOA, perform the interaction step
