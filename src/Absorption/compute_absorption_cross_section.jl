@@ -154,6 +154,12 @@ function compute_absorption_cross_section(
     # Scale the interpolation to match the model grids
     sitp = scale(model.itp, model.ν_grid, model.p_grid, model.t_grid)
 
+    # Clamp pressure and temperature to the LUT's valid range.
+    # At extreme altitudes (TOA), pressures can fall far below the LUT minimum;
+    # absorption is negligible there, so clamping is physically reasonable.
+    pressure    = clamp(pressure,    first(model.p_grid), last(model.p_grid))
+    temperature = clamp(temperature, first(model.t_grid), last(model.t_grid))
+
     # Perform the interpolation and return the resulting grid
     return sitp(grid, pressure, temperature)
 end
