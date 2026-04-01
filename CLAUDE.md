@@ -24,8 +24,8 @@ No linter or formatter configured. Julia compatibility: 1.9-1.12.
 ### Module Load Order (`src/vSmartMOM.jl`)
 
 1. **Architectures** (`src/Architectures.jl`) — CPU/GPU abstraction via KernelAbstractions
-2. **Artifacts** (`src/Artifacts/`) — HITRAN data download helpers
-3. **Absorption** (`src/Absorption/Absorption.jl`) — Line-by-line cross-sections (HITRAN, Voigt/Doppler/Lorentz)
+2. **Absorption** (`src/Absorption/Absorption.jl`) — Line-by-line cross-sections (HITRAN, Voigt/Doppler/Lorentz)
+3. **Artifacts** (`src/Artifacts/`) — HITRAN data management (edition preferences, hitran.org API client, artifact dispatch)
 4. **Scattering** (`src/Scattering/Scattering.jl`) — Mie scattering (NAI2 and PCW decomposition)
 5. **InelasticScattering** (`src/Inelastic/InelasticScattering.jl`) — Raman scattering (RRS, VS)
 6. **CoreRT** (`src/CoreRT/CoreRT.jl`) — Core RT solver (adding-doubling, surfaces, layer optics)
@@ -141,7 +141,11 @@ All surfaces implement `create_surface_layer!()`. Linearized variants have `_lin
 src/
   vSmartMOM.jl                # Entry point, module definition
   Architectures.jl            # CPU/GPU abstraction
-  Artifacts/                  # HITRAN data artifact helpers
+  Artifacts/                  # HITRAN data management
+    hitran_preferences.jl     # Edition selection (set/get_hitran_edition!, available_hitran_editions)
+    hitran_api.jl             # Download client (fetch_hitran, fetch_hitran_by_ids)
+    artifact_helper.jl        # Unified artifact() dispatch (legacy Artifacts vs scratch cache)
+    download_hitran.jl        # Offline artifact generation script (developer-only)
   Absorption/
     Absorption.jl             # Module entry
     types.jl                  # HitranTable, broadening types, CEF types

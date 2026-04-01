@@ -74,11 +74,36 @@ The vSmartMOM module allows end-to-end simulation of radiative transfer (RT) thr
 
 ### vSmartMOM.Absorption
 
-This module enables absorption cross-section calculations of atmospheric gases at different pressures, temperatures, and broadeners (Doppler, Lorentzian, Voigt). It uses the <a href="https://hitran.org">HITRAN</a> energy transition database for calculations. While it enables lineshape calculations from scratch, it also allows users to create and save an interpolator object at specified wavelength, pressure, and temperature grids. It can perform these computations either on CPU or GPU. <br><img src="docs/src/assets/CrossSectionGIF.gif" alt="Absorption cross-section" /><br> Key functions:
+This module enables absorption cross-section calculations of atmospheric gases at different pressures, temperatures, and broadeners (Doppler, Lorentzian, Voigt). It uses the <a href="https://hitran.org">HITRAN</a> energy transition database for calculations. While it enables lineshape calculations from scratch, it also allows users to create and save an interpolator object at specified wavelength, pressure, and temperature grids. It can perform these computations either on CPU or GPU. <br><img src="docs/src/assets/CrossSectionGIF.gif" alt="Absorption cross-section" /><br>
 
-  - `read_hitran(filepath::String)`: Creates a HitranTable struct from the fixed-width HITRAN file with transitions.
-  - `make_hitran_model(hitran::HitranTable, broadening::AbstractBroadeningFunction, ...)`: Create a HitranModel struct that holds all of the model parameters needed to perform a absorption cross-section (transitions, broadening type, wing_cutoff, etc.)
-  - `make_interpolation_model(hitran::HitranTable, broadening::AbstractBroadeningFunction, )`: Similar to creating a HitranModel, but this will perform the interpolation at the given wavelength, pressure, and temperature grids and store the interpolator in InterpolationModel.
+#### HITRAN Data Access
+
+vSmartMOM provides two pathways for obtaining HITRAN spectroscopic data:
+
+- **Legacy artifacts (default):** Pre-packaged HITRAN 2016 data, downloaded automatically on first use. No setup required.
+- **Direct download from hitran.org:** Fetch the latest HITRAN edition (currently HITRAN 2024) with full provenance tracking (SHA-256 hash, download date, source URL).
+
+```julia
+# Default: HITRAN 2016 via artifacts
+path = artifact("CO2")
+
+# Switch to HITRAN 2024 from hitran.org
+set_hitran_edition!("HITRAN2024")
+path = artifact("CO2")  # auto-downloads on first call
+
+# Check provenance
+hitran_info("CO2")  # returns metadata dict with SHA-256, download date, etc.
+```
+
+See the full <a href="https://RemoteSensingTools.github.io/vSmartMOM.jl/dev/pages/Absorption/HITRAN_Data/">HITRAN Data Management</a> documentation for details on edition switching, custom wavenumber ranges, and cache management.
+
+#### Key functions
+
+  - `artifact(molecule::String)`: Retrieve the path to a HITRAN `.par` file for a molecule. Routes through legacy artifacts or hitran.org depending on the active edition.
+  - `fetch_hitran(molecule; numin, numax, edition)`: Download HITRAN data directly from hitran.org with optional wavenumber filtering.
+  - `read_hitran(filepath::String)`: Creates a HitranTable struct from a fixed-width HITRAN `.par` file.
+  - `make_hitran_model(hitran::HitranTable, broadening::AbstractBroadeningFunction, ...)`: Create a HitranModel struct that holds all of the model parameters needed to perform an absorption cross-section calculation (transitions, broadening type, wing_cutoff, etc.)
+  - `make_interpolation_model(hitran::HitranTable, broadening::AbstractBroadeningFunction, ...)`: Similar to creating a HitranModel, but this will perform the interpolation at the given wavelength, pressure, and temperature grids and store the interpolator in InterpolationModel.
   - `absorption_cross_section(model::AbstractCrossSectionModel, grid::AbstractRange{<:Real}, pressure::Real, temperature::Real, ...)`: Performs an absorption cross-section calculation with the given model (HitranModel or InterpolationModel), at a given wavelength grid, pressure and temperature
 
 ### vSmartMOM.Scattering

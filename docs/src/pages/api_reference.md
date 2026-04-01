@@ -14,6 +14,19 @@ vSmartMOM.rt_run_lin
 vSmartMOM.model_from_parameters_lin
 ```
 
+## HITRAN Data Management
+
+```@docs
+vSmartMOM.artifact
+vSmartMOM.fetch_hitran
+vSmartMOM.fetch_hitran_by_ids
+vSmartMOM.set_hitran_edition!
+vSmartMOM.get_hitran_edition
+vSmartMOM.available_hitran_editions
+vSmartMOM.hitran_info
+vSmartMOM.hitran_is_cached
+```
+
 ## Absorption
 
 ```@docs
