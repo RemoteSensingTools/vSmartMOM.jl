@@ -8,7 +8,7 @@ The module also supports auto-differentiation (AD) of the profile, with respect 
 
 Users can calculate an absorption cross-section in a few simple steps: 
 
-0. First, download HITRAN line transitions file either using [`artifact`](@ref), or manually
+0. First, obtain HITRAN line transition data. vSmartMOM supports two pathways: legacy pre-packaged HITRAN 2016 artifacts (the default) or direct download from hitran.org for the latest edition (currently HITRAN 2024). See the [HITRAN Data Management](HITRAN_Data.md) page for details.
 1. Use [`read_hitran`](@ref) to read in the HITRAN database file 
 2. Use [`make_hitran_model`](@ref) or [`make_interpolation_model`](@ref) to set up model parameters for the cross-section calculation
 3. Use [`absorption_cross_section`](@ref) to perform the cross-section calculation using the defined model settings

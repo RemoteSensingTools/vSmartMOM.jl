@@ -14,12 +14,19 @@ using Parameters
 using DocStringExtensions
 using UnPack
 using UnicodePlots
+using Dates
+using Downloads: Downloads
+using SHA: sha256
+using Scratch: @get_scratch!
 
 # Export Architecture functions
 export CPU, GPU, default_architecture, array_type
 
-# Export the artifact convenience function
+# Export the artifact convenience function and HITRAN management
 export artifact
+export fetch_hitran, fetch_hitran_by_ids
+export set_hitran_edition!, get_hitran_edition, available_hitran_editions, hitran_info
+export hitran_is_cached
 
 # RT mode types (forward vs linearized)
 abstract type RT_Mode end
@@ -31,11 +38,13 @@ export FwdMode, LinMode
 include("Architectures.jl")
 using .Architectures
 
-# Artifacts
-include("Artifacts/artifact_helper.jl")
-
-# Absorption Cross Section module:
+# Absorption Cross Section module (loaded before Artifacts so mol_names/global_ids are available):
 include("Absorption/Absorption.jl")
+
+# Artifacts — HITRAN data management (preferences, API client, artifact dispatch)
+include("Artifacts/hitran_preferences.jl")
+include("Artifacts/hitran_api.jl")
+include("Artifacts/artifact_helper.jl")
 
 # Mie Phase Function module:
 include("Scattering/Scattering.jl")

@@ -107,7 +107,7 @@ function model_from_parameters(lin::LinMode,
         (isnothing(abs_params) && isnothing(params.q)) && continue
 
         if !isnothing(params.q)
-            @timeit "Read HITRAN" hitran_data = read_hitran(artifact("H2O"), iso=1)
+            @timeit "Read HITRAN" hitran_data = read_hitran(artifact("H2O"), iso=-1)
 
             println("Computing profile for water vapor in band #$(i_band)")
             absorption_model = make_hitran_model(hitran_data,
@@ -132,7 +132,7 @@ function model_from_parameters(lin::LinMode,
                     mol_name = abs_params.fixed_molecules[i_band][molec_i]
                     if isempty(abs_params.luts)
                         @timeit "Read HITRAN" hitran_data =
-                            read_hitran(artifact(mol_name), iso=1)
+                            read_hitran(artifact(mol_name), iso=-1)
 
                         println("Computing profile for $(mol_name) with vmr $(profile.vmr[mol_name]) for band #$(i_band)")
                         absorption_model = make_hitran_model(hitran_data,
@@ -162,7 +162,7 @@ function model_from_parameters(lin::LinMode,
                     jac_idx = molec_i + 1
                     if isempty(abs_params.luts)
                         @timeit "Read HITRAN" hitran_data =
-                            read_hitran(artifact(mol_name), iso=1)
+                            read_hitran(artifact(mol_name), iso=-1)
                         println("Computing profile for $(mol_name) with vmr $(profile.vmr[mol_name]) for band #$(i_band)")
 
                         absorption_model = make_hitran_model(hitran_data,

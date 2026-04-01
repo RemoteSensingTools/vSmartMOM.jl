@@ -38,6 +38,7 @@ function build()
                                     ],
         "Absorption"            => [
                                     "Overview" => "pages/Absorption/Overview.md",
+                                    "HITRAN Data Management" => "pages/Absorption/HITRAN_Data.md",
                                     "Example" => "pages/Absorption/Example.md",
                                     "Methods & Types" => "pages/Absorption/Types.md",
                                     "References" => "pages/Absorption/References.md"
