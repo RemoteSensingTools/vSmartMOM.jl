@@ -177,7 +177,7 @@ absorption:
     #- [H2O,CO2]  # Molecules in Band #3
   # LookUpTable files (Interpolation Model saved as JLD2!)
   LUTfiles:
-    CO2: "/net/fluo/data3/data/Databases/ABSCO_CS_Database/v5.2_final/wco2_v52.jld2"
+    CO2: "/net/fluo/data2/data/ABSCO_CS_Database/v5.2_final/wco2_v52.jld2" #"/net/fluo/data3/data/Databases/ABSCO_CS_Database/v5.2_final/wco2_v52.jld2"
   vmr: 
     CO2:   0.0004 #0.21
   # Broadening function (Doppler/Lorentz/Voigt)

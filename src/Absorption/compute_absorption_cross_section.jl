@@ -52,8 +52,8 @@ function compute_absorption_cross_section(
     grid_min = minimum(grid) - wing_cutoff
 
     # Convert to wavenumber from [nm] space if necessary
-    grid = wavelength_flag ? reverse(nm_per_m ./ grid) : grid
-    grid_min, grid_max = wavelength_flag ? (nm_per_m /grid_max, nm_per_m/grid_min) : (grid_min, grid_max)
+    grid = wavelength_flag ? reverse(nm_per_cm./ grid) : grid
+    grid_min, grid_max = wavelength_flag ? (nm_per_cm/grid_max, nm_per_m/grid_min) : (grid_min, grid_max)
 
     # Interpolators from grid bounds to index values
     if length(grid)>1
@@ -149,7 +149,7 @@ function compute_absorption_cross_section(
     )
 
     # Convert to wavenumber from [nm] space if necessary
-    grid = wavelength_flag ? reverse(nm_per_m ./ collect(grid)) : collect(grid)
+    grid = wavelength_flag ? reverse(nm_per_cm./ collect(grid)) : collect(grid)
 
     # Scale the interpolation to match the model grids
     sitp = scale(model.itp, model.ν_grid, model.p_grid, model.t_grid)
@@ -160,8 +160,14 @@ function compute_absorption_cross_section(
     pressure    = clamp(pressure,    first(model.p_grid), last(model.p_grid))
     temperature = clamp(temperature, first(model.t_grid), last(model.t_grid))
 
-    # Perform the interpolation and return the resulting grid
-    return sitp(grid, pressure, temperature)
+    # Handle wavenumbers outside the LUT range: absorption is zero there.
+    ν_min, ν_max = first(model.ν_grid), last(model.ν_grid)
+    in_range = ν_min .≤ grid .≤ ν_max
+    result = zeros(eltype(grid), length(grid))
+    if any(in_range)
+        result[in_range] = sitp(grid[in_range], pressure, temperature)
+    end
+    return result
 end
 
 #=

@@ -65,7 +65,7 @@ function getMolecularConstants(::N₂, vmr::FT) where {FT}
                                 σ_RoRaman_coeff_JtoJp2 = FT[1.0],
                                 Δν̃_RoRaman_coeff_JtoJm2 = FT[1.0],
                                 Δν̃_RoRaman_coeff_JtoJp2 = FT[1.0],
-                                E_vJ = FT[1.0] )
+                                E_vJ = zeros(FT,1,1) )
      )   # Fill with dummies for start
 end
 
@@ -136,7 +136,7 @@ function getMolecularConstants(::O₂, vmr::FT) where {FT}
                                 σ_RoRaman_coeff_JtoJp2 = FT[1.0],
                                 Δν̃_RoRaman_coeff_JtoJm2 = FT[1.0],
                                 Δν̃_RoRaman_coeff_JtoJp2 = FT[1.0],
-                                E_vJ = FT[1.0] )
+                                E_vJ = zeros(FT,1,1) )
                         )
 end
 
@@ -207,6 +207,6 @@ function getMolecularConstants(::H₂, vmr::FT) where {FT}
                                 σ_RoRaman_coeff_JtoJp2 = FT[1.0],
                                 Δν̃_RoRaman_coeff_JtoJm2 = FT[1.0],
                                 Δν̃_RoRaman_coeff_JtoJp2 = FT[1.0],
-                                E_vJ = FT[1.0] )
+                                E_vJ = zeros(FT,1,1) )
                         )
 end

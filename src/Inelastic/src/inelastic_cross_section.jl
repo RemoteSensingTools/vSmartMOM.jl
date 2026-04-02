@@ -3,7 +3,7 @@ function compute_effective_coefficents!(ν_eff, T, mol::MolecularConstants{FT}) 
     @unpack α̅,  γ̅, α_prime, γ_prime, ϵ, ϵ_prime = mol.effCoeff
     @unpack α̅₀₀, γ̅₀₀, ω₀, α_b, α_c, α₀₀_prime, γ₀₀_prime = mol.PolTensor
     #Computing α̅
-    α̅ = α̅₀₀*(1 + α_b*T + α_c*T^2)/(1-(2π*c*ν_eff/ω₀)^2)
+    α̅ = α̅₀₀*(1 + α_b*T + α_c*T^2)/(1-(c*ν_eff/ω₀)^2)
     γ̅ = γ̅₀₀
     ϵ = α̅/γ̅ 
     α_prime = α₀₀_prime * sqrt(mol.Y[1,2]/mol.Y[2,1]) # see Eqs (36a-39b) of Buldakov et al. 1996 (Spectrochimica Acta Part A) 
@@ -102,14 +102,17 @@ function compute_energy_levels!(mol::MolecularConstants{FT}; vmax=2, Jmax=30) wh
         @unpack E_vJ = mol.effCoeff
         @unpack Y = mol
         E_vJ = OffsetArray(zeros(FT, vmax+1,Jmax+1), 0:vmax, 0:Jmax);
-        for v in 0:vmax, J in 0:Jmax
-            E₁ = J*(J+1)
-            for k in 1:5
-                E₂ = (v+0.5)^(k-1)
-                for l in 1:5
-                    E₃ = E₁^(l-1) * E₂ * Y[k,l]
-                    E_vJ[v,J] += E₃
+        @inbounds for v in 0:vmax, J in 0:Jmax
+            E₁ = FT(J*(J+1))
+            E₁_pow = one(FT)  # E₁^0
+            for l in 1:5
+                E₂_pow = one(FT)  # (v+0.5)^0
+                v_half = FT(v) + FT(0.5)
+                for k in 1:5
+                    E_vJ[v,J] += E₁_pow * E₂_pow * Y[k,l]
+                    E₂_pow *= v_half
                 end
+                E₁_pow *= E₁
             end
         end
         @pack! mol.effCoeff = E_vJ
@@ -169,11 +172,11 @@ function compute_σ_RoVibRaman_coeff!(T, mol::MolecularConstants{FT}; vmax=2, Jm
     #Δνₛ = OffsetArray(zeros(FT, vmax+1,Jmax+1,vmax+1,Jmax+1), 0:vmax, 0:Jmax, 0:vmax, 0:Jmax); #zeros(3, 11, 3, 11)
         
     Z_pf = 0
-    for Ji in 0:Jmax         
+    @inbounds for Ji in 0:Jmax
         b_JJm2 = 3Ji*(Ji-1)/(2*(2Ji+1)*(2Ji-1))
         #b_JJ   = Ji*(Ji+1)/((2Ji-1)*(2Ji+3))
         b_JJp2 = 3*(Ji+1)*(Ji+2)/(2*(2Ji+1)*(2Ji+3))
-        g_N = gₛ[2-Ji%2]    
+        g_N = gₛ[2-Ji%2]
         
         #Rotational Raman scattering
         vi = 0

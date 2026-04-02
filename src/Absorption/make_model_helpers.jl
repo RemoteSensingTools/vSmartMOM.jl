@@ -73,7 +73,7 @@ function make_interpolation_model(
     end
 
     # Convert from wavelength to wavenumber if necessary
-    ν_grid = wavelength_flag ? reverse(nm_per_m ./ wave_grid) : wave_grid
+    ν_grid = wavelength_flag ? reverse(nm_per_cm./ wave_grid) : wave_grid
 
     # Empty matrix to store the calculated cross-sections
     cs_matrix = zeros(length(ν_grid),length(p_grid), length(t_grid));
@@ -121,7 +121,7 @@ function make_interpolation_model(
     )
 
     # Convert from wavelength to wavenumber if necessary
-    ν_grid = wavelength_flag ? reverse(nm_per_m ./ wave_grid) : wave_grid
+    ν_grid = wavelength_flag ? reverse(nm_per_cm./ wave_grid) : wave_grid
 
     # Empty matrix to store the calculated cross-sections
     cs_matrix = zeros(length(ν_grid),length(p_grid), length(t_grid));
@@ -185,7 +185,7 @@ function make_interpolation_model_test(
     )
 
     # Convert from wavelength to wavenumber if necessary
-    ν_grid = wavelength_flag ? reverse(nm_per_m ./ wave_grid) : wave_grid
+    ν_grid = wavelength_flag ? reverse(nm_per_cm./ wave_grid) : wave_grid
 
     # Empty matrix to store the calculated cross-sections
     cs_matrix = zeros(length(ν_grid),length(p_grid), length(t_grid));

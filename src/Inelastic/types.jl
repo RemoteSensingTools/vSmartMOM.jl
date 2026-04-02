@@ -177,16 +177,16 @@ $(DocStringExtensions.FIELDS)
 """
 Base.@kwdef mutable struct VS_0to1_plus{FT<:AbstractFloat} <: AbstractRamanType 
     "Concatenated indices of band limits"
-    bandSpecLim::Vector{Any} = []#Array{UnitRange{Int64},1}
-    iBand::Vector{Any}       = []   #Array{Int,1} 
-    grid_in::Vector{Any}     = []#Vector{StepRangeLen{Float64, Base.TwicePrecision{Float64}, Base.TwicePrecision{Float64}, Int64}}#AbstractRange{<:Real}#Vector{StepRangeLen{FT}} 
+    bandSpecLim::Vector{UnitRange{Int64}} = UnitRange{Int64}[]
+    iBand::Vector{Int}       = Int[]
+    grid_in::Vector{StepRangeLen{FT}} = StepRangeLen{FT}[]
 
     "Molecular Constant for N2"
     n2::InelasticScattering.MolecularConstants{FT}
     "Molecular Constant for O2"
     o2::InelasticScattering.MolecularConstants{FT}
-    
-    "Greek coefs in Raman calculations" 
+
+    "Greek coefs in Raman calculations"
     greek_raman::GreekCoefs       = GreekCoefs([FT(1)], [FT(1)], [FT(1)], [FT(1)], [FT(1)], [FT(1)])
     greek_raman_VS_n2::GreekCoefs = GreekCoefs([FT(1)], [FT(1)], [FT(1)], [FT(1)], [FT(1)], [FT(1)])
     greek_raman_VS_o2::GreekCoefs = GreekCoefs([FT(1)], [FT(1)], [FT(1)], [FT(1)], [FT(1)], [FT(1)])
@@ -441,9 +441,9 @@ $(DocStringExtensions.FIELDS)
 """
 Base.@kwdef mutable struct sol_VS_0to1_plus{FT<:AbstractFloat} <: AbstractRamanType 
     "Concatenated indices of band limits"
-    bandSpecLim::Vector{Any} = []#Array{UnitRange{Int64},1}
-    iBand::Vector{Any}       = []   #Array{Int,1} 
-    grid_in::Vector{Any}     = []#Vector{StepRangeLen{Float64, Base.TwicePrecision{Float64}, Base.TwicePrecision{Float64}, Int64}}#AbstractRange{<:Real}#Vector{StepRangeLen{FT}} 
+    bandSpecLim::Vector{UnitRange{Int64}} = UnitRange{Int64}[]
+    iBand::Vector{Int}       = Int[]
+    grid_in::Vector{StepRangeLen{FT}} = StepRangeLen{FT}[]
 
     "Molecular Constant for H2"
     h2::InelasticScattering.MolecularConstants{FT}

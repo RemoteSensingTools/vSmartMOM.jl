@@ -15,12 +15,14 @@ using DelimitedFiles
 ## run this code using the following command:
 ## /net/fluo/data2/software/Julia/julia-1.11.1/bin/julia --project=/home/sanghavi/code/github/vSmartMOM.jl/ /home/sanghavi/code/github/vSmartMOM.jl/test/benchmarks/creategrid_O2Aband_RamanSIF.jl &
 
-FT = Float64
+
 
 # Load YAML files into parameter struct
 parameters = 
     parameters_from_yaml("/home/sanghavi/code/github/vSmartMOM.jl/test/test_parameters/O2_parameters2_SIF_grid.yaml");
-#parameters = parameters_from_yaml("test/test_parameters/O2Parameters2.yaml");
+
+FT = parameters.float_type
+    #parameters = parameters_from_yaml("test/test_parameters/O2Parameters2.yaml");
 # Create model struct (precomputes optical properties) from parameters
 model      = model_from_parameters(parameters);
 a=[]
@@ -49,9 +51,9 @@ Tsolar_interp = LinearInterpolation(Tsolar[4:end, 1], Tsolar[4:end, 2])
 n_bands = length(parameters.spec_bands);
 T_sun = 5777. # K
 
-for isurf = 1:1 # 3:3 # 2:2 # 1:1 # 
-    for iρ = 1:21 #1:15 #3 #1:15
-        for iA = 1:14
+for isurf = 1:1 # 2:2 # 1:1 # 
+    for iρ = 1:1 #3:21 #1:15 #3 #1:15
+        for iA = 2:2 #1:14
             parameters.sza = 1.0*sza[iA]
             model.obs_geom = CoreRT.ObsGeometry(parameters.sza, parameters.vza, parameters.vaz, parameters.obs_alt)
             # Set quadrature points for streams
@@ -66,7 +68,7 @@ for isurf = 1:1 # 3:3 # 2:2 # 1:1 #
             #@show parameters.vza
 
             
-            for iBand=1:n_bands
+            for iBand=7:13 #1:n_bands
                 parameters.brdf[iBand].albedo = ρ[iρ]
                 #model.params.brdf[iBand].albedo = ρ[iρ]
                 #@show model.params.brdf[iBand].albedo
@@ -182,11 +184,11 @@ for isurf = 1:1 # 3:3 # 2:2 # 1:1 #
                 vaz_str = replace(string(round(model.params.vaz[vctr], digits=1)),"."=>"p")
                 
                 # With SIF
-                #fname0 = "/home/sanghavi/data/RamanSIFgrid/raylSIF_sza"*sza_str*"_vza"*vza_str*"_vaz"*vaz_str*"_alb"*albedo*"_psurf"*string(psurf[isurf])*"hpa_nors_ABO2.dat"
-                #fname1 = "/home/sanghavi/data/RamanSIFgrid/raylSIF_sza"*sza_str*"_vza"*vza_str*"_vaz"*vaz_str*"_alb"*albedo*"_psurf"*string(psurf[isurf])*"hpa_rrs_ABO2.dat"
+                #fname0 = "/home/sanghavi/data/RamanSIFgrid_new/raylSIF_sza"*sza_str*"_vza"*vza_str*"_vaz"*vaz_str*"_alb"*albedo*"_psurf"*string(psurf[isurf])*"hpa_nors_ABO2.dat"
+                #fname1 = "/home/sanghavi/data/RamanSIFgrid_new/raylSIF_sza"*sza_str*"_vza"*vza_str*"_vaz"*vaz_str*"_alb"*albedo*"_psurf"*string(psurf[isurf])*"hpa_rrs_ABO2.dat"
                 # No SIF
-                fname0 = "/home/sanghavi/data/RamanSIFgrid/rayl_sza"*sza_str*"_vza"*vza_str*"_vaz"*vaz_str*"_alb"*albedo*"_psurf"*string(psurf[isurf])*"hpa_nors_ABO2.dat"
-                fname1 = "/home/sanghavi/data/RamanSIFgrid/rayl_sza"*sza_str*"_vza"*vza_str*"_vaz"*vaz_str*"_alb"*albedo*"_psurf"*string(psurf[isurf])*"hpa_rrs_ABO2.dat"
+                fname0 = "/home/sanghavi/data/RamanSIFgrid_new/rayl_sza"*sza_str*"_vza"*vza_str*"_vaz"*vaz_str*"_alb"*albedo*"_psurf"*string(psurf[isurf])*"hpa_nors_ABO2.dat"
+                fname1 = "/home/sanghavi/data/RamanSIFgrid_new/rayl_sza"*sza_str*"_vza"*vza_str*"_vaz"*vaz_str*"_alb"*albedo*"_psurf"*string(psurf[isurf])*"hpa_rrs_ABO2.dat"
                 
                 rayl_rrs_ABO2 = []
                 rayl_nors_ABO2 = []

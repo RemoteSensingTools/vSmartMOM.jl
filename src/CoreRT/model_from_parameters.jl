@@ -145,7 +145,8 @@ function model_from_parameters(#::FwdMode,
     
     # This is a kludge for now, tau_abs sometimes needs to be a dual. Suniti & us need to rethink this all!!
     # i.e. code the rt core with fixed amount of derivatives as in her paper, then compute chain rule for dtau/dVMr, etc...
-    FT2 = isnothing(params.absorption_params) || !haskey(params.absorption_params.vmr,"CO2") ? params.float_type : eltype(params.absorption_params.vmr["CO2"])
+    FT = params.float_type
+    FT2 = FT #isnothing(params.absorption_params) || !haskey(params.absorption_params.vmr,"CO2") ? params.float_type : eltype(params.absorption_params.vmr["CO2"])
     τ_abs     = [zeros(FT2, length(params.spec_bands[i]), length(profile.p_full)) for i in 1:n_bands]
     max_m = zeros(Int, n_bands)
     l_max = zeros(Int, n_bands)
@@ -162,9 +163,11 @@ function model_from_parameters(#::FwdMode,
         # Needs better (more general) formulation 
         νₘ = 0.5*(params.spec_bands[i_band][1]+params.spec_bands[i_band][end])
         λₘ = 1.e7/νₘ
+        effT = (profile.vcd_dry' * profile.T) / sum(profile.vcd_dry);
         #@show i_band
-        ϖ_Cabannes[i_band], γ_air_Cabannes, γ_air_Rayleigh = 
-            InelasticScattering.compute_γ_air_Rayleigh!(λₘ)
+        n2,o2 = InelasticScattering.getRamanAtmoConstants(νₘ ,effT);
+        γ_air_Cabannes, ϖ_Cabannes[i_band] = InelasticScattering.compute_γ_air_Cabannes!(λₘ,  n2, o2)
+        γ_air_Rayleigh, σ_air_Rayleigh = InelasticScattering.compute_γ_air_Rayleigh!(λₘ, n2, o2)
         #@show ϖ_Cabannes[i_band]
         depol_air_Cabannes = 2γ_air_Cabannes/(1+γ_air_Cabannes)
         depol_air_Rayleigh = 2γ_air_Rayleigh/(1+γ_air_Rayleigh)
@@ -837,11 +840,14 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
     effT = (profile.vcd_dry' * profile.T) / sum(profile.vcd_dry);
     # Define RS type
     # Compute N2 and O2
-    #RS_type.n2, RS_type.o2 = 
+    #n2, o2 = 
     #    InelasticScattering.getRamanAtmoConstants(1.e7/λ₀,effT);
     ϖ_Cabannes = zeros(n_bands)
-    ϖ_Cabannes[1], γ_air_Cabannes, γ_air_Rayleigh = 
-        InelasticScattering.compute_γ_air_Rayleigh!(λ₀)
+    #ϖ_Cabannes[1], γ_air_Cabannes, γ_air_Rayleigh = 
+    #    InelasticScattering.compute_γ_air_Rayleigh!(λ₀)
+    γ_air_Cabannes, ϖ_Cabannes[i_band] = InelasticScattering.compute_γ_air_Cabannes(λ₀,  RS_type.n2, RS_type.o2)
+    γ_air_Rayleigh, σ_air_Rayleigh = InelasticScattering.compute_γ_air_Rayleigh!(λ₀, RS_type.n2, RS_type.o2)
+        #
     depol_air_Cabannes = 2γ_air_Cabannes/(1+γ_air_Cabannes)
     depol_air_Rayleigh = 2γ_air_Rayleigh/(1+γ_air_Rayleigh)
     #println("here 0")
@@ -874,8 +880,11 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
         curr_band_λ = 1e4 ./ params.spec_bands[i_band]
         νₘ = 0.5*(params.spec_bands[i_band][1]+params.spec_bands[i_band][end])
         λₘ = 1.e7/νₘ
-        ϖ_Cabannes[i_band], γ_air_Cabannes, γ_air_Rayleigh = 
-            InelasticScattering.compute_γ_air_Rayleigh!(λₘ)
+        #ϖ_Cabannes[i_band], γ_air_Cabannes, γ_air_Rayleigh = 
+        #    InelasticScattering.compute_γ_air_Rayleigh!(λₘ)
+        γ_air_Cabannes, ϖ_Cabannes[i_band] = InelasticScattering.compute_γ_air_Cabannes(λₘ,  RS_type.n2, RS_type.o2)
+        γ_air_Rayleigh, σ_air_Rayleigh = InelasticScattering.compute_γ_air_Rayleigh!(λₘ, RS_type.n2, RS_type.o2)
+    
         if(i_band==1) 
             ϖ_Cabannes[i_band]=1.
         end

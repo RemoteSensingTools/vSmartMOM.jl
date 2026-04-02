@@ -71,11 +71,11 @@ function getRamanSSProp!(RS_type::sol_RRS, λ, grid_in)
     index_raman_grid, solar_σ_RRS = compute_stellar_RS!(RS_type, grid_in, λ, h2)
     # declare ϖ_Raman to be a grid of length raman grid
     #RS_type.ϖ_λ₁λ₀ = atmo_σ_RRS[end:-1:1]/atmo_σ_Rayl * (1-RS_type.ϖ_Cabannes[1])/sum(atmo_σ_RRS[end:-1:1]/atmo_σ_Rayl) #the grid gets inverted because the central wavelength is now seen as the recipient of RRS from neighboring source wavelengths
-    RS_type.ϖ_λ₁λ₀ = (solar_σ_RRS[end:-1:1]/solar_σ_Rayl) #the grid gets inverted because the central wavelength is now seen as the recipient of RRS from neighboring source wavelengths
+    RS_type.ϖ_λ₁λ₀ = (reverse(solar_σ_RRS)/solar_σ_Rayl) #the grid gets inverted because the central wavelength is now seen as the recipient of RRS from neighboring source wavelengths
     #@show RS_type.ϖ_λ₁λ₀
     #@show sum(RS_type.ϖ_λ₁λ₀)
     #@show RS_type.ϖ_Cabannes
-    RS_type.i_λ₁λ₀ = index_raman_grid[end:-1:1]
+    RS_type.i_λ₁λ₀ = reverse(index_raman_grid)
     RS_type.n_Raman = length(RS_type.ϖ_λ₁λ₀)
     return nothing
 end
@@ -97,7 +97,7 @@ function getRamanSSProp!(RS_type::sol_RRS, λ, grid_in)
     #@show RS_type.ϖ_λ₁λ₀
     #@show sum(RS_type.ϖ_λ₁λ₀)
     #@show RS_type.ϖ_Cabannes
-    RS_type.i_λ₁λ₀ = index_raman_grid #index_raman_grid[end:-1:1]
+    RS_type.i_λ₁λ₀ = index_raman_grid #reverse(index_raman_grid)
     RS_type.n_Raman = length(RS_type.ϖ_λ₁λ₀)
     return nothing
 end 
@@ -118,7 +118,7 @@ function getRamanSSProp!(
     grid_in = []
     bandSpecLim = []
 
-    nm_per_m = 1.e7;
+    nm_per_cm= 1.e7;
     greek_raman = get_greek_raman(RS_type, h2)
     greek_raman_VS = get_greek_raman_VS(RS_type, h2)
 
@@ -219,7 +219,7 @@ function getRamanSSProp!(
         ϖ_λ₁λ₀_VS[Δn] = t_w_VS[2][Δn];
     end
 
-    i_λ₁λ₀_all = unique(cat(i_λ₁λ₀, i_λ₁λ₀_VS, dims = (1)))
+    i_λ₁λ₀_all = unique(vcat(i_λ₁λ₀, i_λ₁λ₀_VS))
 
     @pack! RS_type =
             iBand, grid_in, bandSpecLim,  
@@ -248,7 +248,7 @@ function getRamanSSProp!(
     grid_in = []
     bandSpecLim = []
 
-    nm_per_m = 1.e7;
+    nm_per_cm= 1.e7;
     greek_raman = get_greek_raman(RS_type, h2)
     greek_raman_VS = get_greek_raman_VS(RS_type, h2)
     #λ_scatt = 2.e7/(grid_in[1]+grid_in[end])     
@@ -347,7 +347,7 @@ function getRamanSSProp!(
     ϖ_λ₁λ₀_VS[Δn] = t_w_VS[2][Δn];
     end
 
-    i_λ₁λ₀_all = unique(cat(i_λ₁λ₀, i_λ₁λ₀_VS, dims = (1)))
+    i_λ₁λ₀_all = unique(vcat(i_λ₁λ₀, i_λ₁λ₀_VS))
 
     @pack! RS_type =
         iBand, grid_in, bandSpecLim,  
@@ -375,7 +375,7 @@ function getRamanSSProp!(
     grid_in = []
     bandSpecLim = []
 
-    nm_per_m = 1.e7;
+    nm_per_cm= 1.e7;
     greek_raman = get_greek_raman(RS_type, h2)
     greek_raman_VS = get_greek_raman_VS(RS_type, h2)
 
@@ -481,7 +481,7 @@ function getRamanSSProp!(
         ϖ_λ₁λ₀_VS[Δn] = t_w_VS[2][Δn];
     end
 
-    i_λ₁λ₀_all = unique(cat(i_λ₁λ₀, i_λ₁λ₀_VS, dims = (1)))
+    i_λ₁λ₀_all = unique(vcat(i_λ₁λ₀, i_λ₁λ₀_VS))
 
     @pack! RS_type =
         iBand, grid_in, bandSpecLim,  

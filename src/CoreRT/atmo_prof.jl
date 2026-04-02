@@ -94,8 +94,8 @@ function read_atmos_profile(file_path::String)
 
 end
 
-"Reduce profile dimensions by re-averaging to near-equidistant pressure grid"
-function reduce_profile(n::Int, profile::AtmosphericProfile{FT}) where {FT}
+"Reduce profile dimensions by re-averaging to near-equidistant pressure grid (old bin-based method)"
+function reduce_profile_old(n::Int, profile::AtmosphericProfile{FT}) where {FT}
 
     # Can only reduce the profile, not expand it
     @assert n < length(profile.T)
@@ -143,10 +143,69 @@ function reduce_profile(n::Int, profile::AtmosphericProfile{FT}) where {FT}
     # need to double check this logic, maybe better to add VCDs?!
     for molec_i in keys(vmr)
         if profile.vmr[molec_i] isa AbstractArray
-            
+
             #pressure_grid = collect(range(minimum(p_full), maximum(p_full), length=length(profile.vmr[molec_i])))
             #interp_linear = LinearInterpolation(pressure_grid, vmr[molec_i])
             new_vmr[molec_i] = [mean(profile.vmr[molec_i][ind]) for ind in indices]
+        else
+            new_vmr[molec_i] = profile.vmr[molec_i]
+        end
+    end
+
+    return AtmosphericProfile(T, p_full, q, p_half, vmr_h2o, vcd_dry, vcd_h2o, new_vmr)
+end
+
+"Reduce profile to n layers with uniform pressure spacing, using interpolation"
+function reduce_profile(n::Int, profile::AtmosphericProfile{FT}) where {FT}
+
+    # Can only reduce the profile, not expand it
+    @assert n < length(profile.T)
+
+    @unpack vmr = profile
+
+    Nₐ = FT(6.02214179e+23)
+    dry_mass = FT(28.9644e-3)
+    wet_mass = FT(18.01534e-3)
+    g₀ = FT(9.8032465)
+
+    # New uniform half-levels from TOA to surface
+    p_half = collect(range(profile.p_half[1], profile.p_half[end], length=n+1))
+
+    # Mid-layer pressures
+    p_full = (p_half[1:end-1] .+ p_half[2:end]) ./ 2
+
+    # Build pressure grids matching each profile array's length
+    # (T, q, vmr_h2o etc. may have fewer elements than p_full)
+    old_p = profile.p_full
+    p_lo, p_hi = minimum(old_p), maximum(old_p)
+
+    function _interp(data::AbstractVector)
+        grid = collect(range(p_lo, p_hi, length=length(data)))
+        itp = LinearInterpolation(grid, data)
+        return itp.(p_full)
+    end
+
+    T       = _interp(profile.T)
+    q       = _interp(profile.q)
+    vmr_h2o = _interp(profile.vmr_h2o)
+
+    # Recompute VCDs from the new pressure layers (consistent with compute_atmos_profile_fields)
+    vcd_dry = zeros(FT, n)
+    vcd_h2o = zeros(FT, n)
+    for i = 1:n
+        Δp = p_half[i+1] - p_half[i]
+        vmr_dry = 1 - vmr_h2o[i]
+        M = vmr_dry * dry_mass + vmr_h2o[i] * wet_mass
+        vcd = Nₐ * Δp / (M * g₀ * FT(100)^2) * 100
+        vcd_dry[i] = vmr_dry    * vcd
+        vcd_h2o[i] = vmr_h2o[i] * vcd
+    end
+
+    # Interpolate per-species VMR profiles
+    new_vmr = Dict{String, Union{Real, Vector}}()
+    for molec_i in keys(vmr)
+        if profile.vmr[molec_i] isa AbstractArray
+            new_vmr[molec_i] = _interp(profile.vmr[molec_i])
         else
             new_vmr[molec_i] = profile.vmr[molec_i]
         end
@@ -172,10 +231,24 @@ function getRayleighLayerOptProp(psurf::FT, λ::Union{Array{FT}, FT}, depol_fct:
     Nz = length(vcd_dry)
     τRayl = zeros(FT,size(λ,1),Nz)
     # Total vertical Rayleigh scattering optical thickness, TODO: enable sub-layers and use VCD based taus
-    tau_scat = FT(0.00864) * (psurf / FT(1013.25)) *  λ.^(-FT(3.916) .- FT(0.074) * λ .- FT(0.05) ./ λ)  
-    tau_scat = tau_scat * (FT(6.0) + FT(3.0) * depol_fct) / (FT(6.0)- FT(7.0) * depol_fct) 
-    # @show tau_scat, λ
-    k = tau_scat / sum(vcd_dry)
+    #tau_scat = FT(0.00864) * (psurf / FT(1013.25)) *  λ.^(-FT(3.916) .- FT(0.074) * λ .- FT(0.05) ./ λ)  
+    #tau_scat = tau_scat * (FT(6.0) + FT(3.0) * depol_fct) / (FT(6.0)- FT(7.0) * depol_fct) 
+    #"""
+    # The following relation is Eq(30) in Bodhaine et al. (1999) "On Rayleigh optical depth calculations" 
+    # It has an implicit depolarization ratio that is nearly the same as the one computed for Rayleigh scattering in our code from first principles.
+    # We have included an explicit depolarization factor for flexibility.  
+    #"""
+    τ_scat = 0.002152 * (1.0455996 .- 341.29061*λ.^(-2) - 0.90230850*λ.^2)./
+            (1 .+ 0.0027059889*λ.^(-2) - 85.968563*λ.^2)
+    τ_scat *= (psurf / FT(1013.25))
+    ρ₀ = 0.0279 
+    τ_scat *= (6 - 7ρ₀)*(6+3*depol_fct) / ((6 + 3ρ₀) * (6 - 7*depol_fct))
+    #for i=1:length(λ)
+         #@show λ[i], tau_scat[i]
+    #     @show λ[i], psurf, tau_scat[i], τ_scat[i]
+    #end 
+    #@show λ, psurf, tau_scat, τ_scat
+    k = τ_scat / sum(vcd_dry)
     for i = 1:Nz
         τRayl[:,i] .= k * vcd_dry[i]
     end 

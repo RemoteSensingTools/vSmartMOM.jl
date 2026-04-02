@@ -14,4 +14,4 @@ const cc_                = 2.99792458e8
 const cBolts_            = 1.3806503e-23
 const p_ref              = 1013.25  # reference pressure [hPa]
 const t_ref              = 296.0    # reference temperature [K]
-const nm_per_m           = 1.0e7
+const nm_per_cm          = 1.0e7
