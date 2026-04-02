@@ -1,0 +1,3 @@
+# Test output files - do not commit
+*.jld2
+*.txt
