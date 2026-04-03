@@ -238,8 +238,8 @@ function parameters_from_yaml(file_path)
     # atmospheric_profile group
     T = convert.(FT, params_dict["atmospheric_profile"]["T"]) # Level
     p = convert.(FT, params_dict["atmospheric_profile"]["p"]) # Boundaries
-    q = "q" in keys(params_dict["atmospheric_profile"]) ? # Specific humidity, if it's specified. 
-            convert.(FT, params_dict["atmospheric_profile"]["q"]) : zeros(FT, length(T)) # Otherwise 0
+    q = "q" in keys(params_dict["atmospheric_profile"]) ? # Specific humidity, if it's specified.
+            convert.(FT, params_dict["atmospheric_profile"]["q"]) : nothing # Otherwise not considered
 
     # absorption group
     if "absorption" in keys(params_dict)
@@ -334,7 +334,7 @@ function parameters_from_yaml(file_path)
                                 obs_geom,
 
                                 # atmospheric_profile group
-                                convert.(FT,T), convert.(FT,p), convert.(FT,q), 
+                                convert.(FT,T), convert.(FT,p), isnothing(q) ? nothing : convert.(FT,q),
                                 params_dict["atmospheric_profile"]["profile_reduction"],
 
                                 # absorption group

@@ -3,10 +3,15 @@ function constructCoreOpticalProperties(RS_type, iBand, m, model)
             greek_rayleigh, greek_cabannes, ϖ_Cabannes = model
     
     @assert all(iBand .≤ length(τ_rayl)) "iBand exceeded number of bands"
-    FT = eltype(τ_rayl)
+    FT = eltype(τ_rayl[1])
     arr_type = array_type(model.params.architecture)
 
     pol_type = model.params.polarization_type
+    # Convert pol_type to match FT if needed
+    if FT != eltype(pol_type.D)
+        PT = Base.typename(typeof(pol_type)).wrapper
+        pol_type = PT{FT}(n=pol_type.n, D=FT.(pol_type.D), I₀=FT.(pol_type.I₀))
+    end
     # Do this in CPU space only first:
     
     # Quadrature points:
@@ -24,23 +29,28 @@ function constructCoreOpticalProperties(RS_type, iBand, m, model)
     # @show arr_type
     for iB in iBand
         if (typeof(RS_type)<:noRS) #!(typeof(RS_type)<:Union{RRS,RRS_plus})
-            Rayl𝐙⁺⁺, Rayl𝐙⁻⁺ = Scattering.compute_Z_moments(pol_type, μ, 
-                                                            greek_rayleigh[iB], m, 
+            Rayl𝐙⁺⁺, Rayl𝐙⁻⁺ = Scattering.compute_Z_moments(pol_type, μ,
+                                                            greek_rayleigh[iB], m,
                                                             arr_type = arr_type);
         else
-            Rayl𝐙⁺⁺, Rayl𝐙⁻⁺ = Scattering.compute_Z_moments(pol_type, μ, 
-                                                            greek_cabannes[iB], m, 
+            Rayl𝐙⁺⁺, Rayl𝐙⁻⁺ = Scattering.compute_Z_moments(pol_type, μ,
+                                                            greek_cabannes[iB], m,
                                                             arr_type = arr_type);
             #Rayl2𝐙⁺⁺, Rayl2𝐙⁻⁺ = Scattering.compute_Z_moments(pol_type, μ, 
             #                                                greek_rayleigh[iB], m, 
             #                                                arr_type = arr_type);
         end
+        # Convert Z-matrices to FT if needed (compute_Z_moments may return Float64)
+        if eltype(Rayl𝐙⁺⁺) != FT
+            Rayl𝐙⁺⁺ = FT.(Rayl𝐙⁺⁺)
+            Rayl𝐙⁻⁺ = FT.(Rayl𝐙⁻⁺)
+        end
 
         if (typeof(RS_type)<:noRS) #if !(typeof(RS_type)<:Union{RRS,RRS_plus})
-            rayl =  [CoreScatteringOpticalProperties(arr_type(τ_rayl[iB][:,i]), 1.0, 
-                (Rayl𝐙⁺⁺), (Rayl𝐙⁻⁺)) for i=1:nZ]    
+            rayl =  [CoreScatteringOpticalProperties(arr_type(τ_rayl[iB][:,i]), FT(1),
+                (Rayl𝐙⁺⁺), (Rayl𝐙⁻⁺)) for i=1:nZ]
         else
-            rayl =  [CoreScatteringOpticalProperties(arr_type(τ_rayl[iB][:,i]), ϖ_Cabannes[iB], 
+            rayl =  [CoreScatteringOpticalProperties(arr_type(τ_rayl[iB][:,i]), FT(ϖ_Cabannes[iB]),
                 (Rayl𝐙⁺⁺), (Rayl𝐙⁻⁺)) for i=1:nZ]
             #@show τ_rayl[iB][1,i]
             #rayl2 =  [CoreScatteringOpticalProperties(arr_type(τ_rayl[iB][:,i]), 1.0, 
@@ -76,9 +86,14 @@ function constructCoreOpticalProperties(RS_type, iBand, m, model)
             # Precomute Z matrices per type (constant per layer)
             #@show iB,i
             AerZ⁺⁺, AerZ⁻⁺ = Scattering.compute_Z_moments(
-                                pol_type, μ, 
-                                aerosol_optics[iB][iaer].greek_coefs, 
+                                pol_type, μ,
+                                aerosol_optics[iB][iaer].greek_coefs,
                                 m, arr_type=arr_type)
+            # Convert to FT if needed
+            if eltype(AerZ⁺⁺) != FT
+                AerZ⁺⁺ = FT.(AerZ⁺⁺)
+                AerZ⁻⁺ = FT.(AerZ⁻⁺)
+            end
             # Generate Core optical properties for Aerosols iaer
             #@show size(τ_aer[iB][iaer,:,:])
             #aer = Vector{CoreScatteringOpticalProperties}
@@ -127,8 +142,11 @@ function constructCoreOpticalProperties(RS_type, iBand, m, model)
         #@show size(fScattRayleigh)
         #@show size(combo[1].τ), size(τ_abs[iB][:,1])
 
-        combo2 = combo .+ [CoreAbsorptionOpticalProperties(arr_type(τ_abs[iB][:,i])) for i=1:nZ]
-        #@show size(combo2[1].τ)
+        combo2 = combo .+ [CoreAbsorptionOpticalProperties(arr_type(FT.(τ_abs[iB][:,i]))) for i=1:nZ]
+        # Ensure all layer properties are in FT precision
+        if eltype(combo2[1].τ) != FT
+            combo2 = [CoreScatteringOpticalProperties{FT}(FT.(c.τ), FT.(c.ϖ), FT.(c.Z⁺⁺), FT.(c.Z⁻⁺)) for c in combo2]
+        end
         fScattRayleigh = [Array(rayl[i].τ  ./ combo2[i].τ) for i=1:nZ]
         #@show fScattRayleigh[1]
         #for i=1:nZ

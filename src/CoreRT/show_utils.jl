@@ -39,7 +39,11 @@ function Base.show(io::IO,::MIME"text/plain", x::vSmartMOM_Parameters)
     println(io, "-------------------")
     println(io, "\tTemperature: $(length(x.T))-length array")
     println(io, "\tPressure: $(length(x.p))-length array")
-    println(io, "\tSpecific humidity: $(length(x.q))-length array")
+    if isnothing(x.q)
+        println(io, "\tSpecific humidity: not specified")
+    else
+        println(io, "\tSpecific humidity: $(length(x.q))-length array")
+    end
     if x.profile_reduction_n == -1
         println(io, "\tProfile Reduction: None")
     else

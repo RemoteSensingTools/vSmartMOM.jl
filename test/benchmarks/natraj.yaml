@@ -4,7 +4,7 @@
 radiative_transfer: 
   # Spectral bands (list of ν_start:ν_step:ν_end, in cm⁻¹)
   spec_bands: 
-    - "[18867.92 18868.92]"
+    - "[18867.92, 18868.92]"
   # Bidirectional Reflectance Distribution Function (BRDF) per band
   surface: 
     - LambertianSurfaceScalar(0.0)
@@ -36,7 +36,7 @@ geometry:
   # Viewing azimuth angles (degrees)
   vaz:                [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
   # Observation altitude (Pa)
-  obs_alt:            1000.0
+  obs_alt:            0 #1000.0
 
 # =================================================================
 # Atmospheric Profile
@@ -47,7 +47,8 @@ atmospheric_profile:
   T: [231.62]
   # Pressure Profile (TOA to BOA at each boundary, in hPa)
   # Half-levels, specified at layer boundaries
-  p: [  0.14,   0.22]
+  #p: [  0.14,   0.22]
+  p: [  1013.25,   0.0]
   # Reduce profile to n layers
   profile_reduction: -1
 

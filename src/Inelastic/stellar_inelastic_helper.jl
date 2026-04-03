@@ -26,7 +26,7 @@ const nm_per_cm          = 1.0e7
     return n₀, n₁
 end=#
 # Currently assuming same T for all vertical atmospheric layers (so that a uniform Raman wavelength grid can be assumed for rt_interactions)
-function getRamanSolarConstants(ν̃::FT, T::FT) where FT
+function getRamanSolarConstants(ν̃::AbstractFloat, T::AbstractFloat)
     h2 = InelasticScattering.getMolecularConstants(InelasticScattering.H₂(), (0.91));
     compute_effective_coefficents!(ν̃, T, h2)
     compute_energy_levels!(h2)
@@ -38,7 +38,7 @@ function getRamanSolarConstants(ν̃::FT, T::FT) where FT
     return h2
 end
 
-function getRamanSolarConstants(ν̃::FT, T::FT, vmr_h2::FT) where FT
+function getRamanSolarConstants(ν̃::AbstractFloat, T::AbstractFloat, vmr_h2::AbstractFloat)
     @assert 0<=vmr_h2<=1
     h2 = InelasticScattering.getMolecularConstants(InelasticScattering.H₂(), vmr_h2);
     compute_effective_coefficents!(ν̃, T, h2)
@@ -283,7 +283,7 @@ end
 =#
 
 # for VS
-function compute_γ_solar_Rayleigh_VS!(λ₀::FT, effT::FT) where FT
+function compute_γ_solar_Rayleigh_VS!(λ₀::AbstractFloat, effT::AbstractFloat)
     ν̃ =  1.e7/λ₀
     #effT  =  300.; #K assumed constant for Earth atmospheres
 

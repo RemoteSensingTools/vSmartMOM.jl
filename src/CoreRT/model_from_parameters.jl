@@ -434,11 +434,15 @@ function model_from_parameters(#::FwdMode,
             #@show params.scattering_params.rt_aerosols[i_aer].τ_ref
         end                  
     end
-    for i_band = 1:n_bands
-        l_max[i_band] = maximum(l_max_aer[:,i_band]) 
-        max_m[i_band] = Int(ceil(l_max[i_band] + 1)/2)  
+    if n_aer > 0
+        for i_band = 1:n_bands
+            l_max[i_band] = maximum(l_max_aer[:,i_band])
+            max_m[i_band] = Int(ceil(l_max[i_band] + 1)/2)
+        end
+        set_uniform_lmax!(l_max, aerosol_optics)
+    else
+        max_m .= params.max_m
     end
-    set_uniform_lmax!(l_max, aerosol_optics)
 #@show typeof(τ_aer)
 #@show typeof(τ_rayl)
 
@@ -772,11 +776,15 @@ function model_from_parameters(OCO::Bool, params::vSmartMOM_Parameters)
             #@show params.scattering_params.rt_aerosols[i_aer].τ_ref
         end                  
     end
-    for i_band = 1:n_bands
-        l_max[i_band] = maximum(l_max_aer[:,i_band]) 
-        max_m[i_band] = Int(ceil(l_max[i_band] + 1)/2)  
+    if n_aer > 0
+        for i_band = 1:n_bands
+            l_max[i_band] = maximum(l_max_aer[:,i_band])
+            max_m[i_band] = Int(ceil(l_max[i_band] + 1)/2)
+        end
+        set_uniform_lmax!(l_max, aerosol_optics)
+    else
+        max_m .= params.max_m
     end
-    set_uniform_lmax!(l_max, aerosol_optics)
 #@show typeof(τ_aer)
 #@show typeof(τ_rayl)
 
@@ -1103,11 +1111,15 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
             #    CoreRT.getAerosolLayerOptProp(1.0, c_aero.p₀, c_aero.σp, profile.p_half)
         end 
     end
-    for i_band = 1:n_bands
-        l_max[i_band] = maximum(l_max_aer[:,i_band]) 
-        max_m[i_band] = Int(ceil(l_max[i_band] + 1)/2)  
+    if n_aer > 0
+        for i_band = 1:n_bands
+            l_max[i_band] = maximum(l_max_aer[:,i_band])
+            max_m[i_band] = Int(ceil(l_max[i_band] + 1)/2)
+        end
+        set_uniform_lmax!(l_max, aerosol_optics)
+    else
+        max_m .= params.max_m
     end
-    set_uniform_lmax!(l_max, aerosol_optics)
     # Check the floating-type output matches specified FT
 
     # Return the model 
@@ -1384,11 +1396,15 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
             #    CoreRT.getAerosolLayerOptProp(1.0, c_aero.p₀, c_aero.σp, profile.p_half)
         end 
     end
-    for i_band = 1:n_bands
-        l_max[i_band] = maximum(l_max_aer[:,i_band]) 
-        max_m[i_band] = Int(ceil(l_max[i_band] + 1)/2)  
+    if n_aer > 0
+        for i_band = 1:n_bands
+            l_max[i_band] = maximum(l_max_aer[:,i_band])
+            max_m[i_band] = Int(ceil(l_max[i_band] + 1)/2)
+        end
+        set_uniform_lmax!(l_max, aerosol_optics)
+    else
+        max_m .= params.max_m
     end
-    set_uniform_lmax!(l_max, aerosol_optics)
     # Check the floating-type output matches specified FT
 
     # Return the model 

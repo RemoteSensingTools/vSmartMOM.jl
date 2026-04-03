@@ -1,8 +1,53 @@
 #=
- 
+
 This file contains RT interaction-related functions
- 
+
 =#
+
+"""
+Pre-allocated workspace for ScatteringInterface_11 interaction to avoid
+repeated GPU memory allocation (~7 GB per call for typical Raman runs).
+Create once before the layer loop and pass to `interaction!`.
+"""
+mutable struct InteractionWorkspace{A3, A4_mat, A4_src, A3_src}
+    tmp_inv::A3         # nQuad × nQuad × nSpec
+    tmpR⁻⁺::A3
+    tmpR⁺⁻::A3
+    tmpT⁻⁻::A3
+    tmpT⁺⁺::A3
+    tmpJ₀⁻::A3_src     # nQuad × 1 × nSpec
+    tmpJ₀⁺::A3_src
+    tmpieR⁻⁺::A4_mat   # nQuad × nQuad × nSpec × nRaman
+    tmpieR⁺⁻::A4_mat
+    tmpieT⁻⁻::A4_mat
+    tmpieT⁺⁺::A4_mat
+    tmpieJ₀⁻::A4_src   # nQuad × 1 × nSpec × nRaman
+    tmpieJ₀⁺::A4_src
+end
+
+function InteractionWorkspace(composite_layer, added_layer)
+    @unpack R⁻⁺, R⁺⁻, T⁺⁺, T⁻⁻, J₀⁺, J₀⁻ = composite_layer
+    @unpack ieR⁻⁺, ieR⁺⁻, ieT⁻⁻, ieT⁺⁺, ieJ₀⁺, ieJ₀⁻ = composite_layer
+    InteractionWorkspace(
+        similar(T⁺⁺),                          # tmp_inv
+        similar(R⁻⁺), similar(R⁺⁻),            # tmpR
+        similar(T⁻⁻), similar(T⁺⁺),            # tmpT
+        similar(J₀⁻), similar(J₀⁺),            # tmpJ
+        similar(ieR⁻⁺), similar(ieR⁺⁻),        # tmpieR
+        similar(ieT⁻⁻), similar(ieT⁺⁺),        # tmpieT
+        similar(ieJ₀⁻), similar(ieJ₀⁺))        # tmpieJ
+end
+
+function reset!(ws::InteractionWorkspace)
+    ws.tmp_inv .= 0
+    ws.tmpR⁻⁺ .= 0; ws.tmpR⁺⁻ .= 0
+    ws.tmpT⁻⁻ .= 0; ws.tmpT⁺⁺ .= 0
+    ws.tmpJ₀⁻ .= 0; ws.tmpJ₀⁺ .= 0
+    ws.tmpieR⁻⁺ .= 0; ws.tmpieR⁺⁻ .= 0
+    ws.tmpieT⁻⁻ .= 0; ws.tmpieT⁺⁺ .= 0
+    ws.tmpieJ₀⁻ .= 0; ws.tmpieJ₀⁺ .= 0
+    return nothing
+end
 
 # No scattering in either the added layer or the composite layer
 function interaction_helper!(RS_type,::ScatteringInterface_00, SFI,
@@ -251,30 +296,42 @@ end
 # Scattering in homogeneous layer which is added to the bottom of the composite layer.
 # Produces a new, scattering composite layer.
 function interaction_helper!(RS_type::RRS, ::ScatteringInterface_11, SFI,
-                                composite_layer::Union{CompositeLayer, CompositeLayerRS}, 
-                                added_layer::Union{AddedLayer,AddedLayerRS}, 
-                                I_static::AbstractArray{FT}) where {FT<:Union{AbstractFloat, ForwardDiff.Dual}}
+                                composite_layer::Union{CompositeLayer, CompositeLayerRS},
+                                added_layer::Union{AddedLayer,AddedLayerRS},
+                                I_static::AbstractArray{FT};
+                                workspace::Union{InteractionWorkspace, Nothing}=nothing) where {FT<:Union{AbstractFloat, ForwardDiff.Dual}}
     @unpack i_λ₁λ₀ = RS_type
     @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺ = added_layer
     @unpack R⁻⁺, R⁺⁻, T⁺⁺, T⁻⁻, J₀⁺, J₀⁻ = composite_layer
     @unpack ier⁺⁻, ier⁻⁺, iet⁻⁻, iet⁺⁺ = added_layer
     @unpack ieR⁻⁺, ieR⁺⁻, ieT⁺⁺, ieT⁻⁻, ieJ₀⁺, ieJ₀⁻ = composite_layer
-    
+
     @show "interaction 11"
     # Used to store `(I - R⁺⁻ * r⁻⁺)⁻¹`
-    tmp_inv  = similar(t⁺⁺); tmp_inv.=0;
-    tmpieJ₀⁻ = similar(ieJ₀⁻); tmpieJ₀⁻.=0;
-    tmpieJ₀⁺ = similar(ieJ₀⁺); tmpieJ₀⁺.=0;
-    tmpieR⁻⁺ = similar(ieR⁻⁺); tmpieR⁻⁺.=0;
-    tmpieR⁺⁻ = similar(ieR⁺⁻); tmpieR⁺⁻.=0;
-    tmpieT⁻⁻ = similar(ieT⁻⁻); tmpieT⁻⁻.=0;
-    tmpieT⁺⁺ = similar(ieT⁺⁺); tmpieT⁺⁺.=0;
-    tmpJ₀⁻   = similar(J₀⁻); tmpJ₀⁻.=0;
-    tmpJ₀⁺   = similar(J₀⁺); tmpJ₀⁺.=0;
-    tmpR⁻⁺   = similar(R⁻⁺); tmpR⁻⁺.=0;
-    tmpR⁺⁻   = similar(R⁺⁻); tmpR⁺⁻.=0;
-    tmpT⁻⁻   = similar(T⁻⁻); tmpT⁻⁻.=0;
-    tmpT⁺⁺   = similar(T⁺⁺); tmpT⁺⁺.=0;
+    if workspace !== nothing
+        reset!(workspace)
+        tmp_inv  = workspace.tmp_inv
+        tmpieJ₀⁻ = workspace.tmpieJ₀⁻; tmpieJ₀⁺ = workspace.tmpieJ₀⁺
+        tmpieR⁻⁺ = workspace.tmpieR⁻⁺; tmpieR⁺⁻ = workspace.tmpieR⁺⁻
+        tmpieT⁻⁻ = workspace.tmpieT⁻⁻; tmpieT⁺⁺ = workspace.tmpieT⁺⁺
+        tmpJ₀⁻ = workspace.tmpJ₀⁻; tmpJ₀⁺ = workspace.tmpJ₀⁺
+        tmpR⁻⁺ = workspace.tmpR⁻⁺; tmpR⁺⁻ = workspace.tmpR⁺⁻
+        tmpT⁻⁻ = workspace.tmpT⁻⁻; tmpT⁺⁺ = workspace.tmpT⁺⁺
+    else
+        tmp_inv  = similar(t⁺⁺); tmp_inv.=0;
+        tmpieJ₀⁻ = similar(ieJ₀⁻); tmpieJ₀⁻.=0;
+        tmpieJ₀⁺ = similar(ieJ₀⁺); tmpieJ₀⁺.=0;
+        tmpieR⁻⁺ = similar(ieR⁻⁺); tmpieR⁻⁺.=0;
+        tmpieR⁺⁻ = similar(ieR⁺⁻); tmpieR⁺⁻.=0;
+        tmpieT⁻⁻ = similar(ieT⁻⁻); tmpieT⁻⁻.=0;
+        tmpieT⁺⁺ = similar(ieT⁺⁺); tmpieT⁺⁺.=0;
+        tmpJ₀⁻   = similar(J₀⁻); tmpJ₀⁻.=0;
+        tmpJ₀⁺   = similar(J₀⁺); tmpJ₀⁺.=0;
+        tmpR⁻⁺   = similar(R⁻⁺); tmpR⁻⁺.=0;
+        tmpR⁺⁻   = similar(R⁺⁻); tmpR⁺⁻.=0;
+        tmpT⁻⁻   = similar(T⁻⁻); tmpT⁻⁻.=0;
+        tmpT⁺⁺   = similar(T⁺⁺); tmpT⁺⁺.=0;
+    end
     # Compute and store `(I - R⁺⁻ * r⁻⁺)⁻¹`
     @timeit "interaction inv1" batch_inv!(tmp_inv, I_static .- r⁻⁺ ⊠ R⁺⁻) #Suniti
     # Temporary arrays:
@@ -390,30 +447,41 @@ function interaction_helper!(RS_type::RRS, ::ScatteringInterface_11, SFI,
     composite_layer.ieR⁺⁻ .= tmpieR⁺⁻
 end
 
-function interaction_helper!(RS_type::Union{VS_0to1_plus, VS_1to0_plus}, 
+function interaction_helper!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
     ::ScatteringInterface_11, SFI,
-    composite_layer::Union{CompositeLayer, CompositeLayerRS}, 
-    added_layer::Union{AddedLayer,AddedLayerRS}, 
-    I_static::AbstractArray{FT}) where {FT<:Union{AbstractFloat, ForwardDiff.Dual}}
- 
+    composite_layer::Union{CompositeLayer, CompositeLayerRS},
+    added_layer::Union{AddedLayer,AddedLayerRS},
+    I_static::AbstractArray{FT};
+    workspace::Union{InteractionWorkspace, Nothing}=nothing) where {FT<:Union{AbstractFloat, ForwardDiff.Dual}}
+
     @unpack i_λ₁λ₀_all = RS_type
     @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, ier⁺⁻, ier⁻⁺, iet⁻⁻, iet⁺⁺ = added_layer
     @unpack R⁻⁺, R⁺⁻, T⁺⁺, T⁻⁻, J₀⁺, J₀⁻, ieR⁻⁺, ieR⁺⁻, ieT⁺⁺, ieT⁻⁻, ieJ₀⁺, ieJ₀⁻ = composite_layer
-    #@show "hello 100"
     # Used to store `(I - R⁺⁻ * r⁻⁺)⁻¹`
-    tmp_inv = similar(t⁺⁺); tmp_inv.=0;
-    tmpieJ₀⁻ = similar(ieJ₀⁻); tmpieJ₀⁻.=0;
-    tmpieJ₀⁺ = similar(ieJ₀⁺); tmpieJ₀⁺.=0;
-    tmpieR⁻⁺ = similar(ieR⁻⁺); tmpieR⁻⁺.=0;
-    tmpieR⁺⁻ = similar(ieR⁺⁻); tmpieR⁺⁻.=0;
-    tmpieT⁻⁻ = similar(ieT⁻⁻); tmpieT⁻⁻.=0;
-    tmpieT⁺⁺ = similar(ieT⁺⁺); tmpieT⁺⁺.=0;
-    tmpJ₀⁻   = similar(J₀⁻); tmpJ₀⁻.=0;
-    tmpJ₀⁺   = similar(J₀⁺); tmpJ₀⁺.=0;
-    tmpR⁻⁺   = similar(R⁻⁺); tmpR⁻⁺.=0;
-    tmpR⁺⁻   = similar(R⁺⁻); tmpR⁺⁻.=0;
-    tmpT⁻⁻   = similar(T⁻⁻); tmpT⁻⁻.=0;
-    tmpT⁺⁺   = similar(T⁺⁺); tmpT⁺⁺.=0;
+    if workspace !== nothing
+        reset!(workspace)
+        tmp_inv  = workspace.tmp_inv
+        tmpieJ₀⁻ = workspace.tmpieJ₀⁻; tmpieJ₀⁺ = workspace.tmpieJ₀⁺
+        tmpieR⁻⁺ = workspace.tmpieR⁻⁺; tmpieR⁺⁻ = workspace.tmpieR⁺⁻
+        tmpieT⁻⁻ = workspace.tmpieT⁻⁻; tmpieT⁺⁺ = workspace.tmpieT⁺⁺
+        tmpJ₀⁻ = workspace.tmpJ₀⁻; tmpJ₀⁺ = workspace.tmpJ₀⁺
+        tmpR⁻⁺ = workspace.tmpR⁻⁺; tmpR⁺⁻ = workspace.tmpR⁺⁻
+        tmpT⁻⁻ = workspace.tmpT⁻⁻; tmpT⁺⁺ = workspace.tmpT⁺⁺
+    else
+        tmp_inv = similar(t⁺⁺); tmp_inv.=0;
+        tmpieJ₀⁻ = similar(ieJ₀⁻); tmpieJ₀⁻.=0;
+        tmpieJ₀⁺ = similar(ieJ₀⁺); tmpieJ₀⁺.=0;
+        tmpieR⁻⁺ = similar(ieR⁻⁺); tmpieR⁻⁺.=0;
+        tmpieR⁺⁻ = similar(ieR⁺⁻); tmpieR⁺⁻.=0;
+        tmpieT⁻⁻ = similar(ieT⁻⁻); tmpieT⁻⁻.=0;
+        tmpieT⁺⁺ = similar(ieT⁺⁺); tmpieT⁺⁺.=0;
+        tmpJ₀⁻   = similar(J₀⁻); tmpJ₀⁻.=0;
+        tmpJ₀⁺   = similar(J₀⁺); tmpJ₀⁺.=0;
+        tmpR⁻⁺   = similar(R⁻⁺); tmpR⁻⁺.=0;
+        tmpR⁺⁻   = similar(R⁺⁻); tmpR⁺⁻.=0;
+        tmpT⁻⁻   = similar(T⁻⁻); tmpT⁻⁻.=0;
+        tmpT⁺⁺   = similar(T⁺⁺); tmpT⁺⁺.=0;
+    end
     # Compute and store `(I - R⁺⁻ * r⁻⁺)⁻¹`
     @timeit "interaction inv1" batch_inv!(tmp_inv, I_static .- r⁻⁺ ⊠ R⁺⁻) #Suniti
     # Temporary arrays:
@@ -540,20 +608,12 @@ end
 
 "Compute interaction between composite and added layers"
 function interaction!(RS_type::Union{RRS, VS_0to1_plus, VS_1to0_plus}, scattering_interface::AbstractScatteringInterface, SFI,
-                        composite_layer::Union{CompositeLayer,CompositeLayerRS}, 
+                        composite_layer::Union{CompositeLayer,CompositeLayerRS},
                         added_layer::Union{AddedLayer,AddedLayerRS},
-                        I_static::AbstractArray{FT}) where {FT<:Union{AbstractFloat, ForwardDiff.Dual}}
-                        
-    #M1 = composite_layer.R⁻⁺[1,1,1]
-    #M2 = composite_layer.R⁺⁻[1,1,1]
-    #M3 = composite_layer.T⁺⁺[1,1,1]
-    #M4 = composite_layer.T⁻⁻[1,1,1]
-    #M5 = composite_layer.J₀⁺[1,1,1]
-    #M6 = composite_layer.J₀⁻[1,1,1]
+                        I_static::AbstractArray{FT};
+                        workspace::Union{InteractionWorkspace, Nothing}=nothing) where {FT<:Union{AbstractFloat, ForwardDiff.Dual}}
 
-    #@show M1, M2, M3, M4, M5, M6
-                        
-    interaction_helper!(RS_type, scattering_interface, SFI, composite_layer, added_layer, I_static)
+    interaction_helper!(RS_type, scattering_interface, SFI, composite_layer, added_layer, I_static; workspace=workspace)
     
     #M1 = composite_layer.R⁻⁺[1,1,1]
     #M2 = composite_layer.R⁺⁻[1,1,1]
@@ -568,9 +628,10 @@ function interaction!(RS_type::Union{RRS, VS_0to1_plus, VS_1to0_plus}, scatterin
 end
 
 function interaction!(RS_type::noRS, scattering_interface::AbstractScatteringInterface, SFI,
-    composite_layer::Union{CompositeLayer,CompositeLayerRS}, 
+    composite_layer::Union{CompositeLayer,CompositeLayerRS},
     added_layer::Union{AddedLayer,AddedLayerRS},
-    I_static::AbstractArray{FT}) where {FT<:Union{AbstractFloat, ForwardDiff.Dual}}
+    I_static::AbstractArray{FT};
+    workspace=nothing) where {FT<:Union{AbstractFloat, ForwardDiff.Dual}}
     
     interaction_helper!(scattering_interface, SFI, composite_layer, added_layer, I_static)
     synchronize_if_gpu()

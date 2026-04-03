@@ -23,7 +23,7 @@ struct AtmosphericProfile{FT, VMR <: Union{Real, Vector}}
     "Pressure Profile (Full)"
     p_full::Array{FT,1}
     "Specific humidity profile"
-    q::Array{FT,1}
+    q::Union{Array{FT,1}, Nothing}
     "Pressure Levels"
     p_half::Array{FT,1}
     "H2O Volume Mixing Ratio Profile"
@@ -280,7 +280,7 @@ mutable struct vSmartMOM_Parameters{FT<:Union{AbstractFloat, ForwardDiff.Dual}}
     "Pressure Profile [hPa]"
     p::AbstractArray{FT}
     "Specific humidity profile"
-    q::AbstractArray{FT}
+    q::Union{AbstractArray{FT}, Nothing}
     "Length of profile reduction"
     profile_reduction_n::Integer
 

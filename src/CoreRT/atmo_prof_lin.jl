@@ -108,7 +108,7 @@ function reduce_profile(n::Int, profile::AtmosphericProfile{FT}) where {FT}
 
     # Matrices to hold new values
     T = zeros(FT, n);
-    q = zeros(FT, n);
+    q = isnothing(profile.q) ? nothing : zeros(FT, n);
     p_full = zeros(FT, n);
     p_half = zeros(FT, n+1);
     vmr_h2o  = zeros(FT, n);
@@ -131,7 +131,9 @@ function reduce_profile(n::Int, profile::AtmosphericProfile{FT}) where {FT}
         # Re-average the other parameters to produce new layers
         p_full[i] = mean(profile.p_full[ind])
         T[i] = mean(profile.T[ind])
-        q[i] = mean(profile.q[ind])
+        if !isnothing(q)
+            q[i] = mean(profile.q[ind])
+        end
         vmr_h2o[i] = mean(profile.vmr_h2o[ind])
         vcd_dry[i] = sum(profile.vcd_dry[ind])
         vcd_h2o[i] = sum(profile.vcd_h2o[ind])

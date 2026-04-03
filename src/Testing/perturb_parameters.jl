@@ -13,13 +13,15 @@ function perturb_parameters(params::vSmartMOM.CoreRT.vSmartMOM_Parameters, ppct)
     
     #@show "hi1"
     # q
-    tmp_params = deepcopy(params)  # ← CRITICAL FIX: Use deepcopy
-    if all(params.q .== 0.0)
-        tmp_params.q .+= 0.01*ppct
-    else
-        tmp_params.q .*= incr_fct
+    if !isnothing(params.q)
+        tmp_params = deepcopy(params)  # ← CRITICAL FIX: Use deepcopy
+        if all(params.q .== 0.0)
+            tmp_params.q .+= 0.01*ppct
+        else
+            tmp_params.q .*= incr_fct
+        end
+        push!(pert_params, tmp_params)
     end
-    push!(pert_params, tmp_params)
     
     #@show "hi2"
     # variable molecules
@@ -122,33 +124,37 @@ function compute_FD_modelJacobian(params::vSmartMOM.CoreRT.vSmartMOM_Parameters,
     Naer = length(params.scattering_params.rt_aerosols)
     Nbands = length(params.brdf)
 
-    @assert Nparams == 1 + Nmol + Naer * 7 + Nbands
-    
+    has_q = !isnothing(params.q)
+    q_offset = has_q ? 1 : 0
+    @assert Nparams == q_offset + Nmol + Naer * 7 + Nbands
+
     iband=1
     # q
-    M_air = 28.9647  # g/mol
-    M_H₂O = 18.01528  # g/mol
-    Δq = pert_params[1].q - params.q
-    #pert_model = model_from_parameters(fwd_mode, pert_params[1])
-    pert_model = model_from_parameters(pert_params[1])
-    K_FD = (pert_model.τ_abs[iband] .- model.τ_abs[iband]).*(1.0./Δq)'
-    K_lin = lin_model.τ̇_abs[iband][1,:,:]*(M_air/M_H₂O).*(1.0./(1.0.-params.q).^2)'  # ← FIX: Account for the scaling factor in the linear model
-    @assert K_FD ≈ K_lin
+    if has_q
+        M_air = 28.9647  # g/mol
+        M_H₂O = 18.01528  # g/mol
+        Δq = pert_params[1].q - params.q
+        #pert_model = model_from_parameters(fwd_mode, pert_params[1])
+        pert_model = model_from_parameters(pert_params[1])
+        K_FD = (pert_model.τ_abs[iband] .- model.τ_abs[iband]).*(1.0./Δq)'
+        K_lin = lin_model.τ̇_abs[iband][1,:,:]*(M_air/M_H₂O).*(1.0./(1.0.-params.q).^2)'  # ← FIX: Account for the scaling factor in the linear model
+        @assert K_FD ≈ K_lin
+    end
 
     # variable_molecules
     for imol=1:Nmol
-        tΔmol = pert_params[1+imol].absorption_params.vmr[var_mols[imol][1]] - params.absorption_params.vmr[var_mols[imol][1]]
+        tΔmol = pert_params[q_offset+imol].absorption_params.vmr[var_mols[imol][1]] - params.absorption_params.vmr[var_mols[imol][1]]
         Δmol = (tΔmol[2:end] + tΔmol[1:end-1])/2.  # ← FIX: Compute Δmol correctly
-        pert_model = model_from_parameters(pert_params[1+imol])
+        pert_model = model_from_parameters(pert_params[q_offset+imol])
         K_FD = (pert_model.τ_abs[iband] .- model.τ_abs[iband]).*(1.0./Δmol)'
-        K_lin = lin_model.τ̇_abs[iband][1+imol,:,:]
+        K_lin = lin_model.τ̇_abs[iband][q_offset+imol,:,:]
     end
 
     #Aerosols
     for iaer = 1:Naer
         #τ_ref
         i_aerprop = 1
-        idx = 1 + Nmol + 7*(iaer-1) + i_aerprop
+        idx = q_offset + Nmol + 7*(iaer-1) + i_aerprop
         Δτ_ref = pert_params[idx].scattering_params.rt_aerosols[iaer].τ_ref - params.scattering_params.rt_aerosols[iaer].τ_ref
         pert_model = model_from_parameters(pert_params[idx])
         
@@ -161,7 +167,7 @@ function compute_FD_modelJacobian(params::vSmartMOM.CoreRT.vSmartMOM_Parameters,
     
         # nᵣ
         i_aerprop = 2
-        idx = 1 + Nmol + 7*(iaer-1) + i_aerprop
+        idx = q_offset + Nmol + 7*(iaer-1) + i_aerprop
         Δnᵣ = pert_params[idx].scattering_params.rt_aerosols[iaer].aerosol.nᵣ - params.scattering_params.rt_aerosols[iaer].aerosol.nᵣ  
         pert_model = model_from_parameters(pert_params[idx])
         
@@ -220,7 +226,7 @@ function compute_FD_modelJacobian(params::vSmartMOM.CoreRT.vSmartMOM_Parameters,
 
         # nᵢ
         i_aerprop = 3
-        idx = 1 + Nmol + 7*(iaer-1) + i_aerprop
+        idx = q_offset + Nmol + 7*(iaer-1) + i_aerprop
         Δnᵢ = pert_params[idx].scattering_params.rt_aerosols[iaer].aerosol.nᵢ - params.scattering_params.rt_aerosols[iaer].aerosol.nᵢ  
         pert_model = model_from_parameters(pert_params[idx])
         
@@ -278,7 +284,7 @@ function compute_FD_modelJacobian(params::vSmartMOM.CoreRT.vSmartMOM_Parameters,
 
         # r₀
         i_aerprop = 4
-        idx = 1 + Nmol + 7*(iaer-1) + i_aerprop
+        idx = q_offset + Nmol + 7*(iaer-1) + i_aerprop
         Δμ = pert_params[idx].scattering_params.rt_aerosols[iaer].aerosol.size_distribution.μ - params.scattering_params.rt_aerosols[iaer].aerosol.size_distribution.μ
         pert_model = model_from_parameters(pert_params[idx])
         #K_FD = (pert_model.τ_aer .- model.τ_aer)./Δμ
@@ -338,7 +344,7 @@ function compute_FD_modelJacobian(params::vSmartMOM.CoreRT.vSmartMOM_Parameters,
 
         # σ₀
         i_aerprop = 5
-        idx = 1 + Nmol + 7*(iaer-1) + i_aerprop
+        idx = q_offset + Nmol + 7*(iaer-1) + i_aerprop
         Δσ = pert_params[idx].scattering_params.rt_aerosols[iaer].aerosol.size_distribution.σ - params.scattering_params.rt_aerosols[iaer].aerosol.size_distribution.σ
         pert_model = model_from_parameters(pert_params[idx])
         #K_FD = (pert_model.τ_aer .- model.τ_aer)./Δσ
@@ -398,7 +404,7 @@ function compute_FD_modelJacobian(params::vSmartMOM.CoreRT.vSmartMOM_Parameters,
 
         # z₀
         i_aerprop = 6
-        idx = 1 + Nmol + 7*(iaer-1) + i_aerprop
+        idx = q_offset + Nmol + 7*(iaer-1) + i_aerprop
         Δz₀ = pert_params[idx].scattering_params.rt_aerosols[iaer].z₀ - params.scattering_params.rt_aerosols[iaer].z₀
         pert_model = model_from_parameters(pert_params[idx])
                 
@@ -411,7 +417,7 @@ function compute_FD_modelJacobian(params::vSmartMOM.CoreRT.vSmartMOM_Parameters,
 
         # σ₀
         i_aerprop = 7
-        idx = 1 + Nmol + 7*(iaer-1) + i_aerprop
+        idx = q_offset + Nmol + 7*(iaer-1) + i_aerprop
         Δσ₀ = pert_params[idx].scattering_params.rt_aerosols[iaer].σ₀ - params.scattering_params.rt_aerosols[iaer].σ₀
         pert_model = model_from_parameters(pert_params[idx])    
         for iband=1:Nband

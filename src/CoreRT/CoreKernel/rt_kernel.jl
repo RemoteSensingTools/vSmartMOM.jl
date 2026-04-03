@@ -5,14 +5,15 @@ This file implements rt_kernel!, which performs the core RT routines (elemental,
 =#
 #No Raman (default)
 # Perform the Core RT routines (elemental, doubling, interaction)
-function rt_kernel!(RS_type::noRS, 
-                    pol_type, SFI, 
-                    added_layer, 
-                    composite_layer, 
-                    computed_layer_properties, 
-                    m, quad_points, 
-                    I_static, architecture, 
-                    qp_μN, iz) 
+function rt_kernel!(RS_type::noRS,
+                    pol_type, SFI,
+                    added_layer,
+                    composite_layer,
+                    computed_layer_properties,
+                    m, quad_points,
+                    I_static, architecture,
+                    qp_μN, iz;
+                    workspace=nothing)
 
     @unpack τ_λ, ϖ_λ, τ, ϖ, Z⁺⁺, Z⁻⁺, dτ_max, dτ, ndoubl, dτ_λ, expk, scatter, τ_sum, scattering_interface = computed_layer_properties
     @unpack F₀ = RS_type
@@ -61,21 +62,22 @@ function rt_kernel!(RS_type::noRS,
         
     # If this is not the TOA, perform the interaction step
     else
-        @timeit "interaction" interaction!(RS_type, scattering_interface, SFI, composite_layer, added_layer, I_static)
+        @timeit "interaction" interaction!(RS_type, scattering_interface, SFI, composite_layer, added_layer, I_static; workspace=workspace)
     end
 end
 
 #
 #Rotational Raman Scattering (default)
 # Perform the Core RT routines (elemental, doubling, interaction)
-function rt_kernel!(RS_type::Union{RRS, VS_0to1, VS_1to0}, 
-                    pol_type, SFI, 
-                    added_layer, composite_layer, 
-                    computed_layer_properties, 
-                    m, quad_points, 
-                    I_static, 
-                    architecture, 
-                    qp_μN, iz) 
+function rt_kernel!(RS_type::Union{RRS, VS_0to1, VS_1to0},
+                    pol_type, SFI,
+                    added_layer, composite_layer,
+                    computed_layer_properties,
+                    m, quad_points,
+                    I_static,
+                    architecture,
+                    qp_μN, iz;
+                    workspace=nothing)
     
     @unpack τ_λ, ϖ_λ, τ, ϖ, Z⁺⁺, Z⁻⁺, dτ_max, dτ, ndoubl, dτ_λ, expk, scatter, τ_sum, scattering_interface = computed_layer_properties
     @unpack F₀ = RS_type
@@ -148,17 +150,18 @@ end
 
 
 ### New update:
-function rt_kernel!(RS_type::noRS{FT}, 
-                    pol_type, SFI, 
-                    added_layer, 
-                    composite_layer, 
-                    computed_layer_properties::CoreScatteringOpticalProperties, 
-                    scattering_interface, 
-                    τ_sum, 
-                    m, quad_points, 
-                    I_static, 
-                    architecture, 
-                    qp_μN, iz) where {FT}
+function rt_kernel!(RS_type::noRS{FT},
+                    pol_type, SFI,
+                    added_layer,
+                    composite_layer,
+                    computed_layer_properties::CoreScatteringOpticalProperties,
+                    scattering_interface,
+                    τ_sum,
+                    m, quad_points,
+                    I_static,
+                    architecture,
+                    qp_μN, iz;
+                    workspace=nothing) where {FT}
     #@show array_type(architecture)
     @unpack qp_μ, μ₀ = quad_points
     @unpack F₀ = RS_type
@@ -268,15 +271,16 @@ function rt_kernel!(RS_type::noRS{FT},
 end
 
 function rt_kernel!(
-            RS_type::Union{RRS{FT}, VS_0to1{FT}, VS_1to0{FT}, 
-                RRS_plus{FT}, VS_0to1_plus{FT}, VS_1to0_plus{FT}}, 
-            pol_type, SFI, 
-            added_layer, 
-            composite_layer, 
-            computed_layer_properties::CoreScatteringOpticalProperties, 
-            scattering_interface, 
-            τ_sum, m, quad_points, 
-            I_static, architecture, qp_μN, iz)  where {FT}
+            RS_type::Union{RRS{FT}, VS_0to1{FT}, VS_1to0{FT},
+                RRS_plus{FT}, VS_0to1_plus{FT}, VS_1to0_plus{FT}},
+            pol_type, SFI,
+            added_layer,
+            composite_layer,
+            computed_layer_properties::CoreScatteringOpticalProperties,
+            scattering_interface,
+            τ_sum, m, quad_points,
+            I_static, architecture, qp_μN, iz;
+            workspace=nothing)  where {FT}
     @unpack qp_μ, μ₀ = quad_points
     @unpack F₀ = RS_type
     # Just unpack core optical properties from 
@@ -363,8 +367,8 @@ function rt_kernel!(
     
     # If this is not the TOA, perform the interaction step
     else
-        @timeit "interaction" interaction!(RS_type, scattering_interface, 
-            SFI, composite_layer, added_layer, I_static)
+        @timeit "interaction" interaction!(RS_type, scattering_interface,
+            SFI, composite_layer, added_layer, I_static; workspace=workspace)
     end
 
 end

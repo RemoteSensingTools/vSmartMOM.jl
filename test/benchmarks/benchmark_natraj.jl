@@ -1,7 +1,8 @@
 ##
 
-using RadiativeTransfer, RadiativeTransfer.vSmartMOM
-
+#using RadiativeTransfer, RadiativeTransfer.vSmartMOM
+using vSmartMOM, vSmartMOM.CoreRT, vSmartMOM.SolarModel
+using vSmartMOM.InelasticScattering
 ## 
 
 I_modeled_all = zeros(7, 16);
@@ -23,7 +24,7 @@ acosd.(μ)
 
 include("test/benchmarks/natraj_trues.jl")
 parameters = parameters_from_yaml("test/benchmarks/natraj.yaml");
-
+FT = parameters.float_type;
 λ = 360.0
 parameters.spec_bands = [1e7/λ (1e7/λ + 1)]
 parameters.vza = acosd.(μ)
@@ -31,12 +32,23 @@ parameters.sza = acosd.(0.2)
 
 τ = 0.5
 
-for ϕ_i in 1:length(ϕs)
+for ϕ_i = 1:length(ϕs)
     parameters.vaz = repeat([ϕs[ϕ_i]], 16)
     model = model_from_parameters(parameters);
     model.τ_rayl[1] .= τ
-
-    R = vSmartMOM.rt_run(model, i_band=1)
+    RS_type0 = InelasticScattering.noRS(
+                        fscattRayl  = [FT(1)],
+                        ϖ_Cabannes  = [FT(1)], 
+                        bandSpecLim = [],
+                        iBand       = [1],
+                        F₀          = zeros(FT,1,1),
+                        SIF₀        = zeros(FT,1,1));
+    RS_type0.F₀ = zeros(model.params.polarization_type.n, length(model.τ_rayl))
+    RS_type0.SIF₀ = zeros(model.params.polarization_type.n, length(model.τ_rayl))
+    RS_type0.F₀[1,:] .= 1;  
+    R, T, _, _ = CoreRT.rt_run_test(RS_type0, model, 1);
+                
+    #R = vSmartMOM.rt_run(model, i_band=1)
     @show size(R)
 
     I_modeled_all[ϕ_i,:] = R[:,1,1]

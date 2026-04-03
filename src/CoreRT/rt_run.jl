@@ -118,6 +118,9 @@ function rt_run_bck(RS_type::AbstractRamanType, #Default - no Raman scattering (
                                         τ_abs, ϖ_Cabannes,
                                         arr_type, qp_μ, μ₀, m)
 
+        # Pre-allocate interaction workspace for Raman runs
+        _interaction_ws = (typeof(RS_type) <: noRS) ? nothing : InteractionWorkspace(composite_layer, added_layer)
+
         # Loop over vertical layers:
         @showprogress 1 "Looping over layers ..." for iz = 1:Nz  # Count from TOA to BOA
 
@@ -133,19 +136,19 @@ function rt_run_bck(RS_type::AbstractRamanType, #Default - no Raman scattering (
             end
             #@show RS_type.fscattRayl, RS_type.ϖ_Cabannes
             # Perform Core RT (doubling/elemental/interaction)
-            rt_kernel!(RS_type, pol_type, SFI, added_layer, composite_layer, computed_layer_properties, m, quad_points, I_static, architecture, qp_μN, iz) 
-        end 
+            rt_kernel!(RS_type, pol_type, SFI, added_layer, composite_layer, computed_layer_properties, m, quad_points, I_static, architecture, qp_μN, iz; workspace=_interaction_ws)
+        end
 
         # Create surface matrices:
-        create_surface_layer!(RS_type, brdf, added_layer_surface, 
-                    SFI, m, pol_type, quad_points, 
+        create_surface_layer!(RS_type, brdf, added_layer_surface,
+                    SFI, m, pol_type, quad_points,
                     arr_type(computed_atmosphere_properties.τ_sum_all[:,end]), 
                     arr_type(F₀), architecture);
 
         # One last interaction with surface:
         @timeit "interaction" interaction!(RS_type,
-            computed_atmosphere_properties.scattering_interfaces_all[end], 
-            SFI, composite_layer, added_layer_surface, I_static)
+            computed_atmosphere_properties.scattering_interfaces_all[end],
+            SFI, composite_layer, added_layer_surface, I_static; workspace=_interaction_ws)
         
             #interaction_inelastic!(RS_type,computed_atmosphere_properties.scattering_interfaces_all[end], 
         #    SFI, composite_layer, added_layer_surface, I_static)
@@ -291,10 +294,15 @@ function rt_run(RS_type::AbstractRamanType,
     end   
     
     FT = eltype(sza)                    # Get the float-type to use
+    # Convert pol_type to match FT (may differ from model's default Float64)
+    if FT != eltype(pol_type.D)
+        PT = Base.typename(typeof(pol_type)).wrapper
+        pol_type = PT{FT}(n=pol_type.n, D=FT.(pol_type.D), I₀=FT.(pol_type.I₀))
+    end
     Nz = length(model.profile.p_full)   # Number of vertical slices
     # CFRANKEN NEEDS to be changed for concatenated arrays!!
-    
-    
+
+
     RS_type.bandSpecLim = [] # (1:τ_abs[iB])#zeros(Int64, iBand, 2) #Suniti: how to do this?
     #Suniti: make bandSpecLim a part of RS_type (including noRS) so that it can be passed into rt_kernel and elemental/doubling/interaction and postprocessing_vza without major syntax changes
     #put this code in model_from_parameters
@@ -311,8 +319,8 @@ function rt_run(RS_type::AbstractRamanType,
     dims = (NquadN,NquadN)              # nxn dims
     
     # Need to check this a bit better in the future!
-    FT_dual = length(model.τ_aer[1][1]) > 0 ? typeof(model.τ_aer[1][1]) : FT
-    #FT_dual = FT
+    #FT_dual = length(model.τ_aer[1][1]) > 0 ? typeof(model.τ_aer[1][1]) : FT
+    FT_dual = FT
     # Output variables: Reflected and transmitted solar irradiation at TOA and BOA respectively # Might need Dual later!!
     #Suniti: consider adding a new dimension (iBand) to these arrays. The assignment of simulated spectra to their specific bands will take place after batch operations, thereby leaving the computational time unaffected 
     R       = zeros(FT_dual, length(vza), pol_type.n, nSpec)
@@ -365,75 +373,52 @@ function rt_run(RS_type::AbstractRamanType,
             extractEffectiveProps(layer_opt_props);
         
         
-        # Loop over vertical layers: 
+        # Pre-allocate interaction workspace for Raman runs
+        _interaction_ws2 = (typeof(RS_type) <: noRS) ? nothing : InteractionWorkspace(composite_layer, added_layer)
+
+        # Loop over vertical layers:
         @showprogress 1 "Looping over layers ..." for iz = 1:Nz  # Count from TOA to BOA
-            
+
             # Construct the atmospheric layer
             # From Rayleigh and aerosol τ, ϖ, compute overall layer τ, ϖ
             # Suniti: modified to return fscattRayl as the last element of  computed_atmosphere_properties
             if !(typeof(RS_type) <: noRS)
-                RS_type.fscattRayl = expandBandScalars(RS_type, fScattRayleigh[iz]) 
+                RS_type.fscattRayl = expandBandScalars(RS_type, fScattRayleigh[iz])
             end
-            
+
             # Expand all layer optical properties to their full dimension:
-            @timeit "OpticalProps" layer_opt = 
+            @timeit "OpticalProps" layer_opt =
                 expandOpticalProperties(layer_opt_props[iz], arr_type)
-            #@show size(layer_opt.Z⁺⁺[:,:,1]), size(RS_type.Z⁺⁺_λ₁λ₀)
-            #@show typeof(layer_opt.Z⁺⁺[:,:,1]), typeof(RS_type.Z⁺⁺_λ₁λ₀)
-            #aa = Array(layer_opt.Z⁺⁺[:,:,1]) #Array(RS_type.ϖ_Cabannes[1]*layer_opt.Z⁺⁺[:,:,1]) .+ (sum(RS_type.ϖ_λ₁λ₀)*RS_type.Z⁺⁺_λ₁λ₀)
-            #bb = Array(layer_opt.Z⁻⁺[:,:,1]) #Array(RS_type.ϖ_Cabannes[1]*layer_opt.Z⁻⁺[:,:,1]) .+ (sum(RS_type.ϖ_λ₁λ₀)*RS_type.Z⁻⁺_λ₁λ₀)
-            
-            #aa = Array((RS_type.ϖ_Cabannes[1]*layer_opt.Z⁺⁺[:,:,1]) .+ (sum(RS_type.ϖ_λ₁λ₀)*RS_type.Z⁺⁺_λ₁λ₀))[1,:]
-            #=
-            for ia=1:NquadN
-                for ib=1:NquadN
-                    @show ia, ib, aa[ia, ib]
-                end
-            end
-            
-            for ia=1:NquadN
-                for ib=1:NquadN
-                    @show ia, ib, bb[ia, ib]
-                end
-            end
-            bbb
-            =#
 
             # Perform Core RT (doubling/elemental/interaction)
-            rt_kernel!(RS_type, pol_type, SFI, 
-                        #bandSpecLim, 
-                        added_layer, composite_layer, 
+            rt_kernel!(RS_type, pol_type, SFI,
+                        added_layer, composite_layer,
                         layer_opt,
-                        scattering_interfaces_all[iz], 
-                        τ_sum_all[:,iz], 
-                        m, quad_points, 
-                        I_static, 
-                        model.params.architecture, 
-                        qp_μN, iz) 
-        end 
+                        scattering_interfaces_all[iz],
+                        τ_sum_all[:,iz],
+                        m, quad_points,
+                        I_static,
+                        model.params.architecture,
+                        qp_μN, iz; workspace=_interaction_ws2)
+        end
 
         # Create surface matrices:
-        create_surface_layer!(RS_type, brdf, 
-                            added_layer_surface, 
-                            SFI, m, 
-                            pol_type, 
-                            quad_points, 
-                            arr_type(τ_sum_all[:,end]), 
+        create_surface_layer!(RS_type, brdf,
+                            added_layer_surface,
+                            SFI, m,
+                            pol_type,
+                            quad_points,
+                            arr_type(τ_sum_all[:,end]),
                             arr_type(F₀),
                             model.params.architecture);
-        #@show F₀[:,1]
         @show scattering_interfaces_all[end]
-                            #@show scattering_interfaces_all[end]
-        #blapl
         # One last interaction with surface:
-        #@show composite_layer.J₀⁻[:,1,1] 
         @timeit "interaction" interaction!(RS_type,
-                                    #bandSpecLim,
-                                    scattering_interfaces_all[end], 
-                                    SFI, 
-                                    composite_layer, 
-                                    added_layer_surface, 
-                                    I_static)
+                                    scattering_interfaces_all[end],
+                                    SFI,
+                                    composite_layer,
+                                    added_layer_surface,
+                                    I_static; workspace=_interaction_ws2)
         #@show composite_layer.J₀⁻[:,1,1]                            
         #bla
         # Postprocess and weight according to vza

@@ -10,18 +10,17 @@ const p_ref              = 1013.25  # reference pressure [hPa]
 const t_ref              = 296.0    # reference temperature [K]
 const nm_per_cm          = 1.0e7
 
-function get_n₀_n₁(ieJ₁⁺,Δ)
-    n₁_ = 1:size(ieJ₁⁺,3);
-    n₀_  = n₁_ .+ Δ  ;
-    # Find valid indices:
-    sub = findall(1 .≤ n₀_ .≤ size(ieJ₁⁺,3));
-    n₁ = n₁_[sub[1]]:n₁_[sub[end]]
-    n₀ = n₀_[sub[1]]:n₀_[sub[end]]
-    #@show Δ, n₁, n₀
+function get_n₀_n₁(ieJ₁⁺, Δ)
+    nSpec = size(ieJ₁⁺, 3)
+    n₁_start = max(1, 1 - Δ)
+    n₁_end   = min(nSpec, nSpec - Δ)
+    n₁ = n₁_start:n₁_end
+    n₀ = (n₁_start + Δ):(n₁_end + Δ)
     return n₀, n₁
 end
 # Currently assuming same T for all vertical atmospheric layers (so that a uniform Raman wavelength grid can be assumed for rt_interactions)
-function getRamanAtmoConstants(ν̃::FT, T::FT) where FT
+function getRamanAtmoConstants(ν̃::AbstractFloat, T::AbstractFloat)
+    ν̃, T = promote(ν̃, T)
     n2 = InelasticScattering.getMolecularConstants(InelasticScattering.N₂(), (0.8));
     compute_effective_coefficents!(ν̃, T, n2)
     compute_energy_levels!(n2)
@@ -41,7 +40,8 @@ function getRamanAtmoConstants(ν̃::FT, T::FT) where FT
     return n2,o2
 end
 
-function getRamanAtmoConstants(ν̃::FT, T::FT, vmr_n2::FT, vmr_o2::FT) where FT
+function getRamanAtmoConstants(ν̃::AbstractFloat, T::AbstractFloat, vmr_n2::AbstractFloat, vmr_o2::AbstractFloat)
+    ν̃, T, vmr_n2, vmr_o2 = promote(ν̃, T, vmr_n2, vmr_o2)
     @assert 0<=vmr_n2+vmr_o2<=1
     n2 = InelasticScattering.getMolecularConstants(InelasticScattering.N₂(), vmr_n2);
     compute_effective_coefficents!(ν̃, T, n2)

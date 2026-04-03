@@ -22,7 +22,7 @@ struct AtmosphericProfile{FT, VMR <: Union{Real, Vector}}
     "Pressure Profile (Full)"
     p_full::Array{FT,1}
     "Specific humidity profile"
-    q::Array{FT,1}
+    q::Union{Array{FT,1}, Nothing}
     "Pressure Levels"
     p_half::Array{FT,1}
     "H2O Volume Mixing Ratio Profile"
@@ -416,7 +416,7 @@ mutable struct vSmartMOM_Parameters{FT<:Union{AbstractFloat, ForwardDiff.Dual}}
     "Pressure Profile [hPa]"
     p::AbstractArray{FT}
     "Specific humidity profile"
-    q::AbstractArray{FT}
+    q::Union{AbstractArray{FT}, Nothing}
     "Length of profile reduction"
     profile_reduction_n::Integer
 
@@ -623,15 +623,25 @@ Base.@kwdef struct CoreScatteringOpticalProperties{FT} <:  AbstractOpticalProper
     Z⁻⁺::Union{AbstractArray{FT,2}, AbstractArray{FT,3}}
 end
 
+# Converting constructor: promotes mixed float types to a common type
+function CoreScatteringOpticalProperties(τ, ϖ, Z⁺⁺, Z⁻⁺)
+    FT = promote_type(eltype(τ), ϖ isa AbstractArray ? eltype(ϖ) : typeof(ϖ),
+                      eltype(Z⁺⁺), eltype(Z⁻⁺))
+    CoreScatteringOpticalProperties{FT}(
+        τ isa AbstractArray ? FT.(τ) : FT(τ),
+        ϖ isa AbstractArray ? FT.(ϖ) : FT(ϖ),
+        FT.(Z⁺⁺), FT.(Z⁻⁺))
+end
+
 Base.@kwdef struct CoreAbsorptionOpticalProperties{FT} <:  AbstractOpticalProperties
     "Absorption optical depth (scalar or wavelength dependent)"
     τ::Union{FT, AbstractArray{FT,1}} 
 end
 
 # Adding Core Optical Properties, can have mixed dimensions!
-function Base.:+( x::CoreScatteringOpticalProperties{FT}, # {xFT, xFT2, xFT3}, 
-                  y::CoreScatteringOpticalProperties{FT} #{yFT, yFT2, yFT3} 
-                ) where FT #{xFT, xFT2, xFT3, yFT, yFT2, yFT3} 
+function Base.:+( x::CoreScatteringOpticalProperties{FT1},
+                  y::CoreScatteringOpticalProperties{FT2}
+                ) where {FT1, FT2}
     # Predefine some arrays:            
     xZ⁺⁺ = x.Z⁺⁺
     xZ⁻⁺ = x.Z⁻⁺
@@ -706,7 +716,7 @@ function Base.:+(  y::CoreAbsorptionOpticalProperties, x::CoreScatteringOpticalP
 end
 
 
-function Base.:*( x::FT, y::CoreScatteringOpticalProperties{FT} ) where FT
+function Base.:*( x, y::CoreScatteringOpticalProperties)
     CoreScatteringOpticalProperties(y.τ * x, y.ϖ, y.Z⁺⁺, y.Z⁻⁺)
 end
 

@@ -26,7 +26,9 @@ function compute_atmos_profile_fields(T, p_half::AbstractArray, q, vmr; g₀=9.8
     # Now actually compute the layer VCDs
     for i = 1:n_layers 
         Δp = p_half[i + 1] - p_half[i]
-        vmr_h2o[i] = (dry_mass/wet_mass)*q[i]/(1-q[i])
+        if !isnothing(q)
+            vmr_h2o[i] = (dry_mass/wet_mass)*q[i]/(1-q[i])
+        end
         vmr_dry = 1 - vmr_h2o[i]
         M  = vmr_dry * dry_mass + vmr_h2o[i] * wet_mass
         vcd = Nₐ * Δp / (M  * g₀ * 100^2) * 100
@@ -82,7 +84,7 @@ function read_atmos_profile(file_path::String)
     else
         p_half = convert.(Float64, params_dict["p_half"])
         psurf = p_half[end]
-        q = zeros(length(T))
+        q = nothing
         p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o = compute_atmos_profile_fields(T, p_half, q, Dict())
     end
 
@@ -108,7 +110,7 @@ function reduce_profile_old(n::Int, profile::AtmosphericProfile{FT}) where {FT}
 
     # Matrices to hold new values
     T = zeros(FT, n);
-    q = zeros(FT, n);
+    q = isnothing(profile.q) ? nothing : zeros(FT, n);
     p_full = zeros(FT, n);
     p_half = zeros(FT, n+1);
     vmr_h2o  = zeros(FT, n);
@@ -131,7 +133,9 @@ function reduce_profile_old(n::Int, profile::AtmosphericProfile{FT}) where {FT}
         # Re-average the other parameters to produce new layers
         p_full[i] = mean(profile.p_full[ind])
         T[i] = mean(profile.T[ind])
-        q[i] = mean(profile.q[ind])
+        if !isnothing(q)
+            q[i] = mean(profile.q[ind])
+        end
         vmr_h2o[i] = mean(profile.vmr_h2o[ind])
         vcd_dry[i] = sum(profile.vcd_dry[ind])
         vcd_h2o[i] = sum(profile.vcd_h2o[ind])
@@ -186,7 +190,7 @@ function reduce_profile(n::Int, profile::AtmosphericProfile{FT}) where {FT}
     end
 
     T       = _interp(profile.T)
-    q       = _interp(profile.q)
+    q       = isnothing(profile.q) ? nothing : _interp(profile.q)
     vmr_h2o = _interp(profile.vmr_h2o)
 
     # Recompute VCDs from the new pressure layers (consistent with compute_atmos_profile_fields)
@@ -225,9 +229,10 @@ Input:
     - `depol_fct` depolarization factor
     - `vcd_dry` dry vertical column (no water) per layer
 """
-function getRayleighLayerOptProp(psurf::FT, λ::Union{Array{FT}, FT}, depol_fct::FT, vcd_dry::Array{FT}) where FT
+function getRayleighLayerOptProp(psurf, λ, depol_fct, vcd_dry)
     # TODO: Use noRS/noRS_plus to use n2/o2 molecular constants
     # to compute tau_scat and depol_fct
+    FT = promote_type(typeof(psurf), eltype(λ), typeof(depol_fct), eltype(vcd_dry))
     Nz = length(vcd_dry)
     τRayl = zeros(FT,size(λ,1),Nz)
     # Total vertical Rayleigh scattering optical thickness, TODO: enable sub-layers and use VCD based taus

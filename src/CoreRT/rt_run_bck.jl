@@ -94,6 +94,9 @@ function rt_run_bck(RS_type::AbstractRamanType, #Default - no Raman scattering (
                                         τ_abs, ϖ_Cabannes,
                                         arr_type, qp_μ, μ₀, m)
 
+        # Pre-allocate interaction workspace for Raman runs
+        _interaction_ws = (typeof(RS_type) <: noRS) ? nothing : InteractionWorkspace(composite_layer, added_layer)
+
         # Loop over vertical layers:
         @showprogress 1 "Looping over layers ..." for iz = 1:Nz  # Count from TOA to BOA
 
@@ -109,16 +112,16 @@ function rt_run_bck(RS_type::AbstractRamanType, #Default - no Raman scattering (
             end
             #@show RS_type.fscattRayl, RS_type.ϖ_Cabannes
             # Perform Core RT (doubling/elemental/interaction)
-            rt_kernel!(RS_type, pol_type, SFI, added_layer, composite_layer, computed_layer_properties, m, quad_points, I_static, architecture, qp_μN, iz) 
-        end 
+            rt_kernel!(RS_type, pol_type, SFI, added_layer, composite_layer, computed_layer_properties, m, quad_points, I_static, architecture, qp_μN, iz; workspace=_interaction_ws)
+        end
 
         # Create surface matrices:
         create_surface_layer!(brdf, added_layer_surface, SFI, m, pol_type, quad_points, arr_type(computed_atmosphere_properties.τ_sum_all[:,end]), architecture);
 
         # One last interaction with surface:
         @timeit "interaction" interaction!(RS_type,
-            computed_atmosphere_properties.scattering_interfaces_all[end], 
-            SFI, composite_layer, added_layer_surface, I_static)
+            computed_atmosphere_properties.scattering_interfaces_all[end],
+            SFI, composite_layer, added_layer_surface, I_static; workspace=_interaction_ws)
         
             #interaction_inelastic!(RS_type,computed_atmosphere_properties.scattering_interfaces_all[end], 
         #    SFI, composite_layer, added_layer_surface, I_static)
