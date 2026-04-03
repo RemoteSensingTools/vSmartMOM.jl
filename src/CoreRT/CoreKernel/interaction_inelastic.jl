@@ -8,6 +8,10 @@ This file contains RT interaction-related functions
 Pre-allocated workspace for ScatteringInterface_11 interaction to avoid
 repeated GPU memory allocation (~7 GB per call for typical Raman runs).
 Create once before the layer loop and pass to `interaction!`.
+
+When `staged=true`, uses CPU-backed output with per-pass GPU buffers:
+- Only 3 GPU 4D output buffers at a time (vs 6), saving ~3.5 GB FP64
+- Results staged through CPU between passes
 """
 mutable struct InteractionWorkspace{A3, A4_mat, A4_src, A3_src}
     tmp_inv::A3         # nQuad × nQuad × nSpec
@@ -17,25 +21,44 @@ mutable struct InteractionWorkspace{A3, A4_mat, A4_src, A3_src}
     tmpT⁺⁺::A3
     tmpJ₀⁻::A3_src     # nQuad × 1 × nSpec
     tmpJ₀⁺::A3_src
-    tmpieR⁻⁺::A4_mat   # nQuad × nQuad × nSpec × nRaman
-    tmpieR⁺⁻::A4_mat
-    tmpieT⁻⁻::A4_mat
-    tmpieT⁺⁺::A4_mat
-    tmpieJ₀⁻::A4_src   # nQuad × 1 × nSpec × nRaman
-    tmpieJ₀⁺::A4_src
+    # GPU 4D output buffers (reused per pass: 2 mat + 1 src)
+    gpu_ie_mat_A::A4_mat    # nQuad × nQuad × nSpec × nRaman
+    gpu_ie_mat_B::A4_mat
+    gpu_ie_src::A4_src      # nQuad × 1 × nSpec × nRaman
+    # CPU-backed results for per-pass staging
+    cpu_ieR⁻⁺::Array       # Pass 1 output
+    cpu_ieT⁻⁻::Array
+    cpu_ieJ₀⁻::Array
+    cpu_ieR⁺⁻::Array       # Pass 2 output
+    cpu_ieT⁺⁺::Array
+    cpu_ieJ₀⁺::Array
+    staged::Bool            # Whether to use per-pass CPU staging
 end
 
-function InteractionWorkspace(composite_layer, added_layer)
+function InteractionWorkspace(composite_layer, added_layer; staged::Bool=false)
     @unpack R⁻⁺, R⁺⁻, T⁺⁺, T⁻⁻, J₀⁺, J₀⁻ = composite_layer
     @unpack ieR⁻⁺, ieR⁺⁻, ieT⁻⁻, ieT⁺⁺, ieJ₀⁺, ieJ₀⁻ = composite_layer
+    # GPU 3D buffers (always needed)
+    ws_tmp_inv = similar(T⁺⁺)
+    ws_tmpR⁻⁺ = similar(R⁻⁺); ws_tmpR⁺⁻ = similar(R⁺⁻)
+    ws_tmpT⁻⁻ = similar(T⁻⁻); ws_tmpT⁺⁺ = similar(T⁺⁺)
+    ws_tmpJ₀⁻ = similar(J₀⁻); ws_tmpJ₀⁺ = similar(J₀⁺)
+    # GPU 4D buffers: only 2 matrix + 1 source (reused per pass)
+    ws_gpu_mat_A = similar(ieR⁻⁺)
+    ws_gpu_mat_B = similar(ieR⁻⁺)
+    ws_gpu_src   = similar(ieJ₀⁻)
+    # CPU output arrays for staging
+    FT = eltype(ieR⁻⁺)
+    sz_mat = size(ieR⁻⁺)
+    sz_src = size(ieJ₀⁻)
     InteractionWorkspace(
-        similar(T⁺⁺),                          # tmp_inv
-        similar(R⁻⁺), similar(R⁺⁻),            # tmpR
-        similar(T⁻⁻), similar(T⁺⁺),            # tmpT
-        similar(J₀⁻), similar(J₀⁺),            # tmpJ
-        similar(ieR⁻⁺), similar(ieR⁺⁻),        # tmpieR
-        similar(ieT⁻⁻), similar(ieT⁺⁺),        # tmpieT
-        similar(ieJ₀⁻), similar(ieJ₀⁺))        # tmpieJ
+        ws_tmp_inv,
+        ws_tmpR⁻⁺, ws_tmpR⁺⁻, ws_tmpT⁻⁻, ws_tmpT⁺⁺,
+        ws_tmpJ₀⁻, ws_tmpJ₀⁺,
+        ws_gpu_mat_A, ws_gpu_mat_B, ws_gpu_src,
+        zeros(FT, sz_mat...), zeros(FT, sz_mat...), zeros(FT, sz_src...),  # Pass 1 CPU
+        zeros(FT, sz_mat...), zeros(FT, sz_mat...), zeros(FT, sz_src...),  # Pass 2 CPU
+        staged)
 end
 
 function reset!(ws::InteractionWorkspace)
@@ -43,9 +66,7 @@ function reset!(ws::InteractionWorkspace)
     ws.tmpR⁻⁺ .= 0; ws.tmpR⁺⁻ .= 0
     ws.tmpT⁻⁻ .= 0; ws.tmpT⁺⁺ .= 0
     ws.tmpJ₀⁻ .= 0; ws.tmpJ₀⁺ .= 0
-    ws.tmpieR⁻⁺ .= 0; ws.tmpieR⁺⁻ .= 0
-    ws.tmpieT⁻⁻ .= 0; ws.tmpieT⁺⁺ .= 0
-    ws.tmpieJ₀⁻ .= 0; ws.tmpieJ₀⁺ .= 0
+    ws.gpu_ie_mat_A .= 0; ws.gpu_ie_mat_B .= 0; ws.gpu_ie_src .= 0
     return nothing
 end
 
@@ -307,16 +328,31 @@ function interaction_helper!(RS_type::RRS, ::ScatteringInterface_11, SFI,
     @unpack ieR⁻⁺, ieR⁺⁻, ieT⁺⁺, ieT⁻⁻, ieJ₀⁺, ieJ₀⁻ = composite_layer
 
     @show "interaction 11"
+    staged = workspace !== nothing && workspace.staged
     # Used to store `(I - R⁺⁻ * r⁻⁺)⁻¹`
     if workspace !== nothing
         reset!(workspace)
-        tmp_inv  = workspace.tmp_inv
-        tmpieJ₀⁻ = workspace.tmpieJ₀⁻; tmpieJ₀⁺ = workspace.tmpieJ₀⁺
-        tmpieR⁻⁺ = workspace.tmpieR⁻⁺; tmpieR⁺⁻ = workspace.tmpieR⁺⁻
-        tmpieT⁻⁻ = workspace.tmpieT⁻⁻; tmpieT⁺⁺ = workspace.tmpieT⁺⁺
+        tmp_inv = workspace.tmp_inv
         tmpJ₀⁻ = workspace.tmpJ₀⁻; tmpJ₀⁺ = workspace.tmpJ₀⁺
         tmpR⁻⁺ = workspace.tmpR⁻⁺; tmpR⁺⁻ = workspace.tmpR⁺⁻
         tmpT⁻⁻ = workspace.tmpT⁻⁻; tmpT⁺⁺ = workspace.tmpT⁺⁺
+        if staged
+            # Per-pass: use 3 shared GPU buffers, alias for Pass 1 outputs
+            tmpieR⁻⁺ = workspace.gpu_ie_mat_A
+            tmpieT⁻⁻ = workspace.gpu_ie_mat_B
+            tmpieJ₀⁻ = workspace.gpu_ie_src
+            # Pass 2 outputs will reuse same buffers after Pass 1 copies to CPU
+            tmpieT⁺⁺ = workspace.gpu_ie_mat_A  # placeholder, reassigned after Pass 1
+            tmpieR⁺⁻ = workspace.gpu_ie_mat_B
+            tmpieJ₀⁺ = workspace.gpu_ie_src
+        else
+            tmpieJ₀⁻ = workspace.gpu_ie_src;  workspace.gpu_ie_src .= 0
+            tmpieJ₀⁺ = similar(ieJ₀⁺); tmpieJ₀⁺ .= 0
+            tmpieR⁻⁺ = workspace.gpu_ie_mat_A; workspace.gpu_ie_mat_A .= 0
+            tmpieR⁺⁻ = workspace.gpu_ie_mat_B; workspace.gpu_ie_mat_B .= 0
+            tmpieT⁻⁻ = similar(ieT⁻⁻); tmpieT⁻⁻ .= 0
+            tmpieT⁺⁺ = similar(ieT⁺⁺); tmpieT⁺⁺ .= 0
+        end
     else
         tmp_inv  = similar(t⁺⁺); tmp_inv.=0;
         tmpieJ₀⁻ = similar(ieJ₀⁻); tmpieJ₀⁻.=0;
@@ -331,6 +367,7 @@ function interaction_helper!(RS_type::RRS, ::ScatteringInterface_11, SFI,
         tmpR⁺⁻   = similar(R⁺⁻); tmpR⁺⁻.=0;
         tmpT⁻⁻   = similar(T⁻⁻); tmpT⁻⁻.=0;
         tmpT⁺⁺   = similar(T⁺⁺); tmpT⁺⁺.=0;
+        staged = false
     end
     # Compute and store `(I - R⁺⁻ * r⁻⁺)⁻¹`
     @timeit "interaction inv1" batch_inv!(tmp_inv, I_static .- r⁻⁺ ⊠ R⁺⁻) #Suniti
@@ -378,6 +415,20 @@ function interaction_helper!(RS_type::RRS, ::ScatteringInterface_11, SFI,
     # T₀₂ = T₀₁(1-R₂₁R₀₁)⁻¹T₁₂
     tmpT⁻⁻ .= T01_inv ⊠ t⁻⁻ #Suniti
 
+    # --- Stage Pass 1 results to CPU, prepare Pass 2 GPU buffers ---
+    if staged
+        synchronize_if_gpu()
+        copyto!(workspace.cpu_ieR⁻⁺, tmpieR⁻⁺)  # gpu_ie_mat_A → CPU
+        copyto!(workspace.cpu_ieT⁻⁻, tmpieT⁻⁻)  # gpu_ie_mat_B → CPU
+        copyto!(workspace.cpu_ieJ₀⁻, tmpieJ₀⁻)  # gpu_ie_src → CPU
+        workspace.gpu_ie_mat_A .= 0
+        workspace.gpu_ie_mat_B .= 0
+        workspace.gpu_ie_src .= 0
+        tmpieT⁺⁺ = workspace.gpu_ie_mat_A
+        tmpieR⁺⁻ = workspace.gpu_ie_mat_B
+        tmpieJ₀⁺ = workspace.gpu_ie_src
+    end
+
     # Repeating for mirror-reflected directions
 
     # Compute and store `(I - r⁻⁺ * R⁺⁻)⁻¹`
@@ -387,7 +438,7 @@ function interaction_helper!(RS_type::RRS, ::ScatteringInterface_11, SFI,
     if SFI
         for Δn = 1:size(ieJ₀⁺,4)
             n₀, n₁ = get_n₀_n₁(ieJ₀⁺,i_λ₁λ₀[Δn])
-            @inbounds @views tmpieJ₀⁺[:,:,n₁,Δn] = 
+            @inbounds @views tmpieJ₀⁺[:,:,n₁,Δn] =
                             added_layer.ieJ₀⁺[:,:,n₁,Δn] + 
                             T21_inv[:,:,n₁] ⊠ 
                             (ieJ₀⁺[:,:,n₁,Δn] + 
@@ -437,14 +488,28 @@ function interaction_helper!(RS_type::RRS, ::ScatteringInterface_11, SFI,
     composite_layer.J₀⁺ .= tmpJ₀⁺
     composite_layer.T⁺⁺ .= tmpT⁺⁺
     composite_layer.R⁺⁻ .= tmpR⁺⁻
-    
-    composite_layer.ieJ₀⁻ .= tmpieJ₀⁻
-    composite_layer.ieJ₀⁺ .= tmpieJ₀⁺
 
-    composite_layer.ieT⁻⁻ .= tmpieT⁻⁻
-    composite_layer.ieR⁻⁺ .= tmpieR⁻⁺
-    composite_layer.ieT⁺⁺ .= tmpieT⁺⁺
-    composite_layer.ieR⁺⁻ .= tmpieR⁺⁻
+    if staged
+        # Stage Pass 2 results to CPU
+        synchronize_if_gpu()
+        copyto!(workspace.cpu_ieT⁺⁺, tmpieT⁺⁺)  # gpu_ie_mat_A → CPU
+        copyto!(workspace.cpu_ieR⁺⁻, tmpieR⁺⁻)  # gpu_ie_mat_B → CPU
+        copyto!(workspace.cpu_ieJ₀⁺, tmpieJ₀⁺)  # gpu_ie_src → CPU
+        # Copy ALL staged results from CPU → GPU composite_layer fields
+        copyto!(composite_layer.ieJ₀⁻, workspace.cpu_ieJ₀⁻)
+        copyto!(composite_layer.ieR⁻⁺, workspace.cpu_ieR⁻⁺)
+        copyto!(composite_layer.ieT⁻⁻, workspace.cpu_ieT⁻⁻)
+        copyto!(composite_layer.ieJ₀⁺, workspace.cpu_ieJ₀⁺)
+        copyto!(composite_layer.ieT⁺⁺, workspace.cpu_ieT⁺⁺)
+        copyto!(composite_layer.ieR⁺⁻, workspace.cpu_ieR⁺⁻)
+    else
+        composite_layer.ieJ₀⁻ .= tmpieJ₀⁻
+        composite_layer.ieJ₀⁺ .= tmpieJ₀⁺
+        composite_layer.ieT⁻⁻ .= tmpieT⁻⁻
+        composite_layer.ieR⁻⁺ .= tmpieR⁻⁺
+        composite_layer.ieT⁺⁺ .= tmpieT⁺⁺
+        composite_layer.ieR⁺⁻ .= tmpieR⁺⁻
+    end
 end
 
 function interaction_helper!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},

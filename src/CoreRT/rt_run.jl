@@ -119,7 +119,7 @@ function rt_run_bck(RS_type::AbstractRamanType, #Default - no Raman scattering (
                                         arr_type, qp_μ, μ₀, m)
 
         # Pre-allocate interaction workspace for Raman runs
-        _interaction_ws = (typeof(RS_type) <: noRS) ? nothing : InteractionWorkspace(composite_layer, added_layer)
+        _interaction_ws = (typeof(RS_type) <: noRS) ? nothing : InteractionWorkspace(composite_layer, added_layer; staged=true)
 
         # Loop over vertical layers:
         @showprogress 1 "Looping over layers ..." for iz = 1:Nz  # Count from TOA to BOA
@@ -374,7 +374,7 @@ function rt_run(RS_type::AbstractRamanType,
         
         
         # Pre-allocate interaction workspace for Raman runs
-        _interaction_ws2 = (typeof(RS_type) <: noRS) ? nothing : InteractionWorkspace(composite_layer, added_layer)
+        _interaction_ws2 = (typeof(RS_type) <: noRS) ? nothing : InteractionWorkspace(composite_layer, added_layer; staged=true)
 
         # Loop over vertical layers:
         @showprogress 1 "Looping over layers ..." for iz = 1:Nz  # Count from TOA to BOA
