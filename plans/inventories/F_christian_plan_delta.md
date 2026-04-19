@@ -7,6 +7,8 @@
 
 **Authoritative scope document (supersedes Christian's plan):** `/home/sanghavi/code/github/uni_vSmartMOM/plans/CLAUDE_HANDOFF_BRIEF.md`
 
+**Editorial-pass note (2026-04-19):** The 2026-04-19 user review session established the **authority rule** — *sanghavi is the authority for the inelastic path*. This inventory's "Phase 2 recast" wording in §5 has been rewritten to reflect that sanghavi's workspace design is the base **by authority**, not by reconciliation. Christian's doubling/pivot additions are candidates to layer on if compatible, not a synthesis. See `plans/PLAN_AMENDMENTS_2026-04-19.md` §1 and §4 Phase 4 for the binding text. Evidence and staleness audit findings stand unchanged.
+
 ## Branch tips audited
 
 | Worktree | Branch | Tip |
@@ -66,7 +68,7 @@ Ten+ concrete references lifted from Christian's two documents, checked against 
   - Sanghavi's struct design differs from Christian's proposal: 15 fields + per-pass CPU staging, NOT 23 fields with doubling merged in.
   - Doubling-side allocations (`tmp3`…`tmp6`, `gp_refl`, `J₁⁺/⁻`, `ieJ₁⁺/⁻`) are **still present on sanghavi** — sanghavi's optimization did not extend to doubling.
   - `batch_inv!` pivot/info allocations are unified-only (no `ext/` on sanghavi); the workspace-aware overload exists but is not actually wired (pivot/info from the workspace aren't consumed).
-- **Verdict:** Phase 2 is **recast** per the handoff brief: "land sanghavi's InteractionWorkspace in unified's architecture as the starting point; extend to cover doubling temporaries and `batch_inv!` pivot/info where clear headroom exists." This is NOT "eliminate from scratch." The handoff brief §7 is explicit that reverting sanghavi's work is unacceptable.
+- **Verdict:** Phase 2 is **recast under the authority rule (2026-04-19 user review session):** "sanghavi's `InteractionWorkspace` adapted to unified's `RTModel` architecture is the **base design by authority**. Christian's proposed additional fields (doubling temporaries, `batch_inv!` pivot/info sharing, `ScatteringInterface_01`/`_10` coverage) layer on **if compatible**; if not compatible, sanghavi wins. `staged::Bool = true` default-on." This is NOT "eliminate from scratch," and it is NOT a synthesis of the two designs — the base is sanghavi's by authority, and Christian's additions are candidates to layer on. The handoff brief §7 and amendments §1 are explicit that reverting sanghavi's work is unacceptable.
 
 ### Phase 3 — Flatten 4D → 3D with index map
 
@@ -162,7 +164,7 @@ On the current branches this figure is neither verified nor representative. In p
 ### Phase-by-phase recommendation
 
 - **Phase 1** — Proceed as scoped, but scope the SS-kernel work down to a physics-parity audit (files already exist) and expand the benchmarks/SIF port to match the real content set (Inventory B §1a).
-- **Phase 2** — **Recast**: "land sanghavi's `InteractionWorkspace` in unified's architecture; extend coverage where clear headroom remains (doubling temporaries, `batch_inv!` pivot/info, `ScatteringInterface_01`/`_10` 2D-mul loops)." Drop Christian's proposed struct layout in favour of sanghavi's existing one. Bit-exactness target applies only to the non-staged path.
+- **Phase 2** — **Recast under authority rule (2026-04-19):** sanghavi's `InteractionWorkspace` layout adapted to `RTModel` is the **base design by authority**, not by reconciliation. Christian's proposed additional fields (doubling-tmp buffers, `batch_inv!` pivot/info sharing, shared 3D buffers with elastic `RTWorkspace`, `ScatteringInterface_01`/`_10` 2D-mul loop coverage) layer on **if compatible**; if not compatible, sanghavi wins. `staged::Bool = true` default-on. The Phase 4 Christian checkpoint is framed as "review of additions," not a design review. Bit-exactness target applies only to the non-staged path (per plan v2 invariant 6).
 - **Phase 3** — Proceed as scoped. **Replace bit-exactness claim with tolerance-based verification** (tolerance numbers to come from the user at execution time, per handoff brief §6 and §7).
 - **Phase 4** — Proceed as scoped. Targets in `ext/gpu_batched_cuda.jl` and `doubling_inelastic.jl` are current.
 - **Phase 5** — **Remove.** Not "defer." The linearized Raman path is not to be built.

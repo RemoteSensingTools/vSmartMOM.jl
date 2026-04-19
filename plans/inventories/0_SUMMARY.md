@@ -2,6 +2,8 @@
 
 As-of 2026-04-19. Worktree tips: sanghavi `9ee9a75`, unified-vsmartmom `a4e4187`.
 
+**Editorial-pass note (2026-04-19):** This summary was written before the 2026-04-19 user review session established the **authority rule** — *sanghavi is the authority for the inelastic path*. The recommendations in Findings #3 and in "What this means for the implementation plan shape" have been rewritten to match the authority rule. The *evidence* and *factual observations* stand unchanged. Per-item rationale in the body of each inventory is retained for historical reference; for binding decisions see `plans/PLAN_AMENDMENTS_2026-04-19.md` and `plans/IMPLEMENTATION_PLAN_v2.md`.
+
 Six inventories produced per §5 of `plans/CLAUDE_HANDOFF_BRIEF.md`. Each is a standalone markdown file you should read and validate before the implementation plan is written.
 
 - [A — sanghavi_optimization_inventory.md](A_sanghavi_optimization_inventory.md)
@@ -36,7 +38,7 @@ Inventory D §4: unified exports `rt_run_ss` and ships `rt_kernel_ss.jl` + `inte
 
 Inventory A: Christian's proposed `InelasticWorkspace` is a strict superset of sanghavi's `InteractionWorkspace` plus extra doubling/pivot fields, EXCEPT sanghavi's `d75dacb` adds a CPU-staging mode (3-buffer GPU aliasing + 6 CPU staging arrays + `staged::Bool` flag) that saves ~3.5 GB FP64 at ~4.2% runtime cost. Sanghavi covers `ScatteringInterface_11` RRS only.
 
-**Recommendation (Inventory A):** Build the merged workspace to Christian's layout + add `staged` as an opt-in flag; staging forces a hard mid-kernel sync so it fights any future batching work.
+**Recommendation (per authority rule, 2026-04-19):** Build the merged workspace to **sanghavi's `InteractionWorkspace` layout adapted to `RTModel`**. Christian's proposed additional fields (doubling-tmp, `batch_inv!` pivot/info, shared 3D buffers with elastic `RTWorkspace`) layer on **if compatible**; if not compatible, sanghavi wins. `staged::Bool = true` **default-on** (not an opt-in). This is a review-of-additions, not a design-review, at the Phase 4 Christian checkpoint.
 
 ### 4. Christian's "bit-exact after Phase 2/3" claim is false by construction
 
@@ -63,10 +65,10 @@ Inventory B: sanghavi already has `raman_optimization_baseline.jl` + `raman_opti
 ## What this means for the implementation plan shape
 
 1. **Phase 0 (reconciliation, no code).** User validates inventories; Christian sign-off on the A/F delta before any branch creation.
-2. **Phase 1 (physics truth sync).** Land the sanghavi-only forward-physics fixes on unified first — `inelastic_helper.jl` Cabannes correction, `α̅` factor, Bodhaine Rayleigh, band-specific γ constants, `nm_per_cm`, LUT clamping, `rt_run_ss` driver, `hem_R`/`hem_T` signature decision, `get_n₀_n₁` micro-optimization adopted verbatim. This must come BEFORE baseline capture or baselines compare against physics sanghavi has since corrected.
+2. **Phase 1 (physics truth sync + inelastic port).** Under the authority rule: bulk-port `src/Inelastic/` + inelastic `*_inelastic.jl` kernels from sanghavi. Sub-phases per v2 plan: 1a (Bodhaine + `reduce_profile` default switches, re-baseline 474 tests), 1b (inelastic port — drops `hem_R`/`hem_T` and D-matrix scalar shortcut per amendments §2.2/§2.3; adds α̅ verification comment per §2.4; adds canopy+Raman TODO per §2.6), 1c (`rt_run_ss` driver port), 1d (Aerosols module wire-in per §2.7), 1e (`perturb_parameters.jl` port). This must come BEFORE baseline capture or baselines compare against physics sanghavi has since corrected.
 3. **Phase 2 (baseline capture).** Regenerate Inventory B's timing numbers and allocation counts on **both branches at current tips**, on a thin extended harness that also captures GPU memory and allocation deltas. Commit JSON/CSV baselines.
 4. **Phase 3 (SIF + single-scatter port).** 2-line Lambertian SIF injection + 4 data files committed + two `creategrid_*RamanSIF.jl` benchmarks ported with path rewrites. Single-scatter driver adapted from sanghavi to RTModel access.
-5. **Phase 4 (workspace landing).** Build the merged `InelasticWorkspace` (Christian's layout + `staged` flag), thread through elemental / doubling / interaction. No gratuitous rewrites — sanghavi's `InteractionWorkspace` is a drop-in starting point. Validate against Phase 2 baselines.
+5. **Phase 4 (workspace landing).** Build the merged `InteractionWorkspace` by adapting sanghavi's layout to `RTModel` per the authority rule; Christian's additions (doubling-tmp, `batch_inv!` pivot/info) layer on if compatible. `staged::Bool = true` default-on. Thread through elemental / doubling / interaction. Validate against Phase 2 baselines.
 6. **Phase 5 (further GPU headroom).** ONLY if Phase 4 shows headroom and Phase 2 empirically proves `batched_mul` isn't the right tool. Doubling-side allocations (`tmp3-tmp6`, `gp_refl`, `ieJ₁⁺/⁻`) remain open even post-Phase-4.
 7. **Phase 6 (scripts + detritus cleanup).** Port EMIT/Balsamic + perturb_parameters.jl + remaining benchmarks; drop PNGs, Manifest copies, `.dat~`, hardcoded paths.
 8. **Phase 7 (docs overhaul).** Fix `warnonly=true`, fill docstring gaps, wire 7 orphan tests, migrate CUDA_SETUP + JACOBIAN_TEST_WORKFLOW to Documenter, rewrite README, add committed-output examples covering the golden path, `include` the Aerosols module.
@@ -78,12 +80,10 @@ Each phase gets explicit regression checks confirming no sanghavi optimization i
 
 ## What still needs user input (§6 open questions)
 
-Before the implementation plan can be written, the following must be answered (see §6 of the handoff brief):
+**Resolution status (2026-04-19 user review session + amendments):**
 
-1. **Acceptance script list.** Which scripts form the regression suite?
-2. **Per-script spectral truncation.** Narrower band subsets for dev iteration?
-3. **Per-quantity tolerance bars.** rtol / atol for I, Q, U, V, ieR, ieT, dR, dT, SIF?
-4. **Christian coordination.** Which phases need his sign-off?
-5. **Cleanup confirmation.** Drop the research detritus?
-
-The assistant will ask these in a bundled question prompt next.
+1. ~~Acceptance script list~~ — **Resolved.** `prototype_EMIT_aer_ht.jl` (noRS) and `creategrid_O2Aband_RamanSIF.jl` (RRS + SIF) are the acceptance pair for this merge. Full ported-script list for Phase 6 is a separate pre-flight deliverable (`plans/phase6_script_port_list.md`, user-signed) per v2 plan.
+2. **Per-script spectral truncation** — **Still open.** Determined empirically during Phase 3 (target: <60 s per warm run on reference GPU).
+3. **Per-quantity tolerance bars** — **Still open.** User fills the tolerance table in `plans/IMPLEMENTATION_PLAN_v2.md` before Phase 2b baseline capture.
+4. ~~Christian coordination~~ — **Resolved (amendments §3):** Phase 0 sign-off on Inventory A/F delta + amendments doc; Phase 4 review of workspace-design-adapted-to-`RTModel` *additions* (not a design review — base is sanghavi's by authority); Phase 5 per-optimization reviews if conditional phase runs; NOT required on the final merge PR.
+5. ~~Cleanup confirmation~~ — **Resolved.** Drop all research detritus (PNGs, Manifest copies, `.dat~`, hardcoded absolute paths, `rt_run_bck.jl`, `inelastic_helper_old.jl`, in-source prototype/plot folders).
