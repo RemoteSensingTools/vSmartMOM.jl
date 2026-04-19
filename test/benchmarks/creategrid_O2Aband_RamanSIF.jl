@@ -19,7 +19,7 @@ using DelimitedFiles
 
 # Load YAML files into parameter struct
 parameters = 
-    parameters_from_yaml("/home/sanghavi/code/github/vSmartMOM.jl/test/test_parameters/O2_parameters2_SIF_grid.yaml");
+    parameters_from_yaml("/home/sanghavi/code/github/vSmartMOM.jl/test/test_parameters/O2_parameters2_SIF_grid_float32.yaml");
 
 FT = parameters.float_type
     #parameters = parameters_from_yaml("test/test_parameters/O2Parameters2.yaml");
@@ -52,8 +52,8 @@ n_bands = length(parameters.spec_bands);
 T_sun = 5777. # K
 
 for isurf = 1:1 # 2:2 # 1:1 # 
-    for iρ = 1:1 #3:21 #1:15 #3 #1:15
-        for iA = 2:2 #1:14
+    for iρ = 1:21 #3:21 #1:15 #3 #1:15
+        for iA = 3:3 #1:1 #2:2 #1:14
             parameters.sza = 1.0*sza[iA]
             model.obs_geom = CoreRT.ObsGeometry(parameters.sza, parameters.vza, parameters.vaz, parameters.obs_alt)
             # Set quadrature points for streams
@@ -68,7 +68,7 @@ for isurf = 1:1 # 2:2 # 1:1 #
             #@show parameters.vza
 
             
-            for iBand=7:13 #1:n_bands
+            for iBand=1:n_bands
                 parameters.brdf[iBand].albedo = ρ[iρ]
                 #model.params.brdf[iBand].albedo = ρ[iρ]
                 #@show model.params.brdf[iBand].albedo
@@ -77,7 +77,7 @@ for isurf = 1:1 # 2:2 # 1:1 #
             #model      = model_from_parameters(parameters);
             overlap_ν = 250 #230
             Δν = parameters.spec_bands[1][2] - parameters.spec_bands[1][1]; #Make sure all bands have the same spectral resolution Δν
-            n_overlap = Int(floor(overlap_ν/Δν))
+            n_overlap = round(Int, overlap_ν/Δν)
             tot_nspec = sum([length(parameters.spec_bands[i]) for i=1:length(parameters.spec_bands)]) - 2*(n_bands)*n_overlap
             n_cam = length(parameters.vza) #for generating the grid, the SZA and the VZA will be swapped, so that the resulting Rs and ieRs will need to be multiplied by cos(VZA) for the true value 
             RnoRS = zeros(FT, n_cam, parameters.polarization_type.n, tot_nspec)

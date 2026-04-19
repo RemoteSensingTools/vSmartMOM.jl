@@ -665,15 +665,19 @@ end
     end
 end
 
-function apply_D_matrix_elemental!(RS_type::RRS_plus, ndoubl::Int, n_stokes::Int, 
-                                    ier⁻⁺::AbstractArray{FT,4}, 
-                                    iet⁺⁺::AbstractArray{FT,4}, 
-                                    ier⁺⁻::AbstractArray{FT,4}, 
+function apply_D_matrix_elemental!(RS_type::RRS_plus, ndoubl::Int, n_stokes::Int,
+                                    ier⁻⁺::AbstractArray{FT,4},
+                                    iet⁺⁺::AbstractArray{FT,4},
+                                    ier⁺⁻::AbstractArray{FT,4},
                                     iet⁻⁻::AbstractArray{FT,4}) where {FT}
+    if n_stokes == 1
+        ier⁺⁻[:] = ier⁻⁺
+        iet⁻⁻[:] = iet⁺⁺
+        return nothing
+    end
     device = devi(architecture(ier⁻⁺))
     applyD_kernel! = apply_D_elemental_RRS!(device)
     event = applyD_kernel!(ndoubl,n_stokes, ier⁻⁺, iet⁺⁺, ier⁺⁻, iet⁻⁻, ndrange=size(ier⁻⁺));
-    #wait(device, event);
     synchronize_if_gpu();
     return nothing
 end

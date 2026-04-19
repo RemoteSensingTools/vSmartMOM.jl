@@ -604,6 +604,13 @@ function apply_D_matrix_elemental!(ndoubl::Int, n_stokes::Int,
                     ṫ⁺⁺::AbstractArray{FT,4}, 
                     ṙ⁺⁻::AbstractArray{FT,4}, 
                     ṫ⁻⁻::AbstractArray{FT,4}) where {FT}
+    if n_stokes == 1
+        r⁺⁻[:] = r⁻⁺
+        t⁻⁻[:] = t⁺⁺
+        ṙ⁺⁻[:] = ṙ⁻⁺
+        ṫ⁻⁻[:] = ṫ⁺⁺
+        return nothing
+    end
     device = devi(architecture(r⁻⁺))
     applyD_kernel! = apply_D_elemental!(device)
     event = applyD_kernel!(ndoubl,n_stokes, 

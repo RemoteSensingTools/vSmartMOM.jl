@@ -1,0 +1,125 @@
+Float64 reference loaded.
+Loading LUT for O2 from /net/fluo/data1/ABSCO_CS_Database/v5.2_final/o2_v52_v2.jld2
+Float type: Float32
+┌ Warning: CUDA runtime library `libcublasLt.so.12` was loaded from a system path, `/usr/local/cuda/lib64/libcublasLt.so.12`.
+│ This may cause errors.
+│ 
+│ If you're running under a profiler, this situation is expected. Otherwise,
+│ ensure that your library path environment variable (e.g., `PATH` on Windows
+│ or `LD_LIBRARY_PATH` on Linux) does not include CUDA library paths.
+│ 
+│ In any other case, please file an issue.
+└ @ CUDA ~/.julia/packages/CUDA/TPbi4/src/initialization.jl:218
+┌ Warning: CUDA runtime library `libnvJitLink.so.12` was loaded from a system path, `/usr/local/cuda/lib64/libnvJitLink.so.12`.
+│ This may cause errors.
+│ 
+│ If you're running under a profiler, this situation is expected. Otherwise,
+│ ensure that your library path environment variable (e.g., `PATH` on Windows
+│ or `LD_LIBRARY_PATH` on Linux) does not include CUDA library paths.
+│ 
+│ In any other case, please file an issue.
+└ @ CUDA ~/.julia/packages/CUDA/TPbi4/src/initialization.jl:218
+┌ Warning: CUDA runtime library `libcusparse.so.12` was loaded from a system path, `/usr/local/cuda/lib64/libcusparse.so.12`.
+│ This may cause errors.
+│ 
+│ If you're running under a profiler, this situation is expected. Otherwise,
+│ ensure that your library path environment variable (e.g., `PATH` on Windows
+│ or `LD_LIBRARY_PATH` on Linux) does not include CUDA library paths.
+│ 
+│ In any other case, please file an issue.
+└ @ CUDA ~/.julia/packages/CUDA/TPbi4/src/initialization.jl:218
+Precompiling packages...
+Info Given vSmartMOM was explicitly requested, output will be shown live [0K
+[0K┌ Warning: CUDA runtime library `libcublasLt.so.12` was loaded from a system path, `/usr/local/cuda/lib64/libcublasLt.so.12`.
+[0K│ This may cause errors.
+[0K│ 
+[0K│ If you're running under a profiler, this situation is expected. Otherwise,
+[0K│ ensure that your library path environment variable (e.g., `PATH` on Windows
+[0K│ or `LD_LIBRARY_PATH` on Linux) does not include CUDA library paths.
+[0K│ 
+[0K│ In any other case, please file an issue.
+[0K└ @ CUDA ~/.julia/packages/CUDA/TPbi4/src/initialization.jl:218
+[0K┌ Warning: CUDA runtime library `libnvJitLink.so.12` was loaded from a system path, `/usr/local/cuda/lib64/libnvJitLink.so.12`.
+[0K│ This may cause errors.
+[0K│ 
+[0K│ If you're running under a profiler, this situation is expected. Otherwise,
+[0K│ ensure that your library path environment variable (e.g., `PATH` on Windows
+[0K│ or `LD_LIBRARY_PATH` on Linux) does not include CUDA library paths.
+[0K│ 
+[0K│ In any other case, please file an issue.
+[0K└ @ CUDA ~/.julia/packages/CUDA/TPbi4/src/initialization.jl:218
+[0K┌ Warning: CUDA runtime library `libcusparse.so.12` was loaded from a system path, `/usr/local/cuda/lib64/libcusparse.so.12`.
+[0K│ This may cause errors.
+[0K│ 
+[0K│ If you're running under a profiler, this situation is expected. Otherwise,
+[0K│ ensure that your library path environment variable (e.g., `PATH` on Windows
+[0K│ or `LD_LIBRARY_PATH` on Linux) does not include CUDA library paths.
+[0K│ 
+[0K│ In any other case, please file an issue.
+[0K└ @ CUDA ~/.julia/packages/CUDA/TPbi4/src/initialization.jl:218
+  17255.2 ms  ✓ vSmartMOM
+  1 dependency successfully precompiled in 18 seconds. 274 already precompiled.
+  1 dependency had output during precompilation:
+┌ vSmartMOM
+│  [Output was shown above]
+└  
+[ Info: CUDA-enabled GPU(s) detected
+[ Info: CuDevice(0): NVIDIA A100-PCIE-40GB
+[ Info: CuDevice(1): NVIDIA A100-PCIE-40GB
+┌ Info: Constructing N₂ constants, using VMR (unitless) of 
+└   vmr = 0.8
+┌ Info: Constructing O₂ constants, using VMR (unitless) of 
+└   vmr = 0.2
+Progress:  17%|██████▉                                  |  ETA: 0:02:08[KProgress:  92%|█████████████████████████████████████▋   |  ETA: 0:00:03[KProgress: 100%|█████████████████████████████████████████| Time: 0:00:28[K
+[ Info: Fraction of size distribution cut by max radius: 0.0 %
+[ Info: Fraction of size distribution cut by max radius: 0.0 %
+Computing PhaseFunctions Siewert NAI-2 style ...  41%|█▎ |  ETA: 0:00:01[KComputing PhaseFunctions Siewert NAI-2 style ...  82%|██▌|  ETA: 0:00:01[KComputing PhaseFunctions Siewert NAI-2 style ...  99%|███|  ETA: 0:00:00[KComputing PhaseFunctions Siewert NAI-2 style ... 100%|███| Time: 0:00:04[K
+[ Info: Fraction of size distribution cut by max radius: 0.0 %
+Computing PhaseFunctions Siewert NAI-2 style ...  93%|██▊|  ETA: 0:00:00[KComputing PhaseFunctions Siewert NAI-2 style ... 100%|███| Time: 0:00:03[K
+#= /home/sanghavi/code/github/vSmartMOM.jl/src/Artifacts/artifact_helper.jl:9 =# @__DIR__() = "/home/sanghavi/code/github/vSmartMOM.jl/src/Artifacts"
+Computing profile for water vapor in band #1
+Using LUT for O2 (fixed, band #1)
+n_Raman = 172, nSpec = 5424
+Running Float32 RRS...
+┌ Info: Constructing N₂ constants, using VMR (unitless) of 
+└   vmr = 0.8
+┌ Info: Constructing O₂ constants, using VMR (unitless) of 
+└   vmr = 0.2
+┌ Info: Processing on: architecture
+│ With FT: Float32
+│ Source Function Integration: true
+└ Dimensions: (15, 15, 5424)
+ERROR: LoadError: MethodError: no method matching elemental_inelastic!(::RRS{Float32}, ::vSmartMOM.Scattering.Stokes_IQU{Float32}, ::Bool, ::CuArray{Float64, 1, CUDA.DeviceMemory}, ::CuArray{Float64, 1, CUDA.DeviceMemory}, ::CuArray{Float64, 1, CUDA.DeviceMemory}, ::Matrix{Float32}, ::Matrix{Float32}, ::Matrix{Float32}, ::Int64, ::Int64, ::Bool, ::vSmartMOM.CoreRT.QuadPoints{Float32}, ::vSmartMOM.CoreRT.AddedLayerRS{Float32}, ::LinearAlgebra.Diagonal{Float32, CuArray{Float32, 1, CUDA.DeviceMemory}}, ::GPU)
+The function `elemental_inelastic!` exists, but no method is defined for this combination of argument types.
+
+Closest candidates are:
+  elemental_inelastic!(::Union{RRS, RRS_plus}, ::Any, ::Bool, ::AbstractVector{FT}, ::AbstractVector{FT}, ::AbstractVector{FT}, !Matched::AbstractMatrix{FT}, !Matched::AbstractMatrix{FT}, !Matched::AbstractMatrix{FT}, ::Int64, ::Int64, ::Bool, ::vSmartMOM.CoreRT.QuadPoints{FT2}, !Matched::Union{vSmartMOM.CoreRT.AddedLayer{FT}, vSmartMOM.CoreRT.AddedLayerRS{FT}}, ::Any, ::Any) where {FT<:Union{AbstractFloat, ForwardDiff.Dual}, FT2}
+   @ vSmartMOM ~/code/github/vSmartMOM.jl/src/CoreRT/CoreKernel/elemental_inelastic.jl:23
+  elemental_inelastic!(!Matched::Union{VS_0to1_plus, VS_1to0_plus}, ::Any, ::Bool, ::AbstractVector{FT}, ::AbstractVector{FT}, ::AbstractVector{FT}, !Matched::AbstractMatrix{FT}, !Matched::AbstractMatrix{FT}, !Matched::AbstractMatrix{FT}, ::Int64, ::Int64, ::Bool, ::vSmartMOM.CoreRT.QuadPoints{FT2}, !Matched::Union{vSmartMOM.CoreRT.AddedLayer{FT}, vSmartMOM.CoreRT.AddedLayerRS{FT}}, ::Any, ::Any) where {FT<:Union{AbstractFloat, ForwardDiff.Dual}, FT2}
+   @ vSmartMOM ~/code/github/vSmartMOM.jl/src/CoreRT/CoreKernel/elemental_inelastic_plus.jl:25
+
+Stacktrace:
+  [1] rt_kernel!(RS_type::RRS{Float32}, pol_type::vSmartMOM.Scattering.Stokes_IQU{Float32}, SFI::Bool, added_layer::vSmartMOM.CoreRT.AddedLayerRS{Float32}, composite_layer::vSmartMOM.CoreRT.CompositeLayerRS{Float32}, computed_layer_properties::vSmartMOM.CoreRT.CoreScatteringOpticalProperties{Float64}, scattering_interface::vSmartMOM.CoreRT.ScatteringInterface_11, τ_sum::CuArray{Float64, 1, CUDA.DeviceMemory}, m::Int64, quad_points::vSmartMOM.CoreRT.QuadPoints{Float32}, I_static::LinearAlgebra.Diagonal{Float32, CuArray{Float32, 1, CUDA.DeviceMemory}}, architecture::GPU, qp_μN::CuArray{Float32, 1, CUDA.DeviceMemory}, iz::Int64; workspace::vSmartMOM.CoreRT.InteractionWorkspace{CuArray{Float32, 3, CUDA.DeviceMemory}, CuArray{Float32, 4, CUDA.DeviceMemory}, CuArray{Float32, 4, CUDA.DeviceMemory}, CuArray{Float32, 3, CUDA.DeviceMemory}})
+    @ vSmartMOM.CoreRT ~/code/github/vSmartMOM.jl/src/CoreRT/CoreKernel/rt_kernel.jl:301
+  [2] macro expansion
+    @ ~/code/github/vSmartMOM.jl/src/CoreRT/rt_run.jl:394 [inlined]
+  [3] macro expansion
+    @ ~/.julia/packages/ProgressMeter/N660J/src/ProgressMeter.jl:1026 [inlined]
+  [4] rt_run(RS_type::RRS{Float32}, model::vSmartMOM.CoreRT.vSmartMOM_Model, iBand::Int64)
+    @ vSmartMOM.CoreRT ~/code/github/vSmartMOM.jl/src/CoreRT/rt_run.jl:380
+  [5] rt_run_test(RS_type::RRS{Float32}, model::vSmartMOM.CoreRT.vSmartMOM_Model, iBand::Int64)
+    @ vSmartMOM.CoreRT ~/code/github/vSmartMOM.jl/src/CoreRT/rt_run.jl:254
+  [6] macro expansion
+    @ /tmp/float32_test.jl:67 [inlined]
+  [7] top-level scope
+    @ ./timing.jl:461
+  [8] include(mod::Module, _path::String)
+    @ Base ./Base.jl:306
+  [9] exec_options(opts::Base.JLOptions)
+    @ Base ./client.jl:317
+ [10] _start()
+    @ Base ./client.jl:550
+in expression starting at /tmp/float32_test.jl:66
+(iBand, sza, vza, vaz, (model.params.brdf[iBand[1]]).albedo) = (1, 19.0f0, Float32[0.0], Float32[0.0], 0.0f0)
+Finished initializing arrays
+Fourier Moment: 0/2

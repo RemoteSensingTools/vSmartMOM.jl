@@ -43,8 +43,8 @@ for ϕ_i = 1:length(ϕs)
                         iBand       = [1],
                         F₀          = zeros(FT,1,1),
                         SIF₀        = zeros(FT,1,1));
-    RS_type0.F₀ = zeros(model.params.polarization_type.n, length(model.τ_rayl))
-    RS_type0.SIF₀ = zeros(model.params.polarization_type.n, length(model.τ_rayl))
+    RS_type0.F₀ = zeros(model.params.polarization_type.n, size(model.τ_rayl[1],1))
+    RS_type0.SIF₀ = zeros(model.params.polarization_type.n, size(model.τ_rayl[1],1))
     RS_type0.F₀[1,:] .= 1;  
     R, T, _, _ = CoreRT.rt_run_test(RS_type0, model, 1);
                 

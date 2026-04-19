@@ -6,10 +6,11 @@ kernel calculations.
 =#
 
 "Perform post-processing to azimuthally-weight RT matrices"
-function postprocessing_vza!(RS_type::noRS, iμ₀, pol_type, 
-        composite_layer, vza, qp_μ, m, vaz, μ₀, weight, 
-        nSpec, SFI, R, R_SFI, T, T_SFI,ieR_SFI, ieT_SFI)
-    
+function postprocessing_vza!(RS_type::noRS, iμ₀, pol_type,
+        composite_layer, vza, qp_μ, m, vaz, μ₀, weight,
+        nSpec, SFI, R, R_SFI, T, T_SFI, ieR_SFI, ieT_SFI,
+        hem_R, hem_T, wt_μ)
+
     # idx of μ0 = cos(sza)
     st_iμ0, istart0, iend0 = get_indices(iμ₀, pol_type);
 
@@ -18,7 +19,23 @@ function postprocessing_vza!(RS_type::noRS, iμ₀, pol_type,
     T⁺⁺ = Array(composite_layer.T⁺⁺);
     J₀⁺ = Array(composite_layer.J₀⁺);
     J₀⁻ = Array(composite_layer.J₀⁻);
-    
+
+    # Hemispheric integrals: only m=0 contributes (higher moments vanish under 2π azimuthal integration).
+    # weight_m0 × 2π = (0.5/π)(2π) = 1, so hem = Σⱼ J₀[j_I, 1, λ] · μⱼ · wⱼ
+    if m == 0 && SFI
+        Nquad = length(qp_μ)
+        n = pol_type.n
+        μ_arr = Array(qp_μ)
+        w_arr = Array(wt_μ)
+        for s = 1:nSpec
+            for j = 1:Nquad
+                j_I = (j - 1) * n + 1
+                hem_R[s] += J₀⁻[j_I, 1, s] * μ_arr[j] * w_arr[j]
+                hem_T[s] += J₀⁺[j_I, 1, s] * μ_arr[j] * w_arr[j]
+            end
+        end
+    end
+
     # Loop over all viewing zenith angles
     for i = 1:length(vza)
 

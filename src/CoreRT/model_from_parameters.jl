@@ -291,7 +291,7 @@ function model_from_parameters(#::FwdMode,
     # aerosol_optics[iBand][iAer]
     aerosol_optics = [Array{AerosolOptics}(undef, (n_aer)) for i=1:n_bands];
         
-    FT2 = isnothing(params.scattering_params) ? params.float_type : typeof(params.scattering_params.rt_aerosols[1].τ_ref)
+    #FT2 = isnothing(params.scattering_params) ? params.float_type : typeof(params.scattering_params.rt_aerosols[1].τ_ref)
     FT2 =  params.float_type 
 
     # τ_aer[iBand][iAer,iZ]        

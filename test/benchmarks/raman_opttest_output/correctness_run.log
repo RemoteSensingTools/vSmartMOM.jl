@@ -1,0 +1,165 @@
+┌ Warning: CUDA runtime library `libcublasLt.so.12` was loaded from a system path, `/usr/local/cuda/lib64/libcublasLt.so.12`.
+│ This may cause errors.
+│ 
+│ If you're running under a profiler, this situation is expected. Otherwise,
+│ ensure that your library path environment variable (e.g., `PATH` on Windows
+│ or `LD_LIBRARY_PATH` on Linux) does not include CUDA library paths.
+│ 
+│ In any other case, please file an issue.
+└ @ CUDA ~/.julia/packages/CUDA/TPbi4/src/initialization.jl:218
+┌ Warning: CUDA runtime library `libnvJitLink.so.12` was loaded from a system path, `/usr/local/cuda/lib64/libnvJitLink.so.12`.
+│ This may cause errors.
+│ 
+│ If you're running under a profiler, this situation is expected. Otherwise,
+│ ensure that your library path environment variable (e.g., `PATH` on Windows
+│ or `LD_LIBRARY_PATH` on Linux) does not include CUDA library paths.
+│ 
+│ In any other case, please file an issue.
+└ @ CUDA ~/.julia/packages/CUDA/TPbi4/src/initialization.jl:218
+┌ Warning: CUDA runtime library `libcusparse.so.12` was loaded from a system path, `/usr/local/cuda/lib64/libcusparse.so.12`.
+│ This may cause errors.
+│ 
+│ If you're running under a profiler, this situation is expected. Otherwise,
+│ ensure that your library path environment variable (e.g., `PATH` on Windows
+│ or `LD_LIBRARY_PATH` on Linux) does not include CUDA library paths.
+│ 
+│ In any other case, please file an issue.
+└ @ CUDA ~/.julia/packages/CUDA/TPbi4/src/initialization.jl:218
+[ Info: CUDA-enabled GPU(s) detected
+[ Info: CuDevice(0): NVIDIA A100-PCIE-40GB
+[ Info: CuDevice(1): NVIDIA A100-PCIE-40GB
+┌ Info: Constructing N₂ constants, using VMR (unitless) of 
+└   vmr = 0.8
+┌ Info: Constructing O₂ constants, using VMR (unitless) of 
+└   vmr = 0.2
+Progress:  17%|██████▉                                  |  ETA: 0:02:11[KProgress:  92%|█████████████████████████████████████▋   |  ETA: 0:00:03[KProgress: 100%|█████████████████████████████████████████| Time: 0:00:28[K
+[ Info: Fraction of size distribution cut by max radius: 1.432187701766452e-12 %
+[ Info: Fraction of size distribution cut by max radius: 1.432187701766452e-12 %
+Computing PhaseFunctions Siewert NAI-2 style ...  32%|█  |  ETA: 0:00:03[KComputing PhaseFunctions Siewert NAI-2 style ...  65%|██ |  ETA: 0:00:01[KComputing PhaseFunctions Siewert NAI-2 style ...  93%|██▊|  ETA: 0:00:00[KComputing PhaseFunctions Siewert NAI-2 style ... 100%|███| Time: 0:00:04[K
+[ Info: Fraction of size distribution cut by max radius: 1.432187701766452e-12 %
+Computing PhaseFunctions Siewert NAI-2 style ...  83%|██▌|  ETA: 0:00:01[KComputing PhaseFunctions Siewert NAI-2 style ... 100%|███| Time: 0:00:03[K
+Reference loaded. Running optimized code...
+Loading LUT for O2 from /net/fluo/data1/ABSCO_CS_Database/v5.2_final/o2_v52_v2.jld2
+#= /home/sanghavi/code/github/vSmartMOM.jl/src/Artifacts/artifact_helper.jl:9 =# @__DIR__() = "/home/sanghavi/code/github/vSmartMOM.jl/src/Artifacts"
+Computing profile for water vapor in band #1
+Using LUT for O2 (fixed, band #1)
+Running RRS...
+┌ Info: Constructing N₂ constants, using VMR (unitless) of 
+└   vmr = 0.8
+┌ Info: Constructing O₂ constants, using VMR (unitless) of 
+└   vmr = 0.2
+┌ Info: Processing on: architecture
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (15, 15, 5424)
+Looping over layers ...  17%|████▋                       |  ETA: 0:08:07[KLooping over layers ...  25%|███████                     |  ETA: 0:07:04[KLooping over layers ...  33%|█████████▍                  |  ETA: 0:06:10[KLooping over layers ...  42%|███████████▋                |  ETA: 0:05:21[KLooping over layers ...  50%|██████████████              |  ETA: 0:04:33[KLooping over layers ...  58%|████████████████▍           |  ETA: 0:03:46[KLooping over layers ...  67%|██████████████████▋         |  ETA: 0:03:01[KLooping over layers ...  75%|█████████████████████       |  ETA: 0:02:15[KLooping over layers ...  83%|███████████████████████▍    |  ETA: 0:01:30[KLooping over layers ...  92%|█████████████████████████▋  |  ETA: 0:00:45[KLooping over layers ... 100%|████████████████████████████| Time: 0:08:57[K
+Looping over layers ...  17%|████▋                       |  ETA: 0:06:22[KLooping over layers ...  25%|███████                     |  ETA: 0:06:01[KLooping over layers ...  33%|█████████▍                  |  ETA: 0:05:28[KLooping over layers ...  42%|███████████▋                |  ETA: 0:04:51[KLooping over layers ...  50%|██████████████              |  ETA: 0:04:12[KLooping over layers ...  58%|████████████████▍           |  ETA: 0:03:31[KLooping over layers ...  67%|██████████████████▋         |  ETA: 0:02:50[KLooping over layers ...  75%|█████████████████████       |  ETA: 0:02:08[KLooping over layers ...  83%|███████████████████████▍    |  ETA: 0:01:26[KLooping over layers ...  92%|█████████████████████████▋  |  ETA: 0:00:43[KLooping over layers ... 100%|████████████████████████████| Time: 0:08:36[K
+Looping over layers ...  17%|████▋                       |  ETA: 0:06:21[KLooping over layers ...  25%|███████                     |  ETA: 0:06:00[KLooping over layers ...  33%|█████████▍                  |  ETA: 0:05:28[KLooping over layers ...  42%|███████████▋                |  ETA: 0:04:51[KLooping over layers ...  50%|██████████████              |  ETA: 0:04:12[KLooping over layers ...  58%|████████████████▍           |  ETA: 0:03:31[KLooping over layers ...  67%|██████████████████▋         |  ETA: 0:02:50[KLooping over layers ...  75%|█████████████████████       |  ETA: 0:02:08[KLooping over layers ...  83%|███████████████████████▍    |  ETA: 0:01:26[KLooping over layers ...  92%|█████████████████████████▋  |  ETA: 0:00:43[KLooping over layers ... 100%|████████████████████████████| Time: 0:08:35[K
+(iBand, sza, vza, vaz, (model.params.brdf[iBand[1]]).albedo) = (1, 19.0, [0.0], [0.0], 0.0)
+Finished initializing arrays
+Fourier Moment: 0/2
+"interaction 11" = "interaction 11"
+"interaction 11" = "interaction 11"
+"interaction 11" = "interaction 11"
+"interaction 11" = "interaction 11"
+"interaction 11" = "interaction 11"
+"interaction 11" = "interaction 11"
+"interaction 11" = "interaction 11"
+"interaction 11" = "interaction 11"
+"interaction 11" = "interaction 11"
+"interaction 11" = "interaction 11"
+"interaction 11" = "interaction 11"
+(size(repeat(arr_type(RS_type.SIF₀), Nquad)), size(added_layer.J₀⁻[:, 1, :])) = ((15, 5424), (15, 5424))
+scattering_interfaces_all[end] = vSmartMOM.CoreRT.ScatteringInterface_11()
+"interaction 11" = "interaction 11"
+Fourier Moment: 1/2
+"interaction 11" = "interaction 11"
+"interaction 11" = "interaction 11"
+"interaction 11" = "interaction 11"
+"interaction 11" = "interaction 11"
+"interaction 11" = "interaction 11"
+"interaction 11" = "interaction 11"
+"interaction 11" = "interaction 11"
+"interaction 11" = "interaction 11"
+"interaction 11" = "interaction 11"
+"interaction 11" = "interaction 11"
+"interaction 11" = "interaction 11"
+scattering_interfaces_all[end] = vSmartMOM.CoreRT.ScatteringInterface_11()
+"interaction 11" = "interaction 11"
+Fourier Moment: 2/2
+"interaction 11" = "interaction 11"
+"interaction 11" = "interaction 11"
+"interaction 11" = "interaction 11"
+"interaction 11" = "interaction 11"
+"interaction 11" = "interaction 11"
+"interaction 11" = "interaction 11"
+"interaction 11" = "interaction 11"
+"interaction 11" = "interaction 11"
+"interaction 11" = "interaction 11"
+"interaction 11" = "interaction 11"
+"interaction 11" = "interaction 11"
+scattering_interfaces_all[end] = vSmartMOM.CoreRT.ScatteringInterface_11()
+"interaction 11" = "interaction 11"
+────────────────────────────────────────────────────────────────────────────────
+                                       Time                    Allocations      
+                              ───────────────────────   ────────────────────────
+      Tot / % measured:            1740s /  96.0%           45.3GiB /  70.8%    
+
+Section               ncalls     time    %tot     avg     alloc    %tot      avg
+────────────────────────────────────────────────────────────────────────────────
+doubling_inelastic        36    1133s   67.8%   31.5s   3.48GiB   10.8%  98.9MiB
+  n loop 2             61.9k     992s   59.4%  16.0ms   1.17GiB    3.7%  19.9KiB
+  precomp                360    417ms    0.0%  1.16ms   25.0MiB    0.1%  71.1KiB
+interaction               36     460s   27.6%   12.8s   0.93GiB    2.9%  26.6MiB
+  interaction inv2        36    23.5s    1.4%   652ms    687KiB    0.0%  19.1KiB
+  interaction inv1        36    711ms    0.0%  19.8ms    466KiB    0.0%  13.0KiB
+Absorption Coeff           1    31.6s    1.9%   31.6s   2.80GiB    8.7%  2.80GiB
+Creating layers            3    14.6s    0.9%   4.85s   19.5GiB   60.8%  6.51GiB
+OpticalProps              39    9.89s    0.6%   253ms   1.46GiB    4.5%  38.3MiB
+Mie calc                   2    9.22s    0.6%   4.61s   2.73GiB    8.5%  1.36GiB
+elemental_inelastic       36    4.25s    0.3%   118ms    265MiB    0.8%  7.35MiB
+Read HITRAN                1    4.22s    0.3%   4.22s    678MiB    2.1%   678MiB
+elemental                 36    2.13s    0.1%  59.1ms    122MiB    0.4%  3.39MiB
+Creating arrays            1    1.88s    0.1%   1.88s    142MiB    0.4%   142MiB
+────────────────────────────────────────────────────────────────────────────────
+RRS done: 1653.4s
+Running noRS...
+┌ Info: Processing on: architecture
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (15, 15, 5424)
+ERROR: LoadError: MethodError: no method matching rt_kernel!(::noRS{Float64}, ::vSmartMOM.Scattering.Stokes_IQU{Float64}, ::Bool, ::vSmartMOM.CoreRT.AddedLayer{Float64}, ::vSmartMOM.CoreRT.CompositeLayer{Float64}, ::vSmartMOM.CoreRT.CoreScatteringOpticalProperties{Float64}, ::vSmartMOM.CoreRT.ScatteringInterface_11, ::CuArray{Float64, 1, CUDA.DeviceMemory}, ::Int64, ::vSmartMOM.CoreRT.QuadPoints{Float64}, ::LinearAlgebra.Diagonal{Float64, CuArray{Float64, 1, CUDA.DeviceMemory}}, ::GPU, ::CuArray{Float64, 1, CUDA.DeviceMemory}, ::Int64; workspace::Nothing)
+This method does not support all of the given keyword arguments (and may not support any).
+
+Closest candidates are:
+  rt_kernel!(::noRS{FT}, ::Any, ::Any, ::Any, ::Any, ::vSmartMOM.CoreRT.CoreScatteringOpticalProperties, ::Any, ::Any, ::Any, ::Any, ::Any, ::Any, ::Any, ::Any) where FT got unsupported keyword argument "workspace"
+   @ vSmartMOM ~/code/github/vSmartMOM.jl/src/CoreRT/CoreKernel/rt_kernel.jl:152
+  rt_kernel!(!Matched::Union{RRS{FT}, RRS_plus{FT}, VS_0to1{FT}, VS_0to1_plus{FT}, VS_1to0{FT}, VS_1to0_plus{FT}}, ::Any, ::Any, ::Any, ::Any, ::vSmartMOM.CoreRT.CoreScatteringOpticalProperties, ::Any, ::Any, ::Any, ::Any, ::Any, ::Any, ::Any, ::Any; workspace) where FT
+   @ vSmartMOM ~/code/github/vSmartMOM.jl/src/CoreRT/CoreKernel/rt_kernel.jl:271
+  rt_kernel!(::noRS, ::Any, ::Any, ::Any, ::Any, ::Any, ::Any, ::Any, ::Any, ::Any, ::Any, ::Any) got unsupported keyword argument "workspace"
+   @ vSmartMOM ~/code/github/vSmartMOM.jl/src/CoreRT/CoreKernel/rt_kernel.jl:8
+  ...
+
+Stacktrace:
+ [1] macro expansion
+   @ ~/code/github/vSmartMOM.jl/src/CoreRT/rt_run.jl:389 [inlined]
+ [2] macro expansion
+   @ ~/.julia/packages/ProgressMeter/N660J/src/ProgressMeter.jl:1026 [inlined]
+ [3] rt_run(RS_type::noRS{Float64}, model::vSmartMOM.CoreRT.vSmartMOM_Model, iBand::Int64)
+   @ vSmartMOM.CoreRT ~/code/github/vSmartMOM.jl/src/CoreRT/rt_run.jl:375
+ [4] rt_run_test(RS_type::noRS{Float64}, model::vSmartMOM.CoreRT.vSmartMOM_Model, iBand::Int64)
+   @ vSmartMOM.CoreRT ~/code/github/vSmartMOM.jl/src/CoreRT/rt_run.jl:254
+ [5] macro expansion
+   @ /tmp/quick_correctness_check.jl:65 [inlined]
+ [6] top-level scope
+   @ ./timing.jl:461
+ [7] include(mod::Module, _path::String)
+   @ Base ./Base.jl:306
+ [8] exec_options(opts::Base.JLOptions)
+   @ Base ./client.jl:317
+ [9] _start()
+   @ Base ./client.jl:550
+in expression starting at /tmp/quick_correctness_check.jl:64
+(iBand, sza, vza, vaz, (model.params.brdf[iBand[1]]).albedo) = (1, 19.0, [0.0], [0.0], 0.0)
+Finished initializing arrays
+Fourier Moment: 0/2

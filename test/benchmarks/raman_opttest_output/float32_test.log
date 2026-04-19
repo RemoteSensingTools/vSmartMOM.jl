@@ -1,0 +1,54 @@
+Float64 reference loaded.
+Loading LUT for O2 from /net/fluo/data1/ABSCO_CS_Database/v5.2_final/o2_v52_v2.jld2
+Float type: Float32
+┌ Warning: CUDA runtime library `libcublasLt.so.12` was loaded from a system path, `/usr/local/cuda/lib64/libcublasLt.so.12`.
+│ This may cause errors.
+│ 
+│ If you're running under a profiler, this situation is expected. Otherwise,
+│ ensure that your library path environment variable (e.g., `PATH` on Windows
+│ or `LD_LIBRARY_PATH` on Linux) does not include CUDA library paths.
+│ 
+│ In any other case, please file an issue.
+└ @ CUDA ~/.julia/packages/CUDA/TPbi4/src/initialization.jl:218
+┌ Warning: CUDA runtime library `libnvJitLink.so.12` was loaded from a system path, `/usr/local/cuda/lib64/libnvJitLink.so.12`.
+│ This may cause errors.
+│ 
+│ If you're running under a profiler, this situation is expected. Otherwise,
+│ ensure that your library path environment variable (e.g., `PATH` on Windows
+│ or `LD_LIBRARY_PATH` on Linux) does not include CUDA library paths.
+│ 
+│ In any other case, please file an issue.
+└ @ CUDA ~/.julia/packages/CUDA/TPbi4/src/initialization.jl:218
+┌ Warning: CUDA runtime library `libcusparse.so.12` was loaded from a system path, `/usr/local/cuda/lib64/libcusparse.so.12`.
+│ This may cause errors.
+│ 
+│ If you're running under a profiler, this situation is expected. Otherwise,
+│ ensure that your library path environment variable (e.g., `PATH` on Windows
+│ or `LD_LIBRARY_PATH` on Linux) does not include CUDA library paths.
+│ 
+│ In any other case, please file an issue.
+└ @ CUDA ~/.julia/packages/CUDA/TPbi4/src/initialization.jl:218
+[ Info: CUDA-enabled GPU(s) detected
+[ Info: CuDevice(0): NVIDIA A100-PCIE-40GB
+[ Info: CuDevice(1): NVIDIA A100-PCIE-40GB
+ERROR: LoadError: MethodError: no method matching getRamanAtmoConstants(::Float64, ::Float32)
+The function `getRamanAtmoConstants` exists, but no method is defined for this combination of argument types.
+
+Closest candidates are:
+  getRamanAtmoConstants(::FT, !Matched::FT) where FT
+   @ vSmartMOM ~/code/github/vSmartMOM.jl/src/Inelastic/inelastic_helper.jl:22
+  getRamanAtmoConstants(::FT, !Matched::FT, !Matched::FT, !Matched::FT) where FT
+   @ vSmartMOM ~/code/github/vSmartMOM.jl/src/Inelastic/inelastic_helper.jl:42
+
+Stacktrace:
+ [1] model_from_parameters(params::vSmartMOM.CoreRT.vSmartMOM_Parameters{Float32})
+   @ vSmartMOM.CoreRT ~/code/github/vSmartMOM.jl/src/CoreRT/model_from_parameters.jl:168
+ [2] top-level scope
+   @ /tmp/float32_test.jl:30
+ [3] include(mod::Module, _path::String)
+   @ Base ./Base.jl:306
+ [4] exec_options(opts::Base.JLOptions)
+   @ Base ./client.jl:317
+ [5] _start()
+   @ Base ./client.jl:550
+in expression starting at /tmp/float32_test.jl:30

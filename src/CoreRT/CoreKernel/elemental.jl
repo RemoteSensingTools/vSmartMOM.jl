@@ -316,10 +316,16 @@ end
 end
 
 function apply_D_matrix_elemental!(ndoubl::Int, n_stokes::Int, r⁻⁺::AbstractArray{FT,3}, t⁺⁺::AbstractArray{FT,3}, r⁺⁻::AbstractArray{FT,3}, t⁻⁻::AbstractArray{FT,3}) where {FT}
+    if n_stokes == 1
+        # Scalar (Stokes_I) RT — no Stokes-component sign flips needed.
+        # Mirror apply_D_matrix! in doubling.jl: just copy the symmetric pairs.
+        r⁺⁻[:] = r⁻⁺
+        t⁻⁻[:] = t⁺⁺
+        return nothing
+    end
     device = devi(architecture(r⁻⁺))
     applyD_kernel! = apply_D_elemental!(device)
     event = applyD_kernel!(ndoubl,n_stokes, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻, ndrange=size(r⁻⁺));
-    #wait(device, event);
     synchronize_if_gpu();
     return nothing
 end

@@ -322,15 +322,17 @@ function rt_run(RS_type::AbstractRamanType,
     #FT_dual = length(model.τ_aer[1][1]) > 0 ? typeof(model.τ_aer[1][1]) : FT
     FT_dual = FT
     # Output variables: Reflected and transmitted solar irradiation at TOA and BOA respectively # Might need Dual later!!
-    #Suniti: consider adding a new dimension (iBand) to these arrays. The assignment of simulated spectra to their specific bands will take place after batch operations, thereby leaving the computational time unaffected 
+    #Suniti: consider adding a new dimension (iBand) to these arrays. The assignment of simulated spectra to their specific bands will take place after batch operations, thereby leaving the computational time unaffected
     R       = zeros(FT_dual, length(vza), pol_type.n, nSpec)
     T       = zeros(FT_dual, length(vza), pol_type.n, nSpec)
     R_SFI   = zeros(FT_dual, length(vza), pol_type.n, nSpec)
     T_SFI   = zeros(FT_dual, length(vza), pol_type.n, nSpec)
     ieR_SFI = zeros(FT_dual, length(vza), pol_type.n, nSpec)
     ieT_SFI = zeros(FT_dual, length(vza), pol_type.n, nSpec)
+    hem_R   = zeros(FT_dual, nSpec)
+    hem_T   = zeros(FT_dual, nSpec)
     # Notify user of processing parameters
-    msg = 
+    msg =
     """
     Processing on: $(architecture)
     With FT: $(FT)
@@ -422,30 +424,30 @@ function rt_run(RS_type::AbstractRamanType,
         #@show composite_layer.J₀⁻[:,1,1]                            
         #bla
         # Postprocess and weight according to vza
-        postprocessing_vza!(RS_type, 
-                            iμ₀, pol_type, 
-                            composite_layer, 
-                            vza, qp_μ, m, vaz, μ₀, 
-                            weight, nSpec, 
-                            SFI, 
-                            R, R_SFI, 
+        postprocessing_vza!(RS_type,
+                            iμ₀, pol_type,
+                            composite_layer,
+                            vza, qp_μ, m, vaz, μ₀,
+                            weight, nSpec,
+                            SFI,
+                            R, R_SFI,
                             T, T_SFI,
-                            ieR_SFI, ieT_SFI)
+                            ieR_SFI, ieT_SFI,
+                            hem_R, hem_T, wt_μ)
         #@show R_SFI[:,1,1]
         #bla
     end
-    
+
     # Show timing statistics
     print_timer()
     reset_timer!()
 
     # Return R_SFI or R, depending on the flag
-    return SFI ? (R_SFI, T_SFI, ieR_SFI, ieT_SFI) : (R, T)
-    #return Array(added_layer.ieJ₀⁻), Array(composite_layer.ieJ₀⁻)#
+    return SFI ? (R_SFI, T_SFI, ieR_SFI, ieT_SFI, hem_R, hem_T) : (R, T, hem_R, hem_T)
 end
 
 # Single scattering only
-function rt_run_ss(RS_type::AbstractRamanType, 
+function rt_run_ss(RS_type::AbstractRamanType,
     model::vSmartMOM_Model, iBand)
     @unpack obs_alt, sza, vza, vaz = model.obs_geom   # Observational geometry properties
     @unpack qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart, μ₀, iμ₀, Nquad = model.quad_points # All quadrature points
@@ -488,13 +490,15 @@ function rt_run_ss(RS_type::AbstractRamanType,
     #FT_dual = length(model.τ_aer[1][1]) > 0 ? typeof(model.τ_aer[1][1]) : FT
     FT_dual = FT
     # Output variables: Reflected and transmitted solar irradiation at TOA and BOA respectively # Might need Dual later!!
-    #Suniti: consider adding a new dimension (iBand) to these arrays. The assignment of simulated spectra to their specific bands will take place after batch operations, thereby leaving the computational time unaffected 
+    #Suniti: consider adding a new dimension (iBand) to these arrays. The assignment of simulated spectra to their specific bands will take place after batch operations, thereby leaving the computational time unaffected
     R       = zeros(FT_dual, length(vza), pol_type.n, nSpec)
     T       = zeros(FT_dual, length(vza), pol_type.n, nSpec)
     R_SFI   = zeros(FT_dual, length(vza), pol_type.n, nSpec)
     T_SFI   = zeros(FT_dual, length(vza), pol_type.n, nSpec)
     ieR_SFI = zeros(FT_dual, length(vza), pol_type.n, nSpec)
     ieT_SFI = zeros(FT_dual, length(vza), pol_type.n, nSpec)
+    hem_R   = zeros(FT_dual, nSpec)
+    hem_T   = zeros(FT_dual, nSpec)
     # Notify user of processing parameters
     msg = 
         """
@@ -601,15 +605,16 @@ function rt_run_ss(RS_type::AbstractRamanType,
                         model.params.architecture)
         end=#
         # Postprocess and weight according to vza
-        postprocessing_vza!(RS_type, 
-                    iμ₀, pol_type, 
-                    composite_layer, 
-                    vza, qp_μ, m, vaz, μ₀, 
-                    weight, nSpec, 
-                    SFI, 
-                    R, R_SFI, 
+        postprocessing_vza!(RS_type,
+                    iμ₀, pol_type,
+                    composite_layer,
+                    vza, qp_μ, m, vaz, μ₀,
+                    weight, nSpec,
+                    SFI,
+                    R, R_SFI,
                     T, T_SFI,
-                    ieR_SFI, ieT_SFI)
+                    ieR_SFI, ieT_SFI,
+                    hem_R, hem_T, wt_μ)
     end
 
     # Show timing statistics
@@ -617,5 +622,5 @@ function rt_run_ss(RS_type::AbstractRamanType,
     reset_timer!()
 
     # Return R_SFI or R, depending on the flag
-    return SFI ? (R_SFI, T_SFI, ieR_SFI, ieT_SFI) : (R, T)
+    return SFI ? (R_SFI, T_SFI, ieR_SFI, ieT_SFI, hem_R, hem_T) : (R, T, hem_R, hem_T)
 end

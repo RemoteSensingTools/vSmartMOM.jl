@@ -12,12 +12,12 @@ radiative_transfer:
   quadrature_type:    RadauQuad()
   # Polarization type (Stokes_I, Stokes_IQ, Stokes_IQU, Stokes_IQUV)
   polarization_type:  Stokes_IQUV()
-  # Maximum m (number of Fourier moments to loop over)
+  # Total m including 0 (number of Fourier moments to loop over)
   max_m:              3
   # Exclusion angle for forward peak in fitting procedure (degrees)
   Δ_angle:            2.0
   # Trunction length for legendre terms
-  l_trunc:            20
+  l_trunc:            20 #5 #20
   # Depolarization factor
   depol:              0.0
   # Floating point type for calculations (Float32, Float64)
@@ -44,11 +44,11 @@ geometry:
 atmospheric_profile: 
   # Temperature Profile (TOA to BOA, in K)
   # Full-levels, specified at layer centers
-  T: [231.62]
+  T: [231.62 231.62 231.62 231.62] #[231.62] # 
   # Pressure Profile (TOA to BOA at each boundary, in hPa)
   # Half-levels, specified at layer boundaries
   #p: [  0.14,   0.22]
-  p: [  1013.25,   0.0]
+  p: [0.0, 250., 500., 750.,1013.25] #[0.0,  1013.25] # 
   # Reduce profile to n layers
   profile_reduction: -1
 

@@ -8,24 +8,26 @@ radiative_transfer:
     #- (1e7/768):0.05:(1e7/763) 
     #- (1e7/783):0.15:(1e7/750)
     #- (1e7/780):0.02:(1e7/755)
-    - (1e7/785)-250.:0.1:(1e7/782.5)+250. #dwl = 0.01040 nm
-    - (1e7/782.5)-250.:0.1:(1e7/780)+250. #dwl = 0.01040 nm
-    - (1e7/780)-250.:0.1:(1e7/777.5)+250. #dwl = 0.01040 nm
-    - (1e7/777.5)-250.:0.1:(1e7/775)+250. #dwl = 0.01040 nm
-    - (1e7/775)-250.:0.1:(1e7/772.5)+250. #dwl = 0.01040 nm
-    - (1e7/772.5)-250.:0.1:(1e7/770)+250. #dwl = 0.01040 nm
-    - (1e7/770)-250.:0.1:(1e7/767.5)+250. #dwl = 0.01040 nm
-    - (1e7/767.5)-250.:0.1:(1e7/765)+250. #dwl = 0.01040 nm
-    - (1e7/765)-250.:0.1:(1e7/762.5)+250. #dwl = 0.01040 nm
-    - (1e7/762.5)-250.:0.1:(1e7/760)+250. #dwl = 0.01040 nm
-    - (1e7/760)-250.:0.1:(1e7/757.5)+250. #dwl = 0.01040 nm
-    - (1e7/757.5)-250.:0.1:(1e7/755)+250. #dwl = 0.01040 nm
-    - (1e7/755)-250.:0.1:(1e7/752.5)+250. #dwl = 0.01040 nm
-    - (1e7/752.5)-250.:0.1:(1e7/750)+250. #dwl = 0.01040 nm
-    - (1e7/750)-250.:0.1:(1e7/747.5)+250. #dwl = 0.01040 nm
-    - (1e7/747.5)-250.:0.1:(1e7/745)+250. #dwl = 0.01040 nm
-    - (1e7/745)-250.:0.1:(1e7/742.5)+250. #dwl = 0.01040 nm
-    - (1e7/742.5)-250.:0.1:(1e7/740)+250. #dwl = 0.01040 nm
+    - (1e7/790)-250.:0.1:(1e7/765)+250. #dwl = 0.01040 nm
+    - (1e7/765)-250.:0.1:(1e7/740)+250. #dwl = 0.01040 nm
+    #- (1e7/785)-250.:0.1:(1e7/782.5)+250. #dwl = 0.01040 nm
+    #- (1e7/782.5)-250.:0.1:(1e7/780)+250. #dwl = 0.01040 nm
+    #- (1e7/780)-250.:0.1:(1e7/777.5)+250. #dwl = 0.01040 nm
+    #- (1e7/777.5)-250.:0.1:(1e7/775)+250. #dwl = 0.01040 nm
+    #- (1e7/775)-250.:0.1:(1e7/772.5)+250. #dwl = 0.01040 nm
+    #- (1e7/772.5)-250.:0.1:(1e7/770)+250. #dwl = 0.01040 nm
+    #- (1e7/770)-250.:0.1:(1e7/767.5)+250. #dwl = 0.01040 nm
+    #- (1e7/767.5)-250.:0.1:(1e7/765)+250. #dwl = 0.01040 nm
+    #- (1e7/765)-250.:0.1:(1e7/762.5)+250. #dwl = 0.01040 nm
+    #- (1e7/762.5)-250.:0.1:(1e7/760)+250. #dwl = 0.01040 nm
+    #- (1e7/760)-250.:0.1:(1e7/757.5)+250. #dwl = 0.01040 nm
+    #- (1e7/757.5)-250.:0.1:(1e7/755)+250. #dwl = 0.01040 nm
+    #- (1e7/755)-250.:0.1:(1e7/752.5)+250. #dwl = 0.01040 nm
+    #- (1e7/752.5)-250.:0.1:(1e7/750)+250. #dwl = 0.01040 nm
+    #- (1e7/750)-250.:0.1:(1e7/747.5)+250. #dwl = 0.01040 nm
+    #- (1e7/747.5)-250.:0.1:(1e7/745)+250. #dwl = 0.01040 nm
+    #- (1e7/745)-250.:0.1:(1e7/742.5)+250. #dwl = 0.01040 nm
+    #- (1e7/742.5)-250.:0.1:(1e7/740)+250. #dwl = 0.01040 nm
     #- (1e7/782):1.0:(1e7/750) #dwl = 0.05776 nm  
     #- (1e7/782):0.002:(1e7/750) --> this works only for noRS, indicating that the max. spectral resolution decreases by a factor of 100 for RRS computations
     #- (1e7/777):0.08:(1e7/758)
@@ -33,29 +35,29 @@ radiative_transfer:
   surface: 
     - LambertianSurfaceScalar{Float64}(0.) #(0.3) #(0.2) #(0.05)
     - LambertianSurfaceScalar{Float64}(0.) #(0.3) #(0.2) #(0.05)
-    - LambertianSurfaceScalar{Float64}(0.) #(0.3) #(0.2) #(0.05)
-    - LambertianSurfaceScalar{Float64}(0.) #(0.3) #(0.2) #(0.05)
-    - LambertianSurfaceScalar{Float64}(0.) #(0.3) #(0.2) #(0.05)
-    - LambertianSurfaceScalar{Float64}(0.) #(0.3) #(0.2) #(0.05)
-    - LambertianSurfaceScalar{Float64}(0.) #(0.3) #(0.2) #(0.05)
-    - LambertianSurfaceScalar{Float64}(0.) #(0.3) #(0.2) #(0.05)
-    - LambertianSurfaceScalar{Float64}(0.) #(0.3) #(0.2) #(0.05)
-    - LambertianSurfaceScalar{Float64}(0.) #(0.3) #(0.2) #(0.05)
-    - LambertianSurfaceScalar{Float64}(0.) #(0.3) #(0.2) #(0.05)
-    - LambertianSurfaceScalar{Float64}(0.) #(0.3) #(0.2) #(0.05)
-    - LambertianSurfaceScalar{Float64}(0.) #(0.3) #(0.2) #(0.05)
-    - LambertianSurfaceScalar{Float64}(0.) #(0.3) #(0.2) #(0.05)
-    - LambertianSurfaceScalar{Float64}(0.) #(0.3) #(0.2) #(0.05)
-    - LambertianSurfaceScalar{Float64}(0.) #(0.3) #(0.2) #(0.05)
-    - LambertianSurfaceScalar{Float64}(0.) #(0.3) #(0.2) #(0.05)
-    - LambertianSurfaceScalar{Float64}(0.) #(0.3) #(0.2) #(0.05)
+    #- LambertianSurfaceScalar{Float64}(0.) #(0.3) #(0.2) #(0.05)
+    #- LambertianSurfaceScalar{Float64}(0.) #(0.3) #(0.2) #(0.05)
+    #- LambertianSurfaceScalar{Float64}(0.) #(0.3) #(0.2) #(0.05)
+    #- LambertianSurfaceScalar{Float64}(0.) #(0.3) #(0.2) #(0.05)
+    #- LambertianSurfaceScalar{Float64}(0.) #(0.3) #(0.2) #(0.05)
+    #- LambertianSurfaceScalar{Float64}(0.) #(0.3) #(0.2) #(0.05)
+    #- LambertianSurfaceScalar{Float64}(0.) #(0.3) #(0.2) #(0.05)
+    #- LambertianSurfaceScalar{Float64}(0.) #(0.3) #(0.2) #(0.05)
+    #- LambertianSurfaceScalar{Float64}(0.) #(0.3) #(0.2) #(0.05)
+    #- LambertianSurfaceScalar{Float64}(0.) #(0.3) #(0.2) #(0.05)
+    #- LambertianSurfaceScalar{Float64}(0.) #(0.3) #(0.2) #(0.05)
+    #- LambertianSurfaceScalar{Float64}(0.) #(0.3) #(0.2) #(0.05)
+    #- LambertianSurfaceScalar{Float64}(0.) #(0.3) #(0.2) #(0.05)
+    #- LambertianSurfaceScalar{Float64}(0.) #(0.3) #(0.2) #(0.05)
+    #- LambertianSurfaceScalar{Float64}(0.) #(0.3) #(0.2) #(0.05)
+    #- LambertianSurfaceScalar{Float64}(0.) #(0.3) #(0.2) #(0.05)
     #- LambertianSurfaceScalar{Float64}(0.3)
   # Quadrature-scheme for stream calculations
   quadrature_type:    GaussQuadHemisphere()
   # Polarization type (Stokes_I, Stokes_IQ, Stokes_IQU, Stokes_IQUV)
   polarization_type:  Stokes_IQU() #QU()
-  # Maximum m (number of Fourier moments to loop over)
-  max_m:              1 #3
+  # Total m including 0 (number of Fourier moments to loop over)
+  max_m:              3
   # Exclusion angle for forward peak in fitting procedure (degrees)
   Δ_angle:            2.0
   # Trunction length for legendre terms
@@ -63,7 +65,7 @@ radiative_transfer:
   # Depolarization factor
   depol:              0.028 #(0.028: Cabannes), (0.1032: Rayleigh) 
   # Floating point type for calculations (Float32, Float64)
-  float_type:         Float64
+  float_type:         Float32
   # Architecture (default_architecture, Architectures.GPU(), Architectures.CPU())
   architecture:       Architectures.GPU() # default_architecture
   
@@ -150,48 +152,15 @@ absorption:
   fixed_molecules:
     - [O2]       # Molecules in Band #1
     - [O2]       # Molecules in Band #2
-    - [O2]       # Molecules in Band #3
-    - [O2]       # Molecules in Band #4
-    - [O2]       # Molecules in Band #1
-    - [O2]       # Molecules in Band #2
-    - [O2]       # Molecules in Band #3
-    - [O2]       # Molecules in Band #4
-    - [O2]       # Molecules in Band #1
-    - [O2]       # Molecules in Band #1
-    - [O2]       # Molecules in Band #2
-    - [O2]       # Molecules in Band #3
-    - [O2]       # Molecules in Band #4
-    - [O2]       # Molecules in Band #1
-    - [O2]       # Molecules in Band #2
-    - [O2]       # Molecules in Band #3
-    - [O2]       # Molecules in Band #4
-    - [O2]       # Molecules in Band #1
   variable_molecules:
     - []
-    - []
-    - []
-    - []
-    - []
-    - []
-    - []
-    - []
-    - []
-    - []
-    - []
-    - []
-    - []
-    - []
-    - []
-    - []
-    - []
-    - []
-    
+    - []    
     #- [H2O,CO2]  # Molecules in Band #3
   # LookUpTable files (Interpolation Model saved as JLD2!)
   LUTfiles:
     O2: "/net/fluo/data1/ABSCO_CS_Database/v5.2_final/o2_v52_v2.jld2"
   vmr: 
-    O2:   0.21
+    O2:   0.2095
   # Broadening function (Doppler/Lorentz/Voigt)
   broadening:         Voigt()
   # Complex error function for Voigt calculations
@@ -207,7 +176,7 @@ scattering:
   aerosols:       
     - τ_ref:          0.0 #00001 #0.5           # Reference τ
       μ:              0.01 #1.3           # Log mean radius (µm)
-      σ:              0.11 #log(1.12)           # Log stddev of radius (µm)
+      σ:              1.12 #2.0           # Log stddev of radius (µm)
       nᵣ:             1.5           # Real part of refractive index
       nᵢ:             0.00000001    # Imag part of refractive index
       z₀:             2.0         # Pressure peak (hPa)

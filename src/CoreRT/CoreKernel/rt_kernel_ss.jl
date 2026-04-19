@@ -220,13 +220,13 @@ function rt_kernel_ss!(RS_type::noRS{FT},
     else
         #@timeit "interaction" interaction!(RS_type, scattering_interface, SFI, composite_layer, added_layer, I_static)
         interaction_ss!(SFI,
-            composite_layer, 
-            added_layer, 
+            composite_layer,
+            added_layer,
             τ_sum,
             τ,
             quad_points,
             architecture)
-        
+
         if iz==2
             M1 = Array(composite_layer.T⁺⁺);
             M2 = Array(composite_layer.R⁺⁻);

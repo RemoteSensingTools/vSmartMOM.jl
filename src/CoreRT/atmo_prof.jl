@@ -253,9 +253,10 @@ function getRayleighLayerOptProp(psurf, λ, depol_fct, vcd_dry)
     #     @show λ[i], psurf, tau_scat[i], τ_scat[i]
     #end 
     #@show λ, psurf, tau_scat, τ_scat
-    k = τ_scat / sum(vcd_dry)
+    #k = τ_scat / sum(vcd_dry)
+    k = vcd_dry/sum(vcd_dry)
     for i = 1:Nz
-        τRayl[:,i] .= k * vcd_dry[i]
+        τRayl[:,i] .= τ_scat * k[i] #vcd_dry[i]
     end 
     return τRayl
 end
