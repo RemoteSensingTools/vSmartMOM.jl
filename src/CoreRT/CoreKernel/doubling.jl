@@ -84,13 +84,13 @@ end
 
 @kernel function apply_D!(n_stokes::Int,  r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻)
     iμ, jμ, n = @index(Global, NTuple)
-    i = mod(iμ, n_stokes)
-    j = mod(jμ, n_stokes)
+    i = mod1(iμ, n_stokes)
+    j = mod1(jμ, n_stokes)
 
     if (i > 2)
         r⁻⁺[iμ,jμ,n] = - r⁻⁺[iμ, jμ,n]
     end
-    
+
     if ((i <= 2) & (j <= 2)) | ((i > 2) & (j > 2))
         r⁺⁻[iμ,jμ,n] = r⁻⁺[iμ,jμ,n]
         t⁻⁻[iμ,jμ,n] = t⁺⁺[iμ,jμ,n]
@@ -103,9 +103,9 @@ end
 
 @kernel function apply_D_SFI!(n_stokes::Int, J₀⁻)
     iμ, _, n = @index(Global, NTuple)
-    i = mod(iμ, n_stokes)
+    i = mod1(iμ, n_stokes)
     if (i > 2)
-        J₀⁻[iμ, 1, n] = - J₀⁻[iμ, 1, n] 
+        J₀⁻[iμ, 1, n] = - J₀⁻[iμ, 1, n]
     end
 end
 
