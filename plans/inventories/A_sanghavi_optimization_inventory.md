@@ -7,6 +7,8 @@ the `InteractionWorkspace` work (Apr 2026) and several physics updates; this inv
 the actual state so the `sanghavi-unified` merge does not regress sanghavi's optimizations or
 physics.
 
+**Editorial-pass note (2026-04-19):** The 2026-04-19 user review session established the **authority rule** — *sanghavi is the authority for the inelastic path*. The per-item "adopt wholesale / rewrite / discard" framing in §5 below and several of the open questions in §8 are **superseded** by that rule and by `plans/PLAN_AMENDMENTS_2026-04-19.md`. Specific redirections are marked inline. The evidence and factual observations stand unchanged.
+
 ## Branch tips
 
 | Branch | Tip commit | Tip message | Path |
@@ -389,22 +391,14 @@ Out of scope: `src/CoreRT/atmo_prof_lin.jl`, `src/CoreRT/CoreKernel/elemental_li
 
 ### Recommendation
 
-**Adopt wholesale for items 1-10 (forward physics + helpers); discard for _lin items.** In detail:
+**Per authority rule (2026-04-19):** Items 1, 3, 4, 5, 6, 7, 8, 9, 10 (and item 2 per amendments §2.1 with bin-averaging kept as `reduce_profile_binavg`) **land via the wholesale Inelastic port** in Phase 1a / 1b per `plans/IMPLEMENTATION_PLAN_v2.md`. No per-item evaluation is required.
 
-- **Items 1 (Bodhaine), 3 (ϖ_Cabannes fix), 4 (effective-T γ), 8 (α̅ 2π), 5 (nm_per_cm rename),
-  10 (absorption clamping)** are physics correctness fixes. They MUST land on `sanghavi-unified`
-  or the Raman output will disagree with sanghavi's reference.
-- **Items 7 (compute_energy_levels!), 6 (apply_gridlines!), 9 (type-firming)** are perf/cleanup;
-  adopt.
-- **Item 2 (new reduce_profile)** should be evaluated: unified's current bin-averaging
-  `reduce_profile` and sanghavi's new interpolated `reduce_profile` give different layer
-  discretizations. Keeping both under different names is safest (sanghavi does: `reduce_profile`
-  = new, `reduce_profile_old` = old). Decide whether unified standardizes on one — this is a
-  user decision, not an automatic port.
-- **Delete `src/Inelastic/inelastic_helper_old.jl`** before merging — it's a 924-line frozen
-  reference copy that should live in git history, not on disk.
-- **_lin files**: do **not** port. Flag any cross-contamination (e.g., if the Cabannes physics
-  fix is duplicated in `_lin` files, only port the forward version).
+Carve-outs from the authority rule:
+
+- **Item 2 (new `reduce_profile`)** — default flips to linear interpolation per amendments §2.1 / Phase 1a. Bin-averaging preserved as `reduce_profile_binavg` via opt-in keyword. Lands in Phase 1a alongside the Bodhaine Rayleigh switch as a single commit with 474-test re-baselining.
+- **Item 8 (α̅ `2π` drop)** — verified correct by the user per amendments §2.4. Port with the verification comment specified there.
+- **`inelastic_helper_old.jl` (924-line frozen reference)** — does not port per amendments §1 exception; drop is achieved by not-porting, not by a delete commit.
+- **_lin files** — do **not** port (linearized Raman permanently out of scope per amendments §7). Flag any cross-contamination at Phase 1b port site.
 
 ---
 
@@ -476,10 +470,9 @@ a549a13, e7eef97, cd2de96, 2b9a0a4, 7376422, 298c63c, 2cda7ed, e61b318, 2fc2ae2,
 
 ## 8. Open questions for user validation
 
-1. **Staging (commit `d75dacb`): Keep or drop?** Adopting staging adds ~150 lines of branchy
-   code to `ScatteringInterface_11::RRS` and forces a hard GPU sync mid-kernel. Dropping it
-   means we rely on Phase 3 (flat 3D batching) to fix the memory pressure — but Phase 3 is not
-   bit-exact with sanghavi's reference. **Which side of the tradeoff does the user want?**
+**Resolution status as of 2026-04-19 user review session:** Q1, Q4, Q5, Q6 are closed by `plans/PLAN_AMENDMENTS_2026-04-19.md`. Remaining questions (Q2, Q3, Q7, Q8, Q9, Q10) are still open at the noted severity.
+
+1. ~~**Staging (commit `d75dacb`): Keep or drop?**~~ **Resolved (amendments §4 Phase 4):** Keep. `staged::Bool = true` **default-on**. Phase 5 may eventually replace the memory win with batching if re-measurement shows benefit; until then, don't trade a certain 3.5 GB win for an uncertain one.
 
 2. **Scope of `9a26002`:** The `hem_R, hem_T` additions change `rt_run`'s return signature from
    4-tuple to 6-tuple (SFI=true) and 2-tuple to 4-tuple (SFI=false). On unified, `rt_run(model)`
@@ -495,19 +488,11 @@ a549a13, e7eef97, cd2de96, 2b9a0a4, 7376422, 298c63c, 2cda7ed, e61b318, 2fc2ae2,
    cases, which use scalar Stokes_I. Does it still match `apply_D_matrix!` in `doubling.jl`
    mod1 logic (commit `a5e0de5`)?
 
-4. **Rayleigh formula switch** (Bodhaine, item 1 of commit `083353b`): changes τ_Rayleigh values
-   by a few percent in the UV/blue. Will break bit-exact regression tests on unified's 474-test
-   suite that currently use the old formula. Is it OK to update all unified test references to
-   the new Bodhaine values, or does the user want to keep the old formula behind a
-   `use_bodhaine=false` flag?
+4. ~~**Rayleigh formula switch** (Bodhaine, item 1 of commit `083353b`)~~ **Resolved (amendments §4 Phase 1a):** Bodhaine 1999 Eq. 30 becomes the default on `sanghavi-unified`. 474-test suite is re-baselined against the new Bodhaine values as one logical commit, paired with the `reduce_profile` default switch (Q5).
 
-5. **`reduce_profile` semantics** (item 2 of `083353b`): unified uses bin-averaging; sanghavi
-   replaced with linear interpolation. Different layer-averaged T/p/vmr values per layer
-   produce different τ profiles. User must pick one canonical implementation for
-   `sanghavi-unified`.
+5. ~~**`reduce_profile` semantics** (item 2 of `083353b`)~~ **Resolved (amendments §2.1 / §4 Phase 1a):** Linear interpolation on uniform pressure half-levels becomes the default. Bin-averaging preserved as `reduce_profile_binavg` (or equivalent) available via an opt-in keyword. Re-baselining lands in the same commit as the Bodhaine switch.
 
-6. **Delete `src/Inelastic/inelastic_helper_old.jl`** (924 lines, frozen reference copy
-   introduced in `083353b`)? It's a git-history artifact.
+6. ~~**Delete `src/Inelastic/inelastic_helper_old.jl`**~~ **Resolved (amendments §1 exception):** Not ported. Drop is achieved by not-porting, not by a delete commit; the file stays in git history on the sanghavi branch.
 
 7. **Sanghavi's baseline numbers** (e89ec1c commit message): `RRS: 1672s, noRS: 2.8s` on n_Raman=172,
    nSpec=5424, NquadN=15. Inventory B is supposed to compare unified's current numbers against

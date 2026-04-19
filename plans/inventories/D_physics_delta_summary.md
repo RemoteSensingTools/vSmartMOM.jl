@@ -9,6 +9,8 @@
 
 Scope: non-optimization physics differences — bug fixes, new dispatches, missing functions, new numerical formulas — between `sanghavi` and `unified-vsmartmom`. Out of scope: Inventory A (performance/workspace), Inventory C (SIF plumbing), linearized Raman (dropped).
 
+**Editorial-pass note (2026-04-19):** The 2026-04-19 user review session established the **authority rule** — *sanghavi is the authority for the inelastic path* — which settles by fiat the per-item P0/P1/P2 framing in §6 below. §7 open questions Q1, Q2, Q5 are closed by `plans/PLAN_AMENDMENTS_2026-04-19.md`. Specific redirections are marked inline. Evidence and factual observations stand.
+
 ---
 
 ## 1. Inelastic CoreKernel files
@@ -200,21 +202,35 @@ Low-to-medium. Copy the `rt_run_ss` body from sanghavi `src/CoreRT/rt_run.jl` in
 
 ---
 
-## 6. Port list for sanghavi-unified (priority-ordered)
+## 6. Port list for sanghavi-unified
+
+**Per authority rule (2026-04-19):** All items touching the inelastic path (`src/Inelastic/`, `*_inelastic.jl`, inelastic-specific portions of `atmo_prof.jl`, `model_from_parameters.jl`, `types.jl`, and the `RS_type <: noRS` branches of `rt_run.jl`) **land via the wholesale Inelastic port in Phase 1b** of `plans/IMPLEMENTATION_PLAN_v2.md`. No per-item P0/P1/P2 evaluation is required. The priority-ordered framing below is retained for historical reference.
+
+**Items 1 and 2 below** (Cabannes/depolarization physics fixes; α̅ frequency correction) land via the wholesale port per the authority rule. Item 2's unit-convention question is **closed — sanghavi is correct** per amendments §2.4 (user verification).
+
+**Item 3** (`rt_run_ss` driver port) is **not inelastic per se** but an export-leak fix; it lands in **Phase 1c** of the v2 plan.
+
+**Item 4** (`apply_D_matrix_elemental!` scalar shortcut) is **dropped** per amendments §2.2 / v2 Phase 1b. Exception from the authority rule: the dispatch-correctness risk in a merge is not worth the small performance gain; revisit as a one-line follow-up PR if scalar-mode performance becomes a concern.
+
+**Items 5 and 6** (organizational decisions about `rt_kernel!` dispatch structure and `noRS.ϖ_Cabannes` default length) remain organizational; resolve at port time in Phase 1b.
+
+Original priority framing retained below for historical reference.
+
+---
 
 **P0 — correctness bugs affecting Raman numerics, must port:**
 
 1. **`inelastic_helper.jl` Cabannes/depolarization physics fixes** (sanghavi commit `7376422`). Rewrite `compute_ϖ_Cabannes(RRS, λ₀)`, `compute_ϖ_Cabannes(VS_plus, λ₀)`, `compute_γ_air_Cabannes!`, `compute_γ_air_Rayleigh!`, and rename/rewrite `compute_γ_mol_Rayleigh!` → `compute_γ_mol_Cabannes!` (inverting the γ_C_Rayl interpretation). See §3.2 for exact formula diffs. **Without this port, `γ_C_Rayl` is used as if it were γ_mol_Cabannes but the stored value is γ_mol_Rayleigh, corrupting the Cabannes phase-matrix depolarization for RRS and VS.**
 
-2. **`inelastic_cross_section.jl` α̅ frequency correction** (sanghavi commit `083353b`). Change `1-(2π*c*ν_eff/ω₀)^2` → `1-(c*ν_eff/ω₀)^2`. **Verify unit convention first** — `ν_eff` is called with `ν̃` (wavenumber cm⁻¹) from callers in `InelasticScattering.getRamanAtmoConstants` and `getRamanSolarConstants`. If `ω₀` is stored in angular frequency (rad/s), then `c·ν̃` needs conversion; in either case sanghavi and unified differ by a factor of (2π)² in the denominator correction, which is small for visible/NIR but non-negligible for Raman in the A-band. Cross-check with Buldakov et al. 1996 Eq. 36a-39b at port time.
+2. **`inelastic_cross_section.jl` α̅ frequency correction** (sanghavi commit `083353b`). Change `1-(2π*c*ν_eff/ω₀)^2` → `1-(c*ν_eff/ω₀)^2`. ~~**Verify unit convention first**~~ — **Closed per amendments §2.4: sanghavi is correct.** `ν_eff` is wavenumber (cm⁻¹), `ω₀` is stored in wavenumber units; no `2π` factor. Verified against Buldakov et al. 1996 Eqs. 36a–39b by the user. Port with the one-line verification comment specified in amendments §2.4.
 
 **P1 — missing feature / export leak:**
 
-3. **Port `rt_run_ss` driver function** from sanghavi `src/CoreRT/rt_run.jl` to unified. Adapt field accesses to unified's `RTModel` structure. Also port the `rt_run_test_ss` wrapper. Currently `rt_run_ss` is exported from unified but undefined → import-time silent, runtime `UndefVarError`.
+3. **Port `rt_run_ss` driver function** from sanghavi `src/CoreRT/rt_run.jl` to unified. Adapt field accesses to unified's `RTModel` structure. Also port the `rt_run_test_ss` wrapper. Currently `rt_run_ss` is exported from unified but undefined → import-time silent, runtime `UndefVarError`. Lands in Phase 1c of v2 plan.
 
 **P2 — correctness nice-to-have:**
 
-4. **Port `apply_D_matrix_elemental!` scalar early-return** (sanghavi) for both RRS and VS_plus variants of `elemental_inelastic.jl` and `elemental_inelastic_plus.jl`. Low risk; avoids unnecessary kernel launch for `n_stokes == 1`.
+4. ~~**Port `apply_D_matrix_elemental!` scalar early-return**~~ — **Dropped per amendments §2.2.** The dispatch-correctness risk in a merge is not worth the small performance gain. One-line follow-up post-merge if scalar-mode performance becomes a concern.
 
 **P3 — organizational (pick one style; no numerical effect):**
 
@@ -232,16 +248,16 @@ Low-to-medium. Copy the `rt_run_ss` body from sanghavi `src/CoreRT/rt_run.jl` in
 
 ## 7. Open questions
 
-1. **Unit convention for `ν_eff` / `ω₀` in `compute_effective_coefficents!`.** Callers pass wavenumber (cm⁻¹) as `ν̃`. Is `ω₀` in the `MolecularConstants.PolTensor` struct a wavenumber (cm⁻¹), linear frequency (Hz), or angular frequency (rad/s)? Check `src/Inelastic/src/molecular_constructors.jl` and the literature source for the stored `ω₀` values. Until answered, we cannot confirm whether sanghavi's drop of `2π` or unified's retention is physically correct.
+**Resolution status as of 2026-04-19 user review session:** Q1, Q2, Q5 are closed by `plans/PLAN_AMENDMENTS_2026-04-19.md`. Q3, Q4, Q6 remain open and resolve in-flight during the Phase 1b port.
 
-2. **Which storage convention does `σ_Rayl_coeff` follow?** Sanghavi docstring for `compute_σ_Rayl_coeff!` (unified-cleaned) says it's the full Rayleigh cross-section coefficient including `(1 + 2γ_C)/(3 − 4γ_C)`, i.e., Rayleigh = Cabannes + RRS. If so, unified's `compute_ϖ_Cabannes` using `σ_elastic = σ_Rayl_coeff * vmr * ν⁰⁴` with the wrong label is numerically wrong. Confirm by checking `compute_σ_Rayl_coeff!`:
-   - If `σ_Rayl_coeff = 128π⁵α̅² · (1+2γ)/(3-4γ)` → it's full Rayleigh → sanghavi's formula is correct.
-   - If `σ_Rayl_coeff = 128π⁵α̅² / (3-4γ)` or similar Cabannes-only form → unified's formula is correct.
+1. ~~**Unit convention for `ν_eff` / `ω₀` in `compute_effective_coefficents!`.**~~ **Resolved (amendments §2.4):** `ν_eff` is wavenumber (cm⁻¹); `ω₀` is stored in wavenumber units; no `2π` factor. Verified correct against Buldakov et al. 1996 Eqs. 36a–39b by the user. Port sanghavi's form with the verification comment from amendments §2.4.
 
-3. **Should `compute_ϖ_Cabannes` take `depol` argument path be live or dead?** Sanghavi commented it out; unified kept it live but returns a simple depolarization-derived value. Who calls the 3-argument variant? A grep on each branch would clarify the call-site contract.
+2. ~~**Which storage convention does `σ_Rayl_coeff` follow?**~~ **Resolved by authority rule:** sanghavi's `inelastic_helper.jl` is the code that lands; the convention is whatever sanghavi's code assumes. Separately, amendments §4 Phase 0 adds a grep over `src/Inelastic/src/` to confirm the convention for future-maintainer documentation — that's a documentation task, not a decision gate.
 
-4. **`rt_run_ss` for inelastic_plus_plus (RRS_plus/VS_plus)?** Sanghavi's `rt_run_ss` uses `RS_type<:Union{RRS,RRS_plus}` to dispatch ϖ_λ₁λ₀ normalization but the `rt_kernel_ss!` has no explicit RRS_plus/VS_plus dispatch (only RRS, VS_0to1, VS_1to0). Is single-scatter needed for `_plus` variants or can it be noRS/RRS-only?
+3. **Should `compute_ϖ_Cabannes` take `depol` argument path be live or dead?** Sanghavi commented it out; unified kept it live but returns a simple depolarization-derived value. Who calls the 3-argument variant? A grep on each branch would clarify the call-site contract. Resolve in-flight during Phase 1b port.
 
-5. **Does unified's `interaction_hdrf!` / `elemental_canopy!` / canopy-surface code need to interact with Raman at all?** Unified has canopy code that is noRS-only; sanghavi has no canopy code. Post-merge we should verify `rt_run` for canopy + RRS doesn't try to call a canopy RRS kernel that doesn't exist.
+4. **`rt_run_ss` for inelastic_plus_plus (RRS_plus/VS_plus)?** Sanghavi's `rt_run_ss` uses `RS_type<:Union{RRS,RRS_plus}` to dispatch ϖ_λ₁λ₀ normalization but the `rt_kernel_ss!` has no explicit RRS_plus/VS_plus dispatch (only RRS, VS_0to1, VS_1to0). Is single-scatter needed for `_plus` variants or can it be noRS/RRS-only? Resolve in Phase 1c when porting the driver.
 
-6. **Noted missing: `compute_γ_air_Cabannes!` / `compute_γ_air_Rayleigh!` callers on each branch.** Confirm they are not on some cold path that hides the bug before declaring P0 priority. A grep sweep over CoreRT/atmo_prof/compEffectiveLayerProperties will find the call sites and tell us whether these enter forward RT for RRS/VS or only SIF/diagnostic paths.
+5. ~~**Does unified's `interaction_hdrf!` / `elemental_canopy!` / canopy-surface code need to interact with Raman at all?**~~ **Resolved (amendments §2.6):** Canopy + Raman coupling is a future project, not in scope for this merge. Unified's canopy code is noRS-only; sanghavi has no canopy. The combination `CanopySurface + RRS` is untested and has undefined behavior. No code guard, no smoke test; land the TODO comment specified in amendments §2.6 at the canopy dispatch site during Phase 1b.
+
+6. **Noted missing: `compute_γ_air_Cabannes!` / `compute_γ_air_Rayleigh!` callers on each branch.** Confirm they are not on some cold path that hides the bug before declaring P0 priority. A grep sweep over CoreRT/atmo_prof/compEffectiveLayerProperties will find the call sites and tell us whether these enter forward RT for RRS/VS or only SIF/diagnostic paths. Resolve in-flight during Phase 1b port.
