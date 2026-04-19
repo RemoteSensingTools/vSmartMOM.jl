@@ -41,7 +41,7 @@ const REPO_ROOT    = "/home/sanghavi/code/github/vSmartMOM.jl"
 const YAML_PATH    = "/home/sanghavi/code/github/vSmartMOM.jl/test/test_parameters/ParamsEMIT_MODTRANcomp.yaml"
 const JSON_PATH    = "/home/sanghavi/data/EMIT_MODTRANcomp/emit_20250404.json"
 const DAT_DIR      = "/home/sanghavi/data/EMIT_MODTRANcomp/vSmartMOM_out"
-const OUTPUT_PATH  = "/home/sanghavi/data/EMIT_MODTRANcomp/vSmartMOM_out/emit_modtran_noRS_results.jld2"
+const OUTPUT_PATH  = "/home/sanghavi/data/EMIT_MODTRANcomp/emit_modtran_noRS_results.jld2"
 const NC_PATH      = "/home/sanghavi/data/EMIT_MODTRANcomp/vSmartMOM_out/emit_noRS_vSmartMOM.nc"
 
 # ---- Coarse-stride controls -------------------------------------------------
