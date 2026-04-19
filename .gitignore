@@ -26,3 +26,5 @@ wigner_values.jld
 *.pyc
 *.dat
 *.hdf.nc4
+*.jld2
+*.jld
