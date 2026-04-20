@@ -448,23 +448,6 @@ function compute_γ_air_Rayleigh_VS!(λ₀::FT) where FT
     return ϖ_Cabannes_VS, γ_air_Cabannes, γ_air_Rayleigh
 end
 
-# 1-arg convenience wrapper retained from pre-port unified for compatibility
-# with model_from_parameters / lin_model_from_parameters callers. Internally
-# builds n2/o2 at T = 300 K and returns (ϖ_Cabannes, γ_air_Cabannes, γ_air_Rayleigh).
-# Phase 1b commit 5 will replace these callsites with the explicit n2/o2 form.
-function compute_γ_air_Rayleigh!(λ₀::FT) where FT
-    ν̃ =  1.e7/λ₀
-    effT  =  300.; #K assumed constant for Earth atmospheres
-
-    n2,o2 = InelasticScattering.getRamanAtmoConstants(ν̃,effT);
-    ϖ_Cabannes = compute_ϖ_Cabannes(λ₀, n2, o2)
-    γ_air_Cabannes, _ = compute_γ_air_Cabannes!(λ₀, n2, o2)
-
-    tmp = (1/ϖ_Cabannes)*((1+2γ_air_Cabannes)/(3-4γ_air_Cabannes))
-    γ_air_Rayleigh = 0.5*((3*tmp-1)/(2*tmp+1))
-
-    return ϖ_Cabannes, γ_air_Cabannes, γ_air_Rayleigh
-end
 
 # Note: ν stands for wavenumber in the following (NOT frequency)
 function apply_lineshape!(Δνᵢ, σᵢ,  # discrete transitions
