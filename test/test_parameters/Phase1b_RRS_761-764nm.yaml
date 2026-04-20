@@ -1,17 +1,24 @@
 # Phase 1b regression reference configuration — toy 1-band RRS
 #
-# Derived from sanghavi's test/test_parameters/O2_parameters2_SIF_grid_float32.yaml
-# per user's 2026-04-19 Phase 1b kickoff Q2 answer. Spectral range reduced to
-# 761–764 nm with the sanghavi default 0.1 cm⁻¹ step (≈517 points). Float32 /
-# Stokes_IQU / GaussQuadHemisphere retained from the sanghavi source. Absorption
-# block removed to isolate the RRS/Rayleigh path from HITRAN/LUT availability —
-# this is the Phase 1b gate (clean RRS numerics), not an O2 A-band physics test.
-# Aerosol τ_ref = 0 so the path is pure Rayleigh + RRS.
+# Spectral range narrowed to 762.9–763.1 nm (~34 cm⁻¹ wide at 0.1 cm⁻¹ step ≈ 34
+# points) so the routine regression gate runs in seconds on CPU while still
+# exercising the full RRS code path (Fourier moments, doubling_inelastic,
+# interaction_inelastic, RRS.Z_λ₁λ₀ cross-wavelength matrices). Per user's
+# 2026-04-19 Q1 answer for commit 7 config scope.
+#
+# Aerosol vertical distribution uses the new z₀/σ₀ (altitude-form, km) schema —
+# matching sanghavi's YAML convention, now supported by unified's validator.
+# τ_ref = 0, so the path is pure Rayleigh + RRS.
 
 radiative_transfer:
-  # Single band 761–764 nm (wavenumber 1e7/764 ≈ 13089 to 1e7/761 ≈ 13141 cm⁻¹)
+  # Single band 762–765 nm (wavenumber 1e7/765 ≈ 13071 to 1e7/762 ≈ 13123 cm⁻¹,
+  # step 0.5 cm⁻¹ → ~104 points). The ~50 cm⁻¹ window is wide enough to capture
+  # the strongest N₂/O₂ rotational Raman transitions (at ~25–55 cm⁻¹ shifts),
+  # so ieR and ieT are non-zero and the regression gate actually exercises the
+  # RRS branch. Coarser 0.5 cm⁻¹ step keeps the O(nSpec²) memory manageable on
+  # CPU — target wall time ~1 min on CPU / ~seconds on GPU.
   spec_bands:
-    - (1e7/764):0.1:(1e7/761)
+    - (1e7/765):0.5:(1e7/762)
   surface:
     - LambertianSurfaceScalar{Float64}(0.0)
   quadrature_type:    GaussQuadHemisphere()
@@ -55,18 +62,17 @@ atmospheric_profile:
   profile_reduction: 12
 
 scattering:
-  # Aerosol τ_ref = 0 so the path is pure Rayleigh + RRS. p₀/σp values are
-  # unified's pressure-peak schema (vs sanghavi's z₀/σ₀ altitude form) — with
-  # τ_ref = 0 the specific values don't matter, but the schema validator
-  # requires them.
+  # Altitude-form (z₀, σ₀) — sanghavi's preferred YAML convention. Altitude in
+  # km; σ₀ is the log-normal scale parameter in log-km. τ_ref = 0 means Mie
+  # optics are computed but never weighted into the RT — pure Rayleigh + RRS.
   aerosols:
     - τ_ref:  0.0
       μ:      0.01
       σ:      1.12
       nᵣ:     1.5
       nᵢ:     0.00000001
-      p₀:     800.0
-      σp:     100.0
+      z₀:     2.0
+      σ₀:     0.4
   r_max:         50.0
   nquad_radius:  2500
   λ_ref:         0.770
