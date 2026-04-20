@@ -94,8 +94,16 @@ Base.@kwdef mutable struct EffectiveCoefficients{FT}
     rho_depol_RotRaman::FT # 2γ_C_RotRaman/(1+γ_C_RotRaman)
     rho_depol_VibRaman::FT # 2γ_C_VibRaman/(1+γ_C_VibRaman)
     rho_depol_RoVibRaman::FT # 2γ_C_RoVibRaman/(1+γ_C_RoVibRaman)
-    "Rayl cross-section σ(ν) = σ_Rayl_coeff * (ν)⁴"
-    σ_Rayl_coeff::FT  #Cross-section = σ_Rayl_coeff * ν⁴
+    """
+    Rayleigh cross-section prefactor: σ(ν̃) = σ_Rayl_coeff · ν̃⁴.
+
+    Storage convention: ν̃ is wavenumber in cm⁻¹ (= 1e7/λ with λ in nm).
+    `σ_Rayl_coeff` is the ν̃-independent factor
+    `128π⁵ · α̅² · (1+2γ_C_Rayl)/(3-4γ_C_Rayl)` (see `compute_σ_Rayl_coeff!`
+    in src/inelastic_cross_section.jl). Multiplying by ν̃⁴ gives the
+    Rayleigh cross section in cm²/molecule.
+    """
+    σ_Rayl_coeff::FT
     σ_Rayl_coeff_hires::AbstractVector{FT}
     Δν̃_Rayl_coeff_hires::AbstractVector{FT}
 
