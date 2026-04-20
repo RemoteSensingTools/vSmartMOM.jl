@@ -1,0 +1,35 @@
+# Phase 2 harness scenarios.
+#
+# Each [[scenario]] entry declares a benchmark run. The runner loads the
+# YAML config, constructs an RS_type per `rs_type`, and invokes the
+# specified driver (`rt_run` or `rt_run_ss`).
+#
+# Scenarios added in Phase 2a are the diagnostic set — narrow enough to
+# run in <~3 min per branch and exercise both elastic + inelastic paths
+# through shared kernels. Full-range acceptance scripts
+# (prototype_EMIT_aer_ht.jl, creategrid_O2Aband_RamanSIF.jl) land in
+# Phase 3 and are added to this list then.
+
+[[scenario]]
+name        = "phase1b_RRS_761-764nm_cpu"
+yaml        = "test_parameters/Phase1b_RRS_761-764nm.yaml"
+architecture = "cpu"
+rs_type     = "RRS"
+driver      = "rt_run"
+n_samples   = 3   # Phase 2a diagnostic — 3 is sufficient; Phase 2b will raise to ≥5
+
+[[scenario]]
+name        = "phase1b_noRS_761-764nm_cpu"
+yaml        = "test_parameters/Phase1b_RRS_761-764nm.yaml"
+architecture = "cpu"
+rs_type     = "noRS"
+driver      = "rt_run"
+n_samples   = 3   # Phase 2a diagnostic — 3 is sufficient; Phase 2b will raise to ≥5
+
+[[scenario]]
+name        = "phase1b_ss_761-764nm_cpu"
+yaml        = "test_parameters/Phase1b_RRS_761-764nm.yaml"
+architecture = "cpu"
+rs_type     = "noRS"
+driver      = "rt_run_ss"
+n_samples   = 3   # Phase 2a diagnostic — 3 is sufficient; Phase 2b will raise to ≥5
