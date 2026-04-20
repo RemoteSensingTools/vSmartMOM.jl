@@ -51,14 +51,15 @@ atmospheric_profile:
       31.00,  42.07,  56.09,  74.78,  99.69, 131.00,
      176.85, 236.64, 314.58, 418.87, 557.76, 735.00,
      800.12, 849.00, 912.00, 980.00, 1000.0]
+  # Dry atmosphere: q zeroed to suppress sanghavi's implicit H2O absorption path
+  # that would otherwise produce a physics-config asymmetry with unified (which
+  # has no absorption block → no absorption at all). With q = 0 everywhere,
+  # both branches compute Rayleigh + RRS only, which is the core Phase 1b gate.
   q:
-    [2.1e-6, 2.85e-6, 3.45e-6, 4.5e-6, 5.7e-6,
-     6.45e-6, 7.35e-6, 9.3e-6, 11.4e-6, 13.95e-6,
-     15.3e-6, 16.5e-6, 17.7e-6, 20.1e-6, 20.7e-6,
-     23.1e-6, 25.2e-6, 26.4e-6, 27.3e-6, 19.65e-6,
-     14.1e-6, 8.7e-6, 5.85e-6, 4.95e-6, 4.95e-6,
-     16.95e-6, 195.0e-6, 577.5e-6, 1366.5e-6, 3673.5e-6,
-     4350.0e-6, 5100.0e-6, 5994.0e-6, 6789.0e-6, 7029.0e-6]
+    [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+     0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+     0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+     0.0, 0.0, 0.0, 0.0, 0.0]
   profile_reduction: 12
 
 scattering:

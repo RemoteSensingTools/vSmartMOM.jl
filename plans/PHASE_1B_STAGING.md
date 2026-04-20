@@ -205,3 +205,41 @@ All three blocking items closed during the Phase 1b kickoff Q&A on 2026-04-19:
 - Phase 1b: this document is the next-session launchpad.
 - Tooling: `julia-mcp` available via `.mcp.json`; persistent session at `env_path=/home/sanghavi/code/github/uni_vSmartMOM/test/` (TestEnv auto-activates).
 - Memory updated: `project_sanghavi_unified_phase_status.md` now points at Phase 1b.
+
+---
+
+## 8. Phase 1b cross-check with sanghavi — findings (2026-04-20)
+
+Ran the Phase1b_RRS YAML (762–765 nm, Stokes_IQU, Float32, CPU, dry atmosphere `q = 0`) on both worktrees. Had to work around two sanghavi-side bugs to get a run:
+
+- sanghavi's `rt_run(::RRS, model, iBand)` passes 21 args to `postprocessing_vza!` (including `hem_R, hem_T, wt_μ`) but sanghavi's RRS-method only accepts 18. The `hem_R`/`hem_T` API was the one amendments §2.3 explicitly deferred post-merge; sanghavi never wired it through the RRS method. Worked around with a session-local `@eval CoreRT` override (no file edits) that forwards the 21-arg call to the 18-arg implementation.
+- sanghavi's `rt_run_bck(::RRS, ..., greek_rayleigh::GreekCoefs, ...)` signature expects a single `GreekCoefs` but the body does `greek_rayleigh[1]` — internally inconsistent. Couldn't use this entry point at all.
+
+**Physics discrepancies** (unified / sanghavi) on identical 103-pt RRS run with `q = 0`:
+
+| Quantity | unified | sanghavi | ratio |
+|---|---|---|---|
+| I  (max) | 8.71e-3 | 2.80e-3 | **3.11 ≈ π** |
+| Q  (max) | 4.69e-4 | 1.53e-4 | **3.04 ≈ π** |
+| ieI (max)| 1.77e-5 | 7.54e-5 | **0.235** |
+| ieQ (max)| 5.47e-7 | 2.33e-6 | **0.234** |
+
+Diagnosed causes:
+
+1. **Elastic π factor.** [src/CoreRT/rt_run.jl:183](../src/CoreRT/rt_run.jl#L183) on unified defines `weight = m == 0 ? FT(0.5) : FT(1.0)`. All three sanghavi `rt_run.jl` methods (lines 81, 365, 533) use `FT(0.5/π)` / `FT(1.0/π)`. The missing `/π` factor multiplies both elastic R_SFI and inelastic ieR_SFI by π (since postprocessing_vza! applies `weight` uniformly in the accumulation at [tools/postprocessing_vza.jl:127–131](../src/CoreRT/tools/postprocessing_vza.jl#L127-L131)). This explains the 3.11 ≈ π ratio on I and Q.
+
+2. **Inelastic 0.235 factor is unexplained.** If the only discrepancy were the weight, ieI would also be 3.11× larger on unified (and the observed ratio would be π, not 0.235). Instead ieI on unified is SMALLER than sanghavi by ~4.27×. With the weight π already accounted for, the remaining factor is `0.235 × π ≈ 0.738 ≈ 3/4π`. Possible causes (to investigate):
+   - Different `compute_Z_moments` normalization for RRS Z_λ₁λ₀ between branches.
+   - Different convention on `ϖ_λ₁λ₀` scaling.
+   - `computeRamanZλ!` setup in `rt_run` not fully equivalent (unified has the bulk-ported `inelastic_helper.jl` but may still reference an old convention in the shared `rt_run` body).
+   - Raman Z-matrices stored with cm⁻¹ vs nm convention mismatch (sanghavi vs unified disagree on which).
+
+**Decision (pre-fix):** Phase 1b's `test/reference/phase1b_RRS_unified_selfref.jld2` (current regression gate in commit `70478fc`) is a self-reference — it catches future numerical regression on `sanghavi-unified`, but it does NOT prove "matches sanghavi physics." The new `phase1b_RRS_sanghavi_q0.jld2` (committed as a fresh reference) and `phase1b_RRS_unified_q0.jld2` side-by-side make the discrepancy visible and testable.
+
+**Next session's Phase 1b follow-up must:**
+
+1. Land the `/π` fix on [src/CoreRT/rt_run.jl:183](../src/CoreRT/rt_run.jl#L183) (and `rt_run_multisensor.jl:82` by parallel). This is a forward-RT physics default change (similar footprint to Phase 1a's Bodhaine switch) that will shift **all** elastic test reference values by π. Expect to re-baseline the 6SV1, Natraj, and test_forward_noRS reference numbers.
+2. Trace the 0.235 inelastic factor through `rt_run`, `computeRamanZλ!`, and the RRS kernel chain.
+3. Once both are aligned, regenerate `phase1b_RRS_unified_q0.jld2` and swap the regression-gate reference from `_unified_selfref` → `_sanghavi_q0`. At that point the Phase 1b "matches sanghavi physics to the 6th decimal place" gate is truly closed.
+
+Both currently-committed references live at [test/reference/](../test/reference/) — `phase1b_RRS_sanghavi_q0.jld2` (what unified should match), `phase1b_RRS_unified_q0.jld2` (what unified currently produces on the dry YAML), and `phase1b_RRS_unified_selfref.jld2` (original self-ref on the `q>0` YAML).
