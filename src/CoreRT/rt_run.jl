@@ -306,3 +306,200 @@ function rt_run(RS_type::AbstractRamanType, model, iBand)
     #return SFI ? (R_SFI, T_SFI, ieR_SFI, ieT_SFI) : (R, T)
     #end
 end
+
+
+# =========================================================================
+# Single-scatter approximation driver
+# =========================================================================
+
+"""
+    rt_run_ss(model::RTModel; i_band=1) -> (R_SFI, T_SFI, ieR_SFI, ieT_SFI, hem_R, hem_T)
+
+Run the single-scatter approximation forward RT solver for one or more bands.
+
+Computes only the single-scattering component of the TOA reflectance /
+BOA transmittance by replacing the layer-doubling kernel with
+[`rt_kernel_ss!`](@ref) and using [`interaction_ss!`](@ref) for the final
+surface coupling. Useful as a fast/debug reference path; not a physically
+complete RT solution (multiple scattering is dropped).
+
+Equivalent to `rt_run_ss(noRS(), model, i_band)`.
+
+Ported from sanghavi-branch `rt_run_ss` (see `plans/IMPLEMENTATION_PLAN_v2.md`
+Phase 1c).
+
+# Arguments
+- `model::RTModel`: Pre-built model from [`model_from_parameters`](@ref).
+- `i_band::Integer=1`: Spectral band index (or vector of indices).
+
+# Returns
+6-tuple `(R_SFI, T_SFI, ieR_SFI, ieT_SFI, hem_R, hem_T)`:
+- `R_SFI`, `T_SFI`, `ieR_SFI`, `ieT_SFI`: shape `(nVza, nStokes, nSpec)` — same
+  per-direction outputs as [`rt_run`](@ref).
+- `hem_R`, `hem_T`: hemispherical-integrated TOA reflectance / BOA transmittance,
+  shape `(nSpec,)`. Computed from the m=0 Fourier coefficient of the Stokes-I
+  source function over the full upper hemisphere (Σⱼ J₀[j, 1, λ] · μⱼ · wⱼ).
+"""
+function rt_run_ss(model; i_band::Integer = 1)
+    rt_run_ss(InelasticScattering.noRS{float_type(model)}(), model, i_band)
+end
+
+"""
+    rt_run_test_ss(RS_type, model, iBand)
+
+Test entry point for single-scatter RT with explicit Raman type.
+"""
+function rt_run_test_ss(RS_type::AbstractRamanType, model, iBand)
+    rt_run_ss(RS_type, model, iBand)
+end
+
+"""
+    rt_run_ss(RS_type, model::RTModel, iBand)
+
+Single-scatter approximation driver with explicit Raman type. See
+[`rt_run_ss`](@ref) for the user-facing entry point.
+"""
+function rt_run_ss(RS_type::AbstractRamanType, model, iBand)
+    (; vza, vaz) = model.obs_geom
+    (; qp_μ, wt_μ, qp_μN, μ₀, iμ₀, Nquad) = model.quad_points
+    pol_type = CoreRT.polarization_type(model)
+    max_m    = get_max_m(model)
+    (; quad_points) = model
+    FT       = CoreRT.float_type(model)
+
+    brdf = get_surface(model, iBand[1])
+    if length(iBand) > 1
+        @info "More than one band has been chosen; single-scatter path uses only the first BRDF."
+    end
+
+    # Same ϖ_λ₁λ₀ normalization as rt_run (ported from sanghavi rt_run_ss:466).
+    if typeof(RS_type) <: Union{RRS, RRS_plus}
+        RS_type.ϖ_λ₁λ₀ .*= (1 - model.ϖ_Cabannes[iBand[1]]) / sum(RS_type.ϖ_λ₁λ₀)
+    end
+
+    Nz = length(model.profile.p_full)
+
+    RS_type.bandSpecLim = UnitRange{Int}[]
+    nSpec = 0
+    for iB in iBand
+        nSpec0 = nSpec + 1
+        nSpec += size(model.τ_abs[iB], 1)
+        push!(RS_type.bandSpecLim, nSpec0:nSpec)
+    end
+
+    arr_type = CoreRT.array_type(model)
+    arch     = CoreRT.architecture(model)
+    SFI = true
+    NquadN = Nquad * pol_type.n
+    dims   = (NquadN, NquadN)
+
+    @timeit "Arrays"  R       = zeros(FT, length(vza), pol_type.n, nSpec)
+    @timeit "Arrays"  T       = zeros(FT, length(vza), pol_type.n, nSpec)
+    @timeit "Arrays"  R_SFI   = zeros(FT, length(vza), pol_type.n, nSpec)
+    @timeit "Arrays"  T_SFI   = zeros(FT, length(vza), pol_type.n, nSpec)
+    @timeit "Arrays"  ieR_SFI = zeros(FT, length(vza), pol_type.n, nSpec)
+    @timeit "Arrays"  ieT_SFI = zeros(FT, length(vza), pol_type.n, nSpec)
+    @timeit "Arrays"  hem_R   = zeros(FT, nSpec)
+    @timeit "Arrays"  hem_T   = zeros(FT, nSpec)
+
+    msg = """
+    Single-scatter mode — processing on: $(arch)
+    With FT: $(FT)
+    Source Function Integration: $(SFI)
+    Dimensions: $((NquadN, NquadN, nSpec))
+    """
+    @info msg
+
+    @timeit "Creating layers" added_layer         = make_added_layer(RS_type, FT, arr_type, dims, nSpec)
+    @timeit "Creating layers" added_layer_surface = make_added_layer(RS_type, FT, arr_type, dims, nSpec)
+    @timeit "Creating layers" composite_layer     = make_composite_layer(RS_type, FT, arr_type, dims, nSpec)
+    @timeit "Creating arrays" I_static            = Diagonal(arr_type(Diagonal{FT}(ones(dims[1]))))
+
+    # Default F₀ (unit Stokes I) if still at placeholder size.
+    if size(RS_type.F₀) != (pol_type.n, nSpec)
+        F₀ = zeros(FT, pol_type.n, nSpec)
+        F₀[1, :] .= one(FT)
+        RS_type.F₀ = F₀
+    end
+
+    τ_sum_all = nothing
+
+    for m = 0:max_m - 1
+        weight = m == 0 ? FT(0.5/π) : FT(1.0/π)
+
+        @timeit "IE" InelasticScattering.computeRamanZλ!(RS_type, pol_type, collect(qp_μ), m, arr_type)
+
+        @timeit "OpticalProps" layer_opt_props, fScattRayleigh =
+            constructCoreOpticalProperties(RS_type, iBand, m, model)
+
+        @timeit "Extract Optical Properties" scattering_interfaces_all, τ_sum_all =
+            extractEffectiveProps(layer_opt_props, quad_points)
+
+        @showprogress 1 "SS looping over layers ..." for iz = 1:Nz
+            if !(typeof(RS_type) <: noRS)
+                @timeit "Expand Bands" RS_type.fscattRayl = expandBandScalars(RS_type, fScattRayleigh[iz])
+            end
+
+            @timeit "OpticalProps" layer_opt = expandOpticalProperties(layer_opt_props[iz], arr_type)
+
+            @timeit "RT SS Kernel" rt_kernel_ss!(RS_type, pol_type, SFI,
+                        added_layer, composite_layer,
+                        layer_opt,
+                        scattering_interfaces_all[iz],
+                        τ_sum_all[:, iz],
+                        m, quad_points,
+                        I_static,
+                        arch,
+                        qp_μN, iz)
+        end
+
+        @timeit "Create Surface" create_surface_layer!(brdf,
+                            added_layer_surface,
+                            SFI, m,
+                            pol_type,
+                            quad_points,
+                            arr_type(τ_sum_all[:, end]),
+                            arch)
+
+        # SS mode uses interaction_ss! (no multiple-scattering doubling with surface).
+        τsurf = zeros(FT, length(τ_sum_all[:, Nz + 1]))
+        @timeit "interaction_ss" interaction_ss!(SFI,
+                            composite_layer,
+                            added_layer_surface,
+                            τ_sum_all[:, Nz + 1],
+                            τsurf,
+                            quad_points,
+                            arch)
+
+        @timeit "Postprocessing VZA" postprocessing_vza!(RS_type,
+                            iμ₀, pol_type,
+                            composite_layer,
+                            vza, qp_μ, m, vaz, μ₀,
+                            weight, nSpec,
+                            SFI,
+                            R, R_SFI,
+                            T, T_SFI,
+                            ieR_SFI, ieT_SFI)
+
+        # Hemispherical integration — only m=0 contributes under 2π azimuthal
+        # integration (higher Fourier moments vanish). Weight factor
+        # (0.5/π) × 2π = 1 makes the raw Σⱼ J₀[j,1,λ] · μⱼ · wⱼ direct.
+        if m == 0 && SFI
+            J₀⁻_cpu = Array(composite_layer.J₀⁻)
+            J₀⁺_cpu = Array(composite_layer.J₀⁺)
+            μ_arr = Array(qp_μ)
+            w_arr = Array(wt_μ)
+            nStokes = pol_type.n
+            @inbounds for s = 1:nSpec, j = 1:Nquad
+                j_I = (j - 1) * nStokes + 1
+                hem_R[s] += J₀⁻_cpu[j_I, 1, s] * μ_arr[j] * w_arr[j]
+                hem_T[s] += J₀⁺_cpu[j_I, 1, s] * μ_arr[j] * w_arr[j]
+            end
+        end
+    end
+
+    print_timer()
+    reset_timer!()
+
+    return SFI ? (R_SFI, T_SFI, ieR_SFI, ieT_SFI, hem_R, hem_T) : (R, T, hem_R, hem_T)
+end
