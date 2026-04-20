@@ -1,3 +1,8 @@
+#=
+ 
+This file contains RT elemental-related functions
+ 
+=#
 function getKernelDim(RS_type::RRS,ier⁻⁺)
     return size(ier⁻⁺);
 end
@@ -29,10 +34,10 @@ function elemental_inelastic!(RS_type::Union{RRS, RRS_plus},
                             quad_points::QuadPoints{FT2}, # struct with quadrature points, weights, 
                             added_layer::Union{AddedLayer{FT},AddedLayerRS{FT}}, 
                             I_static,
-                            architecture) where {FT<:Real,FT2}
+                            architecture) where {FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2}
 
-    (; ier⁺⁻, ier⁻⁺, iet⁻⁻, iet⁺⁺, ieJ₀⁺, ieJ₀⁻) = added_layer
-    (; qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart, iμ₀) = quad_points
+    @unpack ier⁺⁻, ier⁻⁺, iet⁻⁻, iet⁺⁺, ieJ₀⁺, ieJ₀⁻ = added_layer
+    @unpack qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart, iμ₀ = quad_points
     arr_type = array_type(architecture)
     τ_sum = arr_type(τ_sum)
     # Need to check with paper nomenclature. This is basically eqs. 19-20 in vSmartMOM
@@ -49,12 +54,13 @@ function elemental_inelastic!(RS_type::Union{RRS, RRS_plus},
         # for m==0, ₀∫²ᵖⁱ cos²(mϕ)dϕ/4π = 0.5, while
         # for m>0,  ₀∫²ᵖⁱ cos²(mϕ)dϕ/4π = 0.25  
         
-        wct02 = fourier_weight(m, FT)
-        wct2  = scaled_weights(m, wt_μN)
+        wct02 = m == 0 ? FT(0.50)              : FT(0.25)
+        wct2  = m == 0 ? wt_μN/2               : wt_μN/4
 
         # Calculate r⁻⁺ and t⁺⁺
         #Version 2: More computationally intensive definition of a single scattering layer with variable (0-∞) absorption
         # Version 2: with absorption in batch mode, low tau_scatt but higher tau_total, needs different equations
+        #@show RS_type
         get_elem_rt!(RS_type, ier⁻⁺, iet⁺⁺, 
             dτ_λ, ϖ_λ, Z⁻⁺_λ₁λ₀, Z⁺⁺_λ₁λ₀, qp_μN, wct2)
         
@@ -68,32 +74,38 @@ function elemental_inelastic!(RS_type::Union{RRS, RRS_plus},
         # Apply D Matrix
         apply_D_matrix_elemental!(RS_type, ndoubl, pol_type.n, 
                                     ier⁻⁺, iet⁺⁺, ier⁺⁻, iet⁻⁻)
+        #println("Apply D matrix done")
         if SFI
+            #@show "here 1"
             apply_D_matrix_elemental_SFI!(RS_type, 
                                         ndoubl, 
                                         pol_type.n, 
                                         ieJ₀⁻)
+            #@show "here 2"
         end
+        #println("Apply D matrix SFI done")      
     else 
         # Note: τ is not defined here
         iet⁺⁺[:] = 0.0 #Diagonal{exp(-τ ./ qp_μN)}
         iet⁻⁻[:] = 0.0 #Diagonal{exp(-τ ./ qp_μN)}
     end    
+    #@show size(ieJ₀⁺)
+    #=
+    if m<3
+    for ctr=1:pol_type.n:length(qp_μN)
+        for ctr2=1:pol_type.n:length(qp_μN)
+    @show m, ctr, ctr2, sum(ieJ₀⁺[ctr,ctr2,963,:])
+    @show m, ctr, ctr2, sum(ieJ₀⁻[ctr,ctr2,963,:])
+    @show m, ctr, ctr2, sum(iet⁺⁺[ctr,ctr2,963,:])
+    @show m, ctr, ctr2, sum(ier⁻⁺[ctr,ctr2,963,:])
+    end
+    end
+    end=#
     #@pack! added_layer = r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, J₀⁺, J₀⁻   
 end
 
-"""
-    get_elem_rt_RRS!(fscattRayl, ϖ_λ₁λ₀, i_λ₁λ₀, i_ref, ier⁻⁺, iet⁺⁺, dτ_λ, ϖ_λ, Z⁻⁺_λ₁λ₀, Z⁺⁺_λ₁λ₀, qp_μN, wct2)
-
-Compute elemental layer inelastic reflectance (ier⁻⁺) and transmittance (iet⁺⁺) for Rotational Raman Scattering (RRS).
-
-Implements the thin-layer (elemental) R and T for inelastic scattering:
-- **R⁻⁺(μᵢ,μⱼ; λ→λᵣ)**: Eq. 14 in Sanghavi & Frankenberg (2023), JQSRT 311, 108791
-- **T⁺⁺(μᵢ,μⱼ; λ→λᵣ)**: Eq. 14, with L'Hôpital limit when μᵢ/μⱼ ≈ Δτ(λᵣ)/Δτ(λ)
-
-Variable mapping: `n₀` = incident wavelength index (λ), `n₁` = scattered wavelength index (λᵣ),
-`n₀ = n₁ + i_λ₁λ₀[Δn]`.
-"""
+#Suniti: is there a way to pass information like ϖ_λ₁λ₀, i_λ₁λ₀, i_ref, etc. along with RS_type? So that they can be retrieved as RSS.ϖ_λ₁λ₀ for example?
+# This one is only for RRS
 @kernel function get_elem_rt_RRS!(fscattRayl, 
                             ϖ_λ₁λ₀, i_λ₁λ₀, i_ref,
                             ier⁻⁺, iet⁺⁺, 
@@ -123,6 +135,7 @@ Variable mapping: `n₀` = incident wavelength index (λ), `n₁` = scattered wa
 
 
         if (qp_μN[i] == qp_μN[j])
+            # @show i,j
             # 𝐓⁺⁺(μᵢ, μᵢ) = (exp{-τ/μᵢ} + ϖ ̇𝐙⁺⁺(μᵢ, μᵢ) ̇(τ/μᵢ) ̇exp{-τ/μᵢ}) ̇𝑤ᵢ
             #if i == j       
                 if abs(dτ_λ[n₀]-dτ_λ[n₁])>1.e-8
@@ -142,6 +155,7 @@ Variable mapping: `n₀` = incident wavelength index (λ), `n₁` = scattered wa
             #    iet⁺⁺[i,j,n₁,Δn] =  0.0
             #end
         else
+            #@show  qp_μN[i], qp_μN[j]  
             # 𝐓⁺⁺(μᵢ, μⱼ) = ϖ ̇𝐙⁺⁺(μᵢ, μⱼ) ̇(μⱼ/(μᵢ-μⱼ)) ̇(exp{-τ/μᵢ} - exp{-τ/μⱼ}) ̇𝑤ⱼ
             # (𝑖 ≠ 𝑗)
 
@@ -156,6 +170,19 @@ Variable mapping: `n₀` = incident wavelength index (λ), `n₁` = scattered wa
                 wct2[j] * 
                 (exp(-dτ_λ[n₁] / qp_μN[i]) - exp(-dτ_λ[n₀] / qp_μN[j]))
             end
+                #=
+                if (i%3==1)&(j%3==1)&(n₁==200)  
+                    @show i, j, n₁, n₀, Δn
+                        @show fscattRayl[n₀]
+                        @show ϖ_λ₁λ₀[Δn]
+                        @show ϖ_λ[n₀] 
+                        @show Z⁺⁺_λ₁λ₀[i,j] 
+                        @show (1 / ( (qp_μN[i]/qp_μN[j]) - (dτ_λ[n₁]/dτ_λ[n₀]) )) 
+                        @show (exp(-dτ_λ[n₁] / qp_μN[i]) - exp(-dτ_λ[n₀] / qp_μN[j]))
+                        @show wct2[j]
+                        @show iet⁺⁺[i,j,n₁,Δn]
+                 end 
+                 =#
         end
         
     else
@@ -175,10 +202,20 @@ function get_elem_rt!(RS_type::RRS,
                         dτ_λ, ϖ_λ,
                         Z⁻⁺_λ₁λ₀, Z⁺⁺_λ₁λ₀, 
                         qp_μN, wct2)
-        (; fscattRayl, ϖ_λ₁λ₀, i_λ₁λ₀, i_ref) = RS_type
+        @unpack fscattRayl, ϖ_λ₁λ₀, i_λ₁λ₀, i_ref = RS_type
         device = devi(architecture(ier⁻⁺))
         aType = array_type(architecture(ier⁻⁺))
         kernel! = get_elem_rt_RRS!(device)
+       #@show typeof(i_ref), typeof(ϖ_λ₁λ₀)
+       # @show typeof(dτ_λ), typeof(ϖ_λ)
+       # @show typeof(qp_μN), typeof(wct2)
+       # @show typeof(ier⁻⁺), typeof(iet⁺⁺)
+        #@show typeof(fscattRayl), (fscattRayl[1:10]), typeof(aType(ϖ_λ₁λ₀))
+        #exit()
+        #sleep(10)
+       
+            #@show minimum(ϖ_λ₁λ₀), maximum(ϖ_λ₁λ₀)
+            
         event = kernel!(aType(fscattRayl), 
                     aType(ϖ_λ₁λ₀), aType(i_λ₁λ₀), 
                     i_ref,
@@ -187,7 +224,16 @@ function get_elem_rt!(RS_type::RRS,
                     aType(Z⁻⁺_λ₁λ₀), aType(Z⁺⁺_λ₁λ₀), 
                     qp_μN, wct2, 
                     ndrange=getKernelDim(RS_type,ier⁻⁺)); 
+        #wait(device, event);
         synchronize_if_gpu();
+        #for j=1:1:length(qp_μN)
+        #    @show minimum(iet⁺⁺[1:3:end,j,200,50]), minimum(ier⁻⁺[1:3:end,j,200,50]) 
+        #    @show maximum(iet⁺⁺[1:3:end,j,200,50]), maximum(ier⁻⁺[1:3:end,j,200,50]) 
+        #end
+        #for j=1:3:length(qp_μN)
+        #    @show minimum(iet⁺⁺[1:3:end,j,200,50]), minimum(ier⁻⁺[1:3:end,j,200,50]) 
+        #    @show maximum(iet⁺⁺[1:3:end,j,200,50]), maximum(ier⁻⁺[1:3:end,j,200,50]) 
+        #end
 end
 
 function get_elem_rt!(RS_type::Union{VS_0to1, VS_1to0}, 
@@ -195,10 +241,11 @@ function get_elem_rt!(RS_type::Union{VS_0to1, VS_1to0},
     dτ_λ, ϖ_λ,
     Z⁻⁺_λ₁λ₀, Z⁺⁺_λ₁λ₀, 
     qp_μN, wct2)
-    (; fscattRayl, ϖ_λ₁λ₀, i_λ₁λ₀, i_ref) = RS_type
+    @unpack fscattRayl, ϖ_λ₁λ₀, i_λ₁λ₀, i_ref = RS_type
     device = devi(architecture(ier⁻⁺))
     aType = array_type(architecture(ier⁻⁺))
     kernel! = get_elem_rt_VS!(device)
+    #@show typeof(Z⁻⁺_λ₁λ₀), typeof(Z⁺⁺_λ₁λ₀), typeof(ϖ_λ₁λ₀), typeof(i_λ₁λ₀), typeof(i_ref)
     event = kernel!(aType(fscattRayl), 
         aType(ϖ_λ₁λ₀), aType(i_λ₁λ₀), 
         i_ref,
@@ -211,17 +258,7 @@ function get_elem_rt!(RS_type::Union{VS_0to1, VS_1to0},
     synchronize_if_gpu();
 end
 
-"""
-    get_elem_rt_VS!(fscattRayl, ϖ_λ₁λ₀, i_λ₁λ₀, i_ref, ier⁻⁺, iet⁺⁺, dτ_λ, ϖ_λ, Z⁻⁺_λ₁λ₀, Z⁺⁺_λ₁λ₀, qp_μN, wct2)
 
-Compute elemental layer inelastic reflectance (ier⁻⁺) and transmittance (iet⁺⁺) for Vibrational Raman Scattering (VS).
-
-Implements the thin-layer (elemental) R and T for inelastic scattering:
-- **R⁻⁺(μᵢ,μⱼ; λ→λᵣ)**: Eq. 14 in Sanghavi & Frankenberg (2023), JQSRT 311, 108791
-- **T⁺⁺(μᵢ,μⱼ; λ→λᵣ)**: Eq. 14, with L'Hôpital limit when μᵢ/μⱼ ≈ Δτ(λᵣ)/Δτ(λ)
-
-For VS, incident wavelength is always at `n₀ = 1`; `n₁` indexes the scattered wavelength in the target band.
-"""
 @kernel function get_elem_rt_VS!(fscattRayl,
                             ϖ_λ₁λ₀, i_λ₁λ₀, i_ref,
                             ier⁻⁺, iet⁺⁺, 
@@ -248,6 +285,7 @@ For VS, incident wavelength is always at `n₀ = 1`; `n₁` indexes the scattere
                 (1 - exp(-((dτ_λ[n₁] / qp_μN[i]) + (dτ_λ[n₀] / qp_μN[j])))) * wct2[j] 
                     
         if (qp_μN[i] == qp_μN[j])
+            # @show i,j
             # 𝐓⁺⁺(μᵢ, μᵢ) = (exp{-τ/μᵢ} + ϖ ̇𝐙⁺⁺(μᵢ, μᵢ) ̇(τ/μᵢ) ̇exp{-τ/μᵢ}) ̇𝑤ᵢ
             if i == j       
                 if abs(dτ_λ[n₀]-dτ_λ[n₁])>1.e-6
@@ -265,6 +303,7 @@ For VS, incident wavelength is always at `n₀ = 1`; `n₁` indexes the scattere
                 iet⁺⁺[i,j,n₁,1] = 0.0
             end
         else
+            #@show  qp_μN[i], qp_μN[j]  
             # 𝐓⁺⁺(μᵢ, μⱼ) = ϖ ̇𝐙⁺⁺(μᵢ, μⱼ) ̇(μⱼ/(μᵢ-μⱼ)) ̇(exp{-τ/μᵢ} - exp{-τ/μⱼ}) ̇𝑤ⱼ
             # (𝑖 ≠ 𝑗)
             iet⁺⁺[i,j,n₁,1] = 
@@ -290,10 +329,12 @@ function get_elem_rt_SFI!(RS_type::Union{VS_0to1, VS_1to0},
                         qp_μN, ndoubl,
                         wct02, nStokes,
                         I₀, iμ0,D)
-    (; fscattRayl, ϖ_λ₁λ₀, i_λ₁λ₀, i_ref) = RS_type
+    @unpack fscattRayl, ϖ_λ₁λ₀, i_λ₁λ₀, i_ref = RS_type
+    #@show fscattRayl
     device = devi(architecture(ieJ₀⁺))
     aType = array_type(architecture(ieJ₀⁺))
     kernel! = get_elem_rt_SFI_VS!(device)
+    #@show typeof(ieJ₀⁺), typeof(τ_sum), typeof(dτ_λ),typeof(wct02), typeof(qp_μN), typeof(dτ_λ) 
     event = kernel!(fscattRayl, aType(ϖ_λ₁λ₀), aType(i_λ₁λ₀), 
     i_ref, ieJ₀⁺, ieJ₀⁻, 
     τ_sum, dτ_λ, 
@@ -305,7 +346,79 @@ function get_elem_rt_SFI!(RS_type::Union{VS_0to1, VS_1to0},
     synchronize_if_gpu();
 end
 
-function get_elem_rt_SFI!(RS_type::RRS,
+#  TODO: Nov 30, 2021
+#=
+@kernel function get_elem_rt_SFI_VS!(fscattRayl,
+                            ϖ_λ₁λ₀, i_λ₁λ₀, i_ref,
+                            ieJ₀⁺, ieJ₀⁻, 
+                            τ_sum, dτ_λ, ϖ_λ,
+                            Z⁻⁺_λ₁λ₀, Z⁺⁺_λ₁λ₀, 
+                            qp_μN, ndoubl,
+                            wct02, nStokes, 
+                            I₀, iμ0, D)
+    
+    i_start  = nStokes*(iμ0-1) + 1 
+    i_end    = nStokes*iμ0
+
+    i, _, Δn = @index(Global, NTuple) ##Suniti: What are Global and Ntuple?
+    # let n₁ cover the full range of wavelengths, while n₀ only includes wavelengths at intervals 
+    # that contribute significantly enough to inelastic scattering, so that n₀≪n₁ 
+
+    #Suniti: require that the incident wavelength is always the first element of 1:nSpec, and all the others belong to the same target VS band
+    #Suniti: Then,
+    n₀ = 1    
+    n₁ = n₀ + i_λ₁λ₀[Δn]  
+      
+    #if (wct2[j]>1.e-8) 
+    
+    FT = eltype(I₀)
+    ieJ₀⁺[i, 1, n₁, 1]=0
+    ieJ₀⁻[i, 1, n₁, 1]=0
+    
+    Z⁺⁺_I₀ = FT(0.0);
+    Z⁻⁺_I₀ = FT(0.0);
+    for ii = i_start:i_end
+        Z⁺⁺_I₀ += Z⁺⁺_λ₁λ₀[i,ii] * I₀[ii-i_start+1]
+        Z⁻⁺_I₀ += Z⁻⁺_λ₁λ₀[i,ii] * I₀[ii-i_start+1] 
+    end
+    
+    if (i>=i_start) && (i<=i_end)
+        #ctr = i-i_start+1
+        # J₀⁺ = 0.25*(1+δ(m,0)) * ϖ(λ) * Z⁺⁺ * I₀ * (dτ(λ)/μ₀) * exp(-dτ(λ)/μ₀)
+        if abs(dτ_λ[n₀]-dτ_λ[n₁])>1.e-6
+            ieJ₀⁺[i, 1, n₁, 1] = 
+                    (exp(-dτ_λ[n₀] / qp_μN[i]) - exp(-dτ_λ[n₁] / qp_μN[i])) /
+                    ((dτ_λ[n₁]/dτ_λ[n₀])-1) * 
+                    ϖ_λ₁λ₀[Δn] * ϖ_λ[n₀] * fscattRayl * Z⁺⁺_I₀ * wct02
+        else
+            ieJ₀⁺[i, 1, n₁, 1] = 
+                    wct02 * ϖ_λ₁λ₀[Δn] * ϖ_λ[n₀] * fscattRayl * Z⁺⁺_I₀ * 
+                    (1 - exp(-dτ_λ[n₀] / qp_μN[i_start]))
+        end
+    else
+        # J₀⁺ = 0.25*(1+δ(m,0)) * ϖ(λ) * Z⁺⁺ * I₀ * [μ₀ / (μᵢ - μ₀)] * [exp(-dτ(λ)/μᵢ) - exp(-dτ(λ)/μ₀)]
+        ieJ₀⁺[i, 1, n₁, 1] = 
+                    wct02 * ϖ_λ₁λ₀[Δn] * ϖ_λ[n₀] * fscattRayl * Z⁺⁺_I₀ * 
+                    (1 /( (qp_μN[i]/qp_μN[i_start]) - (dτ_λ[n₁]/dτ_λ[n₀]) ) ) * 
+                    (exp(-dτ_λ[n₁] / qp_μN[i]) - exp(-dτ_λ[n₀] / qp_μN[i_start]))  
+    end
+    #TODO
+    #J₀⁻ = 0.25*(1+δ(m,0)) * ϖ(λ) * Z⁻⁺ * I₀ * [μ₀ / (μᵢ + μ₀)] * [1 - exp{-dτ(λ)(1/μᵢ + 1/μ₀)}]                    
+    ieJ₀⁻[i, 1, n₁, 1] = 
+                wct02 * ϖ_λ₁λ₀[Δn] * ϖ_λ[n₀] * fscattRayl * Z⁻⁺_I₀ * 
+                (1/( (qp_μN[i] / qp_μN[i_start]) + (dτ_λ[n₁]/dτ_λ[n₀]) )) *
+                (1 - exp(-( (dτ_λ[n₁] / qp_μN[i]) + (dτ_λ[n₀] / qp_μN[i_start]) ) ))  
+
+    ieJ₀⁺[i, 1, n₁, 1] *= exp(-τ_sum[n₀]/qp_μN[i_start])
+    ieJ₀⁻[i, 1, n₁, 1] *= exp(-τ_sum[n₀]/qp_μN[i_start])
+
+    if ndoubl >= 1
+        ieJ₀⁻[i, 1, n₁, 1] = D[i,i]*ieJ₀⁻[i, 1, n₁, 1] #D = Diagonal{1,1,-1,-1,...Nquad times}
+    end        
+end
+=#
+#  TODO: Nov 30, 2021
+function get_elem_rt_SFI!(RS_type::RRS, 
                         ieJ₀⁺, ieJ₀⁻, 
                         τ_sum, dτ_λ, ϖ_λ, 
                         Z⁻⁺_λ₁λ₀, Z⁺⁺_λ₁λ₀, 
@@ -313,10 +426,12 @@ function get_elem_rt_SFI!(RS_type::RRS,
                         qp_μN, ndoubl,
                         wct02, nStokes,
                         I₀, iμ0,D)
-    (; fscattRayl, ϖ_λ₁λ₀, i_λ₁λ₀, i_ref) = RS_type
+    @unpack fscattRayl, ϖ_λ₁λ₀, i_λ₁λ₀, i_ref = RS_type
+    #@show fscattRayl
     device  = devi(architecture(ieJ₀⁺))
     aType   = array_type(architecture(ieJ₀⁺))
     kernel! = get_elem_rt_SFI_RRS!(device)
+    #@show typeof(ieJ₀⁺), typeof(τ_sum), typeof(dτ_λ),typeof(wct02), typeof(qp_μN), typeof(dτ_λ) 
     event = kernel!(aType(fscattRayl), aType(ϖ_λ₁λ₀), aType(i_λ₁λ₀), 
                 i_ref, ieJ₀⁺, ieJ₀⁻, 
                 τ_sum, dτ_λ, ϖ_λ,
@@ -326,18 +441,14 @@ function get_elem_rt_SFI!(RS_type::RRS,
                 I₀, iμ0, D, 
                 ndrange=getKernelDimSFI(RS_type,ieJ₀⁻));
     
+    #wait(device, event)
     synchronize_if_gpu();
+    #@show minimum(ieJ₀⁺[1:3:end,1,200,50]), minimum(ieJ₀⁻[1:3:end,1,200,50]) 
+    #@show maximum(ieJ₀⁺[1:3:end,1,200,50]), maximum(ieJ₀⁻[1:3:end,1,200,50]) 
 end
 
-"""
-    get_elem_rt_SFI_RRS!(...)
-
-Compute elemental layer inelastic source functions J⁺(λ→λᵣ) and J⁻(λ→λᵣ) for RRS.
-Implements Eq. 15 in Sanghavi & Frankenberg (2023), JQSRT 311, 108791.
-Includes solar beam attenuation via exp(−τ_sum/μ₀).
-Variable mapping: `n₀` = incident wavelength index (λ), `n₁` = scattered wavelength index (λᵣ).
-"""
-@kernel function get_elem_rt_SFI_RRS!(fscattRayl,
+# only for RRS
+@kernel function get_elem_rt_SFI_RRS!(fscattRayl, 
                             ϖ_λ₁λ₀, i_λ₁λ₀, i_ref, 
                             ieJ₀⁺, ieJ₀⁻, 
                             τ_sum, dτ_λ, ϖ_λ,
@@ -374,12 +485,38 @@ Variable mapping: `n₀` = incident wavelength index (λ), `n₁` = scattered wa
                         ϖ_λ₁λ₀[Δn] * fscattRayl[n₀] * Z⁺⁺_I₀ * wct02 *
                         (exp(-dτ_λ[n₁] / qp_μN[i]) - exp(-dτ_λ[n₀] / qp_μN[i])) /
                         (1 - (dτ_λ[n₁]/dτ_λ[n₀])) 
+                        #=
+                        if (i%3==1)&(n₁==200)  
+                            @show i, n₁, n₀, Δn
+                                #@show fscattRayl[n₀]
+                                @show ϖ_λ₁λ₀[Δn]
+                                #@show ϖ_λ[n₀] 
+                                @show Z⁺⁺_I₀
+                                @show (1 - (dτ_λ[n₁]/dτ_λ[n₀])) 
+                                @show (exp(-dτ_λ[n₁] / qp_μN[i]) - exp(-dτ_λ[n₀] / qp_μN[i]))
+                                #@show wct2[j]
+                                @show ieJ₀⁺[i, 1, n₁, Δn]
+                         end 
+                        =#
             else
                 ieJ₀⁺[i, 1, n₁, Δn] = 
                         (dτ_λ[n₀]/ qp_μN[i]) * wct02 * ϖ_λ₁λ₀[Δn] * 
                         fscattRayl[n₀] * 
                         Z⁺⁺_I₀ * 
                         exp(-dτ_λ[n₀] / qp_μN[i])
+                        #=
+                        if (i%3==1)&(n₁==200)  
+                            @show i, n₁, n₀, Δn
+                                #@show fscattRayl[n₀]
+                                @show ϖ_λ₁λ₀[Δn]
+                                #@show ϖ_λ[n₀] 
+                                @show Z⁺⁺_I₀
+                                @show (dτ_λ[n₀]/ qp_μN[i_start])
+                                @show exp(-dτ_λ[n₀] / qp_μN[i_start])
+                                #@show wct2[j]
+                                @show ieJ₀⁺[i, 1, n₁, Δn]
+                         end 
+                         =#
             end
         else
             # J₀⁺ = 0.25*(1+δ(m,0)) * ϖ(λ) * Z⁺⁺ * I₀ * [μ₀ / (μᵢ - μ₀)] * [exp(-dτ(λ)/μᵢ) - exp(-dτ(λ)/μ₀)]
@@ -393,12 +530,31 @@ Variable mapping: `n₀` = incident wavelength index (λ), `n₁` = scattered wa
                     (1 /( (qp_μN[i]/qp_μN[i_start]) - (dτ_λ[n₁]/dτ_λ[n₀]) ) ) * 
                     (exp(-dτ_λ[n₁] / qp_μN[i]) - exp(-dτ_λ[n₀] / qp_μN[i_start]))
             end
+#=
+                    if (i%3==1)&(n₁==200)
+                    @show i, n₁, n₀, Δn
+                                #@show fscattRayl[n₀]
+                                @show ϖ_λ₁λ₀[Δn]
+                                #@show ϖ_λ[n₀] 
+                                @show Z⁺⁺_I₀
+                                @show (1 /( (qp_μN[i]/qp_μN[i_start]) - (dτ_λ[n₁]/dτ_λ[n₀]) ) )
+                                @show (exp(-dτ_λ[n₁] / qp_μN[i]) - exp(-dτ_λ[n₀] / qp_μN[i_start]))
+                                #@show wct2[j]
+                                @show ieJ₀⁺[i, 1, n₁, Δn]
+                         end=#
         end
         
-        # J₀⁻ = 0.25*(1+δ(m,0)) * ϖ(λ) * Z⁻⁺ * I₀ * [μ₀ / (μᵢ + μ₀)] * [1 - exp{-dτ(λ)(1/μᵢ + 1/μ₀)}]
+        #TODO
+        #J₀⁻ = 0.25*(1+δ(m,0)) * ϖ(λ) * Z⁻⁺ * I₀ * [μ₀ / (μᵢ + μ₀)] * [1 - exp{-dτ(λ)(1/μᵢ + 1/μ₀)}]                    
         ieJ₀⁻[i, 1, n₁, Δn] = wct02 * ϖ_λ₁λ₀[Δn] * fscattRayl[n₀] * Z⁻⁺_I₀ * 
                 (1/( (qp_μN[i] / qp_μN[i_start]) + (dτ_λ[n₁]/dτ_λ[n₀]) )) *
                 (1 - exp(-( (dτ_λ[n₁] / qp_μN[i]) + (dτ_λ[n₀] / qp_μN[i_start]) ) ))  
+#=
+        if (i%3==1) & ((ieJ₀⁻[i, 1, n₁, Δn]<0) | (ieJ₀⁻[i, 1, n₁, Δn]>1) | (ieJ₀⁺[i, 1, n₁, Δn]<0) | (ieJ₀⁺[i, 1, n₁, Δn]>1)) 
+            @show "1", i, n₁, Δn, ieJ₀⁺[i, 1, n₁, Δn], ieJ₀⁻[i, 1, n₁, Δn]
+            bla
+        end
+        =#
         
         ieJ₀⁺[i, 1, n₁, Δn] *= exp(-τ_sum[n₀]/qp_μN[i_start]) #correct this to include n₀ap
         ieJ₀⁻[i, 1, n₁, Δn] *= exp(-τ_sum[n₀]/qp_μN[i_start]) 
@@ -406,6 +562,16 @@ Variable mapping: `n₀` = incident wavelength index (λ), `n₁` = scattered wa
     if ndoubl >= 1 #double check to make sure this isnt repeated using apply_D
         ieJ₀⁻[i, 1, n₁, Δn] = D[i,i] * ieJ₀⁻[i, 1, n₁, Δn] #D = Diagonal{1,1,-1,-1,...Nquad times}
     end    
+    #=
+    if (i%3==1) & ((ieJ₀⁻[i, 1, n₁, Δn]<0) | (ieJ₀⁻[i, 1, n₁, Δn]>1) | (ieJ₀⁺[i, 1, n₁, Δn]<0) | (ieJ₀⁺[i, 1, n₁, Δn]>1)) 
+        @show "2", i, n₁, Δn, ieJ₀⁺[i, 1, n₁, Δn], ieJ₀⁻[i, 1, n₁, Δn]
+        bla
+    end
+    =#
+    #if ((n₀==840||n₀==850)&&(i==3))       
+    #    @show i, n₀, n₁, Δn, ieJ₀⁺[i, 1, n₁, Δn], ieJ₀⁻[i, 1, n₁, Δn]
+    #end
+    #@show i, n₁, Δn
 end
 
 @kernel function apply_D_elemental_RRS!(ndoubl, pol_n, ier⁻⁺, iet⁺⁺, ier⁺⁻, iet⁻⁻)
@@ -484,36 +650,43 @@ end
 end
 
 
-function apply_D_matrix_elemental!(RS_type::Union{RRS, RRS_plus}, ndoubl::Int, n_stokes::Int, 
-                                    ier⁻⁺::AbstractArray{FT,4}, 
-                                    iet⁺⁺::AbstractArray{FT,4}, 
-                                    ier⁺⁻::AbstractArray{FT,4}, 
+function apply_D_matrix_elemental!(RS_type::Union{RRS, RRS_plus}, ndoubl::Int, n_stokes::Int,
+                                    ier⁻⁺::AbstractArray{FT,4},
+                                    iet⁺⁺::AbstractArray{FT,4},
+                                    ier⁺⁻::AbstractArray{FT,4},
                                     iet⁻⁻::AbstractArray{FT,4}) where {FT}
+    if n_stokes == 1
+        ier⁺⁻[:] = ier⁻⁺
+        iet⁻⁻[:] = iet⁺⁺
+        return nothing
+    end
     device = devi(architecture(ier⁻⁺))
     applyD_kernel! = apply_D_elemental_RRS!(device)
     event = applyD_kernel!(ndoubl,
-        n_stokes, 
-        ier⁻⁺, iet⁺⁺, ier⁺⁻, iet⁻⁻, 
+        n_stokes,
+        ier⁻⁺, iet⁺⁺, ier⁺⁻, iet⁻⁻,
         ndrange=size(ier⁻⁺));
-    #wait(device, event);
     synchronize_if_gpu();
     return nothing
 end
 
-function apply_D_matrix_elemental!(RS_type::Union{VS_0to1_plus, VS_1to0_plus}, 
-                        ndoubl::Int, n_stokes::Int, 
-                        ier⁻⁺::AbstractArray{FT,4}, 
-                        iet⁺⁺::AbstractArray{FT,4}, 
-                        ier⁺⁻::AbstractArray{FT,4}, 
+function apply_D_matrix_elemental!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
+                        ndoubl::Int, n_stokes::Int,
+                        ier⁻⁺::AbstractArray{FT,4},
+                        iet⁺⁺::AbstractArray{FT,4},
+                        ier⁺⁻::AbstractArray{FT,4},
                         iet⁻⁻::AbstractArray{FT,4}) where {FT}
-    
+    if n_stokes == 1
+        ier⁺⁻[:] = ier⁻⁺
+        iet⁻⁻[:] = iet⁺⁺
+        return nothing
+    end
     device = devi(architecture(ier⁻⁺))
     applyD_kernel! = apply_D_elemental_VS!(device)
     event = applyD_kernel!(ndoubl,
                     n_stokes, RS_type.i_λ₁λ₀_all,
-                    ier⁻⁺, iet⁺⁺, ier⁺⁻, iet⁻⁻, 
+                    ier⁻⁺, iet⁺⁺, ier⁺⁻, iet⁻⁻,
                     ndrange=getKernelDim(RS_type,ier⁻⁺,RS_type.i_λ₁λ₀_all));
-    #wait(device, event);
     synchronize_if_gpu();
     return nothing
 end
@@ -523,14 +696,18 @@ function apply_D_matrix_elemental_SFI!(RS_type::Union{RRS, RRS_plus},
     if ndoubl > 1
         return nothing
     else 
+        #@show "here 1.1"
         device = devi(architecture(ieJ₀⁻))
+        #@show "here 1.2"
         applyD_kernel! = apply_D_elemental_SFI_RRS!(device)
+        #@show "here 1.3", RS_type
         event = applyD_kernel!(ndoubl,
                                 n_stokes, 
                                 ieJ₀⁻, 
                                 ndrange=size(ieJ₀⁻));
+        #@show "here 1.4"
         #wait(device, event);
-        synchronize_if_gpu();
+        synchronize();
         return nothing
     end
 end
@@ -540,14 +717,20 @@ function apply_D_matrix_elemental_SFI!(RS_type::Union{VS_0to1_plus, VS_1to0_plus
     if ndoubl > 1
         return nothing
     else 
+        #@show "here 1.1"
         device = devi(architecture(ieJ₀⁻))
+        #@show "here 1.2"
         applyD_kernel! = apply_D_elemental_SFI_VS!(device)
+        #@show "here 1.3", RS_type
         event = applyD_kernel!(ndoubl,
                             n_stokes, 
                             RS_type.i_λ₁λ₀_all,    
                             ieJ₀⁻, 
                             ndrange = getKernelDimSFI(RS_type,ieJ₀⁻,RS_type.i_λ₁λ₀_all));
-        synchronize_if_gpu();
+                            #ndrange=size(ieJ₀⁻));
+        #@show "here 1.4"
+        #wait(device, event);
+        synchronize();
         return nothing
     end
 end
