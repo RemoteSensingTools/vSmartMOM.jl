@@ -271,6 +271,13 @@ Internally:
 3. Accumulate sub-layers via `interaction!`.
 4. Create soil surface layer and interact with the canopy composite.
 5. Copy the resulting R⁻⁺ and J₀ into the output `added_layer`.
+
+# TODO: Canopy + Raman (RRS/VS) coupling is not currently implemented. The
+# canopy BRDF code is noRS-only; calling rt_run with CanopySurface + RRS/VS
+# has undefined behavior (the inelastic ieR/ieT branches in the kernels
+# never see a canopy-adapted contribution and will return garbage or crash).
+# Future work: couple the canopy path to the inelastic path — this is a
+# separate project, not part of the sanghavi-unified merge.
 """
 function create_surface_layer!(canopy::CanopySurface{FT},
                                added_layer::Union{AddedLayer,AddedLayerRS},
