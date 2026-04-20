@@ -164,6 +164,15 @@ function rt_run(RS_type::AbstractRamanType, model, iBand)
         RS_type.F₀ = F₀
     end
 
+    # TODO (Phase 4): allocate `InteractionWorkspace(composite_layer, added_layer;
+    # staged=true)` here for RRS/VS runs and thread it through rt_kernel! /
+    # interaction! as `workspace=ws`. Doing so requires first extending the
+    # rt_kernel! / interaction! signatures (currently positional-only) with a
+    # `workspace::Union{InteractionWorkspace,Nothing}=nothing` kwarg, paralleling
+    # the kwarg already present in interaction_inelastic.jl. Until Phase 4, the
+    # inelastic kernels fall back to `similar()` via their `workspace === nothing`
+    # branch.
+
     # Cumulative optical depth (m-independent, saved for TMS correction)
     τ_sum_all = nothing
 
@@ -194,6 +203,8 @@ function rt_run(RS_type::AbstractRamanType, model, iBand)
                 expandOpticalProperties(layer_opt_props[iz], arr_type)
 
             # Perform Core RT (doubling/elemental/interaction)
+            # Phase 4 will pass `workspace=_interaction_ws` once rt_kernel!
+            # signatures are extended to accept the kwarg (not part of 1b).
             @timeit "RT Kernel" rt_kernel!(RS_type, pol_type, SFI,
                         added_layer, composite_layer,
                         layer_opt,
