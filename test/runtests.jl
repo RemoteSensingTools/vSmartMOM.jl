@@ -62,3 +62,6 @@ end
 
 # Phase 1d — Aerosols module wire-in (close `using vSmartMOM.Aerosols` export gap).
 @testset "Aerosols" begin include("test_Aerosols.jl") end
+
+# Phase 1e — perturb_parameters utility ported from sanghavi.
+@testset "Phase 1e perturb_parameters" begin include("test_perturb_parameters.jl") end
