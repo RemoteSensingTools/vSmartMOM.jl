@@ -1,4 +1,4 @@
-function constructCoreOpticalProperties(RS_type::AbstractRamanType{FT}, iBand, m, model) where FT
+function constructCoreOpticalProperties(RS_type::AbstractRamanType, iBand, m, model)
     (; τ_rayl, τ_aer, τ_abs, aerosol_optics, greek_rayleigh) = model
     @assert all(iBand .≤ length(τ_rayl)) "iBand exceeded number of bands"
 

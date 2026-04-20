@@ -2,20 +2,15 @@
     type AbstractRamanType
 Abstract Raman type 
 """
-abstract type AbstractRamanType{FT}  end
+abstract type AbstractRamanType  end
 
 """
-    RRS{FT} <: AbstractRamanType{FT}
-
-Rotational Raman Scattering (RRS) parameters for atmospheric N₂ and O₂.
-RRS redistributes photons from Fraunhofer absorption lines into the
-surrounding continuum ("filling-in" effect), which is important for
-high-resolution spectral retrievals (e.g., O₂ A-band).
-
+    struct RRS{FT<:AbstractFloat}
+A struct which defines Rotational Raman Scattering parameters
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-Base.@kwdef mutable struct RRS{FT<:AbstractFloat} <: AbstractRamanType{FT}
+Base.@kwdef mutable struct RRS{FT<:AbstractFloat} <: AbstractRamanType 
 
     "Molecular Constants for N2"
     n2::InelasticScattering.MolecularConstants{Float64}
@@ -33,24 +28,19 @@ Base.@kwdef mutable struct RRS{FT<:AbstractFloat} <: AbstractRamanType{FT}
     Z⁺⁺_λ₁λ₀::Array{FT,2}
     i_ref::Int
     n_Raman::Int
-    bandSpecLim::Vector{UnitRange{Int}} = UnitRange{Int}[]
+    bandSpecLim = []
     iBand = 1
     F₀::Array{FT,2} # Solar/Stellar irradiation Stokes vector of size (pol_type.n, nSpec)
     SIF₀::Array{FT,2} # Solar/Stellar irradiation Stokes vector of size (pol_type.n, nSpec)
 end
 
 """
-    VS_0to1{FT} <: AbstractRamanType{FT}
-
-Vibrational Raman Scattering: Stokes transition (v=0 → v=1).
-Models the energy transfer from incident photons to vibrational
-excitation of N₂ and O₂ molecules, shifting scattered photons to
-longer wavelengths (lower wavenumbers).
-
+    struct RRS{FT<:AbstractFloat}
+A struct which defines Rotational Raman Scattering parameters
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-Base.@kwdef struct VS_0to1{FT<:AbstractFloat} <: AbstractRamanType{FT}
+Base.@kwdef struct VS_0to1{FT<:AbstractFloat} <: AbstractRamanType 
     "Molecular Constant for N2"
     n2::InelasticScattering.MolecularConstants{FT}
     "Molecular Constant for O2"
@@ -74,17 +64,12 @@ Base.@kwdef struct VS_0to1{FT<:AbstractFloat} <: AbstractRamanType{FT}
 end
 
 """
-    VS_1to0{FT} <: AbstractRamanType{FT}
-
-Vibrational Raman Scattering: anti-Stokes transition (v=1 → v=0).
-Models the energy transfer from vibrationally excited N₂ and O₂
-molecules back to incident photons, shifting scattered photons to
-shorter wavelengths (higher wavenumbers).
-
+    struct RRS{FT<:AbstractFloat}
+A struct which defines Rotational Raman Scattering parameters
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-Base.@kwdef struct VS_1to0{FT<:AbstractFloat} <: AbstractRamanType{FT}
+Base.@kwdef struct VS_1to0{FT<:AbstractFloat} <: AbstractRamanType 
     "Molecular Constant for N2"
     n2::InelasticScattering.MolecularConstants{FT}
     "Molecular Constant for O2"
@@ -113,14 +98,14 @@ A struct which defines Rotational Raman Scattering parameters
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-Base.@kwdef mutable struct RVRS{FT<:AbstractFloat} <: AbstractRamanType{FT} 
+Base.@kwdef mutable struct RVRS{FT<:AbstractFloat} <: AbstractRamanType 
     "Molecular Constant for N2"
     n2::InelasticScattering.MolecularConstants{FT}
     "Molecular Constant for O2"
     o2::InelasticScattering.MolecularConstants{FT}
 
-    bandSpecLim::Vector{UnitRange{Int}} = UnitRange{Int}[]
-    iBand::Vector{Int} = Int[1]
+    bandSpecLim = []
+    iBand::Array{Int,1} = [1]
 
     "Pre-computed optical properties"
     #ramanAtmoProp::RamanAtmosphereProperties
@@ -134,20 +119,17 @@ Base.@kwdef mutable struct RVRS{FT<:AbstractFloat} <: AbstractRamanType{FT}
     n_Raman::Int
 end
 =#
-"""
-    noRS{FT} <: AbstractRamanType{FT}
-
-No Raman Scattering (elastic-only RT).  This is the default Raman type
-used by `rt_run(model)`.  All scattering is treated as elastic
-(Cabannes fraction = 1).
-"""
-Base.@kwdef mutable struct noRS{FT} <: AbstractRamanType{FT}
+Base.@kwdef mutable struct noRS{FT} <: AbstractRamanType
     fscattRayl::Array{FT,1} = [0.0]
-    ϖ_Cabannes::Array{FT,1} = [1.0, 1.0, 1.0] #elastic fraction (Cabannes) of Rayleigh (Cabannes+Raman) scattering
-    bandSpecLim::Vector{UnitRange{Int}} = UnitRange{Int}[]
-    iBand::Vector{Int} = Int[1]
-    F₀ = zeros(Float64, 1, 1)  # Solar/Stellar irradiation Stokes vector of size (pol_type.n, nSpec)
-    SIF₀ = zeros(Float64, 1, 1) # Solar/Stellar irradiation Stokes vector of size (pol_type.n, nSpec)
+    # ϖ_Cabannes is indexed by iBand; default sized for up to 3 bands so
+    # zero-arg `noRS()` works with multi-band smoke configs (e.g. EMIT 2-band).
+    ϖ_Cabannes::Array{FT,1} = [1.0, 1.0, 1.0] # elastic fraction (Cabannes) of Rayleigh (Cabannes+Raman) scattering
+    bandSpecLim = []
+    iBand::Array{Int,1} = [1]
+    # F₀/SIF₀ placeholders: rt_run resizes to (pol_type.n, nSpec) before first use.
+    # Defaults keep zero-arg `noRS()` ergonomic for pure-elastic callers.
+    F₀::Array{FT,2}  = zeros(FT, 1, 1) # Solar/Stellar irradiation Stokes vector of size (pol_type.n, nSpec)
+    SIF₀::Array{FT,2} = zeros(FT, 1, 1) # Solar/Stellar irradiation Stokes vector of size (pol_type.n, nSpec)
 end
 
 ############################################################
@@ -156,33 +138,30 @@ end
 
 
 """
-    RRS_plus{FT} <: AbstractRamanType{FT}
-
-Rotational Raman Scattering parameters for the concatenated (multi-band)
-mode of vSmartMOM.  Extends [`RRS`](@ref) with band-concatenation bookkeeping.
-
+    struct RRS_plus{FT<:AbstractFloat}
+A struct which defines Rotational Raman Scattering parameters for the concatenated mode of vSmartMOM
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-Base.@kwdef mutable struct RRS_plus{FT<:AbstractFloat} <: AbstractRamanType{FT}
+Base.@kwdef mutable struct RRS_plus{FT<:AbstractFloat} <: AbstractRamanType 
 
     "Concatenated indices of band limits"
     bandSpecLim = Array{UnitRange{Int64},1}
     iBand::Array{Int,1} = [1]
-    grid_in::Array{StepRangeLen{FT},1}
+    grid_in::Array{StepRangeLen{FT},1} 
 
     "Molecular Constants for N2"
     n2::InelasticScattering.MolecularConstants{Float64}
     "Molecular Constants for O2"
     o2::InelasticScattering.MolecularConstants{Float64}
-    "Greek coeffs in Raman calculations"
+    "Greek coeffs in Raman calculations" 
     greek_raman::GreekCoefs
     "Pre-computed optical properties"
     # ramanAtmoProp::RamanAtmosphereProperties
     #values for each band
     fscattRayl#::Array{FT,1}
     ϖ_Cabannes::Array{FT,1} #elastic fraction (Cabannes) of Rayleigh (Cabannes+Raman) scattering
-
+    
     ϖ_λ₁λ₀::Array{FT,2} #last index represents the band iB
     i_λ₁λ₀::Array{Int,2} #last index represents the band iB
 
@@ -195,27 +174,23 @@ Base.@kwdef mutable struct RRS_plus{FT<:AbstractFloat} <: AbstractRamanType{FT}
 end
 
 """
-    VS_0to1_plus{FT} <: AbstractRamanType{FT}
-
-Vibrational Raman Scattering (v=0→1, Stokes) for the concatenated
-(multi-band) mode.  Extends [`VS_0to1`](@ref) with band-concatenation
-bookkeeping and separate N₂/O₂ vibrational channels.
-
+    struct RRS{FT<:AbstractFloat}
+A struct which defines Rotational Raman Scattering parameters
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-Base.@kwdef mutable struct VS_0to1_plus{FT<:AbstractFloat} <: AbstractRamanType{FT}
+Base.@kwdef mutable struct VS_0to1_plus{FT<:AbstractFloat} <: AbstractRamanType 
     "Concatenated indices of band limits"
-    bandSpecLim::Vector{UnitRange{Int}} = UnitRange{Int}[]
+    bandSpecLim::Vector{UnitRange{Int64}} = UnitRange{Int64}[]
     iBand::Vector{Int}       = Int[]
-    grid_in::Vector{AbstractRange{Float64}} = AbstractRange{Float64}[] 
+    grid_in::Vector{StepRangeLen{FT}} = StepRangeLen{FT}[]
 
     "Molecular Constant for N2"
     n2::InelasticScattering.MolecularConstants{FT}
     "Molecular Constant for O2"
     o2::InelasticScattering.MolecularConstants{FT}
-    
-    "Greek coefs in Raman calculations" 
+
+    "Greek coefs in Raman calculations"
     greek_raman::GreekCoefs       = GreekCoefs([FT(1)], [FT(1)], [FT(1)], [FT(1)], [FT(1)], [FT(1)])
     greek_raman_VS_n2::GreekCoefs = GreekCoefs([FT(1)], [FT(1)], [FT(1)], [FT(1)], [FT(1)], [FT(1)])
     greek_raman_VS_o2::GreekCoefs = GreekCoefs([FT(1)], [FT(1)], [FT(1)], [FT(1)], [FT(1)], [FT(1)])
@@ -245,24 +220,20 @@ Base.@kwdef mutable struct VS_0to1_plus{FT<:AbstractFloat} <: AbstractRamanType{
     i_ref::Int                  = 1
     n_Raman::Int                = 1
     F₀::Array{FT,2}             = zeros(FT,1,1) # Solar/Stellar irradiation Stokes vector of size (pol_type.n, nSpec)
-    SIF₀::Array{FT,2} # Solar/Stellar irradiation Stokes vector of size (pol_type.n, nSpec)
+    SIF₀::Array{FT,2}           = zeros(FT,1,1)# Solar/Stellar irradiation Stokes vector of size (pol_type.n, nSpec)
 end
 
 """
-    VS_1to0_plus{FT} <: AbstractRamanType{FT}
-
-Vibrational Raman Scattering (v=1→0, anti-Stokes) for the concatenated
-(multi-band) mode.  Extends [`VS_1to0`](@ref) with band-concatenation
-bookkeeping and separate N₂/O₂ vibrational channels.
-
+    struct RRS{FT<:AbstractFloat}
+A struct which defines Rotational Raman Scattering parameters
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-Base.@kwdef mutable struct VS_1to0_plus{FT<:AbstractFloat} <: AbstractRamanType{FT}
+Base.@kwdef mutable struct VS_1to0_plus{FT<:AbstractFloat} <: AbstractRamanType 
     
     "Concatenated indices of band limits"
     bandSpecLim = Array{UnitRange{Int64},1}
-    iBand::Vector{Int} = Int[]
+    iBand::Array{Int,1} = []
     grid_in::Array{StepRangeLen{FT},1} 
 
     "Molecular Constant for N2"
@@ -306,19 +277,14 @@ Base.@kwdef mutable struct VS_1to0_plus{FT<:AbstractFloat} <: AbstractRamanType{
     #ramanAtmoProp::RamanAtmosphereProperties
 end
 
-"""
-    noRS_plus{FT} <: AbstractRamanType{FT}
-
-No Raman Scattering (elastic-only) for the concatenated (multi-band) mode.
-Extends [`noRS`](@ref) with band-concatenation bookkeeping.
-"""
-Base.@kwdef mutable struct noRS_plus{FT} <: AbstractRamanType{FT}
+Base.@kwdef mutable struct noRS_plus{FT} <: AbstractRamanType
     fscattRayl::Array{FT,1} = [0.0]
     ϖ_Cabannes::FT = 1.0 #elastic fraction (Cabannes) of Rayleigh (Cabannes+Raman) scattering
-    bandSpecLim::Vector{UnitRange{Int}} = UnitRange{Int}[]
-    iBand::Vector{Int} = Int[]
-    F₀::Array{FT,2} = zeros(FT, 1, 1) # Solar/Stellar irradiation Stokes vector of size (pol_type.n, nSpec)
-    SIF₀::Array{FT,2} # Solar/Stellar irradiation Stokes vector of size (pol_type.n, nSpec)
+    bandSpecLim = []
+    iBand::Array{Int,1} = []
+    # F₀/SIF₀ placeholders: rt_run resizes to (pol_type.n, nSpec) before first use.
+    F₀::Array{FT,2}  = zeros(FT, 1, 1) # Solar/Stellar irradiation Stokes vector of size (pol_type.n, nSpec)
+    SIF₀::Array{FT,2} = zeros(FT, 1, 1) # Solar/Stellar irradiation Stokes vector of size (pol_type.n, nSpec)
 end
 
 
@@ -326,16 +292,7 @@ end
 # ############### Types for Stellar Mode #######################
 #==============================================================#
 
-"""
-    sol_RRS{FT} <: AbstractRamanType{FT}
-
-Rotational Raman Scattering for stellar (non-solar) atmospheres,
-using H₂ molecular constants instead of N₂/O₂.
-
-# Fields
-$(DocStringExtensions.FIELDS)
-"""
-Base.@kwdef mutable struct sol_RRS{FT<:AbstractFloat} <: AbstractRamanType{FT}
+Base.@kwdef mutable struct sol_RRS{FT<:AbstractFloat} <: AbstractRamanType 
 
     "Molecular Constants for H2"
     h2::InelasticScattering.MolecularConstants{Float64}
@@ -351,22 +308,19 @@ Base.@kwdef mutable struct sol_RRS{FT<:AbstractFloat} <: AbstractRamanType{FT}
     Z⁺⁺_λ₁λ₀::Array{FT,2}
     i_ref::Int
     n_Raman::Int
-    bandSpecLim::Vector{UnitRange{Int}} = UnitRange{Int}[]
+    bandSpecLim = []
     iBand = 1
     F₀::Array{FT,2} # Solar/Stellar irradiation Stokes vector of size (pol_type.n, nSpec)
     #SIF₀::Array{FT,2} # Solar/Stellar irradiation Stokes vector of size (pol_type.n, nSpec)
 end
 
 """
-    sol_VS_0to1{FT} <: AbstractRamanType{FT}
-
-Vibrational Raman Scattering (v=0→1, Stokes) for stellar atmospheres,
-using H₂ molecular constants.
-
+    struct RRS{FT<:AbstractFloat}
+A struct which defines Rotational Raman Scattering parameters
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-Base.@kwdef struct sol_VS_0to1{FT<:AbstractFloat} <: AbstractRamanType{FT}
+Base.@kwdef struct sol_VS_0to1{FT<:AbstractFloat} <: AbstractRamanType 
     "Molecular Constant for H2"
     h2::InelasticScattering.MolecularConstants{FT}
     "Greek coefs in Raman calculations" 
@@ -388,15 +342,12 @@ Base.@kwdef struct sol_VS_0to1{FT<:AbstractFloat} <: AbstractRamanType{FT}
 end
 
 """
-    sol_VS_1to0{FT} <: AbstractRamanType{FT}
-
-Vibrational Raman Scattering (v=1→0, anti-Stokes) for stellar atmospheres,
-using H₂ molecular constants.
-
+    struct RRS{FT<:AbstractFloat}
+A struct which defines Rotational Raman Scattering parameters
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-Base.@kwdef struct sol_VS_1to0{FT<:AbstractFloat} <: AbstractRamanType{FT}
+Base.@kwdef struct sol_VS_1to0{FT<:AbstractFloat} <: AbstractRamanType 
     "Molecular Constant for H2"
     h2::InelasticScattering.MolecularConstants{FT}
     "Greek coefs in Raman calculations" 
@@ -423,14 +374,14 @@ A struct which defines Rotational Raman Scattering parameters
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-Base.@kwdef mutable struct RVRS{FT<:AbstractFloat} <: AbstractRamanType{FT} 
+Base.@kwdef mutable struct RVRS{FT<:AbstractFloat} <: AbstractRamanType 
     "Molecular Constant for N2"
     n2::InelasticScattering.MolecularConstants{FT}
     "Molecular Constant for O2"
     o2::InelasticScattering.MolecularConstants{FT}
 
-    bandSpecLim::Vector{UnitRange{Int}} = UnitRange{Int}[]
-    iBand::Vector{Int} = Int[1]
+    bandSpecLim = []
+    iBand::Array{Int,1} = [1]
 
     "Pre-computed optical properties"
     #ramanAtmoProp::RamanAtmosphereProperties
@@ -458,7 +409,7 @@ A struct which defines Rotational Raman Scattering parameters for the concatenat
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-#=Base.@kwdef mutable struct RRS_plus{FT<:AbstractFloat} <: AbstractRamanType{FT} 
+#=Base.@kwdef mutable struct RRS_plus{FT<:AbstractFloat} <: AbstractRamanType 
 
     "Concatenated indices of band limits"
     bandSpecLim = Array{UnitRange{Int64},1}
@@ -488,19 +439,16 @@ $(DocStringExtensions.FIELDS)
 end
 =#
 """
-    sol_VS_0to1_plus{FT} <: AbstractRamanType{FT}
-
-Vibrational Raman Scattering (v=0→1, Stokes) for stellar atmospheres
-in the concatenated (multi-band) mode.  Uses H₂ molecular constants.
-
+    struct RRS{FT<:AbstractFloat}
+A struct which defines Rotational Raman Scattering parameters
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-Base.@kwdef mutable struct sol_VS_0to1_plus{FT<:AbstractFloat} <: AbstractRamanType{FT}
+Base.@kwdef mutable struct sol_VS_0to1_plus{FT<:AbstractFloat} <: AbstractRamanType 
     "Concatenated indices of band limits"
-    bandSpecLim::Vector{UnitRange{Int}} = UnitRange{Int}[]
+    bandSpecLim::Vector{UnitRange{Int64}} = UnitRange{Int64}[]
     iBand::Vector{Int}       = Int[]
-    grid_in::Vector{AbstractRange{Float64}} = AbstractRange{Float64}[] 
+    grid_in::Vector{StepRangeLen{FT}} = StepRangeLen{FT}[]
 
     "Molecular Constant for H2"
     h2::InelasticScattering.MolecularConstants{FT}
@@ -533,19 +481,16 @@ Base.@kwdef mutable struct sol_VS_0to1_plus{FT<:AbstractFloat} <: AbstractRamanT
 end
 
 """
-    sol_VS_1to0_plus{FT} <: AbstractRamanType{FT}
-
-Vibrational Raman Scattering (v=1→0, anti-Stokes) for stellar atmospheres
-in the concatenated (multi-band) mode.  Uses H₂ molecular constants.
-
+    struct RRS{FT<:AbstractFloat}
+A struct which defines Rotational Raman Scattering parameters
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-Base.@kwdef mutable struct sol_VS_1to0_plus{FT<:AbstractFloat} <: AbstractRamanType{FT}
+Base.@kwdef mutable struct sol_VS_1to0_plus{FT<:AbstractFloat} <: AbstractRamanType 
     
     "Concatenated indices of band limits"
     bandSpecLim = Array{UnitRange{Int64},1}
-    iBand::Vector{Int} = Int[]
+    iBand::Array{Int,1} = []
     grid_in::Array{StepRangeLen{FT},1} 
 
     "Molecular Constant for H2"
