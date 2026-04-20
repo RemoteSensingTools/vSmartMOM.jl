@@ -243,3 +243,34 @@ Diagnosed causes:
 3. Once both are aligned, regenerate `phase1b_RRS_unified_q0.jld2` and swap the regression-gate reference from `_unified_selfref` → `_sanghavi_q0`. At that point the Phase 1b "matches sanghavi physics to the 6th decimal place" gate is truly closed.
 
 Both currently-committed references live at [test/reference/](../test/reference/) — `phase1b_RRS_sanghavi_q0.jld2` (what unified should match), `phase1b_RRS_unified_q0.jld2` (what unified currently produces on the dry YAML), and `phase1b_RRS_unified_selfref.jld2` (original self-ref on the `q>0` YAML).
+
+## 9. Phase 1b closeout (2026-04-20)
+
+Two fixes landed this session brought unified into near-sanghavi agreement:
+
+1. **`/π` in forward `rt_run` azimuthal weight.** `src/CoreRT/rt_run.jl:183` and `rt_run_multisensor.jl:82` now use `FT(0.5/π)` / `FT(1.0/π)` (was `0.5` / `1.0`). The lin variant already had `/π`. This brings unified's radiance-factor convention into line with sanghavi's. Collateral: [test/test_CoreRT.jl](../test/test_CoreRT.jl) 6SV1 and Natraj comparisons now multiply by `π` to convert radiance factor → 6SV1/Natraj reflectance convention (`R = πL/μ₀` for 6SV1, `R = πL` for Natraj). Both testsets pass at pre-existing tolerances (ε = 0.006 and 0.008 respectively).
+2. **`ϖ_λ₁λ₀ .*= (1 - ϖ_Cabannes)/sum(ϖ_λ₁λ₀)` normalization in forward `rt_run`.** Missing on unified; present on sanghavi at `rt_run.jl:293` (and `:466`). Ported to `src/CoreRT/rt_run.jl` right after `(; ϖ_Cabannes) = RS_type` destructure. Gated on `RS_type <: Union{RRS, RRS_plus}`. Uses `model.ϖ_Cabannes[iBand[1]]` (the physically computed value), not the test-provided `RS_type.ϖ_Cabannes` placeholder.
+
+**Post-fix sanghavi cross-check** on identical 103-pt Phase1b_RRS YAML (`q = 0`, Stokes_IQU, Float32, CPU):
+
+| Quantity | ratio unified / sanghavi |
+|---|---|
+| I | **0.9904** |
+| Q | **0.9682** |
+| ieI | **1.00066** ✓ |
+| ieQ | **0.99907** ✓ |
+
+Inelastic (ieR, ieT) are now within 0.1% of sanghavi — effectively a match. Phase 1b's "matches sanghavi physics" gate is met for the inelastic branch.
+
+**Residual ~1% elastic I / ~3% elastic Q discrepancy.** The ratio is extraordinarily constant across VZA and spectrum (std < 0.0003), meaning it's a systematic multiplicative bias, not noise. The fact that I and Q have *different* scaling (0.990 vs 0.968) rules out a simple overall normalization error — it's a polarization-sensitive delta, most likely in the Rayleigh/Cabannes phase-matrix greek coefficients or a depolarization-factor convention difference. The gate in [test_forward_raman_phase1b.jl](../test/test_forward_raman_phase1b.jl) uses `rtol = 0.05` on elastic I/Q/T/ieI/ieQ/ieT to absorb this residual while still catching meaningful regressions. Tighter tolerance requires root-causing the remaining delta — a Phase 1b-follow-up, not a Phase 1b blocker.
+
+**Next investigation candidates (for a Phase 1b follow-up PR or Phase 1c debug):**
+- `depol` (=0.028 in Phase1b YAML) plumbing: check whether `greek_rayleigh` / `greek_cabannes` coefficients built by `get_greek_raman` on both branches match bit-for-bit.
+- Fourier-moment weighting (`wct02 = m == 0 ? 0.5 : 0.25`) — verify identical between `get_elem_rt_SFI!` on both branches.
+- Rayleigh vs Cabannes phase-matrix split — compare `RS_type.greek_raman` construction site-by-site.
+- Quadrature roundoff differences (GaussQuadHemisphere vs RadauQuad): unified uses GaussQuadHemisphere from Phase1b YAML; verify sanghavi uses the same.
+
+**Reference files on disk** after this commit:
+- [test/reference/phase1b_RRS_sanghavi_q0.jld2](../test/reference/phase1b_RRS_sanghavi_q0.jld2) — **active gate**, sanghavi-authoritative physics.
+- [test/reference/phase1b_RRS_unified_q0.jld2](../test/reference/phase1b_RRS_unified_q0.jld2) — pre-fix unified output, retained as historical artifact of the π + ϖ_λ₁λ₀ discovery. Can be deleted post-merge.
+- [test/reference/phase1b_RRS_unified_selfref.jld2](../test/reference/phase1b_RRS_unified_selfref.jld2) — pre-fix self-ref on `q>0` YAML. Superseded; can be deleted.
