@@ -82,8 +82,8 @@ function interaction_helper!(RS_type,::ScatteringInterface_00, SFI,
         composite_layer.ieJ₀⁺[:] = 0.0 #ieJ₀⁺
         composite_layer.ieJ₀⁻[:] = 0.0 #ieJ₀⁻
 
-        composite_layer.J₀⁺ = added_layer.J₀⁺ .+ added_layer.t⁺⁺ ⊠ composite_layer.J₀⁺
-        composite_layer.J₀⁻ = composite_layer.J₀⁻ .+ composite_layer.T⁻⁻ ⊠ added_layer.J₀⁻
+        composite_layer.J₀⁺ = added_layer.j₀⁺ .+ added_layer.t⁺⁺ ⊠ composite_layer.J₀⁺
+        composite_layer.J₀⁻ = composite_layer.J₀⁻ .+ composite_layer.T⁻⁻ ⊠ added_layer.j₀⁻
     end
 
     # Batched multiplication between added and composite
@@ -125,8 +125,8 @@ function interaction_helper!(RS_type::RRS, ::ScatteringInterface_01, SFI,
         end
 
         composite_layer.J₀⁻ = composite_layer.J₀⁻ .+ composite_layer.T⁻⁻ ⊠ 
-            (added_layer.r⁻⁺ ⊠ composite_layer.J₀⁺ .+ added_layer.J₀⁻) 
-        composite_layer.J₀⁺ = added_layer.J₀⁺ .+ added_layer.t⁺⁺ ⊠ composite_layer.J₀⁺ 
+            (added_layer.r⁻⁺ ⊠ composite_layer.J₀⁺ .+ added_layer.j₀⁻) 
+        composite_layer.J₀⁺ = added_layer.j₀⁺ .+ added_layer.t⁺⁺ ⊠ composite_layer.J₀⁺ 
     end
 
     for n₁ in eachindex ieJ₁⁺[1,1,:,1]
@@ -179,8 +179,8 @@ function interaction_helper!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
         end
 
         composite_layer.J₀⁻ = composite_layer.J₀⁻ .+ composite_layer.T⁻⁻ ⊠ 
-            (added_layer.r⁻⁺ ⊠ composite_layer.J₀⁺ .+ added_layer.J₀⁻) 
-        composite_layer.J₀⁺ = added_layer.J₀⁺ .+ added_layer.t⁺⁺ ⊠ composite_layer.J₀⁺ 
+            (added_layer.r⁻⁺ ⊠ composite_layer.J₀⁺ .+ added_layer.j₀⁻) 
+        composite_layer.J₀⁺ = added_layer.j₀⁺ .+ added_layer.t⁺⁺ ⊠ composite_layer.J₀⁺ 
     end
 
     for Δn = 1:length(i_λ₁λ₀_all)
@@ -228,18 +228,18 @@ function interaction_helper!(RS_type::RRS, ::ScatteringInterface_10, SFI,
                         added_layer.t⁺⁺[:,:,n₁] * 
                         (composite_layer.ieJ₀⁺[:,1,n₁,Δn] + 
                         composite_layer.ieR⁺⁻[:,:,n₁,Δn] * 
-                        added_layer.J₀⁻[:,1,n₀])
+                        added_layer.j₀⁻[:,1,n₀])
                 composite_layer.ieJ₀⁻[:,1,n₁,Δn] = 
                         composite_layer.ieJ₀⁻[:,1,n₁,Δn] + 
                         composite_layer.ieT⁻⁻[:,:,n₁,Δn] * 
-                        added_layer.J₀⁻[:,1,n₀]
+                        added_layer.j₀⁻[:,1,n₀]
             end
         end
-        composite_layer.J₀⁺ = added_layer.J₀⁺ .+ 
+        composite_layer.J₀⁺ = added_layer.j₀⁺ .+ 
             added_layer.t⁺⁺ ⊠ (composite_layer.J₀⁺ .+ 
-                composite_layer.R⁺⁻ ⊠ added_layer.J₀⁻)
+                composite_layer.R⁺⁻ ⊠ added_layer.j₀⁻)
         composite_layer.J₀⁻ = composite_layer.J₀⁻ .+ 
-            composite_layer.T⁻⁻ ⊠ added_layer.J₀⁻
+            composite_layer.T⁻⁻ ⊠ added_layer.j₀⁻
     end
 
     for n₁ in eachindex ieJ₁⁺[1,1,:,1]
@@ -276,20 +276,20 @@ function interaction_helper!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
                     added_layer.t⁺⁺[:,:,n₁] * 
                     (composite_layer.ieJ₀⁺[:,1,n₁,n₀] + 
                     composite_layer.ieR⁺⁻[:,:,n₁,n₀] * 
-                    added_layer.J₀⁻[:,1,n₀])
+                    added_layer.j₀⁻[:,1,n₀])
 
                 composite_layer.ieJ₀⁻[:,1,n₁,n₀] = 
                             composite_layer.ieJ₀⁻[:,1,n₁,n₀] + 
                             composite_layer.ieT⁻⁻[:,:,n₁,n₀] * 
-                            added_layer.J₀⁻[:,1,n₀]
+                            added_layer.j₀⁻[:,1,n₀]
             end
         end
 
-        composite_layer.J₀⁺ = added_layer.J₀⁺ .+ 
+        composite_layer.J₀⁺ = added_layer.j₀⁺ .+ 
             added_layer.t⁺⁺ ⊠ (composite_layer.J₀⁺ .+ 
-            composite_layer.R⁺⁻ ⊠ added_layer.J₀⁻)
+            composite_layer.R⁺⁻ ⊠ added_layer.j₀⁻)
         composite_layer.J₀⁻ = composite_layer.J₀⁻ .+ 
-            composite_layer.T⁻⁻ ⊠ added_layer.J₀⁻
+            composite_layer.T⁻⁻ ⊠ added_layer.j₀⁻
     end
 
     for Δn = 1:length(i_λ₁λ₀_all)
@@ -388,10 +388,10 @@ function interaction_helper!(RS_type::RRS, ::ScatteringInterface_11, SFI,
                     r⁻⁺[:,:,n₁] ⊠ ieR⁺⁻[:,:,n₁,Δn]) +
                     ieT⁻⁻[:,:,n₁,Δn]) ⊠
                     tmp_inv[:,:,n₀] ⊠ 
-                    (added_layer.J₀⁻[:,:,n₀] + r⁻⁺[:,:,n₀] ⊠ J₀⁺[:,:,n₀]);
+                    (added_layer.j₀⁻[:,:,n₀] + r⁻⁺[:,:,n₀] ⊠ J₀⁺[:,:,n₀]);
         end
         #J₀₂⁻ = J₀₁⁻ + T₀₁(1-R₂₁R₀₁)⁻¹(R₂₁J₁₀⁺+J₁₂⁻)
-        tmpJ₀⁻ .= J₀⁻ .+ T01_inv ⊠ (r⁻⁺ ⊠ J₀⁺ .+ added_layer.J₀⁻) 
+        tmpJ₀⁻ .= J₀⁻ .+ T01_inv ⊠ (r⁻⁺ ⊠ J₀⁺ .+ added_layer.j₀⁻) 
     end 
     for Δn = 1:size(ier⁻⁺,4)
         n₀, n₁ = get_n₀_n₁(ier⁻⁺,i_λ₁λ₀[Δn])
@@ -442,18 +442,18 @@ function interaction_helper!(RS_type::RRS, ::ScatteringInterface_11, SFI,
                             added_layer.ieJ₀⁺[:,:,n₁,Δn] + 
                             T21_inv[:,:,n₁] ⊠ 
                             (ieJ₀⁺[:,:,n₁,Δn] + 
-                            ieR⁺⁻[:,:,n₁,Δn] ⊠ added_layer.J₀⁻[:,:,n₀] +
+                            ieR⁺⁻[:,:,n₁,Δn] ⊠ added_layer.j₀⁻[:,:,n₀] +
                             R⁺⁻[:,:,n₁] ⊠ added_layer.ieJ₀⁻[:,:,n₁,Δn]) +
                             (T21_inv[:,:,n₁] ⊠ 
                             (ieR⁺⁻[:,:,n₁,Δn] ⊠ r⁻⁺[:,:,n₀] + 
                             R⁺⁻[:,:,n₁] ⊠ ier⁻⁺[:,:,n₁,Δn]) +
                             iet⁺⁺[:,:,n₁,Δn]) ⊠ 
                             tmp_inv[:,:,n₀] ⊠ (J₀⁺[:,:,n₀] + 
-                            R⁺⁻[:,:,n₀] ⊠ added_layer.J₀⁻[:,:,n₀])
+                            R⁺⁻[:,:,n₀] ⊠ added_layer.j₀⁻[:,:,n₀])
         end
         # J₂₀⁺ = J₂₁⁺ + T₂₁(I-R₀₁R₂₁)⁻¹(J₁₀ + R₀₁J₁₂⁻ )
-        tmpJ₀⁺ = added_layer.J₀⁺ .+ 
-            T21_inv ⊠ (J₀⁺ + R⁺⁻ ⊠ added_layer.J₀⁻)
+        tmpJ₀⁺ = added_layer.j₀⁺ .+ 
+            T21_inv ⊠ (J₀⁺ + R⁺⁻ ⊠ added_layer.j₀⁻)
     end 
     for Δn = 1:size(ieJ₀⁺,4)
         n₀, n₁ = get_n₀_n₁(ieJ₀⁺,i_λ₁λ₀[Δn])
@@ -568,11 +568,11 @@ function interaction_helper!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
                                         r⁻⁺[:,:,n₁] * ieR⁺⁻[:,:,n₁,n₀]) +
                                         ieT⁻⁻[:,:,n₁,n₀]) *
                                         tmp_inv[:,:,n₀] * 
-                                        (added_layer.J₀⁻[:,1,n₀] + r⁻⁺[:,:,n₀] * J₀⁺[:,1,n₀]) #Suniti: Eq 17 of Raman paper draft
+                                        (added_layer.j₀⁻[:,1,n₀] + r⁻⁺[:,:,n₀] * J₀⁺[:,1,n₀]) #Suniti: Eq 17 of Raman paper draft
             end
         end
         #J₀₂⁻ = J₀₁⁻ + T₀₁(1-R₂₁R₀₁)⁻¹(R₂₁J₁₀⁺+J₁₂⁻)
-        tmpJ₀⁻ .= J₀⁻ .+ T01_inv ⊠ (r⁻⁺ ⊠ J₀⁺ .+ added_layer.J₀⁻) 
+        tmpJ₀⁻ .= J₀⁻ .+ T01_inv ⊠ (r⁻⁺ ⊠ J₀⁺ .+ added_layer.j₀⁻) 
     end 
 
     for Δn = 1:length(i_λ₁λ₀_all) # in eachindex ieJ₁⁺[1,1,:,1]
@@ -614,19 +614,19 @@ function interaction_helper!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
                 tmpieJ₀⁺[:,1,n₁,n₀] = added_layer.ieJ₀⁺[:,1,n₁,n₀] + 
                         T21_inv[:,:,n₁] * 
                         (ieJ₀⁺[:,1,n₁,n₀] + 
-                        ieR⁺⁻[:,:,n₁,n₀] * added_layer.J₀⁻[:,1,n₀] +
+                        ieR⁺⁻[:,:,n₁,n₀] * added_layer.j₀⁻[:,1,n₀] +
                         R⁺⁻[:,:,n₁] * added_layer.ieJ₀⁻[:,1,n₁,n₀]) +
                         (T21_inv[:,:,n₁] * 
                         (ieR⁺⁻[:,:,n₁,n₀] * r⁻⁺[:,:,n₀] + 
                         R⁺⁻[:,:,n₁] * ier⁻⁺[:,:,n₁,n₀]) +
                         iet⁺⁺[:,:,n₁,n₀]) * 
                         tmp_inv[:,:,n₀] * (J₀⁺[:,1,n₀] + 
-                        R⁺⁻[:,:,n₀] * added_layer.J₀⁻[:,1,n₀])
+                        R⁺⁻[:,:,n₀] * added_layer.j₀⁻[:,1,n₀])
             end
         end
     # J₂₀⁺ = J₂₁⁺ + T₂₁(I-R₀₁R₂₁)⁻¹(J₁₀ + R₀₁J₁₂⁻ )
-    tmpJ₀⁺ = added_layer.J₀⁺ .+ 
-                T21_inv ⊠ (J₀⁺ .+ R⁺⁻ ⊠ added_layer.J₀⁻)
+    tmpJ₀⁺ = added_layer.j₀⁺ .+ 
+                T21_inv ⊠ (J₀⁺ .+ R⁺⁻ ⊠ added_layer.j₀⁻)
     end 
     for Δn = 1:length(i_λ₁λ₀_all) #Δn in eachindex ieJ₁⁺[1,1,:,1]
         n₁ = i_λ₁λ₀_all[Δn]

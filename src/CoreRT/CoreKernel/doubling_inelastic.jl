@@ -20,8 +20,12 @@ function doubling_helper!(RS_type::RRS,
     architecture) where {FT}
 
     # Unpack the added layer
-    @unpack i_λ₁λ₀ = RS_type 
-    @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, J₀⁺, J₀⁻ = added_layer
+    @unpack i_λ₁λ₀ = RS_type
+    # AddedLayerRS stores elastic source as lowercase `j₀⁺/j₀⁻` on unified (consistent
+    # with AddedLayer); alias to uppercase here to match sanghavi's kernel body.
+    @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺ = added_layer
+    J₀⁺ = added_layer.j₀⁺
+    J₀⁻ = added_layer.j₀⁻
     #@unpack ier⁺⁻, ier⁻⁺, iet⁻⁻, iet⁺⁺, ieJ₀⁺, ieJ₀⁻ = added_layer
     @unpack  ier⁻⁺, iet⁺⁺, ieJ₀⁺, ieJ₀⁻ = added_layer
     # Device architecture
@@ -153,10 +157,10 @@ function doubling_helper!(RS_type::RRS,
 
     apply_D_matrix!(pol_type.n, added_layer.r⁻⁺, added_layer.t⁺⁺, added_layer.r⁺⁻, added_layer.t⁻⁻)
     apply_D_matrix_IE!(RS_type, pol_type.n, added_layer.ier⁻⁺, added_layer.iet⁺⁺, added_layer.ier⁺⁻, added_layer.iet⁻⁻)
-    SFI && apply_D_matrix_SFI!(pol_type.n, added_layer.J₀⁻)
+    SFI && apply_D_matrix_SFI!(pol_type.n, added_layer.j₀⁻)
     SFI && apply_D_matrix_SFI_IE!(RS_type, pol_type.n, added_layer.ieJ₀⁻)
 
-    return nothing 
+    return nothing
 end
 
 
@@ -169,8 +173,12 @@ function doubling_helper!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
                         I_static::AbstractArray{FT}, 
                         architecture) where {FT}
     # Unpack the added layer
-    @unpack i_λ₁λ₀_all = RS_type 
-    @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, J₀⁺, J₀⁻ = added_layer
+    @unpack i_λ₁λ₀_all = RS_type
+    # AddedLayerRS stores elastic source as lowercase `j₀⁺/j₀⁻` on unified (consistent
+    # with AddedLayer); alias to uppercase here to match sanghavi's kernel body.
+    @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺ = added_layer
+    J₀⁺ = added_layer.j₀⁺
+    J₀⁻ = added_layer.j₀⁻
     @unpack ier⁺⁻, ier⁻⁺, iet⁻⁻, iet⁺⁺, ieJ₀⁺, ieJ₀⁻ = added_layer
     # Device architecture
     dev = devi(architecture)
@@ -290,11 +298,11 @@ function doubling_helper!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
 
     synchronize_if_gpu()
 
-    apply_D_matrix!(pol_type.n, 
+    apply_D_matrix!(pol_type.n,
         added_layer.r⁻⁺, added_layer.t⁺⁺, added_layer.r⁺⁻, added_layer.t⁻⁻)
-    apply_D_matrix_IE!(RS_type, pol_type.n, 
+    apply_D_matrix_IE!(RS_type, pol_type.n,
         added_layer.ier⁻⁺, added_layer.iet⁺⁺, added_layer.ier⁺⁻, added_layer.iet⁻⁻)
-    SFI && apply_D_matrix_SFI!(pol_type.n, added_layer.J₀⁻)
+    SFI && apply_D_matrix_SFI!(pol_type.n, added_layer.j₀⁻)
     SFI && apply_D_matrix_SFI_IE!(RS_type, pol_type.n, added_layer.ieJ₀⁻)
     
     return nothing 
