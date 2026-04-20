@@ -79,7 +79,7 @@ function rt_run_test_ms(RS_type::AbstractRamanType,
     for m = 0:max_m - 1
 
         # Azimuthal weighting
-        weight = m == 0 ? FT(0.5) : FT(1.0)
+        weight = m == 0 ? FT(0.5/π) : FT(1.0/π)
         # Set the Zλᵢλₒ interaction parameters for Raman (or nothing for noRS)
         InelasticScattering.computeRamanZλ!(RS_type, pol_type, collect(qp_μ), m, arr_type)
         # Compute the core layer optical properties:

@@ -86,6 +86,14 @@ function rt_run(RS_type::AbstractRamanType, model, iBand)
 
     (; ϖ_Cabannes) = RS_type
 
+    # Normalize ϖ_λ₁λ₀ so its sum equals the Raman fraction of scattering
+    # (1 - ϖ_Cabannes) for this band. Missing on unified → inelastic ieR/ieT
+    # was off by ~4× relative to sanghavi reference (see plans/PHASE_1B_STAGING.md §8).
+    # Ported from sanghavi/src/CoreRT/rt_run.jl:293.
+    if typeof(RS_type) <: Union{RRS, RRS_plus}
+        RS_type.ϖ_λ₁λ₀ .*= (1 - model.ϖ_Cabannes[iBand[1]]) / sum(RS_type.ϖ_λ₁λ₀)
+    end
+
     Nz = length(model.profile.p_full)   # Number of vertical slices
 
     RS_type.bandSpecLim = UnitRange{Int}[]
@@ -180,7 +188,7 @@ function rt_run(RS_type::AbstractRamanType, model, iBand)
     for m = 0:max_m - 1
 
         # Azimuthal weighting
-        weight = m == 0 ? FT(0.5) : FT(1.0)
+        weight = m == 0 ? FT(0.5/π) : FT(1.0/π)
         # Set the Zλᵢλₒ interaction parameters for Raman (or nothing for noRS)
         @timeit "IE"  InelasticScattering.computeRamanZλ!(RS_type, pol_type,collect(qp_μ), m, arr_type)
         # Compute the core layer optical properties:
