@@ -1,3 +1,7 @@
+# WIP: This module is user-facing but the API may evolve in follow-up PRs.
+# Landed as part of the sanghavi-unified merge to close the
+# `using vSmartMOM.Aerosols` export gap; further cleanup is a known
+# follow-up workstream.
 """
     Aerosols Module
 
@@ -25,6 +29,8 @@ export RefractiveIndexLUT, RefractiveIndexDatabase
 export read_aerosol_data
 export load_refractive_index_database
 export get_refractive_index
+export list_species
+export wavelength_range
 export compute_optical_properties
 
 # Include submodules
