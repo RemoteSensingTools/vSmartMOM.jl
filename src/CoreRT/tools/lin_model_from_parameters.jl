@@ -90,8 +90,11 @@ function model_from_parameters(lin::LinMode,
         curr_band_λ = params.float_type(1e4) ./ params.spec_bands[i_band]
         νₘ = FT(0.5)*(params.spec_bands[i_band][1]+params.spec_bands[i_band][end])
         λₘ = FT(1.e7)/νₘ
-        ϖ_Cabannes[i_band], γ_air_Cabannes, γ_air_Rayleigh =
-            InelasticScattering.compute_γ_air_Rayleigh!(λₘ)
+        # Explicit (λ₀, n2, o2) form (effT = 300 K, Earth atmospheres).
+        _n2, _o2 = InelasticScattering.getRamanAtmoConstants(FT(1.0e7) / λₘ, FT(300))
+        ϖ_Cabannes[i_band] = InelasticScattering.compute_ϖ_Cabannes(λₘ, _n2, _o2)
+        γ_air_Cabannes, _ = InelasticScattering.compute_γ_air_Cabannes!(λₘ, _n2, _o2)
+        γ_air_Rayleigh, _ = InelasticScattering.compute_γ_air_Rayleigh!(λₘ, _n2, _o2)
         depol_air_Cabannes = 2γ_air_Cabannes/(1+γ_air_Cabannes)
         depol_air_Rayleigh = 2γ_air_Rayleigh/(1+γ_air_Rayleigh)
 

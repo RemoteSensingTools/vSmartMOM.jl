@@ -77,10 +77,14 @@ function model_from_parameters(params::vSmartMOM_Parameters)
         # i'th spectral band (convert from cm⁻¹ to μm)
         curr_band_λ = FT.(1e4 ./ params.spec_bands[i_band])
         
-        # Compute per-band Cabannes properties for inelastic scattering support
+        # Compute per-band Cabannes properties for inelastic scattering support.
+        # Use explicit (λ₀, n2, o2) form (effT = 300 K assumed for Earth atmospheres
+        # to match the historical 1-arg wrapper). Phase 1b commit 5 form.
         νₘ = FT(0.5) * (params.spec_bands[i_band][1] + params.spec_bands[i_band][end])
         λₘ = FT(1.0e7) / νₘ
-        ϖ_Cab, γ_air_Cab, _ = InelasticScattering.compute_γ_air_Rayleigh!(λₘ)
+        _n2, _o2 = InelasticScattering.getRamanAtmoConstants(FT(1.0e7) / λₘ, FT(300))
+        ϖ_Cab = InelasticScattering.compute_ϖ_Cabannes(λₘ, _n2, _o2)
+        γ_air_Cab, _ = InelasticScattering.compute_γ_air_Cabannes!(λₘ, _n2, _o2)
         ϖ_Cabannes[i_band] = FT(ϖ_Cab)
         depol_air_Cab = 2γ_air_Cab / (1 + γ_air_Cab)
         push!(greek_cabannes, Scattering.get_greek_rayleigh(FT(depol_air_Cab)))
@@ -287,10 +291,13 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
         # i'th spectral band (convert from cm⁻¹ to μm)
         curr_band_λ = 1e4 ./ params.spec_bands[i_band]
 
-        # Compute per-band Cabannes properties
+        # Compute per-band Cabannes properties.
+        # Explicit (λ₀, n2, o2) form (effT = 300 K, Earth atmospheres).
         νₘ = 0.5 * (params.spec_bands[i_band][1] + params.spec_bands[i_band][end])
         λₘ = 1.0e7 / νₘ
-        ϖ_Cab, γ_air_Cab, _ = InelasticScattering.compute_γ_air_Rayleigh!(λₘ)
+        _n2, _o2 = InelasticScattering.getRamanAtmoConstants(1.0e7 / λₘ, 300.0)
+        ϖ_Cab = InelasticScattering.compute_ϖ_Cabannes(λₘ, _n2, _o2)
+        γ_air_Cab, _ = InelasticScattering.compute_γ_air_Cabannes!(λₘ, _n2, _o2)
         ϖ_Cabannes[i_band] = FT_vrs(ϖ_Cab)
         depol_air_Cab = 2γ_air_Cab / (1 + γ_air_Cab)
         push!(greek_cabannes, Scattering.get_greek_rayleigh(FT_vrs(depol_air_Cab)))
