@@ -73,7 +73,7 @@ function rt_run(model,
         lin_model,
         NAer::Int, NGas::Int, NSurf::Int;
         i_band::Integer = 1)
-    rt_run(noRS(), model, lin_model, NAer, NGas, NSurf, i_band)
+    rt_run(InelasticScattering.noRS{float_type(model)}(), model, lin_model, NAer, NGas, NSurf, i_band)
 end
 
 """

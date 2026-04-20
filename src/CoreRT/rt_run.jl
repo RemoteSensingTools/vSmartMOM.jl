@@ -51,7 +51,7 @@ R[1, 1, :]  # Stokes-I reflectance at first VZA across the spectrum
 - [`model_from_parameters`](@ref) to build the model from parameters.
 """
 function rt_run(model; i_band::Integer = 1)
-    rt_run(noRS(), model, i_band)
+    rt_run(InelasticScattering.noRS{float_type(model)}(), model, i_band)
 end
 
 """

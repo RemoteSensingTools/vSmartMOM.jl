@@ -152,11 +152,40 @@ Concrete checks before flipping Phase 1b complete:
 
 ---
 
-## 6. Open items for user on Phase 1b kickoff
+## 6. Open items — resolved 2026-04-19
 
-1. **α̅ verification citation** (§3.2) — needed to fill `[AUTHOR/SOURCE]` placeholder before commit 2 lands.
-2. **Reference JLD2 generation** — need user to approve the toy 1-band RRS config (spectral range, layers) that generates `phase1b_inelastic_port.jld2`. Target <60 s warm run per amendments §4 Phase 2, but for Phase 1b it's just a regression artifact, so smaller is fine.
-3. **Per-quantity tolerance on I/Q/U/V/ieR/ieT** for the phase1b regression check. Per the plan, user supplies at execution time — this is the moment.
+All three blocking items closed during the Phase 1b kickoff Q&A on 2026-04-19:
+
+1. **α̅ verification citation** (§3.2) — comment reads:
+   ```julia
+   # Frequency correction (1 - (c·ν_eff/ω₀)²). ν_eff is wavenumber (cm⁻¹),
+   # ω₀ is stored in wavenumber units; no 2π factor. Buldakov 1996 writes ω
+   # for what is literally frequency in Hz (not angular frequency in rad/Hz),
+   # so no 2π conversion is needed. Verified correct against
+   # Buldakov et al. 1996 Eqs. 36a-39b by S. Sanghavi
+   # (2026-04 review, unit-cross-check on ω vs ν).
+   ```
+
+2. **Reference JLD2 generation** — copy sanghavi's
+   `test/test_parameters/O2_parameters2_SIF_grid_float32.yaml` into
+   unified as `test/test_parameters/Phase1b_RRS_761-764nm.yaml`, reduce
+   spec_bands to a **single band** spanning **761–764 nm** with the
+   existing 0.1 cm⁻¹ step (≈ 517 spectral points). Keep Float32 / GPU
+   default. Generate the reference on the sanghavi worktree
+   (`/home/sanghavi/code/github/vSmartMOM.jl/`) and commit
+   `test/reference/phase1b_inelastic_port.jld2` containing I, Q, U, V,
+   ieR, ieT arrays plus a `wall_clock_sec` scalar (median of N≥5 warm
+   runs).
+
+3. **Tolerances** — "agreement to the 6th decimal place" in Float32 ≈
+   `atol = 1e-6`. Concrete per-quantity gates:
+   - **I, ieI**: `isapprox(a, b; atol=1e-6, rtol=1e-6)` (relative
+     makes sense; effectively atol-bounded for Float32 precision).
+   - **Q, U, V, ieQ, ieU, ieV**: `isapprox(a, b; atol=1e-6, rtol=0)`
+     (no rtol — these can be zero; absolute tolerance only).
+   - **Wall-clock**: `t_merged ≤ 1.02 × t_sanghavi_ref` (2% ceiling).
+   - **Failure mode**: fail hard on the first single-pixel breach
+     (no percentile aggregation). Use `@test all(isapprox.(…))`.
 
 ---
 
