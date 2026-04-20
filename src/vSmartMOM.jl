@@ -63,6 +63,11 @@ include("SolarModel/SolarModel.jl")
 include("IO/IO.jl")
 using .IO
 
+# Aerosols module — user-facing flexible aerosol framework (TOMAS-15 +
+# two-moment schemes). WIP header in Aerosols.jl documents follow-up cleanup.
+include("Aerosols/Aerosols.jl")
+using .Aerosols
+
 # Export some vSmartMOM functions
 export default_parameters, parameters_from_yaml, model_from_parameters, rt_run, read_parameters, read_atmos_profile
 # Export linearized RT functions
