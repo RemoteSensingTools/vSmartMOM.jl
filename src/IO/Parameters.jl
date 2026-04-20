@@ -306,26 +306,53 @@ function check_yaml_field(dict::AbstractDict, full_keys::Vector{String}, curr_ke
     end
 end
 
-"Given a list of aerosol parameter dictionaries, validate all of them"
+"Given a list of aerosol parameter dictionaries, validate all of them.
+
+Vertical distribution may be specified either as (z₀, σ₀) — altitude-form log-normal,
+preferred going forward to match sanghavi's YAML convention — or as (p₀, σp) —
+pressure-form normal, the legacy unified convention. Exactly one form must be
+present per aerosol."
 function validate_aerosols(aerosols)
     @assert !isempty(aerosols) "Aerosols list shouldn't be empty if scattering block is included"
-    fields = [(["τ_ref"], Real), (["μ"], Real), (["σ"], Real), (["nᵣ"], Real), (["nᵢ"], Real), (["p₀"], Real), (["p₀"], Real)]
+    base_fields = [(["τ_ref"], Real), (["μ"], Real), (["σ"], Real),
+                   (["nᵣ"], Real), (["nᵢ"], Real)]
     for aerosol in aerosols
-        for f in fields
+        for f in base_fields
             key, elty = f[1:2]
-            @assert check_yaml_field(aerosol, key, key, elty, String[]) 
+            @assert check_yaml_field(aerosol, key, key, elty, String[])
         end
+        has_alt  = haskey(aerosol, "z₀") && haskey(aerosol, "σ₀")
+        has_pres = haskey(aerosol, "p₀") && haskey(aerosol, "σp")
+        @assert has_alt || has_pres "Aerosol must specify vertical distribution as either (z₀, σ₀) [altitude-form, preferred] or (p₀, σp) [pressure-form, legacy]"
+        @assert !(has_alt && has_pres) "Aerosol must specify exactly one of (z₀, σ₀) or (p₀, σp) — got both"
     end
 end
 
-"Convert the input dictionary of aerosols into a list of RT_aerosols"
+"""Convert the input dictionary of aerosols into a list of RT_aerosols.
+
+When (z₀, σ₀) is provided (altitude-form, preferred), the profile is stored as
+`LogNormal(log(z₀), σ₀)` and consumed by the altitude-space `getAerosolLayerOptProp`
+signature. When (p₀, σp) is provided (pressure-form, legacy), the profile is
+stored as `Normal(p₀, σp)` and consumed by the pressure-space signature.
+
+NOTE (Phase 1b): the altitude-form → pressure-grid integration path in
+`getAerosolLayerOptProp(total_τ, dist::Distribution, profile::AtmosphericProfile)`
+still interprets `dist` in pressure space. When τ_ref = 0 (e.g. the Phase 1b
+regression gate), this is a no-op. Proper altitude-form dispatch will land in a
+follow-up alongside the aerosol-module wire-in (Phase 1d) or the workspace
+landing (Phase 4), whichever proves more natural."""
 function aerosol_params_to_obj(aerosols, FT)
     rt_aerosol_obj_list = RT_Aerosol{FT}[]
     for aerosol in aerosols
-        @assert aerosol["σ"] ≥ 1 "Geometric standard deviation has to be ≥ 1"    
+        @assert aerosol["σ"] ≥ 1 "Geometric standard deviation has to be ≥ 1"
         size_distribution = LogNormal(log(FT(aerosol["μ"])), log(FT(aerosol["σ"])))
         new_aerosol_obj = Aerosol(size_distribution, FT(aerosol["nᵣ"]), FT(aerosol["nᵢ"]))
-        new_rt_aerosol_obj = RT_Aerosol(new_aerosol_obj, FT(aerosol["τ_ref"]), Normal(FT(aerosol["p₀"]), FT(aerosol["σp"])))
+        profile = if haskey(aerosol, "z₀")
+            LogNormal(log(FT(aerosol["z₀"])), FT(aerosol["σ₀"]))
+        else
+            Normal(FT(aerosol["p₀"]), FT(aerosol["σp"]))
+        end
+        new_rt_aerosol_obj = RT_Aerosol(new_aerosol_obj, FT(aerosol["τ_ref"]), profile)
         push!(rt_aerosol_obj_list, new_rt_aerosol_obj)
     end
     return rt_aerosol_obj_list

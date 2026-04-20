@@ -51,3 +51,8 @@ end
 if CUDA_AVAILABLE
     @testset "Raman GPU" begin include("test_forward_raman_gpu.jl") end
 end
+
+# Phase 1b regression gate — RRS forward model vs frozen reference.
+# Skipped by default on CPU-only machines (run takes ~3 min); set
+# PHASE1B_CPU=1 or have CUDA available to actually run.
+@testset "Phase 1b RRS regression" begin include("test_forward_raman_phase1b.jl") end
