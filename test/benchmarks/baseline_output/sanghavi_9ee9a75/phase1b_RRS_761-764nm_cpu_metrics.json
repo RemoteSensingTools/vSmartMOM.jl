@@ -1,0 +1,27 @@
+{
+  "gpu_used_delta": null,
+  "gpu_used_before": null,
+  "wall_max_s": null,
+  "name": "phase1b_RRS_761-764nm_cpu",
+  "wall_min_s": null,
+  "gpu_name": "unmeasured",
+  "output_path": "phase1b_RRS_761-764nm_cpu_output.jld2",
+  "wall_median_s": null,
+  "hw": {
+    "julia_version": "unknown",
+    "cpu": "unmeasured",
+    "gpu": "unmeasured"
+  },
+  "note": "Ported from test/reference/phase1b_RRS_sanghavi_q0.jld2; output arrays only. Wall-clock / allocs not captured in this baseline — re-run on sanghavi worktree to add those metrics.",
+  "wall_mad_s": null,
+  "output_keys": [
+    "R_SFI",
+    "T_SFI",
+    "ieR_SFI",
+    "ieT_SFI"
+  ],
+  "gpu_used_after": null,
+  "wall_n": 0,
+  "cpu_alloc_bytes": null,
+  "cpu_gctime_s": null
+}
