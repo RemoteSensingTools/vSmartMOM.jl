@@ -85,12 +85,22 @@ Unified's 288 lines are the `RTModel`-aware forward driver (Phase 0 baseline). S
 - `InteractionWorkspace` allocation site around line 122: `_interaction_ws = (typeof(RS_type) <: noRS) ? nothing : InteractionWorkspace(composite_layer, added_layer; staged=true)`.
 - `RS_type.bandSpecLim`, `RS_type.F₀`, `RS_type.Z⁺⁺_λ₁λ₀`/`Z⁻⁺_λ₁λ₀` set-up, `InelasticScattering.compute_Z_moments`, `RS_type.fscattRayl` updates, `interaction_inelastic!` branches.
 
-**Phase 1b scope for rt_run.jl:**
-1. Take unified's `rt_run(RS_type::AbstractRamanType, model, iBand)` body (already present, `noRS()` path works).
-2. Graft sanghavi's `RS_type`-branch pre-setup (bandSpecLim, F₀, Z⁺⁺_λ₁λ₀, fscattRayl).
-3. Leave `_interaction_ws = nothing` at the allocation site (per amendments §4 Phase 1b; workspace landing is Phase 4).
-4. Pass `workspace=_interaction_ws` kwarg through `rt_kernel!` / `interaction!` / surface — kernels already accept `workspace === nothing` (verify).
-5. Strip the `{FT}` type parameter from the two `AbstractRamanType{FT}` occurrences.
+**Phase 1b scope for rt_run.jl — resolution:**
+
+Auditing unified's rt_run.jl during implementation showed that items 1, 2, and 5 below were already present on unified from the Phase 0 baseline:
+
+1. `rt_run(RS_type::AbstractRamanType, model, iBand)` body — present.
+2. `RS_type.bandSpecLim` loop (lines 91–97), `RS_type.F₀` size check + init (lines 161–165), `InelasticScattering.computeRamanZλ!(RS_type, pol_type, collect(qp_μ), m, arr_type)` (line 176), `RS_type.fscattRayl = expandBandScalars(...)` branch (lines 188–190) — all present.
+5. `AbstractRamanType{FT}` → `AbstractRamanType` — unified was already unparameterized at the rt_run.jl callsites (commit 1 closed the parameterized variants elsewhere).
+
+The `noRS{FT}()` call-site fix already landed in commit 1.
+
+Items 3 and 4 (workspace placeholder + kwarg threading) resolve to a **Phase-4 TODO only**:
+
+- Item 3: landing a `_interaction_ws = nothing` local does not produce any downstream effect because item 4 can't be done in Phase 1b — unified's `rt_kernel!` / `interaction!` signatures are positional-only and don't accept a `workspace` kwarg. Extending all 5+ kernel signatures would expand Phase 1b scope significantly.
+- Item 4: deferred. Phase 4 will extend the signatures and thread the workspace at the same time it flips construction from `nothing` to the real allocation.
+
+**Commit 4 landed as a TODO-only anchor at the intended allocation site**, replacing the earlier plan of a stub variable. The TODO explicitly names the Phase-4 work (allocate `InteractionWorkspace(composite_layer, added_layer; staged=true)` for `RS_type <: noRS == false`, extend kernel signatures, thread the kwarg). No runtime change in Phase 1b — kernels still see the `workspace === nothing` fallback via their own default kwargs in `interaction_inelastic.jl`.
 
 **Do NOT** port `rt_run_bck` or `rt_run_ss` in Phase 1b. `rt_run_ss` is Phase 1c.
 
