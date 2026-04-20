@@ -8,7 +8,6 @@ module InelasticScattering
     using UnPack
     #import PhysicalConstants.CODATA2018:c_0, h, k_B
 
-    include("raman_constants.jl")
     include("src/raman_constants.jl")
     include("src/molecular_constructors.jl")
     include("src/inelastic_cross_section.jl")
@@ -27,6 +26,8 @@ module InelasticScattering
     "Boltzmann constant in `[erg/K]`"
     global const k_B = 1.380649e-16
 
+    export compute_γ_air_Cabannes! 
+    export compute_γ_air_Rayleigh!
     export compute_effective_coefficents!
     export compute_σ_Rayl_coeff!, compute_stellar_Rayl
     export compute_σ_Rayl_VibRaman_coeff_hires!

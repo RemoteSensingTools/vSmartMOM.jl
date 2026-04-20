@@ -13,7 +13,7 @@ const sol_t_ref              = 5800.0    # reference temperature [K]
 # Base of the photosphere (τ ≈ 1): ~6,400–6,500 K
 # Middle layer: ~5,800 K (this is the often-quoted "surface temperature" of the Sun)
 # Top of the photosphere (τ ≈ 0.01): ~4,200–4,500 K
-const nm_per_m           = 1.0e7
+const nm_per_cm          = 1.0e7
 
 #=function get_n₀_n₁(ieJ₁⁺,Δ)
     n₁_ = 1:size(ieJ₁⁺,3);
@@ -26,7 +26,7 @@ const nm_per_m           = 1.0e7
     return n₀, n₁
 end=#
 # Currently assuming same T for all vertical atmospheric layers (so that a uniform Raman wavelength grid can be assumed for rt_interactions)
-function getRamanSolarConstants(ν̃::FT, T::FT) where FT
+function getRamanSolarConstants(ν̃::AbstractFloat, T::AbstractFloat)
     h2 = InelasticScattering.getMolecularConstants(InelasticScattering.H₂(), (0.91));
     compute_effective_coefficents!(ν̃, T, h2)
     compute_energy_levels!(h2)
@@ -38,7 +38,7 @@ function getRamanSolarConstants(ν̃::FT, T::FT) where FT
     return h2
 end
 
-function getRamanSolarConstants(ν̃::FT, T::FT, vmr_h2::FT) where FT
+function getRamanSolarConstants(ν̃::AbstractFloat, T::AbstractFloat, vmr_h2::AbstractFloat)
     @assert 0<=vmr_h2<=1
     h2 = InelasticScattering.getMolecularConstants(InelasticScattering.H₂(), vmr_h2);
     compute_effective_coefficents!(ν̃, T, h2)
@@ -283,7 +283,7 @@ end
 =#
 
 # for VS
-function compute_γ_solar_Rayleigh_VS!(λ₀::FT, effT::FT) where FT
+function compute_γ_solar_Rayleigh_VS!(λ₀::AbstractFloat, effT::AbstractFloat)
     ν̃ =  1.e7/λ₀
     #effT  =  300.; #K assumed constant for Earth atmospheres
 
@@ -456,31 +456,24 @@ function compute_stellar_RS!(sol_RS_type::sol_RRS, grid_in, λ₀, h2)
     # TMP: grid_in = nm_per_m/λ₀.+collect(-250:0.002:250) #this is a wavenumber grid
     # get_greek_raman!(RS_type, n2, o2)
     
-    σ_out = similar(grid_in);
-    solar_σ_RRS_JtoJp2 = similar(grid_in);
-    solar_σ_RRS_JtoJm2 = similar(grid_in);     
-    σ_tmp = similar(grid_in);
+    grid_in_collected = collect(grid_in)
+    σ_out = similar(grid_in_collected);
+    solar_σ_RRS_JtoJp2 = similar(grid_in_collected);
+    solar_σ_RRS_JtoJm2 = similar(grid_in_collected);
+    σ_tmp = similar(grid_in_collected);
 
     # H2
-    #apply_lineshape!(n2.effCoeff.Δν̃_RoRaman_coeff_JtoJp2, n2.effCoeff.σ_RoRaman_coeff_JtoJp2,  λ₀, collect(grid_out), σ_out, 1, 300.0, 28);
-    apply_gridlines!(h2.effCoeff.Δν̃_RoRaman_coeff_JtoJp2, h2.effCoeff.σ_RoRaman_coeff_JtoJp2,  λ₀, collect(grid_in), σ_out);
+    apply_gridlines!(h2.effCoeff.Δν̃_RoRaman_coeff_JtoJp2, h2.effCoeff.σ_RoRaman_coeff_JtoJp2,  λ₀, grid_in_collected, σ_out);
     solar_σ_RRS_JtoJp2 = σ_out #cross section in cm^2
-    #@show length(atmo_σ_RRS_JtoJp2[atmo_σ_RRS_JtoJp2.>0])
-    #for I in eachindex(grid_out)
-    #    @show grid_out[I], σ_out[I]
-    #end
 
-    #apply_lineshape!(n2.effCoeff.Δν̃_RoRaman_coeff_JtoJm2, n2.effCoeff.σ_RoRaman_coeff_JtoJm2, λ₀, collect(grid_out), σ_out, 1, 300.0, 40);
-    apply_gridlines!(h2.effCoeff.Δν̃_RoRaman_coeff_JtoJm2, h2.effCoeff.σ_RoRaman_coeff_JtoJm2, λ₀, collect(grid_in), σ_out);
+    apply_gridlines!(h2.effCoeff.Δν̃_RoRaman_coeff_JtoJm2, h2.effCoeff.σ_RoRaman_coeff_JtoJm2, λ₀, grid_in_collected, σ_out);
     solar_σ_RRS_JtoJm2 = σ_out #cross section in cm^2
-    #@show length(atmo_σ_RRS_JtoJm2[atmo_σ_RRS_JtoJm2.>0])
 
     σ_tmp .= solar_σ_RRS_JtoJm2 .+ solar_σ_RRS_JtoJp2
-    solar_σ_RRS = σ_tmp[σ_tmp.>0]
-    #finding all indices of σ_out (and hence of ν_in) that have finite (non-zero) values
-    index_ramangrid_out = findall(x->x in σ_tmp[σ_tmp.>0],σ_tmp)
+    index_ramangrid_out = findall(>(0), σ_tmp)
+    solar_σ_RRS = σ_tmp[index_ramangrid_out]
     if (nm_per_m/λ₀>grid_in[1] && nm_per_m/λ₀<grid_in[end])
-        index_ramangrid_out .-= argmin(abs.(grid_in .- nm_per_m/λ₀))
+        index_ramangrid_out .-= argmin(abs.(grid_in_collected .- nm_per_m/λ₀))
     end 
     #for I in eachindex(atmo_σ_RRS)
     #    @show grid_in[argmin(abs.(grid_in .- nm_per_m/λ₀))+index_ramangrid_out[I]], index_ramangrid_out[I], atmo_σ_RRS[I]
@@ -507,29 +500,19 @@ function compute_stellar_RS!(RS_type::Union{sol_VS_0to1, sol_VS_0to1_plus}, grid
     # H2
     xin = [h2.effCoeff.Δν̃_RoVibRaman_coeff_0to1_JtoJp2.parent; h2.effCoeff.Δν̃_RoVibRaman_coeff_0to1_JtoJm2.parent]
     yin = [h2.effCoeff.σ_RoVibRaman_coeff_0to1_JtoJp2.parent; h2.effCoeff.σ_RoVibRaman_coeff_0to1_JtoJm2.parent];
-    #apply_lineshape!(xin, yin, λ₀, collect(grid_out), σ_out, 1, 300.0, 40);
-    apply_gridlines!(xin[abs.(xin).>0], yin[abs.(xin).>0], λ₀, grid_in, σ_out);
+    nz_mask = abs.(xin) .> 0
+    apply_gridlines!(xin[nz_mask], yin[nz_mask], λ₀, grid_in, σ_out);
     σ_tmpRVRS = σ_out #cross section in cm^2
-    #for i in 1:length(xin)
-    #    @show i, xin[i], yin[i]
-    #end
     xin = h2.effCoeff.Δν̃_VibRaman_coeff_0to1_hires
     yin = h2.effCoeff.σ_VibRaman_coeff_0to1_hires
-    #for i in 0:length(xin)-1
-    #    @show i, xin[i], yin[i]
-    #end
-    #apply_lineshape!(xin, yin, λ₀, collect(grid_out), σ_out, 1, 300.0, 40);
     apply_gridlines!(xin, yin, λ₀, grid_in, σ_out);
     σ_tmpVRS = σ_out #cross section in cm^2
 
+    index_VRSgrid_out = findall(>(0), σ_tmpVRS)
+    solar_σ_VRS_0to1 = σ_tmpVRS[index_VRSgrid_out]
 
-    solar_σ_VRS_0to1 = σ_tmpVRS[σ_tmpVRS.>0]
-    #finding all indices of σ_out (and hence of ν_in) that have finite (non-zero) values
-    index_VRSgrid_out = findall(x->x>0,σ_tmpVRS)
-
-    solar_σ_RVRS_0to1 = σ_tmpRVRS[σ_tmpRVRS.>0]
-    #finding all indices of σ_out (and hence of ν_in) that have finite (non-zero) values
-    index_RVRSgrid_out = findall(x->x>0,σ_tmpRVRS)
+    index_RVRSgrid_out = findall(>(0), σ_tmpRVRS)
+    solar_σ_RVRS_0to1 = σ_tmpRVRS[index_RVRSgrid_out]
     #plot(grid_out, atmo_σ_RRS_JtoJp2, yscale=:log10)
     #plot(grid_in, σ_tmpRVRS*1.e40)
     #plot!(grid_in, σ_tmpVRS*1.e40)
@@ -545,36 +528,24 @@ function compute_stellar_RS!(RS_type::Union{sol_VS_1to0, sol_VS_1to0_plus}, grid
     νᵣ = h2.effCoeff.Δν̃_VibRaman_coeff_1to0_hires[0]
         
     # TMP: grid_in = nm_per_m/λ₀ + collect((νᵣ-750):0.002:(νᵣ+750))
-    σ_out = similar(collect(grid_in));        
-    solar_σ_VRS_1to0 = similar(grid_in);
-    solar_σ_RVRS_1to0 = similar(grid_in);
-    #σ_tmpVRS = similar(grid_in);
-    #σ_tmpRVRS = similar(grid_in);
-
-    #@show n2.effCoeff.Δν̃_VibRaman_coeff_1to0_hires[1], o2.effCoeff.Δν̃_VibRaman_coeff_1to0_hires[1]
-    #νᵣ = 0.5*(n2.effCoeff.Δν̃_VibRaman_coeff_1to0_hires[1] + o2.effCoeff.Δν̃_VibRaman_coeff_1to0_hires[1])
-    #grid_out = (νᵣ-750):0.002:(νᵣ+750)
-    #σ_out = similar(collect(grid_out));
+    σ_out = similar(grid_in);
     # H2
     xin = [h2.effCoeff.Δν̃_RoVibRaman_coeff_1to0_JtoJp2.parent; h2.effCoeff.Δν̃_RoVibRaman_coeff_1to0_JtoJm2.parent]
     yin = [h2.effCoeff.σ_RoVibRaman_coeff_1to0_JtoJp2.parent; h2.effCoeff.σ_RoVibRaman_coeff_1to0_JtoJm2.parent];
-    #apply_lineshape!(xin, yin, λ₀, collect(grid_out), σ_out, 1, 300.0, 40);
-    apply_gridlines!(xin[abs.(xin).>0], yin[abs.(xin).>0], λ₀, grid_in, σ_out);
-    σ_RVRStmp= σ_out #cross section in cm^2
+    nz_mask = abs.(xin) .> 0
+    apply_gridlines!(xin[nz_mask], yin[nz_mask], λ₀, grid_in, σ_out);
+    σ_RVRStmp = σ_out #cross section in cm^2
 
     xin = h2.effCoeff.Δν̃_VibRaman_coeff_1to0_hires
     yin = h2.effCoeff.σ_VibRaman_coeff_1to0_hires
-    #apply_lineshape!(xin, yin, λ₀, collect(grid_out), σ_out, 1, 300.0, 40);
     apply_gridlines!(xin, yin, λ₀, grid_in, σ_out);
     σ_VRStmp = σ_out #cross section in cm^2
 
-    solar_σ_VRS_1to0 .= σ_VRStmp(σ_VRStmp.>0)
-    #finding all indices of σ_out (and hence of ν_in) that have finite (non-zero) values
-    index_VRSgrid_out = findall(x->x>0,σ_VRStmp)
+    index_VRSgrid_out = findall(>(0), σ_VRStmp)
+    solar_σ_VRS_1to0 = σ_VRStmp[index_VRSgrid_out]
 
-    solar_σ_RVRS_1to0 .= σ_RVRStmp(σ_RVRStmp.>0)
-    #finding all indices of σ_out (and hence of ν_in) that have finite (non-zero) values
-    index_RVRSgrid_out = findall(x->x>0,σ_RVRStmp)
+    index_RVRSgrid_out = findall(>(0), σ_RVRStmp)
+    solar_σ_RVRS_1to0 = σ_RVRStmp[index_RVRSgrid_out]
 
     return index_VRSgrid_out, solar_σ_VRS_1to0, index_RVRSgrid_out, solar_σ_RVRS_1to0;
     #plot(grid_out, atmo_σ_RRS_JtoJp2, yscale=:log10)
@@ -590,73 +561,61 @@ function compute_stellar_RVRS!(RS_type::Union{sol_VS_0to1, sol_VS_0to1_plus}, gr
     #σ_tmpVRS = similar(grid_in);
     σ_tmpRVRS = similar(grid_in);
     
-    # N2
+    # H2
     xin = [h2.effCoeff.Δν̃_RoVibRaman_coeff_0to1_JtoJp2.parent; h2.effCoeff.Δν̃_RoVibRaman_coeff_0to1_JtoJm2.parent]
     yin = [h2.effCoeff.σ_RoVibRaman_coeff_0to1_JtoJp2.parent; h2.effCoeff.σ_RoVibRaman_coeff_0to1_JtoJm2.parent];
-    #apply_lineshape!(xin, yin, λ₀, collect(grid_out), σ_out, 1, 300.0, 40);
-    apply_gridlines!(xin[abs.(xin).>0], yin[abs.(xin).>0], λ₀, grid_in, σ_out);
+    nz_mask = abs.(xin) .> 0
+    apply_gridlines!(xin[nz_mask], yin[nz_mask], λ₀, grid_in, σ_out);
     σ_tmpRVRS = σ_out #cross section in cm^2
-    
-    solar_σ_RVRS_0to1 = σ_tmpRVRS[σ_tmpRVRS.>0]
-    #finding all indices of σ_out (and hence of ν_in) that have finite (non-zero) values
-    index_RVRSgrid_out = findall(x->x in σ_tmpRVRS[σ_tmpRVRS.>0],σ_tmpRVRS)
-    
+
+    index_RVRSgrid_out = findall(>(0), σ_tmpRVRS)
+    solar_σ_RVRS_0to1 = σ_tmpRVRS[index_RVRSgrid_out]
+
     return index_RVRSgrid_out, solar_σ_RVRS_0to1;
 end
 
-function compute_stellar_RVRS!(RS_type::Union{sol_VS_1to0, sol_VS_1to0_plus}, grid_in, λ₀, h2)        
-    σ_out = similar(collect(grid_in));        
-    #atmo_σ_VRS_1to0 = similar(grid_in);
-    #atmo_σ_RVRS_1to0 = similar(grid_in);
-    #σ_tmpVRS = similar(grid_in);
-    σ_tmpRVRS = similar(grid_in);
+function compute_stellar_RVRS!(RS_type::Union{sol_VS_1to0, sol_VS_1to0_plus}, grid_in, λ₀, h2)
+    σ_out = similar(grid_in);
 
     # H2
     xin = [h2.effCoeff.Δν̃_RoVibRaman_coeff_1to0_JtoJp2.parent; h2.effCoeff.Δν̃_RoVibRaman_coeff_1to0_JtoJm2.parent]
     yin = [h2.effCoeff.σ_RoVibRaman_coeff_1to0_JtoJp2.parent; h2.effCoeff.σ_RoVibRaman_coeff_1to0_JtoJm2.parent];
-    #apply_lineshape!(xin, yin, λ₀, collect(grid_out), σ_out, 1, 300.0, 40);
-    apply_gridlines!(xin[abs.(xin).>0], yin[abs.(xin).>0], λ₀, grid_in, σ_out);
+    nz_mask = abs.(xin) .> 0
+    apply_gridlines!(xin[nz_mask], yin[nz_mask], λ₀, grid_in, σ_out);
     σ_RVRStmp = σ_out #cross section in cm^2
-    
-    solar_σ_RVRS_1to0 = σ_tmpRVRS(σ_RVRStmp.>0)
-    #finding all indices of σ_out (and hence of ν_in) that have finite (non-zero) values
-    index_RVRSgrid_out = findall(x->x>0,σ_tmpRVRS)
+
+    index_RVRSgrid_out = findall(>(0), σ_RVRStmp)
+    solar_σ_RVRS_1to0 = σ_RVRStmp[index_RVRSgrid_out]
 
     return index_RVRSgrid_out, solar_σ_RVRS_1to0;
 end
 
 function compute_stellar_VRS!(RS_type::Union{sol_VS_0to1, sol_VS_0to1_plus}, grid_in, λ₀, mol)
     σ_out = similar(grid_in);
-    σ_tmpVRS = similar(grid_in);
 
-    # mol: N2 OR O2
+    # mol: H2
     xin = mol.effCoeff.Δν̃_VibRaman_coeff_0to1_hires
     yin = mol.effCoeff.σ_VibRaman_coeff_0to1_hires
-    #apply_lineshape!(xin, yin, λ₀, collect(grid_out), σ_out, 1, 300.0, 40);
     apply_gridlines!(xin, yin, λ₀, grid_in, σ_out);
     σ_tmpVRS = σ_out #cross section in cm^2
 
-    solar_σ_VRS_0to1 = σ_tmpVRS[σ_tmpVRS.>0]
-    #finding all indices of σ_out (and hence of ν_in) that have finite (non-zero) values
-    index_VRSgrid_out = findall(x->x>0,σ_tmpVRS)
+    index_VRSgrid_out = findall(>(0), σ_tmpVRS)
+    solar_σ_VRS_0to1 = σ_tmpVRS[index_VRSgrid_out]
 
     return index_VRSgrid_out, solar_σ_VRS_0to1;
 end
 
 function compute_stellar_VRS!(RS_type::Union{sol_VS_1to0, sol_VS_1to0_plus}, grid_in, λ₀, mol)
     σ_out = similar(grid_in);
-    σ_tmpVRS = similar(grid_in);
 
-    # mol: N2 OR O2
+    # mol: H2
     xin = mol.effCoeff.Δν̃_VibRaman_coeff_1to0_hires
     yin = mol.effCoeff.σ_VibRaman_coeff_1to0_hires
-    #apply_lineshape!(xin, yin, λ₀, collect(grid_out), σ_out, 1, 300.0, 40);
     apply_gridlines!(xin, yin, λ₀, grid_in, σ_out);
     σ_tmpVRS = mol.vmr * σ_out #cross section in cm^2
 
-    solar_σ_VRS_1to0 = σ_tmpVRS[σ_tmpVRS.>0]
-    #finding all indices of σ_out (and hence of ν_in) that have finite (non-zero) values
-    index_VRSgrid_out = findall(x->x>0,σ_tmpVRS)
+    index_VRSgrid_out = findall(>(0), σ_tmpVRS)
+    solar_σ_VRS_1to0 = σ_tmpVRS[index_VRSgrid_out]
 
     return index_VRSgrid_out, solar_σ_VRS_1to0;
 end
@@ -748,7 +707,7 @@ function computeRamanZλ!(RS_type::Union{sol_RRS,
                                         arr_type = arr_type);
     RS_type.Z⁺⁺_λ₁λ₀_VS_h2, RS_type.Z⁻⁺_λ₁λ₀_VS_h2 = 
                     Scattering.compute_Z_moments(pol_type, 
-                                            collect(qp_μ), 
+                                            Array(qp_μ), 
                                             RS_type.greek_raman_VS, 
                                             m, 
                                             arr_type = arr_type);

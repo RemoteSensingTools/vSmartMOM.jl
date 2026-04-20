@@ -21,7 +21,7 @@ Input:
 end=#
 
 function getRamanSSProp!(RS_type::Union{sol_VS_0to1, sol_VS_1to0}, depol, λ, grid_in)
-    (; h2) = RS_type
+    @unpack h2 =  RS_type
     #n2, o2 = getRamanAtmoConstants(1.e7/λ, T)
     λ_scatt = 2.e7/(grid_in[1]+grid_in[end])     
     #determine Rayleigh scattering cross-section at mean scattered wavelength
@@ -59,25 +59,29 @@ end
 
 
 function getRamanSSProp!(RS_type::sol_RRS, λ, grid_in) 
-    (; h2) = RS_type
+    @unpack h2 =  RS_type
     #n2, o2 = getRamanAtmoConstants(1.e7/λ, T)
     # determine Rayleigh scattering cross-section at central wavelength λ of the spectral band (assumed constant throughout the band)
     solar_σ_Rayl = compute_stellar_Rayl(λ, h2)
     RS_type.greek_raman = get_greek_raman(RS_type, h2)
     #get_greek_raman!(RS_type, n2, o2)
     RS_type.ϖ_Cabannes .= compute_ϖ_Cabannes(RS_type, λ)
+    # @show RS_type.ϖ_Cabannes
     # determine RRS cross-sections to λ₀ from nSpecRaman wavelengths around λ₀  
     index_raman_grid, solar_σ_RRS = compute_stellar_RS!(RS_type, grid_in, λ, h2)
     # declare ϖ_Raman to be a grid of length raman grid
     #RS_type.ϖ_λ₁λ₀ = atmo_σ_RRS[end:-1:1]/atmo_σ_Rayl * (1-RS_type.ϖ_Cabannes[1])/sum(atmo_σ_RRS[end:-1:1]/atmo_σ_Rayl) #the grid gets inverted because the central wavelength is now seen as the recipient of RRS from neighboring source wavelengths
-    RS_type.ϖ_λ₁λ₀ = (solar_σ_RRS[end:-1:1]/solar_σ_Rayl) #the grid gets inverted because the central wavelength is now seen as the recipient of RRS from neighboring source wavelengths
-    RS_type.i_λ₁λ₀ = index_raman_grid[end:-1:1]
+    RS_type.ϖ_λ₁λ₀ = (reverse(solar_σ_RRS)/solar_σ_Rayl) #the grid gets inverted because the central wavelength is now seen as the recipient of RRS from neighboring source wavelengths
+    #@show RS_type.ϖ_λ₁λ₀
+    #@show sum(RS_type.ϖ_λ₁λ₀)
+    #@show RS_type.ϖ_Cabannes
+    RS_type.i_λ₁λ₀ = reverse(index_raman_grid)
     RS_type.n_Raman = length(RS_type.ϖ_λ₁λ₀)
     return nothing
 end
 #=
 function getRamanSSProp!(RS_type::sol_RRS, λ, grid_in) 
-    (; h2) = RS_type
+    @unpack h2 =  RS_type
     #n2, o2 = getRamanAtmoConstants(1.e7/λ, T)
     # determine Rayleigh scattering cross-section at central wavelength λ of the spectral band (assumed constant throughout the band)
     atmo_σ_Rayl = compute_optical_Rayl(λ, n2, o2)
@@ -93,7 +97,7 @@ function getRamanSSProp!(RS_type::sol_RRS, λ, grid_in)
     #@show RS_type.ϖ_λ₁λ₀
     #@show sum(RS_type.ϖ_λ₁λ₀)
     #@show RS_type.ϖ_Cabannes
-    RS_type.i_λ₁λ₀ = index_raman_grid #index_raman_grid[end:-1:1]
+    RS_type.i_λ₁λ₀ = index_raman_grid #reverse(index_raman_grid)
     RS_type.n_Raman = length(RS_type.ϖ_λ₁λ₀)
     return nothing
 end 
@@ -102,19 +106,19 @@ end
 function getRamanSSProp!(
             RS_type::sol_VS_0to1_plus, λ_inc)
 
-    (; h2,
+    @unpack h2,
             iBand, grid_in, bandSpecLim, 
             greek_raman, greek_raman_VS,
             ϖ_Cabannes, fscattRayl,
             ϖ_λ₁λ₀, i_λ₁λ₀,
             ϖ_λ₁λ₀_VS, i_λ₁λ₀_VS,
-            i_λ₁λ₀_all) = RS_type
+            i_λ₁λ₀_all =  RS_type
     #n2, o2 = getRamanAtmoConstants(1.e7/λ, T)
     iBand = []
-    grid_in = AbstractRange{Float64}[]
-    bandSpecLim = UnitRange{Int}[]
+    grid_in = []
+    bandSpecLim = []
 
-    nm_per_m = 1.e7;
+    nm_per_cm= 1.e7;
     greek_raman = get_greek_raman(RS_type, h2)
     greek_raman_VS = get_greek_raman_VS(RS_type, h2)
 
@@ -160,9 +164,11 @@ function getRamanSSProp!(
         λ = nm_per_m/(0.5*(_grid_in[1]+_grid_in[end]))
         
         if iB==1
+            #@show InelasticScattering.compute_ϖ_Cabannes(RS_type, depol, λ_inc, n2, o2)
             ϖ_Cabannes[iB] = InelasticScattering.compute_ϖ_Cabannes(RS_type, λ_inc)
+            # 1.
         else
-            ϖ_Cabannes[iB] = 1.
+            ϖ_Cabannes[iB] = 1.    #@show ϖ_Cabannes
         end
         if iB==1
             t_ϖ_VRS = [0.]
@@ -189,7 +195,8 @@ function getRamanSSProp!(
         
     end
     n_Raman = 1;
-    bandSpecLim = UnitRange{Int}[]
+    bandSpecLim = [] # (1:τ_abs[iB])#zeros(Int64, iBand, 2) #Suniti: how to do this?
+    #Suniti: make bandSpecLim a part of RS_type (including noRS) so that it can be passed into rt_kernel and elemental/doubling/interaction and postprocessing_vza without major syntax changes
     nSpec = 0;
     for iB in iBand
         nSpec0 = nSpec+1;
@@ -212,7 +219,7 @@ function getRamanSSProp!(
         ϖ_λ₁λ₀_VS[Δn] = t_w_VS[2][Δn];
     end
 
-    i_λ₁λ₀_all = unique(cat(i_λ₁λ₀, i_λ₁λ₀_VS, dims = (1)))
+    i_λ₁λ₀_all = unique(vcat(i_λ₁λ₀, i_λ₁λ₀_VS))
 
     @pack! RS_type =
             iBand, grid_in, bandSpecLim,  
@@ -229,19 +236,19 @@ end
 function getRamanSSProp!(
     RS_type::sol_VS_1to0_plus, λ_inc)
 
-    (; h2,
+    @unpack h2,
         iBand, grid_in, bandSpecLim, 
         greek_raman, greek_raman_VS,
         ϖ_Cabannes, fscattRayl,
         ϖ_λ₁λ₀, i_λ₁λ₀,
         ϖ_λ₁λ₀_VS, i_λ₁λ₀_VS,
-        i_λ₁λ₀_all) = RS_type
+        i_λ₁λ₀_all =  RS_type
     #n2, o2 = getRamanAtmoConstants(1.e7/λ, T)
     iBand = []
-    grid_in = AbstractRange{Float64}[]
-    bandSpecLim = UnitRange{Int}[]
+    grid_in = []
+    bandSpecLim = []
 
-    nm_per_m = 1.e7;
+    nm_per_cm= 1.e7;
     greek_raman = get_greek_raman(RS_type, h2)
     greek_raman_VS = get_greek_raman_VS(RS_type, h2)
     #λ_scatt = 2.e7/(grid_in[1]+grid_in[end])     
@@ -287,6 +294,7 @@ function getRamanSSProp!(
 
     if iB==1
         ϖ_Cabannes[iB] = InelasticScattering.compute_ϖ_Cabannes(RS_type, λ_inc)
+        #@show ϖ_Cabannes
     else
         ϖ_Cabannes[iB] = 1.
     end
@@ -315,7 +323,8 @@ function getRamanSSProp!(
 
     end
     n_Raman = 1;
-    bandSpecLim = UnitRange{Int}[]
+    bandSpecLim = [] # (1:τ_abs[iB])#zeros(Int64, iBand, 2) #Suniti: how to do this?
+    #Suniti: make bandSpecLim a part of RS_type (including noRS) so that it can be passed into rt_kernel and elemental/doubling/interaction and postprocessing_vza without major syntax changes
     nSpec = 0;
     for iB in iBand
     nSpec0 = nSpec+1;
@@ -338,7 +347,7 @@ function getRamanSSProp!(
     ϖ_λ₁λ₀_VS[Δn] = t_w_VS[2][Δn];
     end
 
-    i_λ₁λ₀_all = unique(cat(i_λ₁λ₀, i_λ₁λ₀_VS, dims = (1)))
+    i_λ₁λ₀_all = unique(vcat(i_λ₁λ₀, i_λ₁λ₀_VS))
 
     @pack! RS_type =
         iBand, grid_in, bandSpecLim,  
@@ -354,19 +363,19 @@ end
 function getRamanSSProp!(
     RS_type::Union{sol_VS_0to1_plus, sol_VS_1to0_plus}, λ_inc,  target_grid)
 
-    (; h2,
+    @unpack h2,
         iBand, grid_in, bandSpecLim, 
         greek_raman, greek_raman_VS,
         ϖ_Cabannes, fscattRayl,
         ϖ_λ₁λ₀, i_λ₁λ₀,
         ϖ_λ₁λ₀_VS, i_λ₁λ₀_VS,
-        i_λ₁λ₀_all) = RS_type
+        i_λ₁λ₀_all =  RS_type
     #n2, o2 = getRamanAtmoConstants(1.e7/λ, T)
     iBand = []
-    grid_in = AbstractRange{Float64}[]
-    bandSpecLim = UnitRange{Int}[]
+    grid_in = []
+    bandSpecLim = []
 
-    nm_per_m = 1.e7;
+    nm_per_cm= 1.e7;
     greek_raman = get_greek_raman(RS_type, h2)
     greek_raman_VS = get_greek_raman_VS(RS_type, h2)
 
@@ -415,7 +424,9 @@ function getRamanSSProp!(
         #λ = nm_per_m/(0.5*(_grid_in[1]+_grid_in[end]))
 
         if iB==1
+            #@show InelasticScattering.compute_ϖ_Cabannes(RS_type, λ_inc)
             ϖ_Cabannes[iB] = InelasticScattering.compute_ϖ_Cabannes(RS_type, λ_inc)
+            #@show ϖ_Cabannes
         else
             ϖ_Cabannes[iB] = 1.
         end
@@ -446,7 +457,8 @@ function getRamanSSProp!(
 
     end
     n_Raman = 1;
-    bandSpecLim = UnitRange{Int}[]
+    bandSpecLim = [] # (1:τ_abs[iB])#zeros(Int64, iBand, 2) #Suniti: how to do this?
+    #Suniti: make bandSpecLim a part of RS_type (including noRS) so that it can be passed into rt_kernel and elemental/doubling/interaction and postprocessing_vza without major syntax changes
     nSpec = 0;
     for iB in iBand
         nSpec0 = nSpec+1;
@@ -469,7 +481,7 @@ function getRamanSSProp!(
         ϖ_λ₁λ₀_VS[Δn] = t_w_VS[2][Δn];
     end
 
-    i_λ₁λ₀_all = unique(cat(i_λ₁λ₀, i_λ₁λ₀_VS, dims = (1)))
+    i_λ₁λ₀_all = unique(vcat(i_λ₁λ₀, i_λ₁λ₀_VS))
 
     @pack! RS_type =
         iBand, grid_in, bandSpecLim,  

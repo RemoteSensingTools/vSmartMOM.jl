@@ -13,7 +13,7 @@ A struct which provides all polarizability tensor elements
 
     The polarizability at arbitrary wavenumbers [m⁻¹] and temperatures [K] can be computed as 
     
-    α̅(2πcν, T) = α̅₀₀(1 + α_b⋅T + α_c⋅T²)/(1-(2πcν/ω₀)²
+    α̅(2πcν, T) = α̅₀₀(1 + α_b⋅T + α_c⋅T²)/(1-(2πcν/ω₀)²)
 
 # Fields
 $(DocStringExtensions.FIELDS)
@@ -47,7 +47,7 @@ $(DocStringExtensions.FIELDS)
 """
 Base.@kwdef struct NuclearSpinMultiplicity
     "Nuclear Spin Multiplicity (Array of length 2 {odd J_initial, even J_initial})"
-    gₛ::AbstractArray{Int}    
+    gₛ::AbstractVector{Int}
 end
 
 """
@@ -67,7 +67,7 @@ $(DocStringExtensions.FIELDS)
 """
 Base.@kwdef struct DunhamCoefficients{FT}
     "Dunham Expansion Coefficients (5x5 Matrix)"
-    Y::AbstractArray{FT}    
+    Y::AbstractMatrix{FT}
 end
 
 Base.@kwdef mutable struct EffectiveCoefficients{FT}
@@ -96,41 +96,41 @@ Base.@kwdef mutable struct EffectiveCoefficients{FT}
     rho_depol_RoVibRaman::FT # 2γ_C_RoVibRaman/(1+γ_C_RoVibRaman)
     "Rayl cross-section σ(ν) = σ_Rayl_coeff * (ν)⁴"
     σ_Rayl_coeff::FT  #Cross-section = σ_Rayl_coeff * ν⁴
-    σ_Rayl_coeff_hires::AbstractArray{FT}
-    Δν̃_Rayl_coeff_hires::AbstractArray{FT}
-    
+    σ_Rayl_coeff_hires::AbstractVector{FT}
+    Δν̃_Rayl_coeff_hires::AbstractVector{FT}
+
     #"Wavenumber shift in emitted light after vᵢ, Jᵢ --> v_f, J_f transition, νₛ = ν + Δνₛ"
-    #Δνₛ::AbstractArray{FT}  
+    #Δνₛ::AbstractVector{FT}
     "Raman scattering coefficient for pure vibrational scattering"
     σ_VibRaman_coeff_0to1::FT
     σ_VibRaman_coeff_1to0::FT
-    σ_VibRaman_coeff_0to1_hires::AbstractArray{FT} 
-    σ_VibRaman_coeff_1to0_hires::AbstractArray{FT}
-    
+    σ_VibRaman_coeff_0to1_hires::AbstractVector{FT}
+    σ_VibRaman_coeff_1to0_hires::AbstractVector{FT}
+
     "Vibrational Raman scattering wavenumber displacement Δν̃"
-    Δν̃_VibRaman_coeff_0to1::FT 
+    Δν̃_VibRaman_coeff_0to1::FT
     Δν̃_VibRaman_coeff_1to0::FT
-    Δν̃_VibRaman_coeff_0to1_hires::AbstractArray{FT}
-    Δν̃_VibRaman_coeff_1to0_hires::AbstractArray{FT}
-    
+    Δν̃_VibRaman_coeff_0to1_hires::AbstractVector{FT}
+    Δν̃_VibRaman_coeff_1to0_hires::AbstractVector{FT}
+
     "Raman scattering coefficient for rovibrational scattering"
-    σ_RoVibRaman_coeff_0to1_JtoJm2::AbstractArray{FT} 
-    σ_RoVibRaman_coeff_0to1_JtoJp2::AbstractArray{FT} 
-    σ_RoVibRaman_coeff_1to0_JtoJm2::AbstractArray{FT}      
-    σ_RoVibRaman_coeff_1to0_JtoJp2::AbstractArray{FT}  #Cross-section = σ_VibRaman_coeff * ν⁴
+    σ_RoVibRaman_coeff_0to1_JtoJm2::AbstractVector{FT}
+    σ_RoVibRaman_coeff_0to1_JtoJp2::AbstractVector{FT}
+    σ_RoVibRaman_coeff_1to0_JtoJm2::AbstractVector{FT}
+    σ_RoVibRaman_coeff_1to0_JtoJp2::AbstractVector{FT}  #Cross-section = σ_VibRaman_coeff * ν⁴
     "Rovibrational wavenumber displacement Δν̃"
-    Δν̃_RoVibRaman_coeff_0to1_JtoJm2::AbstractArray{FT} 
-    Δν̃_RoVibRaman_coeff_0to1_JtoJp2::AbstractArray{FT} 
-    Δν̃_RoVibRaman_coeff_1to0_JtoJm2::AbstractArray{FT} 
-    Δν̃_RoVibRaman_coeff_1to0_JtoJp2::AbstractArray{FT} 
+    Δν̃_RoVibRaman_coeff_0to1_JtoJm2::AbstractVector{FT}
+    Δν̃_RoVibRaman_coeff_0to1_JtoJp2::AbstractVector{FT}
+    Δν̃_RoVibRaman_coeff_1to0_JtoJm2::AbstractVector{FT}
+    Δν̃_RoVibRaman_coeff_1to0_JtoJp2::AbstractVector{FT}
     "Rotational Raman cross-section σ(ν, vᵢ, Jᵢ --> v_f, J_f) = σ_Raman_coeff * (ν+Δνₛ)⁴"
-    σ_RoRaman_coeff_JtoJm2::AbstractArray{FT}
-    σ_RoRaman_coeff_JtoJp2::AbstractArray{FT} #Cross-section = σ_Raman_coeff * ν⁴
+    σ_RoRaman_coeff_JtoJm2::AbstractVector{FT}
+    σ_RoRaman_coeff_JtoJp2::AbstractVector{FT} #Cross-section = σ_Raman_coeff * ν⁴
     "Rotational Raman wavenumber displacement Δν̃"
-    Δν̃_RoRaman_coeff_JtoJm2::AbstractArray{FT} 
-    Δν̃_RoRaman_coeff_JtoJp2::AbstractArray{FT} #Cross-section = σ_Raman_coeff * ν⁴
+    Δν̃_RoRaman_coeff_JtoJm2::AbstractVector{FT}
+    Δν̃_RoRaman_coeff_JtoJp2::AbstractVector{FT} #Cross-section = σ_Raman_coeff * ν⁴
     "Energy levels (in wavenumbers [cm^{-1}]) for a given v, J state"
-    E_vJ::AbstractArray{FT}  
+    E_vJ::AbstractMatrix{FT}
 end
 
 
@@ -138,9 +138,9 @@ Base.@kwdef struct MolecularConstants{FT}
     "Volume mixing ratio"
     vmr::FT
     "Dunham Expansion Coefficients (5x5 Matrix)"
-    Y::AbstractArray{FT}  
+    Y::AbstractMatrix{FT}
     "Nuclear Spin Multiplicity (Array of length 2 {odd J_initial, even J_initial})"
-    gₛ::AbstractArray{Int} 
+    gₛ::AbstractVector{Int}
     PolTensor::PolarizationTensor{FT}
     effCoeff::EffectiveCoefficients{FT}
 end
