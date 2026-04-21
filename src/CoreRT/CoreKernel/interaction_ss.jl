@@ -18,23 +18,19 @@ function interaction_ss!(SFI::Bool,
             quad_points::QuadPoints{FT2},
             architecture) where {FT<:Real, FT2}
     
-    #@unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺ = added_layer #these are aliases to the respective struct elements  
-    (; J₀⁺, J₀⁻) = composite_layer #these are aliases to the respective struct elements 
     (; qp_μN) = quad_points
     arr_type = array_type(architecture)
     device = devi(architecture)
     qp_μN = arr_type(qp_μN)
     τ_sum = arr_type(τ_sum)
     τ_λ = arr_type(τ_λ)
-    J₀⁺ = arr_type(J₀⁺)
-    J₀⁻ = arr_type(J₀⁻)
 
     kernel! = get_interaction_ss!(device)
-    event = kernel!(τ_sum, τ_λ, qp_μN, 
-                    arr_type(added_layer.j₀⁺), 
+    event = kernel!(τ_sum, τ_λ, qp_μN,
+                    arr_type(added_layer.j₀⁺),
                     arr_type(added_layer.j₀⁻),
-                    J₀⁺, J₀⁻, ndrange=size(J₀⁻))
-    #wait(device, event)
+                    composite_layer.J₀⁺, composite_layer.J₀⁻,
+                    ndrange=size(composite_layer.J₀⁻))
     synchronize_if_gpu()
 end
 
@@ -47,9 +43,7 @@ function interaction_inelastic_ss!(RS_type::RRS,
     quad_points::QuadPoints{FT2},
     architecture) where {FT<:Real, FT2}
 
-    #@unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺ = added_layer #these are aliases to the respective struct elements  
     (; i_λ₁λ₀) = RS_type
-    (; ieJ₀⁺, ieJ₀⁻) = composite_layer #these are aliases to the respective struct elements 
     (; qp_μN) = quad_points
 
     atype = array_type(architecture)
@@ -57,15 +51,11 @@ function interaction_inelastic_ss!(RS_type::RRS,
     qp_μN = atype(qp_μN)
     τ_sum = atype(τ_sum)
     τ_λ = atype(τ_λ)
-    ieJ₀⁺ = atype(ieJ₀⁺)
-    ieJ₀⁻ = atype(ieJ₀⁻)
-    aa = getKernelDimSFI(RS_type, ieJ₀⁻)
     kernel! = get_interaction_ss_RRS!(device)
     event = kernel!(τ_sum, τ_λ, qp_μN, atype(i_λ₁λ₀),
                 atype(added_layer.ieJ₀⁺), atype(added_layer.ieJ₀⁻),
-                ieJ₀⁺, ieJ₀⁻,
-                ndrange=getKernelDimSFI(RS_type, ieJ₀⁻))
-    #wait(device, event)
+                composite_layer.ieJ₀⁺, composite_layer.ieJ₀⁻,
+                ndrange=getKernelDimSFI(RS_type, composite_layer.ieJ₀⁻))
     synchronize_if_gpu()
 end
 
@@ -93,7 +83,6 @@ function interaction_inelastic_ss!(
     architecture) where {FT<:Real, FT2}
 
 (; i_λ₁λ₀_all) = RS_type
-(; ieJ₀⁺, ieJ₀⁻) = composite_layer #these are aliases to the respective struct elements 
 (; qp_μN) = quad_points
 
 atype = array_type(architecture)
@@ -101,15 +90,12 @@ device = devi(architecture)
 qp_μN = atype(qp_μN)
 τ_sum = atype(τ_sum)
 τ_λ = atype(τ_λ)
-ieJ₀⁺ = atype(ieJ₀⁺)
-ieJ₀⁻ = atype(ieJ₀⁻)
 
 kernel! = get_interaction_ss_VS!(device)
 event = kernel!(τ_sum, τ_λ, qp_μN, atype(i_λ₁λ₀_all),
             atype(added_layer.ieJ₀⁺), atype(added_layer.ieJ₀⁻),
-            ieJ₀⁺, ieJ₀⁻,
-            ndrange = getKernelDimSFI(RS_type,ieJ₀⁻,RS_type.i_λ₁λ₀_all))
-#wait(device, event)
+            composite_layer.ieJ₀⁺, composite_layer.ieJ₀⁻,
+            ndrange = getKernelDimSFI(RS_type, composite_layer.ieJ₀⁻, RS_type.i_λ₁λ₀_all))
 synchronize_if_gpu()
 end
 
