@@ -76,26 +76,35 @@ The full-range versions remain runnable (separate YAML or a `--full` flag) for f
 
 ---
 
-## Tolerance table (TBD — user fills during Phase 2 draft)
+## Tolerance table (populated by user 2026-04-21)
 
-Per handoff brief §7 and amendments §7, tolerances are a user-facing choice per-script, per-quantity. Placeholders to be populated before Phase 2b baselines are committed:
+Per handoff brief §7 and amendments §7, tolerances are a user-facing choice per-script, per-quantity. User-specified values:
+
+- **I (intensity):** `rtol = 1e-4` (better than 0.01% relative)
+- **Q, U, V:** `atol = 1e-8` (absolute)
+- **Inelastic ieR/ieT:** same split — I component `rtol = 1e-4`, Q/U/V components `atol = 1e-8`
+- **Performance:** sanghavi's numbers are the ceiling. Any scenario that exceeds sanghavi's wall-clock, CPU allocs, or GPU memory is flagged, not auto-failed — iterate.
 
 | Quantity | `prototype_EMIT_aer_ht.jl` (noRS) | `creategrid_O2Aband_RamanSIF.jl` (RRS+SIF) |
 |---|---|---|
-| I | rtol=?, atol=? | rtol=?, atol=? |
-| Q | rtol=?, atol=? | rtol=?, atol=? |
-| U | rtol=?, atol=? | rtol=?, atol=? |
-| V | rtol=?, atol=? | rtol=?, atol=? |
-| ieR (Raman reflected) | n/a | rtol=?, atol=? |
-| ieT (Raman transmitted) | n/a | rtol=?, atol=? |
-| dR (Jacobian wrt R) | rtol=?, atol=? | n/a (linearized Raman out of scope) |
-| dT (Jacobian wrt T) | rtol=?, atol=? | n/a |
-| SIF contribution (pattern; see Phase 3) | n/a | rtol=?, atol=? |
-| Wall-clock (warm) | regression ≤ +X% of sanghavi | ≤ +X% |
-| GPU alloc count | ≤ sanghavi count | ≤ sanghavi count |
-| GPU peak memory | ≤ sanghavi peak + Y MB | ≤ sanghavi peak + Y MB |
+| I | rtol=1e-4 | rtol=1e-4 |
+| Q | atol=1e-8 | atol=1e-8 |
+| U | atol=1e-8 | atol=1e-8 |
+| V | atol=1e-8 | atol=1e-8 |
+| ieR·I | n/a | rtol=1e-4 |
+| ieR·(Q,U,V) | n/a | atol=1e-8 |
+| ieT·I | n/a | rtol=1e-4 |
+| ieT·(Q,U,V) | n/a | atol=1e-8 |
+| dR (Jacobian wrt R) | rtol=1e-4 on I, atol=1e-8 on Q/U/V | n/a (linearized Raman out of scope) |
+| dT (Jacobian wrt T) | rtol=1e-4 on I, atol=1e-8 on Q/U/V | n/a |
+| SIF contribution (pattern; see Phase 3) | n/a | atol=1e-8 on the pattern |
+| Wall-clock (warm) | **≤ sanghavi** — flag if exceeded | **≤ sanghavi** — flag if exceeded |
+| CPU alloc bytes | **≤ sanghavi** — flag if exceeded | **≤ sanghavi** — flag if exceeded |
+| GPU used Δ-memory | **≤ sanghavi** — flag if exceeded | **≤ sanghavi** — flag if exceeded |
 
 Per invariant 6 (below), tolerance claims must be honest: bit-exactness applies only to phases that preserve execution path verbatim; phases that reorder accumulation (staging, 4D→3D batching) use the tolerances above.
+
+**Known outstanding residual (from Phase 2a diagnostic):** elastic R/T shows a ~1-3% systematic polarization-sensitive multiplicative bias between sanghavi-unified and sanghavi (ratio 0.968-0.991 on I/Q). This exceeds the `rtol=1e-4` gate on I by ~100×. Candidate root causes documented in [PHASE_1B_STAGING.md §9](PHASE_1B_STAGING.md). Phase 2b will flag this as a blocking failure and we iterate on it before Phase 3.
 
 ---
 

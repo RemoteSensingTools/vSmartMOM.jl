@@ -1,13 +1,15 @@
 {
   "hw": {
-    "julia_version": "unknown",
-    "cpu": "unmeasured",
-    "gpu": "unmeasured"
+    "julia_version": "1.12.5",
+    "cpu": "AMD EPYC 7H12 64-Core Processor",
+    "gpu": "no-cuda"
   },
   "scenarios": [
-    "phase1b_RRS_761-764nm_cpu"
+    "phase1b_RRS_761-764nm_cpu",
+    "phase1b_noRS_761-764nm_cpu",
+    "phase1b_ss_761-764nm_cpu"
   ],
-  "note": "Output-only sanghavi baseline for Phase 2a diagnostic. Wall-clock / GPU metrics require a re-run on sanghavi worktree.",
-  "git_sha": "9ee9a75 (sanghavi tip at Phase 1b cross-check)",
-  "toml": "derived from test/reference/phase1b_RRS_sanghavi_q0.jld2"
+  "note": "Phase 2b sanghavi-side baseline captured via capture_sanghavi.jl with 21-arg postprocessing_vza! monkey-patch.",
+  "git_sha": "9ee9a7522c6c0f2cac85733dbc7ddf7465dafe3c (sanghavi tip at Phase 2b freeze)",
+  "toml": "/home/sanghavi/code/github/uni_vSmartMOM/test/benchmarks/harness/scenarios.toml"
 }
