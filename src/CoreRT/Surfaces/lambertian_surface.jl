@@ -198,5 +198,50 @@ function reflectance(sur::LambertianSurfaceScalar{FT}, μᵢ::FT, μᵣ::FT, dϕ
     return sur.albedo
 end
 
+"""
+    inject_surface_SIF!(brdf, added_layer, m, pol_type, SIF₀, architecture)
+
+Add isotropic solar-induced fluorescence (SIF) surface emission to
+`added_layer.j₀⁻`. SIF is Lambertian — only the m=0 Fourier moment carries
+it — so higher moments are untouched. The factor 2 comes from
+(1/π) × 2π: (1/π) normalizes the hemispheric SIF flux `SIF₀` into a
+Lambertian radiance, and 2π compensates the `weight = 0.5/π` azimuthal
+weighting applied downstream in `postprocessing_vza!` (SIF is isotropic
+and must not be azimuthally weighted).
+
+Ported from sanghavi `lambertian_surface.jl` (injection sites at
+sanghavi lines 67-68 and 157-158). Non-Lambertian surfaces fall through
+to a no-op.
+"""
+inject_surface_SIF!(::AbstractSurfaceType, _added_layer, _m, _pol_type, _SIF₀, _architecture) = nothing
+inject_surface_SIF!(_brdf, _added_layer, _m, _pol_type, ::Nothing, _architecture) = nothing
+
+function inject_surface_SIF!(
+    ::Union{LambertianSurfaceScalar, LambertianSurfaceLegendre, LambertianSurfaceSpline},
+    added_layer::Union{AddedLayer, AddedLayerRS},
+    m::Int,
+    pol_type,
+    SIF₀::AbstractArray,
+    architecture,
+)
+    m == 0 || return nothing
+    iszero(SIF₀) && return nothing
+    FT = eltype(added_layer.j₀⁻)
+    arr_type = array_type(architecture)
+    Nquad = size(added_layer.j₀⁻, 1) ÷ pol_type.n
+    added_layer.j₀⁻[:, 1, :] .+= FT(2) .* arr_type(repeat(FT.(SIF₀), Nquad))
+    return nothing
+end
+
+"""
+    _sif_source(RS_type)
+
+Return `RS_type.SIF₀` if the field is declared, else `nothing`. Used by
+`rt_run` / `rt_run_ss` to thread SIF into `inject_surface_SIF!` without
+requiring every `AbstractRamanType` concrete to carry the field (e.g.
+`_plus` variants have it commented out).
+"""
+_sif_source(RS_type) = hasproperty(RS_type, :SIF₀) ? RS_type.SIF₀ : nothing
+
 
 
