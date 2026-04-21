@@ -244,7 +244,11 @@ function rt_run(RS_type::AbstractRamanType, model, iBand)
                                 arr_type(τ_sum_all[:,end]),
                                 arch)
         end
-        
+
+        # Inject isotropic SIF emission into surface j₀⁻ (Lambertian only; no-op
+        # for other surfaces and for m>0). See `inject_surface_SIF!` docstring.
+        inject_surface_SIF!(brdf, added_layer_surface, m, pol_type, _sif_source(RS_type), arch)
+
         #@show composite_layer.J₀⁺[iμ₀,1,1:3]
         # One last interaction with surface:
         @timeit "interaction" interaction!(RS_type,
@@ -460,6 +464,8 @@ function rt_run_ss(RS_type::AbstractRamanType, model, iBand)
                             quad_points,
                             arr_type(τ_sum_all[:, end]),
                             arch)
+
+        inject_surface_SIF!(brdf, added_layer_surface, m, pol_type, _sif_source(RS_type), arch)
 
         # SS mode uses interaction_ss! (no multiple-scattering doubling with surface).
         τsurf = zeros(FT, length(τ_sum_all[:, Nz + 1]))

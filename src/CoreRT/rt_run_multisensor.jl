@@ -122,13 +122,15 @@ function rt_run_test_ms(RS_type::AbstractRamanType,
         end 
 
         # Create surface matrices:
-        create_surface_layer!(brdf, 
-                    added_layer_surface, 
-                    SFI, m, 
-                    pol_type, 
-                    quad_points, 
-                    arr_type(τ_sum_all[:,end]), 
+        create_surface_layer!(brdf,
+                    added_layer_surface,
+                    SFI, m,
+                    pol_type,
+                    quad_points,
+                    arr_type(τ_sum_all[:,end]),
                     arch);
+
+        inject_surface_SIF!(brdf, added_layer_surface, m, pol_type, _sif_source(RS_type), arch)
 
         # One last interaction with surface:
         for ims=1:length(sensor_levels)
