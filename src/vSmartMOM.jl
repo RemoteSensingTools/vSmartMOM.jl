@@ -68,6 +68,11 @@ using .IO
 include("Aerosols/Aerosols.jl")
 using .Aerosols
 
+# SIF emission data + loaders
+import DataInterpolations: ExtrapolationType
+include("SIF_emission/sif_loader.jl")
+export load_sif_spectrum, load_ficus_reflectance, sif_data_path, build_sif_source
+
 # Export some vSmartMOM functions
 export default_parameters, parameters_from_yaml, model_from_parameters, rt_run, read_parameters, read_atmos_profile
 # Export linearized RT functions
