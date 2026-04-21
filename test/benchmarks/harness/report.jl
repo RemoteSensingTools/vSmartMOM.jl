@@ -23,18 +23,40 @@ using JLD2
 using Statistics
 using Printf
 
-# Default tolerance table (LOOSE — used only when `compare_baselines` is
-# called without explicit tolerances). Replace with user-provided numbers
-# before Phase 2b freeze.
-const DEFAULT_TOLERANCES = Dict{String, NamedTuple}(
-    # quantity => (atol, rtol)
-    "R_SFI"   => (atol=1e-6, rtol=0.05),
-    "T_SFI"   => (atol=1e-6, rtol=0.05),
-    "ieR_SFI" => (atol=1e-6, rtol=0.05),
-    "ieT_SFI" => (atol=1e-6, rtol=0.05),
-    "hem_R"   => (atol=1e-6, rtol=0.05),
-    "hem_T"   => (atol=1e-6, rtol=0.05),
+# Per-Stokes-component tolerances, Phase 2b (user-specified 2026-04-21).
+# I component: relative-only gate (rtol = 1e-4).
+# Q, U, V components: absolute-only gate (atol = 1e-8).
+# A tolerance of (atol=Inf, rtol=r) means "rtol gate only"; (atol=a, rtol=0)
+# means "atol gate only". `within_tol` takes atol-OR-rtol per v2 plan.
+const STOKES_TOL_I   = (atol=0.0,  rtol=1e-4)
+const STOKES_TOL_QUV = (atol=1e-8, rtol=0.0)
+
+# Mapping from (quantity, stokes_index) => tolerance. Stokes indexing is
+# 1=I, 2=Q, 3=U, 4=V as stored along axis 2 of the (Nvza, Nstokes, Nspec)
+# SFI arrays.
+const DEFAULT_TOLERANCES = Dict{Tuple{String,Int}, NamedTuple}(
+    ("R_SFI",   1) => STOKES_TOL_I,
+    ("R_SFI",   2) => STOKES_TOL_QUV,
+    ("R_SFI",   3) => STOKES_TOL_QUV,
+    ("R_SFI",   4) => STOKES_TOL_QUV,
+    ("T_SFI",   1) => STOKES_TOL_I,
+    ("T_SFI",   2) => STOKES_TOL_QUV,
+    ("T_SFI",   3) => STOKES_TOL_QUV,
+    ("T_SFI",   4) => STOKES_TOL_QUV,
+    ("ieR_SFI", 1) => STOKES_TOL_I,
+    ("ieR_SFI", 2) => STOKES_TOL_QUV,
+    ("ieR_SFI", 3) => STOKES_TOL_QUV,
+    ("ieR_SFI", 4) => STOKES_TOL_QUV,
+    ("ieT_SFI", 1) => STOKES_TOL_I,
+    ("ieT_SFI", 2) => STOKES_TOL_QUV,
+    ("ieT_SFI", 3) => STOKES_TOL_QUV,
+    ("ieT_SFI", 4) => STOKES_TOL_QUV,
+    # Hemispheric — scalar-like outputs; use I tolerance.
+    ("hem_R",   1) => STOKES_TOL_I,
+    ("hem_T",   1) => STOKES_TOL_I,
 )
+
+const STOKES_LABELS = ("I", "Q", "U", "V")
 
 """
     load_baseline(dir)
@@ -129,45 +151,76 @@ function compare_baselines(a_dir::AbstractString, b_dir::AbstractString;
 
         verbose && println()
         verbose && println("--- $scen ---")
-        if ma !== nothing && mb !== nothing
-            wa = get(ma, "wall_median_s", nothing); wb = get(mb, "wall_median_s", nothing)
-            aa = get(ma, "cpu_alloc_bytes", nothing); ab = get(mb, "cpu_alloc_bytes", nothing)
-            ga = get(ma, "gpu_used_delta", nothing); gb = get(mb, "gpu_used_delta", nothing)
-            if !isnothing(wa) && !isnothing(wb)
-                verbose && @printf "  wall (s)  : %8.3f -> %8.3f   (ratio %.2fx)\n" wa wb wb/wa
-            elseif !isnothing(wb)
-                verbose && @printf "  wall (s)  :   (target unmeasured) -> %8.3f\n" wb
-            end
-            if !isnothing(aa) && !isnothing(ab)
-                verbose && @printf "  cpu allocs: %10d -> %10d   (ratio %.2fx)\n" aa ab ab/max(aa,1)
-            elseif !isnothing(ab)
-                verbose && @printf "  cpu allocs:   (target unmeasured) -> %10d\n" ab
-            end
-            if !isnothing(ga) && !isnothing(gb)
-                verbose && @printf "  gpu Δmem  : %10d -> %10d   bytes\n" ga gb
-            end
-        end
 
+        # Per-Stokes-component comparison. Arrays are (Nvza, Nstokes, Nspec).
         shared_keys = intersect(keys(oa), keys(ob))
         for k in sort(collect(shared_keys))
             a_arr = oa[k]; b_arr = ob[k]
-            if a_arr isa AbstractArray && b_arr isa AbstractArray
-                d = array_diff_summary(b_arr, a_arr)  # note: b is candidate, a is target
-                results[(scen, k)] = d
-                tol = get(tolerances, k, (atol=Inf, rtol=Inf))
+            if !(a_arr isa AbstractArray && b_arr isa AbstractArray)
+                continue
+            end
+            if size(a_arr) != size(b_arr)
+                verbose && @printf("  %-8s: SHAPE MISMATCH %s vs %s\n", k,
+                                   size(a_arr), size(b_arr))
+                all_pass = false
+                continue
+            end
+            nstokes = ndims(a_arr) >= 2 ? size(a_arr, 2) : 1
+            for s in 1:nstokes
+                slice_a = ndims(a_arr) >= 3 ? selectdim(a_arr, 2, s) :
+                          (nstokes == 1 ? a_arr : selectdim(a_arr, 2, s))
+                slice_b = ndims(b_arr) >= 3 ? selectdim(b_arr, 2, s) :
+                          (nstokes == 1 ? b_arr : selectdim(b_arr, 2, s))
+                d = array_diff_summary(slice_b, slice_a)
+                results[(scen, k * "_" * STOKES_LABELS[s])] = d
+                tol = get(tolerances, (k, s), (atol=Inf, rtol=Inf))
                 pass = within_tol(d, tol.atol, tol.rtol)
                 all_pass &= pass
-                verbose && @printf("  %-8s: max|Δ|=%-10.3g max_rel=%-10.3g median_rel=%-10.3g  ratio[%.4f..%.4f]  %s\n",
-                                   k, d.max_abs_diff, d.max_rel_diff, d.median_rel_diff,
-                                   d.ratio_min, d.ratio_max,
-                                   pass ? "PASS" : "FAIL")
+                gate = tol.atol == 0    ? @sprintf("rtol≤%.1e",  tol.rtol) :
+                       tol.rtol == 0    ? @sprintf("atol≤%.1e",  tol.atol) :
+                       tol.atol == Inf  ? "(no gate)" :
+                                          @sprintf("atol≤%.1e|rtol≤%.1e", tol.atol, tol.rtol)
+                verbose && @printf("  %-10s: max|Δ|=%-10.3g max_rel=%-10.3g  %s  %s\n",
+                                   k * "[" * STOKES_LABELS[s] * "]",
+                                   d.max_abs_diff, d.max_rel_diff,
+                                   gate, pass ? "PASS" : "FAIL")
             end
+        end
+
+        # Perf-ceiling flags. Each dimension is "≤ sanghavi" per user policy
+        # 2026-04-21 — if the candidate exceeds the target, we FLAG but don't
+        # necessarily gate the whole comparison.
+        if ma !== nothing && mb !== nothing
+            flag_perf!(verbose, ma, mb)
         end
     end
 
     verbose && println("="^75)
-    verbose && println("Overall: $(all_pass ? "PASS" : "FAIL")")
+    verbose && println("Overall (physics): $(all_pass ? "PASS" : "FAIL")")
     verbose && println("="^75)
 
     return (results=results, all_pass=all_pass, shared=shared, A=A, B=B)
+end
+
+"""
+    flag_perf!(verbose, ma, mb)
+
+Print perf-ceiling flags per user policy 2026-04-21: sanghavi (a) is the
+ceiling; any candidate (b) metric that exceeds it is flagged with
+`FLAG` (not `FAIL` — perf regressions are tracked, not auto-blocking).
+"""
+function flag_perf!(verbose::Bool, ma::Dict, mb::Dict)
+    function _cmp(label::String, a, b, unit::String="")
+        (a === nothing || b === nothing) && return
+        # For wall-clock, we use (b > a) as the flag condition.
+        # Same for cpu_alloc_bytes and gpu_used_delta.
+        a, b = float(a), float(b)
+        ratio = b / max(abs(a), eps())
+        verdict = b > a ? "FLAG (> sanghavi)" : "ok (≤ sanghavi)"
+        verbose && @printf("  perf %-18s: sanghavi=%-12.4g candidate=%-12.4g  ratio=%5.2fx  %s\n",
+                           label * unit, a, b, ratio, verdict)
+    end
+    _cmp("wall_median_s",    get(ma, "wall_median_s",   nothing), get(mb, "wall_median_s",   nothing), " s")
+    _cmp("cpu_alloc_bytes",  get(ma, "cpu_alloc_bytes", nothing), get(mb, "cpu_alloc_bytes", nothing), " B")
+    _cmp("gpu_used_delta",   get(ma, "gpu_used_delta",  nothing), get(mb, "gpu_used_delta",  nothing), " B")
 end

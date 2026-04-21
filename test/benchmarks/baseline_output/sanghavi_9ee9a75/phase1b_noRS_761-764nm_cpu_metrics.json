@@ -1,0 +1,28 @@
+{
+  "gpu_used_delta": null,
+  "gpu_used_before": null,
+  "wall_max_s": 0.31563806533813477,
+  "name": "phase1b_noRS_761-764nm_cpu",
+  "wall_min_s": 0.3117671012878418,
+  "gpu_name": "none",
+  "output_path": "/home/sanghavi/code/github/uni_vSmartMOM/test/benchmarks/baseline_output/sanghavi_9ee9a75/phase1b_noRS_761-764nm_cpu_output.jld2",
+  "wall_median_s": 0.3137025833129883,
+  "hw": {
+    "julia_version": "1.12.5",
+    "cpu": "AMD EPYC 7H12 64-Core Processor",
+    "gpu": "no-cuda"
+  },
+  "wall_mad_s": 0.0019354820251464844,
+  "output_keys": [
+    "T_SFI",
+    "ieT_SFI",
+    "hem_R",
+    "hem_T",
+    "R_SFI",
+    "ieR_SFI"
+  ],
+  "gpu_used_after": null,
+  "wall_n": 2,
+  "cpu_alloc_bytes": 460470728,
+  "cpu_gctime_s": 0.064089726
+}
