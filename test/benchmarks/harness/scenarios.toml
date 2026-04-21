@@ -16,7 +16,9 @@ yaml        = "test_parameters/Phase1b_RRS_761-764nm.yaml"
 architecture = "cpu"
 rs_type     = "RRS"
 driver      = "rt_run"
-n_samples   = 3   # Phase 2a diagnostic — 3 is sufficient; Phase 2b will raise to ≥5
+# n_samples reduced to 1 for Phase 3 re-baseline (RRS warm-run ≈ 200 s CPU);
+# Phase 4 workspace port lands the headroom to raise this back to ≥3.
+n_samples   = 1
 
 [[scenario]]
 name        = "phase1b_noRS_761-764nm_cpu"
@@ -24,7 +26,7 @@ yaml        = "test_parameters/Phase1b_RRS_761-764nm.yaml"
 architecture = "cpu"
 rs_type     = "noRS"
 driver      = "rt_run"
-n_samples   = 3   # Phase 2a diagnostic — 3 is sufficient; Phase 2b will raise to ≥5
+n_samples   = 3
 
 [[scenario]]
 name        = "phase1b_ss_761-764nm_cpu"
@@ -32,4 +34,4 @@ yaml        = "test_parameters/Phase1b_RRS_761-764nm.yaml"
 architecture = "cpu"
 rs_type     = "noRS"
 driver      = "rt_run_ss"
-n_samples   = 3   # Phase 2a diagnostic — 3 is sufficient; Phase 2b will raise to ≥5
+n_samples   = 3
