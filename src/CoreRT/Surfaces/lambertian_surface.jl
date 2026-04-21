@@ -214,7 +214,6 @@ sanghavi lines 67-68 and 157-158). Non-Lambertian surfaces fall through
 to a no-op.
 """
 inject_surface_SIF!(::AbstractSurfaceType, _added_layer, _m, _pol_type, _SIF₀, _architecture) = nothing
-inject_surface_SIF!(_brdf, _added_layer, _m, _pol_type, ::Nothing, _architecture) = nothing
 
 function inject_surface_SIF!(
     ::Union{LambertianSurfaceScalar, LambertianSurfaceLegendre, LambertianSurfaceSpline},

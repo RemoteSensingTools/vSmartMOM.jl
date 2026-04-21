@@ -65,3 +65,6 @@ end
 
 # Phase 1e — perturb_parameters utility ported from sanghavi.
 @testset "Phase 1e perturb_parameters" begin include("test_perturb_parameters.jl") end
+
+# Phase 3a — SIF injection + data loaders (Lambertian surface + sif_loader.jl).
+@testset "Phase 3a SIF" begin include("test_sif.jl") end
