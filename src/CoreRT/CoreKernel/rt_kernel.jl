@@ -298,52 +298,39 @@ end
 end
 
 
-function rt_kernel!(RS_type::Union{RRS{FT}, VS_0to1{FT}, VS_1to0{FT}}, pol_type, SFI, added_layer, composite_layer, computed_layer_properties::CoreScatteringOpticalProperties, scattering_interface, τ_sum,m, quad_points, I_static, architecture, qp_μN, iz)  where {FT}
+function rt_kernel!(RS_type::Union{RRS{FT}, VS_0to1{FT}, VS_1to0{FT}}, pol_type, SFI, added_layer, composite_layer, computed_layer_properties::CoreScatteringOpticalProperties, scattering_interface, τ_sum, m, quad_points, I_static, architecture, qp_μN, iz;
+                    workspace::Union{InteractionWorkspace, Nothing}=nothing)  where {FT}
     (; qp_μ, μ₀) = quad_points
-    # Just unpack core optical properties from 
+    # Just unpack core optical properties from
     (; τ, ϖ, Z⁺⁺, Z⁻⁺) = computed_layer_properties
-    # SUNITI, check? Also, better to write function here
     dτ_max = minimum([maximum(τ .* ϖ), FT(0.001) * minimum(qp_μ)])
     _, ndoubl = doubling_number(dτ_max, maximum(τ .* ϖ))
     scatter = true # edit later
     arr_type = array_type(architecture)
-    # Compute dτ vector
     dτ = τ ./ 2^ndoubl
     expk = arr_type(exp.(-dτ /μ₀))
-    
+
     (; Z⁺⁺_λ₁λ₀, Z⁻⁺_λ₁λ₀) = RS_type
-    # If there is scattering, perform the elemental and doubling steps
     if scatter
-        #@show τ, ϖ, RS_type.fscattRayl
-        
-        @timeit "elemental_inelastic" elemental_inelastic!(RS_type, 
-                                                pol_type, SFI, 
-                                                τ_sum, dτ, ϖ, 
-                                                Z⁺⁺_λ₁λ₀, Z⁻⁺_λ₁λ₀, 
+        @timeit "elemental_inelastic" elemental_inelastic!(RS_type,
+                                                pol_type, SFI,
+                                                τ_sum, dτ, ϖ,
+                                                Z⁺⁺_λ₁λ₀, Z⁻⁺_λ₁λ₀,
                                                 RS_type.F₀,
-                                                m, ndoubl, scatter, 
-                                                quad_points,  added_layer,  
+                                                m, ndoubl, scatter,
+                                                quad_points,  added_layer,
                                                 I_static, architecture)
-        #println("Elemental inelastic done...")
         @timeit "elemental" elemental!(pol_type, SFI, τ_sum, dτ, RS_type.F₀, computed_layer_properties, m, ndoubl, scatter, quad_points,  added_layer,  architecture)
-        #println("Elemental  done...")
         @timeit "doubling_inelastic" doubling_inelastic!(RS_type, pol_type, SFI, expk, ndoubl, added_layer, I_static, architecture)
-        #println("Doubling done...")
-        #@timeit "doubling"   doubling!(pol_type, SFI, expk, ndoubl, added_layer, I_static, architecture)
-    else # This might not work yet on GPU!
-        # If not, there is no reflectance. Assign r/t appropriately
+    else
         zero_added_noscat_ie!(added_layer, τ_λ, qp_μN)
     end
 
-    # @assert !any(isnan.(added_layer.t⁺⁺))
-    
-    # If this TOA, just copy the added layer into the composite layer
     if (iz == 1)
         copy_added_to_composite_ie!(composite_layer, added_layer)
-    
-    # If this is not the TOA, perform the interaction step
     else
-        @timeit "interaction" interaction!(RS_type, scattering_interface, SFI, composite_layer, added_layer, I_static)
+        @timeit "interaction" interaction!(RS_type, scattering_interface, SFI, composite_layer, added_layer, I_static;
+                                            workspace=workspace)
     end
 end
 
