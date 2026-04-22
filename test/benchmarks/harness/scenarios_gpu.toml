@@ -1,0 +1,30 @@
+# Phase 5 headroom harness — GPU variants of the Phase 1b scenarios.
+#
+# Mirrors scenarios.toml but sets architecture = "gpu". Used to establish
+# GPU baselines post-Phase 4 InteractionWorkspace port: if the numbers
+# show significant headroom remaining beyond sanghavi, Phase 5 is real;
+# otherwise the phase exits as a no-op (dev_notes/phase5_headroom.md).
+
+[[scenario]]
+name        = "phase1b_RRS_761-764nm_gpu"
+yaml        = "test_parameters/Phase1b_RRS_761-764nm.yaml"
+architecture = "gpu"
+rs_type     = "RRS"
+driver      = "rt_run"
+n_samples   = 1
+
+[[scenario]]
+name        = "phase1b_noRS_761-764nm_gpu"
+yaml        = "test_parameters/Phase1b_RRS_761-764nm.yaml"
+architecture = "gpu"
+rs_type     = "noRS"
+driver      = "rt_run"
+n_samples   = 3
+
+[[scenario]]
+name        = "phase1b_ss_761-764nm_gpu"
+yaml        = "test_parameters/Phase1b_RRS_761-764nm.yaml"
+architecture = "gpu"
+rs_type     = "noRS"
+driver      = "rt_run_ss"
+n_samples   = 3
