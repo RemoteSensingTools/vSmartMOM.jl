@@ -172,14 +172,19 @@ function rt_run(RS_type::AbstractRamanType, model, iBand)
         RS_type.F₀ = F₀
     end
 
-    # TODO (Phase 4): allocate `InteractionWorkspace(composite_layer, added_layer;
-    # staged=true)` here for RRS/VS runs and thread it through rt_kernel! /
-    # interaction! as `workspace=ws`. Doing so requires first extending the
-    # rt_kernel! / interaction! signatures (currently positional-only) with a
-    # `workspace::Union{InteractionWorkspace,Nothing}=nothing` kwarg, paralleling
-    # the kwarg already present in interaction_inelastic.jl. Until Phase 4, the
-    # inelastic kernels fall back to `similar()` via their `workspace === nothing`
-    # branch.
+    # Phase 4: allocate the InteractionWorkspace once before the layer loop for
+    # RRS/VS runs to avoid the per-call GPU allocation (sanghavi reported ~7 GB
+    # per call on high-spec Float64 configs). noRS skips the workspace — the
+    # elastic interaction! path doesn't consume it. `staged=true` pages large
+    # 4-D ie buffers through CPU between passes; only beneficial on GPU where
+    # device memory pressure matters. CPU runs use staged=false (CPU↔CPU copies
+    # would be pure overhead).
+    _interaction_ws = if RS_type isa noRS
+        nothing
+    else
+        InteractionWorkspace(composite_layer, added_layer;
+                             staged = arch isa GPU)
+    end
 
     # Cumulative optical depth (m-independent, saved for TMS correction)
     τ_sum_all = nothing
@@ -211,8 +216,6 @@ function rt_run(RS_type::AbstractRamanType, model, iBand)
                 expandOpticalProperties(layer_opt_props[iz], arr_type)
 
             # Perform Core RT (doubling/elemental/interaction)
-            # Phase 4 will pass `workspace=_interaction_ws` once rt_kernel!
-            # signatures are extended to accept the kwarg (not part of 1b).
             @timeit "RT Kernel" rt_kernel!(RS_type, pol_type, SFI,
                         added_layer, composite_layer,
                         layer_opt,
@@ -221,7 +224,8 @@ function rt_run(RS_type::AbstractRamanType, model, iBand)
                         m, quad_points,
                         I_static,
                         arch,
-                        qp_μN, iz)
+                        qp_μN, iz;
+                        workspace=_interaction_ws)
         end
 
         # Create surface matrices:
@@ -252,12 +256,12 @@ function rt_run(RS_type::AbstractRamanType, model, iBand)
         #@show composite_layer.J₀⁺[iμ₀,1,1:3]
         # One last interaction with surface:
         @timeit "interaction" interaction!(RS_type,
-                                    #bandSpecLim,
-                                    scattering_interfaces_all[end], 
-                                    SFI, 
-                                    composite_layer, 
-                                    added_layer_surface, 
-                                    I_static)
+                                    scattering_interfaces_all[end],
+                                    SFI,
+                                    composite_layer,
+                                    added_layer_surface,
+                                    I_static;
+                                    workspace=_interaction_ws)
        #@show composite_layer.J₀⁺[iμ₀,1,1:3]
         hdr_J₀⁻ = similar(composite_layer.J₀⁻)
         # One last interaction with surface:
