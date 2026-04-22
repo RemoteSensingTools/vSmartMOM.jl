@@ -172,17 +172,18 @@ function rt_kernel!(RS_type::Union{RRS, VS_0to1, VS_1to0}, pol_type, SFI, added_
 end
 
 ### 
-function rt_kernel!(RS_type::noRS{FT}, 
-                    pol_type, SFI, 
-                    added_layer, 
-                    composite_layer, 
-                    computed_layer_properties::M, 
-                    scattering_interface, 
-                    τ_sum, 
-                    m, quad_points, 
-                    I_static, 
-                    architecture, 
-                    qp_μN, iz) where {FT,M}
+function rt_kernel!(RS_type::noRS{FT},
+                    pol_type, SFI,
+                    added_layer,
+                    composite_layer,
+                    computed_layer_properties::M,
+                    scattering_interface,
+                    τ_sum,
+                    m, quad_points,
+                    I_static,
+                    architecture,
+                    qp_μN, iz;
+                    workspace=nothing) where {FT,M}
     #@show array_type(architecture)
     
     (; qp_μ, μ₀) = quad_points
@@ -337,14 +338,15 @@ end
 
 
 function rt_kernel!(
-            RS_type::Union{RRS_plus{FT}, VS_0to1_plus{FT}, VS_1to0_plus{FT}}, 
-            pol_type, SFI, 
-            added_layer, 
-            composite_layer, 
-            computed_layer_properties::CoreScatteringOpticalProperties, 
-            scattering_interface, 
-            τ_sum,m, quad_points, 
-            I_static, architecture, qp_μN, iz)  where {FT}
+            RS_type::Union{RRS_plus{FT}, VS_0to1_plus{FT}, VS_1to0_plus{FT}},
+            pol_type, SFI,
+            added_layer,
+            composite_layer,
+            computed_layer_properties::CoreScatteringOpticalProperties,
+            scattering_interface,
+            τ_sum, m, quad_points,
+            I_static, architecture, qp_μN, iz;
+            workspace::Union{InteractionWorkspace, Nothing}=nothing)  where {FT}
     (; qp_μ, μ₀) = quad_points
     # Just unpack core optical properties from 
     (; τ, ϖ, Z⁺⁺, Z⁻⁺) = computed_layer_properties
@@ -386,10 +388,11 @@ function rt_kernel!(
     # If this TOA, just copy the added layer into the composite layer
     if (iz == 1)
         copy_added_to_composite_ie!(composite_layer, added_layer)
-    
+
     # If this is not the TOA, perform the interaction step
     else
-        @timeit "interaction" interaction!(RS_type, scattering_interface, SFI, composite_layer, added_layer, I_static)
+        @timeit "interaction" interaction!(RS_type, scattering_interface, SFI, composite_layer, added_layer, I_static;
+                                            workspace=workspace)
     end
 end
 
