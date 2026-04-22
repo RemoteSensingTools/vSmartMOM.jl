@@ -68,3 +68,6 @@ end
 
 # Phase 3a — SIF injection + data loaders (Lambertian surface + sif_loader.jl).
 @testset "Phase 3a SIF" begin include("test_sif.jl") end
+
+# Phase 6 — sanghavi test/benchmarks/*.jl script ports (parse + light-unit).
+@testset "Phase 6 script ports" begin include("test_phase6_ports.jl") end

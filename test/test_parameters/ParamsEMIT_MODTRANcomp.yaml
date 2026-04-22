@@ -1,0 +1,145 @@
+# =================================================================
+# Parameter file for the EMIT / MODTRAN LUT comparison scenarios
+# (driven by ~/data/EMIT_MODTRANcomp/emit_20250404.json)
+#
+# Geometry (SZA, RAA) is taken from the JSON "MISC" block. AOT550,
+# H2OSTR, GNDALT (and TSZ) are LUT-grid dimensions that are varied
+# by the driver script on a per-scenario basis.
+# =================================================================
+radiative_transfer:
+  # Spectral bands (list of ν_start:ν_step:ν_end, in cm⁻¹).
+  spec_bands:
+    - (1e7/2510.0):0.1:(1e7/380.0)
+  surface:
+    - LambertianSurfaceScalar{Float64}(0.0)
+  quadrature_type:    GaussQuadHemisphere()
+  polarization_type:  Stokes_I()
+  max_m:              3
+  Δ_angle:            2.0
+  l_trunc:            5
+  depol:              0.028
+  float_type:         Float32
+  architecture:       Architectures.GPU()
+
+# =================================================================
+# Simulation Geometry  (SZA, RAA from emit_20250404.json MISC block)
+# =================================================================
+geometry:
+  sza:                39.583965990615404    # MISC.SZA
+  vza:                [0.0]                 # nadir viewing
+  vaz:                [81.49773971061641]   # MISC.RAA
+  obs_alt:            0                     # observer at TOA
+
+# =================================================================
+# Atmospheric Profile — AFGL 1986 Midlatitude Winter (model 3, table 1c)
+# p, T, H2O, O3, N2O, CO, CH4 from AFGL1986/1c.csv (50 levels, 0–120 km)
+# CO2 from AFGL1986/2a.csv (compatible with all AFGL models)
+# Arrays run TOA → BOA. p is on half-levels (50); T, q and vmr arrays
+# are on the 49 layer centres, obtained by averaging adjacent AFGL levels.
+# H2O mixing ratio is used to derive specific humidity q (≈0.622·vmr_H2O).
+# =================================================================
+atmospheric_profile:
+  # Specific humidity q (kg/kg), layer centres, derived from AFGL 1c H2O
+  q: [1.368e-7, 1.617e-7, 1.928e-7, 2.301e-7, 2.923e-7, 4.323e-7, 6.780e-7,
+      1.036e-6, 1.462e-6, 1.866e-6, 2.270e-6, 2.644e-6, 2.908e-6, 3.048e-6,
+      3.095e-6, 3.110e-6, 3.110e-6, 3.095e-6, 3.064e-6, 3.032e-6, 3.001e-6,
+      2.970e-6, 2.939e-6, 2.908e-6, 2.877e-6, 2.846e-6, 2.824e-6, 2.808e-6,
+      2.799e-6, 2.799e-6, 2.799e-6, 2.799e-6, 2.830e-6, 2.892e-6, 2.955e-6,
+      3.048e-6, 3.421e-6, 4.976e-6, 1.232e-5, 2.653e-5, 5.091e-5, 1.057e-4,
+      2.308e-4, 4.149e-4, 6.543e-4, 1.048e-3, 1.518e-3, 1.941e-3, 2.417e-3]
+  # Temperature profile (TOA→BOA, layer centres, K) — AFGL 1c midpoints
+  T: [313.00, 276.25, 248.30, 227.85, 213.45, 203.90, 199.65,
+      204.95, 215.25, 225.55, 235.80, 245.85, 255.70, 263.15,
+      265.40, 261.80, 254.65, 247.00, 239.35, 231.70, 224.15,
+      218.90, 216.45, 215.35, 215.20, 215.20, 215.20, 215.20,
+      215.20, 215.20, 215.45, 215.95, 216.45, 216.95, 217.45,
+      217.95, 218.45, 218.95, 219.45, 222.70, 228.70, 234.70,
+      240.70, 246.70, 252.70, 258.70, 263.45, 266.95, 270.45]
+  # Pressure profile (TOA→BOA, half-levels, hPa) — AFGL 1c at 0–120 km
+  p: [3.600e-5, 5.980e-5, 1.057e-4, 2.000e-4, 4.074e-4, 8.770e-4, 1.980e-3,
+      4.560e-3, 1.030e-2, 2.220e-2, 4.700e-2, 9.500e-2, 1.880e-1, 3.620e-1,
+      6.830e-1, 9.400e-1, 1.290, 1.800, 2.530, 3.600, 5.180,
+      7.560, 11.10, 16.46, 24.40, 28.60, 33.40, 39.10,
+      45.80, 53.70, 62.80, 73.60, 86.10, 100.7, 117.8,
+      137.8, 161.1, 188.2, 219.9, 256.8, 299.3, 347.3,
+      401.6, 462.7, 531.3, 608.1, 693.8, 789.7, 897.3, 1018.0]
+  profile_reduction: -1
+
+# =================================================================
+# Absorption
+# =================================================================
+absorption:
+  fixed_molecules:
+    - [O2, CO2]
+  variable_molecules:
+    - [H2O, CH4, O3, N2O, CO]
+  LUTfiles:
+    O2: "/net/fluo/data1/ABSCO_CS_Database/v5.2_final/o2_v52_v2.jld2"
+  # VMR profiles (TOA→BOA, unitless), layer centres from AFGL 1c
+  # (CO2 from AFGL 2a). Values in CSV are ppmv → divided by 1e6.
+  vmr:
+    O2:   0.209    # constant (AFGL 2a: 2.09e5 ppmv)
+    H2O:  [2.20e-7, 2.60e-7, 3.10e-7, 3.70e-7, 4.70e-7, 6.95e-7, 1.09e-6,
+           1.665e-6, 2.35e-6, 3.00e-6, 3.65e-6, 4.25e-6, 4.675e-6, 4.90e-6,
+           4.975e-6, 5.00e-6, 5.00e-6, 4.975e-6, 4.925e-6, 4.875e-6, 4.825e-6,
+           4.775e-6, 4.725e-6, 4.675e-6, 4.625e-6, 4.575e-6, 4.54e-6, 4.515e-6,
+           4.50e-6, 4.50e-6, 4.50e-6, 4.50e-6, 4.55e-6, 4.65e-6, 4.75e-6,
+           4.90e-6, 5.50e-6, 8.00e-6, 1.98e-5, 4.265e-5, 8.185e-5, 1.70e-4,
+           3.71e-4, 6.67e-4, 1.052e-3, 1.685e-3, 2.44e-3, 3.12e-3, 3.885e-3]
+    O3:   [2.75e-9, 2.75e-8, 1.25e-7, 3.00e-7, 6.00e-7, 8.00e-7, 6.75e-7,
+           3.90e-7, 2.40e-7, 2.85e-7, 4.35e-7, 7.75e-7, 1.35e-6, 2.225e-6,
+           3.225e-6, 4.15e-6, 5.25e-6, 6.40e-6, 7.05e-6, 7.15e-6, 6.95e-6,
+           6.45e-6, 5.85e-6, 5.35e-6, 4.90e-6, 4.50e-6, 4.10e-6, 3.70e-6,
+           3.20e-6, 2.60e-6, 2.05e-6, 1.60e-6, 1.25e-6, 1.00e-6, 8.50e-7,
+           7.52e-7, 6.135e-7, 4.425e-7, 2.995e-7, 1.97e-7, 1.305e-7, 9.145e-8,
+           6.865e-8, 5.28e-8, 4.145e-8, 3.385e-8, 3.025e-8, 2.825e-8, 2.79e-8]
+    N2O:  [1.97e-10, 2.23e-10, 2.545e-10, 2.93e-10, 3.405e-10, 4.00e-10, 4.76e-10,
+           5.76e-10, 7.105e-10, 8.99e-10, 1.165e-9, 1.565e-9, 2.22e-9, 3.395e-9,
+           6.115e-9, 1.0585e-8, 1.695e-8, 2.54e-8, 3.485e-8, 4.545e-8, 5.625e-8,
+           6.825e-8, 8.105e-8, 9.175e-8, 1.008e-7, 1.085e-7, 1.175e-7, 1.295e-7,
+           1.49e-7, 1.73e-7, 2.005e-7, 2.295e-7, 2.515e-7, 2.665e-7, 2.76e-7,
+           2.83e-7, 2.90e-7, 2.965e-7, 3.045e-7, 3.13e-7, 3.18e-7, 3.20e-7,
+           3.20e-7, 3.20e-7, 3.20e-7, 3.20e-7, 3.20e-7, 3.20e-7, 3.20e-7]
+    CO:   [4.575e-5, 3.755e-5, 2.915e-5, 2.09e-5, 1.38e-5, 8.68e-6, 5.695e-6,
+           3.745e-6, 2.43e-6, 1.49e-6, 8.195e-7, 4.26e-7, 2.205e-7, 1.0525e-7,
+           5.025e-8, 3.43e-8, 2.84e-8, 2.475e-8, 2.24e-8, 2.075e-8, 1.925e-8,
+           1.78e-8, 1.655e-8, 1.55e-8, 1.45e-8, 1.355e-8, 1.27e-8, 1.23e-8,
+           1.28e-8, 1.44e-8, 1.76e-8, 2.23e-8, 2.78e-8, 3.505e-8, 4.485e-8,
+           5.70e-8, 7.09e-8, 8.385e-8, 9.46e-8, 1.043e-7, 1.14e-7, 1.22e-7,
+           1.27e-7, 1.295e-7, 1.305e-7, 1.33e-7, 1.375e-7, 1.425e-7, 1.475e-7]
+    CH4:  [4.50e-8, 7.75e-8, 1.025e-7, 1.15e-7, 1.25e-7, 1.35e-7, 1.45e-7,
+           1.50e-7, 1.50e-7, 1.50e-7, 1.50e-7, 1.50e-7, 1.535e-7, 1.755e-7,
+           2.165e-7, 2.635e-7, 3.14e-7, 3.665e-7, 4.205e-7, 4.765e-7, 5.40e-7,
+           6.095e-7, 6.785e-7, 7.53e-7, 8.365e-7, 9.265e-7, 1.0215e-6, 1.11e-6,
+           1.185e-6, 1.25e-6, 1.30e-6, 1.34e-6, 1.375e-6, 1.405e-6, 1.435e-6,
+           1.465e-6, 1.495e-6, 1.525e-6, 1.56e-6, 1.60e-6, 1.625e-6, 1.64e-6,
+           1.66e-6, 1.68e-6, 1.695e-6, 1.70e-6, 1.70e-6, 1.70e-6, 1.70e-6]
+    CO2:  [3.75e-5, 5.00e-5, 8.50e-5, 1.525e-4, 2.325e-4, 2.90e-4, 3.15e-4,
+           3.24e-4, 3.29e-4, 3.30e-4, 3.30e-4, 3.30e-4, 3.30e-4, 3.30e-4,
+           3.30e-4, 3.30e-4, 3.30e-4, 3.30e-4, 3.30e-4, 3.30e-4, 3.30e-4,
+           3.30e-4, 3.30e-4, 3.30e-4, 3.30e-4, 3.30e-4, 3.30e-4, 3.30e-4,
+           3.30e-4, 3.30e-4, 3.30e-4, 3.30e-4, 3.30e-4, 3.30e-4, 3.30e-4,
+           3.30e-4, 3.30e-4, 3.30e-4, 3.30e-4, 3.30e-4, 3.30e-4, 3.30e-4,
+           3.30e-4, 3.30e-4, 3.30e-4, 3.30e-4, 3.30e-4, 3.30e-4, 3.30e-4]
+  broadening:         Voigt()
+  CEF:                HumlicekWeidemann32SDErrorFunction()
+  wing_cutoff:        40
+
+# =================================================================
+# Scattering — one arbitrary aerosol (lognormal size distribution,
+# lognormal vertical profile peaked near 2 km).
+# τ_ref is overwritten per-scenario by the driver script from AOT550.
+# =================================================================
+scattering:
+  aerosols:
+    - τ_ref:          0.1       # overwritten per scenario (AOT550)
+      μ:              0.3       # lognormal mean radius (µm)
+      σ:              0.35       # lognormal geometric stddev
+      nᵣ:             1.443      # real refractive index
+      nᵢ:             0.0037     # imag refractive index
+      z₀:             2.0       # vertical peak altitude (km)
+      σ₀:             0.4       # vertical peak width (km)
+  r_max:          30.0
+  nquad_radius:   1000
+  λ_ref:          0.55          # AOT550 reference wavelength
+  decomp_type:    NAI2()
