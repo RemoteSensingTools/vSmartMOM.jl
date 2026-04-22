@@ -15,6 +15,9 @@ using JLD2
 # Test the Absorption module
 @testset "Absorption" begin include("test_Absorption.jl") end
 
+# Test IO exports
+@testset "IO" begin include("test_IO_exports.jl") end
+
 # Test the Scattering module
 @testset "Scattering" begin include("test_Scattering.jl") end
 

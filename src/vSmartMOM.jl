@@ -47,6 +47,9 @@ include("SolarModel/SolarModel.jl")
 # IO submodule (must come after CoreRT types are defined)
 include("IO/IO.jl")
 using .IO
+import .IO: read_parameters, parameters_from_yaml, parameters_from_dict, read_atmos_profile,
+            read_atmos_profile_dict, GeosChemSource, NetCDFGridSource, NetCDFSource,
+            geoschem_to_dict, read_geoschem_profile
 
 # Export some vSmartMOM functions
 export default_parameters, parameters_from_yaml, model_from_parameters, rt_run, read_parameters, read_atmos_profile
