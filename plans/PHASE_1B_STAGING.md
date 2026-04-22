@@ -262,13 +262,30 @@ Two fixes landed this session brought unified into near-sanghavi agreement:
 
 Inelastic (ieR, ieT) are now within 0.1% of sanghavi — effectively a match. Phase 1b's "matches sanghavi physics" gate is met for the inelastic branch.
 
-**Residual ~1% elastic I / ~3% elastic Q discrepancy.** The ratio is extraordinarily constant across VZA and spectrum (std < 0.0003), meaning it's a systematic multiplicative bias, not noise. The fact that I and Q have *different* scaling (0.990 vs 0.968) rules out a simple overall normalization error — it's a polarization-sensitive delta, most likely in the Rayleigh/Cabannes phase-matrix greek coefficients or a depolarization-factor convention difference. The gate in [test_forward_raman_phase1b.jl](../test/test_forward_raman_phase1b.jl) uses `rtol = 0.05` on elastic I/Q/T/ieI/ieQ/ieT to absorb this residual while still catching meaningful regressions. Tighter tolerance requires root-causing the remaining delta — a Phase 1b-follow-up, not a Phase 1b blocker.
+**Residual ~1% elastic I / ~3% elastic Q discrepancy.** The ratio is extraordinarily constant across VZA and spectrum (std < 0.0003), meaning it's a systematic multiplicative bias, not noise. The fact that I and Q have *different* scaling (0.990 vs 0.968) rules out a simple overall normalization error — it's a polarization-sensitive delta, most likely in the Rayleigh/Cabannes phase-matrix greek coefficients or a depolarization-factor convention difference.
 
-**Next investigation candidates (for a Phase 1b follow-up PR or Phase 1c debug):**
-- `depol` (=0.028 in Phase1b YAML) plumbing: check whether `greek_rayleigh` / `greek_cabannes` coefficients built by `get_greek_raman` on both branches match bit-for-bit.
-- Fourier-moment weighting (`wct02 = m == 0 ? 0.5 : 0.25`) — verify identical between `get_elem_rt_SFI!` on both branches.
-- Rayleigh vs Cabannes phase-matrix split — compare `RS_type.greek_raman` construction site-by-site.
-- Quadrature roundoff differences (GaussQuadHemisphere vs RadauQuad): unified uses GaussQuadHemisphere from Phase1b YAML; verify sanghavi uses the same.
+## 10. Phase 1b residual closure (2026-04-22)
+
+**Root cause identified and fixed.** `src/CoreRT/LayerOpticalProperties/compEffectiveLayerProperties.jl:22` unconditionally used `greek_rayleigh` (depol ≈ 0.028) for the Rayleigh Z moments. Sanghavi at `src/CoreRT/LayerOpticalProperties/compEffectiveLayerProperties.jl:31-42` branches on `typeof(RS_type)<:noRS` — uses `greek_rayleigh` for noRS, `greek_cabannes` (depol ≈ 0.007) for RRS/VS. The Cabannes phase matrix is less depolarized, so its polarization-sensitive greek coefficients (β, δ) are ~3% larger. That exactly maps to the observed residual: ~3.2% offset on Q-coupled blocks, ~0.3% on the I→I diagonal (which compounds to ~1% through multi-layer adding-doubling).
+
+Fix: unified now picks `greek_cabannes` when `RS_type` is anything other than `noRS`/`noRS_plus`.
+
+**Post-fix sanghavi cross-check** (same Phase1b_RRS YAML, `q = 0`, Stokes_IQU, Float32, CPU):
+
+| Quantity | ratio unified / sanghavi | max per-pixel rel error |
+|---|---|---|
+| R   I | **1.000003** | 0.04% |
+| R   Q | **1.000025** | 0.04% |
+| T   I | **1.000011** | 1.5% (FP32 single-pixel) |
+| T   Q | **1.000034** | 1.6% |
+| ieR I | **1.000730** | 0.08% |
+| ieR Q | **1.000732** | 0.08% |
+| ieT I | **1.000636** | 1.6% |
+| ieT Q | **1.000634** | 1.6% |
+
+Mean ratios indistinguishable from 1.0 within Float32 precision. Test tolerance in [test_forward_raman_phase1b.jl](../test/test_forward_raman_phase1b.jl) tightened from `rtol=0.05` → `rtol=0.02`. The `0.02` gives headroom for single-pixel FP32 accumulation noise on T (~1.6% max) while catching any real regression.
+
+**Investigation notes:** Confirmed NOT the culprit along the way — `greek_rayleigh`/`greek_cabannes` numerical values match sanghavi to Float32 precision, quadrature points are bit-identical, `τ_rayl` agrees to 1e-5, `compute_Z_moments` is identical between branches, `/π` weight and `ϖ_λ₁λ₀` normalization already fixed in the 2026-04-20 closeout. The remaining delta was a single-line conditional dispatch on RS_type.
 
 **Reference files on disk** after this commit:
 - [test/reference/phase1b_RRS_sanghavi_q0.jld2](../test/reference/phase1b_RRS_sanghavi_q0.jld2) — **active gate**, sanghavi-authoritative physics.

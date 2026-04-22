@@ -1,25 +1,31 @@
 function constructCoreOpticalProperties(RS_type::AbstractRamanType, iBand, m, model)
-    (; τ_rayl, τ_aer, τ_abs, aerosol_optics, greek_rayleigh) = model
+    (; τ_rayl, τ_aer, τ_abs, aerosol_optics, greek_rayleigh, greek_cabannes) = model
     @assert all(iBand .≤ length(τ_rayl)) "iBand exceeded number of bands"
 
     arr_type = CoreRT.array_type(model)
 
     pol_type = CoreRT.polarization_type(model)
-    
+
     # Quadrature points:
     μ = collect(model.quad_points.qp_μ)
     N = length(model.quad_points.qp_μN)
     # Number of Aerosols:
     nAero = size(τ_aer[iBand[1]],1)
     nZ    = size(τ_rayl[1],2)
-    # Rayleigh Z matrix per band — `greek_rayleigh` is a per-band Vector{GreekCoefs}
-    # in the new convention (depol_air_Rayleigh varies with wavelength), so the Z
-    # moments must be computed inside the iBand loop. Single-GreekCoefs callers
-    # are still supported via the elseif branch.
+    # Rayleigh Z matrix per band — pick greek_rayleigh for noRS (pure-elastic,
+    # includes rotational Raman in the effective depol) or greek_cabannes for
+    # any Raman-aware RS_type (rotational Raman is handled separately via the
+    # RRS interaction, so the elastic path should use the lower-depol Cabannes
+    # phase matrix). Mismatch here produces a ~1% bias on Stokes I and ~3% on Q
+    # because the Cabannes depol (~0.007) vs Rayleigh depol (~0.028) shifts the
+    # polarization-sensitive greek coefficients (β, δ) by ~3%.
+    # See sanghavi src/CoreRT/LayerOpticalProperties/compEffectiveLayerProperties.jl:31-42.
+    raman_active = !(RS_type isa noRS) && !(RS_type isa noRS_plus)
     band_layer_props    = Vector{Vector{CoreScatteringOpticalProperties}}()
     band_fScattRayleigh = Vector{Vector}()
     for iB in iBand
-        gr = greek_rayleigh isa AbstractVector ? greek_rayleigh[iB] : greek_rayleigh
+        gr_source = raman_active ? greek_cabannes : greek_rayleigh
+        gr = gr_source isa AbstractVector ? gr_source[iB] : gr_source
         Rayl𝐙⁺⁺, Rayl𝐙⁻⁺ = Scattering.compute_Z_moments(pol_type, μ, gr, m,
                                                         arr_type = arr_type)
         rayl = [CoreScatteringOpticalProperties(arr_type(τ_rayl[iB][:,i]), RS_type.ϖ_Cabannes[iB],

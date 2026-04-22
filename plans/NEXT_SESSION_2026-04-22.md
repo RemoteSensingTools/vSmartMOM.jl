@@ -16,25 +16,11 @@ Phases 0 → 4 complete. Phase 5 conditional on GPU measurement + Christian sign
 
 ## Known open items
 
-### (a) Elastic R/T residual — not closed by Bodhaine alignment
+### (a) Elastic R/T residual — CLOSED 2026-04-22
 
-Phase 1b RRS regression vs sanghavi reference:
-- Stokes I ratio: **0.9907** (≈ 1% delta)
-- Stokes Q ratio: **0.9683** (≈ 3% delta)
-- ieR/ieT ratios: within 0.1% (effectively matched)
-- Both ratios are constant across VZA / spectrum (std < 5e-5)
+Root cause: unified's `compEffectiveLayerProperties.jl:22` unconditionally used `greek_rayleigh` (depol ≈ 0.028) for the Rayleigh Z moments, while sanghavi branches on `RS_type <: noRS` and uses `greek_cabannes` (depol ≈ 0.007) for RRS/VS. The Cabannes phase matrix has ~3% larger polarization-sensitive greek coefs (β, δ) — exactly the observed residual.
 
-The **depol delta** between user-supplied 0.028 and computed
-`depol_air_Rayleigh = 0.0281` is 0.5% → propagates to <0.01% on phase
-coefs. Not the culprit.
-
-**Next hypotheses to bisect** (from [PHASE_1B_STAGING.md §9](PHASE_1B_STAGING.md)):
-1. **Elastic Cabannes phase routing**: unified `compEffectiveLayerProperties.jl` uses `greek_rayleigh` (now per-band, depol≈0.0281) for the Rayleigh Z-moments. Sanghavi does the same at `rt_run.jl:84`. Verify bit-exact agreement on `Rayl𝐙⁺⁺` / `Rayl𝐙⁻⁺` between branches for the same layer.
-2. **`construct_atm_layer` elastic weighting**: sanghavi `atmo_prof.jl:410-414` weights τ_rayl × ϖ_Cabannes × Rayl𝐙⁺⁺. Unified `compEffectiveLayerProperties.jl:24` does `CoreScatteringOpticalProperties(τ_rayl, ϖ_Cabannes, Rayl𝐙⁺⁺, Rayl𝐙⁻⁺)`. Verify the downstream consumer applies the same weighting.
-3. **Q-specific terms (δ, γ)**: the ratio-of-ratios Q/I = 0.977 is suggestive of a fixed 2.3% multiplicative bias on Q. Check `elemental!`'s `δ * dpl_r * 1.5` term and `apply_D_matrix_elemental!` Stokes sign convention.
-4. **Fourier-moment weight `wct02`**: m=0 → 0.5, m>0 → 0.25 in both branches; verify identical.
-
-**Suggested attack**: write a minimal diagnostic that dumps `layer_opt[iz].Z⁺⁺` and `computed_layer_properties.Z⁺⁺` (first layer, m=0) from both branches on identical YAML, diff elementwise. If they're bit-identical, the residual is in elemental / doubling / interaction. If they differ, localize to `compEffectiveLayerProperties` or `compute_Z_moments`.
+Fix: [compEffectiveLayerProperties.jl](../src/CoreRT/LayerOpticalProperties/compEffectiveLayerProperties.jl) now picks `greek_cabannes` when `RS_type` is Raman-active. Phase 1b RRS ratios all ≈ 1.000 within FP32 precision (mean <1e-4 deviation). Test tolerance tightened from `rtol=0.05` → `rtol=0.02`. See [PHASE_1B_STAGING.md §10](PHASE_1B_STAGING.md).
 
 ### (b) Phase 5 — GPU headroom (conditional)
 
@@ -64,8 +50,8 @@ Bump version in `Project.toml` (2.0.0 → 2.1.0), update CHANGELOG, open PR `san
 
 ## Recommended ordering for 2026-04-22
 
-1. **Push today's commits** (`git push origin sanghavi-unified`) — 13 commits currently unpushed.
-2. **Bisect the elastic R/T residual** (item a). Two hours tops before switching. If not root-caused by then, write up findings in `PHASE_1B_STAGING.md §10` and move on.
+1. ~~Push today's commits~~ — done (30 commits pushed to origin/sanghavi-unified).
+2. ~~Bisect the elastic R/T residual (item a)~~ — **done**, root-caused and fixed (greek_cabannes dispatch). Phase 1b RRS 12/12 pass at `rtol=0.02`.
 3. **Run harness on GPU** for Phase 5 measurement. If headroom exists, brief Christian on specific optimization targets and measurement protocol. If not, write `dev_notes/phase5_headroom.md` no-op and proceed to Phase 6.
 4. **Phase 6 pre-flight**: `plans/phase6_script_port_list.md` triage.
 

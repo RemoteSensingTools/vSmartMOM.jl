@@ -7,12 +7,13 @@
 # at test/reference/phase1b_RRS_sanghavi_q0.jld2. This is the "matches
 # sanghavi physics" gate the merge plan calls for.
 #
-# Tolerances (2026-04-20 Phase 1b closeout, after π-fix + ϖ_λ₁λ₀ normalization):
-#  - I, Q, ieI, ieQ  :  atol = 1e-6, rtol = 0.05
-#      Residual systematic ~1% discrepancy on elastic I and ~3% on elastic Q
-#      between unified and sanghavi (see plans/PHASE_1B_STAGING.md §9). This
-#      rtol absorbs that residual while still flagging larger regressions.
-#  - T, ieT          :  atol = 1e-6, rtol = 0.05
+# Tolerances (2026-04-22 residual closed; greek_cabannes fix in
+# compEffectiveLayerProperties.jl):
+#  - I, Q, ieI, ieQ  :  atol = 1e-6, rtol = 0.02
+#      Mean ratios match sanghavi to <1e-4 after fix; per-pixel max rel-error is
+#      ~0.04% on R, ~1.6% on T (single-pixel Float32 accumulation noise).
+#      rtol=0.02 gives headroom while still catching any real regression.
+#  - T, ieT          :  atol = 1e-6, rtol = 0.02
 #  - U, V, ieU, ieV  :  atol = 1e-6, rtol = 0 (zero for this config)
 #  - wall-clock gate removed — comparison against sanghavi reference, hardware
 #    asymmetry makes a wall ceiling meaningless here.
@@ -73,7 +74,7 @@ else
     ieT_ref = ref["ieT"]
 
     atol_all = 1e-6
-    rtol_Stokes = 0.05   # see docstring — absorbs residual ~1% elastic / ~3% Q discrepancy
+    rtol_Stokes = 0.02   # see docstring — headroom for FP32 per-pixel noise after greek_cabannes fix
     rtol_U_V    = 0      # U and V expected zero for this config; atol enforced only
 
     # Stokes I/Q on elastic + inelastic — rtol enabled.
