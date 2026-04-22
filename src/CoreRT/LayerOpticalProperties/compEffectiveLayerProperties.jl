@@ -12,15 +12,17 @@ function constructCoreOpticalProperties(RS_type::AbstractRamanType, iBand, m, mo
     # Number of Aerosols:
     nAero = size(τ_aer[iBand[1]],1)
     nZ    = size(τ_rayl[1],2)
-    # Rayleigh Z matrix:
-    Rayl𝐙⁺⁺, Rayl𝐙⁻⁺ = Scattering.compute_Z_moments(pol_type, μ, 
-                                                    greek_rayleigh, m, 
-                                                    arr_type = arr_type);
-    
+    # Rayleigh Z matrix per band — `greek_rayleigh` is a per-band Vector{GreekCoefs}
+    # in the new convention (depol_air_Rayleigh varies with wavelength), so the Z
+    # moments must be computed inside the iBand loop. Single-GreekCoefs callers
+    # are still supported via the elseif branch.
     band_layer_props    = Vector{Vector{CoreScatteringOpticalProperties}}()
     band_fScattRayleigh = Vector{Vector}()
     for iB in iBand
-        rayl = [CoreScatteringOpticalProperties(arr_type(τ_rayl[iB][:,i]), RS_type.ϖ_Cabannes[iB], 
+        gr = greek_rayleigh isa AbstractVector ? greek_rayleigh[iB] : greek_rayleigh
+        Rayl𝐙⁺⁺, Rayl𝐙⁻⁺ = Scattering.compute_Z_moments(pol_type, μ, gr, m,
+                                                        arr_type = arr_type)
+        rayl = [CoreScatteringOpticalProperties(arr_type(τ_rayl[iB][:,i]), RS_type.ϖ_Cabannes[iB],
                 Rayl𝐙⁺⁺, Rayl𝐙⁻⁺) for i=1:nZ]
         
         combo = rayl

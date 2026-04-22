@@ -57,13 +57,16 @@ function model_from_parameters(params::vSmartMOM_Parameters)
         profile = reduce_profile(params.profile_reduction_n, profile);
     end
 
-    # Rayleigh optical properties calculation
-    greek_rayleigh = Scattering.get_greek_rayleigh(FT(params.depol))
-    # Rayleigh optical depth per spectral point per layer (uses reduced profile size)
+    # Rayleigh optical depth per spectral point per layer (uses reduced profile size).
+    # The greek_rayleigh entries are computed per-band from the physically derived
+    # `depol_air_Rayleigh` (see loop below) rather than the user-supplied
+    # `params.depol`, matching sanghavi. `params.depol` is retained as a fallback
+    # for non-Earth atmospheres where the molecular-constant path doesn't apply.
     τ_rayl = [zeros(FT,length(params.spec_bands[i]), length(profile.p_full)) for i=1:n_bands];
-    
-    # Per-band Cabannes / Rayleigh depolarization (for inelastic scattering support)
-    greek_cabannes = typeof(greek_rayleigh)[]
+
+    # Per-band Cabannes / Rayleigh greek coefs (depolarizations from molecular constants)
+    greek_rayleigh_arr = Vector{Scattering.GreekCoefs{FT}}()
+    greek_cabannes = Vector{Scattering.GreekCoefs{FT}}()
     ϖ_Cabannes = zeros(FT, n_bands)
     
     τ_abs     = [zeros(FT, length(params.spec_bands[i]), length(profile.p_full)) for i in 1:n_bands]
@@ -77,22 +80,28 @@ function model_from_parameters(params::vSmartMOM_Parameters)
         # i'th spectral band (convert from cm⁻¹ to μm)
         curr_band_λ = FT.(1e4 ./ params.spec_bands[i_band])
         
-        # Compute per-band Cabannes properties for inelastic scattering support.
-        # Use explicit (λ₀, n2, o2) form (effT = 300 K assumed for Earth atmospheres
-        # to match the historical 1-arg wrapper). Phase 1b commit 5 form.
+        # Compute per-band Cabannes AND Rayleigh depolarizations from molecular
+        # constants (n2, o2). Sanghavi's convention: greek_cabannes uses the
+        # Cabannes-only depol (~0.007 at 763 nm); greek_rayleigh + τ_rayl use
+        # the full Rayleigh depol (~0.028 at 763 nm). The user-supplied
+        # `params.depol` is only consulted as a fallback if no molecular path
+        # is wired (not exercised on Earth-atmosphere YAMLs).
         νₘ = FT(0.5) * (params.spec_bands[i_band][1] + params.spec_bands[i_band][end])
         λₘ = FT(1.0e7) / νₘ
         _n2, _o2 = InelasticScattering.getRamanAtmoConstants(FT(1.0e7) / λₘ, FT(300))
         ϖ_Cab = InelasticScattering.compute_ϖ_Cabannes(λₘ, _n2, _o2)
         γ_air_Cab, _ = InelasticScattering.compute_γ_air_Cabannes!(λₘ, _n2, _o2)
+        γ_air_Ray, _ = InelasticScattering.compute_γ_air_Rayleigh!(λₘ, _n2, _o2)
         ϖ_Cabannes[i_band] = FT(ϖ_Cab)
         depol_air_Cab = 2γ_air_Cab / (1 + γ_air_Cab)
-        push!(greek_cabannes, Scattering.get_greek_rayleigh(FT(depol_air_Cab)))
-        
-        # Compute Rayleigh properties per layer for `i_band` band center  
-        τ_rayl[i_band]   .= getRayleighLayerOptProp(profile.p_half[end], 
-                                curr_band_λ, #(mean(curr_band_λ)), 
-                                params.depol, profile.vcd_dry);
+        depol_air_Ray = 2γ_air_Ray / (1 + γ_air_Ray)
+        push!(greek_cabannes,    Scattering.get_greek_rayleigh(FT(depol_air_Cab)))
+        push!(greek_rayleigh_arr, Scattering.get_greek_rayleigh(FT(depol_air_Ray)))
+
+        # Compute Rayleigh properties per layer for `i_band` band center
+        τ_rayl[i_band]   .= getRayleighLayerOptProp(profile.p_half[end],
+                                curr_band_λ,
+                                FT(depol_air_Ray), profile.vcd_dry);
         #@show τ_rayl[i_band]
         # If no absorption, continue to next band
         isnothing(params.absorption_params) && continue
@@ -224,7 +233,7 @@ function model_from_parameters(params::vSmartMOM_Parameters)
         FT_(params.depol),
     )
     atm = Atmosphere(profile, params.spec_bands)
-    rayleigh = RayleighScattering(greek_rayleigh, greek_cabannes, FT_.(ϖ_Cabannes))
+    rayleigh = RayleighScattering(greek_rayleigh_arr, greek_cabannes, FT_.(ϖ_Cabannes))
     aerosols_s = AerosolState(aerosol_optics, τ_aer)
     optics = Optics(rayleigh, aerosols_s, τ_abs, τ_rayl)
     return RTModel(params.architecture, solver, obs_geom, quad_points, atm, optics, params.brdf)
