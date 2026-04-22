@@ -86,12 +86,9 @@ spec_bands = parameters.spec_bands
 n_bands    = length(spec_bands)
 nPol       = parameters.polarization_type.n
 
-# Band range — by default only band 1 runs. Set `EMIT_BANDS=1:2` or similar
-# to widen. NOTE: band-2 (CH4) currently hits a pre-existing BoundsError in
-# the linearized Lambertian surface path at NAer*7+NGas+NSurf parameter
-# indexing — out of scope for the Phase 3 SIF + script port, tracked
-# separately.
-const EMIT_BANDS = let s = get(ENV, "EMIT_BANDS", "1:1")
+# Band range — defaults to all bands declared in the YAML. Override via
+# `EMIT_BANDS=1:1` (or any range) to restrict.
+const EMIT_BANDS = let s = get(ENV, "EMIT_BANDS", "1:$(n_bands)")
     rng_parts = parse.(Int, split(s, ':'))
     length(rng_parts) == 2 ? (rng_parts[1]:rng_parts[2]) :
     length(rng_parts) == 1 ? (rng_parts[1]:rng_parts[1]) :

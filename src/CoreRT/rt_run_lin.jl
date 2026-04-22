@@ -243,8 +243,13 @@ function rt_run(RS_type::AbstractRamanType,
                         qp_μN, iz) 
         end 
 
-        # Create surface matrices:
-        iparam = surface_index(layout, iBand)
+        # Create surface matrices. `surface_index(layout, i)` indexes WITHIN
+        # the surface block (1..n_surface). For per-band rt_run calls the
+        # layout has n_surface=1, so the surface-albedo Jacobian always lands
+        # at the first surface slot, regardless of which atmospheric band this
+        # rt_run call is processing. (Earlier code passed `iBand` here, which
+        # blew through the surface block when iBand>1.)
+        iparam = surface_index(layout, 1)
         create_surface_layer!(RS_type, brdf, #brdf_lin,
                             added_surface_layer, 
                             added_surface_layer_lin,
