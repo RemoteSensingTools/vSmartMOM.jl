@@ -183,7 +183,7 @@ function rt_run(RS_type::AbstractRamanType, model, iBand)
         nothing
     else
         InteractionWorkspace(composite_layer, added_layer;
-                             staged = arch isa GPU)
+                             staged = arch isa Architectures.GPU)
     end
 
     # Cumulative optical depth (m-independent, saved for TMS correction)
