@@ -1,0 +1,14 @@
+{
+  "hw": {
+    "julia_version": "1.12.5",
+    "cpu": "AMD EPYC 7H12 64-Core Processor",
+    "gpu": "NVIDIA A100-PCIE-40GB"
+  },
+  "scenarios": [
+    "phase1b_RRS_761-764nm_gpu",
+    "phase1b_noRS_761-764nm_gpu",
+    "phase1b_ss_761-764nm_gpu"
+  ],
+  "git_sha": "16d074e0dfa7bf69da41380c9cd174f4f6433507",
+  "toml": "test/benchmarks/harness/scenarios_gpu.toml"
+}
