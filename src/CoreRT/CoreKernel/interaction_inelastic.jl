@@ -77,7 +77,7 @@ function interaction_helper!(RS_type,::ScatteringInterface_00, SFI,
                                 I_static::AbstractArray{FT2}) where {FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2}
 
     # If SFI, interact source function in no scattering
-    @show "interaction 00"
+    # @show "interaction 00"
     if SFI
         composite_layer.ieJ₀⁺[:] = 0.0 #ieJ₀⁺
         composite_layer.ieJ₀⁻[:] = 0.0 #ieJ₀⁻
@@ -107,7 +107,7 @@ function interaction_helper!(RS_type::RRS, ::ScatteringInterface_01, SFI,
 
     @unpack i_λ₁λ₀ = RS_type     
     
-    @show "interaction 01"
+    # @show "interaction 01"
     if SFI   
         for n₁ in eachindex ieJ₁⁺[1,1,:,1]
             for Δn in eachindex ieJ₁⁺[1,1,1,:]
@@ -218,7 +218,7 @@ function interaction_helper!(RS_type::RRS, ::ScatteringInterface_10, SFI,
                                 I_static::AbstractArray{FT2}) where {FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2}
     @unpack i_λ₁λ₀ = RS_type 
 
-    @show "interaction 10"
+    # @show "interaction 10"
     if SFI
         for n₁ in eachindex ieJ₁⁺[1,1,:,1]
             for Δn in eachindex ieJ₁⁺[1,1,1,:]
@@ -327,7 +327,7 @@ function interaction_helper!(RS_type::RRS, ::ScatteringInterface_11, SFI,
     @unpack ier⁺⁻, ier⁻⁺, iet⁻⁻, iet⁺⁺ = added_layer
     @unpack ieR⁻⁺, ieR⁺⁻, ieT⁺⁺, ieT⁻⁻, ieJ₀⁺, ieJ₀⁻ = composite_layer
 
-    @show "interaction 11"
+    # @show "interaction 11"
     staged = workspace !== nothing && workspace.staged
     # Used to store `(I - R⁺⁻ * r⁻⁺)⁻¹`
     if workspace !== nothing
