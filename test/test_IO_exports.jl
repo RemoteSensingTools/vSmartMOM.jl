@@ -1,3 +1,5 @@
+using vSmartMOM
+
 @testset "IO exports" begin
     @test isdefined(Main, :read_parameters)
     @test read_parameters === vSmartMOM.read_parameters
