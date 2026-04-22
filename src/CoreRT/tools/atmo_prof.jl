@@ -33,11 +33,11 @@ This function calculates various atmospheric profile fields given temperature, p
 4. Layer thicknesses (Δz).
 5. Interpolated volume mixing ratios for other trace gases.
 """
-function compute_atmos_profile_fields(T::AbstractArray{FT,1}, p_half::AbstractArray{FT,1}, q, vmr; g₀=9.807) where FT
-    #@show "Atmos",  FT 
-    # Floating type to use
-    # convert q from g/kg to kg/kg
-    q = q ./ FT(1000)
+function compute_atmos_profile_fields(T::AbstractArray{FT,1}, p_half::AbstractArray{FT,1}, q, vmr; g₀=9.8032465) where FT
+    # g₀ default aligned with sanghavi (Bodhaine 1999 Eq.30 implementation
+    # uses gravitational acceleration ≈ 9.8032 m/s² for column-air mass — see
+    # sanghavi atmo_prof.jl). q is treated as kg/kg directly (volume mixing
+    # ratio of water vapor by mass), matching sanghavi convention.
     #FT = eltype(T)
     Nₐ = FT(6.02214179e+23)
     R  = FT(8.3144598)
@@ -121,7 +121,7 @@ function reduce_profile(n::Int, profile::AtmosphericProfile{FT}; binavg::Bool=fa
     R        = FT(8.3144598)
     dry_mass = FT(28.9644e-3)
     wet_mass = FT(18.01534e-3)
-    g₀       = FT(9.807)
+    g₀       = FT(9.8032465)  # aligned with sanghavi compute_atmos_profile_fields
 
     # New uniform half-levels spanning the original column extent (TOA → BOA)
     p_half = collect(range(profile.p_half[1], profile.p_half[end], length=n+1))
