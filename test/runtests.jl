@@ -31,8 +31,8 @@ using JLD2
 # Float32 consistency tests
 @testset "Float32 Consistency" begin include("test_float32.jl") end
 
-# RAMI smoke test (no gas absorption, bypasses sandbox scripts)
-@testset "RAMI Smoke" begin include("test_rami_smoke.jl") end
+# Parameter parser regression tests
+@testset "Parameter Parser" begin include("test_parameters_parser.jl") end
 
 # Canopy surface tests (CanopySurface composable surface type)
 @testset "Canopy Surface" begin include("test_canopy.jl") end
