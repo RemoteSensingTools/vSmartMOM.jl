@@ -34,6 +34,9 @@ using JLD2
 # Quality gates
 @testset "Quality Gates" begin include("test_quality.jl") end
 
+# Top-level public IO API
+@testset "IO Exports" begin include("test_io_exports.jl") end
+
 # Parameter parser regression tests
 @testset "Parameter Parser" begin include("test_parameters_parser.jl") end
 

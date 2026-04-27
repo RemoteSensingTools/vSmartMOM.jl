@@ -3,10 +3,11 @@
 The IO submodule centralizes loading and validation of simulation inputs, decoupled from the CoreRT solvers.
 
 - Multiple dispatch entry points:
-  - `read_parameters(path::AbstractString)` → load from YAML (via formats registry)
+  - `read_parameters(path::AbstractString)` → load from a registered file format
+  - `parameters_from_file(path::AbstractString)` → load from a registered file format
   - `read_parameters(dict::Dict)` → convert an in-memory config
   - `read_atmos_profile(path|dict)` → load an atmospheric profile only
-- Format registry: `IO.Formats` selects a loader based on source/extension (YAML supported).
+- Format registry: `IO.Formats` selects a loader based on source/extension (YAML and TOML supported).
 - Safe parsing: enums and types are parsed with explicit maps. Surfaces (BRDF) are parsed safely.
 - **Exception**: `spec_bands` uses `eval()` to support flexible Julia range expressions and Unitful conversions (e.g., `"(1e7/777):0.015:(1e7/757)"`). All other fields avoid eval.
 
@@ -15,7 +16,7 @@ The IO submodule centralizes loading and validation of simulation inputs, decoup
 ```julia
 using vSmartMOM
 
-# 1) YAML file
+# 1) YAML or TOML file
 params = read_parameters(joinpath(dirname(pathof(vSmartMOM)), "CoreRT", "DefaultParameters.yaml"))
 model  = model_from_parameters(params)
 R, T   = rt_run(model)
@@ -42,7 +43,7 @@ params2 = read_parameters(cfg)
 
 ## Formats
 
-- YAML: registered by default. Add more by calling `IO.Formats.register_format`.
+- YAML and TOML: registered by default. Add more by calling `IO.Formats.register_format`.
 
 ## Safety maps
 
