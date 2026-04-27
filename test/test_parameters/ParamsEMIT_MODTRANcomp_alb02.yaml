@@ -11,7 +11,7 @@ radiative_transfer:
   spec_bands:
     - 3984.2:0.1:26315.7
   surface:
-    - LambertianSurfaceScalar{Float64}(0.0)
+    - LambertianSurfaceScalar{Float64}(0.2)
   quadrature_type:    GaussQuadHemisphere()
   polarization_type:  Stokes_I()
   max_m:              3

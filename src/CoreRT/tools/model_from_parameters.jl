@@ -58,10 +58,18 @@ function model_from_parameters(params::vSmartMOM_Parameters)
     end
 
     # Rayleigh optical depth per spectral point per layer (uses reduced profile size).
-    # The greek_rayleigh entries are computed per-band from the physically derived
-    # `depol_air_Rayleigh` (see loop below) rather than the user-supplied
-    # `params.depol`, matching sanghavi. `params.depol` is retained as a fallback
-    # for non-Earth atmospheres where the molecular-constant path doesn't apply.
+    #
+    # Depolarization sourcing rule (2026-04-24):
+    #   params.depol < 0  → "auto": derive both Rayleigh (greek_rayleigh, τ_rayl)
+    #                       and Cabannes (greek_cabannes) depolarizations per
+    #                       band from the N₂/O₂ molecular constants (sanghavi
+    #                       convention; appropriate for Earth atmospheres).
+    #   params.depol ≥ 0  → "explicit": use params.depol uniformly for
+    #                       greek_rayleigh, greek_cabannes, AND τ_rayl. Required
+    #                       for idealizations such as Natraj (1980) which fix
+    #                       depol = 0 — no molecular path can reproduce that.
+    # ϖ_Cabannes is always taken from the molecular path (it relates Cabannes
+    # single-scattering albedo to N₂/O₂ line ratios, not depol).
     τ_rayl = [zeros(FT,length(params.spec_bands[i]), length(profile.p_full)) for i=1:n_bands];
 
     # Per-band Cabannes / Rayleigh greek coefs (depolarizations from molecular constants)
@@ -80,12 +88,8 @@ function model_from_parameters(params::vSmartMOM_Parameters)
         # i'th spectral band (convert from cm⁻¹ to μm)
         curr_band_λ = FT.(1e4 ./ params.spec_bands[i_band])
         
-        # Compute per-band Cabannes AND Rayleigh depolarizations from molecular
-        # constants (n2, o2). Sanghavi's convention: greek_cabannes uses the
-        # Cabannes-only depol (~0.007 at 763 nm); greek_rayleigh + τ_rayl use
-        # the full Rayleigh depol (~0.028 at 763 nm). The user-supplied
-        # `params.depol` is only consulted as a fallback if no molecular path
-        # is wired (not exercised on Earth-atmosphere YAMLs).
+        # Per-band molecular-constant depolarizations (always needed for ϖ_Cab;
+        # used as the depol values when params.depol < 0).
         νₘ = FT(0.5) * (params.spec_bands[i_band][1] + params.spec_bands[i_band][end])
         λₘ = FT(1.0e7) / νₘ
         _n2, _o2 = InelasticScattering.getRamanAtmoConstants(FT(1.0e7) / λₘ, FT(300))
@@ -95,13 +99,18 @@ function model_from_parameters(params::vSmartMOM_Parameters)
         ϖ_Cabannes[i_band] = FT(ϖ_Cab)
         depol_air_Cab = 2γ_air_Cab / (1 + γ_air_Cab)
         depol_air_Ray = 2γ_air_Ray / (1 + γ_air_Ray)
-        push!(greek_cabannes,    Scattering.get_greek_rayleigh(FT(depol_air_Cab)))
-        push!(greek_rayleigh_arr, Scattering.get_greek_rayleigh(FT(depol_air_Ray)))
+
+        # Apply the auto vs. explicit depol rule (see comment above the loop).
+        depol_use_Cab = params.depol < 0 ? FT(depol_air_Cab) : FT(params.depol)
+        depol_use_Ray = params.depol < 0 ? FT(depol_air_Ray) : FT(params.depol)
+
+        push!(greek_cabannes,     Scattering.get_greek_rayleigh(depol_use_Cab))
+        push!(greek_rayleigh_arr, Scattering.get_greek_rayleigh(depol_use_Ray))
 
         # Compute Rayleigh properties per layer for `i_band` band center
         τ_rayl[i_band]   .= getRayleighLayerOptProp(profile.p_half[end],
                                 curr_band_λ,
-                                FT(depol_air_Ray), profile.vcd_dry);
+                                depol_use_Ray, profile.vcd_dry);
         #@show τ_rayl[i_band]
         # If no absorption, continue to next band
         isnothing(params.absorption_params) && continue

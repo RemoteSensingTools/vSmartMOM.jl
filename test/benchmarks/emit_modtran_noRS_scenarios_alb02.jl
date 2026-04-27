@@ -1,37 +1,17 @@
 # =============================================================================
-# emit_modtran_noRS_scenarios.jl — noRS forward LUT driver across MODTRAN
-# scenarios (Phase 6 port from sanghavi).
+# emit_modtran_noRS_scenarios_alb02.jl — noRS forward LUT driver with α=0.2
 #
-# Drives noRS (Rayleigh + aerosol + Lambertian surface α=0) forward simulations
-# across the scenarios defined in a JSON LUT-grid descriptor (default
-# `$HOME/data/EMIT_MODTRANcomp/emit_20250404.json`). For each scenario the
-# script computes multiple-scattering TOA R + BOA T, the total vertical
-# atmospheric optical thickness, and hemispheric flux integrals; writes
-# per-scenario `.dat` files and an aggregate NetCDF.
+# Paired companion to emit_modtran_noRS_scenarios.jl. Writes exactly the same
+# per-scenario fields (R_tot, T_tot, tau_total, hemR_tot, hemT_tot) so that
+# modtran_equivalent_fields.jl can assemble the MODTRAN-equivalent fields via
+# the two-albedo Lambertian closure (see plans/MODTRAN_equivalent_equations.md).
 #
 # 2026-04-24 rewrite:
-#   * Single-scattering outputs removed. The MODTRAN-equivalent decomposition
-#     now uses the two-albedo flux closure (bhr_dw at α=0 and α=0.2) and no
-#     longer needs a single-scatter proxy for the spherical albedo. See
-#     `plans/MODTRAN_equivalent_equations.md` for the derivation.
-#   * Total column τ (absorption + Rayleigh + aerosol extinction, vertical)
-#     is written as a spectrum per scenario.
-#   * Default YAML switched to ParamsEMIT_MODTRANcomp_newLUT.yaml (rebuilt
-#     HITRAN LUTs under ~/data/HITRAN_LUTs/).
-#   * AOT axis is hard-clamped to AOT=0.0001 scenarios (stride 4 on the
-#     four-point descriptor axis) — MODTRAN comparisons at this leg use
-#     AOT=0.0001 only.
+#   * Default YAML switched to ParamsEMIT_MODTRANcomp_newLUT_alb02.yaml
+#     (rebuilt HITRAN LUTs under ~/data/HITRAN_LUTs/).
+#   * AOT stride defaults to 4 (AOT=0.0001 only) to match the α=0 driver.
 #
-# ENV overrides:
-#   EMIT_YAML          default test_parameters/ParamsEMIT_MODTRANcomp_newLUT.yaml
-#   EMIT_JSON          default ~/data/EMIT_MODTRANcomp/emit_20250404.json
-#   EMIT_NORS_DAT_DIR  default ~/data/EMIT_MODTRANcomp/vSmartMOM_out
-#   EMIT_NORS_NC       default $EMIT_NORS_DAT_DIR/emit_noRS_vSmartMOM.nc
-#   EMIT_NORS_JLD2     default ~/data/EMIT_MODTRANcomp/emit_modtran_noRS_results.jld2
-#   EMIT_STRIDE_H2O    default 2
-#   EMIT_STRIDE_AOT    default 4     (keep only AOT=0.0001)
-#   EMIT_STRIDE_GNDALT default 2
-#   EMIT_STRIDE_TSZ    default 1
+# Output files: vSmartMOM_alb02_H2O*_AOT*_GNDALT*_TSZ*.dat
 # =============================================================================
 
 using vSmartMOM
@@ -43,17 +23,17 @@ using NCDatasets
 using Dates
 using Printf
 
-const EMIT_YAML          = get(ENV, "EMIT_YAML",
+const EMIT_YAML_ALB02     = get(ENV, "EMIT_YAML_ALB02",
                                  joinpath(pkgdir(vSmartMOM), "test", "test_parameters",
-                                          "ParamsEMIT_MODTRANcomp_newLUT.yaml"))
+                                          "ParamsEMIT_MODTRANcomp_newLUT_alb02.yaml"))
 const EMIT_JSON          = get(ENV, "EMIT_JSON",
                                  expanduser("~/data/EMIT_MODTRANcomp/emit_20250404.json"))
 const EMIT_NORS_DAT_DIR  = get(ENV, "EMIT_NORS_DAT_DIR",
                                  expanduser("~/data/EMIT_MODTRANcomp/vSmartMOM_out"))
-const EMIT_NORS_NC       = get(ENV, "EMIT_NORS_NC",
-                                 joinpath(EMIT_NORS_DAT_DIR, "emit_noRS_vSmartMOM.nc"))
-const EMIT_NORS_JLD2     = get(ENV, "EMIT_NORS_JLD2",
-                                 expanduser("~/data/EMIT_MODTRANcomp/emit_modtran_noRS_results.jld2"))
+const EMIT_NORS_NC_ALB02 = get(ENV, "EMIT_NORS_NC_ALB02",
+                                 joinpath(EMIT_NORS_DAT_DIR, "emit_noRS_vSmartMOM_alb02.nc"))
+const EMIT_NORS_JLD2_ALB02 = get(ENV, "EMIT_NORS_JLD2_ALB02",
+                                 expanduser("~/data/EMIT_MODTRANcomp/emit_modtran_noRS_results_alb02.jld2"))
 
 const STRIDE_H2O    = parse(Int, get(ENV, "EMIT_STRIDE_H2O",    "2"))
 const STRIDE_AOT    = parse(Int, get(ENV, "EMIT_STRIDE_AOT",    "4"))
@@ -133,9 +113,9 @@ end
 """
     compute_total_optical_depth(τ_abs, τ_rayl, τ_aer)
 
-Compute total column (vertical) optical depth per wavelength by summing the
-per-layer τ's. Each τ array is shaped `(nSpec, nLayers)` (see the allocation
-in `src/CoreRT/tools/model_from_parameters.jl`), so we reduce over dim 2.
+Compute total column optical depth per wavelength by summing across layers.
+τ_abs/τ_rayl/τ_aer are each (nSpec, nLayers) (see `τ_abs` alloc in
+`src/CoreRT/tools/model_from_parameters.jl`), so we reduce over dim 2.
 """
 function compute_total_optical_depth(τ_abs, τ_rayl, τ_aer)
     τ_abs_vec  = vec(sum(τ_abs,  dims = 2))
@@ -145,19 +125,17 @@ function compute_total_optical_depth(τ_abs, τ_rayl, τ_aer)
 end
 
 """
-    write_scenario_dat(dir, λ_nm, ν, R_tot, T_tot, τ_total, hem_R, hem_T;
-                       h2o, aot, gndalt, tsz)
+    write_scenario_dat(dir, λ_nm, ν, R_tot, T_tot, τ_total; h2o, aot, gndalt, tsz)
 
-Write per-scenario `.dat` file (α=0 run): TOA reflectance, BOA transmittance,
-vertical total optical thickness, and bi-hemispheric flux ratios.
+Write scenario output with total optical depth instead of single-scattering.
 """
 function write_scenario_dat(dir, λ_nm, ν, R_tot_I, T_tot_I, τ_total, hem_R, hem_T;
                             h2o, aot, gndalt, tsz)
-    fname = @sprintf("vSmartMOM_H2O%.4f_AOT%.4f_GNDALT%.3f_TSZ%.1f.dat",
+    fname = @sprintf("vSmartMOM_alb02_H2O%.4f_AOT%.4f_GNDALT%.3f_TSZ%.1f.dat",
                      h2o, aot, gndalt, tsz)
     path = joinpath(dir, fname)
     open(path, "w") do io
-        @printf(io, "# vSmartMOM noRS (alb=0.0)   H2OSTR=%.4f  AOT550=%.4f  GNDALT=%.3f km  TSZ=%.1f\n",
+        @printf(io, "# vSmartMOM noRS (alb02)   H2OSTR=%.4f  AOT550=%.4f  GNDALT=%.3f km  TSZ=%.1f\n",
                 h2o, aot, gndalt, tsz)
         @printf(io, "# %16s %16s %16s %16s %16s %16s %16s\n",
                 "wl_nm", "wn_cm-1", "R_tot", "T_tot", "tau_total", "hem_R", "hem_T")
@@ -172,13 +150,13 @@ end
 """
     write_results_nc(path, axes..., data..., metadata)
 
-Write aggregate LUT into NetCDF.
+Write aggregate LUT into NetCDF with total optical depth.
 """
 function write_results_nc(path, h2o_axis, aot_axis, gndalt_axis, tsz_axis,
                           λ_nm, ν_axis, R_tot, T_tot, τ_total,
                           hemR_tot, hemT_tot, metadata)
     ds = NCDataset(path, "c")
-    ds.attrib["title"]       = "vSmartMOM noRS radiance LUT (albedo=0.0)"
+    ds.attrib["title"]       = "vSmartMOM noRS radiance LUT (albedo=0.2)"
     ds.attrib["source"]      = "vSmartMOM.jl"
     ds.attrib["yaml_source"] = metadata["yaml_source"]
     ds.attrib["json_source"] = metadata["json_source"]
@@ -200,11 +178,11 @@ function write_results_nc(path, h2o_axis, aot_axis, gndalt_axis, tsz_axis,
 
     data_dims = ("H2OSTR", "AOT550", "surface_elevation_km", "TSZ", "wl")
     for (name, arr, desc) in [
-        ("R_tot",    R_tot,    "TOA reflected radiance, Stokes I (F0=1)"),
-        ("T_tot",    T_tot,    "BOA transmitted radiance, Stokes I (F0=1)"),
-        ("tau_total", τ_total, "Total vertical atmospheric optical depth (absorption + Rayleigh + aerosol extinction)"),
-        ("hemR_tot", hemR_tot, "Bi-hemispheric reflectance bhr_uw (flux ratio)"),
-        ("hemT_tot", hemT_tot, "Bi-hemispheric transmittance bhr_dw (flux ratio)"),
+        ("R_tot",    R_tot,    "TOA reflected radiance (multiple scattering)"),
+        ("T_tot",    T_tot,    "BOA transmitted radiance (multiple scattering)"),
+        ("tau_total", τ_total, "Total atmospheric optical depth (Rayleigh + aerosol + absorption)"),
+        ("hemR_tot", hemR_tot, "Hemispheric reflectance (multiple scattering)"),
+        ("hemT_tot", hemT_tot, "Hemispheric transmittance (multiple scattering)"),
     ]
         v = defVar(ds, name, Float64, data_dims)
         v.attrib["description"] = desc
@@ -216,24 +194,19 @@ function write_results_nc(path, h2o_axis, aot_axis, gndalt_axis, tsz_axis,
 end
 
 """
-    run_all_scenarios(; yaml=EMIT_YAML, json=EMIT_JSON, ...)
+    run_all_scenarios(; yaml=EMIT_YAML_ALB02, json=EMIT_JSON, ...)
 
-Run the full LUT scan for α=0. Returns `nothing` if inputs are not available.
-
-Port notes (vs sanghavi):
-  - No quadrature-swap optimization across TSZ — the model is rebuilt once
-    per (GNDALT, TSZ) pair rather than mutating quad_points in place.
-  - Inner loop (H2OSTR × AOT550) still uses direct τ mutation for speed.
+Run the full LUT scan with albedo 0.2 and optical depth output.
 """
-function run_all_scenarios(; yaml     = EMIT_YAML,
+function run_all_scenarios(; yaml     = EMIT_YAML_ALB02,
                              json     = EMIT_JSON,
                              dat_dir  = EMIT_NORS_DAT_DIR,
-                             nc       = EMIT_NORS_NC,
-                             jld      = EMIT_NORS_JLD2,
+                             nc       = EMIT_NORS_NC_ALB02,
+                             jld      = EMIT_NORS_JLD2_ALB02,
                              strides  = (; h2o = STRIDE_H2O, aot = STRIDE_AOT,
                                            gndalt = STRIDE_GNDALT, tsz = STRIDE_TSZ))
-    isfile(yaml) || (@info "EMIT driver: YAML not found — skipping" yaml; return nothing)
-    isfile(json) || (@info "EMIT driver: JSON not found — skipping" json; return nothing)
+    isfile(yaml) || (@info "EMIT driver (alb02): YAML not found — skipping" yaml; return nothing)
+    isfile(json) || (@info "EMIT driver (alb02): JSON not found — skipping" json; return nothing)
 
     mkpath(dat_dir)
 
@@ -289,11 +262,6 @@ function run_all_scenarios(; yaml     = EMIT_YAML,
                 scenario_k += 1
                 t_scen = time()
 
-                # Inner scaling is only an approximation for the unified port —
-                # exact sanghavi requires rescaling τ_abs by (vcd_dry(new q) /
-                # vcd_dry(base)). For grid-scale runs users should rebuild the
-                # model per H2O-point by calling apply_scenario!/model_from_parameters
-                # again (slower but correct).
                 model.τ_abs[1]  .= τ_abs_base   .* h2o
                 model.τ_aer[1]  .= τ_aer_base   .* (aot / aot_base)
                 model.τ_rayl[1] .= τ_rayl_base
@@ -303,14 +271,14 @@ function run_all_scenarios(; yaml     = EMIT_YAML,
 
                 R_tot_I, T_tot_I = extract_I_radiances(R_SFI_tot, T_SFI_tot)
 
-                # Vertical total optical thickness from the just-updated τ's.
+                # Compute total optical depth
                 τ_total_spec = compute_total_optical_depth(model.τ_abs[1],
                                                            model.τ_rayl[1],
                                                            model.τ_aer[1])
 
-                R_tot[ih, ia, ig, it, :]    .= R_tot_I
-                T_tot[ih, ia, ig, it, :]    .= T_tot_I
-                τ_total[ih, ia, ig, it, :]  .= τ_total_spec
+                R_tot[ih, ia, ig, it, :] .= R_tot_I
+                T_tot[ih, ia, ig, it, :] .= T_tot_I
+                τ_total[ih, ia, ig, it, :] .= τ_total_spec
                 hemR_tot[ih, ia, ig, it, :] .= Float64.(hem_R_tot)
                 hemT_tot[ih, ia, ig, it, :] .= Float64.(hem_T_tot)
 
@@ -334,7 +302,7 @@ function run_all_scenarios(; yaml     = EMIT_YAML,
         "n_total"        => n_total,
         "stride"         => (; H2O = strides.h2o, AOT = strides.aot,
                                GNDALT = strides.gndalt, TSZ = strides.tsz),
-        "surface_albedo" => 0.0,
+        "surface_albedo" => 0.2,
     )
 
     @info "Saving JLD2" jld
@@ -351,5 +319,5 @@ end
 
 if abspath(PROGRAM_FILE) == @__FILE__
     res = run_all_scenarios()
-    isnothing(res) && @info "emit_modtran_noRS_scenarios: no outputs produced (missing inputs)."
+    isnothing(res) && @info "emit_modtran_noRS_scenarios_alb02: no outputs produced (missing inputs)."
 end

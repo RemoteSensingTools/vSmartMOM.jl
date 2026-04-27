@@ -26,7 +26,8 @@ radiative_transfer:
   max_m:              3
   Δ_angle:            2.0
   l_trunc:            5
-  depol:              0.028
+  # depol:              0.028   # <-- previous explicit value (auto via line below)
+  depol:              -1
   float_type:         Float32
   architecture:       Architectures.CPU()
 

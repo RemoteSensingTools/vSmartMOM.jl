@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "julia": {
+      "type": "stdio",
+      "command": "uv",
+      "args": [
+        "run",
+        "--directory",
+        "/home/sanghavi/code/github/julia-mcp",
+        "python",
+        "server.py"
+      ],
+      "env": {}
+    }
+  }
+}

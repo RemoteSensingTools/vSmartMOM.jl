@@ -18,8 +18,12 @@ radiative_transfer:
   Δ_angle:            2.0
   # Trunction length for legendre terms
   l_trunc:            20
-  # Depolarization factor
-  depol:              0.0
+  # Depolarization factor.
+  #   -1  → auto: derived per band from N₂/O₂ molecular constants (default).
+  #   ≥0  → explicit: use this value uniformly for greek_rayleigh,
+  #         greek_cabannes, and τ_rayl. Set 0.0 for Natraj (1980)
+  #         idealizations or any benchmark that fixes depol = 0.
+  depol:              -1
   # Floating point type for calculations (Float32, Float64)
   float_type:         Float64
   # Architecture (default_architecture, GPU(), CPU())
