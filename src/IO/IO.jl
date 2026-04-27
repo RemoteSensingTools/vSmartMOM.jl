@@ -1,4 +1,9 @@
-# IO submodule: centralizes input/output for vSmartMOM
+"""
+    IO
+
+Input/output helpers for loading YAML, dictionary, atmospheric-profile, and
+NetCDF/GEOS-Chem configuration sources into vSmartMOM parameter objects.
+"""
 module IO
 
 using YAML

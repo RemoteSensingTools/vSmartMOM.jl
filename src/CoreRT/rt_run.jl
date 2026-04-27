@@ -64,6 +64,28 @@ function rt_run_test(RS_type::AbstractRamanType, model, iBand)
 end
 
 """
+    _interaction_workspace(rs, composite_layer, added_layer, arch)
+
+Allocate the inelastic interaction workspace only for Raman-aware modes. Pure
+elastic modes dispatch to `nothing`.
+"""
+_interaction_workspace(::Union{noRS, noRS_plus}, composite_layer, added_layer, arch) = nothing
+_interaction_workspace(::AbstractRamanType, composite_layer, added_layer, arch) =
+    InteractionWorkspace(composite_layer, added_layer; staged = arch isa Architectures.GPU)
+
+"""
+    _expand_layer_rayleigh!(rs, fScattRayleigh, iz)
+
+Populate per-layer Rayleigh scattering fractions for Raman-aware modes. Pure
+elastic modes are a no-op.
+"""
+_expand_layer_rayleigh!(::Union{noRS, noRS_plus}, fScattRayleigh, iz) = nothing
+function _expand_layer_rayleigh!(RS_type::AbstractRamanType, fScattRayleigh, iz)
+    RS_type.fscattRayl = expandBandScalars(RS_type, fScattRayleigh[iz])
+    return nothing
+end
+
+"""
     rt_run(RS_type, model::RTModel, iBand)
 
 Perform Radiative Transfer calculations with explicit Raman type.
@@ -90,9 +112,7 @@ function rt_run(RS_type::AbstractRamanType, model, iBand)
     # (1 - ϖ_Cabannes) for this band. Missing on unified → inelastic ieR/ieT
     # was off by ~4× relative to sanghavi reference (see plans/PHASE_1B_STAGING.md §8).
     # Ported from sanghavi/src/CoreRT/rt_run.jl:293.
-    if typeof(RS_type) <: Union{RRS, RRS_plus}
-        RS_type.ϖ_λ₁λ₀ .*= (1 - model.ϖ_Cabannes[iBand[1]]) / sum(RS_type.ϖ_λ₁λ₀)
-    end
+    InelasticScattering.normalize_raman_weights!(RS_type, model, iBand)
 
     Nz = length(model.profile.p_full)   # Number of vertical slices
 
@@ -179,12 +199,7 @@ function rt_run(RS_type::AbstractRamanType, model, iBand)
     # 4-D ie buffers through CPU between passes; only beneficial on GPU where
     # device memory pressure matters. CPU runs use staged=false (CPU↔CPU copies
     # would be pure overhead).
-    _interaction_ws = if RS_type isa noRS
-        nothing
-    else
-        InteractionWorkspace(composite_layer, added_layer;
-                             staged = arch isa Architectures.GPU)
-    end
+    _interaction_ws = _interaction_workspace(RS_type, composite_layer, added_layer, arch)
 
     # Cumulative optical depth (m-independent, saved for TMS correction)
     τ_sum_all = nothing
@@ -207,9 +222,7 @@ function rt_run(RS_type::AbstractRamanType, model, iBand)
         @showprogress 1 "Looping over layers ..." for iz = 1:Nz  # Count from TOA to BOA
 
             # Construct the atmospheric layer
-            if !(typeof(RS_type) <: noRS)
-                @timeit "Expand Bands" RS_type.fscattRayl = expandBandScalars(RS_type, fScattRayleigh[iz])
-            end
+            @timeit "Expand Bands" _expand_layer_rayleigh!(RS_type, fScattRayleigh, iz)
 
             # Expand all layer optical properties to their full dimension:
             @timeit "OpticalProps" layer_opt =
@@ -381,9 +394,7 @@ function rt_run_ss(RS_type::AbstractRamanType, model, iBand)
     end
 
     # Same ϖ_λ₁λ₀ normalization as rt_run (ported from sanghavi rt_run_ss:466).
-    if typeof(RS_type) <: Union{RRS, RRS_plus}
-        RS_type.ϖ_λ₁λ₀ .*= (1 - model.ϖ_Cabannes[iBand[1]]) / sum(RS_type.ϖ_λ₁λ₀)
-    end
+    InelasticScattering.normalize_raman_weights!(RS_type, model, iBand)
 
     Nz = length(model.profile.p_full)
 
@@ -444,9 +455,7 @@ function rt_run_ss(RS_type::AbstractRamanType, model, iBand)
             extractEffectiveProps(layer_opt_props, quad_points)
 
         @showprogress 1 "SS looping over layers ..." for iz = 1:Nz
-            if !(typeof(RS_type) <: noRS)
-                @timeit "Expand Bands" RS_type.fscattRayl = expandBandScalars(RS_type, fScattRayleigh[iz])
-            end
+            @timeit "Expand Bands" _expand_layer_rayleigh!(RS_type, fScattRayleigh, iz)
 
             @timeit "OpticalProps" layer_opt = expandOpticalProperties(layer_opt_props[iz], arr_type)
 

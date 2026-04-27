@@ -119,6 +119,12 @@ Base.@kwdef mutable struct RVRS{FT<:AbstractFloat} <: AbstractRamanType
     n_Raman::Int
 end
 =#
+"""
+    noRS{FT}()
+
+Pure elastic-scattering mode. This mode carries no inelastic redistribution
+state and is the default Raman type used by `rt_run(model)`.
+"""
 Base.@kwdef mutable struct noRS{FT} <: AbstractRamanType
     fscattRayl::Array{FT,1} = FT[0]
     # ϖ_Cabannes is indexed by iBand; default sized for up to 3 bands so
@@ -277,6 +283,12 @@ Base.@kwdef mutable struct VS_1to0_plus{FT<:AbstractFloat} <: AbstractRamanType
     #ramanAtmoProp::RamanAtmosphereProperties
 end
 
+"""
+    noRS_plus{FT}()
+
+Concatenated-grid pure elastic-scattering mode used by plus-mode code paths
+that share the Raman interface but do not include inelastic redistribution.
+"""
 Base.@kwdef mutable struct noRS_plus{FT} <: AbstractRamanType
     fscattRayl::Array{FT,1} = FT[0]
     ϖ_Cabannes::FT = FT(1) #elastic fraction (Cabannes) of Rayleigh (Cabannes+Raman) scattering
@@ -292,6 +304,11 @@ end
 # ############### Types for Stellar Mode #######################
 #==============================================================#
 
+"""
+    sol_RRS{FT}
+
+Stellar/solar rotational Raman-scattering mode for H₂-dominated atmospheres.
+"""
 Base.@kwdef mutable struct sol_RRS{FT<:AbstractFloat} <: AbstractRamanType 
 
     "Molecular Constants for H2"
@@ -524,4 +541,53 @@ Base.@kwdef mutable struct sol_VS_1to0_plus{FT<:AbstractFloat} <: AbstractRamanT
     F₀::Array{FT,2} # Solar/Stellar irradiation Stokes vector of size (pol_type.n, nSpec)
     #SIF₀::Array{FT,2} # Solar/Stellar irradiation Stokes vector of size (pol_type.n, nSpec)
     #ramanAtmoProp::RamanAtmosphereProperties
+end
+
+"""
+    has_inelastic(rs::AbstractRamanType) -> Bool
+
+Return whether `rs` represents a Raman-aware mode that carries inelastic
+source/scattering state. This is the public trait used by CoreRT boundary code
+instead of spelling out `isa noRS` checks at each call site.
+"""
+has_inelastic(::AbstractRamanType) = true
+has_inelastic(::Union{noRS, noRS_plus}) = false
+
+"""
+    uses_cabannes_phase(rs::AbstractRamanType) -> Bool
+
+Return whether the elastic Rayleigh path should use Cabannes phase coefficients
+because Raman redistribution is handled explicitly by `rs`.
+"""
+uses_cabannes_phase(rs::AbstractRamanType) = has_inelastic(rs)
+
+"""
+    needs_interaction_workspace(rs::AbstractRamanType) -> Bool
+
+Return whether CoreRT should allocate the staged inelastic interaction
+workspace for this Raman mode.
+"""
+needs_interaction_workspace(rs::AbstractRamanType) = has_inelastic(rs)
+
+"""
+    needs_rayleigh_expansion(rs::AbstractRamanType) -> Bool
+
+Return whether per-layer Rayleigh scattering fractions must be expanded onto
+the active Raman spectral grid before entering the core kernel.
+"""
+needs_rayleigh_expansion(rs::AbstractRamanType) = has_inelastic(rs)
+
+"""
+    normalize_raman_weights!(rs, model, iBand)
+
+Normalize Raman redistribution weights for modes whose `ϖ_λ₁λ₀` represents a
+rotational Raman fraction. Modes that do not require this normalization are
+left unchanged.
+"""
+normalize_raman_weights!(::AbstractRamanType, model, iBand) = nothing
+
+function normalize_raman_weights!(rs::Union{RRS, RRS_plus}, model, iBand)
+    iB = iBand[1]
+    rs.ϖ_λ₁λ₀ .*= (1 - model.ϖ_Cabannes[iB]) / sum(rs.ϖ_λ₁λ₀)
+    return nothing
 end

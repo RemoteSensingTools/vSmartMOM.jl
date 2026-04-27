@@ -6,6 +6,12 @@ It includes this module's source files and exports the relevant keywords.
  
 =#
 
+"""
+    vSmartMOM
+
+Top-level package module for configuring and running vector adding-doubling
+radiative-transfer simulations.
+"""
 module vSmartMOM
 using Pkg.Artifacts
 using LinearAlgebra
@@ -30,7 +36,19 @@ export hitran_is_cached
 
 # RT mode types (forward vs linearized)
 abstract type RT_Mode end
+
+"""
+    FwdMode()
+
+Marker selecting the forward radiative-transfer model construction path.
+"""
 struct FwdMode <: RT_Mode end
+
+"""
+    LinMode()
+
+Marker selecting the linearized model construction path used for Jacobians.
+"""
 struct LinMode <: RT_Mode end
 export FwdMode, LinMode
 

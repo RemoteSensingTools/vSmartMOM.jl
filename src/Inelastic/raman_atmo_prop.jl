@@ -1,21 +1,22 @@
 
 
 """
-    $(FUNCTIONNAME)(RS_type, λ, grid_in)
+    getRamanSSProp!(rs, args...)
 
-Returns the Raman SSA per layer at reference wavelength `λ` from nearby source wavelengths for RRS and a (currently) single incident wavelength for VRS/RVRS
-(N₂,O₂ atmosphere, i.e. terrestrial)
-
-Input: 
-    - `RS_type` Raman scattering type (RRS/RVRS/VRS)
-    - `λ` wavelength in `[μm]`
-    - `grid_in` wavenumber grid with equidistant gridpoints
+Populate Raman single-scattering properties on a Raman mode for the supplied
+reference wavelength and spectral grid.
 """
 function getRamanSSProp(RS_type::noRS, depol,  λ, grid_in)
 
     return nothing
 end
 
+"""
+    getRamanSSProp!(rs, args...)
+
+Populate Raman single-scattering properties on `rs` for the supplied reference
+wavelength and spectral grid.
+"""
 function getRamanSSProp!(RS_type::Union{VS_0to1,VS_1to0}, depol, λ, grid_in)
     @unpack n2,o2 =  RS_type
     #n2, o2 = getRamanAtmoConstants(1.e7/λ, T)
@@ -578,4 +579,3 @@ function getRamanSSProp!(
         greek_raman_VS_o2
     return nothing
 end
-

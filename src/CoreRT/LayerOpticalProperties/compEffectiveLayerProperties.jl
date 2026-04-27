@@ -1,3 +1,13 @@
+"""
+    _rayleigh_greek_source(rs, greek_rayleigh, greek_cabannes)
+
+Select the Rayleigh phase-coefficient source for the elastic path. Pure
+elastic modes use the full Rayleigh coefficients; Raman-aware modes use
+Cabannes coefficients because Raman redistribution is handled explicitly.
+"""
+_rayleigh_greek_source(::Union{noRS, noRS_plus}, greek_rayleigh, greek_cabannes) = greek_rayleigh
+_rayleigh_greek_source(::AbstractRamanType, greek_rayleigh, greek_cabannes) = greek_cabannes
+
 function constructCoreOpticalProperties(RS_type::AbstractRamanType, iBand, m, model)
     (; τ_rayl, τ_aer, τ_abs, aerosol_optics, greek_rayleigh, greek_cabannes) = model
     @assert all(iBand .≤ length(τ_rayl)) "iBand exceeded number of bands"
@@ -20,11 +30,10 @@ function constructCoreOpticalProperties(RS_type::AbstractRamanType, iBand, m, mo
     # because the Cabannes depol (~0.007) vs Rayleigh depol (~0.028) shifts the
     # polarization-sensitive greek coefficients (β, δ) by ~3%.
     # See sanghavi src/CoreRT/LayerOpticalProperties/compEffectiveLayerProperties.jl:31-42.
-    raman_active = !(RS_type isa noRS) && !(RS_type isa noRS_plus)
     band_layer_props    = Vector{Vector{CoreScatteringOpticalProperties}}()
     band_fScattRayleigh = Vector{Vector}()
     for iB in iBand
-        gr_source = raman_active ? greek_cabannes : greek_rayleigh
+        gr_source = _rayleigh_greek_source(RS_type, greek_rayleigh, greek_cabannes)
         gr = gr_source isa AbstractVector ? gr_source[iB] : gr_source
         Rayl𝐙⁺⁺, Rayl𝐙⁻⁺ = Scattering.compute_Z_moments(pol_type, μ, gr, m,
                                                         arr_type = arr_type)
