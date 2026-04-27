@@ -701,10 +701,12 @@ end
 read_parameters(x)
 
 Multi-dispatch convenience wrapper:
-- String (file path) → parameters_from_yaml
+- String (file path) → parameters_from_file
+- IOSource → parameters_from_source
 - Dict → parameters_from_dict
 - vSmartMOM_Parameters → pass-through
 """
-read_parameters(x::String) = parameters_from_yaml(x)
-read_parameters(x::Dict)   = parameters_from_dict(x)
+read_parameters(x::AbstractString) = parameters_from_file(x)
+read_parameters(x::Formats.IOSource) = parameters_from_source(x)
+read_parameters(x::Dict) = parameters_from_dict(x)
 read_parameters(p::vSmartMOM_Parameters) = p

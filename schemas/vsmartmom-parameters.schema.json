@@ -1,0 +1,269 @@
+{
+  "$schema": "http://json-schema.org/draft-04/schema#",
+  "title": "vSmartMOM parameter file",
+  "description": "Schema for vSmartMOM scene/configuration files consumed by parameters_from_file and parameters_from_dict. TOML keys containing Unicode, such as \"Δ_angle\", must be quoted in TOML. See docs/dev_notes/pre_registration_hardening_plan.md and src/IO/Parameters.jl for parser details.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "radiative_transfer",
+    "geometry",
+    "atmospheric_profile"
+  ],
+  "properties": {
+    "radiative_transfer": {
+      "$ref": "#/definitions/radiative_transfer"
+    },
+    "geometry": {
+      "$ref": "#/definitions/geometry"
+    },
+    "atmospheric_profile": {
+      "$ref": "#/definitions/atmospheric_profile"
+    },
+    "absorption": {
+      "$ref": "#/definitions/absorption"
+    },
+    "scattering": {
+      "$ref": "#/definitions/scattering"
+    },
+    "canopy": {
+      "$ref": "#/definitions/canopy"
+    },
+    "_metadata": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Optional provenance metadata. Ignored by the vSmartMOM parameter parser."
+    }
+  },
+  "definitions": {
+    "numberArray": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      }
+    },
+    "stringArray": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "radiative_transfer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "spec_bands",
+        "surface",
+        "quadrature_type",
+        "polarization_type",
+        "max_m",
+        "Δ_angle",
+        "l_trunc",
+        "depol",
+        "float_type",
+        "architecture"
+      ],
+      "properties": {
+        "spec_bands": {
+          "$ref": "#/definitions/stringArray",
+          "description": "Spectral band expressions parsed by _safe_parse_spec_band, for example \"[13000.0, 13000.1]\" or \"(1e7/775):0.05:(1e7/755)\"."
+        },
+        "surface": {
+          "$ref": "#/definitions/stringArray",
+          "description": "One surface expression per band. Current parser supports LambertianSurfaceScalar, LambertianSurfaceSpectrum, LambertianSurfaceLegendre, rpvSurfaceScalar, RossLiSurfaceScalar, and CoxMunkSurface."
+        },
+        "quadrature_type": {
+          "type": "string",
+          "enum": [
+            "RadauQuad()",
+            "GaussQuadHemisphere()",
+            "GaussQuadFullSphere()"
+          ],
+          "description": "Angular quadrature rule."
+        },
+        "polarization_type": {
+          "type": "string",
+          "enum": [
+            "Stokes_I()",
+            "Stokes_IQ()",
+            "Stokes_IQU()",
+            "Stokes_IQUV()"
+          ],
+          "description": "Stokes vector dimensionality."
+        },
+        "max_m": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Maximum Fourier moment included in the RT solve."
+        },
+        "Δ_angle": {
+          "type": "number",
+          "description": "Forward-peak exclusion angle in degrees. In TOML, write this key as \"Δ_angle\" = 0.0."
+        },
+        "l_trunc": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Legendre truncation length."
+        },
+        "depol": {
+          "type": "number",
+          "description": "Rayleigh depolarization factor."
+        },
+        "float_type": {
+          "type": "string",
+          "enum": [
+            "Float32",
+            "Float64"
+          ],
+          "description": "Floating point type used by the RT model."
+        },
+        "architecture": {
+          "type": "string",
+          "enum": [
+            "default_architecture",
+            "CPU()",
+            "GPU()",
+            "Architectures.CPU()",
+            "Architectures.GPU()"
+          ],
+          "description": "Compute backend selector."
+        }
+      }
+    },
+    "geometry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sza",
+        "vza",
+        "vaz",
+        "obs_alt"
+      ],
+      "properties": {
+        "sza": {
+          "type": "number",
+          "description": "Solar zenith angle in degrees."
+        },
+        "vza": {
+          "$ref": "#/definitions/numberArray",
+          "description": "Viewing zenith angles in degrees."
+        },
+        "vaz": {
+          "$ref": "#/definitions/numberArray",
+          "description": "Viewing azimuth angles in degrees."
+        },
+        "obs_alt": {
+          "type": "number",
+          "description": "Observer altitude/pressure coordinate used by the existing parser."
+        }
+      }
+    },
+    "atmospheric_profile": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "T",
+        "p",
+        "profile_reduction"
+      ],
+      "properties": {
+        "T": {
+          "$ref": "#/definitions/numberArray",
+          "description": "Layer temperature profile."
+        },
+        "p": {
+          "$ref": "#/definitions/numberArray",
+          "description": "Pressure boundary profile."
+        },
+        "q": {
+          "$ref": "#/definitions/numberArray",
+          "description": "Optional specific humidity profile."
+        },
+        "profile_reduction": {
+          "type": "integer",
+          "description": "Profile reduction level. TOML has no null value, so omit future optional semantics carefully or use an integer."
+        }
+      }
+    },
+    "absorption": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "molecules": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/stringArray"
+          },
+          "description": "Molecules per spectral band."
+        },
+        "vmr": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Volume mixing ratios by molecule name."
+        },
+        "broadening": {
+          "type": "string",
+          "enum": [
+            "Voigt()",
+            "Doppler()",
+            "Lorentz()"
+          ]
+        },
+        "CEF": {
+          "type": "string",
+          "enum": [
+            "HumlicekWeidemann32SDErrorFunction()"
+          ]
+        },
+        "wing_cutoff": {
+          "type": "integer"
+        }
+      }
+    },
+    "scattering": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "aerosols": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "description": "Aerosol dictionaries consumed by aerosol_params_to_obj."
+        },
+        "r_max": {
+          "type": "number"
+        },
+        "nquad_radius": {
+          "type": "number"
+        },
+        "λ_ref": {
+          "type": "number",
+          "description": "Reference wavelength. In TOML, write this key as \"λ_ref\" = 550.0."
+        },
+        "decomp_type": {
+          "type": "string",
+          "enum": [
+            "NAI2()",
+            "PCW()"
+          ]
+        }
+      }
+    },
+    "canopy": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Optional canopy wrapper configuration parsed by _parse_canopy_section."
+    }
+  },
+  "x-taplo": {
+    "docs": {
+      "main": "vSmartMOM parameter file schema. Source of truth is `src/IO/Parameters.jl`; this schema mirrors the public file format for editor help and Taplo validation."
+    },
+    "initKeys": [
+      "radiative_transfer",
+      "geometry",
+      "atmospheric_profile"
+    ]
+  }
+}

@@ -92,7 +92,9 @@ include("SIF_emission/sif_loader.jl")
 export load_sif_spectrum, load_ficus_reflectance, sif_data_path, build_sif_source
 
 # Export some vSmartMOM functions
-export default_parameters, parameters_from_yaml, model_from_parameters, rt_run, read_parameters, read_atmos_profile
+export default_parameters, parameters_from_file, parameters_from_source,
+       parameters_from_yaml, parameters_from_dict,
+       model_from_parameters, rt_run, read_parameters, read_atmos_profile
 # Export linearized RT functions
 export rt_run_lin, model_from_parameters_lin
 # Export new hierarchical model types

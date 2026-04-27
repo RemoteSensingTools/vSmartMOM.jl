@@ -6,6 +6,20 @@ using Parameters: @unpack
 using ..CoreRT: AtmosphericProfile
 import ..CoreRT: compute_atmos_profile_fields
 
+"""
+    _atmos_profile_error(msg)
+
+Raise a stable `ArgumentError` for invalid atmospheric-profile input.
+"""
+@inline _atmos_profile_error(msg) = throw(ArgumentError(msg))
+
+"""
+    _require_atmos_profile(cond, msg)
+
+Validate atmospheric-profile input and raise `ArgumentError` when invalid.
+"""
+@inline _require_atmos_profile(cond, msg) = cond ? nothing : _atmos_profile_error(msg)
+
 "Read atmospheric profile from a parameters Dict"
 function read_atmos_profile_dict(params_dict::Dict)
     T = convert.(Float64, params_dict["T"])
@@ -33,7 +47,7 @@ end
 
 "Load atmospheric profile from YAML file path"
 function read_atmos_profile(file_path::AbstractString)
-    @assert endswith(file_path, ".yaml") "File must be yaml"
+    _require_atmos_profile(endswith(file_path, ".yaml"), "File must be yaml")
     params_dict = YAML.load_file(file_path)
     return read_atmos_profile_dict(params_dict)
 end
