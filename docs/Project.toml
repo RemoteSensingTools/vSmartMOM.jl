@@ -9,6 +9,9 @@ Literate = "98b081ad-f1c9-55d3-8b20-4c87d4299306"
 Parameters = "d96e819e-fc66-5662-9728-84c9c7592b0a"
 vSmartMOM = "7ba11eeb-0a61-4a04-a413-bf612cc2007e"
 
+[sources]
+vSmartMOM = {path = ".."}
+
 [compat]
 CairoMakie = "0.12, 0.13, 0.14, 0.15"
 CanopyOptics = "0.1.4"

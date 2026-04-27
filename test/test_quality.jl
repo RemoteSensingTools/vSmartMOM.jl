@@ -41,6 +41,9 @@ using vSmartMOM
         @test TOML.parsefile(joinpath(root, toml_path)) isa Dict
     end
 
+    docs_project = TOML.parsefile(joinpath(root, "docs", "Project.toml"))
+    @test docs_project["sources"]["vSmartMOM"]["path"] == ".."
+
     parameter_schema = JSON.parsefile(joinpath(schema_dir, "vsmartmom-parameters.schema.json"))
     radiative_transfer = parameter_schema["definitions"]["radiative_transfer"]
 
