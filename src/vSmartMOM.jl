@@ -79,7 +79,11 @@ include("SolarModel/SolarModel.jl")
 
 # IO submodule (must come after CoreRT types are defined)
 include("IO/IO.jl")
-using .IO
+import .IO: parameters_from_file, parameters_from_source,
+            parameters_from_yaml, parameters_from_dict, read_parameters,
+            read_atmos_profile, read_atmos_profile_dict,
+            GeosChemSource, NetCDFGridSource, NetCDFSource,
+            geoschem_to_dict, read_geoschem_profile
 
 # Aerosols module — user-facing flexible aerosol framework (TOMAS-15 +
 # two-moment schemes). WIP header in Aerosols.jl documents follow-up cleanup.
@@ -94,7 +98,8 @@ export load_sif_spectrum, load_ficus_reflectance, sif_data_path, build_sif_sourc
 # Export some vSmartMOM functions
 export default_parameters, parameters_from_file, parameters_from_source,
        parameters_from_yaml, parameters_from_dict,
-       model_from_parameters, rt_run, read_parameters, read_atmos_profile
+       model_from_parameters, rt_run, read_parameters,
+       read_atmos_profile, read_atmos_profile_dict
 # Export linearized RT functions
 export rt_run_lin, model_from_parameters_lin
 # Export new hierarchical model types
