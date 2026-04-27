@@ -31,8 +31,14 @@ using JLD2
 # Float32 consistency tests
 @testset "Float32 Consistency" begin include("test_float32.jl") end
 
+# Quality gates
+@testset "Quality Gates" begin include("test_quality.jl") end
+
 # Parameter parser regression tests
 @testset "Parameter Parser" begin include("test_parameters_parser.jl") end
+
+# IO validation regression tests
+@testset "IO Validation" begin include("test_io_validation.jl") end
 
 # Canopy surface tests (CanopySurface composable surface type)
 @testset "Canopy Surface" begin include("test_canopy.jl") end

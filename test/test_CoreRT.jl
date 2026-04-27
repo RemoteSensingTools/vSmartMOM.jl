@@ -1,11 +1,15 @@
+using Test
+using vSmartMOM
+using vSmartMOM.CoreRT
 
+const CORE_RT_BENCHMARK_DIR = joinpath(@__DIR__, "benchmarks")
 
 @testset "compare against 6SV1" begin 
 
-    include("benchmarks/6SV1_R_trues.jl")
+    include(joinpath(CORE_RT_BENCHMARK_DIR, "6SV1_R_trues.jl"))
     R_modeled_all = zeros(6, 3, 3, 16);
     R_deltas_all = zeros(6, 3, 3, 16);
-    parameters = parameters_from_yaml("benchmarks/6SV1_1.yaml");
+    parameters = parameters_from_yaml(joinpath(CORE_RT_BENCHMARK_DIR, "6SV1_1.yaml"));
 
     function test_against_6SV1(case_i, azs, szas, λ, τ, ρ)
         for sza_i in 1:length(szas)
@@ -51,8 +55,8 @@ end
     ϕs = collect(0.0:30.0:180.0)
     τ = 0.5
 
-    include("/home/sanghavi/code/github/uni_vSmartMOM/test/benchmarks/natraj_trues.jl")
-    parameters = parameters_from_yaml("/home/sanghavi/code/github/uni_vSmartMOM/test/benchmarks/natraj.yaml");
+    include(joinpath(CORE_RT_BENCHMARK_DIR, "natraj_trues.jl"))
+    parameters = parameters_from_yaml(joinpath(CORE_RT_BENCHMARK_DIR, "natraj.yaml"));
 
     parameters.spec_bands = [[1e7/360.0, 1e7/360.0 + 1]]
     parameters.vza = acosd.(μ)
@@ -83,4 +87,3 @@ end
     @test maximum(filter(!isnan, U_deltas_all[findall(i -> i >= 0.01, U_modeled_all)])) < ϵ
 
 end
-

@@ -1,4 +1,5 @@
 [deps]
+Aqua = "4c88cf16-eb10-579e-8560-4a9242c79595"
 CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
 CanopyOptics = "a18e34a6-5dbe-4f38-a44b-e5141852e7a7"
 DelimitedFiles = "8bb1440f-4735-579b-a4ab-409b98df4dab"
@@ -19,3 +20,6 @@ TimerOutputs = "a759f4b9-e2f1-59dc-863e-4aeb61b1ea8f"
 WignerSymbols = "9f57e263-0b3d-5e2e-b1be-24f2bb48858b"
 YAML = "ddb6d928-2868-570f-bddf-ab3f9cf99eb6"
 vSmartMOM = "7ba11eeb-0a61-4a04-a413-bf612cc2007e"
+
+[compat]
+Aqua = "0.8"

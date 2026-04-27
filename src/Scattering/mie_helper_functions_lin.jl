@@ -303,7 +303,7 @@ end
     $(FUNCTIONNAME)(an, bn, π_, τ_, S₁, S₂)
 Determines the amplitude functions `S₁`,`S₂` in Mie theory
 - `an` and `bn` pre-calculated Mie coefficients `an` and `bn`, see [`compute_mie_ab!`](@ref) function
-- `π` and `τ` pre-calculated associated Legendre functions `π` and `τ`, see [`compute_mie_π_τ!`](@ref) function 
+- `π` and `τ` pre-calculated associated Legendre functions `π` and `τ`, see [`compute_mie_π_τ`](@ref) function
 The function returns `S₁`,`S₂` as a function of the cosine of the scattering angle `ξ`. 
 Users need to make sure `an` and `bn`, `π` and `τ` are pre-computed.
 """

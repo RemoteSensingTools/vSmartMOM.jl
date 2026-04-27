@@ -53,11 +53,11 @@ export NAI2, PCW, Aerosol, MieModel, Stokes_IQUV, Stokes_I, Stokes_IQU,
 # Export linearized types
 export linGreekCoefs, linAerosolOptics
 
-export compute_B, compute_ab, GreekCoefs, comp_ab, compute_mie_π_τ!,
+export GreekCoefs, compute_mie_π_τ,
        compute_wigner_values, save_wigner_values, load_wigner_values,
        compute_Sl, gausslegendre, compute_aerosol_optical_properties,
        compute_ref_aerosol_extinction, truncate_phase,
-       ConjugateTransposePairs, AbstractPolarizationType,
+       AbstractPolarizationType,
        AbstractAerosolType, AbstractAerosolType, MieModel,
        AbstractTruncationType, phase_function, compute_aerosol_XS
 

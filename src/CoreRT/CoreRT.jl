@@ -135,7 +135,7 @@ export model_from_parameters,               # Converting the parameters to model
        model_from_parameters_lin,           # Convenience alias for linearized model
        rt_run, rt_run_lin, rt_run_ss,       # Run the RT code (forward, linearized, single scatter)
        default_parameters                   # Set of default parameters
-export lin_added_layer_all_params,            # 3 params -> all params chain rule
+export lin_added_layer_all_params!,           # 3 params -> all params chain rule
        OpticalPropertyJacobian,               # AD boundary struct alias
        RawAerosolJacobian,                    # AD boundary for raw aerosol derivatives
        delta_m_forward, delta_m_truncation_lin, # δ-M truncation functions

@@ -1,0 +1,71 @@
+include = [
+  "Project.toml",
+  "test/Project.toml",
+  "docs/Project.toml",
+  "Artifacts.toml",
+  ".taplo.toml",
+  "config/**/*.toml",
+  "configs/**/*.toml",
+  "examples/**/*.toml",
+  "sandbox/**/*.toml",
+  "test/**/*.toml",
+  "*parameters*.toml",
+  "*params*.toml",
+  "*scene*.toml",
+]
+exclude = [
+  "**/Manifest.toml",
+  "docs/build/**",
+]
+
+[formatting]
+align_comments = true
+align_entries = false
+array_auto_expand = true
+column_width = 100
+indent_string = "  "
+reorder_keys = false
+
+[[rule]]
+include = [
+  "Project.toml",
+  "test/Project.toml",
+  "docs/Project.toml",
+]
+
+[rule.schema]
+path = "./schemas/julia-project.schema.json"
+
+[[rule]]
+include = ["Artifacts.toml"]
+
+[rule.schema]
+path = "./schemas/julia-artifacts.schema.json"
+
+[[rule]]
+include = [
+  "config/**/*.toml",
+  "configs/**/*.toml",
+  "examples/**/*.toml",
+  "sandbox/**/*.toml",
+  "test/**/*.toml",
+  "*parameters*.toml",
+  "*params*.toml",
+  "*scene*.toml",
+]
+exclude = [
+  "Project.toml",
+  "test/Project.toml",
+  "docs/Project.toml",
+  "Artifacts.toml",
+  ".taplo.toml",
+]
+
+[rule.schema]
+path = "./schemas/vsmartmom-parameters.schema.json"
+
+[[rule]]
+include = [".taplo.toml"]
+
+[rule.schema]
+path = "taplo://taplo.toml"
