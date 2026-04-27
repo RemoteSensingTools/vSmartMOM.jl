@@ -127,7 +127,7 @@ end
         # 𝐑⁻⁺(μᵢ, μⱼ) = ϖ ̇𝐙⁻⁺(μᵢ, μⱼ) ̇(μⱼ/(μᵢ+μⱼ)) ̇(1 - exp{-τ ̇(1/μᵢ + 1/μⱼ)}) ̇𝑤ⱼ
         ier⁻⁺[i,j,n₁,Δn] = fscattRayl * ϖ_λ₁λ₀[Δn] * ϖ_λ[n₀] * Z⁻⁺_λ₁λ₀[i,j] * 
             (1/( (qp_μN[i] / qp_μN[j]) + (dτ_λ[n₁]/dτ_λ[n₀]) )) * 
-            (1 - exp(-((dτ_λ[n₁] / qp_μN[i]) + (dτ_λ[n₀] / qp_μN[j])))) * wct2[j] 
+            -expm1(-((dτ_λ[n₁] / qp_μN[i]) + (dτ_λ[n₀] / qp_μN[j]))) * wct2[j]
               
         #if ((n₀==840) || (n₀==850))
         #    @show n₀, (1/( (qp_μN[i] / qp_μN[j]) + (dτ_λ[n₁]/dτ_λ[n₀]) )),  
@@ -145,7 +145,7 @@ end
                 else    
                     iet⁺⁺[i,j,n₁,Δn] = 
                         ϖ_λ₁λ₀[Δn] * ϖ_λ[n₀] * fscattRayl * Z⁺⁺_λ₁λ₀[i,i] * wct2[i] *
-                        (1 - exp(-dτ_λ[n₀] / qp_μN[j]))
+                        -expm1(-dτ_λ[n₀] / qp_μN[j])
                 end
             else
                 iet⁺⁺[i,j,n₁,Δn] = 0.0
@@ -309,7 +309,7 @@ end
             ier⁻⁺[i,j,n₁,1] += 
                     ϖ_λ₁λ₀[Δn] * fscattRayl[n₀] * Z⁻⁺_λ₁λ₀[i,j] * 
                     (1/( (qp_μN[i] / qp_μN[j]) + (dτ[n₁]/dτ[n₀]) )) * 
-                    (1 - exp(-((dτ[n₁] / qp_μN[i]) + (dτ[n₀] / qp_μN[j])))) * wct2[j] 
+                    -expm1(-((dτ[n₁] / qp_μN[i]) + (dτ[n₀] / qp_μN[j]))) * wct2[j]
             
             if (qp_μN[i] == qp_μN[j])
                 # @show i,j
@@ -494,7 +494,7 @@ end
         ieJ₀⁻[i, 1, n₁, 1] = 
                     wct02 * ϖ_λ₁λ₀[Δn] * fscattRayl[n₀] * Z⁻⁺_I₀ * 
                     (1/( (qp_μN[i] / qp_μN[i_start]) + (dτ[n₁]/dτ[n₀]) )) *
-                    (1 - exp(-( (dτ[n₁] / qp_μN[i]) + (dτ[n₀] / qp_μN[i_start]) ) ))  
+                    -expm1(-( (dτ[n₁] / qp_μN[i]) + (dτ[n₀] / qp_μN[i_start]) ))
 
         ieJ₀⁺[i, 1, n₁, 1] *= exp(-τ_sum[n₀]/qp_μN[i_start])
         ieJ₀⁻[i, 1, n₁, 1] *= exp(-τ_sum[n₀]/qp_μN[i_start])
@@ -571,7 +571,7 @@ end
             else
                 ieJ₀⁺[i, 1, n₁, Δn] = 
                         wct02 * ϖ_λ₁λ₀[Δn] * ϖ_λ[n₀] * fscattRayl * Z⁺⁺_I₀ * 
-                        (1 - exp(-dτ_λ[n₀] / qp_μN[i_start]))
+                        -expm1(-dτ_λ[n₀] / qp_μN[i_start])
             end
         else
             # J₀⁺ = 0.25*(1+δ(m,0)) * ϖ(λ) * Z⁺⁺ * I₀ * [μ₀ / (μᵢ - μ₀)] * [exp(-dτ(λ)/μᵢ) - exp(-dτ(λ)/μ₀)]
@@ -584,7 +584,7 @@ end
         #J₀⁻ = 0.25*(1+δ(m,0)) * ϖ(λ) * Z⁻⁺ * I₀ * [μ₀ / (μᵢ + μ₀)] * [1 - exp{-dτ(λ)(1/μᵢ + 1/μ₀)}]                    
         ieJ₀⁻[i, 1, n₁, Δn] = wct02 * ϖ_λ₁λ₀[Δn] * ϖ_λ[n₀] * fscattRayl * Z⁻⁺_I₀ * 
                 (1/( (qp_μN[i] / qp_μN[i_start]) + (dτ_λ[n₁]/dτ_λ[n₀]) )) *
-                (1 - exp(-( (dτ_λ[n₁] / qp_μN[i]) + (dτ_λ[n₀] / qp_μN[i_start]) ) ))  
+                -expm1(-( (dτ_λ[n₁] / qp_μN[i]) + (dτ_λ[n₀] / qp_μN[i_start]) ))
         ieJ₀⁺[i, 1, n₁, Δn] *= exp(-τ_sum[n₀]/qp_μN[i_start]) #correct this to include n₀ap
         ieJ₀⁻[i, 1, n₁, Δn] *= exp(-τ_sum[n₀]/qp_μN[i_start]) 
     end
