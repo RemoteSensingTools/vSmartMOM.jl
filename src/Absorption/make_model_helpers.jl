@@ -54,17 +54,24 @@ at the given pressure and temperature grids
 """
 function make_interpolation_model(
                                   # Required
-                                  hitran::HitranTable, 
-                                  broadening::AbstractBroadeningFunction, 
-                                  wave_grid::AbstractRange{<:Real}, 
+                                  hitran::HitranTable,
+                                  broadening::AbstractBroadeningFunction,
+                                  wave_grid::AbstractRange{<:Real},
                                   p_grid::AbstractRange{<:Real},
-                                  t_grid::AbstractRange{<:Real}; 
+                                  t_grid::AbstractRange{<:Real};
                                   # Optionals
                                   wavelength_flag::Bool=false,
-                                  wing_cutoff::Real=40, 
-                                  vmr::Real=0, 
+                                  wing_cutoff::Real=40,
+                                  vmr::Real=0,
                                   CEF::AbstractComplexErrorFunction=HumlicekWeidemann32SDErrorFunction(),
-                                  architecture::AbstractArchitecture = default_architecture()     # Computer `Architecture` on which `Model` is run
+                                  architecture::AbstractArchitecture = default_architecture(),
+                                  # Linear avoids cubic spline overshoot/undershoot on under-sampled
+                                  # narrow absorption lines. Default stays :cubic for back-compat.
+                                  interp_type::Symbol = :cubic,
+                                  # Storage type of the LUT coefficient array. Float32 halves disk/VRAM
+                                  # with negligible accuracy loss for σ values that span ~10 orders
+                                  # of magnitude logarithmically but are interpolated linearly.
+                                  storage_type::Type{<:AbstractFloat} = Float64,
                                 )
 
     # Warn user if using incompatible/untested CEF
@@ -76,19 +83,24 @@ function make_interpolation_model(
     ν_grid = wavelength_flag ? reverse(nm_per_m ./ wave_grid) : wave_grid
 
     # Empty matrix to store the calculated cross-sections
-    cs_matrix = zeros(length(ν_grid),length(p_grid), length(t_grid));
+    cs_matrix = zeros(storage_type, length(ν_grid), length(p_grid), length(t_grid))
 
     # Calculate all the cross-sections at the pressure and temperature grids
     @showprogress 1 "Computing Cross Sections for Interpolation..." for i in 1:length(p_grid)
         for j in 1:length(t_grid)
-            # make_hitran_model(hitran_data, Voigt(), wing_cutoff = 40, CEF=HumlicekWeidemann32SDErrorFunction(), architecture=CPU())
             model = make_hitran_model(hitran, broadening, wing_cutoff=wing_cutoff, CEF=CEF, architecture=architecture)
-            cs_matrix[:,i,j] = collect(compute_absorption_cross_section(model, collect(ν_grid), p_grid[i], t_grid[j], wavelength_flag=wavelength_flag))
+            cs_matrix[:,i,j] = storage_type.(collect(compute_absorption_cross_section(model, collect(ν_grid), p_grid[i], t_grid[j], wavelength_flag=wavelength_flag)))
         end
     end
-    
+
     # Perform the interpolation
-    itp = interpolate(cs_matrix, BSpline(Cubic(Line(OnGrid()))))
+    itp = if interp_type === :linear
+        interpolate(cs_matrix, BSpline(Linear()))
+    elseif interp_type === :cubic
+        interpolate(cs_matrix, BSpline(Cubic(Line(OnGrid()))))
+    else
+        throw(ArgumentError("interp_type must be :linear or :cubic, got $(interp_type)"))
+    end
 
     # Get the molecule and isotope numbers from the HitranTable
     mol = hitran.mol[1]

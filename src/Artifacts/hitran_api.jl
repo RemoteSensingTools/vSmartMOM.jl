@@ -97,12 +97,34 @@ function fetch_hitran_by_ids(name::AbstractString, iso_ids::Vector{Int};
                               numin::Real=0, numax::Real=150000,
                               edition::AbstractString="HITRAN2024",
                               force::Bool=false)
-    par_path = _hitran_par_path(name, edition)
+    par_path  = _hitran_par_path(name, edition)
+    meta_path = _hitran_meta_path(name, edition)
 
-    # Return cached file unless force re-download
+    # Reuse the cached file only if it actually covers the requested
+    # wavenumber band. The cache key is keyed on (molecule, edition); a
+    # narrower-band fetch made earlier in the session would otherwise be
+    # silently reused for wider requests, producing an LUT with most lines
+    # missing (root cause of the 2026-04-23 H2O truncation).
     if isfile(par_path) && !force
-        @info "Using cached HITRAN data: $par_path"
-        return par_path
+        cached_ok = false
+        if isfile(meta_path)
+            try
+                meta = _read_meta_toml(meta_path)
+                cnumin = get(meta, "numin", nothing)
+                cnumax = get(meta, "numax", nothing)
+                if cnumin isa Real && cnumax isa Real
+                    cached_ok = cnumin <= numin && cnumax >= numax
+                end
+            catch err
+                @warn "Could not parse $meta_path; ignoring cache" exception=err
+            end
+        end
+        if cached_ok
+            @info "Using cached HITRAN data: $par_path"
+            return par_path
+        else
+            @info "Cached HITRAN data for $name does not cover [$numin, $numax]; re-downloading" par_path
+        end
     end
 
     # Construct API URL (same pattern as HAPI's queryHITRAN)

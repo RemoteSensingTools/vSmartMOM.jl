@@ -90,7 +90,10 @@ function model_from_parameters(lin::LinMode,
         curr_band_λ = params.float_type(1e4) ./ params.spec_bands[i_band]
         νₘ = FT(0.5)*(params.spec_bands[i_band][1]+params.spec_bands[i_band][end])
         λₘ = FT(1.e7)/νₘ
-        # Explicit (λ₀, n2, o2) form (effT = 300 K, Earth atmospheres).
+        # Per-band molecular-constant depolarizations. ϖ_Cabannes is always
+        # taken from the molecular path; the depol values feed greek coefs and
+        # τ_rayl only when params.depol < 0 (auto). See model_from_parameters.jl
+        # for the full rule.
         _n2, _o2 = InelasticScattering.getRamanAtmoConstants(FT(1.0e7) / λₘ, FT(300))
         ϖ_Cabannes[i_band] = InelasticScattering.compute_ϖ_Cabannes(λₘ, _n2, _o2)
         γ_air_Cabannes, _ = InelasticScattering.compute_γ_air_Cabannes!(λₘ, _n2, _o2)
@@ -98,14 +101,15 @@ function model_from_parameters(lin::LinMode,
         depol_air_Cabannes = 2γ_air_Cabannes/(1+γ_air_Cabannes)
         depol_air_Rayleigh = 2γ_air_Rayleigh/(1+γ_air_Rayleigh)
 
-        a = Scattering.get_greek_rayleigh(depol_air_Cabannes)
-        push!(greek_cabannes, a)
-        a = Scattering.get_greek_rayleigh(depol_air_Rayleigh)
-        push!(greek_rayleigh, a)
+        depol_use_Cab = params.depol < 0 ? FT(depol_air_Cabannes) : FT(params.depol)
+        depol_use_Ray = params.depol < 0 ? FT(depol_air_Rayleigh) : FT(params.depol)
+
+        push!(greek_cabannes, Scattering.get_greek_rayleigh(depol_use_Cab))
+        push!(greek_rayleigh, Scattering.get_greek_rayleigh(depol_use_Ray))
 
         τ_rayl[i_band]   .= getRayleighLayerOptProp(profile.p_half[end],
                                 curr_band_λ,
-                                params.depol, profile.vcd_dry)
+                                depol_use_Ray, profile.vcd_dry)
 
         (isnothing(abs_params) && isnothing(params.q)) && continue
 

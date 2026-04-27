@@ -51,8 +51,8 @@ end
     ϕs = collect(0.0:30.0:180.0)
     τ = 0.5
 
-    include("benchmarks/natraj_trues.jl")
-    parameters = parameters_from_yaml("benchmarks/natraj.yaml");
+    include("/home/sanghavi/code/github/uni_vSmartMOM/test/benchmarks/natraj_trues.jl")
+    parameters = parameters_from_yaml("/home/sanghavi/code/github/uni_vSmartMOM/test/benchmarks/natraj.yaml");
 
     parameters.spec_bands = [[1e7/360.0, 1e7/360.0 + 1]]
     parameters.vza = acosd.(μ)
