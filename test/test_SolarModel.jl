@@ -1,3 +1,6 @@
+using Test
+using vSmartMOM.SolarModel
+
 @testset "planck_spectra" begin
 
     ν_grid = collect((1e7/778):0.015:(1e7/755))
