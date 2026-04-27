@@ -132,7 +132,7 @@ function compute_absorption_cross_section(
             end
             S = S * qoft_cache[key] *
                     exp(c₂ * hitran.E″[j] * (1 / t_ref - 1 / temperature)) *
-                    (1 - exp(-c₂ * hitran.νᵢ[j] / temperature)) / (1 - exp(-c₂ * hitran.νᵢ[j] / t_ref))
+                    (-expm1(-c₂ * hitran.νᵢ[j] / temperature)) / (-expm1(-c₂ * hitran.νᵢ[j] / t_ref))
         end
 
         # Calculate index range that this line impacts

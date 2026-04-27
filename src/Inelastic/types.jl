@@ -42,9 +42,9 @@ $(DocStringExtensions.FIELDS)
 """
 Base.@kwdef struct VS_0to1{FT<:AbstractFloat} <: AbstractRamanType 
     "Molecular Constant for N2"
-    n2::InelasticScattering.MolecularConstants{FT}
+    n2::InelasticScattering.MolecularConstants{Float64}
     "Molecular Constant for O2"
-    o2::InelasticScattering.MolecularConstants{FT}
+    o2::InelasticScattering.MolecularConstants{Float64}
     "Greek coefs in Raman calculations" 
     greek_raman::GreekCoefs
     "Pre-computed optical properties"
@@ -71,9 +71,9 @@ $(DocStringExtensions.FIELDS)
 """
 Base.@kwdef struct VS_1to0{FT<:AbstractFloat} <: AbstractRamanType 
     "Molecular Constant for N2"
-    n2::InelasticScattering.MolecularConstants{FT}
+    n2::InelasticScattering.MolecularConstants{Float64}
     "Molecular Constant for O2"
-    o2::InelasticScattering.MolecularConstants{FT}
+    o2::InelasticScattering.MolecularConstants{Float64}
     "Greek coefs in Raman calculations" 
     greek_raman::GreekCoefs
     "Pre-computed optical properties"
@@ -100,9 +100,9 @@ $(DocStringExtensions.FIELDS)
 """
 Base.@kwdef mutable struct RVRS{FT<:AbstractFloat} <: AbstractRamanType 
     "Molecular Constant for N2"
-    n2::InelasticScattering.MolecularConstants{FT}
+    n2::InelasticScattering.MolecularConstants{Float64}
     "Molecular Constant for O2"
-    o2::InelasticScattering.MolecularConstants{FT}
+    o2::InelasticScattering.MolecularConstants{Float64}
 
     bandSpecLim = []
     iBand::Array{Int,1} = [1]
@@ -120,10 +120,10 @@ Base.@kwdef mutable struct RVRS{FT<:AbstractFloat} <: AbstractRamanType
 end
 =#
 Base.@kwdef mutable struct noRS{FT} <: AbstractRamanType
-    fscattRayl::Array{FT,1} = [0.0]
+    fscattRayl::Array{FT,1} = FT[0]
     # ϖ_Cabannes is indexed by iBand; default sized for up to 3 bands so
     # zero-arg `noRS()` works with multi-band smoke configs (e.g. EMIT 2-band).
-    ϖ_Cabannes::Array{FT,1} = [1.0, 1.0, 1.0] # elastic fraction (Cabannes) of Rayleigh (Cabannes+Raman) scattering
+    ϖ_Cabannes::Array{FT,1} = FT[1, 1, 1] # elastic fraction (Cabannes) of Rayleigh (Cabannes+Raman) scattering
     bandSpecLim = []
     iBand::Array{Int,1} = [1]
     # F₀/SIF₀ placeholders: rt_run resizes to (pol_type.n, nSpec) before first use.
@@ -186,9 +186,9 @@ Base.@kwdef mutable struct VS_0to1_plus{FT<:AbstractFloat} <: AbstractRamanType
     grid_in::Vector{StepRangeLen{FT}} = StepRangeLen{FT}[]
 
     "Molecular Constant for N2"
-    n2::InelasticScattering.MolecularConstants{FT}
+    n2::InelasticScattering.MolecularConstants{Float64}
     "Molecular Constant for O2"
-    o2::InelasticScattering.MolecularConstants{FT}
+    o2::InelasticScattering.MolecularConstants{Float64}
 
     "Greek coefs in Raman calculations"
     greek_raman::GreekCoefs       = GreekCoefs([FT(1)], [FT(1)], [FT(1)], [FT(1)], [FT(1)], [FT(1)])
@@ -237,9 +237,9 @@ Base.@kwdef mutable struct VS_1to0_plus{FT<:AbstractFloat} <: AbstractRamanType
     grid_in::Array{StepRangeLen{FT},1} 
 
     "Molecular Constant for N2"
-    n2::InelasticScattering.MolecularConstants{FT}
+    n2::InelasticScattering.MolecularConstants{Float64}
     "Molecular Constant for O2"
-    o2::InelasticScattering.MolecularConstants{FT}
+    o2::InelasticScattering.MolecularConstants{Float64}
     
     "Greek coefs in Raman calculations" 
     greek_raman::GreekCoefs
@@ -278,8 +278,8 @@ Base.@kwdef mutable struct VS_1to0_plus{FT<:AbstractFloat} <: AbstractRamanType
 end
 
 Base.@kwdef mutable struct noRS_plus{FT} <: AbstractRamanType
-    fscattRayl::Array{FT,1} = [0.0]
-    ϖ_Cabannes::FT = 1.0 #elastic fraction (Cabannes) of Rayleigh (Cabannes+Raman) scattering
+    fscattRayl::Array{FT,1} = FT[0]
+    ϖ_Cabannes::FT = FT(1) #elastic fraction (Cabannes) of Rayleigh (Cabannes+Raman) scattering
     bandSpecLim = []
     iBand::Array{Int,1} = []
     # F₀/SIF₀ placeholders: rt_run resizes to (pol_type.n, nSpec) before first use.
@@ -322,7 +322,7 @@ $(DocStringExtensions.FIELDS)
 """
 Base.@kwdef struct sol_VS_0to1{FT<:AbstractFloat} <: AbstractRamanType 
     "Molecular Constant for H2"
-    h2::InelasticScattering.MolecularConstants{FT}
+    h2::InelasticScattering.MolecularConstants{Float64}
     "Greek coefs in Raman calculations" 
     greek_raman::GreekCoefs
     "Pre-computed optical properties"
@@ -349,7 +349,7 @@ $(DocStringExtensions.FIELDS)
 """
 Base.@kwdef struct sol_VS_1to0{FT<:AbstractFloat} <: AbstractRamanType 
     "Molecular Constant for H2"
-    h2::InelasticScattering.MolecularConstants{FT}
+    h2::InelasticScattering.MolecularConstants{Float64}
     "Greek coefs in Raman calculations" 
     greek_raman::GreekCoefs
     "Pre-computed optical properties"
@@ -376,9 +376,9 @@ $(DocStringExtensions.FIELDS)
 """
 Base.@kwdef mutable struct RVRS{FT<:AbstractFloat} <: AbstractRamanType 
     "Molecular Constant for N2"
-    n2::InelasticScattering.MolecularConstants{FT}
+    n2::InelasticScattering.MolecularConstants{Float64}
     "Molecular Constant for O2"
-    o2::InelasticScattering.MolecularConstants{FT}
+    o2::InelasticScattering.MolecularConstants{Float64}
 
     bandSpecLim = []
     iBand::Array{Int,1} = [1]
@@ -451,7 +451,7 @@ Base.@kwdef mutable struct sol_VS_0to1_plus{FT<:AbstractFloat} <: AbstractRamanT
     grid_in::Vector{StepRangeLen{FT}} = StepRangeLen{FT}[]
 
     "Molecular Constant for H2"
-    h2::InelasticScattering.MolecularConstants{FT}
+    h2::InelasticScattering.MolecularConstants{Float64}
         
     "Greek coefs in Raman calculations" 
     greek_raman::GreekCoefs       = GreekCoefs([FT(1)], [FT(1)], [FT(1)], [FT(1)], [FT(1)], [FT(1)])
@@ -494,7 +494,7 @@ Base.@kwdef mutable struct sol_VS_1to0_plus{FT<:AbstractFloat} <: AbstractRamanT
     grid_in::Array{StepRangeLen{FT},1} 
 
     "Molecular Constant for H2"
-    h2::InelasticScattering.MolecularConstants{FT}
+    h2::InelasticScattering.MolecularConstants{Float64}
         
     "Greek coefs in Raman calculations" 
     greek_raman::GreekCoefs
