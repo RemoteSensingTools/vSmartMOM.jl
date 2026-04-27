@@ -441,6 +441,11 @@ function apply_gridlines!(Δνᵢ, σᵢ,  # discrete transitions
 end
 =#
 
+"""
+    compute_stellar_Rayl(λ₀, h2)
+
+Return the H₂ Rayleigh cross section at stellar/solar wavelength `λ₀`.
+"""
 #function compute_optical_Rayl!(grid_out,atmo_σ_Rayl, λ₀, n2, o2)
 function compute_stellar_Rayl(λ₀, h2)
     solar_σ_Rayl = h2.effCoeff.σ_Rayl_coeff #σ_out #cross section in cm^2

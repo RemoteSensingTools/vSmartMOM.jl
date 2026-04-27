@@ -6,6 +6,13 @@ It includes this module's source files and exports the relevant keywords.
  
 =#
 
+"""
+    CoreRT
+
+Core radiative-transfer implementation: model types, layer optical-property
+construction, adding-doubling kernels, surface coupling, and solver entry
+points.
+"""
 module CoreRT
 
 using UnicodePlots

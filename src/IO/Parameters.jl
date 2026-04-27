@@ -11,6 +11,21 @@ using ..Scattering: AbstractFourierDecompositionType, Aerosol
 using ..Architectures
 
 """
+    _config_error(msg)
+
+Raise a stable `ArgumentError` for invalid user configuration input.
+"""
+@inline _config_error(msg) = throw(ArgumentError(msg))
+
+"""
+    _require_config(cond, msg)
+
+Validate a user configuration condition and raise `ArgumentError` when it
+fails. This keeps parameter parsing independent of Julia's assert settings.
+"""
+@inline _require_config(cond, msg) = cond ? nothing : _config_error(msg)
+
+"""
 FLOAT_MAP
 
 Maps configuration strings to floating-point types.
@@ -106,46 +121,12 @@ Supported:
 - CoxMunkSurface(wind_speed=U) or CoxMunkSurface(U)
 """
 const BRDF_MAP = Dict{String, Function}(
-    "LambertianSurfaceScalar" => (FT, args)-> begin
-        @assert length(args) == 1 "LambertianSurfaceScalar expects 1 argument (albedo)."
-        CoreRT.LambertianSurfaceScalar(FT(args[1]))
-    end,
-    "LambertianSurfaceSpectrum" => (FT, args)-> begin
-        @assert length(args) == 1 && args[1] isa AbstractVector "LambertianSurfaceSpectrum expects 1 vector argument."
-        CoreRT.LambertianSurfaceSpectrum(convert.(FT, collect(args[1])))
-    end,
-    "LambertianSurfaceLegendre" => (FT, args)-> begin
-        @assert length(args) == 1 && args[1] isa AbstractVector "LambertianSurfaceLegendre expects 1 vector argument."
-        CoreRT.LambertianSurfaceLegendre(convert.(FT, collect(args[1])))
-    end,
-    "rpvSurfaceScalar" => (FT, args)-> begin
-        @assert length(args) == 4 "rpvSurfaceScalar expects 4 arguments (ρ₀, ρ_c, k, Θ)."
-        CoreRT.rpvSurfaceScalar(FT(args[1]), FT(args[2]), FT(args[3]), FT(args[4]))
-    end,
-    "RossLiSurfaceScalar" => (FT, args)-> begin
-        @assert length(args) == 3 "RossLiSurfaceScalar expects 3 arguments (fvol, fgeo, fiso)."
-        CoreRT.RossLiSurfaceScalar(FT(args[1]), FT(args[2]), FT(args[3]))
-    end,
-    "CoxMunkSurface" => (FT, args)-> begin
-        # Called with kwargs dict as first positional arg (from parse_surface_str)
-        # or with a single positional wind_speed
-        if length(args) == 1 && args[1] isa Dict
-            kw = args[1]
-            ws = FT(kw[:wind_speed])
-            n_raw = get(kw, :n_water, nothing)
-            n_water = n_raw === nothing ? nothing : Complex{FT}(n_raw)
-            wc_alb = FT(get(kw, :whitecap_albedo, FT(0.22)))
-            inc_wc = Bool(get(kw, :include_whitecaps, true))
-            shad   = Bool(get(kw, :shadowing, true))
-            CoreRT.CoxMunkSurface(wind_speed=ws, n_water=n_water,
-                                  whitecap_albedo=wc_alb,
-                                  include_whitecaps=inc_wc,
-                                  shadowing=shad)
-        else
-            @assert length(args) == 1 "CoxMunkSurface expects 1 argument (wind_speed) or keyword arguments."
-            CoreRT.CoxMunkSurface(wind_speed=FT(args[1]))
-        end
-    end,
+    "LambertianSurfaceScalar" => (FT, args)-> _construct_surface(Val(:LambertianSurfaceScalar), FT, args),
+    "LambertianSurfaceSpectrum" => (FT, args)-> _construct_surface(Val(:LambertianSurfaceSpectrum), FT, args),
+    "LambertianSurfaceLegendre" => (FT, args)-> _construct_surface(Val(:LambertianSurfaceLegendre), FT, args),
+    "rpvSurfaceScalar" => (FT, args)-> _construct_surface(Val(:rpvSurfaceScalar), FT, args),
+    "RossLiSurfaceScalar" => (FT, args)-> _construct_surface(Val(:RossLiSurfaceScalar), FT, args),
+    "CoxMunkSurface" => (FT, args)-> _construct_surface(Val(:CoxMunkSurface), FT, args),
 )
 
 """
@@ -249,23 +230,87 @@ function _parse_arg(arg::AbstractString, FT)
 end
 
 """
+    _require_nargs(name, args, n, detail)
+
+Validate the positional arity for an inline surface specification.
+"""
+_require_nargs(name, args, n, detail) =
+    _require_config(length(args) == n, "$(name) expects $(n) argument$(n == 1 ? "" : "s") ($(detail)).")
+
+"""
+    _construct_surface(::Val{name}, FT, args)
+
+Construct a surface from an inline YAML surface tag. New surface parsers should
+add a method for their tag instead of extending a branch inside
+`parse_surface_str`.
+"""
+function _construct_surface(::Val{:LambertianSurfaceScalar}, FT, args)
+    _require_nargs("LambertianSurfaceScalar", args, 1, "albedo")
+    return CoreRT.LambertianSurfaceScalar(FT(args[1]))
+end
+
+function _construct_surface(::Val{:LambertianSurfaceSpectrum}, FT, args)
+    _require_nargs("LambertianSurfaceSpectrum", args, 1, "albedo vector")
+    _require_config(args[1] isa AbstractVector, "LambertianSurfaceSpectrum expects 1 vector argument.")
+    return CoreRT.LambertianSurfaceSpectrum(convert.(FT, collect(args[1])))
+end
+
+function _construct_surface(::Val{:LambertianSurfaceLegendre}, FT, args)
+    _require_nargs("LambertianSurfaceLegendre", args, 1, "coefficient vector")
+    _require_config(args[1] isa AbstractVector, "LambertianSurfaceLegendre expects 1 vector argument.")
+    return CoreRT.LambertianSurfaceLegendre(convert.(FT, collect(args[1])))
+end
+
+function _construct_surface(::Val{:rpvSurfaceScalar}, FT, args)
+    _require_nargs("rpvSurfaceScalar", args, 4, "ρ₀, ρ_c, k, Θ")
+    return CoreRT.rpvSurfaceScalar(FT(args[1]), FT(args[2]), FT(args[3]), FT(args[4]))
+end
+
+function _construct_surface(::Val{:RossLiSurfaceScalar}, FT, args)
+    _require_nargs("RossLiSurfaceScalar", args, 3, "fvol, fgeo, fiso")
+    return CoreRT.RossLiSurfaceScalar(FT(args[1]), FT(args[2]), FT(args[3]))
+end
+
+function _construct_surface(::Val{:CoxMunkSurface}, FT, args)
+    if length(args) == 1 && args[1] isa AbstractDict
+        kw = args[1]
+        _require_config(haskey(kw, :wind_speed), "CoxMunkSurface keyword arguments require wind_speed.")
+        ws = FT(kw[:wind_speed])
+        n_raw = get(kw, :n_water, nothing)
+        n_water = n_raw === nothing ? nothing : Complex{FT}(n_raw)
+        wc_alb = FT(get(kw, :whitecap_albedo, FT(0.22)))
+        inc_wc = Bool(get(kw, :include_whitecaps, true))
+        shad   = Bool(get(kw, :shadowing, true))
+        return CoreRT.CoxMunkSurface(wind_speed=ws, n_water=n_water,
+                                     whitecap_albedo=wc_alb,
+                                     include_whitecaps=inc_wc,
+                                     shadowing=shad)
+    else
+        _require_nargs("CoxMunkSurface", args, 1, "wind_speed")
+        return CoreRT.CoxMunkSurface(wind_speed=FT(args[1]))
+    end
+end
+
+_construct_surface(::Val{name}, FT, args) where {name} =
+    _config_error("Unknown surface type $(name).")
+
+"""
 Parse a surface spec like "LambertianSurfaceScalar(0.1)" or
 "CoxMunkSurface(wind_speed=5.0)" into a CoreRT surface instance, without eval.
 
 Supports both positional arguments and keyword arguments (key=value syntax).
 When keyword arguments are detected, a `Dict{Symbol,Any}` is passed as the
-sole element of the args list to the BRDF_MAP constructor.
+sole element of the args list to the dispatching surface constructor.
 """
 function parse_surface_str(s::AbstractString, FT)
     # Match "Name(args)" or "Name{Type}(args)" -- strip optional type parameter
     name_args = match(r"^(\w+)(?:\{[^}]*\})?\((.*)\)$", strip(String(s)))
-    @assert name_args !== nothing "Invalid surface specification: '$(s)'"
+    _require_config(name_args !== nothing, "Invalid surface specification: '$(s)'")
     name = name_args.captures[1]
     args_raw = name_args.captures[2]
-    @assert haskey(BRDF_MAP, name) "Unknown surface type $(name)."
 
     if isempty(strip(args_raw))
-        return BRDF_MAP[name](FT, Any[])
+        return _construct_surface(Val(Symbol(name)), FT, Any[])
     end
 
     raw_parts = _split_args(args_raw)
@@ -283,25 +328,25 @@ function parse_surface_str(s::AbstractString, FT)
                 kwargs[Symbol(strip(kv[1]))] = _parse_arg(strip(kv[2]), FT)
             end
         end
-        return BRDF_MAP[name](FT, Any[kwargs])
+        return _construct_surface(Val(Symbol(name)), FT, Any[kwargs])
     else
         args_list = [_parse_arg(x, FT) for x in raw_parts]
-        return BRDF_MAP[name](FT, args_list)
+        return _construct_surface(Val(Symbol(name)), FT, args_list)
     end
 end
 
 "Check that a field exists in yaml file"
 function check_yaml_field(dict::AbstractDict, full_keys::Vector{String}, curr_keys::Vector{String}, final_type, valid_options::Vector{String})
-    @assert length(curr_keys) >= 1
+    _require_config(length(curr_keys) >= 1, "Internal error: empty YAML key path.")
     if length(curr_keys) == 1
-        @assert curr_keys[1] in keys(dict) "Missing key in parameters yaml: $(join(full_keys, '/'))"
-        @assert dict[curr_keys[1]] isa final_type "Improper type for $(join(full_keys, '/')); must be a $(final_type)" 
+        _require_config(curr_keys[1] in keys(dict), "Missing key in parameters yaml: $(join(full_keys, '/'))")
+        _require_config(dict[curr_keys[1]] isa final_type, "Improper type for $(join(full_keys, '/')); must be a $(final_type)")
         if !isempty(valid_options)
-            @assert dict[curr_keys[1]] in valid_options "Field $(join(full_keys, '/')) must be one of $(valid_options)"
+            _require_config(dict[curr_keys[1]] in valid_options, "Field $(join(full_keys, '/')) must be one of $(valid_options)")
         end
         return true
     else
-        @assert curr_keys[1] in keys(dict) "Missing key in parameters yaml: $(join(full_keys, '/'))"
+        _require_config(curr_keys[1] in keys(dict), "Missing key in parameters yaml: $(join(full_keys, '/'))")
         return check_yaml_field(dict[curr_keys[1]], full_keys, curr_keys[2:end], final_type, valid_options)
     end
 end
@@ -313,18 +358,18 @@ preferred going forward to match sanghavi's YAML convention — or as (p₀, σp
 pressure-form normal, the legacy unified convention. Exactly one form must be
 present per aerosol."
 function validate_aerosols(aerosols)
-    @assert !isempty(aerosols) "Aerosols list shouldn't be empty if scattering block is included"
+    _require_config(!isempty(aerosols), "Aerosols list shouldn't be empty if scattering block is included")
     base_fields = [(["τ_ref"], Real), (["μ"], Real), (["σ"], Real),
                    (["nᵣ"], Real), (["nᵢ"], Real)]
     for aerosol in aerosols
         for f in base_fields
             key, elty = f[1:2]
-            @assert check_yaml_field(aerosol, key, key, elty, String[])
+            check_yaml_field(aerosol, key, key, elty, String[])
         end
         has_alt  = haskey(aerosol, "z₀") && haskey(aerosol, "σ₀")
         has_pres = haskey(aerosol, "p₀") && haskey(aerosol, "σp")
-        @assert has_alt || has_pres "Aerosol must specify vertical distribution as either (z₀, σ₀) [altitude-form, preferred] or (p₀, σp) [pressure-form, legacy]"
-        @assert !(has_alt && has_pres) "Aerosol must specify exactly one of (z₀, σ₀) or (p₀, σp) — got both"
+        _require_config(has_alt || has_pres, "Aerosol must specify vertical distribution as either (z₀, σ₀) [altitude-form, preferred] or (p₀, σp) [pressure-form, legacy]")
+        _require_config(!(has_alt && has_pres), "Aerosol must specify exactly one of (z₀, σ₀) or (p₀, σp) — got both")
     end
 end
 
@@ -344,7 +389,7 @@ landing (Phase 4), whichever proves more natural."""
 function aerosol_params_to_obj(aerosols, FT)
     rt_aerosol_obj_list = RT_Aerosol{FT}[]
     for aerosol in aerosols
-        @assert aerosol["σ"] ≥ 1 "Geometric standard deviation has to be ≥ 1"
+        _require_config(aerosol["σ"] ≥ 1, "Geometric standard deviation has to be ≥ 1")
         size_distribution = LogNormal(log(FT(aerosol["μ"])), log(FT(aerosol["σ"])))
         new_aerosol_obj = Aerosol(size_distribution, FT(aerosol["nᵣ"]), FT(aerosol["nᵢ"]))
         profile = if haskey(aerosol, "z₀")
@@ -361,8 +406,8 @@ end
 "Check that the vmr's in the atmospheric profile match the molecules in the parameters" 
 function validate_vmrs(molecules::Array, vmr::Dict)
     for molec in unique(vcat(molecules...))
-        @assert molec in keys(vmr) "$(molec) listed as molecule in parameters yaml, but no vmr given in atmospheric profile"
-        @assert vmr[molec] isa Real || vmr[molec] isa Vector "The vmr for $(molec) in the atmospheric profile must either be a real-valued number, or an array of nodal points from surface to 0hPa (TOA)"
+        _require_config(molec in keys(vmr), "$(molec) listed as molecule in parameters yaml, but no vmr given in atmospheric profile")
+        _require_config(vmr[molec] isa Real || vmr[molec] isa Vector, "The vmr for $(molec) in the atmospheric profile must either be a real-valued number, or an array of nodal points from surface to 0hPa (TOA)")
     end
 end
 
@@ -403,14 +448,14 @@ function validate_yaml_parameters(params)
         top = key[1]
         if top == "absorption"
             if haskey(params, "absorption")
-                @assert check_yaml_field(params, key, key, elty, valid_options)
+                check_yaml_field(params, key, key, elty, valid_options)
             end
         elseif top == "scattering"
             if haskey(params, "scattering")
-                @assert check_yaml_field(params, key, key, elty, valid_options)
+                check_yaml_field(params, key, key, elty, valid_options)
             end
         else
-            @assert check_yaml_field(params, key, key, elty, valid_options)
+            check_yaml_field(params, key, key, elty, valid_options)
         end
     end
     if "scattering" in keys(params)
@@ -421,7 +466,7 @@ end
 "Build parameters from a Dict (e.g., parsed YAML)"
 function _parse_float_type(params_dict::Dict)
     key = String(params_dict["radiative_transfer"]["float_type"])
-    @assert haskey(FLOAT_MAP, key) "Unknown float_type $(key)."
+    _require_config(haskey(FLOAT_MAP, key), "Unknown float_type $(key).")
     return FLOAT_MAP[key]
 end
 
@@ -530,19 +575,19 @@ end
 
 function _parse_quadrature(params_dict::Dict)
     qkey = replace(String(params_dict["radiative_transfer"]["quadrature_type"]),"()"=>"")
-    @assert haskey(QUAD_MAP, qkey) "Unknown quadrature_type $(qkey)."
+    _require_config(haskey(QUAD_MAP, qkey), "Unknown quadrature_type $(qkey).")
     return QUAD_MAP[qkey]()
 end
 
 function _parse_polarization(params_dict::Dict, FT)
     pol_key = replace(String(params_dict["radiative_transfer"]["polarization_type"]),"()"=>"")
-    @assert haskey(POLARIZATION_MAP, pol_key) "Unknown polarization_type $(pol_key)."
+    _require_config(haskey(POLARIZATION_MAP, pol_key), "Unknown polarization_type $(pol_key).")
     return POLARIZATION_MAP[pol_key](FT)
 end
 
 function _parse_architecture(params_dict::Dict)
     arch_key = String(params_dict["radiative_transfer"]["architecture"]) |> x->replace(x, "Architectures."=>"") |> x->replace(x, "()"=>"")
-    @assert haskey(ARCH_MAP, arch_key) "Unknown architecture $(arch_key)."
+    _require_config(haskey(ARCH_MAP, arch_key), "Unknown architecture $(arch_key).")
     return ARCH_MAP[arch_key]()
 end
 
@@ -562,16 +607,16 @@ function _parse_absorption(params_dict::Dict, FT)
     vmr = convert(Dict{String, Union{Real, Vector}}, params_dict["absorption"]["vmr"])
     validate_vmrs(params_dict["absorption"]["molecules"], vmr)
     bkey = replace(String(params_dict["absorption"]["broadening"]),"()"=>"")
-    @assert haskey(BROADENING_MAP, bkey) "Unknown broadening $(bkey)."
+    _require_config(haskey(BROADENING_MAP, bkey), "Unknown broadening $(bkey).")
     broadening_function = BROADENING_MAP[bkey]()
     ckey = replace(String(params_dict["absorption"]["CEF"]),"()"=>"")
-    @assert haskey(CEF_MAP, ckey) "Unknown CEF $(ckey)."
+    _require_config(haskey(CEF_MAP, ckey), "Unknown CEF $(ckey).")
     CEF = CEF_MAP[ckey]()
     wing_cutoff = FT(params_dict["absorption"]["wing_cutoff"])
     luts = []
     if haskey(params_dict["absorption"], "LUTfiles")
         files_lut = Array(params_dict["absorption"]["LUTfiles"])
-        @assert size(files_lut) == size(molecules) "Size of LUTfiles has to match molecules"
+        _require_config(size(files_lut) == size(molecules), "Size of LUTfiles has to match molecules")
         for i in eachindex(files_lut)
             push!(luts, [load_interpolation_model(file) for file in files_lut[i]])
         end
@@ -606,7 +651,7 @@ function _parse_scattering(params_dict::Dict, FT::Type{<:AbstractFloat}=Float64)
     nquad_radius = params_dict["scattering"]["nquad_radius"]
     λ_ref = FTa(params_dict["scattering"]["λ_ref"])
     dkey = replace(String(params_dict["scattering"]["decomp_type"]),"()"=>"")
-    @assert haskey(DECOMP_MAP, dkey) "Unknown decomp_type $(dkey)."
+    _require_config(haskey(DECOMP_MAP, dkey), "Unknown decomp_type $(dkey).")
     decomp_type = DECOMP_MAP[dkey]()
     n_ref = if !haskey(params_dict["scattering"],"n_ref")
         aerosols[1].aerosol.nᵣ - im*aerosols[1].aerosol.nᵢ

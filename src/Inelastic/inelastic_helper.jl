@@ -10,6 +10,12 @@ const p_ref              = 1013.25  # reference pressure [hPa]
 const t_ref              = 296.0    # reference temperature [K]
 const nm_per_cm          = 1.0e7
 
+"""
+    get_n₀_n₁(arr, Δ)
+
+Return destination and source spectral index ranges for a Raman offset `Δ`
+against the third dimension of `arr`.
+"""
 function get_n₀_n₁(ieJ₁⁺, Δ)
     nSpec = size(ieJ₁⁺, 3)
     n₁_start = max(1, 1 - Δ)
@@ -315,6 +321,12 @@ function compute_ϖ_Cabannes(λ₀, mol)
     return ϖ_Cabannes;
 end
 
+"""
+    compute_γ_air_Rayleigh!(λ₀, rs_or_n2, [o2])
+
+Compute the effective Rayleigh Greek coefficient `γ` and Rayleigh cross section
+for an air mixture at wavelength `λ₀` in nm.
+"""
 # New: γ_air_Rayleigh is computed from the effective Rayleigh depolarization ratios of N₂ and O₂, which are then combined to give the effective depolarization ratio of air. 
 function compute_γ_air_Rayleigh!(λ₀::FT, RS_type::Union{RRS, VS_0to1, VS_1to0, RRS_plus, VS_0to1_plus, VS_1to0_plus}) where FT
 
@@ -337,6 +349,12 @@ function compute_γ_air_Rayleigh!(λ₀::FT, RS_type::Union{RRS, VS_0to1, VS_1to
     return γ_air_Rayleigh, σ_air_Rayleigh
 end
 
+"""
+    compute_γ_air_Cabannes!(λ₀, rs_or_n2, [o2])
+
+Compute the effective Cabannes Greek coefficient `γ` and elastic Cabannes
+fraction for an air mixture at wavelength `λ₀` in nm.
+"""
 # New: γ_air_Cabannes is computed by assuming the same form of the scattering equation (Is = σ*((1+2γ)/(3-4γ))*P*Ii*dz, see Eq.14 of Sanghavi(2022) for exact form) as for Rayleigh scattering      
 function compute_γ_air_Cabannes!(λ₀::FT, RS_type::Union{RRS, VS_0to1, VS_1to0, RRS_plus, VS_0to1_plus, VS_1to0_plus}) where FT
 
@@ -449,6 +467,12 @@ function compute_γ_air_Rayleigh_VS!(λ₀::FT) where FT
 end
 
 
+"""
+    apply_lineshape!(Δνᵢ, σᵢ, λ₀, Δν_out, σ_out, pressure, temperature, molMass; wavelength_flag=false)
+
+Broaden discrete Raman transitions onto `Δν_out`, writing cross sections into
+`σ_out` for incident wavelength `λ₀`.
+"""
 # Note: ν stands for wavenumber in the following (NOT frequency)
 function apply_lineshape!(Δνᵢ, σᵢ,  # discrete transitions
                 λ₀,                 # incident  wavelength [nm]
@@ -830,6 +854,12 @@ function get_greek_raman!(RS_type::noRS, n2, o2)
     return nothing
 end
 
+"""
+    get_greek_raman(rs, n2, o2)
+
+Return Raman phase-function Greek coefficients for rotational/rovibrational
+Raman scattering in an N₂/O₂ atmosphere.
+"""
 # the following applies to both rovibrational and rotational Raman scattering (by both N2 and O2)
 function get_greek_raman(RS_type::Union{RRS, RRS_plus, VS_0to1, VS_0to1_plus, VS_1to0, VS_1to0_plus}, 
                             n2, o2)
@@ -851,6 +881,12 @@ function get_greek_raman(RS_type::Union{RRS, RRS_plus, VS_0to1, VS_0to1_plus, VS
     #return nothing
 end
 
+"""
+    get_greek_raman_VS(rs, molecule)
+
+Return vibrational Raman phase-function Greek coefficients for one molecular
+species.
+"""
 function get_greek_raman_VS(RS_type::Union{VS_0to1, VS_0to1_plus, VS_1to0, VS_1to0_plus}, 
                             in_molec)
     
@@ -911,7 +947,6 @@ function computeRamanZλ!(RS_type::AbstractRamanType, pol_type, qp_μ, m, arr_ty
                                         arr_type = arr_type);      
     nothing
 end
-
 
 
 

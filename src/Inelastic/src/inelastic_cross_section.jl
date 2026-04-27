@@ -24,6 +24,12 @@ CPU-side molecular cross-section precomputations.
 """
 @inline _rovib_prefactor64() = (256 / 27) * Float64(π)^5
 
+"""
+    compute_effective_coefficents!(ν_eff, T, mol)
+
+Update molecular effective polarizability, anisotropy, depolarization, and
+Greek-coefficient factors at effective wavenumber `ν_eff` and temperature `T`.
+"""
 function compute_effective_coefficents!(ν_eff, T, mol::MolecularConstants{FT}) where {FT}#molecules::Array{MolecularConstants{FT}}) where {FT}   
     #@unpack Y = mol
     @unpack α̅,  γ̅, α_prime, γ_prime, ϵ, ϵ_prime = mol.effCoeff
@@ -54,6 +60,11 @@ function compute_effective_coefficents!(ν_eff, T, mol::MolecularConstants{FT}) 
         α̅, γ̅, α_prime, γ_prime, ϵ, ϵ_prime, γ_C_Rayl, γ_C_RotRaman, γ_C_VibRaman, γ_C_RoVibRaman
 end
 
+"""
+    compute_σ_Rayl_coeff!(mol)
+
+Update the molecular Rayleigh cross-section prefactor stored on `mol`.
+"""
 #Compute elastic scattering cross-section (Cabannes line)
 function compute_σ_Rayl_coeff!(mol::MolecularConstants{FT}) where {FT}#ν, molecules::Array{MolecularConstants{FT}}) where {FT}
     @unpack α̅, γ_C_Rayl, σ_Rayl_coeff = mol.effCoeff
@@ -63,6 +74,12 @@ function compute_σ_Rayl_coeff!(mol::MolecularConstants{FT}) where {FT}#ν, mole
     @pack! mol.effCoeff = σ_Rayl_coeff,α̅,γ_C_Rayl
 end
 
+"""
+    compute_σ_Rayl_VibRaman_coeff_hires!(T, mol; Jmax=30)
+
+Update high-resolution Rayleigh and vibrational Raman transition prefactors
+over rotational levels up to `Jmax`.
+"""
 #Compute elastic scattering cross-section (Cabannes line)
 function compute_σ_Rayl_VibRaman_coeff_hires!(T, mol::MolecularConstants{FT}; Jmax=30) where {FT}#ν, molecules::Array{MolecularConstants{FT}}) where {FT}
     @unpack α̅, γ̅, α_prime, γ_prime, E_vJ, σ_Rayl_coeff_hires, σ_VibRaman_coeff_0to1_hires, σ_VibRaman_coeff_1to0_hires, Δν̃_Rayl_coeff_hires, Δν̃_VibRaman_coeff_0to1_hires, Δν̃_VibRaman_coeff_1to0_hires = mol.effCoeff
@@ -135,6 +152,12 @@ function compute_σ_Rayl_VibRaman_coeff_hires!(T, mol::MolecularConstants{FT}; J
     @pack! mol.effCoeff = σ_Rayl_coeff_hires, σ_VibRaman_coeff_0to1_hires, σ_VibRaman_coeff_1to0_hires, Δν̃_Rayl_coeff_hires, Δν̃_VibRaman_coeff_0to1_hires, Δν̃_VibRaman_coeff_1to0_hires
 end
 
+"""
+    compute_energy_levels!(mol; vmax=2, Jmax=30)
+
+Populate molecular vibrational/rotational energy levels in cm⁻¹ for
+`v = 0:vmax` and `J = 0:Jmax`.
+"""
 #Compute energy levels [in wavenumbers [cm^{-1}]] corresponding to v={0, 1, 2} and J={0, 1, 2,..., 10}
 function compute_energy_levels!(mol::MolecularConstants{FT}; vmax=2, Jmax=30) where {FT}#molecules::Array{MolecularConstants{FT}}) where {FT}
     #for mol in molecules
@@ -158,6 +181,12 @@ function compute_energy_levels!(mol::MolecularConstants{FT}; vmax=2, Jmax=30) wh
     #end
 end
 
+"""
+    compute_σ_VibRaman_coeff!(T, mol; vmax=2, Jmax=30)
+
+Update Stokes and anti-Stokes vibrational Raman cross-section prefactors for
+`mol` at temperature `T`.
+"""
 #Compute vibrational Raman scattering coefficient (for Δν=±1)
 function compute_σ_VibRaman_coeff!(T, mol::MolecularConstants{FT}; vmax=2, Jmax=30) where {FT}#ν, molecules::Array{MolecularConstants{FT}}) where {FT}
     @unpack α_prime, γ_C_VibRaman, E_vJ,σ_VibRaman_coeff_0to1,σ_VibRaman_coeff_1to0, Δν̃_VibRaman_coeff_0to1, Δν̃_VibRaman_coeff_1to0 = mol.effCoeff
@@ -184,6 +213,12 @@ function compute_σ_VibRaman_coeff!(T, mol::MolecularConstants{FT}; vmax=2, Jmax
     @pack! mol.effCoeff = σ_VibRaman_coeff_0to1, σ_VibRaman_coeff_1to0, Δν̃_VibRaman_coeff_0to1, Δν̃_VibRaman_coeff_1to0
 end
 
+"""
+    compute_σ_RoVibRaman_coeff!(T, mol; vmax=2, Jmax=30)
+
+Update rotational and rovibrational Raman transition prefactors for `mol` at
+temperature `T`.
+"""
 function compute_σ_RoVibRaman_coeff!(T, mol::MolecularConstants{FT}; vmax=2, Jmax=30) where {FT}#molecules::Array{MolecularConstants{FT}}) where {FT}
     kᵥ = _rovib_prefactor64()
     #for mol in molecules
