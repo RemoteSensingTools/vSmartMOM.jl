@@ -120,7 +120,7 @@ end
     #end
     #i_ϖ = i_ref + i_λ₁λ₀[Δn]
     #@show   n₀ , i_ϖ 
-    if (1 ≤ n₀ ≤ nMax) & (wct2[j]>1.e-8) 
+    if (1 ≤ n₀ ≤ nMax) & (wct2[j] > rt_weight_tol(eltype(wct2)))
 
         # dτ₀, dτ₁ are the purely scattering (elastic+inelastic) molecular elemental 
         # optical thicknesses at wavelengths λ₀ and λ₁
@@ -137,10 +137,10 @@ end
             # @show i,j
             # 𝐓⁺⁺(μᵢ, μᵢ) = (exp{-τ/μᵢ} + ϖ ̇𝐙⁺⁺(μᵢ, μᵢ) ̇(τ/μᵢ) ̇exp{-τ/μᵢ}) ̇𝑤ᵢ
             if i == j       
-                if abs(dτ_λ[n₀]-dτ_λ[n₁])>1.e-6
+                if abs(dτ_λ[n₀]-dτ_λ[n₁]) > rt_loose_tol(eltype(dτ_λ))
                     iet⁺⁺[i,j,n₁,Δn] = 
                         ϖ_λ₁λ₀[Δn] * ϖ_λ[n₀] * fscattRayl * Z⁺⁺_λ₁λ₀[i,i] * wct2[i] *
-                        (exp(-dτ_λ[n₀] / qp_μN[i]) - exp(-dτ_λ[n₁] / qp_μN[i]))/
+                        expdiff_neg(dτ_λ[n₀] / qp_μN[i], dτ_λ[n₁] / qp_μN[i])/
                         (1 - (dτ_λ[n₁]/dτ_λ[n₀]))                         
                 else    
                     iet⁺⁺[i,j,n₁,Δn] = 
@@ -157,7 +157,7 @@ end
             iet⁺⁺[i,j,n₁,Δn] = 
                 ϖ_λ₁λ₀[Δn] * ϖ_λ[n₀] * fscattRayl * Z⁺⁺_λ₁λ₀[i,j] * 
                 (1 / ( (qp_μN[i]/qp_μN[j]) - (dτ_λ[n₁]/dτ_λ[n₀]) )) * wct2[j] * 
-                (exp(-dτ_λ[n₁] / qp_μN[i]) - exp(-dτ_λ[n₀] / qp_μN[j]))
+                expdiff_neg(dτ_λ[n₁] / qp_μN[i], dτ_λ[n₀] / qp_μN[j])
         end
     else
         ier⁻⁺[i,j,n₁,Δn] = 0.0
@@ -296,7 +296,7 @@ end
     n₁ = i_λ₁λ₀[Δn]  
     #@show i,j,n₁,Δn
     if n₁ >0
-        if (wct2[j]>1.e-8)
+        if (wct2[j] > rt_weight_tol(eltype(wct2)))
             
             # dτ₀, dτ₁ are the purely scattering (elastic+inelastic) molecular elemental 
             # optical thicknesses at wavelengths λ₀ and λ₁
@@ -315,10 +315,10 @@ end
                 # @show i,j
                 # 𝐓⁺⁺(μᵢ, μᵢ) = (exp{-τ/μᵢ} + ϖ ̇𝐙⁺⁺(μᵢ, μᵢ) ̇(τ/μᵢ) ̇exp{-τ/μᵢ}) ̇𝑤ᵢ
                 #if i == j       
-                if abs(dτ[n₀]-dτ[n₁])>1.e-8
+                if abs(dτ[n₀]-dτ[n₁]) > rt_close_tol(eltype(dτ))
                     iet⁺⁺[i,j,n₁,1] += 
                         ϖ_λ₁λ₀[Δn] * fscattRayl[n₀] * Z⁺⁺_λ₁λ₀[i,j] * wct2[j] *
-                        (exp(-dτ[n₁] / qp_μN[i]) - exp(-dτ[n₀] / qp_μN[j]))/
+                        expdiff_neg(dτ[n₁] / qp_μN[i], dτ[n₀] / qp_μN[j])/
                         (1 - (dτ[n₁]/dτ[n₀]))  
                 else    
                     iet⁺⁺[i,j,n₁,1] += 
@@ -333,7 +333,7 @@ end
                 #@show  qp_μN[i], qp_μN[j]  
                 # 𝐓⁺⁺(μᵢ, μⱼ) = ϖ ̇𝐙⁺⁺(μᵢ, μⱼ) ̇(μⱼ/(μᵢ-μⱼ)) ̇(exp{-τ/μᵢ} - exp{-τ/μⱼ}) ̇𝑤ⱼ
                 # (𝑖 ≠ 𝑗)
-                if (abs( (qp_μN[i]/qp_μN[j]) - (dτ[n₁]/dτ[n₀]) ) < 1.e-8)
+                if (abs( (qp_μN[i]/qp_μN[j]) - (dτ[n₁]/dτ[n₀]) ) < rt_close_tol(eltype(dτ)))
                     iet⁺⁺[i,j,n₁,1] = 
                         (dτ[n₀]/qp_μN[i]) * ϖ_λ₁λ₀[Δn] * fscattRayl[n₀] * 
                         Z⁺⁺_λ₁λ₀[i,j] * 
@@ -343,7 +343,7 @@ end
                             ϖ_λ₁λ₀[Δn] * fscattRayl[n₀] * Z⁺⁺_λ₁λ₀[i,j] * 
                             (1 / ( (qp_μN[i]/qp_μN[j]) - (dτ[n₁]/dτ[n₀]) )) * 
                             wct2[j] * 
-                            (exp(-dτ[n₁] / qp_μN[i]) - exp(-dτ[n₀] / qp_μN[j]))
+                            expdiff_neg(dτ[n₁] / qp_μN[i], dτ[n₀] / qp_μN[j])
                 end
             end
         else
@@ -463,10 +463,10 @@ end
         if (i_start ≤ i ≤ i_end)
             #ctr = i-i_start+1
             # J₀⁺ = 0.25*(1+δ(m,0)) * ϖ(λ) * Z⁺⁺ * I₀ * (dτ(λ)/μ₀) * exp(-dτ(λ)/μ₀)
-            if abs(dτ[n₀]-dτ[n₁])>1.e-8
+            if abs(dτ[n₀]-dτ[n₁]) > rt_close_tol(eltype(dτ))
                 ieJ₀⁺[i, 1, n₁, 1] = 
                         ϖ_λ₁λ₀[Δn] * fscattRayl[n₀] * Z⁺⁺_I₀ * wct02 *
-                        (exp(-dτ[n₁] / qp_μN[i]) - exp(-dτ[n₀] / qp_μN[i])) /
+                        expdiff_neg(dτ[n₁] / qp_μN[i], dτ[n₀] / qp_μN[i]) /
                         (1-(dτ[n₁]/dτ[n₀])) 
                         
             else
@@ -477,7 +477,7 @@ end
             end
         else
             # J₀⁺ = 0.25*(1+δ(m,0)) * ϖ(λ) * Z⁺⁺ * I₀ * [μ₀ / (μᵢ - μ₀)] * [exp(-dτ(λ)/μᵢ) - exp(-dτ(λ)/μ₀)]
-            if (abs( (qp_μN[i]/qp_μN[i_start]) - (dτ[n₁]/dτ[n₀]) ) < 1.e-8)
+            if (abs( (qp_μN[i]/qp_μN[i_start]) - (dτ[n₁]/dτ[n₀]) ) < rt_close_tol(eltype(dτ)))
                 ieJ₀⁺[i, 1, n₁, 1] = 
                     (dτ[n₀]/qp_μN[i]) * wct02 * ϖ_λ₁λ₀[Δn] * fscattRayl[n₀] * 
                     Z⁺⁺_I₀ * 
@@ -486,7 +486,7 @@ end
             ieJ₀⁺[i, 1, n₁, 1] = 
                         wct02 * ϖ_λ₁λ₀[Δn] * fscattRayl[n₀] * Z⁺⁺_I₀ * 
                         (1 /( (qp_μN[i]/qp_μN[i_start]) - (dτ[n₁]/dτ[n₀]) ) ) * 
-                        (exp(-dτ[n₁] / qp_μN[i]) - exp(-dτ[n₀] / qp_μN[i_start]))  
+                        expdiff_neg(dτ[n₁] / qp_μN[i], dτ[n₀] / qp_μN[i_start])
             end
         end
         #TODO
@@ -563,9 +563,9 @@ end
         if (i_start ≤ i ≤ i_end)
             #ctr = i-i_start+1
             # J₀⁺ = 0.25*(1+δ(m,0)) * ϖ(λ) * Z⁺⁺ * I₀ * (dτ(λ)/μ₀) * exp(-dτ(λ)/μ₀)
-            if abs(dτ_λ[n₀]-dτ_λ[n₁])>1.e-6
+            if abs(dτ_λ[n₀]-dτ_λ[n₁]) > rt_loose_tol(eltype(dτ_λ))
                 ieJ₀⁺[i, 1, n₁, Δn] = 
-                        (exp(-dτ_λ[n₀] / qp_μN[i]) - exp(-dτ_λ[n₁] / qp_μN[i])) /
+                        expdiff_neg(dτ_λ[n₀] / qp_μN[i], dτ_λ[n₁] / qp_μN[i]) /
                         ((dτ_λ[n₁]/dτ_λ[n₀])-1) * 
                         ϖ_λ₁λ₀[Δn] * ϖ_λ[n₀] * fscattRayl * Z⁺⁺_I₀ * wct02
             else
@@ -578,7 +578,7 @@ end
             ieJ₀⁺[i, 1, n₁, Δn] = 
                     wct02 * ϖ_λ₁λ₀[Δn] * ϖ_λ[n₀] * fscattRayl * Z⁺⁺_I₀ * 
                     (1 /( (qp_μN[i]/qp_μN[i_start]) - (dτ_λ[n₁]/dτ_λ[n₀]) ) ) * 
-                    (exp(-dτ_λ[n₁] / qp_μN[i]) - exp(-dτ_λ[n₀] / qp_μN[i_start]))
+                    expdiff_neg(dτ_λ[n₁] / qp_μN[i], dτ_λ[n₀] / qp_μN[i_start])
         end
         #TODO
         #J₀⁻ = 0.25*(1+δ(m,0)) * ϖ(λ) * Z⁻⁺ * I₀ * [μ₀ / (μᵢ + μ₀)] * [1 - exp{-dτ(λ)(1/μᵢ + 1/μ₀)}]                    

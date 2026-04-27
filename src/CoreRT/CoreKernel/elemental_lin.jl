@@ -259,7 +259,7 @@ end
                 ϖ_λ[n] * Z⁺⁺[i,j,n2] * 
                 #Z⁺⁺[i,j] * 
                 (qp_μN[j] / (qp_μN[i] - qp_μN[j])) * wct[j] * 
-                (exp(-dτ_λ[n] / qp_μN[i]) - exp(-dτ_λ[n] / qp_μN[j])) 
+                expdiff_neg(dτ_λ[n] / qp_μN[i], dτ_λ[n] / qp_μN[j])
             # derivative wrt τ_λ
             ṫ⁺⁺[i,j,n,1] = -ϖ_λ[n] * Z⁺⁺[i,j,n2] * 
                 (qp_μN[j] / (qp_μN[i] - qp_μN[j])) * wct[j] * 
@@ -271,7 +271,7 @@ end
             # derivative wrt Z: direct formula avoids 0/0
             ṫ⁺⁺[i,j,n,3] = ϖ_λ[n] * 
                 (qp_μN[j] / (qp_μN[i] - qp_μN[j])) * wct[j] * 
-                (exp(-dτ_λ[n] / qp_μN[i]) - exp(-dτ_λ[n] / qp_μN[j]))
+                expdiff_neg(dτ_λ[n] / qp_μN[i], dτ_λ[n] / qp_μN[j])
         end
     else
         #r⁻⁺[i,j,n] = 0.0
@@ -335,7 +335,7 @@ end
     else
         # J₀⁺ = 0.25*(1+δ(m,0)) * ϖ(λ) * Z⁺⁺ * I₀ * [μ₀ / (μᵢ - μ₀)] * [exp(-dτ(λ)/μᵢ) - exp(-dτ(λ)/μ₀)]
         J₀⁺[i, 1, n] = wct02 * ϖ_λ[n] * Z⁺⁺_I₀ * 
-            (qp_μN[i_start] / (qp_μN[i] - qp_μN[i_start])) * (exp(-dτ_λ[n] / qp_μN[i]) - exp(-dτ_λ[n] / qp_μN[i_start]))
+            (qp_μN[i_start] / (qp_μN[i] - qp_μN[i_start])) * expdiff_neg(dτ_λ[n] / qp_μN[i], dτ_λ[n] / qp_μN[i_start])
         # derivative wrt τ
         J̇₀⁺[i, 1, n, 1] = - wct02 * ϖ_λ[n] * Z⁺⁺_I₀ * (qp_μN[i_start] / (qp_μN[i] - qp_μN[i_start])) * 
             (exp(-dτ_λ[n] / qp_μN[i]) / qp_μN[i] - exp(-dτ_λ[n] / qp_μN[i_start]) / qp_μN[i_start])
@@ -489,7 +489,7 @@ compatibility with the 3-core doubling path.
             t⁺⁺[i,j,n] =
                 ϖ_λ[n] * Z⁺⁺[i,j,n2] *
                 (qp_μN[j] / (qp_μN[i] - qp_μN[j])) * wct[j] *
-                (exp(-dτ_λ[n] / qp_μN[i]) - exp(-dτ_λ[n] / qp_μN[j]))
+                expdiff_neg(dτ_λ[n] / qp_μN[i], dτ_λ[n] / qp_μN[j])
             ṫ_tau = -ϖ_λ[n] * Z⁺⁺[i,j,n2] *
                 (qp_μN[j] / (qp_μN[i] - qp_μN[j])) * wct[j] *
                 (exp(-dτ_λ[n] / qp_μN[i])/ qp_μN[i] -
@@ -497,7 +497,7 @@ compatibility with the 3-core doubling path.
             ṫ_w = ϖ_λ[n] == 0 ? FT(0) : t⁺⁺[i,j,n] / ϖ_λ[n]
             ṫ_Z = ϖ_λ[n] *
                 (qp_μN[j] / (qp_μN[i] - qp_μN[j])) * wct[j] *
-                (exp(-dτ_λ[n] / qp_μN[i]) - exp(-dτ_λ[n] / qp_μN[j]))
+                expdiff_neg(dτ_λ[n] / qp_μN[i], dτ_λ[n] / qp_μN[j])
         end
 
         # Write 3-core (backward compat)
@@ -591,7 +591,7 @@ Eliminates the separate chain-rule pass for SFI terms and the per-parameter
         J̇⁺_Z = Z⁺⁺_I₀ == 0 ? FT(0) : J₀⁺[i, 1, n] / Z⁺⁺_I₀
     else
         J₀⁺[i, 1, n] = wct02 * ϖ_λ[n] * Z⁺⁺_I₀ *
-            (qp_μN[i_start] / (qp_μN[i] - qp_μN[i_start])) * (exp(-dτ_λ[n] / qp_μN[i]) - exp(-dτ_λ[n] / qp_μN[i_start]))
+            (qp_μN[i_start] / (qp_μN[i] - qp_μN[i_start])) * expdiff_neg(dτ_λ[n] / qp_μN[i], dτ_λ[n] / qp_μN[i_start])
         J̇⁺_tau = - wct02 * ϖ_λ[n] * Z⁺⁺_I₀ * (qp_μN[i_start] / (qp_μN[i] - qp_μN[i_start])) *
             (exp(-dτ_λ[n] / qp_μN[i]) / qp_μN[i] - exp(-dτ_λ[n] / qp_μN[i_start]) / qp_μN[i_start])
         J̇⁺_w = ϖ_λ[n] == 0 ? FT(0) : J₀⁺[i, 1, n] / ϖ_λ[n]

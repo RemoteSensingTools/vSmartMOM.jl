@@ -24,6 +24,60 @@ Quadrature weights scaled by the azimuthal Fourier factor:
 @inline scaled_weights(m::Int, wt_μN) = m == 0 ? wt_μN / 2 : wt_μN / 4
 
 """
+    expdiff_neg(a, b)
+
+Stably compute `exp(-a) - exp(-b)` for nearby positive optical-depth
+arguments without losing the small difference to cancellation.
+"""
+@inline function expdiff_neg(a, b)
+    if a == b
+        return zero(a - b)
+    elseif a < b
+        return exp(-a) * (-expm1(-(b - a)))
+    else
+        return -exp(-b) * (-expm1(-(a - b)))
+    end
+end
+
+"""
+    rt_tol(FT, x)
+
+Cast a scalar tolerance to the kernel element type. Use this in GPU-facing
+kernels instead of Float64 literals so Float32 kernels stay Float32.
+"""
+@inline rt_tol(::Type{FT}, x) where {FT} = FT(x)
+
+"""
+    rt_weight_tol(FT)
+
+Return the same-type cutoff for ignoring effectively zero quadrature weights
+inside elemental kernels.
+"""
+@inline rt_weight_tol(::Type{FT}) where {FT} = rt_tol(FT, 1e-8)
+@inline rt_weight_tol(::Type{Float32}) = 1f-8
+@inline rt_weight_tol(::Type{Float64}) = 1e-8
+
+"""
+    rt_close_tol(FT)
+
+Return the same-type near-singularity tolerance used by elemental Raman branch
+checks that historically used `1e-8`.
+"""
+@inline rt_close_tol(::Type{FT}) where {FT} = rt_tol(FT, 1e-8)
+@inline rt_close_tol(::Type{Float32}) = 1f-8
+@inline rt_close_tol(::Type{Float64}) = 1e-8
+
+"""
+    rt_loose_tol(FT)
+
+Return the same-type near-singularity tolerance used by elemental Raman branch
+checks that historically used `1e-6`.
+"""
+@inline rt_loose_tol(::Type{FT}) where {FT} = rt_tol(FT, 1e-6)
+@inline rt_loose_tol(::Type{Float32}) = 1f-6
+@inline rt_loose_tol(::Type{Float64}) = 1e-6
+
+"""
     compute_geometric_progression!(gp_refl, tt_gp, r⁻⁺, t⁺⁺, I_static, temp1_ptr, temp2_ptr)
 
 Compute the geometric-progression factor `(I - R·R)⁻¹` and pre-multiply by `T⁺⁺`.
