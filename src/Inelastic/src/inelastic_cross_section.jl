@@ -133,7 +133,7 @@ function compute_σ_VibRaman_coeff!(T, mol::MolecularConstants{FT}; vmax=2, Jmax
     #Stokes
     vi = 0
     Δν̃ = E_vJ[1,0]-E_vJ[0,0]
-    Nvib = (1 - exp(-h*c*Δν̃/(k_B*T)))^(-1)
+    Nvib = (-expm1(-h*c*Δν̃/(k_B*T)))^(-1)
     #sq_bₖ = h/(8π²c*E_νJ[vi,0])#bₖ = √(h/8π²cνₖ)
     σ_VibRaman_coeff_0to1 = 128π^5 * α_prime^2 * Nvib * (1+2*γ_C_VibRaman)/(3-4*γ_C_VibRaman) 
     Δν̃_VibRaman_coeff_0to1 = -Δν̃

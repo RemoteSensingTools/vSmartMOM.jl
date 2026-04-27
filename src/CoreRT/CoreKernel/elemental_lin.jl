@@ -197,7 +197,7 @@ end
             ϖ_λ[n] * Z⁻⁺[i,j,n2] * 
             #Z⁻⁺[i,j] * 
             (qp_μN[j] / (qp_μN[i] + qp_μN[j])) * wct[j] * 
-            (1 - exp(-dτ_λ[n] * ((1 / qp_μN[i]) + (1 / qp_μN[j])))) 
+            -expm1(-dτ_λ[n] * ((1 / qp_μN[i]) + (1 / qp_μN[j])))
         # derivative wrt τ_λ
         ṙ⁻⁺[i,j,n,1] = 
             ϖ_λ[n] * Z⁻⁺[i,j,n2] * 
@@ -209,7 +209,7 @@ end
         # derivative wrt Z: direct formula avoids 0/0 when Z=0
         ṙ⁻⁺[i,j,n,3] = ϖ_λ[n] * 
             (qp_μN[j] / (qp_μN[i] + qp_μN[j])) * wct[j] * 
-            (1 - exp(-dτ_λ[n] * ((1 / qp_μN[i]) + (1 / qp_μN[j]))))
+            -expm1(-dτ_λ[n] * ((1 / qp_μN[i]) + (1 / qp_μN[j])))
                     
         if (qp_μN[i] == qp_μN[j])
             # 𝐓⁺⁺(μᵢ, μᵢ) = (exp{-τ/μᵢ}(1 + ϖ ̇𝐙⁺⁺(μᵢ, μᵢ) ̇(τ/μᵢ))) ̇𝑤ᵢ
@@ -346,7 +346,7 @@ end
     end
     #J₀⁻ = 0.25*(1+δ(m,0)) * ϖ(λ) * Z⁻⁺ * I₀ * [μ₀ / (μᵢ + μ₀)] * [1 - exp{-dτ(λ)(1/μᵢ + 1/μ₀)}]
     J₀⁻[i, 1, n] = wct02 * ϖ_λ[n] * Z⁻⁺_I₀ * (qp_μN[i_start] / (qp_μN[i] + qp_μN[i_start])) * 
-            (1 - exp(-dτ_λ[n] * ((1 / qp_μN[i]) + (1 / qp_μN[i_start]))))
+            -expm1(-dτ_λ[n] * ((1 / qp_μN[i]) + (1 / qp_μN[i_start])))
     # derivative wrt τ
     J̇₀⁻[i, 1, n, 1] = wct02 * ϖ_λ[n] * Z⁻⁺_I₀ * (qp_μN[i_start] / (qp_μN[i] + qp_μN[i_start])) * 
             exp(-dτ_λ[n] * ((1 / qp_μN[i]) + (1 / qp_μN[i_start]))) *
@@ -445,7 +445,7 @@ compatibility with the 3-core doubling path.
         r⁻⁺[i,j,n] =
             ϖ_λ[n] * Z⁻⁺[i,j,n2] *
             (qp_μN[j] / (qp_μN[i] + qp_μN[j])) * wct[j] *
-            (1 - exp(-dτ_λ[n] * ((1 / qp_μN[i]) + (1 / qp_μN[j]))))
+            -expm1(-dτ_λ[n] * ((1 / qp_μN[i]) + (1 / qp_μN[j])))
 
         ṙ_tau = ϖ_λ[n] * Z⁻⁺[i,j,n2] *
             (1/qp_μN[i]) * wct[j] *
@@ -453,7 +453,7 @@ compatibility with the 3-core doubling path.
         ṙ_w = ϖ_λ[n] == 0 ? FT(0) : r⁻⁺[i,j,n] / ϖ_λ[n]
         ṙ_Z = ϖ_λ[n] *
             (qp_μN[j] / (qp_μN[i] + qp_μN[j])) * wct[j] *
-            (1 - exp(-dτ_λ[n] * ((1 / qp_μN[i]) + (1 / qp_μN[j]))))
+            -expm1(-dτ_λ[n] * ((1 / qp_μN[i]) + (1 / qp_μN[j])))
 
         # Write 3-core (backward compat)
         ṙ⁻⁺[i,j,n,1] = ṙ_tau
@@ -600,7 +600,7 @@ Eliminates the separate chain-rule pass for SFI terms and the per-parameter
 
     # ---- J₀⁻ and 3-core scalars ----
     J₀⁻[i, 1, n] = wct02 * ϖ_λ[n] * Z⁻⁺_I₀ * (qp_μN[i_start] / (qp_μN[i] + qp_μN[i_start])) *
-            (1 - exp(-dτ_λ[n] * ((1 / qp_μN[i]) + (1 / qp_μN[i_start]))))
+            -expm1(-dτ_λ[n] * ((1 / qp_μN[i]) + (1 / qp_μN[i_start])))
     J̇⁻_tau = wct02 * ϖ_λ[n] * Z⁻⁺_I₀ * (qp_μN[i_start] / (qp_μN[i] + qp_μN[i_start])) *
             exp(-dτ_λ[n] * ((1 / qp_μN[i]) + (1 / qp_μN[i_start]))) *
             ((1 / qp_μN[i]) + (1 / qp_μN[i_start]))
