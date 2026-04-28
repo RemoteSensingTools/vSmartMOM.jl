@@ -88,10 +88,9 @@ function build()
         modules = [vSmartMOM],
         pages = pages,
         checkdocs = :exports,
-        # Keep known legacy docs debt non-fatal while still failing on new
-        # doctest/eval/parse errors. These classes cover duplicate @docs
-        # blocks, missing-doc coverage, and stale tutorial image links.
-        warnonly = [:docs_block, :missing_docs, :cross_references],
+        # Keep the remaining missing-doc coverage debt non-fatal while making
+        # docs-block and cross-reference regressions fail the build.
+        warnonly = [:missing_docs],
     )
 
 end
