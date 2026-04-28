@@ -339,8 +339,8 @@ end
 Run the single-scatter approximation forward RT solver for one or more bands.
 
 Computes only the single-scattering component of the TOA reflectance /
-BOA transmittance by replacing the layer-doubling kernel with
-[`rt_kernel_ss!`](@ref) and using [`interaction_ss!`](@ref) for the final
+BOA transmittance by replacing the layer-doubling kernel with `rt_kernel_ss!`
+and using `interaction_ss!` for the final
 surface coupling. Useful as a fast/debug reference path; not a physically
 complete RT solution (multiple scattering is dropped).
 
