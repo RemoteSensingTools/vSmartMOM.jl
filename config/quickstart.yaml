@@ -1,0 +1,31 @@
+# Tiny CPU-only scene used by the documentation quick start.
+#
+# It intentionally avoids HITRAN absorption and aerosol Mie calculations so a
+# first run only exercises the core Rayleigh adding-doubling path.
+
+radiative_transfer:
+  spec_bands:
+    - "[12987.0]"
+
+  surface:
+    - LambertianSurfaceScalar(0.15)
+
+  quadrature_type:    GaussQuadHemisphere()
+  polarization_type:  Stokes_I()
+  max_m:              1
+  Δ_angle:            2.0
+  l_trunc:            1
+  depol:              -1
+  float_type:         Float64
+  architecture:       CPU()
+
+geometry:
+  sza:     60.0
+  vza:     [60.0]
+  vaz:     [180.0]
+  obs_alt: 1000.0
+
+atmospheric_profile:
+  T: [250.0, 275.0]
+  p: [100.0, 500.0, 1000.0]
+  profile_reduction: -1

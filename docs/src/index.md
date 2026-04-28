@@ -14,16 +14,17 @@ vSmartMOM supports Julia 1.10 or later.
 pkg> add vSmartMOM
 ```
 
-## Smallest Entry Point
+## Smallest Complete Run
 
 ```julia
 using vSmartMOM
 
-params = default_parameters()
-params.architecture = vSmartMOM.Architectures.CPU()
+params = read_parameters(joinpath(pkgdir(vSmartMOM), "config", "quickstart.yaml"))
+model = model_from_parameters(params)
+R, T = rt_run(model)
 ```
 
-`params` is a mutable scene description: atmosphere, surface, geometry, spectral grid, gases, aerosols, solver settings, and compute architecture. The [Quick Start](pages/quickstart.md) shows the first full `model_from_parameters` and `rt_run` workflow on a small CPU scene.
+`R` is top-of-atmosphere reflectance and `T` is bottom-of-atmosphere transmittance, both shaped as view zenith angle × Stokes component × spectral point. The [Quick Start](pages/quickstart.md) walks through the same CPU scene step by step.
 
 ## Where To Go
 
