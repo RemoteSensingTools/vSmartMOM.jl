@@ -2,28 +2,24 @@
 
 ## Downloading HITRAN Data
 
-```@docs
-artifact
-```
+Use `artifact("CO2")`, `artifact("H2O")`, and related artifact names to resolve
+packaged HITRAN `.par` files. See [HITRAN Data Management](HITRAN_Data.md) and
+the [API Reference](../api_reference.md) for the canonical artifact helpers.
 
 ## Reading HITRAN Files
 
-```@docs
-read_hitran
-```
+Use `read_hitran` to select molecule/isotopologue records and spectral windows
+from HITRAN `.par` files.
 
 ## Defining Models with Cross-Section Parameters
 
-```@docs
-make_hitran_model
-make_interpolation_model
-```
+Use `make_hitran_model` for line-by-line cross sections and
+`make_interpolation_model` for lookup-table interpolation workflows.
 
 ## Computing Absorption Cross-Sections
 
-```@docs
-absorption_cross_section
-```
+Use `absorption_cross_section(model, ν, pressure, temperature)` to evaluate the
+selected line-shape or interpolation model on a wavenumber grid.
 
 ## Types
 
@@ -34,11 +30,9 @@ HitranTable
 ```
 
 ### Broadening Function Types
-```@docs
-Doppler
-Lorentz
-Voigt
-```
+
+The primary broadening models are `Doppler`, `Lorentz`, and `Voigt`. The
+canonical docstrings are grouped in the [API Reference](../api_reference.md).
 
 ### Complex Error Function Types
 
@@ -58,4 +52,3 @@ ErfcErrorFunction
 HitranModel
 InterpolationModel
 ```
-

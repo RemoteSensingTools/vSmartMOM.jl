@@ -244,13 +244,6 @@ Pkg.gc()  # removes unused artifacts
 
 ## API Reference
 
-```@docs
-vSmartMOM.artifact
-vSmartMOM.fetch_hitran
-vSmartMOM.fetch_hitran_by_ids
-vSmartMOM.set_hitran_edition!
-vSmartMOM.get_hitran_edition
-vSmartMOM.available_hitran_editions
-vSmartMOM.hitran_info
-vSmartMOM.hitran_is_cached
-```
+The canonical docstrings for `artifact`, `fetch_hitran`,
+`fetch_hitran_by_ids`, HITRAN edition preferences, `hitran_info`, and
+`hitran_is_cached` are grouped in the [API Reference](../api_reference.md).
