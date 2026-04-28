@@ -12,6 +12,9 @@ The linearized mode propagates derivatives through the adding-doubling
 solver alongside the forward radiance, producing exact Jacobians in a
 single RT pass — no finite differences needed.
 
+This is a local walkthrough. It builds HITRAN absorption and aerosol Mie
+optical properties, so it is intentionally heavier than `docs/test_examples.jl`.
+
 ## 1) Setup: load a test case
 
 ```julia
@@ -21,7 +24,7 @@ using CairoMakie
 
 params = read_parameters(
     joinpath(pkgdir(vSmartMOM),
-             "test", "test_parameters", "ParamsEMIT_fast.yaml"))
+             "test", "test_parameters", "JacobianTestFast.yaml"))
 params.architecture = vSmartMOM.Architectures.CPU()
 ```
 

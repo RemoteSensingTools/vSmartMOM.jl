@@ -10,10 +10,10 @@ The `Aerosols` module is a user-facing framework for aerosol input data, refract
 
 | Scheme | Type | Input style | Use case |
 | --- | --- | --- | --- |
-| TOMAS-15 | [`TOMAS15Scheme`](@ref) | Size-resolved concentrations in 15 logarithmic diameter bins | Microphysics-aware aerosol columns |
-| Two-moment | [`TwoMomentScheme`](@ref) | AOD, effective radius, and fixed geometric width per species | Compact aerosol-state inputs from chemistry or retrieval systems |
+| TOMAS-15 | `TOMAS15Scheme` | Size-resolved concentrations in 15 logarithmic diameter bins | Microphysics-aware aerosol columns |
+| Two-moment | `TwoMomentScheme` | AOD, effective radius, and fixed geometric width per species | Compact aerosol-state inputs from chemistry or retrieval systems |
 
-Both schemes are configured from YAML and read from NetCDF through [`read_aerosol_data`](@ref). The returned [`AerosolData`](@ref) stores the scheme, species data, coordinates, and NetCDF metadata.
+Both schemes are configured from YAML and read from NetCDF through `read_aerosol_data`. The returned `AerosolData` stores the scheme, species data, coordinates, and NetCDF metadata.
 
 ## Refractive Indices
 
@@ -26,7 +26,7 @@ db = vSmartMOM.Aerosols.load_refractive_index_database("refractive_indices.yaml"
 n = vSmartMOM.Aerosols.get_refractive_index(db, "sulfate_suso", 0.55)
 ```
 
-Wavelengths are in micrometers. [`get_refractive_index`](@ref) interpolates the real and imaginary parts linearly and returns a complex refractive index.
+Wavelengths are in micrometers. `get_refractive_index` interpolates the real and imaginary parts linearly and returns a complex refractive index.
 
 ## Relationship To Scattering
 
@@ -40,8 +40,8 @@ Wavelengths are in micrometers. [`get_refractive_index`](@ref) interpolates the 
 
 ## Useful APIs
 
-- [`AerosolScheme`](@ref), [`TOMAS15Scheme`](@ref), [`TwoMomentScheme`](@ref)
-- [`AerosolData`](@ref), [`AerosolSpeciesData`](@ref)
-- [`RefractiveIndexDatabase`](@ref), [`RefractiveIndexLUT`](@ref)
-- [`read_aerosol_data`](@ref), [`load_refractive_index_database`](@ref), [`get_refractive_index`](@ref)
-- [`list_species`](@ref), [`wavelength_range`](@ref)
+- `AerosolScheme`, `TOMAS15Scheme`, `TwoMomentScheme`
+- `AerosolData`, `AerosolSpeciesData`
+- `RefractiveIndexDatabase`, `RefractiveIndexLUT`
+- `read_aerosol_data`, `load_refractive_index_database`, `get_refractive_index`
+- `list_species`, `wavelength_range`

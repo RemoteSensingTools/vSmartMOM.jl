@@ -12,14 +12,14 @@ This page documents the current public mode layer. Solar-induced fluorescence is
 
 | Type | Meaning | Typical use |
 | --- | --- | --- |
-| [`noRS`](@ref) | Pure elastic scattering mode with no Raman redistribution | Default mode for ordinary `rt_run(model)` calls |
-| [`RRS`](@ref) | Rotational Raman scattering for an N2/O2 atmosphere | Filling-in calculations over one spectral grid |
-| [`VS_0to1`](@ref) | Vibrational Stokes-style mode | Single vibrational transition family |
-| [`VS_1to0`](@ref) | Vibrational anti-Stokes-style mode | Single vibrational transition family |
-| [`noRS_plus`](@ref) | Elastic mode for concatenated-grid code paths | Plus-mode workflows that share Raman interfaces |
-| [`RRS_plus`](@ref) | Rotational Raman for concatenated spectral bands | Multi-band Raman calculations |
-| [`VS_0to1_plus`](@ref) | Vibrational Stokes-style plus mode | Concatenated-grid vibrational workflows |
-| [`VS_1to0_plus`](@ref) | Vibrational anti-Stokes-style plus mode | Concatenated-grid vibrational workflows |
+| `noRS` | Pure elastic scattering mode with no Raman redistribution | Default mode for ordinary `rt_run(model)` calls |
+| `RRS` | Rotational Raman scattering for an N2/O2 atmosphere | Filling-in calculations over one spectral grid |
+| `VS_0to1` | Vibrational Stokes-style mode | Single vibrational transition family |
+| `VS_1to0` | Vibrational anti-Stokes-style mode | Single vibrational transition family |
+| `noRS_plus` | Elastic mode for concatenated-grid code paths | Plus-mode workflows that share Raman interfaces |
+| `RRS_plus` | Rotational Raman for concatenated spectral bands | Multi-band Raman calculations |
+| `VS_0to1_plus` | Vibrational Stokes-style plus mode | Concatenated-grid vibrational workflows |
+| `VS_1to0_plus` | Vibrational anti-Stokes-style plus mode | Concatenated-grid vibrational workflows |
 
 The mode type is the dispatch key. CoreRT asks trait methods such as `has_inelastic`, `uses_cabannes_phase`, and `needs_interaction_workspace` what workspaces and optical-property transforms are needed for the selected mode.
 
@@ -47,7 +47,7 @@ For the current code map, see the inelastic section of [Core RT Theory](../vSmar
 
 ## Useful APIs
 
-- [`AbstractRamanType`](@ref)
-- [`noRS`](@ref), [`RRS`](@ref), [`VS_0to1`](@ref), [`VS_1to0`](@ref)
-- [`noRS_plus`](@ref), [`RRS_plus`](@ref), [`VS_0to1_plus`](@ref), [`VS_1to0_plus`](@ref)
-- [`compute_γ_air_Cabannes!`](@ref), [`compute_γ_air_Rayleigh!`](@ref), [`apply_lineshape!`](@ref)
+- `AbstractRamanType`
+- `noRS`, `RRS`, `VS_0to1`, `VS_1to0`
+- `noRS_plus`, `RRS_plus`, `VS_0to1_plus`, `VS_1to0_plus`
+- `compute_γ_air_Cabannes!`, `compute_γ_air_Rayleigh!`, `apply_lineshape!`

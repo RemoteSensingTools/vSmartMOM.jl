@@ -28,7 +28,7 @@ radiative_transfer:
 
 ## Canopy Wrapper
 
-Vegetation canopies are configured through an optional top-level `canopy:` section. The parser wraps each band surface in [`CanopySurface`](@ref), so the existing surface becomes the soil BRDF unless a separate canopy soil tag is supplied.
+Vegetation canopies are configured through an optional top-level `canopy:` section. The parser wraps each band surface in `CanopySurface`, so the existing surface becomes the soil BRDF unless a separate canopy soil tag is supplied.
 
 ```yaml
 canopy:
@@ -50,7 +50,7 @@ Internally the canopy is treated as scattering sub-layers above the soil boundar
 
 ## Useful APIs
 
-- [`AbstractSurfaceType`](@ref)
-- [`LambertianSurfaceScalar`](@ref), [`LambertianSurfaceSpectrum`](@ref), [`LambertianSurfaceLegendre`](@ref), [`LambertianSurfaceSpline`](@ref)
-- [`rpvSurfaceScalar`](@ref), [`RossLiSurfaceScalar`](@ref), [`CoxMunkSurface`](@ref)
-- [`CanopySurface`](@ref), [`CanopySurface_from_prospect`](@ref), [`create_surface_layer!`](@ref)
+- `AbstractSurfaceType`
+- `LambertianSurfaceScalar`, `LambertianSurfaceSpectrum`, `LambertianSurfaceLegendre`, `LambertianSurfaceSpline`
+- `rpvSurfaceScalar`, `RossLiSurfaceScalar`, `CoxMunkSurface`
+- `CanopySurface`, `CanopySurface_from_prospect`, `create_surface_layer!`
