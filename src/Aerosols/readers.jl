@@ -3,6 +3,22 @@
 """
 
 """
+    aerosol_processing_options(config::Dict)
+
+Return aerosol reader options from either the documented top-level
+`processing_options` table or the legacy `aerosol_scheme.options` table.
+Missing options are represented by an empty dictionary.
+"""
+function aerosol_processing_options(config::Dict)
+    if haskey(config, "processing_options")
+        return config["processing_options"]
+    end
+
+    aerosol_scheme = get(config, "aerosol_scheme", Dict())
+    return get(aerosol_scheme, "options", Dict())
+end
+
+"""
     read_aerosol_data(config_file::String, netcdf_file::String, FT=Float64)
 
 Read aerosol data from NetCDF file using YAML configuration.

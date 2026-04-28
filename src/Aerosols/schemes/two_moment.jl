@@ -56,7 +56,7 @@ function read_two_moment(config::Dict, netcdf_file::String, FT=Float64)
         n_levels = length(coordinates["lev"])
         
         # Get processing options
-        vertical_flip = get(config["processing_options"], "vertical_flip", false)
+        vertical_flip = get(aerosol_processing_options(config), "vertical_flip", false)
         
         # Read each species
         species_data = Dict{String, AerosolSpeciesData}()
@@ -110,7 +110,7 @@ function read_two_moment(config::Dict, netcdf_file::String, FT=Float64)
             end
             
             # Store species data
-            data_dict = Dict{String, Array}(
+            data_dict = Dict{String, Any}(
                 "aod" => aod_profile,
                 "radius" => radius_profile
             )

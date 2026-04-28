@@ -47,9 +47,28 @@ where M_air = 28.9644e-3 kg/mol
 The config dict must specify:
 - aerosol_scheme/species: Dict of species with properties
 - aerosol_scheme/size_bins: Size bin configuration
-- netcdf_mapping: Variable name patterns
-- processing_options/vertical_flip: Whether to flip BOA→TOA to TOA→BOA
+- netcdf_mapping/concentration_pattern or per-species aerosol_scheme/species/*/nc_prefix
+- processing_options/vertical_flip or aerosol_scheme/options/vertical_flip: Whether to flip BOA→TOA to TOA→BOA
 """
+function _tomas_concentration_variable(config::Dict, species_name::AbstractString, ibin::Integer)
+    bin = @sprintf("%02d", ibin)
+    mapping = get(config, "netcdf_mapping", nothing)
+
+    if mapping !== nothing && haskey(mapping, "concentration_pattern")
+        pattern = mapping["concentration_pattern"]
+        return replace(
+            pattern,
+            "{species}" => species_name,
+            "{bin:02d}" => bin,
+            "{bin}" => string(ibin),
+        )
+    end
+
+    species_config = config["aerosol_scheme"]["species"][species_name]
+    prefix = get(species_config, "nc_prefix", "SpeciesConcVV_$(species_name)")
+    return string(prefix, bin)
+end
+
 function read_tomas15(config::Dict, netcdf_file::String, FT=Float64)
     # Construct scheme from config
     scheme = TOMAS15Scheme(config, FT)
@@ -63,10 +82,7 @@ function read_tomas15(config::Dict, netcdf_file::String, FT=Float64)
         n_levels = length(coordinates["lev"])
         
         # Get processing options
-        vertical_flip = get(config["processing_options"], "vertical_flip", false)
-        
-        # Get meteorology variables for conversion
-        met_vars = config["netcdf_mapping"]["meteorology"]
+        vertical_flip = get(aerosol_processing_options(config), "vertical_flip", false)
         
         # Physical constants
         M_air = FT(28.9644e-3)  # kg/mol (molar mass of dry air)
@@ -159,20 +175,13 @@ function read_tomas15(config::Dict, netcdf_file::String, FT=Float64)
         species_particle_number = Dict{String, Array{FT, 2}}()  # Species → (bins × levels)
         
         for species_name in scheme.species
-            # NetCDF variable pattern
-            var_pattern = replace(
-                config["netcdf_mapping"]["concentration_pattern"],
-                "{species}" => species_name,
-                "{bin:02d}" => ""
-            )
-            
             # Read all bins for this species
             concentrations = zeros(FT, scheme.n_bins, n_levels)  # mol/mol
             mass_conc = zeros(FT, scheme.n_bins, n_levels)  # μg/m³
             part_num = zeros(FT, scheme.n_bins, n_levels)  # #/cm³
             
             for ibin in 1:scheme.n_bins
-                var_name = replace(var_pattern, "{bin:02d}" => @sprintf("%02d", ibin))
+                var_name = _tomas_concentration_variable(config, species_name, ibin)
                 
                 if haskey(ds, var_name)
                     data_full = Array(ds[var_name])
@@ -239,7 +248,7 @@ function read_tomas15(config::Dict, netcdf_file::String, FT=Float64)
             species_particle_number[species_name] = part_num
             
             # Store species data
-            data_dict = Dict{String, Array}(
+            data_dict = Dict{String, Any}(
                 "concentration" => concentrations,  # mol/mol
                 "mass" => mass_conc,  # μg/m³
                 "particle_number" => part_num  # #/cm³
@@ -286,7 +295,7 @@ function read_tomas15(config::Dict, netcdf_file::String, FT=Float64)
         # Store NK data
         # ====================================================================
         
-        nk_data_dict = Dict{String, Array}(
+        nk_data_dict = Dict{String, Any}(
             "NK_raw" => NK_raw,  # Raw NK values from file
             "concentration" => N_concentration,  # #/cm³
             "dN_dlogD" => dN_dlogD,  # cm⁻³
