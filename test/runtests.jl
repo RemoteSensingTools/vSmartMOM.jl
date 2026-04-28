@@ -13,6 +13,10 @@ using WignerSymbols
 using Distributions
 using JLD2
 
+const _VSMARTMOM_TEST_ORIGINAL_CWD = pwd()
+cd(@__DIR__)
+try
+
 # Core module tests
 @testset "Absorption" begin include("test_Absorption.jl") end
 @testset "Scattering" begin include("test_Scattering.jl") end
@@ -80,3 +84,7 @@ end
 
 # Phase 6 — sanghavi test/benchmarks/*.jl script ports (parse + light-unit).
 @testset "Phase 6 script ports" begin include("test_phase6_ports.jl") end
+
+finally
+    cd(_VSMARTMOM_TEST_ORIGINAL_CWD)
+end
