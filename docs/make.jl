@@ -44,7 +44,6 @@ function build()
                                     "Example" => "pages/vSmartMOM/Example.md",
                                     "User-Defined RT Parameters" => "pages/vSmartMOM/InputParametersGuide.md",
                                     "Methods & Types" => "pages/vSmartMOM/Types.md",
-                                    "Principles" => "pages/vSmartMOM/Principles.md",
                                     "References" => "pages/vSmartMOM/References.md"
                                     ],
         "Absorption"            => [

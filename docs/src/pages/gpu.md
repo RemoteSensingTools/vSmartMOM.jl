@@ -13,3 +13,12 @@ GPU support is provided through the optional CUDA extension. The full task page 
 - how to fall back cleanly to CPU.
 
 For now, see the long-form [GPU tutorial](tutorials/Tutorial_GPU.md).
+
+## Performance Notes
+
+The main architecture switch is the `radiative_transfer.architecture` field in
+the scene configuration, or `params.architecture = GPU()` after loading a
+configuration. GPU runs are most useful when enough spectral points, layers, or
+viewing geometries are batched to amortize kernel-launch and transfer costs.
+Use `CPU()` for small debugging scenes and for workflows that are not yet
+GPU-safe.

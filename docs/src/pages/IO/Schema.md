@@ -31,6 +31,12 @@ Top-level keys:
 - float_type: String in {Float32, Float64}
 - architecture: String in {default_architecture, CPU(), GPU(), Architectures.CPU(), Architectures.GPU()}
 
+Accuracy and cost are controlled mainly through `quadrature_type`, `max_m`,
+`Δ_angle`, `l_trunc`, and `depol`. Increase quadrature order and Fourier
+moments for strongly anisotropic or highly polarized scenes; increase
+`l_trunc` when aerosol phase functions have sharp forward peaks. Use consistent
+units for spectral bands and optical inputs.
+
 ## geometry
 - sza: Real (deg)
 - vza: Vector{Real} (deg)
