@@ -39,8 +39,9 @@ R, T = rt_run(model)
 
 - **CoreRT**: adding-doubling solver, model types, optical-property assembly, surface coupling, and Jacobian kernels.
 - **IO**: YAML, TOML, Dict, NetCDF, and GEOS-Chem inputs.
-- **Absorption**: HITRAN and lookup-table gas absorption.
-- **Scattering**: Mie calculations, phase functions, Greek coefficients, and truncation inputs.
-- **InelasticScattering**: Raman/Cabannes mode types and optical-property helpers.
-- **Aerosols**: TOMAS-15 and two-moment aerosol input support. This API is still being stabilized.
-- **SolarModel**: solar/stellar spectra and transmission helpers.
+- **[Absorption](pages/Absorption/Overview.md)**: HITRAN and lookup-table gas absorption.
+- **[Scattering](pages/Scattering/Overview.md)**: Mie calculations, phase functions, Greek coefficients, and truncation inputs.
+- **[Surfaces](pages/Surfaces/Overview.md)**: lower-boundary BRDF models and canopy coupling.
+- **[InelasticScattering](pages/Inelastic/Overview.md)**: Raman/Cabannes mode types and optical-property helpers.
+- **[Aerosols](pages/Aerosols/Overview.md)**: TOMAS-15 and two-moment aerosol input support. This API is still being stabilized.
+- **[SolarModel](pages/SolarModel/Overview.md)**: solar/stellar spectra and transmission helpers.

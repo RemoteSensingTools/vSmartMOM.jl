@@ -56,6 +56,10 @@ function build()
                                     "Methods & Types" => "pages/Scattering/Types.md",
                                     "References" => "pages/Scattering/References.md"
                                     ],
+        "Surfaces"              => "pages/Surfaces/Overview.md",
+        "Inelastic Scattering"  => "pages/Inelastic/Overview.md",
+        "Aerosols"              => "pages/Aerosols/Overview.md",
+        "SolarModel"            => "pages/SolarModel/Overview.md",
         "GEOSChem Integration"  => "pages/geoschem_integration.md",
         "Tutorials"             => tutorials_md
     ]

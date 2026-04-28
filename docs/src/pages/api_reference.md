@@ -70,6 +70,57 @@ vSmartMOM.Scattering.NAI2
 vSmartMOM.Scattering.PCW
 ```
 
+## Inelastic Scattering
+
+```@docs
+vSmartMOM.InelasticScattering.AbstractRamanType
+vSmartMOM.InelasticScattering.noRS
+vSmartMOM.InelasticScattering.noRS_plus
+vSmartMOM.InelasticScattering.RRS
+vSmartMOM.InelasticScattering.RRS_plus
+vSmartMOM.InelasticScattering.VS_0to1
+vSmartMOM.InelasticScattering.VS_1to0
+vSmartMOM.InelasticScattering.VS_0to1_plus
+vSmartMOM.InelasticScattering.VS_1to0_plus
+vSmartMOM.InelasticScattering.compute_γ_air_Cabannes!
+vSmartMOM.InelasticScattering.compute_γ_air_Rayleigh!
+vSmartMOM.InelasticScattering.compute_σ_Rayl_coeff!
+vSmartMOM.InelasticScattering.compute_σ_Rayl_VibRaman_coeff_hires!
+vSmartMOM.InelasticScattering.compute_σ_VibRaman_coeff!
+vSmartMOM.InelasticScattering.apply_lineshape!
+vSmartMOM.InelasticScattering.compute_energy_levels!
+vSmartMOM.InelasticScattering.compute_stellar_Rayl
+vSmartMOM.InelasticScattering.get_greek_raman
+```
+
+## Aerosols
+
+```@docs
+vSmartMOM.Aerosols.AerosolScheme
+vSmartMOM.Aerosols.TOMAS15Scheme
+vSmartMOM.Aerosols.TwoMomentScheme
+vSmartMOM.Aerosols.AerosolSpeciesData
+vSmartMOM.Aerosols.AerosolData
+vSmartMOM.Aerosols.RefractiveIndexLUT
+vSmartMOM.Aerosols.RefractiveIndexDatabase
+vSmartMOM.Aerosols.read_aerosol_data
+vSmartMOM.Aerosols.load_refractive_index_database
+vSmartMOM.Aerosols.get_refractive_index
+vSmartMOM.Aerosols.list_species
+vSmartMOM.Aerosols.wavelength_range
+```
+
+## SolarModel
+
+```@docs
+vSmartMOM.SolarModel.planck_spectrum_wn
+vSmartMOM.SolarModel.planck_spectrum_wl
+vSmartMOM.SolarModel.solar_transmission_from_file
+vSmartMOM.SolarModel.default_solar_transmission_path
+vSmartMOM.SolarModel.default_solar_transmission
+vSmartMOM.SolarModel.default_solar_spectrum_at_earth
+```
+
 ## Surface Models
 
 ```@docs
@@ -83,6 +134,7 @@ vSmartMOM.CoreRT.RossLiSurfaceScalar
 vSmartMOM.CoreRT.CoxMunkSurface
 vSmartMOM.CoreRT.CanopySurface
 vSmartMOM.CoreRT.CanopySurface_from_prospect
+vSmartMOM.CoreRT.create_surface_layer!
 vSmartMOM.CoreRT.water_refractive_index
 vSmartMOM.CoreRT.fresnel_coefficients
 vSmartMOM.CoreRT.fresnel_mueller
