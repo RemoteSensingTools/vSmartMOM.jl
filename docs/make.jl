@@ -41,8 +41,6 @@ function build()
                                    ],
         "vSmartMOM"             => Any[
                                     "Overview" => "pages/vSmartMOM/Overview.md",
-                                    "Example" => "pages/vSmartMOM/Example.md",
-                                    "User-Defined RT Parameters" => "pages/vSmartMOM/InputParametersGuide.md",
                                     "Methods & Types" => "pages/vSmartMOM/Types.md",
                                     "References" => "pages/vSmartMOM/References.md"
                                     ],

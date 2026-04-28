@@ -288,6 +288,21 @@ Edits:
 Validation:
 - Docs build.
 
+## Legacy vSmartMOM Page Triage — Completed 2026-04-28
+
+The legacy `pages/vSmartMOM/*` cleanup was completed as a follow-up to the
+strict Documenter work:
+
+- Trimmed `Overview.md` to a reference-layer landing page.
+- Folded `Principles.md` into `CoreRTTheory.md`, `gpu.md`, and `IO/Schema.md`,
+  then removed it from navigation.
+- Folded the missing Cox-Munk and canopy details from `InputParametersGuide.md`
+  into `IO/Schema.md`, then deleted the duplicate parameter guide.
+- Deleted `Example.md`; the forward and linearized examples now live in the
+  task pages and tutorials.
+- Refreshed `References.md` so the JOSS software paper is the primary package
+  citation and the method papers are grouped separately.
+
 ## Deferred Until Product Decision
 
 - SIF docs page.
