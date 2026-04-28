@@ -2,10 +2,14 @@
 
 ## Defining Parameters for RT Simulation
 
-```@docs
-parameters_from_yaml
-default_parameters
-```
+Use [`read_parameters`](@ref) as the general loader for YAML/TOML files, in-memory
+dictionaries, and typed IO sources. Use [`default_parameters`](@ref) for the built-in
+default scene.
+
+The explicit helpers [`parameters_from_file`](@ref),
+[`parameters_from_dict`](@ref), [`parameters_from_source`](@ref), and
+[`parameters_from_yaml`](@ref) are also available when a call site should state the
+input kind directly.
 
 ## Using the Parameters Object to Create a Model 
 

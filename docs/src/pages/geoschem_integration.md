@@ -23,7 +23,7 @@ src/IO/
 
 ```julia
 IOSource (from Formats.jl)
-├── FileSource              # YAML files
+├── FileSource              # YAML/TOML files
 ├── DictSource              # Direct Dict
 └── NetCDFSource            # Abstract for NetCDF data
     ├── GeosChemSource      # GEOSChem cubed-sphere
@@ -41,14 +41,14 @@ using vSmartMOM
 src = GeosChemSource("GEOSChem.Custom.20190101_0000z.nc4", 10, 20, 1)
 
 # Option 1: Use with default RT parameters
-params = parameters_from_yaml(src)
+params = read_parameters(src)
 model = model_from_parameters(params)
 R = rt_run(model)
 
 # Option 2: Get Dict and customize
 config = geoschem_to_dict(src)
 config["radiative_transfer"]["spec_bands"] = [(1e7/777):0.015:(1e7/757)]
-params = parameters_from_dict(config)
+params = read_parameters(config)
 ```
 
 ### Complete Example
@@ -94,7 +94,7 @@ config["geometry"] = Dict(
 )
 
 # Convert to parameters and run
-params = parameters_from_dict(config)
+params = read_parameters(config)
 model = model_from_parameters(params)
 R = rt_run(model)
 ```
@@ -249,12 +249,12 @@ parameters.p = geos.data["pressure"]
 src = GeosChemSource(file, idx, idy, idf)
 
 # Automatic conversion
-params = parameters_from_yaml(src)
+params = read_parameters(src)
 
 # Or customize
 config = geoschem_to_dict(src)
 # ... modify config ...
-params = parameters_from_dict(config)
+params = read_parameters(config)
 ```
 
 ## Benefits

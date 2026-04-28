@@ -30,8 +30,8 @@ println("Default architecture: ", arch)
 # When loading from YAML, set `architecture: GPU` in the config, or
 # override after loading:
 
-params = parameters_from_yaml(
-    joinpath(dirname(dirname(pathof(vSmartMOM))),
+params = read_parameters(
+    joinpath(pkgdir(vSmartMOM),
              "test", "test_parameters", "PureRayleighParameters.yaml"))
 
 params.architecture = vSmartMOM.Architectures.CPU()

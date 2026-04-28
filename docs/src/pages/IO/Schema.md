@@ -1,6 +1,6 @@
 # Configuration schema (IO)
 
-This page documents the expected configuration structure for `read_parameters`.
+This page documents the expected configuration structure accepted by `read_parameters`, `parameters_from_file`, `parameters_from_dict`, and `parameters_from_source`. YAML, TOML, and in-memory `Dict` inputs use the same schema.
 
 Top-level keys:
 - radiative_transfer (required)

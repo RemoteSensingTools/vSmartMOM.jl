@@ -11,9 +11,9 @@ using vSmartMOM.CoreRT
 # Load a default set of parameters
 parameters = default_parameters();
 
-# Or load from a YAML file (see format at:
+# Or load from a YAML/TOML file (see format at:
 # https://github.com/remotesensingtools/vSmartMOM.jl/blob/main/src/CoreRT/DefaultParameters.yaml)
-# parameters = parameters_from_yaml("path/to/your/params.yaml")
+# parameters = read_parameters("path/to/your/params.yaml")
 
 # You can modify any field in parameters (it is a mutable struct):
 # parameters.max_m = 5

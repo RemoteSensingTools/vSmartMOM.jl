@@ -366,9 +366,9 @@ canopy = CanopySurface(
 #
 # Load a parameter file, override the surface, and run the RT:
 
-yaml_path = joinpath(dirname(dirname(pathof(vSmartMOM))),
+yaml_path = joinpath(pkgdir(vSmartMOM),
                      "test", "test_parameters", "PureRayleighParameters.yaml")
-params = parameters_from_yaml(yaml_path)
+params = read_parameters(yaml_path)
 params.brdf[1] = CoxMunkSurface(wind_speed = 5.0)
 model = model_from_parameters(params)
 R, T = rt_run(model)
@@ -376,7 +376,7 @@ println("R shape: ", size(R))
 println("R(nadir, I): ", R[1, 1, 1])
 
 # Compare with a Lambertian surface at the same geometry:
-params2 = parameters_from_yaml(yaml_path)
+params2 = read_parameters(yaml_path)
 params2.brdf[1] = LambertianSurfaceScalar(0.06)
 model2 = model_from_parameters(params2)
 R2, T2 = rt_run(model2)

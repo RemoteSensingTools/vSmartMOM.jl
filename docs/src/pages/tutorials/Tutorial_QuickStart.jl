@@ -13,9 +13,9 @@ using CairoMakie
 # Parameters define the atmosphere, surface, geometry, and spectral bands.
 # See the IO Schema documentation for the full YAML format.
 
-yaml_path = joinpath(dirname(dirname(pathof(vSmartMOM))),
+yaml_path = joinpath(pkgdir(vSmartMOM),
                      "test", "test_parameters", "ParamsEMIT_fast.yaml")
-params = parameters_from_yaml(yaml_path)
+params = read_parameters(yaml_path)
 params.architecture = vSmartMOM.Architectures.CPU()
 
 # ## 3) Build the model and run forward RT

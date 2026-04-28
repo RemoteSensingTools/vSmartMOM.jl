@@ -26,7 +26,7 @@ vSmartMOM (root module)
 ├── SolarModel             Solar/stellar irradiance
 │   └── uses: CoreRT
 │
-└── IO                     YAML parameter files, NetCDF, atmospheric profiles
+└── IO                     YAML/TOML/Dict parameter files, NetCDF, atmospheric profiles
     └── uses: CoreRT (for types)
 ```
 
@@ -37,8 +37,10 @@ The complete forward model pipeline is:
 ### 1. Parameter Loading
 
 ```
-YAML file  ──>  parameters_from_yaml()  ──>  vSmartMOM_Parameters
+YAML/TOML file, Dict, or IOSource  ──>  read_parameters()  ──>  vSmartMOM_Parameters
 ```
+
+`read_parameters` is the user-facing loader. It dispatches on file paths, in-memory dictionaries, and typed IO sources such as GEOS-Chem NetCDF. The explicit aliases `parameters_from_file`, `parameters_from_dict`, and `parameters_from_source` call the same parser after loading the configuration.
 
 `vSmartMOM_Parameters` holds all configuration: spectral bands, geometry, atmospheric profile, gas absorption settings, aerosol properties, surface type, and architecture (CPU/GPU).
 

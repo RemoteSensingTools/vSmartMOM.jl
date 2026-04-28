@@ -44,8 +44,8 @@ Let's run the linearized model and inspect the Jacobian layout.
 using vSmartMOM
 using vSmartMOM.CoreRT
 
-params = parameters_from_yaml(
-    joinpath(dirname(dirname(pathof(vSmartMOM))),
+params = read_parameters(
+    joinpath(pkgdir(vSmartMOM),
              "test", "test_parameters", "JacobianTestFast.yaml"))
 params.architecture = vSmartMOM.Architectures.CPU()
 ```
@@ -113,8 +113,8 @@ are automatically moved to `CuArray` and the RT kernels use
 
 ```julia
 if vSmartMOM.Architectures.has_cuda()
-    params_gpu = parameters_from_yaml(
-        joinpath(dirname(dirname(pathof(vSmartMOM))),
+    params_gpu = read_parameters(
+        joinpath(pkgdir(vSmartMOM),
                  "test", "test_parameters", "JacobianTestFast.yaml"))
     params_gpu.architecture = vSmartMOM.Architectures.GPU()
     model_gpu, lin_model_gpu = model_from_parameters(LinMode(), params_gpu)
