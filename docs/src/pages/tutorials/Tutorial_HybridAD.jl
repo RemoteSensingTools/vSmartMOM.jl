@@ -6,6 +6,9 @@
 # derivatives for performance. This tutorial explains the architecture
 # and shows how to use both paths on CPU and GPU.
 #
+# This is a local walkthrough. It builds HITRAN absorption and aerosol Mie
+# optical properties, so it is intentionally heavier than `docs/test_examples.jl`.
+#
 # ## 1) The AD Boundary
 #
 # The key architectural idea is a clean separation between two zones:
@@ -53,10 +56,10 @@ model, lin_model = model_from_parameters(LinMode(), params)
 NAer  = length(params.scattering_params.rt_aerosols)
 NGas  = size(lin_model.τ̇_abs[1], 1)
 NSurf = 1
-R_cpu, T_cpu, dR_cpu, dT_cpu = rt_run(model, lin_model, NAer, NGas, NSurf)
+R_cpu, T_cpu, dR_cpu, dT_cpu = rt_run_lin(model, lin_model, NAer, NGas, NSurf)
 
 println("R  shape: ", size(R_cpu), "  (nVZA × nStokes × nSpec)")
-println("dR shape: ", size(dR_cpu), "  (nParams × nVZA × nStokes × nSpec)")
+println("dR shape: ", size(dR_cpu), "  (nVZA × nStokes × nSpec × nParams)")
 
 # ## 3) Understanding ParameterLayout
 #
@@ -83,11 +86,11 @@ idx_tau    = CoreRT.aerosol_range(layout, 1)[1]  # τ_ref
 idx_nr     = CoreRT.aerosol_range(layout, 1)[2]  # nᵣ
 
 println("\ndR/d(albedo) first 3 spec points: ",
-        round.(dR_cpu[idx_albedo, 1, 1, 1:min(3,end)], digits=6))
+        round.(dR_cpu[1, 1, 1:min(3,end), idx_albedo], digits=6))
 println("dR/d(τ_ref)  first 3 spec points: ",
-        round.(dR_cpu[idx_tau, 1, 1, 1:min(3,end)], digits=6))
+        round.(dR_cpu[1, 1, 1:min(3,end), idx_tau], digits=6))
 println("dR/d(nᵣ)     first 3 spec points: ",
-        round.(dR_cpu[idx_nr, 1, 1, 1:min(3,end)], digits=6))
+        round.(dR_cpu[1, 1, 1:min(3,end), idx_nr], digits=6))
 
 # ## 4) Linearized RT on GPU
 #
@@ -101,8 +104,8 @@ if vSmartMOM.Architectures.has_cuda()
                  "test", "test_parameters", "JacobianTestFast.yaml"))
     params_gpu.architecture = vSmartMOM.Architectures.GPU()
     model_gpu, lin_model_gpu = model_from_parameters(LinMode(), params_gpu)
-    R_gpu, T_gpu, dR_gpu, dT_gpu = rt_run(model_gpu, lin_model_gpu,
-                                           NAer, NGas, NSurf)
+    R_gpu, T_gpu, dR_gpu, dT_gpu = rt_run_lin(model_gpu, lin_model_gpu,
+                                               NAer, NGas, NSurf)
 
     R_gpu_a  = Array(R_gpu)
     dR_gpu_a = Array(dR_gpu)

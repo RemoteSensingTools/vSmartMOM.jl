@@ -29,7 +29,7 @@ using CairoMakie
 # ## 1) Overview
 #
 # Every surface model is a subtype of `AbstractSurfaceType`.  The RT solver
-# dispatches through [`create_surface_layer!`](@ref), which computes the
+# dispatches through `create_surface_layer!`, which computes the
 # Fourier-decomposed surface reflectance matrix $R_\text{surf}$ for each
 # azimuthal moment $m$.
 #

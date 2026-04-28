@@ -6,7 +6,7 @@
 
 Surface models are part of `CoreRT` because the lower boundary is represented as an `AddedLayer` and then interacts with the atmospheric composite layer. A new BRDF usually needs three pieces:
 
-1. a concrete [`AbstractSurfaceType`](@ref);
+1. a concrete `AbstractSurfaceType`;
 2. a `reflectance` or `create_surface_layer!` method that builds the surface layer;
 3. a parser registration if the surface should be available from YAML/TOML scene files.
 
