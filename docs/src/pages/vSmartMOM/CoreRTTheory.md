@@ -46,6 +46,14 @@ for a Stokes vector ``\mathbf{L}`` with a direct solar beam:
 The vector formulation and linearization follow Sanghavi et al. (2014). The
 scalar predecessor is Sanghavi et al. (2013).
 
+### Polarization State
+
+vSmartMOM carries Stokes subsets through fixed polarization types: `Stokes_I`,
+`Stokes_IQ`, `Stokes_IQU`, and `Stokes_IQUV`. The phase-matrix moments,
+quadrature stream blocks, surface matrices, and kernel work arrays are sized
+from that type, so scalar and vector runs share the same operator structure
+without runtime branching over unused Stokes components.
+
 ## Discretization
 
 After Fourier decomposition in azimuth and quadrature discretization in polar
@@ -268,9 +276,10 @@ inhomogeneous atmosphere.
 
 ## Truncation
 
-Truncation reduces the high-order forward peak before the RT solve. The method
-comes from Sanghavi and Stephens (2015), with vector delta-m and delta-fit
-details tied back to Sanghavi et al. (2014), Appendix A.
+Truncation reduces the high-order forward peak before the RT solve. vSmartMOM
+uses vector delta-m / delta-fit style corrections following Sanghavi and
+Stephens (2015), while the Greek-coefficient representation follows Sanghavi
+et al. (2014), Appendix A.
 
 Primary source files:
 
@@ -278,14 +287,61 @@ Primary source files:
 - `src/CoreRT/tools/atmo_prof.jl`
 - `src/CoreRT/LayerOpticalProperties/`
 
-The resulting truncation factor `fᵗ` and truncated Greek coefficients enter
-layer assembly through `construct_atm_layer`, where optical properties are
-rescaled before `rt_kernel!` sees them.
+For a truncation order ``L_\mathrm{tr}``, the scalar truncation factor is
+Sanghavi and Stephens (2015), Eq. 26:
+
+```math
+f_\mathrm{tr} =
+\frac{\beta_{L_\mathrm{tr}}}{2L_\mathrm{tr}+1}.
+```
+
+The forward peak is removed from the Greek coefficients and the remaining
+coefficients are renormalized. For the coefficient families affected by the
+truncation term, Sanghavi and Stephens (2015), Eqs. 27a-27d, give:
+
+```math
+\beta_l^* =
+\frac{\beta_l - \frac{2l+1}{2L_\mathrm{tr}+1}\beta_{L_\mathrm{tr}}}
+{1 - f_\mathrm{tr}},
+\qquad
+\delta_l^* =
+\frac{\delta_l - \frac{2l+1}{2L_\mathrm{tr}+1}\beta_{L_\mathrm{tr}}}
+{1 - f_\mathrm{tr}}.
+```
+
+```math
+\gamma_l^* =
+\frac{\gamma_l}{1 - f_\mathrm{tr}},
+\qquad
+\epsilon_l^* =
+\frac{\epsilon_l}{1 - f_\mathrm{tr}}.
+```
+
+The layer optical properties are adjusted consistently:
+
+```math
+\tau^* = \tau(1 - f_\mathrm{tr}\varpi_0),
+\qquad
+\varpi_0^* =
+\frac{\varpi_0(1 - f_\mathrm{tr})}
+{1 - f_\mathrm{tr}\varpi_0}.
+```
+
+The resulting truncation factor `fᵗ`, truncated Greek coefficients, optical
+depth, and single-scattering albedo enter layer assembly through
+`construct_atm_layer`, where the atmospheric optical properties are rescaled
+before `rt_kernel!` sees them.
 
 ## Linearization
 
 Linearized RT follows Sanghavi et al. (2014), Appendix C. The public workflow is
 documented in [Compute Jacobians](../jacobians.md).
+
+The matrix-operator formalism makes the linearization exact at the operator
+level: each elemental, doubling, and interaction update has a corresponding
+tangent-linear update. This is the source of the "linearization is an exact
+method" statement in the original vSmartMOM papers, and it is the reason the
+hand-coded path remains useful alongside AD-based optical-property derivatives.
 
 Main files:
 
@@ -324,6 +380,21 @@ Main files:
 The current implementation uses a linear-in-inelastic-scattering approximation:
 only one inelastic event is included along a photon path. Elastic multiple
 scattering still uses the full adding-doubling machinery.
+
+## Surface Interaction and HDRF
+
+Surfaces enter as lower-boundary BRDF operators and are coupled through the same
+matrix-operator language used for layer adding. Scalar surface models
+(`LambertianSurface*`, RPV, Ross-Li) populate the scalar Stokes block, while
+polarized surface models such as Cox-Munk populate Mueller-matrix blocks from
+Fresnel reflection over a wind-roughened facet distribution.
+
+The relevant code lives in `src/CoreRT/Surfaces/`,
+`src/CoreRT/CoreKernel/interaction_hdrf.jl`, and the postprocessing utilities in
+`src/CoreRT/tools/postprocessing_vza*.jl`. Canopy surfaces solve their internal
+vegetation/soil stack before presenting an effective lower boundary to the
+atmospheric solver. HDRF/BHR postprocessing then converts the accumulated
+operator state into view-angle products and hemispheric quantities.
 
 ## Other Dispatch Arms
 
