@@ -20,10 +20,18 @@ function build()
 
     pages = Any[
         "Getting Started"       => "index.md",
+        "Quick Start (5 min)"   => "pages/quickstart.md",
+        "Configure a Scene"     => "pages/IO/Overview.md",
+        "Compute Jacobians"     => "pages/jacobians.md",
+        "Run on GPU"            => "pages/gpu.md",
+        "Extend vSmartMOM"      => Any[
+                                    "Add a Surface BRDF" => "pages/extending/surfaces.md",
+                                    "Add a Raman Mode" => "pages/extending/raman.md",
+                                   ],
         "Architecture & Design" => "design.md",
+        "Core RT Theory"        => "pages/vSmartMOM/CoreRTTheory.md",
         "API Reference"         => "pages/api_reference.md",
-        "IO"                    => Any[
-                                    "Overview" => "pages/IO/Overview.md",
+        "IO Reference"          => Any[
                                     "Schema" => "pages/IO/Schema.md",
                                     "Examples" => "pages/IO/Examples.md",
                                    ],
@@ -33,7 +41,6 @@ function build()
                                     "User-Defined RT Parameters" => "pages/vSmartMOM/InputParametersGuide.md",
                                     "Methods & Types" => "pages/vSmartMOM/Types.md",
                                     "Principles" => "pages/vSmartMOM/Principles.md",
-                                    "Core RT Theory (Doubling/Adding)" => "pages/vSmartMOM/CoreRTTheory.md",
                                     "References" => "pages/vSmartMOM/References.md"
                                     ],
         "Absorption"            => [
