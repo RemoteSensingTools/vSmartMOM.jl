@@ -22,6 +22,13 @@ Top-level keys:
     - LambertianSurfaceLegendre([0.2, 0.05, 0.01])
     - rpvSurfaceScalar(ρ₀, ρ_c, k, Θ)
     - RossLiSurfaceScalar(fvol, fgeo, fiso)
+    - CoxMunkSurface(wind_speed=U)
+  - `CoxMunkSurface` supports full-polarization ocean BRDFs. Optional
+    keywords include `n_water`, `whitecap_albedo` (default `0.22`),
+    `include_whitecaps` (default `true`), and `shadowing` (default `true`).
+  - Vegetation canopies are configured through a top-level `canopy` section;
+    the parser wraps each band surface as the soil BRDF inside a
+    `CanopySurface`.
 - quadrature_type: String in {RadauQuad(), GaussQuadHemisphere(), GaussQuadFullSphere()}
 - polarization_type: String in {Stokes_I(), Stokes_IQ(), Stokes_IQU(), Stokes_IQUV()}
 - max_m: Int
