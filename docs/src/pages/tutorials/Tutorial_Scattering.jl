@@ -193,4 +193,5 @@ if get(ENV, "VSMARTMOM_RUN_HEAVY_DOCS", "false") == "true"
     end
 end
 
-# ![Scattering phase function radius sweep](scattering_radius_sweep.gif)
+# When run locally with `VSMARTMOM_RUN_HEAVY_DOCS=true`, this writes
+# `scattering_radius_sweep.gif` next to the tutorial.
