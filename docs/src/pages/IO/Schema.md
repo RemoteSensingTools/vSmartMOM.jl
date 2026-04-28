@@ -50,7 +50,7 @@ Top-level keys:
 - broadening: String in {Voigt(), Lorentz(), Doppler()}
 - CEF: String in {HumlicekWeidemann32SDErrorFunction()}
 - wing_cutoff: Real (cm⁻¹)
-- LUTfiles: Vector{Vector{String}} (optional, per molecule per band)
+- LUTfiles: Vector{Vector{String}} (optional, per molecule per band). Paths may begin with `${ENV:NAME}` to resolve large local LUT directories outside the repository.
 
 ## scattering (optional)
 - aerosols: Vector of Dicts with keys: τ_ref, μ, σ, nᵣ, nᵢ, p₀, σp

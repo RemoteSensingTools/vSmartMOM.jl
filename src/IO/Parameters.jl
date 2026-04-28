@@ -25,6 +25,28 @@ fails. This keeps parameter parsing independent of Julia's assert settings.
 """
 @inline _require_config(cond, msg) = cond ? nothing : _config_error(msg)
 
+const ENV_PATH_PATTERN = r"^\$\{ENV:([A-Za-z_][A-Za-z0-9_]*)\}(.*)$"
+
+_strip_leading_path_separators(path::AbstractString) = replace(String(path), r"^[\\/]+" => "")
+
+"""
+    _expand_env_path(path)
+
+Resolve an optional leading `\${ENV:NAME}` marker in a configuration path.
+This keeps checked-in parameter files portable while still allowing large
+local assets, such as absorption LUTs, to live outside the repository.
+"""
+function _expand_env_path(path::AbstractString)
+    text = String(path)
+    match_env = match(ENV_PATH_PATTERN, text)
+    match_env === nothing && return text
+
+    env_name, suffix = match_env.captures
+    _require_config(haskey(ENV, env_name), "Environment variable $(env_name) must be set to resolve $(text)")
+    _require_config(!isempty(ENV[env_name]), "Environment variable $(env_name) must not be empty to resolve $(text)")
+    return normpath(joinpath(ENV[env_name], _strip_leading_path_separators(suffix)))
+end
+
 """
 FLOAT_MAP
 
@@ -618,7 +640,7 @@ function _parse_absorption(params_dict::Dict, FT)
         files_lut = Array(params_dict["absorption"]["LUTfiles"])
         _require_config(size(files_lut) == size(molecules), "Size of LUTfiles has to match molecules")
         for i in eachindex(files_lut)
-            push!(luts, [load_interpolation_model(file) for file in files_lut[i]])
+            push!(luts, [load_interpolation_model(_expand_env_path(file)) for file in files_lut[i]])
         end
     end
     # Partition molecules into fixed (no Jacobian) and variable (Jacobian computed).
