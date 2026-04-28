@@ -86,6 +86,7 @@ function build()
         clean = false,
         modules = [vSmartMOM],
         pages = pages,
+        checkdocs = :exports,
         # Keep known legacy docs debt non-fatal while still failing on new
         # doctest/eval/parse errors. These classes cover duplicate @docs
         # blocks, missing-doc coverage, and stale tutorial image links.

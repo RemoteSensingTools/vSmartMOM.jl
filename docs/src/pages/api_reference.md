@@ -18,6 +18,8 @@ vSmartMOM.rt_run
 ## Linearized RT
 
 ```@docs
+vSmartMOM.FwdMode
+vSmartMOM.LinMode
 vSmartMOM.model_from_parameters_lin
 vSmartMOM.rt_run_lin
 vSmartMOM.CoreRT.ParameterLayout
@@ -28,6 +30,37 @@ vSmartMOM.CoreRT.surface_range
 vSmartMOM.CoreRT.surface_index
 vSmartMOM.CoreRT.n_layer_params
 vSmartMOM.CoreRT.canopy_range
+```
+
+## RT Model Types
+
+```@docs
+vSmartMOM.AbstractRTModel
+vSmartMOM.RTModel
+vSmartMOM.SolverConfig
+vSmartMOM.Atmosphere
+vSmartMOM.RayleighScattering
+vSmartMOM.AerosolState
+vSmartMOM.Optics
+vSmartMOM.OpticsLin
+vSmartMOM.CoreRT.vSmartMOM_Parameters
+vSmartMOM.CoreRT.AtmosphericProfile
+vSmartMOM.CoreRT.ObsGeometry
+vSmartMOM.CoreRT.QuadPoints
+vSmartMOM.CoreRT.CompositeLayer
+vSmartMOM.CoreRT.AddedLayer
+```
+
+## IO Sources and Profiles
+
+```@docs
+vSmartMOM.read_atmos_profile
+vSmartMOM.read_atmos_profile_dict
+vSmartMOM.GeosChemSource
+vSmartMOM.NetCDFGridSource
+vSmartMOM.NetCDFSource
+vSmartMOM.geoschem_to_dict
+vSmartMOM.read_geoschem_profile
 ```
 
 ## HITRAN Data Management
@@ -121,6 +154,19 @@ vSmartMOM.SolarModel.default_solar_transmission
 vSmartMOM.SolarModel.default_solar_spectrum_at_earth
 ```
 
+## Experimental SIF Data Helpers
+
+These helpers expose currently shipped SIF data loaders. The end-to-end SIF
+workflow is still pending a product/data-policy decision and is not documented
+as a task page yet.
+
+```@docs
+vSmartMOM.sif_data_path
+vSmartMOM.load_sif_spectrum
+vSmartMOM.load_ficus_reflectance
+vSmartMOM.build_sif_source
+```
+
 ## Surface Models
 
 ```@docs
@@ -139,18 +185,6 @@ vSmartMOM.CoreRT.water_refractive_index
 vSmartMOM.CoreRT.fresnel_coefficients
 vSmartMOM.CoreRT.fresnel_mueller
 vSmartMOM.CoreRT.stokes_rotation_matrix
-```
-
-## Types
-
-```@docs
-vSmartMOM.CoreRT.vSmartMOM_Parameters
-vSmartMOM.CoreRT.RTModel
-vSmartMOM.CoreRT.AtmosphericProfile
-vSmartMOM.CoreRT.ObsGeometry
-vSmartMOM.CoreRT.QuadPoints
-vSmartMOM.CoreRT.CompositeLayer
-vSmartMOM.CoreRT.AddedLayer
 ```
 
 ## Architecture
