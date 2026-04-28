@@ -125,22 +125,88 @@ Base.@kwdef mutable struct RVRS{FT<:AbstractFloat} <: AbstractRamanType
 end
 =#
 """
-    noRS{FT}()
+    noRS(; kwargs...)
+    noRS{FT}(; kwargs...)
 
 Pure elastic-scattering mode. This mode carries no inelastic redistribution
-state and is the default Raman type used by `rt_run(model)`.
+state and is the default Raman type used by `rt_run(model)`. The untyped
+keyword constructor infers `FT` from supplied floating-point arrays and falls
+back to `Float64` when no typed arrays are provided.
 """
-Base.@kwdef mutable struct noRS{FT} <: AbstractRamanType
-    fscattRayl::Array{FT,1} = FT[0]
+mutable struct noRS{FT} <: AbstractRamanType
+    fscattRayl::Array{FT,1}
     # ϖ_Cabannes is indexed by iBand; default sized for up to 3 bands so
     # zero-arg `noRS()` works with multi-band smoke configs (e.g. EMIT 2-band).
-    ϖ_Cabannes::Array{FT,1} = FT[1, 1, 1] # elastic fraction (Cabannes) of Rayleigh (Cabannes+Raman) scattering
-    bandSpecLim = []
-    iBand::Array{Int,1} = [1]
+    ϖ_Cabannes::Array{FT,1} # elastic fraction (Cabannes) of Rayleigh (Cabannes+Raman) scattering
+    bandSpecLim
+    iBand::Array{Int,1}
     # F₀/SIF₀ placeholders: rt_run resizes to (pol_type.n, nSpec) before first use.
     # Defaults keep zero-arg `noRS()` ergonomic for pure-elastic callers.
-    F₀::Array{FT,2}  = zeros(FT, 1, 1) # Solar/Stellar irradiation Stokes vector of size (pol_type.n, nSpec)
-    SIF₀::Array{FT,2} = zeros(FT, 1, 1) # Solar/Stellar irradiation Stokes vector of size (pol_type.n, nSpec)
+    F₀::Array{FT,2} # Solar/Stellar irradiation Stokes vector of size (pol_type.n, nSpec)
+    SIF₀::Array{FT,2} # Solar/Stellar irradiation Stokes vector of size (pol_type.n, nSpec)
+end
+
+_maybe_float_type(::Nothing) = nothing
+_maybe_float_type(x::AbstractFloat) = typeof(x)
+function _maybe_float_type(x)
+    T = try
+        eltype(x)
+    catch
+        return nothing
+    end
+    return T <: AbstractFloat ? T : nothing
+end
+
+function _configured_float_type(default::Type{<:AbstractFloat}, values...)
+    FT = default
+    has_configured_type = false
+    for value in values
+        T = _maybe_float_type(value)
+        T === nothing && continue
+        FT = has_configured_type ? promote_type(FT, T) : T
+        has_configured_type = true
+    end
+    return FT
+end
+
+_config_vector(::Type{FT}, value, default) where {FT} =
+    value === nothing ? default : collect(FT, value)
+_config_matrix(::Type{FT}, value, default) where {FT} =
+    value === nothing ? default : Array{FT,2}(value)
+_config_scalar(::Type{FT}, value, default) where {FT} =
+    value === nothing ? default : FT(value)
+
+function noRS{FT}(; fscattRayl = FT[0],
+                    ϖ_Cabannes = FT[1, 1, 1],
+                    bandSpecLim = [],
+                    iBand = [1],
+                    F₀ = zeros(FT, 1, 1),
+                    SIF₀ = zeros(FT, 1, 1)) where {FT}
+    return noRS{FT}(
+        _config_vector(FT, fscattRayl, FT[0]),
+        _config_vector(FT, ϖ_Cabannes, FT[1, 1, 1]),
+        bandSpecLim,
+        collect(Int, iBand),
+        _config_matrix(FT, F₀, zeros(FT, 1, 1)),
+        _config_matrix(FT, SIF₀, zeros(FT, 1, 1)),
+    )
+end
+
+function noRS(; fscattRayl = nothing,
+                ϖ_Cabannes = nothing,
+                bandSpecLim = [],
+                iBand = [1],
+                F₀ = nothing,
+                SIF₀ = nothing)
+    FT = _configured_float_type(Float64, fscattRayl, ϖ_Cabannes, F₀, SIF₀)
+    return noRS{FT}(
+        _config_vector(FT, fscattRayl, FT[0]),
+        _config_vector(FT, ϖ_Cabannes, FT[1, 1, 1]),
+        bandSpecLim,
+        collect(Int, iBand),
+        _config_matrix(FT, F₀, zeros(FT, 1, 1)),
+        _config_matrix(FT, SIF₀, zeros(FT, 1, 1)),
+    )
 end
 
 ############################################################
@@ -289,19 +355,55 @@ Base.@kwdef mutable struct VS_1to0_plus{FT<:AbstractFloat} <: AbstractRamanType
 end
 
 """
-    noRS_plus{FT}()
+    noRS_plus(; kwargs...)
+    noRS_plus{FT}(; kwargs...)
 
 Concatenated-grid pure elastic-scattering mode used by plus-mode code paths
 that share the Raman interface but do not include inelastic redistribution.
+The untyped keyword constructor infers `FT` from supplied floating-point
+inputs and falls back to `Float64` when no typed inputs are provided.
 """
-Base.@kwdef mutable struct noRS_plus{FT} <: AbstractRamanType
-    fscattRayl::Array{FT,1} = FT[0]
-    ϖ_Cabannes::FT = FT(1) #elastic fraction (Cabannes) of Rayleigh (Cabannes+Raman) scattering
-    bandSpecLim = []
-    iBand::Array{Int,1} = []
+mutable struct noRS_plus{FT} <: AbstractRamanType
+    fscattRayl::Array{FT,1}
+    ϖ_Cabannes::FT #elastic fraction (Cabannes) of Rayleigh (Cabannes+Raman) scattering
+    bandSpecLim
+    iBand::Array{Int,1}
     # F₀/SIF₀ placeholders: rt_run resizes to (pol_type.n, nSpec) before first use.
-    F₀::Array{FT,2}  = zeros(FT, 1, 1) # Solar/Stellar irradiation Stokes vector of size (pol_type.n, nSpec)
-    SIF₀::Array{FT,2} = zeros(FT, 1, 1) # Solar/Stellar irradiation Stokes vector of size (pol_type.n, nSpec)
+    F₀::Array{FT,2} # Solar/Stellar irradiation Stokes vector of size (pol_type.n, nSpec)
+    SIF₀::Array{FT,2} # Solar/Stellar irradiation Stokes vector of size (pol_type.n, nSpec)
+end
+
+function noRS_plus{FT}(; fscattRayl = FT[0],
+                         ϖ_Cabannes = one(FT),
+                         bandSpecLim = [],
+                         iBand = Int[],
+                         F₀ = zeros(FT, 1, 1),
+                         SIF₀ = zeros(FT, 1, 1)) where {FT}
+    return noRS_plus{FT}(
+        _config_vector(FT, fscattRayl, FT[0]),
+        _config_scalar(FT, ϖ_Cabannes, one(FT)),
+        bandSpecLim,
+        collect(Int, iBand),
+        _config_matrix(FT, F₀, zeros(FT, 1, 1)),
+        _config_matrix(FT, SIF₀, zeros(FT, 1, 1)),
+    )
+end
+
+function noRS_plus(; fscattRayl = nothing,
+                     ϖ_Cabannes = nothing,
+                     bandSpecLim = [],
+                     iBand = Int[],
+                     F₀ = nothing,
+                     SIF₀ = nothing)
+    FT = _configured_float_type(Float64, fscattRayl, ϖ_Cabannes, F₀, SIF₀)
+    return noRS_plus{FT}(
+        _config_vector(FT, fscattRayl, FT[0]),
+        _config_scalar(FT, ϖ_Cabannes, one(FT)),
+        bandSpecLim,
+        collect(Int, iBand),
+        _config_matrix(FT, F₀, zeros(FT, 1, 1)),
+        _config_matrix(FT, SIF₀, zeros(FT, 1, 1)),
+    )
 end
 
 

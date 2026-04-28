@@ -127,6 +127,26 @@ println("="^60)
         @test @inferred CoreRT.nearest_point(f_arr64, 0.25) isa Integer
     end
 
+    @testset "Raman noRS keyword constructors infer float type" begin
+        rs_default = vSmartMOM.InelasticScattering.noRS()
+        @test rs_default isa vSmartMOM.InelasticScattering.noRS{Float64}
+        @test eltype(rs_default.F₀) === Float64
+
+        rs32 = vSmartMOM.InelasticScattering.noRS(
+            fscattRayl = Float32[1],
+            ϖ_Cabannes = Float32[1],
+            bandSpecLim = UnitRange{Int}[],
+            iBand = [1],
+            F₀ = zeros(Float32, 1, 2),
+        )
+        @test rs32 isa vSmartMOM.InelasticScattering.noRS{Float32}
+        @test eltype(rs32.F₀) === Float32
+
+        rs_plus = vSmartMOM.InelasticScattering.noRS_plus(ϖ_Cabannes = Float32(1))
+        @test rs_plus isa vSmartMOM.InelasticScattering.noRS_plus{Float32}
+        @test rs_plus.ϖ_Cabannes === Float32(1)
+    end
+
     @testset "AddedLayer and CompositeLayer with Float32" begin
         RS_type = vSmartMOM.InelasticScattering.noRS{Float32}()
         FT = Float32
