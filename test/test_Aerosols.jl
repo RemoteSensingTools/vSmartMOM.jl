@@ -74,10 +74,13 @@ const RI_DATABASE = joinpath(TEST_DATA_DIR, "data", "refractive_indices_database
         
         # Construct scheme
         scheme = TOMAS15Scheme(config)
+        options = vSmartMOM.Aerosols.aerosol_processing_options(config)
         
         # Check basic properties
         @test scheme isa TOMAS15Scheme
         @test scheme.n_bins == 15
+        @test get(options, "vertical_flip", false) === true
+        @test vSmartMOM.Aerosols._tomas_concentration_variable(config, "DUST", 1) == "SpeciesConcVV_DUST01"
         @test scheme.diam_min == 10.0  # nm
         @test scheme.diam_max == 10000.0  # nm
         @test length(scheme.species) == 8
@@ -138,8 +141,9 @@ const RI_DATABASE = joinpath(TEST_DATA_DIR, "data", "refractive_indices_database
             data = read_aerosol_data(TOMAS_CONFIG, TOMAS_FILE)
             
             # Check structure
-            @test data isa AerosolData{TOMAS15Scheme}
-            @test length(data.species_data) == 8
+            @test data isa AerosolData{<:TOMAS15Scheme}
+            @test length(data.species_data) == length(data.scheme.species) + 1
+            @test haskey(data.species_data, "NK")
             
             # Check coordinates
             @test haskey(data.coordinates, "lev")
@@ -273,7 +277,7 @@ const RI_DATABASE = joinpath(TEST_DATA_DIR, "data", "refractive_indices_database
             ri_db = load_refractive_index_database(RI_DATABASE)
             
             # Compute optical properties at a few wavelengths
-            wavelengths = [0.4, 0.55, 0.86]  # μm
+            wavelengths = [0.55, 0.86, 1.0]  # μm
             
             opt_props = compute_optical_properties(data, wavelengths, ri_db)
             

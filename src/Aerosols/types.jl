@@ -79,12 +79,13 @@ Structure varies by scheme type.
 # Fields
 - `data::Dict{String, Array}`: Variable name → array data
   - TOMAS15: "concentration" → Array{Float64, 2} (n_bins × n_levels)
+  - TOMAS15 NK: may also include nested species-fraction dictionaries
   - TwoMoment: "aod" → Vector{Float64}, "radius" → Vector{Float64}
 - `units::Dict{String, String}`: Variable name → units
 - `description::String`: Human-readable description
 """
 struct AerosolSpeciesData
-    data::Dict{String, Array}
+    data::Dict{String, Any}
     units::Dict{String, String}
     description::String
 end
