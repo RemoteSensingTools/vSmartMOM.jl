@@ -21,8 +21,8 @@ using vSmartMOM.CoreRT
 Load a simple pure-Rayleigh test case (no aerosols, no gas absorption).
 
 ```julia
-params = parameters_from_yaml(
-    joinpath(dirname(dirname(pathof(vSmartMOM))),
+params = read_parameters(
+    joinpath(pkgdir(vSmartMOM),
              "test", "test_parameters", "PureRayleighParameters.yaml"))
 params.architecture = vSmartMOM.Architectures.CPU()
 params.max_m = 2

@@ -4,7 +4,7 @@
 
 ```julia
 using vSmartMOM
-params = read_parameters(joinpath(dirname(pathof(vSmartMOM)), "CoreRT", "DefaultParameters.yaml"))
+params = read_parameters(joinpath(pkgdir(vSmartMOM), "src", "CoreRT", "DefaultParameters.yaml"))
 model  = model_from_parameters(params)
 R, T   = rt_run(model)
 ```
@@ -46,5 +46,5 @@ radiative_transfer:
 
 ```julia
 using vSmartMOM
-ap = read_atmos_profile(joinpath(dirname(pathof(vSmartMOM)), "CoreRT", "DefaultParameters.yaml"))
+ap = read_atmos_profile(joinpath(pkgdir(vSmartMOM), "src", "CoreRT", "DefaultParameters.yaml"))
 ```

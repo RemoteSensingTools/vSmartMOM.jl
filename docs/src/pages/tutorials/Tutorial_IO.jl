@@ -9,7 +9,7 @@
 
 using vSmartMOM
 
-params = vSmartMOM.read_parameters(joinpath(dirname(pathof(vSmartMOM)), "CoreRT", "DefaultParameters.yaml"))
+params = vSmartMOM.read_parameters(joinpath(pkgdir(vSmartMOM), "src", "CoreRT", "DefaultParameters.yaml"))
 model  = vSmartMOM.model_from_parameters(params)
 R, T   = vSmartMOM.rt_run(model)
 println("Reflectance shape: ", size(R))

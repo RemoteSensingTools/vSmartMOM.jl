@@ -5,11 +5,11 @@ This page provides a grouped reference of key functions and types in vSmartMOM.j
 ## High-Level Functions
 
 ```@docs
+vSmartMOM.read_parameters
 vSmartMOM.parameters_from_file
 vSmartMOM.parameters_from_source
-vSmartMOM.parameters_from_yaml
 vSmartMOM.parameters_from_dict
-vSmartMOM.read_parameters
+vSmartMOM.parameters_from_yaml
 vSmartMOM.default_parameters
 vSmartMOM.model_from_parameters
 vSmartMOM.rt_run

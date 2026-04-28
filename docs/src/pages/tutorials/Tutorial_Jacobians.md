@@ -19,8 +19,8 @@ using vSmartMOM
 using vSmartMOM.CoreRT
 using CairoMakie
 
-params = parameters_from_yaml(
-    joinpath(dirname(dirname(pathof(vSmartMOM))),
+params = read_parameters(
+    joinpath(pkgdir(vSmartMOM),
              "test", "test_parameters", "ParamsEMIT_fast.yaml"))
 params.architecture = vSmartMOM.Architectures.CPU()
 ```
