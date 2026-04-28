@@ -31,6 +31,7 @@ function build()
         "Architecture & Design" => "design.md",
         "Core RT Theory"        => "pages/vSmartMOM/CoreRTTheory.md",
         "API Reference"         => "pages/api_reference.md",
+        "Release Notes"         => "pages/release_notes.md",
         "IO Reference"          => Any[
                                     "Schema" => "pages/IO/Schema.md",
                                     "Examples" => "pages/IO/Examples.md",
