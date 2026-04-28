@@ -11,17 +11,17 @@ when CUDA is loaded.
 # Default synchronization (no-op for CPU, overridden in CUDAExt for GPU)
 @inline synchronize() = nothing
 
-"Given 3D Julia Arrays A and B, fill in X[:,:,k] = A[:,:,k] \\ B[:,:,k]" 
+"Given 3D Julia Arrays A and B, fill in X[:,:,k] = A[:,:,k] \\ B[:,:,k]"
 function batch_solve!(X::AbstractArray{FT,3}, A::AbstractArray{FT,3}, B::AbstractArray{FT,3}) where {FT}
-    for i = 1:size(A, 3)
+    Threads.@threads for i = 1:size(A, 3)
         @views ldiv!(X[:,:,i], qr!(A[:,:,i]), B[:,:,i])
     end
 end
 
-"Given 3D Julia Array A, fill in X[:,:,k] = A[:,:,k] \\ I" 
+"Given 3D Julia Array A, fill in X[:,:,k] = A[:,:,k] \\ I"
 function batch_inv!(X::AbstractArray{FT,3}, A::AbstractArray{FT,3}) where {FT}
-    for i = 1:size(A, 3)
-        @views X[:,:,i] = A[:,:,i]\I;
+    Threads.@threads for i = 1:size(A, 3)
+        @views X[:,:,i] = A[:,:,i]\I
     end
 end
 
@@ -38,4 +38,25 @@ end
 "Batched multiplication for 3D Matrix with 1D vector (i.e. repeated)"
 function batched_mul(A::AbstractArray{FT,3}, B::AbstractArray{FT,1}) where {FT}
     return batched_mul(A, reshape(B, (size(B,1), 1)))
+end
+
+"""
+    batched_mul(A, B)
+
+Threaded CPU override for `NNlib.batched_mul` on dense `Array`s of `BlasFloat`
+element type. Parallelizes over the batch (third) axis with one BLAS `gemm!`
+per slice. Pin BLAS to one thread (`LinearAlgebra.BLAS.set_num_threads(1)`)
+when running with `Threads.nthreads() > 1` to avoid nested BLAS×Julia
+parallelism on the small per-slice matrices used in vSmartMOM kernels. The
+`ForwardDiff.Dual` element type is *not* `BlasFloat` and falls through to
+NNlib's existing generic path unchanged.
+"""
+function batched_mul(A::Array{T,3}, B::Array{T,3}) where {T<:LinearAlgebra.BLAS.BlasFloat}
+    @assert size(A,3) == size(B,3) "batch dim mismatch: $(size(A,3)) vs $(size(B,3))"
+    @assert size(A,2) == size(B,1) "inner dim mismatch: $(size(A,2)) vs $(size(B,1))"
+    C = Array{T,3}(undef, size(A,1), size(B,2), size(A,3))
+    Threads.@threads for k in 1:size(C,3)
+        @views mul!(C[:,:,k], A[:,:,k], B[:,:,k])
+    end
+    return C
 end
