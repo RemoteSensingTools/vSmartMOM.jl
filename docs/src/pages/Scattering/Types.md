@@ -17,15 +17,14 @@ For the expanded mapping table and implementation notes, see the [Scattering ove
 
 ### 1) Define model inputs
 
-```@docs
-make_mie_model
-```
+Use `make_mie_model` to combine aerosol microphysics, wavelength, polarization,
+truncation, and quadrature settings into a `MieModel`.
 
 ### 2) Compute optical properties
 
-```@docs
-compute_aerosol_optical_properties
-```
+Use `compute_aerosol_optical_properties` to produce RT-facing aerosol optical
+properties: Fourier/Greek coefficients, single-scattering albedo, extinction,
+and truncation information.
 
 ### 3) Reconstruct phase matrix elements
 
@@ -41,7 +40,6 @@ These are useful if you need cross-sections or scalar phase-function outputs wit
 phase_function
 compute_aerosol_XS
 compute_ref_aerosol_extinction
-truncate_phase
 ```
 
 ## Wigner Utilities (PCW)
@@ -66,16 +64,15 @@ AbstractTruncationType
 ### Aerosol and model types
 
 ```@docs
-Aerosol
 MieModel
 ```
 
+`Aerosol` defines a size distribution and complex refractive index. See the
+[API Reference](../api_reference.md) for its canonical docstring.
+
 ### Fourier decomposition types
 
-```@docs
-NAI2
-PCW
-```
+The supported Fourier decomposition families are `NAI2` and `PCW`.
 
 ### Polarization types
 
@@ -93,10 +90,9 @@ Stokes_I
 
 ### Output types
 
-```@docs
-GreekCoefs
-AerosolOptics
-```
+`GreekCoefs` stores the Fourier/Greek coefficient representation consumed by
+the RT kernels, and `AerosolOptics` groups those coefficients with extinction,
+single-scattering albedo, and truncation outputs.
 
 ### Linearized output types
 

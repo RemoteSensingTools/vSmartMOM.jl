@@ -13,43 +13,37 @@ input kind directly.
 
 ## Using the Parameters Object to Create a Model 
 
-```@docs
-model_from_parameters
-```
+Use `model_from_parameters(params)` to construct an `RTModel` from a parsed
+scene. See the [API Reference](../api_reference.md) for the canonical docstring
+and return-shape details.
 
 ## Performing the RT Simulation
 
-```@docs
-rt_run
-```
+Use `rt_run(model)` for the forward solver. Linearized runs use
+`model_from_parameters_lin` and `rt_run_lin`; see [Compute Jacobians](../jacobians.md).
 
 ## Types
 
 ### Parameters Type
 
-```@docs
-CoreRT.vSmartMOM_Parameters
-```
+`CoreRT.vSmartMOM_Parameters` is the parsed scene container returned by
+`read_parameters`, `parameters_from_file`, and related loader helpers.
 
 ### Model Type
 
-```@docs
-CoreRT.RTModel
-```
+`RTModel` is the hierarchical model state used by the solver. New code should
+prefer the `solver`, `geometry`, `quad_points`, `atmosphere`, `optics`, and
+`surfaces` fields over legacy flat-field access.
 
 ### Surface Types
 
+Surface models are subtypes of `CoreRT.AbstractSurfaceType`. The public surface
+set includes Lambertian scalar/spectrum/Legendre/spline forms, RPV, Ross-Li,
+Cox-Munk ocean, and canopy surfaces. See [Surfaces](../Surfaces/Overview.md)
+and [Add a Surface BRDF](../extending/surfaces.md) for configuration and
+extension guidance.
+
 ```@docs
-CoreRT.AbstractSurfaceType
-CoreRT.LambertianSurfaceScalar
-CoreRT.LambertianSurfaceSpectrum
-CoreRT.LambertianSurfaceLegendre
-CoreRT.LambertianSurfaceSpline
-CoreRT.rpvSurfaceScalar
-CoreRT.RossLiSurfaceScalar
-CoreRT.CoxMunkSurface
-CoreRT.CanopySurface
-CoreRT.CanopySurface_from_prospect
 CoreRT.invalidate_canopy_cache!
 ```
 
@@ -63,6 +57,6 @@ CoreRT.GaussQuadFullSphere
 ```
 
 ### Atmospheric Profile Type
-```@docs
-CoreRT.AtmosphericProfile
-```
+
+`CoreRT.AtmosphericProfile` stores the layer temperature, pressure, humidity,
+column-density, and gas-mixing-ratio fields consumed by `model_from_parameters`.
