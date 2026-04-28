@@ -30,7 +30,10 @@ function build()
                                    ],
         "Architecture & Design" => "design.md",
         "Core RT Theory"        => "pages/vSmartMOM/CoreRTTheory.md",
-        "API Reference"         => "pages/api_reference.md",
+        "API Reference"         => Any[
+                                    "Public API" => "pages/api_reference.md",
+                                    "Developer API Coverage" => "pages/internal_api_coverage.md",
+                                   ],
         "Release Notes"         => "pages/release_notes.md",
         "IO Reference"          => Any[
                                     "Schema" => "pages/IO/Schema.md",
@@ -77,20 +80,19 @@ function build()
         prettyurls = get(ENV, "CI", nothing) == "true",
         mathengine = mathengine,
         collapselevel = 1,
-        assets = ["assets/favicon.ico"]
+        assets = ["assets/favicon.ico"],
+        size_threshold_warn = 250 * 1024,
+        size_threshold = 500 * 1024,
     )
 
     # This way it shows warnings of functions that have not been documented
     makedocs(
         sitename = "vSmartMOM",
         format = format,
-        clean = false,
+        clean = true,
         modules = [vSmartMOM],
         pages = pages,
         checkdocs = :exports,
-        # Keep the remaining missing-doc coverage debt non-fatal while making
-        # docs-block and cross-reference regressions fail the build.
-        warnonly = [:missing_docs],
     )
 
 end
