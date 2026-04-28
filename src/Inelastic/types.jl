@@ -4,6 +4,11 @@ Abstract Raman type
 """
 abstract type AbstractRamanType  end
 
+# Molecular constants stay in Float64 even when FT is Float32. The Raman
+# cross-section prefactors can sit near Float32's subnormal range; widening
+# these constants keeps the molecular state stable while RT work arrays remain
+# parameterized by FT.
+
 """
     struct RRS{FT<:AbstractFloat}
 A struct which defines Rotational Raman Scattering parameters

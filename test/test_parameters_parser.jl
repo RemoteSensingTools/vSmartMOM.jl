@@ -91,6 +91,26 @@ end
     @test_throws ArgumentError vSmartMOM.IO.parse_surface_str("CoxMunkSurface()", Float64)
 end
 
+@testset "environment path expansion" begin
+    env_key = "VSMARTMOM_TEST_LUT_DIR"
+    old_value = get(ENV, env_key, nothing)
+
+    try
+        ENV[env_key] = "/tmp/vsmartmom-luts"
+        @test vSmartMOM.IO._expand_env_path("\${ENV:$(env_key)}/O2.jld2") == normpath("/tmp/vsmartmom-luts/O2.jld2")
+        @test vSmartMOM.IO._expand_env_path("relative/O2.jld2") == "relative/O2.jld2"
+
+        delete!(ENV, env_key)
+        @test_throws ArgumentError vSmartMOM.IO._expand_env_path("\${ENV:$(env_key)}/O2.jld2")
+    finally
+        if old_value === nothing
+            delete!(ENV, env_key)
+        else
+            ENV[env_key] = old_value
+        end
+    end
+end
+
 @testset "invalid configuration raises ArgumentError" begin
     cfg = _minimal_parameter_dict(float_type = "Float16")
     @test_throws ArgumentError parameters_from_dict(cfg)

@@ -8,8 +8,7 @@ The IO submodule centralizes loading and validation of simulation inputs, decoup
   - `read_parameters(dict::Dict)` → convert an in-memory config
   - `read_atmos_profile(path|dict)` → load an atmospheric profile only
 - Format registry: `IO.Formats` selects a loader based on source/extension (YAML and TOML supported).
-- Safe parsing: enums and types are parsed with explicit maps. Surfaces (BRDF) are parsed safely.
-- **Exception**: `spec_bands` uses `eval()` to support flexible Julia range expressions and Unitful conversions (e.g., `"(1e7/777):0.015:(1e7/757)"`). All other fields avoid eval.
+- Safe parsing: enums and types are parsed with explicit maps. Surfaces (BRDF) and spectral band ranges are parsed without `eval`.
 
 ## Quick start
 
@@ -55,4 +54,4 @@ params2 = read_parameters(cfg)
 - Complex error function: `HumlicekWeidemann32SDErrorFunction`
 - Surfaces (BRDF): LambertianSurfaceScalar, LambertianSurfaceSpectrum, LambertianSurfaceLegendre, LambertianSurfaceSpline, rpvSurfaceScalar, RossLiSurfaceScalar, CoxMunkSurface, CanopySurface
 
-All are passed in as strings in the YAML and mapped safely (without eval, except for spec_bands range expressions).
+All are passed in as strings in the YAML and mapped safely without `eval`.

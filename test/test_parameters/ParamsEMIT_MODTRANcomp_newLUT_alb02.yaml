@@ -7,6 +7,8 @@
 #
 # Identical to the alb=0 file apart from the surface line below. Points
 # at the rebuilt HITRAN LUTs under ~/data/HITRAN_LUTs/.
+#
+# Set VSMARTMOM_HITRAN_LUT_DIR to the rebuilt HITRAN LUT directory.
 # =================================================================
 radiative_transfer:
   spec_bands:
@@ -39,13 +41,13 @@ absorption:
   variable_molecules:
     - [H2O, CH4, O3, N2O, CO]
   LUTfiles:
-    - ["/home/sanghavi/data/HITRAN_LUTs/O2.jld2",
-       "/home/sanghavi/data/HITRAN_LUTs/CO2.jld2",
-       "/home/sanghavi/data/HITRAN_LUTs/H2O.jld2",
-       "/home/sanghavi/data/HITRAN_LUTs/CH4.jld2",
-       "/home/sanghavi/data/HITRAN_LUTs/O3.jld2",
-       "/home/sanghavi/data/HITRAN_LUTs/N2O.jld2",
-       "/home/sanghavi/data/HITRAN_LUTs/CO.jld2"]
+    - ["${ENV:VSMARTMOM_HITRAN_LUT_DIR}/O2.jld2",
+       "${ENV:VSMARTMOM_HITRAN_LUT_DIR}/CO2.jld2",
+       "${ENV:VSMARTMOM_HITRAN_LUT_DIR}/H2O.jld2",
+       "${ENV:VSMARTMOM_HITRAN_LUT_DIR}/CH4.jld2",
+       "${ENV:VSMARTMOM_HITRAN_LUT_DIR}/O3.jld2",
+       "${ENV:VSMARTMOM_HITRAN_LUT_DIR}/N2O.jld2",
+       "${ENV:VSMARTMOM_HITRAN_LUT_DIR}/CO.jld2"]
   vmr:
     O2:   0.209
     CO2:  3.30e-4

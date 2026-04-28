@@ -5,6 +5,8 @@
 # Geometry (SZA, RAA) is taken from the JSON "MISC" block. AOT550,
 # H2OSTR, GNDALT (and TSZ) are LUT-grid dimensions that are varied
 # by the driver script on a per-scenario basis.
+#
+# Set VSMARTMOM_EMIT_LUT_DIR to the directory containing *_emit_lut.jld2.
 # =================================================================
 radiative_transfer:
   # Spectral bands (list of ν_start:ν_step:ν_end, in cm⁻¹).
@@ -51,13 +53,13 @@ absorption:
   variable_molecules:
     - [H2O, CH4, O3, N2O, CO]
   LUTfiles:
-    - ["/home/sanghavi/data/EMIT_MODTRANcomp/LUTs/O2_emit_lut.jld2", 
-       "/home/sanghavi/data/EMIT_MODTRANcomp/LUTs/CO2_emit_lut.jld2",
-       "/home/sanghavi/data/EMIT_MODTRANcomp/LUTs/H2O_emit_lut.jld2",
-       "/home/sanghavi/data/EMIT_MODTRANcomp/LUTs/CH4_emit_lut.jld2",
-       "/home/sanghavi/data/EMIT_MODTRANcomp/LUTs/O3_emit_lut.jld2",
-       "/home/sanghavi/data/EMIT_MODTRANcomp/LUTs/N2O_emit_lut.jld2",
-       "/home/sanghavi/data/EMIT_MODTRANcomp/LUTs/CO_emit_lut.jld2"]
+    - ["${ENV:VSMARTMOM_EMIT_LUT_DIR}/O2_emit_lut.jld2",
+       "${ENV:VSMARTMOM_EMIT_LUT_DIR}/CO2_emit_lut.jld2",
+       "${ENV:VSMARTMOM_EMIT_LUT_DIR}/H2O_emit_lut.jld2",
+       "${ENV:VSMARTMOM_EMIT_LUT_DIR}/CH4_emit_lut.jld2",
+       "${ENV:VSMARTMOM_EMIT_LUT_DIR}/O3_emit_lut.jld2",
+       "${ENV:VSMARTMOM_EMIT_LUT_DIR}/N2O_emit_lut.jld2",
+       "${ENV:VSMARTMOM_EMIT_LUT_DIR}/CO_emit_lut.jld2"]
   vmr:
     O2:   0.209    # constant
     CO2:  3.30e-4  # constant
