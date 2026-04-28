@@ -13,8 +13,21 @@ vSmartMOM.parameters_from_yaml
 vSmartMOM.default_parameters
 vSmartMOM.model_from_parameters
 vSmartMOM.rt_run
-vSmartMOM.rt_run_lin
+```
+
+## Linearized RT
+
+```@docs
 vSmartMOM.model_from_parameters_lin
+vSmartMOM.rt_run_lin
+vSmartMOM.CoreRT.ParameterLayout
+vSmartMOM.CoreRT.n_total
+vSmartMOM.CoreRT.aerosol_range
+vSmartMOM.CoreRT.gas_range
+vSmartMOM.CoreRT.surface_range
+vSmartMOM.CoreRT.surface_index
+vSmartMOM.CoreRT.n_layer_params
+vSmartMOM.CoreRT.canopy_range
 ```
 
 ## HITRAN Data Management
@@ -86,7 +99,6 @@ vSmartMOM.CoreRT.ObsGeometry
 vSmartMOM.CoreRT.QuadPoints
 vSmartMOM.CoreRT.CompositeLayer
 vSmartMOM.CoreRT.AddedLayer
-vSmartMOM.CoreRT.ParameterLayout
 ```
 
 ## Architecture

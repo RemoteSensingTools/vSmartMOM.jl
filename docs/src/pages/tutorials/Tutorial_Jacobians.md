@@ -27,11 +27,12 @@ params.architecture = vSmartMOM.Architectures.CPU()
 
 ## 2) Build the linearized model
 
-`LinMode()` tells the constructor to compute both the forward model and
-the derivative containers (`RTModelLin`).
+`model_from_parameters_lin` tells the constructor to compute both the forward
+model and the derivative containers (`RTModelLin`). It is equivalent to
+`model_from_parameters(LinMode(), params)`.
 
 ```julia
-model, lin_model = model_from_parameters(LinMode(), params)
+model, lin_model = model_from_parameters_lin(params)
 ```
 
 `model` is the same forward model as `model_from_parameters(params)`.
@@ -54,11 +55,11 @@ The linearized `rt_run` returns `(R, T, dR, dT)`:
 - `dT` — Jacobian of T
 
 ```julia
-NAer  = length(params.scattering_params.rt_aerosols)
+NAer  = isnothing(params.scattering_params) ? 0 : length(params.scattering_params.rt_aerosols)
 NGas  = size(lin_model.τ̇_abs[1], 1)
 NSurf = 1
 
-R, T, dR, dT = rt_run(model, lin_model, NAer, NGas, NSurf)
+R, T, dR, dT = rt_run_lin(model, lin_model, NAer, NGas, NSurf)
 
 println("R  shape: ", size(R))
 println("dR shape: ", size(dR))
@@ -76,7 +77,7 @@ fig
 
 ## 4) Interpret the Jacobian layout
 
-The derivative dimension of `dR` is ordered as:
+The derivative dimension of `dR` is ordered by `ParameterLayout`:
 
 | Index range                | Parameter                        |
 |:---------------------------|:---------------------------------|
@@ -87,17 +88,20 @@ The derivative dimension of `dR` is ordered as:
 For this test case:
 
 ```julia
-Nparams = NAer * 7 + NGas + NSurf
+layout = CoreRT.ParameterLayout(aerosol_params=7, n_aerosols=NAer,
+                                n_gases=NGas, n_surface=NSurf)
+Nparams = CoreRT.n_total(layout)
 println("Total Jacobian parameters: ", Nparams,
         " (NAer×7=", NAer*7, ", NGas=", NGas, ", NSurf=", NSurf, ")")
 ```
 
 ## 5) Inspect individual derivatives
 
-Surface albedo Jacobian (last parameter, first VZA, Stokes-I):
+Surface albedo Jacobian (surface parameter, first VZA, Stokes-I):
 
 ```julia
-dR_albedo = dR[:, 1, :, end]
+surface_idx = CoreRT.surface_index(layout)
+dR_albedo = dR[:, 1, :, surface_idx]
 println("dR/d(albedo) at nadir, first 5 spectral points: ",
         round.(dR_albedo[1, 1:min(5,end)], digits=6))
 ```
@@ -106,7 +110,7 @@ Gas VMR Jacobians:
 
 ```julia
 if NGas > 0
-    igas_start = NAer * 7 + 1
+    igas_start = first(CoreRT.gas_range(layout))
     dR_gas1 = dR[:, 1, :, igas_start]
     println("dR/d(gas₁ VMR) at nadir, first 5 points: ",
             round.(dR_gas1[1, 1:min(5,end)], digits=6))
@@ -122,12 +126,12 @@ ax = Axis(fig[1,1],
     ylabel = "dR/dx (Stokes I, nadir)",
     title  = "Spectral Jacobians")
 
-lines!(ax, dR[1, 1, :, end], label="dR/d(albedo)")
+lines!(ax, dR[1, 1, :, surface_idx], label="dR/d(albedo)")
 if NGas > 0
-    lines!(ax, dR[1, 1, :, NAer * 7 + 1], label="dR/d(gas₁ VMR)")
+    lines!(ax, dR[1, 1, :, first(CoreRT.gas_range(layout))], label="dR/d(gas₁ VMR)")
 end
 if NAer > 0
-    lines!(ax, dR[1, 1, :, 1], label="dR/d(aer₁ param₁)")
+    lines!(ax, dR[1, 1, :, first(CoreRT.aerosol_range(layout, 1))], label="dR/d(aer₁ param₁)")
 end
 axislegend(ax, position=:rt)
 fig
