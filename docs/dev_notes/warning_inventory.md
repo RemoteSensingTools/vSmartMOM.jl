@@ -10,7 +10,7 @@ julia --project=docs --startup-file=no docs/make.jl 2>&1 | tee /tmp/docs_build.l
 
 ## Docs Block
 
-0 entries.
+0 entries. Resolved for Commit B by dropping `:docs_block` from `warnonly`.
 
 ## Missing Docs
 
@@ -67,4 +67,5 @@ julia --project=docs --startup-file=no docs/make.jl 2>&1 | tee /tmp/docs_build.l
 
 ## Cross References
 
-0 entries.
+0 entries. Resolved for Commit B by dropping `:cross_references` from
+`warnonly`.
