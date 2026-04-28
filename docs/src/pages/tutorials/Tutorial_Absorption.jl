@@ -249,7 +249,7 @@ record(fig, joinpath(@__DIR__, "absorption_pressure.gif"), 10:10:1100; framerate
     axislegend(ax, position=:rt)
 end
 
-# ![Pressure effect on absorption cross section](absorption_pressure.gif)
+# When run locally, this writes `absorption_pressure.gif` next to the tutorial.
 
 #-------------------------
 
@@ -267,7 +267,7 @@ record(fig, joinpath(@__DIR__, "absorption_temperature.gif"), 10:10:320; framera
     axislegend(ax, position=:rt)
 end
 
-# ![Temperature effect on absorption cross section](absorption_temperature.gif)
+# When run locally, this writes `absorption_temperature.gif` next to the tutorial.
 
 #-------------------------
 

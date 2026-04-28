@@ -289,7 +289,7 @@ record(fig, joinpath(@__DIR__, "absorption_pressure.gif"), 10:10:1100; framerate
 end
 ```
 
-![Pressure effect on absorption cross section](absorption_pressure.gif)
+When run locally, this writes `absorption_pressure.gif` next to the tutorial.
 
 ```julia
 p = 900.0
@@ -307,7 +307,7 @@ record(fig, joinpath(@__DIR__, "absorption_temperature.gif"), 10:10:320; framera
 end
 ```
 
-![Temperature effect on absorption cross section](absorption_temperature.gif)
+When run locally, this writes `absorption_temperature.gif` next to the tutorial.
 
 ```julia
 # More extreme case, let's take 10 atmospheres (10,000 hPa)

@@ -96,3 +96,12 @@ and product policy are settled.
   `@docs` blocks, missing-doc coverage warnings, and stale tutorial image links.
 - Unified offline source-function integration and thermal emission are design
   topics, not implemented user-facing features in this release line.
+
+## Future Developments
+
+- Mixed automatic differentiation and hand-coded linearization.
+- Coupled ocean-atmosphere radiative transfer.
+- More line-shape and line-mixing functionality, including expansion to more
+  spectral databases.
+- Raman performance and memory-pressure improvements.
+- Correlated-k and other spectral dimension-reduction methods.
