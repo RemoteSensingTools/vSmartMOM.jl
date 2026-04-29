@@ -124,6 +124,14 @@ fig
 The forward peak in f₁₁ is characteristic of Mie scattering by particles larger than the wavelength.
 The f₁₂/f₁₁ ratio gives the degree of linear polarization for unpolarized incident light.
 
+The docs build also writes a standalone Plotly version of this phase-function
+preview. It keeps the log-scaled f₁₁ panel and the polarization-ratio panel
+interactive on the rendered documentation page.
+
+```@raw html
+<iframe title="Mie phase function preview" src="../../assets/plots/scattering_phase_preview.html" loading="lazy" style="width: 100%; height: 560px; border: 1px solid var(--vp-c-divider); border-radius: 8px;"></iframe>
+```
+
 Polar view of the phase function and polarization ratio:
 
 ```julia

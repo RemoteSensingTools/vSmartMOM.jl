@@ -28,6 +28,14 @@ R, T = rt_run(model)
 println("R shape: ", size(R))
 println("R(nadir, I, λ₁) = ", R[1, 1, 1])
 
+# The generated docs include a Plotly view of this pure-Rayleigh scene across
+# the signed viewing-angle sweep in the YAML file. The first trace is Stokes I;
+# the second trace is Stokes Q.
+#
+# ```@raw html
+# <iframe title="Pure-Rayleigh reflectance by viewing angle" src="../../assets/plots/core_rt_vza_response.html" loading="lazy" style="width: 100%; height: 470px; border: 1px solid var(--vp-c-divider); border-radius: 8px;"></iframe>
+# ```
+
 # ## 2) What happens internally
 #
 # The layer loop is implemented in `src/CoreRT/rt_run.jl`.

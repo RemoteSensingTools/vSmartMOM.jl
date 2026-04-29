@@ -121,6 +121,14 @@ The Voigt line-shape is the combination of Doppler and Lorentz broadening (convo
 
 Once you dig deeper, there are various other more complex line-shapes (and line-mixing effects), which we ignore for now as the Voigt line-shape can provide very reasonable results. See, for instance, [here](https://www.degruyter.com/view/j/pac.2014.86.issue-12/pac-2014-0208/pac-2014-0208.xml).
 
+The generated docs include a compact Plotly preview of the same line-shape
+families. The Voigt trace is computed as a numerical convolution of the
+Doppler and Lorentz profiles on the displayed grid.
+
+```@raw html
+<iframe title="Absorption line-shape families" src="../../assets/plots/absorption_lineshape_families.html" loading="lazy" style="width: 100%; height: 470px; border: 1px solid var(--vp-c-divider); border-radius: 8px;"></iframe>
+```
+
 Import the required tools:
 
 ```julia
