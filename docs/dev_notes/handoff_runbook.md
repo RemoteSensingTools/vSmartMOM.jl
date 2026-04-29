@@ -22,9 +22,6 @@ if you already know the context.
 | (none — see Deferred for next pickup) | |
 
 ## Deferred (next pickups, in order)
-| ⏸ [design_brief.md](design_brief.md) | **Next pickup.** Specifies the visual system for the hero block, icons, and palette. The follow-up commit moves the four staged SVGs into `docs/src/assets/icons/`, adds the hero frontmatter to `docs/src/index.md`, and verifies the build. |
-| ⏸ [design/index_hero_draft.md](design/index_hero_draft.md) | Exact frontmatter to paste into `docs/src/index.md` on Vitepress hero day. |
-| ⏸ [design/icons/](design/icons/) | Four production-ready SVGs (`logo`, `scattering`, `absorption`, `radiative_transfer`). Move to `docs/src/assets/icons/` on Vitepress hero day. |
 | ⏸ [design/preview.html](design/preview.html) | Self-contained browser preview of all four icons at multiple sizes in both color schemes. Open anytime for visual sanity check. |
 | ⏸ [design/CITATION.bib](design/CITATION.bib) | Six canonical citations. Two uses: (1) drop at repo root for GitHub's "Cite this repository" widget, (2) input for `pages/vSmartMOM/References.md` refresh during legacy_pages_triage T3. |
 | ⏸ [internal_api_cleanup.md](internal_api_cleanup.md) | Post-v2.0.0 follow-up. Triages the 48 internal exports into four action buckets with a six-commit execution plan. Not blocking. |
@@ -47,6 +44,9 @@ if you already know the context.
 | ✅ [codex_next_task.md](codex_next_task.md) | The warnonly retirement task: three commits A/B/C. | Commits 491e30a, eaa8fd9, 42d9366. |
 | ✅ [legacy_pages_triage.md](legacy_pages_triage.md) | Per-file decisions for the four legacy `pages/vSmartMOM/*.md` files. | Commits f455de6, 38d88e0, 776eb97. |
 | ✅ [docs_vitepress_migration.md](docs_vitepress_migration.md) | DocumenterVitepress renderer cutover. | Commit 164c98d. `docs/src/.vitepress/config.mts` not committed — DocumenterVitepress 0.3 generates at build time; revisit if sidebar grouping needs customization. |
+| ✅ [design_brief.md](design_brief.md) | Visual system for the hero block, icons, and palette. | Consumed by the hero/icon landing-page commit. |
+| ✅ [design/index_hero_draft.md](design/index_hero_draft.md) | Exact Vitepress hero frontmatter for `docs/src/index.md`. | Consumed by the hero/icon landing-page commit. |
+| ✅ `design/icons/` | Four production SVGs for the landing-page hero and feature cards. | Moved to `docs/src/assets/icons/` by the hero/icon landing-page commit. |
 
 ## Recommended reading order for cold pickup
 
