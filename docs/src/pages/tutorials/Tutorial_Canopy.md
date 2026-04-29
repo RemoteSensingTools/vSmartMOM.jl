@@ -164,6 +164,13 @@ axislegend(ax, position=:rt)
 fig
 ```
 
+The rendered docs include a Plotly red-edge view so the spectral contrast is
+visible even when static Makie figures are not rendered by the docs frontend:
+
+```@raw html
+<iframe title="Canopy spectral response" src="../../assets/plots/canopy_spectral_response.html" loading="lazy" style="width: 100%; height: 520px; border: 1px solid var(--vp-c-divider); border-radius: 8px;"></iframe>
+```
+
 ## 7) Effect of within-canopy atmosphere
 
 The within-canopy atmosphere adds gas absorption between canopy sub-layers.

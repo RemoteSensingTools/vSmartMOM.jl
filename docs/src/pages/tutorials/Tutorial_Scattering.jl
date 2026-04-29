@@ -80,6 +80,13 @@ for i in 1:6
 end
 fig
 
+# The docs build renders these coefficients as an interactive Plotly panel so
+# individual Fourier coefficients can be toggled on and off.
+#
+# ```@raw html
+# <iframe title="Mie Greek coefficient preview" src="../../assets/plots/scattering_greek_coefficients.html" loading="lazy" style="width: 100%; height: 500px; border: 1px solid var(--vp-c-divider); border-radius: 8px;"></iframe>
+# ```
+#
 # These coefficients are Fourier-space quantities used by RT kernels.
 # Reconstruct angle-dependent phase-matrix elements only when needed.
 
