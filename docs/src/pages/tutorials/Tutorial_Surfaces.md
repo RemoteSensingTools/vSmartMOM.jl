@@ -420,6 +420,13 @@ axislegend(ax, position=:rt)
 fig
 ```
 
+The rendered docs include a Plotly comparison of the angular signatures for
+the main surface families:
+
+```@raw html
+<iframe title="Surface BRDF angular slices" src="../../assets/plots/surface_brdf_slices.html" loading="lazy" style="width: 100%; height: 520px; border: 1px solid var(--vp-c-divider); border-radius: 8px;"></iframe>
+```
+
 ---
 
 ## 11) YAML Configuration

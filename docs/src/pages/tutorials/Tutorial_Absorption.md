@@ -126,7 +126,7 @@ families. The Voigt trace is computed as a numerical convolution of the
 Doppler and Lorentz profiles on the displayed grid.
 
 ```@raw html
-<iframe title="Absorption line-shape families" src="../../assets/plots/absorption_lineshape_families.html" loading="lazy" style="width: 100%; height: 470px; border: 1px solid var(--vp-c-divider); border-radius: 8px;"></iframe>
+<iframe title="Absorption line-shape families" src="../../assets/plots/absorption_lineshape_families.html" loading="lazy" style="width: 100%; height: 520px; border: 1px solid var(--vp-c-divider); border-radius: 8px;"></iframe>
 ```
 
 Import the required tools:
@@ -273,6 +273,13 @@ lines!(ax, collect(ν_band), ff .* (σ_co2_Voigt220 .- σ_co2_Voigt290), label="
 xlims!(ax, 6300, 6380)
 axislegend(ax, position=:rt)
 fig
+```
+
+The docs build includes an interactive Plotly summary of this temperature
+redistribution effect across the band:
+
+```@raw html
+<iframe title="CO2 temperature redistribution plot" src="../../assets/plots/absorption_temperature_band.html" loading="lazy" style="width: 100%; height: 560px; border: 1px solid var(--vp-c-divider); border-radius: 8px;"></iframe>
 ```
 
 Now we can clearly see how the change in the distribution of the lower rotational state leads to a redistribution of cross sections (a shift from lower to higher ground states with higher T)

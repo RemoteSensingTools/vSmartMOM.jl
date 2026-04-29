@@ -120,37 +120,35 @@ if NGas > 0
 end
 ```
 
-Plot spectral Jacobians for the main parameter types:
+Plot the aerosol optical depth Jacobian (`τ_ref`, the first aerosol
+parameter) rather than the full parameter matrix. This is the most useful
+first diagnostic: it shows how an AOD perturbation changes the reflected
+Stokes-I spectrum.
 
 ```julia
 fig = Figure(size=(700, 500))
 ax = Axis(fig[1,1],
     xlabel = "Spectral index",
-    ylabel = "dR/dx (Stokes I, nadir)",
-    title  = "Spectral Jacobians")
+    ylabel = "dR/dτ_ref (Stokes I)",
+    title  = "AOD Jacobian")
 
-lines!(ax, dR[1, 1, :, surface_idx], label="dR/d(albedo)")
-if NGas > 0
-    lines!(ax, dR[1, 1, :, first(CoreRT.gas_range(layout))], label="dR/d(gas₁ VMR)")
-end
 if NAer > 0
-    lines!(ax, dR[1, 1, :, first(CoreRT.aerosol_range(layout, 1))], label="dR/d(aer₁ param₁)")
+    aod_idx = first(CoreRT.aerosol_range(layout, 1))
+    lines!(ax, dR[1, 1, :, aod_idx], label="VZA 0°")
+    if size(dR, 1) > 1
+        lines!(ax, dR[2, 1, :, aod_idx], label="VZA 30°")
+    end
 end
 axislegend(ax, position=:rt)
 fig
 ```
 
-Jacobian heatmap (all parameters):
+The rendered docs use Plotly for the visible figure. The top panel shows the
+forward reflectance; the bottom panel shows the `τ_ref` Jacobian for the same
+viewing angles.
 
-```julia
-fig = Figure(size=(700, 450))
-ax = Axis(fig[1,1],
-    xlabel = "Parameter index",
-    ylabel = "Spectral index",
-    title  = "Full Jacobian matrix dR/dx")
-hm = heatmap!(ax, dR[1, 1, :, :]')
-Colorbar(fig[1,2], hm, label="dR/dx")
-fig
+```@raw html
+<iframe title="AOD Jacobian response" src="../../assets/plots/jacobian_aod_response.html" loading="lazy" style="width: 100%; height: 560px; border: 1px solid var(--vp-c-divider); border-radius: 8px;"></iframe>
 ```
 
 ## 6) Verify against finite differences (optional)
