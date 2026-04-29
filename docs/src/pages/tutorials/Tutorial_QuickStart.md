@@ -44,6 +44,13 @@ println("T shape: ", size(T))
 println("R(nadir, I, λ₁) = ", R[1, 1, 1])
 ```
 
+The documentation build renders the same two arrays as an interactive Plotly
+view. Hovering the bars shows the numeric Stokes-I values returned above.
+
+```@raw html
+<iframe title="Quickstart RT output" src="../../assets/plots/quickstart_rt_response.html" loading="lazy" style="width: 100%; height: 420px; border: 1px solid var(--vp-c-divider); border-radius: 8px;"></iframe>
+```
+
 ## 5) Next steps
 
 The shipped quickstart scene intentionally avoids absorption and aerosol Mie
