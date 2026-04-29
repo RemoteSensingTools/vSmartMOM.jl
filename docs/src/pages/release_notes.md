@@ -84,16 +84,33 @@ The registration-oriented test suite avoids machine-local data assumptions.
 RAMI remains useful as an external canopy validation workflow, but it is not a
 unit-test fixture in the default test environment.
 
+The EMIT/MODTRAN comparison scripts remain in the repository as benchmark and
+analysis utilities, but their execution tests are disabled in CI because they
+depend on external LUTs and machine-local scene inputs. The Phase 6 test suite
+still parses those scripts so ordinary import and syntax drift is caught.
+
 SIF helper functions are exported because the data loaders exist, but the
-end-to-end SIF workflow is not presented as a task page until the data-fixture
-and product policy are settled.
+end-to-end SIF workflow is kept under [Experimental Helpers](api/experimental.md)
+until the data-fixture and product policy are settled.
+
+## Documentation and Citation
+
+The manual has been reorganized around task pages first and a module-grouped
+[Library](api_reference.md) second. The docs build runs with
+`checkdocs = :exports` and without `warnonly`, so exported public symbols and
+cross references are checked as part of the release gate.
+
+The repository now ships a root `CITATION.bib` with the JOSS software paper and
+the core method references. See [References](vSmartMOM/References.md) for the
+human-readable citation guide.
 
 ## Known WIP Areas
 
 - Aerosol scene input is documented, but the high-level API is still being
   stabilized.
-- The docs build intentionally tolerates a small backlog of duplicate legacy
-  `@docs` blocks, missing-doc coverage warnings, and stale tutorial image links.
+- Internal export cleanup is intentionally deferred until after v2.0.0 so this
+  release does not tighten public API surface area at the same time as the
+  registration cutover.
 - Unified offline source-function integration and thermal emission are design
   topics, not implemented user-facing features in this release line.
 
