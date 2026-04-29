@@ -23,7 +23,6 @@ if you already know the context.
 
 ## Deferred (next pickups, in order)
 | ⏸ [design/preview.html](design/preview.html) | Self-contained browser preview of all four icons at multiple sizes in both color schemes. Open anytime for visual sanity check. |
-| ⏸ [design/CITATION.bib](design/CITATION.bib) | Six canonical citations. Two uses: (1) drop at repo root for GitHub's "Cite this repository" widget, (2) input for `pages/vSmartMOM/References.md` refresh during legacy_pages_triage T3. |
 | ⏸ [internal_api_cleanup.md](internal_api_cleanup.md) | Post-v2.0.0 follow-up. Triages the 48 internal exports into four action buckets with a six-commit execution plan. Not blocking. |
 
 ## Reference (read anytime; no consumption)
@@ -47,6 +46,7 @@ if you already know the context.
 | ✅ [design_brief.md](design_brief.md) | Visual system for the hero block, icons, and palette. | Consumed by the hero/icon landing-page commit. |
 | ✅ [design/index_hero_draft.md](design/index_hero_draft.md) | Exact Vitepress hero frontmatter for `docs/src/index.md`. | Consumed by the hero/icon landing-page commit. |
 | ✅ `design/icons/` | Four production SVGs for the landing-page hero and feature cards. | Moved to `docs/src/assets/icons/` by the hero/icon landing-page commit. |
+| ✅ [design/CITATION.bib](design/CITATION.bib) | Six canonical citations. | Copied to root `CITATION.bib`; references page refreshed for release prep. |
 
 ## Recommended reading order for cold pickup
 
