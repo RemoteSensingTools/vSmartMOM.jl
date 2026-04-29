@@ -4,7 +4,7 @@
 
 Use `artifact("CO2")`, `artifact("H2O")`, and related artifact names to resolve
 packaged HITRAN `.par` files. See [HITRAN Data Management](HITRAN_Data.md) and
-the [API Reference](../api_reference.md) for the canonical artifact helpers.
+the [Library](../api_reference.md) for the canonical artifact helpers.
 
 ## Reading HITRAN Files
 
@@ -32,7 +32,7 @@ HitranTable
 ### Broadening Function Types
 
 The primary broadening models are `Doppler`, `Lorentz`, and `Voigt`. The
-canonical docstrings are grouped in the [API Reference](../api_reference.md).
+canonical docstrings are grouped in the [Library](../api_reference.md).
 
 ### Complex Error Function Types
 

@@ -14,7 +14,7 @@ input kind directly.
 ## Using the Parameters Object to Create a Model 
 
 Use `model_from_parameters(params)` to construct an `RTModel` from a parsed
-scene. See the [API Reference](../api_reference.md) for the canonical docstring
+scene. See the [Library](../api_reference.md) for the canonical docstring
 and return-shape details.
 
 ## Performing the RT Simulation

@@ -40,7 +40,7 @@ organizes solver state into named sub-objects:
 The old flat `vSmartMOM_Model` container has been replaced. Compatibility
 getters still expose many legacy fields, but new code should prefer the
 hierarchical fields and accessor functions documented in the
-[API Reference](api_reference.md).
+[Library](api_reference.md).
 
 ## Parameter Loading
 

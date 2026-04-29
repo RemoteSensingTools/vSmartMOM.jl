@@ -2,7 +2,7 @@
 
 **For:** users selecting a lower-boundary BRDF and developers adding new surface models.
 
-**Next:** [Add a Surface BRDF](../extending/surfaces.md), [Surfaces tutorial](../tutorials/Tutorial_Surfaces.md), [API Reference](../api_reference.md).
+**Next:** [Add a Surface BRDF](../extending/surfaces.md), [Surfaces tutorial](../tutorials/Tutorial_Surfaces.md), [Library](../api_reference.md).
 
 Surface models live in `CoreRT` because they are part of the lower-boundary interaction in the adding-doubling solver. Scene files refer to them through safe parser entries such as `LambertianSurfaceScalar(0.15)`.
 

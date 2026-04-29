@@ -1,7 +1,7 @@
 # Developer API Coverage
 
 This page makes exported developer-facing helpers canonical for Documenter.
-Most users should start from the [Public API](api_reference.md), task pages, or
+Most users should start from the [Library](api_reference.md), task pages, or
 module overview pages instead.
 
 ## Package Modules

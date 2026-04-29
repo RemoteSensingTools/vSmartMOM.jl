@@ -68,7 +68,7 @@ MieModel
 ```
 
 `Aerosol` defines a size distribution and complex refractive index. See the
-[API Reference](../api_reference.md) for its canonical docstring.
+[Library](../api_reference.md) for its canonical docstring.
 
 ### Fourier decomposition types
 

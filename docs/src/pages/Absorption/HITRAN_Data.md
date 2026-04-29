@@ -242,8 +242,8 @@ using Pkg
 Pkg.gc()  # removes unused artifacts
 ```
 
-## API Reference
+## Library Reference
 
 The canonical docstrings for `artifact`, `fetch_hitran`,
 `fetch_hitran_by_ids`, HITRAN edition preferences, `hitran_info`, and
-`hitran_is_cached` are grouped in the [API Reference](../api_reference.md).
+`hitran_is_cached` are grouped in the [Absorption API](../api/absorption.md).
