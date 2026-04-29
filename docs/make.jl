@@ -1,4 +1,5 @@
 using Documenter
+using DocumenterVitepress
 using Literate
 using vSmartMOM
 using vSmartMOM.Absorption
@@ -65,21 +66,20 @@ function build()
         "Tutorials"             => tutorials_md
     ]
 
-    mathengine = MathJax(Dict(
-        :TeX => Dict(
-            :equationNumbers => Dict(:autoNumber => "AMS"),
-            :Macros => Dict(),
-        ),
-    ))
+    ref_name = get(ENV, "GITHUB_REF_NAME", "")
+    deploy_devbranch = ref_name == "unified-vsmartmom" ? "unified-vsmartmom" : "main"
+    deploy_devurl = ref_name == "unified-vsmartmom" ? "unified-vsmartmom" : "dev"
 
-    # The format will make other pages in parallel with the index page
-    format = Documenter.HTML(
-        prettyurls = get(ENV, "CI", nothing) == "true",
-        mathengine = mathengine,
-        collapselevel = 1,
-        assets = ["assets/favicon.ico"],
-        size_threshold_warn = 250 * 1024,
-        size_threshold = 500 * 1024,
+    format = MarkdownVitepress(
+        repo = "github.com/RemoteSensingTools/vSmartMOM.jl",
+        devbranch = deploy_devbranch,
+        devurl = deploy_devurl,
+        deploy_decision = get(ENV, "CI", "false") == "true" ?
+            nothing : Documenter.DeployDecision(all_ok = false),
+        deploy_url = "https://remotesensingtools.github.io/vSmartMOM.jl",
+        description = "Polarized atmospheric radiative transfer and remote sensing tools in Julia.",
+        assets = ["assets/favicon.ico", "assets/logo.png"],
+        sidebar_drawer = true,
     )
 
     # This way it shows warnings of functions that have not been documented
@@ -104,7 +104,8 @@ if get(ENV, "CI", "false") == "true"
     deploy_devbranch = ref_name == "unified-vsmartmom" ? "unified-vsmartmom" : "main"
     deploy_devurl = ref_name == "unified-vsmartmom" ? "unified-vsmartmom" : "dev"
 
-    deploydocs(
+    DocumenterVitepress.deploydocs(
+        root = @__DIR__,
         repo = "github.com/RemoteSensingTools/vSmartMOM.jl.git",
         target = "build",
         push_preview = true,
