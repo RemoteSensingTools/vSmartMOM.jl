@@ -124,8 +124,8 @@ Construct an `AddedLayer` with zero-initialized R, T, J₀ matrices for elastic 
 function make_added_layer(RS_type::Union{noRS, noRS_plus}, FT, arr_type, dims, nSpec) 
     t1 = default_matrix(FT, arr_type, dims, nSpec)
     t2 = default_matrix(FT, arr_type, dims, nSpec)
-    t1_ptr = arr_type == Array ? nothing : (CUBLAS_ref[] === nothing ? error("GPU RT requires CUDA; load with using CUDA") : CUBLAS_ref[].unsafe_strided_batch(t1));
-    t2_ptr = arr_type == Array ? nothing : (CUBLAS_ref[] === nothing ? error("GPU RT requires CUDA; load with using CUDA") : CUBLAS_ref[].unsafe_strided_batch(t2));
+    t1_ptr = batched_pointer_cache(t1)
+    t2_ptr = batched_pointer_cache(t2)
     return AddedLayer(
         r⁻⁺ = default_matrix(FT, arr_type, dims, nSpec), 
         t⁺⁺ = default_matrix(FT, arr_type, dims, nSpec), 
@@ -280,4 +280,3 @@ function get_layer_properties(computed_atmospheric_properties::ComputedAtmospher
         fscattRayl, 
         scattering_interface)
 end
-

@@ -104,6 +104,7 @@ include("rt_run_lin.jl")                       # Linearized RT run
 include("rt_run_multisensor.jl")
 
 # CPU batched operations (always available)
+include("tools/ka_batched_kernels.jl")         # Portable KA batched kernels
 include("tools/cpu_batched.jl")                   # CPU batched linear algebra operations
 
 # Utilities / Helper Functions

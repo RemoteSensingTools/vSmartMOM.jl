@@ -21,6 +21,7 @@ try
 @testset "Absorption" begin include("test_Absorption.jl") end
 @testset "Scattering" begin include("test_Scattering.jl") end
 @testset "CoreRT" begin include("test_CoreRT.jl") end
+@testset "Batched Kernels" begin include("test_batched_kernels.jl") end
 @testset "SolarModel" begin include("test_SolarModel.jl") end
 
 # Forward model tests (these require YAML parameter files + data)

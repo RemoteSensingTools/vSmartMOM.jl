@@ -4,9 +4,9 @@ EditURL = "Tutorial_GPU.jl"
 
 # GPU Acceleration
 
-vSmartMOM can run the full RT solver on NVIDIA GPUs via CUDA.jl.
-This tutorial explains how to enable GPU mode, what works on GPU,
-and how to fall back to CPU.
+vSmartMOM can run the RT solver on optional GPU backends. CUDA.jl is the
+mature NVIDIA path. Metal.jl support is experimental for Apple Silicon
+Float32 runs and starts with the core batched multiply/inverse path.
 
 ## 1) Checking GPU availability
 
@@ -15,6 +15,8 @@ using vSmartMOM
 
 if vSmartMOM.Architectures.has_cuda()
     println("CUDA is available — GPU mode enabled.")
+elseif vSmartMOM.Architectures.has_metal()
+    println("Metal is available — Apple GPU mode enabled.")
 else
     println("CUDA not available — running CPU-only examples.")
 end
@@ -33,11 +35,12 @@ You can explicitly choose CPU or GPU:
 
 ```julia
 params.architecture = vSmartMOM.Architectures.CPU()   # force CPU
-params.architecture = vSmartMOM.Architectures.GPU()   # force GPU
+params.architecture = vSmartMOM.Architectures.GPU()   # force CUDA GPU
+params.architecture = vSmartMOM.Architectures.MetalGPU()  # force Metal GPU
 ```
 
-When loading from YAML, set `architecture: GPU` in the config, or
-override after loading:
+When loading from YAML, set `architecture: GPU` for CUDA or
+`architecture: MetalGPU` for Apple Silicon Metal, or override after loading:
 
 ```julia
 params = read_parameters(
@@ -61,8 +64,8 @@ R_gpu, = rt_run(model_gpu)
 ```
 
 The same code paths are used — arrays are automatically moved to GPU
-via `CuArray`, and the RT kernels use `KernelAbstractions.jl` for
-device-portable kernel dispatch.
+via backend arrays (`CuArray` or `MtlArray`), and the RT kernels use
+`KernelAbstractions.jl` for device-portable kernel dispatch.
 
 ## 4) What runs on GPU
 
@@ -73,7 +76,7 @@ The following operations are fully GPU-accelerated:
 | Elemental layer (`elemental!`) | ✅ Full |
 | Doubling (`doubling!`)         | ✅ Full |
 | Interaction (`interaction!`)   | ✅ Full |
-| Batched matrix inverse         | ✅ via CUBLAS |
+| Batched matrix inverse         | ✅ CUBLAS on CUDA; portable KA kernel on Metal |
 | Phase function computation     | ❌ CPU only |
 | Absorption cross-sections      | ✅ Full |
 | Postprocessing (VZA interp.)   | ✅ Full |
@@ -92,6 +95,14 @@ radiative_transfer:
   architecture: GPU
   spec_bands:
     - "(1e7/771):0.2:(1e7/759)"   # coarser grid
+```
+
+On Apple Silicon, use Float32 and the Metal architecture:
+
+```yaml
+radiative_transfer:
+  float_type: Float32
+  architecture: MetalGPU
 ```
 
 ## 6) Benchmarking CPU vs GPU
