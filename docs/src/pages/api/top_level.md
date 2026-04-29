@@ -27,6 +27,7 @@ vSmartMOM.rt_run
 ```@docs
 vSmartMOM.CPU
 vSmartMOM.GPU
+vSmartMOM.MetalGPU
 vSmartMOM.default_architecture
 vSmartMOM.array_type
 ```

@@ -11,6 +11,13 @@ import NNlib: batched_mul
 # Note: synchronize() in CoreRT already uses Architectures.synchronize_if_gpu()
 # which calls CUDA.synchronize() when CUDA is available (via _sync_gpu Ref)
 
+"Return CUBLAS strided-batch pointer metadata for CUDA-backed RT work arrays."
+function vSmartMOM.CoreRT.batched_pointer_cache(A::CuArray)
+    vSmartMOM.CoreRT.CUBLAS_ref[] === nothing &&
+        error("CUDA batched RT requires CUBLAS; load with using CUDA")
+    return vSmartMOM.CoreRT.CUBLAS_ref[].unsafe_strided_batch(A)
+end
+
 "Given 3D CuArrays A and B, fill in X[:,:,k] = A[:,:,k] \\ B[:,:,k]" 
 function vSmartMOM.CoreRT.batch_solve!(X::CuArray{FT,3}, A::CuArray{FT,3}, B::CuArray{FT,3}) where {FT}
     # Temporary factorization matrix

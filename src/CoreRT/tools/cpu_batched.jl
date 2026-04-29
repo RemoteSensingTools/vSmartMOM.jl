@@ -11,6 +11,16 @@ when CUDA is loaded.
 # Default synchronization (no-op for CPU, overridden in CUDAExt for GPU)
 @inline synchronize() = nothing
 
+"""
+    batched_pointer_cache(A)
+
+Return backend-specific batched pointer metadata for `A`, or `nothing` when
+the backend does not need pointer arrays. CUDA overrides this for `CuArray`
+so the existing CUBLAS batched inverse path can use `unsafe_strided_batch`.
+Portable KernelAbstractions backends, including Metal, use `nothing`.
+"""
+@inline batched_pointer_cache(::AbstractArray) = nothing
+
 "Given 3D Julia Arrays A and B, fill in X[:,:,k] = A[:,:,k] \\ B[:,:,k]"
 function batch_solve!(X::AbstractArray{FT,3}, A::AbstractArray{FT,3}, B::AbstractArray{FT,3}) where {FT}
     Threads.@threads for i = 1:size(A, 3)
