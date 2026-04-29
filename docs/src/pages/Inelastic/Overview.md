@@ -2,7 +2,7 @@
 
 **For:** users choosing Raman/Cabannes modes and developers extending inelastic scattering.
 
-**Next:** [Core RT Theory](../vSmartMOM/CoreRTTheory.md), [Add a Raman Mode](../extending/raman.md), [API Reference](../api_reference.md).
+**Next:** [Core RT Theory](../vSmartMOM/CoreRTTheory.md), [Add a Raman Mode](../extending/raman.md), [Library](../api_reference.md).
 
 The `InelasticScattering` module defines the Raman mode types and molecular precomputations used by the CoreRT solver. The forward model can run without Raman redistribution, with rotational Raman scattering, or with vibrational Raman scattering modes.
 

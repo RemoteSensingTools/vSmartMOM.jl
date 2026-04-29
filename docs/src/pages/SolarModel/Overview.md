@@ -2,7 +2,7 @@
 
 **For:** users supplying solar spectra or checking the package default solar transmission table.
 
-**Next:** [Configure a Scene](../IO/Overview.md), [Core RT Theory](../vSmartMOM/CoreRTTheory.md), [API Reference](../api_reference.md).
+**Next:** [Configure a Scene](../IO/Overview.md), [Core RT Theory](../vSmartMOM/CoreRTTheory.md), [Library](../api_reference.md).
 
 The `SolarModel` module provides Planck-spectrum helpers and solar transmission readers used by vSmartMOM examples and RT configurations. It is intentionally small: it loads or generates spectral inputs, while the CoreRT solver applies those inputs through the solar source-function path.
 

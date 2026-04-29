@@ -49,13 +49,13 @@ pkg> add vSmartMOM
 
 ## Public Modules
 
-- **CoreRT** — adding-doubling solver, model types, optical-property assembly, surface coupling, Jacobian kernels.
-- **IO** — YAML, TOML, Dict, NetCDF, and GEOS-Chem inputs.
-- **Absorption** — HITRAN line-by-line and lookup-table gas absorption.
-- **Scattering** — Mie calculations, phase functions, Greek coefficients, truncation inputs.
-- **InelasticScattering** — Raman / Cabannes mode types and optical-property helpers.
-- **Aerosols** — TOMAS-15 and two-moment aerosol input support. *API still being stabilized.*
-- **SolarModel** — solar / stellar spectra and transmission helpers.
+- **[CoreRT](pages/api/core_rt.md)** — adding-doubling solver, model types, optical-property assembly, surface coupling, Jacobian kernels.
+- **[IO](pages/api/io.md)** — YAML, TOML, Dict, NetCDF, and GEOS-Chem inputs.
+- **[Absorption](pages/api/absorption.md)** — HITRAN line-by-line and lookup-table gas absorption.
+- **[Scattering](pages/api/scattering.md)** — Mie calculations, phase functions, Greek coefficients, truncation inputs.
+- **[InelasticScattering](pages/api/inelastic.md)** — Raman / Cabannes mode types and optical-property helpers.
+- **[Aerosols](pages/api/aerosols.md)** — TOMAS-15 and two-moment aerosol input support. *API still being stabilized.*
+- **[SolarModel](pages/api/solar_model.md)** — solar / stellar spectra and transmission helpers.
 
 ## Cite
 

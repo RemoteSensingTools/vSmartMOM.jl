@@ -118,7 +118,7 @@ R = run_rt_with_geoschem_v2(
 )
 ```
 
-## API Reference
+## Library Reference
 
 ### Types
 

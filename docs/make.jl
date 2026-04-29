@@ -43,50 +43,51 @@ function build()
     tutorials_md = [joinpath("pages", "tutorials", tutorial[1:end-3]) * ".md" for tutorial in tutorials]
 
     pages = Any[
-        "Getting Started"       => "index.md",
-        "Quick Start (5 min)"   => "pages/quickstart.md",
-        "Configure a Scene"     => "pages/IO/Overview.md",
-        "Compute Jacobians"     => "pages/jacobians.md",
-        "Run on GPU"            => "pages/gpu.md",
-        "Extend vSmartMOM"      => Any[
+        "Home"                  => "index.md",
+        "Manual"                => Any[
+                                    "Quick Start (5 min)" => "pages/quickstart.md",
+                                    "Configure a Scene" => "pages/IO/Overview.md",
+                                    "Compute Jacobians" => "pages/jacobians.md",
+                                    "Run on GPU" => "pages/gpu.md",
+                                   ],
+        "Concepts"              => Any[
+                                    "Core RT Theory" => "pages/vSmartMOM/CoreRTTheory.md",
+                                    "Architecture & Design" => "design.md",
+                                    "Absorption" => "pages/Absorption/Overview.md",
+                                    "Scattering" => "pages/Scattering/Overview.md",
+                                    "Surfaces" => "pages/Surfaces/Overview.md",
+                                    "Inelastic Scattering" => "pages/Inelastic/Overview.md",
+                                    "Aerosols" => "pages/Aerosols/Overview.md",
+                                    "Solar Model" => "pages/SolarModel/Overview.md",
+                                   ],
+        "Developer Guides"      => Any[
                                     "Add a Surface BRDF" => "pages/extending/surfaces.md",
                                     "Add a Raman Mode" => "pages/extending/raman.md",
+                                    "GEOS-Chem Integration" => "pages/geoschem_integration.md",
                                    ],
-        "Architecture & Design" => "design.md",
-        "Core RT Theory"        => "pages/vSmartMOM/CoreRTTheory.md",
-        "API Reference"         => Any[
-                                    "Public API" => "pages/api_reference.md",
-                                    "Developer API Coverage" => "pages/internal_api_coverage.md",
+        "Tutorials"             => tutorials_md,
+        "Library"               => Any[
+                                    "Overview" => "pages/api_reference.md",
+                                    "Top-Level API" => "pages/api/top_level.md",
+                                    "CoreRT" => "pages/api/core_rt.md",
+                                    "IO" => "pages/api/io.md",
+                                    "Absorption" => "pages/api/absorption.md",
+                                    "Scattering" => "pages/api/scattering.md",
+                                    "Surfaces" => "pages/api/surfaces.md",
+                                    "Inelastic Scattering" => "pages/api/inelastic.md",
+                                    "Aerosols" => "pages/api/aerosols.md",
+                                    "SolarModel" => "pages/api/solar_model.md",
+                                    "Experimental Helpers" => "pages/api/experimental.md",
+                                    "Developer Coverage" => "pages/internal_api_coverage.md",
+                                    "Function Index" => "pages/api/function_index.md",
                                    ],
-        "Release Notes"         => "pages/release_notes.md",
-        "IO Reference"          => Any[
-                                    "Schema" => "pages/IO/Schema.md",
-                                    "Examples" => "pages/IO/Examples.md",
-                                   ],
-        "vSmartMOM"             => Any[
-                                    "Overview" => "pages/vSmartMOM/Overview.md",
-                                    "Methods & Types" => "pages/vSmartMOM/Types.md",
-                                    "References" => "pages/vSmartMOM/References.md"
-                                    ],
-        "Absorption"            => [
-                                    "Overview" => "pages/Absorption/Overview.md",
+        "Resources"             => Any[
+                                    "Input Schema" => "pages/IO/Schema.md",
+                                    "IO Examples" => "pages/IO/Examples.md",
                                     "HITRAN Data Management" => "pages/Absorption/HITRAN_Data.md",
-                                    "Example" => "pages/Absorption/Example.md",
-                                    "Methods & Types" => "pages/Absorption/Types.md",
-                                    "References" => "pages/Absorption/References.md"
-                                    ],
-        "Scattering"            => [
-                                    "Overview" => "pages/Scattering/Overview.md",
-                                    "Example" => "pages/Scattering/Example.md",
-                                    "Methods & Types" => "pages/Scattering/Types.md",
-                                    "References" => "pages/Scattering/References.md"
-                                    ],
-        "Surfaces"              => "pages/Surfaces/Overview.md",
-        "Inelastic Scattering"  => "pages/Inelastic/Overview.md",
-        "Aerosols"              => "pages/Aerosols/Overview.md",
-        "SolarModel"            => "pages/SolarModel/Overview.md",
-        "GEOSChem Integration"  => "pages/geoschem_integration.md",
-        "Tutorials"             => tutorials_md
+                                    "References" => "pages/vSmartMOM/References.md",
+                                    "Release Notes" => "pages/release_notes.md",
+                                   ],
     ]
 
     ref_name = get(ENV, "GITHUB_REF_NAME", "")
