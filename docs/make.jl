@@ -7,6 +7,29 @@ using vSmartMOM.Scattering
 using vSmartMOM.CoreRT
 using CairoMakie
 
+function copy_landing_page_icons()
+    icon_src = joinpath(@__DIR__, "src", "assets", "icons")
+    isdir(icon_src) || return nothing
+
+    destinations = [joinpath(@__DIR__, "build", ".documenter", "public", "assets", "icons")]
+    bases_file = joinpath(@__DIR__, "build", "bases.txt")
+    if isfile(bases_file)
+        bases = readlines(bases_file)
+        append!(destinations,
+                [joinpath(@__DIR__, "build", string(i), "assets", "icons")
+                 for i in eachindex(bases)])
+    end
+
+    for dest in destinations
+        mkpath(dest)
+        for icon in readdir(icon_src)
+            endswith(icon, ".svg") || continue
+            cp(joinpath(icon_src, icon), joinpath(dest, icon); force = true)
+        end
+    end
+    return nothing
+end
+
 function build()
 
     tutorials = ["Tutorial_QuickStart.jl", "Tutorial_Absorption.jl", "Tutorial_Scattering.jl", "Tutorial_MieDeepDive.jl", "Tutorial_IO.jl", "Tutorial_CoreRT.jl", "Tutorial_Surfaces.jl", "Tutorial_Canopy.jl", "Tutorial_Jacobians.jl", "Tutorial_GPU.jl", "Tutorial_HybridAD.jl"]
@@ -78,7 +101,14 @@ function build()
             nothing : Documenter.DeployDecision(all_ok = false),
         deploy_url = "https://remotesensingtools.github.io/vSmartMOM.jl",
         description = "Polarized atmospheric radiative transfer and remote sensing tools in Julia.",
-        assets = ["assets/favicon.ico", "assets/logo.png"],
+        assets = [
+            "assets/favicon.ico",
+            "assets/logo.png",
+            "assets/icons/logo.svg",
+            "assets/icons/scattering.svg",
+            "assets/icons/absorption.svg",
+            "assets/icons/radiative_transfer.svg",
+        ],
         sidebar_drawer = true,
     )
 
@@ -91,6 +121,8 @@ function build()
         pages = pages,
         checkdocs = :exports,
     )
+
+    copy_landing_page_icons()
 
 end
 

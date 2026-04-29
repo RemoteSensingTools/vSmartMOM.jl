@@ -1,10 +1,43 @@
-# vSmartMOM.jl
+```@raw html
+---
+layout: home
 
-**For:** first-time users, retrieval developers, and method reviewers.
+hero:
+  name: "vSmartMOM.jl"
+  text: "Polarized atmospheric radiative transfer"
+  tagline: "Vector matrix-operator method with analytic Jacobians, Raman scattering, and CUDA support."
+  image:
+    src: /assets/icons/logo.svg
+    alt: vSmartMOM logo
+  actions:
+    - theme: brand
+      text: Quick Start
+      link: /pages/quickstart
+    - theme: alt
+      text: Core RT Theory
+      link: /pages/vSmartMOM/CoreRTTheory
+    - theme: alt
+      text: View on GitHub
+      link: https://github.com/RemoteSensingTools/vSmartMOM.jl
 
-**Next:** [Quick Start](pages/quickstart.md), [Configure a Scene](pages/IO/Overview.md), [Core RT Theory](pages/vSmartMOM/CoreRTTheory.md).
-
-vSmartMOM.jl is a polarized atmospheric radiative-transfer solver based on the vector matrix-operator adding-doubling method. It supports gas absorption, aerosol scattering, Raman/inelastic source terms, flexible surface models, optional CUDA acceleration, and analytic Jacobians for retrieval work.
+features:
+  - icon:
+      src: /assets/icons/scattering.svg
+    title: Scattering
+    details: Mie theory, Greek-coefficient phase matrices, NAI2 / PCW Fourier decomposition, vector δ-m truncation.
+    link: /pages/Scattering/Overview
+  - icon:
+      src: /assets/icons/absorption.svg
+    title: Absorption
+    details: HITRAN line-by-line cross sections with Voigt, Doppler, and Lorentz line shapes; lookup-table interpolation for hot loops.
+    link: /pages/Absorption/Overview
+  - icon:
+      src: /assets/icons/radiative_transfer.svg
+    title: Radiative Transfer
+    details: Adding-doubling matrix operator method, polarized solver, analytic Jacobians, Raman / Cabannes inelastic path, GPU-ready.
+    link: /pages/vSmartMOM/CoreRTTheory
+---
+```
 
 ## Install
 
@@ -14,34 +47,16 @@ vSmartMOM supports Julia 1.10 or later.
 pkg> add vSmartMOM
 ```
 
-## Smallest Complete Run
-
-```julia
-using vSmartMOM
-
-params = read_parameters(joinpath(pkgdir(vSmartMOM), "config", "quickstart.yaml"))
-model = model_from_parameters(params)
-R, T = rt_run(model)
-```
-
-`R` is top-of-atmosphere reflectance and `T` is bottom-of-atmosphere transmittance, both shaped as view zenith angle × Stokes component × spectral point. The [Quick Start](pages/quickstart.md) walks through the same CPU scene step by step.
-
-## Where To Go
-
-- New to the package: start with [Quick Start](pages/quickstart.md).
-- Changing a scene: use [Configure a Scene](pages/IO/Overview.md), then the [schema reference](pages/IO/Schema.md).
-- Computing retrieval sensitivities: go to [Compute Jacobians](pages/jacobians.md).
-- Running on CUDA: go to [Run on GPU](pages/gpu.md).
-- Checking the method against the papers: go to [Core RT Theory](pages/vSmartMOM/CoreRTTheory.md) and [References](pages/vSmartMOM/References.md).
-- Extending internals: start with [Add a Surface BRDF](pages/extending/surfaces.md) or [Add a Raman Mode](pages/extending/raman.md).
-
 ## Public Modules
 
-- **CoreRT**: adding-doubling solver, model types, optical-property assembly, surface coupling, and Jacobian kernels.
-- **IO**: YAML, TOML, Dict, NetCDF, and GEOS-Chem inputs.
-- **[Absorption](pages/Absorption/Overview.md)**: HITRAN and lookup-table gas absorption.
-- **[Scattering](pages/Scattering/Overview.md)**: Mie calculations, phase functions, Greek coefficients, and truncation inputs.
-- **[Surfaces](pages/Surfaces/Overview.md)**: lower-boundary BRDF models and canopy coupling.
-- **[InelasticScattering](pages/Inelastic/Overview.md)**: Raman/Cabannes mode types and optical-property helpers.
-- **[Aerosols](pages/Aerosols/Overview.md)**: TOMAS-15 and two-moment aerosol input support. This API is still being stabilized.
-- **[SolarModel](pages/SolarModel/Overview.md)**: solar/stellar spectra and transmission helpers.
+- **CoreRT** — adding-doubling solver, model types, optical-property assembly, surface coupling, Jacobian kernels.
+- **IO** — YAML, TOML, Dict, NetCDF, and GEOS-Chem inputs.
+- **Absorption** — HITRAN line-by-line and lookup-table gas absorption.
+- **Scattering** — Mie calculations, phase functions, Greek coefficients, truncation inputs.
+- **InelasticScattering** — Raman / Cabannes mode types and optical-property helpers.
+- **Aerosols** — TOMAS-15 and two-moment aerosol input support. *API still being stabilized.*
+- **SolarModel** — solar / stellar spectra and transmission helpers.
+
+## Cite
+
+If you use vSmartMOM.jl in published work, please cite the JOSS software paper and the underlying methodology papers — see [References](pages/vSmartMOM/References.md).
