@@ -29,4 +29,9 @@ GPU-safe.
 For Apple Silicon experiments, load Metal.jl and use `MetalGPU()` with
 `Float32` scene parameters. The current Metal path focuses on the core batched
 matrix multiply and inverse operations; fused kernels can be added after Mac
-validation.
+validation. The portable inverse kernel uses Metal threadgroup memory and is
+intended for modest stream/Stokes dimensions; larger matrices fail early with a
+clear local-memory error instead of a driver launch failure. With the current
+32 KiB guard, Float32 matrices with `N = Nquad * nStokes >= 64` are rejected.
+Metal Jacobian workflows have not been validated yet, so use CPU or CUDA for
+linearized runs.

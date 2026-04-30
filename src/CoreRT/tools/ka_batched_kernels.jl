@@ -54,16 +54,47 @@ end
 Fill `X[:, :, k] = inv(A[:, :, k])` using a portable KernelAbstractions LU
 kernel with partial pivoting. One workgroup handles one matrix and uses
 `N = size(A, 1)` workitems.
+
+Set `max_localmem_bytes` for backends with fixed threadgroup/local-memory
+budgets. The kernel uses two `N x N` local-memory arrays plus a length-`N`
+`Int32` pivot array.
 """
-function ka_batch_inv_lu!(X::AbstractArray{FT,3}, A::AbstractArray{FT,3}, backend) where {FT}
+function ka_batch_inv_lu!(X::AbstractArray{FT,3},
+                          A::AbstractArray{FT,3},
+                          backend;
+                          max_localmem_bytes=nothing) where {FT}
     @assert size(A, 1) == size(A, 2) "batched inverse requires square matrices"
     @assert size(X) == size(A) "output size $(size(X)) must match input size $(size(A))"
     N = size(A, 1)
+    check_ka_batch_inv_localmem(FT, N, max_localmem_bytes)
     batch = size(A, 3)
     kernel! = _batched_inv_lu_par_kernel!(backend, N)
     kernel!(X, A, Val(N); ndrange=(N * batch,))
     KernelAbstractions.synchronize(backend)
     return X
+end
+
+"""
+    ka_batch_inv_localmem_bytes(FT, N)
+
+Return the local-memory bytes required per workgroup by
+`ka_batch_inv_lu!` for element type `FT` and matrix dimension `N`.
+"""
+ka_batch_inv_localmem_bytes(::Type{FT}, N::Integer) where {FT} =
+    2 * N * N * sizeof(FT) + N * sizeof(Int32)
+
+function check_ka_batch_inv_localmem(::Type{FT}, N::Integer, max_localmem_bytes) where {FT}
+    max_localmem_bytes === nothing && return nothing
+
+    required = ka_batch_inv_localmem_bytes(FT, N)
+    required <= max_localmem_bytes && return nothing
+
+    throw(ArgumentError(
+        "portable batched inverse for N=$(N), eltype=$(FT) requires $(required) " *
+        "bytes of local memory per workgroup, exceeding the backend limit of " *
+        "$(max_localmem_bytes) bytes. Reduce the stream/Stokes dimension or use " *
+        "a backend with a larger local-memory budget."
+    ))
 end
 
 @kernel function _batched_inv_lu_par_kernel!(X, A, ::Val{N}) where {N}

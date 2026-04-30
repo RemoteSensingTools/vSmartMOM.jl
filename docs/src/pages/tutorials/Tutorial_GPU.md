@@ -76,7 +76,8 @@ The following operations are fully GPU-accelerated:
 | Elemental layer (`elemental!`) | ✅ Full |
 | Doubling (`doubling!`)         | ✅ Full |
 | Interaction (`interaction!`)   | ✅ Full |
-| Batched matrix inverse         | ✅ CUBLAS on CUDA; portable KA kernel on Metal |
+| Batched matrix inverse         | ✅ CUBLAS on CUDA; portable KA kernel on Metal, with a local-memory guard |
+| Linearized/Jacobian runs       | ✅ CUDA/CPU; Metal not yet validated |
 | Phase function computation     | ❌ CPU only |
 | Absorption cross-sections      | ✅ Full |
 | Postprocessing (VZA interp.)   | ✅ Full |
@@ -104,6 +105,12 @@ radiative_transfer:
   float_type: Float32
   architecture: MetalGPU
 ```
+
+Metal support currently targets modest stream/Stokes dimensions. The batched
+inverse path checks the backend local-memory budget before launch and errors
+clearly when a scene is too large for the shared-memory LU kernel. With the
+current 32 KiB guard, Float32 matrices with `N = Nquad * nStokes >= 64` are
+rejected.
 
 ## 6) Benchmarking CPU vs GPU
 
