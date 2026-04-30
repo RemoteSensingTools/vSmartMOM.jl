@@ -49,6 +49,9 @@ struct GPU <: AbstractArchitecture end
 
 Run on an Apple Silicon GPU through Metal.jl. Metal support is loaded through
 the optional `vSmartMOMMetalExt` package extension and requires Float32 arrays.
+The current Metal batched inverse path uses a conservative 32 KiB threadgroup
+memory guard, so large stream/Stokes matrices should use CPU or CUDA until a
+global-memory fallback lands.
 """
 struct MetalGPU <: AbstractArchitecture end
 

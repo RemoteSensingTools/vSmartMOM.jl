@@ -13,31 +13,23 @@ using vSmartMOM.CoreRT
 using Metal
 
 const _MetalArray3{FT} = Metal.MtlArray{FT,3}
+const _MetalArrayOrView3{FT} = Union{Metal.MtlArray{FT,3}, SubArray{FT,3,<:Metal.MtlArray}}
+const METAL_BATCH_INV_LOCALMEM_LIMIT_BYTES = 32 * 1024
 
 Architectures.devi(::vSmartMOM.Architectures.MetalGPU) = Metal.MetalBackend()
 Architectures.array_type(::vSmartMOM.Architectures.MetalGPU) = Metal.MtlArray
 Architectures.architecture(::Metal.MtlArray) = vSmartMOM.Architectures.MetalGPU()
 Architectures.architecture(::Type{<:Metal.MtlArray}) = vSmartMOM.Architectures.MetalGPU()
 
-"Batched matrix multiply for 3D Metal arrays using a portable KA kernel."
-function vSmartMOM.CoreRT.batched_mul(A::_MetalArray3{FT}, B::_MetalArray3{FT}) where {FT}
-    vSmartMOM.CoreRT.ka_batched_mul(A, B, Metal.MetalBackend())
-end
+"Return the backing Metal array used to allocate outputs for arrays or views."
+@inline _metal_storage(A::Metal.MtlArray) = A
+@inline _metal_storage(A::SubArray{FT,3,<:Metal.MtlArray}) where {FT} = parent(A)
 
-"Batched multiply for 3D Metal array views."
-@inline _as_mtlarray3(A::SubArray{FT,3,<:Metal.MtlArray}) where {FT} = copy(A)
-
-function vSmartMOM.CoreRT.batched_mul(A::SubArray{FT,3,<:Metal.MtlArray}, B::_MetalArray3{FT}) where {FT}
-    vSmartMOM.CoreRT.batched_mul(_as_mtlarray3(A), B)
-end
-
-function vSmartMOM.CoreRT.batched_mul(A::_MetalArray3{FT}, B::SubArray{FT,3,<:Metal.MtlArray}) where {FT}
-    vSmartMOM.CoreRT.batched_mul(A, _as_mtlarray3(B))
-end
-
-function vSmartMOM.CoreRT.batched_mul(A::SubArray{FT,3,<:Metal.MtlArray},
-                                      B::SubArray{FT,3,<:Metal.MtlArray}) where {FT}
-    vSmartMOM.CoreRT.batched_mul(_as_mtlarray3(A), _as_mtlarray3(B))
+"Batched matrix multiply for 3D Metal arrays or views using a portable KA kernel."
+function vSmartMOM.CoreRT.batched_mul(A::_MetalArrayOrView3{FT},
+                                      B::_MetalArrayOrView3{FT}) where {FT}
+    C = similar(_metal_storage(A), FT, (size(A, 1), size(B, 2), size(A, 3)))
+    vSmartMOM.CoreRT.ka_batched_mul!(C, A, B, Metal.MetalBackend())
 end
 
 "Given 3D Metal arrays A and B, fill in X[:,:,k] = A[:,:,k] \\ B[:,:,k]."
@@ -53,7 +45,10 @@ end
 
 "Given 3D Metal array A, fill in X[:,:,k] = inv(A[:,:,k])."
 function vSmartMOM.CoreRT.batch_inv!(X::_MetalArray3{FT}, A::_MetalArray3{FT}) where {FT}
-    vSmartMOM.CoreRT.ka_batch_inv_lu!(X, A, Metal.MetalBackend())
+    vSmartMOM.CoreRT.ka_batch_inv_lu!(
+        X, A, Metal.MetalBackend();
+        max_localmem_bytes=METAL_BATCH_INV_LOCALMEM_LIMIT_BYTES,
+    )
     Metal.synchronize()
     return X
 end
@@ -71,46 +66,36 @@ function vSmartMOM.CoreRT.batch_inv!(X::_MetalArray3{FT},
     vSmartMOM.CoreRT.batch_inv!(X, A)
 end
 
-"""
-    CoreRT.make_gpu_rt_workspace(FT, NquadN, nSpec, ::MetalGPU)
-
-Create an RT workspace backed by Metal `MtlArray`s.
-"""
-function vSmartMOM.CoreRT.make_gpu_rt_workspace(FT::Type,
-                                                NquadN::Int,
-                                                nSpec::Int,
-                                                ::vSmartMOM.Architectures.MetalGPU)
-    dims3 = (NquadN, NquadN, nSpec)
-    dims_J = (NquadN, 1, nSpec)
-
-    vSmartMOM.CoreRT.RTWorkspace(
-        Metal.MtlArray(zeros(FT, dims3)),
-        Metal.MtlArray(zeros(FT, dims3)),
-        Metal.MtlArray(zeros(FT, dims_J)),
-        Metal.MtlArray(zeros(FT, dims_J)),
-        zeros(Cint, NquadN, nSpec),
-        zeros(Cint, nSpec),
-        Metal.MtlArray(zeros(FT, dims3)),
-        Metal.MtlArray(zeros(FT, dims3)),
-        Metal.MtlArray(zeros(FT, dims3)),
-        Metal.MtlArray(zeros(FT, dims3)),
-    )
-end
-
 function __init__()
-    if Sys.isapple() && Metal.functional()
-        try
-            test_arr = Metal.MtlArray([1.0f0])
-            Metal.synchronize()
-            test_arr = nothing
+    if !Sys.isapple()
+        Architectures._has_metal[] = false
+        return
+    end
 
-            Architectures._has_metal[] = true
+    metal_functional = try
+        Metal.functional()
+    catch e
+        @warn "vSmartMOM Metal availability check failed, falling back to CPU" exception=e
+        false
+    end
+
+    if !metal_functional
+        Architectures._has_metal[] = false
+        @info "Metal.jl is loaded but no functional Metal device is available; default_architecture() will not select MetalGPU()."
+        return
+    end
+
+    try
+        test_arr = Metal.MtlArray([1.0f0])
+        Metal.synchronize()
+        test_arr = nothing
+
+        Architectures._has_metal[] = true
+        if !Architectures.has_cuda()
             Architectures._sync_gpu[] = Metal.synchronize
-        catch e
-            @warn "vSmartMOM Metal initialization failed, falling back to CPU" exception=e
-            Architectures._has_metal[] = false
         end
-    else
+    catch e
+        @warn "vSmartMOM Metal initialization failed, falling back to CPU" exception=e
         Architectures._has_metal[] = false
     end
 end
