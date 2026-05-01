@@ -14,8 +14,8 @@ hero:
       text: Quick Start
       link: /pages/quickstart
     - theme: alt
-      text: Core RT Theory
-      link: /pages/vSmartMOM/CoreRTTheory
+      text: Concepts (the story)
+      link: /pages/concepts/01_overview
     - theme: alt
       text: View on GitHub
       link: https://github.com/RemoteSensingTools/vSmartMOM.jl
@@ -25,17 +25,17 @@ features:
       src: /assets/icons/scattering.svg
     title: Scattering
     details: Mie theory, Greek-coefficient phase matrices, NAI2 / PCW Fourier decomposition, vector δ-m truncation.
-    link: /pages/Scattering/Overview
+    link: /pages/concepts/03b_scattering
   - icon:
       src: /assets/icons/absorption.svg
     title: Absorption
     details: HITRAN line-by-line cross sections with Voigt, Doppler, and Lorentz line shapes; lookup-table interpolation for hot loops.
-    link: /pages/Absorption/Overview
+    link: /pages/concepts/03a_absorption
   - icon:
       src: /assets/icons/radiative_transfer.svg
     title: Radiative Transfer
     details: Adding-doubling matrix operator method, polarized solver, analytic Jacobians, Raman / Cabannes inelastic path, GPU-ready.
-    link: /pages/vSmartMOM/CoreRTTheory
+    link: /pages/concepts/04_mom_solver
 ---
 ```
 

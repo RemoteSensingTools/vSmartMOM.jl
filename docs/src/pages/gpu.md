@@ -2,7 +2,7 @@
 
 **For:** users who want to run the solver on GPU backends.
 
-**Next:** [Quick Start](quickstart.md), [Configure a Scene](IO/Overview.md), [Tutorial: GPU](tutorials/Tutorial_GPU.md).
+**Next:** [Quick Start](quickstart.md), [Configure a Scene](IO/Overview.md), [Tutorial: GPU](tutorials/Tutorial_GPU.md), [Architecture-Agnostic Code (Concepts)](concepts/07_architecture.md).
 
 GPU support is provided through optional backend extensions. CUDA is the mature
 NVIDIA path; Metal is a first-pass Apple Silicon path for Float32 runs. The full
