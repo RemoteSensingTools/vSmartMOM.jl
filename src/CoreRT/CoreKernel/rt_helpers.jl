@@ -78,26 +78,54 @@ checks that historically used `1e-6`.
 @inline rt_loose_tol(::Type{Float64}) = 1e-6
 
 """
-    compute_geometric_progression!(gp_refl, tt_gp, r⁻⁺, t⁺⁺, I_static, temp1_ptr, temp2_ptr)
+    compute_geometric_progression!(gp_refl, tt_gp, r⁻⁺, t⁺⁺, I_static, temp2, temp1_ptr, temp2_ptr)
 
-Compute the geometric-progression factor `(I - R·R)⁻¹` and pre-multiply by `T⁺⁺`.
-Used in doubling and interaction steps across all RT paths.
+Compute the matrix geometric-series factor `(E − R·R)⁻¹` that captures all
+internal reflections within a homogeneous layer being doubled, then
+pre-multiply by `T⁺⁺` to form the helper `tt_gp = T·(E − R·R)⁻¹` reused by
+[`doubling_source_update!`](@ref) and [`doubling_rt_update!`](@ref).
 
-Mutates `gp_refl` (temp1) and `tt_gp` in place.
+This is the inner factor of Sanghavi et al. (2014, JQSRT 133:412–433),
+Eqs. (23)–(28) — the matrix-operator-method *adding equations*. For a layer
+combined with an identical copy of itself, the only place an inverse matrix
+appears is `(E − R·R)⁻¹`; representing it as the geometric series
+`I + R·R + (R·R)² + …` makes clear that this term sums up an infinite series
+of internal reflections.
+
+The batched matrix inversion `batch_inv!` is dispatched by array type to
+threaded BLAS (CPU), CUBLAS `getrf_strided_batched! + getri_strided_batched!`
+(CUDA), or the portable KernelAbstractions LU kernel (Metal). One batched
+call covers all spectral points; see [Concepts/07](../../docs/src/pages/concepts/07_architecture.md).
+
+Mutates `gp_refl` and `tt_gp` in place.
 """
 @inline function compute_geometric_progression!(gp_refl, tt_gp, r⁻⁺, t⁺⁺, I_static, temp2, temp1_ptr, temp2_ptr)
-    temp2 .= I_static .- r⁻⁺ ⊠ r⁻⁺
-    batch_inv!(gp_refl, temp2, temp1_ptr, temp2_ptr)
-    tt_gp .= t⁺⁺ ⊠ gp_refl
+    temp2 .= I_static .- r⁻⁺ ⊠ r⁻⁺                  # (E − R·R)
+    batch_inv!(gp_refl, temp2, temp1_ptr, temp2_ptr) # (E − R·R)⁻¹
+    tt_gp .= t⁺⁺ ⊠ gp_refl                          # T · (E − R·R)⁻¹
     return nothing
 end
 
 """
     doubling_source_update!(j₀⁺, j₀⁻, j₁⁺, j₁⁻, r⁻⁺, tt_gp, expk)
 
-Update source functions during a single doubling step.
-Applies the adding equations for `J⁻₀₂` and `J⁺₂₀` (Eqs.8 in Raman paper).
-Common to forward, linearized, and inelastic paths.
+Update the source-function vectors during a single doubling step.
+
+Applies the adding equations for `J₂₀⁻` and `J₀₂⁺` from Sanghavi et al. (2014),
+Eqs. (27)–(28), restated for two identical layers as Eqs. (8) of Sanghavi &
+Frankenberg (2023):
+
+    j₁⁺  =  j₀⁺ · expk         (direct-beam attenuation across the lower copy)
+    j₁⁻  =  j₀⁻ · expk
+    j₀⁻  ←  j₀⁻ + tt_gp · (j₁⁻ + r⁻⁺ · j₀⁺)
+    j₀⁺  ←  j₁⁺ + tt_gp · (j₀⁺ + r⁻⁺ · j₁⁻)
+
+`expk` is the scalar attenuation factor `exp(−δτ/μ₀)` for the elemental
+optical thickness; it is *squared* by [`doubling_rt_update!`](@ref) at the
+end of each iteration so the layer thickness doubles. `tt_gp` is the helper
+`T · (E − R·R)⁻¹` produced by [`compute_geometric_progression!`](@ref).
+
+Common to the forward, linearized, and inelastic paths.
 """
 @inline function doubling_source_update!(j₀⁺, j₀⁻, j₁⁺, j₁⁻, r⁻⁺, tt_gp, expk)
     @inbounds @views j₁⁺[:,1,:] .= j₀⁺[:,1,:] .* expk'
@@ -110,9 +138,25 @@ end
 """
     doubling_rt_update!(r⁻⁺, t⁺⁺, tt_gp, expk)
 
-Update reflection and transmission matrices during a single doubling step.
-Applies `R₂₀ = R₁₀ + T₀₁·(I-R₂₁R₀₁)⁻¹·R₂₁·T₁₀` and
-       `T₂₀ = T₂₁·(I-R₀₁R₂₁)⁻¹·T₁₀`.
+Update the reflection and transmission supermatrices during a single
+doubling step.
+
+Applies the adding equations from Sanghavi et al. (2014), Eqs. (23)–(24),
+restated for a homogeneous layer combined with an identical copy of itself:
+
+    R₂₀  =  R₁₀ + T₀₁ · (E − R₂₁·R₀₁)⁻¹ · R₂₁ · T₁₀
+    T₂₀  =  T₂₁ · (E − R₀₁·R₂₁)⁻¹ · T₁₀
+
+In the symmetric case (both layers identical), the geometric-series helper
+`tt_gp = T · (E − R·R)⁻¹` from [`compute_geometric_progression!`](@ref)
+collapses both updates to:
+
+    r⁻⁺  ←  r⁻⁺  +  tt_gp · r⁻⁺ · t⁺⁺
+    t⁺⁺  ←  tt_gp · t⁺⁺
+
+`expk` (= `exp(−δτ/μ₀)`) is squared so the elemental thickness doubles
+between iterations: `n` doublings give layer thickness `2ⁿ · δτ`. That's
+the **logarithmic-in-τ** scaling that makes MOM cheap for thick atmospheres.
 """
 @inline function doubling_rt_update!(r⁻⁺, t⁺⁺, tt_gp, expk)
     r⁻⁺ .= r⁻⁺ .+ (tt_gp ⊠ r⁻⁺ ⊠ t⁺⁺)

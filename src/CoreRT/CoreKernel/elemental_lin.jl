@@ -5,53 +5,74 @@ This file contains RT elemental-related functions
 =#
 """
     elemental!(pol_type, SFI, τ_sum, τ̇_sum, dτ, F₀, computed_layer_properties,
-               m, ndoubl, scatter, quad_points, added_layer, added_layer_lin, architecture)
+               computed_layer_properties_lin, m, ndoubl, scatter, quad_points,
+               added_layer, added_layer_lin, architecture)
 
-Compute the elemental (single-scattering) layer reflection and transmission matrices
-and their derivatives with respect to the 3 core optical parameters ``(\\tau, \\varpi, \\mathbf{Z})``.
+Tangent-linear partner of the forward [`elemental!`](@ref) kernel: builds
+the elemental-layer reflection, transmission, and source matrices **and
+their derivatives** with respect to the three core layer variables
+``(\\tau, \\varpi, \\mathbf{Z})`` in a single sweep.
 
-The elemental layer has optical depth ``d\\tau = \\tau / 2^{n_d}`` where ``n_d`` is the number
-of doublings needed to build the full layer.
+# Forward formulas
 
-# Single-scattering formulas (Sanghavi & Stephens 2013, Eqs. 19–20)
+The forward kernel uses the **exact finite-δ single-scatter** formulas of
+Fell (1997, FU Berlin PhD thesis, Eqs. 1.52–1.56), restated as Eqs. (10)–(11)
+of Sanghavi & Frankenberg (2023, JQSRT 311:108791) — **not** the
+infinitesimal-δ linear limit of Sanghavi et al. (2014, JQSRT 133:412–433),
+Eqs. (19)–(20). See [`get_elem_rt!`](@ref) and the Concepts/04 § Elemental
+page for the side-by-side comparison.
 
-**Reflection matrix:**
 ```math
-\\mathbf{r}^{-+}(\\mu_i, \\mu_j) = \\varpi \\, \\mathbf{Z}^{-+}(\\mu_i, \\mu_j) 
+\\mathbf{r}^{-+}(\\mu_i, \\mu_j) = \\varpi \\, \\mathbf{Z}^{-+}(\\mu_i, \\mu_j)
   \\frac{\\mu_j}{\\mu_i + \\mu_j} \\left(1 - e^{-d\\tau(1/\\mu_i + 1/\\mu_j)}\\right) w_j
 ```
 
-**Transmission matrix:**
 ```math
-\\mathbf{t}^{++}(\\mu_i, \\mu_j) = \\delta_{ij} e^{-d\\tau/\\mu_i} + 
-  \\varpi \\, \\mathbf{Z}^{++}(\\mu_i, \\mu_j) 
+\\mathbf{t}^{++}(\\mu_i, \\mu_j) = \\delta_{ij} e^{-d\\tau/\\mu_i} +
+  \\varpi \\, \\mathbf{Z}^{++}(\\mu_i, \\mu_j)
   \\frac{\\mu_j}{\\mu_i - \\mu_j} \\left(e^{-d\\tau/\\mu_i} - e^{-d\\tau/\\mu_j}\\right) w_j
 ```
 
-# Core derivatives (3 per matrix element)
-For each matrix ``\\mathbf{M} \\in \\{\\mathbf{r}^{-+}, \\mathbf{t}^{++}, \\ldots\\}``:
-- ``\\dot{\\mathbf{M}}[1]``: ``\\partial \\mathbf{M}/\\partial(d\\tau)`` — optical depth derivative
-- ``\\dot{\\mathbf{M}}[2]``: ``\\partial \\mathbf{M}/\\partial\\varpi`` — single-scattering albedo derivative
-- ``\\dot{\\mathbf{M}}[3]``: ``\\partial \\mathbf{M}/\\partial\\mathbf{Z}`` — phase matrix derivative
+# Linearization (Sanghavi 2014 App. C)
 
-When `SFI=true`, the source function vectors ``\\mathbf{j}_0^+, \\mathbf{j}_0^-`` and their
-derivatives are also computed for the solar beam contribution.
+Implements Sanghavi 2014 Eqs. (C.8)–(C.10). For each matrix element, three
+partial derivatives are stored along the parameter axis:
+
+- ``\\dot{\\mathbf{M}}[\\,..,1]``: ``\\partial \\mathbf{M}/\\partial(d\\tau)`` — optical-depth derivative
+- ``\\dot{\\mathbf{M}}[\\,..,2]``: ``\\partial \\mathbf{M}/\\partial\\varpi`` — single-scatter albedo derivative
+- ``\\dot{\\mathbf{M}}[\\,..,3]``: ``\\partial \\mathbf{M}/\\partial\\mathbf{Z}`` — phase-matrix derivative
+
+These three "core" derivatives feed the chain rule in
+[`lin_added_layer_all_params!`](@ref) which expands them to derivatives
+against the physical state vector ``\\mathbf{x}`` (aerosol microphysics,
+gas VMRs, surface BRDF parameters) using the boundary
+`CoreScatteringOpticalPropertiesLin = (\\dot{\\tau}, \\dot{\\varpi}, \\dot{\\mathbf{Z}}^{++}, \\dot{\\mathbf{Z}}^{-+})`.
+
+When `SFI=true`, source vectors ``\\mathbf{j}_0^+, \\mathbf{j}_0^-`` and
+their derivatives are computed for the direct-solar contribution.
+
+# Concepts page
+See [Linearization — operator-level chain rule](../../docs/src/pages/concepts/06_linearization.md)
+for the AD-boundary diagram, the parameter-strategy table, and the link
+back to ParameterLayout for column ordering.
 
 # Arguments
-- `pol_type`: Polarization type (I, IQU, or IQUV).
-- `SFI::Bool`: Whether to compute Source Function Integration terms.
+- `pol_type`: Polarization type (`Stokes_I`/`IQ`/`IQU`/`IQUV`).
+- `SFI::Bool`: Whether to compute source-function integration terms.
 - `τ_sum`: Cumulative optical depth above this layer `[nSpec]`.
 - `τ̇_sum`: Derivative of cumulative τ w.r.t. parameters `[Nparams × nSpec]`.
 - `dτ`: Elemental optical depth ``\\tau/2^{n_d}`` `[nSpec]`.
 - `F₀`: Solar irradiance Stokes vector `[nStokes × nSpec]`.
-- `computed_layer_properties`: Forward optical properties ``(\\tau, \\varpi, \\mathbf{Z}^{++}, \\mathbf{Z}^{-+})``.
+- `computed_layer_properties`: Forward `CoreScatteringOpticalProperties`.
+- `computed_layer_properties_lin`: `CoreScatteringOpticalPropertiesLin` =
+  the AD-boundary handoff carrying ``(\\dot{\\tau}, \\dot{\\varpi}, \\dot{\\mathbf{Z}}^{++}, \\dot{\\mathbf{Z}}^{-+})``.
 - `m::Int`: Fourier moment index.
 - `ndoubl::Int`: Number of doublings.
 - `scatter::Bool`: Whether the layer scatters.
 - `quad_points`: Quadrature points and weights.
-- `added_layer`: Output: forward RT matrices (modified in-place).
-- `added_layer_lin`: Output: linearized RT matrices (modified in-place).
-- `architecture`: CPU or GPU.
+- `added_layer`, `added_layer_lin`: Forward + linearized RT matrices,
+  written in place.
+- `architecture`: `CPU`, `GPU`, or `MetalGPU`.
 """
 function elemental!(pol_type, SFI::Bool,
                 τ_sum::AbstractArray,#{FT2,1}, #Suniti

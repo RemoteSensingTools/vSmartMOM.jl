@@ -39,8 +39,12 @@ from TOA downward.
 - `noRS`: Elastic scattering only (no Raman).
 - Future: `RRS`, `VRS` for inelastic scattering (not yet linearized).
 
-See Sanghavi & Stephens (2013), Eqs. 19–34 for the elemental formulas, and
-Sanghavi, Davis & Eldering (2014) for the full linearization framework.
+See Sanghavi, Davis & Eldering (2014, JQSRT 133:412–433) for the full
+forward (Eqs. 19–32) and linearization (App. C) framework. The elemental
+kernel uses the *exact* finite-δ formulas of Fell (1997) Eqs. 1.52–1.56,
+restated as Sanghavi & Frankenberg (2023, JQSRT 311:108791) Eqs. (10)–(11),
+not the linear S2014 Eqs. (19)–(20) limit. See `docs/src/pages/concepts/04_mom_solver.md`
+§ Elemental and `docs/src/pages/concepts/06_linearization.md`.
 """
 ### New update: including towers/airborne sensors
 function rt_kernel!(RS_type::noRS{FT}, 
