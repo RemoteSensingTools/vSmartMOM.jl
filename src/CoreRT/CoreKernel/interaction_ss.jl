@@ -1,23 +1,31 @@
 #=
- 
+
 This file contains RT interaction-related functions
- 
+
 =#
-@kernel function get_interaction_ss!(τ_sum, τ_λ, qp_μN,
-                j₀⁺, j₀⁻, J₀⁺, J₀⁻)
+"""
+    get_interaction_ss!(τ_sum, τ_λ, qp_μN, j₀⁺, j₀⁻, J₀⁺, J₀⁻)
+
+KernelAbstractions single-scattering source interaction kernel. Each workitem
+owns one stream/spectral source element, attenuates the existing composite
+downwelling source through the added layer, and adds the new upwelling source
+with attenuation through the optical depth above the added layer.
+"""
+@kernel function get_interaction_ss!(@Const(τ_sum), @Const(τ_λ), @Const(qp_μN),
+                @Const(j₀⁺), @Const(j₀⁻), J₀⁺, J₀⁻)
     i, _, n = @index(Global, NTuple)
     J₀⁺[i,1,n] = J₀⁺[i,1,n] * exp(-τ_λ[n]/qp_μN[i]) + j₀⁺[i,1,n]
     J₀⁻[i,1,n] = J₀⁻[i,1,n] + j₀⁻[i,1,n] * exp(-τ_sum[n]/qp_μN[i])
 end
 
 function interaction_ss!(SFI::Bool,
-            composite_layer::Union{CompositeLayer{FT},CompositeLayerRS{FT}}, 
-            added_layer::Union{AddedLayer{FT},AddedLayerRS{FT}}, 
+            composite_layer::Union{CompositeLayer{FT},CompositeLayerRS{FT}},
+            added_layer::Union{AddedLayer{FT},AddedLayerRS{FT}},
             τ_sum::AbstractArray,
             τ_λ::AbstractArray{FT,1},
             quad_points::QuadPoints{FT2},
             architecture) where {FT<:Real, FT2}
-    
+
     (; qp_μN) = quad_points
     arr_type = array_type(architecture)
     device = devi(architecture)
@@ -36,8 +44,8 @@ end
 
 function interaction_inelastic_ss!(RS_type::RRS,
     SFI::Bool,
-    composite_layer::Union{CompositeLayer{FT},CompositeLayerRS{FT}}, 
-    added_layer::Union{AddedLayer{FT},AddedLayerRS{FT}}, 
+    composite_layer::Union{CompositeLayer{FT},CompositeLayerRS{FT}},
+    added_layer::Union{AddedLayer{FT},AddedLayerRS{FT}},
     τ_sum::AbstractArray,
     τ_λ::AbstractArray{FT,1},
     quad_points::QuadPoints{FT2},
@@ -59,14 +67,23 @@ function interaction_inelastic_ss!(RS_type::RRS,
     synchronize_if_gpu()
 end
 
-@kernel function get_interaction_ss_RRS!(τ_sum, τ_λ, 
-                    qp_μN,
-                    i_λ₁λ₀,
-                    iej₀⁺, iej₀⁻, ieJ₀⁺, ieJ₀⁻)
+"""
+    get_interaction_ss_RRS!(τ_sum, τ_λ, qp_μN, i_λ₁λ₀, iej₀⁺, iej₀⁻, ieJ₀⁺, ieJ₀⁻)
+
+KernelAbstractions single-scattering interaction kernel for rotational Raman
+spectral coupling. Each workitem maps an output wavelength `n₁` and Raman
+offset `Δn` to its incident wavelength, skips out-of-band couplings, then
+updates the inelastic source vectors with the same attenuation convention as
+the elastic single-scattering interaction.
+"""
+@kernel function get_interaction_ss_RRS!(@Const(τ_sum), @Const(τ_λ),
+                    @Const(qp_μN),
+                    @Const(i_λ₁λ₀),
+                    @Const(iej₀⁺), @Const(iej₀⁻), ieJ₀⁺, ieJ₀⁻)
     i, _, n₁, Δn = @index(Global, NTuple)
     n₀  = n₁ + i_λ₁λ₀[Δn]
-    nMax = length(τ_λ) 
-    if (1 ≤ n₀ ≤ nMax) 
+    nMax = length(τ_λ)
+    if (1 <= n₀) & (n₀ <= nMax)
         ieJ₀⁺[i,1,n₁,Δn] = ieJ₀⁺[i,1,n₁,Δn] * exp(-τ_λ[n₁]/qp_μN[i]) + iej₀⁺[i,1,n₁,Δn]
         ieJ₀⁻[i,1,n₁,Δn] = ieJ₀⁻[i,1,n₁,Δn] + iej₀⁻[i,1,n₁,Δn] * exp(-τ_sum[n₁]/qp_μN[i])
     end
@@ -75,8 +92,8 @@ end
 function interaction_inelastic_ss!(
     RS_type::Union{VS_0to1_plus, VS_1to0_plus},
     SFI::Bool,
-    composite_layer::Union{CompositeLayer{FT},CompositeLayerRS{FT}}, 
-    added_layer::Union{AddedLayer{FT},AddedLayerRS{FT}}, 
+    composite_layer::Union{CompositeLayer{FT},CompositeLayerRS{FT}},
+    added_layer::Union{AddedLayer{FT},AddedLayerRS{FT}},
     τ_sum::AbstractArray,
     τ_λ::AbstractArray{FT,1},
     quad_points::QuadPoints{FT2},
@@ -99,15 +116,23 @@ event = kernel!(τ_sum, τ_λ, qp_μN, atype(i_λ₁λ₀_all),
 synchronize_if_gpu()
 end
 
+"""
+    get_interaction_ss_VS!(τ_sum, τ_λ, qp_μN, i_λ₁λ₀_all, iej₀⁺, iej₀⁻, ieJ₀⁺, ieJ₀⁻)
+
+KernelAbstractions single-scattering interaction kernel for vibrational Raman
+couplings represented by a sparse wavelength map. Each workitem owns one
+active Raman offset, skips inactive map entries, and updates the inelastic
+source vectors at the mapped wavelength.
+"""
 @kernel function get_interaction_ss_VS!(
-                    τ_sum, τ_λ, 
-                    qp_μN,
-                    i_λ₁λ₀_all,
-                    iej₀⁺, iej₀⁻, ieJ₀⁺, ieJ₀⁻)
+                    @Const(τ_sum), @Const(τ_λ),
+                    @Const(qp_μN),
+                    @Const(i_λ₁λ₀_all),
+                    @Const(iej₀⁺), @Const(iej₀⁻), ieJ₀⁺, ieJ₀⁻)
     i, Δn = @index(Global, NTuple)
     n₁ =  i_λ₁λ₀_all[Δn]
-     
-    if (n₁ > 0) 
+
+    if (n₁ > 0)
         ieJ₀⁺[i,1,n₁,1] = ieJ₀⁺[i,1,n₁,1] * exp(-τ_λ[n₁]/qp_μN[i]) + iej₀⁺[i,1,n₁,1]
         ieJ₀⁻[i,1,n₁,1] = ieJ₀⁻[i,1,n₁,1] + iej₀⁻[i,1,n₁,1] * exp(-τ_sum[n₁]/qp_μN[i])
     end

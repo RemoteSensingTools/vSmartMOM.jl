@@ -127,7 +127,7 @@ See [The MOM Solver § Doubling](../../docs/src/pages/concepts/04_mom_solver.md)
 for the equation derivation, a stream-by-stream worked example, and the
 side-by-side mapping back to the doubling inner loop.
 """
-@kernel function apply_D!(n_stokes::Int,  r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻)
+@kernel function apply_D!(n_stokes::Int, r⁻⁺, @Const(t⁺⁺), r⁺⁻, t⁻⁻)
     iμ, jμ, n = @index(Global, NTuple)
     i = mod1(iμ, n_stokes)
     j = mod1(jμ, n_stokes)

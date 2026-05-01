@@ -58,7 +58,19 @@ function elemental!(pol_type, SFI::Bool,
     end    
 end
 
-@kernel function get_canopy_elem_rt!(r⁻⁺, t⁺⁺, ϖ_λ, dτ_λ, G, Z⁻⁺, Z⁺⁺, μ, wct) 
+"""
+    get_canopy_elem_rt!(r⁻⁺, t⁺⁺, ϖ_λ, dτ_λ, G, Z⁻⁺, Z⁺⁺, μ, wct)
+
+KernelAbstractions elemental R/T kernel for directional canopy scattering.
+Each workitem owns one `(i, j, n)` matrix element and evaluates the same
+finite-δ single-scattering formulas as the elastic elemental kernel, with
+directional path-length factors `G` included in the optical-depth exponents
+and stream denominators.
+"""
+@kernel function get_canopy_elem_rt!(r⁻⁺, t⁺⁺, @Const(ϖ_λ), @Const(dτ_λ),
+                                     @Const(G), @Const(Z⁻⁺), @Const(Z⁺⁺),
+                                     @Const(μ), @Const(wct))
+    FT = eltype(r⁻⁺)
     n2 = 1
     i, j, n = @index(Global, NTuple) 
     if size(Z⁻⁺,3)>1
@@ -79,7 +91,7 @@ end
                     exp(-dτ_λ[n]*G[i] / μ[i]) *
                     (1 + ϖ_λ[n]  * Z⁺⁺[i,i,n2] * (dτ_λ[n]  / μ[i]) * wct[i])
             else
-                t⁺⁺[i,j,n] = 0.0
+                t⁺⁺[i,j,n] = zero(FT)
             end
         else
     
@@ -92,38 +104,51 @@ end
                 #(exp(-dτ_λ[n] * G[j] / μ[j]) - exp(-dτ_λ[n] * G[i] / μ[i]))  
         end
     else
-        r⁻⁺[i,j,n] = 0.0
+        r⁻⁺[i,j,n] = zero(FT)
         if i==j
             t⁺⁺[i,j,n] = exp(-dτ_λ[n] * G[i] / μ[i]) #Suniti
         else
-            t⁺⁺[i,j,n] = 0.0
+            t⁺⁺[i,j,n] = zero(FT)
         end
     end
     nothing
 end
 
-@kernel function get_canopy_elem_rt_SFI!(J₀⁺, J₀⁻, ϖ_λ, dτ_λ, τ_sum, G, Z⁻⁺, Z⁺⁺, μ, ndoubl, wct02, nStokes ,I₀, iμ0, D)
+"""
+    get_canopy_elem_rt_SFI!(J₀⁺, J₀⁻, ϖ_λ, dτ_λ, τ_sum, G, Z⁻⁺, Z⁺⁺, μ,
+                            ndoubl, wct02, nStokes, I₀, iμ0, D)
+
+KernelAbstractions source-function kernel for canopy elemental layers. Each
+workitem computes the direct-beam `Z * I₀` contractions for one stream and
+wavelength, applies the canopy path factor `G` in the finite-δ source
+formulas, multiplies by the direct-beam attenuation above the layer, and
+applies the upwelling D-matrix sign when required.
+"""
+@kernel function get_canopy_elem_rt_SFI!(J₀⁺, J₀⁻, @Const(ϖ_λ), @Const(dτ_λ),
+                                         @Const(τ_sum), @Const(G), @Const(Z⁻⁺),
+                                         @Const(Z⁺⁺), @Const(μ), ndoubl, wct02,
+                                         nStokes, @Const(I₀), iμ0, @Const(D))
     i_start  = nStokes*(iμ0-1) + 1 
     i_end    = nStokes*iμ0
     
     i, _, n = @index(Global, NTuple) ##Suniti: What are Global and Ntuple?
     FT = eltype(I₀)
-    J₀⁺[i, 1, n]=0
-    J₀⁻[i, 1, n]=0
+    J₀⁺[i, 1, n] = zero(FT)
+    J₀⁻[i, 1, n] = zero(FT)
     n2=1
     if size(Z⁻⁺,3)>1
         n2 = n
     end
     
-    Z⁺⁺_I₀ = FT(0.0);
-    Z⁻⁺_I₀ = FT(0.0);
+    Z⁺⁺_I₀ = zero(FT);
+    Z⁻⁺_I₀ = zero(FT);
     
     for ii = i_start:i_end
         Z⁺⁺_I₀ += Z⁺⁺[i,ii,n2] * I₀[ii-i_start+1]
         Z⁻⁺_I₀ += Z⁻⁺[i,ii,n2] * I₀[ii-i_start+1] 
     end
 
-    if (i>=i_start) && (i<=i_end)
+    if (i >= i_start) & (i <= i_end)
         ctr = i-i_start+1
         # J₀⁺ = 0.25*(1+δ(m,0)) * ϖ(λ) * Z⁺⁺ * I₀ * (dτ(λ)/μ₀) * exp(-dτ(λ)/μ₀)
         # 1.54 in Fell

@@ -29,7 +29,7 @@ Layout: an, bn are (nquad_radius, nmax_global) -- transposed for coalescing.
 """
 @kernel function mie_coefficients_kernel_ds!(
     an, bn,                     # output: (nquad_radius, nmax_global) Complex{FT}
-    x_params,                   # input:  (nquad_radius,) FT -- size parameters
+    @Const(x_params),           # input:  (nquad_radius,) FT -- size parameters
     m_re, m_im,                 # scalars: real/imag refractive index parts
     @Const(nmax_per_r),         # input:  (nquad_radius,) Int -- per-radius nmax
     nmx_max::Int                # scalar: max Dn recursion depth
@@ -152,12 +152,14 @@ end
 """
     mie_coefficients_kernel_f64!(an, bn, x_params, m_re, m_im, nmax_per_r, nmx_max)
 
-Native Float64 variant of the Mie coefficient kernel for GPUs with full FP64
-(A100, V100). Same algorithm as CPU code, parallelized over radius points.
+Native floating-point Mie coefficient kernel used by the `NativeFloat64`
+policy. The host launcher restricts this path to `Float64` arrays; inside the
+kernel all scalar work uses `eltype(x_params)` so the device code itself does
+not hardcode a floating-point type.
 """
 @kernel function mie_coefficients_kernel_f64!(
     an, bn,                     # output: (nquad_radius, nmax_global) Complex{FT}
-    x_params,                   # input:  (nquad_radius,) FT -- size parameters
+    @Const(x_params),           # input:  (nquad_radius,) FT -- size parameters
     m_re, m_im,                 # scalars: real/imag refractive index parts
     @Const(nmax_per_r),         # input:  (nquad_radius,) Int -- per-radius nmax
     nmx_max::Int                # scalar: max Dn recursion depth
@@ -168,21 +170,22 @@ Native Float64 variant of the Mie coefficient kernel for GPUs with full FP64
     x = x_params[i]
     n_max_i = nmax_per_r[i]
 
-    # Complex y in Float64
-    y_re64 = Float64(x) * Float64(m_re)
-    y_im64 = Float64(x) * Float64(m_im)
-    nmx_i = max(n_max_i, round(Int, sqrt(y_re64^2 + y_im64^2)) + 1) + 50
+    # Complex y in native FT. The host launcher only selects this kernel for
+    # NativeFloat64 policy with Float64 arrays.
+    y_re = FT(x) * FT(m_re)
+    y_im = FT(x) * FT(m_im)
+    nmx_i = max(n_max_i, round(Int, sqrt(y_re^2 + y_im^2)) + 1) + 50
 
-    # --- Dn downward recursion in native Float64 ---
-    Dn_prev_re = 0.0
-    Dn_prev_im = 0.0
+    # --- Dn downward recursion in native FT ---
+    Dn_prev_re = zero(FT)
+    Dn_prev_im = zero(FT)
 
     @inbounds for n = (nmx_i - 1):-1:1
         # ratio = (n+1) / y  [complex division]
-        n1 = Float64(n + 1)
-        denom = y_re64^2 + y_im64^2
-        ratio_re = n1 * y_re64 / denom
-        ratio_im = -n1 * y_im64 / denom
+        n1 = FT(n + 1)
+        denom = y_re^2 + y_im^2
+        ratio_re = n1 * y_re / denom
+        ratio_im = -n1 * y_im / denom
 
         # sum = Dn_prev + ratio
         sum_re = Dn_prev_re + ratio_re
@@ -306,7 +309,7 @@ Grid: (n_mu, nquad_radius) -- one thread per (angle, radius) pair.
     s2 = cneumaier_sum(S2_acc)
 
     # Phase matrix elements (Tier 3 -- native FT)
-    inv_x2 = FT(0.5) / (x * x)
+    inv_x2 = convert(FT, 1//2) / (x * x)
     abs2_s1 = real(s1)^2 + imag(s1)^2
     abs2_s2 = real(s2)^2 + imag(s2)^2
     cross_re = real(s1) * real(s2) + imag(s1) * imag(s2)  # Re(s1 * conj(s2))
