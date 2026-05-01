@@ -84,12 +84,14 @@ function interp_at_p(profile, p_centers, p_target)
 end
 
 """
-    apply_scenario!(params, base_q, base_p, base_T, base_vmr; h2o, aot, gndalt, tsz)
+    apply_scenario!(params, base_q, base_p, base_T, base_vmr; h2o, aot, gndalt)
 
-Mutate `params` for a single LUT-grid point.
+Mutate `params` for a single LUT-grid point. VZA/VAZ are set once at the top of
+the driver (paired with `tsz_axis`), so this function leaves them untouched —
+all TSZ scenarios share a single rt_run via the parallel-VZA scheme.
 """
 function apply_scenario!(params, base_q, base_p, base_T, base_vmr;
-                         h2o::Real, aot::Real, gndalt::Real, tsz::Real)
+                         h2o::Real, aot::Real, gndalt::Real)
     p_surf = p_surface_from_gndalt(gndalt)
     params.scattering_params.rt_aerosols[1].τ_ref = aot
 
@@ -121,13 +123,12 @@ function apply_scenario!(params, base_q, base_p, base_T, base_vmr;
         end
     end
 
-    params.vza = [180 - tsz]
     nothing
 end
 
-"Return (R_TOA_I, T_BOA_I) as spectra for the first VZA, Stokes I."
-function extract_I_radiances(R_SFI::AbstractArray, T_SFI::AbstractArray)
-    return Array(R_SFI)[1, 1, :], Array(T_SFI)[1, 1, :]
+"Return (R_TOA_I, T_BOA_I) at VZA index `iv`, Stokes I."
+function extract_I_radiances(R_SFI::AbstractArray, T_SFI::AbstractArray, iv::Int = 1)
+    return Array(R_SFI)[iv, 1, :], Array(T_SFI)[iv, 1, :]
 end
 
 """
@@ -221,8 +222,10 @@ end
 Run the full LUT scan for α=0. Returns `nothing` if inputs are not available.
 
 Port notes (vs sanghavi):
-  - No quadrature-swap optimization across TSZ — the model is rebuilt once
-    per (GNDALT, TSZ) pair rather than mutating quad_points in place.
+  - Parallel-VZA scheme: every TSZ in `tsz_axis` is loaded into `params.vza`
+    once at the top, paired with the YAML's `vaz`. The model is built once per
+    GNDALT, and each `rt_run` returns R_SFI/T_SFI of shape
+    `(length(tsz_axis), n_stokes, nSpec)`. We slice per-TSZ for output.
   - Inner loop (H2OSTR × AOT550) still uses direct τ mutation for speed.
 """
 function run_all_scenarios(; yaml     = EMIT_YAML,
@@ -258,9 +261,18 @@ function run_all_scenarios(; yaml     = EMIT_YAML,
     base_vmr = Dict(g => v isa AbstractVector ? copy(v) : v
                     for (g, v) in params.absorption_params.vmr)
 
-    ν_axis = collect(params.spec_bands[1])
-    λ_nm   = 1e7 ./ ν_axis
-    n_spec = length(ν_axis)
+    # Parallel-VZA setup: load every TSZ as a paired (vza, vaz) pair so a single
+    # rt_run yields all TSZ outputs in one shot.
+    base_vaz_scalar = FT(params.vaz[1])
+    params.vza = FT.(180 .- tsz_axis)
+    params.vaz = fill(base_vaz_scalar, length(tsz_axis))
+    @info "Parallel-VZA setup" vza = params.vza vaz = params.vaz
+
+    n_bands = length(params.spec_bands)
+    ν_axis  = vcat([collect(params.spec_bands[ib]) for ib in 1:n_bands]...)
+    λ_nm    = 1e7 ./ ν_axis
+    n_spec  = length(ν_axis)
+    @info "Spectral grid" n_bands n_spec n_per_band = [length(collect(b)) for b in params.spec_bands]
 
     out_dims = (length(h2o_axis), length(aot_axis),
                 length(gndalt_axis), length(tsz_axis), n_spec)
@@ -272,57 +284,74 @@ function run_all_scenarios(; yaml     = EMIT_YAML,
     t_start    = time()
 
     for (ig, gndalt) in enumerate(gndalt_axis)
-        for (it, tsz) in enumerate(tsz_axis)
-            @info "Build model for GNDALT/TSZ" ig gndalt tsz
-            apply_scenario!(params, base_q, base_p, base_T, base_vmr;
-                            h2o = FT(1), aot = aot_axis[1], gndalt = gndalt, tsz = tsz)
-            model = model_from_parameters(params)
-            RS    = InelasticScattering.noRS{FT}()
+        @info "Build model for GNDALT (all TSZs in one rt_run)" ig gndalt
+        apply_scenario!(params, base_q, base_p, base_T, base_vmr;
+                        h2o = FT(1), aot = aot_axis[1], gndalt = gndalt)
+        model = model_from_parameters(params)
+        RS    = InelasticScattering.noRS{FT}()
 
-            # Cache the base τ's at this (gndalt, tsz); H2O/AOT scale from here.
-            τ_abs_base  = copy(model.τ_abs[1])
-            τ_rayl_base = copy(model.τ_rayl[1])
-            τ_aer_base  = copy(model.τ_aer[1])
-            aot_base    = aot_axis[1]
+        # Cache the base τ's per band at this gndalt; H2O/AOT scale from here.
+        τ_abs_base  = [copy(model.τ_abs[ib])  for ib in 1:n_bands]
+        τ_rayl_base = [copy(model.τ_rayl[ib]) for ib in 1:n_bands]
+        τ_aer_base  = [copy(model.τ_aer[ib])  for ib in 1:n_bands]
+        aot_base    = aot_axis[1]
 
-            for (ih, h2o) in enumerate(h2o_axis), (ia, aot) in enumerate(aot_axis)
-                scenario_k += 1
-                t_scen = time()
+        for (ih, h2o) in enumerate(h2o_axis), (ia, aot) in enumerate(aot_axis)
+            t_scen = time()
 
+            # Per-TSZ accumulators for the full concatenated spectrum.
+            n_tsz = length(tsz_axis)
+            R_concat = [Float64[] for _ in 1:n_tsz]
+            T_concat = [Float64[] for _ in 1:n_tsz]
+            τ_concat    = Float64[]
+            hemR_concat = Float64[]
+            hemT_concat = Float64[]
+
+            for ib in 1:n_bands
                 # Inner scaling is only an approximation for the unified port —
                 # exact sanghavi requires rescaling τ_abs by (vcd_dry(new q) /
                 # vcd_dry(base)). For grid-scale runs users should rebuild the
                 # model per H2O-point by calling apply_scenario!/model_from_parameters
                 # again (slower but correct).
-                model.τ_abs[1]  .= τ_abs_base   .* h2o
-                model.τ_aer[1]  .= τ_aer_base   .* (aot / aot_base)
-                model.τ_rayl[1] .= τ_rayl_base
+                model.τ_abs[ib]  .= τ_abs_base[ib]   .* h2o
+                model.τ_aer[ib]  .= τ_aer_base[ib]   .* (aot / aot_base)
+                model.τ_rayl[ib] .= τ_rayl_base[ib]
 
                 # rt_run returns 7-tuple (R_SFI, T_SFI, ieR_SFI, ieT_SFI, hdr, bhr_uw, bhr_dw).
-                R_SFI_tot, T_SFI_tot, _, _, _, hem_R_tot, hem_T_tot = rt_run(RS, model, 1)
+                # R_SFI/T_SFI shape: (length(vza), n_stokes, nSpec_band) — one slice per TSZ.
+                R_SFI_b, T_SFI_b, _, _, _, hem_R_b, hem_T_b = rt_run(RS, model, ib)
 
-                R_tot_I, T_tot_I = extract_I_radiances(R_SFI_tot, T_SFI_tot)
+                for it in 1:n_tsz
+                    R_band, T_band = extract_I_radiances(R_SFI_b, T_SFI_b, it)
+                    append!(R_concat[it], R_band)
+                    append!(T_concat[it], T_band)
+                end
 
-                # Vertical total optical thickness from the just-updated τ's.
-                τ_total_spec = compute_total_optical_depth(model.τ_abs[1],
-                                                           model.τ_rayl[1],
-                                                           model.τ_aer[1])
+                τ_b = compute_total_optical_depth(model.τ_abs[ib],
+                                                   model.τ_rayl[ib],
+                                                   model.τ_aer[ib])
+                append!(τ_concat, τ_b)
+                append!(hemR_concat, Float64.(hem_R_b))
+                append!(hemT_concat, Float64.(hem_T_b))
+            end
 
-                R_tot[ih, ia, ig, it, :]    .= R_tot_I
-                T_tot[ih, ia, ig, it, :]    .= T_tot_I
-                τ_total[ih, ia, ig, it, :]  .= τ_total_spec
-                hemR_tot[ih, ia, ig, it, :] .= Float64.(hem_R_tot)
-                hemT_tot[ih, ia, ig, it, :] .= Float64.(hem_T_tot)
+            for (it, tsz) in enumerate(tsz_axis)
+                scenario_k += 1
+                R_tot[ih, ia, ig, it, :]    .= R_concat[it]
+                T_tot[ih, ia, ig, it, :]    .= T_concat[it]
+                τ_total[ih, ia, ig, it, :]  .= τ_concat
+                hemR_tot[ih, ia, ig, it, :] .= hemR_concat
+                hemT_tot[ih, ia, ig, it, :] .= hemT_concat
 
                 write_scenario_dat(dat_dir, λ_nm, ν_axis,
-                                   R_tot_I, T_tot_I, τ_total_spec,
-                                   hem_R_tot, hem_T_tot;
+                                   R_concat[it], T_concat[it], τ_concat,
+                                   hemR_concat, hemT_concat;
                                    h2o = h2o, aot = aot, gndalt = gndalt, tsz = tsz)
-
-                dt_scen   = round(time() - t_scen;   digits = 2)
-                elapsed_s = round(time() - t_start; digits = 1)
-                @info "Scenario complete" scenario_k n_total dt_s = dt_scen elapsed_s h2o aot gndalt tsz
             end
+
+            dt_scen   = round(time() - t_scen;   digits = 2)
+            elapsed_s = round(time() - t_start; digits = 1)
+            @info "Inner-loop point complete (all bands × all TSZs)" scenario_k n_total dt_s = dt_scen elapsed_s h2o aot gndalt
         end
     end
 

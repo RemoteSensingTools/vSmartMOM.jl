@@ -454,7 +454,6 @@ function validate_yaml_parameters(params)
         (["atmospheric_profile", "T"], Array{<:Real}),
         (["atmospheric_profile", "p"], Array{<:Real}),
         (["atmospheric_profile", "profile_reduction"], Union{Integer, Nothing}),
-        (["absorption", "molecules"], Array),
         (["absorption", "vmr"], Dict),
         (["absorption", "broadening"], String, ["Voigt()", "Doppler()", "Lorentz()"]), 
         (["absorption", "CEF"], String, ["HumlicekWeidemann32SDErrorFunction()"]),
@@ -483,6 +482,10 @@ function validate_yaml_parameters(params)
     end
     if "scattering" in keys(params)
         validate_aerosols(params["scattering"]["aerosols"])
+    end
+    if haskey(params, "absorption")
+        ab = params["absorption"]
+        @assert haskey(ab, "molecules") || haskey(ab, "fixed_molecules") || haskey(ab, "variable_molecules") "absorption section must define `fixed_molecules` and/or `variable_molecules` (or legacy `molecules`)"
     end
 end
 
@@ -622,46 +625,108 @@ function _parse_atmosphere(params_dict::Dict, FT)
     return T, p, q, prof_red
 end
 
-function _parse_absorption(params_dict::Dict, FT)
+function _parse_absorption(params_dict::Dict, FT, q=nothing)
     if !haskey(params_dict, "absorption")
         return nothing
     end
-    molecules = Array(params_dict["absorption"]["molecules"])
-    vmr = convert(Dict{String, Union{Real, Vector}}, params_dict["absorption"]["vmr"])
-    validate_vmrs(params_dict["absorption"]["molecules"], vmr)
-    bkey = replace(String(params_dict["absorption"]["broadening"]),"()"=>"")
+    abs_dict = params_dict["absorption"]
+
+    # ── Resolve fixed_molecules / variable_molecules. ─────────────────────
+    # Three accepted YAML forms:
+    #   (a) `fixed_molecules:` and/or `variable_molecules:` — preferred.
+    #   (b) `molecules:` only (legacy) — treated as all-fixed.
+    #   (c) `molecules:` + `variable_molecules:` (legacy) — fixed = molecules \ variable.
+    # H2O must NOT appear in any of these lists; when q is provided, H2O is
+    # auto-included as variable (linearised path) or as fixed (forward path).
+    has_fixed = haskey(abs_dict, "fixed_molecules")
+    has_var   = haskey(abs_dict, "variable_molecules")
+    has_legacy_molecules = haskey(abs_dict, "molecules")
+    if has_fixed
+        fixed_molecules = Array(abs_dict["fixed_molecules"])
+    elseif has_legacy_molecules && has_var
+        legacy_mol = Array(abs_dict["molecules"])
+        var_legacy = Array(abs_dict["variable_molecules"])
+        fixed_molecules = [setdiff(legacy_mol[i],
+            i <= length(var_legacy) ? var_legacy[i] : String[])
+            for i in 1:length(legacy_mol)]
+    elseif has_legacy_molecules
+        fixed_molecules = deepcopy(Array(abs_dict["molecules"]))
+    else
+        fixed_molecules = Vector{Vector{String}}()
+    end
+    if has_var
+        variable_molecules = Array(abs_dict["variable_molecules"])
+    else
+        variable_molecules = [String[] for _ in eachindex(fixed_molecules)]
+    end
+    while length(variable_molecules) < length(fixed_molecules)
+        push!(variable_molecules, String[])
+    end
+    while length(fixed_molecules) < length(variable_molecules)
+        push!(fixed_molecules, String[])
+    end
+    n_bands = length(fixed_molecules)
+    for ib in 1:n_bands
+        _require_config(!any(==("H2O"), fixed_molecules[ib]),
+            "H2O must not appear in fixed_molecules (band $ib). H2O is driven by atmospheric_profile.q.")
+        _require_config(!any(==("H2O"), variable_molecules[ib]),
+            "H2O must not appear in variable_molecules (band $ib). H2O is driven by atmospheric_profile.q.")
+    end
+
+    # ── VMR dict: H2O entry (if any) is ignored — we derive from q. ──────
+    vmr = convert(Dict{String, Union{Real, Vector}}, abs_dict["vmr"])
+    delete!(vmr, "H2O")
+    # Validate every fixed/variable species (excluding H2O) has a VMR.
+    all_species = unique(vcat(fixed_molecules..., variable_molecules...))
+    for sp in all_species
+        _require_config(haskey(vmr, sp),
+            "$(sp) listed as molecule in YAML but no vmr given in absorption.vmr")
+        _require_config(vmr[sp] isa Real || vmr[sp] isa Vector,
+            "vmr for $(sp) must be a Real or a Vector")
+    end
+
+    # ── Broadening / CEF / wing_cutoff. ─────────────────────────────────────
+    bkey = replace(String(abs_dict["broadening"]),"()"=>"")
     _require_config(haskey(BROADENING_MAP, bkey), "Unknown broadening $(bkey).")
     broadening_function = BROADENING_MAP[bkey]()
-    ckey = replace(String(params_dict["absorption"]["CEF"]),"()"=>"")
+    ckey = replace(String(abs_dict["CEF"]),"()"=>"")
     _require_config(haskey(CEF_MAP, ckey), "Unknown CEF $(ckey).")
     CEF = CEF_MAP[ckey]()
-    wing_cutoff = FT(params_dict["absorption"]["wing_cutoff"])
+    wing_cutoff = FT(abs_dict["wing_cutoff"])
+
+    # ── LUTs. Per band, load all LUTfiles. Detect H2O LUT (mol == 1) and
+    #    pop it into h2o_lut[band]. The remaining LUTs must be parallel to
+    #    `vcat(fixed_molecules[band], variable_molecules[band])`. ───────────
     luts = []
-    if haskey(params_dict["absorption"], "LUTfiles")
-        files_lut = Array(params_dict["absorption"]["LUTfiles"])
-        _require_config(size(files_lut) == size(molecules), "Size of LUTfiles has to match molecules")
-        for i in eachindex(files_lut)
-            push!(luts, [load_interpolation_model(_expand_env_path(file)) for file in files_lut[i]])
+    h2o_lut = Vector{Any}(nothing, n_bands)
+    if haskey(abs_dict, "LUTfiles")
+        files_lut = Array(abs_dict["LUTfiles"])
+        _require_config(length(files_lut) == n_bands,
+            "LUTfiles must have one entry per band ($(n_bands)); got $(length(files_lut))")
+        for ib in 1:n_bands
+            band_models = [load_interpolation_model(_expand_env_path(f)) for f in files_lut[ib]]
+            h2o_idx = findfirst(m -> getfield(m, :mol) == 1, band_models)
+            if h2o_idx !== nothing
+                h2o_lut[ib] = band_models[h2o_idx]
+                deleteat!(band_models, h2o_idx)
+            end
+            expected = length(fixed_molecules[ib]) + length(variable_molecules[ib])
+            _require_config(length(band_models) == expected,
+                "LUTfiles for band $ib has $(length(band_models)) non-H2O entries but fixed+variable_molecules sum is $(expected)")
+            push!(luts, band_models)
         end
     end
-    # Partition molecules into fixed (no Jacobian) and variable (Jacobian computed).
-    # Default: all molecules are fixed unless explicitly listed as variable in YAML.
-    if haskey(params_dict["absorption"], "variable_molecules")
-        variable_molecules = Array(params_dict["absorption"]["variable_molecules"])
-        # Fixed = molecules minus variable per band
-        fixed_molecules = [setdiff(molecules[i], 
-            i <= length(variable_molecules) ? variable_molecules[i] : String[]) 
-            for i in 1:length(molecules)]
-        # Pad variable_molecules to match n_bands if shorter
-        while length(variable_molecules) < length(molecules)
-            push!(variable_molecules, String[])
-        end
-    else
-        # No linearization requested: all molecules are fixed, none variable
-        fixed_molecules = deepcopy(molecules)
-        variable_molecules = [String[] for _ in 1:length(molecules)]
-    end
-    return AbsorptionParameters(molecules, fixed_molecules, variable_molecules, vmr, broadening_function, CEF, wing_cutoff, luts)
+
+    cia_files = haskey(abs_dict, "cia_files") ?
+                String.(Array(abs_dict["cia_files"])) :
+                String[]
+    mtckd_file = haskey(abs_dict, "mtckd_file") ?
+                 String(abs_dict["mtckd_file"]) :
+                 ""
+
+    return AbsorptionParameters(fixed_molecules, variable_molecules, vmr,
+                                broadening_function, CEF, wing_cutoff,
+                                luts, h2o_lut, cia_files, mtckd_file)
 end
 
 function _parse_scattering(params_dict::Dict, FT::Type{<:AbstractFloat}=Float64)
@@ -700,7 +765,7 @@ function parameters_from_dict(params_dict::Dict)
     polarization_type = _parse_polarization(params_dict, FT)
     architecture = _parse_architecture(params_dict)
     T, p, q, profile_reduction = _parse_atmosphere(params_dict, FT)
-    absorption_params = _parse_absorption(params_dict, FT)
+    absorption_params = _parse_absorption(params_dict, FT, q)
     scattering_params = _parse_scattering(params_dict, FT)
 
     if haskey(params_dict, "canopy")

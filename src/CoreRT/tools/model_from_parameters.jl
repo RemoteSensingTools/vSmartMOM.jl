@@ -114,36 +114,72 @@ function model_from_parameters(params::vSmartMOM_Parameters)
         #@show τ_rayl[i_band]
         # If no absorption, continue to next band
         isnothing(params.absorption_params) && continue
-        
-        # Loop over all molecules in this band, obtain profile for each, and add them up
-        for molec_i in 1:length(params.absorption_params.molecules[i_band])
-            #@show params.absorption_params.molecules[i_band][molec_i]
-            # This can be precomputed as well later in my mind, providing an absorption_model or an interpolation_model!
-            if isempty(params.absorption_params.luts)
-                # Obtain hitran data for this molecule
-                @timeit "Read HITRAN"  hitran_data = read_hitran(artifact(params.absorption_params.molecules[i_band][molec_i]), iso=-1)
+        ap = params.absorption_params
 
-                println("Computing profile for $(params.absorption_params.molecules[i_band][molec_i]) with vmr $(profile.vmr[params.absorption_params.molecules[i_band][molec_i]]) for band #$(i_band)")
-                # Create absorption model with parameters beforehand now:
-                absorption_model = make_hitran_model(hitran_data, 
-                    params.absorption_params.broadening_function, 
-                    wing_cutoff = params.absorption_params.wing_cutoff, 
-                    CEF = params.absorption_params.CEF, 
-                    architecture = params.architecture, 
-                    vmr = 0);#mean(profile.vmr[params.absorption_params.molecules[i_band][molec_i]]))
-                # Calculate absorption profile
-                
-                @timeit "Absorption Coeff"  compute_absorption_profile!(τ_abs[i_band], absorption_model, params.spec_bands[i_band],profile.vmr[params.absorption_params.molecules[i_band][molec_i]], profile);
-            # Use LUT directly
+        # Loop over fixed_molecules ∪ variable_molecules in this band; H2O is
+        # handled separately below (driven by q, not by these lists).
+        all_species = vcat(ap.fixed_molecules[i_band], ap.variable_molecules[i_band])
+        for (molec_i, mol_name) in enumerate(all_species)
+            if isempty(ap.luts)
+                @timeit "Read HITRAN" hitran_data = read_hitran(artifact(mol_name), iso=-1)
+                println("Computing profile for $(mol_name) with vmr $(profile.vmr[mol_name]) for band #$(i_band)")
+                absorption_model = make_hitran_model(hitran_data,
+                    ap.broadening_function,
+                    wing_cutoff = ap.wing_cutoff,
+                    CEF = ap.CEF,
+                    architecture = params.architecture,
+                    vmr = 0)
+                @timeit "Absorption Coeff" compute_absorption_profile!(τ_abs[i_band], absorption_model, params.spec_bands[i_band], profile.vmr[mol_name], profile)
             else
-                compute_absorption_profile!(τ_abs[i_band], params.absorption_params.luts[i_band][molec_i], params.spec_bands[i_band],profile.vmr[params.absorption_params.molecules[i_band][molec_i]], profile);
+                compute_absorption_profile!(τ_abs[i_band], ap.luts[i_band][molec_i], params.spec_bands[i_band], profile.vmr[mol_name], profile)
+            end
+        end
+
+        # H₂O line absorption (driven by q). Use the band's H2O LUT if the
+        # parser found one inside LUTfiles; otherwise fall back to artifact.
+        if any(!iszero, params.q)
+            if ap.h2o_lut[i_band] !== nothing
+                @timeit "Absorption Coeff H2O" compute_absorption_profile!(
+                    τ_abs[i_band], ap.h2o_lut[i_band],
+                    params.spec_bands[i_band], profile.vmr_h2o, profile)
+            else
+                @timeit "Read HITRAN H2O" hitran_data = read_hitran(artifact("H2O"), iso=-1)
+                println("Computing profile for H2O (q-driven) for band #$(i_band)")
+                h2o_model = make_hitran_model(hitran_data,
+                    ap.broadening_function,
+                    wing_cutoff = ap.wing_cutoff,
+                    CEF = ap.CEF,
+                    architecture = params.architecture,
+                    vmr = 0)
+                @timeit "Absorption Coeff H2O" compute_absorption_profile!(τ_abs[i_band], h2o_model, params.spec_bands[i_band], profile.vmr_h2o, profile)
+            end
+        end
+
+        # Collision-induced absorption (HITRAN .cia files), if any.
+        for cia_path in ap.cia_files
+            @timeit "CIA $(basename(cia_path))" begin
+                cia_table = Absorption.load_cia_table(cia_path,
+                                                     params.spec_bands[i_band];
+                                                     FT = FT)
+                Absorption.compute_τ_cia!(τ_abs[i_band], cia_table, profile,
+                                           ap.vmr)
+            end
+        end
+
+        # MT_CKD H₂O continuum (self + foreign), if a reference table is configured.
+        if !isempty(ap.mtckd_file)
+            @timeit "MT_CKD H2O continuum" begin
+                mtckd_table = Absorption.load_mtckd(ap.mtckd_file)
+                Absorption.compute_τ_h2o_continuum!(τ_abs[i_band], mtckd_table,
+                                                     params.spec_bands[i_band], profile,
+                                                     profile.vmr_h2o)
             end
         end
     end
 
     # aerosol_optics[iBand][iAer]
     aerosol_optics = [Array{AerosolOptics}(undef, (n_aer)) for i=1:n_bands];
-        
+
     # τ_aer[iBand][iAer,iZ]
     τ_aer = [zeros(FT, n_aer, length(profile.p_full)) for i=1:n_bands];
 
@@ -327,26 +363,65 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
 
         # If no absorption, continue to next band
         isnothing(params.absorption_params) && continue
-        # Loop over all molecules in this band, obtain profile for each, and add them up
-        for molec_i in 1:length(params.absorption_params.molecules[i_band])
-            # This can be precomputed as well later in my mind, providing an absorption_model or an interpolation_model!
-            if isempty(params.absorption_params.luts)
-                # Obtain hitran data for this molecule
-                @timeit "Read HITRAN"  hitran_data = read_hitran(artifact(params.absorption_params.molecules[i_band][molec_i]), iso=-1)
+        ap = params.absorption_params
 
-                println("Computing profile for $(params.absorption_params.molecules[i_band][molec_i]) with vmr $(profile.vmr[params.absorption_params.molecules[i_band][molec_i]]) for band #$(i_band)")
-                # Create absorption model with parameters beforehand now:
-                absorption_model = make_hitran_model(hitran_data, 
-                    params.absorption_params.broadening_function, 
-                    wing_cutoff = params.absorption_params.wing_cutoff, 
-                    CEF = params.absorption_params.CEF, 
-                    architecture = params.architecture, 
-                    vmr = 0);#mean(profile.vmr[params.absorption_params.molecules[i_band][molec_i]]))
-                # Calculate absorption profile
-                @timeit "Absorption Coeff"  compute_absorption_profile!(τ_abs[i_band], absorption_model, params.spec_bands[i_band],profile.vmr[params.absorption_params.molecules[i_band][molec_i]], profile);
-            # Use LUT directly
+        # Loop over fixed_molecules ∪ variable_molecules in this band; H2O is
+        # handled separately below (driven by q, not by these lists).
+        all_species = vcat(ap.fixed_molecules[i_band], ap.variable_molecules[i_band])
+        for (molec_i, mol_name) in enumerate(all_species)
+            if isempty(ap.luts)
+                @timeit "Read HITRAN" hitran_data = read_hitran(artifact(mol_name), iso=-1)
+                println("Computing profile for $(mol_name) with vmr $(profile.vmr[mol_name]) for band #$(i_band)")
+                absorption_model = make_hitran_model(hitran_data,
+                    ap.broadening_function,
+                    wing_cutoff = ap.wing_cutoff,
+                    CEF = ap.CEF,
+                    architecture = params.architecture,
+                    vmr = 0)
+                @timeit "Absorption Coeff" compute_absorption_profile!(τ_abs[i_band], absorption_model, params.spec_bands[i_band], profile.vmr[mol_name], profile)
             else
-                compute_absorption_profile!(τ_abs[i_band], params.absorption_params.luts[i_band][molec_i], params.spec_bands[i_band],profile.vmr[params.absorption_params.molecules[i_band][molec_i]], profile);
+                compute_absorption_profile!(τ_abs[i_band], ap.luts[i_band][molec_i], params.spec_bands[i_band], profile.vmr[mol_name], profile)
+            end
+        end
+
+        # H₂O line absorption (driven by q). Use the band's H2O LUT if the
+        # parser found one inside LUTfiles; otherwise fall back to artifact.
+        if any(!iszero, params.q)
+            if ap.h2o_lut[i_band] !== nothing
+                @timeit "Absorption Coeff H2O" compute_absorption_profile!(
+                    τ_abs[i_band], ap.h2o_lut[i_band],
+                    params.spec_bands[i_band], profile.vmr_h2o, profile)
+            else
+                @timeit "Read HITRAN H2O" hitran_data = read_hitran(artifact("H2O"), iso=-1)
+                println("Computing profile for H2O (q-driven) for band #$(i_band)")
+                h2o_model = make_hitran_model(hitran_data,
+                    ap.broadening_function,
+                    wing_cutoff = ap.wing_cutoff,
+                    CEF = ap.CEF,
+                    architecture = params.architecture,
+                    vmr = 0)
+                @timeit "Absorption Coeff H2O" compute_absorption_profile!(τ_abs[i_band], h2o_model, params.spec_bands[i_band], profile.vmr_h2o, profile)
+            end
+        end
+
+        # Collision-induced absorption (HITRAN .cia files), if any.
+        for cia_path in ap.cia_files
+            @timeit "CIA $(basename(cia_path))" begin
+                cia_table = Absorption.load_cia_table(cia_path,
+                                                     params.spec_bands[i_band];
+                                                     FT = FT)
+                Absorption.compute_τ_cia!(τ_abs[i_band], cia_table, profile,
+                                           ap.vmr)
+            end
+        end
+
+        # MT_CKD H₂O continuum (self + foreign), if a reference table is configured.
+        if !isempty(ap.mtckd_file)
+            @timeit "MT_CKD H2O continuum" begin
+                mtckd_table = Absorption.load_mtckd(ap.mtckd_file)
+                Absorption.compute_τ_h2o_continuum!(τ_abs[i_band], mtckd_table,
+                                                     params.spec_bands[i_band], profile,
+                                                     profile.vmr_h2o)
             end
         end
     end
