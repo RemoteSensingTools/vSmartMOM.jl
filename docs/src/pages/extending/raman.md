@@ -2,7 +2,7 @@
 
 **For:** method developers extending inelastic-scattering support.
 
-**Next:** [Inelastic Scattering](../Inelastic/Overview.md), [Core RT Theory](../vSmartMOM/CoreRTTheory.md), [Library](../api_reference.md).
+**Next:** [Inelastic Extension (Concepts)](../concepts/08_inelastic.md), [The MOM Solver](../concepts/04_mom_solver.md), [Library](../api_reference.md).
 
 Raman support is selected by dispatch on `AbstractRamanType`. Adding a new mode should mean adding methods for that mode, not adding new `isa` branches inside the main RT loop.
 

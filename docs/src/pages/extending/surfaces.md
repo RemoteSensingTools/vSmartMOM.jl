@@ -2,7 +2,7 @@
 
 **For:** method developers adding a new lower-boundary reflectance model.
 
-**Next:** [Surfaces](../Surfaces/Overview.md), [Surfaces tutorial](../tutorials/Tutorial_Surfaces.md), [Core RT Theory](../vSmartMOM/CoreRTTheory.md), [Library](../api_reference.md).
+**Next:** [Surfaces (Concepts)](../concepts/05_surfaces.md), [Surfaces tutorial](../tutorials/Tutorial_Surfaces.md), [The MOM Solver](../concepts/04_mom_solver.md), [Library](../api_reference.md).
 
 Surface models are part of `CoreRT` because the lower boundary is represented as an `AddedLayer` and then interacts with the atmospheric composite layer. A new BRDF usually needs three pieces:
 

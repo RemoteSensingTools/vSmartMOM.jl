@@ -2,7 +2,7 @@
 
 **For:** retrieval and inversion developers who need analytic sensitivities.
 
-**Next:** [Core RT Theory](vSmartMOM/CoreRTTheory.md), [Library](api_reference.md), [Tutorial: Jacobians](tutorials/Tutorial_Jacobians.md).
+**Next:** [Linearization (Concepts)](concepts/06_linearization.md), [Library](api_reference.md), [Tutorial: Jacobians](tutorials/Tutorial_Jacobians.md).
 
 vSmartMOM has a linearized radiative-transfer path for Jacobians. It propagates derivative optical properties through the same adding-doubling solver used for the forward model.
 
