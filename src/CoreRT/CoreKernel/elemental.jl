@@ -204,10 +204,67 @@ function elemental!(pol_type, SFI::Bool,
     end    
 end
 
-@kernel function get_elem_rt!(r⁻⁺, t⁺⁺, ϖ_λ, dτ_λ, Z⁻⁺, Z⁺⁺, μ, wct) 
+"""
+    get_elem_rt!(r⁻⁺, t⁺⁺, ϖ_λ, dτ_λ, Z⁻⁺, Z⁺⁺, μ, wct)
+
+KernelAbstractions kernel that fills the elemental layer's reflection
+`r⁻⁺` and transmission `t⁺⁺` matrices using the **exact finite-δ
+single-scatter formulas** of Fell (1997, FU Berlin PhD thesis), Eqs.
+1.52–1.56, restated in Sanghavi & Frankenberg (2023, JQSRT 311:108791),
+Eqs. (10)–(11):
+
+    r⁻⁺[i,j] = ϖ_λ · Z⁻⁺[i,j] · (μⱼ/(μᵢ+μⱼ)) · wⱼ · (1 - exp(-δτ(1/μᵢ + 1/μⱼ)))
+    t⁺⁺[i,j] = ϖ_λ · Z⁺⁺[i,j] · (μⱼ/(μᵢ-μⱼ)) · wⱼ · (exp(-δτ/μᵢ) - exp(-δτ/μⱼ))     (i ≠ j)
+    t⁺⁺[i,i] = exp(-δτ/μᵢ) · (1 + ϖ_λ · Z⁺⁺[i,i] · (δτ/μᵢ) · wᵢ)                    (i = j, L'Hôpital limit)
+
+These are NOT the infinitesimal-δ linearization of Sanghavi et al. (2014,
+JQSRT 133:412–433) Eqs. (19)–(20) used by many other MOM codes. Those are
+linear in δ and require very thin elemental layers (large N_doubl) for
+accuracy. The exact finite-δ form here lets the elemental layer be much
+thicker at the same single-scatter accuracy → smaller N_doubl → less
+round-off through doubling, stable in Float32 on GPU.
+
+The numerical-stability discipline:
+- `1 - exp(-x)` is computed as `-expm1(-x)`, accurate when x is small.
+- `exp(-a) - exp(-b)` is computed as `expdiff_neg(a, b)`, accurate when
+  a ≈ b. This case occurs when nearby μ_i, μ_j make the difference of
+  exponentials catastrophically cancel in the naive evaluation.
+- The `μ[i] == μ[j]` branch handles the diagonal limit where the i ≠ j
+  formula has an `(μⱼ/(μᵢ-μⱼ))` apparent singularity. The L'Hôpital limit
+  used here is the closed-form replacement.
+
+Streams with quadrature weight below `eps(FT)` (e.g. zero-weight viewing
+nodes appended for direct ray-tracing in the Block-Radau scheme) get
+trivial Beer-law transmission and zero reflection.
+
+# Arguments
+- `r⁻⁺::AbstractArray{FT,3}`: reflection matrix `(NquadN, NquadN, nSpec)`,
+  written in place.
+- `t⁺⁺::AbstractArray{FT,3}`: transmission matrix `(NquadN, NquadN, nSpec)`,
+  written in place.
+- `ϖ_λ::AbstractArray{FT,1}`: per-wavelength SSA (= τ_scat·ϖ / τ_λ from
+  the layer-optics build); shape `(nSpec,)`.
+- `dτ_λ::AbstractArray{FT,1}`: per-wavelength **total** elemental optical
+  depth (absorption included); shape `(nSpec,)`. **Note** that this is
+  the total τ_λ at the elemental thickness — the doubling count was sized
+  by the scattering-only τ_scat in `get_dtau_ndoubl` (rt_kernel.jl:245).
+  See `docs/src/pages/concepts/03c_mixing.md`.
+- `Z⁻⁺`, `Z⁺⁺`: backscatter and forward Fourier-moment phase matrices,
+  shape `(NquadN, NquadN, 1)` or `(NquadN, NquadN, nSpec)`. The kernel
+  detects which.
+- `μ`: quadrature angle cosines.
+- `wct`: quadrature-weight factors carrying the polarization-stream count
+  (Stokes_n) for index conversion.
+
+# Concepts page
+See [The MOM Solver § Elemental layer](../../docs/src/pages/concepts/04_mom_solver.md#elemental-layer)
+for the side-by-side comparison with the linear S2014 limit, the
+worked-example O₂ A-band layer, and the `expm1`/`expdiff_neg` rationale.
+"""
+@kernel function get_elem_rt!(r⁻⁺, t⁺⁺, ϖ_λ, dτ_λ, Z⁻⁺, Z⁺⁺, μ, wct)
     FT = eltype(r⁻⁺)
     n2 = 1
-    i, j, n = @index(Global, NTuple) 
+    i, j, n = @index(Global, NTuple)
     if size(Z⁻⁺,3)>1
         n2 = n
     end
