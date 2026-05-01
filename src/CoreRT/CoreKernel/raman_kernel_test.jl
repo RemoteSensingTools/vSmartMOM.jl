@@ -21,7 +21,19 @@ qp_μN= rand(nij);
 wct2 = rand(nij);
 ϖ_λ = rand(nn1);
 
-@kernel function get_elem_rt!(ier⁻⁺, iet⁺⁺, ϖ_λ, ϖ_λ₀λ₁, dτ₀, dτ₁, dτ_λ, Z⁻⁺_λ₀λ₁, Z⁺⁺_λ₀λ₁, qp_μN, wct2)
+"""
+    get_elem_rt!(ier⁻⁺, iet⁺⁺, ϖ_λ, ϖ_λ₀λ₁, dτ₀, dτ₁, dτ_λ,
+                 Z⁻⁺_λ₀λ₁, Z⁺⁺_λ₀λ₁, qp_μN, wct2)
+
+KernelAbstractions prototype kernel used by this Raman test script. Each
+workitem owns one `(i, j, n₁, n₀)` inelastic matrix element and evaluates the
+wavelength-coupled elemental reflection/transmission formulas for comparison
+against the scalar reference implementation below.
+"""
+@kernel function get_elem_rt!(ier⁻⁺, iet⁺⁺, @Const(ϖ_λ), @Const(ϖ_λ₀λ₁),
+                              dτ₀, dτ₁, @Const(dτ_λ), @Const(Z⁻⁺_λ₀λ₁),
+                              @Const(Z⁺⁺_λ₀λ₁), @Const(qp_μN), @Const(wct2))
+    FT = eltype(ier⁻⁺)
     i, j, n₁, n₀ = @index(Global, NTuple) 
     # let n₁ cover the full range of wavelengths, while n₀ only includes wavelengths at intervals 
     # that contribute significantly enough to inelastic scattering, so that n₀≪n₁ 
@@ -41,7 +53,7 @@ wct2 = rand(nij);
                     iet⁺⁺[i,j,n₁,n₀] = ϖ_λ₀λ₁[n₁,n₀] * dτ₀ * Z⁺⁺_λ₀λ₁[i,i] * wct2[i] * exp(-dτ_λ[n₀] / qp_μN[j])/ qp_μN[j]
                 end
             else
-                iet⁺⁺[i,j,n₁,n₀] = 0.0
+                iet⁺⁺[i,j,n₁,n₀] = zero(FT)
             end
         else
             #@show  qp_μN[i], qp_μN[j]  
@@ -50,11 +62,11 @@ wct2 = rand(nij);
             iet⁺⁺[i,j,n₁,n₀] = ϖ_λ₀λ₁[n₁,n₀] * (dτ₀/dτ₁) * Z⁺⁺_λ₀λ₁[i,j] * (qp_μN[j]*dτ₁ / (qp_μN[i]*dτ₀ - qp_μN[j]*dτ₁)) * expdiff_neg(dτ_λ[n₁] / qp_μN[i], dτ_λ[n₀] / qp_μN[j]) * wct2[j]
         end
     else
-        ier⁻⁺[i,j,n₁,n₀] = 0.0
+        ier⁻⁺[i,j,n₁,n₀] = zero(FT)
         if i==j
-            iet⁺⁺[i,j,n₁,n₀] = 0.0
+            iet⁺⁺[i,j,n₁,n₀] = zero(FT)
         else
-            iet⁺⁺[i,j,n₁,n₀] = 0.0
+            iet⁺⁺[i,j,n₁,n₀] = zero(FT)
         end
     end
 end

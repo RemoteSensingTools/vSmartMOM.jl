@@ -225,7 +225,15 @@ launch pattern with a single kernel launch.
 
 =#
 
-"""Batched Gaussian (Doppler) line-shape kernel. Each thread sums all line contributions."""
+"""
+    line_shape_batch!(A, grid, ν_arr, γ_d_arr, γ_l_arr, y_arr, S_arr,
+                      istart_arr, istop_arr, N_lines, ::Doppler, CEF)
+
+KernelAbstractions batched Doppler line-shape kernel. Each workitem owns one
+spectral grid index, loops over all active HITRAN lines, applies each line's
+wing-cutoff index window, and accumulates the Gaussian contribution into
+`A[I]`.
+"""
 @kernel function line_shape_batch!(A, @Const(grid), @Const(ν_arr), @Const(γ_d_arr),
                                    @Const(γ_l_arr), @Const(y_arr), @Const(S_arr),
                                    @Const(istart_arr), @Const(istop_arr),
@@ -243,7 +251,15 @@ launch pattern with a single kernel launch.
     @inbounds A[I] += acc
 end
 
-"""Batched Lorentz (collision) line-shape kernel. Each thread sums all line contributions."""
+"""
+    line_shape_batch!(A, grid, ν_arr, γ_d_arr, γ_l_arr, y_arr, S_arr,
+                      istart_arr, istop_arr, N_lines, ::Lorentz, CEF)
+
+KernelAbstractions batched Lorentz line-shape kernel. Each workitem owns one
+spectral grid index, loops over all active HITRAN lines, applies each line's
+wing-cutoff index window, and accumulates the collision-broadened profile into
+`A[I]`.
+"""
 @kernel function line_shape_batch!(A, @Const(grid), @Const(ν_arr), @Const(γ_d_arr),
                                    @Const(γ_l_arr), @Const(y_arr), @Const(S_arr),
                                    @Const(istart_arr), @Const(istop_arr),
@@ -261,7 +277,15 @@ end
     @inbounds A[I] += acc
 end
 
-"""Batched Voigt line-shape kernel. Each thread sums all line contributions using CEF."""
+"""
+    line_shape_batch!(A, grid, ν_arr, γ_d_arr, γ_l_arr, y_arr, S_arr,
+                      istart_arr, istop_arr, N_lines, ::Voigt, CEF)
+
+KernelAbstractions batched Voigt line-shape kernel. Each workitem owns one
+spectral grid index, loops over all active HITRAN lines, applies the line
+wing-cutoff window, evaluates the selected complex error function `CEF`, and
+accumulates the Voigt profile into `A[I]`.
+"""
 @kernel function line_shape_batch!(A, @Const(grid), @Const(ν_arr), @Const(γ_d_arr),
                                    @Const(γ_l_arr), @Const(y_arr), @Const(S_arr),
                                    @Const(istart_arr), @Const(istop_arr),
@@ -285,30 +309,81 @@ Legacy per-line kernels (kept for reference and potential single-line use cases)
 
 =#
 
-"""Gaussian (Doppler) line-shape kernel. Adds S × (Gaussian) to A at each grid point."""
+"""
+    line_shape!(A, grid, ν, γ_d, γ_l, y, S, ::Doppler, CEF)
+
+KernelAbstractions single-line Doppler kernel. Each workitem owns one spectral
+grid index and adds this line's Gaussian contribution to `A[I]`.
+"""
 @kernel function line_shape!(A, @Const(grid), ν, γ_d, γ_l, y, S, ::Doppler, CEF)
     FT = eltype(ν)
     I = @index(Global, Linear)
     @inbounds A[I] += FT(S) * FT(cSqrtLn2divSqrtPi) * exp(-FT(cLn2) * ((FT(grid[I]) - FT(ν)) / FT(γ_d))^2) / FT(γ_d)
 end
 
-"""Lorentz (collision) line-shape kernel. Adds S × (Lorentzian) to A at each grid point."""
+"""
+    line_shape!(A, grid, ν, γ_d, γ_l, y, S, ::Lorentz, CEF)
+
+KernelAbstractions single-line Lorentz kernel. Each workitem owns one spectral
+grid index and adds this line's collision-broadened contribution to `A[I]`.
+"""
 @kernel function line_shape!(A, @Const(grid), ν, γ_d, γ_l, y, S, ::Lorentz, CEF)
     FT = eltype(ν)
     I = @index(Global, Linear)
     @inbounds A[I] += FT(S) * FT(γ_l) / (FT(pi) * (FT(γ_l)^2 + (FT(grid[I]) - FT(ν))^2))
 end
 
-"""Voigt (convolution of Doppler + Lorentz) line-shape kernel. Uses CEF for complex error function."""
+"""
+    line_shape!(A, grid, ν, γ_d, γ_l, y, S, ::Voigt, CEF)
+
+KernelAbstractions single-line Voigt kernel. Each workitem owns one spectral
+grid index, evaluates the selected complex error function `CEF`, and adds the
+line's Voigt contribution to `A[I]`.
+"""
 @kernel function line_shape!(A, @Const(grid), ν, γ_d, γ_l, y, S, ::Voigt, CEF)
     FT = eltype(ν)
     I = @index(Global, Linear)
     @inbounds A[I] += FT(S) * FT(cSqrtLn2divSqrtPi) / FT(γ_d) * real(w(CEF, FT(cSqrtLn2) / FT(γ_d) * (FT(grid[I]) - FT(ν)) + im * FT(y)))
 end
 
-"""Float32 variant of line_shape! for GPU compatibility. Casts inputs to Float32 before kernel call."""
-@kernel function line_shape32!(A, @Const(grid), ν, γ_d, γ_l, y, S, broadening, CEF)
-    line_shape!(A, grid, Float32(ν), Float32(γ_d), Float32(γ_l), Float32(y), Float32(S), broadening, CEF)
+"""
+    line_shape32!(A, grid, ν, γ_d, γ_l, y, S, ::Doppler, CEF)
+
+Float32-oriented single-line Doppler kernel retained for callers that pass
+Float64 host scalars into a Float32 accumulation array. The scalar line
+parameters are converted to `eltype(A)` inside the kernel and each workitem
+adds this line's Gaussian contribution to one spectral grid point.
+"""
+@kernel function line_shape32!(A, @Const(grid), ν, γ_d, γ_l, y, S, ::Doppler, CEF)
+    FT = eltype(A)
+    I = @index(Global, Linear)
+    @inbounds A[I] += FT(S) * FT(cSqrtLn2divSqrtPi) * exp(-FT(cLn2) * ((FT(grid[I]) - FT(ν)) / FT(γ_d))^2) / FT(γ_d)
+end
+
+"""
+    line_shape32!(A, grid, ν, γ_d, γ_l, y, S, ::Lorentz, CEF)
+
+Float32-oriented single-line Lorentz kernel. Each workitem converts scalar
+line parameters to `eltype(A)` and adds the collision-broadened line profile
+for one spectral grid point.
+"""
+@kernel function line_shape32!(A, @Const(grid), ν, γ_d, γ_l, y, S, ::Lorentz, CEF)
+    FT = eltype(A)
+    I = @index(Global, Linear)
+    @inbounds A[I] += FT(S) * FT(γ_l) / (FT(pi) * (FT(γ_l)^2 + (FT(grid[I]) - FT(ν))^2))
+end
+
+"""
+    line_shape32!(A, grid, ν, γ_d, γ_l, y, S, ::Voigt, CEF)
+
+Float32-oriented single-line Voigt kernel. Each workitem evaluates the Voigt
+complex-error-function profile in `eltype(A)` and adds the contribution for
+one spectral grid point.
+"""
+@kernel function line_shape32!(A, @Const(grid), ν, γ_d, γ_l, y, S, ::Voigt, CEF)
+    FT = eltype(A)
+    I = @index(Global, Linear)
+    @inbounds A[I] += FT(S) * FT(cSqrtLn2divSqrtPi) / FT(γ_d) * real(w(CEF, FT(cSqrtLn2) / FT(γ_d) * (FT(grid[I]) - FT(ν)) + im * FT(y)))
 end
 
 #=

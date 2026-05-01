@@ -261,7 +261,7 @@ See [The MOM Solver § Elemental layer](../../docs/src/pages/concepts/04_mom_sol
 for the side-by-side comparison with the linear S2014 limit, the
 worked-example O₂ A-band layer, and the `expm1`/`expdiff_neg` rationale.
 """
-@kernel function get_elem_rt!(r⁻⁺, t⁺⁺, ϖ_λ, dτ_λ, Z⁻⁺, Z⁺⁺, μ, wct)
+@kernel function get_elem_rt!(r⁻⁺, t⁺⁺, @Const(ϖ_λ), @Const(dτ_λ), @Const(Z⁻⁺), @Const(Z⁺⁺), @Const(μ), @Const(wct))
     FT = eltype(r⁻⁺)
     n2 = 1
     i, j, n = @index(Global, NTuple)
@@ -308,7 +308,19 @@ worked-example O₂ A-band layer, and the `expm1`/`expdiff_neg` rationale.
     nothing
 end
 
-@kernel function get_elem_rt_SFI!(J₀⁺, J₀⁻, ϖ_λ, dτ_λ, τ_sum, Z⁻⁺, Z⁺⁺, F₀, μ, ndoubl, wct02, nStokes, I₀, iμ0, D)
+"""
+    get_elem_rt_SFI!(J₀⁺, J₀⁻, ϖ_λ, dτ_λ, τ_sum, Z⁻⁺, Z⁺⁺, F₀, μ,
+                     ndoubl, wct02, nStokes, I₀, iμ0, D)
+
+KernelAbstractions elemental source-function kernel for the direct solar beam.
+Each workitem owns one stream/spectral element `(i, n)`, forms the local
+`Z⁺⁺ * F₀` and `Z⁻⁺ * F₀` Stokes contractions for the incident solar stream,
+then writes the exact finite-δ downwelling and upwelling source vectors. The
+kernel applies cumulative beam attenuation `exp(-τ_sum / μ₀)` and the
+D-matrix sign for upwelling source terms when the elemental layer will be
+doubled.
+"""
+@kernel function get_elem_rt_SFI!(J₀⁺, J₀⁻, @Const(ϖ_λ), @Const(dτ_λ), @Const(τ_sum), @Const(Z⁻⁺), @Const(Z⁺⁺), @Const(F₀), @Const(μ), ndoubl, wct02, nStokes, @Const(I₀), iμ0, @Const(D))
     i_start  = nStokes*(iμ0-1) + 1 
     i_end    = nStokes*iμ0
     
@@ -321,15 +333,15 @@ end
         n2 = n
     end
     
-    Z⁺⁺_I₀ = FT(0.0);
-    Z⁻⁺_I₀ = FT(0.0);
+    Z⁺⁺_I₀ = zero(FT);
+    Z⁻⁺_I₀ = zero(FT);
     
     for ii = i_start:i_end
         Z⁺⁺_I₀ += Z⁺⁺[i,ii,n2] * F₀[ii-i_start+1,n2]
         Z⁻⁺_I₀ += Z⁻⁺[i,ii,n2] * F₀[ii-i_start+1,n2]
     end
 
-    if (i>=i_start) && (i<=i_end)
+    if (i >= i_start) & (i <= i_end)
         ctr = i-i_start+1
         # See Eq. 1.54 in Fell
         # J₀⁺ = 0.25*(1+δ(m,0)) * ϖ(λ) * Z⁺⁺ * I₀ * (dτ(λ)/μ₀) * exp(-dτ(λ)/μ₀)
@@ -354,7 +366,16 @@ end
     nothing
 end
 
-@kernel function apply_D_elemental!(ndoubl, pol_n, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻)
+"""
+    apply_D_elemental!(ndoubl, pol_n, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻)
+
+KernelAbstractions D-matrix symmetry kernel for the elemental elastic layer.
+For undoubled layers it fills the reverse-direction operators `r⁺⁻` and `t⁻⁻`
+from `r⁻⁺` and `t⁺⁺` using the Stokes parity signs. For layers that will be
+doubled it applies the row sign to `r⁻⁺` in place so the doubling step can use
+the cheaper symmetric operator form.
+"""
+@kernel function apply_D_elemental!(ndoubl, pol_n, r⁻⁺, @Const(t⁺⁺), r⁺⁻, t⁻⁻)
     i, j, n = @index(Global, NTuple)
 
     if ndoubl < 1
@@ -375,6 +396,13 @@ end
     nothing
 end
 
+"""
+    apply_D_elemental_SFI!(ndoubl, pol_n, J₀⁻)
+
+KernelAbstractions D-matrix symmetry kernel for the elemental solar source
+vector. It negates the upwelling `U/V` Stokes rows of `J₀⁻` when the
+source-vector symmetry has not already been handled by the doubling path.
+"""
 @kernel function apply_D_elemental_SFI!(ndoubl, pol_n, J₀⁻)
     i, _, n = @index(Global, NTuple)
 

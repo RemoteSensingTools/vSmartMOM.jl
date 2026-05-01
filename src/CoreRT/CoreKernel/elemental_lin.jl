@@ -197,11 +197,20 @@ function elemental!(pol_type, SFI::Bool,
     end
 end
 
+"""
+    get_elem_rt!(r⁻⁺, t⁺⁺, ṙ⁻⁺, ṫ⁺⁺, ϖ_λ, dτ_λ, Z⁻⁺, Z⁺⁺, qp_μN, wct)
+
+KernelAbstractions tangent-linear elemental R/T kernel. Each workitem owns one
+matrix/spectral element `(i, j, n)`, writes the exact finite-δ forward
+reflection/transmission entries, and stores the three local core derivatives
+with respect to `(dτ, ϖ, Z)` in the fourth dimension of `ṙ⁻⁺` and `ṫ⁺⁺`.
+Zero-weight quadrature columns receive Beer-law diagonal transmission only.
+"""
 @kernel function get_elem_rt!(r⁻⁺, t⁺⁺,
                         ṙ⁻⁺, ṫ⁺⁺, 
-                        ϖ_λ, dτ_λ, 
-                        Z⁻⁺, Z⁺⁺, 
-                        qp_μN, wct) 
+                        @Const(ϖ_λ), @Const(dτ_λ),
+                        @Const(Z⁻⁺), @Const(Z⁺⁺),
+                        @Const(qp_μN), @Const(wct))
     FT = eltype(r⁻⁺)
     n2 = 1
     i, j, n = @index(Global, NTuple) 
@@ -314,13 +323,23 @@ end
     nothing
 end
 
+"""
+    get_elem_rt_SFI!(J₀⁺, J₀⁻, J̇₀⁺, J̇₀⁻, ϖ_λ, dτ_λ, τ_sum, τ̇_sum,
+                     Z⁻⁺, Z⁺⁺, F₀, qp_μN, ndoubl, wct02, nStokes, I₀, iμ0, D)
+
+KernelAbstractions tangent-linear elemental source-function kernel. Each
+workitem computes the direct-beam source vectors for one stream/spectral point
+and stores the three core derivatives of those source terms with respect to
+`(dτ, ϖ, Z)`. Beam attenuation from the optical depth above the layer is
+included in both the forward and derivative outputs.
+"""
 @kernel function get_elem_rt_SFI!(J₀⁺, J₀⁻, 
                 J̇₀⁺, J̇₀⁻, 
-                ϖ_λ, dτ_λ, 
-                τ_sum, τ̇_sum, 
-                Z⁻⁺, Z⁺⁺, F₀,
-                qp_μN, ndoubl, wct02, nStokes,
-                I₀, iμ0, D)
+                @Const(ϖ_λ), @Const(dτ_λ),
+                @Const(τ_sum), @Const(τ̇_sum),
+                @Const(Z⁻⁺), @Const(Z⁺⁺), @Const(F₀),
+                @Const(qp_μN), ndoubl, wct02, nStokes,
+                @Const(I₀), iμ0, @Const(D))
     i_start  = nStokes*(iμ0-1) + 1 
     i_end    = nStokes*iμ0
     
@@ -335,15 +354,15 @@ end
         n2 = n
     end
     
-    Z⁺⁺_I₀ = FT(0.0);
-    Z⁻⁺_I₀ = FT(0.0);
+    Z⁺⁺_I₀ = zero(FT);
+    Z⁻⁺_I₀ = zero(FT);
     
     for ii = i_start:i_end
         Z⁺⁺_I₀ += Z⁺⁺[i,ii,n2] * F₀[ii-i_start+1,n2] #I₀[ii-i_start+1]
         Z⁻⁺_I₀ += Z⁻⁺[i,ii,n2] * F₀[ii-i_start+1,n2] #I₀[ii-i_start+1] 
     end
 
-    if (i>=i_start) && (i<=i_end)
+    if (i >= i_start) & (i <= i_end)
         ctr = i-i_start+1
         # J₀⁺ = 0.25*(1+δ(m,0)) * ϖ(λ) * Z⁺⁺ * I₀ * (dτ(λ)/μ₀) * exp(-dτ(λ)/μ₀)
         J₀⁺[i, 1, n] = wct02 * ϖ_λ[n] * Z⁺⁺_I₀ * (dτ_λ[n] / qp_μN[i]) * exp(-dτ_λ[n] / qp_μN[i])
@@ -429,9 +448,11 @@ compatibility with the 3-core doubling path.
 @kernel function get_elem_rt_fused!(r⁻⁺, t⁺⁺,
                         ṙ⁻⁺, ṫ⁺⁺,
                         ap_ṙ⁻⁺, ap_ṫ⁺⁺, ap_ṙ⁺⁻, ap_ṫ⁻⁻,
-                        ϖ_λ, dτ_λ, Z⁻⁺, Z⁺⁺,
-                        dτ̇, ϖ̇, Ż⁻⁺, Ż⁺⁺_lin,
-                        qp_μN, wct,
+                        @Const(ϖ_λ), @Const(dτ_λ),
+                        @Const(Z⁻⁺), @Const(Z⁺⁺),
+                        @Const(dτ̇), @Const(ϖ̇),
+                        @Const(Ż⁻⁺), @Const(Ż⁺⁺_lin),
+                        @Const(qp_μN), @Const(wct),
                         nparams, ndoubl, pol_n)
     FT = eltype(r⁻⁺)
     i, j, n = @index(Global, NTuple)
@@ -573,12 +594,13 @@ Eliminates the separate chain-rule pass for SFI terms and the per-parameter
 @kernel function get_elem_rt_SFI_fused!(J₀⁺, J₀⁻,
                 J̇₀⁺, J̇₀⁻,
                 ap_J̇₀⁺, ap_J̇₀⁻,
-                ϖ_λ, dτ_λ,
-                τ_sum, τ̇_sum,
-                Z⁻⁺, Z⁺⁺, F₀,
-                dτ̇, ϖ̇, Ż⁻⁺, Ż⁺⁺_lin,
-                qp_μN, ndoubl, wct02, nStokes,
-                I₀, iμ0, D, nparams)
+                @Const(ϖ_λ), @Const(dτ_λ),
+                @Const(τ_sum), @Const(τ̇_sum),
+                @Const(Z⁻⁺), @Const(Z⁺⁺), @Const(F₀),
+                @Const(dτ̇), @Const(ϖ̇),
+                @Const(Ż⁻⁺), @Const(Ż⁺⁺_lin),
+                @Const(qp_μN), ndoubl, wct02, nStokes,
+                @Const(I₀), iμ0, @Const(D), nparams)
     i_start  = nStokes*(iμ0-1) + 1
     i_end    = nStokes*iμ0
 
@@ -595,8 +617,8 @@ Eliminates the separate chain-rule pass for SFI terms and the per-parameter
     end
 
     # Forward Z·I₀ products
-    Z⁺⁺_I₀ = FT(0.0)
-    Z⁻⁺_I₀ = FT(0.0)
+    Z⁺⁺_I₀ = zero(FT)
+    Z⁻⁺_I₀ = zero(FT)
     for ii = i_start:i_end
         Z⁺⁺_I₀ += Z⁺⁺[i,ii,n2] * F₀[ii-i_start+1,n2]
         Z⁻⁺_I₀ += Z⁻⁺[i,ii,n2] * F₀[ii-i_start+1,n2]
@@ -605,7 +627,7 @@ Eliminates the separate chain-rule pass for SFI terms and the per-parameter
     # ---- J₀⁺ and 3-core scalars ----
     J̇⁺_tau = FT(0); J̇⁺_w = FT(0); J̇⁺_Z = FT(0)
 
-    if (i>=i_start) && (i<=i_end)
+    if (i >= i_start) & (i <= i_end)
         J₀⁺[i, 1, n] = wct02 * ϖ_λ[n] * Z⁺⁺_I₀ * (dτ_λ[n] / qp_μN[i]) * exp(-dτ_λ[n] / qp_μN[i])
         J̇⁺_tau = J₀⁺[i, 1, n]*(1/dτ_λ[n] - 1/qp_μN[i])
         J̇⁺_w = ϖ_λ[n] == 0 ? FT(0) : J₀⁺[i, 1, n] / ϖ_λ[n]
@@ -681,9 +703,17 @@ Eliminates the separate chain-rule pass for SFI terms and the per-parameter
     nothing
 end
 
+"""
+    apply_D_elemental!(ndoubl, pol_n, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻, ṙ⁻⁺, ṫ⁺⁺, ṙ⁺⁻, ṫ⁻⁻)
+
+KernelAbstractions D-matrix symmetry kernel for linearized elemental R/T
+operators. It applies the same Stokes parity signs to the forward matrices and
+their three core derivative slots so reverse-direction operators remain
+consistent with the elastic D-symmetry convention.
+"""
 @kernel function apply_D_elemental!(ndoubl, pol_n, 
-                                r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻,
-                                ṙ⁻⁺, ṫ⁺⁺, ṙ⁺⁻, ṫ⁻⁻)
+                                r⁻⁺, @Const(t⁺⁺), r⁺⁻, t⁻⁻,
+                                ṙ⁻⁺, @Const(ṫ⁺⁺), ṙ⁺⁻, ṫ⁻⁻)
     i, j, n = @index(Global, NTuple) #how best to do this for linearization? Is : okay, or should I use an iparam index?
 
     if ndoubl < 1
@@ -719,6 +749,14 @@ end
     nothing
 end
 
+"""
+    apply_D_elemental_SFI!(ndoubl, pol_n, J₀⁻, J̇₀⁻)
+
+KernelAbstractions D-matrix symmetry kernel for linearized elemental source
+vectors. It negates the upwelling `U/V` source components and their three core
+derivative slots when source-vector D-symmetry must be applied outside the
+doubling update.
+"""
 @kernel function apply_D_elemental_SFI!(ndoubl, pol_n, J₀⁻, J̇₀⁻)
     i, _, n = @index(Global, NTuple)
     

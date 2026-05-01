@@ -160,8 +160,14 @@ function reflectance(brdf::AbstractSurfaceType, pol_type, μ::AbstractArray{FT},
     return ff * Rsurf
 end
 
+"""
+    applyExpansion!(Rsurf, n_stokes, v)
 
-@kernel function applyExpansion!(Rsurf,n_stokes::Int,  v)
+KernelAbstractions surface-expansion kernel for RPV BRDF matrices. Each
+workitem owns one scalar quadrature block `(i, j)` from `v` and expands its
+per-Stokes diagonal entries into the full `Rsurf` Mueller-block matrix.
+"""
+@kernel function applyExpansion!(Rsurf, n_stokes::Int, @Const(v))
     i, j = @index(Global, NTuple)
     # get indices:
     ii = (i-1)*n_stokes 
@@ -182,4 +188,3 @@ function expandSurface!(Rsurf::AbstractArray{FT,2}, n_stokes::Int, v) where {FT}
     synchronize_if_gpu();
     return nothing
 end
-

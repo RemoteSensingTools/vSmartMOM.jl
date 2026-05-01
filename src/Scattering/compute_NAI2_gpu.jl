@@ -95,6 +95,7 @@ function compute_aerosol_optical_properties_gpu(
 
     # --- Kernel 1: Mie coefficients ---
     if precision_policy isa NativeFloat64
+        @assert FT === Float64 "NativeFloat64 Mie precision policy requires Float64 model inputs; use DSEmulated() for Float32."
         kernel1 = mie_coefficients_kernel_f64!(backend)
     else
         kernel1 = mie_coefficients_kernel_ds!(backend)

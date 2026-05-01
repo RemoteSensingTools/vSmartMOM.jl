@@ -352,15 +352,22 @@ function doubling_allparams!(pol_type, SFI, expk,
     synchronize_if_gpu()
 end
 
-# WARNING: make sure the linearized version does not clash with the Raman version
+"""
+    apply_D!(n_stokes, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻, ṙ⁻⁺, ṫ⁺⁺, ṙ⁺⁻, ṫ⁻⁻)
+
+KernelAbstractions D-matrix symmetry kernel for linearized doubling. Each
+workitem owns one elastic R/T matrix element, applies the row sign to
+`r⁻⁺` and every parameter derivative in `ṙ⁻⁺`, then writes the reverse
+operators and their derivatives using the Stokes parity sign table.
+"""
 @kernel function apply_D!(n_stokes::Int,  
-                        r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻,
-                        ṙ⁻⁺, ṫ⁺⁺, ṙ⁺⁻, ṫ⁻⁻)
+                        r⁻⁺, @Const(t⁺⁺), r⁺⁻, t⁻⁻,
+                        ṙ⁻⁺, @Const(ṫ⁺⁺), ṙ⁺⁻, ṫ⁻⁻)
     iμ, jμ, n = @index(Global, NTuple)
-    i = mod(iμ, n_stokes)
-    j = mod(jμ, n_stokes)
-    i12 = (i == 1) || (i == 2)
-    j12 = (j == 1) || (j == 2)
+    i = mod1(iμ, n_stokes)
+    j = mod1(jμ, n_stokes)
+    i12 = (i == 1) | (i == 2)
+    j12 = (j == 1) | (j == 2)
     nparams = size(ṙ⁻⁺, 4)
 
     if !i12
@@ -370,7 +377,7 @@ end
         end
     end
 
-    same_block = (i12 && j12) || (!i12 && !j12)
+    same_block = (i12 & j12) | (!i12 & !j12)
     s = ifelse(same_block, one(eltype(r⁻⁺)), -one(eltype(r⁻⁺)))
 
     r⁺⁻[iμ, jμ, n] = s * r⁻⁺[iμ, jμ, n]
@@ -382,10 +389,18 @@ end
 
 end
 
+"""
+    apply_D_SFI!(n_stokes, J₀⁻, J̇₀⁻)
+
+KernelAbstractions D-matrix symmetry kernel for linearized source-function
+integration during doubling. It negates upwelling `U/V` source entries and all
+physical-parameter derivative slots in `J̇₀⁻` for the same stream/spectral
+location.
+"""
 @kernel function apply_D_SFI!(n_stokes::Int, J₀⁻, J̇₀⁻)
     iμ, _, n = @index(Global, NTuple)
-    i = mod(iμ, n_stokes)
-    i12 = (i == 1) || (i == 2)
+    i = mod1(iμ, n_stokes)
+    i12 = (i == 1) | (i == 2)
     if !i12
         J₀⁻[iμ, 1, n] = - J₀⁻[iμ, 1, n] 
         for iparam = 1:size(J̇₀⁻, 4)

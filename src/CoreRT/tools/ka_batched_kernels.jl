@@ -39,7 +39,16 @@ function ka_batched_mul!(C::AbstractArray{FT,3},
     return C
 end
 
-@kernel function _batched_mul_kernel!(C, A, B, ::Val{K}) where {K}
+"""
+    _batched_mul_kernel!(C, A, B, Val(K))
+
+KernelAbstractions device kernel for batched matrix multiplication. Each
+workitem owns one `(i, j, k)` output element and accumulates
+`C[i, j, k] = sum(A[i, l, k] * B[l, j, k], l=1:K)` in a scalar register.
+The inputs are read-only and `K` is carried as a `Val` so the inner loop bound
+is compile-time constant for the generated kernel.
+"""
+@kernel function _batched_mul_kernel!(C, @Const(A), @Const(B), ::Val{K}) where {K}
     i, j, k = @index(Global, NTuple)
     s = zero(eltype(C))
     @inbounds for l in 1:K
@@ -97,7 +106,16 @@ function check_ka_batch_inv_localmem(::Type{FT}, N::Integer, max_localmem_bytes)
     ))
 end
 
-@kernel function _batched_inv_lu_par_kernel!(X, A, ::Val{N}) where {N}
+"""
+    _batched_inv_lu_par_kernel!(X, A, Val(N))
+
+KernelAbstractions device kernel for small batched matrix inversion using LU
+factorization with partial pivoting. One workgroup handles one spectral
+matrix `A[:, :, k]`, each local workitem owns one row/RHS column, and the
+shared `LU`, `piv`, and `work` arrays live in kernel local memory. The kernel
+writes `X[:, :, k] = inv(A[:, :, k])` without heap allocation.
+"""
+@kernel function _batched_inv_lu_par_kernel!(X, @Const(A), ::Val{N}) where {N}
     k = @index(Group, Linear)
     tid = @index(Local, Linear)
 

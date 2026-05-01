@@ -272,17 +272,26 @@ function get_elem_rt!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
     #@show(t_ier⁻⁺[1,1,:])
 end
 
+"""
+    get_elem_rt_VS!(fscattRayl, ϖ_λ₁λ₀, i_λ₁λ₀, ier⁻⁺, iet⁺⁺, dτ, ϖ,
+                    Z⁻⁺_λ₁λ₀, Z⁺⁺_λ₁λ₀, qp_μN, wct2)
 
-@kernel function get_elem_rt_VS!(fscattRayl, 
-                            ϖ_λ₁λ₀, i_λ₁λ₀, 
+KernelAbstractions elemental R/T accumulation kernel for the multi-band
+vibrational Raman "plus" path. Each workitem owns one stream pair and Raman
+offset, maps the offset to its active target wavelength, and adds that
+scatterer contribution into the shared inelastic reflection/transmission
+arrays.
+"""
+@kernel function get_elem_rt_VS!(@Const(fscattRayl),
+                            @Const(ϖ_λ₁λ₀), @Const(i_λ₁λ₀),
                             #ϖ_λ₁λ₀_VS_n2, i_λ₁λ₀_VS_n2, 
                             #ϖ_λ₁λ₀_VS_o2, i_λ₁λ₀_VS_o2, 
                             ier⁻⁺, iet⁺⁺, 
-                            dτ, ϖ,
-                            Z⁻⁺_λ₁λ₀, Z⁺⁺_λ₁λ₀, 
+                            @Const(dτ), @Const(ϖ),
+                            @Const(Z⁻⁺_λ₁λ₀), @Const(Z⁺⁺_λ₁λ₀),
                             #Z⁻⁺_λ₁λ₀_VS_n2, Z⁺⁺_λ₁λ₀_VS_n2, 
                             #Z⁻⁺_λ₁λ₀_VS_o2, Z⁺⁺_λ₁λ₀_VS_o2, 
-                            qp_μN, wct2)
+                            @Const(qp_μN), @Const(wct2))
     i, j, Δn = @index(Global, NTuple) 
     #@unpack fscattRayl, ϖ_λ₁λ₀, i_λ₁λ₀, dτ₀, dτ₀_λ = RS_type 
     # let n₁ cover the full range of wavelengths, while n₀ only includes wavelengths at intervals 
@@ -290,6 +299,7 @@ end
     #dτ₁ = 1 #dummy for now
     #Suniti: require that the incident wavelength is always the first element of 1:nSpec, and all the others belong to the same target VS band
     #Suniti: Then,
+    FT = eltype(ier⁻⁺)
     n₀ = 1    
     #@show i,j,Δn
     #@show size(ier⁻⁺)
@@ -347,11 +357,11 @@ end
                 end
             end
         else
-            ier⁻⁺[i,j,n₁,1] += 0.0
+            ier⁻⁺[i,j,n₁,1] += zero(FT)
             if i==j
-                iet⁺⁺[i,j,n₁,1] += 0.0
+                iet⁺⁺[i,j,n₁,1] += zero(FT)
             else
-                iet⁺⁺[i,j,n₁,1] += 0.0
+                iet⁺⁺[i,j,n₁,1] += zero(FT)
             end
         end
     end
@@ -426,15 +436,25 @@ function get_elem_rt_SFI!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
     ieJ₀⁻ .+= t_ieJ₀⁻ 
 end
 
-#  TODO: Nov 30, 2021
-@kernel function get_elem_rt_SFI_VS!(fscattRayl,
-                            ϖ_λ₁λ₀, i_λ₁λ₀, 
+"""
+    get_elem_rt_SFI_VS!(fscattRayl, ϖ_λ₁λ₀, i_λ₁λ₀, ieJ₀⁺, ieJ₀⁻,
+                        τ_sum, dτ, ϖ, Z⁻⁺_λ₁λ₀, Z⁺⁺_λ₁λ₀, F₀, qp_μN,
+                        ndoubl, wct02, nStokes, I₀, iμ0, D)
+
+KernelAbstractions elemental source-function kernel for the multi-band
+vibrational Raman "plus" path. Each workitem maps one Raman offset to an
+active wavelength, forms `Z * F₀` contractions for the fixed incident band,
+applies finite-δ source terms and beam attenuation, and writes the inelastic
+source vectors for that wavelength.
+"""
+@kernel function get_elem_rt_SFI_VS!(@Const(fscattRayl),
+                            @Const(ϖ_λ₁λ₀), @Const(i_λ₁λ₀),
                             ieJ₀⁺, ieJ₀⁻, 
-                            τ_sum, dτ, ϖ, 
-                            Z⁻⁺_λ₁λ₀, Z⁺⁺_λ₁λ₀, F₀,
-                            qp_μN, ndoubl,
+                            @Const(τ_sum), @Const(dτ), @Const(ϖ),
+                            @Const(Z⁻⁺_λ₁λ₀), @Const(Z⁺⁺_λ₁λ₀), @Const(F₀),
+                            @Const(qp_μN), ndoubl,
                             wct02, nStokes, 
-                            I₀, iμ0, D)
+                            @Const(I₀), iμ0, @Const(D))
     
     i_start  = nStokes*(iμ0-1) + 1 
     i_end    = nStokes*iμ0
@@ -451,16 +471,16 @@ end
     FT = eltype(I₀)
     
     if n₁>0
-        ieJ₀⁺[i, 1, n₁, 1]=0
-        ieJ₀⁻[i, 1, n₁, 1]=0
-        Z⁺⁺_I₀ = FT(0.0);
-        Z⁻⁺_I₀ = FT(0.0);
+        ieJ₀⁺[i, 1, n₁, 1] = zero(FT)
+        ieJ₀⁻[i, 1, n₁, 1] = zero(FT)
+        Z⁺⁺_I₀ = zero(FT);
+        Z⁻⁺_I₀ = zero(FT);
         for ii = i_start:i_end
             Z⁺⁺_I₀ += Z⁺⁺_λ₁λ₀[i,ii] * F₀[ii-i_start+1, n₀] #I₀[ii-i_start+1]
             Z⁻⁺_I₀ += Z⁻⁺_λ₁λ₀[i,ii] * F₀[ii-i_start+1, n₀] #I₀[ii-i_start+1] 
         end
         
-        if (i_start ≤ i ≤ i_end)
+        if (i_start <= i) & (i <= i_end)
             #ctr = i-i_start+1
             # J₀⁺ = 0.25*(1+δ(m,0)) * ϖ(λ) * Z⁺⁺ * I₀ * (dτ(λ)/μ₀) * exp(-dτ(λ)/μ₀)
             if abs(dτ[n₀]-dτ[n₁]) > rt_close_tol(eltype(dτ))
