@@ -574,15 +574,16 @@ end
     struct AbsorptionParameters
 
 A struct which holds all absorption-related parameters (before any computations).
-`molecules` is the full list per band; `fixed_molecules` and `variable_molecules`
-partition it for analytic Jacobians (fixed = no derivative, variable = derivative computed).
+The species list per band is the union of `fixed_molecules` (no Jacobian) and
+`variable_molecules` (Jacobian computed). H₂O is handled separately: when
+`atmospheric_profile.q` is provided, line absorption is computed from
+`profile.vmr_h2o` using `h2o_lut` (if present) or HITRAN-on-the-fly otherwise,
+and is automatically treated as variable in the linearised path.
 """
-mutable struct AbsorptionParameters{M,FM,VM,V,BF,CE,LT}
-    "Molecules to use for absorption calculations (`nBand, nMolecules`)"
-    molecules::M
-    "Fixed-abundance molecules per band (no Jacobian computed)"
+mutable struct AbsorptionParameters{FM,VM,V,BF,CE,LT,HL}
+    "Fixed-abundance molecules per band (no Jacobian computed). Must NOT include H2O."
     fixed_molecules::FM
-    "Variable-abundance molecules per band (Jacobian computed w.r.t. VMR)"
+    "Variable-abundance molecules per band (Jacobian computed w.r.t. VMR). Must NOT include H2O."
     variable_molecules::VM
     "Volume-Mixing Ratios"
     vmr::V
@@ -592,8 +593,14 @@ mutable struct AbsorptionParameters{M,FM,VM,V,BF,CE,LT}
     CEF::CE
     "Wing cutoff to use in cross-section calculation (cm⁻¹)"
     wing_cutoff::Real
-    "Lookup table type"
+    "Lookup table per (band, position-in-fixed_molecules ∪ variable_molecules)"
     luts::LT
+    "Optional H₂O LUT (one per band). `nothing` means HITRAN-on-the-fly fallback."
+    h2o_lut::HL
+    "Optional list of HITRAN CIA file paths (one per collision pair)"
+    cia_files::Vector{String}
+    "Optional path to AER MT_CKD water-vapor continuum NetCDF (e.g. absco-ref_wv-mt-ckd.nc)"
+    mtckd_file::String
 end
 
 """
