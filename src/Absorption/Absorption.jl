@@ -31,6 +31,8 @@ include("make_model_helpers.jl")                  # CS interpolator functions
 include("compute_absorption_cross_section.jl")      # Cross-section from HITRAN
 include("autodiff_helper.jl")                       # Auto-differentiation
 include("show_utils.jl")                             # Pretty-printing
+include("cia.jl")                                    # HITRAN collision-induced absorption
+include("mtckd.jl")                                  # MT_CKD water-vapor continuum
 
 # Export the Cross Section models
 export AbstractCrossSectionModel, HitranModel, InterpolationModel
@@ -55,5 +57,12 @@ export HitranTable
 
 # Export the interpolator functions
 export make_interpolation_model, save_interpolation_model, load_interpolation_model
+
+# CIA (collision-induced absorption)
+export CIATable, CIABlock, parse_cia_file, build_cia_table, load_cia_table,
+       compute_τ_cia!, cia_σ_at_T!
+
+# MT_CKD water-vapor continuum
+export MTCKDTable, MTCKDBand, load_mtckd, build_mtckd_band, compute_τ_h2o_continuum!
 
 end

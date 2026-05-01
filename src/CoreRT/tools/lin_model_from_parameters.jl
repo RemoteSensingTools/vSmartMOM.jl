@@ -113,25 +113,37 @@ function model_from_parameters(lin::LinMode,
 
         (isnothing(abs_params) && isnothing(params.q)) && continue
 
-        if !isnothing(params.q)
-            @timeit "Read HITRAN" hitran_data = read_hitran(artifact("H2O"), iso=-1)
-
-            println("Computing profile for water vapor in band #$(i_band)")
-            absorption_model = make_hitran_model(hitran_data,
-                vSmartMOM.Absorption.Voigt(),
-                wing_cutoff = 150,
-                CEF = vSmartMOM.Absorption.HumlicekWeidemann32SDErrorFunction(),
-                architecture = params.architecture,
-                vmr = 0)
+        if !isnothing(params.q) && any(!iszero, params.q)
             jac_idx = 1
-            @timeit "Absorption Coeff"  compute_absorption_profile!(
-                τ_abs[i_band],
-                τ̇_abs[i_band],
-                jac_idx,
-                absorption_model,
-                params.spec_bands[i_band],
-                profile.vmr_h2o,
-                profile)
+            if !isnothing(abs_params) && !isempty(abs_params.h2o_lut) && abs_params.h2o_lut[i_band] !== nothing
+                @timeit "Absorption Coeff H2O"  compute_absorption_profile!(
+                    τ_abs[i_band],
+                    τ̇_abs[i_band],
+                    jac_idx,
+                    abs_params.h2o_lut[i_band],
+                    params.spec_bands[i_band],
+                    profile.vmr_h2o,
+                    profile)
+            else
+                @timeit "Read HITRAN" hitran_data = read_hitran(artifact("H2O"), iso=-1)
+                println("Computing profile for water vapor (q-driven) in band #$(i_band)")
+                bf  = isnothing(abs_params) ? vSmartMOM.Absorption.Voigt() : abs_params.broadening_function
+                cef = isnothing(abs_params) ? vSmartMOM.Absorption.HumlicekWeidemann32SDErrorFunction() : abs_params.CEF
+                wc  = isnothing(abs_params) ? 150 : abs_params.wing_cutoff
+                absorption_model = make_hitran_model(hitran_data, bf,
+                    wing_cutoff = wc,
+                    CEF = cef,
+                    architecture = params.architecture,
+                    vmr = 0)
+                @timeit "Absorption Coeff H2O"  compute_absorption_profile!(
+                    τ_abs[i_band],
+                    τ̇_abs[i_band],
+                    jac_idx,
+                    absorption_model,
+                    params.spec_bands[i_band],
+                    profile.vmr_h2o,
+                    profile)
+            end
         end
         if !isnothing(abs_params)
             if !isempty(abs_params.fixed_molecules[i_band])
@@ -164,6 +176,9 @@ function model_from_parameters(lin::LinMode,
                 end
             end
             if !isempty(abs_params.variable_molecules[i_band])
+                # luts[i_band] is parallel to vcat(fixed_molecules[i_band],
+                # variable_molecules[i_band]); offset variable indices past fixed.
+                lut_offset = length(abs_params.fixed_molecules[i_band])
                 for molec_i in 1:length(abs_params.variable_molecules[i_band])
                     mol_name = abs_params.variable_molecules[i_band][molec_i]
                     jac_idx = molec_i + 1
@@ -191,12 +206,35 @@ function model_from_parameters(lin::LinMode,
                             τ_abs[i_band],
                             τ̇_abs[i_band],
                             jac_idx,
-                            abs_params.luts[i_band][molec_i],
+                            abs_params.luts[i_band][lut_offset + molec_i],
                             params.spec_bands[i_band],
                             profile.vmr[mol_name],
                             profile)
                     end
                 end
+            end
+        end
+
+        # Collision-induced absorption (HITRAN .cia files), if any.
+        # CIA is treated as a fixed contribution — no Jacobian (τ̇_abs unchanged).
+        for cia_path in abs_params.cia_files
+            @timeit "CIA $(basename(cia_path))" begin
+                cia_table = Absorption.load_cia_table(cia_path,
+                                                     params.spec_bands[i_band];
+                                                     FT = FT)
+                Absorption.compute_τ_cia!(τ_abs[i_band], cia_table, profile,
+                                           abs_params.vmr)
+            end
+        end
+
+        # MT_CKD H₂O continuum, if a reference table is configured.
+        # Treated as fixed (no Jacobian wrt H₂O VMR for now).
+        if !isempty(abs_params.mtckd_file)
+            @timeit "MT_CKD H2O continuum" begin
+                mtckd_table = Absorption.load_mtckd(abs_params.mtckd_file)
+                Absorption.compute_τ_h2o_continuum!(τ_abs[i_band], mtckd_table,
+                                                     params.spec_bands[i_band], profile,
+                                                     profile.vmr_h2o)
             end
         end
     end
