@@ -1,21 +1,27 @@
 #=
 
-This file contains linearized RT interaction (Adding Method) functions.
+This file contains linearized RT interaction (Adding Method) functions —
+the tangent-linear partners of `interaction.jl`.
 
-The interaction step combines two adjacent layers — the "composite" layer (accumulated
-from above) and the "added" layer (the current layer) — into a new composite layer.
-This implements the Adding Method of de Haan, Bosma & Hovenier (1987).
+The interaction step combines two adjacent layers — the "composite" layer
+(accumulated from above) and the newly "added" layer below — into a new
+composite layer. The forward kernel implements Sanghavi et al. (2014,
+JQSRT 133:412–433), Eqs. (23)–(28); these `_lin` companions implement the
+tangent-linear partners from Sanghavi 2014 App. C, Eqs. (C.11)–(C.16).
 
-Multiple dispatch on `ScatteringInterface` types selects the appropriate physics:
-- `ScatteringInterface_00`: Neither layer scatters (pure absorption).
+Multiple dispatch on `ScatteringInterface` types selects the appropriate
+case (see also `interaction.jl` for the forward methods):
+
+- `ScatteringInterface_00`: Neither layer scatters (pure absorption cascade).
 - `ScatteringInterface_01`: Only the added (lower) layer scatters.
 - `ScatteringInterface_10`: Only the composite (upper) layer scatters.
-- `ScatteringInterface_11`: Both layers scatter (general case).
+- `ScatteringInterface_11`: Both layers scatter (general case; two batched
+  matrix inversions; full Sanghavi 2014 Eqs. 23–28).
 
-**Adding equations (de Haan et al. 1987, Eqs. 14–17):**
+**Forward adding equations (`ScatteringInterface_11`):**
 
 ```math
-\\mathbf{G} = (\\mathbf{I} - \\mathbf{R}^{-+}_\\text{add} \\, \\mathbf{R}^{+-}_\\text{comp})^{-1}
+\\mathbf{G} = (\\mathbf{E} - \\mathbf{R}^{-+}_\\text{add} \\, \\mathbf{R}^{+-}_\\text{comp})^{-1}
 ```
 ```math
 \\mathbf{T}^{++}_\\text{new} = \\mathbf{T}^{++}_\\text{add} \\, \\mathbf{G} \\, \\mathbf{T}^{++}_\\text{comp}
@@ -25,8 +31,23 @@ Multiple dispatch on `ScatteringInterface` types selects the appropriate physics
   \\mathbf{T}^{--}_\\text{comp} \\, \\mathbf{G} \\, \\mathbf{R}^{-+}_\\text{add} \\, \\mathbf{T}^{++}_\\text{comp}
 ```
 
-The linearized versions propagate ``N_\\text{params}`` physical parameter derivatives
-through the same matrix algebra using the product rule.
+**Linearized versions (Sanghavi 2014 Eqs. C.11–C.16):** propagate the full
+``N_\\text{params}``-axis of derivatives through the same matrix algebra
+using the product rule, with the closed-form
+``\\dot{\\mathbf{G}} = \\mathbf{G}\\,\\dot{(\\mathbf{R}\\mathbf{R})}\\,\\mathbf{G}``
+identity. No AD through the batched matrix inversion; the chain rule on
+``(\\mathbf{E} - \\mathbf{R}\\mathbf{R})^{-1}`` is closed-form, which keeps
+the Jacobian numerically stable and roughly forward-cost.
+
+The ``\\mathbf{ap\\_*}`` fields on `AddedLayerLin` carry the chain-rule
+expansion to the **physical state vector** ``\\mathbf{x}`` (computed by
+[`lin_added_layer_all_params!`](@ref) before this kernel runs); the
+``\\dot{\\mathbf{*}}`` fields carry the three-core derivatives w.r.t.
+``(\\tau, \\varpi, \\mathbf{Z})``.
+
+See [`Concepts/06 — Linearization`](../../docs/src/pages/concepts/06_linearization.md)
+for the three-tier Jacobian diagram, the parameter-strategy table, and the
+ParameterLayout column ordering.
 
 =#
 

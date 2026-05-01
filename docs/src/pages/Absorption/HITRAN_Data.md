@@ -201,13 +201,13 @@ The full RT pipeline (`model_from_parameters`) uses `artifact()` internally to o
 using vSmartMOM
 
 # Option A: Use HITRAN 2016 (default, no setup needed)
-params = parameters_from_yaml("config/my_config.yaml")
+params = read_parameters("config/my_config.yaml")
 model = model_from_parameters(params)
 R, T = rt_run(model)
 
 # Option B: Use HITRAN 2024
 set_hitran_edition!("HITRAN2024")
-params = parameters_from_yaml("config/my_config.yaml")
+params = read_parameters("config/my_config.yaml")
 model = model_from_parameters(params)  # downloads HITRAN 2024 data as needed
 R, T = rt_run(model)
 ```
@@ -242,15 +242,8 @@ using Pkg
 Pkg.gc()  # removes unused artifacts
 ```
 
-## API Reference
+## Library Reference
 
-```@docs
-vSmartMOM.artifact
-vSmartMOM.fetch_hitran
-vSmartMOM.fetch_hitran_by_ids
-vSmartMOM.set_hitran_edition!
-vSmartMOM.get_hitran_edition
-vSmartMOM.available_hitran_editions
-vSmartMOM.hitran_info
-vSmartMOM.hitran_is_cached
-```
+The canonical docstrings for `artifact`, `fetch_hitran`,
+`fetch_hitran_by_ids`, HITRAN edition preferences, `hitran_info`, and
+`hitran_is_cached` are grouped in the [Absorption API](../api/absorption.md).

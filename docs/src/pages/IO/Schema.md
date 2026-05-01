@@ -1,6 +1,6 @@
 # Configuration schema (IO)
 
-This page documents the expected configuration structure for `read_parameters`.
+This page documents the expected configuration structure accepted by `read_parameters`, `parameters_from_file`, `parameters_from_dict`, and `parameters_from_source`. YAML, TOML, and in-memory `Dict` inputs use the same schema.
 
 Top-level keys:
 - radiative_transfer (required)
@@ -22,6 +22,13 @@ Top-level keys:
     - LambertianSurfaceLegendre([0.2, 0.05, 0.01])
     - rpvSurfaceScalar(ρ₀, ρ_c, k, Θ)
     - RossLiSurfaceScalar(fvol, fgeo, fiso)
+    - CoxMunkSurface(wind_speed=U)
+  - `CoxMunkSurface` supports full-polarization ocean BRDFs. Optional
+    keywords include `n_water`, `whitecap_albedo` (default `0.22`),
+    `include_whitecaps` (default `true`), and `shadowing` (default `true`).
+  - Vegetation canopies are configured through a top-level `canopy` section;
+    the parser wraps each band surface as the soil BRDF inside a
+    `CanopySurface`.
 - quadrature_type: String in {RadauQuad(), GaussQuadHemisphere(), GaussQuadFullSphere()}
 - polarization_type: String in {Stokes_I(), Stokes_IQ(), Stokes_IQU(), Stokes_IQUV()}
 - max_m: Int
@@ -30,6 +37,12 @@ Top-level keys:
 - depol: Real
 - float_type: String in {Float32, Float64}
 - architecture: String in {default_architecture, CPU(), GPU(), Architectures.CPU(), Architectures.GPU()}
+
+Accuracy and cost are controlled mainly through `quadrature_type`, `max_m`,
+`Δ_angle`, `l_trunc`, and `depol`. Increase quadrature order and Fourier
+moments for strongly anisotropic or highly polarized scenes; increase
+`l_trunc` when aerosol phase functions have sharp forward peaks. Use consistent
+units for spectral bands and optical inputs.
 
 ## geometry
 - sza: Real (deg)

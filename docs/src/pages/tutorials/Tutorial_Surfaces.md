@@ -35,7 +35,7 @@ using CairoMakie
 ## 1) Overview
 
 Every surface model is a subtype of `AbstractSurfaceType`.  The RT solver
-dispatches through [`create_surface_layer!`](@ref), which computes the
+dispatches through `create_surface_layer!`, which computes the
 Fourier-decomposed surface reflectance matrix $R_\text{surf}$ for each
 azimuthal moment $m$.
 
@@ -387,9 +387,9 @@ No built-in linearization.  Use external finite differences or ForwardDiff.
 Load a parameter file, override the surface, and run the RT:
 
 ```julia
-yaml_path = joinpath(dirname(dirname(pathof(vSmartMOM))),
+yaml_path = joinpath(pkgdir(vSmartMOM),
                      "test", "test_parameters", "PureRayleighParameters.yaml")
-params = parameters_from_yaml(yaml_path)
+params = read_parameters(yaml_path)
 params.brdf[1] = CoxMunkSurface(wind_speed = 5.0)
 model = model_from_parameters(params)
 R, T = rt_run(model)
@@ -400,7 +400,7 @@ println("R(nadir, I): ", R[1, 1, 1])
 Compare with a Lambertian surface at the same geometry:
 
 ```julia
-params2 = parameters_from_yaml(yaml_path)
+params2 = read_parameters(yaml_path)
 params2.brdf[1] = LambertianSurfaceScalar(0.06)
 model2 = model_from_parameters(params2)
 R2, T2 = rt_run(model2)
@@ -418,6 +418,13 @@ lines!(ax, R[1, 1, :],  label="Cox-Munk (U=5 m/s)")
 lines!(ax, R2[1, 1, :], label="Lambertian (α=0.06)")
 axislegend(ax, position=:rt)
 fig
+```
+
+The rendered docs include a Plotly comparison of the angular signatures for
+the main surface families:
+
+```@raw html
+<iframe title="Surface BRDF angular slices" src="../../assets/plots/surface_brdf_slices.html" loading="lazy" style="width: 100%; height: 520px; border: 1px solid var(--vp-c-divider); border-radius: 8px;"></iframe>
 ```
 
 ---

@@ -21,8 +21,8 @@ using vSmartMOM.CoreRT
 Load a simple pure-Rayleigh test case (no aerosols, no gas absorption).
 
 ```julia
-params = parameters_from_yaml(
-    joinpath(dirname(dirname(pathof(vSmartMOM))),
+params = read_parameters(
+    joinpath(pkgdir(vSmartMOM),
              "test", "test_parameters", "PureRayleighParameters.yaml"))
 params.architecture = vSmartMOM.Architectures.CPU()
 params.max_m = 2
@@ -41,6 +41,14 @@ R is the top-of-atmosphere reflected Stokes field [nVZA × nStokes × nSpec].
 ```julia
 println("R shape: ", size(R))
 println("R(nadir, I, λ₁) = ", R[1, 1, 1])
+```
+
+The generated docs include a Plotly view of this pure-Rayleigh scene across
+the signed viewing-angle sweep in the YAML file. The first trace is Stokes I;
+the second trace is Stokes Q.
+
+```@raw html
+<iframe title="Pure-Rayleigh reflectance by viewing angle" src="../../assets/plots/core_rt_vza_response.html" loading="lazy" style="width: 100%; height: 520px; border: 1px solid var(--vp-c-divider); border-radius: 8px;"></iframe>
 ```
 
 ## 2) What happens internally

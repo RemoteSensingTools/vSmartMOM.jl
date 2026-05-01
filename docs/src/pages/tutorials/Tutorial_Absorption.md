@@ -121,6 +121,14 @@ The Voigt line-shape is the combination of Doppler and Lorentz broadening (convo
 
 Once you dig deeper, there are various other more complex line-shapes (and line-mixing effects), which we ignore for now as the Voigt line-shape can provide very reasonable results. See, for instance, [here](https://www.degruyter.com/view/j/pac.2014.86.issue-12/pac-2014-0208/pac-2014-0208.xml).
 
+The generated docs include a compact Plotly preview of the same line-shape
+families. The Voigt trace is computed as a numerical convolution of the
+Doppler and Lorentz profiles on the displayed grid.
+
+```@raw html
+<iframe title="Absorption line-shape families" src="../../assets/plots/absorption_lineshape_families.html" loading="lazy" style="width: 100%; height: 520px; border: 1px solid var(--vp-c-divider); border-radius: 8px;"></iframe>
+```
+
 Import the required tools:
 
 ```julia
@@ -267,6 +275,13 @@ axislegend(ax, position=:rt)
 fig
 ```
 
+The docs build includes an interactive Plotly summary of this temperature
+redistribution effect across the band:
+
+```@raw html
+<iframe title="CO2 temperature redistribution plot" src="../../assets/plots/absorption_temperature_band.html" loading="lazy" style="width: 100%; height: 560px; border: 1px solid var(--vp-c-divider); border-radius: 8px;"></iframe>
+```
+
 Now we can clearly see how the change in the distribution of the lower rotational state leads to a redistribution of cross sections (a shift from lower to higher ground states with higher T)
 
 ---
@@ -289,7 +304,7 @@ record(fig, joinpath(@__DIR__, "absorption_pressure.gif"), 10:10:1100; framerate
 end
 ```
 
-![Pressure effect on absorption cross section](absorption_pressure.gif)
+When run locally, this writes `absorption_pressure.gif` next to the tutorial.
 
 ```julia
 p = 900.0
@@ -307,7 +322,7 @@ record(fig, joinpath(@__DIR__, "absorption_temperature.gif"), 10:10:320; framera
 end
 ```
 
-![Temperature effect on absorption cross section](absorption_temperature.gif)
+When run locally, this writes `absorption_temperature.gif` next to the tutorial.
 
 ```julia
 # More extreme case, let's take 10 atmospheres (10,000 hPa)

@@ -106,9 +106,9 @@ canopy_atm = CanopySurface(
 
 # ## 6) Running with the forward model
 
-yaml_path = joinpath(dirname(dirname(pathof(vSmartMOM))),
+yaml_path = joinpath(pkgdir(vSmartMOM),
                      "test", "test_parameters", "PureRayleighParameters.yaml")
-params = parameters_from_yaml(yaml_path)
+params = read_parameters(yaml_path)
 params.architecture = vSmartMOM.Architectures.CPU()
 params.max_m = 2
 params.l_trunc = 20
@@ -122,7 +122,7 @@ println("R shape: ", size(R_canopy))
 println("R(nadir, I) with canopy: ", R_canopy[1, 1, 1])
 
 # Compare with bare Lambertian surface:
-params2 = parameters_from_yaml(yaml_path)
+params2 = read_parameters(yaml_path)
 params2.architecture = vSmartMOM.Architectures.CPU()
 params2.max_m = 2
 params2.l_trunc = 20
@@ -142,6 +142,13 @@ lines!(ax, R_canopy[1, 1, :], label="Canopy (LAI=3)")
 lines!(ax, R_bare[1, 1, :],   label="Bare soil (α=0.1)")
 axislegend(ax, position=:rt)
 fig
+
+# The rendered docs include a Plotly red-edge view so the spectral contrast is
+# visible even when static Makie figures are not rendered by the docs frontend:
+#
+# ```@raw html
+# <iframe title="Canopy spectral response" src="../../assets/plots/canopy_spectral_response.html" loading="lazy" style="width: 100%; height: 520px; border: 1px solid var(--vp-c-divider); border-radius: 8px;"></iframe>
+# ```
 
 # ## 7) Effect of within-canopy atmosphere
 #
@@ -170,7 +177,7 @@ canopy_with_atm = CanopySurface(
 )
 
 # Run without canopy atmosphere:
-params_na = parameters_from_yaml(yaml_path)
+params_na = read_parameters(yaml_path)
 params_na.architecture = vSmartMOM.Architectures.CPU()
 params_na.max_m = 2
 params_na.l_trunc = 20
@@ -180,7 +187,7 @@ R_no_atm, _ = rt_run(model_na)
 invalidate_canopy_cache!(model_na.params.brdf[1])
 
 # Run with canopy atmosphere:
-params_wa = parameters_from_yaml(yaml_path)
+params_wa = read_parameters(yaml_path)
 params_wa.architecture = vSmartMOM.Architectures.CPU()
 params_wa.max_m = 2
 params_wa.l_trunc = 20

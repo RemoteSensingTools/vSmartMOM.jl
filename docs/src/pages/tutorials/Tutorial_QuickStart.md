@@ -5,13 +5,12 @@ EditURL = "Tutorial_QuickStart.jl"
 # Quick Start: vSmartMOM Radiative Transfer
 
 vSmartMOM is a polarized radiative transfer solver using the adding-doubling method.
-This 5-minute tutorial runs a forward RT simulation and computes Jacobians.
+This 5-minute tutorial runs a small forward RT simulation on CPU.
 
 ## 1) Load the package
 
 ```julia
 using vSmartMOM
-using CairoMakie
 ```
 
 ## 2) Load parameters from YAML
@@ -20,9 +19,8 @@ Parameters define the atmosphere, surface, geometry, and spectral bands.
 See the IO Schema documentation for the full YAML format.
 
 ```julia
-yaml_path = joinpath(dirname(dirname(pathof(vSmartMOM))),
-                     "test", "test_parameters", "ParamsEMIT_fast.yaml")
-params = parameters_from_yaml(yaml_path)
+yaml_path = joinpath(pkgdir(vSmartMOM), "config", "quickstart.yaml")
+params = read_parameters(yaml_path)
 params.architecture = vSmartMOM.Architectures.CPU()
 ```
 
@@ -46,54 +44,19 @@ println("T shape: ", size(T))
 println("R(nadir, I, λ₁) = ", R[1, 1, 1])
 ```
 
-Plot the reflectance spectrum at nadir (Stokes-I):
+The documentation build renders the same two arrays as an interactive Plotly
+view. Hovering the bars shows the numeric Stokes-I values returned above.
 
-```julia
-fig = Figure(size=(700, 400))
-ax = Axis(fig[1,1], xlabel="Spectral index", ylabel="TOA Reflectance (Stokes I)")
-for ivza in 1:min(size(R, 1), 4)
-    lines!(ax, R[ivza, 1, :], label="VZA #$(ivza)")
-end
-axislegend(ax, position=:rt)
-fig
+```@raw html
+<iframe title="Quickstart RT output" src="../../assets/plots/quickstart_rt_response.html" loading="lazy" style="width: 100%; height: 420px; border: 1px solid var(--vp-c-divider); border-radius: 8px;"></iframe>
 ```
 
-## 5) Linearized RT for Jacobians
+## 5) Next steps
 
-Use `model_from_parameters(LinMode(), params)` and `rt_run` to get analytic
-derivatives of R and T with respect to atmospheric and surface parameters.
-No finite differences required — Jacobians come from a single RT pass.
-
-```julia
-using vSmartMOM.CoreRT
-
-model_lin, lin_model = model_from_parameters(LinMode(), params)
-NAer = length(params.scattering_params.rt_aerosols)
-NGas = size(lin_model.τ̇_abs[1], 1)
-NSurf = 1
-
-R_lin, T_lin, dR, dT = rt_run(model_lin, lin_model, NAer, NGas, NSurf)
-```
-
-`dR` has shape `[nVZA × nStokes × nSpec × nParams]` — derivatives w.r.t. aerosols,
-gas VMRs, and surface albedo.
-
-```julia
-println("dR shape (Jacobian): ", size(dR))
-```
-
-Visualize the Jacobian as a heatmap (spectral × parameter):
-
-```julia
-fig = Figure(size=(700, 450))
-ax = Axis(fig[1,1],
-    xlabel = "Parameter index",
-    ylabel = "Spectral index",
-    title  = "dR/dx at nadir (Stokes I)")
-hm = heatmap!(ax, dR[1, 1, :, :]')
-Colorbar(fig[1,2], hm, label="dR/dx")
-fig
-```
+The shipped quickstart scene intentionally avoids absorption and aerosol Mie
+setup. For richer spectra and plots, use the absorption, scattering, surface,
+and Jacobian tutorials. For analytic derivatives, start with the Compute
+Jacobians page.
 
 ## 6) GPU support
 

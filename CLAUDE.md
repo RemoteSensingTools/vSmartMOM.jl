@@ -1,5 +1,13 @@
 # CLAUDE.md - vSmartMOM.jl
 
+> **First read for any agent: [AGENTS.md](AGENTS.md)**
+> AGENTS.md gives a 3-minute orientation — the narrative spine (problem → MOM →
+> layer optics → solver → architecture), the two non-obvious tricks that
+> compound (exact finite-δ elemental + scattering-only `N_doubl` sizing), the
+> code-anchor table, and pointers into the Concepts arc and the verified
+> equation crib sheet at [docs/dev_notes/theory_references.md](docs/dev_notes/theory_references.md).
+> Read it before doing anything substantive.
+
 ## Project Overview
 
 vSmartMOM.jl is a Julia package for vectorized atmospheric radiative transfer using the Matrix Operator Method (MOM). It computes polarized radiances and analytic Jacobians across spectral bands, supporting elastic/inelastic (Raman) scattering, multiple surface BRDF types, and CPU/GPU execution.

@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <style>
+    .ink { fill: #1a1a1a; }
+    @media (prefers-color-scheme: dark) { .ink { fill: #e6e6e6; } }
+  </style>
+  <!-- Particle -->
+  <circle class="ink" cx="12" cy="12" r="2"/>
+  <!-- Forward-asymmetric phase-function rays (Henyey-Greenstein, g ~ 0.5) -->
+  <g stroke="#4a90c2" stroke-width="1.5">
+    <!-- Forward (3 o'clock) -->
+    <line x1="14" y1="12" x2="22" y2="12"/>
+    <!-- Upper-right / lower-right -->
+    <line x1="14" y1="11" x2="19" y2="8"/>
+    <line x1="14" y1="13" x2="19" y2="16"/>
+    <!-- Top / bottom -->
+    <line x1="12" y1="10" x2="12" y2="6"/>
+    <line x1="12" y1="14" x2="12" y2="18"/>
+    <!-- Upper-left / lower-left -->
+    <line x1="10" y1="11" x2="8"  y2="10"/>
+    <line x1="10" y1="13" x2="8"  y2="14"/>
+    <!-- Backscatter (9 o'clock) -->
+    <line x1="10" y1="12" x2="8"  y2="12"/>
+  </g>
+</svg>

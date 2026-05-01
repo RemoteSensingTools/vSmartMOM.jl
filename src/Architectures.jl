@@ -3,12 +3,12 @@ module Architectures
 
 export
     @hascuda,
-    AbstractArchitecture, CPU, GPU,
+    AbstractArchitecture, CPU, GPU, MetalGPU,
     devi, array_type, 
     architecture,
     default_architecture,
     synchronize_if_gpu,
-    has_cuda
+    has_cuda, has_metal
 
 using KernelAbstractions
 
@@ -17,13 +17,18 @@ using KernelAbstractions
 const _has_cuda = Ref(false)
 has_cuda() = _has_cuda[]
 
-# Synchronization function reference - will be set by CUDAExt
+# Check if Metal is available and functional.
+# This will be true when the Metal extension is loaded on a supported Mac.
+const _has_metal = Ref(false)
+has_metal() = _has_metal[]
+
+# Synchronization function reference - set by loaded GPU backend extensions.
 const _sync_gpu = Ref{Function}(() -> nothing)
 sync_device() = _sync_gpu[]()
 
 """
     AbstractArchitecture
-Abstract supertype for architectures supported by Oceananigans.
+Abstract supertype for compute architectures supported by vSmartMOM.
 """
 abstract type AbstractArchitecture end
 
@@ -38,6 +43,17 @@ struct CPU <: AbstractArchitecture end
 Run on a single NVIDIA CUDA GPU.
 """
 struct GPU <: AbstractArchitecture end
+
+"""
+    MetalGPU <: AbstractArchitecture
+
+Run on an Apple Silicon GPU through Metal.jl. Metal support is loaded through
+the optional `vSmartMOMMetalExt` package extension and requires Float32 arrays.
+The current Metal batched inverse path uses a conservative 32 KiB threadgroup
+memory guard, so large stream/Stokes matrices should use CPU or CUDA until a
+global-memory fallback lands.
+"""
+struct MetalGPU <: AbstractArchitecture end
 
 """
     @hascuda expr
@@ -59,21 +75,24 @@ end
 """
     array_type(arch::AbstractArchitecture)
 
-Return the array constructor for the given architecture (`Array` for CPU, `CuArray` for GPU).
+Return the array constructor for the given architecture (`Array` for CPU,
+`CuArray` for CUDA `GPU`, and `MtlArray` for `MetalGPU` when the matching
+optional backend extension is loaded).
 """
 @inline array_type(::CPU) = Array
 
-# GPU array_type - will be defined in CUDAExt when CUDA is loaded
+# GPU array_type - will be defined in CUDAExt/MetalExt when loaded
 # No fallback method defined to avoid precompilation errors
 
 """
     default_architecture()
 
-Return `GPU()` if CUDA is available, otherwise `CPU()`.
+Return `GPU()` if CUDA is available, `MetalGPU()` if Metal is available, and
+otherwise `CPU()`.
 """
-default_architecture() = has_cuda() ? GPU() : CPU()
+default_architecture() = has_cuda() ? GPU() : has_metal() ? MetalGPU() : CPU()
 
-# Synchronization - calls the sync function (set by CUDAExt if CUDA is loaded)
+# Synchronization - calls the sync function set by the loaded GPU backend.
 @inline synchronize_if_gpu() = sync_device()
 
 end
