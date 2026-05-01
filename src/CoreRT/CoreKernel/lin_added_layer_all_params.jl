@@ -3,8 +3,19 @@
                                        computed_layer_properties_lin,
                                        added_layer_lin, architecture, ndoubl)
 
-Apply the **chain rule** to map derivatives from the 3 core optical parameters
-``(\\tau, \\varpi, \\mathbf{Z})`` to ``N_\\text{params}`` physical state vector parameters.
+Implements Sanghavi 2014 Eq. (C.21) — the **chain rule** that maps the
+three core derivatives ``(\\dot{\\tau}, \\dot{\\varpi}, \\dot{\\mathbf{Z}})``
+left in `added_layer_lin` after [`elemental!`](@ref) + [`doubling!`](@ref)
+to the full ``N_\\text{params}``-axis Jacobian against the physical state
+vector ``\\mathbf{x}`` (aerosol microphysics, gas VMRs, surface BRDF
+parameters). The output column ordering follows
+[`ParameterLayout`](@ref).
+
+This is the **AD-boundary cross-over**: above this function the upstream
+computation can use ForwardDiff `Dual{T,V,N}` or analytic Mie linearization
+to produce `CoreScatteringOpticalPropertiesLin = (\\dot{\\tau}, \\dot{\\varpi}, \\dot{\\mathbf{Z}}^{++}, \\dot{\\mathbf{Z}}^{-+})`
+per layer; below it the RT kernel runs pure-`FT` with three closed-form
+core derivatives. See `docs/src/pages/concepts/06_linearization.md`.
 
 After `elemental!` and `doubling!`, the `added_layer_lin` contains derivatives of the
 RT matrices ``\\mathbf{r}, \\mathbf{t}, \\mathbf{J}_0`` with respect to 3 core parameters:

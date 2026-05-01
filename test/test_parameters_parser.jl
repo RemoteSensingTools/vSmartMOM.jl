@@ -41,6 +41,13 @@ end
     @test params.architecture isa vSmartMOM.Architectures.CPU
     @test params.brdf[1] isa LambertianSurfaceScalar{Float64}
     @test params.spec_bands == [[13000.0, 13000.1]]
+
+    metal_params = parameters_from_dict(_minimal_parameter_dict(
+        float_type = "Float32",
+        architecture = "MetalGPU()",
+    ))
+    @test metal_params.float_type === Float32
+    @test metal_params.architecture isa vSmartMOM.Architectures.MetalGPU
 end
 
 @testset "TOML file input" begin

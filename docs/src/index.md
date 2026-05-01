@@ -1,43 +1,62 @@
-# Introduction
+```@raw html
+---
+layout: home
 
-vSmartMOM.jl is a polarized radiative transfer solver that uses the adding-doubling method to compute reflectance and transmittance for atmospheric remote sensing. It supports gas absorption, aerosol scattering, and analytic Jacobians for inversion. The interface is designed for researchers and students, with optional GPU acceleration via CUDA.jl.
+hero:
+  name: "vSmartMOM.jl"
+  text: "Polarized atmospheric radiative transfer"
+  tagline: "Vector matrix-operator method with analytic Jacobians, Raman scattering, and CUDA support."
+  image:
+    src: /assets/icons/logo.svg
+    alt: vSmartMOM logo
+  actions:
+    - theme: brand
+      text: Quick Start
+      link: /pages/quickstart
+    - theme: alt
+      text: Concepts (the story)
+      link: /pages/concepts/01_overview
+    - theme: alt
+      text: View on GitHub
+      link: https://github.com/RemoteSensingTools/vSmartMOM.jl
 
-## System requirements
-
-- **Julia** 1.9 or later
-- **Optional:** NVIDIA GPU with CUDA for `vSmartMOM.Architectures.GPU()` support
-
-## Quick example
-
-```julia
-using vSmartMOM
-params = parameters_from_yaml("path/to/your/params.yaml")
-model = model_from_parameters(params)
-R, T = rt_run(model)   # R = TOA reflectance, T = BOA transmittance
+features:
+  - icon:
+      src: /assets/icons/scattering.svg
+    title: Scattering
+    details: Mie theory, Greek-coefficient phase matrices, NAI2 / PCW Fourier decomposition, vector δ-m truncation.
+    link: /pages/concepts/03b_scattering
+  - icon:
+      src: /assets/icons/absorption.svg
+    title: Absorption
+    details: HITRAN line-by-line cross sections with Voigt, Doppler, and Lorentz line shapes; lookup-table interpolation for hot loops.
+    link: /pages/concepts/03a_absorption
+  - icon:
+      src: /assets/icons/radiative_transfer.svg
+    title: Radiative Transfer
+    details: Adding-doubling matrix operator method, polarized solver, analytic Jacobians, Raman / Cabannes inelastic path, GPU-ready.
+    link: /pages/concepts/04_mom_solver
+---
 ```
 
-See [Tutorial: Quick Start](pages/tutorials/Tutorial_QuickStart.md) for a complete walkthrough.
+## Install
 
-## Installation
+vSmartMOM supports Julia 1.10 or later.
 
-1. Install [Julia](https://julialang.org/downloads/) (1.9+)
-2. Start the Julia REPL, enter the Pkg REPL by pressing `]`, and run:  
 ```julia
-add vSmartMOM
+pkg> add vSmartMOM
 ```
 
-## Submodules
+## Public Modules
 
-vSmartMOM.jl has a modular architecture, allowing users to import just the specific module(s) that they need: 
+- **[CoreRT](pages/api/core_rt.md)** — adding-doubling solver, model types, optical-property assembly, surface coupling, Jacobian kernels.
+- **[IO](pages/api/io.md)** — YAML, TOML, Dict, NetCDF, and GEOS-Chem inputs.
+- **[Absorption](pages/api/absorption.md)** — HITRAN line-by-line and lookup-table gas absorption.
+- **[Scattering](pages/api/scattering.md)** — Mie calculations, phase functions, Greek coefficients, truncation inputs.
+- **[InelasticScattering](pages/api/inelastic.md)** — Raman / Cabannes mode types and optical-property helpers.
+- **[Aerosols](pages/api/aerosols.md)** — TOMAS-15 and two-moment aerosol input support. *API still being stabilized.*
+- **[SolarModel](pages/api/solar_model.md)** — solar / stellar spectra and transmission helpers.
 
-**vSmartMOM** is the top-level module that uses absorption and scattering submodules to compute RT simulations. 
-- **Absorption** is used for computing absorption cross-sections for gases over specified pressure, temperature, and wavelength grids. 
-- **Scattering** is used for calculating scattering phase-functions for aerosols with specified size distributions and refractive indices. 
+## Cite
 
-## How to use the documentation
-
-Each module has a set of documentation pages, as seen on the navigation bar. Each module's documentation contains a high-level **overview** of the module, an **example** of the module in use, a list of key **methods and types**, and a list of academic **references**. 
-
-The vSmartMOM module's documentation additionally has a guide to all the user-defined RT parameters that can be modified. 
-
-Finally, there are tutorials that combine text, equations, code, and plots to demonstrate uses of the submodules. 
+If you use vSmartMOM.jl in published work, please cite the JOSS software paper and the underlying methodology papers — see [References](pages/vSmartMOM/References.md).

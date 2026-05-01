@@ -5,57 +5,76 @@ This file contains RT doubling-related functions
 =#
 
 """
-    doubling_helper!(pol_type, SFI, expk, expk_lin, ndoubl, added_layer, 
+    doubling_helper!(pol_type, SFI, expk, expk_lin, ndoubl, added_layer,
                      added_layer_lin, I_static, architecture)
 
-Compute full homogeneous layer matrices from the elemental layer using the **Doubling Method**
-(de Haan, Bosma & Hovenier 1987), and simultaneously propagate derivatives with respect to
-the 3 core optical parameters ``(\\tau, \\varpi, \\mathbf{Z})``.
+Tangent-linear partner of the forward [`doubling_helper!`](@ref) kernel:
+doubles the elemental layer ``n_d`` times to reach the full homogeneous-layer
+optical depth, **and simultaneously propagates derivatives** with respect to
+the three core layer variables ``(\\tau, \\varpi, \\mathbf{Z})``.
 
-Starting from the elemental layer (optical depth ``d\\tau = \\tau/2^{n_d}``), this function
-doubles the layer ``n_d`` times. After each doubling step, the optical depth doubles and
-the reflection/transmission matrices are updated.
+# Forward (Sanghavi 2014, Eqs. 23–28; restated for homogeneous case)
 
-# Doubling formulas (de Haan et al. 1987, Eq. 25)
-
-For a homogeneous layer with reflection ``\\mathbf{R}`` and transmission ``\\mathbf{T}``,
-the doubled layer has:
 ```math
-\\mathbf{G} = (\\mathbf{I} - \\mathbf{R} \\mathbf{R})^{-1}
+\\mathbf{G} = (\\mathbf{E} - \\mathbf{R}\\,\\mathbf{R})^{-1}
 ```
 ```math
-\\mathbf{R}_{2\\tau} = \\mathbf{R} + \\mathbf{T} \\, \\mathbf{G} \\, \\mathbf{R} \\, \\mathbf{T}
-```
-```math
-\\mathbf{T}_{2\\tau} = \\mathbf{T} \\, \\mathbf{G} \\, \\mathbf{T}
+\\mathbf{R}_{2\\tau} = \\mathbf{R} + \\mathbf{T}\\,\\mathbf{G}\\,\\mathbf{R}\\,\\mathbf{T},\\qquad
+\\mathbf{T}_{2\\tau} = \\mathbf{T}\\,\\mathbf{G}\\,\\mathbf{T}.
 ```
 
-# Linearized doubling
+After ``n_d`` iterations, the layer has optical depth ``2^{n_d}\\,d\\tau`` —
+the **logarithmic-in-τ** scaling that makes MOM cheap for thick atmospheres.
+The original adding-doubling formulation is de Haan, Bosma & Hovenier
+(1987); Sanghavi 2014 §2.1 is the vector form vSmartMOM uses.
 
-The derivatives propagate through the doubling via the product/chain rule. For each core
-parameter ``c \\in \\{\\tau, \\varpi, \\mathbf{Z}\\}``:
+# Linearization (Sanghavi 2014 App. C, Eqs. C.11–C.16)
+
+The derivatives propagate through the doubling via the product/chain rule.
+For each core parameter ``c \\in \\{\\tau, \\varpi, \\mathbf{Z}\\}``:
+
 ```math
-\\dot{\\mathbf{G}}_c = \\mathbf{G} (\\dot{\\mathbf{R}}_c \\mathbf{R} + 
-  \\mathbf{R} \\dot{\\mathbf{R}}_c) \\mathbf{G}
+\\dot{\\mathbf{G}}_c = \\mathbf{G}\\,\\bigl(\\dot{\\mathbf{R}}_c\\,\\mathbf{R} + \\mathbf{R}\\,\\dot{\\mathbf{R}}_c\\bigr)\\,\\mathbf{G}
 ```
 ```math
-\\dot{\\mathbf{R}}_{2\\tau,c} = \\dot{\\mathbf{R}}_c + 
-  \\dot{\\mathbf{T}}_c \\mathbf{G} \\mathbf{R} \\mathbf{T} + \\ldots
+\\dot{\\mathbf{R}}_{2\\tau,c} = \\dot{\\mathbf{R}}_c + \\dot{\\mathbf{T}}_c\\,\\mathbf{G}\\,\\mathbf{R}\\,\\mathbf{T} + \\ldots
 ```
 
-The source function vectors ``\\mathbf{J}_0^\\pm`` are also doubled when `SFI=true`,
-with the beam attenuation factor ``e^{-\\tau/\\mu_0}`` applied between doublings.
+The closed-form ``\\dot{\\mathbf{G}} = -\\mathbf{G}\\,\\dot{(\\mathbf{R}\\mathbf{R})}\\,\\mathbf{G}`` derivation
+keeps the linearization analytic — no AD through the batched matrix
+inversion. **Crucially, ``\\mathbf{G}`` is the same inverse the forward
+doubling step already computed**, so the linearized partner *reuses* it
+rather than recomputing. The marginal cost per linearized iteration is
+two extra batched matmuls per core parameter, not another LU. This is
+why a combined forward + linearized run costs **less than 2× a forward-only
+run** — the dominant ``N_\\mathrm{quad}^3`` LU work is paid once. ForwardDiff
+through `batch_inv!` would force ``(1+N_\\mathrm{params})`` evaluations of the
+inverse; finite differences would force ``(1+N_\\mathrm{state})`` full forward
+runs. See [Concepts/06 — Linearization § Why this is fast](../../docs/src/pages/concepts/06_linearization.md#why-this-is-fast-the-matrix-inversion-is-reused).
+
+The D-matrix symmetry from Sanghavi 2014 Eqs. (C.17)–(C.18) is preserved on
+the derivatives too (`apply_D_matrix!` is reused), halving the linearized
+doubling cost just as it halves the forward doubling cost.
+
+When `SFI=true`, the source-function vectors ``\\mathbf{J}_0^\\pm`` and their
+derivatives are doubled, with the beam attenuation factor ``e^{-d\\tau/\\mu_0}``
+(and its derivative ``-e^{-d\\tau/\\mu_0}/\\mu_0``) applied between
+iterations.
+
+# Concepts page
+See [Linearization — operator-level chain rule](../../docs/src/pages/concepts/06_linearization.md)
+for the three-tier Jacobian diagram and the AD-boundary discussion.
 
 # Arguments
 - `pol_type`: Polarization type.
-- `SFI`: Source Function Integration flag.
+- `SFI`: Source-function-integration flag.
 - `expk`: Beam attenuation factor ``e^{-d\\tau/\\mu_0}`` `[nSpec]`.
 - `expk_lin`: Its derivative ``-e^{-d\\tau/\\mu_0}/\\mu_0`` `[nSpec]`.
 - `ndoubl::Int`: Number of doubling iterations.
-- `added_layer::AddedLayer`: Forward RT matrices (modified in-place).
-- `added_layer_lin::AddedLayerLin`: Linearized RT matrices (modified in-place).
-- `I_static`: Identity matrix for batched operations.
-- `architecture`: CPU or GPU.
+- `added_layer::AddedLayer`: Forward RT matrices (modified in place).
+- `added_layer_lin::AddedLayerLin`: Linearized RT matrices (modified in place).
+- `I_static`: Pre-allocated batched identity matrix.
+- `architecture`: `CPU`, `GPU`, or `MetalGPU`.
 """
 function doubling_helper!(pol_type, 
                           SFI, 

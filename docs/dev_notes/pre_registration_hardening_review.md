@@ -324,3 +324,56 @@ Pick these up first — visible cleanup for low effort:
 
 Stack these in a single PR titled "Pre-registration housekeeping" so review is
 trivial.
+
+---
+
+## 10. Continuation Snapshot — 2026-04-27
+
+Current integration branch: `sanghavi-unified`.
+
+Current low-risk follow-up branch: `cfranken/refactor-low-risk-cleanup`
+at `3b2679e` (`Make tests cwd-independent`), pushed to origin.
+
+Recent completed hardening work:
+
+- numerical Float32 hardening: `expm1` / stable exponential differences,
+  tolerance helpers, and CPU-side precision promotion where appropriate;
+- Raman dispatch cleanup: trait/method-based inelastic handling in place of
+  scattered type checks;
+- parser hardening: required config/source checks now throw validation errors;
+- SolarModel relocation: default solar transmission no longer writes into the
+  package tree;
+- test/tooling cleanup: RAMI smoke removed from the unit-test dependency path,
+  Aqua/schema quality gates added, top-level IO exports smoke-tested;
+- compat pruning/bumping, including CUDA 6 support;
+- aerosol config readers hardened;
+- current sub-branch made the main test runner and aerosol tests less dependent
+  on caller working directory.
+
+Known current blockers / follow-ups before `main` + registration:
+
+- SIF loader tests currently fail because `src/SIF_emission/sif-spectra.csv`
+  and `src/SIF_emission/ficus_refl_600to800nm.dat` are referenced but not
+  tracked on this branch. Decide whether to commit the small canonical data
+  files, move them to artifacts, or gate the loader smoke tests when fixtures
+  are absent.
+- Sanghavi has uncommitted CIA/MT_CKD and parameter reorganization WIP in her
+  home checkout. Do not overwrite or rebase that work until it is preserved as
+  a patch or temporary branch.
+- Full test pass should be rerun after the SIF fixture decision and after
+  merging any Sanghavi WIP back into `sanghavi-unified`.
+- Compat changes still deserve one upper-bound verification pass for the major
+  jumps that were allowed.
+- `parameters_from_yaml` now rejects non-YAML/TOML misuse earlier; document the
+  intended migration to `parameters_from_file` before tagging.
+
+Safe next commits while waiting on Sanghavi WIP:
+
+1. Resolve SIF data/test policy without touching absorption or parameter WIP.
+2. Finish test cwd cleanup for any remaining standalone test files.
+3. Normalize test top-level execution so smoke tests run inside named
+   `@testset`s.
+4. Add a short `CHANGELOG.md` / registration notes section covering breaking
+   parser/API behavior and compat baseline.
+5. Review exported names and docstrings for the top-level IO and Raman helper
+   surface, without moving implementation files that overlap Sanghavi WIP.

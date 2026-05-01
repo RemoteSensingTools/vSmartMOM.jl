@@ -152,7 +152,7 @@ end
 """
     OpticalPropertyJacobian
 
-Type alias for [`CoreScatteringOpticalPropertiesLin`](@ref).  Use this name
+Type alias for `CoreScatteringOpticalPropertiesLin`. Use this name
 in new code to emphasise the physical meaning: the Jacobian of the four
 core optical properties `(τ, ϖ, Z⁺⁺, Z⁻⁺)` w.r.t. the state vector.
 """

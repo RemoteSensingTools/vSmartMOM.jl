@@ -26,7 +26,7 @@ using SHA: sha256
 using Scratch: @get_scratch!
 
 # Export Architecture functions
-export CPU, GPU, default_architecture, array_type
+export CPU, GPU, MetalGPU, default_architecture, array_type
 
 # Export the artifact convenience function and HITRAN management
 export artifact
@@ -110,9 +110,9 @@ export GeosChemSource, NetCDFGridSource, NetCDFSource, geoschem_to_dict, read_ge
 using .Architectures
 using .Absorption
 
-# Module initialization - GPU setup happens in CUDAExt when CUDA is loaded
+# Module initialization - GPU setup happens in optional backend extensions.
 function __init__()
-    # Nothing to do here; GPU detection is handled by the CUDA extension
+    # Nothing to do here; GPU detection is handled by backend extensions.
 end
 
 end

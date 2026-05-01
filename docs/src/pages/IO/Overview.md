@@ -2,11 +2,16 @@
 
 The IO submodule centralizes loading and validation of simulation inputs, decoupled from the CoreRT solvers.
 
-- Multiple dispatch entry points:
-  - `read_parameters(path::AbstractString)` → load from a registered file format
-  - `parameters_from_file(path::AbstractString)` → load from a registered file format
-  - `read_parameters(dict::Dict)` → convert an in-memory config
-  - `read_atmos_profile(path|dict)` → load an atmospheric profile only
+Use `read_parameters` as the user-facing entry point. It dispatches on the input type:
+
+- `read_parameters(path::AbstractString)` loads a registered file format.
+- `read_parameters(dict::Dict)` converts an in-memory config.
+- `read_parameters(src::IOSource)` loads a typed source such as GEOS-Chem NetCDF.
+- `read_parameters(params::vSmartMOM_Parameters)` passes an already parsed parameter object through.
+
+The explicit aliases `parameters_from_file`, `parameters_from_dict`, and `parameters_from_source` remain available when code wants the call site to state the input kind. `parameters_from_yaml` is also supported for YAML files.
+
+- `read_atmos_profile(path|dict)` loads an atmospheric profile only.
 - Format registry: `IO.Formats` selects a loader based on source/extension (YAML and TOML supported).
 - Safe parsing: enums and types are parsed with explicit maps. Surfaces (BRDF) and spectral band ranges are parsed without `eval`.
 
@@ -16,7 +21,7 @@ The IO submodule centralizes loading and validation of simulation inputs, decoup
 using vSmartMOM
 
 # 1) YAML or TOML file
-params = read_parameters(joinpath(dirname(pathof(vSmartMOM)), "CoreRT", "DefaultParameters.yaml"))
+params = read_parameters(joinpath(pkgdir(vSmartMOM), "src", "CoreRT", "DefaultParameters.yaml"))
 model  = model_from_parameters(params)
 R, T   = rt_run(model)
 
@@ -43,6 +48,7 @@ params2 = read_parameters(cfg)
 ## Formats
 
 - YAML and TOML: registered by default. Add more by calling `IO.Formats.register_format`.
+- GEOS-Chem and generic NetCDF sources use typed `IOSource` objects and the same `read_parameters` entry point.
 
 ## Safety maps
 

@@ -75,11 +75,12 @@ const POLARIZATION_MAP = Dict(
 ARCH_MAP
 
 String → constructor/value mapping for compute architecture.
-Keys: "CPU", "GPU", "default_architecture".
+Keys: "CPU", "GPU", "MetalGPU", "default_architecture".
 """
 const ARCH_MAP = Dict(
     "CPU" => ()->Architectures.CPU(),
     "GPU" => ()->Architectures.GPU(),
+    "MetalGPU" => ()->Architectures.MetalGPU(),
     # default_architecture is a value (GPU() or CPU()), not a function
     "default_architecture" => ()->Architectures.default_architecture()
 )
@@ -445,7 +446,7 @@ function validate_yaml_parameters(params)
         (["radiative_transfer", "l_trunc"], Integer),
         (["radiative_transfer", "depol"], Real),
         (["radiative_transfer", "float_type"], String),
-        (["radiative_transfer", "architecture"], String, ["default_architecture", "Architectures.GPU()", "Architectures.CPU()", "GPU()", "CPU()"]),
+        (["radiative_transfer", "architecture"], String, ["default_architecture", "Architectures.GPU()", "Architectures.MetalGPU()", "Architectures.CPU()", "GPU()", "MetalGPU()", "CPU()"]),
         (["geometry", "sza"], Real),
         (["geometry", "vza"], Array{<:Real}),
         (["geometry", "vaz"], Array{<:Real}),

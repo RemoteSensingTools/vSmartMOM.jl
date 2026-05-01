@@ -189,7 +189,7 @@ end
 $(FUNCTIONNAME)(μ, nmax, π, τ)
 Computes the associated Legendre functions  amplitude functions `π` and `τ` in Mie theory (stored internally). See eq 6 in Sanghavi 2014
 - `μ` cosine of the scattering angle
-- `nmax` max number of legendre terms (depends on size parameter, see [`get_n_max`](@ref))
+- `nmax` max number of legendre terms (depends on size parameter; see `get_n_max`)
 Functions returns `π` and `τ` (of size `[nmax,length(μ)]`)
 """
 function compute_mie_π_τ(μ, nmax)
@@ -217,7 +217,7 @@ end
 $(FUNCTIONNAME)(x,nmax)
 Returns the associated legendre functions Pᵢ, P²ᵢ, R²ᵢ, and T²ᵢ as a function of x and i=1:nmax 
 - `x` array of locations to be evaluated [-1,1]
-- `nmax` max number of legendre terms (depends on size parameter, see [`get_n_max`](@ref))
+- `nmax` max number of legendre terms (depends on size parameter; see `get_n_max`)
 The function returns `Pᵢ`, `P²ᵢ`, `R²ᵢ`, and `T²ᵢ`, for a size distribution, this can be pre-computed with nmax derived from the maximum size parameter.
 """
 function compute_legendre_poly(x::Array{FT},nmax) where FT
@@ -310,6 +310,5 @@ function compute_legendre_P(μ , Lmax)
 
     return da./ll'
 end
-
 
 
