@@ -133,6 +133,8 @@ end
     try
         ENV[env_key] = "/tmp/vsmartmom-luts"
         @test vSmartMOM.IO._expand_env_path("\${ENV:$(env_key)}/O2.jld2") == normpath("/tmp/vsmartmom-luts/O2.jld2")
+        ENV[env_key] = "/tmp/vsmartmom-luts/O2.jld2"
+        @test vSmartMOM.IO._expand_env_path("\${ENV:$(env_key)}") == normpath("/tmp/vsmartmom-luts/O2.jld2")
         @test vSmartMOM.IO._expand_env_path("relative/O2.jld2") == "relative/O2.jld2"
 
         delete!(ENV, env_key)

@@ -35,6 +35,8 @@
 - Parser validation now throws `ArgumentError` instead of relying on `@assert`, so configuration checks are not elided by optimized Julia runs.
 - The docs include a shipped CPU quick-start scene and a small docs smoke runner for the examples most likely to drift.
 - The docs build runs with `checkdocs = :exports` and no `warnonly` suppressions.
+- Canopy surface integration now targets CanopyOptics.jl 0.2, including the
+  analytic Stokes-aware canopy Z-matrix API used by `CanopySurface`.
 - Replaced `eval(Meta.parse(...))` in YAML spec_bands parsing with a safe literal parser.
 - Fixed `Vector{Any}` fields in Raman types to use proper parametric types.
 - Cleaned up dead code: removed unused prototype files, plot scripts, and old test utilities.

@@ -213,8 +213,23 @@ function compute_absorption_cross_section(
     # Scale the interpolation to match the model grids
     sitp = scale(model.itp, model.ν_grid, model.p_grid, model.t_grid)
 
-    # Perform the interpolation and return the resulting grid
-    return sitp(grid, pressure, temperature)
+    # Extrapolate to zero outside the LUT wavenumber range. ABSCO-style
+    # tables are tabulated for an absorption band; outside the band σ ≈ 0,
+    # so a Throw boundary on inputs is needlessly fragile when the user
+    # widens the spectral window past the table edges.
+    ν_lo, ν_hi = extrema(model.ν_grid)
+    grid_lo, grid_hi = extrema(grid)
+    if grid_lo >= ν_lo && grid_hi <= ν_hi
+        return sitp(grid, pressure, temperature)
+    end
+    clamped = clamp.(grid, ν_lo, ν_hi)
+    result = sitp(clamped, pressure, temperature)
+    @inbounds for i in eachindex(grid)
+        if grid[i] < ν_lo || grid[i] > ν_hi
+            result[i] = 0
+        end
+    end
+    return result
 end
 
 #=
