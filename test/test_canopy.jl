@@ -121,11 +121,10 @@ end
         @test all(iszero, Zmp_d[si:pol.n:end, sj:pol.n:end, :])
     end
 
-    composite = diffuse + specular
-    composite_canopy = CanopySurface(; soil, LAI=1.0, canopy_scattering=composite,
-                                      canopy_quadrature=quadrature)
+    specular_canopy = CanopySurface(; soil, LAI=1.0, canopy_scattering=specular,
+                                     canopy_quadrature=quadrature)
     Zpp_c, Zmp_c = CoreRT._compute_canopy_Z_stack(
-        composite_canopy, composite, μ, 2, Float64, pol.n)
+        specular_canopy, specular, μ, 2, Float64, pol.n)
 
     @test size(Zpp_c) == size(Zpp_d)
     @test all(isfinite, Zpp_c)
