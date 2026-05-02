@@ -48,7 +48,6 @@ try
 # IO validation regression tests
 @testset "IO Validation" begin include("test_io_validation.jl") end
 
-# Canopy surface tests (CanopySurface composable surface type)
 @testset "Canopy Surface" begin include("test_canopy.jl") end
 
 # Cox-Munk ocean surface tests
