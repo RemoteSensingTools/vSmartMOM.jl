@@ -45,6 +45,7 @@ function _expand_env_path(path::AbstractString)
     env_name, suffix = match_env.captures
     _require_config(haskey(ENV, env_name), "Environment variable $(env_name) must be set to resolve $(text)")
     _require_config(!isempty(ENV[env_name]), "Environment variable $(env_name) must not be empty to resolve $(text)")
+    isempty(suffix) && return normpath(ENV[env_name])
     return normpath(joinpath(ENV[env_name], _strip_leading_path_separators(suffix)))
 end
 

@@ -57,6 +57,7 @@ end
 
 Convenience constructor: compute spectral leaf R/T from PROSPECT and build
 a `CanopySurface` with the spectral leaf optics on the PROSPECT wavelength grid.
+If `LAD` is omitted, `CanopySurface` uses `CanopyOptics.spherical_leaves()`.
 
 # Arguments
 - `leaf_prospect`: a `CanopyOptics.LeafProspectProProperties` (N, Ccab, Ccar, ...)

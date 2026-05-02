@@ -15,7 +15,7 @@ vSmartMOM = {path = ".."}
 
 [compat]
 CairoMakie = "0.12, 0.13, 0.14, 0.15"
-CanopyOptics = "0.1.4"
+CanopyOptics = "0.2"
 Distributions = "0.25"
 Documenter = "1"
 DocumenterVitepress = "0.3"
