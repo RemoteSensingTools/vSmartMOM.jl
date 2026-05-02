@@ -8,10 +8,10 @@ using Test
 
 const CO = CanopyOptics
 
-function _canopy_test_quad_points(; FT=Float64, l_trunc=15)
+function _canopy_test_quad_points(; FT=Float64, l_trunc=15, pol_type=CoreRT.Stokes_I())
     obs = CoreRT.ObsGeometry(FT(30), FT[0, 30], FT[0, 0], FT(1000))
     return CoreRT.rt_set_streams(CoreRT.GaussQuadHemisphere(), l_trunc, obs,
-                                 CoreRT.Stokes_I(), Array)
+                                 pol_type, Array)
 end
 
 function _spherical_reference_Z(scatter, μ; n_φ=96)
@@ -90,14 +90,48 @@ end
                             leaf_optics_grid=[760.0, 770.0, 780.0],
                             grid_unit=:nm)
     R_interp, T_interp, wn_coarse, Zpp, Zmp =
-        CoreRT._build_spectral_canopy_cache(canopy, collect(qp.qp_μN), collect(qp.wt_μN),
-                                            [1e7 / 770.0], 1, Float64)
+        CoreRT._build_spectral_canopy_cache(canopy, collect(qp.qp_μ), collect(qp.wt_μ),
+                                            [1e7 / 770.0], 1, Float64, 1)
 
     @test length(R_interp) == 1
     @test length(T_interp) == 1
     @test length(wn_coarse) ≥ 2
     @test size(Zpp, 3) == length(wn_coarse)
     @test size(Zmp, 3) == length(wn_coarse)
+end
+
+@testset "CanopySurface Stokes Z expansion" begin
+    pol = CoreRT.Stokes_IQUV{Float64}()
+    qp = _canopy_test_quad_points(l_trunc=7, pol_type=pol)
+    μ = collect(qp.qp_μ)
+    soil = LambertianSurfaceScalar(0.1)
+    diffuse = CO.BiLambertianCanopyScattering(R=0.40, T=0.10)
+    specular = CO.SpecularCanopyScattering(nᵣ=1.5, κ=0.2)
+    quadrature = CO.CanopyQuadrature(n_leaf=16, n_azimuth=8)
+
+    diffuse_canopy = CanopySurface(; soil, LAI=1.0, canopy_scattering=diffuse,
+                                    canopy_quadrature=quadrature)
+    Zpp_d, Zmp_d = CoreRT._compute_canopy_Z_stack(
+        diffuse_canopy, diffuse, μ, 2, Float64, pol.n)
+
+    @test size(Zpp_d) == (length(μ) * pol.n, length(μ) * pol.n, 2)
+    for si in 1:pol.n, sj in 1:pol.n
+        (si, sj) == (1, 1) && continue
+        @test all(iszero, Zpp_d[si:pol.n:end, sj:pol.n:end, :])
+        @test all(iszero, Zmp_d[si:pol.n:end, sj:pol.n:end, :])
+    end
+
+    composite = diffuse + specular
+    composite_canopy = CanopySurface(; soil, LAI=1.0, canopy_scattering=composite,
+                                      canopy_quadrature=quadrature)
+    Zpp_c, Zmp_c = CoreRT._compute_canopy_Z_stack(
+        composite_canopy, composite, μ, 2, Float64, pol.n)
+
+    @test size(Zpp_c) == size(Zpp_d)
+    @test all(isfinite, Zpp_c)
+    @test all(isfinite, Zmp_c)
+    @test any(abs.(Zpp_c[2:pol.n:end, 1:pol.n:end, :]) .> 1e-12) ||
+          any(abs.(Zmp_c[2:pol.n:end, 1:pol.n:end, :]) .> 1e-12)
 end
 
 @testset "CanopySurface forward RT smoke" begin
