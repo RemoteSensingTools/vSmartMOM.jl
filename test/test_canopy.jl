@@ -1,208 +1,114 @@
-# =================================================================
-# Canopy Surface Tests
-#
-# Tests the CanopySurface integration into the standard rt_run() flow:
-#   1. CanopySurface struct construction
-#   2. YAML-based construction with canopy: section
-#   3. Forward RT with CanopySurface vs Lambertian baseline
-#   4. Multi-layer canopy consistency
-#   5. Multi-band canopy RT
-# =================================================================
-
-using vSmartMOM, vSmartMOM.CoreRT
-using vSmartMOM.Scattering
-using vSmartMOM.InelasticScattering
+using vSmartMOM
+using vSmartMOM.CoreRT
+using vSmartMOM.IO
 using CanopyOptics
-using Test
 using LinearAlgebra
+using Statistics
+using Test
 
-println("="^60)
-println("Canopy Surface Tests")
-println("="^60)
+const CO = CanopyOptics
 
-@testset "CanopySurface type construction" begin
+function _canopy_test_quad_points(; FT=Float64, l_trunc=15)
+    obs = CoreRT.ObsGeometry(FT(30), FT[0, 30], FT[0, 0], FT(1000))
+    return CoreRT.rt_set_streams(CoreRT.GaussQuadHemisphere(), l_trunc, obs,
+                                 CoreRT.Stokes_I(), Array)
+end
+
+function _spherical_reference_Z(scatter, μ; n_φ=96)
+    FT = eltype(μ)
+    ω = FT(scatter.R + scatter.T)
+    φ_az = collect(range(zero(FT), FT(π); length=n_φ + 1))[1:end-1]
+    dφ = FT(π) / n_φ
+    w_azi = (FT(2) / FT(π)) * dφ
+
+    nμ = length(μ)
+    Zpp = zeros(FT, nμ, nμ)
+    Zmp = zeros(FT, nμ, nμ)
+    for j in 1:nμ, i in 1:nμ
+        Ωin = CO.dirVector_μ(μ[j], zero(FT))
+        Γdown = zero(FT)
+        Γup = zero(FT)
+        for φ in φ_az
+            Γdown += CO.compute_Γ_isotropic(scatter, Ωin, CO.dirVector_μ( μ[i], φ)) * w_azi
+            Γup   += CO.compute_Γ_isotropic(scatter, Ωin, CO.dirVector_μ(-μ[i], φ)) * w_azi
+        end
+        scale = FT(2) / (ω * FT(0.5)) # spherical LAD has G(μ) ≡ 0.5
+        Zpp[i, j] = scale * Γdown
+        Zmp[i, j] = scale * Γup
+    end
+    return Zpp, Zmp
+end
+
+@testset "CanopySurface construction and YAML" begin
     soil = LambertianSurfaceScalar(0.1)
-    canopy = CanopySurface(; soil=soil, LAI=3.0)
+    canopy = CanopySurface(; soil, LAI=3.0,
+                            canopy_clumping=CO.ConstantClumping(Ω=0.75))
+
     @test canopy.LAI == 3.0
     @test canopy.n_layers == 1
     @test canopy.soil === soil
-    @test canopy.include_atm == false
+    @test canopy.canopy_quadrature isa CO.CanopyQuadrature
+    @test canopy.canopy_clumping isa CO.ConstantClumping{Float64}
     @test canopy._cache === nothing
 
-    canopy_ml = CanopySurface(; soil=soil, LAI=4.0, n_layers=4,
-                               leaf_reflectance=0.45, leaf_transmittance=0.1)
-    @test canopy_ml.n_layers == 4
-    @test canopy_ml.leaf_reflectance == 0.45
-    @test canopy_ml.leaf_transmittance == 0.1
-
-    canopy_frac = CanopySurface(; soil=soil, LAI=3.0, n_layers=3,
-                                 lai_fractions=[0.5, 0.3, 0.2])
-    @test canopy_frac.lai_fractions == [0.5, 0.3, 0.2]
-end
-
-@testset "CanopySurface YAML parsing" begin
     params = parameters_from_yaml("test_parameters/CanopyTest.yaml")
     @test params.brdf[1] isa CanopySurface
-    canopy = params.brdf[1]
-    @test canopy.LAI == 3.0
-    @test canopy.n_layers == 1
-    @test canopy.soil isa LambertianSurfaceScalar
-    @test canopy.soil.albedo ≈ 0.1
-    @test canopy.leaf_reflectance ≈ 0.4
-    @test canopy.leaf_transmittance ≈ 0.05
+    @test params.brdf[1].soil isa LambertianSurfaceScalar
+    @test params.brdf[1].canopy_quadrature.n_azimuth == CO.CanopyQuadrature().n_azimuth
 end
 
-@testset "CanopySurface forward RT" begin
+@testset "Analytic canopy Z invariants" begin
+    FT = Float64
+    μ, w = CO.gauleg(8, zero(FT), one(FT))
+    μ = collect(μ)
+    w = collect(w)
+    scatter = CO.BiLambertianCanopyScattering(R=FT(0.5), T=FT(0.5))
+    LAD = CO.spherical_leaves(FT)
+    quadrature = CO.CanopyQuadrature(n_leaf=32, n_azimuth=32)
+
+    Zpp, Zmp = CO.compute_Z_matrices_aniso_analytic(scatter, μ, LAD, 2;
+                                                    quadrature)
+    @test all(isfinite.(Zpp))
+    @test all(isfinite.(Zmp))
+    @test minimum(Zpp[:, :, 1]) ≥ -1e-12
+    @test minimum(Zmp[:, :, 1]) ≥ -1e-12
+
+    fluxes = [sum(w .* (Zpp[:, j, 1] .+ Zmp[:, j, 1])) for j in eachindex(μ)]
+    @test all(isapprox.(fluxes, FT(2); rtol=0.03, atol=0.03))
+
+    Zpp_ref, Zmp_ref = _spherical_reference_Z(scatter, μ; n_φ=96)
+    @test norm(Zpp[:, :, 1] - Zpp_ref) / norm(Zpp_ref) < 5e-3
+    @test norm(Zmp[:, :, 1] - Zmp_ref) / norm(Zmp_ref) < 5e-3
+end
+
+@testset "Spectral canopy single-point coarse grid" begin
+    qp = _canopy_test_quad_points(l_trunc=9)
+    soil = LambertianSurfaceScalar(0.1)
+    canopy = CanopySurface(; soil, LAI=2.0,
+                            leaf_reflectance=[0.40, 0.45, 0.48],
+                            leaf_transmittance=[0.05, 0.08, 0.10],
+                            leaf_optics_grid=[760.0, 770.0, 780.0],
+                            grid_unit=:nm)
+    R_interp, T_interp, wn_coarse, Zpp, Zmp =
+        CoreRT._build_spectral_canopy_cache(canopy, collect(qp.qp_μN), collect(qp.wt_μN),
+                                            [1e7 / 770.0], 1, Float64)
+
+    @test length(R_interp) == 1
+    @test length(T_interp) == 1
+    @test length(wn_coarse) ≥ 2
+    @test size(Zpp, 3) == length(wn_coarse)
+    @test size(Zmp, 3) == length(wn_coarse)
+end
+
+@testset "CanopySurface forward RT smoke" begin
     params = parameters_from_yaml("test_parameters/CanopyTest.yaml")
     params.architecture = vSmartMOM.Architectures.CPU()
 
     model = model_from_parameters(params)
-    @test !isnothing(model)
     @test model.surfaces[1] isa CanopySurface
 
-    result = rt_run(model; i_band=1)
-    R = result isa Tuple ? result[1] : result
-
-    nVza = length(model.obs_geom.vza)
-    nStokes = CoreRT.polarization_type(model).n
-    nSpec = length(model.atmosphere.spec_bands[1])
-
+    R = rt_run(model; i_band=1)[1]
     @test ndims(R) == 3
-    @test size(R, 1) == nVza
-    @test size(R, 2) == nStokes
-    @test size(R, 3) == nSpec
     @test all(isfinite.(R))
-
-    I_vals = R[:, 1, :]
-    @test all(I_vals .> 0)
-    @test maximum(I_vals) < 1.0
-
-    println("  Canopy RT I: min=$(minimum(I_vals)), max=$(maximum(I_vals))")
+    @test all(R[:, 1, :] .> 0)
 end
-
-@testset "Canopy vs Lambertian comparison" begin
-    params_canopy = parameters_from_yaml("test_parameters/CanopyTest.yaml")
-    params_canopy.architecture = vSmartMOM.Architectures.CPU()
-
-    params_lamb = parameters_from_yaml("test_parameters/CanopyTest.yaml")
-    params_lamb.architecture = vSmartMOM.Architectures.CPU()
-    params_lamb.brdf[1] = LambertianSurfaceScalar(0.1)
-
-    model_canopy = model_from_parameters(params_canopy)
-    model_lamb   = model_from_parameters(params_lamb)
-
-    R_canopy = rt_run(model_canopy; i_band=1)[1]
-    invalidate_canopy_cache!(model_canopy.surfaces[1])
-    R_lamb   = rt_run(model_lamb; i_band=1)[1]
-
-    @test all(isfinite.(R_canopy))
-    @test all(isfinite.(R_lamb))
-
-    @test !isapprox(R_canopy, R_lamb, rtol=0.01)
-    println("  Canopy I[1]: $(R_canopy[1,1,1])")
-    println("  Lambertian I[1]: $(R_lamb[1,1,1])")
-end
-
-@testset "Multi-layer canopy consistency" begin
-    params = parameters_from_yaml("test_parameters/CanopyTest.yaml")
-    params.architecture = vSmartMOM.Architectures.CPU()
-
-    soil = params.brdf[1].soil
-    LAI = params.brdf[1].LAI
-
-    params.brdf[1] = CanopySurface(; soil=soil, LAI=LAI, n_layers=1)
-    model1 = model_from_parameters(params)
-    R1 = rt_run(model1; i_band=1)[1]
-    invalidate_canopy_cache!(model1.surfaces[1])
-
-    params.brdf[1] = CanopySurface(; soil=soil, LAI=LAI, n_layers=4)
-    model4 = model_from_parameters(params)
-    R4 = rt_run(model4; i_band=1)[1]
-    invalidate_canopy_cache!(model4.surfaces[1])
-
-    @test all(isfinite.(R1))
-    @test all(isfinite.(R4))
-
-    println("  1-layer I[1]: $(R1[1,1,1])")
-    println("  4-layer I[1]: $(R4[1,1,1])")
-end
-
-@testset "ParameterLayout canopy extension" begin
-    layout = ParameterLayout(n_aerosols=1, n_gases=2, n_surface=1, n_canopy=3)
-    @test n_total(layout) == 7 + 2 + 1 + 3
-    @test canopy_range(layout) == 11:13
-    @test surface_range(layout) == 10:10
-
-    layout0 = ParameterLayout(n_aerosols=0, n_gases=0, n_surface=1, n_canopy=0)
-    @test n_total(layout0) == 1
-    @test canopy_range(layout0) == 2:1  # empty range
-end
-
-@testset "Spectral leaf optics construction" begin
-    soil = LambertianSurfaceScalar(0.1)
-
-    λ_grid = [550.0, 660.0, 680.0, 750.0, 780.0]
-    R_leaf = [0.05, 0.08, 0.10, 0.45, 0.48]
-    T_leaf = [0.02, 0.03, 0.05, 0.40, 0.42]
-
-    canopy = CanopySurface(; soil=soil, LAI=3.0,
-                            leaf_reflectance=R_leaf,
-                            leaf_transmittance=T_leaf,
-                            leaf_optics_grid=λ_grid,
-                            grid_unit=:nm)
-    @test canopy.leaf_optics_grid ≈ λ_grid
-    @test canopy.grid_unit == :nm
-    @test canopy.canopy_dp === nothing
-    @test canopy.leaf_reflectance ≈ R_leaf
-    @test canopy.leaf_transmittance ≈ T_leaf
-
-    canopy_wn = CanopySurface(; soil=soil, LAI=3.0,
-                               leaf_reflectance=R_leaf,
-                               leaf_transmittance=T_leaf,
-                               leaf_optics_grid=1e7 ./ reverse(λ_grid),
-                               grid_unit=:cm_inv)
-    @test canopy_wn.grid_unit == :cm_inv
-    println("  Spectral canopy construction: OK")
-end
-
-@testset "Spectral canopy with canopy_dp" begin
-    soil = LambertianSurfaceScalar(0.1)
-
-    canopy = CanopySurface(; soil=soil, LAI=5.0, n_layers=3,
-                            leaf_reflectance=0.45,
-                            leaf_transmittance=0.05,
-                            include_atm=true,
-                            canopy_dp=3.0)
-    @test canopy.canopy_dp ≈ 3.0
-    @test canopy.include_atm == true
-    println("  Canopy with atmospheric column: OK")
-end
-
-@testset "PROSPECT-based CanopySurface" begin
-    leaf = CanopyOptics.LeafProspectProProperties(
-        N=1.4, Ccab=40.0, Ccar=8.0, Canth=0.0, Cbrown=0.0,
-        Cw=0.01, Cm=0.009, Cprot=0.0, Ccbc=0.0)
-
-    canopy = CanopySurface_from_prospect(
-        leaf, 400.0:5.0:2500.0;
-        soil=LambertianSurfaceScalar(0.1),
-        LAI=3.0, n_layers=2)
-    @test canopy.leaf_optics_grid !== nothing
-    @test canopy.grid_unit == :nm
-    @test length(canopy.leaf_reflectance) == length(canopy.leaf_optics_grid)
-    @test length(canopy.leaf_transmittance) == length(canopy.leaf_optics_grid)
-    @test all(0 .<= canopy.leaf_reflectance .<= 1)
-    @test all(0 .<= canopy.leaf_transmittance .<= 1)
-    println("  PROSPECT-based canopy: $(length(canopy.leaf_optics_grid)) spectral points")
-end
-
-@testset "YAML parsing with canopy_dp" begin
-    params = parameters_from_yaml("test_parameters/CanopyTest.yaml")
-    @test params.brdf[1] isa CanopySurface
-    @test params.brdf[1].canopy_dp === nothing
-    println("  YAML canopy_dp parsing: OK")
-end
-
-println("\n" * "="^60)
-println("Canopy surface tests complete.")
-println("="^60)

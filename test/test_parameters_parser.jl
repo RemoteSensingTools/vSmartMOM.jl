@@ -2,6 +2,7 @@ using Test
 using vSmartMOM
 using vSmartMOM.IO
 using vSmartMOM.CoreRT
+using CanopyOptics
 
 function _minimal_parameter_dict(; surface = ["LambertianSurfaceScalar(0.1)"],
                                    float_type = "Float64",
@@ -96,6 +97,33 @@ end
     @test_throws ArgumentError vSmartMOM.IO.parse_surface_str("UnknownSurface(1.0)", Float64)
     @test_throws ArgumentError vSmartMOM.IO.parse_surface_str("LambertianSurfaceScalar()", Float64)
     @test_throws ArgumentError vSmartMOM.IO.parse_surface_str("CoxMunkSurface()", Float64)
+end
+
+@testset "canopy clumping parser" begin
+    cfg = _minimal_parameter_dict()
+    cfg["canopy"] = Dict(
+        "LAI" => 2.0,
+        "clumping" => 0.65,
+    )
+    params = parameters_from_dict(cfg)
+    canopy = params.brdf[1]
+    @test canopy isa CanopySurface{Float64}
+    @test canopy.canopy_clumping isa CanopyOptics.ConstantClumping{Float64}
+    @test CanopyOptics.clumping_index(canopy.canopy_clumping, 0.5) == 0.65
+    @test canopy.canopy_quadrature.n_azimuth == CanopyOptics.CanopyQuadrature().n_azimuth
+
+    cfg = _minimal_parameter_dict(float_type = "Float32")
+    cfg["canopy"] = Dict(
+        "LAI" => 2.0,
+        "clumping" => Dict("type" => "chen_leblanc", "Omega0" => 0.6, "c" => 1.5, "e" => 2.0),
+        "n_leaf_quadrature" => 12,
+    )
+    params = parameters_from_dict(cfg)
+    canopy = params.brdf[1]
+    @test canopy.canopy_clumping isa CanopyOptics.ChenLeblancClumping{Float32}
+    @test CanopyOptics.clumping_index(canopy.canopy_clumping, Float32(1)) ≈ Float32(0.6)
+    @test canopy.canopy_quadrature.n_leaf == 12
+    @test canopy.canopy_quadrature.n_azimuth == CanopyOptics.CanopyQuadrature().n_azimuth
 end
 
 @testset "environment path expansion" begin

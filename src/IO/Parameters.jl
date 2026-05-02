@@ -5,6 +5,7 @@ using YAML
 using Distributions
 using Unitful
 using UnitfulEquivalences
+using CanopyOptics
 using ..CoreRT: vSmartMOM_Parameters, AbsorptionParameters, ScatteringParameters, RT_Aerosol, AtmosphericProfile
 using ..Absorption: AbstractBroadeningFunction, AbstractComplexErrorFunction, load_interpolation_model
 using ..Scattering: AbstractFourierDecompositionType, Aerosol
@@ -165,6 +166,8 @@ Expected YAML keys:
 - `leaf_transmittance`: scalar or list (default 0.05)
 - `leaf_optics_grid`: wavelength/wavenumber grid for spectral leaf R/T (optional)
 - `grid_unit`: "nm" or "cm_inv" (default "nm")
+- `clumping`: optional scalar constant Ω, "none", or a dict with
+  `type: constant|chen_leblanc`
 - `include_atm`: bool (default false)
 - `canopy_dp`: pressure thickness of canopy air column in hPa (optional)
 - `soil`: a BRDF string *or* "from_surface" to reuse the band's existing BRDF
@@ -177,6 +180,8 @@ function _parse_canopy_section(canopy_dict::Dict, FT, brdf_list::Vector)
     incl_atm  = get(canopy_dict, "include_atm", false)
     dp_raw    = get(canopy_dict, "canopy_dp", nothing)
     dp        = dp_raw === nothing ? nothing : FT(dp_raw)
+    n_leaf    = get(canopy_dict, "n_leaf_quadrature", nothing)
+    n_azimuth = get(canopy_dict, "n_azimuth_quadrature", nothing)
 
     lr = leaf_R isa AbstractVector ? convert(Vector{FT}, leaf_R) : FT(leaf_R)
     lt = leaf_T isa AbstractVector ? convert(Vector{FT}, leaf_T) : FT(leaf_T)
@@ -184,8 +189,17 @@ function _parse_canopy_section(canopy_dict::Dict, FT, brdf_list::Vector)
     lg_raw = get(canopy_dict, "leaf_optics_grid", nothing)
     lg = lg_raw === nothing ? nothing : convert(Vector{FT}, lg_raw)
     gu = Symbol(get(canopy_dict, "grid_unit", "nm"))
+    canopy_clumping = _parse_canopy_clumping(get(canopy_dict, "clumping", nothing), FT)
 
     soil_spec = get(canopy_dict, "soil", "from_surface")
+    default_canopy_quadrature = CanopyOptics.CanopyQuadrature()
+    canopy_quadrature = if n_leaf === nothing && n_azimuth === nothing
+        default_canopy_quadrature
+    else
+        CanopyOptics.CanopyQuadrature(
+            n_leaf = n_leaf === nothing ? default_canopy_quadrature.n_leaf : n_leaf,
+            n_azimuth = n_azimuth === nothing ? default_canopy_quadrature.n_azimuth : n_azimuth)
+    end
 
     for (i, existing_brdf) in enumerate(brdf_list)
         if soil_spec == "from_surface"
@@ -197,9 +211,43 @@ function _parse_canopy_section(canopy_dict::Dict, FT, brdf_list::Vector)
             soil=soil, LAI=LAI, n_layers=n_layers,
             leaf_reflectance=lr, leaf_transmittance=lt,
             leaf_optics_grid=lg, grid_unit=gu,
+            canopy_quadrature=canopy_quadrature,
+            canopy_clumping=canopy_clumping,
             include_atm=incl_atm, canopy_dp=dp)
     end
     return brdf_list
+end
+
+function _parse_canopy_clumping(spec, FT)
+    spec === nothing && return CanopyOptics.NoClumping{FT}()
+
+    if spec isa Number
+        return CanopyOptics.ConstantClumping{FT}(Ω = spec)
+    elseif spec isa AbstractString
+        key = lowercase(replace(String(spec), "-" => "_"))
+        key in ("none", "no", "no_clumping", "random") &&
+            return CanopyOptics.NoClumping{FT}()
+        throw(ArgumentError("Unknown canopy clumping string: $spec"))
+    elseif spec isa Dict
+        clumping_type = lowercase(replace(String(get(spec, "type", "constant")),
+                                          "-" => "_"))
+        if clumping_type in ("none", "no", "no_clumping", "random")
+            return CanopyOptics.NoClumping{FT}()
+        elseif clumping_type in ("constant", "constant_clumping")
+            Ω = get(spec, "Ω", get(spec, "Omega", get(spec, "Omega0",
+                get(spec, "Ω₀", get(spec, "value", 1)))))
+            return CanopyOptics.ConstantClumping{FT}(Ω = Ω)
+        elseif clumping_type in ("chen_leblanc", "chenleblanc", "chen_leb")
+            Ω₀ = get(spec, "Ω₀", get(spec, "Ω", get(spec, "Omega0",
+                get(spec, "Omega", get(spec, "value", 0.7)))))
+            c = get(spec, "c", 2.0)
+            e = get(spec, "e", 2.0)
+            return CanopyOptics.ChenLeblancClumping{FT}(Ω₀ = Ω₀, c = c, e = e)
+        end
+        throw(ArgumentError("Unknown canopy clumping type: $clumping_type"))
+    end
+
+    throw(ArgumentError("Unsupported canopy clumping specification: $(typeof(spec))"))
 end
 
 _parse_brdf_string(s::AbstractString, FT) = parse_surface_str(s, FT)

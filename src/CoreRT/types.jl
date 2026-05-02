@@ -505,6 +505,10 @@ mutable struct CanopySurface{FT} <: AbstractSurfaceType
     LAD
     "Canopy scattering model (e.g. BiLambertianCanopyScattering)"
     canopy_scattering
+    "CanopyOptics Z-matrix integration controls"
+    canopy_quadrature
+    "Canopy clumping model; affects effective G for propagation, not Z normalization"
+    canopy_clumping
     "Leaf reflectance (scalar or spectral vector on leaf_optics_grid)"
     leaf_reflectance::Union{FT, Vector{FT}}
     "Leaf transmittance (scalar or spectral vector on leaf_optics_grid)"
@@ -528,6 +532,8 @@ end
 function CanopySurface(; soil::AbstractSurfaceType,
                         LAI, n_layers::Int=1, LAD=nothing,
                         canopy_scattering=nothing,
+                        canopy_quadrature=nothing,
+                        canopy_clumping=nothing,
                         leaf_reflectance=0.4, leaf_transmittance=0.05,
                         leaf_optics_grid=nothing, grid_unit::Symbol=:nm,
                         include_atm::Bool=false,
@@ -544,6 +550,12 @@ function CanopySurface(; soil::AbstractSurfaceType,
                    FT(sum(leaf_transmittance) / length(leaf_transmittance))
         canopy_scattering = CanopyOptics.BiLambertianCanopyScattering(
             R=R_scalar, T=T_scalar)
+    end
+    if canopy_quadrature === nothing
+        canopy_quadrature = CanopyOptics.CanopyQuadrature()
+    end
+    if canopy_clumping === nothing
+        canopy_clumping = CanopyOptics.NoClumping{FT}()
     end
     lr = leaf_reflectance isa Number ? FT(leaf_reflectance) : convert(Vector{FT}, leaf_reflectance)
     lt = leaf_transmittance isa Number ? FT(leaf_transmittance) : convert(Vector{FT}, leaf_transmittance)
@@ -567,6 +579,7 @@ function CanopySurface(; soil::AbstractSurfaceType,
     dp = canopy_dp === nothing ? nothing : FT(canopy_dp)
     lf = lai_fractions === nothing ? nothing : convert(Vector{FT}, lai_fractions)
     CanopySurface{FT}(soil, FT(LAI), n_layers, LAD, canopy_scattering,
+                      canopy_quadrature, canopy_clumping,
                       lr, lt, lg, grid_unit, include_atm, dp, lf, nothing, nothing)
 end
 

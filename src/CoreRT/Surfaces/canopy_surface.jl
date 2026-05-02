@@ -14,13 +14,11 @@ reflectance as a surface boundary condition to the atmospheric RT.
 Pre-allocated workspace for canopy RT inside `create_surface_layer!`.
 Created lazily on first call and stored in `CanopySurface._cache`.
 
-When spectral leaf optics are provided (`R_interp !== nothing`), the cache also
-holds interpolated R/T on the computation grid and coarse-grid Z-matrices
-for spectral interpolation.
+The cache also holds canopy Z matrices for every Fourier moment. For scalar
+leaf optics this is a single spectral node; for spectral leaf optics these are
+coarse-grid Z matrices used for spectral interpolation.
 """
-struct CanopyCache{FT, AZ, AG, AL<:AddedLayer{FT}, CL<:CompositeLayer{FT}, IS}
-    Zup::AZ
-    Zdown::AZ
+struct CanopyCache{FT, AG, AL<:AddedLayer{FT}, CL<:CompositeLayer{FT}, IS}
     G::AG
     canopy_added::AL
     canopy_composite::CL
@@ -38,6 +36,21 @@ struct CanopyCache{FT, AZ, AG, AL<:AddedLayer{FT}, CL<:CompositeLayer{FT}, IS}
     Z_coarse_mp::Union{Nothing, Array{FT,4}}
 end
 
+@inline _array_with_eltype(::Type{FT}, A::Array{FT,N}) where {FT,N} = A
+@inline _array_with_eltype(::Type{FT}, A::AbstractArray{<:Any,N}) where {FT,N} =
+    Array{FT,N}(A)
+
+function _compute_canopy_Z_stack(canopy::CanopySurface{FT},
+                                 scat_model, qp_μN,
+                                 max_m::Int,
+                                 ::Type{FT}) where {FT}
+    n_m = max(max_m, 1)
+    Zpp, Zmp = CanopyOptics.compute_Z_matrices_aniso_analytic(
+        scat_model, qp_μN, canopy.LAD, n_m - 1;
+        quadrature = canopy.canopy_quadrature)
+    return _array_with_eltype(FT, Zpp), _array_with_eltype(FT, Zmp)
+end
+
 """
     CanopySurface_from_prospect(leaf_prospect, prospect_grid; soil, LAI, kwargs...)
 
@@ -52,6 +65,8 @@ a `CanopySurface` with the spectral leaf optics on the PROSPECT wavelength grid.
 function CanopySurface_from_prospect(leaf_prospect, prospect_grid=400.0:1.0:2500.0;
                                      soil::AbstractSurfaceType,
                                      LAI, n_layers::Int=1, LAD=nothing,
+                                     canopy_quadrature=nothing,
+                                     canopy_clumping=nothing,
                                      include_atm::Bool=false,
                                      canopy_dp=nothing,
                                      lai_fractions=nothing)
@@ -61,6 +76,8 @@ function CanopySurface_from_prospect(leaf_prospect, prospect_grid=400.0:1.0:2500
     CanopySurface(; soil=soil, LAI=LAI, n_layers=n_layers, LAD=LAD,
                    leaf_reflectance=R, leaf_transmittance=T,
                    leaf_optics_grid=λ_nm, grid_unit=:nm,
+                   canopy_quadrature=canopy_quadrature,
+                   canopy_clumping=canopy_clumping,
                    include_atm=include_atm, canopy_dp=canopy_dp,
                    lai_fractions=lai_fractions)
 end
@@ -69,8 +86,8 @@ end
     _init_canopy_cache!(canopy, added_layer, pol_type, quad_points, architecture;
                         spec_bands_wn=nothing, max_m=3)
 
-Compute azimuthal pre-integration (`Zup`, `Zdown`), the Ross `G` factor,
-and allocate working arrays for the canopy RT.  Stored in `canopy._cache`.
+Compute the effective Ross `G` factor, canopy Z-matrix cache, and working
+arrays for the canopy RT. Stored in `canopy._cache`.
 
 When spectral leaf optics are provided (`canopy.leaf_optics_grid !== nothing`),
 also interpolates leaf R/T to the computation grid and pre-computes Z-matrices
@@ -84,9 +101,9 @@ function _init_canopy_cache!(canopy::CanopySurface{FT},
     arr_type = array_type(architecture)
     (; qp_μN) = quad_points
 
-    Zup, Zdown = CanopyOptics.precompute_Zazi(
-        canopy.canopy_scattering, collect(qp_μN), canopy.LAD)
-    G = arr_type(CanopyOptics.G(collect(qp_μN), canopy.LAD))
+    qμ = collect(qp_μN)
+    G_raw = CanopyOptics.G(qμ, canopy.LAD)
+    G = arr_type(FT.(CanopyOptics.effective_G(canopy.canopy_clumping, G_raw, qμ)))
 
     dims = (size(added_layer.r⁻⁺, 1), size(added_layer.r⁻⁺, 2))
     nSpec = size(added_layer.r⁻⁺, 3)
@@ -105,10 +122,17 @@ function _init_canopy_cache!(canopy::CanopySurface{FT},
 
     if canopy.leaf_optics_grid !== nothing && spec_bands_wn !== nothing
         R_interp, T_interp, Z_coarse_wn, Z_coarse_pp, Z_coarse_mp =
-            _build_spectral_canopy_cache(canopy, collect(qp_μN), spec_bands_wn, max_m, FT)
+            _build_spectral_canopy_cache(canopy, qμ, collect(quad_points.wt_μN),
+                                         spec_bands_wn, max_m, FT)
+    else
+        Z_stack_pp, Z_stack_mp =
+            _compute_canopy_Z_stack(canopy, canopy.canopy_scattering, qμ, max_m, FT)
+        Z_coarse_pp = reshape(Z_stack_pp, size(Z_stack_pp, 1), size(Z_stack_pp, 2), 1, size(Z_stack_pp, 3))
+        Z_coarse_mp = reshape(Z_stack_mp, size(Z_stack_mp, 1), size(Z_stack_mp, 2), 1, size(Z_stack_mp, 3))
+        _check_Z_flux_conservation(Z_coarse_pp, Z_coarse_mp, collect(quad_points.wt_μN), 1)
     end
 
-    canopy._cache = CanopyCache(Zup, Zdown, G,
+    canopy._cache = CanopyCache(G,
                                 canopy_added, canopy_composite,
                                 soil_added, I_static,
                                 R_interp, T_interp,
@@ -134,25 +158,50 @@ function _leaf_grid_to_wn(grid::Vector{FT}, grid_unit::Symbol) where {FT}
 end
 
 """
-    _check_Z_flux_conservation(Z_pp, Z_mp, qp_μN, n_coarse; tol=0.05)
+    _check_Z_flux_conservation(Z_pp, Z_mp, qp_μN, wt_μN, n_coarse; tol=0.05)
 
-Verify flux conservation for the m=0 Z-matrices: for each coarse spectral
-point, the column sums of Z⁺⁺ and Z⁻⁺ should approximately equal 1.
+Verify the m=0 single-scattering normalisation of the canopy Z matrices
+against the convention used by `Scattering.compute_Z_moments` for the
+atmospheric path (Rayleigh / Mie). Both that routine and the canonical
+`CanopyOptics.compute_Z_matrices` (line ~178 in leafAngleRoutines.jl)
+divide Γ by `ϖ·G`, so Z is independent of leaf ω. The expected
+hemispheric column integral is therefore
+
+    Σᵢ wᵢ · (Z⁺⁺[i,j] + Z⁻⁺[i,j])  ≈  2     (for every incidence j)
+
+`elemental!` multiplies Z by ϖ explicitly, which is what restores the
+ω scaling at the layer level. If this check sees a mean of ≈ 1 instead
+of 2 then the canopy Z source is missing the `/G(μ_in)` normalisation
+and canopy reflectance will be biased low.
 """
 function _check_Z_flux_conservation(Z_pp::Array{FT,4}, Z_mp::Array{FT,4},
-                                     qp_μN, n_coarse; tol::FT=FT(0.05)) where {FT}
+                                     wt_μN, n_coarse;
+                                     tol::FT=FT(5e-2)) where {FT}
     Nq = size(Z_pp, 1)
+    w  = collect(wt_μN)
+    target = FT(2)
     n_warn = 0
-    for ic in 1:n_coarse
-        for j in 1:Nq
-            flux = sum(Z_pp[:, j, ic, 1]) + sum(Z_mp[:, j, ic, 1])
-            if abs(flux - FT(1)) > tol
-                n_warn += 1
-            end
+    flux_min = FT(Inf); flux_max = FT(-Inf); flux_sum = FT(0)
+    for ic in 1:n_coarse, j in 1:Nq
+        flux = FT(0)
+        @inbounds for i in 1:Nq
+            flux += w[i] * (Z_pp[i, j, ic, 1] + Z_mp[i, j, ic, 1])
+        end
+        flux_min = min(flux_min, flux)
+        flux_max = max(flux_max, flux)
+        flux_sum += flux
+        if abs(flux - target) > tol * target
+            n_warn += 1
         end
     end
+    flux_mean = flux_sum / (n_coarse * Nq)
     if n_warn > 0
-        @warn "Canopy Z-matrix flux conservation violated at $n_warn / $(n_coarse * Nq) points (tol=$tol)"
+        @warn """Canopy Z-matrix m=0 flux normalisation off vs atmospheric convention.
+                 Σᵢ wᵢ (Z⁺⁺ + Z⁻⁺)[:,j] expected ≈ 2, got mean=$(round(flux_mean, digits=4))
+                 (range $(round(flux_min, digits=4))–$(round(flux_max, digits=4)))
+                 at $n_warn / $(n_coarse * Nq) (μ', spectral) points (tol=$tol).
+                 A mean ≈ 1 indicates the canopy Z source is missing the
+                 /G(μ) normalisation that compute_Z_matrices applies."""
     end
     return nothing
 end
@@ -164,7 +213,7 @@ Interpolate leaf R/T from user grid to computation grid and pre-compute
 Z-matrices on a coarse spectral grid for later per-wavenumber interpolation.
 """
 function _build_spectral_canopy_cache(canopy::CanopySurface{FT},
-                                      qp_μN, spec_bands_wn::Vector{FT},
+                                      qp_μN, wt_μN, spec_bands_wn::Vector{FT},
                                       max_m::Int, ::Type{FT}) where {FT}
     leaf_wn = _leaf_grid_to_wn(canopy.leaf_optics_grid, canopy.grid_unit)
     leaf_R = canopy.leaf_reflectance isa Number ?
@@ -193,6 +242,11 @@ function _build_spectral_canopy_cache(canopy::CanopySurface{FT},
     if isempty(λ_coarse) || λ_coarse[end] < λ_max_nm
         push!(λ_coarse, λ_max_nm)
     end
+    # LinearInterpolation needs at least 2 distinct knots; pad the coarse
+    # grid when the spectral band is a single point or very narrow.
+    if length(λ_coarse) < 2
+        push!(λ_coarse, λ_coarse[end] + coarse_step_nm)
+    end
     wn_coarse = sort(FT(1e7) ./ λ_coarse)
 
     R_coarse = FT[clamp(itp_R(wn), FT(0), FT(1)) for wn in wn_coarse]
@@ -200,7 +254,7 @@ function _build_spectral_canopy_cache(canopy::CanopySurface{FT},
 
     Nq = length(qp_μN)
     n_coarse = length(wn_coarse)
-    n_m = max_m
+    n_m = max(max_m, 1)
 
     Z_coarse_pp = zeros(FT, Nq, Nq, n_coarse, n_m)
     Z_coarse_mp = zeros(FT, Nq, Nq, n_coarse, n_m)
@@ -208,16 +262,12 @@ function _build_spectral_canopy_cache(canopy::CanopySurface{FT},
     for ic in 1:n_coarse
         scat_model = CanopyOptics.BiLambertianCanopyScattering(
             R=R_coarse[ic], T=T_coarse[ic])
-        Zup_c, Zdown_c = CanopyOptics.precompute_Zazi(scat_model, qp_μN, canopy.LAD)
-        for m_idx in 1:n_m
-            Zpp, Zmp = CanopyOptics.compute_Z_matrices_aniso(
-                scat_model, qp_μN, canopy.LAD, Zup_c, Zdown_c, m_idx - 1)
-            Z_coarse_pp[:, :, ic, m_idx] .= Zpp
-            Z_coarse_mp[:, :, ic, m_idx] .= Zmp
-        end
+        Zpp_stack, Zmp_stack = _compute_canopy_Z_stack(canopy, scat_model, qp_μN, n_m, FT)
+        Z_coarse_pp[:, :, ic, :] .= Zpp_stack
+        Z_coarse_mp[:, :, ic, :] .= Zmp_stack
     end
 
-    _check_Z_flux_conservation(Z_coarse_pp, Z_coarse_mp, qp_μN, n_coarse)
+    _check_Z_flux_conservation(Z_coarse_pp, Z_coarse_mp, wt_μN, n_coarse)
 
     return R_interp, T_interp, wn_coarse, Z_coarse_pp, Z_coarse_mp
 end
@@ -265,7 +315,7 @@ computation wavenumber grid) is required for initializing the spectral cache
 on first call.
 
 Internally:
-1. Compute Z-matrices from cached azimuthal pre-integration (or coarse-grid interpolation).
+1. Compute Z-matrices from the cached analytic stack (or coarse-grid interpolation).
 2. For each canopy sub-layer: build `CoreDirectionalScatteringOpticalProperties`,
    run `elemental!` (canopy kernel) + `doubling!`.
 3. Accumulate sub-layers via `interaction!`.
@@ -303,10 +353,12 @@ function create_surface_layer!(canopy::CanopySurface{FT},
     if has_spectral && cache.Z_coarse_pp !== nothing
         𝐙⁺⁺, 𝐙⁻⁺ = _interpolate_Z_spectral(cache.Z_coarse_pp, cache.Z_coarse_mp,
                                                cache.Z_coarse_wn, spec_bands_wn, m, FT)
+    elseif cache.Z_coarse_pp !== nothing
+        m_idx = min(m + 1, size(cache.Z_coarse_pp, 4))
+        𝐙⁺⁺ = cache.Z_coarse_pp[:, :, 1, m_idx]
+        𝐙⁻⁺ = cache.Z_coarse_mp[:, :, 1, m_idx]
     else
-        𝐙⁺⁺, 𝐙⁻⁺ = CanopyOptics.compute_Z_matrices_aniso(
-            canopy.canopy_scattering, collect(qp_μN), canopy.LAD,
-            cache.Zup, cache.Zdown, m)
+        error("Canopy Z cache was not initialized")
     end
 
     G_iμ₀ = Array(cache.G)[iμ₀]
@@ -456,23 +508,35 @@ Uses the pre-set `canopy._within_canopy_τ` (absorption-only, no scattering).
 function _interleave_atm_layer!(canopy::CanopySurface{FT}, ilay, nSpec, τ_sum_curr, SFI,
                                 pol_type, quad_points, cache, arr_type, architecture) where {FT}
     τ_atm = canopy._within_canopy_τ
-    if τ_atm === nothing || length(τ_atm) != nSpec
+    if τ_atm === nothing || length(τ_atm) != nSpec || all(iszero, τ_atm)
         return nothing
     end
     τ_gap = arr_type(τ_atm ./ max(1, canopy.n_layers - 1))
-    atm_abs = CoreAbsorptionOpticalProperties(τ_gap)
+
+    # Wrap the pure-absorption sub-layer as a CoreScatteringOpticalProperties
+    # with ϖ = 0 and zero Z so the standard elemental! dispatch applies.
+    # The ϖ = 0 multiplier zeroes out the scattering kernel exactly, leaving
+    # t⁺⁺ = exp(-τ/μ) (the correct Beer–Lambert transmission) and r⁻⁺ = 0.
+    NquadN = size(cache.canopy_added.r⁻⁺, 1)
+    ϖ_zero = arr_type(zeros(FT, nSpec))
+    Z_zero = arr_type(zeros(FT, NquadN, NquadN, nSpec))
+    atm_scat = CoreScatteringOpticalProperties(τ_gap, ϖ_zero, Z_zero, Z_zero)
+
+    # F₀ shape (nStokes, nSpec) — only its shape matters here since ϖ = 0
+    # zeroes the SFI source contributions inside the elemental kernel.
+    F₀_local = arr_type(zeros(FT, pol_type.n, nSpec))
+    @views F₀_local[1, :] .= 1
 
     τ_sum_dev = arr_type(τ_sum_curr)
-    (; qp_μN, μ₀) = quad_points
-    expk_abs = arr_type(exp.(-Array(τ_gap) ./ μ₀))
     ndoubl_abs = 0
 
-    elemental!(pol_type, SFI, τ_sum_dev, τ_gap, atm_abs,
-               0, ndoubl_abs, false, quad_points, cache.canopy_added, architecture)
+    elemental!(pol_type, SFI, τ_sum_dev, τ_gap, F₀_local, atm_scat,
+               0, ndoubl_abs, true, quad_points, cache.canopy_added, architecture)
     interaction!(ScatteringInterface_10(), SFI,
                  cache.canopy_composite, cache.canopy_added, cache.I_static)
 
-    @inbounds @. τ_sum_curr += Array(τ_gap)
+    τ_gap_host = Array(τ_gap)
+    @inbounds @. τ_sum_curr += τ_gap_host
     return nothing
 end
 
@@ -546,7 +610,9 @@ function _perturb_soil_albedo(canopy::CanopySurface{FT}, ε::FT) where {FT}
         perturbed_soil = soil
     end
     CanopySurface{FT}(perturbed_soil, canopy.LAI, canopy.n_layers, canopy.LAD,
-                      canopy.canopy_scattering, canopy.leaf_reflectance,
+                      canopy.canopy_scattering, canopy.canopy_quadrature,
+                      canopy.canopy_clumping,
+                      canopy.leaf_reflectance,
                       canopy.leaf_transmittance, canopy.leaf_optics_grid,
                       canopy.grid_unit, canopy.include_atm, canopy.canopy_dp,
                       canopy.lai_fractions, canopy._within_canopy_τ, nothing)
