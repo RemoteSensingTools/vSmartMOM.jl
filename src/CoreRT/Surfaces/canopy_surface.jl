@@ -178,9 +178,9 @@ For vector runs (`npol > 1`) this check is applied only to the I→I block
 because diffuse canopy components intentionally leave Q/U/V blocks empty and
 specular components are not conservative by themselves.
 
-`elemental!` multiplies Z by ϖ explicitly, which is what restores the
-ω scaling at the layer level. If this check sees a mean of ≈ 1 instead
-of 2 then the canopy Z source is missing the `/G(μ_in)` normalisation
+`elemental!` multiplies Z by `ϖ * G(μ_in)`, which restores the physical
+area-scattering kernel Γ at the layer level. If this check sees a mean of ≈ 1
+instead of 2 then the canopy Z source is missing the `/G(μ_in)` normalisation
 and canopy reflectance will be biased low.
 """
 function _check_Z_flux_conservation(Z_pp::Array{FT,4}, Z_mp::Array{FT,4},
@@ -245,27 +245,45 @@ function _build_spectral_canopy_cache(canopy::CanopySurface{FT},
 
     itp_R = LinearInterpolation(leaf_wn, leaf_R)
     itp_T = LinearInterpolation(leaf_wn, leaf_T)
+    leaf_wn_min, leaf_wn_max = extrema(leaf_wn)
 
-    R_interp = FT[clamp(itp_R(wn), FT(0), FT(1)) for wn in spec_bands_wn]
-    T_interp = FT[clamp(itp_T(wn), FT(0), FT(1)) for wn in spec_bands_wn]
+    R_interp = FT[clamp(itp_R(clamp(wn, leaf_wn_min, leaf_wn_max)), FT(0), FT(1))
+                  for wn in spec_bands_wn]
+    T_interp = FT[clamp(itp_T(clamp(wn, leaf_wn_min, leaf_wn_max)), FT(0), FT(1))
+                  for wn in spec_bands_wn]
 
-    wn_min, wn_max = extrema(spec_bands_wn)
-    λ_max_nm = FT(1e7) / wn_min
-    λ_min_nm = FT(1e7) / wn_max
+    wn_requested = sort(unique(spec_bands_wn))
     coarse_step_nm = FT(5)
-    λ_coarse = collect(λ_min_nm:coarse_step_nm:λ_max_nm)
-    if isempty(λ_coarse) || λ_coarse[end] < λ_max_nm
-        push!(λ_coarse, λ_max_nm)
+    wn_coarse = if length(wn_requested) <= 8
+        # Sparse spectra should be evaluated at their actual wavelengths.
+        # This keeps two-point BRDF checks from building a dense 5 nm cache
+        # across the full red-to-NIR interval.
+        wn_sparse = copy(wn_requested)
+        if length(wn_sparse) < 2
+            λ_pad_nm = FT(1e7) / only(wn_sparse) + coarse_step_nm
+            push!(wn_sparse, FT(1e7) / λ_pad_nm)
+        end
+        sort(unique(wn_sparse))
+    else
+        wn_min, wn_max = extrema(spec_bands_wn)
+        λ_max_nm = FT(1e7) / wn_min
+        λ_min_nm = FT(1e7) / wn_max
+        λ_coarse = collect(λ_min_nm:coarse_step_nm:λ_max_nm)
+        if isempty(λ_coarse) || λ_coarse[end] < λ_max_nm
+            push!(λ_coarse, λ_max_nm)
+        end
+        # LinearInterpolation needs at least 2 distinct knots; pad the coarse
+        # grid when the spectral band is a single point or very narrow.
+        if length(λ_coarse) < 2
+            push!(λ_coarse, λ_coarse[end] + coarse_step_nm)
+        end
+        sort(FT(1e7) ./ λ_coarse)
     end
-    # LinearInterpolation needs at least 2 distinct knots; pad the coarse
-    # grid when the spectral band is a single point or very narrow.
-    if length(λ_coarse) < 2
-        push!(λ_coarse, λ_coarse[end] + coarse_step_nm)
-    end
-    wn_coarse = sort(FT(1e7) ./ λ_coarse)
 
-    R_coarse = FT[clamp(itp_R(wn), FT(0), FT(1)) for wn in wn_coarse]
-    T_coarse = FT[clamp(itp_T(wn), FT(0), FT(1)) for wn in wn_coarse]
+    R_coarse = FT[clamp(itp_R(clamp(wn, leaf_wn_min, leaf_wn_max)), FT(0), FT(1))
+                  for wn in wn_coarse]
+    T_coarse = FT[clamp(itp_T(clamp(wn, leaf_wn_min, leaf_wn_max)), FT(0), FT(1))
+                  for wn in wn_coarse]
 
     Nq = length(qp_μ) * npol
     n_coarse = length(wn_coarse)

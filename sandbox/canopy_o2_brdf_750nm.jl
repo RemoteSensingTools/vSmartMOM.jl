@@ -1,7 +1,7 @@
 # =================================================================
 # Canopy BRDF phase plot at 750 nm
 #
-# Uses the same canopy + within-canopy O2 setup as the spectral
+# Uses the same leaf/soil setup as the spectral
 # script (sandbox/canopy_o2_740_780nm.jl) but reduces to a single
 # wavelength (750 nm — outside the O2 A-band, so we see the canopy
 # scattering structure cleanly) and sweeps a dense (VZA, VAZ) grid
@@ -11,8 +11,8 @@
 # resolve the azimuthal BRDF structure (hot spot, principal-plane
 # asymmetry); we use max_m = 8 here.
 #
-# The canopy uses a spherical leaf-angle distribution explicitly:
-# LAD = CanopyOptics.spherical_leaves(Float64).
+# The canopy uses one layer and a planophile leaf-angle distribution:
+# LAD = CanopyOptics.planophile_leaves2(Float64).
 # =================================================================
 
 using vSmartMOM
@@ -39,7 +39,7 @@ params.spec_bands = [Float64[ν_target]]
 
 # ── 3) Dense angular grid: SZA = 30°, VZA × VAZ ─────────────────────
 vzas_deg = collect(0.0:5.0:80.0)     # 17 polar zenith angles
-vazs_deg = collect(0.0:5.0:355.0)    # 72 relative azimuth angles (0 = backscatter)
+vazs_deg = collect(0.0:5.0:355.0)    # 72 relative azimuth angles (180 = backscatter)
 n_vza, n_vaz = length(vzas_deg), length(vazs_deg)
 
 vza_all = repeat(vzas_deg; inner=n_vaz)
@@ -54,7 +54,7 @@ params.vaz = vaz_all
 params.max_m   = 8
 params.l_trunc = 64
 
-# ── 5) PROSPECT canopy with within-canopy O2 (same as spectral run) ─
+# ── 5) One-layer PROSPECT canopy with planophile LAD ───────────────
 leaf = CanopyOptics.LeafProspectProProperties(
     N      = 1.5,
     Ccab   = 40.0,
@@ -66,15 +66,13 @@ leaf = CanopyOptics.LeafProspectProProperties(
     Cprot  = 0.0,
     Ccbc   = 0.0,
 )
-LAD = CanopyOptics.spherical_leaves(Float64)
+LAD = CanopyOptics.planophile_leaves2(Float64)
 canopy = CanopySurface_from_prospect(
     leaf, 400.0:1.0:2500.0;
     soil        = LambertianSurfaceScalar(0.10),
     LAI         = 4.0,
-    n_layers    = 4,
+    n_layers    = 1,
     LAD         = LAD,
-    include_atm = true,
-    canopy_dp   = 3.0,
 )
 for ib in eachindex(params.brdf)
     params.brdf[ib] = canopy
@@ -92,7 +90,7 @@ println("R_grid extrema: ", extrema(R_grid))
 # ── 7) Polar phase plot ─────────────────────────────────────────────
 fig = Figure(size = (820, 720))
 ax  = PolarAxis(fig[1, 1];
-    title       = "Spherical-LAD canopy BRDF at 750 nm  (SZA = 30°, LAI = 4, Ccab = 40)",
+    title       = "Planophile-LAD one-layer canopy BRDF at 750 nm  (SZA = 30°, LAI = 4, Ccab = 40)",
     theta_0     = π / 2,    # 0° azimuth at the top
     direction   = -1,        # azimuth increases clockwise (visual convention)
     rticks      = 0:20:80,
@@ -107,9 +105,9 @@ hm = surface!(ax, θ_rad, vzas_deg, R_plot';
 
 Colorbar(fig[1, 2], hm; label = "Reflectance  (Stokes I)")
 
-# Mark the solar position (anti-sun direction is at VAZ=0 in this code's
-# convention; the hotspot is in the back-scatter half-plane near VZA = SZA).
-sca_θ = deg2rad(0.0)
+# Mark the solar-opposition direction. In vSmartMOM's principal-plane
+# convention, the hotspot/backscatter side is at VAZ=180 and VZA=SZA.
+sca_θ = deg2rad(180.0)
 sca_r = 30.0
 scatter!(ax, [sca_θ], [sca_r];
          color = :red, markersize = 12, marker = :star5,

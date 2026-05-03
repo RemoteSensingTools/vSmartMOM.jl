@@ -146,3 +146,46 @@ end
     @test all(isfinite.(R))
     @test all(R[:, 1, :] .> 0)
 end
+
+@testset "CanopySurface bright-soil coupling stays positive" begin
+    ν_800nm = 1e7 / 800.0
+    params = parameters_from_dict(Dict{String,Any}(
+        "radiative_transfer" => Dict{String,Any}(
+            "spec_bands" => ["[$ν_800nm]"],
+            "surface" => ["LambertianSurfaceScalar(0.0)"],
+            "quadrature_type" => "RadauQuad()",
+            "polarization_type" => "Stokes_I()",
+            "max_m" => 4,
+            "Δ_angle" => 2.0,
+            "l_trunc" => 20,
+            "depol" => -1.0,
+            "float_type" => "Float64",
+            "architecture" => "CPU()",
+        ),
+        "geometry" => Dict{String,Any}(
+            "sza" => 30.0,
+            "vza" => [30.0, 0.0, 30.0],
+            "vaz" => [180.0, 0.0, 0.0],
+            "obs_alt" => 1000.0,
+        ),
+        "atmospheric_profile" => Dict{String,Any}(
+            "T" => [285.0],
+            "p" => [1012.99, 1013.0],
+            "profile_reduction" => -1,
+        ),
+    ))
+
+    params.brdf[1] = CanopySurface(;
+        soil = LambertianSurfaceScalar(1.0),
+        LAI = 4.0,
+        n_layers = 1,
+        LAD = CO.planophile_leaves2(Float64),
+        leaf_reflectance = 0.4424617419246772,
+        leaf_transmittance = 0.4745523417367442,
+    )
+
+    R = rt_run(model_from_parameters(params); i_band=1)[1]
+    @test all(isfinite.(R))
+    @test minimum(R[:, 1, 1]) >= -1e-10
+    @test maximum(R[:, 1, 1]) < 1.0
+end
