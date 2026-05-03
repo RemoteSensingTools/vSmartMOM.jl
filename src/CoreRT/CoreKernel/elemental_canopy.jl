@@ -77,10 +77,11 @@ and stream denominators.
         n2 = n
     end
     if (wct[j] > rt_weight_tol(eltype(wct)))
-        # 𝐑⁻⁺(μᵢ, μⱼ) = ϖ ̇𝐙⁻⁺(μᵢ, μⱼ) ̇(μⱼ/(μᵢ+μⱼ)) ̇(1 - exp{-τ ̇(1/μᵢ + 1/μⱼ)}) ̇𝑤ⱼ
+        # CanopyOptics normalizes Z by ϖ * G(μ_in), so multiply by the
+        # incoming-stream G[j] here to recover the physical Γ kernel.
 
         r⁻⁺[i,j,n] = 
-            ϖ_λ[n] *  Z⁻⁺[i,j,n2] * 
+            ϖ_λ[n] * G[j] * Z⁻⁺[i,j,n2] * 
             (μ[j] / (μ[i]*G[j] + μ[j]*G[i])) * wct[j] * 
             -expm1(-dτ_λ[n] * ((G[i] / μ[i]) + (G[j] / μ[j])))
                       
@@ -89,7 +90,8 @@ and stream denominators.
             if i == j
                 t⁺⁺[i,j,n] = 
                     exp(-dτ_λ[n]*G[i] / μ[i]) *
-                    (1 + ϖ_λ[n]  * Z⁺⁺[i,i,n2] * (dτ_λ[n]  / μ[i]) * wct[i])
+                    (1 + ϖ_λ[n] * G[i] * Z⁺⁺[i,i,n2] *
+                         (dτ_λ[n]  / μ[i]) * wct[i])
             else
                 t⁺⁺[i,j,n] = zero(FT)
             end
@@ -98,7 +100,7 @@ and stream denominators.
             # 𝐓⁺⁺(μᵢ, μⱼ) = ϖ ̇𝐙⁺⁺(μᵢ, μⱼ) ̇(μⱼ/(μᵢ-μⱼ)) ̇(exp{-τ/μᵢ} - exp{-τ/μⱼ}) ̇𝑤ⱼ
             # (𝑖 ≠ 𝑗)
             t⁺⁺[i,j,n] = 
-                ϖ_λ[n]  * Z⁺⁺[i,j,n2] * 
+                ϖ_λ[n] * G[j] * Z⁺⁺[i,j,n2] * 
                 (μ[j] / (μ[i]*G[j] - μ[j]*G[i])) * wct[j] * 
                 expdiff_neg(dτ_λ[n] * G[i] / μ[i], dτ_λ[n] * G[j] / μ[j])
                 #(exp(-dτ_λ[n] * G[j] / μ[j]) - exp(-dτ_λ[n] * G[i] / μ[i]))  
@@ -157,14 +159,14 @@ applies the upwelling D-matrix sign when required.
         # J₀⁺ = 0.25*(1+δ(m,0)) * ϖ(λ) * Z⁺⁺ * I₀ * [μ₀ / (μᵢ - μ₀)] * [exp(-dτ(λ)/μᵢ) - exp(-dτ(λ)/μ₀)]
         # 1.53 in Fell; 2.14 in Myneni Book 
         J₀⁺[i, 1, n] = 
-        wct02 * ϖ_λ[n]  *  Z⁺⁺_I₀ * 
+        wct02 * ϖ_λ[n] * G[i_start] * Z⁺⁺_I₀ * 
         (μ[i_start] / (μ[i]*G[i_start] - μ[i_start]*G[i])) * 
         expdiff_neg(dτ_λ[n] * G[i] / μ[i], dτ_λ[n] * G[i_start] / μ[i_start])
         #(exp(-dτ_λ[n] * G[i_start] / μ[i_start]) - exp(-dτ_λ[n] * G[i] / μ[i]))
     end
     #J₀⁻ = 0.25*(1+δ(m,0)) * ϖ(λ) * Z⁻⁺ * I₀ * [μ₀ / (μᵢ + μ₀)] * [1 - exp{-dτ(λ)(1/μᵢ + 1/μ₀)}]
     # 1.52 in Fell
-    J₀⁻[i, 1, n] = wct02 * ϖ_λ[n] *  Z⁻⁺_I₀ * 
+    J₀⁻[i, 1, n] = wct02 * ϖ_λ[n] * G[i_start] * Z⁻⁺_I₀ * 
             (μ[i_start] / (μ[i]*G[i_start] + μ[i_start]*G[i])) *
             -expm1(-dτ_λ[n] * ((G[i] / μ[i]) + (G[i_start] / μ[i_start])))
              
