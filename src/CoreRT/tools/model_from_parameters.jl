@@ -9,6 +9,18 @@ like optical thicknesses, from the input parameters. Produces an RTModel object.
 default_parameters() = vSmartMOM.IO.parameters_from_yaml(joinpath(dirname(pathof(vSmartMOM)), "CoreRT", "DefaultParameters.yaml"))
 
 """
+    _resolved_truncation(params, FT)
+
+Return `params.truncation` typed for `FT`. If a downstream caller has
+mutated the legacy `l_trunc` / `Δ_angle` fields after construction (an
+older idiom — e.g. `test_float32.jl`), they must also mutate
+`params.truncation` to keep the two in sync; this function does NOT
+silently rebuild from the legacy fields, because that would discard a
+user-set explicit truncation (e.g. `NoTruncation()` or a custom δBGE).
+"""
+@inline _resolved_truncation(params, ::Type{FT}) where {FT} = params.truncation
+
+"""
     model_from_parameters(params::vSmartMOM_Parameters) -> RTModel
 
 Construct an [`RTModel`](@ref) from user-supplied [`vSmartMOM_Parameters`](@ref).
@@ -40,9 +52,13 @@ function model_from_parameters(params::vSmartMOM_Parameters)
     # Create observation geometry
     obs_geom = ObsGeometry{FT}(params.sza, params.vza, params.vaz, params.obs_alt)
 
-    # Create truncation type
-    truncation_type = Scattering.δBGE{FT}(params.l_trunc, params.Δ_angle)
-    #@show truncation_type
+    # Truncation method (typed; NoTruncation, δBGE, ...). The legacy
+    # `params.Δ_angle` is only consulted via the default δBGE built in
+    # `parameters_from_dict` when the user has not set `truncation`
+    # explicitly. If a downstream caller mutates `l_trunc` / `Δ_angle`
+    # after construction, they must also mutate `params.truncation` —
+    # see `_resolved_truncation`.
+    truncation_type = _resolved_truncation(params, FT)
     # Set quadrature points for streams
     quad_points = rt_set_streams(params.quadrature_type, params.l_trunc, obs_geom, params.polarization_type, array_type(params.architecture))
 

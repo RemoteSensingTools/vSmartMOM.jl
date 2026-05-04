@@ -47,8 +47,8 @@ include("compute_Z_matrices.jl")
 export make_mie_model, reconstruct_phase
 
 # Export types
-export NAI2, PCW, Aerosol, MieModel, Stokes_IQUV, Stokes_I, Stokes_IQU, 
-       δBGE, GreekCoefs, AerosolOptics, AbstractFourierDecompositionType
+export NAI2, PCW, Aerosol, MieModel, Stokes_IQUV, Stokes_I, Stokes_IQU,
+       δBGE, NoTruncation, GreekCoefs, AerosolOptics, AbstractFourierDecompositionType
 
 # Export linearized types
 export linGreekCoefs, linAerosolOptics

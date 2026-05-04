@@ -50,6 +50,9 @@ try
 
 @testset "Canopy Surface" begin include("test_canopy.jl") end
 
+# Phase-function truncation invariants (Sanghavi & Stephens 2015)
+@testset "Truncation" begin include("test_truncation.jl") end
+
 # Cox-Munk ocean surface tests
 @testset "Cox-Munk Surface" begin include("test_coxmunk.jl") end
 
