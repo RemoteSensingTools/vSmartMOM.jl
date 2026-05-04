@@ -149,24 +149,75 @@ Types of Truncation (for Legendre terms)
 =#
 
 """
-    type AbstractTruncationType
+    AbstractTruncationType
 
-Abstract greek coefficient truncation type 
+Abstract supertype for phase-function truncation methods. All concrete
+methods are dispatched through [`truncate_phase`](@ref) and supply
+`l_max(t)` (the per-band Legendre cutoff that the RT pipeline allocates
+for). Subtypes:
+
+* [`NoTruncation`](@ref) — identity. Use when the phase function has
+  no sharp forward peak (canopy, isotropic scattering, smooth Rayleigh).
+* [`δBGE`](@ref) — δ-BGE-fit (Sanghavi & Stephens 2015, JQSRT 159
+  §3); recommended for hyperspectral retrievals.
+
+The atmospheric `Δ_angle` (forward exclusion half-angle) lives inside
+the truncation type that needs it, not as a free parameter on
+[`vSmartMOM_Parameters`](@ref) — different methods have different
+hyper-parameters and `NoTruncation` has none.
 """
 abstract type AbstractTruncationType end
 
 """
-    type δBGE{FT} <: AbstractTruncationType
-        
+    NoTruncation(; l_max=typemax(Int))
+
+Identity truncation — phase functions are passed through unchanged.
+
+This is the correct choice for radiative transfer through media whose
+phase function has no sharp forward peak: canopy bi-Lambertian
+scattering (the `f_tr → 0` limit of Sanghavi & Stephens 2015 Eq. 8 is
+exactly the identity), isotropic scattering, and smooth Rayleigh.
+For Mie aerosol or ice-cloud forward peaks use [`δBGE`](@ref) instead.
+"""
+Base.@kwdef struct NoTruncation <: AbstractTruncationType
+    "Per-band Legendre cutoff used by the RT pipeline. Defaults to
+    `typemax(Int)`, which is interpreted downstream as 'use the full
+    Greek-coefficient length'."
+    l_max::Int = typemax(Int)
+end
+
+"""
+    δBGE{FT}(l_max, Δ_angle)
+
+δ-BGE-fit truncation, vector form (Sanghavi & Stephens 2015, JQSRT 159,
+§3 — extension of Hu et al. 2000 to vector RT). Fits truncated Legendre
+coefficients outside the forward exclusion cone of half-angle
+`Δ_angle` and renormalises by the retained scattering fraction
+``c_0 = 1 - f^t``.
+
+Recommended over plain δ-m for hyperspectral retrievals because δ-m
+has known DSE and PTE errors near exact backscatter (Sanghavi &
+Stephens 2015 §2.4).
+
 # Fields
 $(DocStringExtensions.FIELDS)
 """
 struct δBGE{FT} <: AbstractTruncationType
-    "Trunction length for legendre terms"
+    "Truncation length for Legendre terms"
     l_max::Int
     "Exclusion angle for forward peak (in fitting procedure) `[degrees]`"
     Δ_angle::FT
 end
+
+"""
+    l_max(t::AbstractTruncationType) -> Int
+
+Per-band Legendre cutoff supplied by the truncation type. RT pipeline
+code that needs a finite cutoff with `NoTruncation` should clamp to the
+actual Greek-coefficient length, e.g.
+`min(length(greek.β), l_max(truncation))`.
+"""
+@inline l_max(t::AbstractTruncationType) = t.l_max
 
 #=
 

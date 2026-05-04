@@ -821,16 +821,47 @@ function parameters_from_dict(params_dict::Dict)
         _parse_canopy_section(params_dict["canopy"], FT, BRDF_per_band)
     end
 
+    Δ_angle = FT(params_dict["radiative_transfer"]["Δ_angle"])
+    l_trunc = params_dict["radiative_transfer"]["l_trunc"]
+    truncation = _parse_truncation(params_dict, l_trunc, Δ_angle, FT)
+
     return vSmartMOM_Parameters(
         spec_bands, BRDF_per_band, quadrature_type, polarization_type,
-        params_dict["radiative_transfer"]["max_m"], FT(params_dict["radiative_transfer"]["Δ_angle"]),
-        params_dict["radiative_transfer"]["l_trunc"], FT(params_dict["radiative_transfer"]["depol"]), FT,
+        params_dict["radiative_transfer"]["max_m"], Δ_angle,
+        l_trunc, truncation, FT(params_dict["radiative_transfer"]["depol"]), FT,
         architecture,
         FT(params_dict["geometry"]["sza"]), convert.(FT, params_dict["geometry"]["vza"]),
         convert.(FT, params_dict["geometry"]["vaz"]), FT(params_dict["geometry"]["obs_alt"]),
         T, p, q, profile_reduction,
         absorption_params, scattering_params
     )
+end
+
+"""
+    _parse_truncation(params_dict, l_trunc, Δ_angle, FT)
+
+Resolve the truncation method from the YAML/dict config.
+
+If `radiative_transfer.truncation` is set explicitly (e.g.
+`"NoTruncation()"` or `"δBGE(20, 2.0)"`), eval it. Otherwise build the
+legacy default `δBGE(l_trunc, Δ_angle)` from the top-level fields, so
+existing config files keep working.
+"""
+function _parse_truncation(params_dict, l_trunc, Δ_angle, FT)
+    rt = params_dict["radiative_transfer"]
+    if haskey(rt, "truncation") && rt["truncation"] !== nothing
+        spec = rt["truncation"]
+        if spec isa Scattering.AbstractTruncationType
+            return spec
+        elseif spec isa AbstractString
+            # Allow YAML strings like "NoTruncation()" or "δBGE(20, 2.0)".
+            return @eval(Scattering, $(Meta.parse(spec)))
+        else
+            throw(ArgumentError("radiative_transfer.truncation must be a string " *
+                                "or AbstractTruncationType, got $(typeof(spec))"))
+        end
+    end
+    return Scattering.δBGE{FT}(l_trunc, Δ_angle)
 end
 
 # Convenience wrappers
