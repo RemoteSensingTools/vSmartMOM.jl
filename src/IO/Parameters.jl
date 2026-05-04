@@ -842,10 +842,14 @@ end
 
 Resolve the truncation method from the YAML/dict config.
 
-If `radiative_transfer.truncation` is set explicitly (e.g.
-`"NoTruncation()"` or `"δBGE(20, 2.0)"`), eval it. Otherwise build the
-legacy default `δBGE(l_trunc, Δ_angle)` from the top-level fields, so
-existing config files keep working.
+If `radiative_transfer.truncation` is set explicitly, parse it via the
+small whitelist in [`_truncation_from_string`](@ref). Otherwise build
+the legacy default `δBGE(l_trunc, Δ_angle)` from the top-level fields,
+so existing config files keep working.
+
+YAML/TOML string values are matched against a fixed allow-list of
+constructors — `Meta.parse` + `eval` is not used, so untrusted configs
+can't execute arbitrary Julia code from this field.
 """
 function _parse_truncation(params_dict, l_trunc, Δ_angle, FT)
     rt = params_dict["radiative_transfer"]
@@ -854,14 +858,49 @@ function _parse_truncation(params_dict, l_trunc, Δ_angle, FT)
         if spec isa Scattering.AbstractTruncationType
             return spec
         elseif spec isa AbstractString
-            # Allow YAML strings like "NoTruncation()" or "δBGE(20, 2.0)".
-            return @eval(Scattering, $(Meta.parse(spec)))
+            return _truncation_from_string(spec, FT)
         else
             throw(ArgumentError("radiative_transfer.truncation must be a string " *
                                 "or AbstractTruncationType, got $(typeof(spec))"))
         end
     end
     return Scattering.δBGE{FT}(l_trunc, Δ_angle)
+end
+
+"""
+    _truncation_from_string(spec, FT) -> AbstractTruncationType
+
+Parse a YAML truncation spec string against a fixed allow-list of
+constructor shapes:
+
+* `"NoTruncation()"`
+* `"NoTruncation(l_max)"` or `"NoTruncation(l_max=N)"`
+* `"δBGE(l_max, Δ_angle)"` or `"δBGE{Float64}(l_max, Δ_angle)"`
+
+Anything else throws `ArgumentError`. No `eval` — string matching only,
+so untrusted configs can't execute arbitrary code.
+"""
+function _truncation_from_string(spec::AbstractString, ::Type{FT}) where {FT}
+    s = strip(spec)
+    if s == "NoTruncation()"
+        return Scattering.NoTruncation()
+    end
+    # NoTruncation(N) or NoTruncation(l_max=N)
+    m = match(r"^NoTruncation\(\s*(?:l_max\s*=\s*)?(\d+)\s*\)$", s)
+    if m !== nothing
+        return Scattering.NoTruncation(l_max = parse(Int, m.captures[1]))
+    end
+    # δBGE(l_max, Δ_angle) or δBGE{TYPE}(l_max, Δ_angle)
+    m = match(r"^δBGE(?:\{[^}]+\})?\(\s*(\d+)\s*,\s*([+-]?\d+(?:\.\d*)?(?:[eE][+-]?\d+)?)\s*\)$", s)
+    if m !== nothing
+        return Scattering.δBGE{FT}(parse(Int, m.captures[1]),
+                                   parse(FT, m.captures[2]))
+    end
+    throw(ArgumentError(
+        "radiative_transfer.truncation = $(repr(spec)) does not match a " *
+        "supported constructor. Allowed: \"NoTruncation()\", " *
+        "\"NoTruncation(l_max=N)\", \"δBGE(l_max, Δ_angle)\", " *
+        "\"δBGE{T}(l_max, Δ_angle)\"."))
 end
 
 # Convenience wrappers

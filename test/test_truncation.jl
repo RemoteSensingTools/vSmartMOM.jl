@@ -102,6 +102,81 @@ using CanopyOptics
         @test v_default ≈ v_dbge    atol = 1e-12
     end
 
+    @testset "NoTruncation aerosol passthrough resets fᵗ" begin
+        # Raw Mie outputs initialise `fᵗ = 1` as a "untruncated yet"
+        # sentinel; downstream `delta_m_forward` interprets a literal 1
+        # as "everything is in the forward peak" and zeros out
+        # scattering. NoTruncation must therefore return `fᵗ = 0`,
+        # not the raw `fᵗ = 1`.
+        l = 8
+        g = Scattering.GreekCoefs(zeros(l), ones(l), zeros(l),
+                                  ones(l), zeros(l), ones(l))
+        raw = AerosolOptics(greek_coefs=g, ω̃=0.95, k=1.7, fᵗ=1.0)
+        out = Scattering.truncate_phase(NoTruncation(), raw)
+        @test out.fᵗ == 0
+        @test out.ω̃ == raw.ω̃
+        @test out.k == raw.k
+        @test out.greek_coefs === raw.greek_coefs
+    end
+
+    @testset "Explicit truncation is preserved (no silent rebuild)" begin
+        # Regression for the P2 finding from codex review: setting
+        # `params.truncation = δBGE(40, 5.0)` with legacy `Δ_angle=2.0`
+        # `l_trunc=20` must keep δBGE(40, 5.0); the model-builder must
+        # NOT silently rebuild from the legacy fields.
+        rt = Dict{String,Any}(
+            "spec_bands" => ["[14492 14493]"],
+            "surface" => ["LambertianSurfaceScalar(0.1)"],
+            "quadrature_type" => "RadauQuad()",
+            "polarization_type" => "Stokes_I()",
+            "max_m" => 8, "Δ_angle" => 2.0, "l_trunc" => 20,
+            "depol" => -1.0, "float_type" => "Float64", "architecture" => "CPU()")
+        p = parameters_from_dict(Dict{String,Any}(
+            "radiative_transfer" => rt,
+            "geometry" => Dict{String,Any}("sza" => 30.0, "vza" => [0.0],
+                                            "vaz" => [0.0], "obs_alt" => 1000.0),
+            "atmospheric_profile" => Dict{String,Any}(
+                "T" => [285.0], "p" => [1012.99, 1013.0], "profile_reduction" => -1)))
+        @test p.truncation isa δBGE                  # legacy default
+        p.truncation = δBGE{Float64}(40, 5.0)        # user overrides
+        resolved = vSmartMOM.CoreRT._resolved_truncation(p, Float64)
+        @test resolved isa δBGE
+        @test resolved.l_max == 40
+        @test resolved.Δ_angle == 5.0
+    end
+
+    @testset "String parser whitelist (no eval)" begin
+        # parameters_from_dict should match a small allow-list and
+        # reject anything else with ArgumentError — no Meta.parse + eval.
+        base_rt = Dict{String,Any}(
+            "spec_bands" => ["[14492 14493]"],
+            "surface" => ["LambertianSurfaceScalar(0.1)"],
+            "quadrature_type" => "RadauQuad()",
+            "polarization_type" => "Stokes_I()",
+            "max_m" => 8, "Δ_angle" => 2.0, "l_trunc" => 20,
+            "depol" => -1.0, "float_type" => "Float64", "architecture" => "CPU()")
+        function build(trunc_spec)
+            rt = copy(base_rt); rt["truncation"] = trunc_spec
+            parameters_from_dict(Dict{String,Any}(
+                "radiative_transfer" => rt,
+                "geometry" => Dict{String,Any}("sza" => 30.0, "vza" => [0.0],
+                                                "vaz" => [0.0], "obs_alt" => 1000.0),
+                "atmospheric_profile" => Dict{String,Any}(
+                    "T" => [285.0], "p" => [1012.99, 1013.0], "profile_reduction" => -1)))
+        end
+        @test build("NoTruncation()").truncation isa NoTruncation
+        @test build("NoTruncation(l_max=32)").truncation.l_max == 32
+        @test build("NoTruncation(32)").truncation.l_max == 32
+        @test build("δBGE(20, 2.0)").truncation isa δBGE
+        @test build("δBGE{Float64}(20, 2.0)").truncation.l_max == 20
+        # Whitelist enforcement — refuses anything that isn't a
+        # supported constructor shape, even valid Julia. Defends
+        # against arbitrary-code execution from untrusted YAML.
+        @test_throws ArgumentError build("println(\"pwned\")")
+        @test_throws ArgumentError build("run(`whoami`)")
+        @test_throws ArgumentError build("Foo()")
+    end
+
     # Pending invariant — δ-m / δ-BGE absorption budget (Sanghavi &
     # Stephens 2015 Eq. 8):
     #
