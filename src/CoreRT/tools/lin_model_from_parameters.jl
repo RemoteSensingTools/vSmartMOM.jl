@@ -58,7 +58,7 @@ function model_from_parameters(lin::LinMode,
 
     obs_geom = ObsGeometry(params.sza, params.vza, params.vaz, params.obs_alt)
 
-    truncation_type = Scattering.δBGE{params.float_type}(params.l_trunc, params.Δ_angle)
+    truncation_type = _resolved_truncation(params, params.float_type)
 
     quad_points = rt_set_streams(params.quadrature_type, params.l_trunc, obs_geom, params.polarization_type, array_type(params.architecture))
 

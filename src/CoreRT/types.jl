@@ -661,12 +661,18 @@ mutable struct vSmartMOM_Parameters{FT<:Real}
     polarization_type::AbstractPolarizationType
     "Hard cutoff for maximum number of Fourier moments to loop over"
     max_m::Integer
-    "Exclusion angle for forward peak [deg]"
+    "Exclusion angle for forward peak [deg] (legacy — see `truncation`)"
     Δ_angle::FT
     "Truncation length for legendre terms (scalar for now, can do `nBand` later)"
     l_trunc::Integer
+    "Phase-function truncation method.
+    Defaults to `δBGE(l_trunc, Δ_angle)` for backward compatibility;
+    set explicitly to `NoTruncation()` for canopy-only or
+    smooth-phase-function runs (Sanghavi & Stephens 2015 §2 — the
+    `f_tr → 0` limit). The `Δ_angle` field above is then ignored."
+    truncation::Scattering.AbstractTruncationType
     "Depolarization factor"
-    depol::FT    
+    depol::FT
     "Float type to use in the RT (Float64/Float32)"
     float_type::DataType
     "Architecture to use for calculations (CPU/GPU)"
@@ -1090,10 +1096,10 @@ function Base.:+( x::CoreScatteringOpticalProperties{xFT, xFT2, xFT3},
     yZ⁻⁺ = y.Z⁻⁺
 
     τ  = x.τ .+ y.τ
-    wx = x.τ .* x.ϖ 
-    wy = y.τ .* y.ϖ  
+    wx = x.τ .* x.ϖ
+    wy = y.τ .* y.ϖ
     w  = wx .+ wy
-    ϖ  =  w ./ τ
+    ϖ  = w ./ ifelse.(τ .> zero.(τ), τ, one.(τ))
     
     #@show xFT, xFT2, xFT3
     all(wx .== 0.0) ? (return CoreScatteringOpticalProperties(τ, ϖ, y.Z⁺⁺, y.Z⁻⁺)) : nothing
@@ -1124,7 +1130,7 @@ function Base.:+( x::CoreScatteringOpticalProperties, y::CoreAbsorptionOpticalPr
     τ  = x.τ .+ y.τ
     wx = x.τ .* x.ϖ 
     #@show size(wx), size(τ)
-    ϖ  = (wx) ./ τ
+    ϖ  = wx ./ ifelse.(τ .> zero.(τ), τ, one.(τ))
     CoreScatteringOpticalProperties(τ, ϖ, x.Z⁺⁺, x.Z⁻⁺)
 end
 

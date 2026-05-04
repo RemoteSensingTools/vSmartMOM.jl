@@ -14,10 +14,18 @@ radiative_transfer:
   polarization_type:  Stokes_I()
   # Maximum m (number of Fourier moments to loop over)
   max_m:              3
-  # Exclusion angle for forward peak in fitting procedure (degrees)
+  # Exclusion angle for forward peak in fitting procedure (degrees).
+  # Legacy field — used to build the default truncation if `truncation`
+  # below is unset.
   Δ_angle:            2.0
-  # Trunction length for legendre terms
+  # Truncation length for legendre terms.
   l_trunc:            20
+  # Phase-function truncation method. If unset, defaults to
+  # δBGE(l_trunc, Δ_angle) for backward compatibility. Set to
+  # "NoTruncation()" for canopy-only or smooth-phase-function runs
+  # (Sanghavi & Stephens 2015 Eq. 8 collapses to the identity when
+  # f_tr → 0).
+  # truncation:       NoTruncation()
   # Depolarization factor.
   #   -1  → auto: derived per band from N₂/O₂ molecular constants (default).
   #   ≥0  → explicit: use this value uniformly for greek_rayleigh,
