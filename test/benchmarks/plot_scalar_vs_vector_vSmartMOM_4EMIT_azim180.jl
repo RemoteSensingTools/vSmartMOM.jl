@@ -1,30 +1,27 @@
 #=
-plot_scalar_vs_vector_vSmartMOM_4EMIT.jl — vSmartMOM intercomparison plotter.
+plot_scalar_vs_vector_vSmartMOM_4EMIT_azim180.jl — azim180 convention-probe
+variant of the MODTRAN/vSmartMOM EMIT comparison plotter.
 
-Compares Stokes-I from scalar (Stokes_I) and vector (Stokes_IQU) RT runs of
-the EMIT regression for the same atmospheric scenarios. Vector RT is
-physically more complete (includes the depolarising effect of multiple
-scattering on intensity); the Stokes-I difference between scalar and vector
-is the "scalar approximation error."
+This plotter is identical to its parent script except that it
+reads vSmartMOM .dat files from
+  $HOME/data/EMIT_MODTRANcomp/azim180/vSmartMOM_out/...
+and writes plots into
+  $HOME/data/EMIT_MODTRANcomp/azim180/plots/...
+with `_azim180` injected into every output filename.
 
-Reads noRS .dat files from:
-  scalar : $HOME/data/EMIT_MODTRANcomp/vSmartMOM_out/scalarI/
-  vector : $HOME/data/EMIT_MODTRANcomp/vSmartMOM_out/vectorIQU/
+Background. vSmartMOM defines vaz = 0° as Sun and satellite on
+*opposite* sides of zenith in the principal plane, and vaz = 180°
+as Sun directly *behind* the satellite (same side of zenith). Many
+other models — MODTRAN among them — define RAA = 0 as
+Sun-behind-detector, which corresponds to vSmartMOM vaz = 180°. The azim180 YAML series
+(`ParamsEMIT_MODTRANcomp_newLUT*_azim180.yaml`) tests this
+convention-mismatch hypothesis by running vSmartMOM with
+vaz = (parent vaz) - 180°. If the hypothesis is correct, the
+azim180 outputs should match MODTRAN better than the parent
+outputs.
 
-Each .dat has columns: wl_nm wn_cm-1 R_tot T_tot tau_total hem_R hem_T
-
-Output: /home/sanghavi/data/EMIT_MODTRANcomp/plots/scalar_vs_vector/
-        — overlay (R, T, τ) and ΔI (vec-sca abs and relative) per scenario,
-          plus full-range and per-spectral-slice variants. Filenames carry
-          the `_scalar_vs_vector` tag.
-        — log-y variants of every linear plot are also written to the
-          adjacent `logplots/` subdirectory, with `_log` appended to the
-          filename. For diff plots, the log version plots `|Δ|` (signed Δ
-          can't be log-scaled) and adjusts the title accordingly.
-
-Sister scripts:
-  plot_MODTRAN_vSmartMOM_4EMIT.jl       (scalar  vs MODTRAN)
-  plot_MODTRAN_vec_vSmartMOM_4EMIT.jl   (vector  vs MODTRAN, _IQU output tag)
+MODTRAN data is unchanged between the two comparisons; only the
+vSmartMOM model output and the resulting plot directory differ.
 =#
 using Plots
 using DelimitedFiles
@@ -34,9 +31,9 @@ using Statistics
 
 default(alpha = 0.5)
 
-const SCAL_DIR = "/home/sanghavi/data/EMIT_MODTRANcomp/vSmartMOM_out/scalarI_singleVZA"
-const VEC_DIR  = "/home/sanghavi/data/EMIT_MODTRANcomp/vSmartMOM_out/vectorIQU"
-const OUT_DIR  = "/home/sanghavi/data/EMIT_MODTRANcomp/plots/scalar_vs_vector"
+const SCAL_DIR = "/home/sanghavi/data/EMIT_MODTRANcomp/azim180/vSmartMOM_out/scalarI_singleVZA"
+const VEC_DIR  = "/home/sanghavi/data/EMIT_MODTRANcomp/azim180/vSmartMOM_out/vectorIQU"
+const OUT_DIR  = "/home/sanghavi/data/EMIT_MODTRANcomp/azim180/plots/scalar_vs_vector"
 mkpath(OUT_DIR)
 
 # ---------------------------------------------------------------------------
@@ -162,7 +159,7 @@ function plot_overlay(s, v, tag, slice_label, lo, hi)
         return nothing
     end
     out = joinpath(OUT_DIR,
-                   "overlay_$(tag)_$(slice_label)_scalar_vs_vector.pdf")
+                   "overlay_$(tag)_$(slice_label)_scalar_vs_vector_azim180.pdf")
     pl_lin = _build_overlay(s, v, tag, slice_label, m, :identity)
     safe_savefig(pl_lin, out)
     pl_log = _build_overlay(s, v, tag, slice_label, m, :log10)
@@ -212,7 +209,7 @@ function plot_diff(s, v, tag, slice_label, lo, hi)
         return nothing
     end
     out = joinpath(OUT_DIR,
-                   "diff_$(tag)_$(slice_label)_scalar_vs_vector.pdf")
+                   "diff_$(tag)_$(slice_label)_scalar_vs_vector_azim180.pdf")
     pl_lin = _build_diff(s, v, tag, slice_label, m, :identity)
     safe_savefig(pl_lin, out)
     pl_log = _build_diff(s, v, tag, slice_label, m, :log10)
@@ -272,4 +269,5 @@ function main()
     println("Output: ", OUT_DIR)
 end
 
-main()
+# DISABLED for azim180: scalar-vs-vector is not a MODTRAN-equivalent comparison.
+# main()

@@ -1,5 +1,12 @@
 # =================================================================
-# ParamsEMIT_MODTRANcomp_newLUT_alb02.yaml
+# ParamsEMIT_MODTRANcomp_newLUT_alb02_azim180.yaml
+#
+# AZIM180 CONVENTION-PROBE companion to ParamsEMIT_MODTRANcomp_newLUT_alb02.yaml.
+# Identical to the parent file apart from `vaz`, which is reduced by 180°
+# (81.49773971061641 -> -98.50226028938359). Used together with the
+# matching alb=0 azim180 file to test whether MODTRAN's RAA = 0 is
+# vSmartMOM vaz = 180° (Sun-behind-detector). Outputs from this YAML
+# should be written under ~/data/EMIT_MODTRANcomp/azim180/.
 #
 # Paired alb=0.2 companion to ParamsEMIT_MODTRANcomp_newLUT.yaml. Used
 # together with the alb=0 file to compute the two-albedo Lambertian
@@ -40,7 +47,7 @@ radiative_transfer:
 geometry:
   sza:                39.583965990615404
   vza:                [12.0]
-  vaz:                [81.49773971061641]
+  vaz:                [-98.50226028938359]   # = 81.49773971061641 - 180 (azim180 convention probe)
   obs_alt:            0
 
 atmospheric_profile:
