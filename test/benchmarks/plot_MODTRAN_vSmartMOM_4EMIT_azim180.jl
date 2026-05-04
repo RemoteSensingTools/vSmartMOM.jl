@@ -1,19 +1,27 @@
 #=
-plot_MODTRAN_vec_vSmartMOM_4EMIT.jl — vector-RT (Stokes_IQU) MODTRAN/vSmartMOM compare.
+plot_MODTRAN_vSmartMOM_4EMIT_azim180.jl — azim180 convention-probe
+variant of the MODTRAN/vSmartMOM EMIT comparison plotter.
 
-Reads:
-  MODTRAN .dat from $HOME/data/EMIT_MODTRANcomp/MODTRAN_out/
-  vSmartMOM .dat from $HOME/data/EMIT_MODTRANcomp/vSmartMOM_out/vectorIQU/
+This plotter is identical to its parent script except that it
+reads vSmartMOM .dat files from
+  $HOME/data/EMIT_MODTRANcomp/azim180/vSmartMOM_out/...
+and writes plots into
+  $HOME/data/EMIT_MODTRANcomp/azim180/plots/...
+with `_azim180` injected into every output filename.
 
-The vSmartMOM filenames expected here are `vSmartMOM_modtran_equiv_*.dat`
-(MODTRAN-equivalent 6S decomposition: rho_atm, td_dir, td_dif, tu_dir, tu_dif,
-sphalb) generated from IQU runs of `modtran_equivalent_fields.jl`. The
-Stokes-I component of vSmartMOM is compared against MODTRAN here; Q/U are
-not consumed (MODTRAN is scalar). Output filenames carry the `_IQU` suffix
-to distinguish them from the scalar plotter.
+Background. vSmartMOM defines vaz = 0° as Sun and satellite on
+*opposite* sides of zenith in the principal plane, and vaz = 180°
+as Sun directly *behind* the satellite (same side of zenith). Many
+other models — MODTRAN among them — define RAA = 0 as
+Sun-behind-detector, which corresponds to vSmartMOM vaz = 180°. The azim180 YAML series
+(`ParamsEMIT_MODTRANcomp_newLUT*_azim180.yaml`) tests this
+convention-mismatch hypothesis by running vSmartMOM with
+vaz = (parent vaz) - 180°. If the hypothesis is correct, the
+azim180 outputs should match MODTRAN better than the parent
+outputs.
 
-For the scalar (Stokes_I) equivalent see plot_MODTRAN_vSmartMOM_4EMIT.jl.
-For a vSmartMOM scalar-vs-vector intercomparison see plot_scalar_vs_vector_vSmartMOM_4EMIT.jl.
+MODTRAN data is unchanged between the two comparisons; only the
+vSmartMOM model output and the resulting plot directory differ.
 =#
 using Plots
 using DelimitedFiles
@@ -165,7 +173,7 @@ path1 = joinpath(MOD_DIR, filename1(h2o, aot, gndalt, tsz))
 data1 = readdlm(path1, skipstart=2)
 _pos_floor!(data1, 3:8)
 
-MOM_DIR = "/home/sanghavi/data/EMIT_MODTRANcomp/vSmartMOM_out/vector_modtran_equiv/"
+MOM_DIR = "/home/sanghavi/data/EMIT_MODTRANcomp/azim180/vSmartMOM_out/scalar_modtran_equiv/"
 filename2(h2o, aot, gndalt, tsz) =
            "vSmartMOM_modtran_equiv_H2O$(fmt(h2o,4))_AOT$(fmt(aot,4))_GNDALT$(fmt(gndalt,3))_TSZ$(fmt(tsz,1)).dat"
 path2 = joinpath(MOM_DIR, filename2(h2o, aot, gndalt, tsz))
@@ -179,10 +187,10 @@ ylabels = [L"$\rho_\mathrm{atm}$", L"$T^\downarrow_\mathrm{dir}$", L"$T^\downarr
 xlabel = "Wavelength [nm]"
 for i=3:8
     plot(data1[:,1], data1[:,i], label="MODTRAN")#, xaxis=:log, yaxis=:log)
-    plot!(data2[:,1], data2[:,i], label="vSmartMOM IQU")#, xaxis=:log, yaxis=:log)
+    plot!(data2[:,1], data2[:,i], label="vSmartMOM")#, xaxis=:log, yaxis=:log)
     xlabel!(xlabel)
     ylabel!(ylabels[i-2])
-    savefig_both("MODTRAN_vSmartMOM_4EMIT_IQU_$(i-2).pdf")
+    savefig_both("/home/sanghavi/data/EMIT_MODTRANcomp/azim180/plots/MODTRAN_vSmartMOM_4EMIT_azim180_$(i-2).pdf")
 end
 
 vza = 12.0
@@ -191,25 +199,26 @@ ylabels = [L"$\tau_\mathrm{atm}$ [downward]", L"$\tau_\mathrm{atm}$ [upward]"]
 for i in [4,6]
     if i==4
         plot(data1[:,1], -log.(data1[:,i])*cosd(sza), label="MODTRAN")#, xaxis=:log, yaxis=:log)
-        plot!(data2[:,1], -log.(data2[:,i])*cosd(sza), label="vSmartMOM IQU")#, xaxis=:log, yaxis=:log)
+        plot!(data2[:,1], -log.(data2[:,i])*cosd(sza), label="vSmartMOM")#, xaxis=:log, yaxis=:log)
         ylabel!(ylabels[1])
         xlabel!(xlabel)
-        savefig_both("MODTRAN_vSmartMOM_4EMIT_IQU_tau_down.pdf")
+        savefig_both("/home/sanghavi/data/EMIT_MODTRANcomp/azim180/plots/MODTRAN_vSmartMOM_4EMIT_azim180_tau_down.pdf")
     else
         plot(data1[:,1], -log.(data1[:,i])*cosd(vza), label="MODTRAN")#, xaxis=:log, yaxis=:log)
-        plot!(data2[:,1], -log.(data2[:,i])*cosd(vza), label="vSmartMOM IQU")#, xaxis=:log, yaxis=:log)
+        plot!(data2[:,1], -log.(data2[:,i])*cosd(vza), label="vSmartMOM")#, xaxis=:log, yaxis=:log)
         ylabel!(ylabels[2])
         xlabel!(xlabel)
-        savefig_both("MODTRAN_vSmartMOM_4EMIT_IQU_tau_up.pdf")
+        savefig_both("/home/sanghavi/data/EMIT_MODTRANcomp/azim180/plots/MODTRAN_vSmartMOM_4EMIT_azim180_tau_up.pdf")
     end
 end
     
 plot(data1[:,1], -log.(data1[:,4])*cosd(sza) + log.(data1[:,6])*cosd(vza), label="MODTRAN")#, xaxis=:log, yaxis=:log)
-plot!(data2[:,1], -log.(data2[:,4])*cosd(sza) + log.(data2[:,6])*cosd(vza), label="vSmartMOM IQU")#, xaxis=:log, yaxis=:log)
+plot!(data2[:,1], -log.(data2[:,4])*cosd(sza) + log.(data2[:,6])*cosd(vza), label="vSmartMOM")#, xaxis=:log, yaxis=:log)
 ylabel!(L"$\Delta\tau_\mathrm{atm}$ [down-up]")
 xlabel!(xlabel)
-savefig_both("MODTRAN_vSmartMOM_4EMIT_IQU_tau_diff.pdf")
+savefig_both("/home/sanghavi/data/EMIT_MODTRANcomp/azim180/plots/MODTRAN_vSmartMOM_4EMIT_azim180_tau_diff.pdf")
 
+if false  # DISABLED for azim180: not a full-spectrum MODTRAN-equivalent comparison
 ind_uv1 = findall(x -> 350<=x<= 400.0, data1[:,1])
 ind_uv2 = findall(x -> 350<=x<= 400.0, data2[:,1])
 
@@ -252,35 +261,36 @@ for ctr=1:5
     local xlabel = "Wavelength [nm]"
     for i=3:8
         plot(data1[ind1,1], data1[ind1,i], label="MODTRAN")#, xaxis=:log, yaxis=:log)
-        plot!(data2[ind2,1], data2[ind2,i], label="vSmartMOM IQU")#, xaxis=:log, yaxis=:log)
+        plot!(data2[ind2,1], data2[ind2,i], label="vSmartMOM")#, xaxis=:log, yaxis=:log)
         xlabel!(xlabel)
         ylabel!(ylabels[i-2])
-        savefig_both("/home/sanghavi/data/EMIT_MODTRANcomp/plots/MODTRAN_vSmartMOM_4EMIT_IQU_$(i-2)"*"_"*spec_slice[ctr]*".pdf")
+        savefig_both("/home/sanghavi/data/EMIT_MODTRANcomp/azim180/plots/MODTRAN_vSmartMOM_4EMIT_azim180_$(i-2)"*"_"*spec_slice[ctr]*".pdf")
     end
 
     ylabels = [L"$\tau_\mathrm{atm}$ [downward]", L"$\tau_\mathrm{atm}$ [upward]"]
     for i in [4,6]
         if i==4
             plot(data1[ind1,1], -log.(data1[ind1,i])*cosd(sza), label="MODTRAN")#, xaxis=:log, yaxis=:log)
-            plot!(data2[ind2,1], -log.(data2[ind2,i])*cosd(sza), label="vSmartMOM IQU")#, xaxis=:log, yaxis=:log)
+            plot!(data2[ind2,1], -log.(data2[ind2,i])*cosd(sza), label="vSmartMOM")#, xaxis=:log, yaxis=:log)
             ylabel!(ylabels[1])
             xlabel!(xlabel)
-            savefig_both("/home/sanghavi/data/EMIT_MODTRANcomp/plots/MODTRAN_vSmartMOM_4EMIT_IQU_tau_down_"*spec_slice[ctr]*".pdf")
+            savefig_both("/home/sanghavi/data/EMIT_MODTRANcomp/azim180/plots/MODTRAN_vSmartMOM_4EMIT_azim180_tau_down_"*spec_slice[ctr]*".pdf")
         else
             plot(data1[ind1,1], -log.(data1[ind1,i])*cosd(vza), label="MODTRAN")#, xaxis=:log, yaxis=:log)
-            plot!(data2[ind2,1], -log.(data2[ind2,i])*cosd(vza), label="vSmartMOM IQU")#, xaxis=:log, yaxis=:log)
+            plot!(data2[ind2,1], -log.(data2[ind2,i])*cosd(vza), label="vSmartMOM")#, xaxis=:log, yaxis=:log)
             ylabel!(ylabels[2])
             xlabel!(xlabel)
-            savefig_both("/home/sanghavi/data/EMIT_MODTRANcomp/plots/MODTRAN_vSmartMOM_4EMIT_IQU_tau_up_"*spec_slice[ctr]*".pdf")
+            savefig_both("/home/sanghavi/data/EMIT_MODTRANcomp/azim180/plots/MODTRAN_vSmartMOM_4EMIT_azim180_tau_up_"*spec_slice[ctr]*".pdf")
         end
     end
     
     plot(data1[ind1,1], -log.(data1[ind1,4])*cosd(sza) + log.(data1[ind1,6])*cosd(vza), label="MODTRAN")#, xaxis=:log, yaxis=:log)
-    plot!(data2[ind2,1], -log.(data2[ind2,4])*cosd(sza) + log.(data2[ind2,6])*cosd(vza), label="vSmartMOM IQU")#, xaxis=:log, yaxis=:log)
+    plot!(data2[ind2,1], -log.(data2[ind2,4])*cosd(sza) + log.(data2[ind2,6])*cosd(vza), label="vSmartMOM")#, xaxis=:log, yaxis=:log)
     ylabel!(L"$\Delta\tau_\mathrm{atm}$ [down-up]")
     xlabel!(xlabel)
-    savefig_both("/home/sanghavi/data/EMIT_MODTRANcomp/plots/MODTRAN_vSmartMOM_4EMIT_IQU_tau_diff_"*spec_slice[ctr]*".pdf")
+    savefig_both("/home/sanghavi/data/EMIT_MODTRANcomp/azim180/plots/MODTRAN_vSmartMOM_4EMIT_azim180_tau_diff_"*spec_slice[ctr]*".pdf")
 end
+end  # /azim180-disabled
 
 #=================================================================================================#
 # Compare H2O0.05 and H2O2.05 cases to see how the difference between MODTRAN and vSmartMOM changes with H2O column.
@@ -303,7 +313,7 @@ path11 = joinpath(MOD_DIR, filename11(h2o, aot, gndalt, tsz))
 data11 = readdlm(path11, skipstart=2)
 _pos_floor!(data11, 3:8)
 
-MOM_DIR = "/home/sanghavi/data/EMIT_MODTRANcomp/vSmartMOM_out/vector_modtran_equiv/"
+MOM_DIR = "/home/sanghavi/data/EMIT_MODTRANcomp/azim180/vSmartMOM_out/scalar_modtran_equiv/"
 filename21(h2o, aot, gndalt, tsz) =
            "vSmartMOM_modtran_equiv_H2O$(fmt(h2o,4))_AOT$(fmt(aot,4))_GNDALT$(fmt(gndalt,3))_TSZ$(fmt(tsz,1)).dat"
 path21 = joinpath(MOM_DIR, filename21(h2o, aot, gndalt, tsz))
@@ -317,12 +327,12 @@ ylabels = [L"$\rho_\mathrm{atm}$", L"$T^\downarrow_\mathrm{dir}$", L"$T^\downarr
 xlabel = "Wavelength [nm]"
 for i=3:8
     plot(data1[:,1], data1[:,i], label="MODTRAN, H₂O=0.05")#, xaxis=:log, yaxis=:log)
-    plot!(data2[:,1], data2[:,i], label="vSmartMOM IQU, H₂O=0.05")#, xaxis=:log, yaxis=:log)
+    plot!(data2[:,1], data2[:,i], label="vSmartMOM, H₂O=0.05")#, xaxis=:log, yaxis=:log)
     plot!(data11[:,1], data11[:,i], label="MODTRAN, H₂O=2.05")#, xaxis=:log, yaxis=:log)
-    plot!(data21[:,1], data21[:,i], label="vSmartMOM IQU, H₂O=2.05")
+    plot!(data21[:,1], data21[:,i], label="vSmartMOM, H₂O=2.05")
     xlabel!(xlabel)
     ylabel!(ylabels[i-2])
-    savefig_both("/home/sanghavi/data/EMIT_MODTRANcomp/plots/MODTRAN_vSmartMOM_4EMIT_IQU_$(i-2)_H2O.pdf")
+    savefig_both("/home/sanghavi/data/EMIT_MODTRANcomp/azim180/plots/MODTRAN_vSmartMOM_4EMIT_azim180_$(i-2)_H2O.pdf")
 end
 
 vza = 12.0
@@ -331,31 +341,32 @@ ylabels = [L"$\tau_\mathrm{atm}$ [downward]", L"$\tau_\mathrm{atm}$ [upward]"]
 for i in [4,6]
     if i==4
         plot(data1[:,1], -log.(data1[:,i])*cosd(sza), label="MODTRAN, H₂O=0.05")#, xaxis=:log, yaxis=:log)
-        plot!(data2[:,1], -log.(data2[:,i])*cosd(sza), label="vSmartMOM IQU, H₂O=0.05")#, xaxis=:log, yaxis=:log)
+        plot!(data2[:,1], -log.(data2[:,i])*cosd(sza), label="vSmartMOM, H₂O=0.05")#, xaxis=:log, yaxis=:log)
         plot!(data11[:,1], -log.(data11[:,i])*cosd(sza), label="MODTRAN, H₂O=2.05")#, xaxis=:log, yaxis=:log
-        plot!(data21[:,1], -log.(data21[:,i])*cosd(sza), label="vSmartMOM IQU, H₂O=2.05")#, xaxis=:log, yaxis=:log)
+        plot!(data21[:,1], -log.(data21[:,i])*cosd(sza), label="vSmartMOM, H₂O=2.05")#, xaxis=:log, yaxis=:log)
         ylabel!(ylabels[1])
         xlabel!(xlabel)
-        savefig_both("/home/sanghavi/data/EMIT_MODTRANcomp/plots/MODTRAN_vSmartMOM_4EMIT_IQU_tau_down_H2O.pdf")
+        savefig_both("/home/sanghavi/data/EMIT_MODTRANcomp/azim180/plots/MODTRAN_vSmartMOM_4EMIT_azim180_tau_down_H2O.pdf")
     else
         plot(data1[:,1], -log.(data1[:,i])*cosd(vza), label="MODTRAN, H₂O=0.05")#, xaxis=:log, yaxis=:log)
-        plot!(data2[:,1], -log.(data2[:,i])*cosd(vza), label="vSmartMOM IQU, H₂O=0.05")#, xaxis=:log, yaxis=:log)
+        plot!(data2[:,1], -log.(data2[:,i])*cosd(vza), label="vSmartMOM, H₂O=0.05")#, xaxis=:log, yaxis=:log)
         plot!(data11[:,1], -log.(data11[:,i])*cosd(vza), label="MODTRAN, H₂O=2.05")#, xaxis=:log, yaxis=:log)
-        plot!(data21[:,1], -log.(data21[:,i])*cosd(vza), label="vSmartMOM IQU, H₂O=2.05")#, xaxis=:log, yaxis=:log)
+        plot!(data21[:,1], -log.(data21[:,i])*cosd(vza), label="vSmartMOM, H₂O=2.05")#, xaxis=:log, yaxis=:log)
         ylabel!(ylabels[2])
         xlabel!(xlabel)
-        savefig_both("/home/sanghavi/data/EMIT_MODTRANcomp/plots/MODTRAN_vSmartMOM_4EMIT_IQU_tau_up_H2O.pdf")
+        savefig_both("/home/sanghavi/data/EMIT_MODTRANcomp/azim180/plots/MODTRAN_vSmartMOM_4EMIT_azim180_tau_up_H2O.pdf")
     end
 end
     
 plot(data1[:,1], -log.(data1[:,4])*cosd(sza) + log.(data1[:,6])*cosd(vza), label="MODTRAN, H₂O=0.05")#, xaxis=:log, yaxis=:log)
-plot!(data2[:,1], -log.(data2[:,4])*cosd(sza) + log.(data2[:,6])*cosd(vza), label="vSmartMOM IQU, H₂O=0.05")#, xaxis=:log, yaxis=:log)
+plot!(data2[:,1], -log.(data2[:,4])*cosd(sza) + log.(data2[:,6])*cosd(vza), label="vSmartMOM, H₂O=0.05")#, xaxis=:log, yaxis=:log)
 plot!(data11[:,1], -log.(data11[:,4])*cosd(sza) + log.(data11[:,6])*cosd(vza), label="MODTRAN, H₂O=2.05")#, xaxis=:log, yaxis=:log)
-plot!(data21[:,1], -log.(data21[:,4])*cosd(sza) + log.(data21[:,6])*cosd(vza), label="vSmartMOM IQU, H₂O=2.05")#, xaxis=:log, yaxis=:log)
+plot!(data21[:,1], -log.(data21[:,4])*cosd(sza) + log.(data21[:,6])*cosd(vza), label="vSmartMOM, H₂O=2.05")#, xaxis=:log, yaxis=:log)
 ylabel!(L"$\Delta\tau_\mathrm{atm}$ [down-up]")
 xlabel!(xlabel)
-savefig_both("/home/sanghavi/data/EMIT_MODTRANcomp/plots/MODTRAN_vSmartMOM_4EMIT_IQU_tau_diff_H2O.pdf")
+savefig_both("/home/sanghavi/data/EMIT_MODTRANcomp/azim180/plots/MODTRAN_vSmartMOM_4EMIT_azim180_tau_diff_H2O.pdf")
 
+if false  # DISABLED for azim180: not a full-spectrum MODTRAN-equivalent comparison
 ind_uv1 = findall(x -> 350<=x<= 400.0, data1[:,1])
 ind_uv2 = findall(x -> 350<=x<= 400.0, data2[:,1])
 
@@ -398,53 +409,55 @@ for ctr=1:5
     local xlabel = "Wavelength [nm]"
     for i=3:8
         plot(data1[ind1,1], data1[ind1,i], label="MODTRAN, H₂O=0.05")#, xaxis=:log, yaxis=:log)
-        plot!(data2[ind2,1], data2[ind2,i], label="vSmartMOM IQU, H₂O=0.05")#, xaxis=:log, yaxis=:log)
+        plot!(data2[ind2,1], data2[ind2,i], label="vSmartMOM, H₂O=0.05")#, xaxis=:log, yaxis=:log)
         plot!(data11[ind1,1], data11[ind1,i], label="MODTRAN, H₂O=2.05")#, xaxis=:log, yaxis=:log)
-        plot!(data21[ind2,1], data21[ind2,i], label="vSmartMOM IQU, H₂O=2.05")#, xaxis=:log, yaxis=:log)
+        plot!(data21[ind2,1], data21[ind2,i], label="vSmartMOM, H₂O=2.05")#, xaxis=:log, yaxis=:log)
         xlabel!(xlabel)
         ylabel!(ylabels[i-2])
-        savefig_both("/home/sanghavi/data/EMIT_MODTRANcomp/plots/MODTRAN_vSmartMOM_4EMIT_IQU_$(i-2)"*"_"*spec_slice[ctr]*"_H2O.pdf")
+        savefig_both("/home/sanghavi/data/EMIT_MODTRANcomp/azim180/plots/MODTRAN_vSmartMOM_4EMIT_azim180_$(i-2)"*"_"*spec_slice[ctr]*"_H2O.pdf")
     end
 
     ylabels = [L"$\tau_\mathrm{atm}$ [downward]", L"$\tau_\mathrm{atm}$ [upward]"]
     for i in [4,6]
         if i==4
             plot(data1[ind1,1], -log.(data1[ind1,i])*cosd(sza), label="MODTRAN, H₂O=0.05")#, xaxis=:log, yaxis=:log)
-            plot!(data2[ind2,1], -log.(data2[ind2,i])*cosd(sza), label="vSmartMOM IQU, H₂O=0.05")#, xaxis=:log, yaxis=:log)
+            plot!(data2[ind2,1], -log.(data2[ind2,i])*cosd(sza), label="vSmartMOM, H₂O=0.05")#, xaxis=:log, yaxis=:log)
             plot!(data11[ind1,1], -log.(data11[ind1,i])*cosd(sza), label="MODTRAN, H₂O=2.05")#, xaxis=:log, yaxis=:log)
-            plot!(data21[ind2,1], -log.(data21[ind2,i])*cosd(sza), label="vSmartMOM IQU, H₂O=2.05")#, xaxis=:log, yaxis=:log)
+            plot!(data21[ind2,1], -log.(data21[ind2,i])*cosd(sza), label="vSmartMOM, H₂O=2.05")#, xaxis=:log, yaxis=:log)
             ylabel!(ylabels[1])
             xlabel!(xlabel)
-            savefig_both("/home/sanghavi/data/EMIT_MODTRANcomp/plots/MODTRAN_vSmartMOM_4EMIT_IQU_tau_down_"*spec_slice[ctr]*"_H2O.pdf")
+            savefig_both("/home/sanghavi/data/EMIT_MODTRANcomp/azim180/plots/MODTRAN_vSmartMOM_4EMIT_azim180_tau_down_"*spec_slice[ctr]*"_H2O.pdf")
         else
             plot(data1[ind1,1], -log.(data1[ind1,i])*cosd(vza), label="MODTRAN, H₂O=0.05")#, xaxis=:log, yaxis=:log)
-            plot!(data2[ind2,1], -log.(data2[ind2,i])*cosd(vza), label="vSmartMOM IQU, H₂O=0.05")#, xaxis=:log, yaxis=:log)
+            plot!(data2[ind2,1], -log.(data2[ind2,i])*cosd(vza), label="vSmartMOM, H₂O=0.05")#, xaxis=:log, yaxis=:log)
             plot!(data11[ind1,1], -log.(data11[ind1,i])*cosd(vza), label="MODTRAN, H₂O=2.05")#, xaxis=:log, yaxis=:log)
-            plot!(data21[ind2,1], -log.(data21[ind2,i])*cosd(vza), label="vSmartMOM IQU, H₂O=2.05")#, xaxis=:log, yaxis=:log)
+            plot!(data21[ind2,1], -log.(data21[ind2,i])*cosd(vza), label="vSmartMOM, H₂O=2.05")#, xaxis=:log, yaxis=:log)
             ylabel!(ylabels[2])
             xlabel!(xlabel)
-            savefig_both("/home/sanghavi/data/EMIT_MODTRANcomp/plots/MODTRAN_vSmartMOM_4EMIT_IQU_tau_up_"*spec_slice[ctr]*"_H2O.pdf")
+            savefig_both("/home/sanghavi/data/EMIT_MODTRANcomp/azim180/plots/MODTRAN_vSmartMOM_4EMIT_azim180_tau_up_"*spec_slice[ctr]*"_H2O.pdf")
         end
     end
     
     plot(data1[ind1,1], -log.(data1[ind1,4])*cosd(sza) + log.(data1[ind1,6])*cosd(vza), label="MODTRAN, H₂O=0.05")#, xaxis=:log, yaxis=:log)
-    plot!(data2[ind2,1], -log.(data2[ind2,4])*cosd(sza) + log.(data2[ind2,6])*cosd(vza), label="vSmartMOM IQU, H₂O=0.05")#, xaxis=:log, yaxis=:log)
+    plot!(data2[ind2,1], -log.(data2[ind2,4])*cosd(sza) + log.(data2[ind2,6])*cosd(vza), label="vSmartMOM, H₂O=0.05")#, xaxis=:log, yaxis=:log)
     plot!(data11[ind1,1], -log.(data11[ind1,4])*cosd(sza) + log.(data11[ind1,6])*cosd(vza), label="MODTRAN, H₂O=2.05")#, xaxis=:log, yaxis=:log)
-    plot!(data21[ind2,1], -log.(data21[ind2,4])*cosd(sza) + log.(data21[ind2,6])*cosd(vza), label="vSmartMOM IQU, H₂O=2.05")#, xaxis=:log, yaxis=:log)
+    plot!(data21[ind2,1], -log.(data21[ind2,4])*cosd(sza) + log.(data21[ind2,6])*cosd(vza), label="vSmartMOM, H₂O=2.05")#, xaxis=:log, yaxis=:log)
     ylabel!(L"$\Delta\tau_\mathrm{atm}$ [down-up]")
     xlabel!(xlabel)
-    savefig_both("/home/sanghavi/data/EMIT_MODTRANcomp/plots/MODTRAN_vSmartMOM_4EMIT_IQU_tau_diff_"*spec_slice[ctr]*"_H2O.pdf")
+    savefig_both("/home/sanghavi/data/EMIT_MODTRANcomp/azim180/plots/MODTRAN_vSmartMOM_4EMIT_azim180_tau_diff_"*spec_slice[ctr]*"_H2O.pdf")
 end
+end  # /azim180-disabled
 
+if false  # DISABLED for azim180: not a full-spectrum MODTRAN-equivalent comparison
 #====== only vSmartMOM ======#
 ylabels = [L"$\rho_\mathrm{atm}$", L"$T^\downarrow_\mathrm{dir}$", L"$T^\downarrow_\mathrm{dif}$", L"$T^\uparrow_\mathrm{dir}$", L"$T^\uparrow_\mathrm{dif}$", L"$S_\mathrm{atm}$"]
 xlabel = "Wavelength [nm]"
 for i=3:8
-    plot(data21[:,1], data21[:,i], label="vSmartMOM IQU, H₂O=0.05")#, xaxis=:log, yaxis=:log)
-    plot!(data21[:,1], data21[:,i], label="vSmartMOM IQU, H₂O=2.05")
+    plot(data21[:,1], data21[:,i], label="vSmartMOM, H₂O=0.05")#, xaxis=:log, yaxis=:log)
+    plot!(data21[:,1], data21[:,i], label="vSmartMOM, H₂O=2.05")
     xlabel!(xlabel)
     ylabel!(ylabels[i-2])
-    savefig_both("/home/sanghavi/data/EMIT_MODTRANcomp/plots/h2o_sensitivity/vSmartMOM_4EMIT_IQU_$(i-2)_H2O.pdf")
+    savefig_both("/home/sanghavi/data/EMIT_MODTRANcomp/azim180/plots/h2o_sensitivity/vSmartMOM_4EMIT_azim180_$(i-2)_H2O.pdf")
 end
 
 vza = 12.0
@@ -452,25 +465,25 @@ sza = 39.583965990615404
 ylabels = [L"$\tau_\mathrm{atm}$ [downward]", L"$\tau_\mathrm{atm}$ [upward]"]
 for i in [4,6]
     if i==4
-        plot(data2[:,1], -log.(data2[:,i])*cosd(sza), label="vSmartMOM IQU, H₂O=0.05")#, xaxis=:log, yaxis=:log)
-        plot!(data21[:,1], -log.(data21[:,i])*cosd(sza), label="vSmartMOM IQU, H₂O=2.05")#, xaxis=:log, yaxis=:log)
+        plot(data2[:,1], -log.(data2[:,i])*cosd(sza), label="vSmartMOM, H₂O=0.05")#, xaxis=:log, yaxis=:log)
+        plot!(data21[:,1], -log.(data21[:,i])*cosd(sza), label="vSmartMOM, H₂O=2.05")#, xaxis=:log, yaxis=:log)
         ylabel!(ylabels[1])
         xlabel!(xlabel)
-        savefig_both("/home/sanghavi/data/EMIT_MODTRANcomp/plots/h2o_sensitivity/vSmartMOM_4EMIT_IQU_tau_down_H2O.pdf")
+        savefig_both("/home/sanghavi/data/EMIT_MODTRANcomp/azim180/plots/h2o_sensitivity/vSmartMOM_4EMIT_azim180_tau_down_H2O.pdf")
     else
-        plot(data2[:,1], -log.(data2[:,i])*cosd(vza), label="vSmartMOM IQU, H₂O=0.05")#, xaxis=:log, yaxis=:log)
-        plot!(data21[:,1], -log.(data21[:,i])*cosd(vza), label="vSmartMOM IQU, H₂O=2.05")#, xaxis=:log, yaxis=:log)
+        plot(data2[:,1], -log.(data2[:,i])*cosd(vza), label="vSmartMOM, H₂O=0.05")#, xaxis=:log, yaxis=:log)
+        plot!(data21[:,1], -log.(data21[:,i])*cosd(vza), label="vSmartMOM, H₂O=2.05")#, xaxis=:log, yaxis=:log)
         ylabel!(ylabels[2])
         xlabel!(xlabel)
-        savefig_both("/home/sanghavi/data/EMIT_MODTRANcomp/plots/h2o_sensitivity/vSmartMOM_4EMIT_IQU_tau_up_H2O.pdf")
+        savefig_both("/home/sanghavi/data/EMIT_MODTRANcomp/azim180/plots/h2o_sensitivity/vSmartMOM_4EMIT_azim180_tau_up_H2O.pdf")
     end
 end
     
-plot(data2[:,1], -log.(data2[:,4])*cosd(sza) + log.(data2[:,6])*cosd(vza), label="vSmartMOM IQU, H₂O=0.05")#, 
-plot!(data21[:,1], -log.(data21[:,4])*cosd(sza) + log.(data21[:,6])*cosd(vza), label="vSmartMOM IQU, H₂O=2.05")#, xaxis=:log, yaxis=:log)
+plot(data2[:,1], -log.(data2[:,4])*cosd(sza) + log.(data2[:,6])*cosd(vza), label="vSmartMOM, H₂O=0.05")#, 
+plot!(data21[:,1], -log.(data21[:,4])*cosd(sza) + log.(data21[:,6])*cosd(vza), label="vSmartMOM, H₂O=2.05")#, xaxis=:log, yaxis=:log)
 ylabel!(L"$\Delta\tau_\mathrm{atm}$ [down-up]")
 xlabel!(xlabel)
-savefig_both("/home/sanghavi/data/EMIT_MODTRANcomp/plots/h2o_sensitivity/vSmartMOM_4EMIT_IQU_tau_diff_H2O.pdf")
+savefig_both("/home/sanghavi/data/EMIT_MODTRANcomp/azim180/plots/h2o_sensitivity/vSmartMOM_4EMIT_azim180_tau_diff_H2O.pdf")
 
 ind_uv1 = findall(x -> 350<=x<= 400.0, data1[:,1])
 ind_uv2 = findall(x -> 350<=x<= 400.0, data2[:,1])
@@ -513,35 +526,35 @@ for ctr=1:5
     local ylabels = [L"$\rho_\mathrm{atm}$", L"$T^\downarrow_\mathrm{dir}$", L"$T^\downarrow_\mathrm{dif}$", L"$T^\uparrow_\mathrm{dir}$", L"$T^\uparrow_\mathrm{dif}$", L"$S_\mathrm{atm}$"]
     local xlabel = "Wavelength [nm]"
     for i=3:8
-        plot(data2[ind2,1], data2[ind2,i], label="vSmartMOM IQU, H₂O=0.05")#, xaxis=:log, yaxis=:log)
-        plot!(data21[ind2,1], data21[ind2,i], label="vSmartMOM IQU, H₂O=2.05")#, xaxis=:log, yaxis=:log)
+        plot(data2[ind2,1], data2[ind2,i], label="vSmartMOM, H₂O=0.05")#, xaxis=:log, yaxis=:log)
+        plot!(data21[ind2,1], data21[ind2,i], label="vSmartMOM, H₂O=2.05")#, xaxis=:log, yaxis=:log)
         xlabel!(xlabel)
         ylabel!(ylabels[i-2])
-        savefig_both("/home/sanghavi/data/EMIT_MODTRANcomp/plots/h2o_sensitivity/vSmartMOM_4EMIT_IQU_$(i-2)"*"_"*spec_slice[ctr]*"_H2O.pdf")
+        savefig_both("/home/sanghavi/data/EMIT_MODTRANcomp/azim180/plots/h2o_sensitivity/vSmartMOM_4EMIT_azim180_$(i-2)"*"_"*spec_slice[ctr]*"_H2O.pdf")
     end
 
     ylabels = [L"$\tau_\mathrm{atm}$ [downward]", L"$\tau_\mathrm{atm}$ [upward]"]
     for i in [4,6]
         if i==4
-            plot(data2[ind2,1], -log.(data2[ind2,i])*cosd(sza), label="vSmartMOM IQU, H₂O=0.05")#, xaxis=:log, yaxis=:log)
-            plot!(data21[ind2,1], -log.(data21[ind2,i])*cosd(sza), label="vSmartMOM IQU, H₂O=2.05")#, xaxis=:log, yaxis=:log)
+            plot(data2[ind2,1], -log.(data2[ind2,i])*cosd(sza), label="vSmartMOM, H₂O=0.05")#, xaxis=:log, yaxis=:log)
+            plot!(data21[ind2,1], -log.(data21[ind2,i])*cosd(sza), label="vSmartMOM, H₂O=2.05")#, xaxis=:log, yaxis=:log)
             ylabel!(ylabels[1])
             xlabel!(xlabel)
-            savefig_both("/home/sanghavi/data/EMIT_MODTRANcomp/plots/h2o_sensitivity/vSmartMOM_4EMIT_IQU_tau_down_"*spec_slice[ctr]*"_H2O.pdf")
+            savefig_both("/home/sanghavi/data/EMIT_MODTRANcomp/azim180/plots/h2o_sensitivity/vSmartMOM_4EMIT_azim180_tau_down_"*spec_slice[ctr]*"_H2O.pdf")
         else
-            plot(data2[ind2,1], -log.(data2[ind2,i])*cosd(vza), label="vSmartMOM IQU, H₂O=0.05")#, xaxis=:log, yaxis=:log)
-            plot!(data21[ind2,1], -log.(data21[ind2,i])*cosd(vza), label="vSmartMOM IQU, H₂O=2.05")#, xaxis=:log, yaxis=:log)
+            plot(data2[ind2,1], -log.(data2[ind2,i])*cosd(vza), label="vSmartMOM, H₂O=0.05")#, xaxis=:log, yaxis=:log)
+            plot!(data21[ind2,1], -log.(data21[ind2,i])*cosd(vza), label="vSmartMOM, H₂O=2.05")#, xaxis=:log, yaxis=:log)
             ylabel!(ylabels[2])
             xlabel!(xlabel)
-            savefig_both("/home/sanghavi/data/EMIT_MODTRANcomp/plots/h2o_sensitivity/vSmartMOM_4EMIT_IQU_tau_up_"*spec_slice[ctr]*"_H2O.pdf")
+            savefig_both("/home/sanghavi/data/EMIT_MODTRANcomp/azim180/plots/h2o_sensitivity/vSmartMOM_4EMIT_azim180_tau_up_"*spec_slice[ctr]*"_H2O.pdf")
         end
     end
     
-    plot(data2[ind2,1], -log.(data2[ind2,4])*cosd(sza) + log.(data2[ind2,6])*cosd(vza), label="vSmartMOM IQU, H₂O=0.05")#, xaxis=:log, yaxis=:log)
-    plot!(data21[ind2,1], -log.(data21[ind2,4])*cosd(sza) + log.(data21[ind2,6])*cosd(vza), label="vSmartMOM IQU, H₂O=2.05")#, xaxis=:log, yaxis=:log)
+    plot(data2[ind2,1], -log.(data2[ind2,4])*cosd(sza) + log.(data2[ind2,6])*cosd(vza), label="vSmartMOM, H₂O=0.05")#, xaxis=:log, yaxis=:log)
+    plot!(data21[ind2,1], -log.(data21[ind2,4])*cosd(sza) + log.(data21[ind2,6])*cosd(vza), label="vSmartMOM, H₂O=2.05")#, xaxis=:log, yaxis=:log)
     ylabel!(L"$\Delta\tau_\mathrm{atm}$ [down-up]")
     xlabel!(xlabel)
-    savefig_both("/home/sanghavi/data/EMIT_MODTRANcomp/plots/h2o_sensitivity/vSmartMOM_4EMIT_IQU_tau_diff_"*spec_slice[ctr]*"_H2O.pdf")
+    savefig_both("/home/sanghavi/data/EMIT_MODTRANcomp/azim180/plots/h2o_sensitivity/vSmartMOM_4EMIT_azim180_tau_diff_"*spec_slice[ctr]*"_H2O.pdf")
 end
 #====== only MODTRAN ======#
 ylabels = [L"$\rho_\mathrm{atm}$", L"$T^\downarrow_\mathrm{dir}$", L"$T^\downarrow_\mathrm{dif}$", L"$T^\uparrow_\mathrm{dir}$", L"$T^\uparrow_\mathrm{dif}$", L"$S_\mathrm{atm}$"]
@@ -552,7 +565,7 @@ for i=3:8
 
     xlabel!(xlabel)
     ylabel!(ylabels[i-2])
-    savefig_both("/home/sanghavi/data/EMIT_MODTRANcomp/plots/h2o_sensitivity/MODTRAN_4EMIT_IQU_$(i-2)_H2O.pdf")
+    savefig_both("/home/sanghavi/data/EMIT_MODTRANcomp/azim180/plots/h2o_sensitivity/MODTRAN_4EMIT_azim180_$(i-2)_H2O.pdf")
 end
 
 vza = 12.0
@@ -564,13 +577,13 @@ for i in [4,6]
         plot!(data11[:,1], -log.(data11[:,i])*cosd(sza), label="MODTRAN, H₂O=2.05")#, xaxis=:log, yaxis=:log
         ylabel!(ylabels[1])
         xlabel!(xlabel)
-        savefig_both("/home/sanghavi/data/EMIT_MODTRANcomp/plots/h2o_sensitivity/MODTRAN_4EMIT_IQU_tau_down_H2O.pdf")
+        savefig_both("/home/sanghavi/data/EMIT_MODTRANcomp/azim180/plots/h2o_sensitivity/MODTRAN_4EMIT_azim180_tau_down_H2O.pdf")
     else
         plot(data1[:,1], -log.(data1[:,i])*cosd(vza), label="MODTRAN, H₂O=0.05")#, xaxis=:log, yaxis=:log)
         plot!(data11[:,1], -log.(data11[:,i])*cosd(vza), label="MODTRAN, H₂O=2.05")#, xaxis=:log, yaxis=:log)
         ylabel!(ylabels[2])
         xlabel!(xlabel)
-        savefig_both("/home/sanghavi/data/EMIT_MODTRANcomp/plots/h2o_sensitivity/MODTRAN_4EMIT_IQU_tau_up_H2O.pdf")
+        savefig_both("/home/sanghavi/data/EMIT_MODTRANcomp/azim180/plots/h2o_sensitivity/MODTRAN_4EMIT_azim180_tau_up_H2O.pdf")
     end
 end
     
@@ -578,7 +591,7 @@ plot(data1[:,1], -log.(data1[:,4])*cosd(sza) + log.(data1[:,6])*cosd(vza), label
 plot!(data11[:,1], -log.(data11[:,4])*cosd(sza) + log.(data11[:,6])*cosd(vza), label="MODTRAN, H₂O=2.05")#, xaxis=:log, yaxis=:log)
 ylabel!(L"$\Delta\tau_\mathrm{atm}$ [down-up]")
 xlabel!(xlabel)
-savefig_both("/home/sanghavi/data/EMIT_MODTRANcomp/plots/h2o_sensitivity/MODTRAN_4EMIT_IQU_tau_diff_H2O.pdf")
+savefig_both("/home/sanghavi/data/EMIT_MODTRANcomp/azim180/plots/h2o_sensitivity/MODTRAN_4EMIT_azim180_tau_diff_H2O.pdf")
 
 ind_uv1 = findall(x -> 350<=x<= 400.0, data1[:,1])
 ind_vis1 = findall(x -> 500<=x<=700.0, data1[:,1])
@@ -611,7 +624,7 @@ for ctr=1:5
         plot!(data11[ind1,1], data11[ind1,i], label="MODTRAN, H₂O=2.05")#, xaxis=:log, yaxis=:log)
         xlabel!(xlabel)
         ylabel!(ylabels[i-2])
-        savefig_both("/home/sanghavi/data/EMIT_MODTRANcomp/plots/h2o_sensitivity/MODTRAN_4EMIT_IQU_$(i-2)"*"_"*spec_slice[ctr]*"_H2O.pdf")
+        savefig_both("/home/sanghavi/data/EMIT_MODTRANcomp/azim180/plots/h2o_sensitivity/MODTRAN_4EMIT_azim180_$(i-2)"*"_"*spec_slice[ctr]*"_H2O.pdf")
     end
 
     ylabels = [L"$\tau_\mathrm{atm}$ [downward]", L"$\tau_\mathrm{atm}$ [upward]"]
@@ -621,13 +634,13 @@ for ctr=1:5
             plot!(data11[ind1,1], -log.(data11[ind1,i])*cosd(sza), label="MODTRAN, H₂O=2.05")#, xaxis=:log, yaxis=:log)
             ylabel!(ylabels[1])
             xlabel!(xlabel)
-            savefig_both("/home/sanghavi/data/EMIT_MODTRANcomp/plots/h2o_sensitivity/MODTRAN_4EMIT_IQU_tau_down_"*spec_slice[ctr]*"_H2O.pdf")
+            savefig_both("/home/sanghavi/data/EMIT_MODTRANcomp/azim180/plots/h2o_sensitivity/MODTRAN_4EMIT_azim180_tau_down_"*spec_slice[ctr]*"_H2O.pdf")
         else
             plot(data1[ind1,1], -log.(data1[ind1,i])*cosd(vza), label="MODTRAN, H₂O=0.05")#, xaxis=:log, yaxis=:log)
             plot!(data11[ind1,1], -log.(data11[ind1,i])*cosd(vza), label="MODTRAN, H₂O=2.05")#, xaxis=:log, yaxis=:log)
             ylabel!(ylabels[2])
             xlabel!(xlabel)
-            savefig_both("/home/sanghavi/data/EMIT_MODTRANcomp/plots/h2o_sensitivity/MODTRAN_4EMIT_IQU_tau_up_"*spec_slice[ctr]*"_H2O.pdf")
+            savefig_both("/home/sanghavi/data/EMIT_MODTRANcomp/azim180/plots/h2o_sensitivity/MODTRAN_4EMIT_azim180_tau_up_"*spec_slice[ctr]*"_H2O.pdf")
         end
     end
     
@@ -635,5 +648,6 @@ for ctr=1:5
     plot!(data11[ind1,1], -log.(data11[ind1,4])*cosd(sza) + log.(data11[ind1,6])*cosd(vza), label="MODTRAN, H₂O=2.05")#, xaxis=:log, yaxis=:log)
     ylabel!(L"$\Delta\tau_\mathrm{atm}$ [down-up]")
     xlabel!(xlabel)
-    savefig_both("/home/sanghavi/data/EMIT_MODTRANcomp/plots/h2o_sensitivity/MODTRAN_4EMIT_IQU_tau_diff_"*spec_slice[ctr]*"_H2O.pdf")
+    savefig_both("/home/sanghavi/data/EMIT_MODTRANcomp/azim180/plots/h2o_sensitivity/MODTRAN_4EMIT_azim180_tau_diff_"*spec_slice[ctr]*"_H2O.pdf")
 end
+end  # /azim180-disabled

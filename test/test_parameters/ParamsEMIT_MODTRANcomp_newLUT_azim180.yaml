@@ -1,12 +1,22 @@
 # =================================================================
-# ParamsEMIT_MODTRANcomp_newLUT_alb02.yaml
+# ParamsEMIT_MODTRANcomp_newLUT_azim180.yaml
 #
-# Paired alb=0.2 companion to ParamsEMIT_MODTRANcomp_newLUT.yaml. Used
-# together with the alb=0 file to compute the two-albedo Lambertian
-# decomposition in modtran_equivalent_fields.jl.
+# AZIM180 CONVENTION-PROBE companion to ParamsEMIT_MODTRANcomp_newLUT.yaml.
+# Identical to the parent file apart from `vaz`, which is reduced by 180°
+# (81.49773971061641 -> -98.50226028938359). The purpose is to test
+# whether MODTRAN's RAA convention is offset by 180° from vSmartMOM's
+# (i.e., MODTRAN RAA = 0 corresponds to Sun directly behind the
+# detector, which is vSmartMOM vaz = 180°). Pair with the alb02_azim180
+# YAML for the two-albedo Lambertian decomposition. Outputs from this
+# YAML should be written under ~/data/EMIT_MODTRANcomp/azim180/.
 #
-# Identical to the alb=0 file apart from the surface line below. Points
-# at the rebuilt HITRAN LUTs under ~/data/HITRAN_LUTs/.
+# Same scenario as ParamsEMIT_MODTRANcomp.yaml but pointing at the
+# rebuilt HITRAN LUTs under ~/data/HITRAN_LUTs/  (Δν = 0.01 cm⁻¹,
+# linear interp, Float32, 280–3500 nm). See
+# plans/HANDOFF_LUT_REBUILD_2026-04-23.md for the rebuild spec.
+#
+# Note on spectral band: the rebuilt LUT spans 2857.14–35714.29 cm⁻¹
+# (exact). Use spec_bands inside that range.
 #
 # Set VSMARTMOM_HITRAN_LUT_DIR to the rebuilt HITRAN LUT directory.
 # =================================================================
@@ -14,7 +24,7 @@ radiative_transfer:
   spec_bands:
     - 3984.2:0.1:28571.4   # 350 - 2510 nm (extended from 380 nm to capture Hartley/Huggins UV)
   surface:
-    - LambertianSurfaceScalar{Float64}(0.2)
+    - LambertianSurfaceScalar{Float64}(0.0)
   quadrature_type:    GaussQuadHemisphere()
   polarization_type:  Stokes_I()
   max_m:              3
@@ -40,7 +50,7 @@ radiative_transfer:
 geometry:
   sza:                39.583965990615404
   vza:                [12.0]
-  vaz:                [81.49773971061641]
+  vaz:                [-98.50226028938359]   # = 81.49773971061641 - 180 (azim180 convention probe)
   obs_alt:            0
 
 atmospheric_profile:

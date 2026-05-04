@@ -1,22 +1,23 @@
 # =================================================================
-# ParamsEMIT_MODTRANcomp_newLUT_alb02.yaml
+# ParamsEMIT_MODTRANcomp_newLUT_IQU_alb02.yaml
 #
-# Paired alb=0.2 companion to ParamsEMIT_MODTRANcomp_newLUT.yaml. Used
-# together with the alb=0 file to compute the two-albedo Lambertian
-# decomposition in modtran_equivalent_fields.jl.
-#
-# Identical to the alb=0 file apart from the surface line below. Points
-# at the rebuilt HITRAN LUTs under ~/data/HITRAN_LUTs/.
-#
-# Set VSMARTMOM_HITRAN_LUT_DIR to the rebuilt HITRAN LUT directory.
+# alb=0.2 companion of ParamsEMIT_MODTRANcomp_newLUT_IQU.yaml. Identical
+# apart from `surface:` (Lambertian albedo 0.2). Used together with the
+# alb=0 IQU file to compute the two-albedo Lambertian decomposition for
+# the vector-RT (Stokes_IQU) MODTRAN-equivalent comparison.
 # =================================================================
 radiative_transfer:
   spec_bands:
-    - 3984.2:0.1:28571.4   # 350 - 2510 nm (extended from 380 nm to capture Hartley/Huggins UV)
+    # Split into two bands at the wavenumber midpoint (16278.0 cm⁻¹ ≈ 614 nm)
+    # so each band has ~123k spectral points and the per-band Stokes_IQU RT
+    # matrices fit on a 40 GB A100. Same Δν = 0.1 cm⁻¹ as the scalar runs.
+    - 3984.2:0.1:16278.0    # 614 – 2510 nm  (NIR/SWIR), ~122,939 points
+    - 16278.1:0.1:28571.4   # 350 – 614 nm   (UV/Vis),    ~122,934 points
   surface:
-    - LambertianSurfaceScalar{Float64}(0.2)
+    - LambertianSurfaceScalar{Float64}(0.2)   # band 1 (614 – 2510 nm)
+    - LambertianSurfaceScalar{Float64}(0.2)   # band 2 (350 – 614  nm)
   quadrature_type:    GaussQuadHemisphere()
-  polarization_type:  Stokes_I()
+  polarization_type:  Stokes_IQU()
   max_m:              3
   Δ_angle:            2.0
   l_trunc:            5
@@ -54,23 +55,30 @@ absorption:
   # atmospheric_profile.q is provided. The H2O LUT below (HITRAN mol_id 1) is
   # auto-detected by the parser and pulled into AbsorptionParameters.h2o_lut.
   fixed_molecules:
-    - [O2, CO2, NO2, SO2]
+    - [O2, CO2, NO2, SO2]   # band 1 (614 – 2510 nm)
+    - [O2, CO2, NO2, SO2]   # band 2 (350 – 614  nm)
   variable_molecules:
-    - [CH4, O3, N2O, CO]
+    - [CH4, O3, N2O, CO]    # band 1
+    - [CH4, O3, N2O, CO]    # band 2
   LUTfiles:
-    # Order is parallel to fixed_molecules + variable_molecules. H2O LUT
-    # appended last; parser auto-detects HITRAN mol_id 1 and pulls it into
-    # AbsorptionParameters.h2o_lut. Set VSMARTMOM_HITRAN_LUT_DIR in env
-    # (e.g. /home/sanghavi/data/HITRAN_LUTs).
-    - ["${ENV:VSMARTMOM_HITRAN_LUT_DIR}/O2.jld2",
-       "${ENV:VSMARTMOM_HITRAN_LUT_DIR}/CO2.jld2",
-       "${ENV:VSMARTMOM_HITRAN_LUT_DIR}/NO2.jld2",
-       "${ENV:VSMARTMOM_HITRAN_LUT_DIR}/SO2.jld2",
-       "${ENV:VSMARTMOM_HITRAN_LUT_DIR}/CH4.jld2",
-       "${ENV:VSMARTMOM_HITRAN_LUT_DIR}/O3.jld2",
-       "${ENV:VSMARTMOM_HITRAN_LUT_DIR}/N2O.jld2",
-       "${ENV:VSMARTMOM_HITRAN_LUT_DIR}/CO.jld2",
-       "${ENV:VSMARTMOM_HITRAN_LUT_DIR}/H2O.jld2"]
+    - ["/home/sanghavi/data/HITRAN_LUTs/O2.jld2",
+       "/home/sanghavi/data/HITRAN_LUTs/CO2.jld2",
+       "/home/sanghavi/data/HITRAN_LUTs/NO2.jld2",
+       "/home/sanghavi/data/HITRAN_LUTs/SO2.jld2",
+       "/home/sanghavi/data/HITRAN_LUTs/CH4.jld2",
+       "/home/sanghavi/data/HITRAN_LUTs/O3.jld2",
+       "/home/sanghavi/data/HITRAN_LUTs/N2O.jld2",
+       "/home/sanghavi/data/HITRAN_LUTs/CO.jld2",
+       "/home/sanghavi/data/HITRAN_LUTs/H2O.jld2"]
+    - ["/home/sanghavi/data/HITRAN_LUTs/O2.jld2",
+       "/home/sanghavi/data/HITRAN_LUTs/CO2.jld2",
+       "/home/sanghavi/data/HITRAN_LUTs/NO2.jld2",
+       "/home/sanghavi/data/HITRAN_LUTs/SO2.jld2",
+       "/home/sanghavi/data/HITRAN_LUTs/CH4.jld2",
+       "/home/sanghavi/data/HITRAN_LUTs/O3.jld2",
+       "/home/sanghavi/data/HITRAN_LUTs/N2O.jld2",
+       "/home/sanghavi/data/HITRAN_LUTs/CO.jld2",
+       "/home/sanghavi/data/HITRAN_LUTs/H2O.jld2"]
   vmr:
     O2:   0.209
     CO2:  4.00e-4
