@@ -15,18 +15,29 @@ code applies the τ/ω rescaling per Sanghavi & Stephens 2015 Eq. 8.
 """
     truncate_phase(::NoTruncation, aero::AerosolOptics; kwargs...) -> AerosolOptics
 
-Identity passthrough. Returns the input untouched. The `f^t = 0` limit
-of the δ-m / δ-fit / δ-BGE family corresponds to the identity
-(Sanghavi & Stephens 2015 Eq. 8 with `f_tr → 0`).
+Identity passthrough. Returns an `AerosolOptics` with the same Greek
+coefficients, ω̃ and k, and `fᵗ = 0` (the `f_tr → 0` limit of Sanghavi
+& Stephens 2015 Eq. 8 — the truncation-modified `τ*`, `ω*`, `Z*`
+collapse to the originals).
+
+Note: raw Mie outputs initialise `fᵗ = 1` as a "untruncated yet"
+sentinel — passing them through unchanged would let downstream
+`delta_m_forward` interpret the 1 as "everything is in the forward
+peak" and silently zero out aerosol scattering. We return `fᵗ = 0`
+so the rescaling is a true no-op.
 """
-truncate_phase(::NoTruncation, aero::AerosolOptics; kwargs...) = aero
+truncate_phase(::NoTruncation, aero::AerosolOptics{FT}; kwargs...) where {FT} =
+    AerosolOptics(greek_coefs = aero.greek_coefs, ω̃ = aero.ω̃,
+                  k = aero.k, fᵗ = zero(FT), derivs = aero.derivs)
 
 """
     truncate_phase_lowconf(::NoTruncation, aero::AerosolOptics; kwargs...) -> AerosolOptics
 
 Identity passthrough; matches [`truncate_phase`](@ref) for `NoTruncation`.
+Same `fᵗ = 0` reset.
 """
-truncate_phase_lowconf(::NoTruncation, aero::AerosolOptics; kwargs...) = aero
+truncate_phase_lowconf(::NoTruncation, aero::AerosolOptics; kwargs...) =
+    truncate_phase(NoTruncation(), aero; kwargs...)
 
 
 @doc raw"""
