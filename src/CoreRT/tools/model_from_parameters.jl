@@ -9,6 +9,28 @@ like optical thicknesses, from the input parameters. Produces an RTModel object.
 default_parameters() = vSmartMOM.IO.parameters_from_yaml(joinpath(dirname(pathof(vSmartMOM)), "CoreRT", "DefaultParameters.yaml"))
 
 """
+    _synced_truncation(params, FT)
+
+Reconcile `params.truncation` with the legacy `params.l_trunc` /
+`params.Δ_angle` fields.
+
+If `truncation` is a `δBGE` whose `l_max` or `Δ_angle` no longer matches
+the legacy fields, the user has mutated the legacy fields after
+construction (the `test_float32.jl` pattern) — rebuild a fresh δBGE from
+them. For all other truncation types (e.g. `NoTruncation`) the legacy
+fields are ignored and `truncation` is returned as-is, so explicit
+opt-in to non-default methods is respected.
+"""
+function _synced_truncation(params, ::Type{FT}) where {FT}
+    t = params.truncation
+    if t isa Scattering.δBGE && (t.l_max != params.l_trunc ||
+                                  FT(t.Δ_angle) != FT(params.Δ_angle))
+        return Scattering.δBGE{FT}(params.l_trunc, FT(params.Δ_angle))
+    end
+    return t
+end
+
+"""
     model_from_parameters(params::vSmartMOM_Parameters) -> RTModel
 
 Construct an [`RTModel`](@ref) from user-supplied [`vSmartMOM_Parameters`](@ref).
@@ -40,9 +62,13 @@ function model_from_parameters(params::vSmartMOM_Parameters)
     # Create observation geometry
     obs_geom = ObsGeometry{FT}(params.sza, params.vza, params.vaz, params.obs_alt)
 
-    # Create truncation type
-    truncation_type = Scattering.δBGE{FT}(params.l_trunc, params.Δ_angle)
-    #@show truncation_type
+    # Truncation method (typed; NoTruncation, δBGE, ...). The legacy
+    # `params.Δ_angle` is consulted only via the default δBGE constructed
+    # in `parameters_from_dict` when the user hasn't set `truncation`
+    # explicitly. If the user mutated the legacy `l_trunc` or `Δ_angle`
+    # fields after construction, re-sync the cached δBGE so existing
+    # workflows (e.g. `test_float32.jl`) keep working.
+    truncation_type = _synced_truncation(params, FT)
     # Set quadrature points for streams
     quad_points = rt_set_streams(params.quadrature_type, params.l_trunc, obs_geom, params.polarization_type, array_type(params.architecture))
 

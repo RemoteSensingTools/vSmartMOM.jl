@@ -1,8 +1,33 @@
 #=
- 
-This file specifies how to truncate the AerosolOptics struct, given the truncation type
- 
+
+This file specifies how to truncate the AerosolOptics struct, given the
+truncation type. All `truncate_phase` methods share the contract:
+
+    truncate_phase(method::AbstractTruncationType, aero::AerosolOptics; kwargs...)
+        -> AerosolOptics
+
+The returned `AerosolOptics` carries the truncated Greek coefficients
+and the `fᵗ = 1 - c₀` retained-fraction parameter; downstream pipeline
+code applies the τ/ω rescaling per Sanghavi & Stephens 2015 Eq. 8.
+
 =#
+
+"""
+    truncate_phase(::NoTruncation, aero::AerosolOptics; kwargs...) -> AerosolOptics
+
+Identity passthrough. Returns the input untouched. The `f^t = 0` limit
+of the δ-m / δ-fit / δ-BGE family corresponds to the identity
+(Sanghavi & Stephens 2015 Eq. 8 with `f_tr → 0`).
+"""
+truncate_phase(::NoTruncation, aero::AerosolOptics; kwargs...) = aero
+
+"""
+    truncate_phase_lowconf(::NoTruncation, aero::AerosolOptics; kwargs...) -> AerosolOptics
+
+Identity passthrough; matches [`truncate_phase`](@ref) for `NoTruncation`.
+"""
+truncate_phase_lowconf(::NoTruncation, aero::AerosolOptics; kwargs...) = aero
+
 
 @doc raw"""
     truncate_phase_lowconf(mod::δBGE, aero::AerosolOptics; reportFit=false) -> AerosolOptics
