@@ -116,14 +116,14 @@ function truncate_phase_lowconf(mod::δBGE, aero::AerosolOptics{FT}; reportFit=f
     αᵗ = (α[1:l_max] .- (β[1:l_max] .- cl)) / c₀    # Eq. 38c, derived from β
     ζᵗ = (ζ[1:l_max] .- (β[1:l_max] .- cl)) / c₀    # Eq. 38d, derived from β
 
-    # Adjust scattering and extinction cross section!
-    greek_coefs = GreekCoefs(αᵗ, βᵗ, γᵗ, δᵗ, ϵᵗ, ζᵗ  )
-  
-    # C_sca  = (ω̃ * k);
-    # C_scaᵗ = C_sca * c₀; 
-    # C_ext  = k - (C_sca - C_scaᵗ);
-    #@show typeof(ω̃), typeof(k),typeof(c₀)
-    # return AerosolOptics(greek_coefs = greek_coefs, ω̃=C_scaᵗ / C_ext, k=C_ext, fᵗ = 1-c₀) 
+    # Truncated Greek coefficients only — ω̃ and k pass through. The
+    # τ / ω rescaling per Sanghavi & Stephens 2015 Eq. 8 is applied
+    # later in the pipeline by `delta_m_forward` (see
+    # CoreRT/LayerOpticalProperties/delta_m_truncation.jl): given
+    # `(τ, ω̃, fᵗ)` it returns `(τ_mod, ϖ_mod)` with the proper
+    # `(1 − fᵗ·ω̃)` and `(1−fᵗ)·ω̃/(1−fᵗ·ω̃)` factors. Re-applying
+    # them here would double-count.
+    greek_coefs = GreekCoefs(αᵗ, βᵗ, γᵗ, δᵗ, ϵᵗ, ζᵗ)
     return AerosolOptics(greek_coefs=greek_coefs, ω̃=ω̃, k=k, fᵗ=(FT(1) - c₀))
 end
 
@@ -261,13 +261,13 @@ function truncate_phase(mod::δBGE, aero::AerosolOptics{FT}; reportFit=false) wh
     αᵗ = (α[1:l_tr] .- (β[1:l_tr] .- cl)) / c₀    # Eq. 38c, derived from β
     ζᵗ = (ζ[1:l_tr] .- (β[1:l_tr] .- cl)) / c₀    # Eq. 38d, derived from β
 
-    # Adjust scattering and extinction cross section!
-    greek_coefs = GreekCoefs(αᵗ, βᵗ, γᵗ, δᵗ, ϵᵗ, ζᵗ  )
-  
-    # C_sca  = (ω̃ * k);
-    # C_scaᵗ = C_sca * c₀; 
-    # C_ext  = k - (C_sca - C_scaᵗ);
-    #@show typeof(ω̃), typeof(k),typeof(c₀)
-    # return AerosolOptics(greek_coefs = greek_coefs, ω̃=C_scaᵗ / C_ext, k=C_ext, fᵗ = 1-c₀) 
+    # Truncated Greek coefficients only — ω̃ and k pass through. The
+    # τ / ω rescaling per Sanghavi & Stephens 2015 Eq. 8 is applied
+    # later in the pipeline by `delta_m_forward` (see
+    # CoreRT/LayerOpticalProperties/delta_m_truncation.jl): given
+    # `(τ, ω̃, fᵗ)` it returns `(τ_mod, ϖ_mod)` with the proper
+    # `(1 − fᵗ·ω̃)` and `(1−fᵗ)·ω̃/(1−fᵗ·ω̃)` factors. Re-applying
+    # them here would double-count.
+    greek_coefs = GreekCoefs(αᵗ, βᵗ, γᵗ, δᵗ, ϵᵗ, ζᵗ)
     return AerosolOptics(greek_coefs=greek_coefs, ω̃=ω̃, k=k, fᵗ=(FT(1) - c₀))
 end

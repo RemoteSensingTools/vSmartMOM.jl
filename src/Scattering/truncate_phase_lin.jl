@@ -207,3 +207,23 @@ function truncate_phase(mod::δBGE, aero::AerosolOptics{FT}, lin_aero::linAeroso
         linAerosolOptics(lin_greek_coefs=linGreekCoefs(α̇ᵗ, β̇ᵗ, γ̇ᵗ, δ̇ᵗ, ϵ̇ᵗ, ζ̇ᵗ), ω̃̇=ω̃̇, k̇=k̇, ḟᵗ=-ẋβ[:,1])
 end
 
+
+"""
+    truncate_phase(::NoTruncation, aero::AerosolOptics, lin_aero::linAerosolOptics; kwargs...)
+        -> (AerosolOptics, linAerosolOptics)
+
+Identity passthrough for the linearised (Jacobian) path. Resets the
+raw Mie sentinel `fᵗ = 1` (and the corresponding `ḟᵗ`) to zero,
+matching the two-argument [`truncate_phase`](@ref)(::NoTruncation,
+aero) so `delta_m_truncation_lin` doesn't silently zero the aerosol
+SSA Jacobian when `params.truncation = NoTruncation()`.
+"""
+function truncate_phase(::NoTruncation, aero::AerosolOptics{FT},
+                        lin_aero::linAerosolOptics{FT}; kwargs...) where {FT}
+    aero_out = AerosolOptics(greek_coefs = aero.greek_coefs, ω̃ = aero.ω̃,
+                             k = aero.k, fᵗ = zero(FT), derivs = aero.derivs)
+    lin_out = linAerosolOptics(lin_greek_coefs = lin_aero.lin_greek_coefs,
+                               ω̃̇ = lin_aero.ω̃̇, k̇ = lin_aero.k̇,
+                               ḟᵗ = zero.(lin_aero.ḟᵗ))
+    return aero_out, lin_out
+end
