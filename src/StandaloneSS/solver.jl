@@ -116,6 +116,13 @@ function _azimuthal_average_phase(c::AbstractSSContributor, μ_a, μ_b,
     return total / FT(n_phi)
 end
 
+function _azimuthal_average_phase(::RayleighSSContributor, μ_a, μ_b,
+                                  n_phi::Int)
+    n_phi > 0 || throw(ArgumentError("azimuth_nquad must be positive"))
+    FT = promote_type(typeof(μ_a), typeof(μ_b))
+    return _rayleigh_azimuthal_average(convert(FT, μ_a), convert(FT, μ_b))
+end
+
 function _precompute_optics(config::ExactSSConfig)
     FT = _config_numeric_type(config)
     contributors = config.contributors
@@ -125,6 +132,12 @@ function _precompute_optics(config::ExactSSConfig)
     τ_total_layer = zeros(FT, n_layers, n_spec)
     τ_scat_layer = zeros(FT, n_layers, n_spec)
     weighted_phase = zeros(FT, n_geom, n_layers, n_spec)
+    cosΘ = Vector{FT}(undef, n_geom)
+    @inbounds for iv in 1:n_geom
+        cosΘ[iv] = _scattering_angle_cosine(config.geometry.μ₀,
+                                            config.geometry.μv[iv],
+                                            config.geometry.Δϕ[iv])
+    end
 
     for c in contributors
         τ = τ_matrix(c)
@@ -136,11 +149,8 @@ function _precompute_optics(config::ExactSSConfig)
             τ_scat_layer[iz, ispec] += scat_weight
             if scat_weight != zero(FT)
                 for iv in 1:n_geom
-                    cosΘ = _scattering_angle_cosine(config.geometry.μ₀,
-                                                    config.geometry.μv[iv],
-                                                    config.geometry.Δϕ[iv])
                     weighted_phase[iv, iz, ispec] +=
-                        scat_weight * exact_phase_function(c, cosΘ)
+                        scat_weight * exact_phase_function(c, cosΘ[iv])
                 end
             end
         end

@@ -57,13 +57,17 @@ end
     return ϖ * layer_sum
 end
 
+@inline function _rayleigh_azimuthal_average(μ_a::FT, μ_b::FT) where {FT}
+    a = μ_a * μ_b
+    b = sqrt(max(zero(FT), one(FT) - μ_a^2)) *
+        sqrt(max(zero(FT), one(FT) - μ_b^2))
+    return FT(0.75) * (one(FT) + a^2 + FT(0.5) * b^2)
+end
+
 @inline function _phase_azimuth_average_kind(kind::Int32, g::FT, μ_a::FT,
                                              μ_b::FT, n_phi::Int) where {FT}
     if kind == Int32(1)
-        a = μ_a * μ_b
-        b = sqrt(max(zero(FT), one(FT) - μ_a^2)) *
-            sqrt(max(zero(FT), one(FT) - μ_b^2))
-        return FT(0.75) * (one(FT) + a^2 + FT(0.5) * b^2)
+        return _rayleigh_azimuthal_average(μ_a, μ_b)
     elseif kind == Int32(2)
         a = μ_a * μ_b
         b = sqrt(max(zero(FT), one(FT) - μ_a^2)) *
