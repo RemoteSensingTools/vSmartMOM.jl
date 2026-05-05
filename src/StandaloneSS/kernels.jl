@@ -201,6 +201,51 @@ end
 end
 
 function _run_path1_kernel!(path1, τ_cum, ϖ_eff, P_eff, μ₀, μv, I0, backend)
+    return _run_path1_kernel!(Val(1), path1, τ_cum, ϖ_eff, P_eff, μ₀, μv,
+                              I0, backend)
+end
+
+function _run_path2_kernel!(path2, τ_total, μ₀, μv, surface_brdf, I0, backend)
+    return _run_path2_kernel!(Val(1), path2, τ_total, μ₀, μv, surface_brdf,
+                              I0, backend)
+end
+
+function _run_path3_kernel!(path3, τ_cum, ϖ_eff, P̄, μ₀, μv, albedo, I0,
+                            μ_nodes, μ_weights, backend)
+    return _run_path3_kernel!(Val(1), path3, τ_cum, ϖ_eff, P̄, μ₀, μv,
+                              albedo, I0, μ_nodes, μ_weights, backend)
+end
+
+function _run_path4_kernel!(path4, τ_cum, ϖ_eff, P̄, μ₀, μv, albedo, I0,
+                            μ_nodes, μ_weights, backend)
+    return _run_path4_kernel!(Val(1), path4, τ_cum, ϖ_eff, P̄, μ₀, μv,
+                              albedo, I0, μ_nodes, μ_weights, backend)
+end
+
+function _run_path34_kernel!(path3, path4, τ_cum, ϖ_eff, P̄3, P̄4, μ₀, μv,
+                             albedo, I0, μ_nodes, μ_weights, backend)
+    return _run_path34_kernel!(Val(1), path3, path4, τ_cum, ϖ_eff, P̄3, P̄4,
+                               μ₀, μv, albedo, I0, μ_nodes, μ_weights,
+                               backend)
+end
+
+function _unsupported_stokes_kernel(::Val{N}) where {N}
+    throw(ArgumentError("StandaloneSS exact SS kernels currently support only Stokes-I (n_stokes == 1); received n_stokes=$N"))
+end
+
+_run_path1_kernel!(pol::Val{N}, args...) where {N} =
+    _unsupported_stokes_kernel(pol)
+_run_path2_kernel!(pol::Val{N}, args...) where {N} =
+    _unsupported_stokes_kernel(pol)
+_run_path3_kernel!(pol::Val{N}, args...) where {N} =
+    _unsupported_stokes_kernel(pol)
+_run_path4_kernel!(pol::Val{N}, args...) where {N} =
+    _unsupported_stokes_kernel(pol)
+_run_path34_kernel!(pol::Val{N}, args...) where {N} =
+    _unsupported_stokes_kernel(pol)
+
+function _run_path1_kernel!(::Val{1}, path1, τ_cum, ϖ_eff, P_eff, μ₀, μv,
+                            I0, backend)
     kernel! = _path1_kernel!(backend)
     event = kernel!(path1, τ_cum, ϖ_eff, P_eff, μ₀, μv, I0;
                     ndrange=(size(path1, 1), size(path1, 3)))
@@ -208,7 +253,8 @@ function _run_path1_kernel!(path1, τ_cum, ϖ_eff, P_eff, μ₀, μv, I0, backen
     return path1
 end
 
-function _run_path2_kernel!(path2, τ_total, μ₀, μv, surface_brdf, I0, backend)
+function _run_path2_kernel!(::Val{1}, path2, τ_total, μ₀, μv, surface_brdf,
+                            I0, backend)
     kernel! = _path2_kernel!(backend)
     event = kernel!(path2, τ_total, μ₀, μv, surface_brdf, I0;
                     ndrange=(size(path2, 1), size(path2, 3)))
@@ -216,8 +262,8 @@ function _run_path2_kernel!(path2, τ_total, μ₀, μv, surface_brdf, I0, backe
     return path2
 end
 
-function _run_path3_kernel!(path3, τ_cum, ϖ_eff, P̄, μ₀, μv, albedo, I0,
-                            μ_nodes, μ_weights, backend)
+function _run_path3_kernel!(::Val{1}, path3, τ_cum, ϖ_eff, P̄, μ₀, μv,
+                            albedo, I0, μ_nodes, μ_weights, backend)
     kernel! = _path3_kernel!(backend)
     event = kernel!(path3, τ_cum, ϖ_eff, P̄, μ₀, μv, albedo, I0,
                     μ_nodes, μ_weights;
@@ -226,8 +272,8 @@ function _run_path3_kernel!(path3, τ_cum, ϖ_eff, P̄, μ₀, μv, albedo, I0,
     return path3
 end
 
-function _run_path4_kernel!(path4, τ_cum, ϖ_eff, P̄, μ₀, μv, albedo, I0,
-                            μ_nodes, μ_weights, backend)
+function _run_path4_kernel!(::Val{1}, path4, τ_cum, ϖ_eff, P̄, μ₀, μv,
+                            albedo, I0, μ_nodes, μ_weights, backend)
     kernel! = _path4_kernel!(backend)
     event = kernel!(path4, τ_cum, ϖ_eff, P̄, μ₀, μv, albedo, I0,
                     μ_nodes, μ_weights;
@@ -236,8 +282,8 @@ function _run_path4_kernel!(path4, τ_cum, ϖ_eff, P̄, μ₀, μv, albedo, I0,
     return path4
 end
 
-function _run_path34_kernel!(path3, path4, τ_cum, ϖ_eff, P̄3, P̄4, μ₀, μv,
-                             albedo, I0, μ_nodes, μ_weights, backend)
+function _run_path34_kernel!(::Val{1}, path3, path4, τ_cum, ϖ_eff, P̄3, P̄4,
+                             μ₀, μv, albedo, I0, μ_nodes, μ_weights, backend)
     kernel! = _path34_kernel!(backend)
     event = kernel!(path3, path4, τ_cum, ϖ_eff, P̄3, P̄4, μ₀, μv,
                     albedo, I0, μ_nodes, μ_weights;

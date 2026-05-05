@@ -17,9 +17,12 @@ export AbsorptionSSContributor,
        HGAerosolSSContributor,
        LambertianSSSurface,
        RayleighSSContributor,
+       SSMeasurementSelector,
        SSGeometry,
        TruncatedAndExactScatteringOpticalProperties,
+       chain_rule_combine_dP,
        chain_rule_combine_dτ,
+       chain_rule_combine_dϖ,
        chain_rule_combine_surface_brdf,
        determine_required_l_aerosol,
        determine_required_l_from_moments,
@@ -30,13 +33,16 @@ export AbsorptionSSContributor,
        determine_required_nstreams,
        exact_phase_function,
        run_exact_ss,
-       run_exact_ss_with_jacobians
+       run_exact_ss_with_jacobians,
+       selected_measurement_jacobian,
+       selected_measurements
 
 include("types.jl")
 include("surfaces.jl")
 include("kernels.jl")
 include("quadrature_required.jl")
 include("solver.jl")
+include("measurement_selector.jl")
 include("linearized_f2.jl")
 include("chain_rule.jl")
 
