@@ -312,6 +312,47 @@ end
         @test both.total ≈ only1.total .+ only2.total rtol=1e-12
         @test all_paths.total ≈
               only1.total .+ only2.total .+ only3.total .+ only4.total rtol=1e-12
+        @test all_paths.path3 ≈ only3.path3 rtol=1e-12
+        @test all_paths.path4 ≈ only4.path4 rtol=1e-12
+    end
+
+    @testset "Type inference and path parity" begin
+        FT = Float64
+        geometry = SSGeometry(μ₀=FT(0.79), μv=FT[0.46], Δϕ=FT[0.4])
+        surface = LambertianSSSurface(albedo=FT(0.27))
+        rayleigh = RayleighSSContributor(τ=reshape(FT[0.05, 0.08], 2, 1))
+        config = ExactSSConfig(geometry=geometry, surface=surface,
+                               contributors=(rayleigh,), I0=FT[1.0],
+                               inner_nquad=4, azimuth_nquad=8)
+
+        optics = @inferred vSmartMOM.StandaloneSS._precompute_optics(config)
+        ρ = @inferred vSmartMOM.StandaloneSS._precompute_surface_brdf(
+            config.surface, config.geometry, 1, FT)
+        μ_nodes, _ = vSmartMOM.StandaloneSS._gauss_legendre_01(config.inner_nquad, FT)
+        reference_μ₀ = fill(config.geometry.μ₀, length(config.geometry.μv))
+        P̄3, P̄4 = @inferred vSmartMOM.StandaloneSS._precompute_azimuthal_phase_pair(
+            config, optics.τ_scat_layer, μ_nodes, reference_μ₀, config.geometry.μv)
+
+        @test eltype(optics.τ_cum) == FT
+        @test eltype(ρ) == FT
+        @test size(P̄3) == size(P̄4) == (1, 2, 1, config.inner_nquad)
+
+        all_paths = @inferred run_exact_ss(config; paths=:all)
+        split3 = run_exact_ss(config; paths=:path3)
+        split4 = run_exact_ss(config; paths=:path4)
+        @test all_paths.path3 ≈ split3.path3 rtol=1e-12 atol=1e-14
+        @test all_paths.path4 ≈ split4.path4 rtol=1e-12 atol=1e-14
+
+        dualτ = ForwardDiff.Dual{Nothing}(FT(0.05), one(FT))
+        dual_config = ExactSSConfig(
+            geometry=geometry,
+            surface=surface,
+            contributors=(RayleighSSContributor(
+                τ=reshape([dualτ, zero(dualτ) + FT(0.08)], 2, 1)),),
+            I0=FT[1.0])
+        dual_result = @inferred run_exact_ss(dual_config; paths=:path1)
+        @test eltype(dual_result.total) <: ForwardDiff.Dual
+        @test isfinite(ForwardDiff.value(dual_result.total[1, 1, 1]))
     end
 
     @testset "Black surface and pure absorption" begin

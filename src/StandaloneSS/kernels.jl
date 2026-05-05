@@ -98,35 +98,6 @@ end
     path4[iv, 1, ispec] = value
 end
 
-@kernel function _path34_kernel!(path3, path4, @Const(τ_cum), @Const(ϖ_eff),
-                                @Const(P̄3), @Const(P̄4), μ₀, @Const(μv),
-                                @Const(albedo), @Const(I0), @Const(μ_nodes),
-                                @Const(μ_weights))
-    iv, ispec = @index(Global, NTuple)
-    FT = eltype(path3)
-    μᵥ = μv[iv]
-    τ_total = τ_cum[size(τ_cum, 1), ispec]
-    L_surface = (albedo[ispec] / FT(pi)) * μ₀ * I0[ispec] *
-                exp(-τ_total / μ₀)
-
-    F_surface = zero(FT)
-    path4_value = zero(FT)
-    n_layers = size(ϖ_eff, 1)
-    for iz in 1:n_layers
-        F_surface += I0[ispec] *
-                     _inner_scatter_sum(τ_cum, ϖ_eff, P̄3, τ_total, iv,
-                                        ispec, iz, μ₀, μ_nodes, μ_weights)
-        path4_value += L_surface *
-                       _inner_scatter_sum(τ_cum, ϖ_eff, P̄4, τ_total, iv,
-                                          ispec, iz, μᵥ, μ_nodes,
-                                          μ_weights) / μᵥ
-    end
-
-    path3[iv, 1, ispec] =
-        (albedo[ispec] / FT(pi)) * F_surface * exp(-τ_total / μᵥ)
-    path4[iv, 1, ispec] = path4_value
-end
-
 function _run_path1_kernel!(path1, τ_cum, ϖ_eff, P_eff, geometry, I0)
     backend = KernelAbstractions.CPU()
     kernel! = _path1_kernel!(backend)
@@ -165,15 +136,4 @@ function _run_path4_kernel!(path4, τ_cum, ϖ_eff, P̄, geometry, albedo, I0,
                     ndrange=(size(path4, 1), size(path4, 3)))
     event === nothing || wait(event)
     return path4
-end
-
-function _run_path34_kernel!(path3, path4, τ_cum, ϖ_eff, P̄3, P̄4, geometry,
-                             albedo, I0, μ_nodes, μ_weights)
-    backend = KernelAbstractions.CPU()
-    kernel! = _path34_kernel!(backend)
-    event = kernel!(path3, path4, τ_cum, ϖ_eff, P̄3, P̄4, geometry.μ₀,
-                    geometry.μv, albedo, I0, μ_nodes, μ_weights;
-                    ndrange=(size(path3, 1), size(path3, 3)))
-    event === nothing || wait(event)
-    return path3, path4
 end
