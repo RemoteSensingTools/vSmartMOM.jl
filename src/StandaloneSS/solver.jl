@@ -51,7 +51,11 @@ function _vectorize_I0(I0, n_spec::Int, ::Type{FT}) where {FT}
     return convert(Vector{FT}, collect(I0))
 end
 
-function _scattering_angle_cosine(μ₀::FT, μᵥ::FT, Δϕ::FT) where {FT}
+function _scattering_angle_cosine(μ₀, μᵥ, Δϕ)
+    FT = promote_type(typeof(μ₀), typeof(μᵥ), typeof(Δϕ))
+    μ₀ = convert(FT, μ₀)
+    μᵥ = convert(FT, μᵥ)
+    Δϕ = convert(FT, Δϕ)
     sin₀ = sqrt(max(zero(FT), one(FT) - μ₀^2))
     sinᵥ = sqrt(max(zero(FT), one(FT) - μᵥ^2))
     return -μ₀ * μᵥ + sin₀ * sinᵥ * cos(Δϕ)
@@ -64,8 +68,11 @@ function _gauss_legendre_01(n::Int, ::Type{FT}) where {FT}
            convert(Vector{FT}, w ./ 2)
 end
 
-function _azimuthal_average_phase(c::AbstractSSContributor, μ_a::FT, μ_b::FT,
-                                  n_phi::Int) where {FT}
+function _azimuthal_average_phase(c::AbstractSSContributor, μ_a, μ_b,
+                                  n_phi::Int)
+    FT = promote_type(typeof(μ_a), typeof(μ_b), _contributor_numeric_type(c))
+    μ_a = convert(FT, μ_a)
+    μ_b = convert(FT, μ_b)
     n_phi > 0 || throw(ArgumentError("azimuth_nquad must be positive"))
     a = μ_a * μ_b
     b = sqrt(max(zero(FT), one(FT) - μ_a^2)) *
@@ -80,7 +87,7 @@ function _azimuthal_average_phase(c::AbstractSSContributor, μ_a::FT, μ_b::FT,
 end
 
 function _precompute_optics(config::ExactSSConfig)
-    FT = typeof(config.geometry.μ₀)
+    FT = _config_numeric_type(config)
     contributors = config.contributors
     n_layers, n_spec = _dims(contributors)
     n_geom = length(config.geometry.μv)
@@ -132,7 +139,8 @@ function _precompute_optics(config::ExactSSConfig)
 end
 
 function _precompute_azimuthal_phase(config::ExactSSConfig, τ_scat_layer, μ_nodes,
-                                     reference_μ::AbstractVector{FT}) where {FT}
+                                     reference_μ::AbstractVector)
+    FT = _config_numeric_type(config)
     contributors = config.contributors
     n_layers, n_spec = _dims(contributors)
     n_geom = length(reference_μ)
@@ -148,7 +156,8 @@ function _precompute_azimuthal_phase(config::ExactSSConfig, τ_scat_layer, μ_no
             scat_weight == zero(FT) && continue
             for iv in 1:n_geom, k in 1:n_quad
                 P̄[iv, iz, ispec, k] += scat_weight *
-                    _azimuthal_average_phase(c, μ_nodes[k], reference_μ[iv],
+                    _azimuthal_average_phase(c, convert(FT, μ_nodes[k]),
+                                             convert(FT, reference_μ[iv]),
                                              config.azimuth_nquad)
             end
         end
@@ -168,6 +177,10 @@ function _validate_config(config::ExactSSConfig, paths::Symbol)
     _validate_paths(paths)
     config.n_stokes == 1 ||
         throw(ArgumentError("StandaloneSS Phase 1 supports only n_stokes == 1"))
+    if (_wants_path3(paths) || _wants_path4(paths)) &&
+       !(config.surface isa LambertianSSSurface)
+        throw(ArgumentError("StandaloneSS paths 3 and 4 currently support LambertianSSSurface only"))
+    end
     _validate_geometry(config.geometry)
     config.inner_nquad > 0 ||
         throw(ArgumentError("ExactSSConfig.inner_nquad must be positive"))
@@ -182,12 +195,12 @@ end
 """
     run_exact_ss(config::ExactSSConfig; paths=:paths_1_2)
 
-Run Phase 1 exact single-scattering for scalar Lambertian paths 1 and/or 2.
-Returns `(; total, path1, path2, quadrature_info, metadata)`, where radiance
-arrays have shape `(nGeom, 1, nSpec)`.
+Run standalone exact single-scattering for selected scalar paths. Path 2
+supports Lambertian and Cox-Munk surfaces; paths 3 and 4 currently support
+Lambertian surfaces. Radiance arrays have shape `(nGeom, 1, nSpec)`.
 """
 function run_exact_ss(config::ExactSSConfig; paths::Symbol = :paths_1_2)
-    FT = typeof(config.geometry.μ₀)
+    FT = _config_numeric_type(config)
     _validate_config(config, paths)
     optics = _precompute_optics(config)
 
@@ -203,20 +216,31 @@ function run_exact_ss(config::ExactSSConfig; paths::Symbol = :paths_1_2)
         _run_path1_kernel!(path1, optics.τ_cum, optics.ϖ_eff, optics.P_eff,
                            config.geometry, I0)
     end
-    albedo = _vectorize_albedo(config.surface, n_spec, FT)
     if _wants_path2(paths)
-        _run_path2_kernel!(path2, optics.τ_total_column, config.geometry, albedo, I0)
+        surface_brdf = _precompute_surface_brdf(config.surface, config.geometry,
+                                                n_spec, FT)
+        _run_path2_kernel!(path2, optics.τ_total_column, config.geometry,
+                           surface_brdf, I0)
     end
     if _wants_path3(paths) || _wants_path4(paths)
+        albedo = _vectorize_albedo(config.surface, n_spec, FT)
         μ_nodes, μ_weights = _gauss_legendre_01(config.inner_nquad, FT)
-        if _wants_path3(paths)
+        if _wants_path3(paths) && _wants_path4(paths)
+            reference_μ₀ = fill(config.geometry.μ₀, n_geom)
+            P̄3 = _precompute_azimuthal_phase(config, optics.τ_scat_layer,
+                                              μ_nodes, reference_μ₀)
+            P̄4 = _precompute_azimuthal_phase(config, optics.τ_scat_layer,
+                                              μ_nodes, config.geometry.μv)
+            _run_path34_kernel!(path3, path4, optics.τ_cum, optics.ϖ_eff,
+                                P̄3, P̄4, config.geometry, albedo, I0,
+                                μ_nodes, μ_weights)
+        elseif _wants_path3(paths)
             reference_μ₀ = fill(config.geometry.μ₀, n_geom)
             P̄3 = _precompute_azimuthal_phase(config, optics.τ_scat_layer,
                                               μ_nodes, reference_μ₀)
             _run_path3_kernel!(path3, optics.τ_cum, optics.ϖ_eff, P̄3,
                                config.geometry, albedo, I0, μ_nodes, μ_weights)
-        end
-        if _wants_path4(paths)
+        else
             P̄4 = _precompute_azimuthal_phase(config, optics.τ_scat_layer,
                                               μ_nodes, config.geometry.μv)
             _run_path4_kernel!(path4, optics.τ_cum, optics.ϖ_eff, P̄4,

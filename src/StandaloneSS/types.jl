@@ -8,10 +8,10 @@ Solar and viewing geometry for the standalone single-scatter solver.
 `μ₀` is the positive solar cosine, `μv` are positive upward viewing cosines,
 and `Δϕ` is the view-sun relative azimuth in radians for each view.
 """
-Base.@kwdef struct SSGeometry{FT<:Real, V<:AbstractVector{FT}}
-    μ₀::FT
+Base.@kwdef struct SSGeometry{M<:Real, V<:AbstractVector{<:Real}, A<:AbstractVector{<:Real}}
+    μ₀::M
     μv::V
-    Δϕ::V
+    Δϕ::A
 end
 
 """
@@ -22,6 +22,34 @@ per-spectral vector.
 """
 Base.@kwdef struct LambertianSSSurface{A} <: AbstractSSSurface
     albedo::A
+end
+
+"""
+    CoxMunkSSSurface(; wind_speed, n_water=nothing, whitecap_albedo=0.22,
+                       include_whitecaps=true, shadowing=true)
+
+Scalar Cox-Munk ocean surface for standalone exact path 2. `wind_speed` is the
+10-m wind speed in m/s. `n_water` may be `nothing`, a scalar complex refractive
+index, or a per-spectral vector of complex refractive indices. The `nothing`
+fallback uses a fixed visible-water refractive index for this standalone path.
+"""
+struct CoxMunkSSSurface{W<:Real, N, A<:Real} <: AbstractSSSurface
+    wind_speed::W
+    n_water::N
+    whitecap_albedo::A
+    include_whitecaps::Bool
+    shadowing::Bool
+end
+
+function CoxMunkSSSurface(; wind_speed::W, n_water=nothing,
+                          whitecap_albedo = nothing,
+                          include_whitecaps::Bool = true,
+                          shadowing::Bool = true) where {W<:Real}
+    albedo = whitecap_albedo === nothing ? W(0.22) : whitecap_albedo
+    albedo isa Real ||
+        throw(ArgumentError("CoxMunkSSSurface.whitecap_albedo must be real"))
+    return CoxMunkSSSurface(wind_speed, n_water, albedo, include_whitecaps,
+                            shadowing)
 end
 
 Base.@kwdef struct RayleighSSContributor{A<:AbstractMatrix} <: AbstractSSContributor
@@ -81,8 +109,10 @@ exact_phase_function(::RayleighSSContributor, cosΘ) =
     oftype(cosΘ, 0.75) * (one(cosΘ) + cosΘ^2)
 
 function exact_phase_function(c::HGAerosolSSContributor, cosΘ)
-    g = convert(typeof(cosΘ), c.g)
-    return (one(g) - g^2) / (one(g) + g^2 - 2g * cosΘ)^(oftype(g, 1.5))
+    FT = promote_type(typeof(c.g), typeof(cosΘ))
+    g = convert(FT, c.g)
+    x = convert(FT, cosΘ)
+    return (one(g) - g^2) / (one(g) + g^2 - 2g * x)^(FT(1.5))
 end
 
 exact_phase_function(::AbsorptionSSContributor, cosΘ) = zero(cosΘ)

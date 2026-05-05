@@ -2,14 +2,16 @@
     StandaloneSS
 
 Standalone exact single-scattering tools. Phase 1 implements scalar,
-plane-parallel, Lambertian paths 1 and 2 with KernelAbstractions CPU kernels.
+plane-parallel exact paths with KernelAbstractions CPU kernels.
 """
 module StandaloneSS
 
 using FastGaussQuadrature: gausslegendre
 using KernelAbstractions
+using SpecialFunctions: erfc
 
 export AbsorptionSSContributor,
+       CoxMunkSSSurface,
        ExactSSConfig,
        HGAerosolSSContributor,
        LambertianSSSurface,
@@ -27,6 +29,7 @@ export AbsorptionSSContributor,
        run_exact_ss
 
 include("types.jl")
+include("surfaces.jl")
 include("kernels.jl")
 include("quadrature_required.jl")
 include("solver.jl")

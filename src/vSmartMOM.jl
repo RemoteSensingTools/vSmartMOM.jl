@@ -108,8 +108,8 @@ export default_parameters, parameters_from_file, parameters_from_source,
 export rt_run_lin, model_from_parameters_lin
 # Export standalone exact single-scattering API
 export StandaloneSS, run_exact_ss, ExactSSConfig, SSGeometry,
-       LambertianSSSurface, RayleighSSContributor, HGAerosolSSContributor,
-       AbsorptionSSContributor, determine_required_l_aerosol,
+       LambertianSSSurface, CoxMunkSSSurface, RayleighSSContributor,
+       HGAerosolSSContributor, AbsorptionSSContributor, determine_required_l_aerosol,
        determine_required_l_from_moments, determine_required_nbrdf,
        determine_required_nbrdf_coxmunk, determine_required_nquad,
        determine_required_nquad_inner, determine_required_nstreams

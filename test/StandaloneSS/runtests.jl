@@ -1,6 +1,7 @@
 using Test
 using vSmartMOM
 using vSmartMOM.StandaloneSS
+using ForwardDiff
 using LinearAlgebra
 
 _want_ref_path1(paths) = paths in (:path1, :paths_1_2, :all, :all_four)
@@ -210,6 +211,7 @@ end
     @testset "Top-level exports" begin
         @test run_exact_ss === vSmartMOM.run_exact_ss
         @test StandaloneSS === vSmartMOM.StandaloneSS
+        @test CoxMunkSSSurface === vSmartMOM.CoxMunkSSSurface
     end
 
     @testset "Rayleigh path 1 and Lambertian path 2" begin
@@ -229,6 +231,41 @@ end
         @test result.metadata.n_stokes == 1
         @test result.quadrature_info.kernel_backend == :KernelAbstractionsCPU
         @test result.quadrature_info.inner_quadrature == config.inner_nquad
+    end
+
+    @testset "Cox-Munk path 2" begin
+        FT = Float64
+        geometry = SSGeometry(μ₀=FT(0.78), μv=FT[0.42, 0.71],
+                              Δϕ=FT[0.15, 1.2])
+        n_water = Complex{FT}(FT(1.34), FT(1e-8))
+        surface = CoxMunkSSSurface(wind_speed=FT(5.0), n_water=n_water,
+                                   include_whitecaps=false, shadowing=true)
+        absorption = AbsorptionSSContributor(τ=reshape(FT[0.02, 0.06], 2, 1))
+        config = ExactSSConfig(geometry=geometry, surface=surface,
+                               contributors=(absorption,), I0=FT[1.0])
+
+        result = run_exact_ss(config; paths=:path2)
+        expected = zeros(FT, 2, 1, 1)
+        core_surface = vSmartMOM.CoreRT.CoxMunkSurface{FT}(
+            wind_speed=surface.wind_speed,
+            n_water=n_water,
+            whitecap_albedo=FT(0.22),
+            include_whitecaps=false,
+            shadowing=true)
+        τ = sum(absorption.τ[:, 1])
+        for iv in eachindex(geometry.μv)
+            M = vSmartMOM.CoreRT.coxmunk_brdf_mueller(
+                core_surface, 1, geometry.μv[iv], geometry.μ₀,
+                geometry.Δϕ[iv]; n_water=n_water)
+            expected[iv, 1, 1] = geometry.μ₀ * M[1, 1] *
+                                 exp(-τ / geometry.μ₀) *
+                                 exp(-τ / geometry.μv[iv])
+        end
+
+        @test result.path1 == zero(result.path1)
+        @test result.path2 ≈ expected rtol=1e-12 atol=1e-14
+        @test result.total ≈ expected rtol=1e-12 atol=1e-14
+        @test_throws ArgumentError run_exact_ss(config; paths=:all)
     end
 
     @testset "Mixed τϖ-weighted phase mixing" begin
@@ -315,6 +352,37 @@ end
         @test result.path2 ≈ expected.path2 rtol=5e-6 atol=1e-7
     end
 
+    @testset "ForwardDiff compatibility" begin
+        FT = Float64
+        geometry = SSGeometry(μ₀=FT(0.76), μv=FT[0.48], Δϕ=FT[0.35])
+
+        fτ(x) = begin
+            surface = LambertianSSSurface(albedo=FT(0.31))
+            absorption = AbsorptionSSContributor(τ=reshape([x[1], FT(0.04)], 2, 1))
+            config = ExactSSConfig(geometry=geometry, surface=surface,
+                                   contributors=(absorption,), I0=FT[1.0])
+            vec(run_exact_ss(config; paths=:path2).total)
+        end
+        Jτ = ForwardDiff.jacobian(fτ, FT[0.18])
+        baseτ = only(fτ(FT[0.18]))
+        atten_slope = inv(geometry.μ₀) + inv(only(geometry.μv))
+        @test Jτ[1, 1] ≈ -baseτ * atten_slope rtol=1e-12 atol=1e-14
+
+        fw(u) = begin
+            n_water = Complex{FT}(FT(1.34), FT(1e-8))
+            surface = CoxMunkSSSurface(wind_speed=u[1], n_water=n_water,
+                                       include_whitecaps=false, shadowing=true)
+            absorption = AbsorptionSSContributor(τ=reshape(FT[0.07, 0.03], 2, 1))
+            config = ExactSSConfig(geometry=geometry, surface=surface,
+                                   contributors=(absorption,), I0=FT[1.0])
+            vec(run_exact_ss(config; paths=:path2).total)
+        end
+        Jw = ForwardDiff.jacobian(fw, FT[4.0])
+        h = FT(1e-5)
+        fd = (only(fw(FT[4.0 + h])) - only(fw(FT[4.0 - h]))) / (2h)
+        @test Jw[1, 1] ≈ fd rtol=2e-5 atol=1e-8
+    end
+
     @testset "Validation errors" begin
         FT = Float64
         good_surface = LambertianSSSurface(albedo=FT(0.2))
@@ -341,6 +409,10 @@ end
         @test_throws ArgumentError run_exact_ss(ExactSSConfig(
             geometry=good.geometry, surface=good.surface,
             contributors=good.contributors, I0=good.I0, azimuth_nquad=0))
+        @test_throws ArgumentError run_exact_ss(ExactSSConfig(
+            geometry=good.geometry,
+            surface=CoxMunkSSSurface(wind_speed=FT(4.0)),
+            contributors=good.contributors, I0=good.I0); paths=:path3)
     end
 
     @testset "Required-Nquad diagnostics" begin
@@ -357,6 +429,9 @@ end
             HGAerosolSSContributor(g=0.0, ϖ=1.0, τ=[1.0;;])) == 0
 
         @test determine_required_nbrdf(config.surface) == 1
+        coxmunk = CoxMunkSSSurface(wind_speed=4.0)
+        @test determine_required_nbrdf(coxmunk) ==
+              determine_required_nbrdf_coxmunk(coxmunk.wind_speed)
         @test determine_required_nbrdf_coxmunk(0.0; target_relative_error=1e-4) ==
               clamp(ceil(Int, log(1 / 1e-4) / sqrt(0.003)), 16, 200)
         @test determine_required_nbrdf_coxmunk(1000.0; target_relative_error=1e-4) == 16
