@@ -60,6 +60,10 @@ surfaces only need `m=0`, represented as a count of 1.
 determine_required_nbrdf(::LambertianSSSurface;
                          target_relative_error::Real = 1e-4) = 1
 
+determine_required_nbrdf(surface::CoxMunkSSSurface;
+                         target_relative_error::Real = 1e-4) =
+    determine_required_nbrdf_coxmunk(surface.wind_speed; target_relative_error)
+
 """
     determine_required_nbrdf_coxmunk(wind_speed_ms; target_relative_error=1e-4)
 
