@@ -11,6 +11,36 @@ _wants_path2(paths::Symbol) = paths in (:path2, :paths_1_2, :all, :all_four)
 _wants_path3(paths::Symbol) = paths in (:path3, :all, :all_four)
 _wants_path4(paths::Symbol) = paths in (:path4, :all, :all_four)
 
+_architecture_backend(architecture::AbstractArchitecture) = devi(architecture)
+_architecture_array_type(architecture::AbstractArchitecture) = array_type(architecture)
+
+_to_arch(::CPU, x::AbstractArray) = x
+_to_arch(architecture::AbstractArchitecture, x::AbstractArray) =
+    _architecture_array_type(architecture)(x)
+
+_zeros_arch(::CPU, ::Type{FT}, dims::Int...) where {FT} = zeros(FT, dims...)
+_zeros_arch(architecture::AbstractArchitecture, ::Type{FT}, dims::Int...) where {FT} =
+    _architecture_array_type(architecture)(zeros(FT, dims...))
+
+_kernel_backend_name(::CPU) = :KernelAbstractionsCPU
+_kernel_backend_name(::GPU) = :CUDA
+_kernel_backend_name(::MetalGPU) = :Metal
+_kernel_backend_name(architecture::AbstractArchitecture) =
+    Symbol(nameof(typeof(architecture)))
+
+_validate_architecture(::CPU) = nothing
+function _validate_architecture(architecture::AbstractArchitecture)
+    try
+        _architecture_backend(architecture)
+        _architecture_array_type(architecture)
+    catch err
+        throw(ArgumentError("StandaloneSS architecture $(typeof(architecture)) " *
+                            "is not available. Load a functional backend " *
+                            "package, e.g. `using CUDA`, before using GPU()."))
+    end
+    return nothing
+end
+
 function _validate_geometry(geometry::SSGeometry)
     geometry.μ₀ > zero(geometry.μ₀) ||
         throw(ArgumentError("SSGeometry.μ₀ must be positive"))
@@ -218,6 +248,78 @@ function _precompute_azimuthal_phase_pair(config::ExactSSConfig, τ_scat_layer,
     return P̄a, P̄b
 end
 
+_contributor_kind(::RayleighSSContributor) = Int32(1)
+_contributor_kind(::HGAerosolSSContributor) = Int32(2)
+_contributor_kind(::AbsorptionSSContributor) = Int32(0)
+
+_contributor_g(::RayleighSSContributor, ::Type{FT}) where {FT} = zero(FT)
+_contributor_g(c::HGAerosolSSContributor, ::Type{FT}) where {FT} =
+    convert(FT, c.g)
+_contributor_g(::AbsorptionSSContributor, ::Type{FT}) where {FT} = zero(FT)
+
+function _pack_contributors(contributors, n_layers::Int, n_spec::Int,
+                            ::Type{FT}) where {FT}
+    n_contrib = length(contributors)
+    τ_contrib = zeros(FT, n_contrib, n_layers, n_spec)
+    ϖ_contrib = zeros(FT, n_contrib)
+    g_contrib = zeros(FT, n_contrib)
+    kind_contrib = zeros(Int32, n_contrib)
+
+    for (ic, c) in enumerate(contributors)
+        τ = τ_matrix(c)
+        @inbounds for ispec in 1:n_spec, iz in 1:n_layers
+            τ_contrib[ic, iz, ispec] = convert(FT, τ[iz, ispec])
+        end
+        ϖ_contrib[ic] = convert(FT, single_scattering_albedo(c))
+        g_contrib[ic] = _contributor_g(c, FT)
+        kind_contrib[ic] = _contributor_kind(c)
+    end
+
+    return (; τ_contrib, ϖ_contrib, g_contrib, kind_contrib)
+end
+
+function _precompute_azimuthal_phase_pair_arch(config::ExactSSConfig,
+                                               τ_scat_layer, μ_nodes,
+                                               reference_a::AbstractVector,
+                                               reference_b::AbstractVector,
+                                               architecture::CPU, backend)
+    return _precompute_azimuthal_phase_pair(config, τ_scat_layer, μ_nodes,
+                                            reference_a, reference_b)
+end
+
+function _precompute_azimuthal_phase_pair_arch(config::ExactSSConfig,
+                                               τ_scat_layer, μ_nodes,
+                                               reference_a::AbstractVector,
+                                               reference_b::AbstractVector,
+                                               architecture::AbstractArchitecture,
+                                               backend)
+    length(reference_a) == length(reference_b) ||
+        throw(ArgumentError("paired azimuthal phase references must have the same length"))
+
+    FT = _config_numeric_type(config)
+    n_layers, n_spec = _dims(config.contributors)
+    n_geom = length(reference_a)
+    n_quad = length(μ_nodes)
+    P̄a = _zeros_arch(architecture, FT, n_geom, n_layers, n_spec, n_quad)
+    P̄b = _zeros_arch(architecture, FT, n_geom, n_layers, n_spec, n_quad)
+    packed = _pack_contributors(config.contributors, n_layers, n_spec, FT)
+
+    _run_azimuthal_phase_pair_kernel!(
+        P̄a, P̄b,
+        _to_arch(architecture, τ_scat_layer),
+        _to_arch(architecture, packed.τ_contrib),
+        _to_arch(architecture, packed.ϖ_contrib),
+        _to_arch(architecture, packed.g_contrib),
+        _to_arch(architecture, packed.kind_contrib),
+        _to_arch(architecture, μ_nodes),
+        _to_arch(architecture, reference_a),
+        _to_arch(architecture, reference_b),
+        config.azimuth_nquad,
+        backend)
+
+    return P̄a, P̄b
+end
+
 function _validate_config(config::ExactSSConfig, paths::Symbol)
     _validate_paths(paths)
     config.n_stokes == 1 ||
@@ -234,6 +336,7 @@ function _validate_config(config::ExactSSConfig, paths::Symbol)
     n_layers, n_spec = _dims(config.contributors)
     n_spec > 0 && n_layers > 0 ||
         throw(ArgumentError("ExactSSConfig requires at least one layer and one spectral point"))
+    _validate_architecture(config.architecture)
     return n_layers, n_spec
 end
 
@@ -247,54 +350,67 @@ Lambertian surfaces. Radiance arrays have shape `(nGeom, 1, nSpec)`.
 function run_exact_ss(config::ExactSSConfig; paths::Symbol = :paths_1_2)
     FT = _config_numeric_type(config)
     _validate_config(config, paths)
+    architecture = config.architecture
+    backend = _architecture_backend(architecture)
     optics = _precompute_optics(config)
 
     n_geom = length(config.geometry.μv)
     n_spec = size(optics.τ_cum, 2)
-    path1 = zeros(FT, n_geom, 1, n_spec)
-    path2 = zeros(FT, n_geom, 1, n_spec)
-    path3 = zeros(FT, n_geom, 1, n_spec)
-    path4 = zeros(FT, n_geom, 1, n_spec)
+    path1 = _zeros_arch(architecture, FT, n_geom, 1, n_spec)
+    path2 = _zeros_arch(architecture, FT, n_geom, 1, n_spec)
+    path3 = _zeros_arch(architecture, FT, n_geom, 1, n_spec)
+    path4 = _zeros_arch(architecture, FT, n_geom, 1, n_spec)
 
-    I0 = _vectorize_I0(config.I0, n_spec, FT)
+    μv = _to_arch(architecture, config.geometry.μv)
+    τ_cum = _to_arch(architecture, optics.τ_cum)
+    τ_total_column = _to_arch(architecture, optics.τ_total_column)
+    ϖ_eff = _to_arch(architecture, optics.ϖ_eff)
+    P_eff = _to_arch(architecture, optics.P_eff)
+
+    I0 = _to_arch(architecture, _vectorize_I0(config.I0, n_spec, FT))
     if _wants_path1(paths)
-        _run_path1_kernel!(path1, optics.τ_cum, optics.ϖ_eff, optics.P_eff,
-                           config.geometry, I0)
+        _run_path1_kernel!(path1, τ_cum, ϖ_eff, P_eff, config.geometry.μ₀,
+                           μv, I0, backend)
     end
     if _wants_path2(paths)
         surface_brdf = _precompute_surface_brdf(config.surface, config.geometry,
                                                 n_spec, FT)
-        _run_path2_kernel!(path2, optics.τ_total_column, config.geometry,
-                           surface_brdf, I0)
+        surface_brdf = _to_arch(architecture, surface_brdf)
+        _run_path2_kernel!(path2, τ_total_column, config.geometry.μ₀, μv,
+                           surface_brdf, I0, backend)
     end
     if _wants_path3(paths) || _wants_path4(paths)
-        albedo = _vectorize_albedo(config.surface, n_spec, FT)
-        μ_nodes, μ_weights = _gauss_legendre_01(config.inner_nquad, FT)
+        albedo = _to_arch(architecture, _vectorize_albedo(config.surface, n_spec, FT))
+        μ_nodes_host, μ_weights_host = _gauss_legendre_01(config.inner_nquad, FT)
+        μ_nodes = _to_arch(architecture, μ_nodes_host)
+        μ_weights = _to_arch(architecture, μ_weights_host)
         if _wants_path3(paths) && _wants_path4(paths)
             reference_μ₀ = fill(convert(FT, config.geometry.μ₀), n_geom)
-            P̄3, P̄4 = _precompute_azimuthal_phase_pair(
-                config, optics.τ_scat_layer, μ_nodes, reference_μ₀,
-                config.geometry.μv)
-            _run_path3_kernel!(path3, optics.τ_cum, optics.ϖ_eff, P̄3,
-                               config.geometry, albedo, I0, μ_nodes, μ_weights)
-            _run_path4_kernel!(path4, optics.τ_cum, optics.ϖ_eff, P̄4,
-                               config.geometry, albedo, I0, μ_nodes, μ_weights)
+            P̄3, P̄4 = _precompute_azimuthal_phase_pair_arch(
+                config, optics.τ_scat_layer, μ_nodes_host, reference_μ₀,
+                config.geometry.μv, architecture, backend)
+            _run_path3_kernel!(path3, τ_cum, ϖ_eff, P̄3, config.geometry.μ₀,
+                               μv, albedo, I0, μ_nodes, μ_weights, backend)
+            _run_path4_kernel!(path4, τ_cum, ϖ_eff, P̄4, config.geometry.μ₀,
+                               μv, albedo, I0, μ_nodes, μ_weights, backend)
         elseif _wants_path3(paths)
             reference_μ₀ = fill(convert(FT, config.geometry.μ₀), n_geom)
             P̄3 = _precompute_azimuthal_phase(config, optics.τ_scat_layer,
-                                              μ_nodes, reference_μ₀)
-            _run_path3_kernel!(path3, optics.τ_cum, optics.ϖ_eff, P̄3,
-                               config.geometry, albedo, I0, μ_nodes, μ_weights)
+                                              μ_nodes_host, reference_μ₀)
+            P̄3 = _to_arch(architecture, P̄3)
+            _run_path3_kernel!(path3, τ_cum, ϖ_eff, P̄3, config.geometry.μ₀,
+                               μv, albedo, I0, μ_nodes, μ_weights, backend)
         else
             P̄4 = _precompute_azimuthal_phase(config, optics.τ_scat_layer,
-                                              μ_nodes, config.geometry.μv)
-            _run_path4_kernel!(path4, optics.τ_cum, optics.ϖ_eff, P̄4,
-                               config.geometry, albedo, I0, μ_nodes, μ_weights)
+                                              μ_nodes_host, config.geometry.μv)
+            P̄4 = _to_arch(architecture, P̄4)
+            _run_path4_kernel!(path4, τ_cum, ϖ_eff, P̄4, config.geometry.μ₀,
+                               μv, albedo, I0, μ_nodes, μ_weights, backend)
         end
     end
 
     total = path1 .+ path2 .+ path3 .+ path4
-    quadrature_info = (; paths, kernel_backend = :KernelAbstractionsCPU,
+    quadrature_info = (; paths, kernel_backend = _kernel_backend_name(architecture),
                        inner_quadrature = config.inner_nquad,
                        azimuth_quadrature = config.azimuth_nquad)
     metadata = (; n_layers = size(optics.ϖ_eff, 1), n_spec, n_geom,

@@ -9,6 +9,7 @@ module StandaloneSS
 using FastGaussQuadrature: gausslegendre
 using KernelAbstractions
 using SpecialFunctions: erfc
+using ..Architectures: AbstractArchitecture, CPU, GPU, MetalGPU, array_type, devi
 
 export AbsorptionSSContributor,
        CoxMunkSSSurface,

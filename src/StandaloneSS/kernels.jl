@@ -57,6 +57,64 @@ end
     return ϖ * layer_sum
 end
 
+@inline function _phase_azimuth_average_kind(kind::Int32, g::FT, μ_a::FT,
+                                             μ_b::FT, n_phi::Int) where {FT}
+    if kind == Int32(1)
+        a = μ_a * μ_b
+        b = sqrt(max(zero(FT), one(FT) - μ_a^2)) *
+            sqrt(max(zero(FT), one(FT) - μ_b^2))
+        return FT(0.75) * (one(FT) + a^2 + FT(0.5) * b^2)
+    elseif kind == Int32(2)
+        a = μ_a * μ_b
+        b = sqrt(max(zero(FT), one(FT) - μ_a^2)) *
+            sqrt(max(zero(FT), one(FT) - μ_b^2))
+        total = zero(FT)
+        for j in 0:(n_phi - 1)
+            ϕ = FT(2) * FT(pi) * FT(j) / FT(n_phi)
+            cosΘ = clamp(a + b * cos(ϕ), -one(FT), one(FT))
+            total += (one(g) - g^2) /
+                     (one(g) + g^2 - FT(2) * g * cosΘ)^(FT(1.5))
+        end
+        return total / FT(n_phi)
+    end
+    return zero(FT)
+end
+
+@kernel function _azimuthal_phase_pair_kernel!(
+    P̄a, P̄b, @Const(τ_scat_layer), @Const(τ_contrib),
+    @Const(ϖ_contrib), @Const(g_contrib), @Const(kind_contrib),
+    @Const(μ_nodes), @Const(reference_a), @Const(reference_b), n_phi)
+
+    iv, iz, ispec, k = @index(Global, NTuple)
+    FT = eltype(P̄a)
+    τ_scat = τ_scat_layer[iz, ispec]
+    if τ_scat == zero(FT)
+        P̄a[iv, iz, ispec, k] = zero(FT)
+        P̄b[iv, iz, ispec, k] = zero(FT)
+    else
+        μ_node = μ_nodes[k]
+        weighted_a = zero(FT)
+        weighted_b = zero(FT)
+        n_contrib = size(τ_contrib, 1)
+        for ic in 1:n_contrib
+            scat_weight = τ_contrib[ic, iz, ispec] * ϖ_contrib[ic]
+            if scat_weight != zero(FT)
+                kind = kind_contrib[ic]
+                g = g_contrib[ic]
+                weighted_a += scat_weight *
+                              _phase_azimuth_average_kind(kind, g, μ_node,
+                                                          reference_a[iv], n_phi)
+                weighted_b += scat_weight *
+                              _phase_azimuth_average_kind(kind, g, μ_node,
+                                                          reference_b[iv], n_phi)
+            end
+        end
+
+        P̄a[iv, iz, ispec, k] = weighted_a / τ_scat
+        P̄b[iv, iz, ispec, k] = weighted_b / τ_scat
+    end
+end
+
 @kernel function _path3_kernel!(path3, @Const(τ_cum), @Const(ϖ_eff),
                                @Const(P̄), μ₀, @Const(μv), @Const(albedo),
                                @Const(I0), @Const(μ_nodes), @Const(μ_weights))
@@ -98,42 +156,50 @@ end
     path4[iv, 1, ispec] = value
 end
 
-function _run_path1_kernel!(path1, τ_cum, ϖ_eff, P_eff, geometry, I0)
-    backend = KernelAbstractions.CPU()
+function _run_path1_kernel!(path1, τ_cum, ϖ_eff, P_eff, μ₀, μv, I0, backend)
     kernel! = _path1_kernel!(backend)
-    event = kernel!(path1, τ_cum, ϖ_eff, P_eff, geometry.μ₀, geometry.μv, I0;
+    event = kernel!(path1, τ_cum, ϖ_eff, P_eff, μ₀, μv, I0;
                     ndrange=(size(path1, 1), size(path1, 3)))
     event === nothing || wait(event)
     return path1
 end
 
-function _run_path2_kernel!(path2, τ_total, geometry, surface_brdf, I0)
-    backend = KernelAbstractions.CPU()
+function _run_path2_kernel!(path2, τ_total, μ₀, μv, surface_brdf, I0, backend)
     kernel! = _path2_kernel!(backend)
-    event = kernel!(path2, τ_total, geometry.μ₀, geometry.μv, surface_brdf, I0;
+    event = kernel!(path2, τ_total, μ₀, μv, surface_brdf, I0;
                     ndrange=(size(path2, 1), size(path2, 3)))
     event === nothing || wait(event)
     return path2
 end
 
-function _run_path3_kernel!(path3, τ_cum, ϖ_eff, P̄, geometry, albedo, I0,
-                            μ_nodes, μ_weights)
-    backend = KernelAbstractions.CPU()
+function _run_path3_kernel!(path3, τ_cum, ϖ_eff, P̄, μ₀, μv, albedo, I0,
+                            μ_nodes, μ_weights, backend)
     kernel! = _path3_kernel!(backend)
-    event = kernel!(path3, τ_cum, ϖ_eff, P̄, geometry.μ₀, geometry.μv,
-                    albedo, I0, μ_nodes, μ_weights;
+    event = kernel!(path3, τ_cum, ϖ_eff, P̄, μ₀, μv, albedo, I0,
+                    μ_nodes, μ_weights;
                     ndrange=(size(path3, 1), size(path3, 3)))
     event === nothing || wait(event)
     return path3
 end
 
-function _run_path4_kernel!(path4, τ_cum, ϖ_eff, P̄, geometry, albedo, I0,
-                            μ_nodes, μ_weights)
-    backend = KernelAbstractions.CPU()
+function _run_path4_kernel!(path4, τ_cum, ϖ_eff, P̄, μ₀, μv, albedo, I0,
+                            μ_nodes, μ_weights, backend)
     kernel! = _path4_kernel!(backend)
-    event = kernel!(path4, τ_cum, ϖ_eff, P̄, geometry.μ₀, geometry.μv,
-                    albedo, I0, μ_nodes, μ_weights;
+    event = kernel!(path4, τ_cum, ϖ_eff, P̄, μ₀, μv, albedo, I0,
+                    μ_nodes, μ_weights;
                     ndrange=(size(path4, 1), size(path4, 3)))
     event === nothing || wait(event)
     return path4
+end
+
+function _run_azimuthal_phase_pair_kernel!(P̄a, P̄b, τ_scat_layer, τ_contrib,
+                                           ϖ_contrib, g_contrib, kind_contrib,
+                                           μ_nodes, reference_a, reference_b,
+                                           n_phi::Int, backend)
+    kernel! = _azimuthal_phase_pair_kernel!(backend)
+    event = kernel!(P̄a, P̄b, τ_scat_layer, τ_contrib, ϖ_contrib,
+                    g_contrib, kind_contrib, μ_nodes, reference_a, reference_b,
+                    n_phi; ndrange=size(P̄a))
+    event === nothing || wait(event)
+    return P̄a, P̄b
 end

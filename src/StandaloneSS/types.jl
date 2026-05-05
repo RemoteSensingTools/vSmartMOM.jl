@@ -84,12 +84,13 @@ struct TruncatedAndExactScatteringOpticalProperties{T, E, F}
 end
 
 """
-    ExactSSConfig(; geometry, surface, contributors, I0, n_stokes=1)
+    ExactSSConfig(; geometry, surface, contributors, I0, n_stokes=1,
+                    architecture=CPU())
 
 Configuration for the Phase 1 standalone exact single-scatter solver.
 Outputs are scalar Stokes-I arrays with shape `(nGeom, 1, nSpec)`.
 """
-Base.@kwdef struct ExactSSConfig{GEO, SUR, CTRB, I}
+Base.@kwdef struct ExactSSConfig{GEO, SUR, CTRB, I, ARCH<:AbstractArchitecture}
     geometry::GEO
     surface::SUR
     contributors::CTRB
@@ -97,6 +98,7 @@ Base.@kwdef struct ExactSSConfig{GEO, SUR, CTRB, I}
     n_stokes::Int = 1
     inner_nquad::Int = 16
     azimuth_nquad::Int = 64
+    architecture::ARCH = CPU()
 end
 
 τ_matrix(c::AbstractSSContributor) = c.τ
