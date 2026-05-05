@@ -4,6 +4,17 @@ using vSmartMOM.StandaloneSS
 using ForwardDiff
 using LinearAlgebra
 
+const _STANDALONE_CUDA_LOADED = Ref(false)
+try
+    @eval using CUDA
+    _STANDALONE_CUDA_LOADED[] = true
+catch
+end
+
+_standalone_cuda_functional() =
+    _STANDALONE_CUDA_LOADED[] && CUDA.functional() &&
+    vSmartMOM.Architectures.has_cuda()
+
 _want_ref_path1(paths) = paths in (:path1, :paths_1_2, :all, :all_four)
 _want_ref_path2(paths) = paths in (:path2, :paths_1_2, :all, :all_four)
 _want_ref_path3(paths) = paths in (:path3, :all, :all_four)
@@ -205,6 +216,32 @@ function _mixed_config(::Type{FT}) where {FT}
     ExactSSConfig(geometry=geometry, surface=surface,
                   contributors=(rayleigh, aerosol, absorption),
                   I0=FT[1.0, 0.8])
+end
+
+function _benchmark_config(::Type{FT}; n_geom::Int = 8, n_spec::Int = 8,
+                           n_layers::Int = 4) where {FT}
+    geometry = SSGeometry(
+        μ₀ = FT(0.82),
+        μv = collect(range(FT(0.3), FT(0.85); length=n_geom)),
+        Δϕ = collect(range(FT(0.1), FT(2.4); length=n_geom)))
+    surface = LambertianSSSurface(albedo=fill(FT(0.22), n_spec))
+    rayleigh = RayleighSSContributor(τ=fill(FT(0.03), n_layers, n_spec))
+    aerosol = HGAerosolSSContributor(g=FT(0.7), ϖ=FT(0.9),
+                                     τ=fill(FT(0.01), n_layers, n_spec))
+    absorption = AbsorptionSSContributor(τ=fill(FT(0.02), n_layers, n_spec))
+    return ExactSSConfig(geometry=geometry, surface=surface,
+                         contributors=(rayleigh, aerosol, absorption),
+                         I0=fill(one(FT), n_spec), inner_nquad=8,
+                         azimuth_nquad=16)
+end
+
+function _average_elapsed(f, n::Int)
+    total = 0.0
+    for _ in 1:n
+        GC.gc(false)
+        total += @elapsed f()
+    end
+    return total / n
 end
 
 @testset "StandaloneSS Phase 1" begin
@@ -422,6 +459,47 @@ end
         h = FT(1e-5)
         fd = (only(fw(FT[4.0 + h])) - only(fw(FT[4.0 - h]))) / (2h)
         @test Jw[1, 1] ≈ fd rtol=2e-5 atol=1e-8
+    end
+
+    @testset "CUDA equivalency and speed smoke" begin
+        if !_standalone_cuda_functional()
+            @test_skip "CUDA not available or not functional; skipping StandaloneSS GPU smoke"
+        else
+            FT = Float64
+            cpu_config = _benchmark_config(FT; n_geom=32, n_spec=32, n_layers=6)
+            gpu_config = ExactSSConfig(
+                geometry=cpu_config.geometry,
+                surface=cpu_config.surface,
+                contributors=cpu_config.contributors,
+                I0=cpu_config.I0,
+                inner_nquad=cpu_config.inner_nquad,
+                azimuth_nquad=cpu_config.azimuth_nquad,
+                architecture=vSmartMOM.GPU())
+
+            cpu_result = run_exact_ss(cpu_config; paths=:all)
+            gpu_result = run_exact_ss(gpu_config; paths=:all)
+            CUDA.synchronize()
+
+            @test gpu_result.quadrature_info.kernel_backend == :CUDA
+            @test gpu_result.total isa CUDA.CuArray
+            for field in (:total, :path1, :path2, :path3, :path4)
+                @test Array(getfield(gpu_result, field)) ≈
+                      getfield(cpu_result, field) rtol=5e-12 atol=5e-14
+            end
+
+            cpu_time = _average_elapsed(3) do
+                run_exact_ss(cpu_config; paths=:all)
+                nothing
+            end
+            gpu_time = _average_elapsed(3) do
+                run_exact_ss(gpu_config; paths=:all)
+                CUDA.synchronize()
+                nothing
+            end
+            @info "StandaloneSS CPU/GPU timing smoke" cpu_time gpu_time speedup=cpu_time / gpu_time
+            @test isfinite(cpu_time) && cpu_time > 0
+            @test isfinite(gpu_time) && gpu_time > 0
+        end
     end
 
     @testset "Validation errors" begin
