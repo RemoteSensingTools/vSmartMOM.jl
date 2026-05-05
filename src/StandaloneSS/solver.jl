@@ -389,10 +389,9 @@ function run_exact_ss(config::ExactSSConfig; paths::Symbol = :paths_1_2)
             P̄3, P̄4 = _precompute_azimuthal_phase_pair_arch(
                 config, optics.τ_scat_layer, μ_nodes_host, reference_μ₀,
                 config.geometry.μv, architecture, backend)
-            _run_path3_kernel!(path3, τ_cum, ϖ_eff, P̄3, config.geometry.μ₀,
-                               μv, albedo, I0, μ_nodes, μ_weights, backend)
-            _run_path4_kernel!(path4, τ_cum, ϖ_eff, P̄4, config.geometry.μ₀,
-                               μv, albedo, I0, μ_nodes, μ_weights, backend)
+            _run_path34_kernel!(path3, path4, τ_cum, ϖ_eff, P̄3, P̄4,
+                                config.geometry.μ₀, μv, albedo, I0,
+                                μ_nodes, μ_weights, backend)
         elseif _wants_path3(paths)
             reference_μ₀ = fill(convert(FT, config.geometry.μ₀), n_geom)
             P̄3 = _precompute_azimuthal_phase(config, optics.τ_scat_layer,
