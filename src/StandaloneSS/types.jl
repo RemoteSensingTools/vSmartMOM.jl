@@ -52,9 +52,11 @@ function CoxMunkSSSurface(; wind_speed::W, n_water=nothing,
                             shadowing)
 end
 
-Base.@kwdef struct RayleighSSContributor{A<:AbstractMatrix} <: AbstractSSContributor
+Base.@kwdef struct RayleighSSContributor{A<:AbstractMatrix, D<:Real} <: AbstractSSContributor
     "Optical depth by layer and spectral point: (nLayer, nSpec)."
     τ::A
+    "Rayleigh depolarization factor. `0` gives ideal molecular Rayleigh."
+    depol::D = 0
 end
 
 Base.@kwdef struct HGAerosolSSContributor{FT<:Real, A<:AbstractMatrix} <: AbstractSSContributor
@@ -121,8 +123,17 @@ single_scattering_albedo(::RayleighSSContributor) = 1
 single_scattering_albedo(c::HGAerosolSSContributor) = c.ϖ
 single_scattering_albedo(::AbsorptionSSContributor) = 0
 
-exact_phase_function(::RayleighSSContributor, cosΘ) =
-    oftype(cosΘ, 0.75) * (one(cosΘ) + cosΘ^2)
+@inline function _rayleigh_depolarization_scale(depol::FT) where {FT}
+    return (one(FT) - depol) / (one(FT) + depol / FT(2))
+end
+
+function exact_phase_function(c::RayleighSSContributor, cosΘ)
+    FT = promote_type(typeof(c.depol), typeof(cosΘ))
+    x = convert(FT, cosΘ)
+    dpl_p = _rayleigh_depolarization_scale(convert(FT, c.depol))
+    P₂ = (FT(3) * x^2 - one(FT)) / FT(2)
+    return one(FT) + FT(0.5) * dpl_p * P₂
+end
 
 function exact_phase_function(c::HGAerosolSSContributor, cosΘ)
     FT = promote_type(typeof(c.g), typeof(cosΘ))

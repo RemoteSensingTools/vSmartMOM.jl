@@ -66,16 +66,20 @@ vector. The vector order is geometry, then Stokes, then spectral point within
 each selected path, with geometry varying fastest; multiple paths are
 concatenated in selector order.
 """
-function selected_measurements(result,
-                               selector::SSMeasurementSelector =
-                                   SSMeasurementSelector())
+function selected_measurements(result, selector::SSMeasurementSelector)
     chunks = map(path -> _selected_measurement_path(result, path, selector),
                  selector.paths)
     return length(chunks) == 1 ? first(chunks) : reduce(vcat, chunks)
 end
 
-selected_measurements(result; kwargs...) =
-    selected_measurements(result, SSMeasurementSelector(; kwargs...))
+function selected_measurements(result; paths = (:total,),
+                               geometry_indices = Colon(),
+                               spectral_indices = Colon(),
+                               stokes_indices = Colon())
+    selector = SSMeasurementSelector(; paths, geometry_indices,
+                                     spectral_indices, stokes_indices)
+    return selected_measurements(result, selector)
+end
 
 function _validate_single_path_jacobian_selector(selector::SSMeasurementSelector)
     length(selector.paths) == 1 ||
@@ -94,7 +98,7 @@ Flatten a StandaloneSS Jacobian array with shape
 """
 function selected_measurement_jacobian(
     dL_dp::AbstractArray{<:Any,4},
-    selector::SSMeasurementSelector = SSMeasurementSelector(),
+    selector::SSMeasurementSelector,
 )
     _validate_single_path_jacobian_selector(selector)
     selected = dL_dp[_slice_index(selector.geometry_indices),
@@ -104,5 +108,11 @@ function selected_measurement_jacobian(
     return reshape(selected, :, size(dL_dp, 4))
 end
 
-selected_measurement_jacobian(dL_dp; kwargs...) =
-    selected_measurement_jacobian(dL_dp, SSMeasurementSelector(; kwargs...))
+function selected_measurement_jacobian(dL_dp; paths = (:total,),
+                                       geometry_indices = Colon(),
+                                       spectral_indices = Colon(),
+                                       stokes_indices = Colon())
+    selector = SSMeasurementSelector(; paths, geometry_indices,
+                                     spectral_indices, stokes_indices)
+    return selected_measurement_jacobian(dL_dp, selector)
+end

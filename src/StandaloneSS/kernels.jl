@@ -57,17 +57,21 @@ end
     return ϖ * layer_sum
 end
 
-@inline function _rayleigh_azimuthal_average(μ_a::FT, μ_b::FT) where {FT}
+@inline function _rayleigh_azimuthal_average(μ_a::FT, μ_b::FT,
+                                             depol::FT = zero(FT)) where {FT}
     a = μ_a * μ_b
     b = sqrt(max(zero(FT), one(FT) - μ_a^2)) *
         sqrt(max(zero(FT), one(FT) - μ_b^2))
-    return FT(0.75) * (one(FT) + a^2 + FT(0.5) * b^2)
+    mean_cos² = a^2 + FT(0.5) * b^2
+    mean_P₂ = (FT(3) * mean_cos² - one(FT)) / FT(2)
+    dpl_p = _rayleigh_depolarization_scale(depol)
+    return one(FT) + FT(0.5) * dpl_p * mean_P₂
 end
 
 @inline function _phase_azimuth_average_kind(kind::Int32, g::FT, μ_a::FT,
                                              μ_b::FT, n_phi::Int) where {FT}
     if kind == Int32(1)
-        return _rayleigh_azimuthal_average(μ_a, μ_b)
+        return _rayleigh_azimuthal_average(μ_a, μ_b, g)
     elseif kind == Int32(2)
         a = μ_a * μ_b
         b = sqrt(max(zero(FT), one(FT) - μ_a^2)) *
