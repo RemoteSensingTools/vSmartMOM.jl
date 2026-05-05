@@ -36,8 +36,13 @@ function _config_numeric_type(config::ExactSSConfig)
                         _contributors_numeric_type(config.contributors))
 end
 
-function _precompute_surface_brdf(surface::LambertianSSSurface, geometry::SSGeometry,
-                                  n_spec::Int, ::Type{FT}) where {FT}
+_precompute_surface_brdf(surface::AbstractSSSurface, geometry::SSGeometry,
+                         n_spec::Int, ::Type{FT}) where {FT} =
+    _precompute_surface_brdf(Val(1), surface, geometry, n_spec, FT)
+
+function _precompute_surface_brdf(::Val{1}, surface::LambertianSSSurface,
+                                  geometry::SSGeometry, n_spec::Int,
+                                  ::Type{FT}) where {FT}
     albedo = _vectorize_albedo(surface, n_spec, FT)
     n_geom = length(geometry.μv)
     ρ = zeros(FT, n_geom, n_spec)
@@ -47,8 +52,21 @@ function _precompute_surface_brdf(surface::LambertianSSSurface, geometry::SSGeom
     return ρ
 end
 
-function _precompute_surface_brdf(surface::CoxMunkSSSurface, geometry::SSGeometry,
-                                  n_spec::Int, ::Type{FT}) where {FT}
+function _precompute_surface_brdf(::Val{N}, surface::LambertianSSSurface,
+                                  geometry::SSGeometry, n_spec::Int,
+                                  ::Type{FT}) where {N,FT}
+    albedo = _vectorize_albedo(surface, n_spec, FT)
+    n_geom = length(geometry.μv)
+    ρ = zeros(FT, n_geom, N, n_spec)
+    @inbounds for ispec in 1:n_spec, iv in 1:n_geom
+        ρ[iv, 1, ispec] = albedo[ispec] / FT(pi)
+    end
+    return ρ
+end
+
+function _precompute_surface_brdf(::Val{1}, surface::CoxMunkSSSurface,
+                                  geometry::SSGeometry, n_spec::Int,
+                                  ::Type{FT}) where {FT}
     n_geom = length(geometry.μv)
     ρ = zeros(FT, n_geom, n_spec)
     μ₀ = convert(FT, geometry.μ₀)
@@ -57,6 +75,31 @@ function _precompute_surface_brdf(surface::CoxMunkSSSurface, geometry::SSGeometr
         Δϕ = convert(FT, geometry.Δϕ[iv])
         ρ[iv, ispec] = _coxmunk_brdf_scalar(surface, μᵥ, μ₀, Δϕ,
                                             ispec, n_spec, FT)
+    end
+    return ρ
+end
+
+function _precompute_surface_brdf(::Val{N}, surface::CoxMunkSSSurface,
+                                  geometry::SSGeometry, n_spec::Int,
+                                  ::Type{FT}) where {N,FT}
+    n_geom = length(geometry.μv)
+    ρ = zeros(FT, n_geom, N, n_spec)
+    μ₀ = convert(FT, geometry.μ₀)
+    core_surface = CoxMunkSurface{FT}(
+        wind_speed=convert(FT, surface.wind_speed),
+        n_water=nothing,
+        whitecap_albedo=convert(FT, surface.whitecap_albedo),
+        include_whitecaps=surface.include_whitecaps,
+        shadowing=surface.shadowing)
+    @inbounds for ispec in 1:n_spec, iv in 1:n_geom
+        μᵥ = convert(FT, geometry.μv[iv])
+        Δϕ = convert(FT, geometry.Δϕ[iv])
+        n_water = _coxmunk_n_water(surface, ispec, n_spec, FT)
+        M = coxmunk_brdf_mueller(core_surface, N, μᵥ, μ₀, Δϕ;
+                                  n_water)
+        for istokes in 1:N
+            ρ[iv, istokes, ispec] = M[istokes, 1]
+        end
     end
     return ρ
 end

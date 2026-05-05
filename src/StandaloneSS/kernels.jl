@@ -27,6 +27,18 @@ end
                           exp(-τ / μ₀) * exp(-τ / μᵥ)
 end
 
+@kernel function _path2_stokes_kernel!(path2, @Const(τ_total), μ₀,
+                                      @Const(μv), @Const(surface_brdf),
+                                      @Const(I0))
+    iv, istokes, ispec = @index(Global, NTuple)
+    FT = eltype(path2)
+    μᵥ = μv[iv]
+    τ = τ_total[ispec]
+    path2[iv, istokes, ispec] =
+        (μ₀ * I0[ispec] * surface_brdf[iv, istokes, ispec]) *
+        exp(-τ / μ₀) * exp(-τ / μᵥ)
+end
+
 @inline function _τ_integral(τ_top, τ_bot, τ_total, μ_first, μ_second)
     FT = typeof(τ_top)
     b = inv(μ_first) - inv(μ_second)
@@ -239,8 +251,6 @@ end
 
 _run_path1_kernel!(pol::Val{N}, args...) where {N} =
     _unsupported_stokes_kernel(pol)
-_run_path2_kernel!(pol::Val{N}, args...) where {N} =
-    _unsupported_stokes_kernel(pol)
 _run_path3_kernel!(pol::Val{N}, args...) where {N} =
     _unsupported_stokes_kernel(pol)
 _run_path4_kernel!(pol::Val{N}, args...) where {N} =
@@ -262,6 +272,15 @@ function _run_path2_kernel!(::Val{1}, path2, τ_total, μ₀, μv, surface_brdf,
     kernel! = _path2_kernel!(backend)
     event = kernel!(path2, τ_total, μ₀, μv, surface_brdf, I0;
                     ndrange=(size(path2, 1), size(path2, 3)))
+    _synchronize_kernel(event, backend)
+    return path2
+end
+
+function _run_path2_kernel!(::Val{N}, path2, τ_total, μ₀, μv, surface_brdf,
+                            I0, backend) where {N}
+    kernel! = _path2_stokes_kernel!(backend)
+    event = kernel!(path2, τ_total, μ₀, μv, surface_brdf, I0;
+                    ndrange=size(path2))
     _synchronize_kernel(event, backend)
     return path2
 end
