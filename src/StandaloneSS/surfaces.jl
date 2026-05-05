@@ -14,7 +14,7 @@ _surface_numeric_type(surface::CoxMunkSSSurface{W, N, A}) where {W, N, A} =
     promote_type(W, A, _real_numeric_type(surface.n_water))
 
 _contributor_numeric_type(c::RayleighSSContributor) =
-    _real_numeric_type(c.τ)
+    promote_type(_real_numeric_type(c.τ), typeof(c.depol))
 _contributor_numeric_type(c::AbsorptionSSContributor) =
     _real_numeric_type(c.τ)
 _contributor_numeric_type(c::HGAerosolSSContributor) =

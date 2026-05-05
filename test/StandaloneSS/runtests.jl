@@ -25,7 +25,11 @@ function _as_vector(x, n_spec, ::Type{FT}) where {FT}
     return convert(Vector{FT}, collect(x))
 end
 
-_ref_phase(::RayleighSSContributor, cosΘ) = 0.75 * (1 + cosΘ^2)
+function _ref_phase(c::RayleighSSContributor, cosΘ)
+    dpl_p = (1 - c.depol) / (1 + c.depol / 2)
+    P₂ = (3 * cosΘ^2 - 1) / 2
+    return 1 + 0.5 * dpl_p * P₂
+end
 function _ref_phase(c::HGAerosolSSContributor, cosΘ)
     g = c.g
     (1 - g^2) / (1 + g^2 - 2g * cosΘ)^1.5
@@ -374,6 +378,28 @@ end
         refined_result = run_exact_ss(refined; paths=:all)
         @test coarse_result.path3 ≈ refined_result.path3 rtol=1e-12 atol=1e-14
         @test coarse_result.path4 ≈ refined_result.path4 rtol=1e-12 atol=1e-14
+
+        depol = FT(0.028)
+        depol_rayleigh = RayleighSSContributor(
+            τ=reshape(FT[0.04, 0.07], 2, 1), depol=depol)
+        cosΘ = FT(0.31)
+        dpl_p = (one(FT) - depol) / (one(FT) + depol / FT(2))
+        expected_phase = one(FT) + FT(0.5) * dpl_p *
+                         ((FT(3) * cosΘ^2 - one(FT)) / FT(2))
+        @test exact_phase_function(depol_rayleigh, cosΘ) ≈ expected_phase
+
+        depol_base = ExactSSConfig(geometry=geometry, surface=surface,
+                                   contributors=(depol_rayleigh,),
+                                   I0=FT[1.0], inner_nquad=4,
+                                   azimuth_nquad=1)
+        depol_refined = ExactSSConfig(geometry=geometry, surface=surface,
+                                      contributors=(depol_rayleigh,),
+                                      I0=FT[1.0], inner_nquad=4,
+                                      azimuth_nquad=32)
+        depol_coarse = run_exact_ss(depol_base; paths=:all)
+        depol_fine = run_exact_ss(depol_refined; paths=:all)
+        @test depol_coarse.path3 ≈ depol_fine.path3 rtol=1e-12 atol=1e-14
+        @test depol_coarse.path4 ≈ depol_fine.path4 rtol=1e-12 atol=1e-14
     end
 
     @testset "Path selection" begin

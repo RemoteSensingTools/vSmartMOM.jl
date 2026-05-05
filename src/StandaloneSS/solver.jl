@@ -153,11 +153,12 @@ function _azimuthal_average_phase(c::AbstractSSContributor, μ_a, μ_b,
     return total / FT(n_phi)
 end
 
-function _azimuthal_average_phase(::RayleighSSContributor, μ_a, μ_b,
+function _azimuthal_average_phase(c::RayleighSSContributor, μ_a, μ_b,
                                   n_phi::Int)
     n_phi > 0 || throw(ArgumentError("azimuth_nquad must be positive"))
-    FT = promote_type(typeof(μ_a), typeof(μ_b))
-    return _rayleigh_azimuthal_average(convert(FT, μ_a), convert(FT, μ_b))
+    FT = promote_type(typeof(μ_a), typeof(μ_b), typeof(c.depol))
+    return _rayleigh_azimuthal_average(
+        convert(FT, μ_a), convert(FT, μ_b), convert(FT, c.depol))
 end
 
 _precompute_optics(config::ExactSSConfig) =
@@ -310,7 +311,8 @@ _contributor_kind(::RayleighSSContributor) = Int32(1)
 _contributor_kind(::HGAerosolSSContributor) = Int32(2)
 _contributor_kind(::AbsorptionSSContributor) = Int32(0)
 
-_contributor_g(::RayleighSSContributor, ::Type{FT}) where {FT} = zero(FT)
+_contributor_g(c::RayleighSSContributor, ::Type{FT}) where {FT} =
+    convert(FT, c.depol)
 _contributor_g(c::HGAerosolSSContributor, ::Type{FT}) where {FT} =
     convert(FT, c.g)
 _contributor_g(::AbsorptionSSContributor, ::Type{FT}) where {FT} = zero(FT)
