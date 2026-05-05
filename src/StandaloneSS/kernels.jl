@@ -194,11 +194,17 @@ end
     end
 end
 
+@inline function _synchronize_kernel(event, backend)
+    event === nothing || wait(event)
+    KernelAbstractions.synchronize(backend)
+    return nothing
+end
+
 function _run_path1_kernel!(path1, τ_cum, ϖ_eff, P_eff, μ₀, μv, I0, backend)
     kernel! = _path1_kernel!(backend)
     event = kernel!(path1, τ_cum, ϖ_eff, P_eff, μ₀, μv, I0;
                     ndrange=(size(path1, 1), size(path1, 3)))
-    event === nothing || wait(event)
+    _synchronize_kernel(event, backend)
     return path1
 end
 
@@ -206,7 +212,7 @@ function _run_path2_kernel!(path2, τ_total, μ₀, μv, surface_brdf, I0, backe
     kernel! = _path2_kernel!(backend)
     event = kernel!(path2, τ_total, μ₀, μv, surface_brdf, I0;
                     ndrange=(size(path2, 1), size(path2, 3)))
-    event === nothing || wait(event)
+    _synchronize_kernel(event, backend)
     return path2
 end
 
@@ -216,7 +222,7 @@ function _run_path3_kernel!(path3, τ_cum, ϖ_eff, P̄, μ₀, μv, albedo, I0,
     event = kernel!(path3, τ_cum, ϖ_eff, P̄, μ₀, μv, albedo, I0,
                     μ_nodes, μ_weights;
                     ndrange=(size(path3, 1), size(path3, 3)))
-    event === nothing || wait(event)
+    _synchronize_kernel(event, backend)
     return path3
 end
 
@@ -226,7 +232,7 @@ function _run_path4_kernel!(path4, τ_cum, ϖ_eff, P̄, μ₀, μv, albedo, I0,
     event = kernel!(path4, τ_cum, ϖ_eff, P̄, μ₀, μv, albedo, I0,
                     μ_nodes, μ_weights;
                     ndrange=(size(path4, 1), size(path4, 3)))
-    event === nothing || wait(event)
+    _synchronize_kernel(event, backend)
     return path4
 end
 
@@ -236,7 +242,7 @@ function _run_path34_kernel!(path3, path4, τ_cum, ϖ_eff, P̄3, P̄4, μ₀, μ
     event = kernel!(path3, path4, τ_cum, ϖ_eff, P̄3, P̄4, μ₀, μv,
                     albedo, I0, μ_nodes, μ_weights;
                     ndrange=(size(path3, 1), size(path3, 3)))
-    event === nothing || wait(event)
+    _synchronize_kernel(event, backend)
     return path3, path4
 end
 
@@ -248,6 +254,6 @@ function _run_azimuthal_phase_pair_kernel!(P̄a, P̄b, τ_scat_layer, τ_contrib
     event = kernel!(P̄a, P̄b, τ_scat_layer, τ_contrib, ϖ_contrib,
                     g_contrib, kind_contrib, μ_nodes, reference_a, reference_b,
                     n_phi; ndrange=size(P̄a))
-    event === nothing || wait(event)
+    _synchronize_kernel(event, backend)
     return P̄a, P̄b
 end
