@@ -74,6 +74,10 @@ include("Inelastic/InelasticScattering.jl")
 include("CoreRT/CoreRT.jl")
 using .CoreRT
 
+# Standalone exact single-scattering module:
+include("StandaloneSS/StandaloneSS.jl")
+using .StandaloneSS
+
 # SolarModel module:
 include("SolarModel/SolarModel.jl")
 
@@ -102,6 +106,10 @@ export default_parameters, parameters_from_file, parameters_from_source,
        read_atmos_profile, read_atmos_profile_dict
 # Export linearized RT functions
 export rt_run_lin, model_from_parameters_lin
+# Export standalone exact single-scattering API
+export StandaloneSS, run_exact_ss, ExactSSConfig, SSGeometry,
+       LambertianSSSurface, RayleighSSContributor, HGAerosolSSContributor,
+       AbsorptionSSContributor
 # Export new hierarchical model types
 export RTModel, AbstractRTModel, SolverConfig, Atmosphere, RayleighScattering, AerosolState, Optics, OpticsLin
 # Export GEOSChem/NetCDF integration

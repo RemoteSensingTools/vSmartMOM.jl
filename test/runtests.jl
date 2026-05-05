@@ -76,6 +76,9 @@ end
 # Phase 1c single-scatter driver smoke test.
 @testset "Phase 1c SS driver" begin include("test_forward_ss.jl") end
 
+# Standalone exact single-scatter Phase 1.
+@testset "StandaloneSS" begin include("StandaloneSS/runtests.jl") end
+
 # Phase 1d — Aerosols module wire-in (close `using vSmartMOM.Aerosols` export gap).
 @testset "Aerosols" begin include("test_Aerosols.jl") end
 
