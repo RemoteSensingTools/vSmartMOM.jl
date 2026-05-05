@@ -249,6 +249,8 @@ end
         @test run_exact_ss === vSmartMOM.run_exact_ss
         @test run_exact_ss_with_jacobians === vSmartMOM.run_exact_ss_with_jacobians
         @test chain_rule_combine_dτ === vSmartMOM.chain_rule_combine_dτ
+        @test chain_rule_combine_surface_brdf ===
+              vSmartMOM.chain_rule_combine_surface_brdf
         @test StandaloneSS === vSmartMOM.StandaloneSS
         @test CoxMunkSSSurface === vSmartMOM.CoxMunkSSSurface
     end
@@ -549,6 +551,36 @@ end
             zeros(FT, 1, 1, 1, 2), zeros(FT, 2, 2, 1))
         @test_throws ArgumentError chain_rule_combine_dτ(
             zeros(FT, 1, 1, 1), zeros(FT, 1, 1))
+
+        surface_geometry = SSGeometry(μ₀=FT(0.79),
+                                      μv=FT[0.41, 0.73],
+                                      Δϕ=FT[0.2, 1.1])
+        surface_base_albedo = FT[0.25, 0.41]
+        surface_abs = AbsorptionSSContributor(τ=FT[0.06 0.02; 0.03 0.05])
+        surface_config_from_p(p) = ExactSSConfig(
+            geometry=surface_geometry,
+            surface=LambertianSSSurface(albedo=surface_base_albedo .* p),
+            contributors=(surface_abs,),
+            I0=FT[1.0, 0.8])
+        fp(p) = vec(run_exact_ss(surface_config_from_p(p); paths=:path2).total)
+        Jp = ForwardDiff.jacobian(fp, ones(FT, 2))
+        surface_jac = run_exact_ss_with_jacobians(
+            surface_config_from_p(ones(FT, 2)); paths=:path2).jacobians
+        dρ_dp = zeros(FT, 2, 2, 2)
+        dρ_dp[:, 1, 1] .= surface_base_albedo[1] / π
+        dρ_dp[:, 2, 2] .= surface_base_albedo[2] / π
+        J_surface_chain = @inferred chain_rule_combine_surface_brdf(
+            surface_jac.path2.surface_brdf, dρ_dp)
+        @test size(J_surface_chain) == (2, 1, 2, 2)
+        for ip in 1:2
+            @test vec(J_surface_chain[:, :, :, ip]) ≈ Jp[:, ip] rtol=1e-12 atol=1e-14
+        end
+        @test_throws ArgumentError chain_rule_combine_surface_brdf(
+            zeros(FT, 1, 1, 1), zeros(FT, 2, 1, 1))
+        @test_throws ArgumentError chain_rule_combine_surface_brdf(
+            zeros(FT, 1, 1, 1), zeros(FT, 1, 2, 1))
+        @test_throws ArgumentError chain_rule_combine_surface_brdf(
+            zeros(FT, 1, 1), zeros(FT, 1, 1, 1))
     end
 
     @testset "CUDA equivalency and speed smoke" begin
