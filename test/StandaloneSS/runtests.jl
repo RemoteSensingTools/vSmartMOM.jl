@@ -248,9 +248,15 @@ end
     @testset "Top-level exports" begin
         @test run_exact_ss === vSmartMOM.run_exact_ss
         @test run_exact_ss_with_jacobians === vSmartMOM.run_exact_ss_with_jacobians
+        @test chain_rule_combine_dP === vSmartMOM.chain_rule_combine_dP
         @test chain_rule_combine_dτ === vSmartMOM.chain_rule_combine_dτ
+        @test chain_rule_combine_dϖ === vSmartMOM.chain_rule_combine_dϖ
         @test chain_rule_combine_surface_brdf ===
               vSmartMOM.chain_rule_combine_surface_brdf
+        @test SSMeasurementSelector === vSmartMOM.SSMeasurementSelector
+        @test selected_measurements === vSmartMOM.selected_measurements
+        @test selected_measurement_jacobian ===
+              vSmartMOM.selected_measurement_jacobian
         @test StandaloneSS === vSmartMOM.StandaloneSS
         @test CoxMunkSSSurface === vSmartMOM.CoxMunkSSSurface
     end
@@ -272,6 +278,23 @@ end
         @test result.metadata.n_stokes == 1
         @test result.quadrature_info.kernel_backend == :KernelAbstractionsCPU
         @test result.quadrature_info.inner_quadrature == config.inner_nquad
+
+        pol_config = ExactSSConfig(geometry=geometry, surface=surface,
+                                   contributors=(rayleigh,), I0=FT[1.0, 0.7],
+                                   polarization_type=vSmartMOM.Scattering.Stokes_I{FT}())
+        pol_result = run_exact_ss(pol_config; paths=:paths_1_2)
+        @test pol_result.total ≈ result.total rtol=1e-12 atol=1e-14
+        @test pol_result.metadata.n_stokes == 1
+
+        vector_config = ExactSSConfig(
+            geometry=geometry,
+            surface=surface,
+            contributors=(rayleigh,),
+            I0=FT[1.0, 0.7],
+            polarization_type=vSmartMOM.Scattering.Stokes_IQU{FT}())
+        @test_throws ArgumentError run_exact_ss(vector_config; paths=:path1)
+        @test_throws ArgumentError run_exact_ss_with_jacobians(
+            vector_config; paths=:path1)
     end
 
     @testset "Cox-Munk path 2" begin
@@ -374,6 +397,61 @@ end
               only1.total .+ only2.total .+ only3.total .+ only4.total rtol=1e-12
         @test all_paths.path3 ≈ only3.path3 rtol=1e-12
         @test all_paths.path4 ≈ only4.path4 rtol=1e-12
+    end
+
+    @testset "Measurement selector" begin
+        config = _mixed_config(Float64)
+        result = run_exact_ss(config; paths=:all)
+
+        default_selector = SSMeasurementSelector()
+        @test selected_measurements(result, default_selector) ==
+              vec(result.total[:, :, :])
+        @test selected_measurements(result) ==
+              selected_measurements(result, default_selector)
+
+        one_geometry = SSMeasurementSelector(geometry_indices=2)
+        @test selected_measurements(result, one_geometry) ==
+              vec(result.total[2:2, 1:1, :])
+
+        multiple_geometries = SSMeasurementSelector(geometry_indices=[2, 1])
+        @test selected_measurements(result, multiple_geometries) ==
+              vec(result.total[[2, 1], 1:1, :])
+
+        spectral_subset = SSMeasurementSelector(spectral_indices=2)
+        @test selected_measurements(result, spectral_subset) ==
+              vec(result.total[:, 1:1, 2:2])
+
+        path_selector = SSMeasurementSelector(paths=(:path1, :path2),
+                                              geometry_indices=1:2,
+                                              spectral_indices=1)
+        @test selected_measurements(result, path_selector) ==
+              vcat(vec(result.path1[:, 1:1, 1:1]),
+                   vec(result.path2[:, 1:1, 1:1]))
+
+        J4 = reshape(collect(1.0:18.0), 2, 1, 3, 3)
+        jac_selector = SSMeasurementSelector(geometry_indices=2,
+                                             spectral_indices=[1, 3])
+        @test selected_measurement_jacobian(J4, jac_selector) ==
+              reshape(J4[2:2, 1:1, [1, 3], :], :, 3)
+
+        polarized_result = (; total = reshape(collect(1.0:12.0), 2, 3, 2))
+        @test selected_measurements(polarized_result) ==
+              vec(polarized_result.total)
+        stokes_i_selector = SSMeasurementSelector(stokes_indices=1)
+        @test selected_measurements(polarized_result, stokes_i_selector) ==
+              vec(polarized_result.total[:, 1:1, :])
+
+        J_polarized = reshape(collect(1.0:48.0), 2, 3, 2, 4)
+        @test selected_measurement_jacobian(J_polarized) ==
+              reshape(J_polarized, :, 4)
+        stokes_subset = SSMeasurementSelector(stokes_indices=[3, 1])
+        @test selected_measurement_jacobian(J_polarized, stokes_subset) ==
+              reshape(J_polarized[:, [3, 1], :, :], :, 4)
+
+        @test_throws ArgumentError SSMeasurementSelector(paths=())
+        @test_throws ArgumentError SSMeasurementSelector(paths=(:bogus,))
+        @test_throws ArgumentError selected_measurement_jacobian(
+            J4, SSMeasurementSelector(paths=(:total, :path1)))
     end
 
     @testset "Type inference and path parity" begin
@@ -496,8 +574,11 @@ end
         τ_rayleigh = FT[0.07, 0.04]
         f1(x) = vec(run_exact_ss(path1_config_from_τ(x); paths=:path1).total)
         J1 = ForwardDiff.jacobian(f1, τ_rayleigh)
-        jac1 = run_exact_ss_with_jacobians(path1_config_from_τ(τ_rayleigh);
-                                           paths=:path1).jacobians
+        path1_with_jac = run_exact_ss_with_jacobians(
+            path1_config_from_τ(τ_rayleigh); paths=:path1)
+        jac1 = path1_with_jac.jacobians
+        @test path1_with_jac.measurements ==
+              selected_measurements(path1_with_jac, SSMeasurementSelector())
         @test vec(jac1.path1.τ_layer[1, 1, 1, :]) ≈ vec(J1) rtol=1e-12 atol=1e-14
         @test all(jac1.path1.ϖ_eff .>= 0)
         @test all(jac1.path1.P_eff .>= 0)
@@ -510,8 +591,13 @@ end
         τ_abs = FT[0.09, 0.03]
         f2(x) = vec(run_exact_ss(path2_config_from_τ(x); paths=:path2).total)
         J2 = ForwardDiff.jacobian(f2, τ_abs)
-        jac2 = run_exact_ss_with_jacobians(path2_config_from_τ(τ_abs);
-                                           paths=:path2).jacobians
+        path2_selector = SSMeasurementSelector(paths=:path2)
+        path2_with_jac = run_exact_ss_with_jacobians(
+            path2_config_from_τ(τ_abs); paths=:path2, selector=path2_selector)
+        jac2 = path2_with_jac.jacobians
+        @test path2_with_jac.measurement_selector == path2_selector
+        @test path2_with_jac.measurements ==
+              selected_measurements(path2_with_jac, path2_selector)
         @test vec(jac2.path2.τ_layer[1, 1, 1, :]) ≈ vec(J2) rtol=1e-12 atol=1e-14
 
         falbedo(a) = only(run_exact_ss(ExactSSConfig(
@@ -522,6 +608,9 @@ end
         d_albedo = ForwardDiff.derivative(falbedo, FT(0.33))
         @test jac2.path2.surface_brdf[1, 1, 1] / π ≈ d_albedo rtol=1e-12 atol=1e-14
         @test jac2.total.τ_layer ≈ jac2.path2.τ_layer
+        @test_throws ArgumentError run_exact_ss_with_jacobians(
+            path1_config_from_τ(τ_rayleigh); paths=:path1,
+            selector=SSMeasurementSelector(paths=:path2))
     end
 
     @testset "f2 τ chain-rule contraction" begin
@@ -546,6 +635,14 @@ end
         J1_chain = @inferred chain_rule_combine_dτ(jac1.path1.τ_layer, dτ1_dp)
         @test size(J1_chain) == (1, 1, 1, 2)
         @test vec(J1_chain) ≈ vec(J1p) rtol=1e-12 atol=1e-14
+        path1_selector = SSMeasurementSelector(paths=:path1)
+        J1_selected = @inferred chain_rule_combine_dτ(
+            jac1.path1.τ_layer, dτ1_dp, path1_selector)
+        @test size(J1_selected) == (1, 2)
+        @test J1_selected ≈ reshape(J1_chain, :, 2) rtol=1e-12 atol=1e-14
+        @test_throws ArgumentError chain_rule_combine_dτ(
+            jac1.path1.τ_layer, dτ1_dp,
+            SSMeasurementSelector(paths=(:path1, :path2)))
 
         path2_baseτ = FT[0.09, 0.03]
         path2_config_from_p(p) = ExactSSConfig(
@@ -571,6 +668,62 @@ end
         @test_throws ArgumentError chain_rule_combine_dτ(
             zeros(FT, 1, 1, 1), zeros(FT, 1, 1))
 
+        hg_geometry = SSGeometry(μ₀=FT(0.77),
+                                 μv=FT[0.43, 0.69],
+                                 Δϕ=FT[0.15, 1.0])
+        τ_hg = FT[0.05 0.08; 0.03 0.04]
+        g0 = FT(0.35)
+        ϖ0 = FT(0.82)
+        hg_contributor(g, ϖ) = begin
+            T = promote_type(typeof(g), typeof(ϖ))
+            HGAerosolSSContributor(g=convert(T, g), ϖ=convert(T, ϖ),
+                                   τ=τ_hg)
+        end
+        hg_config(g, ϖ) = ExactSSConfig(
+            geometry=hg_geometry,
+            surface=LambertianSSSurface(albedo=zero(FT)),
+            contributors=(hg_contributor(g, ϖ),),
+            I0=FT[1.0, 0.9])
+        hg_selector = SSMeasurementSelector(paths=:path1,
+                                            geometry_indices=[2, 1],
+                                            spectral_indices=1:2)
+        hg_jac = run_exact_ss_with_jacobians(hg_config(g0, ϖ0);
+                                             paths=:path1,
+                                             selector=hg_selector).jacobians
+
+        fϖ(p) = selected_measurements(
+            run_exact_ss(hg_config(g0, p[1]); paths=:path1),
+            hg_selector)
+        Jϖ = ForwardDiff.jacobian(fϖ, FT[ϖ0])
+        dϖ_dp = ones(FT, 2, 2, 1)
+        Jϖ_chain = @inferred chain_rule_combine_dϖ(
+            hg_jac.path1.ϖ_eff, dϖ_dp, hg_selector)
+        @test Jϖ_chain ≈ Jϖ rtol=1e-12 atol=1e-14
+
+        fg(p) = selected_measurements(
+            run_exact_ss(hg_config(p[1], ϖ0); paths=:path1),
+            hg_selector)
+        Jg = ForwardDiff.jacobian(fg, FT[g0])
+        dP_dp = zeros(FT, 2, 2, 2, 1)
+        for iv in eachindex(hg_geometry.μv)
+            cosΘ = _ref_cos_scatter(hg_geometry.μ₀, hg_geometry.μv[iv],
+                                    hg_geometry.Δϕ[iv])
+            dP_dg = ForwardDiff.derivative(
+                g -> exact_phase_function(hg_contributor(g, ϖ0), cosΘ),
+                g0)
+            dP_dp[iv, :, :, 1] .= dP_dg
+        end
+        Jg_chain = @inferred chain_rule_combine_dP(
+            hg_jac.path1.P_eff, dP_dp, hg_selector)
+        @test Jg_chain ≈ Jg rtol=1e-12 atol=1e-14
+
+        @test_throws ArgumentError chain_rule_combine_dϖ(
+            zeros(FT, 1, 1, 1, 2), zeros(FT, 3, 1, 1))
+        @test_throws ArgumentError chain_rule_combine_dP(
+            zeros(FT, 1, 1, 1, 2), zeros(FT, 2, 2, 1, 1))
+        @test_throws ArgumentError chain_rule_combine_dP(
+            zeros(FT, 1, 1, 1), zeros(FT, 1, 1, 1))
+
         surface_geometry = SSGeometry(μ₀=FT(0.79),
                                       μv=FT[0.41, 0.73],
                                       Δϕ=FT[0.2, 1.1])
@@ -594,6 +747,17 @@ end
         for ip in 1:2
             @test vec(J_surface_chain[:, :, :, ip]) ≈ Jp[:, ip] rtol=1e-12 atol=1e-14
         end
+        surface_selector = SSMeasurementSelector(paths=:path2,
+                                                 geometry_indices=2,
+                                                 spectral_indices=1:2)
+        fp_selected(p) = selected_measurements(
+            run_exact_ss(surface_config_from_p(p); paths=:path2),
+            surface_selector)
+        Jp_selected = ForwardDiff.jacobian(fp_selected, ones(FT, 2))
+        J_surface_selected = @inferred chain_rule_combine_surface_brdf(
+            surface_jac.path2.surface_brdf, dρ_dp, surface_selector)
+        @test size(J_surface_selected) == (2, 2)
+        @test J_surface_selected ≈ Jp_selected rtol=1e-12 atol=1e-14
         @test_throws ArgumentError chain_rule_combine_surface_brdf(
             zeros(FT, 1, 1, 1), zeros(FT, 2, 1, 1))
         @test_throws ArgumentError chain_rule_combine_surface_brdf(
@@ -682,6 +846,8 @@ end
         @test_throws ArgumentError run_exact_ss(ExactSSConfig(
             geometry=good.geometry, surface=good.surface,
             contributors=good.contributors, I0=good.I0, n_stokes=3))
+        @test_throws ArgumentError vSmartMOM.StandaloneSS._precompute_optics(
+            Val(3), good)
         @test_throws ArgumentError run_exact_ss(ExactSSConfig(
             geometry=good.geometry, surface=good.surface,
             contributors=good.contributors, I0=good.I0, inner_nquad=0))

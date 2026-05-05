@@ -85,20 +85,34 @@ end
 
 """
     ExactSSConfig(; geometry, surface, contributors, I0, n_stokes=1,
-                    architecture=CPU())
+                    polarization_type=nothing, architecture=CPU())
 
 Configuration for the Phase 1 standalone exact single-scatter solver.
-Outputs are scalar Stokes-I arrays with shape `(nGeom, 1, nSpec)`.
+Outputs are currently scalar Stokes-I arrays with shape `(nGeom, 1, nSpec)`.
+`polarization_type`, when provided, is the future dispatch skeleton for
+`Stokes_I/IQ/IQU/IQUV` exact-SS kernels and determines the Stokes count.
 """
-Base.@kwdef struct ExactSSConfig{GEO, SUR, CTRB, I, ARCH<:AbstractArchitecture}
+Base.@kwdef struct ExactSSConfig{GEO, SUR, CTRB, I, ARCH<:AbstractArchitecture, POL}
     geometry::GEO
     surface::SUR
     contributors::CTRB
     I0::I
     n_stokes::Int = 1
+    polarization_type::POL = nothing
     inner_nquad::Int = 16
     azimuth_nquad::Int = 64
     architecture::ARCH = CPU()
+end
+
+_config_n_stokes(config::ExactSSConfig) =
+    _config_n_stokes(config.polarization_type, config.n_stokes)
+
+_config_n_stokes(::Nothing, n_stokes::Int) = n_stokes
+
+function _config_n_stokes(polarization_type, n_stokes::Int)
+    hasproperty(polarization_type, :n) ||
+        throw(ArgumentError("ExactSSConfig.polarization_type must expose an `n` field"))
+    return Int(getproperty(polarization_type, :n))
 end
 
 τ_matrix(c::AbstractSSContributor) = c.τ

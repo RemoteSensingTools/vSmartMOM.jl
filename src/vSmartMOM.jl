@@ -109,12 +109,15 @@ export rt_run_lin, model_from_parameters_lin
 # Export standalone exact single-scattering API
 export StandaloneSS, run_exact_ss, ExactSSConfig, SSGeometry,
        LambertianSSSurface, CoxMunkSSSurface, RayleighSSContributor,
+       SSMeasurementSelector,
        HGAerosolSSContributor, AbsorptionSSContributor, determine_required_l_aerosol,
        determine_required_l_from_moments, determine_required_nbrdf,
        determine_required_nbrdf_coxmunk, determine_required_nquad,
        determine_required_nquad_inner, determine_required_nstreams,
-       run_exact_ss_with_jacobians, chain_rule_combine_dτ,
-       chain_rule_combine_surface_brdf
+       run_exact_ss_with_jacobians, chain_rule_combine_dP,
+       chain_rule_combine_dτ, chain_rule_combine_dϖ,
+       chain_rule_combine_surface_brdf, selected_measurement_jacobian,
+       selected_measurements
 # Export new hierarchical model types
 export RTModel, AbstractRTModel, SolverConfig, Atmosphere, RayleighScattering, AerosolState, Optics, OpticsLin
 # Export GEOSChem/NetCDF integration
