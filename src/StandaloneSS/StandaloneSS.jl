@@ -27,12 +27,14 @@ export AbsorptionSSContributor,
        determine_required_nquad_inner,
        determine_required_nstreams,
        exact_phase_function,
-       run_exact_ss
+       run_exact_ss,
+       run_exact_ss_with_jacobians
 
 include("types.jl")
 include("surfaces.jl")
 include("kernels.jl")
 include("quadrature_required.jl")
 include("solver.jl")
+include("linearized_f2.jl")
 
 end

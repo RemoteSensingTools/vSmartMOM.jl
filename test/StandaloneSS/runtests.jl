@@ -247,6 +247,7 @@ end
 @testset "StandaloneSS Phase 1" begin
     @testset "Top-level exports" begin
         @test run_exact_ss === vSmartMOM.run_exact_ss
+        @test run_exact_ss_with_jacobians === vSmartMOM.run_exact_ss_with_jacobians
         @test StandaloneSS === vSmartMOM.StandaloneSS
         @test CoxMunkSSSurface === vSmartMOM.CoxMunkSSSurface
     end
@@ -459,6 +460,46 @@ end
         h = FT(1e-5)
         fd = (only(fw(FT[4.0 + h])) - only(fw(FT[4.0 - h]))) / (2h)
         @test Jw[1, 1] ≈ fd rtol=2e-5 atol=1e-8
+    end
+
+    @testset "Handcoded f2 Jacobians for paths 1 and 2" begin
+        FT = Float64
+        geometry = SSGeometry(μ₀=FT(0.81), μv=FT[0.47], Δϕ=FT[0.25])
+
+        path1_config_from_τ(x) = ExactSSConfig(
+            geometry=geometry,
+            surface=LambertianSSSurface(albedo=zero(FT)),
+            contributors=(RayleighSSContributor(τ=reshape(x, 2, 1)),),
+            I0=FT[1.0])
+        τ_rayleigh = FT[0.07, 0.04]
+        f1(x) = vec(run_exact_ss(path1_config_from_τ(x); paths=:path1).total)
+        J1 = ForwardDiff.jacobian(f1, τ_rayleigh)
+        jac1 = run_exact_ss_with_jacobians(path1_config_from_τ(τ_rayleigh);
+                                           paths=:path1).jacobians
+        @test vec(jac1.path1.τ_layer[1, 1, 1, :]) ≈ vec(J1) rtol=1e-12 atol=1e-14
+        @test all(jac1.path1.ϖ_eff .>= 0)
+        @test all(jac1.path1.P_eff .>= 0)
+
+        path2_config_from_τ(x) = ExactSSConfig(
+            geometry=geometry,
+            surface=LambertianSSSurface(albedo=FT(0.33)),
+            contributors=(AbsorptionSSContributor(τ=reshape(x, 2, 1)),),
+            I0=FT[1.0])
+        τ_abs = FT[0.09, 0.03]
+        f2(x) = vec(run_exact_ss(path2_config_from_τ(x); paths=:path2).total)
+        J2 = ForwardDiff.jacobian(f2, τ_abs)
+        jac2 = run_exact_ss_with_jacobians(path2_config_from_τ(τ_abs);
+                                           paths=:path2).jacobians
+        @test vec(jac2.path2.τ_layer[1, 1, 1, :]) ≈ vec(J2) rtol=1e-12 atol=1e-14
+
+        falbedo(a) = only(run_exact_ss(ExactSSConfig(
+            geometry=geometry,
+            surface=LambertianSSSurface(albedo=a),
+            contributors=(AbsorptionSSContributor(τ=reshape(τ_abs, 2, 1)),),
+            I0=FT[1.0]); paths=:path2).total)
+        d_albedo = ForwardDiff.derivative(falbedo, FT(0.33))
+        @test jac2.path2.surface_brdf[1, 1, 1] / π ≈ d_albedo rtol=1e-12 atol=1e-14
+        @test jac2.total.τ_layer ≈ jac2.path2.τ_layer
     end
 
     @testset "CUDA equivalency and speed smoke" begin

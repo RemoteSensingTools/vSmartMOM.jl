@@ -112,7 +112,8 @@ export StandaloneSS, run_exact_ss, ExactSSConfig, SSGeometry,
        HGAerosolSSContributor, AbsorptionSSContributor, determine_required_l_aerosol,
        determine_required_l_from_moments, determine_required_nbrdf,
        determine_required_nbrdf_coxmunk, determine_required_nquad,
-       determine_required_nquad_inner, determine_required_nstreams
+       determine_required_nquad_inner, determine_required_nstreams,
+       run_exact_ss_with_jacobians
 # Export new hierarchical model types
 export RTModel, AbstractRTModel, SolverConfig, Atmosphere, RayleighScattering, AerosolState, Optics, OpticsLin
 # Export GEOSChem/NetCDF integration
