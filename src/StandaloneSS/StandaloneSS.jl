@@ -15,11 +15,19 @@ export AbsorptionSSContributor,
        RayleighSSContributor,
        SSGeometry,
        TruncatedAndExactScatteringOpticalProperties,
+       determine_required_l_aerosol,
+       determine_required_l_from_moments,
+       determine_required_nbrdf,
+       determine_required_nbrdf_coxmunk,
+       determine_required_nquad,
+       determine_required_nquad_inner,
+       determine_required_nstreams,
        exact_phase_function,
        run_exact_ss
 
 include("types.jl")
 include("kernels.jl")
+include("quadrature_required.jl")
 include("solver.jl")
 
 end
