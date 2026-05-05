@@ -19,6 +19,7 @@ export AbsorptionSSContributor,
        RayleighSSContributor,
        SSGeometry,
        TruncatedAndExactScatteringOpticalProperties,
+       chain_rule_combine_dτ,
        determine_required_l_aerosol,
        determine_required_l_from_moments,
        determine_required_nbrdf,
@@ -36,5 +37,6 @@ include("kernels.jl")
 include("quadrature_required.jl")
 include("solver.jl")
 include("linearized_f2.jl")
+include("chain_rule.jl")
 
 end

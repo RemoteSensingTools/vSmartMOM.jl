@@ -248,6 +248,7 @@ end
     @testset "Top-level exports" begin
         @test run_exact_ss === vSmartMOM.run_exact_ss
         @test run_exact_ss_with_jacobians === vSmartMOM.run_exact_ss_with_jacobians
+        @test chain_rule_combine_dτ === vSmartMOM.chain_rule_combine_dτ
         @test StandaloneSS === vSmartMOM.StandaloneSS
         @test CoxMunkSSSurface === vSmartMOM.CoxMunkSSSurface
     end
@@ -500,6 +501,54 @@ end
         d_albedo = ForwardDiff.derivative(falbedo, FT(0.33))
         @test jac2.path2.surface_brdf[1, 1, 1] / π ≈ d_albedo rtol=1e-12 atol=1e-14
         @test jac2.total.τ_layer ≈ jac2.path2.τ_layer
+    end
+
+    @testset "f2 τ chain-rule contraction" begin
+        FT = Float64
+        geometry = SSGeometry(μ₀=FT(0.81), μv=FT[0.47], Δϕ=FT[0.25])
+
+        path1_baseτ = FT[0.07, 0.04]
+        path1_config_from_p(p) = ExactSSConfig(
+            geometry=geometry,
+            surface=LambertianSSSurface(albedo=zero(FT)),
+            contributors=(RayleighSSContributor(
+                τ=reshape(path1_baseτ .* p, 2, 1)),),
+            I0=FT[1.0])
+        p0 = ones(FT, 2)
+        f1p(p) = vec(run_exact_ss(path1_config_from_p(p); paths=:path1).total)
+        J1p = ForwardDiff.jacobian(f1p, p0)
+        jac1 = run_exact_ss_with_jacobians(path1_config_from_p(p0);
+                                           paths=:path1).jacobians
+        dτ1_dp = zeros(FT, 2, 1, 2)
+        dτ1_dp[1, 1, 1] = path1_baseτ[1]
+        dτ1_dp[2, 1, 2] = path1_baseτ[2]
+        J1_chain = @inferred chain_rule_combine_dτ(jac1.path1.τ_layer, dτ1_dp)
+        @test size(J1_chain) == (1, 1, 1, 2)
+        @test vec(J1_chain) ≈ vec(J1p) rtol=1e-12 atol=1e-14
+
+        path2_baseτ = FT[0.09, 0.03]
+        path2_config_from_p(p) = ExactSSConfig(
+            geometry=geometry,
+            surface=LambertianSSSurface(albedo=FT(0.33)),
+            contributors=(AbsorptionSSContributor(
+                τ=reshape(path2_baseτ .* p, 2, 1)),),
+            I0=FT[1.0])
+        f2p(p) = vec(run_exact_ss(path2_config_from_p(p); paths=:path2).total)
+        J2p = ForwardDiff.jacobian(f2p, p0)
+        jac2 = run_exact_ss_with_jacobians(path2_config_from_p(p0);
+                                           paths=:path2).jacobians
+        dτ2_dp = zeros(FT, 2, 1, 2)
+        dτ2_dp[1, 1, 1] = path2_baseτ[1]
+        dτ2_dp[2, 1, 2] = path2_baseτ[2]
+        J2_chain = @inferred chain_rule_combine_dτ(jac2.path2.τ_layer, dτ2_dp)
+        @test vec(J2_chain) ≈ vec(J2p) rtol=1e-12 atol=1e-14
+
+        @test_throws ArgumentError chain_rule_combine_dτ(
+            zeros(FT, 1, 1, 1, 2), zeros(FT, 3, 1, 1))
+        @test_throws ArgumentError chain_rule_combine_dτ(
+            zeros(FT, 1, 1, 1, 2), zeros(FT, 2, 2, 1))
+        @test_throws ArgumentError chain_rule_combine_dτ(
+            zeros(FT, 1, 1, 1), zeros(FT, 1, 1))
     end
 
     @testset "CUDA equivalency and speed smoke" begin
