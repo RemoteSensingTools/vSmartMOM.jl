@@ -10,6 +10,7 @@ using FastGaussQuadrature: gausslegendre
 using KernelAbstractions
 using SpecialFunctions: erfc
 using ..Architectures: AbstractArchitecture, CPU, GPU, MetalGPU, array_type, devi
+using ..CoreRT: CoxMunkSurface, coxmunk_brdf_mueller
 
 export AbsorptionSSContributor,
        CoxMunkSSSurface,

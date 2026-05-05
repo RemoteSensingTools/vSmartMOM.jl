@@ -11,6 +11,10 @@ _wants_path2(paths::Symbol) = paths in (:path2, :paths_1_2, :all, :all_four)
 _wants_path3(paths::Symbol) = paths in (:path3, :all, :all_four)
 _wants_path4(paths::Symbol) = paths in (:path4, :all, :all_four)
 
+_vector_stokes_paths_supported(paths::Symbol) = paths === :path2
+_optics_dispatch(paths::Symbol, stokes_dispatch) =
+    paths === :path2 ? Val(1) : stokes_dispatch
+
 _architecture_backend(architecture::AbstractArchitecture) = devi(architecture)
 _architecture_array_type(architecture::AbstractArchitecture) = array_type(architecture)
 
@@ -383,8 +387,9 @@ end
 function _validate_config(config::ExactSSConfig, paths::Symbol)
     _validate_paths(paths)
     n_stokes = _config_n_stokes(config)
-    n_stokes == 1 ||
-        throw(ArgumentError("StandaloneSS Phase 1 kernels currently support only Stokes-I (n_stokes == 1); received n_stokes=$n_stokes"))
+    if n_stokes != 1 && !_vector_stokes_paths_supported(paths)
+        throw(ArgumentError("StandaloneSS vector Stokes kernels currently support only the direct-surface path `paths=:path2`; received n_stokes=$n_stokes and paths=:$paths"))
+    end
     if (_wants_path3(paths) || _wants_path4(paths)) &&
        !(config.surface isa LambertianSSSurface)
         throw(ArgumentError("StandaloneSS paths 3 and 4 currently support LambertianSSSurface only"))
@@ -417,7 +422,7 @@ function run_exact_ss(config::ExactSSConfig; paths::Symbol = :paths_1_2)
     n_geom = length(config.geometry.μv)
     n_stokes = _config_n_stokes(config)
     stokes_dispatch = Val(n_stokes)
-    optics = _precompute_optics(stokes_dispatch, config)
+    optics = _precompute_optics(_optics_dispatch(paths, stokes_dispatch), config)
     n_spec = size(optics.τ_cum, 2)
     path1 = nothing
     path2 = nothing
@@ -438,8 +443,8 @@ function run_exact_ss(config::ExactSSConfig; paths::Symbol = :paths_1_2)
     end
     if _wants_path2(paths)
         path2 = _path_zeros(architecture, FT, n_geom, n_stokes, n_spec)
-        surface_brdf = _precompute_surface_brdf(config.surface, config.geometry,
-                                                n_spec, FT)
+        surface_brdf = _precompute_surface_brdf(
+            stokes_dispatch, config.surface, config.geometry, n_spec, FT)
         surface_brdf = _to_arch(architecture, surface_brdf)
         _run_path2_kernel!(stokes_dispatch, path2, τ_total_column,
                            config.geometry.μ₀, μv, surface_brdf, I0, backend)

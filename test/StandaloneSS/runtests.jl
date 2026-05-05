@@ -297,8 +297,15 @@ end
             I0=FT[1.0, 0.7],
             polarization_type=vSmartMOM.Scattering.Stokes_IQU{FT}())
         @test_throws ArgumentError run_exact_ss(vector_config; paths=:path1)
+        vector_path2 = run_exact_ss(vector_config; paths=:path2)
+        @test size(vector_path2.path2) == (2, 3, 2)
+        @test vector_path2.path2[:, 1:1, :] ≈ expected.path2 rtol=1e-12 atol=1e-14
+        @test vector_path2.path2[:, 2:3, :] == zero(vector_path2.path2[:, 2:3, :])
+        @test_throws ArgumentError run_exact_ss(vector_config; paths=:paths_1_2)
         @test_throws ArgumentError run_exact_ss_with_jacobians(
             vector_config; paths=:path1)
+        @test_throws ArgumentError run_exact_ss_with_jacobians(
+            vector_config; paths=:path2)
     end
 
     @testset "Cox-Munk path 2" begin
@@ -333,6 +340,22 @@ end
         @test result.path1 == zero(result.path1)
         @test result.path2 ≈ expected rtol=1e-12 atol=1e-14
         @test result.total ≈ expected rtol=1e-12 atol=1e-14
+
+        vector_config = ExactSSConfig(
+            geometry=geometry, surface=surface,
+            contributors=(absorption,), I0=FT[1.0],
+            polarization_type=vSmartMOM.Scattering.Stokes_IQUV{FT}())
+        vector_result = run_exact_ss(vector_config; paths=:path2)
+        vector_expected = zeros(FT, 2, 4, 1)
+        for iv in eachindex(geometry.μv)
+            M = vSmartMOM.CoreRT.coxmunk_brdf_mueller(
+                core_surface, 4, geometry.μv[iv], geometry.μ₀,
+                geometry.Δϕ[iv]; n_water=n_water)
+            vector_expected[iv, :, 1] .= geometry.μ₀ .* M[:, 1] .*
+                                         exp(-τ / geometry.μ₀) .*
+                                         exp(-τ / geometry.μv[iv])
+        end
+        @test vector_result.path2 ≈ vector_expected rtol=1e-12 atol=1e-14
         @test_throws ArgumentError run_exact_ss(config; paths=:all)
     end
 

@@ -8,6 +8,9 @@ end
 function _validate_jacobian_config(config::ExactSSConfig)
     config.architecture isa CPU ||
         throw(ArgumentError("StandaloneSS f2 Jacobians currently support CPU() configs only"))
+    n_stokes = _config_n_stokes(config)
+    n_stokes == 1 ||
+        throw(ArgumentError("StandaloneSS f2 Jacobians currently support only Stokes-I (n_stokes == 1); received n_stokes=$n_stokes"))
     return nothing
 end
 
