@@ -6,6 +6,7 @@ plane-parallel, Lambertian paths 1 and 2 with KernelAbstractions CPU kernels.
 """
 module StandaloneSS
 
+using FastGaussQuadrature: gausslegendre
 using KernelAbstractions
 
 export AbsorptionSSContributor,

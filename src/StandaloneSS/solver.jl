@@ -1,9 +1,15 @@
-const _SUPPORTED_PHASE1_PATHS = (:path1, :path2, :paths_1_2)
+const _SUPPORTED_PATHS = (:path1, :path2, :path3, :path4, :paths_1_2,
+                          :all, :all_four)
 
 function _validate_paths(paths::Symbol)
-    paths in _SUPPORTED_PHASE1_PATHS && return paths
-    throw(ArgumentError("StandaloneSS Phase 1 supports paths :path1, :path2, and :paths_1_2; got :$paths"))
+    paths in _SUPPORTED_PATHS && return paths
+    throw(ArgumentError("StandaloneSS supports paths :path1, :path2, :path3, :path4, :paths_1_2, :all, and :all_four; got :$paths"))
 end
+
+_wants_path1(paths::Symbol) = paths in (:path1, :paths_1_2, :all, :all_four)
+_wants_path2(paths::Symbol) = paths in (:path2, :paths_1_2, :all, :all_four)
+_wants_path3(paths::Symbol) = paths in (:path3, :all, :all_four)
+_wants_path4(paths::Symbol) = paths in (:path4, :all, :all_four)
 
 function _validate_geometry(geometry::SSGeometry)
     geometry.μ₀ > zero(geometry.μ₀) ||
@@ -49,6 +55,28 @@ function _scattering_angle_cosine(μ₀::FT, μᵥ::FT, Δϕ::FT) where {FT}
     sin₀ = sqrt(max(zero(FT), one(FT) - μ₀^2))
     sinᵥ = sqrt(max(zero(FT), one(FT) - μᵥ^2))
     return -μ₀ * μᵥ + sin₀ * sinᵥ * cos(Δϕ)
+end
+
+function _gauss_legendre_01(n::Int, ::Type{FT}) where {FT}
+    n > 0 || throw(ArgumentError("inner_nquad must be positive"))
+    x, w = gausslegendre(n)
+    return convert(Vector{FT}, (x .+ 1) ./ 2),
+           convert(Vector{FT}, w ./ 2)
+end
+
+function _azimuthal_average_phase(c::AbstractSSContributor, μ_a::FT, μ_b::FT,
+                                  n_phi::Int) where {FT}
+    n_phi > 0 || throw(ArgumentError("azimuth_nquad must be positive"))
+    a = μ_a * μ_b
+    b = sqrt(max(zero(FT), one(FT) - μ_a^2)) *
+        sqrt(max(zero(FT), one(FT) - μ_b^2))
+    total = zero(FT)
+    for k in 0:(n_phi - 1)
+        ϕ = FT(2) * FT(pi) * FT(k) / FT(n_phi)
+        cosΘ = clamp(a + b * cos(ϕ), -one(FT), one(FT))
+        total += exact_phase_function(c, cosΘ)
+    end
+    return total / FT(n_phi)
 end
 
 function _precompute_optics(config::ExactSSConfig)
@@ -103,11 +131,48 @@ function _precompute_optics(config::ExactSSConfig)
     return (; τ_total_layer, τ_scat_layer, τ_cum, τ_total_column, ϖ_eff, P_eff)
 end
 
+function _precompute_azimuthal_phase(config::ExactSSConfig, τ_scat_layer, μ_nodes,
+                                     reference_μ::AbstractVector{FT}) where {FT}
+    contributors = config.contributors
+    n_layers, n_spec = _dims(contributors)
+    n_geom = length(reference_μ)
+    n_quad = length(μ_nodes)
+    P̄ = zeros(FT, n_geom, n_layers, n_spec, n_quad)
+
+    for c in contributors
+        τ = τ_matrix(c)
+        ϖ = convert(FT, single_scattering_albedo(c))
+        ϖ == zero(FT) && continue
+        @inbounds for ispec in 1:n_spec, iz in 1:n_layers
+            scat_weight = convert(FT, τ[iz, ispec]) * ϖ
+            scat_weight == zero(FT) && continue
+            for iv in 1:n_geom, k in 1:n_quad
+                P̄[iv, iz, ispec, k] += scat_weight *
+                    _azimuthal_average_phase(c, μ_nodes[k], reference_μ[iv],
+                                             config.azimuth_nquad)
+            end
+        end
+    end
+
+    @inbounds for ispec in 1:n_spec, iz in 1:n_layers
+        τ_scat = τ_scat_layer[iz, ispec]
+        τ_scat == zero(FT) && continue
+        for iv in 1:n_geom, k in 1:n_quad
+            P̄[iv, iz, ispec, k] /= τ_scat
+        end
+    end
+    return P̄
+end
+
 function _validate_config(config::ExactSSConfig, paths::Symbol)
     _validate_paths(paths)
     config.n_stokes == 1 ||
         throw(ArgumentError("StandaloneSS Phase 1 supports only n_stokes == 1"))
     _validate_geometry(config.geometry)
+    config.inner_nquad > 0 ||
+        throw(ArgumentError("ExactSSConfig.inner_nquad must be positive"))
+    config.azimuth_nquad > 0 ||
+        throw(ArgumentError("ExactSSConfig.azimuth_nquad must be positive"))
     n_layers, n_spec = _dims(config.contributors)
     n_spec > 0 && n_layers > 0 ||
         throw(ArgumentError("ExactSSConfig requires at least one layer and one spectral point"))
@@ -130,21 +195,40 @@ function run_exact_ss(config::ExactSSConfig; paths::Symbol = :paths_1_2)
     n_spec = size(optics.τ_cum, 2)
     path1 = zeros(FT, n_geom, 1, n_spec)
     path2 = zeros(FT, n_geom, 1, n_spec)
+    path3 = zeros(FT, n_geom, 1, n_spec)
+    path4 = zeros(FT, n_geom, 1, n_spec)
 
     I0 = _vectorize_I0(config.I0, n_spec, FT)
-    if paths in (:path1, :paths_1_2)
+    if _wants_path1(paths)
         _run_path1_kernel!(path1, optics.τ_cum, optics.ϖ_eff, optics.P_eff,
                            config.geometry, I0)
     end
-    if paths in (:path2, :paths_1_2)
-        albedo = _vectorize_albedo(config.surface, n_spec, FT)
+    albedo = _vectorize_albedo(config.surface, n_spec, FT)
+    if _wants_path2(paths)
         _run_path2_kernel!(path2, optics.τ_total_column, config.geometry, albedo, I0)
     end
+    if _wants_path3(paths) || _wants_path4(paths)
+        μ_nodes, μ_weights = _gauss_legendre_01(config.inner_nquad, FT)
+        if _wants_path3(paths)
+            reference_μ₀ = fill(config.geometry.μ₀, n_geom)
+            P̄3 = _precompute_azimuthal_phase(config, optics.τ_scat_layer,
+                                              μ_nodes, reference_μ₀)
+            _run_path3_kernel!(path3, optics.τ_cum, optics.ϖ_eff, P̄3,
+                               config.geometry, albedo, I0, μ_nodes, μ_weights)
+        end
+        if _wants_path4(paths)
+            P̄4 = _precompute_azimuthal_phase(config, optics.τ_scat_layer,
+                                              μ_nodes, config.geometry.μv)
+            _run_path4_kernel!(path4, optics.τ_cum, optics.ϖ_eff, P̄4,
+                               config.geometry, albedo, I0, μ_nodes, μ_weights)
+        end
+    end
 
-    total = path1 .+ path2
+    total = path1 .+ path2 .+ path3 .+ path4
     quadrature_info = (; paths, kernel_backend = :KernelAbstractionsCPU,
-                       inner_quadrature = :none)
+                       inner_quadrature = config.inner_nquad,
+                       azimuth_quadrature = config.azimuth_nquad)
     metadata = (; n_layers = size(optics.ϖ_eff, 1), n_spec, n_geom,
                 n_stokes = config.n_stokes)
-    return (; total, path1, path2, quadrature_info, metadata)
+    return (; total, path1, path2, path3, path4, quadrature_info, metadata)
 end
