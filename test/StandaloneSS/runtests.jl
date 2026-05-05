@@ -334,6 +334,25 @@ end
         @test result.quadrature_info.azimuth_quadrature == config.azimuth_nquad
     end
 
+    @testset "Rayleigh azimuth average is analytic" begin
+        FT = Float64
+        geometry = SSGeometry(μ₀=FT(0.82),
+                              μv=FT[0.43, 0.77],
+                              Δϕ=FT[0.1, 1.3])
+        surface = LambertianSSSurface(albedo=FT(0.24))
+        rayleigh = RayleighSSContributor(τ=reshape(FT[0.04, 0.07], 2, 1))
+        base = ExactSSConfig(geometry=geometry, surface=surface,
+                             contributors=(rayleigh,), I0=FT[1.0],
+                             inner_nquad=4, azimuth_nquad=1)
+        refined = ExactSSConfig(geometry=geometry, surface=surface,
+                                contributors=(rayleigh,), I0=FT[1.0],
+                                inner_nquad=4, azimuth_nquad=32)
+        coarse_result = run_exact_ss(base; paths=:all)
+        refined_result = run_exact_ss(refined; paths=:all)
+        @test coarse_result.path3 ≈ refined_result.path3 rtol=1e-12 atol=1e-14
+        @test coarse_result.path4 ≈ refined_result.path4 rtol=1e-12 atol=1e-14
+    end
+
     @testset "Path selection" begin
         config = _mixed_config(Float64)
         only1 = run_exact_ss(config; paths=:path1)
