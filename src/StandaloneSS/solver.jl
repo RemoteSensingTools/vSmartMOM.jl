@@ -22,6 +22,35 @@ _zeros_arch(::CPU, ::Type{FT}, dims::Int...) where {FT} = zeros(FT, dims...)
 _zeros_arch(architecture::AbstractArchitecture, ::Type{FT}, dims::Int...) where {FT} =
     _architecture_array_type(architecture)(zeros(FT, dims...))
 
+_path_zeros(architecture::AbstractArchitecture, ::Type{FT}, n_geom::Int,
+            n_spec::Int) where {FT} =
+    _zeros_arch(architecture, FT, n_geom, 1, n_spec)
+
+_path_or_zeros(path, architecture::AbstractArchitecture, ::Type{FT},
+               n_geom::Int, n_spec::Int) where {FT} =
+    path === nothing ? _path_zeros(architecture, FT, n_geom, n_spec) : path
+
+function _requested_total(paths::Symbol, path1, path2, path3, path4)
+    if _wants_path1(paths)
+        total = copy(path1)
+        _wants_path2(paths) && (total .+= path2)
+        _wants_path3(paths) && (total .+= path3)
+        _wants_path4(paths) && (total .+= path4)
+        return total
+    elseif _wants_path2(paths)
+        total = copy(path2)
+        _wants_path3(paths) && (total .+= path3)
+        _wants_path4(paths) && (total .+= path4)
+        return total
+    elseif _wants_path3(paths)
+        total = copy(path3)
+        _wants_path4(paths) && (total .+= path4)
+        return total
+    else
+        return copy(path4)
+    end
+end
+
 _kernel_backend_name(::CPU) = :KernelAbstractionsCPU
 _kernel_backend_name(::GPU) = :CUDA
 _kernel_backend_name(::MetalGPU) = :Metal
@@ -366,10 +395,10 @@ function run_exact_ss(config::ExactSSConfig; paths::Symbol = :paths_1_2)
 
     n_geom = length(config.geometry.μv)
     n_spec = size(optics.τ_cum, 2)
-    path1 = _zeros_arch(architecture, FT, n_geom, 1, n_spec)
-    path2 = _zeros_arch(architecture, FT, n_geom, 1, n_spec)
-    path3 = _zeros_arch(architecture, FT, n_geom, 1, n_spec)
-    path4 = _zeros_arch(architecture, FT, n_geom, 1, n_spec)
+    path1 = nothing
+    path2 = nothing
+    path3 = nothing
+    path4 = nothing
 
     μv = _to_arch(architecture, config.geometry.μv)
     τ_cum = _to_arch(architecture, optics.τ_cum)
@@ -379,10 +408,12 @@ function run_exact_ss(config::ExactSSConfig; paths::Symbol = :paths_1_2)
 
     I0 = _to_arch(architecture, _vectorize_I0(config.I0, n_spec, FT))
     if _wants_path1(paths)
+        path1 = _path_zeros(architecture, FT, n_geom, n_spec)
         _run_path1_kernel!(path1, τ_cum, ϖ_eff, P_eff, config.geometry.μ₀,
                            μv, I0, backend)
     end
     if _wants_path2(paths)
+        path2 = _path_zeros(architecture, FT, n_geom, n_spec)
         surface_brdf = _precompute_surface_brdf(config.surface, config.geometry,
                                                 n_spec, FT)
         surface_brdf = _to_arch(architecture, surface_brdf)
@@ -395,6 +426,8 @@ function run_exact_ss(config::ExactSSConfig; paths::Symbol = :paths_1_2)
         μ_nodes = _to_arch(architecture, μ_nodes_host)
         μ_weights = _to_arch(architecture, μ_weights_host)
         if _wants_path3(paths) && _wants_path4(paths)
+            path3 = _path_zeros(architecture, FT, n_geom, n_spec)
+            path4 = _path_zeros(architecture, FT, n_geom, n_spec)
             reference_μ₀ = fill(convert(FT, config.geometry.μ₀), n_geom)
             P̄3, P̄4 = _precompute_azimuthal_phase_pair_arch(
                 config, optics.τ_scat_layer, μ_nodes_host, reference_μ₀,
@@ -403,6 +436,7 @@ function run_exact_ss(config::ExactSSConfig; paths::Symbol = :paths_1_2)
                                 config.geometry.μ₀, μv, albedo, I0,
                                 μ_nodes, μ_weights, backend)
         elseif _wants_path3(paths)
+            path3 = _path_zeros(architecture, FT, n_geom, n_spec)
             reference_μ₀ = fill(convert(FT, config.geometry.μ₀), n_geom)
             P̄3 = _precompute_azimuthal_phase(config, optics.τ_scat_layer,
                                               μ_nodes_host, reference_μ₀)
@@ -410,6 +444,7 @@ function run_exact_ss(config::ExactSSConfig; paths::Symbol = :paths_1_2)
             _run_path3_kernel!(path3, τ_cum, ϖ_eff, P̄3, config.geometry.μ₀,
                                μv, albedo, I0, μ_nodes, μ_weights, backend)
         else
+            path4 = _path_zeros(architecture, FT, n_geom, n_spec)
             P̄4 = _precompute_azimuthal_phase(config, optics.τ_scat_layer,
                                               μ_nodes_host, config.geometry.μv)
             P̄4 = _to_arch(architecture, P̄4)
@@ -418,7 +453,11 @@ function run_exact_ss(config::ExactSSConfig; paths::Symbol = :paths_1_2)
         end
     end
 
-    total = path1 .+ path2 .+ path3 .+ path4
+    total = _requested_total(paths, path1, path2, path3, path4)
+    path1 = _path_or_zeros(path1, architecture, FT, n_geom, n_spec)
+    path2 = _path_or_zeros(path2, architecture, FT, n_geom, n_spec)
+    path3 = _path_or_zeros(path3, architecture, FT, n_geom, n_spec)
+    path4 = _path_or_zeros(path4, architecture, FT, n_geom, n_spec)
     quadrature_info = (; paths, kernel_backend = _kernel_backend_name(architecture),
                        inner_quadrature = config.inner_nquad,
                        azimuth_quadrature = config.azimuth_nquad)
