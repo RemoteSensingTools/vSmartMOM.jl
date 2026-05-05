@@ -628,6 +628,25 @@ end
                       getfield(cpu_result, field) rtol=5e-12 atol=5e-14
             end
 
+            cpu32_config = _benchmark_config(Float32; n_geom=8, n_spec=16,
+                                             n_layers=4)
+            gpu32_config = ExactSSConfig(
+                geometry=cpu32_config.geometry,
+                surface=cpu32_config.surface,
+                contributors=cpu32_config.contributors,
+                I0=cpu32_config.I0,
+                inner_nquad=cpu32_config.inner_nquad,
+                azimuth_nquad=cpu32_config.azimuth_nquad,
+                architecture=vSmartMOM.GPU())
+            cpu32_result = run_exact_ss(cpu32_config; paths=:all)
+            gpu32_result = run_exact_ss(gpu32_config; paths=:all)
+            CUDA.synchronize()
+            @test eltype(gpu32_result.total) == Float32
+            for field in (:total, :path1, :path2, :path3, :path4)
+                @test Array(getfield(gpu32_result, field)) ≈
+                      getfield(cpu32_result, field) rtol=5e-5 atol=1e-6
+            end
+
             cpu_time = _average_elapsed(3) do
                 run_exact_ss(cpu_config; paths=:all)
                 nothing
