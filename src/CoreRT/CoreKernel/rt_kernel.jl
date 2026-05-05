@@ -191,13 +191,11 @@ function rt_kernel!(RS_type::noRS{FT},
     # Just unpack core optical properties from
     (; τ, ϖ, Z⁺⁺, Z⁻⁺) = computed_layer_properties
 
-    # @show ndoubl
-    scatter = true # edit later
-
-    dτ, ndoubl, expk = init_layer(computed_layer_properties, quad_points, pol_type, architecture)
+    scatter = maximum(τ .* ϖ) > 2eps(FT)
 
     # If there is scattering, perform the elemental and doubling steps
     if scatter
+        dτ, ndoubl, expk = init_layer(computed_layer_properties, quad_points, pol_type, architecture)
         #@show typeof(computed_layer_properties)
         @timeit "elemental" elemental!(pol_type, SFI,
                                 τ_sum, dτ, F₀,
@@ -214,7 +212,7 @@ function rt_kernel!(RS_type::noRS{FT},
     #println("Doubling done...")
     else # This might not work yet on GPU!
         # If not, there is no reflectance. Assign r/t appropriately
-        zero_added_noscat!(added_layer, τ_λ, qp_μN)
+        zero_added_noscat!(added_layer, τ, qp_μN)
     end
 
     # @assert !any(isnan.(added_layer.t⁺⁺))
@@ -395,5 +393,4 @@ function rt_kernel!(
                                             workspace=workspace)
     end
 end
-
 

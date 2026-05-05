@@ -119,6 +119,26 @@ using CanopyOptics
         @test out.greek_coefs === raw.greek_coefs
     end
 
+    @testset "NoTruncation lin passthrough resets fᵗ and ḟᵗ" begin
+        # Same sentinel issue applies to the linearised
+        # (Jacobian) path: `delta_m_truncation_lin` reads `fᵗ` and
+        # `ḟᵗ` and would zero the SSA Jacobian if `fᵗ = 1` leaked
+        # through. NoTruncation must reset both.
+        l = 8
+        g  = Scattering.GreekCoefs(zeros(l), ones(l), zeros(l),
+                                   ones(l), zeros(l), ones(l))
+        lg = Scattering.linGreekCoefs(zeros(2, l), zeros(2, l), zeros(2, l),
+                                      zeros(2, l), zeros(2, l), zeros(2, l))
+        raw     = AerosolOptics(greek_coefs=g, ω̃=0.95, k=1.7, fᵗ=1.0)
+        raw_lin = Scattering.linAerosolOptics(lin_greek_coefs=lg,
+                      ω̃̇=zeros(2), k̇=zeros(2), ḟᵗ=ones(2))   # raw lin sentinel
+        out, lout = Scattering.truncate_phase(NoTruncation(), raw, raw_lin)
+        @test out.fᵗ == 0
+        @test all(lout.ḟᵗ .== 0)
+        @test out.greek_coefs === raw.greek_coefs
+        @test lout.lin_greek_coefs === raw_lin.lin_greek_coefs
+    end
+
     @testset "Explicit truncation is preserved (no silent rebuild)" begin
         # Regression for the P2 finding from codex review: setting
         # `params.truncation = δBGE(40, 5.0)` with legacy `Δ_angle=2.0`
@@ -177,20 +197,43 @@ using CanopyOptics
         @test_throws ArgumentError build("Foo()")
     end
 
-    # Pending invariant — δ-m / δ-BGE absorption budget (Sanghavi &
-    # Stephens 2015 Eq. 8):
-    #
-    #     τ*·(1 − ω*) = τ·(1 − f_tr·ω)·(1 − ω·(1−f_tr)/(1−f_tr·ω))
-    #                 = τ·(1 − f_tr·ω − ω + f_tr·ω)
-    #                 = τ·(1 − ω).
-    #
-    # The current `truncate_phase(::δBGE, ...)` returns the truncated
-    # Greek coefficients but does NOT rescale ω̃ or k (lines 231–235 of
-    # `truncate_phase.jl` are commented out — see Eq. 8 in the paper).
-    # Restore those, then implement this test against a real Mie
-    # AerosolOptics from `compute_aerosol_optical_properties`. Marking
-    # as @test_skip with a stub assertion until the rescaling lands.
-    @testset "δBGE absorption budget τ(1-ω) — pending τ/ω rescaling" begin
-        @test_skip false  # placeholder; see comment block above
+    @testset "δ-M Eq. 8 invariants (delta_m_forward)" begin
+        # Sanghavi & Stephens 2015 Eq. 8 is implemented downstream in
+        # `delta_m_forward`, not inside `truncate_phase` (the
+        # commented-out lines at truncate_phase.jl:115-116 / 260-261
+        # would *double-apply* the rescaling and are correctly
+        # disabled). Test the live function instead.
+        using vSmartMOM.CoreRT: delta_m_forward
+        Z⁺⁺ = randn(4, 4); Z⁻⁺ = randn(4, 4)
+
+        # Invariant 1 — absorption budget τ(1−ω) is exactly invariant
+        # under δ-M scaling, for any (τ, ω̃, fᵗ):
+        #   τ_mod·(1 − ϖ_mod) = (1−fᵗω̃)τ · (1 − (1−fᵗ)ω̃/(1−fᵗω̃))
+        #                     = τ·(1 − ω̃).
+        for τ_aer in (0.1, 0.5, 1.0, 5.0),
+            ω̃    in (0.1, 0.5, 0.9, 0.99),
+            fᵗ   in (0.0, 0.1, 0.5, 0.9)
+            out = delta_m_forward(τ_aer, ω̃, fᵗ, Z⁺⁺, Z⁻⁺)
+            @test out.τ * (1 - out.ϖ) ≈ τ_aer * (1 - ω̃) rtol = 1e-12
+        end
+
+        # Invariant 2 — scattering optical depth shrinks by exactly
+        # `(1 - fᵗ)`: τ_mod·ϖ_mod = τ·ω̃·(1−fᵗ).
+        for τ_aer in (0.5, 2.0), ω̃ in (0.3, 0.95), fᵗ in (0.0, 0.3, 0.7)
+            out = delta_m_forward(τ_aer, ω̃, fᵗ, Z⁺⁺, Z⁻⁺)
+            @test out.τ * out.ϖ ≈ τ_aer * ω̃ * (1 - fᵗ) rtol = 1e-12
+        end
+
+        # Invariant 3 — fᵗ = 0 is the identity (NoTruncation limit).
+        for τ_aer in (0.1, 1.0, 5.0), ω̃ in (0.05, 0.5, 0.99)
+            out = delta_m_forward(τ_aer, ω̃, 0.0, Z⁺⁺, Z⁻⁺)
+            @test out.τ ≈ τ_aer
+            @test out.ϖ ≈ ω̃
+        end
+
+        # Invariant 4 — phase matrices pass through unchanged.
+        out = delta_m_forward(0.5, 0.9, 0.3, Z⁺⁺, Z⁻⁺)
+        @test out.Z⁺⁺ === Z⁺⁺
+        @test out.Z⁻⁺ === Z⁻⁺
     end
 end

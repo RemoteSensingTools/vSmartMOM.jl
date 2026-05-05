@@ -96,6 +96,20 @@ println("="^60)
         cat_opt64 = opt_a64 * opt_b64
         @test eltype(cat_opt64.τ) == Float64
         @test eltype(cat_opt64.ϖ) == Float64
+
+        # Vacuum layers are valid: zero scattering plus zero absorption should
+        # remain finite and non-scattering, not create NaN SSA through 0 / 0.
+        zero_opt = CoreRT.CoreScatteringOpticalProperties(
+            τ = zeros(Float64, nSpec),
+            ϖ = zeros(Float64, nSpec),
+            Z⁺⁺ = copy(Z⁺⁺64),
+            Z⁻⁺ = copy(Z⁻⁺64),
+        )
+        zero_abs = CoreRT.CoreAbsorptionOpticalProperties(τ = zeros(Float64, nSpec))
+        vacuum_opt = zero_opt + zero_abs
+        @test all(vacuum_opt.τ .== 0)
+        @test all(vacuum_opt.ϖ .== 0)
+        @test all(isfinite.(vacuum_opt.ϖ))
     end
 
     @testset "Helper functions type-stable (@inferred)" begin

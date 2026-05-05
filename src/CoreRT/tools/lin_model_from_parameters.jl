@@ -348,15 +348,23 @@ function model_from_parameters(lin::LinMode,
                 lin_aerosol_optics_raw = linAerosolOptics(lin_greek_coefs=lin_greek_coeffs, ω̃̇=ω̃̇, k̇=k̇, ḟᵗ=ḟᵗ)
             end
 
-            if length(aerosol_optics_raw.greek_coefs.β) > truncation_type.l_max
+            # Always go through `truncate_phase`. For NoTruncation this
+            # is the cheap passthrough that resets the raw Mie sentinel
+            # `fᵗ = 1` to 0 (and `ḟᵗ` to zero) so downstream
+            # `delta_m_truncation_lin` doesn't silently kill the
+            # aerosol SSA. For δBGE the existing least-squares fit runs
+            # only when the Greek expansion is long enough to truncate.
+            β_len = length(aerosol_optics_raw.greek_coefs.β)
+            if truncation_type isa Scattering.δBGE && β_len > truncation_type.l_max
                 aerosol_optics[i_band][i_aer], lin_aerosol_optics[i_band][i_aer] =
                     Scattering.truncate_phase(truncation_type,
                                 aerosol_optics_raw, lin_aerosol_optics_raw; reportFit=false)
                 l_max_aer[i_aer, i_band] = truncation_type.l_max
             else
-                aerosol_optics[i_band][i_aer] = aerosol_optics_raw
-                lin_aerosol_optics[i_band][i_aer] = lin_aerosol_optics_raw
-                l_max_aer[i_aer, i_band] = length(aerosol_optics_raw.greek_coefs.β)
+                aerosol_optics[i_band][i_aer], lin_aerosol_optics[i_band][i_aer] =
+                    Scattering.truncate_phase(Scattering.NoTruncation(),
+                                aerosol_optics_raw, lin_aerosol_optics_raw)
+                l_max_aer[i_aer, i_band] = β_len
             end
 
             k_band = aerosol_optics[i_band][i_aer].k
