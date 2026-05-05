@@ -163,6 +163,11 @@ function _precompute_azimuthal_phase(config::ExactSSConfig, τ_scat_layer, μ_no
         end
     end
 
+    return _normalize_azimuthal_phase!(P̄, τ_scat_layer, FT)
+end
+
+function _normalize_azimuthal_phase!(P̄, τ_scat_layer, ::Type{FT}) where {FT}
+    n_geom, n_layers, n_spec, n_quad = size(P̄)
     @inbounds for ispec in 1:n_spec, iz in 1:n_layers
         τ_scat = τ_scat_layer[iz, ispec]
         τ_scat == zero(FT) && continue
@@ -171,6 +176,46 @@ function _precompute_azimuthal_phase(config::ExactSSConfig, τ_scat_layer, μ_no
         end
     end
     return P̄
+end
+
+function _precompute_azimuthal_phase_pair(config::ExactSSConfig, τ_scat_layer,
+                                          μ_nodes, reference_a::AbstractVector,
+                                          reference_b::AbstractVector)
+    length(reference_a) == length(reference_b) ||
+        throw(ArgumentError("paired azimuthal phase references must have the same length"))
+
+    FT = _config_numeric_type(config)
+    contributors = config.contributors
+    n_layers, n_spec = _dims(contributors)
+    n_geom = length(reference_a)
+    n_quad = length(μ_nodes)
+    P̄a = zeros(FT, n_geom, n_layers, n_spec, n_quad)
+    P̄b = zeros(FT, n_geom, n_layers, n_spec, n_quad)
+
+    for c in contributors
+        τ = τ_matrix(c)
+        ϖ = convert(FT, single_scattering_albedo(c))
+        ϖ == zero(FT) && continue
+        @inbounds for ispec in 1:n_spec, iz in 1:n_layers
+            scat_weight = convert(FT, τ[iz, ispec]) * ϖ
+            scat_weight == zero(FT) && continue
+            for iv in 1:n_geom, k in 1:n_quad
+                μ_node = convert(FT, μ_nodes[k])
+                P̄a[iv, iz, ispec, k] += scat_weight *
+                    _azimuthal_average_phase(c, μ_node,
+                                             convert(FT, reference_a[iv]),
+                                             config.azimuth_nquad)
+                P̄b[iv, iz, ispec, k] += scat_weight *
+                    _azimuthal_average_phase(c, μ_node,
+                                             convert(FT, reference_b[iv]),
+                                             config.azimuth_nquad)
+            end
+        end
+    end
+
+    _normalize_azimuthal_phase!(P̄a, τ_scat_layer, FT)
+    _normalize_azimuthal_phase!(P̄b, τ_scat_layer, FT)
+    return P̄a, P̄b
 end
 
 function _validate_config(config::ExactSSConfig, paths::Symbol)
@@ -226,16 +271,16 @@ function run_exact_ss(config::ExactSSConfig; paths::Symbol = :paths_1_2)
         albedo = _vectorize_albedo(config.surface, n_spec, FT)
         μ_nodes, μ_weights = _gauss_legendre_01(config.inner_nquad, FT)
         if _wants_path3(paths) && _wants_path4(paths)
-            reference_μ₀ = fill(config.geometry.μ₀, n_geom)
-            P̄3 = _precompute_azimuthal_phase(config, optics.τ_scat_layer,
-                                              μ_nodes, reference_μ₀)
-            P̄4 = _precompute_azimuthal_phase(config, optics.τ_scat_layer,
-                                              μ_nodes, config.geometry.μv)
-            _run_path34_kernel!(path3, path4, optics.τ_cum, optics.ϖ_eff,
-                                P̄3, P̄4, config.geometry, albedo, I0,
-                                μ_nodes, μ_weights)
+            reference_μ₀ = fill(convert(FT, config.geometry.μ₀), n_geom)
+            P̄3, P̄4 = _precompute_azimuthal_phase_pair(
+                config, optics.τ_scat_layer, μ_nodes, reference_μ₀,
+                config.geometry.μv)
+            _run_path3_kernel!(path3, optics.τ_cum, optics.ϖ_eff, P̄3,
+                               config.geometry, albedo, I0, μ_nodes, μ_weights)
+            _run_path4_kernel!(path4, optics.τ_cum, optics.ϖ_eff, P̄4,
+                               config.geometry, albedo, I0, μ_nodes, μ_weights)
         elseif _wants_path3(paths)
-            reference_μ₀ = fill(config.geometry.μ₀, n_geom)
+            reference_μ₀ = fill(convert(FT, config.geometry.μ₀), n_geom)
             P̄3 = _precompute_azimuthal_phase(config, optics.τ_scat_layer,
                                               μ_nodes, reference_μ₀)
             _run_path3_kernel!(path3, optics.τ_cum, optics.ϖ_eff, P̄3,
