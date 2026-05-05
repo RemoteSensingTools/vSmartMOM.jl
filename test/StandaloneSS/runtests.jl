@@ -200,4 +200,51 @@ end
             geometry=good.geometry, surface=good.surface,
             contributors=good.contributors, I0=good.I0, n_stokes=3))
     end
+
+    @testset "Required-Nquad diagnostics" begin
+        config = _mixed_config(Float64)
+        rayleigh, aerosol, absorption = config.contributors
+
+        @test determine_required_l_from_moments([1.0]) == 0
+        @test determine_required_l_from_moments([0.0, 0.0, 0.0]) == 0
+        @test determine_required_l_aerosol(rayleigh) == 2
+        @test determine_required_l_aerosol(absorption) == 0
+        @test determine_required_l_aerosol(aerosol; target_relative_error=1e-4) ==
+              ceil(Int, log(1e-4) / log(abs(aerosol.g)))
+        @test determine_required_l_aerosol(
+            HGAerosolSSContributor(g=0.0, ϖ=1.0, τ=[1.0;;])) == 0
+
+        @test determine_required_nbrdf(config.surface) == 1
+        @test determine_required_nbrdf_coxmunk(0.0; target_relative_error=1e-4) ==
+              clamp(ceil(Int, log(1 / 1e-4) / sqrt(0.003)), 16, 200)
+        @test determine_required_nbrdf_coxmunk(1000.0; target_relative_error=1e-4) == 16
+
+        stream_diag = determine_required_nstreams(config.contributors, config.surface)
+        @test stream_diag.L_aerosol ==
+              determine_required_l_aerosol(aerosol; target_relative_error=1e-4)
+        @test stream_diag.Nstreams == ceil(Int, (stream_diag.L_aerosol + 1) / 2)
+        @test stream_diag.NSTREAMS_BRDF == 1
+        @test stream_diag.surface_kind == :LambertianSSSurface
+
+        inner = determine_required_nquad_inner([0.1, 1.5], config.contributors)
+        @test 8 <= inner <= 64
+        @test inner >= determine_required_nquad_inner(0.0, (absorption,))
+
+        combined = determine_required_nquad(config)
+        τ_total = zeros(2)
+        for c in config.contributors
+            τ_total .+= vec(sum(c.τ; dims=1))
+        end
+        @test combined.Nstreams == stream_diag.Nstreams
+        @test combined.NSTREAMS_BRDF == stream_diag.NSTREAMS_BRDF
+        @test combined.inner_nquad == determine_required_nquad_inner(τ_total,
+                                                                     config.contributors)
+
+        @test_throws ArgumentError determine_required_l_from_moments(Float64[])
+        @test_throws ArgumentError determine_required_l_from_moments([1.0]; target_relative_error=0.0)
+        @test_throws ArgumentError determine_required_l_aerosol(
+            HGAerosolSSContributor(g=1.0, ϖ=1.0, τ=[1.0;;]))
+        @test_throws ArgumentError determine_required_nbrdf_coxmunk(-1.0)
+        @test_throws ArgumentError determine_required_nquad_inner(-0.1, config.contributors)
+    end
 end
