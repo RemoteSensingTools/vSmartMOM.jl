@@ -67,6 +67,8 @@ Base.@kwdef struct ExactSSConfig{GEO, SUR, CTRB, I}
     contributors::CTRB
     I0::I
     n_stokes::Int = 1
+    inner_nquad::Int = 16
+    azimuth_nquad::Int = 64
 end
 
 τ_matrix(c::AbstractSSContributor) = c.τ

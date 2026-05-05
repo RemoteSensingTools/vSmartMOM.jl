@@ -1,6 +1,12 @@
 using Test
 using vSmartMOM
 using vSmartMOM.StandaloneSS
+using LinearAlgebra
+
+_want_ref_path1(paths) = paths in (:path1, :paths_1_2, :all, :all_four)
+_want_ref_path2(paths) = paths in (:path2, :paths_1_2, :all, :all_four)
+_want_ref_path3(paths) = paths in (:path3, :all, :all_four)
+_want_ref_path4(paths) = paths in (:path4, :all, :all_four)
 
 function _as_vector(x, n_spec, ::Type{FT}) where {FT}
     x isa Number && return fill(convert(FT, x), n_spec)
@@ -20,6 +26,47 @@ _ref_ssa(::AbsorptionSSContributor) = 0
 
 function _ref_cos_scatter(μ₀, μv, Δϕ)
     -μ₀ * μv + sqrt(max(0, 1 - μ₀^2)) * sqrt(max(0, 1 - μv^2)) * cos(Δϕ)
+end
+
+function _ref_gauss_legendre_01(n, ::Type{FT}) where {FT}
+    β = [FT(k) / sqrt(FT(4k^2 - 1)) for k in 1:(n - 1)]
+    T = SymTridiagonal(zeros(FT, n), β)
+    eig = eigen(T)
+    x = FT(0.5) .* (eig.values .+ one(FT))
+    w = FT(0.5) .* (FT(2) .* eig.vectors[1, :].^2)
+    return x, w
+end
+
+function _ref_azimuthal_average_phase(c, μa, μb, n_phi)
+    a = μa * μb
+    b = sqrt(max(0, 1 - μa^2)) * sqrt(max(0, 1 - μb^2))
+    s = zero(promote_type(typeof(μa), typeof(μb)))
+    for k in 0:(n_phi - 1)
+        ϕ = 2π * k / n_phi
+        cosΘ = clamp(a + b * cos(ϕ), -1, 1)
+        s += _ref_phase(c, cosΘ)
+    end
+    return s / n_phi
+end
+
+function _ref_effective_azimuthal_phase(contributors, τ_scat_layer, iz, ispec,
+                                        μa, μb, n_phi)
+    τ_scat = τ_scat_layer[iz, ispec]
+    τ_scat == 0 && return zero(τ_scat)
+    weighted = zero(τ_scat)
+    for c in contributors
+        scat_weight = c.τ[iz, ispec] * _ref_ssa(c)
+        weighted += scat_weight * _ref_azimuthal_average_phase(c, μa, μb, n_phi)
+    end
+    return weighted / τ_scat
+end
+
+function _ref_τ_integral(τ_top, τ_bot, τ_total, μ_first, μ_second)
+    b = 1 / μ_first - 1 / μ_second
+    f_top = exp(-τ_top / μ_first - (τ_total - τ_top) / μ_second)
+    f_bot = exp(-τ_bot / μ_first - (τ_total - τ_bot) / μ_second)
+    abs(b) < 1e-10 && return 0.5 * (f_top + f_bot) * (τ_bot - τ_top)
+    return (f_top - f_bot) / b
 end
 
 function _ref_outputs(config; paths=:paths_1_2)
@@ -53,10 +100,13 @@ function _ref_outputs(config; paths=:paths_1_2)
         τ_cum[iz + 1, s] = τ_cum[iz, s] + τ_total_layer[iz, s]
     end
 
-    path1 = zeros(typeof(config.geometry.μ₀), n_geom, 1, n_spec)
-    path2 = zeros(typeof(config.geometry.μ₀), n_geom, 1, n_spec)
+    FT = typeof(config.geometry.μ₀)
+    path1 = zeros(FT, n_geom, 1, n_spec)
+    path2 = zeros(FT, n_geom, 1, n_spec)
+    path3 = zeros(FT, n_geom, 1, n_spec)
+    path4 = zeros(FT, n_geom, 1, n_spec)
 
-    if paths in (:path1, :paths_1_2)
+    if _want_ref_path1(paths)
         for iv in 1:n_geom, s in 1:n_spec
             μ₀ = config.geometry.μ₀
             μv = config.geometry.μv[iv]
@@ -76,7 +126,7 @@ function _ref_outputs(config; paths=:paths_1_2)
         end
     end
 
-    if paths in (:path2, :paths_1_2)
+    if _want_ref_path2(paths)
         for iv in 1:n_geom, s in 1:n_spec
             μ₀ = config.geometry.μ₀
             μv = config.geometry.μv[iv]
@@ -86,7 +136,60 @@ function _ref_outputs(config; paths=:paths_1_2)
         end
     end
 
-    (; path1, path2, total=path1 .+ path2)
+    if _want_ref_path3(paths) || _want_ref_path4(paths)
+        μ_nodes, μ_weights = _ref_gauss_legendre_01(config.inner_nquad, FT)
+        for iv in 1:n_geom, s in 1:n_spec
+            μ₀ = config.geometry.μ₀
+            μv = config.geometry.μv[iv]
+            τ_total = τ_cum[end, s]
+
+            if _want_ref_path3(paths)
+                F_surface = zero(FT)
+                for iz in 1:n_layers
+                    τ_scat = τ_scat_layer[iz, s]
+                    τ_total_layer[iz, s] == 0 && continue
+                    τ_scat == 0 && continue
+                    ϖ_eff = τ_scat / τ_total_layer[iz, s]
+                    layer_sum = zero(FT)
+                    for k in eachindex(μ_nodes)
+                        μd = μ_nodes[k]
+                        P̄ = _ref_effective_azimuthal_phase(
+                            contributors, τ_scat_layer, iz, s, μd, μ₀,
+                            config.azimuth_nquad)
+                        τ_int = _ref_τ_integral(τ_cum[iz, s], τ_cum[iz + 1, s],
+                                                τ_total, μ₀, μd)
+                        layer_sum += μ_weights[k] * P̄ * τ_int * FT(0.5)
+                    end
+                    F_surface += ϖ_eff * I0[s] * layer_sum
+                end
+                path3[iv, 1, s] =
+                    (albedo[s] / π) * F_surface * exp(-τ_total / μv)
+            end
+
+            if _want_ref_path4(paths)
+                L_surface = (albedo[s] / π) * μ₀ * I0[s] * exp(-τ_total / μ₀)
+                for iz in 1:n_layers
+                    τ_scat = τ_scat_layer[iz, s]
+                    τ_total_layer[iz, s] == 0 && continue
+                    τ_scat == 0 && continue
+                    ϖ_eff = τ_scat / τ_total_layer[iz, s]
+                    layer_sum = zero(FT)
+                    for k in eachindex(μ_nodes)
+                        μu = μ_nodes[k]
+                        P̄ = _ref_effective_azimuthal_phase(
+                            contributors, τ_scat_layer, iz, s, μu, μv,
+                            config.azimuth_nquad)
+                        τ_int = _ref_τ_integral(τ_cum[iz, s], τ_cum[iz + 1, s],
+                                                τ_total, μv, μu)
+                        layer_sum += μ_weights[k] * P̄ * τ_int * FT(0.5)
+                    end
+                    path4[iv, 1, s] += L_surface * ϖ_eff * layer_sum / μv
+                end
+            end
+        end
+    end
+
+    (; path1, path2, path3, path4, total=path1 .+ path2 .+ path3 .+ path4)
 end
 
 function _mixed_config(::Type{FT}) where {FT}
@@ -125,6 +228,7 @@ end
         @test result.total ≈ expected.total rtol=1e-12 atol=1e-14
         @test result.metadata.n_stokes == 1
         @test result.quadrature_info.kernel_backend == :KernelAbstractionsCPU
+        @test result.quadrature_info.inner_quadrature == config.inner_nquad
     end
 
     @testset "Mixed τϖ-weighted phase mixing" begin
@@ -137,14 +241,40 @@ end
         @test all(result.total .> 0)
     end
 
+    @testset "Lambertian paths 3 and 4" begin
+        config = _mixed_config(Float64)
+        result = run_exact_ss(config; paths=:all)
+        expected = _ref_outputs(config; paths=:all)
+        @test result.path1 ≈ expected.path1 rtol=1e-12 atol=1e-14
+        @test result.path2 ≈ expected.path2 rtol=1e-12 atol=1e-14
+        @test result.path3 ≈ expected.path3 rtol=1e-12 atol=1e-14
+        @test result.path4 ≈ expected.path4 rtol=1e-12 atol=1e-14
+        @test result.total ≈ expected.total rtol=1e-12 atol=1e-14
+        @test all(result.path3 .> 0)
+        @test all(result.path4 .> 0)
+        @test result.quadrature_info.inner_quadrature == config.inner_nquad
+        @test result.quadrature_info.azimuth_quadrature == config.azimuth_nquad
+    end
+
     @testset "Path selection" begin
         config = _mixed_config(Float64)
         only1 = run_exact_ss(config; paths=:path1)
         only2 = run_exact_ss(config; paths=:path2)
+        only3 = run_exact_ss(config; paths=:path3)
+        only4 = run_exact_ss(config; paths=:path4)
         both = run_exact_ss(config; paths=:paths_1_2)
+        all_paths = run_exact_ss(config; paths=:all)
         @test only1.path2 == zero(only1.path2)
         @test only2.path1 == zero(only2.path1)
+        @test only3.path1 == zero(only3.path1)
+        @test only3.path2 == zero(only3.path2)
+        @test only3.path4 == zero(only3.path4)
+        @test only4.path1 == zero(only4.path1)
+        @test only4.path2 == zero(only4.path2)
+        @test only4.path3 == zero(only4.path3)
         @test both.total ≈ only1.total .+ only2.total rtol=1e-12
+        @test all_paths.total ≈
+              only1.total .+ only2.total .+ only3.total .+ only4.total rtol=1e-12
     end
 
     @testset "Black surface and pure absorption" begin
@@ -156,6 +286,9 @@ end
                                      contributors=(rayleigh,), I0=FT[1.0])
         black_result = run_exact_ss(black_config)
         @test black_result.path2 == zero(black_result.path2)
+        black_all = run_exact_ss(black_config; paths=:all)
+        @test black_all.path3 == zero(black_all.path3)
+        @test black_all.path4 == zero(black_all.path4)
         @test black_result.path1[1, 1, 1] > 0
 
         absorption = AbsorptionSSContributor(τ=reshape(FT[0.2, 0.3], 2, 1))
@@ -165,6 +298,9 @@ end
         abs_result = run_exact_ss(abs_config)
         abs_expected = _ref_outputs(abs_config)
         @test abs_result.path1 == zero(abs_result.path1)
+        abs_all = run_exact_ss(abs_config; paths=:all)
+        @test abs_all.path3 == zero(abs_all.path3)
+        @test abs_all.path4 == zero(abs_all.path4)
         @test abs_result.path2 ≈ abs_expected.path2 rtol=1e-12 atol=1e-14
         @test abs_result.path2[1, 1, 1] > 0
     end
@@ -195,10 +331,16 @@ end
 
         @test_throws ArgumentError run_exact_ss(bad_μ₀)
         @test_throws ArgumentError run_exact_ss(bad_μv)
-        @test_throws ArgumentError run_exact_ss(good; paths=:all)
+        @test_throws ArgumentError run_exact_ss(good; paths=:not_a_path)
         @test_throws ArgumentError run_exact_ss(ExactSSConfig(
             geometry=good.geometry, surface=good.surface,
             contributors=good.contributors, I0=good.I0, n_stokes=3))
+        @test_throws ArgumentError run_exact_ss(ExactSSConfig(
+            geometry=good.geometry, surface=good.surface,
+            contributors=good.contributors, I0=good.I0, inner_nquad=0))
+        @test_throws ArgumentError run_exact_ss(ExactSSConfig(
+            geometry=good.geometry, surface=good.surface,
+            contributors=good.contributors, I0=good.I0, azimuth_nquad=0))
     end
 
     @testset "Required-Nquad diagnostics" begin
