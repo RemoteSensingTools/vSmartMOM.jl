@@ -104,6 +104,19 @@ end
     @test size(Z⁻⁺) == (4, 4)
     @test all(isfinite.(Z⁺⁺))
     @test all(isfinite.(Z⁻⁺))
+
+    zero_lin = zeros(4, length(polarized_greek.β))
+    lin_greek = linGreekCoefs(zero_lin, copy(zero_lin), copy(zero_lin),
+                              copy(zero_lin), copy(zero_lin), copy(zero_lin))
+    Z⁺⁺_lin, Z⁻⁺_lin, dZ⁺⁺, dZ⁻⁺ =
+        vSmartMOM.Scattering.compute_Z_moments(
+            pol_iq, [0.3, 0.7], polarized_greek, lin_greek, 0)
+    @test Z⁺⁺_lin ≈ Z⁺⁺
+    @test Z⁻⁺_lin ≈ Z⁻⁺
+    @test size(dZ⁺⁺) == (4, 4, 4)
+    @test size(dZ⁻⁺) == (4, 4, 4)
+    @test all(iszero, dZ⁺⁺)
+    @test all(iszero, dZ⁻⁺)
 end
 
 # Test the Aerosol Optics calculations (both NAI2 and Siewert)
