@@ -12,7 +12,8 @@ Construct a [`MieModel`](@ref) configured for the Siewert NAI-2 workflow.
 # Arguments
 - `aerosol`: aerosol size-distribution and refractive-index specification.
 - `λ`: wavelength (must use the same length units as `r_max` and the aerosol radius scale).
-- `polarization`: one of [`Stokes_I`](@ref), [`Stokes_IQU`](@ref), [`Stokes_IQUV`](@ref).
+- `polarization`: one of [`Stokes_I`](@ref), [`Stokes_IQ`](@ref),
+  [`Stokes_IQU`](@ref), [`Stokes_IQUV`](@ref).
 - `truncation_type`: typically [`δBGE`](@ref).
 - `r_max`: upper radius used in size quadrature.
 - `nquad_radius`: number of radius quadrature points.

@@ -567,6 +567,22 @@ end
                                          exp(-τ / geometry.μv[iv])
         end
         @test vector_result.path2 ≈ vector_expected rtol=1e-12 atol=1e-14
+
+        iq_config = ExactSSConfig(
+            geometry=geometry, surface=surface,
+            contributors=(absorption,), I0=FT[1.0],
+            polarization_type=vSmartMOM.Scattering.Stokes_IQ{FT}())
+        iq_result = run_exact_ss(iq_config; paths=:path2)
+        iq_expected = zeros(FT, 2, 2, 1)
+        for iv in eachindex(geometry.μv)
+            M = vSmartMOM.CoreRT.coxmunk_brdf_mueller(
+                core_surface, 2, geometry.μv[iv], geometry.μ₀,
+                geometry.Δϕ[iv]; n_water=n_water)
+            iq_expected[iv, :, 1] .= geometry.μ₀ .* M[:, 1] .*
+                                     exp(-τ / geometry.μ₀) .*
+                                     exp(-τ / geometry.μv[iv])
+        end
+        @test iq_result.path2 ≈ iq_expected rtol=1e-12 atol=1e-14
         @test_throws ArgumentError run_exact_ss(config; paths=:all)
     end
 
