@@ -400,6 +400,11 @@ _contributor_kind(::RayleighSSContributor) = Int32(1)
 _contributor_kind(::HGAerosolSSContributor) = Int32(2)
 _contributor_kind(::AbsorptionSSContributor) = Int32(0)
 
+_supports_packed_azimuthal_phase_pair(::RayleighSSContributor) = true
+_supports_packed_azimuthal_phase_pair(::HGAerosolSSContributor) = true
+_supports_packed_azimuthal_phase_pair(::AbsorptionSSContributor) = true
+_supports_packed_azimuthal_phase_pair(::AbstractSSContributor) = false
+
 _contributor_g(c::RayleighSSContributor, ::Type{FT}) where {FT} =
     convert(FT, c.depol)
 _contributor_g(c::HGAerosolSSContributor, ::Type{FT}) where {FT} =
@@ -444,6 +449,12 @@ function _precompute_azimuthal_phase_pair_arch(config::ExactSSConfig,
                                                backend)
     length(reference_a) == length(reference_b) ||
         throw(ArgumentError("paired azimuthal phase references must have the same length"))
+
+    if !all(_supports_packed_azimuthal_phase_pair, config.contributors)
+        P̄a, P̄b = _precompute_azimuthal_phase_pair(
+            config, τ_scat_layer, μ_nodes, reference_a, reference_b)
+        return _to_arch(architecture, P̄a), _to_arch(architecture, P̄b)
+    end
 
     FT = _config_numeric_type(config)
     n_layers, n_spec = _dims(config.contributors)

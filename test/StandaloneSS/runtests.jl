@@ -1041,6 +1041,37 @@ end
                       getfield(cpu32_result, field) rtol=5e-5 atol=1e-6
             end
 
+            phase = vSmartMOM.Scattering.SyntheticPolarizedHenyeyGreensteinPhaseFunction(
+                g=FT(0.35), polarization_fraction=FT(0.4))
+            greek = vSmartMOM.Scattering.greek_coefficients(
+                phase; l_max=16, nquad=48)
+            greek_cpu = ExactSSConfig(
+                geometry=SSGeometry(μ₀=FT(0.81),
+                                    μv=FT[0.42, 0.68],
+                                    Δϕ=FT[0.2, 1.0]),
+                surface=LambertianSSSurface(albedo=FT(0.24)),
+                contributors=(GreekCoefsSSContributor(
+                                  greek_coefs=greek, ϖ=FT(0.9),
+                                  τ=reshape(FT[0.02, 0.03], 2, 1)),
+                              AbsorptionSSContributor(
+                                  τ=reshape(FT[0.01, 0.01], 2, 1))),
+                I0=FT[1.0], inner_nquad=8, azimuth_nquad=16)
+            greek_gpu = ExactSSConfig(
+                geometry=greek_cpu.geometry,
+                surface=greek_cpu.surface,
+                contributors=greek_cpu.contributors,
+                I0=greek_cpu.I0,
+                inner_nquad=greek_cpu.inner_nquad,
+                azimuth_nquad=greek_cpu.azimuth_nquad,
+                architecture=vSmartMOM.GPU())
+            greek_cpu_result = run_exact_ss(greek_cpu; paths=:all)
+            greek_gpu_result = run_exact_ss(greek_gpu; paths=:all)
+            CUDA.synchronize()
+            for field in (:total, :path1, :path2, :path3, :path4)
+                @test Array(getfield(greek_gpu_result, field)) ≈
+                      getfield(greek_cpu_result, field) rtol=5e-12 atol=5e-14
+            end
+
             cpu_time = _average_elapsed(3) do
                 run_exact_ss(cpu_config; paths=:all)
                 nothing
