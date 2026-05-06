@@ -21,7 +21,7 @@ try
     @testset "VLIDORT baseline" begin
         include(joinpath(@__DIR__, "cases", "case_A_siewert2000.jl"))
         include(joinpath(@__DIR__, "cases", "case_B_solar_tester.jl"))
-        # Future cases (Stokes-3 vector solar_tester) will be added here.
+        include(joinpath(@__DIR__, "cases", "case_C_solar_tester_vector.jl"))
     end
 finally
     cd(_ORIGINAL_PWD)
