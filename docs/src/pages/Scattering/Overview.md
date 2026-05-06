@@ -3,7 +3,7 @@
 The Scattering module computes aerosol optical properties from Mie theory for user-defined size distributions and refractive indices. It supports:
 
 - Siewert NAI-2 and Domke PCW Fourier decomposition methods
-- scalar and polarized phase-matrix workflows (`Stokes_I`, `Stokes_IQU`, `Stokes_IQUV`)
+- scalar and polarized phase-matrix workflows (`Stokes_I`, `Stokes_IQ`, `Stokes_IQU`, `Stokes_IQUV`)
 - automatic differentiation (AD) for core aerosol parameters (`r_m`, `sigma`, `n_r`, `n_i`)
 - phase matrix reconstruction from Greek coefficients for downstream RT use
 
