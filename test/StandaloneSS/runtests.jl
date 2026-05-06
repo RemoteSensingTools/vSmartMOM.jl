@@ -356,6 +356,15 @@ end
         @test all(isfinite.(result.total))
         @test any(abs.(result.path1[:, 2:3, :]) .> 0)
 
+        scalar_cfg = deepcopy(cfg)
+        scalar_cfg["radiative_transfer"]["polarization_type"] = "Stokes_I()"
+        scalar_model = model_from_parameters(parameters_from_dict(scalar_cfg))
+        scalar_all = run_exact_ss(scalar_model; paths=:all)
+        @test size(scalar_all.total) == (2, 1, 1)
+        @test all(isfinite.(scalar_all.total))
+        @test any(scalar_all.path3 .!= 0)
+        @test any(scalar_all.path4 .!= 0)
+
         cfg_trunc = deepcopy(cfg)
         delete!(cfg_trunc["radiative_transfer"], "truncation")
         truncated_model = model_from_parameters(parameters_from_dict(cfg_trunc))
