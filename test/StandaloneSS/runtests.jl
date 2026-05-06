@@ -381,6 +381,13 @@ end
         @test cox_model_result.path2 ≈ cox_result.path2 rtol=1e-12 atol=1e-14
         @test size(cox_result.path2) == (2, 3, 1)
         @test all(isfinite.(cox_result.path2))
+
+        iq_cox_cfg = deepcopy(cox_cfg)
+        iq_cox_cfg["radiative_transfer"]["polarization_type"] = "Stokes_IQ()"
+        iq_cox_model = model_from_parameters(parameters_from_dict(iq_cox_cfg))
+        iq_cox_result = run_exact_ss(iq_cox_model; paths=:path2)
+        @test size(iq_cox_result.path2) == (2, 2, 1)
+        @test all(isfinite.(iq_cox_result.path2))
     end
 
     @testset "Rayleigh path 1 and Lambertian path 2" begin
