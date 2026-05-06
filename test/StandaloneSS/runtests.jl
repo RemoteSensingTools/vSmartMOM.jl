@@ -44,6 +44,33 @@ function _ref_cos_scatter(μ₀, μv, Δϕ)
     -μ₀ * μv + sqrt(max(0, 1 - μ₀^2)) * sqrt(max(0, 1 - μv^2)) * cos(Δϕ)
 end
 
+function _ref_rayleigh_phase_first_column(μ₀, μv, Δϕ, depol, n_stokes)
+    cosΘ = _ref_cos_scatter(μ₀, μv, Δϕ)
+    dpl_p = (1 - depol) / (1 + depol / 2)
+    f11 = 1 + 0.5 * dpl_p * ((3 * cosΘ^2 - 1) / 2)
+    f12 = 0.75 * dpl_p * max(0, 1 - cosΘ^2)
+    p = zeros(typeof(f11), n_stokes)
+    p[1] = f11
+    n_stokes == 1 && return p
+
+    sinΘ² = max(0, 1 - cosΘ^2)
+    if sinΘ² <= eps(typeof(f11))
+        cos2χ = one(f11)
+        sin2χ = zero(f11)
+    else
+        sinΘ = sqrt(sinΘ²)
+        sin₀ = sqrt(max(0, 1 - μ₀^2))
+        sinᵥ = sqrt(max(0, 1 - μv^2))
+        cosχ = (μ₀ * sinᵥ + μv * sin₀ * cos(Δϕ)) / sinΘ
+        sinχ = sin₀ * sin(Δϕ) / sinΘ
+        cos2χ = cosχ^2 - sinχ^2
+        sin2χ = 2 * sinχ * cosχ
+    end
+    p[2] = f12 * cos2χ
+    n_stokes >= 3 && (p[3] = f12 * sin2χ)
+    return p
+end
+
 function _ref_gauss_legendre_01(n, ::Type{FT}) where {FT}
     β = [FT(k) / sqrt(FT(4k^2 - 1)) for k in 1:(n - 1)]
     T = SymTridiagonal(zeros(FT, n), β)
@@ -258,11 +285,16 @@ end
         @test chain_rule_combine_surface_brdf ===
               vSmartMOM.chain_rule_combine_surface_brdf
         @test SSMeasurementSelector === vSmartMOM.SSMeasurementSelector
+        @test GreekCoefsSSContributor === vSmartMOM.GreekCoefsSSContributor
         @test selected_measurements === vSmartMOM.selected_measurements
         @test selected_measurement_jacobian ===
               vSmartMOM.selected_measurement_jacobian
         @test StandaloneSS === vSmartMOM.StandaloneSS
         @test CoxMunkSSSurface === vSmartMOM.CoxMunkSSSurface
+        @test vSmartMOM.HenyeyGreensteinPhaseFunction ===
+              vSmartMOM.Scattering.HenyeyGreensteinPhaseFunction
+        @test vSmartMOM.SyntheticPolarizedHenyeyGreensteinPhaseFunction ===
+              vSmartMOM.Scattering.SyntheticPolarizedHenyeyGreensteinPhaseFunction
     end
 
     @testset "Rayleigh path 1 and Lambertian path 2" begin
@@ -296,16 +328,79 @@ end
             contributors=(rayleigh,),
             I0=FT[1.0, 0.7],
             polarization_type=vSmartMOM.Scattering.Stokes_IQU{FT}())
-        @test_throws ArgumentError run_exact_ss(vector_config; paths=:path1)
+        vector_path1 = run_exact_ss(vector_config; paths=:path1)
+        expected_path1 = zeros(FT, 2, 3, 2)
+        for iv in eachindex(geometry.μv), ispec in 1:2
+            phase_col = _ref_rayleigh_phase_first_column(
+                geometry.μ₀, geometry.μv[iv], geometry.Δϕ[iv],
+                rayleigh.depol, 3)
+            expected_path1[iv, :, ispec] .=
+                expected.path1[iv, 1, ispec] .* phase_col ./ phase_col[1]
+        end
+        @test size(vector_path1.path1) == (2, 3, 2)
+        @test vector_path1.path1 ≈ expected_path1 rtol=1e-12 atol=1e-14
+        @test vector_path1.total ≈ expected_path1 rtol=1e-12 atol=1e-14
+        @test vector_path1.path2 == zero(vector_path1.path2)
+
         vector_path2 = run_exact_ss(vector_config; paths=:path2)
         @test size(vector_path2.path2) == (2, 3, 2)
         @test vector_path2.path2[:, 1:1, :] ≈ expected.path2 rtol=1e-12 atol=1e-14
         @test vector_path2.path2[:, 2:3, :] == zero(vector_path2.path2[:, 2:3, :])
-        @test_throws ArgumentError run_exact_ss(vector_config; paths=:paths_1_2)
+        vector_paths12 = run_exact_ss(vector_config; paths=:paths_1_2)
+        expected_paths12 = copy(expected_path1)
+        expected_paths12[:, 1:1, :] .+= expected.path2
+        @test vector_paths12.path1 ≈ expected_path1 rtol=1e-12 atol=1e-14
+        @test vector_paths12.path2[:, 1:1, :] ≈ expected.path2 rtol=1e-12 atol=1e-14
+        @test vector_paths12.path2[:, 2:3, :] == zero(vector_paths12.path2[:, 2:3, :])
+        @test vector_paths12.total ≈ expected_paths12 rtol=1e-12 atol=1e-14
         @test_throws ArgumentError run_exact_ss_with_jacobians(
             vector_config; paths=:path1)
         @test_throws ArgumentError run_exact_ss_with_jacobians(
             vector_config; paths=:path2)
+    end
+
+    @testset "Greek-coefficient aerosol vector path 1" begin
+        FT = Float64
+        phase = vSmartMOM.Scattering.SyntheticPolarizedHenyeyGreensteinPhaseFunction(
+            g=FT(0.45), polarization_fraction=FT(0.6))
+        greek = vSmartMOM.Scattering.greek_coefficients(phase; l_max=24,
+                                                        nquad=80)
+        optics = vSmartMOM.Scattering.analytic_aerosol_optics(
+            phase; single_scattering_albedo=FT(0.92),
+            extinction_cross_section=FT(1.7), l_max=24, nquad=80)
+        @test length(greek.β) == 24
+        @test optics.greek_coefs ≈ greek
+        @test optics.ω̃ == FT(0.92)
+        @test optics.k == FT(1.7)
+
+        geometry = SSGeometry(μ₀=FT(0.82),
+                              μv=FT[0.51, 0.69],
+                              Δϕ=FT[0.4, 1.1])
+        aerosol = GreekCoefsSSContributor(greek_coefs=greek, ϖ=FT(0.92),
+                                          τ=reshape(FT[0.03, 0.04], 2, 1))
+        absorption = AbsorptionSSContributor(
+            τ=reshape(FT[0.01, 0.02], 2, 1))
+        scalar_config = ExactSSConfig(
+            geometry=geometry, surface=LambertianSSSurface(albedo=FT(0.0)),
+            contributors=(aerosol, absorption), I0=FT(1.0))
+        vector_config = ExactSSConfig(
+            geometry=geometry, surface=scalar_config.surface,
+            contributors=scalar_config.contributors, I0=scalar_config.I0,
+            polarization_type=vSmartMOM.Scattering.Stokes_IQU{FT}())
+
+        scalar = run_exact_ss(scalar_config; paths=:path1)
+        vector = run_exact_ss(vector_config; paths=:path1)
+        expected = zeros(FT, 2, 3, 1)
+        for iv in eachindex(geometry.μv)
+            phase_col = vSmartMOM.Scattering.phase_matrix_first_column(
+                greek, geometry.μ₀, geometry.μv[iv], geometry.Δϕ[iv],
+                Val(3))
+            expected[iv, :, 1] .= scalar.path1[iv, 1, 1] .*
+                                  collect(phase_col) ./ phase_col[1]
+        end
+        @test vector.path1 ≈ expected rtol=1e-10 atol=1e-13
+        @test vector.path1[:, 1:1, :] ≈ scalar.path1 rtol=1e-10 atol=1e-13
+        @test any(abs.(vector.path1[:, 2:3, :]) .> 0)
     end
 
     @testset "Cox-Munk path 2" begin
@@ -894,9 +989,16 @@ end
         @test_throws ArgumentError run_exact_ss(good; paths=:not_a_path)
         @test_throws ArgumentError run_exact_ss(ExactSSConfig(
             geometry=good.geometry, surface=good.surface,
-            contributors=good.contributors, I0=good.I0, n_stokes=3))
-        @test_throws ArgumentError vSmartMOM.StandaloneSS._precompute_optics(
-            Val(3), good)
+            contributors=good.contributors, I0=good.I0, n_stokes=3);
+            paths=:all)
+        @test size(vSmartMOM.StandaloneSS._precompute_optics(
+            Val(3), good).P_eff) == (1, 3, 1, 1)
+        hg_vector = ExactSSConfig(
+            geometry=good.geometry, surface=good.surface,
+            contributors=(HGAerosolSSContributor(g=FT(0.4), ϖ=FT(0.9),
+                                                 τ=FT[0.1;;]),),
+            I0=FT[1.0], n_stokes=3)
+        @test_throws ArgumentError run_exact_ss(hg_vector; paths=:path1)
         @test_throws ArgumentError run_exact_ss(ExactSSConfig(
             geometry=good.geometry, surface=good.surface,
             contributors=good.contributors, I0=good.I0, inner_nquad=0))

@@ -19,6 +19,9 @@ _contributor_numeric_type(c::AbsorptionSSContributor) =
     _real_numeric_type(c.τ)
 _contributor_numeric_type(c::HGAerosolSSContributor) =
     promote_type(_real_numeric_type(c.τ), typeof(c.g), typeof(c.ϖ))
+_contributor_numeric_type(c::GreekCoefsSSContributor) =
+    promote_type(_real_numeric_type(c.τ), typeof(c.ϖ),
+                 _real_numeric_type(c.greek_coefs.β))
 
 _contributors_numeric_type(::Tuple{}) = Bool
 _contributors_numeric_type(contributors::Tuple) =

@@ -17,6 +17,26 @@
     path1[iv, 1, ispec] = value
 end
 
+@kernel function _path1_stokes_kernel!(path1, @Const(τ_cum), @Const(ϖ_eff),
+                                       @Const(P_eff), μ₀, @Const(μv),
+                                       @Const(I0))
+    iv, istokes, ispec = @index(Global, NTuple)
+    FT = eltype(path1)
+    μᵥ = μv[iv]
+    a = inv(μ₀) + inv(μᵥ)
+    prefactor = I0[ispec] / (FT(4) * FT(pi) * μᵥ * a)
+
+    value = zero(FT)
+    n_layers = size(ϖ_eff, 1)
+    for iz in 1:n_layers
+        layer_factor = exp(-τ_cum[iz, ispec] * a) -
+                       exp(-τ_cum[iz + 1, ispec] * a)
+        value += prefactor * ϖ_eff[iz, ispec] *
+                 P_eff[iv, istokes, iz, ispec] * layer_factor
+    end
+    path1[iv, istokes, ispec] = value
+end
+
 @kernel function _path2_kernel!(path2, @Const(τ_total), μ₀, @Const(μv),
                                @Const(surface_brdf), @Const(I0))
     iv, ispec = @index(Global, NTuple)
@@ -246,11 +266,9 @@ function _run_path34_kernel!(path3, path4, τ_cum, ϖ_eff, P̄3, P̄4, μ₀, μ
 end
 
 function _unsupported_stokes_kernel(::Val{N}) where {N}
-    throw(ArgumentError("StandaloneSS exact SS kernels currently support only Stokes-I (n_stokes == 1); received n_stokes=$N"))
+    throw(ArgumentError("StandaloneSS exact SS kernels currently support this path only for Stokes-I (n_stokes == 1); received n_stokes=$N"))
 end
 
-_run_path1_kernel!(pol::Val{N}, args...) where {N} =
-    _unsupported_stokes_kernel(pol)
 _run_path3_kernel!(pol::Val{N}, args...) where {N} =
     _unsupported_stokes_kernel(pol)
 _run_path4_kernel!(pol::Val{N}, args...) where {N} =
@@ -263,6 +281,15 @@ function _run_path1_kernel!(::Val{1}, path1, τ_cum, ϖ_eff, P_eff, μ₀, μv,
     kernel! = _path1_kernel!(backend)
     event = kernel!(path1, τ_cum, ϖ_eff, P_eff, μ₀, μv, I0;
                     ndrange=(size(path1, 1), size(path1, 3)))
+    _synchronize_kernel(event, backend)
+    return path1
+end
+
+function _run_path1_kernel!(::Val{N}, path1, τ_cum, ϖ_eff, P_eff, μ₀, μv,
+                            I0, backend) where {N}
+    kernel! = _path1_stokes_kernel!(backend)
+    event = kernel!(path1, τ_cum, ϖ_eff, P_eff, μ₀, μv, I0;
+                    ndrange=size(path1))
     _synchronize_kernel(event, backend)
     return path1
 end
