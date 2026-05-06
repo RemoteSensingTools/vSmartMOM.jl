@@ -105,6 +105,62 @@ function _precompute_surface_brdf(::Val{N}, surface::CoxMunkSSSurface,
     return ρ
 end
 
+function _precompute_surface_brdf_wind_jacobian(
+    surface::CoxMunkSSSurface,
+    geometry::SSGeometry,
+    n_spec::Int,
+    ::Type{FT},
+) where {FT}
+    return _precompute_surface_brdf_wind_jacobian(
+        Val(1), surface, geometry, n_spec, FT)
+end
+
+function _precompute_surface_brdf_wind_jacobian(
+    ::Val{1},
+    surface::CoxMunkSSSurface,
+    geometry::SSGeometry,
+    n_spec::Int,
+    ::Type{FT},
+) where {FT}
+    n_geom = length(geometry.μv)
+    dρ = zeros(FT, n_geom, n_spec, 1)
+    μ₀ = convert(FT, geometry.μ₀)
+    core_surface = _coxmunk_core_surface(surface, FT)
+    @inbounds for ispec in 1:n_spec, iv in 1:n_geom
+        μᵥ = convert(FT, geometry.μv[iv])
+        Δϕ = convert(FT, geometry.Δϕ[iv])
+        n_water = _coxmunk_n_water(surface, ispec, n_spec, FT)
+        _, dM = coxmunk_brdf_mueller_and_deriv(
+            core_surface, 1, μᵥ, μ₀, Δϕ; n_water)
+        dρ[iv, ispec, 1] = dM[1, 1]
+    end
+    return dρ
+end
+
+function _precompute_surface_brdf_wind_jacobian(
+    ::Val{N},
+    surface::CoxMunkSSSurface,
+    geometry::SSGeometry,
+    n_spec::Int,
+    ::Type{FT},
+) where {N,FT}
+    n_geom = length(geometry.μv)
+    dρ = zeros(FT, n_geom, N, n_spec, 1)
+    μ₀ = convert(FT, geometry.μ₀)
+    core_surface = _coxmunk_core_surface(surface, FT)
+    @inbounds for ispec in 1:n_spec, iv in 1:n_geom
+        μᵥ = convert(FT, geometry.μv[iv])
+        Δϕ = convert(FT, geometry.Δϕ[iv])
+        n_water = _coxmunk_n_water(surface, ispec, n_spec, FT)
+        _, dM = coxmunk_brdf_mueller_and_deriv(
+            core_surface, N, μᵥ, μ₀, Δϕ; n_water)
+        for istokes in 1:N
+            dρ[iv, istokes, ispec, 1] = dM[istokes, 1]
+        end
+    end
+    return dρ
+end
+
 function _coxmunk_core_surface(surface::CoxMunkSSSurface, ::Type{FT}) where {FT}
     return CoxMunkSurface{FT}(
         wind_speed=convert(FT, surface.wind_speed),

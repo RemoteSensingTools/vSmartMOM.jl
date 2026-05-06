@@ -1073,10 +1073,64 @@ end
             surface_jac.path2.surface_brdf, dρ_dp, surface_selector)
         @test size(J_surface_selected) == (2, 2)
         @test J_surface_selected ≈ Jp_selected rtol=1e-12 atol=1e-14
+
+        vector_surface_config_from_p(p) = ExactSSConfig(
+            geometry=surface_geometry,
+            surface=LambertianSSSurface(albedo=surface_base_albedo .* p),
+            contributors=(surface_abs,),
+            I0=FT[1.0, 0.8],
+            polarization_type=vSmartMOM.Scattering.Stokes_IQU{FT}())
+        vector_surface_selector = SSMeasurementSelector(
+            paths=:path2, geometry_indices=[2, 1], stokes_indices=1:3,
+            spectral_indices=1:2)
+        fp_vector_selected(p) = selected_measurements(
+            run_exact_ss(vector_surface_config_from_p(p); paths=:path2),
+            vector_surface_selector)
+        Jp_vector_selected = ForwardDiff.jacobian(
+            fp_vector_selected, ones(FT, 2))
+        vector_surface_jac = run_exact_ss_with_jacobians(
+            vector_surface_config_from_p(ones(FT, 2)); paths=:path2).jacobians
+        dρ_dp_vector = zeros(FT, 2, 3, 2, 2)
+        dρ_dp_vector[:, 1, 1, 1] .= surface_base_albedo[1] / π
+        dρ_dp_vector[:, 1, 2, 2] .= surface_base_albedo[2] / π
+        J_surface_vector_selected = @inferred chain_rule_combine_surface_brdf(
+            vector_surface_jac.path2.surface_brdf, dρ_dp_vector,
+            vector_surface_selector)
+        @test size(J_surface_vector_selected) == (12, 2)
+        @test J_surface_vector_selected ≈ Jp_vector_selected rtol=1e-12 atol=1e-14
+
+        wind0 = FT(4.0)
+        n_water = Complex{FT}(FT(1.34), FT(1e-8))
+        coxmunk_surface_from_wind(wind) =
+            CoxMunkSSSurface(wind_speed=wind, n_water=n_water,
+                             include_whitecaps=false, shadowing=true)
+        coxmunk_config_from_wind(wind) = ExactSSConfig(
+            geometry=surface_geometry,
+            surface=coxmunk_surface_from_wind(wind),
+            contributors=(surface_abs,),
+            I0=FT[1.0, 0.8],
+            polarization_type=vSmartMOM.Scattering.Stokes_IQ{FT}())
+        coxmunk_selector = SSMeasurementSelector(
+            paths=:path2, stokes_indices=1:2)
+        fw_selected(p) = selected_measurements(
+            run_exact_ss(coxmunk_config_from_wind(p[1]); paths=:path2),
+            coxmunk_selector)
+        Jw_selected = ForwardDiff.jacobian(fw_selected, FT[wind0])
+        coxmunk_jac = run_exact_ss_with_jacobians(
+            coxmunk_config_from_wind(wind0); paths=:path2).jacobians
+        dρ_dwind = vSmartMOM.StandaloneSS._precompute_surface_brdf_wind_jacobian(
+            Val(2), coxmunk_surface_from_wind(wind0), surface_geometry, 2, FT)
+        Jw_chain = @inferred chain_rule_combine_surface_brdf(
+            coxmunk_jac.path2.surface_brdf, dρ_dwind, coxmunk_selector)
+        @test size(Jw_chain) == (8, 1)
+        @test Jw_chain ≈ Jw_selected rtol=2e-10 atol=1e-12
+
         @test_throws ArgumentError chain_rule_combine_surface_brdf(
             zeros(FT, 1, 1, 1), zeros(FT, 2, 1, 1))
         @test_throws ArgumentError chain_rule_combine_surface_brdf(
             zeros(FT, 1, 1, 1), zeros(FT, 1, 2, 1))
+        @test_throws ArgumentError chain_rule_combine_surface_brdf(
+            zeros(FT, 1, 2, 1), zeros(FT, 1, 1, 1, 1))
         @test_throws ArgumentError chain_rule_combine_surface_brdf(
             zeros(FT, 1, 1), zeros(FT, 1, 1, 1))
     end
