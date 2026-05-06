@@ -66,12 +66,47 @@ units for spectral bands and optical inputs.
 - LUTfiles: Vector{Vector{String}} (optional, per molecule per band). Paths may begin with `${ENV:NAME}` to resolve large local LUT directories outside the repository.
 
 ## scattering (optional)
-- aerosols: Vector of Dicts with keys: τ_ref, μ, σ, nᵣ, nᵢ, p₀, σp
+- aerosols: Vector of Dicts. Two aerosol forms are supported:
+  - Mie/lognormal aerosol:
+    - Required optical keys: `τ_ref`, `μ`, `σ`, `nᵣ`, `nᵢ`
+    - Required vertical-profile keys: either `p₀`, `σp` or `z₀`, `σ₀`
+  - Analytic phase-function aerosol:
+    - Required keys: `τ_ref`, `phase_function`
+    - Optional keys: `ssa` or `ϖ` for single-scattering albedo
+      (default `1`)
+    - Required vertical-profile keys: either `p₀`, `σp` or `z₀`, `σ₀`
+    - Optional Mie/lognormal keys: `μ`, `σ`, `nᵣ`, `nᵢ`; if one is
+      provided, all four must be provided. They are retained as metadata, but
+      the analytic `phase_function` supplies the scattering optics.
 - r_max: Real (µm)
 - nquad_radius: Int
 - λ_ref: Real (µm)
 - decomp_type: String in {NAI2(), PCW()}
 - n_ref: Complex (optional). If not provided, computed from first aerosol.
+
+Analytic `phase_function` may be written as a constructor-like string:
+
+```yaml
+phase_function: HenyeyGreensteinPhaseFunction(g=0.7)
+```
+
+or as a mapping:
+
+```yaml
+phase_function:
+  type: SyntheticPolarizedHenyeyGreensteinPhaseFunction
+  g: 0.45
+  polarization_fraction: 0.6
+```
+
+Supported analytic phase-function types are
+`HenyeyGreensteinPhaseFunction` and
+`SyntheticPolarizedHenyeyGreensteinPhaseFunction`. They are converted to
+`GreekCoefs` and use the same CoreRT layer-optics path as Mie-derived
+aerosols, so they are available to both full MOM and StandaloneSS. Linearized
+Mie-parameter Jacobians are currently defined only for Mie/lognormal aerosols;
+analytic phase-function aerosols throw in `LinMode` until their parameter
+layout is defined.
 
 ## Minimal YAML example
 
