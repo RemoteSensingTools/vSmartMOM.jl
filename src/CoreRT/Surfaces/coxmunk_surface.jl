@@ -406,6 +406,9 @@ function _whitecap_mueller(albedo::FT, n_stokes::Int) where FT
     val = albedo / FT(π)
     if n_stokes == 1
         return SMatrix{1,1,FT}(val)
+    elseif n_stokes == 2
+        z = zero(FT)
+        return SMatrix{2,2,FT}(val, z, z, z)
     elseif n_stokes == 3
         z = zero(FT)
         return SMatrix{3,3,FT}(val, z, z, z, z, z, z, z, z)

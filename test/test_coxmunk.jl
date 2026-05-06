@@ -92,6 +92,9 @@ end
     @testset "Consistent sizes" begin
         M1 = CM.fresnel_mueller(r_s, r_p, 1)
         @test size(M1) == (1, 1)
+        M2 = CM.fresnel_mueller(r_s, r_p, 2)
+        @test size(M2) == (2, 2)
+        @test M2 ≈ M[1:2, 1:2]
         M3 = CM.fresnel_mueller(r_s, r_p, 3)
         @test size(M3) == (3, 3)
         M4 = CM.fresnel_mueller(r_s, r_p, 4)
@@ -107,6 +110,8 @@ end
     @testset "Identity at zero angle" begin
         L0 = CM.stokes_rotation_matrix(0.0, 4)
         @test L0 ≈ SMatrix{4,4}(I) atol = 1e-15
+        L0_IQ = CM.stokes_rotation_matrix(0.0, 2)
+        @test L0_IQ ≈ SMatrix{2,2}(I) atol = 1e-15
     end
 
     @testset "Composition L(a)·L(b) = L(a+b)" begin
@@ -330,6 +335,13 @@ end
         pol_IQU = Stokes_IQU{Float64}()
         R0 = CM.reflectance(surf, pol_IQU, μ, 0; n_water=complex(1.33, 0.0))
         @test size(R0) == (12, 12)
+        @test all(isfinite.(R0))
+    end
+
+    @testset "Stokes_IQ" begin
+        pol_IQ = Stokes_IQ{Float64}()
+        R0 = CM.reflectance(surf, pol_IQ, μ, 0; n_water=complex(1.33, 0.0))
+        @test size(R0) == (8, 8)
         @test all(isfinite.(R0))
     end
 end

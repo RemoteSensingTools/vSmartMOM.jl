@@ -110,7 +110,8 @@ end
 Configuration for the Phase 1 standalone exact single-scatter solver.
 Outputs have shape `(nGeom, nStokes, nSpec)`. `polarization_type`, when
 provided, determines the Stokes count for the currently supported vector
-paths: Rayleigh atmospheric single scatter and direct-beam surface reflection.
+paths: Rayleigh or Greek-coefficient atmospheric single scatter and
+direct-beam surface reflection.
 """
 Base.@kwdef struct ExactSSConfig{GEO, SUR, CTRB, I, ARCH<:AbstractArchitecture, POL}
     geometry::GEO

@@ -59,7 +59,12 @@ function fresnel_mueller(r_s::Complex{FT}, r_p::Complex{FT}, n_stokes::Int) wher
     half_sum  = (rs2 + rp2) / 2
     half_diff = (rs2 - rp2) / 2
 
-    if n_stokes == 3
+    if n_stokes == 2
+        return SMatrix{2,2,FT}(
+            half_sum,  half_diff,
+            half_diff, half_sum
+        )
+    elseif n_stokes == 3
         return SMatrix{3,3,FT}(
             half_sum,  half_diff, FT(0),
             half_diff, half_sum,  FT(0),
@@ -97,7 +102,12 @@ function stokes_rotation_matrix(φ::FT, n_stokes::Int) where FT
     c2 = cos(2φ)
     s2 = sin(2φ)
 
-    if n_stokes == 3
+    if n_stokes == 2
+        return SMatrix{2,2,FT}(
+            one(FT), FT(0),
+            FT(0),   c2
+        )
+    elseif n_stokes == 3
         return SMatrix{3,3,FT}(
             one(FT), FT(0), FT(0),
             FT(0),   c2,   -s2,

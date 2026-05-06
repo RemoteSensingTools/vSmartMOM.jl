@@ -508,9 +508,10 @@ end
     run_exact_ss(config::ExactSSConfig; paths=:paths_1_2)
 
 Run standalone exact single-scattering for selected paths. Stokes-vector
-path 1 currently supports Rayleigh scattering; path 2 supports Lambertian and
-Cox-Munk direct-beam reflection. Paths 3 and 4 currently support scalar
-Lambertian surfaces. Radiance arrays have shape `(nGeom, nStokes, nSpec)`.
+path 1 currently supports Rayleigh and Greek-coefficient scattering; path 2
+supports Lambertian and Cox-Munk direct-beam reflection. Paths 3 and 4
+currently support scalar Lambertian surfaces. Radiance arrays have shape
+`(nGeom, nStokes, nSpec)`.
 """
 function run_exact_ss(config::ExactSSConfig; paths::Symbol = :paths_1_2)
     FT = _config_numeric_type(config)
