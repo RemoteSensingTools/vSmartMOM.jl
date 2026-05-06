@@ -108,6 +108,7 @@ The supported Fourier decomposition families are `NAI2` and `PCW`.
 ```@docs
 Stokes_IQUV
 Stokes_IQU
+Stokes_IQ
 Stokes_I
 ```
 
