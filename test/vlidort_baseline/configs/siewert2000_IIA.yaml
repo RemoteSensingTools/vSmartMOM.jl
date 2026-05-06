@@ -21,7 +21,7 @@
 
 radiative_transfer:
   spec_bands:
-    - "[18867.92 18868.92]"
+    - "[18867.92]"
   surface:
     - LambertianSurfaceScalar(0.0)
   quadrature_type:    RadauQuad()
