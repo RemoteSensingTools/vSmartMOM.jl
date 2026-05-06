@@ -290,6 +290,8 @@ end
         @test selected_measurements === vSmartMOM.selected_measurements
         @test selected_measurement_jacobian ===
               vSmartMOM.selected_measurement_jacobian
+        @test surface_brdf_wind_jacobian ===
+              vSmartMOM.surface_brdf_wind_jacobian
         @test StandaloneSS === vSmartMOM.StandaloneSS
         @test CoxMunkSSSurface === vSmartMOM.CoxMunkSSSurface
         @test vSmartMOM.HenyeyGreensteinPhaseFunction ===
@@ -1158,12 +1160,19 @@ end
         Jw_selected = ForwardDiff.jacobian(fw_selected, FT[wind0])
         coxmunk_jac = run_exact_ss_with_jacobians(
             coxmunk_config_from_wind(wind0); paths=:path2).jacobians
-        dρ_dwind = vSmartMOM.StandaloneSS._precompute_surface_brdf_wind_jacobian(
-            Val(2), coxmunk_surface_from_wind(wind0), surface_geometry, 2, FT)
+        dρ_dwind = @inferred surface_brdf_wind_jacobian(
+            coxmunk_surface_from_wind(wind0), surface_geometry, 2;
+            polarization_type=vSmartMOM.Scattering.Stokes_IQ{FT}())
         Jw_chain = @inferred chain_rule_combine_surface_brdf(
             coxmunk_jac.path2.surface_brdf, dρ_dwind, coxmunk_selector)
         @test size(Jw_chain) == (8, 1)
         @test Jw_chain ≈ Jw_selected rtol=2e-10 atol=1e-12
+        @test size(surface_brdf_wind_jacobian(
+            coxmunk_surface_from_wind(wind0), surface_geometry, 2)) == (2, 2, 1)
+        @test_throws ArgumentError surface_brdf_wind_jacobian(
+            LambertianSSSurface(albedo=FT(0.2)), surface_geometry, 2)
+        @test_throws ArgumentError surface_brdf_wind_jacobian(
+            coxmunk_surface_from_wind(wind0), surface_geometry, 0)
 
         @test_throws ArgumentError chain_rule_combine_surface_brdf(
             zeros(FT, 1, 1, 1), zeros(FT, 2, 1, 1))
