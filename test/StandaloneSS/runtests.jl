@@ -1032,10 +1032,50 @@ end
             hg_jac.path1.P_eff, dP_dp, hg_selector)
         @test Jg_chain ≈ Jg rtol=1e-12 atol=1e-14
 
+        depol_geometry = SSGeometry(μ₀=FT(0.74),
+                                    μv=FT[0.39, 0.68],
+                                    Δϕ=FT[0.18, 1.2])
+        τ_ray = FT[0.04 0.06; 0.02 0.03]
+        depol0 = FT(0.027)
+        depol_config(depol) = ExactSSConfig(
+            geometry=depol_geometry,
+            surface=LambertianSSSurface(albedo=zero(FT)),
+            contributors=(RayleighSSContributor(τ=τ_ray, depol=depol),),
+            I0=FT[1.0, 0.85],
+            polarization_type=vSmartMOM.Scattering.Stokes_IQU{FT}())
+        depol_selector = SSMeasurementSelector(
+            paths=:path1, geometry_indices=[2, 1], stokes_indices=[3, 2, 1],
+            spectral_indices=1:2)
+        fdepol(p) = selected_measurements(
+            run_exact_ss(depol_config(p[1]); paths=:path1),
+            depol_selector)
+        Jdepol = ForwardDiff.jacobian(fdepol, FT[depol0])
+        depol_jac = run_exact_ss_with_jacobians(
+            depol_config(depol0); paths=:path1,
+            selector=depol_selector).jacobians
+        dP_depol = zeros(FT, 2, 3, 2, 2, 1)
+        for iv in eachindex(depol_geometry.μv)
+            dcol = ForwardDiff.jacobian(FT[depol0]) do p
+                greek = vSmartMOM.Scattering.get_greek_rayleigh(p[1])
+                collect(vSmartMOM.Scattering.phase_matrix_first_column(
+                    greek, depol_geometry.μ₀, depol_geometry.μv[iv],
+                    depol_geometry.Δϕ[iv], Val(3)))
+            end
+            for istokes in 1:3
+                dP_depol[iv, istokes, :, :, 1] .= dcol[istokes, 1]
+            end
+        end
+        Jdepol_chain = @inferred chain_rule_combine_dP(
+            depol_jac.path1.P_eff, dP_depol, depol_selector)
+        @test size(Jdepol_chain) == (12, 1)
+        @test Jdepol_chain ≈ Jdepol rtol=1e-12 atol=1e-14
+
         @test_throws ArgumentError chain_rule_combine_dϖ(
             zeros(FT, 1, 1, 1, 2), zeros(FT, 3, 1, 1))
         @test_throws ArgumentError chain_rule_combine_dP(
             zeros(FT, 1, 1, 1, 2), zeros(FT, 2, 2, 1, 1))
+        @test_throws ArgumentError chain_rule_combine_dP(
+            zeros(FT, 1, 2, 1, 2), zeros(FT, 1, 1, 2, 1, 1))
         @test_throws ArgumentError chain_rule_combine_dP(
             zeros(FT, 1, 1, 1), zeros(FT, 1, 1, 1))
 

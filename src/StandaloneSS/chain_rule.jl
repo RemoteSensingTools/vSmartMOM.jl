@@ -88,8 +88,10 @@ chain_rule_combine_dϖ(dL_dϖ::AbstractArray{<:Any,4},
 
 Contract f₂ Jacobians with parameter derivatives of geometry-dependent
 effective phase values. `dL_dP` has shape
-`(nGeom, nStokes, nSpec, nLayers)` and `dP_dp` has shape
-`(nGeom, nLayers, nSpec, nParam)`. The returned array has shape
+`(nGeom, nStokes, nSpec, nLayers)`. For scalar phase derivatives, `dP_dp`
+has shape `(nGeom, nLayers, nSpec, nParam)`. For vector-Stokes phase
+derivatives, `dP_dp` has shape
+`(nGeom, nStokes, nLayers, nSpec, nParam)`. The returned array has shape
 `(nGeom, nStokes, nSpec, nParam)`.
 """
 function chain_rule_combine_dP(dL_dP::AbstractArray{FT1,4},
@@ -122,11 +124,52 @@ function chain_rule_combine_dP(dL_dP::AbstractArray{FT1,4},
     return dL_dp
 end
 
+function chain_rule_combine_dP(dL_dP::AbstractArray{FT1,4},
+                               dP_dp::AbstractArray{FT2,5}) where {FT1,FT2}
+    n_geom, n_stokes, n_spec, n_layers = size(dL_dP)
+    n_geom_p, n_stokes_p, n_layers_p, n_spec_p, n_param = size(dP_dp)
+    n_geom == n_geom_p ||
+        throw(ArgumentError("geometry dimension mismatch: dL_dP has " *
+                            "$n_geom geometries, dP_dp has $n_geom_p"))
+    n_stokes == n_stokes_p ||
+        throw(ArgumentError("Stokes dimension mismatch: dL_dP has " *
+                            "$n_stokes components, dP_dp has $n_stokes_p"))
+    n_layers == n_layers_p ||
+        throw(ArgumentError("layer dimension mismatch: dL_dP has " *
+                            "$n_layers layers, dP_dp has $n_layers_p"))
+    n_spec == n_spec_p ||
+        throw(ArgumentError("spectral dimension mismatch: dL_dP has " *
+                            "$n_spec spectra, dP_dp has $n_spec_p"))
+
+    FT = promote_type(FT1, FT2)
+    dL_dp = zeros(FT, n_geom, n_stokes, n_spec, n_param)
+
+    @inbounds for ip in 1:n_param, ispec in 1:n_spec,
+                  istokes in 1:n_stokes, ig in 1:n_geom
+        acc = zero(FT)
+        for iz in 1:n_layers
+            acc += convert(FT, dL_dP[ig, istokes, ispec, iz]) *
+                   convert(FT, dP_dp[ig, istokes, iz, ispec, ip])
+        end
+        dL_dp[ig, istokes, ispec, ip] = acc
+    end
+
+    return dL_dp
+end
+
 chain_rule_combine_dP(dL_dP, dP_dp) =
-    throw(ArgumentError("chain_rule_combine_dP expects a 4D dL_dP array and a 4D dP_dp array"))
+    throw(ArgumentError("chain_rule_combine_dP expects a 4D dL_dP array " *
+                        "and either a 4D scalar or 5D vector-Stokes " *
+                        "dP_dp array"))
 
 chain_rule_combine_dP(dL_dP::AbstractArray{<:Any,4},
                       dP_dp::AbstractArray{<:Any,4},
+                      selector::SSMeasurementSelector) =
+    selected_measurement_jacobian(chain_rule_combine_dP(dL_dP, dP_dp),
+                                  selector)
+
+chain_rule_combine_dP(dL_dP::AbstractArray{<:Any,4},
+                      dP_dp::AbstractArray{<:Any,5},
                       selector::SSMeasurementSelector) =
     selected_measurement_jacobian(chain_rule_combine_dP(dL_dP, dP_dp),
                                   selector)
