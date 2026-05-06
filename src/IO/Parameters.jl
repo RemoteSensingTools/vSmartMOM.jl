@@ -8,6 +8,7 @@ using UnitfulEquivalences
 using CanopyOptics
 using ..CoreRT: vSmartMOM_Parameters, AbsorptionParameters, ScatteringParameters, RT_Aerosol, AtmosphericProfile
 using ..Absorption: AbstractBroadeningFunction, AbstractComplexErrorFunction, load_interpolation_model
+using ..Scattering
 using ..Scattering: AbstractFourierDecompositionType, Aerosol
 using ..Architectures
 
@@ -407,6 +408,74 @@ function parse_surface_str(s::AbstractString, FT)
     end
 end
 
+function _construct_phase_function(::Val{:HenyeyGreensteinPhaseFunction}, FT, args)
+    if length(args) == 1 && args[1] isa AbstractDict
+        kw = args[1]
+        _require_config(haskey(kw, :g), "HenyeyGreensteinPhaseFunction keyword arguments require g.")
+        return Scattering.HenyeyGreensteinPhaseFunction(g=FT(kw[:g]))
+    end
+    _require_nargs("HenyeyGreensteinPhaseFunction", args, 1, "g")
+    return Scattering.HenyeyGreensteinPhaseFunction(g=FT(args[1]))
+end
+
+function _construct_phase_function(::Val{:SyntheticPolarizedHenyeyGreensteinPhaseFunction},
+                                   FT, args)
+    if length(args) == 1 && args[1] isa AbstractDict
+        kw = args[1]
+        _require_config(haskey(kw, :g),
+                        "SyntheticPolarizedHenyeyGreensteinPhaseFunction keyword arguments require g.")
+        p = get(kw, :polarization_fraction, get(kw, :p, nothing))
+        _require_config(p !== nothing,
+                        "SyntheticPolarizedHenyeyGreensteinPhaseFunction keyword arguments require polarization_fraction.")
+        return Scattering.SyntheticPolarizedHenyeyGreensteinPhaseFunction(
+            g=FT(kw[:g]), polarization_fraction=FT(p))
+    end
+    _require_nargs("SyntheticPolarizedHenyeyGreensteinPhaseFunction", args, 2,
+                   "g, polarization_fraction")
+    return Scattering.SyntheticPolarizedHenyeyGreensteinPhaseFunction(
+        g=FT(args[1]), polarization_fraction=FT(args[2]))
+end
+
+_construct_phase_function(::Val{name}, FT, args) where {name} =
+    _config_error("Unknown analytic phase function $(name).")
+
+function parse_phase_function_spec(spec, FT)
+    if spec isa AbstractDict
+        name = get(spec, "type", get(spec, :type, nothing))
+        _require_config(name !== nothing, "Analytic phase function dictionaries require a `type` field.")
+        kwargs = Dict{Symbol,Any}()
+        for (k, v) in spec
+            String(k) == "type" && continue
+            kwargs[Symbol(k)] = v isa Real ? FT(v) : v
+        end
+        return _construct_phase_function(Val(Symbol(String(name))), FT,
+                                         Any[kwargs])
+    elseif spec isa AbstractString
+        name_args = match(r"^(\w+)(?:\{[^}]*\})?\((.*)\)$", strip(String(spec)))
+        _require_config(name_args !== nothing,
+                        "Invalid analytic phase function specification: '$(spec)'")
+        name = name_args.captures[1]
+        args_raw = name_args.captures[2]
+        raw_parts = isempty(strip(args_raw)) ? String[] : _split_args(args_raw)
+        has_kwargs = any(p -> occursin('=', p) && !startswith(strip(p), "["),
+                         raw_parts)
+        if has_kwargs
+            kwargs = Dict{Symbol,Any}()
+            for part in raw_parts
+                p = strip(part)
+                if occursin('=', p) && !startswith(p, "[")
+                    kv = split(p, '='; limit=2)
+                    kwargs[Symbol(strip(kv[1]))] = _parse_arg(strip(kv[2]), FT)
+                end
+            end
+            return _construct_phase_function(Val(Symbol(name)), FT, Any[kwargs])
+        end
+        return _construct_phase_function(Val(Symbol(name)), FT,
+                                         [_parse_arg(x, FT) for x in raw_parts])
+    end
+    _config_error("Unsupported analytic phase function specification: $(typeof(spec)).")
+end
+
 "Check that a field exists in yaml file"
 function check_yaml_field(dict::AbstractDict, full_keys::Vector{String}, curr_keys::Vector{String}, final_type, valid_options::Vector{String})
     _require_config(length(curr_keys) >= 1, "Internal error: empty YAML key path.")
@@ -431,12 +500,26 @@ pressure-form normal, the legacy unified convention. Exactly one form must be
 present per aerosol."
 function validate_aerosols(aerosols)
     _require_config(!isempty(aerosols), "Aerosols list shouldn't be empty if scattering block is included")
-    base_fields = [(["τ_ref"], Real), (["μ"], Real), (["σ"], Real),
-                   (["nᵣ"], Real), (["nᵢ"], Real)]
     for aerosol in aerosols
-        for f in base_fields
-            key, elty = f[1:2]
-            check_yaml_field(aerosol, key, key, elty, String[])
+        check_yaml_field(aerosol, ["τ_ref"], ["τ_ref"], Real, String[])
+        has_phase = haskey(aerosol, "phase_function")
+        microphysical_keys = ("μ", "σ", "nᵣ", "nᵢ")
+        if has_phase
+            present = count(k -> haskey(aerosol, k), microphysical_keys)
+            _require_config(present == 0 || present == length(microphysical_keys),
+                            "Analytic phase-function aerosols must specify either all or none of μ, σ, nᵣ, nᵢ.")
+            if haskey(aerosol, "ssa")
+                check_yaml_field(aerosol, ["ssa"], ["ssa"], Real, String[])
+            elseif haskey(aerosol, "ϖ")
+                check_yaml_field(aerosol, ["ϖ"], ["ϖ"], Real, String[])
+            end
+        else
+            base_fields = [(["μ"], Real), (["σ"], Real),
+                           (["nᵣ"], Real), (["nᵢ"], Real)]
+            for f in base_fields
+                key, elty = f[1:2]
+                check_yaml_field(aerosol, key, key, elty, String[])
+            end
         end
         has_alt  = haskey(aerosol, "z₀") && haskey(aerosol, "σ₀")
         has_pres = haskey(aerosol, "p₀") && haskey(aerosol, "σp")
@@ -461,15 +544,29 @@ landing (Phase 4), whichever proves more natural."""
 function aerosol_params_to_obj(aerosols, FT)
     rt_aerosol_obj_list = RT_Aerosol{FT}[]
     for aerosol in aerosols
-        _require_config(aerosol["σ"] ≥ 1, "Geometric standard deviation has to be ≥ 1")
-        size_distribution = LogNormal(log(FT(aerosol["μ"])), log(FT(aerosol["σ"])))
-        new_aerosol_obj = Aerosol(size_distribution, FT(aerosol["nᵣ"]), FT(aerosol["nᵢ"]))
+        has_microphysics = all(k -> haskey(aerosol, k), ("μ", "σ", "nᵣ", "nᵢ"))
+        if has_microphysics
+            _require_config(aerosol["σ"] ≥ 1, "Geometric standard deviation has to be ≥ 1")
+        end
+        μ = has_microphysics ? FT(aerosol["μ"]) : FT(0.1)
+        σ = has_microphysics ? FT(aerosol["σ"]) : FT(1.1)
+        size_distribution = LogNormal(log(μ), log(σ))
+        nᵣ = has_microphysics ? FT(aerosol["nᵣ"]) : one(FT)
+        nᵢ = has_microphysics ? FT(aerosol["nᵢ"]) : zero(FT)
+        new_aerosol_obj = Aerosol(size_distribution, nᵣ, nᵢ)
         profile = if haskey(aerosol, "z₀")
             LogNormal(log(FT(aerosol["z₀"])), FT(aerosol["σ₀"]))
         else
             Normal(FT(aerosol["p₀"]), FT(aerosol["σp"]))
         end
-        new_rt_aerosol_obj = RT_Aerosol(new_aerosol_obj, FT(aerosol["τ_ref"]), profile)
+        phase_function = haskey(aerosol, "phase_function") ?
+                         parse_phase_function_spec(aerosol["phase_function"], FT) :
+                         nothing
+        ssa = FT(get(aerosol, "ssa", get(aerosol, "ϖ", one(FT))))
+        new_rt_aerosol_obj = phase_function === nothing ?
+            RT_Aerosol(new_aerosol_obj, FT(aerosol["τ_ref"]), profile) :
+            RT_Aerosol(new_aerosol_obj, FT(aerosol["τ_ref"]), profile,
+                       phase_function; ϖ=ssa)
         push!(rt_aerosol_obj_list, new_rt_aerosol_obj)
     end
     return rt_aerosol_obj_list
