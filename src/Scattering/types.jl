@@ -200,8 +200,9 @@ for). Subtypes:
 
 The atmospheric `Δ_angle` (forward exclusion half-angle) lives inside
 the truncation type that needs it, not as a free parameter on
-[`vSmartMOM_Parameters`](@ref) — different methods have different
-hyper-parameters and `NoTruncation` has none.
+[`CoreRT.vSmartMOM_Parameters`](@ref vSmartMOM.CoreRT.vSmartMOM_Parameters)
+— different methods have different hyper-parameters and `NoTruncation` has
+none.
 """
 abstract type AbstractTruncationType end
 

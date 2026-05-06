@@ -12,6 +12,7 @@ vSmartMOM.CoreRT
 vSmartMOM.IO
 vSmartMOM.InelasticScattering
 vSmartMOM.Aerosols
+vSmartMOM.StandaloneSS
 ```
 
 ## Absorption Internals
@@ -21,11 +22,23 @@ vSmartMOM.Absorption.AbstractCrossSectionModel
 vSmartMOM.Absorption.AbstractComplexErrorFunction
 vSmartMOM.Absorption.save_interpolation_model
 vSmartMOM.Absorption.load_interpolation_model
+vSmartMOM.Absorption.CIATable
+vSmartMOM.Absorption.MTCKDTable
+vSmartMOM.Absorption.MTCKDBand
+vSmartMOM.Absorption.parse_cia_file
+vSmartMOM.Absorption.build_cia_table
+vSmartMOM.Absorption.load_cia_table
+vSmartMOM.Absorption.compute_τ_cia!
+vSmartMOM.Absorption.cia_σ_at_T!
+vSmartMOM.Absorption.load_mtckd
+vSmartMOM.Absorption.build_mtckd_band
+vSmartMOM.Absorption.compute_τ_h2o_continuum!
 ```
 
 ## Scattering Internals
 
 ```@docs
+vSmartMOM.Scattering.greek_coefficients_from_scattering_matrix
 vSmartMOM.Scattering.compute_aerosol_optical_properties_gpu
 vSmartMOM.Scattering.MiePrecisionPolicy
 vSmartMOM.Scattering.NativeFloat64
@@ -49,6 +62,34 @@ vSmartMOM.CoreRT.rt_run_ss
 vSmartMOM.CoreRT.lin_added_layer_all_params!
 vSmartMOM.CoreRT.delta_m_forward
 vSmartMOM.CoreRT.delta_m_truncation_lin
+```
+
+## StandaloneSS Internals
+
+```@docs
+vSmartMOM.StandaloneSS.ExactSSConfig
+vSmartMOM.StandaloneSS.SSGeometry
+vSmartMOM.StandaloneSS.LambertianSSSurface
+vSmartMOM.StandaloneSS.CoxMunkSSSurface
+vSmartMOM.StandaloneSS.GreekCoefsSSContributor
+vSmartMOM.StandaloneSS.TruncatedAndExactScatteringOpticalProperties
+vSmartMOM.StandaloneSS.SSMeasurementSelector
+vSmartMOM.StandaloneSS.run_exact_ss
+vSmartMOM.StandaloneSS.run_exact_ss_with_jacobians
+vSmartMOM.StandaloneSS.exact_ss_config_from_model
+vSmartMOM.StandaloneSS.selected_measurements
+vSmartMOM.StandaloneSS.selected_measurement_jacobian
+vSmartMOM.StandaloneSS.determine_required_l_aerosol
+vSmartMOM.StandaloneSS.determine_required_l_from_moments
+vSmartMOM.StandaloneSS.determine_required_nbrdf
+vSmartMOM.StandaloneSS.determine_required_nbrdf_coxmunk
+vSmartMOM.StandaloneSS.determine_required_nquad
+vSmartMOM.StandaloneSS.determine_required_nquad_inner
+vSmartMOM.StandaloneSS.determine_required_nstreams
+vSmartMOM.StandaloneSS.chain_rule_combine_dτ
+vSmartMOM.StandaloneSS.chain_rule_combine_dϖ
+vSmartMOM.StandaloneSS.chain_rule_combine_dP
+vSmartMOM.StandaloneSS.chain_rule_combine_surface_brdf
 ```
 
 ## Inelastic Internals
