@@ -284,6 +284,7 @@ end
         @test chain_rule_combine_dϖ === vSmartMOM.chain_rule_combine_dϖ
         @test chain_rule_combine_surface_brdf ===
               vSmartMOM.chain_rule_combine_surface_brdf
+        @test exact_ss_config_from_model === vSmartMOM.exact_ss_config_from_model
         @test SSMeasurementSelector === vSmartMOM.SSMeasurementSelector
         @test GreekCoefsSSContributor === vSmartMOM.GreekCoefsSSContributor
         @test selected_measurements === vSmartMOM.selected_measurements
@@ -295,6 +296,68 @@ end
               vSmartMOM.Scattering.HenyeyGreensteinPhaseFunction
         @test vSmartMOM.SyntheticPolarizedHenyeyGreensteinPhaseFunction ===
               vSmartMOM.Scattering.SyntheticPolarizedHenyeyGreensteinPhaseFunction
+    end
+
+    @testset "RTModel adapter" begin
+        cfg = Dict(
+            "radiative_transfer" => Dict(
+                "spec_bands" => ["[13000.0]"],
+                "surface" => ["LambertianSurfaceScalar(0.2)"],
+                "quadrature_type" => "GaussQuadHemisphere()",
+                "polarization_type" => "Stokes_IQU()",
+                "max_m" => 3,
+                "Δ_angle" => 0.0,
+                "l_trunc" => 8,
+                "truncation" => "NoTruncation(l_max=8)",
+                "depol" => 0.0,
+                "float_type" => "Float64",
+                "architecture" => "CPU()",
+            ),
+            "geometry" => Dict(
+                "sza" => 35.0,
+                "vza" => [20.0, 50.0],
+                "vaz" => [0.0, 90.0],
+                "obs_alt" => 1000.0,
+            ),
+            "atmospheric_profile" => Dict(
+                "T" => [280.0],
+                "p" => [100.0, 1000.0],
+                "profile_reduction" => -1,
+            ),
+            "scattering" => Dict(
+                "aerosols" => [Dict(
+                    "τ_ref" => 0.02,
+                    "phase_function" => "SyntheticPolarizedHenyeyGreensteinPhaseFunction(g=0.45, polarization_fraction=0.6)",
+                    "ssa" => 0.92,
+                    "p₀" => 550.0,
+                    "σp" => 200.0,
+                )],
+                "r_max" => 1.0,
+                "nquad_radius" => 16,
+                "λ_ref" => 0.55,
+                "decomp_type" => "NAI2()",
+            ),
+        )
+
+        params = parameters_from_dict(cfg)
+        model = model_from_parameters(params)
+        config = exact_ss_config_from_model(model)
+        @test config.geometry.μ₀ ≈ cosd(params.sza)
+        @test config.surface isa LambertianSSSurface
+        @test length(config.contributors) == 2
+        @test config.contributors[1] isa GreekCoefsSSContributor
+        @test config.contributors[2] isa GreekCoefsSSContributor
+        @test config.polarization_type isa vSmartMOM.Scattering.Stokes_IQU{Float64}
+
+        result = run_exact_ss(config; paths=:paths_1_2)
+        @test size(result.total) == (2, 3, 1)
+        @test all(isfinite.(result.total))
+        @test any(abs.(result.path1[:, 2:3, :]) .> 0)
+
+        cfg_trunc = deepcopy(cfg)
+        delete!(cfg_trunc["radiative_transfer"], "truncation")
+        truncated_model = model_from_parameters(parameters_from_dict(cfg_trunc))
+        @test_throws ArgumentError exact_ss_config_from_model(truncated_model)
     end
 
     @testset "Rayleigh path 1 and Lambertian path 2" begin
