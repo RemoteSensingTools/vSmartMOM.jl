@@ -19,7 +19,7 @@ When `SFI == true`, the solar source terms `J₀⁺` and `J₀⁻` are computed;
 otherwise they are left untouched.
 
 # Arguments
-- `pol_type`: polarization type (Stokes_I, Stokes_IQU, or Stokes_IQUV)
+- `pol_type`: polarization type (Stokes_I, Stokes_IQ, Stokes_IQU, or Stokes_IQUV)
 - `SFI::Bool`: use Source Function Integration for the solar beam
 - `τ_sum`: cumulative optical depth above the current layer (per λ)
 - `dτ_λ`: elemental-layer total optical depth (per λ, including gas absorption)

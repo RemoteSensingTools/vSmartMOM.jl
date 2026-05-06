@@ -4,7 +4,7 @@ This file contains all types that are used in the Scattering module:
 
 - `AbstractAerosolTypes` specify aerosol properties
 - `AbstractFourierDecompositionTypes` specify the decomposition method to use (NAI2 vs PCW)
-- `AbstractPolarizationTypes` specify the polarization type (I/IQU/IQUV)
+- `AbstractPolarizationTypes` specify the polarization type (I/IQ/IQU/IQUV)
 - `AbstractTruncationTypes` specify the type of truncation for legendre terms
 - `GreekCoefs` holds all greek coefficients 
 - `ScatteringMatrix` holds all computed phase function elements
