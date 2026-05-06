@@ -487,6 +487,23 @@ end
         @test vector.path1 ≈ expected rtol=1e-10 atol=1e-13
         @test vector.path1[:, 1:1, :] ≈ scalar.path1 rtol=1e-10 atol=1e-13
         @test any(abs.(vector.path1[:, 2:3, :]) .> 0)
+
+        vector4_config = ExactSSConfig(
+            geometry=geometry, surface=scalar_config.surface,
+            contributors=scalar_config.contributors, I0=scalar_config.I0,
+            polarization_type=vSmartMOM.Scattering.Stokes_IQUV{FT}())
+        vector4 = run_exact_ss(vector4_config; paths=:path1)
+        expected4 = zeros(FT, 2, 4, 1)
+        for iv in eachindex(geometry.μv)
+            phase_col = vSmartMOM.Scattering.phase_matrix_first_column(
+                greek, geometry.μ₀, geometry.μv[iv], geometry.Δϕ[iv],
+                Val(4))
+            expected4[iv, :, 1] .= scalar.path1[iv, 1, 1] .*
+                                   collect(phase_col) ./ phase_col[1]
+        end
+        @test vector4.path1 ≈ expected4 rtol=1e-10 atol=1e-13
+        @test vector4.path1[:, 1:1, :] ≈ scalar.path1 rtol=1e-10 atol=1e-13
+        @test vector4.path1[:, 4:4, :] == zero(vector4.path1[:, 4:4, :])
     end
 
     @testset "Cox-Munk path 2" begin
