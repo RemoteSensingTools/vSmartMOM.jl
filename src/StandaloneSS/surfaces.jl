@@ -106,6 +106,7 @@ function _precompute_surface_brdf(::Val{N}, surface::CoxMunkSSSurface,
 end
 
 """
+    surface_brdf_wind_jacobian(config)
     surface_brdf_wind_jacobian(surface, geometry, n_spec; polarization_type=nothing)
 
 Return the StandaloneSS seam derivative of Cox-Munk direct-beam surface BRDF
@@ -114,6 +115,13 @@ with respect to wind speed. For scalar Stokes it returns an array with shape
 `(nGeom, nStokes, nSpec, 1)`, matching
 [`chain_rule_combine_surface_brdf`](@ref)'s `dρ_dp` input.
 """
+function surface_brdf_wind_jacobian(config::ExactSSConfig)
+    _, n_spec = _dims(config.contributors)
+    return surface_brdf_wind_jacobian(
+        config.surface, config.geometry, n_spec;
+        polarization_type=config.polarization_type)
+end
+
 function surface_brdf_wind_jacobian(surface::CoxMunkSSSurface,
                                     geometry::SSGeometry,
                                     n_spec::Integer;

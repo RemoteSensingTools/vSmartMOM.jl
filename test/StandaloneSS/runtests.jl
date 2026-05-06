@@ -1161,8 +1161,7 @@ end
         coxmunk_jac = run_exact_ss_with_jacobians(
             coxmunk_config_from_wind(wind0); paths=:path2).jacobians
         dρ_dwind = @inferred surface_brdf_wind_jacobian(
-            coxmunk_surface_from_wind(wind0), surface_geometry, 2;
-            polarization_type=vSmartMOM.Scattering.Stokes_IQ{FT}())
+            coxmunk_config_from_wind(wind0))
         Jw_chain = @inferred chain_rule_combine_surface_brdf(
             coxmunk_jac.path2.surface_brdf, dρ_dwind, coxmunk_selector)
         @test size(Jw_chain) == (8, 1)
