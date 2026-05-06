@@ -114,6 +114,7 @@ Stokes_I
 ### Truncation type
 
 ```@docs
+NoTruncation
 δBGE
 ```
 
