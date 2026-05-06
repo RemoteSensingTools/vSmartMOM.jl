@@ -41,7 +41,8 @@ export AbsorptionSSContributor,
        run_exact_ss,
        run_exact_ss_with_jacobians,
        selected_measurement_jacobian,
-       selected_measurements
+       selected_measurements,
+       surface_brdf_wind_jacobian
 
 include("types.jl")
 include("surfaces.jl")

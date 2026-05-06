@@ -105,6 +105,44 @@ function _precompute_surface_brdf(::Val{N}, surface::CoxMunkSSSurface,
     return ρ
 end
 
+"""
+    surface_brdf_wind_jacobian(surface, geometry, n_spec; polarization_type=nothing)
+
+Return the StandaloneSS seam derivative of Cox-Munk direct-beam surface BRDF
+with respect to wind speed. For scalar Stokes it returns an array with shape
+`(nGeom, nSpec, 1)`. For vector Stokes it returns
+`(nGeom, nStokes, nSpec, 1)`, matching
+[`chain_rule_combine_surface_brdf`](@ref)'s `dρ_dp` input.
+"""
+function surface_brdf_wind_jacobian(surface::CoxMunkSSSurface,
+                                    geometry::SSGeometry,
+                                    n_spec::Integer;
+                                    polarization_type = nothing)
+    n_spec > 0 ||
+        throw(ArgumentError("surface_brdf_wind_jacobian requires n_spec > 0"))
+    FT = promote_type(typeof(geometry.μ₀), eltype(geometry.μv),
+                      eltype(geometry.Δϕ), _surface_numeric_type(surface))
+    stokes_dispatch = _surface_jacobian_stokes_dispatch(polarization_type)
+    return _precompute_surface_brdf_wind_jacobian(
+        stokes_dispatch, surface, geometry, Int(n_spec), FT)
+end
+
+surface_brdf_wind_jacobian(surface::AbstractSSSurface, args...; kwargs...) =
+    throw(ArgumentError("surface_brdf_wind_jacobian currently supports " *
+                        "CoxMunkSSSurface only; got $(typeof(surface))"))
+
+_surface_jacobian_stokes_dispatch(::Nothing) = Val(1)
+_surface_jacobian_stokes_dispatch(::Scattering.Stokes_I) = Val(1)
+_surface_jacobian_stokes_dispatch(::Scattering.Stokes_IQ) = Val(2)
+_surface_jacobian_stokes_dispatch(::Scattering.Stokes_IQU) = Val(3)
+_surface_jacobian_stokes_dispatch(::Scattering.Stokes_IQUV) = Val(4)
+
+function _surface_jacobian_stokes_dispatch(polarization_type)
+    hasproperty(polarization_type, :n) ||
+        throw(ArgumentError("polarization_type must expose an `n` field"))
+    return Val(Int(getproperty(polarization_type, :n)))
+end
+
 function _precompute_surface_brdf_wind_jacobian(
     surface::CoxMunkSSSurface,
     geometry::SSGeometry,
