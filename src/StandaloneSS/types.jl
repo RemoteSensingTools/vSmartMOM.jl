@@ -68,6 +68,24 @@ Base.@kwdef struct HGAerosolSSContributor{FT<:Real, A<:AbstractMatrix} <: Abstra
     τ::A
 end
 
+"""
+    GreekCoefsSSContributor(; greek_coefs, ϖ, τ)
+
+Standalone exact-angle scattering contributor backed by the same
+`Scattering.GreekCoefs` used by the full MOM solver. This is the preferred
+bridge for vector aerosol single scattering in StandaloneSS.
+"""
+Base.@kwdef struct GreekCoefsSSContributor{
+    G<:Scattering.GreekCoefs, W<:Real, A<:AbstractMatrix
+} <: AbstractSSContributor
+    "Greek phase-matrix coefficients from `Scattering`."
+    greek_coefs::G
+    "Single-scattering albedo."
+    ϖ::W
+    "Optical depth by layer and spectral point: (nLayer, nSpec)."
+    τ::A
+end
+
 Base.@kwdef struct AbsorptionSSContributor{A<:AbstractMatrix} <: AbstractSSContributor
     "Absorption optical depth by layer and spectral point: (nLayer, nSpec)."
     τ::A
@@ -90,9 +108,9 @@ end
                     polarization_type=nothing, architecture=CPU())
 
 Configuration for the Phase 1 standalone exact single-scatter solver.
-Outputs are currently scalar Stokes-I arrays with shape `(nGeom, 1, nSpec)`.
-`polarization_type`, when provided, is the future dispatch skeleton for
-`Stokes_I/IQ/IQU/IQUV` exact-SS kernels and determines the Stokes count.
+Outputs have shape `(nGeom, nStokes, nSpec)`. `polarization_type`, when
+provided, determines the Stokes count for the currently supported vector
+paths: Rayleigh atmospheric single scatter and direct-beam surface reflection.
 """
 Base.@kwdef struct ExactSSConfig{GEO, SUR, CTRB, I, ARCH<:AbstractArchitecture, POL}
     geometry::GEO
@@ -121,6 +139,7 @@ end
 
 single_scattering_albedo(::RayleighSSContributor) = 1
 single_scattering_albedo(c::HGAerosolSSContributor) = c.ϖ
+single_scattering_albedo(c::GreekCoefsSSContributor) = c.ϖ
 single_scattering_albedo(::AbsorptionSSContributor) = 0
 
 @inline function _rayleigh_depolarization_scale(depol::FT) where {FT}
@@ -140,6 +159,12 @@ function exact_phase_function(c::HGAerosolSSContributor, cosΘ)
     g = convert(FT, c.g)
     x = convert(FT, cosΘ)
     return (one(g) - g^2) / (one(g) + g^2 - 2g * x)^(FT(1.5))
+end
+
+function exact_phase_function(c::GreekCoefsSSContributor, cosΘ)
+    FT = promote_type(eltype(c.greek_coefs.β), typeof(cosΘ))
+    x = convert(FT, cosΘ)
+    return Scattering.reconstruct_phase(c.greek_coefs, [x]).f₁₁[1]
 end
 
 exact_phase_function(::AbsorptionSSContributor, cosΘ) = zero(cosΘ)

@@ -52,6 +52,11 @@ Marker selecting the linearized model construction path used for Jacobians.
 struct LinMode <: RT_Mode end
 export FwdMode, LinMode
 
+export HenyeyGreensteinPhaseFunction,
+       SyntheticPolarizedHenyeyGreensteinPhaseFunction,
+       greek_coefficients, analytic_aerosol_optics,
+       phase_matrix_first_column
+
 # GPU/CPU Architecture (from Oceanigans)
 include("Architectures.jl")
 using .Architectures
@@ -66,6 +71,10 @@ include("Artifacts/artifact_helper.jl")
 
 # Mie Phase Function module:
 include("Scattering/Scattering.jl")
+using .Scattering: HenyeyGreensteinPhaseFunction,
+                   SyntheticPolarizedHenyeyGreensteinPhaseFunction,
+                   greek_coefficients, analytic_aerosol_optics,
+                   phase_matrix_first_column
 
 # Inelastic Scattering module:
 include("Inelastic/InelasticScattering.jl")
@@ -110,7 +119,9 @@ export rt_run_lin, model_from_parameters_lin
 export StandaloneSS, run_exact_ss, ExactSSConfig, SSGeometry,
        LambertianSSSurface, CoxMunkSSSurface, RayleighSSContributor,
        SSMeasurementSelector,
-       HGAerosolSSContributor, AbsorptionSSContributor, determine_required_l_aerosol,
+       HGAerosolSSContributor, GreekCoefsSSContributor,
+       AbsorptionSSContributor,
+       determine_required_l_aerosol,
        determine_required_l_from_moments, determine_required_nbrdf,
        determine_required_nbrdf_coxmunk, determine_required_nquad,
        determine_required_nquad_inner, determine_required_nstreams,

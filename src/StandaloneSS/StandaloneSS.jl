@@ -2,7 +2,8 @@
     StandaloneSS
 
 Standalone exact single-scattering tools. Phase 1 implements scalar,
-plane-parallel exact paths with KernelAbstractions CPU kernels.
+plane-parallel exact paths with vector-Stokes support for atmospheric
+Rayleigh single scatter and direct-beam surface reflection.
 """
 module StandaloneSS
 
@@ -11,10 +12,12 @@ using KernelAbstractions
 using SpecialFunctions: erfc
 using ..Architectures: AbstractArchitecture, CPU, GPU, MetalGPU, array_type, devi
 using ..CoreRT: CoxMunkSurface, coxmunk_brdf_mueller
+using ..Scattering
 
 export AbsorptionSSContributor,
        CoxMunkSSSurface,
        ExactSSConfig,
+       GreekCoefsSSContributor,
        HGAerosolSSContributor,
        LambertianSSSurface,
        RayleighSSContributor,

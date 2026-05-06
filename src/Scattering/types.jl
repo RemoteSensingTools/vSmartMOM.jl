@@ -19,6 +19,43 @@ Abstract aerosol type
 abstract type AbstractAerosolType end
 
 """
+    AbstractAnalyticPhaseFunction
+
+Analytic phase/scattering matrix source that can be converted to Greek
+coefficients and then used by the standard MOM optical-property path.
+"""
+abstract type AbstractAnalyticPhaseFunction end
+
+"""
+    HenyeyGreensteinPhaseFunction(g)
+
+Scalar Henyey-Greenstein phase function,
+`(1 - g^2) / (1 + g^2 - 2g cosΘ)^(3/2)`, normalized so its sphere average is
+one.
+"""
+Base.@kwdef struct HenyeyGreensteinPhaseFunction{FT<:Real} <: AbstractAnalyticPhaseFunction
+    "Henyey-Greenstein asymmetry parameter; must satisfy `abs(g) < 1`."
+    g::FT
+end
+
+"""
+    SyntheticPolarizedHenyeyGreensteinPhaseFunction(; g, polarization_fraction)
+
+Diagnostic polarizing Henyey-Greenstein-like scattering matrix. The `f11`
+element is standard Henyey-Greenstein; `f12/f11` follows the bounded toy law
+`polarization_fraction * (1 - cosΘ^2) / (1 + cosΘ^2)`. This is intended for
+tests and sensitivity experiments, not as a Mie substitute.
+"""
+Base.@kwdef struct SyntheticPolarizedHenyeyGreensteinPhaseFunction{
+    FT<:Real, PF<:Real
+} <: AbstractAnalyticPhaseFunction
+    "Henyey-Greenstein asymmetry parameter; must satisfy `abs(g) < 1`."
+    g::FT
+    "Maximum synthetic fractional linear polarization; must satisfy `abs(p) <= 1`."
+    polarization_fraction::PF
+end
+
+"""
     Aerosol
 
 Aerosol microphysical properties: particle size distribution and complex

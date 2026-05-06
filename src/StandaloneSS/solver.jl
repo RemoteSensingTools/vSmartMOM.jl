@@ -11,9 +11,10 @@ _wants_path2(paths::Symbol) = paths in (:path2, :paths_1_2, :all, :all_four)
 _wants_path3(paths::Symbol) = paths in (:path3, :all, :all_four)
 _wants_path4(paths::Symbol) = paths in (:path4, :all, :all_four)
 
-_vector_stokes_paths_supported(paths::Symbol) = paths === :path2
+_vector_stokes_paths_supported(paths::Symbol) =
+    paths in (:path1, :path2, :paths_1_2)
 _optics_dispatch(paths::Symbol, stokes_dispatch) =
-    paths === :path2 ? Val(1) : stokes_dispatch
+    _wants_path1(paths) ? stokes_dispatch : Val(1)
 
 _architecture_backend(architecture::AbstractArchitecture) = devi(architecture)
 _architecture_array_type(architecture::AbstractArchitecture) = array_type(architecture)
@@ -168,12 +169,31 @@ end
 _precompute_optics(config::ExactSSConfig) =
     _precompute_optics(Val(1), config)
 
-function _unsupported_stokes_optics(::Val{N}) where {N}
-    throw(ArgumentError("StandaloneSS exact SS optics precompute currently supports only Stokes-I (n_stokes == 1); received n_stokes=$N"))
+function _unsupported_vector_path1_contributor(c)
+    throw(ArgumentError("StandaloneSS vector path1 currently supports RayleighSSContributor, GreekCoefsSSContributor, and AbsorptionSSContributor only; got $(typeof(c))"))
 end
 
-function _precompute_optics(pol::Val{N}, ::ExactSSConfig) where {N}
-    _unsupported_stokes_optics(pol)
+_validate_vector_path1_contributor(::RayleighSSContributor) = nothing
+_validate_vector_path1_contributor(::GreekCoefsSSContributor) = nothing
+_validate_vector_path1_contributor(::AbsorptionSSContributor) = nothing
+_validate_vector_path1_contributor(c::AbstractSSContributor) =
+    _unsupported_vector_path1_contributor(c)
+
+function _validate_vector_path1_contributors(contributors)
+    foreach(_validate_vector_path1_contributor, contributors)
+    return nothing
+end
+
+function _phase_first_column(c::RayleighSSContributor, pol::Val{N}, μ₀::FT,
+                             μᵥ::FT, Δϕ::FT) where {N,FT}
+    greek = Scattering.get_greek_rayleigh(convert(FT, c.depol))
+    return Scattering.phase_matrix_first_column(greek, μ₀, μᵥ, Δϕ, pol)
+end
+
+function _phase_first_column(c::GreekCoefsSSContributor, pol::Val{N}, μ₀::FT,
+                             μᵥ::FT, Δϕ::FT) where {N,FT}
+    return Scattering.phase_matrix_first_column(c.greek_coefs, μ₀, μᵥ, Δϕ,
+                                                pol)
 end
 
 function _precompute_optics(::Val{1}, config::ExactSSConfig)
@@ -222,6 +242,71 @@ function _precompute_optics(::Val{1}, config::ExactSSConfig)
             if τ_scat != zero(FT)
                 for iv in 1:n_geom
                     P_eff[iv, iz, ispec] = weighted_phase[iv, iz, ispec] / τ_scat
+                end
+            end
+        end
+    end
+
+    τ_total_column = vec(τ_cum[end, :])
+    return (; τ_total_layer, τ_scat_layer, τ_cum, τ_total_column, ϖ_eff, P_eff)
+end
+
+function _precompute_optics(pol::Val{N}, config::ExactSSConfig) where {N}
+    N > 1 || return _precompute_optics(Val(1), config)
+    _validate_vector_path1_contributors(config.contributors)
+
+    FT = _config_numeric_type(config)
+    contributors = config.contributors
+    n_layers, n_spec = _dims(contributors)
+    n_geom = length(config.geometry.μv)
+
+    τ_total_layer = zeros(FT, n_layers, n_spec)
+    τ_scat_layer = zeros(FT, n_layers, n_spec)
+    weighted_phase = zeros(FT, n_geom, N, n_layers, n_spec)
+
+    μ₀ = convert(FT, config.geometry.μ₀)
+    phase_cols = Vector{NTuple{N,FT}}(undef, n_geom)
+
+    for c in contributors
+        τ = τ_matrix(c)
+        ϖ = convert(FT, single_scattering_albedo(c))
+        if c isa Union{RayleighSSContributor, GreekCoefsSSContributor}
+            @inbounds for iv in 1:n_geom
+                phase_cols[iv] = _phase_first_column(
+                    c, pol, μ₀, convert(FT, config.geometry.μv[iv]),
+                    convert(FT, config.geometry.Δϕ[iv]))
+            end
+        end
+
+        @inbounds for ispec in 1:n_spec, iz in 1:n_layers
+            τᵢ = convert(FT, τ[iz, ispec])
+            τ_total_layer[iz, ispec] += τᵢ
+            scat_weight = τᵢ * ϖ
+            τ_scat_layer[iz, ispec] += scat_weight
+            if scat_weight != zero(FT) &&
+               c isa Union{RayleighSSContributor, GreekCoefsSSContributor}
+                for iv in 1:n_geom, istokes in 1:N
+                    weighted_phase[iv, istokes, iz, ispec] +=
+                        scat_weight * phase_cols[iv][istokes]
+                end
+            end
+        end
+    end
+
+    ϖ_eff = zeros(FT, n_layers, n_spec)
+    P_eff = zeros(FT, n_geom, N, n_layers, n_spec)
+    τ_cum = zeros(FT, n_layers + 1, n_spec)
+
+    @inbounds for ispec in 1:n_spec
+        for iz in 1:n_layers
+            τ = τ_total_layer[iz, ispec]
+            τ_scat = τ_scat_layer[iz, ispec]
+            ϖ_eff[iz, ispec] = τ == zero(FT) ? zero(FT) : τ_scat / τ
+            τ_cum[iz + 1, ispec] = τ_cum[iz, ispec] + τ
+            if τ_scat != zero(FT)
+                for iv in 1:n_geom, istokes in 1:N
+                    P_eff[iv, istokes, iz, ispec] =
+                        weighted_phase[iv, istokes, iz, ispec] / τ_scat
                 end
             end
         end
@@ -388,8 +473,10 @@ function _validate_config(config::ExactSSConfig, paths::Symbol)
     _validate_paths(paths)
     n_stokes = _config_n_stokes(config)
     if n_stokes != 1 && !_vector_stokes_paths_supported(paths)
-        throw(ArgumentError("StandaloneSS vector Stokes kernels currently support only the direct-surface path `paths=:path2`; received n_stokes=$n_stokes and paths=:$paths"))
+        throw(ArgumentError("StandaloneSS vector Stokes kernels currently support only `paths=:path1`, `paths=:path2`, and `paths=:paths_1_2`; received n_stokes=$n_stokes and paths=:$paths"))
     end
+    n_stokes == 1 || !_wants_path1(paths) ||
+        _validate_vector_path1_contributors(config.contributors)
     if (_wants_path3(paths) || _wants_path4(paths)) &&
        !(config.surface isa LambertianSSSurface)
         throw(ArgumentError("StandaloneSS paths 3 and 4 currently support LambertianSSSurface only"))
@@ -409,9 +496,10 @@ end
 """
     run_exact_ss(config::ExactSSConfig; paths=:paths_1_2)
 
-Run standalone exact single-scattering for selected scalar paths. Path 2
-supports Lambertian and Cox-Munk surfaces; paths 3 and 4 currently support
-Lambertian surfaces. Radiance arrays have shape `(nGeom, 1, nSpec)`.
+Run standalone exact single-scattering for selected paths. Stokes-vector
+path 1 currently supports Rayleigh scattering; path 2 supports Lambertian and
+Cox-Munk direct-beam reflection. Paths 3 and 4 currently support scalar
+Lambertian surfaces. Radiance arrays have shape `(nGeom, nStokes, nSpec)`.
 """
 function run_exact_ss(config::ExactSSConfig; paths::Symbol = :paths_1_2)
     FT = _config_numeric_type(config)

@@ -28,6 +28,7 @@ include("types.jl")                       # All types used in this module
 include("types_lin.jl")                   # Derivative types for linearization
 include("gpu_precision.jl")              # DS arithmetic, Neumaier accumulators (GPU-compatible)
 include("mie_helper_functions.jl")        # Mie file-related functions
+include("analytic_phase_functions.jl")    # Analytic phase functions -> Greek coefficients
 include("mie_helper_functions_lin.jl")    # Linearized Mie functions
 include("legendre_functions.jl")          # Recursions for associated Legendre Polynomials
 include("truncate_phase.jl")              # Functions for truncation
@@ -44,11 +45,16 @@ include("show_utils.jl")                  # Pretty-print
 include("compute_Z_matrices.jl")
 
 # Export make functions/types
-export make_mie_model, reconstruct_phase
+export make_mie_model, reconstruct_phase, greek_coefficients,
+       greek_coefficients_from_scattering_matrix, analytic_aerosol_optics,
+       phase_matrix_first_column, scattering_matrix
 
 # Export types
 export NAI2, PCW, Aerosol, MieModel, Stokes_IQUV, Stokes_I, Stokes_IQU,
-       δBGE, NoTruncation, GreekCoefs, AerosolOptics, AbstractFourierDecompositionType
+       δBGE, NoTruncation, GreekCoefs, AerosolOptics,
+       AbstractFourierDecompositionType, AbstractAnalyticPhaseFunction,
+       HenyeyGreensteinPhaseFunction,
+       SyntheticPolarizedHenyeyGreensteinPhaseFunction
 
 # Export linearized types
 export linGreekCoefs, linAerosolOptics

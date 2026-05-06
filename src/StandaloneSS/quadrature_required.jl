@@ -51,6 +51,10 @@ function determine_required_l_aerosol(c::HGAerosolSSContributor;
     return max(0, ceil(Int, log(target_relative_error) / log(g)))
 end
 
+determine_required_l_aerosol(c::GreekCoefsSSContributor;
+                             target_relative_error::Real = 1e-4) =
+    determine_required_l_from_moments(c.greek_coefs.β; target_relative_error)
+
 """
     determine_required_nbrdf(surface; target_relative_error=1e-4)
 
@@ -106,6 +110,7 @@ end
 _residual_asymmetry(::RayleighSSContributor) = 0
 _residual_asymmetry(::AbsorptionSSContributor) = 0
 _residual_asymmetry(c::HGAerosolSSContributor) = abs(c.g)
+_residual_asymmetry(::GreekCoefsSSContributor) = 0
 
 """
     determine_required_nquad_inner(τ_total, contributors; target_relative_error=1e-4)
