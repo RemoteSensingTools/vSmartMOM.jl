@@ -55,6 +55,11 @@ function model_from_parameters(lin::LinMode,
     n_aer = isnothing(params.scattering_params) ? 0 : length(params.scattering_params.rt_aerosols)
     scat = params.scattering_params
     abs_params = params.absorption_params
+    if scat !== nothing && any(_has_analytic_phase_function, scat.rt_aerosols)
+        throw(ArgumentError(
+            "model_from_parameters(LinMode(), ...) currently supports Mie aerosols only; " *
+            "analytic phase-function aerosols do not yet define Mie-parameter Jacobians."))
+    end
 
     obs_geom = ObsGeometry(params.sza, params.vza, params.vaz, params.obs_alt)
 

@@ -99,6 +99,56 @@ end
     @test_throws ArgumentError vSmartMOM.IO.parse_surface_str("CoxMunkSurface()", Float64)
 end
 
+@testset "analytic phase-function aerosol parser" begin
+    cfg = _minimal_parameter_dict()
+    cfg["radiative_transfer"]["polarization_type"] = "Stokes_IQU()"
+    cfg["radiative_transfer"]["max_m"] = 3
+    cfg["radiative_transfer"]["l_trunc"] = 8
+    cfg["atmospheric_profile"]["profile_reduction"] = -1
+    cfg["atmospheric_profile"]["p"] = [100.0, 1000.0]
+    cfg["scattering"] = Dict(
+        "aerosols" => [Dict(
+            "τ_ref" => 0.02,
+            "phase_function" => "SyntheticPolarizedHenyeyGreensteinPhaseFunction(g=0.45, polarization_fraction=0.6)",
+            "ssa" => 0.92,
+            "p₀" => 550.0,
+            "σp" => 200.0,
+        )],
+        "r_max" => 1.0,
+        "nquad_radius" => 16,
+        "λ_ref" => 0.55,
+        "decomp_type" => "NAI2()",
+    )
+
+    params = parameters_from_dict(cfg)
+    aer = params.scattering_params.rt_aerosols[1]
+    @test aer.phase_function isa vSmartMOM.Scattering.SyntheticPolarizedHenyeyGreensteinPhaseFunction
+    @test aer.ϖ == 0.92
+
+    model = model_from_parameters(params)
+    @test model.aerosol_optics[1][1].ω̃ ≈ 0.92
+    @test length(model.aerosol_optics[1][1].greek_coefs.β) == params.l_trunc
+    @test all(model.τ_aer[1][1, :] .>= 0)
+    @test sum(model.τ_aer[1][1, :]) ≈ aer.τ_ref
+    @test_throws ArgumentError model_from_parameters(LinMode(), params)
+
+    cfg_no_trunc = deepcopy(cfg)
+    cfg_no_trunc["radiative_transfer"]["truncation"] = "NoTruncation()"
+    params_no_trunc = parameters_from_dict(cfg_no_trunc)
+    model_no_trunc = model_from_parameters(params_no_trunc)
+    @test length(model_no_trunc.aerosol_optics[1][1].greek_coefs.β) == params_no_trunc.l_trunc
+    @test model_no_trunc.aerosol_optics[1][1].fᵗ == 0
+
+    cfg_no_trunc_lmax = deepcopy(cfg)
+    cfg_no_trunc_lmax["radiative_transfer"]["truncation"] = "NoTruncation(l_max=5)"
+    model_no_trunc_lmax = model_from_parameters(parameters_from_dict(cfg_no_trunc_lmax))
+    @test length(model_no_trunc_lmax.aerosol_optics[1][1].greek_coefs.β) == 5
+
+    bad_cfg = deepcopy(cfg)
+    bad_cfg["scattering"]["aerosols"][1]["phase_function"] = "UnknownPhaseFunction(g=0.2)"
+    @test_throws ArgumentError parameters_from_dict(bad_cfg)
+end
+
 @testset "canopy clumping parser" begin
     cfg = _minimal_parameter_dict()
     cfg["canopy"] = Dict(

@@ -66,6 +66,34 @@ if get(ENV, "VSMARTMOM_FULL_TESTS", "") == "true"
 end
 end
 
+# Test analytic phase functions through the shared Greek/AerosolOptics path.
+@testset "analytic phase functions" begin
+    hg = HenyeyGreensteinPhaseFunction(g = 0.4)
+    μ = [-0.5, 0.0, 0.5]
+    expected_hg = @. (1 - 0.4^2) / (1 + 0.4^2 - 2 * 0.4 * μ)^1.5
+    @test phase_function(hg, μ) ≈ expected_hg
+
+    greek = greek_coefficients(hg; l_max = 12, nquad = 48)
+    @test length(greek.β) == 12
+    @test greek.β[1] ≈ 1 atol = 1e-12
+
+    optics = analytic_aerosol_optics(
+        hg;
+        single_scattering_albedo = 0.9,
+        extinction_cross_section = 1.3,
+        l_max = 12,
+        nquad = 48)
+    @test optics isa AerosolOptics
+    @test optics.ω̃ ≈ 0.9
+    @test optics.k ≈ 1.3
+    @test optics.fᵗ == 0
+
+    polarized = SyntheticPolarizedHenyeyGreensteinPhaseFunction(
+        g = 0.3, polarization_fraction = 0.6)
+    polarized_greek = greek_coefficients(polarized; l_max = 12, nquad = 48)
+    @test any(abs.(polarized_greek.γ[3:end]) .> 0)
+end
+
 # Test the Aerosol Optics calculations (both NAI2 and Siewert)
 @testset "aerosol_optics" begin
 

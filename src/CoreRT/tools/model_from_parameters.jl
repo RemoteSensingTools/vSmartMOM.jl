@@ -20,6 +20,36 @@ user-set explicit truncation (e.g. `NoTruncation()` or a custom δBGE).
 """
 @inline _resolved_truncation(params, ::Type{FT}) where {FT} = params.truncation
 
+_has_analytic_phase_function(c_aero::RT_Aerosol) =
+    c_aero.phase_function !== nothing
+
+function _finite_truncation_lmax(params, truncation_type)
+    fallback = max(1, Int(params.l_trunc), 2 * Int(params.max_m) - 1)
+    hasproperty(truncation_type, :l_max) || return fallback
+    trunc_lmax = Int(getproperty(truncation_type, :l_max))
+    return trunc_lmax == typemax(Int) ? fallback : max(1, trunc_lmax)
+end
+
+function _analytic_phase_lmax(params, truncation_type)
+    trunc_lmax = _finite_truncation_lmax(params, truncation_type)
+    base_lmax = max(1, trunc_lmax, 2 * Int(params.max_m) - 1)
+    if truncation_type isa Scattering.δBGE
+        return max(base_lmax + 1, 2 * trunc_lmax)
+    end
+    return base_lmax
+end
+
+function _analytic_aerosol_optics(c_aero::RT_Aerosol, params, truncation_type,
+                                  ::Type{FT}) where {FT}
+    lmax = _analytic_phase_lmax(params, truncation_type)
+    return Scattering.analytic_aerosol_optics(
+        c_aero.phase_function;
+        single_scattering_albedo = convert(FT, c_aero.ϖ),
+        extinction_cross_section = one(FT),
+        l_max = lmax,
+        nquad = max(2lmax + 1, 64))
+end
+
 """
     model_from_parameters(params::vSmartMOM_Parameters) -> RTModel
 
@@ -204,6 +234,30 @@ function model_from_parameters(params::vSmartMOM_Parameters)
 
         # Get curr_aerosol
         c_aero = params.scattering_params.rt_aerosols[i_aer]
+
+        if _has_analytic_phase_function(c_aero)
+            τ_profile = getAerosolLayerOptProp(one(FT), c_aero.profile, profile)
+            for i_band=1:n_bands
+                aerosol_optics_raw =
+                    _analytic_aerosol_optics(c_aero, params, truncation_type, FT)
+                β_len = length(aerosol_optics_raw.greek_coefs.β)
+                aerosol_optics[i_band][i_aer] =
+                    if truncation_type isa Scattering.δBGE && β_len > truncation_type.l_max
+                        Scattering.truncate_phase_lowconf(truncation_type,
+                                                          aerosol_optics_raw; reportFit=false)
+                    else
+                        Scattering.truncate_phase(Scattering.NoTruncation(),
+                                                  aerosol_optics_raw)
+                    end
+                l_max_aer[i_aer, i_band] =
+                    length(aerosol_optics[i_band][i_aer].greek_coefs.β)
+                τ_aer[i_band][i_aer, :] =
+                    c_aero.τ_ref * τ_profile
+                @info "AOD at band $i_band : $(sum(τ_aer[i_band][i_aer,:])), analytic phase function = $(typeof(c_aero.phase_function)), truncation factor = $(aerosol_optics[i_band][i_aer].fᵗ)"
+            end
+            continue
+        end
+
         curr_aerosol = c_aero.aerosol
         
         # Create Aerosol size distribution for each aerosol species

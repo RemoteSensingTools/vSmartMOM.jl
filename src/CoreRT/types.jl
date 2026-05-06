@@ -87,7 +87,20 @@ mutable struct RT_Aerosol{FT<:Real}
     τ_ref::FT
     "Vertical distribution as function of pressure (from Distributions.jl)"
     profile::Distribution
+    "Optional analytic phase function; `nothing` selects the Mie path"
+    phase_function::Union{Nothing, Scattering.AbstractAnalyticPhaseFunction}
+    "Single-scattering albedo for analytic phase-function aerosols"
+    ϖ::FT
 end
+
+RT_Aerosol(aerosol::Aerosol, τ_ref::FT,
+           profile::Distribution) where {FT<:Real} =
+    RT_Aerosol{FT}(aerosol, τ_ref, profile, nothing, one(FT))
+
+RT_Aerosol(aerosol::Aerosol, τ_ref::FT, profile::Distribution,
+           phase_function::Scattering.AbstractAnalyticPhaseFunction;
+           ϖ::Real = one(FT)) where {FT<:Real} =
+    RT_Aerosol{FT}(aerosol, τ_ref, profile, phase_function, convert(FT, ϖ))
 
 "Quadrature Types for RT streams"
 abstract type AbstractQuadratureType end
