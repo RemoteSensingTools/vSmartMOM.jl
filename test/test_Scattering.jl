@@ -92,6 +92,18 @@ end
         g = 0.3, polarization_fraction = 0.6)
     polarized_greek = greek_coefficients(polarized; l_max = 12, nquad = 48)
     @test any(abs.(polarized_greek.γ[3:end]) .> 0)
+
+    pol_iq = Stokes_IQ{Float64}()
+    @test pol_iq.n == 2
+    @test pol_iq.D == [1.0, 1.0]
+    @test pol_iq.I₀ == [1.0, 0.0]
+    @test sprint(show, pol_iq) == "Stokes_IQ()"
+    Z⁺⁺, Z⁻⁺ = vSmartMOM.Scattering.compute_Z_moments(
+        pol_iq, [0.3, 0.7], polarized_greek, 0)
+    @test size(Z⁺⁺) == (4, 4)
+    @test size(Z⁻⁺) == (4, 4)
+    @test all(isfinite.(Z⁺⁺))
+    @test all(isfinite.(Z⁻⁺))
 end
 
 # Test the Aerosol Optics calculations (both NAI2 and Siewert)

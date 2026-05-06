@@ -99,6 +99,7 @@ end
 # ── Polarization types ────────────────────────────────────────────────────
 
 Base.show(io::IO, ::Stokes_I)    = print(io, "Stokes_I()")
+Base.show(io::IO, ::Stokes_IQ)   = print(io, "Stokes_IQ()")
 Base.show(io::IO, ::Stokes_IQU)  = print(io, "Stokes_IQU()")
 Base.show(io::IO, ::Stokes_IQUV) = print(io, "Stokes_IQUV()")
 

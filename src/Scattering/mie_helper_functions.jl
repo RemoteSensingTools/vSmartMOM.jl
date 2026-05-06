@@ -561,6 +561,20 @@ function construct_Π_matrix(mo::Stokes_IQU, P, R, T, l::Int, m::Int; sign_chang
 end
 
 """
+    $(FUNCTIONNAME)(mo::Stokes_IQ, P, R, T, l::Int, m::Int; sign_change=false)
+Compute Π matrix for Stokes vector elements I,Q used in computations of the
+phase matrix. This is the I/Q block of Sanghavi 2014, eq. 15.
+"""
+function construct_Π_matrix(mo::Stokes_IQ, P, R, T, l::Int, m::Int; sign_change=false)
+    if sign_change && isodd(l - m)
+        return [SMatrix{2,2}([-P[i, l, m] 0;
+                              0 -R[i, l, m]]) for i in 1:size(P, 1)]
+    end
+    return [SMatrix{2,2}([P[i, l, m] 0;
+                          0 R[i, l, m]]) for i in 1:size(P, 1)]
+end
+
+"""
     $(FUNCTIONNAME)(mo::Stokes_I, P, R, T, l::Int, m::Int; sign_change=false)
 Compute Π matrix for  stokes vector elements I used in computations of the phase matrix 
 
@@ -584,6 +598,13 @@ Compute B matrix for stokes vector elements I,Q,U used in computations of the ph
     See Sanghavi 2014, eq. 16 
 """
 construct_B_matrix(mod::Stokes_IQU, α, β, γ, δ, ϵ, ζ, l::Int) = SMatrix{3,3}([β[l] γ[l] 0 ; γ[l] α[l] 0 ; 0 0 ζ[l]])
+
+"""
+    $(FUNCTIONNAME)(mod::Stokes_IQ, α, β, γ, δ, ϵ, ζ, l::Int)
+Compute B matrix for Stokes vector elements I,Q used in computations of the
+phase matrix. This is the I/Q block of Sanghavi 2014, eq. 16.
+"""
+construct_B_matrix(mod::Stokes_IQ, α, β, γ, δ, ϵ, ζ, l::Int) = SMatrix{2,2}([β[l] γ[l]; γ[l] α[l]])
 
 """
 $(FUNCTIONNAME)(mod::Stokes_I, α, β, γ, δ, ϵ, ζ, l::Int)

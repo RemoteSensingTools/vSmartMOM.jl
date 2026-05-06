@@ -408,6 +408,14 @@ end
         @test pol_result.total ≈ result.total rtol=1e-12 atol=1e-14
         @test pol_result.metadata.n_stokes == 1
 
+        iq_config = ExactSSConfig(
+            geometry=geometry,
+            surface=surface,
+            contributors=(rayleigh,),
+            I0=FT[1.0, 0.7],
+            polarization_type=vSmartMOM.Scattering.Stokes_IQ{FT}())
+        iq_path1 = run_exact_ss(iq_config; paths=:path1)
+
         vector_config = ExactSSConfig(
             geometry=geometry,
             surface=surface,
@@ -427,11 +435,16 @@ end
         @test vector_path1.path1 ≈ expected_path1 rtol=1e-12 atol=1e-14
         @test vector_path1.total ≈ expected_path1 rtol=1e-12 atol=1e-14
         @test vector_path1.path2 == zero(vector_path1.path2)
+        @test size(iq_path1.path1) == (2, 2, 2)
+        @test iq_path1.path1 ≈ expected_path1[:, 1:2, :] rtol=1e-12 atol=1e-14
 
         vector_path2 = run_exact_ss(vector_config; paths=:path2)
         @test size(vector_path2.path2) == (2, 3, 2)
         @test vector_path2.path2[:, 1:1, :] ≈ expected.path2 rtol=1e-12 atol=1e-14
         @test vector_path2.path2[:, 2:3, :] == zero(vector_path2.path2[:, 2:3, :])
+        iq_path2 = run_exact_ss(iq_config; paths=:path2)
+        @test iq_path2.path2[:, 1:1, :] ≈ expected.path2 rtol=1e-12 atol=1e-14
+        @test iq_path2.path2[:, 2:2, :] == zero(iq_path2.path2[:, 2:2, :])
         vector_paths12 = run_exact_ss(vector_config; paths=:paths_1_2)
         expected_paths12 = copy(expected_path1)
         expected_paths12[:, 1:1, :] .+= expected.path2

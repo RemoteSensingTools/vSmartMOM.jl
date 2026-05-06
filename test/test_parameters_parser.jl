@@ -43,6 +43,12 @@ end
     @test params.brdf[1] isa LambertianSurfaceScalar{Float64}
     @test params.spec_bands == [[13000.0, 13000.1]]
 
+    iq_cfg = _minimal_parameter_dict()
+    iq_cfg["radiative_transfer"]["polarization_type"] = "Stokes_IQ()"
+    iq_params = parameters_from_dict(iq_cfg)
+    @test iq_params.polarization_type isa vSmartMOM.Scattering.Stokes_IQ{Float64}
+    @test iq_params.polarization_type.n == 2
+
     metal_params = parameters_from_dict(_minimal_parameter_dict(
         float_type = "Float32",
         architecture = "MetalGPU()",

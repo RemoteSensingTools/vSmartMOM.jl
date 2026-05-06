@@ -50,7 +50,8 @@ export make_mie_model, reconstruct_phase, greek_coefficients,
        phase_matrix_first_column, scattering_matrix
 
 # Export types
-export NAI2, PCW, Aerosol, MieModel, Stokes_IQUV, Stokes_I, Stokes_IQU,
+export NAI2, PCW, Aerosol, MieModel, Stokes_IQUV, Stokes_I, Stokes_IQ,
+       Stokes_IQU,
        δBGE, NoTruncation, GreekCoefs, AerosolOptics,
        AbstractFourierDecompositionType, AbstractAnalyticPhaseFunction,
        HenyeyGreensteinPhaseFunction,
