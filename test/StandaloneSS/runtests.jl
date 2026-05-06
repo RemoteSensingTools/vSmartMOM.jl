@@ -350,6 +350,8 @@ end
         @test config.polarization_type isa vSmartMOM.Scattering.Stokes_IQU{Float64}
 
         result = run_exact_ss(config; paths=:paths_1_2)
+        model_result = run_exact_ss(model; paths=:paths_1_2)
+        @test model_result.total ≈ result.total rtol=1e-12 atol=1e-14
         @test size(result.total) == (2, 3, 1)
         @test all(isfinite.(result.total))
         @test any(abs.(result.path1[:, 2:3, :]) .> 0)
@@ -366,6 +368,8 @@ end
         cox_config = exact_ss_config_from_model(cox_model)
         @test cox_config.surface isa CoxMunkSSSurface
         cox_result = run_exact_ss(cox_config; paths=:path2)
+        cox_model_result = run_exact_ss(cox_model; paths=:path2)
+        @test cox_model_result.path2 ≈ cox_result.path2 rtol=1e-12 atol=1e-14
         @test size(cox_result.path2) == (2, 3, 1)
         @test all(isfinite.(cox_result.path2))
     end

@@ -24,6 +24,19 @@ function exact_ss_config_from_model(model::RTModel; i_band::Integer = 1,
         architecture = model.architecture)
 end
 
+"""
+    run_exact_ss(model::RTModel; i_band=1, paths=:paths_1_2, I0=nothing)
+
+Convenience wrapper that builds an [`ExactSSConfig`](@ref) from `model` via
+[`exact_ss_config_from_model`](@ref) and runs the standalone exact
+single-scattering solver.
+"""
+function run_exact_ss(model::RTModel; i_band::Integer = 1,
+                      paths::Symbol = :paths_1_2, I0 = nothing)
+    config = exact_ss_config_from_model(model; i_band, I0)
+    return run_exact_ss(config; paths)
+end
+
 function _ss_geometry_from_model(model::RTModel, ::Type{FT}) where {FT}
     obs = model.obs_geom
     return SSGeometry(
