@@ -10,7 +10,9 @@ module StandaloneSS
 using FastGaussQuadrature: gausslegendre
 using KernelAbstractions
 using ..Architectures: AbstractArchitecture, CPU, GPU, MetalGPU, array_type, devi
-using ..CoreRT: CoxMunkSurface, coxmunk_brdf_mueller
+using ..CoreRT: CoxMunkSurface, LambertianSurfaceScalar,
+                LambertianSurfaceSpectrum, RTModel, coxmunk_brdf_mueller,
+                float_type
 using ..Scattering
 
 export AbsorptionSSContributor,
@@ -34,6 +36,7 @@ export AbsorptionSSContributor,
        determine_required_nquad,
        determine_required_nquad_inner,
        determine_required_nstreams,
+       exact_ss_config_from_model,
        exact_phase_function,
        run_exact_ss,
        run_exact_ss_with_jacobians,
@@ -42,6 +45,7 @@ export AbsorptionSSContributor,
 
 include("types.jl")
 include("surfaces.jl")
+include("model_adapter.jl")
 include("kernels.jl")
 include("quadrature_required.jl")
 include("solver.jl")
