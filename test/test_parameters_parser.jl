@@ -125,6 +125,19 @@ end
     @test aer.phase_function isa vSmartMOM.Scattering.SyntheticPolarizedHenyeyGreensteinPhaseFunction
     @test aer.ϖ == 0.92
 
+    cfg_dict_phase = deepcopy(cfg)
+    cfg_dict_phase["scattering"]["aerosols"][1]["phase_function"] = Dict(
+        "type" => "HenyeyGreensteinPhaseFunction",
+        "g" => 0.35,
+    )
+    delete!(cfg_dict_phase["scattering"]["aerosols"][1], "ssa")
+    cfg_dict_phase["scattering"]["aerosols"][1]["ϖ"] = 0.85
+    params_dict_phase = parameters_from_dict(cfg_dict_phase)
+    aer_dict_phase = params_dict_phase.scattering_params.rt_aerosols[1]
+    @test aer_dict_phase.phase_function isa vSmartMOM.Scattering.HenyeyGreensteinPhaseFunction
+    @test aer_dict_phase.phase_function.g === 0.35
+    @test aer_dict_phase.ϖ == 0.85
+
     model = model_from_parameters(params)
     @test model.aerosol_optics[1][1].ω̃ ≈ 0.92
     @test length(model.aerosol_optics[1][1].greek_coefs.β) == params.l_trunc
@@ -147,6 +160,10 @@ end
     bad_cfg = deepcopy(cfg)
     bad_cfg["scattering"]["aerosols"][1]["phase_function"] = "UnknownPhaseFunction(g=0.2)"
     @test_throws ArgumentError parameters_from_dict(bad_cfg)
+
+    bad_microphysics_cfg = deepcopy(cfg)
+    bad_microphysics_cfg["scattering"]["aerosols"][1]["μ"] = 0.1
+    @test_throws ArgumentError parameters_from_dict(bad_microphysics_cfg)
 end
 
 @testset "canopy clumping parser" begin
