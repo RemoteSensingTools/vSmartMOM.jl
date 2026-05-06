@@ -358,6 +358,16 @@ end
         delete!(cfg_trunc["radiative_transfer"], "truncation")
         truncated_model = model_from_parameters(parameters_from_dict(cfg_trunc))
         @test_throws ArgumentError exact_ss_config_from_model(truncated_model)
+
+        cox_cfg = deepcopy(cfg)
+        cox_cfg["radiative_transfer"]["surface"] = ["CoxMunkSurface(wind_speed=5.0)"]
+        delete!(cox_cfg, "scattering")
+        cox_model = model_from_parameters(parameters_from_dict(cox_cfg))
+        cox_config = exact_ss_config_from_model(cox_model)
+        @test cox_config.surface isa CoxMunkSSSurface
+        cox_result = run_exact_ss(cox_config; paths=:path2)
+        @test size(cox_result.path2) == (2, 3, 1)
+        @test all(isfinite.(cox_result.path2))
     end
 
     @testset "Rayleigh path 1 and Lambertian path 2" begin
