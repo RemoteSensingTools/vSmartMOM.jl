@@ -26,6 +26,13 @@ Use `compute_aerosol_optical_properties` to produce RT-facing aerosol optical
 properties: Fourier/Greek coefficients, single-scattering albedo, extinction,
 and truncation information.
 
+For analytic test or parameterized aerosols, use
+`HenyeyGreensteinPhaseFunction` or
+`SyntheticPolarizedHenyeyGreensteinPhaseFunction` with
+`analytic_aerosol_optics`. This produces the same `AerosolOptics` container as
+the Mie path and therefore feeds the normal CoreRT and StandaloneSS layer
+optics.
+
 ### 3) Reconstruct phase matrix elements
 
 ```@docs
@@ -41,6 +48,28 @@ phase_function
 compute_aerosol_XS
 compute_ref_aerosol_extinction
 ```
+
+## Analytic Phase Functions
+
+Analytic phase-function aerosols are lightweight scattering sources for
+idealized tests, sensitivity experiments, and StandaloneSS validation. They are
+not a separate RT implementation: each analytic source is projected into
+`GreekCoefs` and then consumed by the same CoreRT optical-property machinery as
+Mie-derived aerosols.
+
+```@docs
+AbstractAnalyticPhaseFunction
+HenyeyGreensteinPhaseFunction
+SyntheticPolarizedHenyeyGreensteinPhaseFunction
+greek_coefficients
+analytic_aerosol_optics
+phase_matrix_first_column
+```
+
+`phase_matrix_first_column` evaluates the single-scatter phase-matrix column
+needed for an unpolarized direct solar beam at one exact sun-view geometry. It
+is the shared hook used by StandaloneSS vector paths for the
+sun-to-atmosphere-to-sensor term.
 
 ## Wigner Utilities (PCW)
 
