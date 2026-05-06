@@ -8,9 +8,6 @@ end
 function _validate_jacobian_config(config::ExactSSConfig)
     config.architecture isa CPU ||
         throw(ArgumentError("StandaloneSS f2 Jacobians currently support CPU() configs only"))
-    n_stokes = _config_n_stokes(config)
-    n_stokes == 1 ||
-        throw(ArgumentError("StandaloneSS f2 Jacobians currently support only Stokes-I (n_stokes == 1); received n_stokes=$n_stokes"))
     return nothing
 end
 
@@ -34,31 +31,15 @@ function _validate_jacobian_selector(selector::SSMeasurementSelector,
     return nothing
 end
 
-_path1_jacobians(config::ExactSSConfig, optics, I0) =
-    _path1_jacobians(Val(1), config, optics, I0)
-
-_path2_jacobians(config::ExactSSConfig, optics, surface_brdf, I0, path2) =
-    _path2_jacobians(Val(1), config, optics, surface_brdf, I0, path2)
-
-function _unsupported_stokes_jacobians(::Val{N}) where {N}
-    throw(ArgumentError("StandaloneSS f2 Jacobians currently support only Stokes-I (n_stokes == 1); received n_stokes=$N"))
-end
-
-_path1_jacobians(pol::Val{N}, args...) where {N} =
-    _unsupported_stokes_jacobians(pol)
-
-_path2_jacobians(pol::Val{N}, args...) where {N} =
-    _unsupported_stokes_jacobians(pol)
-
-function _path1_jacobians(::Val{1}, config::ExactSSConfig, optics, I0)
+function _path1_jacobians(::Val{N}, config::ExactSSConfig, optics, I0) where {N}
     FT = _config_numeric_type(config)
     n_layers, n_spec = size(optics.ϖ_eff)
     n_geom = length(config.geometry.μv)
-    dτ = zeros(FT, n_geom, 1, n_spec, n_layers)
-    dϖ = zeros(FT, n_geom, 1, n_spec, n_layers)
-    dP = zeros(FT, n_geom, 1, n_spec, n_layers)
+    dτ = zeros(FT, n_geom, N, n_spec, n_layers)
+    dϖ = zeros(FT, n_geom, N, n_spec, n_layers)
+    dP = zeros(FT, n_geom, N, n_spec, n_layers)
 
-    @inbounds for ispec in 1:n_spec, iv in 1:n_geom
+    @inbounds for ispec in 1:n_spec, istokes in 1:N, iv in 1:n_geom
         μ₀ = convert(FT, config.geometry.μ₀)
         μᵥ = convert(FT, config.geometry.μv[iv])
         a = inv(μ₀) + inv(μᵥ)
@@ -67,20 +48,21 @@ function _path1_jacobians(::Val{1}, config::ExactSSConfig, optics, I0)
 
         for iz in 1:n_layers
             ϖ = optics.ϖ_eff[iz, ispec]
-            P = optics.P_eff[iv, iz, ispec]
+            P = _path1_jacobian_phase(Val(N), optics.P_eff, iv, istokes, iz,
+                                       ispec)
             τ_top = optics.τ_cum[iz, ispec]
             τ_bot = optics.τ_cum[iz + 1, ispec]
             layer_factor = exp(-τ_top * a) - exp(-τ_bot * a)
 
-            dϖ[iv, 1, ispec, iz] += prefactor * P * layer_factor
-            dP[iv, 1, ispec, iz] += prefactor * ϖ * layer_factor
+            dϖ[iv, istokes, ispec, iz] += prefactor * P * layer_factor
+            dP[iv, istokes, ispec, iz] += prefactor * ϖ * layer_factor
 
             same_layer = no_a_prefactor * ϖ * P * exp(-τ_bot * a)
-            dτ[iv, 1, ispec, iz] += same_layer
+            dτ[iv, istokes, ispec, iz] += same_layer
 
             attenuation_from_above = -no_a_prefactor * ϖ * P * layer_factor
             for i_above in 1:(iz - 1)
-                dτ[iv, 1, ispec, i_above] += attenuation_from_above
+                dτ[iv, istokes, ispec, i_above] += attenuation_from_above
             end
         end
     end
@@ -88,25 +70,31 @@ function _path1_jacobians(::Val{1}, config::ExactSSConfig, optics, I0)
     return (; τ_layer=dτ, ϖ_eff=dϖ, P_eff=dP)
 end
 
-function _path2_jacobians(::Val{1}, config::ExactSSConfig, optics, surface_brdf,
-                          I0, path2)
+_path1_jacobian_phase(::Val{1}, P_eff, iv, istokes, iz, ispec) =
+    P_eff[iv, iz, ispec]
+_path1_jacobian_phase(::Val{N}, P_eff, iv, istokes, iz, ispec) where {N} =
+    P_eff[iv, istokes, iz, ispec]
+
+function _path2_jacobians(::Val{N}, config::ExactSSConfig, optics, surface_brdf,
+                          I0, path2) where {N}
     FT = _config_numeric_type(config)
     n_layers = size(optics.ϖ_eff, 1)
     n_spec = size(optics.ϖ_eff, 2)
     n_geom = length(config.geometry.μv)
-    dτ = zeros(FT, n_geom, 1, n_spec, n_layers)
-    dρ = zeros(FT, n_geom, 1, n_spec)
+    dτ = zeros(FT, n_geom, N, n_spec, n_layers)
+    dρ = zeros(FT, n_geom, N, n_spec)
 
-    @inbounds for ispec in 1:n_spec, iv in 1:n_geom
+    @inbounds for ispec in 1:n_spec, istokes in 1:N, iv in 1:n_geom
         μ₀ = convert(FT, config.geometry.μ₀)
         μᵥ = convert(FT, config.geometry.μv[iv])
         τ_total = optics.τ_total_column[ispec]
         attenuation = exp(-τ_total / μ₀) * exp(-τ_total / μᵥ)
-        dρ[iv, 1, ispec] = μ₀ * I0[ispec] * attenuation
+        dρ[iv, istokes, ispec] = μ₀ * I0[ispec] * attenuation
 
         slope = inv(μ₀) + inv(μᵥ)
         for iz in 1:n_layers
-            dτ[iv, 1, ispec, iz] = -path2[iv, 1, ispec] * slope
+            dτ[iv, istokes, ispec, iz] =
+                -path2[iv, istokes, ispec] * slope
         end
     end
 
@@ -176,8 +164,8 @@ function run_exact_ss_with_jacobians(config::ExactSSConfig;
         _zero_path1_jacobians(FT, n_geom, n_stokes, n_spec, n_layers)
 
     if _wants_path2(paths)
-        surface_brdf = _precompute_surface_brdf(config.surface, config.geometry,
-                                                n_spec, FT)
+        surface_brdf = _precompute_surface_brdf(
+            stokes_dispatch, config.surface, config.geometry, n_spec, FT)
         path2_jac = _path2_jacobians(stokes_dispatch, config, optics,
                                      surface_brdf, I0, result.path2)
     else

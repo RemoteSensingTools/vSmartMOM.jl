@@ -459,10 +459,16 @@ end
         @test vector_paths12.path2[:, 1:1, :] ≈ expected.path2 rtol=1e-12 atol=1e-14
         @test vector_paths12.path2[:, 2:3, :] == zero(vector_paths12.path2[:, 2:3, :])
         @test vector_paths12.total ≈ expected_paths12 rtol=1e-12 atol=1e-14
-        @test_throws ArgumentError run_exact_ss_with_jacobians(
-            vector_config; paths=:path1)
-        @test_throws ArgumentError run_exact_ss_with_jacobians(
-            vector_config; paths=:path2)
+
+        vector_jac1 = run_exact_ss_with_jacobians(vector_config; paths=:path1)
+        @test size(vector_jac1.jacobians.path1.τ_layer) == (2, 3, 2, 2)
+        @test size(vector_jac1.jacobians.path1.P_eff) == (2, 3, 2, 2)
+        @test all(isfinite.(vector_jac1.jacobians.path1.τ_layer))
+
+        vector_jac2 = run_exact_ss_with_jacobians(vector_config; paths=:path2)
+        @test size(vector_jac2.jacobians.path2.τ_layer) == (2, 3, 2, 2)
+        @test size(vector_jac2.jacobians.path2.surface_brdf) == (2, 3, 2)
+        @test all(vector_jac2.jacobians.path2.surface_brdf[:, 2:3, :] .!= 0)
     end
 
     @testset "Greek-coefficient aerosol vector path 1" begin
@@ -894,6 +900,32 @@ end
         @test_throws ArgumentError run_exact_ss_with_jacobians(
             path1_config_from_τ(τ_rayleigh); paths=:path1,
             selector=SSMeasurementSelector(paths=:path2))
+
+        vector_path1_config_from_τ(x) = ExactSSConfig(
+            geometry=geometry,
+            surface=LambertianSSSurface(albedo=zero(FT)),
+            contributors=(RayleighSSContributor(τ=reshape(x, 2, 1)),),
+            I0=FT[1.0],
+            polarization_type=vSmartMOM.Scattering.Stokes_IQU{FT}())
+        f1v(x) = vec(run_exact_ss(vector_path1_config_from_τ(x);
+                                  paths=:path1).total)
+        J1v = ForwardDiff.jacobian(f1v, τ_rayleigh)
+        jac1v = run_exact_ss_with_jacobians(
+            vector_path1_config_from_τ(τ_rayleigh); paths=:path1).jacobians
+        @test reshape(jac1v.path1.τ_layer, :, 2) ≈ J1v rtol=1e-12 atol=1e-14
+
+        vector_path2_config_from_τ(x) = ExactSSConfig(
+            geometry=geometry,
+            surface=LambertianSSSurface(albedo=FT(0.33)),
+            contributors=(AbsorptionSSContributor(τ=reshape(x, 2, 1)),),
+            I0=FT[1.0],
+            polarization_type=vSmartMOM.Scattering.Stokes_IQU{FT}())
+        f2v(x) = vec(run_exact_ss(vector_path2_config_from_τ(x);
+                                  paths=:path2).total)
+        J2v = ForwardDiff.jacobian(f2v, τ_abs)
+        jac2v = run_exact_ss_with_jacobians(
+            vector_path2_config_from_τ(τ_abs); paths=:path2).jacobians
+        @test reshape(jac2v.path2.τ_layer, :, 2) ≈ J2v rtol=1e-12 atol=1e-14
     end
 
     @testset "f2 τ chain-rule contraction" begin
