@@ -82,12 +82,17 @@ function elemental!(pol_type, SFI::Bool,
                 computed_layer_properties,
                 computed_layer_properties_lin,
                 m::Int,                     # m: fourier moment
-                ndoubl::Int,                # ndoubl: number of doubling computations needed 
+                ndoubl::Int,                # ndoubl: number of doubling computations needed
                 scatter::Bool,              # scatter: flag indicating scattering
-                quad_points::QuadPoints{FT}, # struct with quadrature points, weights, 
-                added_layer::AddedLayer{FT}, 
-                added_layer_lin::AddedLayerLin{FT}, 
-                architecture) where {FT<:AbstractFloat}
+                quad_points::QuadPoints{FT}, # struct with quadrature points, weights,
+                added_layer::AddedLayer{FT},
+                added_layer_lin::AddedLayerLin{FT},
+                architecture;
+                prepared_sources::AbstractSource =
+                    SFI ? SourceSet((PreparedSolarBeam{FT,
+                            typeof(array_type(architecture)(F₀))}(array_type(architecture)(F₀)),)) :
+                          NoSource()
+                ) where {FT<:AbstractFloat}
 
     (; r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻) = added_layer
     (; ṙ⁺⁻, ṙ⁻⁺, ṫ⁻⁻, ṫ⁺⁺, J̇₀⁺, J̇₀⁻) = added_layer_lin
@@ -148,32 +153,31 @@ function elemental!(pol_type, SFI::Bool,
                     ndrange=size(r⁻⁺))
         synchronize_if_gpu()
 
-        if SFI
-            # Phase 3: dispatch through source_tangent!(::PreparedSolarBeam),
-            # the named hand-written linearization entry point for the solar
-            # beam. The fused SFI+chain-rule+Bug-22 kernel still lives in
-            # `get_elem_rt_SFI_fused!` (this file, below); `source_tangent!`
-            # is a thin wrapper. Bit-equal to the previous inline call.
-            prep_solar = PreparedSolarBeam{FT, typeof(arr_type(F₀))}(arr_type(F₀))
-            source_tangent!(prep_solar,
-                j₀⁺, j₀⁻,
-                J̇₀⁺, J̇₀⁻,
-                added_layer_lin.ap_J̇₀⁺, added_layer_lin.ap_J̇₀⁻,
-                ϖ, dτ,
-                τ_sum, τ̇_sum,
-                Z⁻⁺, Z⁺⁺,
-                dτ̇_dev, ϖ̇_dev, Ż⁻⁺_dev, Ż⁺⁺_dev,
-                qp_μN, ndoubl, wct02,
-                pol_type.n, I₀, iμ₀, D, nparams,
-                architecture)
-        end
+        # Phase 3.5: source contributions dispatch via prepared_sources.
+        # NoSource → no-op; PreparedSolarBeam → fused SFI+chain-rule+Bug-22
+        # kernel; SourceSet → unrolled tuple iteration over each member.
+        # The legacy `if SFI` block is gone; a single dispatch line handles
+        # every scene. Bit-equal to the previous inline path when
+        # prepared_sources is the default (SFI ? SolarBeam : NoSource).
+        source_tangent!(prepared_sources,
+            j₀⁺, j₀⁻,
+            J̇₀⁺, J̇₀⁻,
+            added_layer_lin.ap_J̇₀⁺, added_layer_lin.ap_J̇₀⁻,
+            ϖ, dτ,
+            τ_sum, τ̇_sum,
+            Z⁻⁺, Z⁺⁺,
+            dτ̇_dev, ϖ̇_dev, Ż⁻⁺_dev, Ż⁺⁺_dev,
+            qp_μN, ndoubl, wct02,
+            pol_type.n, I₀, iμ₀, D, nparams,
+            architecture)
         synchronize_if_gpu()
 
         # Apply D Matrix to forward quantities (fused kernel handles derivative D internally)
         apply_D_matrix_elemental!(ndoubl, pol_type.n, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻)
 
-        # SFI D-matrix already applied inside fused kernel
-        if SFI
+        # SFI D-matrix already applied inside fused kernel for sources;
+        # this post-pass is a no-op for NoSource. Dispatch hides the gate.
+        if has_solar_beam(prepared_sources)
             apply_D_matrix_elemental_SFI!(ndoubl, pol_type.n, j₀⁻)
         end
     else
