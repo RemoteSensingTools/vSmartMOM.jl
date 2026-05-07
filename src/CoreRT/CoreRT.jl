@@ -160,7 +160,8 @@ export AbstractSource, AbstractPreparedSource,
        NoSourceJacobian, source_ad_mode
 
 # Phase 2: SolarBeam + the prepare_source seam
-export SolarBeam, PreparedSolarBeam, prepare_source, prepare_sources
+# Phase 4: BlackbodySource constructor sugar (returns a SolarBeam with Planck F₀)
+export SolarBeam, PreparedSolarBeam, prepare_source, prepare_sources, BlackbodySource
 
 # Export types to show easily
 export RadauQuad, GaussLegQuad,
