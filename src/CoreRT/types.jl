@@ -759,7 +759,36 @@ mutable struct vSmartMOM_Parameters{FT<:Real}
     # scattering group
     "Optional struct that holds all aerosol scattering-related parameters"
     scattering_params::Union{ScatteringParameters, Nothing}
-    
+
+    # === Phase D — `nstreams`-first schema (v0.7) ============================
+    # New-schema fields appended after the existing positional fields so the
+    # legacy positional constructor call in `parameters_from_dict` and any
+    # downstream consumers using positional construction keep working unchanged.
+    # All default to `nothing` — populated by the parser only when the user
+    # opts into the new schema (presence of `nstreams` in YAML).
+
+    "Phase D — primary user-facing resolution knob: weighted streams per
+    hemisphere. Public contract: `stream_l_cap = 2·nstreams - 1`. When
+    `nothing`, the parser populated `max_m`/`l_trunc` from a legacy YAML;
+    new-schema configs set this and may omit `max_m`/`l_trunc`."
+    nstreams::Union{Int, Nothing}
+
+    "Phase D — explicit per-band Fourier loop bound (order, optional). When
+    set, clamps the trait-aggregator output. Lower hard cap on top of
+    `stream_l_cap`."
+    m_max_override::Union{Int, Nothing}
+
+    "Phase D — derived projection cap: `2·nstreams - 1` for new schema, or
+    `l_trunc` for legacy. Internally consumed by the trait aggregator and
+    the truncation-resolver. Always populated; defaults to `l_trunc` until
+    `nstreams` is explicitly set."
+    stream_l_cap::Int
+
+    "Phase D — legacy `l_trunc` value retained verbatim from YAML when the
+    user explicitly set it. `nothing` for new-schema configs that derive
+    `stream_l_cap` from `nstreams` instead."
+    legacy_l_cap_override::Union{Int, Nothing}
+
 end
 
 """
