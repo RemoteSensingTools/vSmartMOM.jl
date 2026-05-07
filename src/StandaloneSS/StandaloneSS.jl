@@ -42,7 +42,10 @@ export AbsorptionSSContributor,
        run_exact_ss_with_jacobians,
        selected_measurement_jacobian,
        selected_measurements,
-       surface_brdf_wind_jacobian
+       surface_brdf_wind_jacobian,
+       truncated_ss_path1,
+       truncated_ss_path2,
+       apply_back_correction!
 
 include("types.jl")
 include("surfaces.jl")
@@ -50,6 +53,7 @@ include("model_adapter.jl")
 include("kernels.jl")
 include("quadrature_required.jl")
 include("solver.jl")
+include("truncated.jl")
 include("measurement_selector.jl")
 include("linearized_f2.jl")
 include("chain_rule.jl")

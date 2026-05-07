@@ -159,14 +159,25 @@ make_added_layer(RS_type::Union{RRS, RRS_plus,VS_0to1_plus, VS_1to0_plus}, FT, a
                                                          
 
 "Make a random added layer, supplying all random matrices"
-make_added_layer_rand(RS_type::Union{noRS, noRS_plus}, FT, arr_type, dims, nSpec)  = AddedLayer(
-                                                        default_matrix_rand(FT, arr_type, dims, nSpec), 
-                                                        default_matrix_rand(FT, arr_type, dims, nSpec), 
-                                                        default_matrix_rand(FT, arr_type, dims, nSpec),
-                                                        default_matrix_rand(FT, arr_type, dims, nSpec),
-                                                        default_J_matrix_rand(FT, arr_type, dims, nSpec),
-                                                        default_J_matrix_rand(FT, arr_type, dims, nSpec)
-                                                        )
+function make_added_layer_rand(RS_type::Union{noRS, noRS_plus}, FT, arr_type, dims, nSpec)
+    t1 = default_matrix_rand(FT, arr_type, dims, nSpec)
+    t2 = default_matrix_rand(FT, arr_type, dims, nSpec)
+    return AddedLayer(
+        r⁻⁺ = default_matrix_rand(FT, arr_type, dims, nSpec),
+        t⁺⁺ = default_matrix_rand(FT, arr_type, dims, nSpec),
+        r⁺⁻ = default_matrix_rand(FT, arr_type, dims, nSpec),
+        t⁻⁻ = default_matrix_rand(FT, arr_type, dims, nSpec),
+        j₀⁺ = default_J_matrix_rand(FT, arr_type, dims, nSpec),
+        j₀⁻ = default_J_matrix_rand(FT, arr_type, dims, nSpec),
+        temp1 = t1,
+        temp2 = t2,
+        temp1_ptr = batched_pointer_cache(t1),
+        temp2_ptr = batched_pointer_cache(t2),
+        dbl_gp_refl = default_matrix_rand(FT, arr_type, dims, nSpec),
+        dbl_j₁⁺ = default_J_matrix_rand(FT, arr_type, dims, nSpec),
+        dbl_j₁⁻ = default_J_matrix_rand(FT, arr_type, dims, nSpec),
+    )
+end
                                                          
 """Construct a `CompositeLayer` with zero-initialized R, T, J₀ for elastic RT."""
 make_composite_layer(RS_type::Union{noRS, noRS_plus},

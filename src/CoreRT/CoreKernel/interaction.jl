@@ -166,7 +166,7 @@ function interaction_helper!(::ScatteringInterface_11, SFI,
                                 added_layer::AddedLayer{FT}, 
                                 I_static::AbstractArray{FT2}) where {FT<:Real,FT2}
     
-    (; r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻, temp1, temp2, temp1_ptr, temp2_ptr) = added_layer     #these are aliases to the respective struct elements  
+    (; r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻, temp1, temp2, temp1_ptr, temp2_ptr) = added_layer     #these are aliases to the respective struct elements
     (; R⁻⁺, R⁺⁻, T⁺⁺, T⁻⁻, J₀⁺, J₀⁻) = composite_layer #these are aliases to the respective struct elements 
     
     # X₂₁ refers to added layer, X₁₀ to composite layer!
@@ -175,7 +175,7 @@ function interaction_helper!(::ScatteringInterface_11, SFI,
     #tmp_inv = similar(t⁺⁺)
     temp2 .= I_static .- r⁻⁺ ⊠ R⁺⁻
     # Compute and store `(I - R⁺⁻ * r⁻⁺)⁻¹`
-    @timeit "interaction inv1 bla" batch_inv!(temp1, temp2, temp1_ptr, temp2_ptr) 
+    @timeit "interaction inv1 bla" batch_inv!(temp1, temp2, temp1_ptr, temp2_ptr)
     # Temporary arrays:
     
     # T₁₂(I-R₀₁R₂₁)⁻¹
@@ -197,7 +197,7 @@ function interaction_helper!(::ScatteringInterface_11, SFI,
     #CUBLAS.math_mode!(handle, CUDA.FAST_MATH)
     #@show typeof(I_static .- R⁺⁻ ⊠ r⁻⁺)
     temp2 .= I_static .- R⁺⁻ ⊠ r⁻⁺
-    @timeit "interaction inv2" batch_inv!(temp1, temp2, temp1_ptr, temp2_ptr) 
+    @timeit "interaction inv2" batch_inv!(temp1, temp2, temp1_ptr, temp2_ptr)
     # T₂₁(I-R₀₁R₂₁)⁻¹
     T21_inv = t⁺⁺ ⊠ temp1
 

@@ -292,6 +292,9 @@ end
               vSmartMOM.selected_measurement_jacobian
         @test surface_brdf_wind_jacobian ===
               vSmartMOM.surface_brdf_wind_jacobian
+        @test truncated_ss_path1 === vSmartMOM.truncated_ss_path1
+        @test truncated_ss_path2 === vSmartMOM.truncated_ss_path2
+        @test apply_back_correction! === vSmartMOM.apply_back_correction!
         @test StandaloneSS === vSmartMOM.StandaloneSS
         @test CoxMunkSSSurface === vSmartMOM.CoxMunkSSSurface
         @test vSmartMOM.HenyeyGreensteinPhaseFunction ===
@@ -305,7 +308,7 @@ end
             "radiative_transfer" => Dict(
                 "spec_bands" => ["[13000.0]"],
                 "surface" => ["LambertianSurfaceScalar(0.2)"],
-                "quadrature_type" => "GaussQuadHemisphere()",
+                "quadrature_type" => "GaussLegQuad()",
                 "polarization_type" => "Stokes_IQU()",
                 "max_m" => 3,
                 "Δ_angle" => 0.0,
@@ -599,6 +602,80 @@ end
         end
         @test iq_result.path2 ≈ iq_expected rtol=1e-12 atol=1e-14
         @test_throws ArgumentError run_exact_ss(config; paths=:all)
+    end
+
+    @testset "Truncated path helpers and back correction" begin
+        FT = Float64
+        geometry = SSGeometry(μ₀=FT(0.81), μv=FT[0.44, 0.68],
+                              Δϕ=FT[0.25, 1.0])
+        phase = vSmartMOM.Scattering.SyntheticPolarizedHenyeyGreensteinPhaseFunction(
+            g=FT(0.62), polarization_fraction=FT(0.45))
+        greek = vSmartMOM.Scattering.greek_coefficients(phase; l_max=18,
+                                                        nquad=80)
+        surface = LambertianSSSurface(albedo=FT(0.23))
+        aerosol = GreekCoefsSSContributor(greek_coefs=greek, ϖ=FT(0.91),
+                                          τ=reshape(FT[0.025, 0.04], 2, 1))
+        absorption = AbsorptionSSContributor(
+            τ=reshape(FT[0.01, 0.02], 2, 1))
+        config = ExactSSConfig(
+            geometry=geometry, surface=surface,
+            contributors=(aerosol, absorption), I0=FT[1.0],
+            polarization_type=vSmartMOM.Scattering.Stokes_IQU{FT}())
+
+        exact = run_exact_ss(config; paths=:paths_1_2)
+        path1_full = truncated_ss_path1(config, length(greek.β))
+        path1_low = truncated_ss_path1(config, 4)
+        path2_lambertian = truncated_ss_path2(config, 1)
+
+        @test path1_full ≈ exact.path1 rtol=1e-10 atol=1e-13
+        @test path2_lambertian ≈ exact.path2 rtol=1e-12 atol=1e-14
+        @test all(isfinite.(path1_low))
+        @test maximum(abs.(path1_low .- exact.path1)) > FT(1e-9)
+
+        truncated_total = path1_low .+ path2_lambertian
+        corrected = apply_back_correction!(copy(truncated_total), config;
+                                           l_trunc=4, max_m=1)
+        @test corrected ≈ exact.total rtol=1e-10 atol=1e-13
+
+        hg_config = ExactSSConfig(
+            geometry=SSGeometry(μ₀=FT(0.79), μv=FT[0.5], Δϕ=FT[0.8]),
+            surface=LambertianSSSurface(albedo=zero(FT)),
+            contributors=(HGAerosolSSContributor(
+                g=FT(0.7), ϖ=FT(0.9), τ=reshape(FT[0.03, 0.02], 2, 1)),),
+            I0=FT[1.0])
+        hg_exact = run_exact_ss(hg_config; paths=:path1).path1
+        hg_truncated = truncated_ss_path1(hg_config, 3)
+        @test all(isfinite.(hg_truncated))
+        @test maximum(abs.(hg_truncated .- hg_exact)) > FT(1e-8)
+        @test_throws ArgumentError truncated_ss_path1(config, 1)
+
+        rayleigh_config = ExactSSConfig(
+            geometry=geometry, surface=surface,
+            contributors=(RayleighSSContributor(
+                τ=reshape(FT[0.02, 0.03], 2, 1)),),
+            I0=FT[1.0],
+            polarization_type=vSmartMOM.Scattering.Stokes_IQU{FT}())
+        rayleigh_exact = run_exact_ss(rayleigh_config; paths=:path1).path1
+        @test truncated_ss_path1(rayleigh_config, 3) ≈ rayleigh_exact rtol=1e-12 atol=1e-14
+
+        cox_surface = CoxMunkSSSurface(wind_speed=FT(5.0),
+                                       n_water=Complex{FT}(FT(1.34), FT(1e-8)),
+                                       include_whitecaps=false,
+                                       shadowing=true)
+        cox_config = ExactSSConfig(
+            geometry=SSGeometry(μ₀=FT(0.78), μv=FT[0.42],
+                                Δϕ=FT[0.15]),
+            surface=cox_surface,
+            contributors=(AbsorptionSSContributor(
+                τ=reshape(FT[0.02, 0.06], 2, 1)),),
+            I0=FT[1.0],
+            polarization_type=vSmartMOM.Scattering.Stokes_IQ{FT}())
+        cox_exact = run_exact_ss(cox_config; paths=:path2).path2
+        cox_m1 = truncated_ss_path2(cox_config, 1)
+        cox_m48 = truncated_ss_path2(cox_config, 48)
+        @test all(isfinite.(cox_m48))
+        @test norm(vec(cox_m48 .- cox_exact)) < norm(vec(cox_m1 .- cox_exact))
+        @test_throws ArgumentError truncated_ss_path2(cox_config, 0)
     end
 
     @testset "Mixed τϖ-weighted phase mixing" begin

@@ -49,7 +49,7 @@ export read_hitran, make_hitran_model
 # Re-export from submodules for convenience
 export CPU, GPU, default_architecture
 export Stokes_I, Stokes_IQ, Stokes_IQU, Stokes_IQUV
-export RadauQuad, GaussQuadHemisphere, GaussQuadFullSphere
+export RadauQuad, GaussLegQuad, GaussQuadFullSphere
 
 end # module Exports
 ```

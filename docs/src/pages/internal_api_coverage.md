@@ -80,6 +80,9 @@ vSmartMOM.StandaloneSS.exact_ss_config_from_model
 vSmartMOM.StandaloneSS.selected_measurements
 vSmartMOM.StandaloneSS.selected_measurement_jacobian
 vSmartMOM.StandaloneSS.surface_brdf_wind_jacobian
+vSmartMOM.StandaloneSS.truncated_ss_path1
+vSmartMOM.StandaloneSS.truncated_ss_path2
+vSmartMOM.StandaloneSS.apply_back_correction!
 vSmartMOM.StandaloneSS.determine_required_l_aerosol
 vSmartMOM.StandaloneSS.determine_required_l_from_moments
 vSmartMOM.StandaloneSS.determine_required_nbrdf
