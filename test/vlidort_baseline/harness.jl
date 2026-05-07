@@ -36,7 +36,7 @@ F32 rows lives in `tol_scale(spec)`.
 function axis_specs(; include_gpu::Bool = gpu_available())
     # Single-spec filter for parallel-process invocation: when env var
     # `VLIDORT_BASELINE_ONLY_SPEC` is set (e.g.
-    # "GaussQuadHemisphere/Float64/CPU"), `axis_specs()` returns only that
+    # "GaussLegQuad/Float64/CPU"), `axis_specs()` returns only that
     # spec. The parallel runner script `runtests_parallel.sh` uses this to
     # fan out across processes.
     only = get(ENV, "VLIDORT_BASELINE_ONLY_SPEC", "")
@@ -44,7 +44,7 @@ function axis_specs(; include_gpu::Bool = gpu_available())
     # baseline suite on the matching vSmartMOM quadrature; Radau has a
     # different weighted-node count and is a convergence experiment, not an
     # apples-to-apples VLIDORT comparison.
-    quads  = (:GaussQuadHemisphere,)
+    quads  = (:GaussLegQuad,)
     floats = (Float64, Float32)
     archs  = include_gpu ? ((:CPU, () -> Architectures.CPU()),
                             (:GPU, () -> Architectures.GPU())) :
@@ -73,7 +73,7 @@ the (quadrature, float, architecture) tuple `spec`. Returns `params`.
 function apply_overrides!(params, spec)
     params.quadrature_type =
         spec.quad === :RadauQuad           ? CoreRT.RadauQuad() :
-        spec.quad === :GaussQuadHemisphere ? CoreRT.GaussQuadHemisphere() :
+        spec.quad === :GaussLegQuad ? CoreRT.GaussLegQuad() :
         error("unknown quadrature $(spec.quad)")
     params.float_type   = spec.float
     params.architecture = spec.arch_ctor()

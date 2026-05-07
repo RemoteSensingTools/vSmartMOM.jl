@@ -114,20 +114,12 @@ Use Gauss Radau quadrature scheme, which includes the SZA as point (see Sanghavi
 struct RadauQuad <:AbstractQuadratureType end
 
 """
-    struct GaussQuadHemisphere
+    struct GaussLegQuad
 
-Use Gauss quadrature scheme, define interval [-1,1] within an hemisphere (90⁰), repeat for both
-
+Half-space Gauss-Legendre quadrature on `[0, 1]` for the upper hemisphere.
+The default for plane-parallel RT.
 """
-struct GaussQuadHemisphere <:AbstractQuadratureType end
-
-"""
-    struct GaussQuadFullSphere
-
-Use Gauss quadrature scheme, define interval [-1,1] for full sphere (180⁰), take half of it (less points near horizon compared to GaussQuadHemisphere)
-
-"""
-struct GaussQuadFullSphere <:AbstractQuadratureType end
+struct GaussLegQuad <: AbstractQuadratureType end
 
 "Abstract Type for Source Function Integration"
 abstract type AbstractSourceType end
@@ -698,7 +690,7 @@ mutable struct vSmartMOM_Parameters{FT<:Real}
     spec_bands::Vector{Vector{FT}}
     "Surface (Bidirectional Reflectance Distribution Function)"
     brdf::Vector{<:AbstractSurfaceType}
-    "Quadrature type for RT streams (RadauQuad/GaussQuadHemisphere/GaussQuadFullSphere)"
+    "Quadrature type for RT streams (RadauQuad/GaussLegQuad)"
     quadrature_type::AbstractQuadratureType
     "Type of polarization (I/IQ/IQU/IQUV)"
     polarization_type::AbstractPolarizationType
@@ -803,7 +795,7 @@ $(DocStringExtensions.FIELDS)
 struct SolverConfig{FT<:AbstractFloat, PT<:AbstractPolarizationType, QT<:AbstractQuadratureType}
     "Type of polarization (Stokes_I / IQU / IQUV)"
     polarization_type::PT
-    "Quadrature type (RadauQuad / GaussQuadHemisphere / GaussQuadFullSphere)"
+    "Quadrature type (RadauQuad / GaussLegQuad)"
     quadrature_type::QT
     "Hard cutoff for maximum number of Fourier moments (scalar, user-specified)"
     max_m::Int

@@ -1,13 +1,14 @@
 using Test
 using vSmartMOM
 using vSmartMOM.CoreRT
+using vSmartMOM.StandaloneSS
 
 function docs_minimal_parameter_dict()
     return Dict(
         "radiative_transfer" => Dict(
             "spec_bands" => ["[12987.0]"],
             "surface" => ["LambertianSurfaceScalar(0.1)"],
-            "quadrature_type" => "GaussQuadHemisphere()",
+            "quadrature_type" => "GaussLegQuad()",
             "polarization_type" => "Stokes_I()",
             "max_m" => 1,
             "Δ_angle" => 2.0,
@@ -71,4 +72,10 @@ end
     @test CoreRT.aerosol_range(layout, 2) == 8:14
     @test CoreRT.gas_range(layout) == 15:17
     @test CoreRT.surface_index(layout) == 18
+end
+
+@testset "docs StandaloneSS vector Jacobian example" begin
+    include(joinpath(pkgdir(vSmartMOM), "examples",
+                     "standalone_ss_vector_jacobian.jl"))
+    @test true
 end

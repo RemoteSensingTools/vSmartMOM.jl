@@ -91,13 +91,11 @@ const ARCH_MAP = Dict(
 """
 QUAD_MAP
 
-String → quadrature type mapping for stream calculations.
-Keys: "RadauQuad", "GaussQuadHemisphere", "GaussQuadFullSphere".
+String → quadrature type mapping. Keys: "RadauQuad", "GaussLegQuad".
 """
 const QUAD_MAP = Dict(
     "RadauQuad"           => ()->CoreRT.RadauQuad(),
-    "GaussQuadHemisphere" => ()->CoreRT.GaussQuadHemisphere(),
-    "GaussQuadFullSphere" => ()->CoreRT.GaussQuadFullSphere(),
+    "GaussLegQuad" => ()->CoreRT.GaussLegQuad(),
 )
 
 """

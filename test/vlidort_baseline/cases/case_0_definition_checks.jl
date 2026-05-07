@@ -35,7 +35,7 @@ end
         diag = solar_tester_stream_counts(path)
         params = diag.params
 
-        @test params.quadrature_type isa CoreRT.GaussQuadHemisphere
+        @test params.quadrature_type isa CoreRT.GaussLegQuad
         @test diag.weighted_nodes == VLIDORT_SOLAR_TESTER_NSTREAMS
         @test params.l_trunc == VLIDORT_SOLAR_TESTER_NMOMENTS
         @test params.max_m >= VLIDORT_SOLAR_TESTER_NMOMENTS + 1

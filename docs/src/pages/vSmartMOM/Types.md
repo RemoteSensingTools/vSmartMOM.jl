@@ -51,8 +51,7 @@ CoreRT.invalidate_canopy_cache!
 ```@docs
 CoreRT.AbstractQuadratureType
 CoreRT.RadauQuad
-CoreRT.GaussQuadHemisphere
-CoreRT.GaussQuadFullSphere
+CoreRT.GaussLegQuad
 
 ```
 

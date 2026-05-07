@@ -7,7 +7,7 @@ using CanopyOptics
 function _minimal_parameter_dict(; surface = ["LambertianSurfaceScalar(0.1)"],
                                    float_type = "Float64",
                                    architecture = "CPU()",
-                                   quadrature_type = "GaussQuadHemisphere()")
+                                   quadrature_type = "GaussLegQuad()")
     return Dict(
         "radiative_transfer" => Dict(
             "spec_bands" => ["[13000.0, 13000.1]"],
@@ -65,7 +65,7 @@ end
                 [radiative_transfer]
                 spec_bands = ["[13000.0, 13000.1]"]
                 surface = ["LambertianSurfaceScalar(0.1)"]
-                quadrature_type = "GaussQuadHemisphere()"
+                quadrature_type = "GaussLegQuad()"
                 polarization_type = "Stokes_I()"
                 max_m = 1
                 "Δ_angle" = 0.0

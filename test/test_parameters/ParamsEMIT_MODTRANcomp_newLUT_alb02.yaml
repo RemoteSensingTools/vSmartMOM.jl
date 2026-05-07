@@ -15,7 +15,7 @@ radiative_transfer:
     - 3984.2:0.1:28571.4   # 350 - 2510 nm (extended from 380 nm to capture Hartley/Huggins UV)
   surface:
     - LambertianSurfaceScalar{Float64}(0.2)
-  quadrature_type:    GaussQuadHemisphere()
+  quadrature_type:    GaussLegQuad()
   polarization_type:  Stokes_I()
   max_m:              3
   Δ_angle:            2.0
