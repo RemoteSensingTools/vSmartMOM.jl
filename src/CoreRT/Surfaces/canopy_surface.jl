@@ -42,12 +42,13 @@ end
 
 function _compute_canopy_Z_stack(canopy::CanopySurface{FT},
                                  scat_model, qp_μ,
-                                 max_m::Int,
+                                 m_max::Int,
                                  ::Type{FT},
                                  npol::Int) where {FT}
-    n_m = max(max_m, 1)
+    # `m_max` is order (loop bound). `compute_Z_matrices_aniso_analytic`
+    # also takes the max Fourier order, so we forward it directly.
     Zpp, Zmp = CanopyOptics.compute_Z_matrices_aniso_analytic(
-        scat_model, qp_μ, canopy.LAD, n_m - 1;
+        scat_model, qp_μ, canopy.LAD, max(m_max, 0);
         quadrature = canopy.canopy_quadrature, npol = npol)
     return _array_with_eltype(FT, Zpp), _array_with_eltype(FT, Zmp)
 end
@@ -86,10 +87,12 @@ end
 
 """
     _init_canopy_cache!(canopy, added_layer, pol_type, quad_points, architecture;
-                        spec_bands_wn=nothing, max_m=3)
+                        spec_bands_wn=nothing, m_max=2)
 
 Compute the effective Ross `G` factor, canopy Z-matrix cache, and working
-arrays for the canopy RT. Stored in `canopy._cache`.
+arrays for the canopy RT. Stored in `canopy._cache`. `m_max` is the
+Fourier loop bound in **order semantics** (loop runs `m = 0:m_max`); the
+default of 2 corresponds to the historical 3-moment count.
 
 When spectral leaf optics are provided (`canopy.leaf_optics_grid !== nothing`),
 also interpolates leaf R/T to the computation grid and pre-computes Z-matrices
@@ -99,7 +102,7 @@ function _init_canopy_cache!(canopy::CanopySurface{FT},
                              added_layer, pol_type,
                              quad_points, architecture;
                              spec_bands_wn::Union{Nothing, Vector{FT}}=nothing,
-                             max_m::Int=3) where {FT}
+                             m_max::Int=2) where {FT}
     arr_type = array_type(architecture)
     (; qp_μ, wt_μ, qp_μN) = quad_points
 
@@ -126,11 +129,11 @@ function _init_canopy_cache!(canopy::CanopySurface{FT},
     if canopy.leaf_optics_grid !== nothing && spec_bands_wn !== nothing
         R_interp, T_interp, Z_coarse_wn, Z_coarse_pp, Z_coarse_mp =
             _build_spectral_canopy_cache(canopy, qμ, collect(wt_μ),
-                                         spec_bands_wn, max_m, FT, pol_type.n)
+                                         spec_bands_wn, m_max, FT, pol_type.n)
     else
         Z_stack_pp, Z_stack_mp =
             _compute_canopy_Z_stack(canopy, canopy.canopy_scattering,
-                                    qμ, max_m, FT, pol_type.n)
+                                    qμ, m_max, FT, pol_type.n)
         Z_coarse_pp = reshape(Z_stack_pp, size(Z_stack_pp, 1), size(Z_stack_pp, 2), 1, size(Z_stack_pp, 3))
         Z_coarse_mp = reshape(Z_stack_mp, size(Z_stack_mp, 1), size(Z_stack_mp, 2), 1, size(Z_stack_mp, 3))
         _check_Z_flux_conservation(Z_coarse_pp, Z_coarse_mp, collect(wt_μ), 1;
@@ -221,14 +224,16 @@ function _check_Z_flux_conservation(Z_pp::Array{FT,4}, Z_mp::Array{FT,4},
 end
 
 """
-    _build_spectral_canopy_cache(canopy, qp_μ, wt_μ, spec_bands_wn, max_m, FT, npol)
+    _build_spectral_canopy_cache(canopy, qp_μ, wt_μ, spec_bands_wn, m_max, FT, npol)
 
 Interpolate leaf R/T from user grid to computation grid and pre-compute
 Z-matrices on a coarse spectral grid for later per-wavenumber interpolation.
+`m_max` is the Fourier loop bound in **order semantics** (loop runs
+`m = 0:m_max`); the cache holds `m_max + 1` moments per spectral knot.
 """
 function _build_spectral_canopy_cache(canopy::CanopySurface{FT},
                                       qp_μ, wt_μ, spec_bands_wn::Vector{FT},
-                                      max_m::Int, ::Type{FT},
+                                      m_max::Int, ::Type{FT},
                                       npol::Int) where {FT}
     leaf_wn = _leaf_grid_to_wn(canopy.leaf_optics_grid, canopy.grid_unit)
     leaf_R = canopy.leaf_reflectance isa Number ?
@@ -287,16 +292,17 @@ function _build_spectral_canopy_cache(canopy::CanopySurface{FT},
 
     Nq = length(qp_μ) * npol
     n_coarse = length(wn_coarse)
-    n_m = max(max_m, 1)
+    # Cache holds (m_max + 1) Fourier moments along the last axis.
+    n_m_count = max(m_max + 1, 1)
 
-    Z_coarse_pp = zeros(FT, Nq, Nq, n_coarse, n_m)
-    Z_coarse_mp = zeros(FT, Nq, Nq, n_coarse, n_m)
+    Z_coarse_pp = zeros(FT, Nq, Nq, n_coarse, n_m_count)
+    Z_coarse_mp = zeros(FT, Nq, Nq, n_coarse, n_m_count)
 
     for ic in 1:n_coarse
         scat_model = CanopyOptics.BiLambertianCanopyScattering(
             R=R_coarse[ic], T=T_coarse[ic])
         Zpp_stack, Zmp_stack = _compute_canopy_Z_stack(
-            canopy, scat_model, qp_μ, n_m, FT, npol)
+            canopy, scat_model, qp_μ, m_max, FT, npol)
         Z_coarse_pp[:, :, ic, :] .= Zpp_stack
         Z_coarse_mp[:, :, ic, :] .= Zmp_stack
     end
@@ -341,9 +347,10 @@ end
 """
     create_surface_layer!(canopy::CanopySurface, added_layer, SFI, m, pol_type,
                           quad_points, τ_sum, architecture;
-                          spec_bands_wn=nothing, max_m=3)
+                          spec_bands_wn=nothing, m_max=2)
 
 Compute the effective canopy+soil surface layer for Fourier moment `m`.
+`m_max` is the Fourier loop bound in **order semantics**.
 
 When spectral leaf optics are provided, `spec_bands_wn` (the concatenated
 computation wavenumber grid) is required for initializing the spectral cache
@@ -370,13 +377,13 @@ function create_surface_layer!(canopy::CanopySurface{FT},
                                quad_points, τ_sum,
                                architecture;
                                spec_bands_wn::Union{Nothing, Vector{FT}}=nothing,
-                               max_m::Int=3) where {FT}
+                               m_max::Int=2) where {FT}
     arr_type = array_type(architecture)
     (; qp_μN, iμ₀) = quad_points
 
     if canopy._cache === nothing
         _init_canopy_cache!(canopy, added_layer, pol_type, quad_points, architecture;
-                            spec_bands_wn=spec_bands_wn, max_m=max_m)
+                            spec_bands_wn=spec_bands_wn, m_max=m_max)
     end
     cache = canopy._cache::CanopyCache
 

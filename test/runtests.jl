@@ -54,6 +54,11 @@ try
 # distinct from augmented `Nquad`). See docs/src/pages/conventions.md §6.
 @testset "QuadPoints streams" begin include("test_quadpoints_streams.jl") end
 
+# Phase B — forward and lin paths must derive the same per-band Fourier
+# loop bound. Regression for the previous lin-only precedence bug at
+# even `l_max`; both paths now flow through `_derive_m_max_bands`.
+@testset "Forward/lin m_max parity" begin include("test_lin_forward_loop_parity.jl") end
+
 # Phase-function truncation invariants (Sanghavi & Stephens 2015)
 @testset "Truncation" begin include("test_truncation.jl") end
 

@@ -269,7 +269,9 @@ function apply_back_correction!(R_SFI::AbstractArray, model::RTModel;
                                 max_m = nothing, I0 = nothing)
     ib = Int(i_band)
     l = l_trunc === nothing ? model.solver.l_max[ib] : l_trunc
-    m = max_m === nothing ? model.solver.max_m_bands[ib] : max_m
+    # The public `max_m` kwarg here is a count of Fourier moments; the
+    # solver stores order in `m_max_bands`, so convert via +1 (Phase B).
+    m = max_m === nothing ? n_fourier_moments_bands(model)[ib] : max_m
     config = exact_ss_config_from_model(model; i_band = ib, I0)
     return apply_back_correction!(R_SFI, config; l_trunc = l, max_m = m)
 end

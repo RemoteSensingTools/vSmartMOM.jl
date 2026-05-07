@@ -111,8 +111,10 @@ end
 
     diffuse_canopy = CanopySurface(; soil, LAI=1.0, canopy_scattering=diffuse,
                                     canopy_quadrature=quadrature)
+    # Phase B: fourth arg is now `m_max` (order). m_max=1 ⇒ 2 moments,
+    # matching the original (count=2) test expectation at line 117.
     Zpp_d, Zmp_d = CoreRT._compute_canopy_Z_stack(
-        diffuse_canopy, diffuse, μ, 2, Float64, pol.n)
+        diffuse_canopy, diffuse, μ, 1, Float64, pol.n)
 
     @test size(Zpp_d) == (length(μ) * pol.n, length(μ) * pol.n, 2)
     for si in 1:pol.n, sj in 1:pol.n
@@ -124,8 +126,9 @@ end
     composite = diffuse + specular
     specular_canopy = CanopySurface(; soil, LAI=1.0, canopy_scattering=composite,
                                      canopy_quadrature=quadrature)
+    # Phase B: fourth arg is `m_max` (order). m_max=1 ⇒ 2 moments.
     Zpp_c, Zmp_c = CoreRT._compute_canopy_Z_stack(
-        specular_canopy, composite, μ, 2, Float64, pol.n)
+        specular_canopy, composite, μ, 1, Float64, pol.n)
 
     @test size(Zpp_c) == size(Zpp_d)
     @test all(isfinite, Zpp_c)

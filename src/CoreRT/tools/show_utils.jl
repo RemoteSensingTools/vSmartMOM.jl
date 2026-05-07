@@ -203,7 +203,9 @@ function Base.show(io::IO, ::MIME"text/plain", m::RTModel)
 
     # solver
     pol_name = typeof(m.solver.polarization_type).name.name
-    println(io, _TREE_MID, "solver: $pol_name, Nstreams=$(m.quad_points.Nstreams), Nquad=$(m.quad_points.Nquad), max_m=$(m.solver.max_m), l_trunc=$(m.solver.l_trunc)")
+    m_max_str = length(m.solver.m_max_bands) == 1 ?
+        string(m.solver.m_max_bands[1]) : string(m.solver.m_max_bands)
+    println(io, _TREE_MID, "solver: $pol_name, Nstreams=$(m.quad_points.Nstreams), Nquad=$(m.quad_points.Nquad), m_max=$m_max_str, l_trunc=$(m.solver.l_trunc)")
 
     # geometry
     vza_str = length(m.geometry.vza) <= 4 ? string(m.geometry.vza) : "[$(length(m.geometry.vza)) angles]"

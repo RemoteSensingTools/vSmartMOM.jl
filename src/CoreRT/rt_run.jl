@@ -110,7 +110,10 @@ function rt_run(RS_type::AbstractRamanType, model, iBand;
     (; obs_alt, sza, vza, vaz) = model.obs_geom   # Observational geometry properties
     (; qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart, μ₀, iμ₀, Nquad) = model.quad_points # All quadrature points
     pol_type = CoreRT.polarization_type(model)
-    max_m    = get_max_m(model)
+    # Per-band Fourier loop bound (order). Multi-band runs loop to the
+    # max across bands; per-component skipping inside the loop is a
+    # Phase C concern.
+    m_max = maximum(m_max_bands(model)[ib] for ib in iBand)
     (; quad_points) = model
     FT       = CoreRT.float_type(model)
     dτ_max_threshold = model.numerics.dτ_max_threshold   # numerical knob → rt_kernel!
@@ -193,7 +196,7 @@ function rt_run(RS_type::AbstractRamanType, model, iBand;
     if brdf isa CanopySurface && brdf._cache === nothing
         @timeit "Canopy cache init" _init_canopy_cache!(
             brdf, added_layer_surface, pol_type, quad_points, arch;
-            spec_bands_wn=_canopy_spec_wn, max_m=max_m)
+            spec_bands_wn=_canopy_spec_wn, m_max=m_max)
     end
 
     # Pre-compute within-canopy atmospheric optical depth if requested
@@ -230,7 +233,7 @@ function rt_run(RS_type::AbstractRamanType, model, iBand;
     τ_sum_all = nothing
 
     # Loop over fourier moments
-    for m = 0:max_m - 1
+    for m = 0:m_max
 
         # Azimuthal weighting
         weight = m == 0 ? FT(0.5/π) : FT(1.0/π)
@@ -278,7 +281,7 @@ function rt_run(RS_type::AbstractRamanType, model, iBand;
                                 arr_type(τ_sum_all[:,end]),
                                 arch;
                                 spec_bands_wn=_canopy_spec_wn,
-                                max_m=max_m)
+                                m_max=m_max)
         else
             @timeit "Create Surface" create_surface_layer!(brdf,
                                 added_layer_surface,
@@ -348,7 +351,7 @@ function rt_run(RS_type::AbstractRamanType, model, iBand;
     if brdf isa CoxMunkSurface && SFI
         @timeit "SS Correction" apply_ss_correction!(
             R_SFI, brdf, pol_type, vza, vaz, μ₀,
-            Array(τ_sum_all[:,end]), max_m, nSpec)
+            Array(τ_sum_all[:,end]), m_max, nSpec)
     end
 
     # Show timing statistics
@@ -427,7 +430,9 @@ function rt_run_ss(RS_type::AbstractRamanType, model, iBand;
     (; vza, vaz) = model.obs_geom
     (; qp_μ, wt_μ, qp_μN, μ₀, iμ₀, Nquad) = model.quad_points
     pol_type = CoreRT.polarization_type(model)
-    max_m    = get_max_m(model)
+    # Per-band Fourier loop bound (order). Multi-band runs loop to the
+    # max across bands; per-component skipping is a Phase C concern.
+    m_max = maximum(m_max_bands(model)[ib] for ib in iBand)
     (; quad_points) = model
     FT       = CoreRT.float_type(model)
 
@@ -490,7 +495,7 @@ function rt_run_ss(RS_type::AbstractRamanType, model, iBand;
 
     τ_sum_all = nothing
 
-    for m = 0:max_m - 1
+    for m = 0:m_max
         weight = m == 0 ? FT(0.5/π) : FT(1.0/π)
 
         @timeit "IE" InelasticScattering.computeRamanZλ!(RS_type, pol_type, collect(qp_μ), m, arr_type)

@@ -17,7 +17,9 @@ function rt_run_test_ms(RS_type::AbstractRamanType,
     (; obs_alt, sza, vza, vaz) = model.obs_geom   # Observational geometry properties
     (; qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart, μ₀, iμ₀, Nquad) = model.quad_points # All quadrature points
     pol_type = CoreRT.polarization_type(model)
-    max_m = get_max_m(model)
+    # Per-band Fourier loop bound (order). Multi-band runs loop to the
+    # max across bands; per-component skipping is a Phase C concern.
+    m_max = maximum(m_max_bands(model)[ib] for ib in iBand)
     quad_points = model.quad_points
 
     # Also to be changed!!
@@ -76,7 +78,7 @@ function rt_run_test_ms(RS_type::AbstractRamanType,
     # in model_from_parameters when RS_type != noRS.
 
     # Loop over fourier moments
-    for m = 0:max_m - 1
+    for m = 0:m_max
 
         # Azimuthal weighting
         weight = m == 0 ? FT(0.5/π) : FT(1.0/π)
