@@ -59,6 +59,12 @@ try
 # even `l_max`; both paths now flow through `_derive_m_max_bands`.
 @testset "Forward/lin m_max parity" begin include("test_lin_forward_loop_parity.jl") end
 
+# Phase C — `component_m_max(c, ctx)` trait dispatch + flag-gated
+# aggregator. Default flag is `false` (bit-equal to Phase B); flipping
+# to `true` will swap Cox-Munk / RossLi / RPV / canopy from
+# silently-half-truncated to their full user_l_cap (Phase C-flip).
+@testset "Component m_max traits" begin include("test_component_m_max.jl") end
+
 # Phase-function truncation invariants (Sanghavi & Stephens 2015)
 @testset "Truncation" begin include("test_truncation.jl") end
 

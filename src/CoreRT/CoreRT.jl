@@ -134,6 +134,12 @@ include("Surfaces/water_refraction.jl")              # Built-in water refractive
 include("Surfaces/coxmunk_surface.jl")               # Cox-Munk ocean surface
 include("Surfaces/coxmunk_surface_lin.jl")           # Linearized Cox-Munk (Jacobians)
 
+# Phase C of the v0.7 Fourier/Stream Resolution refactor — per-component
+# trait dispatch. Comes after all surface/source/scatterer types are
+# defined (types.jl + Sources/ + Surfaces/) but before
+# tools/model_from_parameters.jl which consumes the aggregator.
+include("component_m_max.jl")
+
 # Functions to export
 export model_from_parameters,               # Converting the parameters to model
        model_from_parameters_lin,           # Convenience alias for linearized model
