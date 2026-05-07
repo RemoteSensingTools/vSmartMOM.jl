@@ -33,6 +33,7 @@ function batch_inv!(X::AbstractArray{FT,3}, A::AbstractArray{FT,3}) where {FT}
     Threads.@threads for i = 1:size(A, 3)
         @views X[:,:,i] = A[:,:,i]\I
     end
+    return X
 end
 
 "Given 3D Julia Array A, fill in X[:,:,k] = A[:,:,k] \\ I (pointer version, ignores pointers for CPU)" 
@@ -64,6 +65,15 @@ NNlib's existing generic path unchanged.
 function batched_mul(A::Array{T,3}, B::Array{T,3}) where {T<:LinearAlgebra.BLAS.BlasFloat}
     @assert size(A,3) == size(B,3) "batch dim mismatch: $(size(A,3)) vs $(size(B,3))"
     @assert size(A,2) == size(B,1) "inner dim mismatch: $(size(A,2)) vs $(size(B,1))"
+    # Singleton-batch defers to NNlib's generic path. The threaded `mul!` loop
+    # over `1:1` was empirically producing wrong (≈ 1/50) intensities in
+    # multi-layer Stokes_I + per-layer-injection elastic RT — surfaced by the
+    # VLIDORT baseline Case B (see dev_notes/nspec1_multilayer_stokesI_bug.md).
+    if size(A, 3) == 1
+        return invoke(NNlib.batched_mul,
+                      Tuple{AbstractArray{T,3}, AbstractArray{T,3}},
+                      A, B)
+    end
     C = Array{T,3}(undef, size(A,1), size(B,2), size(A,3))
     Threads.@threads for k in 1:size(C,3)
         @views mul!(C[:,:,k], A[:,:,k], B[:,:,k])

@@ -650,6 +650,36 @@ mutable struct ScatteringParameters{FT<:Real}
 end
 
 """
+    RTNumericalParameters{FT}
+
+Centralised home for tunable numerical knobs that were previously hardcoded
+in the RT kernels. Lives once on `vSmartMOM_Parameters` / `RTModel`, threaded
+through to the kernels where needed. Designed to grow as more constants are
+lifted (Glint Legendre expansion cap, etc.).
+
+# Fields
+$(DocStringExtensions.FIELDS)
+"""
+Base.@kwdef struct RTNumericalParameters{FT<:AbstractFloat}
+    "Doubling resolution: cap on the elemental-layer optical depth
+    `dτ_max = threshold · μ_min`, where `μ_min` is the smallest TRUE
+    (positive-weight) quadrature stream cosine. Smaller values produce
+    finer initial layers (more doublings → more accurate single-scatter
+    at the cost of more roundoff through doubling). Default `0.001` is
+    conservative legacy; raising to `~0.01` reduces doubling iterations."
+    dτ_max_threshold::FT = FT(0.001)
+
+    "Absolute floor on `dτ_max` (and hence on `dτ_initial`), expressed
+    as a multiple of `eps(FT)`. Prevents the doubling discretisation
+    from collapsing below FT precision regardless of geometry. Default
+    `1024·eps(FT)` ≈ 1.2e-4 for Float32 / 2.3e-13 for Float64 — the
+    F32 value caps `ndoubl` around 13–14 for τ_total≤1 (well within
+    Float32 representability); the F64 value is far below any sensible
+    `threshold·μ_min` so it never activates in practice."
+    dτ_min_floor::FT = FT(1024) * eps(FT)
+end
+
+"""
     vSmartMOM_Parameters{FT<:Real}
 
 Top-level container for all user-specified model parameters **before** any
@@ -686,6 +716,9 @@ mutable struct vSmartMOM_Parameters{FT<:Real}
     truncation::Scattering.AbstractTruncationType
     "Depolarization factor"
     depol::FT
+    "Numerical-knob parameters (doubling threshold, etc.) — defaults to
+    `RTNumericalParameters{FT}()` if not specified in YAML."
+    numerics::RTNumericalParameters
     "Float type to use in the RT (Float64/Float32)"
     float_type::DataType
     "Architecture to use for calculations (CPU/GPU)"
@@ -884,6 +917,9 @@ struct RTModel{ARCH<:AbstractArchitecture, FT<:AbstractFloat} <: AbstractRTModel
     architecture::ARCH
     "RT solver configuration"
     solver::SolverConfig{FT}
+    "Numerical-knob parameters (doubling threshold, etc.) — see
+    `RTNumericalParameters`"
+    numerics::RTNumericalParameters{FT}
     "Observation geometry"
     geometry::ObsGeometry{FT}
     "Quadrature points and weights"

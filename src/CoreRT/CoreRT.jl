@@ -147,7 +147,8 @@ export lin_added_layer_all_params!,           # 3 params -> all params chain rul
 
 # Export new hierarchical model types
 export AbstractRTModel, RTModel,
-       SolverConfig, Atmosphere, RayleighScattering, AerosolState, Optics, OpticsLin,
+       SolverConfig, RTNumericalParameters,
+       Atmosphere, RayleighScattering, AerosolState, Optics, OpticsLin,
        RTModelLin
 
 # Export types to show easily

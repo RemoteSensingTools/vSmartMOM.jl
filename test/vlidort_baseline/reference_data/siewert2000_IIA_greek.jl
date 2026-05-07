@@ -5,11 +5,24 @@
 # VLIDORT-to-vSmartMOM mapping (see Fortran lines 280-289):
 #   PROBLEM_IIA(1,:) ↔ B[2,2] / α₂ ↔ vSmartMOM α
 #   PROBLEM_IIA(2,:) ↔ B[1,1] / α₁ ↔ vSmartMOM β  (phase function)
-#   PROBLEM_IIA(3,:) ↔ B[1,2]=B[2,1] / β₁ ↔ vSmartMOM γ
+#   PROBLEM_IIA(3,:) ↔ B[1,2]=B[2,1] / β₁ ↔ vSmartMOM −γ  (sign flipped: VLIDORT
+#                                                          stores Mishchenko-style
+#                                                          γ; vSmartMOM uses
+#                                                          Hovenier convention)
 #   PROBLEM_IIA(4,:) ↔ B[4,4] / α₄ ↔ vSmartMOM δ
 #   PROBLEM_IIA(5,:) ↔ B[3,4] / β₂ ↔ vSmartMOM −ϵ  (sign flipped! VLIDORT uses
 #                                                   GREEKMAT(...,12) = -PROBLEM_IIA(5,:))
 #   PROBLEM_IIA(6,:) ↔ B[3,3] / α₃ ↔ vSmartMOM ζ
+#
+# WHY γ SIGN-FLIPS ON IMPORT: vSmartMOM's `get_greek_rayleigh` returns
+# γ[L=2] = +√(3/2)·dpl_p (Hovenier convention, matching
+# `compute_NAI2.jl:132` f₁₂ = −Re(|s1|²−|s2|²)). VLIDORT stores γ with
+# the opposite sign. Importing the data file as-is would mix Hovenier
+# (Rayleigh) with Mishchenko (aerosol) γ in mixed-layer atmospheres
+# (e.g. Case C) and produce sign-clashed Z[1,2]. We sign-flip on
+# import so all γ inside vSmartMOM is Hovenier; the price is that
+# truth Q/U/V from VLIDORT must also be sign-flipped at the comparison
+# stage. See dev_notes/case_c_q_u_conventions.md.
 
 const SIEWERT_PROBLEM_IIA = (
     row1 = [0.0, 0.0, 3.726079, 2.202868, 1.190694, 0.391203, 0.105556, 0.020484, 0.003097, 0.000366, 3.5e-5, 3.0e-6],
@@ -22,7 +35,8 @@ const SIEWERT_PROBLEM_IIA = (
 
 const SIEWERT_α = SIEWERT_PROBLEM_IIA.row1
 const SIEWERT_β = SIEWERT_PROBLEM_IIA.row2
-const SIEWERT_γ = SIEWERT_PROBLEM_IIA.row3
+# γ stored with sign flip per VLIDORT(Mishchenko)→vSmartMOM(Hovenier) convention.
+const SIEWERT_γ = .-SIEWERT_PROBLEM_IIA.row3
 const SIEWERT_δ = SIEWERT_PROBLEM_IIA.row4
 # ϵ stored with sign flip per VLIDORT-to-vSmartMOM B[3,4] convention.
 const SIEWERT_ϵ = .-SIEWERT_PROBLEM_IIA.row5

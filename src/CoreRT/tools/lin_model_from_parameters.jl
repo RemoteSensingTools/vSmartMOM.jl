@@ -68,9 +68,10 @@ function model_from_parameters(lin::LinMode,
     quad_points = rt_set_streams(params.quadrature_type, params.l_trunc, obs_geom, params.polarization_type, array_type(params.architecture))
 
     vmr = isnothing(abs_params) ? Dict() : abs_params.vmr
-    p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o, new_vmr, Δz = compute_atmos_profile_fields(params.T, params.p, params.q, vmr)
+    T_ft, p_ft, q_ft = convert(Vector{FT}, params.T), convert(Vector{FT}, params.p), convert(Vector{FT}, params.q)
+    p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o, new_vmr, Δz = compute_atmos_profile_fields(T_ft, p_ft, q_ft, vmr)
 
-    profile = AtmosphericProfile(params.T, p_full, params.q, p_half, vmr_h2o, vcd_dry, vcd_h2o, new_vmr, Δz)
+    profile = AtmosphericProfile(T_ft, p_full, q_ft, p_half, vmr_h2o, vcd_dry, vcd_h2o, new_vmr, Δz)
 
     if params.profile_reduction_n != -1
         profile = reduce_profile(params.profile_reduction_n, profile)
@@ -426,11 +427,13 @@ function model_from_parameters(lin::LinMode,
         FT(params.Δ_angle),
         FT(params.depol),
     )
-    atm = Atmosphere(profile, params.spec_bands)
+    spec_bands_ft = [convert(Vector{FT}, b) for b in params.spec_bands]
+    atm = Atmosphere(profile, spec_bands_ft)
     rayleigh_s = RayleighScattering(greek_rayleigh, greek_cabannes, FT.(ϖ_Cabannes))
     aerosols_s = AerosolState(aerosol_optics, τ_aer)
     optics = Optics(rayleigh_s, aerosols_s, τ_abs, τ_rayl)
-    model = RTModel(params.architecture, solver, obs_geom, quad_points, atm, optics, params.brdf)
+    numerics = _convert_numerics(params.numerics, FT)
+    model = RTModel(params.architecture, solver, numerics, obs_geom, quad_points, atm, optics, params.brdf)
     return model, RTModelLin(τ̇_abs, τ̇_aer, lin_aerosol_optics)
 end
 

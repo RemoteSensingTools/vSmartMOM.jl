@@ -8,6 +8,14 @@
 > equation crib sheet at [docs/dev_notes/theory_references.md](docs/dev_notes/theory_references.md).
 > Read it before doing anything substantive.
 
+> **⚠ CONVENTIONS — read before any cross-validation or data-import work:**
+> [docs/src/pages/conventions.md](docs/src/pages/conventions.md) documents
+> vSmartMOM's Hovenier-style γ sign, Stokes Q/U/V signs, and azimuth (Δφ)
+> definition, plus exactly which sign-flips are needed when comparing to /
+> importing from VLIDORT-format data (Siewert 2000 PROBLEM_IIA, PROBLEMIII,
+> solar_tester). Most "vSmartMOM doesn't match VLIDORT" bugs are convention
+> mismatches caught in this page.
+
 ## Project Overview
 
 vSmartMOM.jl is a Julia package for vectorized atmospheric radiative transfer using the Matrix Operator Method (MOM). It computes polarized radiances and analytic Jacobians across spectral bands, supporting elastic/inelastic (Raman) scattering, multiple surface BRDF types, and CPU/GPU execution.

@@ -19,6 +19,7 @@ try
     include(joinpath(@__DIR__, "harness.jl"))
 
     @testset "VLIDORT baseline" begin
+        include(joinpath(@__DIR__, "cases", "case_0_definition_checks.jl"))
         include(joinpath(@__DIR__, "cases", "case_A_siewert2000.jl"))
         include(joinpath(@__DIR__, "cases", "case_B_solar_tester.jl"))
         include(joinpath(@__DIR__, "cases", "case_C_solar_tester_vector.jl"))

@@ -92,12 +92,18 @@ function model_from_parameters(params::vSmartMOM_Parameters)
     # Set quadrature points for streams
     quad_points = rt_set_streams(params.quadrature_type, params.l_trunc, obs_geom, params.polarization_type, array_type(params.architecture))
 
-    # Get AtmosphericProfile from parameters
+    # Get AtmosphericProfile from parameters.
+    # Convert T, p, q to the requested FT so that profile arrays (vcd_dry,
+    # p_half, etc.) are consistent with the model float type.  Without this,
+    # mutating params.float_type = Float32 on a Float64-constructed
+    # vSmartMOM_Parameters causes getRayleighLayerOptProp to receive mixed
+    # Float32/Float64 arguments and raises a MethodError.
     vmr = isnothing(params.absorption_params) ? Dict() : params.absorption_params.vmr
-    p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o, new_vmr, Δz = compute_atmos_profile_fields(params.T, params.p, params.q, vmr)
+    T_ft, p_ft, q_ft = convert(Vector{FT}, params.T), convert(Vector{FT}, params.p), convert(Vector{FT}, params.q)
+    p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o, new_vmr, Δz = compute_atmos_profile_fields(T_ft, p_ft, q_ft, vmr)
 
-    profile = AtmosphericProfile(params.T, p_full, params.q, p_half, vmr_h2o, vcd_dry, vcd_h2o, new_vmr,Δz)
-    
+    profile = AtmosphericProfile(T_ft, p_full, q_ft, p_half, vmr_h2o, vcd_dry, vcd_h2o, new_vmr, Δz)
+
     # Reduce the profile to the number of target layers (if specified)
     if params.profile_reduction_n != -1
         profile = reduce_profile(params.profile_reduction_n, profile);
@@ -347,11 +353,23 @@ function model_from_parameters(params::vSmartMOM_Parameters)
         FT_(params.Δ_angle),
         FT_(params.depol),
     )
-    atm = Atmosphere(profile, params.spec_bands)
+    spec_bands_ft = [convert(Vector{FT_}, b) for b in params.spec_bands]
+    atm = Atmosphere(profile, spec_bands_ft)
     rayleigh = RayleighScattering(greek_rayleigh_arr, greek_cabannes, FT_.(ϖ_Cabannes))
     aerosols_s = AerosolState(aerosol_optics, τ_aer)
     optics = Optics(rayleigh, aerosols_s, τ_abs, τ_rayl)
-    return RTModel(params.architecture, solver, obs_geom, quad_points, atm, optics, params.brdf)
+    numerics = _convert_numerics(params.numerics, FT_)
+    return RTModel(params.architecture, solver, numerics, obs_geom, quad_points, atm, optics, params.brdf)
+end
+
+"Re-type the user-supplied `RTNumericalParameters` to the resolved
+RTModel float type. No-op when types already match."
+@inline _convert_numerics(n::RTNumericalParameters{FT}, ::Type{FT}) where {FT} = n
+@inline function _convert_numerics(n::RTNumericalParameters, ::Type{FT}) where {FT}
+    RTNumericalParameters{FT}(
+        dτ_max_threshold = FT(n.dτ_max_threshold),
+        dτ_min_floor     = FT(n.dτ_min_floor),
+    )
 end
 
 
@@ -379,11 +397,14 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
     # Set quadrature points for streams
     quad_points = rt_set_streams(params.quadrature_type, params.l_trunc, obs_geom, params.polarization_type, array_type(params.architecture))
 
-    # Get AtmosphericProfile from parameters
+    # Get AtmosphericProfile from parameters.
+    # Convert T, p, q to params.float_type so profile arrays are type-consistent.
+    FT_vrs_early = params.float_type
     vmr = isnothing(params.absorption_params) ? Dict() : params.absorption_params.vmr
-    p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o, new_vmr, Δz = compute_atmos_profile_fields(params.T, params.p, params.q, vmr)
-    profile = AtmosphericProfile(params.T, p_full, params.q, p_half, vmr_h2o, vcd_dry, vcd_h2o, new_vmr,Δz)
-    
+    T_ft, p_ft, q_ft = convert(Vector{FT_vrs_early}, params.T), convert(Vector{FT_vrs_early}, params.p), convert(Vector{FT_vrs_early}, params.q)
+    p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o, new_vmr, Δz = compute_atmos_profile_fields(T_ft, p_ft, q_ft, vmr)
+    profile = AtmosphericProfile(T_ft, p_full, q_ft, p_half, vmr_h2o, vcd_dry, vcd_h2o, new_vmr, Δz)
+
     # Reduce the profile to the number of target layers (if specified)
     if params.profile_reduction_n != -1
         profile = reduce_profile(params.profile_reduction_n, profile);
@@ -585,11 +606,13 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
         FT_vrs2(params.Δ_angle),
         FT_vrs2(params.depol),
     )
-    atm = Atmosphere(profile, params.spec_bands)
+    spec_bands_ft2 = [convert(Vector{FT_vrs2}, b) for b in params.spec_bands]
+    atm = Atmosphere(profile, spec_bands_ft2)
     rayleigh_s = RayleighScattering(greek_rayleigh, greek_cabannes, FT_vrs2.(ϖ_Cabannes))
     aerosols_s = AerosolState(aerosol_optics, τ_aer)
     optics = Optics(rayleigh_s, aerosols_s, τ_abs, τ_rayl)
-    return RTModel(params.architecture, solver, obs_geom, quad_points, atm, optics, params.brdf)
+    numerics = _convert_numerics(params.numerics, FT_vrs2)
+    return RTModel(params.architecture, solver, numerics, obs_geom, quad_points, atm, optics, params.brdf)
 end
 
 function loadAbsco(file; scale=(1.0))
