@@ -277,3 +277,39 @@ function source_tangent!(prep::PreparedSolarBeam,
             ndrange = size(j₀⁺))
     return nothing
 end
+
+# ============================================================================
+# Multiple-dispatch entry points for NoSource and SourceSet (Phase 3.5)
+#
+# These dispatchers replace `if SFI` branching across the elastic kernels.
+# `NoSource` and an empty `SourceSet` route to a no-op; a populated
+# `SourceSet` iterates over its tuple at compile time and dispatches each
+# member to the correct concrete `contribute!` / `source_tangent!`.
+#
+# The signature here matches the per-source forms above so a single call
+# site `contribute!(prepared_sources, ...)` works regardless of whether
+# `prepared_sources` is a `NoSource`, a single `PreparedSolarBeam`, or a
+# `SourceSet` of mixed prepared sources.
+# ============================================================================
+
+# Forward `contribute!` — to be defined per concrete prepared source. SolarBeam
+# is added in a follow-up sub-phase that wires the elemental forward kernel
+# through this dispatch. NoSource and SourceSet dispatchers are universal:
+contribute!(::NoSource, args...; kwargs...) = nothing
+
+function contribute!(s::SourceSet, args...; kwargs...)
+    @inbounds for src in s.sources
+        contribute!(src, args...; kwargs...)
+    end
+    return nothing
+end
+
+# Linearized `source_tangent!` — NoSource and SourceSet dispatchers.
+source_tangent!(::NoSource, args...; kwargs...) = nothing
+
+function source_tangent!(s::SourceSet, args...; kwargs...)
+    @inbounds for src in s.sources
+        source_tangent!(src, args...; kwargs...)
+    end
+    return nothing
+end
