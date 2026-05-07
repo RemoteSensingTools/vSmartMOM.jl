@@ -957,6 +957,12 @@ function _parse_numerics(params_dict, FT)
         v = haskey(n, "dτ_min_floor") ? n["dτ_min_floor"] : n["dtau_min_floor"]
         kwargs[:dτ_min_floor] = FT(v)
     end
+    if haskey(n, "blas_threads")
+        v = n["blas_threads"]
+        # Allow `null` / `~` in YAML to mean "leave BLAS alone"; otherwise
+        # parse to Int and pass through as `RTNumericalParameters.blas_threads`.
+        kwargs[:blas_threads] = v === nothing ? nothing : Int(v)
+    end
     return RTNumericalParameters{FT}(; kwargs...)
 end
 

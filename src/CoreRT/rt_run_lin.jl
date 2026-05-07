@@ -105,6 +105,11 @@ function rt_run(RS_type::AbstractRamanType,
                     NAer::Int, NGas::Int, NSurf::Int,
                     iBand;
                     sources::Union{Nothing, AbstractSource} = nothing)
+    # Per-model BLAS thread cap (see `rt_run` body for rationale).
+    if model.numerics.blas_threads !== nothing
+        LinearAlgebra.BLAS.set_num_threads(model.numerics.blas_threads)
+    end
+
     (; obs_alt, sza, vza, vaz) = model.obs_geom   # Observational geometry properties
     (; qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart, μ₀, iμ₀, Nquad) = model.quad_points # All quadrature points
     pol_type = CoreRT.polarization_type(model)

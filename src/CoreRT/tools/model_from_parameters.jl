@@ -370,6 +370,7 @@ RTModel float type. No-op when types already match."
     RTNumericalParameters{FT}(
         dτ_max_threshold = FT(n.dτ_max_threshold),
         dτ_min_floor     = FT(n.dτ_min_floor),
+        blas_threads     = n.blas_threads,
     )
 end
 
