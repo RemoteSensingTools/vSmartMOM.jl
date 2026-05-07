@@ -40,8 +40,13 @@ default.
   constraint so users can pass a `Vector{Float32}` matrix into a
   `Float64` model (or vice versa) — the conversion happens once in
   `prepare_source`.
-- `sza :: Union{Nothing, Real}`: solar zenith angle in degrees, or
-  `nothing` to inherit from `RTModel.obs_geom.sza`.
+- `sza :: Union{Nothing, Real}`: **advisory only in v0.6.** vSmartMOM
+  currently always reads SZA from `RTModel.obs_geom.sza` (which is fixed
+  at model construction by `parameters_from_yaml(...).sza`). The
+  `SolarBeam.sza` field is reserved for a future per-source-geometry
+  override (rt_run will rebuild quad_points from this when set), but
+  setting it today is a no-op — the model's geometry wins. To change
+  SZA today, set `params.sza` before `model_from_parameters(params)`.
 
 # AD mode
 [`source_ad_mode`](@ref) returns [`AnalyticSourceJacobian`](@ref); Phase 3
@@ -178,11 +183,13 @@ function extract_solar_F₀(s::SourceSet, FT::Type{<:AbstractFloat},
             return src.F₀
         end
     end
-    # No solar beam in the set ⇒ unit Stokes-I default (matches today's
-    # behaviour when the user supplied a non-solar SourceSet, e.g. a
-    # SurfaceSIF-only scene).
+    # User supplied an explicit `SourceSet` that does not contain a
+    # PreparedSolarBeam — they meant "no solar contribution". Return zeros
+    # so the SFI kernel produces zero source vectors. Today's bit-equal
+    # default (unit Stokes-I) only applies when the user did NOT specify
+    # `sources=` at all, in which case `model.sources` defaults to a
+    # `SolarBeam()` and this branch is never reached.
     F₀ = zeros(FT, pol_n, nSpec)
-    @inbounds @views F₀[1, :] .= one(FT)
     return arr_type(F₀)
 end
 

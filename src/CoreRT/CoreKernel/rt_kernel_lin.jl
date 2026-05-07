@@ -59,7 +59,7 @@ function rt_kernel!(RS_type::noRS{FT},
                     I_static, 
                     architecture, 
                     qp_μN, iz) where {FT}
-    (; qp_μ, μ₀, Nquad, iμ₀Nstart) = quad_points
+    (; qp_μ, wt_μ, μ₀, Nquad, iμ₀Nstart) = quad_points
     (; F₀) = RS_type
     # Just unpack core optical properties from 
     (; τ, ϖ, Z⁺⁺, Z⁻⁺) = computed_layer_properties
@@ -76,7 +76,20 @@ function rt_kernel!(RS_type::noRS{FT},
     nD=Int(size(added_layer.t⁺⁺,1)/n)
     D_diag = repeat(arr_type(D), nD)             # full diagonal entries
     bigD = Diagonal(D_diag)                     # D-matrix
-    dτ_max = minimum([maximum(τ .* ϖ), FT(0.001) * minimum(qp_μ)])
+    # `dτ_max` constraint must use only the TRUE quadrature streams
+    # (positive weights). Zero-weight user-VZA / SZA nodes get appended for
+    # output postprocessing — they don't drive the discrete-ordinate
+    # eigen/matrix work, and their grazing μ would otherwise force `dτ_max`
+    # below FT precision for grazing test geometries (e.g. vza=89.9999° at
+    # τ_total=1) and over-double the layer. The forward path applies this
+    # filter via `init_layer`/`get_dtau_ndoubl`; the lin path inlines it
+    # here. Threshold/floor still come from `RTNumericalParameters` via
+    # `model.numerics.dτ_max_threshold` and `dτ_min_floor` is a future
+    # enhancement (the forward path threading is in `rt_kernel!`).
+    threshold = FT(0.001)
+    real_streams = qp_μ[Array(wt_μ) .> eps(FT)]
+    μ_min = isempty(real_streams) ? minimum(qp_μ) : minimum(real_streams)
+    dτ_max = minimum([maximum(τ .* ϖ), threshold * μ_min])
 
     _, ndoubl = doubling_number(dτ_max, maximum(τ .* ϖ))
     scatter = true # edit later

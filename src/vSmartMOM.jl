@@ -133,6 +133,16 @@ export StandaloneSS, run_exact_ss, ExactSSConfig, SSGeometry,
        truncated_ss_path1, truncated_ss_path2, apply_back_correction!
 # Export new hierarchical model types
 export RTModel, AbstractRTModel, SolverConfig, Atmosphere, RayleighScattering, AerosolState, Optics, OpticsLin
+# Export v0.6 source-term abstraction so `using vSmartMOM` is enough for
+# `SolarBeam`, `SurfaceSIF`, `BlackbodySource`, etc. — re-exports the names
+# the CoreRT submodule already exports.
+export AbstractSource, AbstractPreparedSource,
+       NoSource, SourceSet,
+       AbstractSourceADMode, AnalyticSourceJacobian, ForwardDiffSourceJacobian,
+       NoSourceJacobian, source_ad_mode,
+       SolarBeam, PreparedSolarBeam, BlackbodySource,
+       SurfaceSIF, PreparedSurfaceSIF,
+       prepare_source, prepare_sources, surface_source_contribute!
 # Export GEOSChem/NetCDF integration
 export GeosChemSource, NetCDFGridSource, NetCDFSource, geoschem_to_dict, read_geoschem_profile
 
