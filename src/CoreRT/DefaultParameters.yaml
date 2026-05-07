@@ -8,8 +8,8 @@ radiative_transfer:
   # Bidirectional Reflectance Distribution Function (BRDF) per band
   surface: 
     - LambertianSurfaceScalar(0.15)
-  # Quadrature-scheme for stream calculations
-  quadrature_type:    GaussQuadFullSphere()
+  # Quadrature-scheme for stream calculations (RadauQuad / GaussLegQuad)
+  quadrature_type:    GaussLegQuad()
   # Polarization type (Stokes_I, Stokes_IQ, Stokes_IQU, Stokes_IQUV)
   polarization_type:  Stokes_I()
   # Maximum m (number of Fourier moments to loop over)
@@ -18,8 +18,10 @@ radiative_transfer:
   # Legacy field — used to build the default truncation if `truncation`
   # below is unset.
   Δ_angle:            2.0
-  # Truncation length for legendre terms.
-  l_trunc:            20
+  # Upper-bound for Legendre truncation of aerosol phase function /
+  # Cox-Munk reflectance / canopy or BRDF hotspot. Per-case `l_max` may
+  # be smaller (e.g. Rayleigh+Lambertian needs only `l_max=2`).
+  l_trunc:            25
   # Phase-function truncation method. If unset, defaults to
   # δBGE(l_trunc, Δ_angle) for backward compatibility. Set to
   # "NoTruncation()" for canopy-only or smooth-phase-function runs

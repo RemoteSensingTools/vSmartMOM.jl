@@ -21,7 +21,7 @@ radiative_transfer:
     - (1e7/765):0.5:(1e7/762)
   surface:
     - LambertianSurfaceScalar{Float64}(0.0)
-  quadrature_type:    GaussQuadHemisphere()
+  quadrature_type:    GaussLegQuad()
   polarization_type:  Stokes_IQU()
   max_m:              3
   Δ_angle:            2.0

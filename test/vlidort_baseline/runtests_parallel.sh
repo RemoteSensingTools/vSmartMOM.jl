@@ -19,10 +19,10 @@ LOGDIR="${LOGDIR:-/tmp/vlidort_baseline_parallel}"
 mkdir -p "$LOGDIR"
 
 SPECS=(
-  "GaussQuadHemisphere/Float64/CPU"
-  "GaussQuadHemisphere/Float64/GPU"
-  "GaussQuadHemisphere/Float32/CPU"
-  "GaussQuadHemisphere/Float32/GPU"
+  "GaussLegQuad/Float64/CPU"
+  "GaussLegQuad/Float64/GPU"
+  "GaussLegQuad/Float32/CPU"
+  "GaussLegQuad/Float32/GPU"
 )
 
 echo "Launching ${#SPECS[@]} specs, up to $MAX_PARALLEL in parallel"

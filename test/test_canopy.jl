@@ -10,7 +10,7 @@ const CO = CanopyOptics
 
 function _canopy_test_quad_points(; FT=Float64, l_trunc=15, pol_type=CoreRT.Stokes_I())
     obs = CoreRT.ObsGeometry(FT(30), FT[0, 30], FT[0, 0], FT(1000))
-    return CoreRT.rt_set_streams(CoreRT.GaussQuadHemisphere(), l_trunc, obs,
+    return CoreRT.rt_set_streams(CoreRT.GaussLegQuad(), l_trunc, obs,
                                  pol_type, Array)
 end
 

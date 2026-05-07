@@ -83,7 +83,7 @@ truncation_type:
 
 vSmartMOM: 
   # Type of quadrature
-  quadrature_type:    GaussQuadFullSphere()
+  quadrature_type:    GaussLegQuad()
   # Maximum m (for loop)
   max_m:              3
   # Architecture (default_architecture, GPU(), CPU())

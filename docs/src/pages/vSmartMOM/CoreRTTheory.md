@@ -84,10 +84,8 @@ The quadrature state is `QuadPoints`, built by `rt_set_streams` in
 
 Implemented quadrature choices:
 
-- `GaussQuadHemisphere()`: Gaussian nodes on ``[0,1]`` plus camera and solar
-  directions as zero-weight nodes.
-- `GaussQuadFullSphere()`: full-sphere Gaussian construction, then uses the
-  positive-hemisphere nodes.
+- `GaussLegQuad()`: half-space Gauss-Legendre on ``[0,1]`` plus camera
+  and solar directions as zero-weight nodes.
 - `RadauQuad()`: block-Radau construction that includes the solar direction,
   matching the direct-beam treatment in Sanghavi et al. (2014), Appendix B.
 

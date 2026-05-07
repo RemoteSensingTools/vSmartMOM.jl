@@ -51,7 +51,7 @@ radiative_transfer:
     - LambertianSurfaceScalar{Float64}(0.) #(0.3) #(0.2) #(0.05)
     #- LambertianSurfaceScalar{Float64}(0.3)
   # Quadrature-scheme for stream calculations
-  quadrature_type:    GaussQuadHemisphere()
+  quadrature_type:    GaussLegQuad()
   # Polarization type (Stokes_I, Stokes_IQ, Stokes_IQU, Stokes_IQUV)
   polarization_type:  Stokes_IQU() #QU()
   # Maximum m (number of Fourier moments to loop over)

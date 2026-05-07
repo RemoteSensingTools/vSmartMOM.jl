@@ -152,7 +152,8 @@ export AbstractRTModel, RTModel,
        RTModelLin
 
 # Export types to show easily
-export GaussQuadFullSphere, LambertianSurfaceScalar, LambertianSurfaceSpectrum,
+export RadauQuad, GaussLegQuad,
+       LambertianSurfaceScalar, LambertianSurfaceSpectrum,
        CanopySurface, CanopySurface_from_prospect, invalidate_canopy_cache!,
        CoxMunkSurface, water_refractive_index
 

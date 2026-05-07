@@ -30,7 +30,7 @@ cfg = Dict(
   "radiative_transfer" => Dict(
     "spec_bands" => ["(1e7/777):0.015:(1e7/757)"],
     "surface" => ["LambertianSurfaceScalar(0.15)"],
-    "quadrature_type" => "GaussQuadFullSphere()",
+    "quadrature_type" => "GaussLegQuad()",
     "polarization_type" => "Stokes_I()",
     "max_m" => 3,
     "Δ_angle" => 2.0,
@@ -52,7 +52,7 @@ params2 = read_parameters(cfg)
 
 ## Safety maps
 
-- Quadrature: `RadauQuad`, `GaussQuadHemisphere`, `GaussQuadFullSphere`
+- Quadrature: `RadauQuad`, `GaussLegQuad`
 - Polarization: `Stokes_I`, `Stokes_IQ`, `Stokes_IQU`, `Stokes_IQUV`
 - Architecture: `CPU`, `GPU`, `default_architecture`
 - Decomposition: `NAI2`, `PCW`

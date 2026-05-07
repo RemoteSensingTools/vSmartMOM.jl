@@ -67,14 +67,12 @@ with the rest). Each Fourier moment ``m`` solves an *independent* RTE — the
 ## Quadrature in ``\mu``
 
 After Fourier decomposition, each per-moment integral over ``\mu' \in [-1, 1]``
-is replaced by a finite sum. vSmartMOM offers three quadrature schemes
-([`src/CoreRT/tools/rt_set_streams.jl:24–110`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/tools/rt_set_streams.jl#L24-L110)):
+is replaced by a finite sum. vSmartMOM offers two quadrature schemes
+([`src/CoreRT/tools/rt_set_streams.jl`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/tools/rt_set_streams.jl)):
 
-- **`GaussQuadHemisphere`** — Gauss-Legendre on ``[0,1]``; the solar zenith
-  angle and viewing zenith angles are appended as zero-weight extra nodes.
+- **`GaussLegQuad`** — half-space Gauss-Legendre on ``[0,1]``; the solar
+  zenith angle and viewing zenith angles are appended as zero-weight nodes.
   Cheap; interpolation between roots loses accuracy at off-quadrature angles.
-- **`GaussQuadFullSphere`** — Gauss-Legendre on ``[-1,1]``; the positive
-  hemisphere is then used. More nodes for the same order; same caveats.
 - **`RadauQuad`** — block-Radau composite on ``[0, \mu_0] \cup [\mu_0, 1]``
   with ``\mu_0`` as a true quadrature node carrying non-zero weight (Sanghavi
   2014 App. B, Eqs. B.1–B.2). Required when the solar direction does not

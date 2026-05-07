@@ -29,7 +29,7 @@ Top-level keys:
   - Vegetation canopies are configured through a top-level `canopy` section;
     the parser wraps each band surface as the soil BRDF inside a
     `CanopySurface`.
-- quadrature_type: String in {RadauQuad(), GaussQuadHemisphere(), GaussQuadFullSphere()}
+- quadrature_type: String in {RadauQuad(), GaussLegQuad()}
 - polarization_type: String in {Stokes_I(), Stokes_IQ(), Stokes_IQU(), Stokes_IQUV()}
 - max_m: Int
 - Δ_angle: Real (degrees)
@@ -116,7 +116,7 @@ radiative_transfer:
     - (1e7/777):0.015:(1e7/757)
   surface:
     - LambertianSurfaceScalar(0.15)
-  quadrature_type: GaussQuadFullSphere()
+  quadrature_type: GaussLegQuad()
   polarization_type: Stokes_I()
   max_m: 3
   Δ_angle: 2.0
