@@ -96,6 +96,19 @@ end
 # Phase 6 — sanghavi test/benchmarks/*.jl script ports (parse + light-unit).
 @testset "Phase 6 script ports" begin include("test_phase6_ports.jl") end
 
+# v0.6 source-term refactor — AbstractSource vocabulary, SolarBeam, BlackbodySource,
+# SurfaceSIF, surface_source_contribute! double-dispatch, prepared_sources flow.
+# Includes the full Phase 1 → 5b regression assertions and end-to-end bit-equality
+# checks via small CPU rt_run scenarios on PureRayleighParameters.
+@testset "Sources (v0.6)" begin include("test_sources.jl") end
+
+# VLIDORT 2.8.3 baseline validation suite — Siewert 2000 PROBLEM_IIA Stokes-I,
+# solar_tester scalar (Task 1), solar_tester vector (Task 1, IQU). Reference
+# tables are committed under test/vlidort_baseline/reference_data/; no PyVLIDORT
+# / Fortran runtime needed. The included file already wraps its own
+# `@testset "VLIDORT baseline"`, so we don't double-nest.
+include("vlidort_baseline/runtests.jl")
+
 finally
     cd(_VSMARTMOM_TEST_ORIGINAL_CWD)
 end

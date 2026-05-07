@@ -255,14 +255,18 @@ function Base.show(io::IO, ::MIME"text/plain", m::RTModel)
 
     # surfaces
     surf_strs = [sprint(show, s) for s in m.surfaces]
-    print(io, _TREE_END, "surfaces: ", join(surf_strs, ", "))
+    println(io, _TREE_MID, "surfaces: ", join(surf_strs, ", "))
+
+    # sources (v0.6 source-term refactor)
+    print(io, _TREE_END, "sources: ", sprint(show, m.sources))
 end
 
 # Compact show (single-line, e.g. inside arrays)
 function Base.show(io::IO, m::RTModel)
     FT = float_type(m)
     nBands = length(m.atmosphere.spec_bands)
-    print(io, "RTModel{$(typeof(m.architecture)), $FT}($nBands band(s))")
+    nSources = m.sources isa SourceSet ? length(m.sources) : (m.sources isa NoSource ? 0 : 1)
+    print(io, "RTModel{$(typeof(m.architecture)), $FT}($nBands band(s), $nSources source(s))")
 end
 
 # ── vSmartMOM_Parameters ──────────────────────────────────────────────────
