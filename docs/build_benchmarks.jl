@@ -70,18 +70,24 @@ end
 
 function summary_line(rows::AbstractVector{Row}; near_zero_atol::Real = 0.0)
     res = [rel_err(r; near_zero_atol) for r in rows]
-    valid = filter(!isnan, res)
+    valid_idx = findall(!isnan, res)
+    valid = res[valid_idx]
     n_total = length(rows)
     n_valid = length(valid)
     if n_valid == 0
         return @sprintf("(n=%d, all values masked as near-zero truth)", n_total)
     end
-    abs_errs = [abs_err(r) for r in rows]
-    return @sprintf("n=%d  median rel = %s  max rel = %s  max |Δ| = %s",
+    abs_errs_valid = [abs_err(rows[i]) for i in valid_idx]
+    excluded = n_total - n_valid
+    suffix = excluded == 0 ? "" :
+             @sprintf("  (excluded %d cells with |truth| < %s)", excluded, fmt_sci(near_zero_atol))
+    return @sprintf("n=%d  median rel = %s  max rel = %s  median |Δ| = %s  max |Δ| = %s%s",
                     n_valid,
                     fmt_pct(Statistics.median(valid)),
                     fmt_pct(maximum(valid)),
-                    fmt_sci(maximum(abs_errs)))
+                    fmt_sci(Statistics.median(abs_errs_valid)),
+                    fmt_sci(maximum(abs_errs_valid)),
+                    suffix)
 end
 
 # =============================================================================
@@ -166,7 +172,7 @@ const NATRAJ_μ    = [0.02, 0.06, 0.10, 0.16, 0.20, 0.28, 0.32, 0.40,
                      0.52, 0.64, 0.72, 0.84, 0.92, 0.96, 0.98, 1.00]
 const NATRAJ_ϕs   = collect(0.0:30.0:180.0)
 
-function run_natraj(FT::Type)
+function run_natraj(FT::Type; quadrature::CoreRT.AbstractQuadratureType = CoreRT.RadauQuad())
     I_modeled = zeros(Float64, length(NATRAJ_μ), length(NATRAJ_ϕs))
     Q_modeled = zeros(Float64, length(NATRAJ_μ), length(NATRAJ_ϕs))
     U_modeled = zeros(Float64, length(NATRAJ_μ), length(NATRAJ_ϕs))
@@ -175,6 +181,13 @@ function run_natraj(FT::Type)
         params = parameters_from_yaml(NATRAJ_YAML)
         params.architecture = vSmartMOM.Architectures.CPU()
         params.float_type = FT
+        params.quadrature_type = quadrature
+        # Pure Rayleigh has only β₀, β₁, β₂ non-zero — δBGE forward-peak
+        # truncation is meaningless here and visibly corrupts the answer.
+        # The matching in-tree benchmark in test_CoreRT.jl picks up
+        # NoTruncation through the YAML; we override explicitly so the
+        # docs run does not depend on whichever default the YAML carries.
+        params.truncation = Scattering.NoTruncation()
         params.spec_bands = [Float64[ν0, ν0 + 1.0]]
         params.vza = acosd.(NATRAJ_μ)
         params.sza = acosd(0.2)
@@ -199,6 +212,9 @@ function run_natraj(FT::Type)
     end
     return by_stokes
 end
+
+run_natraj_radau(FT::Type) = run_natraj(FT; quadrature = CoreRT.RadauQuad())
+run_natraj_gauss(FT::Type) = run_natraj(FT; quadrature = CoreRT.GaussLegQuad())
 
 # =============================================================================
 # Case B — solar_tester scalar Stokes-I, Task 1   (🧪 VLIDORT regression)
@@ -373,7 +389,8 @@ end
 results = Dict{Tuple{Symbol, Type}, Dict{Symbol, Vector{Row}}}()
 for (case_sym, runner) in (
     (:siewert,        run_siewert),
-    (:natraj,         run_natraj),
+    (:natraj_radau,   run_natraj_radau),
+    (:natraj_gauss,   run_natraj_gauss),
     (:st_scalar,      run_solar_tester_scalar),
     (:st_vector,      run_solar_tester_vector),
 ), FT in (Float64, Float32)
@@ -413,12 +430,23 @@ open(OUT_PATH, "w") do io
     println(io)
     println(io, "Each row reports the modeled value, the truth value, the absolute")
     println(io, "error `|Δ| = |modeled − truth|`, and the relative error")
-    println(io, "`|Δ|/|truth|·100%`. Per-stokes rows where `|truth| ≈ 0` (sign")
-    println(io, "crossings, especially for Q/U) are reported as `—` for the relative")
-    println(io, "error and excluded from the median/max in the summary line.")
+    println(io, "`|Δ|/|truth|·100%`. Cells where `|truth|` falls below a per-case")
+    println(io, "*near-zero threshold* are reported as `—` for the relative error")
+    println(io, "and excluded from the median/max in the summary line — at small")
+    println(io, "|truth| the relative error is dominated by the absolute noise floor")
+    println(io, "and is not a meaningful accuracy measure. The threshold and the")
+    println(io, "number of excluded cells are stated in each summary line.")
+    println(io)
+    println(io, "Where applicable, thresholds match the in-tree regression tests:")
+    println(io, "for Natraj Q/U we use `|truth| < 0.01`, the same filter applied in")
+    println(io, "[`test/test_CoreRT.jl`](../../../test/test_CoreRT.jl) (`@test maximum(Q_deltas[Q_modeled .≥ 0.01]) < 0.008`).")
     println(io)
 
-    # Explicit per-case stokes/section ordering (Dict iteration is unstable).
+    # Explicit per-case (stokes_label => near_zero_atol) ordering.
+    # Dict iteration is unstable; using a Vector of Pairs preserves order.
+    # near_zero_atol = 0 means no filtering. Natraj Q/U use 0.01 to match the
+    # in-tree test_CoreRT.jl filter (Q_modeled .≥ 0.01); the relative error at
+    # smaller |truth| is dominated by the absolute noise floor.
     case_meta = (
         (:siewert, :published, "Case A — Siewert 2000 PROBLEM IIA",
          """A single-layer aerosol slab (`τ = 1.0`, `ω̃ = 0.973527`) with the
@@ -426,26 +454,44 @@ open(OUT_PATH, "w") do io
          2.8.3. TOA upwelling Stokes vector at 11 viewing-zenith cosines and
          3 azimuths (0°, 90°, 180°). Q/U/V truth signs flipped to vSmartMOM's
          Hovenier convention.""",
-         (:I, :Q, :U, :V)),
-        (:natraj, :published, "Natraj 2009 — polarised Rayleigh τ=0.5",
+         [:I => 0.0, :Q => 0.0, :U => 0.0, :V => 0.0]),
+        (:natraj_radau, :published,
+         "Natraj 2009 — polarised Rayleigh τ=0.5  (RadauQuad)",
          """Pure Rayleigh, optical depth `τ = 0.5`, sza = `acos(0.2)` ≈ 78.46°,
          depolarization `0` (Natraj's idealization). 16 viewing-zenith cosines
          from 0.02 to 1.00 across 7 azimuths from 0° to 180°. Modeled
-         reflectance `R = π · (I/F₀)`.""",
-         (:I, :Q, :U)),
+         reflectance `R = π · (I/F₀)`. **Gauss-Radau quadrature** (the YAML
+         default) — includes the SZA as a quadrature node, so the
+         single-scatter geometry sits exactly on a quadrature stream and no
+         SS-exact correction is needed. **`NoTruncation()`** — Rayleigh has
+         only `β₀, β₁, β₂` non-zero; δ-fit forward-peak truncation is
+         meaningless and was visibly inflating the docs-page errors before.
+         Q/U use a near-zero filter of `|truth| < 0.01` (matching the
+         `Q_modeled .≥ 0.01` filter in `test/test_CoreRT.jl`).""",
+         [:I => 0.0, :Q => 0.01, :U => 0.01]),
+        (:natraj_gauss, :published,
+         "Natraj 2009 — polarised Rayleigh τ=0.5  (GaussLegQuad)",
+         """Same Natraj setup as above, but with **half-space Gauss-Legendre
+         quadrature on `[0, 1]`** instead of Gauss-Radau. Direct apples-to-
+         apples comparison of the two quadrature schemes; the underlying RT
+         path, polarization treatment, reference table, and `NoTruncation()`
+         override are identical.""",
+         [:I => 0.0, :Q => 0.01, :U => 0.01]),
         (:st_scalar, :vlidort_regression, "Case B — solar_tester scalar (Task 1)",
          """23-layer atmosphere from VLIDORT's `2p8p3_solar_tester.f90`,
          Stokes-I only, isotropic Henyey-Greenstein aerosol (`g=0.8`,
          `ω̃=0.95`, `τ=0.5`) with NMOMENTS=15 to match VLIDORT's
          NSTREAMS=8. SZA=35°, RAZ=0°, 3 viewing zenith angles. TOA upwelling
          and BOA downwelling Stokes-I.""",
-         (:I_TOA_up, :I_BOA_dn)),
+         [:I_TOA_up => 0.0, :I_BOA_dn => 0.0]),
         (:st_vector, :vlidort_regression, "Case C — solar_tester vector Stokes-IQU (Task 1)",
          """Same 23-layer atmosphere as Case B but with vector RT
          (Stokes-IQU) and the PROBLEM-III aerosol Greek coefficients shipped
          with VLIDORT. Q/U truth signs flipped to vSmartMOM's Hovenier
          convention.""",
-         (:I_TOA_up, :I_BOA_dn, :Q_TOA_up, :Q_BOA_dn, :U_TOA_up, :U_BOA_dn)),
+         [:I_TOA_up => 0.0, :I_BOA_dn => 0.0,
+          :Q_TOA_up => 0.0, :Q_BOA_dn => 0.0,
+          :U_TOA_up => 0.0, :U_BOA_dn => 0.0]),
     )
     provenance_label(p::Symbol) = p === :published ? "📚 published benchmark" : "🧪 VLIDORT regression table"
 
@@ -460,12 +506,13 @@ open(OUT_PATH, "w") do io
             println(io, "### Float", FT === Float64 ? "64" : "32")
             println(io)
             by_stokes = results[(case_sym, FT)]
-            for s_label in stokes_order
+            for (s_label, atol) in stokes_order
                 haskey(by_stokes, s_label) || continue
                 rows = by_stokes[s_label]
-                println(io, "**Stokes ", s_label, "**  ", summary_line(rows))
+                println(io, "**Stokes ", s_label, "**  ",
+                        summary_line(rows; near_zero_atol = atol))
                 println(io)
-                write_table(io, rows)
+                write_table(io, rows; near_zero_atol = atol)
                 println(io)
             end
         end
