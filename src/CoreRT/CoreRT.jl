@@ -54,9 +54,10 @@ import Base.show                   # For overloading show for custom types
 
 # Constants and Types
 include("constants.jl")                        # Scientific constants
-include("types.jl")  
+include("types.jl")
 include("parameter_layout.jl")                 # ParameterLayout struct for Jacobian indexing
 include("types_lin.jl")                        # Types for linearized RT
+include("Sources/types.jl")                    # v0.6 AbstractSource / SourceSet vocabulary (Phase 1)
 
 # Note: Raman types (AbstractRamanType, noRS, RRS, etc.) come from 
 # InelasticScattering module via `using ..InelasticScattering` above.
@@ -150,6 +151,12 @@ export AbstractRTModel, RTModel,
        SolverConfig, RTNumericalParameters,
        Atmosphere, RayleighScattering, AerosolState, Optics, OpticsLin,
        RTModelLin
+
+# v0.6 source-term vocabulary (Phase 1: types only; behaviour lands in Phase 2+)
+export AbstractSource, AbstractPreparedSource,
+       NoSource, SourceSet,
+       AbstractSourceADMode, AnalyticSourceJacobian, ForwardDiffSourceJacobian,
+       NoSourceJacobian, source_ad_mode
 
 # Export types to show easily
 export RadauQuad, GaussLegQuad,
