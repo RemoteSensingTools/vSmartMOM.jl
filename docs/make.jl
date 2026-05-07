@@ -595,6 +595,7 @@ function build()
         "Home"                  => "index.md",
         "Manual"                => Any[
                                     "Quick Start (5 min)" => "pages/quickstart.md",
+                                    "Conventions ⚠ (read first)" => "pages/conventions.md",
                                     "Configure a Scene" => "pages/IO/Overview.md",
                                     "Compute Jacobians" => "pages/jacobians.md",
                                     "Run on GPU" => "pages/gpu.md",

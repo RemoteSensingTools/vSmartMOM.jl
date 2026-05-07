@@ -11,19 +11,19 @@
 # IMPORTANT: f90 driver overrides cfg's Lambertian albedo 0.2 → 0.05 at
 # line 392 of V2p8p3_solar_tester.f90 (same convention as scalar).
 #
-# spec_band uses 2 frequencies (not 1) — see solar_tester.yaml header for
-# the nSpec=1 numerical issue we worked around.
+# Use the same 8 non-zero-weight Gauss-Legendre half-space streams as
+# VLIDORT's NSTREAMS=8; user VZAs/SZA are appended as zero-weight nodes.
 
 radiative_transfer:
   spec_bands:
-    - "[18867.92 18867.93]"
+    - "[18867.92]"
   surface:
     - LambertianSurfaceScalar(0.05)
   quadrature_type:    GaussQuadHemisphere()
   polarization_type:  Stokes_IQU()
-  max_m:              16          # NSTOKES=3, NSTREAMS=8 ⇒ Fourier-moment count ≤ 2·NSTREAMS = 16
+  max_m:              16          # NSTREAMS=8 ⇒ Fourier moments m=0..15
   Δ_angle:            2.0
-  l_trunc:            16          # match VLIDORT NMOMENTS (cap at 2·NSTREAMS−1 = 15 + 1 for L=0..15)
+  l_trunc:            15          # match VLIDORT NMOMENTS = 2·NSTREAMS−1 = 15 (L=0..15)
   truncation:         "NoTruncation()"
   depol:              0.01072
   float_type:         Float64
@@ -32,7 +32,7 @@ radiative_transfer:
 geometry:
   sza:                35.0          # overridden per-run in case file
   vza:                [10.0, 20.0, 40.0]
-  vaz:                [0.0, 0.0, 0.0]
+  vaz:                [10.0, 10.0, 10.0]
   obs_alt:            1000.0
 
 atmospheric_profile:

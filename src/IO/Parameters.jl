@@ -6,7 +6,7 @@ using Distributions
 using Unitful
 using UnitfulEquivalences
 using CanopyOptics
-using ..CoreRT: vSmartMOM_Parameters, AbsorptionParameters, ScatteringParameters, RT_Aerosol, AtmosphericProfile
+using ..CoreRT: vSmartMOM_Parameters, RTNumericalParameters, AbsorptionParameters, ScatteringParameters, RT_Aerosol, AtmosphericProfile
 using ..Absorption: AbstractBroadeningFunction, AbstractComplexErrorFunction, load_interpolation_model
 using ..Scattering
 using ..Scattering: AbstractFourierDecompositionType, Aerosol
@@ -921,17 +921,45 @@ function parameters_from_dict(params_dict::Dict)
     Δ_angle = FT(params_dict["radiative_transfer"]["Δ_angle"])
     l_trunc = params_dict["radiative_transfer"]["l_trunc"]
     truncation = _parse_truncation(params_dict, l_trunc, Δ_angle, FT)
+    numerics = _parse_numerics(params_dict, FT)
 
     return vSmartMOM_Parameters(
         spec_bands, BRDF_per_band, quadrature_type, polarization_type,
         params_dict["radiative_transfer"]["max_m"], Δ_angle,
-        l_trunc, truncation, FT(params_dict["radiative_transfer"]["depol"]), FT,
+        l_trunc, truncation, FT(params_dict["radiative_transfer"]["depol"]),
+        numerics, FT,
         architecture,
         FT(params_dict["geometry"]["sza"]), convert.(FT, params_dict["geometry"]["vza"]),
         convert.(FT, params_dict["geometry"]["vaz"]), FT(params_dict["geometry"]["obs_alt"]),
         T, p, q, profile_reduction,
         absorption_params, scattering_params
     )
+end
+
+"""
+    _parse_numerics(params_dict, FT)
+
+Build the `RTNumericalParameters` from the optional `radiative_transfer.numerics`
+YAML subsection. Missing keys fall back to type defaults (defined on the
+struct in `src/CoreRT/types.jl`). Existing configs without a `numerics`
+section keep their legacy values.
+"""
+function _parse_numerics(params_dict, FT)
+    rt = params_dict["radiative_transfer"]
+    if !haskey(rt, "numerics") || rt["numerics"] === nothing
+        return RTNumericalParameters{FT}()
+    end
+    n = rt["numerics"]
+    kwargs = Dict{Symbol, Any}()
+    if haskey(n, "dτ_max_threshold") || haskey(n, "dtau_max_threshold")
+        v = haskey(n, "dτ_max_threshold") ? n["dτ_max_threshold"] : n["dtau_max_threshold"]
+        kwargs[:dτ_max_threshold] = FT(v)
+    end
+    if haskey(n, "dτ_min_floor") || haskey(n, "dtau_min_floor")
+        v = haskey(n, "dτ_min_floor") ? n["dτ_min_floor"] : n["dtau_min_floor"]
+        kwargs[:dτ_min_floor] = FT(v)
+    end
+    return RTNumericalParameters{FT}(; kwargs...)
 end
 
 """

@@ -1,0 +1,79 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 360" font-family="sans-serif" font-size="13">
+  <!-- Background -->
+  <rect width="720" height="360" fill="#fafafa"/>
+
+  <!-- LEFT panel: Δφ = 0° (forward scattering) -->
+  <g transform="translate(0,0)">
+    <!-- Earth surface -->
+    <line x1="20" y1="290" x2="340" y2="290" stroke="#553" stroke-width="2"/>
+    <text x="180" y="310" text-anchor="middle" fill="#553">Earth surface</text>
+
+    <!-- Zenith arrow -->
+    <line x1="180" y1="290" x2="180" y2="50" stroke="#aaa" stroke-width="1" stroke-dasharray="4,3"/>
+    <text x="186" y="58" fill="#888">zenith</text>
+
+    <!-- Sun (yellow circle, top-right) -->
+    <circle cx="290" cy="80" r="14" fill="#fc0" stroke="#cc0" stroke-width="2"/>
+    <text x="290" y="68" text-anchor="middle" fill="#996">sun</text>
+
+    <!-- Sun ray (downward, ~SZA=35°) -->
+    <line x1="290" y1="80" x2="180" y2="290" stroke="#cc0" stroke-width="2" marker-end="url(#arrowSun)"/>
+
+    <!-- Satellite (gray circle, top-right same side as sun) -->
+    <circle cx="245" cy="115" r="10" fill="#999" stroke="#444" stroke-width="2"/>
+    <text x="248" y="105" fill="#444">sat</text>
+
+    <!-- Satellite line of sight (from surface upward to sat) -->
+    <line x1="180" y1="290" x2="245" y2="115" stroke="#666" stroke-width="2" stroke-dasharray="6,3" marker-end="url(#arrowSat)"/>
+
+    <!-- Δφ = 0° label -->
+    <text x="180" y="345" text-anchor="middle" font-size="16" font-weight="bold">Δφ = 0°  (forward scattering)</text>
+
+    <!-- Caption -->
+    <text x="180" y="35" text-anchor="middle" fill="#333">sun behind satellite</text>
+  </g>
+
+  <!-- Divider -->
+  <line x1="360" y1="20" x2="360" y2="340" stroke="#ccc" stroke-width="1"/>
+
+  <!-- RIGHT panel: Δφ = 180° (back scattering) -->
+  <g transform="translate(360,0)">
+    <!-- Earth surface -->
+    <line x1="20" y1="290" x2="340" y2="290" stroke="#553" stroke-width="2"/>
+    <text x="180" y="310" text-anchor="middle" fill="#553">Earth surface</text>
+
+    <!-- Zenith arrow -->
+    <line x1="180" y1="290" x2="180" y2="50" stroke="#aaa" stroke-width="1" stroke-dasharray="4,3"/>
+    <text x="186" y="58" fill="#888">zenith</text>
+
+    <!-- Sun (yellow circle, top-right) -->
+    <circle cx="290" cy="80" r="14" fill="#fc0" stroke="#cc0" stroke-width="2"/>
+    <text x="290" y="68" text-anchor="middle" fill="#996">sun</text>
+
+    <!-- Sun ray (downward) -->
+    <line x1="290" y1="80" x2="180" y2="290" stroke="#cc0" stroke-width="2" marker-end="url(#arrowSun)"/>
+
+    <!-- Satellite (gray circle, opposite side at top-left) -->
+    <circle cx="115" cy="115" r="10" fill="#999" stroke="#444" stroke-width="2"/>
+    <text x="105" y="105" fill="#444">sat</text>
+
+    <!-- Satellite line of sight (from surface upward to opposite-side sat) -->
+    <line x1="180" y1="290" x2="115" y2="115" stroke="#666" stroke-width="2" stroke-dasharray="6,3" marker-end="url(#arrowSat)"/>
+
+    <!-- Δφ = 180° label -->
+    <text x="180" y="345" text-anchor="middle" font-size="16" font-weight="bold">Δφ = 180°  (back scattering)</text>
+
+    <!-- Caption -->
+    <text x="180" y="35" text-anchor="middle" fill="#333">sun and satellite on opposite sides of zenith</text>
+  </g>
+
+  <!-- Arrow markers -->
+  <defs>
+    <marker id="arrowSun" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,8 L8,4 z" fill="#cc0"/>
+    </marker>
+    <marker id="arrowSat" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,8 L8,4 z" fill="#666"/>
+    </marker>
+  </defs>
+</svg>

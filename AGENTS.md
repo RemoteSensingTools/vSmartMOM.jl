@@ -7,6 +7,7 @@ conventions that keep the codebase coherent.
 
 **Sister files:**
 - [CLAUDE.md](CLAUDE.md) — project conventions, build/test commands, file structure.
+- **⚠ [docs/src/pages/conventions.md](docs/src/pages/conventions.md)** — Hovenier-style γ sign, Stokes Q/U/V signs, azimuth (Δφ) definition, and the sign-flip checklist for VLIDORT cross-validation. **Read this before any cross-code comparison or data import.**
 - [docs/dev_notes/theory_references.md](docs/dev_notes/theory_references.md) — verified equation↔code crib sheet (the source of truth for paper citations and `file.jl:LINE` anchors).
 - [docs/src/pages/concepts/](docs/src/pages/concepts/) — the user-facing narrative arc; same thread, polished prose.
 

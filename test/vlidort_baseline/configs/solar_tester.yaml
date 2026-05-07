@@ -17,20 +17,23 @@
 
 radiative_transfer:
   spec_bands:
-    # NOTE: 2-point spec band (not 1) — vSmartMOM exhibits a numerical
-    # issue (TOA/BOA off by ~50×) when nSpec=1 with this multi-layer
-    # Stokes_I + per-layer optical-injection setup. Using two repeated
-    # frequencies keeps nSpec=2 with negligible compute cost. See
-    # case_B_solar_tester.jl header for the diagnosis.
+    # NOTE: 2-point spec band (not 1) — vSmartMOM Stokes_I + multi-layer +
+    # per-layer-injection still produces ~50× wrong intensity at nSpec=1
+    # even after the batched_mul singleton fix (cpu_batched.jl). Cases A
+    # (single-layer Stokes_IQUV) and C (multi-layer Stokes_IQU) work at
+    # nSpec=1; Case B's scalar Stokes_I path still has an unidentified
+    # bug. See dev_notes/nspec1_multilayer_stokesI_bug.md for the residual
+    # issue + diagnostic context.
     - "[18867.92 18867.93]"
   surface:
     - LambertianSurfaceScalar(0.05)
   quadrature_type:    GaussQuadHemisphere()
   polarization_type:  Stokes_I()
-  max_m:              12          # NSTOKES=1, NSTREAMS=8 in cfg ⇒ Fourier-moment count ≤ 2·NSTREAMS
+  max_m:              16          # NSTREAMS=8 ⇒ Fourier moments m=0..15
   Δ_angle:            2.0
   # l_trunc matches VLIDORT NMOMENTS = 2·NSTREAMS−1 = 15 (NSTREAMS=8 in cfg).
-  # vSmartMOM Nquad ≈ (l_trunc+1)/2 = 8, plus user VZAs/SZA augmentation.
+  # vSmartMOM GaussQuadHemisphere has 8 non-zero-weight streams, plus user
+  # VZAs/SZA appended as zero-weight nodes.
   l_trunc:            15
   truncation:         "NoTruncation()"   # Task 1 default; case file may rebuild for δ-M
   depol:              0.01072      # raymoms[2] = 0.4920062 ⇒ depol ≈ 0.01072

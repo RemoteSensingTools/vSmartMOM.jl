@@ -74,15 +74,17 @@ function inject_solar_tester_optics!(model)
 end
 
 "Run vSmartMOM at one (SZA, RAZ). Returns `(R, T)` — reflectance at TOA upwelling
-and transmittance at BOA downwelling, both shape `(n_vza, 1, n_spec)`."
-function solar_tester_run_at(sza::Real, raz::Real)
+and transmittance at BOA downwelling, both shape `(n_vza, 1, n_spec)`.
+`spec`, when supplied, overrides quadrature/float/arch."
+function solar_tester_run_at(sza::Real, raz::Real; spec = nothing)
     params = parameters_from_yaml(SOLAR_TESTER_YAML)
+    spec === nothing || apply_overrides!(params, spec)
     params.sza = float(sza)
     fill!(params.vaz, float(raz))
     model = model_from_parameters(params)
     inject_solar_tester_optics!(model)
     out = CoreRT.rt_run(model, i_band=1)
-    return out[1], out[2]
+    return Array(out[1]), Array(out[2])
 end
 
 "Geometry index in 1..36 for (i_sza, i_vza, i_raz). RAZ inner, VZA mid, SZA outer."
@@ -105,51 +107,57 @@ geom_index(i_sza, i_vza, i_raz) = (i_sza - 1) * 9 + (i_vza - 1) * 3 + i_raz
 # TODO: investigate root cause; until then this regression test is also a
 # canary on the nSpec=1 vs nSpec=2 path divergence.
 
-@testset "VLIDORT baseline: Case B — solar_tester scalar (Task 1, single SZA/RAZ)" begin
-    # Scope-restricted: one (SZA, RAZ) point. Why: a full 4 SZA × 3 RAZ ×
-    # 2 task = 24 vSmartMOM runs at ~12 min each would exceed any reasonable
-    # test budget. This single-point version validates the multi-layer +
-    # Lambertian + per-layer-aerosol-injection path; broader coverage is
-    # gated on solver-speed work.
-    #
-    # Compare TOA upwelling reflectance (`R`) and BOA downwelling
-    # transmittance (`T`) against VLIDORT Task 1 (no FOcorr, no δ-M,
-    # plane-parallel) at the matching τ-levels (0 and 23 = nlayers).
+for spec in axis_specs()
+    @testset "VLIDORT baseline: Case B — solar_tester scalar (Task 1) [$(spec_tag(spec))]" begin
+        # VLIDORT solar_tester cfg/reference data: USER_RELAZMS = 0°, 90°,
+        # 180°; geometry index 1 is raz=0°.
+        sza = 35.0
+        raz = SOLAR_TESTER_RAZ_DEG[1]
+        i_sza = 1
+        i_raz = 1
 
-    sza = 35.0
-    raz = 0.0
-    i_sza = 1
-    i_raz = 1
+        task_idx = SOLAR_TESTER_TASKS.pp_noDM
+        toa_level = 1
+        boa_level = length(SOLAR_TESTER_TAU_LEVELS)
+        s = tol_scale(spec)
 
-    task_idx = SOLAR_TESTER_TASKS.pp_noDM       # Task 1 = no FOcorr, no δ-M, plane-parallel
-    toa_level = 1                                # τ-level = 0 (TOA)
-    boa_level = length(SOLAR_TESTER_TAU_LEVELS)  # τ-level = 23 (BOA)
+        @info "Case B: running solar_tester [$(spec_tag(spec))]" sza raz
+        R, T = solar_tester_run_at(sza, raz; spec=spec)
 
-    @info "Case B: running solar_tester at" sza raz
-    R, T = solar_tester_run_at(sza, raz)
+        # Regularized rel-err: |err| / (|truth| + atol). atol = 100·eps(FT)·scale
+        # is the FT-precision noise floor at the data scale; gives a meaningful
+        # "noise-relative" measure when |truth| is small. Uses the maximum
+        # truth magnitude in the comparison set as the representative scale.
+        truth_scale = max(maximum(abs.(SOLAR_TESTER_STOKES[:, toa_level, SOLAR_TESTER_DIR_UP, task_idx])),
+                          maximum(abs.(SOLAR_TESTER_STOKES[:, boa_level, SOLAR_TESTER_DIR_DN, task_idx])))
+        atol = 100 * eps(spec.float) * truth_scale
+        function compare(modeled, truth, label, sza, vza, raz, geom)
+            re = abs(modeled - truth) / (abs(truth) + atol)
+            @info "  geom=$geom $label" sza vza raz modeled=round(modeled, sigdigits=6) truth=round(truth, sigdigits=6) rel_err=round(re, sigdigits=3)
+            return re
+        end
 
-    function compare(modeled, truth, label, sza, vza, raz, geom)
-        re = abs(modeled - truth) / abs(truth)
-        @info "  geom=$geom $label" sza vza raz modeled=round(modeled, sigdigits=6) truth=round(truth, sigdigits=6) rel_err=round(re, sigdigits=3)
-        return re
+        rel_up = Float64[]
+        rel_dn = Float64[]
+        for (i_vza, vza) in enumerate(SOLAR_TESTER_VZA_DEG)
+            geom = geom_index(i_sza, i_vza, i_raz)
+            truth_up = SOLAR_TESTER_STOKES[geom, toa_level, SOLAR_TESTER_DIR_UP, task_idx]
+            truth_dn = SOLAR_TESTER_STOKES[geom, boa_level, SOLAR_TESTER_DIR_DN, task_idx]
+            push!(rel_up, compare(R[i_vza, 1, 1], truth_up, "TOA-up", sza, vza, raz, geom))
+            push!(rel_dn, compare(T[i_vza, 1, 1], truth_dn, "BOA-dn", sza, vza, raz, geom))
+        end
+
+        println("\nCase B [$(spec_tag(spec))] — solar_tester Task 1, sza=$sza raz=$raz:")
+        println("  TOA-up: median=$(round(Statistics.median(rel_up), sigdigits=3))  max=$(round(maximum(rel_up), sigdigits=3))")
+        println("  BOA-dn: median=$(round(Statistics.median(rel_dn), sigdigits=3))  max=$(round(maximum(rel_dn), sigdigits=3))")
+
+        # FT-objective gate: √(floor² + ft_margin²), assumes uncorrelated
+        # truncation+roundoff errors (RSS of variances). No per-FT branching.
+        # K=300 calibrated to F32 noise floor in ~30-doubling pipelines.
+        floor_rtol = 1e-3
+        ft_margin = 300 * sqrt(eps(spec.float))
+        rtol = sqrt(floor_rtol^2 + ft_margin^2)
+        @test maximum(rel_up) < rtol
+        @test maximum(rel_dn) < rtol
     end
-
-    rel_up = Float64[]
-    rel_dn = Float64[]
-    for (i_vza, vza) in enumerate(SOLAR_TESTER_VZA_DEG)
-        geom = geom_index(i_sza, i_vza, i_raz)
-        truth_up = SOLAR_TESTER_STOKES[geom, toa_level, SOLAR_TESTER_DIR_UP, task_idx]
-        truth_dn = SOLAR_TESTER_STOKES[geom, boa_level, SOLAR_TESTER_DIR_DN, task_idx]
-        push!(rel_up, compare(R[i_vza, 1, 1], truth_up, "TOA-up", sza, vza, raz, geom))
-        push!(rel_dn, compare(T[i_vza, 1, 1], truth_dn, "BOA-dn", sza, vza, raz, geom))
-    end
-
-    println("\nCase B — solar_tester Task 1 (PP, no DM), sza=$sza raz=$raz:")
-    println("  TOA-up: median=$(round(Statistics.median(rel_up), sigdigits=3))  max=$(round(maximum(rel_up), sigdigits=3))")
-    println("  BOA-dn: median=$(round(Statistics.median(rel_dn), sigdigits=3))  max=$(round(maximum(rel_dn), sigdigits=3))")
-
-    # Tolerance gate: 1e-3 — observed maxima are ~5e-4 for both directions
-    # under the matched-NMOMENTS-15 setup; gates set ~2× observed.
-    @test maximum(rel_up) < 1e-3
-    @test maximum(rel_dn) < 1e-3
 end

@@ -480,9 +480,9 @@ function emit_solar_tester_vector_truth(stokes_dict, tau_levels)
 # Source: vlidort_v_test/saved_results/gfortran/nstokes3/results_solar_tester_IQU0.all
 # DO NOT EDIT BY HAND — re-run extraction.
 #
-# Same geom/level/dir/task layout as scalar solar_tester — see
-# solar_tester_truth.jl. Three Stokes components (I, Q, U) per
-# STOKES-X block in the .all file.
+# Vector solar_tester geometry differs from scalar solar_tester: the vector
+# cfg uses RAZ = [10, 90, 170], not [0, 90, 180]. Three Stokes components
+# (I, Q, U) per STOKES-X block in the .all file.
 #
 # Layout: SOLAR_TESTER_VECTOR_STOKES[:I/:Q/:U][geom, level, dir, task]
 #   geom  in 1..36   (4 SZA × 3 VZA × 3 RAZ; SZA outer, VZA mid, RAZ inner)
@@ -494,6 +494,10 @@ function emit_solar_tester_vector_truth(stokes_dict, tau_levels)
 # rt_run reflectance L = R/F₀ (F₀=1 here).
 
 const SOLAR_TESTER_VECTOR_TAU_LEVELS = $(repr(tau_levels))
+const SOLAR_TESTER_VECTOR_SZA_DEG    = [35.0, 67.0, 75.0, 82.0]
+const SOLAR_TESTER_VECTOR_VZA_DEG    = [10.0, 20.0, 40.0]
+const SOLAR_TESTER_VECTOR_RAZ_DEG    = [10.0, 90.0, 170.0]
+const SOLAR_TESTER_VECTOR_ALBEDO     = 0.05
 
 """)
         for sym in (:I, :Q, :U)

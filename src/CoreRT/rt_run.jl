@@ -97,6 +97,8 @@ function rt_run(RS_type::AbstractRamanType, model, iBand)
     max_m    = get_max_m(model)
     (; quad_points) = model
     FT       = CoreRT.float_type(model)
+    dτ_max_threshold = model.numerics.dτ_max_threshold   # numerical knob → rt_kernel!
+    dτ_min_floor     = model.numerics.dτ_min_floor
 
     n_aer = CoreRT.n_aerosols(model)
 
@@ -238,7 +240,9 @@ function rt_run(RS_type::AbstractRamanType, model, iBand)
                         I_static,
                         arch,
                         qp_μN, iz;
-                        workspace=_interaction_ws)
+                        workspace=_interaction_ws,
+                        dτ_max_threshold=dτ_max_threshold,
+                        dτ_min_floor=dτ_min_floor)
         end
 
         # Create surface matrices:

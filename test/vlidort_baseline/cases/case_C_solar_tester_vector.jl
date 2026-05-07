@@ -17,10 +17,7 @@ const VEC_AEROSOL_TAU_TOTAL  = 0.5
 const VEC_AEROSOL_NMOMENTS   = 15
 
 "Build the Problem III `AerosolOptics` from the parsed `PROBLEMIII_*`
-arrays. The mapping below uses the **same convention as Case A's Siewert
-PROBLEM_IIA** (no SMASK flip on b1/b2): the data file's column values
-are passed through to vSmartMOM's `GreekCoefs` directly, with only the
-ϵ = −b2 sign flip that B[3,4] requires.
+arrays.
 
     a1   → β   (B[1,1] phase function)
     b1   → γ   (B[1,2] = B[2,1])
@@ -29,15 +26,13 @@ are passed through to vSmartMOM's `GreekCoefs` directly, with only the
     b2   → −ϵ  (B[3,4]; sign-flipped per VLIDORT GREEKMAT(.,12) = −b2)
     a4   → δ   (B[4,4])
 
-(For `Stokes_IQU` only β/γ/α/ζ enter the B-matrix, so δ/ϵ live but are
-unused here; populating them keeps the GreekCoefs constructor happy.)
-
-EMPIRICAL NOTE: I tried flipping γ → −b1 (mirroring VLIDORT's SMASK = −1
-applied to RTS-Mie b1 output) — that hurt the I match (max rel-err 7e-3
-vs 2e-3 without the flip) and did NOT fix Q's sign. So we keep the
-'no-flip' Siewert-style mapping. The Q sign flip is a Rayleigh-side
-convention mismatch (vSmartMOM `get_greek_rayleigh` γ has the opposite
-sign from VLIDORT PROBLEM_RAY at L=2). See dev_notes/case_c_q_u_conventions.md."
+Important: VLIDORT's vector solar_tester driver later applies
+`SMASK(2:3)=-1` when converting `ProblemIII.Moms` into `GREEKMAT`.
+The committed `PROBLEMIII_b1` values are the pre-SMASK file values, not the
+final VLIDORT `GREEKMAT(1,2)` values. Passing `b1` through here keeps the
+aerosol in the same internal convention as vSmartMOM's Rayleigh
+`get_greek_rayleigh`; the VLIDORT truth Q/U values are sign-flipped at
+comparison."
 function solar_tester_vector_aerosol_optics()
     Lp1 = VEC_AEROSOL_NMOMENTS + 1   # L = 0..VEC_AEROSOL_NMOMENTS
     @assert length(PROBLEMIII_a1) >= Lp1 "PROBLEMIII has $(length(PROBLEMIII_a1)) moments, need ≥$(Lp1)"
@@ -82,114 +77,100 @@ end
 
 "Run vSmartMOM at one (SZA, RAZ). Returns `(R, T)` — TOA upwelling
 reflectance and BOA downwelling transmittance with shape `(n_vza, 3, n_spec)`
-for Stokes_IQU."
-function solar_tester_vector_run_at(sza::Real, raz::Real)
+for Stokes_IQU. `spec`, when supplied, overrides quadrature/float/arch."
+function solar_tester_vector_run_at(sza::Real, raz::Real; spec = nothing)
     params = parameters_from_yaml(SOLAR_TESTER_VECTOR_YAML)
+    spec === nothing || apply_overrides!(params, spec)
     params.sza = float(sza)
     fill!(params.vaz, float(raz))
     model = model_from_parameters(params)
     inject_solar_tester_vector_optics!(model)
     out = CoreRT.rt_run(model, i_band=1)
-    return out[1], out[2]
+    return Array(out[1]), Array(out[2])
 end
 
 "Geometry index in 1..36 for (i_sza, i_vza, i_raz). RAZ inner, VZA mid, SZA outer."
 geom_index_vec(i_sza, i_vza, i_raz) = (i_sza - 1) * 9 + (i_vza - 1) * 3 + i_raz
 
-@testset "VLIDORT baseline: Case C — solar_tester vector Stokes-3 (Task 1, single SZA/RAZ)" begin
-    # Scope-restricted to one (SZA, RAZ) for the same runtime reason as Case B.
-    # Compare I, Q (and U if non-trivial) at TOA upwelling and BOA downwelling
-    # against VLIDORT Task 1 (No FOcorr, No δ-M, plane-parallel).
-    #
-    # CONVENTION NOTES (open issues — Case C currently gates only on I):
-    #
-    #   1. Q sign convention (Rayleigh-derived). vSmartMOM's `get_greek_rayleigh`
-    #      sets γ[L=2] = +0.5·sqrt(6)·dpl_p, while VLIDORT's `PROBLEM_RAY(5,2)`
-    #      = −sqrt(6)·β_2. These are opposite-sign entries for the same Rayleigh
-    #      B[1,2] coefficient. With pure aerosol (Case A, Siewert PROBLEM_IIA,
-    #      τ_rayl = 0) Q matches at ~1e-6 because the convention only enters
-    #      through aerosol Greek (passed as-is). Once Rayleigh contributes
-    #      meaningfully (Case C, mixed Rayleigh+aerosol layers), Q comes out
-    #      with the wrong sign (modeled ≈ +0.014 vs truth ≈ −0.013 at vza=10°).
-    #      Resolving it needs a sign reconciliation in Rayleigh greek
-    #      construction; until then Q is reported but NOT gated.
-    #
-    #   2. U at vaz = 0° / 180° (principal plane). vSmartMOM's `postprocessing_vza!`
-    #      weights U by `sin(m·φ)` (postprocessing_vza.jl:33), which is zero
-    #      at φ = 0° / 180°. So vSmartMOM returns U ≡ 0 there regardless of
-    #      the multi-scatter kernel. VLIDORT's `results_solar_tester_IQU0.all`
-    #      reports a small non-zero U at raz=0° (~−4e-3 at vza=10°) — likely a
-    #      different rotation convention. U is reported but NOT gated.
-    #
-    # Both items are tracked in a follow-up; this commit lands Case C as an
-    # I-only regression baseline (similar in spirit to Case B's nSpec-2
-    # workaround).
+for spec in axis_specs()
+    @testset "VLIDORT baseline: Case C — solar_tester vector Stokes-3 (Task 1) [$(spec_tag(spec))]" begin
+        # vSmartMOM internal convention is kept consistent between Rayleigh and
+        # imported aerosol γ. Truth Q/U from VLIDORT's convention is sign-flipped
+        # at comparison.
+        #
+        # VLIDORT vector solar_tester cfg/reference data: USER_RELAZMS = 10°,
+        # 90°, 170°; geometry index 1 is raz=10°.
+        sza = 35.0
+        raz = SOLAR_TESTER_VECTOR_RAZ_DEG[1]
+        i_sza = 1
+        i_raz = 1
+        task_idx = 1
+        toa_level = 1
+        boa_level = length(SOLAR_TESTER_VECTOR_TAU_LEVELS)
+        s = tol_scale(spec)
 
-    sza = 35.0
-    raz = 0.0
-    i_sza = 1
-    i_raz = 1
-    task_idx = 1                                # Task 1 = no FOcorr / no δ-M
-    toa_level = 1
-    boa_level = length(SOLAR_TESTER_VECTOR_TAU_LEVELS)
+        @info "Case C: running solar_tester vector [$(spec_tag(spec))]" sza raz
+        R, T = solar_tester_vector_run_at(sza, raz; spec=spec)
 
-    @info "Case C: running solar_tester vector at" sza raz
-    R, T = solar_tester_vector_run_at(sza, raz)
+        # Per-Stokes representative scale = max truth magnitude in this set.
+        # `atol = 100·eps(FT)·scale` is the FT noise floor.
+        stokes_map = [(1, :I), (2, :Q), (3, :U)]
+        truth_scales = Dict(s_sym => max(maximum(abs.(SOLAR_TESTER_VECTOR_STOKES[s_sym][:, toa_level, 1, task_idx])),
+                                          maximum(abs.(SOLAR_TESTER_VECTOR_STOKES[s_sym][:, boa_level, 2, task_idx])))
+                            for (_, s_sym) in stokes_map)
+        atol_per_stokes = Dict(s_sym => 100 * eps(spec.float) * truth_scales[s_sym]
+                               for (_, s_sym) in stokes_map)
 
-    function compare(modeled, truth, label, sza, vza, raz, geom, stokes_sym)
-        # Skip the rel-err calc when truth is essentially zero (numerical noise).
-        if abs(truth) < 1e-9
-            return NaN
+        function compare(modeled, truth, label, sza, vza, raz, geom, stokes_sym)
+            # Regularized rel-err: |err| / (|truth| + atol). Naturally
+            # bounded when |truth| → 0 (saturates at |err|/atol).
+            atol = atol_per_stokes[stokes_sym]
+            re = abs(modeled - truth) / (abs(truth) + atol)
+            @info "  geom=$geom $label $stokes_sym" sza vza raz modeled=round(modeled, sigdigits=6) truth=round(truth, sigdigits=6) rel_err=round(re, sigdigits=3)
+            return re
         end
-        re = abs(modeled - truth) / abs(truth)
-        # Always log so the comparison is visible — including the principal-plane
-        # U mismatch where modeled = 0 exactly (vSmartMOM symmetry; see
-        # CONVENTION NOTES). Returning NaN here would hide that.
-        zero_modeled = stokes_sym == :U && abs(modeled) < 1e-12
-        tag = zero_modeled ? " [modeled≡0; principal-plane convention]" : ""
-        @info "  geom=$geom $label $stokes_sym$tag" sza vza raz modeled=round(modeled, sigdigits=6) truth=round(truth, sigdigits=6) rel_err=round(re, sigdigits=3)
-        # Don't add the principal-plane U mismatch into the test-stat vector
-        # (that would gate the test on a known convention discrepancy).
-        return zero_modeled ? NaN : re
+        rel_up = Dict{Symbol, Vector{Float64}}(:I => Float64[], :Q => Float64[], :U => Float64[])
+        rel_dn = Dict{Symbol, Vector{Float64}}(:I => Float64[], :Q => Float64[], :U => Float64[])
+
+        vza_list = SOLAR_TESTER_VECTOR_VZA_DEG
+        for (i_vza, vza) in enumerate(vza_list)
+            geom = geom_index_vec(i_sza, i_vza, i_raz)
+            for (s_idx, s_sym) in stokes_map
+                truth_up = SOLAR_TESTER_VECTOR_STOKES[s_sym][geom, toa_level, 1, task_idx]
+                truth_dn = SOLAR_TESTER_VECTOR_STOKES[s_sym][geom, boa_level, 2, task_idx]
+                # Convert VLIDORT truth to the vSmartMOM internal convention for
+                # comparison. The ProblemIII.Moms b1 file values are pre-SMASK;
+                # the VLIDORT driver applies SMASK before solving.
+                if s_sym in (:Q, :U)
+                    truth_up = -truth_up
+                    truth_dn = -truth_dn
+                end
+                re_u = compare(R[i_vza, s_idx, 1], truth_up, "TOA-up", sza, vza, raz, geom, s_sym)
+                re_d = compare(T[i_vza, s_idx, 1], truth_dn, "BOA-dn", sza, vza, raz, geom, s_sym)
+                isnan(re_u) || push!(rel_up[s_sym], re_u)
+                isnan(re_d) || push!(rel_dn[s_sym], re_d)
+            end
+        end
+
+        println("\nCase C [$(spec_tag(spec))] — solar_tester vector Task 1, sza=$sza raz=$raz:")
+        for s_sym in (:I, :Q, :U)
+            if !isempty(rel_up[s_sym])
+                println("  TOA-up $s_sym: median=$(round(Statistics.median(rel_up[s_sym]), sigdigits=3))  max=$(round(maximum(rel_up[s_sym]), sigdigits=3))")
+            end
+            if !isempty(rel_dn[s_sym])
+                println("  BOA-dn $s_sym: median=$(round(Statistics.median(rel_dn[s_sym]), sigdigits=3))  max=$(round(maximum(rel_dn[s_sym]), sigdigits=3))")
+            end
+        end
+
+        # FT-objective gate: √(floor² + ft_margin²) with ft_margin=K·√(eps(FT)).
+        # Quadrature combination of physics-model truncation + FT roundoff.
+        # K=300 calibrated empirically to ~30-doubling F32 noise floor.
+        # F64: ~4.5e-6 (negligible); F32: ~0.1 (dominates).
+        ft_margin = 300 * sqrt(eps(spec.float))
+        for s_sym in (:I, :Q, :U)
+            @test maximum(rel_up[s_sym]) < sqrt((1e-3)^2 + ft_margin^2)
+            @test maximum(rel_dn[s_sym]) < sqrt((2e-3)^2 + ft_margin^2)
+        end
+        @info "Case C maxima" TOA_I_max=maximum(rel_up[:I]) BOA_I_max=maximum(rel_dn[:I]) Q_TOA_max=maximum(rel_up[:Q]) Q_BOA_max=maximum(rel_dn[:Q]) U_TOA_max=maximum(rel_up[:U]) U_BOA_max=maximum(rel_dn[:U])
     end
-
-    # Map vSmartMOM stokes index → truth-table key. Stokes_IQU layout: I=1, Q=2, U=3.
-    stokes_map = [(1, :I), (2, :Q), (3, :U)]
-
-    rel_up = Dict{Symbol, Vector{Float64}}(:I => Float64[], :Q => Float64[], :U => Float64[])
-    rel_dn = Dict{Symbol, Vector{Float64}}(:I => Float64[], :Q => Float64[], :U => Float64[])
-
-    # Case C uses the same 3-VZA cfg as Case B (cfg's user-defined VZAs).
-    vza_list = (10.0, 20.0, 40.0)
-    for (i_vza, vza) in enumerate(vza_list)
-        geom = geom_index_vec(i_sza, i_vza, i_raz)
-        for (s_idx, s_sym) in stokes_map
-            truth_up = SOLAR_TESTER_VECTOR_STOKES[s_sym][geom, toa_level, 1, task_idx]
-            truth_dn = SOLAR_TESTER_VECTOR_STOKES[s_sym][geom, boa_level, 2, task_idx]
-            re_u = compare(R[i_vza, s_idx, 1], truth_up, "TOA-up", sza, vza, raz, geom, s_sym)
-            re_d = compare(T[i_vza, s_idx, 1], truth_dn, "BOA-dn", sza, vza, raz, geom, s_sym)
-            isnan(re_u) || push!(rel_up[s_sym], re_u)
-            isnan(re_d) || push!(rel_dn[s_sym], re_d)
-        end
-    end
-
-    println("\nCase C — solar_tester vector Task 1, sza=$sza raz=$raz:")
-    for s_sym in (:I, :Q, :U)
-        if !isempty(rel_up[s_sym])
-            println("  TOA-up $s_sym: median=$(round(Statistics.median(rel_up[s_sym]), sigdigits=3))  max=$(round(maximum(rel_up[s_sym]), sigdigits=3))")
-        end
-        if !isempty(rel_dn[s_sym])
-            println("  BOA-dn $s_sym: median=$(round(Statistics.median(rel_dn[s_sym]), sigdigits=3))  max=$(round(maximum(rel_dn[s_sym]), sigdigits=3))")
-        end
-    end
-
-    # Tolerances — only TOA-up I is tightly gated (5e-3); observed max
-    # ~2e-3. BOA-dn I is gated very loosely (3e-1) because the Rayleigh γ
-    # sign mismatch (see CONVENTION NOTES) leaks into the I↔Q multi-scatter
-    # coupling and produces ~18% error in downwelling I. Q/U are not gated.
-    # All three (BOA-dn I tightening, Q sign, U principal-plane) are
-    # tracked in dev_notes/case_c_q_u_conventions.md.
-    @test maximum(rel_up[:I]) < 5e-3
-    @test maximum(rel_dn[:I]) < 3e-1
-    @info "Q/U/BOA-dn-I gates loose — see CONVENTION NOTES" TOA_I_max=maximum(rel_up[:I]) BOA_I_max=maximum(rel_dn[:I]) Q_max=maximum(rel_up[:Q]) U_zero=any(R[:, 3, 1] .== 0)
 end

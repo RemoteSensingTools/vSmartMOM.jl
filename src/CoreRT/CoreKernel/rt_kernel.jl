@@ -183,9 +183,11 @@ function rt_kernel!(RS_type::noRS{FT},
                     I_static,
                     architecture,
                     qp_μN, iz;
-                    workspace=nothing) where {FT,M}
+                    workspace=nothing,
+                    dτ_max_threshold::Union{Nothing,Real} = nothing,
+                    dτ_min_floor::Union{Nothing,Real} = nothing) where {FT,M}
     #@show array_type(architecture)
-    
+
     (; qp_μ, μ₀) = quad_points
     (; F₀) = RS_type
     # Just unpack core optical properties from
@@ -195,7 +197,9 @@ function rt_kernel!(RS_type::noRS{FT},
 
     # If there is scattering, perform the elemental and doubling steps
     if scatter
-        dτ, ndoubl, expk = init_layer(computed_layer_properties, quad_points, pol_type, architecture)
+        dτ, ndoubl, expk = init_layer(computed_layer_properties, quad_points, pol_type, architecture;
+                                      dτ_max_threshold = dτ_max_threshold,
+                                      dτ_min_floor = dτ_min_floor)
         #@show typeof(computed_layer_properties)
         @timeit "elemental" elemental!(pol_type, SFI,
                                 τ_sum, dτ, F₀,
@@ -240,10 +244,23 @@ Uses `doubling_number` to determine `ndoubl` from the maximum allowed `dτ_max`.
 - `dτ`: Elemental optical depth vector `[nSpec]`.
 - `ndoubl`: Number of doubling iterations.
 """
-@inline function get_dtau_ndoubl(computed_layer_properties::CoreScatteringOpticalProperties, quad_points::QuadPoints{FT}) where {FT}
-    (; qp_μ) = quad_points
+@inline function get_dtau_ndoubl(computed_layer_properties::CoreScatteringOpticalProperties, quad_points::QuadPoints{FT};
+                                  dτ_max_threshold::Union{Nothing,Real} = nothing,
+                                  dτ_min_floor::Union{Nothing,Real} = nothing) where {FT}
+    (; qp_μ, wt_μ) = quad_points
     (; τ, ϖ) = computed_layer_properties
-    dτ_max = minimum([maximum(τ .* ϖ), FT(0.001) * minimum(qp_μ)])
+    # Constrain `dτ_max` using only the TRUE quadrature streams (positive
+    # weights). Zero-weight user-VZA / SZA nodes are appended for output
+    # postprocessing — they don't drive the discrete-ordinate eigen/matrix
+    # work, and their grazing μ would otherwise force `dτ_initial` below
+    # Float32 ε for grazing test geometries (e.g. vza=89.9999° at τ_total=1).
+    threshold = FT(dτ_max_threshold === nothing ? 0.001 : dτ_max_threshold)
+    floor_val = FT(dτ_min_floor === nothing ? 1024 * eps(FT) : dτ_min_floor)
+    real_streams = qp_μ[Array(wt_μ) .> eps(FT)]
+    μ_min = isempty(real_streams) ? minimum(qp_μ) : minimum(real_streams)
+    # Absolute floor caps `ndoubl` from above so the elemental dτ never
+    # collapses below FT precision regardless of geometry/threshold.
+    dτ_max = max(floor_val, minimum([maximum(τ .* ϖ), threshold * μ_min]))
     _, ndoubl = doubling_number(dτ_max, maximum(τ .* ϖ))
     # Compute dτ vector
     dτ = τ ./ 2^ndoubl
@@ -256,11 +273,19 @@ end
 Variant for directional scattering: uses `G[iμ₀]` to scale optical depth for the solar beam
 direction when computing `dτ_max` for the doubling criterion.
 """
-@inline function get_dtau_ndoubl(computed_layer_properties::CoreDirectionalScatteringOpticalProperties, quad_points::QuadPoints{FT}) where {FT}
-    (; qp_μ, iμ₀) = quad_points
+@inline function get_dtau_ndoubl(computed_layer_properties::CoreDirectionalScatteringOpticalProperties, quad_points::QuadPoints{FT};
+                                  dτ_max_threshold::Union{Nothing,Real} = nothing,
+                                  dτ_min_floor::Union{Nothing,Real} = nothing) where {FT}
+    (; qp_μ, wt_μ, iμ₀) = quad_points
     (; τ, ϖ, G) = computed_layer_properties
     gfct = Array(G)[iμ₀]
-    dτ_max = minimum([maximum(gfct * τ .* ϖ), FT(0.001) * minimum(qp_μ)])
+    # Constrain `dτ_max` using only the TRUE quadrature streams — see
+    # comment in the `CoreScatteringOpticalProperties` variant above.
+    threshold = FT(dτ_max_threshold === nothing ? 0.001 : dτ_max_threshold)
+    floor_val = FT(dτ_min_floor === nothing ? 1024 * eps(FT) : dτ_min_floor)
+    real_streams = qp_μ[Array(wt_μ) .> eps(FT)]
+    μ_min = isempty(real_streams) ? minimum(qp_μ) : minimum(real_streams)
+    dτ_max = max(floor_val, minimum([maximum(gfct * τ .* ϖ), threshold * μ_min]))
     _, ndoubl = doubling_number(dτ_max, maximum(τ .* ϖ))
     # Compute dτ vector
     dτ = τ ./ 2^ndoubl
@@ -278,20 +303,28 @@ and beam attenuation factor ``e^{-d\\tau/\\mu_0}`` (or ``e^{-d\\tau \\cdot G/\\m
 - `ndoubl`: Number of doubling iterations.
 - `expk`: Beam attenuation factor ``e^{-d\\tau/\\mu_0}`` `[nSpec]`, on the correct architecture.
 """
-@inline function init_layer(computed_layer_properties::CoreDirectionalScatteringOpticalProperties, quad_points, pol_type, architecture)
-    arr_type = array_type(architecture) 
+@inline function init_layer(computed_layer_properties::CoreDirectionalScatteringOpticalProperties, quad_points, pol_type, architecture;
+                            dτ_max_threshold::Union{Nothing,Real} = nothing,
+                            dτ_min_floor::Union{Nothing,Real} = nothing)
+    arr_type = array_type(architecture)
     (; μ₀, iμ₀) = quad_points
     (; G) = computed_layer_properties
-    dτ, ndoubl = get_dtau_ndoubl(computed_layer_properties, quad_points)
+    dτ, ndoubl = get_dtau_ndoubl(computed_layer_properties, quad_points;
+                                 dτ_max_threshold = dτ_max_threshold,
+                                 dτ_min_floor = dτ_min_floor)
     gfct = Array(G)[iμ₀]
     expk = exp.(-dτ*gfct/μ₀)
     return dτ, ndoubl, arr_type(expk)
 end
 
-@inline function init_layer(computed_layer_properties::CoreScatteringOpticalProperties, quad_points, pol_type, architecture)
+@inline function init_layer(computed_layer_properties::CoreScatteringOpticalProperties, quad_points, pol_type, architecture;
+                            dτ_max_threshold::Union{Nothing,Real} = nothing,
+                            dτ_min_floor::Union{Nothing,Real} = nothing)
     arr_type = array_type(architecture)
     (; μ₀) = quad_points
-    dτ, ndoubl = get_dtau_ndoubl(computed_layer_properties, quad_points)
+    dτ, ndoubl = get_dtau_ndoubl(computed_layer_properties, quad_points;
+                                 dτ_max_threshold = dτ_max_threshold,
+                                 dτ_min_floor = dτ_min_floor)
     expk = exp.(-dτ/μ₀)
     return dτ, ndoubl, arr_type(expk)
 end
