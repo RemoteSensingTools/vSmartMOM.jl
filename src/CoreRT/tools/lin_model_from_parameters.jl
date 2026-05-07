@@ -418,10 +418,11 @@ function model_from_parameters(lin::LinMode,
     # Per-band Fourier loop bound (order). Phase C: trait-based aggregator
     # via `component_m_max(c, ctx)`. Same helper as the forward path so
     # forward and lin can never silently disagree.
-    components_per_band = [_band_components(params, aerosol_optics, i_band)
+    components_per_band = [_band_components(params, aerosol_optics, sources, i_band)
                             for i_band in 1:n_bands]
     m_max_bands = _derive_m_max_bands_via_traits(l_max, params.max_m,
-                                                  components_per_band)
+                                                  components_per_band,
+                                                  quad_points.Nstreams)
     n_fourier_moments_bands = m_max_bands .+ 1
 
     # Build the hierarchical RTModel

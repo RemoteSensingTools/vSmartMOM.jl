@@ -70,32 +70,49 @@ band `i`. The trait dispatch already lives in `component_m_max.jl`.
 """
 function _derive_m_max_bands_via_traits(l_max::AbstractVector{Int},
                                         legacy_max_m_count::Int,
-                                        components_per_band)
+                                        components_per_band,
+                                        nstreams::Int)
     @assert length(l_max) == length(components_per_band)
     m_max_bands = similar(l_max, Int)
+    # Public contract: stream_l_cap = 2·Nstreams - 1 (see Phase A; same
+    # formula for both Gauss and Radau — Radau's internal subinterval
+    # node count is bookkeeping). Codex review of Phase C (P2) flagged
+    # that using `2·l_max - 1` here lets the trait aggregator hand
+    # back loop bounds the quadrature can't actually resolve.
+    quadrature_l_cap = max(2 * nstreams - 1, 0)
     legacy_order_cap = max(legacy_max_m_count - 1, 0)
     for i in eachindex(l_max)
-        stream_l_cap = max(2 * l_max[i] - 1, 0)
-        user_l_cap = min(stream_l_cap, legacy_order_cap)
-        ctx = (; user_l_cap, stream_l_cap, m_max_override = nothing,
-                truncation = nothing)
+        # `user_l_cap` is the most restrictive of: the stream resolving
+        # power, the legacy `max_m` knob, and the per-band Legendre
+        # ceiling derived from aerosol greek length.
+        user_l_cap = min(quadrature_l_cap, legacy_order_cap, l_max[i])
+        ctx = (; user_l_cap, stream_l_cap = quadrature_l_cap,
+                m_max_override = nothing, truncation = nothing)
         m_max_bands[i] = _aggregate_m_max(components_per_band[i], ctx)
     end
     return m_max_bands
 end
 
 """
-    _band_components(params, aerosol_optics, i_band) -> Vector
+    _band_components(params, aerosol_optics, sources, i_band) -> Vector
 
 Build the per-band component list consumed by the trait aggregator.
-Always includes Rayleigh (m_max=2 floor) plus the band's surface BRDF
-and any truncated aerosol optics. The Rayleigh contribution is added
-as the type itself (`RayleighScattering`) and `component_m_max(::Type{...})`
-is dispatched to `2` — this avoids constructing a dummy
-`RayleighScattering` instance at trait-resolution time.
+Always includes Rayleigh (m_max=2 floor) plus the band's surface BRDF,
+any truncated aerosol optics, and the active source(s) — typically a
+`SolarBeam` (m_max=0, neutral) but may include `SurfaceSIF` or a
+future thermal source whose Fourier support is non-trivial.
+
+The Rayleigh contribution is added as the type itself
+(`RayleighScattering`) and `component_m_max(::Type{...})` is dispatched
+to `2` — this avoids constructing a dummy `RayleighScattering`
+instance at trait-resolution time.
+
+Codex review of Phase C (P2) flagged that omitting `sources` here
+would silently drop source-driven Fourier moments for any future
+source whose trait isn't `0`.
 """
-function _band_components(params, aerosol_optics, i_band)
-    comps = Any[RayleighScattering, params.brdf[i_band]]
+function _band_components(params, aerosol_optics, sources, i_band)
+    comps = Any[RayleighScattering, params.brdf[i_band], sources]
     if !isempty(aerosol_optics) && i_band <= length(aerosol_optics)
         for ao in aerosol_optics[i_band]
             push!(comps, ao)
@@ -428,10 +445,11 @@ function model_from_parameters(params::vSmartMOM_Parameters;
     # Codex review of Phase B (P1) flagged that the previous count-only
     # aggregator silently half-truncated Cox-Munk forward — traits restore the
     # full surface-driven Fourier resolution.
-    components_per_band = [_band_components(params, aerosol_optics, i_band)
+    components_per_band = [_band_components(params, aerosol_optics, sources, i_band)
                             for i_band in 1:n_bands]
     m_max_bands = _derive_m_max_bands_via_traits(l_max, params.max_m,
-                                                  components_per_band)
+                                                  components_per_band,
+                                                  quad_points.Nstreams)
     n_fourier_moments_bands = m_max_bands .+ 1
 
     # Build the hierarchical RTModel
@@ -688,10 +706,11 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
     end
     # Per-band Fourier loop bound (order). See Phase C note in the matching
     # `model_from_parameters` site above.
-    components_per_band = [_band_components(params, aerosol_optics, i_band)
+    components_per_band = [_band_components(params, aerosol_optics, sources, i_band)
                             for i_band in 1:n_bands]
     m_max_bands = _derive_m_max_bands_via_traits(l_max, params.max_m,
-                                                  components_per_band)
+                                                  components_per_band,
+                                                  quad_points.Nstreams)
     n_fourier_moments_bands = m_max_bands .+ 1
 
     # Build the hierarchical RTModel
