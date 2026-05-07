@@ -80,10 +80,13 @@ end
         U_deltas_all[ϕ_i,:] = abs.(U_trues[:,ϕ_i] - U_modeled_all[ϕ_i,:]) ./ U_trues[:,ϕ_i]
     end
 
-    ϵ = 0.008
-
-    @test maximum(I_deltas_all) < 0.002
-    @test maximum(Q_deltas_all[findall(i -> i >= 0.01, Q_modeled_all)]) < ϵ
-    @test maximum(filter(!isnan, U_deltas_all[findall(i -> i >= 0.01, U_modeled_all)])) < ϵ
+    # Tightened tolerances after switching natraj.yaml to GaussLegQuad +
+    # NoTruncation: Float64 max rel-err on F64 measures 0.02% (I), 0.14% (Q,
+    # |modeled| ≥ 0.01), and 0.01% (U, |modeled| ≥ 0.01) — see
+    # docs/src/pages/benchmarks.md. Limits sit ~2× over measured for the
+    # noisy-Q rows and ~5× over the very stable I/U rows.
+    @test maximum(I_deltas_all) < 5e-4
+    @test maximum(Q_deltas_all[findall(i -> i >= 0.01, Q_modeled_all)]) < 2.5e-3
+    @test maximum(filter(!isnan, U_deltas_all[findall(i -> i >= 0.01, U_modeled_all)])) < 5e-4
 
 end
