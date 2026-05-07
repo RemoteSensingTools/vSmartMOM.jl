@@ -36,11 +36,80 @@ organizes solver state into named sub-objects:
 - `atmosphere`: atmospheric profile and spectral bands.
 - `optics`: Rayleigh, aerosol, gas, and linearized optical-property state.
 - `surfaces`: one surface model per spectral band.
+- `sources`: source-term scene (v0.6 — see below). Default
+  `SolarBeam()` preserves historical unit-Stokes-I behavior.
 
 The old flat `vSmartMOM_Model` container has been replaced. Compatibility
 getters still expose many legacy fields, but new code should prefer the
 hierarchical fields and accessor functions documented in the
 [Library](api_reference.md).
+
+## v0.6 Source-Term Refactor
+
+Source terms (solar, surface fluorescence, blackbody, future thermal /
+lidar / lunar) are now first-class composable types under
+`AbstractSource`. The MOM solver is mathematically affine — optical
+properties define the operator `A`, sources define the additive RHS `b` —
+and v0.6 makes that explicit at the type level.
+
+```julia
+# Default (unchanged behavior — unit Stokes-I solar beam):
+R, T = rt_run(model)
+
+# Explicit solar with custom irradiance (mW · m⁻² · cm⁻¹):
+R, T = rt_run(model; sources = SolarBeam(F₀ = solar_spec))
+
+# Solar + surface fluorescence:
+R, T = rt_run(model; sources = SolarBeam() + SurfaceSIF(SIF₀ = sif_spec))
+
+# Thermal-IR / Carbon-I-style scene (1500 K blackbody at 2-2.4 µm):
+spec_band = collect(model.atmosphere.spec_bands[1])
+R, T = rt_run(model; sources = BlackbodySource(1500, spec_band))
+```
+
+Highlights:
+
+- `RTModel.sources::AbstractSource` is a new top-level field. Set it
+  with `model_from_parameters(params; sources = …)` or override per-call
+  with the `sources=` kwarg on `rt_run` / `rt_run_lin` / `rt_run_ss`.
+- `SolarBeam` (FT-deferred — the model's float type drives precision via
+  `prepare_source`), `SurfaceSIF`, `BlackbodySource` (constructor sugar
+  that returns a `SolarBeam` with Planck-derived F₀), `NoSource`,
+  `SourceSet` (compile-time-unrolled tuple) ship as built-ins.
+- Composition via `+`: `SolarBeam() + SurfaceSIF()` ⇒
+  `SourceSet((SolarBeam, SurfaceSIF))`. `NoSource` is the identity.
+- Multiple-dispatch entry points `contribute!` (forward) and
+  `source_tangent!` (linearized) replace the legacy `if SFI` branching
+  across the elastic linearized path. Surfaces use a parallel
+  `surface_source_contribute!(prepared_sources, surface, …)` double-
+  dispatch table for surface-side contributions (SIF on Lambertian
+  surfaces today; non-Lambertian dispatches to a no-op).
+- The Sanghavi 2014 App. C analytic tangents and the Bug-22 beam-
+  attenuation chain-rule fix are unchanged inside
+  `get_elem_rt_SFI_fused!`; they're now reached via
+  `source_tangent!(::PreparedSolarBeam, …)` — the named hand-written
+  linearization seam.
+- AD seam at `prepare_source(::AbstractSource, FT, pol_n, nSpec, arr_type)`:
+  user-parameter space (potentially `Dual`) above; kernel space (plain
+  `FT`) below. A future `prepare_source_with_tangent` will mirror this
+  signature and return source-parameter Jacobians; v0.6 reserves the
+  `ForwardDiffSourceJacobian` AD-mode trait for that path.
+- Source-unit convention adopted: `F₀` and `SIF₀` in
+  **mW · m⁻² · cm⁻¹**, `rt_run` outputs in
+  **mW · m⁻² · sr⁻¹ · cm⁻¹**. `BlackbodySource` defaults to
+  `factor = π` (Lambertian-disk → hemisphere irradiance) so its `F₀` is
+  comparable to a unit `SolarBeam(F₀ = 1)` baseline.
+
+Legacy compatibility: the `inject_surface_SIF!(brdf, …, SIF₀, arch)` path
+that consumes `RS_type.SIF₀` still runs in parallel for back-compat with
+existing `rs.SIF₀ = …; rt_run_test_ss(rs, model, 1)` test patterns. If a
+user supplies BOTH `model.sources` containing a `SurfaceSIF` AND sets
+`RS_type.SIF₀`, the surface SIF is double-counted; choose one API at a
+time. A future PR will retire `RS_type.F₀` / `RS_type.SIF₀` ownership in
+favour of the dispatch system.
+
+Full architecture writeup: [Sources](extending/sources.md). Test coverage
+is in `test/test_sources.jl` (Phase 1 → 5b regression, 86/86 pass).
 
 ## Parameter Loading
 
