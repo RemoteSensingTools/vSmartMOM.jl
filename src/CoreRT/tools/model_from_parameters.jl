@@ -23,6 +23,34 @@ user-set explicit truncation (e.g. `NoTruncation()` or a custom δBGE).
 _has_analytic_phase_function(c_aero::RT_Aerosol) =
     c_aero.phase_function !== nothing
 
+"""
+    _derive_m_max_bands(l_max::Vector{Int}, legacy_max_m_count::Int) -> Vector{Int}
+
+Per-band Fourier loop bound (**order semantics**) for both the forward
+and linearized RT paths. Identical aggregator across both paths so the
+loops can never silently diverge — see Phase B of the v0.7
+fourier-stream-resolution refactor.
+
+The inner-paren division `Int(ceil((l+1)/2))` is the **forward path's**
+historical formula. The lin path used to write
+`Int(ceil(l+1)/2)` (outer-paren division), which evaluates `Int` of a
+non-integer Float at even `l_max` and either throws `InexactError` or
+silently rounds down by 1 depending on Julia version. Phase B unifies
+both paths through this helper, fixing the latent precedence bug.
+
+Returns a vector of orders `m_max_bands[i] = ceil((l_max[i]+1)/2) - 1`,
+clamped from above by the user-supplied `legacy_max_m_count - 1`.
+"""
+function _derive_m_max_bands(l_max::AbstractVector{Int}, legacy_max_m_count::Int)
+    m_max_bands = similar(l_max, Int)
+    legacy_order_cap = max(legacy_max_m_count - 1, 0)
+    for i in eachindex(l_max)
+        m_max_bands[i] = Int(ceil((l_max[i] + 1) / 2)) - 1
+        m_max_bands[i] = min(m_max_bands[i], legacy_order_cap)
+    end
+    return m_max_bands
+end
+
 function _finite_truncation_lmax(params, truncation_type)
     fallback = max(1, Int(params.l_trunc), 2 * Int(params.max_m) - 1)
     hasproperty(truncation_type, :l_max) || return fallback
@@ -328,27 +356,26 @@ function model_from_parameters(params::vSmartMOM_Parameters;
         end 
     end
 
-    # Compute per-band l_max and max_m from aerosol greek coefficient lengths
+    # Compute per-band l_max from aerosol greek coefficient lengths.
     l_max = zeros(Int, n_bands)
-    max_m_bands = zeros(Int, n_bands)
     for i_band = 1:n_bands
         if n_aer > 0
             l_max[i_band] = maximum(l_max_aer[:, i_band])
         else
             l_max[i_band] = params.l_trunc
         end
-        max_m_bands[i_band] = Int(ceil((l_max[i_band] + 1) / 2))
-        # Clamp to user-specified max_m if it's lower (hard cutoff)
-        max_m_bands[i_band] = min(max_m_bands[i_band], params.max_m)
     end
+    # Per-band Fourier loop bound (order). Single helper shared with lin path.
+    m_max_bands = _derive_m_max_bands(l_max, params.max_m)
+    n_fourier_moments_bands = m_max_bands .+ 1
 
     # Build the hierarchical RTModel
     FT_ = FT
     solver = SolverConfig{FT_, typeof(params.polarization_type), typeof(params.quadrature_type)}(
         params.polarization_type,
         params.quadrature_type,
-        params.max_m,
-        max_m_bands,
+        m_max_bands,
+        n_fourier_moments_bands,
         l_max,
         params.l_trunc,
         FT_(params.Δ_angle),
@@ -584,26 +611,26 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
         end 
     end
 
-    # Compute per-band l_max and max_m
+    # Compute per-band l_max from aerosol greek coefficient lengths.
     l_max = zeros(Int, n_bands)
-    max_m_bands = zeros(Int, n_bands)
     for i_band = 1:n_bands
         if n_aer > 0
             l_max[i_band] = maximum(l_max_aer[:, i_band])
         else
             l_max[i_band] = params.l_trunc
         end
-        max_m_bands[i_band] = Int(ceil((l_max[i_band] + 1) / 2))
-        max_m_bands[i_band] = min(max_m_bands[i_band], params.max_m)
     end
+    # Per-band Fourier loop bound (order). Single helper shared with lin path.
+    m_max_bands = _derive_m_max_bands(l_max, params.max_m)
+    n_fourier_moments_bands = m_max_bands .+ 1
 
     # Build the hierarchical RTModel
     FT_vrs2 = params.float_type
     solver = SolverConfig{FT_vrs2, typeof(params.polarization_type), typeof(params.quadrature_type)}(
         params.polarization_type,
         params.quadrature_type,
-        params.max_m,
-        max_m_bands,
+        m_max_bands,
+        n_fourier_moments_bands,
         l_max,
         params.l_trunc,
         FT_vrs2(params.Δ_angle),

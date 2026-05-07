@@ -88,7 +88,6 @@ function model_from_parameters(lin::LinMode,
     N_fix_gas = length(unique(Iterators.flatten(abs_params.fixed_molecules)))
     N_var_gas = length(unique(Iterators.flatten(abs_params.variable_molecules)))
     τ̇_abs     = [zeros(FT2, 1+N_var_gas, length(params.spec_bands[i]), length(profile.p_full)) for i in 1:n_bands]
-    max_m = zeros(Int, n_bands)
     l_max = zeros(Int, n_bands)
     l_max_aer = zeros(Int, n_aer, n_bands)
 
@@ -413,16 +412,21 @@ function model_from_parameters(lin::LinMode,
     end
     for i_band = 1:n_bands
         l_max[i_band] = maximum(l_max_aer[:,i_band])
-        max_m[i_band] = Int(ceil(l_max[i_band] + 1)/2)
     end
     set_uniform_lmax!(l_max, aerosol_optics)
+
+    # Per-band Fourier loop bound (order). Single helper shared with the
+    # forward path. Fixes the previous lin-only precedence bug
+    # `Int(ceil(l_max+1)/2)` (outer division) — see _derive_m_max_bands.
+    m_max_bands = _derive_m_max_bands(l_max, params.max_m)
+    n_fourier_moments_bands = m_max_bands .+ 1
 
     # Build the hierarchical RTModel
     solver = SolverConfig{FT, typeof(params.polarization_type), typeof(params.quadrature_type)}(
         params.polarization_type,
         params.quadrature_type,
-        params.max_m,
-        max_m,
+        m_max_bands,
+        n_fourier_moments_bands,
         l_max,
         params.l_trunc,
         FT(params.Δ_angle),

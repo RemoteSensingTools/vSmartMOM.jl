@@ -815,10 +815,10 @@ struct SolverConfig{FT<:AbstractFloat, PT<:AbstractPolarizationType, QT<:Abstrac
     polarization_type::PT
     "Quadrature type (RadauQuad / GaussLegQuad)"
     quadrature_type::QT
-    "Hard cutoff for maximum number of Fourier moments (scalar, user-specified)"
-    max_m::Int
-    "Per-band adjusted max Fourier iterations (derived from aerosol greek coef lengths)"
-    max_m_bands::Vector{Int}
+    "Per-band Fourier loop bound, **order semantics**: loop runs `m = 0:m_max_bands[iBand]`. Equals `n_fourier_moments_bands .- 1`."
+    m_max_bands::Vector{Int}
+    "Per-band Fourier moment count: `n_fourier_moments_bands[iBand] = m_max_bands[iBand] + 1`. Provided so consumers don't have to remember the count↔order convention."
+    n_fourier_moments_bands::Vector{Int}
     "Per-band max truncated Legendre index"
     l_max::Vector{Int}
     "Legendre truncation order (user-specified)"
@@ -960,14 +960,25 @@ polarization_type(m::AbstractRTModel) = m.solver.polarization_type
 "Number of aerosol species"
 n_aerosols(m::RTModel) = isempty(m.optics.aerosols.aerosol_optics) ? 0 :
     length(first(m.optics.aerosols.aerosol_optics))
-"Per-band max Fourier moments"
-max_m_bands(m::RTModel, iBand::Int) = m.solver.max_m_bands[iBand]
+"""
+    m_max_bands(m::RTModel) -> Vector{Int}
+
+Per-band Fourier loop bound (order). Loop runs `m = 0:m_max_bands(m)[iBand]`.
+"""
+m_max_bands(m::RTModel) = m.solver.m_max_bands
+
+"""
+    n_fourier_moments_bands(m::RTModel) -> Vector{Int}
+
+Per-band Fourier moment count (= `m_max_bands(m) .+ 1`). Provided for
+consumers that explicitly want count rather than order.
+"""
+n_fourier_moments_bands(m::RTModel) = m.solver.n_fourier_moments_bands
 
 # ── RTModel accessors ─────────────────────────────────────────────────────
 get_surface(m::RTModel, iBand) = m.surfaces[iBand]
 get_surfaces(m::RTModel) = m.surfaces
 get_spec_bands(m::RTModel) = m.atmosphere.spec_bands
-get_max_m(m::RTModel) = m.solver.max_m
 
 # ── Convenience property forwarding ──────────────────────────────────────
 # Allows shorthand access (model.τ_abs, model.profile, model.obs_geom, etc.)
@@ -983,7 +994,6 @@ function Base.getproperty(m::RTModel, s::Symbol)
     s === :ϖ_Cabannes && return m.optics.rayleigh.ϖ_Cabannes
     s === :obs_geom && return m.geometry
     s === :profile && return m.atmosphere.profile
-    s === :max_m && return m.solver.max_m_bands
     s === :l_max && return m.solver.l_max
     return getfield(m, s)
 end

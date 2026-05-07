@@ -113,9 +113,11 @@ function rt_run(RS_type::AbstractRamanType,
     (; obs_alt, sza, vza, vaz) = model.obs_geom   # Observational geometry properties
     (; qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart, μ₀, iμ₀, Nquad) = model.quad_points # All quadrature points
     pol_type = CoreRT.polarization_type(model)
-    #@unpack max_m = model.max_m #params
     quad_points = model.quad_points
-    max_m = model.max_m
+    # Per-band Fourier loop bound (order). Phase B unifies forward and
+    # lin paths through `m_max_bands(model)`, fixing the lin-only
+    # precedence bug at the previous lin formula.
+    m_max = m_max_bands(model)[iBand]
     (; τ̇_abs, τ̇_aer, lin_aerosol_optics) = lin_model
 
     lin = LinMode()
@@ -208,7 +210,7 @@ function rt_run(RS_type::AbstractRamanType,
     # Linearized RT currently supports RS_type = noRS() only.
 
     # Loop over fourier moments
-    for m = 0:max_m[iBand] - 1
+    for m = 0:m_max
 
         # Azimuthal weighting
         weight = m == 0 ? FT(0.5/π) : FT(1.0/π)

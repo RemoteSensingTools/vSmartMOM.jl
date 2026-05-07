@@ -495,10 +495,11 @@ end
 # ──────────────────────────────────────────────────────────────────────
 
 """
-    apply_ss_correction!(R_SFI, surf, pol_type, vza, vaz, μ₀, τ_total, max_m, nSpec;
+    apply_ss_correction!(R_SFI, surf, pol_type, vza, vaz, μ₀, τ_total, m_max, nSpec;
                          n_water)
 
 Truncated Multiple Scattering (TMS) correction for the specular sun glint peak.
+`m_max` is the Fourier loop bound in **order semantics** (loop runs `m = 0:m_max`).
 
 After the Fourier loop, adds the difference between the exact single-scattering
 surface contribution and the truncated Fourier reconstruction at each viewing geometry.
@@ -509,7 +510,7 @@ function apply_ss_correction!(R_SFI::AbstractArray{FT,3},
                                surf::CoxMunkSurface{FT},
                                pol_type, vza, vaz, μ₀::FT,
                                τ_total::AbstractVector{FT},
-                               max_m::Int, nSpec::Int;
+                               m_max::Int, nSpec::Int;
                                n_water::Complex{FT} = _get_n_water(surf, FT(550))) where FT
     n = pol_type.n
 
@@ -522,7 +523,7 @@ function apply_ss_correction!(R_SFI::AbstractArray{FT,3},
 
         # ── Fourier-reconstructed BRDF at this geometry ──
         M_fourier = zeros(FT, n, n)
-        for m in 0:(max_m - 1)
+        for m in 0:m_max
             weight_m = m == 0 ? FT(0.5) : FT(1.0)
             for si in 1:n, sj in 1:n
                 az = _azimuthal_kernel(si, sj, m, dϕ)
