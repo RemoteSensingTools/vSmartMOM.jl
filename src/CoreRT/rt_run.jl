@@ -50,8 +50,8 @@ R[1, 1, :]  # Stokes-I reflectance at first VZA across the spectrum
 - [`rt_run(model, lin_model, NAer, NGas, NSurf)`](@ref) for linearized RT with Jacobians.
 - [`model_from_parameters`](@ref) to build the model from parameters.
 """
-function rt_run(model; i_band::Integer = 1)
-    rt_run(InelasticScattering.noRS{float_type(model)}(), model, i_band)
+function rt_run(model; i_band::Integer = 1, sources::Union{Nothing, AbstractSource} = nothing)
+    rt_run(InelasticScattering.noRS{float_type(model)}(), model, i_band; sources)
 end
 
 """
@@ -86,11 +86,19 @@ function _expand_layer_rayleigh!(RS_type::AbstractRamanType, fScattRayleigh, iz)
 end
 
 """
-    rt_run(RS_type, model::RTModel, iBand)
+    rt_run(RS_type, model::RTModel, iBand; sources=nothing)
 
 Perform Radiative Transfer calculations with explicit Raman type.
+
+Accepts an optional `sources::AbstractSource` argument (v0.6 source-term
+refactor, Phase 2). When `nothing`, the legacy F₀ default is preserved
+bit-for-bit. When a [`SourceSet`](@ref) (or a single
+[`AbstractSource`](@ref)) is supplied, the F₀ carried by the first
+[`SolarBeam`](@ref) is routed into `RS_type.F₀` ahead of the existing
+SFI kernel call. Phase 5 will remove the `RS_type.F₀` indirection.
 """
-function rt_run(RS_type::AbstractRamanType, model, iBand)
+function rt_run(RS_type::AbstractRamanType, model, iBand;
+                sources::Union{Nothing, AbstractSource} = nothing)
     (; obs_alt, sza, vza, vaz) = model.obs_geom   # Observational geometry properties
     (; qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart, μ₀, iμ₀, Nquad) = model.quad_points # All quadrature points
     pol_type = CoreRT.polarization_type(model)
@@ -185,13 +193,20 @@ function rt_run(RS_type::AbstractRamanType, model, iBand)
         @timeit "Canopy atm tau" _compute_canopy_atm_tau!(brdf, model, _canopy_spec_wn)
     end
 
-    # Initialize F₀ (solar irradiance Stokes vector) if still at default size.
-    # Default: unit Stokes I across all spectral points; users can set actual
-    # solar spectral irradiance for broadband instruments.
-    if size(RS_type.F₀) != (pol_type.n, nSpec)
-        F₀ = zeros(FT, pol_type.n, nSpec)
-        F₀[1,:] .= one(FT)  # Only Stokes I = 1
-        RS_type.F₀ = F₀
+    # Resolve sources for this RT solve (v0.6 source-term refactor).
+    # Resolution order: explicit `sources=` kwarg > `model.sources` > legacy
+    # `RS_type.F₀` (only when the latter is already user-shaped, to preserve
+    # the historical `rs.F₀ = ...; rt_run(rs, model, ...)` test pattern).
+    # Phase 5 will remove the legacy `RS_type.F₀` channel entirely.
+    effective_sources = sources === nothing ? model.sources : sources
+    if sources === nothing && size(RS_type.F₀) == (pol_type.n, nSpec)
+        # User has pre-set RS_type.F₀; leave it alone for back-compat.
+    else
+        prepared = prepare_sources(effective_sources, FT, pol_type.n, nSpec, arr_type)
+        F₀_dev = extract_solar_F₀(prepared, FT, pol_type.n, nSpec, arr_type)
+        # `RS_type.F₀` historically lives on host memory; keep that contract by
+        # converting back through Array. (Cheap: F₀ is (pol_n, nSpec).)
+        RS_type.F₀ = Array{FT, 2}(F₀_dev)
     end
 
     # Phase 4: allocate the InteractionWorkspace once before the layer loop for
@@ -365,8 +380,8 @@ Phase 1c).
   shape `(nSpec,)`. Computed from the m=0 Fourier coefficient of the Stokes-I
   source function over the full upper hemisphere (Σⱼ J₀[j, 1, λ] · μⱼ · wⱼ).
 """
-function rt_run_ss(model; i_band::Integer = 1)
-    rt_run_ss(InelasticScattering.noRS{float_type(model)}(), model, i_band)
+function rt_run_ss(model; i_band::Integer = 1, sources::Union{Nothing, AbstractSource} = nothing)
+    rt_run_ss(InelasticScattering.noRS{float_type(model)}(), model, i_band; sources)
 end
 
 """
@@ -384,7 +399,8 @@ end
 Single-scatter approximation driver with explicit Raman type. See
 [`rt_run_ss`](@ref) for the user-facing entry point.
 """
-function rt_run_ss(RS_type::AbstractRamanType, model, iBand)
+function rt_run_ss(RS_type::AbstractRamanType, model, iBand;
+                   sources::Union{Nothing, AbstractSource} = nothing)
     (; vza, vaz) = model.obs_geom
     (; qp_μ, wt_μ, qp_μN, μ₀, iμ₀, Nquad) = model.quad_points
     pol_type = CoreRT.polarization_type(model)
@@ -438,11 +454,15 @@ function rt_run_ss(RS_type::AbstractRamanType, model, iBand)
     @timeit "Creating layers" composite_layer     = make_composite_layer(RS_type, FT, arr_type, dims, nSpec)
     @timeit "Creating arrays" I_static            = Diagonal(arr_type(Diagonal{FT}(ones(dims[1]))))
 
-    # Default F₀ (unit Stokes I) if still at placeholder size.
-    if size(RS_type.F₀) != (pol_type.n, nSpec)
-        F₀ = zeros(FT, pol_type.n, nSpec)
-        F₀[1, :] .= one(FT)
-        RS_type.F₀ = F₀
+    # Resolve sources (v0.6 source-term refactor). Resolution: kwarg >
+    # model.sources > pre-set `RS_type.F₀` for back-compat. See `rt_run`.
+    effective_sources = sources === nothing ? model.sources : sources
+    if sources === nothing && size(RS_type.F₀) == (pol_type.n, nSpec)
+        # User-pre-set F₀ honored.
+    else
+        prepared = prepare_sources(effective_sources, FT, pol_type.n, nSpec, arr_type)
+        F₀_dev = extract_solar_F₀(prepared, FT, pol_type.n, nSpec, arr_type)
+        RS_type.F₀ = Array{FT, 2}(F₀_dev)
     end
 
     τ_sum_all = nothing

@@ -72,8 +72,9 @@ where ``p_j`` is any physical parameter in the state vector.
 function rt_run(model,
         lin_model,
         NAer::Int, NGas::Int, NSurf::Int;
-        i_band::Integer = 1)
-    rt_run(InelasticScattering.noRS{float_type(model)}(), model, lin_model, NAer, NGas, NSurf, i_band)
+        i_band::Integer = 1,
+        sources::Union{Nothing, AbstractSource} = nothing)
+    rt_run(InelasticScattering.noRS{float_type(model)}(), model, lin_model, NAer, NGas, NSurf, i_band; sources)
 end
 
 """
@@ -102,7 +103,8 @@ function rt_run(RS_type::AbstractRamanType,
                     model,
                     lin_model,
                     NAer::Int, NGas::Int, NSurf::Int,
-                    iBand)
+                    iBand;
+                    sources::Union{Nothing, AbstractSource} = nothing)
     (; obs_alt, sza, vza, vaz) = model.obs_geom   # Observational geometry properties
     (; qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart, μ₀, iμ₀, Nquad) = model.quad_points # All quadrature points
     pol_type = CoreRT.polarization_type(model)
@@ -151,11 +153,15 @@ function rt_run(RS_type::AbstractRamanType,
                               n_gases=NGas, n_surface=NSurf)
     Nparams = n_total(layout)
 
-    # For noRS: F₀ should be the solar irradiance Stokes vector per spectral point.
-    # If still at its default 1×1 size, initialize to unit solar flux (Stokes I only).
-    if size(F₀) != (pol_type.n, nSpec)
-        F₀ = zeros(FT, pol_type.n, nSpec)
-        F₀[1,:] .= one(FT)  # Only Stokes I = 1
+    # Resolve sources (v0.6 source-term refactor). Resolution: kwarg >
+    # model.sources > pre-set `RS_type.F₀` for back-compat. See `rt_run`.
+    effective_sources = sources === nothing ? model.sources : sources
+    if sources === nothing && size(F₀) == (pol_type.n, nSpec)
+        # User pre-set F₀ honored — F₀ already in scope from RS_type unpack.
+    else
+        prepared = prepare_sources(effective_sources, FT, pol_type.n, nSpec, arr_type)
+        F₀_dev = extract_solar_F₀(prepared, FT, pol_type.n, nSpec, arr_type)
+        F₀ = Array{FT, 2}(F₀_dev)
         RS_type.F₀ = F₀
     end
 
