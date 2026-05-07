@@ -201,7 +201,61 @@ source already agree.
 
 ---
 
-## 6. Where this lives in code
+## 6. Quadrature streams: `Nstreams` vs `Nquad`
+
+Two distinct stream counts live on `QuadPoints`. Surfacing the
+distinction prevents the kind of silent mismatch that bit the Natraj
+2009 benchmark (where `l_trunc=20` derived 11 nodes in Gauss but 10 in
+Radau because of a per-scheme formula difference; see commit
+`f9403eb`).
+
+- **`Nstreams`** — count of nonzero weights (`count(!iszero, wt_μ)`).
+  This is the user-facing **resolving-power** knob. The public
+  contract is
+
+  ```
+  stream_l_cap = 2·Nstreams - 1
+  ```
+
+  i.e., the largest Legendre order the chosen quadrature is contracted
+  to resolve. Set `radiative_transfer.nstreams = N` in YAML; the
+  engine guarantees `2·N - 1` resolving order regardless of which
+  quadrature scheme is chosen.
+
+- **`Nquad`** — total node count, including zero-weight SZA/VZA
+  *output nodes* appended for postprocessing. Used for kernel
+  workspace sizing (`NquadN = Nquad · n_stokes`). Always satisfies
+  `Nquad ≥ Nstreams + length(unique([sza; vza]))`.
+
+### Per-scheme construction
+
+| Scheme | Weighted-streams construction | Nstreams (pre-augmentation) |
+|--------|-------------------------------|-----------------------------|
+| `GaussLegQuad` | Gauss-Legendre on `[0, 1]`, `(Ltrunc+2)÷2` nodes (Sanghavi: `+2` form avoids zero streams at `Ltrunc=0`) | `(Ltrunc+2)÷2` |
+| `RadauQuad` | Gauss-Radau on subintervals around μ₀; SZA-on-node branch builds `(Ltrunc+1)÷2` nodes, SZA-not-on-node branch builds `2·((Ltrunc+1)÷2)` weighted nodes split around μ₀ | `count(!iszero, wt_μ)` after construction |
+
+Because Radau allocates a different number of weighted nodes
+depending on whether μ₀ lands on a Gauss-Radau abscissa, the
+`Nstreams` field is computed as `count(!iszero, wt_μ)` rather than a
+formula — this guarantees it matches what the builder actually
+produced. Radau's split-around-μ₀ branch typically uses **more**
+weighted streams than Gauss for the same `Ltrunc`, which is one
+reason Radau is more expensive; Sanghavi recommends `GaussLegQuad`
+as the default. Radau remains available for users who need an
+SZA-on-node quadrature but is documented as expert/legacy.
+
+After SZA + VZAs are appended as zero-weight output nodes, both
+schemes report the same fields:
+
+- `qp.Nstreams` = weighted streams (resolving power)
+- `qp.Nquad` = augmented total (kernel size)
+- `qp.wt_μ` carries explicit zeros at the appended SZA/VZA positions
+
+The `RTModel` `Base.show` summary prints both: `"Nstreams=N, Nquad=M"`.
+
+---
+
+## 7. Where this lives in code
 
 | Concept | File |
 |---------|------|

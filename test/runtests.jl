@@ -50,6 +50,10 @@ try
 
 @testset "Canopy Surface" begin include("test_canopy.jl") end
 
+# Phase A — `Nstreams` field on `QuadPoints` (count of nonzero weights;
+# distinct from augmented `Nquad`). See docs/src/pages/conventions.md §6.
+@testset "QuadPoints streams" begin include("test_quadpoints_streams.jl") end
+
 # Phase-function truncation invariants (Sanghavi & Stephens 2015)
 @testset "Truncation" begin include("test_truncation.jl") end
 
