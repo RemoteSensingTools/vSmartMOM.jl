@@ -40,3 +40,17 @@ Codex review for Phase 1 was BLOCKED by a CLI/model mismatch:
 Action: codex CLI needs upgrade (or model config alignment with the
 account type) before subsequent phase reviews can run. Phase 1 committed
 without codex sign-off; Phase 2+ reviews will resume once codex CLI works.
+
+2026-05-07 update — second attempt to unblock codex:
+  - `codex review --commit HEAD -c model='o3' …`         ⇒ "not supported"
+  - `codex review --commit HEAD -c model='gpt-5-codex' …` ⇒ "not supported"
+  - `codex review --commit HEAD -c model='claude-3-5-sonnet-20241022'` ⇒ "not supported"
+Every model option is rejected on the ChatGPT account. User-side action
+needed:
+  (a) upgrade the local codex CLI (the gpt-5.5 default would presumably
+      work post-upgrade), OR
+  (b) `codex login --api-key …` to switch off ChatGPT-account auth.
+The whole Phase 1 → 5b stack (00f3192 → b401ff0 + a2c6bfd) shipped
+without codex sign-off; per-commit summaries in mail to Christian +
+Suniti. Plan and per-phase intent documented in
+~/.claude/plans/gpt-also-had-some-velvety-whale.md.
