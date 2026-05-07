@@ -1,5 +1,62 @@
 # Changelog
 
+## Unreleased — v0.7 / Fourier-Stream Resolution refactor
+
+### New user-facing schema (Phase D)
+
+- **`nstreams` is the primary resolution knob.** Public contract:
+  `stream_l_cap = 2·nstreams - 1` regardless of `quadrature_type`.
+  Minimum 3 (Rayleigh contributes through m=2). Default 13 when
+  legacy `max_m`/`l_trunc` are absent.
+- **`truncation: auto`** — VLIDORT-`DO_DELTAM_SCALING`-style mode.
+  Resolves at model build time: `NoTruncation()` when phase fits
+  within `stream_l_cap`, `δBGE(N, Δ_angle)` otherwise. Logs the
+  choice via `@info`.
+- **`quadrature_type` defaults to `GaussLegQuad()`** when omitted
+  (Sanghavi: 5–50× more accurate per stream than `RadauQuad` on
+  Rayleigh-only). `RadauQuad` remains supported but is documented
+  as expert/legacy.
+- **JSON Schema updated** —
+  `schemas/vsmartmom-parameters.schema.json` covers the new fields.
+  The repo's `.taplo.toml` already wires it to TOML configs; YAML
+  editors honour it via `# yaml-language-server: $schema=...`. See
+  `docs/src/pages/IO/Schema.md` for the per-block reference and
+  editor-setup recipes.
+
+### Internal architecture (Phases A–C)
+
+- **`Nstreams` field on `QuadPoints`** (Phase A) — count of nonzero
+  weights, distinct from the augmented `Nquad` total. Surfaces in
+  `Base.show` and `conventions.md` §6.
+- **`m_max_bands` order semantics on `SolverConfig`** (Phase B) —
+  replaces the scalar `max_m` and the count-form `max_m_bands`.
+  Forward and lin RT paths now flow through `_derive_m_max_bands`,
+  fixing a latent precedence bug at even `l_max` in the lin path
+  (`Int(ceil(l_max+1)/2)` → `Int(ceil((l_max+1)/2))`).
+- **`component_m_max(c, ctx)` traits** (Phase C) — per-component
+  Fourier support dispatch (Rayleigh → 2, Lambertian → 0,
+  CoxMunk/RPV/RossLi/Canopy → `user_l_cap`, SolarBeam → 0,
+  SurfaceSIF → 0). Resolves Phase B's regression for Cox-Munk
+  forward; the Phase C P2 follow-up clamps trait-derived `m_max`
+  against the actual quadrature `Nstreams` cap and includes active
+  sources in the aggregation.
+
+### Bit-equality
+
+- All 64 in-tree YAMLs run byte-equal through Phase D — they carry
+  explicit `max_m` / `l_trunc` so the parser hits the legacy branch.
+- Phase B fixed the lin-only precedence bug at even `l_max`; lin
+  Jacobians shift by one Fourier moment for affected configs
+  (intentional silent-bug fix).
+- Phase C+P2 unified forward and lin Fourier-loop bounds. Cox-Munk
+  forward goes from the half-truncated count-aggregator output
+  back to its full `user_l_cap` resolution.
+
+### See also
+
+- Plan: `docs/dev_notes/fourier_stream_resolution_plan.md`
+- Schema index: `docs/src/pages/IO/Schema.md`
+
 ## v2.0.0
 
 ### Breaking Changes

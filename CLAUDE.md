@@ -68,9 +68,9 @@ Linearized variant: `model_from_parameters(LinMode(), params)` then `rt_run(mode
 ```
 RTModel{ARCH, FT} <: AbstractRTModel{ARCH, FT}
 ├── architecture :: ARCH                    # CPU() or GPU()
-├── solver       :: SolverConfig{FT}        # polarization, quadrature, truncation, max_m
+├── solver       :: SolverConfig{FT}        # polarization, quadrature, truncation, m_max_bands
 ├── geometry     :: ObsGeometry{FT}         # sza, vza, vaz, obs_alt
-├── quad_points  :: QuadPoints{FT}          # μ₀, qp_μ, wt_μ, Nquad
+├── quad_points  :: QuadPoints{FT}          # μ₀, qp_μ, wt_μ, Nquad, Nstreams (v0.7)
 ├── atmosphere   :: Atmosphere{FT}          # profile + spec_bands
 ├── optics       :: Optics{FT}             # ALL optical properties
 │   ├── rayleigh :: RayleighScattering{FT}  # greek_rayleigh, greek_cabannes, ϖ_Cabannes
@@ -91,7 +91,7 @@ RTModel{ARCH, FT} <: AbstractRTModel{ARCH, FT}
 
 ### CoreRT Solver Flow (Adding-Doubling)
 
-For each Fourier moment m = 0..max_m:
+For each Fourier moment m = 0..m_max_bands[iBand] (v0.7 — order-semantics; trait-derived per-component bound):
 1. **Elemental** — single-scattering layer → AddedLayer (r, t, j)
 2. **Doubling** — double thin layers ndoubl times to full optical depth
 3. **Interaction** — combine layers top-to-bottom: CompositeLayer (R, T, J) + AddedLayer
@@ -247,6 +247,25 @@ NGas = size(lin_model.tau_dot_abs[1], 1)
 NSurf = 1
 R, T, dR, dT = rt_run(model, lin_model, NAer, NGas, NSurf)
 ```
+
+### Writing or modifying YAML/TOML configs
+
+**Schema reference**: [`docs/src/pages/IO/Schema/`](docs/src/pages/IO/Schema/)
+has one page per top-level block (`radiative_transfer.md`,
+`geometry.md`, `surface.md`, `aerosols.md`, etc.) with full field
+reference and examples.
+
+**v0.7 schema (Phase D)**: prefer `nstreams` over the legacy
+`max_m` / `l_trunc`. Public contract: `stream_l_cap = 2·nstreams - 1`
+regardless of `quadrature_type`. `nstreams ≥ 3` (Rayleigh m=2
+minimum). `truncation: auto` is the recommended default — resolves
+to `NoTruncation()` if the phase function fits, `δBGE(N, Δ_angle)`
+otherwise. Legacy YAMLs with `max_m`/`l_trunc` keep working unchanged.
+
+**Editor support**: TOML configs get autocomplete + validation via
+the repo's `.taplo.toml` (wires `schemas/vsmartmom-parameters.schema.json`).
+For YAML, add `# yaml-language-server: $schema=...` at the top —
+recipe in [`Schema.md`](docs/src/pages/IO/Schema.md#editor-support--autocomplete--inline-validation).
 
 ### Modifying YAML Config Parsing
 

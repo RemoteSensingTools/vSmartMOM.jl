@@ -31,7 +31,11 @@ WHY MOM?     Per-layer matrix operator → linear-algebra composition →
              doubling), exact analytic Jacobians.
                 │
                 ▼
-DISCRETIZE   Fourier in azimuth (m=0..max_m), Gauss/Radau quadrature in μ.
+DISCRETIZE   Fourier in azimuth (m=0..m_max_bands[iBand]; v0.7: per-component
+             trait dispatch — Rayleigh→2, Lambertian→0, Cox-Munk→user_l_cap),
+             Gauss/Radau quadrature in μ. User knob is `nstreams` (weighted
+             streams per hemisphere); public contract `stream_l_cap = 2·N-1`.
+             Schema: docs/src/pages/IO/Schema/.
              Per Fourier moment m, each layer reduces to FOUR ARRAYS of
              shape (NquadN, NquadN, nSpec):
                τ      — optical depth          ϖ      — single-scatter albedo
