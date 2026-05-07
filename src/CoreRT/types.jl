@@ -922,6 +922,11 @@ struct RTModel{ARCH<:AbstractArchitecture, FT<:AbstractFloat} <: AbstractRTModel
     optics::Optics{FT}
     "Surface models, one per spectral band"
     surfaces::Vector{<:AbstractSurfaceType}
+    "Source-term scene (v0.6 source-term refactor). Defaults to a single
+    [`SolarBeam`](@ref) — i.e. the historical unit-Stokes-I direct solar
+    illumination — and can be overridden at `rt_run` call time via the
+    `sources=` kwarg. Mirrors the abstract-typed `surfaces` slot."
+    sources::AbstractSource
 end
 
 # ── Accessor functions (Oceananigans-style) ───────────────────────────────

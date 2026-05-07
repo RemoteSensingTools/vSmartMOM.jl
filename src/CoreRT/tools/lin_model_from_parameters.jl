@@ -49,7 +49,8 @@ This is the **linearized** counterpart of `model_from_parameters(params)`. It co
   factor, and greek coefficients with respect to `[nᵣ, nᵢ, rₘ, σᵣ]`.
 """
 function model_from_parameters(lin::LinMode,
-    params::vSmartMOM_Parameters)
+    params::vSmartMOM_Parameters;
+    sources::AbstractSource = SolarBeam())
     FT = params.float_type
     n_bands = length(params.spec_bands)
     n_aer = isnothing(params.scattering_params) ? 0 : length(params.scattering_params.rt_aerosols)
@@ -433,7 +434,7 @@ function model_from_parameters(lin::LinMode,
     aerosols_s = AerosolState(aerosol_optics, τ_aer)
     optics = Optics(rayleigh_s, aerosols_s, τ_abs, τ_rayl)
     numerics = _convert_numerics(params.numerics, FT)
-    model = RTModel(params.architecture, solver, numerics, obs_geom, quad_points, atm, optics, params.brdf)
+    model = RTModel(params.architecture, solver, numerics, obs_geom, quad_points, atm, optics, params.brdf, sources)
     return model, RTModelLin(τ̇_abs, τ̇_aer, lin_aerosol_optics)
 end
 

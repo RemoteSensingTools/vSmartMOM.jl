@@ -54,10 +54,11 @@ import Base.show                   # For overloading show for custom types
 
 # Constants and Types
 include("constants.jl")                        # Scientific constants
+include("Sources/types.jl")                    # v0.6 AbstractSource / SourceSet vocabulary (Phase 1) — must precede types.jl since RTModel.sources::AbstractSource
 include("types.jl")
 include("parameter_layout.jl")                 # ParameterLayout struct for Jacobian indexing
 include("types_lin.jl")                        # Types for linearized RT
-include("Sources/types.jl")                    # v0.6 AbstractSource / SourceSet vocabulary (Phase 1)
+include("Sources/solar_beam.jl")               # v0.6 SolarBeam + PreparedSolarBeam (Phase 2)
 
 # Note: Raman types (AbstractRamanType, noRS, RRS, etc.) come from 
 # InelasticScattering module via `using ..InelasticScattering` above.
@@ -157,6 +158,9 @@ export AbstractSource, AbstractPreparedSource,
        NoSource, SourceSet,
        AbstractSourceADMode, AnalyticSourceJacobian, ForwardDiffSourceJacobian,
        NoSourceJacobian, source_ad_mode
+
+# Phase 2: SolarBeam + the prepare_source seam
+export SolarBeam, PreparedSolarBeam, prepare_source, prepare_sources
 
 # Export types to show easily
 export RadauQuad, GaussLegQuad,

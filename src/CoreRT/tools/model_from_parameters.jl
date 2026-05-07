@@ -72,7 +72,8 @@ Computes all derived quantities needed by the RT solver:
 - `model_from_parameters(LinMode(), params)` for the linearized (Jacobian) variant.
 - `parameters_from_yaml(path)` to load parameters from a YAML file.
 """
-function model_from_parameters(params::vSmartMOM_Parameters)
+function model_from_parameters(params::vSmartMOM_Parameters;
+                               sources::AbstractSource = SolarBeam())
     FT = params.float_type
     #@show FT
     # Number of total bands and aerosols (for convenience)
@@ -359,7 +360,7 @@ function model_from_parameters(params::vSmartMOM_Parameters)
     aerosols_s = AerosolState(aerosol_optics, τ_aer)
     optics = Optics(rayleigh, aerosols_s, τ_abs, τ_rayl)
     numerics = _convert_numerics(params.numerics, FT_)
-    return RTModel(params.architecture, solver, numerics, obs_geom, quad_points, atm, optics, params.brdf)
+    return RTModel(params.architecture, solver, numerics, obs_geom, quad_points, atm, optics, params.brdf, sources)
 end
 
 "Re-type the user-supplied `RTNumericalParameters` to the resolved
@@ -383,7 +384,8 @@ Modified version for vibrational Raman scattering
 "Take the parameters specified in the vSmartMOM_Parameters struct, and calculate derived attributes into an RTModel"
 function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
                     λ₀,
-                    params::vSmartMOM_Parameters)
+                    params::vSmartMOM_Parameters;
+                    sources::AbstractSource = SolarBeam())
     # Number of total bands and aerosols (for convenience)
     n_bands = 3 #length(params.spec_bands)
     n_aer = isnothing(params.scattering_params) ? 0 : length(params.scattering_params.rt_aerosols)
@@ -612,7 +614,7 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
     aerosols_s = AerosolState(aerosol_optics, τ_aer)
     optics = Optics(rayleigh_s, aerosols_s, τ_abs, τ_rayl)
     numerics = _convert_numerics(params.numerics, FT_vrs2)
-    return RTModel(params.architecture, solver, numerics, obs_geom, quad_points, atm, optics, params.brdf)
+    return RTModel(params.architecture, solver, numerics, obs_geom, quad_points, atm, optics, params.brdf, sources)
 end
 
 function loadAbsco(file; scale=(1.0))
