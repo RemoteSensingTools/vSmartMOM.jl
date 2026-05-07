@@ -99,6 +99,14 @@ SFI kernel call. Phase 5 will remove the `RS_type.F₀` indirection.
 """
 function rt_run(RS_type::AbstractRamanType, model, iBand;
                 sources::Union{Nothing, AbstractSource} = nothing)
+    # Apply the per-model BLAS thread cap once per `rt_run` invocation
+    # (no-op when `model.numerics.blas_threads === nothing`). Lives here
+    # so swapping models with different caps "just works" — the caller
+    # doesn't have to remember to re-pin BLAS between runs.
+    if model.numerics.blas_threads !== nothing
+        LinearAlgebra.BLAS.set_num_threads(model.numerics.blas_threads)
+    end
+
     (; obs_alt, sza, vza, vaz) = model.obs_geom   # Observational geometry properties
     (; qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart, μ₀, iμ₀, Nquad) = model.quad_points # All quadrature points
     pol_type = CoreRT.polarization_type(model)
@@ -411,6 +419,11 @@ Single-scatter approximation driver with explicit Raman type. See
 """
 function rt_run_ss(RS_type::AbstractRamanType, model, iBand;
                    sources::Union{Nothing, AbstractSource} = nothing)
+    # Per-model BLAS thread cap (see `rt_run` body for rationale).
+    if model.numerics.blas_threads !== nothing
+        LinearAlgebra.BLAS.set_num_threads(model.numerics.blas_threads)
+    end
+
     (; vza, vaz) = model.obs_geom
     (; qp_μ, wt_μ, qp_μN, μ₀, iμ₀, Nquad) = model.quad_points
     pol_type = CoreRT.polarization_type(model)

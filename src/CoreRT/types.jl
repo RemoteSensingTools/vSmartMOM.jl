@@ -669,6 +669,22 @@ Base.@kwdef struct RTNumericalParameters{FT<:AbstractFloat}
     Float32 representability); the F64 value is far below any sensible
     `threshold·μ_min` so it never activates in practice."
     dτ_min_floor::FT = FT(1024) * eps(FT)
+
+    "BLAS thread cap applied at every `rt_run` invocation. `nothing`
+    means leave the BLAS thread setting alone (use whatever
+    `LinearAlgebra.BLAS.get_num_threads()` returned at session start).
+    Why cap: the batched-GEMM call sites in `cpu_batched.jl` and the
+    elemental/doubling/interaction kernels operate on small matrices
+    (NSTREAMS·n_stokes ≈ 12-48 per side) tiled across a wide spectral
+    batch. Multi-threaded BLAS coordination dominates the work at that
+    matrix size and serializes against the spectral-batch parallelism.
+    The VLIDORT baseline harness empirically picked 8 as the sweet spot
+    on a 128-thread machine; `1` is the most defensive choice when a
+    single process owns all spectral points and threading happens at
+    the batched outer level. Set via the `numerics.blas_threads` YAML
+    key, or programmatically with
+    `RTNumericalParameters{FT}(blas_threads = 8)`."
+    blas_threads::Union{Nothing, Int} = nothing
 end
 
 """
