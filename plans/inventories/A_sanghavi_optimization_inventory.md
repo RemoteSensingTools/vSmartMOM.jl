@@ -201,7 +201,7 @@ is the harness that will let the merge be verified bit-exact against sanghavi's 
 ### Abstractions introduced
 
 - **YAML config** `test/test_parameters/O2_parameters2_1band_opttest.yaml` — 1-band,
-  GaussQuadHemisphere, Stokes_IQU, `l_trunc=5`, `max_m=1`, `Architectures.GPU()`, 34-layer T/p/q
+  GaussLegQuad, Stokes_IQU, `l_trunc=5`, `max_m=1`, `Architectures.GPU()`, 34-layer T/p/q
   profile, one LUT (`/net/fluo/data1/ABSCO_CS_Database/v5.2_final/o2_v52_v2.jld2`). Fast enough
   for iterative testing but exercises the full RRS pipeline.
 - **`test/benchmarks/raman_optimization_baseline.jl`** — runs one RRS and one noRS computation,

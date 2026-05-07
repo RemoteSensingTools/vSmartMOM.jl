@@ -1,7 +1,7 @@
 # Case C vector solar_tester conventions
 
 **Status**: Resolved as of 2026-05-06 for the checked
-`GaussQuadHemisphere/Float64/CPU` axis. The large Case C residuals were from
+`GaussLegQuad/Float64/CPU` axis. The large Case C residuals were from
 comparing vSmartMOM at `raz = 0°` against VLIDORT vector truth at `raz = 10°`,
 plus a transient `l_trunc = 16` mismatch. With the corrected setup, I/Q/U all
 match VLIDORT at about `1e-3` relative error or better.
@@ -25,7 +25,7 @@ VLIDORT source facts from `V2p8p3_solar_tester.f90`:
 
 The vSmartMOM Case C comparison currently keeps a single internal convention:
 
-- `solar_tester_vector.yaml`: `GaussQuadHemisphere()`, `l_trunc = 15`,
+- `solar_tester_vector.yaml`: `GaussLegQuad()`, `l_trunc = 15`,
   `max_m = 16`, `NoTruncation()`, `Stokes_IQU()`, one spectral point, and
   the first baseline comparison at `raz = 10°`.
 - Aerosol import: `PROBLEMIII_b1 -> γ` directly. Do **not** apply VLIDORT's
@@ -36,7 +36,7 @@ The vSmartMOM Case C comparison currently keeps a single internal convention:
   saved-results geometry is not exact principal plane for the first/last RAZ
   entries (`10°` and `170°`).
 
-Current `GaussQuadHemisphere/Float64/CPU` residuals at
+Current `GaussLegQuad/Float64/CPU` residuals at
 `sza = 35°`, `raz = 10°`, Task 1:
 
 ```text
@@ -57,7 +57,7 @@ VLIDORT vector truth at `raz = 10°`, so the printed residuals below include a
 geometry mismatch:
 
 ```text
-Case C [GaussQuadHemisphere/Float64/CPU], vSmartMOM raz=0 vs VLIDORT raz=10:
+Case C [GaussLegQuad/Float64/CPU], vSmartMOM raz=0 vs VLIDORT raz=10:
   TOA-up I max ≈ 0.00715
   BOA-dn I max ≈ 0.189
   TOA-up Q max ≈ 0.137

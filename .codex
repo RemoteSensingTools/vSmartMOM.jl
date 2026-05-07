@@ -1,0 +1,22 @@
+State note - vSmartMOM dispatch design review
+
+Workspace: /home/cfranken/code/gitHub/vSmartMOM.jl
+Latest user request: review dev_notes/vsmartmom_dispatch_design_v0_4.md
+
+Do not revert unrelated dirty worktree changes. Existing modified files include:
+- src/CoreRT/CoreKernel/rt_kernel.jl
+- src/CoreRT/tools/lin_model_from_parameters.jl
+- src/Scattering/truncate_phase.jl
+- src/Scattering/truncate_phase_lin.jl
+- test/test_truncation.jl
+- test/test_type_stability.jl
+
+Prior design conclusions:
+- Prefer Julia multiple dispatch at physical/workflow boundaries, not scalar if/else rewrites.
+- Outputs can be composed via output/postprocessing strategy tuples.
+- Long-term API can move toward run_rt(model), with legacy rt_run wrappers during migration.
+- VLIDORT atmosphere quadrature uses half-range Gauss-Legendre streams on [0, 1]; user streams are separate. vSmartMOM currently appends SZA/VZA as zero-weight nodes, so separate Nstreams from augmented Nquad.
+
+v0.4 preliminary review notes:
+- Strong improvement over v0.3: max_m sentinel fixed, Nstreams separated from Nquad, source rename deferred, ss_corrections moved to kwarg, hotspot field parameterized, zero dims corrected, canopy/directional excluded from simple contributor pattern.
+- Highest risks: Step 1D is too broad for one migration step; NoScattering dispatch must use a layer-level spectral maximum test and cannot represent per-wavelength mixed scattering; direct-beam "subtract SS from MS solve" wording is physically risky; fScattRayleigh Option B still lacks current function arguments; RTContext fields should be concretely parameterized in implementation.

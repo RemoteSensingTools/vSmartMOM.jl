@@ -129,7 +129,8 @@ export StandaloneSS, run_exact_ss, ExactSSConfig, SSGeometry,
        run_exact_ss_with_jacobians, chain_rule_combine_dP,
        chain_rule_combine_dτ, chain_rule_combine_dϖ,
        chain_rule_combine_surface_brdf, selected_measurement_jacobian,
-       selected_measurements, surface_brdf_wind_jacobian
+       selected_measurements, surface_brdf_wind_jacobian,
+       truncated_ss_path1, truncated_ss_path2, apply_back_correction!
 # Export new hierarchical model types
 export RTModel, AbstractRTModel, SolverConfig, Atmosphere, RayleighScattering, AerosolState, Optics, OpticsLin
 # Export GEOSChem/NetCDF integration

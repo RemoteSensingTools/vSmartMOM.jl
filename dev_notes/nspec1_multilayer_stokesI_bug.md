@@ -3,7 +3,7 @@
 **Status**: Surfaced 2026-05-05 by `test/vlidort_baseline/cases/case_B_solar_tester.jl`.
 **PARTIALLY** patched 2026-05-06 in `src/CoreRT/tools/cpu_batched.jl` per Codex
 investigation — singleton-batch defers to `NNlib.batched_mul`. That fix
-unblocks **Case A** (single-layer Stokes_IQUV, nSpec=1, GaussQuadHemisphere)
+unblocks **Case A** (single-layer Stokes_IQUV, nSpec=1, GaussLegQuad)
 and **Case C** (multi-layer Stokes_IQU, nSpec=1, then tested under RadauQuad), with a dramatic
 speedup (Case A 12 min → 2 min). But **Case B** (multi-layer **Stokes_I**,
 nSpec=1) still produces ~50× wrong intensity. Bug is therefore narrower than
@@ -119,7 +119,7 @@ batches correctly.
 
 Historical verification before the definition-audit correction (combined run
 with quadrature-swapped YAMLs):
-- Case A (Siewert single-layer IQUV, GaussQuadHemisphere, nSpec=1): 8/8
+- Case A (Siewert single-layer IQUV, GaussLegQuad, nSpec=1): 8/8
   pass in 1m53s (down from 12m09s). ✓
 - Case B (solar_tester scalar Stokes_I, RadauQuad, nSpec=1): 0/2 pass —
   same 0.98 rel-err pattern as the original bug. The cpu_batched fix did
