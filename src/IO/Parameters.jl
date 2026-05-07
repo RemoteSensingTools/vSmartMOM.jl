@@ -580,14 +580,12 @@ end
 
 "Given a parameter dictionary from a YAML file, validate the dictionary"
 function validate_yaml_parameters(params)
-    fields = [
-        (["radiative_transfer", "spec_bands"], Array{String}),  
-        (["radiative_transfer", "surface"], Array{String}),   
-        (["radiative_transfer", "quadrature_type"], String), 
-        (["radiative_transfer", "polarization_type"], String),   
-        (["radiative_transfer", "max_m"], Integer), 
+    # Required fields — must be present and well-typed.
+    required_fields = [
+        (["radiative_transfer", "spec_bands"], Array{String}),
+        (["radiative_transfer", "surface"], Array{String}),
+        (["radiative_transfer", "polarization_type"], String),
         (["radiative_transfer", "Δ_angle"], Real),
-        (["radiative_transfer", "l_trunc"], Integer),
         (["radiative_transfer", "depol"], Real),
         (["radiative_transfer", "float_type"], String),
         (["radiative_transfer", "architecture"], String, ["default_architecture", "Architectures.GPU()", "Architectures.MetalGPU()", "Architectures.CPU()", "GPU()", "MetalGPU()", "CPU()"]),
@@ -598,8 +596,20 @@ function validate_yaml_parameters(params)
         (["atmospheric_profile", "T"], Array{<:Real}),
         (["atmospheric_profile", "p"], Array{<:Real}),
         (["atmospheric_profile", "profile_reduction"], Union{Integer, Nothing}),
+    ]
+    # Phase D — optional fields. When absent the parser supplies a sensible
+    # default (`GaussLegQuad()` for quadrature, `nstreams = 13` for the new
+    # schema, etc.). When present, type/value must match.
+    optional_fields = [
+        (["radiative_transfer", "quadrature_type"], String),     # Phase D: default GaussLegQuad()
+        (["radiative_transfer", "max_m"], Integer),              # Legacy
+        (["radiative_transfer", "l_trunc"], Integer),            # Legacy
+        (["radiative_transfer", "nstreams"], Integer),           # Phase D primary knob
+        (["radiative_transfer", "m_max"], Union{Integer, Nothing}),  # Phase D explicit override
+    ]
+    section_fields = [
         (["absorption", "vmr"], Dict),
-        (["absorption", "broadening"], String, ["Voigt()", "Doppler()", "Lorentz()"]), 
+        (["absorption", "broadening"], String, ["Voigt()", "Doppler()", "Lorentz()"]),
         (["absorption", "CEF"], String, ["HumlicekWeidemann32SDErrorFunction()"]),
         (["absorption", "wing_cutoff"], Integer),
         (["scattering", "aerosols"], Array),
@@ -608,22 +618,42 @@ function validate_yaml_parameters(params)
         (["scattering", "λ_ref"], Real),
         (["scattering", "decomp_type"], String, ["NAI2()", "PCW()"]),
     ]
-    for f in fields
+
+    for f in required_fields
         key, elty = f[1:2]
         valid_options = length(f) == 3 ? f[3] : String[]
-        top = key[1]
-        if top == "absorption"
-            if haskey(params, "absorption")
-                check_yaml_field(params, key, key, elty, valid_options)
-            end
-        elseif top == "scattering"
-            if haskey(params, "scattering")
-                check_yaml_field(params, key, key, elty, valid_options)
-            end
-        else
+        check_yaml_field(params, key, key, elty, valid_options)
+    end
+
+    for f in optional_fields
+        key, elty = f[1:2]
+        valid_options = length(f) == 3 ? f[3] : String[]
+        # Only validate if present.
+        if haskey(params, key[1]) && haskey(params[key[1]], key[2])
             check_yaml_field(params, key, key, elty, valid_options)
         end
     end
+
+    for f in section_fields
+        key, elty = f[1:2]
+        valid_options = length(f) == 3 ? f[3] : String[]
+        top = key[1]
+        if top == "absorption" && haskey(params, "absorption")
+            check_yaml_field(params, key, key, elty, valid_options)
+        elseif top == "scattering" && haskey(params, "scattering")
+            check_yaml_field(params, key, key, elty, valid_options)
+        end
+    end
+
+    # New-schema sanity: forbid the user-confusing combination of both
+    # `nstreams` and a competing `l_trunc` (they imply different
+    # `stream_l_cap` values). `m_max` plus `nstreams` is fine because
+    # `m_max` is a tighter override on top of `stream_l_cap`.
+    rt = params["radiative_transfer"]
+    if haskey(rt, "nstreams") && haskey(rt, "l_trunc")
+        @warn "Both `nstreams` and `l_trunc` set in radiative_transfer; `l_trunc` is legacy and will be ignored. Use only `nstreams` for new configs."
+    end
+
     if "scattering" in keys(params)
         validate_aerosols(params["scattering"]["aerosols"])
     end
@@ -743,8 +773,21 @@ function _parse_surfaces(params_dict::Dict, FT)
     return surfs
 end
 
+"""
+    _parse_quadrature(params_dict)
+
+Parse `radiative_transfer.quadrature_type` from YAML. Phase D makes the
+field optional; missing or `null` defaults to `GaussLegQuad()` (the
+recommended scheme — see `docs/dev_notes/fourier_stream_resolution_plan.md`
+and the natraj-benchmark observation that Radau is 5–50× less accurate per
+stream on Rayleigh-only setups).
+"""
 function _parse_quadrature(params_dict::Dict)
-    qkey = replace(String(params_dict["radiative_transfer"]["quadrature_type"]),"()"=>"")
+    rt = params_dict["radiative_transfer"]
+    if !haskey(rt, "quadrature_type") || rt["quadrature_type"] === nothing
+        return CoreRT.GaussLegQuad()
+    end
+    qkey = replace(String(rt["quadrature_type"]),"()"=>"")
     _require_config(haskey(QUAD_MAP, qkey), "Unknown quadrature_type $(qkey).")
     return QUAD_MAP[qkey]()
 end
@@ -916,22 +959,98 @@ function parameters_from_dict(params_dict::Dict)
         _parse_canopy_section(params_dict["canopy"], FT, BRDF_per_band)
     end
 
+    # Phase D — resolve the new-vs-legacy schema knobs. See
+    # `_resolve_resolution_knobs` for the exact precedence rules.
+    res = _resolve_resolution_knobs(params_dict)
+
     Δ_angle = FT(params_dict["radiative_transfer"]["Δ_angle"])
-    l_trunc = params_dict["radiative_transfer"]["l_trunc"]
-    truncation = _parse_truncation(params_dict, l_trunc, Δ_angle, FT)
+    truncation = _parse_truncation(params_dict, res.l_trunc, Δ_angle, FT)
     numerics = _parse_numerics(params_dict, FT)
 
     return vSmartMOM_Parameters(
         spec_bands, BRDF_per_band, quadrature_type, polarization_type,
-        params_dict["radiative_transfer"]["max_m"], Δ_angle,
-        l_trunc, truncation, FT(params_dict["radiative_transfer"]["depol"]),
+        res.max_m, Δ_angle,
+        res.l_trunc, truncation, FT(params_dict["radiative_transfer"]["depol"]),
         numerics, FT,
         architecture,
         FT(params_dict["geometry"]["sza"]), convert.(FT, params_dict["geometry"]["vza"]),
         convert.(FT, params_dict["geometry"]["vaz"]), FT(params_dict["geometry"]["obs_alt"]),
         T, p, q, profile_reduction,
-        absorption_params, scattering_params
+        absorption_params, scattering_params,
+        res.nstreams, res.m_max_override, res.stream_l_cap, res.legacy_l_cap_override,
     )
+end
+
+"""
+    _resolve_resolution_knobs(params_dict) -> NamedTuple
+
+Phase D — normalize the resolution knobs from YAML into the fields the
+struct expects. Distinguishes legacy schema (`max_m`/`l_trunc` present)
+from new schema (`nstreams` present). Returns a NamedTuple with:
+
+- `nstreams::Union{Int, Nothing}`        — verbatim if user set it, else nothing
+- `m_max_override::Union{Int, Nothing}`  — verbatim `m_max` (order) if set
+- `stream_l_cap::Int`                    — derived: `2·nstreams - 1` (new) or
+                                            `l_trunc` (legacy)
+- `legacy_l_cap_override::Union{Int, Nothing}` — `l_trunc` if user set it
+- `max_m::Int`                           — count, populated for back-compat;
+                                            derived from `nstreams + 1` or
+                                            `m_max + 1` if the user gave one
+- `l_trunc::Int`                         — populated for back-compat; derived
+                                            from `2·nstreams - 1` if absent
+
+Defaults when the user supplies neither legacy nor new fields:
+`nstreams = 13` (new-schema default), `max_m = 14`, `l_trunc = 25`.
+"""
+function _resolve_resolution_knobs(params_dict::Dict)
+    rt = params_dict["radiative_transfer"]
+
+    nstreams_raw   = haskey(rt, "nstreams") ? Int(rt["nstreams"]) : nothing
+    m_max_raw      = (haskey(rt, "m_max") && rt["m_max"] !== nothing) ?
+                       Int(rt["m_max"]) : nothing
+    legacy_max_m   = haskey(rt, "max_m")   ? Int(rt["max_m"])    : nothing
+    legacy_l_trunc = haskey(rt, "l_trunc") ? Int(rt["l_trunc"])  : nothing
+
+    # Decide effective `nstreams`.
+    nstreams = if nstreams_raw !== nothing
+        nstreams_raw
+    elseif legacy_max_m === nothing && legacy_l_trunc === nothing
+        13   # Phase D default for minimal new-schema configs
+    else
+        nothing   # legacy schema: leave `nstreams` undefined
+    end
+
+    if nstreams !== nothing
+        nstreams >= 1 || throw(ArgumentError(
+            "radiative_transfer.nstreams = $nstreams; must be ≥ 1"))
+    end
+
+    # `stream_l_cap` and the legacy `l_trunc` mirror.
+    stream_l_cap = if nstreams !== nothing
+        2 * nstreams - 1
+    else
+        # Legacy schema: l_trunc is the projection cap.
+        legacy_l_trunc !== nothing ? legacy_l_trunc :
+            (legacy_max_m !== nothing ? legacy_max_m : 25)
+    end
+    l_trunc = legacy_l_trunc !== nothing ? legacy_l_trunc : stream_l_cap
+
+    # `max_m` (legacy count). New-schema configs: derive from nstreams.
+    max_m = if legacy_max_m !== nothing
+        legacy_max_m
+    elseif m_max_raw !== nothing
+        m_max_raw + 1
+    elseif nstreams !== nothing
+        nstreams + 1   # count = nstreams + 1 reads as "Fourier moments"
+    else
+        14
+    end
+
+    return (; nstreams,
+            m_max_override = m_max_raw,
+            stream_l_cap,
+            legacy_l_cap_override = legacy_l_trunc,
+            max_m, l_trunc)
 end
 
 """
