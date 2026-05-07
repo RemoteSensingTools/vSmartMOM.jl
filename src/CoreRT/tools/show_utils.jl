@@ -185,8 +185,8 @@ function Base.summary(io::IO, m::RTModel)
     FT = float_type(m)
     nBands = length(m.atmosphere.spec_bands)
     nLevels = length(m.atmosphere.profile.p_full)
-    nQuad = m.quad_points.Nquad
-    print(io, "RTModel{$(typeof(m.architecture)), $FT}($nQuad streams, $nBands band(s), $nLevels levels)")
+    nStreams = m.quad_points.Nstreams
+    print(io, "RTModel{$(typeof(m.architecture)), $FT}($nStreams weighted streams, $nBands band(s), $nLevels levels)")
 end
 
 function Base.show(io::IO, ::MIME"text/plain", m::RTModel)
@@ -203,14 +203,14 @@ function Base.show(io::IO, ::MIME"text/plain", m::RTModel)
 
     # solver
     pol_name = typeof(m.solver.polarization_type).name.name
-    println(io, _TREE_MID, "solver: $pol_name, Nquad=$(m.quad_points.Nquad), max_m=$(m.solver.max_m), l_trunc=$(m.solver.l_trunc)")
+    println(io, _TREE_MID, "solver: $pol_name, Nstreams=$(m.quad_points.Nstreams), Nquad=$(m.quad_points.Nquad), max_m=$(m.solver.max_m), l_trunc=$(m.solver.l_trunc)")
 
     # geometry
     vza_str = length(m.geometry.vza) <= 4 ? string(m.geometry.vza) : "[$(length(m.geometry.vza)) angles]"
     println(io, _TREE_MID, "geometry: SZA=$(m.geometry.sza)°, VZA=$(vza_str)°")
 
     # quad_points
-    println(io, _TREE_MID, "quad_points: $(m.quad_points.Nquad) streams, μ₀=$(round(m.quad_points.μ₀, digits=4))")
+    println(io, _TREE_MID, "quad_points: $(m.quad_points.Nstreams) weighted streams (Nquad=$(m.quad_points.Nquad) inc. SZA/VZA output nodes), μ₀=$(round(m.quad_points.μ₀, digits=4))")
 
     # atmosphere
     band_strs = [begin

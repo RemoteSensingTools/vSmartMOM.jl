@@ -772,7 +772,7 @@ of the solar zenith angle (`μ₀`) and its index within the quadrature grid.
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-struct QuadPoints{FT} 
+struct QuadPoints{FT}
     "μ₀, cos(SZA)"
     μ₀::FT
     "Index in quadrature points with sun"
@@ -787,8 +787,10 @@ struct QuadPoints{FT}
     qp_μN::AbstractArray{FT,1}
     "Weights of quadrature points (repeated for polarizations)"
     wt_μN::AbstractArray{FT,1}
-    "Number of quadrature points"
+    "Total number of quadrature points (weighted streams + zero-weight SZA/VZA output nodes)"
     Nquad::Int
+    "Number of weighted streams per hemisphere (count of nonzero weights). Public contract: stream_l_cap = 2·Nstreams - 1."
+    Nstreams::Int
 end
 
 # ============================================================================
