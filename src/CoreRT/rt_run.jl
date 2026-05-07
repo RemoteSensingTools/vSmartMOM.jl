@@ -197,13 +197,13 @@ function rt_run(RS_type::AbstractRamanType, model, iBand;
     # Resolution order: explicit `sources=` kwarg > `model.sources` > legacy
     # `RS_type.F₀` (only when the latter is already user-shaped, to preserve
     # the historical `rs.F₀ = ...; rt_run(rs, model, ...)` test pattern).
-    # Phase 5 will remove the legacy `RS_type.F₀` channel entirely.
+    # Phase 6 will remove the legacy `RS_type.F₀` / `RS_type.SIF₀` channels.
     effective_sources = sources === nothing ? model.sources : sources
+    prepared_sources = prepare_sources(effective_sources, FT, pol_type.n, nSpec, arr_type)
     if sources === nothing && size(RS_type.F₀) == (pol_type.n, nSpec)
         # User has pre-set RS_type.F₀; leave it alone for back-compat.
     else
-        prepared = prepare_sources(effective_sources, FT, pol_type.n, nSpec, arr_type)
-        F₀_dev = extract_solar_F₀(prepared, FT, pol_type.n, nSpec, arr_type)
+        F₀_dev = extract_solar_F₀(prepared_sources, FT, pol_type.n, nSpec, arr_type)
         # `RS_type.F₀` historically lives on host memory; keep that contract by
         # converting back through Array. (Cheap: F₀ is (pol_n, nSpec).)
         RS_type.F₀ = Array{FT, 2}(F₀_dev)
@@ -281,9 +281,19 @@ function rt_run(RS_type::AbstractRamanType, model, iBand;
                                 arch)
         end
 
-        # Inject isotropic SIF emission into surface j₀⁻ (Lambertian only; no-op
-        # for other surfaces and for m>0). See `inject_surface_SIF!` docstring.
+        # Inject surface source contributions into surface j₀⁻. Two paths
+        # coexist during the v0.6 → v0.7 transition:
+        #   1. Legacy: from `RS_type.SIF₀` via `inject_surface_SIF!`. Kept
+        #      until Phase 6 retires the `RS_type.SIF₀` / `RS_type.F₀`
+        #      channel.
+        #   2. New: from any `PreparedSurfaceSIF` in `prepared_sources` via
+        #      the `surface_source_contribute!` double-dispatch. Bit-equal
+        #      to (1) when both reach the Lambertian factor-2 injection.
+        # When the user supplies a SurfaceSIF source AND sets RS_type.SIF₀,
+        # both paths fire and SIF is double-counted; tests must use one API
+        # at a time during the transition.
         inject_surface_SIF!(brdf, added_layer_surface, m, pol_type, _sif_source(RS_type), arch)
+        surface_source_contribute!(prepared_sources, brdf, added_layer_surface, m, pol_type, arch)
 
         #@show composite_layer.J₀⁺[iμ₀,1,1:3]
         # One last interaction with surface:
@@ -457,11 +467,11 @@ function rt_run_ss(RS_type::AbstractRamanType, model, iBand;
     # Resolve sources (v0.6 source-term refactor). Resolution: kwarg >
     # model.sources > pre-set `RS_type.F₀` for back-compat. See `rt_run`.
     effective_sources = sources === nothing ? model.sources : sources
+    prepared_sources = prepare_sources(effective_sources, FT, pol_type.n, nSpec, arr_type)
     if sources === nothing && size(RS_type.F₀) == (pol_type.n, nSpec)
         # User-pre-set F₀ honored.
     else
-        prepared = prepare_sources(effective_sources, FT, pol_type.n, nSpec, arr_type)
-        F₀_dev = extract_solar_F₀(prepared, FT, pol_type.n, nSpec, arr_type)
+        F₀_dev = extract_solar_F₀(prepared_sources, FT, pol_type.n, nSpec, arr_type)
         RS_type.F₀ = Array{FT, 2}(F₀_dev)
     end
 
@@ -502,7 +512,11 @@ function rt_run_ss(RS_type::AbstractRamanType, model, iBand;
                             arr_type(τ_sum_all[:, end]),
                             arch)
 
+        # Surface source contributions — legacy (RS_type.SIF₀) + new
+        # (prepared_sources) paths coexist during the v0.6 → v0.7 transition.
+        # See `rt_run` body for the full rationale.
         inject_surface_SIF!(brdf, added_layer_surface, m, pol_type, _sif_source(RS_type), arch)
+        surface_source_contribute!(prepared_sources, brdf, added_layer_surface, m, pol_type, arch)
 
         # SS mode uses interaction_ss! (no multiple-scattering doubling with surface).
         τsurf = zeros(FT, length(τ_sum_all[:, Nz + 1]))
