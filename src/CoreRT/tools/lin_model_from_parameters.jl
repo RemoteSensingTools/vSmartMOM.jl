@@ -415,10 +415,13 @@ function model_from_parameters(lin::LinMode,
     end
     set_uniform_lmax!(l_max, aerosol_optics)
 
-    # Per-band Fourier loop bound (order). Single helper shared with the
-    # forward path. Fixes the previous lin-only precedence bug
-    # `Int(ceil(l_max+1)/2)` (outer division) — see _derive_m_max_bands.
-    m_max_bands = _derive_m_max_bands(l_max, params.max_m)
+    # Per-band Fourier loop bound (order). Phase C: trait-based aggregator
+    # via `component_m_max(c, ctx)`. Same helper as the forward path so
+    # forward and lin can never silently disagree.
+    components_per_band = [_band_components(params, aerosol_optics, i_band)
+                            for i_band in 1:n_bands]
+    m_max_bands = _derive_m_max_bands_via_traits(l_max, params.max_m,
+                                                  components_per_band)
     n_fourier_moments_bands = m_max_bands .+ 1
 
     # Build the hierarchical RTModel
@@ -431,6 +434,7 @@ function model_from_parameters(lin::LinMode,
         params.l_trunc,
         FT(params.Δ_angle),
         FT(params.depol),
+        true,   # use_component_traits — flipped on in Phase C
     )
     spec_bands_ft = [convert(Vector{FT}, b) for b in params.spec_bands]
     atm = Atmosphere(profile, spec_bands_ft)
