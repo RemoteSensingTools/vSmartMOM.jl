@@ -8,8 +8,10 @@ radiative_transfer:
   # Bidirectional Reflectance Distribution Function (BRDF) per band
   surface: 
     - LambertianSurfaceScalar(0.0)
-  # Quadrature-scheme for stream calculations
-  quadrature_type:    RadauQuad()
+  # Quadrature-scheme for stream calculations.
+  # GaussLegQuad is 5–50× more accurate than RadauQuad on this pure-Rayleigh
+  # benchmark — see docs/src/pages/benchmarks.md.
+  quadrature_type:    GaussLegQuad()
   # Polarization type (Stokes_I, Stokes_IQ, Stokes_IQU, Stokes_IQUV)
   polarization_type:  Stokes_IQUV()
   # Maximum m (number of Fourier moments to loop over)

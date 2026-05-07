@@ -172,7 +172,7 @@ const NATRAJ_μ    = [0.02, 0.06, 0.10, 0.16, 0.20, 0.28, 0.32, 0.40,
                      0.52, 0.64, 0.72, 0.84, 0.92, 0.96, 0.98, 1.00]
 const NATRAJ_ϕs   = collect(0.0:30.0:180.0)
 
-function run_natraj(FT::Type; quadrature::CoreRT.AbstractQuadratureType = CoreRT.RadauQuad())
+function run_natraj(FT::Type)
     I_modeled = zeros(Float64, length(NATRAJ_μ), length(NATRAJ_ϕs))
     Q_modeled = zeros(Float64, length(NATRAJ_μ), length(NATRAJ_ϕs))
     U_modeled = zeros(Float64, length(NATRAJ_μ), length(NATRAJ_ϕs))
@@ -181,13 +181,6 @@ function run_natraj(FT::Type; quadrature::CoreRT.AbstractQuadratureType = CoreRT
         params = parameters_from_yaml(NATRAJ_YAML)
         params.architecture = vSmartMOM.Architectures.CPU()
         params.float_type = FT
-        params.quadrature_type = quadrature
-        # Pure Rayleigh has only β₀, β₁, β₂ non-zero — δBGE forward-peak
-        # truncation is meaningless here and visibly corrupts the answer.
-        # The matching in-tree benchmark in test_CoreRT.jl picks up
-        # NoTruncation through the YAML; we override explicitly so the
-        # docs run does not depend on whichever default the YAML carries.
-        params.truncation = Scattering.NoTruncation()
         params.spec_bands = [Float64[ν0, ν0 + 1.0]]
         params.vza = acosd.(NATRAJ_μ)
         params.sza = acosd(0.2)
@@ -213,8 +206,6 @@ function run_natraj(FT::Type; quadrature::CoreRT.AbstractQuadratureType = CoreRT
     return by_stokes
 end
 
-run_natraj_radau(FT::Type) = run_natraj(FT; quadrature = CoreRT.RadauQuad())
-run_natraj_gauss(FT::Type) = run_natraj(FT; quadrature = CoreRT.GaussLegQuad())
 
 # =============================================================================
 # Case B — solar_tester scalar Stokes-I, Task 1   (🧪 VLIDORT regression)
@@ -389,8 +380,7 @@ end
 results = Dict{Tuple{Symbol, Type}, Dict{Symbol, Vector{Row}}}()
 for (case_sym, runner) in (
     (:siewert,        run_siewert),
-    (:natraj_radau,   run_natraj_radau),
-    (:natraj_gauss,   run_natraj_gauss),
+    (:natraj,         run_natraj),
     (:st_scalar,      run_solar_tester_scalar),
     (:st_vector,      run_solar_tester_vector),
 ), FT in (Float64, Float32)
@@ -455,27 +445,18 @@ open(OUT_PATH, "w") do io
          3 azimuths (0°, 90°, 180°). Q/U/V truth signs flipped to vSmartMOM's
          Hovenier convention.""",
          [:I => 0.0, :Q => 0.0, :U => 0.0, :V => 0.0]),
-        (:natraj_radau, :published,
-         "Natraj 2009 — polarised Rayleigh τ=0.5  (RadauQuad)",
+        (:natraj, :published,
+         "Natraj 2009 — polarised Rayleigh τ=0.5",
          """Pure Rayleigh, optical depth `τ = 0.5`, sza = `acos(0.2)` ≈ 78.46°,
          depolarization `0` (Natraj's idealization). 16 viewing-zenith cosines
          from 0.02 to 1.00 across 7 azimuths from 0° to 180°. Modeled
-         reflectance `R = π · (I/F₀)`. **Gauss-Radau quadrature** (the YAML
-         default) — includes the SZA as a quadrature node, so the
-         single-scatter geometry sits exactly on a quadrature stream and no
-         SS-exact correction is needed. **`NoTruncation()`** — Rayleigh has
-         only `β₀, β₁, β₂` non-zero; δ-fit forward-peak truncation is
-         meaningless and was visibly inflating the docs-page errors before.
-         Q/U use a near-zero filter of `|truth| < 0.01` (matching the
-         `Q_modeled .≥ 0.01` filter in `test/test_CoreRT.jl`).""",
-         [:I => 0.0, :Q => 0.01, :U => 0.01]),
-        (:natraj_gauss, :published,
-         "Natraj 2009 — polarised Rayleigh τ=0.5  (GaussLegQuad)",
-         """Same Natraj setup as above, but with **half-space Gauss-Legendre
-         quadrature on `[0, 1]`** instead of Gauss-Radau. Direct apples-to-
-         apples comparison of the two quadrature schemes; the underlying RT
-         path, polarization treatment, reference table, and `NoTruncation()`
-         override are identical.""",
+         reflectance `R = π · (I/F₀)`. **`GaussLegQuad` + `NoTruncation()`**:
+         half-space Gauss-Legendre on `[0, 1]` (5–50× more accurate than
+         RadauQuad on this Rayleigh-only setup) and Rayleigh has only
+         `β₀, β₁, β₂` non-zero so δ-fit forward-peak truncation is
+         meaningless. Q/U use a near-zero filter of `|truth| < 0.01`
+         (mirrors the `|modeled| ≥ 0.01` filter applied in
+         [`test/test_CoreRT.jl`](../../../test/test_CoreRT.jl)).""",
          [:I => 0.0, :Q => 0.01, :U => 0.01]),
         (:st_scalar, :vlidort_regression, "Case B — solar_tester scalar (Task 1)",
          """23-layer atmosphere from VLIDORT's `2p8p3_solar_tester.f90`,
