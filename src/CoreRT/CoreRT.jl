@@ -59,6 +59,7 @@ include("types.jl")
 include("parameter_layout.jl")                 # ParameterLayout struct for Jacobian indexing
 include("types_lin.jl")                        # Types for linearized RT
 include("Sources/solar_beam.jl")               # v0.6 SolarBeam + PreparedSolarBeam (Phase 2)
+include("Sources/surface_sif.jl")              # v0.6 SurfaceSIF + PreparedSurfaceSIF (Phase 5)
 
 # Note: Raman types (AbstractRamanType, noRS, RRS, etc.) come from 
 # InelasticScattering module via `using ..InelasticScattering` above.
@@ -161,7 +162,9 @@ export AbstractSource, AbstractPreparedSource,
 
 # Phase 2: SolarBeam + the prepare_source seam
 # Phase 4: BlackbodySource constructor sugar (returns a SolarBeam with Planck F₀)
-export SolarBeam, PreparedSolarBeam, prepare_source, prepare_sources, BlackbodySource
+# Phase 5: SurfaceSIF + double-dispatch surface_source_contribute!
+export SolarBeam, PreparedSolarBeam, prepare_source, prepare_sources, BlackbodySource,
+       SurfaceSIF, PreparedSurfaceSIF, surface_source_contribute!
 
 # Export types to show easily
 export RadauQuad, GaussLegQuad,
