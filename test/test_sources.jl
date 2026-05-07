@@ -195,4 +195,110 @@ using Test
         R_2x = rt_run(model; sources = SolarBeam(F₀ = F₀_2x))[1]
         @test R_2x ≈ FT(2) .* R_default rtol = 1e-12
     end
+
+    @testset "Phase 4: BlackbodySource constructor sugar" begin
+        spec_band = collect(4167.0:100.0:5000.0)             # 9 pts spanning 2-2.4 µm
+        sources = BlackbodySource(1500, spec_band; pol_n = 3)
+        @test sources isa SolarBeam
+        @test size(sources.F₀) == (3, length(spec_band))
+        @test all(sources.F₀[1, :] .> 0)
+        @test all(sources.F₀[2, :] .== 0)
+        @test all(sources.F₀[3, :] .== 0)
+
+        direct = π * vSmartMOM.SolarModel.planck_spectrum_wn(1500.0, [4167.0])
+        @test sources.F₀[1, 1] ≈ direct[1] rtol = 1e-12
+
+        sources_collimated = BlackbodySource(1500, spec_band; pol_n = 3, factor = 1.0)
+        @test sources_collimated.F₀[1, 1] ≈ sources.F₀[1, 1] / π rtol = 1e-12
+
+        sources_q = BlackbodySource(1500, spec_band; pol_n = 3, pol_component = 2)
+        @test all(sources_q.F₀[1, :] .== 0)
+        @test all(sources_q.F₀[2, :] .> 0)
+
+        @test_throws ErrorException BlackbodySource(1500, spec_band; pol_n = 3, pol_component = 5)
+    end
+
+    @testset "Phase 5a: SurfaceSIF construction + prepare_source" begin
+        sif_default = SurfaceSIF()
+        @test sif_default isa SurfaceSIF
+        @test sif_default.SIF₀ === nothing
+        @test source_ad_mode(sif_default) isa AnalyticSourceJacobian
+
+        sif_custom = SurfaceSIF(SIF₀ = ones(3, 5))
+        @test sif_custom.SIF₀ == ones(3, 5)
+
+        prep_default = prepare_source(SurfaceSIF(), Float64, 3, 5, identity)
+        @test prep_default isa PreparedSurfaceSIF
+        @test size(prep_default.SIF₀) == (3, 5)
+        @test all(prep_default.SIF₀ .== 0)
+
+        SIF₀_in = ones(Float64, 3, 5)
+        prep_custom = prepare_source(SurfaceSIF(SIF₀ = SIF₀_in), Float64, 3, 5, identity)
+        @test prep_custom.SIF₀ == SIF₀_in
+
+        prep32 = prepare_source(SurfaceSIF(SIF₀ = SIF₀_in), Float32, 3, 5, identity)
+        @test eltype(prep32.SIF₀) === Float32
+
+        combo = SolarBeam() + SurfaceSIF()
+        @test combo isa SourceSet
+        @test length(combo) == 2
+    end
+
+    @testset "Phase 5a: surface_source_contribute! double-dispatch" begin
+        FT = Float64
+        nSpec = 5
+        NquadN = 9
+        struct _PolStub
+            n :: Int
+        end
+        pol = _PolStub(3)
+        arch = vSmartMOM.Architectures.CPU()
+
+        prep_sif = prepare_source(SurfaceSIF(SIF₀ = ones(FT, 3, nSpec)),
+                                  FT, 3, nSpec, identity)
+        brdf_lambert = LambertianSurfaceScalar(FT(0.5))
+
+        added = (j₀⁻ = zeros(FT, NquadN, 1, nSpec),)
+        CoreRT.surface_source_contribute!(prep_sif, brdf_lambert, added, 0, pol, arch)
+        @test all(added.j₀⁻[:, 1, :] .≈ FT(2))
+
+        added.j₀⁻ .= 0
+        CoreRT.surface_source_contribute!(prep_sif, brdf_lambert, added, 1, pol, arch)
+        @test all(added.j₀⁻ .== 0)
+
+        brdf_rpv = CoreRT.rpvSurfaceScalar(FT(0.1), FT(0.1), FT(0.7), FT(-0.1))
+        added.j₀⁻ .= 0
+        CoreRT.surface_source_contribute!(prep_sif, brdf_rpv, added, 0, pol, arch)
+        @test all(added.j₀⁻ .== 0)
+
+        added.j₀⁻ .= 0
+        CoreRT.surface_source_contribute!(NoSource(), brdf_lambert, added, 0, pol, arch)
+        @test all(added.j₀⁻ .== 0)
+
+        prep_combo = prepare_sources(
+            SolarBeam() + SurfaceSIF(SIF₀ = ones(FT, 3, nSpec)),
+            FT, 3, nSpec, identity)
+        added.j₀⁻ .= 0
+        CoreRT.surface_source_contribute!(prep_combo, brdf_lambert, added, 0, pol, arch)
+        @test all(added.j₀⁻[:, 1, :] .≈ FT(2))
+    end
+
+    @testset "Phase 5b: rt_run with sources=SurfaceSIF wires through dispatch" begin
+        params = parameters_from_yaml("test_parameters/PureRayleighParameters.yaml")
+        params.architecture = vSmartMOM.Architectures.CPU()
+        model = model_from_parameters(params)
+        FT = CoreRT.float_type(model)
+        pol_n = CoreRT.polarization_type(model).n
+        nSpec = sum(size(model.τ_abs[i], 1) for i in 1:length(model.τ_abs))
+
+        R_default = rt_run(model)[1]
+
+        SIF₀_arr = zeros(FT, pol_n, nSpec); SIF₀_arr[1, :] .= FT(0.01)
+        R_with_sif = rt_run(model; sources = SolarBeam() + SurfaceSIF(SIF₀ = SIF₀_arr))[1]
+        δI = maximum(abs, R_with_sif[:, 1, :] .- R_default[:, 1, :])
+        @test δI > 0
+        # Order of magnitude (1/π)·0.01·attenuation ≈ 3e-3 for Lambertian albedo+atmosphere
+        @test 1e-4 < δI < 1e-1
+    end
 end
+
