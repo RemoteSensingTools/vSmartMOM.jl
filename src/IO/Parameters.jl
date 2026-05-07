@@ -599,9 +599,11 @@ function validate_yaml_parameters(params)
     ]
     # Phase D — optional fields. When absent the parser supplies a sensible
     # default (`GaussLegQuad()` for quadrature, `nstreams = 13` for the new
-    # schema, etc.). When present, type/value must match.
+    # schema, etc.). When present, type/value must match. `quadrature_type`
+    # also accepts `null` (YAML) → defaults to `GaussLegQuad()`. (Codex
+    # Phase D1 P3 finding.)
     optional_fields = [
-        (["radiative_transfer", "quadrature_type"], String),     # Phase D: default GaussLegQuad()
+        (["radiative_transfer", "quadrature_type"], Union{String, Nothing}),  # Phase D: default GaussLegQuad()
         (["radiative_transfer", "max_m"], Integer),              # Legacy
         (["radiative_transfer", "l_trunc"], Integer),            # Legacy
         (["radiative_transfer", "nstreams"], Integer),           # Phase D primary knob
@@ -1021,8 +1023,18 @@ function _resolve_resolution_knobs(params_dict::Dict)
     end
 
     if nstreams !== nothing
-        nstreams >= 1 || throw(ArgumentError(
-            "radiative_transfer.nstreams = $nstreams; must be ≥ 1"))
+        # Solar/scattering minimum: Rayleigh declares Fourier support
+        # through m=2, so nstreams ≥ 3 ⇒ stream_l_cap ≥ 5 ≥ 2. Anything
+        # smaller silently drops the Rayleigh m=2 term. (Codex Phase D1
+        # P2 finding.) Thermal-only / source-only scenes that genuinely
+        # only need m=0 will get a separate escape valve once Phase 7
+        # ThermalEmission lands.
+        nstreams >= 3 || throw(ArgumentError(
+            "radiative_transfer.nstreams = $nstreams; must be ≥ 3 for " *
+            "solar/scattering scenes (Rayleigh contributes through m=2). " *
+            "Streams here are weighted streams per hemisphere — classical " *
+            "two-stream uses one stream per hemisphere, vSmartMOM's solar " *
+            "scattering minimum is three."))
     end
 
     # `stream_l_cap` and the legacy `l_trunc` mirror.
@@ -1033,15 +1045,31 @@ function _resolve_resolution_knobs(params_dict::Dict)
         legacy_l_trunc !== nothing ? legacy_l_trunc :
             (legacy_max_m !== nothing ? legacy_max_m : 25)
     end
-    l_trunc = legacy_l_trunc !== nothing ? legacy_l_trunc : stream_l_cap
 
-    # `max_m` (legacy count). New-schema configs: derive from nstreams.
+    # When `nstreams` is the primary knob, override any legacy `l_trunc`
+    # the user kept around — passing the larger `l_trunc` to
+    # `rt_set_streams` would build more streams than `nstreams` requests.
+    # (Codex Phase D1 P2 finding.)
+    l_trunc = if nstreams !== nothing
+        stream_l_cap
+    elseif legacy_l_trunc !== nothing
+        legacy_l_trunc
+    else
+        stream_l_cap
+    end
+
+    # `max_m` (legacy count). When `nstreams` drives the schema, the
+    # back-compat count must reflect `stream_l_cap + 1` so the trait
+    # aggregator's `legacy_order_cap = max_m - 1` matches `stream_l_cap`.
+    # Otherwise `nstreams: 8` would silently truncate Cox-Munk at
+    # `max_m - 1 = nstreams = 8` instead of the documented
+    # `stream_l_cap = 15`. (Codex Phase D1 P1 finding.)
     max_m = if legacy_max_m !== nothing
         legacy_max_m
     elseif m_max_raw !== nothing
         m_max_raw + 1
     elseif nstreams !== nothing
-        nstreams + 1   # count = nstreams + 1 reads as "Fourier moments"
+        stream_l_cap + 1
     else
         14
     end
@@ -1130,6 +1158,11 @@ so untrusted configs can't execute arbitrary code.
 """
 function _truncation_from_string(spec::AbstractString, ::Type{FT}) where {FT}
     s = strip(spec)
+    # Phase D — `auto` is the deferred-decision marker; resolved at
+    # `model_from_parameters` time per the per-band phase_lmax check.
+    if s == "auto" || s == "AutoTruncation()"
+        return Scattering.AutoTruncation()
+    end
     if s == "NoTruncation()"
         return Scattering.NoTruncation()
     end
@@ -1146,7 +1179,7 @@ function _truncation_from_string(spec::AbstractString, ::Type{FT}) where {FT}
     end
     throw(ArgumentError(
         "radiative_transfer.truncation = $(repr(spec)) does not match a " *
-        "supported constructor. Allowed: \"NoTruncation()\", " *
+        "supported constructor. Allowed: \"auto\", \"NoTruncation()\", " *
         "\"NoTruncation(l_max=N)\", \"δBGE(l_max, Δ_angle)\", " *
         "\"δBGE{T}(l_max, Δ_angle)\"."))
 end

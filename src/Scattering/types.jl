@@ -265,14 +265,45 @@ struct δBGE{FT} <: AbstractTruncationType
 end
 
 """
+    AutoTruncation()
+
+Phase D — deferred-decision marker for `truncation: auto` in YAML
+(mirrors VLIDORT's `DO_DELTAM_SCALING` philosophy). At
+`model_from_parameters` time it resolves deterministically:
+
+- No aerosol scattering, or all aerosols' `length(greek.β) - 1`
+  fits within `stream_l_cap` ⇒ `NoTruncation()` (typical for
+  Rayleigh-only or smooth-aerosol scenes).
+- Aerosols with `phase_lmax > stream_l_cap` ⇒
+  `δBGE(stream_l_cap, Δ_angle)`.
+
+The resolver emits an `@info` line stating which branch was taken
+so the user can always see what was applied. `AutoTruncation` is
+**deliberately not threaded through the Mie/RT kernels** — it is a
+build-time placeholder that gets replaced before any kernel sees it.
+
+User-facing knobs in YAML:
+
+| Value                     | Meaning                                            |
+|---------------------------|----------------------------------------------------|
+| `truncation: auto`        | This deferred-decision mode (Phase D recommended)  |
+| `truncation: NoTruncation()` / `null` | Exactly no transform; errors if coefs exceed cap |
+| `truncation: δBGE(N, Δ)`  | Explicit; used for benchmarks / cross-validation   |
+"""
+struct AutoTruncation <: AbstractTruncationType end
+
+"""
     l_max(t::AbstractTruncationType) -> Int
 
 Per-band Legendre cutoff supplied by the truncation type. RT pipeline
 code that needs a finite cutoff with `NoTruncation` should clamp to the
 actual Greek-coefficient length, e.g.
-`min(length(greek.β), l_max(truncation))`.
+`min(length(greek.β), l_max(truncation))`. `AutoTruncation()` reports
+`typemax(Int)` because it is unresolved — the model builder replaces it
+before any kernel runs.
 """
 @inline l_max(t::AbstractTruncationType) = t.l_max
+@inline l_max(::AutoTruncation) = typemax(Int)
 
 #=
 

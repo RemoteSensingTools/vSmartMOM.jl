@@ -50,14 +50,12 @@
     "radiative_transfer": {
       "type": "object",
       "additionalProperties": false,
+      "description": "RT solver configuration. v0.7 makes nstreams the primary user knob; max_m / l_trunc / quadrature_type are now optional with backward-compatible defaults. See docs/src/pages/IO/Schema/radiative_transfer.md for the full reference.",
       "required": [
         "spec_bands",
         "surface",
-        "quadrature_type",
         "polarization_type",
-        "max_m",
         "Δ_angle",
-        "l_trunc",
         "depol",
         "float_type",
         "architecture"
@@ -69,16 +67,17 @@
         },
         "surface": {
           "$ref": "#/definitions/stringArray",
-          "description": "One surface expression per band. Current parser supports LambertianSurfaceScalar, LambertianSurfaceSpectrum, LambertianSurfaceLegendre, rpvSurfaceScalar, RossLiSurfaceScalar, and CoxMunkSurface."
+          "description": "One surface expression per band. Parser supports LambertianSurfaceScalar, LambertianSurfaceSpectrum, LambertianSurfaceLegendre, rpvSurfaceScalar, RossLiSurfaceScalar, and CoxMunkSurface."
         },
         "quadrature_type": {
-          "type": "string",
+          "type": ["string", "null"],
           "enum": [
             "RadauQuad()",
-            "GaussQuadHemisphere()",
-            "GaussQuadFullSphere()"
+            "GaussLegQuad()",
+            null
           ],
-          "description": "Angular quadrature rule."
+          "default": "GaussLegQuad()",
+          "description": "Optional angular quadrature rule. Default GaussLegQuad() (Sanghavi: cheaper and 5-50× more accurate per stream than Radau on Rayleigh-only setups)."
         },
         "polarization_type": {
           "type": "string",
@@ -90,19 +89,35 @@
           ],
           "description": "Stokes vector dimensionality."
         },
+        "nstreams": {
+          "type": "integer",
+          "minimum": 3,
+          "description": "v0.7 primary resolution knob: weighted streams per hemisphere. Public contract: stream_l_cap = 2·nstreams - 1 regardless of quadrature_type. Minimum 3 (Rayleigh declares Fourier support through m=2). Default 13 when no legacy fields are set."
+        },
+        "m_max": {
+          "type": ["integer", "null"],
+          "minimum": 0,
+          "description": "v0.7 explicit Fourier loop bound (order). Optional override clamping the trait-derived bound from above. Default null."
+        },
         "max_m": {
           "type": "integer",
           "minimum": 0,
-          "description": "Maximum Fourier moment included in the RT solve."
+          "description": "Legacy: Fourier moment count (loop runs m=0:max_m-1). Triggers legacy-schema parsing. Use nstreams in new configs."
         },
         "Δ_angle": {
           "type": "number",
-          "description": "Forward-peak exclusion angle in degrees. In TOML, write this key as \"Δ_angle\" = 0.0."
+          "description": "Forward-peak exclusion angle in degrees, consumed by δBGE truncation. In TOML, write this key as \"Δ_angle\" = 0.0."
         },
         "l_trunc": {
           "type": "integer",
           "minimum": 0,
-          "description": "Legendre truncation length."
+          "description": "Legacy Legendre truncation length. Plays the role of stream_l_cap under the legacy schema. Use nstreams instead in new configs."
+        },
+        "truncation": {
+          "type": ["string", "null"],
+          "default": "auto",
+          "description": "v0.7 phase-function truncation mode. 'auto' (default): NoTruncation if phase fits stream_l_cap, δBGE(N, Δ) otherwise. 'NoTruncation()' / null: exactly no transform; errors if coefs exceed cap. 'δBGE(L, Δ)': explicit (for benchmarks).",
+          "examples": ["auto", "NoTruncation()", "δBGE(20, 2.0)"]
         },
         "depol": {
           "type": "number",
@@ -122,10 +137,34 @@
             "default_architecture",
             "CPU()",
             "GPU()",
+            "MetalGPU()",
             "Architectures.CPU()",
-            "Architectures.GPU()"
+            "Architectures.GPU()",
+            "Architectures.MetalGPU()"
           ],
           "description": "Compute backend selector."
+        },
+        "numerics": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Optional sub-block: rarely-touched solver knobs.",
+          "properties": {
+            "dτ_max_threshold": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Doubling-step cap. Default ~0.0125."
+            },
+            "dτ_min_floor": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Minimum layer thickness. Default ~1e-7."
+            },
+            "blas_threads": {
+              "type": ["integer", "null"],
+              "minimum": 1,
+              "description": "Per-model BLAS thread cap. null = leave global BLAS alone (default). Recommend 4-8 for batched runs."
+            }
+          }
         }
       }
     },

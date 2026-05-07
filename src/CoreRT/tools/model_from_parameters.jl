@@ -18,7 +18,50 @@ older idiom — e.g. `test_float32.jl`), they must also mutate
 silently rebuild from the legacy fields, because that would discard a
 user-set explicit truncation (e.g. `NoTruncation()` or a custom δBGE).
 """
-@inline _resolved_truncation(params, ::Type{FT}) where {FT} = params.truncation
+@inline _resolved_truncation(params, ::Type{FT}) where {FT} =
+    _resolve_auto_truncation(params.truncation, params, FT)
+
+"""
+    _resolve_auto_truncation(t, params, FT) -> AbstractTruncationType
+
+Phase D — resolve `Scattering.AutoTruncation()` (the `truncation: auto`
+YAML knob) into a concrete `NoTruncation()` or `δBGE(...)` based on
+whether the configured aerosols' phase function fits within
+`params.stream_l_cap`.
+
+Heuristic (mirrors VLIDORT's `DO_DELTAM_SCALING`):
+
+- No `scattering_params` block, or no aerosols configured ⇒
+  `NoTruncation()` (Rayleigh-only / canopy-only scenes; β has length 3
+  and trivially fits any reasonable `stream_l_cap`).
+- Aerosols configured ⇒ `δBGE(stream_l_cap, Δ_angle)` (typical Mie
+  computations produce hundreds of greek moments; the projection cap
+  determines what's resolvable).
+
+Logs the chosen branch via `@info` so the user always sees what was
+applied. Non-`AutoTruncation` inputs pass through unchanged.
+
+Caveat: this is a **build-time** heuristic that doesn't peek at the
+actual `length(greek.β)` produced by the Mie loop. A more sophisticated
+two-step resolver (compute raw Mie, inspect, then re-truncate) is a
+follow-up; in practice the simple heuristic gets the right answer for
+the typical configs (Rayleigh-only ⇒ NoTruncation, aerosol ⇒ δBGE).
+"""
+function _resolve_auto_truncation(t::Scattering.AbstractTruncationType, params, ::Type{FT}) where {FT}
+    t isa Scattering.AutoTruncation || return t
+
+    has_aerosols = params.scattering_params !== nothing &&
+                   !isempty(params.scattering_params.rt_aerosols)
+    if !has_aerosols
+        @info "truncation: auto → NoTruncation() (no aerosols; Rayleigh-only scene)"
+        return Scattering.NoTruncation()
+    end
+
+    cap = params.stream_l_cap
+    Δ = FT(params.Δ_angle)
+    @info "truncation: auto → δBGE($cap, $Δ) (aerosols configured; cap from stream_l_cap)"
+    return Scattering.δBGE{FT}(cap, Δ)
+end
 
 _has_analytic_phase_function(c_aero::RT_Aerosol) =
     c_aero.phase_function !== nothing

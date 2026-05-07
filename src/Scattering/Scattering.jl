@@ -52,7 +52,7 @@ export make_mie_model, reconstruct_phase, greek_coefficients,
 # Export types
 export NAI2, PCW, Aerosol, MieModel, Stokes_IQUV, Stokes_I, Stokes_IQ,
        Stokes_IQU,
-       δBGE, NoTruncation, GreekCoefs, AerosolOptics,
+       δBGE, NoTruncation, AutoTruncation, GreekCoefs, AerosolOptics,
        AbstractFourierDecompositionType, AbstractAnalyticPhaseFunction,
        HenyeyGreensteinPhaseFunction,
        SyntheticPolarizedHenyeyGreensteinPhaseFunction

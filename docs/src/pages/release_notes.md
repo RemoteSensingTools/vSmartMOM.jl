@@ -7,6 +7,79 @@
 This page summarizes the user-visible changes in the 2.0 line. It is written as
 a migration guide, not as a complete git history.
 
+## Unreleased — v0.7 (Fourier / Stream Resolution refactor)
+
+The v0.7 line replaces the legacy `max_m` / `l_trunc` resolution knobs
+with a single primary input: **`nstreams`** (weighted streams per
+hemisphere). Existing YAML and TOML configs continue to work; new
+configs should prefer `nstreams`.
+
+### What changed for users
+
+```yaml
+# Before (still works — legacy schema)
+radiative_transfer:
+  quadrature_type: GaussLegQuad()
+  max_m: 14
+  l_trunc: 25
+
+# After (new schema, recommended)
+radiative_transfer:
+  nstreams: 13           # public contract: stream_l_cap = 2·N - 1
+  truncation: auto       # NoTruncation if phase fits, δBGE otherwise
+  # quadrature_type omitted ⇒ GaussLegQuad() (Sanghavi: cheaper +
+  # 5–50× more accurate per stream than RadauQuad on Rayleigh)
+```
+
+### Highlights
+
+- **`nstreams ≥ 3`** is enforced — Rayleigh contributes through m=2.
+- **`truncation: auto`** mirrors VLIDORT's `DO_DELTAM_SCALING`: the
+  resolver picks `NoTruncation()` when the phase function fits within
+  `stream_l_cap`, `δBGE(N, Δ_angle)` otherwise. Logs the choice via
+  `@info` so the user always sees what was applied.
+- **`GaussLegQuad()`** is the default quadrature when `quadrature_type`
+  is omitted. `RadauQuad()` remains an option but is documented as
+  expert/legacy. (See the natraj benchmark in
+  [`docs/src/pages/benchmarks.md`](benchmarks.md) for the per-scheme
+  accuracy comparison.)
+- **JSON Schema** at
+  [`schemas/vsmartmom-parameters.schema.json`](https://github.com/cfranken/vSmartMOM.jl/blob/main/schemas/vsmartmom-parameters.schema.json)
+  describes the v0.7 schema. Wired to TOML via the repo's
+  `.taplo.toml`; YAML editors honour it via
+  `# yaml-language-server: $schema=...`. Setup recipe in
+  [`Schema.md`](IO/Schema.md#editor-support--autocomplete--inline-validation).
+- **Per-block schema docs** under
+  [`docs/src/pages/IO/Schema/`](IO/Schema/) — one page per top-level
+  YAML/TOML block.
+
+### Internal cleanup
+
+- `Nstreams` and `m_max_bands` are first-class fields on `QuadPoints`
+  and `SolverConfig`. Forward and lin RT paths share a single
+  `_derive_m_max_bands` helper, fixing a latent precedence-bug in the
+  lin path at even `l_max`.
+- Per-component `component_m_max(c, ctx)` traits drive the per-band
+  Fourier loop bound. Cox-Munk / RPV / Ross-Li / canopy now run to
+  their full `user_l_cap` instead of the silently-half-truncated
+  count-aggregator output.
+
+### Migration guidance
+
+- **YAMLs that explicitly set `max_m` / `l_trunc`** keep working
+  byte-identically — they hit the legacy parsing branch.
+- **YAMLs that hand-set `max_m` to upper-bound a Cox-Munk loop**
+  (e.g. `config/ocean_coxmunk.yaml`) get a numeric change: the
+  Fourier loop now runs to the user-set order rather than the
+  half-truncated aggregator output. The new behavior matches the
+  user's explicit request.
+- **lin Jacobians** may shift by one Fourier moment for configs with
+  even `l_max` (intentional fix to a latent precedence bug;
+  documented in the Phase B commit).
+
+See [`docs/dev_notes/fourier_stream_resolution_plan.md`](../../dev_notes/fourier_stream_resolution_plan.md)
+for the design rationale.
+
 ## Platform Support
 
 vSmartMOM 2.0 supports Julia 1.10 and newer Julia 1.x releases listed in
