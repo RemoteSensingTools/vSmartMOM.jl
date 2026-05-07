@@ -155,12 +155,15 @@ function rt_run(RS_type::AbstractRamanType,
 
     # Resolve sources (v0.6 source-term refactor). Resolution: kwarg >
     # model.sources > pre-set `RS_type.F₀` for back-compat. See `rt_run`.
+    # `prepared_sources` is now hoisted outside the conditional so it's
+    # in scope for the surface step (`surface_source_contribute!`) that
+    # routes SurfaceSIF / future per-source surface contributions.
     effective_sources = sources === nothing ? model.sources : sources
+    prepared_sources = prepare_sources(effective_sources, FT, pol_type.n, nSpec, arr_type)
     if sources === nothing && size(F₀) == (pol_type.n, nSpec)
         # User pre-set F₀ honored — F₀ already in scope from RS_type unpack.
     else
-        prepared = prepare_sources(effective_sources, FT, pol_type.n, nSpec, arr_type)
-        F₀_dev = extract_solar_F₀(prepared, FT, pol_type.n, nSpec, arr_type)
+        F₀_dev = extract_solar_F₀(prepared_sources, FT, pol_type.n, nSpec, arr_type)
         F₀ = Array{FT, 2}(F₀_dev)
         RS_type.F₀ = F₀
     end
@@ -257,24 +260,25 @@ function rt_run(RS_type::AbstractRamanType,
         # blew through the surface block when iBand>1.)
         iparam = surface_index(layout, 1)
         create_surface_layer!(RS_type, brdf, #brdf_lin,
-                            added_surface_layer, 
+                            added_surface_layer,
                             added_surface_layer_lin,
                             iparam,
-                            SFI, m, 
-                            pol_type, 
-                            quad_points, 
+                            SFI, m,
+                            pol_type,
+                            quad_points,
                             arr_type(τ_sum_all[:,end]),
-                            arr_type(τ̇_sum_all[:,:,end]), 
+                            arr_type(τ̇_sum_all[:,:,end]),
                             arr_type(F₀),
                             CoreRT.architecture(model));
-        
-        
-        #@show F₀[:,1]
-        #@show scattering_interfaces_all[end]
-                            #@show scattering_interfaces_all[end]
-        #blapl
-        # One last interaction with surface:
-        #@show composite_layer.J₀⁻[:,1,1] 
+
+        # Surface source contributions (v0.6 source-term refactor): mirror
+        # the rt_run / rt_run_ss surface step. NoSource → no-op;
+        # PreparedSurfaceSIF on a Lambertian BRDF → factor-2 SIF₀ injection
+        # at m=0. SolarBeam contributions to surface j₀⁻ stay inside
+        # `create_surface_layer!` for back-compat; Phase 5c will move them
+        # out into the same dispatch table.
+        surface_source_contribute!(prepared_sources, brdf, added_surface_layer,
+                                   m, pol_type, CoreRT.architecture(model))
         
         @timeit "interaction" interaction!(#RS_type,
                                     #bandSpecLim,
