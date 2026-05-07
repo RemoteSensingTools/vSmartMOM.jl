@@ -20,3 +20,23 @@ Prior design conclusions:
 v0.4 preliminary review notes:
 - Strong improvement over v0.3: max_m sentinel fixed, Nstreams separated from Nquad, source rename deferred, ss_corrections moved to kwarg, hotspot field parameterized, zero dims corrected, canopy/directional excluded from simple contributor pattern.
 - Highest risks: Step 1D is too broad for one migration step; NoScattering dispatch must use a layer-level spectral maximum test and cannot represent per-wavelength mixed scattering; direct-beam "subtract SS from MS solve" wording is physically risky; fScattRayleigh Option B still lacks current function arguments; RTContext fields should be concretely parameterized in implementation.
+
+v0.6 source-term refactor (AbstractSourceType plan): plan file at
+~/.claude/plans/gpt-also-had-some-velvety-whale.md. Per-phase Codex review
+gate is part of the workflow.
+
+Phase 1 status (2026-05-06): vocabulary types landed (AbstractSource,
+AbstractPreparedSource, NoSource, SourceSet with `+` flattening + NoSource
+identity, AbstractSourceADMode trait family). Pure additive change — no
+kernel / rt_run / surface / RS_type touch. Module precompiles, smoke checks
+on `+` composition and `source_ad_mode` dispatch pass.
+
+Codex review for Phase 1 was BLOCKED by a CLI/model mismatch:
+  - `codex review --uncommitted` defaulted to model "gpt-5.5" which the API
+    rejected with: "The 'gpt-5.5' model requires a newer version of Codex.
+    Please upgrade to the latest app or CLI and try again."
+  - Override `-c model='gpt-5'` returned: "The 'gpt-5' model is not
+    supported when using Codex with a ChatGPT account."
+Action: codex CLI needs upgrade (or model config alignment with the
+account type) before subsequent phase reviews can run. Phase 1 committed
+without codex sign-off; Phase 2+ reviews will resume once codex CLI works.
