@@ -100,14 +100,17 @@ function doubling_helper!(pol_type,
     tt⁺⁺_gp_refl = similar(t⁺⁺)
     gp_refl_lin       = arr_type(zeros(size(t⁺⁺)[1], size(t⁺⁺)[2], size(t⁺⁺)[3], 3))
     tt⁺⁺_gp_refl_lin  = arr_type(zeros(size(t⁺⁺)[1], size(t⁺⁺)[2], size(t⁺⁺)[3], 3))
-    if SFI
-        # Dummy for source 
-        J₁⁺ = similar(j₀⁺)
-        J̇₁⁺ = similar(J̇₀⁺)
-        # Dummy for J
-        J₁⁻ = similar(j₀⁻)
-        J̇₁⁻ = similar(J̇₀⁻)
-    end
+    # Source-doubling scratch — always allocated. Affine source propagation
+    # is source-agnostic; if no sources contributed at the elemental step,
+    # `j₀±/J̇₀±` are zero (initialized in elemental_lin.jl) and the
+    # propagation below is a series of zero-array matmuls returning zero.
+    # No `if SFI` gate needed — multiple dispatch (NoSource → no contribute!)
+    # already determines whether source state exists; the operator side
+    # then propagates it unconditionally per Fourier moment.
+    J₁⁺ = similar(j₀⁺)
+    J̇₁⁺ = similar(J̇₀⁺)
+    J₁⁻ = similar(j₀⁻)
+    J̇₁⁻ = similar(J̇₀⁻)
 
     # Loop over number of doublings
     @inbounds for n = 1:ndoubl
@@ -119,35 +122,37 @@ function doubling_helper!(pol_type,
             @views gp_refl_lin[:,:,:,iparam] .= gp_refl ⊠ (ṙ⁻⁺[:,:,:,iparam] ⊠ r⁻⁺ .+ r⁻⁺ ⊠ ṙ⁻⁺[:,:,:,iparam]) ⊠ gp_refl
             @views tt⁺⁺_gp_refl_lin[:,:,:,iparam] .= ṫ⁺⁺[:,:,:,iparam] ⊠ gp_refl .+ t⁺⁺ ⊠ gp_refl_lin[:,:,:,iparam]
         end
-        if SFI
-            # J⁺₂₁(λ) = J⁺₁₀(λ).exp(-τ(λ)/μ₀)
-            @views J₁⁺[:,1,:] = j₀⁺[:,1,:] .* expk'
-            # J⁻₁₂(λ)  = J⁻₀₁(λ).exp(-τ(λ)/μ₀)
-            @views J₁⁻[:,1,:] = j₀⁻[:,1,:] .* expk'
-            for iparam = 1:3
-                if iparam == 1
-                    @views J̇₁⁺[:,1,:,iparam] .= J̇₀⁺[:,1,:,iparam] .* expk' .+ j₀⁺[:,1,:] .* expk_lin'        
-                    @views J̇₁⁻[:,1,:,iparam] .= J̇₀⁻[:,1,:,iparam] .* expk' .+ j₀⁻[:,1,:] .* expk_lin'
-                    
-                    @views expk_lin .= 2*expk .* expk_lin
-                else
-                    @views J̇₁⁺[:,1,:,iparam] .= J̇₀⁺[:,1,:,iparam] .* expk'         
-                    @views J̇₁⁻[:,1,:,iparam] .= J̇₀⁻[:,1,:,iparam] .* expk' 
-                end
-                @views J̇₀⁻[:,:,:,iparam] .= J̇₀⁻[:,:,:,iparam] .+
-                        (tt⁺⁺_gp_refl_lin[:,:,:,iparam] ⊠ (J₁⁻ .+ r⁻⁺ ⊠ j₀⁺)) .+
-                        (tt⁺⁺_gp_refl ⊠ (J̇₁⁻[:,:,:,iparam] .+ ṙ⁻⁺[:,:,:,iparam] ⊠ j₀⁺ .+ r⁻⁺ ⊠ J̇₀⁺[:,:,:,iparam]))
-                @views J̇₀⁺[:,:,:,iparam] .= J̇₁⁺[:,:,:,iparam] .+
-                    (tt⁺⁺_gp_refl_lin[:,:,:,iparam] ⊠ (j₀⁺ .+ r⁻⁺ ⊠ J₁⁻)) .+
-                    (tt⁺⁺_gp_refl ⊠ (J̇₀⁺[:,:,:,iparam] .+ ṙ⁻⁺[:,:,:,iparam] ⊠ J₁⁻ .+ r⁻⁺ ⊠ J̇₁⁻[:,:,:,iparam]))
-            end
+        # Source-vector doubling — always-on per the v0.6 design (the affine
+        # update is source-agnostic; doubling does not need to know whether
+        # any source contributed; if `j₀±=0` (NoSource scene) the matmuls
+        # produce zero — bit-equal to the previously-gated `if SFI` path).
+        # J⁺₂₁(λ) = J⁺₁₀(λ).exp(-τ(λ)/μ₀)
+        @views J₁⁺[:,1,:] = j₀⁺[:,1,:] .* expk'
+        # J⁻₁₂(λ)  = J⁻₀₁(λ).exp(-τ(λ)/μ₀)
+        @views J₁⁻[:,1,:] = j₀⁻[:,1,:] .* expk'
+        for iparam = 1:3
+            if iparam == 1
+                @views J̇₁⁺[:,1,:,iparam] .= J̇₀⁺[:,1,:,iparam] .* expk' .+ j₀⁺[:,1,:] .* expk_lin'
+                @views J̇₁⁻[:,1,:,iparam] .= J̇₀⁻[:,1,:,iparam] .* expk' .+ j₀⁻[:,1,:] .* expk_lin'
 
-            # J⁻₀₂(λ) = J⁻₀₁(λ) + T⁻⁻₀₁(λ)[I - R⁻⁺₂₁(λ)R⁺⁻₀₁(λ)]⁻¹[J⁻₁₂(λ) + R⁻⁺₂₁(λ)J⁺₁₀(λ)] (see Eqs.8 in Raman paper draft)
-            j₀⁻[:] = j₀⁻ .+ (tt⁺⁺_gp_refl ⊠ (J₁⁻ .+ r⁻⁺ ⊠ j₀⁺)) 
-            # J⁺₂₀(λ) = J⁺₂₁(λ) + T⁺⁺₂₁(λ)[I - R⁺⁻₀₁(λ)R⁻⁺₂₁(λ)]⁻¹[J⁺₁₀(λ) + R⁺⁻₀₁(λ)J⁻₁₂(λ)] (see Eqs.8 in Raman paper draft)
-            j₀⁺[:] = J₁⁺ .+ (tt⁺⁺_gp_refl ⊠ (j₀⁺ .+ r⁻⁺ ⊠ J₁⁻))
-            expk[:] = expk.^2
-        end  
+                @views expk_lin .= 2*expk .* expk_lin
+            else
+                @views J̇₁⁺[:,1,:,iparam] .= J̇₀⁺[:,1,:,iparam] .* expk'
+                @views J̇₁⁻[:,1,:,iparam] .= J̇₀⁻[:,1,:,iparam] .* expk'
+            end
+            @views J̇₀⁻[:,:,:,iparam] .= J̇₀⁻[:,:,:,iparam] .+
+                    (tt⁺⁺_gp_refl_lin[:,:,:,iparam] ⊠ (J₁⁻ .+ r⁻⁺ ⊠ j₀⁺)) .+
+                    (tt⁺⁺_gp_refl ⊠ (J̇₁⁻[:,:,:,iparam] .+ ṙ⁻⁺[:,:,:,iparam] ⊠ j₀⁺ .+ r⁻⁺ ⊠ J̇₀⁺[:,:,:,iparam]))
+            @views J̇₀⁺[:,:,:,iparam] .= J̇₁⁺[:,:,:,iparam] .+
+                (tt⁺⁺_gp_refl_lin[:,:,:,iparam] ⊠ (j₀⁺ .+ r⁻⁺ ⊠ J₁⁻)) .+
+                (tt⁺⁺_gp_refl ⊠ (J̇₀⁺[:,:,:,iparam] .+ ṙ⁻⁺[:,:,:,iparam] ⊠ J₁⁻ .+ r⁻⁺ ⊠ J̇₁⁻[:,:,:,iparam]))
+        end
+
+        # J⁻₀₂(λ) = J⁻₀₁(λ) + T⁻⁻₀₁(λ)[I - R⁻⁺₂₁(λ)R⁺⁻₀₁(λ)]⁻¹[J⁻₁₂(λ) + R⁻⁺₂₁(λ)J⁺₁₀(λ)]
+        j₀⁻[:] = j₀⁻ .+ (tt⁺⁺_gp_refl ⊠ (J₁⁻ .+ r⁻⁺ ⊠ j₀⁺))
+        # J⁺₂₀(λ) = J⁺₂₁(λ) + T⁺⁺₂₁(λ)[I - R⁺⁻₀₁(λ)R⁻⁺₂₁(λ)]⁻¹[J⁺₁₀(λ) + R⁺⁻₀₁(λ)J⁻₁₂(λ)]
+        j₀⁺[:] = J₁⁺ .+ (tt⁺⁺_gp_refl ⊠ (j₀⁺ .+ r⁻⁺ ⊠ J₁⁻))
+        expk[:] = expk.^2
 
         for iparam = 1:3
             ṙ⁻⁺[:,:,:,iparam] .= ṙ⁻⁺[:,:,:,iparam] .+
@@ -171,10 +176,11 @@ function doubling_helper!(pol_type,
 
     apply_D_matrix!(pol_type.n, added_layer.r⁻⁺, added_layer.t⁺⁺, added_layer.r⁺⁻, added_layer.t⁻⁻)
 
-    SFI && apply_D_matrix_SFI!(pol_type.n, added_layer.j₀⁻)
+    # Source-vector D-matrix is always applied; for a NoSource scene
+    # `j₀⁻=0` and the kernel is a no-op for all Stokes components.
+    apply_D_matrix_SFI!(pol_type.n, added_layer.j₀⁻)
 
-    return nothing 
-
+    return nothing
 end
 
 function doubling!(pol_type, SFI, expk, expk_lin,
@@ -237,23 +243,23 @@ function doubling_allparams_helper!(pol_type,
     gp_refl_lin       = added_layer_lin.dbl_gp_refl_lin
     tt⁺⁺_gp_refl_lin  = added_layer_lin.dbl_tt_gp_refl_lin
 
-    if SFI
-        J₁⁺        = added_layer_lin.dbl_J₁⁺
-        J₁⁻        = added_layer_lin.dbl_J₁⁻
-        ap_J̇₁⁺     = added_layer_lin.dbl_ap_J̇₁⁺
-        ap_J̇₁⁻     = added_layer_lin.dbl_ap_J̇₁⁻
-        ap_expk_lin = added_layer_lin.dbl_ap_expk_lin
-        # Initialize per-parameter expk_lin: d(exp(-dτ/μ₀))/dp_j = -exp(-dτ/μ₀)/μ₀ * dτ̇_j
-        for iparam = 1:Nparams
-            @views ap_expk_lin[:,iparam] .= -expk ./ μ₀ .* dτ̇[:,iparam]
-        end
+    # Source-doubling workspace — always-on per the v0.6 design. Workspace
+    # arrays live on `added_layer_lin` and are pre-allocated unconditionally
+    # by `make_added_layer(LinMode(), …)` (see rt_helper_functions_lin.jl);
+    # NoSource scenes pay only zero-array matmul cost during propagation.
+    J₁⁺         = added_layer_lin.dbl_J₁⁺
+    J₁⁻         = added_layer_lin.dbl_J₁⁻
+    ap_J̇₁⁺      = added_layer_lin.dbl_ap_J̇₁⁺
+    ap_J̇₁⁻      = added_layer_lin.dbl_ap_J̇₁⁻
+    ap_expk_lin = added_layer_lin.dbl_ap_expk_lin
+    # Initialize per-parameter expk_lin: d(exp(-dτ/μ₀))/dp_j = -exp(-dτ/μ₀)/μ₀ * dτ̇_j
+    for iparam = 1:Nparams
+        @views ap_expk_lin[:,iparam] .= -expk ./ μ₀ .* dτ̇[:,iparam]
     end
 
-    # Precompute hoisted temporaries for SFI (reused across params each step)
-    if SFI
-        J1m_plus_r_j0p = similar(j₀⁻)
-        j0p_plus_r_J1m = similar(j₀⁺)
-    end
+    # Per-iteration source-doubling temporaries (reused across params each step)
+    J1m_plus_r_j0p = similar(j₀⁻)
+    j0p_plus_r_J1m = similar(j₀⁺)
     r_times_t = similar(t⁺⁺)
 
     # Loop over number of doublings
@@ -269,34 +275,37 @@ function doubling_allparams_helper!(pol_type,
             @views tt⁺⁺_gp_refl_lin[:,:,:,iparam] .= ap_ṫ⁺⁺[:,:,:,iparam] ⊠ gp_refl .+ t⁺⁺ ⊠ gp_refl_lin[:,:,:,iparam]
         end
 
-        if SFI
-            # Forward source doubling
-            @views J₁⁺[:,1,:] = j₀⁺[:,1,:] .* expk'
-            @views J₁⁻[:,1,:] = j₀⁻[:,1,:] .* expk'
+        # Source-vector all-params doubling — always-on. NoSource scenes have
+        # j₀±/ap_J̇₀±=0 → matmuls produce zero, bit-equal to the previously
+        # gated path. Per-Fourier-moment cleanliness is preserved: each m
+        # call into doubling_allparams_helper! propagates that m's sources.
 
-            # Hoist param-independent source terms
-            J1m_plus_r_j0p .= J₁⁻ .+ r⁻⁺ ⊠ j₀⁺
-            j0p_plus_r_J1m .= j₀⁺ .+ r⁻⁺ ⊠ J₁⁻
+        # Forward source doubling
+        @views J₁⁺[:,1,:] = j₀⁺[:,1,:] .* expk'
+        @views J₁⁻[:,1,:] = j₀⁻[:,1,:] .* expk'
 
-            for iparam = 1:Nparams
-                @views ap_J̇₁⁺[:,1,:,iparam] .= ap_J̇₀⁺[:,1,:,iparam] .* expk' .+ j₀⁺[:,1,:] .* ap_expk_lin[:,iparam]'
-                @views ap_J̇₁⁻[:,1,:,iparam] .= ap_J̇₀⁻[:,1,:,iparam] .* expk' .+ j₀⁻[:,1,:] .* ap_expk_lin[:,iparam]'
+        # Hoist param-independent source terms
+        J1m_plus_r_j0p .= J₁⁻ .+ r⁻⁺ ⊠ j₀⁺
+        j0p_plus_r_J1m .= j₀⁺ .+ r⁻⁺ ⊠ J₁⁻
 
-                @views ap_expk_lin[:,iparam] .= 2 .* expk .* ap_expk_lin[:,iparam]
+        for iparam = 1:Nparams
+            @views ap_J̇₁⁺[:,1,:,iparam] .= ap_J̇₀⁺[:,1,:,iparam] .* expk' .+ j₀⁺[:,1,:] .* ap_expk_lin[:,iparam]'
+            @views ap_J̇₁⁻[:,1,:,iparam] .= ap_J̇₀⁻[:,1,:,iparam] .* expk' .+ j₀⁻[:,1,:] .* ap_expk_lin[:,iparam]'
 
-                @views ap_J̇₀⁻[:,:,:,iparam] .= ap_J̇₀⁻[:,:,:,iparam] .+
-                        (tt⁺⁺_gp_refl_lin[:,:,:,iparam] ⊠ J1m_plus_r_j0p) .+
-                        (tt⁺⁺_gp_refl ⊠ (ap_J̇₁⁻[:,:,:,iparam] .+ ap_ṙ⁻⁺[:,:,:,iparam] ⊠ j₀⁺ .+ r⁻⁺ ⊠ ap_J̇₀⁺[:,:,:,iparam]))
-                @views ap_J̇₀⁺[:,:,:,iparam] .= ap_J̇₁⁺[:,:,:,iparam] .+
-                    (tt⁺⁺_gp_refl_lin[:,:,:,iparam] ⊠ j0p_plus_r_J1m) .+
-                    (tt⁺⁺_gp_refl ⊠ (ap_J̇₀⁺[:,:,:,iparam] .+ ap_ṙ⁻⁺[:,:,:,iparam] ⊠ J₁⁻ .+ r⁻⁺ ⊠ ap_J̇₁⁻[:,:,:,iparam]))
-            end
+            @views ap_expk_lin[:,iparam] .= 2 .* expk .* ap_expk_lin[:,iparam]
 
-            # Forward source function updates (use precomputed hoisted terms)
-            j₀⁻[:] = j₀⁻ .+ (tt⁺⁺_gp_refl ⊠ J1m_plus_r_j0p)
-            j₀⁺[:] = J₁⁺ .+ (tt⁺⁺_gp_refl ⊠ j0p_plus_r_J1m)
-            expk[:] = expk.^2
+            @views ap_J̇₀⁻[:,:,:,iparam] .= ap_J̇₀⁻[:,:,:,iparam] .+
+                    (tt⁺⁺_gp_refl_lin[:,:,:,iparam] ⊠ J1m_plus_r_j0p) .+
+                    (tt⁺⁺_gp_refl ⊠ (ap_J̇₁⁻[:,:,:,iparam] .+ ap_ṙ⁻⁺[:,:,:,iparam] ⊠ j₀⁺ .+ r⁻⁺ ⊠ ap_J̇₀⁺[:,:,:,iparam]))
+            @views ap_J̇₀⁺[:,:,:,iparam] .= ap_J̇₁⁺[:,:,:,iparam] .+
+                (tt⁺⁺_gp_refl_lin[:,:,:,iparam] ⊠ j0p_plus_r_J1m) .+
+                (tt⁺⁺_gp_refl ⊠ (ap_J̇₀⁺[:,:,:,iparam] .+ ap_ṙ⁻⁺[:,:,:,iparam] ⊠ J₁⁻ .+ r⁻⁺ ⊠ ap_J̇₁⁻[:,:,:,iparam]))
         end
+
+        # Forward source function updates (use precomputed hoisted terms)
+        j₀⁻[:] = j₀⁻ .+ (tt⁺⁺_gp_refl ⊠ J1m_plus_r_j0p)
+        j₀⁺[:] = J₁⁺ .+ (tt⁺⁺_gp_refl ⊠ j0p_plus_r_J1m)
+        expk[:] = expk.^2
 
         # Hoist param-independent R*T product
         r_times_t .= r⁻⁺ ⊠ t⁺⁺
@@ -322,7 +331,9 @@ function doubling_allparams_helper!(pol_type,
     apply_D_matrix!(pol_type.n,
         added_layer.r⁻⁺, added_layer.t⁺⁺, added_layer.r⁺⁻, added_layer.t⁻⁻,
         ap_ṙ⁻⁺, ap_ṫ⁺⁺, ap_ṙ⁺⁻, ap_ṫ⁻⁻)
-    SFI && apply_D_matrix_SFI!(pol_type.n, added_layer.j₀⁻, ap_J̇₀⁻)
+    # Source-vector D-matrix is always applied; for a NoSource scene
+    # j₀⁻ and ap_J̇₀⁻ are zero and the kernel is a no-op for all Stokes rows.
+    apply_D_matrix_SFI!(pol_type.n, added_layer.j₀⁻, ap_J̇₀⁻)
 
     return nothing
 end
