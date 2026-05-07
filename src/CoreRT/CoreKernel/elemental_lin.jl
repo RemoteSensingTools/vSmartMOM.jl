@@ -149,19 +149,23 @@ function elemental!(pol_type, SFI::Bool,
         synchronize_if_gpu()
 
         if SFI
-            # Fused SFI + chain rule + Bug 22 fix kernel
-            kernel! = get_elem_rt_SFI_fused!(device)
-            event = kernel!(j₀⁺, j₀⁻,
+            # Phase 3: dispatch through source_tangent!(::PreparedSolarBeam),
+            # the named hand-written linearization entry point for the solar
+            # beam. The fused SFI+chain-rule+Bug-22 kernel still lives in
+            # `get_elem_rt_SFI_fused!` (this file, below); `source_tangent!`
+            # is a thin wrapper. Bit-equal to the previous inline call.
+            prep_solar = PreparedSolarBeam{FT, typeof(arr_type(F₀))}(arr_type(F₀))
+            source_tangent!(prep_solar,
+                j₀⁺, j₀⁻,
                 J̇₀⁺, J̇₀⁻,
                 added_layer_lin.ap_J̇₀⁺, added_layer_lin.ap_J̇₀⁻,
                 ϖ, dτ,
                 τ_sum, τ̇_sum,
                 Z⁻⁺, Z⁺⁺,
-                arr_type(F₀),
                 dτ̇_dev, ϖ̇_dev, Ż⁻⁺_dev, Ż⁺⁺_dev,
                 qp_μN, ndoubl, wct02,
                 pol_type.n, I₀, iμ₀, D, nparams,
-                ndrange=size(j₀⁺))
+                architecture)
         end
         synchronize_if_gpu()
 

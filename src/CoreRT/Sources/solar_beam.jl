@@ -203,3 +203,77 @@ function has_solar_beam(s::SourceSet)
     end
     return false
 end
+
+# ============================================================================
+# Phase 3 — source_tangent! seam
+#
+# `source_tangent!(::PreparedSolarBeam, ...)` is the named hand-written
+# linearization entry point for the solar beam. It satisfies constraint 2
+# (hand-written linearization keeps working — bit-equal numerics) and
+# constraint 3 (future AD ↔ hand-written boundary is named).
+#
+# In Phase 3 the body is a thin wrapper around the existing fused kernel
+# `CoreRT.CoreKernel.get_elem_rt_SFI_fused!` defined in
+# `src/CoreRT/CoreKernel/elemental_lin.jl`. Math is unchanged; the
+# Sanghavi 2014 App. C tangents (∂J/∂τ, ∂J/∂ϖ, ∂J/∂Z) plus the Bug-22
+# per-parameter beam-attenuation derivative remain in that kernel.
+#
+# A future sub-phase can either:
+#   (a) relocate the kernel body into this file (literal source-locality
+#       refactor — zero numeric change), or
+#   (b) replace the wrapper with a `LayerContext` / `LayerLinContext`-based
+#       dispatch (Pillar A in the v0.6 plan) once the context structs land.
+# Either evolution preserves bit-equality.
+# ============================================================================
+
+"""
+    source_tangent!(prep::PreparedSolarBeam,
+                    j₀⁺, j₀⁻, J̇₀⁺, J̇₀⁻, ap_J̇₀⁺, ap_J̇₀⁻,
+                    ϖ_λ, dτ_λ, τ_sum, τ̇_sum, Z⁻⁺, Z⁺⁺,
+                    dτ̇, ϖ̇, Ż⁻⁺, Ż⁺⁺,
+                    qp_μN, ndoubl, wct02, nStokes, I₀, iμ0, D, nparams,
+                    architecture)
+
+Hand-written analytic source tangent for a [`PreparedSolarBeam`](@ref).
+Writes forward source vectors (`j₀⁺`, `j₀⁻`), 3-core derivatives
+(`J̇₀±[i,1,n,1:3]` w.r.t. `τ, ϖ, Z`), and per-physical-parameter chain-rule
+slabs (`ap_J̇₀±[i,1,n,iparam]`) — all in one fused GPU pass — by delegating
+to `CoreRT.CoreKernel.get_elem_rt_SFI_fused!`. Bit-equal to today's
+in-line dispatch in `elemental_lin.jl`.
+
+Implements Sanghavi 2014 App. C Eqs. (C.8)–(C.10) plus the Bug-22
+beam-attenuation chain-rule fix `J̇₀± += J₀± · (-τ̇_sum/μ₀)`.
+
+# AD seam
+This is the **below-the-seam** path: arguments are plain `FT`. Above the
+seam, [`prepare_source`](@ref) materialises the F₀ from a user-facing
+[`SolarBeam`](@ref) (potentially under ForwardDiff `Dual` numbers in
+v0.7+). The seam is named here so future AD work lands without renaming.
+
+# Mode trait
+[`source_ad_mode`](@ref) returns [`AnalyticSourceJacobian`](@ref) — this
+function is the authoritative path for solar-beam Jacobians.
+"""
+function source_tangent!(prep::PreparedSolarBeam,
+                         j₀⁺, j₀⁻, J̇₀⁺, J̇₀⁻, ap_J̇₀⁺, ap_J̇₀⁻,
+                         ϖ_λ, dτ_λ, τ_sum, τ̇_sum,
+                         Z⁻⁺, Z⁺⁺,
+                         dτ̇, ϖ̇, Ż⁻⁺, Ż⁺⁺,
+                         qp_μN, ndoubl, wct02, nStokes, I₀, iμ0, D, nparams,
+                         architecture)
+    # Reuse the existing fused SFI + chain-rule kernel. `get_elem_rt_SFI_fused!`
+    # is forward-referenced here — its definition lives in
+    # `src/CoreRT/CoreKernel/elemental_lin.jl` which is included after this file.
+    device = devi(architecture)
+    kernel! = get_elem_rt_SFI_fused!(device)
+    kernel!(j₀⁺, j₀⁻,
+            J̇₀⁺, J̇₀⁻,
+            ap_J̇₀⁺, ap_J̇₀⁻,
+            ϖ_λ, dτ_λ, τ_sum, τ̇_sum,
+            Z⁻⁺, Z⁺⁺, prep.F₀,
+            dτ̇, ϖ̇, Ż⁻⁺, Ż⁺⁺,
+            qp_μN, ndoubl, wct02,
+            nStokes, I₀, iμ0, D, nparams,
+            ndrange = size(j₀⁺))
+    return nothing
+end
