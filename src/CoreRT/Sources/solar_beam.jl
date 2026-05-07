@@ -205,6 +205,84 @@ function has_solar_beam(s::SourceSet)
 end
 
 # ============================================================================
+# BlackbodySource — Planck-derived collimated source (Phase 4)
+#
+# Units convention (Phase 4 source-unit decision):
+#   F₀  [mW · m⁻² · cm⁻¹]  spectral irradiance (Stokes vector by component)
+#   B(ν,T) returned by `vSmartMOM.SolarModel.planck_spectrum_wn` is the
+#   Planck SPECTRAL RADIANCE in mW · m⁻² · sr⁻¹ · cm⁻¹. Multiplying by
+#   `factor=π` converts radiance from a Lambertian disk to incident
+#   hemispheric irradiance (mW · m⁻² · cm⁻¹) — directly comparable to
+#   `SolarBeam` F₀ = 1 (which we adopt as 1 mW · m⁻² · cm⁻¹ for unit
+#   normalization). All sources in a `SourceSet` should share these units;
+#   `R = rt_run(model; sources=...)` is then in mW · m⁻² · sr⁻¹ · cm⁻¹.
+#
+# `BlackbodySource` is a constructor function (not a struct) — it
+# materialises the Planck spectrum at user-construction time and returns a
+# `SolarBeam` with the right `F₀`. The kernel sees a `SolarBeam`; the
+# "this is thermal" semantics live entirely above the `prepare_source`
+# seam. Once we add full ThermalEmission (atmospheric volume Planck
+# integral) in a later phase, the two concepts will be cleanly separated:
+#   - `BlackbodySource(T, spec_band)`  → boundary/external Planck beam
+#   - `ThermalEmission(T_layers)`      → in-atmosphere volume emission
+# ============================================================================
+
+"""
+    BlackbodySource(T, spec_band; pol_component=1, pol_n=3, factor=π, scale=1) -> SolarBeam
+
+Construct a [`SolarBeam`](@ref) whose `F₀` is the Planck spectrum at
+temperature `T` (K) on spectral grid `spec_band` (cm⁻¹). Useful for
+modelling thermal-IR scenes such as a Carbon-I-like 2-2.4 µm setup with a
+hot lab source illuminating CO₂/CH₄/H₂O absorption.
+
+`F₀[pol_component, :] = factor · scale · B(ν, T)` where
+`B(ν,T)` is the Planck radiance from `planck_spectrum_wn` in
+mW · m⁻² · sr⁻¹ · cm⁻¹. The default `factor = π` converts radiance to
+hemispheric irradiance for a Lambertian-disk source — set `factor = 1`
+for a head-on collimated lab beam where `F₀` is the radiance directly.
+
+# Arguments
+- `T :: Real`: blackbody temperature in K.
+- `spec_band :: AbstractVector{<:Real}`: spectral grid in cm⁻¹.
+- `pol_component :: Integer = 1`: which Stokes component carries the
+  source (1=I, 2=Q, 3=U, 4=V); only `1` is physically meaningful for an
+  unpolarized blackbody.
+- `pol_n :: Integer = 3`: number of Stokes components in the model
+  (1=Stokes_I, 3=Stokes_IQU, 4=Stokes_IQUV). Match the model's
+  polarization to avoid `prepare_source` shape errors.
+- `factor :: Real = π`: geometric factor (π for Lambertian-disk → hemisphere irradiance).
+- `scale :: Real = 1`: extra normalization multiplier.
+
+# Units
+`F₀` has units **mW · m⁻² · cm⁻¹** (irradiance). All sources in a
+`SourceSet` must agree on units, so a default `SolarBeam(F₀=ones(...))`
+should be interpreted as `1 mW · m⁻² · cm⁻¹`. The radiance returned by
+`rt_run` is in **mW · m⁻² · sr⁻¹ · cm⁻¹**.
+
+# Example: Carbon-I-like 2-2.4 µm with a 1500 K source
+```julia
+spec_band = collect(4167:0.1:5000)            # cm⁻¹ for 2-2.4 µm
+sources   = BlackbodySource(1500, spec_band)  # SolarBeam with Planck F₀
+R, T      = rt_run(model; sources = sources)  # R in mW·m⁻²·sr⁻¹·cm⁻¹
+```
+"""
+function BlackbodySource(T::Real, spec_band::AbstractVector{<:Real};
+                         pol_component::Integer = 1,
+                         pol_n::Integer = 3,
+                         factor::Real = π,
+                         scale::Real = 1.0)
+    pol_component <= pol_n ||
+        error("BlackbodySource: pol_component=$pol_component exceeds pol_n=$pol_n.")
+    ν_grid = collect(float.(spec_band))
+    radiance = vSmartMOM.SolarModel.planck_spectrum_wn(T, ν_grid)  # mW/m²/sr/cm⁻¹
+    nSpec = length(ν_grid)
+    F₀ = zeros(eltype(radiance), pol_n, nSpec)
+    coeff = float(factor) * float(scale)
+    @inbounds @views F₀[pol_component, :] .= coeff .* radiance
+    return SolarBeam(F₀ = F₀)
+end
+
+# ============================================================================
 # Phase 3 — source_tangent! seam
 #
 # `source_tangent!(::PreparedSolarBeam, ...)` is the named hand-written
