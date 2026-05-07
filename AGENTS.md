@@ -156,6 +156,10 @@ material when explaining the package:
 
 | Concept | Source |
 |---|---|
+| **v0.6 source-term abstraction** (AbstractSource, SolarBeam, SurfaceSIF, BlackbodySource, NoSource, SourceSet, multi-dispatch) | [`src/CoreRT/Sources/`](src/CoreRT/Sources/), [`docs/src/pages/extending/sources.md`](docs/src/pages/extending/sources.md) |
+| `RTModel.sources::AbstractSource` field | `src/CoreRT/types.jl::RTModel` |
+| `contribute!` / `source_tangent!` dispatch (replaces legacy `if SFI` in elastic lin path) | [`src/CoreRT/Sources/solar_beam.jl`](src/CoreRT/Sources/solar_beam.jl), `elemental_lin.jl`, `doubling_lin.jl`, `interaction_lin.jl` |
+| `surface_source_contribute!` double-dispatch on (source-type × surface-type) | [`src/CoreRT/Sources/surface_sif.jl`](src/CoreRT/Sources/surface_sif.jl) |
 | Top-level RT loop (bands × m × layers) | `src/CoreRT/rt_run.jl:53–329` |
 | Per-layer kernel dispatch | `src/CoreRT/CoreKernel/rt_kernel.jl:48–229` |
 | Build per-layer (τ, ϖ, Z) | `src/CoreRT/LayerOpticalProperties/compEffectiveLayerProperties.jl:11–65` |
