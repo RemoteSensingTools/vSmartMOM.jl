@@ -58,9 +58,9 @@ type slot reserved by the v0.5 dispatch design for future thermal RT —
 left untouched in v0.6 to avoid breaking external code).
 
 A concrete source must satisfy the contract documented in
-[`src/CoreRT/Sources/types.jl`](src/CoreRT/Sources/types.jl): user-facing
-configuration that round-trips through `prepare_source` into a
-[`AbstractPreparedSource`](@ref) before reaching kernel code.
+`src/CoreRT/Sources/types.jl`: user-facing configuration that round-trips
+through `prepare_source` into a [`AbstractPreparedSource`](@ref) before
+reaching kernel code.
 """
 abstract type AbstractSource end
 

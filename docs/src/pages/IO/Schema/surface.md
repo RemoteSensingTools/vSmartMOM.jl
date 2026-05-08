@@ -55,7 +55,7 @@ The `surface` vector must have **the same length as `spec_bands`**.
 `CanopySurface` is configured via a top-level `canopy:` block, not as
 a string in `surface:`. The parser wraps each band's surface entry as
 the soil BRDF inside the canopy when `canopy:` is present. See
-[`Schema/canopy.md`](canopy.md) (forthcoming).
+`Schema/canopy.md` (forthcoming).
 
 ## Examples
 
@@ -100,7 +100,7 @@ Each surface declares its `component_m_max`:
 
 A Cox-Munk + Lambertian band loops to the user-set `stream_l_cap`; a
 Lambertian-only Rayleigh band loops only to `m=0:2` (Rayleigh trait
-`= 2`). See [`docs/dev_notes/fourier_stream_resolution_plan.md`](../../../dev_notes/fourier_stream_resolution_plan.md)
+`= 2`). See [`docs/dev_notes/fourier_stream_resolution_plan.md`](https://github.com/cfranken/vSmartMOM.jl/blob/main/docs/dev_notes/fourier_stream_resolution_plan.md)
 for the full trait table.
 
 ## See also

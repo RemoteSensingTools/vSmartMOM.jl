@@ -32,7 +32,6 @@ radiative_transfer:
   # benchmark reproducibility.
   truncation:         auto
   polarization_type:  Stokes_IQUV()
-  Δ_angle:            2.0       # ignored under NoTruncation
   depol:              -1        # auto: derived from N₂/O₂ molecular constants
   float_type:         Float64
   architecture:       default_architecture

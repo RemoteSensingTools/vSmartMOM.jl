@@ -7,11 +7,8 @@ radiative_transfer:
     - "[19417.0 19418.0]"
   surface:
     - LambertianSurfaceScalar(0.10)
-  quadrature_type:    GaussLegQuad()
   polarization_type:  Stokes_I()
-  max_m:              1
-  Δ_angle:            2.0
-  l_trunc:            10
+  nstreams:           6
   # Pure Rayleigh atmosphere: no forward-peak truncation.
   truncation:         NoTruncation()
   depol:              -1

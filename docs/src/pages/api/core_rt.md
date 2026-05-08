@@ -29,7 +29,13 @@ vSmartMOM.CoreRT.ObsGeometry
 vSmartMOM.CoreRT.QuadPoints
 vSmartMOM.CoreRT.CompositeLayer
 vSmartMOM.CoreRT.AddedLayer
+vSmartMOM.CoreRT.RTNumericalParameters
 ```
+
+> Source-term types (`SolarBeam`, `BlackbodySource`, `SurfaceSIF`,
+> `SourceSet`, `NoSource`, AD-mode traits, `prepare_source` /
+> `surface_source_contribute!` dispatchers) are documented on the
+> [Source terms](../extending/sources.md#api-reference) page.
 
 ## Jacobian Parameter Layout
 

@@ -15,7 +15,6 @@ radiative_transfer:
   # (Rayleigh phase function contributes through m=2).
   nstreams:           3
   polarization_type:  Stokes_I()
-  Δ_angle:            2.0
   # Pure Rayleigh: phase function fits within stream_l_cap, no truncation needed.
   truncation:         NoTruncation()
   depol:              -1

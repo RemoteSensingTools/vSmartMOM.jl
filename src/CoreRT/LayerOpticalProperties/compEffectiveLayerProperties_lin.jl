@@ -284,6 +284,50 @@ For `τ_ref, p₀, σp`: only the `τ_aer` chain contributes (Mie properties are
 - `CoreScatteringOpticalProperties`: Forward δ-M scaled properties.
 - `CoreScatteringOpticalPropertiesLin`: Linearized properties (7 sub-params).
 """
+# ----------------------------------------------------------------------
+# Helper: normalise the Mie-parameter linearisation arrays into a
+# uniform `(n_spec, 4)` block for the v0.6+ Jacobian assembly path.
+#
+# `lin_aerosol_optics.ω̃̇` and `.ḟᵗ` carry derivatives w.r.t. the four Mie
+# parameters (n_r, n_i, r_m, sigma_r). Their concrete shape depends on
+# the Fourier truncation chosen at parameters_from_yaml time:
+#   ()                 -- scalar (NoTruncation: f^t = 0 everywhere)
+#   (nparams,)         -- spectrally flat (legacy delta-BGE pre-v0.7)
+#   (nparams, 1)       -- degenerate matrix form
+#   (nparams, n_spec)  -- fully resolved (v0.7 auto + Mie Dual chain)
+# `createAero` then writes columns 2:5 of the 7-parameter layout
+# [tau_ref, n_r, n_i, r_m, sigma_r, p_0, sigma_p] uniformly.
+function _lift_mie_param_to_n_x_4(x, n, arr_type)
+    eltyp = eltype(x)
+    if x isa Number
+        return arr_type(fill(eltyp(x), n, 4))
+    elseif ndims(x) == 1
+        # (nparams,) -> broadcast to (n, nparams), pad/truncate to 4 cols
+        x4 = length(x) == 4 ? collect(x) : _pad4(collect(x), eltyp)
+        return arr_type(repeat(reshape(x4, 1, 4), n, 1))
+    elseif ndims(x) == 2
+        sz = size(x)
+        # Accept (nparams, 1) (degenerate) -- broadcast across spectral.
+        if sz[2] == 1
+            x4 = sz[1] == 4 ? collect(x[:, 1]) : _pad4(collect(x[:, 1]), eltyp)
+            return arr_type(repeat(reshape(x4, 1, 4), n, 1))
+        end
+        # (nparams, n_spec) -- transpose to (n_spec, nparams), pad to 4 cols.
+        if sz[1] in (1, 2, 3, 4) && sz[2] == n
+            xt = collect(transpose(x))   # (n, nparams)
+            return sz[1] == 4 ? arr_type(xt) : arr_type(_pad4_cols(xt, eltyp))
+        end
+        # (n_spec, nparams) already in the assembly orientation.
+        if sz[1] == n && sz[2] in (1, 2, 3, 4)
+            return sz[2] == 4 ? arr_type(collect(x)) : arr_type(_pad4_cols(collect(x), eltyp))
+        end
+    end
+    error("createAero: unexpected shape ", size(x), " for Mie parameter linearisation array; expected scalar, (nparams,), or 2-D with one dim equal to n_spec=", n)
+end
+
+_pad4(v::AbstractVector, T) = (out = zeros(T, 4); out[1:length(v)] .= v; out)
+_pad4_cols(M::AbstractMatrix, T) = (out = zeros(T, size(M, 1), 4); out[:, 1:size(M, 2)] .= M; out)
+
 function createAero(τAer, aerosol_optics, AerZ⁺⁺, AerZ⁻⁺, 
                     τ̇Aer, lin_aerosol_optics, AerŻ⁺⁺, AerŻ⁻⁺,
                     arr_type)
@@ -313,22 +357,22 @@ function createAero(τAer, aerosol_optics, AerZ⁺⁺, AerZ⁻⁺,
     ω̃̇ = arr_type(ω̃̇)
     ḟᵗ = arr_type(ḟᵗ)
     
-    sz = size(ω̃̇)
-    if ndims(ω̃̇) == 1
-        tmpω̃̇ = reshape(ω̃̇, sz..., 1) .* ones(eltype(ω̃̇), 1,n)        
-    elseif ndims(ω̃̇) == 2 && sz[2] == 1
-        tmpω̃̇ = ω̃̇ .* ones(eltype(ω̃̇), 1,n)
-    else
-        tmpω̃̇ = ω̃̇
-    end
-    ω̃̇ = arr_type(zeros(n,7))
-    ω̃̇[:,2:5] .= arr_type(collect(tmpω̃̇'))
-    
-    ḟᵗ_vec = collect(ḟᵗ)  # keep as 4-element vector from Mie
-    ḟᵗ = arr_type(zeros(n,7))
-    for k in eachindex(ḟᵗ_vec)
-        ḟᵗ[:,1+k] .= ḟᵗ_vec[k]
-    end
+    # ω̃̇ and ḟᵗ from Mie are derivatives w.r.t. the 4 Mie
+    # parameters (n_r, n_i, r_m, sigma_r). They arrive in any of:
+    #   ()                 -- scalar (e.g. NoTruncation case)
+    #   (nparams,)         -- spectrally flat (legacy delta-BGE pre-v0.7)
+    #   (nparams, 1)       -- degenerate matrix form
+    #   (nparams, n_spec)  -- fully resolved (v0.7 Mie Dual chain)
+    # `_lift_mie_param_to_n_x_4` normalises all four to (n_spec, 4) so
+    # we can write columns 2:5 of the 7-parameter
+    # [tau_ref, n_r, n_i, r_m, sigma_r, p0, sigma_p] layout uniformly.
+    # Replaces an `eachindex` loop on ḟᵗ that overflowed when the
+    # matrix form contained n_spec*4 > 6 entries (BoundsError on the
+    # docs build's `_jacobian_aod_plot` after the v0.7 YAML migration).
+    ω̃̇_block = _lift_mie_param_to_n_x_4(ω̃̇, n, arr_type)
+    ḟᵗ_block = _lift_mie_param_to_n_x_4(ḟᵗ, n, arr_type)
+    ω̃̇ = arr_type(zeros(n, 7));  ω̃̇[:, 2:5] .= ω̃̇_block
+    ḟᵗ = arr_type(zeros(n, 7));  ḟᵗ[:, 2:5] .= ḟᵗ_block
 
     # Forward modified properties
     τ_mod = (1 .- fᵗ * ω̃) .* τAer

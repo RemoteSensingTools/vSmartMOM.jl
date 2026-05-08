@@ -50,7 +50,7 @@ radiative_transfer:
   `# yaml-language-server: $schema=...`. Setup recipe in
   [`Schema.md`](IO/Schema.md#editor-support--autocomplete--inline-validation).
 - **Per-block schema docs** under
-  [`docs/src/pages/IO/Schema/`](IO/Schema/) — one page per top-level
+  [`docs/src/pages/IO/Schema/`](IO/Schema.md) — one page per top-level
   YAML/TOML block.
 
 ### Internal cleanup
@@ -77,7 +77,7 @@ radiative_transfer:
   even `l_max` (intentional fix to a latent precedence bug;
   documented in the Phase B commit).
 
-See [`docs/dev_notes/fourier_stream_resolution_plan.md`](../../dev_notes/fourier_stream_resolution_plan.md)
+See [`docs/dev_notes/fourier_stream_resolution_plan.md`](https://github.com/cfranken/vSmartMOM.jl/blob/main/docs/dev_notes/fourier_stream_resolution_plan.md)
 for the design rationale.
 
 ## Platform Support

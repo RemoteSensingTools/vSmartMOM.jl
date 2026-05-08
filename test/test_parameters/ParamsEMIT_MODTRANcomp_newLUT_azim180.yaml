@@ -25,11 +25,9 @@ radiative_transfer:
     - 3984.2:0.1:28571.4   # 350 - 2510 nm (extended from 380 nm to capture Hartley/Huggins UV)
   surface:
     - LambertianSurfaceScalar{Float64}(0.0)
-  quadrature_type:    GaussLegQuad()
   polarization_type:  Stokes_I()
-  max_m:              3
-  Δ_angle:            2.0
-  l_trunc:            5
+  nstreams:           3
+  truncation:         auto
   depol:              -1     # auto: per-band depol from N₂/O₂ molecular constants
   float_type:         Float32
   architecture:       Architectures.GPU()

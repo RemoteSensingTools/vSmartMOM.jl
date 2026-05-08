@@ -39,7 +39,7 @@ Legacy `max_m` / `l_trunc` configs **continue to work**; the parser
 detects the legacy schema by the presence of either field and applies
 the historical aggregator + `δBGE` default. New configs should prefer
 `nstreams`. See [`radiative_transfer.md`](Schema/radiative_transfer.md)
-for the precedence rules and [`docs/dev_notes/fourier_stream_resolution_plan.md`](../../dev_notes/fourier_stream_resolution_plan.md)
+for the precedence rules and [`docs/dev_notes/fourier_stream_resolution_plan.md`](https://github.com/cfranken/vSmartMOM.jl/blob/main/docs/dev_notes/fourier_stream_resolution_plan.md)
 for the design rationale.
 
 ## Editor support — autocomplete + inline validation
@@ -132,5 +132,5 @@ params = parameters_from_dict(my_dict)
   examples
 - [`docs/src/pages/conventions.md`](../conventions.md) — sign conventions
   for VLIDORT cross-validation
-- [`docs/dev_notes/fourier_stream_resolution_plan.md`](../../dev_notes/fourier_stream_resolution_plan.md)
+- [`docs/dev_notes/fourier_stream_resolution_plan.md`](https://github.com/cfranken/vSmartMOM.jl/blob/main/docs/dev_notes/fourier_stream_resolution_plan.md)
   — v0.7 Fourier/stream resolution design memo

@@ -25,3 +25,9 @@ vSmartMOM.Scattering.AerosolOptics
 vSmartMOM.Scattering.NAI2
 vSmartMOM.Scattering.PCW
 ```
+
+## Phase-function Truncation
+
+```@docs
+vSmartMOM.Scattering.AutoTruncation
+```

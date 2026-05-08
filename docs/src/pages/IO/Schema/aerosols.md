@@ -143,4 +143,4 @@ benchmark that requires no transform), set
   modes (`auto`, `NoTruncation`, `δBGE`)
 - [`Schema/atmospheric_profile.md`](atmospheric_profile.md) — vertical
   grid that pressure-form profiles bind to
-- Aerosol module reference: [`docs/src/pages/api/Scattering.md`](../../api/Scattering.md)
+- Aerosol module reference: [`docs/src/pages/api/scattering.md`](../../api/scattering.md)
