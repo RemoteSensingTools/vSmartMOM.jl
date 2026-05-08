@@ -383,7 +383,14 @@ function interaction_helper!(RS_type::RRS, ::ScatteringInterface_11, SFI,
                     (ier⁻⁺[:,:,n₁,Δn] ⊠ J₀⁺[:,:,n₀] +
                     r⁻⁺[:,:,n₁] ⊠ ieJ₀⁺[:,:,n₁,Δn] +
                     added_layer.ieJ₀⁻[:,:,n₁,Δn]) +
-                    # Suniti Check for consistency
+                    # ── Suniti, please re-derive. The (n₀, n₁, Δn) index
+                    #    triple here was the site of a long-standing
+                    #    sign/index mismatch in the inelastic interaction
+                    #    update. Verify that the second `T01_inv ⊠ (…)`
+                    #    block below indexes the recipient wavelength `n₁`
+                    #    and donor wavelength `n₀` consistently with the
+                    #    Hovenier composition rule used in `interaction!`
+                    #    for the elastic part.
                     (T01_inv[:,:,n₁] ⊠
                     (ier⁻⁺[:,:,n₁,Δn] ⊠ R⁺⁻[:,:,n₀] + 
                     r⁻⁺[:,:,n₁] ⊠ ieR⁺⁻[:,:,n₁,Δn]) +

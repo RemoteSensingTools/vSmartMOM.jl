@@ -132,7 +132,7 @@ function model_from_parameters(lin::LinMode,
                     profile)
             else
                 @timeit "Read HITRAN" hitran_data = read_hitran(artifact("H2O"), iso=-1)
-                println("Computing profile for water vapor (q-driven) in band #$(i_band)")
+                @debug "Computing profile for water vapor (q-driven) in band #$(i_band)"
                 bf  = isnothing(abs_params) ? vSmartMOM.Absorption.Voigt() : abs_params.broadening_function
                 cef = isnothing(abs_params) ? vSmartMOM.Absorption.HumlicekWeidemann32SDErrorFunction() : abs_params.CEF
                 wc  = isnothing(abs_params) ? 150 : abs_params.wing_cutoff
@@ -159,7 +159,7 @@ function model_from_parameters(lin::LinMode,
                         @timeit "Read HITRAN" hitran_data =
                             read_hitran(artifact(mol_name), iso=-1)
 
-                        println("Computing profile for $(mol_name) with vmr $(profile.vmr[mol_name]) for band #$(i_band)")
+                        @debug "Computing profile for $(mol_name) with vmr $(profile.vmr[mol_name]) for band #$(i_band)"
                         absorption_model = make_hitran_model(hitran_data,
                             abs_params.broadening_function,
                             wing_cutoff = abs_params.wing_cutoff,
@@ -191,7 +191,7 @@ function model_from_parameters(lin::LinMode,
                     if isempty(abs_params.luts)
                         @timeit "Read HITRAN" hitran_data =
                             read_hitran(artifact(mol_name), iso=-1)
-                        println("Computing profile for $(mol_name) with vmr $(profile.vmr[mol_name]) for band #$(i_band)")
+                        @debug "Computing profile for $(mol_name) with vmr $(profile.vmr[mol_name]) for band #$(i_band)"
 
                         absorption_model = make_hitran_model(hitran_data,
                             abs_params.broadening_function,

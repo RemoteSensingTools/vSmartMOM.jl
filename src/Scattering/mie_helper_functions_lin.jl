@@ -454,7 +454,7 @@ function compute_wₓ(lin::LinMode, size_distribution, wᵣ, r, r_max)
     wₓ .*= wᵣ    # pre multiply with wᵣ to get proper means eventually:
     # normalize (could apply a check whether cdf.(size_distribution,r_max) is larger than 0.99:
     #println("Test")
-    @info "Fraction of size distribution cut by max radius: $((1-cdf.(size_distribution,r_max))*100) %"  
+    @debug "Fraction of size distribution cut by max radius: $((1-cdf.(size_distribution,r_max))*100) %"  
     wₓ /= sum(wₓ)
     for ctr = 1:2                               
         ẇₓ[:,ctr] .= ẇₓ[:,ctr] .* wᵣ
@@ -489,7 +489,7 @@ function compute_wₓ(lin::LinMode, size_distribution, wᵣ, r, r_max)
 #sum(wₓ), 
 #sum(ẇₓ[1,:]), 
 #sum(ẇₓ[2,:])
-     @info "Fraction of size distribution cut by max radius: $((1-cdf.(size_distribution,r_max))*100) %"  
+     @debug "Fraction of size distribution cut by max radius: $((1-cdf.(size_distribution,r_max))*100) %"  
     
     return wₓ, ẇₓ
 end

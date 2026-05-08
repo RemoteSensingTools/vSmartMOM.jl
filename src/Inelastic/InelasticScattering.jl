@@ -31,6 +31,11 @@ module InelasticScattering
     global const h = 6.62607015e-27
     "Boltzmann constant in `[erg/K]`"
     global const k_B = 1.380649e-16
+    "Wavenumber-to-wavelength conversion: `λ_nm = nm_per_m / ν̄_cm⁻¹`.
+    Despite the name (preserved for cross-module consistency with
+    `Absorption.constants`), this is `1e7` (= nm per cm), the Raman
+    band-grid code uses ν̄ in cm⁻¹ throughout."
+    global const nm_per_m = 1.0e7
 
     export compute_γ_air_Cabannes! 
     export compute_γ_air_Rayleigh!

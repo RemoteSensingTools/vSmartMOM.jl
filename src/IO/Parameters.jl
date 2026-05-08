@@ -687,7 +687,15 @@ Examples:
 function _safe_parse_number(s::AbstractString)
     s = strip(s)
     isempty(s) && throw(ArgumentError("_safe_parse_number: empty input"))
-    return _expr_eval_pos!(Ref(1), s)
+    pos = Ref(1)
+    val = _expr_eval_pos!(pos, s)
+    # Reject trailing junk: `"1abc"` and `"1 2"` were silently accepted as 1.0
+    # before this guard. (Codex review.)
+    _expr_skip_ws!(pos, s)
+    if pos[] <= ncodeunits(s)
+        throw(ArgumentError("_safe_parse_number: unexpected characters at pos $(pos[]) in `$(s)`"))
+    end
+    return val
 end
 
 # Tiny recursive-descent evaluator for `+ - * /` over numeric literals

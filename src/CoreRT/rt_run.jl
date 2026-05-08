@@ -354,8 +354,9 @@ function rt_run(RS_type::AbstractRamanType, model, iBand;
             Array(τ_sum_all[:,end]), m_max, nSpec)
     end
 
-    # Show timing statistics
-    print_timer()
+    # Show timing statistics (only when the user asked — verbose flag in
+    # `RTNumericalParameters`; default false to keep production loops quiet).
+    model.numerics.verbose && print_timer()
     reset_timer!()
 
     # Return R_SFI or R, depending on the flag
@@ -578,7 +579,7 @@ function rt_run_ss(RS_type::AbstractRamanType, model, iBand;
         end
     end
 
-    print_timer()
+    model.numerics.verbose && print_timer()
     reset_timer!()
 
     return SFI ? (R_SFI, T_SFI, ieR_SFI, ieT_SFI, hem_R, hem_T) : (R, T, hem_R, hem_T)

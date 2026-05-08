@@ -176,8 +176,8 @@ function rt_run_test_ms(RS_type::AbstractRamanType,
                     I_static, arr_type)
     end
 
-    # Show timing statistics
-    print_timer()
+    # Show timing statistics (gated on numerics.verbose; default off).
+    model.numerics.verbose && print_timer()
     reset_timer!()
 
     # Return R_SFI or R, depending on the flag

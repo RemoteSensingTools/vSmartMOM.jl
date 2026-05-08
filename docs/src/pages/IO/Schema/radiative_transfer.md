@@ -89,11 +89,19 @@ legacy `l_trunc` is ignored and `nstreams` wins.
   guidance: keep Radau as an option, but reach for Gauss by default.
 - **`numerics`** — *optional*. Sub-block with rarely-touched solver
   knobs:
-  - `dτ_max_threshold` *(default ≈ 0.0125)* — doubling-step cap.
-  - `dτ_min_floor`     *(default ≈ 1e-7)*  — minimum layer thickness.
+  - `dτ_max_threshold` *(default `0.001`)* — doubling-step cap. Sets
+    `dτ_max = threshold · μ_min` where μ_min is the smallest TRUE
+    quadrature stream. Smaller → finer initial layers / more
+    doublings; raising to ~0.01 reduces doublings.
+  - `dτ_min_floor`     *(default `1024·eps(FT)`)* — absolute floor on
+    `dτ_max`. ~`1.2e-4` for Float32 / `2.3e-13` for Float64. Prevents
+    grazing-VZA configs from collapsing dτ below FT precision.
   - `blas_threads`     *(default `null`)*  — per-model BLAS thread
     cap. `null` leaves `BLAS.get_num_threads()` alone; an integer
     pins it for the duration of `rt_run`. See commit `37390d2`.
+  - `verbose`          *(default `false`)*  — when `true`, `rt_run`
+    prints the `TimerOutputs` timing tree at the end of each call
+    (useful for profiling, noisy in batched loops).
 
 ## Example — minimal new schema
 
