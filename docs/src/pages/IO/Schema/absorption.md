@@ -100,5 +100,5 @@ absorption:
 
 - [`Schema/atmospheric_profile.md`](atmospheric_profile.md) — `T`, `p`,
   `q` profile that VMRs bind to
-- [`Schema/spec_bands.md`](spec_bands.md) — spectral grid the absorption
+- `Schema/spec_bands.md` *(forthcoming)* — spectral grid the absorption
   cross-sections are evaluated on

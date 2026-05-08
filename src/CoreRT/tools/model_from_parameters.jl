@@ -25,42 +25,54 @@ user-set explicit truncation (e.g. `NoTruncation()` or a custom δBGE).
     _resolve_auto_truncation(t, params, FT) -> AbstractTruncationType
 
 Phase D — resolve `Scattering.AutoTruncation()` (the `truncation: auto`
-YAML knob) into a concrete `NoTruncation()` or `δBGE(...)` based on
-whether the configured aerosols' phase function fits within
-`params.stream_l_cap`.
+YAML knob) into a concrete `NoTruncation()` for Phase D5. Mirrors
+VLIDORT's `DO_DELTAM_SCALING` philosophy in spirit, but **defers
+the per-band δBGE decision** to a future v0.7.1 follow-up.
 
-Heuristic (mirrors VLIDORT's `DO_DELTAM_SCALING`):
+Why conservative? Codex review of Phase D2/D3/D4 (commit 45dddbf,
+P1 finding) flagged that an "aerosols ⇒ δBGE(stream_l_cap, Δ)"
+build-time decision crashes `Scattering.truncate_phase` with a
+`BoundsError` whenever the raw aerosol greek series is shorter
+than `stream_l_cap`. Small-particle Mie (μ ≲ 0.3 µm at visible
+wavelengths) commonly produces greek series with length ≪ 25, so
+the naive auto-with-aerosols heuristic was unsafe.
 
-- No `scattering_params` block, or no aerosols configured ⇒
-  `NoTruncation()` (Rayleigh-only / canopy-only scenes; β has length 3
-  and trivially fits any reasonable `stream_l_cap`).
-- Aerosols configured ⇒ `δBGE(stream_l_cap, Δ_angle)` (typical Mie
-  computations produce hundreds of greek moments; the projection cap
-  determines what's resolvable).
+The proper fix is a **two-step resolver**:
 
-Logs the chosen branch via `@info` so the user always sees what was
-applied. Non-`AutoTruncation` inputs pass through unchanged.
+1. Compute raw aerosol optics with `NoTruncation()`.
+2. Per-band, inspect `length(greek.β)-1` and pick `NoTruncation()`
+   if it fits `user_l_cap` else `δBGE(user_l_cap, Δ_angle)`.
+3. Re-apply `truncate_phase` per-band.
 
-Caveat: this is a **build-time** heuristic that doesn't peek at the
-actual `length(greek.β)` produced by the Mie loop. A more sophisticated
-two-step resolver (compute raw Mie, inspect, then re-truncate) is a
-follow-up; in practice the simple heuristic gets the right answer for
-the typical configs (Rayleigh-only ⇒ NoTruncation, aerosol ⇒ δBGE).
+That restructures `model_from_parameters`'s aerosol loop and is
+slated for v0.7.1. For Phase D5 we ship the conservative
+`auto → NoTruncation()` so:
+
+- Rayleigh-only scenes get the right answer (β has length 3,
+  fits any `stream_l_cap ≥ 5`).
+- Aerosol scenes that already fit get the right answer.
+- Aerosol scenes whose `length(β)-1 > user_l_cap` produce a Phase
+  C trait clamp at the loop level — the loop runs to `user_l_cap`
+  but greek coefficients above that are silently dropped from the
+  projection. Users who want explicit forward-peak handling should
+  set `truncation: "δBGE(L, Δ)"` directly until the two-step
+  resolver lands.
+
+Logs the chosen branch via `@info`. Non-`AutoTruncation` inputs
+pass through unchanged.
 """
 function _resolve_auto_truncation(t::Scattering.AbstractTruncationType, params, ::Type{FT}) where {FT}
     t isa Scattering.AutoTruncation || return t
 
     has_aerosols = params.scattering_params !== nothing &&
                    !isempty(params.scattering_params.rt_aerosols)
-    if !has_aerosols
+    if has_aerosols
+        @info "truncation: auto → NoTruncation() (Phase D5 conservative; \
+              v0.7.1 will add the post-Mie δBGE decision per-band)"
+    else
         @info "truncation: auto → NoTruncation() (no aerosols; Rayleigh-only scene)"
-        return Scattering.NoTruncation()
     end
-
-    cap = params.stream_l_cap
-    Δ = FT(params.Δ_angle)
-    @info "truncation: auto → δBGE($cap, $Δ) (aerosols configured; cap from stream_l_cap)"
-    return Scattering.δBGE{FT}(cap, Δ)
+    return Scattering.NoTruncation()
 end
 
 _has_analytic_phase_function(c_aero::RT_Aerosol) =

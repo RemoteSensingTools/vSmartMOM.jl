@@ -1116,12 +1116,21 @@ end
 """
     _parse_truncation(params_dict, l_trunc, Δ_angle, FT)
 
-Resolve the truncation method from the YAML/dict config.
+Resolve the truncation method from the YAML/dict config. The
+new-vs-legacy distinguisher is the presence of `nstreams` —
+configs that opt into the v0.7 schema get the documented `auto`
+default and treat explicit `null` as `NoTruncation()` (per
+docs/src/pages/IO/Schema/radiative_transfer.md). Legacy configs
+(`max_m`/`l_trunc` set) keep the historical `δBGE(l_trunc, Δ_angle)`
+default for backward compatibility.
 
-If `radiative_transfer.truncation` is set explicitly, parse it via the
-small whitelist in [`_truncation_from_string`](@ref). Otherwise build
-the legacy default `δBGE(l_trunc, Δ_angle)` from the top-level fields,
-so existing config files keep working.
+| YAML form                    | new schema (nstreams set) | legacy schema |
+|------------------------------|---------------------------|---------------|
+| `truncation:` *(omitted)*    | `AutoTruncation()`        | `δBGE(...)`   |
+| `truncation: null`           | `NoTruncation()`          | `δBGE(...)`   |
+| `truncation: auto`           | `AutoTruncation()`        | same          |
+| `truncation: NoTruncation()` | `NoTruncation()`          | same          |
+| `truncation: δBGE(L, Δ)`     | `δBGE(L, Δ)`              | same          |
 
 YAML/TOML string values are matched against a fixed allow-list of
 constructors — `Meta.parse` + `eval` is not used, so untrusted configs
@@ -1129,9 +1138,18 @@ can't execute arbitrary Julia code from this field.
 """
 function _parse_truncation(params_dict, l_trunc, Δ_angle, FT)
     rt = params_dict["radiative_transfer"]
-    if haskey(rt, "truncation") && rt["truncation"] !== nothing
+    is_new_schema = haskey(rt, "nstreams")
+
+    if haskey(rt, "truncation")
         spec = rt["truncation"]
-        if spec isa Scattering.AbstractTruncationType
+        if spec === nothing
+            # Explicit `null` — under new schema this means NoTruncation()
+            # (the schema doc promises "exactly no transform; errors if
+            # coefs exceed cap"). Under legacy schema we preserve the
+            # historical δBGE fallback.
+            return is_new_schema ? Scattering.NoTruncation() :
+                                    Scattering.δBGE{FT}(l_trunc, Δ_angle)
+        elseif spec isa Scattering.AbstractTruncationType
             return spec
         elseif spec isa AbstractString
             return _truncation_from_string(spec, FT)
@@ -1140,7 +1158,10 @@ function _parse_truncation(params_dict, l_trunc, Δ_angle, FT)
                                 "or AbstractTruncationType, got $(typeof(spec))"))
         end
     end
-    return Scattering.δBGE{FT}(l_trunc, Δ_angle)
+    # Field omitted entirely: new schema → AutoTruncation (deferred
+    # decision); legacy → δBGE(l_trunc, Δ_angle) for back-compat.
+    return is_new_schema ? Scattering.AutoTruncation() :
+                            Scattering.δBGE{FT}(l_trunc, Δ_angle)
 end
 
 """

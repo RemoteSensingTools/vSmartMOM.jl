@@ -15,7 +15,7 @@ top-level block has its own detail page.
 | [`atmospheric_profile`](Schema/atmospheric_profile.md) | ✓ | T, p, q, profile reduction |
 | [`absorption`](Schema/absorption.md)          | ◯        | Gas absorption: VMRs, broadening, HITRAN edition pointer |
 | [`scattering`](Schema/aerosols.md)            | ◯        | Mie aerosol size distribution, phase-function, decomposition |
-| [`canopy`](Schema/canopy.md) *(forthcoming)*  | ◯        | Vegetation canopy + soil composite surface |
+| `canopy` *(forthcoming)*                      | ◯        | Vegetation canopy + soil composite surface — page not yet authored |
 | `sources` (programmatic only)                 | ◯        | See [`Schema/sources.md`](Schema/sources.md) — set via `model_from_parameters(...; sources=...)` for now |
 
 The `surface:` field inside `radiative_transfer` has its own
