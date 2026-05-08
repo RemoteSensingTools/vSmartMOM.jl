@@ -1,0 +1,31 @@
+Here we present improved values for Stokes parameters published by Coulson, Dave and Sekera 
+(1960). These are tabulated for the following sets of parameters:
+
+TAU = 0.02, 0.05, 0.1, 0.15, 0.25, 0.5, 1
+ALBEDO = 0.0, 0.25, 0.8
+MU0 = 0.1, 0.2, 0.4, 0.6, 0.8, 0.92, 1.0
+MU = 0.02, 0.06, 0.1, 0.16, 0.2, 0.28, 0.32, 0.4, 0.52, 0.64, 0.72, 0.84, 0.92, 0.96, 0.98, 1.0
+PHI = 0, 30, 60, 90, 120, 150, 180
+
+Here, TAU is the optical thickness; ALBEDO is the ground albedo of an underlying Lambert 
+surface; MU0 is the absolute value of the cosine of the angle between the incident beam and 
+the vertical; MU is the absolute value of the cosine of the angle between the emergent beam 
+and the vertical; PHI is the relative azimuth angle between the emergent and incident 
+beams.
+
+We refer the reader to Natraj et al. (2009) for computational details.
+
+The files are named as follows:
+
+{I/Q/U}_{UP/DN}_TAU_{0.02/0.05/0.1/0.15/0.25/0.5/1}
+
+where the filename has one of each argument inside the parentheses. UP, DN refer, 
+respectively, to upwelling radiation emerging from the top of the atmosphere and 
+downwelling radiation emerging from the bottom of the atmosphere.
+
+References:
+
+1. Coulson, K. L., Dave, J. V., & Sekera, Z. 1960, Tables Related to Radiation Emerging 
+   From a Planetary Atmosphere With Rayleigh Scattering (Berkeley: Univ. California Press)
+
+2. Natraj, V., Li, K.-F., & Yung, Y. L. 2009, ApJ, 691, 1909

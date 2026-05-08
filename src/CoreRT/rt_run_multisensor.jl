@@ -21,6 +21,9 @@ function rt_run_test_ms(RS_type::AbstractRamanType,
     # max across bands; per-component skipping is a Phase C concern.
     m_max = maximum(m_max_bands(model)[ib] for ib in iBand)
     quad_points = model.quad_points
+    # Numerics knobs threaded into rt_kernel_multisensor! (matches rt_run).
+    dτ_max_threshold = model.numerics.dτ_max_threshold
+    dτ_min_floor     = model.numerics.dτ_min_floor
 
     # Also to be changed!!
     brdf = get_surface(model, iBand[1])
@@ -110,18 +113,20 @@ function rt_run_test_ms(RS_type::AbstractRamanType,
                 
             # Perform Core RT (doubling/elemental/interaction)
             rt_kernel_multisensor!(RS_type,
-                    sensor_levels, 
-                    pol_type, SFI, 
-                    #bandSpecLim, 
-                    added_layer, composite_layer, 
+                    sensor_levels,
+                    pol_type, SFI,
+                    #bandSpecLim,
+                    added_layer, composite_layer,
                     layer_opt,
-                    scattering_interfaces_all[iz], 
-                    τ_sum_all[:,iz], 
-                    m, quad_points, 
-                    I_static, 
-                    arch, 
-                    qp_μN, iz, arr_type) 
-        end 
+                    scattering_interfaces_all[iz],
+                    τ_sum_all[:,iz],
+                    m, quad_points,
+                    I_static,
+                    arch,
+                    qp_μN, iz, arr_type;
+                    dτ_max_threshold=dτ_max_threshold,
+                    dτ_min_floor=dτ_min_floor)
+        end
 
         # Create surface matrices:
         create_surface_layer!(brdf,

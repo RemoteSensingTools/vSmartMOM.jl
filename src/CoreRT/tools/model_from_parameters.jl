@@ -554,8 +554,10 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
     # Create observation geometry
     obs_geom = ObsGeometry(params.sza, params.vza, params.vaz, params.obs_alt)
 
-    # Create truncation type
-    truncation_type = Scattering.δBGE{params.float_type}(params.l_trunc, params.Δ_angle)
+    # Truncation method (typed; NoTruncation, δBGE, ...). Matches the elastic
+    # `model_from_parameters` site: respects user-set `truncation` field and
+    # honours `truncation: auto` via `_resolved_truncation`.
+    truncation_type = _resolved_truncation(params, params.float_type)
 
     # Set quadrature points for streams
     quad_points = rt_set_streams(params.quadrature_type, params.l_trunc, obs_geom, params.polarization_type, array_type(params.architecture))
@@ -576,9 +578,11 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
     effT = (profile.vcd_dry' * profile.T) / sum(profile.vcd_dry);
     # Define RS type
     # Compute N2 and O2
-    RS_type.n2, RS_type.o2 = 
+    RS_type.n2, RS_type.o2 =
         InelasticScattering.getRamanAtmoConstants(1.e7/λ₀,effT);
-    InelasticScattering.getRamanSSProp!(RS_type, λ₀);
+    # VS-plus signature: getRamanSSProp!(RS, depol, λ_inc) — the depol
+    # arg sets the Rayleigh/Raman cross-section ratio per Hovenier convention.
+    InelasticScattering.getRamanSSProp!(RS_type, params.depol, λ₀);
     n_bands = length(RS_type.iBand)
     params.spec_bands = RS_type.grid_in
 
@@ -746,12 +750,23 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
                                               aerosol_optics_raw)
                 end
 
-            # Compute nAer aerosol optical thickness profiles
-            τ_aer[i_band][i_aer,:] = 
-                params.scattering_params.rt_aerosols[i_aer].τ_ref * 
-                (aerosol_optics[i_band][i_aer].k/k_ref) * 
-                CoreRT.getAerosolLayerOptProp(1.0, c_aero.p₀, c_aero.σp, profile)
-        end 
+            # Track greek coef length for l_max computation (was previously
+            # left at zero, which made `l_max[i_band]` always 0 in the
+            # presence of aerosols and silently dropped Mie Fourier moments).
+            l_max_aer[i_aer, i_band] =
+                truncation_type isa Scattering.δBGE ?
+                    min(length(aerosol_optics[i_band][i_aer].greek_coefs.β), truncation_type.l_max) :
+                    length(aerosol_optics[i_band][i_aer].greek_coefs.β)
+
+            # Compute nAer aerosol optical thickness profiles. RT_Aerosol stores
+            # the vertical pressure distribution as `c_aero.profile` (a
+            # `Distributions.Distribution`); use the 3-arg `getAerosolLayerOptProp`
+            # that consumes it directly, matching the elastic site.
+            τ_aer[i_band][i_aer,:] =
+                params.scattering_params.rt_aerosols[i_aer].τ_ref *
+                (aerosol_optics[i_band][i_aer].k/k_ref) *
+                CoreRT.getAerosolLayerOptProp(1, c_aero.profile, profile)
+        end
     end
 
     # Compute per-band l_max from aerosol greek coefficient lengths.

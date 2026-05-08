@@ -426,6 +426,9 @@ function rt_run_ss(RS_type::AbstractRamanType, model, iBand;
     if model.numerics.blas_threads !== nothing
         LinearAlgebra.BLAS.set_num_threads(model.numerics.blas_threads)
     end
+    # Numerics knobs threaded into rt_kernel_ss! (matches rt_run forward path).
+    dτ_max_threshold = model.numerics.dτ_max_threshold
+    dτ_min_floor     = model.numerics.dτ_min_floor
 
     (; vza, vaz) = model.obs_geom
     (; qp_μ, wt_μ, qp_μN, μ₀, iμ₀, Nquad) = model.quad_points
@@ -519,7 +522,9 @@ function rt_run_ss(RS_type::AbstractRamanType, model, iBand;
                         m, quad_points,
                         I_static,
                         arch,
-                        qp_μN, iz)
+                        qp_μN, iz;
+                        dτ_max_threshold=dτ_max_threshold,
+                        dτ_min_floor=dτ_min_floor)
         end
 
         @timeit "Create Surface" create_surface_layer!(brdf,

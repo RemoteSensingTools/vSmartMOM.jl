@@ -4,32 +4,30 @@ This file implements rt_kernel!, which performs the core RT routines (elemental,
  
 =#
 ### New update:
-function rt_kernel_multisensor!(RS_type::noRS{FT}, 
+function rt_kernel_multisensor!(RS_type::noRS{FT},
                     sensor_levels,
-                    pol_type, SFI, 
-                    added_layer, 
-                    composite_layer, 
-                    computed_layer_properties::CoreScatteringOpticalProperties, 
-                    scattering_interface, 
-                    τ_sum, 
-                    m, quad_points, 
-                    I_static, 
-                    architecture, 
-                    qp_μN, iz, arr_type) where {FT}
+                    pol_type, SFI,
+                    added_layer,
+                    composite_layer,
+                    computed_layer_properties::CoreScatteringOpticalProperties,
+                    scattering_interface,
+                    τ_sum,
+                    m, quad_points,
+                    I_static,
+                    architecture,
+                    qp_μN, iz, arr_type;
+                    dτ_max_threshold::Union{Nothing,Real} = nothing,
+                    dτ_min_floor::Union{Nothing,Real} = nothing) where {FT}
 
-    (; qp_μ, μ₀) = quad_points
+    (; μ₀) = quad_points
     (; F₀) = RS_type
-    # Just unpack core optical properties from 
     (; τ, ϖ, Z⁺⁺, Z⁻⁺) = computed_layer_properties
-    # SUNITI, check? Also, better to write function here
-    #@show "here", size(τ .* ϖ), size(qp_μ)
-    #@show maximum(τ .* ϖ), minimum(qp_μ)
-    dτ_max = minimum([maximum(τ .* ϖ), FT(0.001) * minimum(qp_μ)])
-    _, ndoubl = doubling_number(dτ_max, maximum(τ .* ϖ))
+    # Centralised dτ/ndoubl helper (see noRS rt_kernel! variant).
+    dτ, ndoubl = get_dtau_ndoubl(computed_layer_properties, quad_points;
+                                 dτ_max_threshold = dτ_max_threshold,
+                                 dτ_min_floor = dτ_min_floor)
     scatter = true # edit later
     arr_type = array_type(architecture)
-    # Compute dτ vector
-    dτ = τ ./ 2^ndoubl
     expk = arr_type(exp.(-dτ /μ₀))
     
 
@@ -145,32 +143,31 @@ function rt_kernel_multisensor!(RS_type::noRS{FT},
     end
 end
 
-function rt_kernel_multisensor!(RS_type::Union{RRS{FT}, RRS_plus{FT}, VS_0to1_plus{FT}, VS_1to0_plus{FT}}, 
-                                sensor_levels, 
-                                pol_type, 
-                                SFI, 
-                                added_layer, 
-                                composite_layer, 
-                                computed_layer_properties::CoreScatteringOpticalProperties, 
-                                scattering_interface, 
+function rt_kernel_multisensor!(RS_type::Union{RRS{FT}, RRS_plus{FT}, VS_0to1_plus{FT}, VS_1to0_plus{FT}},
+                                sensor_levels,
+                                pol_type,
+                                SFI,
+                                added_layer,
+                                composite_layer,
+                                computed_layer_properties::CoreScatteringOpticalProperties,
+                                scattering_interface,
                                 τ_sum,
-                                m, 
-                                quad_points, 
-                                I_static, 
-                                architecture, 
-                                qp_μN, 
-                                iz, 
-                                arr_type)  where {FT}
-    (; qp_μ, μ₀) = quad_points
-    # Just unpack core optical properties from 
+                                m,
+                                quad_points,
+                                I_static,
+                                architecture,
+                                qp_μN,
+                                iz,
+                                arr_type;
+                                dτ_max_threshold::Union{Nothing,Real} = nothing,
+                                dτ_min_floor::Union{Nothing,Real} = nothing)  where {FT}
+    (; μ₀) = quad_points
     (; τ, ϖ, Z⁺⁺, Z⁻⁺) = computed_layer_properties
-    # SUNITI, check? Also, better to write function here
-    dτ_max = minimum([maximum(τ .* ϖ), FT(0.001) * minimum(qp_μ)])
-    _, ndoubl = doubling_number(dτ_max, maximum(τ .* ϖ))
+    # Centralised dτ/ndoubl helper (see noRS rt_kernel! variant).
+    dτ, ndoubl = get_dtau_ndoubl(computed_layer_properties, quad_points;
+                                 dτ_max_threshold = dτ_max_threshold,
+                                 dτ_min_floor = dτ_min_floor)
     scatter = true # edit later
-    #arr_type = array_type(architecture)
-    # Compute dτ vector
-    dτ = τ ./ 2^ndoubl
     expk = arr_type(exp.(-dτ /μ₀))
 
     (; Z⁺⁺_λ₁λ₀, Z⁻⁺_λ₁λ₀, F₀) = RS_type

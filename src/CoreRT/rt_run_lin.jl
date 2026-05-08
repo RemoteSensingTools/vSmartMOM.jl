@@ -114,6 +114,9 @@ function rt_run(RS_type::AbstractRamanType,
     (; qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart, μ₀, iμ₀, Nquad) = model.quad_points # All quadrature points
     pol_type = CoreRT.polarization_type(model)
     quad_points = model.quad_points
+    # Numerics knobs threaded into the lin rt_kernel! (matches rt_run forward path).
+    dτ_max_threshold = model.numerics.dτ_max_threshold
+    dτ_min_floor     = model.numerics.dτ_min_floor
     # Per-band Fourier loop bound (order). Phase B unifies forward and
     # lin paths through `m_max_bands(model)`, fixing the lin-only
     # precedence bug at the previous lin formula.
@@ -246,17 +249,19 @@ function rt_run(RS_type::AbstractRamanType,
             #@show iz,(layer_opt), (layer_opt_lin)
             #@show iz, size(τ_sum_all), size(τ̇_sum_all)
             # Perform Core RT (doubling/elemental/interaction)
-            rt_kernel!(RS_type::noRS, pol_type, SFI, 
-                        #bandSpecLim, 
-                        added_layer, added_layer_lin, 
+            rt_kernel!(RS_type::noRS, pol_type, SFI,
+                        #bandSpecLim,
+                        added_layer, added_layer_lin,
                         composite_layer, composite_layer_lin,
                         layer_opt, layer_opt_lin,
-                        scattering_interfaces_all[iz], 
-                        τ_sum_all[:,iz], τ̇_sum_all[:,:,iz], 
-                        m, quad_points, 
-                        I_static, 
-                        CoreRT.architecture(model), 
-                        qp_μN, iz) 
+                        scattering_interfaces_all[iz],
+                        τ_sum_all[:,iz], τ̇_sum_all[:,:,iz],
+                        m, quad_points,
+                        I_static,
+                        CoreRT.architecture(model),
+                        qp_μN, iz;
+                        dτ_max_threshold=dτ_max_threshold,
+                        dτ_min_floor=dτ_min_floor)
         end 
 
         # Create surface matrices. `surface_index(layout, i)` indexes WITHIN
