@@ -334,16 +334,16 @@ function rt_kernel!(RS_type::Union{RRS{FT}, VS_0to1{FT}, VS_1to0{FT}}, pol_type,
                     workspace::Union{InteractionWorkspace, Nothing}=nothing,
                     dτ_max_threshold::Union{Nothing,Real} = nothing,
                     dτ_min_floor::Union{Nothing,Real} = nothing)  where {FT}
-    (; qp_μ, μ₀) = quad_points
+    (; μ₀) = quad_points
     # Just unpack core optical properties from
     (; τ, ϖ, Z⁺⁺, Z⁻⁺) = computed_layer_properties
-    threshold = FT(dτ_max_threshold === nothing ? 0.001 : dτ_max_threshold)
-    floor_val = FT(dτ_min_floor === nothing ? 1024 * eps(FT) : dτ_min_floor)
-    dτ_max = max(floor_val, minimum([maximum(τ .* ϖ), threshold * minimum(qp_μ)]))
-    _, ndoubl = doubling_number(dτ_max, maximum(τ .* ϖ))
+    # Centralised dτ/ndoubl: filters zero-weight user-VZA/SZA streams and
+    # applies the absolute floor — same formula as the noRS rt_kernel! above.
+    dτ, ndoubl = get_dtau_ndoubl(computed_layer_properties, quad_points;
+                                 dτ_max_threshold = dτ_max_threshold,
+                                 dτ_min_floor = dτ_min_floor)
     scatter = true # edit later
     arr_type = array_type(architecture)
-    dτ = τ ./ 2^ndoubl
     expk = arr_type(exp.(-dτ /μ₀))
 
     (; Z⁺⁺_λ₁λ₀, Z⁻⁺_λ₁λ₀) = RS_type
@@ -384,17 +384,16 @@ function rt_kernel!(
             workspace::Union{InteractionWorkspace, Nothing}=nothing,
             dτ_max_threshold::Union{Nothing,Real} = nothing,
             dτ_min_floor::Union{Nothing,Real} = nothing)  where {FT}
-    (; qp_μ, μ₀) = quad_points
+    (; μ₀) = quad_points
     # Just unpack core optical properties from
     (; τ, ϖ, Z⁺⁺, Z⁻⁺) = computed_layer_properties
-    threshold = FT(dτ_max_threshold === nothing ? 0.001 : dτ_max_threshold)
-    floor_val = FT(dτ_min_floor === nothing ? 1024 * eps(FT) : dτ_min_floor)
-    dτ_max = max(floor_val, minimum([maximum(τ .* ϖ), threshold * minimum(qp_μ)]))
-    _, ndoubl = doubling_number(dτ_max, maximum(τ .* ϖ))
+    # Centralised dτ/ndoubl: filters zero-weight user-VZA/SZA streams and
+    # applies the absolute floor — same formula as the noRS rt_kernel! above.
+    dτ, ndoubl = get_dtau_ndoubl(computed_layer_properties, quad_points;
+                                 dτ_max_threshold = dτ_max_threshold,
+                                 dτ_min_floor = dτ_min_floor)
     scatter = true # edit later
     arr_type = array_type(architecture)
-    # Compute dτ vector
-    dτ = τ ./ 2^ndoubl
     expk = arr_type(exp.(-dτ /μ₀))
 
     (; Z⁺⁺_λ₁λ₀, Z⁻⁺_λ₁λ₀) = RS_type

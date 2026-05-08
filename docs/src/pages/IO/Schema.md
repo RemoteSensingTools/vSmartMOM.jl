@@ -108,7 +108,7 @@ radiative_transfer:
   depol: 0.0
   float_type: Float64
   architecture: Architectures.CPU()
-  # nstreams omitted ⇒ default 13
+  # nstreams omitted ⇒ default 8
   # truncation omitted ⇒ "auto"
   # quadrature_type omitted ⇒ GaussLegQuad()
 

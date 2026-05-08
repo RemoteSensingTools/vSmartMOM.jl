@@ -153,34 +153,32 @@ function rt_kernel_ss!(RS_type::Union{RRS, VS_0to1, VS_1to0}, pol_type, SFI, add
 end
 
 ### New update:
-function rt_kernel_ss!(RS_type::noRS{FT}, 
-                    pol_type, SFI, 
-                    added_layer, 
-                    composite_layer, 
-                    computed_layer_properties::CoreScatteringOpticalProperties, 
-                    scattering_interface, 
-                    τ_sum, 
-                    m, quad_points, 
-                    I_static, 
-                    architecture, 
-                    qp_μN, iz) where {FT}
-    #@show array_type(architecture)
-    (; qp_μ, μ₀) = quad_points
+function rt_kernel_ss!(RS_type::noRS{FT},
+                    pol_type, SFI,
+                    added_layer,
+                    composite_layer,
+                    computed_layer_properties::CoreScatteringOpticalProperties,
+                    scattering_interface,
+                    τ_sum,
+                    m, quad_points,
+                    I_static,
+                    architecture,
+                    qp_μN, iz;
+                    dτ_max_threshold::Union{Nothing,Real} = nothing,
+                    dτ_min_floor::Union{Nothing,Real} = nothing) where {FT}
+    (; μ₀) = quad_points
     (; F₀) = RS_type
-    # Just unpack core optical properties from 
     (; τ, ϖ, Z⁺⁺, Z⁻⁺) = computed_layer_properties
-    # SUNITI, check? Also, better to write function here
-    #@show τ, ϖ
-    dτ_max = minimum([maximum(τ .* ϖ), FT(0.001) * minimum(qp_μ)])
-
-    _, ndoubl = doubling_number(dτ_max, maximum(τ .* ϖ))
-    # @show ndoubl
+    # Centralised dτ/ndoubl — same helper as rt_kernel! to keep the
+    # zero-weight-stream filter and absolute floor consistent across the
+    # full RT, single-scatter, and multi-sensor paths.
+    dτ, ndoubl = get_dtau_ndoubl(computed_layer_properties, quad_points;
+                                 dτ_max_threshold = dτ_max_threshold,
+                                 dτ_min_floor = dτ_min_floor)
     scatter = true # edit later
     arr_type = array_type(architecture)
-    # Compute dτ vector
-    dτ = τ ./ 2^ndoubl
     expk = arr_type(exp.(-dτ /μ₀))
-    
+
     ndoubl_ss = Int(0)
     # If there is scattering, perform the elemental and doubling steps
     if scatter
@@ -240,26 +238,26 @@ function rt_kernel_ss!(RS_type::noRS{FT},
 end
 
 function rt_kernel_ss!(
-            RS_type::Union{RRS{FT}, VS_0to1{FT}, VS_1to0{FT}, 
-                RRS_plus{FT}, VS_0to1_plus{FT}, VS_1to0_plus{FT}}, 
-            pol_type, SFI, 
-            added_layer, 
-            composite_layer, 
-            computed_layer_properties::CoreScatteringOpticalProperties, 
-            scattering_interface, 
-            τ_sum, m, quad_points, 
-            I_static, architecture, qp_μN, iz)  where {FT}
-    (; qp_μ, μ₀) = quad_points
+            RS_type::Union{RRS{FT}, VS_0to1{FT}, VS_1to0{FT},
+                RRS_plus{FT}, VS_0to1_plus{FT}, VS_1to0_plus{FT}},
+            pol_type, SFI,
+            added_layer,
+            composite_layer,
+            computed_layer_properties::CoreScatteringOpticalProperties,
+            scattering_interface,
+            τ_sum, m, quad_points,
+            I_static, architecture, qp_μN, iz;
+            dτ_max_threshold::Union{Nothing,Real} = nothing,
+            dτ_min_floor::Union{Nothing,Real} = nothing)  where {FT}
+    (; μ₀) = quad_points
     (; F₀) = RS_type
-    # Just unpack core optical properties from 
     (; τ, ϖ, Z⁺⁺, Z⁻⁺) = computed_layer_properties
-    # SUNITI, check? Also, better to write function here
-    dτ_max = minimum([maximum(τ .* ϖ), FT(0.001) * minimum(qp_μ)])
-    _, ndoubl = doubling_number(dτ_max, maximum(τ .* ϖ))
+    # Centralised dτ/ndoubl helper (see noRS rt_kernel_ss! variant).
+    dτ, ndoubl = get_dtau_ndoubl(computed_layer_properties, quad_points;
+                                 dτ_max_threshold = dτ_max_threshold,
+                                 dτ_min_floor = dτ_min_floor)
     scatter = true # edit later
     arr_type = array_type(architecture)
-    # Compute dτ vector
-    dτ = τ ./ 2^ndoubl
     expk = arr_type(exp.(-dτ /μ₀))
 
     (; Z⁺⁺_λ₁λ₀, Z⁻⁺_λ₁λ₀) = RS_type

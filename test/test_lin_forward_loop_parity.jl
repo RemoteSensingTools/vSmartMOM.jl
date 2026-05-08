@@ -9,11 +9,13 @@
 # moments to include — exactly the latent bug the
 # `_derive_m_max_bands` helper unifies.
 #
-# A handful of YAMLs use config knobs that the lin path does not
-# support (no aerosol scattering parameters, missing absorption
-# blocks, etc.); we skip those with `@info` so the testset only
-# fails when the forward and lin paths actively disagree on a
-# config they both build cleanly.
+# Parse failures and forward-build failures are still skipped (RRS/VS
+# configs need the explicit RS_type argument, etc.) — those are tested
+# elsewhere. But once a config builds forward, the lin path MUST also
+# build cleanly: we no longer silently swallow lin-build errors,
+# because masking them lets latent regressions slip through CI (see
+# the Rayleigh-only LinMode FieldError that surfaced in the v2.1
+# Codex review).
 
 using vSmartMOM
 using vSmartMOM.CoreRT
@@ -40,13 +42,8 @@ _yaml_paths() = filter(p -> endswith(p, ".yaml"), readdir(_PARAMS_DIR; join = tr
             continue
         end
 
-        lin_pair = try
-            model_from_parameters(LinMode(), params)
-        catch err
-            @info "Skipping (lin build failed)" path = basename(path) err
-            continue
-        end
-        lin_model, _ = lin_pair
+        # No longer wrap in try/catch — lin-build failures are real bugs.
+        lin_model, _ = model_from_parameters(LinMode(), params)
 
         fwd_m = CoreRT.m_max_bands(fwd)
         lin_m = CoreRT.m_max_bands(lin_model)

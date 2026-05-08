@@ -196,12 +196,12 @@
             "dτ_max_threshold": {
               "type": "number",
               "minimum": 0,
-              "description": "Doubling-step cap. Default ~0.0125."
+              "description": "Doubling-step cap (`dτ_max = threshold · μ_min`, where μ_min is the smallest TRUE quadrature stream cosine). Default 0.001 (legacy floor); raising to ~0.01 reduces doubling iterations."
             },
             "dτ_min_floor": {
               "type": "number",
               "minimum": 0,
-              "description": "Minimum layer thickness. Default ~1e-7."
+              "description": "Absolute floor on dτ_max as a multiple of eps(FT). Default 1024·eps(FT) ≈ 1.2e-4 for Float32 and 2.3e-13 for Float64."
             },
             "blas_threads": {
               "type": ["integer", "null"],

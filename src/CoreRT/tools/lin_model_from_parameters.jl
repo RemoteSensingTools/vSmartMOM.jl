@@ -85,8 +85,8 @@ function model_from_parameters(lin::LinMode,
 
     FT2 = isnothing(abs_params) || !haskey(abs_params.vmr, "CO2") ? params.float_type : eltype(abs_params.vmr["CO2"])
     τ_abs     = [zeros(FT2, length(params.spec_bands[i]), length(profile.p_full)) for i in 1:n_bands]
-    N_fix_gas = length(unique(Iterators.flatten(abs_params.fixed_molecules)))
-    N_var_gas = length(unique(Iterators.flatten(abs_params.variable_molecules)))
+    N_fix_gas = isnothing(abs_params) ? 0 : length(unique(Iterators.flatten(abs_params.fixed_molecules)))
+    N_var_gas = isnothing(abs_params) ? 0 : length(unique(Iterators.flatten(abs_params.variable_molecules)))
     τ̇_abs     = [zeros(FT2, 1+N_var_gas, length(params.spec_bands[i]), length(profile.p_full)) for i in 1:n_bands]
     l_max = zeros(Int, n_bands)
     l_max_aer = zeros(Int, n_aer, n_bands)
@@ -223,24 +223,26 @@ function model_from_parameters(lin::LinMode,
 
         # Collision-induced absorption (HITRAN .cia files), if any.
         # CIA is treated as a fixed contribution — no Jacobian (τ̇_abs unchanged).
-        for cia_path in abs_params.cia_files
-            @timeit "CIA $(basename(cia_path))" begin
-                cia_table = Absorption.load_cia_table(cia_path,
-                                                     params.spec_bands[i_band];
-                                                     FT = FT)
-                Absorption.compute_τ_cia!(τ_abs[i_band], cia_table, profile,
-                                           abs_params.vmr)
+        if !isnothing(abs_params)
+            for cia_path in abs_params.cia_files
+                @timeit "CIA $(basename(cia_path))" begin
+                    cia_table = Absorption.load_cia_table(cia_path,
+                                                         params.spec_bands[i_band];
+                                                         FT = FT)
+                    Absorption.compute_τ_cia!(τ_abs[i_band], cia_table, profile,
+                                               abs_params.vmr)
+                end
             end
-        end
 
-        # MT_CKD H₂O continuum, if a reference table is configured.
-        # Treated as fixed (no Jacobian wrt H₂O VMR for now).
-        if !isempty(abs_params.mtckd_file)
-            @timeit "MT_CKD H2O continuum" begin
-                mtckd_table = Absorption.load_mtckd(abs_params.mtckd_file)
-                Absorption.compute_τ_h2o_continuum!(τ_abs[i_band], mtckd_table,
-                                                     params.spec_bands[i_band], profile,
-                                                     profile.vmr_h2o)
+            # MT_CKD H₂O continuum, if a reference table is configured.
+            # Treated as fixed (no Jacobian wrt H₂O VMR for now).
+            if !isempty(abs_params.mtckd_file)
+                @timeit "MT_CKD H2O continuum" begin
+                    mtckd_table = Absorption.load_mtckd(abs_params.mtckd_file)
+                    Absorption.compute_τ_h2o_continuum!(τ_abs[i_band], mtckd_table,
+                                                         params.spec_bands[i_band], profile,
+                                                         profile.vmr_h2o)
+                end
             end
         end
     end
@@ -410,10 +412,13 @@ function model_from_parameters(lin::LinMode,
 
         end
     end
+    # Mirror forward path: with no aerosols, fall back to the legacy l_trunc.
     for i_band = 1:n_bands
-        l_max[i_band] = maximum(l_max_aer[:,i_band])
+        l_max[i_band] = n_aer > 0 ? maximum(l_max_aer[:,i_band]) : params.l_trunc
     end
-    set_uniform_lmax!(l_max, aerosol_optics)
+    if n_aer > 0
+        set_uniform_lmax!(l_max, aerosol_optics)
+    end
 
     # Per-band Fourier loop bound (order). Phase C: trait-based aggregator
     # via `component_m_max(c, ctx)`. Same helper as the forward path so
@@ -441,7 +446,13 @@ function model_from_parameters(lin::LinMode,
     atm = Atmosphere(profile, spec_bands_ft)
     rayleigh_s = RayleighScattering(greek_rayleigh, greek_cabannes, FT.(ϖ_Cabannes))
     aerosols_s = AerosolState(aerosol_optics, τ_aer)
-    optics = Optics(rayleigh_s, aerosols_s, τ_abs, τ_rayl)
+    # τ_abs may have been allocated at FT2 (= eltype of the VMR for AD)
+    # which can differ from FT (= params.float_type, e.g. Float32 with
+    # Float64 VMR). Optics requires both τ-vectors to share the same
+    # element type, so coerce τ_abs back to FT here. Matches the forward
+    # path's behavior of always allocating τ_abs at params.float_type.
+    τ_abs_ft = eltype(eltype(τ_abs)) === FT ? τ_abs : [convert(Matrix{FT}, m) for m in τ_abs]
+    optics = Optics(rayleigh_s, aerosols_s, τ_abs_ft, τ_rayl)
     numerics = _convert_numerics(params.numerics, FT)
     model = RTModel(params.architecture, solver, numerics, obs_geom, quad_points, atm, optics, params.brdf, sources)
     return model, RTModelLin(τ̇_abs, τ̇_aer, lin_aerosol_optics)

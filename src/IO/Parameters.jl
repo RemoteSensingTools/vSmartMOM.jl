@@ -1006,7 +1006,7 @@ from new schema (`nstreams` present). Returns a NamedTuple with:
                                             from `2·nstreams - 1` if absent
 
 Defaults when the user supplies neither legacy nor new fields:
-`nstreams = 8` (new-schema default), `max_m = 14`, `l_trunc = 25`.
+`nstreams = 8` ⇒ `stream_l_cap = 15`, `max_m = 16`, `l_trunc = 15`.
 """
 function _resolve_resolution_knobs(params_dict::Dict)
     rt = params_dict["radiative_transfer"]

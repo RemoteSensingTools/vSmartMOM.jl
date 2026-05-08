@@ -114,7 +114,7 @@ radiative_transfer:
   architecture: Architectures.CPU()
 ```
 
-This expands to: `nstreams = 13` (so `stream_l_cap = 25`),
+This expands to: `nstreams = 8` (so `stream_l_cap = 15`),
 `quadrature_type = GaussLegQuad()`, `truncation = auto`. For a
 Rayleigh-only Lambertian scene this resolves to `NoTruncation()` and
 the Fourier loop runs `m = 0:2` (Phase C trait dispatch).
