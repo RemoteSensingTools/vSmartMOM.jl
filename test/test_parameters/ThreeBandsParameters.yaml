@@ -78,14 +78,12 @@ surface:
 
 truncation_type: 
   # Truncated for aerosol optical properties
-  l_trunc:            20
-  Δ_angle:            2.0
+  nstreams:           11
+  truncation:         auto
 
 vSmartMOM: 
   # Type of quadrature
-  quadrature_type:    GaussLegQuad()
   # Maximum m (for loop)
-  max_m:              3
   # Architecture (default_architecture, GPU(), CPU())
   architecture:       default_architecture
   # Floating point type (Float32, Float64)

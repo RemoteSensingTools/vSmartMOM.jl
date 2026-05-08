@@ -25,11 +25,9 @@ radiative_transfer:
   surface:
     - LambertianSurfaceScalar{Float64}(0.0)   # band 1 (614 – 2510 nm)
     - LambertianSurfaceScalar{Float64}(0.0)   # band 2 (350 – 614  nm)
-  quadrature_type:    GaussLegQuad()
   polarization_type:  Stokes_IQU()
-  max_m:              3
-  Δ_angle:            2.0
-  l_trunc:            5
+  nstreams:           3
+  truncation:         auto
   depol:              -1     # auto: per-band depol from N₂/O₂ molecular constants
   float_type:         Float32
   architecture:       Architectures.GPU()

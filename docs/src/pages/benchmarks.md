@@ -35,7 +35,7 @@ number of excluded cells are stated in each summary line.
 
 Where applicable, thresholds match the in-tree regression tests:
 for Natraj Q/U we use `|truth| < 0.01`, the same filter applied in
-[`test/test_CoreRT.jl`](../../../test/test_CoreRT.jl) (`@test maximum(Q_deltas[Q_modeled .≥ 0.01]) < 0.008`).
+[`test/test_CoreRT.jl`](https://github.com/cfranken/vSmartMOM.jl/blob/main/test/test_CoreRT.jl) (`@test maximum(Q_deltas[Q_modeled .≥ 0.01]) < 0.008`).
 
 ## Case A — Siewert 2000 PROBLEM IIA
 
@@ -280,7 +280,7 @@ RadauQuad on this Rayleigh-only setup) and Rayleigh has only
 `β₀, β₁, β₂` non-zero so δ-fit forward-peak truncation is
 meaningless. Q/U use a near-zero filter of `|truth| < 0.01`
 (mirrors the `|modeled| ≥ 0.01` filter applied in
-[`test/test_CoreRT.jl`](../../../test/test_CoreRT.jl)).
+[`test/test_CoreRT.jl`](https://github.com/cfranken/vSmartMOM.jl/blob/main/test/test_CoreRT.jl)).
 
 ### Float64
 
@@ -1149,8 +1149,8 @@ convention.
 julia --project=docs docs/build_benchmarks.jl
 ```
 
-Reference data lives under [`test/vlidort_baseline/reference_data/`](../../../test/vlidort_baseline/reference_data/)
-(Siewert + VLIDORT-shipped) and [`test/benchmarks/natraj_trues.jl`](../../../test/benchmarks/natraj_trues.jl)
+Reference data lives under [`test/vlidort_baseline/reference_data/`](https://github.com/cfranken/vSmartMOM.jl/tree/main/test/vlidort_baseline/reference_data)
+(Siewert + VLIDORT-shipped) and [`test/benchmarks/natraj_trues.jl`](https://github.com/cfranken/vSmartMOM.jl/blob/main/test/benchmarks/natraj_trues.jl)
 (Natraj 2009 transcribed). Configurations are at
-[`test/vlidort_baseline/configs/`](../../../test/vlidort_baseline/configs/)
-and [`test/benchmarks/natraj.yaml`](../../../test/benchmarks/natraj.yaml).
+[`test/vlidort_baseline/configs/`](https://github.com/cfranken/vSmartMOM.jl/tree/main/test/vlidort_baseline/configs)
+and [`test/benchmarks/natraj.yaml`](https://github.com/cfranken/vSmartMOM.jl/blob/main/test/benchmarks/natraj.yaml).

@@ -187,9 +187,50 @@ handled:
 
 ## See also
 
-- [`src/CoreRT/Sources/types.jl`](../../../../../src/CoreRT/Sources/types.jl) — `AbstractSource`, `SourceSet`, `NoSource`, AD-mode traits.
-- [`src/CoreRT/Sources/solar_beam.jl`](../../../../../src/CoreRT/Sources/solar_beam.jl) — `SolarBeam`, `PreparedSolarBeam`, `BlackbodySource`, `source_tangent!`.
-- [`src/CoreRT/Sources/surface_sif.jl`](../../../../../src/CoreRT/Sources/surface_sif.jl) — `SurfaceSIF`, `surface_source_contribute!`.
-- [`test/test_sources.jl`](../../../../../test/test_sources.jl) — per-phase regression tests with end-to-end bit-equality assertions.
-- The original v0.6 design note: [`dev_notes/source_terms_architecture_v0_6.md`](../../../../../dev_notes/source_terms_architecture_v0_6.md).
+- [`src/CoreRT/Sources/types.jl`](https://github.com/cfranken/vSmartMOM.jl/blob/main/src/CoreRT/Sources/types.jl) — `AbstractSource`, `SourceSet`, `NoSource`, AD-mode traits.
+- [`src/CoreRT/Sources/solar_beam.jl`](https://github.com/cfranken/vSmartMOM.jl/blob/main/src/CoreRT/Sources/solar_beam.jl) — `SolarBeam`, `PreparedSolarBeam`, `BlackbodySource`, `source_tangent!`.
+- [`src/CoreRT/Sources/surface_sif.jl`](https://github.com/cfranken/vSmartMOM.jl/blob/main/src/CoreRT/Sources/surface_sif.jl) — `SurfaceSIF`, `surface_source_contribute!`.
+- [`test/test_sources.jl`](https://github.com/cfranken/vSmartMOM.jl/blob/main/test/test_sources.jl) — per-phase regression tests with end-to-end bit-equality assertions.
+- The original v0.6 design note: [`dev_notes/source_terms_architecture_v0_6.md`](https://github.com/cfranken/vSmartMOM.jl/blob/main/dev_notes/source_terms_architecture_v0_6.md).
 - The execution plan: `~/.claude/plans/gpt-also-had-some-velvety-whale.md`.
+
+## API reference
+
+### Source vocabulary
+
+```@docs
+vSmartMOM.CoreRT.AbstractSource
+vSmartMOM.CoreRT.AbstractPreparedSource
+vSmartMOM.CoreRT.NoSource
+vSmartMOM.CoreRT.SourceSet
+```
+
+### Concrete sources
+
+```@docs
+vSmartMOM.CoreRT.SolarBeam
+vSmartMOM.CoreRT.PreparedSolarBeam
+vSmartMOM.CoreRT.BlackbodySource(::Real, ::AbstractVector{<:Real})
+vSmartMOM.CoreRT.SurfaceSIF
+vSmartMOM.CoreRT.PreparedSurfaceSIF
+```
+
+### AD-mode traits
+
+```@docs
+vSmartMOM.CoreRT.AbstractSourceADMode
+vSmartMOM.CoreRT.AnalyticSourceJacobian
+vSmartMOM.CoreRT.ForwardDiffSourceJacobian
+vSmartMOM.CoreRT.NoSourceJacobian
+vSmartMOM.CoreRT.source_ad_mode(::vSmartMOM.CoreRT.AbstractSource)
+```
+
+### Dispatch entry points
+
+```@docs
+vSmartMOM.CoreRT.prepare_source(::vSmartMOM.CoreRT.SolarBeam, ::Type{<:AbstractFloat}, ::Integer, ::Integer, ::Any)
+vSmartMOM.CoreRT.prepare_source(::vSmartMOM.CoreRT.SurfaceSIF, ::Type{<:AbstractFloat}, ::Integer, ::Integer, ::Any)
+vSmartMOM.CoreRT.prepare_sources(::vSmartMOM.CoreRT.NoSource, ::Type{<:AbstractFloat}, ::Integer, ::Integer, ::Any)
+vSmartMOM.CoreRT.surface_source_contribute!(::vSmartMOM.CoreRT.PreparedSurfaceSIF, ::Union{vSmartMOM.CoreRT.LambertianSurfaceLegendre, vSmartMOM.CoreRT.LambertianSurfaceScalar, vSmartMOM.CoreRT.LambertianSurfaceSpline}, ::Any, ::Integer, ::Any, ::Any)
+vSmartMOM.CoreRT.surface_source_contribute!(::vSmartMOM.CoreRT.NoSource, ::vSmartMOM.CoreRT.AbstractSurfaceType, ::Vararg{Any, 4})
+```

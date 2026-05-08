@@ -25,11 +25,8 @@ radiative_transfer:
   surface:
     - RossLiSurfaceScalar(0.05, 0.03, 0.10)
 
-  quadrature_type:    GaussLegQuad()
   polarization_type:  Stokes_I()    # Ross-Li is scalar-only
-  max_m:              10
-  Δ_angle:            2.0
-  l_trunc:            20
+  nstreams:           11
   # Pure Rayleigh: trim forward-peak truncation off (β has only β₀, β₁, β₂).
   truncation:         NoTruncation()
   # depol:              0.029   # <-- previous explicit value (auto via line below)

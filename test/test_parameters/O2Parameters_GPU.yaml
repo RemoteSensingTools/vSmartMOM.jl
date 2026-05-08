@@ -9,11 +9,9 @@ radiative_transfer:
     - (1e7/771):1.0:(1e7/767)
   surface: 
     - LambertianSurfaceScalar{Float64}(0.0)
-  quadrature_type:    GaussLegQuad()
   polarization_type:  Stokes_IQU()
-  max_m:              3
-  Δ_angle:            2.0
-  l_trunc:            5
+  nstreams:           3
+  truncation:         auto
   # depol:              0.03   # <-- previous explicit value (auto via line below)
   depol:              -1
   float_type:         Float64

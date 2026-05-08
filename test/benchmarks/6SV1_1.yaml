@@ -9,16 +9,13 @@ radiative_transfer:
   surface: 
     - LambertianSurfaceScalar(0.0)
   # Quadrature-scheme for stream calculations
-  quadrature_type:    GaussLegQuad()
   # Polarization type (Stokes_I, Stokes_IQ, Stokes_IQU, Stokes_IQUV)
   polarization_type:  Stokes_IQUV()
   # Maximum m (number of Fourier moments to loop over)
-  max_m:              3
   # Exclusion angle for forward peak in fitting procedure (degrees)
   # — unused with NoTruncation, kept for parser compatibility.
-  Δ_angle:            2.0
   # Trunction length for legendre terms
-  l_trunc:            20
+  nstreams:           11
   # Pure Rayleigh has only β₀, β₁, β₂ non-zero; δ-fit forward-peak
   # truncation is meaningless and corrupts the smooth phase function.
   truncation:         NoTruncation()

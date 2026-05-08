@@ -171,6 +171,46 @@ that touches these files).
 
 ---
 
+## 9. Linearized Mie Jacobian column-count bug
+
+**Location**: `src/CoreRT/LayerOpticalProperties/compEffectiveLayerProperties_lin.jl`
+around lines 322-330.
+
+```julia
+ω̃̇ = arr_type(zeros(n,7))
+ω̃̇[:,2:5] .= arr_type(collect(tmpω̃̇'))   # hard-coded col 2:5 (4 wide)
+
+ḟᵗ_vec = collect(ḟᵗ)  # comment says "keep as 4-element vector from Mie"
+ḟᵗ = arr_type(zeros(n,7))
+for k in eachindex(ḟᵗ_vec)
+    ḟᵗ[:,1+k] .= ḟᵗ_vec[k]              # writes col 1+k; out-of-bounds when len(ḟᵗ_vec) > 6
+end
+```
+
+The 7-column matrix is sized for the 7-parameter aerosol layout
+(`[τ_ref, nᵣ, nᵢ, rₘ, σᵣ, p₀, σp]`) but the loop assumes `ḟᵗ_vec`
+length 4 (Mie-only).  Under the v0.7 migration of `JacobianTestFast.yaml`
+(legacy `max_m=3, l_trunc=5, Δ_angle=2.0` → `nstreams=3, truncation: auto`)
+the docs build's `_jacobian_aod_plot` triggers a `BoundsError` here.
+
+**Tactical workaround in v2.1**: `test/test_parameters/JacobianTestFast.yaml`
+was held back on the legacy schema — the only one of 48 fixtures not
+migrated.  All other Jacobian regression tests pass on the migrated
+fixtures.
+
+**What a future PR would do.**  Replace the hard-coded `2:5` and `1+k`
+with the actual Mie-derivative column indices (probably `2:size(ḟᵗ_vec,1)+1`
+clamped to the matrix width, plus an `@assert` that the input length
+matches `ParameterLayout`'s expectation).  Then re-migrate
+`JacobianTestFast.yaml` to v0.7.
+
+**Why deferred.**  The fix touches the analytic-Jacobian construction
+path; needs Jacobian regression validation across every YAML in
+`test/test_parameters/` to confirm no numerical drift.  Out of scope
+for v2.1's "quick wins" release.
+
+---
+
 ## Quick wins delivered in v2.1.0 *(for reference)*
 
 So the next person doesn't redo these:

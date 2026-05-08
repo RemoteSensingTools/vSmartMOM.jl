@@ -55,7 +55,6 @@
         "spec_bands",
         "surface",
         "polarization_type",
-        "Δ_angle",
         "depol",
         "float_type",
         "architecture"
@@ -106,7 +105,7 @@
         },
         "Δ_angle": {
           "type": "number",
-          "description": "Forward-peak exclusion angle in degrees, consumed by δBGE truncation. In TOML, write this key as \"Δ_angle\" = 0.0."
+          "description": "Optional forward-peak exclusion angle in degrees consumed by δBGE truncation. Defaults to 0.0 (no forward-peak excluded) when omitted; legacy YAMLs may still set 2.0 explicitly. In TOML, quote the Unicode key as \"Δ_angle\" = 0.0."
         },
         "l_trunc": {
           "type": "integer",

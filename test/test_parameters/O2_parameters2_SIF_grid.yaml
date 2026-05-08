@@ -51,15 +51,13 @@ radiative_transfer:
     - LambertianSurfaceScalar{Float64}(0.) #(0.3) #(0.2) #(0.05)
     #- LambertianSurfaceScalar{Float64}(0.3)
   # Quadrature-scheme for stream calculations
-  quadrature_type:    GaussLegQuad()
   # Polarization type (Stokes_I, Stokes_IQ, Stokes_IQU, Stokes_IQUV)
   polarization_type:  Stokes_IQU() #QU()
   # Maximum m (number of Fourier moments to loop over)
-  max_m:              1 #3
   # Exclusion angle for forward peak in fitting procedure (degrees)
-  Δ_angle:            2.0
   # Trunction length for legendre terms
-  l_trunc:            5 #5
+  nstreams:           3
+  truncation:         auto
   # Depolarization factor
   # depol:              0.028 #(0.028: Cabannes), (0.1032: Rayleigh)   # <-- previous explicit value (auto via line below)
   depol:              -1

@@ -585,7 +585,6 @@ function validate_yaml_parameters(params)
         (["radiative_transfer", "spec_bands"], Array{String}),
         (["radiative_transfer", "surface"], Array{String}),
         (["radiative_transfer", "polarization_type"], String),
-        (["radiative_transfer", "Δ_angle"], Real),
         (["radiative_transfer", "depol"], Real),
         (["radiative_transfer", "float_type"], String),
         (["radiative_transfer", "architecture"], String, ["default_architecture", "Architectures.GPU()", "Architectures.MetalGPU()", "Architectures.CPU()", "GPU()", "MetalGPU()", "CPU()"]),
@@ -965,7 +964,12 @@ function parameters_from_dict(params_dict::Dict)
     # `_resolve_resolution_knobs` for the exact precedence rules.
     res = _resolve_resolution_knobs(params_dict)
 
-    Δ_angle = FT(params_dict["radiative_transfer"]["Δ_angle"])
+    # Δ_angle is optional (default 0.0 — no forward-peak exclusion in δBGE).
+    # When the legacy parser path resolves `truncation` to `δBGE`, this is the
+    # forward-peak half-angle in degrees. Ignored when `truncation` resolves to
+    # `NoTruncation()` or when `truncation: auto` decides the phase function
+    # already fits within `stream_l_cap`.
+    Δ_angle = FT(get(params_dict["radiative_transfer"], "Δ_angle", 0.0))
     truncation = _parse_truncation(params_dict, res.l_trunc, Δ_angle, FT)
     numerics = _parse_numerics(params_dict, FT)
 

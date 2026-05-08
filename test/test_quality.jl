@@ -52,7 +52,11 @@ using vSmartMOM
         "geometry",
         "atmospheric_profile",
     ])
-    @test "Δ_angle" in radiative_transfer["required"]
+    # `Δ_angle` is optional in v2.1+ — defaults to 0.0 when omitted (parser:
+    # `get(...; default=0.0)` in src/IO/Parameters.jl). The property must still
+    # be declared so editors offer it for autocomplete on legacy / explicit
+    # configs.
+    @test !("Δ_angle" in radiative_transfer["required"])
     @test haskey(radiative_transfer["properties"], "Δ_angle")
 end
 

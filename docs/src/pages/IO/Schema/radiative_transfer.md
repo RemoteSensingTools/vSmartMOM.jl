@@ -133,4 +133,4 @@ radiative_transfer:
 - [`Schema/aerosols.md`](aerosols.md) — Mie size distribution + refractive index
 - [`Schema/sources.md`](sources.md) — `SolarBeam`, `SurfaceSIF`, `BlackbodySource`
 - [`docs/src/pages/conventions.md`](../../conventions.md) §6 — `Nstreams` vs `Nquad` distinction
-- [`docs/dev_notes/fourier_stream_resolution_plan.md`](../../../dev_notes/fourier_stream_resolution_plan.md) — design memo for the v0.7 schema migration
+- [`docs/dev_notes/fourier_stream_resolution_plan.md`](https://github.com/cfranken/vSmartMOM.jl/blob/main/docs/dev_notes/fourier_stream_resolution_plan.md) — design memo for the v0.7 schema migration

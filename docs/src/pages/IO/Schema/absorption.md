@@ -49,7 +49,7 @@ vSmartMOM.set_hitran_edition!(2020)   # default; or 2016
 This is a per-session preference, not a YAML field. The Artifacts
 infrastructure caches HITRAN snapshots in `~/.julia/scratchspaces/`
 and downloads on-demand from hitran.org if needed. See
-[`docs/dev_notes/hitran_artifacts.md`](../../../dev_notes/hitran_artifacts.md)
+[`docs/dev_notes/hitran_artifacts.md`](https://github.com/cfranken/vSmartMOM.jl/blob/main/docs/dev_notes/hitran_artifacts.md)
 for the dispatch flow.
 
 ## Examples
