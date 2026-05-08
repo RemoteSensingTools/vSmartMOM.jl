@@ -1211,6 +1211,9 @@ function _parse_numerics(params_dict, FT)
         # parse to Int and pass through as `RTNumericalParameters.blas_threads`.
         kwargs[:blas_threads] = v === nothing ? nothing : Int(v)
     end
+    if haskey(n, "verbose")
+        kwargs[:verbose] = Bool(n["verbose"])
+    end
     return RTNumericalParameters{FT}(; kwargs...)
 end
 

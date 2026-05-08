@@ -14,10 +14,10 @@ exp_m1(x) = iseven(x) ? 1 : -1
 
 """
     $(FUNCTIONNAME)(size_parameter)
-Computes the number of required Legendre functions  for a given size parameter. 
+Computes the number of required Legendre functions  for a given size parameter.
 See eq 6 in Sanghavi 2014
 - `size_parameter` size parameter of the aerosol (2πr/λ)
-The function returns a rounded integer, following conventions by BH, Rooj/Stap, Siewert 
+The function returns a rounded integer, following conventions by BH, Rooj/Stap, Siewert
 """
 get_n_max(size_parameter) = (size_parameter>8.0) ? round(Int, size_parameter + 4.05 * size_parameter^(1/3) + 10) : round(Int, size_parameter + 4.0 * size_parameter^(1/3) + 1)
 
@@ -69,13 +69,13 @@ function compute_mie_ab!(size_param, refractive_idx::Number, an, bn, Dn)
     ξ₁ = ψ₁ + χ₁*im
 
     # This solves Bohren and Huffman eq. 4.88 for an and bn, computing updated ψ and ξ on the fly
-    @inbounds for n = 1:n_max  
+    @inbounds for n = 1:n_max
         ψ  = (2n - 1) * ψ₁ / size_param - ψ₀
         χ  = (2n - 1) * χ₁ / size_param - χ₀
         ξ   = ψ + χ*im
         t_a = Dn[n] / refractive_idx + n / size_param
         t_b = Dn[n] * refractive_idx + n / size_param
-         
+
         an[n] = (t_a * ψ - ψ₁) / (t_a * ξ - ξ₁)
         bn[n] = (t_b * ψ - ψ₁) / (t_b * ξ - ξ₁)
 
@@ -101,7 +101,7 @@ function compute_mie_ab_new!(size_param, refractive_idx::Number, an, bn, Dn)
     # Maximum expansion (see eq. A17 from de Rooij and Stap, 1984)
     n_max = get_n_max(size_param)
 
-    # Make sure downward recurrence starts higher up 
+    # Make sure downward recurrence starts higher up
     # (at least 15, check eq. A9 in de Rooij and Stap, 1984, may need to check what is needed)
     nmx = length(Dn)
     @assert size(an)[1] >= n_max
@@ -109,18 +109,18 @@ function compute_mie_ab_new!(size_param, refractive_idx::Number, an, bn, Dn)
     fill!(Dn, 0);
 
 
-    
+
     #Computing ψ using downward recursion
     N_ = n_max+60
-    
+
     ψ = zeros(N_)
     ψ[end]   = 0.0
     ψ[end-1] = 1.0
     for idx=N_-2:-1:1
-        ψ[idx] = (2idx+1)*ψ[idx+1]/size_param - ψ[idx+2];    
+        ψ[idx] = (2idx+1)*ψ[idx+1]/size_param - ψ[idx+2];
     end
-    
-    
+
+
     #Computing ψ using upward recursion
     N_ = n_max
     ψ = zeros(N_)
@@ -133,10 +133,10 @@ function compute_mie_ab_new!(size_param, refractive_idx::Number, an, bn, Dn)
     end
     #computing χ using upward recursion
     N_ = n_max
-    χ = zeros(N_)     
+    χ = zeros(N_)
     χ[1] = cos(size_param)
     if N_>1
-        χ[2] = cos(size_param)/size_param + sin(size_param)            
+        χ[2] = cos(size_param)/size_param + sin(size_param)
         for idx=3:N_
             χ[idx] = (2idx-3)*χ[idx-1]/size_param - χ[idx-2];
         end
@@ -151,21 +151,21 @@ function compute_mie_ab_new!(size_param, refractive_idx::Number, an, bn, Dn)
         aj     =-(n + 1.5)*zinv
         alpha_j1 = aj+1/alpha_
         alpha_j2 = aj
-      
+
         ratio = alpha_j1/alpha_j2
         runratio = alpha_*ratio
-      
+
         while abs(abs(ratio)-1) > 1e-20
             aj=zinv-aj
             alpha_j1=1/alpha_j1+aj
             alpha_j2=1/alpha_j2+aj
             ratio=alpha_j1/alpha_j2
-            
+
             epsilon1 = 1.0e-2
             compare_1 = abs(alpha_j1/aj)
             compare_2 = abs(alpha_j2/aj)
 
-            if abs(compare_1)<=epsilon1 || abs(compare_2)<=epsilon1   
+            if abs(compare_1)<=epsilon1 || abs(compare_2)<=epsilon1
                 zinv *= -1
                 aj = zinv - aj
                 ratio = (1+aj*alpha_j1)/(1+aj*alpha_j2)
@@ -174,7 +174,7 @@ function compute_mie_ab_new!(size_param, refractive_idx::Number, an, bn, Dn)
             end
             zinv *= -1;
             runratio=ratio*runratio;
-        end 
+        end
         result[n] = -n/z;
         result[n] += runratio;
     end
@@ -193,7 +193,7 @@ function compute_mie_ab_new!(size_param, refractive_idx::Number, an, bn, Dn)
     χ0 = zeros(N_)
 
     # This solves Bohren and Huffman eq. 4.88 for an and bn, computing updated ψ and ξ on the fly
-    @inbounds for n = 1:n_max  
+    @inbounds for n = 1:n_max
         ψ  = (2n - 1) * ψ₁ / size_param - ψ₀
         χ  = (2n - 1) * χ₁ / size_param - χ₀
         ξ   = ψ -χ*im
@@ -213,14 +213,14 @@ function compute_mie_ab_new!(size_param, refractive_idx::Number, an, bn, Dn)
 end
 
 
-""" 
+"""
     $(FUNCTIONNAME)(model::MieModel, λ, radius)
 Compute all an, bn using compute_mie_ab!
 Input: MieModel, wavelength (λ), radius
 Output: an, bn. Both of shape (aerosol.nquad_radius, N_max) (N_max from aerosol.r_max)
 """
 function compute_anbn(model::MieModel, λ, radius)
-    
+
     (; computation_type, aerosol, r_max, nquad_radius, λ, polarization_type, truncation_type, wigner_A, wigner_B) = model
     (; size_distribution, nᵣ, nᵢ) = aerosol
 
@@ -243,7 +243,7 @@ function compute_anbn(model::MieModel, λ, radius)
     for i in 1:nquad_radius
 
         # Get current radius and size parameter
-        r = radius[i] 
+        r = radius[i]
         size_param = 2 * π * r / λ
 
         # Compute an, bn (Dn is zeroed inside compute_mie_ab!)
@@ -288,7 +288,7 @@ function compute_avg_anbns!(an, bn, ab_pairs, w, Nmax, N_max_)
                 anbm += w[i] * an[i,n]' * bn[i,m]
                 bnam += w[i] * bn[i,n]' * an[i,m]
             end
-        end 
+        end
         @inbounds mat_anam[m,n] = anam;
         @inbounds mat_bnbm[m,n] = bnbm;
         @inbounds mat_anbm[m,n] = anbm;
@@ -301,7 +301,7 @@ end
 Determines the amplitude functions `S₁`,`S₂` in Mie theory
 - `an` and `bn` pre-calculated Mie coefficients `an` and `bn`, see [`compute_mie_ab!`](@ref) function
 - `π` and `τ` pre-calculated associated Legendre functions `π` and `τ`, see [`compute_mie_π_τ`](@ref) function
-The function returns `S₁`,`S₂` as a function of the cosine of the scattering angle `ξ`. 
+The function returns `S₁`,`S₂` as a function of the cosine of the scattering angle `ξ`.
 Users need to make sure `an` and `bn`, `π` and `τ` are pre-computed.
 """
 function compute_mie_S₁S₂!(an, bn, π_, τ_, S₁, S₂)
@@ -313,7 +313,7 @@ function compute_mie_S₁S₂!(an, bn, π_, τ_, S₁, S₂)
     @assert size(S₁) == size(S₂)
     @assert length(S₁) == nμ
 
-    @inbounds for l in 1:nmax, iμ in 1:nμ 
+    @inbounds for l in 1:nmax, iμ in 1:nμ
             S₁[iμ] += (2l + 1) / (l * (l + 1)) * (an[l] * τ_[iμ,l] + bn[l] * π_[iμ,l])
             S₂[iμ] += (2l + 1) / (l * (l + 1)) * (an[l] * π_[iμ,l] + bn[l] * τ_[iμ,l])
     end
@@ -325,7 +325,7 @@ Returns the `n` Gauss-Legendre quadrature points and weights with a change of in
 - `n` number of quadrature points
 - `xmin`,`xmax` lower and upper bound of integral
 - `norm`: if `true`, normalizes the weights so that a mean can be computed instead of full integration
-The function returns `n` quadrature points ξ within [xmin,xmax] with associated weightes `w` 
+The function returns `n` quadrature points ξ within [xmin,xmax] with associated weightes `w`
 """
 function gauleg(n, xmin, xmax; norm=false)
     ξ, w = gausslegendre(n)
@@ -423,7 +423,7 @@ function reconstruct_phase(greek_coefs, μ; returnLeg=false)
 
     # To stay general, we also don't assume f₂₂=f₁₁ or f₄₄=f₃₃
     # which only holds for spherical
-    f₁₁, f₃₃, f₁₂, f₃₄, f₂₂, f₄₄ = (zeros(FT, nμ), zeros(FT, nμ), zeros(FT, nμ), 
+    f₁₁, f₃₃, f₁₂, f₃₄, f₂₂, f₄₄ = (zeros(FT, nμ), zeros(FT, nμ), zeros(FT, nμ),
                                     zeros(FT, nμ), zeros(FT, nμ), zeros(FT, nμ))
 
     # Compute prefactor
@@ -447,8 +447,8 @@ end
 
 """
     $(FUNCTIONNAME)(depol)
-Returns the greek coefficients (as [`GreekCoefs`](@ref)) of the Rayleigh phase function given 
-depolarization value. 
+Returns the greek coefficients (as [`GreekCoefs`](@ref)) of the Rayleigh phase function given
+depolarization value.
 - `depol` Depolarization (best use 0 as default )
 """
 function get_greek_rayleigh(depol::Number)
@@ -457,12 +457,12 @@ function get_greek_rayleigh(depol::Number)
     dpl_p = (1 - depol)  / (1 + depol / 2)
     #dpl_q = (1 + depol)  / (1 - depol)
     dpl_r = (1 - 2depol) / (1 - depol)
-  
+
     α  =  FT[0.0, 0.0,             3dpl_p]
     β  =  FT[1.0, 0.0,             0.5 * dpl_p]
-    γ  =  FT[0.0, 0.0,             dpl_p * sqrt(1.5)] 
-    δ  =  FT[0.0, dpl_p * dpl_r * 1.5, 0.0] 
-    ϵ  =  FT[0.0, 0.0,             0.0] 
+    γ  =  FT[0.0, 0.0,             dpl_p * sqrt(1.5)]
+    δ  =  FT[0.0, dpl_p * dpl_r * 1.5, 0.0]
+    ϵ  =  FT[0.0, 0.0,             0.0]
     ζ  =  FT[0.0, 0.0,             0.0]
     return GreekCoefs(α, β, γ, δ, ϵ, ζ)
 end
@@ -508,14 +508,14 @@ distribution cut by `r_max`.
 # Returns
 - Normalized weights summing to 1
 """
-function compute_wₓ(size_distribution, wᵣ, r, r_max) 
-    
+function compute_wₓ(size_distribution, wᵣ, r, r_max)
+
     wₓ = pdf.(size_distribution,r)      # Weights from distribution
     wₓ .*= wᵣ                           # pre multiply with wᵣ to get proper means eventually:
 
     # normalize (could apply a check whether cdf.(size_distribution,r_max) is larger than 0.99:
     #println("Test")
-    @debug "Fraction of size distribution cut by max radius: $((1-cdf.(size_distribution,r_max))*100) %"  
+    @debug "Fraction of size distribution cut by max radius: $((1-cdf.(size_distribution,r_max))*100) %"
     wₓ /= sum(wₓ)
     return wₓ
 end
@@ -526,13 +526,13 @@ end
 
 """
     $(FUNCTIONNAME)(mo::Stokes_IQUV, P, R, T, l::Int, m::Int; sign_change=false)
-Compute Π matrix for all stokes vector elements used in computations of the phase matrix 
+Compute Π matrix for all stokes vector elements used in computations of the phase matrix
 See Sanghavi 2014, eq. 15
 """
 function construct_Π_matrix(mo::Stokes_IQUV, P, R, T, l::Int, m::Int; sign_change=false)
     if sign_change # (basically gets it for -μ due to symmetries on P,R,T)
         if isodd(l-m)
-            Π = [SMatrix{4,4}([-P[i,l,m] 0 0 0 ; 0 -R[i,l,m] -T[i,l,m] 0; 0 -T[i,l,m] -R[i,l,m] 0; 0 0 0 -P[i,l,m]]) for i in 1:size(P, 1)] 
+            Π = [SMatrix{4,4}([-P[i,l,m] 0 0 0 ; 0 -R[i,l,m] -T[i,l,m] 0; 0 -T[i,l,m] -R[i,l,m] 0; 0 0 0 -P[i,l,m]]) for i in 1:size(P, 1)]
         else
             Π = [SMatrix{4,4}([P[i,l,m] 0 0 0 ; 0 R[i,l,m] T[i,l,m] 0; 0 T[i,l,m] R[i,l,m] 0; 0 0 0 P[i,l,m]]) for i in 1:size(P, 1)]
         end
@@ -550,7 +550,7 @@ See Sanghavi 2014, eq. 15
 function construct_Π_matrix(mo::Stokes_IQU, P, R, T, l::Int, m::Int; sign_change=false)
     if sign_change # (basically gets it for -μ due to symmetries on P,R,T)
         if isodd(l-m)
-            Π = [SMatrix{3,3}([-P[i,l,m] 0 0  ; 0 -R[i,l,m] -T[i,l,m] ; 0 -T[i,l,m] -R[i,l,m] ]) for i in 1:size(P, 1)] 
+            Π = [SMatrix{3,3}([-P[i,l,m] 0 0  ; 0 -R[i,l,m] -T[i,l,m] ; 0 -T[i,l,m] -R[i,l,m] ]) for i in 1:size(P, 1)]
         else
             Π = [SMatrix{3,3}([P[i,l,m] 0 0  ; 0 R[i,l,m] T[i,l,m] ; 0 T[i,l,m] R[i,l,m] ]) for i in 1:size(P, 1)]
         end
@@ -576,7 +576,7 @@ end
 
 """
     $(FUNCTIONNAME)(mo::Stokes_I, P, R, T, l::Int, m::Int; sign_change=false)
-Compute Π matrix for  stokes vector elements I used in computations of the phase matrix 
+Compute Π matrix for  stokes vector elements I used in computations of the phase matrix
 
 """
 construct_Π_matrix(mod::Stokes_I, P, R, T, l::Int, m::Int; sign_change=false) = sign_change ? -P[:,l,m] : P[:,l,m]
@@ -587,15 +587,15 @@ construct_Π_matrix(mod::Stokes_I, P, R, T, l::Int, m::Int; sign_change=false) =
 
 """
     $(FUNCTIONNAME)(mod::Stokes_IQUV, α, β, γ, δ, ϵ, ζ, l::Int)
-Compute B matrix for all stokes vector elements used in computations of the phase matrix 
-See Sanghavi 2014, eq. 16 
+Compute B matrix for all stokes vector elements used in computations of the phase matrix
+See Sanghavi 2014, eq. 16
 """
 construct_B_matrix(mod::Stokes_IQUV, α, β, γ, δ, ϵ, ζ, l::Int) = SMatrix{4,4}([β[l] γ[l] 0 0 ; γ[l] α[l] 0 0; 0 0 ζ[l] ϵ[l]; 0 0 -ϵ[l] δ[l]])
 
 """
     $(FUNCTIONNAME)(mod::Stokes_IQU, α, β, γ, δ, ϵ, ζ, l::Int)
 Compute B matrix for stokes vector elements I,Q,U used in computations of the phase matrix
-    See Sanghavi 2014, eq. 16 
+    See Sanghavi 2014, eq. 16
 """
 construct_B_matrix(mod::Stokes_IQU, α, β, γ, δ, ϵ, ζ, l::Int) = SMatrix{3,3}([β[l] γ[l] 0 ; γ[l] α[l] 0 ; 0 0 ζ[l]])
 
@@ -609,7 +609,7 @@ construct_B_matrix(mod::Stokes_IQ, α, β, γ, δ, ϵ, ζ, l::Int) = SMatrix{2,2
 """
 $(FUNCTIONNAME)(mod::Stokes_I, α, β, γ, δ, ϵ, ζ, l::Int)
 Compute Π matrix for stokes vector elements I used in computations of the phase matrix
-See Sanghavi 2014, eq. 16 
+See Sanghavi 2014, eq. 16
 """
 construct_B_matrix(mod::Stokes_I, α, β, γ, δ, ϵ, ζ, l::Int) = β[l]
 
@@ -617,17 +617,17 @@ construct_B_matrix(mod::Stokes_I, α, β, γ, δ, ϵ, ζ, l::Int) = β[l]
 #=
 """
     $(FUNCTIONNAME)(mod::AbstractPolarizationType, μ, α, β, γ, δ, ϵ, ζ, m::Int)
-Compute moments of the phase matrix 
+Compute moments of the phase matrix
 """
 function compute_Z_moments(mod::AbstractPolarizationType, μ, greek_coefs::GreekCoefs, m::Int ; arr_type = Array)
     @unpack α, β, γ, δ, ϵ, ζ = greek_coefs
     FT = eltype(β)
     n = length(μ)
 
-    # Change from 0-index to 1-index (i.e. the lowest m is 0 ), 
+    # Change from 0-index to 1-index (i.e. the lowest m is 0 ),
     # make more logical later to avoid confusion later (m=0 has a meaning!!)
     m = m+1
-    
+
     # Set prefactor for moments (note 1-notation for `m` here):
     fact = (m == 1) ? 0.5 : 1.0
 
@@ -641,13 +641,13 @@ function compute_Z_moments(mod::AbstractPolarizationType, μ, greek_coefs::Greek
     # Compute legendre Polynomials at μ and up to lmax
     P, R, T    = Scattering.compute_associated_legendre_PRT(μ, l_max)
     P⁻, R⁻, T⁻ = Scattering.compute_associated_legendre_PRT(-μ, l_max)
-  
+
     # Pre-compute all required B matrices
     𝐁_all = [construct_B_matrix(mod, α, β, γ, δ, ϵ, ζ, i) for i in 1:l_max]
 
     # Get dimension of square matrix (easier for Scalar/Stokes dimensions)
     B_dim = Int(sqrt(length(𝐁_all[1])))
-    
+
     # Create matrices:
     nb = B_dim * n
     𝐙⁺⁺, 𝐙⁻⁺ = (zeros(FT, nb, nb), zeros(FT, nb, nb))
@@ -678,11 +678,11 @@ function compute_Z_moments(mod::AbstractPolarizationType, μ, greek_coefs::Greek
 
     # Now get to the Z part:
     @inbounds for imu in eachindex(μ), jmu in eachindex(μ)
-        
+
         # Indices adjusted for size of A
         ii, jj = ((imu - 1) * B_dim, (jmu - 1) * B_dim)
-            
-        # This is equivalent to Z̄ = 1/(1+δ) * C̄m+S̄m = 1/(1+δ) * (A+DAD+AD-DA) 
+
+        # This is equivalent to Z̄ = 1/(1+δ) * C̄m+S̄m = 1/(1+δ) * (A+DAD+AD-DA)
         # (see eq 11 in Sanghavi et al, 2013)
         for i in 1:B_dim, j in 1:B_dim
             𝐙⁺⁺[ii + i,jj + j] = 2fact * A⁺⁺[i,j,imu,jmu]

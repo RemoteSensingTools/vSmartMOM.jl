@@ -86,16 +86,23 @@ is the *scattering* optical depth ``\tau_\mathrm{scat}``. The variable named
 ``\tau_\lambda = \tau_\mathrm{abs} + \tau_\mathrm{scat}``.
 
 The doubling count ``N_\mathrm{doubl}`` is chosen by `get_dtau_ndoubl`
-([`src/CoreRT/CoreKernel/rt_kernel.jl:245–253`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/CoreKernel/rt_kernel.jl#L245-L253)) from
-``\tau_\mathrm{scat} \cdot \varpi`` — **not** from ``\tau_\lambda``:
+([`src/CoreRT/CoreKernel/rt_kernel.jl`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/CoreKernel/rt_kernel.jl)) from
+``\tau_\mathrm{scat} \cdot \varpi`` — **not** from ``\tau_\lambda``. The
+real implementation also filters zero-weight user-VZA / SZA streams
+(grazing μ would otherwise force `dτ_initial` below FT precision) and
+applies an absolute floor `1024 * eps(FT)`:
 
 ```julia
-function get_dtau_ndoubl(computed_layer_properties, quad_points)
-    (; qp_μ) = quad_points
+function get_dtau_ndoubl(computed_layer_properties, quad_points; kwargs...)
+    (; qp_μ, wt_μ) = quad_points
     (; τ, ϖ) = computed_layer_properties      # τ here is τ_scat
-    dτ_max  = minimum([maximum(τ .* ϖ), FT(0.001) * minimum(qp_μ)])
-    _, ndoubl = doubling_number(dτ_max, maximum(τ .* ϖ))
-    dτ = τ ./ 2^ndoubl                        # elemental SCATTERING thickness
+    threshold     = FT(0.001)                 # numerics.dτ_max_threshold
+    floor_val     = FT(1024) * eps(FT)        # numerics.dτ_min_floor
+    real_streams  = qp_μ[Array(wt_μ) .> eps(FT)]   # exclude zero-weight nodes
+    μ_min         = isempty(real_streams) ? minimum(qp_μ) : minimum(real_streams)
+    dτ_max        = max(floor_val, minimum([maximum(τ .* ϖ), threshold * μ_min]))
+    _, ndoubl     = doubling_number(dτ_max, maximum(τ .* ϖ))
+    dτ            = τ ./ 2^ndoubl             # elemental SCATTERING thickness
     return dτ, ndoubl
 end
 ```
