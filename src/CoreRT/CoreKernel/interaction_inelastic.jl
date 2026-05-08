@@ -380,10 +380,11 @@ function interaction_helper!(RS_type::RRS, ::ScatteringInterface_11, SFI,
             @inbounds @views tmpieJ₀⁻[:,:,n₁,Δn] = 
                     ieJ₀⁻[:,:,n₁,Δn] + 
                     T01_inv[:,:,n₁] ⊠ 
-                    (ier⁻⁺[:,:,n₁,Δn] ⊠ J₀⁺[:,:,n₀] + 
+                    (ier⁻⁺[:,:,n₁,Δn] ⊠ J₀⁺[:,:,n₀] +
                     r⁻⁺[:,:,n₁] ⊠ ieJ₀⁺[:,:,n₁,Δn] +
-                    added_layer.ieJ₀⁻[:,:,n₁,Δn]) + # Somewhere nbehind here is the BUGGGGGG
-                    (T01_inv[:,:,n₁] ⊠ 
+                    added_layer.ieJ₀⁻[:,:,n₁,Δn]) +
+                    # Suniti Check for consistency
+                    (T01_inv[:,:,n₁] ⊠
                     (ier⁻⁺[:,:,n₁,Δn] ⊠ R⁺⁻[:,:,n₀] + 
                     r⁻⁺[:,:,n₁] ⊠ ieR⁺⁻[:,:,n₁,Δn]) +
                     ieT⁻⁻[:,:,n₁,Δn]) ⊠

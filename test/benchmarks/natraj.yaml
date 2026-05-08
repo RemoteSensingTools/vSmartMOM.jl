@@ -13,10 +13,7 @@ radiative_transfer:
   # benchmark — see docs/src/pages/benchmarks.md.
   # Polarization type (Stokes_I, Stokes_IQ, Stokes_IQU, Stokes_IQUV)
   polarization_type:  Stokes_IQUV()
-  # Maximum m (number of Fourier moments to loop over)
-  # Exclusion angle for forward peak in fitting procedure (degrees)
   # — unused with NoTruncation, kept for parser compatibility.
-  # Trunction length for legendre terms
   nstreams:           11
   # Pure Rayleigh has only β₀, β₁, β₂ non-zero; δ-fit forward-peak
   # truncation is meaningless and corrupts the smooth phase function.
