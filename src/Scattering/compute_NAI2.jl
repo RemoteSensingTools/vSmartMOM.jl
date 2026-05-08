@@ -1,7 +1,26 @@
 #=
- 
-This file specifies how to compute aerosol optical properties using the Siewert-NAI2 method
- 
+=====================================================================
+Siewert NAI-2 aerosol optical properties (cross-sections + Greek
+coefficients of the polarized phase matrix).
+=====================================================================
+For a given Mie aerosol size distribution, this file computes:
+
+ 1. Bulk extinction Cₑₓₜ and single-scattering Cₛ cross-sections, and
+    the single-scattering albedo ϖ̃ = Cₛ / Cₑₓₜ.
+ 2. The Greek expansion coefficients α(l), β(l), γ(l), δ(l), ϵ(l),
+    ζ(l) of the polarized scattering matrix in the Hovenier basis. β is
+    the same as the scalar Legendre expansion of the phase function;
+    α…ζ together encode the full 4×4 Mueller matrix.
+ 3. The δ-M truncation factor fᵗ when a δBGE-style truncation is
+    requested (otherwise fᵗ = 0). With NoTruncation(), the raw
+    coefficients are returned as-is.
+
+NAI-2 = "Numerical Algorithm for Inelastic-2" in Siewert's notation.
+The companion `compute_PCW.jl` uses precomputed Wigner symbol tables
+for the Greek expansion — same physics, different numerical strategy.
+
+Reference: Siewert (1982) ApJ 245, 357; (2000a) JQSRT 64, 109.
+=====================================================================
 =#
 
 @doc raw"""

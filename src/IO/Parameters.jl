@@ -674,16 +674,98 @@ end
 """
     _safe_parse_number(s) -> Float64
 
-Parse a numeric expression that may contain division, e.g. "1e7/775".
-Supports integers, floats, scientific notation, and a single `/` operator.
+Parse a numeric expression without `eval`. Supports integers, floats,
+scientific notation, parentheses, unary `+`/`-`, and the four
+arithmetic operators `+ - * /` with conventional precedence. Only
+numeric literals are allowed — no identifiers, no function calls.
+
+Examples:
+- `"1e7/775"`
+- `"(1e7/785)-250."` (subtraction after division — common in SIF grids)
+- `"((1e7/777.5)-250.)*1.0"`
 """
 function _safe_parse_number(s::AbstractString)
     s = strip(s)
-    if occursin('/', s)
-        parts = split(s, '/'; limit=2)
-        return parse(Float64, strip(parts[1])) / parse(Float64, strip(parts[2]))
-    else
-        return parse(Float64, s)
+    isempty(s) && throw(ArgumentError("_safe_parse_number: empty input"))
+    return _expr_eval_pos!(Ref(1), s)
+end
+
+# Tiny recursive-descent evaluator for `+ - * /` over numeric literals
+# and parenthesized sub-expressions. Position is threaded via a Ref.
+function _expr_eval_pos!(pos::Ref{Int}, s::AbstractString)
+    val = _expr_term!(pos, s)
+    while pos[] <= ncodeunits(s)
+        c = s[pos[]]
+        if c == '+' || c == '-'
+            pos[] = nextind(s, pos[])
+            rhs = _expr_term!(pos, s)
+            val = c == '+' ? val + rhs : val - rhs
+        else
+            break
+        end
+        _expr_skip_ws!(pos, s)
+    end
+    return val
+end
+
+function _expr_term!(pos::Ref{Int}, s::AbstractString)
+    val = _expr_factor!(pos, s)
+    while pos[] <= ncodeunits(s)
+        c = s[pos[]]
+        if c == '*' || c == '/'
+            pos[] = nextind(s, pos[])
+            rhs = _expr_factor!(pos, s)
+            val = c == '*' ? val * rhs : val / rhs
+        else
+            break
+        end
+        _expr_skip_ws!(pos, s)
+    end
+    return val
+end
+
+function _expr_factor!(pos::Ref{Int}, s::AbstractString)
+    _expr_skip_ws!(pos, s)
+    pos[] <= ncodeunits(s) || throw(ArgumentError("_safe_parse_number: unexpected end at pos $(pos[]) in `$(s)`"))
+    c = s[pos[]]
+    # Unary +/-
+    if c == '+' || c == '-'
+        pos[] = nextind(s, pos[])
+        v = _expr_factor!(pos, s)
+        return c == '+' ? v : -v
+    end
+    # Parenthesized sub-expression
+    if c == '('
+        pos[] = nextind(s, pos[])
+        v = _expr_eval_pos!(pos, s)
+        _expr_skip_ws!(pos, s)
+        (pos[] <= ncodeunits(s) && s[pos[]] == ')') ||
+            throw(ArgumentError("_safe_parse_number: missing `)` near pos $(pos[]) in `$(s)`"))
+        pos[] = nextind(s, pos[])
+        _expr_skip_ws!(pos, s)
+        return v
+    end
+    # Numeric literal: digits, dot, optional exponent (e±N)
+    start = pos[]
+    while pos[] <= ncodeunits(s)
+        ch = s[pos[]]
+        if isdigit(ch) || ch == '.' || ch == 'e' || ch == 'E' ||
+           ((ch == '+' || ch == '-') && pos[] > start &&
+              (s[prevind(s, pos[])] == 'e' || s[prevind(s, pos[])] == 'E'))
+            pos[] = nextind(s, pos[])
+        else
+            break
+        end
+    end
+    start == pos[] && throw(ArgumentError("_safe_parse_number: expected number at pos $start in `$(s)`"))
+    tok = s[start:prevind(s, pos[])]
+    _expr_skip_ws!(pos, s)
+    return parse(Float64, tok)
+end
+
+@inline function _expr_skip_ws!(pos::Ref{Int}, s::AbstractString)
+    while pos[] <= ncodeunits(s) && isspace(s[pos[]])
+        pos[] = nextind(s, pos[])
     end
 end
 
@@ -741,14 +823,15 @@ function _safe_parse_spec_band(s::AbstractString)
     push!(range_parts, String(take!(buf)))
 
     local vals::Vector{Float64}
+    # `_safe_parse_number` is paren-aware now — pass each range part as-is.
     if length(range_parts) == 3
-        start = _safe_parse_number(strip(range_parts[1], ['(', ')']))
-        step  = _safe_parse_number(strip(range_parts[2], ['(', ')']))
-        stop  = _safe_parse_number(strip(range_parts[3], ['(', ')']))
+        start = _safe_parse_number(range_parts[1])
+        step  = _safe_parse_number(range_parts[2])
+        stop  = _safe_parse_number(range_parts[3])
         vals = collect(start:step:stop)
     elseif length(range_parts) == 2
-        start = _safe_parse_number(strip(range_parts[1], ['(', ')']))
-        stop  = _safe_parse_number(strip(range_parts[2], ['(', ')']))
+        start = _safe_parse_number(range_parts[1])
+        stop  = _safe_parse_number(range_parts[2])
         vals = collect(start:stop)
     else
         vals = [_safe_parse_number(s)]

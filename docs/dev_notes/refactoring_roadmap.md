@@ -60,21 +60,20 @@ loop structure — needs careful benchmarking before merging.
 
 ---
 
-## 3. `compute_Z_moments` overload pair
+## 3. `compute_Z_moments` overload pair *(consolidated in v2.1.0)*
 
-**Location**: `src/Scattering/compute_Z_matrices.jl`, two near-duplicate
-overloads (lines 1–89 and 95–218).  The second adds μ₀ direct-beam
-handling on top of the first; ~80% of the A-matrix assembly loop is
-copied verbatim.
+**Was**: `src/Scattering/compute_Z_matrices.jl` had two near-duplicate
+overloads — the 4-arg `(mod, μ, μ₀, greek_coefs, m)` variant added a
+μ₀ direct-beam projection branch on top of the 3-arg
+`(mod, μ, greek_coefs, m)` form, but the entire μ₀-loop was already
+commented out (the v0.6 source-term refactor took it over via
+`prepare_source` / `contribute!`). About 100 lines of dead code.
 
-**What a future PR would do.**  Factor out a private
-`assemble_A_matrices!(A⁺⁺, A⁻⁺, μ_set, 𝐁_all, l_range)` helper; call it
-once with the quadrature `μ` set, optionally a second time with `[μ₀]`
-gated by an `include_direct=false` keyword.
-
-**Why deferred.**  Small, low-risk pilot — would make a good
-"refactor practice" PR, but didn't fit the v2.1 scope freeze.  Pick this
-one first when starting on item 1.
+**Fix landed in v2.1.0**: the 4-arg variant now delegates to the
+3-arg one. If a future SS path needs the per-μ₀ projection, factor
+out a private `assemble_A_matrices!(A⁺⁺, A⁻⁺, μ_set, 𝐁_all, l_range)`
+helper and call it once with `μ`, optionally again with `[μ₀]`. For
+now the 4-arg signature is preserved as a back-compat thin wrapper.
 
 ---
 
