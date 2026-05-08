@@ -146,11 +146,11 @@ This module enables scattering phase-function calculation of atmospheric aerosol
 
 vSmartMOM.jl is a growing package and thus feedback from users like you are highly appreciated. To report bugs or suggest new features in vSmartMOM.jl, please create GitHub [Issues](https://github.com/RemoteSensingTools/vSmartMOM.jl/issues). To contribute to the package, please feel free to create a [Pull Request](https://github.com/RemoteSensingTools/vSmartMOM.jl/pulls). 
 
-If you have any questions about the methods used or would like to chat with us, please feel free to shoot us an email <a href="mailto:cfranken@caltech.edu,wennberg@gps.caltech.edu,suniti.sanghavi@gmail.com?cc=rjeyaram@caltech.edu">here</a>. 
+If you have any questions about the methods used or would like to chat with us, please feel free to shoot us an email <a href="mailto:suniti.sanghavi@gmail.com,cfranken@caltech.edu">here</a>. 
 
 ## Acknowledgements
 
-This project is being developed at Caltech/JPL and largely based on papers and ideas by Suniti Sanghavi from NASA/JPL, with initial support from the Schmidt Academy for Software Engineering (SASE).
+This project is being developed at Caltech/JPL and largely based on work by Suniti Sanghavi from NASA/JPL, with initial support from the Schmidt Academy for Software Engineering (SASE) for the first refactor into Julia.
 
 ## Copyright Notice
 
