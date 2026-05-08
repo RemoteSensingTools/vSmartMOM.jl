@@ -1,6 +1,13 @@
 # Changelog
 
-## Unreleased — v0.7 / Fourier-Stream Resolution refactor
+## v2.1.0 — Fourier-stream resolution + source-term refactor
+
+Additive minor release over v2.0.0. Highlights: first-class `AbstractSource`
+type vocabulary (`SolarBeam`, `BlackbodySource`, `SurfaceSIF`); user-facing
+`nstreams` / `truncation: auto` Fourier-resolution schema; per-model BLAS
+thread cap; VLIDORT 2.8.3 baseline validation suite (Siewert 2000 Problem IIA,
+solar_tester scalar/vector). All v2.0.0 YAMLs run byte-equal — `max_m` /
+`l_trunc` keep working through the legacy parser branch.
 
 ### New user-facing schema (Phase D)
 

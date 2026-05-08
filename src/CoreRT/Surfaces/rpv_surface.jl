@@ -1,7 +1,38 @@
 #=
+============================================================================
+RPV (Rahman–Pinty–Verstraete) BRDF surface
+============================================================================
 
-This file specifies how to create surface layers, given the surface type, and related info
+A semi-empirical bidirectional reflectance for vegetated and bare-soil
+canopies (Rahman, Pinty & Verstraete, JGR 1993).  The full BRDF is the
+product of four physically-named factors:
 
+    ρ(μᵢ, μᵣ, Δϕ) =  ρ₀ · M(μᵢ, μᵣ, k) · F(Θ, cos g) · H(ρ_c, G)
+                     ↑     ↑               ↑            ↑
+                     |     |               |            |
+                     |     Minnaert        Henyey-      "bowl-shape"
+                     overall   limb-       Greenstein   geometric
+                     amplitude darkening   hot-spot     correction
+
+Geometric quantities (computed in `reflectance(::rpvSurfaceScalar, …)`):
+    θᵢ = acos(μᵢ),   θᵣ = acos(μᵣ)        viewing/illumination polar angles
+    cos g = -μᵢμᵣ + sin θᵢ sin θᵣ cos Δϕ   scattering (phase) angle
+    G = √(tan²θᵢ + tan²θᵣ + 2 tanθᵢ tanθᵣ cosΔϕ)   geometric scale
+
+Free parameters (in `rpvSurfaceScalar`):
+    ρ₀    overall albedo                 ρ_c    bowl-shape amplitude
+    k     Minnaert exponent              Θ     hot-spot width
+
+`reflectance(rpv, μ, m)` does the azimuthal Fourier integral over Δϕ to
+get the m-th moment used in the adding-doubling solver; the generic
+`reflectance(::AbstractSurfaceType, pol_type, μ, m)` below performs the
+same Gauss-Legendre quadrature for any analytic BRDF.
+
+Polarized RT: only the I → I block is non-zero (RPV is a scalar model),
+so for n_stokes > 1 the function returns 0 in the off-diagonal Stokes
+slots.  See `rossli_surface.jl` and `coxmunk_surface.jl` for the
+polarization-aware analogues.
+============================================================================
 =#
 
 """

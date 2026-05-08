@@ -1,7 +1,32 @@
 #=
- 
-This file contains RT elemental-related functions
- 
+============================================================================
+Elemental layer  (1/3 of the CoreKernel adding-doubling solver)
+============================================================================
+
+For a single thin homogeneous slab of optical thickness dτ this builds the
+single-scattering reflection / transmission / source operators
+
+    r⁻⁺ = (ϖ / 4μ) · Z⁻⁺ · dτ                  reflection (single-scatter)
+    t⁺⁺ = I − [(I − ϖ·Z⁺⁺/4μ) · dτ]            transmission (1 − ext)
+    j₀± = (ϖ · Z(μ, μ₀) / 4μ) · F₀ · e^(-τ̄/μ₀) solar source vectors (SFI)
+
+where ϖ is the single-scattering albedo, Z± are the phase-matrix moments
+assembled from the Fourier-decomposed Greek coefficients (see
+`Scattering/compute_Z_matrices.jl`), μ₀ is the cosine of the solar zenith,
+and F₀ is the incident solar flux.  The D-matrix symmetry relation is then
+applied to recover `r⁺⁻` and `t⁻⁻` from `r⁻⁺` and `t⁺⁺`.
+
+The slab is intentionally thin (≪ 1 mean free path); doubling repeatedly
+combines two such slabs into one of double the thickness, and interaction
+glues the resulting homogeneous layers together with the layer above /
+below.  The trio is therefore:
+
+    elemental!  →  doubling!  →  interaction!  (top → bottom of column)
+
+Numerically stable for arbitrary absorption (Fell 1997, Eqs. 1.52–1.56).
+Sanghavi et al. 2014, JQSRT 133:412–433, §3 gives the vector formulation
+used here.  GPU kernels are dispatched through KernelAbstractions.
+============================================================================
 =#
 
 """

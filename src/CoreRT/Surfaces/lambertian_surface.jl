@@ -1,7 +1,28 @@
 #=
+============================================================================
+Lambertian (isotropic) surface BRDF
+============================================================================
 
-This file specifies how to create surface layers, given the surface type, and related info
+A Lambertian surface scatters incident flux equally in every outgoing
+direction.  Its bidirectional reflectance is constant:
 
+    ρ(μᵢ, μᵣ, Δϕ)  =  a / π
+
+where `a` ∈ [0, 1] is the spectrally-varying albedo.  Because the BRDF has
+no angular structure, only the m = 0 Fourier moment is non-zero — the
+`m > 0` branch sets the surface added-layer to identity / zero.  The
+factor of 2 in `ρ = 2·a` here is the `1/π · 2π` from converting the
+hemispheric flux `a` to a Lambertian radiance × azimuthal-weight
+compensation (the same trick is used in `inject_surface_SIF!` below).
+
+Three flavours share the same equation:
+  • `LambertianSurfaceScalar`    — single-band scalar albedo
+  • `LambertianSurfaceLegendre`  — albedo = Σ cₙ · Pₙ(λ̃) (spectral)
+  • `LambertianSurfaceSpline`    — albedo from a spline interpolator
+
+Each fills `added_layer.r⁻⁺ = a/π · μ_quad·w_quad`, leaves `r⁺⁻ = 0`, and
+sets `t⁺⁺ = t⁻⁻ = I` (the surface itself does not transmit).
+============================================================================
 =#
 
 """

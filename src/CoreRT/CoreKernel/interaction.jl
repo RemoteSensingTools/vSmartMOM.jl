@@ -1,7 +1,32 @@
 #=
- 
-This file contains RT interaction-related functions
- 
+============================================================================
+Interaction  (3/3 of the CoreKernel adding-doubling solver)
+============================================================================
+
+Combines the *composite* layer accumulated above (R, T, J — uppercase) with
+the freshly *added* homogeneous layer below (r, t, j — lowercase) using the
+matrix-operator-method adding equations (Sanghavi et al. 2014, JQSRT
+133:412–433, Eqs. 23–28):
+
+    G    = (E − r⁻⁺ · R⁺⁻)⁻¹                  geometric-series factor
+    R'⁻⁺ = R⁻⁺ + T⁻⁻ · G · r⁻⁺ · T⁺⁺
+    T'⁺⁺ = t⁺⁺ · G · T⁺⁺
+    J'₀± = J₀± + T · G · (r · J₀∓ + j₀±)      source cascade
+
+Called once per atmospheric layer as the column is assembled top-to-bottom.
+The `R⁺⁻ / T⁻⁻` half is recovered by D-matrix symmetry (vector case) or
+direct copy (scalar case).
+
+Four `ScatteringInterface_{ab}` traits dispatch to specialized kernels:
+`_00` (neither layer scatters; Beer-law product, no inverse), `_01` /
+`_10` (only one side scatters; one of r and R⁺⁻ is zero, no inverse), and
+`_11` (both scatter; full adding equations).  This trait-dispatch pattern
+keeps every branch of the algorithm in its own type-stable method instead
+of an `if`-tree inside one large function.
+
+See `elemental.jl` and `doubling.jl` for the upstream layer construction,
+and `docs/src/pages/concepts/04_mom_solver.md` for the prose walkthrough.
+============================================================================
 =#
 
 """
