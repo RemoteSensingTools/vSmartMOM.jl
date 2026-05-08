@@ -63,7 +63,7 @@ function constructCoreOpticalProperties(RS_type, iBand, m, model, lin_model) #wh
     band_layer_props_lin = [];
     band_fScattRayleigh  = [];
     for iB in iBand
-        if (typeof(RS_type)<:noRS) #!(typeof(RS_type)<:Union{RRS,RRS_plus})
+        if (typeof(RS_type)<:noRS) #!(typeof(RS_type)<:RRS)
             Rayl𝐙⁺⁺, Rayl𝐙⁻⁺ = Scattering.compute_Z_moments(pol_type, μ, 
                                                             greek_rayleigh[iB], m, 
                                                             arr_type = arr_type);
@@ -76,7 +76,7 @@ function constructCoreOpticalProperties(RS_type, iBand, m, model, lin_model) #wh
             #                                                arr_type = arr_type);
         end
 
-        #if (typeof(RS_type)<:noRS) #if !(typeof(RS_type)<:Union{RRS,RRS_plus})
+        #if (typeof(RS_type)<:noRS) #if !(typeof(RS_type)<:RRS)
         CoreScatteringOpticalProperties(arr_type(τ_rayl[iB][:,1]), FT(1.0), 
                 (Rayl𝐙⁺⁺), (Rayl𝐙⁻⁺))
 

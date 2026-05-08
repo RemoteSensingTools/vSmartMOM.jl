@@ -215,42 +215,6 @@ end
 
 
 """
-    struct RRS_plus{FT<:AbstractFloat}
-A struct which defines Rotational Raman Scattering parameters for the concatenated mode of vSmartMOM
-# Fields
-$(DocStringExtensions.FIELDS)
-"""
-Base.@kwdef mutable struct RRS_plus{FT<:AbstractFloat} <: AbstractRamanType 
-
-    "Concatenated indices of band limits"
-    bandSpecLim = Array{UnitRange{Int64},1}
-    iBand::Array{Int,1} = [1]
-    grid_in::Array{StepRangeLen{FT},1} 
-
-    "Molecular Constants for N2"
-    n2::InelasticScattering.MolecularConstants{Float64}
-    "Molecular Constants for O2"
-    o2::InelasticScattering.MolecularConstants{Float64}
-    "Greek coeffs in Raman calculations" 
-    greek_raman::GreekCoefs
-    "Pre-computed optical properties"
-    # ramanAtmoProp::RamanAtmosphereProperties
-    #values for each band
-    fscattRayl#::Array{FT,1}
-    ϖ_Cabannes::Array{FT,1} #elastic fraction (Cabannes) of Rayleigh (Cabannes+Raman) scattering
-    
-    ϖ_λ₁λ₀::Array{FT,2} #last index represents the band iB
-    i_λ₁λ₀::Array{Int,2} #last index represents the band iB
-
-    Z⁻⁺_λ₁λ₀::Array{FT,2}
-    Z⁺⁺_λ₁λ₀::Array{FT,2}
-    i_ref::Int
-    n_Raman::Int
-    F₀::Array{FT,2} # Solar/Stellar irradiation Stokes vector of size (pol_type.n, nSpec)
-    SIF₀::Array{FT,2} # Solar/Stellar irradiation Stokes vector of size (pol_type.n, nSpec)
-end
-
-"""
     struct RRS{FT<:AbstractFloat}
 A struct which defines Rotational Raman Scattering parameters
 # Fields
@@ -528,41 +492,6 @@ end
 
 
 """
-    struct RRS_plus{FT<:AbstractFloat}
-A struct which defines Rotational Raman Scattering parameters for the concatenated mode of vSmartMOM
-# Fields
-$(DocStringExtensions.FIELDS)
-"""
-#=Base.@kwdef mutable struct RRS_plus{FT<:AbstractFloat} <: AbstractRamanType 
-
-    "Concatenated indices of band limits"
-    bandSpecLim = Array{UnitRange{Int64},1}
-    iBand::Array{Int,1} = [1]
-    grid_in::Array{StepRangeLen{FT},1} 
-
-    "Molecular Constants for H2"
-    h2::InelasticScattering.MolecularConstants{Float64}
-    
-    "Greek coeffs in Raman calculations" 
-    greek_raman::GreekCoefs
-    "Pre-computed optical properties"
-    # ramanAtmoProp::RamanAtmosphereProperties
-    #values for each band
-    fscattRayl#::Array{FT,1}
-    ϖ_Cabannes::Array{FT,1} #elastic fraction (Cabannes) of Rayleigh (Cabannes+Raman) scattering
-    
-    ϖ_λ₁λ₀::Array{FT,2} #last index represents the band iB
-    i_λ₁λ₀::Array{Int,2} #last index represents the band iB
-
-    Z⁻⁺_λ₁λ₀::Array{FT,2}
-    Z⁺⁺_λ₁λ₀::Array{FT,2}
-    i_ref::Int
-    n_Raman::Int
-    F₀::Array{FT,2} # Solar/Stellar irradiation Stokes vector of size (pol_type.n, nSpec)
-    #SIF₀::Array{FT,2} # Solar/Stellar irradiation Stokes vector of size (pol_type.n, nSpec)
-end
-=#
-"""
     struct RRS{FT<:AbstractFloat}
 A struct which defines Rotational Raman Scattering parameters
 # Fields
@@ -693,7 +622,7 @@ left unchanged.
 """
 normalize_raman_weights!(::AbstractRamanType, model, iBand) = nothing
 
-function normalize_raman_weights!(rs::Union{RRS, RRS_plus}, model, iBand)
+function normalize_raman_weights!(rs::RRS, model, iBand)
     iB = iBand[1]
     rs.ϖ_λ₁λ₀ .*= (1 - model.ϖ_Cabannes[iB]) / sum(rs.ϖ_λ₁λ₀)
     return nothing

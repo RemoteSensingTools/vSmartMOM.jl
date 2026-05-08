@@ -20,7 +20,7 @@ function getKernelDimSFI(RS_type::Union{VS_0to1, VS_1to0},ieJ₀⁻)
 end
 
 "Elemental single-scattering layer for RRS"
-function elemental_inelastic!(RS_type::Union{RRS, RRS_plus},
+function elemental_inelastic!(RS_type::RRS,
                             pol_type, SFI::Bool,
                             τ_sum::AbstractArray{FT,1},
                             dτ_λ::AbstractArray{FT,1},  # dτ_λ: total optical depth of elemental layer (per λ)
@@ -707,7 +707,7 @@ upwelling `U/V` source entries in place.
 end
 
 
-function apply_D_matrix_elemental!(RS_type::Union{RRS, RRS_plus}, ndoubl::Int, n_stokes::Int,
+function apply_D_matrix_elemental!(RS_type::RRS, ndoubl::Int, n_stokes::Int,
                                     ier⁻⁺::AbstractArray{FT,4},
                                     iet⁺⁺::AbstractArray{FT,4},
                                     ier⁺⁻::AbstractArray{FT,4},
@@ -748,7 +748,7 @@ function apply_D_matrix_elemental!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
     return nothing
 end
 
-function apply_D_matrix_elemental_SFI!(RS_type::Union{RRS, RRS_plus},
+function apply_D_matrix_elemental_SFI!(RS_type::RRS,
         ndoubl::Int, n_stokes::Int, ieJ₀⁻::AbstractArray{FT,4}) where {FT}
     if ndoubl > 1
         return nothing

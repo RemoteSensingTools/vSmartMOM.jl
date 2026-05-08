@@ -74,7 +74,7 @@ function compute_ϖ_Cabannes(RS_type::noRS, depol, λ₀)
 end
 
 #=function compute_ϖ_Cabannes(
-            RS_type::Union{RRS, VS_0to1, VS_1to0, RRS_plus, VS_0to1_plus, VS_1to0_plus}, 
+            RS_type::Union{RRS, VS_0to1, VS_1to0, VS_0to1_plus, VS_1to0_plus},
             depol, λ₀)
     ν₀ = 1e7/λ₀;
 
@@ -87,7 +87,7 @@ end
 =#
 
 function compute_ϖ_Cabannes(
-            RS_type::Union{RRS, RRS_plus}, 
+            RS_type::RRS,
             λ₀)
     ν₀ = 1e7/λ₀;
 
@@ -328,7 +328,7 @@ Compute the effective Rayleigh Greek coefficient `γ` and Rayleigh cross section
 for an air mixture at wavelength `λ₀` in nm.
 """
 # New: γ_air_Rayleigh is computed from the effective Rayleigh depolarization ratios of N₂ and O₂, which are then combined to give the effective depolarization ratio of air. 
-function compute_γ_air_Rayleigh!(λ₀::FT, RS_type::Union{RRS, VS_0to1, VS_1to0, RRS_plus, VS_0to1_plus, VS_1to0_plus}) where FT
+function compute_γ_air_Rayleigh!(λ₀::FT, RS_type::Union{RRS, VS_0to1, VS_1to0, VS_0to1_plus, VS_1to0_plus}) where FT
 
     γN₂ = RS_type.n2.effCoeff.γ_C_Rayl
     σ0N₂ = RS_type.n2.effCoeff.σ_Rayl_coeff
@@ -356,7 +356,7 @@ Compute the effective Cabannes Greek coefficient `γ` and elastic Cabannes
 fraction for an air mixture at wavelength `λ₀` in nm.
 """
 # New: γ_air_Cabannes is computed by assuming the same form of the scattering equation (Is = σ*((1+2γ)/(3-4γ))*P*Ii*dz, see Eq.14 of Sanghavi(2022) for exact form) as for Rayleigh scattering      
-function compute_γ_air_Cabannes!(λ₀::FT, RS_type::Union{RRS, VS_0to1, VS_1to0, RRS_plus, VS_0to1_plus, VS_1to0_plus}) where FT
+function compute_γ_air_Cabannes!(λ₀::FT, RS_type::Union{RRS, VS_0to1, VS_1to0, VS_0to1_plus, VS_1to0_plus}) where FT
 
     γN₂ = compute_γ_mol_Cabannes!(λ₀, RS_type.n2)[2]
     ϖN₂ = compute_ϖ_Cabannes(λ₀, RS_type.n2)
@@ -623,7 +623,7 @@ function compute_optical_Rayl(λ₀, n2, o2)
     return atmo_σ_Rayl;
 end
 
-function compute_optical_RS!(RS_type::Union{RRS, RRS_plus}, grid_in, λ₀, n2, o2)
+function compute_optical_RS!(RS_type::RRS, grid_in, λ₀, n2, o2)
     #plotly()
     # grid_in is a uniform wavenumber grid covering the entire band spectrum 
     # TMP: grid_in = nm_per_cm/λ₀.+collect(-250:0.002:250) #this is a wavenumber grid
@@ -861,7 +861,7 @@ Return Raman phase-function Greek coefficients for rotational/rovibrational
 Raman scattering in an N₂/O₂ atmosphere.
 """
 # the following applies to both rovibrational and rotational Raman scattering (by both N2 and O2)
-function get_greek_raman(RS_type::Union{RRS, RRS_plus, VS_0to1, VS_0to1_plus, VS_1to0, VS_1to0_plus}, 
+function get_greek_raman(RS_type::Union{RRS, VS_0to1, VS_0to1_plus, VS_1to0, VS_1to0_plus},
                             n2, o2)
     depol = n2.effCoeff.rho_depol_RotRaman
     FT = eltype(depol)
@@ -914,7 +914,7 @@ function compute_Rayl_depol(n2, o2)
 end
 
 
-function computeRamanZλ!(RS_type::Union{RRS_plus,RRS}, pol_type, qp_μ, m, arr_type)
+function computeRamanZλ!(RS_type::RRS, pol_type, qp_μ, m, arr_type)
     RS_type.Z⁺⁺_λ₁λ₀, RS_type.Z⁻⁺_λ₁λ₀ =  Scattering.compute_Z_moments(pol_type, 
                                         qp_μ, 
                                         RS_type.greek_raman, 
@@ -947,6 +947,4 @@ function computeRamanZλ!(RS_type::AbstractRamanType, pol_type, qp_μ, m, arr_ty
                                         arr_type = arr_type);      
     nothing
 end
-
-
 

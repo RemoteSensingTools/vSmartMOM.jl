@@ -249,7 +249,7 @@ Both currently-committed references live at [test/reference/](../test/reference/
 Two fixes landed this session brought unified into near-sanghavi agreement:
 
 1. **`/π` in forward `rt_run` azimuthal weight.** `src/CoreRT/rt_run.jl:183` and `rt_run_multisensor.jl:82` now use `FT(0.5/π)` / `FT(1.0/π)` (was `0.5` / `1.0`). The lin variant already had `/π`. This brings unified's radiance-factor convention into line with sanghavi's. Collateral: [test/test_CoreRT.jl](../test/test_CoreRT.jl) 6SV1 and Natraj comparisons now multiply by `π` to convert radiance factor → 6SV1/Natraj reflectance convention (`R = πL/μ₀` for 6SV1, `R = πL` for Natraj). Both testsets pass at pre-existing tolerances (ε = 0.006 and 0.008 respectively).
-2. **`ϖ_λ₁λ₀ .*= (1 - ϖ_Cabannes)/sum(ϖ_λ₁λ₀)` normalization in forward `rt_run`.** Missing on unified; present on sanghavi at `rt_run.jl:293` (and `:466`). Ported to `src/CoreRT/rt_run.jl` right after `(; ϖ_Cabannes) = RS_type` destructure. Gated on `RS_type <: Union{RRS, RRS_plus}`. Uses `model.ϖ_Cabannes[iBand[1]]` (the physically computed value), not the test-provided `RS_type.ϖ_Cabannes` placeholder.
+2. **`ϖ_λ₁λ₀ .*= (1 - ϖ_Cabannes)/sum(ϖ_λ₁λ₀)` normalization in forward `rt_run`.** Missing on unified; present on sanghavi at `rt_run.jl:293` (and `:466`). Ported to `src/CoreRT/rt_run.jl` right after `(; ϖ_Cabannes) = RS_type` destructure. The live gate is now `RRS` only because the concatenated rotational Raman mode was retired. Uses `model.ϖ_Cabannes[iBand[1]]` (the physically computed value), not the test-provided `RS_type.ϖ_Cabannes` placeholder.
 
 **Post-fix sanghavi cross-check** on identical 103-pt Phase1b_RRS YAML (`q = 0`, Stokes_IQU, Float32, CPU):
 

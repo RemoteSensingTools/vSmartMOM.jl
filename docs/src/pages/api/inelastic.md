@@ -10,7 +10,6 @@ vSmartMOM.InelasticScattering.AbstractRamanType
 vSmartMOM.InelasticScattering.noRS
 vSmartMOM.InelasticScattering.noRS_plus
 vSmartMOM.InelasticScattering.RRS
-vSmartMOM.InelasticScattering.RRS_plus
 vSmartMOM.InelasticScattering.VS_0to1
 vSmartMOM.InelasticScattering.VS_1to0
 vSmartMOM.InelasticScattering.VS_0to1_plus

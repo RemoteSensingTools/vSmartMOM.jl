@@ -25,7 +25,6 @@
 | 63  | `VS_0to1{FT}` | live |
 | 91  | `VS_1to0{FT}` | live |
 | 128 | `noRS{FT}` (mutable) | live |
-| 169 | `RRS_plus{FT}` (mutable) | live |
 | 219 | `VS_0to1_plus{FT}` (mutable) | live, with `= zeros(FT,1,1)` default |
 | 272 | `VS_1to0_plus{FT}` (mutable) | live |
 | 282 | `noRS_plus{FT}` (mutable) | live |
@@ -75,7 +74,6 @@ No `src/` function exists that computes or loads `SIF₀` for an RS-type; the pl
 | 73  | `VS_0to1{FT}` | required |
 | 106 | `VS_1to0{FT}` | required |
 | 150 | `noRS{FT}` (mutable) | `= zeros(Float64, 1, 1)` |
-| 194 | `RRS_plus{FT}` | required |
 | 248 | `VS_0to1_plus{FT}` | required |
 | 305 | `VS_1to0_plus{FT}` | required |
 | 321 | `noRS_plus{FT}` | required |

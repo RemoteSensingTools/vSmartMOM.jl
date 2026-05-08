@@ -51,7 +51,7 @@ module InelasticScattering
     export getRamanSSProp!
     export AbstractRamanType
     export noRS, RRS, VS_0to1, VS_1to0
-    export noRS_plus, RRS_plus, VS_0to1_plus, VS_1to0_plus
+    export noRS_plus, VS_0to1_plus, VS_1to0_plus
     export has_inelastic, uses_cabannes_phase, needs_interaction_workspace,
            needs_rayleigh_expansion, normalize_raman_weights!
 
