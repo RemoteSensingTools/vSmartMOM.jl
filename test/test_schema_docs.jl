@@ -64,6 +64,19 @@ const _VSCODE_EXTENSIONS = joinpath(@__DIR__, "..", ".vscode", "extensions.json"
         @test m !== nothing
     end
 
+    @testset "JSON Schema choice fields expose flat enum completions" begin
+        s = read(_JSON_SCHEMA, String)
+        # yaml-language-server completion works more reliably from flat enum
+        # lists than from oneOf-per-value branches. Keep descriptions via
+        # enumDescriptions so VS Code shows useful choice help.
+        @test match(r"\"polarization_type\":\s*\{[^}]*\"enum\":\s*\[[^\]]*\"Stokes_I\(\)\"[^\]]*\"Stokes_IQ\(\)\"[^\]]*\"Stokes_IQU\(\)\"[^\]]*\"Stokes_IQUV\(\)\""s, s) !== nothing
+        @test match(r"\"polarization_type\":\s*\{[^}]*\"enumDescriptions\""s, s) !== nothing
+        for field in ("quadrature_type", "float_type", "architecture", "broadening", "CEF", "decomp_type")
+            @test match(Regex("\"$field\"\\s*:\\s*\\{[^}]*\"enum\"\\s*:", "s"), s) !== nothing
+            @test match(Regex("\"$field\"\\s*:\\s*\\{[^}]*\"enumDescriptions\"", "s"), s) !== nothing
+        end
+    end
+
     @testset "Taplo wires JSON schema to TOML configs" begin
         @test isfile(_TAPLO_TOML)
         t = read(_TAPLO_TOML, String)
@@ -91,11 +104,11 @@ const _VSCODE_EXTENSIONS = joinpath(@__DIR__, "..", ".vscode", "extensions.json"
         settings = read(_VSCODE_SETTINGS, String)
         extensions = read(_VSCODE_EXTENSIONS, String)
         @test occursin("vsmartmom-parameters.schema.json", settings)
-        @test occursin("config/**/*.yaml", settings)
-        @test occursin("test/test_parameters/**/*.yaml", settings)
-        @test occursin("test/benchmarks/*.yaml", settings)
-        @test occursin("test/vlidort_baseline/configs/**/*.yaml", settings)
-        @test occursin("sandbox/**/*.yaml", settings)
+        @test occursin("/config/**/*.yaml", settings)
+        @test occursin("/test/test_parameters/**/*.yaml", settings)
+        @test occursin("/test/benchmarks/*.yaml", settings)
+        @test occursin("/test/vlidort_baseline/configs/**/*.yaml", settings)
+        @test occursin("/sandbox/**/*.yaml", settings)
         @test !occursin("**/*params*.yaml", settings)
         @test occursin("tamasfe.even-better-toml", extensions)
         @test occursin("redhat.vscode-yaml", extensions)

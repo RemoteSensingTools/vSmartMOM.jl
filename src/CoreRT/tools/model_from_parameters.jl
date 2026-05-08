@@ -24,42 +24,23 @@ user-set explicit truncation (e.g. `NoTruncation()` or a custom δBGE).
 """
     _resolve_auto_truncation(t, params, FT) -> AbstractTruncationType
 
-Phase D — resolve `Scattering.AutoTruncation()` (the `truncation: auto`
-YAML knob) into a concrete `NoTruncation()` for Phase D5. Mirrors
-VLIDORT's `DO_DELTAM_SCALING` philosophy in spirit, but **defers
-the per-band δBGE decision** to a future v0.7.1 follow-up.
+Resolve `Scattering.AutoTruncation()` (the `truncation: auto` YAML
+knob) into a concrete truncation type at model-build time:
 
-Why conservative? Codex review of Phase D2/D3/D4 (commit 45dddbf,
-P1 finding) flagged that an "aerosols ⇒ δBGE(stream_l_cap, Δ)"
-build-time decision crashes `Scattering.truncate_phase` with a
-`BoundsError` whenever the raw aerosol greek series is shorter
-than `stream_l_cap`. Small-particle Mie (μ ≲ 0.3 µm at visible
-wavelengths) commonly produces greek series with length ≪ 25, so
-the naive auto-with-aerosols heuristic was unsafe.
+- **No aerosols** → `NoTruncation()`. Rayleigh has only β₀, β₁, β₂
+  so the phase function fits any `stream_l_cap ≥ 5`.
+- **With aerosols** → `δBGE(stream_l_cap, Δ_angle)`. Mie phase
+  functions can have hundreds of Greek coefficients; the δ-BGE
+  forward-peak fit (Sanghavi & Stephens 2015) keeps the projection
+  tractable. The Mie call sites in `model_from_parameters` guard
+  the `truncate_phase(::δBGE, …)` call with a length check
+  (`length(greek.β) > l_max`) so short phase functions degrade
+  to `NoTruncation()` automatically — no crash on small-particle
+  Mie that produces a series shorter than `stream_l_cap`.
 
-The proper fix is a **two-step resolver**:
-
-1. Compute raw aerosol optics with `NoTruncation()`.
-2. Per-band, inspect `length(greek.β)-1` and pick `NoTruncation()`
-   if it fits `user_l_cap` else `δBGE(user_l_cap, Δ_angle)`.
-3. Re-apply `truncate_phase` per-band.
-
-That restructures `model_from_parameters`'s aerosol loop and is
-slated for v0.7.1. For Phase D5 we ship the conservative
-`auto → NoTruncation()` so:
-
-- Rayleigh-only scenes get the right answer (β has length 3,
-  fits any `stream_l_cap ≥ 5`).
-- Aerosol scenes that already fit get the right answer.
-- Aerosol scenes whose `length(β)-1 > user_l_cap` produce a Phase
-  C trait clamp at the loop level — the loop runs to `user_l_cap`
-  but greek coefficients above that are silently dropped from the
-  projection. Users who want explicit forward-peak handling should
-  set `truncation: "δBGE(L, Δ)"` directly until the two-step
-  resolver lands.
-
-Logs the chosen branch via `@info`. Non-`AutoTruncation` inputs
-pass through unchanged.
+Mirrors VLIDORT's `DO_DELTAM_SCALING` philosophy. Logs the chosen
+branch via `@info`. Non-`AutoTruncation` inputs pass through
+unchanged so users keep full control.
 """
 function _resolve_auto_truncation(t::Scattering.AbstractTruncationType, params, ::Type{FT}) where {FT}
     t isa Scattering.AutoTruncation || return t
@@ -67,12 +48,14 @@ function _resolve_auto_truncation(t::Scattering.AbstractTruncationType, params, 
     has_aerosols = params.scattering_params !== nothing &&
                    !isempty(params.scattering_params.rt_aerosols)
     if has_aerosols
-        @info "truncation: auto → NoTruncation() (Phase D5 conservative; \
-              v0.7.1 will add the post-Mie δBGE decision per-band)"
+        l_cap = params.stream_l_cap > 0 ? params.stream_l_cap : params.l_trunc
+        chosen = Scattering.δBGE{FT}(l_cap, FT(params.Δ_angle))
+        @info "truncation: auto → δBGE(stream_l_cap=$(l_cap), Δ_angle=$(FT(params.Δ_angle))) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)"
+        return chosen
     else
         @info "truncation: auto → NoTruncation() (no aerosols; Rayleigh-only scene)"
+        return Scattering.NoTruncation()
     end
-    return Scattering.NoTruncation()
 end
 
 _has_analytic_phase_function(c_aero::RT_Aerosol) =
@@ -459,17 +442,28 @@ function model_from_parameters(params::vSmartMOM_Parameters;
             k = compute_ref_aerosol_extinction(mie_model,  params.float_type)
             
             #@show k
-            # Compute raw (not truncated) aerosol optical properties (not needed in RT eventually) 
+            # Compute raw (not truncated) aerosol optical properties (not needed in RT eventually)
             @timeit "Mie calc"  aerosol_optics_raw = compute_aerosol_optical_properties(mie_model, FT);
-            # Compute truncated aerosol optical properties (phase function and fᵗ), consistent with Ltrunc:
-            #@show i_aer, i_band
-            aerosol_optics[i_band][i_aer] = Scattering.truncate_phase(truncation_type, 
-                                                    aerosol_optics_raw; reportFit=false)
-            #aerosol_optics[i_band][i_aer] =  aerosol_optics_raw
-            
+            # Compute truncated aerosol optical properties (phase function and fᵗ).
+            # Safety guard: only run δBGE forward-peak truncation when the raw
+            # Greek series is actually longer than the projection cap; otherwise
+            # the phase function already fits and δBGE would crash on a short
+            # series. Mirrors the analytic-phase-function branch above.
+            β_len = length(aerosol_optics_raw.greek_coefs.β)
+            aerosol_optics[i_band][i_aer] =
+                if truncation_type isa Scattering.δBGE && β_len > truncation_type.l_max
+                    Scattering.truncate_phase(truncation_type,
+                                              aerosol_optics_raw; reportFit=false)
+                else
+                    Scattering.truncate_phase(Scattering.NoTruncation(),
+                                              aerosol_optics_raw)
+                end
+
             # Track greek coef length for l_max computation
-            l_max_aer[i_aer, i_band] = min(length(aerosol_optics[i_band][i_aer].greek_coefs.β), 
-                                            truncation_type.l_max)
+            l_max_aer[i_aer, i_band] =
+                truncation_type isa Scattering.δBGE ?
+                    min(length(aerosol_optics[i_band][i_aer].greek_coefs.β), truncation_type.l_max) :
+                    length(aerosol_optics[i_band][i_aer].greek_coefs.β)
 
             #@show aerosol_optics[i_band][i_aer].fᵗ
             # Compute nAer aerosol optical thickness profiles
@@ -734,13 +728,23 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
                                             params.scattering_params.r_max, 
                                             params.scattering_params.nquad_radius)
 
-            # Compute raw (not truncated) aerosol optical properties (not needed in RT eventually) 
+            # Compute raw (not truncated) aerosol optical properties (not needed in RT eventually)
 
             @timeit "Mie calc"  aerosol_optics_raw = compute_aerosol_optical_properties(mie_model, FT2);
 
-            # Compute truncated aerosol optical properties (phase function and fᵗ), consistent with Ltrunc:
-            aerosol_optics[i_band][i_aer] = Scattering.truncate_phase(truncation_type, 
-                                                    aerosol_optics_raw; reportFit=false)
+            # Compute truncated aerosol optical properties (phase function and fᵗ).
+            # Safety guard: only run δBGE forward-peak truncation when the raw
+            # Greek series exceeds the projection cap. See the matching guard in
+            # the forward-model `model_from_parameters` aerosol loop.
+            β_len = length(aerosol_optics_raw.greek_coefs.β)
+            aerosol_optics[i_band][i_aer] =
+                if truncation_type isa Scattering.δBGE && β_len > truncation_type.l_max
+                    Scattering.truncate_phase(truncation_type,
+                                              aerosol_optics_raw; reportFit=false)
+                else
+                    Scattering.truncate_phase(Scattering.NoTruncation(),
+                                              aerosol_optics_raw)
+                end
 
             # Compute nAer aerosol optical thickness profiles
             τ_aer[i_band][i_aer,:] = 

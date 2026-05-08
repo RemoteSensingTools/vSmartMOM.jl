@@ -60,9 +60,11 @@ try
 @testset "Forward/lin m_max parity" begin include("test_lin_forward_loop_parity.jl") end
 
 # Phase C — `component_m_max(c, ctx)` trait dispatch + flag-gated
-# aggregator. Default flag is `false` (bit-equal to Phase B); flipping
-# to `true` will swap Cox-Munk / RossLi / RPV / canopy from
-# silently-half-truncated to their full user_l_cap (Phase C-flip).
+# aggregator. **Default flag is `true`** in v2.1: Cox-Munk / RossLi /
+# RPV / canopy run to their full `user_l_cap`. The flag exists as an
+# escape hatch (`use_component_traits = false`) so the legacy
+# half-truncated aggregator can still be selected for byte-equality
+# regression.
 @testset "Component m_max traits" begin include("test_component_m_max.jl") end
 
 # Phase D — schema-doc invariants. Ensures every top-level YAML/TOML

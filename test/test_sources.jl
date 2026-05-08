@@ -8,7 +8,7 @@
 #          RS_type.F₀ channel — verified bit-equal against the unchanged
 #          default path.
 #
-# Plan:  ~/.claude/plans/gpt-also-had-some-velvety-whale.md
+# Design notes:  docs/src/pages/extending/sources.md
 # =========================================================================
 
 using vSmartMOM, vSmartMOM.CoreRT, vSmartMOM.InelasticScattering

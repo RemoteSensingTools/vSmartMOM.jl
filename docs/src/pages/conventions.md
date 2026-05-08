@@ -50,9 +50,9 @@ generalized spherical functions following de Rooij & van der Stap
 
 with ``α_l, β_l, γ_l, δ_l, ε_l, ζ_l ∈ ℝ`` (per Legendre order ``l``).
 This matches the `GreekCoefs` struct in
-[`src/Scattering/types.jl`](https://github.com/cfranken/vSmartMOM.jl/blob/main/src/Scattering/types.jl)
+[`src/Scattering/types.jl`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/Scattering/types.jl)
 and `construct_B_matrix` in
-[`src/Scattering/mie_helper_functions.jl`](https://github.com/cfranken/vSmartMOM.jl/blob/main/src/Scattering/mie_helper_functions.jl).
+[`src/Scattering/mie_helper_functions.jl`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/Scattering/mie_helper_functions.jl).
 
 The off-diagonal ``γ_l`` couples ``I↔Q`` (and is therefore the dominant
 driver of single-scattering polarization). ``ε_l`` is **anti-symmetric**
@@ -87,7 +87,7 @@ degrees), with:
 ![Azimuth convention](../assets/conventions_azimuth.svg)
 
 The Fourier reconstruction in
-[`src/CoreRT/tools/postprocessing_vza.jl`](https://github.com/cfranken/vSmartMOM.jl/blob/main/src/CoreRT/tools/postprocessing_vza.jl)
+[`src/CoreRT/tools/postprocessing_vza.jl`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/tools/postprocessing_vza.jl)
 weights ``I, Q`` by ``\cos(m \, \Delta\varphi)`` and ``U, V`` by
 ``\sin(m \, \Delta\varphi)`` for each Fourier moment ``m``. This is the
 de Haan–Bosma–Hovenier (1987) convention.
@@ -259,11 +259,11 @@ The `RTModel` `Base.show` summary prints both: `"Nstreams=N, Nquad=M"`.
 
 | Concept | File |
 |---------|------|
-| Hovenier B-matrix construction | [`src/Scattering/mie_helper_functions.jl`](https://github.com/cfranken/vSmartMOM.jl/blob/main/src/Scattering/mie_helper_functions.jl) (`construct_B_matrix`) |
-| Rayleigh γ (Hovenier-positive) | [`src/Scattering/mie_helper_functions.jl`](https://github.com/cfranken/vSmartMOM.jl/blob/main/src/Scattering/mie_helper_functions.jl) (`get_greek_rayleigh`) |
-| Mie coefficient sign (compute_NAI2 f₁₂) | [`src/Scattering/compute_NAI2.jl`](https://github.com/cfranken/vSmartMOM.jl/blob/main/src/Scattering/compute_NAI2.jl) |
-| Azimuth weighting (sin/cos by Stokes) | [`src/CoreRT/tools/postprocessing_vza.jl`](https://github.com/cfranken/vSmartMOM.jl/blob/main/src/CoreRT/tools/postprocessing_vza.jl) |
-| VLIDORT cross-validation (worked example) | [`test/vlidort_baseline/`](https://github.com/cfranken/vSmartMOM.jl/blob/main/test/vlidort_baseline/) |
+| Hovenier B-matrix construction | [`src/Scattering/mie_helper_functions.jl`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/Scattering/mie_helper_functions.jl) (`construct_B_matrix`) |
+| Rayleigh γ (Hovenier-positive) | [`src/Scattering/mie_helper_functions.jl`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/Scattering/mie_helper_functions.jl) (`get_greek_rayleigh`) |
+| Mie coefficient sign (compute_NAI2 f₁₂) | [`src/Scattering/compute_NAI2.jl`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/Scattering/compute_NAI2.jl) |
+| Azimuth weighting (sin/cos by Stokes) | [`src/CoreRT/tools/postprocessing_vza.jl`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/tools/postprocessing_vza.jl) |
+| VLIDORT cross-validation (worked example) | [`test/vlidort_baseline/`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/test/vlidort_baseline/) |
 
 ---
 

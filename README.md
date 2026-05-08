@@ -8,7 +8,11 @@
 </h1>
 
 <div align="center">
-<h4 align="center">An end-to-end modular software suite for vectorized atmospheric radiative transfer calculations, based on the Matrix Operator Method. </h4>
+<h4 align="center">
+  <strong>v</strong>ector <strong>s</strong>imulated <strong>m</strong>easurements of the <strong>a</strong>tmosphere
+  using <strong>r</strong>adiative <strong>t</strong>ransfer based on the <strong>M</strong>atrix <strong>O</strong>perator <strong>M</strong>ethod
+</h4>
+<h4 align="center">An end-to-end modular software suite for vectorized atmospheric radiative transfer calculations, based on the Matrix Operator Method.</h4>
 <h5 align="center">Written in <a href="https://julialang.org">Julia</a>.</h4>
 
 [![version](https://github.com/RemoteSensingTools/vSmartMOM.jl/actions/workflows/AutomatedTests.yml/badge.svg)](https://github.com/RemoteSensingTools/vSmartMOM.jl/actions/workflows/AutomatedTests.yml/)

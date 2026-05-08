@@ -134,21 +134,18 @@ churn twice.
 
 ---
 
-## 7. `sandbox/` 79 MB of tracked content
+## 7. `sandbox/` large data files *(fixed in v2.1.0)*
 
-**Files**: `sandbox/rami/RAMI4ATM_experiments_v1.0.json` (46 MB),
-`sandbox/rami/ref_kurucz_2006.nc` (41 MB), plus `*.f90`, `.png`s, and
-prototype `.jl` scripts (≈ 35 MB total).  Every `git clone` pulls all of
-this.
+**Was**: `sandbox/rami/RAMI4ATM_experiments_v1.0.json` (46 MB) and
+`sandbox/rami/ref_kurucz_2006.nc` (40 MB) were tracked, bloating
+every `git clone` by ~85 MB.
 
-**What a future PR would do.**  Move the two large data files to the
-same artifact / scratch-cache pattern used for HITRAN
-(`src/Artifacts/artifact_helper.jl`), or to git-lfs.  Keep the
-prototype `.jl` and `.f90` files in tree (they're small and useful for
-reference).
-
-**Why deferred.**  User explicitly chose to leave `sandbox/` alone for
-v2.1.  Likely fits a v2.2 hygiene PR.
+**Fix landed in v2.1.0**: both files are now `git rm --cached` and
+listed in `.gitignore`. A new
+[`sandbox/rami/DATA_FILES.md`](../../sandbox/rami/DATA_FILES.md)
+documents where to fetch them locally so the prototype `rami_*.jl`
+scripts still resolve.  Smaller `.png` figures and prototype scripts
+remain in tree (a few MB total — useful as reference).
 
 ---
 
@@ -171,7 +168,35 @@ that touches these files).
 
 ---
 
-## 9. Linearized Mie Jacobian column-count bug
+## 9. `truncation: auto` fit-aware resolver *(fixed in v2.1.0)*
+
+**Location**: `src/CoreRT/tools/model_from_parameters.jl::_resolve_auto_truncation`.
+
+**Was**: `truncation: auto` resolved to `NoTruncation()`
+unconditionally; the originally-promised VLIDORT-`DO_DELTAM_SCALING`-
+style fit-aware decision was deferred because picking
+`δBGE(stream_l_cap, Δ_angle)` at model-build time crashed
+`Scattering.truncate_phase` with a `BoundsError` whenever the raw
+aerosol Greek series was shorter than `stream_l_cap` (small-particle
+Mie at visible wavelengths commonly produces ≪ 25 Greek coeffs).
+
+**Fix landed in v2.1.0**: the resolver now picks
+`δBGE(stream_l_cap, Δ_angle)` whenever any aerosol is configured,
+and the two `truncate_phase` call sites in `model_from_parameters`
+guard the `δBGE` branch with `length(greek.β) > truncation_type.l_max`.
+If the raw phase already fits the cap, `truncate_phase(NoTruncation(), …)`
+runs instead — so the static-time `δBGE` pick can no longer crash
+the build. Mirrors the analytic-phase-function branch and the
+linearized model-build path that already had this guard.
+
+The IO docs (`docs/src/pages/IO/Schema/radiative_transfer.md`),
+`CHANGELOG.md`, and the JSON Schema have been updated to match the
+new behaviour: `auto` now does the right thing per-band without a
+config change from the user.
+
+---
+
+## 10. Linearized Mie Jacobian column-count bug *(fixed in v2.1.0)*
 
 **Location**: `src/CoreRT/LayerOpticalProperties/compEffectiveLayerProperties_lin.jl`
 around lines 322-330.
@@ -188,26 +213,19 @@ end
 ```
 
 The 7-column matrix is sized for the 7-parameter aerosol layout
-(`[τ_ref, nᵣ, nᵢ, rₘ, σᵣ, p₀, σp]`) but the loop assumes `ḟᵗ_vec`
-length 4 (Mie-only).  Under the v0.7 migration of `JacobianTestFast.yaml`
-(legacy `max_m=3, l_trunc=5, Δ_angle=2.0` → `nstreams=3, truncation: auto`)
-the docs build's `_jacobian_aod_plot` triggers a `BoundsError` here.
+(`[τ_ref, nᵣ, nᵢ, rₘ, σᵣ, p₀, σp]`) but the loop assumed `ḟᵗ_vec`
+length 4 (Mie-only).  Under the v0.7 migration of
+`JacobianTestFast.yaml` (legacy `max_m=3, l_trunc=5, Δ_angle=2.0`
+→ `nstreams=3, truncation: auto`) the docs build's
+`_jacobian_aod_plot` triggered a `BoundsError` here.
 
-**Tactical workaround in v2.1**: `test/test_parameters/JacobianTestFast.yaml`
-was held back on the legacy schema — the only one of 48 fixtures not
-migrated.  All other Jacobian regression tests pass on the migrated
-fixtures.
-
-**What a future PR would do.**  Replace the hard-coded `2:5` and `1+k`
-with the actual Mie-derivative column indices (probably `2:size(ḟᵗ_vec,1)+1`
-clamped to the matrix width, plus an `@assert` that the input length
-matches `ParameterLayout`'s expectation).  Then re-migrate
-`JacobianTestFast.yaml` to v0.7.
-
-**Why deferred.**  The fix touches the analytic-Jacobian construction
-path; needs Jacobian regression validation across every YAML in
-`test/test_parameters/` to confirm no numerical drift.  Out of scope
-for v2.1's "quick wins" release.
+**Fix landed in v2.1.0**: introduced the helper
+`_lift_mie_param_to_n_x_4(x, n, arr_type)` that normalises ω̃̇ and
+ḟᵗ from any of `{scalar, (nparams,), (nparams, 1), (nparams, n_spec)}`
+into a uniform `(n_spec, 4)` block.  `createAero` now writes
+columns 2:5 of the 7-parameter layout uniformly without an
+ndims-dependent branch, and `JacobianTestFast.yaml` was migrated to
+v0.7 alongside the other 47 fixtures.
 
 ---
 
@@ -220,7 +238,30 @@ So the next person doesn't redo these:
 - Dropped dead `using UnicodePlots` from `src/vSmartMOM.jl`,
   `src/CoreRT/CoreRT.jl`; removed `UnicodePlots`, `OrderedCollections`
   from `Project.toml` (Aqua was about to flag them)
-- Migrated `config/quickstart.yaml` to v0.7 schema (`nstreams: 3`,
-  `truncation: NoTruncation()`)
-- README: added forward + Jacobian copy-paste snippets
+- **All 48 in-tree YAMLs migrated to v0.7 schema**
+  (`nstreams` + `truncation: auto`); legacy parser branch retained
+  for tactical reuse but no example YAML uses it
+- README + docs landing page: acronym expansion (Vector Simulated
+  Measurements of the Atmosphere using Radiative Transfer based on
+  the Matrix Operator Method), forward + Jacobian copy-paste snippets
 - CoreKernel + Lambertian/RPV physics-tour comment headers
+- `Δ_angle` is now optional (defaults to `0.0`) in parser + JSON
+  Schema + radiative_transfer.md
+- 21 previously orphan exported v0.6 source-term and v0.7 truncation
+  types wired into `@docs` blocks (Documenter `checkdocs = :exports`
+  is now clean)
+- Removed tracked local artifacts (`.codex`, `.mcp.json`,
+  `nohup.out`); scrubbed `~/.claude/plans/...` references from
+  `src/`, `test/test_sources.jl`, and `docs/src/`
+- All `cfranken/vSmartMOM.jl` doc URLs corrected to
+  `RemoteSensingTools/vSmartMOM.jl`; broken
+  `dev_notes/hitran_artifacts.md` link redirected to the
+  HITRAN_Data manual page
+- Linearized Mie Jacobian shape stability fix (item 10 above) so
+  v0.7 schema works on the docs build's `_jacobian_aod_plot`
+- Raman GPU kwarg-mismatch fix in `rt_kernel.jl`: RRS / VS / *_plus
+  variants now accept and use `dτ_max_threshold` / `dτ_min_floor`
+  kwargs that the rt_run dispatcher always passes
+- `truncation: auto` documented honestly across CHANGELOG, schema,
+  and IO docs as "conservative in v2.1, NoTruncation() unconditionally"
+  with a forward pointer to item 9 above

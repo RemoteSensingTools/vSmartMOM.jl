@@ -331,11 +331,15 @@ end
 
 
 function rt_kernel!(RS_type::Union{RRS{FT}, VS_0to1{FT}, VS_1to0{FT}}, pol_type, SFI, added_layer, composite_layer, computed_layer_properties::CoreScatteringOpticalProperties, scattering_interface, τ_sum, m, quad_points, I_static, architecture, qp_μN, iz;
-                    workspace::Union{InteractionWorkspace, Nothing}=nothing)  where {FT}
+                    workspace::Union{InteractionWorkspace, Nothing}=nothing,
+                    dτ_max_threshold::Union{Nothing,Real} = nothing,
+                    dτ_min_floor::Union{Nothing,Real} = nothing)  where {FT}
     (; qp_μ, μ₀) = quad_points
     # Just unpack core optical properties from
     (; τ, ϖ, Z⁺⁺, Z⁻⁺) = computed_layer_properties
-    dτ_max = minimum([maximum(τ .* ϖ), FT(0.001) * minimum(qp_μ)])
+    threshold = FT(dτ_max_threshold === nothing ? 0.001 : dτ_max_threshold)
+    floor_val = FT(dτ_min_floor === nothing ? 1024 * eps(FT) : dτ_min_floor)
+    dτ_max = max(floor_val, minimum([maximum(τ .* ϖ), threshold * minimum(qp_μ)]))
     _, ndoubl = doubling_number(dτ_max, maximum(τ .* ϖ))
     scatter = true # edit later
     arr_type = array_type(architecture)
@@ -377,12 +381,15 @@ function rt_kernel!(
             scattering_interface,
             τ_sum, m, quad_points,
             I_static, architecture, qp_μN, iz;
-            workspace::Union{InteractionWorkspace, Nothing}=nothing)  where {FT}
+            workspace::Union{InteractionWorkspace, Nothing}=nothing,
+            dτ_max_threshold::Union{Nothing,Real} = nothing,
+            dτ_min_floor::Union{Nothing,Real} = nothing)  where {FT}
     (; qp_μ, μ₀) = quad_points
-    # Just unpack core optical properties from 
+    # Just unpack core optical properties from
     (; τ, ϖ, Z⁺⁺, Z⁻⁺) = computed_layer_properties
-    # SUNITI, check? Also, better to write function here
-    dτ_max = minimum([maximum(τ .* ϖ), FT(0.001) * minimum(qp_μ)])
+    threshold = FT(dτ_max_threshold === nothing ? 0.001 : dτ_max_threshold)
+    floor_val = FT(dτ_min_floor === nothing ? 1024 * eps(FT) : dτ_min_floor)
+    dτ_max = max(floor_val, minimum([maximum(τ .* ϖ), threshold * minimum(qp_μ)]))
     _, ndoubl = doubling_number(dτ_max, maximum(τ .* ϖ))
     scatter = true # edit later
     arr_type = array_type(architecture)

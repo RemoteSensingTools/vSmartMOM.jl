@@ -597,7 +597,7 @@ function validate_yaml_parameters(params)
         (["atmospheric_profile", "profile_reduction"], Union{Integer, Nothing}),
     ]
     # Phase D — optional fields. When absent the parser supplies a sensible
-    # default (`GaussLegQuad()` for quadrature, `nstreams = 13` for the new
+    # default (`GaussLegQuad()` for quadrature, `nstreams = 8` for the new
     # schema, etc.). When present, type/value must match. `quadrature_type`
     # also accepts `null` (YAML) → defaults to `GaussLegQuad()`. (Codex
     # Phase D1 P3 finding.)
@@ -1006,7 +1006,7 @@ from new schema (`nstreams` present). Returns a NamedTuple with:
                                             from `2·nstreams - 1` if absent
 
 Defaults when the user supplies neither legacy nor new fields:
-`nstreams = 13` (new-schema default), `max_m = 14`, `l_trunc = 25`.
+`nstreams = 8` (new-schema default), `max_m = 14`, `l_trunc = 25`.
 """
 function _resolve_resolution_knobs(params_dict::Dict)
     rt = params_dict["radiative_transfer"]
@@ -1017,11 +1017,17 @@ function _resolve_resolution_knobs(params_dict::Dict)
     legacy_max_m   = haskey(rt, "max_m")   ? Int(rt["max_m"])    : nothing
     legacy_l_trunc = haskey(rt, "l_trunc") ? Int(rt["l_trunc"])  : nothing
 
-    # Decide effective `nstreams`.
+    # Decide effective `nstreams`. Default `8` chosen for v2.1: gives
+    # `stream_l_cap = 15` which fits typical aerosol Mie δ-fit truncations
+    # and four-decimal-place Rayleigh convergence on standard atmospheres
+    # while staying well under the per-band BLAS cost floor of `nstreams ≥ 13`.
+    # Users who need tighter Mie phase-function resolution should set
+    # `nstreams` explicitly (a guideline / table is on
+    # `docs/src/pages/IO/Schema/radiative_transfer.md`).
     nstreams = if nstreams_raw !== nothing
         nstreams_raw
     elseif legacy_max_m === nothing && legacy_l_trunc === nothing
-        13   # Phase D default for minimal new-schema configs
+        8    # v2.1 default for minimal new-schema configs
     else
         nothing   # legacy schema: leave `nstreams` undefined
     end

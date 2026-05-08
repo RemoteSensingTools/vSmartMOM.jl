@@ -11,8 +11,8 @@ R, T = rt_run(model; sources = SolarBeam(F₀ = solar_spec))
 The SFI math itself is **unchanged in Phase 2**: F₀ still flows through
 `RS_type.F₀` via the existing `get_elem_rt_SFI!` kernel. Phase 3 relocates
 the analytic Sanghavi 2014 tangent into `source_tangent!`, and Phase 5
-removes `RS_type.F₀` ownership entirely. See
-[~/.claude/plans/gpt-also-had-some-velvety-whale.md](/home/cfranken/.claude/plans/gpt-also-had-some-velvety-whale.md).
+removes `RS_type.F₀` ownership entirely. See the user-facing source-term
+guide at `docs/src/pages/extending/sources.md` for the design summary.
 
 =#
 

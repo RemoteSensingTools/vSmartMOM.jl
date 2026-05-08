@@ -856,7 +856,7 @@ struct SolverConfig{FT<:AbstractFloat, PT<:AbstractPolarizationType, QT<:Abstrac
     Δ_angle::FT
     "Depolarization factor"
     depol::FT
-    "Phase C flag: when `true`, per-band `m_max_bands` are derived from `component_m_max(c, ctx)` traits across active components. When `false` (default), the historical aggregator `min(ceil((l_max+1)/2), params.max_m)` runs and behavior is bit-equal to Phase B."
+    "Phase C flag: when `true` (current default), per-band `m_max_bands` are derived from `component_m_max(c, ctx)` traits across active components — Cox-Munk / RPV / RossLi / canopy run to their full `user_l_cap` instead of the historical half-truncated aggregator. Flip to `false` to fall back to the legacy `min(ceil((l_max+1)/2), params.max_m)` aggregator (bit-equal to Phase B)."
     use_component_traits::Bool
 end
 

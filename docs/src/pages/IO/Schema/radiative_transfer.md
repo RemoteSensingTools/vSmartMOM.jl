@@ -17,8 +17,12 @@ defaults are, and which legacy aliases still work.
 - **`polarization_type`** — `String`. One of `"Stokes_I()"`,
   `"Stokes_IQ()"`, `"Stokes_IQU()"`, `"Stokes_IQUV()"`. Sets the Stokes
   vector dimension (1/2/3/4 channels respectively).
-- **`Δ_angle`** — `Real`. Forward-peak exclusion angle in degrees,
-  consumed by `δBGE` truncation. Ignored when `truncation: NoTruncation()`.
+- **`Δ_angle`** — `Real`, **optional** (default `0.0`). Forward-peak
+  exclusion angle in degrees, consumed by `δBGE` truncation. Ignored
+  when `truncation: NoTruncation()` or when `truncation: auto` resolves
+  to `NoTruncation()`. Legacy YAMLs commonly set `2.0` to reproduce
+  VLIDORT's `DO_DELTAM_SCALING` default — set explicitly when matching
+  a benchmark that pins this value.
 - **`depol`** — `Real`. Rayleigh depolarization factor (0 = no
   depolarization, the Natraj-2009 idealization).
 - **`float_type`** — `String`. `"Float64"` or `"Float32"`. Float32 is
@@ -37,7 +41,7 @@ recommended path; legacy `max_m` + `l_trunc` configs keep working.
 
 ### New schema (recommended)
 
-- **`nstreams`** — *optional, default `13`*. **Weighted streams per
+- **`nstreams`** — *optional, default `8`*. **Weighted streams per
   hemisphere**, the primary user-facing resolution knob. Public
   contract: `stream_l_cap = 2·nstreams - 1` regardless of
   `quadrature_type`. For VLIDORT users: this is the Julia equivalent
@@ -48,13 +52,16 @@ recommended path; legacy `max_m` + `l_trunc` configs keep working.
   aggressively than the per-component traits would.
 - **`truncation`** — *optional, default `auto`*. Controls how the
   aerosol phase function is treated relative to the projection cap:
-  - `"auto"` *(default)*: deterministic — `NoTruncation()` if the
-    phase function fits within `stream_l_cap`, `δBGE(N, Δ_angle)`
-    otherwise. Mirrors VLIDORT's `DO_DELTAM_SCALING`. Logs the choice
-    via `@info`.
-  - `"NoTruncation()"` or `null`: exactly no transform. Errors at model
-    build time if `length(greek.β) - 1 > stream_l_cap` (no silent
-    coefficient drop).
+  - `"auto"` *(default)*: VLIDORT-`DO_DELTAM_SCALING`-style. With no
+    aerosols, resolves to `NoTruncation()`. With aerosols, picks
+    `δBGE(stream_l_cap, Δ_angle)` and the per-band Mie loop applies
+    it only when `length(greek.β) > stream_l_cap` — short phase
+    functions automatically fall back to `NoTruncation()` so the
+    truncation step can never crash on a fits-the-cap series.
+    Logs the choice via `@info`.
+  - `"NoTruncation()"` or `null`: exactly no transform. Coefficients
+    above `stream_l_cap` are silently dropped from the Fourier
+    projection (per Phase C trait clamps).
   - `"δBGE(L, Δ)"`: explicit δ-BGE-fit truncation (Sanghavi & Stephens
     2015). Used for benchmark reproducibility when you want exact
     parity with a published numerical convention.
@@ -90,7 +97,7 @@ legacy `l_trunc` is ignored and `nstreams` wins.
 
 ## Example — minimal new schema
 
-A new-schema config can omit `nstreams` (default `13`),
+A new-schema config can omit `nstreams` (default `8`),
 `quadrature_type` (default `GaussLegQuad`), and `truncation` (default
 `auto`). The leanest valid `radiative_transfer` block is:
 
@@ -133,4 +140,4 @@ radiative_transfer:
 - [`Schema/aerosols.md`](aerosols.md) — Mie size distribution + refractive index
 - [`Schema/sources.md`](sources.md) — `SolarBeam`, `SurfaceSIF`, `BlackbodySource`
 - [`docs/src/pages/conventions.md`](../../conventions.md) §6 — `Nstreams` vs `Nquad` distinction
-- [`docs/dev_notes/fourier_stream_resolution_plan.md`](https://github.com/cfranken/vSmartMOM.jl/blob/main/docs/dev_notes/fourier_stream_resolution_plan.md) — design memo for the v0.7 schema migration
+- [`docs/dev_notes/fourier_stream_resolution_plan.md`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/docs/dev_notes/fourier_stream_resolution_plan.md) — design memo for the v0.7 schema migration
