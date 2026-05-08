@@ -246,50 +246,57 @@ function run_all_scenarios(; yaml     = EMIT_YAML_ALB02,
 
     for (ig, gndalt) in enumerate(gndalt_axis)
         for (it, tsz) in enumerate(tsz_axis)
-            @info "Build model for GNDALT/TSZ" ig gndalt tsz
-            apply_scenario!(params, base_q, base_p, base_T, base_vmr;
-                            h2o = FT(1), aot = aot_axis[1], gndalt = gndalt, tsz = tsz)
-            model = model_from_parameters(params)
-            RS    = InelasticScattering.noRS{FT}()
+            for (ih, h2o) in enumerate(h2o_axis)
+                @info "Build model for (GNDALT, TSZ, H2OSTR)" ig it ih gndalt tsz h2o
+                # Rebuild the model per (gndalt, tsz, h2o) so the H2O
+                # scaling is applied ONLY to the H2O VMR (via
+                # apply_scenario!'s `params.q = base_q .* h2o`, with all
+                # other species at their base VMR). The previous inner-loop
+                # trick `τ_abs .*= h2o` scaled every species' contribution
+                # to the summed τ_abs.
+                apply_scenario!(params, base_q, base_p, base_T, base_vmr;
+                                h2o = h2o, aot = aot_axis[1], gndalt = gndalt, tsz = tsz)
+                model = model_from_parameters(params)
+                RS    = InelasticScattering.noRS{FT}()
 
-            # Cache the base τ's at this (gndalt, tsz); H2O/AOT scale from here.
-            τ_abs_base  = copy(model.τ_abs[1])
-            τ_rayl_base = copy(model.τ_rayl[1])
-            τ_aer_base  = copy(model.τ_aer[1])
-            aot_base    = aot_axis[1]
+                # Aerosol τ still scales linearly with τ_ref, so AOT scaling
+                # remains in the inner loop. τ_abs/τ_rayl are h2o-correct
+                # from the build above and must NOT be rescaled.
+                τ_aer_base = copy(model.τ_aer[1])
+                aot_base   = aot_axis[1]
 
-            for (ih, h2o) in enumerate(h2o_axis), (ia, aot) in enumerate(aot_axis)
-                scenario_k += 1
-                t_scen = time()
+                for (ia, aot) in enumerate(aot_axis)
+                    scenario_k += 1
+                    t_scen = time()
 
-                model.τ_abs[1]  .= τ_abs_base   .* h2o
-                model.τ_aer[1]  .= τ_aer_base   .* (aot / aot_base)
-                model.τ_rayl[1] .= τ_rayl_base
+                    model.τ_aer[1] .= τ_aer_base .* (aot / aot_base)
+                    # τ_abs[1] and τ_rayl[1] left as built (h2o-correct).
 
-                # rt_run returns 7-tuple (R_SFI, T_SFI, ieR_SFI, ieT_SFI, hdr, bhr_uw, bhr_dw).
-                R_SFI_tot, T_SFI_tot, _, _, _, hem_R_tot, hem_T_tot = rt_run(RS, model, 1)
+                    # rt_run returns 7-tuple (R_SFI, T_SFI, ieR_SFI, ieT_SFI, hdr, bhr_uw, bhr_dw).
+                    R_SFI_tot, T_SFI_tot, _, _, _, hem_R_tot, hem_T_tot = rt_run(RS, model, 1)
 
-                R_tot_I, T_tot_I = extract_I_radiances(R_SFI_tot, T_SFI_tot)
+                    R_tot_I, T_tot_I = extract_I_radiances(R_SFI_tot, T_SFI_tot)
 
-                # Compute total optical depth
-                τ_total_spec = compute_total_optical_depth(model.τ_abs[1],
-                                                           model.τ_rayl[1],
-                                                           model.τ_aer[1])
+                    # Compute total optical depth
+                    τ_total_spec = compute_total_optical_depth(model.τ_abs[1],
+                                                               model.τ_rayl[1],
+                                                               model.τ_aer[1])
 
-                R_tot[ih, ia, ig, it, :] .= R_tot_I
-                T_tot[ih, ia, ig, it, :] .= T_tot_I
-                τ_total[ih, ia, ig, it, :] .= τ_total_spec
-                hemR_tot[ih, ia, ig, it, :] .= Float64.(hem_R_tot)
-                hemT_tot[ih, ia, ig, it, :] .= Float64.(hem_T_tot)
+                    R_tot[ih, ia, ig, it, :] .= R_tot_I
+                    T_tot[ih, ia, ig, it, :] .= T_tot_I
+                    τ_total[ih, ia, ig, it, :] .= τ_total_spec
+                    hemR_tot[ih, ia, ig, it, :] .= Float64.(hem_R_tot)
+                    hemT_tot[ih, ia, ig, it, :] .= Float64.(hem_T_tot)
 
-                write_scenario_dat(dat_dir, λ_nm, ν_axis,
-                                   R_tot_I, T_tot_I, τ_total_spec,
-                                   hem_R_tot, hem_T_tot;
-                                   h2o = h2o, aot = aot, gndalt = gndalt, tsz = tsz)
+                    write_scenario_dat(dat_dir, λ_nm, ν_axis,
+                                       R_tot_I, T_tot_I, τ_total_spec,
+                                       hem_R_tot, hem_T_tot;
+                                       h2o = h2o, aot = aot, gndalt = gndalt, tsz = tsz)
 
-                dt_scen   = round(time() - t_scen;   digits = 2)
-                elapsed_s = round(time() - t_start; digits = 1)
-                @info "Scenario complete" scenario_k n_total dt_s = dt_scen elapsed_s h2o aot gndalt tsz
+                    dt_scen   = round(time() - t_scen;   digits = 2)
+                    elapsed_s = round(time() - t_start; digits = 1)
+                    @info "Scenario complete" scenario_k n_total dt_s = dt_scen elapsed_s h2o aot gndalt tsz
+                end
             end
         end
     end
