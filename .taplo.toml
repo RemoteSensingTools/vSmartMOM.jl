@@ -1,21 +1,19 @@
+# Taplo is scoped to vSmartMOM scene/setup TOML files only.
+# Julia Project/Artifacts TOML, manifests, and benchmark harness metadata are
+# intentionally outside this schema association.
 include = [
-  "Project.toml",
-  "test/Project.toml",
-  "docs/Project.toml",
-  "Artifacts.toml",
-  ".taplo.toml",
   "config/**/*.toml",
   "configs/**/*.toml",
   "examples/**/*.toml",
   "sandbox/**/*.toml",
-  "test/**/*.toml",
-  "*parameters*.toml",
-  "*params*.toml",
-  "*scene*.toml",
+  "test/test_parameters/**/*.toml",
+  "test/benchmarks/*.toml",
+  "test/vlidort_baseline/configs/**/*.toml",
 ]
 exclude = [
   "**/Manifest.toml",
   "docs/build/**",
+  "test/benchmarks/harness/**/*.toml",
 ]
 
 [formatting]
@@ -28,44 +26,19 @@ reorder_keys = false
 
 [[rule]]
 include = [
-  "Project.toml",
-  "test/Project.toml",
-  "docs/Project.toml",
-]
-
-[rule.schema]
-path = "./schemas/julia-project.schema.json"
-
-[[rule]]
-include = ["Artifacts.toml"]
-
-[rule.schema]
-path = "./schemas/julia-artifacts.schema.json"
-
-[[rule]]
-include = [
   "config/**/*.toml",
   "configs/**/*.toml",
   "examples/**/*.toml",
   "sandbox/**/*.toml",
-  "test/**/*.toml",
-  "*parameters*.toml",
-  "*params*.toml",
-  "*scene*.toml",
+  "test/test_parameters/**/*.toml",
+  "test/benchmarks/*.toml",
+  "test/vlidort_baseline/configs/**/*.toml",
 ]
 exclude = [
-  "Project.toml",
-  "test/Project.toml",
-  "docs/Project.toml",
-  "Artifacts.toml",
-  ".taplo.toml",
+  "**/Manifest.toml",
+  "docs/build/**",
+  "test/benchmarks/harness/**/*.toml",
 ]
 
 [rule.schema]
 path = "./schemas/vsmartmom-parameters.schema.json"
-
-[[rule]]
-include = [".taplo.toml"]
-
-[rule.schema]
-path = "taplo://taplo.toml"

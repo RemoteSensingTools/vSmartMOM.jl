@@ -6,7 +6,9 @@ prefs
 packages
 *.cpp
 *.f90
-.vscode
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
 Manifest.toml
 *.csv
 *.pdf

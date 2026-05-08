@@ -2,7 +2,7 @@
 
 vSmartMOM accepts configuration as **YAML**, **TOML**, or in-memory
 `Dict`. All three are normalized through the same
-`parameters_from_dict` pipeline (see [`Parameters.jl`](https://github.com/cfranken/vSmartMOM.jl/blob/main/src/IO/Parameters.jl)).
+`parameters_from_dict` pipeline (see [`Parameters.jl`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/IO/Parameters.jl)).
 This page is the top-level index for the configuration schema; each
 top-level block has its own detail page.
 
@@ -39,37 +39,43 @@ Legacy `max_m` / `l_trunc` configs **continue to work**; the parser
 detects the legacy schema by the presence of either field and applies
 the historical aggregator + `δBGE` default. New configs should prefer
 `nstreams`. See [`radiative_transfer.md`](Schema/radiative_transfer.md)
-for the precedence rules and [`docs/dev_notes/fourier_stream_resolution_plan.md`](https://github.com/cfranken/vSmartMOM.jl/blob/main/docs/dev_notes/fourier_stream_resolution_plan.md)
+for the precedence rules and [`docs/dev_notes/fourier_stream_resolution_plan.md`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/docs/dev_notes/fourier_stream_resolution_plan.md)
 for the design rationale.
 
 ## Editor support — autocomplete + inline validation
 
 vSmartMOM ships a JSON Schema at
-[`schemas/vsmartmom-parameters.schema.json`](https://github.com/cfranken/vSmartMOM.jl/blob/main/schemas/vsmartmom-parameters.schema.json),
-plus a `.taplo.toml` at the repo root that wires it to all
-configuration TOML files in `config/`, `test/test_parameters/`,
-`test/benchmarks/`, `test/vlidort_baseline/configs/`, `examples/`,
-and `sandbox/`.
+[`schemas/vsmartmom-parameters.schema.json`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/schemas/vsmartmom-parameters.schema.json).
+The repo wires that schema only to vSmartMOM scene/setup files:
+`config/`, `test/test_parameters/`, direct files under
+`test/benchmarks/`, `test/vlidort_baseline/configs/`, `examples/`, and
+`sandbox/`.
+
+Package TOML (`Project.toml`, `Artifacts.toml`), manifests, generated
+docs, and benchmark harness metadata such as
+`test/benchmarks/harness/scenarios.toml` are deliberately out of scope.
 
 ### TOML — Taplo (VS Code or CLI)
 
 Install the [Even Better TOML extension](https://marketplace.visualstudio.com/items?itemName=tamasfe.even-better-toml)
-or the standalone `taplo` CLI:
+or the standalone `taplo` CLI. VS Code uses the repo-root
+`.taplo.toml`; the CLI can smoke-test the same setup:
 
 ```bash
 cargo install taplo-cli --locked
-taplo lint config/lambertian_land.toml      # validates against the schema
-taplo format config/*.toml                   # formats per .taplo.toml
+taplo lint                                  # validates setup TOML files only
+taplo format path/to/setup_scene.toml       # formats one setup TOML file
 ```
 
 ### YAML — yaml-language-server
 
 VS Code's [YAML extension](https://marketplace.visualstudio.com/items?itemName=redhat.vscode-yaml)
-or any editor running `yaml-language-server` honors a `$schema`
-directive at the top of a YAML file:
+uses `.vscode/settings.json` in this repo to associate the same schema
+with setup YAML files. Any editor running `yaml-language-server` can
+also honor a `$schema` directive at the top of a YAML file:
 
 ```yaml
-# yaml-language-server: $schema=https://raw.githubusercontent.com/cfranken/vSmartMOM.jl/main/schemas/vsmartmom-parameters.schema.json
+# yaml-language-server: $schema=https://raw.githubusercontent.com/RemoteSensingTools/vSmartMOM.jl/main/schemas/vsmartmom-parameters.schema.json
 
 radiative_transfer:
   nstreams: 13
@@ -83,8 +89,11 @@ file:
 # yaml-language-server: $schema=../../../schemas/vsmartmom-parameters.schema.json
 ```
 
-Once wired, hovering over any field shows the inline description, and
-typos / out-of-range values surface as squiggles before runtime.
+Once wired, hovering over any field shows the inline description. Choice
+fields such as `quadrature_type`, `polarization_type`, `truncation`,
+`float_type`, `architecture`, `broadening`, and `decomp_type` also carry
+per-choice descriptions in completion popups. Typos and out-of-range
+values surface as squiggles before runtime.
 
 ## Minimal new-schema YAML example
 
@@ -132,5 +141,5 @@ params = parameters_from_dict(my_dict)
   examples
 - [`docs/src/pages/conventions.md`](../conventions.md) — sign conventions
   for VLIDORT cross-validation
-- [`docs/dev_notes/fourier_stream_resolution_plan.md`](https://github.com/cfranken/vSmartMOM.jl/blob/main/docs/dev_notes/fourier_stream_resolution_plan.md)
+- [`docs/dev_notes/fourier_stream_resolution_plan.md`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/docs/dev_notes/fourier_stream_resolution_plan.md)
   — v0.7 Fourier/stream resolution design memo
