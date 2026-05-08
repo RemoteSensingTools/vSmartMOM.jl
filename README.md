@@ -72,6 +72,30 @@ The vSmartMOM module allows end-to-end simulation of radiative transfer (RT) thr
   - `model_from_parameters(LinMode(), params)`: Build both an `RTModel` and an `RTModelLin` for analytic Jacobian computation.
   - `rt_run(model, lin_model, NAer, NGas, NSurf)`: Linearized RT returning `(R, T, dR, dT)` with exact Jacobians.
 
+#### Forward run (minimal)
+
+```julia
+using vSmartMOM
+params = parameters_from_yaml("config/quickstart.yaml")  # any YAML config
+model  = model_from_parameters(params)
+R, T   = rt_run(model)                                    # reflectance, transmittance
+```
+
+#### Linearized run (analytic Jacobians)
+
+```julia
+using vSmartMOM
+params = parameters_from_yaml("config/ocean_coxmunk.yaml")
+model, lin_model = model_from_parameters(LinMode(), params)
+NAer  = length(params.scattering_params.rt_aerosols)
+NGas  = size(lin_model.tau_dot_abs[1], 1)
+NSurf = 1
+R, T, dR, dT = rt_run(model, lin_model, NAer, NGas, NSurf)
+```
+
+`dR` and `dT` carry the exact analytic derivatives of `R`, `T` w.r.t.
+aerosol, gas, and surface parameters laid out via `ParameterLayout`.
+
 ### vSmartMOM.Absorption
 
 This module enables absorption cross-section calculations of atmospheric gases at different pressures, temperatures, and broadeners (Doppler, Lorentzian, Voigt). It uses the <a href="https://hitran.org">HITRAN</a> energy transition database for calculations. While it enables lineshape calculations from scratch, it also allows users to create and save an interpolator object at specified wavelength, pressure, and temperature grids. It can perform these computations either on CPU or GPU. <br><img src="docs/src/assets/CrossSectionGIF.gif" alt="Absorption cross-section" /><br>

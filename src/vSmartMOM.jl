@@ -19,7 +19,6 @@ using Distributions
 using Parameters
 using DocStringExtensions
 using UnPack
-using UnicodePlots
 using Dates
 using Downloads: Downloads
 using SHA: sha256

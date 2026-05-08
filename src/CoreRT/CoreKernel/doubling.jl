@@ -1,7 +1,32 @@
 #=
- 
-This file contains RT doubling-related functions
- 
+============================================================================
+Doubling  (2/3 of the CoreKernel adding-doubling solver)
+============================================================================
+
+Promotes the thin elemental slab returned by `elemental!` (optical thickness
+δτ ≈ 2^(-N) · τ_layer) to a full homogeneous layer of optical thickness
+τ_layer by `N` successive doublings.  Each doubling step combines two
+identical sub-slabs of thickness h into one of thickness 2h via the
+adding equations, which collapse for identical sub-slabs to:
+
+    G   = (I − r⁻⁺ · r⁺⁻)⁻¹           geometric-series resummation
+    R'⁻⁺ = r⁻⁺ + t⁻⁻ · G · r⁻⁺ · t⁺⁺
+    T'⁺⁺ = t⁺⁺ · G · t⁺⁺
+    J'₀± = j₀± + t · G · (r · j₀∓ + j₀±)   source cascade
+
+The `r⁺⁻ / t⁻⁻` half is recovered by D-matrix symmetry at the end.  The
+binary doubling ladder gives O(log N) matrix products instead of O(N), and
+the geometric-series form remains stable for τ_layer ≫ 1.
+
+The N is chosen by `compute_doubling_n!` so that the seed elemental slab
+satisfies (ϖ · Z̃ / 4μ) · δτ ≪ 1 (single-scattering regime).  In the v0.6
+source-term refactor the layer is sized off the *scattering* mean free
+path only; pure absorption is folded back in through the τ-sum exponent.
+
+Sanghavi et al. 2014, JQSRT 133:412–433, §3.2.  See also `elemental.jl`
+(the seed) and `interaction.jl` (combines doubled layers across the
+column).
+============================================================================
 =#
 
 """
