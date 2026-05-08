@@ -207,6 +207,10 @@
               "type": ["integer", "null"],
               "minimum": 1,
               "description": "Per-model BLAS thread cap. null = leave global BLAS alone (default). Recommend 4-8 for batched runs."
+            },
+            "verbose": {
+              "type": "boolean",
+              "description": "When true, rt_run prints the TimerOutputs timing tree at the end of each call. Default false (quiet). Useful for profiling, noisy in batched loops."
             }
           }
         }

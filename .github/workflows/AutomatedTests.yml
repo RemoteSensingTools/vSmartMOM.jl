@@ -29,8 +29,11 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install Taplo
         run: |
+          install_dir="${RUNNER_TEMP}/taplo"
+          mkdir -p "$install_dir"
           curl -fsSL https://github.com/tamasfe/taplo/releases/latest/download/taplo-linux-x86_64.gz \
-            | gunzip > /usr/local/bin/taplo
-          chmod +x /usr/local/bin/taplo
+            | gunzip > "$install_dir/taplo"
+          chmod +x "$install_dir/taplo"
+          echo "$install_dir" >> "$GITHUB_PATH"
       - name: Lint setup TOML files
         run: taplo lint

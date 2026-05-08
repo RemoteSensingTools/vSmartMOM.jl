@@ -20,7 +20,7 @@
   [![](https://img.shields.io/github/license/RemoteSensingTools/vSmartMOM.jl)](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/master/LICENSE)
   [![DOI](https://joss.theoj.org/papers/10.21105/joss.04575/status.svg)](https://doi.org/10.21105/joss.04575)
   [![](https://img.shields.io/github/commit-activity/y/RemoteSensingTools/vSmartMOM.jl)](https://github.com/RemoteSensingTools/vSmartMOM.jl/commits/master)
-  
+
 
 
 <p align="center">
@@ -64,9 +64,9 @@ For in-depth examples, tutorials, and implementation details, please see the com
 The vSmartMOM module allows end-to-end simulation of radiative transfer (RT) throughout Earth's atmosphere and surface. Specifically, it:
 
   1. Enables 1D vectorized plane-parallel RT modeling based on the Matrix Operator Method.
-  2. Incorporates fast, high fidelity simulations of scattering atmospheres containing haze and clouds – including pressure- and temperature-resolved absorption profiles of gaseous species in the atmosphere. 
+  2. Incorporates fast, high fidelity simulations of scattering atmospheres containing haze and clouds – including pressure- and temperature-resolved absorption profiles of gaseous species in the atmosphere.
   3. Enables GPU-accelerated computations of the resulting hyperspectral reflectances/transmittances.
-  
+
   Key functions:
 
   - `parameters_from_yaml(filepath::String)`: Load a custom set of RT parameters from a YAML file.
@@ -138,15 +138,15 @@ See the full <a href="https://RemoteSensingTools.github.io/vSmartMOM.jl/dev/page
 
 This module enables scattering phase-function calculation of atmospheric aerosols with different size distributions, incident wavelengths, and refractive indices. It can perform the calculation using either the Siewert NAI-2 or Domke PCW methods ([Suniti Sanghavi 2014](https://www.sciencedirect.com/science/article/pii/S0022407313004962)). <br><br><img src="docs/src/assets/ScatteringGIF.gif" alt="Scattering phase function" /><br> Key functions:
 
-  - `make_univariate_aerosol(size_distribution::ContinuousUnivariateDistribution, r_max, nquad_radius::Int, nᵣ, nᵢ`: Create an aerosol object with size distribution and complex refractive index. 
+  - `make_univariate_aerosol(size_distribution::ContinuousUnivariateDistribution, r_max, nquad_radius::Int, nᵣ, nᵢ`: Create an aerosol object with size distribution and complex refractive index.
   - `make_mie_model(computation_type::AbstractFourierDecompositionType, aerosol::AbstractAerosolType, λ::Real, polarization::AbstractPolarizationType, truncation_type::AbstractTruncationType, ...)`: Create a MieModel struct that holds all of the model parameters needed to perform a phase function calculation (computation type, aerosol, incident wavelength, etc. )
   - `compute_aerosol_optical_properties(model::MieModel)`: Compute the aerosol optical properties using the specified model parameters
 
-## How to Contribute 
+## How to Contribute
 
-vSmartMOM.jl is a growing package and thus feedback from users like you are highly appreciated. To report bugs or suggest new features in vSmartMOM.jl, please create GitHub [Issues](https://github.com/RemoteSensingTools/vSmartMOM.jl/issues). To contribute to the package, please feel free to create a [Pull Request](https://github.com/RemoteSensingTools/vSmartMOM.jl/pulls). 
+vSmartMOM.jl is a growing package and thus feedback from users like you are highly appreciated. To report bugs or suggest new features in vSmartMOM.jl, please create GitHub [Issues](https://github.com/RemoteSensingTools/vSmartMOM.jl/issues). To contribute to the package, please feel free to create a [Pull Request](https://github.com/RemoteSensingTools/vSmartMOM.jl/pulls).
 
-If you have any questions about the methods used or would like to chat with us, please feel free to shoot us an email <a href="mailto:suniti.sanghavi@gmail.com,cfranken@caltech.edu">here</a>. 
+If you have any questions about the methods used or would like to chat with us, please feel free to shoot us an email <a href="mailto:suniti.sanghavi@gmail.com,cfranken@caltech.edu">here</a>.
 
 ## Acknowledgements
 
