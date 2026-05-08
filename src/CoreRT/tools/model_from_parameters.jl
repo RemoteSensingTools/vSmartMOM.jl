@@ -311,7 +311,7 @@ function model_from_parameters(params::vSmartMOM_Parameters;
         for (molec_i, mol_name) in enumerate(all_species)
             if isempty(ap.luts)
                 @timeit "Read HITRAN" hitran_data = read_hitran(artifact(mol_name), iso=-1)
-                println("Computing profile for $(mol_name) with vmr $(profile.vmr[mol_name]) for band #$(i_band)")
+                @debug "Computing profile for $(mol_name) with vmr $(profile.vmr[mol_name]) for band #$(i_band)"
                 absorption_model = make_hitran_model(hitran_data,
                     ap.broadening_function,
                     wing_cutoff = ap.wing_cutoff,
@@ -333,7 +333,7 @@ function model_from_parameters(params::vSmartMOM_Parameters;
                     params.spec_bands[i_band], profile.vmr_h2o, profile)
             else
                 @timeit "Read HITRAN H2O" hitran_data = read_hitran(artifact("H2O"), iso=-1)
-                println("Computing profile for H2O (q-driven) for band #$(i_band)")
+                @debug "Computing profile for H2O (q-driven) for band #$(i_band)"
                 h2o_model = make_hitran_model(hitran_data,
                     ap.broadening_function,
                     wing_cutoff = ap.wing_cutoff,
@@ -396,7 +396,7 @@ function model_from_parameters(params::vSmartMOM_Parameters;
                     length(aerosol_optics[i_band][i_aer].greek_coefs.β)
                 τ_aer[i_band][i_aer, :] =
                     c_aero.τ_ref * τ_profile
-                @info "AOD at band $i_band : $(sum(τ_aer[i_band][i_aer,:])), analytic phase function = $(typeof(c_aero.phase_function)), truncation factor = $(aerosol_optics[i_band][i_aer].fᵗ)"
+                @debug "AOD at band $i_band : $(sum(τ_aer[i_band][i_aer,:])), analytic phase function = $(typeof(c_aero.phase_function)), truncation factor = $(aerosol_optics[i_band][i_aer].fᵗ)"
             end
             continue
         end
@@ -471,7 +471,7 @@ function model_from_parameters(params::vSmartMOM_Parameters;
                 params.scattering_params.rt_aerosols[i_aer].τ_ref * 
                 (aerosol_optics[i_band][i_aer].k/k_ref) * 
                 getAerosolLayerOptProp(1, c_aero.profile, profile)
-            @info "AOD at band $i_band : $(sum(τ_aer[i_band][i_aer,:])), truncation factor = $(aerosol_optics[i_band][i_aer].fᵗ)"
+            @debug "AOD at band $i_band : $(sum(τ_aer[i_band][i_aer,:])), truncation factor = $(aerosol_optics[i_band][i_aer].fᵗ)"
         end 
     end
 
@@ -629,7 +629,7 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
         for (molec_i, mol_name) in enumerate(all_species)
             if isempty(ap.luts)
                 @timeit "Read HITRAN" hitran_data = read_hitran(artifact(mol_name), iso=-1)
-                println("Computing profile for $(mol_name) with vmr $(profile.vmr[mol_name]) for band #$(i_band)")
+                @debug "Computing profile for $(mol_name) with vmr $(profile.vmr[mol_name]) for band #$(i_band)"
                 absorption_model = make_hitran_model(hitran_data,
                     ap.broadening_function,
                     wing_cutoff = ap.wing_cutoff,
@@ -651,7 +651,7 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
                     params.spec_bands[i_band], profile.vmr_h2o, profile)
             else
                 @timeit "Read HITRAN H2O" hitran_data = read_hitran(artifact("H2O"), iso=-1)
-                println("Computing profile for H2O (q-driven) for band #$(i_band)")
+                @debug "Computing profile for H2O (q-driven) for band #$(i_band)"
                 h2o_model = make_hitran_model(hitran_data,
                     ap.broadening_function,
                     wing_cutoff = ap.wing_cutoff,
@@ -667,7 +667,7 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
             @timeit "CIA $(basename(cia_path))" begin
                 cia_table = Absorption.load_cia_table(cia_path,
                                                      params.spec_bands[i_band];
-                                                     FT = FT)
+                                                     FT = FT_vrs)
                 Absorption.compute_τ_cia!(τ_abs[i_band], cia_table, profile,
                                            ap.vmr)
             end
@@ -686,9 +686,9 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
 
     # aerosol_optics[iBand][iAer]
     aerosol_optics = [Array{AerosolOptics}(undef, (n_aer)) for i=1:n_bands];
-        
+
     # τ_aer[iBand][iAer,iZ]
-    τ_aer = [zeros(FT, n_aer, length(profile.p_full)) for i=1:n_bands];
+    τ_aer = [zeros(FT_vrs, n_aer, length(profile.p_full)) for i=1:n_bands];
 
     # Loop over aerosol type
     for i_aer=1:n_aer
@@ -734,7 +734,7 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
 
             # Compute raw (not truncated) aerosol optical properties (not needed in RT eventually)
 
-            @timeit "Mie calc"  aerosol_optics_raw = compute_aerosol_optical_properties(mie_model, FT2);
+            @timeit "Mie calc"  aerosol_optics_raw = compute_aerosol_optical_properties(mie_model, FT_vrs);
 
             # Compute truncated aerosol optical properties (phase function and fᵗ).
             # Safety guard: only run δBGE forward-peak truncation when the raw
@@ -780,6 +780,13 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
     end
     # Per-band Fourier loop bound (order). See Phase C note in the matching
     # `model_from_parameters` site above.
+    # VS-plus expands the user's single spectral band into `n_bands` sub-bands
+    # (incident + vibrational ±). The user's YAML normally has one `surface:`
+    # entry; replicate it so per-band lookups in `_band_components` and the
+    # RTModel constructor have one BRDF per sub-band.
+    if length(params.brdf) == 1 && n_bands > 1
+        params.brdf = [params.brdf[1] for _ in 1:n_bands]
+    end
     components_per_band = [_band_components(params, aerosol_optics, sources, i_band)
                             for i_band in 1:n_bands]
     m_max_bands = _derive_m_max_bands_via_traits(l_max, params.max_m,

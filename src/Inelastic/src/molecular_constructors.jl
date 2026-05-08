@@ -2,7 +2,7 @@
 function getMolecularConstants(::N₂, vmr::FTin) where {FTin}
     FT = promote_type(FTin, Float64)
     vmr = FT(vmr)
-    @info "Constructing N₂ constants, using VMR (unitless) of " vmr
+    @debug "Constructing N₂ constants, using VMR (unitless) of " vmr
     @assert 0 ≤ vmr ≤ 1 "VMR has to be between [0,1]"
     p = PolarizationTensor{FT}(
             α̅₀₀     = 1.7406e-24, #[cm^3]
@@ -74,7 +74,7 @@ end
 function getMolecularConstants(::O₂, vmr::FTin) where {FTin}
     FT = promote_type(FTin, Float64)
     vmr = FT(vmr)
-    @info "Constructing O₂ constants, using VMR (unitless) of " vmr
+    @debug "Constructing O₂ constants, using VMR (unitless) of " vmr
     @assert 0 ≤ vmr ≤ 1 "VMR has to be between [0,1]"
     p = PolarizationTensor{FT}(
             α̅₀₀     = 1.5658e-24, #[cm^3]
@@ -146,7 +146,7 @@ end
 function getMolecularConstants(::H₂, vmr::FTin) where {FTin}
     FT = promote_type(FTin, Float64)
     vmr = FT(vmr)
-    @info "Constructing H₂ constants, using VMR (unitless) of " vmr
+    @debug "Constructing H₂ constants, using VMR (unitless) of " vmr
     @assert 0 ≤ vmr ≤ 1 "VMR has to be between [0,1]"
     p = PolarizationTensor{FT}(
             α̅₀₀     = 0.8032e-24, #[cm^3]

@@ -685,6 +685,16 @@ Base.@kwdef struct RTNumericalParameters{FT<:AbstractFloat}
     key, or programmatically with
     `RTNumericalParameters{FT}(blas_threads = 8)`."
     blas_threads::Union{Nothing, Int} = nothing
+
+    "Verbose output flag. When `false` (default) `rt_run`/`rt_run_lin`
+    suppress the per-call `print_timer()` dump at the end of the run.
+    Set `true` (YAML key `numerics.verbose: true` or programmatically
+    `RTNumericalParameters{FT}(verbose = true)`) to bring back the
+    timing tree — useful for profiling, noisy for production loops.
+    Per-band `Computing profile for X...` and `AOD at band X...`
+    messages were demoted to `@debug` and are silent unless you set
+    `ENV[\"JULIA_DEBUG\"] = \"vSmartMOM\"`."
+    verbose::Bool = false
 end
 
 """
