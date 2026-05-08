@@ -1,3 +1,22 @@
+# =====================================================================
+# Ross-Li (kernel-weighted) land surface BRDF.
+# =====================================================================
+# A semi-empirical land-surface reflectance built from a linear sum of
+# three physically-motivated kernels:
+#
+#   ρ(μᵢ, μᵣ, Δϕ) = f_iso
+#                + f_vol · K_vol(μᵢ, μᵣ, Δϕ)   "Ross-Thick" volumetric
+#                + f_geo · K_geo(μᵢ, μᵣ, Δϕ)   "Li-Sparse"  geometric
+#
+# Ross-Thick models multiple scattering inside a dense canopy;
+# Li-Sparse models shadow casting / hot-spot from sparse 3D
+# scatterers. The three weights f_iso, f_vol, f_geo are fit to
+# MODIS / VIIRS observations per band and shipped in the BRDF product.
+# Scalar (n=1) only — polarized (n=3, 4) returns zero.
+#
+# Reference: Ross (1981); Li & Strahler (1992) IEEE TGRS 30(2);
+#            Lucht, Schaaf & Strahler (2000) IEEE TGRS 38(2).
+# =====================================================================
 """
     reflectance(RossLi::RossLiSurfaceScalar, n, μᵢ, μᵣ, dϕ)
 
