@@ -65,6 +65,11 @@ try
 # silently-half-truncated to their full user_l_cap (Phase C-flip).
 @testset "Component m_max traits" begin include("test_component_m_max.jl") end
 
+# Phase D — schema-doc invariants. Ensures every top-level YAML/TOML
+# block has a per-block doc page and the JSON Schema covers the v0.7
+# resolution knobs.
+@testset "Schema docs" begin include("test_schema_docs.jl") end
+
 # Phase-function truncation invariants (Sanghavi & Stephens 2015)
 @testset "Truncation" begin include("test_truncation.jl") end
 

@@ -18,6 +18,11 @@ top-level block has its own detail page.
 | [`canopy`](Schema/canopy.md) *(forthcoming)*  | ◯        | Vegetation canopy + soil composite surface |
 | `sources` (programmatic only)                 | ◯        | See [`Schema/sources.md`](Schema/sources.md) — set via `model_from_parameters(...; sources=...)` for now |
 
+The `surface:` field inside `radiative_transfer` has its own
+detailed page at [`Schema/surface.md`](Schema/surface.md) covering
+the BRDF vocabulary (`LambertianSurfaceScalar`, `CoxMunkSurface`,
+`rpvSurfaceScalar`, etc.) and the Phase C trait dispatch table.
+
 ## v0.7 schema migration (Phase D)
 
 vSmartMOM v0.7 promotes **`nstreams`** to the primary user-facing

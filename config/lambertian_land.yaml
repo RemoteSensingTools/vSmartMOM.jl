@@ -20,13 +20,20 @@ radiative_transfer:
   surface:
     - LambertianSurfaceScalar(0.15)
 
-  quadrature_type:    RadauQuad()
+  # v0.7 nstreams-first schema. nstreams = weighted streams per
+  # hemisphere; public contract stream_l_cap = 2·nstreams - 1.
+  # Phase C trait dispatch: Rayleigh contributes m=2, Lambertian
+  # contributes m=0, so the effective Fourier loop runs m=0:2 here
+  # regardless of nstreams. We pick nstreams=11 for parity with the
+  # legacy `l_trunc=20` setup; reduce for cheaper runs.
+  nstreams:           11
+  # truncation: auto resolves to NoTruncation() for Rayleigh-only
+  # scenes (logged at @info). Set explicit NoTruncation() for
+  # benchmark reproducibility.
+  truncation:         auto
   polarization_type:  Stokes_IQUV()
-  max_m:              3           # Lambertian needs only m=0
-  Δ_angle:            2.0
-  l_trunc:            20
-  # depol:              0.029   # <-- previous explicit value (auto via line below)
-  depol:              -1
+  Δ_angle:            2.0       # ignored under NoTruncation
+  depol:              -1        # auto: derived from N₂/O₂ molecular constants
   float_type:         Float64
   architecture:       default_architecture
 

@@ -23,6 +23,8 @@ radiative_transfer:
   Δ_angle:            2.0
   # Trunction length for legendre terms
   l_trunc:            20
+  # Pure Rayleigh: trim forward-peak truncation off (β has only β₀, β₁, β₂).
+  truncation:         NoTruncation()
   # Depolarization factor
   # depol:              0.029   # <-- previous explicit value (auto via line below)
   depol:              -1

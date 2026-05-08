@@ -32,11 +32,13 @@ radiative_transfer:
   surface:
     - CoxMunkSurface(wind_speed=5.0)
 
-  quadrature_type:    RadauQuad()
+  quadrature_type:    GaussLegQuad()
   polarization_type:  Stokes_IQUV()
   max_m:              20          # Ocean BRDF needs more Fourier moments
   Δ_angle:            2.0
   l_trunc:            20
+  # Pure Rayleigh: trim forward-peak truncation off (β has only β₀, β₁, β₂).
+  truncation:         NoTruncation()
   # depol:              0.029   # <-- previous explicit value (auto via line below)
   depol:              -1
   float_type:         Float64
