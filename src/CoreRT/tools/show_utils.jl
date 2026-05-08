@@ -304,7 +304,16 @@ function Base.show(io::IO, ::MIME"text/plain", x::vSmartMOM_Parameters{FT}) wher
     pol_name = typeof(x.polarization_type).name.name
     println(io, _TREE_PIPE, _TREE_MID, "quadrature: $quad_name")
     println(io, _TREE_PIPE, _TREE_MID, "polarization: $pol_name")
-    println(io, _TREE_PIPE, _TREE_END, "max_m=$(x.max_m), l_trunc=$(x.l_trunc), Δ_angle=$(x.Δ_angle)°, depol=$(x.depol)")
+    # Prefer the v0.7-first knobs (nstreams + stream_l_cap + truncation type),
+    # falling back to the legacy `max_m`/`l_trunc` count when the user kept the
+    # legacy schema (nstreams === nothing).
+    trunc_name = typeof(x.truncation).name.name
+    res_str = if x.nstreams !== nothing
+        "nstreams=$(x.nstreams), stream_l_cap=$(x.stream_l_cap), truncation=$trunc_name"
+    else
+        "max_m=$(x.max_m), l_trunc=$(x.l_trunc), truncation=$trunc_name"
+    end
+    println(io, _TREE_PIPE, _TREE_END, "$res_str, Δ_angle=$(x.Δ_angle)°, depol=$(x.depol)")
 
     # ── geometry ──
     vza_str = length(x.vza) <= 4 ? string(x.vza) : "[$(length(x.vza)) angles]"

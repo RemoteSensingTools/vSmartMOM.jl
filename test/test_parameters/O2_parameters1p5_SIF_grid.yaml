@@ -50,9 +50,6 @@ radiative_transfer:
   # Quadrature-scheme for stream calculations
   # Polarization type (Stokes_I, Stokes_IQ, Stokes_IQU, Stokes_IQUV)
   polarization_type:  Stokes_IQU() #QU()
-  # Maximum m (number of Fourier moments to loop over)
-  # Exclusion angle for forward peak in fitting procedure (degrees)
-  # Trunction length for legendre terms
   nstreams:           3
   truncation:         auto
   # Depolarization factor

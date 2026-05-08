@@ -90,7 +90,7 @@ atmospheric_profile:
        31.00,  42.07,  56.09,  74.78,  99.69, 131.00,
       176.85, 236.64, 314.58, 418.87, 557.76, 735.00, 
       800.12, 849.00, 912.00, 980.00, 1005.0]
-  # Reduce profile to n layers
+  # Reduce profile to n layers (-1 uses all layers)
   profile_reduction: -1
 
 # =================================================================

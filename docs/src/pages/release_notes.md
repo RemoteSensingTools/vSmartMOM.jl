@@ -9,6 +9,8 @@ a migration guide, not as a complete git history.
 
 ## v2.1.0 — Fourier / stream resolution + source-term refactor
 
+> **vSmartMOM** = **V**ector **S**imulated **M**easurements of the **A**tmosphere using **R**adiative **T**ransfer based on the **M**atrix **O**perator **M**ethod.
+
 This is the package version that ships the schema generation we
 internally called `v0.7` (Fourier / Stream Resolution refactor) plus
 the `v0.6` source-term abstraction. *Treat it as a breaking schema

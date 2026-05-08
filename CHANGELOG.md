@@ -2,6 +2,8 @@
 
 ## v2.1.0 — Fourier-stream resolution + source-term refactor
 
+> **vSmartMOM** = **V**ector **S**imulated **M**easurements of the **A**tmosphere using **R**adiative **T**ransfer based on the **M**atrix **O**perator **M**ethod.
+
 **Schema migration release.** Treat as breaking for downstream code
 that hard-codes `params.max_m` / `params.l_trunc` field reads, raw
 access to `SolarBeam`'s `F₀` on `RS_type`, or `Δ_angle = 2.0` as the
@@ -52,6 +54,19 @@ These will require user action if you have downstream code:
   `rt_run` with `CanopySurface` as the BRDF.
 - `parameters_from_yaml` is now YAML-only; use `parameters_from_file`
   / `read_parameters` for TOML or registry-dispatched inputs.
+
+### Numerical changes
+
+- The doubling-step `dτ_max` formula now filters zero-weight quadrature
+  streams (user-supplied VZA / SZA nodes are appended for output
+  postprocessing but should not constrain `dτ_initial`) and applies an
+  absolute `dτ_min_floor` of `1024·eps(FT)`. This affects results at
+  grazing geometries (e.g. `vza ≈ 89.99°`) at the level of single-bit
+  rounding — large enough to flag in floating-point comparisons against
+  pre-v2.1 reference outputs, but well within published-benchmark
+  precision.  Threaded into `rt_kernel!`, `rt_kernel_ss!`,
+  `rt_kernel_multisensor!`, and `rt_kernel_lin!` so the user-set
+  `numerics.dτ_max_threshold` / `dτ_min_floor` reach all four paths.
 
 ### Highlights
 
