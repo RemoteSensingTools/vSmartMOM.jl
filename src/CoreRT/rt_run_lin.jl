@@ -136,7 +136,7 @@ function rt_run(RS_type::AbstractRamanType,
     #brdf_lin = model_lin.brdf_lin[iBand]
     (; F₀) = RS_type
     # no Raman
-    #if (typeof(RS_type)<:Union{RRS,RRS_plus})
+    #if (typeof(RS_type)<:RRS)
     #    RS_type.ϖ_λ₁λ₀ .*=  (1. - model.ϖ_Cabannes[iBand])/sum(RS_type.ϖ_λ₁λ₀) # RS_type.ϖ_λ₁λ₀ .*=  (1. - model.ϖ_Cabannes[iBand[1]])/sum(RS_type.ϖ_λ₁λ₀) 
     #end   
     

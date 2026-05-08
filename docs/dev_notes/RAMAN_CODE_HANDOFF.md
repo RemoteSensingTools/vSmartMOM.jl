@@ -40,7 +40,7 @@ This dispatches to `rt_run(RS_type, model, iBand)` in **`src/CoreRT/rt_run.jl`**
    Uses `RS_type` to build layers:
    - `make_added_layer(RS_type, FT_dual, arr_type, dims, nSpec)`  
    - `make_composite_layer(RS_type, ...)`  
-   For Raman types (`RRS`, `RRS_plus`, `VS_0to1_plus`, `VS_1to0_plus`), `rt_helper_functions.jl` returns `AddedLayerRS` / composite with the extra Raman dimension (`n_Raman`).
+   For Raman types (`RRS`, `VS_0to1_plus`, `VS_1to0_plus`), `rt_helper_functions.jl` returns `AddedLayerRS` / composite with the extra Raman dimension (`n_Raman`).
 
 2. **Per Fourier moment `m`**  
    - `InelasticScattering.computeRamanZλ!(RS_type, pol_type, Array(qp_μ), m, arr_type)`  
@@ -126,7 +126,7 @@ So **single-scatter Raman** is still invoked when you call **`rt_run_test_ss(RS_
 
 3. **No regressions from unified merge**  
    - In **`rt_run.jl`**, the loop over `m` and `iz` still passes `RS_type` into `rt_kernel!`, `interaction!`, and `postprocessing_vza!`.  
-   - In **`rt_helper_functions.jl`**, `make_added_layer` / `make_composite_layer` for `RRS`, `RRS_plus`, `VS_0to1_plus`, `VS_1to0_plus` are unchanged (they still return `AddedLayerRS` and the composite with `n_Raman`).  
+   - In **`rt_helper_functions.jl`**, `make_added_layer` / `make_composite_layer` for `RRS`, `VS_0to1_plus`, `VS_1to0_plus` are unchanged (they still return `AddedLayerRS` and the composite with `n_Raman`).
    So the only way Raman would break is if something in that forward call chain was changed to assume `noRS` or to drop `RS_type`. A quick grep for `RS_type` in **`rt_run.jl`** and **`rt_kernel.jl`** will show that dispatch is still in place.
 
 4. **Linearized vs Raman**  

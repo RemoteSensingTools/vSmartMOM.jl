@@ -107,7 +107,7 @@ Add sections for exported areas currently missing or underrepresented:
   `solar_transmission_from_file`, and any other exported SolarModel symbols
   after checking `names(vSmartMOM.SolarModel)`.
 - Inelastic/Raman mode types:
-  `noRS`, `RRS`, `RRS_plus`, `VS_0to1`, `VS_1to0`, plus traits such as
+  `noRS`, `RRS`, `VS_0to1`, `VS_1to0`, plus traits such as
   `has_inelastic`, `needs_interaction_workspace`, and
   `normalize_raman_weights!` if they are intentionally public.
 - Aerosols:
@@ -301,4 +301,3 @@ whether it over-documents internals, whether the proposed public API policy is
 coherent, and whether any registration-blocking documentation risks are
 missing. Do not edit code. Return a prioritized list of changes to the plan.
 ```
-

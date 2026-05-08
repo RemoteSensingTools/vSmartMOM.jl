@@ -19,7 +19,7 @@ Scope: non-optimization physics differences — bug fixes, new dispatches, missi
 
 | File | First-on | What differs | Assessment |
 |------|----------|--------------|------------|
-| `elemental_inelastic.jl` | sanghavi | `apply_D_matrix_elemental!` for `Union{RRS,RRS_plus}` **and** `Union{VS_0to1_plus,VS_1to0_plus}` has an **early-return scalar branch** `if n_stokes == 1 … ier⁺⁻[:] = ier⁻⁺; iet⁻⁻[:] = iet⁺⁺; return nothing; end`. Unified lacks this scalar shortcut. | **Correctness-preserving optimization with physics-safety guard.** The D-matrix for scalar (nStokes=1) is identity, so `ier⁺⁻ = ier⁻⁺` and `iet⁻⁻ = iet⁺⁺`. Without the early return, unified launches a kernel whose body depends on the D-matrix; if the kernel code path for `n_stokes==1` is right, results match. Low-risk-to-port; medium-value. |
+| `elemental_inelastic.jl` | sanghavi | `apply_D_matrix_elemental!` for `RRS` **and** `Union{VS_0to1_plus,VS_1to0_plus}` has an **early-return scalar branch** `if n_stokes == 1 … ier⁺⁻[:] = ier⁻⁺; iet⁻⁻[:] = iet⁺⁺; return nothing; end`. Unified lacks this scalar shortcut. | **Correctness-preserving optimization with physics-safety guard.** The D-matrix for scalar (nStokes=1) is identity, so `ier⁺⁻ = ier⁻⁺` and `iet⁻⁻ = iet⁺⁺`. Without the early return, unified launches a kernel whose body depends on the D-matrix; if the kernel code path for `n_stokes==1` is right, results match. Low-risk-to-port; medium-value. |
 | `elemental_inelastic.jl` | equal (semantically) | Sanghavi uses inline `wct02 = m == 0 ? FT(0.50) : FT(0.25)`; unified factored into `fourier_weight`/`scaled_weights` helpers in `rt_helpers.jl`. | Equivalent. No action. |
 | `elemental_inelastic.jl` | unified | Unified adds comprehensive docstrings citing Sanghavi & Frankenberg 2023, JQSRT 311, 108791, Eq. 14. Sanghavi has only internal `#Suniti:` comments. | Doc-only. |
 | `elemental_inelastic.jl` | sanghavi | Many `@show`/debug comments on sanghavi; unified cleaned. | No action. |
@@ -69,8 +69,8 @@ However:
 | `rt_kernel_canopy!(::noRS, …)` | no | **yes** (unified-only) | canopy addition in unified, no Raman coupling |
 | `rt_kernel!(::Union{RRS,VS_0to1,VS_1to0}, …, computed_layer_properties)` (legacy precomputed) | yes | yes | equal |
 | `rt_kernel!(::noRS, …, ::CoreScatteringOpticalProperties, scattering_interface, τ_sum, …)` (new hybrid path) | yes | yes | equal (unified refactored via `init_layer`, `get_dtau_ndoubl`) |
-| `rt_kernel!(::Union{RRS,VS_0to1,VS_1to0,RRS_plus,VS_0to1_plus,VS_1to0_plus}, …, ::CoreScatteringOpticalProperties, …)` (hybrid, Raman+_plus union) | **yes** (single merged method) | **no** | **Unified has split into two separate dispatches** (RRS/VS and RRS_plus/VS_plus) |
-| `rt_kernel!(::Union{RRS_plus,VS_0to1_plus,VS_1to0_plus}, …)` (dedicated _plus method) | commented out in `#= … =#` | **yes** (active) | Unified's dedicated _plus method is active; sanghavi merged it |
+| `rt_kernel!(::Union{RRS,VS_0to1,VS_1to0,VS_0to1_plus,VS_1to0_plus}, …, ::CoreScatteringOpticalProperties, …)` (hybrid, Raman+_plus union) | **yes** (single merged method) | **no** | **Unified has split into two separate dispatches** (RRS/VS and VS-plus) |
+| `rt_kernel!(::Union{VS_0to1_plus,VS_1to0_plus}, …)` (dedicated _plus method) | commented out in `#= … =#` | **yes** (active) | Unified's dedicated _plus method is active; sanghavi merged it |
 
 Both approaches are **numerically equivalent** but organized differently. Unified's split is cleaner; sanghavi's merged union is shorter. Neither is a physics bug. Pick one and retain.
 
@@ -111,7 +111,7 @@ No new physics fields on sanghavi. Both have `F₀`, `SIF₀`, `ϖ_Cabannes`, `�
 
 | Function | First-on | What differs | Assessment |
 |---|---|---|---|
-| `compute_ϖ_Cabannes(RS_type::Union{RRS, RRS_plus}, λ₀)` | sanghavi (renamed/re-derived) | Sanghavi: `σ_Rayl = Σ(vmr_i * σ_Rayl_coeff_i) * ν₀⁴; ϖ_Cabannes = 1.0 - σ_RRS/σ_Rayl`. Unified: `σ_elastic = Σ(vmr_i * σ_Rayl_coeff_i) * ν₀⁴; ϖ_Cabannes = σ_elastic/(σ_RRS+σ_elastic)`. | **Numerically different if `σ_Rayl_coeff` is the _Rayleigh_ (Cabannes+RRS) cross-section (as sanghavi comment claims) rather than pure-elastic Cabannes.** Sanghavi docstring: `σ_Rayl_coeff` stores `128π⁵α̅² (1 + 2γ_C)/(3 − 4γ_C)` which is the FULL Rayleigh. Then `σ_elastic = σ_Rayl − σ_RRS`, and `σ_elastic/σ_Rayl = 1 − σ_RRS/σ_Rayl` (sanghavi) ≠ `σ_elastic/(σ_elastic+σ_RRS)` (unified, with `σ_elastic` labelled but computed as `σ_Rayl`). **Sanghavi's is the corrected physics**; unified's is the pre-fix code with wrong labelling. This pattern repeats in the VS and _plus variants. |
+| `compute_ϖ_Cabannes(RS_type::RRS, λ₀)` | sanghavi (renamed/re-derived) | Sanghavi: `σ_Rayl = Σ(vmr_i * σ_Rayl_coeff_i) * ν₀⁴; ϖ_Cabannes = 1.0 - σ_RRS/σ_Rayl`. Unified: `σ_elastic = Σ(vmr_i * σ_Rayl_coeff_i) * ν₀⁴; ϖ_Cabannes = σ_elastic/(σ_RRS+σ_elastic)`. | **Numerically different if `σ_Rayl_coeff` is the _Rayleigh_ (Cabannes+RRS) cross-section (as sanghavi comment claims) rather than pure-elastic Cabannes.** Sanghavi docstring: `σ_Rayl_coeff` stores `128π⁵α̅² (1 + 2γ_C)/(3 − 4γ_C)` which is the FULL Rayleigh. Then `σ_elastic = σ_Rayl − σ_RRS`, and `σ_elastic/σ_Rayl = 1 − σ_RRS/σ_Rayl` (sanghavi) ≠ `σ_elastic/(σ_elastic+σ_RRS)` (unified, with `σ_elastic` labelled but computed as `σ_Rayl`). **Sanghavi's is the corrected physics**; unified's is the pre-fix code with wrong labelling. This pattern repeats in the VS and _plus variants. |
 | `compute_ϖ_Cabannes(RS_type::Union{VS_0to1_plus, VS_1to0_plus}, λ₀)` | sanghavi | Same issue: sanghavi uses `ϖ_Cabannes_VS = 1.0 − (σ_RVRS+σ_VRS)/σ_Rayl`; unified uses `σ_elastic/(σ_RVRS+σ_VRS+σ_elastic)` | Same physics fix needed. |
 | `compute_ϖ_Cabannes(RS_type::Union{RRS,VS,…}, depol, λ₀)` (3-arg depolarization variant) | sanghavi has it commented out with a debug version that returns `(4-3*depol)/(4+2*depol)`; unified has an active version returning the depolarization formula | — | Both retain the 3-arg variant as dead/debug; active callers use the 2-arg `(RS_type, λ₀)` signature. |
 | `compute_γ_air_Rayleigh!(λ₀, RS_type)` and `compute_γ_air_Rayleigh!(λ₀, n2, o2)` | **sanghavi** | Sanghavi rewrote this: directly computes `γ_air_Rayleigh` from N₂/O₂ polarizabilities using a molecule-weighted combination formula with Rayleigh cross-sections (returns `(γ_air_Rayleigh, σ_air_Rayleigh)`). **Unified**: `compute_γ_air_Rayleigh!(λ₀)` internally calls `getRamanAtmoConstants(ν̃,300.0)` (hard-coded T=300K) and derives γ from `γ_air_Cabannes` and `ϖ_Cabannes`. | **Sanghavi's version is more accurate and returns the air-Rayleigh cross-section as well.** Unified uses a hard-coded 300 K effective T. |
@@ -234,7 +234,7 @@ Original priority framing retained below for historical reference.
 
 **P3 — organizational (pick one style; no numerical effect):**
 
-5. Decide: keep unified's split `rt_kernel!` dispatches (separate RRS/VS and RRS_plus/VS_plus methods) vs. sanghavi's merged union. Unified's is cleaner; keep unified.
+5. Decide: keep unified's split `rt_kernel!` dispatches (separate RRS/VS and VS-plus methods) vs. sanghavi's merged union. Unified's is cleaner; keep unified.
 
 6. Decide: unified has `noRS.ϖ_Cabannes = [1.0, 1.0, 1.0]` (3-element default) vs sanghavi `[1.0]` (1-element). Unified's is more tolerant; keep unified — but ensure `noRS_plus` and the multi-band expansion still work with single-band configs.
 
@@ -256,7 +256,7 @@ Original priority framing retained below for historical reference.
 
 3. **Should `compute_ϖ_Cabannes` take `depol` argument path be live or dead?** Sanghavi commented it out; unified kept it live but returns a simple depolarization-derived value. Who calls the 3-argument variant? A grep on each branch would clarify the call-site contract. Resolve in-flight during Phase 1b port.
 
-4. **`rt_run_ss` for inelastic_plus_plus (RRS_plus/VS_plus)?** Sanghavi's `rt_run_ss` uses `RS_type<:Union{RRS,RRS_plus}` to dispatch ϖ_λ₁λ₀ normalization but the `rt_kernel_ss!` has no explicit RRS_plus/VS_plus dispatch (only RRS, VS_0to1, VS_1to0). Is single-scatter needed for `_plus` variants or can it be noRS/RRS-only? Resolve in Phase 1c when porting the driver.
+4. **`rt_run_ss` for VS-plus?** Sanghavi's `rt_run_ss` uses `RRS` to dispatch ϖ_λ₁λ₀ normalization but the `rt_kernel_ss!` has no explicit VS-plus dispatch (only RRS, VS_0to1, VS_1to0). Is single-scatter needed for `_plus` variants or can it be noRS/RRS-only? Resolve in Phase 1c when porting the driver.
 
 5. ~~**Does unified's `interaction_hdrf!` / `elemental_canopy!` / canopy-surface code need to interact with Raman at all?**~~ **Resolved (amendments §2.6):** Canopy + Raman coupling is a future project, not in scope for this merge. Unified's canopy code is noRS-only; sanghavi has no canopy. The combination `CanopySurface + RRS` is untested and has undefined behavior. No code guard, no smoke test; land the TODO comment specified in amendments §2.6 at the canopy dispatch site during Phase 1b.
 

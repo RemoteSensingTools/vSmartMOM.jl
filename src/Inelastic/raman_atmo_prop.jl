@@ -98,51 +98,6 @@ function getRamanSSProp!(RS_type::RRS, λ, grid_in)
     RS_type.n_Raman = length(RS_type.ϖ_λ₁λ₀)
     return nothing
 end 
-#=
-function getRamanSSProp!(RS_type::RRS_plus, depol) 
-    @unpack n2, o2, 
-            iBand, grid_in,
-            greek_raman,
-            ϖ_Cabannes, fscattRayl,
-            ϖ_λ₁λ₀, i_λ₁λ₀,
-            n_Raman =  RS_type
-    #n2, o2 = getRamanAtmoConstants(1.e7/λ, T)
-    # determine Rayleigh scattering cross-section at central wavelength λ of the spectral band (assumed constant throughout the band)
-    greek_raman = get_greek_raman(RS_type, n2, o2)
-    t_w = Vector{Vector{FT}}(undef,0)
-    t_i = Vector{Vector{Int}}(undef,0)
-    nBands = length(iBand)
-    ϖ_Cabannes = zeros(FT, nBands) 
-    fscattRayl = zeros(FT, nBands)
-    n_Raman = 0
-    atmo_σ_Rayl = compute_optical_Rayl(λ, n2, o2)
-    ϖ_Cabannes[iB] = compute_ϖ_Cabannes(RS_type, λ)
-    for iB = 1:nBands
-        _grid_in = grid_in[iB]
-        λ = nm_per_m/(0.5*(_grid_in[1]+_grid_in[end]))
-        #@show ϖ_Cabannes
-        # determine RRS cross-sections to λ₀ from nSpecRaman wavelengths around λ₀  
-        index_raman_grid, atmo_σ_RRS = compute_optical_RS!(RS_type, grid_in, λ, n2, o2)
-        # declare ϖ_λ₁λ₀ to be a grid of length N_raman 
-        t_ϖ_λ₁λ₀ = atmo_σ_RRS[end:-1:1]/atmo_σ_Rayl; #the grid gets inverted because the central wavelength is now seen as the recipient of RRS from neighboring source wavelengths
-        t_i_λ₁λ₀ = index_raman_grid; #reverse(index_raman_grid);
-        push!(t_w, t_ϖ_λ₁λ₀);
-        push!(t_i, t_i_λ₁λ₀);
-        t_n_Raman = length(t_ϖ_λ₁λ₀);
-        n_Raman = (t_n_Raman>n_Raman) ? t_n_Raman : n_Raman
-    end
-    i_λ₁λ₀ = zeros(Int, nBands, n_Raman);
-    ϖ_λ₁λ₀ = zeros( FT, nBands, n_Raman);
-    for iB = 1:nBands
-        for Δn = 1:length(t_i[iB])
-            i_λ₁λ₀[iB,Δn] = t_i[iB][Δn];
-            ϖ_λ₁λ₀[iB,Δn] = t_w[iB][Δn];
-        end
-    end
-    @pack! RS_type = greek_raman, ϖ_Cabannes, fscattRayl, ϖ_λ₁λ₀, i_λ₁λ₀, n_Raman 
-    return nothing;
-end
-=#
 function getRamanSSProp!(
             RS_type::VS_0to1_plus, depol, λ_inc)
 

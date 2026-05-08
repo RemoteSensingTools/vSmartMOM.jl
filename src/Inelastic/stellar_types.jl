@@ -122,41 +122,6 @@ end
 
 
 """
-    struct RRS_plus{FT<:AbstractFloat}
-A struct which defines Rotational Raman Scattering parameters for the concatenated mode of vSmartMOM
-# Fields
-$(DocStringExtensions.FIELDS)
-"""
-#=Base.@kwdef mutable struct RRS_plus{FT<:AbstractFloat} <: AbstractRamanType 
-
-    "Concatenated indices of band limits"
-    bandSpecLim = Array{UnitRange{Int64},1}
-    iBand::Array{Int,1} = [1]
-    grid_in::Array{StepRangeLen{FT},1} 
-
-    "Molecular Constants for H2"
-    h2::InelasticScattering.MolecularConstants{Float64}
-    
-    "Greek coeffs in Raman calculations" 
-    greek_raman::GreekCoefs
-    "Pre-computed optical properties"
-    # ramanAtmoProp::RamanAtmosphereProperties
-    #values for each band
-    fscattRayl#::Array{FT,1}
-    ϖ_Cabannes::Array{FT,1} #elastic fraction (Cabannes) of Rayleigh (Cabannes+Raman) scattering
-    
-    ϖ_λ₁λ₀::Array{FT,2} #last index represents the band iB
-    i_λ₁λ₀::Array{Int,2} #last index represents the band iB
-
-    Z⁻⁺_λ₁λ₀::Array{FT,2}
-    Z⁺⁺_λ₁λ₀::Array{FT,2}
-    i_ref::Int
-    n_Raman::Int
-    F₀::Array{FT,2} # Solar/Stellar irradiation Stokes vector of size (pol_type.n, nSpec)
-    #SIF₀::Array{FT,2} # Solar/Stellar irradiation Stokes vector of size (pol_type.n, nSpec)
-end
-=#
-"""
     struct RRS{FT<:AbstractFloat}
 A struct which defines Rotational Raman Scattering parameters
 # Fields
@@ -299,25 +264,6 @@ Base.@kwdef struct sol_VS_1to0{FT<:AbstractFloat} <: AbstractRamanType
     #SIF₀::Array{FT,2}
 end
 
-#=
-Base.@kwdef mutable struct sol_RRS_plus{FT<:AbstractFloat} <: AbstractRamanType 
-    bandSpecLim = Array{UnitRange{Int64},1}
-    iBand::Array{Int,1} = [1]
-    grid_in::Array{StepRangeLen{FT},1}
-    h2::InelasticScattering.MolecularConstants{Float64}
-    greek_raman::GreekCoefs
-    fscattRayl#::Array{FT,1}
-    ϖ_Cabannes::Array{FT,1}
-    ϖ_λ₁λ₀::Array{FT,2}
-    i_λ₁λ₀::Array{Int,2}
-    Z⁻⁺_λ₁λ₀::Array{FT,2}
-    Z⁺⁺_λ₁λ₀::Array{FT,2}
-    i_ref::Int
-    n_Raman::Int
-    F₀::Array{FT,2}
-    #SIF₀::Array{FT,2}
-end
-=#
 Base.@kwdef mutable struct sol_VS_0to1_plus{FT<:AbstractFloat} <: AbstractRamanType 
     bandSpecLim::Vector{Any} = []
     iBand::Vector{Any} = []

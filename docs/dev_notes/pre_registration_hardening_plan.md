@@ -116,7 +116,6 @@ Recommended implementation direction:
 interaction_workspace(::noRS, args...) = nothing
 interaction_workspace(::noRS_plus, args...) = nothing
 interaction_workspace(::RRS, args...) = InteractionWorkspace(args...)
-interaction_workspace(::RRS_plus, args...) = InteractionWorkspace(args...)
 
 # Until the VS-plus path is fully ported:
 interaction_workspace(::VS_0to1_plus, args...) = nothing
@@ -384,17 +383,14 @@ Preferred direction:
 has_inelastic(::noRS) = Val(false)
 has_inelastic(::noRS_plus) = Val(false)
 has_inelastic(::RRS) = Val(true)
-has_inelastic(::RRS_plus) = Val(true)
 
 rayleigh_greek_source(::noRS, model) = model.greek_rayleigh
 rayleigh_greek_source(::noRS_plus, model) = model.greek_rayleigh
 rayleigh_greek_source(::RRS, model) = model.greek_cabannes
-rayleigh_greek_source(::RRS_plus, model) = model.greek_cabannes
 
 inelastic_workspace(::noRS, args...) = nothing
 inelastic_workspace(::noRS_plus, args...) = nothing
 inelastic_workspace(::RRS, args...) = InteractionWorkspace(args...)
-inelastic_workspace(::RRS_plus, args...) = InteractionWorkspace(args...)
 ```
 
 Use explicit VS methods. Do not allow VS-plus to accidentally reuse an RRS-only
@@ -484,7 +480,6 @@ Do not start with a physics rewrite. Start by extracting transition metadata:
 
 ```julia
 inelastic_transitions(::RRS)
-inelastic_transitions(::RRS_plus)
 inelastic_transitions(::VS_0to1)
 inelastic_transitions(::VS_1to0)
 inelastic_transitions(::VS_0to1_plus)

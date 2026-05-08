@@ -143,7 +143,7 @@ function rt_kernel_multisensor!(RS_type::noRS{FT},
     end
 end
 
-function rt_kernel_multisensor!(RS_type::Union{RRS{FT}, RRS_plus{FT}, VS_0to1_plus{FT}, VS_1to0_plus{FT}},
+function rt_kernel_multisensor!(RS_type::Union{RRS{FT}, VS_0to1_plus{FT}, VS_1to0_plus{FT}},
                                 sensor_levels,
                                 pol_type,
                                 SFI,
@@ -283,7 +283,7 @@ function rt_kernel_multisensor!(RS_type::Union{RRS{FT}, RRS_plus{FT}, VS_0to1_pl
 end
 #=
 function rt_kernel_multisensor!(
-            RS_type::Union{RRS_plus{FT}, VS_0to1_plus{FT}, VS_1to0_plus{FT}}, 
+            RS_type::Union{VS_0to1_plus{FT}, VS_1to0_plus{FT}},
             sensor_levels,              
             pol_type, 
             SFI, 

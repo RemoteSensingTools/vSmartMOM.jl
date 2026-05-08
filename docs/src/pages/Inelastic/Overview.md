@@ -17,7 +17,6 @@ This page documents the current public mode layer. Solar-induced fluorescence is
 | `VS_0to1` | Vibrational Stokes-style mode | Single vibrational transition family |
 | `VS_1to0` | Vibrational anti-Stokes-style mode | Single vibrational transition family |
 | `noRS_plus` | Elastic mode for concatenated-grid code paths | Plus-mode workflows that share Raman interfaces |
-| `RRS_plus` | Rotational Raman for concatenated spectral bands | Multi-band Raman calculations |
 | `VS_0to1_plus` | Vibrational Stokes-style plus mode | Concatenated-grid vibrational workflows |
 | `VS_1to0_plus` | Vibrational anti-Stokes-style plus mode | Concatenated-grid vibrational workflows |
 
@@ -49,5 +48,5 @@ For the current code map, see the inelastic section of [Core RT Theory](../vSmar
 
 - `AbstractRamanType`
 - `noRS`, `RRS`, `VS_0to1`, `VS_1to0`
-- `noRS_plus`, `RRS_plus`, `VS_0to1_plus`, `VS_1to0_plus`
+- `noRS_plus`, `VS_0to1_plus`, `VS_1to0_plus`
 - `compute_γ_air_Cabannes!`, `compute_γ_air_Rayleigh!`, `apply_lineshape!`

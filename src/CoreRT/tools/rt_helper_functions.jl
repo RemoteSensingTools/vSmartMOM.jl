@@ -142,7 +142,7 @@ function make_added_layer(RS_type::Union{noRS, noRS_plus}, FT, arr_type, dims, n
 end
 
 """Construct an `AddedLayerRS` with inelastic (Raman) matrices for Raman scattering."""
-make_added_layer(RS_type::Union{RRS, RRS_plus,VS_0to1_plus, VS_1to0_plus}, FT, arr_type, dims, nSpec)  = AddedLayerRS(
+make_added_layer(RS_type::Union{RRS, VS_0to1_plus, VS_1to0_plus}, FT, arr_type, dims, nSpec)  = AddedLayerRS(
                                                 default_matrix(FT, arr_type, dims, nSpec), 
                                                 default_matrix(FT, arr_type, dims, nSpec), 
                                                 default_matrix(FT, arr_type, dims, nSpec),
@@ -190,7 +190,7 @@ make_composite_layer(RS_type::Union{noRS, noRS_plus},
                                                         default_J_matrix(FT, arr_type, dims, nSpec)
                                                         )
 """Construct a `CompositeLayerRS` with inelastic matrices for Raman scattering."""
-make_composite_layer(RS_type::Union{RRS, RRS_plus,VS_0to1_plus, VS_1to0_plus}, 
+make_composite_layer(RS_type::Union{RRS, VS_0to1_plus, VS_1to0_plus},
     FT, arr_type, dims, nSpec) = CompositeLayerRS(
                                                         default_matrix(FT, arr_type, dims, nSpec), 
                                                         default_matrix(FT, arr_type, dims, nSpec), 
@@ -222,7 +222,7 @@ make_composite_layer(RS_type::Union{noRS, noRS_plus},
                     default_J_matrix(FT, arr_type, NSens, dims, nSpec),
                     default_J_matrix(FT, arr_type, NSens, dims, nSpec))
 "Make a composite layer, supplying all default matrices"
-make_composite_layer(RS_type::Union{RRS, RRS_plus, VS_0to1_plus, VS_1to0_plus}, 
+make_composite_layer(RS_type::Union{RRS, VS_0to1_plus, VS_1to0_plus},
     FT, arr_type, NSens, dims, nSpec) = 
     CompositeLayerMSRS(default_matrix(FT, arr_type, NSens, dims, nSpec), 
                     default_matrix(FT, arr_type, NSens, dims, nSpec), 

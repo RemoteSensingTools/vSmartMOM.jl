@@ -3,17 +3,9 @@
 This file contains RT elemental-related functions
  
 =#
-function getKernelDim(RS_type::RRS_plus,ier⁻⁺)
-    return size(ier⁻⁺);
-end
-
 function getKernelDim(RS_type::Union{VS_0to1_plus, VS_1to0_plus},ier⁻⁺, i_λ₁λ₀)
     #@show size(ier⁻⁺,1),size(ier⁻⁺,2), size(i_λ₁λ₀,1)
     return (size(ier⁻⁺,1),size(ier⁻⁺,2), size(i_λ₁λ₀,1));
-end
-
-function getKernelDimSFI(RS_type::RRS_plus,ieJ₀⁻)
-    return size(ieJ₀⁻);
 end
 
 function getKernelDimSFI(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
@@ -21,7 +13,7 @@ function getKernelDimSFI(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
     return (size(ieJ₀⁻,1), size(i_λ₁λ₀,1));
 end
 
-"Elemental single-scattering layer for RRS"
+"Elemental single-scattering layer for vibrational plus modes"
 function elemental_inelastic!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
                             pol_type, SFI::Bool, 
                             τ_sum::AbstractArray{FT,1},
@@ -169,34 +161,6 @@ end
     end
 end
 =#
-# kernel wrapper:
-function get_elem_rt!(RS_type::RRS_plus, 
-                        ier⁻⁺, iet⁺⁺, 
-                        dτ, ϖ, 
-                        #Z⁻⁺_λ₁λ₀, Z⁺⁺_λ₁λ₀, 
-                        qp_μN, wct2)
-    @unpack fscattRayl, ϖ_λ₁λ₀, i_λ₁λ₀, i_ref, iBand, bandSpecLim = RS_type
-    device = devi(architecture(ier⁻⁺))
-    aType = array_type(architecture(ier⁻⁺))
-    kernel! = get_elem_rt_RRS!(device)
-    #@show typeof(Z⁻⁺_λ₁λ₀), typeof(Z⁺⁺_λ₁λ₀), typeof(ϖ_λ₁λ₀), typeof(i_λ₁λ₀), typeof(i_ref)
-    for iB in RS_type.iBand
-        event = kernel!(fscattRayl[iB], 
-                    aType(ϖ_λ₁λ₀[iB]), aType(i_λ₁λ₀[iB]), 
-                    i_ref,
-                    ier⁻⁺[:,:,bandSpecLim[iB],:], 
-                    iet⁺⁺[:,:,bandSpecLim[iB],:], 
-                    dτ[bandSpecLim[iB]], 
-                    #ϖ[bandSpecLim[iB]], 
-                    aType(Z⁻⁺_λ₁λ₀[:,:,bandSpecLim[iB]]), 
-                    aType(Z⁺⁺_λ₁λ₀[:,:,bandSpecLim[iB]]), 
-                    qp_μN, wct2, 
-                    ndrange=getKernelDim(RS_type,ier⁻⁺[:,:,RS_type.bandSpecLim[iB],:])); 
-        #wait(device, event);
-        synchronize_if_gpu();
-    end
-end
-
 function get_elem_rt!(RS_type::Union{VS_0to1_plus, VS_1to0_plus}, 
     ier⁻⁺, iet⁺⁺, 
     dτ, ϖ,
@@ -525,31 +489,6 @@ source vectors for that wavelength.
     end    
 end
 
-#  TODO: Nov 30, 2021
-function get_elem_rt_SFI!(RS_type::RRS_plus, 
-                        ieJ₀⁺, ieJ₀⁻, 
-                        τ_sum, dτ_λ, ϖ_λ, 
-                        Z⁻⁺_λ₁λ₀, Z⁺⁺_λ₁λ₀, F₀,
-                        qp_μN, ndoubl,
-                        wct02, nStokes,
-                        I₀, iμ0,D)
-    @unpack fscattRayl, ϖ_λ₁λ₀, i_λ₁λ₀, i_ref = RS_type
-   # @show fscattRayl
-    device = devi(architecture(ieJ₀⁺))
-    aType = array_type(architecture(ieJ₀⁺))
-    kernel! = get_elem_rt_SFI_RRS!(device)
-    #@show typeof(ieJ₀⁺), typeof(τ_sum), typeof(dτ_λ),typeof(wct02), typeof(qp_μN), typeof(dτ_λ) 
-    event = kernel!(aType(fscattRayl), aType(ϖ_λ₁λ₀), aType(i_λ₁λ₀), 
-                i_ref, ieJ₀⁺, ieJ₀⁻, 
-                τ_sum, dτ_λ, ϖ_λ, 
-                aType(Z⁻⁺_λ₁λ₀), aType(Z⁺⁺_λ₁λ₀), aType(F₀),
-                qp_μN, ndoubl, wct02, nStokes, 
-                I₀, iμ0, D, 
-                ndrange=getKernelDimSFI(RS_type,ieJ₀⁻));
-    #wait(device, event)
-    synchronize_if_gpu();
-end
-
 # only for RRS
 #=
 @kernel function get_elem_rt_SFI_RRS!(fscattRayl, 
@@ -634,85 +573,6 @@ end
         if mod(i, pol_n) > 2
             ier⁻⁺[i, j, n₁, n₀] = - ier⁻⁺[i, j, n₁, n₀]
         end 
-    end
-end
-=#
-#=
-@kernel function apply_D_elemental_SFI!(RS_type::RRS_plus, ndoubl, pol_n, ieJ₀⁻)
-    i, _, n₁, n₀ = @index(Global, NTuple)
-    
-    if ndoubl>1
-        if mod(i, pol_n) > 2
-            ieJ₀⁻[i, 1, n₁, n₀] = - ieJ₀⁻[i, 1, n₁, n₀]
-        end 
-    end
-end
-
-@kernel function apply_D_elemental!(RS_type::Union{VS_0to1_plus, VS_1to0_plus}, 
-                        ndoubl, pol_n, ier⁻⁺, iet⁺⁺, ier⁺⁻, iet⁻⁻)
-
-    i, j, Δn = @index(Global, NTuple)
-    @unpack i_λ₁λ₀ = RS_type
-    
-    n₁ = i_λ₁λ₀[Δn]
-    if ndoubl < 1
-        ii = mod(i, pol_n) 
-        jj = mod(j, pol_n) 
-        if ((ii <= 2) & (jj <= 2)) | ((ii > 2) & (jj > 2)) 
-            ier⁺⁻[i, j, n₁, 1] = ier⁻⁺[i, j, n₁, 1]
-            iet⁻⁻[i, j, n₁, 1] = iet⁺⁺[i, j ,n₁, 1]
-        else
-            ier⁺⁻[i, j, n₁, 1] = -ier⁻⁺[i, j, n₁, 1] 
-            iet⁻⁻[i, j, n₁, 1] = -iet⁺⁺[i, j, n₁, 1] 
-        end
-    else
-        if mod(i, pol_n) > 2
-            ier⁻⁺[i, j, n₁, 1] = - ier⁻⁺[i, j, n₁, 1]
-        end 
-    end
-end
-
-@kernel function apply_D_elemental_SFI!(RS_type::Union{VS_0to1_plus, VS_1to0_plus}, 
-                        ndoubl, pol_n, ieJ₀⁻)
-    i, _, Δn = @index(Global, NTuple)
-    @unpack i_λ₁λ₀ = RS_type
-    
-    n₁ = i_λ₁λ₀[Δn]
-    if ndoubl>1
-        if mod(i, pol_n) > 2
-            ieJ₀⁻[i, 1, n₁, 1] = - ieJ₀⁻[i, 1, n₁, 1]
-        end 
-    end
-end
-
-function apply_D_matrix_elemental!(RS_type::RRS_plus, ndoubl::Int, n_stokes::Int,
-                                    ier⁻⁺::AbstractArray{FT,4},
-                                    iet⁺⁺::AbstractArray{FT,4},
-                                    ier⁺⁻::AbstractArray{FT,4},
-                                    iet⁻⁻::AbstractArray{FT,4}) where {FT}
-    if n_stokes == 1
-        ier⁺⁻[:] = ier⁻⁺
-        iet⁻⁻[:] = iet⁺⁺
-        return nothing
-    end
-    device = devi(architecture(ier⁻⁺))
-    applyD_kernel! = apply_D_elemental_RRS!(device)
-    event = applyD_kernel!(ndoubl,n_stokes, ier⁻⁺, iet⁺⁺, ier⁺⁻, iet⁻⁻, ndrange=size(ier⁻⁺));
-    synchronize_if_gpu();
-    return nothing
-end
-
-function apply_D_matrix_elemental_SFI!(RS_type::Union{RRS_plus, VS_0to1_plus, VS_1to0_plus},
-    ndoubl::Int, n_stokes::Int, ieJ₀⁻::AbstractArray{FT,4}) where {FT}
-    if ndoubl > 1
-        return nothing
-    else 
-        device = devi(architecture(ieJ₀⁻))
-        applyD_kernel! = apply_D_elemental_SFI!(device)
-        event = applyD_kernel!(RS_type,ndoubl,n_stokes, ieJ₀⁻, ndrange=size(ieJ₀⁻));
-        #wait(device, event);
-        synchronize();
-        return nothing
     end
 end
 =#

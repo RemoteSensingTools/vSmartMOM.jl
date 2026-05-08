@@ -54,6 +54,9 @@ These will require user action if you have downstream code:
   `rt_run` with `CanopySurface` as the BRDF.
 - `parameters_from_yaml` is now YAML-only; use `parameters_from_file`
   / `read_parameters` for TOML or registry-dispatched inputs.
+- `RRS_plus` has been retired. Rotational Raman remains available via
+  `RRS`; concatenated-grid inelastic workflows should use the
+  vibrational plus modes.
 
 ### Numerical changes
 
