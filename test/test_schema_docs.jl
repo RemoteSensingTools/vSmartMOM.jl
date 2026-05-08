@@ -18,6 +18,8 @@ const _SCHEMA_DOCS = joinpath(@__DIR__, "..", "docs", "src", "pages", "IO", "Sch
 const _SCHEMA_INDEX = joinpath(@__DIR__, "..", "docs", "src", "pages", "IO", "Schema.md")
 const _JSON_SCHEMA = joinpath(@__DIR__, "..", "schemas", "vsmartmom-parameters.schema.json")
 const _TAPLO_TOML  = joinpath(@__DIR__, "..", ".taplo.toml")
+const _VSCODE_SETTINGS = joinpath(@__DIR__, "..", ".vscode", "settings.json")
+const _VSCODE_EXTENSIONS = joinpath(@__DIR__, "..", ".vscode", "extensions.json")
 
 @testset "Schema docs invariants" begin
     @testset "Per-block pages exist" begin
@@ -66,12 +68,36 @@ const _TAPLO_TOML  = joinpath(@__DIR__, "..", ".taplo.toml")
         @test isfile(_TAPLO_TOML)
         t = read(_TAPLO_TOML, String)
         @test occursin("vsmartmom-parameters.schema.json", t)
-        # Common config locations the schema applies to.
-        # Note: .taplo.toml uses globs like `test/**/*.toml` which
-        # covers test/test_parameters/ — we just check the parent
-        # directory tokens are mentioned.
-        for path_glob in ("config/", "test/", "examples/")
+        # Schema association is intentionally limited to setup/scene TOML
+        # locations, not every TOML file in test/ or the package metadata.
+        for path_glob in (
+            "config/**/*.toml",
+            "test/test_parameters/**/*.toml",
+            "test/benchmarks/*.toml",
+            "test/vlidort_baseline/configs/**/*.toml",
+            "examples/**/*.toml",
+            "sandbox/**/*.toml",
+        )
             @test occursin(path_glob, t)
         end
+        @test !occursin("\"test/**/*.toml\"", t)
+        @test !occursin("**/*params*.toml", t)
+        @test occursin("test/benchmarks/harness/**/*.toml", t)
+    end
+
+    @testset "VS Code wires JSON schema to YAML setup files" begin
+        @test isfile(_VSCODE_SETTINGS)
+        @test isfile(_VSCODE_EXTENSIONS)
+        settings = read(_VSCODE_SETTINGS, String)
+        extensions = read(_VSCODE_EXTENSIONS, String)
+        @test occursin("vsmartmom-parameters.schema.json", settings)
+        @test occursin("config/**/*.yaml", settings)
+        @test occursin("test/test_parameters/**/*.yaml", settings)
+        @test occursin("test/benchmarks/*.yaml", settings)
+        @test occursin("test/vlidort_baseline/configs/**/*.yaml", settings)
+        @test occursin("sandbox/**/*.yaml", settings)
+        @test !occursin("**/*params*.yaml", settings)
+        @test occursin("tamasfe.even-better-toml", extensions)
+        @test occursin("redhat.vscode-yaml", extensions)
     end
 end

@@ -69,24 +69,50 @@
           "description": "One surface expression per band. Parser supports LambertianSurfaceScalar, LambertianSurfaceSpectrum, LambertianSurfaceLegendre, rpvSurfaceScalar, RossLiSurfaceScalar, and CoxMunkSurface."
         },
         "quadrature_type": {
-          "type": ["string", "null"],
-          "enum": [
-            "RadauQuad()",
-            "GaussLegQuad()",
-            null
-          ],
           "default": "GaussLegQuad()",
-          "description": "Optional angular quadrature rule. Default GaussLegQuad() (Sanghavi: cheaper and 5-50× more accurate per stream than Radau on Rayleigh-only setups)."
+          "description": "Optional angular quadrature rule. Leave unset for the default Gauss-Legendre quadrature.",
+          "oneOf": [
+            {
+              "type": "string",
+              "enum": ["GaussLegQuad()"],
+              "description": "Default. Gauss-Legendre streams; generally cheaper and more accurate per stream for Rayleigh-only setups."
+            },
+            {
+              "type": "string",
+              "enum": ["RadauQuad()"],
+              "description": "Legacy-compatible Radau streams. Use when reproducing older setups that were tuned against Radau quadrature."
+            },
+            {
+              "type": "null",
+              "description": "YAML only. Same as omitting the field: use GaussLegQuad(). TOML has no null value, so omit the key."
+            }
+          ],
+          "examples": ["GaussLegQuad()", "RadauQuad()"]
         },
         "polarization_type": {
-          "type": "string",
-          "enum": [
-            "Stokes_I()",
-            "Stokes_IQ()",
-            "Stokes_IQU()",
-            "Stokes_IQUV()"
-          ],
-          "description": "Stokes vector dimensionality."
+          "description": "Stokes vector dimensionality. Choose the smallest state that carries the signal you need.",
+          "oneOf": [
+            {
+              "type": "string",
+              "enum": ["Stokes_I()"],
+              "description": "Scalar intensity only. Fastest option; suitable for scalar surfaces and unpolarized diagnostics."
+            },
+            {
+              "type": "string",
+              "enum": ["Stokes_IQ()"],
+              "description": "Intensity plus linear Q polarization. Useful when U/V are known to be unnecessary."
+            },
+            {
+              "type": "string",
+              "enum": ["Stokes_IQU()"],
+              "description": "Intensity plus both linear polarization components. Good default for polarized reflection without circular polarization."
+            },
+            {
+              "type": "string",
+              "enum": ["Stokes_IQUV()"],
+              "description": "Full Stokes vector including circular polarization V. Most complete and most expensive option."
+            }
+          ]
         },
         "nstreams": {
           "type": "integer",
@@ -113,9 +139,29 @@
           "description": "Legacy Legendre truncation length. Plays the role of stream_l_cap under the legacy schema. Use nstreams instead in new configs."
         },
         "truncation": {
-          "type": ["string", "null"],
           "default": "auto",
-          "description": "v0.7 phase-function truncation mode. 'auto' (default): NoTruncation if phase fits stream_l_cap, δBGE(N, Δ) otherwise. 'NoTruncation()' / null: exactly no transform; errors if coefs exceed cap. 'δBGE(L, Δ)': explicit (for benchmarks).",
+          "description": "v0.7 phase-function truncation mode. 'auto' (default): VLIDORT-DO_DELTAM_SCALING-style. NoTruncation if no aerosols; δBGE(stream_l_cap, Δ_angle) once aerosols are configured — the per-band Mie loop applies δBGE only when greek.β exceeds the cap, otherwise falls back to NoTruncation. 'NoTruncation()' / null: exactly no transform; coefficients above the cap are silently dropped. 'δBGE(L, Δ)': explicit forward-peak handling (Sanghavi & Stephens 2015) — set explicitly to override the auto resolver.",
+          "oneOf": [
+            {
+              "type": "string",
+              "enum": ["auto"],
+              "description": "Recommended default. NoTruncation if no aerosols; δBGE(stream_l_cap, Δ_angle) once aerosols are configured (with a per-band length guard that falls back to NoTruncation when the raw greek series already fits the cap)."
+            },
+            {
+              "type": "string",
+              "enum": ["NoTruncation()"],
+              "description": "Do not transform the phase function. Appropriate for Rayleigh-only or other phase series that already fit the stream cap."
+            },
+            {
+              "type": "string",
+              "pattern": "^δBGE\\([^)]*\\)$",
+              "description": "Explicit delta-BGE forward-peak handling, for example δBGE(20, 2.0). Use for benchmark reproduction or known strongly forward-scattering aerosol cases."
+            },
+            {
+              "type": "null",
+              "description": "YAML only. Same as NoTruncation(). TOML has no null value, so use NoTruncation() or omit the key depending on intent."
+            }
+          ],
           "examples": ["auto", "NoTruncation()", "δBGE(20, 2.0)"]
         },
         "depol": {
@@ -123,25 +169,44 @@
           "description": "Rayleigh depolarization factor."
         },
         "float_type": {
-          "type": "string",
-          "enum": [
-            "Float32",
-            "Float64"
-          ],
-          "description": "Floating point type used by the RT model."
+          "description": "Floating point type used by the RT model.",
+          "oneOf": [
+            {
+              "type": "string",
+              "enum": ["Float64"],
+              "description": "Default precision for science runs and cross-validation."
+            },
+            {
+              "type": "string",
+              "enum": ["Float32"],
+              "description": "Lower-memory, faster path for GPU or throughput-oriented experiments after accuracy is checked."
+            }
+          ]
         },
         "architecture": {
-          "type": "string",
-          "enum": [
-            "default_architecture",
-            "CPU()",
-            "GPU()",
-            "MetalGPU()",
-            "Architectures.CPU()",
-            "Architectures.GPU()",
-            "Architectures.MetalGPU()"
-          ],
-          "description": "Compute backend selector."
+          "description": "Compute backend selector.",
+          "oneOf": [
+            {
+              "type": "string",
+              "enum": ["default_architecture"],
+              "description": "Use the package default backend for the current environment. Best for portable examples."
+            },
+            {
+              "type": "string",
+              "enum": ["CPU()", "Architectures.CPU()"],
+              "description": "Force the CPU backend. Best for CI, debugging, and reproducible small runs."
+            },
+            {
+              "type": "string",
+              "enum": ["GPU()", "Architectures.GPU()"],
+              "description": "Use the CUDA backend when CUDA is installed and available."
+            },
+            {
+              "type": "string",
+              "enum": ["MetalGPU()", "Architectures.MetalGPU()"],
+              "description": "Use the Metal backend on supported Apple hardware."
+            }
+          ]
         },
         "numerics": {
           "type": "object",
@@ -239,17 +304,33 @@
           "description": "Volume mixing ratios by molecule name."
         },
         "broadening": {
-          "type": "string",
-          "enum": [
-            "Voigt()",
-            "Doppler()",
-            "Lorentz()"
+          "description": "Absorption line-shape broadening model.",
+          "oneOf": [
+            {
+              "type": "string",
+              "enum": ["Voigt()"],
+              "description": "Default physical line shape combining Doppler and pressure broadening."
+            },
+            {
+              "type": "string",
+              "enum": ["Doppler()"],
+              "description": "Thermal Doppler broadening only. Useful in low-pressure or diagnostic setups."
+            },
+            {
+              "type": "string",
+              "enum": ["Lorentz()"],
+              "description": "Pressure broadening only. Useful for simplified high-pressure diagnostics."
+            }
           ]
         },
         "CEF": {
-          "type": "string",
-          "enum": [
-            "HumlicekWeidemann32SDErrorFunction()"
+          "description": "Complex error function implementation used by Voigt absorption.",
+          "oneOf": [
+            {
+              "type": "string",
+              "enum": ["HumlicekWeidemann32SDErrorFunction()"],
+              "description": "Current supported implementation; stable default for Voigt line-shape evaluation."
+            }
           ]
         },
         "wing_cutoff": {
@@ -280,10 +361,18 @@
           "description": "Reference wavelength. In TOML, write this key as \"λ_ref\" = 550.0."
         },
         "decomp_type": {
-          "type": "string",
-          "enum": [
-            "NAI2()",
-            "PCW()"
+          "description": "Aerosol phase-matrix decomposition used to produce Greek coefficients.",
+          "oneOf": [
+            {
+              "type": "string",
+              "enum": ["NAI2()"],
+              "description": "Normalized associated integral decomposition. Current default path for aerosol Greek coefficients."
+            },
+            {
+              "type": "string",
+              "enum": ["PCW()"],
+              "description": "Polynomials of generalized spherical functions. Use for comparisons with PCW-based references."
+            }
           ]
         }
       }

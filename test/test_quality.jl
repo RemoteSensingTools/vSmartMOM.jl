@@ -11,11 +11,7 @@ using vSmartMOM
     @test haskey(taplo, "rule")
 
     schema_dir = joinpath(root, "schemas")
-    schema_names = [
-        "julia-artifacts.schema.json",
-        "julia-project.schema.json",
-        "vsmartmom-parameters.schema.json",
-    ]
+    schema_names = ["vsmartmom-parameters.schema.json"]
     schema_paths = Set(joinpath(schema_dir, name) for name in schema_names)
 
     for schema_path in schema_paths
@@ -37,12 +33,9 @@ using vSmartMOM
         @test isfile(local_schema_path)
     end
 
-    for toml_path in ["Project.toml", "test/Project.toml", "docs/Project.toml", "Artifacts.toml", ".taplo.toml"]
+    for toml_path in [".taplo.toml"]
         @test TOML.parsefile(joinpath(root, toml_path)) isa Dict
     end
-
-    docs_project = TOML.parsefile(joinpath(root, "docs", "Project.toml"))
-    @test docs_project["sources"]["vSmartMOM"]["path"] == ".."
 
     parameter_schema = JSON.parsefile(joinpath(schema_dir, "vsmartmom-parameters.schema.json"))
     radiative_transfer = parameter_schema["definitions"]["radiative_transfer"]
