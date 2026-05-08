@@ -18,6 +18,8 @@ radiative_transfer:
   Δ_angle:            2.0
   # Trunction length for legendre terms
   l_trunc:            60
+  # Pure Rayleigh: no forward-peak truncation.
+  truncation:         NoTruncation()
   # Depolarization factor
   depol:              0.0
   # Floating point type for calculations (Float32, Float64)
@@ -50,4 +52,3 @@ atmospheric_profile:
   p: [  0.14,   0.22]
   # Reduce profile to n layers
   profile_reduction: -1
-

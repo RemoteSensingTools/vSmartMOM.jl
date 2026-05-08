@@ -1,33 +1,36 @@
 # =================================================================
 # Top-Level Radiative Transfer Parameters
 # =================================================================
-radiative_transfer: 
+# This default file uses the v0.7 nstreams-first schema. See
+# docs/src/pages/IO/Schema/radiative_transfer.md for full reference,
+# or the JSON Schema at schemas/vsmartmom-parameters.schema.json
+# (auto-loaded by Taplo for TOML configs and by yaml-language-server
+# for YAML — recipe in docs/src/pages/IO/Schema.md).
+radiative_transfer:
   # Spectral bands (list of ν_start:ν_step:ν_end, in cm⁻¹)
-  spec_bands: 
+  spec_bands:
     - (1e7/777):0.015:(1e7/757)
   # Bidirectional Reflectance Distribution Function (BRDF) per band
-  surface: 
+  surface:
     - LambertianSurfaceScalar(0.15)
-  # Quadrature-scheme for stream calculations (RadauQuad / GaussLegQuad)
-  quadrature_type:    GaussLegQuad()
+  # v0.7 primary resolution knob: weighted streams per hemisphere.
+  # Public contract: stream_l_cap = 2·nstreams - 1 regardless of
+  # quadrature_type. Minimum 3 (Rayleigh contributes through m=2).
+  nstreams:           13
+  # Phase-function truncation. `auto` is the deterministic default —
+  # NoTruncation() if the phase function fits stream_l_cap, δBGE(N, Δ)
+  # otherwise. Logged at @info level so the choice is visible.
+  truncation:         auto
+  # Quadrature scheme. Optional — defaults to GaussLegQuad() (Sanghavi:
+  # cheaper and 5–50× more accurate per stream than RadauQuad on
+  # Rayleigh-only setups). Uncomment to override:
+  # quadrature_type:  GaussLegQuad()   # default
+  # quadrature_type:  RadauQuad()      # legacy / SZA-on-node use cases
   # Polarization type (Stokes_I, Stokes_IQ, Stokes_IQU, Stokes_IQUV)
   polarization_type:  Stokes_I()
-  # Maximum m (number of Fourier moments to loop over)
-  max_m:              3
-  # Exclusion angle for forward peak in fitting procedure (degrees).
-  # Legacy field — used to build the default truncation if `truncation`
-  # below is unset.
+  # Forward-peak exclusion angle for δBGE [deg]. Ignored when
+  # truncation resolves to NoTruncation().
   Δ_angle:            2.0
-  # Upper-bound for Legendre truncation of aerosol phase function /
-  # Cox-Munk reflectance / canopy or BRDF hotspot. Per-case `l_max` may
-  # be smaller (e.g. Rayleigh+Lambertian needs only `l_max=2`).
-  l_trunc:            25
-  # Phase-function truncation method. If unset, defaults to
-  # δBGE(l_trunc, Δ_angle) for backward compatibility. Set to
-  # "NoTruncation()" for canopy-only or smooth-phase-function runs
-  # (Sanghavi & Stephens 2015 Eq. 8 collapses to the identity when
-  # f_tr → 0).
-  # truncation:       NoTruncation()
   # Depolarization factor.
   #   -1  → auto: derived per band from N₂/O₂ molecular constants (default).
   #   ≥0  → explicit: use this value uniformly for greek_rayleigh,
