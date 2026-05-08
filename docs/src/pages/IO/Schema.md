@@ -30,7 +30,7 @@ resolution knob:
 
 ```yaml
 radiative_transfer:
-  nstreams: 13          # weighted streams per hemisphere
+  nstreams: 8           # weighted streams per hemisphere
                         # public contract: stream_l_cap = 2·nstreams - 1
   truncation: auto      # NoTruncation if phase fits, δBGE otherwise
 ```
@@ -78,7 +78,7 @@ also honor a `$schema` directive at the top of a YAML file:
 # yaml-language-server: $schema=https://raw.githubusercontent.com/RemoteSensingTools/vSmartMOM.jl/main/schemas/vsmartmom-parameters.schema.json
 
 radiative_transfer:
-  nstreams: 13
+  nstreams: 8
   ...
 ```
 

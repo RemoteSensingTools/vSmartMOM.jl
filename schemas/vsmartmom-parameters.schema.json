@@ -69,55 +69,41 @@
           "description": "One surface expression per band. Parser supports LambertianSurfaceScalar, LambertianSurfaceSpectrum, LambertianSurfaceLegendre, rpvSurfaceScalar, RossLiSurfaceScalar, and CoxMunkSurface."
         },
         "quadrature_type": {
+          "type": ["string", "null"],
           "default": "GaussLegQuad()",
           "description": "Optional angular quadrature rule. Leave unset for the default Gauss-Legendre quadrature.",
-          "oneOf": [
-            {
-              "type": "string",
-              "enum": ["GaussLegQuad()"],
-              "description": "Default. Gauss-Legendre streams; generally cheaper and more accurate per stream for Rayleigh-only setups."
-            },
-            {
-              "type": "string",
-              "enum": ["RadauQuad()"],
-              "description": "Legacy-compatible Radau streams. Use when reproducing older setups that were tuned against Radau quadrature."
-            },
-            {
-              "type": "null",
-              "description": "YAML only. Same as omitting the field: use GaussLegQuad(). TOML has no null value, so omit the key."
-            }
+          "enum": [
+            "GaussLegQuad()",
+            "RadauQuad()",
+            null
+          ],
+          "enumDescriptions": [
+            "Default. Gauss-Legendre streams; generally cheaper and more accurate per stream for Rayleigh-only setups.",
+            "Legacy-compatible Radau streams. Use when reproducing older setups that were tuned against Radau quadrature.",
+            "YAML only. Same as omitting the field: use GaussLegQuad(). TOML has no null value, so omit the key."
           ],
           "examples": ["GaussLegQuad()", "RadauQuad()"]
         },
         "polarization_type": {
+          "type": "string",
           "description": "Stokes vector dimensionality. Choose the smallest state that carries the signal you need.",
-          "oneOf": [
-            {
-              "type": "string",
-              "enum": ["Stokes_I()"],
-              "description": "Scalar intensity only. Fastest option; suitable for scalar surfaces and unpolarized diagnostics."
-            },
-            {
-              "type": "string",
-              "enum": ["Stokes_IQ()"],
-              "description": "Intensity plus linear Q polarization. Useful when U/V are known to be unnecessary."
-            },
-            {
-              "type": "string",
-              "enum": ["Stokes_IQU()"],
-              "description": "Intensity plus both linear polarization components. Good default for polarized reflection without circular polarization."
-            },
-            {
-              "type": "string",
-              "enum": ["Stokes_IQUV()"],
-              "description": "Full Stokes vector including circular polarization V. Most complete and most expensive option."
-            }
+          "enum": [
+            "Stokes_I()",
+            "Stokes_IQ()",
+            "Stokes_IQU()",
+            "Stokes_IQUV()"
+          ],
+          "enumDescriptions": [
+            "Scalar intensity only. Fastest option; suitable for scalar surfaces and unpolarized diagnostics.",
+            "Intensity plus linear Q polarization. Useful when U/V are known to be unnecessary.",
+            "Intensity plus both linear polarization components. Good default for polarized reflection without circular polarization.",
+            "Full Stokes vector including circular polarization V. Most complete and most expensive option."
           ]
         },
         "nstreams": {
           "type": "integer",
           "minimum": 3,
-          "description": "v0.7 primary resolution knob: weighted streams per hemisphere. Public contract: stream_l_cap = 2·nstreams - 1 regardless of quadrature_type. Minimum 3 (Rayleigh declares Fourier support through m=2). Default 13 when no legacy fields are set."
+          "description": "v0.7 primary resolution knob: weighted streams per hemisphere. Public contract: stream_l_cap = 2·nstreams - 1 regardless of quadrature_type. Minimum 3 (Rayleigh declares Fourier support through m=2). Default 8 when no legacy fields are set (gives stream_l_cap = 15; matches typical aerosol δ-fit caps and four-decimal-place Rayleigh convergence)."
         },
         "m_max": {
           "type": ["integer", "null"],
@@ -169,43 +155,37 @@
           "description": "Rayleigh depolarization factor."
         },
         "float_type": {
+          "type": "string",
           "description": "Floating point type used by the RT model.",
-          "oneOf": [
-            {
-              "type": "string",
-              "enum": ["Float64"],
-              "description": "Default precision for science runs and cross-validation."
-            },
-            {
-              "type": "string",
-              "enum": ["Float32"],
-              "description": "Lower-memory, faster path for GPU or throughput-oriented experiments after accuracy is checked."
-            }
+          "enum": [
+            "Float64",
+            "Float32"
+          ],
+          "enumDescriptions": [
+            "Default precision for science runs and cross-validation.",
+            "Lower-memory, faster path for GPU or throughput-oriented experiments after accuracy is checked."
           ]
         },
         "architecture": {
+          "type": "string",
           "description": "Compute backend selector.",
-          "oneOf": [
-            {
-              "type": "string",
-              "enum": ["default_architecture"],
-              "description": "Use the package default backend for the current environment. Best for portable examples."
-            },
-            {
-              "type": "string",
-              "enum": ["CPU()", "Architectures.CPU()"],
-              "description": "Force the CPU backend. Best for CI, debugging, and reproducible small runs."
-            },
-            {
-              "type": "string",
-              "enum": ["GPU()", "Architectures.GPU()"],
-              "description": "Use the CUDA backend when CUDA is installed and available."
-            },
-            {
-              "type": "string",
-              "enum": ["MetalGPU()", "Architectures.MetalGPU()"],
-              "description": "Use the Metal backend on supported Apple hardware."
-            }
+          "enum": [
+            "default_architecture",
+            "CPU()",
+            "Architectures.CPU()",
+            "GPU()",
+            "Architectures.GPU()",
+            "MetalGPU()",
+            "Architectures.MetalGPU()"
+          ],
+          "enumDescriptions": [
+            "Use the package default backend for the current environment. Best for portable examples.",
+            "Force the CPU backend. Best for CI, debugging, and reproducible small runs.",
+            "Force the CPU backend. Best for CI, debugging, and reproducible small runs.",
+            "Use the CUDA backend when CUDA is installed and available.",
+            "Use the CUDA backend when CUDA is installed and available.",
+            "Use the Metal backend on supported Apple hardware.",
+            "Use the Metal backend on supported Apple hardware."
           ]
         },
         "numerics": {
@@ -304,33 +284,27 @@
           "description": "Volume mixing ratios by molecule name."
         },
         "broadening": {
+          "type": "string",
           "description": "Absorption line-shape broadening model.",
-          "oneOf": [
-            {
-              "type": "string",
-              "enum": ["Voigt()"],
-              "description": "Default physical line shape combining Doppler and pressure broadening."
-            },
-            {
-              "type": "string",
-              "enum": ["Doppler()"],
-              "description": "Thermal Doppler broadening only. Useful in low-pressure or diagnostic setups."
-            },
-            {
-              "type": "string",
-              "enum": ["Lorentz()"],
-              "description": "Pressure broadening only. Useful for simplified high-pressure diagnostics."
-            }
+          "enum": [
+            "Voigt()",
+            "Doppler()",
+            "Lorentz()"
+          ],
+          "enumDescriptions": [
+            "Default physical line shape combining Doppler and pressure broadening.",
+            "Thermal Doppler broadening only. Useful in low-pressure or diagnostic setups.",
+            "Pressure broadening only. Useful for simplified high-pressure diagnostics."
           ]
         },
         "CEF": {
+          "type": "string",
           "description": "Complex error function implementation used by Voigt absorption.",
-          "oneOf": [
-            {
-              "type": "string",
-              "enum": ["HumlicekWeidemann32SDErrorFunction()"],
-              "description": "Current supported implementation; stable default for Voigt line-shape evaluation."
-            }
+          "enum": [
+            "HumlicekWeidemann32SDErrorFunction()"
+          ],
+          "enumDescriptions": [
+            "Current supported implementation; stable default for Voigt line-shape evaluation."
           ]
         },
         "wing_cutoff": {
@@ -361,18 +335,15 @@
           "description": "Reference wavelength. In TOML, write this key as \"λ_ref\" = 550.0."
         },
         "decomp_type": {
+          "type": "string",
           "description": "Aerosol phase-matrix decomposition used to produce Greek coefficients.",
-          "oneOf": [
-            {
-              "type": "string",
-              "enum": ["NAI2()"],
-              "description": "Normalized associated integral decomposition. Current default path for aerosol Greek coefficients."
-            },
-            {
-              "type": "string",
-              "enum": ["PCW()"],
-              "description": "Polynomials of generalized spherical functions. Use for comparisons with PCW-based references."
-            }
+          "enum": [
+            "NAI2()",
+            "PCW()"
+          ],
+          "enumDescriptions": [
+            "Normalized associated integral decomposition. Current default path for aerosol Greek coefficients.",
+            "Polynomials of generalized spherical functions. Use for comparisons with PCW-based references."
           ]
         }
       }

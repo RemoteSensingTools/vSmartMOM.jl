@@ -2,20 +2,20 @@
 # component_m_max — per-component Fourier-support traits
 # =========================================================================
 #
-# Phase C of the Fourier/Stream Resolution refactor (plan:
-# ~/.claude/plans/gpt-also-had-some-velvety-whale.md). Each component
+# Phase C of the Fourier/Stream Resolution refactor. Each component
 # (surface, source, scatterer) declares the maximum Fourier order it
 # contributes to via `component_m_max(c, ctx) :: Int`. The model-build
 # aggregator takes `maximum(component_m_max(...))` across the active
 # components and clamps against the user's resolving cap.
 #
-# Phase C lands the dispatch *infrastructure* behind a flag on
-# `SolverConfig.use_component_traits` (default `false`). When `false`,
-# the historical aggregator at `model_from_parameters.jl` keeps running
-# and behavior is bit-equal to Phase B. When flipped to `true` (a
-# follow-up commit, after Sanghavi sign-off on the Cox-Munk runtime
-# impact), Cox-Munk / RossLi / RPV / canopy stop being silently
-# half-truncated — they get their full `user_l_cap` Fourier resolution.
+# Phase C lands the dispatch *infrastructure* behind the flag
+# `SolverConfig.use_component_traits` — **default `true`** in v2.1.
+# Cox-Munk / RossLi / RPV / canopy now run to their full
+# `user_l_cap` Fourier resolution instead of being silently
+# half-truncated by the legacy aggregator.  Flip to `false` to fall
+# back to the historical `min(ceil((l_max+1)/2), params.max_m)`
+# aggregator at `model_from_parameters.jl` (bit-equal to Phase B —
+# kept as an escape hatch for byte-equality regression).
 #
 # Trait values:
 # - LambertianSurface*  → 0   (m=0 is exact for any Lambertian)

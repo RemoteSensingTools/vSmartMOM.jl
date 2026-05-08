@@ -7,12 +7,19 @@
 This page summarizes the user-visible changes in the 2.0 line. It is written as
 a migration guide, not as a complete git history.
 
-## Unreleased — v0.7 (Fourier / Stream Resolution refactor)
+## v2.1.0 — Fourier / stream resolution + source-term refactor
 
-The v0.7 line replaces the legacy `max_m` / `l_trunc` resolution knobs
-with a single primary input: **`nstreams`** (weighted streams per
-hemisphere). Existing YAML and TOML configs continue to work; new
-configs should prefer `nstreams`.
+This is the package version that ships the schema generation we
+internally called `v0.7` (Fourier / Stream Resolution refactor) plus
+the `v0.6` source-term abstraction. *Treat it as a breaking schema
+migration*: `max_m` / `l_trunc` still parse for tactical reasons but
+are no longer the recommended idiom in any in-tree YAML — every
+example uses `nstreams` + `truncation: auto` now.
+
+The new public input is **`nstreams`** (weighted streams per
+hemisphere). The schema-generation v0.7 label persists in some docs
+(`stream_l_cap = 2·nstreams - 1` and the per-band trait dispatch);
+the package version on the registry is v2.1.0.
 
 ### What changed for users
 
@@ -25,7 +32,7 @@ radiative_transfer:
 
 # After (new schema, recommended)
 radiative_transfer:
-  nstreams: 13           # public contract: stream_l_cap = 2·N - 1
+  nstreams: 8            # public contract: stream_l_cap = 2·N - 1
   truncation: auto       # NoTruncation if phase fits, δBGE otherwise
   # quadrature_type omitted ⇒ GaussLegQuad() (Sanghavi: cheaper +
   # 5–50× more accurate per stream than RadauQuad on Rayleigh)
@@ -44,7 +51,7 @@ radiative_transfer:
   [`docs/src/pages/benchmarks.md`](benchmarks.md) for the per-scheme
   accuracy comparison.)
 - **JSON Schema** at
-  [`schemas/vsmartmom-parameters.schema.json`](https://github.com/cfranken/vSmartMOM.jl/blob/main/schemas/vsmartmom-parameters.schema.json)
+  [`schemas/vsmartmom-parameters.schema.json`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/schemas/vsmartmom-parameters.schema.json)
   describes the v0.7 schema. Wired to TOML via the repo's
   `.taplo.toml`; YAML editors honour it via
   `# yaml-language-server: $schema=...`. Setup recipe in
@@ -77,7 +84,7 @@ radiative_transfer:
   even `l_max` (intentional fix to a latent precedence bug;
   documented in the Phase B commit).
 
-See [`docs/dev_notes/fourier_stream_resolution_plan.md`](https://github.com/cfranken/vSmartMOM.jl/blob/main/docs/dev_notes/fourier_stream_resolution_plan.md)
+See [`docs/dev_notes/fourier_stream_resolution_plan.md`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/docs/dev_notes/fourier_stream_resolution_plan.md)
 for the design rationale.
 
 ## Platform Support

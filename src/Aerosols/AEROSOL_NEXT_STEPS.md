@@ -12,7 +12,7 @@
 
 - [ ] **Create TOMAS-aerosols branch**
   ```bash
-  cd /home/cfranken/code/gitHub/vSmartMOM.jl
+  cd <repo-root>           # path to your vSmartMOM.jl checkout
   git checkout -b TOMAS-aerosols
   ```
 

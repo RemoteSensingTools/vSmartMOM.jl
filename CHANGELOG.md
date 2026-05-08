@@ -2,23 +2,82 @@
 
 ## v2.1.0 — Fourier-stream resolution + source-term refactor
 
-Additive minor release over v2.0.0. Highlights: first-class `AbstractSource`
-type vocabulary (`SolarBeam`, `BlackbodySource`, `SurfaceSIF`); user-facing
-`nstreams` / `truncation: auto` Fourier-resolution schema; per-model BLAS
-thread cap; VLIDORT 2.8.3 baseline validation suite (Siewert 2000 Problem IIA,
-solar_tester scalar/vector). All v2.0.0 YAMLs run byte-equal — `max_m` /
-`l_trunc` keep working through the legacy parser branch.
+**Schema migration release.** Treat as breaking for downstream code
+that hard-codes `params.max_m` / `params.l_trunc` field reads, raw
+access to `SolarBeam`'s `F₀` on `RS_type`, or `Δ_angle = 2.0` as the
+implicit default.  The legacy YAML parser branch (`max_m`/`l_trunc`)
+is preserved for tactical reuse, but every in-tree YAML has been
+migrated to `nstreams` + `truncation: auto`; users following examples
+will land on the v0.7 schema.
+
+### What's new since v2.0.0 — at-a-glance
+
+If you last looked at `vSmartMOM.jl` on `main`, this is what changed.
+Most items have their own subsection further down, or a dedicated
+docs page in `docs/src/pages/`.
+
+| Theme | Summary |
+|-------|---------|
+| **Source-term abstraction (v0.6)** | First-class `AbstractSource` types — `SolarBeam`, `BlackbodySource`, `SurfaceSIF`, `NoSource`, composed via `+` into `SourceSet`. Replaces the implicit `RS_type.F₀` ownership. Forward/linearized RT now flow through `prepare_source` → `contribute!` / `source_tangent!` dispatchers. AD seam at `prepare_source` (user-parameter space ⇄ kernel space). See `docs/src/pages/extending/sources.md`. |
+| **Fourier / stream resolution schema (v0.7)** | `nstreams` is the primary user input; `stream_l_cap = 2·nstreams - 1` regardless of quadrature. `truncation: auto` (conservative in v2.1, see below) and `truncation: "δBGE(L, Δ)"` are the recommended idioms. Per-component `component_m_max(c, ctx)` traits — Cox-Munk / RPV / RossLi / canopy now run to their full `user_l_cap` instead of being silently half-truncated. |
+| **VLIDORT 2.8.3 baseline suite** | New `test/vlidort_baseline/` with Siewert 2000 Problem IIA (Stokes-I), and `solar_tester` scalar (Task 1) + vector (Task 1, IQU) reference data committed in tree. No PyVLIDORT / Fortran runtime needed for regression. |
+| **Stokes IQ polarization** | New `Stokes_IQ()` polarization type — 2-channel I/Q, between scalar I and IQU, useful for instruments with linear polarization but no Q/U separation. Forward, single-scatter, surface BRDFs (incl. Cox-Munk SS wind Jacobian), and Greek single-scatter all covered. |
+| **Standalone exact single-scatter** | `StandaloneSS` driver (`run_exact_ss`, `ExactSSConfig`, `SSGeometry`) for high-precision SS-only computations independent of the adding-doubling solver. RTModel SS adapter included. |
+| **Aerosols module** | Multi-moment + TOMAS-15 aerosol size-distribution support; analytic phase-function aerosols (Henyey-Greenstein); `compute_aerosol_optical_properties` exported; vector phase + surface BRDF chain rules wired through. |
+| **Canopy surface (PROSAIL/4SAIL)** | `CanopySurface` BRDF integrated into the standard `rt_run` pipeline (legacy `rt_run_canopy` removed). Canopy block in YAML schema; per-band soil + leaf reflectance/transmittance. |
+| **HITRAN edition selection** | `set_hitran_edition!`, `get_hitran_edition`, `available_hitran_editions`, `fetch_hitran`, `fetch_hitran_by_ids` — fetches from hitran.org with SHA-256 provenance. Defaults to the legacy 2016 artifacts; switch with one call. |
+| **Numerics tuning surface** | `RTNumericalParameters` carries `dτ_max_threshold`, `dτ_min_floor`, `blas_threads` knobs that previously lived as hard-coded `0.001` / `1024·eps(FT)`. YAML key `radiative_transfer.numerics` exposes them. |
+| **Documentation rewrite** | DocumenterVitepress migration, narrative-thread restructure (Concepts arc), per-block schema docs under `docs/src/pages/IO/Schema/`, JSON-Schema autocomplete for TOML/YAML, auto-generated benchmarks page (Siewert IIA et al). README + landing page now expand the **vSmartMOM** acronym (Vector Simulated Measurements of the Atmosphere using Radiative Transfer based on the Matrix Operator Method). |
+| **`RTModel` hierarchy (v2.0 finalised)** | `model_from_parameters` returns a hierarchical `RTModel{ARCH, FT}` with physics-based sub-structs (`SolverConfig`, `Atmosphere`, `Optics`, `Surfaces`, `Sources`). `Base.getproperty` shim provides backward-compat field access. |
+| **CI hardening** | Test matrix now Julia 1.10 / 1.11 / 1.12; `actions/checkout@v4`; `julia-actions/cache@v2` step; Aqua quality gate (stale deps, ambiguities, piracy, undocumented exports) included in `runtests.jl`. |
+
+### Breaking changes vs v2.0.0
+
+These will require user action if you have downstream code:
+
+- `params.max_m` and `params.l_trunc` are still parsed but no longer
+  the canonical knobs.  In-tree YAMLs all use `nstreams` now.
+- `SolverConfig.max_m` / `get_max_m(model)` have been removed in
+  favour of `m_max_bands` (per-band order). If you read these,
+  replace with `model.solver.m_max_bands[iBand]`.
+- `RS_type.F₀` is no longer the public interface for solar irradiance
+  — pass `sources = SolarBeam(F₀ = …)` to `model_from_parameters` or
+  `rt_run` instead.  Existing code that wrote to `RS_type.F₀`
+  directly still works in the legacy code path but the field is
+  scheduled for removal in a follow-up.
+- `Δ_angle` is now an optional YAML field, default `0.0` (was a
+  required field with implicit `2.0` examples).  Set explicitly when
+  reproducing VLIDORT `DO_DELTAM_SCALING = 2°` benchmarks.
+- `rt_run_canopy` (canopy-only entry point) was removed — call
+  `rt_run` with `CanopySurface` as the BRDF.
+- `parameters_from_yaml` is now YAML-only; use `parameters_from_file`
+  / `read_parameters` for TOML or registry-dispatched inputs.
+
+### Highlights
+
+First-class `AbstractSource` type vocabulary (`SolarBeam`,
+`BlackbodySource`, `SurfaceSIF`); user-facing `nstreams` /
+`truncation: auto` Fourier-resolution schema; per-model BLAS thread
+cap; VLIDORT 2.8.3 baseline validation suite (Siewert 2000 Problem IIA,
+solar_tester scalar/vector); `Δ_angle` is now optional and defaults to
+`0.0` (legacy `2.0` matches VLIDORT `DO_DELTAM_SCALING` and can still
+be set explicitly).
 
 ### New user-facing schema (Phase D)
 
 - **`nstreams` is the primary resolution knob.** Public contract:
   `stream_l_cap = 2·nstreams - 1` regardless of `quadrature_type`.
-  Minimum 3 (Rayleigh contributes through m=2). Default 13 when
-  legacy `max_m`/`l_trunc` are absent.
-- **`truncation: auto`** — VLIDORT-`DO_DELTAM_SCALING`-style mode.
-  Resolves at model build time: `NoTruncation()` when phase fits
-  within `stream_l_cap`, `δBGE(N, Δ_angle)` otherwise. Logs the
-  choice via `@info`.
+  Minimum 3 (Rayleigh contributes through m=2). Default 8 when
+  legacy `max_m`/`l_trunc` are absent — gives `stream_l_cap = 15`,
+  which fits typical aerosol δ-fit truncations and gives ~4-decimal
+  Rayleigh convergence at standard atmospheric depth.
+- **`truncation: auto`** — VLIDORT-`DO_DELTAM_SCALING`-style.
+  `NoTruncation()` for Rayleigh-only scenes; `δBGE(stream_l_cap,
+  Δ_angle)` once aerosols are configured. The per-band Mie loop
+  applies δBGE only when `length(greek.β) > stream_l_cap`, so a
+  small-particle Mie series shorter than the cap automatically
+  falls back to `NoTruncation()` — no crash, no user action
+  needed. Logs the chosen branch via `@info`.
 - **`quadrature_type` defaults to `GaussLegQuad()`** when omitted
   (Sanghavi: 5–50× more accurate per stream than `RadauQuad` on
   Rayleigh-only). `RadauQuad` remains supported but is documented

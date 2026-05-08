@@ -5,7 +5,7 @@ layout: home
 hero:
   name: "vSmartMOM.jl"
   text: "Polarized atmospheric radiative transfer"
-  tagline: "Vector matrix-operator method with analytic Jacobians, Raman scattering, and CUDA support."
+  tagline: "<strong>v</strong>ector <strong>s</strong>imulated <strong>m</strong>easurements of the <strong>a</strong>tmosphere using <strong>r</strong>adiative <strong>t</strong>ransfer based on the <strong>M</strong>atrix <strong>O</strong>perator <strong>M</strong>ethod — analytic Jacobians, Raman scattering, CUDA-ready."
   image:
     src: /assets/icons/logo.svg
     alt: vSmartMOM logo

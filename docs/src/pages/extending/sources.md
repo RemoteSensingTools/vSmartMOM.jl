@@ -187,12 +187,11 @@ handled:
 
 ## See also
 
-- [`src/CoreRT/Sources/types.jl`](https://github.com/cfranken/vSmartMOM.jl/blob/main/src/CoreRT/Sources/types.jl) — `AbstractSource`, `SourceSet`, `NoSource`, AD-mode traits.
-- [`src/CoreRT/Sources/solar_beam.jl`](https://github.com/cfranken/vSmartMOM.jl/blob/main/src/CoreRT/Sources/solar_beam.jl) — `SolarBeam`, `PreparedSolarBeam`, `BlackbodySource`, `source_tangent!`.
-- [`src/CoreRT/Sources/surface_sif.jl`](https://github.com/cfranken/vSmartMOM.jl/blob/main/src/CoreRT/Sources/surface_sif.jl) — `SurfaceSIF`, `surface_source_contribute!`.
-- [`test/test_sources.jl`](https://github.com/cfranken/vSmartMOM.jl/blob/main/test/test_sources.jl) — per-phase regression tests with end-to-end bit-equality assertions.
-- The original v0.6 design note: [`dev_notes/source_terms_architecture_v0_6.md`](https://github.com/cfranken/vSmartMOM.jl/blob/main/dev_notes/source_terms_architecture_v0_6.md).
-- The execution plan: `~/.claude/plans/gpt-also-had-some-velvety-whale.md`.
+- [`src/CoreRT/Sources/types.jl`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/Sources/types.jl) — `AbstractSource`, `SourceSet`, `NoSource`, AD-mode traits.
+- [`src/CoreRT/Sources/solar_beam.jl`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/Sources/solar_beam.jl) — `SolarBeam`, `PreparedSolarBeam`, `BlackbodySource`, `source_tangent!`.
+- [`src/CoreRT/Sources/surface_sif.jl`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/Sources/surface_sif.jl) — `SurfaceSIF`, `surface_source_contribute!`.
+- [`test/test_sources.jl`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/test/test_sources.jl) — per-phase regression tests with end-to-end bit-equality assertions.
+- The original v0.6 design note: [`dev_notes/source_terms_architecture_v0_6.md`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/dev_notes/source_terms_architecture_v0_6.md).
 
 ## API reference
 

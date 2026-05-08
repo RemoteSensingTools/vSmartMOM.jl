@@ -16,7 +16,7 @@ radiative_transfer:
   # v0.7 primary resolution knob: weighted streams per hemisphere.
   # Public contract: stream_l_cap = 2·nstreams - 1 regardless of
   # quadrature_type. Minimum 3 (Rayleigh contributes through m=2).
-  nstreams:           13
+  nstreams:           8
   # Phase-function truncation. `auto` is the deterministic default —
   # NoTruncation() if the phase function fits stream_l_cap, δBGE(N, Δ)
   # otherwise. Logged at @info level so the choice is visible.

@@ -30,3 +30,14 @@ wigner_values.jld
 *.pyc
 *.hdf.nc4
 GEOSChem.Custom.20190702_0000z.nc4
+
+# Local agent / session artifacts (do not ship)
+.codex
+.mcp.json
+.mcp.local.json
+nohup.out
+.claude/scheduled_tasks.lock
+
+# Large reference datasets (fetch separately — see sandbox/rami/DATA_FILES.md)
+sandbox/rami/RAMI4ATM_experiments_v1.0.json
+sandbox/rami/ref_kurucz_2006.nc
