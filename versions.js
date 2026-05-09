@@ -1,9 +1,25 @@
 var DOC_VERSIONS = [
+  "sanghavi-unified",
   "stable",
+  "v1",
   "v1.0",
+  "v1.0.5",
+  "v1.0.3",
+  "v1.0.2",
+  "v1.0.1",
+  "v1.0.1-5",
+  "v1.0.1-4",
+  "v1.0.1-3",
+  "v1.0.1-2",
+  "v1.0.0",
   "v0.4",
+  "v0.4.3",
+  "v0.4.2",
+  "v0.4.1",
   "v0.2",
-  "dev",
+  "v0.2.2",
+  "v0.2.1",
+  "v0.2.0",
 ];
-var DOCUMENTER_NEWEST = "v1.0.5";
+var DOCUMENTER_NEWEST = "1.0.5";
 var DOCUMENTER_STABLE = "stable";
