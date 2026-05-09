@@ -646,8 +646,20 @@ function build()
     ]
 
     ref_name = get(ENV, "GITHUB_REF_NAME", "")
-    deploy_devbranch = ref_name == "unified-vsmartmom" ? "unified-vsmartmom" : "main"
-    deploy_devurl = ref_name == "unified-vsmartmom" ? "unified-vsmartmom" : "dev"
+    deploy_devbranch = if ref_name == "unified-vsmartmom"
+        "unified-vsmartmom"
+    elseif ref_name == "sanghavi-unified"
+        "sanghavi-unified"
+    else
+        "main"
+    end
+    deploy_devurl = if ref_name == "unified-vsmartmom"
+        "unified-vsmartmom"
+    elseif ref_name == "sanghavi-unified"
+        "sanghavi-unified"
+    else
+        "dev"
+    end
 
     format = MarkdownVitepress(
         repo = "github.com/RemoteSensingTools/vSmartMOM.jl",
@@ -690,8 +702,20 @@ if get(ENV, "CI", "false") == "true"
     # Keep main as the canonical dev docs, but allow branch-specific dev deployment
     # for unified-vsmartmom so pushes to that branch publish docs as well.
     ref_name = get(ENV, "GITHUB_REF_NAME", "")
-    deploy_devbranch = ref_name == "unified-vsmartmom" ? "unified-vsmartmom" : "main"
-    deploy_devurl = ref_name == "unified-vsmartmom" ? "unified-vsmartmom" : "dev"
+    deploy_devbranch = if ref_name == "unified-vsmartmom"
+        "unified-vsmartmom"
+    elseif ref_name == "sanghavi-unified"
+        "sanghavi-unified"
+    else
+        "main"
+    end
+    deploy_devurl = if ref_name == "unified-vsmartmom"
+        "unified-vsmartmom"
+    elseif ref_name == "sanghavi-unified"
+        "sanghavi-unified"
+    else
+        "dev"
+    end
 
     DocumenterVitepress.deploydocs(
         root = @__DIR__,
