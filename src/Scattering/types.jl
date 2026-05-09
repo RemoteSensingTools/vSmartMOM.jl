@@ -368,7 +368,7 @@ $(DocStringExtensions.FIELDS)
 mutable struct GreekCoefs{FT<:Real}
     "Greek matrix coefficient α, is in B[2,2]"
     α::Array{FT,1} 
-    "Greek matrix coefficient β, is in B[1,1] (only important one for scalar!)"
+    "Greek matrix coefficient β, is in `B[1,1]` (only important one for scalar!)"
     β::Array{FT,1}
     "Greek matrix coefficient γ, is in B[2,1],B[1,2]"
     γ::Array{FT,1}
