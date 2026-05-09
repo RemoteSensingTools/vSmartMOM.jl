@@ -667,7 +667,13 @@ function build()
         devurl = deploy_devurl,
         deploy_decision = get(ENV, "CI", "false") == "true" ?
             nothing : Documenter.DeployDecision(all_ok = false),
-        deploy_url = "https://remotesensingtools.github.io/vSmartMOM.jl",
+        # NOTE: do NOT pass `deploy_url` here — DocumenterVitepress 0.3's
+        # url-parser miscomputes the Vitepress `base` when it's set to a full
+        # `https://host/path` URL (it strips only `"https:"` and leaves the
+        # hostname in the path, producing
+        # `base: '/remotesensingtools.github.io/vSmartMOM.jl/...'`). When the
+        # arg is omitted, the fallback path `"/" * splitpath(repo)[end]`
+        # correctly yields `/vSmartMOM.jl/`.
         description = "Polarized atmospheric radiative transfer and remote sensing tools in Julia.",
         assets = [
             "assets/favicon.ico",
