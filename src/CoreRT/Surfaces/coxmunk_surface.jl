@@ -18,7 +18,7 @@ References:
 # Helper functions
 # ──────────────────────────────────────────────────────────────────────
 
-"""Isotropic slope variance σ² as a function of 10-m wind speed U [m/s] (Cox & Munk 1954)."""
+"""Isotropic slope variance σ² as a function of 10-m wind speed U in m/s (Cox & Munk 1954)."""
 wind_to_sigma2(U::FT) where FT = FT(0.003) + FT(0.00512) * U
 
 """Isotropic Gaussian slope PDF for slope components (zx, zy)."""

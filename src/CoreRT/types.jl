@@ -477,7 +477,7 @@ Base.@kwdef struct CoxMunkSurface{FT} <: AbstractSurfaceType
     shadowing::Bool = true
 end
 
-"Defined by Legendre polynomial terms as function of spectral grid, which is scaled to [-1,1] (degree derived from length of `a_coeff`)"
+"Defined by Legendre polynomial terms as function of spectral grid, which is scaled to `[-1,1]` (degree derived from length of `a_coeff`)"
 struct LambertianSurfaceLegendre{FT} <: AbstractSurfaceType
     "albedo = legendre_coeff[1] * P₀ + legendre_coeff[2]*P₁ + legendre_coeff[3]*P₂ + ... "
     legendre_coeff::AbstractArray{FT,1}
@@ -722,7 +722,7 @@ mutable struct vSmartMOM_Parameters{FT<:Real}
     polarization_type::AbstractPolarizationType
     "Hard cutoff for maximum number of Fourier moments to loop over"
     max_m::Integer
-    "Exclusion angle for forward peak [deg] (legacy — see `truncation`)"
+    "Exclusion angle for forward peak in degrees (legacy — see `truncation`)"
     Δ_angle::FT
     "Truncation length for legendre terms (scalar for now, can do `nBand` later)"
     l_trunc::Integer
@@ -915,7 +915,7 @@ $(DocStringExtensions.FIELDS)
 struct AerosolState{FT<:AbstractFloat, AO, AT<:AbstractArray{FT}}
     "Truncated aerosol optics: aerosol_optics[iBand][iAer]"
     aerosol_optics::Vector{Vector{AO}}
-    "Aerosol optical depth profiles: τ_aer[iBand][iAer, iLayer] (or [iAer, nSpec, iLayer] for lin)"
+    "Aerosol optical depth profiles: `τ_aer[iBand][iAer, iLayer]` (or `[iAer, nSpec, iLayer]` for lin)"
     τ_aer::Vector{AT}
 end
 
