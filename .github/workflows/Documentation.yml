@@ -4,7 +4,7 @@ on:
     branches:
       - main
       - develop
-      - unified-vsmartmom
+      - sanghavi-unified
     tags: '*'
   pull_request:
 
