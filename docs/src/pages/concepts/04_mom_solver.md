@@ -28,29 +28,35 @@ GPU.
 
 ## The per-layer kernel sequence
 
-```@raw html
-<pre class="mermaid">
-flowchart TD
-    A["rt_run loops Fourier moments<br/>m = 0 ... max_m-1"]
-    B["constructCoreOpticalProperties<br/>→ Vector of layer optics"]
-    C["for each layer iz, TOA → BOA"]
-    D["<b>Elemental</b>: r, t, j<br/>(single-scatter, exact finite-δ)"]
-    E["<b>Doubling</b>: thicken to full layer<br/>(geometric series)"]
-    F["<b>Interaction</b>: stack onto composite layer above<br/>(4-case dispatch)"]
-    G{"iz &lt; Nz?"}
-    H["Surface coupling<br/>(BRDF as bottom AddedLayer)"]
-    I["Postprocessing<br/>(azimuthal weighting, VZA interpolation)"]
-    A --> B --> C --> D --> E --> F --> G
-    G -- yes --> C
-    G -- no --> H --> I
-</pre>
-<script type="module">
-  if (!window.__mermaidLoader) {
-    window.__mermaidLoader = import('https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs')
-      .then(m => { window.__mermaid = m.default; m.default.initialize({ startOnLoad: false, theme: 'default' }); return m.default; });
-  }
-  window.__mermaidLoader.then(m => m.run({ querySelector: '.mermaid' }));
-</script>
+```
+   rt_run loops Fourier moments  m = 0 ... max_m-1
+        │
+        ▼
+   constructCoreOpticalProperties  →  Vector of layer optics
+        │
+        ▼
+   for each layer iz, TOA → BOA  ────────────┐
+        │                                     │
+        ▼                                     │
+   Elemental:    r, t, j  (single-scatter,    │
+                          exact finite-δ)     │
+        │                                     │
+        ▼                                     │
+   Doubling:     thicken to full layer        │
+                 (geometric series)           │
+        │                                     │
+        ▼                                     │
+   Interaction:  stack onto composite layer   │
+                 above (4-case dispatch)      │
+        │                                     │
+        ├──── iz < Nz ?  yes ─────────────────┘
+        │
+        no
+        ▼
+   Surface coupling  (BRDF as bottom AddedLayer)
+        │
+        ▼
+   Postprocessing  (azimuthal weighting, VZA interpolation)
 ```
 
 The orchestrator is `rt_kernel!` in [`src/CoreRT/CoreKernel/rt_kernel.jl:48–229`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/CoreKernel/rt_kernel.jl#L48-L229).
