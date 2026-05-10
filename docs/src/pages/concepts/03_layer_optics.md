@@ -34,7 +34,8 @@ the constructor is `constructCoreOpticalProperties` in
 [`src/CoreRT/LayerOpticalProperties/compEffectiveLayerProperties.jl:11–65`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/LayerOpticalProperties/compEffectiveLayerProperties.jl#L11-L65). The
 build happens once per band, per Fourier moment, before the layer loop:
 
-```mermaid
+```@raw html
+<pre class="mermaid">
 flowchart LR
     G["Gas opacity τ_abs<br/>(HITRAN LBL)"]
     R["Rayleigh<br/>(greek + ϖ_Cab)"]
@@ -48,6 +49,14 @@ flowchart LR
     A1 --> C
     A2 --> C
     C --> L --> M
+</pre>
+<script type="module">
+  if (!window.__mermaidLoader) {
+    window.__mermaidLoader = import('https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs')
+      .then(m => { window.__mermaid = m.default; m.default.initialize({ startOnLoad: false, theme: 'default' }); return m.default; });
+  }
+  window.__mermaidLoader.then(m => m.run({ querySelector: '.mermaid' }));
+</script>
 ```
 
 The build proceeds in five steps (the relevant lines from

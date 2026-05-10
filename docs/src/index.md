@@ -5,7 +5,7 @@ layout: home
 hero:
   name: "vSmartMOM.jl"
   text: "Polarized atmospheric radiative transfer"
-  tagline: "<strong style=\"color:#dc2626\">v</strong>ector <strong style=\"color:#7c3aed\">S</strong>imulated <strong style=\"color:#dc2626\">m</strong>easurements of the <strong style=\"color:#dc2626\">a</strong>tmosphere using <strong style=\"color:#dc2626\">r</strong>adiative <strong style=\"color:#dc2626\">t</strong>ransfer based on the <strong style=\"color:#7c3aed\">M</strong>atrix <strong style=\"color:#7c3aed\">O</strong>perator <strong style=\"color:#7c3aed\">M</strong>ethod — analytic Jacobians, Raman scattering, CUDA-ready."
+  tagline: "<strong style=\"color:#dc2626\">v</strong>ector <strong style=\"color:#dc2626\">S</strong>imulated <strong style=\"color:#dc2626\">m</strong>easurements of the <strong style=\"color:#dc2626\">a</strong>tmosphere using <strong style=\"color:#dc2626\">r</strong>adiative <strong style=\"color:#dc2626\">t</strong>ransfer based on the <strong style=\"color:#7c3aed\">M</strong>atrix <strong style=\"color:#7c3aed\">O</strong>perator <strong style=\"color:#7c3aed\">M</strong>ethod — analytic Jacobians, Raman scattering, CUDA-ready."
   image:
     src: /assets/icons/logo.png
     alt: vSmartMOM logo
