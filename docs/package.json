@@ -11,7 +11,9 @@
     "@nolebase/vitepress-plugin-enhanced-readabilities": "^2.18.2",
     "markdown-it": "^14.1.0",
     "markdown-it-footnote": "^4.0.0",
+    "mermaid": "^10.9.1",
     "vitepress": "^1.6.4",
+    "vitepress-plugin-mermaid": "^2.0.17",
     "vitepress-plugin-tabs": "^0.9.0"
   },
   "devDependencies": {

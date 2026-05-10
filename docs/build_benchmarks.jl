@@ -56,7 +56,7 @@ fmt_val(x; d::Int = 4) = @sprintf("%.*f", d, x)
 
 function write_table(io::IO, rows::AbstractVector{Row};
                      near_zero_atol::Real = 0.0)
-    println(io, "| Geometry | Modeled | Truth | |Δ| | |Δ|/|truth| |")
+    println(io, "| Geometry | Modeled | Truth | \\|Δ\\| | \\|Δ\\|/\\|truth\\| |")
     println(io, "|---|---|---|---|---|")
     for r in rows
         re = rel_err(r; near_zero_atol)

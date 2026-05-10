@@ -572,8 +572,45 @@ function copy_landing_page_icons()
     for dest in destinations
         mkpath(dest)
         for icon in readdir(icon_src)
-            endswith(icon, ".svg") || continue
+            (endswith(icon, ".svg") || endswith(icon, ".png")) || continue
             cp(joinpath(icon_src, icon), joinpath(dest, icon); force = true)
+        end
+    end
+    return nothing
+end
+
+# Patch the DocumenterVitepress-generated `.vitepress/config.mts` to wrap its
+# default export with `withMermaid(...)` so ` ```mermaid ` fenced blocks are
+# rendered by VitePress. The package `vitepress-plugin-mermaid` is declared
+# in docs/package.json. Idempotent: skips if already patched.
+function wire_mermaid_into_vitepress_config()
+    config_paths = [joinpath(@__DIR__, "build", ".documenter", ".vitepress", "config.mts")]
+    bases_file = joinpath(@__DIR__, "build", "bases.txt")
+    if isfile(bases_file)
+        append!(config_paths,
+                [joinpath(@__DIR__, "build", string(i), ".vitepress", "config.mts")
+                 for i in eachindex(readlines(bases_file))])
+    end
+
+    for path in config_paths
+        isfile(path) || continue
+        src = read(path, String)
+        occursin("vitepress-plugin-mermaid", src) && continue
+        patched = replace(src,
+            r"^(import\s+\{[^}]*\}\s+from\s+['\"]vitepress['\"];?\s*\n)"m =>
+                s"\1import { withMermaid } from 'vitepress-plugin-mermaid';\n";
+            count = 1)
+        patched = replace(patched,
+            r"export default defineConfig\("s => "export default withMermaid(defineConfig(";
+            count = 1)
+        patched = replace(patched,
+            r"\n\}\);\s*$"s => "\n}));\n";
+            count = 1)
+        if patched == src
+            @warn "Could not patch VitePress config for mermaid — pattern not matched" path
+        else
+            write(path, patched)
+            @info "Patched VitePress config to enable mermaid" path
         end
     end
     return nothing
@@ -593,14 +630,14 @@ function build()
 
     pages = Any[
         "Home"                  => "index.md",
-        "Manual"                => Any[
+        "User Guide"            => Any[
                                     "Quick Start (5 min)" => "pages/quickstart.md",
                                     "Conventions ⚠ (read first)" => "pages/conventions.md",
                                     "Configure a Scene" => "pages/IO/Overview.md",
                                     "Compute Jacobians" => "pages/jacobians.md",
                                     "Run on GPU" => "pages/gpu.md",
                                    ],
-        "Concepts"              => Any[
+        "RT basics"             => Any[
                                     "1 · Problem & MOM Thesis" => "pages/concepts/01_overview.md",
                                     "2 · Vector RTE & Discretization" => "pages/concepts/02_rt_theory.md",
                                     "3 · Layer Optical Properties" => "pages/concepts/03_layer_optics.md",
@@ -614,6 +651,9 @@ function build()
                                     "8 · Inelastic Extension" => "pages/concepts/08_inelastic.md",
                                     "Aerosols (microphysics)" => "pages/Aerosols/Overview.md",
                                     "Solar Model (irradiance)" => "pages/SolarModel/Overview.md",
+                                   ],
+        "Validation"            => Any[
+                                    "Benchmarks" => "pages/benchmarks.md",
                                    ],
         "Developer Guides"      => Any[
                                     "Add a Surface BRDF" => "pages/extending/surfaces.md",
@@ -678,10 +718,10 @@ function build()
         assets = [
             "assets/favicon.ico",
             "assets/logo.png",
-            "assets/icons/logo.svg",
-            "assets/icons/scattering.svg",
-            "assets/icons/absorption.svg",
-            "assets/icons/radiative_transfer.svg",
+            "assets/icons/logo.png",
+            "assets/icons/scattering.png",
+            "assets/icons/absorption.png",
+            "assets/icons/radiative_transfer.png",
         ],
         sidebar_drawer = true,
     )
@@ -698,6 +738,7 @@ function build()
 
     generate_tutorial_plot_assets()
     copy_landing_page_icons()
+    wire_mermaid_into_vitepress_config()
 
 end
 

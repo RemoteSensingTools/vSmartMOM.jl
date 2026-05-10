@@ -6,7 +6,7 @@
 
 This page writes the equation that vSmartMOM solves, then discretizes it.
 By the end, the per-layer problem reduces to four arrays of shape
-`(NquadN, NquadN, nSpec)` — the arrays the rest of the Concepts arc
+`(NquadN, NquadN, nSpec)` — the arrays the rest of the RT basics arc
 manipulates.
 
 ## The vector RTE
@@ -64,7 +64,7 @@ polarization ``Q``); ``\bar{\mathbf{S}}_m`` is block-off-diagonal (mixing ``U``
 with the rest). Each Fourier moment ``m`` solves an *independent* RTE — the
 ``m``-loop in `rt_run.jl` is therefore embarrassingly parallel.
 
-## Quadrature in ``\mu``
+## Quadrature in μ
 
 After Fourier decomposition, each per-moment integral over ``\mu' \in [-1, 1]``
 is replaced by a finite sum. vSmartMOM offers two quadrature schemes

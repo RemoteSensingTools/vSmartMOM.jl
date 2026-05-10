@@ -1,6 +1,6 @@
 # 6 · Linearization — operator-level chain rule
 
-> **For:** retrieval / inversion developers; anyone who needs `∂R/∂x` for a parameter `x`. The runnable workflow is at [Manual → Compute Jacobians](../jacobians.md); this page explains the *why*.
+> **For:** retrieval / inversion developers; anyone who needs `∂R/∂x` for a parameter `x`. The runnable workflow is at [User Guide → Compute Jacobians](../jacobians.md); this page explains the *why*.
 >
 > **Prev:** [5 · Surfaces](05_surfaces.md) · **Next:** [7 · Architecture-Agnostic Code](07_architecture.md)
 
@@ -240,7 +240,7 @@ involving `rt_run`.
 | Linearized δ-M truncation | [`src/CoreRT/LayerOpticalProperties/delta_m_truncation_lin.jl`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/LayerOpticalProperties/delta_m_truncation_lin.jl) |
 | Linearized Cox-Munk | [`src/CoreRT/Surfaces/coxmunk_surface_lin.jl`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/Surfaces/coxmunk_surface_lin.jl) |
 
-See also [Manual → Compute Jacobians](../jacobians.md) for the runnable
+See also [User Guide → Compute Jacobians](../jacobians.md) for the runnable
 workflow, [Tutorial_Jacobians](../tutorials/Tutorial_Jacobians.md) for a
 hands-on example with finite-difference cross-checks, and
 [Tutorial_HybridAD](../tutorials/Tutorial_HybridAD.md) for ForwardDiff

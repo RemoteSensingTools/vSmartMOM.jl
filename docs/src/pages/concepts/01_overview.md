@@ -125,49 +125,21 @@ Every claim below has a `file.jl:LINE` next to it. No marketing.
 
 ## The narrative thread
 
-```
-PROBLEM      Polarized radiance from a layered scattering+absorbing
-             atmosphere, plus Jacobians, fast, on any hardware.
-                |
-                v
-WHY MOM?     Per-layer matrix operator → linear-algebra composition →
-             full multiple scattering by construction; large τ cheap
-             (logarithmic via doubling); exact analytic Jacobians.
-                |
-                v
-DISCRETIZE   Fourier in φ (m=0..max_m), Gauss/Radau quadrature in μ.
-                |
-                v
-4 ARRAYS     Per Fourier moment m, each layer reduces to four arrays
-             of shape (NquadN, NquadN, nSpec):
-                τ, ϖ, Z⁺⁺, Z⁻⁺
-                |
-                v
-BUILD        Gas absorption (HITRAN LBL) + Mie/Rayleigh scattering
-LAYER        + τϖ-weighted mixing + δ-M truncation + vertical stacking
-OPTICS       (Concepts 3, 3a, 3b, 3c).
-                |
-                v
-SOLVE        Per Fourier moment m, layer iz from TOA → BOA:
-(MOM)            elemental!  →  doubling!  →  interaction!
-             (Concepts 4)
-                |
-                v
-SURFACE      BRDF as the bottom-most AddedLayer (Concepts 5).
-                |
-                v
-LINEARIZE    Operator-level chain rule on adding-doubling.
-             ParameterLayout names the Jacobian columns.
-             Forward + linearized < 2× forward-only (Concepts 6).
-                |
-                v
-EVERYWHERE   One @kernel source compiles for CPU + CUDA + Metal.
-ON ANY       All wavelengths in parallel via the spectral batch axis.
-HARDWARE     ForwardDiff Duals flow through GPU batched paths.
-             (Concepts 7)
+```mermaid
+flowchart TD
+    P["<b>PROBLEM</b><br/>Polarized radiance from a layered<br/>scattering+absorbing atmosphere,<br/>plus Jacobians, fast, on any hardware."]
+    W["<b>WHY MOM?</b><br/>Per-layer matrix operator → linear-algebra<br/>composition → full multiple scattering;<br/>large τ cheap (logarithmic via doubling);<br/>exact analytic Jacobians."]
+    D["<b>DISCRETIZE</b><br/>Fourier in φ (m=0..max_m),<br/>Gauss/Radau quadrature in μ."]
+    A["<b>4 ARRAYS</b><br/>Per Fourier moment m, each layer reduces to<br/>four arrays of shape (NquadN, NquadN, nSpec):<br/>τ, ϖ, Z⁺⁺, Z⁻⁺"]
+    B["<b>BUILD LAYER OPTICS</b><br/>Gas absorption (HITRAN LBL) + Mie/Rayleigh +<br/>τϖ-weighted mixing + δ-M truncation +<br/>vertical stacking (RT basics 3, 3a, 3b, 3c)."]
+    S["<b>SOLVE (MOM)</b><br/>Per Fourier moment m, layer iz from TOA → BOA:<br/>elemental! → doubling! → interaction!<br/>(RT basics 4)"]
+    R["<b>SURFACE</b><br/>BRDF as the bottom-most AddedLayer<br/>(RT basics 5)."]
+    L["<b>LINEARIZE</b><br/>Operator-level chain rule on adding-doubling.<br/>ParameterLayout names the Jacobian columns.<br/>Forward + linearized &lt; 2× forward-only<br/>(RT basics 6)."]
+    E["<b>EVERYWHERE ON ANY HARDWARE</b><br/>One @kernel source for CPU + CUDA + Metal.<br/>All wavelengths parallel via spectral batch axis.<br/>ForwardDiff Duals flow through GPU batched paths.<br/>(RT basics 7)"]
+    P --> W --> D --> A --> B --> S --> R --> L --> E
 ```
 
-That's the spine. Every page in this Concepts arc is one segment of it.
+That's the spine. Every page in this RT basics arc is one segment of it.
 
 ## Where this thread continues
 
