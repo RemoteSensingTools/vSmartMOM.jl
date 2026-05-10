@@ -1,0 +1,59 @@
+# Siewert 2000 Problem IIA — vSmartMOM configuration matching the actual
+# VLIDORT 2.8.3 driver V2p8p3_Siewert2000_validation.f90 (NOT the .cfg).
+#
+# IMPORTANT: the .cfg specifies SZA = 78.463° (μ₀=0.2), but the f90 driver
+# overrides it at line 243 with `DACOS(0.6d0)/DEG_TO_RAD ≈ 53.13°` (μ₀=0.6).
+# The shipped truth tables `results_Siewert2000_validation.all` were generated
+# with μ₀ = 0.6, so we must match that here.
+#
+# Single-layer, plane-parallel, vector RT. Geometry:
+#   SZA = acos(0.6) ≈ 53.130102° (μ₀ = 0.6)
+#   11 viewing zenith angles (degrees): 0.0001, 25.84, 36.87, ..., 89.9999
+#   3 azimuths: 0°, 90°, 180°
+#   τ_total = 1.0  (overridden in case file)
+#   ω̃     = 0.973527 (overridden in case file)
+#   Lambertian albedo = 0
+#
+# The aerosol block specifies an analytic HenyeyGreensteinPhaseFunction so
+# `model_from_parameters` populates `aerosol_optics[1][1]` without running Mie.
+# The case file replaces that AerosolOptics with a hand-built one carrying the
+# Siewert PROBLEM_IIA Greek coefficients, and overrides τ_aer / τ_rayl directly.
+
+radiative_transfer:
+  spec_bands:
+    - "[18867.92]"
+  surface:
+    - LambertianSurfaceScalar(0.0)
+  quadrature_type:    GaussLegQuad()
+  polarization_type:  Stokes_IQUV()
+  max_m:              30
+  Δ_angle:            2.0
+  l_trunc:            30
+  depol:              0.0
+  float_type:         Float64
+  architecture:       Architectures.CPU()
+
+geometry:
+  sza:                53.130102354065   # acos(0.6) — see header note
+  vza:                [0.0001, 25.841932763, 36.869897646, 45.572995999,
+                       53.130102354, 60.0, 66.421821522, 72.542396876,
+                       78.463040967, 84.260829523, 89.9999]
+  vaz:                [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+  obs_alt:            1000.0
+
+atmospheric_profile:
+  T: [231.62]
+  p: [0.14, 0.22]
+  profile_reduction: -1
+
+scattering:
+  aerosols:
+    - τ_ref: 1.0
+      phase_function: HenyeyGreensteinPhaseFunction(0.5)
+      ssa: 0.973527
+      p₀: 0.18
+      σp: 0.05
+  r_max:          50.0
+  nquad_radius:   1000
+  λ_ref:          0.530
+  decomp_type:    NAI2()

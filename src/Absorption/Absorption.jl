@@ -15,7 +15,7 @@ using Interpolations            # For interpolating in lookup tables and interpo
 using JLD2                      # For saving and loading the interpolator
 using ProgressMeter             # For showing progress, especially in creating interpolator
 using KernelAbstractions        # For heterogeneous (GPU+CPU) programming
-using ForwardDiff, DiffResults  # For auto-differentiation
+# ForwardDiff/DiffResults removed — autodiff wrapper was unused in the RT pipeline
 using NetCDF                    # For loading NetCDF files with constants
 using ..Architectures           # For GPU/CPU convenience
 using ..Architectures: CPU, GPU # Again for GPU/CPU convenience
@@ -30,6 +30,9 @@ include("complex_error_functions.jl")               # CEFs used in line broadeni
 include("make_model_helpers.jl")                  # CS interpolator functions
 include("compute_absorption_cross_section.jl")      # Cross-section from HITRAN
 include("autodiff_helper.jl")                       # Auto-differentiation
+include("show_utils.jl")                             # Pretty-printing
+include("cia.jl")                                    # HITRAN collision-induced absorption
+include("mtckd.jl")                                  # MT_CKD water-vapor continuum
 
 # Export the Cross Section models
 export AbstractCrossSectionModel, HitranModel, InterpolationModel
@@ -54,5 +57,12 @@ export HitranTable
 
 # Export the interpolator functions
 export make_interpolation_model, save_interpolation_model, load_interpolation_model
+
+# CIA (collision-induced absorption)
+export CIATable, CIABlock, parse_cia_file, build_cia_table, load_cia_table,
+       compute_τ_cia!, cia_σ_at_T!
+
+# MT_CKD water-vapor continuum
+export MTCKDTable, MTCKDBand, load_mtckd, build_mtckd_band, compute_τ_h2o_continuum!
 
 end

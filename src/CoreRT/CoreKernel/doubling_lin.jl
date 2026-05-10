@@ -1,0 +1,485 @@
+#=
+ 
+This file contains RT doubling-related functions
+ 
+=#
+
+"""
+    doubling_helper!(pol_type, SFI, expk, expk_lin, ndoubl, added_layer,
+                     added_layer_lin, I_static, architecture)
+
+Tangent-linear partner of the forward [`doubling_helper!`](@ref) kernel:
+doubles the elemental layer ``n_d`` times to reach the full homogeneous-layer
+optical depth, **and simultaneously propagates derivatives** with respect to
+the three core layer variables ``(\\tau, \\varpi, \\mathbf{Z})``.
+
+# Forward (Sanghavi 2014, Eqs. 23–28; restated for homogeneous case)
+
+```math
+\\mathbf{G} = (\\mathbf{E} - \\mathbf{R}\\,\\mathbf{R})^{-1}
+```
+```math
+\\mathbf{R}_{2\\tau} = \\mathbf{R} + \\mathbf{T}\\,\\mathbf{G}\\,\\mathbf{R}\\,\\mathbf{T},\\qquad
+\\mathbf{T}_{2\\tau} = \\mathbf{T}\\,\\mathbf{G}\\,\\mathbf{T}.
+```
+
+After ``n_d`` iterations, the layer has optical depth ``2^{n_d}\\,d\\tau`` —
+the **logarithmic-in-τ** scaling that makes MOM cheap for thick atmospheres.
+The original adding-doubling formulation is de Haan, Bosma & Hovenier
+(1987); Sanghavi 2014 §2.1 is the vector form vSmartMOM uses.
+
+# Linearization (Sanghavi 2014 App. C, Eqs. C.11–C.16)
+
+The derivatives propagate through the doubling via the product/chain rule.
+For each core parameter ``c \\in \\{\\tau, \\varpi, \\mathbf{Z}\\}``:
+
+```math
+\\dot{\\mathbf{G}}_c = \\mathbf{G}\\,\\bigl(\\dot{\\mathbf{R}}_c\\,\\mathbf{R} + \\mathbf{R}\\,\\dot{\\mathbf{R}}_c\\bigr)\\,\\mathbf{G}
+```
+```math
+\\dot{\\mathbf{R}}_{2\\tau,c} = \\dot{\\mathbf{R}}_c + \\dot{\\mathbf{T}}_c\\,\\mathbf{G}\\,\\mathbf{R}\\,\\mathbf{T} + \\ldots
+```
+
+The closed-form ``\\dot{\\mathbf{G}} = -\\mathbf{G}\\,\\dot{(\\mathbf{R}\\mathbf{R})}\\,\\mathbf{G}`` derivation
+keeps the linearization analytic — no AD through the batched matrix
+inversion. **Crucially, ``\\mathbf{G}`` is the same inverse the forward
+doubling step already computed**, so the linearized partner *reuses* it
+rather than recomputing. The marginal cost per linearized iteration is
+two extra batched matmuls per core parameter, not another LU. This is
+why a combined forward + linearized run costs **less than 2× a forward-only
+run** — the dominant ``N_\\mathrm{quad}^3`` LU work is paid once. ForwardDiff
+through `batch_inv!` would force ``(1+N_\\mathrm{params})`` evaluations of the
+inverse; finite differences would force ``(1+N_\\mathrm{state})`` full forward
+runs. See [Concepts/06 — Linearization § Why this is fast](../../docs/src/pages/concepts/06_linearization.md#why-this-is-fast-the-matrix-inversion-is-reused).
+
+The D-matrix symmetry from Sanghavi 2014 Eqs. (C.17)–(C.18) is preserved on
+the derivatives too (`apply_D_matrix!` is reused), halving the linearized
+doubling cost just as it halves the forward doubling cost.
+
+When `SFI=true`, the source-function vectors ``\\mathbf{J}_0^\\pm`` and their
+derivatives are doubled, with the beam attenuation factor ``e^{-d\\tau/\\mu_0}``
+(and its derivative ``-e^{-d\\tau/\\mu_0}/\\mu_0``) applied between
+iterations.
+
+# Concepts page
+See [Linearization — operator-level chain rule](../../docs/src/pages/concepts/06_linearization.md)
+for the three-tier Jacobian diagram and the AD-boundary discussion.
+
+# Arguments
+- `pol_type`: Polarization type.
+- `SFI`: Source-function-integration flag.
+- `expk`: Beam attenuation factor ``e^{-d\\tau/\\mu_0}`` `[nSpec]`.
+- `expk_lin`: Its derivative ``-e^{-d\\tau/\\mu_0}/\\mu_0`` `[nSpec]`.
+- `ndoubl::Int`: Number of doubling iterations.
+- `added_layer::AddedLayer`: Forward RT matrices (modified in place).
+- `added_layer_lin::AddedLayerLin`: Linearized RT matrices (modified in place).
+- `I_static`: Pre-allocated batched identity matrix.
+- `architecture`: `CPU`, `GPU`, or `MetalGPU`.
+"""
+function doubling_helper!(pol_type, 
+                          SFI, 
+                          expk, expk_lin,
+                          ndoubl::Int, 
+                          added_layer::AddedLayer,
+                          added_layer_lin::AddedLayerLin,
+                          I_static::AbstractArray{FT}, 
+                          architecture) where {FT}
+
+    # Unpack the added layer
+    (; r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻) = added_layer
+    (; ṙ⁺⁻, ṙ⁻⁺, ṫ⁻⁻, ṫ⁺⁺, J̇₀⁺, J̇₀⁻) = added_layer_lin
+    # Device architecture
+    dev = devi(architecture)
+    arr_type = array_type(architecture)
+
+    # Note: short-circuit evaluation => return nothing evaluated iff ndoubl == 0 
+    ndoubl == 0 && return nothing
+    
+    # Geometric progression of reflections (1-RR)⁻¹
+    gp_refl      = similar(t⁺⁺)
+    tt⁺⁺_gp_refl = similar(t⁺⁺)
+    gp_refl_lin       = arr_type(zeros(size(t⁺⁺)[1], size(t⁺⁺)[2], size(t⁺⁺)[3], 3))
+    tt⁺⁺_gp_refl_lin  = arr_type(zeros(size(t⁺⁺)[1], size(t⁺⁺)[2], size(t⁺⁺)[3], 3))
+    # Source-doubling scratch — always allocated. Affine source propagation
+    # is source-agnostic; if no sources contributed at the elemental step,
+    # `j₀±/J̇₀±` are zero (initialized in elemental_lin.jl) and the
+    # propagation below is a series of zero-array matmuls returning zero.
+    # No `if SFI` gate needed — multiple dispatch (NoSource → no contribute!)
+    # already determines whether source state exists; the operator side
+    # then propagates it unconditionally per Fourier moment.
+    J₁⁺ = similar(j₀⁺)
+    J̇₁⁺ = similar(J̇₀⁺)
+    J₁⁻ = similar(j₀⁻)
+    J̇₁⁻ = similar(J̇₀⁻)
+
+    # Loop over number of doublings
+    @inbounds for n = 1:ndoubl
+        
+        # T⁺⁺(λ)[I - R⁺⁻(λ)R⁻⁺(λ)]⁻¹, for doubling R⁺⁻,R⁻⁺ and T⁺⁺,T⁻⁻ is identical
+        batch_inv!(gp_refl, I_static .- r⁻⁺ ⊠ r⁻⁺)
+        tt⁺⁺_gp_refl[:] = t⁺⁺ ⊠ gp_refl
+        for iparam = 1:3
+            @views gp_refl_lin[:,:,:,iparam] .= gp_refl ⊠ (ṙ⁻⁺[:,:,:,iparam] ⊠ r⁻⁺ .+ r⁻⁺ ⊠ ṙ⁻⁺[:,:,:,iparam]) ⊠ gp_refl
+            @views tt⁺⁺_gp_refl_lin[:,:,:,iparam] .= ṫ⁺⁺[:,:,:,iparam] ⊠ gp_refl .+ t⁺⁺ ⊠ gp_refl_lin[:,:,:,iparam]
+        end
+        # Source-vector doubling — always-on per the v0.6 design (the affine
+        # update is source-agnostic; doubling does not need to know whether
+        # any source contributed; if `j₀±=0` (NoSource scene) the matmuls
+        # produce zero — bit-equal to the previously-gated `if SFI` path).
+        # J⁺₂₁(λ) = J⁺₁₀(λ).exp(-τ(λ)/μ₀)
+        @views J₁⁺[:,1,:] = j₀⁺[:,1,:] .* expk'
+        # J⁻₁₂(λ)  = J⁻₀₁(λ).exp(-τ(λ)/μ₀)
+        @views J₁⁻[:,1,:] = j₀⁻[:,1,:] .* expk'
+        for iparam = 1:3
+            if iparam == 1
+                @views J̇₁⁺[:,1,:,iparam] .= J̇₀⁺[:,1,:,iparam] .* expk' .+ j₀⁺[:,1,:] .* expk_lin'
+                @views J̇₁⁻[:,1,:,iparam] .= J̇₀⁻[:,1,:,iparam] .* expk' .+ j₀⁻[:,1,:] .* expk_lin'
+
+                @views expk_lin .= 2*expk .* expk_lin
+            else
+                @views J̇₁⁺[:,1,:,iparam] .= J̇₀⁺[:,1,:,iparam] .* expk'
+                @views J̇₁⁻[:,1,:,iparam] .= J̇₀⁻[:,1,:,iparam] .* expk'
+            end
+            @views J̇₀⁻[:,:,:,iparam] .= J̇₀⁻[:,:,:,iparam] .+
+                    (tt⁺⁺_gp_refl_lin[:,:,:,iparam] ⊠ (J₁⁻ .+ r⁻⁺ ⊠ j₀⁺)) .+
+                    (tt⁺⁺_gp_refl ⊠ (J̇₁⁻[:,:,:,iparam] .+ ṙ⁻⁺[:,:,:,iparam] ⊠ j₀⁺ .+ r⁻⁺ ⊠ J̇₀⁺[:,:,:,iparam]))
+            @views J̇₀⁺[:,:,:,iparam] .= J̇₁⁺[:,:,:,iparam] .+
+                (tt⁺⁺_gp_refl_lin[:,:,:,iparam] ⊠ (j₀⁺ .+ r⁻⁺ ⊠ J₁⁻)) .+
+                (tt⁺⁺_gp_refl ⊠ (J̇₀⁺[:,:,:,iparam] .+ ṙ⁻⁺[:,:,:,iparam] ⊠ J₁⁻ .+ r⁻⁺ ⊠ J̇₁⁻[:,:,:,iparam]))
+        end
+
+        # J⁻₀₂(λ) = J⁻₀₁(λ) + T⁻⁻₀₁(λ)[I - R⁻⁺₂₁(λ)R⁺⁻₀₁(λ)]⁻¹[J⁻₁₂(λ) + R⁻⁺₂₁(λ)J⁺₁₀(λ)]
+        j₀⁻[:] = j₀⁻ .+ (tt⁺⁺_gp_refl ⊠ (J₁⁻ .+ r⁻⁺ ⊠ j₀⁺))
+        # J⁺₂₀(λ) = J⁺₂₁(λ) + T⁺⁺₂₁(λ)[I - R⁺⁻₀₁(λ)R⁻⁺₂₁(λ)]⁻¹[J⁺₁₀(λ) + R⁺⁻₀₁(λ)J⁻₁₂(λ)]
+        j₀⁺[:] = J₁⁺ .+ (tt⁺⁺_gp_refl ⊠ (j₀⁺ .+ r⁻⁺ ⊠ J₁⁻))
+        expk[:] = expk.^2
+
+        for iparam = 1:3
+            ṙ⁻⁺[:,:,:,iparam] .= ṙ⁻⁺[:,:,:,iparam] .+
+                        tt⁺⁺_gp_refl_lin[:,:,:,iparam] ⊠ r⁻⁺ ⊠ t⁺⁺ .+
+                        tt⁺⁺_gp_refl ⊠ (ṙ⁻⁺[:,:,:,iparam] ⊠ t⁺⁺ .+
+                        r⁻⁺ ⊠ ṫ⁺⁺[:,:,:,iparam])
+            ṫ⁺⁺[:,:,:,iparam]  = tt⁺⁺_gp_refl_lin[:,:,:,iparam] ⊠ t⁺⁺ .+
+                        tt⁺⁺_gp_refl ⊠ ṫ⁺⁺[:,:,:,iparam]
+        end
+        # R⁻⁺₂₀(λ) = R⁻⁺₁₀(λ) + T⁻⁻₀₁(λ)[I - R⁻⁺₂₁(λ)R⁺⁻₀₁(λ)]⁻¹R⁻⁺₂₁(λ)T⁺⁺₁₀(λ) (see Eqs.8 in Raman paper draft)
+        r⁻⁺[:]  = r⁻⁺ .+ (tt⁺⁺_gp_refl ⊠ r⁻⁺ ⊠ t⁺⁺)
+
+        # T⁺⁺₂₀(λ) = T⁺⁺₂₁(λ)[I - R⁺⁻₀₁(λ)R⁻⁺₂₁(λ)]⁻¹T⁺⁺₁₀(λ) (see Eqs.8 in Raman paper draft)
+        t⁺⁺[:]  = tt⁺⁺_gp_refl ⊠ t⁺⁺
+    end
+
+    # After doubling, revert D(DR)->R, where D = Diagonal{1,1,-1,-1}
+    # For SFI, after doubling, revert D(DJ₀⁻)->J₀⁻
+
+    synchronize_if_gpu()
+
+    apply_D_matrix!(pol_type.n, added_layer.r⁻⁺, added_layer.t⁺⁺, added_layer.r⁺⁻, added_layer.t⁻⁻)
+
+    # Source-vector D-matrix is always applied; for a NoSource scene
+    # `j₀⁻=0` and the kernel is a no-op for all Stokes components.
+    apply_D_matrix_SFI!(pol_type.n, added_layer.j₀⁻)
+
+    return nothing
+end
+
+function doubling!(pol_type, SFI, expk, expk_lin,
+                    ndoubl::Int, 
+                    added_layer::AddedLayer,#{FT},
+                    added_layer_lin::AddedLayerLin,
+                    I_static::AbstractArray, 
+                    architecture) #where {FT}
+
+    doubling_helper!(pol_type, SFI, expk, expk_lin, 
+        ndoubl, added_layer, added_layer_lin, I_static, architecture)
+    synchronize_if_gpu()
+end
+
+"""
+    doubling_allparams_helper!(pol_type, SFI, expk, ndoubl, added_layer, 
+                               added_layer_lin, I_static, architecture, dτ̇, μ₀)
+
+Propagate **N physical-parameter** derivatives through the doubling method (Bug 19 fix).
+
+Unlike `doubling_helper!` which propagates only the 3 core derivatives (τ, ϖ, Z),
+this function propagates the `ap_` (all-params) fields through doubling. This is 
+necessary because the Z chain rule must be applied at the **elemental** level 
+(where it is correctly element-wise), not after doubling (where matrix products 
+have mixed the Z indices).
+
+The chain rule (`lin_added_layer_all_params!`) should be called BEFORE this function
+to fill the `ap_ṙ⁻⁺`, `ap_ṫ⁺⁺`, `ap_J̇₀⁺`, `ap_J̇₀⁻` fields.
+
+For SFI, the beam attenuation derivative `d(e^{-τ/μ₀})/dp_j = -e^{-τ/μ₀}/μ₀ ⋅ ∂τ/∂p_j`
+is per-parameter, handled via `dτ̇` (the elemental τ derivative per parameter).
+"""
+function doubling_allparams_helper!(pol_type,
+                          SFI,
+                          expk,
+                          ndoubl::Int,
+                          added_layer::AddedLayer,
+                          added_layer_lin::AddedLayerLin,
+                          I_static::AbstractArray{FT},
+                          architecture,
+                          dτ̇::AbstractArray,
+                          μ₀::FT;
+                          N_active::Int=0) where {FT}
+
+    # Unpack the added layer (forward)
+    (; r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻) = added_layer
+    # Use the all-params derivatives
+    (; ap_ṙ⁺⁻, ap_ṙ⁻⁺, ap_ṫ⁻⁻, ap_ṫ⁺⁺, ap_J̇₀⁺, ap_J̇₀⁻) = added_layer_lin
+
+    dev = devi(architecture)
+    arr_type = array_type(architecture)
+
+    ndoubl == 0 && return nothing
+
+    Nparams = N_active > 0 ? N_active : size(ap_ṙ⁻⁺, 4)
+
+    # Use pre-allocated workspace from added_layer_lin (avoids ~100 MB allocation per layer)
+    gp_refl           = added_layer_lin.dbl_gp_refl
+    tt⁺⁺_gp_refl      = added_layer_lin.dbl_tt_gp_refl
+    gp_refl_lin       = added_layer_lin.dbl_gp_refl_lin
+    tt⁺⁺_gp_refl_lin  = added_layer_lin.dbl_tt_gp_refl_lin
+
+    # Source-doubling workspace — always-on per the v0.6 design. Workspace
+    # arrays live on `added_layer_lin` and are pre-allocated unconditionally
+    # by `make_added_layer(LinMode(), …)` (see rt_helper_functions_lin.jl);
+    # NoSource scenes pay only zero-array matmul cost during propagation.
+    J₁⁺         = added_layer_lin.dbl_J₁⁺
+    J₁⁻         = added_layer_lin.dbl_J₁⁻
+    ap_J̇₁⁺      = added_layer_lin.dbl_ap_J̇₁⁺
+    ap_J̇₁⁻      = added_layer_lin.dbl_ap_J̇₁⁻
+    ap_expk_lin = added_layer_lin.dbl_ap_expk_lin
+    # Initialize per-parameter expk_lin: d(exp(-dτ/μ₀))/dp_j = -exp(-dτ/μ₀)/μ₀ * dτ̇_j
+    for iparam = 1:Nparams
+        @views ap_expk_lin[:,iparam] .= -expk ./ μ₀ .* dτ̇[:,iparam]
+    end
+
+    # Per-iteration source-doubling temporaries (reused across params each step)
+    J1m_plus_r_j0p = similar(j₀⁻)
+    j0p_plus_r_J1m = similar(j₀⁺)
+    r_times_t = similar(t⁺⁺)
+
+    # Loop over number of doublings
+    for n = 1:ndoubl
+
+        # Forward: geometric progression (1-RR)⁻¹
+        batch_inv!(gp_refl, I_static .- r⁻⁺ ⊠ r⁻⁺)
+        tt⁺⁺_gp_refl[:] = t⁺⁺ ⊠ gp_refl
+
+        # Linearized geometric progression for all N params
+        for iparam = 1:Nparams
+            @views gp_refl_lin[:,:,:,iparam] .= gp_refl ⊠ (ap_ṙ⁻⁺[:,:,:,iparam] ⊠ r⁻⁺ .+ r⁻⁺ ⊠ ap_ṙ⁻⁺[:,:,:,iparam]) ⊠ gp_refl
+            @views tt⁺⁺_gp_refl_lin[:,:,:,iparam] .= ap_ṫ⁺⁺[:,:,:,iparam] ⊠ gp_refl .+ t⁺⁺ ⊠ gp_refl_lin[:,:,:,iparam]
+        end
+
+        # Source-vector all-params doubling — always-on. NoSource scenes have
+        # j₀±/ap_J̇₀±=0 → matmuls produce zero, bit-equal to the previously
+        # gated path. Per-Fourier-moment cleanliness is preserved: each m
+        # call into doubling_allparams_helper! propagates that m's sources.
+
+        # Forward source doubling
+        @views J₁⁺[:,1,:] = j₀⁺[:,1,:] .* expk'
+        @views J₁⁻[:,1,:] = j₀⁻[:,1,:] .* expk'
+
+        # Hoist param-independent source terms
+        J1m_plus_r_j0p .= J₁⁻ .+ r⁻⁺ ⊠ j₀⁺
+        j0p_plus_r_J1m .= j₀⁺ .+ r⁻⁺ ⊠ J₁⁻
+
+        for iparam = 1:Nparams
+            @views ap_J̇₁⁺[:,1,:,iparam] .= ap_J̇₀⁺[:,1,:,iparam] .* expk' .+ j₀⁺[:,1,:] .* ap_expk_lin[:,iparam]'
+            @views ap_J̇₁⁻[:,1,:,iparam] .= ap_J̇₀⁻[:,1,:,iparam] .* expk' .+ j₀⁻[:,1,:] .* ap_expk_lin[:,iparam]'
+
+            @views ap_expk_lin[:,iparam] .= 2 .* expk .* ap_expk_lin[:,iparam]
+
+            @views ap_J̇₀⁻[:,:,:,iparam] .= ap_J̇₀⁻[:,:,:,iparam] .+
+                    (tt⁺⁺_gp_refl_lin[:,:,:,iparam] ⊠ J1m_plus_r_j0p) .+
+                    (tt⁺⁺_gp_refl ⊠ (ap_J̇₁⁻[:,:,:,iparam] .+ ap_ṙ⁻⁺[:,:,:,iparam] ⊠ j₀⁺ .+ r⁻⁺ ⊠ ap_J̇₀⁺[:,:,:,iparam]))
+            @views ap_J̇₀⁺[:,:,:,iparam] .= ap_J̇₁⁺[:,:,:,iparam] .+
+                (tt⁺⁺_gp_refl_lin[:,:,:,iparam] ⊠ j0p_plus_r_J1m) .+
+                (tt⁺⁺_gp_refl ⊠ (ap_J̇₀⁺[:,:,:,iparam] .+ ap_ṙ⁻⁺[:,:,:,iparam] ⊠ J₁⁻ .+ r⁻⁺ ⊠ ap_J̇₁⁻[:,:,:,iparam]))
+        end
+
+        # Forward source function updates (use precomputed hoisted terms)
+        j₀⁻[:] = j₀⁻ .+ (tt⁺⁺_gp_refl ⊠ J1m_plus_r_j0p)
+        j₀⁺[:] = J₁⁺ .+ (tt⁺⁺_gp_refl ⊠ j0p_plus_r_J1m)
+        expk[:] = expk.^2
+
+        # Hoist param-independent R*T product
+        r_times_t .= r⁻⁺ ⊠ t⁺⁺
+
+        # Linearized R and T doubling (N params)
+        for iparam = 1:Nparams
+            ap_ṙ⁻⁺[:,:,:,iparam] .= ap_ṙ⁻⁺[:,:,:,iparam] .+
+                        tt⁺⁺_gp_refl_lin[:,:,:,iparam] ⊠ r_times_t .+
+                        tt⁺⁺_gp_refl ⊠ (ap_ṙ⁻⁺[:,:,:,iparam] ⊠ t⁺⁺ .+
+                        r⁻⁺ ⊠ ap_ṫ⁺⁺[:,:,:,iparam])
+            ap_ṫ⁺⁺[:,:,:,iparam] = tt⁺⁺_gp_refl_lin[:,:,:,iparam] ⊠ t⁺⁺ .+
+                        tt⁺⁺_gp_refl ⊠ ap_ṫ⁺⁺[:,:,:,iparam]
+        end
+
+        # Forward R and T doubling
+        r⁻⁺[:]  = r⁻⁺ .+ (tt⁺⁺_gp_refl ⊠ r_times_t)
+        t⁺⁺[:]  = tt⁺⁺_gp_refl ⊠ t⁺⁺
+    end
+
+    # After doubling, apply D matrix to both forward and derivative quantities
+    # Uses GPU kernels (apply_D! / apply_D_SFI!) when arrays are on device
+    synchronize_if_gpu()
+    apply_D_matrix!(pol_type.n,
+        added_layer.r⁻⁺, added_layer.t⁺⁺, added_layer.r⁺⁻, added_layer.t⁻⁻,
+        ap_ṙ⁻⁺, ap_ṫ⁺⁺, ap_ṙ⁺⁻, ap_ṫ⁻⁻)
+    # Source-vector D-matrix is always applied; for a NoSource scene
+    # j₀⁻ and ap_J̇₀⁻ are zero and the kernel is a no-op for all Stokes rows.
+    apply_D_matrix_SFI!(pol_type.n, added_layer.j₀⁻, ap_J̇₀⁻)
+
+    return nothing
+end
+
+"""
+    doubling_allparams!(pol_type, SFI, expk, ndoubl, added_layer, added_layer_lin,
+                        I_static, architecture, dτ̇, μ₀)
+
+Propagate N physical-parameter derivatives through the doubling method (linearized RT).
+
+Wrapper that calls `doubling_allparams_helper!` and synchronizes GPU if needed.
+Requires the chain rule (`lin_added_layer_all_params!`) to be applied *before* calling,
+so that `ap_ṙ⁻⁺`, `ap_ṫ⁺⁺`, etc. contain per-parameter derivatives at the elemental level.
+
+See Sanghavi & Stephens (2013) for the doubling method; Sanghavi, Davis & Eldering (2014)
+for the linearization framework.
+"""
+function doubling_allparams!(pol_type, SFI, expk,
+                    ndoubl::Int, 
+                    added_layer::AddedLayer,
+                    added_layer_lin::AddedLayerLin,
+                    I_static::AbstractArray, 
+                    architecture, dτ̇, μ₀; N_active::Int=0)
+
+    doubling_allparams_helper!(pol_type, SFI, expk,
+        ndoubl, added_layer, added_layer_lin, I_static, architecture, dτ̇, μ₀; N_active=N_active)
+    synchronize_if_gpu()
+end
+
+"""
+    apply_D!(n_stokes, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻, ṙ⁻⁺, ṫ⁺⁺, ṙ⁺⁻, ṫ⁻⁻)
+
+KernelAbstractions D-matrix symmetry kernel for linearized doubling. Each
+workitem owns one elastic R/T matrix element, applies the row sign to
+`r⁻⁺` and every parameter derivative in `ṙ⁻⁺`, then writes the reverse
+operators and their derivatives using the Stokes parity sign table.
+"""
+@kernel function apply_D!(n_stokes::Int,  
+                        r⁻⁺, @Const(t⁺⁺), r⁺⁻, t⁻⁻,
+                        ṙ⁻⁺, @Const(ṫ⁺⁺), ṙ⁺⁻, ṫ⁻⁻)
+    iμ, jμ, n = @index(Global, NTuple)
+    i = mod1(iμ, n_stokes)
+    j = mod1(jμ, n_stokes)
+    i12 = (i == 1) | (i == 2)
+    j12 = (j == 1) | (j == 2)
+    nparams = size(ṙ⁻⁺, 4)
+
+    if !i12
+        r⁻⁺[iμ, jμ, n] = -r⁻⁺[iμ, jμ, n]
+        for iparam = 1:nparams
+            ṙ⁻⁺[iμ, jμ, n, iparam] = -ṙ⁻⁺[iμ, jμ, n, iparam]
+        end
+    end
+
+    same_block = (i12 & j12) | (!i12 & !j12)
+    s = ifelse(same_block, one(eltype(r⁻⁺)), -one(eltype(r⁻⁺)))
+
+    r⁺⁻[iμ, jμ, n] = s * r⁻⁺[iμ, jμ, n]
+    t⁻⁻[iμ, jμ, n] = s * t⁺⁺[iμ, jμ, n]
+    for iparam = 1:nparams
+        ṙ⁺⁻[iμ, jμ, n, iparam] = s * ṙ⁻⁺[iμ, jμ, n, iparam]
+        ṫ⁻⁻[iμ, jμ, n, iparam] = s * ṫ⁺⁺[iμ, jμ, n, iparam]
+    end
+
+end
+
+"""
+    apply_D_SFI!(n_stokes, J₀⁻, J̇₀⁻)
+
+KernelAbstractions D-matrix symmetry kernel for linearized source-function
+integration during doubling. It negates upwelling `U/V` source entries and all
+physical-parameter derivative slots in `J̇₀⁻` for the same stream/spectral
+location.
+"""
+@kernel function apply_D_SFI!(n_stokes::Int, J₀⁻, J̇₀⁻)
+    iμ, _, n = @index(Global, NTuple)
+    i = mod1(iμ, n_stokes)
+    i12 = (i == 1) | (i == 2)
+    if !i12
+        J₀⁻[iμ, 1, n] = - J₀⁻[iμ, 1, n] 
+        for iparam = 1:size(J̇₀⁻, 4)
+            J̇₀⁻[iμ, 1, n, iparam] = -J̇₀⁻[iμ, 1, n, iparam]
+        end
+    end
+end
+
+function apply_D_matrix!(n_stokes::Int, 
+        r⁻⁺::AbstractArray{FT,3}, t⁺⁺::AbstractArray{FT,3}, 
+        r⁺⁻::AbstractArray{FT,3}, t⁻⁻::AbstractArray{FT,3},
+        ṙ⁻⁺::AbstractArray{FT,4}, ṫ⁺⁺::AbstractArray{FT,4}, 
+        ṙ⁺⁻::AbstractArray{FT,4}, ṫ⁻⁻::AbstractArray{FT,4}) where {FT}
+    if n_stokes == 1
+        r⁺⁻[:] = r⁻⁺
+        t⁻⁻[:] = t⁺⁺  
+        ṙ⁺⁻[:] = ṙ⁻⁺
+        ṫ⁻⁻[:] = ṫ⁺⁺    
+        return nothing
+    else 
+        device = devi(architecture(r⁻⁺))
+        applyD_kernel! = apply_D!(device)
+        event = applyD_kernel!(n_stokes, 
+                                r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻, 
+                                ṙ⁻⁺, ṫ⁺⁺, ṙ⁺⁻, ṫ⁻⁻, 
+                                ndrange=size(r⁻⁺));
+        ##wait(device, event);
+        synchronize_if_gpu();
+        return nothing
+    end
+end
+
+#=function apply_D_matrix!(n_stokes::Int, r⁻⁺::Array{FT,3}, t⁺⁺::Array{FT,3}, r⁺⁻::Array{FT,3}, t⁻⁻::Array{FT,3}) where {FT}
+    if n_stokes == 1
+        r⁺⁻[:] = r⁻⁺
+        t⁻⁻[:] = t⁺⁺
+        
+        return nothing
+    else 
+        device = devi(Architectures.CPU())
+        applyD_kernel! = apply_D!(device)
+        event = applyD_kernel!(n_stokes, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻, ndrange=size(r⁻⁺));
+        #wait(device, event);
+        return nothing
+    end
+end=#
+
+function apply_D_matrix_SFI!(n_stokes::Int, 
+                    J₀⁻::AbstractArray{FT,3}, 
+                    J̇₀⁻::AbstractArray{FT,4}) where {FT}
+    n_stokes == 1 && return nothing
+    device = devi(architecture(J₀⁻))
+    applyD_kernel! = apply_D_SFI!(device)
+    event = applyD_kernel!(n_stokes, J₀⁻, J̇₀⁻, ndrange=size(J₀⁻));
+    ##wait(device, event);
+    synchronize_if_gpu();
+    nothing
+end
+
+#=
+function apply_D_matrix_SFI!(n_stokes::Int, J₀⁻::Array{FT,3}) where {FT}
+    
+    n_stokes == 1 && return nothing
+
+    device = devi(architecture(J₀⁻))
+    applyD_kernel! = apply_D_SFI!(device)
+    event = applyD_kernel!(n_stokes, J₀⁻, ndrange=size(J₀⁻));
+    #wait(device, event);
+    
+    return nothing
+end=#

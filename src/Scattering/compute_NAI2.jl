@@ -1,51 +1,87 @@
 #=
- 
-This file specifies how to compute aerosol optical properties using the Siewert-NAI2 method
- 
+=====================================================================
+Siewert NAI-2 aerosol optical properties (cross-sections + Greek
+coefficients of the polarized phase matrix).
+=====================================================================
+For a given Mie aerosol size distribution, this file computes:
+
+ 1. Bulk extinction Cₑₓₜ and single-scattering Cₛ cross-sections, and
+    the single-scattering albedo ϖ̃ = Cₛ / Cₑₓₜ.
+ 2. The Greek expansion coefficients α(l), β(l), γ(l), δ(l), ϵ(l),
+    ζ(l) of the polarized scattering matrix in the Hovenier basis. β is
+    the same as the scalar Legendre expansion of the phase function;
+    α…ζ together encode the full 4×4 Mueller matrix.
+ 3. The δ-M truncation factor fᵗ when a δBGE-style truncation is
+    requested (otherwise fᵗ = 0). With NoTruncation(), the raw
+    coefficients are returned as-is.
+
+NAI-2 = "Numerical Algorithm for Inelastic-2" in Siewert's notation.
+The companion `compute_PCW.jl` uses precomputed Wigner symbol tables
+for the Greek expansion — same physics, different numerical strategy.
+
+Reference: Siewert (1982) ApJ 245, 357; (2000a) JQSRT 64, 109.
+=====================================================================
 =#
 
-"""
-    $(FUNCTIONNAME)(model::MieModel{FDT}) where FDT<:NAI2
+@doc raw"""
+    compute_aerosol_optical_properties(model::MieModel{<:NAI2}, FT2::Type=Float64) -> AerosolOptics
 
-Reference: Suniti Sanghavi 2014, https://doi.org/10.1016/j.jqsrt.2013.12.015
+Compute bulk aerosol optical properties with the Siewert NAI-2 formulation.
 
-Compute the aerosol optical properties using the Siewert-NAI2 method
-Input: MieModel, holding all computation and aerosol properties 
-Output: AerosolOptics, holding all Greek coefficients and Cross-Sectional information
+Reference:
+- S. Sanghavi, *Revisiting the Fourier expansion of Mie scattering matrices in generalized spherical functions*, JQSRT 136 (2014), 16-27. https://doi.org/10.1016/j.jqsrt.2013.12.015
+- Cross-section expressions are the standard Mie-series forms (paper Eq. (1)); Greek-coefficient Fourier expansion follows the Siewert/Domke framework discussed around paper Eq. (17).
+
+For each radius quadrature point, Mie coefficients are used to compute
+extinction and scattering cross-sections:
+
+```math
+C_{\mathrm{sca}}(r) = \frac{2\pi}{k^2}\sum_{n=1}^{N}(2n+1)\left(|a_n|^2 + |b_n|^2\right),
+\qquad
+C_{\mathrm{ext}}(r) = \frac{2\pi}{k^2}\sum_{n=1}^{N}(2n+1)\Re(a_n+b_n),
+```
+
+with ``k=2\pi/\lambda``. Bulk values are quadrature-weighted means over the
+size distribution. The returned optical scalars are:
+
+```math
+\tilde{\omega} = \frac{\bar{C}_{\mathrm{sca}}}{\bar{C}_{\mathrm{ext}}},
+\qquad
+k = \bar{C}_{\mathrm{ext}}.
+```
+
+Greek coefficients `(α, β, γ, δ, ϵ, ζ)` are then derived from the bulk phase
+matrix moments (Sanghavi, 2014).
+
+# Returns
+- [`AerosolOptics`](@ref) with `greek_coefs`, `ω̃`, `k`, and `fᵗ = 1`.
+
+# Notes
+- Uses the convention `nᵢ >= 0`.
+- Radius and wavelength units must be consistent.
 """
 function compute_aerosol_optical_properties(model::MieModel{FDT}, FT2::Type=Float64) where FDT <: NAI2
 
     # Unpack the model
-    @unpack aerosol, λ, r_max, nquad_radius = model
-    @show nquad_radius, λ
+    (; computation_type, aerosol, λ, polarization_type, truncation_type, r_max, nquad_radius, wigner_A, wigner_B) = model
+
     # Extract variables from aerosol struct:
-    @unpack size_distribution, nᵣ, nᵢ = aerosol
-    #@show typeof(size_distribution.σ), typeof(nᵣ)
+    (; size_distribution, nᵣ, nᵢ) = aerosol
+    
     # Imaginary part of the refractive index must be ≥ 0
     @assert nᵢ ≥ 0
 
     # Get the refractive index's real part type
     #@show size_distribution.σ  
-    # TODO: This is still very clumsy, the FT conversions are not good here.
-    FT = eltype(nᵣ);
-    @show "Mie", FT, FT2
-    #@show FT, ForwardDiff.valtype(size_distribution.σ)
-    vFT = ForwardDiff.valtype(nᵣ)
-    #@assert FT == Float64 "Aerosol computations require 64bit"
-    # Get radius quadrature points and weights (for mean, thus normalized):
-    # 
-    
-    # Just sample from 0.25%ile to 99.75%ile:
-    #start,stop = quantile(size_distribution,[vFT(0.0001),vFT(0.99999999)])
-    r, wᵣ = gauleg(nquad_radius, 0.0, r_max ; norm=true) 
-    #r, wᵣ = gauleg(nquad_radius, 0.0, min(stop,r_max) ; norm=true) 
-    #@show start, stop
-    #@show typeof(r), typeof(wᵣ)
-    #@show typeof(convert.(FT, r))
-    r  = convert.(FT, r)
-    wᵣ = convert.(FT, wᵣ)
+    FT = eltype(size_distribution.σ);
+    # @assert FT == Float64 "Aerosol computations require 64bit"
+    # Get radius quadrature points and weights using log-space quadrature
+    # (equidistant in ln(r) for efficient integration of log-normal distributions)
+    r_min = max(quantile(size_distribution, 1e-8), 1e-6 * r_max)
+    r, wᵣ = gauleg_log(nquad_radius, r_min, r_max; norm=false)
+
     # Wavenumber
-    k = vFT(2π) / λ  
+    k = 2π / λ
 
     # Size parameter
     x_size_param = k * r # (2πr/λ)
@@ -76,42 +112,48 @@ function compute_aerosol_optical_properties(model::MieModel{FDT}, FT2::Type=Floa
     # Standardized weights for the size distribution:
     wₓ = compute_wₓ(size_distribution, wᵣ, r, r_max) 
     
+    # Pre-allocate buffers for the inner loop (sized for the largest particle)
+    m_ref = aerosol.nᵣ - aerosol.nᵢ * im
+    y_max = maximum(x_size_param) * abs(m_ref)
+    nmx_max = round(Int, max(n_max, y_max) + 51)
+    an  = zeros(Complex{FT}, n_max)
+    bn  = zeros(Complex{FT}, n_max)
+    Dₙ  = zeros(Complex{FT}, nmx_max)
+    n_  = FT.(2 .* collect(1:n_max) .+ 1)
+
     # Loop over size parameters
-    @showprogress 1 "Computing PhaseFunctions Siewert NAI-2 style ..." for i = 1:length(x_size_param)
+    for i = 1:length(x_size_param)
 
-        # Maximum expansion (see eq. A17 from de Rooij and Stap, 1984)
-        n_max = get_n_max(x_size_param[i])
+        n_max_i = get_n_max(x_size_param[i])
 
-        # In Domke methods, we want to pre-allocate these as 2D outside of this loop.
-        an = (zeros(Complex{FT}, n_max))
-        bn = (zeros(Complex{FT}, n_max))
-
-        # Weighting for sums of 2n+1
-        n_ = collect(FT, 1:n_max);
-        n_ = 2n_ .+ 1
-
-        # Pre-allocate Dₙ  :
-        y = x_size_param[i] * (aerosol.nᵣ - aerosol.nᵢ);
-        nmx = round(Int, max(n_max, abs(y)) + 51)
-        Dₙ  = zeros(Complex{FT}, nmx)
+        # Zero the views that will be used
+        an_v = view(an, 1:n_max_i)
+        bn_v = view(bn, 1:n_max_i)
+        fill!(an_v, 0)
+        fill!(bn_v, 0)
+        fill!(Dₙ, 0)
 
         # Compute aₙ,bₙ and S₁,S₂
-        compute_mie_ab!(x_size_param[i], aerosol.nᵣ + aerosol.nᵢ * im, an, bn, Dₙ )
-        compute_mie_S₁S₂!(an, bn, leg_π, leg_τ, view(S₁, :, i), view(S₂, :, i))
+        compute_mie_ab!(x_size_param[i], m_ref, an_v, bn_v, Dₙ)
+        compute_mie_S₁S₂!(an_v, bn_v, leg_π, leg_τ, view(S₁, :, i), view(S₂, :, i))
         
-        # Compute Extinction and scattering cross sections: 
-        C_sca[i] = 2π / k^2 * (n_' * (abs2.(an) + abs2.(bn)))
-        C_ext[i] = 2π / k^2 * (n_' * real(an + bn))
+        # Compute Extinction and scattering cross sections using pre-allocated n_
+        n_v = view(n_, 1:n_max_i)
+        @inbounds C_sca[i] = 2π / k^2 * dot(n_v, abs2.(an_v) .+ abs2.(bn_v))
+        @inbounds C_ext[i] = 2π / k^2 * dot(n_v, real.(an_v .+ bn_v))
        
-        # Compute scattering matrix components per size parameter:
-        f₁₁[:,i] =  vFT(0.5) / x_size_param[i]^2   * real(abs2.(S₁[:,i]) + abs2.(S₂[:,i]));
-        f₃₃[:,i] =  vFT(0.5) / x_size_param[i]^2   * real(S₁[:,i] .* conj(S₂[:,i]) + S₂[:,i] .* conj(S₁[:,i]));
-        f₁₂[:,i] = -vFT(0.5) / x_size_param[i]^2   * real(abs2.(S₁[:,i]) - abs2.(S₂[:,i]));
-        f₃₄[:,i] = -vFT(0.5) / x_size_param[i]^2   * imag(S₁[:,i] .* conj(S₂[:,i]) - S₂[:,i] .* conj(S₁[:,i]));
-
+        # Compute scattering matrix components per size parameter (in-place)
+        inv_x2 = FT(0.5) / x_size_param[i]^2
+        @inbounds for iμ in 1:n_mu
+            s1 = S₁[iμ, i]; s2 = S₂[iμ, i]
+            f₁₁[iμ, i] =  inv_x2 * real(abs2(s1) + abs2(s2))
+            f₃₃[iμ, i] =  inv_x2 * real(s1 * conj(s2) + s2 * conj(s1))
+            f₁₂[iμ, i] = -inv_x2 * real(abs2(s1) - abs2(s2))
+            f₃₄[iμ, i] = -inv_x2 * imag(s1 * conj(s2) - s2 * conj(s1))
+        end
     end
 
-    # Calculate bulk scattering and extinction coeffitientcs
+    # Calculate bulk scattering and extinction cross-sections
     bulk_C_sca =  sum(wₓ .* C_sca)
     bulk_C_ext =  sum(wₓ .* C_ext)
     
@@ -159,35 +201,44 @@ function compute_aerosol_optical_properties(model::MieModel{FDT}, FT2::Type=Floa
         α[l + 1] = fac      * w_μ' * (bulk_f₁₁ .* R²[:,l + 1] + bulk_f₃₃ .* T²[:,l + 1]) 
     end
 
-    # Check whether this is a Dual number (if so, don't do any conversions)
-    # TODO: Equally clumsy, needs to be fixed.
-    #if FT <: AbstractFloat
-        #@show "Convert greek", FT2
-        # Create GreekCoefs object with α, β, γ, δ, ϵ, ζ
+    # When FT is a Dual type (ForwardDiff), skip conversion to preserve derivative info
+    if FT <: AbstractFloat && FT2 <: AbstractFloat
         greek_coefs = GreekCoefs(convert.(FT2, α), 
                                  convert.(FT2, β), 
                                  convert.(FT2, γ), 
                                  convert.(FT2, δ), 
                                  convert.(FT2, ϵ), 
                                  convert.(FT2, ζ))
-        #@show typeof(convert.(FT2, β)), typeof(greek_coefs)
-        # Return the packaged AerosolOptics object
-        #@show greek_coefs
         return AerosolOptics(greek_coefs=greek_coefs, ω̃=FT2(bulk_C_sca / bulk_C_ext), k=FT2(bulk_C_ext), fᵗ=FT2(1))
-
-    #else
-    #    greek_coefs = GreekCoefs(α, β, γ,δ,ϵ,ζ)
-    #    return AerosolOptics(greek_coefs=greek_coefs, ω̃=(bulk_C_sca / bulk_C_ext), k=(bulk_C_ext), fᵗ=FT(1))
-    #end
+    else
+        greek_coefs = GreekCoefs(α, β, γ, δ, ϵ, ζ)
+        return AerosolOptics(greek_coefs=greek_coefs, ω̃=(bulk_C_sca / bulk_C_ext), k=(bulk_C_ext), fᵗ=one(eltype(α)))
+    end
 end
 
+@doc raw"""
+    compute_ref_aerosol_extinction(model::MieModel{<:NAI2}, FT2::Type=Float64) -> Real
+
+Compute only the bulk extinction cross-section for the aerosol model:
+
+```math
+\bar{C}_{\mathrm{ext}} = \int C_{\mathrm{ext}}(r)\,p(r)\,dr,
+```
+
+where ``C_{\mathrm{ext}}(r)`` is evaluated from the Mie series and ``p(r)`` is
+represented with quadrature over `[0, r_max]`.
+
+This helper avoids phase-function and Greek-coefficient reconstruction.
+
+Reference: Sanghavi (2014), Eq. (1) for `C_ext(r)`.
+"""
 function compute_ref_aerosol_extinction(model::MieModel{FDT}, FT2::Type=Float64) where FDT <: NAI2
 
     # Unpack the model
-    @unpack computation_type, aerosol, λ, polarization_type, r_max, nquad_radius = model
+    (; computation_type, aerosol, λ, polarization_type, r_max, nquad_radius) = model
 
     # Extract variables from aerosol struct:
-    @unpack size_distribution, nᵣ, nᵢ = aerosol
+    (; size_distribution, nᵣ, nᵢ) = aerosol
     
     # Imaginary part of the refractive index must be ≥ 0
     @assert nᵢ ≥ 0 "Imaginary part of the refractive index must be ≥ 0 (definition)"
@@ -196,12 +247,12 @@ function compute_ref_aerosol_extinction(model::MieModel{FDT}, FT2::Type=Float64)
     FT = eltype(nᵣ);
     #@show FT
     #@assert FT == Float64 "Aerosol computations require 64bit"
-    # Get radius quadrature points and weights (for mean, thus normalized):
-    # start,stop = quantile(size_distribution,[0.0001, 0.99999999])
-    r, wᵣ = gauleg(nquad_radius, 0.0, r_max ; norm=true) 
-    
+    # Get radius quadrature points and weights using log-space quadrature
+    r_min = max(quantile(size_distribution, 1e-8), 1e-6 * r_max)
+    r, wᵣ = gauleg_log(nquad_radius, r_min, r_max; norm=false)
+
     # Wavenumber
-    k = 2π / λ  
+    k = 2π / λ
 
     # Size parameter
     x_size_param = k * r # (2πr/λ)
@@ -211,10 +262,10 @@ function compute_ref_aerosol_extinction(model::MieModel{FDT}, FT2::Type=Float64)
 
     # Determine max amount of Gaussian quadrature points for angle dependence of 
     # phase functions:
-    n_mu = 2n_max - 1;
+    #n_mu = 2n_max - 1;
 
     # Obtain Gauss-Legendre quadrature points and weights for phase function
-    μ, w_μ = gausslegendre(n_mu)
+    #μ, w_μ = gausslegendre(n_mu)
 
     # Compute π and τ functions
     #leg_π, leg_τ = compute_mie_π_τ(μ, n_max)
@@ -227,7 +278,7 @@ function compute_ref_aerosol_extinction(model::MieModel{FDT}, FT2::Type=Float64)
     wₓ = compute_wₓ(size_distribution, wᵣ, r, r_max) 
     
     # Loop over size parameters
-    @showprogress 1 "Computing extinction XS at reference wavelength ..." for i = 1:length(x_size_param)
+    for i = 1:length(x_size_param)
 
         # Maximum expansion (see eq. A17 from de Rooij and Stap, 1984)
         n_max = get_n_max(x_size_param[i])
@@ -241,12 +292,12 @@ function compute_ref_aerosol_extinction(model::MieModel{FDT}, FT2::Type=Float64)
         n_ = 2n_ .+ 1
 
         # Pre-allocate Dn:
-        y = x_size_param[i] * (aerosol.nᵣ - aerosol.nᵢ);
+        y = x_size_param[i] * (aerosol.nᵣ - aerosol.nᵢ * im);
         nmx = round(Int, max(n_max, abs(y)) + 51)
         Dn = zeros(Complex{FT}, nmx)
 
         # Compute an,bn and S₁,S₂
-        compute_mie_ab!(x_size_param[i], aerosol.nᵣ + aerosol.nᵢ * im, an, bn, Dn)
+        compute_mie_ab!(x_size_param[i], aerosol.nᵣ - aerosol.nᵢ * im, an, bn, Dn)
         
         # Compute Extinction and scattering cross sections: 
         C_ext[i] = 2π / k^2 * (n_' * real(an + bn))
@@ -259,16 +310,31 @@ function compute_ref_aerosol_extinction(model::MieModel{FDT}, FT2::Type=Float64)
     return bulk_C_ext
 end
 
-"""
-    $(FUNCTIONNAME)(aerosol::Aerosol, λ)
+@doc raw"""
+    phase_function(aerosol::Aerosol, λ, r_max, nquad_radius)
+        -> (μ, w_μ, p11, C_ext, C_sca, g)
 
-Compute phase function from aerosol distribution with log-normal mean μ [µm] and σ
-Output: μ, w_μ, P, C_ext, C_sca, g
+Compute scalar phase-function output for a size-distributed aerosol.
+
+The returned `p11(μ)` is normalized by the bulk scattering cross-section and
+satisfies:
+
+```math
+\frac{1}{4\pi}\int_0^{2\pi}\int_{-1}^{1} p_{11}(\mu)\,d\mu\,d\phi = 1.
+```
+
+Asymmetry factor:
+
+```math
+g = \frac{1}{2}\int_{-1}^{1}\mu\,p_{11}(\mu)\,d\mu.
+```
+
+Reference: Sanghavi (2014), Mie-amplitude/cross-section setup from Eq. (1), with NAI-style angular integration discussed in Secs. 3-4.
 """
 function phase_function(aerosol::Aerosol, λ, r_max, nquad_radius) 
 
     # Extract variables from aerosol struct:
-    @unpack size_distribution, nᵣ, nᵢ = aerosol
+    (; size_distribution, nᵣ, nᵢ) = aerosol
     
     # Imaginary part of the refractive index must be ≥ 0
     @assert nᵢ ≥ 0 "Imaginary part of the refractive index must be ≥ 0 (definition)"
@@ -276,11 +342,12 @@ function phase_function(aerosol::Aerosol, λ, r_max, nquad_radius)
     # Get the refractive index's real part type
     FT = eltype(nᵣ);
     # @assert FT == Float64 "Aerosol computations require 64bit"
-    # Get radius quadrature points and weights (for mean, thus normalized):
-    r, wᵣ = gauleg(nquad_radius, 0.0, r_max ; norm=true) 
-    
+    # Get radius quadrature points and weights using log-space quadrature
+    r_min = max(quantile(size_distribution, 1e-8), 1e-6 * r_max)
+    r, wᵣ = gauleg_log(nquad_radius, r_min, r_max; norm=true)
+
     # Wavenumber
-    k = 2π / λ  
+    k = 2π / λ
 
     # Size parameter
     x_size_param = k * r # (2πr/λ)
@@ -309,7 +376,7 @@ function phase_function(aerosol::Aerosol, λ, r_max, nquad_radius)
     wₓ = compute_wₓ(size_distribution, wᵣ, r, r_max) 
     
     # Loop over size parameters
-    @showprogress 1 "Computing PhaseFunctions Siewert NAI-2 style ..." for i = 1:length(x_size_param)
+    for i = 1:length(x_size_param)
 
         # Maximum expansion (see eq. A17 from de Rooij and Stap, 1984)
         n_max = get_n_max(x_size_param[i])
@@ -328,7 +395,7 @@ function phase_function(aerosol::Aerosol, λ, r_max, nquad_radius)
         Dn = zeros(Complex{FT}, nmx)
 
         # Compute an,bn and S₁,S₂
-        compute_mie_ab!(x_size_param[i], aerosol.nᵣ + aerosol.nᵢ * im, an, bn, Dn)
+        compute_mie_ab!(x_size_param[i], aerosol.nᵣ - aerosol.nᵢ * im, an, bn, Dn)
         compute_mie_S₁S₂!(an, bn, leg_π, leg_τ, view(S₁, :, i), view(S₂, :, i))
         
         # Compute Extinction and scattering cross sections: 
@@ -356,10 +423,11 @@ function phase_function(aerosol::Aerosol, λ, r_max, nquad_radius)
 end
 
 """
-    $(FUNCTIONNAME)(r::FT, λ::FT, nᵣ::FT, nᵢ::FT)
+    phase_function(r::FT, λ::FT, nᵣ::FT, nᵢ::FT) where {FT<:AbstractFloat}
+        -> (μ, w_μ, p11, C_ext, C_sca, g)
 
-Compute phase function from mono-modal aerosol with radius `r` at wavelength `λ`, both in `[μm]`
-Output: μ, w_μ, P, C_ext, C_sca, g
+Monodisperse version of [`phase_function`](@ref), for a single radius `r`.
+Returns the same tuple as the size-distribution overload.
 """
 function phase_function(r::FT, λ::FT, nᵣ::FT, nᵢ::FT) where {FT<:AbstractFloat} 
     # Imaginary part of the refractive index must be ≥ 0 (definition)
@@ -401,7 +469,7 @@ function phase_function(r::FT, λ::FT, nᵣ::FT, nᵢ::FT) where {FT<:AbstractFl
     Dn = zeros(Complex{FT}, nmx)
 
     # Compute an,bn and S₁,S₂
-    compute_mie_ab!(size_param, nᵣ + nᵢ * im, an, bn, Dn)
+    compute_mie_ab!(size_param, nᵣ - nᵢ * im, an, bn, Dn)
     compute_mie_S₁S₂!(an, bn, leg_π, leg_τ, S₁, S₂)
         
     # Compute Extinction and scattering cross sections: 
@@ -418,11 +486,30 @@ function phase_function(r::FT, λ::FT, nᵣ::FT, nᵢ::FT) where {FT<:AbstractFl
     return μ, w_μ, f₁₁, C_ext, C_sca, g
 end
 
-# Suniti, Oct 18, 2024
-# Computes only extinction and scattering cross-sections for a given aerosol model (defined by size distribution and complex refractive index)
+@doc raw"""
+    compute_aerosol_XS(aerosol::Aerosol, λ, r_max, nquad_radius)
+        -> (XS_ext, XS_sca, Cext_eff, Csca_eff)
+
+Compute bulk extinction/scattering cross-sections for a size-distributed aerosol
+without reconstructing phase matrices.
+
+# Returns
+- `XS_ext`: bulk extinction cross-section ``\bar{C}_{\mathrm{ext}}``
+- `XS_sca`: bulk scattering cross-section ``\bar{C}_{\mathrm{sca}}``
+- `Cext_eff`: area-normalized extinction
+- `Csca_eff`: area-normalized scattering
+
+with
+
+```math
+C_{\mathrm{eff}} = \frac{\bar{C}}{\pi\int r^2 p(r)\,dr}.
+```
+
+Reference: Sanghavi (2014), Eq. (1) for particle-level `C_ext`/`C_sca`.
+"""
 function compute_aerosol_XS(aerosol::Aerosol, λ::FT, r_max::FT, nquad_radius::Int64) where {FT<:AbstractFloat} 
     # Extract variables from aerosol struct:
-    @unpack size_distribution, nᵣ, nᵢ = aerosol
+    (; size_distribution, nᵣ, nᵢ) = aerosol
     
     # Imaginary part of the refractive index must be ≥ 0
     @assert nᵢ ≥ 0
@@ -431,16 +518,12 @@ function compute_aerosol_XS(aerosol::Aerosol, λ::FT, r_max::FT, nquad_radius::I
     #@show size_distribution.σ  
     #FT = eltype(size_distribution.σ);
     # @assert FT == Float64 "Aerosol computations require 64bit"
-    # Get radius quadrature points and weights (for mean, thus normalized):
-    # 
-    
-    # Just sample from 0.25%ile to 99.75%ile:
-    start,stop = 0, r_max #quantile(size_distribution,[0.0025,0.9975])
-    #r, wᵣ = gauleg(nquad_radius, 0.0, r_max ; norm=true) 
-    r, wᵣ = gauleg(nquad_radius, start, min(stop,r_max) ; norm=true) 
-    
+    # Get radius quadrature points and weights using log-space quadrature
+    r_min = max(quantile(size_distribution, 1e-8), 1e-6 * r_max)
+    r, wᵣ = gauleg_log(nquad_radius, r_min, r_max; norm=true)
+
     # Wavenumber
-    k = 2π / λ  
+    k = 2π / λ
 
     # Size parameter
     x_size_param = k * r # (2πr/λ)
@@ -472,7 +555,7 @@ function compute_aerosol_XS(aerosol::Aerosol, λ::FT, r_max::FT, nquad_radius::I
     wₓ = compute_wₓ(size_distribution, wᵣ, r, r_max) 
     
     # Loop over size parameters
-    @showprogress 1 "Computing PhaseFunctions Siewert NAI-2 style ..." for i = 1:length(x_size_param)
+    for i = 1:length(x_size_param)
 
         # Maximum expansion (see eq. A17 from de Rooij and Stap, 1984)
         n_max = get_n_max(x_size_param[i])

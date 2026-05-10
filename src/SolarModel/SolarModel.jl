@@ -1,10 +1,20 @@
 module SolarModel
 
-using ..vSmartMOM               # For locating default solar T
+using ..vSmartMOM               # For package-relative data locations
 using DocStringExtensions       # For simplifying docstring
 using DelimitedFiles            # For easily reading in solar spectrum 
 using Interpolations            # For interpolating solar spectrum
 using Pkg.Artifacts             # For default solar spectrum
+using Downloads: Downloads      # For scratch-cache fallback downloads
+using Scratch: get_scratch!     # For relocatable data cache
+using SHA: sha256               # For verifying downloaded solar spectrum
+
+const DEFAULT_SOLAR_FILENAME = "solar_merged_20160127_600_26316_100.out"
+const DEFAULT_SOLAR_ARTIFACT = "solar"
+const DEFAULT_SOLAR_URL = "http://web.gps.caltech.edu/~cfranken/hitran_2016/$(DEFAULT_SOLAR_FILENAME)"
+const DEFAULT_SOLAR_SHA256 = "2fcedbb84da5dcefe5aa8c39583fcaf116d01a0887ec066ee9ea6f1305abeb43"
+
+
 
 """
     $(FUNCTIONNAME)(T::Real, ν_grid::Vector)
@@ -126,6 +136,98 @@ function solar_transmission_from_file(file_name::String,
 end
 
 """
+    $(FUNCTIONNAME)() -> String
+
+Return the local path to the package default disk-integrated solar
+transmission table.
+
+Resolution order:
+- `ENV["VSMARTMOM_SOLAR_FILE"]`, when set
+- the registered `solar` Julia artifact, when installed or installable
+- a checksum-verified scratch-space cache downloaded from the legacy vSmartMOM
+  solar table URL
+
+This helper is package-relocatable and never writes downloaded data into the
+source tree.
+"""
+function default_solar_transmission_path()
+    override = get(ENV, "VSMARTMOM_SOLAR_FILE", "")
+    if !isempty(override)
+        isfile(override) || error("VSMARTMOM_SOLAR_FILE does not exist: $(override)")
+        return override
+    end
+
+    artifact_file = _default_solar_artifact_path()
+    artifact_file === nothing || return artifact_file
+
+    scratch_file = joinpath(get_scratch!(vSmartMOM, "solar"), DEFAULT_SOLAR_FILENAME)
+    isfile(scratch_file) && return scratch_file
+
+    _download_default_solar_transmission!(scratch_file)
+    return scratch_file
+end
+
+function _default_solar_artifact_path()
+    artifacts_toml = find_artifacts_toml(@__DIR__)
+    artifact_hash(DEFAULT_SOLAR_ARTIFACT, artifacts_toml) === nothing && return nothing
+
+    artifact_dir = try
+        ensure_artifact_installed(DEFAULT_SOLAR_ARTIFACT, artifacts_toml; quiet_download=true)
+    catch
+        nothing
+    end
+    artifact_dir === nothing && return nothing
+
+    expected = joinpath(artifact_dir, DEFAULT_SOLAR_FILENAME)
+    isfile(expected) && return expected
+
+    candidates = filter(path -> isfile(path) && endswith(basename(path), ".out"),
+                        readdir(artifact_dir; join=true))
+    return length(candidates) == 1 ? only(candidates) : nothing
+end
+
+function _download_default_solar_transmission!(filename::AbstractString)
+    mkpath(dirname(filename))
+    tmp, io = mktemp(dirname(filename))
+    close(io)
+
+    try
+        try
+            Downloads.download(DEFAULT_SOLAR_URL, tmp)
+        catch err
+            @warn "Default solar transmission download failed; retrying legacy host without TLS certificate verification" error=sprint(showerror, err)
+            _download_insecure(DEFAULT_SOLAR_URL, tmp)
+        end
+        _verify_default_solar_transmission!(tmp)
+        mv(tmp, filename; force=true)
+    catch
+        rm(tmp; force=true)
+        rethrow()
+    end
+
+    return filename
+end
+
+function _download_insecure(url::AbstractString, filename::AbstractString)
+    downloader = Downloads.Downloader()
+    downloader.easy_hook = (easy, info) -> begin
+        Downloads.Curl.setopt(easy, Downloads.Curl.CURLOPT_SSL_VERIFYPEER, 0)
+        Downloads.Curl.setopt(easy, Downloads.Curl.CURLOPT_SSL_VERIFYHOST, 0)
+    end
+    return Downloads.download(url, filename; downloader)
+end
+
+function _verify_default_solar_transmission!(filename::AbstractString)
+    digest = open(filename, "r") do io
+        bytes2hex(sha256(io))
+    end
+    if digest != DEFAULT_SOLAR_SHA256
+        error("Downloaded solar transmission checksum mismatch for $(filename).")
+    end
+    return nothing
+end
+
+"""
     $(FUNCTIONNAME)(ν_grid::Union{AbstractRange{<:Real}, AbstractArray} = 600.0:0.01:26316.0)
 
 Get the default solar transmission and interpolate to wavenumber grid (entire grid if not specified)
@@ -135,9 +237,7 @@ function default_solar_transmission(ν_grid::Union{AbstractRange{<:Real}, Abstra
     @info "Using line-list from:\nToon, G. C., Solar line list for GGG2014, TCCON data archive, hosted by the Carbon Dioxide Information Analysis Center, Oak Ridge National Laboratory, Oak Ridge, Tennessee, U.S.A., doi:10. 14291/tccon.ggg2014.solar.R0/1221658, 2014."
     @info "Found at: https://mark4sun.jpl.nasa.gov/toon/solar/solar_spectrum.html"
 
-    filename = joinpath(dirname(pathof(RadiativeTransfer)), "SolarModel", "solar.out")
-    !isfile(filename) && download("http://web.gps.caltech.edu/~cfranken/hitran_2016/solar_merged_20160127_600_26316_100.out", filename)
-
+    filename = default_solar_transmission_path()
     return hcat(ν_grid, solar_transmission_from_file(filename, ν_grid))
 end
 
@@ -156,6 +256,7 @@ function default_solar_spectrum_at_earth(ν_grid::Union{AbstractRange{<:Real}, A
     return hcat(ν_grid, black_body .* solar_transmission)
 end
 
-export planck_spectrum_wn, planck_spectrum_wl, solar_transmission_from_file, default_solar_transmission
+export planck_spectrum_wn, planck_spectrum_wl, solar_transmission_from_file,
+       default_solar_transmission, default_solar_transmission_path
 
 end

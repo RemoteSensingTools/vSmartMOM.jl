@@ -4,33 +4,43 @@ This file specifies how to compute aerosol optical properties using the Domke-PC
  
 =#
 
-"""
-    $(FUNCTIONNAME)(model::MieModel{FDT}) where FDT<:PCW
+@doc raw"""
+    compute_aerosol_optical_properties(model::MieModel{<:PCW}, FT2::Type=Float64) -> AerosolOptics
 
-Reference: Suniti Sanghavi 2014, https://doi.org/10.1016/j.jqsrt.2013.12.015
+Compute bulk aerosol optical properties with the Domke PCW formulation
+(Sanghavi, 2014), using precomputed Wigner tables.
 
-Compute the aerosol optical properties using the Domke-PCW method 
-Input: MieModel, holding all computation and aerosol properties 
-Output: AerosolOptics, holding all Greek coefficients and Cross-Sectional information
+Reference:
+- S. Sanghavi, *Revisiting the Fourier expansion of Mie scattering matrices in generalized spherical functions*, JQSRT 136 (2014), 16-27. https://doi.org/10.1016/j.jqsrt.2013.12.015
+
+The method evaluates ``S_l^{\nu_1\nu_2}`` terms (Eq. 22 in Sanghavi, 2014),
+maps them to Greek coefficients (Eq. 24), and returns
+[`AerosolOptics`](@ref) with:
+
+```math
+\tilde{\omega} = \bar{C}_{\mathrm{sca}} / \bar{C}_{\mathrm{ext}},\qquad
+k = \bar{C}_{\mathrm{ext}},\qquad f^t = 1.
+```
+
+Use [`make_mie_model`](@ref) with `PCW()` and Wigner inputs before calling
+this function.
 """
 function compute_aerosol_optical_properties(model::MieModel{FDT}, FT2::Type=Float64) where FDT<:PCW
 
     # Unpack the model
-    @unpack computation_type, aerosol, r_max, nquad_radius, λ, polarization_type, truncation_type, wigner_A, wigner_B = model
+    (; computation_type, aerosol, r_max, nquad_radius, λ, polarization_type, truncation_type, wigner_A, wigner_B) = model
 
     # Extract variables from aerosol struct:
     # @unpack aerosol, r_max, nquad_radius = mie_aerosol
-    @unpack size_distribution, nᵣ, nᵢ = aerosol
+    (; size_distribution, nᵣ, nᵢ) = aerosol
 
     # Get the refractive index's real part type
     FT = eltype(nᵣ);
 
-    # Compute radii and weights
-    # start,stop = quantile(size_distribution,[0.0025,0.9975])
-    r, wᵣ = gauleg(nquad_radius, 0.0, r_max ; norm=true) 
-    # r, wᵣ = gauleg(nquad_radius, start, min(stop,r_max) ; norm=true) 
-    #r, wᵣ = gauleg(nquad_radius, 0.0, r_max ; norm=true)
-    wₓ = compute_wₓ(size_distribution, wᵣ, r, r_max) 
+    # Compute radii and weights using log-space quadrature
+    r_min = max(quantile(size_distribution, 1e-8), 1e-6 * r_max)
+    r, wᵣ = gauleg_log(nquad_radius, r_min, r_max; norm=true)
+    wₓ = compute_wₓ(size_distribution, wᵣ, r, r_max)
 
     # Find overall N_max from the maximum radius
     N_max = Scattering.get_n_max(2 * π * r_max/ λ)
@@ -104,15 +114,25 @@ function compute_aerosol_optical_properties(model::MieModel{FDT}, FT2::Type=Floa
 end
 
 
-"""
-    $(FUNCTIONNAME)(l, ν₁, ν₂, ν₂_positive_flag, k, N_max, ab_pairs, an_m_bn, an_p_bn, wigner_A, wigner_B)
+@doc raw"""
+    compute_Sl(l, ν₁, ν₂, ν₂_positive_flag, k, N_max, ab_pairs, an_m_bn, an_p_bn, wigner_A, wigner_B)
 
-Reference: Suniti Sanghavi 2014, https://doi.org/10.1016/j.jqsrt.2013.12.015
+Evaluate ``S_l^{\nu_1\nu_2}`` for the Domke PCW Greek-coefficient formulation (Sanghavi 2014, Eq. 22).
 
-Compute Sl_νν, given by Eq 22
-Input: l, ν₁, ν₂, ν₂_positive_flag (to differentiate b/w 0 and -0), 
-k, N_max, ab_pairs (precomputed), an_m_bn, an_p_bn, wigner_A, wigner_B, 
-Output: Complex{Float64}
+Sums over Mie indices ``n,m`` with Wigner d-matrix elements. Valid ``(ν₁, ν₂)`` pairs:
+(0,0), (2,2), (2,-2), (0,2). Used to compute α, β, γ, δ, ϵ, ζ via Eq. 24.
+
+# Arguments
+- `l`: expansion index (1-based, corresponds to ``l-1`` in Eq. 22)
+- `ν₁`, `ν₂`: Fourier indices; `ν₂_positive_flag` selects sign convention for ``ν₂ = \pm 2``
+- `k`: wavenumber
+- `N_max`: maximum Mie expansion order
+- `ab_pairs`: precomputed ``⟨a_n^* a_m⟩`` etc. from `compute_avg_anbns!`
+- `an_m_bn`, `an_p_bn`: ``|a_n - b_n|^2`` and ``|a_n + b_n|^2`` weighted by size distribution
+- `wigner_A`, `wigner_B`: Wigner d-matrix tables for ``ν=0`` and ``ν=2``
+
+# Returns
+- Complex ``S_l^{\nu_1\nu_2}`` value
 """
 function compute_Sl(l::Integer, ν₁::Integer, ν₂::Integer, ν₂_positive_flag::Bool, 
                     k, N_max, ab_pairs, an_m_bn, an_p_bn, wigner_A, wigner_B)

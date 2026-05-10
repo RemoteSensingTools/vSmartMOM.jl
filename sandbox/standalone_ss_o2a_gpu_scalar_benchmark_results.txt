@@ -1,0 +1,17 @@
+StandaloneSS scalar exact-pass GPU benchmark
+date=2026-05-06T07:26:35.810
+gpu=NVIDIA A100-PCIE-40GB
+julia=1.12.5
+n_spec=20000 n_layers=8 n_geom=16
+inner_nquad=8 azimuth_nquad=12 reps=2
+note=individual :path3/:path4 timings are intentionally not run at 20k here; the combined :all path uses the GPU packed path3+path4 precompute.
+
+paths 1/2      paths=paths_1_2  min=0.073111 s median=0.073171 s reps=[0.073110812, 0.073231819]
+  size=(16, 1, 20000) finite=true total[min,max,sum]=[1.282825e-03, 2.899507e-02, 3.931126e+03]
+  component sums: p1=1.920700e+03 p2=2.010427e+03 p3=0.000000e+00 p4=0.000000e+00
+all 1/2/3/4    paths=all        min=0.193688 s median=0.193796 s reps=[0.193903405, 0.19368779]
+  size=(16, 1, 20000) finite=true total[min,max,sum]=[1.282825e-03, 3.089649e-02, 4.163021e+03]
+  component sums: p1=1.920700e+03 p2=2.010427e+03 p3=8.314110e+01 p4=1.487527e+02
+
+GPU analytic Jacobian probe: ArgumentError: ArgumentError: StandaloneSS f2 Jacobians currently support CPU() configs only
+GPU ForwardDiff probe: (status = "ok", elapsed = 4.634788907, size = (320000, 1), finite = true, sample = -0.013022475875914097)

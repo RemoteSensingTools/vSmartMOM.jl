@@ -1,8 +1,40 @@
+# =====================================================================
+# Ross-Li (kernel-weighted) land surface BRDF.
+# =====================================================================
+# A semi-empirical land-surface reflectance built from a linear sum of
+# three physically-motivated kernels:
+#
+#   ρ(μᵢ, μᵣ, Δϕ) = f_iso
+#                + f_vol · K_vol(μᵢ, μᵣ, Δϕ)   "Ross-Thick" volumetric
+#                + f_geo · K_geo(μᵢ, μᵣ, Δϕ)   "Li-Sparse"  geometric
+#
+# Ross-Thick models multiple scattering inside a dense canopy;
+# Li-Sparse models shadow casting / hot-spot from sparse 3D
+# scatterers. The three weights f_iso, f_vol, f_geo are fit to
+# MODIS / VIIRS observations per band and shipped in the BRDF product.
+# Scalar (n=1) only — polarized (n=3, 4) returns zero.
+#
+# Reference: Ross (1981); Li & Strahler (1992) IEEE TGRS 30(2);
+#            Lucht, Schaaf & Strahler (2000) IEEE TGRS 38(2).
+# =====================================================================
+"""
+    reflectance(RossLi::RossLiSurfaceScalar, n, μᵢ, μᵣ, dϕ)
+
+Ross-Li BRDF model (Ross & Li, 2000): linear combination of isotropic, volumetric, and geometric kernels.
+
+``\\rho = f_{\\text{iso}} K_{\\text{iso}} + f_{\\text{vol}} K_{\\text{vol}} + f_{\\text{geo}} K_{\\text{geo}}``
+
+- **fiso**: Isotropic coefficient.
+- **fvol**: Volumetric (Ross Thick) coefficient — models dense canopy scattering.
+- **fgeo**: Geometric (Li Sparse) coefficient — models shadowing effects.
+
+For scalar RT (n=1) only; returns zero for polarized. See Ross & Li (2000), RSE.
+"""
 function reflectance(RossLi::RossLiSurfaceScalar{FT},n, μᵢ::FT, μᵣ::FT, dϕ::FT) where FT
-    @unpack fiso, fvol, fgeo = RossLi
+    (; fiso, fvol, fgeo) = RossLi
     # Function was defined for RAMI definition, have to reverse here:
     dϕ = π - dϕ
-    # TODO: Suniti, stupid calculations here:
+    # Convert cosines to angles for Ross-Li kernels
     θᵢ   = acos(μᵢ) #assert 0<=θᵢ<=π/2
     θᵣ   = acos(μᵣ) #assert 0<=θᵣ<=π/2
 
@@ -14,12 +46,17 @@ function reflectance(RossLi::RossLiSurfaceScalar{FT},n, μᵢ::FT, μᵣ::FT, d�
         return FT(0)
     end
 end
-# Isotropic kernel
+"""Isotropic kernel: ``K_{\\text{iso}} = 1``."""
 function RossLi_K_iso()
     return 1.0;
 end
 
-# Volumetric (Ross Thick) kernel
+"""
+    RossLi_K_vol(θᵢ, θᵣ, dϕ)
+
+Ross Thick volumetric kernel: models dense vegetation scattering.
+``K_{\\text{vol}} = ((\\pi/2 - \\xi)\\cos\\xi + \\sin\\xi)/(\\cos\\theta_i + \\cos\\theta_r) - \\pi/4``
+"""
 function RossLi_K_vol(θᵢ::FT, θᵣ::FT, dϕ::FT) where FT
     ξ = acos(cos(θᵢ)*cos(θᵣ) + sin(θᵢ)*sin(θᵣ)*cos(dϕ))
     #@show ξ
@@ -28,7 +65,12 @@ function RossLi_K_vol(θᵢ::FT, θᵣ::FT, dϕ::FT) where FT
     return K_vol
 end
 
-#Geometric (Li Sparse) kernel
+"""
+    RossLi_K_geo(θᵢ, θᵣ, dϕ)
+
+Li Sparse geometric kernel: models shadowing by sparsely distributed objects.
+Uses RAMI default: h/b = 2, b/r = 1. Returns overlap area ``O``.
+"""
 function RossLi_K_geo(θᵢ::FT, θᵣ::FT, dϕ::FT) where FT
     h_by_b = FT(2) #for RAMI
     b_by_r = FT(1) #for RAMI

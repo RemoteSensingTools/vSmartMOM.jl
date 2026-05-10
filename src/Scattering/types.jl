@@ -4,7 +4,7 @@ This file contains all types that are used in the Scattering module:
 
 - `AbstractAerosolTypes` specify aerosol properties
 - `AbstractFourierDecompositionTypes` specify the decomposition method to use (NAI2 vs PCW)
-- `AbstractPolarizationTypes` specify the polarization type (I/IQU/IQUV)
+- `AbstractPolarizationTypes` specify the polarization type (I/IQ/IQU/IQUV)
 - `AbstractTruncationTypes` specify the type of truncation for legendre terms
 - `GreekCoefs` holds all greek coefficients 
 - `ScatteringMatrix` holds all computed phase function elements
@@ -18,7 +18,64 @@ Abstract aerosol type
 """
 abstract type AbstractAerosolType end
 
-"Aerosol type with its properties (size distribution and refractive index)"
+"""
+    AbstractAnalyticPhaseFunction
+
+Analytic phase/scattering matrix source that can be converted to Greek
+coefficients and then used by the standard MOM optical-property path.
+"""
+abstract type AbstractAnalyticPhaseFunction end
+
+"""
+    HenyeyGreensteinPhaseFunction(g)
+
+Scalar Henyey-Greenstein phase function,
+`(1 - g^2) / (1 + g^2 - 2g cosΘ)^(3/2)`, normalized so its sphere average is
+one.
+"""
+Base.@kwdef struct HenyeyGreensteinPhaseFunction{FT<:Real} <: AbstractAnalyticPhaseFunction
+    "Henyey-Greenstein asymmetry parameter; must satisfy `abs(g) < 1`."
+    g::FT
+end
+
+"""
+    SyntheticPolarizedHenyeyGreensteinPhaseFunction(; g, polarization_fraction)
+
+Diagnostic polarizing Henyey-Greenstein-like scattering matrix. The `f11`
+element is standard Henyey-Greenstein; `f12/f11` follows the bounded toy law
+`polarization_fraction * (1 - cosΘ^2) / (1 + cosΘ^2)`. This is intended for
+tests and sensitivity experiments, not as a Mie substitute.
+"""
+Base.@kwdef struct SyntheticPolarizedHenyeyGreensteinPhaseFunction{
+    FT<:Real, PF<:Real
+} <: AbstractAnalyticPhaseFunction
+    "Henyey-Greenstein asymmetry parameter; must satisfy `abs(g) < 1`."
+    g::FT
+    "Maximum synthetic fractional linear polarization; must satisfy `abs(p) <= 1`."
+    polarization_fraction::PF
+end
+
+"""
+    Aerosol
+
+Aerosol microphysical properties: particle size distribution and complex
+refractive index.  Used as input to [`MieModel`](@ref) for computing
+single-scattering optical properties via Lorenz-Mie theory.
+
+The refractive index convention is `n = nᵣ - i·nᵢ`, where positive `nᵢ`
+indicates absorption.
+
+# Fields
+- `size_distribution::ContinuousUnivariateDistribution`: Particle radius distribution (e.g., `LogNormal`). Units: μm.
+- `nᵣ`: Real part of the refractive index (relative to air).
+- `nᵢ`: Imaginary part of the refractive index (absorption).
+
+# Example
+```julia
+using Distributions
+aer = Aerosol(LogNormal(log(0.3), 0.4), 1.3, 0.01)
+```
+"""
 mutable struct Aerosol{}
     "Univariate size distribution"
     size_distribution::ContinuousUnivariateDistribution
@@ -69,7 +126,7 @@ Types of Polarization (which Stokes vector to use)
 
 Abstract Polarization type 
 """
-abstract type AbstractPolarizationType{FT}  end
+abstract type AbstractPolarizationType  end
 
 """
     struct Stokes_IQUV{FT<:AbstractFloat}
@@ -79,7 +136,7 @@ A struct which defines full Stokes Vector ([I,Q,U,V]) RT code
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-Base.@kwdef struct Stokes_IQUV{FT<:AbstractFloat} <: AbstractPolarizationType{FT} 
+Base.@kwdef struct Stokes_IQUV{FT<:AbstractFloat} <: AbstractPolarizationType
     "Number of Stokes components (int)"
     n::Int = 4
     "Vector of length `n` for ... (see eq in Sanghavi )"
@@ -96,13 +153,30 @@ A struct which defines Stokes Vector ([I,Q,U]) RT code
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-Base.@kwdef struct Stokes_IQU{FT<:AbstractFloat} <: AbstractPolarizationType{FT} 
+Base.@kwdef struct Stokes_IQU{FT<:AbstractFloat} <: AbstractPolarizationType
     "Number of Stokes components (int)" 
     n::Int = 3
     "Vector of length `n` for ... (see eq in Sanghavi )"
     D::Array{FT}  = [1.0, 1.0, -1.0]
     "Incoming Stokes vector for scalar only"
     I₀::Array{FT} = [1.0, 0.0, 0.0] #assuming linearly unpolarized incident stellar radiation
+end
+
+"""
+    struct Stokes_IQ{FT<:AbstractFloat}
+
+A struct which defines Stokes Vector ([I,Q]) RT code.
+
+# Fields
+$(DocStringExtensions.FIELDS)
+"""
+Base.@kwdef struct Stokes_IQ{FT<:AbstractFloat} <: AbstractPolarizationType
+    "Number of Stokes components (int)"
+    n::Int = 2
+    "Vector of length `n` for ... (see eq in Sanghavi )"
+    D::Array{FT}  = [1.0, 1.0]
+    "Incoming Stokes vector for scalar only"
+    I₀::Array{FT} = [1.0, 0.0] #assuming linearly unpolarized incident stellar radiation
 end
 
 """
@@ -113,7 +187,7 @@ A struct which define scalar I only RT code
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-Base.@kwdef struct Stokes_I{FT<:AbstractFloat} <: AbstractPolarizationType{FT} 
+Base.@kwdef struct Stokes_I{FT<:AbstractFloat} <: AbstractPolarizationType 
     "Number of Stokes components (int)"
     n::Int = 1
     "Vector of length `n` for ... (see eq in Sanghavi )"
@@ -129,24 +203,107 @@ Types of Truncation (for Legendre terms)
 =#
 
 """
-    type AbstractTruncationType
+    AbstractTruncationType
 
-Abstract greek coefficient truncation type 
+Abstract supertype for phase-function truncation methods. All concrete
+methods are dispatched through [`truncate_phase`](@ref) and supply
+`l_max(t)` (the per-band Legendre cutoff that the RT pipeline allocates
+for). Subtypes:
+
+* [`NoTruncation`](@ref) — identity. Use when the phase function has
+  no sharp forward peak (canopy, isotropic scattering, smooth Rayleigh).
+* [`δBGE`](@ref) — δ-BGE-fit (Sanghavi & Stephens 2015, JQSRT 159
+  §3); recommended for hyperspectral retrievals.
+
+The atmospheric `Δ_angle` (forward exclusion half-angle) lives inside
+the truncation type that needs it, not as a free parameter on
+[`CoreRT.vSmartMOM_Parameters`](@ref vSmartMOM.CoreRT.vSmartMOM_Parameters)
+— different methods have different hyper-parameters and `NoTruncation` has
+none.
 """
 abstract type AbstractTruncationType end
 
 """
-    type δBGE{FT} <: AbstractTruncationType
-        
+    NoTruncation(; l_max=typemax(Int))
+
+Identity truncation — phase functions are passed through unchanged.
+
+This is the correct choice for radiative transfer through media whose
+phase function has no sharp forward peak: canopy bi-Lambertian
+scattering (the `f_tr → 0` limit of Sanghavi & Stephens 2015 Eq. 8 is
+exactly the identity), isotropic scattering, and smooth Rayleigh.
+For Mie aerosol or ice-cloud forward peaks use [`δBGE`](@ref) instead.
+"""
+Base.@kwdef struct NoTruncation <: AbstractTruncationType
+    "Per-band Legendre cutoff used by the RT pipeline. Defaults to
+    `typemax(Int)`, which is interpreted downstream as 'use the full
+    Greek-coefficient length'."
+    l_max::Int = typemax(Int)
+end
+
+"""
+    δBGE{FT}(l_max, Δ_angle)
+
+δ-BGE-fit truncation, vector form (Sanghavi & Stephens 2015, JQSRT 159,
+§3 — extension of Hu et al. 2000 to vector RT). Fits truncated Legendre
+coefficients outside the forward exclusion cone of half-angle
+`Δ_angle` and renormalises by the retained scattering fraction
+``c_0 = 1 - f^t``.
+
+Recommended over plain δ-m for hyperspectral retrievals because δ-m
+has known DSE and PTE errors near exact backscatter (Sanghavi &
+Stephens 2015 §2.4).
+
 # Fields
 $(DocStringExtensions.FIELDS)
 """
 struct δBGE{FT} <: AbstractTruncationType
-    "Trunction length for legendre terms"
+    "Truncation length for Legendre terms"
     l_max::Int
     "Exclusion angle for forward peak (in fitting procedure) `[degrees]`"
     Δ_angle::FT
 end
+
+"""
+    AutoTruncation()
+
+Phase D — deferred-decision marker for `truncation: auto` in YAML
+(mirrors VLIDORT's `DO_DELTAM_SCALING` philosophy). At
+`model_from_parameters` time it resolves deterministically:
+
+- No aerosol scattering, or all aerosols' `length(greek.β) - 1`
+  fits within `stream_l_cap` ⇒ `NoTruncation()` (typical for
+  Rayleigh-only or smooth-aerosol scenes).
+- Aerosols with `phase_lmax > stream_l_cap` ⇒
+  `δBGE(stream_l_cap, Δ_angle)`.
+
+The resolver emits an `@info` line stating which branch was taken
+so the user can always see what was applied. `AutoTruncation` is
+**deliberately not threaded through the Mie/RT kernels** — it is a
+build-time placeholder that gets replaced before any kernel sees it.
+
+User-facing knobs in YAML:
+
+| Value                     | Meaning                                            |
+|---------------------------|----------------------------------------------------|
+| `truncation: auto`        | This deferred-decision mode (Phase D recommended)  |
+| `truncation: NoTruncation()` / `null` | Exactly no transform; errors if coefs exceed cap |
+| `truncation: δBGE(N, Δ)`  | Explicit; used for benchmarks / cross-validation   |
+"""
+struct AutoTruncation <: AbstractTruncationType end
+
+"""
+    l_max(t::AbstractTruncationType) -> Int
+
+Per-band Legendre cutoff supplied by the truncation type. RT pipeline
+code that needs a finite cutoff with `NoTruncation` should clamp to the
+actual Greek-coefficient length, e.g.
+`min(length(greek.β), l_max(truncation))`. `AutoTruncation()` reports
+`typemax(Int)` because it is unresolved — the model builder replaces it
+before any kernel runs.
+"""
+@inline l_max(t::AbstractTruncationType) = t.l_max
+@inline l_max(::AutoTruncation) = typemax(Int)
 
 #=
 
@@ -155,9 +312,16 @@ Model that specifies the Mie computation details
 =#
 
 """
-    type MieModel
+    MieModel{FDT<:AbstractFourierDecompositionType, FT}
 
-Model to hold all Mie computation details for NAI2 and PCW
+Configuration for a Lorenz–Mie scattering computation.  Specifies the aerosol
+(size distribution + refractive index), wavelength, polarization type,
+truncation strategy, and integration parameters.  The `computation_type`
+selects between NAI-2 (Siewert) and PCW (Domke) Fourier decomposition
+algorithms.
+
+Pre-computed Wigner symbol tables (`wigner_A`, `wigner_B`) can be supplied
+for PCW; they default to trivial placeholders when unused.
 
 # Fields
 $(DocStringExtensions.FIELDS)
@@ -187,26 +351,32 @@ Types that are needed for the output of the Fourier decomposition
 =#
 
 """
-    struct GreekCoefs{FT}
+    GreekCoefs{FT<:Real}
 
-A struct which holds all Greek coefficient lists (over l) in one object. 
-See eq 16 in Sanghavi 2014 for details. 
+Expansion coefficients of the 4×4 scattering (phase) matrix in generalised
+spherical functions (the "Greek" coefficients).  Six independent coefficient
+vectors (`α, β, γ, δ, ϵ, ζ`) fully describe the azimuthal Fourier
+decomposition of the scattering matrix **B** for a given particle or mixture.
+See Eq. 16 in Sanghavi (2014) for the mapping to **B** elements.
+
+For scalar (intensity-only) RT, only `β` (the phase-function expansion) is
+used.
 
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-struct GreekCoefs{FT<:Union{AbstractFloat, ForwardDiff.Dual}}
-    "Greek matrix coefficient α, is in `B[2,2]`"
+mutable struct GreekCoefs{FT<:Real}
+    "Greek matrix coefficient α, is in B[2,2]"
     α::Array{FT,1} 
     "Greek matrix coefficient β, is in `B[1,1]` (only important one for scalar!)"
     β::Array{FT,1}
-    "Greek matrix coefficient γ, is in `B[2,1]`, `B[1,2]`"
+    "Greek matrix coefficient γ, is in B[2,1],B[1,2]"
     γ::Array{FT,1}
-    "Greek matrix coefficient δ, is in `B[4,4]`"
+    "Greek matrix coefficient δ, is in B[4,4]"
     δ::Array{FT,1}
-    "Greek matrix coefficient ϵ, is in `B[3,4]` and - in `B[4,3]`"
+    "Greek matrix coefficient ϵ, is in B[3,4] and - in B[4,3]"
     ϵ::Array{FT,1}
-    "Greek matrix coefficient ζ, is in `B[3,3]`"
+    "Greek matrix coefficient ζ, is in B[3,3]"
     ζ::Array{FT,1}
 end
 
@@ -236,22 +406,24 @@ struct ScatteringMatrix{FT}
 end
 
 """
-    struct AerosolOptics
+    AerosolOptics{FT<:Real}
 
-A struct which holds all computed aerosol optics
+Computed aerosol single-scattering optical properties for one aerosol type
+at one (or more) wavelengths.  Produced by integrating the Mie solution over
+the particle size distribution.
 
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-Base.@kwdef struct AerosolOptics{FT<:Union{AbstractFloat, ForwardDiff.Dual}}
+Base.@kwdef struct AerosolOptics{FT<:Real}
     "Greek matrix"
     greek_coefs::GreekCoefs
     "Single Scattering Albedo"
-    ω̃::FT
+    ω̃::Union{FT, AbstractArray{FT}}
     "Extinction cross-section"
-    k::FT
+    k::Union{FT, AbstractArray{FT}}
     "Truncation factor" 
-    fᵗ::FT
+    fᵗ::Union{FT, AbstractArray{FT}}
     "Derivatives"
     derivs = zeros(1)
 end

@@ -1,0 +1,28 @@
+{
+  "gpu_used_delta": null,
+  "gpu_used_before": null,
+  "wall_max_s": 0.041993141174316406,
+  "name": "phase1b_ss_761-764nm_cpu",
+  "wall_min_s": 0.04197287559509277,
+  "gpu_name": "none",
+  "output_path": "test/benchmarks/baseline_output/sanghavi-unified_6b01912/phase1b_ss_761-764nm_cpu_output.jld2",
+  "wall_median_s": 0.04198300838470459,
+  "hw": {
+    "julia_version": "1.12.5",
+    "cpu": "AMD EPYC 7H12 64-Core Processor",
+    "gpu": "no-cuda"
+  },
+  "wall_mad_s": 1.0132789611816406e-5,
+  "output_keys": [
+    "T_SFI",
+    "ieT_SFI",
+    "hem_R",
+    "hem_T",
+    "R_SFI",
+    "ieR_SFI"
+  ],
+  "gpu_used_after": null,
+  "wall_n": 2,
+  "cpu_alloc_bytes": 67694488,
+  "cpu_gctime_s": 0.0
+}

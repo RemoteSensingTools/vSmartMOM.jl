@@ -1,0 +1,371 @@
+{
+  "$schema": "http://json-schema.org/draft-04/schema#",
+  "title": "vSmartMOM parameter file",
+  "description": "Schema for vSmartMOM scene/configuration files consumed by parameters_from_file and parameters_from_dict. TOML keys containing Unicode, such as \"Δ_angle\", must be quoted in TOML. See docs/dev_notes/pre_registration_hardening_plan.md and src/IO/Parameters.jl for parser details.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "radiative_transfer",
+    "geometry",
+    "atmospheric_profile"
+  ],
+  "properties": {
+    "radiative_transfer": {
+      "$ref": "#/definitions/radiative_transfer"
+    },
+    "geometry": {
+      "$ref": "#/definitions/geometry"
+    },
+    "atmospheric_profile": {
+      "$ref": "#/definitions/atmospheric_profile"
+    },
+    "absorption": {
+      "$ref": "#/definitions/absorption"
+    },
+    "scattering": {
+      "$ref": "#/definitions/scattering"
+    },
+    "canopy": {
+      "$ref": "#/definitions/canopy"
+    },
+    "_metadata": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Optional provenance metadata. Ignored by the vSmartMOM parameter parser."
+    }
+  },
+  "definitions": {
+    "numberArray": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      }
+    },
+    "stringArray": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "radiative_transfer": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "RT solver configuration. v0.7 makes nstreams the primary user knob; max_m / l_trunc / quadrature_type are now optional with backward-compatible defaults. See docs/src/pages/IO/Schema/radiative_transfer.md for the full reference.",
+      "required": [
+        "spec_bands",
+        "surface",
+        "polarization_type",
+        "depol",
+        "float_type",
+        "architecture"
+      ],
+      "properties": {
+        "spec_bands": {
+          "$ref": "#/definitions/stringArray",
+          "description": "Spectral band expressions parsed by _safe_parse_spec_band, for example \"[13000.0, 13000.1]\" or \"(1e7/775):0.05:(1e7/755)\"."
+        },
+        "surface": {
+          "$ref": "#/definitions/stringArray",
+          "description": "One surface expression per band. Parser supports LambertianSurfaceScalar, LambertianSurfaceSpectrum, LambertianSurfaceLegendre, rpvSurfaceScalar, RossLiSurfaceScalar, and CoxMunkSurface."
+        },
+        "quadrature_type": {
+          "type": ["string", "null"],
+          "default": "GaussLegQuad()",
+          "description": "Optional angular quadrature rule. Leave unset for the default Gauss-Legendre quadrature.",
+          "enum": [
+            "GaussLegQuad()",
+            "RadauQuad()",
+            null
+          ],
+          "enumDescriptions": [
+            "Default. Gauss-Legendre streams; generally cheaper and more accurate per stream for Rayleigh-only setups.",
+            "Legacy-compatible Radau streams. Use when reproducing older setups that were tuned against Radau quadrature.",
+            "YAML only. Same as omitting the field: use GaussLegQuad(). TOML has no null value, so omit the key."
+          ],
+          "examples": ["GaussLegQuad()", "RadauQuad()"]
+        },
+        "polarization_type": {
+          "type": "string",
+          "description": "Stokes vector dimensionality. Choose the smallest state that carries the signal you need.",
+          "enum": [
+            "Stokes_I()",
+            "Stokes_IQ()",
+            "Stokes_IQU()",
+            "Stokes_IQUV()"
+          ],
+          "enumDescriptions": [
+            "Scalar intensity only. Fastest option; suitable for scalar surfaces and unpolarized diagnostics.",
+            "Intensity plus linear Q polarization. Useful when U/V are known to be unnecessary.",
+            "Intensity plus both linear polarization components. Good default for polarized reflection without circular polarization.",
+            "Full Stokes vector including circular polarization V. Most complete and most expensive option."
+          ]
+        },
+        "nstreams": {
+          "type": "integer",
+          "minimum": 3,
+          "description": "v0.7 primary resolution knob: weighted streams per hemisphere. Public contract: stream_l_cap = 2·nstreams - 1 regardless of quadrature_type. Minimum 3 (Rayleigh declares Fourier support through m=2). Default 8 when no legacy fields are set (gives stream_l_cap = 15; matches typical aerosol δ-fit caps and four-decimal-place Rayleigh convergence)."
+        },
+        "m_max": {
+          "type": ["integer", "null"],
+          "minimum": 0,
+          "description": "v0.7 explicit Fourier loop bound (order). Optional override clamping the trait-derived bound from above. Default null."
+        },
+        "max_m": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Legacy: Fourier moment count (loop runs m=0:max_m-1). Triggers legacy-schema parsing. Use nstreams in new configs."
+        },
+        "Δ_angle": {
+          "type": "number",
+          "description": "Optional forward-peak exclusion angle in degrees consumed by δBGE truncation. Defaults to 0.0 (no forward-peak excluded) when omitted; legacy YAMLs may still set 2.0 explicitly. In TOML, quote the Unicode key as \"Δ_angle\" = 0.0."
+        },
+        "l_trunc": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Legacy Legendre truncation length. Plays the role of stream_l_cap under the legacy schema. Use nstreams instead in new configs."
+        },
+        "truncation": {
+          "default": "auto",
+          "description": "v0.7 phase-function truncation mode. 'auto' (default): VLIDORT-DO_DELTAM_SCALING-style. NoTruncation if no aerosols; δBGE(stream_l_cap, Δ_angle) once aerosols are configured — the per-band Mie loop applies δBGE only when greek.β exceeds the cap, otherwise falls back to NoTruncation. 'NoTruncation()' / null: exactly no transform; coefficients above the cap are silently dropped. 'δBGE(L, Δ)': explicit forward-peak handling (Sanghavi & Stephens 2015) — set explicitly to override the auto resolver.",
+          "oneOf": [
+            {
+              "type": "string",
+              "enum": ["auto"],
+              "description": "Recommended default. NoTruncation if no aerosols; δBGE(stream_l_cap, Δ_angle) once aerosols are configured (with a per-band length guard that falls back to NoTruncation when the raw greek series already fits the cap)."
+            },
+            {
+              "type": "string",
+              "enum": ["NoTruncation()"],
+              "description": "Do not transform the phase function. Appropriate for Rayleigh-only or other phase series that already fit the stream cap."
+            },
+            {
+              "type": "string",
+              "pattern": "^δBGE\\([^)]*\\)$",
+              "description": "Explicit delta-BGE forward-peak handling, for example δBGE(20, 2.0). Use for benchmark reproduction or known strongly forward-scattering aerosol cases."
+            },
+            {
+              "type": "null",
+              "description": "YAML only. Same as NoTruncation(). TOML has no null value, so use NoTruncation() or omit the key depending on intent."
+            }
+          ],
+          "examples": ["auto", "NoTruncation()", "δBGE(20, 2.0)"]
+        },
+        "depol": {
+          "type": "number",
+          "description": "Rayleigh depolarization factor."
+        },
+        "float_type": {
+          "type": "string",
+          "description": "Floating point type used by the RT model.",
+          "enum": [
+            "Float64",
+            "Float32"
+          ],
+          "enumDescriptions": [
+            "Default precision for science runs and cross-validation.",
+            "Lower-memory, faster path for GPU or throughput-oriented experiments after accuracy is checked."
+          ]
+        },
+        "architecture": {
+          "type": "string",
+          "description": "Compute backend selector.",
+          "enum": [
+            "default_architecture",
+            "CPU()",
+            "Architectures.CPU()",
+            "GPU()",
+            "Architectures.GPU()",
+            "MetalGPU()",
+            "Architectures.MetalGPU()"
+          ],
+          "enumDescriptions": [
+            "Use the package default backend for the current environment. Best for portable examples.",
+            "Force the CPU backend. Best for CI, debugging, and reproducible small runs.",
+            "Force the CPU backend. Best for CI, debugging, and reproducible small runs.",
+            "Use the CUDA backend when CUDA is installed and available.",
+            "Use the CUDA backend when CUDA is installed and available.",
+            "Use the Metal backend on supported Apple hardware.",
+            "Use the Metal backend on supported Apple hardware."
+          ]
+        },
+        "numerics": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Optional sub-block: rarely-touched solver knobs.",
+          "properties": {
+            "dτ_max_threshold": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Doubling-step cap (`dτ_max = threshold · μ_min`, where μ_min is the smallest TRUE quadrature stream cosine). Default 0.001 (legacy floor); raising to ~0.01 reduces doubling iterations."
+            },
+            "dτ_min_floor": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Absolute floor on dτ_max as a multiple of eps(FT). Default 1024·eps(FT) ≈ 1.2e-4 for Float32 and 2.3e-13 for Float64."
+            },
+            "blas_threads": {
+              "type": ["integer", "null"],
+              "minimum": 1,
+              "description": "Per-model BLAS thread cap. null = leave global BLAS alone (default). Recommend 4-8 for batched runs."
+            },
+            "verbose": {
+              "type": "boolean",
+              "description": "When true, rt_run prints the TimerOutputs timing tree at the end of each call. Default false (quiet). Useful for profiling, noisy in batched loops."
+            }
+          }
+        }
+      }
+    },
+    "geometry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sza",
+        "vza",
+        "vaz",
+        "obs_alt"
+      ],
+      "properties": {
+        "sza": {
+          "type": "number",
+          "description": "Solar zenith angle in degrees."
+        },
+        "vza": {
+          "$ref": "#/definitions/numberArray",
+          "description": "Viewing zenith angles in degrees."
+        },
+        "vaz": {
+          "$ref": "#/definitions/numberArray",
+          "description": "Viewing azimuth angles in degrees."
+        },
+        "obs_alt": {
+          "type": "number",
+          "description": "Observer altitude/pressure coordinate used by the existing parser."
+        }
+      }
+    },
+    "atmospheric_profile": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "T",
+        "p",
+        "profile_reduction"
+      ],
+      "properties": {
+        "T": {
+          "$ref": "#/definitions/numberArray",
+          "description": "Layer temperature profile."
+        },
+        "p": {
+          "$ref": "#/definitions/numberArray",
+          "description": "Pressure boundary profile."
+        },
+        "q": {
+          "$ref": "#/definitions/numberArray",
+          "description": "Optional specific humidity profile."
+        },
+        "profile_reduction": {
+          "type": "integer",
+          "description": "Profile reduction level. TOML has no null value, so omit future optional semantics carefully or use an integer."
+        }
+      }
+    },
+    "absorption": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "molecules": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/stringArray"
+          },
+          "description": "Molecules per spectral band."
+        },
+        "vmr": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Volume mixing ratios by molecule name."
+        },
+        "broadening": {
+          "type": "string",
+          "description": "Absorption line-shape broadening model.",
+          "enum": [
+            "Voigt()",
+            "Doppler()",
+            "Lorentz()"
+          ],
+          "enumDescriptions": [
+            "Default physical line shape combining Doppler and pressure broadening.",
+            "Thermal Doppler broadening only. Useful in low-pressure or diagnostic setups.",
+            "Pressure broadening only. Useful for simplified high-pressure diagnostics."
+          ]
+        },
+        "CEF": {
+          "type": "string",
+          "description": "Complex error function implementation used by Voigt absorption.",
+          "enum": [
+            "HumlicekWeidemann32SDErrorFunction()"
+          ],
+          "enumDescriptions": [
+            "Current supported implementation; stable default for Voigt line-shape evaluation."
+          ]
+        },
+        "wing_cutoff": {
+          "type": "integer"
+        }
+      }
+    },
+    "scattering": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "aerosols": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "description": "Aerosol dictionaries consumed by aerosol_params_to_obj."
+        },
+        "r_max": {
+          "type": "number"
+        },
+        "nquad_radius": {
+          "type": "number"
+        },
+        "λ_ref": {
+          "type": "number",
+          "description": "Reference wavelength. In TOML, write this key as \"λ_ref\" = 550.0."
+        },
+        "decomp_type": {
+          "type": "string",
+          "description": "Aerosol phase-matrix decomposition used to produce Greek coefficients.",
+          "enum": [
+            "NAI2()",
+            "PCW()"
+          ],
+          "enumDescriptions": [
+            "Normalized associated integral decomposition. Current default path for aerosol Greek coefficients.",
+            "Polynomials of generalized spherical functions. Use for comparisons with PCW-based references."
+          ]
+        }
+      }
+    },
+    "canopy": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Optional canopy wrapper configuration parsed by _parse_canopy_section."
+    }
+  },
+  "x-taplo": {
+    "docs": {
+      "main": "vSmartMOM parameter file schema. Source of truth is `src/IO/Parameters.jl`; this schema mirrors the public file format for editor help and Taplo validation."
+    },
+    "initKeys": [
+      "radiative_transfer",
+      "geometry",
+      "atmospheric_profile"
+    ]
+  }
+}

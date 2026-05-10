@@ -1,0 +1,14 @@
+{
+  "hw": {
+    "julia_version": "1.12.5",
+    "cpu": "AMD EPYC 7H12 64-Core Processor",
+    "gpu": "no-cuda"
+  },
+  "scenarios": [
+    "phase1b_RRS_761-764nm_cpu",
+    "phase1b_noRS_761-764nm_cpu",
+    "phase1b_ss_761-764nm_cpu"
+  ],
+  "git_sha": "b4a5ab11131e336ae1819cf646d87e681ed5fef4",
+  "toml": "test/benchmarks/harness/scenarios.toml"
+}

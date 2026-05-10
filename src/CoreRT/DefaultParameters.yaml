@@ -1,25 +1,44 @@
 # =================================================================
 # Top-Level Radiative Transfer Parameters
 # =================================================================
-radiative_transfer: 
+# This default file uses the v0.7 nstreams-first schema. See
+# docs/src/pages/IO/Schema/radiative_transfer.md for full reference,
+# or the JSON Schema at schemas/vsmartmom-parameters.schema.json
+# (auto-loaded by Taplo for TOML configs and by yaml-language-server
+# for YAML — recipe in docs/src/pages/IO/Schema.md).
+radiative_transfer:
   # Spectral bands (list of ν_start:ν_step:ν_end, in cm⁻¹)
-  spec_bands: 
+  spec_bands:
     - (1e7/777):0.015:(1e7/757)
   # Bidirectional Reflectance Distribution Function (BRDF) per band
-  surface: 
+  surface:
     - LambertianSurfaceScalar(0.15)
-  # Quadrature-scheme for stream calculations
-  quadrature_type:    GaussQuadFullSphere()
+  # v0.7 primary resolution knob: weighted streams per hemisphere.
+  # Public contract: stream_l_cap = 2·nstreams - 1 regardless of
+  # quadrature_type. Minimum 3 (Rayleigh contributes through m=2).
+  nstreams:           8
+  # Phase-function truncation. `auto` is the deterministic default —
+  # NoTruncation() if the phase function fits stream_l_cap, δBGE(N, Δ)
+  # otherwise. Logged at @info level so the choice is visible.
+  truncation:         auto
+  # Quadrature scheme. Optional — defaults to GaussLegQuad() (Sanghavi:
+  # cheaper and 5–50× more accurate per stream than RadauQuad on
+  # Rayleigh-only setups). Uncomment to override:
+  # quadrature_type:  GaussLegQuad()   # default
+  # quadrature_type:  RadauQuad()      # legacy / SZA-on-node use cases
   # Polarization type (Stokes_I, Stokes_IQ, Stokes_IQU, Stokes_IQUV)
   polarization_type:  Stokes_I()
-  # Maximum m (number of Fourier moments to loop over)
-  max_m:              3
-  # Exclusion angle for forward peak in fitting procedure (degrees)
-  Δ_angle:            2.0
-  # Trunction length for legendre terms
-  l_trunc:            20
-  # Depolarization factor
-  depol:              0.0
+  # Optional: forward-peak exclusion angle for δBGE [deg]. Defaults to 0
+  # (no exclusion) when omitted. Ignored when `truncation` resolves to
+  # NoTruncation(). Set explicitly only when reproducing VLIDORT's
+  # `DO_DELTAM_SCALING = 2°` behaviour or matching legacy benchmarks:
+  # Δ_angle:          2.0
+  # Depolarization factor.
+  #   -1  → auto: derived per band from N₂/O₂ molecular constants (default).
+  #   ≥0  → explicit: use this value uniformly for greek_rayleigh,
+  #         greek_cabannes, and τ_rayl. Set 0.0 for Natraj (1980)
+  #         idealizations or any benchmark that fixes depol = 0.
+  depol:              -1
   # Floating point type for calculations (Float32, Float64)
   float_type:         Float64
   # Architecture (default_architecture, GPU(), CPU())
@@ -28,6 +47,19 @@ radiative_transfer:
 # =================================================================
 # Simulation Geometry
 # =================================================================
+# -----------------------------------------------------------------
+# AZIMUTH CONVENTION (vSmartMOM):
+#   `vaz` is the relative azimuth between the satellite-detector
+#   and the Sun, measured in the principal plane.
+#     vaz =   0°  -> Sun and satellite on *opposite* sides of zenith
+#                    in the principal plane (vSmartMOM convention).
+#     vaz = 180°  -> Sun directly *behind* the satellite (same side
+#                    of zenith). This is the geometry that many
+#                    third-party models — including MODTRAN — call
+#                    "RAA = 0".
+#   To compare with a model whose RAA = 0 means Sun-behind-satellite
+#   (e.g. MODTRAN), set vaz = RAA + 180° (mod 360°).
+# -----------------------------------------------------------------
 geometry: 
   # Solar zenith angle (degrees)
   sza:                60
@@ -58,7 +90,7 @@ atmospheric_profile:
        31.00,  42.07,  56.09,  74.78,  99.69, 131.00,
       176.85, 236.64, 314.58, 418.87, 557.76, 735.00, 
       800.12, 849.00, 912.00, 980.00, 1005.0]
-  # Reduce profile to n layers
+  # Reduce profile to n layers (-1 uses all layers)
   profile_reduction: -1
 
 # =================================================================

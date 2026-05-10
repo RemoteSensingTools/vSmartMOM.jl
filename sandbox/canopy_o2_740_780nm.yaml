@@ -1,0 +1,59 @@
+# =================================================================
+# Canopy + within-canopy O2 absorption — isolated layer
+#
+# Spectral window: 740–780 nm at 0.2 cm⁻¹.  The v5.2 O2 ABSCO LUT
+# only covers 12745–13245 cm⁻¹ (~754.6–784.6 nm); outside that range
+# the cross section is extrapolated to zero (which is essentially
+# correct — the O2 A-band is the only feature in this window).
+#
+# To plot ONLY the canopy reflectance (not the atmosphere above it),
+# the atmospheric profile is collapsed to a single vanishingly-thin
+# layer (Δp = 0.01 hPa) so the column above the canopy contributes
+# essentially zero Rayleigh and zero absorption. The canopy's internal
+# O2 column is set via canopy_dp = 3.0 hPa in the Julia driver.
+#
+# The O2 LUT path is read from ENV["VSMARTMOM_O2_ABSCO"]. The Julia sandbox
+# drivers set this to the local /net/squid default when that file exists.
+# =================================================================
+
+radiative_transfer:
+  # 12820.5 cm⁻¹ ≈ 780 nm, 13513.5 cm⁻¹ ≈ 740 nm.
+  spec_bands:
+    - (1e7/780):0.2:(1e7/740)
+
+  surface:
+    - LambertianSurfaceScalar(0.10)
+
+  quadrature_type:    RadauQuad()
+  polarization_type:  Stokes_I()
+  max_m:              3
+  Δ_angle:            2.0
+  l_trunc:            20
+  depol:              -1
+  float_type:         Float64
+  architecture:       default_architecture
+
+geometry:
+  sza:     30.0
+  vza:     [0.0, 30.0, 60.0]
+  vaz:     [0.0, 0.0, 0.0]
+  obs_alt: 1000.0
+
+# Vanishingly thin "atmosphere" sitting on top of the canopy — only there
+# so model_from_parameters has a valid bottom-layer absorption to scale
+# into the canopy's internal O2 path (see _compute_canopy_atm_tau!).
+atmospheric_profile:
+  T: [285.0]
+  p: [1012.99, 1013.0]      # Δp = 0.01 hPa above the canopy
+  profile_reduction: -1
+
+absorption:
+  fixed_molecules:
+    - [O2]
+  LUTfiles:
+    - ["${ENV:VSMARTMOM_O2_ABSCO}"]
+  vmr:
+    O2: 0.21
+  broadening:  Voigt()
+  CEF:         HumlicekWeidemann32SDErrorFunction()
+  wing_cutoff: 10

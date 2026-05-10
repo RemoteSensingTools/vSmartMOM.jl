@@ -1,22 +1,121 @@
 # Scattering Module Overview
 
-This module enables scattering phase-function calculation of atmospheric aerosols with different size distributions, incident wavelengths, and refractive indices. It can perform the calculation using either the Siewert NAI-2 or Domke PCW methods ([Suniti Sanghavi 2014](https://www.sciencedirect.com/science/article/pii/S0022407313004962)). 
+The Scattering module computes aerosol optical properties from Mie theory for user-defined size distributions and refractive indices. It supports:
 
-The module also supports auto-differentiation (AD) of the phase function, with respect to the aerosol's size distribution parameters and its refractive index. 
+- Siewert NAI-2 and Domke PCW Fourier decomposition methods
+- scalar and polarized phase-matrix workflows (`Stokes_I`, `Stokes_IQ`, `Stokes_IQU`, `Stokes_IQUV`)
+- automatic differentiation (AD) for core aerosol parameters (`r_m`, `sigma`, `n_r`, `n_i`)
+- phase matrix reconstruction from Greek coefficients for downstream RT use
 
-You can calculate a scattering phase-function in a few short steps: 
+Primary reference: [Sanghavi (2014)](https://doi.org/10.1016/j.jqsrt.2013.12.015)
 
-1. Use [`Aerosol`](@ref) to create an aerosol with selected distribution and properties
-2. Use [`make_mie_model`](@ref) to set up all calculation parameters
-3. Use [`compute_aerosol_optical_properties`](@ref) to perform the optical-properties calculations using the defined model settings
-4. Use [`reconstruct_phase`](@ref) to produce the scattering matrix from the computed optical properties
+## Typical Workflow
 
-For a full demo of how to use this module, please see the [example](https://remotesensingtools.github.io/vSmartMOM.jl/dev/pages/Scattering/Example/) page. 
+1. Create an [`Aerosol`](@ref) from a size distribution and refractive index
+2. Build a [`MieModel`](@ref) with [`make_mie_model`](@ref)
+3. Compute bulk optical properties with [`compute_aerosol_optical_properties`](@ref)
+4. Reconstruct scattering matrix elements with [`reconstruct_phase`](@ref)
+
+For a runnable code walkthrough, see:
+
+- [Scattering example page](Example.md)
+- [Scattering tutorial](../tutorials/Tutorial_Scattering.md)
+
+## Core Outputs
+
+`compute_aerosol_optical_properties` returns an [`AerosolOptics`](@ref) object containing:
+
+- `greek_coefs`: `alpha, beta, gamma, delta, epsilon, zeta`
+- `omega_tilde`: single scattering albedo
+- `k`: bulk extinction cross-section
+- `f_t`: truncation factor used by delta-M style workflows
+- `derivs` (if AD enabled): Jacobian of outputs with respect to `[r_m, sigma, n_r, n_i]`
+
+## Theory Mapping (Sanghavi 2014)
+
+The table below maps key Scattering APIs to equations/sections in:
+[Sanghavi (2014)](https://doi.org/10.1016/j.jqsrt.2013.12.015).
+
+| vSmartMOM API | Theory anchor in paper | Notes |
+| --- | --- | --- |
+| `compute_aerosol_optical_properties(model::MieModel{NAI2})` | Eq. (1), Fourier framework around Eq. (17), NAI-2 discussion in Secs. 3-4 | Uses Mie-series cross-sections and numerical-angular-integration route to Greek coefficients |
+| `phase_function(aerosol, ...)` | Eq. (1), Secs. 3-4 | Returns scalar phase function with `C_ext`, `C_sca`, `g` |
+| `compute_aerosol_XS(aerosol, ...)` | Eq. (1) | Cross-section-only path (no Greek reconstruction) |
+| `reconstruct_phase(greek_coefs, μ)` | Fourier/Greek matrix representation around Eq. (17) | Rebuilds angle-space matrix elements from stored Greek moments |
+| `compute_aerosol_optical_properties(model::MieModel{PCW})` | Eq. (22) for `S_l`, Eq. (24) for Greek coefficients | Direct Domke/PCW route using Wigner-symbol tables |
+| `compute_Sl(...)` | Eq. (22) | Internal helper used by PCW implementation |
+
+Implementation notes:
+- The code follows Sanghavi's corrected Domke/PCW formalism where applicable.
+- Some engineering choices (memory layout, AD wrapping, truncation helpers) are implementation details and not direct one-to-one equation transcriptions.
+
+## API Map (for `miepython` Users)
+
+If you are coming from `miepython`, this is the closest functional mapping:
+
+- `efficiencies(...)` -> `compute_aerosol_XS(...)` or `phase_function(...)` for bulk cross-sections
+- `S1_S2(...)` / `phase_matrix(...)` -> `compute_aerosol_optical_properties(...)` + `reconstruct_phase(...)`
+- `coefficients(...)` -> low-level `compute_mie_ab!` and `compute_mie_S1S2!` routines
+- normalization/RT-oriented outputs -> Greek coefficients + `omega_tilde`, `k`, `f_t`
+
+This module is oriented toward atmospheric RT pipelines where Fourier moments (Greek coefficients) are the main interface.
+
+## Mathematical Background
+
+### Mie Cross-Sections
+
+The extinction and scattering cross-sections for a single sphere are computed from the Mie coefficients ``a_n`` and ``b_n`` (Sanghavi 2014, Eq. 1):
+
+```math
+C_\text{ext} = \frac{2\pi}{k^2}\sum_{n=1}^{\infty}(2n+1)\,\text{Re}(a_n+b_n)
+```
+```math
+C_\text{scat} = \frac{2\pi}{k^2}\sum_{n=1}^{\infty}(2n+1)(|a_n|^2+|b_n|^2)
+```
+
+where ``k = 2\pi/\lambda`` and the sum is truncated at a size-parameter-dependent ``n_\text{max}``.
+
+### Scattering Matrix
+
+The 4x4 scattering matrix ``\mathbf{F}(\xi)`` for a single sphere has the form (Sanghavi 2014, Eq. 2):
+
+```math
+\mathbf{F}(\xi) = \begin{pmatrix}f_{11} & f_{12} & 0 & 0\\f_{12} & f_{22} & 0 & 0\\0 & 0 & f_{33} & f_{34}\\0 & 0 & -f_{34} & f_{44}\end{pmatrix}
+```
+
+For spherical particles, ``f_{11} = f_{22}`` and ``f_{33} = f_{44}``, leaving four independent elements.
+
+### Greek Coefficient Matrix
+
+The Greek matrix ``\mathbf{B}_l`` provides the Fourier-space representation of the scattering matrix (Sanghavi 2014, Eq. 16):
+
+```math
+\mathbf{B}_l = \begin{pmatrix}\beta_l & \gamma_l & 0 & 0\\\gamma_l & \alpha_l & 0 & 0\\0 & 0 & \zeta_l & -\epsilon_l\\0 & 0 & \epsilon_l & \delta_l\end{pmatrix}
+```
+
+The six Greek coefficients ``(\alpha, \beta, \gamma, \delta, \epsilon, \zeta)`` are the compact representation stored in `GreekCoefs` and used by the RT kernels.
+
+### NAI2 vs PCW Performance
+
+The two decomposition methods have different computational trade-offs:
+
+> "For polydispersions over a finite range of particle sizes, PCW is found to be at least 6--8 times faster for size parameters ranging from ~0 to beyond 900." -- Sanghavi (2014)
+
+NAI2 is the default due to its simplicity and lower memory footprint (no precomputed Wigner tables required). PCW becomes advantageous for large size parameters or when many repeated computations amortize the Wigner table precomputation.
+
+## Conventions
+
+- Refractive index input uses `n_r` and `n_i >= 0`
+- Length units for `lambda`, `r`, and `r_max` must be consistent
+- `phase_function(...)` and `compute_aerosol_XS(...)` are convenience APIs when you do not need full Greek-coefficient reconstruction
 
 ## Architecture
 
 ![ArchitectureDiagram](vSmartMOMDiagram-Scattering.drawio.png)
 
-The Scattering.jl architecture closely follows the user's workflow to calculate the scattering phase-function. There are functions for creating an aerosol, defining scattering parameters, calculating aerosol optical properties, and constructing the phase-function from said optical properties. 
+The design separates expensive Mie/Fourier computation from phase reconstruction:
 
-The aerosol optical properties contain computed "Greek Coefficients", which are to be multiplied by matrices composed of generalized spherical functions, in order to produce the phase-functions. Since calculating the greek coefficients is the most computationally intensive part – and the output phase-function can be produced at various resolutions – the [`reconstruct_phase`](@ref) function is separate from [`compute_aerosol_optical_properties`](@ref). 
+- `compute_aerosol_optical_properties` computes and stores compact Fourier-space information
+- `reconstruct_phase` evaluates angle-dependent scattering matrix elements at arbitrary angular grids
+
+This separation is useful when RT or inversion workflows need repeated matrix reconstruction on different angle grids without recomputing the full Mie solution.
