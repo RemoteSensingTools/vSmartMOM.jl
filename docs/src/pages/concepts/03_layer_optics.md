@@ -34,29 +34,20 @@ the constructor is `constructCoreOpticalProperties` in
 [`src/CoreRT/LayerOpticalProperties/compEffectiveLayerProperties.jl:11–65`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/LayerOpticalProperties/compEffectiveLayerProperties.jl#L11-L65). The
 build happens once per band, per Fourier moment, before the layer loop:
 
-```@raw html
-<pre class="mermaid">
-flowchart LR
-    G["Gas opacity τ_abs<br/>(HITRAN LBL)"]
-    R["Rayleigh<br/>(greek + ϖ_Cab)"]
-    A1["Aerosol_1<br/>(GreekCoefs, ϖ, k, fᵗ)"]
-    A2["Aerosol_2<br/>(GreekCoefs, ϖ, k, fᵗ)"]
-    C["<b>constructCoreOpticalProperties</b>"]
-    L["Per-layer<br/>(τ, ϖ₀, Z⁺⁺, Z⁻⁺)"]
-    M["MOM solver"]
-    G --> C
-    R --> C
-    A1 --> C
-    A2 --> C
-    C --> L --> M
-</pre>
-<script type="module">
-  if (!window.__mermaidLoader) {
-    window.__mermaidLoader = import('https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs')
-      .then(m => { window.__mermaid = m.default; m.default.initialize({ startOnLoad: false, theme: 'default' }); return m.default; });
-  }
-  window.__mermaidLoader.then(m => m.run({ querySelector: '.mermaid' }));
-</script>
+```
+   Gas opacity τ_abs  ─┐
+   (HITRAN LBL)        │
+                       │
+   Rayleigh ─────────┐ │
+   (greek + ω̃_Cab)   │ │
+                     ▼ ▼
+   Aerosol_1 ──→ constructCoreOpticalProperties ──→ Per-layer
+   (GreekCoefs,                                     (τ, ϖ₀,
+    ω̃, k, fᵗ)                                       Z⁺⁺, Z⁻⁺)
+                     ▲                                   │
+                     │                                   │
+   Aerosol_2 ────────┘                                   ▼
+                                                    MOM solver
 ```
 
 The build proceeds in five steps (the relevant lines from
