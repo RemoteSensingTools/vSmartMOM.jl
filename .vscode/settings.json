@@ -1,0 +1,22 @@
+{
+  "evenBetterToml.taplo.configFile.path": ".taplo.toml",
+  "yaml.schemas": {
+    "schemas/vsmartmom-parameters.schema.json": [
+      "/config/**/*.yaml",
+      "/config/**/*.yml",
+      "/configs/**/*.yaml",
+      "/configs/**/*.yml",
+      "/examples/**/*.yaml",
+      "/examples/**/*.yml",
+      "/sandbox/**/*.yaml",
+      "/sandbox/**/*.yml",
+      "/test/test_parameters/**/*.yaml",
+      "/test/test_parameters/**/*.yml",
+      "/test/benchmarks/*.yaml",
+      "/test/benchmarks/*.yml",
+      "/test/vlidort_baseline/configs/**/*.yaml",
+      "/test/vlidort_baseline/configs/**/*.yml"
+    ]
+  },
+  "yaml.validate": true
+}

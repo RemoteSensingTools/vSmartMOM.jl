@@ -1,0 +1,26 @@
+{
+  "gpu_used_delta": 0,
+  "gpu_used_before": 11476926464,
+  "wall_max_s": 0.18629193305969238,
+  "name": "phase1b_noRS_761-764nm_gpu",
+  "wall_min_s": 0.18620896339416504,
+  "gpu_name": "NVIDIA A100-PCIE-40GB",
+  "output_path": "test/benchmarks/baseline_output/sanghavi-unified_16d074e_gpu/phase1b_noRS_761-764nm_gpu_output.jld2",
+  "wall_median_s": 0.1862504482269287,
+  "hw": {
+    "julia_version": "1.12.5",
+    "cpu": "AMD EPYC 7H12 64-Core Processor",
+    "gpu": "NVIDIA A100-PCIE-40GB"
+  },
+  "wall_mad_s": 4.1484832763671875e-5,
+  "output_keys": [
+    "T_SFI",
+    "ieT_SFI",
+    "R_SFI",
+    "ieR_SFI"
+  ],
+  "gpu_used_after": 11476926464,
+  "wall_n": 2,
+  "cpu_alloc_bytes": 117433520,
+  "cpu_gctime_s": 0.0
+}

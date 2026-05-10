@@ -2,21 +2,26 @@
 
 The IO submodule centralizes loading and validation of simulation inputs, decoupled from the CoreRT solvers.
 
-- Multiple dispatch entry points:
-  - `read_parameters(path::AbstractString)` → load from YAML (via formats registry)
-  - `read_parameters(dict::Dict)` → convert an in-memory config
-  - `read_atmos_profile(path|dict)` → load an atmospheric profile only
-- Format registry: `IO.Formats` selects a loader based on source/extension (YAML supported).
-- Safe parsing: enums and types are parsed with explicit maps. Surfaces (BRDF) are parsed safely.
-- **Exception**: `spec_bands` uses `eval()` to support flexible Julia range expressions and Unitful conversions (e.g., `"(1e7/777):0.015:(1e7/757)"`). All other fields avoid eval.
+Use `read_parameters` as the user-facing entry point. It dispatches on the input type:
+
+- `read_parameters(path::AbstractString)` loads a registered file format.
+- `read_parameters(dict::Dict)` converts an in-memory config.
+- `read_parameters(src::IOSource)` loads a typed source such as GEOS-Chem NetCDF.
+- `read_parameters(params::vSmartMOM_Parameters)` passes an already parsed parameter object through.
+
+The explicit aliases `parameters_from_file`, `parameters_from_dict`, and `parameters_from_source` remain available when code wants the call site to state the input kind. `parameters_from_yaml` is also supported for YAML files.
+
+- `read_atmos_profile(path|dict)` loads an atmospheric profile only.
+- Format registry: `IO.Formats` selects a loader based on source/extension (YAML and TOML supported).
+- Safe parsing: enums and types are parsed with explicit maps. Surfaces (BRDF) and spectral band ranges are parsed without `eval`.
 
 ## Quick start
 
 ```julia
 using vSmartMOM
 
-# 1) YAML file
-params = read_parameters(joinpath(dirname(pathof(vSmartMOM)), "CoreRT", "DefaultParameters.yaml"))
+# 1) YAML or TOML file
+params = read_parameters(joinpath(pkgdir(vSmartMOM), "src", "CoreRT", "DefaultParameters.yaml"))
 model  = model_from_parameters(params)
 R, T   = rt_run(model)
 
@@ -25,7 +30,7 @@ cfg = Dict(
   "radiative_transfer" => Dict(
     "spec_bands" => ["(1e7/777):0.015:(1e7/757)"],
     "surface" => ["LambertianSurfaceScalar(0.15)"],
-    "quadrature_type" => "GaussQuadFullSphere()",
+    "quadrature_type" => "GaussLegQuad()",
     "polarization_type" => "Stokes_I()",
     "max_m" => 3,
     "Δ_angle" => 2.0,
@@ -42,16 +47,17 @@ params2 = read_parameters(cfg)
 
 ## Formats
 
-- YAML: registered by default. Add more by calling `IO.Formats.register_format`.
+- YAML and TOML: registered by default. Add more by calling `IO.Formats.register_format`.
+- GEOS-Chem and generic NetCDF sources use typed `IOSource` objects and the same `read_parameters` entry point.
 
 ## Safety maps
 
-- Quadrature: `RadauQuad`, `GaussQuadHemisphere`, `GaussQuadFullSphere`
+- Quadrature: `RadauQuad`, `GaussLegQuad`
 - Polarization: `Stokes_I`, `Stokes_IQ`, `Stokes_IQU`, `Stokes_IQUV`
 - Architecture: `CPU`, `GPU`, `default_architecture`
 - Decomposition: `NAI2`, `PCW`
 - Broadening: `Voigt`, `Lorentz`, `Doppler`
 - Complex error function: `HumlicekWeidemann32SDErrorFunction`
-- Surfaces (BRDF): LambertianSurfaceScalar, LambertianSurfaceSpectrum, LambertianSurfaceLegendre, rpvSurfaceScalar, RossLiSurfaceScalar
+- Surfaces (BRDF): LambertianSurfaceScalar, LambertianSurfaceSpectrum, LambertianSurfaceLegendre, LambertianSurfaceSpline, rpvSurfaceScalar, RossLiSurfaceScalar, CoxMunkSurface, CanopySurface
 
-All are passed in as strings in the YAML and mapped safely (without eval, except for spec_bands range expressions).
+All are passed in as strings in the YAML and mapped safely without `eval`.

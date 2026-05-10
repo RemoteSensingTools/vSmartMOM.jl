@@ -4,8 +4,15 @@ This file contains helper functions that are used throughout the vSmartMOM modul
 
 =#
 
-"Given the previous scattering interface and current layer information, return what type of scattering interface is nexts"
-function get_scattering_interface(scattering_interface,scatter, iz)
+"""
+    get_scattering_interface(scattering_interface, scatter, iz)
+
+Determine the `ScatteringInterface` type for layer `iz` based on previous interface and current scattering.
+
+- **iz == 1**: TOA → `ScatteringInterface_11` (scattering) or `00` (non-scattering).
+- **iz > 1**: Toggles between 00↔01 or 10↔11 depending on whether the composite layer scatters.
+"""
+@inline function get_scattering_interface(scattering_interface, scatter, iz)
 
     # First layer (TOA)
     if (iz == 1)
@@ -22,76 +29,84 @@ function get_scattering_interface(scattering_interface,scatter, iz)
                                     (!scatter ? ScatteringInterface_00() : ScatteringInterface_01()) : 
                                     (!scatter ? ScatteringInterface_10() : ScatteringInterface_11())
     end
-    #@show scattering_interface
-    return scattering_interface #ScatteringInterface_11() #  # ScatteringInterface_11() # scattering_interface #ScatteringInterface_11() # 
+    return scattering_interface
 end
 
-"Minimum number of doublings needed to reach an optical depth τ_end, starting with an optical depth dτ.
-The starting optical depth dτ is also determined from its maximum possible value, τ"
-function doubling_number(dτ_max, τ_end) # check if τ_end can be replaced by τ_end*ϖ for absorbing atmospheres
+"""
+    doubling_number(dτ_max, τ_end)
+
+Compute elemental optical depth and doubling count for the adding-doubling method.
+
+Finds the smallest `ndoubl` such that ``d\\tau = \\tau_{\\text{end}} / 2^{n_d} \\leq d\\tau_{\\text{max}}``.
+Ensures the elemental layer is optically thin enough for accurate single-scattering.
+
+# Returns
+- `dτ`: Elemental optical depth.
+- `ndoubl`: Number of doubling iterations.
+
+See Sanghavi & Stephens (2013).
+"""
+@inline function doubling_number(dτ_max, τ_end)
     FT = eltype(dτ_max)
-    #@show dτ_max, τ_end
-    # minimum number of doublings needed to reach an optical depth τ_end, starting with an optical depth dτ.
-    # The starting optical depth dτ is also determined from its maximum possible value, dτ_max
     if τ_end <= dτ_max
-        dτ = τ_end
-        ndoubl = 0
-        return dτ, ndoubl
+        return τ_end, 0
     else
-        q1 = log10(2.0)
+        q1 = log10(FT(2))
         q2 = log10(dτ_max)
         q3 = log10(τ_end)
         tlimit = (q3 - q2) / q1
         nlimit = floor(Int, tlimit)
         diff = tlimit - nlimit
         if diff < eps(FT)
-            dτ = dτ_max
-            ndoubl = nlimit
+            return dτ_max, nlimit
         else
             ndoubl = nlimit + 1       
             x = q3 - q1 * ndoubl
-            dτ = 10.0^x
+            dτ = FT(10)^x
+            return dτ, ndoubl
         end 
-        return dτ, ndoubl
     end
 end
 
-"Finds index i of f_array (i) which is nearest point to f"
-nearest_point(f_array, f) = argmin(abs.(f_array.-f))
+"""
+    nearest_point(f_array, f)
 
-"Get indices scaled according to pol_type"
-function get_indices(iμ::Integer, pol_type::AbstractPolarizationType) 
+Index of `f_array` whose value is closest to `f`. Used to map VZA to quadrature points.
+"""
+@inline nearest_point(f_array, f) = argmin(abs.(f_array.-f))
 
+"""
+    get_indices(iμ, pol_type)
+
+Stokes-scaled indices for quadrature point `iμ`. Returns `(st_iμ, istart, iend)` where
+`istart:iend` spans the Stokes components for that direction.
+"""
+@inline function get_indices(iμ::Integer, pol_type::AbstractPolarizationType) 
     st_iμ = (iμ - 1) * pol_type.n
     istart = st_iμ + 1
     iend   = st_iμ + pol_type.n
-
     return st_iμ, istart, iend
 end
 
-"Default matrix in RT calculation (zeros)"
-default_matrix(FT, arr_type, dims, nSpec)   = arr_type(zeros(FT, tuple(dims[1], dims[2], nSpec)))
+"""Allocate zero matrix for RT reflection/transmission: `[nμ, nμ, nSpec]`."""
+@inline default_matrix(FT, arr_type, dims, nSpec) = arr_type(zeros(FT, (dims[1], dims[2], nSpec)))
 "Default matrix in ieRT calculation (zeros)"
-default_matrix_ie(FT, arr_type, dims, nSpec, nRaman)   = arr_type(zeros(FT, tuple(dims[1], dims[2], nSpec, nRaman)))
+@inline default_matrix_ie(FT, arr_type, dims, nSpec, nRaman) = arr_type(zeros(FT, (dims[1], dims[2], nSpec, nRaman)))
 
 "Default J matrix in RT calculation (zeros)"
-default_J_matrix(FT, arr_type, dims, nSpec) = arr_type(zeros(FT, tuple(dims[1], 1, nSpec)))
+@inline default_J_matrix(FT, arr_type, dims, nSpec) = arr_type(zeros(FT, (dims[1], 1, nSpec)))
 "Default J matrix in ieRT calculation (zeros)"
-default_J_matrix_ie(FT, arr_type, dims, nSpec, nRaman) = arr_type(zeros(FT, tuple(dims[1], 1, nSpec, nRaman)))
+@inline default_J_matrix_ie(FT, arr_type, dims, nSpec, nRaman) = arr_type(zeros(FT, (dims[1], 1, nSpec, nRaman)))
 
-"Default matrix in RT calculation (zeros)"
-default_matrix(FT, arr_type, NSens, dims, nSpec)   = [arr_type(zeros(FT, (dims[1], dims[2], nSpec))) for i=1:NSens]
-#arr_type(zeros(FT, tuple(NSens, dims[1], dims[2], nSpec)))
-"Default matrix in ieRT calculation (zeros)"
-default_matrix_ie(FT, arr_type, NSens, dims, nSpec, nRaman)   = [zeros(FT, (dims[1], dims[2], nSpec, nRaman)) for i=1:NSens]
-#zeros(FT, tuple(NSens, dims[1], dims[2], nSpec, nRaman)))
+"Default matrix in RT calculation (zeros) — multi-sensor variant"
+@inline default_matrix(FT, arr_type, NSens, dims, nSpec) = [arr_type(zeros(FT, (dims[1], dims[2], nSpec))) for _ in 1:NSens]
+"Default matrix in ieRT calculation (zeros) — multi-sensor variant"
+@inline default_matrix_ie(FT, arr_type, NSens, dims, nSpec, nRaman) = [zeros(FT, (dims[1], dims[2], nSpec, nRaman)) for _ in 1:NSens]
 
-"Default J matrix in RT calculation (zeros)"
-default_J_matrix(FT, arr_type, NSens, dims, nSpec) = [arr_type(zeros(FT, (dims[1], 1, nSpec))) for i=1:NSens]
-#arr_type(zeros(FT, tuple(NSens, dims[1], 1, nSpec)))
-"Default J matrix in ieRT calculation (zeros)"
-default_J_matrix_ie(FT, arr_type, NSens, dims, nSpec, nRaman) = [zeros(FT, (dims[1], 1, nSpec, nRaman)) for i=1:NSens]
-#arr_type(zeros(FT, tuple(NSens, dims[1], 1, nSpec, nRaman)))
+"Default J matrix in RT calculation (zeros) — multi-sensor variant"
+@inline default_J_matrix(FT, arr_type, NSens, dims, nSpec) = [arr_type(zeros(FT, (dims[1], 1, nSpec))) for _ in 1:NSens]
+"Default J matrix in ieRT calculation (zeros) — multi-sensor variant"
+@inline default_J_matrix_ie(FT, arr_type, NSens, dims, nSpec, nRaman) = [zeros(FT, (dims[1], 1, nSpec, nRaman)) for _ in 1:NSens]
 
 ##### Only for testing, random matrices:
 "Default matrix in RT calculation (random)"
@@ -101,28 +116,33 @@ default_matrix_rand(FT, arr_type, dims, nSpec)   = arr_type(randn(FT, tuple(dims
 default_J_matrix_rand(FT, arr_type, dims, nSpec) = arr_type(randn(FT, tuple(dims[1], 1, nSpec)))
 
 
-"Make an added layer, supplying all default matrices"
+"""
+    make_added_layer(RS_type, FT, arr_type, dims, nSpec)
+
+Construct an `AddedLayer` with zero-initialized R, T, J₀ matrices for elastic RT.
+"""
 function make_added_layer(RS_type::Union{noRS, noRS_plus}, FT, arr_type, dims, nSpec) 
     t1 = default_matrix(FT, arr_type, dims, nSpec)
     t2 = default_matrix(FT, arr_type, dims, nSpec)
-    t1_ptr = arr_type == Array ? nothing : CUBLAS.unsafe_strided_batch(t1);
-    t2_ptr = arr_type == Array ? nothing : CUBLAS.unsafe_strided_batch(t2);
+    t1_ptr = batched_pointer_cache(t1)
+    t2_ptr = batched_pointer_cache(t2)
     return AddedLayer(
-                                                        default_matrix(FT, arr_type, dims, nSpec), 
-                                                        default_matrix(FT, arr_type, dims, nSpec), 
-                                                        default_matrix(FT, arr_type, dims, nSpec),
-                                                        default_matrix(FT, arr_type, dims, nSpec),
-                                                        default_J_matrix(FT, arr_type, dims, nSpec),
-                                                        default_J_matrix(FT, arr_type, dims, nSpec),
-                                                        t1,
-                                                        t2,
-                                                        t1_ptr,
-                                                        t2_ptr
-                                                        )
+        r⁻⁺ = default_matrix(FT, arr_type, dims, nSpec), 
+        t⁺⁺ = default_matrix(FT, arr_type, dims, nSpec), 
+        r⁺⁻ = default_matrix(FT, arr_type, dims, nSpec),
+        t⁻⁻ = default_matrix(FT, arr_type, dims, nSpec),
+        j₀⁺ = default_J_matrix(FT, arr_type, dims, nSpec),
+        j₀⁻ = default_J_matrix(FT, arr_type, dims, nSpec),
+        temp1 = t1, temp2 = t2,
+        temp1_ptr = t1_ptr, temp2_ptr = t2_ptr,
+        dbl_gp_refl = default_matrix(FT, arr_type, dims, nSpec),
+        dbl_j₁⁺ = default_J_matrix(FT, arr_type, dims, nSpec),
+        dbl_j₁⁻ = default_J_matrix(FT, arr_type, dims, nSpec),
+    )
 end
 
-"Make an added layer, supplying all default matrices"
-make_added_layer(RS_type::Union{RRS, RRS_plus,VS_0to1_plus, VS_1to0_plus}, FT, arr_type, dims, nSpec)  = AddedLayerRS(
+"""Construct an `AddedLayerRS` with inelastic (Raman) matrices for Raman scattering."""
+make_added_layer(RS_type::Union{RRS, VS_0to1_plus, VS_1to0_plus}, FT, arr_type, dims, nSpec)  = AddedLayerRS(
                                                 default_matrix(FT, arr_type, dims, nSpec), 
                                                 default_matrix(FT, arr_type, dims, nSpec), 
                                                 default_matrix(FT, arr_type, dims, nSpec),
@@ -139,17 +159,28 @@ make_added_layer(RS_type::Union{RRS, RRS_plus,VS_0to1_plus, VS_1to0_plus}, FT, a
                                                          
 
 "Make a random added layer, supplying all random matrices"
-make_added_layer_rand(RS_type::Union{noRS, noRS_plus}, FT, arr_type, dims, nSpec)  = AddedLayer(
-                                                        default_matrix_rand(FT, arr_type, dims, nSpec), 
-                                                        default_matrix_rand(FT, arr_type, dims, nSpec), 
-                                                        default_matrix_rand(FT, arr_type, dims, nSpec),
-                                                        default_matrix_rand(FT, arr_type, dims, nSpec),
-                                                        default_J_matrix_rand(FT, arr_type, dims, nSpec),
-                                                        default_J_matrix_rand(FT, arr_type, dims, nSpec)
-                                                        )
+function make_added_layer_rand(RS_type::Union{noRS, noRS_plus}, FT, arr_type, dims, nSpec)
+    t1 = default_matrix_rand(FT, arr_type, dims, nSpec)
+    t2 = default_matrix_rand(FT, arr_type, dims, nSpec)
+    return AddedLayer(
+        r⁻⁺ = default_matrix_rand(FT, arr_type, dims, nSpec),
+        t⁺⁺ = default_matrix_rand(FT, arr_type, dims, nSpec),
+        r⁺⁻ = default_matrix_rand(FT, arr_type, dims, nSpec),
+        t⁻⁻ = default_matrix_rand(FT, arr_type, dims, nSpec),
+        j₀⁺ = default_J_matrix_rand(FT, arr_type, dims, nSpec),
+        j₀⁻ = default_J_matrix_rand(FT, arr_type, dims, nSpec),
+        temp1 = t1,
+        temp2 = t2,
+        temp1_ptr = batched_pointer_cache(t1),
+        temp2_ptr = batched_pointer_cache(t2),
+        dbl_gp_refl = default_matrix_rand(FT, arr_type, dims, nSpec),
+        dbl_j₁⁺ = default_J_matrix_rand(FT, arr_type, dims, nSpec),
+        dbl_j₁⁻ = default_J_matrix_rand(FT, arr_type, dims, nSpec),
+    )
+end
                                                          
-"Make a composite layer, supplying all default matrices"
-make_composite_layer(RS_type::Union{noRS, noRS_plus}, 
+"""Construct a `CompositeLayer` with zero-initialized R, T, J₀ for elastic RT."""
+make_composite_layer(RS_type::Union{noRS, noRS_plus},
     FT, arr_type, dims, nSpec) = CompositeLayer(
                                                         default_matrix(FT, arr_type, dims, nSpec), 
                                                         default_matrix(FT, arr_type, dims, nSpec), 
@@ -158,8 +189,8 @@ make_composite_layer(RS_type::Union{noRS, noRS_plus},
                                                         default_J_matrix(FT, arr_type, dims, nSpec),
                                                         default_J_matrix(FT, arr_type, dims, nSpec)
                                                         )
-"Make a composite layer, supplying all default matrices"
-make_composite_layer(RS_type::Union{RRS, RRS_plus,VS_0to1_plus, VS_1to0_plus}, 
+"""Construct a `CompositeLayerRS` with inelastic matrices for Raman scattering."""
+make_composite_layer(RS_type::Union{RRS, VS_0to1_plus, VS_1to0_plus},
     FT, arr_type, dims, nSpec) = CompositeLayerRS(
                                                         default_matrix(FT, arr_type, dims, nSpec), 
                                                         default_matrix(FT, arr_type, dims, nSpec), 
@@ -191,7 +222,7 @@ make_composite_layer(RS_type::Union{noRS, noRS_plus},
                     default_J_matrix(FT, arr_type, NSens, dims, nSpec),
                     default_J_matrix(FT, arr_type, NSens, dims, nSpec))
 "Make a composite layer, supplying all default matrices"
-make_composite_layer(RS_type::Union{RRS, RRS_plus, VS_0to1_plus, VS_1to0_plus}, 
+make_composite_layer(RS_type::Union{RRS, VS_0to1_plus, VS_1to0_plus},
     FT, arr_type, NSens, dims, nSpec) = 
     CompositeLayerMSRS(default_matrix(FT, arr_type, NSens, dims, nSpec), 
                     default_matrix(FT, arr_type, NSens, dims, nSpec), 
@@ -218,9 +249,16 @@ make_composite_layer(RS_type::Union{RRS, RRS_plus, VS_0to1_plus, VS_1to0_plus},
                     default_J_matrix_ie(FT, arr_type, NSens, dims, nSpec, RS_type.n_Raman),
                     default_J_matrix_ie(FT, arr_type, NSens, dims, nSpec, RS_type.n_Raman)
                     )
-"Given a ComputedAtmosphereProperties object, extract a ComputedLayerProperties object using data from the iz index of all arrays in the ComputedAtmosphereProperties"
+"""
+    get_layer_properties(computed_atmospheric_properties, iz, arr_type)
+
+Extract layer `iz` optical properties from `ComputedAtmosphereProperties`.
+
+Returns a `ComputedLayerProperties` with τ, ϖ, Z⁺⁺, Z⁻⁺, dτ, ndoubl, expk, scatter,
+τ_sum, and scattering_interface for the specified layer.
+"""
 function get_layer_properties(computed_atmospheric_properties::ComputedAtmosphereProperties, iz, arr_type)
-     @unpack τ_λ_all, ϖ_λ_all, τ_all, ϖ_all, Z⁺⁺_all, Z⁻⁺_all , dτ_max_all, dτ_all, ndoubl_all, dτ_λ_all, expk_all, scatter_all, τ_sum_all, fscattRayl_all,  scattering_interfaces_all = computed_atmospheric_properties
+     (; τ_λ_all, ϖ_λ_all, τ_all, ϖ_all, Z⁺⁺_all, Z⁻⁺_all , dτ_max_all, dτ_all, ndoubl_all, dτ_λ_all, expk_all, scatter_all, τ_sum_all, fscattRayl_all,  scattering_interfaces_all) = computed_atmospheric_properties
 
     τ_λ = arr_type(τ_λ_all[:, iz])
     ϖ_λ = arr_type(ϖ_λ_all[:, iz])
@@ -253,4 +291,3 @@ function get_layer_properties(computed_atmospheric_properties::ComputedAtmospher
         fscattRayl, 
         scattering_interface)
 end
-

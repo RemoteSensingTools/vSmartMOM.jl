@@ -1,0 +1,117 @@
+# TOMAS-15 Aerosol Configuration
+# GEOSChem with TOMAS microphysics (15-bin size distribution)
+
+aerosol_scheme:
+  type: "TOMAS15"
+  name: "GEOSChem TOMAS-15"
+  description: "15-bin size-resolved aerosol microphysics"
+  
+  # NetCDF file path
+  file: "GEOSChem.Custom.20190702_0000z.nc4"
+  
+  # Size bin configuration
+  size_bins:
+    n_bins: 15
+    diam_min_nm: 10.0      # Minimum dry diameter (nm)
+    diam_max_nm: 10000.0   # Maximum dry diameter (nm) = 10 μm
+    spacing: "logarithmic"
+    variable_type: "diameter"  # TOMAS uses dry particle diameter
+  
+  # Aerosol species (mass concentration)
+  species:
+    DUST:
+      nc_prefix: "SpeciesConcVV_DUST"
+      description: "Mineral dust"
+      units: "mol mol-1 dry"
+      refractive_index: "dust_opac"
+      density: 2.65e3  # kg/m³
+      molar_mass: 100.0e-3  # kg/mol (approximate)
+      
+    SS:
+      nc_prefix: "SpeciesConcVV_SS"
+      description: "Sea salt"
+      units: "mol mol-1 dry"
+      refractive_index: "seasalt_sscm"
+      density: 2.165e3  # kg/m³
+      molar_mass: 58.44e-3  # kg/mol (NaCl)
+      
+    SF:
+      nc_prefix: "SpeciesConcVV_SF"
+      description: "Sulfate (as H2SO4)"
+      units: "mol mol-1 dry"
+      refractive_index: "sulfate_suso"
+      density: 1.77e3  # kg/m³
+      molar_mass: 98.08e-3  # kg/mol (H2SO4)
+      
+    ECIL:
+      nc_prefix: "SpeciesConcVV_ECIL"
+      description: "Black carbon (hydrophilic)"
+      units: "mol mol-1 dry"
+      refractive_index: "black_carbon"
+      density: 1.8e3  # kg/m³
+      molar_mass: 12.01e-3  # kg/mol (C)
+      
+    ECOB:
+      nc_prefix: "SpeciesConcVV_ECOB"
+      description: "Black carbon (hydrophobic)"
+      units: "mol mol-1 dry"
+      refractive_index: "black_carbon"
+      density: 1.8e3  # kg/m³
+      molar_mass: 12.01e-3  # kg/mol (C)
+      
+    OCIL:
+      nc_prefix: "SpeciesConcVV_OCIL"
+      description: "Organic carbon (hydrophilic)"
+      units: "mol mol-1 dry"
+      refractive_index: "organic_carbon"
+      density: 1.4e3  # kg/m³
+      molar_mass: 12.01e-3  # kg/mol (as C, approximate)
+      
+    OCOB:
+      nc_prefix: "SpeciesConcVV_OCOB"
+      description: "Organic carbon (hydrophobic)"
+      units: "mol mol-1 dry"
+      refractive_index: "organic_carbon"
+      density: 1.4e3  # kg/m³
+      molar_mass: 12.01e-3  # kg/mol (as C, approximate)
+      
+    AW:
+      nc_prefix: "SpeciesConcVV_AW"
+      description: "Aerosol water"
+      units: "mol mol-1 dry"
+      refractive_index: "water"
+      density: 1.0e3  # kg/m³
+      molar_mass: 18.015e-3  # kg/mol (H2O)
+  
+  # Note: NK (number concentration) is excluded as it's not a mass species
+  # Actual nitrate mass is in SpeciesConcVV_NIT (not binned)
+  
+  # NetCDF dimension names
+  dimensions:
+    lon: "Xdim"
+    lat: "Ydim"
+    lev: "lev"
+    face: "nf"
+    time: "time"
+  
+  # Coordinate variables
+  coordinates:
+    lon: "lons"
+    lat: "lats"
+    lev: "lev"
+    time: "time"
+  
+  # Meteorology variables (for computing number density, etc.)
+  meteorology:
+    temperature: "Met_T"
+    pressure_dry_delta: "Met_DELPDRY"
+    pressure_wet_delta: "Met_DELP"
+    surface_pressure: "Met_PS2WET"
+    specific_humidity: "Met_SPHU"
+    air_density: "Met_AD"
+    
+  # Processing options
+  options:
+    vertical_flip: true  # TOMAS stores BOA→TOA, need TOA→BOA
+    compute_number_density: true
+    use_mie_scattering: true

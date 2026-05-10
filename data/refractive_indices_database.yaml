@@ -1,0 +1,98 @@
+# Refractive Index Database for Aerosols
+# Wavelength-dependent complex refractive indices (n = n_real - i*n_imag)
+
+refractive_indices:
+  
+  sulfate_suso:
+    description: "Sulfuric acid solution (75% H2SO4)"
+    source: "GEOS-ESM/GEOSmie data/suso00"
+    reference: "OPAC (Hess et al. 1998)"
+    # Wavelengths in micrometers
+    wavelengths: [0.300, 0.400, 0.488, 0.515, 0.550, 0.633, 0.670, 0.860, 1.000, 1.240, 1.536, 1.650, 2.000, 2.250, 3.000, 3.750]
+    n_real:      [1.430, 1.430, 1.430, 1.430, 1.432, 1.432, 1.432, 1.433, 1.435, 1.436, 1.438, 1.440, 1.450, 1.470, 1.500, 1.520]
+    n_imag:      [1.0e-8, 1.0e-8, 1.0e-8, 1.0e-8, 1.0e-8, 1.0e-8, 1.0e-8, 3.0e-5, 5.0e-3, 8.0e-3, 1.0e-2, 1.2e-2, 2.0e-2, 3.15e-2, 5.0e-2, 8.0e-2]
+    notes: "Hygroscopic, typical stratospheric/sulfate aerosol"
+  
+  organic_carbon:
+    description: "Organic carbon aerosol (water-soluble)"
+    source: "GEOS-ESM/GEOSmie estimates"
+    reference: "Based on OPAC WASO"
+    wavelengths: [0.440, 0.500, 0.550, 0.670, 0.870, 1.000, 1.250, 1.600, 2.130, 2.250]
+    n_real:      [1.530, 1.525, 1.520, 1.520, 1.515, 1.510, 1.500, 1.450, 1.390, 1.384]
+    n_imag:      [8.0e-3, 8.0e-3, 8.0e-3, 8.0e-3, 8.5e-3, 8.0e-3, 9.0e-3, 1.0e-2, 1.2e-2, 1.26e-3]
+    notes: "Typical for biomass burning, secondary organic aerosol"
+  
+  black_carbon:
+    description: "Black carbon (soot)"
+    source: "GEOS-ESM/GEOSmie data/soot00"
+    reference: "OPAC, Bond & Bergstrom (2006)"
+    wavelengths: [0.440, 0.500, 0.550, 0.670, 0.870, 1.000, 1.250, 1.600, 2.130, 2.250, 3.000]
+    n_real:      [1.750, 1.750, 1.750, 1.760, 1.780, 1.800, 1.805, 1.810, 1.815, 1.820, 1.830]
+    n_imag:      [0.440, 0.440, 0.440, 0.450, 0.460, 0.480, 0.490, 0.500, 0.505, 0.510, 0.520]
+    notes: "Strong absorber across all wavelengths"
+  
+  seasalt_sscm:
+    description: "Sea salt (NaCl dominant)"
+    source: "GEOS-ESM/GEOSmie data/sscm00"
+    reference: "OPAC, Shettle & Fenn (1979)"
+    wavelengths: [0.400, 0.488, 0.515, 0.550, 0.633, 0.670, 0.860, 1.000, 1.240, 1.536, 1.650, 2.000, 2.250, 3.000]
+    n_real:      [1.500, 1.500, 1.500, 1.500, 1.498, 1.498, 1.495, 1.490, 1.480, 1.470, 1.460, 1.450, 1.430, 1.410]
+    n_imag:      [1.0e-8, 1.0e-8, 1.0e-8, 1.0e-8, 1.0e-8, 1.0e-8, 5.0e-4, 1.0e-3, 1.5e-3, 2.0e-3, 2.5e-3, 3.0e-3, 4.0e-3, 6.0e-3]
+    notes: "Hygroscopic, marine aerosol"
+  
+  dust_opac:
+    description: "Mineral dust (desert-like)"
+    source: "OPAC dust-like composition"
+    reference: "OPAC (Hess et al. 1998)"
+    wavelengths: [0.400, 0.488, 0.515, 0.550, 0.633, 0.670, 0.860, 1.000, 1.240, 1.536, 1.650, 2.000, 2.250, 3.000, 4.000]
+    n_real:      [1.530, 1.530, 1.530, 1.530, 1.530, 1.530, 1.527, 1.530, 1.525, 1.520, 1.520, 1.515, 1.500, 1.480, 1.450]
+    n_imag:      [8.0e-3, 8.0e-3, 8.0e-3, 8.0e-3, 8.5e-3, 8.0e-3, 8.5e-3, 8.0e-3, 9.0e-3, 1.0e-2, 1.1e-2, 1.3e-2, 1.5e-2, 2.0e-2, 3.0e-2]
+    notes: "Mineral composition varies by source region"
+  
+  water:
+    description: "Liquid water"
+    source: "Standard references (Hale & Querry 1973, Segelstein 1981)"
+    reference: "refractiveindex.info"
+    wavelengths: [0.300, 0.400, 0.500, 0.550, 0.600, 0.700, 0.800, 1.000, 1.500, 2.000, 2.500, 3.000]
+    n_real:      [1.349, 1.339, 1.335, 1.333, 1.332, 1.330, 1.328, 1.324, 1.318, 1.306, 1.288, 1.260]
+    n_imag:      [1.0e-8, 5.0e-9, 1.0e-8, 1.5e-8, 3.0e-8, 8.0e-8, 2.0e-7, 1.0e-6, 1.0e-4, 1.0e-3, 5.0e-3, 2.0e-2]
+    notes: "For aerosol water content and hygroscopic growth"
+  
+  # Future additions:
+  # - Volcanic ash
+  # - Pollen
+  # - Mixed species
+  # - Regional dust variants (Saharan, Asian, etc.)
+
+# Mixing rules for composite aerosols
+mixing_rules:
+  volume_weighted:
+    description: "Volume-weighted average of refractive indices"
+    formula: "n_mix = sum(f_i * n_i) where f_i is volume fraction"
+    
+  maxwell_garnett:
+    description: "Maxwell-Garnett effective medium approximation"
+    formula: "For inclusions in host matrix"
+    notes: "Use for core-shell particles, coated BC, etc."
+
+# Wavelength ranges for common applications
+wavelength_bands:
+  visible:
+    range: [0.400, 0.700]
+    description: "Human visible spectrum"
+    
+  solar:
+    range: [0.300, 4.000]
+    description: "Bulk of solar radiation"
+    
+  nir:
+    range: [0.700, 2.500]
+    description: "Near-infrared"
+    
+  swir:
+    range: [1.000, 3.000]
+    description: "Shortwave infrared (typical for OCO-2/3, GHGSat)"
+    
+  thermal_ir:
+    range: [3.000, 15.000]
+    description: "Thermal infrared"

@@ -4,6 +4,7 @@ on:
     branches:
       - main
       - develop
+      - sanghavi-unified
     tags: '*'
   pull_request:
 
@@ -11,14 +12,25 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v4
       - name: Set up Julia
-        uses: julia-actions/setup-julia@v1
+        uses: julia-actions/setup-julia@v2
         with:
           version: '1.11'
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
       - name: Install Dependencies
-        run: julia --project=docs/ -e 'using Pkg; Pkg.instantiate();Pkg.develop(path="./")';
+        run: |
+          julia --project=docs/ -e '
+            using Pkg
+            Pkg.develop(path="./")
+            Pkg.instantiate()
+          '
+          npm install --prefix docs
       - name: Build and deploy
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }}
         run: julia --project=docs/ docs/make.jl

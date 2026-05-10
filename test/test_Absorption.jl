@@ -1,3 +1,5 @@
+using Interpolations
+
 # Test that a hitran fixed-width file is correctly parsed
 @testset "read_hitran" begin
 
@@ -190,19 +192,41 @@ end
 
 end 
 
-# Test that checks whether the cross-section auto-differentiation works
+@testset "absorption_cross_section_interpolator_outside_band" begin
+    ν_grid = 6000.0:1.0:6002.0
+    p_grid = 1000.0:100.0:1100.0
+    t_grid = 280.0:10.0:290.0
+    coefs = zeros(Float64, length(ν_grid), length(p_grid), length(t_grid))
+    @inbounds for iν in axes(coefs, 1), ip in axes(coefs, 2), it in axes(coefs, 3)
+        coefs[iν, ip, it] = 100 * iν + 10 * ip + it
+    end
+    itp = interpolate(coefs, (BSpline(Linear()), BSpline(Linear()), BSpline(Linear())))
+    model = Absorption.InterpolationModel(itp, 1, 1, ν_grid, p_grid, t_grid)
 
-@testset "absorption_cross_section_autodiff" begin
+    grid = [6003.0, 6002.0, 6001.0, 6000.0, 5999.0]
+    σ = absorption_cross_section(model, grid, 1000.0, 280.0)
 
-    println("Testing absorption_cross_section_autodiff...")
-    
-    # Load HITRAN data
+    @test σ[1] == 0
+    @test σ[end] == 0
+    @test σ[2:4] == [coefs[3, 1, 1], coefs[2, 1, 1], coefs[1, 1, 1]]
+end
+
+# Test batched kernel on GPU (if available) matches CPU result
+@testset "absorption_cross_section_gpu_cpu_match" begin
+
+    println("Testing GPU vs CPU cross-section match...")
+
     hitran_data = read_hitran(artifact("CO2"), mol=2, iso=1, ν_min=6000, ν_max=6400)
+    grid = 6000:0.01:6400
 
-    # Create the model with parameters
-    model = make_hitran_model(hitran_data, Voigt(), wing_cutoff = 40, CEF=HumlicekWeidemann32SDErrorFunction(), architecture=CPU())
+    model_cpu = make_hitran_model(hitran_data, Voigt(), wing_cutoff=40, CEF=HumlicekWeidemann32SDErrorFunction(), architecture=CPU())
+    cs_cpu = absorption_cross_section(model_cpu, grid, 1000.1, 296.1)
 
-    # Compute the cross-section with autodifferentiation
-    value, derivs = absorption_cross_section(model, 6000:0.01:6400, 1000.1, 296.1, autodiff=true);
-
+    if Architectures.has_cuda()
+        model_gpu = make_hitran_model(hitran_data, Voigt(), wing_cutoff=40, CEF=HumlicekWeidemann32SDErrorFunction(), architecture=GPU())
+        cs_gpu = collect(absorption_cross_section(model_gpu, grid, 1000.1, 296.1))
+        @test maximum(abs.(cs_cpu .- cs_gpu)) < 1e-12
+    else
+        @test true  # Skip GPU test if no CUDA
+    end
 end

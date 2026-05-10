@@ -1,14 +1,8 @@
-#=
- 
-This file contains interlayer flux computations for sensors located 
-within the atmosphere, i.e. BOA < Nz < TOA
- 
-=#
 function interlayer_flux_helper!(RS_type::noRS, 
     I_static::AbstractArray{FT2},
     itopR⁺⁻::AbstractArray{FT}, ibotR⁻⁺::AbstractArray{FT},
     itopJ₀⁺::AbstractArray{FT}, ibotJ₀⁻::AbstractArray{FT},
-    otdwJ::AbstractArray{FT}, otuwJ::AbstractArray{FT}) where {FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2}
+    otdwJ::AbstractArray{FT}, otuwJ::AbstractArray{FT}) where {FT<:Real,FT2}
 
     tmpR = similar(itopR⁺⁻)
     # elastic
@@ -31,8 +25,8 @@ function interlayer_flux_helper!(RS_type::RRS,
         otdwJ::AbstractArray{FT}, otuwJ::AbstractArray{FT},
         itopieR⁺⁻::AbstractArray{FT}, ibotieR⁻⁺::AbstractArray{FT},
         itopieJ₀⁺::AbstractArray{FT}, ibotieJ₀⁻::AbstractArray{FT},
-        otdwieJ::AbstractArray{FT}, otuwieJ::AbstractArray{FT}) where {FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2}
-    @unpack i_λ₁λ₀ = RS_type
+        otdwieJ::AbstractArray{FT}, otuwieJ::AbstractArray{FT}) where {FT<:Real,FT2}
+    (; i_λ₁λ₀) = RS_type
     tmpR = similar(itopR⁺⁻)
     # elastic
     #@show size(itopR⁺⁻)
@@ -41,7 +35,7 @@ function interlayer_flux_helper!(RS_type::RRS,
     otdwJ[:] = tmpR ⊠ (itopJ₀⁺ .+ itopR⁺⁻ ⊠ ibotJ₀⁻)
     # inelastic
     #RRS
-    @unpack i_λ₁λ₀ = RS_type
+    (; i_λ₁λ₀) = RS_type
     for Δn=1:size(itopieJ₀⁺,4)
     #for n₁ = 1:size(itopieJ₀⁺,3)
         #for Δn=1:size(itopieJ₀⁺,4) #eachindex itopieJ₀⁺[1,1,1,:]
@@ -89,9 +83,9 @@ function interlayer_flux_helper!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
         otdwJ::AbstractArray{FT}, otuwJ::AbstractArray{FT},
         itopieR⁺⁻::AbstractArray{FT}, ibotieR⁻⁺::AbstractArray{FT},
         itopieJ₀⁺::AbstractArray{FT}, ibotieJ₀⁻::AbstractArray{FT},
-        otdwieJ::AbstractArray{FT}, otuwieJ::AbstractArray{FT}) where {FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2}
+        otdwieJ::AbstractArray{FT}, otuwieJ::AbstractArray{FT}) where {FT<:Real,FT2}
     
-    @unpack i_λ₁λ₀_all = RS_type
+    (; i_λ₁λ₀_all) = RS_type
     
     tmpR = similar(itopR⁺⁻)
     # elastic
@@ -148,7 +142,7 @@ function compute_interlayer_flux!(RS_type::Union{RRS, VS_0to1_plus, VS_1to0_plus
                         itopieJ₀⁺::AbstractArray{FT}, ibotieJ₀⁻::AbstractArray{FT},
                         otdwieJ::AbstractArray{FT}, 
                         otuwieJ::AbstractArray{FT},
-                        arr_type) where {FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2}
+                        arr_type) where {FT<:Real,FT2}
     topR⁺⁻ = arr_type(itopR⁺⁻) 
     botR⁻⁺ = arr_type(ibotR⁻⁺)
     topJ₀⁺ = arr_type(itopJ₀⁺) 
@@ -169,18 +163,18 @@ function compute_interlayer_flux!(RS_type::Union{RRS, VS_0to1_plus, VS_1to0_plus
         topieJ₀⁺, botieJ₀⁻,
         dwieJ, uwieJ)
 
-    itopR⁺⁻.= Array(topR⁺⁻) 
-    ibotR⁻⁺ .= Array(botR⁻⁺)
-    itopJ₀⁺ .= Array(topJ₀⁺) 
-    ibotJ₀⁻ .= Array(botJ₀⁻)
-    otdwJ    .= Array(dwJ)
-    otuwJ    .= Array(uwJ)
-    itopieR⁺⁻ .= Array(topieR⁺⁻) 
-    ibotieR⁻⁺ .= Array(botieR⁻⁺)
-    itopieJ₀⁺ .= Array(topieJ₀⁺) 
-    ibotieJ₀⁻ .= Array(botieJ₀⁻)
-    otdwieJ    .= Array(dwieJ)
-    otuwieJ    .= Array(uwieJ)
+    itopR⁺⁻.= collect(topR⁺⁻) 
+    ibotR⁻⁺ .= collect(botR⁻⁺)
+    itopJ₀⁺ .= collect(topJ₀⁺) 
+    ibotJ₀⁻ .= collect(botJ₀⁻)
+    otdwJ    .= collect(dwJ)
+    otuwJ    .= collect(uwJ)
+    itopieR⁺⁻ .= collect(topieR⁺⁻) 
+    ibotieR⁻⁺ .= collect(botieR⁻⁺)
+    itopieJ₀⁺ .= collect(topieJ₀⁺) 
+    ibotieJ₀⁻ .= collect(botieJ₀⁻)
+    otdwieJ    .= collect(dwieJ)
+    otuwieJ    .= collect(uwieJ)
     
     #scattering_interface, SFI, composite_layer, added_layer, I_static)
     synchronize_if_gpu()
@@ -196,28 +190,13 @@ function compute_interlayer_flux!(RS_type::noRS,
                         itopR⁺⁻::AbstractArray{FT}, ibotR⁻⁺::AbstractArray{FT}, 
                         itopJ₀⁺::AbstractArray{FT}, ibotJ₀⁻::AbstractArray{FT},
                         otdwJ::AbstractArray{FT}, otuwJ::AbstractArray{FT}, 
-                        arr_type) where {FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2}
-
-    #=topR⁺⁻ = arr_type(itopR⁺⁻) 
-    botR⁻⁺ = arr_type(ibotR⁻⁺)
-    topJ₀⁺ = arr_type(itopJ₀⁺) 
-    botJ₀⁻ = arr_type(ibotJ₀⁻)
-    dwJ    = arr_type(otdwJ)
-    uwJ    = arr_type(otuwJ)=#
+                        arr_type) where {FT<:Real,FT2}
 
     interlayer_flux_helper!(RS_type, I_static,
         itopR⁺⁻, ibotR⁻⁺,
         itopJ₀⁺, ibotJ₀⁻,
         otdwJ, otuwJ)
-
-#=    itopR⁺⁻ .= Array(topR⁺⁻) 
-    ibotR⁻⁺ .= Array(botR⁻⁺)
-    itopJ₀⁺ .= Array(topJ₀⁺) 
-    ibotJ₀⁻ .= Array(botJ₀⁻)
-    otdwJ   .= Array(dwJ)
-    otuwJ   .= Array(uwJ)=#
     
-    #scattering_interface, SFI, composite_layer, added_layer, I_static)
     synchronize_if_gpu()
     
 end

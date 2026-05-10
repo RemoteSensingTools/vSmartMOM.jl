@@ -1,11 +1,15 @@
+using Test
+using vSmartMOM
+using vSmartMOM.CoreRT
 
+const CORE_RT_BENCHMARK_DIR = joinpath(@__DIR__, "benchmarks")
 
 @testset "compare against 6SV1" begin 
 
-    include("benchmarks/6SV1_R_trues.jl")
+    include(joinpath(CORE_RT_BENCHMARK_DIR, "6SV1_R_trues.jl"))
     R_modeled_all = zeros(6, 3, 3, 16);
     R_deltas_all = zeros(6, 3, 3, 16);
-    parameters = parameters_from_yaml("benchmarks/6SV1_1.yaml");
+    parameters = parameters_from_yaml(joinpath(CORE_RT_BENCHMARK_DIR, "6SV1_1.yaml"));
 
     function test_against_6SV1(case_i, azs, szas, λ, τ, ρ)
         for sza_i in 1:length(szas)
@@ -13,13 +17,14 @@
                 R_true = R_trues[case_i]
                 R_modeled = view(R_modeled_all, case_i, :, :, :)
                 R_deltas = view(R_deltas_all, case_i, :, :, :)
-                parameters.spec_bands = [1e7/λ (1e7/λ + 1)]
+                parameters.spec_bands = [[1e7/λ, 1e7/λ + 1]]
                 parameters.vaz = repeat([azs[az_i]], 16)
                 parameters.sza = szas[sza_i]
                 parameters.brdf = [vSmartMOM.CoreRT.LambertianSurfaceScalar(ρ)]
                 model = model_from_parameters(parameters);
                 model.τ_rayl[1] .= τ
-                R_modeled[sza_i, az_i, :] = vSmartMOM.CoreRT.rt_run(model, i_band=1)[1][:,1,1] / model.quad_points.μ₀
+                # rt_run returns radiance factor L = I/F₀; 6SV1 reference is reflectance R = πL/μ₀.
+                R_modeled[sza_i, az_i, :] = π * vSmartMOM.CoreRT.rt_run(model, i_band=1)[1][:,1,1] / model.quad_points.μ₀
                 R_deltas[sza_i, az_i, :] = abs.(R_true[sza_i][az_i] - R_modeled[sza_i, az_i, :]) ./ R_true[sza_i][az_i]
             end
         end
@@ -50,10 +55,10 @@ end
     ϕs = collect(0.0:30.0:180.0)
     τ = 0.5
 
-    include("benchmarks/natraj_trues.jl")
-    parameters = parameters_from_yaml("benchmarks/natraj.yaml");
+    include(joinpath(CORE_RT_BENCHMARK_DIR, "natraj_trues.jl"))
+    parameters = parameters_from_yaml(joinpath(CORE_RT_BENCHMARK_DIR, "natraj.yaml"));
 
-    parameters.spec_bands = [1e7/360.0 (1e7/360.0 + 1)]
+    parameters.spec_bands = [[1e7/360.0, 1e7/360.0 + 1]]
     parameters.vza = acosd.(μ)
     parameters.sza = acosd.(0.2)
 
@@ -62,7 +67,8 @@ end
         model = model_from_parameters(parameters);
         model.τ_rayl[1] .= τ
 
-        R = CoreRT.rt_run(model, i_band=1)[1]
+        # rt_run returns radiance factor L = I/F₀; Natraj table is reflectance R = πL.
+        R = π * CoreRT.rt_run(model, i_band=1)[1]
         @show size(R)
 
         I_modeled_all[ϕ_i,:] = R[:,1,1]
@@ -74,11 +80,13 @@ end
         U_deltas_all[ϕ_i,:] = abs.(U_trues[:,ϕ_i] - U_modeled_all[ϕ_i,:]) ./ U_trues[:,ϕ_i]
     end
 
-    ϵ = 0.008
-
-    @test maximum(I_deltas_all) < 0.002
-    @test maximum(Q_deltas_all[findall(i -> i >= 0.01, Q_modeled_all)]) < ϵ
-    @test maximum(filter(!isnan, U_deltas_all[findall(i -> i >= 0.01, U_modeled_all)])) < ϵ
+    # Tightened tolerances after switching natraj.yaml to GaussLegQuad +
+    # NoTruncation: Float64 max rel-err on F64 measures 0.02% (I), 0.14% (Q,
+    # |modeled| ≥ 0.01), and 0.01% (U, |modeled| ≥ 0.01) — see
+    # docs/src/pages/benchmarks.md. Limits sit ~2× over measured for the
+    # noisy-Q rows and ~5× over the very stable I/U rows.
+    @test maximum(I_deltas_all) < 5e-4
+    @test maximum(Q_deltas_all[findall(i -> i >= 0.01, Q_modeled_all)]) < 2.5e-3
+    @test maximum(filter(!isnan, U_deltas_all[findall(i -> i >= 0.01, U_modeled_all)])) < 5e-4
 
 end
-

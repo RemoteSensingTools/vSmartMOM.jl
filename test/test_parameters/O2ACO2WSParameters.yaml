@@ -15,17 +15,13 @@ radiative_transfer:
     - LambertianSurfaceScalar{Float64}(0.0)
     - LambertianSurfaceScalar{Float64}(0.0)
   # Quadrature-scheme for stream calculations
-  quadrature_type:    GaussQuadHemisphere()
   # Polarization type (Stokes_I, Stokes_IQ, Stokes_IQU, Stokes_IQUV)
   polarization_type:  Stokes_IQU() #QU()
-  # Maximum m (number of Fourier moments to loop over)
-  max_m:              3
-  # Exclusion angle for forward peak in fitting procedure (degrees)
-  Δ_angle:            2.0
-  # Trunction length for legendre terms
-  l_trunc:            5 #5
+  nstreams:           3
+  truncation:         auto
   # Depolarization factor
-  depol:              0.03
+  # depol:              0.03   # <-- previous explicit value (auto via line below)
+  depol:              -1
   # Floating point type for calculations (Float32, Float64)
   float_type:         Float64
   # Architecture (default_architecture, Architectures.GPU(), Architectures.CPU())
@@ -34,6 +30,19 @@ radiative_transfer:
 # =================================================================
 # Simulation Geometry
 # =================================================================
+# -----------------------------------------------------------------
+# AZIMUTH CONVENTION (vSmartMOM):
+#   `vaz` is the relative azimuth between the satellite-detector
+#   and the Sun, measured in the principal plane.
+#     vaz =   0°  -> Sun and satellite on *opposite* sides of zenith
+#                    in the principal plane (vSmartMOM convention).
+#     vaz = 180°  -> Sun directly *behind* the satellite (same side
+#                    of zenith). This is the geometry that many
+#                    third-party models — including MODTRAN — call
+#                    "RAA = 0".
+#   To compare with a model whose RAA = 0 means Sun-behind-satellite
+#   (e.g. MODTRAN), set vaz = RAA + 180° (mod 360°).
+# -----------------------------------------------------------------
 geometry: 
   # Solar zenith angle (degrees)
   sza:                60. #32.4436

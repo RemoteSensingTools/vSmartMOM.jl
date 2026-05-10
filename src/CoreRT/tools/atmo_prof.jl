@@ -33,11 +33,11 @@ This function calculates various atmospheric profile fields given temperature, p
 4. Layer thicknesses (Δz).
 5. Interpolated volume mixing ratios for other trace gases.
 """
-function compute_atmos_profile_fields(T::AbstractArray{FT,1}, p_half::AbstractArray{FT,1}, q, vmr; g₀=9.807) where FT
-    #@show "Atmos",  FT 
-    # Floating type to use
-    # convert q from g/kg to kg/kg
-    q = q ./ FT(1000)
+function compute_atmos_profile_fields(T::AbstractArray{FT,1}, p_half::AbstractArray{FT,1}, q, vmr; g₀=9.8032465) where FT
+    # g₀ default aligned with sanghavi (Bodhaine 1999 Eq.30 implementation
+    # uses gravitational acceleration ≈ 9.8032 m/s² for column-air mass — see
+    # sanghavi atmo_prof.jl). q is treated as kg/kg directly (volume mixing
+    # ratio of water vapor by mass), matching sanghavi convention.
     #FT = eltype(T)
     Nₐ = FT(6.02214179e+23)
     R  = FT(8.3144598)
@@ -92,14 +92,88 @@ end
 
 ## IO reader methods moved to src/IO/AtmosProfile.jl to decouple CoreRT from IO.
 
-"Reduce profile dimensions by re-averaging to near-equidistant pressure grid"
-function reduce_profile(n::Int, profile::AtmosphericProfile{FT}) where {FT}
+"""
+    reduce_profile(n, profile; binavg=false)
+
+Reduce an `AtmosphericProfile` to `n` layers.
+
+Default (binavg=false): linear interpolation onto uniform pressure half-levels
+spanning [profile.p_half[1], profile.p_half[end]]. VCDs are recomputed from the
+new pressure grid (consistent with `compute_atmos_profile_fields`), Δz is
+re-derived via the hydrostatic relation for the new T and vmr_h2o. This is the
+physics-forward default: it preserves profile shape across the full column
+rather than averaging within coarse bins.
+
+Pass `binavg=true` (or call `reduce_profile_binavg`) for the legacy bin-averaging
+method.
+"""
+function reduce_profile(n::Int, profile::AtmosphericProfile{FT}; binavg::Bool=false) where {FT}
+
+    if binavg
+        return reduce_profile_binavg(n, profile)
+    end
+
+    @assert n < length(profile.T)
+
+    (; vmr) = profile
+
+    Nₐ       = FT(6.02214179e+23)
+    R        = FT(8.3144598)
+    dry_mass = FT(28.9644e-3)
+    wet_mass = FT(18.01534e-3)
+    g₀       = FT(9.8032465)  # aligned with sanghavi compute_atmos_profile_fields
+
+    # New uniform half-levels spanning the original column extent (TOA → BOA)
+    p_half = collect(range(profile.p_half[1], profile.p_half[end], length=n+1))
+    p_full = (p_half[1:end-1] .+ p_half[2:end]) ./ FT(2)
+
+    # Linear interpolation on the profile's full-level pressure grid
+    old_p = profile.p_full
+    function _interp(data::AbstractVector)
+        grid = collect(range(minimum(old_p), maximum(old_p), length=length(data)))
+        itp  = LinearInterpolation(grid, data)
+        return FT.(itp.(p_full))
+    end
+
+    T       = _interp(profile.T)
+    q       = _interp(profile.q)
+    vmr_h2o = _interp(profile.vmr_h2o)
+
+    # Recompute VCDs and Δz from the new layers (consistent with compute_atmos_profile_fields)
+    vcd_dry = zeros(FT, n)
+    vcd_h2o = zeros(FT, n)
+    Δz_     = zeros(FT, n)
+    for i = 1:n
+        Δp      = p_half[i+1] - p_half[i]
+        vmr_dry = FT(1) - vmr_h2o[i]
+        M       = vmr_dry * dry_mass + vmr_h2o[i] * wet_mass
+        vcd     = Nₐ * Δp / (M * g₀ * FT(100)^2) * FT(100)
+        vcd_dry[i] = vmr_dry    * vcd
+        vcd_h2o[i] = vmr_h2o[i] * vcd
+        Δz_[i]  = (log(p_half[i+1]) - log(p_half[i])) / (g₀ * M / (R * T[i]))
+    end
+
+    # Interpolate per-species VMR profiles (fallback to scalar passthrough)
+    new_vmr = Dict{String, Union{Real, Vector}}()
+    for molec_i in keys(vmr)
+        if profile.vmr[molec_i] isa AbstractArray
+            new_vmr[molec_i] = _interp(profile.vmr[molec_i])
+        else
+            new_vmr[molec_i] = profile.vmr[molec_i]
+        end
+    end
+
+    return AtmosphericProfile(T, p_full, q, p_half, vmr_h2o, vcd_dry, vcd_h2o, new_vmr, Δz_)
+end
+
+"Legacy bin-averaging profile reduction (opt-in via `reduce_profile(n, p; binavg=true)`)."
+function reduce_profile_binavg(n::Int, profile::AtmosphericProfile{FT}) where {FT}
 
     # Can only reduce the profile, not expand it
     @assert n < length(profile.T)
 
     # Unpack the profile vmr
-    @unpack vmr, Δz = profile
+    (; vmr, Δz) = profile
 
     # New rough half levels (boundary points)
     a = range(0, maximum(profile.p_half), length=n+1)
@@ -122,14 +196,11 @@ function reduce_profile(n::Int, profile::AtmosphericProfile{FT}) where {FT}
         ind = findall(a[i] .< profile.p_full .<= a[i+1]);
         push!(indices, ind)
         @assert length(ind) > 0 "Profile reduction has an empty layer"
-        #@show i, ind, a[i], a[i+1]
         # Set the pressure levels accordingly
-        p_half[i]   = a[i]   # profile.p_half[ind[1]]
-        p_half[i+1] = a[i+1] # profile.p_half[ind[end]]
+        p_half[i]   = a[i]
+        p_half[i+1] = a[i+1]
 
         # Re-average the other parameters to produce new layers
-
-        
         p_full[i] = mean(profile.p_full[ind])
         T[i] = mean(profile.T[ind])
         q[i] = mean(profile.q[ind])
@@ -138,21 +209,19 @@ function reduce_profile(n::Int, profile::AtmosphericProfile{FT}) where {FT}
         vcd_h2o[i] = sum(profile.vcd_h2o[ind])
         vmr_h2o[i] = vcd_h2o[i]/vcd_dry[i]
     end
-    #@show indices
 
     new_vmr = Dict{String, Union{Real, Vector}}()
 
-    # need to double check this logic, maybe better to add VCDs?!
+    # TODO: This needs a VCD_dry weighted average!
     for molec_i in keys(vmr)
         if profile.vmr[molec_i] isa AbstractArray
-            # TODO: This needs a VCD_dry weighted average!
             new_vmr[molec_i] = [mean(profile.vmr[molec_i][ind]) for ind in indices]
         else
             new_vmr[molec_i] = profile.vmr[molec_i]
         end
     end
 
-    return AtmosphericProfile(T, p_full, q, p_half, vmr_h2o, vcd_dry, vcd_h2o, new_vmr,Δz_)
+    return AtmosphericProfile(T, p_full, q, p_half, vmr_h2o, vcd_dry, vcd_h2o, new_vmr, Δz_)
 end
 
 """
@@ -167,18 +236,28 @@ Input:
     - `vcd_dry` dry vertical column (no water) per layer
 """
 function getRayleighLayerOptProp(psurf::FT, λ::Union{Array{FT}, FT}, depol_fct::FT, vcd_dry::Array{FT}) where FT
-    # TODO: Use noRS/noRS_plus to use n2/o2 molecular constants
-    # to compute tau_scat and depol_fct
+    # TODO: reduce_profile and getRayleighLayerOptProp both deserve refactoring
+    # beyond this merge. The current defaults are physics-forward (Bodhaine
+    # 1999 Eq. 30, interpolated profile) but the implementation layout mixes
+    # legacy and modern code paths via keyword args and name suffixes. Cleaner
+    # architecture: a single configurable ProfileReduction strategy (dispatch on
+    # type) and a single RayleighFormula strategy, both YAML-configurable.
+    # Tracked as a future PR; not a merge blocker.
     Nz = length(vcd_dry)
-    τRayl = zeros(FT,size(λ,1),Nz)
-    # Total vertical Rayleigh scattering optical thickness, TODO: enable sub-layers and use VCD based taus
-    tau_scat = FT(0.00864) * (psurf / FT(1013.25)) *  λ.^(-FT(3.916) .- FT(0.074) * λ .- FT(0.05) ./ λ)  
-    tau_scat = tau_scat * (FT(6.0) + FT(3.0) * depol_fct) / (FT(6.0)- FT(7.0) * depol_fct) 
-    # @show tau_scat, λ
+    τRayl = zeros(FT, size(λ,1), Nz)
+    # Bodhaine 1999 "On Rayleigh optical depth calculations" Eq. 30.
+    # Has an implicit depolarization ratio ρ₀ ≈ 0.0279 (see Bodhaine Table 3);
+    # we rescale to the caller-supplied depol_fct for flexibility.
+    tau_scat = FT(0.002152) .* (FT(1.0455996) .- FT(341.29061) .* λ.^(-2) .- FT(0.90230850) .* λ.^2) ./
+               (FT(1) .+ FT(0.0027059889) .* λ.^(-2) .- FT(85.968563) .* λ.^2)
+    tau_scat = tau_scat .* (psurf / FT(1013.25))
+    ρ₀ = FT(0.0279)
+    tau_scat = tau_scat .* (FT(6) - FT(7)*ρ₀) * (FT(6) + FT(3)*depol_fct) /
+                          ((FT(6) + FT(3)*ρ₀) * (FT(6) - FT(7)*depol_fct))
     k = tau_scat / sum(vcd_dry)
     for i = 1:Nz
         τRayl[:,i] .= k * vcd_dry[i]
-    end 
+    end
     return τRayl
 end
 
@@ -212,7 +291,7 @@ end
 Returns the aerosol optical depths per layer using a Distribution function in p
 """
 function getAerosolLayerOptProp(total_τ::FT, dist::Distribution, profile::AtmosphericProfile) where FT
-    @unpack p_half, p_full, Δz = profile
+    (; p_half, p_full, Δz) = profile
     
     ρ = pdf.(dist,p_full) .* Δz
     τAer  =  (total_τ / sum(ρ)) * ρ
@@ -250,8 +329,7 @@ function construct_atm_layer(τRayl, τAer,
 
     # Fixes Rayleigh SSA to 1 for purely elastic (RS_type = noRS) scattering,
     # and assumes values less than 1 for Raman scattering
-    ϖRayl = ϖ_Cabannes #FT(1)
-    @show ϖRayl
+    ϖRayl = ϖ_Cabannes
     @assert length(τAer) == nAer "Sizes don't match"
 
     τ = FT(0)
@@ -402,7 +480,7 @@ function compute_absorption_profile!(τ_abs::Array{FT,2},
         # Either use the current layer's vmr, or use the uniform vmr
         vmr_curr = vmr isa AbstractArray ? vmr[iz] : vmr
         #@show vmr_curr
-        τ_abs[:,iz] += Array(absorption_cross_section(absorption_model, grid, p, T)) * profile.vcd_dry[iz] * vmr_curr
+        τ_abs[:,iz] += collect(absorption_cross_section(absorption_model, grid, p, T)) * profile.vcd_dry[iz] * vmr_curr
     end
     
 end

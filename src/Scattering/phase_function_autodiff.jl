@@ -5,7 +5,16 @@ users can call the same function with just a keyword argument change.
 
 =#
 
-""" Function used by auto-differentiation to convert a jacobian result to an AerosolOptics type"""
+"""
+    convert_jacobian_result_to_aerosol_optics(result) -> AerosolOptics
+
+Convert a `DiffResults.JacobianResult` returned by ForwardDiff into an
+[`AerosolOptics`](@ref) object.
+
+The flattened value vector is interpreted as:
+`[α; β; γ; δ; ϵ; ζ; ω̃; k]`, and `result.derivs[1]` is stored in
+`AerosolOptics.derivs`.
+"""
 function convert_jacobian_result_to_aerosol_optics(result)
     
     value = result.value
@@ -28,47 +37,42 @@ function convert_jacobian_result_to_aerosol_optics(result)
     return AerosolOptics(greek_coefs=greek_coefs, ω̃=ω̃, k=k, derivs=derivs, fᵗ=eltype(ω̃)(1)) 
 end
 
-"""
-    $(FUNCTIONNAME)(model::MieModel{FDT})
+@doc raw"""
+    compute_aerosol_optical_properties(model::MieModel; autodiff=false) -> AerosolOptics
 
-Reference: Suniti Sanghavi 2014, https://doi.org/10.1016/j.jqsrt.2013.12.015
+Unified entry point for analytic and AD-enabled aerosol optics.
 
-This function enables user to specify whether to perform auto-differentiation (using either computation type)
-Input: MieModel, holding all computation and aerosol properties & autodiff flag (whether to perform 
-auto-differentiation)
-Output: AerosolOptics, holding all Greek coefficients and Cross-Sectional information
+- `autodiff=false` (default): dispatches to the analytic method for the model's
+  computation type (`NAI2` or `PCW`).
+- `autodiff=true`: computes the Jacobian with respect to the 4 aerosol
+  parameters
+  ``\mathbf{x}=[r_m,\sigma,n_r,n_i]`` using ForwardDiff.
+
+The AD Jacobian is stored in `AerosolOptics.derivs` with shape
+`(6L + 2, 4)`, where `L` is the Greek coefficient length and rows are stacked as
+`[α; β; γ; δ; ϵ; ζ; ω̃; k]`.
 """
 function compute_aerosol_optical_properties(model::MieModel ; autodiff=false)
 
-    # This function takes in the "x-vector" along with the input model so that ForwardDiff will work
-    function compute_aerosol_optical_properties_autodiff(x ; model::MieModel = model)
+    # Closure that ForwardDiff differentiates: x = [r_m, σ_g, nᵣ, nᵢ] as Dual numbers.
+    # The Dual numbers must propagate through the entire Mie computation.
+    function compute_aerosol_optical_properties_autodiff(x)
 
-        if length(x) !== 4 
-            @error "Must receive four aerosol parameters for auto-differentiation (μ, σ, nᵣ, nᵢ)" x
-        end
-    
-        # Make sure that 𝐱 and model match
-        @assert (model.aerosol.size_distribution.μ == log(x[1]))
-        @assert (model.aerosol.size_distribution.σ == log(x[2]))
-        @assert (model.aerosol.nᵣ == x[3])
-        @assert (model.aerosol.nᵢ == x[4])
+        (; computation_type, λ, polarization_type, truncation_type, r_max, nquad_radius, wigner_A, wigner_B) = model
 
-        # Unpack the model and aerosol 
-        @unpack computation_type, aerosol, λ, polarization_type, truncation_type, r_max, nquad_radius, wigner_A, wigner_B = model
-        @unpack size_distribution, nᵣ, nᵢ = aerosol
-
-        aerosol_x = Aerosol(LogNormal(log(x[1].value), log(x[2].value)), x[3].value, x[4].value)
+        # Construct aerosol with Dual-typed parameters so ForwardDiff can track derivatives
+        aerosol_x = Aerosol(LogNormal(log(x[1]), log(x[2])), x[3], x[4])
         model_x = MieModel(computation_type, aerosol_x, λ, polarization_type, truncation_type, r_max, nquad_radius, wigner_A, wigner_B)
     
-        aerosol_optics = compute_aerosol_optical_properties(model_x, ForwardDiff.Dual);
+        aerosol_optics = compute_aerosol_optical_properties(model_x)
     
-        return [aerosol_optics.greek_coefs.α 
-                aerosol_optics.greek_coefs.β 
-                aerosol_optics.greek_coefs.γ 
-                aerosol_optics.greek_coefs.δ 
-                aerosol_optics.greek_coefs.ϵ 
-                aerosol_optics.greek_coefs.ζ
-                aerosol_optics.ω̃
+        return [aerosol_optics.greek_coefs.α; 
+                aerosol_optics.greek_coefs.β; 
+                aerosol_optics.greek_coefs.γ; 
+                aerosol_optics.greek_coefs.δ; 
+                aerosol_optics.greek_coefs.ϵ; 
+                aerosol_optics.greek_coefs.ζ;
+                aerosol_optics.ω̃;
                 aerosol_optics.k]
     end
 

@@ -6,6 +6,20 @@ using ..CoreRT: compute_atmos_profile_fields
 # load_config is imported at top level of IO module
 
 """
+    _geoschem_error(msg)
+
+Raise a stable `ArgumentError` for invalid GEOS-Chem NetCDF input.
+"""
+@inline _geoschem_error(msg) = throw(ArgumentError(msg))
+
+"""
+    _require_geoschem(cond, msg)
+
+Validate GEOS-Chem NetCDF metadata and raise `ArgumentError` when invalid.
+"""
+@inline _require_geoschem(cond, msg) = cond ? nothing : _geoschem_error(msg)
+
+"""
     geoschem_to_dict(src::GeosChemSource) -> Dict
 
 Read a GEOSChem NetCDF4 file at the specified grid location and convert
@@ -56,11 +70,11 @@ function geoschem_to_dict(src::GeosChemSource)
     pressure_half = reverse([sp; sp .+ cumsum(-dp)])
     
     # Temperature profile [K] - flip from BOA→TOA to TOA→BOA
-    @assert ds["Met_T"].attrib["units"] == "K" "Expected temperature in Kelvin"
+    _require_geoschem(ds["Met_T"].attrib["units"] == "K", "Expected temperature in Kelvin")
     temperature = reverse(ds["Met_T"].var[idx, idy, idf, :, 1])
     
     # Specific humidity [g/kg] - flip from BOA→TOA to TOA→BOA
-    @assert ds["Met_SPHU"].attrib["units"] == "g kg-1" "Expected specific humidity in g/kg"
+    _require_geoschem(ds["Met_SPHU"].attrib["units"] == "g kg-1", "Expected specific humidity in g/kg")
     q = reverse(ds["Met_SPHU"].var[idx, idy, idf, :, 1])
     
     # Read volume mixing ratios for trace gases
@@ -73,7 +87,7 @@ function geoschem_to_dict(src::GeosChemSource)
     for molecule in molecules_to_read
         var_name = "SpeciesConcVV_$(molecule)"
         if haskey(ds, var_name)
-            @assert ds[var_name].attrib["units"] == "mol mol-1 dry" "Expected VMR in mol/mol"
+            _require_geoschem(ds[var_name].attrib["units"] == "mol mol-1 dry", "Expected VMR in mol/mol")
             # Flip from BOA→TOA to TOA→BOA
             vmr[molecule] = reverse(Float64.(ds[var_name].var[idx, idy, idf, :, 1]))
             push!(molecules_available, molecule)

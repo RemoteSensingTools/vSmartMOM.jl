@@ -1,6 +1,7 @@
 using KernelAbstractions
-using CUDA.CUDAKernels
+using CUDAKernels
 using CUDA
+using vSmartMOM.CoreRT: expdiff_neg, rt_weight_tol, rt_loose_tol
 
 nij = 14
 nn1 = 1000
@@ -20,40 +21,52 @@ qp_μN= rand(nij);
 wct2 = rand(nij);
 ϖ_λ = rand(nn1);
 
-@kernel function get_elem_rt!(ier⁻⁺, iet⁺⁺, ϖ_λ, ϖ_λ₀λ₁, dτ₀, dτ₁, dτ_λ, Z⁻⁺_λ₀λ₁, Z⁺⁺_λ₀λ₁, qp_μN, wct2)
+"""
+    get_elem_rt!(ier⁻⁺, iet⁺⁺, ϖ_λ, ϖ_λ₀λ₁, dτ₀, dτ₁, dτ_λ,
+                 Z⁻⁺_λ₀λ₁, Z⁺⁺_λ₀λ₁, qp_μN, wct2)
+
+KernelAbstractions prototype kernel used by this Raman test script. Each
+workitem owns one `(i, j, n₁, n₀)` inelastic matrix element and evaluates the
+wavelength-coupled elemental reflection/transmission formulas for comparison
+against the scalar reference implementation below.
+"""
+@kernel function get_elem_rt!(ier⁻⁺, iet⁺⁺, @Const(ϖ_λ), @Const(ϖ_λ₀λ₁),
+                              dτ₀, dτ₁, @Const(dτ_λ), @Const(Z⁻⁺_λ₀λ₁),
+                              @Const(Z⁺⁺_λ₀λ₁), @Const(qp_μN), @Const(wct2))
+    FT = eltype(ier⁻⁺)
     i, j, n₁, n₀ = @index(Global, NTuple) 
     # let n₁ cover the full range of wavelengths, while n₀ only includes wavelengths at intervals 
     # that contribute significantly enough to inelastic scattering, so that n₀≪n₁ 
-    if (wct2[j]>1.e-8) 
+    if (wct2[j] > rt_weight_tol(eltype(wct2)))
         # dτ₀, dτ₁ are the purely scattering (elastic+inelastic) molecular elemental 
         # optical thicknesses at wavelengths λ₀ and λ₁
         # 𝐑⁻⁺(μᵢ, μⱼ) = ϖ ̇𝐙⁻⁺(μᵢ, μⱼ) ̇(μⱼ/(μᵢ+μⱼ)) ̇(1 - exp{-τ ̇(1/μᵢ + 1/μⱼ)}) ̇𝑤ⱼ
-        ier⁻⁺[i,j,n₁,n₀] = ϖ_λ₀λ₁[n₁,n₀] * (dτ₀/dτ₁) * Z⁻⁺_λ₀λ₁[i,j] * (qp_μN[j]*dτ₁ / (qp_μN[i]*dτ₀ + qp_μN[j]*dτ₁)) * (1 - exp(-((dτ_λ[n₁] / qp_μN[i]) + (dτ_λ[n₀] / qp_μN[j])))) * (wct2[j]) 
+        ier⁻⁺[i,j,n₁,n₀] = ϖ_λ₀λ₁[n₁,n₀] * (dτ₀/dτ₁) * Z⁻⁺_λ₀λ₁[i,j] * (qp_μN[j]*dτ₁ / (qp_μN[i]*dτ₀ + qp_μN[j]*dτ₁)) * (-expm1(-((dτ_λ[n₁] / qp_μN[i]) + (dτ_λ[n₀] / qp_μN[j])))) * (wct2[j])
                     
         if (qp_μN[i] == qp_μN[j])
             # @show i,j
             # 𝐓⁺⁺(μᵢ, μᵢ) = (exp{-τ/μᵢ} + ϖ ̇𝐙⁺⁺(μᵢ, μᵢ) ̇(τ/μᵢ) ̇exp{-τ/μᵢ}) ̇𝑤ᵢ
             if i == j       
-                if abs(dτ_λ[n₀]-dτ_λ[n₁])>1.e-6
-                    iet⁺⁺[i,j,n₁,n₀] = ((exp(-dτ_λ[n₀] / qp_μN[i]) - exp(-dτ_λ[n₁] / qp_μN[i]))/(dτ_λ[n₁]-dτ_λ[n₀])) * ϖ_λ₀λ₁[n₁,n₀] * dτ₀ * Z⁺⁺_λ₀λ₁[i,i] * wct2[i]
+                if abs(dτ_λ[n₀]-dτ_λ[n₁]) > rt_loose_tol(eltype(dτ_λ))
+                    iet⁺⁺[i,j,n₁,n₀] = (expdiff_neg(dτ_λ[n₀] / qp_μN[i], dτ_λ[n₁] / qp_μN[i])/(dτ_λ[n₁]-dτ_λ[n₀])) * ϖ_λ₀λ₁[n₁,n₀] * dτ₀ * Z⁺⁺_λ₀λ₁[i,i] * wct2[i]
                 else    
                     iet⁺⁺[i,j,n₁,n₀] = ϖ_λ₀λ₁[n₁,n₀] * dτ₀ * Z⁺⁺_λ₀λ₁[i,i] * wct2[i] * exp(-dτ_λ[n₀] / qp_μN[j])/ qp_μN[j]
                 end
             else
-                iet⁺⁺[i,j,n₁,n₀] = 0.0
+                iet⁺⁺[i,j,n₁,n₀] = zero(FT)
             end
         else
             #@show  qp_μN[i], qp_μN[j]  
             # 𝐓⁺⁺(μᵢ, μⱼ) = ϖ ̇𝐙⁺⁺(μᵢ, μⱼ) ̇(μⱼ/(μᵢ-μⱼ)) ̇(exp{-τ/μᵢ} - exp{-τ/μⱼ}) ̇𝑤ⱼ
             # (𝑖 ≠ 𝑗)
-            iet⁺⁺[i,j,n₁,n₀] = ϖ_λ₀λ₁[n₁,n₀] * (dτ₀/dτ₁) * Z⁺⁺_λ₀λ₁[i,j] * (qp_μN[j]*dτ₁ / (qp_μN[i]*dτ₀ - qp_μN[j]*dτ₁)) * (exp(-dτ_λ[n₁] / qp_μN[i]) - exp(-dτ_λ[n₀] / qp_μN[j])) * wct2[j]
+            iet⁺⁺[i,j,n₁,n₀] = ϖ_λ₀λ₁[n₁,n₀] * (dτ₀/dτ₁) * Z⁺⁺_λ₀λ₁[i,j] * (qp_μN[j]*dτ₁ / (qp_μN[i]*dτ₀ - qp_μN[j]*dτ₁)) * expdiff_neg(dτ_λ[n₁] / qp_μN[i], dτ_λ[n₀] / qp_μN[j]) * wct2[j]
         end
     else
-        ier⁻⁺[i,j,n₁,n₀] = 0.0
+        ier⁻⁺[i,j,n₁,n₀] = zero(FT)
         if i==j
-            iet⁺⁺[i,j,n₁,n₀] = 0.0
+            iet⁺⁺[i,j,n₁,n₀] = zero(FT)
         else
-            iet⁺⁺[i,j,n₁,n₀] = 0.0
+            iet⁺⁺[i,j,n₁,n₀] = zero(FT)
         end
     end
 end
@@ -64,18 +77,18 @@ function get_elem_rt!(ier⁻⁺, iet⁺⁺, ϖ_λ, ϖ_λ₀λ₁, dτ₀, dτ₁
         #i, j, n₁, n₀ = @index(Global, NTuple) 
         # let n₁ cover the full range of wavelengths, while n₀ only includes wavelengths at intervals 
         # that contribute significantly enough to inelastic scattering, so that n₀≪n₁ 
-        if (wct2[j]>1.e-8) 
+        if (wct2[j] > rt_weight_tol(eltype(wct2)))
             # dτ₀, dτ₁ are the purely scattering (elastic+inelastic) molecular elemental 
             # optical thicknesses at wavelengths λ₀ and λ₁
             # 𝐑⁻⁺(μᵢ, μⱼ) = ϖ ̇𝐙⁻⁺(μᵢ, μⱼ) ̇(μⱼ/(μᵢ+μⱼ)) ̇(1 - exp{-τ ̇(1/μᵢ + 1/μⱼ)}) ̇𝑤ⱼ
-            ier⁻⁺[i,j,n₁,n₀] = ϖ_λ₀λ₁[n₁,n₀] * (dτ₀/dτ₁) * Z⁻⁺_λ₀λ₁[i,j] * (qp_μN[j]*dτ₁ / (qp_μN[i]*dτ₀ + qp_μN[j]*dτ₁)) * (1 - exp(-((dτ_λ[n₁] / qp_μN[i]) + (dτ_λ[n₀] / qp_μN[j])))) * (wct2[j]) 
+            ier⁻⁺[i,j,n₁,n₀] = ϖ_λ₀λ₁[n₁,n₀] * (dτ₀/dτ₁) * Z⁻⁺_λ₀λ₁[i,j] * (qp_μN[j]*dτ₁ / (qp_μN[i]*dτ₀ + qp_μN[j]*dτ₁)) * (-expm1(-((dτ_λ[n₁] / qp_μN[i]) + (dτ_λ[n₀] / qp_μN[j])))) * (wct2[j])
                         
             if (qp_μN[i] == qp_μN[j])
                 
                 # 𝐓⁺⁺(μᵢ, μᵢ) = (exp{-τ/μᵢ} + ϖ ̇𝐙⁺⁺(μᵢ, μᵢ) ̇(τ/μᵢ) ̇exp{-τ/μᵢ}) ̇𝑤ᵢ
                 if i == j       
-                    if abs(dτ_λ[n₀]-dτ_λ[n₁])>1.e-6
-                        iet⁺⁺[i,j,n₁,n₀] = ((exp(-dτ_λ[n₀] / qp_μN[i]) - exp(-dτ_λ[n₁] / qp_μN[i]))/(dτ_λ[n₁]-dτ_λ[n₀])) * ϖ_λ₀λ₁[n₁,n₀] * dτ₀ * Z⁺⁺_λ₀λ₁[i,i] * wct2[i]
+                    if abs(dτ_λ[n₀]-dτ_λ[n₁]) > rt_loose_tol(eltype(dτ_λ))
+                        iet⁺⁺[i,j,n₁,n₀] = (expdiff_neg(dτ_λ[n₀] / qp_μN[i], dτ_λ[n₁] / qp_μN[i])/(dτ_λ[n₁]-dτ_λ[n₀])) * ϖ_λ₀λ₁[n₁,n₀] * dτ₀ * Z⁺⁺_λ₀λ₁[i,i] * wct2[i]
                     else    
                         iet⁺⁺[i,j,n₁,n₀] = ϖ_λ₀λ₁[n₁,n₀] * dτ₀ * Z⁺⁺_λ₀λ₁[i,i] * wct2[i] * exp(-dτ_λ[n₀] / qp_μN[j])/ qp_μN[j]
                     end
@@ -86,7 +99,7 @@ function get_elem_rt!(ier⁻⁺, iet⁺⁺, ϖ_λ, ϖ_λ₀λ₁, dτ₀, dτ₁
                 
                 # 𝐓⁺⁺(μᵢ, μⱼ) = ϖ ̇𝐙⁺⁺(μᵢ, μⱼ) ̇(μⱼ/(μᵢ-μⱼ)) ̇(exp{-τ/μᵢ} - exp{-τ/μⱼ}) ̇𝑤ⱼ
                 # (𝑖 ≠ 𝑗)
-                iet⁺⁺[i,j,n₁,n₀] = ϖ_λ₀λ₁[n₁,n₀] * (dτ₀/dτ₁) * Z⁺⁺_λ₀λ₁[i,j] * (qp_μN[j]*dτ₁ / (qp_μN[i]*dτ₀ - qp_μN[j]*dτ₁)) * (exp(-dτ_λ[n₁] / qp_μN[i]) - exp(-dτ_λ[n₀] / qp_μN[j])) * wct2[j]
+                iet⁺⁺[i,j,n₁,n₀] = ϖ_λ₀λ₁[n₁,n₀] * (dτ₀/dτ₁) * Z⁺⁺_λ₀λ₁[i,j] * (qp_μN[j]*dτ₁ / (qp_μN[i]*dτ₀ - qp_μN[j]*dτ₁)) * expdiff_neg(dτ_λ[n₁] / qp_μN[i], dτ_λ[n₀] / qp_μN[j]) * wct2[j]
             end
         else
             ier⁻⁺[i,j,n₁,n₀] = 0.0
@@ -110,7 +123,7 @@ base_iet⁺⁺ = deepcopy(iet⁺⁺);
 device = CPU()
 kernel! = get_elem_rt!(device)
 event = kernel!(ier⁻⁺, iet⁺⁺, ϖ_λ, ϖ_λ₀λ₁,dτ₀, dτ₁, dτ_λ, Z⁻⁺_λ₀λ₁, Z⁺⁺_λ₀λ₁, qp_μN, wct2, ndrange=size(ier⁻⁺)); 
-wait(device, event)
+#wait(device, event)
 
 base_ier⁻⁺ ≈ ier⁻⁺
 base_iet⁺⁺ ≈ iet⁺⁺
@@ -134,7 +147,7 @@ if has_cuda()
     device = CUDAKernels.CUDADevice()
     kernel! = get_elem_rt!(device)
     event = kernel!(c_ier⁻⁺, c_iet⁺⁺, c_ϖ_λ, c_ϖ_λ₀λ₁,dτ₀, dτ₁, c_dτ_λ, c_Z⁻⁺_λ₀λ₁, c_Z⁺⁺_λ₀λ₁, c_qp_μN, c_wct2, ndrange=size(c_ier⁻⁺)); 
-    wait(device, event)
+    #wait(device, event)
 
     cuda_iet⁺⁺ = Array(c_iet⁺⁺);
     cuda_ier⁻⁺ = Array(c_ier⁻⁺);

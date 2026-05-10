@@ -16,6 +16,20 @@ Provides a hierarchy for different NetCDF formats (GEOSChem, WRF, GCHP, etc.).
 abstract type NetCDFSource <: IOSource end
 
 """
+    _source_error(msg)
+
+Raise a stable `ArgumentError` for invalid IO source configuration.
+"""
+@inline _source_error(msg) = throw(ArgumentError(msg))
+
+"""
+    _require_source(cond, msg)
+
+Validate IO source constructor input and raise `ArgumentError` when invalid.
+"""
+@inline _require_source(cond, msg) = cond ? nothing : _source_error(msg)
+
+"""
     GeosChemSource(path::String, idx::Int, idy::Int, idf::Int)
 
 IO source for GEOSChem output files (NetCDF4 format).
@@ -47,12 +61,12 @@ struct GeosChemSource <: NetCDFSource
     idy::Int
     idf::Int
     
-    function GeosChemSource(path::String, idx::Int, idy::Int, idf::Int)
-        @assert isfile(path) "File not found: $path"
-        @assert idx > 0 "idx must be positive"
-        @assert idy > 0 "idy must be positive"
-        @assert 1 ≤ idf ≤ 6 "idf must be between 1 and 6 (cubed-sphere face)"
-        new(path, idx, idy, idf)
+    function GeosChemSource(path::AbstractString, idx::Integer, idy::Integer, idf::Integer)
+        _require_source(isfile(path), "File not found: $path")
+        _require_source(idx > 0, "idx must be positive")
+        _require_source(idy > 0, "idy must be positive")
+        _require_source(1 ≤ idf ≤ 6, "idf must be between 1 and 6 (cubed-sphere face)")
+        new(String(path), Int(idx), Int(idy), Int(idf))
     end
 end
 
@@ -81,11 +95,11 @@ struct NetCDFGridSource <: NetCDFSource
     lat_idx::Int
     lon_idx::Int
     
-    function NetCDFGridSource(path::String, lat_idx::Int, lon_idx::Int)
-        @assert isfile(path) "File not found: $path"
-        @assert lat_idx > 0 "lat_idx must be positive"
-        @assert lon_idx > 0 "lon_idx must be positive"
-        new(path, lat_idx, lon_idx)
+    function NetCDFGridSource(path::AbstractString, lat_idx::Integer, lon_idx::Integer)
+        _require_source(isfile(path), "File not found: $path")
+        _require_source(lat_idx > 0, "lat_idx must be positive")
+        _require_source(lon_idx > 0, "lon_idx must be positive")
+        new(String(path), Int(lat_idx), Int(lon_idx))
     end
 end
 

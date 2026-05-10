@@ -1,8 +1,9 @@
 "Construct constants for N₂:"
-function getMolecularConstants(::N₂, vmr::FT) where {FT}
-    @info "Constructing N₂ constants, using VMR (unitless) of " vmr
+function getMolecularConstants(::N₂, vmr::FTin) where {FTin}
+    FT = promote_type(FTin, Float64)
+    vmr = FT(vmr)
+    @debug "Constructing N₂ constants, using VMR (unitless) of " vmr
     @assert 0 ≤ vmr ≤ 1 "VMR has to be between [0,1]"
-    @assert FT <: Float64 "Requires 64 bit floating type"
     p = PolarizationTensor{FT}(
             α̅₀₀     = 1.7406e-24, #[cm^3]
             α₀₀_prime = 1.86e-24, #[cm^3] #to be multiplied by √(Bₑ/ωₑ)
@@ -65,15 +66,16 @@ function getMolecularConstants(::N₂, vmr::FT) where {FT}
                                 σ_RoRaman_coeff_JtoJp2 = FT[1.0],
                                 Δν̃_RoRaman_coeff_JtoJm2 = FT[1.0],
                                 Δν̃_RoRaman_coeff_JtoJp2 = FT[1.0],
-                                E_vJ = FT[1.0] )
+                                E_vJ = zeros(FT,1,1) )
      )   # Fill with dummies for start
 end
 
 "Construct constants for O₂:"
-function getMolecularConstants(::O₂, vmr::FT) where {FT}
-    @info "Constructing O₂ constants, using VMR (unitless) of " vmr
+function getMolecularConstants(::O₂, vmr::FTin) where {FTin}
+    FT = promote_type(FTin, Float64)
+    vmr = FT(vmr)
+    @debug "Constructing O₂ constants, using VMR (unitless) of " vmr
     @assert 0 ≤ vmr ≤ 1 "VMR has to be between [0,1]"
-    @assert FT <: Float64 "Requires 64 bit floating type"
     p = PolarizationTensor{FT}(
             α̅₀₀     = 1.5658e-24, #[cm^3]
             α₀₀_prime = 1.76e-24, #[cm^3]
@@ -136,15 +138,16 @@ function getMolecularConstants(::O₂, vmr::FT) where {FT}
                                 σ_RoRaman_coeff_JtoJp2 = FT[1.0],
                                 Δν̃_RoRaman_coeff_JtoJm2 = FT[1.0],
                                 Δν̃_RoRaman_coeff_JtoJp2 = FT[1.0],
-                                E_vJ = FT[1.0] )
+                                E_vJ = zeros(FT,1,1) )
                         )
 end
 
 "Construct constants for H₂:"
-function getMolecularConstants(::H₂, vmr::FT) where {FT}
-    @info "Constructing H₂ constants, using VMR (unitless) of " vmr
+function getMolecularConstants(::H₂, vmr::FTin) where {FTin}
+    FT = promote_type(FTin, Float64)
+    vmr = FT(vmr)
+    @debug "Constructing H₂ constants, using VMR (unitless) of " vmr
     @assert 0 ≤ vmr ≤ 1 "VMR has to be between [0,1]"
-    @assert FT <: Float64 "Requires 64 bit floating type"
     p = PolarizationTensor{FT}(
             α̅₀₀     = 0.8032e-24, #[cm^3]
             α₀₀_prime = 0.90e-24, #[cm^3]
@@ -207,6 +210,6 @@ function getMolecularConstants(::H₂, vmr::FT) where {FT}
                                 σ_RoRaman_coeff_JtoJp2 = FT[1.0],
                                 Δν̃_RoRaman_coeff_JtoJm2 = FT[1.0],
                                 Δν̃_RoRaman_coeff_JtoJp2 = FT[1.0],
-                                E_vJ = FT[1.0] )
+                                E_vJ = zeros(FT,1,1) )
                         )
 end

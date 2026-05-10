@@ -1,9 +1,47 @@
+"""
+    _molecular_square64(x)
+
+Return `Float64(x)^2` for CPU-side molecular cross-section precomputations.
+The molecular polarizability constants are near the Float32 subnormal range,
+so the precompute path intentionally widens before storing into the target
+coefficient container.
+"""
+@inline _molecular_square64(x) = Float64(x) * Float64(x)
+
+"""
+    _rayleigh_prefactor64()
+
+Return the Rayleigh/Cabannes coefficient prefactor in Float64 for CPU-side
+molecular cross-section precomputations.
+"""
+@inline _rayleigh_prefactor64() = 128 * Float64(π)^5
+
+"""
+    _rovib_prefactor64()
+
+Return the rotational/rovibrational Raman coefficient prefactor in Float64 for
+CPU-side molecular cross-section precomputations.
+"""
+@inline _rovib_prefactor64() = (256 / 27) * Float64(π)^5
+
+"""
+    compute_effective_coefficents!(ν_eff, T, mol)
+
+Update molecular effective polarizability, anisotropy, depolarization, and
+Greek-coefficient factors at effective wavenumber `ν_eff` and temperature `T`.
+"""
 function compute_effective_coefficents!(ν_eff, T, mol::MolecularConstants{FT}) where {FT}#molecules::Array{MolecularConstants{FT}}) where {FT}   
     #@unpack Y = mol
     @unpack α̅,  γ̅, α_prime, γ_prime, ϵ, ϵ_prime = mol.effCoeff
     @unpack α̅₀₀, γ̅₀₀, ω₀, α_b, α_c, α₀₀_prime, γ₀₀_prime = mol.PolTensor
     #Computing α̅
-    α̅ = α̅₀₀*(1 + α_b*T + α_c*T^2)/(1-(2π*c*ν_eff/ω₀)^2)
+    # Frequency correction (1 - (c·ν_eff/ω₀)²). ν_eff is wavenumber (cm⁻¹),
+    # ω₀ is stored in wavenumber units; no 2π factor. Buldakov 1996 writes ω
+    # for what is literally frequency in Hz (not angular frequency in rad/Hz),
+    # so no 2π conversion is needed. Verified correct against
+    # Buldakov et al. 1996 Eqs. 36a-39b by S. Sanghavi
+    # (2026-04 review, unit-cross-check on ω vs ν).
+    α̅ = α̅₀₀*(1 + α_b*T + α_c*T^2)/(1-(c*ν_eff/ω₀)^2)
     γ̅ = γ̅₀₀
     ϵ = α̅/γ̅ 
     α_prime = α₀₀_prime * sqrt(mol.Y[1,2]/mol.Y[2,1]) # see Eqs (36a-39b) of Buldakov et al. 1996 (Spectrochimica Acta Part A) 
@@ -22,14 +60,26 @@ function compute_effective_coefficents!(ν_eff, T, mol::MolecularConstants{FT}) 
         α̅, γ̅, α_prime, γ_prime, ϵ, ϵ_prime, γ_C_Rayl, γ_C_RotRaman, γ_C_VibRaman, γ_C_RoVibRaman
 end
 
+"""
+    compute_σ_Rayl_coeff!(mol)
+
+Update the molecular Rayleigh cross-section prefactor stored on `mol`.
+"""
 #Compute elastic scattering cross-section (Cabannes line)
 function compute_σ_Rayl_coeff!(mol::MolecularConstants{FT}) where {FT}#ν, molecules::Array{MolecularConstants{FT}}) where {FT}
     @unpack α̅, γ_C_Rayl, σ_Rayl_coeff = mol.effCoeff
-    σ_Rayl_coeff = 128π^5 * α̅^2 * (1+2*γ_C_Rayl)/(3-4*γ_C_Rayl)# * ν^4
-    @show σ_Rayl_coeff,  α̅^2 
+    σ_Rayl_coeff = FT(_rayleigh_prefactor64() * _molecular_square64(α̅) *
+                      Float64((1+2*γ_C_Rayl)/(3-4*γ_C_Rayl)))# * ν^4
+    #@show σ_Rayl_coeff,  α̅^2 
     @pack! mol.effCoeff = σ_Rayl_coeff,α̅,γ_C_Rayl
 end
 
+"""
+    compute_σ_Rayl_VibRaman_coeff_hires!(T, mol; Jmax=30)
+
+Update high-resolution Rayleigh and vibrational Raman transition prefactors
+over rotational levels up to `Jmax`.
+"""
 #Compute elastic scattering cross-section (Cabannes line)
 function compute_σ_Rayl_VibRaman_coeff_hires!(T, mol::MolecularConstants{FT}; Jmax=30) where {FT}#ν, molecules::Array{MolecularConstants{FT}}) where {FT}
     @unpack α̅, γ̅, α_prime, γ_prime, E_vJ, σ_Rayl_coeff_hires, σ_VibRaman_coeff_0to1_hires, σ_VibRaman_coeff_1to0_hires, Δν̃_Rayl_coeff_hires, Δν̃_VibRaman_coeff_0to1_hires, Δν̃_VibRaman_coeff_1to0_hires = mol.effCoeff
@@ -41,7 +91,7 @@ function compute_σ_Rayl_VibRaman_coeff_hires!(T, mol::MolecularConstants{FT}; J
     Δν̃_VibRaman_coeff_0to1_hires = OffsetArray(zeros(FT, Jmax+1), 0:Jmax);
     Δν̃_VibRaman_coeff_1to0_hires = OffsetArray(zeros(FT, Jmax+1), 0:Jmax);
 
-    kᵥ = 128*π^5
+    kᵥ = _rayleigh_prefactor64()
     #σ_Rayl_coeff_hires = 128π^5 * α̅^2 * (1+2*γ_C_Rayl)/(3-4*γ_C_Rayl)# * ν^4
     Z_pf = 0
     for Ji in 0:Jmax   
@@ -51,7 +101,8 @@ function compute_σ_Rayl_VibRaman_coeff_hires!(T, mol::MolecularConstants{FT}; J
         # Rayleigh
         vi = 0
         vf = 0 
-        Ni_by_N = exp(-h*c*E_vJ[vi,Ji]/(k_B*T))  
+        #Ni_by_N = exp(-h*c*E_vJ[vi,Ji]/(k_B*T))  
+        Ni_by_N = exp(-h*c*E_vJ[0,Ji]/(k_B*T)) + exp(-h*c*E_vJ[1,Ji]/(k_B*T)) + exp(-h*c*E_vJ[2,Ji]/(k_B*T)) 
         γ_C = 3/(4+45(α̅/(b_JJ*γ̅))^2)
         Z_pf += g_N * (2Ji+1) * (exp(-h*c*E_vJ[0,Ji]/(k_B*T)) + exp(-h*c*E_vJ[1,Ji]/(k_B*T))) #accounting for both the ground- and the first excited vibrational state - depending on the ambient temperature (e.g. on hot exoplanets), more states may have to be accounted for   
         # Molecular energy level
@@ -59,7 +110,9 @@ function compute_σ_Rayl_VibRaman_coeff_hires!(T, mol::MolecularConstants{FT}; J
         # Wavenumber change of scattered light
         Δνₛ = Δν 
     
-        σ_Rayl_coeff_hires[Ji] = kᵥ * g_N * (2Ji+1) * Ni_by_N * α̅^2 * (1+2*γ_C)/(3-4*γ_C)# * νₛ[vi, Ji, vf, Jf]^4
+        σ_Rayl_coeff_hires[Ji] = FT(kᵥ * Float64(g_N * (2Ji+1)) * Float64(Ni_by_N) *
+                                    _molecular_square64(α̅) *
+                                    Float64((1+2*γ_C)/(3-4*γ_C)))# * νₛ[vi, Ji, vf, Jf]^4
         Δν̃_Rayl_coeff_hires[Ji] = Δνₛ
 
         # Vib. Raman 0->1
@@ -72,9 +125,11 @@ function compute_σ_Rayl_VibRaman_coeff_hires!(T, mol::MolecularConstants{FT}; J
         # Wavenumber change of scattered light
         Δνₛ = -Δν 
     
-        σ_VibRaman_coeff_0to1_hires[Ji] = kᵥ * g_N * (2Ji+1) * Ni_by_N * α_prime^2 * (1+2*γ_C)/(3-4*γ_C)# * νₛ[vi, Ji, vf, Jf]^4
+        σ_VibRaman_coeff_0to1_hires[Ji] = FT(kᵥ * Float64(g_N * (2Ji+1)) * Float64(Ni_by_N) *
+                                             _molecular_square64(α_prime) *
+                                             Float64((1+2*γ_C)/(3-4*γ_C)))# * νₛ[vi, Ji, vf, Jf]^4
         Δν̃_VibRaman_coeff_0to1_hires[Ji] = Δνₛ
-        @show Ji, α_prime^2, (1+2*γ_C)/(3-4*γ_C), α_prime^2 * (1+2*γ_C)/(3-4*γ_C)
+        #@show Ji, α_prime^2, (1+2*γ_C)/(3-4*γ_C), α_prime^2 * (1+2*γ_C)/(3-4*γ_C)
         # Vib. Raman 1->0
         vi = 1
         vf = 0 
@@ -85,7 +140,9 @@ function compute_σ_Rayl_VibRaman_coeff_hires!(T, mol::MolecularConstants{FT}; J
         # Wavenumber change of scattered light
         Δνₛ = -Δν 
     
-        σ_VibRaman_coeff_1to0_hires[Ji] = kᵥ * g_N * (2Ji+1) * Ni_by_N * α_prime^2 * (1+2*γ_C)/(3-4*γ_C)# * νₛ[vi, Ji, vf, Jf]^4
+        σ_VibRaman_coeff_1to0_hires[Ji] = FT(kᵥ * Float64(g_N * (2Ji+1)) * Float64(Ni_by_N) *
+                                             _molecular_square64(α_prime) *
+                                             Float64((1+2*γ_C)/(3-4*γ_C)))# * νₛ[vi, Ji, vf, Jf]^4
         Δν̃_VibRaman_coeff_1to0_hires[Ji] = Δνₛ
     end
     σ_Rayl_coeff_hires /= Z_pf
@@ -95,26 +152,41 @@ function compute_σ_Rayl_VibRaman_coeff_hires!(T, mol::MolecularConstants{FT}; J
     @pack! mol.effCoeff = σ_Rayl_coeff_hires, σ_VibRaman_coeff_0to1_hires, σ_VibRaman_coeff_1to0_hires, Δν̃_Rayl_coeff_hires, Δν̃_VibRaman_coeff_0to1_hires, Δν̃_VibRaman_coeff_1to0_hires
 end
 
+"""
+    compute_energy_levels!(mol; vmax=2, Jmax=30)
+
+Populate molecular vibrational/rotational energy levels in cm⁻¹ for
+`v = 0:vmax` and `J = 0:Jmax`.
+"""
 #Compute energy levels [in wavenumbers [cm^{-1}]] corresponding to v={0, 1, 2} and J={0, 1, 2,..., 10}
 function compute_energy_levels!(mol::MolecularConstants{FT}; vmax=2, Jmax=30) where {FT}#molecules::Array{MolecularConstants{FT}}) where {FT}
     #for mol in molecules
         @unpack E_vJ = mol.effCoeff
         @unpack Y = mol
         E_vJ = OffsetArray(zeros(FT, vmax+1,Jmax+1), 0:vmax, 0:Jmax);
-        for v in 0:vmax, J in 0:Jmax
-            E₁ = J*(J+1)
-            for k in 1:5
-                E₂ = (v+0.5)^(k-1)
-                for l in 1:5
-                    E₃ = E₁^(l-1) * E₂ * Y[k,l]
-                    E_vJ[v,J] += E₃
+        @inbounds for v in 0:vmax, J in 0:Jmax
+            E₁ = FT(J*(J+1))
+            E₁_pow = one(FT)  # E₁^0
+            for l in 1:5
+                E₂_pow = one(FT)  # (v+0.5)^0
+                v_half = FT(v) + FT(0.5)
+                for k in 1:5
+                    E_vJ[v,J] += E₁_pow * E₂_pow * Y[k,l]
+                    E₂_pow *= v_half
                 end
+                E₁_pow *= E₁
             end
         end
         @pack! mol.effCoeff = E_vJ
     #end
 end
 
+"""
+    compute_σ_VibRaman_coeff!(T, mol; vmax=2, Jmax=30)
+
+Update Stokes and anti-Stokes vibrational Raman cross-section prefactors for
+`mol` at temperature `T`.
+"""
 #Compute vibrational Raman scattering coefficient (for Δν=±1)
 function compute_σ_VibRaman_coeff!(T, mol::MolecularConstants{FT}; vmax=2, Jmax=30) where {FT}#ν, molecules::Array{MolecularConstants{FT}}) where {FT}
     @unpack α_prime, γ_C_VibRaman, E_vJ,σ_VibRaman_coeff_0to1,σ_VibRaman_coeff_1to0, Δν̃_VibRaman_coeff_0to1, Δν̃_VibRaman_coeff_1to0 = mol.effCoeff
@@ -123,24 +195,32 @@ function compute_σ_VibRaman_coeff!(T, mol::MolecularConstants{FT}; vmax=2, Jmax
     #Stokes
     vi = 0
     Δν̃ = E_vJ[1,0]-E_vJ[0,0]
-    Nvib = (1 - exp(-h*c*Δν̃/(k_B*T)))^(-1)
+    Nvib = (-expm1(-h*c*Δν̃/(k_B*T)))^(-1)
     #sq_bₖ = h/(8π²c*E_νJ[vi,0])#bₖ = √(h/8π²cνₖ)
-    σ_VibRaman_coeff_0to1 = 128π^5 * α_prime^2 * Nvib * (1+2*γ_C_VibRaman)/(3-4*γ_C_VibRaman) 
+    σ_VibRaman_coeff_0to1 = FT(_rayleigh_prefactor64() * _molecular_square64(α_prime) *
+                               Float64(Nvib) * Float64((1+2*γ_C_VibRaman)/(3-4*γ_C_VibRaman)))
     Δν̃_VibRaman_coeff_0to1 = -Δν̃
     #Anti-Stokes
     vi = 1
 
-    Nvib = (exp(h*c*Δν̃/(k_B*T))-1)^(-1)
+    Nvib = inv(expm1(h*c*Δν̃/(k_B*T)))
     #sq_bₖ = h/(8π²c*E_νJ[vi,0])#bₖ = √(h/8π²cνₖ)
-    σ_VibRaman_coeff_1to0 = 128π^5 * α_prime^2 * Nvib * (1+2*γ_C_VibRaman)/(3-4*γ_C_VibRaman) 
+    σ_VibRaman_coeff_1to0 = FT(_rayleigh_prefactor64() * _molecular_square64(α_prime) *
+                               Float64(Nvib) * Float64((1+2*γ_C_VibRaman)/(3-4*γ_C_VibRaman)))
     Δν̃_VibRaman_coeff_1to0 = Δν̃
 
-    @show σ_VibRaman_coeff_0to1,σ_VibRaman_coeff_1to0  
+    #@show σ_VibRaman_coeff_0to1,σ_VibRaman_coeff_1to0  
     @pack! mol.effCoeff = σ_VibRaman_coeff_0to1, σ_VibRaman_coeff_1to0, Δν̃_VibRaman_coeff_0to1, Δν̃_VibRaman_coeff_1to0
 end
 
+"""
+    compute_σ_RoVibRaman_coeff!(T, mol; vmax=2, Jmax=30)
+
+Update rotational and rovibrational Raman transition prefactors for `mol` at
+temperature `T`.
+"""
 function compute_σ_RoVibRaman_coeff!(T, mol::MolecularConstants{FT}; vmax=2, Jmax=30) where {FT}#molecules::Array{MolecularConstants{FT}}) where {FT}
-    kᵥ = (256/27)*π^5
+    kᵥ = _rovib_prefactor64()
     #for mol in molecules
     @unpack γ̅, γ_prime,
         E_vJ, σ_RoRaman_coeff_JtoJm2,σ_RoRaman_coeff_JtoJp2,
@@ -168,17 +248,17 @@ function compute_σ_RoVibRaman_coeff!(T, mol::MolecularConstants{FT}; vmax=2, Jm
     #Δνₛ = OffsetArray(zeros(FT, vmax+1,Jmax+1,vmax+1,Jmax+1), 0:vmax, 0:Jmax, 0:vmax, 0:Jmax); #zeros(3, 11, 3, 11)
         
     Z_pf = 0
-    for Ji in 0:Jmax         
+    @inbounds for Ji in 0:Jmax
         b_JJm2 = 3Ji*(Ji-1)/(2*(2Ji+1)*(2Ji-1))
         #b_JJ   = Ji*(Ji+1)/((2Ji-1)*(2Ji+3))
         b_JJp2 = 3*(Ji+1)*(Ji+2)/(2*(2Ji+1)*(2Ji+3))
-        g_N = gₛ[2-Ji%2]    
+        g_N = gₛ[2-Ji%2]
         
         #Rotational Raman scattering
         vi = 0
         vf = 0 
         Ni_by_N = exp(-h*c*E_vJ[vi,Ji]/(k_B*T))  
-        @show vi, Ji, Ni_by_N
+        #@show vi, Ji, Ni_by_N
         Z_pf += g_N * (2Ji+1) * (exp(-h*c*E_vJ[0,Ji]/(k_B*T)) + exp(-h*c*E_vJ[1,Ji]/(k_B*T))) #accounting for both the ground- and the first excited vibrational state - depending on the ambient temperature (e.g. on hot exoplanets), more states may have to be accounted for   
         
         Jf=Ji-2
@@ -188,7 +268,9 @@ function compute_σ_RoVibRaman_coeff!(T, mol::MolecularConstants{FT}; vmax=2, Jm
             #Wavenumber change of scattered light
             Δνₛ = - Δν 
         
-            σ_RoRaman_coeff_JtoJm2[Ji] = kᵥ * g_N * (2Ji+1) * b_JJm2 * Ni_by_N * γ̅^2# * νₛ[vi, Ji, vf, Jf]^4
+            σ_RoRaman_coeff_JtoJm2[Ji] = FT(kᵥ * Float64(g_N * (2Ji+1)) *
+                                            Float64(b_JJm2) * Float64(Ni_by_N) *
+                                            _molecular_square64(γ̅))# * νₛ[vi, Ji, vf, Jf]^4
             Δν̃_RoRaman_coeff_JtoJm2[Ji] = Δνₛ
         else
             σ_RoRaman_coeff_JtoJm2[Ji] = 0
@@ -201,7 +283,9 @@ function compute_σ_RoVibRaman_coeff!(T, mol::MolecularConstants{FT}; vmax=2, Jm
             #Wavenumber change of scattered light
             Δνₛ = - Δν 
 
-            σ_RoRaman_coeff_JtoJp2[Ji] = kᵥ * g_N * (2Ji+1) * b_JJp2 * Ni_by_N * γ̅^2# * νₛ[vi, Ji, vf, Jf]^4 
+            σ_RoRaman_coeff_JtoJp2[Ji] = FT(kᵥ * Float64(g_N * (2Ji+1)) *
+                                            Float64(b_JJp2) * Float64(Ni_by_N) *
+                                            _molecular_square64(γ̅))# * νₛ[vi, Ji, vf, Jf]^4
             Δν̃_RoRaman_coeff_JtoJp2[Ji] = Δνₛ
         else
             σ_RoRaman_coeff_JtoJp2[Ji] = 0
@@ -222,7 +306,9 @@ function compute_σ_RoVibRaman_coeff!(T, mol::MolecularConstants{FT}; vmax=2, Jm
             #Wavenumber change of scattered light
             Δνₛ = - Δν 
         
-            σ_RoVibRaman_coeff_0to1_JtoJm2[Ji] = kᵥ * g_N * (2Ji+1) * b_JJm2 * Ni_by_N * (γ_prime)^2# * νₛ[vi, Ji, vf, Jf]^4 
+            σ_RoVibRaman_coeff_0to1_JtoJm2[Ji] = FT(kᵥ * Float64(g_N * (2Ji+1)) *
+                                                    Float64(b_JJm2) * Float64(Ni_by_N) *
+                                                    _molecular_square64(γ_prime))# * νₛ[vi, Ji, vf, Jf]^4
             Δν̃_RoVibRaman_coeff_0to1_JtoJm2[Ji] = Δνₛ
         else
             σ_RoVibRaman_coeff_0to1_JtoJm2[Ji] = 0
@@ -236,7 +322,9 @@ function compute_σ_RoVibRaman_coeff!(T, mol::MolecularConstants{FT}; vmax=2, Jm
             #Wavenumber change of scattered light
             Δνₛ = - Δν 
         
-            σ_RoVibRaman_coeff_0to1_JtoJp2[Ji] = kᵥ * g_N * (2Ji+1) * b_JJp2 * Ni_by_N * (γ_prime)^2# * νₛ[vi, Ji, vf, Jf]^4 
+            σ_RoVibRaman_coeff_0to1_JtoJp2[Ji] = FT(kᵥ * Float64(g_N * (2Ji+1)) *
+                                                    Float64(b_JJp2) * Float64(Ni_by_N) *
+                                                    _molecular_square64(γ_prime))# * νₛ[vi, Ji, vf, Jf]^4
             Δν̃_RoVibRaman_coeff_0to1_JtoJp2[Ji] = Δνₛ
         else
             σ_RoVibRaman_coeff_0to1_JtoJp2[Ji] = 0
@@ -256,7 +344,9 @@ function compute_σ_RoVibRaman_coeff!(T, mol::MolecularConstants{FT}; vmax=2, Jm
             #Wavenumber change of scattered light
             Δνₛ = - Δν 
     
-            σ_RoVibRaman_coeff_1to0_JtoJm2[Ji] = kᵥ * g_N * (2Ji+1) * b_JJm2 * Ni_by_N * (γ_prime)^2# * νₛ[vi, Ji, vf, Jf]^4 
+            σ_RoVibRaman_coeff_1to0_JtoJm2[Ji] = FT(kᵥ * Float64(g_N * (2Ji+1)) *
+                                                    Float64(b_JJm2) * Float64(Ni_by_N) *
+                                                    _molecular_square64(γ_prime))# * νₛ[vi, Ji, vf, Jf]^4
             Δν̃_RoVibRaman_coeff_1to0_JtoJm2[Ji] = Δνₛ
         else
             σ_RoVibRaman_coeff_1to0_JtoJm2[Ji] = 0
@@ -269,7 +359,9 @@ function compute_σ_RoVibRaman_coeff!(T, mol::MolecularConstants{FT}; vmax=2, Jm
             #Wavenumber change of scattered light
             Δνₛ = - Δν 
     
-            σ_RoVibRaman_coeff_1to0_JtoJp2[Ji] = kᵥ * g_N * (2Ji+1) * b_JJp2 * Ni_by_N * (γ_prime)^2# * νₛ[vi, Ji, vf, Jf]^4 
+            σ_RoVibRaman_coeff_1to0_JtoJp2[Ji] = FT(kᵥ * Float64(g_N * (2Ji+1)) *
+                                                    Float64(b_JJp2) * Float64(Ni_by_N) *
+                                                    _molecular_square64(γ_prime))# * νₛ[vi, Ji, vf, Jf]^4
             Δν̃_RoVibRaman_coeff_1to0_JtoJp2[Ji] = Δνₛ
         else
             σ_RoVibRaman_coeff_1to0_JtoJp2[Ji] = 0
@@ -283,7 +375,7 @@ function compute_σ_RoVibRaman_coeff!(T, mol::MolecularConstants{FT}; vmax=2, Jm
     σ_RoVibRaman_coeff_1to0_JtoJm2 /= Z_pf
     σ_RoVibRaman_coeff_1to0_JtoJp2 /= Z_pf
 
-    @show Z_pf
+    #@show Z_pf
     @pack! mol.effCoeff = σ_RoRaman_coeff_JtoJm2, σ_RoRaman_coeff_JtoJp2,
         σ_RoVibRaman_coeff_0to1_JtoJm2, σ_RoVibRaman_coeff_0to1_JtoJp2, 
         σ_RoVibRaman_coeff_1to0_JtoJm2, σ_RoVibRaman_coeff_1to0_JtoJp2,

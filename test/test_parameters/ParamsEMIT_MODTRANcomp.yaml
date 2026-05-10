@@ -1,0 +1,103 @@
+# =================================================================
+# Parameter file for the EMIT / MODTRAN LUT comparison scenarios
+# (driven by ~/data/EMIT_MODTRANcomp/emit_20250404.json)
+#
+# Geometry (SZA, RAA) is taken from the JSON "MISC" block. AOT550,
+# H2OSTR, GNDALT (and TSZ) are LUT-grid dimensions that are varied
+# by the driver script on a per-scenario basis.
+#
+# Set VSMARTMOM_EMIT_LUT_DIR to the directory containing *_emit_lut.jld2.
+# =================================================================
+radiative_transfer:
+  # Spectral bands (list of ν_start:ν_step:ν_end, in cm⁻¹).
+  spec_bands:
+    - 3984.2:0.1:26315.7
+  surface:
+    - LambertianSurfaceScalar{Float64}(0.0)
+  polarization_type:  Stokes_I()
+  nstreams:           3
+  truncation:         auto
+  # depol:              0.028   # <-- previous explicit value (auto via line below)
+  depol:              -1
+  float_type:         Float32
+  architecture:       Architectures.GPU()
+
+# =================================================================
+# Simulation Geometry  (SZA, RAA from emit_20250404.json MISC block)
+# =================================================================
+# -----------------------------------------------------------------
+# AZIMUTH CONVENTION (vSmartMOM):
+#   `vaz` is the relative azimuth between the satellite-detector
+#   and the Sun, measured in the principal plane.
+#     vaz =   0°  -> Sun and satellite on *opposite* sides of zenith
+#                    in the principal plane (vSmartMOM convention).
+#     vaz = 180°  -> Sun directly *behind* the satellite (same side
+#                    of zenith). This is the geometry that many
+#                    third-party models — including MODTRAN — call
+#                    "RAA = 0".
+#   To compare with a model whose RAA = 0 means Sun-behind-satellite
+#   (e.g. MODTRAN), set vaz = RAA + 180° (mod 360°).
+# -----------------------------------------------------------------
+geometry:
+  sza:                39.583965990615404    # MISC.SZA
+  vza:                [0.0]                 # nadir viewing
+  vaz:                [81.49773971061641]   # MISC.RAA
+  obs_alt:            0                     # observer at TOA
+
+# =================================================================
+# Atmospheric Profile — LUT-aligned (54 pressure levels, 53 layers)
+# All query pressures on LUT grid (20.01–1080.01 hPa) to avoid interpolation issues
+# =================================================================
+atmospheric_profile:
+  # Pressure profile (TOA→BOA, half-levels, hPa) — 54 levels on LUT grid
+  p: [20.01, 40.01, 60.01, 80.01, 100.01, 120.01, 140.01, 160.01, 180.01, 200.01, 220.01, 240.01, 260.01, 280.01, 300.01, 320.01, 340.01, 360.01, 380.01, 400.01, 420.01, 440.01, 460.01, 480.01, 500.01, 520.01, 540.01, 560.01, 580.01, 600.01, 620.01, 640.01, 660.01, 680.01, 700.01, 720.01, 740.01, 760.01, 780.01, 800.01, 820.01, 840.01, 860.01, 880.01, 900.01, 920.01, 940.01, 960.01, 980.01, 1000.01, 1020.01, 1040.01, 1060.01, 1080.01]
+  # Temperature profile (TOA→BOA, layer centres, K) — 53 layers
+  T: [215.20, 215.21, 216.03, 216.82, 217.47, 218.00, 218.46, 218.86, 219.21, 220.01, 221.91, 224.46, 227.48, 230.29, 232.94, 235.49, 237.83, 240.18, 242.32, 244.40, 246.48, 248.35, 250.20, 252.05, 253.77, 255.42, 257.07, 258.72, 259.89, 261.06, 262.23, 263.40, 264.18, 264.96, 265.73, 266.50, 267.23, 267.92, 268.61, 269.30, 269.99, 270.65, 271.27, 271.90, 272.52, 273.14, 273.76, 274.38, 275.01, 275.63, 276.25, 276.87, 277.49]
+  profile_reduction: -1
+
+# =================================================================
+# Absorption
+# =================================================================
+absorption:
+  molecules:
+    - [O2, CO2, H2O, CH4, O3, N2O, CO]
+  variable_molecules:
+    - [H2O, CH4, O3, N2O, CO]
+  LUTfiles:
+    - ["${ENV:VSMARTMOM_EMIT_LUT_DIR}/O2_emit_lut.jld2",
+       "${ENV:VSMARTMOM_EMIT_LUT_DIR}/CO2_emit_lut.jld2",
+       "${ENV:VSMARTMOM_EMIT_LUT_DIR}/H2O_emit_lut.jld2",
+       "${ENV:VSMARTMOM_EMIT_LUT_DIR}/CH4_emit_lut.jld2",
+       "${ENV:VSMARTMOM_EMIT_LUT_DIR}/O3_emit_lut.jld2",
+       "${ENV:VSMARTMOM_EMIT_LUT_DIR}/N2O_emit_lut.jld2",
+       "${ENV:VSMARTMOM_EMIT_LUT_DIR}/CO_emit_lut.jld2"]
+  vmr:
+    O2:   0.209    # constant
+    CO2:  3.30e-4  # constant
+    H2O:  [4.58530e-06, 4.50000e-06, 4.50000e-06, 4.53816e-06, 4.65438e-06, 4.76621e-06, 4.91360e-06, 5.39130e-06, 6.73794e-06, 9.46274e-06, 1.60859e-05, 2.51176e-05, 3.68509e-05, 5.11672e-05, 6.82662e-05, 9.06597e-05, 1.21500e-04, 1.60203e-04, 2.12194e-04, 2.78613e-04, 3.61105e-04, 4.39705e-04, 5.27704e-04, 6.28519e-04, 7.27080e-04, 8.26683e-04, 9.35472e-04, 1.05402e-03, 1.19061e-03, 1.33944e-03, 1.50116e-03, 1.67642e-03, 1.82868e-03, 1.98772e-03, 2.15545e-03, 2.33209e-03, 2.49223e-03, 2.62087e-03, 2.75259e-03, 2.88740e-03, 3.02527e-03, 3.16172e-03, 3.29135e-03, 3.42317e-03, 3.55716e-03, 3.69331e-03, 3.83161e-03, 3.97204e-03, 4.11460e-03, 4.25926e-03, 4.40603e-03, 4.55489e-03, 4.70582e-03]
+    O3:   [4.58000e-06, 3.17812e-06, 1.96733e-06, 1.32494e-06, 9.92842e-07, 8.38669e-07, 7.48335e-07, 6.35464e-07, 5.13965e-07, 4.11626e-07, 3.27534e-07, 2.63024e-07, 2.13362e-07, 1.75594e-07, 1.46353e-07, 1.24169e-07, 1.07684e-07, 9.41293e-08, 8.42951e-08, 7.62682e-08, 6.93353e-08, 6.36238e-08, 5.86358e-08, 5.42230e-08, 5.04358e-08, 4.71111e-08, 4.41169e-08, 4.14158e-08, 3.93018e-08, 3.73609e-08, 3.55740e-08, 3.39244e-08, 3.30191e-08, 3.21933e-08, 3.14109e-08, 3.06684e-08, 3.00723e-08, 2.96541e-08, 2.92522e-08, 2.88656e-08, 2.84934e-08, 2.82287e-08, 2.81643e-08, 2.81015e-08, 2.80402e-08, 2.79804e-08, 2.79220e-08, 2.78649e-08, 2.78091e-08, 2.77545e-08, 2.77011e-08, 2.76488e-08, 2.75976e-08]
+    N2O:  [1.06860e-07, 1.49737e-07, 2.05049e-07, 2.46128e-07, 2.66913e-07, 2.76758e-07, 2.83166e-07, 2.88778e-07, 2.93504e-07, 2.97966e-07, 3.02647e-07, 3.07110e-07, 3.11363e-07, 3.14389e-07, 3.16600e-07, 3.18279e-07, 3.19079e-07, 3.19837e-07, 3.20000e-07, 3.20000e-07, 3.20000e-07, 3.20000e-07, 3.20000e-07, 3.20000e-07, 3.20000e-07, 3.20000e-07, 3.20000e-07, 3.20000e-07, 3.20000e-07, 3.20000e-07, 3.20000e-07, 3.20000e-07, 3.20000e-07, 3.20000e-07, 3.20000e-07, 3.20000e-07, 3.20000e-07, 3.20000e-07, 3.20000e-07, 3.20000e-07, 3.20000e-07, 3.20000e-07, 3.20000e-07, 3.20000e-07, 3.20000e-07, 3.20000e-07, 3.20000e-07, 3.20000e-07, 3.20000e-07, 3.20000e-07, 3.20000e-07, 3.20000e-07, 3.20000e-07]
+    CO:   [1.37413e-08, 1.28499e-08, 1.83057e-08, 2.63914e-08, 3.54341e-08, 4.60435e-08, 5.72993e-08, 6.82762e-08, 7.76461e-08, 8.57453e-08, 9.20199e-08, 9.75065e-08, 1.02379e-07, 1.06923e-07, 1.11212e-07, 1.15087e-07, 1.18256e-07, 1.21330e-07, 1.23400e-07, 1.25142e-07, 1.26823e-07, 1.27719e-07, 1.28496e-07, 1.29245e-07, 1.29689e-07, 1.29970e-07, 1.30242e-07, 1.30510e-07, 1.31152e-07, 1.31776e-07, 1.32382e-07, 1.32973e-07, 1.33982e-07, 1.34990e-07, 1.35976e-07, 1.36942e-07, 1.37924e-07, 1.38936e-07, 1.39929e-07, 1.40905e-07, 1.41863e-07, 1.42798e-07, 1.43703e-07, 1.44593e-07, 1.45469e-07, 1.46331e-07, 1.47179e-07, 1.48015e-07, 1.48838e-07, 1.49649e-07, 1.50448e-07, 1.51237e-07, 1.52014e-07]
+    CH4:  [9.07114e-07, 1.18709e-06, 1.30656e-06, 1.36666e-06, 1.40631e-06, 1.43826e-06, 1.46571e-06, 1.48977e-06, 1.51118e-06, 1.53143e-06, 1.55191e-06, 1.57229e-06, 1.59230e-06, 1.60694e-06, 1.61800e-06, 1.62709e-06, 1.63309e-06, 1.63878e-06, 1.64566e-06, 1.65263e-06, 1.65930e-06, 1.66577e-06, 1.67198e-06, 1.67796e-06, 1.68283e-06, 1.68705e-06, 1.69112e-06, 1.69502e-06, 1.69631e-06, 1.69756e-06, 1.69877e-06, 1.69995e-06, 1.70000e-06, 1.70000e-06, 1.70000e-06, 1.70000e-06, 1.70000e-06, 1.70000e-06, 1.70000e-06, 1.70000e-06, 1.70000e-06, 1.70000e-06, 1.70000e-06, 1.70000e-06, 1.70000e-06, 1.70000e-06, 1.70000e-06, 1.70000e-06, 1.70000e-06, 1.70000e-06, 1.70000e-06, 1.70000e-06, 1.70000e-06]
+  broadening:         Voigt()
+  CEF:                HumlicekWeidemann32SDErrorFunction()
+  wing_cutoff:        40
+
+# =================================================================
+# Scattering — one arbitrary aerosol (lognormal size distribution,
+# lognormal vertical profile peaked near 2 km).
+# τ_ref is overwritten per-scenario by the driver script from AOT550.
+# =================================================================
+scattering:
+  aerosols:
+    - τ_ref:          0.1       # overwritten per scenario (AOT550)
+      μ:              0.3       # lognormal mean radius (µm)
+      σ:              1.5       # lognormal geometric stddev (must be ≥ 1)
+      nᵣ:             1.443      # real refractive index
+      nᵢ:             0.0037     # imag refractive index
+      z₀:             2.0       # vertical peak altitude (km)
+      σ₀:             0.4       # vertical peak width (km)
+  r_max:          30.0
+  nquad_radius:   1000
+  λ_ref:          0.55          # AOT550 reference wavelength
+  decomp_type:    NAI2()

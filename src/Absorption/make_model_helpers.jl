@@ -24,7 +24,7 @@ Convenience function to make a HitranModel out of the parameters (Matches make_i
 """
 function make_hitran_model(hitran::HitranTable, 
                            broadening::AbstractBroadeningFunction; 
-                           wing_cutoff::Integer=40, 
+                           wing_cutoff::Real=40, 
                            vmr::Union{Real, Vector}=0, 
                            CEF::AbstractComplexErrorFunction=HumlicekWeidemann32SDErrorFunction(), 
                            architecture::AbstractArchitecture = default_architecture())
@@ -54,17 +54,24 @@ at the given pressure and temperature grids
 """
 function make_interpolation_model(
                                   # Required
-                                  hitran::HitranTable, 
-                                  broadening::AbstractBroadeningFunction, 
-                                  wave_grid::AbstractRange{<:Real}, 
+                                  hitran::HitranTable,
+                                  broadening::AbstractBroadeningFunction,
+                                  wave_grid::AbstractRange{<:Real},
                                   p_grid::AbstractRange{<:Real},
-                                  t_grid::AbstractRange{<:Real}; 
+                                  t_grid::AbstractRange{<:Real};
                                   # Optionals
                                   wavelength_flag::Bool=false,
-                                  wing_cutoff::Integer=40, 
-                                  vmr::Real=0, 
+                                  wing_cutoff::Real=40,
+                                  vmr::Real=0,
                                   CEF::AbstractComplexErrorFunction=HumlicekWeidemann32SDErrorFunction(),
-                                  architecture::AbstractArchitecture = default_architecture()     # Computer `Architecture` on which `Model` is run
+                                  architecture::AbstractArchitecture = default_architecture(),
+                                  # Linear avoids cubic spline overshoot/undershoot on under-sampled
+                                  # narrow absorption lines. Default stays :cubic for back-compat.
+                                  interp_type::Symbol = :cubic,
+                                  # Storage type of the LUT coefficient array. Float32 halves disk/VRAM
+                                  # with negligible accuracy loss for σ values that span ~10 orders
+                                  # of magnitude logarithmically but are interpolated linearly.
+                                  storage_type::Type{<:AbstractFloat} = Float64,
                                 )
 
     # Warn user if using incompatible/untested CEF
@@ -76,19 +83,24 @@ function make_interpolation_model(
     ν_grid = wavelength_flag ? reverse(nm_per_m ./ wave_grid) : wave_grid
 
     # Empty matrix to store the calculated cross-sections
-    cs_matrix = zeros(length(ν_grid),length(p_grid), length(t_grid));
+    cs_matrix = zeros(storage_type, length(ν_grid), length(p_grid), length(t_grid))
 
     # Calculate all the cross-sections at the pressure and temperature grids
     @showprogress 1 "Computing Cross Sections for Interpolation..." for i in 1:length(p_grid)
         for j in 1:length(t_grid)
-            # make_hitran_model(hitran_data, Voigt(), wing_cutoff = 40, CEF=HumlicekWeidemann32SDErrorFunction(), architecture=CPU())
             model = make_hitran_model(hitran, broadening, wing_cutoff=wing_cutoff, CEF=CEF, architecture=architecture)
-            cs_matrix[:,i,j] = Array(compute_absorption_cross_section(model, collect(ν_grid), p_grid[i], t_grid[j], wavelength_flag=wavelength_flag))
+            cs_matrix[:,i,j] = storage_type.(collect(compute_absorption_cross_section(model, collect(ν_grid), p_grid[i], t_grid[j], wavelength_flag=wavelength_flag)))
         end
     end
-    
+
     # Perform the interpolation
-    itp = interpolate(cs_matrix, BSpline(Cubic(Line(OnGrid()))))
+    itp = if interp_type === :linear
+        interpolate(cs_matrix, BSpline(Linear()))
+    elseif interp_type === :cubic
+        interpolate(cs_matrix, BSpline(Cubic(Line(OnGrid()))))
+    else
+        throw(ArgumentError("interp_type must be :linear or :cubic, got $(interp_type)"))
+    end
 
     # Get the molecule and isotope numbers from the HitranTable
     mol = hitran.mol[1]
@@ -109,6 +121,24 @@ function load_interpolation_model(filepath::String)
     return itp_model
 end
 
+"""
+    make_interpolation_model(absco::AbscoTable, wave_grid, p_grid, t_grid; 
+                             wavelength_flag=false, architecture=default_architecture())
+
+Create an InterpolationModel from ABSCO tabulated cross-section data.
+
+Linearly interpolates the pre-computed cross-sections onto the specified pressure and
+temperature grids. Uses the ABSCO format (ν, p, T) for the lookup table.
+
+# Arguments
+- `absco::AbscoTable`: ABSCO table with cross-sections σ(ν, p, T)
+- `wave_grid`: Wavenumber [cm⁻¹] or wavelength [nm] grid (see wavelength_flag)
+- `p_grid`: Pressure grid (hPa)
+- `t_grid`: Temperature grid (K)
+
+# Returns
+- `InterpolationModel`: Interpolator for absorption cross-sections
+"""
 function make_interpolation_model(
         # Required
         absco::AbscoTable,  
@@ -155,7 +185,7 @@ function make_interpolation_model(
             a1 = ceil(fractional_index_p)-fractional_index_p
             xs_interp = a1*xs_interp_p2+(1-a1)*xs_interp_p1 
             interp_xs = LinearInterpolation(absco.ν, xs_interp, extrapolation_bc = Flat())
-            cs_matrix[:,i,j] = Array(interp_xs(ν_grid))
+            cs_matrix[:,i,j] = collect(interp_xs(ν_grid))
         end
     end
 
@@ -173,6 +203,22 @@ function make_interpolation_model(
     return InterpolationModel(itp, mol, iso,  ν_grid, p_grid, t_grid)
 end
 
+"""
+    make_interpolation_model_test(absco::AbscoTable, wave_grid, p_grid, t_grid; 
+                                  wavelength_flag=false, architecture=default_architecture())
+
+Alternative InterpolationModel from ABSCO using cubic spline interpolation in temperature.
+
+Uses cubic splines per pressure level for smoother T-interpolation, then linear
+interpolation on the combined (ν, p, T) grid. Assumes equidistant T-grid in ABSCO.
+
+# Arguments
+- `absco::AbscoTable`: ABSCO table with cross-sections
+- `wave_grid`, `p_grid`, `t_grid`: Output grids (same as make_interpolation_model)
+
+# Returns
+- `InterpolationModel`: Interpolator for absorption cross-sections
+"""
 function make_interpolation_model_test(
         # Required
         absco::AbscoTable,  

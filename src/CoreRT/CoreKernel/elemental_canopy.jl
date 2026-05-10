@@ -13,11 +13,10 @@ function elemental!(pol_type, SFI::Bool,
                             scatter::Bool,              # scatter: flag indicating scattering
                             quad_points::QuadPoints{FT2}, # struct with quadrature points, weights, 
                             added_layer::Union{AddedLayer{FT},AddedLayerRS{FT}}, 
-                            architecture) where {FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2,M}
-    @show "RT elemental Canopy is running!"
-    @unpack r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻ = added_layer
-    @unpack qp_μ, iμ₀, wt_μN, qp_μN = quad_points
-    @unpack τ, ϖ, Z⁺⁺, Z⁻⁺, G = computed_layer_properties
+                            architecture) where {FT<:Real,FT2}
+    (; r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻) = added_layer
+    (; qp_μ, iμ₀, wt_μN, qp_μN) = quad_points
+    (; τ, ϖ, Z⁺⁺, Z⁻⁺, G) = computed_layer_properties
     
     arr_type = array_type(architecture)
     
@@ -31,8 +30,8 @@ function elemental!(pol_type, SFI::Bool,
     if scatter
         # for m==0, ₀∫²ᵖⁱ cos²(mϕ)dϕ/4π = 0.5, while
         # for m>0,  ₀∫²ᵖⁱ cos²(mϕ)dϕ/4π = 0.25  
-        wct02 = m == 0 ? FT(0.50)              : FT(0.25)
-        wct2  = m == 0 ? wt_μN/2               : wt_μN/4
+        wct02 = fourier_weight(m, FT)
+        wct2  = scaled_weights(m, wt_μN)
  
         # More computationally intensive definition of a single scattering layer with variable (0-∞) absorption
         # with absorption in batch mode, low tau_scatt but higher tau_total, needs exact equations
@@ -59,72 +58,99 @@ function elemental!(pol_type, SFI::Bool,
     end    
 end
 
-@kernel function get_canopy_elem_rt!(r⁻⁺, t⁺⁺, ϖ_λ, dτ_λ, G, Z⁻⁺, Z⁺⁺, μ, wct) 
+"""
+    get_canopy_elem_rt!(r⁻⁺, t⁺⁺, ϖ_λ, dτ_λ, G, Z⁻⁺, Z⁺⁺, μ, wct)
+
+KernelAbstractions elemental R/T kernel for directional canopy scattering.
+Each workitem owns one `(i, j, n)` matrix element and evaluates the same
+finite-δ single-scattering formulas as the elastic elemental kernel, with
+directional path-length factors `G` included in the optical-depth exponents
+and stream denominators.
+"""
+@kernel function get_canopy_elem_rt!(r⁻⁺, t⁺⁺, @Const(ϖ_λ), @Const(dτ_λ),
+                                     @Const(G), @Const(Z⁻⁺), @Const(Z⁺⁺),
+                                     @Const(μ), @Const(wct))
+    FT = eltype(r⁻⁺)
     n2 = 1
     i, j, n = @index(Global, NTuple) 
     if size(Z⁻⁺,3)>1
         n2 = n
     end
-    if (wct[j]>1.e-8) 
-        # 𝐑⁻⁺(μᵢ, μⱼ) = ϖ ̇𝐙⁻⁺(μᵢ, μⱼ) ̇(μⱼ/(μᵢ+μⱼ)) ̇(1 - exp{-τ ̇(1/μᵢ + 1/μⱼ)}) ̇𝑤ⱼ
+    if (wct[j] > rt_weight_tol(eltype(wct)))
+        # CanopyOptics normalizes Z by ϖ * G(μ_in), so multiply by the
+        # incoming-stream G[j] here to recover the physical Γ kernel.
 
         r⁻⁺[i,j,n] = 
-            ϖ_λ[n] *  Z⁻⁺[i,j,n2] * 
+            ϖ_λ[n] * G[j] * Z⁻⁺[i,j,n2] * 
             (μ[j] / (μ[i]*G[j] + μ[j]*G[i])) * wct[j] * 
-            (1 - exp(-dτ_λ[n] * ((G[i] / μ[i]) + (G[j] / μ[j]))))
+            -expm1(-dτ_λ[n] * ((G[i] / μ[i]) + (G[j] / μ[j])))
                       
         if (μ[i] == μ[j])
             # 𝐓⁺⁺(μᵢ, μᵢ) = (exp{-τ/μᵢ} + ϖ ̇𝐙⁺⁺(μᵢ, μᵢ) ̇(τ/μᵢ) ̇exp{-τ/μᵢ}) ̇𝑤ᵢ
             if i == j
                 t⁺⁺[i,j,n] = 
                     exp(-dτ_λ[n]*G[i] / μ[i]) *
-                    (1 + ϖ_λ[n]  * Z⁺⁺[i,i,n2] * (dτ_λ[n]  / μ[i]) * wct[i])
+                    (1 + ϖ_λ[n] * G[i] * Z⁺⁺[i,i,n2] *
+                         (dτ_λ[n]  / μ[i]) * wct[i])
             else
-                t⁺⁺[i,j,n] = 0.0
+                t⁺⁺[i,j,n] = zero(FT)
             end
         else
     
             # 𝐓⁺⁺(μᵢ, μⱼ) = ϖ ̇𝐙⁺⁺(μᵢ, μⱼ) ̇(μⱼ/(μᵢ-μⱼ)) ̇(exp{-τ/μᵢ} - exp{-τ/μⱼ}) ̇𝑤ⱼ
             # (𝑖 ≠ 𝑗)
             t⁺⁺[i,j,n] = 
-                ϖ_λ[n]  * Z⁺⁺[i,j,n2] * 
+                ϖ_λ[n] * G[j] * Z⁺⁺[i,j,n2] * 
                 (μ[j] / (μ[i]*G[j] - μ[j]*G[i])) * wct[j] * 
-                (exp(-dτ_λ[n] * G[i] / μ[i]) - exp(-dτ_λ[n] * G[j] / μ[j]))
+                expdiff_neg(dτ_λ[n] * G[i] / μ[i], dτ_λ[n] * G[j] / μ[j])
                 #(exp(-dτ_λ[n] * G[j] / μ[j]) - exp(-dτ_λ[n] * G[i] / μ[i]))  
         end
     else
-        r⁻⁺[i,j,n] = 0.0
+        r⁻⁺[i,j,n] = zero(FT)
         if i==j
             t⁺⁺[i,j,n] = exp(-dτ_λ[n] * G[i] / μ[i]) #Suniti
         else
-            t⁺⁺[i,j,n] = 0.0
+            t⁺⁺[i,j,n] = zero(FT)
         end
     end
     nothing
 end
 
-@kernel function get_canopy_elem_rt_SFI!(J₀⁺, J₀⁻, ϖ_λ, dτ_λ, τ_sum, G, Z⁻⁺, Z⁺⁺, μ, ndoubl, wct02, nStokes ,I₀, iμ0, D)
+"""
+    get_canopy_elem_rt_SFI!(J₀⁺, J₀⁻, ϖ_λ, dτ_λ, τ_sum, G, Z⁻⁺, Z⁺⁺, μ,
+                            ndoubl, wct02, nStokes, I₀, iμ0, D)
+
+KernelAbstractions source-function kernel for canopy elemental layers. Each
+workitem computes the direct-beam `Z * I₀` contractions for one stream and
+wavelength, applies the canopy path factor `G` in the finite-δ source
+formulas, multiplies by the direct-beam attenuation above the layer, and
+applies the upwelling D-matrix sign when required.
+"""
+@kernel function get_canopy_elem_rt_SFI!(J₀⁺, J₀⁻, @Const(ϖ_λ), @Const(dτ_λ),
+                                         @Const(τ_sum), @Const(G), @Const(Z⁻⁺),
+                                         @Const(Z⁺⁺), @Const(μ), ndoubl, wct02,
+                                         nStokes, @Const(I₀), iμ0, @Const(D))
     i_start  = nStokes*(iμ0-1) + 1 
     i_end    = nStokes*iμ0
     
     i, _, n = @index(Global, NTuple) ##Suniti: What are Global and Ntuple?
     FT = eltype(I₀)
-    J₀⁺[i, 1, n]=0
-    J₀⁻[i, 1, n]=0
+    J₀⁺[i, 1, n] = zero(FT)
+    J₀⁻[i, 1, n] = zero(FT)
     n2=1
     if size(Z⁻⁺,3)>1
         n2 = n
     end
     
-    Z⁺⁺_I₀ = FT(0.0);
-    Z⁻⁺_I₀ = FT(0.0);
+    Z⁺⁺_I₀ = zero(FT);
+    Z⁻⁺_I₀ = zero(FT);
     
     for ii = i_start:i_end
         Z⁺⁺_I₀ += Z⁺⁺[i,ii,n2] * I₀[ii-i_start+1]
         Z⁻⁺_I₀ += Z⁻⁺[i,ii,n2] * I₀[ii-i_start+1] 
     end
 
-    if (i>=i_start) && (i<=i_end)
+    if (i >= i_start) & (i <= i_end)
         ctr = i-i_start+1
         # J₀⁺ = 0.25*(1+δ(m,0)) * ϖ(λ) * Z⁺⁺ * I₀ * (dτ(λ)/μ₀) * exp(-dτ(λ)/μ₀)
         # 1.54 in Fell
@@ -133,16 +159,16 @@ end
         # J₀⁺ = 0.25*(1+δ(m,0)) * ϖ(λ) * Z⁺⁺ * I₀ * [μ₀ / (μᵢ - μ₀)] * [exp(-dτ(λ)/μᵢ) - exp(-dτ(λ)/μ₀)]
         # 1.53 in Fell; 2.14 in Myneni Book 
         J₀⁺[i, 1, n] = 
-        wct02 * ϖ_λ[n]  *  Z⁺⁺_I₀ * 
+        wct02 * ϖ_λ[n] * G[i_start] * Z⁺⁺_I₀ * 
         (μ[i_start] / (μ[i]*G[i_start] - μ[i_start]*G[i])) * 
-        (exp(-dτ_λ[n] * G[i] / μ[i]) - exp(-dτ_λ[n] * G[i_start] / μ[i_start]))
+        expdiff_neg(dτ_λ[n] * G[i] / μ[i], dτ_λ[n] * G[i_start] / μ[i_start])
         #(exp(-dτ_λ[n] * G[i_start] / μ[i_start]) - exp(-dτ_λ[n] * G[i] / μ[i]))
     end
     #J₀⁻ = 0.25*(1+δ(m,0)) * ϖ(λ) * Z⁻⁺ * I₀ * [μ₀ / (μᵢ + μ₀)] * [1 - exp{-dτ(λ)(1/μᵢ + 1/μ₀)}]
     # 1.52 in Fell
-    J₀⁻[i, 1, n] = wct02 * ϖ_λ[n] *  Z⁻⁺_I₀ * 
+    J₀⁻[i, 1, n] = wct02 * ϖ_λ[n] * G[i_start] * Z⁻⁺_I₀ * 
             (μ[i_start] / (μ[i]*G[i_start] + μ[i_start]*G[i])) *
-            (1 - exp(-dτ_λ[n] * ((G[i] / μ[i]) + (G[i_start] / μ[i_start]))))
+            -expm1(-dτ_λ[n] * ((G[i] / μ[i]) + (G[i_start] / μ[i_start])))
              
         #(1 - exp(-(dτ_λ[n] * (G[i_start] * μ[i] + G[i] * μ[i_start]))/(μ[i_start] * μ[i])))
         

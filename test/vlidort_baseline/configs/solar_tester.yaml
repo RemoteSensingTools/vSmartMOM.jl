@@ -1,0 +1,71 @@
+# solar_tester (scalar) — vSmartMOM configuration matching VLIDORT 2.8.3
+# `2p8p3_solar_tester.f90` + `2p8p3_VLIDORT_ReadInput.cfg`.
+#
+# IMPORTANT (just like Siewert): the .cfg sets `Lambertian albedo = 0.2`,
+# but the f90 driver overrides it at line 352 to 0.05d0. The shipped
+# `results_solar_tester.all` was produced with albedo = 0.05.
+#
+# This YAML is a *skeleton*: the case file overrides per-layer τ_rayl /
+# τ_abs / τ_aer using the parsed `input_atmos.dat` values, plus injects
+# an HG aerosol (g=0.8, ω=0.95, Σ τ_aer = 0.5 spread over the bottom 6
+# layers). The aerosol block here only exists so that
+# `model_from_parameters` allocates `aerosol_optics[1][1]` for us to fill.
+#
+# Geometry: 4 SZA × 3 VZA × 3 RAZ = 36 lattice geometries handled by
+# multiple model invocations in the case file (one per (SZA, RAZ) pair).
+# 23-layer atmosphere from input_atmos.dat (constant Rayleigh moments).
+
+radiative_transfer:
+  spec_bands:
+    # NOTE: 2-point spec band (not 1) — vSmartMOM Stokes_I + multi-layer +
+    # per-layer-injection still produces ~50× wrong intensity at nSpec=1
+    # even after the batched_mul singleton fix (cpu_batched.jl). Cases A
+    # (single-layer Stokes_IQUV) and C (multi-layer Stokes_IQU) work at
+    # nSpec=1; Case B's scalar Stokes_I path still has an unidentified
+    # bug. See dev_notes/nspec1_multilayer_stokesI_bug.md for the residual
+    # issue + diagnostic context.
+    - "[18867.92 18867.93]"
+  surface:
+    - LambertianSurfaceScalar(0.05)
+  quadrature_type:    GaussLegQuad()
+  polarization_type:  Stokes_I()
+  max_m:              16          # NSTREAMS=8 ⇒ Fourier moments m=0..15
+  Δ_angle:            2.0
+  # l_trunc matches VLIDORT NMOMENTS = 2·NSTREAMS−1 = 15 (NSTREAMS=8 in cfg).
+  # vSmartMOM GaussLegQuad has 8 non-zero-weight streams, plus user
+  # VZAs/SZA appended as zero-weight nodes.
+  l_trunc:            15
+  truncation:         "NoTruncation()"   # Task 1 default; case file may rebuild for δ-M
+  depol:              0.01072      # raymoms[2] = 0.4920062 ⇒ depol ≈ 0.01072
+  float_type:         Float64
+  architecture:       Architectures.CPU()
+
+geometry:
+  sza:                35.0          # overridden per-run in case file
+  vza:                [10.0, 20.0, 40.0]
+  vaz:                [0.0, 0.0, 0.0]
+  obs_alt:            1000.0
+
+# 23 layers; T/p/q values are placeholders (overridden by direct injection
+# of τ_rayl, τ_abs, τ_aer in the case file). Heights from input_atmos.dat.
+atmospheric_profile:
+  T: [231.62, 231.62, 231.62, 231.62, 231.62, 231.62, 231.62, 231.62, 231.62, 231.62,
+      231.62, 231.62, 231.62, 231.62, 231.62, 231.62, 231.62, 231.62, 231.62, 231.62,
+      231.62, 231.62, 231.62]
+  # 24 pressure levels (TOA at level 0, 23 layers).
+  p: [0.001, 0.01, 0.05, 0.1, 0.5, 1.0, 5.0, 10.0, 30.0, 60.0,
+      100.0, 150.0, 200.0, 250.0, 300.0, 400.0, 500.0, 600.0, 700.0, 800.0,
+      900.0, 950.0, 1000.0, 1013.25]
+  profile_reduction: -1
+
+scattering:
+  aerosols:
+    - τ_ref: 0.5
+      phase_function: HenyeyGreensteinPhaseFunction(0.8)
+      ssa: 0.95
+      p₀: 0.18
+      σp: 0.05
+  r_max:          50.0
+  nquad_radius:   100
+  λ_ref:          0.333
+  decomp_type:    NAI2()
