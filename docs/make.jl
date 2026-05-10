@@ -579,43 +579,6 @@ function copy_landing_page_icons()
     return nothing
 end
 
-# Patch the DocumenterVitepress-generated `.vitepress/config.mts` to wrap its
-# default export with `withMermaid(...)` so ` ```mermaid ` fenced blocks are
-# rendered by VitePress. The package `vitepress-plugin-mermaid` is declared
-# in docs/package.json. Idempotent: skips if already patched.
-function wire_mermaid_into_vitepress_config()
-    config_paths = [joinpath(@__DIR__, "build", ".documenter", ".vitepress", "config.mts")]
-    bases_file = joinpath(@__DIR__, "build", "bases.txt")
-    if isfile(bases_file)
-        append!(config_paths,
-                [joinpath(@__DIR__, "build", string(i), ".vitepress", "config.mts")
-                 for i in eachindex(readlines(bases_file))])
-    end
-
-    for path in config_paths
-        isfile(path) || continue
-        src = read(path, String)
-        occursin("vitepress-plugin-mermaid", src) && continue
-        patched = replace(src,
-            r"^(import\s+\{[^}]*\}\s+from\s+['\"]vitepress['\"];?\s*\n)"m =>
-                s"\1import { withMermaid } from 'vitepress-plugin-mermaid';\n";
-            count = 1)
-        patched = replace(patched,
-            r"export default defineConfig\("s => "export default withMermaid(defineConfig(";
-            count = 1)
-        patched = replace(patched,
-            r"\n\}\);\s*$"s => "\n}));\n";
-            count = 1)
-        if patched == src
-            @warn "Could not patch VitePress config for mermaid — pattern not matched" path
-        else
-            write(path, patched)
-            @info "Patched VitePress config to enable mermaid" path
-        end
-    end
-    return nothing
-end
-
 function build()
 
     tutorials = ["Tutorial_QuickStart.jl", "Tutorial_Absorption.jl", "Tutorial_Scattering.jl", "Tutorial_MieDeepDive.jl", "Tutorial_IO.jl", "Tutorial_CoreRT.jl", "Tutorial_Surfaces.jl", "Tutorial_Canopy.jl", "Tutorial_Jacobians.jl", "Tutorial_GPU.jl", "Tutorial_HybridAD.jl"]
@@ -738,7 +701,6 @@ function build()
 
     generate_tutorial_plot_assets()
     copy_landing_page_icons()
-    wire_mermaid_into_vitepress_config()
 
 end
 

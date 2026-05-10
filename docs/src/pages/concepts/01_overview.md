@@ -125,7 +125,8 @@ Every claim below has a `file.jl:LINE` next to it. No marketing.
 
 ## The narrative thread
 
-```mermaid
+```@raw html
+<pre class="mermaid">
 flowchart TD
     P["<b>PROBLEM</b><br/>Polarized radiance from a layered<br/>scattering+absorbing atmosphere,<br/>plus Jacobians, fast, on any hardware."]
     W["<b>WHY MOM?</b><br/>Per-layer matrix operator → linear-algebra<br/>composition → full multiple scattering;<br/>large τ cheap (logarithmic via doubling);<br/>exact analytic Jacobians."]
@@ -137,6 +138,14 @@ flowchart TD
     L["<b>LINEARIZE</b><br/>Operator-level chain rule on adding-doubling.<br/>ParameterLayout names the Jacobian columns.<br/>Forward + linearized &lt; 2× forward-only<br/>(RT basics 6)."]
     E["<b>EVERYWHERE ON ANY HARDWARE</b><br/>One @kernel source for CPU + CUDA + Metal.<br/>All wavelengths parallel via spectral batch axis.<br/>ForwardDiff Duals flow through GPU batched paths.<br/>(RT basics 7)"]
     P --> W --> D --> A --> B --> S --> R --> L --> E
+</pre>
+<script type="module">
+  if (!window.__mermaidLoader) {
+    window.__mermaidLoader = import('https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs')
+      .then(m => { window.__mermaid = m.default; m.default.initialize({ startOnLoad: false, theme: 'default' }); return m.default; });
+  }
+  window.__mermaidLoader.then(m => m.run({ querySelector: '.mermaid' }));
+</script>
 ```
 
 That's the spine. Every page in this RT basics arc is one segment of it.

@@ -28,7 +28,8 @@ GPU.
 
 ## The per-layer kernel sequence
 
-```mermaid
+```@raw html
+<pre class="mermaid">
 flowchart TD
     A["rt_run loops Fourier moments<br/>m = 0 ... max_m-1"]
     B["constructCoreOpticalProperties<br/>→ Vector of layer optics"]
@@ -42,6 +43,14 @@ flowchart TD
     A --> B --> C --> D --> E --> F --> G
     G -- yes --> C
     G -- no --> H --> I
+</pre>
+<script type="module">
+  if (!window.__mermaidLoader) {
+    window.__mermaidLoader = import('https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs')
+      .then(m => { window.__mermaid = m.default; m.default.initialize({ startOnLoad: false, theme: 'default' }); return m.default; });
+  }
+  window.__mermaidLoader.then(m => m.run({ querySelector: '.mermaid' }));
+</script>
 ```
 
 The orchestrator is `rt_kernel!` in [`src/CoreRT/CoreKernel/rt_kernel.jl:48–229`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/CoreKernel/rt_kernel.jl#L48-L229).
