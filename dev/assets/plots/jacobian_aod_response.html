@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AOD Jacobian Response</title>
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+  <style>
+    html, body, #plot {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      background: #ffffff;
+    }
+  </style>
+</head>
+<body>
+  <div id="plot"></div>
+  <script>
+    const data = [{"type":"scatter","mode":"lines+markers","name":"R_I, VZA 0 deg","x":[1,2,3,4],"y":[0.016242347167258267,0.016235303182987364,0.01625788584275792,0.015881079322498312],"line":{"color":"#2563eb","width":3},"marker":{"size":7},"yaxis":"y"},{"type":"scatter","mode":"lines+markers","name":"dR_I/dtau_ref, VZA 0 deg","x":[1,2,3,4],"y":[0.07835263021667221,0.07844793143546666,0.07859701725698418,0.07785418642674476],"line":{"color":"#16a34a","width":3},"marker":{"size":7},"yaxis":"y2"},{"type":"scatter","mode":"lines+markers","name":"R_I, VZA 30 deg","x":[1,2,3,4],"y":[0.015339954823568256,0.015331106552753007,0.015353127032565174,0.014960519717976028],"line":{"color":"#7c3aed","width":2,"dash":"dash"},"marker":{"size":7},"yaxis":"y"},{"type":"scatter","mode":"lines+markers","name":"dR_I/dtau_ref, VZA 30 deg","x":[1,2,3,4],"y":[0.06614704218390274,0.06623231608088741,0.06636573513610612,0.06569226561650723],"line":{"color":"#dc2626","width":2,"dash":"dash"},"marker":{"size":7},"yaxis":"y2"}];
+    const layout = {"title":{"text":"Aerosol Optical Depth Jacobian","x":0.02},"margin":{"l":72,"r":20,"t":78,"b":104},"xaxis":{"title":"Spectral grid index"},"yaxis":{"title":"TOA reflectance","domain":[0.54,1.0]},"yaxis2":{"title":"dR_I / dtau_ref","domain":[0.0,0.34],"zeroline":true},"legend":{"orientation":"h","x":0.0,"y":-0.24,"xanchor":"left","yanchor":"top"},"paper_bgcolor":"#ffffff","plot_bgcolor":"#ffffff","font":{"family":"Inter, system-ui, sans-serif"}};
+    const config = {"responsive":true,"displaylogo":false,"modeBarButtonsToRemove":["lasso2d","select2d"]};
+    Plotly.newPlot("plot", data, layout, config);
+  </script>
+</body>
+</html>

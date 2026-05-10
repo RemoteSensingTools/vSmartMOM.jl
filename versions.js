@@ -1,5 +1,5 @@
 var DOC_VERSIONS = [
-  "sanghavi-unified",
+  "dev",
   "stable",
   "v1",
   "v1.0",

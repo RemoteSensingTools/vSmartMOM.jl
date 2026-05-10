@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CoreRT Viewing-Angle Response</title>
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+  <style>
+    html, body, #plot {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      background: #ffffff;
+    }
+  </style>
+</head>
+<body>
+  <div id="plot"></div>
+  <script>
+    const data = [{"type":"scatter","mode":"lines+markers","name":"Stokes I","x":[-60.0,-45.0,-30.0,-15.0,0.0,15.0,30.0,45.0,60.0],"y":[0.02400738152671003,0.01958739520173121,0.01696896180754297,0.014949084177263018,0.013207119541530346,0.011757354222331502,0.010846137111716878,0.011058951292207766,0.013911182525994019],"line":{"color":"#2563eb","width":3},"marker":{"size":7},"hovertemplate":"VZA=%{x:.0f} deg<br>R_I=%{y:.6f}<extra></extra>"},{"type":"scatter","mode":"lines+markers","name":"Stokes Q","x":[-60.0,-45.0,-30.0,-15.0,0.0,15.0,30.0,45.0,60.0],"y":[0.0009110690243676837,-0.0013580545548487247,-0.0018568340541794866,-0.0013044450427102884,0.0,0.0018872849122212282,0.004265990641646606,0.007170389354674716,0.011007268025083809],"line":{"color":"#dc2626","width":3},"marker":{"size":7},"hovertemplate":"VZA=%{x:.0f} deg<br>R_Q=%{y:.6f}<extra></extra>"}];
+    const layout = {"title":{"text":"Pure-Rayleigh Reflectance by Viewing Angle","x":0.02},"margin":{"l":60,"r":20,"t":78,"b":92},"xaxis":{"title":"Signed viewing zenith angle (deg)"},"yaxis":{"title":"TOA reflectance","zeroline":true},"legend":{"orientation":"h","x":0.0,"y":-0.24,"xanchor":"left","yanchor":"top"},"paper_bgcolor":"#ffffff","plot_bgcolor":"#ffffff","font":{"family":"Inter, system-ui, sans-serif"}};
+    const config = {"responsive":true,"displaylogo":false,"modeBarButtonsToRemove":["lasso2d","select2d"]};
+    Plotly.newPlot("plot", data, layout, config);
+  </script>
+</body>
+</html>
