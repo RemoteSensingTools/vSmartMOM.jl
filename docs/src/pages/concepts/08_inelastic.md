@@ -2,7 +2,7 @@
 
 > **For:** users who need to model the Ring effect or hyperspectral retrievals where rotational/vibrational Raman scattering matters. UV/Vis instruments, O₂ A-band, deep Fraunhofer lines.
 >
-> **Prev:** [7 · Architecture-Agnostic Code](07_architecture.md) · **Next:** [Manual → Compute Jacobians](../jacobians.md) (loop back to task layer)
+> **Prev:** [7 · Architecture-Agnostic Code](07_architecture.md) · **Next:** [User Guide → Compute Jacobians](../jacobians.md) (loop back to task layer)
 
 This page is intentionally brief — vSmartMOM's Raman support is a parallel
 solver path next to the elastic one, not central to most retrievals. For

@@ -51,7 +51,7 @@ Hovenier convention.
 
 **Stokes I**  n=33  median rel = 0.01%  max rel = 0.01%  median |Δ| = 6.133e-06  max |Δ| = 2.691e-05
 
-| Geometry | Modeled | Truth | |Δ| | |Δ|/|truth| |
+| Geometry | Modeled | Truth | \|Δ\| | \|Δ\|/\|truth\| |
 |---|---|---|---|---|
 | vza=0.0°, az=0° | 0.0507 | 0.0507 | 2.996e-06 | 0.01% |
 | vza=25.8°, az=0° | 0.0931 | 0.0931 | 5.354e-06 | 0.01% |
@@ -89,7 +89,7 @@ Hovenier convention.
 
 **Stokes Q**  n=33  median rel = 0.01%  max rel = 0.03%  median |Δ| = 3.518e-07  max |Δ| = 8.066e-07
 
-| Geometry | Modeled | Truth | |Δ| | |Δ|/|truth| |
+| Geometry | Modeled | Truth | \|Δ\| | \|Δ\|/\|truth\| |
 |---|---|---|---|---|
 | vza=0.0°, az=0° | 0.0026 | 0.0026 | 1.018e-07 | 0.00% |
 | vza=25.8°, az=0° | 0.0062 | 0.0062 | 3.419e-07 | 0.01% |
@@ -127,7 +127,7 @@ Hovenier convention.
 
 **Stokes U**  n=11  median rel = 0.01%  max rel = 0.01%  median |Δ| = 4.522e-07  max |Δ| = 6.789e-07
 
-| Geometry | Modeled | Truth | |Δ| | |Δ|/|truth| |
+| Geometry | Modeled | Truth | \|Δ\| | \|Δ\|/\|truth\| |
 |---|---|---|---|---|
 | vza=0.0°, az=90° | 0.0000 | 0.0000 | 4.997e-13 | 0.01% |
 | vza=25.8°, az=90° | 0.0027 | 0.0027 | 1.506e-07 | 0.01% |
@@ -143,7 +143,7 @@ Hovenier convention.
 
 **Stokes V**  n=11  median rel = 0.01%  max rel = 0.02%  median |Δ| = 9.773e-09  max |Δ| = 3.477e-08
 
-| Geometry | Modeled | Truth | |Δ| | |Δ|/|truth| |
+| Geometry | Modeled | Truth | \|Δ\| | \|Δ\|/\|truth\| |
 |---|---|---|---|---|
 | vza=0.0°, az=90° | 0.0000 | 0.0000 | 9.148e-14 | 0.02% |
 | vza=25.8°, az=90° | 0.0001 | 0.0001 | 9.773e-09 | 0.01% |
@@ -161,7 +161,7 @@ Hovenier convention.
 
 **Stokes I**  n=33  median rel = 0.05%  max rel = 0.30%  median |Δ| = 6.352e-05  max |Δ| = 6.347e-04
 
-| Geometry | Modeled | Truth | |Δ| | |Δ|/|truth| |
+| Geometry | Modeled | Truth | \|Δ\| | \|Δ\|/\|truth\| |
 |---|---|---|---|---|
 | vza=0.0°, az=0° | 0.0507 | 0.0507 | 8.506e-06 | 0.02% |
 | vza=25.8°, az=0° | 0.0932 | 0.0931 | 3.058e-05 | 0.03% |
@@ -199,7 +199,7 @@ Hovenier convention.
 
 **Stokes Q**  n=33  median rel = 0.04%  max rel = 0.50%  median |Δ| = 2.734e-06  max |Δ| = 5.077e-05
 
-| Geometry | Modeled | Truth | |Δ| | |Δ|/|truth| |
+| Geometry | Modeled | Truth | \|Δ\| | \|Δ\|/\|truth\| |
 |---|---|---|---|---|
 | vza=0.0°, az=0° | 0.0026 | 0.0026 | 5.046e-08 | 0.00% |
 | vza=25.8°, az=0° | 0.0062 | 0.0062 | 1.137e-06 | 0.02% |
@@ -237,7 +237,7 @@ Hovenier convention.
 
 **Stokes U**  n=11  median rel = 0.05%  max rel = 100.00%  median |Δ| = 4.128e-06  max |Δ| = 1.527e-05
 
-| Geometry | Modeled | Truth | |Δ| | |Δ|/|truth| |
+| Geometry | Modeled | Truth | \|Δ\| | \|Δ\|/\|truth\| |
 |---|---|---|---|---|
 | vza=0.0°, az=90° | 0.0000 | 0.0000 | 9.439e-09 | 100.00% |
 | vza=25.8°, az=90° | 0.0027 | 0.0027 | 9.741e-08 | 0.00% |
@@ -253,7 +253,7 @@ Hovenier convention.
 
 **Stokes V**  n=11  median rel = 0.04%  max rel = 100.00%  median |Δ| = 1.363e-08  max |Δ| = 2.670e-07
 
-| Geometry | Modeled | Truth | |Δ| | |Δ|/|truth| |
+| Geometry | Modeled | Truth | \|Δ\| | \|Δ\|/\|truth\| |
 |---|---|---|---|---|
 | vza=0.0°, az=90° | 0.0000 | 0.0000 | 4.575e-10 | 100.00% |
 | vza=25.8°, az=90° | 0.0001 | 0.0001 | 7.967e-08 | 0.09% |
@@ -286,7 +286,7 @@ meaningless. Q/U use a near-zero filter of `|truth| < 0.01`
 
 **Stokes I**  n=112  median rel = 0.00%  max rel = 0.02%  median |Δ| = 6.479e-06  max |Δ| = 5.528e-05
 
-| Geometry | Modeled | Truth | |Δ| | |Δ|/|truth| |
+| Geometry | Modeled | Truth | \|Δ\| | \|Δ\|/\|truth\| |
 |---|---|---|---|---|
 | μ=0.02, ϕ=0° | 0.4412 | 0.4413 | 5.500e-05 | 0.01% |
 | μ=0.02, ϕ=30° | 0.3944 | 0.3944 | 5.290e-05 | 0.01% |
@@ -403,7 +403,7 @@ meaningless. Q/U use a near-zero filter of `|truth| < 0.01`
 
 **Stokes Q**  n=100  median rel = 0.01%  max rel = 0.14%  median |Δ| = 3.092e-06  max |Δ| = 3.310e-05  (excluded 12 cells with |truth| < 1.000e-02)
 
-| Geometry | Modeled | Truth | |Δ| | |Δ|/|truth| |
+| Geometry | Modeled | Truth | \|Δ\| | \|Δ\|/\|truth\| |
 |---|---|---|---|---|
 | μ=0.02, ϕ=0° | -0.0175 | -0.0175 | 2.446e-05 | 0.14% |
 | μ=0.02, ϕ=30° | -0.0648 | -0.0649 | 2.660e-05 | 0.04% |
@@ -520,7 +520,7 @@ meaningless. Q/U use a near-zero filter of `|truth| < 0.01`
 
 **Stokes U**  n=69  median rel = 0.00%  max rel = 0.01%  median |Δ| = 6.936e-07  max |Δ| = 7.021e-06  (excluded 43 cells with |truth| < 1.000e-02)
 
-| Geometry | Modeled | Truth | |Δ| | |Δ|/|truth| |
+| Geometry | Modeled | Truth | \|Δ\| | \|Δ\|/\|truth\| |
 |---|---|---|---|---|
 | μ=0.02, ϕ=0° | 0.0000 | 0.0000 | 0.000e+00 | — |
 | μ=0.02, ϕ=30° | 0.0439 | 0.0439 | 3.657e-06 | 0.01% |
@@ -639,7 +639,7 @@ meaningless. Q/U use a near-zero filter of `|truth| < 0.01`
 
 **Stokes I**  n=112  median rel = 0.01%  max rel = 0.06%  median |Δ| = 1.893e-05  max |Δ| = 6.683e-05
 
-| Geometry | Modeled | Truth | |Δ| | |Δ|/|truth| |
+| Geometry | Modeled | Truth | \|Δ\| | \|Δ\|/\|truth\| |
 |---|---|---|---|---|
 | μ=0.02, ϕ=0° | 0.4412 | 0.4413 | 6.617e-05 | 0.01% |
 | μ=0.02, ϕ=30° | 0.3944 | 0.3944 | 5.984e-05 | 0.02% |
@@ -756,7 +756,7 @@ meaningless. Q/U use a near-zero filter of `|truth| < 0.01`
 
 **Stokes Q**  n=100  median rel = 0.02%  max rel = 0.09%  median |Δ| = 6.289e-06  max |Δ| = 3.804e-05  (excluded 12 cells with |truth| < 1.000e-02)
 
-| Geometry | Modeled | Truth | |Δ| | |Δ|/|truth| |
+| Geometry | Modeled | Truth | \|Δ\| | \|Δ\|/\|truth\| |
 |---|---|---|---|---|
 | μ=0.02, ϕ=0° | -0.0175 | -0.0175 | 1.216e-05 | 0.07% |
 | μ=0.02, ϕ=30° | -0.0648 | -0.0649 | 1.859e-05 | 0.03% |
@@ -873,7 +873,7 @@ meaningless. Q/U use a near-zero filter of `|truth| < 0.01`
 
 **Stokes U**  n=69  median rel = 0.02%  max rel = 0.06%  median |Δ| = 7.085e-06  max |Δ| = 2.278e-05  (excluded 43 cells with |truth| < 1.000e-02)
 
-| Geometry | Modeled | Truth | |Δ| | |Δ|/|truth| |
+| Geometry | Modeled | Truth | \|Δ\| | \|Δ\|/\|truth\| |
 |---|---|---|---|---|
 | μ=0.02, ϕ=0° | 0.0000 | 0.0000 | 0.000e+00 | — |
 | μ=0.02, ϕ=30° | 0.0439 | 0.0439 | 8.500e-06 | 0.02% |
@@ -1002,7 +1002,7 @@ and BOA downwelling Stokes-I.
 
 **Stokes I_TOA_up**  n=3  median rel = 0.05%  max rel = 0.05%  median |Δ| = 3.025e-05  max |Δ| = 3.155e-05
 
-| Geometry | Modeled | Truth | |Δ| | |Δ|/|truth| |
+| Geometry | Modeled | Truth | \|Δ\| | \|Δ\|/\|truth\| |
 |---|---|---|---|---|
 | vza=10.0°, raz=0°, TOA-up | 0.0646 | 0.0646 | 2.995e-05 | 0.05% |
 | vza=20.0°, raz=0°, TOA-up | 0.0640 | 0.0641 | 3.025e-05 | 0.05% |
@@ -1010,7 +1010,7 @@ and BOA downwelling Stokes-I.
 
 **Stokes I_BOA_dn**  n=3  median rel = 0.06%  max rel = 0.06%  median |Δ| = 1.062e-04  max |Δ| = 2.359e-04
 
-| Geometry | Modeled | Truth | |Δ| | |Δ|/|truth| |
+| Geometry | Modeled | Truth | \|Δ\| | \|Δ\|/\|truth\| |
 |---|---|---|---|---|
 | vza=10.0°, raz=0°, BOA-dn | 0.1049 | 0.1050 | 5.851e-05 | 0.06% |
 | vza=20.0°, raz=0°, BOA-dn | 0.1825 | 0.1826 | 1.062e-04 | 0.06% |
@@ -1020,7 +1020,7 @@ and BOA downwelling Stokes-I.
 
 **Stokes I_TOA_up**  n=3  median rel = 0.04%  max rel = 0.05%  median |Δ| = 2.923e-05  max |Δ| = 2.945e-05
 
-| Geometry | Modeled | Truth | |Δ| | |Δ|/|truth| |
+| Geometry | Modeled | Truth | \|Δ\| | \|Δ\|/\|truth\| |
 |---|---|---|---|---|
 | vza=10.0°, raz=0°, TOA-up | 0.0646 | 0.0646 | 2.945e-05 | 0.05% |
 | vza=20.0°, raz=0°, TOA-up | 0.0640 | 0.0641 | 2.873e-05 | 0.04% |
@@ -1028,7 +1028,7 @@ and BOA downwelling Stokes-I.
 
 **Stokes I_BOA_dn**  n=3  median rel = 0.05%  max rel = 0.07%  median |Δ| = 7.475e-05  max |Δ| = 1.871e-04
 
-| Geometry | Modeled | Truth | |Δ| | |Δ|/|truth| |
+| Geometry | Modeled | Truth | \|Δ\| | \|Δ\|/\|truth\| |
 |---|---|---|---|---|
 | vza=10.0°, raz=0°, BOA-dn | 0.1049 | 0.1050 | 7.475e-05 | 0.07% |
 | vza=20.0°, raz=0°, BOA-dn | 0.1825 | 0.1826 | 4.713e-05 | 0.03% |
@@ -1047,7 +1047,7 @@ convention.
 
 **Stokes I_TOA_up**  n=3  median rel = 0.05%  max rel = 0.05%  median |Δ| = 3.235e-05  max |Δ| = 3.251e-05
 
-| Geometry | Modeled | Truth | |Δ| | |Δ|/|truth| |
+| Geometry | Modeled | Truth | \|Δ\| | \|Δ\|/\|truth\| |
 |---|---|---|---|---|
 | vza=10.0°, raz=10°, TOA-up | 0.0696 | 0.0696 | 3.251e-05 | 0.05% |
 | vza=20.0°, raz=10°, TOA-up | 0.0677 | 0.0677 | 3.219e-05 | 0.05% |
@@ -1055,7 +1055,7 @@ convention.
 
 **Stokes I_BOA_dn**  n=3  median rel = 0.06%  max rel = 0.06%  median |Δ| = 8.916e-05  max |Δ| = 2.148e-04
 
-| Geometry | Modeled | Truth | |Δ| | |Δ|/|truth| |
+| Geometry | Modeled | Truth | \|Δ\| | \|Δ\|/\|truth\| |
 |---|---|---|---|---|
 | vza=10.0°, raz=10°, BOA-dn | 0.0992 | 0.0992 | 5.472e-05 | 0.06% |
 | vza=20.0°, raz=10°, BOA-dn | 0.1554 | 0.1555 | 8.916e-05 | 0.06% |
@@ -1063,7 +1063,7 @@ convention.
 
 **Stokes Q_TOA_up**  n=3  median rel = 0.03%  max rel = 0.04%  median |Δ| = 6.328e-06  max |Δ| = 9.096e-06
 
-| Geometry | Modeled | Truth | |Δ| | |Δ|/|truth| |
+| Geometry | Modeled | Truth | \|Δ\| | \|Δ\|/\|truth\| |
 |---|---|---|---|---|
 | vza=10.0°, raz=10°, TOA-up | 0.0128 | 0.0128 | 4.478e-06 | 0.04% |
 | vza=20.0°, raz=10°, TOA-up | 0.0182 | 0.0182 | 6.328e-06 | 0.03% |
@@ -1071,7 +1071,7 @@ convention.
 
 **Stokes Q_BOA_dn**  n=3  median rel = 0.08%  max rel = 0.11%  median |Δ| = 1.025e-06  max |Δ| = 2.053e-06
 
-| Geometry | Modeled | Truth | |Δ| | |Δ|/|truth| |
+| Geometry | Modeled | Truth | \|Δ\| | \|Δ\|/\|truth\| |
 |---|---|---|---|---|
 | vza=10.0°, raz=10°, BOA-dn | 0.0027 | 0.0027 | 1.025e-06 | 0.04% |
 | vza=20.0°, raz=10°, BOA-dn | -0.0007 | -0.0007 | 8.353e-07 | 0.11% |
@@ -1079,7 +1079,7 @@ convention.
 
 **Stokes U_TOA_up**  n=3  median rel = 0.04%  max rel = 0.04%  median |Δ| = 1.625e-06  max |Δ| = 2.177e-06
 
-| Geometry | Modeled | Truth | |Δ| | |Δ|/|truth| |
+| Geometry | Modeled | Truth | \|Δ\| | \|Δ\|/\|truth\| |
 |---|---|---|---|---|
 | vza=10.0°, raz=10°, TOA-up | 0.0037 | 0.0037 | 1.297e-06 | 0.04% |
 | vza=20.0°, raz=10°, TOA-up | 0.0046 | 0.0046 | 1.625e-06 | 0.04% |
@@ -1087,7 +1087,7 @@ convention.
 
 **Stokes U_BOA_dn**  n=3  median rel = 0.06%  max rel = 0.12%  median |Δ| = 1.043e-07  max |Δ| = 6.449e-07
 
-| Geometry | Modeled | Truth | |Δ| | |Δ|/|truth| |
+| Geometry | Modeled | Truth | \|Δ\| | \|Δ\|/\|truth\| |
 |---|---|---|---|---|
 | vza=10.0°, raz=10°, BOA-dn | -0.0016 | -0.0016 | 6.449e-07 | 0.04% |
 | vza=20.0°, raz=10°, BOA-dn | -0.0002 | -0.0002 | 1.043e-07 | 0.06% |
@@ -1097,7 +1097,7 @@ convention.
 
 **Stokes I_TOA_up**  n=3  median rel = 0.06%  max rel = 0.07%  median |Δ| = 4.422e-05  max |Δ| = 4.698e-05
 
-| Geometry | Modeled | Truth | |Δ| | |Δ|/|truth| |
+| Geometry | Modeled | Truth | \|Δ\| | \|Δ\|/\|truth\| |
 |---|---|---|---|---|
 | vza=10.0°, raz=10°, TOA-up | 0.0696 | 0.0696 | 4.422e-05 | 0.06% |
 | vza=20.0°, raz=10°, TOA-up | 0.0677 | 0.0677 | 4.337e-05 | 0.06% |
@@ -1105,7 +1105,7 @@ convention.
 
 **Stokes I_BOA_dn**  n=3  median rel = 0.08%  max rel = 0.09%  median |Δ| = 8.752e-05  max |Δ| = 2.848e-04
 
-| Geometry | Modeled | Truth | |Δ| | |Δ|/|truth| |
+| Geometry | Modeled | Truth | \|Δ\| | \|Δ\|/\|truth\| |
 |---|---|---|---|---|
 | vza=10.0°, raz=10°, BOA-dn | 0.0991 | 0.0992 | 8.752e-05 | 0.09% |
 | vza=20.0°, raz=10°, BOA-dn | 0.1555 | 0.1555 | 5.903e-05 | 0.04% |
@@ -1113,7 +1113,7 @@ convention.
 
 **Stokes Q_TOA_up**  n=3  median rel = 0.03%  max rel = 0.04%  median |Δ| = 6.072e-06  max |Δ| = 9.280e-06
 
-| Geometry | Modeled | Truth | |Δ| | |Δ|/|truth| |
+| Geometry | Modeled | Truth | \|Δ\| | \|Δ\|/\|truth\| |
 |---|---|---|---|---|
 | vza=10.0°, raz=10°, TOA-up | 0.0128 | 0.0128 | 4.530e-06 | 0.04% |
 | vza=20.0°, raz=10°, TOA-up | 0.0182 | 0.0182 | 6.072e-06 | 0.03% |
@@ -1121,7 +1121,7 @@ convention.
 
 **Stokes Q_BOA_dn**  n=3  median rel = 0.14%  max rel = 0.18%  median |Δ| = 1.304e-06  max |Δ| = 3.401e-06
 
-| Geometry | Modeled | Truth | |Δ| | |Δ|/|truth| |
+| Geometry | Modeled | Truth | \|Δ\| | \|Δ\|/\|truth\| |
 |---|---|---|---|---|
 | vza=10.0°, raz=10°, BOA-dn | 0.0027 | 0.0027 | 8.281e-07 | 0.03% |
 | vza=20.0°, raz=10°, BOA-dn | -0.0007 | -0.0007 | 1.304e-06 | 0.18% |
@@ -1129,7 +1129,7 @@ convention.
 
 **Stokes U_TOA_up**  n=3  median rel = 0.03%  max rel = 0.04%  median |Δ| = 1.542e-06  max |Δ| = 2.279e-06
 
-| Geometry | Modeled | Truth | |Δ| | |Δ|/|truth| |
+| Geometry | Modeled | Truth | \|Δ\| | \|Δ\|/\|truth\| |
 |---|---|---|---|---|
 | vza=10.0°, raz=10°, TOA-up | 0.0037 | 0.0037 | 1.293e-06 | 0.03% |
 | vza=20.0°, raz=10°, TOA-up | 0.0046 | 0.0046 | 1.542e-06 | 0.03% |
@@ -1137,7 +1137,7 @@ convention.
 
 **Stokes U_BOA_dn**  n=3  median rel = 0.16%  max rel = 0.19%  median |Δ| = 3.247e-07  max |Δ| = 6.857e-07
 
-| Geometry | Modeled | Truth | |Δ| | |Δ|/|truth| |
+| Geometry | Modeled | Truth | \|Δ\| | \|Δ\|/\|truth\| |
 |---|---|---|---|---|
 | vza=10.0°, raz=10°, BOA-dn | -0.0016 | -0.0016 | 6.857e-07 | 0.04% |
 | vza=20.0°, raz=10°, BOA-dn | -0.0002 | -0.0002 | 3.247e-07 | 0.19% |

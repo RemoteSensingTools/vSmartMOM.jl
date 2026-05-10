@@ -2,7 +2,7 @@
 
 **For:** first-time users who want one successful forward radiative-transfer run.
 
-**Next:** [Configure a Scene](IO/Overview.md), [Compute Jacobians](jacobians.md), [Concepts arc](concepts/01_overview.md).
+**Next:** [Configure a Scene](IO/Overview.md), [Compute Jacobians](jacobians.md), [RT basics](concepts/01_overview.md).
 
 This page is the 5-minute CPU path. It uses a tiny shipped scene so the first run does not require external line-data downloads or aerosol optics setup. The long-form tutorial remains available at [Tutorial: Quick Start](tutorials/Tutorial_QuickStart.md).
 

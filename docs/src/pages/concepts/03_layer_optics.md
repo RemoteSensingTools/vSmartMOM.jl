@@ -1,6 +1,6 @@
 # 3 · Layer Optical Properties — the bridge
 
-> **For:** anyone reading the Concepts arc top-to-bottom. This is the page that connects "physics inputs" (gas absorption, Mie scattering) to "what the solver does." Centerpiece of the thread.
+> **For:** anyone reading the RT basics arc top-to-bottom. This is the page that connects "physics inputs" (gas absorption, Mie scattering) to "what the solver does." Centerpiece of the thread.
 >
 > **Prev:** [2 · Vector RTE & Discretization](02_rt_theory.md) · **Next:** [3a · Gas Absorption](03a_absorption.md)
 
@@ -34,20 +34,20 @@ the constructor is `constructCoreOpticalProperties` in
 [`src/CoreRT/LayerOpticalProperties/compEffectiveLayerProperties.jl:11–65`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/LayerOpticalProperties/compEffectiveLayerProperties.jl#L11-L65). The
 build happens once per band, per Fourier moment, before the layer loop:
 
-```
-   Gas opacity τ_abs  ─┐
-   (HITRAN LBL)        │
-                       │
-   Rayleigh ─────────┐ │
-   (greek + ω̃_Cab)   │ │
-                     ▼ ▼
-   Aerosol_1 ──→ constructCoreOpticalProperties ──→ Per-layer
-   (GreekCoefs,                                     (τ, ϖ₀,
-    ω̃, k, fᵗ)                                       Z⁺⁺, Z⁻⁺)
-                     ▲                                   │
-                     │                                   │
-   Aerosol_2 ────────┘                                   ▼
-                                                    MOM solver
+```mermaid
+flowchart LR
+    G["Gas opacity τ_abs<br/>(HITRAN LBL)"]
+    R["Rayleigh<br/>(greek + ϖ_Cab)"]
+    A1["Aerosol_1<br/>(GreekCoefs, ϖ, k, fᵗ)"]
+    A2["Aerosol_2<br/>(GreekCoefs, ϖ, k, fᵗ)"]
+    C["<b>constructCoreOpticalProperties</b>"]
+    L["Per-layer<br/>(τ, ϖ₀, Z⁺⁺, Z⁻⁺)"]
+    M["MOM solver"]
+    G --> C
+    R --> C
+    A1 --> C
+    A2 --> C
+    C --> L --> M
 ```
 
 The build proceeds in five steps (the relevant lines from

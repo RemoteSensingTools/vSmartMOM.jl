@@ -386,4 +386,4 @@ Runnable examples with Plotly figures:
 - [`KernelAbstractions.jl`](https://juliagpu.github.io/KernelAbstractions.jl), [`CUDA.jl`](https://juliagpu.org/cuda/), [`Metal.jl`](https://github.com/JuliaGPU/Metal.jl), [`NNlib.jl`](https://github.com/FluxML/NNlib.jl), [`ForwardDiff.jl`](https://github.com/JuliaDiff/ForwardDiff.jl) — see `Project.toml`.
 - Bezanson et al. (2017), *Julia: A fresh approach to numerical computing*, SIAM Review **59**:65. (Multiple-dispatch motivation.)
 - Crib sheet: `docs/dev_notes/theory_references.md` §J.
-- Manual: [Run on GPU](../gpu.md) for the runnable how-to.
+- User Guide: [Run on GPU](../gpu.md) for the runnable how-to.

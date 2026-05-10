@@ -1,6 +1,6 @@
 # 4 · The MOM Solver — Elemental → Doubling → Adding
 
-> **For:** anyone reading the Concepts arc top-to-bottom; users debugging RT output; method developers extending the solver.
+> **For:** anyone reading the RT basics arc top-to-bottom; users debugging RT output; method developers extending the solver.
 >
 > **Prev:** [3c · Mixing & δ-M Truncation](03c_mixing.md) · **Next:** [5 · Surfaces](05_surfaces.md)
 
@@ -28,35 +28,20 @@ GPU.
 
 ## The per-layer kernel sequence
 
-```
-   rt_run loops Fourier moments  m = 0 ... max_m-1
-        │
-        ▼
-   constructCoreOpticalProperties  →  Vector of layer optics
-        │
-        ▼
-   for each layer iz, TOA → BOA  ────────────┐
-        │                                     │
-        ▼                                     │
-   Elemental:    r, t, j  (single-scatter,    │
-                          exact finite-δ)     │
-        │                                     │
-        ▼                                     │
-   Doubling:     thicken to full layer        │
-                 (geometric series)           │
-        │                                     │
-        ▼                                     │
-   Interaction:  stack onto composite layer   │
-                 above (4-case dispatch)      │
-        │                                     │
-        ├──── iz < Nz ?  yes ─────────────────┘
-        │
-        no
-        ▼
-   Surface coupling  (BRDF as bottom AddedLayer)
-        │
-        ▼
-   Postprocessing  (azimuthal weighting, VZA interpolation)
+```mermaid
+flowchart TD
+    A["rt_run loops Fourier moments<br/>m = 0 ... max_m-1"]
+    B["constructCoreOpticalProperties<br/>→ Vector of layer optics"]
+    C["for each layer iz, TOA → BOA"]
+    D["<b>Elemental</b>: r, t, j<br/>(single-scatter, exact finite-δ)"]
+    E["<b>Doubling</b>: thicken to full layer<br/>(geometric series)"]
+    F["<b>Interaction</b>: stack onto composite layer above<br/>(4-case dispatch)"]
+    G{"iz &lt; Nz?"}
+    H["Surface coupling<br/>(BRDF as bottom AddedLayer)"]
+    I["Postprocessing<br/>(azimuthal weighting, VZA interpolation)"]
+    A --> B --> C --> D --> E --> F --> G
+    G -- yes --> C
+    G -- no --> H --> I
 ```
 
 The orchestrator is `rt_kernel!` in [`src/CoreRT/CoreKernel/rt_kernel.jl:48–229`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/CoreKernel/rt_kernel.jl#L48-L229).
@@ -134,7 +119,7 @@ end
 is small. `expdiff_neg(a, b)` computes ``e^{-a} - e^{-b}`` to full machine
 precision when ``a \approx b``. Both replace error-prone direct evaluations.
 
-### 2. Scattering-only ``\delta\tau`` for sizing, total ``\delta\tau_\lambda`` for transmission
+### 2. Scattering-only δτ for sizing, total δτ_λ for transmission
 
 Trace the data flow from `init_layer` / `get_dtau_ndoubl` (`rt_kernel.jl:245–298`)
 into `elemental!`:
