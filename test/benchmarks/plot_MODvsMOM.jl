@@ -26,7 +26,7 @@ for h2o in H2O, aot in AOT, gndalt in GNDALT, tsz in TSZ
     path2 = joinpath(MOM_DIR, filename2(h2o, aot, gndalt, tsz))
     #@show filename1(h2o, aot, gndalt, tsz)
     #@show filename2(h2o, aot, gndalt, tsz)
-    (isfile(path1) && isfile(path2)) || continue
+    #(isfile(path1) && isfile(path2)) || continue
     #isfile(path2) || continue
     data1 = readdlm(path1, skipstart=2)
     data2 = readdlm(path2, skipstart=2)

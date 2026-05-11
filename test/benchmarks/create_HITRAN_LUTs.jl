@@ -14,7 +14,7 @@
 ## After completion, update ParamsEMIT_MODTRANcomp.yaml:
 ##
 ##   LUTfiles:
-##     O2:  "/net/fluo/data1/ABSCO_CS_Database/v5.2_final/o2_v52_v2.jld2"
+##     O2:  "/home/sanghavi/data/EMIT_MODTRANcomp/LUTs/O2_emit_lut.jld2" # for o2 a-band in OCO-2/3 simulations: "/net/fluo/data1/ABSCO_CS_Database/v5.2_final/o2_v52_v2.jld2"
 ##     CO2: "/home/sanghavi/data/EMIT_MODTRANcomp/LUTs/CO2_emit_lut.jld2"
 ##     H2O: "/home/sanghavi/data/EMIT_MODTRANcomp/LUTs/H2O_emit_lut.jld2"
 ##     CH4: "/home/sanghavi/data/EMIT_MODTRANcomp/LUTs/CH4_emit_lut.jld2"
@@ -64,6 +64,7 @@ const MOLECULES = [
     ("O3",    40, "O3_emit_lut.jld2"),
     ("N2O",   40, "N2O_emit_lut.jld2"),
     ("CO",    40, "CO_emit_lut.jld2"),
+    ("O2",    40, "O2_emit_lut.jld2"),
 ]
 
 # ---- Main -------------------------------------------------------------------
