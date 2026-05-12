@@ -117,18 +117,26 @@ default_J_matrix_rand(FT, arr_type, dims, nSpec) = arr_type(randn(FT, tuple(dims
 
 
 """
-    make_added_layer(RS_type, FT, arr_type, dims, nSpec)
+    make_added_layer(RS_type, FT, arr_type, dims, nSpec; prepared_sources=NoSource())
 
 Construct an `AddedLayer` with zero-initialized R, T, J₀ matrices for elastic RT.
+
+When `prepared_sources` contains any source that declares a non-`nothing`
+[`source_key`](@ref) (e.g. `:thermal` for `PreparedThermalEmission`), a
+matching [`SourceSlot`](@ref) is allocated under `j₀_by_src[key]`. Solar
+SFI and surface SIF use the legacy `j₀⁺/j₀⁻` fields, so they don't get a
+separate slot. Empty prepared-sources → empty NT, bit-equal to pre-A.2a.
 """
-function make_added_layer(RS_type::Union{noRS, noRS_plus}, FT, arr_type, dims, nSpec) 
+function make_added_layer(RS_type::Union{noRS, noRS_plus}, FT, arr_type, dims, nSpec;
+                          prepared_sources::AbstractSource = NoSource())
     t1 = default_matrix(FT, arr_type, dims, nSpec)
     t2 = default_matrix(FT, arr_type, dims, nSpec)
     t1_ptr = batched_pointer_cache(t1)
     t2_ptr = batched_pointer_cache(t2)
+    j₀_by_src = _make_added_source_slots(prepared_sources, FT, arr_type, dims, nSpec)
     return AddedLayer(
-        r⁻⁺ = default_matrix(FT, arr_type, dims, nSpec), 
-        t⁺⁺ = default_matrix(FT, arr_type, dims, nSpec), 
+        r⁻⁺ = default_matrix(FT, arr_type, dims, nSpec),
+        t⁺⁺ = default_matrix(FT, arr_type, dims, nSpec),
         r⁺⁻ = default_matrix(FT, arr_type, dims, nSpec),
         t⁻⁻ = default_matrix(FT, arr_type, dims, nSpec),
         j₀⁺ = default_J_matrix(FT, arr_type, dims, nSpec),
@@ -138,7 +146,71 @@ function make_added_layer(RS_type::Union{noRS, noRS_plus}, FT, arr_type, dims, n
         dbl_gp_refl = default_matrix(FT, arr_type, dims, nSpec),
         dbl_j₁⁺ = default_J_matrix(FT, arr_type, dims, nSpec),
         dbl_j₁⁻ = default_J_matrix(FT, arr_type, dims, nSpec),
+        j₀_by_src = j₀_by_src,
     )
+end
+
+# ============================================================================
+# v0.7 Phase A.2a — per-source slot allocators for the elastic noRS path.
+#
+# Iterate the prepared-sources tuple, collect distinct non-nothing source_key
+# values, and build a NamedTuple of SourceSlot (added-layer) /
+# CompositeSourceSlot (composite-layer) carriers.
+#
+# Solar (`source_key === nothing`) is skipped — its j₀ lives in the legacy
+# fields. NoSource is also skipped. Same for any source type that opts out by
+# returning `nothing` from `source_key`.
+# ============================================================================
+_collect_source_keys(::NoSource) = Symbol[]
+function _collect_source_keys(src::AbstractPreparedSource)
+    k = source_key(src)
+    return k === nothing ? Symbol[] : Symbol[k]
+end
+function _collect_source_keys(s::SourceSet)
+    keys = Symbol[]
+    for member in s.sources
+        k = source_key(member)
+        k === nothing && continue
+        k in keys && continue
+        push!(keys, k)
+    end
+    return keys
+end
+# Raw (unprepared) sources should never reach the allocator — but if they do,
+# fall back to the prepared-source contract by reading the trait.
+_collect_source_keys(src::AbstractSource) = Symbol[]
+
+function _make_added_source_slots(prepared_sources::AbstractSource, FT, arr_type, dims, nSpec)
+    keys = _collect_source_keys(prepared_sources)
+    isempty(keys) && return NamedTuple()
+    nspec_vec = ones(FT, nSpec)
+    slots = map(keys) do key
+        SourceSlot(
+            j₀⁺     = default_J_matrix(FT, arr_type, dims, nSpec),
+            j₀⁻     = default_J_matrix(FT, arr_type, dims, nSpec),
+            dbl_j₁⁺ = default_J_matrix(FT, arr_type, dims, nSpec),
+            dbl_j₁⁻ = default_J_matrix(FT, arr_type, dims, nSpec),
+            # For thermal (and every other current per-source slot type)
+            # expk = ones; squaring during the doubling loop is a no-op. We
+            # default to `ones` here so the doubling kernel can treat every
+            # slot uniformly; future sources can override `source_expk_init`
+            # and a separate seed step before the doubling loop will reseed.
+            expk    = arr_type(copy(nspec_vec)),
+        )
+    end
+    return NamedTuple{Tuple(keys)}(Tuple(slots))
+end
+
+function _make_composite_source_slots(prepared_sources::AbstractSource, FT, arr_type, dims, nSpec)
+    keys = _collect_source_keys(prepared_sources)
+    isempty(keys) && return NamedTuple()
+    slots = map(keys) do _key
+        CompositeSourceSlot(
+            J₀⁺ = default_J_matrix(FT, arr_type, dims, nSpec),
+            J₀⁻ = default_J_matrix(FT, arr_type, dims, nSpec),
+        )
+    end
+    return NamedTuple{Tuple(keys)}(Tuple(slots))
 end
 
 """Construct an `AddedLayerRS` with inelastic (Raman) matrices for Raman scattering."""
@@ -179,16 +251,23 @@ function make_added_layer_rand(RS_type::Union{noRS, noRS_plus}, FT, arr_type, di
     )
 end
                                                          
-"""Construct a `CompositeLayer` with zero-initialized R, T, J₀ for elastic RT."""
+"""Construct a `CompositeLayer` with zero-initialized R, T, J₀ for elastic RT.
+
+When `prepared_sources` declares any non-`nothing` [`source_key`](@ref),
+matching [`CompositeSourceSlot`](@ref)s are allocated under `J₀_by_src`.
+"""
 make_composite_layer(RS_type::Union{noRS, noRS_plus},
-    FT, arr_type, dims, nSpec) = CompositeLayer(
-                                                        default_matrix(FT, arr_type, dims, nSpec), 
-                                                        default_matrix(FT, arr_type, dims, nSpec), 
-                                                        default_matrix(FT, arr_type, dims, nSpec),
-                                                        default_matrix(FT, arr_type, dims, nSpec),
-                                                        default_J_matrix(FT, arr_type, dims, nSpec),
-                                                        default_J_matrix(FT, arr_type, dims, nSpec)
-                                                        )
+    FT, arr_type, dims, nSpec;
+    prepared_sources::AbstractSource = NoSource()) =
+    CompositeLayer(
+        R⁻⁺ = default_matrix(FT, arr_type, dims, nSpec),
+        R⁺⁻ = default_matrix(FT, arr_type, dims, nSpec),
+        T⁺⁺ = default_matrix(FT, arr_type, dims, nSpec),
+        T⁻⁻ = default_matrix(FT, arr_type, dims, nSpec),
+        J₀⁺ = default_J_matrix(FT, arr_type, dims, nSpec),
+        J₀⁻ = default_J_matrix(FT, arr_type, dims, nSpec),
+        J₀_by_src = _make_composite_source_slots(prepared_sources, FT, arr_type, dims, nSpec),
+    )
 """Construct a `CompositeLayerRS` with inelastic matrices for Raman scattering."""
 make_composite_layer(RS_type::Union{RRS, VS_0to1_plus, VS_1to0_plus},
     FT, arr_type, dims, nSpec) = CompositeLayerRS(

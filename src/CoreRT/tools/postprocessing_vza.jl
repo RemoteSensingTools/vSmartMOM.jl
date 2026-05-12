@@ -55,6 +55,7 @@ function postprocessing_vza!(RS_type::noRS, iμ₀, pol_type,
     vza_info = _precompute_vza_weights(vza, vaz, qp_μ, pol_type, m, weight)
 
     if SFI
+        # Legacy solar slot accumulation
         J₀⁺ = _to_cpu(composite_layer.J₀⁺)
         J₀⁻ = _to_cpu(composite_layer.J₀⁻)
         @inbounds for i in eachindex(vza)
@@ -62,6 +63,21 @@ function postprocessing_vza!(RS_type::noRS, iμ₀, pol_type,
             for s = 1:nSpec
                 R_SFI[i,:,s] .+= w * J₀⁻[istart:iend, 1, s]
                 T_SFI[i,:,s] .+= w * J₀⁺[istart:iend, 1, s]
+            end
+        end
+        # v0.7 Phase A.2a — per-source J₀ slots. RT reconstruction is linear
+        # in sources so each slot's contribution adds into the same R_SFI/T_SFI
+        # output. The same Fourier `weight` and per-VZA cosine apply (thermal
+        # only contributed at m=0 anyway — see `thermal_emission.jl`).
+        for cslot in values(composite_layer.J₀_by_src)
+            J⁺_src = _to_cpu(cslot.J₀⁺)
+            J⁻_src = _to_cpu(cslot.J₀⁻)
+            @inbounds for i in eachindex(vza)
+                istart, iend, w = vza_info[i]
+                for s = 1:nSpec
+                    R_SFI[i,:,s] .+= w * J⁻_src[istart:iend, 1, s]
+                    T_SFI[i,:,s] .+= w * J⁺_src[istart:iend, 1, s]
+                end
             end
         end
     else

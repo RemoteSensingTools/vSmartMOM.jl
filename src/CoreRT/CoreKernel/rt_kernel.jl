@@ -171,7 +171,7 @@ function rt_kernel!(RS_type::Union{RRS, VS_0to1, VS_1to0}, pol_type, SFI, added_
     end
 end
 
-### 
+###
 function rt_kernel!(RS_type::noRS{FT},
                     pol_type, SFI,
                     added_layer,
@@ -184,6 +184,7 @@ function rt_kernel!(RS_type::noRS{FT},
                     architecture,
                     qp_μN, iz;
                     workspace=nothing,
+                    prepared_sources::AbstractSource = NoSource(),
                     dτ_max_threshold::Union{Nothing,Real} = nothing,
                     dτ_min_floor::Union{Nothing,Real} = nothing) where {FT,M}
     #@show array_type(architecture)
@@ -206,12 +207,19 @@ function rt_kernel!(RS_type::noRS{FT},
                                 computed_layer_properties,
                                 m, ndoubl, scatter, quad_points,
                                 added_layer,  architecture)
+        # v0.7 Phase A volume-source seam: inject thermal Planck per elemental
+        # layer at m=0 only. NoSource / non-volume sources are no-ops. Must
+        # land BEFORE doubling so the doubling step propagates the source
+        # through the layer's full optical depth.
+        @timeit "volume_source" contribute!(prepared_sources, added_layer,
+                                            ϖ, dτ, iz, m,
+                                            pol_type, quad_points, architecture)
         #println("Elemental done...")
-        @timeit "doubling"   doubling!(pol_type, SFI, 
-                                expk, ndoubl, 
+        @timeit "doubling"   doubling!(pol_type, SFI,
+                                expk, ndoubl,
                                 added_layer,
                                 I_static, architecture)
-        #@show added_layer.r⁻⁺[1:2,1,1], added_layer.r⁺⁻[1:2,1,1],added_layer.t⁺⁺[1:2,1,1], added_layer.t⁻⁻[1:2,1,1] 
+        #@show added_layer.r⁻⁺[1:2,1,1], added_layer.r⁺⁻[1:2,1,1],added_layer.t⁺⁺[1:2,1,1], added_layer.t⁻⁻[1:2,1,1]
         #@show dτ, ndoubl, expk
     #println("Doubling done...")
     else # This might not work yet on GPU!
@@ -332,6 +340,7 @@ end
 
 function rt_kernel!(RS_type::Union{RRS{FT}, VS_0to1{FT}, VS_1to0{FT}}, pol_type, SFI, added_layer, composite_layer, computed_layer_properties::CoreScatteringOpticalProperties, scattering_interface, τ_sum, m, quad_points, I_static, architecture, qp_μN, iz;
                     workspace::Union{InteractionWorkspace, Nothing}=nothing,
+                    prepared_sources::AbstractSource = NoSource(),
                     dτ_max_threshold::Union{Nothing,Real} = nothing,
                     dτ_min_floor::Union{Nothing,Real} = nothing)  where {FT}
     (; μ₀) = quad_points
@@ -382,6 +391,7 @@ function rt_kernel!(
             τ_sum, m, quad_points,
             I_static, architecture, qp_μN, iz;
             workspace::Union{InteractionWorkspace, Nothing}=nothing,
+            prepared_sources::AbstractSource = NoSource(),
             dτ_max_threshold::Union{Nothing,Real} = nothing,
             dτ_min_floor::Union{Nothing,Real} = nothing)  where {FT}
     (; μ₀) = quad_points

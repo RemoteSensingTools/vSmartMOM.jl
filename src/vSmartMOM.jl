@@ -141,6 +141,7 @@ export AbstractSource, AbstractPreparedSource,
        NoSourceJacobian, source_ad_mode,
        SolarBeam, PreparedSolarBeam, BlackbodySource,
        SurfaceSIF, PreparedSurfaceSIF,
+       ThermalEmission, PreparedThermalEmission, has_thermal_emission, contribute!,
        prepare_source, prepare_sources, surface_source_contribute!
 # Export GEOSChem/NetCDF integration
 export GeosChemSource, NetCDFGridSource, NetCDFSource, geoschem_to_dict, read_geoschem_profile

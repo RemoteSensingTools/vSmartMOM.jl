@@ -122,6 +122,11 @@ end
 # checks via small CPU rt_run scenarios on PureRayleighParameters.
 @testset "Sources (v0.6)" begin include("test_sources.jl") end
 
+# v0.7 Phase A — ThermalEmission per-layer Planck volume source.
+# Pins the corrected TIR weight rule (overrides REFACTOR_SPEC_v6 §2.11):
+# isotropic source fires only at m=0 with 2π factor to undo downstream 0.5/π.
+@testset "ThermalEmission (v0.7 Phase A)" begin include("test_thermal_emission.jl") end
+
 # VLIDORT 2.8.3 baseline validation suite — Siewert 2000 PROBLEM_IIA Stokes-I,
 # solar_tester scalar (Task 1), solar_tester vector (Task 1, IQU). Reference
 # tables are committed under test/vlidort_baseline/reference_data/; no PyVLIDORT

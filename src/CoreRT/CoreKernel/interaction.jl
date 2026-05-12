@@ -50,15 +50,21 @@ for the general case and `docs/src/pages/concepts/04_mom_solver.md` for the
 prose walkthrough.
 """
 function interaction_helper!(::ScatteringInterface_00, SFI,
-                                composite_layer::CompositeLayer{FT}, 
-                                added_layer::AddedLayer{FT}, 
+                                composite_layer::CompositeLayer{FT},
+                                added_layer::AddedLayer{FT},
                                 I_static::AbstractArray{FT2}) where {FT<:Real,FT2}
-    (; r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻) = added_layer     
-    (; R⁻⁺, R⁺⁻, T⁺⁺, T⁻⁻, J₀⁺, J₀⁻) = composite_layer 
+    (; r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻, j₀_by_src) = added_layer
+    (; R⁻⁺, R⁺⁻, T⁺⁺, T⁻⁻, J₀⁺, J₀⁻, J₀_by_src) = composite_layer
 
-    # Source Function
+    # Source Function — legacy solar slot
     J₀⁺ .= j₀⁺ .+ t⁺⁺ ⊠ J₀⁺
     J₀⁻ .= J₀⁻ .+ T⁻⁻ ⊠ j₀⁻
+    # Per-source slots (same formula; uses pre-mutation T⁻⁻)
+    for (key, slot) in pairs(j₀_by_src)
+        cslot = J₀_by_src[key]
+        cslot.J₀⁺ .= slot.j₀⁺ .+ t⁺⁺ ⊠ cslot.J₀⁺
+        cslot.J₀⁻ .= cslot.J₀⁻ .+ T⁻⁻ ⊠ slot.j₀⁻
+    end
 
     # Batched multiplication between added and composite
     T⁻⁻  .= t⁻⁻ ⊠ T⁻⁻
@@ -88,21 +94,27 @@ No matrix inversion is required. See [`interaction_helper!(::ScatteringInterface
 for the general case.
 """
 function interaction_helper!(::ScatteringInterface_01, SFI,
-                                composite_layer::CompositeLayer{FT}, 
-                                added_layer::AddedLayer{FT}, 
+                                composite_layer::CompositeLayer{FT},
+                                added_layer::AddedLayer{FT},
                                 I_static::AbstractArray{FT2}) where {FT<:Real,FT2}
-    (; r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻) = added_layer     
-    (; R⁻⁺, R⁺⁻, T⁺⁺, T⁻⁻, J₀⁺, J₀⁻) = composite_layer 
+    (; r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻, j₀_by_src) = added_layer
+    (; R⁻⁺, R⁺⁻, T⁺⁺, T⁻⁻, J₀⁺, J₀⁻, J₀_by_src) = composite_layer
 
-    # Source Function
+    # Source Function — legacy solar slot
     J₀⁻ .= J₀⁻ .+ T⁻⁻ ⊠ (r⁻⁺ ⊠ J₀⁺ .+ j₀⁻)
-    J₀⁺ .= j₀⁺ .+ t⁺⁺ ⊠ J₀⁺         
+    J₀⁺ .= j₀⁺ .+ t⁺⁺ ⊠ J₀⁺
+    # Per-source slots (uses pre-mutation T⁻⁻ and r⁻⁺)
+    for (key, slot) in pairs(j₀_by_src)
+        cslot = J₀_by_src[key]
+        cslot.J₀⁻ .= cslot.J₀⁻ .+ T⁻⁻ ⊠ (r⁻⁺ ⊠ cslot.J₀⁺ .+ slot.j₀⁻)
+        cslot.J₀⁺ .= slot.j₀⁺ .+ t⁺⁺ ⊠ cslot.J₀⁺
+    end
 
     # Batched multiplication between added and composite
     R⁻⁺ .= T⁻⁻ ⊠ r⁻⁺ ⊠ T⁺⁺
     R⁺⁻ .= r⁺⁻
     T⁺⁺ .= t⁺⁺ ⊠ T⁺⁺
-    T⁻⁻ .= T⁻⁻ ⊠ t⁻⁻    
+    T⁻⁻ .= T⁻⁻ ⊠ t⁻⁻
 end
 
 """
@@ -127,16 +139,22 @@ No matrix inversion is required. See [`interaction_helper!(::ScatteringInterface
 for the general case.
 """
 function interaction_helper!(::ScatteringInterface_10, SFI,
-                                composite_layer::CompositeLayer{FT}, 
-                                added_layer::AddedLayer{FT}, 
+                                composite_layer::CompositeLayer{FT},
+                                added_layer::AddedLayer{FT},
                                 I_static::AbstractArray{FT2}) where {FT<:Real,FT2}
-    (; r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻) = added_layer     
-    (; R⁻⁺, R⁺⁻, T⁺⁺, T⁻⁻, J₀⁺, J₀⁻) = composite_layer 
+    (; r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻, j₀_by_src) = added_layer
+    (; R⁻⁺, R⁺⁻, T⁺⁺, T⁻⁻, J₀⁺, J₀⁻, J₀_by_src) = composite_layer
 
-    # Source Function
+    # Source Function — legacy solar slot
     J₀⁺ .= j₀⁺ .+ t⁺⁺ ⊠ (J₀⁺ .+ R⁺⁻ ⊠ j₀⁻)
-    J₀⁻ .= J₀⁻ .+ T⁻⁻ ⊠ j₀⁻    
-   
+    J₀⁻ .= J₀⁻ .+ T⁻⁻ ⊠ j₀⁻
+    # Per-source slots (uses pre-mutation R⁺⁻ and T⁻⁻)
+    for (key, slot) in pairs(j₀_by_src)
+        cslot = J₀_by_src[key]
+        cslot.J₀⁺ .= slot.j₀⁺ .+ t⁺⁺ ⊠ (cslot.J₀⁺ .+ R⁺⁻ ⊠ slot.j₀⁻)
+        cslot.J₀⁻ .= cslot.J₀⁻ .+ T⁻⁻ ⊠ slot.j₀⁻
+    end
+
     # Batched multiplication between added and composite
     T⁺⁺ .= t⁺⁺ ⊠ T⁺⁺
     T⁻⁻ .= T⁻⁻ ⊠ t⁻⁻
@@ -187,13 +205,14 @@ for the prose walkthrough and the dispatch table that selects between the
 four `ScatteringInterface_*` cases.
 """
 function interaction_helper!(::ScatteringInterface_11, SFI,
-                                composite_layer::CompositeLayer{FT}, 
-                                added_layer::AddedLayer{FT}, 
+                                composite_layer::CompositeLayer{FT},
+                                added_layer::AddedLayer{FT},
                                 I_static::AbstractArray{FT2}) where {FT<:Real,FT2}
-    
-    (; r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻, temp1, temp2, temp1_ptr, temp2_ptr) = added_layer     #these are aliases to the respective struct elements
-    (; R⁻⁺, R⁺⁻, T⁺⁺, T⁻⁻, J₀⁺, J₀⁻) = composite_layer #these are aliases to the respective struct elements 
-    
+
+    (; r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻, j₀_by_src,
+       temp1, temp2, temp1_ptr, temp2_ptr) = added_layer     #these are aliases to the respective struct elements
+    (; R⁻⁺, R⁺⁻, T⁺⁺, T⁻⁻, J₀⁺, J₀⁻, J₀_by_src) = composite_layer #these are aliases to the respective struct elements
+
     # X₂₁ refers to added layer, X₁₀ to composite layer!
 
     # Used to store `(I - R⁺⁻ * r⁻⁺)⁻¹`
@@ -202,18 +221,23 @@ function interaction_helper!(::ScatteringInterface_11, SFI,
     # Compute and store `(I - R⁺⁻ * r⁻⁺)⁻¹`
     @timeit "interaction inv1 bla" batch_inv!(temp1, temp2, temp1_ptr, temp2_ptr)
     # Temporary arrays:
-    
+
     # T₁₂(I-R₀₁R₂₁)⁻¹
     T01_inv = T⁻⁻ ⊠ temp1;
-    
-    # J₀₂⁻ = J₀₁⁻ + T₀₁(1-R₂₁R₀₁)⁻¹(R₂₁J₁₀⁺+J₁₂⁻)
-    J₀⁻ .= J₀⁻ .+ T01_inv ⊠ (r⁻⁺ ⊠ J₀⁺ .+ j₀⁻) 
- 
+
+    # J₀₂⁻ = J₀₁⁻ + T₀₁(1-R₂₁R₀₁)⁻¹(R₂₁J₁₀⁺+J₁₂⁻) — legacy solar slot
+    J₀⁻ .= J₀⁻ .+ T01_inv ⊠ (r⁻⁺ ⊠ J₀⁺ .+ j₀⁻)
+    # Per-source J₀⁻ slots (same formula, T01_inv reused; uses pre-mutation r⁻⁺)
+    for (key, slot) in pairs(j₀_by_src)
+        cslot = J₀_by_src[key]
+        cslot.J₀⁻ .= cslot.J₀⁻ .+ T01_inv ⊠ (r⁻⁺ ⊠ cslot.J₀⁺ .+ slot.j₀⁻)
+    end
+
     # R₂₀ = R₁₀ + T₀₁(I-R₂₁R₀₁)⁻¹ R₂₁T₁₀
     R⁻⁺ .= R⁻⁺ .+ T01_inv ⊠ r⁻⁺ ⊠ T⁺⁺
-    
+
     # T₀₂ = T₀₁(1-R₂₁R₀₁)⁻¹T₁₂
-    T⁻⁻ .= T01_inv ⊠ t⁻⁻ 
+    T⁻⁻ .= T01_inv ⊠ t⁻⁻
 
     # Repeating for mirror-reflected directions
 
@@ -226,14 +250,19 @@ function interaction_helper!(::ScatteringInterface_11, SFI,
     # T₂₁(I-R₀₁R₂₁)⁻¹
     T21_inv = t⁺⁺ ⊠ temp1
 
-    # J₂₀⁺ = J₂₁⁺ + T₂₁(I-R₀₁R₂₁)⁻¹(J₁₀ + R₀₁J₁₂⁻ )
+    # J₂₀⁺ = J₂₁⁺ + T₂₁(I-R₀₁R₂₁)⁻¹(J₁₀ + R₀₁J₁₂⁻ ) — legacy solar slot
     J₀⁺ .= j₀⁺ .+ T21_inv ⊠ (J₀⁺ .+ R⁺⁻ ⊠ j₀⁻)
+    # Per-source J₀⁺ slots (same formula, T21_inv reused; uses pre-mutation R⁺⁻)
+    for (key, slot) in pairs(j₀_by_src)
+        cslot = J₀_by_src[key]
+        cslot.J₀⁺ .= slot.j₀⁺ .+ T21_inv ⊠ (cslot.J₀⁺ .+ R⁺⁻ ⊠ slot.j₀⁻)
+    end
 
     # T₂₀ = T₂₁(I-R₀₁R₂₁)⁻¹T₁₀
-    T⁺⁺ .= T21_inv  ⊠ T⁺⁺ 
-    
+    T⁺⁺ .= T21_inv  ⊠ T⁺⁺
+
     # R₀₂ = R₁₂ + T₂₁(1-R₀₁R₂₁)⁻¹R₀₁T₁₂
-    R⁺⁻ .= r⁺⁻ .+ T21_inv ⊠ R⁺⁻ ⊠ t⁻⁻  
+    R⁺⁻ .= r⁺⁻ .+ T21_inv ⊠ R⁺⁻ ⊠ t⁻⁻
 end
 
 """
