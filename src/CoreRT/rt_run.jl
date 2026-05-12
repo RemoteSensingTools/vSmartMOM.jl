@@ -172,14 +172,29 @@ function rt_run(RS_type::AbstractRamanType, model, iBand;
     """
     @info msg
 
-    # Create arrays
+    # Resolve sources EARLY so the layer allocators can size per-source slots
+    # (v0.7 Phase A.2a). Resolution order is unchanged: explicit `sources=`
+    # kwarg > `model.sources` > legacy `RS_type.F₀` (only when the latter is
+    # already user-shaped, to preserve the historical
+    # `rs.F₀ = ...; rt_run(rs, model, ...)` test pattern).
+    # Phase 6 will remove the legacy `RS_type.F₀` / `RS_type.SIF₀` channels.
+    effective_sources = sources === nothing ? model.sources : sources
+    prepared_sources = prepare_sources(effective_sources, FT, pol_type.n, nSpec, arr_type)
+
+    # Create arrays — pass `prepared_sources` so per-source j₀ / J₀ slots
+    # (e.g. `:thermal`) get allocated alongside the legacy solar buffers.
     @timeit "Creating layers" added_layer         =
-        make_added_layer(RS_type, FT, arr_type, dims, nSpec)
-    # Just for now, only use noRS here
+        make_added_layer(RS_type, FT, arr_type, dims, nSpec;
+                         prepared_sources=prepared_sources)
+    # Just for now, only use noRS here. The surface added-layer needs the
+    # same per-source slots so per-source j₀⁻ injection works at the surface
+    # (Phase A.2c will wire surface-emission contributions here).
     @timeit "Creating layers" added_layer_surface =
-        make_added_layer(RS_type, FT, arr_type, dims, nSpec)
+        make_added_layer(RS_type, FT, arr_type, dims, nSpec;
+                         prepared_sources=prepared_sources)
     @timeit "Creating layers" composite_layer     =
-        make_composite_layer(RS_type, FT, arr_type, dims, nSpec)
+        make_composite_layer(RS_type, FT, arr_type, dims, nSpec;
+                             prepared_sources=prepared_sources)
     @timeit "Creating arrays" I_static =
         Diagonal(arr_type(Diagonal{FT}(ones(dims[1]))));
 
@@ -204,13 +219,6 @@ function rt_run(RS_type::AbstractRamanType, model, iBand;
         @timeit "Canopy atm tau" _compute_canopy_atm_tau!(brdf, model, _canopy_spec_wn)
     end
 
-    # Resolve sources for this RT solve (v0.6 source-term refactor).
-    # Resolution order: explicit `sources=` kwarg > `model.sources` > legacy
-    # `RS_type.F₀` (only when the latter is already user-shaped, to preserve
-    # the historical `rs.F₀ = ...; rt_run(rs, model, ...)` test pattern).
-    # Phase 6 will remove the legacy `RS_type.F₀` / `RS_type.SIF₀` channels.
-    effective_sources = sources === nothing ? model.sources : sources
-    prepared_sources = prepare_sources(effective_sources, FT, pol_type.n, nSpec, arr_type)
     if sources === nothing && size(RS_type.F₀) == (pol_type.n, nSpec)
         # User has pre-set RS_type.F₀; leave it alone for back-compat.
     else
@@ -267,6 +275,7 @@ function rt_run(RS_type::AbstractRamanType, model, iBand;
                         arch,
                         qp_μN, iz;
                         workspace=_interaction_ws,
+                        prepared_sources=prepared_sources,
                         dτ_max_threshold=dτ_max_threshold,
                         dτ_min_floor=dτ_min_floor)
         end

@@ -58,15 +58,17 @@ function make_added_layer(lin::LinMode, RS_type::Union{noRS, noRS_plus}, FT, arr
 end
 
 "Make a composite layer and its linearized counterpart, supplying all default matrices"
-make_composite_layer(lin::LinMode, RS_type::Union{noRS, noRS_plus}, FT, arr_type, Nparams, dims, nSpec) = 
+make_composite_layer(lin::LinMode, RS_type::Union{noRS, noRS_plus}, FT, arr_type, Nparams, dims, nSpec) =
                                         CompositeLayer(
-                                            default_matrix(FT, arr_type, dims, nSpec), 
-                                            default_matrix(FT, arr_type, dims, nSpec), 
-                                            default_matrix(FT, arr_type, dims, nSpec),
-                                            default_matrix(FT, arr_type, dims, nSpec),
-                                            default_J_matrix(FT, arr_type, dims, nSpec),
-                                            default_J_matrix(FT, arr_type, dims, nSpec)
-                                        ), 
+                                            R⁻⁺ = default_matrix(FT, arr_type, dims, nSpec),
+                                            R⁺⁻ = default_matrix(FT, arr_type, dims, nSpec),
+                                            T⁺⁺ = default_matrix(FT, arr_type, dims, nSpec),
+                                            T⁻⁻ = default_matrix(FT, arr_type, dims, nSpec),
+                                            J₀⁺ = default_J_matrix(FT, arr_type, dims, nSpec),
+                                            J₀⁻ = default_J_matrix(FT, arr_type, dims, nSpec),
+                                            # v0.7 Phase A.2a — lin path keeps J₀_by_src empty (no per-source slots
+                                            # for now; lin support for thermal lands in Phase A.3).
+                                        ),
                                         CompositeLayerLin(
                                             # derivatives wrt all parameters
                                             default_matrix(FT, lin, arr_type, Nparams, dims, nSpec), 

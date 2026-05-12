@@ -152,7 +152,7 @@ Sign convention: `−` = outgoing (upward, decreasing τ), `+` = incoming
 - `J₀⁺::AbstractArray{FT,3}`: source in the incoming (+) direction
 - `J₀⁻::AbstractArray{FT,3}`: source in the outgoing (−) direction
 """
-Base.@kwdef struct CompositeLayer{FT} <: AbstractLayer 
+Base.@kwdef struct CompositeLayer{FT} <: AbstractLayer
     "Composite layer Reflectance matrix R (from + -> -)"
     R⁻⁺::AbstractArray{FT,3}
     "Composite layer Reflectance matrix R (from - -> +)"
@@ -165,6 +165,12 @@ Base.@kwdef struct CompositeLayer{FT} <: AbstractLayer
     J₀⁺::AbstractArray{FT,3}
     "Composite layer source matrix J (in - direction)"
     J₀⁻::AbstractArray{FT,3}
+    # v0.7 Phase A.2a — per-source J₀ slots. Each non-solar source carries its
+    # own J₀⁺/J₀⁻ accumulator so doubling and interaction can apply per-source
+    # math (e.g. thermal's expk = 1 vs solar's exp(-dτ/μ₀)). Empty NT for
+    # solar-only runs → no extra memory, no behavior change.
+    "Per-source composite-layer J₀ slots (v0.7 Phase A.2a, NamedTuple{(:thermal, …)})"
+    J₀_by_src::NamedTuple = (;)
 end
 
 """
@@ -187,7 +193,7 @@ composite-layer quantities (`R`, `T`, `J`).
 - `temp1`, `temp2`: pre-allocated workspace arrays to avoid allocations
 - `temp1_ptr`, `temp2_ptr`: CUDA pointer arrays (ignored on CPU)
 """
-Base.@kwdef struct AddedLayer{FT} <: AbstractLayer 
+Base.@kwdef struct AddedLayer{FT} <: AbstractLayer
     "Added layer Reflectance matrix R (from + -> -)"
     r⁻⁺::AbstractArray{FT,3}
     "Added layer transmission matrix T (from + -> +)"
@@ -214,6 +220,58 @@ Base.@kwdef struct AddedLayer{FT} <: AbstractLayer
     dbl_j₁⁺::Union{AbstractArray{FT,3}, Nothing} = nothing
     "Doubling workspace: source temp -"
     dbl_j₁⁻::Union{AbstractArray{FT,3}, Nothing} = nothing
+    # v0.7 Phase A.2a — per-source j₀ slots. Each non-solar source contributes
+    # its own [`SourceSlot`](@ref) (j₀⁺/j₀⁻ + per-source `expk` for doubling +
+    # j₁ workspace). The doubling/interaction routines iterate this NT to
+    # apply per-source math (e.g. thermal's expk = 1 vs solar's exp(-dτ/μ₀)).
+    # Empty NT in solar-only runs → bit-equal to pre-A.2a behaviour.
+    "Per-source j₀ slots (v0.7 Phase A.2a, NamedTuple{(:thermal, …)} of SourceSlot)"
+    j₀_by_src::NamedTuple = (;)
+end
+
+"""
+    SourceSlot{FT} <: AbstractLayer
+
+Per-source carrier for the j₀ doubling state. One slot per non-solar source
+type in the active `prepared_sources` (Phase A.2a). Holds the source-
+specific elemental j₀⁺/j₀⁻ (filled by `contribute!`), the doubling-
+workspace j₁ buffers, and the per-source `expk` attenuation factor used by
+the doubling recurrence (`exp(-dτ/μ₀)` for solar, `ones` for thermal, etc.).
+
+The composite-layer counterpart is the `J₀_by_src` NamedTuple on
+[`CompositeLayer`](@ref); each slot key (`:thermal`, …) maps to a plain
+`(J₀⁺, J₀⁻)` pair (the composite layer has no doubling workspace, since
+doubling already produced the full per-source J₀ before interaction).
+
+# Fields
+- `j₀⁺::AbstractArray{FT,3}` — incoming-direction source for this source
+- `j₀⁻::AbstractArray{FT,3}` — outgoing-direction source
+- `dbl_j₁⁺::AbstractArray{FT,3}` — doubling-loop workspace
+- `dbl_j₁⁻::AbstractArray{FT,3}` — doubling-loop workspace
+- `expk::AbstractArray{FT,1}` — per-spectral attenuation factor squared each
+  doubling step; for thermal this stays `1.0` because thermal is self-
+  generated (no incident beam to attenuate). For solar this is the
+  legacy `exp(-dτ/μ₀)` — but the solar slot lives in the legacy `j₀⁺/j₀⁻`
+  fields, not in `j₀_by_src`.
+"""
+Base.@kwdef struct SourceSlot{FT} <: AbstractLayer
+    j₀⁺::AbstractArray{FT,3}
+    j₀⁻::AbstractArray{FT,3}
+    dbl_j₁⁺::AbstractArray{FT,3}
+    dbl_j₁⁻::AbstractArray{FT,3}
+    expk::AbstractArray{FT,1}
+end
+
+"""
+    CompositeSourceSlot{FT}
+
+Per-source composite-layer carrier for the J₀ vectors after doubling +
+interaction. Holds J₀⁺ and J₀⁻ on the active architecture; no workspace
+buffers are needed (the interaction step does the combination in place).
+"""
+Base.@kwdef struct CompositeSourceSlot{FT} <: AbstractLayer
+    J₀⁺::AbstractArray{FT,3}
+    J₀⁻::AbstractArray{FT,3}
 end
 
 "Composite Layer Matrices (`-/+` defined in τ coordinates, i.e. `-`=outgoing, `+`=incoming"

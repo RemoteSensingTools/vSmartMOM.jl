@@ -35,20 +35,20 @@ column).
 
 Compute homogenous layer matrices from its elemental layer using Doubling 
 """
-function doubling_helper!(pol_type, 
-                          SFI, 
-                          expk, 
-                          ndoubl::Int, 
+function doubling_helper!(pol_type,
+                          SFI,
+                          expk,
+                          ndoubl::Int,
                           added_layer::M,
-                          I_static::AbstractArray{FT}, 
+                          I_static::AbstractArray{FT},
                           architecture) where {FT,M}
 
     (; r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻, temp1, temp2, temp1_ptr, temp2_ptr,
-       dbl_gp_refl, dbl_j₁⁺, dbl_j₁⁻) = added_layer
+       dbl_gp_refl, dbl_j₁⁺, dbl_j₁⁻, j₀_by_src) = added_layer
     dev = devi(architecture)
 
     ndoubl == 0 && return nothing
-    
+
     @timeit "doubling_allocs" begin
     tt⁺⁺_gp_refl = dbl_gp_refl === nothing ? similar(t⁺⁺) : dbl_gp_refl
     j₁⁺ = dbl_j₁⁺ === nothing ? similar(j₀⁺) : dbl_j₁⁺
@@ -61,7 +61,24 @@ function doubling_helper!(pol_type,
     # Loop over number of doublings
     for n = 1:ndoubl
         @timeit "Batch Inv Doubling" compute_geometric_progression!(temp1, tt⁺⁺_gp_refl, r⁻⁺, t⁺⁺, I_static, temp2, temp1_ptr, temp2_ptr)
+        # Legacy solar j₀± doubling (uses the solar `expk = exp(-dτ/μ₀)`)
         @timeit "source_update" doubling_source_update!(j₀⁺, j₀⁻, j₁⁺, j₁⁻, r⁻⁺, tt⁺⁺_gp_refl, expk)
+        # v0.7 Phase A.2a — per-source j₀± doubling for non-solar sources.
+        # Each slot carries its OWN `expk` (e.g. `ones` for thermal — the
+        # bottom-sub-layer's emission is not pre-attenuated, matching the
+        # Fortran TIR recipe `rt_doubling.f90:191-197`). The R/T-update math
+        # is the same for every source, so we share `tt⁺⁺_gp_refl` and `r⁻⁺`.
+        @timeit "source_update_by_src" begin
+            for slot in values(j₀_by_src)
+                doubling_source_update!(slot.j₀⁺, slot.j₀⁻,
+                                        slot.dbl_j₁⁺, slot.dbl_j₁⁻,
+                                        r⁻⁺, tt⁺⁺_gp_refl, slot.expk)
+                # Square the per-source expk so it tracks the doubled layer
+                # thickness from the source's reference frame (no-op for
+                # thermal whose expk is `ones`).
+                slot.expk .= slot.expk .^ 2
+            end
+        end
         @timeit "rt_update" doubling_rt_update!(r⁻⁺, t⁺⁺, tt⁺⁺_gp_refl, expk)
     end
     @timeit "sync_doubling" synchronize_if_gpu()
@@ -69,10 +86,16 @@ function doubling_helper!(pol_type,
     @timeit "apply_D_matrix" begin
     apply_D_matrix!(pol_type.n, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻)
     apply_D_matrix_SFI!(pol_type.n, j₀⁻)
+    # Same D-matrix sign correction for each per-source j₀⁻ slot
+    # (unpolarized sources are unaffected since D ≡ 1 on Stokes-I; for
+    # polarized sources the same kernel handles U/V row flips).
+    for slot in values(j₀_by_src)
+        apply_D_matrix_SFI!(pol_type.n, slot.j₀⁻)
+    end
     end
 #    CUBLAS.unsafe_free!(temp_ptrs);
 #    CUBLAS.unsafe_free!(gp_ptrs);
-    return nothing 
+    return nothing
 end
 
 """

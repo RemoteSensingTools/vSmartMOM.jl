@@ -225,6 +225,73 @@ source_ad_mode(::NoSource) = NoSourceJacobian()
 # get the same behaviour as a homogeneous analytic set.
 source_ad_mode(::SourceSet) = AnalyticSourceJacobian()
 
+# ============================================================================
+# v0.7 Phase A.2a — Per-source slot traits
+# ============================================================================
+#
+# `source_key(::AbstractPreparedSource) :: Union{Nothing, Symbol}`
+#
+#   The NamedTuple key under which this source's j₀± / J₀± live in the
+#   `AddedLayer.j₀_by_src` / `CompositeLayer.J₀_by_src` containers.
+#
+#   - `:solar`      → SolarBeam (special: lives in legacy `j₀⁺/j₀⁻` fields,
+#                     not in the by_src NamedTuple, so this returns `nothing`
+#                     to skip slot allocation. The legacy field handles it.)
+#   - `:thermal`    → ThermalEmission (volume Planck)
+#   - `:surface_sif` → SurfaceSIF (lives in legacy slot too — surface
+#                     injection only, no doubling — so returns `nothing`)
+#   - `nothing`     → no slot needed (legacy path / surface-only sources)
+#
+# `source_expk_init(::AbstractPreparedSource, dτ_λ, μ₀, arr_type) -> AbstractArray{FT,1}`
+#
+#   The initial per-spectral expk vector for this source's doubling
+#   recurrence. Squared each doubling step in the noRS doubling loop.
+#   For thermal this is `ones(nSpec)`; the doubling math then reduces to
+#   the legacy Fortran TIR recipe (`rt_doubling.f90:191-197`).
+#
+# Concrete sources override these via methods in their respective files
+# (solar_beam.jl returns `nothing` so the legacy path stays; thermal_emission.jl
+# returns `:thermal` and `ones`).
+# ============================================================================
+
+"""
+    source_key(::AbstractPreparedSource) -> Union{Nothing, Symbol}
+
+Trait: which NamedTuple key (under `AddedLayer.j₀_by_src` /
+`CompositeLayer.J₀_by_src`) carries this source's per-source j₀± / J₀±.
+
+Returns `nothing` for sources that live in the legacy `j₀⁺/j₀⁻` slot
+(solar, surface SIF) — `make_added_layer` will skip slot allocation for
+them. Concrete v0.7 source types that want their own slot override this
+to return a `Symbol` (e.g. `:thermal`).
+"""
+source_key(::AbstractPreparedSource) = nothing
+source_key(::NoSource) = nothing
+
+"""
+    source_expk_init(prep, dτ_λ, μ₀, arr_type) -> AbstractArray{FT,1}
+
+Trait: the initial per-spectral `expk` vector for this source's doubling
+recurrence. Each doubling step squares it (so after `n` doublings the
+factor reflects the full layer thickness from the source's reference
+frame).
+
+- Solar: `exp(-dτ_λ/μ₀)` — the direct-beam attenuation across the lower
+  sub-layer. *Lives in the legacy path*; not consulted via this trait.
+- Thermal: `ones(eltype(dτ_λ), length(dτ_λ))` — the bottom sub-layer's
+  Planck emission is **not** attenuated relative to the top's (both
+  sub-layers self-emit). The squaring is then a no-op (1² = 1), so the
+  doubling recurrence collapses to the Fortran TIR formula
+  `tj⁺ = j⁺ + tt_gp · (j⁺ + r⁻⁺ · j⁻)` (rt_doubling.f90:196).
+
+Default implementation returns a `ones` vector matching the architecture
+of `dτ_λ` (covers thermal and any future isotropic-self-generated source).
+"""
+function source_expk_init(::AbstractPreparedSource, dτ_λ::AbstractArray, _μ₀, arr_type)
+    FT = eltype(dτ_λ)
+    return arr_type(ones(FT, length(dτ_λ)))
+end
+
 # Dispatch table for `+` (debugging aid) =====================================
 #
 # Rules in order of decreasing specificity (Julia picks the most specific
