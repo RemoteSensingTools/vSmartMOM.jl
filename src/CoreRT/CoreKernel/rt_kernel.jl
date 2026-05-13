@@ -207,6 +207,17 @@ function rt_kernel!(RS_type::noRS{FT},
                                 computed_layer_properties,
                                 m, ndoubl, scatter, quad_points,
                                 added_layer,  architecture)
+        # v0.7 Phase A.2a — reset per-source slot.j₀ before contribute!.
+        # The slots persist across the (m, layer) iteration; sources whose
+        # `contribute!` gates out at m > 0 (e.g. ThermalEmission, isotropic
+        # by construction) would otherwise see stale m = 0 data still in
+        # the slot when m > 0 doubling/interaction processes it. Symptom:
+        # disk-integrated thermal radiance scales as `1 + 2·m_max` rather
+        # than the expected `1 · B(T)` for thick isothermal columns.
+        for slot in values(added_layer.j₀_by_src)
+            fill!(slot.j₀⁺, zero(eltype(slot.j₀⁺)))
+            fill!(slot.j₀⁻, zero(eltype(slot.j₀⁻)))
+        end
         # v0.7 Phase A volume-source seam: inject thermal Planck per elemental
         # layer at m=0 only. NoSource / non-volume sources are no-ops. Must
         # land BEFORE doubling so the doubling step propagates the source
