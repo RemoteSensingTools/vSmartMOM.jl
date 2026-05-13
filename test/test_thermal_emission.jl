@@ -358,4 +358,47 @@ using Test
         @test maximum(abs, R_30[:, 1, :]) > 0
     end
 
+    @testset "T-A7: thick isothermal magnitude — R/B = 1 across m_max (slot-leak regression)" begin
+        # MAGNITUDE check that catches the per-source slot-leak bug.
+        #
+        # For an optically thick isothermal column with no scattering
+        # (ϖ = 0) the emergent thermal radiance at TOA must equal
+        # `B(T, ν)` to machine precision — independent of how many
+        # Fourier moments the solver runs. Before the slot-reset fix in
+        # `rt_kernel.jl`, the per-source `slot.j₀±` from m=0 leaked into
+        # m>0 doublings and produced `R/B = 1 + 2·m_max` (vaz=0 phase
+        # gathers all moments coherently): m_max=0 → 1, m_max=1 → 3,
+        # m_max=2 → 5, …
+        #
+        # This test pins R/B = 1 at three different forced m_max values.
+        #
+        # Build PureRayleighParameters in IR; force τ_abs huge per layer
+        # so the column is fully opaque; T_iso so the only relevant
+        # quantity is B(T_iso, ν).
+        params = parameters_from_yaml("test_parameters/PureRayleighParameters.yaml")
+        params.architecture = vSmartMOM.Architectures.CPU()
+        params.vza = [0.0]
+        params.vaz = [0.0]
+        T_iso = 250.0
+
+        for m_force in (0, 1, 2)
+            model = model_from_parameters(params)
+            ν = collect(CoreRT.get_spec_bands(model)[1])
+            # Force the Fourier-moment count for this Pkg.test invocation.
+            model.solver.m_max_bands[1] = m_force
+            # Fully opaque per-layer absorption so the atmosphere is a
+            # blackbody at T_iso to numerical precision.
+            fill!(model.τ_abs[1], 100.0)
+
+            FT_mod = CoreRT.float_type(model)
+            T_layers = fill(FT_mod(T_iso), length(model.profile.T))
+            thermal = ThermalEmission(T_layers, ν)
+
+            R, _T_out = rt_run(model; sources = thermal)
+            B_expected = vSmartMOM.SolarModel.planck_spectrum_wn(T_iso, Float64.(ν))[1]
+            ratio = R[1, 1, 1] / B_expected
+            @test isapprox(ratio, 1.0; atol = 1e-3)
+        end
+    end
+
 end

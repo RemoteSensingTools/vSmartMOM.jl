@@ -289,13 +289,10 @@ function contribute!(prep::PreparedThermalEmission, added_layer,
     arr_type = array_type(architecture)
     j_th_dev = arr_type(j_th)
 
-    # Reset the slot before writing this layer's contribution. The slot is
-    # reused across the per-layer iteration of the Fourier loop, so each
-    # layer must overwrite (not accumulate). Use `.=` so Q/U/V rows are
-    # explicitly zeroed too (thermal Planck is unpolarized; only Stokes-I
-    # gets a nonzero contribution).
-    slot.j₀⁺ .= 0
-    slot.j₀⁻ .= 0
+    # NB: the slot is zeroed by `rt_kernel!` immediately before this
+    # contribute! call — see the per-source slot-reset block at the top
+    # of the noRS{FT} `rt_kernel!` body. Writing only the Stokes-I rows
+    # here is therefore safe (Q/U/V stay at zero from that reset).
     @inbounds for iμ in 1:Nquad
         i_I = (iμ - 1) * nStokes + 1
         slot.j₀⁺[i_I, 1, :] .= j_th_dev[iμ, :]
