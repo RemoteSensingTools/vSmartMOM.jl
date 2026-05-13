@@ -42,7 +42,64 @@ const CORE_RT_BENCHMARK_DIR = joinpath(@__DIR__, "benchmarks")
 
 end
 
-@testset "compare against natraj paper" begin 
+@testset "rt_run_streams: Fourier+stream recovery of rt_run" begin
+    # Verify that rt_run_streams + a manual Fourier+nearest-stream
+    # reconstruction (mirroring postprocessing_vza.jl) reproduces
+    # rt_run's R_SFI output exactly. This is the bit-exact plumbing
+    # check for the per-moment streams export (Phase H) that lets
+    # ExoOptics's disk integrator do one rt_run per band instead of
+    # one per disk pixel.
+    parameters = parameters_from_yaml(joinpath(CORE_RT_BENCHMARK_DIR, "natraj.yaml"))
+    parameters.spec_bands = [[1e7/360.0, 1e7/360.0 + 1]]
+    # A handful of VZA × VAZ pairs, all at the same SZA — same Coulson
+    # geometry the rest of test_CoreRT.jl uses.
+    parameters.vza = [11.4783, 23.0739, 50.2082, 73.7398]
+    parameters.vaz = [0.0, 60.0, 120.0, 180.0]
+    parameters.sza = acosd(0.2)
+
+    # Direct rt_run (the reference output)
+    model_a = model_from_parameters(parameters)
+    model_a.τ_rayl[1] .= 0.5
+    R_direct, _T_direct = vSmartMOM.CoreRT.rt_run(model_a)
+
+    # Streams output (separate model — both build from the same
+    # `parameters` so optical depth + Fourier-loop bounds match)
+    model_b = model_from_parameters(parameters)
+    model_b.τ_rayl[1] .= 0.5
+    streams = vSmartMOM.CoreRT.rt_run_streams(model_b)
+
+    # Reconstruct R from streams: per-(vza, vaz), Fourier-sum the
+    # per-moment J⁻ at the nearest quadrature stream to cos(vza),
+    # weighted by (Fourier weight) · (cos m·φ) for I,Q and
+    # (sin m·φ) for U,V. This is exactly what postprocessing_vza.jl
+    # does internally — we just do it offline from the streams.
+    pol_n = streams.pol_n
+    nVZA  = length(parameters.vza)
+    nSpec = size(R_direct, 3)
+    R_recon = zeros(eltype(R_direct), nVZA, pol_n, nSpec)
+    for (i, vza_deg) in enumerate(parameters.vza)
+        vaz_deg = parameters.vaz[i]
+        # vSmartMOM's nearest-point logic (matches postprocessing_vza._precompute_vza_weights)
+        iμ = argmin(abs.(streams.qp_μ .- cosd(vza_deg)))
+        istart = (iμ - 1) * pol_n + 1
+        iend   = iμ * pol_n
+        for mi in eachindex(streams.J⁻_per_m)
+            m = mi - 1
+            cosmφ = cosd(m * vaz_deg)
+            sinmφ = sind(m * vaz_deg)
+            stokes_weights = pol_n == 1 ? cosmφ : [cosmφ, cosmφ, sinmφ, sinmφ][1:pol_n]
+            for s in 1:nSpec
+                slice = streams.J⁻_per_m[mi][istart:iend, 1, s]
+                R_recon[i, :, s] .+= streams.weight[mi] .* stokes_weights .* slice
+            end
+        end
+    end
+
+    @test size(R_recon) == size(R_direct)
+    @test isapprox(R_recon, R_direct; atol = 1e-12, rtol = 1e-10)
+end
+
+@testset "compare against natraj paper" begin
 
     I_modeled_all = zeros(7, 16);
     I_deltas_all  = zeros(7, 16);
