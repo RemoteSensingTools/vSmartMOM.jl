@@ -50,8 +50,125 @@ R[1, 1, :]  # Stokes-I reflectance at first VZA across the spectrum
 - [`rt_run(model, lin_model, NAer, NGas, NSurf)`](@ref) for linearized RT with Jacobians.
 - [`model_from_parameters`](@ref) to build the model from parameters.
 """
-function rt_run(model; i_band::Integer = 1, sources::Union{Nothing, AbstractSource} = nothing)
-    rt_run(InelasticScattering.noRS{float_type(model)}(), model, i_band; sources)
+function rt_run(model; i_band::Integer = 1,
+                sources::Union{Nothing, AbstractSource} = nothing,
+                streams_callback::Union{Nothing, Function} = nothing)
+    rt_run(InelasticScattering.noRS{float_type(model)}(), model, i_band;
+           sources, streams_callback)
+end
+
+"""
+    StreamRTResult{FT}
+
+Per-Fourier-moment radiative-transfer result at all internal quadrature
+streams — the output of [`rt_run_streams`](@ref). Downstream consumers
+(e.g. ExoOptics disk integration) reconstruct the Stokes vector at
+arbitrary `(μ_v, μ_0, Δφ)` by interpolating over `(μ_v, μ_0)` and
+Fourier-summing over `m` with `cos(m·Δφ) / sin(m·Δφ)` weights, instead
+of one `rt_run` per pixel.
+
+# Fields
+- `qp_μ :: Vector{FT}` — full quadrature mu nodes (length `Nquad`).
+- `iμ₀ :: Int` — index into `qp_μ` of the SZA stream (the closest to `μ₀`).
+- `μ₀ :: FT` — cosine of the chosen incident-beam SZA.
+- `pol_n :: Int` — number of Stokes components (`pol_type.n`).
+- `weight :: Vector{FT}` — Fourier weight `(0.5/π for m=0; 1/π otherwise)`
+  used for each moment by the internal post-processor.
+- `R⁻⁺_per_m :: Vector{Array{FT, 3}}` — `(NquadN, NquadN, nSpec)` per
+  Fourier moment, where `NquadN = Nquad · pol_n`. This is the
+  full-stream reflection matrix (stokes-out blocks × stokes-in blocks).
+- `J⁻_per_m :: Vector{Array{FT, 3}}` — `(NquadN, 1, nSpec)` per Fourier
+  moment, the combined per-source SFI Stokes at all output streams
+  (legacy slot + all per-source slots summed). Use this when you want
+  the SFI-style output without re-running RT.
+- `J⁺_per_m :: Vector{Array{FT, 3}}` — analog for BOA transmittance.
+
+# Recovering `rt_run`'s output
+```julia
+streams = rt_run_streams(model; sources = sources)
+# At a single (vza, vaz):
+iμ = nearest_point(streams.qp_μ, cosd(vza))
+_, istart, iend = get_indices(iμ, pol_type)
+R_recovered = zero(rt_run(model; sources)[1][1, :, :])  # (n_stokes, nSpec)
+for (mi, m) in enumerate(0:length(streams.J⁻_per_m)-1)
+    cosmφ = cosd(m * vaz); sinmφ = sind(m * vaz)
+    w_stokes = pol_n == 1 ? streams.weight[mi] * cosmφ :
+               streams.weight[mi] *
+               Diagonal([cosmφ, cosmφ, sinmφ, sinmφ][1:pol_n])
+    for s in 1:nSpec
+        R_recovered[:, s] .+= w_stokes * streams.J⁻_per_m[mi][istart:iend, 1, s]
+    end
+end
+```
+
+A unit test pins the bit-exact agreement of this reconstruction against
+`rt_run` for one published-figure geometry.
+"""
+struct StreamRTResult{FT}
+    qp_μ      :: Vector{FT}
+    iμ₀       :: Int
+    μ₀        :: FT
+    pol_n     :: Int
+    weight    :: Vector{FT}
+    R⁻⁺_per_m :: Vector{Array{FT, 3}}
+    J⁻_per_m  :: Vector{Array{FT, 3}}
+    J⁺_per_m  :: Vector{Array{FT, 3}}
+end
+
+"""
+    rt_run_streams(model; i_band=1, sources=nothing) -> StreamRTResult
+
+Run the RT solver and return per-Fourier-moment Stokes matrices at all
+quadrature streams instead of post-processed `(vza, vaz)` outputs. See
+[`StreamRTResult`](@ref) for the data layout and a worked recovery example.
+
+Internally just calls [`rt_run`](@ref) with a `streams_callback` that
+copies `composite_layer.R⁻⁺`, `composite_layer.J₀⁺/⁻`, and the combined
+per-source-slot SFI contributions out of the live layer accumulators
+once per Fourier moment.
+"""
+function rt_run_streams(model; i_band::Integer = 1,
+                         sources::Union{Nothing, AbstractSource} = nothing)
+    FT = float_type(model)
+    R⁻⁺_list = Vector{Array{FT, 3}}()
+    J⁻_list  = Vector{Array{FT, 3}}()
+    J⁺_list  = Vector{Array{FT, 3}}()
+    weights  = FT[]
+    qp_μ_save = Vector{FT}()
+    iμ₀_save = Ref(0)
+    μ₀_save  = Ref(zero(FT))
+    pol_n_save = Ref(0)
+
+    cb = function (state)
+        if isempty(qp_μ_save)
+            append!(qp_μ_save, FT.(state.qp_μ))
+            iμ₀_save[]   = state.iμ₀
+            μ₀_save[]    = FT(state.μ₀)
+            pol_n_save[] = state.pol_type.n
+        end
+        push!(weights, FT(state.weight))
+        push!(R⁻⁺_list, Array{FT, 3}(_to_cpu(state.composite_layer.R⁻⁺)))
+        # Sum legacy slot + per-source slots so consumers see the same
+        # combined SFI output that postprocessing_vza! accumulates into
+        # R_SFI / T_SFI. The deepcopy on the legacy slot decouples our
+        # stored copy from the live layer matrices (which the next m
+        # iteration overwrites).
+        J⁻_combined = Array{FT, 3}(_to_cpu(state.composite_layer.J₀⁻))
+        J⁺_combined = Array{FT, 3}(_to_cpu(state.composite_layer.J₀⁺))
+        for cslot in values(state.composite_layer.J₀_by_src)
+            J⁻_combined .+= _to_cpu(cslot.J₀⁻)
+            J⁺_combined .+= _to_cpu(cslot.J₀⁺)
+        end
+        push!(J⁻_list, J⁻_combined)
+        push!(J⁺_list, J⁺_combined)
+    end
+
+    rt_run(model; i_band, sources, streams_callback = cb)
+
+    return StreamRTResult{FT}(
+        qp_μ_save, iμ₀_save[], μ₀_save[], pol_n_save[],
+        weights, R⁻⁺_list, J⁻_list, J⁺_list,
+    )
 end
 
 """
@@ -98,7 +215,8 @@ bit-for-bit. When a [`SourceSet`](@ref) (or a single
 SFI kernel call. Phase 5 will remove the `RS_type.F₀` indirection.
 """
 function rt_run(RS_type::AbstractRamanType, model, iBand;
-                sources::Union{Nothing, AbstractSource} = nothing)
+                sources::Union{Nothing, AbstractSource} = nothing,
+                streams_callback::Union{Nothing, Function} = nothing)
     # Apply the per-model BLAS thread cap once per `rt_run` invocation
     # (no-op when `model.numerics.blas_threads === nothing`). Lives here
     # so swapping models with different caps "just works" — the caller
@@ -347,13 +465,34 @@ function rt_run(RS_type::AbstractRamanType, model, iBand;
                             T, T_SFI,
                             ieR_SFI, ieT_SFI)
 
-        @timeit "Postprocessing HDRF" postprocessing_vza_hdrf!(RS_type, 
-            iμ₀, pol_type, 
-            hdr_J₀⁻, 
-            vza, qp_μ, m, vaz, μ₀, 
-            weight, nSpec, 
+        @timeit "Postprocessing HDRF" postprocessing_vza_hdrf!(RS_type,
+            iμ₀, pol_type,
+            hdr_J₀⁻,
+            vza, qp_μ, m, vaz, μ₀,
+            weight, nSpec,
             hdr)
-            
+
+        # Phase H — per-moment streams export hook (v0.7+).
+        # Optional callback called once per Fourier moment AFTER the layer
+        # accumulators have settled but BEFORE the moment-aware quantities
+        # are overwritten by the next m iteration. The callback receives
+        # everything it needs to reproduce the post-processing offline:
+        # the moment index `m`, the Fourier weight `w` that the internal
+        # post-processor used, the polarization type (so it knows the
+        # stokes layout), the quadrature mu nodes + iμ₀ (the SZA stream
+        # index), μ₀ itself, and the composite_layer. Downstream
+        # consumers (ExoOptics disk integration, custom post-processors)
+        # use the per-moment R⁻⁺ / J₀⁻ stored in `composite_layer` to do
+        # their own Fourier sum + interpolation onto arbitrary
+        # (μ_v, μ_0, Δφ) without needing one rt_run per (sza, vza, vaz).
+        #
+        # Cost when the callback is `nothing`: a single branch in the m
+        # loop, no allocations — bit-exact backwards compat.
+        if streams_callback !== nothing
+            streams_callback((;
+                m, weight, pol_type, qp_μ, iμ₀, μ₀,
+                composite_layer, nSpec))
+        end
     end
 
     # Single-scattering correction for Cox-Munk specular hotspot (TMS)
