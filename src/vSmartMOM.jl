@@ -106,7 +106,8 @@ import .IO: parameters_from_file, parameters_from_source,
             GCHPFile, GCHPScene, scene_at, scenes,
             read_gchp_scene, scene_to_dict, parameters_from_scene,
             compute_scene_aod,
-            write_scene_result, generate_benchmark, write_gchp_aod_diagnostic
+            write_scene_result, generate_benchmark,
+            write_gchp_aod_diagnostic, write_gchp_aod_diagnostic_bulk
 
 # SIF emission data + loaders
 import DataInterpolations: ExtrapolationType
@@ -123,7 +124,8 @@ export GeosChemSource, geoschem_to_dict, read_geoschem_profile
 export GCHPFile, GCHPScene, scene_at, scenes,
        read_gchp_scene, scene_to_dict, parameters_from_scene,
        compute_scene_aod
-export write_scene_result, generate_benchmark, write_gchp_aod_diagnostic
+export write_scene_result, generate_benchmark,
+       write_gchp_aod_diagnostic, write_gchp_aod_diagnostic_bulk
 # Export linearized RT functions
 export rt_run_lin, model_from_parameters_lin
 # gchp-io: atmosphere/surface split (Phase C) + scenario sweep (Phase D)

@@ -45,7 +45,8 @@ export GCHPFile, GCHPScene, scene_at, scenes,
        read_gchp_scene, scene_to_dict, parameters_from_scene,
        compute_scene_aod
 # Benchmark writer + scene-loop driver
-export write_scene_result, generate_benchmark, write_gchp_aod_diagnostic
+export write_scene_result, generate_benchmark,
+       write_gchp_aod_diagnostic, write_gchp_aod_diagnostic_bulk
 
 """
     parameters_from_file(path::AbstractString) -> vSmartMOM_Parameters
