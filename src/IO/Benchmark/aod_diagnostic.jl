@@ -19,6 +19,8 @@ function write_gchp_aod_diagnostic(out_path::AbstractString,
                                    faces = nothing,
                                    xrange = nothing,
                                    yrange = nothing,
+                                   integration = nothing,
+                                   mie_lut = nothing,
                                    ri_round_digits = nothing,
                                    FT::DataType = Float64)
     λs = FT.(wavelengths_um)
@@ -54,9 +56,13 @@ function write_gchp_aod_diagnostic(out_path::AbstractString,
 
             for idf in face_iter, idy in y_iter, idx in x_iter
                 scene = scene_at(f, idx, idy, idf; FT=FT)
+                aod_kwargs = integration === nothing ?
+                    (; mie_cache=mie_cache, mie_lut=mie_lut,
+                     ri_round_digits=ri_round_digits) :
+                    (; integration=integration, mie_cache=mie_cache,
+                     mie_lut=mie_lut, ri_round_digits=ri_round_digits)
                 aod[idx, idy, idf, :] = Float64.(compute_scene_aod(
-                    scene, λs; mie_cache=mie_cache,
-                    ri_round_digits=ri_round_digits))
+                    scene, λs; aod_kwargs...))
             end
 
             ds.attrib["source_file"] = String(gchp_path)
@@ -64,6 +70,8 @@ function write_gchp_aod_diagnostic(out_path::AbstractString,
             ds.attrib["time"] = string(f.time)
             ds.attrib["aod_algorithm"] = "Mie extinction at sectional bin centers with volume-weighted effective RI"
             ds.attrib["ri_round_digits"] = ri_round_digits === nothing ? "none" : string(ri_round_digits)
+            ds.attrib["mie_lut"] = mie_lut === nothing ? "none" : string(typeof(mie_lut))
+            ds.attrib["integration"] = integration === nothing ? "scene default" : string(integration)
         end
     end
 

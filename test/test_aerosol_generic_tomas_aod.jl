@@ -8,6 +8,9 @@ const _AOD_RI_DATABASE = joinpath(dirname(@__DIR__), "data",
                                   "refractive_indices_database.yaml")
 const _AOD_GCHP_FILE = get(ENV, "VSMARTMOM_GCHP_FILE",
                            "/home/cfranken/data/GEOSChem.Custom.20190702_0000z.nc4")
+if !isdefined(Main, :AerosolMieExtinctionLUT)
+    include(joinpath(dirname(@__DIR__), "src", "Aerosols", "LUT", "mie_extinction_lut.jl"))
+end
 
 @testset "Generic TOMAS schemes" begin
     expected_bins = Dict(:tomas12 => 12, :tomas15 => 15, :tomas30 => 30, :tomas40 => 40)
@@ -96,6 +99,31 @@ end
     @test any(aod .> 0)
     @test all(isfinite.(aod_constant))
     @test all(isfinite.(aod_direct))
+end
+
+@testset "Mie extinction LUT" begin
+    lut = Main.AerosolMieExtinctionLUT.build_mie_extinction_lut(
+        [0.001, 1.0, 100.0], [1.4, 1.5], [0.0, 0.01]; FT=Float32)
+    q_mid = Main.AerosolMieExtinctionLUT.evaluate_extinction_lut(lut, 0.1, 1.45, 0.005)
+    @test isfinite(q_mid)
+    @test q_mid >= 0
+
+    scheme = TOMASScheme(:tomas15; include_species=["SF"])
+    number = zeros(Float64, scheme.n_bins, 1)
+    number[4, 1] = 100.0
+    mass = zeros(Float64, scheme.n_bins, 1, 1)
+    mass[4, 1, 1] = 1.0
+    data = SectionalAerosolData(
+        scheme, scheme.size_grid, number, ["SF"], mass,
+        (; variant=:tomas15),
+        load_refractive_index_database(_AOD_RI_DATABASE),
+        VolumeWeightedMixing(), DirectBinSum())
+
+    aod = compute_column_aod(data, [500.0, 1000.0], [280.0], [0.0], [0.760];
+                             mie_lut=lut)
+    @test size(aod) == (1,)
+    @test isfinite(aod[1])
+    @test aod[1] >= 0
 end
 
 @testset "GCHP full-file AOD diagnostic" begin

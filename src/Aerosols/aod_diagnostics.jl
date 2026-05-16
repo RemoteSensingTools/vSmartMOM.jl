@@ -179,6 +179,7 @@ function compute_column_aod(aerosols::SectionalAerosolData{FT},
                             mixing_rule::AbstractMixingRule = aerosols.mixing_rule,
                             integration::AbstractBinIntegration = aerosols.integration,
                             mie_cache = nothing,
+                            mie_lut = nothing,
                             ri_round_digits::Union{Nothing, Integer} = nothing) where {FT}
     nlay = nlayers(aerosols)
     length(p_half) == nlay + 1 ||
@@ -209,7 +210,8 @@ function compute_column_aod(aerosols::SectionalAerosolData{FT},
                 n_eff = effective_ri(comp, db, λ, mixing_rule, aerosols.scheme)
                 τ += _integrated_bin_extinction(aerosols, ibin, ilev, λ,
                                                 n_eff, integration,
-                                                mie_cache, ri_round_digits) *
+                                                mie_cache, mie_lut,
+                                                ri_round_digits) *
                      dz_layer
             end
         end
@@ -223,10 +225,11 @@ function _integrated_bin_extinction(aerosols::SectionalAerosolData{FT},
                                     ibin::Integer, ilev::Integer,
                                     λ::FT, n_eff::Complex{FT},
                                     ::DirectBinSum,
-                                    mie_cache, ri_round_digits) where {FT}
+                                    mie_cache, mie_lut, ri_round_digits) where {FT}
     N_m3 = aerosols.number[ibin, ilev] * FT(1e6)
     r_um = _grid_radius_um(aerosols.size_grid, ibin)
-    c_ext = _cached_mie_extinction(r_um, λ, n_eff, mie_cache, ri_round_digits)
+    c_ext = _cached_mie_extinction(r_um, λ, n_eff, mie_cache, mie_lut,
+                                   ri_round_digits)
     return N_m3 * c_ext
 end
 
@@ -234,7 +237,7 @@ function _integrated_bin_extinction(aerosols::SectionalAerosolData{FT},
                                     ibin::Integer, ilev::Integer,
                                     λ::FT, n_eff::Complex{FT},
                                     integration::ConstantIntegrationPerBin,
-                                    mie_cache, ri_round_digits) where {FT}
+                                    mie_cache, mie_lut, ri_round_digits) where {FT}
     xlo, xhi = _bin_log_bounds(aerosols.size_grid, ibin)
     xmid = (xlo + xhi) / FT(2)
     half_width = (xhi - xlo) / FT(2)
@@ -245,7 +248,8 @@ function _integrated_bin_extinction(aerosols::SectionalAerosolData{FT},
     @inbounds for i in eachindex(nodes)
         x = xmid + half_width * FT(nodes[i])
         r_um = _radius_from_log_size(aerosols.size_grid, x)
-        c_ext = _cached_mie_extinction(r_um, λ, n_eff, mie_cache, ri_round_digits)
+        c_ext = _cached_mie_extinction(r_um, λ, n_eff, mie_cache, mie_lut,
+                                       ri_round_digits)
         β += FT(weights[i]) * mean_dndlog * c_ext
     end
     return half_width * β
@@ -255,7 +259,7 @@ function _integrated_bin_extinction(aerosols::SectionalAerosolData{FT},
                                     ibin::Integer, ilev::Integer,
                                     λ::FT, n_eff::Complex{FT},
                                     integration::LinearIntegrationPerBin,
-                                    mie_cache, ri_round_digits) where {FT}
+                                    mie_cache, mie_lut, ri_round_digits) where {FT}
     xlo, xhi = _bin_log_bounds(aerosols.size_grid, ibin)
     xmid = (xlo + xhi) / FT(2)
     half_width = (xhi - xlo) / FT(2)
@@ -270,21 +274,38 @@ function _integrated_bin_extinction(aerosols::SectionalAerosolData{FT},
         dndlog = mean_dndlog + slope * (x - xmid)
         dndlog = max(zero(FT), dndlog)
         r_um = _radius_from_log_size(aerosols.size_grid, x)
-        c_ext = _cached_mie_extinction(r_um, λ, n_eff, mie_cache, ri_round_digits)
+        c_ext = _cached_mie_extinction(r_um, λ, n_eff, mie_cache, mie_lut,
+                                       ri_round_digits)
         β += FT(weights[i]) * dndlog * c_ext
     end
     return half_width * β
 end
 
 _integrated_bin_extinction(::SectionalAerosolData, _ibin, _ilev, _λ, _n_eff,
-                           ::LogNormalFit, _mie_cache, _ri_round_digits) =
+                           ::LogNormalFit, _mie_cache, _mie_lut, _ri_round_digits) =
     error("LogNormalFit AOD integration is not implemented for sectional data yet")
+
+function _lut_mie_extinction(radius_um::FT,
+                             wavelength_um::FT,
+                             n_eff::Complex{FT},
+                             mie_lut) where {FT}
+    x = FT(2π) * radius_um / wavelength_um
+    n_real = real(n_eff)
+    n_imag = max(zero(FT), imag(n_eff))
+    q_ext = mie_lut.q_ext(x, n_real, n_imag)
+    return max(zero(FT), FT(q_ext)) * FT(π) * radius_um^2 * FT(1e-12)
+end
 
 function _cached_mie_extinction(radius_um::FT,
                                 wavelength_um::FT,
                                 n_eff::Complex{FT},
                                 cache,
+                                mie_lut,
                                 ri_round_digits) where {FT}
+    if mie_lut !== nothing
+        return _lut_mie_extinction(radius_um, wavelength_um, n_eff, mie_lut)
+    end
+
     cache === nothing && return _mie_extinction_cross_section(radius_um, wavelength_um, n_eff)
 
     key = if ri_round_digits === nothing

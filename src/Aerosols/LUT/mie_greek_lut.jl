@@ -59,7 +59,7 @@ function single_particle_mie_greek(x::FT, n_real::FT, n_imag::FT;
     n_real > zero(FT) || throw(ArgumentError("n_real must be positive"))
     n_imag >= zero(FT) || throw(ArgumentError("n_imag must be nonnegative"))
 
-    n_mie = Scattering.get_n_max(x)
+    n_mie = max(Scattering.get_n_max(x), 2)
     lmax_eff = lmax === nothing ? n_mie - 1 : Int(lmax)
     lmax_eff >= 1 || throw(ArgumentError("lmax must be at least 1"))
 
