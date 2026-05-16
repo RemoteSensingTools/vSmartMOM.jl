@@ -97,6 +97,14 @@ end
 
     @test size(R_recon) == size(R_direct)
     @test isapprox(R_recon, R_direct; atol = 1e-12, rtol = 1e-10)
+
+    # Sanity-check the τ profile + T⁺⁺ streams (extended Phase H output).
+    @test size(streams.τ_rayl) == size(streams.τ_abs) == size(streams.τ_total)
+    @test all(isfinite, streams.τ_rayl)
+    @test all(streams.τ_total .≈ streams.τ_rayl .+ streams.τ_abs)
+    @test all(>(0), sum(streams.τ_rayl; dims=2))     # nonzero Rayleigh column
+    @test length(streams.T⁺⁺_per_m) == length(streams.R⁻⁺_per_m)
+    @test size(streams.T⁺⁺_per_m[1]) == size(streams.R⁻⁺_per_m[1])
 end
 
 @testset "compare against natraj paper" begin

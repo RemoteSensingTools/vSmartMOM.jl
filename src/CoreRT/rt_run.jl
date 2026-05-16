@@ -110,9 +110,16 @@ struct StreamRTResult{FT}
     μ₀        :: FT
     pol_n     :: Int
     weight    :: Vector{FT}
-    R⁻⁺_per_m :: Vector{Array{FT, 3}}
-    J⁻_per_m  :: Vector{Array{FT, 3}}
-    J⁺_per_m  :: Vector{Array{FT, 3}}
+    R⁻⁺_per_m :: Vector{Array{FT, 3}}     # TOA reflection block (NquadN, NquadN, nSpec)
+    T⁺⁺_per_m :: Vector{Array{FT, 3}}     # BOA transmission block (NquadN, NquadN, nSpec)
+    J⁻_per_m  :: Vector{Array{FT, 3}}     # SFI source-convolved upwelling (NquadN, 1, nSpec)
+    J⁺_per_m  :: Vector{Array{FT, 3}}     # SFI source-convolved downwelling
+    # Optical-depth profile (m-independent, captured once on m=0). Shape
+    # `(nSpec, nLayer)`. Useful for ExoOptics post-processing — photon
+    # budget, weighting-function decompositions, retrieval Jacobians.
+    τ_total   :: Array{FT, 2}             # τ_rayl + τ_abs + (τ_aer if active)
+    τ_rayl    :: Array{FT, 2}
+    τ_abs     :: Array{FT, 2}
 end
 
 """
@@ -131,6 +138,7 @@ function rt_run_streams(model; i_band::Integer = 1,
                          sources::Union{Nothing, AbstractSource} = nothing)
     FT = float_type(model)
     R⁻⁺_list = Vector{Array{FT, 3}}()
+    T⁺⁺_list = Vector{Array{FT, 3}}()
     J⁻_list  = Vector{Array{FT, 3}}()
     J⁺_list  = Vector{Array{FT, 3}}()
     weights  = FT[]
@@ -148,6 +156,7 @@ function rt_run_streams(model; i_band::Integer = 1,
         end
         push!(weights, FT(state.weight))
         push!(R⁻⁺_list, Array{FT, 3}(_to_cpu(state.composite_layer.R⁻⁺)))
+        push!(T⁺⁺_list, Array{FT, 3}(_to_cpu(state.composite_layer.T⁺⁺)))
         # Sum legacy slot + per-source slots so consumers see the same
         # combined SFI output that postprocessing_vza! accumulates into
         # R_SFI / T_SFI. The deepcopy on the legacy slot decouples our
@@ -165,9 +174,21 @@ function rt_run_streams(model; i_band::Integer = 1,
 
     rt_run(model; i_band, sources, streams_callback = cb)
 
+    # Capture the τ profile from the model. These are m-independent
+    # quantities the user wants for post-processing (photon budget,
+    # weighting functions, retrieval Jacobians). Shape: (nSpec, nLayer).
+    # Aerosol contribution is NOT included here — `model.optics.aerosols.τ_aer`
+    # is stored as (n_aer, nLayer) which doesn't broadcast directly. A
+    # spectral aerosol contribution would need the per-band σ_ext applied
+    # at the same time; defer to a follow-up when aerosols are wired.
+    τ_rayl  = Array{FT, 2}(_to_cpu(model.τ_rayl[i_band]))
+    τ_abs   = Array{FT, 2}(_to_cpu(model.τ_abs[i_band]))
+    τ_total = τ_rayl .+ τ_abs
+
     return StreamRTResult{FT}(
         qp_μ_save, iμ₀_save[], μ₀_save[], pol_n_save[],
-        weights, R⁻⁺_list, J⁻_list, J⁺_list,
+        weights, R⁻⁺_list, T⁺⁺_list, J⁻_list, J⁺_list,
+        τ_total, τ_rayl, τ_abs,
     )
 end
 
