@@ -52,9 +52,13 @@ R[1, 1, :]  # Stokes-I reflectance at first VZA across the spectrum
 """
 function rt_run(model; i_band::Integer = 1,
                 sources::Union{Nothing, AbstractSource} = nothing,
-                streams_callback::Union{Nothing, Function} = nothing)
+                streams_callback::Union{Nothing, Function} = nothing,
+                atm_snapshot_callback::Union{Nothing, Function} = nothing,
+                stop_after_atmosphere::Bool = false,
+                m_max_override::Union{Nothing, Int} = nothing)
     rt_run(InelasticScattering.noRS{float_type(model)}(), model, i_band;
-           sources, streams_callback)
+           sources, streams_callback,
+           atm_snapshot_callback, stop_after_atmosphere, m_max_override)
 end
 
 """
@@ -216,7 +220,10 @@ SFI kernel call. Phase 5 will remove the `RS_type.F₀` indirection.
 """
 function rt_run(RS_type::AbstractRamanType, model, iBand;
                 sources::Union{Nothing, AbstractSource} = nothing,
-                streams_callback::Union{Nothing, Function} = nothing)
+                streams_callback::Union{Nothing, Function} = nothing,
+                atm_snapshot_callback::Union{Nothing, Function} = nothing,
+                stop_after_atmosphere::Bool = false,
+                m_max_override::Union{Nothing, Int} = nothing)
     # Apply the per-model BLAS thread cap once per `rt_run` invocation
     # (no-op when `model.numerics.blas_threads === nothing`). Lives here
     # so swapping models with different caps "just works" — the caller
@@ -232,6 +239,14 @@ function rt_run(RS_type::AbstractRamanType, model, iBand;
     # max across bands; per-component skipping inside the loop is a
     # Phase C concern.
     m_max = maximum(m_max_bands(model)[ib] for ib in iBand)
+    # gchp-io PR — Phase C: allow callers (esp. `rt_run_atmosphere`) to
+    # widen the Fourier loop bound without mutating `model.solver`. When
+    # set, `m_max_override` raises the cap to at least the supplied value;
+    # we never lower below the model-derived `m_max` (that would silently
+    # truncate scattering — surprising and almost certainly a bug).
+    if m_max_override !== nothing
+        m_max = max(m_max, m_max_override)
+    end
     (; quad_points) = model
     FT       = CoreRT.float_type(model)
     dτ_max_threshold = model.numerics.dτ_max_threshold   # numerical knob → rt_kernel!
@@ -398,6 +413,30 @@ function rt_run(RS_type::AbstractRamanType, model, iBand;
                         dτ_min_floor=dτ_min_floor)
         end
 
+        # gchp-io PR — atmosphere/surface split hooks (Phase C.2).
+        # Fire the optional callback once the iz-loop has settled and the
+        # composite layer holds the atmosphere-only state for this m. This
+        # is BEFORE the surface step (lines below); when the caller asks
+        # to stop here, we skip the surface block + postprocessing + SS
+        # correction entirely (saving real work, not just discarding
+        # outputs). When `atm_snapshot_callback` is `nothing` and
+        # `stop_after_atmosphere=false`, this is a single branch — bit-
+        # equal to pre-PR behaviour.
+        if atm_snapshot_callback !== nothing
+            atm_snapshot_callback((;
+                m, weight, pol_type, qp_μ, iμ₀, μ₀,
+                vza, vaz, nSpec, NquadN, iBand, SFI,
+                composite_layer,
+                scattering_interface_surf = scattering_interfaces_all[end],
+                τ_sum_surf = τ_sum_all[:, end],
+                arr_type, arch, RS_type, prepared_sources, I_static,
+                quad_points,
+            ))
+        end
+        if stop_after_atmosphere
+            continue
+        end
+
         # Create surface matrices:
         if brdf isa CanopySurface
             @timeit "Create Surface" create_surface_layer!(brdf,
@@ -495,8 +534,10 @@ function rt_run(RS_type::AbstractRamanType, model, iBand;
         end
     end
 
-    # Single-scattering correction for Cox-Munk specular hotspot (TMS)
-    if brdf isa CoxMunkSurface && SFI
+    # Single-scattering correction for Cox-Munk specular hotspot (TMS).
+    # Skip when `stop_after_atmosphere` — there is no surface phase to
+    # correct.
+    if brdf isa CoxMunkSurface && SFI && !stop_after_atmosphere
         @timeit "SS Correction" apply_ss_correction!(
             R_SFI, brdf, pol_type, vza, vaz, μ₀,
             Array(τ_sum_all[:,end]), m_max, nSpec)

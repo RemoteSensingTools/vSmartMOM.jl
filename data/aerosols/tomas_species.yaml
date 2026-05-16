@@ -1,0 +1,194 @@
+# =============================================================================
+# TOMAS aerosol species + bin geometry — authoritative table
+#
+# Source: GCHP / GEOS-Chem upstream code at
+#   src/GCHP_GridComp/GEOSChem_GridComp/geos-chem/GeosCore/tomas_mod.F90
+#   src/GCHP_GridComp/GEOSChem_GridComp/geos-chem/run/shared/species_database_tomas.yml
+#
+# This file is the SINGLE SOURCE OF TRUTH consumed by both
+#   • src/Aerosols/schemes/tomas15.jl  (Julia reader)
+#   • docs/src/pages/aerosols/tomas_overview.md  (human docs)
+# Update one, regenerate the other.
+#
+# Conventions:
+#   • mass (Mo, Xk, AVGMASS):  kg per particle
+#   • diameter (Dp):           m   (use Dp_um helper for μm)
+#   • density:                 kg/m³
+#   • molar mass (MOLWT):      g/mol  (GCHP native; convert at point of use)
+#
+# Diameter from bin mass + density:
+#     Dp = ( mp / ρ · 6/π )^(1/3)         tomas_mod.F90:1627
+#
+# References for users:
+#   • Adams & Seinfeld (2002) — TOMAS framework introduction
+#   • Tang (1997) — inorganic-mixture density polynomial used inside GCHP
+# =============================================================================
+
+# ------------------------------------------------------------------------- BINS
+# Mass-bin construction rule, by IBINS variant. See tomas_mod.F90:6676-6688.
+#
+#   • TOMAS12 / TOMAS15 — mass-quadrupling for k < IBINS, then one ×32 jump.
+#       Xk(k)        = Mo · 4^(k-1)        for k < IBINS
+#       Xk(IBINS+1)  = Xk(IBINS)  · 32     final upper edge
+#
+#   • TOMAS30 / TOMAS40 — mass-doubling for all bins.
+#       Xk(k) = Mo · 2^(k-1)
+#
+#   Note: GCHP defines Mo per-#define block. Verified at tomas_mod.F90:6497-6503.
+
+bin_schemes:
+
+  tomas12:
+    n_bins:     12
+    rule:       quadruple_then_x32
+    M0_kg:      1.0e-21              # = 1.0e-21 · 4^0  (default branch)
+    notes: "12-bin TOMAS — same quadrupling rule as TOMAS15 but smaller M0; reduced bin count for cheap simulations."
+
+  tomas15:
+    n_bins:     15
+    rule:       quadruple_then_x32
+    M0_kg:      1.5625e-23           # = 1.0e-21 · 4^(-3)
+    notes: "Most common TOMAS variant in GEOS-Chem v14+ — 15 bins from ~3.5 nm to ~6 μm dry diameter."
+
+  tomas30:
+    n_bins:     30
+    rule:       double
+    M0_kg:      1.0e-21              # = 1.0e-21 · 2^0  (default branch)
+    notes: "30-bin TOMAS — fine resolution, mass-doubling bins."
+
+  tomas40:
+    n_bins:     40
+    rule:       double
+    M0_kg:      9.765625e-25         # = 1.0e-21 · 2^(-10)
+    notes: "Finest TOMAS variant — 40 mass-doubling bins extending into nucleation mode."
+
+# --------------------------------------------------------------------- SPECIES
+# Canonical order from tomas_mod.F90:107-115. `srt_index` matches GCHP's
+# SRT-constant order; mass-component species appear before diagnostics.
+#
+# `component_type`:
+#   • `mass`       — independent prognostic tracer with per-bin VMR in SpeciesConcVV
+#   • `diagnostic` — derived inside GCHP (NH4 from bulk NH3, AW from RH)
+#
+# `gchp_var_prefix` is the SpeciesConcVV variable prefix for per-bin output;
+# concatenate with two-digit bin index (e.g. "SF" + "01" → "SpeciesConcVV_SF01").
+
+species:
+
+  - srt_index:        1
+    code:             SF
+    gchp_srt:         SRTSO4
+    gchp_var_prefix:  SF
+    long_name:        "Sulfate (SO4)"
+    molwt_g_per_mol:  98.0
+    density_kg_per_m3: 1500.0
+    density_source:   "Tang(1997) inorganic-mixture default; per-bin density varies with composition via INODENS (tomas_mod.F90:8958-9199)"
+    hydrophilic:      true
+    component_type:   mass
+
+  - srt_index:        2
+    code:             SS
+    gchp_srt:         SRTNACL
+    gchp_var_prefix:  SS
+    long_name:        "Sea salt (NaCl)"
+    molwt_g_per_mol:  58.5
+    density_kg_per_m3: 1500.0
+    density_source:   "Tang(1997) inorganic-mixture default"
+    hydrophilic:      true
+    component_type:   mass
+
+  - srt_index:        3
+    code:             ECOB
+    gchp_srt:         SRTECOB
+    gchp_var_prefix:  ECOB
+    long_name:        "Elemental carbon — hydrophobic"
+    molwt_g_per_mol:  12.0
+    density_kg_per_m3: 2200.0
+    density_source:   "Hardcoded DEC (tomas_mod.F90:8924)"
+    hydrophilic:      false
+    component_type:   mass
+
+  - srt_index:        4
+    code:             ECIL
+    gchp_srt:         SRTECIL
+    gchp_var_prefix:  ECIL
+    long_name:        "Elemental carbon — hydrophilic"
+    molwt_g_per_mol:  12.0
+    density_kg_per_m3: 2200.0
+    density_source:   "Hardcoded DEC (tomas_mod.F90:8924)"
+    hydrophilic:      true
+    component_type:   mass
+
+  - srt_index:        5
+    code:             OCOB
+    gchp_srt:         SRTOCOB
+    gchp_var_prefix:  OCOB
+    long_name:        "Organic carbon — hydrophobic"
+    molwt_g_per_mol:  12.0
+    density_kg_per_m3: 1400.0
+    density_source:   "Hardcoded DOC (tomas_mod.F90:8924)"
+    hydrophilic:      false
+    component_type:   mass
+
+  - srt_index:        6
+    code:             OCIL
+    gchp_srt:         SRTOCIL
+    gchp_var_prefix:  OCIL
+    long_name:        "Organic carbon — hydrophilic"
+    molwt_g_per_mol:  12.0
+    density_kg_per_m3: 1400.0
+    density_source:   "Hardcoded DOC (tomas_mod.F90:8924)"
+    hydrophilic:      true
+    component_type:   mass
+
+  - srt_index:        7
+    code:             DUST
+    gchp_srt:         SRTDUST
+    gchp_var_prefix:  DUST
+    long_name:        "Mineral dust"
+    molwt_g_per_mol:  100.0
+    density_kg_per_m3: 2650.0
+    density_source:   "Hardcoded DDUST (tomas_mod.F90:8924)"
+    hydrophilic:      false
+    component_type:   mass
+
+  - srt_index:        8
+    code:             NH4
+    gchp_srt:         SRTNH4
+    gchp_var_prefix:  ~                # not stored per-bin; derived from bulk NH3
+    long_name:        "Ammonium (NH4) — derived from bulk NH3"
+    molwt_g_per_mol:  18.0
+    density_kg_per_m3: 1500.0
+    density_source:   "Tang(1997) inorganic-mixture default; not a prognostic per-bin tracer"
+    hydrophilic:      true
+    component_type:   diagnostic
+    notes: |
+      Derived from bulk NH3 by NH4BULKTOBIN (tomas_mod.F90:3590) — apportioned to
+      bins proportionally to per-bin sulfate mass, capped at (NH4)2SO4 stoichiometry
+      (NH4:SO4 mass ratio = 0.375, tomas_mod.F90:8872). NOT written to per-bin
+      SpeciesConcVV output by default; consumers should re-derive from SF if needed.
+
+  - srt_index:        9
+    code:             AW
+    gchp_srt:         SRTH2O
+    gchp_var_prefix:  AW
+    long_name:        "Aerosol water"
+    molwt_g_per_mol:  18.0
+    density_kg_per_m3: 1000.0
+    density_source:   "Liquid water; aerosol water content from Tang(1997) growth-factor polynomials"
+    hydrophilic:      true
+    component_type:   diagnostic
+    notes: |
+      Per-bin AW01..AW{IBINS} is exported via SpeciesConcVV in GCHP runs that enable
+      the AW diagnostic. The mass tracks aerosol-bound liquid water in equilibrium
+      with ambient RH (Köhler / Tang growth-factor framework). Treated as a
+      diagnostic because it is recomputed every timestep from the RH field, not
+      transported independently.
+
+# --------------------------------------------------------------- METADATA
+references:
+  - "Adams, P. J. & Seinfeld, J. H. (2002), J. Geophys. Res., 107(D19), 4370 — TOMAS framework"
+  - "Tang, I. N. (1997), J. Geophys. Res., 102(D2), 1883 — inorganic aerosol density"
+  - "GCHP source: src/GCHP_GridComp/GEOSChem_GridComp/geos-chem/GeosCore/tomas_mod.F90 (verified 2026-05)"
+
+geoschem_species_database_tomas: "geos-chem/run/shared/species_database_tomas.yml"

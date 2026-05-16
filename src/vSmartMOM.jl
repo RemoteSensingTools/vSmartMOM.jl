@@ -89,18 +89,24 @@ using .StandaloneSS
 # SolarModel module:
 include("SolarModel/SolarModel.jl")
 
-# IO submodule (must come after CoreRT types are defined)
+# Aerosols module — user-facing flexible aerosol framework (TOMAS-15 +
+# two-moment schemes). Loaded before IO so IO/NetCDF/GCHPScene.jl can type
+# its `aerosols` field against AbstractAerosolBinData. Aerosols itself has
+# no IO module dependency (verified: no `using .IO` in src/Aerosols/).
+include("Aerosols/Aerosols.jl")
+using .Aerosols
+
+# IO submodule (must come after CoreRT types and Aerosols are defined)
 include("IO/IO.jl")
 import .IO: parameters_from_file, parameters_from_source,
             parameters_from_yaml, parameters_from_dict, read_parameters,
             read_atmos_profile, read_atmos_profile_dict,
             GeosChemSource, NetCDFGridSource, NetCDFSource,
-            geoschem_to_dict, read_geoschem_profile
-
-# Aerosols module — user-facing flexible aerosol framework (TOMAS-15 +
-# two-moment schemes). WIP header in Aerosols.jl documents follow-up cleanup.
-include("Aerosols/Aerosols.jl")
-using .Aerosols
+            geoschem_to_dict, read_geoschem_profile,
+            GCHPFile, GCHPScene, scene_at, scenes,
+            read_gchp_scene, scene_to_dict, parameters_from_scene,
+            compute_scene_aod,
+            write_scene_result, generate_benchmark, write_gchp_aod_diagnostic
 
 # SIF emission data + loaders
 import DataInterpolations: ExtrapolationType
@@ -112,8 +118,18 @@ export default_parameters, parameters_from_file, parameters_from_source,
        parameters_from_yaml, parameters_from_dict,
        model_from_parameters, rt_run, read_parameters,
        read_atmos_profile, read_atmos_profile_dict
+# GEOS-Chem / GCHP scene IO
+export GeosChemSource, geoschem_to_dict, read_geoschem_profile
+export GCHPFile, GCHPScene, scene_at, scenes,
+       read_gchp_scene, scene_to_dict, parameters_from_scene,
+       compute_scene_aod
+export write_scene_result, generate_benchmark, write_gchp_aod_diagnostic
 # Export linearized RT functions
 export rt_run_lin, model_from_parameters_lin
+# gchp-io: atmosphere/surface split (Phase C) + scenario sweep (Phase D)
+export rt_run_atmosphere, rt_run_surface, rt_run_multi_surface, AtmosphereRTCache
+export ScenarioSweep, SweepResult, run_sweep,
+       SceneOptics, scene_optics, model_for_sza
 # Export standalone exact single-scattering API
 export StandaloneSS, run_exact_ss, ExactSSConfig, SSGeometry,
        LambertianSSSurface, CoxMunkSSSurface, RayleighSSContributor,
@@ -131,7 +147,8 @@ export StandaloneSS, run_exact_ss, ExactSSConfig, SSGeometry,
        selected_measurements, surface_brdf_wind_jacobian,
        truncated_ss_path1, truncated_ss_path2, apply_back_correction!
 # Export new hierarchical model types
-export RTModel, AbstractRTModel, SolverConfig, Atmosphere, RayleighScattering, AerosolState, Optics, OpticsLin
+export RTModel, AbstractRTModel, SolverConfig, Atmosphere, RayleighScattering,
+       AerosolState, LayerResolvedAerosolOptics, Optics, OpticsLin
 # Export v0.6 source-term abstraction so `using vSmartMOM` is enough for
 # `SolarBeam`, `SurfaceSIF`, `BlackbodySource`, etc. — re-exports the names
 # the CoreRT submodule already exports.

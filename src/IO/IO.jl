@@ -9,11 +9,13 @@ module IO
 using YAML
 using NCDatasets
 using DocStringExtensions
+using Printf
 using ..vSmartMOM
 using ..Absorption
 using ..Scattering
 using ..Architectures
 using ..CoreRT
+using ..Aerosols
 
 # Load modules in dependency order
 include("Formats.jl")
@@ -28,6 +30,9 @@ using .Sources
 
 # Include NetCDF readers directly (no nested module)
 include("NetCDF/GeosChem.jl")
+include("NetCDF/GCHPScene.jl")
+include("Benchmark/netcdf_writer.jl")
+include("Benchmark/aod_diagnostic.jl")
 
 export read_parameters, parameters_from_file, parameters_from_source,
        parameters_from_yaml, parameters_from_dict,
@@ -35,6 +40,12 @@ export read_parameters, parameters_from_file, parameters_from_source,
 # NetCDF/GEOSChem exports
 export GeosChemSource, NetCDFGridSource, NetCDFSource
 export geoschem_to_dict, read_geoschem_profile
+# Open-once GCHP scene API
+export GCHPFile, GCHPScene, scene_at, scenes,
+       read_gchp_scene, scene_to_dict, parameters_from_scene,
+       compute_scene_aod
+# Benchmark writer + scene-loop driver
+export write_scene_result, generate_benchmark, write_gchp_aod_diagnostic
 
 """
     parameters_from_file(path::AbstractString) -> vSmartMOM_Parameters

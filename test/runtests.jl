@@ -103,6 +103,8 @@ end
 
 # Phase 1d — Aerosols module wire-in (close `using vSmartMOM.Aerosols` export gap).
 @testset "Aerosols" begin include("test_Aerosols.jl") end
+@testset "Generic TOMAS AOD" begin include("test_aerosol_generic_tomas_aod.jl") end
+@testset "Layer-resolved aerosol optics" begin include("test_layer_resolved_aerosol_optics.jl") end
 
 # Phase 1e — perturb_parameters utility ported from sanghavi.
 @testset "Phase 1e perturb_parameters" begin include("test_perturb_parameters.jl") end

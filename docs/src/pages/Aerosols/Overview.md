@@ -10,7 +10,7 @@ The `Aerosols` module is a user-facing framework for aerosol input data, refract
 
 | Scheme | Type | Input style | Use case |
 | --- | --- | --- | --- |
-| TOMAS-15 | `TOMAS15Scheme` | Size-resolved concentrations in 15 logarithmic diameter bins | Microphysics-aware aerosol columns |
+| TOMAS | `TOMASScheme` | Size-resolved concentrations in TOMAS12/15/30/40 mass bins | Microphysics-aware aerosol columns |
 | Two-moment | `TwoMomentScheme` | AOD, effective radius, and fixed geometric width per species | Compact aerosol-state inputs from chemistry or retrieval systems |
 
 Both schemes are configured from YAML and read from NetCDF through `read_aerosol_data`. The returned `AerosolData` stores the scheme, species data, coordinates, and NetCDF metadata.
@@ -35,13 +35,13 @@ Wavelengths are in micrometers. `get_refractive_index` interpolates the real and
 ## Current Caveats
 
 - The module is public but still WIP; names and configuration details may be cleaned up before registration.
-- TOMAS-15 and two-moment support are present; additional schemes should be added through new `AerosolScheme` subtypes rather than one large parser branch.
+- TOMAS and two-moment support are present; additional schemes should be added through new `AerosolScheme` subtypes rather than one large parser branch.
 - Heavy NetCDF fixtures are not part of the unit-test path.
 
 ## Useful APIs
 
-- `AerosolScheme`, `TOMAS15Scheme`, `TwoMomentScheme`
+- `AerosolScheme`, `TOMASScheme`, `TOMAS15Scheme`, `TwoMomentScheme`
 - `AerosolData`, `AerosolSpeciesData`
 - `RefractiveIndexDatabase`, `RefractiveIndexLUT`
-- `read_aerosol_data`, `load_refractive_index_database`, `get_refractive_index`
+- `read_aerosol_data`, `read_tomas`, `load_refractive_index_database`, `get_refractive_index`
 - `list_species`, `wavelength_range`

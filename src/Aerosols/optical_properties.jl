@@ -6,16 +6,16 @@
 """
 
 """
-    compute_optical_properties(data::AerosolData{TOMAS15Scheme{FT}}, 
+    compute_optical_properties(data::AerosolData{TOMASScheme{FT}}, 
                                wavelengths::AbstractVector,
                                ri_database::RefractiveIndexDatabase{FT}) where FT
 
-Compute optical properties for TOMAS-15 size-resolved aerosols.
+Compute optical properties for TOMAS size-resolved aerosols.
 
 Uses Mie theory for each size bin, then integrates over all bins.
 
 # Arguments
-- `data::AerosolData{TOMAS15Scheme{FT}}`: TOMAS-15 aerosol data
+- `data::AerosolData{TOMASScheme{FT}}`: TOMAS aerosol data
 - `wavelengths::AbstractVector`: Wavelengths (μm) for calculations
 - `ri_database::RefractiveIndexDatabase{FT}`: Refractive index database
 
@@ -35,7 +35,7 @@ For each species and size bin:
 4. Sum over all bins and species
 """
 function compute_optical_properties(
-    data::AerosolData{TOMAS15Scheme{FT}},
+    data::AerosolData{TOMASScheme{FT}},
     wavelengths::AbstractVector,
     ri_database::RefractiveIndexDatabase{FT}
 ) where FT
@@ -135,7 +135,7 @@ assuming lognormal distributions.
 - `ri_database::RefractiveIndexDatabase{FT}`: Refractive index database
 
 # Returns
-- `Dict`: Same structure as TOMAS-15 version
+- `Dict`: Same structure as the TOMAS version
 """
 function compute_optical_properties(
     data::AerosolData{TwoMomentScheme{FT}},

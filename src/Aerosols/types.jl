@@ -9,43 +9,27 @@
 """
     AerosolScheme
 
-Abstract base type for different aerosol schemes.
-Concrete implementations: TOMAS15Scheme, TwoMomentScheme, etc.
+Top-level abstract base type for aerosol-scheme metadata objects.
+Kept un-parameterised for back-compat — code that wrote `x::AerosolScheme`
+or `<: AerosolScheme` continues to work. New schemes should subtype the
+parametric [`AbstractAerosolScheme{FT}`](@ref) below, which is itself
+`<: AerosolScheme`.
 """
 abstract type AerosolScheme end
+
+"""
+    AbstractAerosolScheme{FT} <: AerosolScheme
+
+Parametric layer of the [`AerosolScheme`](@ref) hierarchy. Carries the
+working float type so downstream sectional payloads (e.g.
+[`SectionalAerosolData{FT, S}`](@ref)) can constrain `S` to a matching
+`FT`.
+"""
+abstract type AbstractAerosolScheme{FT} <: AerosolScheme end
 
 # ============================================================================
 # Concrete scheme types
 # ============================================================================
-
-"""
-    TOMAS15Scheme{FT} <: AerosolScheme
-
-TOMAS microphysics with 15 size bins.
-Size-resolved aerosol concentrations in logarithmically-spaced diameter bins.
-
-# Fields
-- `species::Vector{String}`: Aerosol species names (e.g., ["DUST", "SS", "SF", ...])
-- `n_bins::Int`: Number of size bins (15)
-- `diam_min::FT`: Minimum dry diameter (nm)
-- `diam_max::FT`: Maximum dry diameter (nm)
-- `bin_edges::Vector{FT}`: Bin edge diameters (nm), length n_bins+1
-- `bin_centers::Vector{FT}`: Bin center diameters (nm), length n_bins
-- `refractive_indices::Dict{String, String}`: Species → RI database key
-- `densities::Dict{String, FT}`: Species → density (kg/m³)
-- `molar_masses::Dict{String, FT}`: Species → molar mass (kg/mol)
-"""
-struct TOMAS15Scheme{FT} <: AerosolScheme
-    species::Vector{String}
-    n_bins::Int
-    diam_min::FT
-    diam_max::FT
-    bin_edges::Vector{FT}
-    bin_centers::Vector{FT}
-    refractive_indices::Dict{String, String}
-    densities::Dict{String, FT}
-    molar_masses::Dict{String, FT}
-end
 
 """
     TwoMomentScheme{FT} <: AerosolScheme
@@ -59,7 +43,7 @@ Each species characterized by AOD, effective radius, and fixed σ_g.
 - `aod_wavelength::Dict{String, FT}`: Reference wavelength for AOD (μm)
 - `refractive_indices::Dict{String, String}`: Species → RI database key
 """
-struct TwoMomentScheme{FT} <: AerosolScheme
+struct TwoMomentScheme{FT} <: AbstractAerosolScheme{FT}
     species::Vector{String}
     sigma_g::Dict{String, FT}
     aod_wavelength::Dict{String, FT}
@@ -149,45 +133,6 @@ end
 # ============================================================================
 # Helper constructors
 # ============================================================================
-
-"""
-    TOMAS15Scheme(config::Dict, FT=Float64)
-
-Construct TOMAS15Scheme from YAML configuration dictionary.
-"""
-function TOMAS15Scheme(config::Dict, FT=Float64)
-    species_config = config["aerosol_scheme"]["species"]
-    size_config = config["aerosol_scheme"]["size_bins"]
-    
-    # Extract species names
-    species = collect(keys(species_config))
-    
-    # Size bin configuration
-    n_bins = size_config["n_bins"]
-    diam_min = FT(size_config["diam_min_nm"])
-    diam_max = FT(size_config["diam_max_nm"])
-    
-    # Calculate logarithmic bin edges
-    bin_edges = diam_min .* (diam_max / diam_min) .^ (FT.(collect(0:n_bins)) ./ FT(n_bins))
-    bin_centers = sqrt.(bin_edges[1:end-1] .* bin_edges[2:end])
-    
-    # Extract species properties
-    refractive_indices = Dict{String, String}()
-    densities = Dict{String, FT}()
-    molar_masses = Dict{String, FT}()
-    
-    for (sp, sp_config) in species_config
-        refractive_indices[sp] = sp_config["refractive_index"]
-        densities[sp] = FT(sp_config["density"])
-        molar_masses[sp] = FT(sp_config["molar_mass"])
-    end
-    
-    return TOMAS15Scheme{FT}(
-        species, n_bins, diam_min, diam_max,
-        bin_edges, bin_centers,
-        refractive_indices, densities, molar_masses
-    )
-end
 
 """
     TwoMomentScheme(config::Dict, FT=Float64)

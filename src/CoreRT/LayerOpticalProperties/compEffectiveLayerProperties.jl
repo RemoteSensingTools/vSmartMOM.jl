@@ -8,6 +8,31 @@ Cabannes coefficients because Raman redistribution is handled explicitly.
 _rayleigh_greek_source(::Union{noRS, noRS_plus}, greek_rayleigh, greek_cabannes) = greek_rayleigh
 _rayleigh_greek_source(::AbstractRamanType, greek_rayleigh, greek_cabannes) = greek_cabannes
 
+function _validate_layer_resolved_optics(optics::LayerResolvedAerosolOptics,
+                                         nZ::Integer)
+    length(optics) == nZ ||
+        throw(ArgumentError("LayerResolvedAerosolOptics has $(length(optics)) layers, expected $nZ"))
+    return nothing
+end
+
+function _aerosol_layer_props(τ_profile, optics, pol_type, μ, m, arr_type, nZ)
+    AerZ⁺⁺, AerZ⁻⁺ = Scattering.compute_Z_moments(
+        pol_type, μ, optics.greek_coefs, m, arr_type = arr_type)
+    return createAero.(τ_profile, [optics], [AerZ⁺⁺], [AerZ⁻⁺])
+end
+
+function _aerosol_layer_props(τ_profile,
+                              optics::LayerResolvedAerosolOptics,
+                              pol_type, μ, m, arr_type, nZ)
+    _validate_layer_resolved_optics(optics, nZ)
+    return [begin
+        layer_optics = optics[iz]
+        AerZ⁺⁺, AerZ⁻⁺ = Scattering.compute_Z_moments(
+            pol_type, μ, layer_optics.greek_coefs, m, arr_type = arr_type)
+        createAero(τ_profile[iz], layer_optics, AerZ⁺⁺, AerZ⁻⁺)
+    end for iz in 1:nZ]
+end
+
 function constructCoreOpticalProperties(RS_type::AbstractRamanType, iBand, m, model)
     (; τ_rayl, τ_aer, τ_abs, aerosol_optics, greek_rayleigh, greek_cabannes) = model
     @assert all(iBand .≤ length(τ_rayl)) "iBand exceeded number of bands"
@@ -43,13 +68,9 @@ function constructCoreOpticalProperties(RS_type::AbstractRamanType, iBand, m, mo
         combo = rayl
 
         for i=1:nAero
-            AerZ⁺⁺, AerZ⁻⁺ = Scattering.compute_Z_moments(
-                                pol_type, μ, 
-                                aerosol_optics[iB][i].greek_coefs, 
-                                m, arr_type=arr_type)
-            aer = createAero.(τ_aer[iB][i,:], 
-                              [aerosol_optics[iB][i]], 
-                              [AerZ⁺⁺], [AerZ⁻⁺])
+            aer = _aerosol_layer_props(τ_aer[iB][i, :],
+                                       aerosol_optics[iB][i],
+                                       pol_type, μ, m, arr_type, nZ)
             combo = combo .+ aer
         end
 

@@ -35,7 +35,7 @@ Dispatches to scheme-specific reader based on configuration.
 
 # Example
 ```julia
-# TOMAS-15 scheme
+# TOMAS scheme
 data = read_aerosol_data(
     "examples/aerosol_config_tomas15.yaml",
     "GEOSChem.Custom.20190702_0000z.nc4"
@@ -55,12 +55,12 @@ function read_aerosol_data(config_file::String, netcdf_file::String, FT=Float64)
     # Determine scheme type
     scheme_name = config["aerosol_scheme"]["type"]
     
-    if scheme_name == "TOMAS15"
-        return read_tomas15(config, netcdf_file, FT)
+    if scheme_name in ("TOMAS", "TOMAS15")
+        return read_tomas(TOMASScheme(config, FT), config, netcdf_file)
     elseif scheme_name == "TwoMoment"
         return read_two_moment(config, netcdf_file, FT)
     else
-        error("Unknown aerosol scheme: $scheme_name. Supported: TOMAS15, TwoMoment")
+        error("Unknown aerosol scheme: $scheme_name. Supported: TOMAS/TOMAS15, TwoMoment")
     end
 end
 

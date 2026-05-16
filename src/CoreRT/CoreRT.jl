@@ -102,9 +102,10 @@ include("tools/postprocessing_vza_lin.jl")           # Postprocess linearized
 include("tools/postprocessing_vza_ms.jl")
 
 # RT Run entry points
-include("rt_run.jl")                           # Starting point for RT 
+include("rt_run.jl")                           # Starting point for RT
 include("rt_run_lin.jl")                       # Linearized RT run
 include("rt_run_multisensor.jl")
+include("rt_run_split.jl")                     # gchp-io: atmosphere/surface split
 
 # CPU batched operations (always available)
 include("tools/ka_batched_kernels.jl")         # Portable KA batched kernels
@@ -119,6 +120,7 @@ include("tools/rt_set_streams.jl")                # Set streams before RT
 include("tools/model_from_parameters.jl")         # Converting parameters to derived model attributes
 include("tools/lin_model_from_parameters.jl")     # Linearized model from parameters
 include("tools/show_utils.jl")                    # Pretty-printing objects
+include("tools/scenario_sweep.jl")                # gchp-io: ScenarioSweep + SceneOptics
 include("LayerOpticalProperties/compEffectiveLayerProperties.jl")
 include("LayerOpticalProperties/delta_m_truncation.jl")         # δ-M truncation + chain rule
 include("LayerOpticalProperties/compEffectiveLayerProperties_lin.jl")
@@ -145,6 +147,10 @@ export model_from_parameters,               # Converting the parameters to model
        model_from_parameters_lin,           # Convenience alias for linearized model
        rt_run, rt_run_lin, rt_run_ss,       # Run the RT code (forward, linearized, single scatter)
        rt_run_streams, StreamRTResult,      # Per-Fourier-moment quadrature-stream RT (Phase H)
+       rt_run_atmosphere, rt_run_surface,   # gchp-io: atmosphere/surface split
+       rt_run_multi_surface, AtmosphereRTCache,
+       ScenarioSweep, SweepResult, run_sweep, # gchp-io: scenario batching
+       SceneOptics, scene_optics, model_for_sza,
        default_parameters                   # Set of default parameters
 export lin_added_layer_all_params!,           # 3 params -> all params chain rule
        OpticalPropertyJacobian,               # AD boundary struct alias
@@ -158,7 +164,8 @@ export lin_added_layer_all_params!,           # 3 params -> all params chain rul
 # Export new hierarchical model types
 export AbstractRTModel, RTModel,
        SolverConfig, RTNumericalParameters,
-       Atmosphere, RayleighScattering, AerosolState, Optics, OpticsLin,
+       Atmosphere, RayleighScattering, AerosolState, LayerResolvedAerosolOptics,
+       Optics, OpticsLin,
        RTModelLin
 
 # v0.6 source-term vocabulary (Phase 1: types only; behaviour lands in Phase 2+)

@@ -275,7 +275,7 @@ Base.@kwdef struct CompositeSourceSlot{FT} <: AbstractLayer
 end
 
 "Composite Layer Matrices (`-/+` defined in τ coordinates, i.e. `-`=outgoing, `+`=incoming"
-struct CompositeLayerRS{FT} <: AbstractLayer 
+struct CompositeLayerRS{FT} <: AbstractLayer
     "Composite layer Reflectance matrix R (from + -> -)"
     R⁻⁺::AbstractArray{FT,3}
     "Composite layer Reflectance matrix R (from - -> +)"
@@ -431,10 +431,76 @@ struct ScatteringInterface_01 <: AbstractScatteringInterface end
 struct ScatteringInterface_10 <: AbstractScatteringInterface end
 "Scattering in inhomogeneous composite layer; Scattering in homogeneous layer, added to bottom of the composite layer." 
 struct ScatteringInterface_11 <: AbstractScatteringInterface end
-"Scattering Interface between Surface and Composite Layer" 
+"Scattering Interface between Surface and Composite Layer"
 struct ScatteringInterface_AtmoSurf <: AbstractScatteringInterface end
 
-"Abstract Type for Surface Types" 
+"""
+    AtmosphereRTCache{FT, AT3, AT1, AT, PT, QT, ARCH, RS, PS, IS, SCI}
+
+Per-Fourier-moment snapshot of the atmosphere-only composite layer plus
+the context needed to drive the surface phase of `rt_run`. Built by
+[`rt_run_atmosphere`](@ref) and consumed by [`rt_run_surface`](@ref); the
+two together replace one full `rt_run` call when iterating BRDFs over the
+same atmosphere (the m-loop layer accumulation runs once per scene, not
+once per surface).
+
+# Type parameters
+- `FT` — working float type (Float64 / Float32).
+- `AT3` — concrete 3-D array type for R/T/J snapshots (`Array{FT,3}` on
+  CPU, `CuArray{FT,3}` on GPU).
+- `AT1` — concrete 1-D array type for `τ_sum_surf`.
+- `AT` — the array-type constructor (`Array` / `CuArray`); applied as
+  `arr_type(x)` in the hot replay loop.
+- `PT` — polarization type (e.g. `Stokes_IQU{FT}`).
+- `QT` — `QuadPoints{FT}` instance type.
+- `ARCH` — architecture (`CPU` / `GPU`).
+- `RS` — Raman type (`noRS{FT}` for the v1 atmosphere-split path).
+- `PS` — `prepared_sources` concrete type.
+- `IS` — `I_static` concrete type (`Diagonal{FT, AT1}`).
+- `SCI <: AbstractScatteringInterface` — concrete scattering-interface
+  type used at the surface step (uniform across m).
+
+Every field is concrete so the hot replay loop in `rt_run_surface` stays
+type-stable end-to-end.
+"""
+struct AtmosphereRTCache{FT, AT3, AT1, AT, PT, QT, ARCH, RS, PS, IS, SCI}
+    pol_type::PT
+    quad_points::QT
+    iμ₀::Int
+    μ₀::FT
+    vza::Vector{FT}
+    vaz::Vector{FT}
+    nSpec::Int
+    m_max::Int
+    NquadN::Int
+    iBand::Vector{Int}
+    weight_per_m::Vector{FT}
+    arr_type::Type{AT}
+    arch::ARCH
+    SFI::Bool
+    RS_type::RS
+    prepared_sources::PS
+    I_static::IS
+    R⁻⁺_per_m::Vector{AT3}
+    R⁺⁻_per_m::Vector{AT3}
+    T⁺⁺_per_m::Vector{AT3}
+    T⁻⁻_per_m::Vector{AT3}
+    J₀⁺_per_m::Vector{AT3}
+    J₀⁻_per_m::Vector{AT3}
+    # Per-source J₀ slots stay loosely typed: the NT key set + slot type
+    # vary across configurations (solar-only, +thermal, +SIF), and the
+    # surface phase walks the NT once per m so the lookup cost is
+    # negligible.
+    J₀_by_src_per_m::Vector{NamedTuple}
+    sci_surf_per_m::Vector{SCI}
+    τ_sum_surf::AT1
+end
+
+Base.show(io::IO, c::AtmosphereRTCache{FT}) where {FT} = print(io,
+    "AtmosphereRTCache{", FT, "}(m_max=", c.m_max,
+    ", NquadN=", c.NquadN, ", nSpec=", c.nSpec, ")")
+
+"Abstract Type for Surface Types"
 abstract type AbstractSurfaceType end
 
 """
@@ -976,6 +1042,40 @@ struct AerosolState{FT<:AbstractFloat, AO, AT<:AbstractArray{FT}}
     "Aerosol optical depth profiles: `τ_aer[iBand][iAer, iLayer]` (or `[iAer, nSpec, iLayer]` for lin)"
     τ_aer::Vector{AT}
 end
+
+"""
+    LayerResolvedAerosolOptics(layers)
+
+Container for aerosol single-scattering properties that vary by atmospheric
+layer. `layers[iz]` is the `Scattering.AerosolOptics` object used with
+`τ_aer[:, iz]` for layer `iz` in the TOA-to-BOA column.
+
+The historical `AerosolState.aerosol_optics[iBand][iAer]` path remains valid
+for aerosols whose phase matrix, single-scattering albedo, and truncation
+factor are constant with height.
+"""
+struct LayerResolvedAerosolOptics{AO}
+    "Layer-resolved aerosol optics, ordered TOA-to-BOA."
+    layers::Vector{AO}
+
+    function LayerResolvedAerosolOptics{AO}(layers::AbstractVector{<:AO}) where {AO}
+        isempty(layers) && throw(ArgumentError("LayerResolvedAerosolOptics needs at least one layer"))
+        return new{AO}(collect(AO, layers))
+    end
+end
+
+LayerResolvedAerosolOptics(layers::AbstractVector{AO}) where {AO} =
+    LayerResolvedAerosolOptics{AO}(layers)
+
+LayerResolvedAerosolOptics(layers::AO...) where {AO} =
+    LayerResolvedAerosolOptics{AO}(collect(layers))
+
+Base.length(optics::LayerResolvedAerosolOptics) = length(optics.layers)
+Base.getindex(optics::LayerResolvedAerosolOptics, i::Integer) = optics.layers[i]
+Base.iterate(optics::LayerResolvedAerosolOptics, state...) = iterate(optics.layers, state...)
+Base.eachindex(optics::LayerResolvedAerosolOptics) = eachindex(optics.layers)
+Base.eltype(::LayerResolvedAerosolOptics{AO}) where {AO} = AO
+Base.eltype(::Type{LayerResolvedAerosolOptics{AO}}) where {AO} = AO
 
 """
     Optics{FT, RS, AS}
