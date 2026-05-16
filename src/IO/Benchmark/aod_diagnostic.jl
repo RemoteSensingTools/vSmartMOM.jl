@@ -44,17 +44,23 @@ function write_gchp_aod_diagnostic(out_path::AbstractString,
             λ_var.attrib["units"] = "micrometer"
             λ_var.attrib["long_name"] = "wavelength"
 
-            lat = defVar(ds, "lat", Float64, ("x", "y", "face"))
-            lon = defVar(ds, "lon", Float64, ("x", "y", "face"))
-            lat[:, :, :] = f.lats
-            lon[:, :, :] = f.lons
+            # NCDatasets exposes arrays in Julia order, while NetCDF/Python
+            # readers see the external dimension order reversed. Declare the
+            # reversed order here so Python sees x, y, face.
+            lat = defVar(ds, "lat", Float64, ("face", "y", "x"))
+            lon = defVar(ds, "lon", Float64, ("face", "y", "x"))
+            lat[:, :, :] = permutedims(f.lats, (3, 2, 1))
+            lon[:, :, :] = permutedims(f.lons, (3, 2, 1))
             lat.attrib["units"] = "degree_north"
             lon.attrib["units"] = "degree_east"
+            lat.attrib["external_dimension_order"] = "x,y,face"
+            lon.attrib["external_dimension_order"] = "x,y,face"
 
-            aod = defVar(ds, "aod", Float64, ("x", "y", "face", "wavelength"))
+            aod = defVar(ds, "aod", Float64, ("wavelength", "face", "y", "x"))
             aod[:, :, :, :] .= NaN
             aod.attrib["long_name"] = "aerosol optical depth from sectional aerosol microphysics"
             aod.attrib["units"] = "1"
+            aod.attrib["external_dimension_order"] = "x,y,face,wavelength"
 
             for idf in face_iter, idy in y_iter, idx in x_iter
                 scene = scene_at(f, idx, idy, idf; FT=FT)
@@ -63,8 +69,9 @@ function write_gchp_aod_diagnostic(out_path::AbstractString,
                      ri_round_digits=ri_round_digits) :
                     (; integration=integration, mie_cache=mie_cache,
                      mie_lut=mie_lut, ri_round_digits=ri_round_digits)
-                aod[idx, idy, idf, :] = Float64.(compute_scene_aod(
-                    scene, λs; aod_kwargs...))
+                aod[1:length(λs), idf:idf, idy:idy, idx:idx] =
+                    reshape(Float64.(compute_scene_aod(scene, λs; aod_kwargs...)),
+                            length(λs), 1, 1, 1)
             end
 
             ds.attrib["source_file"] = String(gchp_path)
@@ -82,15 +89,22 @@ end
 
 function _range_chunks(r, chunk_size::Integer)
     vals = collect(r)
-    isempty(vals) && return UnitRange{Int}[]
-    chunks = UnitRange{Int}[]
+    isempty(vals) && return Vector{Int}[]
+    chunks = Vector{Int}[]
     i = firstindex(vals)
     while i <= lastindex(vals)
         j = min(i + Int(chunk_size) - 1, lastindex(vals))
-        push!(chunks, vals[i]:vals[j])
+        push!(chunks, vals[i:j])
         i = j + 1
     end
     return chunks
+end
+
+function _chunk_span(indices)
+    vals = collect(Int, indices)
+    isempty(vals) && throw(ArgumentError("empty chunk indices"))
+    lo, hi = extrema(vals)
+    return lo:hi, vals .- lo .+ 1
 end
 
 function _bulk_var3(ds, name::AbstractString, xr, yr, idf, FT)
@@ -417,29 +431,39 @@ function write_gchp_aod_diagnostic_bulk(out_path::AbstractString,
             λ_var.attrib["units"] = "micrometer"
             λ_var.attrib["long_name"] = "wavelength"
 
-            lat = defVar(ods, "lat", Float64, ("x", "y", "face"))
-            lon = defVar(ods, "lon", Float64, ("x", "y", "face"))
-            lat[:, :, :] = f.lats
-            lon[:, :, :] = f.lons
+            # NCDatasets exposes arrays in Julia order, while NetCDF/Python
+            # readers see the external dimension order reversed. Declare the
+            # reversed order here so Python sees x, y, face.
+            lat = defVar(ods, "lat", Float64, ("face", "y", "x"))
+            lon = defVar(ods, "lon", Float64, ("face", "y", "x"))
+            lat[:, :, :] = permutedims(f.lats, (3, 2, 1))
+            lon[:, :, :] = permutedims(f.lons, (3, 2, 1))
             lat.attrib["units"] = "degree_north"
             lon.attrib["units"] = "degree_east"
+            lat.attrib["external_dimension_order"] = "x,y,face"
+            lon.attrib["external_dimension_order"] = "x,y,face"
 
-            aod = defVar(ods, "aod", Float64, ("x", "y", "face", "wavelength"))
+            aod = defVar(ods, "aod", Float64, ("wavelength", "face", "y", "x"))
             aod[:, :, :, :] .= NaN
             aod.attrib["long_name"] = "aerosol optical depth from sectional aerosol microphysics"
             aod.attrib["units"] = "1"
+            aod.attrib["external_dimension_order"] = "x,y,face,wavelength"
 
-            for idf in face_iter, yr in y_chunks, xr in x_chunks
+            for idf in face_iter, yr_selected in y_chunks, xr_selected in x_chunks
+                xr, x_locs = _chunk_span(xr_selected)
+                yr, y_locs = _chunk_span(yr_selected)
                 profile = _bulk_profile_chunk(f.ds, xr, yr, idf, FT)
                 aero_chunk = _chunk_sectional_data(scheme, f.ds, xr, yr, idf;
                                                    integration=integration)
-                nx = length(xr)
-                ny = length(yr)
-                aod_chunk = Array{FT}(undef, nx, ny, length(λs))
+                nx_selected = length(x_locs)
+                ny_selected = length(y_locs)
+                aod_chunk = fill(FT(NaN), length(xr), length(yr), length(λs))
 
                 function compute_column!(linear_index)
-                    ix = (linear_index - 1) % nx + 1
-                    iy = (linear_index - 1) ÷ nx + 1
+                    ix_selected = (linear_index - 1) % nx_selected + 1
+                    iy_selected = (linear_index - 1) ÷ nx_selected + 1
+                    ix = x_locs[ix_selected]
+                    iy = y_locs[iy_selected]
                     p_half = _column_p_half(profile.dp, profile.sp, ix, iy, FT)
                     T = FT.(reverse(view(profile.T_boa, ix, iy, :)))
                     q = FT.(reverse(view(profile.q_raw, ix, iy, :))) .* profile.q_scale
@@ -456,16 +480,18 @@ function write_gchp_aod_diagnostic_bulk(out_path::AbstractString,
                 end
 
                 if threaded && Threads.nthreads() > 1
-                    Threads.@threads for linear_index in 1:(nx * ny)
+                    Threads.@threads for linear_index in 1:(nx_selected * ny_selected)
                         compute_column!(linear_index)
                     end
                 else
-                    for linear_index in 1:(nx * ny)
+                    for linear_index in 1:(nx_selected * ny_selected)
                         compute_column!(linear_index)
                     end
                 end
 
-                aod[xr, yr, idf, :] = Float64.(aod_chunk)
+                aod[1:length(λs), idf:idf, yr, xr] =
+                    reshape(permutedims(Float64.(aod_chunk), (3, 2, 1)),
+                            length(λs), 1, length(yr), length(xr))
             end
 
             ods.attrib["source_file"] = String(gchp_path)

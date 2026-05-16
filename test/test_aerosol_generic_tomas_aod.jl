@@ -70,6 +70,14 @@ end
     @test_throws ArgumentError LinearIntegrationPerBin(0)
 end
 
+@testset "AOD diagnostic chunk indexing" begin
+    @test vSmartMOM.IO._range_chunks(1:2:9, 2) == [[1, 3], [5, 7], [9]]
+    @test vSmartMOM.IO._range_chunks(4:6, 2) == [[4, 5], [6]]
+    span, locs = vSmartMOM.IO._chunk_span([1, 3, 5])
+    @test span == 1:5
+    @test locs == [1, 3, 5]
+end
+
 @testset "Column AOD diagnostic" begin
     scheme = TOMASScheme(:tomas15; include_species=["SF"])
     number = zeros(Float64, scheme.n_bins, 2)
@@ -133,7 +141,8 @@ end
             NCDataset(out) do ds
                 @test haskey(ds, "aod")
                 aod = ds["aod"][:, :, :, :]
-                @test size(aod, 4) == 3
+                @test NCDatasets.dimnames(ds["aod"]) == ("wavelength", "face", "y", "x")
+                @test size(aod, 1) == 3
                 @test all(isfinite.(aod))
                 @test all(aod .>= 0)
                 @test maximum(aod) > minimum(aod)
