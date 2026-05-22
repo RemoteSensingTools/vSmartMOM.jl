@@ -213,8 +213,13 @@ function _make_composite_source_slots(prepared_sources::AbstractSource, FT, arr_
     return NamedTuple{Tuple(keys)}(Tuple(slots))
 end
 
-"""Construct an `AddedLayerRS` with inelastic (Raman) matrices for Raman scattering."""
-make_added_layer(RS_type::Union{RRS, VS_0to1_plus, VS_1to0_plus}, FT, arr_type, dims, nSpec)  = AddedLayerRS(
+"""Construct an `AddedLayerRS` with inelastic (Raman) matrices for Raman scattering.
+
+The `prepared_sources` kwarg is accepted for signature parity with the noRS
+variant but ignored — the Raman path still routes solar / surface emission
+through `RS_type.F₀` / `RS_type.SIF₀` (Phase 6 will retire those channels)."""
+make_added_layer(RS_type::Union{RRS, VS_0to1_plus, VS_1to0_plus}, FT, arr_type, dims, nSpec;
+                 prepared_sources::AbstractSource = NoSource())  = AddedLayerRS(
                                                 default_matrix(FT, arr_type, dims, nSpec), 
                                                 default_matrix(FT, arr_type, dims, nSpec), 
                                                 default_matrix(FT, arr_type, dims, nSpec),
@@ -268,9 +273,13 @@ make_composite_layer(RS_type::Union{noRS, noRS_plus},
         J₀⁻ = default_J_matrix(FT, arr_type, dims, nSpec),
         J₀_by_src = _make_composite_source_slots(prepared_sources, FT, arr_type, dims, nSpec),
     )
-"""Construct a `CompositeLayerRS` with inelastic matrices for Raman scattering."""
+"""Construct a `CompositeLayerRS` with inelastic matrices for Raman scattering.
+
+`prepared_sources` is accepted for signature parity with the noRS variant but
+ignored — see `make_added_layer(::RRS, ...)`."""
 make_composite_layer(RS_type::Union{RRS, VS_0to1_plus, VS_1to0_plus},
-    FT, arr_type, dims, nSpec) = CompositeLayerRS(
+    FT, arr_type, dims, nSpec;
+    prepared_sources::AbstractSource = NoSource()) = CompositeLayerRS(
                                                         default_matrix(FT, arr_type, dims, nSpec), 
                                                         default_matrix(FT, arr_type, dims, nSpec), 
                                                         default_matrix(FT, arr_type, dims, nSpec),
