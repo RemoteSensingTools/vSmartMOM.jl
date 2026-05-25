@@ -50,6 +50,13 @@ vSmartMOM.update_aerosol_loading!
 vSmartMOM.update_aerosol_microphysics!
 ```
 
+## Stream-Level RT Output
+
+```@docs
+vSmartMOM.CoreRT.StreamRTResult
+vSmartMOM.CoreRT.rt_run_streams(::Any)
+```
+
 ## Jacobian Parameter Layout
 
 ```@docs
