@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Quickstart RT Output</title>
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+  <style>
+    html, body, #plot {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      background: #ffffff;
+    }
+  </style>
+</head>
+<body>
+  <div id="plot"></div>
+  <script>
+    const data = [{"type":"bar","x":["TOA reflectance R","BOA transmittance T"],"y":[0.022269051215324822,0.15210242977471305],"marker":{"color":["#2563eb","#16a34a"]},"hovertemplate":"%{x}<br>Stokes I=%{y:.6f}<extra></extra>"}];
+    const layout = {"title":{"text":"Quickstart RT Output","x":0.02},"margin":{"l":56,"r":18,"t":72,"b":52},"xaxis":{"title":""},"yaxis":{"title":"Stokes I","rangemode":"tozero"},"paper_bgcolor":"#ffffff","plot_bgcolor":"#ffffff","font":{"family":"Inter, system-ui, sans-serif"}};
+    const config = {"responsive":true,"displaylogo":false,"modeBarButtonsToRemove":["lasso2d","select2d"]};
+    Plotly.newPlot("plot", data, layout, config);
+  </script>
+</body>
+</html>
