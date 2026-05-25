@@ -212,6 +212,9 @@ vSmartMOM.CoreRT.PreparedSolarBeam
 vSmartMOM.CoreRT.BlackbodySource(::Real, ::AbstractVector{<:Real})
 vSmartMOM.CoreRT.SurfaceSIF
 vSmartMOM.CoreRT.PreparedSurfaceSIF
+vSmartMOM.CoreRT.ThermalEmission
+vSmartMOM.CoreRT.ThermalEmission(::AbstractVector{<:Real}, ::AbstractVector{<:Real})
+vSmartMOM.CoreRT.PreparedThermalEmission
 ```
 
 ### AD-mode traits
@@ -232,4 +235,6 @@ vSmartMOM.CoreRT.prepare_source(::vSmartMOM.CoreRT.SurfaceSIF, ::Type{<:Abstract
 vSmartMOM.CoreRT.prepare_sources(::vSmartMOM.CoreRT.NoSource, ::Type{<:AbstractFloat}, ::Integer, ::Integer, ::Any)
 vSmartMOM.CoreRT.surface_source_contribute!(::vSmartMOM.CoreRT.PreparedSurfaceSIF, ::Union{vSmartMOM.CoreRT.LambertianSurfaceLegendre, vSmartMOM.CoreRT.LambertianSurfaceScalar, vSmartMOM.CoreRT.LambertianSurfaceSpline}, ::Any, ::Integer, ::Any, ::Any)
 vSmartMOM.CoreRT.surface_source_contribute!(::vSmartMOM.CoreRT.NoSource, ::vSmartMOM.CoreRT.AbstractSurfaceType, ::Vararg{Any, 4})
+vSmartMOM.CoreRT.prepare_source(::vSmartMOM.CoreRT.ThermalEmission, ::Type{<:AbstractFloat}, ::Integer, ::Integer, ::Any)
+vSmartMOM.CoreRT.contribute!(::vSmartMOM.CoreRT.PreparedThermalEmission, ::Any, ::AbstractVector, ::AbstractVector, ::Integer, ::Integer, ::Any, ::Any, ::Any)
 ```

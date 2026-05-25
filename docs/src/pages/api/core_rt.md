@@ -37,6 +37,13 @@ vSmartMOM.CoreRT.RTNumericalParameters
 > `surface_source_contribute!` dispatchers) are documented on the
 > [Source terms](../extending/sources.md#api-reference) page.
 
+## Stream-Level RT Output
+
+```@docs
+vSmartMOM.CoreRT.StreamRTResult
+vSmartMOM.CoreRT.rt_run_streams(::Any)
+```
+
 ## Jacobian Parameter Layout
 
 ```@docs
