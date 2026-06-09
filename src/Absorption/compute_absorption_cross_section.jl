@@ -59,13 +59,14 @@ function compute_absorption_cross_section(
     # Store results here to return
     result = array_type(architecture)(zeros(FT, length(grid)))
 
-    # Calculate the minimum and maximum grid bounds, including the wing cutoff
-    grid_max = maximum(grid) + wing_cutoff
-    grid_min = minimum(grid) - wing_cutoff
-
     # Convert to wavenumber from [nm] space if necessary
     grid = wavelength_flag ? reverse(nm_per_m ./ grid) : grid
-    grid_min, grid_max = wavelength_flag ? (nm_per_m /grid_max, nm_per_m/grid_min) : (grid_min, grid_max)
+
+    # Calculate the minimum and maximum grid bounds in wavenumber space,
+    # including the wing cutoff (wing_cutoff is a wavenumber quantity [cm⁻¹],
+    # so the conversion must happen BEFORE applying it)
+    grid_max = maximum(grid) + wing_cutoff
+    grid_min = minimum(grid) - wing_cutoff
 
     # Interpolators from grid bounds to index values
     N_grid = length(grid)
@@ -137,8 +138,16 @@ function compute_absorption_cross_section(
 
         # Calculate index range that this line impacts
         if N_grid > 1
-            istart = Int32(round(grid_idx_interp_low(ν - wing_cutoff)))
-            istop  = Int32(round(grid_idx_interp_high(ν + wing_cutoff)))
+            if ν + wing_cutoff < first(grid) || ν - wing_cutoff > last(grid)
+                # Wing window lies entirely outside the grid (e.g. a
+                # pressure-shifted line near the admission boundary):
+                # empty index range so the line contributes nothing
+                istart = Int32(1)
+                istop  = Int32(0)
+            else
+                istart = Int32(round(grid_idx_interp_low(ν - wing_cutoff)))
+                istop  = Int32(round(grid_idx_interp_high(ν + wing_cutoff)))
+            end
         else
             istart = Int32(1)
             istop  = Int32(1)
