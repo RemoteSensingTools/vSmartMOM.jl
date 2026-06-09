@@ -62,5 +62,10 @@ end
         # the test environment. Keep this check separate from the package
         # hygiene gate until those initialization paths are isolated.
         persistent_tasks = false,
+        # AtmosphericAbsorption is staged as a dependency on this branch ahead of the
+        # Absorption→AtmosphericAbsorption integration: it resolves and loads, but is not
+        # yet `using`d in vSmartMOM's source. Allow it through the stale-deps gate until
+        # that wiring lands (remove this ignore once vSmartMOM actually uses it).
+        stale_deps = (ignore = [:AtmosphericAbsorption],),
     )
 end
