@@ -131,15 +131,16 @@ function model_from_parameters(lin::LinMode,
                     profile.vmr_h2o,
                     profile)
             else
-                @timeit "Read HITRAN" hitran_data = read_hitran(artifact("H2O"), iso=-1)
+                @timeit "Read HITRAN" lines_h2o = AtmosphericAbsorption.load_lines(AtmosphericAbsorption.HitranPort(artifact("H2O")); FT)
                 @debug "Computing profile for water vapor (q-driven) in band #$(i_band)"
-                bf  = isnothing(abs_params) ? vSmartMOM.Absorption.Voigt() : abs_params.broadening_function
-                cef = isnothing(abs_params) ? vSmartMOM.Absorption.HumlicekWeidemann32SDErrorFunction() : abs_params.CEF
+                bf  = isnothing(abs_params) ? AtmosphericAbsorption.Voigt() : abs_params.broadening_function
+                cef = isnothing(abs_params) ? AtmosphericAbsorption.HumlicekWeideman32() : abs_params.CEF
                 wc  = isnothing(abs_params) ? 150 : abs_params.wing_cutoff
-                absorption_model = make_hitran_model(hitran_data, bf,
+                absorption_model = AtmosphericAbsorption.LineByLineModel(lines_h2o;
+                    profile = bf,
                     wing_cutoff = wc,
-                    CEF = cef,
-                    architecture = params.architecture,
+                    cpf = cef,
+                    architecture = _to_aa_arch(params.architecture),
                     vmr = 0)
                 @timeit "Absorption Coeff H2O"  compute_absorption_profile!(
                     τ_abs[i_band],
@@ -156,15 +157,14 @@ function model_from_parameters(lin::LinMode,
                 for molec_i in 1:length(abs_params.fixed_molecules[i_band])
                     mol_name = abs_params.fixed_molecules[i_band][molec_i]
                     if isempty(abs_params.luts)
-                        @timeit "Read HITRAN" hitran_data =
-                            read_hitran(artifact(mol_name), iso=-1)
+                        @timeit "Read HITRAN" lines = AtmosphericAbsorption.load_lines(AtmosphericAbsorption.HitranPort(artifact(mol_name)); FT)
 
                         @debug "Computing profile for $(mol_name) with vmr $(profile.vmr[mol_name]) for band #$(i_band)"
-                        absorption_model = make_hitran_model(hitran_data,
-                            abs_params.broadening_function,
+                        absorption_model = AtmosphericAbsorption.LineByLineModel(lines;
+                            profile = abs_params.broadening_function,
                             wing_cutoff = abs_params.wing_cutoff,
-                            CEF = abs_params.CEF,
-                            architecture = params.architecture,
+                            cpf = abs_params.CEF,
+                            architecture = _to_aa_arch(params.architecture),
                             vmr = 0)
                         @timeit "Absorption Coeff"  compute_absorption_profile!(
                                 τ_abs[i_band],
@@ -189,15 +189,14 @@ function model_from_parameters(lin::LinMode,
                     mol_name = abs_params.variable_molecules[i_band][molec_i]
                     jac_idx = molec_i + 1
                     if isempty(abs_params.luts)
-                        @timeit "Read HITRAN" hitran_data =
-                            read_hitran(artifact(mol_name), iso=-1)
+                        @timeit "Read HITRAN" lines = AtmosphericAbsorption.load_lines(AtmosphericAbsorption.HitranPort(artifact(mol_name)); FT)
                         @debug "Computing profile for $(mol_name) with vmr $(profile.vmr[mol_name]) for band #$(i_band)"
 
-                        absorption_model = make_hitran_model(hitran_data,
-                            abs_params.broadening_function,
+                        absorption_model = AtmosphericAbsorption.LineByLineModel(lines;
+                            profile = abs_params.broadening_function,
                             wing_cutoff = abs_params.wing_cutoff,
-                            CEF = abs_params.CEF,
-                            architecture = params.architecture,
+                            cpf = abs_params.CEF,
+                            architecture = _to_aa_arch(params.architecture),
                             vmr = 0)
                         @timeit "Absorption Coeff"  compute_absorption_profile!(
                                 τ_abs[i_band],

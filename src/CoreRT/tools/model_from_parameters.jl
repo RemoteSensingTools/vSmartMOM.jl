@@ -310,13 +310,13 @@ function model_from_parameters(params::vSmartMOM_Parameters;
         all_species = vcat(ap.fixed_molecules[i_band], ap.variable_molecules[i_band])
         for (molec_i, mol_name) in enumerate(all_species)
             if isempty(ap.luts)
-                @timeit "Read HITRAN" hitran_data = read_hitran(artifact(mol_name), iso=-1)
+                @timeit "Read HITRAN" lines = AtmosphericAbsorption.load_lines(AtmosphericAbsorption.HitranPort(artifact(mol_name)); FT)
                 @debug "Computing profile for $(mol_name) with vmr $(profile.vmr[mol_name]) for band #$(i_band)"
-                absorption_model = make_hitran_model(hitran_data,
-                    ap.broadening_function,
+                absorption_model = AtmosphericAbsorption.LineByLineModel(lines;
+                    profile = ap.broadening_function,
                     wing_cutoff = ap.wing_cutoff,
-                    CEF = ap.CEF,
-                    architecture = params.architecture,
+                    cpf = ap.CEF,
+                    architecture = _to_aa_arch(params.architecture),
                     vmr = 0)
                 @timeit "Absorption Coeff" compute_absorption_profile!(τ_abs[i_band], absorption_model, params.spec_bands[i_band], profile.vmr[mol_name], profile)
             else
@@ -332,13 +332,13 @@ function model_from_parameters(params::vSmartMOM_Parameters;
                     τ_abs[i_band], ap.h2o_lut[i_band],
                     params.spec_bands[i_band], profile.vmr_h2o, profile)
             else
-                @timeit "Read HITRAN H2O" hitran_data = read_hitran(artifact("H2O"), iso=-1)
+                @timeit "Read HITRAN H2O" lines_h2o = AtmosphericAbsorption.load_lines(AtmosphericAbsorption.HitranPort(artifact("H2O")); FT)
                 @debug "Computing profile for H2O (q-driven) for band #$(i_band)"
-                h2o_model = make_hitran_model(hitran_data,
-                    ap.broadening_function,
+                h2o_model = AtmosphericAbsorption.LineByLineModel(lines_h2o;
+                    profile = ap.broadening_function,
                     wing_cutoff = ap.wing_cutoff,
-                    CEF = ap.CEF,
-                    architecture = params.architecture,
+                    cpf = ap.CEF,
+                    architecture = _to_aa_arch(params.architecture),
                     vmr = 0)
                 @timeit "Absorption Coeff H2O" compute_absorption_profile!(τ_abs[i_band], h2o_model, params.spec_bands[i_band], profile.vmr_h2o, profile)
             end
@@ -629,13 +629,13 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
         all_species = vcat(ap.fixed_molecules[i_band], ap.variable_molecules[i_band])
         for (molec_i, mol_name) in enumerate(all_species)
             if isempty(ap.luts)
-                @timeit "Read HITRAN" hitran_data = read_hitran(artifact(mol_name), iso=-1)
+                @timeit "Read HITRAN" lines = AtmosphericAbsorption.load_lines(AtmosphericAbsorption.HitranPort(artifact(mol_name)); FT)
                 @debug "Computing profile for $(mol_name) with vmr $(profile.vmr[mol_name]) for band #$(i_band)"
-                absorption_model = make_hitran_model(hitran_data,
-                    ap.broadening_function,
+                absorption_model = AtmosphericAbsorption.LineByLineModel(lines;
+                    profile = ap.broadening_function,
                     wing_cutoff = ap.wing_cutoff,
-                    CEF = ap.CEF,
-                    architecture = params.architecture,
+                    cpf = ap.CEF,
+                    architecture = _to_aa_arch(params.architecture),
                     vmr = 0)
                 @timeit "Absorption Coeff" compute_absorption_profile!(τ_abs[i_band], absorption_model, params.spec_bands[i_band], profile.vmr[mol_name], profile)
             else
@@ -651,13 +651,13 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
                     τ_abs[i_band], ap.h2o_lut[i_band],
                     params.spec_bands[i_band], profile.vmr_h2o, profile)
             else
-                @timeit "Read HITRAN H2O" hitran_data = read_hitran(artifact("H2O"), iso=-1)
+                @timeit "Read HITRAN H2O" lines_h2o = AtmosphericAbsorption.load_lines(AtmosphericAbsorption.HitranPort(artifact("H2O")); FT)
                 @debug "Computing profile for H2O (q-driven) for band #$(i_band)"
-                h2o_model = make_hitran_model(hitran_data,
-                    ap.broadening_function,
+                h2o_model = AtmosphericAbsorption.LineByLineModel(lines_h2o;
+                    profile = ap.broadening_function,
                     wing_cutoff = ap.wing_cutoff,
-                    CEF = ap.CEF,
-                    architecture = params.architecture,
+                    cpf = ap.CEF,
+                    architecture = _to_aa_arch(params.architecture),
                     vmr = 0)
                 @timeit "Absorption Coeff H2O" compute_absorption_profile!(τ_abs[i_band], h2o_model, params.spec_bands[i_band], profile.vmr_h2o, profile)
             end
