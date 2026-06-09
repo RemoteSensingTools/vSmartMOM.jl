@@ -1,5 +1,5 @@
 const c₂                 = 1.4387769
-const cMassMol           = 1.66053873e-27 #grams per molecule for unit molec. mass
+const cMassMol           = 1.66053873e-27 #kilograms per molecule for unit molec. mass
 const cSqrtLn2divSqrtPi  = 0.469718639319144059835 #√(ln2/π)
 const cLn2               = 0.6931471805599 #ln2
 const cSqrtLn2           = 0.8325546111577 #√(ln2)
@@ -712,8 +712,8 @@ end
 
 function compute_optical_RS!(RS_type::Union{VS_1to0, VS_1to0_plus}, grid_in, λ₀, n2, o2)
     #plotly()
-    get_greek_raman(RS_type, n2, o2)
-    compute_ϖ_Cabannes!(RS_type, λ₀, n2, o2)
+    #get_greek_raman(RS_type, n2, o2)
+    #compute_ϖ_Cabannes!(RS_type, λ₀, n2, o2)
     #@show n2.effCoeff.Δν̃_VibRaman_coeff_1to0_hires[0], o2.effCoeff.Δν̃_VibRaman_coeff_1to0_hires[0]
     νᵣ = 0.5*(n2.effCoeff.Δν̃_VibRaman_coeff_1to0_hires[0] + o2.effCoeff.Δν̃_VibRaman_coeff_1to0_hires[0])
         
