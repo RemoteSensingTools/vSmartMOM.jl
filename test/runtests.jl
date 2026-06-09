@@ -75,6 +75,20 @@ try
 # Phase-function truncation invariants (Sanghavi & Stephens 2015)
 @testset "Truncation" begin include("test_truncation.jl") end
 
+# VS Raman path smoke tests — guards the previously-broken VS_0to1/VS_1to0
+# call chain (undefined compute_optical_Rayl!/compute_ϖ_Cabannes! calls).
+@testset "Inelastic VS smoke" begin include("test_inelastic_vs_smoke.jl") end
+
+# ForwardDiff hybrid-AD path — guards the Dual-safe Dₙ recursion in
+# compute_mie_ab! (Float64-stabilized for plain floats, native for Duals)
+# and the AD albedo Jacobian. Runtime ~2 min.
+@testset "Hybrid AD" begin include("test_hybrid_ad.jl") end
+
+# GPU Mie kernels (DoubleSingle/Neumaier precision layer + NAI2 pipeline),
+# run on the KernelAbstractions CPU backend so no CUDA is required.
+# The slow benchmark/accuracy-table testsets are opt-in via VSMARTMOM_MIE_BENCH=1.
+@testset "Mie GPU kernels" begin include("test_mie_gpu.jl") end
+
 # Cox-Munk ocean surface tests
 @testset "Cox-Munk Surface" begin include("test_coxmunk.jl") end
 

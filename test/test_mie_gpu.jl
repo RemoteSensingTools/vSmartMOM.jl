@@ -352,6 +352,11 @@ end
 # ============================================================================
 # Performance Benchmarks
 # ============================================================================
+# The benchmark sweep and the nquad=2500 accuracy table below take several
+# minutes on the KA-CPU backend, so they are opt-in: run with
+# VSMARTMOM_MIE_BENCH=1 to include them.
+if get(ENV, "VSMARTMOM_MIE_BENCH", "0") == "1"
+
 @testset "Performance comparison" begin
 
     μ_aer = 0.3
@@ -467,3 +472,5 @@ end
     @test k_err_f64   < 1e-6
     @test k_err_ds    < 1e-4
 end
+
+end # if VSMARTMOM_MIE_BENCH
