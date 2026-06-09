@@ -21,6 +21,38 @@ The function returns a rounded integer, following conventions by BH, Rooj/Stap, 
 """
 get_n_max(size_parameter) = (size_parameter>8.0) ? round(Int, size_parameter + 4.05 * size_parameter^(1/3) + 10) : round(Int, size_parameter + 4.0 * size_parameter^(1/3) + 1)
 
+"""
+    _mie_dn_recursion!(Dn, y, nmx)
+
+Perform the downward Dₙ recursion (BH eq. 4.89) for `y = size_param * refractive_idx`.
+
+Two dispatch methods:
+- `Complex{<:AbstractFloat}` (plain floats): stabilised in Float64 to avoid
+  catastrophic cancellation for `|y| ≳ 50` in Float32.
+- `Complex{<:ForwardDiff.Dual}`: uses native arithmetic so derivative tangents
+  propagate correctly through the recursion; no Float64 cast is possible.
+"""
+function _mie_dn_recursion!(Dn, y::Complex{<:AbstractFloat}, nmx)
+    y64 = Complex{Float64}(y)
+    Dn_prev = Complex{Float64}(0)
+    @inbounds for n = (nmx - 1):-1:1
+        ratio = (n + 1) / y64
+        Dn_prev = ratio - 1 / (Dn_prev + ratio)
+        Dn[n] = Dn_prev
+    end
+end
+
+function _mie_dn_recursion!(Dn, y, nmx)
+    # Generic path: used for ForwardDiff Dual numbers and any other numeric type
+    # where conversion to Complex{Float64} is not defined.
+    Dn_prev = zero(y)
+    @inbounds for n = (nmx - 1):-1:1
+        ratio = (n + 1) / y
+        Dn_prev = ratio - 1 / (Dn_prev + ratio)
+        Dn[n] = Dn_prev
+    end
+end
+
 @doc raw"""
     $(FUNCTIONNAME)(size_param, refractive_idx::Number, an, bn, Dn)
 
@@ -28,10 +60,12 @@ Compute Mie coefficients ``a_n`` and ``b_n`` from the size parameter and complex
 refractive index (Bohren & Huffman, eq. 4.88).
 
 The logarithmic derivative ``D_n(y)`` is obtained via downward recursion
-(BH eq. 4.89; de Rooij & Stap 1984, eq. A9).  This recursion is **always
-performed in Float64** regardless of the element type of `Dn`, because the
-cancellation-prone continued-fraction form loses significant digits in Float32
-for ``|y| \gtrsim 50``.
+(BH eq. 4.89; de Rooij & Stap 1984, eq. A9).  For plain
+`Complex{<:AbstractFloat}` arguments the recursion is promoted to Float64
+for numerical stability (cancellation-prone continued-fraction form loses
+significant digits in Float32 for ``|y| \gtrsim 50``).  For
+`Complex{<:ForwardDiff.Dual}` arguments native arithmetic is used so that
+derivative tangents propagate correctly.
 
 # Arguments
 - `size_param`: size parameter ``x = 2\pi r/\lambda``
@@ -55,14 +89,12 @@ function compute_mie_ab!(size_param, refractive_idx::Number, an, bn, Dn)
 
     # Dn as in eq 4.88, Bohren and Huffman, to calculate an and bn
     # Downward Recursion, eq. 4.89, Bohren and Huffman
-    # Always performed in Float64 for numerical stability
-    y64 = Complex{Float64}(y)
-    Dn_prev = Complex{Float64}(0)
-    @inbounds for n = (nmx - 1):-1:1
-        ratio = (n + 1) / y64
-        Dn_prev = ratio - 1 / (Dn_prev + ratio)
-        Dn[n] = Dn_prev
-    end
+    # For plain floating-point types the recursion is performed in Float64
+    # for numerical stability (cancellation-prone continued-fraction form
+    # loses significant digits in Float32 for |y| ≳ 50).
+    # For ForwardDiff Dual types we must keep native arithmetic so that
+    # derivatives ∂aₙ/∂n propagate correctly through Dₙ.
+    _mie_dn_recursion!(Dn, y, nmx)
 
     # Get recursion for bessel functions ψ and ξ
     ψ₀, ψ₁, χ₀, χ₁ =  (cos(size_param), sin(size_param), -sin(size_param), cos(size_param))
