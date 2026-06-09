@@ -41,3 +41,8 @@ nohup.out
 # Large reference datasets (fetch separately — see sandbox/rami/DATA_FILES.md)
 sandbox/rami/RAMI4ATM_experiments_v1.0.json
 sandbox/rami/ref_kurucz_2006.nc
+
+# Local scratch artefacts (interactive RT comparison runs etc.)
+test/scratch*.png
+test/scratch*.jld2
+test/scratch*.log
