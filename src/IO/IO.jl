@@ -11,6 +11,7 @@ using NCDatasets
 using DocStringExtensions
 using ..vSmartMOM
 using ..Absorption
+import AtmosphericAbsorption
 using ..Scattering
 using ..Architectures
 using ..CoreRT

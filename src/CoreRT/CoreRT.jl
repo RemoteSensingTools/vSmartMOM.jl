@@ -24,6 +24,7 @@ using Unitful                      # For unit-aware conversions
 using UnitfulEquivalences          # For spectral equivalences (nm ↔ cm⁻¹)
 using ..Scattering                 # Use scattering module
 using ..Absorption                 # Use absorption module
+import AtmosphericAbsorption       # AA line-by-line models
 using ..InelasticScattering        # Use Inelastic Scattering module
 using ...vSmartMOM                 # Use parent RadiativeTransfer module
 using ...Architectures             # Use Architectures module
@@ -116,6 +117,12 @@ include("tools/atmo_prof_lin.jl")                 # Linearized atmosphere profil
 include("tools/rt_helper_functions.jl")           # Miscellaneous Utility Functions
 include("tools/rt_helper_functions_lin.jl")       # Linearized helper functions
 include("tools/rt_set_streams.jl")                # Set streams before RT
+# Map vSmartMOM architecture singletons to the structurally identical AA singletons
+# (the two packages vendor the same Architectures code; AA's kernel dispatch uses its own type).
+_to_aa_arch(::Architectures.GPU) = AtmosphericAbsorption.GPU()
+_to_aa_arch(::Architectures.CPU) = AtmosphericAbsorption.CPU()
+_to_aa_arch(arch::AtmosphericAbsorption.AbstractArchitecture) = arch  # already correct
+
 include("tools/model_from_parameters.jl")         # Converting parameters to derived model attributes
 include("tools/lin_model_from_parameters.jl")     # Linearized model from parameters
 include("tools/show_utils.jl")                    # Pretty-printing objects

@@ -20,6 +20,7 @@ using NetCDF                    # For loading NetCDF files with constants
 using ..Architectures           # For GPU/CPU convenience
 using ..Architectures: CPU, GPU # Again for GPU/CPU convenience
 import DataInterpolations: CubicSpline as DI_CS # For use in qoft
+import AtmosphericAbsorption    # AA dispatch methods in autodiff_helper.jl
 
 include("constants/constants.jl")                   # Scientific and mathematical constants
 include("constants/mol_weights.jl")                 # Molecular weights

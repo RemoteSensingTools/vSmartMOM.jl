@@ -1,4 +1,5 @@
 [deps]
+AtmosphericAbsorption = "e0e35e18-ffce-4906-90bd-929a5e163038"
 Aqua = "4c88cf16-eb10-579e-8560-4a9242c79595"
 CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
 CanopyOptics = "a18e34a6-5dbe-4f38-a44b-e5141852e7a7"
@@ -24,7 +25,11 @@ WignerSymbols = "9f57e263-0b3d-5e2e-b1be-24f2bb48858b"
 YAML = "ddb6d928-2868-570f-bddf-ab3f9cf99eb6"
 vSmartMOM = "7ba11eeb-0a61-4a04-a413-bf612cc2007e"
 
+[sources]
+AtmosphericAbsorption = {url = "https://github.com/RemoteSensingTools/AtmosphericAbsorption.jl.git"}
+
 [compat]
+AtmosphericAbsorption = "0.1.0"
 Aqua = "0.8"
 CUDA = "5.5, 6"
 CanopyOptics = "0.2"

@@ -25,3 +25,9 @@ absorption_cross_section(model::AbstractCrossSectionModel,
                          temperature::Real;
                          wavelength_flag::Bool=false) =
     compute_absorption_cross_section(model, grid, pressure, temperature; wavelength_flag=wavelength_flag)
+
+absorption_cross_section(model::AtmosphericAbsorption.LineByLineModel,
+                         grid::Union{AbstractRange{<:Real}, AbstractArray},
+                         pressure::Real,
+                         temperature::Real) =
+    AtmosphericAbsorption.compute_cross_section(model, grid, pressure, temperature)

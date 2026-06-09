@@ -7,7 +7,8 @@ using Unitful
 using UnitfulEquivalences
 using CanopyOptics
 using ..CoreRT: vSmartMOM_Parameters, RTNumericalParameters, AbsorptionParameters, ScatteringParameters, RT_Aerosol, AtmosphericProfile
-using ..Absorption: AbstractBroadeningFunction, AbstractComplexErrorFunction, load_interpolation_model
+using ..Absorption: load_interpolation_model
+import AtmosphericAbsorption
 using ..Scattering
 using ..Scattering: AbstractFourierDecompositionType, Aerosol
 using ..Architectures
@@ -116,9 +117,9 @@ String → absorption broadening function mapping.
 Keys: "Voigt", "Lorentz", "Doppler".
 """
 const BROADENING_MAP = Dict(
-    "Voigt"   => ()->Absorption.Voigt(),
-    "Lorentz" => ()->Absorption.Lorentz(),
-    "Doppler" => ()->Absorption.Doppler()
+    "Voigt"   => ()->AtmosphericAbsorption.Voigt(),
+    "Lorentz" => ()->AtmosphericAbsorption.Lorentz(),
+    "Doppler" => ()->AtmosphericAbsorption.Doppler()
 )
 
 """
@@ -128,7 +129,7 @@ String → complex error function mapping for Voigt computations.
 Keys: "HumlicekWeidemann32SDErrorFunction".
 """
 const CEF_MAP = Dict(
-    "HumlicekWeidemann32SDErrorFunction" => ()->Absorption.HumlicekWeidemann32SDErrorFunction()
+    "HumlicekWeidemann32SDErrorFunction" => ()->AtmosphericAbsorption.HumlicekWeideman32()
 )
 
 # --- BRDF (surface) mapping ---
