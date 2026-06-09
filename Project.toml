@@ -52,11 +52,11 @@ Metal = "dde4c033-4e86-420c-a63e-0dd931031962"
 vSmartMOMCUDAExt = "CUDA"
 vSmartMOMMetalExt = "Metal"
 
-# AtmosphericAbsorption is not yet registered; track its GitHub repo (default branch) so a fresh
-# resolve can find it without a committed Manifest. Pin a `rev = "<sha>"` here for a reproducible
-# build once the integration stabilizes.
+# AtmosphericAbsorption is not yet registered; dev it from the sibling local checkout during the
+# integration. Switch to a plain registry [compat] bound (and drop this [sources] entry) once
+# AtmosphericAbsorption.jl is registered.
 [sources]
-AtmosphericAbsorption = {url = "https://github.com/RemoteSensingTools/AtmosphericAbsorption.jl.git"}
+AtmosphericAbsorption = {path = "../AtmosphericAbsorption.jl"}
 
 [compat]
 AtmosphericAbsorption = "0.1.0"
