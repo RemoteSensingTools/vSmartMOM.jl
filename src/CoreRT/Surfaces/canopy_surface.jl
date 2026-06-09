@@ -633,11 +633,11 @@ function create_surface_layer!(RS_type::noRS,
                           quad_points, τ_sum, architecture)
 
     ṙ = (Array(temp_added.r⁻⁺) .- r_ref) ./ ε
-    added_layer_lin.ap_ṙ⁻⁺[iparam,:,:,:] .= arr_type(ṙ)
+    added_layer_lin.ap_ṙ⁻⁺[:,:,:,iparam] .= arr_type(ṙ)
 
     if SFI && j_ref !== nothing
         j̇ = (Array(temp_added.j₀⁻) .- j_ref) ./ ε
-        added_layer_lin.ap_J̇₀⁻[iparam,:,:,:] .= arr_type(j̇)
+        added_layer_lin.ap_J̇₀⁻[:,:,:,iparam] .= arr_type(j̇)
     end
 
     synchronize_if_gpu()
