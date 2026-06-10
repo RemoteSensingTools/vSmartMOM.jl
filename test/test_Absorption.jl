@@ -309,3 +309,33 @@ end
         @test true  # Skip GPU test if no CUDA
     end
 end
+
+@testset "absorption_cross_section_AA_wavelength_flag" begin
+    # The AtmosphericAbsorption.jl dispatch must forward wavelength_flag:
+    # σ on an nm grid (input order) must equal the reverse-mapped σ on the
+    # equivalent wavenumber grid. Mirrors the production model construction
+    # in model_from_parameters.
+    import AtmosphericAbsorption
+    lines = AtmosphericAbsorption.load_lines(
+        AtmosphericAbsorption.HitranPort(artifact("CO2")); FT = Float64)
+    # NB: AA has its own architecture types (production maps via
+    # _to_aa_arch(params.architecture)) — use AA's CPU here.
+    aa = AtmosphericAbsorption.LineByLineModel(lines;
+        profile = AtmosphericAbsorption.Voigt(),
+        wing_cutoff = 40,
+        cpf = AtmosphericAbsorption.HumlicekWeideman32(),
+        architecture = AtmosphericAbsorption.CPU(), vmr = 0)
+
+    ν_grid  = collect(range(6210.0, 6220.0, length = 501))   # cm⁻¹, ascending
+    nm_grid = 1e7 ./ ν_grid                                   # nm, descending
+
+    σ_ν  = collect(absorption_cross_section(aa, ν_grid, 1000.1, 296.1))
+    σ_nm = collect(absorption_cross_section(aa, nm_grid, 1000.1, 296.1;
+                                            wavelength_flag = true))
+
+    @test length(σ_nm) == length(nm_grid)
+    # nm_grid[i] corresponds to ν_grid[i] one-to-one (no reversal needed:
+    # the nm grid above is the elementwise map of the ν grid).
+    @test maximum(abs.(σ_nm .- σ_ν)) ≤ 1e-15 * maximum(σ_ν)
+    @test maximum(σ_ν) > 0   # the window actually contains CO2 lines
+end
