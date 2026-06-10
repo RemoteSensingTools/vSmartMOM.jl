@@ -378,7 +378,6 @@ with code anchors:
 
 Runnable examples with Plotly figures:
 
-- [Run on GPU](../tutorials/Tutorial_GPU.md)
 - [Hybrid AD across the GPU boundary](../tutorials/Tutorial_HybridAD.md)
 
 ## References
