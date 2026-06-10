@@ -92,6 +92,11 @@ try
 # Cox-Munk ocean surface tests
 @testset "Cox-Munk Surface" begin include("test_coxmunk.jl") end
 
+# Lambertian surface scaffold — cross-flavor consistency (Scalar/Legendre/
+# Spline/Spectrum share one create_surface_layer!), m>0 conventions, and the
+# LambertianSurfaceSpectrum end-to-end regression.
+@testset "Lambertian surfaces" begin include("test_lambertian_surfaces.jl") end
+
 # GPU-specific tests (conditional on CUDA availability)
 CUDA_AVAILABLE = try
     using CUDA

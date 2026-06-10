@@ -152,6 +152,7 @@ surface_source_contribute!(::AbstractPreparedSource, ::AbstractSurfaceType,
 """
     surface_source_contribute!(prep::PreparedSurfaceSIF,
                                 surface::Union{LambertianSurfaceScalar,
+                                               LambertianSurfaceSpectrum,
                                                LambertianSurfaceLegendre,
                                                LambertianSurfaceSpline},
                                 surface_added_layer, m, pol_type, architecture)
@@ -166,7 +167,8 @@ applied downstream in `postprocessing_vza!` so the isotropic SIF
 contribution survives unweighted.
 """
 function surface_source_contribute!(prep::PreparedSurfaceSIF,
-        ::Union{LambertianSurfaceScalar, LambertianSurfaceLegendre, LambertianSurfaceSpline},
+        ::Union{LambertianSurfaceScalar, LambertianSurfaceSpectrum,
+                LambertianSurfaceLegendre, LambertianSurfaceSpline},
         surface_added_layer,
         m::Integer, pol_type, architecture)
     m == 0 || return nothing
