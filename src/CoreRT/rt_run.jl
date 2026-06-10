@@ -376,8 +376,32 @@ function rt_run(RS_type::AbstractRamanType, model, iBand;
     # would be pure overhead).
     _interaction_ws = _interaction_workspace(RS_type, composite_layer, added_layer, arch)
 
-    # Cumulative optical depth (m-independent, saved for TMS correction)
+    # --- Pre-loop hoists (m-independent work) ---
+    # Build the m-invariant cache: device uploads of τ_rayl/τ_abs per layer,
+    # pre-applied δ-M aerosol corrections, fScattRayleigh (requires one m=0 Z
+    # pass whose Z matrices are then discarded), and the host copy of qp_μ.
+    # Cost: equivalent to one constructCoreOpticalProperties call; paid once
+    # instead of once per Fourier moment.
+    @timeit "CacheInit" _m_inv_cache = build_m_invariant_cache(RS_type, iBand, model)
+
+    # Cumulative optical depth (m-independent, saved for TMS correction).
+    # Computed once from m=0 optical props (Z doesn't enter τ_sum_all).
     τ_sum_all = nothing
+
+    # Device-resident τ_sum_all[:,end] slice used by create_surface_layer!.
+    # Hoisted out of the m loop — τ_sum_all is m-independent, so the upload
+    # only needs to happen once (after τ_sum_all is first computed below).
+    τ_sum_end_dev = nothing
+
+    # Scattering interface sequence (m-independent: detection uses τ·ϖ only).
+    # Computed once on m=0 and reused for all subsequent moments.
+    scattering_interfaces_all = nothing
+
+    # Pre-allocate hdr_J₀⁻ once; interaction_hdrf! writes into it each moment.
+    # The original `similar(composite_layer.J₀⁻)` inside the loop allocated a
+    # fresh array each moment (and the pre-allocated hdr_J₀⁻ at line 303 was
+    # never used because it has shape (nVZA, pol_n, nSpec), not (NquadN,1,nSpec)).
+    hdr_J₀⁻ = similar(composite_layer.J₀⁻)
 
     # Loop over fourier moments
     for m = 0:m_max
@@ -386,12 +410,19 @@ function rt_run(RS_type::AbstractRamanType, model, iBand;
         weight = m == 0 ? FT(0.5/π) : FT(1.0/π)
         # Set the Zλᵢλₒ interaction parameters for Raman (or nothing for noRS)
         @timeit "IE"  InelasticScattering.computeRamanZλ!(RS_type, pol_type,collect(qp_μ), m, arr_type)
-        # Compute the core layer optical properties:
+        # Compute the core layer optical properties (cache-aware: only Z moments
+        # are recomputed; τ/ϖ uploads and fScattRayleigh come from _m_inv_cache).
         @timeit "OpticalProps" layer_opt_props, fScattRayleigh   =
-            constructCoreOpticalProperties(RS_type,iBand,m,model);
-        # Determine the scattering interface definitions:
-        @timeit "Extract Optical Properties" scattering_interfaces_all, τ_sum_all =
-            extractEffectiveProps(layer_opt_props,quad_points);
+            constructCoreOpticalProperties(RS_type, iBand, m, model, _m_inv_cache);
+        # τ_sum_all and scattering_interfaces_all are m-independent (extractEffectiveProps
+        # only uses τ·ϖ from layer_opt_props, not Z). Compute on m=0, reuse thereafter.
+        if τ_sum_all === nothing
+            @timeit "Extract Optical Properties" scattering_interfaces_all, τ_sum_all =
+                extractEffectiveProps(layer_opt_props, quad_points)
+            # Upload the BOA τ_sum slice to device once.
+            τ_sum_end_dev = arr_type(τ_sum_all[:,end])
+        end
+        # On m>0 we reuse the cached scattering_interfaces_all and τ_sum_all.
 
         # Loop over vertical layers:
         @showprogress 1 "Looping over layers ..." for iz = 1:Nz  # Count from TOA to BOA
@@ -426,7 +457,7 @@ function rt_run(RS_type::AbstractRamanType, model, iBand;
                                 SFI, m,
                                 pol_type,
                                 quad_points,
-                                arr_type(τ_sum_all[:,end]),
+                                τ_sum_end_dev,
                                 arch;
                                 spec_bands_wn=_canopy_spec_wn,
                                 m_max=m_max)
@@ -436,7 +467,7 @@ function rt_run(RS_type::AbstractRamanType, model, iBand;
                                 SFI, m,
                                 pol_type,
                                 quad_points,
-                                arr_type(τ_sum_all[:,end]),
+                                τ_sum_end_dev,
                                 arch)
         end
 
@@ -464,8 +495,7 @@ function rt_run(RS_type::AbstractRamanType, model, iBand;
                                     I_static;
                                     workspace=_interaction_ws)
        #@show composite_layer.J₀⁺[iμ₀,1,1:3]
-        hdr_J₀⁻ = similar(composite_layer.J₀⁻)
-        # One last interaction with surface:
+        # hdr_J₀⁻ is pre-allocated before the m loop (avoids one similar() per moment).
         @timeit "interaction_HDRF" interaction_hdrf!(#RS_type,
                                     #bandSpecLim,
                                     #scattering_interfaces_all[end], 

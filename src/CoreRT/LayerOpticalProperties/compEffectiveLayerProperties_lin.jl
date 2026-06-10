@@ -443,31 +443,57 @@ function extractEffectiveProps(
 end
 
 """
-    expandOpticalProperties(in, in_lin, arr_type)
+    expandOpticalProperties(in, in_lin, arr_type; expand_Z=false)
 
-Expand optical properties and their derivatives to full spectral resolution by
-replicating Z matrices along the spectral dimension if they are spectrally constant.
-
-Ensures that `Z[nμ, nμ, nSpec]` and `Ż[nμ, nμ, nSpec, Nparams]` have matching
-spectral dimensions with `τ` and `ϖ`.
+Convert optical properties and their linearized derivatives to the target
+device array type.  When `expand_Z=false` (default for RT-kernel callers)
+singleton-Z arrays (`size(Z,3)==1`) are **not** replicated to `nSpec` copies —
+the elemental and fused linearized kernels already branch on `size(Z,3)>1` and
+use index `n2=1` when the phase matrix is spectrally flat, so no replication
+is needed.  Set `expand_Z=true` only when the result will be concatenated
+along the spectral dimension (e.g. the `Base.:*` multi-layer combiner).
 """
-function expandOpticalProperties(in::CoreScatteringOpticalProperties, in_lin::CoreScatteringOpticalPropertiesLin,  arr_type)
+function expandOpticalProperties(in::CoreScatteringOpticalProperties,
+                                  in_lin::CoreScatteringOpticalPropertiesLin,
+                                  arr_type;
+                                  expand_Z::Bool = false)
     (; τ, ϖ, Z⁺⁺, Z⁻⁺) = in 
     (; τ̇, ϖ̇, Ż⁺⁺, Ż⁻⁺) = in_lin 
     @assert length(τ) == length(ϖ) "τ and ϖ sizes need to match"
     @assert length(τ̇) == length(ϖ̇) "τ̇ and ϖ̇ sizes need to match"
 
-    #nParams = size(τ̇)[1]
-    if size(Z⁺⁺,3) == 1
-        Z⁺⁺ = _repeat(Z⁺⁺,1,1,length(τ))
-        Z⁻⁺ = _repeat(Z⁻⁺,1,1,length(τ))
-        Ż⁺⁺ = _repeat(reshape(Ż⁺⁺, size(Ż⁺⁺,1), size(Ż⁺⁺,2), 1, size(Ż⁺⁺,3)), 1, 1, length(τ), 1)
-        Ż⁻⁺ = _repeat(reshape(Ż⁻⁺, size(Ż⁻⁺,1), size(Ż⁻⁺,2), 1, size(Ż⁻⁺,3)), 1, 1, length(τ), 1)
-        return CoreScatteringOpticalProperties(arr_type(τ), arr_type(ϖ), arr_type(Z⁺⁺), arr_type(Z⁻⁺)), 
-            CoreScatteringOpticalPropertiesLin(arr_type(τ̇), arr_type(ϖ̇), arr_type(Ż⁺⁺), arr_type(Ż⁻⁺))      
+    if size(Z⁺⁺, 3) == 1
+        if expand_Z
+            Z⁺⁺ = _repeat(Z⁺⁺, 1, 1, length(τ))
+            Z⁻⁺ = _repeat(Z⁻⁺, 1, 1, length(τ))
+            Ż⁺⁺ = _repeat(reshape(Ż⁺⁺, size(Ż⁺⁺,1), size(Ż⁺⁺,2), 1, size(Ż⁺⁺,3)), 1, 1, length(τ), 1)
+            Ż⁻⁺ = _repeat(reshape(Ż⁻⁺, size(Ż⁻⁺,1), size(Ż⁻⁺,2), 1, size(Ż⁻⁺,3)), 1, 1, length(τ), 1)
+            return CoreScatteringOpticalProperties(
+                        _to_device(arr_type, τ), _to_device(arr_type, ϖ),
+                        _to_device(arr_type, Z⁺⁺), _to_device(arr_type, Z⁻⁺)),
+                   CoreScatteringOpticalPropertiesLin(
+                        _to_device(arr_type, τ̇), _to_device(arr_type, ϖ̇),
+                        _to_device(arr_type, Ż⁺⁺), _to_device(arr_type, Ż⁻⁺))
+        else
+            # Fast path: fused linearized kernels branch on size(Z,3) and
+            # size(Ż,3), using n2=1 / n2_lin=1 for singleton spectral dim.
+            # Ensure 3-D / 4-D shapes so Z[i,j,1] and Ż[i,j,1,p] are valid.
+            Z3⁺⁺ = _to_device(arr_type, _ensure_3d(Z⁺⁺))
+            Z3⁻⁺ = _to_device(arr_type, _ensure_3d(Z⁻⁺))
+            Ż4⁺⁺ = _to_device(arr_type, ndims(Ż⁺⁺) == 3 ? reshape(Ż⁺⁺, size(Ż⁺⁺,1), size(Ż⁺⁺,2), 1, size(Ż⁺⁺,3)) : Ż⁺⁺)
+            Ż4⁻⁺ = _to_device(arr_type, ndims(Ż⁻⁺) == 3 ? reshape(Ż⁻⁺, size(Ż⁻⁺,1), size(Ż⁻⁺,2), 1, size(Ż⁻⁺,3)) : Ż⁻⁺)
+            return CoreScatteringOpticalProperties(
+                        _to_device(arr_type, τ), _to_device(arr_type, ϖ), Z3⁺⁺, Z3⁻⁺),
+                   CoreScatteringOpticalPropertiesLin(
+                        _to_device(arr_type, τ̇), _to_device(arr_type, ϖ̇), Ż4⁺⁺, Ż4⁻⁺)
+        end
     else
-        @assert size(Z⁺⁺,3) ==  length(τ) "Z and τ dimensions need to match "
-        return CoreScatteringOpticalProperties(arr_type(τ), arr_type(ϖ), arr_type(Z⁺⁺), arr_type(Z⁻⁺)),
-            CoreScatteringOpticalPropertiesLin(arr_type(τ̇), arr_type(ϖ̇), arr_type(Ż⁺⁺), arr_type(Ż⁻⁺))       
+        @assert size(Z⁺⁺, 3) == length(τ) "Z and τ dimensions need to match"
+        return CoreScatteringOpticalProperties(
+                    _to_device(arr_type, τ), _to_device(arr_type, ϖ),
+                    _to_device(arr_type, Z⁺⁺), _to_device(arr_type, Z⁻⁺)),
+               CoreScatteringOpticalPropertiesLin(
+                    _to_device(arr_type, τ̇), _to_device(arr_type, ϖ̇),
+                    _to_device(arr_type, Ż⁺⁺), _to_device(arr_type, Ż⁻⁺))
     end
 end
