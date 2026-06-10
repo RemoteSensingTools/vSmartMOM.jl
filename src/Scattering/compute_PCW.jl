@@ -24,8 +24,12 @@ k = \bar{C}_{\mathrm{ext}},\qquad f^t = 1.
 
 Use [`make_mie_model`](@ref) with `PCW()` and Wigner inputs before calling
 this function.
+
+There is no GPU PCW kernel; a `GPU()`-architecture PCW model falls back to this
+CPU implementation (with a one-time `@warn`) via the single-verb
+`compute_aerosol_optical_properties(model)` router.
 """
-function compute_aerosol_optical_properties(model::MieModel{FDT}, FT2::Type=Float64) where FDT<:PCW
+function compute_aerosol_optical_properties(model::MieModel{FDT}, FT2::Type) where FDT<:PCW
 
     # Unpack the model
     (; computation_type, aerosol, r_max, nquad_radius, λ, polarization_type, truncation_type, wigner_A, wigner_B) = model

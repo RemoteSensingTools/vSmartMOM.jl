@@ -120,18 +120,31 @@ function compute_aerosol_optical_properties_gpu(
 
     # --- Copy back to CPU for reduction + Greek coefficients ---
     # (These are relatively small arrays, so the transfer is cheap)
-    f11_host = Array(f11_dev)
-    f33_host = Array(f33_dev)
-    f12_host = Array(f12_dev)
-    f34_host = Array(f34_dev)
-    C_sca_host = Array(C_sca_dev)
-    C_ext_host = Array(C_ext_dev)
+    #
+    # Host-side reduction-accumulator type. The GPU kernels run in `FT` (Float32
+    # for the DSEmulated path — that is where the speed comes from), but the
+    # *host-side* size-distribution reduction and the Greek-coefficient angular
+    # quadrature are cheap and accuracy-critical. Float32 here would lose ~3-4
+    # digits in the Greek coefficients even with Neumaier compensation, because
+    # the per-term products round before the compensated sum can help. So we
+    # widen Float32 → Float64 for ALL host reductions (Neumaier still applies,
+    # now in Float64) and only narrow to the requested `FT2` at the very end.
+    # For Float64 models this is a no-op (RA === FT === Float64), so the
+    # NativeFloat64 path is unchanged.
+    RA = FT === Float32 ? Float64 : FT
 
-    # --- Size distribution reduction (CPU, Neumaier-compensated) ---
-    bulk_C_sca = neumaier_dot(C_sca_host, FT.(wₓ))
-    bulk_C_ext = neumaier_dot(C_ext_host, FT.(wₓ))
+    f11_host = RA.(Array(f11_dev))
+    f33_host = RA.(Array(f33_dev))
+    f12_host = RA.(Array(f12_dev))
+    f34_host = RA.(Array(f34_dev))
+    C_sca_host = RA.(Array(C_sca_dev))
+    C_ext_host = RA.(Array(C_ext_dev))
 
-    wr = FT.(4π .* r.^2 .* wₓ)
+    # --- Size distribution reduction (CPU, Neumaier-compensated in RA) ---
+    bulk_C_sca = neumaier_dot(C_sca_host, RA.(wₓ))
+    bulk_C_ext = neumaier_dot(C_ext_host, RA.(wₓ))
+
+    wr = RA.(4π .* r.^2 .* wₓ)
 
     # Compute bulk phase matrix via matrix-vector multiply with Neumaier
     bulk_f11 = neumaier_matvec(f11_host, wr)
@@ -140,37 +153,37 @@ function compute_aerosol_optical_properties_gpu(
     bulk_f34 = neumaier_matvec(f34_host, wr)
 
     # Normalize
-    inv_bulk_C_sca = one(FT) / bulk_C_sca
+    inv_bulk_C_sca = one(RA) / bulk_C_sca
     bulk_f11 .*= inv_bulk_C_sca
     bulk_f33 .*= inv_bulk_C_sca
     bulk_f12 .*= inv_bulk_C_sca
     bulk_f34 .*= inv_bulk_C_sca
 
-    # --- Greek coefficients (CPU, Neumaier-compensated) ---
+    # --- Greek coefficients (CPU, Neumaier-compensated in RA) ---
     l_max = n_mu
-    P, P², R², T² = compute_legendre_poly(FT.(μ), l_max)
+    P, P², R², T² = compute_legendre_poly(RA.(μ), l_max)
 
-    α = zeros(FT, l_max)
-    β = zeros(FT, l_max)
-    γ = zeros(FT, l_max)
-    δ = zeros(FT, l_max)
-    ϵ = zeros(FT, l_max)
-    ζ = zeros(FT, l_max)
+    α = zeros(RA, l_max)
+    β = zeros(RA, l_max)
+    γ = zeros(RA, l_max)
+    δ = zeros(RA, l_max)
+    ϵ = zeros(RA, l_max)
+    ζ = zeros(RA, l_max)
 
-    w_μ_ft = FT.(w_μ)
+    w_μ_ra = RA.(w_μ)
     for l = 0:l_max-1
-        fac = l >= 2 ? FT(2l + 1) / FT(2) * sqrt(one(FT) / FT((l - 1) * l * (l + 1) * (l + 2))) : zero(FT)
-        fac_beta = FT(2l + 1) / FT(2)
+        fac = l >= 2 ? RA(2l + 1) / RA(2) * sqrt(one(RA) / RA((l - 1) * l * (l + 1) * (l + 2))) : zero(RA)
+        fac_beta = RA(2l + 1) / RA(2)
 
-        β[l+1] = fac_beta * neumaier_dot_3(w_μ_ft, bulk_f11, view(P, :, l+1))
-        δ[l+1] = fac_beta * neumaier_dot_3(w_μ_ft, bulk_f33, view(P, :, l+1))
+        β[l+1] = fac_beta * neumaier_dot_3(w_μ_ra, bulk_f11, view(P, :, l+1))
+        δ[l+1] = fac_beta * neumaier_dot_3(w_μ_ra, bulk_f33, view(P, :, l+1))
         if l >= 2
-            γ[l+1] = fac * neumaier_dot_3(w_μ_ft, bulk_f12, view(P², :, l+1))
-            ϵ[l+1] = fac * neumaier_dot_3(w_μ_ft, bulk_f34, view(P², :, l+1))
-            α[l+1] = fac * (neumaier_dot_3(w_μ_ft, bulk_f11, view(R², :, l+1)) +
-                            neumaier_dot_3(w_μ_ft, bulk_f33, view(T², :, l+1)))
-            ζ[l+1] = fac * (neumaier_dot_3(w_μ_ft, bulk_f33, view(R², :, l+1)) +
-                            neumaier_dot_3(w_μ_ft, bulk_f11, view(T², :, l+1)))
+            γ[l+1] = fac * neumaier_dot_3(w_μ_ra, bulk_f12, view(P², :, l+1))
+            ϵ[l+1] = fac * neumaier_dot_3(w_μ_ra, bulk_f34, view(P², :, l+1))
+            α[l+1] = fac * (neumaier_dot_3(w_μ_ra, bulk_f11, view(R², :, l+1)) +
+                            neumaier_dot_3(w_μ_ra, bulk_f33, view(T², :, l+1)))
+            ζ[l+1] = fac * (neumaier_dot_3(w_μ_ra, bulk_f33, view(R², :, l+1)) +
+                            neumaier_dot_3(w_μ_ra, bulk_f11, view(T², :, l+1)))
         end
     end
 

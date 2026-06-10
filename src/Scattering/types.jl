@@ -31,6 +31,7 @@ abstract type AbstractAnalyticPhaseFunction end
 
 Scalar Henyey-Greenstein phase function,
 `(1 - g^2) / (1 + g^2 - 2g cosΘ)^(3/2)`, normalized so its sphere average is
+`(1 - g^2) / (1 + g^2 - 2g cosΘ)^(3/2)`, normalized so its sphere average is
 one.
 """
 Base.@kwdef struct HenyeyGreensteinPhaseFunction{FT<:Real} <: AbstractAnalyticPhaseFunction
@@ -65,10 +66,18 @@ single-scattering optical properties via Lorenz-Mie theory.
 The refractive index convention is `n = nᵣ - i·nᵢ`, where positive `nᵢ`
 indicates absorption.
 
+The struct is parameterized by the refractive-index element type `FT`. `FT` is
+typically a plain `AbstractFloat` (`Float64`/`Float32`) but may also be a
+`ForwardDiff.Dual` so the autodiff path can track derivatives with respect to
+`nᵣ`/`nᵢ`; for that reason `FT` is intentionally **not** constrained to
+`<:AbstractFloat`. The outer convenience constructor `Aerosol(dist, nᵣ, nᵢ)`
+promotes `nᵣ` and `nᵢ` to a common type, so existing call sites continue to
+work unchanged.
+
 # Fields
 - `size_distribution::ContinuousUnivariateDistribution`: Particle radius distribution (e.g., `LogNormal`). Units: μm.
-- `nᵣ`: Real part of the refractive index (relative to air).
-- `nᵢ`: Imaginary part of the refractive index (absorption).
+- `nᵣ::FT`: Real part of the refractive index (relative to air).
+- `nᵢ::FT`: Imaginary part of the refractive index (absorption).
 
 # Example
 ```julia
@@ -76,13 +85,22 @@ using Distributions
 aer = Aerosol(LogNormal(log(0.3), 0.4), 1.3, 0.01)
 ```
 """
-mutable struct Aerosol{}
+mutable struct Aerosol{FT}
     "Univariate size distribution"
     size_distribution::ContinuousUnivariateDistribution
     "Real part of refractive index"
-    nᵣ
+    nᵣ::FT
     "Imag part of refractive index"
-    nᵢ
+    nᵢ::FT
+end
+
+# Outer convenience constructor: promote nᵣ/nᵢ to a common element type so that
+# all existing `Aerosol(dist, nᵣ, nᵢ)` call sites keep working unchanged. We use
+# `promote` (not `promote_type ∘ AbstractFloat`) so that ForwardDiff `Dual`
+# arguments are preserved for the autodiff path.
+function Aerosol(size_distribution::ContinuousUnivariateDistribution, nᵣ, nᵢ)
+    nᵣp, nᵢp = promote(nᵣ, nᵢ)
+    return Aerosol{typeof(nᵣp)}(size_distribution, nᵣp, nᵢp)
 end
 
 # TODO: struct MultivariateAerosol{FT,FT2} <: AbstractAerosolType
@@ -312,21 +330,42 @@ Model that specifies the Mie computation details
 =#
 
 """
-    MieModel{FDT<:AbstractFourierDecompositionType, FT}
+    MieModel{FDT<:AbstractFourierDecompositionType, FT, ARCH}
 
 Configuration for a Lorenz–Mie scattering computation.  Specifies the aerosol
 (size distribution + refractive index), wavelength, polarization type,
-truncation strategy, and integration parameters.  The `computation_type`
-selects between NAI-2 (Siewert) and PCW (Domke) Fourier decomposition
-algorithms.
+truncation strategy, integration parameters, and the compute architecture.
+The `computation_type` selects between NAI-2 (Siewert) and PCW (Domke) Fourier
+decomposition algorithms.
 
 Pre-computed Wigner symbol tables (`wigner_A`, `wigner_B`) can be supplied
 for PCW; they default to trivial placeholders when unused.
 
+# FT semantics (three orthogonal precision axes)
+
+`FT` is the **output** float type of the returned Greek coefficients and
+optical scalars (set by `r_max`'s type). It is independent of two other
+precision choices:
+
+1. `FT` (output type) — what the user consumes downstream in the RT pipeline.
+2. The internal `Dₙ` continued-fraction recursion, which the CPU path always
+   stabilizes in `Float64` for plain floats regardless of `FT` (see
+   [`compute_mie_ab!`](@ref)); `Dual` inputs keep native arithmetic.
+3. `precision_policy` (GPU only) — `NativeFloat64` (default on CUDA) runs the
+   GPU `Dₙ` recursion in hardware FP64; `DSEmulated` uses Float32
+   double-single pairs. This axis is inert on the CPU path.
+
+# Architecture dispatch
+
+`architecture::ARCH` is either `Architectures.CPU()` (default) or
+`Architectures.GPU()`. `compute_aerosol_optical_properties(mie_model)`
+dispatches on it: NAI2+CPU → analytic CPU path; NAI2+GPU → the
+KernelAbstractions GPU pipeline; PCW+GPU → CPU fallback (no GPU PCW kernel).
+
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-Base.@kwdef struct MieModel{FDT<:AbstractFourierDecompositionType, FT}
+Base.@kwdef struct MieModel{FDT<:AbstractFourierDecompositionType, FT, ARCH}
 
     computation_type::FDT
     aerosol::Aerosol
@@ -341,6 +380,11 @@ Base.@kwdef struct MieModel{FDT<:AbstractFourierDecompositionType, FT}
 
     wigner_A = zeros(1, 1, 1)
     wigner_B = zeros(1, 1, 1)
+
+    "Compute architecture (`CPU()` or `GPU()`); selects CPU vs GPU Mie path"
+    architecture::ARCH = Architectures.CPU()
+    "GPU precision policy (`NativeFloat64`/`DSEmulated`); `nothing` = auto-select on GPU, ignored on CPU"
+    precision_policy = nothing
 
 end
 
