@@ -485,7 +485,6 @@ function rt_run(RS_type::AbstractRamanType, model, iBand;
         inject_surface_SIF!(brdf, added_layer_surface, m, pol_type, _sif_source(RS_type), arch)
         surface_source_contribute!(prepared_sources, brdf, added_layer_surface, m, pol_type, arch)
 
-        #@show composite_layer.J₀⁺[iμ₀,1,1:3]
         # One last interaction with surface:
         @timeit "interaction" interaction!(RS_type,
                                     scattering_interfaces_all[end],
@@ -494,7 +493,6 @@ function rt_run(RS_type::AbstractRamanType, model, iBand;
                                     added_layer_surface,
                                     I_static;
                                     workspace=_interaction_ws)
-       #@show composite_layer.J₀⁺[iμ₀,1,1:3]
         # hdr_J₀⁻ is pre-allocated before the m loop (avoids one similar() per moment).
         @timeit "interaction_HDRF" interaction_hdrf!(#RS_type,
                                     #bandSpecLim,
@@ -559,13 +557,7 @@ function rt_run(RS_type::AbstractRamanType, model, iBand;
     reset_timer!()
 
     # Return R_SFI or R, depending on the flag
-    #if RAMI
-    #@show size(hdr), size(bhr_dw)
-    #hdr = hdr[:,1,:] ./ bhr_dw[1,:]
     return SFI ? (R_SFI, T_SFI, ieR_SFI, ieT_SFI, hdr, bhr_uw[1,:], bhr_dw[1,:]) : (R, T)
-    #else
-    #return SFI ? (R_SFI, T_SFI, ieR_SFI, ieT_SFI) : (R, T)
-    #end
 end
 
 

@@ -444,21 +444,6 @@ function apply_D_matrix!(n_stokes::Int,
     end
 end
 
-#=function apply_D_matrix!(n_stokes::Int, r⁻⁺::Array{FT,3}, t⁺⁺::Array{FT,3}, r⁺⁻::Array{FT,3}, t⁻⁻::Array{FT,3}) where {FT}
-    if n_stokes == 1
-        r⁺⁻[:] = r⁻⁺
-        t⁻⁻[:] = t⁺⁺
-        
-        return nothing
-    else 
-        device = devi(Architectures.CPU())
-        applyD_kernel! = apply_D!(device)
-        event = applyD_kernel!(n_stokes, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻, ndrange=size(r⁻⁺));
-        #wait(device, event);
-        return nothing
-    end
-end=#
-
 function apply_D_matrix_SFI!(n_stokes::Int, 
                     J₀⁻::AbstractArray{FT,3}, 
                     J̇₀⁻::AbstractArray{FT,4}) where {FT}
@@ -471,15 +456,3 @@ function apply_D_matrix_SFI!(n_stokes::Int,
     nothing
 end
 
-#=
-function apply_D_matrix_SFI!(n_stokes::Int, J₀⁻::Array{FT,3}) where {FT}
-    
-    n_stokes == 1 && return nothing
-
-    device = devi(architecture(J₀⁻))
-    applyD_kernel! = apply_D_SFI!(device)
-    event = applyD_kernel!(n_stokes, J₀⁻, ndrange=size(J₀⁻));
-    #wait(device, event);
-    
-    return nothing
-end=#

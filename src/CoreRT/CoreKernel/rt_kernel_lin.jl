@@ -16,7 +16,7 @@ Core RT kernel for a single atmospheric layer `iz` in the linearized mode.
 Orchestrates the four fundamental steps of the Matrix Operator Method for layer `iz`:
 1. **Elemental**: Compute single-scattering reflection/transmission matrices and their
    derivatives w.r.t. the 3 core optical parameters ``(\\tau, \\varpi, \\mathbf{Z})``.
-2. **Chain Rule** (`lin_added_layer_all_params!`): Map the 3 core derivatives to
+2. **Chain Rule** (fused into `get_elem_rt_fused!` / `get_elem_rt_SFI_fused!`): Map the 3 core derivatives to
    `Nparams` physical parameter derivatives at the **elemental** level, where the
    Z chain rule is correctly element-wise (Bug 19 fix).
 3. **Doubling** (`doubling_allparams!`): Build full-layer matrices from the elemental 
@@ -68,11 +68,6 @@ function rt_kernel!(RS_type::noRS{FT},
     (; D, n) = pol_type
 
     arr_type = array_type(architecture)
-
-    if any(isnan, τ̇) || any(isnan, ϖ̇) || any(isnan, Ż⁺⁺) || any(isnan, Ż⁻⁺)
-    end
-    if any(isinf, τ̇) || any(isinf, ϖ̇)
-    end
 
     nD=Int(size(added_layer.t⁺⁺,1)/n)
     D_diag = repeat(arr_type(D), nD)             # full diagonal entries
@@ -169,8 +164,8 @@ function rt_kernel!(RS_type::noRS{FT},
         end
     # If this is not the TOA, perform the interaction step
     else
-        # Bug 19 fix: Chain rule already applied before doubling, so ap_* fields
-        # are ready for the interaction step. No need to call lin_added_layer_all_params! here.
+        # Bug 19 fix: Chain rule is fused into the elemental step (get_elem_rt_fused! /
+        # get_elem_rt_SFI_fused!), so ap_* fields are ready for the interaction step.
         @timeit "interaction" interaction!(scattering_interface, 
                     SFI, 
                     composite_layer, composite_layer_lin, 

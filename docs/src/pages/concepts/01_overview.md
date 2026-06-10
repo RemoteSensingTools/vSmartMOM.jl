@@ -72,7 +72,7 @@ Every claim below has a `file.jl:LINE` next to it. No marketing.
    atmospheric profile, surface BRDF parameters — never through the
    adding-doubling kernels. That separation keeps the hot loop pure-`FT`
    and lets the analytic chain rule run on GPU.
-   *Evidence:* [`src/CoreRT/CoreKernel/lin_added_layer_all_params.jl`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/CoreKernel/lin_added_layer_all_params.jl),
+   *Evidence:* [`src/CoreRT/CoreKernel/elemental_lin.jl`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/CoreKernel/elemental_lin.jl) (fused chain-rule kernels `get_elem_rt_fused!` / `get_elem_rt_SFI_fused!`),
    `src/CoreRT/CoreKernel/{elemental,doubling,interaction}_lin.jl`.
 
 2. **One `@kernel` source compiles for CPU, CUDA, and Metal.** Backend

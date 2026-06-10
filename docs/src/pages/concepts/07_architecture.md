@@ -348,7 +348,7 @@ Fortran/C++:
 Recapping the eight differentiators from [Concepts/01](01_overview.md), now
 with code anchors:
 
-1. **Operator-level analytic linearization.** `src/CoreRT/CoreKernel/{elemental,doubling,interaction}_lin.jl`; chain-rule expansion in `lin_added_layer_all_params.jl`.
+1. **Operator-level analytic linearization.** `src/CoreRT/CoreKernel/{elemental,doubling,interaction}_lin.jl`; chain-rule expansion fused into the elemental step via `get_elem_rt_fused!` / `get_elem_rt_SFI_fused!` in `elemental_lin.jl`.
 2. **One `@kernel` source for CPU + CUDA + Metal.** [`src/Architectures.jl:33–96`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/Architectures.jl#L33-L96); injected backends in [`ext/vSmartMOMCUDAExt.jl:21–27`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/ext/vSmartMOMCUDAExt.jl#L21-L27) and [`ext/vSmartMOMMetalExt.jl:19–22`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/ext/vSmartMOMMetalExt.jl#L19-L22).
 3. **Hybrid AD across the GPU boundary.** [`ext/gpu_batched_cuda.jl:141–177`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/ext/gpu_batched_cuda.jl#L141-L177).
 4. **Polarization as a type, not a runtime branch.** [`src/Scattering/types.jl:92–143`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/Scattering/types.jl#L92-L143).

@@ -215,10 +215,6 @@ function create_surface_layer!(lambertian::LambertianSurfaceSpline{FT},
     end
 end
 
-function reflectance(sur::LambertianSurfaceScalar{FT}, μᵢ::FT, μᵣ::FT, dϕ::FT) where FT
-    return sur.albedo
-end
-
 """
     inject_surface_SIF!(brdf, added_layer, m, pol_type, SIF₀, architecture)
 

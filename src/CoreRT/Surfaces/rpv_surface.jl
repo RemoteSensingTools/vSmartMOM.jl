@@ -142,19 +142,6 @@ function rpvF(θ::FT, cosg::FT) where FT
 end
 
 """
-    reflectance(rpv::rpvSurfaceScalar, μ, m)
-
-Fourier moment `m` of the RPV BRDF integrated over azimuth.
-Returns ``2 \\int_0^\\pi \\rho(\\mu, \\mu', \\phi) \\cos(m\\phi) \\, d\\phi`` for m=0.
-"""
-function reflectance(rpv::rpvSurfaceScalar{FT}, μ::Array{FT}, m::Int) where FT
-    (; ρ₀, ρ_c, k, Θ) = rpv
-    f(x) = reflectance.([rpv], μ, μ', [x]) * cos(m*x)
-    return 2*quadgk(f, 0, π, rtol=1e-4)[1]
-end
-
-
-"""
     reflectance(brdf::AbstractSurfaceType, pol_type, μ, m)
 
 Fourier moment `m` of the BRDF reflectance matrix for quadrature directions `μ`.
@@ -191,31 +178,3 @@ function reflectance(brdf::AbstractSurfaceType, pol_type, μ::AbstractArray{FT},
     return ff * Rsurf
 end
 
-"""
-    applyExpansion!(Rsurf, n_stokes, v)
-
-KernelAbstractions surface-expansion kernel for RPV BRDF matrices. Each
-workitem owns one scalar quadrature block `(i, j)` from `v` and expands its
-per-Stokes diagonal entries into the full `Rsurf` Mueller-block matrix.
-"""
-@kernel function applyExpansion!(Rsurf, n_stokes::Int, @Const(v))
-    i, j = @index(Global, NTuple)
-    # get indices:
-    ii = (i-1)*n_stokes 
-    jj = (j-1)*n_stokes 
-    
-    # Fill values:
-    for i_n = 1:n_stokes
-        Rsurf[ii+i_n, jj+i_n] = v[i,j][i_n]
-    end
-end
-
-# 2D expansion:
-function expandSurface!(Rsurf::AbstractArray{FT,2}, n_stokes::Int, v) where {FT}
-    device = devi(architecture(Rsurf))
-    applyExpansion_! = applyExpansion!(device)
-    event = applyExpansion_!(Rsurf, n_stokes, v, ndrange=size(v));
-    #wait(device, event);
-    synchronize_if_gpu();
-    return nothing
-end

@@ -187,15 +187,16 @@ The codebase enforces a clean boundary between two worlds:
            └──────────┬────────────────┘    └──────────────┬───────────────────┘
                       │                                    │
                       ▼                                    ▼
-           OpticalPropertyJacobian            lin_added_layer_all_params!
-           ∂(τ,ϖ,Z⁺⁺,Z⁻⁺)/∂xⱼ      ──────>  Chain rule: ∂R/∂xⱼ
+           OpticalPropertyJacobian            fused elemental+chain-rule kernels
+           ∂(τ,ϖ,Z⁺⁺,Z⁻⁺)/∂xⱼ      ──────>  `get_elem_rt_fused!` / `get_elem_rt_SFI_fused!`
+                                              write ap_ arrays directly: ∂R/∂xⱼ
 ```
 
 The `OpticalPropertyJacobian` (alias for `CoreScatteringOpticalPropertiesLin`) is the handoff struct. It contains `(τ̇, ϖ̇, Ż⁺⁺, Ż⁻⁺)` — the derivatives of the four core optical properties with respect to each retrieval parameter.
 
 ### Chain Rule
 
-The chain rule `lin_added_layer_all_params!` maps per-layer optical property derivatives to radiance derivatives:
+The fused elemental kernels `get_elem_rt_fused!` / `get_elem_rt_SFI_fused!` write the `ap_*` Jacobian arrays directly during the elemental step. The chain rule applied is:
 
 ```
 ∂R/∂x_j = Σ_layers [ ∂R/∂τ · ∂τ/∂x_j + ∂R/∂ϖ · ∂ϖ/∂x_j + ∂R/∂Z · ∂Z/∂x_j ]

@@ -79,7 +79,6 @@ end
     ν₀ = 1e7/λ₀;
 
     
-    #RS_type.ϖ_Cabannes = σ_elastic/(σ_VRS+σ_RVRS+σ_RRS+σ_elastic);
     ϖ_Cabannes = (4-3*depol)/(4+2*depol)
     #ϖ_Cabannes = σ_elastic/(σ_RRS+σ_elastic);
     return ϖ_Cabannes;
@@ -109,47 +108,33 @@ function compute_ϖ_Cabannes(
             ((ν₀.+RS_type.o2.effCoeff.Δν̃_RoRaman_coeff_JtoJm2).^4)' * 
             RS_type.o2.effCoeff.σ_RoRaman_coeff_JtoJm2
 
-    #σ_RVRS =  RS_type.n2.vmr * 
     #        ((ν₀.+RS_type.n2.effCoeff.Δν̃_RoVibRaman_coeff_0to1_JtoJp2).^4)' * 
     #        RS_type.n2.effCoeff.σ_RoVibRaman_coeff_0to1_JtoJp2
-    #σ_RVRS += RS_type.n2.vmr * 
     #        ((ν₀.+RS_type.n2.effCoeff.Δν̃_RoVibRaman_coeff_0to1_JtoJm2).^4)' * 
     #        RS_type.n2.effCoeff.σ_RoVibRaman_coeff_0to1_JtoJm2
-    #σ_RVRS += RS_type.n2.vmr * 
     #        ((ν₀.+RS_type.n2.effCoeff.Δν̃_RoVibRaman_coeff_1to0_JtoJp2).^4)' * 
     #        RS_type.n2.effCoeff.σ_RoVibRaman_coeff_1to0_JtoJp2
-    #σ_RVRS += RS_type.n2.vmr * 
     #        ((ν₀.+RS_type.n2.effCoeff.Δν̃_RoVibRaman_coeff_1to0_JtoJm2).^4)' * 
     #        RS_type.n2.effCoeff.σ_RoVibRaman_coeff_1to0_JtoJm2
     
-    #σ_RVRS += RS_type.o2.vmr * 
     #        ((ν₀.+RS_type.o2.effCoeff.Δν̃_RoVibRaman_coeff_0to1_JtoJp2).^4)' * 
     #        RS_type.o2.effCoeff.σ_RoVibRaman_coeff_0to1_JtoJp2
-    #σ_RVRS += RS_type.o2.vmr * 
     #        ((ν₀.+RS_type.o2.effCoeff.Δν̃_RoVibRaman_coeff_0to1_JtoJm2).^4)' * 
     #        RS_type.o2.effCoeff.σ_RoVibRaman_coeff_0to1_JtoJm2
-    #σ_RVRS += RS_type.o2.vmr * 
     #        ((ν₀.+RS_type.o2.effCoeff.Δν̃_RoVibRaman_coeff_1to0_JtoJp2).^4)' * 
     #        RS_type.o2.effCoeff.σ_RoVibRaman_coeff_1to0_JtoJp2
-    #σ_RVRS += RS_type.o2.vmr * 
     #        ((ν₀.+RS_type.o2.effCoeff.Δν̃_RoVibRaman_coeff_1to0_JtoJm2).^4)' * 
     #        RS_type.o2.effCoeff.σ_RoVibRaman_coeff_1to0_JtoJm2
 
-    #σ_VRS =  RS_type.n2.vmr * 
     #        ((ν₀.+RS_type.n2.effCoeff.Δν̃_VibRaman_coeff_0to1_hires).^4)' * 
     #        RS_type.n2.effCoeff.σ_VibRaman_coeff_0to1_hires
-    #σ_VRS += RS_type.n2.vmr * 
     #        ((ν₀.+RS_type.n2.effCoeff.Δν̃_VibRaman_coeff_1to0_hires).^4)' * 
     #        RS_type.n2.effCoeff.σ_VibRaman_coeff_1to0_hires
-    #σ_VRS += RS_type.o2.vmr * 
     #        ((ν₀.+RS_type.o2.effCoeff.Δν̃_VibRaman_coeff_0to1_hires).^4)' * 
     #        RS_type.o2.effCoeff.σ_VibRaman_coeff_0to1_hires
-    #σ_VRS += RS_type.o2.vmr * 
     #        ((ν₀.+RS_type.o2.effCoeff.Δν̃_VibRaman_coeff_1to0_hires).^4)' * 
     #        RS_type.o2.effCoeff.σ_VibRaman_coeff_1to0_hires    
 
-    #RS_type.ϖ_Cabannes = σ_elastic/(σ_VRS+σ_RVRS+σ_RRS+σ_elastic);
-    #ϖ_Cabannes = σ_elastic/(σ_VRS+σ_RVRS+σ_RRS+σ_elastic);
     ϖ_Cabannes = 1.0 - σ_RRS/σ_Rayl;
     return ϖ_Cabannes;
 end
@@ -218,10 +203,7 @@ function compute_ϖ_Cabannes(
         ((ν₀.+RS_type.o2.effCoeff.Δν̃_VibRaman_coeff_1to0_hires).^4)' * 
         RS_type.o2.effCoeff.σ_VibRaman_coeff_1to0_hires    
 
-    #RS_type.ϖ_Cabannes = σ_elastic/(σ_VRS+σ_RVRS+σ_RRS+σ_elastic);
-    #ϖ_Cabannes = σ_elastic/(σ_VRS+σ_RVRS+σ_RRS+σ_elastic);
-    #ϖ_Cabannes = σ_elastic/(σ_RRS+σ_elastic);
-    ϖ_Cabannes = ϖ_Cabannes = 1.0 - (σ_VRS+σ_RVRS)/σ_Rayl; #σ_elastic/(σ_VRS+σ_RVRS+σ_elastic);
+    ϖ_Cabannes = 1.0 - (σ_VRS+σ_RVRS)/σ_Rayl;
     return ϖ_Cabannes;
 end
 
@@ -237,25 +219,8 @@ function compute_ϖ_Cabannes(λ₀, n2, o2)
     σ_RRS += o2.vmr * ((ν₀.+o2.effCoeff.Δν̃_RoRaman_coeff_JtoJp2).^4)' * o2.effCoeff.σ_RoRaman_coeff_JtoJp2
     σ_RRS += o2.vmr * ((ν₀.+o2.effCoeff.Δν̃_RoRaman_coeff_JtoJm2).^4)' * o2.effCoeff.σ_RoRaman_coeff_JtoJm2
 
-    #σ_RVRS =  n2.vmr * ((ν₀.+n2.effCoeff.Δν̃_RoVibRaman_coeff_0to1_JtoJp2).^4)' * n2.effCoeff.σ_RoVibRaman_coeff_0to1_JtoJp2
-    #σ_RVRS += n2.vmr * ((ν₀.+n2.effCoeff.Δν̃_RoVibRaman_coeff_0to1_JtoJm2).^4)' * n2.effCoeff.σ_RoVibRaman_coeff_0to1_JtoJm2
-    #σ_RVRS += n2.vmr * ((ν₀.+n2.effCoeff.Δν̃_RoVibRaman_coeff_1to0_JtoJp2).^4)' * n2.effCoeff.σ_RoVibRaman_coeff_1to0_JtoJp2
-    #σ_RVRS += n2.vmr * ((ν₀.+n2.effCoeff.Δν̃_RoVibRaman_coeff_1to0_JtoJm2).^4)' * n2.effCoeff.σ_RoVibRaman_coeff_1to0_JtoJm2
-    #σ_RVRS += o2.vmr * ((ν₀.+o2.effCoeff.Δν̃_RoVibRaman_coeff_0to1_JtoJp2).^4)' * o2.effCoeff.σ_RoVibRaman_coeff_0to1_JtoJp2
-    #σ_RVRS += o2.vmr * ((ν₀.+o2.effCoeff.Δν̃_RoVibRaman_coeff_0to1_JtoJm2).^4)' * o2.effCoeff.σ_RoVibRaman_coeff_0to1_JtoJm2
-    #σ_RVRS += o2.vmr * ((ν₀.+o2.effCoeff.Δν̃_RoVibRaman_coeff_1to0_JtoJp2).^4)' * o2.effCoeff.σ_RoVibRaman_coeff_1to0_JtoJp2
-    #σ_RVRS += o2.vmr * ((ν₀.+o2.effCoeff.Δν̃_RoVibRaman_coeff_1to0_JtoJm2).^4)' * o2.effCoeff.σ_RoVibRaman_coeff_1to0_JtoJm2
 
-    #σ_VRS =  n2.vmr * ((ν₀.+n2.effCoeff.Δν̃_VibRaman_coeff_0to1_hires).^4)' * n2.effCoeff.σ_VibRaman_coeff_0to1_hires
-    #σ_VRS += n2.vmr * ((ν₀.+n2.effCoeff.Δν̃_VibRaman_coeff_1to0_hires).^4)' * n2.effCoeff.σ_VibRaman_coeff_1to0_hires
-    #σ_VRS += o2.vmr * ((ν₀.+o2.effCoeff.Δν̃_VibRaman_coeff_0to1_hires).^4)' * o2.effCoeff.σ_VibRaman_coeff_0to1_hires
-    #σ_VRS += o2.vmr * ((ν₀.+o2.effCoeff.Δν̃_VibRaman_coeff_1to0_hires).^4)' * o2.effCoeff.σ_VibRaman_coeff_1to0_hires    
-
-    #RS_type.ϖ_Cabannes = σ_elastic/(σ_VRS+σ_RVRS+σ_RRS+σ_elastic);
-    #ϖ_Cabannes = σ_elastic/(σ_VRS+σ_RVRS+σ_RRS+σ_elastic);
     ϖ_Cabannes = 1.0 - σ_RRS/σ_Rayl;
-    #@show σ_elastic
-    #@show σ_RRS+σ_elastic
     return ϖ_Cabannes;
 end
 
@@ -287,10 +252,7 @@ function compute_ϖ_Cabannes_VS(λ₀, n2, o2)
     σ_VRS += o2.vmr * ((ν₀.+o2.effCoeff.Δν̃_VibRaman_coeff_0to1_hires).^4)' * o2.effCoeff.σ_VibRaman_coeff_0to1_hires
     σ_VRS += o2.vmr * ((ν₀.+o2.effCoeff.Δν̃_VibRaman_coeff_1to0_hires).^4)' * o2.effCoeff.σ_VibRaman_coeff_1to0_hires    
 
-    #RS_type.ϖ_Cabannes = σ_elastic/(σ_VRS+σ_RVRS+σ_RRS+σ_elastic);
-    #ϖ_Cabannes = σ_elastic/(σ_VRS+σ_RVRS+σ_RRS+σ_elastic);
     ϖ_Cabannes_VS = 1.0 - (σ_RVRS+σ_VRS)/σ_Rayl;
-    #@show σ_elastic
     #@show σ_RVRS+σ_VRS+σ_elastic
     return ϖ_Cabannes_VS;
 end
@@ -304,20 +266,10 @@ function compute_ϖ_Cabannes(λ₀, mol)
     σ_RRS =  ((ν₀.+mol.effCoeff.Δν̃_RoRaman_coeff_JtoJp2).^4)' * mol.effCoeff.σ_RoRaman_coeff_JtoJp2
     σ_RRS += ((ν₀.+mol.effCoeff.Δν̃_RoRaman_coeff_JtoJm2).^4)' * mol.effCoeff.σ_RoRaman_coeff_JtoJm2
 
-    #σ_RVRS =  ((ν₀.+mol.effCoeff.Δν̃_RoVibRaman_coeff_0to1_JtoJp2).^4)' * mol.effCoeff.σ_RoVibRaman_coeff_0to1_JtoJp2
-    #σ_RVRS += ((ν₀.+mol.effCoeff.Δν̃_RoVibRaman_coeff_0to1_JtoJm2).^4)' * mol.effCoeff.σ_RoVibRaman_coeff_0to1_JtoJm2
-    #σ_RVRS += ((ν₀.+mol.effCoeff.Δν̃_RoVibRaman_coeff_1to0_JtoJp2).^4)' * mol.effCoeff.σ_RoVibRaman_coeff_1to0_JtoJp2
-    #σ_RVRS += ((ν₀.+mol.effCoeff.Δν̃_RoVibRaman_coeff_1to0_JtoJm2).^4)' * mol.effCoeff.σ_RoVibRaman_coeff_1to0_JtoJm2
     
-    #σ_VRS =  ((ν₀.+mol.effCoeff.Δν̃_VibRaman_coeff_0to1_hires).^4)' * mol.effCoeff.σ_VibRaman_coeff_0to1_hires
-    #σ_VRS += ((ν₀.+mol.effCoeff.Δν̃_VibRaman_coeff_1to0_hires).^4)' * mol.effCoeff.σ_VibRaman_coeff_1to0_hires
 
 
-    #RS_type.ϖ_Cabannes = σ_elastic/(σ_VRS+σ_RVRS+σ_RRS+σ_elastic);
-    #ϖ_Cabannes = σ_elastic/(σ_VRS+σ_RVRS+σ_RRS+σ_elastic);
     ϖ_Cabannes = 1.0 - σ_RRS/σ_Rayl;
-    #@show σ_elastic
-    #@show σ_RRS+σ_elastic
     return ϖ_Cabannes;
 end
 

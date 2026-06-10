@@ -59,7 +59,6 @@ vSmartMOM.CoreRT.RTModelLin
 vSmartMOM.CoreRT.OpticalPropertyJacobian
 vSmartMOM.CoreRT.RawAerosolJacobian
 vSmartMOM.CoreRT.rt_run_ss
-vSmartMOM.CoreRT.lin_added_layer_all_params!
 vSmartMOM.CoreRT.delta_m_forward
 vSmartMOM.CoreRT.delta_m_truncation_lin
 ```
