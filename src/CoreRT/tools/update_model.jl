@@ -54,8 +54,14 @@ end
 - Spectral bands (`params.spec_bands`)
 - Geometry (SZA, VZA, VAZ, observer altitude)
 - Surface BRDF
-- Aerosol microphysics (size distribution, refractive index, τ_ref)
 - Polarization type, quadrature type, truncation
+- A different *number* of aerosols or gas species
+
+Aerosol changes do **not** require a rebuild: use
+[`update_aerosol_loading!`](@ref) for τ_ref / vertical-placement changes
+(cheap, no Mie recomputation) and [`update_aerosol_microphysics!`](@ref) for
+size-distribution / refractive-index changes (reruns Mie for that aerosol and
+re-derives the Fourier-loop bounds).
 
 # Thread safety
 
@@ -826,8 +832,8 @@ fresh model with the new aerosol.
 # Keyword arguments
 
 - `τ_ref::Real`: New column optical depth at `λ_ref`. When `nothing`, the
-  existing value in `params.scattering_params.rt_aerosols[i_aer].τ_ref` is
-  kept.
+  current scene value `ctx.current_τ_ref[i_aer]` is kept (i.e. the most
+  recently applied loading, not the original `params` value).
 
 # SolverConfig mutability note
 
