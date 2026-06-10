@@ -263,8 +263,13 @@ function model_from_parameters(lin::LinMode,
         size_distribution = curr_aerosol.size_distribution
         mie_aerosol = Aerosol(size_distribution, curr_aerosol.nᵣ, curr_aerosol.nᵢ)
 
+        # Linearized Mie has NO GPU variant: ForwardDiff/analytic-derivative Greek
+        # coefficients are only implemented on the CPU analytic kernel. Force CPU
+        # architecture here regardless of params.architecture so a GPU run still
+        # builds Jacobians correctly via compute_aerosol_optical_properties(lin, …).
         _mie(λ) = make_mie_model(scat.decomp_type, mie_aerosol, λ,
-            params.polarization_type, truncation_type, scat.r_max, scat.nquad_radius)
+            params.polarization_type, truncation_type, scat.r_max, scat.nquad_radius;
+            architecture = Architectures.CPU())
 
         mie_model = _mie(scat.λ_ref)
         k_ref, k̇_ref   = compute_ref_aerosol_extinction(lin, mie_model, params.float_type)

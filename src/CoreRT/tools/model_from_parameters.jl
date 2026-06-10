@@ -430,16 +430,18 @@ function model_from_parameters(params::vSmartMOM_Parameters;
             # i'th spectral band (convert from cm⁻¹ to μm)
             curr_band_λ = FT.(1e4 ./ params.spec_bands[i_band])
 
-            # Create the aerosols:
-            mie_model      = make_mie_model(params.scattering_params.decomp_type, 
-                                            mie_aerosol, 
-                                            (maximum(curr_band_λ)+minimum(curr_band_λ))/2, 
-                                            params.polarization_type, 
-                                            truncation_type, 
-                                            params.scattering_params.r_max, 
-                                            params.scattering_params.nquad_radius)
-            # Compute raw (not truncated) aerosol optical properties (not needed in RT eventually)
-            @timeit "Mie calc"  aerosol_optics_raw = compute_aerosol_optical_properties(mie_model, FT);
+            # Create the aerosols (architecture from params selects CPU vs GPU Mie):
+            mie_model      = make_mie_model(params.scattering_params.decomp_type,
+                                            mie_aerosol,
+                                            (maximum(curr_band_λ)+minimum(curr_band_λ))/2,
+                                            params.polarization_type,
+                                            truncation_type,
+                                            params.scattering_params.r_max,
+                                            params.scattering_params.nquad_radius;
+                                            architecture = params.architecture)
+            # Compute raw (not truncated) aerosol optical properties (not needed in RT eventually).
+            # Single-verb call: dispatches CPU/GPU off mie_model.architecture.
+            @timeit "Mie calc"  aerosol_optics_raw = compute_aerosol_optical_properties(mie_model);
             # Compute truncated aerosol optical properties (phase function and fᵗ).
             # Safety guard: only run δBGE forward-peak truncation when the raw
             # Greek series is actually longer than the projection cap; otherwise
@@ -720,18 +722,20 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
             # i'th spectral band (convert from cm⁻¹ to μm)
             curr_band_λ = 1e4 ./ params.spec_bands[i_band]
 
-            # Create the aerosols:
-            mie_model      = make_mie_model(params.scattering_params.decomp_type, 
-                                            mie_aerosol, 
-                                            (maximum(curr_band_λ)+minimum(curr_band_λ))/2, 
-                                            params.polarization_type, 
-                                            truncation_type, 
-                                            params.scattering_params.r_max, 
-                                            params.scattering_params.nquad_radius)
+            # Create the aerosols (architecture from params selects CPU vs GPU Mie):
+            mie_model      = make_mie_model(params.scattering_params.decomp_type,
+                                            mie_aerosol,
+                                            (maximum(curr_band_λ)+minimum(curr_band_λ))/2,
+                                            params.polarization_type,
+                                            truncation_type,
+                                            params.scattering_params.r_max,
+                                            params.scattering_params.nquad_radius;
+                                            architecture = params.architecture)
 
-            # Compute raw (not truncated) aerosol optical properties (not needed in RT eventually)
-
-            @timeit "Mie calc"  aerosol_optics_raw = compute_aerosol_optical_properties(mie_model, FT_vrs);
+            # Compute raw (not truncated) aerosol optical properties (not needed in RT eventually).
+            # Single-verb call: dispatches CPU/GPU off mie_model.architecture; FT2
+            # is the model's FT (== params.float_type == FT_vrs here).
+            @timeit "Mie calc"  aerosol_optics_raw = compute_aerosol_optical_properties(mie_model);
 
             # Compute truncated aerosol optical properties (phase function and fᵗ).
             # Safety guard: only run δBGE forward-peak truncation when the raw
