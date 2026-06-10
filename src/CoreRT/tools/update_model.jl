@@ -71,10 +71,24 @@ run parallel scenes, create one `BatchContext` per worker thread (each
   meta-information such as molecule lists, YAML knobs, float type)
 - `absorption_models`: cached `AtmosphericAbsorption.LineByLineModel` objects,
   one per `(band, species)` pair — eliminates HITRAN re-parsing per scene
-- `h2o_models`: cached H₂O `LineByLineModel` per band (`nothing` when a LUT is
-  used or when `q` is all-zero)
+- `h2o_models`: cached H₂O `LineByLineModel` per band (`nothing` only when the
+  configuration has no `absorption_params` at all; otherwise the model is cached
+  unconditionally so a scene whose `q` changes from all-zero to non-zero can
+  apply H₂O line absorption without a rebuild)
 - `k_ref`: reference-wavelength aerosol extinction coefficients, one per aerosol
   species (needed for Phase 2 aerosol-loading updates)
+- `current_T`, `current_p_half`, `current_q`, `current_vmr`: the **unreduced**
+  scene state that `update_model!` was last called with (initialised from
+  `params` at construction). `nothing` keyword arguments to `update_model!` fall
+  back to these stored values — never to `params` — so successive partial updates
+  compose incrementally. Stored already FT-converted so repeated updates do not
+  re-convert or drift. The unreduced state cannot be recovered from
+  `model.atmosphere.profile` (which is reduced), which is why it lives here.
+- `current_τ_ref`, `current_profile_dist`: the current per-aerosol loading state
+  (column optical depth at `λ_ref` and vertical distribution), initialised from
+  `params` and written by both `update_aerosol_loading!` and
+  `update_aerosol_microphysics!`. `update_model!`'s τ_aer redistribution reads
+  these so a prior loading update is not silently wiped.
 - `n_bands`, `n_aerosols`, `Nz`: scene-invariant dimension bookmarks
 - `profile_reduction_n`: reduction target passed to `reduce_profile`; `-1` means
   no reduction
@@ -86,10 +100,22 @@ mutable struct BatchContext
     params::vSmartMOM_Parameters
     "Cached LineByLineModel per (band, species index in all_species list)"
     absorption_models::Vector{Vector{Any}}      # [i_band][molec_i]
-    "Cached H₂O LineByLineModel per band (nothing when LUT / q≡0)"
+    "Cached H₂O LineByLineModel per band (nothing only when no absorption_params)"
     h2o_models::Vector{Any}                     # [i_band]
     "Reference-wavelength extinction coefficient per aerosol species (Phase 2)"
     k_ref::Vector{Float64}
+    "Current unreduced temperature profile [K] (FT-converted)"
+    current_T::Vector
+    "Current unreduced half-level pressures [hPa] (FT-converted)"
+    current_p_half::Vector
+    "Current unreduced specific humidity [kg/kg] (FT-converted)"
+    current_q::Vector
+    "Current trace-gas VMR overrides (merged over params.absorption_params.vmr)"
+    current_vmr::Dict{String, Any}
+    "Current column optical depth at λ_ref per aerosol species (FT-converted)"
+    current_τ_ref::Vector
+    "Current vertical pressure distribution per aerosol species"
+    current_profile_dist::Vector{Any}
     "Number of spectral bands (scene-invariant)"
     n_bands::Int
     "Number of aerosol species (scene-invariant)"
@@ -158,20 +184,27 @@ function BatchContext(params::vSmartMOM_Parameters;
             end
         end
 
-        # H₂O model (if needed)
-        if any(!iszero, params.q)
-            if ap.h2o_lut[i_band] !== nothing
-                h2o_models[i_band] = ap.h2o_lut[i_band]
-            else
-                lines_h2o = AtmosphericAbsorption.load_lines(
-                    AtmosphericAbsorption.HitranPort(artifact("H2O")); FT)
-                h2o_models[i_band] = AtmosphericAbsorption.LineByLineModel(lines_h2o;
-                    profile      = ap.broadening_function,
-                    wing_cutoff  = ap.wing_cutoff,
-                    cpf          = ap.CEF,
-                    architecture = _to_aa_arch(params.architecture),
-                    vmr          = 0)
-            end
+        # H₂O model — cache unconditionally whenever absorption is configured.
+        # model_from_parameters only *applies* the H₂O path when q is non-zero,
+        # but the LineByLineModel / LUT object itself does not depend on the q
+        # values (only on the band config). Caching it regardless of the initial
+        # q means a scene that later raises q from all-zero to non-zero can apply
+        # H₂O line absorption without rebuilding the context. The q-VALUE gate
+        # lives only in update_model! (per scene), mirroring the `any(!iszero, …)`
+        # branch in model_from_parameters. We are already inside the
+        # `isnothing(params.absorption_params) && continue` guard above, so
+        # absorption is configured here.
+        if ap.h2o_lut[i_band] !== nothing
+            h2o_models[i_band] = ap.h2o_lut[i_band]
+        else
+            lines_h2o = AtmosphericAbsorption.load_lines(
+                AtmosphericAbsorption.HitranPort(artifact("H2O")); FT)
+            h2o_models[i_band] = AtmosphericAbsorption.LineByLineModel(lines_h2o;
+                profile      = ap.broadening_function,
+                wing_cutoff  = ap.wing_cutoff,
+                cpf          = ap.CEF,
+                architecture = _to_aa_arch(params.architecture),
+                vmr          = 0)
         end
     end
 
@@ -206,8 +239,37 @@ function BatchContext(params::vSmartMOM_Parameters;
         end
     end
 
+    # ── 4. Initialise current scene state from params (B3) ─────────────────
+    # These hold the UNREDUCED scene inputs that update_model! was last called
+    # with. `nothing` keyword arguments fall back to these (never to params),
+    # so successive partial updates compose. Store already FT-converted so
+    # repeated updates do not re-convert or drift.
+    current_T      = convert(Vector{FT}, params.T)
+    current_p_half = convert(Vector{FT}, params.p)
+    current_q      = convert(Vector{FT}, params.q)
+    current_vmr    = isnothing(params.absorption_params) ?
+                     Dict{String, Any}() :
+                     Dict{String, Any}(params.absorption_params.vmr)
+
+    # ── 5. Initialise current per-aerosol loading state from params (B4) ───
+    # update_aerosol_loading! and update_aerosol_microphysics! write these;
+    # update_model!'s τ_aer redistribution reads them so a prior loading update
+    # is not wiped by a later profile update.
+    current_τ_ref        = FT[]
+    current_profile_dist = Any[]
+    if !isnothing(params.scattering_params)
+        for i_aer in 1:n_aerosols
+            c_aero = params.scattering_params.rt_aerosols[i_aer]
+            push!(current_τ_ref, FT(c_aero.τ_ref))
+            push!(current_profile_dist, c_aero.profile)
+        end
+    end
+
     return BatchContext(model, params, absorption_models, h2o_models,
-                        k_ref_vec, n_bands, n_aerosols, Nz, profile_reduction_n)
+                        k_ref_vec,
+                        current_T, current_p_half, current_q, current_vmr,
+                        current_τ_ref, current_profile_dist,
+                        n_bands, n_aerosols, Nz, profile_reduction_n)
 end
 
 # ============================================================================
@@ -268,9 +330,27 @@ end
 
 Update `ctx.model` in place for a new atmospheric scene.
 
-Only the arguments you supply are updated; `nothing` means "keep the current
-value from the model". All updated arguments are type-converted to the model's
-float type (`params.float_type`) before use.
+Only the arguments you supply are updated. `nothing` for a field means "keep the
+**current** scene value" — i.e. the value from the most recent successful
+`update_model!` call (or, if none yet, the value the `BatchContext` was built
+with). It does **not** fall back to the original `params`. This makes successive
+partial updates compose incrementally:
+
+```julia
+update_model!(ctx; vmr = B)   # vmr = B, everything else still original
+update_model!(ctx; T   = C)   # T = C AND vmr is still B (not reset to original)
+```
+
+The merge is per-field: `T`, `p_half`, `q`, and the `vmr` override dict are each
+remembered on the context (`ctx.current_T`, `ctx.current_p_half`, `ctx.current_q`,
+`ctx.current_vmr`) and overwritten only by the fields you pass. The remembered
+state is stored **unreduced** and already converted to the model's float type
+(`params.float_type`), so repeated updates neither re-convert nor drift.
+
+For `vmr`, the supplied keys are overlaid onto the current override dict (which
+itself started as `params.absorption_params.vmr`); keys you do not pass keep
+their last value. The merged overrides are then layered over the configured
+defaults exactly as `model_from_parameters` does.
 
 After this call `rt_run(ctx.model)` will produce radiances for the new scene.
 
@@ -325,16 +405,19 @@ function update_model!(ctx::BatchContext;
     # ── 0. Validate and merge inputs ────────────────────────────────────────
     # The public API always accepts **unreduced** profile inputs (i.e. the
     # same length as params.T / params.p / params.q). This is necessary for
-    # partial updates: if the user supplies only T (no p_half), we must fall
-    # back to the original params.p (unreduced) so that the validate-then-
-    # reduce path is consistent. Falling back to the stored (already-reduced)
-    # profile_cur.p_half would produce a length mismatch when T was passed
-    # as an unreduced vector.
+    # partial updates: if the user supplies only T (no p_half), we fall back to
+    # the CURRENT stored scene value (unreduced) — NOT the original params — so
+    # that successive partial updates compose incrementally (true incremental
+    # semantics). The current state is stored unreduced on the context precisely
+    # because it cannot be recovered from model.atmosphere.profile (which is
+    # reduced). Falling back to the stored (already-reduced) profile_cur arrays
+    # would also produce a length mismatch when T is passed unreduced.
     #
-    # Rule: if a field is `nothing`, use the original params value (unreduced).
-    T_new      = T      === nothing ? convert(Vector{FT}, params.T) : convert(Vector{FT}, T)
-    q_new      = q      === nothing ? convert(Vector{FT}, params.q) : convert(Vector{FT}, q)
-    p_half_new = p_half === nothing ? convert(Vector{FT}, params.p) : convert(Vector{FT}, p_half)
+    # Rule: if a field is `nothing`, use the current stored value (unreduced);
+    # otherwise convert the supplied value to FT.
+    T_new      = T      === nothing ? ctx.current_T      : convert(Vector{FT}, T)
+    q_new      = q      === nothing ? ctx.current_q      : convert(Vector{FT}, q)
+    p_half_new = p_half === nothing ? ctx.current_p_half : convert(Vector{FT}, p_half)
 
     # Validate p_half length: it must be Nz+1 (post-reduction) or N_orig
     # (params.p is already the half-level array; it has length Nz_orig + 1,
@@ -373,14 +456,22 @@ function update_model!(ctx::BatchContext;
     end
 
     # ── 1. Recompute AtmosphericProfile fields ──────────────────────────────
-    # Build a merged vmr dict: start from the current profile's vmr, apply overrides.
-    vmr_merged = if vmr === nothing || isnothing(ap)
-        ap === nothing ? Dict{String, Any}() : ap.vmr
+    # Build the merged vmr override dict incrementally: start from the CURRENT
+    # stored overrides (ctx.current_vmr, initialised from params at construction)
+    # and overlay any newly supplied keys. This preserves prior vmr updates
+    # across partial calls (B3). The merged overrides are then used directly as
+    # the per-species vmr for the profile — they already include every configured
+    # default (current_vmr started as a copy of ap.vmr) plus all overrides ever
+    # applied. We do NOT mutate ctx.current_vmr until the update is validated and
+    # applied (done at the end), so a failed call leaves the stored state intact.
+    vmr_merged = if isnothing(ap)
+        Dict{String, Any}()
     else
-        # Overlay the supplied keys over the configured defaults
-        d = Dict{String, Any}(ap.vmr)
-        for (k, v) in vmr
-            d[k] = v
+        d = Dict{String, Any}(ctx.current_vmr)
+        if vmr !== nothing
+            for (k, v) in vmr
+                d[k] = v
+            end
         end
         d
     end
@@ -454,22 +545,28 @@ function update_model!(ctx::BatchContext;
     # ── 3. Recompute τ_aer in place per band per aerosol ───────────────────
     # Microphysics (aerosol_optics, k) are fixed; only the vertical
     # redistribution changes with the new p_full/Δz.
+    # B4: read the CURRENT loading state (ctx.current_τ_ref / current_profile_dist)
+    # — written by update_aerosol_loading! and update_aerosol_microphysics! —
+    # NOT the original params (c_aero.τ_ref / c_aero.profile). Otherwise a prior
+    # loading update would be silently wiped by a profile update.
     if !isnothing(params.scattering_params)
         for i_aer in 1:ctx.n_aerosols
             c_aero    = params.scattering_params.rt_aerosols[i_aer]
             k_ref_aer = ctx.k_ref[i_aer]
+            τ_eff     = ctx.current_τ_ref[i_aer]
+            dist      = ctx.current_profile_dist[i_aer]
 
             if _has_analytic_phase_function(c_aero)
-                τ_profile = getAerosolLayerOptProp(one(FT), c_aero.profile, new_profile)
+                τ_profile = getAerosolLayerOptProp(one(FT), dist, new_profile)
                 for i_band in 1:ctx.n_bands
-                    model.optics.aerosols.τ_aer[i_band][i_aer, :] .= c_aero.τ_ref * τ_profile
+                    model.optics.aerosols.τ_aer[i_band][i_aer, :] .= τ_eff * τ_profile
                 end
             else
                 for i_band in 1:ctx.n_bands
                     k_aer = model.optics.aerosols.aerosol_optics[i_band][i_aer].k
-                    τ_profile = getAerosolLayerOptProp(one(FT), c_aero.profile, new_profile)
+                    τ_profile = getAerosolLayerOptProp(one(FT), dist, new_profile)
                     model.optics.aerosols.τ_aer[i_band][i_aer, :] .=
-                        c_aero.τ_ref * (k_aer / k_ref_aer) * τ_profile
+                        τ_eff * (k_aer / k_ref_aer) * τ_profile
                 end
             end
         end
@@ -502,11 +599,17 @@ function update_model!(ctx::BatchContext;
 
             # Collision-induced absorption (CIA tables — re-read from disk like
             # model_from_parameters; CIA tables are small and rarely configured).
+            # B2: pass the UPDATED scene VMRs (new_profile.vmr), not the original
+            # ap.vmr config dict, so CIA colliders (O2/N2) respond to per-scene
+            # vmr changes exactly as a fresh model_from_parameters build with the
+            # changed vmr would. compute_τ_cia! falls back to USS defaults for
+            # any collider species absent from the dict.
             for cia_path in ap.cia_files
                 cia_table = Absorption.load_cia_table(
                     cia_path, params.spec_bands[i_band]; FT)
                 Absorption.compute_τ_cia!(
-                    model.optics.τ_abs[i_band], cia_table, new_profile, ap.vmr)
+                    model.optics.τ_abs[i_band], cia_table, new_profile,
+                    new_profile.vmr)
             end
 
             # MT_CKD H₂O continuum
@@ -518,6 +621,17 @@ function update_model!(ctx::BatchContext;
             end
         end
     end
+
+    # ── 5. Persist the current scene state (B3) ─────────────────────────────
+    # Only reached after all validation passed and the model was updated, so a
+    # failed call leaves the stored state untouched. Store already FT-converted,
+    # unreduced vectors so the next partial update composes without re-converting
+    # or drifting. (T_new/q_new/p_half_new are either the FT-converted supplied
+    # values or the previously-stored current values — already FT.)
+    ctx.current_T      = T_new
+    ctx.current_q      = q_new
+    ctx.current_p_half = p_half_new
+    ctx.current_vmr    = vmr_merged
 
     return nothing
 end
@@ -650,9 +764,16 @@ function update_aerosol_loading!(ctx::BatchContext, i_aer::Int;
     c_aero = params.scattering_params.rt_aerosols[i_aer]
     profile = model.atmosphere.profile
 
-    # Resolve τ_ref and distribution
-    τ_eff  = τ_ref === nothing ? c_aero.τ_ref : FT(τ_ref)
-    dist   = profile_dist === nothing ? c_aero.profile : profile_dist
+    # Resolve τ_ref and distribution. `nothing` keeps the CURRENT stored value
+    # (not the original params), mirroring update_model!'s incremental semantics.
+    τ_eff  = τ_ref === nothing ? ctx.current_τ_ref[i_aer] : FT(τ_ref)
+    dist   = profile_dist === nothing ? ctx.current_profile_dist[i_aer] : profile_dist
+
+    # B4: persist the resolved loading so a later update_model! redistribution
+    # (and a later loading update that omits a field) sees it instead of the
+    # original params τ_ref / profile.
+    ctx.current_τ_ref[i_aer]        = τ_eff
+    ctx.current_profile_dist[i_aer] = dist
 
     k_ref_aer = ctx.k_ref[i_aer]
 
@@ -760,7 +881,13 @@ function update_aerosol_microphysics!(ctx::BatchContext, i_aer::Int, aerosol::Ae
 
     c_aero          = sp.rt_aerosols[i_aer]
     truncation_type = _resolved_truncation(params, FT)
-    τ_eff = τ_ref === nothing ? c_aero.τ_ref : FT(τ_ref)
+    # B4: resolve τ_ref / distribution from the CURRENT loading state when not
+    # supplied (not the original params), and persist them so a later
+    # update_model! redistribution preserves this loading.
+    τ_eff = τ_ref === nothing ? ctx.current_τ_ref[i_aer] : FT(τ_ref)
+    dist  = ctx.current_profile_dist[i_aer]
+    ctx.current_τ_ref[i_aer]        = τ_eff
+    ctx.current_profile_dist[i_aer] = dist
 
     # ── 1. Recompute k_ref at reference wavelength ──────────────────────────
     mie_model_ref = make_mie_model(
@@ -799,9 +926,9 @@ function update_aerosol_microphysics!(ctx::BatchContext, i_aer::Int, aerosol::Ae
         # Replace aerosol_optics[i_band][i_aer] in-place via Vector setindex!
         model.optics.aerosols.aerosol_optics[i_band][i_aer] = new_ao
 
-        # Recompute τ_aer row for this band
+        # Recompute τ_aer row for this band using the current loading distribution
         k_aer     = new_ao.k
-        τ_profile = getAerosolLayerOptProp(one(FT), c_aero.profile, profile)
+        τ_profile = getAerosolLayerOptProp(one(FT), dist, profile)
         model.optics.aerosols.τ_aer[i_band][i_aer, :] .=
             τ_eff * (k_aer / new_k_ref) * τ_profile
     end
