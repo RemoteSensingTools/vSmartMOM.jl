@@ -152,9 +152,8 @@ function doubling_helper!(RS_type::RRS,
 
     # After doubling, revert D(DR)->R, where D = Diagonal{1,1,-1,-1}
     # For SFI, after doubling, revert D(DJ₀⁻)->J₀⁻
-
-    synchronize_if_gpu()
-
+    # All preceding work (CUBLAS ⊠ / element-wise) and the apply_D KA kernels
+    # below are on the same CUDA stream — no host sync needed here.
     apply_D_matrix!(pol_type.n, added_layer.r⁻⁺, added_layer.t⁺⁺, added_layer.r⁺⁻, added_layer.t⁻⁻)
     apply_D_matrix_IE!(RS_type, pol_type.n, added_layer.ier⁻⁺, added_layer.iet⁺⁺, added_layer.ier⁺⁻, added_layer.iet⁻⁻)
     SFI && apply_D_matrix_SFI!(pol_type.n, added_layer.j₀⁻)
@@ -295,9 +294,8 @@ function doubling_helper!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
 
     # After doubling, revert D(DR)->R, where D = Diagonal{1,1,-1,-1}
     # For SFI, after doubling, revert D(DJ₀⁻)->J₀⁻
-
-    synchronize_if_gpu()
-
+    # All preceding work and the apply_D KA kernels below are on the same
+    # CUDA stream — no host sync needed here.
     apply_D_matrix!(pol_type.n,
         added_layer.r⁻⁺, added_layer.t⁺⁺, added_layer.r⁺⁻, added_layer.t⁻⁻)
     apply_D_matrix_IE!(RS_type, pol_type.n,
@@ -467,7 +465,8 @@ function apply_D_matrix_IE!(RS_type::Union{VS_0to1_plus, VS_1to0_plus}, n_stokes
         event = applyD_kernel_IE!(aType(RS_type.i_λ₁λ₀_all), n_stokes,
             ier⁻⁺, iet⁺⁺, ier⁺⁻, iet⁻⁻, ndrange=getKernelDim(RS_type, ier⁻⁺,(RS_type.i_λ₁λ₀_all)));
         ##wait(device, event);
-        synchronize();
+        # KA kernel is on the same CUDA stream; subsequent device work sees result
+        # without a host barrier. `synchronize()` here was a no-op on GPU anyway.
         return nothing
     end
 end
@@ -484,7 +483,8 @@ function apply_D_matrix_IE!(RS_type::RRS, n_stokes::Int, ier⁻⁺::AbstractArra
         event = applyD_kernel_IE!(aType(RS_type.i_λ₁λ₀), n_stokes,
             ier⁻⁺, iet⁺⁺, ier⁺⁻, iet⁻⁻, ndrange=getKernelDim(RS_type, ier⁻⁺));
         ##wait(device, event);
-        synchronize();
+        # KA kernel is on the same CUDA stream; subsequent device work sees result
+        # without a host barrier. `synchronize()` here was a no-op on GPU anyway.
         return nothing
     end
 end
@@ -510,7 +510,8 @@ function apply_D_matrix_SFI_IE!(RS_type::RRS, n_stokes::Int, ieJ₀⁻::Abstract
     event = applyD_kernel_IE!(aType(RS_type.i_λ₁λ₀),n_stokes,
                     ieJ₀⁻, ndrange=(size(ieJ₀⁻,1), size(ieJ₀⁻,3), size(ieJ₀⁻,4)));
     ##wait(device, event);
-    synchronize_if_gpu()
+    # KA kernel is on the same CUDA stream; caller (doubling_inelastic!) holds
+    # the timing-boundary sync, so no host sync is needed here.
     return nothing
 end
 
@@ -530,7 +531,7 @@ function apply_D_matrix_SFI_IE!(RS_type::Union{VS_0to1_plus, VS_1to0_plus}, n_st
                             aType(RS_type.i_λ₁λ₀_all)));
     #@show "here 3"
     ##wait(device, event);
-    #@show "here 4"
-    synchronize_if_gpu()
+    # KA kernel is on the same CUDA stream; caller (doubling_inelastic!) holds
+    # the timing-boundary sync, so no host sync is needed here.
     return nothing
 end
