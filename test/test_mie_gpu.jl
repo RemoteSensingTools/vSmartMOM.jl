@@ -96,10 +96,14 @@ end
             a_ds = DoubleSingle{Float32}(a64)
             b_ds = DoubleSingle{Float32}(b64)
 
-            # Add
+            # Add. Guard against catastrophic cancellation (a ≈ -b): the
+            # RELATIVE error of any finite-precision add is unbounded there
+            # (tiny exact sum in the denominator), so unlucky draws made this
+            # stochastic bound flaky. DS accuracy under cancellation is
+            # covered deterministically by the Dn-recursion testset below.
             sum_ds = ds_add(a_ds, b_ds)
             sum_exact = a64 + b64
-            if abs(sum_exact) > 1e-30
+            if abs(sum_exact) > 1e-3 * max(abs(a64), abs(b64))
                 rel = abs(convert(Float64, sum_ds) - sum_exact) / abs(sum_exact)
                 max_rel_err_add = max(max_rel_err_add, rel)
             end
