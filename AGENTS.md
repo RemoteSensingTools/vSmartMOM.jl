@@ -125,7 +125,7 @@ bandwidth.
 Not marketing — each claim has a `file:line`. Mirror this list in user-facing
 material when explaining the package:
 
-1. **Operator-level analytic linearization.** RT kernel itself is hand-differentiated; AD is upstream-only. **Combined forward + linearized run costs less than 2× a forward-only run** — the closed-form chain rule on adding-doubling reuses the already-computed batched matrix inverses, so the dominant LU work is paid once. ForwardDiff would pay `(1+N_params)×`; finite differences `(1+N_state)×`. — `src/CoreRT/CoreKernel/lin_added_layer_all_params.jl`, `{elemental,doubling,interaction}_lin.jl`. See `docs/src/pages/concepts/06_linearization.md` § "Why this is fast". *Status: production codebase implements the kernel-level fast path; a cleaner AD-upstream → analytic-downstream boundary (more idiomatic handoff struct, less manual chain-rule expansion in upstream code) is in active development.*
+1. **Operator-level analytic linearization.** RT kernel itself is hand-differentiated; AD is upstream-only. **Combined forward + linearized run costs less than 2× a forward-only run** — the closed-form chain rule on adding-doubling reuses the already-computed batched matrix inverses, so the dominant LU work is paid once. ForwardDiff would pay `(1+N_params)×`; finite differences `(1+N_state)×`. — `src/CoreRT/CoreKernel/elemental_lin.jl` (`get_elem_rt_fused!:456–591`, `get_elem_rt_SFI_fused!:602–815`), `{elemental,doubling,interaction}_lin.jl`. See `docs/src/pages/concepts/06_linearization.md` § "Why this is fast". *Status: production codebase implements the kernel-level fast path; a cleaner AD-upstream → analytic-downstream boundary (more idiomatic handoff struct, less manual chain-rule expansion in upstream code) is in active development.*
 2. **One `@kernel` source compiles for CPU, CUDA, and Metal.** — `src/Architectures.jl:33–96`, `ext/vSmartMOMCUDAExt.jl:21–27`, `ext/vSmartMOMMetalExt.jl:19–22`.
 3. **Hybrid AD across the GPU boundary.** `ForwardDiff.Dual` flows through `NNlib.batched_mul` on `CuArray`. — `ext/gpu_batched_cuda.jl:141–177`.
 4. **Polarization is a type, not a runtime branch.** `Stokes_I/IQ/IQU/IQUV` specialize the kernels at compile time. — `src/Scattering/types.jl:92–143`.
@@ -181,7 +181,7 @@ material when explaining the package:
 | Postprocessing (azimuth, VZA) | `src/CoreRT/tools/postprocessing_vza*.jl:23–99` |
 | Quadrature (Gauss / Radau) | `src/CoreRT/tools/rt_set_streams.jl:24–110` |
 | Linearization kernels | `src/CoreRT/CoreKernel/{elemental,doubling,interaction}_lin.jl` |
-| Chain-rule expansion | `src/CoreRT/CoreKernel/lin_added_layer_all_params.jl:1–100` |
+| Chain-rule expansion (fused) | `src/CoreRT/CoreKernel/elemental_lin.jl:456–591` (`get_elem_rt_fused!`), `602–815` (`get_elem_rt_SFI_fused!`) |
 | Jacobian column layout | `src/CoreRT/parameter_layout.jl:1–67` |
 | Architecture types | `src/Architectures.jl:1–98` |
 | `@kernel` apply_D! (D-matrix) | `src/CoreRT/CoreKernel/doubling.jl:85–110` |
@@ -252,7 +252,7 @@ When the docs evolve, this file evolves with them. Specifically:
 
 - If a new Concepts page is added or the arc reorders, update the Concepts arc table.
 - If a kernel's source location moves, update the code-anchor table.
-- If a new differentiator is added or a current claim no longer holds (e.g., Mie becomes default-GPU), update the differentiator list.
+- If a new differentiator is added or a current claim no longer holds, update the differentiator list. Note: GPU Mie is now architecture-dispatched production reality for CUDA (`has_gpu_mie(::GPU) = true`; `make_mie_model(...; architecture=GPU())` runs on-GPU for CUDA). The differentiator list item "One `@kernel` source" already covers this; update item 6 ("Weak GPU dependency") if the Metal/CPU fallback path changes.
 - If a new design-choice passage is added to `theory_references.md`, add it to "When in doubt" §3.
 
 This file is for agents who don't have time to read the whole codebase. If it's stale, it's actively misleading. Keep it honest.

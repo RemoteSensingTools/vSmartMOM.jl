@@ -22,10 +22,21 @@ number density of the absorbing species in the layer. Once computed,
 ``\tau_\lambda = \tau_\mathrm{abs} + \tau_\mathrm{scat}`` in
 [Concepts/03c](03c_mixing.md).
 
+!!! note "RT pipeline uses AtmosphericAbsorption.jl (since externalAbsorption merge)"
+    The **production RT path** (`model_from_parameters` → `rt_run`) now delegates
+    line-by-line absorption to the external
+    [AtmosphericAbsorption.jl](https://github.com/RemoteSensingTools/AtmosphericAbsorption.jl)
+    package (`AtmosphericAbsorption.load_lines` + `LineByLineModel`; TIPS-2021 partition
+    functions). The diagram and prose below describe the underlying physics — the same
+    line-shape equations apply — but `make_hitran_model` is **not** on the `rt_run` call
+    path since this merge. `make_hitran_model` / `read_hitran` / `absorption_cross_section`
+    remain the supported standalone cross-section API (TIPS-2017) for users who need direct
+    σ(ν, T, p) access outside the full RT pipeline.
+
 ## HITRAN line-by-line
 
-vSmartMOM uses the HITRAN line list as the primary source for molecular
-absorption parameters. The `Absorption` module exposes:
+The HITRAN line list is the primary source for molecular absorption parameters.
+For standalone cross-section work, the internal `Absorption` module exposes:
 
 - `read_hitran(...)` to read a `HitranTable` from a HITRAN-format file.
 - `make_hitran_model(...)` to build a `HitranModel` carrying the line list,

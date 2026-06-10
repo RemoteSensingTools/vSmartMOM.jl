@@ -40,7 +40,7 @@ No linter or formatter configured. Julia compatibility: 1.9-1.12.
 ### Module Load Order (`src/vSmartMOM.jl`)
 
 1. **Architectures** (`src/Architectures.jl`) — CPU/GPU abstraction via KernelAbstractions
-2. **Absorption** (`src/Absorption/Absorption.jl`) — Line-by-line cross-sections (HITRAN, Voigt/Doppler/Lorentz)
+2. **Absorption** (`src/Absorption/Absorption.jl`) — Line-by-line cross-sections (HITRAN, Voigt/Doppler/Lorentz). Note: since the `externalAbsorption` merge, the RT production pipeline (`model_from_parameters`) computes LBL absorption via the external [AtmosphericAbsorption.jl](https://github.com/RemoteSensingTools/AtmosphericAbsorption.jl) package (TIPS-2021). The internal `Absorption` module remains the standalone API for direct σ(ν, T, p) queries plus CIA/MT-CKD/LUT paths.
 3. **Artifacts** (`src/Artifacts/`) — HITRAN data management (edition preferences, hitran.org API client, artifact dispatch)
 4. **Scattering** (`src/Scattering/Scattering.jl`) — Mie scattering (NAI2 and PCW decomposition)
 5. **InelasticScattering** (`src/Inelastic/InelasticScattering.jl`) — Raman scattering (RRS, VS)

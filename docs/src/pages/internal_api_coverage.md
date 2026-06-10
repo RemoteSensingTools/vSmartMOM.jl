@@ -126,6 +126,9 @@ vSmartMOM.Aerosols.compute_optical_properties
 ```@docs
 vSmartMOM.Architectures.AbstractArchitecture
 vSmartMOM.Architectures.@hascuda
+vSmartMOM.Architectures.ka_backend
+vSmartMOM.Architectures.has_gpu_mie
+vSmartMOM.Architectures.default_mie_precision_policy
 ```
 
 ## IO Internals
