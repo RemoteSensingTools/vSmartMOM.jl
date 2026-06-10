@@ -74,6 +74,28 @@ println("compute_aerosol_XS: XS_ext = ", XS_ext, ", XS_sca = ", XS_sca)
 println("compute_aerosol_XS: Cext_eff = ", Cext_eff, ", Csca_eff = ", Csca_eff)
 
 #
+# GPU VARIANT (CUDA): pass architecture = GPU() to run Mie on the GPU.
+# CUDA.jl must be loaded before calling make_mie_model with GPU().
+# NativeFloat64 is the default precision policy; DSEmulated is available for
+# extended-precision Float32 accumulation. Metal and other architectures
+# fall back to CPU Mie automatically (warn-once).
+#
+#     using CUDA
+#     using vSmartMOM
+#     arch = vSmartMOM.Architectures.GPU()
+#     model_GPU = make_mie_model(
+#         NAI2(),
+#         aero,
+#         lambda_um,
+#         polarization,
+#         truncation,
+#         r_max,
+#         nquad_radius;
+#         architecture = arch,
+#     )
+#     aerosol_optics_gpu = compute_aerosol_optical_properties(model_GPU)
+
+#
 # OPTIONAL: PCW model setup
 # - Provide precomputed Wigner matrices from file:
 #     model_PCW = make_mie_model(PCW(), aero, lambda_um, polarization, truncation,

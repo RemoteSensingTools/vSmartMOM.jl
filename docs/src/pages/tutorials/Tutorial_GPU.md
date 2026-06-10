@@ -78,12 +78,17 @@ The following operations are fully GPU-accelerated:
 | Interaction (`interaction!`)   | ✅ Full |
 | Batched matrix inverse         | ✅ CUBLAS on CUDA; portable KA kernel on Metal, with a local-memory guard |
 | Linearized/Jacobian runs       | ✅ CUDA/CPU; Metal not yet validated |
-| Phase function computation     | ❌ CPU only |
+| Phase function computation     | ✅ CUDA via `make_mie_model(...; architecture=GPU())`; Metal/other → CPU fallback |
 | Absorption cross-sections      | ✅ Full |
 | Postprocessing (VZA interp.)   | ✅ Full |
 
-Phase function computation (Mie/NAI2) is always done on CPU and then
-transferred to GPU.  This is typically a one-time cost per aerosol type.
+Phase function computation (Mie/NAI2) now runs on GPU when CUDA.jl is loaded.
+Pass `architecture = GPU()` to `make_mie_model` to enable the GPU Mie path;
+`NativeFloat64` is the default precision policy and `DSEmulated` is available
+for extended-precision Float32 accumulation.  On Metal and other architectures,
+`make_mie_model` automatically falls back to CPU Mie (with a one-time warning)
+because no GPU Mie kernel is compiled for those backends.  This is typically
+a one-time cost per aerosol type per scene.
 
 ## 5) GPU-specific YAML parameters
 

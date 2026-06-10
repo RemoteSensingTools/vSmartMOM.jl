@@ -22,6 +22,15 @@ vSmartMOM.model_from_parameters
 vSmartMOM.rt_run
 ```
 
+## Batch Scene Processing
+
+```@docs
+vSmartMOM.BatchContext
+vSmartMOM.update_model!
+vSmartMOM.update_aerosol_loading!
+vSmartMOM.update_aerosol_microphysics!
+```
+
 ## Architectures
 
 ```@docs
