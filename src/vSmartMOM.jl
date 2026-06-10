@@ -114,6 +114,8 @@ export default_parameters, parameters_from_file, parameters_from_source,
        read_atmos_profile, read_atmos_profile_dict
 # Export linearized RT functions
 export rt_run_lin, model_from_parameters_lin
+# Export batch-processing API
+export BatchContext, update_model!
 # Export standalone exact single-scattering API
 export StandaloneSS, run_exact_ss, ExactSSConfig, SSGeometry,
        LambertianSSSurface, CoxMunkSSSurface, RayleighSSContributor,
