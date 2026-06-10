@@ -154,7 +154,9 @@ export model_from_parameters,               # Converting the parameters to model
        rt_run, rt_run_lin, rt_run_ss,       # Run the RT code (forward, linearized, single scatter)
        rt_run_streams, StreamRTResult,      # Per-Fourier-moment quadrature-stream RT (Phase H)
        default_parameters,                  # Set of default parameters
-       BatchContext, update_model!          # Batch-processing context + scene updater
+       BatchContext, update_model!,         # Batch-processing context + scene updater
+       update_aerosol_loading!,             # Phase 2: cheap τ_ref / profile update (no Mie)
+       update_aerosol_microphysics!         # Phase 2: expensive Mie re-run + Fourier re-derivation
 export lin_added_layer_all_params!,           # 3 params -> all params chain rule
        OpticalPropertyJacobian,               # AD boundary struct alias
        RawAerosolJacobian,                    # AD boundary for raw aerosol derivatives

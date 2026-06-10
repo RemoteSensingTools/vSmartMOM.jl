@@ -522,5 +522,297 @@ function update_model!(ctx::BatchContext;
     return nothing
 end
 
+# ============================================================================
+# Phase 2: aerosol-specific update functions
+# ============================================================================
+
+# ── Internal helper: re-derive and write SolverConfig Fourier bounds ─────────
+#
+# SolverConfig is an immutable struct.  Its three per-band VECTOR fields
+# (m_max_bands, n_fourier_moments_bands, l_max) are mutable Julia Arrays and
+# can be updated with .=.  The SCALAR fields (l_trunc, Δ_angle, depol,
+# polarization_type, quadrature_type, use_component_traits) are bits-immutable
+# and cannot be changed in-place.
+#
+# For all Phase-2 aerosol updates those scalar fields are guaranteed not to
+# change (they derive from params, not from per-aerosol optics), so this helper
+# only needs to rewrite the three Vector fields.  If a future caller tries to
+# change l_trunc or Δ_angle they must rebuild the entire model — this function
+# will @error and throw if it detects the values would need to change.
+function _rewrite_solver_fourier_bounds!(ctx::BatchContext)
+    model  = ctx.model
+    params = ctx.params
+    FT     = params.float_type
+
+    n_bands   = ctx.n_bands
+    solver    = model.solver
+    n_aer     = ctx.n_aerosols
+    ae_optics = model.optics.aerosols.aerosol_optics  # [i_band][i_aer]
+
+    # Recompute l_max_aer exactly as model_from_parameters does.
+    l_max_aer = zeros(Int, max(n_aer, 1), n_bands)
+    truncation_type = _resolved_truncation(params, FT)
+
+    for i_aer in 1:n_aer
+        c_aero = params.scattering_params.rt_aerosols[i_aer]
+        for i_band in 1:n_bands
+            ao = ae_optics[i_band][i_aer]
+            l_max_aer[i_aer, i_band] =
+                if _has_analytic_phase_function(c_aero)
+                    # analytic path: length of the stored greek series
+                    length(ao.greek_coefs.β)
+                elseif truncation_type isa Scattering.δBGE
+                    min(length(ao.greek_coefs.β), truncation_type.l_max)
+                else
+                    length(ao.greek_coefs.β)
+                end
+        end
+    end
+
+    # New per-band l_max
+    new_l_max = zeros(Int, n_bands)
+    for i_band in 1:n_bands
+        new_l_max[i_band] = n_aer > 0 ?
+            maximum(l_max_aer[:, i_band]) : params.l_trunc
+    end
+
+    # Re-derive m_max_bands via the same trait aggregator as model_from_parameters.
+    components_per_band = [_band_components(params, ae_optics, model.sources, i_band)
+                           for i_band in 1:n_bands]
+    new_m_max_bands = _derive_m_max_bands_via_traits(
+        new_l_max, params.max_m, components_per_band, model.quad_points.Nstreams)
+    new_n_fourier   = new_m_max_bands .+ 1
+
+    # Write back into the mutable Vector fields in-place.
+    solver.m_max_bands          .= new_m_max_bands
+    solver.n_fourier_moments_bands .= new_n_fourier
+    solver.l_max                .= new_l_max
+
+    return nothing
+end
+
+"""
+    update_aerosol_loading!(ctx::BatchContext, i_aer::Int;
+                            τ_ref        = nothing,
+                            profile_dist = nothing)
+
+**Cheap path** — update only the column-integrated optical depth (`τ_ref`)
+and/or the vertical pressure distribution (`profile_dist`) for aerosol
+species `i_aer`, using the *cached* aerosol optics (`aerosol_optics`) and
+reference extinction coefficient (`ctx.k_ref[i_aer]`).  No Mie
+recomputation is performed.
+
+After this call `rt_run(ctx.model)` produces radiances for the new aerosol
+loading.  All other model state (gas absorption, profile, surface) is
+unchanged.
+
+# Keyword arguments
+
+- `τ_ref::Real`: New column optical depth at `λ_ref`. When `nothing`, the
+  value stored in `params.scattering_params.rt_aerosols[i_aer].τ_ref` is
+  kept (only the distribution is updated).
+- `profile_dist::Distributions.Distribution`: New vertical pressure
+  distribution (a `Distributions.jl` `Distribution` object — the same type
+  used in `RT_Aerosol.profile`).  When `nothing`, the existing distribution
+  is kept.
+
+# Cost
+
+`O(Nz)` per band — evaluates the distribution PDF on the pressure grid and
+scales the optical depth profile. No Mie, no HITRAN.
+
+# What it invalidates
+
+- `model.optics.aerosols.τ_aer[i_band][i_aer, :]` — all bands.
+- **Does NOT** change `aerosol_optics`, `k_ref`, `SolverConfig` Fourier
+  bounds, gas absorption, or Rayleigh properties.
+
+# Example
+
+```julia
+ctx = BatchContext(params)
+# Change τ_ref for aerosol 1 to 0.3, keep vertical distribution
+update_aerosol_loading!(ctx, 1; τ_ref = 0.3)
+R, T = rt_run(ctx.model)
+```
+"""
+function update_aerosol_loading!(ctx::BatchContext, i_aer::Int;
+                                  τ_ref        = nothing,
+                                  profile_dist = nothing)
+    1 <= i_aer <= ctx.n_aerosols || error(
+        "update_aerosol_loading!: i_aer=$i_aer is out of range " *
+        "[1, $(ctx.n_aerosols)]")
+
+    model  = ctx.model
+    params = ctx.params
+    FT     = params.float_type
+
+    c_aero = params.scattering_params.rt_aerosols[i_aer]
+    profile = model.atmosphere.profile
+
+    # Resolve τ_ref and distribution
+    τ_eff  = τ_ref === nothing ? c_aero.τ_ref : FT(τ_ref)
+    dist   = profile_dist === nothing ? c_aero.profile : profile_dist
+
+    k_ref_aer = ctx.k_ref[i_aer]
+
+    # Recompute τ_aer rows for all bands using the cached aerosol optics.
+    if _has_analytic_phase_function(c_aero)
+        τ_profile = getAerosolLayerOptProp(one(FT), dist, profile)
+        for i_band in 1:ctx.n_bands
+            model.optics.aerosols.τ_aer[i_band][i_aer, :] .= τ_eff * τ_profile
+        end
+    else
+        for i_band in 1:ctx.n_bands
+            k_aer     = model.optics.aerosols.aerosol_optics[i_band][i_aer].k
+            τ_profile = getAerosolLayerOptProp(one(FT), dist, profile)
+            model.optics.aerosols.τ_aer[i_band][i_aer, :] .=
+                τ_eff * (k_aer / k_ref_aer) * τ_profile
+        end
+    end
+
+    return nothing
+end
+
+"""
+    update_aerosol_microphysics!(ctx::BatchContext, i_aer::Int, aerosol::Aerosol;
+                                  τ_ref = nothing)
+
+**Expensive path** — replace the microphysics of aerosol species `i_aer` with
+a new [`Aerosol`](@ref) (new size distribution and/or refractive index) and
+recompute all derived quantities via the same Mie code path that
+[`model_from_parameters`](@ref) uses.
+
+This updates:
+- `model.optics.aerosols.aerosol_optics[i_band][i_aer]` for every band
+- `ctx.k_ref[i_aer]` (the new reference-wavelength extinction coefficient)
+- `model.solver.m_max_bands`, `n_fourier_moments_bands`, `l_max` (in-place
+  via `.=`) — the critical Fourier-loop re-derivation that prevents silent
+  wrong results when the new particle size changes the length of the Greek-
+  coefficient series.
+- `model.optics.aerosols.τ_aer[i_band][i_aer, :]` for every band.
+
+After this call `rt_run(ctx.model)` gives the same result as building a
+fresh model with the new aerosol.
+
+# Arguments
+
+- `ctx`: The [`BatchContext`](@ref) to update.
+- `i_aer`: 1-based index of the aerosol species to replace.
+- `aerosol`: New [`Aerosol`](@ref) (from `Scattering.Aerosol`), carrying
+  the new `size_distribution`, `nᵣ`, and `nᵢ`.
+
+# Keyword arguments
+
+- `τ_ref::Real`: New column optical depth at `λ_ref`. When `nothing`, the
+  existing value in `params.scattering_params.rt_aerosols[i_aer].τ_ref` is
+  kept.
+
+# SolverConfig mutability note
+
+`SolverConfig` is an immutable struct, but its three **Vector** fields
+(`m_max_bands`, `n_fourier_moments_bands`, `l_max`) are mutable Julia arrays
+and are updated in-place with `.=`.  The scalar fields (`l_trunc`, `Δ_angle`,
+`depol`, `polarization_type`, `quadrature_type`) cannot be changed in-place;
+they are guaranteed to be unaffected by aerosol microphysics changes since
+they derive from `params`, not from per-aerosol optics.  If a caller somehow
+requires a new `l_trunc` or `Δ_angle`, a full `model_from_parameters` rebuild
+is necessary.
+
+# Cost
+
+Full Mie per band (`O(n_bands × nquad_radius × size_distribution_points)`),
+i.e. the same cost as the aerosol section of `model_from_parameters`.
+
+# What it invalidates
+
+- `aerosol_optics[i_band][i_aer]` — all bands.
+- `ctx.k_ref[i_aer]`.
+- `solver.m_max_bands`, `solver.n_fourier_moments_bands`, `solver.l_max`.
+- `τ_aer[i_band][i_aer, :]` — all bands.
+
+# Example
+
+```julia
+ctx = BatchContext(params)
+# Save initial state for comparison
+R_A, _ = rt_run(ctx.model)
+
+# Replace aerosol 1 with larger particles (reff ~2 μm)
+new_aerosol = Aerosol(LogNormal(log(2.0), 0.4), 1.3, 1e-8)
+update_aerosol_microphysics!(ctx, 1, new_aerosol; τ_ref = 0.1)
+R_B, _ = rt_run(ctx.model)
+```
+"""
+function update_aerosol_microphysics!(ctx::BatchContext, i_aer::Int, aerosol::Aerosol;
+                                       τ_ref = nothing)
+    1 <= i_aer <= ctx.n_aerosols || error(
+        "update_aerosol_microphysics!: i_aer=$i_aer is out of range " *
+        "[1, $(ctx.n_aerosols)]")
+    # n_aerosols > 0 implies scattering_params is not nothing; guard for safety
+    isnothing(ctx.params.scattering_params) && error(
+        "update_aerosol_microphysics!: ctx.params.scattering_params is nothing")
+
+    model  = ctx.model
+    params = ctx.params
+    FT     = params.float_type
+    sp     = params.scattering_params
+
+    c_aero          = sp.rt_aerosols[i_aer]
+    truncation_type = _resolved_truncation(params, FT)
+    τ_eff = τ_ref === nothing ? c_aero.τ_ref : FT(τ_ref)
+
+    # ── 1. Recompute k_ref at reference wavelength ──────────────────────────
+    mie_model_ref = make_mie_model(
+        sp.decomp_type, aerosol, sp.λ_ref,
+        params.polarization_type, truncation_type,
+        sp.r_max, sp.nquad_radius)
+    mie_model_ref.aerosol.nᵣ = real(sp.n_ref)
+    mie_model_ref.aerosol.nᵢ = -imag(sp.n_ref)
+    new_k_ref = Float64(compute_ref_aerosol_extinction(mie_model_ref, FT))
+    ctx.k_ref[i_aer] = new_k_ref
+
+    # ── 2. Per-band Mie + truncation + τ_aer rows ───────────────────────────
+    profile = model.atmosphere.profile
+
+    for i_band in 1:ctx.n_bands
+        curr_band_λ = FT.(1e4 ./ params.spec_bands[i_band])
+        band_center_λ = (maximum(curr_band_λ) + minimum(curr_band_λ)) / 2
+
+        mie_model = make_mie_model(
+            sp.decomp_type, aerosol, band_center_λ,
+            params.polarization_type, truncation_type,
+            sp.r_max, sp.nquad_radius)
+
+        aerosol_optics_raw = compute_aerosol_optical_properties(mie_model, FT)
+
+        β_len = length(aerosol_optics_raw.greek_coefs.β)
+        new_ao =
+            if truncation_type isa Scattering.δBGE && β_len > truncation_type.l_max
+                Scattering.truncate_phase(truncation_type,
+                                          aerosol_optics_raw; reportFit=false)
+            else
+                Scattering.truncate_phase(Scattering.NoTruncation(),
+                                          aerosol_optics_raw)
+            end
+
+        # Replace aerosol_optics[i_band][i_aer] in-place via Vector setindex!
+        model.optics.aerosols.aerosol_optics[i_band][i_aer] = new_ao
+
+        # Recompute τ_aer row for this band
+        k_aer     = new_ao.k
+        τ_profile = getAerosolLayerOptProp(one(FT), c_aero.profile, profile)
+        model.optics.aerosols.τ_aer[i_band][i_aer, :] .=
+            τ_eff * (k_aer / new_k_ref) * τ_profile
+    end
+
+    # ── 3. Re-derive Fourier bounds (CRITICAL anti-silent-wrongness step) ───
+    # New Greek series length may differ from the old one → m_max_bands /
+    # l_max must be recomputed and written back into the SolverConfig Vectors.
+    _rewrite_solver_fourier_bounds!(ctx)
+
+    return nothing
+end
+
 # Export hint (actual export list lives in CoreRT.jl)
-# export BatchContext, update_model!
+# export BatchContext, update_model!, update_aerosol_loading!, update_aerosol_microphysics!
