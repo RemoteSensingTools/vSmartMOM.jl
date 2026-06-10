@@ -234,7 +234,7 @@ function get_elem_rt!(RS_type::RRS,
                     qp_μN, wct2,
                     ndrange=getKernelDim(RS_type,ier⁻⁺));
         #wait(device, event);
-        synchronize_if_gpu();
+        # KA kernel on same CUDA stream; subsequent device work sees result without host sync.
         #for j=1:1:length(qp_μN)
         #    @show minimum(iet⁺⁺[1:3:end,j,200,50]), minimum(ier⁻⁺[1:3:end,j,200,50])
         #    @show maximum(iet⁺⁺[1:3:end,j,200,50]), maximum(ier⁻⁺[1:3:end,j,200,50])
@@ -264,7 +264,7 @@ function get_elem_rt!(RS_type::Union{VS_0to1, VS_1to0},
         qp_μN, wct2,
         ndrange=getKernelDim(RS_type,ier⁻⁺));
     #wait(device, event);
-    synchronize_if_gpu();
+    # KA kernel on same CUDA stream; subsequent device work sees result without host sync.
 end
 
 """
@@ -361,7 +361,7 @@ function get_elem_rt_SFI!(RS_type::Union{VS_0to1, VS_1to0},
     I₀, iμ0, D,
     ndrange=getKernelDimSFI(RS_type,ieJ₀⁻));
     #wait(device, event)
-    synchronize_if_gpu();
+    # KA kernel on same CUDA stream; subsequent device work sees result without host sync.
 end
 
 #  TODO: Nov 30, 2021
@@ -460,7 +460,7 @@ function get_elem_rt_SFI!(RS_type::RRS,
                 ndrange=getKernelDimSFI(RS_type,ieJ₀⁻));
 
     #wait(device, event)
-    synchronize_if_gpu();
+    # KA kernel on same CUDA stream; subsequent device work sees result without host sync.
     #@show minimum(ieJ₀⁺[1:3:end,1,200,50]), minimum(ieJ₀⁻[1:3:end,1,200,50])
     #@show maximum(ieJ₀⁺[1:3:end,1,200,50]), maximum(ieJ₀⁻[1:3:end,1,200,50])
 end
@@ -764,7 +764,8 @@ function apply_D_matrix_elemental_SFI!(RS_type::RRS,
                                 ndrange=size(ieJ₀⁻));
         #@show "here 1.4"
         #wait(device, event);
-        synchronize();
+        # KA kernel is on the same CUDA stream; subsequent device work sees result
+        # without a host barrier. `synchronize()` here was a no-op on GPU anyway.
         return nothing
     end
 end
@@ -787,7 +788,8 @@ function apply_D_matrix_elemental_SFI!(RS_type::Union{VS_0to1_plus, VS_1to0_plus
                             #ndrange=size(ieJ₀⁻));
         #@show "here 1.4"
         #wait(device, event);
-        synchronize();
+        # KA kernel is on the same CUDA stream; subsequent device work sees result
+        # without a host barrier. `synchronize()` here was a no-op on GPU anyway.
         return nothing
     end
 end

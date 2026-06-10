@@ -31,10 +31,10 @@ function _create_cuda_batched_matrix_inversion(::Type{FT}, n::Int, batchSize::In
 
     function batched_inv_prealloc!(X, A, Xptrs, Aptrs)
         lda = max(1, stride(A, 2))
+        # getrf and getri are on the same CUDA stream: device-to-device ordering
+        # is guaranteed; no host sync needed between or after these CUBLAS calls.
         CUDA.CUBLAS.cublasSgetrfBatched(CUDA.CUBLAS.handle(), n, Aptrs, lda, pivot, info, batchSize)
-        vSmartMOM.Architectures.synchronize_if_gpu()
         CUDA.CUBLAS.cublasSgetriBatched(CUDA.CUBLAS.handle(), n, Aptrs, lda, pivot, Xptrs, lda, info, batchSize)
-        vSmartMOM.Architectures.synchronize_if_gpu()
         return X
     end
     return batched_inv_prealloc!
@@ -46,10 +46,10 @@ function _create_cuda_batched_matrix_inversion(::Type{FT}, n::Int, batchSize::In
 
     function batched_inv_prealloc!(X, A, Xptrs, Aptrs)
         lda = max(1, stride(A, 2))
+        # getrf and getri are on the same CUDA stream: device-to-device ordering
+        # is guaranteed; no host sync needed between or after these CUBLAS calls.
         CUDA.CUBLAS.cublasDgetrfBatched(CUDA.CUBLAS.handle(), n, Aptrs, lda, pivot, info, batchSize)
-        vSmartMOM.Architectures.synchronize_if_gpu()
         CUDA.CUBLAS.cublasDgetriBatched(CUDA.CUBLAS.handle(), n, Aptrs, lda, pivot, Xptrs, lda, info, batchSize)
-        vSmartMOM.Architectures.synchronize_if_gpu()
         return X
     end
     return batched_inv_prealloc!
@@ -81,16 +81,15 @@ function vSmartMOM.CoreRT.batch_solve!(X::CuArray{FT,3}, A::CuArray{FT,3}, B::Cu
     # Temporary factorization matrix
     temp = similar(A)
 
-    # LU-factorize A
+    # LU-factorize A then invert; both calls on the same CUDA stream so no
+    # host sync needed between them (pivot is a CuArray, device-to-device).
     pivot, info = CUDA.CUBLAS.getrf_strided_batched!(A, true)
-    vSmartMOM.Architectures.synchronize_if_gpu()
 
     # Invert LU factorization of A
     CUDA.CUBLAS.getri_strided_batched!(A, temp, pivot)
 
-    # X = inv(A) * B
+    # X = inv(A) * B — also device-only; no host sync needed before return.
     NNlib.batched_mul!(X, temp, B)
-    vSmartMOM.Architectures.synchronize_if_gpu()
 end
 
 "Given 3D CuArray A, fill in X[:,:,k] = A[:,:,k] \\ I"
@@ -100,12 +99,11 @@ function vSmartMOM.CoreRT.batch_inv!(X::CuArray{FT,3}, A::CuArray{FT,3}) where {
         @views X[:,:,1] .= A[:,:,1] \ CUDA.CuMatrix{FT}(I, size(A,1), size(A,1))
         return X
     end
-    # LU-factorize A
+    # getrf → getri on the same CUDA stream; pivot is a CuArray (device-to-device),
+    # so no host sync is needed between or after these calls.
     @timeit "getrf_strided" pivot, info = CUDA.CUBLAS.getrf_strided_batched!(A, true)
-    vSmartMOM.Architectures.synchronize_if_gpu()
     # Invert LU factorization of A
     @timeit "getri_strided" CUDA.CUBLAS.getri_strided_batched!(A, X, pivot)
-    vSmartMOM.Architectures.synchronize_if_gpu()
 end
 
 """
@@ -121,12 +119,11 @@ function vSmartMOM.CoreRT.batch_inv!(X::CuArray{FT,3}, A::CuArray{FT,3},
         @views X[:,:,1] .= A[:,:,1] \ CUDA.CuMatrix{FT}(I, size(A,1), size(A,1))
         return X
     end
-    # LU-factorize A using pre-allocated pivot/info
+    # getrf → getri on the same CUDA stream; pivot is a CuArray (device-to-device),
+    # so no host sync is needed between or after these calls.
     pivot, info = CUDA.CUBLAS.getrf_strided_batched!(A, true)
-    vSmartMOM.Architectures.synchronize_if_gpu()
     # Invert LU factorization of A using pre-allocated output
     CUDA.CUBLAS.getri_strided_batched!(A, X, pivot)
-    vSmartMOM.Architectures.synchronize_if_gpu()
 end
 
 "Given 3D CuArray A with pointers, fill in X[:,:,k] = A[:,:,k] \\ I (Float32 version)"
@@ -146,12 +143,12 @@ function vSmartMOM.CoreRT.batch_inv!(X::CuArray{FT,3}, A::CuArray{FT,3}, Xptrs, 
     @timeit "info" info = CuArray{Cint}(undef, batchSize)
     @timeit "pivot" pivot = CUDA.zeros(Cint, (n, batchSize))
 
+    # getrf and getri are on the same CUDA stream; pivot/info are CuArrays
+    # (device-to-device dependency), so no host sync is needed between them.
     CUDA.CUBLAS.cublasSgetrfBatched(CUDA.CUBLAS.handle(), n, Aptrs, lda, pivot, info, batchSize)
-    vSmartMOM.Architectures.synchronize_if_gpu()
 
     # Invert LU factorization of A
     CUDA.CUBLAS.cublasSgetriBatched(CUDA.CUBLAS.handle(), n, Aptrs, lda, pivot, Xptrs, lda, info, batchSize)
-    vSmartMOM.Architectures.synchronize_if_gpu()
     return X
 end
 
@@ -172,12 +169,12 @@ function vSmartMOM.CoreRT.batch_inv!(X::CuArray{FT,3}, A::CuArray{FT,3}, Xptrs, 
     @timeit "info" info = CuArray{Cint}(undef, batchSize)
     @timeit "pivot" pivot = CUDA.zeros(Cint, (n, batchSize))
 
+    # getrf and getri are on the same CUDA stream; pivot/info are CuArrays
+    # (device-to-device dependency), so no host sync is needed between them.
     CUDA.CUBLAS.cublasDgetrfBatched(CUDA.CUBLAS.handle(), n, Aptrs, lda, pivot, info, batchSize)
-    vSmartMOM.Architectures.synchronize_if_gpu()
 
     # Invert LU factorization of A
     CUDA.CUBLAS.cublasDgetriBatched(CUDA.CUBLAS.handle(), n, Aptrs, lda, pivot, Xptrs, lda, info, batchSize)
-    vSmartMOM.Architectures.synchronize_if_gpu()
     return X
 end
 

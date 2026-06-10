@@ -707,8 +707,6 @@ function interaction!(RS_type::noRS, scattering_interface::AbstractScatteringInt
     workspace=nothing) where {FT<:Union{AbstractFloat, ForwardDiff.Dual}}
     
     interaction_helper!(scattering_interface, SFI, composite_layer, added_layer, I_static)
-    synchronize_if_gpu()
-    
-    synchronize_if_gpu()
+    synchronize_if_gpu() # @timeit "interaction" boundary — ensures device work completes before timing stops
 
 end
