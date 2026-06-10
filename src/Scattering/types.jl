@@ -350,7 +350,7 @@ precision choices:
 1. `FT` (output type) — what the user consumes downstream in the RT pipeline.
 2. The internal `Dₙ` continued-fraction recursion, which the CPU path always
    stabilizes in `Float64` for plain floats regardless of `FT` (see
-   [`compute_mie_ab!`](@ref)); `Dual` inputs keep native arithmetic.
+   `compute_mie_ab!`); `Dual` inputs keep native arithmetic.
 3. `precision_policy` (GPU only) — `NativeFloat64` (default on CUDA) runs the
    GPU `Dₙ` recursion in hardware FP64; `DSEmulated` uses Float32
    double-single pairs. This axis is inert on the CPU path.
