@@ -24,12 +24,10 @@ vSmartMOM.rt_run
 
 ## Batch Scene Processing
 
-```@docs
-vSmartMOM.BatchContext
-vSmartMOM.update_model!
-vSmartMOM.update_aerosol_loading!
-vSmartMOM.update_aerosol_microphysics!
-```
+Process many scenes without rebuilding the model — full reference on the
+[CoreRT API page](core_rt.md#Batch-Scene-Processing): [`BatchContext`](@ref),
+[`update_model!`](@ref), [`update_aerosol_loading!`](@ref),
+[`update_aerosol_microphysics!`](@ref).
 
 ## Architectures
 

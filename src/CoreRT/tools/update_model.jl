@@ -59,7 +59,7 @@ end
 
 Aerosol changes do **not** require a rebuild: use
 [`update_aerosol_loading!`](@ref) for τ_ref / vertical-placement changes
-(cheap, no Mie recomputation) and [`update_aerosol_microphysics!`](@ref) for
+(cheap, no Mie recomputation) and `update_aerosol_microphysics!` for
 size-distribution / refractive-index changes (reruns Mie for that aerosol and
 re-derives the Fourier-loop bounds).
 
