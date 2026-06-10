@@ -46,3 +46,7 @@ sandbox/rami/ref_kurucz_2006.nc
 test/scratch*.png
 test/scratch*.jld2
 test/scratch*.log
+test/scratch*.jl
+
+# Local plot output directories
+plots/

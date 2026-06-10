@@ -42,10 +42,11 @@ partial derivatives are stored along the parameter axis:
 - ``\\dot{\\mathbf{M}}[\\,..,2]``: ``\\partial \\mathbf{M}/\\partial\\varpi`` — single-scatter albedo derivative
 - ``\\dot{\\mathbf{M}}[\\,..,3]``: ``\\partial \\mathbf{M}/\\partial\\mathbf{Z}`` — phase-matrix derivative
 
-These three "core" derivatives feed the chain rule in
-[`lin_added_layer_all_params!`](@ref) which expands them to derivatives
-against the physical state vector ``\\mathbf{x}`` (aerosol microphysics,
-gas VMRs, surface BRDF parameters) using the boundary
+These three "core" derivatives feed the chain rule that is fused directly
+into `get_elem_rt_fused!` (non-SFI path) and `get_elem_rt_SFI_fused!`
+(direct-solar path).  These fused kernels expand the core derivatives into
+the full physical-state-vector derivatives w.r.t. aerosol microphysics,
+gas VMRs, and surface BRDF parameters using the boundary inputs
 `CoreScatteringOpticalPropertiesLin = (\\dot{\\tau}, \\dot{\\varpi}, \\dot{\\mathbf{Z}}^{++}, \\dot{\\mathbf{Z}}^{-+})`.
 
 When `SFI=true`, source vectors ``\\mathbf{j}_0^+, \\mathbf{j}_0^-`` and

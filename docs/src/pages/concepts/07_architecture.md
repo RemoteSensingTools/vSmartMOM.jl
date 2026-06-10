@@ -294,14 +294,17 @@ Honest list of edges:
 
 - **RT solver** (elemental → doubling → interaction) — fully GPU-friendly,
   including linearized variant. This is the hot path.
-- **Gas absorption** (HITRAN line-by-line) — GPU kernel exists
-  (`compute_absorption_cross_section.jl:229–280`). Used when the user
-  selects a GPU architecture.
-- **Mie scattering** — has a CPU-default path (NAI-2 / PCW) and an opt-in
-  GPU path (`compute_aerosol_optical_properties_gpu` in
-  [`src/Scattering/compute_NAI2_gpu.jl`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/Scattering/compute_NAI2_gpu.jl)). Most production runs use CPU-Mie
-  + GPU-RT — Mie computation is dwarfed by the RT solve, and the CPU path
-  is well-tested.
+- **Gas absorption** (HITRAN line-by-line) — the standalone `Absorption`
+  module contains a GPU Voigt kernel (`compute_absorption_cross_section.jl:229–280`)
+  used by the direct σ(ν, T, p) API.  The RT production pipeline
+  (`model_from_parameters` → `rt_run`) computes LBL absorption via
+  [AtmosphericAbsorption.jl](https://github.com/RemoteSensingTools/AtmosphericAbsorption.jl),
+  which has its own backend dispatch.
+- **Mie scattering** — fully automatic via `make_mie_model(...; architecture=GPU())`.
+  NAI-2 runs on GPU; PCW and the ForwardDiff AD path fall back to CPU
+  (Metal multi-kernel overhead makes CPU-Mie + GPU-RT faster on Apple
+  Silicon for typical aerosol loads, and ForwardDiff requires host arrays).
+  Pass `architecture=CPU()` to force CPU Mie regardless of the RT backend.
 - **Thermal emission** — not currently a parallel offline source path.
   Solar-only retrievals are unaffected.
 - **Metal batched LU** — has a 32 KiB threadgroup-memory cap on the portable

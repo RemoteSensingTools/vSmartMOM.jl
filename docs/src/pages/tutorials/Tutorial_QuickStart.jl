@@ -50,4 +50,4 @@ println("R(nadir, I, λ₁) = ", R[1, 1, 1])
 #
 # For NVIDIA GPUs with CUDA.jl, set `params.architecture = vSmartMOM.Architectures.GPU()`
 # before building the model. The same `model_from_parameters` and `rt_run` calls apply.
-# See the GPU tutorial for more.
+# See the [Run on GPU](../gpu.md) task page for more.
