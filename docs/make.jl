@@ -621,6 +621,7 @@ function build()
         "Developer Guides"      => Any[
                                     "Add a Surface BRDF" => "pages/extending/surfaces.md",
                                     "Add a Raman Mode" => "pages/extending/raman.md",
+                                    "Sources & Emission" => "pages/extending/sources.md",
                                     "GEOS-Chem Integration" => "pages/geoschem_integration.md",
                                    ],
         "Tutorials"             => tutorials_md,
@@ -648,21 +649,8 @@ function build()
                                    ],
     ]
 
-    ref_name = get(ENV, "GITHUB_REF_NAME", "")
-    deploy_devbranch = if ref_name == "unified-vsmartmom"
-        "unified-vsmartmom"
-    elseif ref_name == "sanghavi-unified"
-        "sanghavi-unified"
-    else
-        "main"
-    end
-    deploy_devurl = if ref_name == "unified-vsmartmom"
-        "unified-vsmartmom"
-    elseif ref_name == "sanghavi-unified"
-        "sanghavi-unified"
-    else
-        "dev"
-    end
+    deploy_devbranch = "main"
+    deploy_devurl    = "dev"
 
     format = MarkdownVitepress(
         repo = "github.com/RemoteSensingTools/vSmartMOM.jl",
@@ -708,30 +696,12 @@ build()
 
 # Deploy only in CI contexts; local docs builds should not attempt git deployment.
 if get(ENV, "CI", "false") == "true"
-    # Keep main as the canonical dev docs, but allow branch-specific dev deployment
-    # for unified-vsmartmom so pushes to that branch publish docs as well.
-    ref_name = get(ENV, "GITHUB_REF_NAME", "")
-    deploy_devbranch = if ref_name == "unified-vsmartmom"
-        "unified-vsmartmom"
-    elseif ref_name == "sanghavi-unified"
-        "sanghavi-unified"
-    else
-        "main"
-    end
-    deploy_devurl = if ref_name == "unified-vsmartmom"
-        "unified-vsmartmom"
-    elseif ref_name == "sanghavi-unified"
-        "sanghavi-unified"
-    else
-        "dev"
-    end
-
     DocumenterVitepress.deploydocs(
         root = @__DIR__,
         repo = "github.com/RemoteSensingTools/vSmartMOM.jl.git",
         target = "build",
         push_preview = true,
-        devbranch = deploy_devbranch,
-        devurl = deploy_devurl,
+        devbranch = "main",
+        devurl = "dev",
     )
 end

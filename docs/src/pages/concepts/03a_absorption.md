@@ -83,7 +83,18 @@ implementations including a GPU-friendly Humlicek-style approximation
                                    Layer optics  (Concepts 3)
 ```
 
-## The GPU line-shape kernel
+## The standalone Absorption module's GPU kernel
+
+The internal `Absorption` module exposes a direct σ(ν, T, p) API
+(`read_hitran` / `make_hitran_model` / `absorption_cross_section`) backed by
+a KernelAbstractions Voigt kernel.  This is the path used by the Tutorial on
+Absorption and by code that needs custom grids or cross-section comparisons.
+
+> **RT pipeline note:** `model_from_parameters` → `rt_run` computes LBL gas
+> absorption internally via
+> [AtmosphericAbsorption.jl](https://github.com/RemoteSensingTools/AtmosphericAbsorption.jl)
+> (TIPS-2021), not through the kernel shown below.  The description here
+> applies to the standalone `Absorption` module only.
 
 Because the line-shape sum is a per-grid-point reduction over thousands of
 contributing lines, it parallelizes trivially across the spectral grid —

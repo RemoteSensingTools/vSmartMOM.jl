@@ -1,5 +1,50 @@
 # Changelog
 
+## Unreleased — externalAbsorption branch (targeting v2.2.0)
+
+### Summary
+
+- **AtmosphericAbsorption.jl engine swap.** `model_from_parameters` now
+  delegates LBL gas absorption to the external
+  [AtmosphericAbsorption.jl](https://github.com/RemoteSensingTools/AtmosphericAbsorption.jl)
+  package (TIPS-2021 partition sums).  The internal `Absorption` module remains
+  the standalone σ(ν, T, p) API (TIPS-2017).  High-temperature results
+  (> ~500 K) may differ slightly from earlier releases.
+
+- **GPU Mie dispatch (10.7–12.9×).** `make_mie_model(...; architecture=GPU())`
+  now runs NAI-2 Mie on GPU automatically; Metal/PCW fall back to CPU.
+
+- **`BatchContext` batch API.** `BatchContext` / `update_model!` /
+  `update_aerosol_loading!` / `update_aerosol_microphysics!` enable efficient
+  multi-scene loops with shared Mie/Fourier/HITRAN caches.
+
+- **Six correctness fixes.**
+  - Wing-cutoff window: wavenumber-space (was wavelength-space) — standalone
+    Absorption API.
+  - Canopy soil-albedo Jacobian axis fixed.
+  - VS Raman call-chain + atomic-mass factor corrected (vibrational Raman
+    results change; RRS unaffected).
+  - δBGE `Δ_angle` now applied in production truncation fit (was silently
+    ignored; default `Δ_angle = 0` unchanged).
+  - `LambertianSurfaceSpectrum` surface layer now works (missing
+    `create_surface_layer!` method added, including Lambertian scaffold).
+  - Mie Dₙ recurrence: Dual-number-safe initialization restores correct
+    `ForwardDiff` derivatives through Mie.
+
+- **Performance work.** Flat-Z zero-copy path; m-invariant Fourier-loop cache;
+  GPU sync stripping (~19.5% faster forward RT on O₂-A test case).
+
+- **~2,300-line dead-code purge** (retired `rt_run_canopy`, `RRS_plus`,
+  legacy lin entry points).
+
+- **Compat widenings.** LogExpFunctions `0.3`; Parameters.jl `0.13`.
+
+- **Folded PRs #222–#225.**
+
+Release tag (v2.2.0) to be cut by S. Sanghavi.
+
+---
+
 ## v2.1.0 — Fourier-stream resolution + source-term refactor
 
 > **vSmartMOM** = **V**ector **S**imulated **M**easurements of the **A**tmosphere using **R**adiative **T**ransfer based on the **M**atrix **O**perator **M**ethod.

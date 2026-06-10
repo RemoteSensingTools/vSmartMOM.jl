@@ -129,6 +129,10 @@ end
 using vSmartMOM.Scattering
 
 rt_aer = params.scattering_params.rt_aerosols[1]
+# Note: `params.l_trunc` and `params.Δ_angle` are legacy-schema fields parsed from
+# the YAML's `l_trunc` / `Δ_angle` keys.  The v0.7 schema derives truncation
+# automatically via `nstreams` + `truncation: auto`; see the IO Schema docs for the
+# recommended idiom.  The explicit constructor below is still valid for custom use.
 truncation_type = Scattering.δBGE{Float64}(params.l_trunc, params.Δ_angle)
 mie_model = make_mie_model(params.scattering_params.decomp_type,
                             rt_aer.aerosol, params.scattering_params.λ_ref,

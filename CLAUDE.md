@@ -53,11 +53,13 @@ GPU is a weak dependency via `ext/vSmartMOMCUDAExt.jl` (loads when CUDA.jl is pr
 ### Main Pipeline
 
 ```
-YAML config
-    → parameters_from_yaml()   → vSmartMOM_Parameters
+YAML/TOML/Dict
+    → read_parameters()        → vSmartMOM_Parameters   (unified entry point)
     → model_from_parameters()  → RTModel
     → rt_run(model)            → (R, T) reflectance/transmittance
 ```
+
+`parameters_from_yaml(path)` is the YAML-specific alias and still works; use `read_parameters` for TOML or `Dict` inputs.
 
 Linearized variant: `model_from_parameters(LinMode(), params)` then `rt_run(model, lin_model, NAer, NGas, NSurf)` returns `(R, T, dR, dT)`.
 
@@ -231,7 +233,7 @@ test/
 
 ```julia
 using vSmartMOM
-params = parameters_from_yaml("config/lambertian_land.yaml")
+params = read_parameters("config/lambertian_land.yaml")   # preferred; also accepts TOML/Dict
 model  = model_from_parameters(params)
 R, T   = rt_run(model)
 ```
@@ -240,10 +242,10 @@ R, T   = rt_run(model)
 
 ```julia
 using vSmartMOM
-params = parameters_from_yaml("config/ocean_coxmunk.yaml")
+params = read_parameters("config/ocean_coxmunk.yaml")
 model, lin_model = model_from_parameters(LinMode(), params)
 NAer = length(params.scattering_params.rt_aerosols)
-NGas = size(lin_model.tau_dot_abs[1], 1)
+NGas = size(lin_model.τ̇_abs[1], 1)
 NSurf = 1
 R, T, dR, dT = rt_run(model, lin_model, NAer, NGas, NSurf)
 ```

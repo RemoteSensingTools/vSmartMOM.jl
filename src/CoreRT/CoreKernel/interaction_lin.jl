@@ -40,8 +40,9 @@ identity. No AD through the batched matrix inversion; the chain rule on
 the Jacobian numerically stable and roughly forward-cost.
 
 The ``\\mathbf{ap\\_*}`` fields on `AddedLayerLin` carry the chain-rule
-expansion to the **physical state vector** ``\\mathbf{x}`` (computed by
-[`lin_added_layer_all_params!`](@ref) before this kernel runs); the
+expansion to the **physical state vector** ``\\mathbf{x}`` — written
+directly by the fused elemental kernels `get_elem_rt_fused!` and
+`get_elem_rt_SFI_fused!` before this interaction kernel runs; the
 ``\\dot{\\mathbf{*}}`` fields carry the three-core derivatives w.r.t.
 ``(\\tau, \\varpi, \\mathbf{Z})``.
 

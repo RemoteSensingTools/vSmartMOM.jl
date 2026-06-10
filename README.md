@@ -69,7 +69,8 @@ The vSmartMOM module allows end-to-end simulation of radiative transfer (RT) thr
 
   Key functions:
 
-  - `parameters_from_yaml(filepath::String)`: Load a custom set of RT parameters from a YAML file.
+  - `read_parameters(x)`: Unified entry point — accepts a YAML/TOML file path, a `Dict`, or an `IOSource`. Preferred over the lower-level aliases.
+  - `parameters_from_yaml(filepath::String)`: YAML-specific alias (still works; raises `ArgumentError` for `.toml` paths).
   - `default_parameters()`: Load a default set of RT parameters.
   - `model_from_parameters(params::vSmartMOM_Parameters)`: Build an `RTModel` with all derived optical properties (cross-section profiles, scattering phase functions, etc.) ready for simulation.
   - `rt_run(model::RTModel)`: Perform forward RT simulation, returning reflectance and transmittance.
@@ -80,7 +81,7 @@ The vSmartMOM module allows end-to-end simulation of radiative transfer (RT) thr
 
 ```julia
 using vSmartMOM
-params = parameters_from_yaml("config/quickstart.yaml")  # any YAML config
+params = read_parameters("config/quickstart.yaml")        # YAML, TOML, or Dict
 model  = model_from_parameters(params)
 R, T   = rt_run(model)                                    # reflectance, transmittance
 ```
@@ -89,10 +90,10 @@ R, T   = rt_run(model)                                    # reflectance, transmi
 
 ```julia
 using vSmartMOM
-params = parameters_from_yaml("config/ocean_coxmunk.yaml")
+params = read_parameters("config/ocean_coxmunk.yaml")
 model, lin_model = model_from_parameters(LinMode(), params)
 NAer  = length(params.scattering_params.rt_aerosols)
-NGas  = size(lin_model.tau_dot_abs[1], 1)
+NGas  = size(lin_model.τ̇_abs[1], 1)
 NSurf = 1
 R, T, dR, dT = rt_run(model, lin_model, NAer, NGas, NSurf)
 ```
