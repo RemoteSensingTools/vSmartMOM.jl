@@ -125,6 +125,7 @@ _to_aa_arch(arch::AtmosphericAbsorption.AbstractArchitecture) = arch  # already 
 
 include("tools/model_from_parameters.jl")         # Converting parameters to derived model attributes
 include("tools/lin_model_from_parameters.jl")     # Linearized model from parameters
+include("tools/update_model.jl")                  # BatchContext + update_model! for batch processing
 include("tools/show_utils.jl")                    # Pretty-printing objects
 include("LayerOpticalProperties/compEffectiveLayerProperties.jl")
 include("LayerOpticalProperties/delta_m_truncation.jl")         # δ-M truncation + chain rule
@@ -152,7 +153,8 @@ export model_from_parameters,               # Converting the parameters to model
        model_from_parameters_lin,           # Convenience alias for linearized model
        rt_run, rt_run_lin, rt_run_ss,       # Run the RT code (forward, linearized, single scatter)
        rt_run_streams, StreamRTResult,      # Per-Fourier-moment quadrature-stream RT (Phase H)
-       default_parameters                   # Set of default parameters
+       default_parameters,                  # Set of default parameters
+       BatchContext, update_model!          # Batch-processing context + scene updater
 export lin_added_layer_all_params!,           # 3 params -> all params chain rule
        OpticalPropertyJacobian,               # AD boundary struct alias
        RawAerosolJacobian,                    # AD boundary for raw aerosol derivatives

@@ -130,6 +130,11 @@ end
 # Phase 6 — sanghavi test/benchmarks/*.jl script ports (parse + light-unit).
 @testset "Phase 6 script ports" begin include("test_phase6_ports.jl") end
 
+# Batch-processing API: BatchContext + update_model!
+# Validates bit-equality of optical depths and radiances across scene updates,
+# round-trip consistency, and guard rails.
+@testset "BatchContext update_model!" begin include("test_update_model.jl") end
+
 # v0.6 source-term refactor — AbstractSource vocabulary, SolarBeam, BlackbodySource,
 # SurfaceSIF, surface_source_contribute! double-dispatch, prepared_sources flow.
 # Includes the full Phase 1 → 5b regression assertions and end-to-end bit-equality
