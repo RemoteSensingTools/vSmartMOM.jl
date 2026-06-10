@@ -24,9 +24,17 @@ Reference: Siewert (1982) ApJ 245, 357; (2000a) JQSRT 64, 109.
 =#
 
 @doc raw"""
-    compute_aerosol_optical_properties(model::MieModel{<:NAI2}, FT2::Type=Float64) -> AerosolOptics
+    compute_aerosol_optical_properties(model::MieModel{<:NAI2,FT,<:CPU}, FT2::Type=Float64) -> AerosolOptics
 
-Compute bulk aerosol optical properties with the Siewert NAI-2 formulation.
+Compute bulk aerosol optical properties with the Siewert NAI-2 formulation
+on the CPU.
+
+This method is selected by `compute_aerosol_optical_properties(mie_model)` when
+the model carries `architecture = CPU()` (the default). For
+`architecture = GPU()` the GPU KernelAbstractions pipeline is dispatched
+instead (see [`compute_aerosol_optical_properties_gpu`](@ref)). The
+back-compat two-argument form `compute_aerosol_optical_properties(model, FT2)`
+always forwards here on the CPU regardless of the model's architecture.
 
 Reference:
 - S. Sanghavi, *Revisiting the Fourier expansion of Mie scattering matrices in generalized spherical functions*, JQSRT 136 (2014), 16-27. https://doi.org/10.1016/j.jqsrt.2013.12.015
@@ -60,7 +68,7 @@ matrix moments (Sanghavi, 2014).
 - Uses the convention `nᵢ >= 0`.
 - Radius and wavelength units must be consistent.
 """
-function compute_aerosol_optical_properties(model::MieModel{FDT}, FT2::Type=Float64) where FDT <: NAI2
+function compute_aerosol_optical_properties(model::MieModel{FDT}, FT2::Type) where FDT <: NAI2
 
     # Unpack the model
     (; computation_type, aerosol, λ, polarization_type, truncation_type, r_max, nquad_radius, wigner_A, wigner_B) = model

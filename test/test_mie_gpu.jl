@@ -21,9 +21,11 @@ using vSmartMOM
 using Distributions
 using LinearAlgebra
 using Printf
+using Logging
 
 # KernelAbstractions is re-exported through vSmartMOM's Scattering module
 using vSmartMOM.Scattering
+using vSmartMOM.Architectures: CPU, GPU
 using vSmartMOM.Scattering: DoubleSingle, ComplexDS, NeumaierAccum,
     TwoSum, TwoProd, ds_add, ds_sub, ds_mul, ds_div, ds_inv,
     cds_add, cds_sub, cds_mul, cds_div, cds_inv, cds_from_real, cds_mul_real, cds_complex, to_complex,
@@ -35,6 +37,23 @@ using vSmartMOM.Scattering: DoubleSingle, ComplexDS, NeumaierAccum,
 
 import KernelAbstractions
 const KA_CPU = KernelAbstractions.CPU
+
+# Real-GPU tests are gated on a functional CUDA device. On CPU-only machines
+# `CUDA_FUNCTIONAL` stays false and every GPU testset below is skipped, so the
+# file passes everywhere.
+const CUDA_FUNCTIONAL = try
+    @eval import CUDA
+    CUDA.functional()
+catch
+    false
+end
+const CUDA_BACKEND = CUDA_FUNCTIONAL ? CUDA.CUDABackend() : nothing
+
+if CUDA_FUNCTIONAL
+    @info "test_mie_gpu: CUDA is functional — running real-GPU Mie testsets."
+else
+    @info "test_mie_gpu: CUDA not functional — skipping real-GPU Mie testsets."
+end
 
 # ============================================================================
 # Unit Tests: DoubleSingle Arithmetic
@@ -344,6 +363,331 @@ end
                 ref_vals = getproperty(ref.greek_coefs, field)
                 gpu_vals = getproperty(gpu_ds.greek_coefs, field)
                 @test isapprox(gpu_vals, ref_vals, atol=1e-3)
+            end
+        end
+    end
+end
+
+# ============================================================================
+# Real CUDA GPU: full NAI2 pipeline on actual hardware (CUDABackend)
+# ============================================================================
+# Mirrors the KA-CPU accuracy testset above but runs on the real device. Guarded
+# by CUDA_FUNCTIONAL so CPU-only machines skip this entirely.
+@testset "NAI2 real-GPU (CUDABackend) vs CPU" begin
+    if !CUDA_FUNCTIONAL
+        @test_skip "CUDA not functional — real-GPU pipeline test skipped"
+    else
+        μ_aer = 0.3; σ_aer = 2.1; r_max = 30.0
+        nᵣ = 1.3; nᵢ = 0.001; λ = 0.55
+        aero = Aerosol(LogNormal(log(μ_aer), log(σ_aer)), nᵣ, nᵢ)
+        polarization_type = Stokes_IQUV()
+        truncation_type   = δBGE(10, 10.0)
+
+        for nquad in [100, 500, 1000]
+            model = make_mie_model(NAI2(), aero, λ, polarization_type,
+                                   truncation_type, r_max, nquad)
+            ref = compute_aerosol_optical_properties(model)  # CPU reference
+
+            # Backend-explicit real-GPU call (NativeFloat64 Dn recursion)
+            gpu = compute_aerosol_optical_properties_gpu(model, CUDA_BACKEND;
+                        precision_policy = NativeFloat64())
+
+            @testset "real-GPU nquad=$nquad, NativeFloat64" begin
+                @test isapprox(gpu.ω̃, ref.ω̃, rtol=1e-6)
+                @test isapprox(gpu.k,  ref.k,  rtol=1e-6)
+                for field in (:α, :β, :γ, :δ, :ϵ, :ζ)
+                    @test isapprox(getproperty(gpu.greek_coefs, field),
+                                   getproperty(ref.greek_coefs, field), atol=1e-6)
+                end
+            end
+        end
+    end
+end
+
+# ============================================================================
+# Single-verb dispatch: make_mie_model(...; architecture=GPU()) on real hardware
+# ============================================================================
+# Exercises the multiple-dispatch API surface end to end:
+#   make_mie_model(...; architecture=GPU())  +  compute_aerosol_optical_properties(model)
+# must route to the GPU pipeline and match the CPU reference within NativeFloat64
+# tolerances (1e-6 SSA/k).
+@testset "Single-verb GPU dispatch" begin
+    if !CUDA_FUNCTIONAL
+        @test_skip "CUDA not functional — single-verb GPU dispatch test skipped"
+    else
+        μ_aer = 0.3; σ_aer = 2.1; r_max = 30.0
+        nᵣ = 1.3; nᵢ = 0.001; λ = 0.55
+        aero = Aerosol(LogNormal(log(μ_aer), log(σ_aer)), nᵣ, nᵢ)
+        pol = Stokes_IQUV(); trunc = δBGE(10, 10.0)
+
+        for nquad in [100, 500]
+            m_cpu = make_mie_model(NAI2(), aero, λ, pol, trunc, r_max, nquad)
+            m_gpu = make_mie_model(NAI2(), aero, λ, pol, trunc, r_max, nquad;
+                                   architecture = GPU())
+
+            # Type-parameter sanity: architecture rides on the model type
+            @test m_gpu isa MieModel{NAI2, Float64, GPU}
+            @test m_cpu isa MieModel{NAI2, Float64, CPU}
+
+            ref = compute_aerosol_optical_properties(m_cpu)  # CPU dispatch
+            gpu = compute_aerosol_optical_properties(m_gpu)  # GPU dispatch (auto NativeFloat64)
+
+            @testset "single-verb nquad=$nquad" begin
+                @test isapprox(gpu.ω̃, ref.ω̃, rtol=1e-6)
+                @test isapprox(gpu.k,  ref.k,  rtol=1e-6)
+                for field in (:α, :β, :γ, :δ, :ϵ, :ζ)
+                    @test isapprox(getproperty(gpu.greek_coefs, field),
+                                   getproperty(ref.greek_coefs, field), atol=1e-6)
+                end
+            end
+        end
+    end
+end
+
+# ============================================================================
+# Float32 GPU model: compensated host reduction keeps F32 accurate
+# ============================================================================
+# A genuinely Float32 model (FT === Float32) runs the device kernels in Float32
+# (DSEmulated Dn recursion) — this is the only option on F32-only GPUs (e.g.
+# Metal). The host-side size-distribution reduction and Greek-coefficient
+# quadrature are widened to Float64 with Neumaier compensation, so the Greek
+# coefficients land at the Float32 representational floor (~1e-4) instead of the
+# ~5e-3 they would hit if the reduction itself ran in Float32. SSA/k reach ~1e-7.
+@testset "Float32 GPU compensated-reduction accuracy" begin
+    if !CUDA_FUNCTIONAL
+        @test_skip "CUDA not functional — Float32 GPU accuracy test skipped"
+    else
+        # Float64 reference at identical physical parameters
+        aero64 = Aerosol(LogNormal(log(0.3),  log(2.1)),  1.3,   0.001)
+        m64 = make_mie_model(NAI2(), aero64, 0.55, Stokes_IQUV(), δBGE(10, 10.0), 30.0, 500)
+        ref = compute_aerosol_optical_properties(m64)
+
+        # True Float32 model on the GPU with DSEmulated (Float32) Dn recursion
+        aero32 = Aerosol(LogNormal(log(0.3f0), log(2.1f0)), 1.3f0, 0.001f0)
+        m32 = make_mie_model(NAI2(), aero32, 0.55f0, Stokes_IQUV(), δBGE(10, 10.0f0),
+                             30.0f0, 500; architecture = GPU(),
+                             precision_policy = DSEmulated())
+        gpu32 = compute_aerosol_optical_properties(m32)
+
+        # Output type rides on the model's FT (Float32 here)
+        @test eltype(gpu32.greek_coefs.β) === Float32
+        @test gpu32.ω̃ isa Float32
+
+        # SSA / k accurate to ~1e-7 thanks to compensated bulk reductions
+        @test abs(Float64(gpu32.ω̃) - ref.ω̃) / abs(ref.ω̃) < 1e-6
+        @test abs(Float64(gpu32.k)  - ref.k)  / abs(ref.k)  < 1e-6
+
+        # Greek coefficients at the Float32 floor (compensated reduction → ~1e-4,
+        # not the ~5e-3 of an all-Float32 reduction). Compare on the common length.
+        L = min(length(gpu32.greek_coefs.β), length(ref.greek_coefs.β))
+        for field in (:α, :β, :γ, :δ, :ϵ, :ζ)
+            g = Float64.(getproperty(gpu32.greek_coefs, field)[1:L])
+            r = getproperty(ref.greek_coefs, field)[1:L]
+            @test maximum(abs.(g .- r)) < 1e-3
+        end
+    end
+end
+
+# ============================================================================
+# Float32 GPU DEFAULT precision policy (precision_policy = nothing → DSEmulated)
+# ============================================================================
+# Regression for the P1 finding: a Float32 GPU model built WITHOUT an explicit
+# precision_policy (nothing → auto) must NOT resolve to NativeFloat64 (whose GPU
+# kernel asserts FT === Float64) — it must auto-select DSEmulated, the
+# Float32-native path. Several existing GPU YAMLs use float_type: Float32 and
+# never set a policy, so this is the path they actually hit. The DSEmulated host
+# reduction is Float64-widened + Neumaier-compensated, so accuracy is at the
+# Float32 representational floor (1e-4 SSA/k, established DS tolerances).
+@testset "Float32 GPU default-policy auto-selects DSEmulated" begin
+    # FT-aware policy selection is testable WITHOUT a GPU device: the policy
+    # function is provided by the loaded CUDA extension regardless of
+    # CUDA.functional(). Guard the actual compute on CUDA_FUNCTIONAL.
+    if !CUDA_FUNCTIONAL
+        @test_skip "CUDA not functional — Float32 GPU default-policy test skipped"
+    else
+        # 1) The FT-aware default policy itself (provided by the CUDA extension)
+        @test vSmartMOM.Architectures.default_mie_precision_policy(GPU(), Float32) isa DSEmulated
+        @test vSmartMOM.Architectures.default_mie_precision_policy(GPU(), Float64) isa NativeFloat64
+
+        # 2) Float64 reference at identical physical parameters
+        aero64 = Aerosol(LogNormal(log(0.3), log(2.1)), 1.3, 0.001)
+        m64 = make_mie_model(NAI2(), aero64, 0.55, Stokes_IQUV(), δBGE(10, 10.0), 30.0, 500)
+        ref = compute_aerosol_optical_properties(m64)
+
+        # 3) Float32 GPU model with NO explicit policy (precision_policy = nothing).
+        #    FT === Float32 (derived from the Float32 r_max). This MUST run — the
+        #    router resolves nothing → DSEmulated() via the FT-aware default — not
+        #    trip the NativeFloat64 FT === Float64 assert.
+        aero32 = Aerosol(LogNormal(log(0.3f0), log(2.1f0)), 1.3f0, 0.001f0)
+        m32 = make_mie_model(NAI2(), aero32, 0.55f0, Stokes_IQUV(), δBGE(10, 10.0f0),
+                             30.0f0, 500; architecture = GPU())
+        @test m32 isa MieModel{NAI2, Float32, GPU}
+        @test m32.precision_policy === nothing   # auto
+
+        gpu32 = compute_aerosol_optical_properties(m32)   # would assert if NativeFloat64
+
+        # Output type rides on the model's FT (Float32)
+        @test eltype(gpu32.greek_coefs.β) === Float32
+        @test gpu32.ω̃ isa Float32
+
+        # Matches the CPU Float64 reference within the established DS tolerances.
+        @test abs(Float64(gpu32.ω̃) - ref.ω̃) / abs(ref.ω̃) < 1e-4
+        @test abs(Float64(gpu32.k)  - ref.k)  / abs(ref.k)  < 1e-4
+
+        L = min(length(gpu32.greek_coefs.β), length(ref.greek_coefs.β))
+        for field in (:α, :β, :γ, :δ, :ϵ, :ζ)
+            g = Float64.(getproperty(gpu32.greek_coefs, field)[1:L])
+            r = getproperty(ref.greek_coefs, field)[1:L]
+            @test maximum(abs.(g .- r)) < 1e-3
+        end
+    end
+end
+
+# ============================================================================
+# P2 regression: Float32 aerosol params + Float64 r_max/λ → auto-selects DSEmulated
+# ============================================================================
+# The reviewer's exact case: Aerosol(dist, 1.3f0, 0.001f0) combined with a
+# Float64 r_max (30.0) and Float64 λ (0.55). In this model:
+#   - _mie_output_type  → Float64  (r_max's type drives the MieModel FT parameter)
+#   - _mie_kernel_type  → Float32  (eltype(nᵣ) — how compute_NAI2_gpu derives FT)
+# Before the fix the router passed FT2 (Float64) to default_mie_precision_policy,
+# returning NativeFloat64(), whose GPU kernel asserts FT === Float64 — but
+# FT = eltype(nᵣ) = Float32 → assertion failure. The fix uses _mie_kernel_type
+# (Float32) for the policy decision, returning DSEmulated(), which is the
+# Float32-native path and must run without error and match the CPU reference.
+@testset "P2: Float32 aerosol + Float64 r_max — auto-selects DSEmulated" begin
+    if !CUDA_FUNCTIONAL
+        @test_skip "CUDA not functional — P2 mixed-precision policy test skipped"
+    else
+        # The reviewer's exact construction: Float32 nᵣ/nᵢ, Float64 r_max/λ.
+        aero_mixed = Aerosol(LogNormal(log(0.3), log(2.1)), 1.3f0, 0.001f0)
+        m_mixed = make_mie_model(NAI2(), aero_mixed, 0.55, Stokes_IQUV(),
+                                 δBGE(10, 10.0), 30.0, 500;
+                                 architecture = GPU())
+
+        # Confirm the type-level situation that triggered the bug:
+        #   FT (r_max type) = Float64  →  MieModel{NAI2, Float64, GPU}
+        #   eltype(nᵣ) = Float32       →  kernel must run Float32 (DSEmulated)
+        @test m_mixed isa MieModel{NAI2, Float64, GPU}
+        @test eltype(m_mixed.aerosol.nᵣ) === Float32   # kernel precision axis
+        @test m_mixed.precision_policy === nothing       # nothing → auto
+
+        # Before the fix this would @assert-fail with "NativeFloat64 … requires Float64".
+        gpu_mixed = compute_aerosol_optical_properties(m_mixed)
+
+        # The auto policy must have resolved to DSEmulated (Float32-native path).
+        # Verify indirectly: output type rides on FT2 = Float64 (r_max type).
+        @test gpu_mixed.ω̃ isa Float64
+        @test eltype(gpu_mixed.greek_coefs.β) === Float64
+
+        # Float64 CPU reference at identical physical parameters.
+        aero64 = Aerosol(LogNormal(log(0.3), log(2.1)), 1.3, 0.001)
+        m64    = make_mie_model(NAI2(), aero64, 0.55, Stokes_IQUV(), δBGE(10, 10.0), 30.0, 500)
+        ref    = compute_aerosol_optical_properties(m64)
+
+        # DSEmulated tolerance (Float32 kernel, Float64-widened host reduction):
+        # SSA/k within 1e-4, Greek coefficients within 1e-3.
+        @test abs(gpu_mixed.ω̃ - ref.ω̃) / abs(ref.ω̃) < 1e-4
+        @test abs(gpu_mixed.k  - ref.k)  / abs(ref.k)  < 1e-4
+
+        L = min(length(gpu_mixed.greek_coefs.β), length(ref.greek_coefs.β))
+        for field in (:α, :β, :γ, :δ, :ϵ, :ζ)
+            g = getproperty(gpu_mixed.greek_coefs, field)[1:L]
+            r = getproperty(ref.greek_coefs,       field)[1:L]
+            @test maximum(abs.(g .- r)) < 1e-3
+        end
+    end
+end
+
+# ============================================================================
+# Non-CPU architecture WITHOUT a GPU Mie pipeline → warn-once CPU fallback
+# ============================================================================
+# Regression for the P1 finding: a non-CPU architecture that has no GPU Mie
+# pipeline (the trait `has_gpu_mie` is false — e.g. MetalGPU(), which defines no
+# Mie kernels) must NOT route through the GPU branch (which would call
+# ka_backend on an architecture with no backend hook and error). Instead the
+# router must warn ONCE and compute Mie on the CPU, returning results bit-
+# identical to the CPU path (RT arrays are unaffected; only Mie falls back).
+#
+# We test the trait mechanism directly with a minimal local AbstractArchitecture
+# subtype: `has_gpu_mie` defaults to false on the abstract supertype, so the
+# router takes the CPU branch. This needs no GPU device, so it runs everywhere.
+#
+# Minimal architecture with NO ka_backend / precision-policy / Mie hooks, defined
+# at top level (structs cannot be declared inside the function `@testset` wraps).
+# Mirrors MetalGPU()'s situation (Metal ext defines no Mie path).
+struct _NoMieArch <: vSmartMOM.Architectures.AbstractArchitecture end
+
+@testset "Non-CPU no-GPU-Mie architecture → warn-once CPU fallback" begin
+    # Trait default is false (refinement is opt-in, like ka_backend).
+    @test vSmartMOM.Architectures.has_gpu_mie(_NoMieArch()) == false
+
+    aero = Aerosol(LogNormal(log(0.3), log(2.1)), 1.3, 0.001)
+    pol  = Stokes_IQUV(); trunc = δBGE(10, 10.0)
+
+    m_cpu  = make_mie_model(NAI2(), aero, 0.55, pol, trunc, 30.0, 200)
+    m_fall = make_mie_model(NAI2(), aero, 0.55, pol, trunc, 30.0, 200;
+                            architecture = _NoMieArch())
+
+    ref = compute_aerosol_optical_properties(m_cpu)
+
+    # Reset the module-global warn-once flag so this test is self-contained
+    # regardless of whether an earlier testset already tripped the fallback.
+    vSmartMOM.Scattering._WARNED_NO_GPU_MIE[] = false
+
+    # First call warns exactly once; @test_logs asserts a matching @warn fires.
+    fb1 = @test_logs (:warn, r"no GPU Mie pipeline") match_mode = :any begin
+        compute_aerosol_optical_properties(m_fall)
+    end
+    # Subsequent calls must NOT warn again (warn-once flag): assert no
+    # Warn-level (or above) records are produced.
+    fb2 = @test_logs min_level = Logging.Warn begin
+        compute_aerosol_optical_properties(m_fall)
+    end
+
+    # Fallback results are IDENTICAL to the CPU path (not just approximate).
+    @test fb1.ω̃ == ref.ω̃
+    @test fb1.k  == ref.k
+    for field in (:α, :β, :γ, :δ, :ϵ, :ζ)
+        @test getproperty(fb1.greek_coefs, field) == getproperty(ref.greek_coefs, field)
+        @test getproperty(fb2.greek_coefs, field) == getproperty(ref.greek_coefs, field)
+    end
+end
+
+# ============================================================================
+# YAML-level smoke: model_from_parameters with architecture=GPU()
+# ============================================================================
+# Build a full RTModel from a real aerosol YAML, once on CPU and once with the
+# params' architecture flipped to GPU(). The per-band truncated aerosol_optics
+# must match within NativeFloat64 tolerances (1e-6 SSA/k). This validates the
+# production wiring in model_from_parameters.jl (single-verb call +
+# architecture=params.architecture).
+@testset "YAML model_from_parameters GPU vs CPU aerosol_optics" begin
+    if !CUDA_FUNCTIONAL
+        @test_skip "CUDA not functional — YAML GPU model_from_parameters test skipped"
+    else
+        params_cpu = parameters_from_yaml("test_parameters/JacobianTestFast.yaml")
+        params_gpu = parameters_from_yaml("test_parameters/JacobianTestFast.yaml")
+        params_gpu.architecture = GPU()
+
+        model_cpu = model_from_parameters(params_cpu)
+        model_gpu = model_from_parameters(params_gpu)
+
+        ao_cpu = model_cpu.aerosol_optics   # [iBand][iAer]
+        ao_gpu = model_gpu.aerosol_optics
+
+        @test length(ao_gpu) == length(ao_cpu)
+        for iBand in eachindex(ao_cpu)
+            for iAer in eachindex(ao_cpu[iBand])
+                a = ao_cpu[iBand][iAer]
+                b = ao_gpu[iBand][iAer]
+                @test isapprox(b.ω̃, a.ω̃, rtol=1e-6)
+                @test isapprox(b.k,  a.k,  rtol=1e-6)
+                @test isapprox(b.fᵗ, a.fᵗ, atol=1e-6)
+                for field in (:α, :β, :γ, :δ, :ϵ, :ζ)
+                    @test isapprox(getproperty(b.greek_coefs, field),
+                                   getproperty(a.greek_coefs, field), atol=1e-6)
+                end
             end
         end
     end
