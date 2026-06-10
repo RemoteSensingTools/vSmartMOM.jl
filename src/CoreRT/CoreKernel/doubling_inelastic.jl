@@ -435,24 +435,6 @@ negates the upwelling `U/V` Stokes rows for that source element.
     end
 end
 
-#Suniti: is it possible to  use the same kernel for the 3D elastic and 4D inelastic terms or do we need to call two different kernels separately?
-#function apply_D_matrix!(n_stokes::Int, r⁻⁺::CuArray{FT,3}, t⁺⁺::CuArray{FT,3}, r⁺⁻::CuArray{FT,3}, t⁻⁻::CuArray{FT,3}) where {FT}
-#
-#    if n_stokes == 1
-#        r⁺⁻[:] = r⁻⁺
-#        t⁻⁻[:] = t⁺⁺
-#
-#        return nothing
-#    else
-#        device = devi(architecture(r⁻⁺))
-#        applyD_kernel! = apply_D!(device)
-#        event = applyD_kernel!(n_stokes, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻, ndrange=size(r⁻⁺)); #Suniti: is it possible to  use the same kernel for the 3D elastic and 4D inelastic terms or do we need to call two different kernels separately?
-#        #wait(device, event);
-#        synchronize_if_gpu();
-#        return nothing
-#    end
-#end
-
 function apply_D_matrix_IE!(RS_type::Union{VS_0to1_plus, VS_1to0_plus}, n_stokes::Int, ier⁻⁺::AbstractArray{FT,4}, iet⁺⁺::AbstractArray{FT,4}, ier⁺⁻::AbstractArray{FT,4}, iet⁻⁻::AbstractArray{FT,4}) where {FT}
     if n_stokes == 1
         ier⁺⁻[:] = ier⁻⁺

@@ -114,39 +114,15 @@ function elemental!(pol_type, SFI::Bool,
         d_wct = Diagonal(wct)
 
         # Calculate r⁻⁺ and t⁺⁺
-        
-        # Version 1: no absorption in batch mode (initiation of a single-scattering layer with very small dτ).
-        # This is the first-order thin-layer limit and is consistent with Fell (1997) Eq. 1.55-1.56 style
-        # source scaling (linear in optical thickness).
-        if false #maximum(dτ_λ) < 0.0001   
-            # R⁻⁺₀₁(λ) = M⁻¹(0.5ϖₑ(λ)Z⁻⁺C)δ (See Eqs.7 in Raman paper draft)
-            r⁻⁺[:,:,:] .= d_qp * Z⁻⁺ * (d_wct * dτ)
-            # T⁺⁺₀₁(λ) = {I-M⁻¹[I - 0.5*ϖₑ(λ)Z⁺⁺C]}δ (See Eqs.7 in Raman paper draft)
-            t⁺⁺[:,:,:] .= I_static - (d_qp * ((I_static - Z⁺⁺ * d_wct) * dτ))
-            if SFI
-                # Reminder: Add equation here what it does
-                expk = exp.(-τ_sum/qp_μ[iμ₀]) #exp(-τ(z)/μ₀)
-                # J₀⁺ = 0.5[1+δ(m,0)]M⁻¹ϖₑ(λ)Z⁺⁺τI₀exp(-τ(z)/μ₀)
-                J₀⁺[:,1,:] .= ((d_qp * Z⁺⁺ * I₀_NquadN) * wct0) .* expk'
-                # J₀⁻ = 0.5[1+δ(m,0)]M⁻¹ϖₑ(λ)Z⁻⁺τI₀exp(-τ(z)/μ₀)
-                J₀⁻[:,1,:] .= ((d_qp * Z⁻⁺ * I₀_NquadN) * wct0) .* expk'
-              
-            end
-        else 
-            # Version 2: More computationally intensive definition of a single scattering layer with variable (0-∞) absorption
-            # Version 2: with absorption in batch mode, low tau_scatt but higher tau_total, needs different equations
-            kernel! = get_elem_rt!(device)
-            event = kernel!(r⁻⁺, t⁺⁺, ϖ_λ, dτ_λ, Z⁻⁺, Z⁺⁺, 
-                qp_μN, wct2, ndrange=size(r⁻⁺)); 
-            #wait(device, event)
-            synchronize_if_gpu()
+        kernel! = get_elem_rt!(device)
+        event = kernel!(r⁻⁺, t⁺⁺, ϖ_λ, dτ_λ, Z⁻⁺, Z⁺⁺,
+            qp_μN, wct2, ndrange=size(r⁻⁺));
+        synchronize_if_gpu()
 
-            if SFI
-                kernel! = get_elem_rt_SFI!(device)
-                event = kernel!(J₀⁺, J₀⁻, ϖ_λ, dτ_λ, τ_sum, Z⁻⁺, Z⁺⁺, arr_type(F₀), qp_μN, ndoubl, wct02, pol_type.n, arr_type(pol_type.I₀), iμ₀, D, ndrange=size(J₀⁺))
-                #wait(device, event)
-                synchronize_if_gpu()
-            end
+        if SFI
+            kernel! = get_elem_rt_SFI!(device)
+            event = kernel!(J₀⁺, J₀⁻, ϖ_λ, dτ_λ, τ_sum, Z⁻⁺, Z⁺⁺, arr_type(F₀), qp_μN, ndoubl, wct02, pol_type.n, arr_type(pol_type.I₀), iμ₀, D, ndrange=size(J₀⁺))
+            synchronize_if_gpu()
         end
 
         # Apply D Matrix

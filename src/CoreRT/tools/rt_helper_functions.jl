@@ -108,13 +108,6 @@ end
 "Default J matrix in ieRT calculation (zeros) — multi-sensor variant"
 @inline default_J_matrix_ie(FT, arr_type, NSens, dims, nSpec, nRaman) = [zeros(FT, (dims[1], 1, nSpec, nRaman)) for _ in 1:NSens]
 
-##### Only for testing, random matrices:
-"Default matrix in RT calculation (random)"
-default_matrix_rand(FT, arr_type, dims, nSpec)   = arr_type(randn(FT, tuple(dims[1], dims[2], nSpec)))
-
-"Default J matrix in RT calculation (random)"
-default_J_matrix_rand(FT, arr_type, dims, nSpec) = arr_type(randn(FT, tuple(dims[1], 1, nSpec)))
-
 
 """
     make_added_layer(RS_type, FT, arr_type, dims, nSpec; prepared_sources=NoSource())
@@ -235,27 +228,6 @@ make_added_layer(RS_type::Union{RRS, VS_0to1_plus, VS_1to0_plus}, FT, arr_type, 
                                                 )
                                                          
 
-"Make a random added layer, supplying all random matrices"
-function make_added_layer_rand(RS_type::Union{noRS, noRS_plus}, FT, arr_type, dims, nSpec)
-    t1 = default_matrix_rand(FT, arr_type, dims, nSpec)
-    t2 = default_matrix_rand(FT, arr_type, dims, nSpec)
-    return AddedLayer(
-        r⁻⁺ = default_matrix_rand(FT, arr_type, dims, nSpec),
-        t⁺⁺ = default_matrix_rand(FT, arr_type, dims, nSpec),
-        r⁺⁻ = default_matrix_rand(FT, arr_type, dims, nSpec),
-        t⁻⁻ = default_matrix_rand(FT, arr_type, dims, nSpec),
-        j₀⁺ = default_J_matrix_rand(FT, arr_type, dims, nSpec),
-        j₀⁻ = default_J_matrix_rand(FT, arr_type, dims, nSpec),
-        temp1 = t1,
-        temp2 = t2,
-        temp1_ptr = batched_pointer_cache(t1),
-        temp2_ptr = batched_pointer_cache(t2),
-        dbl_gp_refl = default_matrix_rand(FT, arr_type, dims, nSpec),
-        dbl_j₁⁺ = default_J_matrix_rand(FT, arr_type, dims, nSpec),
-        dbl_j₁⁻ = default_J_matrix_rand(FT, arr_type, dims, nSpec),
-    )
-end
-                                                         
 """Construct a `CompositeLayer` with zero-initialized R, T, J₀ for elastic RT.
 
 When `prepared_sources` declares any non-`nothing` [`source_key`](@ref),
@@ -337,45 +309,3 @@ make_composite_layer(RS_type::Union{RRS, VS_0to1_plus, VS_1to0_plus},
                     default_J_matrix_ie(FT, arr_type, NSens, dims, nSpec, RS_type.n_Raman),
                     default_J_matrix_ie(FT, arr_type, NSens, dims, nSpec, RS_type.n_Raman)
                     )
-"""
-    get_layer_properties(computed_atmospheric_properties, iz, arr_type)
-
-Extract layer `iz` optical properties from `ComputedAtmosphereProperties`.
-
-Returns a `ComputedLayerProperties` with τ, ϖ, Z⁺⁺, Z⁻⁺, dτ, ndoubl, expk, scatter,
-τ_sum, and scattering_interface for the specified layer.
-"""
-function get_layer_properties(computed_atmospheric_properties::ComputedAtmosphereProperties, iz, arr_type)
-     (; τ_λ_all, ϖ_λ_all, τ_all, ϖ_all, Z⁺⁺_all, Z⁻⁺_all , dτ_max_all, dτ_all, ndoubl_all, dτ_λ_all, expk_all, scatter_all, τ_sum_all, fscattRayl_all,  scattering_interfaces_all) = computed_atmospheric_properties
-
-    τ_λ = arr_type(τ_λ_all[:, iz])
-    ϖ_λ = arr_type(ϖ_λ_all[:, iz])
-    τ   = τ_all[iz]
-    ϖ   = ϖ_all[iz]
-    Z⁺⁺ = arr_type(Z⁺⁺_all[:,:,iz])
-    Z⁻⁺ = arr_type(Z⁻⁺_all[:,:,iz])
-
-    dτ_max = dτ_max_all[iz]
-    dτ     = dτ_all[iz]
-    ndoubl = ndoubl_all[iz]
-    dτ_λ   = arr_type(dτ_λ_all[:, iz])
-    expk   = arr_type(expk_all[:, iz])
-    scatter = scatter_all[iz]
-    τ_sum = arr_type(τ_sum_all[:,iz])
-    scattering_interface = scattering_interfaces_all[iz]
-    fscattRayl = fscattRayl_all[iz]
-    #ϖ_Cabannes = ϖ_Cabannes_all[iz]
-    # τ * ϖ should remain constant even though they individually change over wavelength
-    # @assert all(i -> (i ≈ τ * ϖ), τ_λ .* ϖ_λ)
-
-    return ComputedLayerProperties(τ_λ, ϖ_λ, τ, ϖ, 
-        Z⁺⁺, Z⁻⁺, 
-        dτ_max, dτ, 
-        ndoubl, 
-        dτ_λ, 
-        expk, 
-        scatter, 
-        τ_sum, 
-        fscattRayl, 
-        scattering_interface)
-end

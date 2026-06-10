@@ -95,7 +95,6 @@ include("CoreKernel/rt_kernel.jl")             # Handle Core RT (Elemental/Doubl
 include("CoreKernel/rt_kernel_lin.jl")         # Linearized RT kernel
 include("CoreKernel/rt_kernel_ss.jl")          # Single scattering RT kernel
 include("CoreKernel/rt_kernel_multisensor.jl") # Multi-sensor RT kernel
-include("CoreKernel/lin_added_layer_all_params.jl") # 3 core params -> all state params
 
 # Postprocessing
 include("tools/postprocessing_vza.jl")               # Postprocess (Azimuthal Weighting)
@@ -157,8 +156,7 @@ export model_from_parameters,               # Converting the parameters to model
        BatchContext, update_model!,         # Batch-processing context + scene updater
        update_aerosol_loading!,             # Phase 2: cheap τ_ref / profile update (no Mie)
        update_aerosol_microphysics!         # Phase 2: expensive Mie re-run + Fourier re-derivation
-export lin_added_layer_all_params!,           # 3 params -> all params chain rule
-       OpticalPropertyJacobian,               # AD boundary struct alias
+export OpticalPropertyJacobian,               # AD boundary struct alias
        RawAerosolJacobian,                    # AD boundary for raw aerosol derivatives
        delta_m_forward, delta_m_truncation_lin, # δ-M truncation functions
        ParameterLayout,                       # Jacobian parameter layout descriptor

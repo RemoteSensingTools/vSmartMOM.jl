@@ -99,8 +99,6 @@ function rt_run_test_ms(RS_type::AbstractRamanType,
 
             # Construct the atmospheric layer
             # From Rayleigh and aerosol τ, ϖ, compute overall layer τ, ϖ
-            # computed_layer_properties = get_layer_properties(computed_atmosphere_properties, iz, arr_type)
-            
             # Suniti: modified to return fscattRayl as the last element of  computed_atmosphere_properties
             if !(typeof(RS_type) <: noRS)
                 #@show fScattRayleigh[iz]
