@@ -438,10 +438,6 @@ function model_from_parameters(params::vSmartMOM_Parameters;
                                             truncation_type, 
                                             params.scattering_params.r_max, 
                                             params.scattering_params.nquad_radius)
-            n_ref = params.scattering_params.n_ref
-            k = compute_ref_aerosol_extinction(mie_model,  params.float_type)
-            
-            #@show k
             # Compute raw (not truncated) aerosol optical properties (not needed in RT eventually)
             @timeit "Mie calc"  aerosol_optics_raw = compute_aerosol_optical_properties(mie_model, FT);
             # Compute truncated aerosol optical properties (phase function and fᵗ).
