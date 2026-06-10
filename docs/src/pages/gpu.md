@@ -2,7 +2,7 @@
 
 **For:** users who want to run the solver on GPU backends.
 
-**Next:** [Quick Start](quickstart.md), [Configure a Scene](IO/Overview.md), [Tutorial: GPU](tutorials/Tutorial_GPU.md), [Architecture-Agnostic Code (Concepts)](concepts/07_architecture.md).
+**Next:** [Quick Start](quickstart.md), [Configure a Scene](IO/Overview.md), [Architecture-Agnostic Code (Concepts)](concepts/07_architecture.md).
 
 GPU support is provided through optional backend extensions. CUDA is the mature
 NVIDIA path; Metal is a first-pass Apple Silicon path for Float32 runs. The full
@@ -15,7 +15,10 @@ task page will cover:
 - memory and precision caveats for Float32 and Float64 runs;
 - how to fall back cleanly to CPU.
 
-For now, see the long-form [GPU tutorial](tutorials/Tutorial_GPU.md).
+For architecture-dispatch details (including the GPU Mie path via
+`make_mie_model(...; architecture = GPU())` with `NativeFloat64`/`DSEmulated`
+precision policies and the automatic CPU-Mie fallback on Metal), see
+[Architecture-Agnostic Code (Concepts)](concepts/07_architecture.md).
 
 ## Performance Notes
 
