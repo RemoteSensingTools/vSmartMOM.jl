@@ -215,6 +215,13 @@ Used in HumlicekWeidemann32 CEF variants when |x|+y ≤ 8 or 15.
 end
 
 """
+    w(::HumlicekErrorFunction, z)
+
+Complex error function w(z) using Humlicek's (1982) four-region rational approximation.
+"""
+@inline w(::HumlicekErrorFunction, z::Complex) = humlicek(z)
+
+"""
     w(::CPF12ErrorFunction, z)
 
 CPF12 complex error function — Humlicek (1979) single rational approximation.
