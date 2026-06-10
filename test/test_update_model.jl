@@ -12,10 +12,11 @@ using vSmartMOM, vSmartMOM.CoreRT
 using Distributions
 using Statistics
 
-# Bring Aerosol into scope for Phase-2 microphysics tests.
-# Aerosol is exported by the Scattering submodule but not re-exported at the
-# vSmartMOM top level; import it directly from the submodule.
-const Aerosol = vSmartMOM.Scattering.Aerosol
+# Bring Aerosol into scope for Phase-2 microphysics tests. Use a `using`
+# binding (not `const Aerosol = ...`): this file shares `Main` with the other
+# suite files, and test_mie_gpu.jl already imports `Aerosol` explicitly — a
+# `const` redeclaration of an imported name is an error on Julia ≥ 1.12.
+using vSmartMOM.Scattering: Aerosol
 
 const YAML_BATCH = "test_parameters/JacobianTestFast.yaml"
 
