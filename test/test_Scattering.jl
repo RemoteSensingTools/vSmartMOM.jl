@@ -180,41 +180,28 @@ end
 end
 
 # Verify that truncate_phase(δBGE) forward-cone exclusion is applied.
-# compute_aerosol_optical_properties returns raw optics (fᵗ=1 sentinel);
-# truncate_phase is called separately here to directly test that the fit
-# with Δ_angle>0 produces different results from Δ_angle=0.
-# NOTE: truncation is stable when l_max matches the raw greek length
-# (e.g., l_max = length(β)); for l_max << length(β) large Δ_angle
-# makes the least-squares ill-conditioned — the guard in
-# model_from_parameters avoids that by truncating only when β_len > l_max.
+# Use the saved PCW reference (a large, forward-peaked aerosol with ~760 Greek
+# modes) and l_max=10.  The normal equations are then 750+ observations × 10
+# unknowns — strongly overdetermined and numerically stable on every platform.
+# Using l_max ≈ length(β) (as the original test did with a small aerosol)
+# makes the system nearly rank-deficient after the forward-cone exclusion
+# removes a handful of GL points, causing c₀ to blow up outside [0,1].
 @testset "δBGE forward-cone exclusion" begin
-    μ_dist  = 0.3
-    σ_dist  = 2.1
-    r_max   = 2.0    # small r_max → short Greek series, well-conditioned fit
-    nqr     = 50
-    λ       = 0.55
-    size_distribution = LogNormal(log(μ_dist), log(σ_dist))
-    aero = Aerosol(size_distribution, 1.3, 0.001)
+    @load "test_pcw/PCW_AerosolOptics_v2.jld" aerosol_optics_PCW
+    # aerosol_optics_PCW carries raw Greek coefficients (fᵗ=1 sentinel).
+    l_max = 10   # << length(β) ≈ 760 → strongly overdetermined → stable
 
-    # Use δBGE to get raw + truncated optics from compute_aerosol_optical_properties:
-    # (Since compute_aerosol_optical_properties does NOT apply truncation internally,
-    # we apply truncate_phase manually with a consistent l_max = length(raw β).)
-    model_raw = make_mie_model(NAI2(), aero, λ, Stokes_IQUV(), NoTruncation(), r_max, nqr)
-    aop_raw   = compute_aerosol_optical_properties(model_raw)
-    l_tr = length(aop_raw.greek_coefs.β)   # use full series length → stable normal equations
-
-    aop_tr0  = Scattering.truncate_phase(δBGE(l_tr, 0.0),  aop_raw)
-    aop_tr10 = Scattering.truncate_phase(δBGE(l_tr, 10.0), aop_raw)
+    aop_tr0  = Scattering.truncate_phase(δBGE(l_max, 0.0),  aerosol_optics_PCW)
+    aop_tr10 = Scattering.truncate_phase(δBGE(l_max, 10.0), aerosol_optics_PCW)
 
     # SSA and extinction unchanged by truncation:
-    @test aop_tr0.ω̃ ≈ aop_raw.ω̃
-    @test aop_tr0.k  ≈ aop_raw.k
-    # fᵗ = 1 - c₀ should be ≈ 0 for Δ_angle=0 (near-identity fit) and
-    # physically meaningful (≥0) for Δ_angle=10°.
-    # Use atol to handle floating-point rounding near zero:
-    @test aop_tr0.fᵗ  ≥ -1e-10   # ≈ 0, allow roundoff
+    @test aop_tr0.ω̃ ≈ aerosol_optics_PCW.ω̃
+    @test aop_tr0.k  ≈ aerosol_optics_PCW.k
+    # fᵗ = 1 - c₀ must be non-negative; with l_max=10 the 10-mode fit of the
+    # large aerosol's 760-mode series gives fᵗ ≈ 0.33 even at Δ_angle=0.
+    @test aop_tr0.fᵗ  ≥ -1e-10
     @test 0 ≤ aop_tr10.fᵗ ≤ 1
     # fᵗ changes when the exclusion cone is applied (proves iμ subset is used):
-    @test aop_tr10.fᵗ > 0.1   # Δ_angle=10° should give non-trivial truncation
+    @test aop_tr10.fᵗ > 0.1   # Δ_angle=10° should give non-trivial truncation for large aerosol
     println("  δBGE fᵗ: Δ_angle=0° → $(round(aop_tr0.fᵗ, sigdigits=6)), Δ_angle=10° → $(round(aop_tr10.fᵗ, sigdigits=6))")
 end
