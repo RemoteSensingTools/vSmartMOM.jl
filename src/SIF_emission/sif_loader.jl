@@ -6,7 +6,7 @@ leaf-reflectance samples bundled under `src/SIF_emission/`.
 using DelimitedFiles: readdlm
 using DataInterpolations: LinearInterpolation
 
-export load_sif_spectrum, load_ficus_reflectance, sif_data_path
+export load_sif_spectrum, load_ficus_reflectance, sif_data_path, build_sif_source
 
 """
     sif_data_path(filename) -> String
@@ -83,28 +83,36 @@ function load_ficus_reflectance(path::AbstractString = sif_data_path("ficus_refl
 end
 
 """
+    build_sif_source(SIF₀, ν_model, ν_sif, jSIF; pol_component=1)
     build_sif_source(RS_type, ν_model, ν_sif, jSIF; pol_component=1)
 
 Interpolate `(ν_sif, jSIF)` onto `ν_model` (both in cm⁻¹) and write the
-result into `RS_type.SIF₀[pol_component, :]`. Other Stokes components are
-left untouched (default-zero for Lambertian/unpolarized SIF).
+result into `SIF₀[pol_component, :]`. Other Stokes components are left
+untouched (default-zero for Lambertian/unpolarized SIF).
 
-Requires `RS_type` to have a `SIF₀::Array{FT,2}` field already sized
-to `(pol_type.n, length(ν_model))`. `rt_run` and `rt_run_ss` resize
-`RS_type.SIF₀` before first use, so call `build_sif_source` *after*
-one of them has run or after a manual resize.
+The matrix method is the preferred path: pass the returned matrix into
+`SurfaceSIF(SIF₀=SIF₀)`. The `RS_type` method remains only for older scripts
+that still carry a legacy `SIF₀` field.
 """
+function build_sif_source(SIF₀::AbstractMatrix, ν_model::AbstractVector,
+                          ν_sif::AbstractVector, jSIF::AbstractVector;
+                          pol_component::Integer = 1)
+    1 ≤ pol_component ≤ size(SIF₀, 1) ||
+        throw(ArgumentError("pol_component=$pol_component is outside SIF₀ rows 1:$(size(SIF₀, 1))"))
+    size(SIF₀, 2) == length(ν_model) ||
+        throw(DimensionMismatch("SIF₀ has size $(size(SIF₀)) but ν_model length $(length(ν_model))"))
+
+    FT = eltype(SIF₀)
+    interp = LinearInterpolation(jSIF, ν_sif; extrapolation = ExtrapolationType.Linear)
+    @inbounds for (i, ν) in enumerate(ν_model)
+        SIF₀[pol_component, i] = FT(interp(ν))
+    end
+    return SIF₀
+end
+
 function build_sif_source(RS_type, ν_model::AbstractVector, ν_sif::AbstractVector,
                           jSIF::AbstractVector; pol_component::Integer = 1)
     hasproperty(RS_type, :SIF₀) ||
         throw(ArgumentError("RS_type $(typeof(RS_type)) has no SIF₀ field"))
-    SIF₀ = RS_type.SIF₀
-    size(SIF₀, 2) == length(ν_model) ||
-        throw(DimensionMismatch("RS_type.SIF₀ has size $(size(SIF₀)) but ν_model length $(length(ν_model))"))
-    FT = eltype(SIF₀)
-    interp = LinearInterpolation(jSIF, ν_sif; extrapolation = ExtrapolationType.Linear)
-    for (i, ν) in enumerate(ν_model)
-        SIF₀[pol_component, i] = FT(interp(ν))
-    end
-    return SIF₀
+    return build_sif_source(RS_type.SIF₀, ν_model, ν_sif, jSIF; pol_component)
 end

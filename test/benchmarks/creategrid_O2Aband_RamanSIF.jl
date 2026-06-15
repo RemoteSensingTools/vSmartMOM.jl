@@ -99,22 +99,26 @@ rs_rrs = InelasticScattering.RRS(
     F₀ = F₀, SIF₀ = zeros(FT, nPol, nSpec))
 CoreRT.getRamanSSProp!(rs_rrs, 1e7/ν̃, ν)
 
-# Populate SIF₀ via the loader (normalized to peak = 0.5π by default).
+SIF₀_surface = zeros(FT, nPol, nSpec)
+
+# Populate surface SIF via the loader (normalized to peak = 0.5π by default).
 if SIF_ON
     ν_sif, jSIF = load_sif_spectrum()
-    build_sif_source(rs_rrs, collect(ν), ν_sif, jSIF; pol_component=1)
-    @info "SIF₀ loaded: peak = $(maximum(rs_rrs.SIF₀[1, :]))  length = $(size(rs_rrs.SIF₀, 2))"
+    build_sif_source(SIF₀_surface, collect(ν), ν_sif, jSIF; pol_component=1)
+    @info "SurfaceSIF loaded: peak = $(maximum(SIF₀_surface[1, :]))  length = $(size(SIF₀_surface, 2))"
 end
+
+sources = CoreRT.SolarBeam(F₀ = F₀) + CoreRT.SurfaceSIF(SIF₀ = SIF₀_surface)
 
 # Parallel noRS run for delta-vs-SIF comparison
 rs_norrs = InelasticScattering.noRS{FT}(
     fscattRayl  = [FT(1)], ϖ_Cabannes = [FT(1)],
     bandSpecLim = UnitRange{Int}[], iBand = [iBand],
     F₀ = copy(F₀),
-    SIF₀ = SIF_ON ? copy(rs_rrs.SIF₀) : zeros(FT, nPol, nSpec))
+    SIF₀ = zeros(FT, nPol, nSpec))
 
-R_rrs, T_rrs, ieR, ieT = CoreRT.rt_run_test(rs_rrs, model, iBand)
-R_nors, T_nors, _, _    = CoreRT.rt_run_test(rs_norrs, model, iBand)
+R_rrs, T_rrs, ieR, ieT = CoreRT.rt_run_test(rs_rrs, model, iBand; sources)
+R_nors, T_nors, _, _    = CoreRT.rt_run_test(rs_norrs, model, iBand; sources)
 
 # --- Save outputs ----------------------------------------------------------
 
@@ -127,7 +131,7 @@ outpath = joinpath(GRID_OUTDIR, "rrs_grid_sza$(sza_str)_alb$(alb_str)_$(sif_tag)
 jldopen(outpath, "w") do f
     f["ν"]        = collect(ν)
     f["F₀"]       = collect(F₀)
-    f["SIF₀"]     = collect(rs_rrs.SIF₀)
+    f["SIF₀"]     = collect(SIF₀_surface)
     f["R_rrs"]    = collect(R_rrs)
     f["T_rrs"]    = collect(T_rrs)
     f["ieR_rrs"]  = collect(ieR)

@@ -118,9 +118,8 @@ function create_surface_layer!(RS_type::noRS,
             end
                 #@show size(added_layer.j₀⁻[:,1,1])
         #@show added_layer.j₀⁻[:,1,1]
-        # for SIF
-            #reinstate the following line after linearization works
-            #added_layer.j₀⁻[:,1,:] .+= (1/π)*repeat(arr_type(RS_type.SIF₀),Nquad) * unweight
+        # Surface SIF is now represented by `SurfaceSIF`; add its linearized
+        # contribution through the source system when that path is extended.
         end
 
         R_surf = R_surf * Diagonal(qp_μN.*wt_μN)
@@ -133,25 +132,28 @@ function create_surface_layer!(RS_type::noRS,
         #@show size(added_layer.r⁻⁺), size(R_surf)
         added_layer.r⁻⁺ .= R_surf;
         added_layer.r⁺⁻ .= zero(FT);
-        added_layer.t⁺⁺ .= T_surf;#1. #0.0; #T_surf;
-        added_layer.t⁻⁻ .= zero(FT); #T_surf;
+        # Opaque lower boundary: no upward transmission from below the
+        # surface. t⁺⁺ remains the downwelling-field pass-through used by the
+        # current surface-as-layer bookkeeping.
+        added_layer.t⁺⁺ .= T_surf;
+        added_layer.t⁻⁻ .= zero(FT);
 
         added_layer_lin.ap_ṙ⁻⁺[:,:,:,iparam] .= Ṙ_surf;
         added_layer_lin.ap_ṙ⁺⁻ .= zero(FT);
-        added_layer_lin.ap_ṫ⁺⁺ .= zero(FT);#1. #0.0; #T_surf;
-        added_layer_lin.ap_ṫ⁻⁻ .= zero(FT); #T_surf;
+        added_layer_lin.ap_ṫ⁺⁺ .= zero(FT);
+        added_layer_lin.ap_ṫ⁻⁻ .= zero(FT);
 
     else
         added_layer.r⁻⁺ .= zero(FT);
         added_layer.r⁻⁺ .= zero(FT);
         added_layer.t⁺⁺ .= T_surf;
-        added_layer.t⁻⁻ .= zero(FT); #T_surf;
+        added_layer.t⁻⁻ .= zero(FT);
         added_layer.j₀⁺ .= zero(FT);
         added_layer.j₀⁻ .= zero(FT);
 
         added_layer_lin.ap_ṙ⁻⁺ .= zero(FT);
         added_layer_lin.ap_ṙ⁺⁻ .= zero(FT);
-        added_layer_lin.ap_ṫ⁺⁺ .= zero(FT);#1. #0.0; #T_surf;
+        added_layer_lin.ap_ṫ⁺⁺ .= zero(FT);
         added_layer_lin.ap_ṫ⁻⁻ .= zero(FT);
         added_layer_lin.ap_J̇₀⁺ .= zero(FT)
         added_layer_lin.ap_J̇₀⁻ .= zero(FT)

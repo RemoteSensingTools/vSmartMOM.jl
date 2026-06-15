@@ -1158,7 +1158,7 @@ Base.@kwdef struct ComputedAtmosphereProperties
     τ_sum_all
     #"elastic (Cabannes) scattering fraction of Rayleigh (Cabannes+Raman) scattering per layer"
     #ϖ_Cabannes_all
-    "Rayleigh fraction of scattering cross section per layer"
+    "Rayleigh fraction of total spectral extinction per layer for Raman source weighting"
     fscattRayl_all
     "Scattering interface type for each layer"
     scattering_interfaces_all

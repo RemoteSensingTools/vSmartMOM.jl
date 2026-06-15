@@ -377,7 +377,8 @@ function create_surface_layer!(canopy::CanopySurface{FT},
                                quad_points, τ_sum,
                                architecture;
                                spec_bands_wn::Union{Nothing, Vector{FT}}=nothing,
-                               m_max::Int=2) where {FT}
+                               m_max::Int=2,
+                               F₀=nothing) where {FT}
     arr_type = array_type(architecture)
     (; qp_μN, iμ₀) = quad_points
 
@@ -444,7 +445,7 @@ function create_surface_layer!(canopy::CanopySurface{FT},
 
     τ_sum_soil = arr_type(τ_sum_curr)
     create_surface_layer!(canopy.soil, cache.soil_added, SFI, m, pol_type,
-                          quad_points, τ_sum_soil, architecture)
+                          quad_points, τ_sum_soil, architecture; F₀)
 
     @timeit "canopy-soil interaction" interaction!(
         ScatteringInterface_11(), SFI,
@@ -453,8 +454,12 @@ function create_surface_layer!(canopy::CanopySurface{FT},
     T_surf = arr_type(Diagonal(ones(FT, pol_type.n * Nquad)))
     added_layer.r⁻⁺ .= cache.canopy_composite.R⁻⁺
     added_layer.r⁺⁻ .= 0
+    # The canopy+soil package is presented to the atmosphere as an opaque
+    # lower boundary. There is no valid sub-surface upward incident field, so
+    # t⁻⁻ is zero. t⁺⁺ remains an identity pass-through for the downwelling
+    # surface-field diagnostics used by the current surface-as-layer coupling.
     added_layer.t⁺⁺ .= T_surf
-    added_layer.t⁻⁻ .= T_surf
+    added_layer.t⁻⁻ .= zero(FT)
     if SFI
         added_layer.j₀⁺ .= 0
         added_layer.j₀⁻ .= cache.canopy_composite.J₀⁻

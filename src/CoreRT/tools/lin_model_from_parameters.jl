@@ -77,6 +77,7 @@ function model_from_parameters(lin::LinMode,
     if params.profile_reduction_n != -1
         profile = reduce_profile(params.profile_reduction_n, profile)
     end
+    rayleigh_molecular_T = (profile.vcd_dry' * profile.T) / sum(profile.vcd_dry)
 
     greek_cabannes = Vector{vSmartMOM.Scattering.GreekCoefs{FT}}()
     greek_rayleigh = Vector{vSmartMOM.Scattering.GreekCoefs{FT}}()
@@ -100,7 +101,7 @@ function model_from_parameters(lin::LinMode,
         # taken from the molecular path; the depol values feed greek coefs and
         # τ_rayl only when params.depol < 0 (auto). See model_from_parameters.jl
         # for the full rule.
-        _n2, _o2 = InelasticScattering.getRamanAtmoConstants(FT(1.0e7) / λₘ, FT(300))
+        _n2, _o2 = InelasticScattering.getRamanAtmoConstants(FT(1.0e7) / λₘ, FT(rayleigh_molecular_T))
         ϖ_Cabannes[i_band] = InelasticScattering.compute_ϖ_Cabannes(λₘ, _n2, _o2)
         γ_air_Cabannes, _ = InelasticScattering.compute_γ_air_Cabannes!(λₘ, _n2, _o2)
         γ_air_Rayleigh, _ = InelasticScattering.compute_γ_air_Rayleigh!(λₘ, _n2, _o2)

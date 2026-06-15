@@ -34,7 +34,7 @@ scattering:
   λ:                  [0.765, 1.610, 2.06]
   λ_ref:              0.770 
   # Depolarization
-  depol:              0.0
+  depol:              -1
   # Polarization type (Stokes_I, Stokes_IQ, Stokes_IQU, Stokes_IQUV)
   polarization_type:  Stokes_I()
   # Decomposition method (NAI2 or PCW)

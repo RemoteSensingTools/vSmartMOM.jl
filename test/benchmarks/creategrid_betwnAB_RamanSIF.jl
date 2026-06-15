@@ -71,19 +71,21 @@ rs_rrs = InelasticScattering.RRS(
     F₀ = F₀, SIF₀ = zeros(FT, nPol, nSpec))
 CoreRT.getRamanSSProp!(rs_rrs, 1e7 / ν̃, ν)
 
+SIF₀_surface = zeros(FT, nPol, nSpec)
 if SIF_ON
     ν_sif, jSIF = load_sif_spectrum()
-    build_sif_source(rs_rrs, collect(ν), ν_sif, jSIF; pol_component = 1)
+    build_sif_source(SIF₀_surface, collect(ν), ν_sif, jSIF; pol_component = 1)
 end
+sources = CoreRT.SolarBeam(F₀ = F₀) + CoreRT.SurfaceSIF(SIF₀ = SIF₀_surface)
 
 rs_norrs = InelasticScattering.noRS{FT}(
     fscattRayl = [FT(1)], ϖ_Cabannes = [FT(1)],
     bandSpecLim = UnitRange{Int}[], iBand = [iBand],
     F₀ = copy(F₀),
-    SIF₀ = SIF_ON ? copy(rs_rrs.SIF₀) : zeros(FT, nPol, nSpec))
+    SIF₀ = zeros(FT, nPol, nSpec))
 
-R_rrs, T_rrs, ieR, ieT = CoreRT.rt_run_test(rs_rrs, model, iBand)
-R_nors, T_nors, _, _   = CoreRT.rt_run_test(rs_norrs, model, iBand)
+R_rrs, T_rrs, ieR, ieT = CoreRT.rt_run_test(rs_rrs, model, iBand; sources)
+R_nors, T_nors, _, _   = CoreRT.rt_run_test(rs_norrs, model, iBand; sources)
 
 sza_str = replace(string(round(parameters.sza, digits = 1)), "." => "p")
 alb     = parameters.brdf[iBand].albedo
@@ -94,7 +96,7 @@ outpath = joinpath(GRID_OUTDIR_BTWN, "rrs_grid_betwnAB_sza$(sza_str)_alb$(alb_st
 jldopen(outpath, "w") do f
     f["ν"]       = collect(ν)
     f["F₀"]      = collect(F₀)
-    f["SIF₀"]    = collect(rs_rrs.SIF₀)
+    f["SIF₀"]    = collect(SIF₀_surface)
     f["R_rrs"]   = collect(R_rrs)
     f["T_rrs"]   = collect(T_rrs)
     f["ieR_rrs"] = collect(ieR)
