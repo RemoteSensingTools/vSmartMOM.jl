@@ -52,11 +52,6 @@ Metal = "dde4c033-4e86-420c-a63e-0dd931031962"
 vSmartMOMCUDAExt = "CUDA"
 vSmartMOMMetalExt = "Metal"
 
-# AtmosphericAbsorption is not yet registered; pin it to its GitHub repo so CI resolves it.
-# Drop this [sources] entry and keep only the [compat] bound once it appears in the registry.
-[sources]
-AtmosphericAbsorption = {url = "https://github.com/RemoteSensingTools/AtmosphericAbsorption.jl.git"}
-
 [compat]
 AtmosphericAbsorption = "0.1.0"
 CUDA = "5.5, 6"
