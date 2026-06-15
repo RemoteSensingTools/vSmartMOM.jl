@@ -20,10 +20,37 @@ Three flavours share the same equation:
   • `LambertianSurfaceLegendre`  — albedo = Σ cₙ · Pₙ(λ̃) (spectral)
   • `LambertianSurfaceSpline`    — albedo from a spline interpolator
 
-Each fills `added_layer.r⁻⁺ = a/π · μ_quad·w_quad`, leaves `r⁺⁻ = 0`, and
-sets `t⁺⁺ = t⁻⁻ = I` (the surface itself does not transmit).
+Each fills `added_layer.r⁻⁺ = a/π · μ_quad·w_quad` and leaves `r⁺⁻ = 0`.
+The lower boundary is opaque, so `t⁻⁻ = 0`: an upward field entering from
+below the surface would represent a sub-surface source, which is outside the
+atmospheric RT problem. `t⁺⁺` is kept as the identity because the current
+surface-as-layer coupling uses it as a pass-through for the downwelling field
+at the surface (e.g. diagnostics/HDRF), not as physical subsurface
+transmission.
 ============================================================================
 =#
+
+function _surface_solar_F₀(F₀, FT, pol_type, nSpec::Integer, arr_type)
+    if F₀ === nothing
+        F₀_host = zeros(FT, pol_type.n, nSpec)
+        @views F₀_host[1, :] .= one(FT)
+        return arr_type(F₀_host)
+    end
+    size(F₀) == (pol_type.n, nSpec) || error(
+        "Surface solar source F₀ shape $(size(F₀)) does not match " *
+        "(pol_type.n, nSpec) = ($(pol_type.n), $nSpec).")
+    return arr_type(FT.(F₀))
+end
+
+function _surface_beam_at_surface(F₀, FT, pol_type, quad_points, τ_sum, architecture)
+    (; qp_μN, iμ₀Nstart, iμ₀, μ₀) = quad_points
+    arr_type = array_type(architecture)
+    nSpec = length(τ_sum)
+    beam = arr_type(zeros(FT, length(qp_μN), nSpec))
+    F₀_dev = _surface_solar_F₀(F₀, FT, pol_type, nSpec, arr_type)
+    beam[iμ₀Nstart:pol_type.n*iμ₀, :] .= F₀_dev .* exp.(-τ_sum / μ₀)'
+    return beam
+end
 
 """
     $(FUNCTIONNAME)(lambertian::LambertianSurfaceScalar{FT})
@@ -45,7 +72,8 @@ function create_surface_layer!(lambertian::LambertianSurfaceScalar{FT},
                                pol_type,
                                quad_points,
                                τ_sum,
-                               architecture) where {FT}
+                               architecture;
+                               F₀=nothing) where {FT}
     
     (; qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart, iμ₀, μ₀) = quad_points
     j₀⁺ = added_layer.j₀⁺
@@ -68,12 +96,11 @@ function create_surface_layer!(lambertian::LambertianSurfaceScalar{FT},
         
         # Source function of surface:
         if SFI
-            I₀_NquadN = similar(qp_μN);
-            I₀_NquadN[:] .= zero(FT);
-            I₀_NquadN[iμ₀Nstart:pol_type.n*iμ₀] = pol_type.I₀;
-            
-            j₀⁺[:,1,:] .= I₀_NquadN .* exp.(-τ_sum/μ₀)';
-            j₀⁻[:,1,:] .= μ₀*(R_surf*I₀_NquadN) .* exp.(-τ_sum/μ₀)';
+            beam_at_surface = _surface_beam_at_surface(F₀, FT, pol_type,
+                                                       quad_points, τ_sum,
+                                                       architecture)
+            j₀⁺[:,1,:] .= beam_at_surface;
+            j₀⁻[:,1,:] .= μ₀ * (R_surf * beam_at_surface);
         end
         R_surf = R_surf * Diagonal(qp_μN.*wt_μN)
         
@@ -82,13 +109,13 @@ function create_surface_layer!(lambertian::LambertianSurfaceScalar{FT},
         added_layer.r⁻⁺ .= R_surf;
         added_layer.r⁺⁻ .= zero(FT);
         added_layer.t⁺⁺ .= T_surf;
-        added_layer.t⁻⁻ .= T_surf;
+        added_layer.t⁻⁻ .= zero(FT);
 
     else
         added_layer.r⁻⁺ .= zero(FT);
         added_layer.r⁻⁺ .= zero(FT);
         added_layer.t⁺⁺ .= T_surf;
-        added_layer.t⁻⁻ .= T_surf;
+        added_layer.t⁻⁻ .= zero(FT);
         j₀⁺ .= zero(FT);
         j₀⁻ .= zero(FT);
     end
@@ -101,7 +128,8 @@ function create_surface_layer!(lambertian::LambertianSurfaceLegendre{FT},
     pol_type,
     quad_points,
     τ_sum,
-    architecture) where {FT}
+    architecture;
+    F₀=nothing) where {FT}
     j₀⁺ = added_layer.j₀⁺
     j₀⁻ = added_layer.j₀⁻
     if m == 0
@@ -129,12 +157,12 @@ function create_surface_layer!(lambertian::LambertianSurfaceLegendre{FT},
 
         # Source function of surface:
         if SFI
-            I₀_NquadN = similar(qp_μN);
-            I₀_NquadN[:] .= zero(FT);
-            I₀_NquadN[iμ₀Nstart:pol_type.n*iμ₀] = pol_type.I₀;
+            beam_at_surface = _surface_beam_at_surface(F₀, FT, pol_type,
+                                                       quad_points, τ_sum,
+                                                       architecture)
             j₀⁺[:] .= zero(FT)
             # Suniti double-check
-            j₀⁻[:,1,:] = μ₀*(R_surf*I₀_NquadN) .* (ρ .* exp.(-τ_sum/μ₀))';
+            j₀⁻[:,1,:] = μ₀*(R_surf*beam_at_surface) .* ρ';
         end
         R_surf   = R_surf * Diagonal(qp_μN.*wt_μN)
         siz = size(added_layer.r⁻⁺)
@@ -146,12 +174,15 @@ function create_surface_layer!(lambertian::LambertianSurfaceLegendre{FT},
         added_layer.r⁻⁺ .= R_surf3D;
         added_layer.r⁺⁻ .= zero(FT);
         added_layer.t⁺⁺ .= T_surf;
-        added_layer.t⁻⁻ .= T_surf;
+        added_layer.t⁻⁻ .= zero(FT);
 
     else
+        Nquad = size(added_layer.r⁻⁺, 1) ÷ pol_type.n
+        arr_type = array_type(architecture)
+        T_surf = arr_type(Diagonal(ones(FT, pol_type.n * Nquad)))
         added_layer.r⁻⁺[:] .= zero(FT);
         added_layer.r⁻⁺[:] .= zero(FT);
-        added_layer.t⁺⁺[:] .= zero(FT);
+        added_layer.t⁺⁺[:] .= T_surf;
         added_layer.t⁻⁻[:] .= zero(FT);
         j₀⁺[:] .= zero(FT);
         j₀⁻[:] .= zero(FT);
@@ -165,7 +196,8 @@ function create_surface_layer!(lambertian::LambertianSurfaceSpline{FT},
     pol_type,
     quad_points,
     τ_sum,
-    architecture) where {FT}
+    architecture;
+    F₀=nothing) where {FT}
     j₀⁺ = added_layer.j₀⁺
     j₀⁻ = added_layer.j₀⁻
     if m == 0
@@ -189,12 +221,12 @@ function create_surface_layer!(lambertian::LambertianSurfaceSpline{FT},
 
         # Source function of surface:
         if SFI
-            I₀_NquadN = similar(qp_μN);
-            I₀_NquadN[:] .= zero(FT);
-            I₀_NquadN[iμ₀Nstart:pol_type.n*iμ₀] = pol_type.I₀;
+            beam_at_surface = _surface_beam_at_surface(F₀, FT, pol_type,
+                                                       quad_points, τ_sum,
+                                                       architecture)
             j₀⁺[:] .= zero(FT)
             # Suniti double-check
-            j₀⁻[:,1,:] = μ₀*(R_surf*I₀_NquadN) .* (ρ .* exp.(-τ_sum/μ₀))';
+            j₀⁻[:,1,:] = μ₀*(R_surf*beam_at_surface) .* ρ';
         end
         R_surf   = R_surf * Diagonal(qp_μN.*wt_μN)
         
@@ -203,12 +235,15 @@ function create_surface_layer!(lambertian::LambertianSurfaceSpline{FT},
         added_layer.r⁻⁺ .= R_surf .* reshape(ρ, 1, 1, :)
         added_layer.r⁺⁻ .= zero(FT);
         added_layer.t⁺⁺ .= T_surf;
-        added_layer.t⁻⁻ .= T_surf;
+        added_layer.t⁻⁻ .= zero(FT);
 
     else
+        Nquad = size(added_layer.r⁻⁺, 1) ÷ pol_type.n
+        arr_type = array_type(architecture)
+        T_surf = arr_type(Diagonal(ones(FT, pol_type.n * Nquad)))
         added_layer.r⁻⁺[:] .= zero(FT);
         added_layer.r⁻⁺[:] .= zero(FT);
-        added_layer.t⁺⁺[:] .= zero(FT);
+        added_layer.t⁺⁺[:] .= T_surf;
         added_layer.t⁻⁻[:] .= zero(FT);
         j₀⁺[:] .= zero(FT);
         j₀⁻[:] .= zero(FT);
@@ -252,16 +287,4 @@ function inject_surface_SIF!(
     added_layer.j₀⁻[:, 1, :] .+= FT(2) .* arr_type(repeat(FT.(SIF₀), Nquad))
     return nothing
 end
-
-"""
-    _sif_source(RS_type)
-
-Return `RS_type.SIF₀` if the field is declared, else `nothing`. Used by
-`rt_run` / `rt_run_ss` to thread SIF into `inject_surface_SIF!` without
-requiring every `AbstractRamanType` concrete to carry the field (e.g.
-`_plus` variants have it commented out).
-"""
-_sif_source(RS_type) = hasproperty(RS_type, :SIF₀) ? RS_type.SIF₀ : nothing
-
-
 

@@ -55,7 +55,8 @@ function create_surface_layer!(brdf::AbstractSurfaceType,
                                pol_type,
                                quad_points,
                                τ_sum,
-                               architecture)
+                               architecture;
+                               F₀=nothing)
     
     (; qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart, iμ₀, μ₀) = quad_points
     # Get size of added layer
@@ -78,21 +79,23 @@ function create_surface_layer!(brdf::AbstractSurfaceType,
     
     # Source function of surface:
     if SFI
-        I₀_NquadN = similar(qp_μN);
-        I₀_NquadN[:] .= 0;
-        I₀_NquadN[iμ₀Nstart:pol_type.n*iμ₀] = pol_type.I₀;
-        
-        added_layer.j₀⁺[:,1,:] .= I₀_NquadN .* exp.(-τ_sum/μ₀)';
-        added_layer.j₀⁻[:,1,:] .= μ₀*(R_surf*I₀_NquadN) .* exp.(-τ_sum/μ₀)';
+        FT = eltype(added_layer.j₀⁻)
+        beam_at_surface = _surface_beam_at_surface(F₀, FT, pol_type,
+                                                   quad_points, τ_sum,
+                                                   architecture)
+        added_layer.j₀⁺[:,1,:] .= beam_at_surface;
+        added_layer.j₀⁻[:,1,:] .= μ₀ * (R_surf * beam_at_surface);
     end
     R_surf = R_surf * Diagonal(qp_μN.*wt_μN)
     
 
-    #@show size(added_layer.r⁻⁺), size(R_surf), size(added_layer.j₀⁻)
+    # Opaque lower boundary: no upward transmission from a sub-surface source.
+    # Keep t⁺⁺ as an identity pass-through for the downwelling surface field
+    # used by current diagnostics/HDRF bookkeeping.
     added_layer.r⁻⁺ .= R_surf;
     added_layer.r⁺⁻ .= 0;
     added_layer.t⁺⁺ .= T_surf;
-    added_layer.t⁻⁻ .= T_surf;
+    added_layer.t⁻⁻ .= zero(eltype(R_surf));
 
 end
 

@@ -206,7 +206,8 @@ Copy all fields from an `AddedLayer` into the `CompositeLayer` (for TOA, iz==1).
     composite_layer.R⁻⁺[:], composite_layer.R⁺⁻[:] = (added_layer.r⁻⁺, added_layer.r⁺⁻)
     composite_layer.J₀⁺[:], composite_layer.J₀⁻[:] = (added_layer.j₀⁺, added_layer.j₀⁻)
     # v0.7 Phase A.2a — copy per-source slots too (if any). AddedLayerRS lacks
-    # the slot — Raman path still uses RS_type.F₀ / SIF₀ (Phase 6 retires those).
+    # these slots; Raman surface-emission sources are injected directly into
+    # the layer's legacy j₀ arrays before this copy.
     if hasproperty(added_layer, :j₀_by_src)
         for (key, slot) in pairs(added_layer.j₀_by_src)
             cslot = composite_layer.J₀_by_src[key]

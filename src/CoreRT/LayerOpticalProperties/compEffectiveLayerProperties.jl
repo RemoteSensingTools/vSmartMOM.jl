@@ -8,6 +8,16 @@ Cabannes coefficients because Raman redistribution is handled explicitly.
 _rayleigh_greek_source(::Union{noRS, noRS_plus}, greek_rayleigh, greek_cabannes) = greek_rayleigh
 _rayleigh_greek_source(::AbstractRamanType, greek_rayleigh, greek_cabannes) = greek_cabannes
 
+"""
+    _rayleigh_fraction_of_total_extinction(rayleigh_layer, total_layer)
+
+Fraction of the total spectral extinction that participates in Rayleigh-driven
+inelastic scattering. The denominator must include gas absorption because the
+RRS elemental kernels attenuate with the total `dτ_λ`.
+"""
+_rayleigh_fraction_of_total_extinction(rayleigh_layer, total_layer) =
+    Array(rayleigh_layer.τ ./ total_layer.τ)
+
 function constructCoreOpticalProperties(RS_type::AbstractRamanType, iBand, m, model)
     (; τ_rayl, τ_aer, τ_abs, aerosol_optics, greek_rayleigh, greek_cabannes) = model
     @assert all(iBand .≤ length(τ_rayl)) "iBand exceeded number of bands"
@@ -53,9 +63,13 @@ function constructCoreOpticalProperties(RS_type::AbstractRamanType, iBand, m, mo
             combo = combo .+ aer
         end
 
-        fScattRayleigh = [Array(rayl[i].τ ./ combo[i].τ) for i=1:nZ]
-        push!(band_layer_props,
-              combo .+ [CoreAbsorptionOpticalProperties(arr_type((τ_abs[iB][:,i]))) for i=1:nZ])
+        combo_with_absorption =
+            combo .+ [CoreAbsorptionOpticalProperties(arr_type((τ_abs[iB][:,i]))) for i=1:nZ]
+
+        fScattRayleigh =
+            [_rayleigh_fraction_of_total_extinction(rayl[i], combo_with_absorption[i])
+             for i=1:nZ]
+        push!(band_layer_props, combo_with_absorption)
         push!(band_fScattRayleigh, fScattRayleigh)
     end
 

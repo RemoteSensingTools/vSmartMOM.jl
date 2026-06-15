@@ -3,11 +3,11 @@
 # (Phase 6 port from sanghavi).
 #
 # Parallels prototype_O2ABand_RRS.jl but uses O2Parameters2_SIF.yaml and
-# injects an isotropic SIF emission term `SIF_interp(ν)` into both RRS
-# and noRS runs. Writes three scenario variants:
+# injects an isotropic surface SIF emission term `SIF_interp(ν)` through
+# `SurfaceSIF`. Writes three scenario variants:
 #   - `*_rrs_ABO2.dat`     — RRS elastic + inelastic outputs
 #   - `*_nors_ABO2.dat`    — pure-elastic reference (same F₀)
-#   - `*_nors_ABO2_SIF.dat`— noRS with SIF term applied to SIF₀
+#   - `*_nors_ABO2_SIF.dat`— noRS with `SurfaceSIF`
 #
 # The sanghavi original had extensive inline plotting (~600 lines);
 # those are dropped. Data-only deliverable.
@@ -96,6 +96,8 @@ function run_prototype_O2Aband_RRS_SIF(; yaml       = O2A_SIF_YAML,
     # SIF interpolator (zero outside table)
     SIF_values = FT.(_sif_spectrum_interp(ν))
     SIF_mat    = zeros(FT, nPol, nSpec); SIF_mat[1, :] = SIF_values
+    sources_nosif = CoreRT.SolarBeam(F₀ = F₀mat)
+    sources_sif   = CoreRT.SolarBeam(F₀ = F₀mat) + CoreRT.SurfaceSIF(SIF₀ = SIF_mat)
 
     # --- RRS with F₀ only (no SIF) --------------------------------------
     RS_rrs = InelasticScattering.RRS(
@@ -108,15 +110,15 @@ function run_prototype_O2Aband_RRS_SIF(; yaml       = O2A_SIF_YAML,
         F₀ = F₀mat, SIF₀ = zeros(FT, nPol, nSpec),
     )
     CoreRT.getRamanSSProp!(RS_rrs, 1e7 / ν̃, ν)
-    R_rrs, T_rrs, ieR, ieT = CoreRT.rt_run_test(RS_rrs, model, iBand)
+    R_rrs, T_rrs, ieR, ieT = CoreRT.rt_run_test(RS_rrs, model, iBand; sources = sources_nosif)
 
     # --- noRS with F₀ only (no SIF) -------------------------------------
     RS_noRS = InelasticScattering.noRS{FT}(F₀ = F₀mat, SIF₀ = zeros(FT, nPol, nSpec))
-    R_nors, T_nors, _, _ = CoreRT.rt_run_test(RS_noRS, model, iBand)
+    R_nors, T_nors, _, _ = CoreRT.rt_run_test(RS_noRS, model, iBand; sources = sources_nosif)
 
-    # --- noRS with SIF (F₀ + SIF₀) --------------------------------------
-    RS_noRS_sif = InelasticScattering.noRS{FT}(F₀ = F₀mat, SIF₀ = SIF_mat)
-    R_nors_sif, T_nors_sif, _, _ = CoreRT.rt_run_test(RS_noRS_sif, model, iBand)
+    # --- noRS with SIF (F₀ + SurfaceSIF) --------------------------------
+    RS_noRS_sif = InelasticScattering.noRS{FT}(F₀ = F₀mat, SIF₀ = zeros(FT, nPol, nSpec))
+    R_nors_sif, T_nors_sif, _, _ = CoreRT.rt_run_test(RS_noRS_sif, model, iBand; sources = sources_sif)
 
     sza_i = Int(round(parameters.sza))
     vza_i = Int(round(first(parameters.vza)))

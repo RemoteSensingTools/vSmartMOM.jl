@@ -41,8 +41,14 @@ The output derivative dimension has `Nparams = 7×NAer + NGas` entries per layer
 - `fscat_opt`: Rayleigh scattering fraction per layer (for inelastic scattering weight).
 """
 function constructCoreOpticalProperties(RS_type, iBand, m, model, lin_model) #where {FT<:Real}
+    if InelasticScattering.has_inelastic(RS_type)
+        throw(ArgumentError(
+            "Linearized Raman-active optical properties are intentionally unsupported. " *
+            "Use forward Raman RT only."))
+    end
+
     (; τ_rayl, τ_aer, τ_abs, aerosol_optics, 
-            greek_rayleigh, greek_cabannes, ϖ_Cabannes) = model
+            greek_rayleigh) = model
     (; τ̇_aer, τ̇_abs, lin_aerosol_optics) = lin_model
     @assert all(iBand .≤ length(τ_rayl)) "iBand exceeded number of bands"
     FT = eltype(τ_rayl[1])
@@ -57,45 +63,19 @@ function constructCoreOpticalProperties(RS_type, iBand, m, model, lin_model) #wh
     # Number of Aerosols:
     nAero = size(τ_aer[iBand[1]],1)
     nZ    = size(τ_rayl[1],2)
-    # Rayleigh Z matrix:
+    # Rayleigh Z matrix. Linearized RT is pure-elastic only; Raman-active
+    # Cabannes/RRS modes are rejected above.
     
     band_layer_props     = [];
     band_layer_props_lin = [];
     band_fScattRayleigh  = [];
     for iB in iBand
-        if (typeof(RS_type)<:noRS) #!(typeof(RS_type)<:RRS)
-            Rayl𝐙⁺⁺, Rayl𝐙⁻⁺ = Scattering.compute_Z_moments(pol_type, μ, 
-                                                            greek_rayleigh[iB], m, 
-                                                            arr_type = arr_type);
-        else
-            Rayl𝐙⁺⁺, Rayl𝐙⁻⁺ = Scattering.compute_Z_moments(pol_type, μ, 
-                                                            greek_cabannes[iB], m, 
-                                                            arr_type = arr_type);
-            #Rayl2𝐙⁺⁺, Rayl2𝐙⁻⁺ = Scattering.compute_Z_moments(pol_type, μ, 
-            #                                                greek_rayleigh[iB], m, 
-            #                                                arr_type = arr_type);
-        end
+        Rayl𝐙⁺⁺, Rayl𝐙⁻⁺ = Scattering.compute_Z_moments(pol_type, μ,
+                                                        greek_rayleigh[iB], m,
+                                                        arr_type = arr_type)
 
-        #if (typeof(RS_type)<:noRS) #if !(typeof(RS_type)<:RRS)
-        CoreScatteringOpticalProperties(arr_type(τ_rayl[iB][:,1]), FT(1.0), 
-                (Rayl𝐙⁺⁺), (Rayl𝐙⁻⁺))
-
-              
         rayl =  [CoreScatteringOpticalProperties(arr_type(τ_rayl[iB][:,i]), 1.0, 
                 (Rayl𝐙⁺⁺), (Rayl𝐙⁻⁺)) for i=1:nZ]
-            #rayl_lin = [CoreScatteringOpticalPropertiesLin(arr_type(τ̇_rayl[iB][:,iz]), 0.0, 
-            #(0.0.*Rayl𝐙⁺⁺), (0.0.*Rayl𝐙⁻⁺)) for iz=1:nZ]    
-        #else
-        #    @error("Cannot linearize Raman computations")
-            #rayl =  [CoreScatteringOpticalProperties(arr_type(τ_rayl[iB][:,i]), ϖ_Cabannes[iB], 
-            #    (Rayl𝐙⁺⁺), (Rayl𝐙⁻⁺)) for i=1:nZ]
-            #rayl2 =  [CoreScatteringOpticalProperties(arr_type(τ_rayl[iB][:,i]), 1.0, 
-            #    (Rayl2𝐙⁺⁺), (Rayl2𝐙⁻⁺)) for i=1:nZ]
-        #end
-        #CoreScatteringOpticalProperties.(
-        #        τ_rayl[iB], 
-        #        [RS_type.ϖ_Cabannes[iB]], 
-        #        [Rayl𝐙⁺⁺], [Rayl𝐙⁻⁺])
         # Initiate combined properties with rayleigh
         #combo = rayl
         combrella = [UmbrellaCoreScatteringOpticalProperties(rayl[i],nothing) for i=1:nZ]
@@ -159,18 +139,15 @@ function constructCoreOpticalProperties(RS_type, iBand, m, model, lin_model) #wh
         # Somewhere here we can add canopy later as well!
         ###
 
-        # fScattRayleigh:
-        # Assume ϖ of 1 for Rayleight here:
-        #fScattRayleigh = [collect(rayl[i].τ  ./ combo[i].τ) for i=1:nZ]
         # Create Core Optical Properties merged with trace gas absorptions:
         gas = [CoreAbsorptionOpticalProperties(arr_type(τ_abs[iB][:,iz])) for iz=1:nZ]
         lin_gas = [CoreAbsorptionOpticalPropertiesLin(arr_type(collect(τ̇_abs[iB][:,:,iz]'))) for iz=1:nZ] 
-        #combo2 = combo .+ gas
         gas_combrella = [UmbrellaCoreAbsorptionOpticalProperties(gas[iz],lin_gas[iz]) for iz=1:nZ]   
         tmp = combrella .+ gas_combrella            
         combrella = tmp
-        #fScattRayleigh = [collect(rayl[iz].τ  ./ combo2[iz].τ) for iz=1:nZ] 
-        fScattRayleigh = [collect(rayl[iz].τ  ./ combrella[iz].fwd.τ) for iz=1:nZ] 
+        fScattRayleigh =
+            [_rayleigh_fraction_of_total_extinction(rayl[iz], combrella[iz].fwd)
+             for iz=1:nZ]
         #for i=1:nZ
         #end
         #combo_lin = [include_rayl!(combo[iz], combo_lin[iz], rayl[iz], rayl_lin[iz]) for iz=1:nZ]

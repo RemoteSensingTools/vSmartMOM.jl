@@ -89,6 +89,8 @@ function run_prototype_O2Bband_RRS_SIF(; yaml       = O2B_SIF_YAML,
 
     SIF_values = FT.(_o2b_sif_spectrum_interp(ν))
     SIF_mat    = zeros(FT, nPol, nSpec); SIF_mat[1, :] = SIF_values
+    sources_nosif = CoreRT.SolarBeam(F₀ = F₀mat)
+    sources_sif   = CoreRT.SolarBeam(F₀ = F₀mat) + CoreRT.SurfaceSIF(SIF₀ = SIF_mat)
 
     RS_rrs = InelasticScattering.RRS(
         n2 = n2, o2 = o2,
@@ -100,13 +102,13 @@ function run_prototype_O2Bband_RRS_SIF(; yaml       = O2B_SIF_YAML,
         F₀ = F₀mat, SIF₀ = zeros(FT, nPol, nSpec),
     )
     CoreRT.getRamanSSProp!(RS_rrs, 1e7 / ν̃, ν)
-    R_rrs, T_rrs, ieR, ieT = CoreRT.rt_run_test(RS_rrs, model, iBand)
+    R_rrs, T_rrs, ieR, ieT = CoreRT.rt_run_test(RS_rrs, model, iBand; sources = sources_nosif)
 
     RS_noRS = InelasticScattering.noRS{FT}(F₀ = F₀mat, SIF₀ = zeros(FT, nPol, nSpec))
-    R_nors, T_nors, _, _ = CoreRT.rt_run_test(RS_noRS, model, iBand)
+    R_nors, T_nors, _, _ = CoreRT.rt_run_test(RS_noRS, model, iBand; sources = sources_nosif)
 
-    RS_noRS_sif = InelasticScattering.noRS{FT}(F₀ = F₀mat, SIF₀ = SIF_mat)
-    R_nors_sif, T_nors_sif, _, _ = CoreRT.rt_run_test(RS_noRS_sif, model, iBand)
+    RS_noRS_sif = InelasticScattering.noRS{FT}(F₀ = F₀mat, SIF₀ = zeros(FT, nPol, nSpec))
+    R_nors_sif, T_nors_sif, _, _ = CoreRT.rt_run_test(RS_noRS_sif, model, iBand; sources = sources_sif)
 
     sza_i = Int(round(parameters.sza))
     vza_i = Int(round(first(parameters.vza)))

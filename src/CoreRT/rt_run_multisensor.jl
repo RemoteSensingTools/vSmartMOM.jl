@@ -14,6 +14,8 @@ are denoted by 0<VZA<90.
 function rt_run_test_ms(RS_type::AbstractRamanType,
                         sensor_levels::Vector{Int64},
                         model, iBand)
+    _warn_explicit_depol_raman(RS_type, model)
+
     (; obs_alt, sza, vza, vaz) = model.obs_geom   # Observational geometry properties
     (; qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart, μ₀, iμ₀, Nquad) = model.quad_points # All quadrature points
     pol_type = CoreRT.polarization_type(model)
@@ -46,6 +48,11 @@ function rt_run_test_ms(RS_type::AbstractRamanType,
 
     arr_type = CoreRT.array_type(model) # Type of array to use
     arch = CoreRT.architecture(model)
+    if size(RS_type.F₀) != (pol_type.n, nSpec)
+        RS_type.F₀ = zeros(FT, pol_type.n, nSpec)
+        @views RS_type.F₀[1, :] .= one(FT)
+    end
+    surface_F₀ = arr_type(FT.(RS_type.F₀))
     SFI = true                          # SFI flag
     NquadN = Nquad * pol_type.n         # Nquad (multiplied by Stokes n)
     dims = (NquadN,NquadN)              # nxn dims
@@ -135,9 +142,8 @@ function rt_run_test_ms(RS_type::AbstractRamanType,
                     pol_type,
                     quad_points,
                     arr_type(τ_sum_all[:,end]),
-                    arch);
-
-        inject_surface_SIF!(brdf, added_layer_surface, m, pol_type, _sif_source(RS_type), arch)
+                    arch;
+                    F₀=surface_F₀);
 
         # One last interaction with surface:
         for ims=1:length(sensor_levels)
