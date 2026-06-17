@@ -531,17 +531,39 @@ function update_model!(ctx::BatchContext;
     end
 
     # ── 2. Recompute τ_rayl in place per band ──────────────────────────────
-    # Use the same depol logic as model_from_parameters.
+    # Use the same depol logic as model_from_parameters — including the SAME
+    # vcd-weighted mean temperature for the Raman atmo constants. Hardcoding
+    # 300 K here made τ_rayl differ from a fresh build at the ~1e-5 level: the
+    # depol's T-dependence is weak, so the mismatch was sub-ULP (bit-invisible)
+    # on x86-Linux but visible on macOS/Windows, breaking the rtol=0
+    # bit-equality test in test_update_model.jl.
+    rayleigh_molecular_T = (new_profile.vcd_dry' * new_profile.T) / sum(new_profile.vcd_dry)
     for i_band in 1:ctx.n_bands
         curr_band_λ = FT.(1e4 ./ params.spec_bands[i_band])
 
         νₘ  = FT(0.5) * (params.spec_bands[i_band][1] + params.spec_bands[i_band][end])
         λₘ  = FT(1.0e7) / νₘ
-        _n2, _o2 = InelasticScattering.getRamanAtmoConstants(FT(1.0e7) / λₘ, FT(300))
-        _, _ = InelasticScattering.compute_γ_air_Cabannes!(λₘ, _n2, _o2)
-        γ_air_Ray, _ = InelasticScattering.compute_γ_air_Rayleigh!(λₘ, _n2, _o2)
+        _n2, _o2 = InelasticScattering.getRamanAtmoConstants(FT(1.0e7) / λₘ, FT(rayleigh_molecular_T))
+        ϖ_Cab         = InelasticScattering.compute_ϖ_Cabannes(λₘ, _n2, _o2)
+        γ_air_Cab, _  = InelasticScattering.compute_γ_air_Cabannes!(λₘ, _n2, _o2)
+        γ_air_Ray, _  = InelasticScattering.compute_γ_air_Rayleigh!(λₘ, _n2, _o2)
+        depol_air_Cab = 2γ_air_Cab / (1 + γ_air_Cab)
         depol_air_Ray = 2γ_air_Ray / (1 + γ_air_Ray)
+        depol_use_Cab = params.depol < 0 ? FT(depol_air_Cab) : FT(params.depol)
         depol_use_Ray = params.depol < 0 ? FT(depol_air_Ray) : FT(params.depol)
+
+        # Refresh the depolarization-dependent Rayleigh/Cabannes phase-matrix
+        # greek coefs + ϖ_Cabannes in place. The vcd-weighted mean T changes
+        # between scenes, so leaving these at the construction-time depol left
+        # rt_run radiances ~1e-8 off a fresh build (test_update_model Test 3).
+        # Mirrors model_from_parameters. greek_cabannes/ϖ_Cabannes are always
+        # per-band vectors; greek_rayleigh is per-band when built via
+        # model_from_parameters (always true for a BatchContext).
+        model.optics.rayleigh.ϖ_Cabannes[i_band]     = FT(ϖ_Cab)
+        model.optics.rayleigh.greek_cabannes[i_band] = Scattering.get_greek_rayleigh(depol_use_Cab)
+        if model.optics.rayleigh.greek_rayleigh isa AbstractVector
+            model.optics.rayleigh.greek_rayleigh[i_band] = Scattering.get_greek_rayleigh(depol_use_Ray)
+        end
 
         model.optics.τ_rayl[i_band] .= getRayleighLayerOptProp(
             new_profile.p_half[end],
