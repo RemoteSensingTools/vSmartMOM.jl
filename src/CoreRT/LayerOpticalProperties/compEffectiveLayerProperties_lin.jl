@@ -70,15 +70,14 @@ function constructCoreOpticalProperties(RS_type, iBand, m, model, lin_model) #wh
     band_layer_props_lin = [];
     band_fScattRayleigh  = [];
     for iB in iBand
-        if (typeof(RS_type)<:noRS) #!(typeof(RS_type)<:RRS)
-            Rayl𝐙⁺⁺, Rayl𝐙⁻⁺ = Scattering.compute_Z_moments(pol_type, μ,
-                                                            greek_rayleigh[iB], m,
-                                                            arr_type = arr_type);
-        else
-            Rayl𝐙⁺⁺, Rayl𝐙⁻⁺ = Scattering.compute_Z_moments(pol_type, μ,
-                                                            greek_cabannes[iB], m,
-                                                            arr_type = arr_type);
-        end
+        # Linearized RT is pure-elastic only — Raman/Cabannes types are rejected
+        # at the lin entry points — so both noRS and noRS_plus use the full
+        # Rayleigh phase matrix. greek_cabannes is intentionally NOT destructured
+        # for this path; a Cabannes branch here would be dead code (and an
+        # UndefVarError for noRS_plus). See project_raman_not_linearized.
+        Rayl𝐙⁺⁺, Rayl𝐙⁻⁺ = Scattering.compute_Z_moments(pol_type, μ,
+                                                        greek_rayleigh[iB], m,
+                                                        arr_type = arr_type)
 
         rayl = [CoreScatteringOpticalProperties(arr_type(τ_rayl[iB][:,i]), 1.0,
                 (Rayl𝐙⁺⁺), (Rayl𝐙⁻⁺)) for i=1:nZ]

@@ -82,10 +82,10 @@ const _LS = vSmartMOM.CoreRT
     @testset "m=0 conventions" begin
         a0 = build_surface(scalar, 0)
 
-        # t⁺⁺ = t⁻⁻ = I, r⁺⁻ = 0.
+        # t⁺⁺ = I (pass-through), t⁻⁻ = 0 (opaque lowest boundary), r⁺⁻ = 0.
         Id = arr_type(Matrix{FT}(I, NquadN, NquadN))
         @test a0.t⁺⁺[:, :, 1] == Id
-        @test a0.t⁻⁻[:, :, 1] == Id
+        @test all(iszero, a0.t⁻⁻)
         @test all(iszero, a0.r⁺⁻)
         # r⁻⁺ is the (positive) reflectance — nonzero.
         @test maximum(abs, a0.r⁻⁺) > 0
@@ -131,7 +131,7 @@ const _LS = vSmartMOM.CoreRT
     end
 
     # ---------------------------------------------------------------------
-    # m > 0 conventions: everything zero except identity transmission.
+    # m > 0 conventions: everything zero; t⁺⁺ = I (pass-through), t⁻⁻ = 0 (opaque).
     # ---------------------------------------------------------------------
     @testset "m>0 conventions (all flavours)" begin
         Id = arr_type(Matrix{FT}(I, NquadN, NquadN))
@@ -142,7 +142,7 @@ const _LS = vSmartMOM.CoreRT
             @test all(iszero, a.j₀⁺)
             @test all(iszero, a.j₀⁻)
             @test a.t⁺⁺[:, :, 1] == Id
-            @test a.t⁻⁻[:, :, 1] == Id
+            @test all(iszero, a.t⁻⁻)
         end
     end
 
