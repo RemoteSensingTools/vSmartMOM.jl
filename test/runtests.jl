@@ -42,6 +42,10 @@ try
 # Quality gates
 @testset "Quality Gates" begin include("test_quality.jl") end
 
+# Package health (Aqua) and static analysis snapshot (JET)
+@testset "Aqua" begin include("test_aqua.jl") end
+@testset "JET"  begin include("test_jet.jl")  end
+
 # Top-level public IO API
 @testset "IO Exports" begin include("test_io_exports.jl") end
 
