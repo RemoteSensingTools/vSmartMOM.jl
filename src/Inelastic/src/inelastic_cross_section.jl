@@ -35,13 +35,9 @@ function compute_effective_coefficents!(ν_eff, T, mol::MolecularConstants{FT}) 
     @unpack α̅,  γ̅, α_prime, γ_prime, ϵ, ϵ_prime = mol.effCoeff
     @unpack α̅₀₀, γ̅₀₀, ω₀, α_b, α_c, α₀₀_prime, γ₀₀_prime = mol.PolTensor
     #Computing α̅
-    # Frequency correction (1 - (c·ν_eff/ω₀)²). ν_eff is wavenumber (cm⁻¹),
-    # ω₀ is stored in wavenumber units; no 2π factor. Buldakov 1996 writes ω
-    # for what is literally frequency in Hz (not angular frequency in rad/Hz),
-    # so no 2π conversion is needed. Verified correct against
-    # Buldakov et al. 1996 Eqs. 36a-39b by S. Sanghavi
-    # (2026-04 review, unit-cross-check on ω vs ν).
-    α̅ = α̅₀₀*(1 + α_b*T + α_c*T^2)/(1-(c*ν_eff/ω₀)^2)
+    # Buldakov et al. define ω as angular frequency, while ν_eff is a
+    # wavenumber in cm⁻¹. Convert with ω = 2πcν_eff.
+    α̅ = α̅₀₀*(1 + α_b*T + α_c*T^2)/(1-(2π*c*ν_eff/ω₀)^2)
     γ̅ = γ̅₀₀
     ϵ = α̅/γ̅ 
     α_prime = α₀₀_prime * sqrt(mol.Y[1,2]/mol.Y[2,1]) # see Eqs (36a-39b) of Buldakov et al. 1996 (Spectrochimica Acta Part A) 
@@ -65,7 +61,8 @@ end
 
 Update the molecular Rayleigh cross-section prefactor stored on `mol`.
 """
-#Compute elastic scattering cross-section (Cabannes line)
+# Compute the Rayleigh scattering cross-section coefficient from the Rayleigh
+# gamma obtained from molecular constants.
 function compute_σ_Rayl_coeff!(mol::MolecularConstants{FT}) where {FT}#ν, molecules::Array{MolecularConstants{FT}}) where {FT}
     @unpack α̅, γ_C_Rayl, σ_Rayl_coeff = mol.effCoeff
     σ_Rayl_coeff = FT(_rayleigh_prefactor64() * _molecular_square64(α̅) *

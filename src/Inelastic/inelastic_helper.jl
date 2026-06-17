@@ -378,25 +378,17 @@ function compute_γ_air_Rayleigh!(λ₀::FT, n2, o2) where FT
     return γ_air_Rayleigh, σ_air_Rayleigh
 end
 
-# New: In the old version, mol.effCoeff.γ_C_Rayl was assumed to be γ_mol_Cabannes, but it actually was indeed γ_mol_Rayleigh. This assumption has now been corrected, and the correct γ_mol_Cabannes is computed in the function below. 
+# Reconstruct the Cabannes phase-matrix gamma from the Rayleigh gamma and the
+# Cabannes fraction. This is Eq. (4) of the Cabannes manuscript: derive from
+# Z_Rayl = ϖ_Cab Z_Cab + (1 - ϖ_Cab) Z_RRS with γ_RRS = 3/4.
 function compute_γ_mol_Cabannes!(λ₀::FT, mol) where FT
-    ν̃ =  1.e7/λ₀
-    effT  =  300.; #K assumed constant for Earth atmospheres
-
-    #n2,o2 = InelasticScattering.getRamanAtmoConstants(ν̃,effT);
-    #greek_raman = get_greek_raman(RS_type, n2, o2);
     ϖ_Cabannes = compute_ϖ_Cabannes(λ₀, mol)
     γ_mol_Rayleigh = mol.effCoeff.γ_C_Rayl
 
-    tmp1 = 1+2*γ_mol_Rayleigh
-    tmp2 = 2+3*ϖ_Cabannes
-    tmp3 = 1-ϖ_Cabannes
-    tmpN = tmp1*tmp2-5
-    tmpD = tmp1*tmp3+5
-    γ_mol_Cabannes = 0.5*tmpN/tmpD
+    num = 2γ_mol_Rayleigh * (2 + 3ϖ_Cabannes) - 3 * (1 - ϖ_Cabannes)
+    den = (3 + 2ϖ_Cabannes) - 4γ_mol_Rayleigh * (1 - ϖ_Cabannes)
+    γ_mol_Cabannes = FT(0.5) * num / den
 
-
-    #@show γ_mol_Rayleigh, tmp_chk
     return ϖ_Cabannes, γ_mol_Cabannes, γ_mol_Rayleigh
 end
 
@@ -899,4 +891,3 @@ function computeRamanZλ!(RS_type::AbstractRamanType, pol_type, qp_μ, m, arr_ty
                                         arr_type = arr_type);      
     nothing
 end
-

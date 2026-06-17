@@ -50,6 +50,14 @@ Architecturally:
   dispatches on `RS_type` to choose which set runs (see
   [`src/CoreRT/CoreKernel/rt_kernel.jl:48–229`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/CoreKernel/rt_kernel.jl#L48-L229)). The elastic kernel
   *also* runs alongside — Raman is additive on top.
+- **`fScattRayleigh` means Rayleigh over total extinction**, not Rayleigh
+  over scattering extinction:
+  ``f_\mathrm{Rayl}(\lambda,z)=\tau_\mathrm{Rayl}(\lambda,z)/
+  [\tau_\mathrm{Rayl}+\tau_\mathrm{aer}+\tau_\mathrm{abs}]``. The RRS
+  elemental kernels attenuate with the total spectral `dτ_λ`; this factor
+  then isolates the Rayleigh-active part of that extinction for the Raman
+  source. Computing it before gas absorption would over-weight Raman source
+  terms inside absorption lines.
 - **`rt_run_ss`** ([`src/CoreRT/rt_run.jl:364–524`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/rt_run.jl#L364-L524)) is the single-scattering
   approximation that exists alongside `rt_run` for SF2023-II Eq. (32) —
   the inelastic correction `I₁ ≈ I₀ + (I'₁ − I'₀)` that makes the
@@ -72,6 +80,7 @@ Architecturally:
 | `_plus` variants (multi-band) | [`src/CoreRT/CoreKernel/elemental_inelastic_plus.jl`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/CoreKernel/elemental_inelastic_plus.jl) |
 | Single-scatter inelastic correction | `src/CoreRT/rt_run.jl::rt_run_ss:364–524` |
 | Cabannes vs full Rayleigh selector | [`src/CoreRT/LayerOpticalProperties/compEffectiveLayerProperties.jl:8–9`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/LayerOpticalProperties/compEffectiveLayerProperties.jl#L8-L9) |
+| Raman Rayleigh extinction fraction | `src/CoreRT/LayerOpticalProperties/compEffectiveLayerProperties.jl::_rayleigh_fraction_of_total_extinction` |
 
 For developers extending the Raman path (adding a new mode, adding new
 molecular species), see [Add a Raman Mode](../extending/raman.md).

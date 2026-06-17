@@ -20,6 +20,12 @@ After the atmosphere has been composed TOA → BOA, the loop calls
 accumulated atmosphere. Then `interaction_hdrf!` ([`src/CoreRT/CoreKernel/interaction_hdrf.jl:1–42`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/CoreKernel/interaction_hdrf.jl#L1-L42))
 runs to extract hemispherical-directional reflectance products for `m=0`.
 
+For opaque lower-boundary surfaces, `t⁻⁻` is zero: an upward field entering
+from below the surface would be a sub-surface source, which is not part of the
+atmospheric RT problem. The current surface-as-layer implementation keeps
+`t⁺⁺` as an identity pass-through so the downwelling field at the surface
+remains available for diagnostics such as `T_SFI`, HDRF, and BHR.
+
 ```
    CompositeLayer (after final iz=Nz)        Surface BRDF
         │                                          │

@@ -209,8 +209,9 @@ end
 """Construct an `AddedLayerRS` with inelastic (Raman) matrices for Raman scattering.
 
 The `prepared_sources` kwarg is accepted for signature parity with the noRS
-variant but ignored — the Raman path still routes solar / surface emission
-through `RS_type.F₀` / `RS_type.SIF₀` (Phase 6 will retire those channels)."""
+variant but ignored here. Source payloads are applied later by the RT driver:
+solar F₀ is copied into `RS_type.F₀`, while surface emission enters through
+`SurfaceSIF` dispatch."""
 make_added_layer(RS_type::Union{RRS, VS_0to1_plus, VS_1to0_plus}, FT, arr_type, dims, nSpec;
                  prepared_sources::AbstractSource = NoSource())  = AddedLayerRS(
                                                 default_matrix(FT, arr_type, dims, nSpec), 

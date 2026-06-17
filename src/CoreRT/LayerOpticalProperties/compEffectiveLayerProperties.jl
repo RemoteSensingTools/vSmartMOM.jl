@@ -9,6 +9,16 @@ _rayleigh_greek_source(::Union{noRS, noRS_plus}, greek_rayleigh, greek_cabannes)
 _rayleigh_greek_source(::AbstractRamanType, greek_rayleigh, greek_cabannes) = greek_cabannes
 
 """
+    _rayleigh_fraction_of_total_extinction(rayleigh_layer, total_layer)
+
+Fraction of the total spectral extinction that participates in Rayleigh-driven
+inelastic scattering. The denominator must include gas absorption because the
+RRS elemental kernels attenuate with the total `dτ_λ`.
+"""
+_rayleigh_fraction_of_total_extinction(rayleigh_layer, total_layer) =
+    Array(rayleigh_layer.τ ./ total_layer.τ)
+
+"""
     MInvariantCache
 
 Cache of m-independent optical quantities computed once before the Fourier
@@ -107,7 +117,15 @@ function build_m_invariant_cache(RS_type::AbstractRamanType, iBand, model)
             combo_m0 = combo_m0 .+ aer_m0
         end
         # Device→host: needed for _expand_layer_rayleigh! (Raman path). Done once.
-        fScattRayleigh_iB = [Array(rayl_m0[iz].τ ./ combo_m0[iz].τ) for iz=1:nZ]
+        # Denominator is the TOTAL extinction (incl. gas absorption), matching the
+        # non-cache constructCoreOpticalProperties path: the RRS elemental kernels
+        # attenuate with the total dτ_λ. Omitting τ_abs here (the gas-free combo_m0)
+        # over-weighted Raman source terms inside absorption lines — the LuT bug.
+        combo_m0_with_absorption =
+            combo_m0 .+ [CoreAbsorptionOpticalProperties(τ_abs_dev_iB[iz]) for iz=1:nZ]
+        fScattRayleigh_iB =
+            [_rayleigh_fraction_of_total_extinction(rayl_m0[iz], combo_m0_with_absorption[iz])
+             for iz=1:nZ]
 
         rayl_τ_dev[iBi]      = rayl_τ_dev_iB
         rayl_ϖ_Cabannes[iBi] = rayl_ϖ_Cabannes_iB
@@ -166,9 +184,13 @@ function constructCoreOpticalProperties(RS_type::AbstractRamanType, iBand, m, mo
             combo = combo .+ aer
         end
 
-        fScattRayleigh = [Array(rayl[i].τ ./ combo[i].τ) for i=1:nZ]
-        push!(band_layer_props,
-              combo .+ [CoreAbsorptionOpticalProperties(arr_type((τ_abs[iB][:,i]))) for i=1:nZ])
+        combo_with_absorption =
+            combo .+ [CoreAbsorptionOpticalProperties(arr_type((τ_abs[iB][:,i]))) for i=1:nZ]
+
+        fScattRayleigh =
+            [_rayleigh_fraction_of_total_extinction(rayl[i], combo_with_absorption[i])
+             for i=1:nZ]
+        push!(band_layer_props, combo_with_absorption)
         push!(band_fScattRayleigh, fScattRayleigh)
     end
 

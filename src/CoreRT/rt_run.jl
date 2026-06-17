@@ -193,12 +193,12 @@ function rt_run_streams(model; i_band::Integer = 1,
 end
 
 """
-    rt_run_test(RS_type, model, iBand)
+    rt_run_test(RS_type, model, iBand; kwargs...)
 
 Test entry point for RT calculations with explicit Raman type.
 """
-function rt_run_test(RS_type::AbstractRamanType, model, iBand)
-    rt_run(RS_type, model, iBand)
+function rt_run_test(RS_type::AbstractRamanType, model, iBand; kwargs...)
+    rt_run(RS_type, model, iBand; kwargs...)
 end
 
 """
@@ -223,6 +223,13 @@ function _expand_layer_rayleigh!(RS_type::AbstractRamanType, fScattRayleigh, iz)
     return nothing
 end
 
+function _warn_explicit_depol_raman(RS_type::AbstractRamanType, model)
+    if InelasticScattering.has_inelastic(RS_type) && model.solver.depol >= 0
+        @warn "Raman-active RT is using an explicit nonnegative depol; current model construction applies this same depol to Rayleigh, Cabannes, and tau_rayl. Use depol: -1 for molecular Rayleigh/Cabannes auto mode." depol=model.solver.depol maxlog=1
+    end
+    return nothing
+end
+
 """
     rt_run(RS_type, model::RTModel, iBand; sources=nothing)
 
@@ -238,6 +245,8 @@ SFI kernel call. Phase 5 will remove the `RS_type.F₀` indirection.
 function rt_run(RS_type::AbstractRamanType, model, iBand;
                 sources::Union{Nothing, AbstractSource} = nothing,
                 streams_callback::Union{Nothing, Function} = nothing)
+    _warn_explicit_depol_raman(RS_type, model)
+
     # Apply the per-model BLAS thread cap once per `rt_run` invocation
     # (no-op when `model.numerics.blas_threads === nothing`). Lives here
     # so swapping models with different caps "just works" — the caller
@@ -316,7 +325,8 @@ function rt_run(RS_type::AbstractRamanType, model, iBand;
     # kwarg > `model.sources` > legacy `RS_type.F₀` (only when the latter is
     # already user-shaped, to preserve the historical
     # `rs.F₀ = ...; rt_run(rs, model, ...)` test pattern).
-    # Phase 6 will remove the legacy `RS_type.F₀` / `RS_type.SIF₀` channels.
+    # Legacy `RS_type.SIF₀` is no longer consumed by rt_run; use SurfaceSIF.
+    # `RS_type.F₀` remains a compatibility fallback when no SolarBeam is supplied.
     effective_sources = sources === nothing ? model.sources : sources
     prepared_sources = prepare_sources(effective_sources, FT, pol_type.n, nSpec, arr_type)
 
@@ -366,6 +376,7 @@ function rt_run(RS_type::AbstractRamanType, model, iBand;
         # converting back through Array. (Cheap: F₀ is (pol_n, nSpec).)
         RS_type.F₀ = Array{FT, 2}(F₀_dev)
     end
+    surface_F₀ = arr_type(FT.(RS_type.F₀))
 
     # Phase 4: allocate the InteractionWorkspace once before the layer loop for
     # RRS/VS runs to avoid the per-call GPU allocation (sanghavi reported ~7 GB
@@ -460,7 +471,8 @@ function rt_run(RS_type::AbstractRamanType, model, iBand;
                                 τ_sum_end_dev,
                                 arch;
                                 spec_bands_wn=_canopy_spec_wn,
-                                m_max=m_max)
+                                m_max=m_max,
+                                F₀=surface_F₀)
         else
             @timeit "Create Surface" create_surface_layer!(brdf,
                                 added_layer_surface,
@@ -468,21 +480,13 @@ function rt_run(RS_type::AbstractRamanType, model, iBand;
                                 pol_type,
                                 quad_points,
                                 τ_sum_end_dev,
-                                arch)
+                                arch;
+                                F₀=surface_F₀)
         end
 
-        # Inject surface source contributions into surface j₀⁻. Two paths
-        # coexist during the v0.6 → v0.7 transition:
-        #   1. Legacy: from `RS_type.SIF₀` via `inject_surface_SIF!`. Kept
-        #      until Phase 6 retires the `RS_type.SIF₀` / `RS_type.F₀`
-        #      channel.
-        #   2. New: from any `PreparedSurfaceSIF` in `prepared_sources` via
-        #      the `surface_source_contribute!` double-dispatch. Bit-equal
-        #      to (1) when both reach the Lambertian factor-2 injection.
-        # When the user supplies a SurfaceSIF source AND sets RS_type.SIF₀,
-        # both paths fire and SIF is double-counted; tests must use one API
-        # at a time during the transition.
-        inject_surface_SIF!(brdf, added_layer_surface, m, pol_type, _sif_source(RS_type), arch)
+        # Surface-emission sources are injected only through the source system.
+        # The legacy `RS_type.SIF₀` path is intentionally ignored here to avoid
+        # double-counting when a `SurfaceSIF` source is also present.
         surface_source_contribute!(prepared_sources, brdf, added_layer_surface, m, pol_type, arch)
 
         # One last interaction with surface:
@@ -598,12 +602,12 @@ function rt_run_ss(model; i_band::Integer = 1, sources::Union{Nothing, AbstractS
 end
 
 """
-    rt_run_test_ss(RS_type, model, iBand)
+    rt_run_test_ss(RS_type, model, iBand; kwargs...)
 
 Test entry point for single-scatter RT with explicit Raman type.
 """
-function rt_run_test_ss(RS_type::AbstractRamanType, model, iBand)
-    rt_run_ss(RS_type, model, iBand)
+function rt_run_test_ss(RS_type::AbstractRamanType, model, iBand; kwargs...)
+    rt_run_ss(RS_type, model, iBand; kwargs...)
 end
 
 """
@@ -614,6 +618,8 @@ Single-scatter approximation driver with explicit Raman type. See
 """
 function rt_run_ss(RS_type::AbstractRamanType, model, iBand;
                    sources::Union{Nothing, AbstractSource} = nothing)
+    _warn_explicit_depol_raman(RS_type, model)
+
     # Per-model BLAS thread cap (see `rt_run` body for rationale).
     if model.numerics.blas_threads !== nothing
         LinearAlgebra.BLAS.set_num_threads(model.numerics.blas_threads)
@@ -687,6 +693,7 @@ function rt_run_ss(RS_type::AbstractRamanType, model, iBand;
         F₀_dev = extract_solar_F₀(prepared_sources, FT, pol_type.n, nSpec, arr_type)
         RS_type.F₀ = Array{FT, 2}(F₀_dev)
     end
+    surface_F₀ = arr_type(FT.(RS_type.F₀))
 
     τ_sum_all = nothing
 
@@ -725,12 +732,12 @@ function rt_run_ss(RS_type::AbstractRamanType, model, iBand;
                             pol_type,
                             quad_points,
                             arr_type(τ_sum_all[:, end]),
-                            arch)
+                            arch;
+                            F₀=surface_F₀)
 
-        # Surface source contributions — legacy (RS_type.SIF₀) + new
-        # (prepared_sources) paths coexist during the v0.6 → v0.7 transition.
-        # See `rt_run` body for the full rationale.
-        inject_surface_SIF!(brdf, added_layer_surface, m, pol_type, _sif_source(RS_type), arch)
+        # Surface-emission sources are injected only through the source system.
+        # The legacy `RS_type.SIF₀` path is intentionally ignored here to avoid
+        # double-counting when a `SurfaceSIF` source is also present.
         surface_source_contribute!(prepared_sources, brdf, added_layer_surface, m, pol_type, arch)
 
         # SS mode uses interaction_ss! (no multiple-scattering doubling with surface).

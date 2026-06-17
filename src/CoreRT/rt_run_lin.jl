@@ -105,6 +105,12 @@ function rt_run(RS_type::AbstractRamanType,
                     NAer::Int, NGas::Int, NSurf::Int,
                     iBand;
                     sources::Union{Nothing, AbstractSource} = nothing)
+    if InelasticScattering.has_inelastic(RS_type)
+        throw(ArgumentError(
+            "Linearized Raman-active RT is intentionally unsupported. " *
+            "Use forward Raman RT only; do not call rt_run with lin_model for RRS/VS modes."))
+    end
+
     # Per-model BLAS thread cap (see `rt_run` body for rationale).
     if model.numerics.blas_threads !== nothing
         LinearAlgebra.BLAS.set_num_threads(model.numerics.blas_threads)
@@ -190,8 +196,7 @@ function rt_run(RS_type::AbstractRamanType,
         make_composite_layer(lin, RS_type, FT, arr_type, Nparams, dims, nSpec)
     @timeit "Creating arrays" I_static = 
         Diagonal(arr_type(Diagonal{FT}(ones(dims[1]))));
-    # Known limitation: Raman Jacobians are not yet implemented.
-    # Linearized RT currently supports RS_type = noRS() only.
+    # Linearized RT intentionally supports pure-elastic noRS only.
 
     # Loop over fourier moments
     for m = 0:m_max
