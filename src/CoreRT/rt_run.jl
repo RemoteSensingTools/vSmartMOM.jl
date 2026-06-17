@@ -548,7 +548,13 @@ function rt_run(RS_type::AbstractRamanType, model, iBand;
         end
     end
 
-    # Single-scattering correction for Cox-Munk specular hotspot (TMS)
+    # Single-scattering correction for Cox-Munk specular hotspot (TMS).
+    # LIMITATION: this TMS correction assumes a unit incident beam per spectral
+    # point. With a non-unit surface F₀ (SolarBeam / RS_type.F₀) the Fourier
+    # surface layer is F₀-scaled but this correction is not, so Cox-Munk SFI with
+    # a real solar spectrum is inconsistent. The default (unit F₀) path is
+    # unaffected. TODO (with Sanghavi): pass surface_F₀ here and scale the glint
+    # correction per spectral point to complete the F₀ surface-source feature.
     if brdf isa CoxMunkSurface && SFI
         @timeit "SS Correction" apply_ss_correction!(
             R_SFI, brdf, pol_type, vza, vaz, μ₀,

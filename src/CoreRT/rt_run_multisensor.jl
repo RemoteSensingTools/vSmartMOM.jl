@@ -143,6 +143,12 @@ function rt_run_test_ms(RS_type::AbstractRamanType,
                     arch;
                     F₀=surface_F₀);
 
+        # Surface SIF emission (legacy RS_type.SIF₀ path). The multisensor entry
+        # point does not yet route SIF through the v0.6 source system the way
+        # rt_run/rt_run_ss do, so keep the direct injection here — dropping it
+        # silently zeroed fluorescence in multisensor scenes.
+        inject_surface_SIF!(brdf, added_layer_surface, m, pol_type, _sif_source(RS_type), arch)
+
         # One last interaction with surface:
         for ims=1:length(sensor_levels)
             #if sensor_levels[ims]==0 #include ims==Nz with ims==0
