@@ -60,7 +60,8 @@ function create_surface_layer!(brdf::AbstractSurfaceType,
                                pol_type,
                                quad_points,
                                τ_sum,
-                               architecture)
+                               architecture;
+                               F₀=nothing)
 
     (; qp_μ, wt_μ, qp_μN, wt_μN) = quad_points
     FT = eltype(qp_μN)
@@ -78,7 +79,7 @@ function create_surface_layer!(brdf::AbstractSurfaceType,
     # Source function of surface (m=0 source fill shared with the Lambertian
     # scaffold; uses the attenuated direct beam — see lambertian_surface.jl).
     if SFI
-        _surface_source!(added_layer, R_surf, τ_sum, quad_points, pol_type, FT)
+        _surface_source!(added_layer, R_surf, τ_sum, quad_points, pol_type, FT, architecture; F₀=F₀)
     end
 
     # Quadrature-weight, then fill r/t via the shared scaffold helper.

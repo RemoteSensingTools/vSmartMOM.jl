@@ -112,22 +112,60 @@ _albedo_eltype(::LambertianSurfaceSpline{FT}) where {FT}   = FT
 # method in rpv_surface.jl — keeps the source fill / zero logic in one place)
 # ---------------------------------------------------------------------------
 """
-    _surface_source!(added_layer, R_surf, τ_sum, quad_points, pol_type, FT)
+    _surface_solar_F₀(F₀, FT, pol_type, nSpec, arr_type)
+
+Device-resident solar source Stokes vector at the surface, shape
+`(pol_type.n, nSpec)`. When `F₀ === nothing` the legacy unit Stokes-I default
+is used (flat spectrum); otherwise the supplied band-resolved irradiance is
+shape-checked and uploaded.
+"""
+function _surface_solar_F₀(F₀, FT, pol_type, nSpec::Integer, arr_type)
+    if F₀ === nothing
+        F₀_host = zeros(FT, pol_type.n, nSpec)
+        @views F₀_host[1, :] .= one(FT)
+        return arr_type(F₀_host)
+    end
+    size(F₀) == (pol_type.n, nSpec) || error(
+        "Surface solar source F₀ shape $(size(F₀)) does not match " *
+        "(pol_type.n, nSpec) = ($(pol_type.n), $nSpec).")
+    return arr_type(FT.(F₀))
+end
+
+"""
+    _surface_beam_at_surface(F₀, FT, pol_type, quad_points, τ_sum, architecture)
+
+Attenuated direct solar beam arriving at the surface, shape `(NquadN, nSpec)`:
+the band-resolved `F₀` placed in the solar-direction Stokes slots and scaled
+by `exp(-τ_sum/μ₀)`. With `F₀ === nothing` this reproduces the legacy flat
+unit-`I₀` beam bit-for-bit; with a real `F₀` it carries the true solar
+spectrum into the surface source (Raman/Ring at the surface).
+"""
+function _surface_beam_at_surface(F₀, FT, pol_type, quad_points, τ_sum, architecture)
+    (; qp_μN, iμ₀Nstart, iμ₀, μ₀) = quad_points
+    arr_type = array_type(architecture)
+    nSpec = length(τ_sum)
+    beam = arr_type(zeros(FT, length(qp_μN), nSpec))
+    F₀_dev = _surface_solar_F₀(F₀, FT, pol_type, nSpec, arr_type)
+    beam[iμ₀Nstart:pol_type.n*iμ₀, :] .= F₀_dev .* exp.(-τ_sum / μ₀)'
+    return beam
+end
+
+"""
+    _surface_source!(added_layer, R_surf, τ_sum, quad_points, pol_type, FT, architecture; F₀=nothing)
 
 Fill the surface added-layer source vectors (`j₀⁺`, `j₀⁻`) for the m=0
 moment under Source-Function-Integration. `R_surf` is the *dense* m=0
 reflectance matrix (already carrying the `2a` factor — pre the
-quadrature-weight multiply). `j₀⁺` is the attenuated direct beam (consumed
-by `interaction_hdrf!`); `j₀⁻` is its reflection.
+quadrature-weight multiply). `j₀⁺` is the attenuated direct beam (the
+band-resolved solar source `F₀`, consumed by `interaction_hdrf!`); `j₀⁻` is
+its reflection. `F₀ === nothing` falls back to the flat unit-`I₀` beam.
 """
-function _surface_source!(added_layer, R_surf, τ_sum, quad_points, pol_type, ::Type{FT}) where {FT}
-    (; qp_μN, iμ₀Nstart, iμ₀, μ₀) = quad_points
-    I₀_NquadN = similar(qp_μN)
-    I₀_NquadN[:] .= zero(FT)
-    I₀_NquadN[iμ₀Nstart:pol_type.n*iμ₀] = pol_type.I₀
-    atten = exp.(-τ_sum / μ₀)'
-    added_layer.j₀⁺[:, 1, :] .= I₀_NquadN .* atten
-    added_layer.j₀⁻[:, 1, :] .= μ₀ * (R_surf * I₀_NquadN) .* atten
+function _surface_source!(added_layer, R_surf, τ_sum, quad_points, pol_type, ::Type{FT},
+                          architecture; F₀=nothing) where {FT}
+    (; μ₀) = quad_points
+    beam = _surface_beam_at_surface(F₀, FT, pol_type, quad_points, τ_sum, architecture)
+    added_layer.j₀⁺[:, 1, :] .= beam
+    added_layer.j₀⁻[:, 1, :] .= μ₀ * (R_surf * beam)
     return nothing
 end
 
@@ -135,16 +173,18 @@ end
     _fill_surface_layer!(added_layer, R_surf_weighted, T_surf)
 
 Write the m=0 surface reflection/transmission into the added layer:
-`r⁻⁺ = R_surf_weighted`, `r⁺⁻ = 0`, `t⁺⁺ = t⁻⁻ = T_surf` (identity).
-`R_surf_weighted` already includes the `·Diag(qp_μN·wt_μN)` quadrature
-weighting (and any spectral broadcast).
+`r⁻⁺ = R_surf_weighted`, `r⁺⁻ = 0`, `t⁺⁺ = T_surf` (identity pass-through),
+`t⁻⁻ = 0`. The surface is the column's lowest boundary, so it is opaque to an
+upward field from below (no sub-surface source). `R_surf_weighted` already
+includes the `·Diag(qp_μN·wt_μN)` quadrature weighting (and any spectral
+broadcast).
 """
 function _fill_surface_layer!(added_layer, R_surf_weighted, T_surf)
     FT = eltype(added_layer.r⁻⁺)
     added_layer.r⁻⁺ .= R_surf_weighted
     added_layer.r⁺⁻ .= zero(FT)
     added_layer.t⁺⁺ .= T_surf
-    added_layer.t⁻⁻ .= T_surf
+    added_layer.t⁻⁻ .= zero(FT)
     return nothing
 end
 
@@ -153,15 +193,15 @@ end
 
 m > 0 surface layer: a Lambertian/isotropic surface contributes nothing to
 non-zero Fourier moments. Zero both reflectances and both source vectors,
-leave transmission at identity. (Zeroes `r⁺⁻` explicitly — the old code
-zeroed `r⁻⁺` twice and never `r⁺⁻`.)
+keep `t⁺⁺` at identity and `t⁻⁻ = 0` (opaque lowest boundary, as at m=0).
+(Zeroes `r⁺⁻` explicitly — the old code zeroed `r⁻⁺` twice and never `r⁺⁻`.)
 """
 function _zero_surface_layer!(added_layer, T_surf)
     FT = eltype(added_layer.r⁻⁺)
     added_layer.r⁻⁺ .= zero(FT)
     added_layer.r⁺⁻ .= zero(FT)
     added_layer.t⁺⁺ .= T_surf
-    added_layer.t⁻⁻ .= T_surf
+    added_layer.t⁻⁻ .= zero(FT)
     added_layer.j₀⁺ .= zero(FT)
     added_layer.j₀⁻ .= zero(FT)
     return nothing
@@ -199,7 +239,8 @@ function create_surface_layer!(lambertian::Union{LambertianSurfaceScalar,
                                pol_type,
                                quad_points,
                                τ_sum,
-                               architecture)
+                               architecture;
+                               F₀=nothing)
 
     FT = _albedo_eltype(lambertian)
 
@@ -235,12 +276,12 @@ function create_surface_layer!(lambertian::Union{LambertianSurfaceScalar,
         # IEEE multiplication is commutative, so baking ρ into the matvec
         # vs. broadcasting it in afterwards gives identical bits.
         if SFI
-            (; iμ₀Nstart, iμ₀, μ₀) = quad_points
-            I₀_NquadN = similar(qp_μN)
-            I₀_NquadN[:] .= zero(FT)
-            I₀_NquadN[iμ₀Nstart:pol_type.n*iμ₀] = pol_type.I₀
-            added_layer.j₀⁺[:, 1, :] .= I₀_NquadN .* exp.(-τ_sum / μ₀)'
-            added_layer.j₀⁻[:, 1, :] .= μ₀ .* ((R_unit * I₀_NquadN) .* ρ') .* exp.(-τ_sum / μ₀)'
+            (; μ₀) = quad_points
+            # Band-resolved solar beam at the surface (flat unit-I₀ when F₀ is
+            # nothing — then bit-identical to the historical Scalar path).
+            beam = _surface_beam_at_surface(F₀, FT, pol_type, quad_points, τ_sum, architecture)
+            added_layer.j₀⁺[:, 1, :] .= beam
+            added_layer.j₀⁻[:, 1, :] .= μ₀ .* ((R_unit * beam) .* ρ')
         end
 
         # Spline pattern: weight the unit selector once, broadcast ρ in.

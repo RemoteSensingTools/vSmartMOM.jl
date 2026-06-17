@@ -377,7 +377,8 @@ function create_surface_layer!(canopy::CanopySurface{FT},
                                quad_points, τ_sum,
                                architecture;
                                spec_bands_wn::Union{Nothing, Vector{FT}}=nothing,
-                               m_max::Int=2) where {FT}
+                               m_max::Int=2,
+                               F₀=nothing) where {FT}
     arr_type = array_type(architecture)
     (; qp_μN, iμ₀) = quad_points
 
@@ -444,7 +445,7 @@ function create_surface_layer!(canopy::CanopySurface{FT},
 
     τ_sum_soil = arr_type(τ_sum_curr)
     create_surface_layer!(canopy.soil, cache.soil_added, SFI, m, pol_type,
-                          quad_points, τ_sum_soil, architecture)
+                          quad_points, τ_sum_soil, architecture; F₀)
 
     @timeit "canopy-soil interaction" interaction!(
         ScatteringInterface_11(), SFI,
@@ -453,6 +454,12 @@ function create_surface_layer!(canopy::CanopySurface{FT},
     T_surf = arr_type(Diagonal(ones(FT, pol_type.n * Nquad)))
     added_layer.r⁻⁺ .= cache.canopy_composite.R⁻⁺
     added_layer.r⁺⁻ .= 0
+    # The opaque-lower-boundary condition (t⁻⁻ = 0) belongs on the true lowest
+    # boundary — the soil below the canopy — which already gets it from the
+    # shared surface scaffold via the `create_surface_layer!(canopy.soil, …)`
+    # call above. The canopy+soil *composite* presented to the atmosphere keeps
+    # t⁻⁻ = identity (the conventional bottom-layer pass-through; invisible to
+    # TOA R since the composite t⁻⁻ is never re-read after R⁻⁺ is formed).
     added_layer.t⁺⁺ .= T_surf
     added_layer.t⁻⁻ .= T_surf
     if SFI

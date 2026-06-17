@@ -245,6 +245,7 @@ function model_from_parameters(params::vSmartMOM_Parameters;
     if params.profile_reduction_n != -1
         profile = reduce_profile(params.profile_reduction_n, profile);
     end
+    rayleigh_molecular_T = (profile.vcd_dry' * profile.T) / sum(profile.vcd_dry)
 
     # Rayleigh optical depth per spectral point per layer (uses reduced profile size).
     #
@@ -281,7 +282,7 @@ function model_from_parameters(params::vSmartMOM_Parameters;
         # used as the depol values when params.depol < 0).
         νₘ = FT(0.5) * (params.spec_bands[i_band][1] + params.spec_bands[i_band][end])
         λₘ = FT(1.0e7) / νₘ
-        _n2, _o2 = InelasticScattering.getRamanAtmoConstants(FT(1.0e7) / λₘ, FT(300))
+        _n2, _o2 = InelasticScattering.getRamanAtmoConstants(FT(1.0e7) / λₘ, FT(rayleigh_molecular_T))
         ϖ_Cab = InelasticScattering.compute_ϖ_Cabannes(λₘ, _n2, _o2)
         γ_air_Cab, _ = InelasticScattering.compute_γ_air_Cabannes!(λₘ, _n2, _o2)
         γ_air_Ray, _ = InelasticScattering.compute_γ_air_Rayleigh!(λₘ, _n2, _o2)
@@ -602,11 +603,12 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
         # i'th spectral band (convert from cm⁻¹ to μm)
         curr_band_λ = 1e4 ./ params.spec_bands[i_band]
 
-        # Compute per-band Cabannes properties.
-        # Explicit (λ₀, n2, o2) form (effT = 300 K, Earth atmospheres).
+        # Compute per-band Cabannes properties using the same effective
+        # temperature as the Raman object for closure between elastic and
+        # inelastic fractions.
         νₘ = 0.5 * (params.spec_bands[i_band][1] + params.spec_bands[i_band][end])
         λₘ = 1.0e7 / νₘ
-        _n2, _o2 = InelasticScattering.getRamanAtmoConstants(1.0e7 / λₘ, 300.0)
+        _n2, _o2 = InelasticScattering.getRamanAtmoConstants(1.0e7 / λₘ, effT)
         ϖ_Cab = InelasticScattering.compute_ϖ_Cabannes(λₘ, _n2, _o2)
         γ_air_Cab, _ = InelasticScattering.compute_γ_air_Cabannes!(λₘ, _n2, _o2)
         ϖ_Cabannes[i_band] = FT_vrs(ϖ_Cab)

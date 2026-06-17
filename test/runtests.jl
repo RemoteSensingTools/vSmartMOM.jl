@@ -27,6 +27,9 @@ try
 # Forward model tests (these require YAML parameter files + data)
 @testset "Forward noRS" begin include("test_forward_noRS.jl") end
 
+# Molecular Rayleigh/Cabannes/RRS optical-property identities.
+@testset "Rayleigh/Cabannes Raman" begin include("test_ray_cab_raman.jl") end
+
 # Jacobian unit tests
 @testset "Jacobian Unit" begin include("test_jacobians_unit.jl") end
 

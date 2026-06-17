@@ -21,7 +21,10 @@ Use the simplest hook that matches the model:
 | Polarized ocean or other Mueller BRDF | specialized `reflectance(surface, pol_type, mu, m)` and helper kernels | `CoxMunkSurface` |
 | Composite lower boundary | specialized `create_surface_layer!` that internally runs sub-layers and interacts with a soil layer | `CanopySurface` |
 
-The generic surface layer stores upward surface reflection in `added_layer.r⁻⁺`, identity transmission in `t⁺⁺`/`t⁻⁻`, and optional direct solar source terms in `j₀⁺`/`j₀⁻` when SFI is active.
+The generic surface layer stores upward surface reflection in `added_layer.r⁻⁺`,
+keeps `t⁺⁺` as the identity pass-through for the downwelling surface field,
+sets `t⁻⁻ = 0` for an opaque lower boundary, and adds optional direct solar
+source terms in `j₀⁺`/`j₀⁻` when SFI is active.
 
 ## Define The Type
 

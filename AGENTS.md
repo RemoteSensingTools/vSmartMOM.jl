@@ -242,7 +242,7 @@ cd docs && julia --project=. make.jl
 
 1. **What is the package about?** → Read the spine above (top of this file).
 2. **What does this code do?** → Find it in the code-anchor table above; read the relevant Concepts page; cross-reference `theory_references.md` for the paper equation.
-3. **Why is the code shaped this way?** → Check the **design-choice passages** at the bottom of `theory_references.md`. There are seven; they explain non-obvious trade-offs (no solar SFI in J, constant-`N_doubl`, Cabannes vs Rayleigh greek, linear-in-inelastic, `rt_run_ss` raison d'être, δBGE-fit vs δ-m, exact finite-δ elemental).
+3. **Why is the code shaped this way?** → Check the **design-choice passages** at the bottom of `theory_references.md`. They explain non-obvious trade-offs (no solar SFI in J, constant-`N_doubl`, Cabannes vs Rayleigh greek, Raman Rayleigh fraction, linear-in-inelastic, `rt_run_ss` raison d'être, δBGE-fit vs δ-m, exact finite-δ elemental).
 4. **Where does this paper equation map in the code?** → `theory_references.md` Sections A–J.
 5. **How should I write a new feature?** → Check `CLAUDE.md` for the "Common Workflows" patterns (adding a surface BRDF, adding a test, modifying YAML parsing).
 
