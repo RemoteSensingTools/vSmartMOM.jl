@@ -31,10 +31,11 @@ host↔device copies, and fScattRayleigh recomputation on every moment.
 - `rayl_τ_dev[iBi][iz]`: device τ_rayl slice per band-index/layer — avoids re-upload.
 - `rayl_ϖ_Cabannes[iBi]`: ϖ_Cabannes per band (scalar or device array) — avoids
   re-upload.
-- `aer_τ_mod[iBi][iAer][iz]`: δ-M-modified aerosol τ (plain FT scalar) per
-  band-index/aerosol/layer — precomputed `(1-fᵗ·ω̃)·τ_aer`.
-- `aer_ϖ_mod[iBi][iAer]`: δ-M-modified aerosol ϖ (plain FT scalar) — precomputed
-  `(1-fᵗ)·ω̃/(1-fᵗ·ω̃)`.
+- `aer_τ_mod[iBi][iAer][iz]`: δ-M-modified aerosol τ per band-index/aerosol/layer —
+  precomputed `(1-fᵗ·ω̃)·τ_aer`; a device nSpec vector for multi-λ bands, or a scalar
+  for single-λ bands.
+- `aer_ϖ_mod[iBi][iAer]`: δ-M-modified aerosol ϖ — precomputed `(1-fᵗ)·ω̃/(1-fᵗ·ω̃)`;
+  an nSpec vector for multi-λ bands, or a scalar for single-λ bands.
 - `τ_abs_dev[iBi][iz]`: device τ_abs slice per band-index/layer — avoids re-upload.
 - `fScattRayleigh`: per-layer Rayleigh scattering fraction (host arrays) — avoids
   the per-m `Array(rayl.τ ./ combo.τ)` device→host copy.
@@ -91,13 +92,24 @@ function build_m_invariant_cache(RS_type::AbstractRamanType, iBand, model)
         rayl_τ_dev_iB      = [_to_device(arr_type, τ_rayl[iB][:,iz]) for iz=1:nZ]
         rayl_ϖ_Cabannes_iB = RS_type.ϖ_Cabannes[iB]  # scalar or existing device array
 
-        # Aerosol: pre-apply δ-M correction (scalars — τ_aer[iB][i,iz] is a FT scalar)
+        # Aerosol: pre-apply δ-M correction.
+        # τ_aer[iB] is now 3-D [iAer, nSpec, iLayer], so τ_aer[iB][i,:,iz] is an
+        # nSpec vector. ω̃ and fᵗ may be scalars (single-λ band) or vectors (multi-λ band);
+        # broadcasting handles both cases.
+        # aer_τ_mod[iBi][iAer][iz] → nSpec vector (or scalar for single-λ bands)
+        # aer_ϖ_mod[iBi][iAer]     → nSpec vector (or scalar for single-λ bands)
         aer_τ_mod_iB = Vector{Vector}(undef, nAero)
         aer_ϖ_mod_iB = Vector(undef, nAero)
         for i = 1:nAero
             (; fᵗ, ω̃) = aerosol_optics[iB][i]
-            aer_ϖ_mod_iB[i] = (1 - fᵗ) * ω̃ / (1 - fᵗ * ω̃)
-            aer_τ_mod_iB[i] = [(1 - fᵗ * ω̃) * τ_aer[iB][i, iz] for iz=1:nZ]
+            # Device-type ω̃/fᵗ when they are host Vectors (multi-λ band on GPU):
+            # aer_ϖ_mod is later passed into CoreScatteringOpticalProperties on the
+            # device path (cache overload), so it must live on the device.
+            # Scalars (single-λ) are unchanged — _to_device only acts on AbstractArray.
+            ω̃_d  = ω̃  isa AbstractArray ? _to_device(arr_type, ω̃)  : ω̃
+            fᵗ_d = fᵗ isa AbstractArray ? _to_device(arr_type, fᵗ) : fᵗ
+            aer_ϖ_mod_iB[i] = (1 .- fᵗ_d) .* ω̃_d ./ (1 .- fᵗ_d .* ω̃_d)
+            aer_τ_mod_iB[i] = [_to_device(arr_type, (1 .- fᵗ .* ω̃) .* τ_aer[iB][i, :, iz]) for iz=1:nZ]
         end
 
         τ_abs_dev_iB = [_to_device(arr_type, τ_abs[iB][:,iz]) for iz=1:nZ]
@@ -178,9 +190,11 @@ function constructCoreOpticalProperties(RS_type::AbstractRamanType, iBand, m, mo
                                 pol_type, μ,
                                 aerosol_optics[iB][i].greek_coefs,
                                 m, arr_type=arr_type)
-            aer = createAero.(τ_aer[iB][i,:],
-                              [aerosol_optics[iB][i]],
-                              [AerZ⁺⁺], [AerZ⁻⁺])
+            # τ_aer[iB] is now 3-D [iAer, nSpec, iLayer]; extract per-spectral
+            # τ vector for layer iz matching the Rayleigh pattern: arr_type(τ_rayl[iB][:,iz]).
+            aer = [createAero(arr_type(τ_aer[iB][i,:,iz]),
+                               aerosol_optics[iB][i],
+                               AerZ⁺⁺, AerZ⁻⁺) for iz=1:nZ]
             combo = combo .+ aer
         end
 
@@ -241,7 +255,9 @@ function constructCoreOpticalProperties(RS_type::AbstractRamanType, iBand, m, mo
         for i = 1:nAero
             AerZ⁺⁺, AerZ⁻⁺ = Scattering.compute_Z_moments(
                 pol_type, μ, aerosol_optics[iB][i].greek_coefs, m, arr_type=arr_type)
-            # Use cached pre-corrected δ-M scalars — avoids createAero recomputing fᵗ/ω̃
+            # Use cached pre-corrected δ-M values — avoids createAero recomputing fᵗ/ω̃.
+            # aer_τ_mod[iBi][i][iz] is an nSpec device vector (or scalar for single-λ bands);
+            # aer_ϖ_mod[iBi][i] is an nSpec vector (or scalar); both broadcast in CoreScatteringOpticalProperties.
             aer = [CoreScatteringOpticalProperties(cache.aer_τ_mod[iBi][i][iz],
                        cache.aer_ϖ_mod[iBi][i], AerZ⁺⁺, AerZ⁻⁺) for iz=1:nZ]
             combo = combo .+ aer
@@ -261,9 +277,14 @@ end
 
 function createAero(τAer, aerosol_optics, AerZ⁺⁺, AerZ⁻⁺)
     (; fᵗ, ω̃) = aerosol_optics
-    τ_mod = (1-fᵗ * ω̃ ) * τAer;
-    ϖ_mod = (1-fᵗ) * ω̃/(1-fᵗ * ω̃)
-    CoreScatteringOpticalProperties(τ_mod, ϖ_mod,AerZ⁺⁺, AerZ⁻⁺)
+    # Device-type ω̃ and fᵗ to match τAer when they are host Vectors (multi-λ band
+    # on GPU: τAer is already a device array, but ω̃/fᵗ remain host Vector{FT}).
+    # Scalars (single-λ band) are left unchanged — `oftype` only acts on AbstractArray.
+    ω̃d  = ω̃  isa AbstractArray ? oftype(τAer, ω̃)  : ω̃
+    fᵗd = fᵗ isa AbstractArray ? oftype(τAer, fᵗ) : fᵗ
+    τ_mod = (1 .- fᵗd .* ω̃d) .* τAer
+    ϖ_mod = (1 .- fᵗd) .* ω̃d ./ (1 .- fᵗd .* ω̃d)
+    CoreScatteringOpticalProperties(τ_mod, ϖ_mod, AerZ⁺⁺, AerZ⁻⁺)
 end
 
 # Extract scattering definitions and integrated absorptions for the source function!

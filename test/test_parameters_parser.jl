@@ -147,8 +147,9 @@ end
     model = model_from_parameters(params)
     @test model.aerosol_optics[1][1].ω̃ ≈ 0.92
     @test length(model.aerosol_optics[1][1].greek_coefs.β) == params.l_trunc
-    @test all(model.τ_aer[1][1, :] .>= 0)
-    @test sum(model.τ_aer[1][1, :]) ≈ aer.τ_ref
+    # τ_aer is 3-D [iAer, nSpec, iLayer]; a single spectral slice sums to the column AOD.
+    @test all(model.τ_aer[1][1, :, :] .>= 0)
+    @test sum(model.τ_aer[1][1, 1, :]) ≈ aer.τ_ref
     @test_throws ArgumentError model_from_parameters(LinMode(), params)
 
     cfg_no_trunc = deepcopy(cfg)

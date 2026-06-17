@@ -272,8 +272,15 @@ function model_from_parameters(lin::LinMode,
             params.polarization_type, truncation_type, scat.r_max, scat.nquad_radius;
             architecture = Architectures.CPU())
 
-        mie_model = _mie(scat.λ_ref)
-        k_ref, k̇_ref   = compute_ref_aerosol_extinction(lin, mie_model, params.float_type)
+        # k_ref normalization at λ_ref uses the aerosol's own nᵣ/nᵢ so the Jacobian
+        # chain w.r.t. nᵣ/nᵢ stays intact — the FD test perturbs the aerosol's nᵣ, and a
+        # fixed-n_ref k_ref would zero ∂k_ref/∂nᵣ. For the common case (n_ref unset →
+        # defaults to the aerosol's own index) this equals the forward path's k_ref value.
+        # KNOWN LIMITATION: for an explicit n_ref that differs from the aerosol's index,
+        # the linearized forward/Jacobian normalization uses the aerosol index here while
+        # the non-linear forward uses n_ref — a small inconsistency for that niche config.
+        mie_model_ref_lin = _mie(scat.λ_ref)
+        k_ref, k̇_ref   = compute_ref_aerosol_extinction(lin, mie_model_ref_lin, params.float_type)
 
         for i_band=1:n_bands
 
