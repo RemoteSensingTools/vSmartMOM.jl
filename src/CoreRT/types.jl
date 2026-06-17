@@ -971,7 +971,7 @@ $(DocStringExtensions.FIELDS)
 struct AerosolState{FT<:AbstractFloat, AO, AT<:AbstractArray{FT}}
     "Truncated aerosol optics: aerosol_optics[iBand][iAer]"
     aerosol_optics::Vector{Vector{AO}}
-    "Aerosol optical depth profiles: `τ_aer[iBand][iAer, iLayer]` (or `[iAer, nSpec, iLayer]` for lin)"
+    "Aerosol optical depth profiles: `τ_aer[iBand][iAer, nSpec, iLayer]` — 3-D for both the forward and linearized paths, enabling per-wavelength aerosol optical depth within wide spectral bands."
     τ_aer::Vector{AT}
 end
 
