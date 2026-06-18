@@ -91,11 +91,6 @@ try
 # and the AD albedo Jacobian. Runtime ~2 min.
 @testset "Hybrid AD" begin include("test_hybrid_ad.jl") end
 
-# GPU Mie kernels (DoubleSingle/Neumaier precision layer + NAI2 pipeline),
-# run on the KernelAbstractions CPU backend so no CUDA is required.
-# The slow benchmark/accuracy-table testsets are opt-in via VSMARTMOM_MIE_BENCH=1.
-@testset "Mie GPU kernels" begin include("test_mie_gpu.jl") end
-
 # Cox-Munk ocean surface tests
 @testset "Cox-Munk Surface" begin include("test_coxmunk.jl") end
 
@@ -104,17 +99,9 @@ try
 # LambertianSurfaceSpectrum end-to-end regression.
 @testset "Lambertian surfaces" begin include("test_lambertian_surfaces.jl") end
 
-# GPU-specific tests (conditional on CUDA availability)
-CUDA_AVAILABLE = try
-    using CUDA
-    CUDA.functional()
-catch
-    false
-end
-
-if CUDA_AVAILABLE
-    @testset "Raman GPU" begin include("test_forward_raman_gpu.jl") end
-end
+# NOTE: GPU/Metal tests live in test/gpu/ (run `julia --project=test
+# test/gpu/runtests.jl`); they are not part of the CI unit suite. test_mie_gpu
+# (KA CPU backend) + test_forward_raman_gpu + test_jacobians_GPU moved there.
 
 # Phase 1b regression gate — RRS forward model vs frozen reference.
 # Skipped by default on CPU-only machines (run takes ~3 min); set

@@ -9,13 +9,13 @@
 # moments to include — exactly the latent bug the
 # `_derive_m_max_bands` helper unifies.
 #
-# Parse failures and forward-build failures are still skipped (RRS/VS
-# configs need the explicit RS_type argument, etc.) — those are tested
-# elsewhere. But once a config builds forward, the lin path MUST also
-# build cleanly: we no longer silently swallow lin-build errors,
-# because masking them lets latent regressions slip through CI (see
-# the Rayleigh-only LinMode FieldError that surfaced in the v2.1
-# Codex review).
+# Every config under test/test_parameters/ MUST parse, build forward, AND
+# build linearized — a failure in any of those is now a HARD test failure,
+# not a silent skip (silent skips let stale/broken configs hide; see the
+# 14 configs that had silently rotted before the test/setup split). Configs
+# that need external data, external LUTs (VSMARTMOM_HITRAN_LUT_DIR), or the
+# not-yet-implemented H2O-override feature live under
+# test/setup/test_parameters/ and run via test/setup/runtests.jl instead.
 
 using vSmartMOM
 using vSmartMOM.CoreRT
@@ -28,21 +28,24 @@ _yaml_paths() = filter(p -> endswith(p, ".yaml"), readdir(_PARAMS_DIR; join = tr
 @testset "Phase B — forward/lin m_max_bands parity" begin
     n_compared = 0
     for path in _yaml_paths()
+        cfg = basename(path)
         params = try
             parameters_from_yaml(path)
         catch err
-            @info "Skipping (parse failed)" path err
+            @error "Config in test_parameters/ failed to parse — fix it or move it to test/setup/test_parameters/" config=cfg exception=(err, catch_backtrace())
+            @test false
             continue
         end
 
         fwd = try
             model_from_parameters(params)
         catch err
-            @info "Skipping (forward build failed)" path = basename(path) err
+            @error "Config in test_parameters/ failed to build forward — fix it or move it to test/setup/test_parameters/" config=cfg exception=(err, catch_backtrace())
+            @test false
             continue
         end
 
-        # No longer wrap in try/catch — lin-build failures are real bugs.
+        # lin-build failures are real bugs — not wrapped.
         lin_model, _ = model_from_parameters(LinMode(), params)
 
         fwd_m = CoreRT.m_max_bands(fwd)
