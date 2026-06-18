@@ -26,7 +26,7 @@ if !CUDA_OK
     @test_skip "CUDA not available - skipping Raman GPU tests"
 else
 
-    params = parameters_from_yaml("test_parameters/O2Parameters_GPU.yaml")
+    params = parameters_from_yaml("local/test_parameters/O2Parameters_GPU.yaml")
     params.architecture = vSmartMOM.Architectures.GPU()
     model = model_from_parameters(params)
 
