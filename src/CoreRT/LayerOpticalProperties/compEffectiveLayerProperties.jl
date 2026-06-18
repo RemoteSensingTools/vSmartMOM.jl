@@ -401,9 +401,13 @@ function expandOpticalProperties(in::CoreDirectionalScatteringOpticalProperties,
 end
 
 function expandBandScalars(RS_type, x)
-    out = zeros(eltype(x[1]), sum([length(RS_type.bandSpecLim[iB]) for iB in RS_type.iBand]))
-    for iB in RS_type.iBand
-        out[RS_type.bandSpecLim[iB]] .= expandScalar(x[iB],length(RS_type.bandSpecLim[iB]))
+    # `constructCoreOpticalProperties` returns one `x` entry per requested band,
+    # in requested-band order. `RS_type.iBand` stores model band numbers, which
+    # may be non-contiguous for single-band calls such as `iBand = [2]`.
+    out = zeros(eltype(x[1]), sum(length.(RS_type.bandSpecLim)))
+    for (ib_local, _) in enumerate(RS_type.iBand)
+        band_range = RS_type.bandSpecLim[ib_local]
+        out[band_range] .= expandScalar(x[ib_local], length(band_range))
     end
     return out
 end
