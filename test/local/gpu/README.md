@@ -7,7 +7,7 @@ to keep the main suite hardware-free.
 ## Run
 
 ```bash
-julia --project=test test/gpu/runtests.jl
+julia --project=test test/local/gpu/runtests.jl
 ```
 
 ## Contents

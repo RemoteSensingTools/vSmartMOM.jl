@@ -99,9 +99,10 @@ try
 # LambertianSurfaceSpectrum end-to-end regression.
 @testset "Lambertian surfaces" begin include("test_lambertian_surfaces.jl") end
 
-# NOTE: GPU/Metal tests live in test/gpu/ (run `julia --project=test
-# test/gpu/runtests.jl`); they are not part of the CI unit suite. test_mie_gpu
-# (KA CPU backend) + test_forward_raman_gpu + test_jacobians_GPU moved there.
+# NOTE: GPU/Metal tests live in test/local/gpu/ and run via
+# `julia --project=test test/local/runtests.jl` (the local-only suite); they are
+# NOT part of this CI suite. Likewise, configs needing external LUTs/ABSCO data
+# or the unimplemented H2O override live in test/local/test_parameters/.
 
 # Phase 1b regression gate — RRS forward model vs frozen reference.
 # Skipped by default on CPU-only machines (run takes ~3 min); set

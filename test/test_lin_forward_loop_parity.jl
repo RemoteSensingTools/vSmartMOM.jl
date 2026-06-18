@@ -9,13 +9,14 @@
 # moments to include — exactly the latent bug the
 # `_derive_m_max_bands` helper unifies.
 #
-# Every config under test/test_parameters/ MUST parse, build forward, AND
-# build linearized — a failure in any of those is now a HARD test failure,
-# not a silent skip (silent skips let stale/broken configs hide; see the
-# 14 configs that had silently rotted before the test/setup split). Configs
-# that need external data, external LUTs (VSMARTMOM_HITRAN_LUT_DIR), or the
-# not-yet-implemented H2O-override feature live under
-# test/setup/test_parameters/ and run via test/setup/runtests.jl instead.
+# `test/test_parameters/` holds ONLY CI-buildable configs, so any parse or
+# forward/lin build failure here is a HARD failure — not a silent skip. (A
+# silent skip on a shared-FS dev box is misleading: it can "see" /home/.../data
+# LUTs that CI's clean runners cannot, so configs that need local data must NOT
+# live here.) Scenes that need external LUTs / ABSCO data / a GPU / the
+# unimplemented H2O-override live under `test/local/test_parameters/` and run
+# via `test/local/runtests.jl` on a machine that has the data. If a config
+# trips this guard on CI, either fix it or move it to test/local/.
 
 using vSmartMOM
 using vSmartMOM.CoreRT
@@ -32,7 +33,7 @@ _yaml_paths() = filter(p -> endswith(p, ".yaml"), readdir(_PARAMS_DIR; join = tr
         params = try
             parameters_from_yaml(path)
         catch err
-            @error "Config in test_parameters/ failed to parse — fix it or move it to test/setup/test_parameters/" config=cfg exception=(err, catch_backtrace())
+            @error "CI config failed to parse — fix it, or move it to test/local/test_parameters/ if it needs local data/LUTs" config=cfg exception=(err, catch_backtrace())
             @test false
             continue
         end
@@ -40,7 +41,7 @@ _yaml_paths() = filter(p -> endswith(p, ".yaml"), readdir(_PARAMS_DIR; join = tr
         fwd = try
             model_from_parameters(params)
         catch err
-            @error "Config in test_parameters/ failed to build forward — fix it or move it to test/setup/test_parameters/" config=cfg exception=(err, catch_backtrace())
+            @error "CI config failed to build forward — fix it, or move it to test/local/test_parameters/ if it needs local data/LUTs" config=cfg exception=(err, catch_backtrace())
             @test false
             continue
         end
