@@ -39,15 +39,18 @@ read again, and `t⁺⁺` / `j₀⁺` flow into the composite `T⁺⁺` / `J₀�
 linearized paths historically disagreed without breaking the golden TOA
 suites. We unify them as follows:
 
-  • `t⁺⁺ = t⁻⁻ = I` (identity) — matches the long-standing Scalar/generic
-    forward path; keeps the bit-pinned Scalar TOA results unchanged.
+  • `t⁺⁺ = I` (identity) and `t⁻⁻ = 0` — the surface transmits no upward
+    field from below because the lower boundary is opaque in these RT
+    applications, while the downward pass-through keeps legacy diagnostics
+    and surface coupling conventions intact.
   • `j₀⁺ = attenuated direct beam` (μ-selector · exp(-τ/μ₀)). This is the
     Scalar/generic convention and is REQUIRED: at m=0 the surface's `j₀⁺`
     is consumed by `interaction_hdrf!` (the BHR-downward flux diagnostic,
     `bhr_J₀⁺ += j₀⁺[iμ₀]·μ₀`). The old Legendre/Spline path zeroed it
     (a "Suniti double-check" stub) and silently broke that diagnostic.
   • `j₀⁻ = μ₀ · R_surf · I₀ · exp(-τ/μ₀)` (the reflected direct beam).
-  • m > 0: everything zero (`r⁻⁺ = r⁺⁻ = 0`, `j₀± = 0`) with `t = I`.
+  • m > 0: everything zero (`r⁻⁺ = r⁺⁻ = 0`, `j₀± = 0`) with `t⁺⁺ = I`
+    and `t⁻⁻ = 0`.
     The pre-consolidation code zeroed `r⁻⁺` twice and never `r⁺⁻`
     (benign only because m=0 runs first and leaves r⁺⁻ already zero) —
     fixed here.

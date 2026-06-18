@@ -9,7 +9,7 @@
 #   1. Cross-flavour equivalence of the surface AddedLayer at m=0 and m=1:
 #        • Spectrum with a constant ρ vector  ==  Scalar (bit-identical)
 #        • Legendre with only the constant coeff == Scalar (bit-identical)
-#      plus the agreed t / r / j conventions (t⁺⁺=t⁻⁻=I, r⁺⁻=0,
+#      plus the agreed t / r / j conventions (t⁺⁺=I, t⁻⁻=0, r⁺⁻=0,
 #      j₀⁺ = attenuated direct beam at m=0, everything zero at m>0).
 #   2. LambertianSurfaceSpectrum end-to-end through `rt_run` equals the
 #      equivalent Scalar config (bit-identical R).

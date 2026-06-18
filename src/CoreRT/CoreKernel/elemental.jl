@@ -338,8 +338,11 @@ doubled.
     Z⁻⁺_I₀ = zero(FT);
     
     for ii = i_start:i_end
-        Z⁺⁺_I₀ += Z⁺⁺[i,ii,n2] * F₀[ii-i_start+1,n2]
-        Z⁻⁺_I₀ += Z⁻⁺[i,ii,n2] * F₀[ii-i_start+1,n2]
+        # `n2` tracks the Z matrix spectral axis, which can be length 1 for
+        # m-invariant Rayleigh/Cabannes fast paths.  The solar source is always
+        # defined on the radiance grid, so keep its spectral index at `n`.
+        Z⁺⁺_I₀ += Z⁺⁺[i,ii,n2] * F₀[ii-i_start+1,n]
+        Z⁻⁺_I₀ += Z⁻⁺[i,ii,n2] * F₀[ii-i_start+1,n]
     end
 
     if (i >= i_start) & (i <= i_end)
