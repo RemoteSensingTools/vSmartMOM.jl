@@ -172,6 +172,15 @@ function _surface_source!(added_layer, R_surf, τ_sum, quad_points, pol_type, ::
     return nothing
 end
 
+function _lambertian_reflect_direct_beam!(j₀⁻, beam_at_surface, ρ, μ₀,
+                                          pol_type, iμ₀Nstart)
+    j₀⁻[:, 1, :] .= zero(eltype(j₀⁻))
+    incident_I = reshape(@view(beam_at_surface[iμ₀Nstart, :]), 1, :)
+    ρ_row = reshape(ρ .+ zero.(@view(beam_at_surface[iμ₀Nstart, :])), 1, :)
+    @views j₀⁻[1:pol_type.n:end, 1, :] .= μ₀ .* ρ_row .* incident_I
+    return nothing
+end
+
 """
     _fill_surface_layer!(added_layer, R_surf_weighted, T_surf)
 
@@ -284,11 +293,14 @@ function create_surface_layer!(lambertian::Union{LambertianSurfaceScalar,
             # nothing — then bit-identical to the historical Scalar path).
             beam = _surface_beam_at_surface(F₀, FT, pol_type, quad_points, τ_sum, architecture)
             added_layer.j₀⁺[:, 1, :] .= beam
-            added_layer.j₀⁻[:, 1, :] .= μ₀ .* ((R_unit * beam) .* ρ')
+            _lambertian_reflect_direct_beam!(added_layer.j₀⁻, beam, ρ, μ₀,
+                                             pol_type, quad_points.iμ₀Nstart)
         end
 
         # Spline pattern: weight the unit selector once, broadcast ρ in.
-        R_weighted = (R_unit * Diagonal(qp_μN .* wt_μN)) .* reshape(ρ, 1, 1, :)
+        # Column scaling is equivalent to `R_unit * Diagonal(qp_μN .* wt_μN)`
+        # but avoids an unnecessary BLAS/cuBLAS call during surface setup.
+        R_weighted = (R_unit .* reshape(qp_μN .* wt_μN, 1, :)) .* reshape(ρ, 1, 1, :)
         _fill_surface_layer!(added_layer, R_weighted, T_surf)
     else
         _zero_surface_layer!(added_layer, T_surf)
