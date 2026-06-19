@@ -377,8 +377,8 @@ function interaction_helper!(RS_type::RRS, ::ScatteringInterface_11, SFI,
     if SFI
         for Δn = 1:size(ieJ₀⁺,4)
             n₀, n₁ = get_n₀_n₁(ieJ₀⁺,i_λ₁λ₀[Δn])
-            @inbounds @views tmpieJ₀⁻[:,:,n₁,Δn] = 
-                    ieJ₀⁻[:,:,n₁,Δn] + 
+            @inbounds @views tmpieJ₀⁻[:,:,n₁,Δn] .=
+                    ieJ₀⁻[:,:,n₁,Δn] +
                     T01_inv[:,:,n₁] ⊠ 
                     (ier⁻⁺[:,:,n₁,Δn] ⊠ J₀⁺[:,:,n₀] +
                     r⁻⁺[:,:,n₁] ⊠ ieJ₀⁺[:,:,n₁,Δn] +
@@ -403,14 +403,14 @@ function interaction_helper!(RS_type::RRS, ::ScatteringInterface_11, SFI,
     end 
     for Δn = 1:size(ier⁻⁺,4)
         n₀, n₁ = get_n₀_n₁(ier⁻⁺,i_λ₁λ₀[Δn])
-        @inbounds @views tmpieR⁻⁺[:,:,n₁,Δn] = ieR⁻⁺[:,:,n₁,Δn] +
+        @inbounds @views tmpieR⁻⁺[:,:,n₁,Δn] .= ieR⁻⁺[:,:,n₁,Δn] +
             T01_inv[:,:,n₁] ⊠   
             (ier⁻⁺[:,:,n₁,Δn] ⊠ T⁺⁺[:,:,n₀] + r⁻⁺[:,:,n₁] ⊠ ieT⁺⁺[:,:,n₁,Δn]) +    
             (T01_inv[:,:,n₁] ⊠ 
             (ier⁻⁺[:,:,n₁,Δn] ⊠ R⁺⁻[:,:,n₀] + r⁻⁺[:,:,n₁] ⊠ ieR⁺⁻[:,:,n₁,Δn]) + 
             ieT⁻⁻[:,:,n₁,Δn]) ⊠ 
             tmp_inv[:,:,n₀] ⊠ r⁻⁺[:,:,n₀] ⊠ T⁺⁺[:,:,n₀]
-        @inbounds @views tmpieT⁻⁻[:,:,n₁,Δn] = 
+        @inbounds @views tmpieT⁻⁻[:,:,n₁,Δn] .=
             T01_inv[:,:,n₁] ⊠ iet⁻⁻[:,:,n₁,Δn] +  
             (T01_inv[:,:,n₁] ⊠ 
             (ier⁻⁺[:,:,n₁,Δn] ⊠ R⁺⁻[:,:,n₀] + r⁻⁺[:,:,n₁] ⊠ ieR⁺⁻[:,:,n₁,Δn]) +
@@ -446,8 +446,8 @@ function interaction_helper!(RS_type::RRS, ::ScatteringInterface_11, SFI,
     if SFI
         for Δn = 1:size(ieJ₀⁺,4)
             n₀, n₁ = get_n₀_n₁(ieJ₀⁺,i_λ₁λ₀[Δn])
-            @inbounds @views tmpieJ₀⁺[:,:,n₁,Δn] =
-                            added_layer.ieJ₀⁺[:,:,n₁,Δn] + 
+            @inbounds @views tmpieJ₀⁺[:,:,n₁,Δn] .=
+                            added_layer.ieJ₀⁺[:,:,n₁,Δn] +
                             T21_inv[:,:,n₁] ⊠ 
                             (ieJ₀⁺[:,:,n₁,Δn] + 
                             ieR⁺⁻[:,:,n₁,Δn] ⊠ added_layer.j₀⁻[:,:,n₀] +
@@ -466,14 +466,14 @@ function interaction_helper!(RS_type::RRS, ::ScatteringInterface_11, SFI,
     for Δn = 1:size(ieJ₀⁺,4)
         n₀, n₁ = get_n₀_n₁(ieJ₀⁺,i_λ₁λ₀[Δn])
         
-        @inbounds @views tmpieT⁺⁺[:,:,n₁,Δn] = 
+        @inbounds @views tmpieT⁺⁺[:,:,n₁,Δn] .=
                     T21_inv[:,:,n₁] ⊠ ieT⁺⁺[:,:,n₁,Δn] +
                     (T21_inv[:,:,n₁] ⊠ (ieR⁺⁻[:,:,n₁,Δn] ⊠ r⁻⁺[:,:,n₀] + 
                     R⁺⁻[:,:,n₁] ⊠ ier⁻⁺[:,:,n₁,Δn]) +
                     iet⁺⁺[:,:,n₁,Δn]) ⊠ tmp_inv[:,:,n₀] ⊠ T⁺⁺[:,:,n₀] #Suniti: Eq 12 of Raman paper draft
 
-        @inbounds @views tmpieR⁺⁻[:,:,n₁,Δn] = 
-                    ier⁺⁻[:,:,n₁,Δn] + 
+        @inbounds @views tmpieR⁺⁻[:,:,n₁,Δn] .=
+                    ier⁺⁻[:,:,n₁,Δn] +
                     T21_inv[:,:,n₁] ⊠ 
                     (ieR⁺⁻[:,:,n₁,Δn] ⊠ t⁻⁻[:,:,n₀] +
                     R⁺⁻[:,:,n₁] ⊠ iet⁻⁻[:,:,n₁,Δn]) +

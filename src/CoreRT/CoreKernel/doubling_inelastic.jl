@@ -138,8 +138,8 @@ function doubling_helper!(RS_type::RRS,
                             (ier⁻⁺[:,:,n₁,Δn] ⊠ r⁻⁺[:,:,n₀] + r⁻⁺[:,:,n₁] ⊠ ier⁻⁺[:,:,n₁,Δn]) ⊠
                             gp_refl[:,:,n₀] ⊠ r⁻⁺[:,:,n₀]) ⊠ t⁺⁺[:,:,n₀])
 
-                iet⁺⁺[:,:,n₁,Δn] = tmp5
-                ier⁻⁺[:,:,n₁,Δn] = tmp6
+                iet⁺⁺[:,:,n₁,Δn] .= tmp5
+                ier⁻⁺[:,:,n₁,Δn] .= tmp6
         end
 
         # R⁻⁺₂₀(λ) = R⁻⁺₁₀(λ) + T⁻⁻₀₁(λ)[I - R⁻⁺₂₁(λ)R⁺⁻₀₁(λ)]⁻¹R⁻⁺₂₁(λ)T⁺⁺₁₀(λ) (see Eqs.8 in Raman paper draft)
