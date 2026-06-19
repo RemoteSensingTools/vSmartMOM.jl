@@ -68,6 +68,7 @@ include("Sources/thermal_emission.jl")         # v0.7 Phase A: ThermalEmission p
 
 # Shared helpers
 include("CoreKernel/rt_helpers.jl")
+include("CoreKernel/fused_raman_kernels.jl") # Fused KA kernels for RRS per-Δn loops (GPU; fits-gated fallback to batched_mul)
 
 # Solvers -- Elemental
 include("CoreKernel/elemental.jl")             # Elemental (elastic)
