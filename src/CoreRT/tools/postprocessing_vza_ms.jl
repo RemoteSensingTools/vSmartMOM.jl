@@ -102,16 +102,20 @@ function postprocessing_vza_ms!(RS_type::Union{RRS, VS_0to1_plus, VS_1to0_plus},
         end
     end
 
+    # Pre-reduce the inelastic sources over the Raman dimension once per sensor
+    # (VZA-independent), mirroring the single-sensor postprocessing_vza! — instead
+    # of re-summing n_raman terms inside the vza×spec loop (the old hot loop).
+    tuwieJr = [dropdims(sum(t, dims=4), dims=4) for t in tuwieJ]   # (nμ,1,nSpec) each
+    tdwieJr = [dropdims(sum(t, dims=4), dims=4) for t in tdwieJ]
+
     for i in eachindex(vza)
         istart, iend, w = vza_info[i]
         for ims in eachindex(sensor_levels)
             for s = 1:nSpec
-                uwJ[ims][i,:,s] .+= w * tuwJ[ims][istart:iend, 1, s]
-                dwJ[ims][i,:,s] .+= w * tdwJ[ims][istart:iend, 1, s]
-                for t = 1:n_raman
-                    uwieJ[ims][i,:,s] .+= w * tuwieJ[ims][istart:iend, 1, s, t]
-                    dwieJ[ims][i,:,s] .+= w * tdwieJ[ims][istart:iend, 1, s, t]
-                end
+                uwJ[ims][i,:,s]   .+= w * tuwJ[ims][istart:iend, 1, s]
+                dwJ[ims][i,:,s]   .+= w * tdwJ[ims][istart:iend, 1, s]
+                uwieJ[ims][i,:,s] .+= w * tuwieJr[ims][istart:iend, 1, s]
+                dwieJ[ims][i,:,s] .+= w * tdwieJr[ims][istart:iend, 1, s]
             end
         end
     end
