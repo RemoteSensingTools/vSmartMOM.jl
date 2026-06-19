@@ -253,3 +253,63 @@ relerr(a, b) = maximum(abs.(Array(a) .- Array(b))) / max(eps(Float64), maximum(a
         end
     end
 end
+
+# ── Raman postprocessing: the Σ-over-Raman-shift reduce must equal the original
+#    per-shift triple-loop (postprocessing_vza.jl). CPU-runnable (no GPU needed —
+#    postprocessing copies to host anyway); the GPU branch also checks the device
+#    reduction path. This locks the ~400× postprocessing optimization. ────────────
+@testset "Raman postprocessing: reduce-over-shift ≡ per-shift loop" begin
+    Nq, NquadN, nSpec, nR = 5, 15, 50, 10
+    pol = CoreRT.Stokes_IQU()
+    n2, o2 = InelasticScattering.getRamanAtmoConstants(1e7/760, 250.0)
+    RS = InelasticScattering.RRS(n2=n2, o2=o2,
+        greek_raman = InelasticScattering.GreekCoefs(fill(1.0,1),fill(1.0,1),fill(1.0,1),fill(1.0,1),fill(1.0,1),fill(1.0,1)),
+        fscattRayl=[1.0], ϖ_Cabannes=[1.0], ϖ_λ₁λ₀=zeros(nR),
+        i_λ₁λ₀=collect(-(nR÷2):(nR-(nR÷2)-1)), Z⁻⁺_λ₁λ₀=zeros(1,1), Z⁺⁺_λ₁λ₀=zeros(1,1),
+        i_ref=nSpec÷2, n_Raman=nR, F₀=zeros(3,nSpec), SIF₀=zeros(3,nSpec))
+    Random.seed!(7)
+    qp_μ = sort(rand(Nq)) .* 0.9 .+ 0.05
+    μ₀ = 0.6; iμ₀ = CoreRT.nearest_point(qp_μ, μ₀)
+    vza = [20.0, 45.0, 60.0]; vaz = [0.0, 30.0, 90.0]; m = 1; weight = 0.7; nvza = length(vza)
+
+    cl = CoreRT.make_composite_layer(RS, Float64, Array, (NquadN,NquadN), nSpec)
+    for f in (:J₀⁺,:J₀⁻,:ieJ₀⁺,:ieJ₀⁻)
+        copyto!(getfield(cl,f), 0.05 .* rand(size(getfield(cl,f))...))
+    end
+    mko() = zeros(Float64, nvza, pol.n, nSpec)
+
+    # reference = the original per-shift triple loop (pre-optimization)
+    function ref_postproc!(R_SFI, T_SFI, ieR_SFI, ieT_SFI)
+        vi = CoreRT._precompute_vza_weights(vza, vaz, qp_μ, pol, m, weight)
+        @inbounds for i in eachindex(vza)
+            istart, iend, w = vi[i]
+            for s = 1:nSpec
+                R_SFI[i,:,s] .+= w * cl.J₀⁻[istart:iend,1,s]
+                T_SFI[i,:,s] .+= w * cl.J₀⁺[istart:iend,1,s]
+                for t = 1:nR
+                    ieR_SFI[i,:,s] .+= w * cl.ieJ₀⁻[istart:iend,1,s,t]
+                    ieT_SFI[i,:,s] .+= w * cl.ieJ₀⁺[istart:iend,1,s,t]
+                end
+            end
+        end
+    end
+    RSr, TSr, ieRSr, ieTSr = mko(), mko(), mko(), mko(); ref_postproc!(RSr, TSr, ieRSr, ieTSr)
+
+    Rn, RSn, Tn, TSn, ieRSn, ieTSn = mko(), mko(), mko(), mko(), mko(), mko()
+    CoreRT.postprocessing_vza!(RS, iμ₀, pol, cl, vza, qp_μ, m, vaz, μ₀, weight, nSpec, true,
+                              Rn, RSn, Tn, TSn, ieRSn, ieTSn)
+    @test relerr(RSn, RSr)   < 1e-12
+    @test relerr(TSn, TSr)   < 1e-12
+    @test relerr(ieRSn, ieRSr) < 1e-12
+    @test relerr(ieTSn, ieTSr) < 1e-12
+
+    if _CUDA_OK    # device-side reduction path on a GPU composite layer
+        clg = CoreRT.make_composite_layer(RS, Float64, CuArray, (NquadN,NquadN), nSpec)
+        for f in (:J₀⁺,:J₀⁻,:ieJ₀⁺,:ieJ₀⁻); copyto!(getfield(clg,f), getfield(cl,f)); end
+        Rg, RSg, Tg, TSg, ieRSg, ieTSg = mko(), mko(), mko(), mko(), mko(), mko()
+        CoreRT.postprocessing_vza!(RS, iμ₀, pol, clg, vza, qp_μ, m, vaz, μ₀, weight, nSpec, true,
+                                  Rg, RSg, Tg, TSg, ieRSg, ieTSg)
+        @test relerr(ieRSg, ieRSr) < 1e-12
+        @test relerr(ieTSg, ieTSr) < 1e-12
+    end
+end
