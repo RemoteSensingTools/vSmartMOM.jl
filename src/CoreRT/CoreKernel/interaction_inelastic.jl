@@ -327,6 +327,14 @@ function interaction_helper!(RS_type::RRS, ::ScatteringInterface_11, SFI,
     @unpack ier⁺⁻, ier⁻⁺, iet⁻⁻, iet⁺⁺ = added_layer
     @unpack ieR⁻⁺, ieR⁺⁻, ieT⁺⁺, ieT⁻⁻, ieJ₀⁺, ieJ₀⁻ = composite_layer
 
+    # Fused per-Δn matrix outputs (tmpieR⁻⁺/T⁻⁻ loop1, tmpieT⁺⁺/R⁺⁻ loop2) on GPU
+    # when they fit static-@localmem/threads; else (CPU, or NquadN too large) the
+    # batched_mul host loops below run. Source-vector outputs (tmpieJ₀±) stay
+    # batched_mul. Fused path is not bit-identical → regen goldens for such configs.
+    arch_ie = architecture(ier⁻⁺)
+    use_fused_ie = (arch_ie isa Architectures.GPU) && _fused_interaction_fits(size(ier⁻⁺,1), eltype(ier⁻⁺))
+    i_λ₁λ₀_dev = use_fused_ie ? array_type(arch_ie)(i_λ₁λ₀) : i_λ₁λ₀
+
     # @show "interaction 11"
     staged = workspace !== nothing && workspace.staged
     # Used to store `(I - R⁺⁻ * r⁻⁺)⁻¹`
@@ -401,6 +409,10 @@ function interaction_helper!(RS_type::RRS, ::ScatteringInterface_11, SFI,
         #J₀₂⁻ = J₀₁⁻ + T₀₁(1-R₂₁R₀₁)⁻¹(R₂₁J₁₀⁺+J₁₂⁻)
         tmpJ₀⁻ .= J₀⁻ .+ T01_inv ⊠ (r⁻⁺ ⊠ J₀⁺ .+ added_layer.j₀⁻) 
     end 
+    if use_fused_ie
+        apply_fused_interaction_Rmp!(tmpieR⁻⁺, T01_inv, tmp_inv, r⁻⁺, R⁺⁻, T⁺⁺, ier⁻⁺, ieR⁺⁻, ieT⁺⁺, ieT⁻⁻, ieR⁻⁺, i_λ₁λ₀_dev, arch_ie)
+        apply_fused_interaction_Tmm!(tmpieT⁻⁻, T01_inv, tmp_inv, r⁻⁺, R⁺⁻, t⁻⁻, ier⁻⁺, ieR⁺⁻, ieT⁻⁻, iet⁻⁻, i_λ₁λ₀_dev, arch_ie)
+    else
     for Δn = 1:size(ier⁻⁺,4)
         n₀, n₁ = get_n₀_n₁(ier⁻⁺,i_λ₁λ₀[Δn])
         @inbounds @views tmpieR⁻⁺[:,:,n₁,Δn] .= ieR⁻⁺[:,:,n₁,Δn] +
@@ -417,8 +429,9 @@ function interaction_helper!(RS_type::RRS, ::ScatteringInterface_11, SFI,
             ieT⁻⁻[:,:,n₁,Δn]) ⊠ 
             tmp_inv[:,:,n₀] ⊠ t⁻⁻[:,:,n₀]
     end
-    
-    # R₂₀ = R₁₀ + T₀₁(I-R₂₁R₀₁)⁻¹ R₂₁T₁₀ 
+    end  # if use_fused_ie (loop 1: tmpieR⁻⁺, tmpieT⁻⁻)
+
+    # R₂₀ = R₁₀ + T₀₁(I-R₂₁R₀₁)⁻¹ R₂₁T₁₀
     tmpR⁻⁺ .= R⁻⁺ .+ T01_inv ⊠ r⁻⁺ ⊠ T⁺⁺ #Suniti
     # T₀₂ = T₀₁(1-R₂₁R₀₁)⁻¹T₁₂
     tmpT⁻⁻ .= T01_inv ⊠ t⁻⁻ #Suniti
@@ -463,9 +476,13 @@ function interaction_helper!(RS_type::RRS, ::ScatteringInterface_11, SFI,
         tmpJ₀⁺ = added_layer.j₀⁺ .+ 
             T21_inv ⊠ (J₀⁺ + R⁺⁻ ⊠ added_layer.j₀⁻)
     end 
+    if use_fused_ie
+        apply_fused_interaction_Tpp!(tmpieT⁺⁺, T21_inv, tmp_inv, r⁻⁺, R⁺⁻, T⁺⁺, ier⁻⁺, ieR⁺⁻, ieT⁺⁺, iet⁺⁺, i_λ₁λ₀_dev, arch_ie)
+        apply_fused_interaction_Rpm2!(tmpieR⁺⁻, T21_inv, tmp_inv, r⁻⁺, R⁺⁻, t⁻⁻, ier⁻⁺, ieR⁺⁻, iet⁻⁻, iet⁺⁺, ier⁺⁻, i_λ₁λ₀_dev, arch_ie)
+    else
     for Δn = 1:size(ieJ₀⁺,4)
         n₀, n₁ = get_n₀_n₁(ieJ₀⁺,i_λ₁λ₀[Δn])
-        
+
         @inbounds @views tmpieT⁺⁺[:,:,n₁,Δn] .=
                     T21_inv[:,:,n₁] ⊠ ieT⁺⁺[:,:,n₁,Δn] +
                     (T21_inv[:,:,n₁] ⊠ (ieR⁺⁻[:,:,n₁,Δn] ⊠ r⁻⁺[:,:,n₀] + 
@@ -483,7 +500,8 @@ function interaction_helper!(RS_type::RRS, ::ScatteringInterface_11, SFI,
                     iet⁺⁺[:,:,n₁,Δn]) ⊠
                     tmp_inv[:,:,n₀] ⊠ R⁺⁻[:,:,n₀] ⊠ t⁻⁻[:,:,n₀]
     end
-    
+    end  # if use_fused_ie (loop 2: tmpieT⁺⁺, tmpieR⁺⁻)
+
     # T₂₀ = T₂₁(I-R₀₁R₂₁)⁻¹T₁₀
     tmpT⁺⁺ .= T21_inv  ⊠ T⁺⁺ #Suniti
     # R₀₂ = R₁₂ + T₂₁(1-R₀₁R₂₁)⁻¹R₀₁T₁₂
