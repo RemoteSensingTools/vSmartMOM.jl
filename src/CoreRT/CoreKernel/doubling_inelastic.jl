@@ -46,7 +46,10 @@ function doubling_helper!(RS_type::RRS,
     # goldens for configs that take it.
     use_fused_nloop2 = (architecture isa Architectures.GPU) &&
                        _fused_doubling_fits(size(iet⁺⁺, 1), eltype(iet⁺⁺))
-    i_λ₁λ₀_dev = use_fused_nloop2 ? array_type(architecture)(i_λ₁λ₀) : i_λ₁λ₀
+    # The SFI source-vector loop (ieJ₀±) fuses under a looser limit (6 N×N buffers).
+    use_fused_jsrc   = (architecture isa Architectures.GPU) &&
+                       _fused_jsrc_fits(size(iet⁺⁺, 1), eltype(iet⁺⁺))
+    i_λ₁λ₀_dev = (use_fused_nloop2 || use_fused_jsrc) ? array_type(architecture)(i_λ₁λ₀) : i_λ₁λ₀
 
     if SFI
         # Dummy for source
@@ -80,6 +83,10 @@ function doubling_helper!(RS_type::RRS,
             @timeit "precomp" tmp1 = gp_refl ⊠  (J₀⁺ + r⁻⁺ ⊠ J₁⁻)
             @timeit "precomp" tmp2 = gp_refl ⊠  (J₁⁻ + r⁻⁺ ⊠ J₀⁺)
             #@timeit "prep"    tmp3 = repeat(r⁻⁺,1,1,1,nRaman) ⊠ reshape(ieJ₁⁻,
+            if use_fused_jsrc
+                apply_fused_doubling_jsrc!(ieJ₀⁺, ieJ₀⁻, tt⁺⁺_gp_refl, r⁻⁺, ier⁻⁺, iet⁺⁺,
+                                           tmp1, tmp2, J₁⁻, J₀⁺, expk, i_λ₁λ₀_dev, architecture)
+            else
             for Δn = 1:nRaman
                 n₀, n₁ = get_n₀_n₁(ieJ₁⁺,i_λ₁λ₀[Δn])
 
@@ -115,7 +122,7 @@ function doubling_helper!(RS_type::RRS,
                 #@show Δn, ieJ₀⁺[1:3,1,642,nRaman-Δn+1], ieJ₀⁻[1:3,1,642,nRaman-Δn+1]
                 #end
             end
-
+            end  # if use_fused_jsrc
         #bla
             # J⁻₀₂(λ) = J⁻₀₁(λ) + T⁻⁻₀₁(λ)[I - R⁻⁺₂₁(λ)R⁺⁻₀₁(λ)]⁻¹[J⁻₁₂(λ) + R⁻⁺₂₁(λ)J⁺₁₀(λ)] (see Eqs.8 in Raman paper draft)
             J₀⁻[:] = J₀⁻ + (tt⁺⁺_gp_refl ⊠ (J₁⁻ + r⁻⁺ ⊠ J₀⁺))

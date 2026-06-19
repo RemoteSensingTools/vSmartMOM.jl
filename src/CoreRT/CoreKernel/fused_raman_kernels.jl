@@ -108,11 +108,26 @@ MAINTAINER GOTCHAS (KA quirks that bit us — keep these in mind when editing)
     return comp ? s + c : s
 end
 
+# matrix·vector row: (M·v)[i] = Σ_k M[i,k]·v[k]. M is an N×N shared matrix, v an
+# N-length shared vector. Used by the source-vector (J₀±) kernels.
+@inline function _ie_mv(M, v, i, comp)
+    T = eltype(M); s = zero(T); c = zero(T)
+    @inbounds for k in 1:size(M, 2)
+        p = M[i,k] * v[k]
+        comp ? (t = s + p; c += ifelse(abs(s) >= abs(p), (s-t)+p, (p-t)+s); s = t) : (s += p)
+    end
+    return comp ? s + c : s
+end
+
 # Static-shared (48 KB) / 1024-thread fit test for `nbuf` N×N buffers of type FT.
 @inline _fused_fits(nbuf::Int, N::Int, ::Type{FT}) where {FT} =
     (nbuf * N * N * sizeof(FT) <= 48 * 1024) && (N * N <= 1024)
 @inline _fused_doubling_fits(N::Int, ::Type{FT}) where {FT}    = _fused_fits(14, N, FT)
 @inline _fused_interaction_fits(N::Int, ::Type{FT}) where {FT} = _fused_fits(12, N, FT)
+# Source-vector (J₀±) kernels use N threads/block (one per output row) and 6 N×N
+# matrices + a handful of N-vectors; the 6 matrices set the shared-memory ceiling.
+@inline _fused_jsrc_fits(N::Int, ::Type{FT}) where {FT} =
+    (6 * N * N * sizeof(FT) + 16 * N * sizeof(FT) <= 48 * 1024) && (N <= 1024)
 
 # ───────────────────────── DOUBLING "n loop 2" ────────────────────────────────
 # Replaces doubling_inelastic.jl:120-143. Writes iet⁺⁺ (tmp5) and ier⁻⁺ (tmp6)
@@ -153,6 +168,55 @@ function apply_fused_doubling_nloop2!(iet⁺⁺, ier⁻⁺, tt⁺⁺_gp_refl, gp
     N, _, nSpec, nRaman = size(iet⁺⁺)
     dbl_nloop2_fused!(devi(architecture), (N, N, 1, 1))(iet⁺⁺, ier⁻⁺, tt⁺⁺_gp_refl, gp_refl, r⁻⁺, t⁺⁺,
         i_λ₁λ₀_dev, nSpec, Val(N), comp; ndrange=(N, N, nSpec, nRaman))
+    return nothing
+end
+
+# ───────────────── DOUBLING SFI source loop (per Δn) ──────────────────────────
+# Fused replacement for the inelastic source update (doubling_inelastic.jl:74-108).
+# Propagates the Raman source vectors ieJ₀⁺ (tmp3) and ieJ₀⁻ (tmp4) of the doubled
+# layer, in place. Physics (Raman-paper Eqs. 16/17 analogues, source form):
+#   ieJ₁± = ieJ₀± · exp(-τ/μ₀)                          (attenuate to the seam)
+#   Q     = r⁻⁺[n₁]·ier⁻⁺ + ier⁻⁺·r⁻⁺[n₀]              (Raman R↔R coupling matrix)
+#   ieJ₀⁺ ← ieJ₁⁺ + T⁺⁺gp·(ieJ₀⁺ + r⁻⁺·ieJ₁⁻ + ier⁻⁺·J₁⁻ + Q·tmp1) + iet⁺⁺·tmp1
+#   ieJ₀⁻ ← ieJ₀⁻ + T⁺⁺gp·(ieJ₁⁻ + ier⁻⁺·J₀⁺ + r⁻⁺·ieJ₀⁺ + Q·tmp2) + iet⁺⁺·tmp2
+# where tmp1 = gp_refl·(J₀⁺+r⁻⁺·J₁⁻), tmp2 = gp_refl·(J₁⁻+r⁻⁺·J₀⁺) are the elastic
+# multiple-scattering source carriers (precomputed by the caller). One block per
+# (n₁,Δn); thread `i` owns output row i and cooperatively loads the N×N matrices.
+@kernel function dbl_jsrc_fused!(ieJ0p, ieJ0m, @Const(tt), @Const(r), @Const(ier), @Const(iet),
+                                 @Const(tmp1), @Const(tmp2), @Const(J1m), @Const(J0p3), @Const(expk),
+                                 @Const(shifts), nSpec, ::Val{N}, comp::Bool) where {N}
+    i, n1, Δn = @index(Global, NTuple); li, _, _ = @index(Local, NTuple)
+    stt=@localmem eltype(ieJ0p) (N,N); sr1=@localmem eltype(ieJ0p) (N,N); sr0=@localmem eltype(ieJ0p) (N,N)
+    sier=@localmem eltype(ieJ0p) (N,N); siet=@localmem eltype(ieJ0p) (N,N); sQ=@localmem eltype(ieJ0p) (N,N)
+    sJ0p=@localmem eltype(ieJ0p) (N,); sJ0m=@localmem eltype(ieJ0p) (N,); sJ1p=@localmem eltype(ieJ0p) (N,); sJ1m=@localmem eltype(ieJ0p) (N,)
+    sJ1m0=@localmem eltype(ieJ0p) (N,); sJ0p0=@localmem eltype(ieJ0p) (N,); st1=@localmem eltype(ieJ0p) (N,); st2=@localmem eltype(ieJ0p) (N,)
+    sX=@localmem eltype(ieJ0p) (N,); sY=@localmem eltype(ieJ0p) (N,)
+    Δ = @inbounds shifts[Δn]; n0 = n1 + Δ
+    if 1 <= n0 <= nSpec
+        @inbounds for k in 1:N    # cooperative load: thread i fills row i of each matrix
+            stt[li,k]=tt[li,k,n1]; sr1[li,k]=r[li,k,n1]; sr0[li,k]=r[li,k,n0]; sier[li,k]=ier[li,k,n1,Δn]; siet[li,k]=iet[li,k,n1,Δn]
+        end
+        ek = @inbounds expk[n0]
+        @inbounds begin
+            sJ0p[li]=ieJ0p[li,1,n1,Δn]; sJ0m[li]=ieJ0m[li,1,n1,Δn]; sJ1m0[li]=J1m[li,1,n0]; sJ0p0[li]=J0p3[li,1,n0]; st1[li]=tmp1[li,1,n0]; st2[li]=tmp2[li,1,n0]
+        end
+        @inbounds sJ1p[li]=sJ0p[li]*ek; @inbounds sJ1m[li]=sJ0m[li]*ek   # ieJ₁± = ieJ₀±·exp(-τ/μ₀)
+        @synchronize
+        @inbounds for k in 1:N; sQ[li,k]=_ie_dotc(sr1,sier,li,k,comp)+_ie_dotc(sier,sr0,li,k,comp); end  # Q (row i)
+        @synchronize
+        @inbounds sX[li]=sJ0p[li]+_ie_mv(sr1,sJ1m,li,comp)+_ie_mv(sier,sJ1m0,li,comp)+_ie_mv(sQ,st1,li,comp)
+        @inbounds sY[li]=sJ1m[li]+_ie_mv(sier,sJ0p0,li,comp)+_ie_mv(sr1,sJ0p,li,comp)+_ie_mv(sQ,st2,li,comp)
+        @synchronize
+        @inbounds ieJ0p[li,1,n1,Δn]=sJ1p[li]+_ie_mv(stt,sX,li,comp)+_ie_mv(siet,st1,li,comp)  # tmp3
+        @inbounds ieJ0m[li,1,n1,Δn]=sJ0m[li]+_ie_mv(stt,sY,li,comp)+_ie_mv(siet,st2,li,comp)  # tmp4
+    end
+end
+
+function apply_fused_doubling_jsrc!(ieJ₀⁺, ieJ₀⁻, tt⁺⁺_gp_refl, r⁻⁺, ier⁻⁺, iet⁺⁺,
+                                    tmp1, tmp2, J₁⁻, J₀⁺, expk, i_λ₁λ₀_dev, architecture; comp::Bool=false)
+    N, _, nSpec, nRaman = size(ieJ₀⁺)
+    dbl_jsrc_fused!(devi(architecture), (N, 1, 1))(ieJ₀⁺, ieJ₀⁻, tt⁺⁺_gp_refl, r⁻⁺, ier⁻⁺, iet⁺⁺,
+        tmp1, tmp2, J₁⁻, J₀⁺, expk, i_λ₁λ₀_dev, nSpec, Val(N), comp; ndrange=(N, nSpec, nRaman))
     return nothing
 end
 
@@ -283,4 +347,69 @@ end
 function apply_fused_interaction_Rpm2!(o, T21, TINV, r, Rpm, tmm, ier, ieRpm, ietmm, iet, ierpm, shd, architecture; comp::Bool=false)
     N,_,nSpec,nRaman = size(ier)
     ie_inter_Rpm2!(devi(architecture),(N,N,1,1))(o,T21,TINV,r,Rpm,tmm,ier,ieRpm,ietmm,iet,ierpm,shd,nSpec,Val(N),comp;ndrange=(N,N,nSpec,nRaman)); return nothing
+end
+
+# ───────────── INTERACTION SI_11 source-vector outputs (per Δn) ───────────────
+# Matrix×vector (NQ×1) source updates; N threads/block (one per output row), the
+# common W/Wt matrix subexpression recomputed in-kernel (9 N×N matrices).
+@inline _fused_ijsrc_fits(N::Int, ::Type{FT}) where {FT} =
+    (9 * N * N * sizeof(FT) + 16 * N * sizeof(FT) <= 48 * 1024) && (N <= 1024)
+
+# loop1 tmpieJ₀⁻ = ieJ₀⁻ + T01·(ier·J₀⁺ + r·ieJ₀⁺ + added.ieJ₀⁻) + W1t·(added.j₀⁻ + r·J₀⁺)
+#   W1 = T01·(ier·R⁺⁻ + r·ieR⁺⁻) + ieT⁻⁻ ;  W1t = W1·tmp_inv   (Raman source, downwelling)
+@kernel function ie_jsrc_m!(o,@Const(T01),@Const(TINV),@Const(ier),@Const(r),@Const(Rpm),@Const(ieRpm),@Const(ieTmm),
+                            @Const(ieJ0m),@Const(J0p),@Const(ieJ0p),@Const(addJ0m),@Const(addj0m),@Const(shifts),nSpec,::Val{N},comp::Bool) where {N}
+    i,n1,Δn=@index(Global,NTuple); li,_,_=@index(Local,NTuple)
+    sT01=@localmem eltype(o) (N,N); sTINV=@localmem eltype(o) (N,N); sier=@localmem eltype(o) (N,N); sr1=@localmem eltype(o) (N,N); sr0=@localmem eltype(o) (N,N)
+    sRpm=@localmem eltype(o) (N,N); sieRpm=@localmem eltype(o) (N,N); sA=@localmem eltype(o) (N,N); sW1=@localmem eltype(o) (N,N)
+    sieJ0m=@localmem eltype(o) (N,); sJ0p=@localmem eltype(o) (N,); sieJ0p=@localmem eltype(o) (N,); saddJ0m=@localmem eltype(o) (N,); saddj0m=@localmem eltype(o) (N,); sv0=@localmem eltype(o) (N,); sinner=@localmem eltype(o) (N,)
+    Δ=@inbounds shifts[Δn]; n0=n1+Δ
+    if 1<=n0<=nSpec
+        @inbounds for k in 1:N; sT01[li,k]=T01[li,k,n1]; sTINV[li,k]=TINV[li,k,n0]; sier[li,k]=ier[li,k,n1,Δn]; sr1[li,k]=r[li,k,n1]; sr0[li,k]=r[li,k,n0]; sRpm[li,k]=Rpm[li,k,n0]; sieRpm[li,k]=ieRpm[li,k,n1,Δn]; end
+        @inbounds begin sieJ0m[li]=ieJ0m[li,1,n1,Δn]; sJ0p[li]=J0p[li,1,n0]; sieJ0p[li]=ieJ0p[li,1,n1,Δn]; saddJ0m[li]=addJ0m[li,1,n1,Δn]; saddj0m[li]=addj0m[li,1,n0]; end
+        @synchronize
+        @inbounds for k in 1:N; sA[li,k]=_ie_dotc(sier,sRpm,li,k,comp)+_ie_dotc(sr1,sieRpm,li,k,comp); end
+        @synchronize
+        @inbounds for k in 1:N; sW1[li,k]=_ie_dotc(sT01,sA,li,k,comp)+ieTmm[li,k,n1,Δn]; end
+        @synchronize
+        @inbounds for k in 1:N; sA[li,k]=_ie_dotc(sW1,sTINV,li,k,comp); end   # reuse sA = W1t
+        @inbounds sv0[li]=saddj0m[li]+_ie_mv(sr0,sJ0p,li,comp)
+        @inbounds sinner[li]=_ie_mv(sier,sJ0p,li,comp)+_ie_mv(sr1,sieJ0p,li,comp)+saddJ0m[li]
+        @synchronize
+        @inbounds o[li,1,n1,Δn]=sieJ0m[li]+_ie_mv(sT01,sinner,li,comp)+_ie_mv(sA,sv0,li,comp)
+    end
+end
+
+# loop2 tmpieJ₀⁺ = added.ieJ₀⁺ + T21·(ieJ₀⁺ + ieR⁺⁻·added.j₀⁻ + R⁺⁻·added.ieJ₀⁻) + W2t·(J₀⁺ + R⁺⁻·added.j₀⁻)
+#   W2 = T21·(ieR⁺⁻·r⁻⁺ + R⁺⁻·ier⁻⁺) + iet⁺⁺ ;  W2t = W2·tmp_inv   (Raman source, upwelling)
+@kernel function ie_jsrc_p!(o,@Const(T21),@Const(TINV),@Const(ier),@Const(r),@Const(Rpm),@Const(ieRpm),@Const(iet),
+                            @Const(ieJ0p),@Const(J0p),@Const(addieJ0p),@Const(addieJ0m),@Const(addj0m),@Const(shifts),nSpec,::Val{N},comp::Bool) where {N}
+    i,n1,Δn=@index(Global,NTuple); li,_,_=@index(Local,NTuple)
+    sT21=@localmem eltype(o) (N,N); sTINV=@localmem eltype(o) (N,N); sier=@localmem eltype(o) (N,N); sr0=@localmem eltype(o) (N,N); sRpm1=@localmem eltype(o) (N,N); sRpm0=@localmem eltype(o) (N,N)
+    sieRpm=@localmem eltype(o) (N,N); sA=@localmem eltype(o) (N,N); sW2=@localmem eltype(o) (N,N)
+    sieJ0p=@localmem eltype(o) (N,); sJ0p=@localmem eltype(o) (N,); saddieJ0p=@localmem eltype(o) (N,); saddieJ0m=@localmem eltype(o) (N,); saddj0m=@localmem eltype(o) (N,); sv0=@localmem eltype(o) (N,); sinner=@localmem eltype(o) (N,)
+    Δ=@inbounds shifts[Δn]; n0=n1+Δ
+    if 1<=n0<=nSpec
+        @inbounds for k in 1:N; sT21[li,k]=T21[li,k,n1]; sTINV[li,k]=TINV[li,k,n0]; sier[li,k]=ier[li,k,n1,Δn]; sr0[li,k]=r[li,k,n0]; sRpm1[li,k]=Rpm[li,k,n1]; sRpm0[li,k]=Rpm[li,k,n0]; sieRpm[li,k]=ieRpm[li,k,n1,Δn]; end
+        @inbounds begin sieJ0p[li]=ieJ0p[li,1,n1,Δn]; sJ0p[li]=J0p[li,1,n0]; saddieJ0p[li]=addieJ0p[li,1,n1,Δn]; saddieJ0m[li]=addieJ0m[li,1,n1,Δn]; saddj0m[li]=addj0m[li,1,n0]; end
+        @synchronize
+        @inbounds for k in 1:N; sA[li,k]=_ie_dotc(sieRpm,sr0,li,k,comp)+_ie_dotc(sRpm1,sier,li,k,comp); end
+        @synchronize
+        @inbounds for k in 1:N; sW2[li,k]=_ie_dotc(sT21,sA,li,k,comp)+iet[li,k,n1,Δn]; end
+        @synchronize
+        @inbounds for k in 1:N; sA[li,k]=_ie_dotc(sW2,sTINV,li,k,comp); end   # reuse sA = W2t
+        @inbounds sv0[li]=sJ0p[li]+_ie_mv(sRpm0,saddj0m,li,comp)
+        @inbounds sinner[li]=sieJ0p[li]+_ie_mv(sieRpm,saddj0m,li,comp)+_ie_mv(sRpm1,saddieJ0m,li,comp)
+        @synchronize
+        @inbounds o[li,1,n1,Δn]=saddieJ0p[li]+_ie_mv(sT21,sinner,li,comp)+_ie_mv(sA,sv0,li,comp)
+    end
+end
+
+function apply_fused_interaction_Jm!(o, T01, TINV, ier, r, Rpm, ieRpm, ieTmm, ieJ0m, J0p, ieJ0p, addJ0m, addj0m, shd, architecture; comp::Bool=false)
+    N,_,nSpec,nRaman = size(ier)
+    ie_jsrc_m!(devi(architecture),(N,1,1))(o,T01,TINV,ier,r,Rpm,ieRpm,ieTmm,ieJ0m,J0p,ieJ0p,addJ0m,addj0m,shd,nSpec,Val(N),comp;ndrange=(N,nSpec,nRaman)); return nothing
+end
+function apply_fused_interaction_Jp!(o, T21, TINV, ier, r, Rpm, ieRpm, iet, ieJ0p, J0p, addieJ0p, addieJ0m, addj0m, shd, architecture; comp::Bool=false)
+    N,_,nSpec,nRaman = size(ier)
+    ie_jsrc_p!(devi(architecture),(N,1,1))(o,T21,TINV,ier,r,Rpm,ieRpm,iet,ieJ0p,J0p,addieJ0p,addieJ0m,addj0m,shd,nSpec,Val(N),comp;ndrange=(N,nSpec,nRaman)); return nothing
 end
