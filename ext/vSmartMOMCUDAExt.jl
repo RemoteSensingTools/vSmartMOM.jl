@@ -27,6 +27,27 @@ Architectures.array_type(::vSmartMOM.Architectures.GPU) = CuArray
 # Extend architecture detection for CuArrays
 Architectures.architecture(::CuArray) = vSmartMOM.Architectures.GPU()
 
+# Memory-aware interaction staging (v0.7+). Non-staged SI_11 interaction is ~6×
+# faster than CPU-staged. Choose it only when the FULL GPU footprint it triggers
+# (all allocated AFTER this call) will fit free VRAM; else fall back to staging
+# (memory-frugal, PCIe-bound). That footprint is:
+#   InteractionWorkspace 4-D : gpu_ie_mat_A/B (2·mat4d) + gpu_ie_src (1·src4d)
+#   InteractionWorkspace 3-D : tmp_inv, tmpR⁻⁺, tmpR⁺⁻, tmpT⁻⁻, tmpT⁺⁺ (5·mat3d)
+#                              + tmpJ₀⁻, tmpJ₀⁺ (2·src3d, negligible)
+#   per-call non-staged temps: tmpieT⁻⁻ + tmpieT⁺⁺ (2·mat4d) + tmpieJ₀⁺ (1·src4d)
+# The 3-D terms (mat3d = mat4d/nRaman) matter at small nRaman (codex P2). +25% margin
+# so we err toward staging when uncertain — an OOM is worse than a slow run.
+function CoreRT._use_staged_interaction(::vSmartMOM.Architectures.GPU, composite_layer)
+    N, _, nSpec, nRaman = size(composite_layer.ieR⁻⁺)
+    FT = eltype(composite_layer.ieR⁻⁺)
+    mat4d = N * N * nSpec * nRaman * sizeof(FT)
+    src4d = N * nSpec * nRaman * sizeof(FT)
+    mat3d = N * N * nSpec * sizeof(FT)
+    src3d = N * nSpec * sizeof(FT)
+    footprint = 4 * mat4d + 2 * src4d + 5 * mat3d + 2 * src3d
+    return CUDA.available_memory() < 1.25 * footprint
+end
+
 # Architecture → KernelAbstractions backend mapping for the GPU Mie pipeline.
 # `always_inline=false` keeps the (large) Mie kernels from blowing up
 # compilation; the batched RT path uses its own backend via `devi`.

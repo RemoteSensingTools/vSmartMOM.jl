@@ -47,17 +47,21 @@ function InteractionWorkspace(composite_layer, added_layer; staged::Bool=false)
     ws_gpu_mat_A = similar(ieR⁻⁺)
     ws_gpu_mat_B = similar(ieR⁻⁺)
     ws_gpu_src   = similar(ieJ₀⁻)
-    # CPU output arrays for staging
+    # CPU output arrays — only needed for staging. Non-staged writes back GPU→GPU
+    # and never touches them, so allocate 0-size placeholders to avoid ~6 large
+    # host allocations per run.
     FT = eltype(ieR⁻⁺)
     sz_mat = size(ieR⁻⁺)
     sz_src = size(ieJ₀⁻)
+    cmat() = staged ? zeros(FT, sz_mat...) : Array{FT}(undef, ntuple(_->0, length(sz_mat))...)
+    csrc() = staged ? zeros(FT, sz_src...) : Array{FT}(undef, ntuple(_->0, length(sz_src))...)
     InteractionWorkspace(
         ws_tmp_inv,
         ws_tmpR⁻⁺, ws_tmpR⁺⁻, ws_tmpT⁻⁻, ws_tmpT⁺⁺,
         ws_tmpJ₀⁻, ws_tmpJ₀⁺,
         ws_gpu_mat_A, ws_gpu_mat_B, ws_gpu_src,
-        zeros(FT, sz_mat...), zeros(FT, sz_mat...), zeros(FT, sz_src...),  # Pass 1 CPU
-        zeros(FT, sz_mat...), zeros(FT, sz_mat...), zeros(FT, sz_src...),  # Pass 2 CPU
+        cmat(), cmat(), csrc(),  # Pass 1 CPU (staged only)
+        cmat(), cmat(), csrc(),  # Pass 2 CPU (staged only)
         staged)
 end
 
