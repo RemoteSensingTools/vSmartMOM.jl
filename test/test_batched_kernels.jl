@@ -70,6 +70,34 @@ end
         max_localmem_bytes=CoreRT.ka_fused_gp_solve_localmem_bytes(FT, n) - 1)
 end
 
+@testset "Fused two-matrix solve (ka_fused_solve!)" begin
+    # T₀₁_inv = B · (E − A1·A2)⁻¹  (the interaction adding factor, A1 ≠ A2), checked
+    # against B · inv(I − A1·A2). A1, A2 scaled so I − A1·A2 is well-conditioned.
+    FT = Float32
+    n = 6
+    nbatch = 8
+    A1 = FT(0.2) .* rand(FT, n, n, nbatch)
+    A2 = FT(0.2) .* rand(FT, n, n, nbatch)
+    B  = rand(FT, n, n, nbatch)
+    backend = KernelAbstractions.CPU()
+
+    X = similar(A1)
+    CoreRT.ka_fused_solve!(X, A1, A2, B, backend)
+
+    X_ref = similar(A1)
+    for k in axes(A1, 3)
+        M = Matrix{FT}(I, n, n) .- A1[:, :, k] * A2[:, :, k]
+        X_ref[:, :, k] = B[:, :, k] * inv(M)
+    end
+    @test maximum(abs.(X .- X_ref)) < 1f-3 * maximum(abs.(X_ref))
+
+    @test CoreRT.ka_fused_solve_localmem_bytes(FT, n) ==
+          2 * n * n * sizeof(FT) + n * sizeof(Int32)
+    @test_throws ArgumentError CoreRT.ka_fused_solve!(
+        similar(A1), A1, A2, B, backend;
+        max_localmem_bytes=CoreRT.ka_fused_solve_localmem_bytes(FT, n) - 1)
+end
+
 @testset "Batched pointer metadata fallback" begin
     A = zeros(Float32, 2, 2, 3)
     @test CoreRT.batched_pointer_cache(A) === nothing
