@@ -38,6 +38,18 @@ function doubling_helper!(RS_type::RRS,
     # Geometric progression of reflections (1-RR)⁻¹
     gp_refl      = similar(t⁺⁺)
     tt⁺⁺_gp_refl = similar(t⁺⁺)
+    # n-loop-2 path selection: a fused KA kernel (one launch over all (n₁,Δn))
+    # replaces the per-Δn batched_mul host loop on GPU when it fits the static
+    # @localmem (48 KB) / 1024-threads limits; otherwise (CPU, or NquadN too
+    # large) fall back to the batched_mul loop below. The fused path is NOT
+    # bit-identical (different accumulation order, ~1e-7 in f32) — regen RRS
+    # goldens for configs that take it.
+    use_fused_nloop2 = (architecture isa Architectures.GPU) &&
+                       _fused_doubling_fits(size(iet⁺⁺, 1), eltype(iet⁺⁺))
+    # The SFI source-vector loop (ieJ₀±) fuses under a looser limit (6 N×N buffers).
+    use_fused_jsrc   = (architecture isa Architectures.GPU) &&
+                       _fused_jsrc_fits(size(iet⁺⁺, 1), eltype(iet⁺⁺))
+    i_λ₁λ₀_dev = (use_fused_nloop2 || use_fused_jsrc) ? array_type(architecture)(i_λ₁λ₀) : i_λ₁λ₀
 
     if SFI
         # Dummy for source
@@ -71,6 +83,10 @@ function doubling_helper!(RS_type::RRS,
             @timeit "precomp" tmp1 = gp_refl ⊠  (J₀⁺ + r⁻⁺ ⊠ J₁⁻)
             @timeit "precomp" tmp2 = gp_refl ⊠  (J₁⁻ + r⁻⁺ ⊠ J₀⁺)
             #@timeit "prep"    tmp3 = repeat(r⁻⁺,1,1,1,nRaman) ⊠ reshape(ieJ₁⁻,
+            if use_fused_jsrc
+                apply_fused_doubling_jsrc!(ieJ₀⁺, ieJ₀⁻, tt⁺⁺_gp_refl, r⁻⁺, ier⁻⁺, iet⁺⁺,
+                                           tmp1, tmp2, J₁⁻, J₀⁺, expk, i_λ₁λ₀_dev, architecture)
+            else
             for Δn = 1:nRaman
                 n₀, n₁ = get_n₀_n₁(ieJ₁⁺,i_λ₁λ₀[Δn])
 
@@ -106,7 +122,7 @@ function doubling_helper!(RS_type::RRS,
                 #@show Δn, ieJ₀⁺[1:3,1,642,nRaman-Δn+1], ieJ₀⁻[1:3,1,642,nRaman-Δn+1]
                 #end
             end
-
+            end  # if use_fused_jsrc
         #bla
             # J⁻₀₂(λ) = J⁻₀₁(λ) + T⁻⁻₀₁(λ)[I - R⁻⁺₂₁(λ)R⁺⁻₀₁(λ)]⁻¹[J⁻₁₂(λ) + R⁻⁺₂₁(λ)J⁺₁₀(λ)] (see Eqs.8 in Raman paper draft)
             J₀⁻[:] = J₀⁻ + (tt⁺⁺_gp_refl ⊠ (J₁⁻ + r⁻⁺ ⊠ J₀⁺))
@@ -117,6 +133,10 @@ function doubling_helper!(RS_type::RRS,
             expk .= expk.^2 #expk[:] = expk.^2
         end
         #println("Doubling part 1 done")
+        if use_fused_nloop2
+            apply_fused_doubling_nloop2!(iet⁺⁺, ier⁻⁺, tt⁺⁺_gp_refl, gp_refl, r⁻⁺, t⁺⁺,
+                                         i_λ₁λ₀_dev, architecture)
+        else
         for Δn = 1:nRaman
                 n₀, n₁ = get_n₀_n₁(ieJ₁⁺,i_λ₁λ₀[Δn])
                 #@show n₁, n₀
@@ -138,9 +158,10 @@ function doubling_helper!(RS_type::RRS,
                             (ier⁻⁺[:,:,n₁,Δn] ⊠ r⁻⁺[:,:,n₀] + r⁻⁺[:,:,n₁] ⊠ ier⁻⁺[:,:,n₁,Δn]) ⊠
                             gp_refl[:,:,n₀] ⊠ r⁻⁺[:,:,n₀]) ⊠ t⁺⁺[:,:,n₀])
 
-                iet⁺⁺[:,:,n₁,Δn] = tmp5
-                ier⁻⁺[:,:,n₁,Δn] = tmp6
+                iet⁺⁺[:,:,n₁,Δn] .= tmp5
+                ier⁻⁺[:,:,n₁,Δn] .= tmp6
         end
+        end  # if use_fused_nloop2
 
         # R⁻⁺₂₀(λ) = R⁻⁺₁₀(λ) + T⁻⁻₀₁(λ)[I - R⁻⁺₂₁(λ)R⁺⁻₀₁(λ)]⁻¹R⁻⁺₂₁(λ)T⁺⁺₁₀(λ) (see Eqs.8 in Raman paper draft)
         r⁻⁺[:]  = r⁻⁺ + (tt⁺⁺_gp_refl ⊠ r⁻⁺ ⊠ t⁺⁺)

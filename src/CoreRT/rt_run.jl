@@ -209,7 +209,16 @@ elastic modes dispatch to `nothing`.
 """
 _interaction_workspace(::Union{noRS, noRS_plus}, composite_layer, added_layer, arch) = nothing
 _interaction_workspace(::AbstractRamanType, composite_layer, added_layer, arch) =
-    InteractionWorkspace(composite_layer, added_layer; staged = arch isa Architectures.GPU)
+    InteractionWorkspace(composite_layer, added_layer; staged = _use_staged_interaction(arch, composite_layer))
+
+# Whether interaction!(ScatteringInterface_11) pages its inelastic outputs through
+# CPU (`staged=true`: memory-frugal but PCIe-bound) or runs GPU-only
+# (`staged=false`: ~6× faster, but needs ~2 extra big 4-D temps in VRAM).
+# Default: non-staged. The fused per-Δn kernels cut transient GPU memory ~7×, so
+# non-staged now fits in the common case and is much faster (measured 87→39 s end-
+# to-end @ nSpec=10000). The CUDA extension overrides the GPU method to fall back to
+# staged ONLY when the non-staged footprint would not fit the device's free memory.
+_use_staged_interaction(arch, composite_layer) = false
 
 """
     _expand_layer_rayleigh!(rs, fScattRayleigh, iz)
