@@ -13,17 +13,19 @@ using KernelAbstractions
 using FastGaussQuadrature
 
 """
-    compute_aerosol_optical_properties_gpu(model::MieModel{<:NAI2}, backend;
+    compute_aerosol_optical_properties_gpu(model::MieModel{<:NAI2,FT}, backend;
                                            precision_policy=NativeFloat64(),
-                                           FT2=Float64)
+                                           FT2=FT)
 
 GPU-accelerated version of `compute_aerosol_optical_properties` for the NAI2 method.
 
 # Arguments
 - `model`: MieModel configured for NAI2 computation
 - `backend`: KernelAbstractions backend (e.g., `CPU()`, `CUDABackend()`)
-- `precision_policy`: `NativeFloat64()` for A100/V100, `DSEmulated()` for L40S
-- `FT2`: output float type (default Float64)
+- `precision_policy`: `NativeFloat64()` for A100/V100, `DSEmulated()` for Float32/Metal
+- `FT2`: output float type. **Defaults to the model's `FT` type parameter** so that a
+  Float32 model produces Float32 greek coefficients without any explicit override.
+  Pass an explicit type only to force an output-precision override (rare).
 
 # Returns
 - `AerosolOptics` with greek_coefs, SSA, extinction, truncation factor
@@ -32,7 +34,7 @@ function compute_aerosol_optical_properties_gpu(
     model::MieModel{FDT}, backend;
     precision_policy::MiePrecisionPolicy = NativeFloat64(),
     FT2::Type = Float64
-) where FDT <: NAI2
+) where {FDT <: NAI2}
 
     # Unpack the model
     (; aerosol, λ, r_max, nquad_radius) = model

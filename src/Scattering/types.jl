@@ -339,21 +339,24 @@ The `computation_type` selects between NAI-2 (Siewert) and PCW (Domke) Fourier
 decomposition algorithms.
 
 Pre-computed Wigner symbol tables (`wigner_A`, `wigner_B`) can be supplied
-for PCW; they default to trivial placeholders when unused.
+for PCW; they default to trivial 1×1×1 placeholders (of element type `FT`)
+when unused (NAI2 path).
 
 # FT semantics (three orthogonal precision axes)
 
 `FT` is the **output** float type of the returned Greek coefficients and
-optical scalars (set by `r_max`'s type). It is independent of two other
-precision choices:
+optical scalars.  It is carried by `λ`, `r_max`, and `aerosol` (which must all
+share the same `FT`) so that the entire `MieModel` is FT-consistent. This is
+independent of two other precision choices:
 
 1. `FT` (output type) — what the user consumes downstream in the RT pipeline.
-2. The internal `Dₙ` continued-fraction recursion, which the CPU path always
-   stabilizes in `Float64` for plain floats regardless of `FT` (see
-   `compute_mie_ab!`); `Dual` inputs keep native arithmetic.
+2. The internal `Dₙ` continued-fraction recursion: on the CPU path the
+   recursion is always promoted to `Float64` for numerical stability regardless
+   of `FT` (see `_mie_dn_recursion!` in `mie_helper_functions.jl`);
+   `Dual` inputs keep native arithmetic for AD compatibility.
 3. `precision_policy` (GPU only) — `NativeFloat64` (default on CUDA) runs the
    GPU `Dₙ` recursion in hardware FP64; `DSEmulated` uses Float32
-   double-single pairs. This axis is inert on the CPU path.
+   double-single pairs (for Metal/L40S). This axis is inert on the CPU path.
 
 # Architecture dispatch
 
@@ -365,11 +368,13 @@ KernelAbstractions GPU pipeline; PCW+GPU → CPU fallback (no GPU PCW kernel).
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-Base.@kwdef struct MieModel{FDT<:AbstractFourierDecompositionType, FT, ARCH}
+struct MieModel{FDT<:AbstractFourierDecompositionType, FT, ARCH}
 
     computation_type::FDT
-    aerosol::Aerosol
-    λ::Real
+    "Aerosol microphysics; element type must match the model's `FT`"
+    aerosol::Aerosol{FT}
+    "Wavelength `[μm]`; must have the same float type as `r_max`"
+    λ::FT
     polarization_type::AbstractPolarizationType
     truncation_type::AbstractTruncationType
 
@@ -378,14 +383,32 @@ Base.@kwdef struct MieModel{FDT<:AbstractFourierDecompositionType, FT, ARCH}
     "Number of quadrature points for integration over size distribution"
     nquad_radius::Int
 
-    wigner_A = zeros(1, 1, 1)
-    wigner_B = zeros(1, 1, 1)
+    "Precomputed Wigner ν=0 table (PCW only; trivial 1×1×1 placeholder for NAI2)"
+    wigner_A::Array{FT,3}
+    "Precomputed Wigner ν=2 table (PCW only; trivial 1×1×1 placeholder for NAI2)"
+    wigner_B::Array{FT,3}
 
     "Compute architecture (`CPU()` or `GPU()`); selects CPU vs GPU Mie path"
-    architecture::ARCH = Architectures.CPU()
+    architecture::ARCH
     "GPU precision policy (`NativeFloat64`/`DSEmulated`); `nothing` = auto-select on GPU, ignored on CPU"
-    precision_policy = nothing
+    precision_policy
 
+end
+
+# Keyword constructor — preserves the public `MieModel(; …)` API that the former
+# `Base.@kwdef` provided, while enforcing the FT-consistent field types. `λ`, `r_max`
+# and the (placeholder) Wigner tables are promoted to the aerosol's float type `FT`,
+# exactly as `make_mie_model` does, so an `Aerosol{FT}` always yields a `MieModel{…,FT,…}`.
+# (FT is read from the aerosol inside the body: a `where {FT}` param cannot be bound from
+# a keyword argument — only positional args do that — so the type annotation route fails.)
+function MieModel(; computation_type, aerosol, λ, polarization_type, truncation_type,
+                  r_max, nquad_radius, wigner_A = nothing, wigner_B = nothing,
+                  architecture = Architectures.CPU(), precision_policy = nothing)
+    FT = typeof(aerosol.nᵣ)   # aerosol::Aerosol{FT}
+    wA = wigner_A === nothing ? zeros(FT, 1, 1, 1) : convert(Array{FT,3}, wigner_A)
+    wB = wigner_B === nothing ? zeros(FT, 1, 1, 1) : convert(Array{FT,3}, wigner_B)
+    return MieModel(computation_type, aerosol, FT(λ), polarization_type, truncation_type,
+                    FT(r_max), nquad_radius, wA, wB, architecture, precision_policy)
 end
 
 #=
