@@ -433,3 +433,154 @@ is too large for the device (the caller falls back to inverse-then-multiply).
     backend isa KernelAbstractions.CPU && return false
     return ka_fused_gp_solve_localmem_bytes(FT, size(X, 1)) <= _gp_fused_localmem_limit(backend)
 end
+
+# ------------------------------------------------------------------------------
+# Two-matrix variant for the MOM adding (interaction) step.
+#
+# The composite/added-layer combine (Sanghavi et al. 2014, Eqs. 23–28) needs the
+# same `B·(I − A₁·A₂)⁻¹` factor, but with two DISTINCT reflection matrices, e.g.
+#   T01_inv = T⁻⁻ · (E − r⁻⁺·R⁺⁻)⁻¹      and   T21_inv = t⁺⁺ · (E − R⁺⁻·r⁻⁺)⁻¹,
+# each reused across the layer's R/T/J updates. As in the doubling case the bare
+# inverse is only an intermediate, so it is again a fused LU + right-solve. With
+# A₁≠A₂ there is no single tile to cache, so this kernel needs only `2N²` local
+# memory (vs `3N²` for the geometric-progression variant) and fits larger `N`.
+# ------------------------------------------------------------------------------
+
+"""
+    ka_fused_solve_localmem_bytes(FT, N)
+
+Local-memory bytes per workgroup required by [`ka_fused_solve!`]: two `N×N` tiles
+(the factorised `M = I − A₁·A₂` and the in-place RHS/solution `Bt`) plus a
+length-`N` `Int32` pivot vector.
+"""
+ka_fused_solve_localmem_bytes(::Type{FT}, N::Integer) where {FT} =
+    2 * N * N * sizeof(FT) + N * sizeof(Int32)
+
+"""
+    ka_fused_solve!(X, A1, A2, B, backend; max_localmem_bytes=nothing)
+
+Compute `X[:, :, k] = B[:, :, k] * (I − A1[:, :, k] * A2[:, :, k])⁻¹` for two
+distinct batched matrices `A1`, `A2` in a single fused KernelAbstractions launch
+(build `M = I − A1·A2`, LU-factorise with partial pivoting in local memory, then
+right-solve `X·M = B` directly — no explicit inverse, no separate GEMM). This is
+the adding-step (`interaction!`) analogue of [`ka_fused_gp_solve!`]; see the
+physics header above and `test/benchmarks/batched_fused_v2_benchmark.jl`.
+"""
+function ka_fused_solve!(X::AbstractArray{FT,3},
+                         A1::AbstractArray{FT,3},
+                         A2::AbstractArray{FT,3},
+                         B::AbstractArray{FT,3},
+                         backend;
+                         max_localmem_bytes=nothing) where {FT}
+    @assert size(A1, 1) == size(A1, 2) "fused solve requires square A1·A2"
+    @assert size(X) == size(A1) == size(A2) == size(B) "X, A1, A2, B must share dimensions"
+    N = size(A1, 1)
+    if max_localmem_bytes !== nothing
+        required = ka_fused_solve_localmem_bytes(FT, N)
+        required <= max_localmem_bytes || throw(ArgumentError(
+            "fused solve for N=$(N), eltype=$(FT) needs $(required) bytes of local " *
+            "memory per workgroup, exceeding the backend limit of $(max_localmem_bytes) " *
+            "bytes; fall back to the inverse path."))
+    end
+    batch = size(A1, 3)
+    kernel! = _fused_solve_kernel!(backend, N)
+    kernel!(X, A1, A2, B, Val(N); ndrange=(N * batch,))
+    KernelAbstractions.synchronize(backend)
+    return X
+end
+
+"""
+    _fused_solve_kernel!(X, A1, A2, B, Val(N))
+
+Device kernel for [`ka_fused_solve!`]. Identical to [`_fused_gp_solve_kernel!`]
+except `M = I − A1·A2` is built from two distinct inputs (no cached `A` tile).
+"""
+@kernel function _fused_solve_kernel!(X, @Const(A1), @Const(A2), @Const(B), ::Val{N}) where {N}
+    k   = @index(Group, Linear)
+    tid = @index(Local, Linear)
+
+    M   = @localmem eltype(X) (N, N)
+    piv = @localmem Int32 (N,)
+    Bt  = @localmem eltype(X) (N, N)
+
+    # M = I − A1·A2 (row `tid`), and load the RHS B.
+    @inbounds for j in 1:N
+        s = zero(eltype(X))
+        for l in 1:N
+            s += A1[tid, l, k] * A2[l, j, k]
+        end
+        M[tid, j] = ((tid == j) ? one(eltype(X)) : zero(eltype(X))) - s
+        Bt[tid, j] = B[tid, j, k]
+    end
+    @inbounds piv[tid] = Int32(tid)
+    @synchronize()
+
+    # LU factorisation of M with partial pivoting.
+    @inbounds for p in 1:N
+        if tid == 1
+            max_val = abs(M[p, p])
+            max_row = p
+            for r in (p + 1):N
+                v = abs(M[r, p])
+                if v > max_val
+                    max_val = v
+                    max_row = r
+                end
+            end
+            if max_row != p
+                for col in 1:N
+                    tmp = M[p, col]
+                    M[p, col] = M[max_row, col]
+                    M[max_row, col] = tmp
+                end
+                tmp_p = piv[p]
+                piv[p] = piv[max_row]
+                piv[max_row] = tmp_p
+            end
+        end
+        @synchronize()
+        if tid > p
+            M[tid, p] /= M[p, p]
+        end
+        @synchronize()
+        if tid > p
+            factor = M[tid, p]
+            for col in (p + 1):N
+                M[tid, col] -= factor * M[p, col]
+            end
+        end
+        @synchronize()
+    end
+
+    # Right-side direct solve X = B·U⁻¹·L⁻¹·P (in place on row `tid` of Bt).
+    @inbounds for j in 1:N
+        s = zero(eltype(X))
+        for l in 1:(j - 1)
+            s += Bt[tid, l] * M[l, j]
+        end
+        Bt[tid, j] = (Bt[tid, j] - s) / M[j, j]
+    end
+    @inbounds for j in (N - 1):-1:1
+        s = zero(eltype(X))
+        for l in (j + 1):N
+            s += Bt[tid, l] * M[l, j]
+        end
+        Bt[tid, j] -= s
+    end
+    @inbounds for j in 1:N
+        X[tid, piv[j], k] = Bt[tid, j]
+    end
+end
+
+"""
+    _use_fused_solve(X) -> Bool
+
+Whether the two-matrix fused solve ([`ka_fused_solve!`]) should be used for output
+array `X`: same policy as [`_use_fused_gp`] but with the smaller `2N²` tile.
+"""
+@inline function _use_fused_solve(X::AbstractArray{FT,3}) where {FT}
+    _FUSED_GP_ENABLED[] || return false
+    backend = KernelAbstractions.get_backend(X)
+    backend isa KernelAbstractions.CPU && return false
+    return ka_fused_solve_localmem_bytes(FT, size(X, 1)) <= _gp_fused_localmem_limit(backend)
+end
