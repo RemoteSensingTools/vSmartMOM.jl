@@ -12,6 +12,10 @@ import NNlib: batched_mul
 # Note: synchronize() in CoreRT already uses Architectures.synchronize_if_gpu()
 # which calls CUDA.synchronize() when CUDA is available (via _sync_gpu Ref)
 
+# The fused geometric-progression solve may use the full 48 KiB CUDA static
+# shared-memory budget per block (vs the conservative portable default).
+vSmartMOM.CoreRT._gp_fused_localmem_limit(::CUDABackend) = 48 * 1024
+
 # Opt-in benchmark path: cache one scratch-owning closure per (FT, n, batch).
 # This keeps the public batch_inv! API unchanged while avoiding repeated
 # pivot/info allocations. The shared scratch is not intended for concurrent

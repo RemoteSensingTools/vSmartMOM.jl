@@ -41,6 +41,35 @@ using KernelAbstractions
     )
 end
 
+@testset "Fused geometric-progression solve (ka_fused_gp_solve!)" begin
+    # tt_gp = t⁺⁺ · (E − r⁻⁺·r⁻⁺)⁻¹  via the single fused LU+right-solve kernel,
+    # checked against the reference B · inv(I − A·A). A is scaled so I − A·A is
+    # well-conditioned (physical reflection ||A·A|| < 1).
+    FT = Float32
+    n = 6
+    nbatch = 8
+    A = FT(0.2) .* rand(FT, n, n, nbatch)
+    B = rand(FT, n, n, nbatch)
+    backend = KernelAbstractions.CPU()
+
+    X = similar(A)
+    CoreRT.ka_fused_gp_solve!(X, A, B, backend)
+
+    X_ref = similar(A)
+    for k in axes(A, 3)
+        M = Matrix{FT}(I, n, n) .- A[:, :, k] * A[:, :, k]
+        X_ref[:, :, k] = B[:, :, k] * inv(M)
+    end
+    @test maximum(abs.(X .- X_ref)) < 1f-3 * maximum(abs.(X_ref))
+
+    @test CoreRT.ka_fused_gp_solve_localmem_bytes(FT, n) ==
+          3 * n * n * sizeof(FT) + n * sizeof(Int32)
+    # localmem guard: too-small budget must throw rather than launch.
+    @test_throws ArgumentError CoreRT.ka_fused_gp_solve!(
+        similar(A), A, B, backend;
+        max_localmem_bytes=CoreRT.ka_fused_gp_solve_localmem_bytes(FT, n) - 1)
+end
+
 @testset "Batched pointer metadata fallback" begin
     A = zeros(Float32, 2, 2, 3)
     @test CoreRT.batched_pointer_cache(A) === nothing
