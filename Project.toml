@@ -5,6 +5,7 @@ authors = ["Suniti Sanghavi (suniti.sanghavi@gmail.com), Christian Frankenberg <
 
 [deps]
 AtmosphericAbsorption = "e0e35e18-ffce-4906-90bd-929a5e163038"
+CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
 CanopyOptics = "a18e34a6-5dbe-4f38-a44b-e5141852e7a7"
 DataInterpolations = "82cc6244-b520-54b8-b5a6-8a565e85f1d0"
 Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
@@ -45,7 +46,6 @@ UnitfulEquivalences = "da9c4bc3-91c8-4f02-8a40-6b990d2a7e0c"
 YAML = "ddb6d928-2868-570f-bddf-ab3f9cf99eb6"
 
 [weakdeps]
-CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
 Metal = "dde4c033-4e86-420c-a63e-0dd931031962"
 
 [extensions]

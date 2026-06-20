@@ -9,6 +9,8 @@
 #   rrs:  wn, Icab, Qcab, Ucab, IRRS, QRRS, URRS, F0
 #   nors: wn, IRayl, QRayl, URayl, F0
 
+ENV["GKSwstype"] = get(ENV, "GKSwstype", "100")
+
 using DelimitedFiles
 using Printf
 using Plots
@@ -64,6 +66,7 @@ function load_case(aod::Float64, albedo::Float64)
         error("Wavenumber mismatch between $rrs_path and $nors_path")
 
     lambda = 1e7 ./ wn
+    jac = 1e7 ./ lambda.^2
     order = sortperm(lambda)
     icab = rrs[:, 2]
     irrs = rrs[:, 5]
@@ -71,9 +74,11 @@ function load_case(aod::Float64, albedo::Float64)
 
     return (;
         lambda=lambda[order],
-        delta=(icab .+ irrs .- irayl)[order],
-        delta_elastic=(icab .- irayl)[order],
-        irrs=irrs[order],
+        # vSmartMOM ASCII output is per cm^-1. Convert to per nm before
+        # plotting against wavelength.
+        delta=((icab .+ irrs .- irayl) .* jac)[order],
+        delta_elastic=((icab .- irayl) .* jac)[order],
+        irrs=(irrs .* jac)[order],
     )
 end
 
@@ -151,6 +156,8 @@ function write_summary(path::AbstractString)
         println(io, "outdir = $OUTDIR")
         println(io, "band_tag = $BAND_TAG")
         println(io, "difference = AOD $(label_value(AOD_HIGH)) - AOD $(label_value(AOD_LOW))")
+        println(io, "conversion = plotted quantities are file quantities * (1e7 / wavelength_nm^2)")
+        println(io, "units = file quantities are mW m^-2 sr^-1 cm; plotted quantities are mW m^-2 sr^-1 nm^-1")
         println(io)
         for albedo in ALBEDOS
             data = diff_case(albedo)

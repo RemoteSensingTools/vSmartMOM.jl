@@ -85,6 +85,7 @@ function load_case(aod::Float64, albedo::Float64)
     end
 
     lambda = 1e7 ./ wn
+    jac = 1e7 ./ lambda.^2
     order = sortperm(lambda)
     icab = rrs[:, 2]
     irrs = rrs[:, 5]
@@ -92,9 +93,11 @@ function load_case(aod::Float64, albedo::Float64)
 
     return (;
         lambda=lambda[order],
-        delta=(icab .+ irrs .- irayl)[order],
-        delta_elastic=(icab .- irayl)[order],
-        irrs=irrs[order],
+        # vSmartMOM ASCII output is spectral radiance per cm^-1. These panels
+        # are drawn against wavelength, so convert to per nm with dν/dλ.
+        delta=((icab .+ irrs .- irayl) .* jac)[order],
+        delta_elastic=((icab .- irayl) .* jac)[order],
+        irrs=(irrs .* jac)[order],
         rrs_path,
         nors_path,
     )
@@ -325,6 +328,8 @@ function write_case_summary(path::AbstractString)
         println(io, "Slide-43-style aerosol preview")
         println(io, "outdir = $OUTDIR")
         println(io, "band_tag = $BAND_TAG")
+        println(io, "conversion = plotted quantities are file quantities * (1e7 / wavelength_nm^2)")
+        println(io, "units = file quantities are mW m^-2 sr^-1 cm; plotted quantities are mW m^-2 sr^-1 nm^-1")
         println(io)
         for albedo in ALBEDOS
             for aod in AODS

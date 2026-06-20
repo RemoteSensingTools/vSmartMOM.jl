@@ -101,6 +101,42 @@ julia --project=workflows/OCORaman \
   workflows/OCORaman/scripts/04_plot_grid_quicklook.jl
 ```
 
+## 5. Full O2 A-Band Float32 NetCDF LuT
+
+The current replacement for hand-edited `O2_parameters2_SIF_grid.yaml` runs is:
+
+```bash
+CUDA_DEVICE=1 DRY_RUN=1 julia --project=. \
+  workflows/OCORaman/scripts/createRamanLUT_O2A.jl
+```
+
+It generates two broad O2 A-band chunks with 250 cm^-1 Raman shoulders, writes
+only the unshouldered 740-785 nm output, uses `Float32`, and stores
+Rayleigh/Cabannes/RRS Stokes `{I,Q,U}`, `F0`, zero `SIF0`, `tau_rayl`,
+`tau_abs`, and the generated `p/T/q` profiles in NetCDF. The dedicated input
+template is `workflows/OCORaman/config/paramsRamanLUT_O2A.yaml`, whose `p/T/q`
+values were copied from `test/test_parameters/ParamsEMIT_MODTRANcomp_newLUT.yaml`
+and trace to the AFGL 1986 Midlatitude Winter profile used by the EMIT/MODTRAN
+comparison workflow. O2 absorption uses ABSCO; q-driven H2O absorption uses the
+rebuilt HITRAN H2O LUT.
+
+Suggested distributed pressure slices:
+
+```bash
+CUDA_DEVICE=1 PSURFS=1000 OUT_NC=/home/sanghavi/data/RamanSIFgrid/o2a_raman_lut_psurf1000.nc \
+  julia --project=. workflows/OCORaman/scripts/createRamanLUT_O2A.jl
+
+CUDA_DEVICE=1 PSURFS=750 OUT_NC=/home/sanghavi/data/RamanSIFgrid/o2a_raman_lut_psurf750.nc \
+  julia --project=. workflows/OCORaman/scripts/createRamanLUT_O2A.jl
+
+CUDA_DEVICE=1 PSURFS=500 OUT_NC=/home/sanghavi/data/RamanSIFgrid/o2a_raman_lut_psurf0500.nc \
+  julia --project=. workflows/OCORaman/scripts/createRamanLUT_O2A.jl
+```
+
+Run `DRY_RUN=1` first: the full default grid is very large
+(`21 albedos x 14 SZA x 1 SIF state x 3 psurf`) and the script prints a
+runtime estimate based on the latest full-band timing baseline.
+
 ## Workflow Notes
 
 - Keep generated `.jld2`, NetCDF, PNG, and PDF files out of git by default.
