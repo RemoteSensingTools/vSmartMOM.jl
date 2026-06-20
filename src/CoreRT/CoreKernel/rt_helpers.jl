@@ -100,9 +100,19 @@ call covers all spectral points; see [Concepts/07](../../docs/src/pages/concepts
 Mutates `gp_refl` and `tt_gp` in place.
 """
 @inline function compute_geometric_progression!(gp_refl, tt_gp, r⁻⁺, t⁺⁺, I_static, temp2, temp1_ptr, temp2_ptr)
-    temp2 .= I_static .- r⁻⁺ ⊠ r⁻⁺                  # (E − R·R)
-    batch_inv!(gp_refl, temp2, temp1_ptr, temp2_ptr) # (E − R·R)⁻¹
-    tt_gp .= t⁺⁺ ⊠ gp_refl                          # T · (E − R·R)⁻¹
+    if _use_fused_gp(tt_gp)
+        # Fused single-kernel path: build (E − R·R), LU-factorise it, and
+        # right-solve `tt_gp · (E − R·R) = T` directly — no explicit inverse and
+        # no separate batched GEMM. For the small RT matrices this is several×
+        # faster than the inverse-then-multiply path below (see
+        # test/benchmarks/batched_fused_v2_benchmark.jl). The fallback runs when
+        # the 3N² local-memory tile exceeds the device budget (large N) or on CPU.
+        ka_fused_gp_solve!(tt_gp, r⁻⁺, t⁺⁺, KernelAbstractions.get_backend(tt_gp))
+    else
+        temp2 .= I_static .- r⁻⁺ ⊠ r⁻⁺                  # (E − R·R)
+        batch_inv!(gp_refl, temp2, temp1_ptr, temp2_ptr) # (E − R·R)⁻¹
+        tt_gp .= t⁺⁺ ⊠ gp_refl                          # T · (E − R·R)⁻¹
+    end
     return nothing
 end
 
