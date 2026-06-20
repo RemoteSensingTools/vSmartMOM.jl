@@ -60,10 +60,14 @@ function postprocessing_vza!(RS_type::noRS, iμ₀, pol_type,
         J₀⁻ = _to_cpu(composite_layer.J₀⁻)
         @inbounds for i in eachindex(vza)
             istart, iend, w = vza_info[i]
-            for s = 1:nSpec
-                R_SFI[i,:,s] .+= w * J₀⁻[istart:iend, 1, s]
-                T_SFI[i,:,s] .+= w * J₀⁺[istart:iend, 1, s]
-            end
+            # Vectorise over the spectral dimension: one matrix product per VZA
+            # instead of a scalar `for s` loop that slice-allocated two tiny arrays
+            # per spectral point (millions of allocations for nSpec≈40k). `w` is the
+            # azimuthal Stokes weight (a Diagonal for n>1, scalar for n=1), so this
+            # is the SAME `w * column` Stokes mix applied to every spectral column at
+            # once — identical result. NOTE: matrix multiply `*`, not elementwise `.*`.
+            @views R_SFI[i, :, :] .+= w * J₀⁻[istart:iend, 1, :]
+            @views T_SFI[i, :, :] .+= w * J₀⁺[istart:iend, 1, :]
         end
         # v0.7 Phase A.2a — per-source J₀ slots. RT reconstruction is linear
         # in sources so each slot's contribution adds into the same R_SFI/T_SFI
@@ -74,10 +78,8 @@ function postprocessing_vza!(RS_type::noRS, iμ₀, pol_type,
             J⁻_src = _to_cpu(cslot.J₀⁻)
             @inbounds for i in eachindex(vza)
                 istart, iend, w = vza_info[i]
-                for s = 1:nSpec
-                    R_SFI[i,:,s] .+= w * J⁻_src[istart:iend, 1, s]
-                    T_SFI[i,:,s] .+= w * J⁺_src[istart:iend, 1, s]
-                end
+                @views R_SFI[i, :, :] .+= w * J⁻_src[istart:iend, 1, :]
+                @views T_SFI[i, :, :] .+= w * J⁺_src[istart:iend, 1, :]
             end
         end
     else
@@ -108,9 +110,7 @@ function postprocessing_vza_hdrf!(RS_type, iμ₀, pol_type,
 
     @inbounds for i in eachindex(vza)
         istart, iend, w = vza_info[i]
-        for s = 1:nSpec
-            hdr[i,:,s] .+= w * hdr_J₀⁻[istart:iend, 1, s]
-        end
+        @views hdr[i, :, :] .+= w * hdr_J₀⁻[istart:iend, 1, :]
     end
 end
 
