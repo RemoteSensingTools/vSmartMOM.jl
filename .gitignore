@@ -36,7 +36,8 @@ GEOSChem.Custom.20190702_0000z.nc4
 .mcp.json
 .mcp.local.json
 nohup.out
-.claude/scheduled_tasks.lock
+# Claude Code local tooling/config — not project content
+.claude/
 
 # Large reference datasets (fetch separately — see sandbox/rami/DATA_FILES.md)
 sandbox/rami/RAMI4ATM_experiments_v1.0.json

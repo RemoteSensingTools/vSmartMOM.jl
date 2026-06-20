@@ -4,6 +4,22 @@
 
 ### Summary
 
+- **RRS GPU performance (~90× on the O2A Raman LUT; ~120× whole-`rt_run`).**
+  The rotational-Raman adding–doubling GPU path was rewritten: fused
+  KernelAbstractions kernels replace the per-Δn `batched_mul` loops for the
+  doubling n-loop, the `ScatteringInterface_11` matrix outputs, and the SFI
+  source vectors (`src/CoreRT/CoreKernel/fused_raman_kernels.jl`); `interaction!`
+  now defaults to a GPU-only (non-staged) workspace with a VRAM-aware fallback;
+  and inelastic postprocessing reduces over Raman shifts once instead of per
+  view-angle. Net on one L40S (Float32): a two-band O2A Raman LUT scene drops
+  from ~1.08 h to ~43 s; peak GPU memory ~7× lower (substantially larger
+  `nSpec` runnable). Results are bit-equivalent up to Float32 reduction reorder
+  (elastic R/T bit-identical, inelastic ~1 ULP in Float64) — **GPU-fused configs
+  need RRS goldens regenerated**. Also includes band-local `expandBandScalars`
+  and spectral-F0 flat-Z correctness fixes, and a GPU regression suite locking
+  each fused kernel against the `batched_mul` reference. CPU and large-`NquadN`
+  configs fall back to the unchanged path.
+
 - **AtmosphericAbsorption.jl engine swap.** `model_from_parameters` now
   delegates LBL gas absorption to the external
   [AtmosphericAbsorption.jl](https://github.com/RemoteSensingTools/AtmosphericAbsorption.jl)
