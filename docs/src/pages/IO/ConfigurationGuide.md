@@ -100,8 +100,8 @@ R, T   = rt_run(model)
 
 - `spec_bands` — one entry per band. Two syntaxes: a single point/list
   `"[12987.0]"`, or a range `"(1e7/775):0.05:(1e7/755)"` (start:step:stop, in
-  cm⁻¹). Wavelength↔wavenumber: `ν[cm⁻¹] = 1e7 / λ[nm]`. See
-  [spec_bands](Schema/spec_bands.md).
+  cm⁻¹). Wavelength↔wavenumber: `ν[cm⁻¹] = 1e7 / λ[nm]`. See the
+  [`radiative_transfer` schema](Schema/radiative_transfer.md) (the `spec_bands` field).
 - `surface` — **one BRDF per band**. `length(surface) == length(spec_bands)`.
 - `nstreams` — angular resolution. Public contract: `stream_l_cap =
   2·nstreams − 1`. Minimum 3.
@@ -433,8 +433,8 @@ cfg["canopy"] = Dict(
 ```
 
 The canopy wraps each band's BRDF in a `CanopySurface`; the soil below is the
-true lower boundary. See [canopy](Schema/canopy.md) for clumping, leaf optics
-grids, and quadrature.
+true lower boundary. See the [`surface` schema](Schema/surface.md) (the
+"Composite (canopy + soil)" section) for `CanopySurface` configuration.
 
 ---
 
