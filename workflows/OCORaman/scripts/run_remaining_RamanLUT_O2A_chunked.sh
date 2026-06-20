@@ -16,6 +16,7 @@ set -euo pipefail
 # Optional:
 #   END_SZA_IDX=14
 #   CHUNK_ALBEDOS=4
+#   SKIP_COMPLETED=1
 #   OUTDIR=/home/sanghavi/data/RamanSIFgrid/o2a_raman_lut_chunked_psurf${PSURF}
 #   LOGDIR=$OUTDIR/logs
 #   JULIA_BIN=julia
@@ -36,6 +37,7 @@ OUTDIR="${OUTDIR:-/home/sanghavi/data/RamanSIFgrid/o2a_raman_lut_chunked_psurf${
 LOGDIR="${LOGDIR:-${OUTDIR}/logs}"
 JULIA_BIN="${JULIA_BIN:-julia}"
 JULIA_FLAGS="${JULIA_FLAGS:---pkgimages=no}"
+SKIP_COMPLETED="${SKIP_COMPLETED:-1}"
 # shellcheck disable=SC2206
 JULIA_FLAGS_ARRAY=(${JULIA_FLAGS})
 
@@ -64,6 +66,11 @@ printf '  albedos per chunk: %s\n' "${CHUNK_ALBEDOS}"
 printf '  output dir: %s\n' "${OUTDIR}"
 printf '  log dir: %s\n' "${LOGDIR}"
 printf '  Julia flags: %s\n' "${JULIA_FLAGS:-<none>}"
+printf '  skip completed: %s\n' "${SKIP_COMPLETED}"
+
+albedo_tag() {
+  printf '%s' "$1" | tr ',' '_' | tr ':' '-'
+}
 
 for sza_idx in $(seq "${START_SZA_IDX}" "${END_SZA_IDX}"); do
   alb_start=1
@@ -78,7 +85,28 @@ for sza_idx in $(seq "${START_SZA_IDX}" "${END_SZA_IDX}"); do
       alb_end=21
     fi
 
-    chunk_tag="$(printf 'remain_psurf%04.0f_sza%03d_alb%03d-%03d' "${PSURF}" "${sza_idx}" "${alb_idx}" "${alb_end}")"
+    requested_albedos="${alb_idx}:${alb_end}"
+    if [[ "${SKIP_COMPLETED}" != "0" ]]; then
+      requested_albedos="$(
+        env \
+          PSURF="${PSURF}" \
+          SZA_IDX="${sza_idx}" \
+          ALBEDO_IDXS="${requested_albedos}" \
+          OUTDIR="${OUTDIR}" \
+          "${JULIA_BIN}" "${JULIA_FLAGS_ARRAY[@]}" --project=. workflows/OCORaman/scripts/priority_missing_RamanLUT_O2A.jl
+      )"
+      requested_albedos="$(printf '%s' "${requested_albedos}" | tail -n 1)"
+    fi
+
+    if [[ -z "${requested_albedos}" ]]; then
+      printf '\n[%s] Skipping psurf=%s sza_idx=%03d alb=%03d-%03d; scenes already complete\n' \
+        "$(date '+%Y-%m-%d %H:%M:%S %Z')" "${PSURF}" "${sza_idx}" "${alb_idx}" "${alb_end}" | tee -a "${LOGDIR}/driver.log"
+      alb_idx=$(( alb_end + 1 ))
+      continue
+    fi
+
+    chunk_albedo_tag="$(albedo_tag "${requested_albedos}")"
+    chunk_tag="$(printf 'remain_psurf%04.0f_sza%03d_alb%s' "${PSURF}" "${sza_idx}" "${chunk_albedo_tag}")"
     out_nc="${OUTDIR}/${chunk_tag}.nc"
     log_file="${LOGDIR}/${chunk_tag}.log"
 
@@ -94,7 +122,7 @@ for sza_idx in $(seq "${START_SZA_IDX}" "${END_SZA_IDX}"); do
       CUDA_DEVICE="${CUDA_DEVICE}" \
       PSURFS="${PSURF}" \
       SZA_IDXS="${sza_idx}" \
-      ALBEDO_IDXS="${alb_idx}:${alb_end}" \
+      ALBEDO_IDXS="${requested_albedos}" \
       CHUNK_TAG="${chunk_tag}" \
       OUTDIR="${OUTDIR}" \
       OUT_NC="${out_nc}" \
