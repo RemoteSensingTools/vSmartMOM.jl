@@ -32,6 +32,10 @@ try
         # GPU Mie kernels via the KA CPU backend — no CUDA required.
         @testset "Mie GPU kernels" begin include("local/gpu/test_mie_gpu.jl") end
 
+        # Fused RRS kernels vs batched_mul reference (per-kernel + integration).
+        # Self-guards on CUDA (GPU-only path); skips cleanly without a device.
+        @testset "Raman fused kernels" begin include("local/gpu/test_raman_fused_kernels.jl") end
+
         CUDA_AVAILABLE = try
             using CUDA
             CUDA.functional()
