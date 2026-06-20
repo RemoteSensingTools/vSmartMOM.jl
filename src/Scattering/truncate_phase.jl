@@ -123,7 +123,12 @@ function truncate_phase_lowconf(mod::δBGE, aero::AerosolOptics{FT}; reportFit=f
     # `(τ, ω̃, fᵗ)` it returns `(τ_mod, ϖ_mod)` with the proper
     # `(1 − fᵗ·ω̃)` and `(1−fᵗ)·ω̃/(1−fᵗ·ω̃)` factors. Re-applying
     # them here would double-count.
-    greek_coefs = GreekCoefs(αᵗ, βᵗ, γᵗ, δᵗ, ϵᵗ, ζᵗ)
+    # The δ-BGE fits are solved in Float64 (the A\b least squares) for numerical
+    # accuracy; the truncated Greek coefficients are then cast back to the aerosol's
+    # float type FT for type stability — an F32 model keeps an F32 phase matrix,
+    # mirroring the Mie generators (internal Float64, output FT).
+    greek_coefs = GreekCoefs(convert.(FT, αᵗ), convert.(FT, βᵗ), convert.(FT, γᵗ),
+                             convert.(FT, δᵗ), convert.(FT, ϵᵗ), convert.(FT, ζᵗ))
     return AerosolOptics(greek_coefs=greek_coefs, ω̃=ω̃, k=k, fᵗ=(FT(1) - c₀))
 end
 
@@ -271,6 +276,11 @@ function truncate_phase(mod::δBGE, aero::AerosolOptics{FT}; reportFit=false) wh
     # `(τ, ω̃, fᵗ)` it returns `(τ_mod, ϖ_mod)` with the proper
     # `(1 − fᵗ·ω̃)` and `(1−fᵗ)·ω̃/(1−fᵗ·ω̃)` factors. Re-applying
     # them here would double-count.
-    greek_coefs = GreekCoefs(αᵗ, βᵗ, γᵗ, δᵗ, ϵᵗ, ζᵗ)
+    # The δ-BGE fits are solved in Float64 (the A\b least squares) for numerical
+    # accuracy; the truncated Greek coefficients are then cast back to the aerosol's
+    # float type FT for type stability — an F32 model keeps an F32 phase matrix,
+    # mirroring the Mie generators (internal Float64, output FT).
+    greek_coefs = GreekCoefs(convert.(FT, αᵗ), convert.(FT, βᵗ), convert.(FT, γᵗ),
+                             convert.(FT, δᵗ), convert.(FT, ϵᵗ), convert.(FT, ζᵗ))
     return AerosolOptics(greek_coefs=greek_coefs, ω̃=ω̃, k=k, fᵗ=(FT(1) - c₀))
 end

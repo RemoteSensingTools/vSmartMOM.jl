@@ -147,15 +147,25 @@ function analytic_aerosol_optics(
     single_scattering_albedo::Real = 1,
     extinction_cross_section::Real = 1,
     l_max::Int = 64,
-    nquad::Int = max(2l_max + 1, 64))
+    nquad::Int = max(2l_max + 1, 64),
+    FT_out::Union{Nothing,Type} = nothing)
 
+    # The greek coefficients are integrated in the Gauss–Legendre quadrature's
+    # native (Float64) precision for accuracy, then emitted in the model's float
+    # type `FT_out` for type stability — mirroring the Mie path, so an F32 model
+    # never carries a Float64 aerosol phase matrix. With `FT_out = nothing`
+    # (default) we keep the historical promoted type for back-compat.
     greek = greek_coefficients(phase; l_max, nquad)
-    FT = promote_type(eltype(greek.β), typeof(float(single_scattering_albedo)),
-                      typeof(float(extinction_cross_section)))
-    return AerosolOptics(greek_coefs=greek,
-                         ω̃=convert(FT, single_scattering_albedo),
-                         k=convert(FT, extinction_cross_section),
-                         fᵗ=zero(FT))
+    FTo = FT_out === nothing ?
+        promote_type(eltype(greek.β), typeof(float(single_scattering_albedo)),
+                     typeof(float(extinction_cross_section))) : FT_out
+    greek_out = GreekCoefs(convert.(FTo, greek.α), convert.(FTo, greek.β),
+                           convert.(FTo, greek.γ), convert.(FTo, greek.δ),
+                           convert.(FTo, greek.ϵ), convert.(FTo, greek.ζ))
+    return AerosolOptics(greek_coefs=greek_out,
+                         ω̃=convert(FTo, single_scattering_albedo),
+                         k=convert(FTo, extinction_cross_section),
+                         fᵗ=zero(FTo))
 end
 
 compute_aerosol_optical_properties(

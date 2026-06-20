@@ -5,6 +5,7 @@ users can call the same function with just a keyword argument change.
 
 =#
 
+#= RETIRED — stale aerosol Mie autodiff helper (unused; to be removed):
 """
     convert_jacobian_result_to_aerosol_optics(result) -> AerosolOptics
 
@@ -34,8 +35,9 @@ function convert_jacobian_result_to_aerosol_optics(result)
     ω̃ = value[end-1]
     k = value[end]
 
-    return AerosolOptics(greek_coefs=greek_coefs, ω̃=ω̃, k=k, derivs=derivs, fᵗ=eltype(ω̃)(1)) 
+    return AerosolOptics(greek_coefs=greek_coefs, ω̃=ω̃, k=k, derivs=derivs, fᵗ=eltype(ω̃)(1))
 end
+=#
 
 @doc raw"""
     compute_aerosol_optical_properties(model::MieModel; autodiff=false) -> AerosolOptics
@@ -65,6 +67,16 @@ The AD Jacobian is stored in `AerosolOptics.derivs` with shape
 `[α; β; γ; δ; ϵ; ζ; ω̃; k]`.
 """
 function compute_aerosol_optical_properties(model::MieModel ; autodiff=false)
+    # NOTE (2026-06): the aerosol Mie ForwardDiff autodiff path is stale/unused and
+    # is commented out (RETIRED block below) pending full removal. Aerosol Jacobians
+    # come from the hand-coded linearized Mie path,
+    # `compute_aerosol_optical_properties(::LinMode, …)`. Only the forward,
+    # architecture-routed (autodiff=false) path is active.
+    autodiff && error("aerosol Mie ForwardDiff autodiff is retired; use the LinMode Mie path for aerosol Jacobians")
+    return _dispatch_aerosol_optics(model.architecture, model)
+end
+
+#= RETIRED — stale aerosol Mie ForwardDiff autodiff (unused; to be removed):
 
     # Closure that ForwardDiff differentiates: x = [r_m, σ_g, nᵣ, nᵢ] as Dual numbers.
     # The Dual numbers must propagate through the entire Mie computation.
@@ -72,13 +84,18 @@ function compute_aerosol_optical_properties(model::MieModel ; autodiff=false)
 
         (; computation_type, λ, polarization_type, truncation_type, r_max, nquad_radius, wigner_A, wigner_B) = model
 
-        # Construct aerosol with Dual-typed parameters so ForwardDiff can track derivatives
+        # Construct aerosol with Dual-typed parameters so ForwardDiff can track derivatives.
+        # nᵣ and nᵢ become Dual numbers here; size_distribution params also become Dual
+        # because x[1],x[2] are Dual-typed. The resulting Aerosol{Dual} has a different
+        # element type than the parent model's FT (plain Float64), so we cannot use the
+        # strict typed MieModel struct directly. Instead we route through make_mie_model,
+        # which promotes λ and r_max to the aerosol's element type (Dual), keeping the
+        # whole model FT-consistent. CPU() is forced because Dual numbers do not flow
+        # through the GPU KernelAbstractions kernels.
         aerosol_x = Aerosol(LogNormal(log(x[1]), log(x[2])), x[3], x[4])
-        # The autodiff/Jacobian path always runs on the CPU analytic kernel:
-        # ForwardDiff Dual numbers do not flow through the GPU KernelAbstractions
-        # kernels, so we force CPU() here (and precision_policy is irrelevant on
-        # the CPU path). The full 11-field positional constructor is used.
-        model_x = MieModel(computation_type, aerosol_x, λ, polarization_type, truncation_type, r_max, nquad_radius, wigner_A, wigner_B, Architectures.CPU(), nothing)
+        model_x = make_mie_model(computation_type, aerosol_x, λ, polarization_type,
+                                 truncation_type, r_max, nquad_radius;
+                                 architecture = Architectures.CPU())
 
         aerosol_optics = compute_aerosol_optical_properties(model_x)
     
@@ -113,6 +130,7 @@ function compute_aerosol_optical_properties(model::MieModel ; autodiff=false)
     end
 
 end
+=#
 
 # ============================================================================
 # Architecture / method router for the single-verb entry point

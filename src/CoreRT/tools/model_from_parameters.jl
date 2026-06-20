@@ -183,7 +183,8 @@ function _analytic_aerosol_optics(c_aero::RT_Aerosol, params, truncation_type,
         single_scattering_albedo = convert(FT, c_aero.ϖ),
         extinction_cross_section = one(FT),
         l_max = lmax,
-        nquad = max(2lmax + 1, 64))
+        nquad = max(2lmax + 1, 64),
+        FT_out = FT)   # emit greek in the model FT (type stability; mirrors the Mie path)
 end
 
 """
@@ -830,8 +831,9 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
                                             architecture = params.architecture)
 
             # Compute raw (not truncated) aerosol optical properties (not needed in RT eventually).
-            # Single-verb call: dispatches CPU/GPU off mie_model.architecture; FT2
-            # is the model's FT (== params.float_type == FT_vrs here).
+            # Single-verb call: dispatches CPU/GPU off mie_model.architecture.
+            # Output type defaults to the MieModel's FT parameter (== params.float_type == FT_vrs),
+            # so a Float32 model produces Float32 greek coefficients with no explicit override.
             @timeit "Mie calc"  aerosol_optics_raw = compute_aerosol_optical_properties(mie_model);
 
             # Compute truncated aerosol optical properties (phase function and fᵗ).

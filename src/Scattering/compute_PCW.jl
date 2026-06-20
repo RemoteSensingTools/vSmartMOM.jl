@@ -5,10 +5,15 @@ This file specifies how to compute aerosol optical properties using the Domke-PC
 =#
 
 @doc raw"""
-    compute_aerosol_optical_properties(model::MieModel{<:PCW}, FT2::Type=Float64) -> AerosolOptics
+    compute_aerosol_optical_properties(model::MieModel{<:PCW,FT}, FT2::Type) -> AerosolOptics
 
 Compute bulk aerosol optical properties with the Domke PCW formulation
 (Sanghavi, 2014), using precomputed Wigner tables.
+
+The second argument `FT2` sets the **output** float type of the returned
+`AerosolOptics`. It is supplied by the router (`_dispatch_aerosol_optics` in
+`phase_function_autodiff.jl`) and must be passed explicitly — there is no
+default.
 
 Reference:
 - S. Sanghavi, *Revisiting the Fourier expansion of Mie scattering matrices in generalized spherical functions*, JQSRT 136 (2014), 16-27. https://doi.org/10.1016/j.jqsrt.2013.12.015
@@ -29,7 +34,7 @@ There is no GPU PCW kernel; a `GPU()`-architecture PCW model falls back to this
 CPU implementation (with a one-time `@warn`) via the single-verb
 `compute_aerosol_optical_properties(model)` router.
 """
-function compute_aerosol_optical_properties(model::MieModel{FDT}, FT2::Type) where FDT<:PCW
+function compute_aerosol_optical_properties(model::MieModel{FDT,FT}, FT2::Type) where {FDT<:PCW, FT}
 
     # Unpack the model
     (; computation_type, aerosol, r_max, nquad_radius, λ, polarization_type, truncation_type, wigner_A, wigner_B) = model
@@ -38,8 +43,7 @@ function compute_aerosol_optical_properties(model::MieModel{FDT}, FT2::Type) whe
     # @unpack aerosol, r_max, nquad_radius = mie_aerosol
     (; size_distribution, nᵣ, nᵢ) = aerosol
 
-    # Get the refractive index's real part type
-    FT = eltype(nᵣ);
+    # FT is captured from the MieModel{FDT,FT,...} type parameter (same as aerosol.nᵣ type).
 
     # Compute radii and weights using log-space quadrature
     r_min = max(quantile(size_distribution, 1e-8), 1e-6 * r_max)
