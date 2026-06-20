@@ -21,6 +21,7 @@ set -euo pipefail
 #   LOGDIR=$OUTDIR/logs
 #   JULIA_BIN=julia
 #   JULIA_FLAGS="--pkgimages=no"
+#   TEE_CHUNK_LOGS=0
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
@@ -38,6 +39,7 @@ LOGDIR="${LOGDIR:-${OUTDIR}/logs}"
 JULIA_BIN="${JULIA_BIN:-julia}"
 JULIA_FLAGS="${JULIA_FLAGS:---pkgimages=no}"
 SKIP_COMPLETED="${SKIP_COMPLETED:-1}"
+TEE_CHUNK_LOGS="${TEE_CHUNK_LOGS:-0}"
 # shellcheck disable=SC2206
 JULIA_FLAGS_ARRAY=(${JULIA_FLAGS})
 
@@ -67,6 +69,7 @@ printf '  output dir: %s\n' "${OUTDIR}"
 printf '  log dir: %s\n' "${LOGDIR}"
 printf '  Julia flags: %s\n' "${JULIA_FLAGS:-<none>}"
 printf '  skip completed: %s\n' "${SKIP_COMPLETED}"
+printf '  tee chunk logs: %s\n' "${TEE_CHUNK_LOGS}"
 
 albedo_tag() {
   printf '%s' "$1" | tr ',' '_' | tr ':' '-'
@@ -118,17 +121,31 @@ for sza_idx in $(seq "${START_SZA_IDX}" "${END_SZA_IDX}"); do
     printf '\n[%s] Running chunk %s\n' "$(date '+%Y-%m-%d %H:%M:%S %Z')" "${chunk_tag}" | tee -a "${LOGDIR}/driver.log"
     printf '  OUT_NC=%s\n' "${out_nc}" | tee -a "${LOGDIR}/driver.log"
 
-    env \
-      CUDA_DEVICE="${CUDA_DEVICE}" \
-      PSURFS="${PSURF}" \
-      SZA_IDXS="${sza_idx}" \
-      ALBEDO_IDXS="${requested_albedos}" \
-      CHUNK_TAG="${chunk_tag}" \
-      OUTDIR="${OUTDIR}" \
-      OUT_NC="${out_nc}" \
-      "${resume_flag[@]}" \
-      "${JULIA_BIN}" "${JULIA_FLAGS_ARRAY[@]}" --project=. workflows/OCORaman/scripts/chunked_createRamanLUT_O2A.jl \
-      2>&1 | tee -a "${log_file}"
+    if [[ "${TEE_CHUNK_LOGS}" == "1" ]]; then
+      env \
+        CUDA_DEVICE="${CUDA_DEVICE}" \
+        PSURFS="${PSURF}" \
+        SZA_IDXS="${sza_idx}" \
+        ALBEDO_IDXS="${requested_albedos}" \
+        CHUNK_TAG="${chunk_tag}" \
+        OUTDIR="${OUTDIR}" \
+        OUT_NC="${out_nc}" \
+        "${resume_flag[@]}" \
+        "${JULIA_BIN}" "${JULIA_FLAGS_ARRAY[@]}" --project=. workflows/OCORaman/scripts/chunked_createRamanLUT_O2A.jl \
+        2>&1 | tee -a "${log_file}"
+    else
+      env \
+        CUDA_DEVICE="${CUDA_DEVICE}" \
+        PSURFS="${PSURF}" \
+        SZA_IDXS="${sza_idx}" \
+        ALBEDO_IDXS="${requested_albedos}" \
+        CHUNK_TAG="${chunk_tag}" \
+        OUTDIR="${OUTDIR}" \
+        OUT_NC="${out_nc}" \
+        "${resume_flag[@]}" \
+        "${JULIA_BIN}" "${JULIA_FLAGS_ARRAY[@]}" --project=. workflows/OCORaman/scripts/chunked_createRamanLUT_O2A.jl \
+        >> "${log_file}" 2>&1
+    fi
 
     alb_idx=$(( alb_end + 1 ))
   done
