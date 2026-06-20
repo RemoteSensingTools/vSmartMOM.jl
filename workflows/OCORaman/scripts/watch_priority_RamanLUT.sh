@@ -29,6 +29,8 @@ CUDA_HOME="${CUDA_HOME:-/usr/local/cuda}"
 INTERVAL_SECONDS="${INTERVAL_SECONDS:-300}"
 STALE_WARN_SECONDS="${STALE_WARN_SECONDS:-1800}"
 JULIA_FLAGS="${JULIA_FLAGS:---pkgimages=no}"
+JULIA_BIN="${JULIA_BIN:-julia}"
+PRIORITY_ALBEDO_IDXS="${PRIORITY_ALBEDO_IDXS:-1,7,21}"
 
 PSURF_TAG="$(printf '%04.0f' "${PSURF}")"
 PSURF_WRAPPER_TAG="$(printf '%.0f' "${PSURF}")"
@@ -76,10 +78,20 @@ julia_pid() {
 }
 
 run_complete() {
-    local nc_count
-    nc_count="$(find "${OUTDIR}" -maxdepth 1 -type f -name "priority_psurf${PSURF_TAG}_sza*_alb*.nc" 2>/dev/null | wc -l | awk '{print $1}')"
-    (( nc_count >= 14 )) &&
-        grep -q "Finished priority O2A Raman LUT run for psurf=${PSURF}" "${LOGDIR}/driver.log" 2>/dev/null
+    local sza_idx missing
+    for sza_idx in $(seq 1 14); do
+        missing="$(
+            env \
+                PSURF="${PSURF}" \
+                SZA_IDX="${sza_idx}" \
+                ALBEDO_IDXS="${PRIORITY_ALBEDO_IDXS}" \
+                OUTDIR="${OUTDIR}" \
+                "${JULIA_BIN}" ${JULIA_FLAGS} --project=. workflows/OCORaman/scripts/priority_missing_RamanLUT_O2A.jl \
+                2>/dev/null | tail -n 1
+        )"
+        [[ -n "${missing}" ]] && return 1
+    done
+    return 0
 }
 
 latest_log_file() {

@@ -53,6 +53,8 @@ function candidate_files(psurf::Real)
     for d in (
         joinpath(DATA_ROOT, "o2a_raman_lut_chunked_psurf$(tag)"),
         joinpath(DATA_ROOT, "o2a_raman_lut_chunked_psurf$(plain)"),
+        joinpath(DATA_ROOT, "o2a_raman_lut_priority_psurf$(tag)_rgb"),
+        joinpath(DATA_ROOT, "o2a_raman_lut_priority_psurf$(plain)_rgb"),
         OUTDIR,
     )
         (isempty(d) || !isdir(d)) && continue
