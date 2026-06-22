@@ -215,15 +215,20 @@ function interaction_helper!(::ScatteringInterface_11, SFI,
 
     # X₂₁ refers to added layer, X₁₀ to composite layer!
 
-    # Used to store `(I - R⁺⁻ * r⁻⁺)⁻¹`
-    #tmp_inv = similar(t⁺⁺)
-    temp2 .= I_static .- r⁻⁺ ⊠ R⁺⁻
-    # Compute and store `(I - R⁺⁻ * r⁻⁺)⁻¹`
-    @timeit "interaction inv1 bla" batch_inv!(temp1, temp2, temp1_ptr, temp2_ptr)
-    # Temporary arrays:
-
-    # T₁₂(I-R₀₁R₂₁)⁻¹
-    T01_inv = T⁻⁻ ⊠ temp1;
+    # T01_inv = T⁻⁻·(E − r⁻⁺·R⁺⁻)⁻¹ — the adding factor reused by the J₀⁻, R⁻⁺ and
+    # T⁻⁻ updates below (Sanghavi et al. 2014, Eqs. 23–28). The bare inverse is only
+    # an intermediate, so on GPU compute it as a single fused LU + right-solve (no
+    # explicit inverse, no separate GEMM); fall back to inverse-then-multiply for
+    # large N / on CPU. `temp1` is repurposed as the T01_inv output.
+    if _use_fused_solve(temp1)
+        @timeit "interaction inv1 fused" ka_fused_solve!(temp1, r⁻⁺, R⁺⁻, T⁻⁻,
+                                                         KernelAbstractions.get_backend(temp1))
+        T01_inv = temp1
+    else
+        temp2 .= I_static .- r⁻⁺ ⊠ R⁺⁻
+        @timeit "interaction inv1 bla" batch_inv!(temp1, temp2, temp1_ptr, temp2_ptr)
+        T01_inv = T⁻⁻ ⊠ temp1
+    end
 
     # J₀₂⁻ = J₀₁⁻ + T₀₁(1-R₂₁R₀₁)⁻¹(R₂₁J₁₀⁺+J₁₂⁻) — legacy solar slot
     J₀⁻ .= J₀⁻ .+ T01_inv ⊠ (r⁻⁺ ⊠ J₀⁺ .+ j₀⁻)
@@ -241,14 +246,17 @@ function interaction_helper!(::ScatteringInterface_11, SFI,
 
     # Repeating for mirror-reflected directions
 
-    # Compute and store `(I - r⁻⁺ * R⁺⁻)⁻¹`
-    #handle = CUBLAS.handle()
-    #CUBLAS.math_mode!(handle, CUDA.FAST_MATH)
-    #@show typeof(I_static .- R⁺⁻ ⊠ r⁻⁺)
-    temp2 .= I_static .- R⁺⁻ ⊠ r⁻⁺
-    @timeit "interaction inv2" batch_inv!(temp1, temp2, temp1_ptr, temp2_ptr)
-    # T₂₁(I-R₀₁R₂₁)⁻¹
-    T21_inv = t⁺⁺ ⊠ temp1
+    # T21_inv = t⁺⁺·(E − R⁺⁻·r⁻⁺)⁻¹ — reused by the J₀⁺, T⁺⁺ and R⁺⁻ updates below.
+    # Same fused LU + right-solve as inv1 (temp1 reused as the T21_inv output).
+    if _use_fused_solve(temp1)
+        @timeit "interaction inv2 fused" ka_fused_solve!(temp1, R⁺⁻, r⁻⁺, t⁺⁺,
+                                                         KernelAbstractions.get_backend(temp1))
+        T21_inv = temp1
+    else
+        temp2 .= I_static .- R⁺⁻ ⊠ r⁻⁺
+        @timeit "interaction inv2" batch_inv!(temp1, temp2, temp1_ptr, temp2_ptr)
+        T21_inv = t⁺⁺ ⊠ temp1
+    end
 
     # J₂₀⁺ = J₂₁⁺ + T₂₁(I-R₀₁R₂₁)⁻¹(J₁₀ + R₀₁J₁₂⁻ ) — legacy solar slot
     J₀⁺ .= j₀⁺ .+ T21_inv ⊠ (J₀⁺ .+ R⁺⁻ ⊠ j₀⁻)

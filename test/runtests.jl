@@ -27,6 +27,9 @@ try
 # Forward model tests (these require YAML parameter files + data)
 @testset "Forward noRS" begin include("test_forward_noRS.jl") end
 
+# Molecular Rayleigh/Cabannes/RRS optical-property identities.
+@testset "Rayleigh/Cabannes Raman" begin include("test_ray_cab_raman.jl") end
+
 # Jacobian unit tests
 @testset "Jacobian Unit" begin include("test_jacobians_unit.jl") end
 
@@ -38,6 +41,10 @@ try
 
 # Quality gates
 @testset "Quality Gates" begin include("test_quality.jl") end
+
+# Package health (Aqua) and static analysis snapshot (JET)
+@testset "Aqua" begin include("test_aqua.jl") end
+@testset "JET"  begin include("test_jet.jl")  end
 
 # Top-level public IO API
 @testset "IO Exports" begin include("test_io_exports.jl") end
@@ -75,20 +82,27 @@ try
 # Phase-function truncation invariants (Sanghavi & Stephens 2015)
 @testset "Truncation" begin include("test_truncation.jl") end
 
+# VS Raman path smoke tests — guards the previously-broken VS_0to1/VS_1to0
+# call chain (undefined compute_optical_Rayl!/compute_ϖ_Cabannes! calls).
+@testset "Inelastic VS smoke" begin include("test_inelastic_vs_smoke.jl") end
+
+# ForwardDiff hybrid-AD path — guards the Dual-safe Dₙ recursion in
+# compute_mie_ab! (Float64-stabilized for plain floats, native for Duals)
+# and the AD albedo Jacobian. Runtime ~2 min.
+@testset "Hybrid AD" begin include("test_hybrid_ad.jl") end
+
 # Cox-Munk ocean surface tests
 @testset "Cox-Munk Surface" begin include("test_coxmunk.jl") end
 
-# GPU-specific tests (conditional on CUDA availability)
-CUDA_AVAILABLE = try
-    using CUDA
-    CUDA.functional()
-catch
-    false
-end
+# Lambertian surface scaffold — cross-flavor consistency (Scalar/Legendre/
+# Spline/Spectrum share one create_surface_layer!), m>0 conventions, and the
+# LambertianSurfaceSpectrum end-to-end regression.
+@testset "Lambertian surfaces" begin include("test_lambertian_surfaces.jl") end
 
-if CUDA_AVAILABLE
-    @testset "Raman GPU" begin include("test_forward_raman_gpu.jl") end
-end
+# NOTE: GPU/Metal tests live in test/local/gpu/ and run via
+# `julia --project=test test/local/runtests.jl` (the local-only suite); they are
+# NOT part of this CI suite. Likewise, configs needing external LUTs/ABSCO data
+# or the unimplemented H2O override live in test/local/test_parameters/.
 
 # Phase 1b regression gate — RRS forward model vs frozen reference.
 # Skipped by default on CPU-only machines (run takes ~3 min); set
@@ -115,6 +129,11 @@ end
 
 # Phase 6 — sanghavi test/benchmarks/*.jl script ports (parse + light-unit).
 @testset "Phase 6 script ports" begin include("test_phase6_ports.jl") end
+
+# Batch-processing API: BatchContext + update_model!
+# Validates bit-equality of optical depths and radiances across scene updates,
+# round-trip consistency, and guard rails.
+@testset "BatchContext update_model!" begin include("test_update_model.jl") end
 
 # v0.6 source-term refactor — AbstractSource vocabulary, SolarBeam, BlackbodySource,
 # SurfaceSIF, surface_source_contribute! double-dispatch, prepared_sources flow.

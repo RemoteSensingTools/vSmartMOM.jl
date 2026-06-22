@@ -88,7 +88,9 @@ function Base.show(io::IO, ::MIME"text/plain", x::MieModel)
     println(io, _S_TREE_MID, "λ: ", x.λ, " μm")
     println(io, _S_TREE_MID, "polarization: ", pol_name)
     println(io, _S_TREE_MID, "r_max: ", x.r_max, " μm")
-    print(io,   _S_TREE_END, "nquad_radius: ", x.nquad_radius)
+    println(io, _S_TREE_MID, "nquad_radius: ", x.nquad_radius)
+    print(io,   _S_TREE_END, "architecture: ", typeof(x.architecture).name.name,
+          x.precision_policy === nothing ? "" : " ($(typeof(x.precision_policy).name.name))")
 end
 
 function Base.show(io::IO, x::MieModel)

@@ -1,3 +1,13 @@
+# Standalone guard: when this file is run directly (not included from runtests.jl),
+# the imports from runtests.jl are missing. Add them here so standalone execution works.
+if !@isdefined(phase_function)
+    using Test
+    using vSmartMOM
+    using vSmartMOM.Scattering
+    using Distributions
+    using JLD2
+end
+
 # Test the wigner 3-j symbol calculations (slow — ~60s, gated behind VSMARTMOM_FULL_TESTS)
 if get(ENV, "VSMARTMOM_FULL_TESTS", "") == "true"
 @testset "wigner3j" begin
@@ -167,4 +177,31 @@ end
     @test aerosol_optics_NAI2.k ≈ aerosol_optics_PCW.k
     @test aerosol_optics_NAI2.fᵗ ≈ aerosol_optics_PCW.fᵗ
 
+end
+
+# Verify that truncate_phase(δBGE) forward-cone exclusion is applied.
+# Use the saved PCW reference (a large, forward-peaked aerosol with ~760 Greek
+# modes) and l_max=10.  The normal equations are then 750+ observations × 10
+# unknowns — strongly overdetermined and numerically stable on every platform.
+# Using l_max ≈ length(β) (as the original test did with a small aerosol)
+# makes the system nearly rank-deficient after the forward-cone exclusion
+# removes a handful of GL points, causing c₀ to blow up outside [0,1].
+@testset "δBGE forward-cone exclusion" begin
+    @load "test_pcw/PCW_AerosolOptics_v2.jld" aerosol_optics_PCW
+    # aerosol_optics_PCW carries raw Greek coefficients (fᵗ=1 sentinel).
+    l_max = 10   # << length(β) ≈ 760 → strongly overdetermined → stable
+
+    aop_tr0  = Scattering.truncate_phase(δBGE(l_max, 0.0),  aerosol_optics_PCW)
+    aop_tr10 = Scattering.truncate_phase(δBGE(l_max, 10.0), aerosol_optics_PCW)
+
+    # SSA and extinction unchanged by truncation:
+    @test aop_tr0.ω̃ ≈ aerosol_optics_PCW.ω̃
+    @test aop_tr0.k  ≈ aerosol_optics_PCW.k
+    # fᵗ = 1 - c₀ must be non-negative; with l_max=10 the 10-mode fit of the
+    # large aerosol's 760-mode series gives fᵗ ≈ 0.33 even at Δ_angle=0.
+    @test aop_tr0.fᵗ  ≥ -1e-10
+    @test 0 ≤ aop_tr10.fᵗ ≤ 1
+    # fᵗ changes when the exclusion cone is applied (proves iμ subset is used):
+    @test aop_tr10.fᵗ > 0.1   # Δ_angle=10° should give non-trivial truncation for large aerosol
+    println("  δBGE fᵗ: Δ_angle=0° → $(round(aop_tr0.fᵗ, sigdigits=6)), Δ_angle=10° → $(round(aop_tr10.fᵗ, sigdigits=6))")
 end

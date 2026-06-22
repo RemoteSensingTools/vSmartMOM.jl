@@ -38,6 +38,18 @@ function doubling_helper!(RS_type::RRS,
     # Geometric progression of reflections (1-RR)⁻¹
     gp_refl      = similar(t⁺⁺)
     tt⁺⁺_gp_refl = similar(t⁺⁺)
+    # n-loop-2 path selection: a fused KA kernel (one launch over all (n₁,Δn))
+    # replaces the per-Δn batched_mul host loop on GPU when it fits the static
+    # @localmem (48 KB) / 1024-threads limits; otherwise (CPU, or NquadN too
+    # large) fall back to the batched_mul loop below. The fused path is NOT
+    # bit-identical (different accumulation order, ~1e-7 in f32) — regen RRS
+    # goldens for configs that take it.
+    use_fused_nloop2 = (architecture isa Architectures.GPU) &&
+                       _fused_doubling_fits(size(iet⁺⁺, 1), eltype(iet⁺⁺))
+    # The SFI source-vector loop (ieJ₀±) fuses under a looser limit (6 N×N buffers).
+    use_fused_jsrc   = (architecture isa Architectures.GPU) &&
+                       _fused_jsrc_fits(size(iet⁺⁺, 1), eltype(iet⁺⁺))
+    i_λ₁λ₀_dev = (use_fused_nloop2 || use_fused_jsrc) ? array_type(architecture)(i_λ₁λ₀) : i_λ₁λ₀
 
     if SFI
         # Dummy for source
@@ -71,6 +83,10 @@ function doubling_helper!(RS_type::RRS,
             @timeit "precomp" tmp1 = gp_refl ⊠  (J₀⁺ + r⁻⁺ ⊠ J₁⁻)
             @timeit "precomp" tmp2 = gp_refl ⊠  (J₁⁻ + r⁻⁺ ⊠ J₀⁺)
             #@timeit "prep"    tmp3 = repeat(r⁻⁺,1,1,1,nRaman) ⊠ reshape(ieJ₁⁻,
+            if use_fused_jsrc
+                apply_fused_doubling_jsrc!(ieJ₀⁺, ieJ₀⁻, tt⁺⁺_gp_refl, r⁻⁺, ier⁻⁺, iet⁺⁺,
+                                           tmp1, tmp2, J₁⁻, J₀⁺, expk, i_λ₁λ₀_dev, architecture)
+            else
             for Δn = 1:nRaman
                 n₀, n₁ = get_n₀_n₁(ieJ₁⁺,i_λ₁λ₀[Δn])
 
@@ -106,7 +122,7 @@ function doubling_helper!(RS_type::RRS,
                 #@show Δn, ieJ₀⁺[1:3,1,642,nRaman-Δn+1], ieJ₀⁻[1:3,1,642,nRaman-Δn+1]
                 #end
             end
-
+            end  # if use_fused_jsrc
         #bla
             # J⁻₀₂(λ) = J⁻₀₁(λ) + T⁻⁻₀₁(λ)[I - R⁻⁺₂₁(λ)R⁺⁻₀₁(λ)]⁻¹[J⁻₁₂(λ) + R⁻⁺₂₁(λ)J⁺₁₀(λ)] (see Eqs.8 in Raman paper draft)
             J₀⁻[:] = J₀⁻ + (tt⁺⁺_gp_refl ⊠ (J₁⁻ + r⁻⁺ ⊠ J₀⁺))
@@ -117,6 +133,10 @@ function doubling_helper!(RS_type::RRS,
             expk .= expk.^2 #expk[:] = expk.^2
         end
         #println("Doubling part 1 done")
+        if use_fused_nloop2
+            apply_fused_doubling_nloop2!(iet⁺⁺, ier⁻⁺, tt⁺⁺_gp_refl, gp_refl, r⁻⁺, t⁺⁺,
+                                         i_λ₁λ₀_dev, architecture)
+        else
         for Δn = 1:nRaman
                 n₀, n₁ = get_n₀_n₁(ieJ₁⁺,i_λ₁λ₀[Δn])
                 #@show n₁, n₀
@@ -138,9 +158,10 @@ function doubling_helper!(RS_type::RRS,
                             (ier⁻⁺[:,:,n₁,Δn] ⊠ r⁻⁺[:,:,n₀] + r⁻⁺[:,:,n₁] ⊠ ier⁻⁺[:,:,n₁,Δn]) ⊠
                             gp_refl[:,:,n₀] ⊠ r⁻⁺[:,:,n₀]) ⊠ t⁺⁺[:,:,n₀])
 
-                iet⁺⁺[:,:,n₁,Δn] = tmp5
-                ier⁻⁺[:,:,n₁,Δn] = tmp6
+                iet⁺⁺[:,:,n₁,Δn] .= tmp5
+                ier⁻⁺[:,:,n₁,Δn] .= tmp6
         end
+        end  # if use_fused_nloop2
 
         # R⁻⁺₂₀(λ) = R⁻⁺₁₀(λ) + T⁻⁻₀₁(λ)[I - R⁻⁺₂₁(λ)R⁺⁻₀₁(λ)]⁻¹R⁻⁺₂₁(λ)T⁺⁺₁₀(λ) (see Eqs.8 in Raman paper draft)
         r⁻⁺[:]  = r⁻⁺ + (tt⁺⁺_gp_refl ⊠ r⁻⁺ ⊠ t⁺⁺)
@@ -152,9 +173,8 @@ function doubling_helper!(RS_type::RRS,
 
     # After doubling, revert D(DR)->R, where D = Diagonal{1,1,-1,-1}
     # For SFI, after doubling, revert D(DJ₀⁻)->J₀⁻
-
-    synchronize_if_gpu()
-
+    # All preceding work (CUBLAS ⊠ / element-wise) and the apply_D KA kernels
+    # below are on the same CUDA stream — no host sync needed here.
     apply_D_matrix!(pol_type.n, added_layer.r⁻⁺, added_layer.t⁺⁺, added_layer.r⁺⁻, added_layer.t⁻⁻)
     apply_D_matrix_IE!(RS_type, pol_type.n, added_layer.ier⁻⁺, added_layer.iet⁺⁺, added_layer.ier⁺⁻, added_layer.iet⁻⁻)
     SFI && apply_D_matrix_SFI!(pol_type.n, added_layer.j₀⁻)
@@ -295,9 +315,8 @@ function doubling_helper!(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
 
     # After doubling, revert D(DR)->R, where D = Diagonal{1,1,-1,-1}
     # For SFI, after doubling, revert D(DJ₀⁻)->J₀⁻
-
-    synchronize_if_gpu()
-
+    # All preceding work and the apply_D KA kernels below are on the same
+    # CUDA stream — no host sync needed here.
     apply_D_matrix!(pol_type.n,
         added_layer.r⁻⁺, added_layer.t⁺⁺, added_layer.r⁺⁻, added_layer.t⁻⁻)
     apply_D_matrix_IE!(RS_type, pol_type.n,
@@ -437,24 +456,6 @@ negates the upwelling `U/V` Stokes rows for that source element.
     end
 end
 
-#Suniti: is it possible to  use the same kernel for the 3D elastic and 4D inelastic terms or do we need to call two different kernels separately?
-#function apply_D_matrix!(n_stokes::Int, r⁻⁺::CuArray{FT,3}, t⁺⁺::CuArray{FT,3}, r⁺⁻::CuArray{FT,3}, t⁻⁻::CuArray{FT,3}) where {FT}
-#
-#    if n_stokes == 1
-#        r⁺⁻[:] = r⁻⁺
-#        t⁻⁻[:] = t⁺⁺
-#
-#        return nothing
-#    else
-#        device = devi(architecture(r⁻⁺))
-#        applyD_kernel! = apply_D!(device)
-#        event = applyD_kernel!(n_stokes, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻, ndrange=size(r⁻⁺)); #Suniti: is it possible to  use the same kernel for the 3D elastic and 4D inelastic terms or do we need to call two different kernels separately?
-#        #wait(device, event);
-#        synchronize_if_gpu();
-#        return nothing
-#    end
-#end
-
 function apply_D_matrix_IE!(RS_type::Union{VS_0to1_plus, VS_1to0_plus}, n_stokes::Int, ier⁻⁺::AbstractArray{FT,4}, iet⁺⁺::AbstractArray{FT,4}, ier⁺⁻::AbstractArray{FT,4}, iet⁻⁻::AbstractArray{FT,4}) where {FT}
     if n_stokes == 1
         ier⁺⁻[:] = ier⁻⁺
@@ -467,7 +468,8 @@ function apply_D_matrix_IE!(RS_type::Union{VS_0to1_plus, VS_1to0_plus}, n_stokes
         event = applyD_kernel_IE!(aType(RS_type.i_λ₁λ₀_all), n_stokes,
             ier⁻⁺, iet⁺⁺, ier⁺⁻, iet⁻⁻, ndrange=getKernelDim(RS_type, ier⁻⁺,(RS_type.i_λ₁λ₀_all)));
         ##wait(device, event);
-        synchronize();
+        # KA kernel is on the same CUDA stream; subsequent device work sees result
+        # without a host barrier. `synchronize()` here was a no-op on GPU anyway.
         return nothing
     end
 end
@@ -484,7 +486,8 @@ function apply_D_matrix_IE!(RS_type::RRS, n_stokes::Int, ier⁻⁺::AbstractArra
         event = applyD_kernel_IE!(aType(RS_type.i_λ₁λ₀), n_stokes,
             ier⁻⁺, iet⁺⁺, ier⁺⁻, iet⁻⁻, ndrange=getKernelDim(RS_type, ier⁻⁺));
         ##wait(device, event);
-        synchronize();
+        # KA kernel is on the same CUDA stream; subsequent device work sees result
+        # without a host barrier. `synchronize()` here was a no-op on GPU anyway.
         return nothing
     end
 end
@@ -510,7 +513,8 @@ function apply_D_matrix_SFI_IE!(RS_type::RRS, n_stokes::Int, ieJ₀⁻::Abstract
     event = applyD_kernel_IE!(aType(RS_type.i_λ₁λ₀),n_stokes,
                     ieJ₀⁻, ndrange=(size(ieJ₀⁻,1), size(ieJ₀⁻,3), size(ieJ₀⁻,4)));
     ##wait(device, event);
-    synchronize_if_gpu()
+    # KA kernel is on the same CUDA stream; caller (doubling_inelastic!) holds
+    # the timing-boundary sync, so no host sync is needed here.
     return nothing
 end
 
@@ -530,7 +534,7 @@ function apply_D_matrix_SFI_IE!(RS_type::Union{VS_0to1_plus, VS_1to0_plus}, n_st
                             aType(RS_type.i_λ₁λ₀_all)));
     #@show "here 3"
     ##wait(device, event);
-    #@show "here 4"
-    synchronize_if_gpu()
+    # KA kernel is on the same CUDA stream; caller (doubling_inelastic!) holds
+    # the timing-boundary sync, so no host sync is needed here.
     return nothing
 end

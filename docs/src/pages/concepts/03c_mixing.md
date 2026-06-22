@@ -60,8 +60,8 @@ same atmospheric column and want to be processed in one call.
 > with ``\tau_\mathrm{scat} \approx 0.05`` (thin aerosol) in the same RT
 > call without blowing up the doubling count.**
 
-Walk through `construct_atm_layer` in
-[`src/CoreRT/tools/atmo_prof.jl:320–380`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/tools/atmo_prof.jl#L320-L380):
+Walk through `constructCoreOpticalProperties` in
+[`src/CoreRT/LayerOpticalProperties/compEffectiveLayerProperties.jl`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/LayerOpticalProperties/compEffectiveLayerProperties.jl):
 
 1. Initialize cumulative ``\tau``, ``\varpi`` for *scattering only*, plus an
    accumulator ``A = \tau \cdot \varpi`` for the τϖ-weighted ``\mathbf{Z}``.
@@ -219,7 +219,7 @@ distortion in ``I`` is small but the distortion in ``Q`` is severe.
 | Layer-optics builder | [`src/CoreRT/LayerOpticalProperties/compEffectiveLayerProperties.jl:11–65`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/LayerOpticalProperties/compEffectiveLayerProperties.jl#L11-L65) |
 | Aerosol δ-M wrapper (`createAero`) | `compEffectiveLayerProperties.jl:67–72` |
 | δ-M Greek-coefficient rescaling | [`src/CoreRT/LayerOpticalProperties/delta_m_truncation.jl:44–48`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/LayerOpticalProperties/delta_m_truncation.jl#L44-L48) |
-| Layer assembly + absorption combination | `src/CoreRT/tools/atmo_prof.jl::construct_atm_layer:320–380` |
+| Layer assembly + absorption combination | [`src/CoreRT/LayerOpticalProperties/compEffectiveLayerProperties.jl`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/LayerOpticalProperties/compEffectiveLayerProperties.jl) — `constructCoreOpticalProperties` |
 | Scattering-only `N_doubl` sizing | `src/CoreRT/CoreKernel/rt_kernel.jl::get_dtau_ndoubl:245–253` |
 | Mix scatterers (`+`) | [`src/CoreRT/types.jl:1063–1093`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/types.jl#L1063-L1093) |
 | Stack layers along spectral axis (`*`) | `src/CoreRT/types.jl:1096+` |

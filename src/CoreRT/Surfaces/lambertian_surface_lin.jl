@@ -64,14 +64,11 @@ function create_surface_layer!(RS_type::noRS,
     
     nparams = size(τ̇_sum,2) # nparams ≠ Nparams (in general)
     nspec = length(τ_sum)
-#@show nparams, nspec
-#@show iμ₀Nstart, iμ₀
     # Get size of added layer
     Nquad = size(added_layer.r⁻⁺,1) ÷ pol_type.n
     tmp = arr_type(ones(pol_type.n*Nquad))
     T_surf = Diagonal(tmp)
     i₀ = iμ₀Nstart:iμ₀Nstart+n-1
-    #@show i₀
     if m == 0
         # Albedo normalized by π (and factor 2 for 0th Fourier Moment)
         ρ = FT(2) * lambertian.albedo#/FT(π)
@@ -96,12 +93,8 @@ function create_surface_layer!(RS_type::noRS,
             F₀_NquadN = arr_type(zeros(length(qp_μN),length(τ_sum)));
             Ḟ₀_NquadN = arr_type(zeros(length(qp_μN),length(τ_sum),nparams+1));
             #F₀_NquadN[:] .=0;
-            #@show size(F₀), size(μ₀), size(R_surf), size(F₀_NquadN), size(added_layer.j₀⁻[:,1,:]), size(F₀ .* (exp.(-τ_sum/μ₀))'), size(F₀_NquadN[iμ₀Nstart:pol_type.n*iμ₀,:])
-            #@show iμ₀Nstart, pol_type.n*iμ₀
-            #@show size(F₀_NquadN[iμ₀Nstart:pol_type.n*iμ₀,:]), size(F₀), size(exp.(-τ_sum/μ₀)')
             tmpF = (F₀ .* arr_type(exp.(-τ_sum/μ₀))');
             F₀_NquadN[i₀,:] .= tmpF 
-            #@show size(Ḟ₀_NquadN[:,i₀,:]), size(-reshape(tmpF,1,n,nspec).*reshape(τ̇_sum,nparams, 1, nspec)/μ₀)
             Ḟ₀_NquadN[i₀,:,1:nparams] .= -reshape(tmpF,n,nspec,1).*reshape(τ̇_sum, 1, nspec, nparams)/μ₀ # , arr_type(zeros(1, n, nspec)); dims=1)
 
             added_layer.j₀⁺[:,:,:] .= zero(FT);#
@@ -116,8 +109,6 @@ function create_surface_layer!(RS_type::noRS,
                 end
                 added_layer_lin.ap_J̇₀⁻[:,1,ii,iparam]  .= μ₀*Ṙ_surf[:,:]*F₀_NquadN[:,ii]#/FT(π);
             end
-                #@show size(added_layer.j₀⁻[:,1,1])
-        #@show added_layer.j₀⁻[:,1,1]
         # for SIF
             #reinstate the following line after linearization works
             #added_layer.j₀⁻[:,1,:] .+= (1/π)*repeat(arr_type(RS_type.SIF₀),Nquad) * unweight
@@ -129,8 +120,6 @@ function create_surface_layer!(RS_type::noRS,
         #R_surf = 2R_surf * Diagonal(qp_μN.*wt_μN)
         #R_surf = R_surf * Diagonal(qp_μN.*wt_μN)/π
 
-        #@show size(added_layer.r⁻⁺), size(R_surf), size(added_layer.j₀⁻)
-        #@show size(added_layer.r⁻⁺), size(R_surf)
         added_layer.r⁻⁺ .= R_surf;
         added_layer.r⁺⁻ .= zero(FT);
         added_layer.t⁺⁺ .= T_surf;#1. #0.0; #T_surf;
@@ -156,8 +145,5 @@ function create_surface_layer!(RS_type::noRS,
         added_layer_lin.ap_J̇₀⁺ .= zero(FT)
         added_layer_lin.ap_J̇₀⁻ .= zero(FT)
     end
-    #@show size(T_surf), size(R_surf)
-    #@show T_surf
-    #@show R_surf
     synchronize_if_gpu()
 end

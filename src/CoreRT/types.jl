@@ -12,8 +12,6 @@ This file contains all types that are used in the vSmartMOM module:
 - `AbstractSurfaceType` specify the type of surface in the RT simulation
 - `AbsorptionParameters`, `ScatteringParameters`, and `RTModel` hold model parameters
 - `QuadPoints` holds quadrature points, weights, etc. 
-- `ComputedAtmosphereProperties` and `ComputedLayerProperties` hold intermediate computed properties
-
 =#
 
 # Conditional type for CUDA pointer arrays (only needed when CUDA is loaded)
@@ -973,7 +971,7 @@ $(DocStringExtensions.FIELDS)
 struct AerosolState{FT<:AbstractFloat, AO, AT<:AbstractArray{FT}}
     "Truncated aerosol optics: aerosol_optics[iBand][iAer]"
     aerosol_optics::Vector{Vector{AO}}
-    "Aerosol optical depth profiles: `τ_aer[iBand][iAer, iLayer]` (or `[iAer, nSpec, iLayer]` for lin)"
+    "Aerosol optical depth profiles: `τ_aer[iBand][iAer, nSpec, iLayer]` — 3-D for both the forward and linearized paths, enabling per-wavelength aerosol optical depth within wide spectral bands."
     τ_aer::Vector{AT}
 end
 
@@ -1118,98 +1116,6 @@ struct OpticsLin{A, B, C}
     lin_aerosol_optics::C
 end
 
-# =========================================================================
-
-"""
-    struct ComputedAtmosphereProperties
-
-A struct which holds (for the entire atmosphere) all key layer optical properties required for the RT core solver
-
-# Fields
-$(DocStringExtensions.FIELDS)
-"""
-Base.@kwdef struct ComputedAtmosphereProperties
-
-    "Absorption optical depth vectors (wavelength dependent)"
-    τ_λ_all
-    "Albedo vectors (wavelength dependent)"
-    ϖ_λ_all
-    "Absorption optical depth scalars (not wavelength dependent)"
-    τ_all
-    "Albedo scalars (not wavelength dependent)"
-    ϖ_all
-    "Combined Z moments (forward)"
-    Z⁺⁺_all
-    "Combined Z moments (backward)"
-    Z⁻⁺_all
-    "Maximum dτs"
-    dτ_max_all
-    "dτs"
-    dτ_all
-    "Number of doublings (for all layers)"
-    ndoubl_all
-    "dτs (wavelength dependent)"
-    dτ_λ_all
-    "All expk"
-    expk_all
-    "Scattering flags"
-    scatter_all
-    "Sum of optical thicknesses of all layers above the current layer"
-    τ_sum_all
-    #"elastic (Cabannes) scattering fraction of Rayleigh (Cabannes+Raman) scattering per layer"
-    #ϖ_Cabannes_all
-    "Rayleigh fraction of scattering cross section per layer"
-    fscattRayl_all
-    "Scattering interface type for each layer"
-    scattering_interfaces_all
-end
-
-
-
-"""
-    struct ComputedLayerProperties
-
-A struct which holds all key layer optical properties required for the RT core solver
-
-# Fields
-$(DocStringExtensions.FIELDS)
-"""
-Base.@kwdef struct ComputedLayerProperties
-
-    "Absorption optical depth vector (wavelength dependent)"
-    τ_λ 
-    "Albedo vector (wavelength dependent)"
-    ϖ_λ 
-    "Absorption optical depth scalar (not wavelength dependent)"
-    τ 
-    "Albedo scalar (not wavelength dependent)"
-    ϖ  
-    "Combined Z moment (forward)"
-    Z⁺⁺ 
-    "Combined Z moment (backward)"
-    Z⁻⁺ 
-    "Maximum dτ"
-    dτ_max 
-    "dτ"
-    dτ     
-    "Number of doublings"
-    ndoubl
-    "dτ (wavelength dependent)"
-    dτ_λ 
-    "expk"
-    expk 
-    "Scattering flag"
-    scatter 
-    "Sum of optical thicknesses of all layers above the current layer"
-    τ_sum
-    "Fraction of scattering caused by Rayleigh"
-    fscattRayl
-    #"Elastic fraction (Cabannes) of Rayleigh (Cabannes+Raman) scattering"
-    #ϖ_Cabannes 
-    "Scattering interface type for current layer"
-    scattering_interface
-end
-
 abstract type AbstractOpticalProperties end
 
 """
@@ -1292,10 +1198,11 @@ function Base.:+( x::CoreScatteringOpticalProperties{xFT, xFT2, xFT3},
 end
 
 # Concatenate Core Optical Properties, can have mixed dimensions!
-function Base.:*( x::CoreScatteringOpticalProperties, y::CoreScatteringOpticalProperties ) 
+function Base.:*( x::CoreScatteringOpticalProperties, y::CoreScatteringOpticalProperties )
     arr_type  = array_type(architecture(x.τ))
-    x = expandOpticalProperties(x,arr_type);
-    y = expandOpticalProperties(y,arr_type);
+    # expand_Z=true: cat along dim=3 requires both operands to have size(Z,3)==nSpec
+    x = expandOpticalProperties(x, arr_type; expand_Z=true);
+    y = expandOpticalProperties(y, arr_type; expand_Z=true);
     CoreScatteringOpticalProperties([x.τ; y.τ],[x.ϖ; y.ϖ],cat(x.Z⁺⁺,y.Z⁺⁺, dims=3), cat(x.Z⁻⁺,y.Z⁻⁺, dims=3) )
 end
 
@@ -1311,10 +1218,6 @@ function Base.:+(  y::CoreAbsorptionOpticalProperties, x::CoreScatteringOpticalP
     x + y
 end
 
-
-function Base.:*( x::FT, y::CoreScatteringOpticalProperties{FT} ) where FT
-    CoreScatteringOpticalProperties(y.τ * x, y.ϖ, y.Z⁺⁺, y.Z⁻⁺, y.G)
-end
 
 # From https://gist.github.com/mcabbott/80ac43cca3bee8f57809155a5240519f
 function _repeat(x::AbstractArray, counts::Integer...)

@@ -70,7 +70,7 @@ function inject_solar_tester_vector_optics!(model)
         ssa = SOLAR_TESTER_MOLOMG[n]
         model.τ_rayl[1][:, n] .= ssa * ext
         model.τ_abs[1][:, n]  .= (1 - ssa) * ext
-        model.τ_aer[1][1, n]   = aerext[n]
+        model.τ_aer[1][1, :, n] .= aerext[n]   # τ_aer is 3-D [iAer, nSpec, iLayer]
     end
     return model
 end

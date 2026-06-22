@@ -165,6 +165,7 @@ sufficient for the brief Concepts/08 page; do not expand.
 | **S2022-I Tables 1–5** | Dunham coefficients, nuclear spin degeneracy `g_J`, polarizability invariants `a_B`, `γ_B`. | `src/Inelastic/` constants |
 | **SF2023-II (5)–(6)** | **Coupled RTE** at λ and λ_r. | `src/CoreRT/CoreKernel/` (Raman dispatch) |
 | **SF2023-II (8)–(9)** | **Constant-`N_doubl` trick** in absorbing bands (already covered in Concepts/03c — referenced here only to note it benefits Raman too). | `compEffectiveLayerProperties.jl`; `rt_kernel.jl` |
+| Raman source weighting | `fScattRayleigh = τ_Rayl / (τ_Rayl + τ_aer + τ_abs)`, because the RRS elemental kernels attenuate with total spectral `dτ_λ`. | `compEffectiveLayerProperties.jl::_rayleigh_fraction_of_total_extinction` |
 | **SF2023-II (14)–(15)** | Inelastic elemental R, T, J for `λ → λ_r`. | `src/CoreRT/CoreKernel/elemental_inelastic.jl` |
 | **SF2023-II (16)–(21)** | Inelastic adding/doubling. **Linear-in-inelastic-scattering approximation** (one inelastic event per photon path: E-E-E-I or E-E-I-E patterns). | `interaction_inelastic.jl`, `doubling_inelastic.jl` |
 | **SF2023-II (32)** | Single-scattering inelastic correction `I₁ ≈ I₀ + (I'₁ − I'₀)`. Justifies `rt_run_ss` alongside `rt_run`. | `src/CoreRT/rt_run.jl::rt_run_ss` lines 364–524 |
@@ -210,18 +211,23 @@ is shaped as it is:
    rolled into effective depolarization). Raman-aware modes use Cabannes
    greek and handle rotational Raman explicitly. The mismatch costs ~1%
    on Stokes I and ~3% on Q. → Concepts/03b + Concepts/08.
-4. **Linear-in-inelastic-scattering approximation** (SF2023-II §3.4). Only
+4. **Raman Rayleigh fraction uses total extinction** (`compEffectiveLayerProperties.jl::_rayleigh_fraction_of_total_extinction`).
+   The RRS elemental kernels use total spectral `dτ_λ` for attenuation, so
+   `fScattRayleigh` must be `τ_Rayl / (τ_Rayl + τ_aer + τ_abs)`, not
+   `τ_Rayl / (τ_Rayl + τ_aer)`. Otherwise absorption lines spuriously amplify
+   Raman source terms. → Concepts/08.
+5. **Linear-in-inelastic-scattering approximation** (SF2023-II §3.4). Only
    one inelastic event per photon path; second-order has been shown
    negligible. → Concepts/08.
-5. **Why the package even has `rt_run_ss`** (SF2023-II §5.4.2, Eq. 32).
+6. **Why the package even has `rt_run_ss`** (SF2023-II §5.4.2, Eq. 32).
    Not a debug helper; it's the single-scattering inelastic correction
    that makes the linear-in-Raman approximation usable in absorbing
    bands. → Concepts/04 (mention) + Concepts/08 (mention).
-6. **δBGE-fit over δ-m for hyperspectral retrievals near backscatter**
+7. **δBGE-fit over δ-m for hyperspectral retrievals near backscatter**
    (SS2015 §4.1). δ-m distorts O₂ A-band line shapes near `ϑ_view ≈ −60°`
    in the principal plane, by an amount that biases XCO₂ retrievals.
    → Concepts/03c.
-7. **Exact finite-δ elemental, not the linear approximation.** S2014
+8. **Exact finite-δ elemental, not the linear approximation.** S2014
    Eqs. (19)–(20) are written in the **infinitesimal-δ limit** (first-order
    in δ, equivalent to `1−exp(−x) ≈ x` and `exp(−x) ≈ 1−x`). Many MOM codes
    stop there — they need a very thin elemental layer (large `N_doubl`)

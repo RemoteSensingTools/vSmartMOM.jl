@@ -22,10 +22,21 @@ number density of the absorbing species in the layer. Once computed,
 ``\tau_\lambda = \tau_\mathrm{abs} + \tau_\mathrm{scat}`` in
 [Concepts/03c](03c_mixing.md).
 
+!!! note "RT pipeline uses AtmosphericAbsorption.jl (since externalAbsorption merge)"
+    The **production RT path** (`model_from_parameters` → `rt_run`) now delegates
+    line-by-line absorption to the external
+    [AtmosphericAbsorption.jl](https://github.com/RemoteSensingTools/AtmosphericAbsorption.jl)
+    package (`AtmosphericAbsorption.load_lines` + `LineByLineModel`; TIPS-2021 partition
+    functions). The diagram and prose below describe the underlying physics — the same
+    line-shape equations apply — but `make_hitran_model` is **not** on the `rt_run` call
+    path since this merge. `make_hitran_model` / `read_hitran` / `absorption_cross_section`
+    remain the supported standalone cross-section API (TIPS-2017) for users who need direct
+    σ(ν, T, p) access outside the full RT pipeline.
+
 ## HITRAN line-by-line
 
-vSmartMOM uses the HITRAN line list as the primary source for molecular
-absorption parameters. The `Absorption` module exposes:
+The HITRAN line list is the primary source for molecular absorption parameters.
+For standalone cross-section work, the internal `Absorption` module exposes:
 
 - `read_hitran(...)` to read a `HitranTable` from a HITRAN-format file.
 - `make_hitran_model(...)` to build a `HitranModel` carrying the line list,
@@ -72,7 +83,18 @@ implementations including a GPU-friendly Humlicek-style approximation
                                    Layer optics  (Concepts 3)
 ```
 
-## The GPU line-shape kernel
+## The standalone Absorption module's GPU kernel
+
+The internal `Absorption` module exposes a direct σ(ν, T, p) API
+(`read_hitran` / `make_hitran_model` / `absorption_cross_section`) backed by
+a KernelAbstractions Voigt kernel.  This is the path used by the Tutorial on
+Absorption and by code that needs custom grids or cross-section comparisons.
+
+> **RT pipeline note:** `model_from_parameters` → `rt_run` computes LBL gas
+> absorption internally via
+> [AtmosphericAbsorption.jl](https://github.com/RemoteSensingTools/AtmosphericAbsorption.jl)
+> (TIPS-2021), not through the kernel shown below.  The description here
+> applies to the standalone `Absorption` module only.
 
 Because the line-shape sum is a per-grid-point reduction over thousands of
 contributing lines, it parallelizes trivially across the spectral grid —

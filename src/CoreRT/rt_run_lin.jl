@@ -105,6 +105,12 @@ function rt_run(RS_type::AbstractRamanType,
                     NAer::Int, NGas::Int, NSurf::Int,
                     iBand;
                     sources::Union{Nothing, AbstractSource} = nothing)
+    if InelasticScattering.has_inelastic(RS_type)
+        throw(ArgumentError(
+            "Linearized Raman-active RT is intentionally unsupported. " *
+            "Use forward Raman RT only; do not call rt_run with lin_model for RRS/VS modes."))
+    end
+
     # Per-model BLAS thread cap (see `rt_run` body for rationale).
     if model.numerics.blas_threads !== nothing
         LinearAlgebra.BLAS.set_num_threads(model.numerics.blas_threads)
@@ -124,22 +130,9 @@ function rt_run(RS_type::AbstractRamanType,
     (; τ̇_abs, τ̇_aer, lin_aerosol_optics) = lin_model
 
     lin = LinMode()
-    #@show iBand, sza, vza, vaz, model.params.brdf[iBand].albedo
-    # Also to be changed!!
-    #brdf = model.params.brdf[iBand[1]]
-    #@show size(iBand)
-    #@show iBand
-    #@show iBand[1]
-    #@show size(iBand[1])
-    #bla
     brdf = get_surface(model, iBand)
-    #brdf_lin = model_lin.brdf_lin[iBand]
     (; F₀) = RS_type
-    # no Raman
-    #if (typeof(RS_type)<:RRS)
-    #    RS_type.ϖ_λ₁λ₀ .*=  (1. - model.ϖ_Cabannes[iBand])/sum(RS_type.ϖ_λ₁λ₀) # RS_type.ϖ_λ₁λ₀ .*=  (1. - model.ϖ_Cabannes[iBand[1]])/sum(RS_type.ϖ_λ₁λ₀) 
-    #end   
-    
+
     FT = eltype(sza)                    # Get the float-type to use
 
     Nz = length(model.profile.p_full)   # Number of vertical slices
@@ -178,14 +171,8 @@ function rt_run(RS_type::AbstractRamanType,
         RS_type.F₀ = F₀
     end
 
-    #FT = length(model.τ_aer[1][1]) > 0 ? typeof(model.τ_aer[1][1]) : FT
-    # RT kernels always use pure FT (Float32/Float64), never Dual types
-    # Output variables: Reflected and transmitted solar irradiation at TOA and BOA respectively # Might need Dual later!!
-    #Suniti: consider adding a new dimension (iBand) to these arrays. The assignment of simulated spectra to their specific bands will take place after batch operations, thereby leaving the computational time unaffected 
     R       = zeros(FT, length(vza), pol_type.n, nSpec)
     T       = zeros(FT, length(vza), pol_type.n, nSpec)
-    #R_SFI   = zeros(FT, length(vza), pol_type.n, nSpec)
-    #T_SFI   = zeros(FT, length(vza), pol_type.n, nSpec)
     Ṙ       = zeros(FT, length(vza), pol_type.n, nSpec, Nparams)
     Ṫ       = zeros(FT, length(vza), pol_type.n, nSpec, Nparams)
     # Notify user of processing parameters
@@ -209,8 +196,7 @@ function rt_run(RS_type::AbstractRamanType,
         make_composite_layer(lin, RS_type, FT, arr_type, Nparams, dims, nSpec)
     @timeit "Creating arrays" I_static = 
         Diagonal(arr_type(Diagonal{FT}(ones(dims[1]))));
-    # Known limitation: Raman Jacobians are not yet implemented.
-    # Linearized RT currently supports RS_type = noRS() only.
+    # Linearized RT intentionally supports pure-elastic noRS only.
 
     # Loop over fourier moments
     for m = 0:m_max
@@ -222,8 +208,6 @@ function rt_run(RS_type::AbstractRamanType,
         # Compute the core layer optical properties:
         @timeit "OpticalProps" layer_opt_props, layer_opt_props_lin, fScattRayleigh   = 
             constructCoreOpticalProperties(RS_type, iBand, m, model, lin_model);
-        #@show size(fScattRayleigh)
-        #@show size(fScattRayleigh[1])
             # Determine the scattering interface definitions:
         scattering_interfaces_all, τ_sum_all, τ̇_sum_all = 
             extractEffectiveProps(layer_opt_props, layer_opt_props_lin);
@@ -242,12 +226,8 @@ function rt_run(RS_type::AbstractRamanType,
             # Expand all layer optical properties to their full dimension:
             @timeit "OpticalProps" layer_opt, layer_opt_lin = 
                 expandOpticalProperties(layer_opt_props[iz], layer_opt_props_lin[iz], arr_type)
-            #@show size(layer_opt.Z⁺⁺[:,:,1]), size(RS_type.Z⁺⁺_λ₁λ₀)
-            #@show typeof(layer_opt.Z⁺⁺[:,:,1]), typeof(RS_type.Z⁺⁺_λ₁λ₀)
             #aa = Array(layer_opt.Z⁺⁺[:,:,1]) #Array(RS_type.ϖ_Cabannes[1]*layer_opt.Z⁺⁺[:,:,1]) .+ (sum(RS_type.ϖ_λ₁λ₀)*RS_type.Z⁺⁺_λ₁λ₀)
             #bb = Array(layer_opt.Z⁻⁺[:,:,1]) #Array(RS_type.ϖ_Cabannes[1]*layer_opt.Z⁻⁺[:,:,1]) .+ (sum(RS_type.ϖ_λ₁λ₀)*RS_type.Z⁻⁺_λ₁λ₀)
-            #@show iz,(layer_opt), (layer_opt_lin)
-            #@show iz, size(τ_sum_all), size(τ̇_sum_all)
             # Perform Core RT (doubling/elemental/interaction)
             rt_kernel!(RS_type::noRS, pol_type, SFI,
                         #bandSpecLim,
@@ -312,8 +292,6 @@ function rt_run(RS_type::AbstractRamanType,
                             R, 
                             T,
                             Ṙ, Ṫ)
-        #@show R_SFI[:,1,1]
-        #bla
     end
     
     # Show timing statistics (gated on numerics.verbose; default off).
@@ -322,5 +300,4 @@ function rt_run(RS_type::AbstractRamanType,
 
     # Return R_SFI or R, depending on the flag
     return R, T, Ṙ, Ṫ
-    #return Array(added_layer.ieJ₀⁻), Array(composite_layer.ieJ₀⁻)#
 end

@@ -61,6 +61,15 @@ radiative_transfer:
 - **Per-block schema docs** under
   [`docs/src/pages/IO/Schema/`](IO/Schema.md) — one page per top-level
   YAML/TOML block.
+- **Gas absorption engine swap (externalAbsorption branch).**
+  `model_from_parameters` now computes LBL gas absorption via
+  [AtmosphericAbsorption.jl](https://github.com/RemoteSensingTools/AtmosphericAbsorption.jl)
+  (TIPS-2021 partition sums) rather than the internal `Absorption` module (TIPS-2017).
+  Users with high-temperature retrievals (> ~500 K) may see small numerical
+  differences in the resulting optical depths; results at standard atmospheric
+  temperatures are practically unchanged.  The standalone `Absorption` module
+  API (`read_hitran` / `make_hitran_model` / `absorption_cross_section`)
+  remains available unchanged for direct σ(ν, T, p) queries.
 
 ### Internal cleanup
 
@@ -221,7 +230,10 @@ Linearized RT is exposed through `LinMode`, `model_from_parameters_lin`, and
 ```julia
 params = read_parameters(joinpath(pkgdir(vSmartMOM), "test", "test_parameters", "JacobianTestFast.yaml"))
 model, lin_model = model_from_parameters_lin(params)
-R, T, R_jac, T_jac = rt_run_lin(model, lin_model)
+NAer  = length(params.scattering_params.rt_aerosols)
+NGas  = size(lin_model.τ̇_abs[1], 1)
+NSurf = 1
+R, T, R_jac, T_jac = rt_run_lin(model, lin_model, NAer, NGas, NSurf)
 ```
 
 Use `ParameterLayout` to map Jacobian columns to aerosol, gas, surface, and
@@ -255,13 +267,91 @@ The repository now ships a root `CITATION.bib` with the JOSS software paper and
 the core method references. See [References](vSmartMOM/References.md) for the
 human-readable citation guide.
 
+## Correctness Fixes
+
+The following bugs were silently wrong in earlier releases; all are fixed in
+the current codebase.
+
+- **δBGE forward-cone exclusion (`Δ_angle`) now applied in production.**
+  The `Δ_angle` parameter of `δBGE(N, Δ_angle)` controls how much of the
+  forward-scattering peak is excluded before fitting the truncation coefficient.
+  Previously, `Δ_angle` was accepted in the constructor but silently ignored
+  during the production truncation fit inside `model_from_parameters`.
+  It is now applied correctly.  The **default `Δ_angle = 0` is unchanged**,
+  so most users see no numerical change.  Users who explicitly set `Δ_angle > 0`
+  in their configs should re-validate their results against this release.
+
+- **`LambertianSurfaceSpectrum` surface layer now works.**
+  Calling `rt_run` on a model with a `LambertianSurfaceSpectrum` surface
+  previously raised a `MethodError` because `create_surface_layer!` was not
+  implemented for that type.  The missing method has been added.
+
+- **Canopy soil-albedo Jacobian axis fix.**
+  The canopy linearization (`create_surface_layer_lin!`) wrote the soil-albedo
+  derivative along the wrong array axis, producing incorrect Jacobians for
+  canopy scenes with soil Jacobians enabled.  The axis index is now correct.
+
+- **Wavelength-path wing-cutoff window fix (standalone Absorption API).**
+  When computing absorption cross-sections with the standalone `Absorption`
+  module, the per-line wing-cutoff window was computed in wavelength space
+  rather than wavenumber space, producing asymmetric cutoffs for lines near
+  band edges at longer wavelengths.  The window is now applied consistently
+  in wavenumber space.
+
+- **VS Raman call-chain and atomic-mass fix.**
+  The vibrational Raman scattering (VS) call chain contained a unit-inconsistency
+  in the atomic-mass factor used to compute the Raman shift.  Corrected values
+  will produce numerically different VS Raman spectra.  Rotational Raman (RRS)
+  is unaffected.
+
+- **Mie Dₙ recurrence: Dual-number-safe initialization.**
+  The downward Dₙ recurrence used in Mie coefficient computation started from
+  a hard-coded `Float64` initial value, causing a type-promotion error when
+  the refractive index was a `ForwardDiff.Dual` number (AD path).  The
+  initializer is now type-generic, restoring correct analytic derivatives for
+  Mie-sensitive parameters via `compute_aerosol_optical_properties(LinMode(), …)`.
+
+## Dependencies
+
+- **LogExpFunctions** compat widened to `0.3` (was `~0.2`) to resolve downstream
+  conflicts when using vSmartMOM alongside other packages.
+- **Parameters.jl** compat widened to allow `0.13` in addition to `0.12`, reducing
+  resolver friction for users that also depend on Turing.jl or Optim.jl.
+
+## Performance
+
+- **GPU Mie dispatch** — CUDA architecture now runs Mie coefficient computation
+  on-GPU via `make_mie_model(...; architecture = GPU())`.  Measured speedup:
+  **10.7–12.9×** vs CPU for typical aerosol grids (1 500 quadrature points,
+  NAI2 decomposition).  `NativeFloat64` is the default precision policy;
+  `DSEmulated` is available for extended-precision Float32 accumulation.
+  Metal and other architectures fall back to CPU Mie automatically.
+
+- **Flat-Z zero-copy path** — Rayleigh-only and analytic-phase-function layers
+  share a single pre-computed Z matrix across all Fourier moments rather than
+  re-copying it per moment, reducing memory traffic in the Fourier loop.
+
+- **m-invariant Fourier-loop cache** — Optical properties that do not vary
+  with Fourier moment `m` (Rayleigh, absorption) are computed once per layer
+  and cached across moments, cutting per-moment setup cost for scenes with
+  many moments.
+
+- **GPU sync stripping** — Redundant device-synchronization calls between
+  kernel launches have been removed.  Measured improvement: **~19.5%** faster
+  GPU forward RT on the O₂-A band test case.
+
+- **`BatchContext` batch API** — New `BatchContext` / `update_model!` /
+  `update_aerosol_loading!` / `update_aerosol_microphysics!` API enables
+  efficient multi-scene loops (ensemble retrievals, parameter sweeps) by
+  caching Mie, Fourier decomposition, and HITRAN parsing across calls.
+  See the [CoreRT API](api/core_rt.md#batch-scene-processing) for details.
+
 ## Known WIP Areas
 
 - Aerosol scene input is documented, but the high-level API is still being
   stabilized.
-- Internal export cleanup is intentionally deferred until after v2.0.0 so this
-  release does not tighten public API surface area at the same time as the
-  registration cutover.
+- Internal export cleanup is intentionally deferred; this release does not
+  tighten public API surface area at the same time as the registration cutover.
 - Unified offline source-function integration and thermal emission are design
   topics, not implemented user-facing features in this release line.
 

@@ -9,13 +9,14 @@
 # moments to include — exactly the latent bug the
 # `_derive_m_max_bands` helper unifies.
 #
-# Parse failures and forward-build failures are still skipped (RRS/VS
-# configs need the explicit RS_type argument, etc.) — those are tested
-# elsewhere. But once a config builds forward, the lin path MUST also
-# build cleanly: we no longer silently swallow lin-build errors,
-# because masking them lets latent regressions slip through CI (see
-# the Rayleigh-only LinMode FieldError that surfaced in the v2.1
-# Codex review).
+# `test/test_parameters/` holds ONLY CI-buildable configs, so any parse or
+# forward/lin build failure here is a HARD failure — not a silent skip. (A
+# silent skip on a shared-FS dev box is misleading: it can "see" /home/.../data
+# LUTs that CI's clean runners cannot, so configs that need local data must NOT
+# live here.) Scenes that need external LUTs / ABSCO data / a GPU / the
+# unimplemented H2O-override live under `test/local/test_parameters/` and run
+# via `test/local/runtests.jl` on a machine that has the data. If a config
+# trips this guard on CI, either fix it or move it to test/local/.
 
 using vSmartMOM
 using vSmartMOM.CoreRT
@@ -28,21 +29,24 @@ _yaml_paths() = filter(p -> endswith(p, ".yaml"), readdir(_PARAMS_DIR; join = tr
 @testset "Phase B — forward/lin m_max_bands parity" begin
     n_compared = 0
     for path in _yaml_paths()
+        cfg = basename(path)
         params = try
             parameters_from_yaml(path)
         catch err
-            @info "Skipping (parse failed)" path err
+            @error "CI config failed to parse — fix it, or move it to test/local/test_parameters/ if it needs local data/LUTs" config=cfg exception=(err, catch_backtrace())
+            @test false
             continue
         end
 
         fwd = try
             model_from_parameters(params)
         catch err
-            @info "Skipping (forward build failed)" path = basename(path) err
+            @error "CI config failed to build forward — fix it, or move it to test/local/test_parameters/ if it needs local data/LUTs" config=cfg exception=(err, catch_backtrace())
+            @test false
             continue
         end
 
-        # No longer wrap in try/catch — lin-build failures are real bugs.
+        # lin-build failures are real bugs — not wrapped.
         lin_model, _ = model_from_parameters(LinMode(), params)
 
         fwd_m = CoreRT.m_max_bands(fwd)

@@ -32,7 +32,7 @@ function siewert_run_at(az_deg::Real; spec = nothing)
     fill!(params.vaz, float(az_deg))
     model = model_from_parameters(params)
     model.aerosol_optics[1][1] = siewert_aerosol_optics()
-    model.τ_aer[1][1, :] .= SIEWERT_τ_TOTAL
+    model.τ_aer[1][1, 1, :] .= SIEWERT_τ_TOTAL   # τ_aer is 3-D [iAer, nSpec, iLayer]; single-λ Siewert case
     model.τ_rayl[1] .= 0.0
     L = CoreRT.rt_run(model, i_band=1)[1]
     return Array(L)   # bring GPU CuArrays back to host for comparison

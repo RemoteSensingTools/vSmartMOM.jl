@@ -60,10 +60,14 @@ function postprocessing_vza!(RS_type::noRS, iμ₀, pol_type,
         J₀⁻ = _to_cpu(composite_layer.J₀⁻)
         @inbounds for i in eachindex(vza)
             istart, iend, w = vza_info[i]
-            for s = 1:nSpec
-                R_SFI[i,:,s] .+= w * J₀⁻[istart:iend, 1, s]
-                T_SFI[i,:,s] .+= w * J₀⁺[istart:iend, 1, s]
-            end
+            # Vectorise over the spectral dimension: one matrix product per VZA
+            # instead of a scalar `for s` loop that slice-allocated two tiny arrays
+            # per spectral point (millions of allocations for nSpec≈40k). `w` is the
+            # azimuthal Stokes weight (a Diagonal for n>1, scalar for n=1), so this
+            # is the SAME `w * column` Stokes mix applied to every spectral column at
+            # once — identical result. NOTE: matrix multiply `*`, not elementwise `.*`.
+            @views R_SFI[i, :, :] .+= w * J₀⁻[istart:iend, 1, :]
+            @views T_SFI[i, :, :] .+= w * J₀⁺[istart:iend, 1, :]
         end
         # v0.7 Phase A.2a — per-source J₀ slots. RT reconstruction is linear
         # in sources so each slot's contribution adds into the same R_SFI/T_SFI
@@ -74,10 +78,8 @@ function postprocessing_vza!(RS_type::noRS, iμ₀, pol_type,
             J⁻_src = _to_cpu(cslot.J₀⁻)
             @inbounds for i in eachindex(vza)
                 istart, iend, w = vza_info[i]
-                for s = 1:nSpec
-                    R_SFI[i,:,s] .+= w * J⁻_src[istart:iend, 1, s]
-                    T_SFI[i,:,s] .+= w * J⁺_src[istart:iend, 1, s]
-                end
+                @views R_SFI[i, :, :] .+= w * J⁻_src[istart:iend, 1, :]
+                @views T_SFI[i, :, :] .+= w * J⁺_src[istart:iend, 1, :]
             end
         end
     else
@@ -108,9 +110,7 @@ function postprocessing_vza_hdrf!(RS_type, iμ₀, pol_type,
 
     @inbounds for i in eachindex(vza)
         istart, iend, w = vza_info[i]
-        for s = 1:nSpec
-            hdr[i,:,s] .+= w * hdr_J₀⁻[istart:iend, 1, s]
-        end
+        @views hdr[i, :, :] .+= w * hdr_J₀⁻[istart:iend, 1, :]
     end
 end
 
@@ -119,8 +119,8 @@ end
 
 Azimuthally-weight RT matrices for Raman/inelastic scattering.
 
-Same as elastic `postprocessing_vza!` but also accumulates inelastic source terms
-`ieJ₀⁺`, `ieJ₀⁻` into `ieR_SFI`, `ieT_SFI` for each Raman shift.
+Same as elastic `postprocessing_vza!` but also accumulates the inelastic source
+terms `ieJ₀⁺`, `ieJ₀⁻` (summed over all Raman shifts) into `ieR_SFI`, `ieT_SFI`.
 """
 function postprocessing_vza!(RS_type::Union{RRS, VS_0to1_plus, VS_1to0_plus},
         iμ₀, pol_type, composite_layer,
@@ -133,19 +133,23 @@ function postprocessing_vza!(RS_type::Union{RRS, VS_0to1_plus, VS_1to0_plus},
     if SFI
         J₀⁺   = _to_cpu(composite_layer.J₀⁺)
         J₀⁻   = _to_cpu(composite_layer.J₀⁻)
-        ieJ₀⁺ = _to_cpu(composite_layer.ieJ₀⁺)
-        ieJ₀⁻ = _to_cpu(composite_layer.ieJ₀⁻)
-        n_raman = size(ieJ₀⁺, 4)
+        # The inelastic output sums over ALL Raman shifts:
+        #   ieR_SFI[i,:,s] = Σₜ w·ieJ₀⁻[…,s,t] = w·(Σₜ ieJ₀⁻[…,s,t]).
+        # That Raman-dim sum is VZA-independent, so reduce it ONCE on the device
+        # (a single memory-bound pass) — collapsing ieJ₀± to a 3-D source with the
+        # same shape as the elastic J₀± — instead of re-summing n_raman terms
+        # inside the vza×spec loop (the old hot loop; ~400× slower at nSpec~10⁴).
+        # Only the reduced (NquadN,1,nSpec) array crosses PCIe, not the full 4-D.
+        ieJ₀⁺ = _to_cpu(dropdims(sum(composite_layer.ieJ₀⁺, dims=4), dims=4))
+        ieJ₀⁻ = _to_cpu(dropdims(sum(composite_layer.ieJ₀⁻, dims=4), dims=4))
 
         @inbounds for i in eachindex(vza)
             istart, iend, w = vza_info[i]
             for s = 1:nSpec
-                R_SFI[i,:,s]  .+= w * J₀⁻[istart:iend, 1, s]
-                T_SFI[i,:,s]  .+= w * J₀⁺[istart:iend, 1, s]
-                for t = 1:n_raman
-                    ieR_SFI[i,:,s] .+= w * ieJ₀⁻[istart:iend, 1, s, t]
-                    ieT_SFI[i,:,s] .+= w * ieJ₀⁺[istart:iend, 1, s, t]
-                end
+                R_SFI[i,:,s]   .+= w * J₀⁻[istart:iend, 1, s]
+                T_SFI[i,:,s]   .+= w * J₀⁺[istart:iend, 1, s]
+                ieR_SFI[i,:,s] .+= w * ieJ₀⁻[istart:iend, 1, s]
+                ieT_SFI[i,:,s] .+= w * ieJ₀⁺[istart:iend, 1, s]
             end
         end
     else

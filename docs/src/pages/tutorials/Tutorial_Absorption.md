@@ -138,6 +138,14 @@ using vSmartMOM
 using vSmartMOM.Absorption
 ```
 
+> **Note:** The functions below (`read_hitran`, `make_hitran_model`, `absorption_cross_section`)
+> are the **standalone cross-section API** that ships with vSmartMOM's internal `Absorption`
+> module (TIPS-2017 partition sums).  The RT pipeline (`model_from_parameters` → `rt_run`)
+> computes gas absorption internally via
+> [AtmosphericAbsorption.jl](https://github.com/RemoteSensingTools/AtmosphericAbsorption.jl)
+> (TIPS-2021), so there is no need to call these functions to run a full scene.  Use them
+> for direct σ(ν, T, p) queries, custom grids, or cross-section comparisons.
+
 Read the HITRAN database for CO$_2$, using artifacts in Julia:
 
 ```julia

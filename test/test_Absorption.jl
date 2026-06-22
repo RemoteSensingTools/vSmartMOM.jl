@@ -156,6 +156,85 @@ end
     @test absorption_cross_section(model, grid, 1000.1, 296.1) ≈ reverse(absorption_cross_section(model, reverse(1e7 ./ collect(grid)), 1000.1, 296.1, wavelength_flag=true));
 end
 
+# Regression test: the wing-cutoff line-admission window must be computed in
+# wavenumber space. Previously, with wavelength_flag=true, ±wing_cutoff was
+# added to the grid bounds while still in nm units (±40 nm at ~760 nm is
+# ≈ ±680 cm⁻¹, a ~17x too wide window), and lines admitted in that bogus
+# margin (but outside the grid) received istart=1/istop=N_grid from the
+# interpolator extrapolation fill values, contributing across the WHOLE grid.
+
+@testset "absorption_cross_section_wing_cutoff_window" begin
+
+    println("Testing wing-cutoff admission window (wavenumber vs wavelength units)...")
+
+    # Minimal synthetic HITRAN table (CO2, main isotopologue) with given line
+    # positions. E″ = -1 skips the TIPS partition-sum temperature correction,
+    # δ_air = 0 keeps lines unshifted.
+    function make_synthetic_ht(ν_lines)
+        n = length(ν_lines)
+        return HitranTable(
+            mol    = fill(2, n),
+            iso    = fill(1, n),
+            νᵢ     = collect(Float64, ν_lines),
+            Sᵢ     = fill(1.0e-20, n),
+            Aᵢ     = fill(1.0e-3, n),
+            γ_air  = fill(0.07, n),
+            γ_self = fill(0.09, n),
+            E″     = fill(-1.0, n),
+            n_air  = fill(0.7, n),
+            δ_air  = fill(0.0, n),
+            global_upper_quanta = fill("", n),
+            global_lower_quanta = fill("", n),
+            local_upper_quanta  = fill("", n),
+            local_lower_quanta  = fill("", n),
+            ierr   = fill("", n),
+            iref   = fill("", n),
+            line_mixing_flag = fill("", n),
+            g′     = fill(1.0, n),
+            g″     = fill(1.0, n))
+    end
+
+    wing_cutoff = 40
+    ν_grid = 13100:0.05:13200               # wavenumber grid [cm⁻¹], ≈ 758-763 nm
+    λ_grid = reverse(1e7 ./ collect(ν_grid))  # same grid in ascending nm
+
+    ν_in  = 13150.0  # inside the grid
+    ν_out = 13500.0  # outside the proper window [13060, 13240] cm⁻¹, but
+                     # inside the old bogus nm-margin window (≈ [12448, 13936])
+
+    make_model(ν_lines) = make_hitran_model(make_synthetic_ht(ν_lines), Voigt(),
+                                            wing_cutoff=wing_cutoff,
+                                            CEF=HumlicekWeidemann32SDErrorFunction(),
+                                            architecture=CPU())
+
+    model_in   = make_model([ν_in])
+    model_out  = make_model([ν_out])
+    model_both = make_model([ν_in, ν_out])
+
+    p, T = 1000.0, 296.0
+
+    # --- wavelength_flag = true (grid in nm) ---
+    σλ_in   = compute_absorption_cross_section(model_in,   λ_grid, p, T, wavelength_flag=true)
+    σλ_out  = compute_absorption_cross_section(model_out,  λ_grid, p, T, wavelength_flag=true)
+    σλ_both = compute_absorption_cross_section(model_both, λ_grid, p, T, wavelength_flag=true)
+
+    @test maximum(σλ_in) > 0          # in-grid line absorbs
+    @test all(σλ_out .== 0)           # out-of-window line contributes exactly zero
+    @test σλ_both == σλ_in            # out-of-window line adds exactly nothing
+
+    # --- wavelength_flag = false (grid in cm⁻¹) ---
+    σν_in   = compute_absorption_cross_section(model_in,   ν_grid, p, T)
+    σν_out  = compute_absorption_cross_section(model_out,  ν_grid, p, T)
+    σν_both = compute_absorption_cross_section(model_both, ν_grid, p, T)
+
+    @test maximum(σν_in) > 0
+    @test all(σν_out .== 0)
+    @test σν_both == σν_in
+
+    # Both input conventions must agree for the in-grid line
+    @test reverse(σλ_in) ≈ σν_in
+end
+
 # Test that absorption cross sections are calculated correctly 
 # using a new interpolator
 
@@ -229,4 +308,34 @@ end
     else
         @test true  # Skip GPU test if no CUDA
     end
+end
+
+@testset "absorption_cross_section_AA_wavelength_flag" begin
+    # The AtmosphericAbsorption.jl dispatch must forward wavelength_flag:
+    # σ on an nm grid (input order) must equal the reverse-mapped σ on the
+    # equivalent wavenumber grid. Mirrors the production model construction
+    # in model_from_parameters.
+    import AtmosphericAbsorption
+    lines = AtmosphericAbsorption.load_lines(
+        AtmosphericAbsorption.HitranPort(artifact("CO2")); FT = Float64)
+    # NB: AA has its own architecture types (production maps via
+    # _to_aa_arch(params.architecture)) — use AA's CPU here.
+    aa = AtmosphericAbsorption.LineByLineModel(lines;
+        profile = AtmosphericAbsorption.Voigt(),
+        wing_cutoff = 40,
+        cpf = AtmosphericAbsorption.HumlicekWeideman32(),
+        architecture = AtmosphericAbsorption.CPU(), vmr = 0)
+
+    ν_grid  = collect(range(6210.0, 6220.0, length = 501))   # cm⁻¹, ascending
+    nm_grid = 1e7 ./ ν_grid                                   # nm, descending
+
+    σ_ν  = collect(absorption_cross_section(aa, ν_grid, 1000.1, 296.1))
+    σ_nm = collect(absorption_cross_section(aa, nm_grid, 1000.1, 296.1;
+                                            wavelength_flag = true))
+
+    @test length(σ_nm) == length(nm_grid)
+    # nm_grid[i] corresponds to ν_grid[i] one-to-one (no reversal needed:
+    # the nm grid above is the elementwise map of the ν grid).
+    @test maximum(abs.(σ_nm .- σ_ν)) ≤ 1e-15 * maximum(σ_ν)
+    @test maximum(σ_ν) > 0   # the window actually contains CO2 lines
 end

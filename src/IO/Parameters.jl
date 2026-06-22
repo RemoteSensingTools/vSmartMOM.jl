@@ -7,7 +7,8 @@ using Unitful
 using UnitfulEquivalences
 using CanopyOptics
 using ..CoreRT: vSmartMOM_Parameters, RTNumericalParameters, AbsorptionParameters, ScatteringParameters, RT_Aerosol, AtmosphericProfile
-using ..Absorption: AbstractBroadeningFunction, AbstractComplexErrorFunction, load_interpolation_model
+using ..Absorption: load_interpolation_model
+import AtmosphericAbsorption
 using ..Scattering
 using ..Scattering: AbstractFourierDecompositionType, Aerosol
 using ..Architectures
@@ -116,9 +117,9 @@ String → absorption broadening function mapping.
 Keys: "Voigt", "Lorentz", "Doppler".
 """
 const BROADENING_MAP = Dict(
-    "Voigt"   => ()->Absorption.Voigt(),
-    "Lorentz" => ()->Absorption.Lorentz(),
-    "Doppler" => ()->Absorption.Doppler()
+    "Voigt"   => ()->AtmosphericAbsorption.Voigt(),
+    "Lorentz" => ()->AtmosphericAbsorption.Lorentz(),
+    "Doppler" => ()->AtmosphericAbsorption.Doppler()
 )
 
 """
@@ -128,7 +129,7 @@ String → complex error function mapping for Voigt computations.
 Keys: "HumlicekWeidemann32SDErrorFunction".
 """
 const CEF_MAP = Dict(
-    "HumlicekWeidemann32SDErrorFunction" => ()->Absorption.HumlicekWeidemann32SDErrorFunction()
+    "HumlicekWeidemann32SDErrorFunction" => ()->AtmosphericAbsorption.HumlicekWeideman32()
 )
 
 # --- BRDF (surface) mapping ---
@@ -570,14 +571,6 @@ function aerosol_params_to_obj(aerosols, FT)
     return rt_aerosol_obj_list
 end
 
-"Check that the vmr's in the atmospheric profile match the molecules in the parameters" 
-function validate_vmrs(molecules::Array, vmr::Dict)
-    for molec in unique(vcat(molecules...))
-        _require_config(molec in keys(vmr), "$(molec) listed as molecule in parameters yaml, but no vmr given in atmospheric profile")
-        _require_config(vmr[molec] isa Real || vmr[molec] isa Vector, "The vmr for $(molec) in the atmospheric profile must either be a real-valued number, or an array of nodal points from surface to 0hPa (TOA)")
-    end
-end
-
 "Given a parameter dictionary from a YAML file, validate the dictionary"
 function validate_yaml_parameters(params)
     # Required fields — must be present and well-typed.
@@ -915,8 +908,7 @@ function _parse_absorption(params_dict::Dict, FT, q=nothing)
     #   (a) `fixed_molecules:` and/or `variable_molecules:` — preferred.
     #   (b) `molecules:` only (legacy) — treated as all-fixed.
     #   (c) `molecules:` + `variable_molecules:` (legacy) — fixed = molecules \ variable.
-    # H2O must NOT appear in any of these lists; when q is provided, H2O is
-    # auto-included as variable (linearised path) or as fixed (forward path).
+    # H2O must NOT appear in any of these lists; it is driven by atmospheric_profile.q.
     has_fixed = haskey(abs_dict, "fixed_molecules")
     has_var   = haskey(abs_dict, "variable_molecules")
     has_legacy_molecules = haskey(abs_dict, "molecules")

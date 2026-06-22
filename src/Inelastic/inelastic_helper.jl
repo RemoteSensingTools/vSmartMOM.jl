@@ -1,5 +1,5 @@
 const c₂                 = 1.4387769
-const cMassMol           = 1.66053873e-27 #grams per molecule for unit molec. mass
+const cMassMol           = 1.66053873e-27 #kilograms per molecule for unit molec. mass
 const cSqrtLn2divSqrtPi  = 0.469718639319144059835 #√(ln2/π)
 const cLn2               = 0.6931471805599 #ln2
 const cSqrtLn2           = 0.8325546111577 #√(ln2)
@@ -79,7 +79,6 @@ end
     ν₀ = 1e7/λ₀;
 
     
-    #RS_type.ϖ_Cabannes = σ_elastic/(σ_VRS+σ_RVRS+σ_RRS+σ_elastic);
     ϖ_Cabannes = (4-3*depol)/(4+2*depol)
     #ϖ_Cabannes = σ_elastic/(σ_RRS+σ_elastic);
     return ϖ_Cabannes;
@@ -109,47 +108,33 @@ function compute_ϖ_Cabannes(
             ((ν₀.+RS_type.o2.effCoeff.Δν̃_RoRaman_coeff_JtoJm2).^4)' * 
             RS_type.o2.effCoeff.σ_RoRaman_coeff_JtoJm2
 
-    #σ_RVRS =  RS_type.n2.vmr * 
     #        ((ν₀.+RS_type.n2.effCoeff.Δν̃_RoVibRaman_coeff_0to1_JtoJp2).^4)' * 
     #        RS_type.n2.effCoeff.σ_RoVibRaman_coeff_0to1_JtoJp2
-    #σ_RVRS += RS_type.n2.vmr * 
     #        ((ν₀.+RS_type.n2.effCoeff.Δν̃_RoVibRaman_coeff_0to1_JtoJm2).^4)' * 
     #        RS_type.n2.effCoeff.σ_RoVibRaman_coeff_0to1_JtoJm2
-    #σ_RVRS += RS_type.n2.vmr * 
     #        ((ν₀.+RS_type.n2.effCoeff.Δν̃_RoVibRaman_coeff_1to0_JtoJp2).^4)' * 
     #        RS_type.n2.effCoeff.σ_RoVibRaman_coeff_1to0_JtoJp2
-    #σ_RVRS += RS_type.n2.vmr * 
     #        ((ν₀.+RS_type.n2.effCoeff.Δν̃_RoVibRaman_coeff_1to0_JtoJm2).^4)' * 
     #        RS_type.n2.effCoeff.σ_RoVibRaman_coeff_1to0_JtoJm2
     
-    #σ_RVRS += RS_type.o2.vmr * 
     #        ((ν₀.+RS_type.o2.effCoeff.Δν̃_RoVibRaman_coeff_0to1_JtoJp2).^4)' * 
     #        RS_type.o2.effCoeff.σ_RoVibRaman_coeff_0to1_JtoJp2
-    #σ_RVRS += RS_type.o2.vmr * 
     #        ((ν₀.+RS_type.o2.effCoeff.Δν̃_RoVibRaman_coeff_0to1_JtoJm2).^4)' * 
     #        RS_type.o2.effCoeff.σ_RoVibRaman_coeff_0to1_JtoJm2
-    #σ_RVRS += RS_type.o2.vmr * 
     #        ((ν₀.+RS_type.o2.effCoeff.Δν̃_RoVibRaman_coeff_1to0_JtoJp2).^4)' * 
     #        RS_type.o2.effCoeff.σ_RoVibRaman_coeff_1to0_JtoJp2
-    #σ_RVRS += RS_type.o2.vmr * 
     #        ((ν₀.+RS_type.o2.effCoeff.Δν̃_RoVibRaman_coeff_1to0_JtoJm2).^4)' * 
     #        RS_type.o2.effCoeff.σ_RoVibRaman_coeff_1to0_JtoJm2
 
-    #σ_VRS =  RS_type.n2.vmr * 
     #        ((ν₀.+RS_type.n2.effCoeff.Δν̃_VibRaman_coeff_0to1_hires).^4)' * 
     #        RS_type.n2.effCoeff.σ_VibRaman_coeff_0to1_hires
-    #σ_VRS += RS_type.n2.vmr * 
     #        ((ν₀.+RS_type.n2.effCoeff.Δν̃_VibRaman_coeff_1to0_hires).^4)' * 
     #        RS_type.n2.effCoeff.σ_VibRaman_coeff_1to0_hires
-    #σ_VRS += RS_type.o2.vmr * 
     #        ((ν₀.+RS_type.o2.effCoeff.Δν̃_VibRaman_coeff_0to1_hires).^4)' * 
     #        RS_type.o2.effCoeff.σ_VibRaman_coeff_0to1_hires
-    #σ_VRS += RS_type.o2.vmr * 
     #        ((ν₀.+RS_type.o2.effCoeff.Δν̃_VibRaman_coeff_1to0_hires).^4)' * 
     #        RS_type.o2.effCoeff.σ_VibRaman_coeff_1to0_hires    
 
-    #RS_type.ϖ_Cabannes = σ_elastic/(σ_VRS+σ_RVRS+σ_RRS+σ_elastic);
-    #ϖ_Cabannes = σ_elastic/(σ_VRS+σ_RVRS+σ_RRS+σ_elastic);
     ϖ_Cabannes = 1.0 - σ_RRS/σ_Rayl;
     return ϖ_Cabannes;
 end
@@ -218,10 +203,7 @@ function compute_ϖ_Cabannes(
         ((ν₀.+RS_type.o2.effCoeff.Δν̃_VibRaman_coeff_1to0_hires).^4)' * 
         RS_type.o2.effCoeff.σ_VibRaman_coeff_1to0_hires    
 
-    #RS_type.ϖ_Cabannes = σ_elastic/(σ_VRS+σ_RVRS+σ_RRS+σ_elastic);
-    #ϖ_Cabannes = σ_elastic/(σ_VRS+σ_RVRS+σ_RRS+σ_elastic);
-    #ϖ_Cabannes = σ_elastic/(σ_RRS+σ_elastic);
-    ϖ_Cabannes = ϖ_Cabannes = 1.0 - (σ_VRS+σ_RVRS)/σ_Rayl; #σ_elastic/(σ_VRS+σ_RVRS+σ_elastic);
+    ϖ_Cabannes = 1.0 - (σ_VRS+σ_RVRS)/σ_Rayl;
     return ϖ_Cabannes;
 end
 
@@ -237,25 +219,8 @@ function compute_ϖ_Cabannes(λ₀, n2, o2)
     σ_RRS += o2.vmr * ((ν₀.+o2.effCoeff.Δν̃_RoRaman_coeff_JtoJp2).^4)' * o2.effCoeff.σ_RoRaman_coeff_JtoJp2
     σ_RRS += o2.vmr * ((ν₀.+o2.effCoeff.Δν̃_RoRaman_coeff_JtoJm2).^4)' * o2.effCoeff.σ_RoRaman_coeff_JtoJm2
 
-    #σ_RVRS =  n2.vmr * ((ν₀.+n2.effCoeff.Δν̃_RoVibRaman_coeff_0to1_JtoJp2).^4)' * n2.effCoeff.σ_RoVibRaman_coeff_0to1_JtoJp2
-    #σ_RVRS += n2.vmr * ((ν₀.+n2.effCoeff.Δν̃_RoVibRaman_coeff_0to1_JtoJm2).^4)' * n2.effCoeff.σ_RoVibRaman_coeff_0to1_JtoJm2
-    #σ_RVRS += n2.vmr * ((ν₀.+n2.effCoeff.Δν̃_RoVibRaman_coeff_1to0_JtoJp2).^4)' * n2.effCoeff.σ_RoVibRaman_coeff_1to0_JtoJp2
-    #σ_RVRS += n2.vmr * ((ν₀.+n2.effCoeff.Δν̃_RoVibRaman_coeff_1to0_JtoJm2).^4)' * n2.effCoeff.σ_RoVibRaman_coeff_1to0_JtoJm2
-    #σ_RVRS += o2.vmr * ((ν₀.+o2.effCoeff.Δν̃_RoVibRaman_coeff_0to1_JtoJp2).^4)' * o2.effCoeff.σ_RoVibRaman_coeff_0to1_JtoJp2
-    #σ_RVRS += o2.vmr * ((ν₀.+o2.effCoeff.Δν̃_RoVibRaman_coeff_0to1_JtoJm2).^4)' * o2.effCoeff.σ_RoVibRaman_coeff_0to1_JtoJm2
-    #σ_RVRS += o2.vmr * ((ν₀.+o2.effCoeff.Δν̃_RoVibRaman_coeff_1to0_JtoJp2).^4)' * o2.effCoeff.σ_RoVibRaman_coeff_1to0_JtoJp2
-    #σ_RVRS += o2.vmr * ((ν₀.+o2.effCoeff.Δν̃_RoVibRaman_coeff_1to0_JtoJm2).^4)' * o2.effCoeff.σ_RoVibRaman_coeff_1to0_JtoJm2
 
-    #σ_VRS =  n2.vmr * ((ν₀.+n2.effCoeff.Δν̃_VibRaman_coeff_0to1_hires).^4)' * n2.effCoeff.σ_VibRaman_coeff_0to1_hires
-    #σ_VRS += n2.vmr * ((ν₀.+n2.effCoeff.Δν̃_VibRaman_coeff_1to0_hires).^4)' * n2.effCoeff.σ_VibRaman_coeff_1to0_hires
-    #σ_VRS += o2.vmr * ((ν₀.+o2.effCoeff.Δν̃_VibRaman_coeff_0to1_hires).^4)' * o2.effCoeff.σ_VibRaman_coeff_0to1_hires
-    #σ_VRS += o2.vmr * ((ν₀.+o2.effCoeff.Δν̃_VibRaman_coeff_1to0_hires).^4)' * o2.effCoeff.σ_VibRaman_coeff_1to0_hires    
-
-    #RS_type.ϖ_Cabannes = σ_elastic/(σ_VRS+σ_RVRS+σ_RRS+σ_elastic);
-    #ϖ_Cabannes = σ_elastic/(σ_VRS+σ_RVRS+σ_RRS+σ_elastic);
     ϖ_Cabannes = 1.0 - σ_RRS/σ_Rayl;
-    #@show σ_elastic
-    #@show σ_RRS+σ_elastic
     return ϖ_Cabannes;
 end
 
@@ -287,10 +252,7 @@ function compute_ϖ_Cabannes_VS(λ₀, n2, o2)
     σ_VRS += o2.vmr * ((ν₀.+o2.effCoeff.Δν̃_VibRaman_coeff_0to1_hires).^4)' * o2.effCoeff.σ_VibRaman_coeff_0to1_hires
     σ_VRS += o2.vmr * ((ν₀.+o2.effCoeff.Δν̃_VibRaman_coeff_1to0_hires).^4)' * o2.effCoeff.σ_VibRaman_coeff_1to0_hires    
 
-    #RS_type.ϖ_Cabannes = σ_elastic/(σ_VRS+σ_RVRS+σ_RRS+σ_elastic);
-    #ϖ_Cabannes = σ_elastic/(σ_VRS+σ_RVRS+σ_RRS+σ_elastic);
     ϖ_Cabannes_VS = 1.0 - (σ_RVRS+σ_VRS)/σ_Rayl;
-    #@show σ_elastic
     #@show σ_RVRS+σ_VRS+σ_elastic
     return ϖ_Cabannes_VS;
 end
@@ -304,20 +266,10 @@ function compute_ϖ_Cabannes(λ₀, mol)
     σ_RRS =  ((ν₀.+mol.effCoeff.Δν̃_RoRaman_coeff_JtoJp2).^4)' * mol.effCoeff.σ_RoRaman_coeff_JtoJp2
     σ_RRS += ((ν₀.+mol.effCoeff.Δν̃_RoRaman_coeff_JtoJm2).^4)' * mol.effCoeff.σ_RoRaman_coeff_JtoJm2
 
-    #σ_RVRS =  ((ν₀.+mol.effCoeff.Δν̃_RoVibRaman_coeff_0to1_JtoJp2).^4)' * mol.effCoeff.σ_RoVibRaman_coeff_0to1_JtoJp2
-    #σ_RVRS += ((ν₀.+mol.effCoeff.Δν̃_RoVibRaman_coeff_0to1_JtoJm2).^4)' * mol.effCoeff.σ_RoVibRaman_coeff_0to1_JtoJm2
-    #σ_RVRS += ((ν₀.+mol.effCoeff.Δν̃_RoVibRaman_coeff_1to0_JtoJp2).^4)' * mol.effCoeff.σ_RoVibRaman_coeff_1to0_JtoJp2
-    #σ_RVRS += ((ν₀.+mol.effCoeff.Δν̃_RoVibRaman_coeff_1to0_JtoJm2).^4)' * mol.effCoeff.σ_RoVibRaman_coeff_1to0_JtoJm2
     
-    #σ_VRS =  ((ν₀.+mol.effCoeff.Δν̃_VibRaman_coeff_0to1_hires).^4)' * mol.effCoeff.σ_VibRaman_coeff_0to1_hires
-    #σ_VRS += ((ν₀.+mol.effCoeff.Δν̃_VibRaman_coeff_1to0_hires).^4)' * mol.effCoeff.σ_VibRaman_coeff_1to0_hires
 
 
-    #RS_type.ϖ_Cabannes = σ_elastic/(σ_VRS+σ_RVRS+σ_RRS+σ_elastic);
-    #ϖ_Cabannes = σ_elastic/(σ_VRS+σ_RVRS+σ_RRS+σ_elastic);
     ϖ_Cabannes = 1.0 - σ_RRS/σ_Rayl;
-    #@show σ_elastic
-    #@show σ_RRS+σ_elastic
     return ϖ_Cabannes;
 end
 
@@ -426,25 +378,17 @@ function compute_γ_air_Rayleigh!(λ₀::FT, n2, o2) where FT
     return γ_air_Rayleigh, σ_air_Rayleigh
 end
 
-# New: In the old version, mol.effCoeff.γ_C_Rayl was assumed to be γ_mol_Cabannes, but it actually was indeed γ_mol_Rayleigh. This assumption has now been corrected, and the correct γ_mol_Cabannes is computed in the function below. 
+# Reconstruct the Cabannes phase-matrix gamma from the Rayleigh gamma and the
+# Cabannes fraction. This is Eq. (4) of the Cabannes manuscript: derive from
+# Z_Rayl = ϖ_Cab Z_Cab + (1 - ϖ_Cab) Z_RRS with γ_RRS = 3/4.
 function compute_γ_mol_Cabannes!(λ₀::FT, mol) where FT
-    ν̃ =  1.e7/λ₀
-    effT  =  300.; #K assumed constant for Earth atmospheres
-
-    #n2,o2 = InelasticScattering.getRamanAtmoConstants(ν̃,effT);
-    #greek_raman = get_greek_raman(RS_type, n2, o2);
     ϖ_Cabannes = compute_ϖ_Cabannes(λ₀, mol)
     γ_mol_Rayleigh = mol.effCoeff.γ_C_Rayl
 
-    tmp1 = 1+2*γ_mol_Rayleigh
-    tmp2 = 2+3*ϖ_Cabannes
-    tmp3 = 1-ϖ_Cabannes
-    tmpN = tmp1*tmp2-5
-    tmpD = tmp1*tmp3+5
-    γ_mol_Cabannes = 0.5*tmpN/tmpD
+    num = 2γ_mol_Rayleigh * (2 + 3ϖ_Cabannes) - 3 * (1 - ϖ_Cabannes)
+    den = (3 + 2ϖ_Cabannes) - 4γ_mol_Rayleigh * (1 - ϖ_Cabannes)
+    γ_mol_Cabannes = FT(0.5) * num / den
 
-
-    #@show γ_mol_Rayleigh, tmp_chk
     return ϖ_Cabannes, γ_mol_Cabannes, γ_mol_Rayleigh
 end
 
@@ -712,8 +656,8 @@ end
 
 function compute_optical_RS!(RS_type::Union{VS_1to0, VS_1to0_plus}, grid_in, λ₀, n2, o2)
     #plotly()
-    get_greek_raman(RS_type, n2, o2)
-    compute_ϖ_Cabannes!(RS_type, λ₀, n2, o2)
+    #get_greek_raman(RS_type, n2, o2)
+    #compute_ϖ_Cabannes!(RS_type, λ₀, n2, o2)
     #@show n2.effCoeff.Δν̃_VibRaman_coeff_1to0_hires[0], o2.effCoeff.Δν̃_VibRaman_coeff_1to0_hires[0]
     νᵣ = 0.5*(n2.effCoeff.Δν̃_VibRaman_coeff_1to0_hires[0] + o2.effCoeff.Δν̃_VibRaman_coeff_1to0_hires[0])
         
@@ -947,4 +891,3 @@ function computeRamanZλ!(RS_type::AbstractRamanType, pol_type, qp_μ, m, arr_ty
                                         arr_type = arr_type);      
     nothing
 end
-

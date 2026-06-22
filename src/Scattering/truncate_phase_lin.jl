@@ -196,7 +196,10 @@ function truncate_phase(mod::δBGE, aero::AerosolOptics{FT}, lin_aero::linAeroso
         ζ̇ᵗ[ctr,:] = (ζ̇[ctr,1:l_tr] - (β̇[ctr,1:l_tr] - ẋβ[ctr,:]) - ζᵗ*ẋβ[ctr,1]) / c₀
     end
     # Adjust scattering and extinction cross section!
-    greek_coefs = GreekCoefs(αᵗ, βᵗ, γᵗ, δᵗ, ϵᵗ, ζᵗ  )
+    # δ-BGE fits are solved in Float64 (accuracy); cast the truncated Greek
+    # coefficients back to the aerosol float type FT for type stability.
+    greek_coefs = GreekCoefs(convert.(FT, αᵗ), convert.(FT, βᵗ), convert.(FT, γᵗ),
+                             convert.(FT, δᵗ), convert.(FT, ϵᵗ), convert.(FT, ζᵗ))
   
     # C_sca  = (ω̃ * k);
     # C_scaᵗ = C_sca * c₀; 
@@ -204,7 +207,7 @@ function truncate_phase(mod::δBGE, aero::AerosolOptics{FT}, lin_aero::linAeroso
     #@show typeof(ω̃), typeof(k),typeof(c₀)
     # return AerosolOptics(greek_coefs = greek_coefs, ω̃=C_scaᵗ / C_ext, k=C_ext, fᵗ = 1-c₀) 
     return AerosolOptics(greek_coefs=greek_coefs, ω̃=ω̃, k=k, fᵗ=(FT(1) - c₀)),
-        linAerosolOptics(lin_greek_coefs=linGreekCoefs(α̇ᵗ, β̇ᵗ, γ̇ᵗ, δ̇ᵗ, ϵ̇ᵗ, ζ̇ᵗ), ω̃̇=ω̃̇, k̇=k̇, ḟᵗ=-ẋβ[:,1])
+        linAerosolOptics(lin_greek_coefs=linGreekCoefs(convert.(FT, α̇ᵗ), convert.(FT, β̇ᵗ), convert.(FT, γ̇ᵗ), convert.(FT, δ̇ᵗ), convert.(FT, ϵ̇ᵗ), convert.(FT, ζ̇ᵗ)), ω̃̇=ω̃̇, k̇=k̇, ḟᵗ=convert.(FT, -ẋβ[:,1]))
 end
 
 

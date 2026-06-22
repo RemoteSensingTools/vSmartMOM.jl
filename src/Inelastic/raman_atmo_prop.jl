@@ -20,11 +20,11 @@ wavelength and spectral grid.
 function getRamanSSProp!(RS_type::Union{VS_0to1,VS_1to0}, depol, λ, grid_in)
     @unpack n2,o2 =  RS_type
     #n2, o2 = getRamanAtmoConstants(1.e7/λ, T)
-    λ_scatt = 2.e7/(grid_in[1]+grid_in[end])     
+    λ_scatt = 2.e7/(grid_in[1]+grid_in[end])
     #determine Rayleigh scattering cross-section at mean scattered wavelength
-    atmo_σ_Rayl_scatt = compute_optical_Rayl!(λ_scatt, n2, o2)
-    # determine Rayleigh scattering cross-section at incident wavelength λ 
-    atmo_σ_Rayl = compute_optical_Rayl!(λ, n2, o2)
+    atmo_σ_Rayl_scatt = compute_optical_Rayl(λ_scatt, n2, o2)
+    # determine Rayleigh scattering cross-section at incident wavelength λ
+    atmo_σ_Rayl = compute_optical_Rayl(λ, n2, o2)
     # determine RRS cross-sections to λ₀ from nSpecRaman wavelengths around λ₀  
     index_VRSgrid_out, atmo_σ_VRS, index_RVRSgrid_out, atmo_σ_RVRS = 
         compute_optical_RS!(RS_type, grid_in, λ, n2, o2)

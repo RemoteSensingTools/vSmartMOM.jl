@@ -4,18 +4,7 @@ This file contains helper functions that are used throughout the module
 
 =#
 
-#= """ Convenience function to perform (-1)^x using x's parity """
- exp_m1(x) = iseven(x) ? 1 : -1
 
-"""
-    $(FUNCTIONNAME)(size_parameter)
-Computes the number of required Legendre functions  for a given size parameter.
-See eq 6 in Sanghavi 2014
-- `size_parameter` size parameter of the aerosol (2πr/λ)
-The function returns a rounded integer, following conventions by BH, Rooj/Stap, Siewert
-"""
-get_n_max(size_parameter) = (size_parameter>8.0) ? round(Int, size_parameter + 4.05 * size_parameter^(1/3) + 10) : round(Int, size_parameter + 4.0 * size_parameter^(1/3) + 1)
-=#
 """
     $(FUNCTIONNAME)(size_parameter,refractive_idx::Number,an,bn,Dn)
 Computes Mie coefficients `an` and `bn` as a function of size parameter and complex
@@ -100,125 +89,6 @@ function compute_mie_ab!(size_param, refractive_idx::Number,
         ξ₁ = ψ₁ + χ₁*im
     end
 end
-#=
-function compute_mie_ab_new!(size_param, refractive_idx::Number, an, bn, Dn)
-    # Compute y
-    y = size_param * refractive_idx
-
-    # Maximum expansion (see eq. A17 from de Rooij and Stap, 1984)
-    n_max = get_n_max(size_param)
-
-    # Make sure downward recurrence starts higher up
-    # (at least 15, check eq. A9 in de Rooij and Stap, 1984, may need to check what is needed)
-    nmx = length(Dn)
-    @assert size(an)[1] >= n_max
-    @assert size(an) == size(bn)
-    fill!(Dn, 0);
-
-
-
-    #Computing ψ using downward recursion
-    N_ = n_max+60
-
-    ψ = zeros(N_)
-    ψ[end]   = 0.0
-    ψ[end-1] = 1.0
-    for idx=N_-2:-1:1
-        ψ[idx] = (2idx+1)*ψ[idx+1]/size_param - ψ[idx+2];
-    end
-
-
-    #Computing ψ using upward recursion
-    N_ = n_max
-    ψ = zeros(N_)
-    ψ[1] = sin(size_param);
-    if N_>1
-        ψ[2]  = (sin(size_param)/size_param)-cos(size_param);
-        for idx = 3:N_
-            ψ[idx] = (2idx-3)*ψ[idx-1]/size_param - ψ[idx-2];
-        end
-    end
-    #computing χ using upward recursion
-    N_ = n_max
-    χ = zeros(N_)
-    χ[1] = cos(size_param)
-    if N_>1
-        χ[2] = cos(size_param)/size_param + sin(size_param)
-        for idx=3:N_
-            χ[idx] = (2idx-3)*χ[idx-1]/size_param - χ[idx-2];
-        end
-    end
-
-    #computing An (Lentz)
-    result = zeros(Complex{FT}, nmx);
-    z=y
-    for n=1:nmx
-        zinv   = 2/z
-        alpha_ = (n + 0.5)*zinv
-        aj     =-(n + 1.5)*zinv
-        alpha_j1 = aj+1/alpha_
-        alpha_j2 = aj
-
-        ratio = alpha_j1/alpha_j2
-        runratio = alpha_*ratio
-
-        while abs(abs(ratio)-1) > 1e-20
-            aj=zinv-aj
-            alpha_j1=1/alpha_j1+aj
-            alpha_j2=1/alpha_j2+aj
-            ratio=alpha_j1/alpha_j2
-
-            epsilon1 = 1.0e-2
-            compare_1 = abs(alpha_j1/aj)
-            compare_2 = abs(alpha_j2/aj)
-
-            if abs(compare_1)<=epsilon1 || abs(compare_2)<=epsilon1
-                zinv *= -1
-                aj = zinv - aj
-                ratio = (1+aj*alpha_j1)/(1+aj*alpha_j2)
-                alpha_j1 = aj + 1/alpha_j1
-                alpha_j2 = aj + 1/alpha_j2
-            end
-            zinv *= -1;
-            runratio=ratio*runratio;
-        end
-        result[n] = -n/z;
-        result[n] += runratio;
-    end
-
-    # Dn as in eq 4.88, Bohren and Huffman, to calculate an and bn
-    # Downward Recursion, eq. 4.89, Bohren and Huffman
-    [Dn[n] = ((n+1) / y) - (1 / (Dn[n+1] + (n+1) / y)) for n = (nmx - 1):-1:1]
-
-    # Get recursion for bessel functions ψ and ξ
-    ψ₀, ψ₁, χ₀, χ₁ =  (cos(size_param), sin(size_param), -sin(size_param), cos(size_param))
-    ξ₁ = ψ₁ -χ₁*im
-
-    ψ0 = zeros(N_)
-    χ0 = zeros(N_)
-
-    # This solves Bohren and Huffman eq. 4.88 for an and bn, computing updated ψ and ξ on the fly
-    for n = 1:n_max
-        # fn = (2n + 1) / (n * (n + 1))
-        ψ  = (2n - 1) * ψ₁ / size_param - ψ₀
-        χ  = (2n - 1) * χ₁ / size_param - χ₀
-        ξ   = ψ -χ*im
-        t_a = Dn[n] / refractive_idx + n / size_param
-        t_b = Dn[n] * refractive_idx + n / size_param
-        ψ0[n] = ψ₁
-        χ0[n] = χ₁
-        an[n] = (t_a * ψ - ψ₁) / (t_a * ξ - ξ₁)
-        bn[n] = (t_b * ψ - ψ₁) / (t_b * ξ - ξ₁)
-
-        ψ₀ = ψ₁
-        ψ₁ = ψ
-        χ₀ = χ₁
-        χ₁ = χ
-        ξ₁ = ψ₁ -χ₁*im
-    end
-end
-=#
-
 """
     $(FUNCTIONNAME)(model::MieModel, λ, radius)
 Compute all an, bn using compute_mie_ab!
@@ -268,38 +138,6 @@ function compute_anbn_lin(model::MieModel, λ, radius)
 end
 
 """
-    $(FUNCTIONNAME)(an, bn, ab_pairs, w, Nmax, N_max_)
-From the an, bn matrices, precompute all (an✶)am, (an✶)bm, (bn✶)am, (bn✶)bm
-This allows quick computation of (an✶ + bn✶) × (am + bm)
-"""
-#=
-function compute_avg_anbns!(an, bn, ab_pairs, w, Nmax, N_max_)
-    FT2 = eltype(an)
-
-    # Unpack ab_pairs
-    mat_anam, mat_anbm, mat_bnam, mat_bnbm = ab_pairs
-
-    # Fill all matrices with 0
-    [fill!(mat, 0) for mat in [mat_anam, mat_bnbm, mat_anbm, mat_bnam]]
-
-    @inbounds for n in 1:Nmax, m in n:Nmax
-        anam = bnbm = anbm = bnam = FT2(0);
-        @inbounds for i = 1:size(an, 1)
-            if m < N_max_[i] && n < N_max_[i]
-                anam += w[i] * an[i,n]' * an[i,m]
-                bnbm += w[i] * bn[i,n]' * bn[i,m]
-                anbm += w[i] * an[i,n]' * bn[i,m]
-                bnam += w[i] * bn[i,n]' * an[i,m]
-            end
-        end
-        @inbounds mat_anam[m,n] = anam;
-        @inbounds mat_bnbm[m,n] = bnbm;
-        @inbounds mat_anbm[m,n] = anbm;
-        @inbounds mat_bnam[m,n] = bnam;
-    end
-end
-=#
-"""
     $(FUNCTIONNAME)(an, bn, π_, τ_, S₁, S₂)
 Determines the amplitude functions `S₁`,`S₂` in Mie theory
 - `an` and `bn` pre-calculated Mie coefficients `an` and `bn`, see [`compute_mie_ab!`](@ref) function
@@ -335,22 +173,7 @@ function compute_mie_S₁S₂!(an, bn, ȧn, ḃn,
     end
 end
 
-"""
-    $(FUNCTIONNAME)(n,xmin,xmax; norm=false)
-Returns the `n` Gauss-Legendre quadrature points and weights with a change of interval between xmin and xmax
-- `n` number of quadrature points
-- `xmin`,`xmax` lower and upper bound of integral
-- `norm`: if `true`, normalizes the weights so that a mean can be computed instead of full integration
-The function returns `n` quadrature points ξ within [xmin,xmax] with associated weightes `w`
-"""
-#=
-function gauleg(n, xmin, xmax; norm=false)
-    ξ, w = gausslegendre(n)
-    ξ = (xmax - xmin) / 2 * ξ .+ (xmin + xmax) / 2
-    norm ? w /= sum(w) : w *= (xmax - xmin) / 2
-    return ξ, w
-end
-=#
+
 @doc raw"""
     $(FUNCTIONNAME)(greek_coefs, μ; returnLeg = false)
 Returns the reconstructed elements of the 4x4 scattering matrix at positions
@@ -409,164 +232,25 @@ function reconstruct_phase(greek_coefs, lin_greek_coefs, μ; returnLeg=false)
     return returnLeg ? (scattering_matrix, lin_scattering_matrix, P, P²) : (scattering_matrix, lin_scattering_matrix, nothing, nothing)
 end
 
-#=
-"""
-    $(FUNCTIONNAME)(depol)
-Returns the greek coefficients (as [`GreekCoefs`](@ref)) of the Rayleigh phase function given
-depolarization value.
-- `depol` Depolarization (best use 0 as default )
-"""
-function get_greek_rayleigh(depol::Number)
-    FT = eltype(depol)
-    # Rayleigh Greek Parameters
-    dpl_p = (1 - depol)  / (1 + depol / 2)
-    #dpl_q = (1 + depol)  / (1 - depol)
-    dpl_r = (1 - 2depol) / (1 - depol)
-
-    α  =  FT[0.0, 0.0,             3dpl_p]
-    β  =  FT[1.0, 0.0,             0.5 * dpl_p]
-    γ  =  FT[0.0, 0.0,             dpl_p * sqrt(1.5)]
-    δ  =  FT[0.0, dpl_p * dpl_r * 1.5, 0.0]
-    ϵ  =  FT[0.0, 0.0,             0.0]
-    ζ  =  FT[0.0, 0.0,             0.0]
-    return GreekCoefs(α, β, γ, δ, ϵ, ζ)
-end
-
-"""
-    $(FUNCTIONNAME)(k, an, bn, w)
-Calculate the average Scattering and Extinction Cross Section
-Eqn. 1, averaged over size distribution
-"""
-function compute_avg_C_scatt_ext(k, an, bn, w)
-    n_ = collect(1:size(an)[2]);
-    n_ = 2n_ .+ 1
-    coef = 2π / k^2 * n_'
-    return (coef * (w' * (abs2.(an') + abs2.(bn'))')', coef * (w' * real(an + bn))')
-end
-=#
-""" Compute probability weights of radii """
-#=
 function compute_wₓ(lin::LinMode, size_distribution, wᵣ, r, r_max)
 
     wₓ = pdf.(size_distribution,r)      # Weights from distribution
-    #g(p) = pdf.(LogNormal(p[1],p[2]), r)  # Weights from lognormal distribution
-    ẇₓ = ForwardDiff.jacobian(g, [size_distribution.μ, size_distribution.σ])
-    wₓ .*= wᵣ    # pre multiply with wᵣ to get proper means eventually:
-    # normalize (could apply a check whether cdf.(size_distribution,r_max) is larger than 0.99:
-    #println("Test")
-    @debug "Fraction of size distribution cut by max radius: $((1-cdf.(size_distribution,r_max))*100) %"
-    wₓ /= sum(wₓ)
-    for ctr = 1:2
-        ẇₓ[:,ctr] .= ẇₓ[:,ctr] .* wᵣ
-        ẇₓ[:,ctr] .= ẇₓ[:,ctr]./sum(wₓ) .- (sum(ẇₓ[:,ctr]) * wₓ)./(sum(wₓ)^2)
-    end
-    return wₓ, ẇₓ'
-end
-=#
-function compute_wₓ(lin::LinMode, size_distribution, wᵣ, r, r_max)
-
-    wₓ = pdf.(size_distribution,r)      # Weights from distribution
-    # compare wₓ with a = (1.0./r*sd1.σ*sqrt(2π)).*exp.(-0.5*((log.(r).-sd1.μ)/sd1.σ).^2)
-    #g(p) = pdf.(LogNormal(p[1],p[2]), r)  # Weights from lognormal distribution
-    #ẇₓ = ForwardDiff.jacobian(g, [size_distribution.μ, size_distribution.σ])
-    ẇₓ = zeros(2, length(r))
-    ẇₓ[1,:] .= ((log.(r).-size_distribution.μ)/size_distribution.σ^2) .* wₓ
-    ẇₓ[2,:] .= (ẇₓ[1,:].*(log.(r).-size_distribution.μ) .- wₓ)/size_distribution.σ
-#@show "before", sum(wᵣ),
-    #sum(wₓ[1:end-1].*(r[2:end]-r[1:end-1])),
-    #sum(ẇₓ[1,1:end-1].*(r[2:end]-r[1:end-1])),
-    #sum(ẇₓ[2,1:end-1].*(r[2:end]-r[1:end-1]))
+    ẇₓ = zeros(2, length(r))
+    ẇₓ[1,:] .= ((log.(r).-size_distribution.μ)/size_distribution.σ^2) .* wₓ
+    ẇₓ[2,:] .= (ẇₓ[1,:].*(log.(r).-size_distribution.μ) .- wₓ)/size_distribution.σ
 
     wₓ .*= wᵣ
-    ẇₓ[1,:] .*= wᵣ
-    ẇₓ[2,:] .*= wᵣ
+    ẇₓ[1,:] .*= wᵣ
+    ẇₓ[2,:] .*= wᵣ
 
     wₓ /= sum(wₓ)
     for ctr = 1:2
-        ẇₓ[ctr,:] .= ẇₓ[ctr,:]./sum(wₓ) .- (sum(ẇₓ[ctr,:]) * wₓ)./(sum(wₓ)^2)
+        ẇₓ[ctr,:] .= ẇₓ[ctr,:]./sum(wₓ) .- (sum(ẇₓ[ctr,:]) * wₓ)./(sum(wₓ)^2)
     end
-#@show "after", sum(wᵣ),
-#sum(wₓ),
-#sum(ẇₓ[1,:]),
-#sum(ẇₓ[2,:])
-     @debug "Fraction of size distribution cut by max radius: $((1-cdf.(size_distribution,r_max))*100) %"
+    @debug "Fraction of size distribution cut by max radius: $((1-cdf.(size_distribution,r_max))*100) %"
 
-    return wₓ, ẇₓ
+    return wₓ, ẇₓ
 end
-
-#####
-##### Π-matrix construction methods (Sanghavi 2014, eq. 15)
-#####
-#=
-"""
-    $(FUNCTIONNAME)(mo::Stokes_IQUV, P, R, T, l::Int, m::Int; sign_change=false)
-Compute Π matrix for all stokes vector elements used in computations of the phase matrix
-See Sanghavi 2014, eq. 15
-"""
-function construct_Π_matrix(mo::Stokes_IQUV, P, R, T, l::Int, m::Int; sign_change=false)
-    if sign_change # (basically gets it for -μ due to symmetries on P,R,T)
-        if isodd(l-m)
-            Π = [SMatrix{4,4}([-P[i,l,m] 0 0 0 ; 0 -R[i,l,m] -T[i,l,m] 0; 0 -T[i,l,m] -R[i,l,m] 0; 0 0 0 -P[i,l,m]]) for i in 1:size(P, 1)]
-        else
-            Π = [SMatrix{4,4}([P[i,l,m] 0 0 0 ; 0 R[i,l,m] T[i,l,m] 0; 0 T[i,l,m] R[i,l,m] 0; 0 0 0 P[i,l,m]]) for i in 1:size(P, 1)]
-        end
-    else
-        Π = [SMatrix{4,4}([P[i,l,m] 0 0 0 ; 0 R[i,l,m] -T[i,l,m] 0; 0 -T[i,l,m] R[i,l,m] 0; 0 0 0 P[i,l,m]]) for i in 1:size(P, 1)]
-    end
-    return Π
-end
-
-"""
-    $(FUNCTIONNAME)(mo::Stokes_IQU, P, R, T, l::Int, m::Int; sign_change=false)
-Compute Π matrix for  stokes vector elements I,Q,U used in computations of the phase matrix
-See Sanghavi 2014, eq. 15
-"""
-function construct_Π_matrix(mo::Stokes_IQU, P, R, T, l::Int, m::Int; sign_change=false)
-    if sign_change # (basically gets it for -μ due to symmetries on P,R,T)
-        if isodd(l-m)
-            Π = [SMatrix{3,3}([-P[i,l,m] 0 0  ; 0 -R[i,l,m] -T[i,l,m] ; 0 -T[i,l,m] -R[i,l,m] ]) for i in 1:size(P, 1)]
-        else
-            Π = [SMatrix{3,3}([P[i,l,m] 0 0  ; 0 R[i,l,m] T[i,l,m] ; 0 T[i,l,m] R[i,l,m] ]) for i in 1:size(P, 1)]
-        end
-    else
-        Π = [SMatrix{3,3}([P[i,l,m] 0 0  ; 0 R[i,l,m] -T[i,l,m] ; 0 -T[i,l,m] R[i,l,m] ]) for i in 1:size(P, 1)]
-    end
-    return Π
-end
-
-"""
-    $(FUNCTIONNAME)(mo::Stokes_I, P, R, T, l::Int, m::Int; sign_change=false)
-Compute Π matrix for  stokes vector elements I used in computations of the phase matrix
-
-"""
-construct_Π_matrix(mod::Stokes_I, P, R, T, l::Int, m::Int; sign_change=false) = sign_change ? -P[:,l,m] : P[:,l,m]
-=#
-#####
-##### B-matrix construction methods (Sanghavi 2014, eq. 16)
-#####
-#=
-"""
-    $(FUNCTIONNAME)(mod::Stokes_IQUV, α, β, γ, δ, ϵ, ζ, l::Int)
-Compute B matrix for all stokes vector elements used in computations of the phase matrix
-See Sanghavi 2014, eq. 16
-"""
-construct_B_matrix(mod::Stokes_IQUV, α, β, γ, δ, ϵ, ζ, l::Int) = SMatrix{4,4}([β[l] γ[l] 0 0 ; γ[l] α[l] 0 0; 0 0 ζ[l] ϵ[l]; 0 0 -ϵ[l] δ[l]])
-
-"""
-    $(FUNCTIONNAME)(mod::Stokes_IQU, α, β, γ, δ, ϵ, ζ, l::Int)
-Compute B matrix for stokes vector elements I,Q,U used in computations of the phase matrix
-    See Sanghavi 2014, eq. 16
-"""
-construct_B_matrix(mod::Stokes_IQU, α, β, γ, δ, ϵ, ζ, l::Int) = SMatrix{3,3}([β[l] γ[l] 0 ; γ[l] α[l] 0 ; 0 0 ζ[l]])
-
-"""
-$(FUNCTIONNAME)(mod::Stokes_I, α, β, γ, δ, ϵ, ζ, l::Int)
-Compute Π matrix for stokes vector elements I used in computations of the phase matrix
-See Sanghavi 2014, eq. 16
-"""
-construct_B_matrix(mod::Stokes_I, α, β, γ, δ, ϵ, ζ, l::Int) = β[l]
-=#
-
 
 """
     $(FUNCTIONNAME)(mod::AbstractPolarizationType, μ, α, β, γ, δ, ϵ, ζ, m::Int)
