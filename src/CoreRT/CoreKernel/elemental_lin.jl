@@ -42,10 +42,11 @@ partial derivatives are stored along the parameter axis:
 - ``\\dot{\\mathbf{M}}[\\,..,2]``: ``\\partial \\mathbf{M}/\\partial\\varpi`` — single-scatter albedo derivative
 - ``\\dot{\\mathbf{M}}[\\,..,3]``: ``\\partial \\mathbf{M}/\\partial\\mathbf{Z}`` — phase-matrix derivative
 
-These three "core" derivatives feed the chain rule in
-[`lin_added_layer_all_params!`](@ref) which expands them to derivatives
-against the physical state vector ``\\mathbf{x}`` (aerosol microphysics,
-gas VMRs, surface BRDF parameters) using the boundary
+These three "core" derivatives feed the chain rule that is fused directly
+into `get_elem_rt_fused!` (non-SFI path) and `get_elem_rt_SFI_fused!`
+(direct-solar path).  These fused kernels expand the core derivatives into
+the full physical-state-vector derivatives w.r.t. aerosol microphysics,
+gas VMRs, and surface BRDF parameters using the boundary inputs
 `CoreScatteringOpticalPropertiesLin = (\\dot{\\tau}, \\dot{\\varpi}, \\dot{\\mathbf{Z}}^{++}, \\dot{\\mathbf{Z}}^{-+})`.
 
 When `SFI=true`, source vectors ``\\mathbf{j}_0^+, \\mathbf{j}_0^-`` and
@@ -366,8 +367,10 @@ included in both the forward and derivative outputs.
     Z⁻⁺_I₀ = zero(FT);
     
     for ii = i_start:i_end
-        Z⁺⁺_I₀ += Z⁺⁺[i,ii,n2] * F₀[ii-i_start+1,n2] #I₀[ii-i_start+1]
-        Z⁻⁺_I₀ += Z⁻⁺[i,ii,n2] * F₀[ii-i_start+1,n2] #I₀[ii-i_start+1] 
+        # `n2` follows the Z spectral axis, which may be length 1 on flat-Z
+        # fast paths.  F₀ remains band-resolved and must be sampled at `n`.
+        Z⁺⁺_I₀ += Z⁺⁺[i,ii,n2] * F₀[ii-i_start+1,n] #I₀[ii-i_start+1]
+        Z⁻⁺_I₀ += Z⁻⁺[i,ii,n2] * F₀[ii-i_start+1,n] #I₀[ii-i_start+1] 
     end
 
     if (i >= i_start) & (i <= i_end)
@@ -628,8 +631,10 @@ Eliminates the separate chain-rule pass for SFI terms and the per-parameter
     Z⁺⁺_I₀ = zero(FT)
     Z⁻⁺_I₀ = zero(FT)
     for ii = i_start:i_end
-        Z⁺⁺_I₀ += Z⁺⁺[i,ii,n2] * F₀[ii-i_start+1,n2]
-        Z⁻⁺_I₀ += Z⁻⁺[i,ii,n2] * F₀[ii-i_start+1,n2]
+        # `n2` follows the Z spectral axis, which may be length 1 on flat-Z
+        # fast paths.  F₀ remains band-resolved and must be sampled at `n`.
+        Z⁺⁺_I₀ += Z⁺⁺[i,ii,n2] * F₀[ii-i_start+1,n]
+        Z⁻⁺_I₀ += Z⁻⁺[i,ii,n2] * F₀[ii-i_start+1,n]
     end
 
     # ---- J₀⁺ and 3-core scalars ----
@@ -694,8 +699,8 @@ Eliminates the separate chain-rule pass for SFI terms and the per-parameter
         Ż⁺⁺_I₀_p = FT(0)
         Ż⁻⁺_I₀_p = FT(0)
         for ii = i_start:i_end
-            Ż⁺⁺_I₀_p += Ż⁺⁺_lin[i, ii, n2_lin, iparam] * F₀[ii-i_start+1, n2]
-            Ż⁻⁺_I₀_p += Ż⁻⁺[i, ii, n2_lin, iparam] * F₀[ii-i_start+1, n2]
+            Ż⁺⁺_I₀_p += Ż⁺⁺_lin[i, ii, n2_lin, iparam] * F₀[ii-i_start+1, n]
+            Ż⁻⁺_I₀_p += Ż⁻⁺[i, ii, n2_lin, iparam] * F₀[ii-i_start+1, n]
         end
 
         # Chain rule: ap_J̇ = J̇_tau*dτ̇ + J̇_w*ϖ̇ + J̇_Z*Ż_I₀

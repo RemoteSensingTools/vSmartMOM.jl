@@ -18,7 +18,8 @@ if hitran_hash === nothing || !artifact_exists(hitran_hash)
             println(i)
             try
                 download(hitran_url_base * string(i), joinpath(artifact_dir, "hitran_global_id_" * string(i) * ".par"))
-            catch
+            catch e
+                @warn "Failed to download HITRAN global_id $i" exception=e
             end
         end
     end

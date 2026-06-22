@@ -48,7 +48,6 @@ function compute_Z_moments(mod::AbstractPolarizationType, μ, greek_coefs::Greek
   
     # Pre-compute all required B matrices
     𝐁_all = [construct_B_matrix(mod, α, β, γ, δ, ϵ, ζ, i) for i in 1:l_max]
-#@show 𝐁_all 
     # Get dimension of square matrix (easier for Scalar/Stokes dimensions)
     B_dim = Int(sqrt(length(𝐁_all[1])))
     
@@ -67,7 +66,6 @@ function compute_Z_moments(mod::AbstractPolarizationType, μ, greek_coefs::Greek
         # See eq. 15 in Sanghavi 2014, note that P,R,T are already normalized
         Π  = construct_Π_matrix(mod, P, R, T, l, m)
         Π⁻ = construct_Π_matrix(mod, P⁻, R⁻, T⁻, l, m)
-        #@show Π, Π⁻
         # Iterate over angles
         for j in eachindex(μ), i in eachindex(μ)
             if B_dim == 1
@@ -78,11 +76,6 @@ function compute_Z_moments(mod::AbstractPolarizationType, μ, greek_coefs::Greek
                 A⁻⁺[:,:,i,j] += Π[i] * 𝐁 * Π⁻[j]
             end
         end
-        #=for i in eachindex(μ)
-                @show m,l
-                @show A⁺⁺[:,:,i,i] 
-                @show A⁻⁺[:,:,i,i] 
-        end=#
     end
 
     # Now get to the Z part:
@@ -109,15 +102,3 @@ function compute_Z_moments(mod::AbstractPolarizationType, μ, greek_coefs::Greek
     return arr_type(𝐙⁺⁺), arr_type(𝐙⁻⁺)
 end
 
-"""
-    $(FUNCTIONNAME)(mod::AbstractPolarizationType, μ, μ₀, greek_coefs::GreekCoefs, m::Int; arr_type = Array)
-
-Variant accepting an explicit incoming direction `μ₀`. The per-μ₀ projection
-that this signature was originally designed for is dead code (the source-term
-loop has been commented out since the v0.6 source-term refactor took it
-over via `prepare_source` / `contribute!`). For now this delegates to the
-3-arg form so we have one source of truth for the (Z⁺⁺, Z⁻⁺) computation.
-"""
-function compute_Z_moments(mod::AbstractPolarizationType, μ, μ₀, greek_coefs::GreekCoefs, m::Int; arr_type = Array)
-    return compute_Z_moments(mod, μ, greek_coefs, m; arr_type = arr_type)
-end

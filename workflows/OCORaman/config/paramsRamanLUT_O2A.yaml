@@ -1,0 +1,66 @@
+# =================================================================
+# paramsRamanLUT_O2A.yaml
+#
+# Dedicated input template for workflows/OCORaman/scripts/createRamanLUT_O2A.jl.
+#
+# Atmospheric profile provenance for manuscript notes:
+#   The p/T/q values below were copied from
+#   test/test_parameters/ParamsEMIT_MODTRANcomp_newLUT.yaml.  They trace to
+#   AFGL 1986 Midlatitude Winter, model/table 1c, carried through the
+#   EMIT/MODTRAN comparison workflow on a 20 hPa grid from 20.01 to
+#   1080.01 hPa.  T and specific humidity q are layer-mid values; H2O VMR is
+#   derived internally from q by the vSmartMOM parser.
+#
+# Absorption:
+#   O2 uses the ABSCO v5.2 table.  H2O uses the rebuilt HITRAN H2O LUT and is
+#   activated by the q profile below.
+#
+# SIF is intentionally off for the first Raman LuT generation pass.  The
+# script will pass a zero SurfaceSIF source term unless SIF_STATES is
+# explicitly overridden.
+# =================================================================
+radiative_transfer:
+  spec_bands:
+    # 785--762.5 nm with 250 cm^-1 Raman shoulders.
+    - 12488.853503184713:0.1:13364.754098360656
+    # 762.5--740 nm with 250 cm^-1 Raman shoulders.
+    - 12864.754098360656:0.1:13763.513513513513
+  surface:
+    - LambertianSurfaceScalar{Float32}(0.0)
+    - LambertianSurfaceScalar{Float32}(0.0)
+  polarization_type:  Stokes_IQU()
+  nstreams:           3
+  truncation:         auto
+  depol:              -1
+  float_type:         Float32
+  architecture:       Architectures.GPU()
+
+geometry:
+  sza:                0.0
+  vza:                [0.0]
+  vaz:                [0.0]
+  obs_alt:            0
+
+atmospheric_profile:
+  p: [20.01, 40.01, 60.01, 80.01, 100.01, 120.01, 140.01, 160.01, 180.01, 200.01, 220.01, 240.01, 260.01, 280.01, 300.01, 320.01, 340.01, 360.01, 380.01, 400.01, 420.01, 440.01, 460.01, 480.01, 500.01, 520.01, 540.01, 560.01, 580.01, 600.01, 620.01, 640.01, 660.01, 680.01, 700.01, 720.01, 740.01, 760.01, 780.01, 800.01, 820.01, 840.01, 860.01, 880.01, 900.01, 920.01, 940.01, 960.01, 980.01, 1000.01, 1020.01, 1040.01, 1060.01, 1080.01]
+  T: [215.27, 215.20, 215.58, 216.32, 216.97, 217.50, 217.97, 218.37, 218.73, 219.05, 219.34, 219.83, 221.64, 224.44, 227.10, 229.62, 232.01, 234.30, 236.48, 238.57, 240.58, 242.51, 244.37, 246.18, 247.92, 249.59, 251.23, 252.82, 254.35, 255.84, 257.30, 258.73, 260.11, 261.37, 262.32, 263.07, 263.80, 264.51, 265.22, 265.89, 266.56, 267.22, 267.86, 268.48, 269.08, 269.69, 270.28, 270.86, 271.43, 271.95, 272.20, 272.20, 272.20]
+  q: [2.85197e-06, 2.79891e-06, 2.79891e-06, 2.82265e-06, 2.89493e-06, 2.96449e-06, 3.05616e-06, 3.35328e-06, 4.19086e-06, 5.88562e-06, 1.00050e-05, 1.56225e-05, 2.29201e-05, 3.18241e-05, 4.24586e-05, 5.63855e-05, 7.55651e-05, 9.96335e-05, 1.31963e-04, 1.73262e-04, 2.24550e-04, 2.73414e-04, 3.28115e-04, 3.90775e-04, 4.52026e-04, 5.13918e-04, 5.81509e-04, 6.55152e-04, 7.39990e-04, 8.32414e-04, 9.32824e-04, 1.04162e-03, 1.13611e-03, 1.23480e-03, 1.33886e-03, 1.44842e-03, 1.54772e-03, 1.62748e-03, 1.70914e-03, 1.79269e-03, 1.87813e-03, 1.96267e-03, 2.04298e-03, 2.12463e-03, 2.20761e-03, 2.29191e-03, 2.37753e-03, 2.46445e-03, 2.55267e-03, 2.64218e-03, 2.73298e-03, 2.82506e-03, 2.91839e-03]
+  profile_reduction: 12
+
+absorption:
+  fixed_molecules:
+    - [O2]
+    - [O2]
+  variable_molecules:
+    - []
+    - []
+  LUTfiles:
+    - ["/net/fluo/data1/ABSCO_CS_Database/v5.2_final/o2_v52_v2.jld2",
+       "/home/sanghavi/data/HITRAN_LUTs/H2O.jld2"]
+    - ["/net/fluo/data1/ABSCO_CS_Database/v5.2_final/o2_v52_v2.jld2",
+       "/home/sanghavi/data/HITRAN_LUTs/H2O.jld2"]
+  vmr:
+    O2: 0.21
+  broadening:         Voigt()
+  CEF:                HumlicekWeidemann32SDErrorFunction()
+  wing_cutoff:        150

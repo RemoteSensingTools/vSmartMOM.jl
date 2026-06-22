@@ -327,7 +327,7 @@ The layer optical properties are adjusted consistently:
 
 The resulting truncation factor `fᵗ`, truncated Greek coefficients, optical
 depth, and single-scattering albedo enter layer assembly through
-`construct_atm_layer`, where the atmospheric optical properties are rescaled
+`constructCoreOpticalProperties`, where the atmospheric optical properties are rescaled
 before `rt_kernel!` sees them.
 
 ## Linearization
@@ -351,8 +351,9 @@ Main files:
   doubling.
 - `src/CoreRT/CoreKernel/interaction_lin.jl`: derivative propagation through
   adding.
-- `src/CoreRT/CoreKernel/lin_added_layer_all_params.jl`: assembles derivative
-  matrices for all active parameter blocks.
+- `src/CoreRT/CoreKernel/elemental_lin.jl`: fused kernels (`get_elem_rt_fused!`,
+  `get_elem_rt_SFI_fused!`) write derivative matrices for all active parameter
+  blocks directly during the elemental step.
 - `src/CoreRT/parameter_layout.jl`: names the final Jacobian parameter ordering.
 
 Use `ParameterLayout` accessors such as `aerosol_range`, `gas_range`, and

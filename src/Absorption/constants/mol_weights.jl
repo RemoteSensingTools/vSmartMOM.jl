@@ -33,7 +33,7 @@ mol_abundance(mol, iso) = check_exists(abundances[mol, iso])
 mol_weight(mol, iso) = check_exists(weights[mol, iso])
 
 """Get molecule name for molecule mol and isotopologue iso."""
-mol_name(mol, iso) = check_exists(names[mol, iso])
+mol_name(mol, iso) = check_exists(mol_names[mol, iso])
 
 """Get HITRAN molecule ID from molecule name string."""
 mol_number(name) = mols[findfirst(x->x==name, mol_names[:,1])]

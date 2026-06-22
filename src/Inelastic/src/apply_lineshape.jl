@@ -1,5 +1,5 @@
 const c₂                 = 1.4387769
-const cMassMolIE           = 1.66053873e-30 #kilograms per molecule for unit molec. mass
+const cMassMolIE           = 1.66053873e-27 #kilograms per molecule for unit molec. mass
 const cSqrtLn2divSqrtPi  = 0.469718639319144059835 #√(ln2/π)
 const cLn2               = 0.6931471805599 #ln2
 const cSqrtLn2           = 0.8325546111577 #√(ln2)

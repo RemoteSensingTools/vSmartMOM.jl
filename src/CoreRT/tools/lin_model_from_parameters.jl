@@ -77,6 +77,7 @@ function model_from_parameters(lin::LinMode,
     if params.profile_reduction_n != -1
         profile = reduce_profile(params.profile_reduction_n, profile)
     end
+    rayleigh_molecular_T = (profile.vcd_dry' * profile.T) / sum(profile.vcd_dry)
 
     greek_cabannes = Vector{vSmartMOM.Scattering.GreekCoefs{FT}}()
     greek_rayleigh = Vector{vSmartMOM.Scattering.GreekCoefs{FT}}()
@@ -100,7 +101,7 @@ function model_from_parameters(lin::LinMode,
         # taken from the molecular path; the depol values feed greek coefs and
         # τ_rayl only when params.depol < 0 (auto). See model_from_parameters.jl
         # for the full rule.
-        _n2, _o2 = InelasticScattering.getRamanAtmoConstants(FT(1.0e7) / λₘ, FT(300))
+        _n2, _o2 = InelasticScattering.getRamanAtmoConstants(FT(1.0e7) / λₘ, FT(rayleigh_molecular_T))
         ϖ_Cabannes[i_band] = InelasticScattering.compute_ϖ_Cabannes(λₘ, _n2, _o2)
         γ_air_Cabannes, _ = InelasticScattering.compute_γ_air_Cabannes!(λₘ, _n2, _o2)
         γ_air_Rayleigh, _ = InelasticScattering.compute_γ_air_Rayleigh!(λₘ, _n2, _o2)
@@ -131,15 +132,16 @@ function model_from_parameters(lin::LinMode,
                     profile.vmr_h2o,
                     profile)
             else
-                @timeit "Read HITRAN" hitran_data = read_hitran(artifact("H2O"), iso=-1)
+                @timeit "Read HITRAN" lines_h2o = AtmosphericAbsorption.load_lines(AtmosphericAbsorption.HitranPort(artifact("H2O")); FT)
                 @debug "Computing profile for water vapor (q-driven) in band #$(i_band)"
-                bf  = isnothing(abs_params) ? vSmartMOM.Absorption.Voigt() : abs_params.broadening_function
-                cef = isnothing(abs_params) ? vSmartMOM.Absorption.HumlicekWeidemann32SDErrorFunction() : abs_params.CEF
+                bf  = isnothing(abs_params) ? AtmosphericAbsorption.Voigt() : abs_params.broadening_function
+                cef = isnothing(abs_params) ? AtmosphericAbsorption.HumlicekWeideman32() : abs_params.CEF
                 wc  = isnothing(abs_params) ? 150 : abs_params.wing_cutoff
-                absorption_model = make_hitran_model(hitran_data, bf,
+                absorption_model = AtmosphericAbsorption.LineByLineModel(lines_h2o;
+                    profile = bf,
                     wing_cutoff = wc,
-                    CEF = cef,
-                    architecture = params.architecture,
+                    cpf = cef,
+                    architecture = _to_aa_arch(params.architecture),
                     vmr = 0)
                 @timeit "Absorption Coeff H2O"  compute_absorption_profile!(
                     τ_abs[i_band],
@@ -156,15 +158,14 @@ function model_from_parameters(lin::LinMode,
                 for molec_i in 1:length(abs_params.fixed_molecules[i_band])
                     mol_name = abs_params.fixed_molecules[i_band][molec_i]
                     if isempty(abs_params.luts)
-                        @timeit "Read HITRAN" hitran_data =
-                            read_hitran(artifact(mol_name), iso=-1)
+                        @timeit "Read HITRAN" lines = AtmosphericAbsorption.load_lines(AtmosphericAbsorption.HitranPort(artifact(mol_name)); FT)
 
                         @debug "Computing profile for $(mol_name) with vmr $(profile.vmr[mol_name]) for band #$(i_band)"
-                        absorption_model = make_hitran_model(hitran_data,
-                            abs_params.broadening_function,
+                        absorption_model = AtmosphericAbsorption.LineByLineModel(lines;
+                            profile = abs_params.broadening_function,
                             wing_cutoff = abs_params.wing_cutoff,
-                            CEF = abs_params.CEF,
-                            architecture = params.architecture,
+                            cpf = abs_params.CEF,
+                            architecture = _to_aa_arch(params.architecture),
                             vmr = 0)
                         @timeit "Absorption Coeff"  compute_absorption_profile!(
                                 τ_abs[i_band],
@@ -189,15 +190,14 @@ function model_from_parameters(lin::LinMode,
                     mol_name = abs_params.variable_molecules[i_band][molec_i]
                     jac_idx = molec_i + 1
                     if isempty(abs_params.luts)
-                        @timeit "Read HITRAN" hitran_data =
-                            read_hitran(artifact(mol_name), iso=-1)
+                        @timeit "Read HITRAN" lines = AtmosphericAbsorption.load_lines(AtmosphericAbsorption.HitranPort(artifact(mol_name)); FT)
                         @debug "Computing profile for $(mol_name) with vmr $(profile.vmr[mol_name]) for band #$(i_band)"
 
-                        absorption_model = make_hitran_model(hitran_data,
-                            abs_params.broadening_function,
+                        absorption_model = AtmosphericAbsorption.LineByLineModel(lines;
+                            profile = abs_params.broadening_function,
                             wing_cutoff = abs_params.wing_cutoff,
-                            CEF = abs_params.CEF,
-                            architecture = params.architecture,
+                            cpf = abs_params.CEF,
+                            architecture = _to_aa_arch(params.architecture),
                             vmr = 0)
                         @timeit "Absorption Coeff"  compute_absorption_profile!(
                                 τ_abs[i_band],
@@ -264,11 +264,23 @@ function model_from_parameters(lin::LinMode,
         size_distribution = curr_aerosol.size_distribution
         mie_aerosol = Aerosol(size_distribution, curr_aerosol.nᵣ, curr_aerosol.nᵢ)
 
+        # Linearized Mie has NO GPU variant: ForwardDiff/analytic-derivative Greek
+        # coefficients are only implemented on the CPU analytic kernel. Force CPU
+        # architecture here regardless of params.architecture so a GPU run still
+        # builds Jacobians correctly via compute_aerosol_optical_properties(lin, …).
         _mie(λ) = make_mie_model(scat.decomp_type, mie_aerosol, λ,
-            params.polarization_type, truncation_type, scat.r_max, scat.nquad_radius)
+            params.polarization_type, truncation_type, scat.r_max, scat.nquad_radius;
+            architecture = Architectures.CPU())
 
-        mie_model = _mie(scat.λ_ref)
-        k_ref, k̇_ref   = compute_ref_aerosol_extinction(lin, mie_model, params.float_type)
+        # k_ref normalization at λ_ref uses the aerosol's own nᵣ/nᵢ so the Jacobian
+        # chain w.r.t. nᵣ/nᵢ stays intact — the FD test perturbs the aerosol's nᵣ, and a
+        # fixed-n_ref k_ref would zero ∂k_ref/∂nᵣ. For the common case (n_ref unset →
+        # defaults to the aerosol's own index) this equals the forward path's k_ref value.
+        # KNOWN LIMITATION: for an explicit n_ref that differs from the aerosol's index,
+        # the linearized forward/Jacobian normalization uses the aerosol index here while
+        # the non-linear forward uses n_ref — a small inconsistency for that niche config.
+        mie_model_ref_lin = _mie(scat.λ_ref)
+        k_ref, k̇_ref   = compute_ref_aerosol_extinction(lin, mie_model_ref_lin, params.float_type)
 
         for i_band=1:n_bands
 

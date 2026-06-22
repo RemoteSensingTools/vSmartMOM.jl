@@ -31,6 +31,7 @@ abstract type AbstractAnalyticPhaseFunction end
 
 Scalar Henyey-Greenstein phase function,
 `(1 - g^2) / (1 + g^2 - 2g cosΘ)^(3/2)`, normalized so its sphere average is
+`(1 - g^2) / (1 + g^2 - 2g cosΘ)^(3/2)`, normalized so its sphere average is
 one.
 """
 Base.@kwdef struct HenyeyGreensteinPhaseFunction{FT<:Real} <: AbstractAnalyticPhaseFunction
@@ -65,10 +66,18 @@ single-scattering optical properties via Lorenz-Mie theory.
 The refractive index convention is `n = nᵣ - i·nᵢ`, where positive `nᵢ`
 indicates absorption.
 
+The struct is parameterized by the refractive-index element type `FT`. `FT` is
+typically a plain `AbstractFloat` (`Float64`/`Float32`) but may also be a
+`ForwardDiff.Dual` so the autodiff path can track derivatives with respect to
+`nᵣ`/`nᵢ`; for that reason `FT` is intentionally **not** constrained to
+`<:AbstractFloat`. The outer convenience constructor `Aerosol(dist, nᵣ, nᵢ)`
+promotes `nᵣ` and `nᵢ` to a common type, so existing call sites continue to
+work unchanged.
+
 # Fields
 - `size_distribution::ContinuousUnivariateDistribution`: Particle radius distribution (e.g., `LogNormal`). Units: μm.
-- `nᵣ`: Real part of the refractive index (relative to air).
-- `nᵢ`: Imaginary part of the refractive index (absorption).
+- `nᵣ::FT`: Real part of the refractive index (relative to air).
+- `nᵢ::FT`: Imaginary part of the refractive index (absorption).
 
 # Example
 ```julia
@@ -76,13 +85,22 @@ using Distributions
 aer = Aerosol(LogNormal(log(0.3), 0.4), 1.3, 0.01)
 ```
 """
-mutable struct Aerosol{}
+mutable struct Aerosol{FT}
     "Univariate size distribution"
     size_distribution::ContinuousUnivariateDistribution
     "Real part of refractive index"
-    nᵣ
+    nᵣ::FT
     "Imag part of refractive index"
-    nᵢ
+    nᵢ::FT
+end
+
+# Outer convenience constructor: promote nᵣ/nᵢ to a common element type so that
+# all existing `Aerosol(dist, nᵣ, nᵢ)` call sites keep working unchanged. We use
+# `promote` (not `promote_type ∘ AbstractFloat`) so that ForwardDiff `Dual`
+# arguments are preserved for the autodiff path.
+function Aerosol(size_distribution::ContinuousUnivariateDistribution, nᵣ, nᵢ)
+    nᵣp, nᵢp = promote(nᵣ, nᵢ)
+    return Aerosol{typeof(nᵣp)}(size_distribution, nᵣp, nᵢp)
 end
 
 # TODO: struct MultivariateAerosol{FT,FT2} <: AbstractAerosolType
@@ -312,25 +330,51 @@ Model that specifies the Mie computation details
 =#
 
 """
-    MieModel{FDT<:AbstractFourierDecompositionType, FT}
+    MieModel{FDT<:AbstractFourierDecompositionType, FT, ARCH}
 
 Configuration for a Lorenz–Mie scattering computation.  Specifies the aerosol
 (size distribution + refractive index), wavelength, polarization type,
-truncation strategy, and integration parameters.  The `computation_type`
-selects between NAI-2 (Siewert) and PCW (Domke) Fourier decomposition
-algorithms.
+truncation strategy, integration parameters, and the compute architecture.
+The `computation_type` selects between NAI-2 (Siewert) and PCW (Domke) Fourier
+decomposition algorithms.
 
 Pre-computed Wigner symbol tables (`wigner_A`, `wigner_B`) can be supplied
-for PCW; they default to trivial placeholders when unused.
+for PCW; they default to trivial 1×1×1 placeholders (of element type `FT`)
+when unused (NAI2 path).
+
+# FT semantics (three orthogonal precision axes)
+
+`FT` is the **output** float type of the returned Greek coefficients and
+optical scalars.  It is carried by `λ`, `r_max`, and `aerosol` (which must all
+share the same `FT`) so that the entire `MieModel` is FT-consistent. This is
+independent of two other precision choices:
+
+1. `FT` (output type) — what the user consumes downstream in the RT pipeline.
+2. The internal `Dₙ` continued-fraction recursion: on the CPU path the
+   recursion is always promoted to `Float64` for numerical stability regardless
+   of `FT` (see `_mie_dn_recursion!` in `mie_helper_functions.jl`);
+   `Dual` inputs keep native arithmetic for AD compatibility.
+3. `precision_policy` (GPU only) — `NativeFloat64` (default on CUDA) runs the
+   GPU `Dₙ` recursion in hardware FP64; `DSEmulated` uses Float32
+   double-single pairs (for Metal/L40S). This axis is inert on the CPU path.
+
+# Architecture dispatch
+
+`architecture::ARCH` is either `Architectures.CPU()` (default) or
+`Architectures.GPU()`. `compute_aerosol_optical_properties(mie_model)`
+dispatches on it: NAI2+CPU → analytic CPU path; NAI2+GPU → the
+KernelAbstractions GPU pipeline; PCW+GPU → CPU fallback (no GPU PCW kernel).
 
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-Base.@kwdef struct MieModel{FDT<:AbstractFourierDecompositionType, FT}
+struct MieModel{FDT<:AbstractFourierDecompositionType, FT, ARCH}
 
     computation_type::FDT
-    aerosol::Aerosol
-    λ::Real
+    "Aerosol microphysics; element type must match the model's `FT`"
+    aerosol::Aerosol{FT}
+    "Wavelength `[μm]`; must have the same float type as `r_max`"
+    λ::FT
     polarization_type::AbstractPolarizationType
     truncation_type::AbstractTruncationType
 
@@ -339,9 +383,32 @@ Base.@kwdef struct MieModel{FDT<:AbstractFourierDecompositionType, FT}
     "Number of quadrature points for integration over size distribution"
     nquad_radius::Int
 
-    wigner_A = zeros(1, 1, 1)
-    wigner_B = zeros(1, 1, 1)
+    "Precomputed Wigner ν=0 table (PCW only; trivial 1×1×1 placeholder for NAI2)"
+    wigner_A::Array{FT,3}
+    "Precomputed Wigner ν=2 table (PCW only; trivial 1×1×1 placeholder for NAI2)"
+    wigner_B::Array{FT,3}
 
+    "Compute architecture (`CPU()` or `GPU()`); selects CPU vs GPU Mie path"
+    architecture::ARCH
+    "GPU precision policy (`NativeFloat64`/`DSEmulated`); `nothing` = auto-select on GPU, ignored on CPU"
+    precision_policy
+
+end
+
+# Keyword constructor — preserves the public `MieModel(; …)` API that the former
+# `Base.@kwdef` provided, while enforcing the FT-consistent field types. `λ`, `r_max`
+# and the (placeholder) Wigner tables are promoted to the aerosol's float type `FT`,
+# exactly as `make_mie_model` does, so an `Aerosol{FT}` always yields a `MieModel{…,FT,…}`.
+# (FT is read from the aerosol inside the body: a `where {FT}` param cannot be bound from
+# a keyword argument — only positional args do that — so the type annotation route fails.)
+function MieModel(; computation_type, aerosol, λ, polarization_type, truncation_type,
+                  r_max, nquad_radius, wigner_A = nothing, wigner_B = nothing,
+                  architecture = Architectures.CPU(), precision_policy = nothing)
+    FT = typeof(aerosol.nᵣ)   # aerosol::Aerosol{FT}
+    wA = wigner_A === nothing ? zeros(FT, 1, 1, 1) : convert(Array{FT,3}, wigner_A)
+    wB = wigner_B === nothing ? zeros(FT, 1, 1, 1) : convert(Array{FT,3}, wigner_B)
+    return MieModel(computation_type, aerosol, FT(λ), polarization_type, truncation_type,
+                    FT(r_max), nquad_radius, wA, wB, architecture, precision_policy)
 end
 
 #=

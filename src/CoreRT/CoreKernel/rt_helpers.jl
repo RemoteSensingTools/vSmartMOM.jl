@@ -100,9 +100,19 @@ call covers all spectral points; see [Concepts/07](../../docs/src/pages/concepts
 Mutates `gp_refl` and `tt_gp` in place.
 """
 @inline function compute_geometric_progression!(gp_refl, tt_gp, r⁻⁺, t⁺⁺, I_static, temp2, temp1_ptr, temp2_ptr)
-    temp2 .= I_static .- r⁻⁺ ⊠ r⁻⁺                  # (E − R·R)
-    batch_inv!(gp_refl, temp2, temp1_ptr, temp2_ptr) # (E − R·R)⁻¹
-    tt_gp .= t⁺⁺ ⊠ gp_refl                          # T · (E − R·R)⁻¹
+    if _use_fused_gp(tt_gp)
+        # Fused single-kernel path: build (E − R·R), LU-factorise it, and
+        # right-solve `tt_gp · (E − R·R) = T` directly — no explicit inverse and
+        # no separate batched GEMM. For the small RT matrices this is several×
+        # faster than the inverse-then-multiply path below (see
+        # test/benchmarks/batched_fused_v2_benchmark.jl). The fallback runs when
+        # the 3N² local-memory tile exceeds the device budget (large N) or on CPU.
+        ka_fused_gp_solve!(tt_gp, r⁻⁺, t⁺⁺, KernelAbstractions.get_backend(tt_gp))
+    else
+        temp2 .= I_static .- r⁻⁺ ⊠ r⁻⁺                  # (E − R·R)
+        batch_inv!(gp_refl, temp2, temp1_ptr, temp2_ptr) # (E − R·R)⁻¹
+        tt_gp .= t⁺⁺ ⊠ gp_refl                          # T · (E − R·R)⁻¹
+    end
     return nothing
 end
 
@@ -206,7 +216,8 @@ Copy all fields from an `AddedLayer` into the `CompositeLayer` (for TOA, iz==1).
     composite_layer.R⁻⁺[:], composite_layer.R⁺⁻[:] = (added_layer.r⁻⁺, added_layer.r⁺⁻)
     composite_layer.J₀⁺[:], composite_layer.J₀⁻[:] = (added_layer.j₀⁺, added_layer.j₀⁻)
     # v0.7 Phase A.2a — copy per-source slots too (if any). AddedLayerRS lacks
-    # the slot — Raman path still uses RS_type.F₀ / SIF₀ (Phase 6 retires those).
+    # these slots; Raman surface-emission sources are injected directly into
+    # the layer's legacy j₀ arrays before this copy.
     if hasproperty(added_layer, :j₀_by_src)
         for (key, slot) in pairs(added_layer.j₀_by_src)
             cslot = composite_layer.J₀_by_src[key]

@@ -367,18 +367,6 @@ end
 
 
 
-# Concatenate Core Optical Properties, can have mixed dimensions!
-function Base.:*(ẋ::CoreScatteringOpticalPropertiesLin, ẏ::CoreScatteringOpticalPropertiesLin) 
-    arr_type  = array_type(architecture(ẋ.τ̇))
-
-    ẋ = expandOpticalProperties(ẋ, arr_type);
-    ẏ = expandOpticalProperties(ẏ, arr_type);
-    CoreScatteringOpticalPropertiesLin([ẋ.τ̇; ẏ.τ̇],
-        [ẋ.ϖ̇; ẏ.ϖ̇],
-        cat(ẋ.Ż⁺⁺,ẏ.Ż⁺⁺, dims=3), 
-        cat(ẋ.Ż⁻⁺,ẏ.Ż⁻⁺, dims=3))
-end
-
 function Base.:+(a::UmbrellaCoreAbsorptionOpticalProperties,
                  b::UmbrellaCoreScatteringOpticalProperties)
     return b+a

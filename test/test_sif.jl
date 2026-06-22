@@ -21,16 +21,15 @@ using Test
 
     @testset "(1/π)·SIF₀ injection magnitude" begin
         SIF_I = FT(0.01)
+        sif_spec = zeros(FT, pol_type.n, nSpec); sif_spec[1, :] .= SIF_I
 
-        rs0 = InelasticScattering.noRS{FT}()
-        rs0.F₀ = zeros(FT, pol_type.n, nSpec); rs0.F₀[1, :] .= 1
-        rs0.SIF₀ = zeros(FT, pol_type.n, nSpec)
-        R0 = CoreRT.rt_run_test_ss(rs0, model, 1)[1]
-
-        rs1 = InelasticScattering.noRS{FT}()
-        rs1.F₀ = zeros(FT, pol_type.n, nSpec); rs1.F₀[1, :] .= 1
-        rs1.SIF₀ = zeros(FT, pol_type.n, nSpec); rs1.SIF₀[1, :] .= SIF_I
-        R1 = CoreRT.rt_run_test_ss(rs1, model, 1)[1]
+        # SIF is injected through the v0.6 source system (SurfaceSIF). The legacy
+        # RS_type.SIF₀ field is intentionally ignored by rt_run_ss (see rt_run.jl);
+        # the SolarBeam() default F₀ is unit Stokes-I, matching the old rs.F₀ = 1.
+        rs = InelasticScattering.noRS{FT}()
+        R0 = CoreRT.rt_run_test_ss(rs, model, 1; sources = SolarBeam())[1]
+        R1 = CoreRT.rt_run_test_ss(rs, model, 1;
+                                   sources = SolarBeam() + SurfaceSIF(SIF₀ = sif_spec))[1]
 
         δ = R1[1, 1, 50] - R0[1, 1, 50]
         # Expected: (1/π)·SIF_I·exp(-τ_atm/μ_view). τ_atm ≈ 0.025 Rayleigh-only

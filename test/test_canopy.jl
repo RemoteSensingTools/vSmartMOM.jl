@@ -1,6 +1,7 @@
 using vSmartMOM
 using vSmartMOM.CoreRT
 using vSmartMOM.IO
+using vSmartMOM.InelasticScattering
 using CanopyOptics
 using LinearAlgebra
 using Statistics
@@ -191,4 +192,61 @@ end
     @test all(isfinite.(R))
     @test minimum(R[:, 1, 1]) >= -1e-10
     @test maximum(R[:, 1, 1]) < 1.0
+end
+
+@testset "CanopySurface linearized soil-albedo Jacobian axis regression" begin
+    # Build a minimal canopy RT problem: 1 spectral point, 6 streams, Stokes_I.
+    # With no aerosols and no gases, Nparams = n_surface = 1 and iparam = 1.
+    # The correct layout for AddedLayerLin is [nμ, nμ, nSpec, Nparams] so the
+    # soil-albedo derivative must land in [:,:,:,1], NOT [1,:,:,:].
+    # Before the fix, iparam was used as the FIRST axis, corrupting a row of
+    # the nμ dimension and leaving the actual parameter slot zero.
+
+    FT = Float64
+    pol_type = CoreRT.Stokes_I{FT}()
+    n_stokes = pol_type.n  # = 1
+    arch = vSmartMOM.Architectures.CPU()
+    arr_type = Array
+
+    qp = CoreRT.rt_set_streams(CoreRT.RadauQuad(), 4, CoreRT.ObsGeometry(FT(30), FT[30.0], FT[0.0], FT(1000)), pol_type, arr_type)
+    nμ   = size(qp.qp_μ, 1) * n_stokes
+    nSpec = 1
+
+    soil = LambertianSurfaceScalar(FT(0.15))
+    canopy = CanopySurface(; soil, LAI=FT(2.0), n_layers=1,
+                            leaf_reflectance=FT(0.4),
+                            leaf_transmittance=FT(0.05))
+
+    # Allocate AddedLayer and AddedLayerLin (Nparams=1, matching one surface param)
+    Nparams = 1
+    dims = (nμ, nμ)
+
+    al, all_lin = CoreRT.make_added_layer(LinMode(), noRS{FT}(), FT, arr_type,
+                                          Nparams, dims, nSpec)
+
+    # Zero optical depth (τ̇_sum shape: [nSpec, Nparams] — unused by canopy lin path)
+    τ_sum  = zeros(FT, nSpec)
+    τ̇_sum  = zeros(FT, nSpec, Nparams)
+
+    CoreRT.create_surface_layer!(noRS{FT}(), canopy, al, all_lin, 1,
+                                 false, 0, pol_type, qp, τ_sum, τ̇_sum,
+                                 zeros(FT, nSpec), arch)
+
+    # The soil-albedo Jacobian must be in the LAST axis (iparam=1 → [:,:,:,1])
+    deriv_correct = all_lin.ap_ṙ⁻⁺[:, :, :, 1]
+    # Before the fix, [1,:,:,:] would hold the (incorrectly placed) data instead
+    deriv_wrong_slot = all_lin.ap_ṙ⁻⁺[1, :, :, :]  # old axis — should be zero or differ
+
+    # The correct parameter slot must be non-trivially populated (canopy with
+    # soil albedo 0.15 has a nonzero soil-albedo Jacobian)
+    @test any(abs.(deriv_correct) .> 1e-10)
+
+    # Verify the wrong slot (first row of nμ dim) is NOT the sole nonzero holder.
+    # If the fix is correct, deriv_correct sums to strictly more than deriv_wrong_slot
+    # summed over a full [:,:,:,1] slice, because the correct slot has a full nμ×nμ
+    # matrix while the wrong slot is just one row.
+    @test sum(abs.(deriv_correct)) > sum(abs.(deriv_wrong_slot))
+
+    # Shape invariant: parameter axis is last
+    @test size(all_lin.ap_ṙ⁻⁺) == (nμ, nμ, nSpec, Nparams)
 end

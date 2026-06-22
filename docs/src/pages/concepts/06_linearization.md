@@ -145,9 +145,9 @@ The full derivation is Sanghavi 2014 App. C. The structure (skipping arithmetic)
 | (C.8)–(C.10) | Elemental derivatives ``\dot{\mathbf{T}}_\delta``, ``\dot{\mathbf{R}}_\delta``, ``\dot{\mathbf{J}}_\delta`` w.r.t. the three core layer variables ``(\tau, \varpi_0, \mathbf{Z})`` | `elemental_lin.jl` |
 | (C.11)–(C.16) | Doubling/adding derivatives — same shape as the forward Eqs (23)–(28), tangent-linear | `doubling_lin.jl`, `interaction_lin.jl` |
 | (C.17)–(C.20) | D-matrix symmetry on derivatives — halves the linearized doubling cost | `doubling_lin.jl` |
-| (C.21) | Final assembled derivative form — what `lin_added_layer_all_params!` produces | `lin_added_layer_all_params.jl` |
+| (C.21) | Final assembled derivative form — written directly by `get_elem_rt_fused!` / `get_elem_rt_SFI_fused!` into the `ap_*` arrays during the elemental step | `elemental_lin.jl` |
 | (C.22)–(C.24) | Layer-averaged ``\bar{\tau}``, ``\bar{\varpi}_0``, ``\bar{\mathbf{Z}}`` definitions | `compEffectiveLayerProperties.jl` (forward); `compEffectiveLayerProperties_lin.jl` (lin) |
-| (C.25)–(C.26) | Chain rule from the elemental SS variables to the microphysical parameters ``(n_r, n_i, r_m, \sigma)`` | `lin_added_layer_all_params.jl` + `Scattering/types_lin.jl` |
+| (C.25)–(C.26) | Chain rule from the elemental SS variables to the microphysical parameters ``(n_r, n_i, r_m, \sigma)`` | `elemental_lin.jl` + `Scattering/types_lin.jl` |
 | (C.27)–(C.31) | δ derivatives (elemental thickness from `N_doubl`) | `compEffectiveLayerProperties_lin.jl` |
 | (C.32)–(C.39) | ``\bar{\varpi}_0`` and ``\bar{\mathbf{Z}}`` derivatives (post-truncation) | same |
 | (C.40) | ``\dot{\mathbf{Z}}_m`` from generalized spherical harmonics | `compute_Z_matrices.jl` (linearized variant) |
@@ -231,7 +231,7 @@ involving `rt_run`.
 | Elemental derivatives | [`src/CoreRT/CoreKernel/elemental_lin.jl`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/CoreKernel/elemental_lin.jl) |
 | Doubling derivatives | [`src/CoreRT/CoreKernel/doubling_lin.jl`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/CoreKernel/doubling_lin.jl) |
 | Interaction derivatives | [`src/CoreRT/CoreKernel/interaction_lin.jl`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/CoreKernel/interaction_lin.jl) |
-| Chain-rule expansion to all parameters | [`src/CoreRT/CoreKernel/lin_added_layer_all_params.jl:1–100`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/CoreKernel/lin_added_layer_all_params.jl#L1-L100) |
+| Chain-rule expansion to all parameters | [`src/CoreRT/CoreKernel/elemental_lin.jl`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/CoreKernel/elemental_lin.jl) — fused kernels `get_elem_rt_fused!` / `get_elem_rt_SFI_fused!` write `ap_*` directly |
 | Three-core-variable lin type | [`src/CoreRT/types_lin.jl:119–149`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/types_lin.jl#L119-L149) |
 | Optical-property Jacobian boundary | `src/CoreRT/types.jl::CoreScatteringOpticalPropertiesLin` |
 | ParameterLayout | [`src/CoreRT/parameter_layout.jl:1–67`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/parameter_layout.jl#L1-L67) |

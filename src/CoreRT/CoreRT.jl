@@ -24,6 +24,7 @@ using Unitful                      # For unit-aware conversions
 using UnitfulEquivalences          # For spectral equivalences (nm ↔ cm⁻¹)
 using ..Scattering                 # Use scattering module
 using ..Absorption                 # Use absorption module
+import AtmosphericAbsorption       # AA line-by-line models
 using ..InelasticScattering        # Use Inelastic Scattering module
 using ...vSmartMOM                 # Use parent RadiativeTransfer module
 using ...Architectures             # Use Architectures module
@@ -67,6 +68,7 @@ include("Sources/thermal_emission.jl")         # v0.7 Phase A: ThermalEmission p
 
 # Shared helpers
 include("CoreKernel/rt_helpers.jl")
+include("CoreKernel/fused_raman_kernels.jl") # Fused KA kernels for RRS per-Δn loops (GPU; fits-gated fallback to batched_mul)
 
 # Solvers -- Elemental
 include("CoreKernel/elemental.jl")             # Elemental (elastic)
@@ -94,7 +96,6 @@ include("CoreKernel/rt_kernel.jl")             # Handle Core RT (Elemental/Doubl
 include("CoreKernel/rt_kernel_lin.jl")         # Linearized RT kernel
 include("CoreKernel/rt_kernel_ss.jl")          # Single scattering RT kernel
 include("CoreKernel/rt_kernel_multisensor.jl") # Multi-sensor RT kernel
-include("CoreKernel/lin_added_layer_all_params.jl") # 3 core params -> all state params
 
 # Postprocessing
 include("tools/postprocessing_vza.jl")               # Postprocess (Azimuthal Weighting)
@@ -116,8 +117,15 @@ include("tools/atmo_prof_lin.jl")                 # Linearized atmosphere profil
 include("tools/rt_helper_functions.jl")           # Miscellaneous Utility Functions
 include("tools/rt_helper_functions_lin.jl")       # Linearized helper functions
 include("tools/rt_set_streams.jl")                # Set streams before RT
+# Map vSmartMOM architecture singletons to the structurally identical AA singletons
+# (the two packages vendor the same Architectures code; AA's kernel dispatch uses its own type).
+_to_aa_arch(::Architectures.GPU) = AtmosphericAbsorption.GPU()
+_to_aa_arch(::Architectures.CPU) = AtmosphericAbsorption.CPU()
+_to_aa_arch(arch::AtmosphericAbsorption.AbstractArchitecture) = arch  # already correct
+
 include("tools/model_from_parameters.jl")         # Converting parameters to derived model attributes
 include("tools/lin_model_from_parameters.jl")     # Linearized model from parameters
+include("tools/update_model.jl")                  # BatchContext + update_model! for batch processing
 include("tools/show_utils.jl")                    # Pretty-printing objects
 include("LayerOpticalProperties/compEffectiveLayerProperties.jl")
 include("LayerOpticalProperties/delta_m_truncation.jl")         # δ-M truncation + chain rule
@@ -145,9 +153,11 @@ export model_from_parameters,               # Converting the parameters to model
        model_from_parameters_lin,           # Convenience alias for linearized model
        rt_run, rt_run_lin, rt_run_ss,       # Run the RT code (forward, linearized, single scatter)
        rt_run_streams, StreamRTResult,      # Per-Fourier-moment quadrature-stream RT (Phase H)
-       default_parameters                   # Set of default parameters
-export lin_added_layer_all_params!,           # 3 params -> all params chain rule
-       OpticalPropertyJacobian,               # AD boundary struct alias
+       default_parameters,                  # Set of default parameters
+       BatchContext, update_model!,         # Batch-processing context + scene updater
+       update_aerosol_loading!,             # Phase 2: cheap τ_ref / profile update (no Mie)
+       update_aerosol_microphysics!         # Phase 2: expensive Mie re-run + Fourier re-derivation
+export OpticalPropertyJacobian,               # AD boundary struct alias
        RawAerosolJacobian,                    # AD boundary for raw aerosol derivatives
        delta_m_forward, delta_m_truncation_lin, # δ-M truncation functions
        ParameterLayout,                       # Jacobian parameter layout descriptor

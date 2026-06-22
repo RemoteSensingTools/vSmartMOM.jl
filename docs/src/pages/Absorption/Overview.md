@@ -1,5 +1,17 @@
 # Absorption Module Overview
 
+!!! note "RT pipeline uses AtmosphericAbsorption.jl (since externalAbsorption merge)"
+    Since the `externalAbsorption` merge, the **RT production pipeline**
+    (`model_from_parameters` → `rt_run`) computes line-by-line gas absorption via the
+    external [AtmosphericAbsorption.jl](https://github.com/RemoteSensingTools/AtmosphericAbsorption.jl)
+    package (`AtmosphericAbsorption.load_lines` + `LineByLineModel`; uses TIPS-2021 partition
+    functions). The internal `Absorption` module documented on this page remains the
+    **supported standalone API** for direct cross-section work:
+    `read_hitran` / `make_hitran_model` / `absorption_cross_section`
+    (TIPS-2017), plus the CIA / MT-CKD continuum and LUT paths.
+    Users who call `rt_run` do not need to interact with the internal `Absorption` module
+    directly; users who need standalone σ(ν, T, p) queries should use this module.
+
 This module enables absorption cross-section calculations of atmospheric gases at different pressures, temperatures, and broadeners (Doppler, Lorentzian, Voigt). It uses the [HITRAN](https://hitran.org) energy transition database for calculations. 
 
 While it enables lineshape calculations from scratch, the module also allows users to create and save an interpolator object at specified wavelength, pressure, and temperature grids. 

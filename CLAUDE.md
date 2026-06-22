@@ -40,7 +40,7 @@ No linter or formatter configured. Julia compatibility: 1.9-1.12.
 ### Module Load Order (`src/vSmartMOM.jl`)
 
 1. **Architectures** (`src/Architectures.jl`) — CPU/GPU abstraction via KernelAbstractions
-2. **Absorption** (`src/Absorption/Absorption.jl`) — Line-by-line cross-sections (HITRAN, Voigt/Doppler/Lorentz)
+2. **Absorption** (`src/Absorption/Absorption.jl`) — Line-by-line cross-sections (HITRAN, Voigt/Doppler/Lorentz). Note: since the `externalAbsorption` merge, the RT production pipeline (`model_from_parameters`) computes LBL absorption via the external [AtmosphericAbsorption.jl](https://github.com/RemoteSensingTools/AtmosphericAbsorption.jl) package (TIPS-2021). The internal `Absorption` module remains the standalone API for direct σ(ν, T, p) queries plus CIA/MT-CKD/LUT paths.
 3. **Artifacts** (`src/Artifacts/`) — HITRAN data management (edition preferences, hitran.org API client, artifact dispatch)
 4. **Scattering** (`src/Scattering/Scattering.jl`) — Mie scattering (NAI2 and PCW decomposition)
 5. **InelasticScattering** (`src/Inelastic/InelasticScattering.jl`) — Raman scattering (RRS, VS)
@@ -53,11 +53,13 @@ GPU is a weak dependency via `ext/vSmartMOMCUDAExt.jl` (loads when CUDA.jl is pr
 ### Main Pipeline
 
 ```
-YAML config
-    → parameters_from_yaml()   → vSmartMOM_Parameters
+YAML/TOML/Dict
+    → read_parameters()        → vSmartMOM_Parameters   (unified entry point)
     → model_from_parameters()  → RTModel
     → rt_run(model)            → (R, T) reflectance/transmittance
 ```
+
+`parameters_from_yaml(path)` is the YAML-specific alias and still works; use `read_parameters` for TOML or `Dict` inputs.
 
 Linearized variant: `model_from_parameters(LinMode(), params)` then `rt_run(model, lin_model, NAer, NGas, NSurf)` returns `(R, T, dR, dT)`.
 
@@ -231,7 +233,7 @@ test/
 
 ```julia
 using vSmartMOM
-params = parameters_from_yaml("config/lambertian_land.yaml")
+params = read_parameters("config/lambertian_land.yaml")   # preferred; also accepts TOML/Dict
 model  = model_from_parameters(params)
 R, T   = rt_run(model)
 ```
@@ -240,10 +242,10 @@ R, T   = rt_run(model)
 
 ```julia
 using vSmartMOM
-params = parameters_from_yaml("config/ocean_coxmunk.yaml")
+params = read_parameters("config/ocean_coxmunk.yaml")
 model, lin_model = model_from_parameters(LinMode(), params)
 NAer = length(params.scattering_params.rt_aerosols)
-NGas = size(lin_model.tau_dot_abs[1], 1)
+NGas = size(lin_model.τ̇_abs[1], 1)
 NSurf = 1
 R, T, dR, dT = rt_run(model, lin_model, NAer, NGas, NSurf)
 ```

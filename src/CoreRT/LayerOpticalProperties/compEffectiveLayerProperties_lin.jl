@@ -41,8 +41,14 @@ The output derivative dimension has `Nparams = 7×NAer + NGas` entries per layer
 - `fscat_opt`: Rayleigh scattering fraction per layer (for inelastic scattering weight).
 """
 function constructCoreOpticalProperties(RS_type, iBand, m, model, lin_model) #where {FT<:Real}
+    if InelasticScattering.has_inelastic(RS_type)
+        throw(ArgumentError(
+            "Linearized Raman-active optical properties are intentionally unsupported. " *
+            "Use forward Raman RT only."))
+    end
+
     (; τ_rayl, τ_aer, τ_abs, aerosol_optics, 
-            greek_rayleigh, greek_cabannes, ϖ_Cabannes) = model
+            greek_rayleigh) = model
     (; τ̇_aer, τ̇_abs, lin_aerosol_optics) = lin_model
     @assert all(iBand .≤ length(τ_rayl)) "iBand exceeded number of bands"
     FT = eltype(τ_rayl[1])
@@ -57,59 +63,26 @@ function constructCoreOpticalProperties(RS_type, iBand, m, model, lin_model) #wh
     # Number of Aerosols:
     nAero = size(τ_aer[iBand[1]],1)
     nZ    = size(τ_rayl[1],2)
-    # Rayleigh Z matrix:
+    # Rayleigh Z matrix. Linearized RT is pure-elastic only; Raman-active
+    # Cabannes/RRS modes are rejected above.
     
     band_layer_props     = [];
     band_layer_props_lin = [];
     band_fScattRayleigh  = [];
     for iB in iBand
-        if (typeof(RS_type)<:noRS) #!(typeof(RS_type)<:RRS)
-            Rayl𝐙⁺⁺, Rayl𝐙⁻⁺ = Scattering.compute_Z_moments(pol_type, μ, 
-                                                            greek_rayleigh[iB], m, 
-                                                            arr_type = arr_type);
-        else
-            Rayl𝐙⁺⁺, Rayl𝐙⁻⁺ = Scattering.compute_Z_moments(pol_type, μ, 
-                                                            greek_cabannes[iB], m, 
-                                                            arr_type = arr_type);
-            #Rayl2𝐙⁺⁺, Rayl2𝐙⁻⁺ = Scattering.compute_Z_moments(pol_type, μ, 
-            #                                                greek_rayleigh[iB], m, 
-            #                                                arr_type = arr_type);
-        end
+        # Linearized RT is pure-elastic only — Raman/Cabannes types are rejected
+        # at the lin entry points — so both noRS and noRS_plus use the full
+        # Rayleigh phase matrix. greek_cabannes is intentionally NOT destructured
+        # for this path; a Cabannes branch here would be dead code (and an
+        # UndefVarError for noRS_plus). See project_raman_not_linearized.
+        Rayl𝐙⁺⁺, Rayl𝐙⁻⁺ = Scattering.compute_Z_moments(pol_type, μ,
+                                                        greek_rayleigh[iB], m,
+                                                        arr_type = arr_type)
 
-        #if (typeof(RS_type)<:noRS) #if !(typeof(RS_type)<:RRS)
-        CoreScatteringOpticalProperties(arr_type(τ_rayl[iB][:,1]), FT(1.0), 
-                (Rayl𝐙⁺⁺), (Rayl𝐙⁻⁺))
-
-              
-        rayl =  [CoreScatteringOpticalProperties(arr_type(τ_rayl[iB][:,i]), 1.0, 
+        rayl = [CoreScatteringOpticalProperties(arr_type(τ_rayl[iB][:,i]), 1.0,
                 (Rayl𝐙⁺⁺), (Rayl𝐙⁻⁺)) for i=1:nZ]
-            #rayl_lin = [CoreScatteringOpticalPropertiesLin(arr_type(τ̇_rayl[iB][:,iz]), 0.0, 
-            #(0.0.*Rayl𝐙⁺⁺), (0.0.*Rayl𝐙⁻⁺)) for iz=1:nZ]    
-        #else
-        #    @error("Cannot linearize Raman computations")
-            #rayl =  [CoreScatteringOpticalProperties(arr_type(τ_rayl[iB][:,i]), ϖ_Cabannes[iB], 
-            #    (Rayl𝐙⁺⁺), (Rayl𝐙⁻⁺)) for i=1:nZ]
-            #rayl2 =  [CoreScatteringOpticalProperties(arr_type(τ_rayl[iB][:,i]), 1.0, 
-            #    (Rayl2𝐙⁺⁺), (Rayl2𝐙⁻⁺)) for i=1:nZ]
-        #end
-        #CoreScatteringOpticalProperties.(
-        #        τ_rayl[iB], 
-        #        [RS_type.ϖ_Cabannes[iB]], 
-        #        [Rayl𝐙⁺⁺], [Rayl𝐙⁻⁺])
         # Initiate combined properties with rayleigh
-        #combo = rayl
         combrella = [UmbrellaCoreScatteringOpticalProperties(rayl[i],nothing) for i=1:nZ]
-        # test:
-        # combo = combo .+ rayl
-        # this throws the following error:
-        # ERROR: MethodError: Cannot `convert` an object of type 
-        #  vSmartMOM.CoreRT.CoreScatteringOpticalProperties{CuArray{Float64{},1,CUDA.Mem.DeviceBuffer{}},CuArray{Float64, 1, CUDA.Mem.DeviceBuffer},CuArray{Float64{},3,CUDA.Mem.DeviceBuffer{}}} to an object of type 
-        #  vSmartMOM.CoreRT.CoreScatteringOpticalProperties{CuArray{Float64{},1,CUDA.Mem.DeviceBuffer{}},Float64,CuArray{Float64{},2,CUDA.Mem.DeviceBuffer{}}}
-        # Closest candidates are:
-        #  convert(::Type{T}, ::T) where T
-        #   @ Base Base.jl:64
-        #  (::Type{vSmartMOM.CoreRT.CoreScatteringOpticalProperties{FT, FT2, FT3}} where {FT, FT2, FT3})(::Any, ::Any, ::Any, ::Any)
-        #   @ vSmartMOM ~/code/github/vSmartMOM.jl/src/CoreRT/types.jl:605
         # Loop over all aerosol types:
         for iaer=1:nAero
             # Precomute Z matrices per type (constant per layer)
@@ -119,20 +92,6 @@ function constructCoreOpticalProperties(RS_type, iBand, m, model, lin_model) #wh
                                 lin_aerosol_optics[iB][iaer].lin_greek_coefs, 
                                 m, arr_type=arr_type)
             # Generate Core optical properties for Aerosols iaer
-            #aer = Vector{CoreScatteringOpticalProperties}
-            #aer =  [CoreScatteringOpticalProperties(zeros(length(τ_rayl[iB][:,1])), zeros(length(τ_rayl[iB][:,1])), 
-            #    zeros(size(Rayl𝐙⁺⁺)), zeros(size(Rayl𝐙⁻⁺))) for i=1:nZ]
-            #for i=1:nZ   
-                #aer[i]   = createAero(τ_aer[iB][iaer,:,i], 
-                #                aerosol_optics[iB][iaer], 
-                #                AerZ⁺⁺, AerZ⁻⁺)
-            #    push!(aer, createAero(τ_aer[iB][iaer,:,i], 
-            #                    aerosol_optics[iB][iaer], 
-            #                    AerZ⁺⁺, AerZ⁻⁺))                
-            #end
-            #aer =  [createAero(arr_type(τ_aer[iB][iaer,:,i]), 
-            #            aerosol_optics[iB][iaer], 
-            #            AerZ⁺⁺, AerZ⁻⁺ ) for i=1:nZ]
             aer = []
             lin_aer = []
             for iz=1:nZ
@@ -147,30 +106,21 @@ function constructCoreOpticalProperties(RS_type, iBand, m, model, lin_model) #wh
                 push!(aer, t_aer)
                 push!(lin_aer, t_lin_aer)
             end 
-            aer_combrella = [UmbrellaCoreScatteringOpticalProperties(aer[i],lin_aer[i]) for i=1:nZ]   
+            aer_combrella = [UmbrellaCoreScatteringOpticalProperties(aer[i],lin_aer[i]) for i=1:nZ]
             # Mix with previous Core Optical Properties
-            #combo = combo .+ aer
-            #combrella = combrella .+ aer_combrella
-            tmp = combrella[1]+aer_combrella[1]
-            tmp = [combrella[i]+aer_combrella[i] for i=1:nZ]
-            combrella = tmp
+            combrella = [combrella[i]+aer_combrella[i] for i=1:nZ]
         end
 
-        # Somewhere here we can add canopy later as well!
-        ###
 
-        # fScattRayleigh:
-        # Assume ϖ of 1 for Rayleight here:
-        #fScattRayleigh = [collect(rayl[i].τ  ./ combo[i].τ) for i=1:nZ]
         # Create Core Optical Properties merged with trace gas absorptions:
         gas = [CoreAbsorptionOpticalProperties(arr_type(τ_abs[iB][:,iz])) for iz=1:nZ]
         lin_gas = [CoreAbsorptionOpticalPropertiesLin(arr_type(collect(τ̇_abs[iB][:,:,iz]'))) for iz=1:nZ] 
-        #combo2 = combo .+ gas
         gas_combrella = [UmbrellaCoreAbsorptionOpticalProperties(gas[iz],lin_gas[iz]) for iz=1:nZ]   
         tmp = combrella .+ gas_combrella            
         combrella = tmp
-        #fScattRayleigh = [collect(rayl[iz].τ  ./ combo2[iz].τ) for iz=1:nZ] 
-        fScattRayleigh = [collect(rayl[iz].τ  ./ combrella[iz].fwd.τ) for iz=1:nZ] 
+        fScattRayleigh =
+            [_rayleigh_fraction_of_total_extinction(rayl[iz], combrella[iz].fwd)
+             for iz=1:nZ]
         #for i=1:nZ
         #end
         #combo_lin = [include_rayl!(combo[iz], combo_lin[iz], rayl[iz], rayl_lin[iz]) for iz=1:nZ]
@@ -189,10 +139,6 @@ function constructCoreOpticalProperties(RS_type, iBand, m, model, lin_model) #wh
         push!(band_layer_props, combo)
         push!(band_layer_props_lin, combo_lin)
         push!(band_fScattRayleigh,fScattRayleigh)
-        #aType = array_type(model.params.architecture)
-        #combo2 = [CoreScatteringOpticalProperties(aType(combo[i].τ),aType(combo[i].ϖ), aType(combo[i].Z⁺⁺), aType(combo[i].Z⁻⁺)) for i in eachindex(combo)]
-        # Need to check how to convert to GPU later as well!
-        #return combo,fScattRayleigh
     end
     layer_opt     = [prod([band_layer_props[i][iz] for i=1:length(iBand)]) for iz=1:nZ]
     layer_opt_lin = [prod([band_layer_props_lin[i][iz] for i=1:length(iBand)]) for iz=1:nZ]
@@ -200,45 +146,6 @@ function constructCoreOpticalProperties(RS_type, iBand, m, model, lin_model) #wh
     return layer_opt, layer_opt_lin, fscat_opt
 end
  
-function createAero(τAer, aerosol_optics, AerZ⁺⁺, AerZ⁻⁺,
-                    τ̇Aer, lin_aerosol_optics, AerŻ⁺⁺, AerŻ⁻⁺)
-    (; fᵗ, ω̃) = aerosol_optics
-    (; ḟᵗ, ω̃̇) = lin_aerosol_optics
-    #τ_mod = (1-fᵗ * ω̃ ) * τAer;
-    #ϖ_mod = (1-fᵗ) * ω̃/(1-fᵗω̃)
-    #τ̇_mod = (1-fᵗ * ω̃ ) * τ̇Aer - (ḟᵗϖ+fᵗϖ̇) * τAer;
-    #ϖ̇_mod = [ϖ̇(1-fᵗ) - ḟᵗϖ(1-ϖ)]/(1-fᵗω̃)²
-    τ_mod = (1 .- fᵗ * ω̃ ) .* τAer;
-    ϖ_mod = (1 .- fᵗ) .* ω̃ ./ (1 .- fᵗ * ω̃)
-    τ̇_mod = similar(7, length(τAer))
-    ϖ̇_mod = similar(7, length(ω̃))
-    Ż⁺⁺_mod = similar(7, size(AerZ⁺⁺,1), size(AerZ⁺⁺,2))
-    Ż⁻⁺_mod = similar(7, size(AerZ⁻⁺,1), size(AerZ⁻⁺,2))
-    #Derivatives with respect to τAer
-    τ̇_mod[1,:] = (1 .- fᵗ * ω̃ )
-    for iparam=1:4
-        tmp = fᵗ.*ω̃̇[iparam,:] .+ ḟᵗ[iparam,:].*ω̃
-
-        τ̇_mod[1+iparam,:] = (1 .- fᵗ .* ω̃ ) .* τ̇Aer[iparam,:];
-        τ̇_mod[1+iparam,:] .-= tmp .* τAer
-        ϖ̇_mod[1+iparam,:] = (ω̃̇[iparam,:].*(1 .- fᵗ) .- ḟᵗ[iparam,:].*ω̃.*(1 .- ω̃))
-        ϖ̇_mod[1+iparam,:] ./= (1 .- fᵗ * ω̃).^2
-        Ż⁺⁺_mod[1+iparam,:,:] .= AerŻ⁺⁺[iparam,:,:]
-        Ż⁻⁺_mod[1+iparam,:,:] .= AerŻ⁻⁺[iparam,:,:]
-    end
-    for iparam=5:6
-        #tmp = 0 #fᵗ.*ω̃̇[iparam,:] .+ ḟᵗ[iparam,:].*ω̃
-        τ̇_mod[1+iparam,:] = (1 .- fᵗ .* ω̃ ) .* τ̇Aer[iparam,:];
-        ϖ̇_mod[1+iparam,:] .= 0
-        Ż⁺⁺_mod[1+iparam,:,:] .= 0
-        Ż⁻⁺_mod[1+iparam,:,:] .= 0
-        #τ̇_mod[1+iparam,:] .-= tmp .* τAer
-        #ϖ̇_mod[1+iparam,:] = (ω̃̇[iparam,:].*(1 .- fᵗ) .- ḟᵗ[iparam,:].*ω̃.*(1 .- ω̃))
-        #ϖ̇_mod[1+iparam,:] ./= (1 .- fᵗ * ω̃).^2
-    end
-    return CoreScatteringOpticalProperties(τ_mod, ϖ_mod, AerZ⁺⁺, AerZ⁻⁺),
-        CoreScatteringOpticalPropertiesLin(τ̇_mod, ϖ̇_mod, Ż⁺⁺_mod, Ż⁻⁺_mod)
-end
 
 """
     createAero(τAer, aerosol_optics, AerZ⁺⁺, AerZ⁻⁺, τ̇Aer, lin_aerosol_optics, AerŻ⁺⁺, AerŻ⁻⁺, arr_type)
@@ -443,31 +350,57 @@ function extractEffectiveProps(
 end
 
 """
-    expandOpticalProperties(in, in_lin, arr_type)
+    expandOpticalProperties(in, in_lin, arr_type; expand_Z=false)
 
-Expand optical properties and their derivatives to full spectral resolution by
-replicating Z matrices along the spectral dimension if they are spectrally constant.
-
-Ensures that `Z[nμ, nμ, nSpec]` and `Ż[nμ, nμ, nSpec, Nparams]` have matching
-spectral dimensions with `τ` and `ϖ`.
+Convert optical properties and their linearized derivatives to the target
+device array type.  When `expand_Z=false` (default for RT-kernel callers)
+singleton-Z arrays (`size(Z,3)==1`) are **not** replicated to `nSpec` copies —
+the elemental and fused linearized kernels already branch on `size(Z,3)>1` and
+use index `n2=1` when the phase matrix is spectrally flat, so no replication
+is needed.  Set `expand_Z=true` only when the result will be concatenated
+along the spectral dimension (e.g. the `Base.:*` multi-layer combiner).
 """
-function expandOpticalProperties(in::CoreScatteringOpticalProperties, in_lin::CoreScatteringOpticalPropertiesLin,  arr_type)
+function expandOpticalProperties(in::CoreScatteringOpticalProperties,
+                                  in_lin::CoreScatteringOpticalPropertiesLin,
+                                  arr_type;
+                                  expand_Z::Bool = false)
     (; τ, ϖ, Z⁺⁺, Z⁻⁺) = in 
     (; τ̇, ϖ̇, Ż⁺⁺, Ż⁻⁺) = in_lin 
     @assert length(τ) == length(ϖ) "τ and ϖ sizes need to match"
     @assert length(τ̇) == length(ϖ̇) "τ̇ and ϖ̇ sizes need to match"
 
-    #nParams = size(τ̇)[1]
-    if size(Z⁺⁺,3) == 1
-        Z⁺⁺ = _repeat(Z⁺⁺,1,1,length(τ))
-        Z⁻⁺ = _repeat(Z⁻⁺,1,1,length(τ))
-        Ż⁺⁺ = _repeat(reshape(Ż⁺⁺, size(Ż⁺⁺,1), size(Ż⁺⁺,2), 1, size(Ż⁺⁺,3)), 1, 1, length(τ), 1)
-        Ż⁻⁺ = _repeat(reshape(Ż⁻⁺, size(Ż⁻⁺,1), size(Ż⁻⁺,2), 1, size(Ż⁻⁺,3)), 1, 1, length(τ), 1)
-        return CoreScatteringOpticalProperties(arr_type(τ), arr_type(ϖ), arr_type(Z⁺⁺), arr_type(Z⁻⁺)), 
-            CoreScatteringOpticalPropertiesLin(arr_type(τ̇), arr_type(ϖ̇), arr_type(Ż⁺⁺), arr_type(Ż⁻⁺))      
+    if size(Z⁺⁺, 3) == 1
+        if expand_Z
+            Z⁺⁺ = _repeat(Z⁺⁺, 1, 1, length(τ))
+            Z⁻⁺ = _repeat(Z⁻⁺, 1, 1, length(τ))
+            Ż⁺⁺ = _repeat(reshape(Ż⁺⁺, size(Ż⁺⁺,1), size(Ż⁺⁺,2), 1, size(Ż⁺⁺,3)), 1, 1, length(τ), 1)
+            Ż⁻⁺ = _repeat(reshape(Ż⁻⁺, size(Ż⁻⁺,1), size(Ż⁻⁺,2), 1, size(Ż⁻⁺,3)), 1, 1, length(τ), 1)
+            return CoreScatteringOpticalProperties(
+                        _to_device(arr_type, τ), _to_device(arr_type, ϖ),
+                        _to_device(arr_type, Z⁺⁺), _to_device(arr_type, Z⁻⁺)),
+                   CoreScatteringOpticalPropertiesLin(
+                        _to_device(arr_type, τ̇), _to_device(arr_type, ϖ̇),
+                        _to_device(arr_type, Ż⁺⁺), _to_device(arr_type, Ż⁻⁺))
+        else
+            # Fast path: fused linearized kernels branch on size(Z,3) and
+            # size(Ż,3), using n2=1 / n2_lin=1 for singleton spectral dim.
+            # Ensure 3-D / 4-D shapes so Z[i,j,1] and Ż[i,j,1,p] are valid.
+            Z3⁺⁺ = _to_device(arr_type, _ensure_3d(Z⁺⁺))
+            Z3⁻⁺ = _to_device(arr_type, _ensure_3d(Z⁻⁺))
+            Ż4⁺⁺ = _to_device(arr_type, ndims(Ż⁺⁺) == 3 ? reshape(Ż⁺⁺, size(Ż⁺⁺,1), size(Ż⁺⁺,2), 1, size(Ż⁺⁺,3)) : Ż⁺⁺)
+            Ż4⁻⁺ = _to_device(arr_type, ndims(Ż⁻⁺) == 3 ? reshape(Ż⁻⁺, size(Ż⁻⁺,1), size(Ż⁻⁺,2), 1, size(Ż⁻⁺,3)) : Ż⁻⁺)
+            return CoreScatteringOpticalProperties(
+                        _to_device(arr_type, τ), _to_device(arr_type, ϖ), Z3⁺⁺, Z3⁻⁺),
+                   CoreScatteringOpticalPropertiesLin(
+                        _to_device(arr_type, τ̇), _to_device(arr_type, ϖ̇), Ż4⁺⁺, Ż4⁻⁺)
+        end
     else
-        @assert size(Z⁺⁺,3) ==  length(τ) "Z and τ dimensions need to match "
-        return CoreScatteringOpticalProperties(arr_type(τ), arr_type(ϖ), arr_type(Z⁺⁺), arr_type(Z⁻⁺)),
-            CoreScatteringOpticalPropertiesLin(arr_type(τ̇), arr_type(ϖ̇), arr_type(Ż⁺⁺), arr_type(Ż⁻⁺))       
+        @assert size(Z⁺⁺, 3) == length(τ) "Z and τ dimensions need to match"
+        return CoreScatteringOpticalProperties(
+                    _to_device(arr_type, τ), _to_device(arr_type, ϖ),
+                    _to_device(arr_type, Z⁺⁺), _to_device(arr_type, Z⁻⁺)),
+               CoreScatteringOpticalPropertiesLin(
+                    _to_device(arr_type, τ̇), _to_device(arr_type, ϖ̇),
+                    _to_device(arr_type, Ż⁺⁺), _to_device(arr_type, Ż⁻⁺))
     end
 end

@@ -193,12 +193,12 @@ function rt_run_streams(model; i_band::Integer = 1,
 end
 
 """
-    rt_run_test(RS_type, model, iBand)
+    rt_run_test(RS_type, model, iBand; kwargs...)
 
 Test entry point for RT calculations with explicit Raman type.
 """
-function rt_run_test(RS_type::AbstractRamanType, model, iBand)
-    rt_run(RS_type, model, iBand)
+function rt_run_test(RS_type::AbstractRamanType, model, iBand; kwargs...)
+    rt_run(RS_type, model, iBand; kwargs...)
 end
 
 """
@@ -209,7 +209,16 @@ elastic modes dispatch to `nothing`.
 """
 _interaction_workspace(::Union{noRS, noRS_plus}, composite_layer, added_layer, arch) = nothing
 _interaction_workspace(::AbstractRamanType, composite_layer, added_layer, arch) =
-    InteractionWorkspace(composite_layer, added_layer; staged = arch isa Architectures.GPU)
+    InteractionWorkspace(composite_layer, added_layer; staged = _use_staged_interaction(arch, composite_layer))
+
+# Whether interaction!(ScatteringInterface_11) pages its inelastic outputs through
+# CPU (`staged=true`: memory-frugal but PCIe-bound) or runs GPU-only
+# (`staged=false`: ~6× faster, but needs ~2 extra big 4-D temps in VRAM).
+# Default: non-staged. The fused per-Δn kernels cut transient GPU memory ~7×, so
+# non-staged now fits in the common case and is much faster (measured 87→39 s end-
+# to-end @ nSpec=10000). The CUDA extension overrides the GPU method to fall back to
+# staged ONLY when the non-staged footprint would not fit the device's free memory.
+_use_staged_interaction(arch, composite_layer) = false
 
 """
     _expand_layer_rayleigh!(rs, fScattRayleigh, iz)
@@ -220,6 +229,13 @@ elastic modes are a no-op.
 _expand_layer_rayleigh!(::Union{noRS, noRS_plus}, fScattRayleigh, iz) = nothing
 function _expand_layer_rayleigh!(RS_type::AbstractRamanType, fScattRayleigh, iz)
     RS_type.fscattRayl = expandBandScalars(RS_type, fScattRayleigh[iz])
+    return nothing
+end
+
+function _warn_explicit_depol_raman(RS_type::AbstractRamanType, model)
+    if InelasticScattering.has_inelastic(RS_type) && model.solver.depol >= 0
+        @warn "Raman-active RT is using an explicit nonnegative depol; current model construction applies this same depol to Rayleigh, Cabannes, and tau_rayl. Use depol: -1 for molecular Rayleigh/Cabannes auto mode." depol=model.solver.depol maxlog=1
+    end
     return nothing
 end
 
@@ -238,6 +254,8 @@ SFI kernel call. Phase 5 will remove the `RS_type.F₀` indirection.
 function rt_run(RS_type::AbstractRamanType, model, iBand;
                 sources::Union{Nothing, AbstractSource} = nothing,
                 streams_callback::Union{Nothing, Function} = nothing)
+    _warn_explicit_depol_raman(RS_type, model)
+
     # Apply the per-model BLAS thread cap once per `rt_run` invocation
     # (no-op when `model.numerics.blas_threads === nothing`). Lives here
     # so swapping models with different caps "just works" — the caller
@@ -316,7 +334,8 @@ function rt_run(RS_type::AbstractRamanType, model, iBand;
     # kwarg > `model.sources` > legacy `RS_type.F₀` (only when the latter is
     # already user-shaped, to preserve the historical
     # `rs.F₀ = ...; rt_run(rs, model, ...)` test pattern).
-    # Phase 6 will remove the legacy `RS_type.F₀` / `RS_type.SIF₀` channels.
+    # Legacy `RS_type.SIF₀` is no longer consumed by rt_run; use SurfaceSIF.
+    # `RS_type.F₀` remains a compatibility fallback when no SolarBeam is supplied.
     effective_sources = sources === nothing ? model.sources : sources
     prepared_sources = prepare_sources(effective_sources, FT, pol_type.n, nSpec, arr_type)
 
@@ -366,6 +385,7 @@ function rt_run(RS_type::AbstractRamanType, model, iBand;
         # converting back through Array. (Cheap: F₀ is (pol_n, nSpec).)
         RS_type.F₀ = Array{FT, 2}(F₀_dev)
     end
+    surface_F₀ = arr_type(FT.(RS_type.F₀))
 
     # Phase 4: allocate the InteractionWorkspace once before the layer loop for
     # RRS/VS runs to avoid the per-call GPU allocation (sanghavi reported ~7 GB
@@ -376,8 +396,32 @@ function rt_run(RS_type::AbstractRamanType, model, iBand;
     # would be pure overhead).
     _interaction_ws = _interaction_workspace(RS_type, composite_layer, added_layer, arch)
 
-    # Cumulative optical depth (m-independent, saved for TMS correction)
+    # --- Pre-loop hoists (m-independent work) ---
+    # Build the m-invariant cache: device uploads of τ_rayl/τ_abs per layer,
+    # pre-applied δ-M aerosol corrections, fScattRayleigh (requires one m=0 Z
+    # pass whose Z matrices are then discarded), and the host copy of qp_μ.
+    # Cost: equivalent to one constructCoreOpticalProperties call; paid once
+    # instead of once per Fourier moment.
+    @timeit "CacheInit" _m_inv_cache = build_m_invariant_cache(RS_type, iBand, model)
+
+    # Cumulative optical depth (m-independent, saved for TMS correction).
+    # Computed once from m=0 optical props (Z doesn't enter τ_sum_all).
     τ_sum_all = nothing
+
+    # Device-resident τ_sum_all[:,end] slice used by create_surface_layer!.
+    # Hoisted out of the m loop — τ_sum_all is m-independent, so the upload
+    # only needs to happen once (after τ_sum_all is first computed below).
+    τ_sum_end_dev = nothing
+
+    # Scattering interface sequence (m-independent: detection uses τ·ϖ only).
+    # Computed once on m=0 and reused for all subsequent moments.
+    scattering_interfaces_all = nothing
+
+    # Pre-allocate hdr_J₀⁻ once; interaction_hdrf! writes into it each moment.
+    # The original `similar(composite_layer.J₀⁻)` inside the loop allocated a
+    # fresh array each moment (and the pre-allocated hdr_J₀⁻ at line 303 was
+    # never used because it has shape (nVZA, pol_n, nSpec), not (NquadN,1,nSpec)).
+    hdr_J₀⁻ = similar(composite_layer.J₀⁻)
 
     # Loop over fourier moments
     for m = 0:m_max
@@ -386,12 +430,19 @@ function rt_run(RS_type::AbstractRamanType, model, iBand;
         weight = m == 0 ? FT(0.5/π) : FT(1.0/π)
         # Set the Zλᵢλₒ interaction parameters for Raman (or nothing for noRS)
         @timeit "IE"  InelasticScattering.computeRamanZλ!(RS_type, pol_type,collect(qp_μ), m, arr_type)
-        # Compute the core layer optical properties:
+        # Compute the core layer optical properties (cache-aware: only Z moments
+        # are recomputed; τ/ϖ uploads and fScattRayleigh come from _m_inv_cache).
         @timeit "OpticalProps" layer_opt_props, fScattRayleigh   =
-            constructCoreOpticalProperties(RS_type,iBand,m,model);
-        # Determine the scattering interface definitions:
-        @timeit "Extract Optical Properties" scattering_interfaces_all, τ_sum_all =
-            extractEffectiveProps(layer_opt_props,quad_points);
+            constructCoreOpticalProperties(RS_type, iBand, m, model, _m_inv_cache);
+        # τ_sum_all and scattering_interfaces_all are m-independent (extractEffectiveProps
+        # only uses τ·ϖ from layer_opt_props, not Z). Compute on m=0, reuse thereafter.
+        if τ_sum_all === nothing
+            @timeit "Extract Optical Properties" scattering_interfaces_all, τ_sum_all =
+                extractEffectiveProps(layer_opt_props, quad_points)
+            # Upload the BOA τ_sum slice to device once.
+            τ_sum_end_dev = arr_type(τ_sum_all[:,end])
+        end
+        # On m>0 we reuse the cached scattering_interfaces_all and τ_sum_all.
 
         # Loop over vertical layers:
         @showprogress 1 "Looping over layers ..." for iz = 1:Nz  # Count from TOA to BOA
@@ -426,35 +477,27 @@ function rt_run(RS_type::AbstractRamanType, model, iBand;
                                 SFI, m,
                                 pol_type,
                                 quad_points,
-                                arr_type(τ_sum_all[:,end]),
+                                τ_sum_end_dev,
                                 arch;
                                 spec_bands_wn=_canopy_spec_wn,
-                                m_max=m_max)
+                                m_max=m_max,
+                                F₀=surface_F₀)
         else
             @timeit "Create Surface" create_surface_layer!(brdf,
                                 added_layer_surface,
                                 SFI, m,
                                 pol_type,
                                 quad_points,
-                                arr_type(τ_sum_all[:,end]),
-                                arch)
+                                τ_sum_end_dev,
+                                arch;
+                                F₀=surface_F₀)
         end
 
-        # Inject surface source contributions into surface j₀⁻. Two paths
-        # coexist during the v0.6 → v0.7 transition:
-        #   1. Legacy: from `RS_type.SIF₀` via `inject_surface_SIF!`. Kept
-        #      until Phase 6 retires the `RS_type.SIF₀` / `RS_type.F₀`
-        #      channel.
-        #   2. New: from any `PreparedSurfaceSIF` in `prepared_sources` via
-        #      the `surface_source_contribute!` double-dispatch. Bit-equal
-        #      to (1) when both reach the Lambertian factor-2 injection.
-        # When the user supplies a SurfaceSIF source AND sets RS_type.SIF₀,
-        # both paths fire and SIF is double-counted; tests must use one API
-        # at a time during the transition.
-        inject_surface_SIF!(brdf, added_layer_surface, m, pol_type, _sif_source(RS_type), arch)
+        # Surface-emission sources are injected only through the source system.
+        # The legacy `RS_type.SIF₀` path is intentionally ignored here to avoid
+        # double-counting when a `SurfaceSIF` source is also present.
         surface_source_contribute!(prepared_sources, brdf, added_layer_surface, m, pol_type, arch)
 
-        #@show composite_layer.J₀⁺[iμ₀,1,1:3]
         # One last interaction with surface:
         @timeit "interaction" interaction!(RS_type,
                                     scattering_interfaces_all[end],
@@ -463,9 +506,7 @@ function rt_run(RS_type::AbstractRamanType, model, iBand;
                                     added_layer_surface,
                                     I_static;
                                     workspace=_interaction_ws)
-       #@show composite_layer.J₀⁺[iμ₀,1,1:3]
-        hdr_J₀⁻ = similar(composite_layer.J₀⁻)
-        # One last interaction with surface:
+        # hdr_J₀⁻ is pre-allocated before the m loop (avoids one similar() per moment).
         @timeit "interaction_HDRF" interaction_hdrf!(#RS_type,
                                     #bandSpecLim,
                                     #scattering_interfaces_all[end], 
@@ -516,7 +557,13 @@ function rt_run(RS_type::AbstractRamanType, model, iBand;
         end
     end
 
-    # Single-scattering correction for Cox-Munk specular hotspot (TMS)
+    # Single-scattering correction for Cox-Munk specular hotspot (TMS).
+    # LIMITATION: this TMS correction assumes a unit incident beam per spectral
+    # point. With a non-unit surface F₀ (SolarBeam / RS_type.F₀) the Fourier
+    # surface layer is F₀-scaled but this correction is not, so Cox-Munk SFI with
+    # a real solar spectrum is inconsistent. The default (unit F₀) path is
+    # unaffected. TODO (with Sanghavi): pass surface_F₀ here and scale the glint
+    # correction per spectral point to complete the F₀ surface-source feature.
     if brdf isa CoxMunkSurface && SFI
         @timeit "SS Correction" apply_ss_correction!(
             R_SFI, brdf, pol_type, vza, vaz, μ₀,
@@ -529,13 +576,7 @@ function rt_run(RS_type::AbstractRamanType, model, iBand;
     reset_timer!()
 
     # Return R_SFI or R, depending on the flag
-    #if RAMI
-    #@show size(hdr), size(bhr_dw)
-    #hdr = hdr[:,1,:] ./ bhr_dw[1,:]
     return SFI ? (R_SFI, T_SFI, ieR_SFI, ieT_SFI, hdr, bhr_uw[1,:], bhr_dw[1,:]) : (R, T)
-    #else
-    #return SFI ? (R_SFI, T_SFI, ieR_SFI, ieT_SFI) : (R, T)
-    #end
 end
 
 
@@ -576,12 +617,12 @@ function rt_run_ss(model; i_band::Integer = 1, sources::Union{Nothing, AbstractS
 end
 
 """
-    rt_run_test_ss(RS_type, model, iBand)
+    rt_run_test_ss(RS_type, model, iBand; kwargs...)
 
 Test entry point for single-scatter RT with explicit Raman type.
 """
-function rt_run_test_ss(RS_type::AbstractRamanType, model, iBand)
-    rt_run_ss(RS_type, model, iBand)
+function rt_run_test_ss(RS_type::AbstractRamanType, model, iBand; kwargs...)
+    rt_run_ss(RS_type, model, iBand; kwargs...)
 end
 
 """
@@ -592,6 +633,8 @@ Single-scatter approximation driver with explicit Raman type. See
 """
 function rt_run_ss(RS_type::AbstractRamanType, model, iBand;
                    sources::Union{Nothing, AbstractSource} = nothing)
+    _warn_explicit_depol_raman(RS_type, model)
+
     # Per-model BLAS thread cap (see `rt_run` body for rationale).
     if model.numerics.blas_threads !== nothing
         LinearAlgebra.BLAS.set_num_threads(model.numerics.blas_threads)
@@ -665,6 +708,7 @@ function rt_run_ss(RS_type::AbstractRamanType, model, iBand;
         F₀_dev = extract_solar_F₀(prepared_sources, FT, pol_type.n, nSpec, arr_type)
         RS_type.F₀ = Array{FT, 2}(F₀_dev)
     end
+    surface_F₀ = arr_type(FT.(RS_type.F₀))
 
     τ_sum_all = nothing
 
@@ -703,12 +747,12 @@ function rt_run_ss(RS_type::AbstractRamanType, model, iBand;
                             pol_type,
                             quad_points,
                             arr_type(τ_sum_all[:, end]),
-                            arch)
+                            arch;
+                            F₀=surface_F₀)
 
-        # Surface source contributions — legacy (RS_type.SIF₀) + new
-        # (prepared_sources) paths coexist during the v0.6 → v0.7 transition.
-        # See `rt_run` body for the full rationale.
-        inject_surface_SIF!(brdf, added_layer_surface, m, pol_type, _sif_source(RS_type), arch)
+        # Surface-emission sources are injected only through the source system.
+        # The legacy `RS_type.SIF₀` path is intentionally ignored here to avoid
+        # double-counting when a `SurfaceSIF` source is also present.
         surface_source_contribute!(prepared_sources, brdf, added_layer_surface, m, pol_type, arch)
 
         # SS mode uses interaction_ss! (no multiple-scattering doubling with surface).

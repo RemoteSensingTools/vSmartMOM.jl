@@ -36,13 +36,17 @@ function postprocessing_vza!(RS_type::noRS,
 
     @inbounds for i in eachindex(vza)
         istart, iend, w = vza_info[i]
-        for s = 1:nSpec
-            R_SFI[i,:,s] .+= w * J₀⁻[istart:iend, 1, s]
-            T_SFI[i,:,s] .+= w * J₀⁺[istart:iend, 1, s]
-            for iparam = 1:Nparams
-                Ṙ_SFI[i,:,s,iparam] .+= w * J̇₀⁻[istart:iend, 1, s, iparam]
-                Ṫ_SFI[i,:,s,iparam] .+= w * J̇₀⁺[istart:iend, 1, s, iparam]
-            end
+        # Vectorise over the spectral dimension with one matrix product per VZA
+        # (and, for the Jacobian, per parameter) instead of a scalar `for s` loop
+        # that slice-allocated per spectral point × per parameter. `w` is the
+        # azimuthal Stokes weight (Diagonal for n>1, scalar for n=1), so this is the
+        # SAME `w * column` Stokes mix on every spectral column — identical result.
+        # NOTE: matrix multiply `*`, not elementwise `.*`.
+        @views R_SFI[i, :, :] .+= w * J₀⁻[istart:iend, 1, :]
+        @views T_SFI[i, :, :] .+= w * J₀⁺[istart:iend, 1, :]
+        for iparam = 1:Nparams
+            @views Ṙ_SFI[i, :, :, iparam] .+= w * J̇₀⁻[istart:iend, 1, :, iparam]
+            @views Ṫ_SFI[i, :, :, iparam] .+= w * J̇₀⁺[istart:iend, 1, :, iparam]
         end
     end
 end

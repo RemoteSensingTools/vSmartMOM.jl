@@ -59,13 +59,14 @@ function compute_absorption_cross_section(
     # Store results here to return
     result = array_type(architecture)(zeros(FT, length(grid)))
 
-    # Calculate the minimum and maximum grid bounds, including the wing cutoff
-    grid_max = maximum(grid) + wing_cutoff
-    grid_min = minimum(grid) - wing_cutoff
-
     # Convert to wavenumber from [nm] space if necessary
     grid = wavelength_flag ? reverse(nm_per_m ./ grid) : grid
-    grid_min, grid_max = wavelength_flag ? (nm_per_m /grid_max, nm_per_m/grid_min) : (grid_min, grid_max)
+
+    # Calculate the minimum and maximum grid bounds in wavenumber space,
+    # including the wing cutoff (wing_cutoff is a wavenumber quantity [cm⁻¹],
+    # so the conversion must happen BEFORE applying it)
+    grid_max = maximum(grid) + wing_cutoff
+    grid_min = minimum(grid) - wing_cutoff
 
     # Interpolators from grid bounds to index values
     N_grid = length(grid)
@@ -137,8 +138,16 @@ function compute_absorption_cross_section(
 
         # Calculate index range that this line impacts
         if N_grid > 1
-            istart = Int32(round(grid_idx_interp_low(ν - wing_cutoff)))
-            istop  = Int32(round(grid_idx_interp_high(ν + wing_cutoff)))
+            if ν + wing_cutoff < first(grid) || ν - wing_cutoff > last(grid)
+                # Wing window lies entirely outside the grid (e.g. a
+                # pressure-shifted line near the admission boundary):
+                # empty index range so the line contributes nothing
+                istart = Int32(1)
+                istop  = Int32(0)
+            else
+                istart = Int32(round(grid_idx_interp_low(ν - wing_cutoff)))
+                istop  = Int32(round(grid_idx_interp_high(ν + wing_cutoff)))
+            end
         else
             istart = Int32(1)
             istop  = Int32(1)
@@ -316,89 +325,6 @@ accumulates the Voigt profile into `A[I]`.
         end
     end
     @inbounds A[I] += acc
-end
-
-#=
-
-Legacy per-line kernels (kept for reference and potential single-line use cases).
-
-=#
-
-"""
-    line_shape!(A, grid, ν, γ_d, γ_l, y, S, ::Doppler, CEF)
-
-KernelAbstractions single-line Doppler kernel. Each workitem owns one spectral
-grid index and adds this line's Gaussian contribution to `A[I]`.
-"""
-@kernel function line_shape!(A, @Const(grid), ν, γ_d, γ_l, y, S, ::Doppler, CEF)
-    FT = eltype(ν)
-    I = @index(Global, Linear)
-    @inbounds A[I] += FT(S) * FT(cSqrtLn2divSqrtPi) * exp(-FT(cLn2) * ((FT(grid[I]) - FT(ν)) / FT(γ_d))^2) / FT(γ_d)
-end
-
-"""
-    line_shape!(A, grid, ν, γ_d, γ_l, y, S, ::Lorentz, CEF)
-
-KernelAbstractions single-line Lorentz kernel. Each workitem owns one spectral
-grid index and adds this line's collision-broadened contribution to `A[I]`.
-"""
-@kernel function line_shape!(A, @Const(grid), ν, γ_d, γ_l, y, S, ::Lorentz, CEF)
-    FT = eltype(ν)
-    I = @index(Global, Linear)
-    @inbounds A[I] += FT(S) * FT(γ_l) / (FT(pi) * (FT(γ_l)^2 + (FT(grid[I]) - FT(ν))^2))
-end
-
-"""
-    line_shape!(A, grid, ν, γ_d, γ_l, y, S, ::Voigt, CEF)
-
-KernelAbstractions single-line Voigt kernel. Each workitem owns one spectral
-grid index, evaluates the selected complex error function `CEF`, and adds the
-line's Voigt contribution to `A[I]`.
-"""
-@kernel function line_shape!(A, @Const(grid), ν, γ_d, γ_l, y, S, ::Voigt, CEF)
-    FT = eltype(ν)
-    I = @index(Global, Linear)
-    @inbounds A[I] += FT(S) * FT(cSqrtLn2divSqrtPi) / FT(γ_d) * real(w(CEF, FT(cSqrtLn2) / FT(γ_d) * (FT(grid[I]) - FT(ν)) + im * FT(y)))
-end
-
-"""
-    line_shape32!(A, grid, ν, γ_d, γ_l, y, S, ::Doppler, CEF)
-
-Float32-oriented single-line Doppler kernel retained for callers that pass
-Float64 host scalars into a Float32 accumulation array. The scalar line
-parameters are converted to `eltype(A)` inside the kernel and each workitem
-adds this line's Gaussian contribution to one spectral grid point.
-"""
-@kernel function line_shape32!(A, @Const(grid), ν, γ_d, γ_l, y, S, ::Doppler, CEF)
-    FT = eltype(A)
-    I = @index(Global, Linear)
-    @inbounds A[I] += FT(S) * FT(cSqrtLn2divSqrtPi) * exp(-FT(cLn2) * ((FT(grid[I]) - FT(ν)) / FT(γ_d))^2) / FT(γ_d)
-end
-
-"""
-    line_shape32!(A, grid, ν, γ_d, γ_l, y, S, ::Lorentz, CEF)
-
-Float32-oriented single-line Lorentz kernel. Each workitem converts scalar
-line parameters to `eltype(A)` and adds the collision-broadened line profile
-for one spectral grid point.
-"""
-@kernel function line_shape32!(A, @Const(grid), ν, γ_d, γ_l, y, S, ::Lorentz, CEF)
-    FT = eltype(A)
-    I = @index(Global, Linear)
-    @inbounds A[I] += FT(S) * FT(γ_l) / (FT(pi) * (FT(γ_l)^2 + (FT(grid[I]) - FT(ν))^2))
-end
-
-"""
-    line_shape32!(A, grid, ν, γ_d, γ_l, y, S, ::Voigt, CEF)
-
-Float32-oriented single-line Voigt kernel. Each workitem evaluates the Voigt
-complex-error-function profile in `eltype(A)` and adds the contribution for
-one spectral grid point.
-"""
-@kernel function line_shape32!(A, @Const(grid), ν, γ_d, γ_l, y, S, ::Voigt, CEF)
-    FT = eltype(A)
-    I = @index(Global, Linear)
-    @inbounds A[I] += FT(S) * FT(cSqrtLn2divSqrtPi) / FT(γ_d) * real(w(CEF, FT(cSqrtLn2) / FT(γ_d) * (FT(grid[I]) - FT(ν)) + im * FT(y)))
 end
 
 #=

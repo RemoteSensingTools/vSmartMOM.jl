@@ -194,3 +194,393 @@ writes `X[:, :, k] = inv(A[:, :, k])` without heap allocation.
         X[row, tid, k] = work[row, tid]
     end
 end
+
+#=
+================================================================================
+Fused geometric-progression solve for the matrix-operator-method (MOM)
+adding-doubling core.
+
+PHYSICS — why this term exists
+------------------------------
+The MOM combines two atmospheric layers by accounting for the *infinite* series
+of internal reflections bouncing between them. Grant & Hunt's central result,
+restated in Sanghavi et al. (2014, JQSRT 133:412–433, Eq. 1), is that this
+series collapses into a single matrix inverse:
+
+        E + X + X² + X³ + ⋯ = (E − X)⁻¹,
+
+where `E` is the identity and `X` is the supermatrix for one pair of consecutive
+reflections. Summing the series exactly (rather than truncating) is what lets
+MOM handle thick, weakly-absorbing layers where the reflection series converges
+slowly — its key advantage over many other RT methods.
+
+When a homogeneous layer is *doubled* (combined with an identical copy), the
+relevant pair of reflections is `X = R·R` (down-reflect, up-reflect), so the
+factor is `(E − R·R)⁻¹`.
+
+WHICH MOM EQUATIONS — the reused factor `T·(E − R·R)⁻¹`
+------------------------------------------------------
+The adding/doubling equations (Sanghavi et al. 2014, Eqs. 23–28) for the
+transmission, reflection, and internal-source operators all share the *same*
+pre-multiplied factor `T·(E − R·R)⁻¹`:
+
+    Tᵈ = T·(E − R·R)⁻¹·T                         (transmission update, Eq. 23)
+    Rᵈ = R + T·(E − R·R)⁻¹·R·T                   (reflection update,   Eq. 24)
+    Jᵈ = J + T·(E − R·R)⁻¹·(J + R·J)             (source update,       Eq. 27/28)
+
+so the adding-doubling kernel forms this factor **once per doubling step**
+(the code's `tt_gp = t⁺⁺·(E − r⁻⁺·r⁻⁺)⁻¹`) and reuses it for the R, T, and J
+updates. The matrices are small — `N = Nstream × Nstokes` (e.g. 18) — and the
+same operation is applied across all `nSpec` spectral points (a large batch).
+
+WHY THE FUSED KERNEL IS FASTER
+------------------------------
+Note `tt_gp` only needs `T·(inverse)`, never the bare inverse, so it is a linear
+*solve*, not an inversion. The textbook batched path is three vendor calls —
+`getrf` (LU) + `getri` (explicit inverse) + `gemm` (× T). For these tiny
+matrices that path is dominated by per-call launch/sync overhead and global-
+memory round-trips, materialises an explicit inverse we never need (≈ an extra
+O(N³) stage), and forming the inverse is less numerically stable than a solve.
+
+The fused kernel does the whole thing in **one launch**: one workgroup per
+spectral matrix builds `M = E − R·R`, LU-factorises it with partial pivoting in
+local (shared) memory, then **right-solves** `tt_gp·M = T` directly
+(`tt_gp = T·U⁻¹·L⁻¹·P`). No explicit inverse, no separate GEMM, no inter-stage
+global traffic. On the small RT matrices this is ~3–6× faster than the vendor
+path at production batch sizes (`test/benchmarks/batched_fused_v2_benchmark.jl`).
+The cost is a `3N²` local-memory tile; for large `N` that exceeds the device
+budget and the caller falls back to the vendor inverse-then-multiply path.
+================================================================================
+=#
+
+"""
+    ka_fused_gp_solve_localmem_bytes(FT, N)
+
+Local-memory bytes per workgroup required by [`ka_fused_gp_solve!`]: three
+`N×N` tiles (`A`, the factorised `M = I − A·A`, and the in-place RHS/solution
+`Bt`) plus a length-`N` `Int32` pivot vector.
+"""
+ka_fused_gp_solve_localmem_bytes(::Type{FT}, N::Integer) where {FT} =
+    3 * N * N * sizeof(FT) + N * sizeof(Int32)
+
+"""
+    ka_fused_gp_solve!(X, A, B, backend; max_localmem_bytes=nothing)
+
+Compute the adding-doubling geometric-progression factor
+
+    X[:, :, k] = B[:, :, k] * (I − A[:, :, k] * A[:, :, k])⁻¹    (= t⁺⁺·(E − r⁻⁺·r⁻⁺)⁻¹)
+
+in a *single* fused KernelAbstractions launch. One workgroup handles one
+spectral matrix and `N = size(A, 1)` workitems cooperate in local memory: build
+`M = I − A·A`, LU-factorise it with partial pivoting, then **right-solve**
+`X·M = B` directly (`X = B·U⁻¹·L⁻¹·P`). The explicit inverse is never formed and
+there is no separate batched GEMM — for the small Nstream×Nstokes matrices of the
+RT core this is several× faster than the vendor `getrf + getri + gemm` path
+(see `test/benchmarks/batched_fused_v2_benchmark.jl`).
+
+Pass `max_localmem_bytes` to assert the `3N²`-tile footprint fits the backend's
+local-memory budget; callers should fall back to the inverse-then-multiply path
+when it does not (large `N`).
+"""
+function ka_fused_gp_solve!(X::AbstractArray{FT,3},
+                            A::AbstractArray{FT,3},
+                            B::AbstractArray{FT,3},
+                            backend;
+                            max_localmem_bytes=nothing) where {FT}
+    @assert size(A, 1) == size(A, 2) "fused GP solve requires square A"
+    @assert size(X) == size(A) == size(B) "X, A, B must share dimensions"
+    N = size(A, 1)
+    if max_localmem_bytes !== nothing
+        required = ka_fused_gp_solve_localmem_bytes(FT, N)
+        required <= max_localmem_bytes || throw(ArgumentError(
+            "fused GP solve for N=$(N), eltype=$(FT) needs $(required) bytes of " *
+            "local memory per workgroup, exceeding the backend limit of " *
+            "$(max_localmem_bytes) bytes; fall back to the inverse path."))
+    end
+    batch = size(A, 3)
+    kernel! = _fused_gp_solve_kernel!(backend, N)
+    kernel!(X, A, B, Val(N); ndrange=(N * batch,))
+    KernelAbstractions.synchronize(backend)
+    return X
+end
+
+"""
+    _fused_gp_solve_kernel!(X, A, B, Val(N))
+
+Device kernel for [`ka_fused_gp_solve!`]. One workgroup per spectral matrix,
+one workitem per row. Local tiles `At`/`M`/`Bt` hold the inputs, the LU factors,
+and the in-place solution; `piv` holds the pivot permutation. After the
+cooperative LU, each workitem solves its own row independently (`X = B·U⁻¹·L⁻¹`),
+then scatters through the column pivot.
+"""
+@kernel function _fused_gp_solve_kernel!(X, @Const(A), @Const(B), ::Val{N}) where {N}
+    k   = @index(Group, Linear)
+    tid = @index(Local, Linear)
+
+    At  = @localmem eltype(X) (N, N)
+    M   = @localmem eltype(X) (N, N)
+    piv = @localmem Int32 (N,)
+    Bt  = @localmem eltype(X) (N, N)
+
+    # Load A and the RHS B into local memory.
+    @inbounds for j in 1:N
+        At[tid, j] = A[tid, j, k]
+        Bt[tid, j] = B[tid, j, k]
+    end
+    @synchronize()
+
+    # M = I − A·A (row `tid`).
+    @inbounds for j in 1:N
+        s = zero(eltype(X))
+        for l in 1:N
+            s += At[tid, l] * At[l, j]
+        end
+        M[tid, j] = ((tid == j) ? one(eltype(X)) : zero(eltype(X))) - s
+    end
+    @inbounds piv[tid] = Int32(tid)
+    @synchronize()
+
+    # LU factorisation of M with partial pivoting (workitems cooperate).
+    @inbounds for p in 1:N
+        if tid == 1
+            max_val = abs(M[p, p])
+            max_row = p
+            for r in (p + 1):N
+                v = abs(M[r, p])
+                if v > max_val
+                    max_val = v
+                    max_row = r
+                end
+            end
+            if max_row != p
+                for col in 1:N
+                    tmp = M[p, col]
+                    M[p, col] = M[max_row, col]
+                    M[max_row, col] = tmp
+                end
+                tmp_p = piv[p]
+                piv[p] = piv[max_row]
+                piv[max_row] = tmp_p
+            end
+        end
+        @synchronize()
+        if tid > p
+            M[tid, p] /= M[p, p]
+        end
+        @synchronize()
+        if tid > p
+            factor = M[tid, p]
+            for col in (p + 1):N
+                M[tid, col] -= factor * M[p, col]
+            end
+        end
+        @synchronize()
+    end
+
+    # Right-side direct solve X = B·U⁻¹·L⁻¹·P, in place on row `tid` of Bt.
+    # (a) forward solve Z·U = B
+    @inbounds for j in 1:N
+        s = zero(eltype(X))
+        for l in 1:(j - 1)
+            s += Bt[tid, l] * M[l, j]
+        end
+        Bt[tid, j] = (Bt[tid, j] - s) / M[j, j]
+    end
+    # (b) backward solve W·L = Z (unit lower diagonal)
+    @inbounds for j in (N - 1):-1:1
+        s = zero(eltype(X))
+        for l in (j + 1):N
+            s += Bt[tid, l] * M[l, j]
+        end
+        Bt[tid, j] -= s
+    end
+    # (c) apply the column permutation
+    @inbounds for j in 1:N
+        X[tid, piv[j], k] = Bt[tid, j]
+    end
+end
+
+"""
+    _gp_fused_localmem_limit(backend)
+
+Per-workgroup local-memory budget (bytes) usable by [`ka_fused_gp_solve!`] on
+`backend`. Conservative portable default (Metal-class threadgroup memory); the
+CUDA extension raises it to the 48 KiB static shared-memory limit.
+"""
+_gp_fused_localmem_limit(::KernelAbstractions.Backend) = 32 * 1024
+
+"""
+    _FUSED_GP_ENABLED
+
+Runtime kill-switch for the fused geometric-progression solve. Default `true`.
+Set `_FUSED_GP_ENABLED[] = false` to force the portable inverse-then-multiply
+fallback (used for A/B validation and as a safety override).
+"""
+const _FUSED_GP_ENABLED = Ref(true)
+
+"""
+    _use_fused_gp(X) -> Bool
+
+Whether the fused geometric-progression solve ([`ka_fused_gp_solve!`]) should be
+used for output array `X`. True on GPU backends when [`_FUSED_GP_ENABLED`] is set
+and the `3N²` local-memory tile fits [`_gp_fused_localmem_limit`]; false on the
+CPU (the threaded BLAS inverse path is already efficient there) and when the tile
+is too large for the device (the caller falls back to inverse-then-multiply).
+"""
+@inline function _use_fused_gp(X::AbstractArray{FT,3}) where {FT}
+    _FUSED_GP_ENABLED[] || return false
+    backend = KernelAbstractions.get_backend(X)
+    backend isa KernelAbstractions.CPU && return false
+    return ka_fused_gp_solve_localmem_bytes(FT, size(X, 1)) <= _gp_fused_localmem_limit(backend)
+end
+
+# ------------------------------------------------------------------------------
+# Two-matrix variant for the MOM adding (interaction) step.
+#
+# The composite/added-layer combine (Sanghavi et al. 2014, Eqs. 23–28) needs the
+# same `B·(I − A₁·A₂)⁻¹` factor, but with two DISTINCT reflection matrices, e.g.
+#   T01_inv = T⁻⁻ · (E − r⁻⁺·R⁺⁻)⁻¹      and   T21_inv = t⁺⁺ · (E − R⁺⁻·r⁻⁺)⁻¹,
+# each reused across the layer's R/T/J updates. As in the doubling case the bare
+# inverse is only an intermediate, so it is again a fused LU + right-solve. With
+# A₁≠A₂ there is no single tile to cache, so this kernel needs only `2N²` local
+# memory (vs `3N²` for the geometric-progression variant) and fits larger `N`.
+# ------------------------------------------------------------------------------
+
+"""
+    ka_fused_solve_localmem_bytes(FT, N)
+
+Local-memory bytes per workgroup required by [`ka_fused_solve!`]: two `N×N` tiles
+(the factorised `M = I − A₁·A₂` and the in-place RHS/solution `Bt`) plus a
+length-`N` `Int32` pivot vector.
+"""
+ka_fused_solve_localmem_bytes(::Type{FT}, N::Integer) where {FT} =
+    2 * N * N * sizeof(FT) + N * sizeof(Int32)
+
+"""
+    ka_fused_solve!(X, A1, A2, B, backend; max_localmem_bytes=nothing)
+
+Compute `X[:, :, k] = B[:, :, k] * (I − A1[:, :, k] * A2[:, :, k])⁻¹` for two
+distinct batched matrices `A1`, `A2` in a single fused KernelAbstractions launch
+(build `M = I − A1·A2`, LU-factorise with partial pivoting in local memory, then
+right-solve `X·M = B` directly — no explicit inverse, no separate GEMM). This is
+the adding-step (`interaction!`) analogue of [`ka_fused_gp_solve!`]; see the
+physics header above and `test/benchmarks/batched_fused_v2_benchmark.jl`.
+"""
+function ka_fused_solve!(X::AbstractArray{FT,3},
+                         A1::AbstractArray{FT,3},
+                         A2::AbstractArray{FT,3},
+                         B::AbstractArray{FT,3},
+                         backend;
+                         max_localmem_bytes=nothing) where {FT}
+    @assert size(A1, 1) == size(A1, 2) "fused solve requires square A1·A2"
+    @assert size(X) == size(A1) == size(A2) == size(B) "X, A1, A2, B must share dimensions"
+    N = size(A1, 1)
+    if max_localmem_bytes !== nothing
+        required = ka_fused_solve_localmem_bytes(FT, N)
+        required <= max_localmem_bytes || throw(ArgumentError(
+            "fused solve for N=$(N), eltype=$(FT) needs $(required) bytes of local " *
+            "memory per workgroup, exceeding the backend limit of $(max_localmem_bytes) " *
+            "bytes; fall back to the inverse path."))
+    end
+    batch = size(A1, 3)
+    kernel! = _fused_solve_kernel!(backend, N)
+    kernel!(X, A1, A2, B, Val(N); ndrange=(N * batch,))
+    KernelAbstractions.synchronize(backend)
+    return X
+end
+
+"""
+    _fused_solve_kernel!(X, A1, A2, B, Val(N))
+
+Device kernel for [`ka_fused_solve!`]. Identical to [`_fused_gp_solve_kernel!`]
+except `M = I − A1·A2` is built from two distinct inputs (no cached `A` tile).
+"""
+@kernel function _fused_solve_kernel!(X, @Const(A1), @Const(A2), @Const(B), ::Val{N}) where {N}
+    k   = @index(Group, Linear)
+    tid = @index(Local, Linear)
+
+    M   = @localmem eltype(X) (N, N)
+    piv = @localmem Int32 (N,)
+    Bt  = @localmem eltype(X) (N, N)
+
+    # M = I − A1·A2 (row `tid`), and load the RHS B.
+    @inbounds for j in 1:N
+        s = zero(eltype(X))
+        for l in 1:N
+            s += A1[tid, l, k] * A2[l, j, k]
+        end
+        M[tid, j] = ((tid == j) ? one(eltype(X)) : zero(eltype(X))) - s
+        Bt[tid, j] = B[tid, j, k]
+    end
+    @inbounds piv[tid] = Int32(tid)
+    @synchronize()
+
+    # LU factorisation of M with partial pivoting.
+    @inbounds for p in 1:N
+        if tid == 1
+            max_val = abs(M[p, p])
+            max_row = p
+            for r in (p + 1):N
+                v = abs(M[r, p])
+                if v > max_val
+                    max_val = v
+                    max_row = r
+                end
+            end
+            if max_row != p
+                for col in 1:N
+                    tmp = M[p, col]
+                    M[p, col] = M[max_row, col]
+                    M[max_row, col] = tmp
+                end
+                tmp_p = piv[p]
+                piv[p] = piv[max_row]
+                piv[max_row] = tmp_p
+            end
+        end
+        @synchronize()
+        if tid > p
+            M[tid, p] /= M[p, p]
+        end
+        @synchronize()
+        if tid > p
+            factor = M[tid, p]
+            for col in (p + 1):N
+                M[tid, col] -= factor * M[p, col]
+            end
+        end
+        @synchronize()
+    end
+
+    # Right-side direct solve X = B·U⁻¹·L⁻¹·P (in place on row `tid` of Bt).
+    @inbounds for j in 1:N
+        s = zero(eltype(X))
+        for l in 1:(j - 1)
+            s += Bt[tid, l] * M[l, j]
+        end
+        Bt[tid, j] = (Bt[tid, j] - s) / M[j, j]
+    end
+    @inbounds for j in (N - 1):-1:1
+        s = zero(eltype(X))
+        for l in (j + 1):N
+            s += Bt[tid, l] * M[l, j]
+        end
+        Bt[tid, j] -= s
+    end
+    @inbounds for j in 1:N
+        X[tid, piv[j], k] = Bt[tid, j]
+    end
+end
+
+"""
+    _use_fused_solve(X) -> Bool
+
+Whether the two-matrix fused solve ([`ka_fused_solve!`]) should be used for output
+array `X`: same policy as [`_use_fused_gp`] but with the smaller `2N²` tile.
+"""
+@inline function _use_fused_solve(X::AbstractArray{FT,3}) where {FT}
+    _FUSED_GP_ENABLED[] || return false
+    backend = KernelAbstractions.get_backend(X)
+    backend isa KernelAbstractions.CPU && return false
+    return ka_fused_solve_localmem_bytes(FT, size(X, 1)) <= _gp_fused_localmem_limit(backend)
+end

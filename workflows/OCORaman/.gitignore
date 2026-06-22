@@ -1,0 +1,16 @@
+Manifest.toml
+output/*
+figures/*
+logs/*
+tmp/*
+*.jld2
+*.nc
+*.h5
+*.hdf5
+*.png
+*.pdf
+*.csv
+!output/.gitkeep
+!figures/.gitkeep
+!logs/.gitkeep
+!tmp/.gitkeep

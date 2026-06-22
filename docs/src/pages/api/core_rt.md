@@ -37,6 +37,26 @@ vSmartMOM.CoreRT.RTNumericalParameters
 > `surface_source_contribute!` dispatchers) are documented on the
 > [Source terms](../extending/sources.md#api-reference) page.
 
+## Batch Scene Processing
+
+`BatchContext` enables efficient multi-scene loop workflows (e.g. ensemble retrievals,
+parameter sweeps) by caching expensive one-time setup work (Mie, Fourier decomposition,
+HITRAN parsing) and exposing cheap per-scene update functions.
+
+```@docs
+vSmartMOM.BatchContext
+vSmartMOM.update_model!
+vSmartMOM.update_aerosol_loading!
+vSmartMOM.update_aerosol_microphysics!
+```
+
+## Stream-Level RT Output
+
+```@docs
+vSmartMOM.CoreRT.StreamRTResult
+vSmartMOM.CoreRT.rt_run_streams(::Any)
+```
+
 ## Jacobian Parameter Layout
 
 ```@docs

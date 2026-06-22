@@ -21,6 +21,38 @@ The function returns a rounded integer, following conventions by BH, Rooj/Stap, 
 """
 get_n_max(size_parameter) = (size_parameter>8.0) ? round(Int, size_parameter + 4.05 * size_parameter^(1/3) + 10) : round(Int, size_parameter + 4.0 * size_parameter^(1/3) + 1)
 
+"""
+    _mie_dn_recursion!(Dn, y, nmx)
+
+Perform the downward Dₙ recursion (BH eq. 4.89) for `y = size_param * refractive_idx`.
+
+Two dispatch methods:
+- `Complex{<:AbstractFloat}` (plain floats): stabilised in Float64 to avoid
+  catastrophic cancellation for `|y| ≳ 50` in Float32.
+- `Complex{<:ForwardDiff.Dual}`: uses native arithmetic so derivative tangents
+  propagate correctly through the recursion; no Float64 cast is possible.
+"""
+function _mie_dn_recursion!(Dn, y::Complex{<:AbstractFloat}, nmx)
+    y64 = Complex{Float64}(y)
+    Dn_prev = Complex{Float64}(0)
+    @inbounds for n = (nmx - 1):-1:1
+        ratio = (n + 1) / y64
+        Dn_prev = ratio - 1 / (Dn_prev + ratio)
+        Dn[n] = Dn_prev
+    end
+end
+
+function _mie_dn_recursion!(Dn, y, nmx)
+    # Generic path: used for ForwardDiff Dual numbers and any other numeric type
+    # where conversion to Complex{Float64} is not defined.
+    Dn_prev = zero(y)
+    @inbounds for n = (nmx - 1):-1:1
+        ratio = (n + 1) / y
+        Dn_prev = ratio - 1 / (Dn_prev + ratio)
+        Dn[n] = Dn_prev
+    end
+end
+
 @doc raw"""
     $(FUNCTIONNAME)(size_param, refractive_idx::Number, an, bn, Dn)
 
@@ -28,10 +60,12 @@ Compute Mie coefficients ``a_n`` and ``b_n`` from the size parameter and complex
 refractive index (Bohren & Huffman, eq. 4.88).
 
 The logarithmic derivative ``D_n(y)`` is obtained via downward recursion
-(BH eq. 4.89; de Rooij & Stap 1984, eq. A9).  This recursion is **always
-performed in Float64** regardless of the element type of `Dn`, because the
-cancellation-prone continued-fraction form loses significant digits in Float32
-for ``|y| \gtrsim 50``.
+(BH eq. 4.89; de Rooij & Stap 1984, eq. A9).  For plain
+`Complex{<:AbstractFloat}` arguments the recursion is promoted to Float64
+for numerical stability (cancellation-prone continued-fraction form loses
+significant digits in Float32 for ``|y| \gtrsim 50``).  For
+`Complex{<:ForwardDiff.Dual}` arguments native arithmetic is used so that
+derivative tangents propagate correctly.
 
 # Arguments
 - `size_param`: size parameter ``x = 2\pi r/\lambda``
@@ -55,14 +89,12 @@ function compute_mie_ab!(size_param, refractive_idx::Number, an, bn, Dn)
 
     # Dn as in eq 4.88, Bohren and Huffman, to calculate an and bn
     # Downward Recursion, eq. 4.89, Bohren and Huffman
-    # Always performed in Float64 for numerical stability
-    y64 = Complex{Float64}(y)
-    Dn_prev = Complex{Float64}(0)
-    @inbounds for n = (nmx - 1):-1:1
-        ratio = (n + 1) / y64
-        Dn_prev = ratio - 1 / (Dn_prev + ratio)
-        Dn[n] = Dn_prev
-    end
+    # For plain floating-point types the recursion is performed in Float64
+    # for numerical stability (cancellation-prone continued-fraction form
+    # loses significant digits in Float32 for |y| ≳ 50).
+    # For ForwardDiff Dual types we must keep native arithmetic so that
+    # derivatives ∂aₙ/∂n propagate correctly through Dₙ.
+    _mie_dn_recursion!(Dn, y, nmx)
 
     # Get recursion for bessel functions ψ and ξ
     ψ₀, ψ₁, χ₀, χ₁ =  (cos(size_param), sin(size_param), -sin(size_param), cos(size_param))
@@ -86,132 +118,6 @@ function compute_mie_ab!(size_param, refractive_idx::Number, an, bn, Dn)
         ξ₁ = ψ₁ + χ₁*im
     end
 end
-
-"""
-    $(FUNCTIONNAME)(size_param, refractive_idx, an, bn, Dn)
-
-Alternative implementation of Mie coefficients ``a_n``, ``b_n`` using upward recursion for ψ and χ
-and Lentz's continued-fraction method for the logarithmic derivative. See Bohren & Huffman eq. 4.88.
-Modifies `an`, `bn`, and `Dn` in-place. Same interface as [`compute_mie_ab!`](@ref).
-"""
-function compute_mie_ab_new!(size_param, refractive_idx::Number, an, bn, Dn)
-    # Compute y
-    y = size_param * refractive_idx
-
-    # Maximum expansion (see eq. A17 from de Rooij and Stap, 1984)
-    n_max = get_n_max(size_param)
-
-    # Make sure downward recurrence starts higher up
-    # (at least 15, check eq. A9 in de Rooij and Stap, 1984, may need to check what is needed)
-    nmx = length(Dn)
-    @assert size(an)[1] >= n_max
-    @assert size(an) == size(bn)
-    fill!(Dn, 0);
-
-
-
-    #Computing ψ using downward recursion
-    N_ = n_max+60
-
-    ψ = zeros(N_)
-    ψ[end]   = 0.0
-    ψ[end-1] = 1.0
-    for idx=N_-2:-1:1
-        ψ[idx] = (2idx+1)*ψ[idx+1]/size_param - ψ[idx+2];
-    end
-
-
-    #Computing ψ using upward recursion
-    N_ = n_max
-    ψ = zeros(N_)
-    ψ[1] = sin(size_param);
-    if N_>1
-        ψ[2]  = (sin(size_param)/size_param)-cos(size_param);
-        for idx = 3:N_
-            ψ[idx] = (2idx-3)*ψ[idx-1]/size_param - ψ[idx-2];
-        end
-    end
-    #computing χ using upward recursion
-    N_ = n_max
-    χ = zeros(N_)
-    χ[1] = cos(size_param)
-    if N_>1
-        χ[2] = cos(size_param)/size_param + sin(size_param)
-        for idx=3:N_
-            χ[idx] = (2idx-3)*χ[idx-1]/size_param - χ[idx-2];
-        end
-    end
-
-    #computing An (Lentz)
-    result = zeros(Complex{FT}, nmx);
-    z=y
-    for n=1:nmx
-        zinv   = 2/z
-        alpha_ = (n + 0.5)*zinv
-        aj     =-(n + 1.5)*zinv
-        alpha_j1 = aj+1/alpha_
-        alpha_j2 = aj
-
-        ratio = alpha_j1/alpha_j2
-        runratio = alpha_*ratio
-
-        while abs(abs(ratio)-1) > 1e-20
-            aj=zinv-aj
-            alpha_j1=1/alpha_j1+aj
-            alpha_j2=1/alpha_j2+aj
-            ratio=alpha_j1/alpha_j2
-
-            epsilon1 = 1.0e-2
-            compare_1 = abs(alpha_j1/aj)
-            compare_2 = abs(alpha_j2/aj)
-
-            if abs(compare_1)<=epsilon1 || abs(compare_2)<=epsilon1
-                zinv *= -1
-                aj = zinv - aj
-                ratio = (1+aj*alpha_j1)/(1+aj*alpha_j2)
-                alpha_j1 = aj + 1/alpha_j1
-                alpha_j2 = aj + 1/alpha_j2
-            end
-            zinv *= -1;
-            runratio=ratio*runratio;
-        end
-        result[n] = -n/z;
-        result[n] += runratio;
-    end
-
-    # Dn as in eq 4.88, Bohren and Huffman, to calculate an and bn
-    # Downward Recursion, eq. 4.89, Bohren and Huffman
-    @inbounds for n = (nmx - 1):-1:1
-        Dn[n] = ((n+1) / y) - (1 / (Dn[n+1] + (n+1) / y))
-    end
-
-    # Get recursion for bessel functions ψ and ξ
-    ψ₀, ψ₁, χ₀, χ₁ =  (cos(size_param), sin(size_param), -sin(size_param), cos(size_param))
-    ξ₁ = ψ₁ -χ₁*im
-
-    ψ0 = zeros(N_)
-    χ0 = zeros(N_)
-
-    # This solves Bohren and Huffman eq. 4.88 for an and bn, computing updated ψ and ξ on the fly
-    @inbounds for n = 1:n_max
-        ψ  = (2n - 1) * ψ₁ / size_param - ψ₀
-        χ  = (2n - 1) * χ₁ / size_param - χ₀
-        ξ   = ψ -χ*im
-        t_a = Dn[n] / refractive_idx + n / size_param
-        t_b = Dn[n] * refractive_idx + n / size_param
-        ψ0[n] = ψ₁
-        χ0[n] = χ₁
-        an[n] = (t_a * ψ - ψ₁) / (t_a * ξ - ξ₁)
-        bn[n] = (t_b * ψ - ψ₁) / (t_b * ξ - ξ₁)
-
-        ψ₀ = ψ₁
-        ψ₁ = ψ
-        χ₀ = χ₁
-        χ₁ = χ
-        ξ₁ = ψ₁ -χ₁*im
-    end
-end
-
 
 """
     $(FUNCTIONNAME)(model::MieModel, λ, radius)
@@ -614,89 +520,3 @@ See Sanghavi 2014, eq. 16
 construct_B_matrix(mod::Stokes_I, α, β, γ, δ, ϵ, ζ, l::Int) = β[l]
 
 
-#=
-"""
-    $(FUNCTIONNAME)(mod::AbstractPolarizationType, μ, α, β, γ, δ, ϵ, ζ, m::Int)
-Compute moments of the phase matrix
-"""
-function compute_Z_moments(mod::AbstractPolarizationType, μ, greek_coefs::GreekCoefs, m::Int ; arr_type = Array)
-    @unpack α, β, γ, δ, ϵ, ζ = greek_coefs
-    FT = eltype(β)
-    n = length(μ)
-
-    # Change from 0-index to 1-index (i.e. the lowest m is 0 ),
-    # make more logical later to avoid confusion later (m=0 has a meaning!!)
-    m = m+1
-
-    # Set prefactor for moments (note 1-notation for `m` here):
-    fact = (m == 1) ? 0.5 : 1.0
-
-    # get l_max just from length of array:
-    l_max = length(β)
-
-    # Check that all μ are positive here ([0,1])
-    # @show μ
-    @assert all(0 .< μ .≤ 1) "all μ's within compute_Z_moments have to be ∈ ]0,1]"
-
-    # Compute legendre Polynomials at μ and up to lmax
-    P, R, T    = Scattering.compute_associated_legendre_PRT(μ, l_max)
-    P⁻, R⁻, T⁻ = Scattering.compute_associated_legendre_PRT(-μ, l_max)
-
-    # Pre-compute all required B matrices
-    𝐁_all = [construct_B_matrix(mod, α, β, γ, δ, ϵ, ζ, i) for i in 1:l_max]
-
-    # Get dimension of square matrix (easier for Scalar/Stokes dimensions)
-    B_dim = Int(sqrt(length(𝐁_all[1])))
-
-    # Create matrices:
-    nb = B_dim * n
-    𝐙⁺⁺, 𝐙⁻⁺ = (zeros(FT, nb, nb), zeros(FT, nb, nb))
-    A⁺⁺, A⁻⁺ = (zeros(FT, B_dim, B_dim, n, n), zeros(FT, B_dim, B_dim, n, n))
-
-    # Iterate over l
-    @inbounds for l = m:l_max
-
-        # B matrix for l
-        𝐁 = 𝐁_all[l];
-
-        # Construct Π matrix for l,m pair (change to in place later!)
-        # See eq. 15 in Sanghavi 2014, note that P,R,T are already normalized
-        Π  = construct_Π_matrix(mod, P, R, T, l, m)
-        Π⁻ = construct_Π_matrix(mod, P⁻, R⁻, T⁻, l, m)
-
-        # Iterate over angles
-        for i in eachindex(μ), j in eachindex(μ)
-            if B_dim == 1
-                A⁺⁺[B_dim,B_dim,i,j] += Π[i] * 𝐁 * Π[j]
-                A⁻⁺[B_dim,B_dim,i,j] += Π[i] * 𝐁 * Π⁻[j]
-            else
-                A⁺⁺[:,:,i,j] += Π[i] * 𝐁 * Π[j]
-                A⁻⁺[:,:,i,j] += Π[i] * 𝐁 * Π⁻[j]
-            end
-        end
-    end
-
-    # Now get to the Z part:
-    @inbounds for imu in eachindex(μ), jmu in eachindex(μ)
-
-        # Indices adjusted for size of A
-        ii, jj = ((imu - 1) * B_dim, (jmu - 1) * B_dim)
-
-        # This is equivalent to Z̄ = 1/(1+δ) * C̄m+S̄m = 1/(1+δ) * (A+DAD+AD-DA)
-        # (see eq 11 in Sanghavi et al, 2013)
-        for i in 1:B_dim, j in 1:B_dim
-            𝐙⁺⁺[ii + i,jj + j] = 2fact * A⁺⁺[i,j,imu,jmu]
-            if i <= 2 && j >= 3
-                𝐙⁻⁺[ii + i,jj + j] = -2fact * A⁻⁺[i,j,imu,jmu]
-            elseif i >= 3 && j <= 2
-                𝐙⁻⁺[ii + i,jj + j] = -2fact * A⁻⁺[i,j,imu,jmu]
-            else
-                𝐙⁻⁺[ii + i,jj + j] = 2fact * A⁻⁺[i,j,imu,jmu]
-            end
-        end
-    end
-
-    # Return Z-moments
-    return arr_type(𝐙⁺⁺), arr_type(𝐙⁻⁺)
-end
-=#

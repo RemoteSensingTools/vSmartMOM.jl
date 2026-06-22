@@ -6,10 +6,9 @@ isotropic emission at the lower boundary that adds to the surface layer's
 upwelling source vector `j₀⁻`.
 
 This is the "surfaces produce R/T only; sources contribute to surface
-j₀± via dispatch" pattern (Christian's design directive). Today's
-`inject_surface_SIF!` shotgun-injects SIF₀ from `RS_type.SIF₀` into the
-Lambertian surface added-layer. Phase 5 replaces that with a clean
-double-dispatch:
+j₀± via dispatch" pattern (Christian's design directive). The old
+`RS_type.SIF₀` surface-emission path is intentionally not used by `rt_run`;
+SIF now enters through clean double-dispatch:
 
   surface_source_contribute!(prepared_sources, surface, surface_added_layer, m, pol_type, arch)
     └─ dispatch on (source-type, surface-type) pairs to the right kernel.
@@ -144,14 +143,16 @@ surface_source_contribute!(::AbstractPreparedSource, ::AbstractSurfaceType,
                            _surface_added_layer, _m, _pol_type, _architecture) = nothing
 
 # Solar-beam contribution to the surface-layer source vector is currently
-# computed inside `create_surface_layer!` for backward compatibility. A
-# later sub-phase will move it out into a dedicated dispatch:
+# computed inside `create_surface_layer!` from the resolved spectral F₀ for
+# backward compatibility. A later sub-phase will move it out into a dedicated
+# dispatch:
 #   surface_source_contribute!(::PreparedSolarBeam, ::LambertianSurfaceScalar, …)
 # The default (above) is a no-op; today's create_surface_layer! handles it.
 
 """
     surface_source_contribute!(prep::PreparedSurfaceSIF,
                                 surface::Union{LambertianSurfaceScalar,
+                                               LambertianSurfaceSpectrum,
                                                LambertianSurfaceLegendre,
                                                LambertianSurfaceSpline},
                                 surface_added_layer, m, pol_type, architecture)
@@ -166,7 +167,8 @@ applied downstream in `postprocessing_vza!` so the isotropic SIF
 contribution survives unweighted.
 """
 function surface_source_contribute!(prep::PreparedSurfaceSIF,
-        ::Union{LambertianSurfaceScalar, LambertianSurfaceLegendre, LambertianSurfaceSpline},
+        ::Union{LambertianSurfaceScalar, LambertianSurfaceSpectrum,
+                LambertianSurfaceLegendre, LambertianSurfaceSpline},
         surface_added_layer,
         m::Integer, pol_type, architecture)
     m == 0 || return nothing

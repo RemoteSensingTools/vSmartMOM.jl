@@ -1,5 +1,66 @@
 # Changelog
 
+## Unreleased — externalAbsorption branch (targeting v2.2.0)
+
+### Summary
+
+- **RRS GPU performance (~90× on the O2A Raman LUT; ~120× whole-`rt_run`).**
+  The rotational-Raman adding–doubling GPU path was rewritten: fused
+  KernelAbstractions kernels replace the per-Δn `batched_mul` loops for the
+  doubling n-loop, the `ScatteringInterface_11` matrix outputs, and the SFI
+  source vectors (`src/CoreRT/CoreKernel/fused_raman_kernels.jl`); `interaction!`
+  now defaults to a GPU-only (non-staged) workspace with a VRAM-aware fallback;
+  and inelastic postprocessing reduces over Raman shifts once instead of per
+  view-angle. Net on one L40S (Float32): a two-band O2A Raman LUT scene drops
+  from ~1.08 h to ~43 s; peak GPU memory ~7× lower (substantially larger
+  `nSpec` runnable). Results are bit-equivalent up to Float32 reduction reorder
+  (elastic R/T bit-identical, inelastic ~1 ULP in Float64) — **GPU-fused configs
+  need RRS goldens regenerated**. Also includes band-local `expandBandScalars`
+  and spectral-F0 flat-Z correctness fixes, and a GPU regression suite locking
+  each fused kernel against the `batched_mul` reference. CPU and large-`NquadN`
+  configs fall back to the unchanged path.
+
+- **AtmosphericAbsorption.jl engine swap.** `model_from_parameters` now
+  delegates LBL gas absorption to the external
+  [AtmosphericAbsorption.jl](https://github.com/RemoteSensingTools/AtmosphericAbsorption.jl)
+  package (TIPS-2021 partition sums).  The internal `Absorption` module remains
+  the standalone σ(ν, T, p) API (TIPS-2017).  High-temperature results
+  (> ~500 K) may differ slightly from earlier releases.
+
+- **GPU Mie dispatch (10.7–12.9×).** `make_mie_model(...; architecture=GPU())`
+  now runs NAI-2 Mie on GPU automatically; Metal/PCW fall back to CPU.
+
+- **`BatchContext` batch API.** `BatchContext` / `update_model!` /
+  `update_aerosol_loading!` / `update_aerosol_microphysics!` enable efficient
+  multi-scene loops with shared Mie/Fourier/HITRAN caches.
+
+- **Six correctness fixes.**
+  - Wing-cutoff window: wavenumber-space (was wavelength-space) — standalone
+    Absorption API.
+  - Canopy soil-albedo Jacobian axis fixed.
+  - VS Raman call-chain + atomic-mass factor corrected (vibrational Raman
+    results change; RRS unaffected).
+  - δBGE `Δ_angle` now applied in production truncation fit (was silently
+    ignored; default `Δ_angle = 0` unchanged).
+  - `LambertianSurfaceSpectrum` surface layer now works (missing
+    `create_surface_layer!` method added, including Lambertian scaffold).
+  - Mie Dₙ recurrence: Dual-number-safe initialization restores correct
+    `ForwardDiff` derivatives through Mie.
+
+- **Performance work.** Flat-Z zero-copy path; m-invariant Fourier-loop cache;
+  GPU sync stripping (~19.5% faster forward RT on O₂-A test case).
+
+- **~2,300-line dead-code purge** (retired `rt_run_canopy`, `RRS_plus`,
+  legacy lin entry points).
+
+- **Compat widenings.** LogExpFunctions `0.3`; Parameters.jl `0.13`.
+
+- **Folded PRs #222–#225.**
+
+Release tag (v2.2.0) to be cut by S. Sanghavi.
+
+---
+
 ## v2.1.0 — Fourier-stream resolution + source-term refactor
 
 > **vSmartMOM** = **V**ector **S**imulated **M**easurements of the **A**tmosphere using **R**adiative **T**ransfer based on the **M**atrix **O**perator **M**ethod.

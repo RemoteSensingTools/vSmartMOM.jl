@@ -14,6 +14,8 @@ are denoted by 0<VZA<90.
 function rt_run_test_ms(RS_type::AbstractRamanType,
                         sensor_levels::Vector{Int64},
                         model, iBand)
+    _warn_explicit_depol_raman(RS_type, model)
+
     (; obs_alt, sza, vza, vaz) = model.obs_geom   # Observational geometry properties
     (; qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart, μ₀, iμ₀, Nquad) = model.quad_points # All quadrature points
     pol_type = CoreRT.polarization_type(model)
@@ -46,6 +48,11 @@ function rt_run_test_ms(RS_type::AbstractRamanType,
 
     arr_type = CoreRT.array_type(model) # Type of array to use
     arch = CoreRT.architecture(model)
+    if size(RS_type.F₀) != (pol_type.n, nSpec)
+        RS_type.F₀ = zeros(FT, pol_type.n, nSpec)
+        @views RS_type.F₀[1, :] .= one(FT)
+    end
+    surface_F₀ = arr_type(FT.(RS_type.F₀))
     SFI = true                          # SFI flag
     NquadN = Nquad * pol_type.n         # Nquad (multiplied by Stokes n)
     dims = (NquadN,NquadN)              # nxn dims
@@ -99,8 +106,6 @@ function rt_run_test_ms(RS_type::AbstractRamanType,
 
             # Construct the atmospheric layer
             # From Rayleigh and aerosol τ, ϖ, compute overall layer τ, ϖ
-            # computed_layer_properties = get_layer_properties(computed_atmosphere_properties, iz, arr_type)
-            
             # Suniti: modified to return fscattRayl as the last element of  computed_atmosphere_properties
             if !(typeof(RS_type) <: noRS)
                 #@show fScattRayleigh[iz]
@@ -135,8 +140,13 @@ function rt_run_test_ms(RS_type::AbstractRamanType,
                     pol_type,
                     quad_points,
                     arr_type(τ_sum_all[:,end]),
-                    arch);
+                    arch;
+                    F₀=surface_F₀);
 
+        # Surface SIF emission (legacy RS_type.SIF₀ path). The multisensor entry
+        # point does not yet route SIF through the v0.6 source system the way
+        # rt_run/rt_run_ss do, so keep the direct injection here — dropping it
+        # silently zeroed fluorescence in multisensor scenes.
         inject_surface_SIF!(brdf, added_layer_surface, m, pol_type, _sif_source(RS_type), arch)
 
         # One last interaction with surface:
