@@ -104,6 +104,57 @@ HDRF is the per-VZA (or per-quadrature) reflectance into the upper
 hemisphere normalized by incident solar flux; BHR is its hemispherical
 integral, only well-defined for `m=0`.
 
+## Sweeping surfaces over a cached atmosphere
+
+Because the surface enters the solve at exactly one point per Fourier
+moment — the final `interaction!` after the layer loop — the expensive
+atmosphere accumulation is surface-independent and can be paid once:
+
+```julia
+cache = rt_run_atmosphere(model)                      # one m-loop, snapshots per moment
+R₁, _ = rt_run_surface(cache, LambertianSurfaceScalar(0.05))
+R₂, _ = rt_run_surface(cache, rpvSurfaceScalar(0.02, 0.3, 0.7, 0.1))
+# or in one call:
+results = rt_run_multi_surface(model, [surf_a, surf_b, surf_c])
+```
+
+Each replayed surface costs roughly `1/Nz` of a full `rt_run` and is
+**bit-exact** against the monolithic result. Size the cache for the widest
+BRDF you intend to replay via `target_brdfs` (a Lambertian-built cache
+holds only `m = 0` unless told otherwise). Scope: elastic (`noRS`), single
+band, non-canopy surfaces.
+
+For **Lambertian albedos specifically**, skip the replay altogether:
+the `m=0` surface reflection is rank-one, so the albedo dependence
+collapses to an exact scalar closure (Sherman–Morrison),
+
+```math
+R(a) = R_{\mathrm{black}} + w_0\,\frac{2a\,E_{\mathrm{dw}}}{1 - a\,\bar S}\;t_{\mathrm{up}},
+```
+
+built once from the cache's `m=0` blocks:
+
+```julia
+c = lambertian_closure(cache)
+R = c(0.3)                        # O(1) per albedo — no matrix algebra
+J = albedo_jacobian(c, 0.3)       # exact ∂R/∂a
+a = invert_albedo(c, R_measured)  # closed-form albedo retrieval
+```
+
+`S̄` is the atmosphere's spherical albedo viewed from below, `E_dw` the
+total (direct + diffuse) downward flux at BOA, and `t_up = T⁻⁻u` the
+upward transmission of an isotropic BOA source — the same quantities the
+classical two-run "MODTRAN" decomposition fits empirically, here read off
+one atmosphere run exactly. Lambertian-only caches are automatically
+stored slim (`cache_mode = :auto`), keeping the full matrices at `m = 0`
+only.
+
+For batch production (many geometries × surfaces), `ScenarioSweep` +
+`run_sweep` cross SZA and BRDF axes, rebuilding only
+`ObsGeometry`/`QuadPoints` per SZA (`remake_geometry` — shares optics, so
+no HITRAN/Mie recomputation) and amortizing each SZA's atmosphere across
+all BRDFs.
+
 ## Code anchors
 
 | Concept | Source |
@@ -115,6 +166,9 @@ integral, only well-defined for `m=0`.
 | Canopy pre-solver | [`src/CoreRT/Surfaces/canopy_surface.jl`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/Surfaces/canopy_surface.jl) |
 | Surface BRDF map (YAML) | `src/IO/Parameters.jl::BRDF_MAP` |
 | Linearized Cox–Munk | [`src/CoreRT/Surfaces/coxmunk_surface_lin.jl`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/Surfaces/coxmunk_surface_lin.jl) |
+| Atmosphere/surface split + replay | `src/CoreRT/rt_run_split.jl` |
+| Analytic Lambertian albedo closure | `src/CoreRT/tools/lambertian_closure.jl` |
+| Scenario sweeps (SZA × BRDF) | `src/CoreRT/tools/scenario_sweep.jl` |
 
 To **add a new surface BRDF**, see the developer guide
 [Add a Surface BRDF](../extending/surfaces.md).
