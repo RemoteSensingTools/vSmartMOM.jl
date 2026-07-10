@@ -470,7 +470,9 @@ picks `:slim` iff every target BRDF has `component_m_max(b, ctx) == 0`
 - `FT` — working float type (Float64 / Float32).
 - `AT3` — concrete 3-D array type for R/T/J snapshots (`Array{FT,3}` on
   CPU, `CuArray{FT,3}` on GPU).
-- `AT1` — concrete 1-D array type for `τ_sum_surf`.
+- `AT1` — concrete 1-D array type for `τ_sum_surf` (device-resident, same
+  as the `τ_sum_end_dev` array the monolithic surface step consumes, so
+  the replay preserves rt_run's host/device contract).
 - `AT2` — concrete 2-D array type for `surface_F₀` (`(pol_n, nSpec)`).
 - `AT` — the array-type constructor (`Array` / `CuArray`); applied as
   `arr_type(x)` when replaying against a different architecture than the
