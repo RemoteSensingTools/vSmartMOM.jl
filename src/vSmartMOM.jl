@@ -118,6 +118,10 @@ export rt_run_lin, model_from_parameters_lin
 export rt_run_atmosphere, rt_run_surface, rt_run_multi_surface, AtmosphereRTCache
 # Analytic Lambertian-albedo closure over a cached atmosphere (O(1) per albedo)
 export LambertianClosure, lambertian_closure, albedo_jacobian, invert_albedo
+# Scenario sweeps: SZA × view-pair × BRDF over one scene, amortising the
+# atmosphere phase per SZA (rt_run_multi_surface) and the per-SZA model
+# rebuild (remake_geometry) — surface_split_albedo_sweep.md §6/§7 PR 3
+export remake_geometry, ScenarioSweep, SweepResult, run_sweep
 # Export batch-processing API
 export BatchContext, update_model!,
        update_aerosol_loading!, update_aerosol_microphysics!

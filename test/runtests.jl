@@ -109,6 +109,12 @@ try
 # proposals/surface_split_albedo_sweep.md §3-4.
 @testset "Lambertian closure" begin include("test_lambertian_closure.jl") end
 
+# SZA × view-pair × BRDF scenario sweeps: `remake_geometry`'s bit-exactness
+# vs a full `model_from_parameters` rebuild, plus `run_sweep`'s output
+# against a monolithic `rt_run` reference; see
+# proposals/surface_split_albedo_sweep.md §6-7 (PR 3).
+@testset "Scenario sweep" begin include("test_scenario_sweep.jl") end
+
 # NOTE: GPU/Metal tests live in test/local/gpu/ and run via
 # `julia --project=test test/local/runtests.jl` (the local-only suite); they are
 # NOT part of this CI suite. Likewise, configs needing external LUTs/ABSCO data

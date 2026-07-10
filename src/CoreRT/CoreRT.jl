@@ -108,6 +108,7 @@ include("rt_run_lin.jl")                       # Linearized RT run
 include("rt_run_multisensor.jl")
 include("rt_run_split.jl")                     # Atmosphere/surface split: rt_run_atmosphere/_surface/_multi_surface
 include("tools/lambertian_closure.jl")         # Analytic O(1)-per-albedo Lambertian closure (surface_split_albedo_sweep.md §3)
+include("tools/scenario_sweep.jl")             # SZA × view-pair × BRDF scenario sweeps (surface_split_albedo_sweep.md §6/§7 PR 3)
 
 # CPU batched operations (always available)
 include("tools/ka_batched_kernels.jl")         # Portable KA batched kernels
@@ -159,6 +160,8 @@ export model_from_parameters,               # Converting the parameters to model
        rt_run_multi_surface, AtmosphereRTCache, # replay/sweep the surface phase
        LambertianClosure, lambertian_closure,   # Analytic O(1)-per-albedo Lambertian closure
        albedo_jacobian, invert_albedo,          # (surface_split_albedo_sweep.md §3)
+       remake_geometry,                     # Cheap per-geometry RTModel rebuild (§6/§7 PR 3)
+       ScenarioSweep, SweepResult, run_sweep,   # SZA × view-pair × BRDF scenario sweeps
        default_parameters,                  # Set of default parameters
        BatchContext, update_model!,         # Batch-processing context + scene updater
        update_aerosol_loading!,             # Phase 2: cheap τ_ref / profile update (no Mie)

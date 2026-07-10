@@ -614,6 +614,76 @@ function model_from_parameters(params::vSmartMOM_Parameters;
     return RTModel(params.architecture, solver, numerics, obs_geom, quad_points, atm, optics, params.brdf, sources)
 end
 
+"""
+    remake_geometry(model::RTModel, params::vSmartMOM_Parameters;
+                   sza = model.geometry.sza,
+                   vza = model.geometry.vza,
+                   vaz = model.geometry.vaz) -> RTModel
+
+Rebuild an [`RTModel`](@ref) at a different observation geometry WITHOUT
+re-running the atmosphere build (`model_from_parameters`'s HITRAN
+absorption, Mie aerosol optics, and per-band Fourier-support derivation) —
+the expensive part of `model_from_parameters` for a spectral-band scene.
+
+Only `geometry::ObsGeometry` and `quad_points::QuadPoints` depend on
+`(sza, vza, vaz)`: `quad_points` is built by [`rt_set_streams`](@ref),
+which appends SZA/VZA cosines as (mostly) zero-weight output nodes onto a
+fixed set of weighted quadrature nodes. Everything else — `atmosphere`
+(profile, τ_abs, τ_rayl), `optics` (aerosol Mie/greek coefs), `solver`
+(m_max_bands, truncation) and `surfaces` — is geometry-independent, so
+this function shares them by reference with `model` and only constructs
+fresh `ObsGeometry`/`QuadPoints` objects, THE SAME WAY
+`model_from_parameters` does (identical `rt_set_streams` call).
+
+`params` must be the SAME parameters object (or an unmutated `deepcopy`)
+used to build `model` in the first place — it supplies the quadrature
+scheme, `l_trunc`, polarization type and architecture that `model.solver`
+was derived from (`params.quadrature_type`, `params.l_trunc`,
+`params.polarization_type`, `params.architecture`); this function does
+NOT re-derive `solver.m_max_bands` from these, it reuses `model.solver`
+verbatim (see the bit-exactness note below for why that's safe). Mutate
+`sza`/`vza`/`vaz` via the keyword arguments here, not by mutating
+`params` — a `params` with anything OTHER than geometry changed (e.g. a
+different `l_trunc`) would silently desync `model.solver` from the
+quadrature this function builds.
+
+# Bit-exactness
+
+`rt_run(remake_geometry(model, params; sza=θ))` is bit-exact with
+`rt_run(model_from_parameters(p′))` for `p′ = deepcopy(params)` with
+`p′.sza = θ` (and same `vza`/`vaz`) — see
+`test/test_scenario_sweep.jl`. This relies on `quad_points.Nstreams`
+(hence `solver.m_max_bands`, which is NOT recomputed here) being
+independent of `sza`/`vza`: `rt_set_streams` builds the weighted
+Gauss-Legendre/Radau nodes first (always nonzero weight) and only
+afterwards appends the SZA/VZA cosines as additional nodes, padded with
+zero weight; `Nstreams = count(!iszero, wt_μ)` therefore only changes if
+a SZA/VZA cosine happens to land exactly on an existing weighted node in
+floating point (it would then be dropped by `unique` instead of
+appended) — a pre-existing knife-edge property of `rt_set_streams`
+itself (shared with the monolithic `model_from_parameters` path), not
+something this function introduces. `quad_points.Nquad` (the total node
+count, including zero-weight SZA/VZA duplicates) MAY legitimately differ
+between geometries — that's expected and harmless, since `rt_run` sizes
+its per-call `NquadN` from `model.quad_points.Nquad` fresh on every
+call, not from anything cached at model-build time.
+
+See `proposals/surface_split_albedo_sweep.md` §6/§7 (PR 3) for the
+design context — this is the seam `run_sweep` uses to amortise the
+per-SZA HITRAN/Mie rebuild across a scenario sweep.
+"""
+function remake_geometry(model::RTModel, params::vSmartMOM_Parameters;
+                         sza::Real = model.geometry.sza,
+                         vza::AbstractVector = model.geometry.vza,
+                         vaz::AbstractVector = model.geometry.vaz)
+    FT = float_type(model)
+    obs_geom = ObsGeometry{FT}(FT(sza), FT.(collect(vza)), FT.(collect(vaz)), model.geometry.obs_alt)
+    quad_points = rt_set_streams(params.quadrature_type, params.l_trunc, obs_geom,
+                                 params.polarization_type, array_type(params.architecture))
+    return RTModel(model.architecture, model.solver, model.numerics, obs_geom, quad_points,
+                   model.atmosphere, model.optics, model.surfaces, model.sources)
+end
+
 "Re-type the user-supplied `RTNumericalParameters` to the resolved
 RTModel float type. No-op when types already match."
 @inline _convert_numerics(n::RTNumericalParameters{FT}, ::Type{FT}) where {FT} = n
