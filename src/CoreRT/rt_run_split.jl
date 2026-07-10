@@ -38,7 +38,8 @@
     rt_run_atmosphere(model::RTModel;
                       target_brdfs = nothing,
                       i_band::Integer = 1,
-                      sources = nothing) -> AtmosphereRTCache
+                      sources = nothing,
+                      cache_mode::Symbol = :auto) -> AtmosphereRTCache
 
 Run the atmosphere phase of [`rt_run`](@ref) once and cache the
 per-Fourier-moment composite-layer snapshot. The returned
@@ -55,6 +56,13 @@ m-loop layer-accumulation cost again.
   always covers the model's own surface at minimum).
 - `i_band::Integer = 1` — spectral band index.
 - `sources` — source set, as in `rt_run`.
+- `cache_mode::Symbol = :auto` — `:full` (all six composite blocks at every
+  Fourier moment), `:slim` (proposal §4: six blocks only at `m=0`; `J₀⁺`/
+  `J₀⁻`/per-source slots only at `m>0` — valid only when every `target_brdfs`
+  entry is Lambertian-family), or `:auto` (picks `:slim` iff every entry in
+  `brdfs` — `target_brdfs`, or `model.surfaces` when left at its default —
+  has `component_m_max(b, ctx) == 0`, else `:full`). See the memory-footprint
+  note on [`AtmosphereRTCache`](@ref).
 
 Only `noRS` is supported (see the module-level scope note above);
 `CanopySurface` in `target_brdfs` (or the model's own surface, when
@@ -63,7 +71,11 @@ Only `noRS` is supported (see the module-level scope note above);
 function rt_run_atmosphere(model;
                            target_brdfs = nothing,
                            i_band::Integer = 1,
-                           sources::Union{Nothing, AbstractSource} = nothing)
+                           sources::Union{Nothing, AbstractSource} = nothing,
+                           cache_mode::Symbol = :auto)
+    cache_mode in (:auto, :full, :slim) || throw(ArgumentError(
+        "rt_run_atmosphere: cache_mode must be :auto, :full, or :slim (got $(repr(cache_mode)))."))
+
     iBand = [Int(i_band)]
     brdfs = target_brdfs === nothing ? model.surfaces : collect(target_brdfs)
     for b in brdfs
@@ -86,6 +98,14 @@ function rt_run_atmosphere(model;
     m_max_cache = max(model.solver.m_max_bands[iBand[1]],
                       maximum(component_m_max(b, ctx) for b in brdfs))
 
+    # :auto -> :slim iff every target BRDF is Lambertian-family
+    # (component_m_max == 0 — the only case where the m>0 surface layer is
+    # provably zero, see proposal §4). Otherwise :full.
+    resolved_cache_mode = cache_mode == :auto ?
+        (all(==(0), (component_m_max(b, ctx) for b in brdfs)) ? :slim : :full) :
+        cache_mode
+    slim = resolved_cache_mode == :slim
+
     # Collection slots — filled by the callback below, one push per Fourier
     # moment (m_max_cache + 1 calls total; a handful for typical configs).
     # Held as `Vector{Any}` and narrowed to concrete element types once the
@@ -107,10 +127,23 @@ function rt_run_atmosphere(model;
 
     function cb(state)
         cl = state.composite_layer
-        push!(R⁻⁺, deepcopy(cl.R⁻⁺))
-        push!(R⁺⁻, deepcopy(cl.R⁺⁻))
-        push!(T⁺⁺, deepcopy(cl.T⁺⁺))
-        push!(T⁻⁻, deepcopy(cl.T⁻⁻))
+        if !slim || state.m == 0
+            push!(R⁻⁺, deepcopy(cl.R⁻⁺))
+            push!(R⁺⁻, deepcopy(cl.R⁺⁻))
+            push!(T⁺⁺, deepcopy(cl.T⁺⁺))
+            push!(T⁻⁻, deepcopy(cl.T⁻⁻))
+        else
+            # Slim m>0: a Lambertian-family surface layer is exactly zero
+            # here, so the final interaction is the identity on J₀⁺/J₀⁻ and
+            # rt_run_surface never reads R/T at m>0 (see its slim branch) —
+            # store zero-size placeholders of the SAME concrete array type
+            # (so `AT3[R⁻⁺...]` below still narrows to one concrete type)
+            # instead of a full (NquadN,NquadN,nSpec) deepcopy.
+            push!(R⁻⁺, similar(cl.R⁻⁺, 0, 0, 0))
+            push!(R⁺⁻, similar(cl.R⁺⁻, 0, 0, 0))
+            push!(T⁺⁺, similar(cl.T⁺⁺, 0, 0, 0))
+            push!(T⁻⁻, similar(cl.T⁻⁻, 0, 0, 0))
+        end
         push!(J₀⁺, deepcopy(cl.J₀⁺))
         push!(J₀⁻, deepcopy(cl.J₀⁻))
         push!(J0_by_src, _deepcopy_J0_by_src(cl.J₀_by_src))
@@ -151,7 +184,7 @@ function rt_run_atmosphere(model;
                              SCI}(
         c.pol_type, c.quad_points, c.iμ₀, FT(c.μ₀),
         FT.(collect(c.vza)), FT.(collect(c.vaz)),
-        c.nSpec, m_max_cache, user_l_cap, c.NquadN,
+        c.nSpec, m_max_cache, user_l_cap, c.NquadN, resolved_cache_mode,
         iBand, weights,
         c.arr_type, c.arch, c.SFI, c.RS_type, c.prepared_sources, c.I_static,
         AT3[R⁻⁺...], AT3[R⁺⁻...],
@@ -198,7 +231,11 @@ module-level scope note in this file), and when `component_m_max(brdf,
 ctx)` — evaluated against the *model's* Fourier-support cap
 (`cache.user_l_cap`), not the cache's own width (`cache.m_max`); see
 [`AtmosphereRTCache`](@ref) — exceeds `cache.m_max`: rebuild the cache with
-this BRDF (or one of the same family) in `target_brdfs`.
+this BRDF (or one of the same family) in `target_brdfs`. Also throws
+`ArgumentError` when `cache.cache_mode == :slim` and `brdf` is not
+Lambertian-family (`component_m_max(brdf, ctx) != 0`) — the cache's m>0
+blocks were discarded on the assumption that only a Lambertian-family
+surface would ever be replayed; rebuild with `cache_mode = :full`.
 """
 function rt_run_surface(cache::AtmosphereRTCache{FT}, brdf;
                         verbose::Bool = false) where {FT}
@@ -212,6 +249,16 @@ function rt_run_surface(cache::AtmosphereRTCache{FT}, brdf;
     m_max_needed = component_m_max(brdf, ctx_brdf)
     if m_max_needed > cache.m_max
         throw(ArgumentError("rt_run_surface: BRDF requires m_max=$(m_max_needed) but cache was built with m_max=$(cache.m_max). Pass this BRDF (or one of the same family) to `target_brdfs` on `rt_run_atmosphere`."))
+    end
+
+    # Guard: a :slim cache only kept m>0 atmosphere blocks on the assumption
+    # that the replayed surface is Lambertian-family (m>0 surface layer
+    # exactly zero, see proposal §4). A non-Lambertian BRDF needs the
+    # discarded R/T blocks at m>0 — reject rather than silently replaying
+    # against stale/empty data.
+    slim = cache.cache_mode === :slim
+    if slim && m_max_needed != 0
+        throw(ArgumentError("rt_run_surface: cache was built with cache_mode=:slim (valid only for Lambertian-family surfaces — component_m_max==0); $(typeof(brdf)) needs m_max=$(m_max_needed) support at m>0, which this cache discarded. Rebuild with cache_mode=:full (or cache_mode=:auto with this BRDF in `target_brdfs`)."))
     end
 
     pol_type    = cache.pol_type
@@ -261,47 +308,70 @@ function rt_run_surface(cache::AtmosphereRTCache{FT}, brdf;
     for m in 0:cache.m_max
         weight = cache.weight_per_m[m + 1]
 
-        # Restore the atmosphere-only snapshot into composite_layer. The
-        # cached blocks are already device-resident copies (built via
-        # `deepcopy` in `rt_run_atmosphere`), so no `arr_type(...)` re-wrap
-        # is needed here — `copyto!` handles same-device same-shape arrays
-        # directly.
-        @timeit "Restore snapshot" begin
-            copyto!(composite_layer.R⁻⁺, cache.R⁻⁺_per_m[m + 1])
-            copyto!(composite_layer.R⁺⁻, cache.R⁺⁻_per_m[m + 1])
-            copyto!(composite_layer.T⁺⁺, cache.T⁺⁺_per_m[m + 1])
-            copyto!(composite_layer.T⁻⁻, cache.T⁻⁻_per_m[m + 1])
-            copyto!(composite_layer.J₀⁺, cache.J₀⁺_per_m[m + 1])
-            copyto!(composite_layer.J₀⁻, cache.J₀⁻_per_m[m + 1])
-            for k in keys(composite_layer.J₀_by_src)
-                slot_src = cache.J₀_by_src_per_m[m + 1][k]
-                slot_dst = composite_layer.J₀_by_src[k]
-                copyto!(slot_dst.J₀⁺, slot_src.J₀⁺)
-                copyto!(slot_dst.J₀⁻, slot_src.J₀⁻)
+        if slim && m > 0
+            # Slim replay at m>0 (proposal §4): the cache discarded R/T here
+            # because a Lambertian-family surface layer is EXACTLY zero at
+            # m>0 (`_zero_surface_layer!`), so `create_surface_layer!` →
+            # `surface_source_contribute!` → `interaction!` →
+            # `interaction_hdrf!` reduce to an identity on J₀⁺/J₀⁻ and an
+            # exact zero on `hdr_J₀⁻` (`hdr_J₀⁻ = r⁻⁺⊠J₀⁺ + j₀⁻ = 0⊠J₀⁺ + 0`)
+            # — verified bit-exact against the full replay in
+            # test/test_lambertian_closure.jl. Restore J₀⁺/J₀⁻ (+ per-source
+            # slots) directly and skip straight to postprocessing.
+            @timeit "Restore snapshot (slim)" begin
+                copyto!(composite_layer.J₀⁺, cache.J₀⁺_per_m[m + 1])
+                copyto!(composite_layer.J₀⁻, cache.J₀⁻_per_m[m + 1])
+                for k in keys(composite_layer.J₀_by_src)
+                    slot_src = cache.J₀_by_src_per_m[m + 1][k]
+                    slot_dst = composite_layer.J₀_by_src[k]
+                    copyto!(slot_dst.J₀⁺, slot_src.J₀⁺)
+                    copyto!(slot_dst.J₀⁻, slot_src.J₀⁻)
+                end
             end
+            hdr_J₀⁻ .= zero(FT)
+        else
+            # Restore the atmosphere-only snapshot into composite_layer. The
+            # cached blocks are already device-resident copies (built via
+            # `deepcopy` in `rt_run_atmosphere`), so no `arr_type(...)` re-wrap
+            # is needed here — `copyto!` handles same-device same-shape arrays
+            # directly.
+            @timeit "Restore snapshot" begin
+                copyto!(composite_layer.R⁻⁺, cache.R⁻⁺_per_m[m + 1])
+                copyto!(composite_layer.R⁺⁻, cache.R⁺⁻_per_m[m + 1])
+                copyto!(composite_layer.T⁺⁺, cache.T⁺⁺_per_m[m + 1])
+                copyto!(composite_layer.T⁻⁻, cache.T⁻⁻_per_m[m + 1])
+                copyto!(composite_layer.J₀⁺, cache.J₀⁺_per_m[m + 1])
+                copyto!(composite_layer.J₀⁻, cache.J₀⁻_per_m[m + 1])
+                for k in keys(composite_layer.J₀_by_src)
+                    slot_src = cache.J₀_by_src_per_m[m + 1][k]
+                    slot_dst = composite_layer.J₀_by_src[k]
+                    copyto!(slot_dst.J₀⁺, slot_src.J₀⁺)
+                    copyto!(slot_dst.J₀⁻, slot_src.J₀⁻)
+                end
+            end
+
+            # Surface step — mirrors rt_run.jl's surface block (non-canopy
+            # branch) call-for-call. NOTE: current `rt_run` does NOT call
+            # `inject_surface_SIF!` here (legacy `RS_type.SIF₀` is intentionally
+            # ignored; SIF flows through `surface_source_contribute!` via the
+            # `SurfaceSIF` source) — do not add it back; see rt_run.jl's own
+            # comment at its surface block for the rationale.
+            @timeit "Create Surface" create_surface_layer!(brdf, added_layer_surface,
+                                SFI, m, pol_type, quad_points,
+                                cache.τ_sum_surf, arch;
+                                F₀ = cache.surface_F₀)
+
+            surface_source_contribute!(prepared_sources, brdf, added_layer_surface,
+                                       m, pol_type, arch)
+
+            @timeit "interaction" interaction!(RS_type, cache.sci_surf_per_m[m + 1], SFI,
+                                composite_layer, added_layer_surface, I_static;
+                                workspace = _interaction_ws)
+
+            @timeit "interaction_HDRF" interaction_hdrf!(SFI, composite_layer,
+                                added_layer_surface, m, pol_type, quad_points,
+                                hdr_J₀⁻, bhr_uw, bhr_dw)
         end
-
-        # Surface step — mirrors rt_run.jl's surface block (non-canopy
-        # branch) call-for-call. NOTE: current `rt_run` does NOT call
-        # `inject_surface_SIF!` here (legacy `RS_type.SIF₀` is intentionally
-        # ignored; SIF flows through `surface_source_contribute!` via the
-        # `SurfaceSIF` source) — do not add it back; see rt_run.jl's own
-        # comment at its surface block for the rationale.
-        @timeit "Create Surface" create_surface_layer!(brdf, added_layer_surface,
-                            SFI, m, pol_type, quad_points,
-                            cache.τ_sum_surf, arch;
-                            F₀ = cache.surface_F₀)
-
-        surface_source_contribute!(prepared_sources, brdf, added_layer_surface,
-                                   m, pol_type, arch)
-
-        @timeit "interaction" interaction!(RS_type, cache.sci_surf_per_m[m + 1], SFI,
-                            composite_layer, added_layer_surface, I_static;
-                            workspace = _interaction_ws)
-
-        @timeit "interaction_HDRF" interaction_hdrf!(SFI, composite_layer,
-                            added_layer_surface, m, pol_type, quad_points,
-                            hdr_J₀⁻, bhr_uw, bhr_dw)
 
         @timeit "Postprocessing VZA" postprocessing_vza!(RS_type, iμ₀, pol_type,
                             composite_layer, vza, qp_μ, m, vaz, μ₀, weight,

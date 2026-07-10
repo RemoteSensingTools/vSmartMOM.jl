@@ -116,6 +116,8 @@ export default_parameters, parameters_from_file, parameters_from_source,
 export rt_run_lin, model_from_parameters_lin
 # Atmosphere/surface split (cache the atmosphere phase, sweep the surface phase)
 export rt_run_atmosphere, rt_run_surface, rt_run_multi_surface, AtmosphereRTCache
+# Analytic Lambertian-albedo closure over a cached atmosphere (O(1) per albedo)
+export LambertianClosure, lambertian_closure, albedo_jacobian, invert_albedo
 # Export batch-processing API
 export BatchContext, update_model!,
        update_aerosol_loading!, update_aerosol_microphysics!
