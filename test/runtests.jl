@@ -99,6 +99,11 @@ try
 # LambertianSurfaceSpectrum end-to-end regression.
 @testset "Lambertian surfaces" begin include("test_lambertian_surfaces.jl") end
 
+# Atmosphere/surface split — rt_run_atmosphere / rt_run_surface /
+# rt_run_multi_surface. Bit-exactness regression against monolithic rt_run
+# (same kernels, same inputs); see proposals/surface_split_albedo_sweep.md.
+@testset "Surface split" begin include("test_surface_split.jl") end
+
 # NOTE: GPU/Metal tests live in test/local/gpu/ and run via
 # `julia --project=test test/local/runtests.jl` (the local-only suite); they are
 # NOT part of this CI suite. Likewise, configs needing external LUTs/ABSCO data

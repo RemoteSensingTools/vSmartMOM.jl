@@ -49,12 +49,21 @@ R[1, 1, :]  # Stokes-I reflectance at first VZA across the spectrum
 # See also
 - [`rt_run(model, lin_model, NAer, NGas, NSurf)`](@ref) for linearized RT with Jacobians.
 - [`model_from_parameters`](@ref) to build the model from parameters.
+- [`rt_run_atmosphere`](@ref) / [`rt_run_surface`](@ref) / [`rt_run_multi_surface`](@ref)
+  to amortize the layer-accumulation cost across many surfaces over the same
+  atmosphere. They are implemented on top of the `atm_snapshot_callback` /
+  `stop_after_atmosphere` / `m_max_override` keywords below — most callers
+  should use the higher-level functions rather than these directly.
 """
 function rt_run(model; i_band::Integer = 1,
                 sources::Union{Nothing, AbstractSource} = nothing,
-                streams_callback::Union{Nothing, Function} = nothing)
+                streams_callback::Union{Nothing, Function} = nothing,
+                atm_snapshot_callback::Union{Nothing, Function} = nothing,
+                stop_after_atmosphere::Bool = false,
+                m_max_override::Union{Nothing, Int} = nothing)
     rt_run(InelasticScattering.noRS{float_type(model)}(), model, i_band;
-           sources, streams_callback)
+           sources, streams_callback,
+           atm_snapshot_callback, stop_after_atmosphere, m_max_override)
 end
 
 """
@@ -250,10 +259,20 @@ bit-for-bit. When a [`SourceSet`](@ref) (or a single
 [`AbstractSource`](@ref)) is supplied, the F₀ carried by the first
 [`SolarBeam`](@ref) is routed into `RS_type.F₀` ahead of the existing
 SFI kernel call. Phase 5 will remove the `RS_type.F₀` indirection.
+
+Also accepts the atmosphere/surface-split hooks consumed by
+[`rt_run_atmosphere`](@ref): `atm_snapshot_callback` (fired once per Fourier
+moment right after the layer loop, before the surface step),
+`stop_after_atmosphere` (skip the surface step + postprocessing for this
+call), and `m_max_override` (widen, never narrow, the Fourier loop bound).
+All three default to a no-op / bit-exact-compatible value.
 """
 function rt_run(RS_type::AbstractRamanType, model, iBand;
                 sources::Union{Nothing, AbstractSource} = nothing,
-                streams_callback::Union{Nothing, Function} = nothing)
+                streams_callback::Union{Nothing, Function} = nothing,
+                atm_snapshot_callback::Union{Nothing, Function} = nothing,
+                stop_after_atmosphere::Bool = false,
+                m_max_override::Union{Nothing, Int} = nothing)
     _warn_explicit_depol_raman(RS_type, model)
 
     # Apply the per-model BLAS thread cap once per `rt_run` invocation
@@ -271,6 +290,13 @@ function rt_run(RS_type::AbstractRamanType, model, iBand;
     # max across bands; per-component skipping inside the loop is a
     # Phase C concern.
     m_max = maximum(m_max_bands(model)[ib] for ib in iBand)
+    # Atmosphere/surface split (`rt_run_atmosphere`) — allow callers to widen
+    # the Fourier loop bound without mutating `model.solver`. Only raises the
+    # cap: silently lowering it would truncate scattering that the model was
+    # built to resolve.
+    if m_max_override !== nothing
+        m_max = max(m_max, m_max_override)
+    end
     (; quad_points) = model
     FT       = CoreRT.float_type(model)
     dτ_max_threshold = model.numerics.dτ_max_threshold   # numerical knob → rt_kernel!
@@ -470,6 +496,32 @@ function rt_run(RS_type::AbstractRamanType, model, iBand;
                         dτ_min_floor=dτ_min_floor)
         end
 
+        # Atmosphere/surface split (`rt_run_atmosphere` / `rt_run_surface`).
+        # Fire the optional callback once the iz-loop has settled and the
+        # composite layer holds the atmosphere-only state for this m — BEFORE
+        # the surface step below. `rt_run_atmosphere` uses this to snapshot
+        # the pre-surface composite per Fourier moment; `stop_after_atmosphere`
+        # then skips the surface block + postprocessing + SS correction
+        # entirely (saving real work, not just discarding outputs). When
+        # `atm_snapshot_callback` is `nothing` and `stop_after_atmosphere =
+        # false` (the default), this is a single branch per m, no
+        # allocations — bit-exact backwards compat with pre-split behaviour.
+        if atm_snapshot_callback !== nothing
+            atm_snapshot_callback((;
+                m, weight, pol_type, qp_μ, iμ₀, μ₀,
+                vza, vaz, nSpec, NquadN, iBand, SFI,
+                composite_layer,
+                scattering_interface_surf = scattering_interfaces_all[end],
+                τ_sum_surf = τ_sum_all[:, end],
+                surface_F₀,
+                arr_type, arch, RS_type, prepared_sources, I_static,
+                quad_points,
+            ))
+        end
+        if stop_after_atmosphere
+            continue
+        end
+
         # Create surface matrices:
         if brdf isa CanopySurface
             @timeit "Create Surface" create_surface_layer!(brdf,
@@ -564,7 +616,7 @@ function rt_run(RS_type::AbstractRamanType, model, iBand;
     # a real solar spectrum is inconsistent. The default (unit F₀) path is
     # unaffected. TODO (with Sanghavi): pass surface_F₀ here and scale the glint
     # correction per spectral point to complete the F₀ surface-source feature.
-    if brdf isa CoxMunkSurface && SFI
+    if brdf isa CoxMunkSurface && SFI && !stop_after_atmosphere
         @timeit "SS Correction" apply_ss_correction!(
             R_SFI, brdf, pol_type, vza, vaz, μ₀,
             Array(τ_sum_all[:,end]), m_max, nSpec)

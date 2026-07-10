@@ -114,6 +114,8 @@ export default_parameters, parameters_from_file, parameters_from_source,
        read_atmos_profile, read_atmos_profile_dict
 # Export linearized RT functions
 export rt_run_lin, model_from_parameters_lin
+# Atmosphere/surface split (cache the atmosphere phase, sweep the surface phase)
+export rt_run_atmosphere, rt_run_surface, rt_run_multi_surface, AtmosphereRTCache
 # Export batch-processing API
 export BatchContext, update_model!,
        update_aerosol_loading!, update_aerosol_microphysics!

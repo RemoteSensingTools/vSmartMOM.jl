@@ -103,9 +103,10 @@ include("tools/postprocessing_vza_lin.jl")           # Postprocess linearized
 include("tools/postprocessing_vza_ms.jl")
 
 # RT Run entry points
-include("rt_run.jl")                           # Starting point for RT 
+include("rt_run.jl")                           # Starting point for RT
 include("rt_run_lin.jl")                       # Linearized RT run
 include("rt_run_multisensor.jl")
+include("rt_run_split.jl")                     # Atmosphere/surface split: rt_run_atmosphere/_surface/_multi_surface
 
 # CPU batched operations (always available)
 include("tools/ka_batched_kernels.jl")         # Portable KA batched kernels
@@ -153,6 +154,8 @@ export model_from_parameters,               # Converting the parameters to model
        model_from_parameters_lin,           # Convenience alias for linearized model
        rt_run, rt_run_lin, rt_run_ss,       # Run the RT code (forward, linearized, single scatter)
        rt_run_streams, StreamRTResult,      # Per-Fourier-moment quadrature-stream RT (Phase H)
+       rt_run_atmosphere, rt_run_surface,   # Atmosphere/surface split — cache the atmosphere,
+       rt_run_multi_surface, AtmosphereRTCache, # replay/sweep the surface phase
        default_parameters,                  # Set of default parameters
        BatchContext, update_model!,         # Batch-processing context + scene updater
        update_aerosol_loading!,             # Phase 2: cheap τ_ref / profile update (no Mie)
