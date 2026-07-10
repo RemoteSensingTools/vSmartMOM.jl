@@ -429,10 +429,135 @@ struct ScatteringInterface_01 <: AbstractScatteringInterface end
 struct ScatteringInterface_10 <: AbstractScatteringInterface end
 "Scattering in inhomogeneous composite layer; Scattering in homogeneous layer, added to bottom of the composite layer." 
 struct ScatteringInterface_11 <: AbstractScatteringInterface end
-"Scattering Interface between Surface and Composite Layer" 
+"Scattering Interface between Surface and Composite Layer"
 struct ScatteringInterface_AtmoSurf <: AbstractScatteringInterface end
 
-"Abstract Type for Surface Types" 
+"""
+    AtmosphereRTCache{FT, AT3, AT1, AT2, AT, PT, QT, ARCH, RS, PS, IS, SCI}
+
+Per-Fourier-moment snapshot of the atmosphere-only composite layer, plus the
+context needed to drive the surface phase of [`rt_run`](@ref). Built by
+[`rt_run_atmosphere`](@ref) and consumed by [`rt_run_surface`](@ref); the two
+together replace one full `rt_run` call when iterating BRDFs over the same
+atmosphere — the m-loop layer accumulation (elemental → doubling →
+interaction over `Nz` layers) runs once per scene, not once per surface.
+
+# Memory footprint
+Device-resident: `(m_max+1)` copies of six `(NquadN, NquadN, nSpec)`-ish
+blocks (`R⁻⁺, R⁺⁻, T⁺⁺, T⁻⁻` are `(NquadN, NquadN, nSpec)`; `J₀⁺, J₀⁻` are
+`(NquadN, 1, nSpec)`, budgeted the same order for a rough estimate):
+
+`bytes ≈ (m_max+1) · sizeof(FT) · nSpec · NquadN · (4·NquadN + 2)`
+
+E.g. Float64, `NquadN=60`, `nSpec=10⁴`, `m_max=20`: ≈ 24 GB — fine for small
+`nSpec` / scalar sweeps, prohibitive for full spectral bands on GPU. A
+Lambertian-only slim cache (only `J₀⁻` needed at `m>0`, since a Lambertian
+surface layer is exactly zero there) is a documented follow-up; see
+`proposals/surface_split_albedo_sweep.md` §4.
+
+# Type parameters
+- `FT` — working float type (Float64 / Float32).
+- `AT3` — concrete 3-D array type for R/T/J snapshots (`Array{FT,3}` on
+  CPU, `CuArray{FT,3}` on GPU).
+- `AT1` — concrete 1-D array type for `τ_sum_surf`.
+- `AT2` — concrete 2-D array type for `surface_F₀` (`(pol_n, nSpec)`).
+- `AT` — the array-type constructor (`Array` / `CuArray`); applied as
+  `arr_type(x)` when replaying against a different architecture than the
+  one the cache was built on (not currently exercised — CPU→CPU / GPU→GPU
+  only).
+- `PT` — polarization type (e.g. `Stokes_IQU{FT}`).
+- `QT` — `QuadPoints{FT}` instance type.
+- `ARCH` — architecture (`CPU` / `GPU`).
+- `RS` — Raman type; always `noRS{FT}` for this cache (the only supported
+  type — see the module-level scope note in `rt_run_split.jl`).
+- `PS` — `prepared_sources` concrete type.
+- `IS` — `I_static` concrete type (`Diagonal{FT, AT1}`).
+- `SCI <: AbstractScatteringInterface` — concrete scattering-interface type
+  used at the surface step (uniform across `m` for a given scene).
+
+Every field is concrete so the hot replay loop in `rt_run_surface` stays
+type-stable end-to-end.
+"""
+struct AtmosphereRTCache{FT, AT3, AT1, AT2, AT, PT, QT, ARCH, RS, PS, IS,
+                         SCI <: AbstractScatteringInterface}
+    "Polarization type (Stokes_I / IQU / IQUV)"
+    pol_type::PT
+    "Quadrature points and weights"
+    quad_points::QT
+    "Index of the solar-zenith stream in the quadrature grid"
+    iμ₀::Int
+    "cos(SZA)"
+    μ₀::FT
+    "Viewing zenith angles [deg]"
+    vza::Vector{FT}
+    "Viewing azimuth angles [deg]"
+    vaz::Vector{FT}
+    "Number of spectral points"
+    nSpec::Int
+    "Cache Fourier loop bound (order): the replay in `rt_run_surface` runs
+    `m = 0:m_max`. May exceed the source model's own `m_max_bands[iBand]`
+    when `target_brdfs` (passed to `rt_run_atmosphere`) need a wider bound
+    (e.g. Cox-Munk/RPV/RossLi over an otherwise Lambertian-only model)."
+    m_max::Int
+    "The *model's* own Fourier-support cap (`model.solver.l_trunc` at
+    `rt_run_atmosphere` time — a proxy for the true per-band
+    `user_l_cap`, exact when no aerosols are present). Distinct from
+    `m_max`: used by `rt_run_surface`'s cache-width guard to determine the
+    Fourier order a candidate BRDF actually *needs*, independent of how
+    wide this particular cache happens to be. Using `m_max` there instead
+    would make the guard trivially pass for any surface whose
+    `component_m_max` trait is `ctx.user_l_cap` (Cox-Munk/RPV/RossLi/Canopy)."
+    user_l_cap::Int
+    "`Nquad · pol_type.n`"
+    NquadN::Int
+    "Spectral band index this cache was built for (single-element; see the
+    module-level scope note in `rt_run_split.jl`)"
+    iBand::Vector{Int}
+    "Fourier azimuthal weight per moment (`0.5/π` at m=0, `1/π` otherwise)"
+    weight_per_m::Vector{FT}
+    "Array-type constructor (`Array`/`CuArray`) for the cache's architecture"
+    arr_type::Type{AT}
+    "Compute architecture (CPU/GPU) the cache was built on"
+    arch::ARCH
+    "Source-Function-Integration flag (always `true` — `rt_run` hardcodes it)"
+    SFI::Bool
+    "Raman type — always `noRS{FT}` for this cache"
+    RS_type::RS
+    "Prepared source set (solar beam + any additional sources)"
+    prepared_sources::PS
+    "Static identity matrix used by the interaction step"
+    I_static::IS
+    "Composite-layer `R⁻⁺` snapshot, one per Fourier moment"
+    R⁻⁺_per_m::Vector{AT3}
+    "Composite-layer `R⁺⁻` snapshot, one per Fourier moment"
+    R⁺⁻_per_m::Vector{AT3}
+    "Composite-layer `T⁺⁺` snapshot, one per Fourier moment"
+    T⁺⁺_per_m::Vector{AT3}
+    "Composite-layer `T⁻⁻` snapshot, one per Fourier moment"
+    T⁻⁻_per_m::Vector{AT3}
+    "Composite-layer `J₀⁺` snapshot, one per Fourier moment"
+    J₀⁺_per_m::Vector{AT3}
+    "Composite-layer `J₀⁻` snapshot, one per Fourier moment"
+    J₀⁻_per_m::Vector{AT3}
+    # Per-source J₀ slots stay loosely typed: the NamedTuple key set + slot
+    # type vary across configurations (solar-only, +thermal, +SIF), and the
+    # surface phase walks the NT once per m so the lookup cost is negligible.
+    "Per-source composite `J₀` slots, one NamedTuple per Fourier moment"
+    J₀_by_src_per_m::Vector{NamedTuple}
+    "Scattering-interface trait at the surface step, one per Fourier moment"
+    sci_surf_per_m::Vector{SCI}
+    "Cumulative optical depth to the surface (TOA→BOA), device-resident"
+    τ_sum_surf::AT1
+    "Device-resident surface-incident solar F₀ (`(pol_n, nSpec)`), consumed
+    by `create_surface_layer!`'s `F₀=` kwarg during replay"
+    surface_F₀::AT2
+end
+
+Base.show(io::IO, c::AtmosphereRTCache{FT}) where {FT} = print(io,
+    "AtmosphereRTCache{", FT, "}(m_max=", c.m_max,
+    ", nSpec=", c.nSpec, ", NquadN=", c.NquadN, ")")
+
+"Abstract Type for Surface Types"
 abstract type AbstractSurfaceType end
 
 """
