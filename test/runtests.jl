@@ -104,6 +104,11 @@ try
 # (same kernels, same inputs); see proposals/surface_split_albedo_sweep.md.
 @testset "Surface split" begin include("test_surface_split.jl") end
 
+# Analytic Lambertian-albedo closure (O(1) per albedo) over a cached
+# atmosphere, + the :slim AtmosphereRTCache mode; see
+# proposals/surface_split_albedo_sweep.md §3-4.
+@testset "Lambertian closure" begin include("test_lambertian_closure.jl") end
+
 # NOTE: GPU/Metal tests live in test/local/gpu/ and run via
 # `julia --project=test test/local/runtests.jl` (the local-only suite); they are
 # NOT part of this CI suite. Likewise, configs needing external LUTs/ABSCO data

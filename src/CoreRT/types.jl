@@ -443,17 +443,28 @@ atmosphere — the m-loop layer accumulation (elemental → doubling →
 interaction over `Nz` layers) runs once per scene, not once per surface.
 
 # Memory footprint
-Device-resident: `(m_max+1)` copies of six `(NquadN, NquadN, nSpec)`-ish
-blocks (`R⁻⁺, R⁺⁻, T⁺⁺, T⁻⁻` are `(NquadN, NquadN, nSpec)`; `J₀⁺, J₀⁻` are
-`(NquadN, 1, nSpec)`, budgeted the same order for a rough estimate):
+`:full` mode (`cache_mode`): device-resident `(m_max+1)` copies of six
+`(NquadN, NquadN, nSpec)`-ish blocks (`R⁻⁺, R⁺⁻, T⁺⁺, T⁻⁻` are `(NquadN,
+NquadN, nSpec)`; `J₀⁺, J₀⁻` are `(NquadN, 1, nSpec)`, budgeted the same
+order for a rough estimate):
 
 `bytes ≈ (m_max+1) · sizeof(FT) · nSpec · NquadN · (4·NquadN + 2)`
 
 E.g. Float64, `NquadN=60`, `nSpec=10⁴`, `m_max=20`: ≈ 24 GB — fine for small
-`nSpec` / scalar sweeps, prohibitive for full spectral bands on GPU. A
-Lambertian-only slim cache (only `J₀⁻` needed at `m>0`, since a Lambertian
-surface layer is exactly zero there) is a documented follow-up; see
-`proposals/surface_split_albedo_sweep.md` §4.
+`nSpec` / scalar sweeps, prohibitive for full spectral bands on GPU.
+
+`:slim` mode (proposal §4, Lambertian-family targets only): the four big
+`(NquadN, NquadN, nSpec)` blocks are retained only at `m=0` (needed by
+[`lambertian_closure`](@ref) and the `a=0` replay); at `m>0` a Lambertian
+surface layer is exactly zero (`_zero_surface_layer!`), so the final
+interaction is the identity on `J₀⁺/J₀⁻` and only those two `(NquadN, 1,
+nSpec)` blocks (+ per-source slots) are kept. Footprint drops to
+`4·NquadN²·nSpec + m_max·NquadN·nSpec` (Float64/NquadN=60/nSpec=10⁴/m_max=20:
+24 GB → ≈1.2 GB). `rt_run_atmosphere(...; cache_mode = :auto)` (the default)
+picks `:slim` iff every target BRDF has `component_m_max(b, ctx) == 0`
+(the Lambertian family), else `:full`. `rt_run_surface` throws
+`ArgumentError` if asked to replay a non-Lambertian-family BRDF against a
+`:slim` cache — rebuild with `cache_mode = :full`.
 
 # Type parameters
 - `FT` — working float type (Float64 / Float32).
@@ -510,6 +521,11 @@ struct AtmosphereRTCache{FT, AT3, AT1, AT2, AT, PT, QT, ARCH, RS, PS, IS,
     user_l_cap::Int
     "`Nquad · pol_type.n`"
     NquadN::Int
+    "`:full` (all six blocks at every m) or `:slim` (six blocks at m=0 only;
+    `J₀⁺`/`J₀⁻`/per-source slots only at m>0 — valid only when every
+    replayed BRDF is Lambertian-family, see the memory-footprint note
+    above and `proposals/surface_split_albedo_sweep.md` §4)."
+    cache_mode::Symbol
     "Spectral band index this cache was built for (single-element; see the
     module-level scope note in `rt_run_split.jl`)"
     iBand::Vector{Int}
@@ -555,7 +571,8 @@ end
 
 Base.show(io::IO, c::AtmosphereRTCache{FT}) where {FT} = print(io,
     "AtmosphereRTCache{", FT, "}(m_max=", c.m_max,
-    ", nSpec=", c.nSpec, ", NquadN=", c.NquadN, ")")
+    ", nSpec=", c.nSpec, ", NquadN=", c.NquadN,
+    ", cache_mode=", c.cache_mode, ")")
 
 "Abstract Type for Surface Types"
 abstract type AbstractSurfaceType end
