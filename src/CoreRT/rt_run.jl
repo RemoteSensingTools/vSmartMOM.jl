@@ -512,7 +512,11 @@ function rt_run(RS_type::AbstractRamanType, model, iBand;
                 vza, vaz, nSpec, NquadN, iBand, SFI,
                 composite_layer,
                 scattering_interface_surf = scattering_interfaces_all[end],
-                τ_sum_surf = τ_sum_all[:, end],
+                # Device-resident — the same array the monolithic surface
+                # step consumes below. Snapshotting the host slice
+                # τ_sum_all[:, end] instead would hand rt_run_surface a CPU
+                # Vector to broadcast against device arrays on GPU models.
+                τ_sum_surf = τ_sum_end_dev,
                 surface_F₀,
                 arr_type, arch, RS_type, prepared_sources, I_static,
                 quad_points,
