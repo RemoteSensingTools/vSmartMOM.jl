@@ -94,6 +94,10 @@ GPU note: the cache's device-resident arrays are read exactly once here
 (`Array(...)`-converted up front), so the closure itself is built on the
 host regardless of the cache's architecture; the returned `LambertianClosure`
 is always host-resident, and evaluating it is plain CPU broadcasting.
+
+Like the cache it is built from, the closure describes the scene *as of*
+`rt_run_atmosphere` — any subsequent [`update_model!`](@ref) /
+`update_aerosol_*!` scene change requires a fresh cache and a fresh closure.
 """
 function lambertian_closure(cache::AtmosphereRTCache{FT}) where {FT}
     isempty(cache.J₀_by_src_per_m[1]) || throw(ArgumentError(

@@ -50,6 +50,36 @@ vSmartMOM.update_aerosol_loading!
 vSmartMOM.update_aerosol_microphysics!
 ```
 
+## Atmosphere/Surface Split
+
+Run the atmosphere phase once, replay the surface phase per BRDF — see the
+[Fast Re-runs & Batch Processing](../batch_processing.md) guide.
+
+```@docs
+vSmartMOM.rt_run_atmosphere
+vSmartMOM.rt_run_surface
+vSmartMOM.rt_run_multi_surface
+vSmartMOM.AtmosphereRTCache
+```
+
+## Analytic Lambertian Albedo Closure
+
+```@docs
+vSmartMOM.LambertianClosure
+vSmartMOM.lambertian_closure
+vSmartMOM.albedo_jacobian
+vSmartMOM.invert_albedo
+```
+
+## Scenario Sweeps
+
+```@docs
+vSmartMOM.ScenarioSweep
+vSmartMOM.SweepResult
+vSmartMOM.run_sweep
+vSmartMOM.remake_geometry
+```
+
 ## Stream-Level RT Output
 
 ```@docs
