@@ -2,23 +2,103 @@
 
 **For:** users who want to run the solver on GPU backends.
 
-**Next:** [Quick Start](quickstart.md), [Configure a Scene](IO/Overview.md), [Architecture-Agnostic Code (Concepts)](concepts/07_architecture.md).
+**Next:** [Quick Start](quickstart.md), [IO API](IO/Overview.md), [Architecture-Agnostic Code (Concepts)](concepts/07_architecture.md).
 
-GPU support is provided through optional backend extensions. CUDA is the mature
-NVIDIA path; Metal is a first-pass Apple Silicon path for Float32 runs. The full
-task page will cover:
+Every RT array in vSmartMOM has shape `(NquadN, NquadN, nSpec)` — the
+spectral axis is the batch axis, and the elemental/doubling/interaction
+kernels run as one batched matrix operation per layer per Fourier moment.
+GPU support attaches to that same kernel source via
+[KernelAbstractions.jl](https://juliagpu.github.io/KernelAbstractions.jl)
+and Julia package extensions, with no second code path. See
+[Architecture-Agnostic Code (Concepts)](concepts/07_architecture.md) for the
+full story with file:line evidence; this page is the practical how-to.
 
-- when `vSmartMOM.Architectures.GPU()` is available;
-- when `vSmartMOM.Architectures.MetalGPU()` is available;
-- how `array_type(model)` and architecture dispatch select CPU or GPU arrays;
-- which workflows are GPU-safe today;
-- memory and precision caveats for Float32 and Float64 runs;
-- how to fall back cleanly to CPU.
+## Selecting an architecture
 
-For architecture-dispatch details (including the GPU Mie path via
-`make_mie_model(...; architecture = GPU())` with `NativeFloat64`/`DSEmulated`
-precision policies and the automatic CPU-Mie fallback on Metal), see
-[Architecture-Agnostic Code (Concepts)](concepts/07_architecture.md).
+Set `radiative_transfer.architecture` in the scene configuration:
+
+```yaml
+radiative_transfer:
+  architecture: Architectures.CPU()       # default; always available
+  # architecture: Architectures.GPU()       # CUDA
+  # architecture: Architectures.MetalGPU()  # Apple Silicon
+```
+
+or override an already-loaded `vSmartMOM_Parameters` in a script:
+
+```julia
+params.architecture = vSmartMOM.Architectures.GPU()
+```
+
+`default_architecture()` picks `GPU()` if a functional CUDA device was
+detected when the CUDA extension loaded, `MetalGPU()` if Metal was
+detected, and `CPU()` otherwise; it is used when `architecture` is left
+unset.
+
+## CUDA vs Metal
+
+Both backends attach through Julia package extensions
+(`ext/vSmartMOMCUDAExt.jl`, `ext/vSmartMOMMetalExt.jl`): the dispatch
+methods `Architectures.devi`, `Architectures.array_type`, and
+`Architectures.architecture` are only defined for `GPU()` / `MetalGPU()`
+once the matching backend package has been loaded in the same session
+(`using CUDA` or `using Metal`). Calling `GPU()`/`MetalGPU()` without the
+matching package loaded throws an actionable error (`Architectures.ka_backend`,
+`default_mie_precision_policy`) rather than failing inside a kernel launch.
+
+- **CUDA (`GPU()`)** is the mature, most-tested path: CUBLAS-backed batched
+  matmul/inverse, a GPU Mie pipeline (NAI2), and ForwardDiff `Dual` support
+  through the batched-matmul kernels for linearized (Jacobian) runs.
+- **Metal (`MetalGPU()`)** is a first-pass Apple Silicon path: a portable
+  KernelAbstractions matmul + LU-with-partial-pivoting kernel, no vendor
+  BLAS. The batched-inverse kernel uses `@localmem` threadgroup memory
+  with a conservative 32 KiB guard, so `Float32` matrices with
+  `N = Nquad * n_stokes ≥ 64` are rejected with a clear local-memory error
+  instead of a driver crash.
+
+## Float32 vs Float64
+
+- `MetalGPU()` requires `Float32` scene parameters (`float_type: Float32`).
+- `GPU()` (CUDA) supports both. The GPU Mie precision policy auto-selects
+  `NativeFloat64` for `Float64` models and a Float32-native double-single
+  path (`DSEmulated`) for `Float32` models (`default_mie_precision_policy`).
+- `CPU()` supports both, with no precision-policy distinction.
+
+## What is GPU-safe today
+
+- **Forward elastic RT** (elemental → doubling → interaction, `noRS`) —
+  fully GPU-friendly on CUDA; this is the hot path the batched design
+  targets.
+- **Linearized RT (Jacobians)** — GPU-friendly on CUDA
+  (`test/local/gpu/test_jacobians_GPU.jl`); Metal Jacobian workflows have
+  not been validated yet, so use `CPU()` or `GPU()` for linearized runs.
+- **Raman (RRS/VS)** — runs on GPU (`test/local/gpu/test_forward_raman_gpu.jl`)
+  but carries materially higher memory pressure than the elastic path — the
+  4-D cross-wavelength coupling arrays scale with `nSpec * n_Raman` — so
+  watch VRAM on large spectral batches.
+- **Atmosphere/surface split caches** (`rt_run_atmosphere` / `rt_run_surface`,
+  see [Fast Re-runs & Batch Processing](batch_processing.md)) keep their
+  `AtmosphereRTCache` snapshot device-resident: the cached R/T/J arrays and
+  `τ_sum_surf` stay on the architecture the cache was built on, so a
+  GPU-built cache replays on GPU without a host round-trip.
+- **Mie scattering** — automatic GPU path on CUDA
+  (`make_mie_model(...; architecture=GPU())`, NAI2 only; PCW and the
+  ForwardDiff AD path fall back to CPU). Always CPU on Metal — faster than
+  the Metal multi-kernel path for typical aerosol loads anyway.
+- **Gas absorption** — the production pipeline (`model_from_parameters` →
+  `rt_run`) computes line-by-line absorption via
+  [AtmosphericAbsorption.jl](https://github.com/RemoteSensingTools/AtmosphericAbsorption.jl),
+  which has its own backend dispatch; the standalone `Absorption` module
+  also ships a GPU Voigt kernel for direct σ(ν,T,p) queries.
+
+## CPU fallback
+
+`CPU()` is always available and is the safe default for debugging scenes
+and for any workflow not yet validated on a GPU backend (Metal Jacobians).
+Pass `architecture=CPU()` to `make_mie_model` to force CPU Mie regardless of
+the RT solver's own architecture. The local GPU test suite
+(`test/local/gpu/`, not part of CI) self-skips cleanly when no CUDA device
+is present.
 
 ## Performance Notes
 

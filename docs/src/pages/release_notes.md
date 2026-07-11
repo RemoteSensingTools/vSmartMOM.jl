@@ -2,10 +2,60 @@
 
 **For:** users moving to the registration-ready vSmartMOM 2.0 interface.
 
-**Next:** [Quick Start](quickstart.md), [Configure a Scene](IO/Overview.md), [Compute Jacobians](jacobians.md).
+**Next:** [Quick Start](quickstart.md), [Configure a Scene (step by step)](IO/ConfigurationGuide.md), [Compute Jacobians](jacobians.md).
 
 This page summarizes the user-visible changes in the 2.0 line. It is written as
 a migration guide, not as a complete git history.
+
+## Unreleased (on `feat/surface-split`)
+
+Work in progress on the `feat/surface-split` branch — not yet merged to
+`main`, not yet tagged or released. Summarized here ahead of the PR so the
+migration story stays contiguous; fold this section under a version heading
+once it ships.
+
+### Atmosphere/surface split
+
+Three opt-in `rt_run` keywords — `atm_snapshot_callback`,
+`stop_after_atmosphere`, `m_max_override` — let the atmosphere phase
+(elemental → doubling → interaction over all `Nz` layers) run once and the
+surface phase (surface layer + one final interaction, per Fourier moment)
+replay cheaply against many BRDFs. Built on top of them:
+
+- `rt_run_atmosphere` runs the atmosphere phase once and returns an
+  `AtmosphereRTCache` — a device-resident, per-Fourier-moment snapshot of
+  the pre-surface composite layer (stays on GPU when built on GPU).
+- `rt_run_surface` / `rt_run_multi_surface` replay the surface phase
+  against one or many target BRDFs from that cache; bit-exact vs. the
+  monolithic `rt_run`.
+- Scope: `noRS` (elastic only), single band, Lambertian / RPV / RossLi /
+  Cox-Munk surfaces (Canopy and Raman are rejected with `ArgumentError`).
+
+### Analytic Lambertian albedo closure
+
+`lambertian_closure` builds a `LambertianClosure` from an
+`AtmosphereRTCache` that maps a scalar/spectral Lambertian albedo directly
+to `(R, T)` via a closed-form adding-method expression — no additional RT
+solve per albedo. `albedo_jacobian` gives the analytic `dR/dalbedo`, and
+`invert_albedo` solves for the albedo that reproduces a target TOA
+reflectance. Uses a slimmer `:slim`-mode atmosphere cache (six R/T/J blocks
+at `m=0` only) whenever every target BRDF is Lambertian-family.
+
+### Scenario sweeps
+
+`ScenarioSweep` + `run_sweep` compose the atmosphere/surface split and the
+albedo closure over an SZA/geometry × surface grid, reusing the shared
+optics across the sweep. `remake_geometry` rebuilds just the
+geometry-dependent `ObsGeometry`/`QuadPoints` pair without re-running
+HITRAN absorption or Mie — bit-exact with a fresh `model_from_parameters`
+call at the new geometry.
+
+### New guide
+
+[Fast Re-runs & Batch Processing](batch_processing.md) is a decision table
+for which of the above (or the existing `BatchContext` / `update_model!` /
+`update_aerosol_loading!` / `update_aerosol_microphysics!` family) to reach
+for, keyed by what changes between runs.
 
 ## v2.1.0 — Fourier / stream resolution + source-term refactor
 

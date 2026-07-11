@@ -2,7 +2,7 @@
 
 **For:** users reading aerosol inputs and developers stabilizing aerosol scheme support.
 
-**Next:** [Configure a Scene](../IO/Overview.md), [Mie & Rayleigh (Concepts)](../concepts/03b_scattering.md), [Library](../api_reference.md).
+**Next:** [Configure a Scene (step by step)](../IO/ConfigurationGuide.md), [Mie & Rayleigh (Concepts)](../concepts/03b_scattering.md), [Library](../api_reference.md).
 
 The `Aerosols` module is a user-facing framework for aerosol input data, refractive-index lookup tables, and scheme-specific optical-property preparation. This API is still being stabilized after the `sanghavi-unified` merge, so treat it as available but more likely to evolve than the CoreRT, Absorption, and Scattering APIs.
 

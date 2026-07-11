@@ -1,5 +1,9 @@
 # `scattering` block (optional)
 
+> **Note:** the YAML/TOML key for this block is `scattering` (this page's
+> filename, `aerosols.md`, is historical — kept for stable links; it is not
+> renamed here).
+
 Mie aerosol configuration: per-aerosol size distribution, refractive
 index, vertical distribution, and the Fourier decomposition method.
 Skip this block entirely for clear-sky / Rayleigh-only / canopy-only

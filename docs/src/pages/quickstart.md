@@ -2,7 +2,7 @@
 
 **For:** first-time users who want one successful forward radiative-transfer run.
 
-**Next:** [Configure a Scene](IO/Overview.md), [Compute Jacobians](jacobians.md), [RT basics](concepts/01_overview.md).
+**Next:** [Configure a Scene (step by step)](IO/ConfigurationGuide.md), [Compute Jacobians](jacobians.md), [RT basics](concepts/01_overview.md).
 
 This page is the 5-minute CPU path. It uses a tiny shipped scene so the first run does not require external line-data downloads or aerosol optics setup. The long-form tutorial remains available at [Tutorial: Quick Start](tutorials/Tutorial_QuickStart.md).
 
@@ -46,6 +46,8 @@ For `config/quickstart.yaml`, both arrays have shape `(1, 1, 1)`. Larger scenes 
 
 ## Next Steps
 
-- Change surface, geometry, atmosphere, or spectral settings in [Configure a Scene](IO/Overview.md).
+- Change surface, geometry, atmosphere, or spectral settings in [Configure a Scene (step by step)](IO/ConfigurationGuide.md).
 - Use the same `model_from_parameters` / `rt_run` workflow on a richer example in [Tutorial: Quick Start](tutorials/Tutorial_QuickStart.md).
 - Read [The MOM Solver](concepts/04_mom_solver.md) for the elemental, doubling, and adding operations behind the run.
+- Read [Conventions](conventions.md) before comparing output against another RT code (VLIDORT, DISORT, …) — sign, phase-matrix, and azimuth conventions differ between lineages.
+- Running many scenes/surfaces/geometries instead of one? See [Fast Re-runs & Batch Processing](batch_processing.md).

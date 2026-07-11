@@ -55,7 +55,7 @@ The `surface` vector must have **the same length as `spec_bands`**.
 `CanopySurface` is configured via a top-level `canopy:` block, not as
 a string in `surface:`. The parser wraps each band's surface entry as
 the soil BRDF inside the canopy when `canopy:` is present. See
-`Schema/canopy.md` (forthcoming).
+[`Schema/canopy.md`](canopy.md).
 
 ## Examples
 
