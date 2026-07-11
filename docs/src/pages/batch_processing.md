@@ -6,7 +6,7 @@ ML training sets. If you find yourself calling `model_from_parameters` +
 `rt_run` inside a loop, read this page first: almost always, most of that work
 is recomputing things that did not change.
 
-**Next:** [Quick Start](quickstart.md), [Configure a Scene](IO/Overview.md),
+**Next:** [Quick Start](quickstart.md), [Configure a Scene (step by step)](IO/ConfigurationGuide.md),
 [Surfaces (Concepts)](concepts/05_surfaces.md).
 
 ## Where the time goes

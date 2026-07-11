@@ -34,3 +34,32 @@ vSmartMOM.Absorption.Voigt
 vSmartMOM.Absorption.Lorentz
 vSmartMOM.Absorption.Doppler
 ```
+
+## HITRAN Data Structure
+
+```@docs
+vSmartMOM.Absorption.HitranTable
+```
+
+## Cross-Section Model Types
+
+```@docs
+vSmartMOM.Absorption.HitranModel
+vSmartMOM.Absorption.InterpolationModel
+```
+
+## Complex Error Function Types
+
+The complex error function evaluated inside the Voigt line shape is
+selectable via the `CEF` field on `make_hitran_model` /
+`radiative_transfer.absorption.CEF`.
+
+```@docs
+vSmartMOM.Absorption.HumlicekErrorFunction
+vSmartMOM.Absorption.HumlicekWeidemann32VoigtErrorFunction
+vSmartMOM.Absorption.HumlicekWeidemann32SDErrorFunction
+vSmartMOM.Absorption.CPF12ErrorFunction
+vSmartMOM.Absorption.ErfcHumliErrorFunctionVoigt
+vSmartMOM.Absorption.ErfcHumliErrorFunctionSD
+vSmartMOM.Absorption.ErfcErrorFunction
+```

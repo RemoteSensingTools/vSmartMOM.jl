@@ -10,7 +10,9 @@ defaults are, and which legacy aliases still work.
 
 - **`spec_bands`** — `Vector{String}`. Each string is a Julia range
   expression in cm⁻¹, e.g. `"(1e7/777):0.015:(1e7/757)"`. Multiple
-  bands run as a band-batched solve.
+  bands run as a band-batched solve. See
+  [`Schema/spec_bands.md`](spec_bands.md) for the full expression
+  grammar (explicit lists, ranges, `u"nm"` wavelength tagging).
 - **`surface`** — `Vector{String}`. One BRDF constructor per spectral
   band. See [`Schema/surface.md`](surface.md) for the surface vocabulary
   (`LambertianSurfaceScalar`, `CoxMunkSurface`, `rpvSurfaceScalar`, etc.).
@@ -144,6 +146,7 @@ radiative_transfer:
 
 ## See also
 
+- [`Schema/spec_bands.md`](spec_bands.md) — `spec_bands` expression grammar
 - [`Schema/surface.md`](surface.md) — BRDF vocabulary
 - [`Schema/aerosols.md`](aerosols.md) — Mie size distribution + refractive index
 - [`Schema/sources.md`](sources.md) — `SolarBeam`, `SurfaceSIF`, `BlackbodySource`

@@ -99,3 +99,17 @@ vSmartMOM.CoreRT.surface_index
 vSmartMOM.CoreRT.n_layer_params
 vSmartMOM.CoreRT.canopy_range
 ```
+
+## Quadrature Types
+
+```@docs
+vSmartMOM.CoreRT.AbstractQuadratureType
+vSmartMOM.CoreRT.RadauQuad
+vSmartMOM.CoreRT.GaussLegQuad
+```
+
+## Quadrature Construction
+
+```@docs
+vSmartMOM.CoreRT.rt_set_streams
+```

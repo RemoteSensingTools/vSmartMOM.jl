@@ -1,5 +1,10 @@
 # Configuration Guide — Building a Scene, Step by Step
 
+**For:** users building up a scene one capability at a time (Rayleigh-only →
+polarization → gases → aerosols → surfaces), in file and in-script forms.
+
+**Next:** [Input Schema](Schema.md), [IO API](Overview.md), [Compute Jacobians](../jacobians.md).
+
 This guide builds a vSmartMOM scene up from the simplest possible setup,
 adding one capability at a time. **Every example is shown in two equivalent
 forms** — a config file (TOML or YAML) and the equivalent pure-Julia

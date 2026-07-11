@@ -47,6 +47,12 @@ vSmartMOM supports Julia 1.10 or later.
 pkg> add vSmartMOM
 ```
 
+## Start Here
+
+New to vSmartMOM? [Quick Start](pages/quickstart.md) →
+[Conventions](pages/conventions.md) →
+[Configure a Scene (step by step)](pages/IO/ConfigurationGuide.md).
+
 ## Public Modules
 
 - **[CoreRT](pages/api/core_rt.md)** — adding-doubling solver, model types, optical-property assembly, surface coupling, Jacobian kernels.

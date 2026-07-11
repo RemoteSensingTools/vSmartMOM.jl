@@ -1,5 +1,10 @@
 # Conventions
 
+**For:** anyone cross-validating vSmartMOM against another RT code (VLIDORT,
+DISORT, …) or importing Greek-coefficient / Stokes data from one.
+
+**Next:** [Configure a Scene (step by step)](IO/ConfigurationGuide.md), [Vector RTE & Discretization (Concepts)](concepts/02_rt_theory.md), [Benchmarks](benchmarks.md).
+
 Polarized radiative transfer codes have to commit to a specific set of sign,
 phase-matrix, and angle conventions. Different lineages (Hovenier-Sanghavi,
 Mishchenko-VLIDORT, Stamnes-DISORT, …) made different choices, and the

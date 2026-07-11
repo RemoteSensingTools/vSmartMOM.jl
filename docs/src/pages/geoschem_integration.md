@@ -1,4 +1,4 @@
-# GEOSChem Integration for vSmartMOM
+# GEOS-Chem Integration for vSmartMOM
 
 This document describes the new clean API for integrating GEOSChem NetCDF output files with vSmartMOM radiative transfer calculations.
 

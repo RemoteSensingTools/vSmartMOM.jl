@@ -1,5 +1,11 @@
 # IO Overview
 
+**For:** users who need the `read_parameters` / `Dict` / TOML API surface —
+what dispatches on what, and the safety maps behind string-based config
+fields.
+
+**Next:** [Configure a Scene (step by step)](ConfigurationGuide.md), [Input Schema](Schema.md).
+
 The IO submodule centralizes loading and validation of simulation inputs, decoupled from the CoreRT solvers.
 
 Use `read_parameters` as the user-facing entry point. It dispatches on the input type:

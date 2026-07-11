@@ -104,3 +104,12 @@ Use `test/test_parameters_parser.jl`, `test/test_coxmunk.jl`, and `test/test_can
 ## Linearized RT
 
 If the new surface should contribute analytic Jacobians, add or extend the matching method under `src/CoreRT/Surfaces/*_lin.jl` and update `ParameterLayout` assumptions as needed. Otherwise document that the surface is forward-only and make sure linearized tests either skip it or compare through an explicit finite-difference path.
+
+## Further Reading
+
+Engineering notes & derivation crib sheets:
+[`docs/dev_notes/`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/docs/dev_notes/README.md)
+(see its README) — living technical references (verified theory crib sheet,
+design specs, linearization bug catalog) that go deeper than the public docs
+above. `dev_notes/` lives outside `docs/src/`, so it is a GitHub link rather
+than a relative one.
