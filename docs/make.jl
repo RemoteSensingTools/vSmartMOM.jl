@@ -599,6 +599,7 @@ function build()
                                     "Configure a Scene" => "pages/IO/Overview.md",
                                     "Configuration Guide (step by step)" => "pages/IO/ConfigurationGuide.md",
                                     "Compute Jacobians" => "pages/jacobians.md",
+                                    "Fast Re-runs & Batch Processing" => "pages/batch_processing.md",
                                     "Run on GPU" => "pages/gpu.md",
                                    ],
         "RT basics"             => Any[

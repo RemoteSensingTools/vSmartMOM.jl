@@ -70,6 +70,14 @@ shared arrays and must **not** be called concurrently on the same `ctx`. If you
 run parallel scenes, create one `BatchContext` per worker thread (each
 `BatchContext` owns its own `RTModel` with independent mutable arrays).
 
+!!! warning "Derived caches do not survive updates"
+    An [`AtmosphereRTCache`](@ref) built from `ctx.model` (via
+    [`rt_run_atmosphere`](@ref)) snapshots the optics at build time — every
+    `update_model!` / `update_aerosol_*!` call invalidates it (and any
+    [`LambertianClosure`](@ref) derived from it). Rebuild such caches after
+    each scene update, never reuse them across updates. See the
+    [Fast Re-runs & Batch Processing](@ref) guide.
+
 # Fields
 
 - `model`: the [`RTModel`](@ref) that is updated in place by `update_model!`

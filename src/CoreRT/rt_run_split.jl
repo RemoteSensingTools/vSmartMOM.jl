@@ -67,6 +67,16 @@ m-loop layer-accumulation cost again.
 Only `noRS` is supported (see the module-level scope note above);
 `CanopySurface` in `target_brdfs` (or the model's own surface, when
 `target_brdfs` is left at its default) raises `ArgumentError`.
+
+!!! warning "Caches do not survive scene updates"
+    The cache snapshots the model's optics *at build time*. Any subsequent
+    [`update_model!`](@ref), [`update_aerosol_loading!`](@ref) /
+    [`update_aerosol_microphysics!`](@ref), or direct mutation of
+    `model.optics` silently invalidates it (and any
+    [`LambertianClosure`](@ref) derived from it) — the replay would keep
+    answering for the *old* scene. Per-scenario order must always be:
+    update the scene → `rt_run_atmosphere` → sweep surfaces. See the
+    [Fast Re-runs & Batch Processing](@ref) guide.
 """
 function rt_run_atmosphere(model;
                            target_brdfs = nothing,
