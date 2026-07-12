@@ -246,11 +246,17 @@ value from dividing by ~0).
 function invert_albedo(c::LambertianClosure{FT}, R_meas::AbstractArray{<:Real, 3};
                        i_vza::Int = 1) where {FT}
     n_vza = size(c.R_black, 1)
+    nSpec = length(c.S̄)
     1 <= i_vza <= n_vza || throw(ArgumentError("invert_albedo: i_vza=$i_vza out of range 1:$n_vza"))
+    # Validate every axis the (@inbounds) loop indexes: with bounds checking
+    # off, a too-short spectral axis would read garbage rather than error.
     size(R_meas, 1) >= i_vza || throw(DimensionMismatch(
         "invert_albedo: R_meas has $(size(R_meas, 1)) VZA rows, need at least $i_vza"))
+    size(R_meas, 2) >= 1 || throw(DimensionMismatch(
+        "invert_albedo: R_meas has no Stokes/polarization axis (size(R_meas, 2) == 0)"))
+    size(R_meas, 3) == nSpec || throw(DimensionMismatch(
+        "invert_albedo: R_meas has $(size(R_meas, 3)) spectral points, closure has $nSpec"))
 
-    nSpec = length(c.S̄)
     a = Vector{FT}(undef, nSpec)
     @inbounds for s in 1:nSpec
         t = c.t_up[i_vza, 1, s]
