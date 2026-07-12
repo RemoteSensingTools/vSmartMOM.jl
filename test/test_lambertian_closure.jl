@@ -185,6 +185,12 @@ using Test
         t_up0    = zeros(FT, 1, 1, 2)   # t_upᴵ == 0 everywhere -> NaN guard
         c_degenerate = CoreRT.LambertianClosure{FT}(R_black0, t_up0, FT[0.1, 0.1], FT[0.5, 0.5], FT(0.5 / π))
         @test all(isnan, invert_albedo(c_degenerate, R_black0))
+
+        # Shape guards: a wrong spectral length must raise a clear
+        # DimensionMismatch, NOT silently index out of bounds (the loop is
+        # @inbounds), and an out-of-range i_vza an ArgumentError.
+        @test_throws DimensionMismatch invert_albedo(c_degenerate, zeros(FT, 1, 1, 3))
+        @test_throws ArgumentError invert_albedo(c_degenerate, R_black0; i_vza = 2)
     end
 
     # ---------------------------------------------------------------------
@@ -224,7 +230,8 @@ using Test
         cache_forced_slim = rt_run_atmosphere(model; target_brdfs = [rpv], cache_mode = :slim)
         @test cache_forced_slim.cache_mode == :slim
         @test cache_forced_slim.m_max >= CoreRT.component_m_max(rpv,
-            (; user_l_cap = cache_forced_slim.user_l_cap, stream_l_cap = cache_forced_slim.user_l_cap,
+            (; user_l_cap = cache_forced_slim.user_l_cap,
+               stream_l_cap = 2 * cache_forced_slim.quad_points.Nstreams - 1,
                truncation = nothing, m_max_override = nothing))
         @test_throws ArgumentError rt_run_surface(cache_forced_slim, rpv)
 

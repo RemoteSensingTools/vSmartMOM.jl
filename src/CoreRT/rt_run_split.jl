@@ -254,7 +254,13 @@ function rt_run_surface(cache::AtmosphereRTCache{FT}, brdf;
     end
 
     # Guard: does this BRDF fit within the cache's Fourier loop bound?
-    ctx_brdf = (; user_l_cap = cache.user_l_cap, stream_l_cap = cache.user_l_cap,
+    # `stream_l_cap` follows the documented contract (2·Nstreams − 1), matching
+    # how `rt_run_atmosphere` built the ctx it sized the cache with — so a
+    # `component_m_max` method that consults `stream_l_cap` resolves the same
+    # cap here as at build time (surface traits read `user_l_cap` today, so
+    # this is consistency insurance rather than a live fix).
+    ctx_brdf = (; user_l_cap = cache.user_l_cap,
+                  stream_l_cap = 2 * cache.quad_points.Nstreams - 1,
                   truncation = nothing, m_max_override = nothing)
     m_max_needed = component_m_max(brdf, ctx_brdf)
     if m_max_needed > cache.m_max
