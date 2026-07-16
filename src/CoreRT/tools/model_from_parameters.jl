@@ -217,9 +217,6 @@ function model_from_parameters(params::vSmartMOM_Parameters;
     n_bands = length(params.spec_bands)
     n_aer = isnothing(params.scattering_params) ? 0 : length(params.scattering_params.rt_aerosols)
 
-    # Create observation geometry
-    obs_geom = ObsGeometry{FT}(params.sza, params.vza, params.vaz, params.obs_alt)
-
     # Truncation method (typed; NoTruncation, δBGE, ...). The legacy
     # `params.Δ_angle` is only consulted via the default δBGE built in
     # `parameters_from_dict` when the user has not set `truncation`
@@ -227,9 +224,6 @@ function model_from_parameters(params::vSmartMOM_Parameters;
     # after construction, they must also mutate `params.truncation` —
     # see `_resolved_truncation`.
     truncation_type = _resolved_truncation(params, FT)
-    # Set quadrature points for streams
-    quad_points = rt_set_streams(params.quadrature_type, params.l_trunc, obs_geom, params.polarization_type, array_type(params.architecture))
-
     # Get AtmosphericProfile from parameters.
     # Convert T, p, q to the requested FT so that profile arrays (vcd_dry,
     # p_half, etc.) are consistent with the model float type.  Without this,
@@ -238,14 +232,17 @@ function model_from_parameters(params::vSmartMOM_Parameters;
     # Float32/Float64 arguments and raises a MethodError.
     vmr = isnothing(params.absorption_params) ? Dict() : params.absorption_params.vmr
     T_ft, p_ft, q_ft = convert(Vector{FT}, params.T), convert(Vector{FT}, params.p), convert(Vector{FT}, params.q)
-    p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o, new_vmr, Δz = compute_atmos_profile_fields(T_ft, p_ft, q_ft, vmr)
-
-    profile = AtmosphericProfile(T_ft, p_full, q_ft, p_half, vmr_h2o, vcd_dry, vcd_h2o, new_vmr, Δz)
-
-    # Reduce the profile to the number of target layers (if specified)
-    if params.profile_reduction_n != -1
-        profile = reduce_profile(params.profile_reduction_n, profile);
-    end
+    obs_alt = params.obs_alt isa Real ? FT(params.obs_alt) : convert(Vector{FT}, params.obs_alt)
+    profile, observation = prepare_observer_profile(
+        T_ft, p_ft, q_ft, vmr, obs_alt, params.profile_reduction_n)
+    input_p_full = (p_ft[1:end-1] .+ p_ft[2:end]) ./ FT(2)
+    sources = reframe_vertical_sources(sources, input_p_full, profile.p_full)
+    obs_geom = ObsGeometry{FT}(
+        FT(params.sza), convert(Vector{FT}, params.vza), convert(Vector{FT}, params.vaz), obs_alt,
+        observation.sensor_levels, observation.interior_altitudes,
+        observation.include_toa, observation.include_boa, observation.toa_altitude)
+    quad_points = rt_set_streams(params.quadrature_type, params.l_trunc, obs_geom,
+                                 params.polarization_type, array_type(params.architecture))
     rayleigh_molecular_T = (profile.vcd_dry' * profile.T) / sum(profile.vcd_dry)
 
     # Rayleigh optical depth per spectral point per layer (uses reduced profile size).
@@ -353,7 +350,7 @@ function model_from_parameters(params::vSmartMOM_Parameters;
                                                      params.spec_bands[i_band];
                                                      FT = FT)
                 Absorption.compute_τ_cia!(τ_abs[i_band], cia_table, profile,
-                                           ap.vmr)
+                                           profile.vmr)
             end
         end
 
@@ -643,29 +640,29 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
     n_bands = 3 #length(params.spec_bands)
     n_aer = isnothing(params.scattering_params) ? 0 : length(params.scattering_params.rt_aerosols)
 
-    # Create observation geometry
-    obs_geom = ObsGeometry(params.sza, params.vza, params.vaz, params.obs_alt)
-
     # Truncation method (typed; NoTruncation, δBGE, ...). Matches the elastic
     # `model_from_parameters` site: respects user-set `truncation` field and
     # honours `truncation: auto` via `_resolved_truncation`.
     truncation_type = _resolved_truncation(params, params.float_type)
-
-    # Set quadrature points for streams
-    quad_points = rt_set_streams(params.quadrature_type, params.l_trunc, obs_geom, params.polarization_type, array_type(params.architecture))
 
     # Get AtmosphericProfile from parameters.
     # Convert T, p, q to params.float_type so profile arrays are type-consistent.
     FT_vrs_early = params.float_type
     vmr = isnothing(params.absorption_params) ? Dict() : params.absorption_params.vmr
     T_ft, p_ft, q_ft = convert(Vector{FT_vrs_early}, params.T), convert(Vector{FT_vrs_early}, params.p), convert(Vector{FT_vrs_early}, params.q)
-    p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o, new_vmr, Δz = compute_atmos_profile_fields(T_ft, p_ft, q_ft, vmr)
-    profile = AtmosphericProfile(T_ft, p_full, q_ft, p_half, vmr_h2o, vcd_dry, vcd_h2o, new_vmr, Δz)
-
-    # Reduce the profile to the number of target layers (if specified)
-    if params.profile_reduction_n != -1
-        profile = reduce_profile(params.profile_reduction_n, profile);
-    end
+    obs_alt = params.obs_alt isa Real ? FT_vrs_early(params.obs_alt) :
+              convert(Vector{FT_vrs_early}, params.obs_alt)
+    profile, observation = prepare_observer_profile(
+        T_ft, p_ft, q_ft, vmr, obs_alt, params.profile_reduction_n)
+    input_p_full = (p_ft[1:end-1] .+ p_ft[2:end]) ./ FT_vrs_early(2)
+    sources = reframe_vertical_sources(sources, input_p_full, profile.p_full)
+    obs_geom = ObsGeometry{FT_vrs_early}(
+        FT_vrs_early(params.sza), convert(Vector{FT_vrs_early}, params.vza),
+        convert(Vector{FT_vrs_early}, params.vaz), obs_alt,
+        observation.sensor_levels, observation.interior_altitudes,
+        observation.include_toa, observation.include_boa, observation.toa_altitude)
+    quad_points = rt_set_streams(params.quadrature_type, params.l_trunc, obs_geom,
+                                 params.polarization_type, array_type(params.architecture))
 
     effT = (profile.vcd_dry' * profile.T) / sum(profile.vcd_dry);
     # Define RS type
@@ -762,7 +759,7 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
                                                      params.spec_bands[i_band];
                                                      FT = FT_vrs)
                 Absorption.compute_τ_cia!(τ_abs[i_band], cia_table, profile,
-                                           ap.vmr)
+                                           profile.vmr)
             end
         end
 

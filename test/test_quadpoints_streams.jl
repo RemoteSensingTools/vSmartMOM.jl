@@ -18,7 +18,7 @@ function _make_obs_geom(; sza, vza)
         sza = Float64(sza),
         vza = Float64.(vza),
         vaz = zeros(Float64, length(vza)),
-        obs_alt = 1000.0,
+        obs_alt = [0.0],
     )
 end
 

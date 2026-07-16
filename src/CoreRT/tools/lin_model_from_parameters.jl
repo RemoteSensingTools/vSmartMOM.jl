@@ -43,7 +43,9 @@ This is the **linearized** counterpart of `model_from_parameters(params)`. It co
 - `lin_model::RTModelLin`: Linearized model (all derivative arrays).
 
 # Notes
-- The atmospheric profile may be truncated to the observer altitude for tower/airborne sensors.
+- Strict-interior observer heights are inserted as exact atmospheric
+  interfaces during model construction. The current analytic-linearized
+  solver is full-column-only and rejects those interior output requests.
 - Aerosol Mie calculations use `ForwardDiff.Dual` numbers to simultaneously obtain
   derivatives of the extinction cross-section, single-scattering albedo, truncation
   factor, and greek coefficients with respect to `[nᵣ, nᵢ, rₘ, σᵣ]`.
@@ -62,21 +64,21 @@ function model_from_parameters(lin::LinMode,
             "analytic phase-function aerosols do not yet define Mie-parameter Jacobians."))
     end
 
-    obs_geom = ObsGeometry(params.sza, params.vza, params.vaz, params.obs_alt)
-
     truncation_type = _resolved_truncation(params, params.float_type)
-
-    quad_points = rt_set_streams(params.quadrature_type, params.l_trunc, obs_geom, params.polarization_type, array_type(params.architecture))
 
     vmr = isnothing(abs_params) ? Dict() : abs_params.vmr
     T_ft, p_ft, q_ft = convert(Vector{FT}, params.T), convert(Vector{FT}, params.p), convert(Vector{FT}, params.q)
-    p_full, p_half, vmr_h2o, vcd_dry, vcd_h2o, new_vmr, Δz = compute_atmos_profile_fields(T_ft, p_ft, q_ft, vmr)
-
-    profile = AtmosphericProfile(T_ft, p_full, q_ft, p_half, vmr_h2o, vcd_dry, vcd_h2o, new_vmr, Δz)
-
-    if params.profile_reduction_n != -1
-        profile = reduce_profile(params.profile_reduction_n, profile)
-    end
+    obs_alt = params.obs_alt isa Real ? FT(params.obs_alt) : convert(Vector{FT}, params.obs_alt)
+    profile, observation = prepare_observer_profile(
+        T_ft, p_ft, q_ft, vmr, obs_alt, params.profile_reduction_n)
+    input_p_full = (p_ft[1:end-1] .+ p_ft[2:end]) ./ FT(2)
+    sources = reframe_vertical_sources(sources, input_p_full, profile.p_full)
+    obs_geom = ObsGeometry{FT}(
+        FT(params.sza), convert(Vector{FT}, params.vza), convert(Vector{FT}, params.vaz), obs_alt,
+        observation.sensor_levels, observation.interior_altitudes,
+        observation.include_toa, observation.include_boa, observation.toa_altitude)
+    quad_points = rt_set_streams(params.quadrature_type, params.l_trunc, obs_geom,
+                                 params.polarization_type, array_type(params.architecture))
     rayleigh_molecular_T = (profile.vcd_dry' * profile.T) / sum(profile.vcd_dry)
 
     greek_cabannes = Vector{vSmartMOM.Scattering.GreekCoefs{FT}}()
@@ -230,7 +232,7 @@ function model_from_parameters(lin::LinMode,
                                                          params.spec_bands[i_band];
                                                          FT = FT)
                     Absorption.compute_τ_cia!(τ_abs[i_band], cia_table, profile,
-                                               abs_params.vmr)
+                                               profile.vmr)
                 end
             end
 

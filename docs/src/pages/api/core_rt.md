@@ -32,6 +32,20 @@ vSmartMOM.CoreRT.AddedLayer
 vSmartMOM.CoreRT.RTNumericalParameters
 ```
 
+## Height-Aware Forward Output
+
+`rt_run` returns a named `ObserverRTResult`. Endpoint fields are `nothing`
+when not selected by `geometry.obs_alt`; strict-interior outputs are stored as
+`LevelRadiance` records in `result.levels`. See the
+[`geometry` schema](../IO/Schema/geometry.md) for the scalar/vector selection
+convention.
+
+```@docs
+vSmartMOM.ObserverRTResult
+vSmartMOM.LevelRadiance
+vSmartMOM.total_downwelling
+```
+
 > Source-term types (`SolarBeam`, `BlackbodySource`, `SurfaceSIF`,
 > `SourceSet`, `NoSource`, AD-mode traits, `prepare_source` /
 > `surface_source_contribute!` dispatchers) are documented on the

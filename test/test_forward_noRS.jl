@@ -36,7 +36,7 @@ function run_forward_noRS_smoke(params)
     nVza = length(model.obs_geom.vza)
     for ib in 1:Nbands
         result = rt_run(model; i_band=ib)
-        R = result isa Tuple ? result[1] : result
+        R = result[1]
         nSpec = length(model.atmosphere.spec_bands[ib])
         @test ndims(R) == 3
         @test size(R, 1) == nVza
@@ -93,7 +93,7 @@ println("  Quadrature points: $(model.quad_points.Nquad)")
         println("\n  Running RT for band $ib...")
         @time result = rt_run(model; i_band=ib)
         # rt_run returns a tuple: (R, T, ieR, ieT, ...) — extract reflectance
-        R = result isa Tuple ? result[1] : result
+        R = result[1]
 
         nStokes = CoreRT.polarization_type(model).n
         nVza = length(model.obs_geom.vza)

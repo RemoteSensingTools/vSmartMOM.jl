@@ -25,7 +25,7 @@ function _minimal_parameter_dict(; surface = ["LambertianSurfaceScalar(0.1)"],
             "sza" => 30.0,
             "vza" => [0.0],
             "vaz" => [0.0],
-            "obs_alt" => 1000.0,
+            "obs_alt" => [0.0],
         ),
         "atmospheric_profile" => Dict(
             "T" => [290.0],
@@ -42,6 +42,8 @@ end
     @test params.architecture isa vSmartMOM.Architectures.CPU
     @test params.brdf[1] isa LambertianSurfaceScalar{Float64}
     @test params.spec_bands == [[13000.0, 13000.1]]
+    @test params.obs_alt == [0.0]
+    @test params.obs_alt isa Vector{Float64}
 
     iq_cfg = _minimal_parameter_dict()
     iq_cfg["radiative_transfer"]["polarization_type"] = "Stokes_IQ()"
@@ -55,6 +57,29 @@ end
     ))
     @test metal_params.float_type === Float32
     @test metal_params.architecture isa vSmartMOM.Architectures.MetalGPU
+end
+
+@testset "observer-height scalar/vector contract" begin
+    scalar_cfg = _minimal_parameter_dict()
+    scalar_cfg["geometry"]["obs_alt"] = 0
+    scalar = parameters_from_dict(scalar_cfg)
+    @test scalar.obs_alt === 0.0
+
+    vector_cfg = _minimal_parameter_dict(float_type="Float32")
+    vector_cfg["geometry"]["obs_alt"] = Real[0, 2.5]
+    vector = parameters_from_dict(vector_cfg)
+    @test vector.obs_alt == Float32[0, 2.5]
+    @test vector.obs_alt isa Vector{Float32}
+
+    null_reduction = _minimal_parameter_dict()
+    null_reduction["atmospheric_profile"]["profile_reduction"] = nothing
+    @test parameters_from_dict(null_reduction).profile_reduction_n == -1
+
+    for invalid in (Any[], [-1.0], [Inf], ["5"], true)
+        cfg = _minimal_parameter_dict()
+        cfg["geometry"]["obs_alt"] = invalid
+        @test_throws ArgumentError parameters_from_dict(cfg)
+    end
 end
 
 @testset "TOML file input" begin
@@ -78,7 +103,7 @@ end
                 sza = 30.0
                 vza = [0.0]
                 vaz = [0.0]
-                obs_alt = 1000.0
+                obs_alt = [0.0]
 
                 [atmospheric_profile]
                 T = [290.0]

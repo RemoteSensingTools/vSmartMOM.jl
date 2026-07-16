@@ -74,7 +74,7 @@ using CanopyOptics
                 "geometry" => Dict{String,Any}("sza" => 30.0,
                     "vza" => [30.0, 0.0, 30.0],
                     "vaz" => [180.0, 0.0, 0.0],
-                    "obs_alt" => 1000.0),
+                    "obs_alt" => [0.0]),
                 "atmospheric_profile" => Dict{String,Any}(
                     "T" => [285.0], "p" => [1012.99, 1013.0],
                     "profile_reduction" => -1)))
@@ -154,7 +154,7 @@ using CanopyOptics
         p = parameters_from_dict(Dict{String,Any}(
             "radiative_transfer" => rt,
             "geometry" => Dict{String,Any}("sza" => 30.0, "vza" => [0.0],
-                                            "vaz" => [0.0], "obs_alt" => 1000.0),
+                                            "vaz" => [0.0], "obs_alt" => [0.0]),
             "atmospheric_profile" => Dict{String,Any}(
                 "T" => [285.0], "p" => [1012.99, 1013.0], "profile_reduction" => -1)))
         @test p.truncation isa δBGE                  # legacy default
@@ -180,7 +180,7 @@ using CanopyOptics
             parameters_from_dict(Dict{String,Any}(
                 "radiative_transfer" => rt,
                 "geometry" => Dict{String,Any}("sza" => 30.0, "vza" => [0.0],
-                                                "vaz" => [0.0], "obs_alt" => 1000.0),
+                                                "vaz" => [0.0], "obs_alt" => [0.0]),
                 "atmospheric_profile" => Dict{String,Any}(
                     "T" => [285.0], "p" => [1012.99, 1013.0], "profile_reduction" => -1)))
         end

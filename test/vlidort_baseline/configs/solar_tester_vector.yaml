@@ -33,7 +33,7 @@ geometry:
   sza:                35.0          # overridden per-run in case file
   vza:                [10.0, 20.0, 40.0]
   vaz:                [10.0, 10.0, 10.0]
-  obs_alt:            1000.0
+  obs_alt:            [0]
 
 atmospheric_profile:
   T: [231.62, 231.62, 231.62, 231.62, 231.62, 231.62, 231.62, 231.62, 231.62, 231.62,

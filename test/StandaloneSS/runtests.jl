@@ -322,7 +322,7 @@ end
                 "sza" => 35.0,
                 "vza" => [20.0, 50.0],
                 "vaz" => [0.0, 90.0],
-                "obs_alt" => 1000.0,
+                "obs_alt" => [0.0],
             ),
             "atmospheric_profile" => Dict(
                 "T" => [280.0],

@@ -111,7 +111,8 @@ export load_sif_spectrum, load_ficus_reflectance, sif_data_path, build_sif_sourc
 export default_parameters, parameters_from_file, parameters_from_source,
        parameters_from_yaml, parameters_from_dict,
        model_from_parameters, rt_run, read_parameters,
-       read_atmos_profile, read_atmos_profile_dict
+       read_atmos_profile, read_atmos_profile_dict,
+       ObserverRTResult, LevelRadiance, total_downwelling
 # Export linearized RT functions
 export rt_run_lin, model_from_parameters_lin
 # Export batch-processing API

@@ -239,8 +239,21 @@
           "description": "Viewing azimuth angles in degrees."
         },
         "obs_alt": {
-          "type": "number",
-          "description": "Observer altitude/pressure coordinate used by the existing parser."
+          "description": "Observer height selection in km above model BOA. Scalar 0 selects BOA only; scalar H selects H (or TOA when H is at or above it); [0] selects TOA+BOA; vectors select arbitrary interior heights, with 0 adding both endpoints.",
+          "oneOf": [
+            {
+              "type": "number",
+              "minimum": 0
+            },
+            {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "number",
+                "minimum": 0
+              }
+            }
+          ]
         }
       }
     },
@@ -263,11 +276,14 @@
         },
         "q": {
           "$ref": "#/definitions/numberArray",
-          "description": "Optional specific humidity profile."
+          "description": "Optional specific humidity mass fraction [kg/kg], supplied at N layer centers or N+1 pressure interfaces. Interface values are interpolated to layer centers in log pressure."
         },
         "profile_reduction": {
-          "type": "integer",
-          "description": "Profile reduction level. TOML has no null value, so omit future optional semantics carefully or use an integer."
+          "anyOf": [
+            { "enum": [-1, null] },
+            { "type": "integer", "minimum": 1 }
+          ],
+          "description": "Profile reduction target. A positive integer coarsens the atmosphere; -1 or null disables reduction. Requested interior observer interfaces are retained, raising the effective target to K+1 layers when necessary."
         }
       }
     },
@@ -284,8 +300,13 @@
         },
         "vmr": {
           "type": "object",
-          "additionalProperties": true,
-          "description": "Volume mixing ratios by molecule name."
+          "additionalProperties": {
+            "anyOf": [
+              { "type": "number" },
+              { "$ref": "#/definitions/numberArray" }
+            ]
+          },
+          "description": "Volume mixing ratios by molecule name. Each value is a scalar, an N-value layer profile, or an N+1-value pressure-interface profile."
         },
         "broadening": {
           "type": "string",

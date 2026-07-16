@@ -7,6 +7,43 @@
 This page summarizes the user-visible changes in the 2.0 line. It is written as
 a migration guide, not as a complete git history.
 
+## Unreleased — observer height selection and multi-level radiances
+
+`geometry.obs_alt` is now a geometric height selection in **km above BOA**,
+not a pressure. Scalar and vector forms distinguish a single observing level
+from the historical full-column output:
+
+- `0` returns BOA downwelling only; an interior scalar `H` returns both
+  directions at `H`; a scalar at or above the model TOA returns TOA
+  upwelling only.
+- `[0]` returns TOA upwelling and BOA downwelling.
+- `[H1, H2]` returns both directions at each strict-interior height, and
+  `[0, H]` adds the TOA and BOA endpoints.
+
+Existing full-column scenes that used scalar `0` or a pressure-like value such
+as `1000.0` should migrate to `obs_alt: [0]`; those scalars now mean BOA-only
+and a height above TOA, respectively.
+
+An interior height becomes an exact atmospheric interface. vSmartMOM
+interpolates layer-centred input profiles in log pressure, recomputes derived
+vertical fields, and builds the optical state on the reframed grid. Profile
+reduction preserves all requested interfaces; if `K` distinct interior
+heights require more than the requested reduced layering, the solver raises
+the count to `K + 1` and warns.
+
+Humidity and vector VMR inputs may now use either `N` layer-center values or
+`N+1` pressure-interface values; interface fields are normalized in log
+pressure before height insertion. The GEOS-Chem reader also converts
+`Met_SPHU` from its declared g/kg units to the internal kg/kg mass fraction.
+
+Forward `rt_run` now returns an `ObserverRTResult` with named `toa`, `boa`, and
+`levels` fields. Historical tuple iteration remains available, so scenes with
+`obs_alt: [0]` continue to support `R, T = rt_run(model)`. See the
+[`geometry` schema](IO/Schema/geometry.md) for the complete convention and
+output fields. Strict-interior outputs currently use the full multiple-scatter
+forward driver; the analytic-linearized and single-scatter drivers reject
+interior requests explicitly while continuing to honor endpoint-only choices.
+
 ## v2.1.0 — Fourier / stream resolution + source-term refactor
 
 > **vSmartMOM** = **V**ector **S**imulated **M**easurements of the **A**tmosphere using **R**adiative **T**ransfer based on the **M**atrix **O**perator **M**ethod.
@@ -122,7 +159,7 @@ load CUDA in the environment that runs the model.
 organizes solver state into named sub-objects:
 
 - `solver`: polarization, quadrature, truncation, and numerical settings.
-- `geometry`: solar/viewing geometry and observer altitude.
+- `geometry`: solar/viewing geometry and resolved observer-output interfaces.
 - `quad_points`: quadrature abscissae and weights.
 - `atmosphere`: atmospheric profile and spectral bands.
 - `optics`: Rayleigh, aerosol, gas, and linearized optical-property state.

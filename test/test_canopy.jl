@@ -10,7 +10,7 @@ using Test
 const CO = CanopyOptics
 
 function _canopy_test_quad_points(; FT=Float64, l_trunc=15, pol_type=CoreRT.Stokes_I())
-    obs = CoreRT.ObsGeometry(FT(30), FT[0, 30], FT[0, 0], FT(1000))
+    obs = CoreRT.ObsGeometry(FT(30), FT[0, 30], FT[0, 0], FT[0])
     return CoreRT.rt_set_streams(CoreRT.GaussLegQuad(), l_trunc, obs,
                                  pol_type, Array)
 end
@@ -170,7 +170,7 @@ end
             "sza" => 30.0,
             "vza" => [30.0, 0.0, 30.0],
             "vaz" => [180.0, 0.0, 0.0],
-            "obs_alt" => 1000.0,
+            "obs_alt" => [0.0],
         ),
         "atmospheric_profile" => Dict{String,Any}(
             "T" => [285.0],
@@ -208,7 +208,7 @@ end
     arch = vSmartMOM.Architectures.CPU()
     arr_type = Array
 
-    qp = CoreRT.rt_set_streams(CoreRT.RadauQuad(), 4, CoreRT.ObsGeometry(FT(30), FT[30.0], FT[0.0], FT(1000)), pol_type, arr_type)
+    qp = CoreRT.rt_set_streams(CoreRT.RadauQuad(), 4, CoreRT.ObsGeometry(FT(30), FT[30.0], FT[0.0], FT[0]), pol_type, arr_type)
     nμ   = size(qp.qp_μ, 1) * n_stokes
     nSpec = 1
 

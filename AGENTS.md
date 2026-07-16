@@ -206,6 +206,9 @@ material when explaining the package:
 - **Layer naming:** `CompositeLayer` fields are uppercase (`R, T, J`); `AddedLayer` fields are lowercase (`r, t, j`).
 - **3D RT array layout:** `(NquadN, NquadN, nSpec)` where `NquadN = Nquad * n_stokes`. The third dim is **spectral** — that's what enables batched-matmul over wavelengths.
 - **Spectral units:** wavenumber (cm⁻¹) internally; wavelength (μm) for Mie.
+- **Observer heights:** `obs_alt` is geometric km above BOA. Scalar `0` means
+  BOA only; vector `[0]` means TOA + BOA. Strict-interior heights are exact
+  interfaces and are exposed through `ObserverRTResult.levels`.
 - **Profile direction:** TOA-to-BOA internally. GEOSChem data is BOA-to-TOA and gets flipped on read.
 - **No co-author attribution in commits.**
 - **Test discipline:** must `cd test/` before running tests — test files use relative paths (`test_profiles/`) that only resolve from `test/`.

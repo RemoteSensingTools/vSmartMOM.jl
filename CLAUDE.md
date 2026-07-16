@@ -56,10 +56,15 @@ GPU is a weak dependency via `ext/vSmartMOMCUDAExt.jl` (loads when CUDA.jl is pr
 YAML/TOML/Dict
     → read_parameters()        → vSmartMOM_Parameters   (unified entry point)
     → model_from_parameters()  → RTModel
-    → rt_run(model)            → (R, T) reflectance/transmittance
+    → rt_run(model)            → ObserverRTResult (named endpoint/level radiances)
 ```
 
 `parameters_from_yaml(path)` is the YAML-specific alias and still works; use `read_parameters` for TOML or `Dict` inputs.
+
+With the default `obs_alt: [0]`, `ObserverRTResult` iterates as the historical
+forward tuple, so `R, T = rt_run(model)` still binds TOA upwelling and BOA
+downwelling. Interior-height radiances are available through
+`result.levels`.
 
 Linearized variant: `model_from_parameters(LinMode(), params)` then `rt_run(model, lin_model, NAer, NGas, NSurf)` returns `(R, T, dR, dT)`.
 
@@ -71,7 +76,7 @@ Linearized variant: `model_from_parameters(LinMode(), params)` then `rt_run(mode
 RTModel{ARCH, FT} <: AbstractRTModel{ARCH, FT}
 ├── architecture :: ARCH                    # CPU() or GPU()
 ├── solver       :: SolverConfig{FT}        # polarization, quadrature, truncation, m_max_bands
-├── geometry     :: ObsGeometry{FT}         # sza, vza, vaz, obs_alt
+├── geometry     :: ObsGeometry{FT}         # angles + resolved observer interfaces
 ├── quad_points  :: QuadPoints{FT}          # μ₀, qp_μ, wt_μ, Nquad, Nstreams (v0.7)
 ├── atmosphere   :: Atmosphere{FT}          # profile + spec_bands
 ├── optics       :: Optics{FT}             # ALL optical properties
@@ -110,7 +115,9 @@ For each Fourier moment m = 0..m_max_bands[iBand] (v0.7 — order-semantics; tra
 | `Atmosphere` | `src/CoreRT/types.jl` | AtmosphericProfile + spec_bands |
 | `Optics` | `src/CoreRT/types.jl` | All optical properties (rayleigh, aerosol, abs, rayl) |
 | `AtmosphericProfile` | `src/CoreRT/types.jl` | T, p, q, VMR profiles |
-| `ObsGeometry` | `src/CoreRT/types.jl` | SZA, VZA, VAZ, observer altitude |
+| `ObsGeometry` | `src/CoreRT/types.jl` | SZA, VZA, VAZ, requested/resolved observer heights |
+| `ObserverRTResult` | `src/CoreRT/types.jl` | Named TOA, BOA, and interior-height forward outputs |
+| `LevelRadiance` | `src/CoreRT/types.jl` | Co-located up/down radiances at one interior interface |
 | `QuadPoints` | `src/CoreRT/types.jl` | Quadrature points, weights, mu0 |
 | `CompositeLayer` | `src/CoreRT/types.jl` | Accumulated R, T, J matrices (uppercase) |
 | `AddedLayer` | `src/CoreRT/types.jl` | Single-layer r, t, j matrices (lowercase) |
@@ -150,7 +157,7 @@ All surfaces implement `create_surface_layer!()`. Linearized variants have `_lin
 - **Layer naming**: CompositeLayer uses uppercase (R, T, J), AddedLayer uses lowercase (r, t, j)
 - **3D matrices**: RT matrices are `(NquadN, NquadN, nSpec)` where `NquadN = Nquad * n_stokes`
 - **Spectral units**: wavenumber in cm⁻¹ internally; wavelength in micrometers for Mie
-- **Pressure**: hPa in YAML configs; Pa for obs_alt
+- **Vertical units**: profile pressure is hPa; `obs_alt` is geometric km above BOA
 - **Profile direction**: TOA to BOA (top of atmosphere to bottom)
 
 ## File Structure

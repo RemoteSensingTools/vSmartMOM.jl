@@ -11,7 +11,7 @@ top-level block has its own detail page.
 | Block                                         | Required | Purpose |
 |-----------------------------------------------|:--------:|---------|
 | [`radiative_transfer`](Schema/radiative_transfer.md) | ✓ | RT solver, quadrature, polarization, Fourier resolution (v0.7 `nstreams` knob), truncation |
-| [`geometry`](Schema/geometry.md)              | ✓        | SZA, VZA(s), VAZ(s), observer altitude |
+| [`geometry`](Schema/geometry.md)              | ✓        | SZA, VZA(s), VAZ(s), observer heights and output levels |
 | [`atmospheric_profile`](Schema/atmospheric_profile.md) | ✓ | T, p, q, profile reduction |
 | [`absorption`](Schema/absorption.md)          | ◯        | Gas absorption: VMRs, broadening, HITRAN edition pointer |
 | [`scattering`](Schema/aerosols.md)            | ◯        | Mie aerosol size distribution, phase-function, decomposition |
@@ -116,7 +116,7 @@ geometry:
   sza: 30
   vza: [10, 20, 40]
   vaz: [0, 0, 0]
-  obs_alt: 1000.0
+  obs_alt: [0]          # TOA upwelling + BOA downwelling
 
 atmospheric_profile:
   T: [260, 262, 264]
