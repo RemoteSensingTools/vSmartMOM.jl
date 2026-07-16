@@ -26,6 +26,24 @@ function _direct_height_model(::Type{FT}, obs_alt;
     return model_from_parameters(params)
 end
 
+"Build the artifact-free quickstart scene and its analytic tangent model."
+function _linear_height_model(obs_alt; albedo=0.15, polarization=nothing)
+    params = parameters_from_yaml(_MS_CONFIG)
+    params.obs_alt = obs_alt
+    params.brdf = [LambertianSurfaceScalar(albedo)]
+    polarization === nothing || (params.polarization_type = polarization)
+    return model_from_parameters(LinMode(), params)
+end
+
+"Run the artifact-free forward multisensor scene at one Lambertian albedo."
+function _surface_height_result(obs_alt, albedo; polarization=nothing)
+    params = parameters_from_yaml(_MS_CONFIG)
+    params.obs_alt = obs_alt
+    params.brdf = [LambertianSurfaceScalar(albedo)]
+    polarization === nothing || (params.polarization_type = polarization)
+    return rt_run(model_from_parameters(params))
+end
+
 "Direct-beam attenuation above one quickstart observer interface."
 function _expected_unscattered(model, boundary_index, F₀)
     FT = CoreRT.float_type(model)
@@ -331,7 +349,7 @@ end
     @test combined.levels[1].downwelling ≈ interior.levels[1].downwelling
 end
 
-@testset "full-column-only solver observer semantics" begin
+@testset "single-scatter observer semantics" begin
     interior_model = _height_model(5.0)
 
     ss_error = try
@@ -344,26 +362,6 @@ end
     @test sprint(showerror, ss_error) ==
           "ArgumentError: rt_run_ss does not support interior-height radiances; " *
           "use rt_run(model) for obs_alt requests inside the atmosphere"
-
-    lin_error = try
-        rt_run(interior_model, nothing, 0, 0, 0; i_band=1)
-        nothing
-    catch err
-        err
-    end
-    @test lin_error isa ArgumentError
-    @test sprint(showerror, lin_error) ==
-          "ArgumentError: linearized rt_run does not support interior-height radiances; " *
-          "use rt_run(model) for obs_alt requests inside the atmosphere"
-
-    lin_params = parameters_from_yaml(_MS_CONFIG)
-    lin_params.obs_alt = 0.0
-    lin_model, jac_model = model_from_parameters(LinMode(), lin_params)
-    lin_boa = rt_run(lin_model, jac_model, 0, 0, 1; i_band=1)
-    @test lin_boa[1] === nothing
-    @test lin_boa[2] !== nothing
-    @test lin_boa[3] === nothing
-    @test lin_boa[4] !== nothing
 
     # Single-scatter still computes a full column internally, but its public
     # slots honor the same resolved scalar endpoint convention as rt_run.
@@ -382,6 +380,312 @@ end
     @test toa_ss[4] === nothing
     @test toa_ss[5] !== nothing
     @test toa_ss[6] === nothing
+end
+
+@testset "linearized multisensor API and surface Jacobian" begin
+    obs_alt = [0.0, 5.0]
+    albedo = 0.15
+    model, lin_model = _linear_height_model(obs_alt; albedo)
+    NAer = 0
+    NGas = size(lin_model.τ̇_abs[1], 1)
+    NSurf = 1
+    result = rt_run(model, lin_model, NAer, NGas, NSurf; i_band=1)
+
+    @test result isa ObserverRTResultLin
+    @test result.layout.aerosol_params == 7
+    @test result.layout.n_aerosols == NAer
+    @test result.layout.n_gases == NGas
+    @test result.layout.n_surface == NSurf
+    @test CoreRT.n_total(result.layout) == 2
+
+    # Preserve the historical four-slot destructuring and indexing contract.
+    R, T, dR, dT = result
+    @test length(result) == 4
+    @test result[1] === R === result.toa
+    @test result[2] === T === result.boa
+    @test result[3] === dR === result.toa_jacobian
+    @test result[4] === dT === result.boa_jacobian
+    @test Tuple(result) == (R, T, dR, dT)
+
+    @test length(result.levels) == 1
+    level = only(result.levels)
+    @test level isa LevelRadianceLin
+    @test level.height_km == 5.0
+    @test level.boundary_index == only(model.obs_geom.sensor_levels)
+    @test size(level.upwelling) == (1, 1, 1)
+    @test size(level.downwelling) == (1, 1, 1)
+    @test size(level.upwelling_jacobian) == (1, 1, 1, 2)
+    @test size(level.downwelling_jacobian) == (1, 1, 1, 2)
+    @test size(level.unscattered_downwelling_jacobian) == (1, 1, 1, 2)
+    @test total_downwelling(level) ==
+          level.downwelling .+ level.unscattered_downwelling
+    @test total_downwelling_jacobian(level) ==
+          level.downwelling_jacobian .+
+          level.unscattered_downwelling_jacobian
+
+    # Height-aware linearized records should remain inspectable without
+    # dumping their array contents.
+    result_summary = sprint(summary, result)
+    result_text = sprint(show, MIME("text/plain"), result)
+    level_text = sprint(show, MIME("text/plain"), level)
+    @test occursin("ObserverRTResultLin(2 endpoint(s), 1 interior level(s), 2 parameter(s))",
+                   result_summary)
+    @test occursin("parameters: 2", result_text)
+    @test occursin("interior levels: 1", result_text)
+    @test occursin("LevelRadianceLin at 5.0 km above BOA", level_text)
+    @test occursin("Jacobians: (1, 1, 1, 2)", level_text)
+
+    # The analytic path must reproduce the independently assembled forward
+    # multisensor field before its tangent is assessed.
+    forward = _surface_height_result(obs_alt, albedo)
+    forward_level = only(forward.levels)
+    @test level.upwelling ≈ forward_level.upwelling rtol=2e-11 atol=2e-13
+    @test level.downwelling ≈ forward_level.downwelling rtol=2e-11 atol=2e-13
+    @test level.unscattered_downwelling ≈
+          forward_level.unscattered_downwelling rtol=2e-13 atol=2e-15
+
+    # Central finite difference in the cheap Rayleigh-only quickstart scene:
+    # no HITRAN or Mie data are loaded by either perturbation.
+    δ = 1e-5
+    plus = only(_surface_height_result(obs_alt, albedo + δ).levels)
+    minus = only(_surface_height_result(obs_alt, albedo - δ).levels)
+    fd_up = (plus.upwelling .- minus.upwelling) ./ (2δ)
+    fd_down = (plus.downwelling .- minus.downwelling) ./ (2δ)
+    surface_column = CoreRT.surface_index(result.layout)
+
+    @test level.upwelling_jacobian[:, :, :, surface_column] ≈
+          fd_up rtol=3e-4 atol=2e-9
+    @test level.downwelling_jacobian[:, :, :, surface_column] ≈
+          fd_down rtol=3e-4 atol=2e-9
+    @test all(iszero,
+              level.unscattered_downwelling_jacobian[:, :, :, surface_column])
+
+    # Endpoint-only selection remains backward compatible with the same
+    # height-aware result type.
+    boa_model, boa_lin_model = _linear_height_model(0.0; albedo)
+    boa_result = rt_run(boa_model, boa_lin_model, 0,
+                        size(boa_lin_model.τ̇_abs[1], 1), 1; i_band=1)
+    @test boa_result isa ObserverRTResultLin
+    @test boa_result.toa === nothing
+    @test boa_result.boa !== nothing
+    @test boa_result.toa_jacobian === nothing
+    @test boa_result.boa_jacobian !== nothing
+    @test isempty(boa_result.levels)
+end
+
+@testset "linearized multisensor absorption and direct-beam Jacobian" begin
+    # Give the quickstart model one synthetic absorption-scale parameter. This
+    # exercises the full atmospheric and direct-beam tangent without requiring
+    # HITRAN input: τ_abs(x) = x κ in every reframed layer.
+    obs_alt = [0.0, 5.0]
+    model, lin_model = _linear_height_model(obs_alt)
+    Nz = length(model.profile.T)
+    κ = reshape(collect(range(0.01, 0.03; length=Nz)), 1, Nz)
+    x = 0.7
+    δ = 1e-5
+
+    model.τ_abs[1] .= x .* κ
+    lin_model.τ̇_abs[1] .= 0
+    @views lin_model.τ̇_abs[1][1, :, :] .= κ
+
+    result = rt_run(model, lin_model, 0, 1, 1; i_band=1)
+    level = only(result.levels)
+    gas_column = first(CoreRT.gas_range(result.layout))
+    surface_column = CoreRT.surface_index(result.layout)
+
+    plus_model = deepcopy(model)
+    minus_model = deepcopy(model)
+    plus_model.τ_abs[1] .+= δ .* κ
+    minus_model.τ_abs[1] .-= δ .* κ
+    plus_result = rt_run(plus_model)
+    minus_result = rt_run(minus_model)
+    plus = only(plus_result.levels)
+    minus = only(minus_result.levels)
+
+    fd_up = (plus.upwelling .- minus.upwelling) ./ (2δ)
+    fd_down = (plus.downwelling .- minus.downwelling) ./ (2δ)
+    fd_direct = (plus.unscattered_downwelling .-
+                 minus.unscattered_downwelling) ./ (2δ)
+    fd_total_down = fd_down .+ fd_direct
+    fd_toa = (plus_result.toa .- minus_result.toa) ./ (2δ)
+    fd_boa = (plus_result.boa .- minus_result.boa) ./ (2δ)
+
+    @test level.upwelling_jacobian[:, :, :, gas_column] ≈
+          fd_up rtol=5e-4 atol=2e-9
+    @test level.downwelling_jacobian[:, :, :, gas_column] ≈
+          fd_down rtol=5e-4 atol=2e-9
+    @test level.unscattered_downwelling_jacobian[:, :, :, gas_column] ≈
+          fd_direct rtol=5e-6 atol=2e-10
+    @test total_downwelling_jacobian(level)[:, :, :, gas_column] ≈
+          fd_total_down rtol=5e-4 atol=2e-9
+    @test result.toa_jacobian[:, :, :, gas_column] ≈
+          fd_toa rtol=5e-4 atol=2e-9
+    @test result.boa_jacobian[:, :, :, gas_column] ≈
+          fd_boa rtol=5e-4 atol=2e-9
+
+    # Independently verify the closed-form direct-beam tangent at the exact
+    # observer interface. The quickstart VZA equals the SZA, so the direct
+    # carrier is present and nonzero.
+    τ̇_above = sum(@view κ[:, 1:level.boundary_index])
+    expected_direct = -level.unscattered_downwelling .* τ̇_above ./
+                      model.quad_points.μ₀
+    @test !all(iszero, level.unscattered_downwelling)
+    @test level.unscattered_downwelling_jacobian[:, :, :, gas_column] ≈
+          expected_direct rtol=5e-13 atol=2e-15
+    @test all(iszero,
+              level.unscattered_downwelling_jacobian[:, :, :, surface_column])
+end
+
+@testset "linearized multisensor endpoint limits" begin
+    # An interface one millimetre above BOA must approach the production BOA
+    # total (diffuse + collimated) radiance and its analytic surface tangent.
+    near_boa_model, near_boa_lin = _linear_height_model([0.0, 1.0e-6])
+    near_boa = rt_run(near_boa_model, near_boa_lin, 0,
+                      size(near_boa_lin.τ̇_abs[1], 1), 1; i_band=1)
+    near_boa_level = only(near_boa.levels)
+    surface_column = CoreRT.surface_index(near_boa.layout)
+    @test total_downwelling(near_boa_level) ≈ near_boa.boa rtol=5e-9
+    @test total_downwelling_jacobian(near_boa_level)[:, :, :, surface_column] ≈
+          near_boa.boa_jacobian[:, :, :, surface_column] rtol=2e-7
+
+    # Likewise, an interface one millimetre below TOA approaches the endpoint
+    # upwelling radiance and Jacobian.
+    base_model = _height_model([0.0])
+    near_toa_height = base_model.obs_geom.toa_altitude - 1.0e-6
+    near_toa_model, near_toa_lin = _linear_height_model(
+        [0.0, near_toa_height])
+    near_toa = rt_run(near_toa_model, near_toa_lin, 0,
+                      size(near_toa_lin.τ̇_abs[1], 1), 1; i_band=1)
+    near_toa_level = only(near_toa.levels)
+    @test near_toa_level.upwelling ≈ near_toa.toa rtol=5e-9
+    @test near_toa_level.upwelling_jacobian[:, :, :, surface_column] ≈
+          near_toa.toa_jacobian[:, :, :, surface_column] rtol=1e-9
+end
+
+@testset "linearized multisensor polarized finite difference" begin
+    polarization = vSmartMOM.Scattering.Stokes_IQU()
+    obs_alt = [0.0, 5.0]
+    albedo = 0.15
+    δ = 1.0e-5
+    model, lin_model = _linear_height_model(
+        obs_alt; albedo, polarization)
+    result = rt_run(model, lin_model, 0, size(lin_model.τ̇_abs[1], 1), 1;
+                    i_band=1)
+    level = only(result.levels)
+    surface_column = CoreRT.surface_index(result.layout)
+
+    forward = only(_surface_height_result(
+        obs_alt, albedo; polarization).levels)
+    plus = only(_surface_height_result(
+        obs_alt, albedo + δ; polarization).levels)
+    minus = only(_surface_height_result(
+        obs_alt, albedo - δ; polarization).levels)
+    fd_up = (plus.upwelling .- minus.upwelling) ./ (2δ)
+    fd_down = (plus.downwelling .- minus.downwelling) ./ (2δ)
+
+    @test size(level.upwelling, 2) == 3
+    @test level.upwelling ≈ forward.upwelling rtol=2e-11 atol=2e-13
+    @test level.downwelling ≈ forward.downwelling rtol=2e-11 atol=2e-13
+    @test level.upwelling_jacobian[:, :, :, surface_column] ≈
+          fd_up rtol=5e-4 atol=2e-9
+    @test level.downwelling_jacobian[:, :, :, surface_column] ≈
+          fd_down rtol=5e-4 atol=2e-9
+end
+
+@testset "linearized multiple arbitrary heights" begin
+    obs_alt = [3.0, 8.0]
+    albedo = 0.15
+    δ = 1.0e-5
+    model, lin_model = _linear_height_model(obs_alt; albedo)
+    result = rt_run(model, lin_model, 0, size(lin_model.τ̇_abs[1], 1), 1;
+                    i_band=1)
+    plus = _surface_height_result(obs_alt, albedo + δ)
+    minus = _surface_height_result(obs_alt, albedo - δ)
+    surface_column = CoreRT.surface_index(result.layout)
+
+    @test result.toa === nothing
+    @test result.boa === nothing
+    @test getfield.(result.levels, :height_km) == [8.0, 3.0]
+    for (level, plus_level, minus_level) in
+            zip(result.levels, plus.levels, minus.levels)
+        fd_up = (plus_level.upwelling .- minus_level.upwelling) ./ (2δ)
+        fd_down = (plus_level.downwelling .- minus_level.downwelling) ./ (2δ)
+        @test level.upwelling_jacobian[:, :, :, surface_column] ≈
+              fd_up rtol=5e-4 atol=2e-9
+        @test level.downwelling_jacobian[:, :, :, surface_column] ≈
+              fd_down rtol=5e-4 atol=2e-9
+    end
+
+    # Exercise the atmospheric prefix and cumulative-τ indexing at both
+    # observer interfaces. A synthetic absorption scale avoids HITRAN data
+    # while giving each reframed layer a distinct derivative.
+    Nz = length(model.profile.T)
+    κ = reshape(collect(range(0.01, 0.03; length=Nz)), 1, Nz)
+    x = 0.7
+    model.τ_abs[1] .= x .* κ
+    lin_model.τ̇_abs[1] .= 0
+    @views lin_model.τ̇_abs[1][1, :, :] .= κ
+    gas_result = rt_run(model, lin_model, 0,
+                        size(lin_model.τ̇_abs[1], 1), 1; i_band=1)
+    gas_column = first(CoreRT.gas_range(gas_result.layout))
+
+    gas_plus_model = deepcopy(model)
+    gas_minus_model = deepcopy(model)
+    gas_plus_model.τ_abs[1] .+= δ .* κ
+    gas_minus_model.τ_abs[1] .-= δ .* κ
+    gas_plus = rt_run(gas_plus_model)
+    gas_minus = rt_run(gas_minus_model)
+
+    for (level, plus_level, minus_level) in
+            zip(gas_result.levels, gas_plus.levels, gas_minus.levels)
+        fd_up = (plus_level.upwelling .- minus_level.upwelling) ./ (2δ)
+        fd_down = (plus_level.downwelling .- minus_level.downwelling) ./ (2δ)
+        fd_direct = (plus_level.unscattered_downwelling .-
+                     minus_level.unscattered_downwelling) ./ (2δ)
+        @test level.upwelling_jacobian[:, :, :, gas_column] ≈
+              fd_up rtol=5e-4 atol=2e-9
+        @test level.downwelling_jacobian[:, :, :, gas_column] ≈
+              fd_down rtol=5e-4 atol=2e-9
+        @test level.unscattered_downwelling_jacobian[:, :, :, gas_column] ≈
+              fd_direct rtol=5e-6 atol=2e-10
+    end
+end
+
+@testset "linearized multisensor source guard" begin
+    model, lin_model = _linear_height_model([0.0, 5.0])
+    thermal = ThermalEmission(B_layer=ones(
+        length(model.profile.T), size(model.τ_abs[1], 1)))
+    err = try
+        rt_run(model, lin_model, 0, size(lin_model.τ̇_abs[1], 1), 1;
+               i_band=1, sources=thermal)
+        nothing
+    catch caught
+        caught
+    end
+    @test err isa ArgumentError
+    @test sprint(showerror, err) ==
+          "ArgumentError: linearized interior-height radiances currently " *
+          "support SolarBeam/NoSource only; thermal and surface-emission " *
+          "sources require linearized multisensor source-slot propagation"
+end
+
+@testset "linearized multisensor Float32" begin
+    params = parameters_from_yaml(_MS_CONFIG)
+    params.float_type = Float32
+    params.obs_alt = [0.0, 5.0]
+    model, lin_model = model_from_parameters(LinMode(), params)
+    result = rt_run(model, lin_model, 0, size(lin_model.τ̇_abs[1], 1), 1;
+                    i_band=1)
+    forward = rt_run(model_from_parameters(params))
+    level = only(result.levels)
+    forward_level = only(forward.levels)
+
+    @test eltype(level.upwelling) === Float32
+    @test eltype(level.upwelling_jacobian) === Float32
+    @test all(isfinite, level.upwelling_jacobian)
+    @test all(isfinite, level.downwelling_jacobian)
+    @test level.upwelling ≈ forward_level.upwelling rtol=2e-5
+    @test level.downwelling ≈ forward_level.downwelling rtol=2e-5
 end
 
 @testset "multisensor explicit solar carrier" begin

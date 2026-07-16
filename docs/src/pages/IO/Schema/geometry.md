@@ -151,14 +151,74 @@ R, T = rt_run(model)
 ```
 
 Use the named `levels` records for interior-height outputs. At present,
-interior-height runs support `SolarBeam` and `NoSource`; thermal and surface
-emission sources require multisensor source-slot propagation and produce a
-clear error. `CanopySurface` also produces a clear error because its spectral
-setup and atmosphere-canopy interleaving are not represented in the legacy
-multisensor kernel. The analytic-linearized and single-scatter drivers are
-currently full-column-only and likewise reject strict-interior height
-requests; endpoint selection still follows the scalar/vector convention in
-those drivers.
+forward interior-height runs support `SolarBeam` and `NoSource`; thermal and
+surface-emission sources require multisensor source-slot propagation and
+produce a clear error. `CanopySurface` also produces a clear error because its
+spectral setup and atmosphere-canopy interleaving are not represented in the
+legacy forward multisensor kernel.
+
+### Reading linearized height-aware results
+
+The analytic full-multiple-scatter path uses the same height convention and
+returns an `ObserverRTResultLin`:
+
+```julia
+model, lin_model = model_from_parameters(LinMode(), params)
+NAer = isnothing(params.scattering_params) ? 0 :
+       length(params.scattering_params.rt_aerosols)
+NGas = size(lin_model.τ̇_abs[1], 1)
+NSurf = 1
+
+result_lin = rt_run_lin(model, lin_model, NAer, NGas, NSurf)
+
+result_lin.toa
+result_lin.boa
+result_lin.toa_jacobian
+result_lin.boa_jacobian
+result_lin.layout
+
+for level in result_lin.levels
+    up = level.upwelling
+    down = level.downwelling
+    direct = level.unscattered_downwelling
+
+    dup = level.upwelling_jacobian
+    ddown = level.downwelling_jacobian
+    ddirect = level.unscattered_downwelling_jacobian
+    dtotal = total_downwelling_jacobian(level)
+end
+```
+
+Each `LevelRadianceLin` Jacobian appends the parameter dimension to the
+corresponding forward array, giving shape
+`nVZA × nStokes × nSpec × nParams`. Its last axis follows
+`result_lin.layout`. The unscattered-beam tangent is reported separately from
+the diffuse tangent and obeys
+
+```math
+\frac{\partial L_{\mathrm{direct}}}{\partial x_j}
+= -\frac{L_{\mathrm{direct}}}{\mu_0}
+  \frac{\partial \tau_{\mathrm{above}}}{\partial x_j}.
+```
+
+It is nonzero only for atmospheric parameter columns and solar-aligned output
+ordinates; surface-parameter columns are zero. Use
+`total_downwelling(level)` and `total_downwelling_jacobian(level)` when a
+diffuse-plus-direct total is required. The BOA endpoint fields `boa` and
+`boa_jacobian` retain the historical total-radiance convention and already
+include this carrier; only strict-interior records keep it separate.
+
+`ObserverRTResultLin` remains iterable as the historical
+`(toa, boa, toa_jacobian, boa_jacobian)` tuple, so endpoint-only callers can
+continue to write `R, T, dR, dT = rt_run_lin(...)`.
+
+Linearized interior-height radiances are currently supported on the elastic
+`noRS` path with `SolarBeam` or `NoSource`. Thermal and surface-emission
+sources require linearized multisensor source-slot propagation and are
+rejected explicitly, as is `CanopySurface`. Raman-active linearization remains
+unsupported. The single-scatter driver `rt_run_ss` is still full-column-only
+and rejects strict-interior requests explicitly; its endpoint selection
+continues to follow the scalar/vector convention above.
 
 ## See also
 

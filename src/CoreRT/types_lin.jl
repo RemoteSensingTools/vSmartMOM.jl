@@ -2,6 +2,73 @@
 abstract type AbstractLayerLin end
 
 """
+    LevelRadianceLin
+
+Forward radiances and analytic Jacobians at one strict-interior atmospheric
+interface.  The three radiance fields mirror [`LevelRadiance`](@ref); each
+`*_jacobian` field appends the `ParameterLayout` dimension as its last axis.
+
+The unscattered solar beam is kept separate from the diffuse MOM field.  Use
+[`total_downwelling`](@ref) and [`total_downwelling_jacobian`](@ref) when the
+sum of both components is desired.
+"""
+struct LevelRadianceLin{FT,U,D,JU,JD}
+    "Geometric height in km above model BOA"
+    height_km::FT
+    "Interface index: number of atmospheric layers above this level"
+    boundary_index::Int
+    upwelling::U
+    downwelling::D
+    unscattered_downwelling::D
+    upwelling_jacobian::JU
+    downwelling_jacobian::JD
+    unscattered_downwelling_jacobian::JD
+end
+
+"Return diffuse plus unscattered downwelling radiance at an interior level."
+function total_downwelling(level::LevelRadianceLin)
+    return level.downwelling .+ level.unscattered_downwelling
+end
+
+"Return the analytic Jacobian of [`total_downwelling`](@ref)."
+function total_downwelling_jacobian(level::LevelRadianceLin)
+    return level.downwelling_jacobian .+
+           level.unscattered_downwelling_jacobian
+end
+
+"""
+    ObserverRTResultLin
+
+Height-aware result from the analytic tangent-linear RT solver.  `toa` and
+`boa` contain the requested endpoint radiances, their matching Jacobians are
+stored in `toa_jacobian` and `boa_jacobian`, and `levels` contains co-located
+up/down results at every requested strict-interior height.
+
+For backward compatibility the result is iterable and indexable as the
+historical four slots `(toa, boa, toa_jacobian, boa_jacobian)`.
+"""
+struct ObserverRTResultLin{FT,TOA,BOA,JTOA,JBOA,L}
+    toa::TOA
+    boa::BOA
+    toa_jacobian::JTOA
+    boa_jacobian::JBOA
+    levels::Vector{L}
+    toa_altitude_km::FT
+    layout::ParameterLayout
+end
+
+@inline _observer_lin_legacy_tuple(r::ObserverRTResultLin) =
+    (r.toa, r.boa, r.toa_jacobian, r.boa_jacobian)
+Base.length(::ObserverRTResultLin) = 4
+Base.firstindex(::ObserverRTResultLin) = 1
+Base.lastindex(::ObserverRTResultLin) = 4
+Base.getindex(r::ObserverRTResultLin, indices...) =
+    getindex(_observer_lin_legacy_tuple(r), indices...)
+Base.iterate(r::ObserverRTResultLin, state...) =
+    iterate(_observer_lin_legacy_tuple(r), state...)
+Base.Tuple(r::ObserverRTResultLin) = _observer_lin_legacy_tuple(r)
+
+"""
     CompositeLayerLin{FT} <: AbstractLayerLin
 
 Linearized (Jacobian) counterpart of [`CompositeLayer`](@ref).  Each field

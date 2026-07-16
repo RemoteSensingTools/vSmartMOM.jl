@@ -55,6 +55,96 @@ function _set_unscattered_downwelling!(direct_dwJ, sensor_levels, τ_sum_all,
     return direct_dwJ
 end
 
+"""
+    _set_unscattered_downwelling_lin!(direct_dwJ, direct_dwJ_lin,
+                                      sensor_levels, τ_sum_all, τ̇_sum_all,
+                                      F₀, vza, qp_μ, iμ₀, μ₀, pol_type)
+
+Populate an observer-boundary unscattered solar carrier and its analytic
+Jacobian. This is used for strict-interior records and for the historical BOA
+endpoint total. `direct_dwJ_lin[ims]` has layout
+`(nVZA, nStokes, nSpec, Nparams)`. For a boundary with `k` layers above it,
+the atmospheric-parameter tangent is
+
+```math
+\\dot L_{\\mathrm{dir},j}
+= -L_{\\mathrm{dir}}\\,\\dot\\tau_{\\mathrm{above},j}/\\mu_0,
+\\qquad
+\\dot\\tau_{\\mathrm{above},j} = \\dot\\tau_{\\mathrm{sum}}[:,j,k+1].
+```
+
+The first `size(τ̇_sum_all, 2)` Jacobian columns are atmospheric
+(aerosol followed by gas). Remaining columns, including surface parameters,
+are reset to zero because an unscattered beam above the surface is independent
+of them. The forward helper supplies the solar-ordinate selection, m=0 Stokes
+selector, and `1/(2π)` normalization so the tangent stays exactly aligned
+with the reported carrier.
+
+Only the requested cumulative-`τ̇` interface slice is transferred from a
+GPU; the full vertical Jacobian profile is never copied to the host.
+"""
+function _set_unscattered_downwelling_lin!(direct_dwJ, direct_dwJ_lin,
+                                            sensor_levels, τ_sum_all, τ̇_sum_all,
+                                            F₀, vza, qp_μ, iμ₀, μ₀, pol_type)
+    length(direct_dwJ) == length(direct_dwJ_lin) == length(sensor_levels) ||
+        throw(DimensionMismatch(
+            "direct radiance, direct Jacobian, and sensor-level collections " *
+            "must have the same length"))
+
+    # Keep the forward carrier and its tangent on one convention path. Reset
+    # both outputs first so reused workspaces also leave non-solar VZAs and
+    # non-atmospheric parameter columns identically zero.
+    for direct in direct_dwJ
+        fill!(direct, zero(eltype(direct)))
+    end
+    _set_unscattered_downwelling!(direct_dwJ, sensor_levels, τ_sum_all,
+                                  F₀, vza, qp_μ, iμ₀, μ₀, pol_type)
+
+    for direct_lin in direct_dwJ_lin
+        fill!(direct_lin, zero(eltype(direct_lin)))
+    end
+
+    FT = eltype(F₀)
+    μ₀ > zero(FT) || return direct_dwJ_lin
+
+    nSpec = size(F₀, 2)
+    size(τ̇_sum_all, 1) == nSpec || throw(DimensionMismatch(
+        "cumulative optical-depth Jacobian has $(size(τ̇_sum_all, 1)) " *
+        "spectral points, but F₀ has $nSpec"))
+    size(τ̇_sum_all, 3) == size(τ_sum_all, 2) || throw(DimensionMismatch(
+        "cumulative optical depth and its Jacobian have different boundary counts"))
+
+    n_atmos_params = size(τ̇_sum_all, 2)
+    n_atmos_params == 0 && return direct_dwJ_lin
+
+    for ims in eachindex(sensor_levels)
+        boundary = sensor_levels[ims]
+        boundary == 0 && continue
+        1 <= boundary < size(τ̇_sum_all, 3) ||
+            throw(BoundsError(τ̇_sum_all, (:, :, boundary + 1)))
+
+        direct = direct_dwJ[ims]
+        direct_lin = direct_dwJ_lin[ims]
+        size(direct_lin)[1:3] == size(direct) || throw(DimensionMismatch(
+            "direct Jacobian leading dimensions $(size(direct_lin)[1:3]) " *
+            "do not match direct radiance dimensions $(size(direct))"))
+        size(direct_lin, 4) >= n_atmos_params || throw(DimensionMismatch(
+            "direct Jacobian has $(size(direct_lin, 4)) parameter columns, " *
+            "but cumulative optical depth has $n_atmos_params"))
+
+        # Transfer only nSpec×nAtmosParams for this requested interface.
+        τ̇_above = _to_cpu(@view τ̇_sum_all[:, :, boundary + 1])
+        direct_cpu = _to_cpu(direct)
+        attenuation_tangent = -τ̇_above ./ μ₀
+        direct_atmos_lin =
+            reshape(direct_cpu, size(direct_cpu)..., 1) .*
+            reshape(attenuation_tangent, 1, 1, nSpec, n_atmos_params)
+        @views direct_lin[:, :, :, 1:n_atmos_params] .= direct_atmos_lin
+    end
+
+    return direct_dwJ_lin
+end
+
 "Multi-sensor post-processing: elastic (noRS)"
 function postprocessing_vza_ms!(RS_type::noRS,
         sensor_levels,
