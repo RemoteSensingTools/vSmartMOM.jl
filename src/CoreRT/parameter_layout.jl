@@ -4,9 +4,11 @@
 Describes the ordering of physical parameters in the Jacobian derivative dimension.
 
 Instead of hardcoding `7*NAer + NGas + NSurf` throughout the codebase, all index
-arithmetic goes through this struct.  Each aerosol carries `aerosol_params`
-sub-parameters (currently 7: `τ_ref, nᵣ, nᵢ, rₘ, σ_g, p₀, σ_p`), followed by
-one slot per gas VMR and one per surface parameter.
+arithmetic goes through this struct. Each aerosol carries `aerosol_params`
+sub-parameters (currently 7: `τ_ref, nᵣ, nᵢ, rₘ, σ_g`, profile location,
+profile width), followed by one slot per gas VMR and one per surface parameter.
+The final two columns are `(p₀, σ_p)` for a pressure-form `Normal` profile and
+`(z₀, σ₀)` for an altitude-form `LogNormal` profile.
 
 # Example
 ```julia

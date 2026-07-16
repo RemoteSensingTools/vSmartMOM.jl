@@ -219,20 +219,21 @@ println("─"^70)
         end
     end
     
-    # --- Profile params (p₀, σp) ---
-    prof_names = ["p₀", "σp"]
+    # --- Profile location/width: (p₀, σp) or (z₀, σ₀) ---
+    prof_names = ["location", "width"]
     @testset "Aerosol profile params" for iaer in 1:NAer
         for (j, pname) in enumerate(prof_names)
-            i_aerprop = j + 5  # p₀=6, σp=7
+            i_aerprop = j + 5  # profile location=6, profile width=7
             pert_idx = 1 + Nmol + 7*(iaer-1) + i_aerprop
             dR_idx = NGas + 7*(iaer-1) + i_aerprop
             
-            if pname == "p₀"
-                Δ = mean(pert_params[pert_idx].scattering_params.rt_aerosols[iaer].profile) - 
-                    mean(params.scattering_params.rt_aerosols[iaer].profile)
+            pert_profile = pert_params[pert_idx].scattering_params.rt_aerosols[iaer].profile
+            base_profile = params.scattering_params.rt_aerosols[iaer].profile
+            if pname == "location"
+                Δ = _profile_location(pert_profile) -
+                    _profile_location(base_profile)
             else
-                Δ = std(pert_params[pert_idx].scattering_params.rt_aerosols[iaer].profile) - 
-                    std(params.scattering_params.rt_aerosols[iaer].profile)
+                Δ = _profile_width(pert_profile) - _profile_width(base_profile)
             end
             
             R_pert = run_fwd_only(pert_params[pert_idx])

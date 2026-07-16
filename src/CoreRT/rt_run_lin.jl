@@ -45,7 +45,9 @@ radiances and Jacobians at requested strict-interior observer heights.
 # Parameter Layout in `dR` / `dT`
 The `Nparams` derivative dimension is ordered as:
 1. **Aerosol sub-parameters** (7 per aerosol type):
-   `[τ_ref, nᵣ, nᵢ, rₘ, σᵣ, p₀, σp]` for each aerosol, so indices `1:7*NAer`
+   `[τ_ref, nᵣ, nᵢ, rₘ, σᵣ, profile_location, profile_width]` for each
+   aerosol, so indices `1:7*NAer`. The profile pair is `(p₀, σp)` for
+   `Normal` and `(z₀, σ₀)` for `LogNormal`.
 2. **Gas VMR parameters**: indices `7*NAer+1 : 7*NAer+NGas`
 3. **Surface parameters**: indices `7*NAer+NGas+1 : Nparams`
 

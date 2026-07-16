@@ -2,14 +2,115 @@ using Test
 using vSmartMOM
 using vSmartMOM.CoreRT
 using YAML
+using Distributions: Exponential, LogNormal, Normal
 
 const _MS_CONFIG = joinpath(@__DIR__, "..", "config", "quickstart.yaml")
+const _MS_JACOBIAN_CONFIG = joinpath(
+    @__DIR__, "test_parameters", "JacobianTestFast.yaml")
 
 function _height_model(obs_alt; reduction=-1)
     params = parameters_from_yaml(_MS_CONFIG)
     params.obs_alt = obs_alt
     params.profile_reduction_n = reduction
     return model_from_parameters(params)
+end
+
+@testset "observer-height aerosol profile linearization parity" begin
+    # Regression for the independent FwdMode-vs-LinMode τ_ref discrepancy at
+    # H=5 km. Both constructors must discretize the pressure Normal on the exact
+    # same reduced/H-anchored grid; otherwise their normalized columns agree in
+    # total while the tiny aerosol tail above H differs materially.
+    params = parameters_from_yaml(_MS_JACOBIAN_CONFIG)
+    params.obs_alt = 5.0
+    FT = params.float_type
+    vmr = params.absorption_params.vmr
+    profile, observation = CoreRT.prepare_observer_profile(
+        convert(Vector{FT}, params.T),
+        convert(Vector{FT}, params.p),
+        convert(Vector{FT}, params.q),
+        vmr, FT(params.obs_alt), params.profile_reduction_n)
+
+    dist = only(params.scattering_params.rt_aerosols).profile
+    @test dist isa Normal
+    p₀ = FT(dist.μ)
+    σp = FT(dist.σ)
+    τ_fwd = CoreRT.getAerosolLayerOptProp(one(FT), dist, profile)
+    τ_lin, dτ_dp₀, dτ_dσp = CoreRT.getAerosolLayerOptProp(
+        LinMode(), one(FT), dist, profile)
+
+    @test τ_lin == τ_fwd
+    @test sum(τ_lin) ≈ one(FT) rtol=2eps(FT)
+
+    # The cumulative τ_ref derivative above H is the direct-beam tangent's
+    # attenuation factor. Check it explicitly so a future normalized-profile
+    # mismatch cannot hide in the very small upper-atmosphere entries.
+    boundary = only(observation.sensor_levels)
+    δτ = FT(1e-6)
+    fd_τref = (((one(FT) + δτ) .* τ_fwd) .-
+                 ((one(FT) - δτ) .* τ_fwd)) ./ (2δτ)
+    @test sum(@view fd_τref[1:boundary]) ≈
+          sum(@view τ_lin[1:boundary]) rtol=2e-10 atol=1e-15
+
+    δp₀ = FT(1e-3)
+    fd_p₀ = (CoreRT.getAerosolLayerOptProp(
+                  one(FT), Normal(p₀ + δp₀, σp), profile) .-
+              CoreRT.getAerosolLayerOptProp(
+                  one(FT), Normal(p₀ - δp₀, σp), profile)) ./ (2δp₀)
+    δσp = FT(1e-4)
+    fd_σp = (CoreRT.getAerosolLayerOptProp(
+                  one(FT), Normal(p₀, σp + δσp), profile) .-
+              CoreRT.getAerosolLayerOptProp(
+                  one(FT), Normal(p₀, σp - δσp), profile)) ./ (2δσp)
+    @test dτ_dp₀ ≈ fd_p₀ rtol=2e-7 atol=2e-13
+    @test dτ_dσp ≈ fd_σp rtol=2e-7 atol=2e-13
+
+    # Altitude-form YAML profiles are stored as LogNormal(log(z₀), σ₀).
+    # Exercise the Float32 type that the broad forward/LinMode parity suite
+    # builds, and verify both the exact base column and its user-parameter
+    # tangents without constructing the expensive Mie model.
+    alt_params = parameters_from_yaml(joinpath(
+        @__DIR__, "test_parameters", "Phase1b_RRS_761-764nm.yaml"))
+    alt_FT = alt_params.float_type
+    alt_vmr = isnothing(alt_params.absorption_params) ?
+              Dict() : alt_params.absorption_params.vmr
+    alt_profile, _ = CoreRT.prepare_observer_profile(
+        convert(Vector{alt_FT}, alt_params.T),
+        convert(Vector{alt_FT}, alt_params.p),
+        convert(Vector{alt_FT}, alt_params.q),
+        alt_vmr,
+        convert(Vector{alt_FT}, alt_params.obs_alt),
+        alt_params.profile_reduction_n)
+    alt_dist = only(alt_params.scattering_params.rt_aerosols).profile
+    @test alt_dist isa LogNormal{Float32}
+
+    alt_fwd = CoreRT.getAerosolLayerOptProp(one(alt_FT), alt_dist, alt_profile)
+    alt_lin, dτ_dz₀, dτ_dσ₀ = CoreRT.getAerosolLayerOptProp(
+        LinMode(), one(alt_FT), alt_dist, alt_profile)
+    @test alt_lin == alt_fwd
+
+    z₀ = exp(alt_dist.μ)
+    δz₀ = alt_FT(1e-3)
+    fd_z₀ = (CoreRT.getAerosolLayerOptProp(
+                  one(alt_FT), LogNormal(log(z₀ + δz₀), alt_dist.σ),
+                  alt_profile) .-
+              CoreRT.getAerosolLayerOptProp(
+                  one(alt_FT), LogNormal(log(z₀ - δz₀), alt_dist.σ),
+                  alt_profile)) ./ (2δz₀)
+    δσ₀ = alt_FT(1e-3)
+    fd_σ₀ = (CoreRT.getAerosolLayerOptProp(
+                  one(alt_FT), LogNormal(alt_dist.μ, alt_dist.σ + δσ₀),
+                  alt_profile) .-
+              CoreRT.getAerosolLayerOptProp(
+                  one(alt_FT), LogNormal(alt_dist.μ, alt_dist.σ - δσ₀),
+                  alt_profile)) ./ (2δσ₀)
+    @test dτ_dz₀ ≈ fd_z₀ rtol=2e-3 atol=5e-11
+    @test dτ_dσ₀ ≈ fd_σ₀ rtol=2e-3 atol=5e-11
+
+    # Do not silently publish zero shape Jacobians when an arbitrary forward
+    # distribution has no mapping onto the fixed two profile parameters.
+    generic_dist = Exponential(alt_FT(100))
+    @test_throws ArgumentError CoreRT.getAerosolLayerOptProp(
+        LinMode(), one(alt_FT), generic_dist, alt_profile)
 end
 
 function _direct_height_model(::Type{FT}, obs_alt;
