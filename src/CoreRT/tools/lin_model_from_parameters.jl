@@ -44,8 +44,8 @@ This is the **linearized** counterpart of `model_from_parameters(params)`. It co
 
 # Notes
 - Strict-interior observer heights are inserted as exact atmospheric
-  interfaces during model construction. The current analytic-linearized
-  solver is full-column-only and rejects those interior output requests.
+  interfaces during model construction and are supported by the elastic
+  analytic-linearized solver.
 - Aerosol Mie calculations use `ForwardDiff.Dual` numbers to simultaneously obtain
   derivatives of the extinction cross-section, single-scattering albedo, truncation
   factor, and greek coefficients with respect to `[nᵣ, nᵢ, rₘ, σᵣ]`.
@@ -83,7 +83,7 @@ function model_from_parameters(lin::LinMode,
 
     greek_cabannes = Vector{vSmartMOM.Scattering.GreekCoefs{FT}}()
     greek_rayleigh = Vector{vSmartMOM.Scattering.GreekCoefs{FT}}()
-    ϖ_Cabannes = zeros(n_bands)
+    ϖ_Cabannes = zeros(FT, n_bands)
     τ_rayl = [zeros(params.float_type, length(params.spec_bands[i]), length(profile.p_full)) for i=1:n_bands]
 
     FT2 = isnothing(abs_params) || !haskey(abs_params.vmr, "CO2") ? params.float_type : eltype(abs_params.vmr["CO2"])
@@ -96,7 +96,10 @@ function model_from_parameters(lin::LinMode,
 
     for i_band=1:n_bands
 
-        curr_band_λ = params.float_type(1e4) ./ params.spec_bands[i_band]
+        # `params` may have been parsed as Float64 and subsequently switched
+        # to Float32 by a caller. Keep the wavelength grid consistent with the
+        # reframed profile and Rayleigh arrays, as the forward constructor does.
+        curr_band_λ = FT.(FT(1e4) ./ params.spec_bands[i_band])
         νₘ = FT(0.5)*(params.spec_bands[i_band][1]+params.spec_bands[i_band][end])
         λₘ = FT(1.e7)/νₘ
         # Per-band molecular-constant depolarizations. ϖ_Cabannes is always

@@ -32,7 +32,7 @@ vSmartMOM.CoreRT.AddedLayer
 vSmartMOM.CoreRT.RTNumericalParameters
 ```
 
-## Height-Aware Forward Output
+## Height-Aware Forward and Linearized Output
 
 `rt_run` returns a named `ObserverRTResult`. Endpoint fields are `nothing`
 when not selected by `geometry.obs_alt`; strict-interior outputs are stored as
@@ -40,10 +40,19 @@ when not selected by `geometry.obs_alt`; strict-interior outputs are stored as
 [`geometry` schema](../IO/Schema/geometry.md) for the scalar/vector selection
 convention.
 
+The analytic linearized solver returns `ObserverRTResultLin`. It stores
+endpoint Jacobians alongside the endpoint radiances and uses
+`LevelRadianceLin` records for co-located forward fields and Jacobians at each
+strict-interior height. Both result types retain their historical tuple
+iteration conventions.
+
 ```@docs
 vSmartMOM.ObserverRTResult
 vSmartMOM.LevelRadiance
+vSmartMOM.ObserverRTResultLin
+vSmartMOM.LevelRadianceLin
 vSmartMOM.total_downwelling
+vSmartMOM.total_downwelling_jacobian
 ```
 
 > Source-term types (`SolarBeam`, `BlackbodySource`, `SurfaceSIF`,

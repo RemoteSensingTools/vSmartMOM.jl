@@ -38,10 +38,9 @@ physical parameters via the linearized Matrix Operator Method.
 - `i_band::Integer=1`: Spectral band index.
 
 # Returns
-- `R`: Reflected Stokes vector `[nVZA × nStokes × nSpec]`
-- `T`: Transmitted Stokes vector `[nVZA × nStokes × nSpec]`
-- `dR`: Jacobian of R, `[nVZA × nStokes × nSpec × Nparams]`
-- `dT`: Jacobian of T, `[nVZA × nStokes × nSpec × Nparams]`
+An [`ObserverRTResultLin`](@ref). It remains iterable as the historical
+`(R, T, dR, dT)` endpoint tuple, while `result.levels` exposes forward
+radiances and Jacobians at requested strict-interior observer heights.
 
 # Parameter Layout in `dR` / `dT`
 The `Nparams` derivative dimension is ordered as:
@@ -105,7 +104,6 @@ function rt_run(RS_type::AbstractRamanType,
                     NAer::Int, NGas::Int, NSurf::Int,
                     iBand;
                     sources::Union{Nothing, AbstractSource} = nothing)
-    _require_endpoint_observers(model, "linearized rt_run")
     if InelasticScattering.has_inelastic(RS_type)
         throw(ArgumentError(
             "Linearized Raman-active RT is intentionally unsupported. " *
@@ -163,6 +161,13 @@ function rt_run(RS_type::AbstractRamanType,
     # in scope for the surface step (`surface_source_contribute!`) that
     # routes SurfaceSIF / future per-source surface contributions.
     effective_sources = sources === nothing ? model.sources : sources
+    if !isempty(model.obs_geom.sensor_levels)
+        _multisensor_source_supported(effective_sources) || throw(ArgumentError(
+            "linearized interior-height radiances currently support " *
+            "SolarBeam/NoSource only; thermal and surface-emission sources " *
+            "require linearized multisensor source-slot propagation"))
+        _require_multisensor_surfaces(model, (iBand,))
+    end
     prepared_sources = prepare_sources(effective_sources, FT, pol_type.n, nSpec, arr_type)
     if sources === nothing && size(F₀) == (pol_type.n, nSpec) && !iszero(F₀)
         # User pre-set F₀ honored — F₀ already in scope from RS_type unpack.
@@ -176,10 +181,17 @@ function rt_run(RS_type::AbstractRamanType,
     T       = zeros(FT, length(vza), pol_type.n, nSpec)
     Ṙ       = zeros(FT, length(vza), pol_type.n, nSpec, Nparams)
     Ṫ       = zeros(FT, length(vza), pol_type.n, nSpec, Nparams)
+    sensor_levels = model.obs_geom.sensor_levels
+    level_uw = [zeros(FT, length(vza), pol_type.n, nSpec) for _ in sensor_levels]
+    level_dw = [zeros(FT, length(vza), pol_type.n, nSpec) for _ in sensor_levels]
+    level_direct_dw = [zeros(FT, length(vza), pol_type.n, nSpec) for _ in sensor_levels]
+    level_uw_lin = [zeros(FT, length(vza), pol_type.n, nSpec, Nparams) for _ in sensor_levels]
+    level_dw_lin = [zeros(FT, length(vza), pol_type.n, nSpec, Nparams) for _ in sensor_levels]
+    level_direct_dw_lin = [zeros(FT, length(vza), pol_type.n, nSpec, Nparams) for _ in sensor_levels]
     # Notify user of processing parameters
     msg = 
     """
-    Processing on: $(architecture)
+    Processing on: $(CoreRT.architecture(model))
     With FT: $(FT)
     Source Function Integration: $(SFI)
     Dimensions: $((NquadN, NquadN, nSpec))
@@ -195,15 +207,34 @@ function rt_run(RS_type::AbstractRamanType,
         make_added_layer(lin, RS_type, FT, arr_type, Nparams, dims, nSpec)
     @timeit "Creating layers" composite_layer, composite_layer_lin  = 
         make_composite_layer(lin, RS_type, FT, arr_type, Nparams, dims, nSpec)
+    # Each interior observer owns two ordinary forward/tangent composites:
+    # the atmosphere above it and the atmosphere below it. Reusing the
+    # production CompositeLayer types means every per-layer Jacobian continues
+    # through the same analytic interaction kernels as the endpoint column.
+    top_pairs = [make_composite_layer(lin, RS_type, FT, arr_type,
+                                      Nparams, dims, nSpec)
+                 for _ in sensor_levels]
+    bottom_pairs = [make_composite_layer(lin, RS_type, FT, arr_type,
+                                         Nparams, dims, nSpec)
+                    for _ in sensor_levels]
+    top_layers = first.(top_pairs)
+    top_layers_lin = last.(top_pairs)
+    bottom_layers = first.(bottom_pairs)
+    bottom_layers_lin = last.(bottom_pairs)
+    bottom_interfaces = AbstractScatteringInterface[
+        ScatteringInterface_00() for _ in sensor_levels]
     @timeit "Creating arrays" I_static = 
         Diagonal(arr_type(Diagonal{FT}(ones(dims[1]))));
     # Linearized RT intentionally supports pure-elastic noRS only.
+    τ_sum_endpoint = nothing
+    τ̇_sum_endpoint = nothing
 
     # Loop over fourier moments
     for m = 0:m_max
 
         # Azimuthal weighting
         weight = m == 0 ? FT(0.5/π) : FT(1.0/π)
+        fill!(bottom_interfaces, ScatteringInterface_00())
         # Set the Zλᵢλₒ interaction parameters for Raman (or nothing for noRS)
         #InelasticScattering.computeRamanZλ!(RS_type, pol_type,Array(qp_μ), m, arr_type)
         # Compute the core layer optical properties:
@@ -212,6 +243,21 @@ function rt_run(RS_type::AbstractRamanType,
             # Determine the scattering interface definitions:
         scattering_interfaces_all, τ_sum_all, τ̇_sum_all = 
             extractEffectiveProps(layer_opt_props, layer_opt_props_lin);
+
+        # The collimated beam is outside the diffuse MOM source field. Report
+        # it once at m=0, together with its atmospheric optical-depth tangent.
+        if m == 0
+            # The optical-depth sums are Fourier-independent. Retain the m=0
+            # references explicitly because the loop introduces a local scope.
+            τ_sum_endpoint = τ_sum_all
+            τ̇_sum_endpoint = τ̇_sum_all
+            if !isempty(sensor_levels)
+                _set_unscattered_downwelling_lin!(
+                    level_direct_dw, level_direct_dw_lin,
+                    sensor_levels, τ_sum_all, τ̇_sum_all,
+                    F₀, vza, qp_μ, iμ₀, μ₀, pol_type)
+            end
+        end
         
         
         # Loop over vertical layers: 
@@ -243,6 +289,42 @@ function rt_run(RS_type::AbstractRamanType,
                         qp_μN, iz;
                         dτ_max_threshold=dτ_max_threshold,
                         dτ_min_floor=dτ_min_floor)
+
+            # Reuse the completed current added layer to grow the two
+            # subcolumns belonging to every interior observer. The top
+            # subcolumn follows the ordinary TOA-down interface dispatch.
+            # The bottom subcolumn tracks its own scattering state because it
+            # starts below the observer rather than at TOA.
+            if !isempty(sensor_levels)
+                layer_scatter = maximum(layer_opt.τ .* layer_opt.ϖ) > 2eps(FT)
+                for ims in eachindex(sensor_levels)
+                    boundary = sensor_levels[ims]
+                    if iz == 1
+                        seed_composite_from_added!(
+                            top_layers[ims], top_layers_lin[ims],
+                            added_layer, added_layer_lin)
+                    elseif iz <= boundary
+                        interaction!(scattering_interfaces_all[iz], SFI,
+                                     top_layers[ims], top_layers_lin[ims],
+                                     added_layer, added_layer_lin, I_static)
+                    end
+
+                    local_iz = iz - boundary
+                    if local_iz == 1
+                        seed_composite_from_added!(
+                            bottom_layers[ims], bottom_layers_lin[ims],
+                            added_layer, added_layer_lin)
+                        bottom_interfaces[ims] = get_scattering_interface(
+                            ScatteringInterface_00(), layer_scatter, 1)
+                    elseif local_iz > 1
+                        bottom_interfaces[ims] = get_scattering_interface(
+                            bottom_interfaces[ims], layer_scatter, local_iz)
+                        interaction!(bottom_interfaces[ims], SFI,
+                                     bottom_layers[ims], bottom_layers_lin[ims],
+                                     added_layer, added_layer_lin, I_static)
+                    end
+                end
+            end
         end 
 
         # Create surface matrices. `surface_index(layout, i)` indexes WITHIN
@@ -272,6 +354,18 @@ function rt_run(RS_type::AbstractRamanType,
         # out into the same dispatch table.
         surface_source_contribute!(prepared_sources, brdf, added_surface_layer,
                                    m, pol_type, CoreRT.architecture(model))
+
+        # Close every lower subcolumn with the same linearized surface layer.
+        # Treat the surface as a potentially reflecting added layer even when
+        # its current reflectance is zero: a surface-parameter tangent can be
+        # nonzero at that point.
+        for ims in eachindex(sensor_levels)
+            surface_interface = get_scattering_interface(
+                bottom_interfaces[ims], true, Nz - sensor_levels[ims] + 1)
+            interaction!(surface_interface, SFI,
+                         bottom_layers[ims], bottom_layers_lin[ims],
+                         added_surface_layer, added_surface_layer_lin, I_static)
+        end
         
         @timeit "interaction" interaction!(#RS_type,
                                     #bandSpecLim,
@@ -293,15 +387,55 @@ function rt_run(RS_type::AbstractRamanType,
                             R, 
                             T,
                             Ṙ, Ṫ)
+
+        postprocessing_vza_ms_lin!(
+            RS_type, top_layers, top_layers_lin,
+            bottom_layers, bottom_layers_lin,
+            pol_type, vza, qp_μ, m, vaz, weight, nSpec,
+            level_uw, level_dw, level_uw_lin, level_dw_lin,
+            I_static, arr_type)
+    end
+
+    # `J₀⁺` is the diffuse SFI field; the historical BOA forward output also
+    # carries the attenuated collimated beam when a requested VZA resolves to
+    # the solar ordinate. Add that carrier and its optical-depth tangent once
+    # (outside the Fourier sum) so linearized endpoint radiances remain equal
+    # to the production forward result. Interior records keep the same carrier
+    # in their explicit `unscattered_downwelling` fields instead.
+    if model.obs_geom.include_boa
+        boa_direct = [zeros(FT, length(vza), pol_type.n, nSpec)]
+        boa_direct_lin = [zeros(FT, length(vza), pol_type.n, nSpec, Nparams)]
+        _set_unscattered_downwelling_lin!(
+            boa_direct, boa_direct_lin, [Nz],
+            τ_sum_endpoint, τ̇_sum_endpoint,
+            F₀, vza, qp_μ, iμ₀, μ₀, pol_type)
+        T .+= only(boa_direct)
+        Ṫ .+= only(boa_direct_lin)
     end
     
     # Show timing statistics (gated on numerics.verbose; default off).
     model.numerics.verbose && print_timer()
     reset_timer!()
 
-    # The analytic kernel computes the complete column. Preserve its historical
-    # four slots while blanking endpoints that were not requested.
+    # Preserve the historical four iterable slots while exposing named
+    # per-height radiance/Jacobian records.
     R_out, T_out = _select_observer_endpoints(model, R, T)
     Ṙ_out, Ṫ_out = _select_observer_endpoints(model, Ṙ, Ṫ)
-    return R_out, T_out, Ṙ_out, Ṫ_out
+    level_type = isempty(sensor_levels) ?
+        LevelRadianceLin{FT,Nothing,Nothing,Nothing,Nothing} :
+        typeof(LevelRadianceLin(
+            model.obs_geom.sensor_altitudes[1], sensor_levels[1],
+            level_uw[1], level_dw[1], level_direct_dw[1],
+            level_uw_lin[1], level_dw_lin[1], level_direct_dw_lin[1]))
+    levels = Vector{level_type}()
+    for (i, (height, boundary)) in enumerate(zip(
+            model.obs_geom.sensor_altitudes, sensor_levels))
+        push!(levels, LevelRadianceLin(
+            height, boundary,
+            level_uw[i], level_dw[i], level_direct_dw[i],
+            level_uw_lin[i], level_dw_lin[i], level_direct_dw_lin[i]))
+    end
+    return ObserverRTResultLin(
+        R_out, T_out, Ṙ_out, Ṫ_out, levels,
+        FT(model.obs_geom.toa_altitude), layout)
 end

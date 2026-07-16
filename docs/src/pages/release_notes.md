@@ -40,9 +40,30 @@ Forward `rt_run` now returns an `ObserverRTResult` with named `toa`, `boa`, and
 `levels` fields. Historical tuple iteration remains available, so scenes with
 `obs_alt: [0]` continue to support `R, T = rt_run(model)`. See the
 [`geometry` schema](IO/Schema/geometry.md) for the complete convention and
-output fields. Strict-interior outputs currently use the full multiple-scatter
-forward driver; the analytic-linearized and single-scatter drivers reject
-interior requests explicitly while continuing to honor endpoint-only choices.
+output fields.
+
+Analytic-linearized runs now return `ObserverRTResultLin`, with named
+`toa_jacobian` and `boa_jacobian` endpoints plus one `LevelRadianceLin` per
+strict-interior height. Interior records contain diffuse up/down radiances,
+their Jacobians, and separate unscattered-solar radiance/Jacobian fields.
+`total_downwelling_jacobian(level)` combines the diffuse and direct tangents.
+The result remains iterable as `(R, T, dR, dT)` for compatibility.
+
+The direct-beam tangent uses the cumulative optical depth above the requested
+interface,
+`dL_direct/dx = -L_direct (dτ_above/dx) / μ₀`; surface-parameter columns
+are zero. The top and bottom subcolumns reuse the production analytic
+elemental, doubling, and interaction kernels, and the interlayer coupling uses
+the closed-form tangent of the batched matrix inverse.
+
+Forward strict-interior outputs retain their existing `SolarBeam`/`NoSource`
+source restriction and continue to reject `CanopySurface`. Linearized
+interior output remains elastic-only; Raman/inelastic linearization is
+unsupported. Linearized interior runs likewise reject thermal and
+surface-emission sources and `CanopySurface` rather than silently omitting
+unsupported contributions. The single-scatter driver still rejects
+strict-interior requests explicitly while continuing to honor endpoint-only
+choices.
 
 ## v2.1.0 — Fourier / stream resolution + source-term refactor
 
@@ -270,13 +291,17 @@ model, lin_model = model_from_parameters_lin(params)
 NAer  = length(params.scattering_params.rt_aerosols)
 NGas  = size(lin_model.τ̇_abs[1], 1)
 NSurf = 1
-R, T, R_jac, T_jac = rt_run_lin(model, lin_model, NAer, NGas, NSurf)
+result = rt_run_lin(model, lin_model, NAer, NGas, NSurf)
+R, T, R_jac, T_jac = result
 ```
 
 Use `ParameterLayout` to map Jacobian columns to aerosol, gas, surface, and
-canopy parameter blocks. Raman/inelastic linearization is not complete in this
-release line; keep linearized scenes on the elastic path unless a feature branch
-or later release states otherwise.
+canopy parameter blocks; the exact layout is also available as
+`result.layout`. With strict-interior `obs_alt` values, use `result.levels` for
+co-located radiance/Jacobian records and `total_downwelling_jacobian(level)`
+for the diffuse-plus-unscattered downwelling derivative. Raman/inelastic
+linearization is not complete in this release line; keep linearized scenes on
+the elastic path unless a later release states otherwise.
 
 ## Test and Data Policy
 

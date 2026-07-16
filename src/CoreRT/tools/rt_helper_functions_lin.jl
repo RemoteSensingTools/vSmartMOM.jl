@@ -9,6 +9,34 @@ default_matrix(FT, lin::LinMode, arr_type, Nparams, dims, nSpec)   = arr_type(ze
 "Default J matrix in linRT calculation (zeros)"
 default_J_matrix(FT, lin::LinMode, arr_type, Nparams, dims, nSpec) = arr_type(zeros(FT, tuple(dims[1], 1, nSpec, Nparams)))
 
+"""
+    seed_composite_from_added!(composite, composite_lin, added, added_lin)
+
+Initialize a forward/tangent composite subcolumn from one fully doubled
+atmospheric layer.  The physical-parameter (`ap_*`) derivatives are used,
+because the three core-property derivatives have already been expanded by the
+elemental and doubling kernels.
+"""
+function seed_composite_from_added!(composite::CompositeLayer,
+                                    composite_lin::CompositeLayerLin,
+                                    added::AddedLayer,
+                                    added_lin::AddedLayerLin)
+    composite.R⁻⁺ .= added.r⁻⁺
+    composite.R⁺⁻ .= added.r⁺⁻
+    composite.T⁺⁺ .= added.t⁺⁺
+    composite.T⁻⁻ .= added.t⁻⁻
+    composite.J₀⁺ .= added.j₀⁺
+    composite.J₀⁻ .= added.j₀⁻
+
+    composite_lin.Ṙ⁻⁺ .= added_lin.ap_ṙ⁻⁺
+    composite_lin.Ṙ⁺⁻ .= added_lin.ap_ṙ⁺⁻
+    composite_lin.Ṫ⁺⁺ .= added_lin.ap_ṫ⁺⁺
+    composite_lin.Ṫ⁻⁻ .= added_lin.ap_ṫ⁻⁻
+    composite_lin.J̇₀⁺ .= added_lin.ap_J̇₀⁺
+    composite_lin.J̇₀⁻ .= added_lin.ap_J̇₀⁻
+    return nothing
+end
+
 
 
 "Make an added layer and its linearized counterpart, supplying all default matrices"

@@ -33,25 +33,83 @@ NAer = isnothing(params.scattering_params) ? 0 : length(params.scattering_params
 NGas = size(lin_model.τ̇_abs[1], 1)
 NSurf = 1
 
-R, T, dR, dT = rt_run_lin(model, lin_model, NAer, NGas, NSurf)
+result = rt_run_lin(model, lin_model, NAer, NGas, NSurf)
+R, T, dR, dT = result
 ```
 
-The outputs are:
+`result` is an [`ObserverRTResultLin`](@ref). Its named endpoint fields are:
 
-- `R`: reflected Stokes field, shaped `nVZA × nStokes × nSpec`
-- `T`: transmitted Stokes field, shaped like `R`
-- `dR`: derivative of `R`, shaped `nVZA × nStokes × nSpec × nParams`
-- `dT`: derivative of `T`, shaped like `dR`
+- `result.toa`: reflected Stokes field, shaped `nVZA × nStokes × nSpec`
+- `result.boa`: transmitted Stokes field, shaped like `result.toa`
+- `result.toa_jacobian`: derivative of `result.toa`, shaped
+  `nVZA × nStokes × nSpec × nParams`
+- `result.boa_jacobian`: derivative of `result.boa`, shaped like the TOA
+  Jacobian
+
+An endpoint field and its Jacobian are `nothing` when that endpoint was not
+selected by `obs_alt`. Historical four-value destructuring remains available,
+as shown above.
+
+## Interior-Height Jacobians
+
+Strict-interior observer heights are supported by the analytic elastic
+multiple-scatter solver. Configure them through `obs_alt` before building the
+forward and linearized models:
+
+```julia
+height_params = deepcopy(params)
+height_params.obs_alt = [0.0, 5.0]  # endpoints plus one interior interface
+
+height_model, height_lin_model = model_from_parameters_lin(height_params)
+height_result = rt_run_lin(
+    height_model, height_lin_model, NAer, NGas, NSurf)
+
+level = only(height_result.levels)
+level.height_km
+level.boundary_index
+
+level.upwelling
+level.downwelling
+level.unscattered_downwelling
+
+level.upwelling_jacobian
+level.downwelling_jacobian
+level.unscattered_downwelling_jacobian
+
+total_down = total_downwelling(level)
+total_down_jacobian = total_downwelling_jacobian(level)
+```
+
+The radiance fields have shape `nVZA × nStokes × nSpec`; each Jacobian
+adds `nParams` as its last axis. The parameter order is stored directly in
+`height_result.layout`.
+
+The unscattered solar contribution remains separate from the diffuse MOM
+field. For fixed solar irradiance and geometry its atmospheric tangent is
+
+```math
+\frac{\partial L_{\mathrm{direct}}}{\partial x_j}
+= -\frac{L_{\mathrm{direct}}}{\mu_0}
+  \frac{\partial \tau_{\mathrm{above}}}{\partial x_j}.
+```
+
+It is zero for non-solar output ordinates and for surface-parameter columns.
+The BOA endpoint `result.boa` and `result.boa_jacobian` retain the historical
+total-radiance convention and therefore already include the direct carrier;
+the separate fields apply to strict-interior records.
+Raman/inelastic linearization remains unsupported. The separate
+single-scatter driver `rt_run_ss` continues to reject strict-interior observer
+requests. Interior linearized runs currently accept `SolarBeam` or `NoSource`;
+thermal and surface-emission sources, plus `CanopySurface`, are rejected
+explicitly until their multisensor tangent/source-slot propagation is
+implemented.
 
 ## Slice The Parameter Dimension
 
 Use [`ParameterLayout`](@ref) rather than hard-coded offsets.
 
 ```julia
-layout = CoreRT.ParameterLayout(aerosol_params = 7,
-                                n_aerosols = NAer,
-                                n_gases = NGas,
-                                n_surface = NSurf)
+layout = result.layout
 
 surface_idx = CoreRT.surface_index(layout)
 gas_block = CoreRT.gas_range(layout)

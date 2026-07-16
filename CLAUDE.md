@@ -66,7 +66,10 @@ forward tuple, so `R, T = rt_run(model)` still binds TOA upwelling and BOA
 downwelling. Interior-height radiances are available through
 `result.levels`.
 
-Linearized variant: `model_from_parameters(LinMode(), params)` then `rt_run(model, lin_model, NAer, NGas, NSurf)` returns `(R, T, dR, dT)`.
+Linearized variant: `model_from_parameters(LinMode(), params)` then
+`rt_run(model, lin_model, NAer, NGas, NSurf)` returns an
+`ObserverRTResultLin`. It remains iterable as `(R, T, dR, dT)` and exposes
+strict-interior radiances/Jacobians through `result.levels`.
 
 ### RTModel Hierarchy (Oceananigans-style)
 
@@ -118,6 +121,8 @@ For each Fourier moment m = 0..m_max_bands[iBand] (v0.7 — order-semantics; tra
 | `ObsGeometry` | `src/CoreRT/types.jl` | SZA, VZA, VAZ, requested/resolved observer heights |
 | `ObserverRTResult` | `src/CoreRT/types.jl` | Named TOA, BOA, and interior-height forward outputs |
 | `LevelRadiance` | `src/CoreRT/types.jl` | Co-located up/down radiances at one interior interface |
+| `ObserverRTResultLin` | `src/CoreRT/types_lin.jl` | Named endpoint and interior-height linearized outputs |
+| `LevelRadianceLin` | `src/CoreRT/types_lin.jl` | Co-located radiances and analytic Jacobians at one interior interface |
 | `QuadPoints` | `src/CoreRT/types.jl` | Quadrature points, weights, mu0 |
 | `CompositeLayer` | `src/CoreRT/types.jl` | Accumulated R, T, J matrices (uppercase) |
 | `AddedLayer` | `src/CoreRT/types.jl` | Single-layer r, t, j matrices (lowercase) |

@@ -41,7 +41,7 @@ Linearized runs use `model_from_parameters_lin` and `rt_run_lin`; see
 prefer the `solver`, `geometry`, `quad_points`, `atmosphere`, `optics`, and
 `surfaces` fields over legacy flat-field access.
 
-### Forward Result Types
+### Forward and Linearized Result Types
 
 `ObserverRTResult` holds requested endpoint and interior-level radiances.
 Each `LevelRadiance` stores the geometric height, atmospheric boundary index,
@@ -49,6 +49,19 @@ co-located diffuse upwelling/downwelling elastic and inelastic arrays, and a
 separate `unscattered_downwelling` solar-beam component. Use
 `total_downwelling(level)` when a total comparable to the historical BOA
 output is required.
+
+`ObserverRTResultLin` is the height-aware analytic-linearized counterpart. Its
+named endpoint fields are `toa`, `boa`, `toa_jacobian`, and `boa_jacobian`;
+`layout` describes the last Jacobian axis. Each `LevelRadianceLin` in
+`result.levels` contains the forward diffuse and unscattered fields together
+with `upwelling_jacobian`, `downwelling_jacobian`, and
+`unscattered_downwelling_jacobian`. Use
+`total_downwelling_jacobian(level)` for the derivative of the combined
+diffuse-plus-direct downwelling field.
+
+For compatibility, `ObserverRTResultLin` iterates as
+`(toa, boa, toa_jacobian, boa_jacobian)`, so existing endpoint-only
+destructuring remains valid.
 
 ### Surface Types
 

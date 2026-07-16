@@ -197,6 +197,43 @@ function Base.show(io::IO, ::MIME"text/plain", result::ObserverRTResult)
     end
 end
 
+function Base.show(io::IO, level::LevelRadianceLin)
+    print(io, "LevelRadianceLin($(level.height_km) km, boundary=$(level.boundary_index), ",
+          "up=$(_radiance_shape(level.upwelling)), down=$(_radiance_shape(level.downwelling)), ",
+          "jacobian=$(_radiance_shape(level.upwelling_jacobian)))")
+end
+
+function Base.show(io::IO, ::MIME"text/plain", level::LevelRadianceLin)
+    println(io, "LevelRadianceLin at $(level.height_km) km above BOA")
+    println(io, _TREE_MID, "boundary index: $(level.boundary_index)")
+    println(io, _TREE_MID, "upwelling: $(_radiance_shape(level.upwelling))")
+    println(io, _TREE_MID, "downwelling (diffuse): $(_radiance_shape(level.downwelling))")
+    println(io, _TREE_MID,
+            "downwelling (unscattered): $(_radiance_shape(level.unscattered_downwelling))")
+    print(io, _TREE_END, "Jacobians: $(_radiance_shape(level.upwelling_jacobian))")
+end
+
+function Base.summary(io::IO, result::ObserverRTResultLin)
+    n_endpoints = (result.toa !== nothing) + (result.boa !== nothing)
+    print(io, "ObserverRTResultLin($n_endpoints endpoint(s), ",
+          "$(length(result.levels)) interior level(s), ",
+          "$(n_total(result.layout)) parameter(s))")
+end
+
+function Base.show(io::IO, result::ObserverRTResultLin)
+    print(io, "ObserverRTResultLin(TOA=$(_radiance_shape(result.toa)), ",
+          "BOA=$(_radiance_shape(result.boa)), levels=$(length(result.levels)), ",
+          "parameters=$(n_total(result.layout)))")
+end
+
+function Base.show(io::IO, ::MIME"text/plain", result::ObserverRTResultLin)
+    println(io, "ObserverRTResultLin")
+    println(io, _TREE_MID, "TOA ($(result.toa_altitude_km) km): $(_radiance_shape(result.toa))")
+    println(io, _TREE_MID, "BOA (0 km): $(_radiance_shape(result.boa))")
+    println(io, _TREE_MID, "parameters: $(n_total(result.layout))")
+    print(io, _TREE_END, "interior levels: $(length(result.levels))")
+end
+
 # ── Optics ───────────────────────────────────────────────────────────────
 
 function Base.show(io::IO, ::MIME"text/plain", o::Optics{FT}) where FT

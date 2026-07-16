@@ -169,7 +169,9 @@ export OpticalPropertyJacobian,               # AD boundary struct alias
 export AbstractRTModel, RTModel,
        SolverConfig, RTNumericalParameters,
        Atmosphere, RayleighScattering, AerosolState, Optics, OpticsLin,
-       RTModelLin, ObserverRTResult, LevelRadiance, total_downwelling
+       RTModelLin, ObserverRTResult, LevelRadiance,
+       ObserverRTResultLin, LevelRadianceLin,
+       total_downwelling, total_downwelling_jacobian
 
 # v0.6 source-term vocabulary (Phase 1: types only; behaviour lands in Phase 2+)
 export AbstractSource, AbstractPreparedSource,
