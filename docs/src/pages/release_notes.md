@@ -56,6 +56,13 @@ are zero. The top and bottom subcolumns reuse the production analytic
 elemental, doubling, and interaction kernels, and the interlayer coupling uses
 the closed-form tangent of the batched matrix inverse.
 
+Forward and linearized model construction now use the same normalized aerosol
+profile discretization: layer-centre probability density weighted by geometric
+layer thickness. This keeps aerosol optical depths identical on height-anchored
+grids and makes interior direct-beam and diffuse-radiance Jacobians agree with
+independently rebuilt finite differences. Profile-shape columns are `(p₀, σp)`
+for `Normal` and `(z₀, σ₀)` for `LogNormal` profiles.
+
 Forward strict-interior outputs retain their existing `SolarBeam`/`NoSource`
 source restriction and continue to reject `CanopySurface`. Linearized
 interior output remains elastic-only; Raman/inelastic linearization is

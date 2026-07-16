@@ -119,6 +119,75 @@ function getAerosolLayerOptProp(lin::LinMode, total_τ, p₀, σp, p_half)
     return convert.(FT, τAer), convert.(FT, dτ_dp₀), convert.(FT, dτ_dσp)
 end
 
+"Apply the quotient rule to two tangents of an unnormalized aerosol profile."
+function _normalized_aerosol_profile_tangents(total_τ, dist::Distribution,
+                                               profile::AtmosphericProfile,
+                                               ρ, dρ₁, dρ₂)
+    # Obtain the base column from the production forward helper itself. This is
+    # deliberately not reconstructed from distribution moments: LinMode must
+    # retain bit-exact base-state parity for every supported Distribution.
+    τAer = getAerosolLayerOptProp(total_τ, dist, profile)
+    norm_ρ = sum(ρ)
+    scale = total_τ / norm_ρ
+    dτ₁ = scale .* (dρ₁ .- ρ .* (sum(dρ₁) / norm_ρ))
+    dτ₂ = scale .* (dρ₂ .- ρ .* (sum(dρ₂) / norm_ρ))
+    return τAer, dτ₁, dτ₂
+end
+
+"""
+    getAerosolLayerOptProp(lin::LinMode, total_τ, dist, profile)
+
+Return the exact production forward aerosol column and two profile-shape
+tangents. The tangent convention depends on the distribution:
+
+- `Normal(μ, σ)`: derivatives with respect to `μ` (`p₀`) and `σ` (`σp`).
+- `LogNormal(log(z₀), σ₀)`: derivatives with respect to the user-facing
+  altitude parameters `z₀ = exp(μ)` and `σ₀ = σ`.
+
+Other `Distribution` types throw an `ArgumentError` because the fixed
+two-column aerosol layout does not define a safe parameter mapping for them.
+"""
+function getAerosolLayerOptProp(::LinMode, total_τ, dist::Distribution,
+                                profile::AtmosphericProfile)
+    throw(ArgumentError(
+        "LinMode aerosol-profile tangents support Normal and LogNormal; " *
+        "got $(typeof(dist))"))
+end
+
+function getAerosolLayerOptProp(::LinMode, total_τ, dist::Normal,
+                                profile::AtmosphericProfile)
+    (; p_full, Δz) = profile
+    ρ = pdf.(dist, p_full) .* Δz
+    offset = p_full .- dist.μ
+    dρ_dμ = ρ .* offset ./ dist.σ^2
+    dρ_dσ = ρ .* (offset.^2 ./ dist.σ^3 .- inv(dist.σ))
+    return _normalized_aerosol_profile_tangents(
+        total_τ, dist, profile, ρ, dρ_dμ, dρ_dσ)
+end
+
+function getAerosolLayerOptProp(::LinMode, total_τ, dist::LogNormal,
+                                profile::AtmosphericProfile)
+    (; p_full, Δz) = profile
+    ρ = pdf.(dist, p_full) .* Δz
+    log_offset = log.(p_full) .- dist.μ
+    z₀ = exp(dist.μ)
+    dρ_dz₀ = ρ .* log_offset ./ (dist.σ^2 * z₀)
+    dρ_dσ₀ = ρ .* (log_offset.^2 ./ dist.σ^3 .- inv(dist.σ))
+    return _normalized_aerosol_profile_tangents(
+        total_τ, dist, profile, ρ, dρ_dz₀, dρ_dσ₀)
+end
+
+"""
+    getAerosolLayerOptProp(lin::LinMode, total_τ, p₀, σp, profile)
+
+Backward-compatible pressure-profile entry point. This is equivalent to the
+`Normal(p₀, σp)` distribution dispatch above.
+"""
+function getAerosolLayerOptProp(lin::LinMode, total_τ, p₀, σp,
+                                profile::AtmosphericProfile)
+    return getAerosolLayerOptProp(lin, total_τ, Normal(p₀, σp), profile)
+end
+
 "Given the CrossSectionModel, the grid, and the AtmosphericProfile, fill up the τ_abs array with the cross section at each layer
 (using pressures/temperatures) from the profile" 
 function compute_absorption_profile!(τ_abs::Array{FT,2}, 

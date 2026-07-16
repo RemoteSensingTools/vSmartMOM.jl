@@ -395,9 +395,12 @@ function model_from_parameters(lin::LinMode,
             k_band = aerosol_optics[i_band][i_aer].k
             k̇_band = lin_aerosol_optics[i_band][i_aer].k̇
 
-            aer_p₀ = mean(c_aero.profile)
-            aer_σp = std(c_aero.profile)
-            τₚ, dτₚdp₀, dτₚdσp = getAerosolLayerOptProp(lin, 1, aer_p₀, aer_σp, profile.p_half)
+            # Match the production forward profile discretization exactly:
+            # pdf(profile, p_full) weighted by geometric layer thickness Δz.
+            # Dispatch on the stored Distribution so LogNormal altitude-form
+            # profiles are not silently reconstructed as pressure Normals.
+            τₚ, dτₚdp₀, dτₚdσp =
+                getAerosolLayerOptProp(lin, 1, c_aero.profile, profile)
 
             # ────────────────────────────────────────────────────────────────
             # Aerosol optical depth per layer:

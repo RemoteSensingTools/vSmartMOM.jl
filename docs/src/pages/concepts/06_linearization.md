@@ -166,7 +166,7 @@ is centralized in [`src/CoreRT/parameter_layout.jl:1–67`](https://github.com/R
 
 ```julia
 struct ParameterLayout
-    aerosol_params::Int     # = 7   (τ_ref, n_r, n_i, r_m, σ_g, p₀, σ_p)
+    aerosol_params::Int     # = 7   (τ_ref, n_r, n_i, r_m, σ_g, profile location/width)
     n_aerosols::Int
     n_gases::Int
     n_surface::Int
@@ -188,8 +188,8 @@ Always use these accessors instead of hand-writing arithmetic like
 | 3 | `n_i`   | imaginary refractive index |
 | 4 | `r_m`   | median radius of size distribution |
 | 5 | `σ_g`   | geometric standard deviation of size distribution |
-| 6 | `p₀`    | central pressure of vertical Gaussian |
-| 7 | `σ_p`   | width of vertical Gaussian |
+| 6 | `p₀` / `z₀` | profile location for pressure-form `Normal` / altitude-form `LogNormal` |
+| 7 | `σ_p` / `σ₀` | corresponding profile width |
 
 A run with two aerosol modes, four gases, and one surface parameter has a
 Jacobian with `2·7 + 4 + 1 = 19` columns, and `aerosol_range(layout, 2)`
@@ -205,7 +205,7 @@ new parameters):
 | Lambertian albedo | analytic | trivial: ``\partial r/\partial \rho = 1/\pi`` |
 | RPV / Ross-Li / Cox-Munk BRDF | ForwardDiff | low-dimensional, simple surface code |
 | `τ_ref` (aerosol OD) | analytic | trivial: ``\partial \tau/\partial \tau_\mathrm{ref} = \tau/\tau_\mathrm{ref}`` |
-| `p₀, σ_p` (aerosol height) | analytic | already in `atmo_prof_lin.jl` |
+| profile location/width (`p₀, σ_p` or `z₀, σ₀`) | analytic | already in `atmo_prof_lin.jl` |
 | `n_r, n_i` (refractive index) | analytic Mie | Mie series is AD-hostile (recurrences) |
 | `r_m, σ_g` (size distribution) | analytic Mie | same |
 | Gas VMR scaling | analytic | ``\partial \tau_\mathrm{abs}/\partial \mathrm{VMR} = \sigma`` |

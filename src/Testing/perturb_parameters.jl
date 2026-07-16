@@ -1,11 +1,30 @@
 # Import necessary modules
 using vSmartMOM, vSmartMOM.CoreRT
-using Distributions: LogNormal
+using Distributions: Distribution, LogNormal, Normal
 
 # defining vSmartMOM modes to be used in the following
 fwd_mode = FwdMode() #vSmartMOM.CoreRT.Mode.FwdMode()
 lin_mode = LinMode() #vSmartMOM.CoreRT.Mode.LinMode() 
 FT = Float64  # ← KEEP: Using Float32 as requested
+
+_profile_location(profile::Normal) = profile.μ
+_profile_location(profile::LogNormal) = exp(profile.μ)
+_profile_width(profile::Union{Normal,LogNormal}) = profile.σ
+
+_profile_with_location(profile::Normal, location) =
+    Normal(location, profile.σ)
+_profile_with_location(profile::LogNormal, location) =
+    LogNormal(log(location), profile.σ)
+_profile_with_width(profile::Normal, width) =
+    Normal(profile.μ, width)
+_profile_with_width(profile::LogNormal, width) =
+    LogNormal(profile.μ, width)
+
+function _profile_location(profile::Distribution)
+    throw(ArgumentError(
+        "profile perturbations support Normal and LogNormal; got " *
+        "$(typeof(profile))"))
+end
 
 function perturb_parameters(params::vSmartMOM.CoreRT.vSmartMOM_Parameters, ppct)
     pert_params = []
@@ -89,23 +108,24 @@ function perturb_parameters(params::vSmartMOM.CoreRT.vSmartMOM_Parameters, ppct)
             LogNormal(μ, new_σ)
         push!(pert_params, tmp_params)  
 
-        # Profile μ (vertical-distribution location)
-        # Adapted from sanghavi's z₀ perturbation: unified's RT_Aerosol stores
-        # the vertical profile as a Distributions.jl Distribution (LogNormal
-        # on altitude z₀/σ₀, or Normal on pressure p₀/σp). We reconstruct
-        # the Distribution with the perturbed location parameter. Distributions
-        # are immutable.
+        # Profile location: p₀=μ for Normal, z₀=exp(μ) for LogNormal.
+        # Perturb the user-facing parameter, then reconstruct the immutable
+        # distribution so finite differences match Jacobian column 6.
         tmp_params = deepcopy(params)
         prof = tmp_params.scattering_params.rt_aerosols[iaer].profile
-        new_prof = typeof(prof)(prof.μ * incr_fct, prof.σ)
+        location = _profile_location(prof)
+        location_factor = oftype(location, incr_fct)
+        new_location = iszero(location) ? oftype(location, 0.01) :
+                       location * location_factor
+        new_prof = _profile_with_location(prof, new_location)
         tmp_params.scattering_params.rt_aerosols[iaer].profile = new_prof
         push!(pert_params, tmp_params)
 
-        # Profile σ (vertical-distribution width)
-        # Adapted from sanghavi's σ₀ perturbation — see note above.
+        # Profile width: σp for Normal, σ₀ for LogNormal (Jacobian column 7).
         tmp_params = deepcopy(params)
         prof = tmp_params.scattering_params.rt_aerosols[iaer].profile
-        new_prof = typeof(prof)(prof.μ, prof.σ * incr_fct)
+        width = _profile_width(prof)
+        new_prof = _profile_with_width(prof, width * oftype(width, incr_fct))
         tmp_params.scattering_params.rt_aerosols[iaer].profile = new_prof
         push!(pert_params, tmp_params)
     end
@@ -424,27 +444,34 @@ function compute_FD_modelJacobian(params::vSmartMOM.CoreRT.vSmartMOM_Parameters,
             lin_model.lin_aerosol_optics[iband][iaer].lin_greek_coefs.ζ̇[4,:]
         end
 
-        # z₀
+        # Profile location (p₀ for Normal, z₀ for LogNormal)
         i_aerprop = 6
         idx = q_offset + Nmol + 7*(iaer-1) + i_aerprop
-        Δz₀ = pert_params[idx].scattering_params.rt_aerosols[iaer].z₀ - params.scattering_params.rt_aerosols[iaer].z₀
+        pert_profile = pert_params[idx].scattering_params.rt_aerosols[iaer].profile
+        base_profile = params.scattering_params.rt_aerosols[iaer].profile
+        Δlocation = _profile_location(pert_profile) -
+                    _profile_location(base_profile)
         pert_model = model_from_parameters(pert_params[idx])
                 
         for iband=1:Nband
             # tau_aer [iband][iaer]
-            K_FD = (pert_model.τ_aer[iband][iaer,:,:] .- model.τ_aer[iband][iaer,:,:])/Δz₀
+            K_FD = (pert_model.τ_aer[iband][iaer,:,:] .-
+                    model.τ_aer[iband][iaer,:,:]) / Δlocation
             K_lin = lin_model.τ̇_aer[iband][iaer, i_aerprop,:,:]
             @assert K_FD ≈ K_lin
         end
 
-        # σ₀
+        # Profile width (σp for Normal, σ₀ for LogNormal)
         i_aerprop = 7
         idx = q_offset + Nmol + 7*(iaer-1) + i_aerprop
-        Δσ₀ = pert_params[idx].scattering_params.rt_aerosols[iaer].σ₀ - params.scattering_params.rt_aerosols[iaer].σ₀
+        pert_profile = pert_params[idx].scattering_params.rt_aerosols[iaer].profile
+        base_profile = params.scattering_params.rt_aerosols[iaer].profile
+        Δwidth = _profile_width(pert_profile) - _profile_width(base_profile)
         pert_model = model_from_parameters(pert_params[idx])    
         for iband=1:Nband
             # tau_aer [iband][iaer]
-            K_FD = (pert_model.τ_aer[iband][iaer,:,:] .- model.τ_aer[iband][iaer,:,:])/Δσ₀
+            K_FD = (pert_model.τ_aer[iband][iaer,:,:] .-
+                    model.τ_aer[iband][iaer,:,:]) / Δwidth
             K_lin = lin_model.τ̇_aer[iband][iaer, i_aerprop,:,:]
             @assert K_FD ≈ K_lin
         end 
