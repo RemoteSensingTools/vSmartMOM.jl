@@ -11,7 +11,7 @@ the model. The latter should generally be used by users.
 
 
 """
-    rt_run(model::RTModel; i_band=1) -> (R, T, ...)
+    rt_run(model::RTModel; i_band=1) -> ObserverRTResult
 
 Run the forward radiative transfer solver for one or more spectral bands.
 
@@ -28,12 +28,13 @@ Equivalent to `rt_run(noRS(), model, i_band)` (no Raman scattering).
 - `i_band::Integer=1`: Spectral band index (or vector of indices) to compute.
 
 # Returns
-A tuple `(R_SFI, T_SFI, ieR_SFI, ieT_SFI, hdr, bhr_uw, bhr_dw)` when using
-source-function integration (default), where:
-- `R_SFI::Array{FT,3}`: TOA reflectance `[nVZA × nStokes × nSpec]`
-- `T_SFI::Array{FT,3}`: BOA transmittance `[nVZA × nStokes × nSpec]`
+An [`ObserverRTResult`](@ref). With the default `obs_alt: [0]`, its `toa` and
+`boa` fields contain the historical TOA reflectance and BOA transmittance,
+each shaped `[nVZA × nStokes × nSpec]`. Strict-interior outputs are stored in
+`result.levels` as [`LevelRadiance`](@ref) records.
 
-For most use cases, only the first two elements are needed:
+The result retains the historical seven-slot iteration order, so ordinary
+endpoint code remains valid:
 ```julia
 R, T = rt_run(model)
 ```
@@ -129,10 +130,15 @@ Run the RT solver and return per-Fourier-moment Stokes matrices at all
 quadrature streams instead of post-processed `(vza, vaz)` outputs. See
 [`StreamRTResult`](@ref) for the data layout and a worked recovery example.
 
-Internally just calls [`rt_run`](@ref) with a `streams_callback` that
-copies `composite_layer.R⁻⁺`, `composite_layer.J₀⁺/⁻`, and the combined
+Internally calls the same production full-column kernel as [`rt_run`](@ref)
+with a callback that copies `composite_layer.R⁻⁺`,
+`composite_layer.J₀⁺/⁻`, and the combined
 per-source-slot SFI contributions out of the live layer accumulators
 once per Fourier moment.
+
+Stream output is intrinsically full-column. `geometry.obs_alt` still affects
+the atmospheric grid (interior heights are exact interfaces), but it does not
+filter the TOA/BOA stream matrices stored in `StreamRTResult`.
 """
 function rt_run_streams(model; i_band::Integer = 1,
                          sources::Union{Nothing, AbstractSource} = nothing)
@@ -172,7 +178,11 @@ function rt_run_streams(model; i_band::Integer = 1,
         push!(J⁺_list, J⁺_combined)
     end
 
-    rt_run(model; i_band, sources, streams_callback = cb)
+    # Call the production column kernel directly. Going through public
+    # height-aware `rt_run` would require a second multisensor solve merely to
+    # construct an ObserverRTResult that this stream API intentionally ignores.
+    _rt_run_column(InelasticScattering.noRS{FT}(), model, [Int(i_band)];
+                   sources, streams_callback=cb)
 
     # Capture the τ profile from the model. These are m-independent
     # quantities the user wants for post-processing (photon budget,
@@ -251,9 +261,9 @@ bit-for-bit. When a [`SourceSet`](@ref) (or a single
 [`SolarBeam`](@ref) is routed into `RS_type.F₀` ahead of the existing
 SFI kernel call. Phase 5 will remove the `RS_type.F₀` indirection.
 """
-function rt_run(RS_type::AbstractRamanType, model, iBand;
-                sources::Union{Nothing, AbstractSource} = nothing,
-                streams_callback::Union{Nothing, Function} = nothing)
+function _rt_run_column(RS_type::AbstractRamanType, model, iBand;
+                        sources::Union{Nothing, AbstractSource} = nothing,
+                        streams_callback::Union{Nothing, Function} = nothing)
     _warn_explicit_depol_raman(RS_type, model)
 
     # Apply the per-model BLAS thread cap once per `rt_run` invocation
@@ -377,8 +387,11 @@ function rt_run(RS_type::AbstractRamanType, model, iBand;
         @timeit "Canopy atm tau" _compute_canopy_atm_tau!(brdf, model, _canopy_spec_wn)
     end
 
-    if sources === nothing && size(RS_type.F₀) == (pol_type.n, nSpec)
-        # User has pre-set RS_type.F₀; leave it alone for back-compat.
+    if sources === nothing && size(RS_type.F₀) == (pol_type.n, nSpec) && !iszero(RS_type.F₀)
+        # User has pre-set a nonzero RS_type.F₀; leave it alone for back-compat.
+        # The noRS constructor's zero 1×1 placeholder happens to have the
+        # correct shape for scalar/single-wavelength runs and must not suppress
+        # the default unit SolarBeam.
     else
         F₀_dev = extract_solar_F₀(prepared_sources, FT, pol_type.n, nSpec, arr_type)
         # `RS_type.F₀` historically lives on host memory; keep that contract by
@@ -579,6 +592,139 @@ function rt_run(RS_type::AbstractRamanType, model, iBand;
     return SFI ? (R_SFI, T_SFI, ieR_SFI, ieT_SFI, hdr, bhr_uw[1,:], bhr_dw[1,:]) : (R, T)
 end
 
+"True when the legacy multisensor kernel can faithfully represent the source set."
+_multisensor_source_supported(::Union{SolarBeam, NoSource}) = true
+_multisensor_source_supported(s::SourceSet) = all(_multisensor_source_supported, s.sources)
+_multisensor_source_supported(::AbstractSource) = false
+
+"Populate the legacy Raman carrier with the solar spectrum for multisensor RT."
+function _prepare_multisensor_F₀!(RS_type, model, iBand, sources)
+    FT = float_type(model)
+    pol_n = polarization_type(model).n
+    nSpec = sum(size(model.τ_abs[iB], 1) for iB in iBand)
+    arr_type = array_type(model)
+    effective_sources = sources === nothing ? model.sources : sources
+    _multisensor_source_supported(effective_sources) || throw(ArgumentError(
+        "interior-height radiances currently support SolarBeam/NoSource only; " *
+        "thermal and surface-emission sources require multisensor source-slot propagation"))
+    if sources === nothing && size(RS_type.F₀) == (pol_n, nSpec) &&
+       !iszero(RS_type.F₀)
+        # Match the production full-column path: a deliberately pre-populated
+        # Raman carrier takes precedence when no source override was supplied.
+        return nothing
+    end
+    prepared = prepare_sources(effective_sources, FT, pol_n, nSpec, arr_type)
+    RS_type.F₀ = Array{FT, 2}(extract_solar_F₀(prepared, FT, pol_n, nSpec, arr_type))
+    return nothing
+end
+
+"Reject surfaces whose production setup is not represented in the legacy multisensor path."
+function _require_multisensor_surfaces(model, iBand)
+    any(iB -> get_surface(model, iB) isa CanopySurface, iBand) &&
+        throw(ArgumentError(
+            "interior-height radiances do not support CanopySurface; " *
+            "the multisensor solver cannot reproduce canopy spectral setup and atmospheric interleaving"))
+    return nothing
+end
+
+"Assemble explicit endpoint and interior-height records from multisensor arrays."
+function _observer_result_from_multisensor(model, sensor_levels, uwJ, dwJ, direct_dwJ,
+                                           uwieJ, dwieJ;
+                                           hdr=nothing, bhr_uw=nothing, bhr_dw=nothing)
+    geom = model.obs_geom
+    FT = float_type(model)
+    offset = (!isempty(sensor_levels) && first(sensor_levels) == 0) ? 1 : 0
+
+    toa = geom.include_toa && offset == 1 ? uwJ[1] : nothing
+    boa = geom.include_boa && offset == 1 ? dwJ[1] : nothing
+    ie_toa = geom.include_toa && offset == 1 ? uwieJ[1] : nothing
+    ie_boa = geom.include_boa && offset == 1 ? dwieJ[1] : nothing
+
+    level_type = isempty(geom.sensor_levels) ?
+        LevelRadiance{FT,Nothing,Nothing,Nothing,Nothing} :
+        typeof(LevelRadiance(geom.sensor_altitudes[1], geom.sensor_levels[1],
+                             uwJ[offset + 1], dwJ[offset + 1], direct_dwJ[offset + 1],
+                             uwieJ[offset + 1], dwieJ[offset + 1]))
+    levels = Vector{level_type}()
+    for (i, (height, boundary)) in enumerate(zip(geom.sensor_altitudes, geom.sensor_levels))
+        j = offset + i
+        push!(levels, LevelRadiance(height, boundary, uwJ[j], dwJ[j], direct_dwJ[j],
+                                    uwieJ[j], dwieJ[j]))
+    end
+
+    return ObserverRTResult(toa, boa, ie_toa, ie_boa, levels,
+                            FT(geom.toa_altitude), hdr, bhr_uw, bhr_dw)
+end
+
+"Select requested endpoints from the ordinary full-column forward result."
+function _observer_result_from_column(model, result)
+    R, T, ieR, ieT, hdr, bhr_uw, bhr_dw = result
+    geom = model.obs_geom
+    FT = float_type(model)
+    levels = LevelRadiance{FT,Nothing,Nothing,Nothing,Nothing}[]
+    return ObserverRTResult(geom.include_toa ? R : nothing,
+                            geom.include_boa ? T : nothing,
+                            geom.include_toa ? ieR : nothing,
+                            geom.include_boa ? ieT : nothing,
+                            levels, FT(geom.toa_altitude), hdr, bhr_uw, bhr_dw)
+end
+
+"Reject observer requests that a full-column-only solver cannot represent."
+function _require_endpoint_observers(model, solver_name::AbstractString)
+    isempty(model.obs_geom.sensor_levels) || throw(ArgumentError(
+        "$solver_name does not support interior-height radiances; " *
+        "use rt_run(model) for obs_alt requests inside the atmosphere"))
+    return nothing
+end
+
+"Apply the resolved TOA/BOA selection to a pair of full-column outputs."
+@inline function _select_observer_endpoints(model, toa, boa)
+    geom = model.obs_geom
+    return geom.include_toa ? toa : nothing,
+           geom.include_boa ? boa : nothing
+end
+
+"""
+    rt_run(RS_type, model, iBand; sources=nothing)
+
+Run height-aware forward RT. The observer convention stored in
+`model.obs_geom` selects optional TOA/BOA endpoints and any exact interior
+interfaces. See [`ObserverRTResult`](@ref).
+"""
+function rt_run(RS_type::AbstractRamanType, model, iBand;
+                sources::Union{Nothing, AbstractSource} = nothing,
+                streams_callback::Union{Nothing, Function} = nothing)
+    bands = iBand isa Integer ? [Int(iBand)] : collect(Int, iBand)
+    geom = model.obs_geom
+
+    # The stream-export callback needs the production composite-layer path.
+    # It is independent of observer selection and intentionally captures the
+    # complete column.
+    if streams_callback !== nothing
+        result = _rt_run_column(RS_type, model, bands; sources, streams_callback)
+        isempty(geom.sensor_levels) &&
+            return _observer_result_from_column(model, result)
+        # The callback represents the full production column, while the
+        # requested interior radiances come from the multisensor composition
+        # below. Advanced callers asking for both therefore pay for both paths,
+        # but never receive a silently empty `levels` result.
+    end
+
+    if isempty(geom.sensor_levels)
+        return _observer_result_from_column(
+            model, _rt_run_column(RS_type, model, bands; sources))
+    end
+
+    _require_multisensor_surfaces(model, bands)
+    _prepare_multisensor_F₀!(RS_type, model, bands, sources)
+    sensor_levels = (geom.include_toa || geom.include_boa) ?
+                    vcat(0, geom.sensor_levels) : copy(geom.sensor_levels)
+    uwJ, dwJ, direct_dwJ, uwieJ, dwieJ =
+        rt_run_test_ms(RS_type, sensor_levels, model, bands)
+    return _observer_result_from_multisensor(
+        model, sensor_levels, uwJ, dwJ, direct_dwJ, uwieJ, dwieJ)
+end
+
 
 # =========================================================================
 # Single-scatter approximation driver
@@ -633,6 +779,7 @@ Single-scatter approximation driver with explicit Raman type. See
 """
 function rt_run_ss(RS_type::AbstractRamanType, model, iBand;
                    sources::Union{Nothing, AbstractSource} = nothing)
+    _require_endpoint_observers(model, "rt_run_ss")
     _warn_explicit_depol_raman(RS_type, model)
 
     # Per-model BLAS thread cap (see `rt_run` body for rationale).
@@ -702,7 +849,8 @@ function rt_run_ss(RS_type::AbstractRamanType, model, iBand;
     # model.sources > pre-set `RS_type.F₀` for back-compat. See `rt_run`.
     effective_sources = sources === nothing ? model.sources : sources
     prepared_sources = prepare_sources(effective_sources, FT, pol_type.n, nSpec, arr_type)
-    if sources === nothing && size(RS_type.F₀) == (pol_type.n, nSpec)
+    if sources === nothing && size(RS_type.F₀) == (pol_type.n, nSpec) &&
+       !iszero(RS_type.F₀)
         # User-pre-set F₀ honored.
     else
         F₀_dev = extract_solar_F₀(prepared_sources, FT, pol_type.n, nSpec, arr_type)
@@ -795,5 +943,13 @@ function rt_run_ss(RS_type::AbstractRamanType, model, iBand;
     model.numerics.verbose && print_timer()
     reset_timer!()
 
-    return SFI ? (R_SFI, T_SFI, ieR_SFI, ieT_SFI, hem_R, hem_T) : (R, T, hem_R, hem_T)
+    if SFI
+        R_out, T_out = _select_observer_endpoints(model, R_SFI, T_SFI)
+        ieR_out, ieT_out = _select_observer_endpoints(model, ieR_SFI, ieT_SFI)
+        hem_R_out, hem_T_out = _select_observer_endpoints(model, hem_R, hem_T)
+        return R_out, T_out, ieR_out, ieT_out, hem_R_out, hem_T_out
+    end
+    R_out, T_out = _select_observer_endpoints(model, R, T)
+    hem_R_out, hem_T_out = _select_observer_endpoints(model, hem_R, hem_T)
+    return R_out, T_out, hem_R_out, hem_T_out
 end

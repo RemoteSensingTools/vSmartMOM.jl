@@ -29,7 +29,7 @@ dry and wet vertical column densities, and volume mixing ratios for
 trace gases.  Constructed internally by [`model_from_parameters`](@ref)
 from the raw arrays in [`vSmartMOM_Parameters`](@ref).
 
-`p_full` has `N` levels; `p_half` has `N-1` layer-boundary pressures.
+`p_full` has `N` levels; `p_half` has `N+1` layer-boundary pressures.
 `T`, `q`, `vmr_h2o`, `vcd_dry`, `vcd_h2o`, and `Δz` are layer quantities
 of length `N`.
 
@@ -60,17 +60,135 @@ end
 "Types for describing atmospheric parameters"
 abstract type AbstractObsGeometry end
 
-"Observation Geometry (basics)" 
-Base.@kwdef struct ObsGeometry{FT} <: AbstractObsGeometry
+"Observation geometry, including the resolved vertical-output interfaces."
+Base.@kwdef mutable struct ObsGeometry{FT} <: AbstractObsGeometry
     "Solar Zenith Angle `[Degree]`"
     sza::FT
     "Viewing Zenith Angle(s) `[Degree]`" 
     vza::Array{FT,1}
     "Viewing Azimuth Angle(s) `[Degree]`" 
     vaz::Array{FT,1}
-    "Altitude of Observer `[Pa]`"
-    obs_alt::FT
+    "Requested observer altitude(s) `[km above BOA]`; scalar and vector forms have distinct semantics"
+    obs_alt::Union{FT, Vector{FT}}
+    "Strictly interior atmospheric interface indices (number of layers above each sensor)"
+    sensor_levels::Vector{Int} = Int[]
+    "Geometric altitudes corresponding to `sensor_levels` `[km above BOA]`"
+    sensor_altitudes::Vector{FT} = FT[]
+    "Whether the requested output includes TOA upwelling radiance"
+    include_toa::Bool = false
+    "Whether the requested output includes BOA downwelling radiance"
+    include_boa::Bool = false
+    "Resolved top-of-atmosphere altitude `[km above BOA]`"
+    toa_altitude::FT = zero(FT)
 end
+
+# Preserve the long-standing four-argument construction seam used by tests and
+# downstream callers.  Model construction replaces this unresolved geometry
+# with one carrying the sensor-interface metadata after the profile is framed.
+function ObsGeometry{FT}(sza, vza, vaz, obs_alt) where {FT}
+    alt = obs_alt isa Real ? FT(obs_alt) : convert(Vector{FT}, collect(obs_alt))
+    has_zero = alt isa AbstractVector ? any(iszero, alt) : iszero(alt)
+    include_boa = alt isa AbstractVector ? has_zero : iszero(alt)
+    include_toa = alt isa AbstractVector && has_zero
+    return ObsGeometry{FT}(FT(sza), convert(Vector{FT}, vza),
+                           convert(Vector{FT}, vaz), alt,
+                           Int[], FT[], include_toa, include_boa, zero(FT))
+end
+
+function ObsGeometry(sza::FT, vza, vaz, obs_alt) where {FT<:Real}
+    return ObsGeometry{FT}(sza, vza, vaz, obs_alt)
+end
+
+"""
+    LevelRadiance
+
+Radiances at one strict-interior atmospheric interface. `upwelling` and
+`downwelling` are the diffuse elastic fields solved by MOM.
+`unscattered_downwelling` is the separately reported attenuated collimated
+solar beam at the solar ordinate (zero for other viewing zenith angles).
+Use [`total_downwelling`](@ref) to add the diffuse and unscattered components.
+"""
+struct LevelRadiance{FT,U,D,IU,ID}
+    "Geometric height in km above model BOA"
+    height_km::FT
+    "Interface index: number of atmospheric layers above this level"
+    boundary_index::Int
+    upwelling::U
+    downwelling::D
+    unscattered_downwelling::D
+    inelastic_upwelling::IU
+    inelastic_downwelling::ID
+end
+
+"Allocate a zero direct-beam component matching an existing downwelling field."
+_zero_unscattered_downwelling(::Nothing) = nothing
+function _zero_unscattered_downwelling(downwelling)
+    direct = similar(downwelling)
+    fill!(direct, zero(eltype(direct)))
+    return direct
+end
+
+# Preserve the original six-argument construction seam for downstream callers.
+function LevelRadiance(height_km, boundary_index, upwelling, downwelling,
+                       inelastic_upwelling, inelastic_downwelling)
+    return LevelRadiance(height_km, boundary_index, upwelling, downwelling,
+                         _zero_unscattered_downwelling(downwelling),
+                         inelastic_upwelling, inelastic_downwelling)
+end
+
+function LevelRadiance{FT,U,D,IU,ID}(height_km::FT, boundary_index::Int,
+                                     upwelling::U, downwelling::D,
+                                     inelastic_upwelling::IU,
+                                     inelastic_downwelling::ID) where {FT,U,D,IU,ID}
+    return LevelRadiance{FT,U,D,IU,ID}(
+        height_km, boundary_index, upwelling, downwelling,
+        _zero_unscattered_downwelling(downwelling),
+        inelastic_upwelling, inelastic_downwelling)
+end
+
+"""
+    total_downwelling(level::LevelRadiance)
+
+Return the total elastic downwelling radiance at an interior level: the MOM
+diffuse field plus the separately reported unscattered solar beam.
+"""
+function total_downwelling(level::LevelRadiance)
+    level.unscattered_downwelling === nothing && return level.downwelling
+    return level.downwelling .+ level.unscattered_downwelling
+end
+
+"""
+    ObserverRTResult
+
+Height-aware forward-RT result. `toa` is upwelling at TOA, `boa` is
+downwelling at BOA, and `levels` contains co-located diffuse up/down radiances
+plus a separate unscattered solar component at requested interior heights.
+Unrequested endpoints are `nothing`.
+
+The result remains iterable/indexable over the historical seven forward
+slots `(toa, boa, inelastic_toa, inelastic_boa, hdr, bhr_uw, bhr_dw)` so
+the default `obs_alt: [0]` preserves historical destructuring and indexing.
+"""
+struct ObserverRTResult{FT,TOA,BOA,IET,IEB,L,H,U,D}
+    toa::TOA
+    boa::BOA
+    inelastic_toa::IET
+    inelastic_boa::IEB
+    levels::Vector{L}
+    toa_altitude_km::FT
+    hdr::H
+    bhr_uw::U
+    bhr_dw::D
+end
+
+@inline _observer_legacy_tuple(r::ObserverRTResult) =
+    (r.toa, r.boa, r.inelastic_toa, r.inelastic_boa, r.hdr, r.bhr_uw, r.bhr_dw)
+Base.length(::ObserverRTResult) = 7
+Base.firstindex(::ObserverRTResult) = 1
+Base.lastindex(::ObserverRTResult) = 7
+Base.getindex(r::ObserverRTResult, indices...) = getindex(_observer_legacy_tuple(r), indices...)
+Base.iterate(r::ObserverRTResult, state...) = iterate(_observer_legacy_tuple(r), state...)
+Base.Tuple(r::ObserverRTResult) = _observer_legacy_tuple(r)
 
 """
     RT_Aerosol{FT}
@@ -805,8 +923,8 @@ mutable struct vSmartMOM_Parameters{FT<:Real}
     vza::AbstractArray{FT}
     "Viewing azimuthal angles [deg]"
     vaz::AbstractArray{FT}
-    "Altitude of observer [Pa]"
-    obs_alt::FT
+    "Observer altitude(s) [km above BOA]; scalar and vector forms have distinct output semantics"
+    obs_alt::Union{FT, Vector{FT}}
 
     # atmospheric_profile group
     "Temperature Profile [K]"

@@ -584,7 +584,7 @@ function validate_yaml_parameters(params)
         (["geometry", "sza"], Real),
         (["geometry", "vza"], Array{<:Real}),
         (["geometry", "vaz"], Array{<:Real}),
-        (["geometry", "obs_alt"], Real),
+        (["geometry", "obs_alt"], Union{Real, AbstractVector}),
         (["atmospheric_profile", "T"], Array{<:Real}),
         (["atmospheric_profile", "p"], Array{<:Real}),
         (["atmospheric_profile", "profile_reduction"], Union{Integer, Nothing}),
@@ -655,6 +655,16 @@ function validate_yaml_parameters(params)
         ab = params["absorption"]
         @assert haskey(ab, "molecules") || haskey(ab, "fixed_molecules") || haskey(ab, "variable_molecules") "absorption section must define `fixed_molecules` and/or `variable_molecules` (or legacy `molecules`)"
     end
+
+
+    obs_alt = params["geometry"]["obs_alt"]
+    values = obs_alt isa AbstractVector ? obs_alt : (obs_alt,)
+    _require_config(!(obs_alt isa AbstractVector) || !isempty(obs_alt),
+                    "geometry/obs_alt must not be an empty vector")
+    _require_config(all(x -> x isa Real && !(x isa Bool), values),
+                    "geometry/obs_alt must be a number or a vector of numbers")
+    _require_config(all(x -> isfinite(x) && x >= 0, values),
+                    "geometry/obs_alt values must be finite, nonnegative heights in km above BOA")
 end
 
 "Build parameters from a Dict (e.g., parsed YAML)"
@@ -893,8 +903,29 @@ function _parse_atmosphere(params_dict::Dict, FT)
     T = convert.(FT, params_dict["atmospheric_profile"]["T"]) # Level
     p = convert.(FT, params_dict["atmospheric_profile"]["p"]) # Boundaries
     q = haskey(params_dict["atmospheric_profile"], "q") ? convert.(FT, params_dict["atmospheric_profile"]["q"]) : zeros(FT, length(T))
-    prof_red = params_dict["atmospheric_profile"]["profile_reduction"]
+    raw_prof_red = params_dict["atmospheric_profile"]["profile_reduction"]
+    prof_red = raw_prof_red === nothing ? -1 : Int(raw_prof_red)
+    _require_config(prof_red == -1 || prof_red > 0,
+                    "atmospheric_profile/profile_reduction must be -1, null, or a positive integer")
     return T, p, q, prof_red
+end
+
+"Parse observer heights without collapsing the scalar/vector distinction."
+function _parse_obs_alt(raw, FT)
+    if raw isa Real && !(raw isa Bool)
+        value = FT(raw)
+        _require_config(isfinite(value) && value >= zero(FT),
+                        "geometry/obs_alt must be finite and nonnegative")
+        return value
+    end
+    _require_config(raw isa AbstractVector && !isempty(raw),
+                    "geometry/obs_alt must be a number or a nonempty vector of numbers")
+    _require_config(all(x -> x isa Real && !(x isa Bool), raw),
+                    "geometry/obs_alt vector entries must be numbers")
+    values = FT.(raw)
+    _require_config(all(x -> isfinite(x) && x >= zero(FT), values),
+                    "geometry/obs_alt values must be finite, nonnegative heights in km above BOA")
+    return convert(Vector{FT}, values)
 end
 
 function _parse_absorption(params_dict::Dict, FT, q=nothing)
@@ -1063,7 +1094,7 @@ function parameters_from_dict(params_dict::Dict)
         numerics, FT,
         architecture,
         FT(params_dict["geometry"]["sza"]), convert.(FT, params_dict["geometry"]["vza"]),
-        convert.(FT, params_dict["geometry"]["vaz"]), FT(params_dict["geometry"]["obs_alt"]),
+        convert.(FT, params_dict["geometry"]["vaz"]), _parse_obs_alt(params_dict["geometry"]["obs_alt"], FT),
         T, p, q, profile_reduction,
         absorption_params, scattering_params,
         res.nstreams, res.m_max_override, res.stream_l_cap, res.legacy_l_cap_override,

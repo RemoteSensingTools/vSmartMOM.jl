@@ -36,7 +36,7 @@ cfg = Dict(
     "float_type" => "Float64",
     "architecture" => "CPU()",
   ),
-  "geometry" => Dict("sza"=>30, "vza"=>[0], "vaz"=>[0], "obs_alt"=>1000.0),
+  "geometry" => Dict("sza"=>30, "vza"=>[0], "vaz"=>[0], "obs_alt"=>[0.0]),
   "atmospheric_profile" => Dict(
       "T"=>[260.0, 280.0],
       "p"=>[100.0, 600.0, 1000.0],
@@ -57,4 +57,3 @@ See the IO Schema doc page for all keys and constraints.
 ---
 
 *This page was generated using [Literate.jl](https://github.com/fredrikekre/Literate.jl).*
-

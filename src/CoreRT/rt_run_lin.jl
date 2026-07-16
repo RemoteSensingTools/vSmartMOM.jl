@@ -105,6 +105,7 @@ function rt_run(RS_type::AbstractRamanType,
                     NAer::Int, NGas::Int, NSurf::Int,
                     iBand;
                     sources::Union{Nothing, AbstractSource} = nothing)
+    _require_endpoint_observers(model, "linearized rt_run")
     if InelasticScattering.has_inelastic(RS_type)
         throw(ArgumentError(
             "Linearized Raman-active RT is intentionally unsupported. " *
@@ -163,7 +164,7 @@ function rt_run(RS_type::AbstractRamanType,
     # routes SurfaceSIF / future per-source surface contributions.
     effective_sources = sources === nothing ? model.sources : sources
     prepared_sources = prepare_sources(effective_sources, FT, pol_type.n, nSpec, arr_type)
-    if sources === nothing && size(F₀) == (pol_type.n, nSpec)
+    if sources === nothing && size(F₀) == (pol_type.n, nSpec) && !iszero(F₀)
         # User pre-set F₀ honored — F₀ already in scope from RS_type unpack.
     else
         F₀_dev = extract_solar_F₀(prepared_sources, FT, pol_type.n, nSpec, arr_type)
@@ -298,6 +299,9 @@ function rt_run(RS_type::AbstractRamanType,
     model.numerics.verbose && print_timer()
     reset_timer!()
 
-    # Return R_SFI or R, depending on the flag
-    return R, T, Ṙ, Ṫ
+    # The analytic kernel computes the complete column. Preserve its historical
+    # four slots while blanking endpoints that were not requested.
+    R_out, T_out = _select_observer_endpoints(model, R, T)
+    Ṙ_out, Ṫ_out = _select_observer_endpoints(model, Ṙ, Ṫ)
+    return R_out, T_out, Ṙ_out, Ṫ_out
 end

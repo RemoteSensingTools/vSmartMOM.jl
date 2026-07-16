@@ -27,6 +27,9 @@ try
 # Forward model tests (these require YAML parameter files + data)
 @testset "Forward noRS" begin include("test_forward_noRS.jl") end
 
+# Restored scalar/vector observer-height convention and exact interior levels.
+@testset "Multi-sensor heights" begin include("test_multisensor_heights.jl") end
+
 # Molecular Rayleigh/Cabannes/RRS optical-property identities.
 @testset "Rayleigh/Cabannes Raman" begin include("test_ray_cab_raman.jl") end
 

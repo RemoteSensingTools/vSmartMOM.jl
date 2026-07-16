@@ -19,8 +19,14 @@ and return-shape details.
 
 ## Performing the RT Simulation
 
-Use `rt_run(model)` for the forward solver. Linearized runs use
-`model_from_parameters_lin` and `rt_run_lin`; see [Compute Jacobians](../jacobians.md).
+Use `rt_run(model)` for the forward solver. It returns an
+`ObserverRTResult`: named `toa` and `boa` endpoint arrays plus one
+`LevelRadiance` record per requested interior height in `result.levels`.
+With `obs_alt: [0]`, the result retains historical tuple iteration, so
+`R, T = rt_run(model)` continues to work. See the
+[`geometry` schema](../IO/Schema/geometry.md) for height-selection semantics.
+Linearized runs use `model_from_parameters_lin` and `rt_run_lin`; see
+[Compute Jacobians](../jacobians.md).
 
 ## Types
 
@@ -34,6 +40,15 @@ Use `rt_run(model)` for the forward solver. Linearized runs use
 `RTModel` is the hierarchical model state used by the solver. New code should
 prefer the `solver`, `geometry`, `quad_points`, `atmosphere`, `optics`, and
 `surfaces` fields over legacy flat-field access.
+
+### Forward Result Types
+
+`ObserverRTResult` holds requested endpoint and interior-level radiances.
+Each `LevelRadiance` stores the geometric height, atmospheric boundary index,
+co-located diffuse upwelling/downwelling elastic and inelastic arrays, and a
+separate `unscattered_downwelling` solar-beam component. Use
+`total_downwelling(level)` when a total comparable to the historical BOA
+output is required.
 
 ### Surface Types
 

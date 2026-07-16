@@ -44,7 +44,7 @@ geometry:
   sza:                35.0          # overridden per-run in case file
   vza:                [10.0, 20.0, 40.0]
   vaz:                [0.0, 0.0, 0.0]
-  obs_alt:            1000.0
+  obs_alt:            [0]
 
 # 23 layers; T/p/q values are placeholders (overridden by direct injection
 # of τ_rayl, τ_abs, τ_aer in the case file). Heights from input_atmos.dat.

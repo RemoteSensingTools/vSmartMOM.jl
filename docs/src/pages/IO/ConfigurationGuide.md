@@ -65,7 +65,7 @@ architecture      = "CPU()"
 sza     = 60.0
 vza     = [60.0]
 vaz     = [180.0]
-obs_alt = 1000.0                                # Pa
+obs_alt = [0.0]                                 # TOA + BOA radiances
 
 [atmospheric_profile]
 T = [250.0, 275.0]                              # K, full levels (layer centers)
@@ -86,7 +86,7 @@ cfg = Dict(
     "float_type"        => "Float64",
     "architecture"      => "CPU()"),
   "geometry" => Dict(
-    "sza" => 60.0, "vza" => [60.0], "vaz" => [180.0], "obs_alt" => 1000.0),
+    "sza" => 60.0, "vza" => [60.0], "vaz" => [180.0], "obs_alt" => [0.0]),
   "atmospheric_profile" => Dict(
     "T" => [250.0, 275.0], "p" => [100.0, 500.0, 1000.0],
     "profile_reduction" => -1))
@@ -107,7 +107,12 @@ R, T   = rt_run(model)
   2·nstreams − 1`. Minimum 3.
 - `T` has length `#layers`; `p` (half levels) has length `#layers + 1`. They
   define the layering — get this off-by-one right.
-- `obs_alt` is in **Pa** (the profile `p` is in **hPa**). TOA→BOA ordering.
+- `obs_alt` is a height selection in **km above BOA**. `[0]` requests the
+  standard TOA-upwelling and BOA-downwelling pair. Scalar `0` requests BOA
+  only; a scalar interior `H` requests both directions at `H`; `[0, H]`
+  requests TOA, BOA, and `H`. See the
+  [`geometry` schema](Schema/geometry.md) for the complete scalar/vector
+  convention and the named `ObserverRTResult` output.
 
 ---
 
@@ -172,8 +177,9 @@ cfg["absorption"] = Dict(
 
 **VMR sources.** A `vmr` value is either
 - a **scalar** (e.g. `O2 = 0.21`) — constant with height, or
-- a **vector** — a per-layer profile; its length must match the atmospheric
-  profile layers (it is interpolated in pressure with a warning if it does not).
+- a **vector** with either one value per layer (`N`) or one value per pressure
+  interface (`N+1`). Interface values are mapped to layer centers in log
+  pressure before any observer-height interfaces are inserted.
 
 **Line shape.** `broadening` ∈ `Voigt()` (default; Doppler+pressure, the right
 choice through the troposphere/stratosphere), `Lorentz()` (pressure limit),
@@ -187,9 +193,9 @@ molecule lists) the precomputed look-up tables are used instead — much faster,
 and the production pipeline path. `cia_files` / `mtckd_file` add
 collision-induced and continuum absorption.
 
-> **Legacy form.** Older configs use a single `molecules = [[O2], [H2O,CO2]]`
+> **Legacy form.** Older configs use a single `molecules = [[O2], [CO2]]`
 > list (all treated as fixed) instead of `fixed_molecules`/`variable_molecules`.
-> It still parses; prefer the explicit split for new work.
+> It still parses for non-H₂O species; prefer the explicit split for new work.
 
 ---
 
@@ -216,14 +222,13 @@ vmr_h2o = q / (1 − q) · (M_dry / M_H₂O)
 ```
 
 and adds the H₂O line absorption automatically (HITRAN on the fly, or the H₂O
-LUT if supplied). `q` has length `#layers` (same as `T`); all-zero `q` (the
-default) means a dry atmosphere.
+LUT if supplied). `q` may contain `N` layer-center values (same as `T`) or
+`N+1` pressure-interface values; interface values are mapped to layer centers
+in log pressure. All-zero `q` (the default) means a dry atmosphere.
 
-> **q vs. an explicit H₂O molecule.** The legacy `molecules` form *can* list
-> `H2O` with its own `vmr` (constant), which bypasses `q`. Mixing both —
-> setting `q` *and* listing `H2O` — double-specifies water. Prefer `q` for the
-> modern path. (If you set `q` where a profile source already provided one, a
-> warning is emitted; a full config-level override is not yet wired.)
+> **H₂O is driven only by `q`.** Do not list `H2O` in `fixed_molecules`,
+> `variable_molecules`, or the legacy `molecules` form; the parser rejects it
+> to prevent double-specifying water vapor.
 
 ---
 

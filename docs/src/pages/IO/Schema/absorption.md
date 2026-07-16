@@ -8,9 +8,13 @@ for clear-sky / Rayleigh-only / canopy-only runs.
 ## Required when present
 
 - **`vmr`** — `Dict{String, Union{Real, Vector{Real}}}`. Volume mixing
-  ratios per molecule, on the same vertical grid as
-  `atmospheric_profile.T`. Scalar = uniform VMR; vector = profile.
-  Example: `{ O2: 0.21, H2O: [1e-6, 1e-5, 1e-4, 1e-3] }`.
+  ratios per molecule. Scalar = uniform VMR; a vector may use the `N`
+  layer centers or the `N+1` pressure interfaces. Interface-defined vectors
+  are interpolated to layer centers in log pressure before observer-height
+  reframing.
+  Example: `{ O2: 0.21, CO2: [3.8e-4, 3.9e-4, 4.0e-4, 4.1e-4] }`.
+  H₂O is derived from the atmospheric-profile `q` field; a legacy H₂O key in
+  this dictionary is ignored.
 - **`broadening`** — `String`. Line shape function. One of
   `"Voigt()"`, `"Doppler()"`, `"Lorentz()"`. Voigt is correct across
   the troposphere and stratosphere; Doppler/Lorentz are diagnostic

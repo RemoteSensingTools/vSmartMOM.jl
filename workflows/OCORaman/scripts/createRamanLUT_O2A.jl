@@ -292,7 +292,7 @@ function write_case_yaml(path::AbstractString, profile::ProfileCase, sza::Real, 
         println(io, "  sza: $(Float64(sza))")
         println(io, "  vza: [0.0]")
         println(io, "  vaz: [0.0]")
-        println(io, "  obs_alt: 0")
+        println(io, "  obs_alt: [0]")
         println(io)
         println(io, "atmospheric_profile:")
         println(io, "  T: $(yaml_array(profile.T))")
