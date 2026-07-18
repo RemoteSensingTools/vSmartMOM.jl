@@ -180,4 +180,32 @@ const _LS = vSmartMOM.CoreRT
         @test R_sp == R_sc          # bit-identical
         @test maximum(abs, R_sc) > 0
     end
+
+    @testset "Legendre coefficient Jacobians vs finite differences" begin
+        coeff = FT[0.22, 0.035, -0.018]
+        p = parameters_from_yaml("test_parameters/PureRayleighParameters.yaml")
+        p.architecture = arch
+        p.brdf = CoreRT.AbstractSurfaceType[CoreRT.LambertianSurfaceLegendre(coeff)]
+        lin_model, optical_lin = model_from_parameters(LinMode(), p)
+        result = rt_run(lin_model, optical_lin, 0,
+                        size(optical_lin.τ̇_abs[1], 1), length(coeff))
+
+        @test result.layout.n_surface == length(coeff)
+        @test CoreRT.surface_parameter_count(p.brdf[1]) == length(coeff)
+        δ = FT(1e-5)
+        for k in eachindex(coeff)
+            cp = copy(coeff); cp[k] += δ
+            cm = copy(coeff); cm[k] -= δ
+            pp = deepcopy(p); pp.brdf = CoreRT.AbstractSurfaceType[CoreRT.LambertianSurfaceLegendre(cp)]
+            pm = deepcopy(p); pm.brdf = CoreRT.AbstractSurfaceType[CoreRT.LambertianSurfaceLegendre(cm)]
+            Rp = rt_run(model_from_parameters(pp)).toa
+            Rm = rt_run(model_from_parameters(pm)).toa
+            fd = (Rp .- Rm) ./ (FT(2) * δ)
+            col = CoreRT.surface_range(result.layout)[k]
+            @test result.toa_jacobian[:, :, :, col] ≈ fd rtol=FT(2e-4) atol=FT(2e-7)
+        end
+
+        @test_throws ArgumentError rt_run(lin_model, optical_lin, 0,
+                                           size(optical_lin.τ̇_abs[1], 1), 1)
+    end
 end

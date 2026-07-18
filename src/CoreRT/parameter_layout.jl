@@ -57,6 +57,10 @@ end
 @inline surface_index(pl::ParameterLayout, i::Int=1) =
     pl.aerosol_params * pl.n_aerosols + pl.n_gases + i
 
+"Number of retrieval parameters contributed by a surface model."
+surface_parameter_count(::AbstractSurfaceType) = 1
+surface_parameter_count(s::LambertianSurfaceLegendre) = length(s.legendre_coeff)
+
 "Number of layer-level parameters (aerosol + gas, excluding surface and canopy)."
 @inline n_layer_params(pl::ParameterLayout) =
     pl.aerosol_params * pl.n_aerosols + pl.n_gases

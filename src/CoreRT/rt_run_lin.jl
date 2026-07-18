@@ -132,6 +132,10 @@ function rt_run(RS_type::AbstractRamanType,
 
     lin = LinMode()
     brdf = get_surface(model, iBand)
+    expected_nsurf = surface_parameter_count(brdf)
+    NSurf == expected_nsurf || throw(ArgumentError(
+        "NSurf=$NSurf does not match $(typeof(brdf)), which has " *
+        "$expected_nsurf linearized surface parameter(s)."))
     (; F₀) = RS_type
 
     FT = eltype(sza)                    # Get the float-type to use
@@ -335,7 +339,8 @@ function rt_run(RS_type::AbstractRamanType,
         # at the first surface slot, regardless of which atmospheric band this
         # rt_run call is processing. (Earlier code passed `iBand` here, which
         # blew through the surface block when iBand>1.)
-        iparam = surface_index(layout, 1)
+        iparam = brdf isa LambertianSurfaceLegendre ?
+                 surface_range(layout) : surface_index(layout, 1)
         create_surface_layer!(RS_type, brdf, #brdf_lin,
                             added_surface_layer,
                             added_surface_layer_lin,
