@@ -163,6 +163,7 @@ export OpticalPropertyJacobian,               # AD boundary struct alias
        ParameterLayout,                       # Jacobian parameter layout descriptor
        n_total, aerosol_range, gas_range,     # ParameterLayout accessors
        surface_range, surface_index,
+       surface_parameter_count,
        canopy_range, n_layer_params
 
 # Export new hierarchical model types
