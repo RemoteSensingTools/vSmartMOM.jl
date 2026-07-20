@@ -26,14 +26,16 @@ the model. The latter should generally be used by users.
 Perform linearized Radiative Transfer and return both radiances and their Jacobians.
 
 Computes the reflected and transmitted Stokes vectors at the top and bottom of the
-atmosphere, along with their analytic derivatives with respect to `Nparams = NAer×7 + NGas + NSurf`
+atmosphere, along with analytic derivatives with respect to
+`Nparams = 1 + NAer×7 + NGasLayer + NSurf` parameters, where
+`NGasLayer = NGasSpecies×Nz`.
 physical parameters via the linearized Matrix Operator Method.
 
 # Arguments
 - `model::RTModel`: Forward model containing optical properties, geometry, etc.
 - `lin_model`: Linearized model containing derivatives of optical properties.
 - `NAer::Int`: Number of aerosol types.
-- `NGas::Int`: Number of trace gas species with variable VMR.
+- `NGas::Int`: Number of layer-resolved gas VMR parameters (`NGasSpecies×Nz`).
 - `NSurf::Int`: Number of surface parameters (typically 1 for Lambertian albedo).
 - `i_band::Integer=1`: Spectral band index.
 
@@ -44,12 +46,16 @@ radiances and Jacobians at requested strict-interior observer heights.
 
 # Parameter Layout in `dR` / `dT`
 The `Nparams` derivative dimension is ordered as:
-1. **Aerosol sub-parameters** (7 per aerosol type):
+1. **Surface pressure** `p_surf` (hPa): column 1.
+2. **Aerosol sub-parameters** (7 per aerosol type):
    `[τ_ref, nᵣ, nᵢ, rₘ, σᵣ, profile_location, profile_width]` for each
-   aerosol, so indices `1:7*NAer`. The profile pair is `(p₀, σp)` for
+   aerosol. The profile pair is `(p₀, σp)` for
    `Normal` and `(z₀, σ₀)` for `LogNormal`.
-2. **Gas VMR parameters**: indices `7*NAer+1 : 7*NAer+NGas`
-3. **Surface parameters**: indices `7*NAer+NGas+1 : Nparams`
+3. **Gas VMR parameters**, species-major with all `Nz` layers for each gas.
+4. **Surface parameters**.
+
+Use `result.layout` with `psurf_index`, `aerosol_range`, `gas_profile_range`,
+`gas_layer_index`, and `surface_range`; do not hard-code offsets.
 
 # Theory
 The forward model solves the vector radiative transfer equation via the discrete ordinate

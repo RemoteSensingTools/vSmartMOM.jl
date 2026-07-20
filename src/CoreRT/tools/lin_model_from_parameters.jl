@@ -34,7 +34,8 @@ This is the **linearized** counterpart of `model_from_parameters(params)`. It co
 2. **Linearized optical properties** (derivatives of the above):
    - `τ̇_aer[iB][iaer, 7, nSpec, nLayers]`: Derivatives of aerosol τ w.r.t. 7 sub-parameters
      `[τ_ref, nᵣ, nᵢ, rₘ, σᵣ, p₀, σp]` per aerosol type.
-   - `τ̇_abs[iB][NGas, nSpec, nLayers]`: Derivatives of gas absorption τ w.r.t. VMR.
+   - `τ̇_abs[iB][NGas*Nz, nSpec, Nz]`: Layer-resolved derivatives of gas
+     absorption τ w.r.t. `VMR(gas, z)`, flattened species-major.
    - `lin_aerosol_optics[iB][iaer]`: Derivatives of Mie properties (ω̃, fᵗ, greek coefficients)
      w.r.t. Mie parameters `[nᵣ, nᵢ, rₘ, σᵣ]`.
 
@@ -90,7 +91,17 @@ function model_from_parameters(lin::LinMode,
     τ_abs     = [zeros(FT2, length(params.spec_bands[i]), length(profile.p_full)) for i in 1:n_bands]
     N_fix_gas = isnothing(abs_params) ? 0 : length(unique(Iterators.flatten(abs_params.fixed_molecules)))
     N_var_gas = isnothing(abs_params) ? 0 : length(unique(Iterators.flatten(abs_params.variable_molecules)))
-    τ̇_abs     = [zeros(FT2, 1+N_var_gas, length(params.spec_bands[i]), length(profile.p_full)) for i in 1:n_bands]
+    # Gas Jacobian columns are species-major and layer-resolved:
+    # (gas 1, z=1:Nz), (gas 2, z=1:Nz), ... .  At layer iz only the
+    # corresponding gas/layer column is nonzero at the optics boundary.
+    N_gas_species = 1 + N_var_gas
+    Nz = length(profile.p_full)
+    τ̇_abs     = [zeros(FT2, N_gas_species * Nz,
+                        length(params.spec_bands[i]), Nz) for i in 1:n_bands]
+    τ̇_rayl_psurf = [zeros(FT2, length(params.spec_bands[i]), length(profile.p_full)) for i in 1:n_bands]
+    τ̇_abs_psurf = [zeros(FT2, length(params.spec_bands[i]), length(profile.p_full)) for i in 1:n_bands]
+    τ̇_aer_psurf = [zeros(FT2, n_aer, length(params.spec_bands[i]), length(profile.p_full)) for i in 1:n_bands]
+    psurf_tangents = psurf_profile_tangents(profile)
     l_max = zeros(Int, n_bands)
     l_max_aer = zeros(Int, n_aer, n_bands)
 
@@ -122,6 +133,14 @@ function model_from_parameters(lin::LinMode,
         τ_rayl[i_band]   .= getRayleighLayerOptProp(profile.p_half[end],
                                 curr_band_λ,
                                 depol_use_Ray, profile.vcd_dry)
+        # τ_rayl = τ_total(p_surf) * vcd_dry/sum(vcd_dry).
+        dry = profile.vcd_dry
+        drydot = psurf_tangents.vcd_dry_dot
+        total = vec(sum(τ_rayl[i_band], dims=2))
+        totaldot = total ./ profile.p_half[end]
+        frac = dry ./ sum(dry)
+        fracdot = (drydot .* sum(dry) .- dry .* sum(drydot)) ./ sum(dry)^2
+        τ̇_rayl_psurf[i_band] .= totaldot * frac' .+ total * fracdot'
 
         (isnothing(abs_params) && isnothing(params.q)) && continue
 
@@ -158,6 +177,7 @@ function model_from_parameters(lin::LinMode,
                     profile)
             end
         end
+
         if !isnothing(abs_params)
             if !isempty(abs_params.fixed_molecules[i_band])
                 for molec_i in 1:length(abs_params.fixed_molecules[i_band])
@@ -250,6 +270,10 @@ function model_from_parameters(lin::LinMode,
                 end
             end
         end
+        # Cross sections, T, q, and VMR are fixed for this tangent. Absorption
+        # changes only through the bottom-layer dry molecular column.
+        dry_ratio_dot = psurf_tangents.vcd_dry_dot[end] / profile.vcd_dry[end]
+        τ̇_abs_psurf[i_band][:, end] .= τ_abs[i_band][:, end] .* dry_ratio_dot
     end
 
     aerosol_optics = [Array{AerosolOptics}(undef, (n_aer)) for i=1:n_bands]
@@ -401,6 +425,8 @@ function model_from_parameters(lin::LinMode,
             # profiles are not silently reconstructed as pressure Normals.
             τₚ, dτₚdp₀, dτₚdσp =
                 getAerosolLayerOptProp(lin, 1, c_aero.profile, profile)
+            dτₚdpsurf = aerosol_profile_psurf_tangent(
+                c_aero.profile, profile, psurf_tangents.Δz_dot)
 
             # ────────────────────────────────────────────────────────────────
             # Aerosol optical depth per layer:
@@ -415,6 +441,8 @@ function model_from_parameters(lin::LinMode,
             # ────────────────────────────────────────────────────────────────
             τ_aer[i_band][i_aer,:,:] =
                 (τ_ref/k_ref) * k_band * τₚ'
+            τ̇_aer_psurf[i_band][i_aer, :, :] .=
+                (τ_ref/k_ref) * k_band * dτₚdpsurf'
 
             τ̇_aer[i_band][i_aer,1,:,:] .=
                 (k_band/k_ref) * τₚ'
@@ -475,7 +503,8 @@ function model_from_parameters(lin::LinMode,
     optics = Optics(rayleigh_s, aerosols_s, τ_abs_ft, τ_rayl)
     numerics = _convert_numerics(params.numerics, FT)
     model = RTModel(params.architecture, solver, numerics, obs_geom, quad_points, atm, optics, params.brdf, sources)
-    return model, RTModelLin(τ̇_abs, τ̇_aer, lin_aerosol_optics)
+    return model, RTModelLin(τ̇_abs, τ̇_aer, lin_aerosol_optics,
+                             τ̇_rayl_psurf, τ̇_aer_psurf, τ̇_abs_psurf)
 end
 
 """

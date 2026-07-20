@@ -32,7 +32,8 @@ For each atmospheric layer, this function:
    the mixing formulas for combined ϖ and Z.
 4. Adds gas absorption via `UmbrellaCoreAbsorptionOpticalProperties`, updating ϖ and τ.
 
-The output derivative dimension has `Nparams = 7×NAer + NGas` entries per layer
+The output derivative dimension has `Nparams = 7×NAer + NGasLayer` entries per layer,
+where `NGasLayer = NGasSpecies×Nz`.
 (surface parameters are handled separately in the interaction step).
 
 # Returns
@@ -49,7 +50,8 @@ function constructCoreOpticalProperties(RS_type, iBand, m, model, lin_model) #wh
 
     (; τ_rayl, τ_aer, τ_abs, aerosol_optics, 
             greek_rayleigh) = model
-    (; τ̇_aer, τ̇_abs, lin_aerosol_optics) = lin_model
+    (; τ̇_aer, τ̇_abs, lin_aerosol_optics,
+       τ̇_rayl_psurf, τ̇_aer_psurf, τ̇_abs_psurf) = lin_model
     @assert all(iBand .≤ length(τ_rayl)) "iBand exceeded number of bands"
     FT = eltype(τ_rayl[1])
     
@@ -83,6 +85,7 @@ function constructCoreOpticalProperties(RS_type, iBand, m, model, lin_model) #wh
                 (Rayl𝐙⁺⁺), (Rayl𝐙⁻⁺)) for i=1:nZ]
         # Initiate combined properties with rayleigh
         combrella = [UmbrellaCoreScatteringOpticalProperties(rayl[i],nothing) for i=1:nZ]
+        aer_ps_components = [Tuple[] for _ in 1:nZ]
         # Loop over all aerosol types:
         for iaer=1:nAero
             # Precomute Z matrices per type (constant per layer)
@@ -105,6 +108,8 @@ function constructCoreOpticalProperties(RS_type, iBand, m, model, lin_model) #wh
                             arr_type) 
                 push!(aer, t_aer)
                 push!(lin_aer, t_lin_aer)
+                rawdot = arr_type(τ̇_aer_psurf[iB][iaer, :, iz])
+                push!(aer_ps_components[iz], (t_aer, rawdot))
             end 
             aer_combrella = [UmbrellaCoreScatteringOpticalProperties(aer[i],lin_aer[i]) for i=1:nZ]
             # Mix with previous Core Optical Properties
@@ -134,7 +139,44 @@ function constructCoreOpticalProperties(RS_type, iBand, m, model, lin_model) #wh
         #igas=1
         #combo2_lin = [include_gas(nAero, igas[iz], combo[iz], combo_lin[iz], gas_lin[iz]) for i=1:nZ]
         combo =     [combrella[iz].fwd for iz=1:nZ]
-        combo_lin = [combrella[iz].lin for iz=1:nZ]
+        # `Any` is intentional here: legacy gas-only mixing may allocate its Z
+        # tangent on the host, while prepending p_surf below moves the completed
+        # tangent to the selected device.
+        combo_lin = Any[combrella[iz].lin for iz=1:nZ]
+
+        # One shared p_surf column precedes all aerosol and gas columns. Its
+        # component tangents are combined at the final mixed-optics boundary.
+        for iz in 1:nZ
+            fwd = combo[iz]
+            nSpec = length(fwd.τ)
+            raydot = arr_type(τ̇_rayl_psurf[iB][:, iz])
+            absdot = arr_type(τ̇_abs_psurf[iB][:, iz])
+            τdot = raydot .+ absdot
+            Wdot = copy(raydot)  # Rayleigh has ϖ=1.
+            Ndot⁺⁺ = reshape(raydot, 1, 1, nSpec) .* Rayl𝐙⁺⁺
+            Ndot⁻⁺ = reshape(raydot, 1, 1, nSpec) .* Rayl𝐙⁻⁺
+            for (iaer, (aer_fwd, rawdot)) in enumerate(aer_ps_components[iz])
+                optics = aerosol_optics[iB][iaer]
+                trunc_factor = arr_type(one(FT) .- optics.fᵗ .* optics.ω̃)
+                moddot = trunc_factor .* rawdot
+                τdot .+= moddot
+                scatterdot = moddot .* aer_fwd.ϖ
+                Wdot .+= scatterdot
+                Ndot⁺⁺ .+= reshape(scatterdot, 1, 1, nSpec) .* aer_fwd.Z⁺⁺
+                Ndot⁻⁺ .+= reshape(scatterdot, 1, 1, nSpec) .* aer_fwd.Z⁻⁺
+            end
+            W = fwd.τ .* fwd.ϖ
+            ϖdot = (Wdot .- fwd.ϖ .* τdot) ./ fwd.τ
+            Zdot⁺⁺ = (Ndot⁺⁺ .- reshape(Wdot, 1, 1, nSpec) .* fwd.Z⁺⁺) ./
+                      reshape(W, 1, 1, nSpec)
+            Zdot⁻⁺ = (Ndot⁻⁺ .- reshape(Wdot, 1, 1, nSpec) .* fwd.Z⁻⁺) ./
+                      reshape(W, 1, 1, nSpec)
+            old = combo_lin[iz]
+            combo_lin[iz] = CoreScatteringOpticalPropertiesLin(
+                hcat(τdot, old.τ̇), hcat(ϖdot, old.ϖ̇),
+                cat(reshape(Zdot⁺⁺, size(Zdot⁺⁺)..., 1), arr_type(old.Ż⁺⁺); dims=4),
+                cat(reshape(Zdot⁻⁺, size(Zdot⁻⁺)..., 1), arr_type(old.Ż⁻⁺); dims=4))
+        end
 
         push!(band_layer_props, combo)
         push!(band_layer_props_lin, combo_lin)

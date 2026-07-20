@@ -4,6 +4,49 @@ Shared functions (reduce_profile, getRayleighLayerOptProp, construct_atm_layer)
 are defined in atmo_prof.jl; this file contains only the lin-mode extensions.
 =#
 
+"""Profile tangents for a fixed grid whose bottom pressure boundary is p_surf."""
+function psurf_profile_tangents(profile::AtmosphericProfile{FT}; g₀=FT(9.8032465)) where FT
+    n = length(profile.T)
+    vcd_dry_dot = zeros(FT, n)
+    vcd_h2o_dot = zeros(FT, n)
+    Δz_dot = zeros(FT, n)
+    dry_mass = FT(28.9644e-3)
+    wet_mass = FT(18.01534e-3)
+    Nₐ = FT(6.02214179e23)
+    R = FT(8.3144598)
+    vmr_h2o = profile.vmr_h2o[end]
+    vmr_dry = one(FT) - vmr_h2o
+    M = vmr_dry * dry_mass + vmr_h2o * wet_mass
+    vcd_dot = Nₐ / (M * g₀ * FT(100)^2) * FT(100)
+    vcd_dry_dot[end] = vmr_dry * vcd_dot
+    vcd_h2o_dot[end] = vmr_h2o * vcd_dot
+    Δz_dot[end] = R * profile.T[end] / (g₀ * M * profile.p_half[end])
+    return (; vcd_dry_dot, vcd_h2o_dot, Δz_dot)
+end
+
+"Derivative of a normalized aerosol allocation with respect to p_surf."
+function aerosol_profile_psurf_tangent(dist::Normal, profile::AtmosphericProfile,
+                                        Δz_dot)
+    p = profile.p_full
+    ρ = pdf.(dist, p) .* profile.Δz
+    ρdot = zero(ρ)
+    pdot = one(eltype(p)) / 2
+    ρdot[end] = pdf(dist, p[end]) * Δz_dot[end] +
+                ρ[end] * (-(p[end] - dist.μ) / dist.σ^2) * pdot
+    return (ρdot .- ρ .* (sum(ρdot) / sum(ρ))) ./ sum(ρ)
+end
+
+function aerosol_profile_psurf_tangent(dist::LogNormal, profile::AtmosphericProfile,
+                                        Δz_dot)
+    p = profile.p_full
+    ρ = pdf.(dist, p) .* profile.Δz
+    ρdot = zero(ρ)
+    pdot = one(eltype(p)) / 2
+    slope = -inv(p[end]) - (log(p[end]) - dist.μ) / (dist.σ^2 * p[end])
+    ρdot[end] = pdf(dist, p[end]) * Δz_dot[end] + ρ[end] * slope * pdot
+    return (ρdot .- ρ .* (sum(ρdot) / sum(ρ))) ./ sum(ρ)
+end
+
 """
     $(FUNCTIONNAME)(total_τ, p₀, σp, p_half)
     
@@ -219,7 +262,11 @@ function compute_absorption_profile!(τ_abs::Array{FT,2},
         #@show minimum(temp), p, T, profile.vcd_dry[iz] * vmr_curr
         #@show iz, profile.vcd_dry[iz], vmr_curr, p, T
         τ_abs[:,iz] += collect(absorption_cross_section(absorption_model, grid, p, T)) * profile.vcd_dry[iz] * vmr_curr
-        τ̇_abs[jac_idx,:,iz] = collect(absorption_cross_section(absorption_model, grid, p, T)) * profile.vcd_dry[iz]
+        # Species-major flattened ordering: (igas - 1) * Nz + iz.
+        # Keeping all other layers zero yields dτ(z)/dVMR(igas, iz).
+        gas_layer_idx = (jac_idx - 1) * length(profile.p_full) + iz
+        τ̇_abs[gas_layer_idx,:,iz] =
+            collect(absorption_cross_section(absorption_model, grid, p, T)) * profile.vcd_dry[iz]
     end
     
 end

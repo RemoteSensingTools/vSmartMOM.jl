@@ -166,6 +166,7 @@ is centralized in [`src/CoreRT/parameter_layout.jl:1–67`](https://github.com/R
 
 ```julia
 struct ParameterLayout
+    n_atmosphere::Int      # = 1   (p_surf)
     aerosol_params::Int     # = 7   (τ_ref, n_r, n_i, r_m, σ_g, profile location/width)
     n_aerosols::Int
     n_gases::Int
@@ -175,11 +176,14 @@ end
 n_total(layout)             # total number of Jacobian columns
 aerosol_range(layout, iaer) # column indices for aerosol iaer (length 7)
 gas_range(layout)           # column indices for gas VMRs
+gas_profile_range(layout, igas, Nz) # all layers for one gas
+gas_layer_index(layout, igas, iz, Nz) # one gas/layer column
 surface_range(layout)       # column indices for surface params
 ```
 
 Always use these accessors instead of hand-writing arithmetic like
-`7*NAer + NGas + 1`. The seven aerosol parameters per mode are:
+`1 + 7*NAer + NGasSpecies*Nz + NSurf`. Column 1 is `p_surf`; the seven aerosol
+parameters per mode follow:
 
 | # | Parameter | Meaning |
 |---|---|---|
@@ -191,9 +195,9 @@ Always use these accessors instead of hand-writing arithmetic like
 | 6 | `p₀` / `z₀` | profile location for pressure-form `Normal` / altitude-form `LogNormal` |
 | 7 | `σ_p` / `σ₀` | corresponding profile width |
 
-A run with two aerosol modes, four gases, and one surface parameter has a
-Jacobian with `2·7 + 4 + 1 = 19` columns, and `aerosol_range(layout, 2)`
-returns `8:14`.
+A run with two aerosol modes, four gases, `Nz` layers, and one surface
+parameter has `1 + 2·7 + 4·Nz + 1` Jacobian columns. Gas columns use
+TOA-to-BOA layer order within each species.
 
 ## What goes through ForwardDiff vs analytic
 

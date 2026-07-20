@@ -206,7 +206,7 @@ The RT kernels compute `∂R/∂τ`, `∂R/∂ϖ`, `∂R/∂Z` analytically (sto
 
 ### Parameter Layout via `ParameterLayout`
 
-Instead of hardcoding `7*NAer + NGas + NSurf`, the codebase uses a `ParameterLayout` struct
+Instead of hardcoding `1 + 7*NAer + NGas + NSurf`, the codebase uses a `ParameterLayout` struct
 (defined in `src/CoreRT/parameter_layout.jl`):
 
 ```julia
@@ -215,13 +215,16 @@ layout = ParameterLayout(aerosol_params=7, n_aerosols=NAer,
 n_total(layout)              # total Nparams
 aerosol_range(layout, iaer)  # indices for aerosol iaer
 gas_range(layout)            # indices for gas VMRs
+gas_profile_range(layout, i, Nz) # vertical VMR profile for gas i
+gas_layer_index(layout, i, z, Nz) # one gas/layer derivative
 surface_index(layout, iBand) # surface param for band iBand
 ```
 
 | Index range               | Parameter                                       | Method   |
 |---------------------------|------------------------------------------------ |----------|
+| `psurf_index(layout)`      | Surface pressure                                | Analytic |
 | `aerosol_range(layout, i)` | `τ_ref, nᵣ, nᵢ, rₘ, σ_g, p₀, σ_p` per aerosol | Analytic |
-| `gas_range(layout)`        | Gas VMR scaling factors                         | Analytic |
+| `gas_profile_range(layout, i, Nz)` | Layer-resolved gas VMR profile        | Analytic |
 | `surface_range(layout)`    | Surface albedo / BRDF parameters                | Analytic |
 
 ### Adding New Parameters

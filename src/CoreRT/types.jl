@@ -1226,7 +1226,7 @@ physical state vector.
 $(DocStringExtensions.FIELDS)
 """
 struct OpticsLin{A, B, C}
-    "∂τ_abs/∂x per band: Vector of arrays [NGas × nSpec × nLayers]"
+    "∂τ_abs/∂VMR(gas,z): [NGas*Nz × nSpec × Nz], species-major"
     τ̇_abs::A
     "∂τ_aer/∂x per band: Vector of arrays [NAer × 7 × nSpec × nLayers]"
     τ̇_aer::B
