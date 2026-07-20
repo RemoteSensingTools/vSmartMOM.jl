@@ -172,13 +172,19 @@ and aerosol properties w.r.t. physical state-vector elements.
 # Fields
 $(DocStringExtensions.FIELDS)
 """
-mutable struct RTModelLin{A,B,C}
-    "∂τ_abs/∂x per band: Vector of arrays [NGas × nSpec × nLayers]"
+mutable struct RTModelLin{A,B,C,D,E,F}
+    "∂τ_abs/∂VMR(gas,z) per band: [NGas*Nz × nSpec × Nz], species-major"
     τ̇_abs::A
     "∂τ_aer/∂x per band: Vector of arrays [NAer × 7 × nSpec × nLayers]"
     τ̇_aer::B
     "Linearized aerosol optics per band per aerosol: Vector{Vector{linAerosolOptics}}"
     lin_aerosol_optics::C
+    "∂τ_rayl/∂p_surf per band: [nSpec × nLayers]"
+    τ̇_rayl_psurf::D
+    "∂τ_aer/∂p_surf per band: [NAer × nSpec × nLayers]"
+    τ̇_aer_psurf::E
+    "∂τ_abs/∂p_surf per band: [nSpec × nLayers]"
+    τ̇_abs_psurf::F
 end
 abstract type AbstractOpticalPropertiesLin end
 

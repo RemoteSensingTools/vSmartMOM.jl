@@ -51,7 +51,8 @@ end
     println("Running linearized RT on GPU...")
     try
         R_gpu, dR_gpu, NAer, NGas, NSurf = run_lin_rt_gpu(params_gpu)
-        Nparams = NAer * 7 + NGas + NSurf
+        Nparams = CoreRT.n_total(CoreRT.ParameterLayout(
+            n_aerosols=NAer, n_gases=NGas, n_surface=NSurf))
         R_gpu_a = Array(R_gpu)
         dR_gpu_a = Array(dR_gpu)
 

@@ -162,7 +162,9 @@ export OpticalPropertyJacobian,               # AD boundary struct alias
        delta_m_forward, delta_m_truncation_lin, # δ-M truncation functions
        ParameterLayout,                       # Jacobian parameter layout descriptor
        n_total, aerosol_range, gas_range,     # ParameterLayout accessors
+       gas_profile_range, gas_layer_index,
        surface_range, surface_index,
+       atmosphere_range, psurf_index,
        surface_parameter_count,
        canopy_range, n_layer_params
 
