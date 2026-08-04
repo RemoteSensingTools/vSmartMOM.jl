@@ -37,6 +37,49 @@ for clear-sky / Rayleigh-only / canopy-only runs.
 H₂O is auto-handled when `q` is set in the profile — don't list it
 manually.
 
+## ABSCO LUT files
+
+`LUTfiles` is an array of file arrays, one per spectral band. Each inner array must contain the
+non-H₂O absorbers in the same order as `fixed_molecules[band]` followed by
+`variable_molecules[band]`. An optional H₂O file can occur anywhere in the inner array; it is
+recognized from its ABSCO molecule ID and is driven by `atmospheric_profile.q`.
+
+Three formats are accepted by extension:
+
+- `.hdf`, `.h5`, `.hdf5`: original ABSCO tables, read by AtmosphericAbsorption. vSmartMOM infers
+  O₂/WCO₂/SCO₂ from `spec_bands`, reads only that continuous slab, retains all H₂O foreign-broadener
+  nodes, and places the Float32 cube on the configured CPU/GPU architecture.
+- `.absco`: a portable table produced by `AtmosphericAbsorption.save_absco_lut`; it is restored on
+  the configured architecture.
+- all other extensions: the legacy vSmartMOM `InterpolationModel`/JLD2 loader.
+
+For a three-band Float32 CUDA run, the relevant TOML fragment is:
+
+```toml
+[radiative_transfer]
+spec_bands = ["12950:0.01:13200", "6170:0.01:6270", "4800:0.01:4900"]
+float_type = "Float32"
+architecture = "GPU()"
+# ...the other radiative_transfer fields...
+
+[absorption]
+fixed_molecules = [["O2"], ["CO2"], ["CO2"]]
+variable_molecules = [[], [], []]
+LUTfiles = [
+  ["${ENV:ABSCO_ROOT}/o2_v52.hdf",  "${ENV:ABSCO_ROOT}/h2o_v52.hdf"],
+  ["${ENV:ABSCO_ROOT}/co2_v52.hdf", "${ENV:ABSCO_ROOT}/h2o_v52.hdf"],
+  ["${ENV:ABSCO_ROOT}/co2_v52.hdf", "${ENV:ABSCO_ROOT}/h2o_v52.hdf"],
+]
+vmr = { O2 = 0.2095, CO2 = 0.00042 }
+broadening = "Voigt()" # retained for HITRAN fallback; ABSCO interpolation is linear
+CEF = "HumlicekWeidemann32SDErrorFunction()"
+wing_cutoff = 25
+```
+
+Set `ENV["ABSCO_ROOT"]` before reading the file. The O₂/CO₂ absorber abundance still multiplies
+optical depth separately. For every ABSCO gas LUT, `profile.vmr_h2o` is automatically passed to the
+table's broadener axis; the H₂O absorber LUT is additionally multiplied by the profile's H₂O VMR.
+
 ## HITRAN edition
 
 Set the HITRAN edition once per session via:

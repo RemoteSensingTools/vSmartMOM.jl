@@ -149,8 +149,10 @@ function compute_absorption_profile!(τ_abs::Array{FT,2},
         #temp = collect(absorption_cross_section(absorption_model, grid, p, T)) * profile.vcd_dry[iz] * vmr_curr
         #@show minimum(temp), p, T, profile.vcd_dry[iz] * vmr_curr
         #@show iz, profile.vcd_dry[iz], vmr_curr, p, T
-        τ_abs[:,iz] += collect(absorption_cross_section(absorption_model, grid, p, T)) * profile.vcd_dry[iz] * vmr_curr
-        τ̇_abs[jac_idx,:,iz] = collect(absorption_cross_section(absorption_model, grid, p, T)) * profile.vcd_dry[iz]
+        σ = collect(_profile_cross_section(absorption_model, grid, p, T,
+                                           profile.vmr_h2o[iz]))
+        τ_abs[:,iz] += σ * profile.vcd_dry[iz] * vmr_curr
+        τ̇_abs[jac_idx,:,iz] = σ * profile.vcd_dry[iz]
     end
     
 end
