@@ -1,4 +1,5 @@
 using Interpolations
+using NCDatasets
 
 # Test that a hitran fixed-width file is correctly parsed
 @testset "read_hitran" begin
@@ -338,4 +339,62 @@ end
     # the nm grid above is the elementwise map of the ν grid).
     @test maximum(abs.(σ_nm .- σ_ν)) ≤ 1e-15 * maximum(σ_ν)
     @test maximum(σ_ν) > 0   # the window actually contains CO2 lines
+end
+
+@testset "AtmosphericAbsorption ABSCO LUT integration" begin
+    FT = Float32
+    ν = FT[6140.00, 6140.01, 6140.02]
+    p = FT[100, 1000]
+    T = FT[200 205; 220 225]
+    h2o_vmr = FT[0, 0.03, 0.06]
+    σ = FT[1 + 10v + FT(1e-3)t + FT(1e-4)pp
+           for x in ν, v in h2o_vmr, t in T[:, 1], pp in p]
+    for ip in eachindex(p), it in axes(T, 1), iv in eachindex(h2o_vmr), iν in eachindex(ν)
+        σ[iν, iv, it, ip] = 1 + 10 * h2o_vmr[iv] + FT(1e-3) * T[it, ip] +
+                             FT(1e-4) * p[ip] + FT(0.01) * (iν - 1)
+    end
+    lut = AtmosphericAbsorption.AbscoLUT(2, -1, ν, p, T, h2o_vmr, σ;
+                                         architecture=AtmosphericAbsorption.CPU())
+
+    # Standalone vSmartMOM API forwards the H₂O broadener VMR to AA's linear interpolator.
+    dry = absorption_cross_section(lut, ν, FT(100), FT(200); vmr=FT(0))
+    wet = absorption_cross_section(lut, ν, FT(100), FT(200); vmr=FT(0.06))
+    @test eltype(wet) === FT
+    @test wet != dry
+    @test wet == σ[:, 3, 1, 1]
+
+    # The profile route automatically uses each layer's atmospheric H₂O VMR for broadening, while
+    # the separate `absorber_vmr` still controls conversion from cross section to optical depth.
+    profile = vSmartMOM.CoreRT.AtmosphericProfile(
+        FT[200, 225], FT[100, 1000], FT[0, 0], FT[550], FT[0, 0.06],
+        FT[1, 1], FT[0, 0.06], Dict("CO2" => FT(1)), FT[1, 1],
+    )
+    τ = zeros(FT, length(ν), 2)
+    vSmartMOM.CoreRT.compute_absorption_profile!(τ, lut, ν, FT(1), profile)
+    @test τ[:, 1] == σ[:, 1, 1, 1]
+    @test τ[:, 2] == σ[:, 3, 2, 2]
+
+    # A raw ABSCO-shaped HDF file and a portable `.absco` file both load through the same vSmartMOM
+    # LUT configuration helper, retaining Float32 and all broadener nodes.
+    tempdir = mktempdir()
+    hdf_path = joinpath(tempdir, "co2_fixture.hdf")
+    NCDataset(hdf_path, "c") do ds
+        defDim(ds, "nu", length(ν)); defDim(ds, "b", length(h2o_vmr))
+        defDim(ds, "t", size(T, 1)); defDim(ds, "p", length(p))
+        defVar(ds, "Wavenumber", Float64.(ν), ("nu",))
+        defVar(ds, "Pressure", Float64.(p .* 100), ("p",))
+        defVar(ds, "Temperature", Float64.(T), ("t", "p"))
+        defVar(ds, "Broadener_01_VMR", Float64.(h2o_vmr), ("b",))
+        defVar(ds, "Gas_02_Absorption", σ, ("nu", "b", "t", "p"))
+    end
+    from_hdf = vSmartMOM.IO._load_absorption_lut(hdf_path, ν, FT, CPU())
+    @test from_hdf isa AtmosphericAbsorption.AbscoLUT
+    @test from_hdf.σ == σ
+    @test from_hdf.vmr == h2o_vmr
+
+    lut_path = joinpath(tempdir, "co2_fixture.absco")
+    AtmosphericAbsorption.save_absco_lut(lut_path, lut)
+    from_lut = vSmartMOM.IO._load_absorption_lut(lut_path, ν, FT, CPU())
+    @test from_lut isa AtmosphericAbsorption.AbscoLUT
+    @test from_lut.σ == σ
 end

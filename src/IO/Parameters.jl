@@ -897,7 +897,44 @@ function _parse_atmosphere(params_dict::Dict, FT)
     return T, p, q, prof_red
 end
 
-function _parse_absorption(params_dict::Dict, FT, q=nothing)
+function _oco2_absco_band(spec_band)
+    νlo, νhi = extrema(spec_band)
+    if νlo >= 12_000 && νhi <= 14_000
+        return :o2
+    elseif νlo >= 6_000 && νhi <= 7_000
+        return :wco2
+    elseif νlo >= 4_500 && νhi <= 5_500
+        return :sco2
+    end
+    throw(ArgumentError(
+        "Direct ABSCO HDF ingestion currently supports OCO-2 O2 (12000–14000 cm⁻¹), " *
+        "WCO2 (6000–7000 cm⁻¹), and SCO2 (4500–5500 cm⁻¹) bands; got " *
+        "$(νlo)–$(νhi) cm⁻¹",
+    ))
+end
+
+function _load_absorption_lut(path::AbstractString, spec_band, FT, architecture)
+    extension = lowercase(splitext(path)[2])
+    aa_architecture = CoreRT._to_aa_arch(architecture)
+    if extension in (".hdf", ".h5", ".hdf5")
+        return AtmosphericAbsorption.read_oco2_absco(
+            path,
+            _oco2_absco_band(spec_band);
+            FT,
+            architecture=aa_architecture,
+            broadener_vmr=:all,
+        )
+    elseif extension == ".absco"
+        lut = AtmosphericAbsorption.load_absco_lut(path; architecture=aa_architecture)
+        eltype(lut) === FT || throw(ArgumentError(
+            "ABSCO LUT $path stores $(eltype(lut)); expected $FT for this configuration",
+        ))
+        return lut
+    end
+    return load_interpolation_model(path)
+end
+
+function _parse_absorption(params_dict::Dict, FT, q, spec_bands, architecture)
     if !haskey(params_dict, "absorption")
         return nothing
     end
@@ -975,7 +1012,8 @@ function _parse_absorption(params_dict::Dict, FT, q=nothing)
         _require_config(length(files_lut) == n_bands,
             "LUTfiles must have one entry per band ($(n_bands)); got $(length(files_lut))")
         for ib in 1:n_bands
-            band_models = [load_interpolation_model(_expand_env_path(f)) for f in files_lut[ib]]
+            band_models = [_load_absorption_lut(_expand_env_path(f), spec_bands[ib], FT,
+                                                architecture) for f in files_lut[ib]]
             h2o_idx = findfirst(m -> getfield(m, :mol) == 1, band_models)
             if h2o_idx !== nothing
                 h2o_lut[ib] = band_models[h2o_idx]
@@ -1036,7 +1074,7 @@ function parameters_from_dict(params_dict::Dict)
     polarization_type = _parse_polarization(params_dict, FT)
     architecture = _parse_architecture(params_dict)
     T, p, q, profile_reduction = _parse_atmosphere(params_dict, FT)
-    absorption_params = _parse_absorption(params_dict, FT, q)
+    absorption_params = _parse_absorption(params_dict, FT, q, spec_bands, architecture)
     scattering_params = _parse_scattering(params_dict, FT)
 
     if haskey(params_dict, "canopy")

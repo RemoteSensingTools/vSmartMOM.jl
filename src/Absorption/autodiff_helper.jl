@@ -41,3 +41,21 @@ absorption_cross_section(model::AtmosphericAbsorption.LineByLineModel,
         AtmosphericAbsorption.compute_cross_section(model, grid, pressure, temperature;
                                                     wavelength_flag=true) :
         AtmosphericAbsorption.compute_cross_section(model, grid, pressure, temperature)
+
+# Native ABSCO tables are linear in spectral position, pressure, temperature, and their tabulated
+# H₂O-broadener axis. `vmr` here is the H₂O broadener VMR, not the absorber abundance used later to
+# turn σ into optical depth. Keep this public standalone route aligned with the profile path below.
+absorption_cross_section(model::AtmosphericAbsorption.AbscoLUT,
+                         grid::Union{AbstractRange{<:Real}, AbstractArray},
+                         pressure::Real,
+                         temperature::Real;
+                         wavelength_flag::Bool=false,
+                         vmr::Real=0) =
+    AtmosphericAbsorption.compute_cross_section(
+        model,
+        wavelength_flag ? 1e7 ./ grid : grid,
+        pressure,
+        temperature;
+        vmr,
+        interp=:linear,
+    )

@@ -299,6 +299,13 @@ end
 
 "Given the CrossSectionModel, the grid, and the AtmosphericProfile, fill up the τ_abs array with the cross section at each layer
 (using pressures/temperatures) from the profile" 
+_profile_cross_section(model, grid, p, T, h2o_vmr) =
+    absorption_cross_section(model, grid, p, T)
+
+_profile_cross_section(model::AtmosphericAbsorption.AbscoLUT, grid, p, T, h2o_vmr) =
+    AtmosphericAbsorption.compute_cross_section(model, grid, p, T;
+                                                 vmr=h2o_vmr, interp=:linear)
+
 function compute_absorption_profile!(τ_abs::Array{FT,2}, 
                                      absorption_model, 
                                      grid,
@@ -318,7 +325,8 @@ function compute_absorption_profile!(τ_abs::Array{FT,2},
         # Either use the current layer's vmr, or use the uniform vmr
         vmr_curr = vmr isa AbstractArray ? vmr[iz] : vmr
         #@show vmr_curr
-        τ_abs[:,iz] += collect(absorption_cross_section(absorption_model, grid, p, T)) * profile.vcd_dry[iz] * vmr_curr
+        σ = _profile_cross_section(absorption_model, grid, p, T, profile.vmr_h2o[iz])
+        τ_abs[:,iz] += collect(σ) * profile.vcd_dry[iz] * vmr_curr
     end
     
 end
