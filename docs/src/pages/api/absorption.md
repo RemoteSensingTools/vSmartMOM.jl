@@ -1,7 +1,18 @@
 # Absorption API
 
+!!! warning "Internal absorption API is deprecated"
+    AtmosphericAbsorption.jl is the sole supported absorption dependency for vSmartMOM
+    going forward. Do not use `vSmartMOM.Absorption` for new work: it remains temporarily
+    for legacy compatibility and will be removed in a future release. Use
+    [AtmosphericAbsorption.jl](https://github.com/RemoteSensingTools/AtmosphericAbsorption.jl)
+    for line-by-line calculations, interpolators, ABSCO HDF tables, and GPU execution.
+
+```@docs
+vSmartMOM.Absorption
+```
+
 `Absorption` provides HITRAN line-list reading, line-shape models, interpolation
-models, and absorption cross-section evaluation.
+models, and absorption cross-section evaluation for legacy callers.
 
 ## HITRAN Data Management
 

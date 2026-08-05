@@ -1,11 +1,10 @@
-#=
- 
-This file is the entry-point for the Absorption module. 
+"""
+Legacy internal absorption implementation.
 
-It includes this module's source files and exports the relevant keywords.  
- 
-=#
-
+AtmosphericAbsorption.jl is the sole supported absorption dependency for vSmartMOM going
+forward. This module remains temporarily for compatibility and will be removed in a future
+release; new code should use `AtmosphericAbsorption` directly.
+"""
 module Absorption
 
 using SpecialFunctions          # For complex error functions

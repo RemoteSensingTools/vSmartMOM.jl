@@ -88,8 +88,9 @@ matching package loaded throws an actionable error (`Architectures.ka_backend`,
 - **Gas absorption** — the production pipeline (`model_from_parameters` →
   `rt_run`) computes line-by-line absorption via
   [AtmosphericAbsorption.jl](https://github.com/RemoteSensingTools/AtmosphericAbsorption.jl),
-  which has its own backend dispatch; the standalone `Absorption` module
-  also ships a GPU Voigt kernel for direct σ(ν,T,p) queries.
+  the sole supported absorption dependency going forward, with its own backend
+  dispatch. The internal standalone `Absorption` module is legacy-only and will
+  be removed; do not use its GPU Voigt kernel for new work.
 
 ## CPU fallback
 

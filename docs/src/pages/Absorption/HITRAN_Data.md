@@ -1,5 +1,11 @@
 # HITRAN Spectroscopic Data Management
 
+!!! warning "Legacy vSmartMOM.Absorption documentation"
+    AtmosphericAbsorption.jl is the sole supported absorption dependency for vSmartMOM
+    going forward. The internal `vSmartMOM.Absorption` data path documented below remains
+    temporarily for compatibility and will be removed. New code should use
+    [AtmosphericAbsorption.jl](https://github.com/RemoteSensingTools/AtmosphericAbsorption.jl).
+
 vSmartMOM.jl requires spectroscopic line parameters from the [HITRAN database](https://hitran.org) to compute gas absorption cross-sections. This page explains the two available data pathways, how to switch between them, and how version provenance is tracked.
 
 ## Overview
