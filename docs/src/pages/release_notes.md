@@ -14,6 +14,13 @@ Work in progress on the `feat/surface-split` branch — not yet merged to
 migration story stays contiguous; fold this section under a version heading
 once it ships.
 
+### AtmosphericAbsorption is the supported absorption dependency
+
+[AtmosphericAbsorption.jl](https://github.com/RemoteSensingTools/AtmosphericAbsorption.jl)
+is the sole supported absorption dependency going forward. The internal
+`vSmartMOM.Absorption` implementation remains temporarily for legacy compatibility, should
+not be used for new work, and will be removed in a future release.
+
 ### Atmosphere/surface split
 
 Three opt-in `rt_run` keywords — `atm_snapshot_callback`,

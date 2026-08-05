@@ -101,7 +101,14 @@ R, T, dR, dT = rt_run(model, lin_model, NAer, NGas, NSurf)
 `dR` and `dT` carry the exact analytic derivatives of `R`, `T` w.r.t.
 aerosol, gas, and surface parameters laid out via `ParameterLayout`.
 
-### vSmartMOM.Absorption
+### Legacy `vSmartMOM.Absorption` (deprecated)
+
+> **Deprecation notice:** AtmosphericAbsorption.jl is the sole supported absorption
+> dependency for vSmartMOM going forward. Do not build new workflows on the internal
+> `vSmartMOM.Absorption` implementation; it remains temporarily for legacy compatibility
+> and will be removed in a future release. Use
+> [AtmosphericAbsorption.jl](https://github.com/RemoteSensingTools/AtmosphericAbsorption.jl)
+> for line-by-line calculations, interpolators, ABSCO HDF tables, and GPU execution.
 
 This module enables absorption cross-section calculations of atmospheric gases at different pressures, temperatures, and broadeners (Doppler, Lorentzian, Voigt). It uses the <a href="https://hitran.org">HITRAN</a> energy transition database for calculations. While it enables lineshape calculations from scratch, it also allows users to create and save an interpolator object at specified wavelength, pressure, and temperature grids. It can perform these computations either on CPU or GPU. <br><img src="docs/src/assets/CrossSectionGIF.gif" alt="Absorption cross-section" /><br>
 
