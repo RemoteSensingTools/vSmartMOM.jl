@@ -347,6 +347,7 @@ function _rt_run_column(RS_type::AbstractRamanType, model, iBand;
     # Legacy `RS_type.SIF₀` is no longer consumed by rt_run; use SurfaceSIF.
     # `RS_type.F₀` remains a compatibility fallback when no SolarBeam is supplied.
     effective_sources = sources === nothing ? model.sources : sources
+    validate_sif_solar_spectrum(effective_sources)
     prepared_sources = prepare_sources(effective_sources, FT, pol_type.n, nSpec, arr_type)
 
     # Create arrays — pass `prepared_sources` so per-source j₀ / J₀ slots
@@ -604,6 +605,7 @@ function _prepare_multisensor_F₀!(RS_type, model, iBand, sources)
     nSpec = sum(size(model.τ_abs[iB], 1) for iB in iBand)
     arr_type = array_type(model)
     effective_sources = sources === nothing ? model.sources : sources
+    validate_sif_solar_spectrum(effective_sources)
     _multisensor_source_supported(effective_sources) || throw(ArgumentError(
         "interior-height radiances currently support SolarBeam/NoSource only; " *
         "thermal and surface-emission sources require multisensor source-slot propagation"))
@@ -848,6 +850,7 @@ function rt_run_ss(RS_type::AbstractRamanType, model, iBand;
     # Resolve sources (v0.6 source-term refactor). Resolution: kwarg >
     # model.sources > pre-set `RS_type.F₀` for back-compat. See `rt_run`.
     effective_sources = sources === nothing ? model.sources : sources
+    validate_sif_solar_spectrum(effective_sources)
     prepared_sources = prepare_sources(effective_sources, FT, pol_type.n, nSpec, arr_type)
     if sources === nothing && size(RS_type.F₀) == (pol_type.n, nSpec) &&
        !iszero(RS_type.F₀)
