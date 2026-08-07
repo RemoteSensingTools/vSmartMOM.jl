@@ -19,6 +19,43 @@ using Test
     pol_type = CoreRT.polarization_type(model)
     nSpec = length(model.atmosphere.spec_bands[1])
 
+    @testset "755 nm radiance state and guard" begin
+        λnm = [754.0, 755.0, 756.0]
+        sif = SurfaceSIF(SIF755=2.0, slope=0.01, wavelength_nm=λnm)
+        prep = CoreRT.prepare_source(sif, Float64, 3, 3, Array)
+        expected_L = [1.99, 2.0, 2.01]
+        @test prep.SIF₀[1, :] ≈ π .* expected_L
+        @test prep.SIḞ₀[1, :, 1] ≈ fill(π, 3)
+        @test prep.SIḞ₀[1, :, 2] ≈ π .* [-1.0, 0.0, 1.0]
+        @test prep.n_parameters == 2
+
+        layout = CoreRT.ParameterLayout(n_surface=3, n_sif=2, n_canopy=1)
+        @test CoreRT.sif_range(layout) == 5:6
+        @test CoreRT.sif755_index(layout) == 5
+        @test CoreRT.sif_slope_index(layout) == 6
+        @test CoreRT.canopy_range(layout) == 7:7
+
+        @test_throws ArgumentError CoreRT.validate_sif_solar_spectrum(SolarBeam() + sif)
+        unit_F₀ = zeros(3, 3); unit_F₀[1, :] .= 1
+        @test_throws ArgumentError CoreRT.validate_sif_solar_spectrum(
+            SolarBeam(F₀=unit_F₀) + sif)
+        physical_F₀ = zeros(3, 3); physical_F₀[1, :] .= [1.9, 2.0, 2.1]
+        @test isnothing(CoreRT.validate_sif_solar_spectrum(
+            SolarBeam(F₀=physical_F₀) + sif))
+
+        # The prepared analytic spectra are the exact tangents used to seed
+        # the MOM source Jacobian. Validate both against central differences.
+        for (k, h) in ((1, 1e-6), (2, 1e-7))
+            sp = k == 1 ? SurfaceSIF(SIF755=2.0+h, slope=0.01, wavelength_nm=λnm) :
+                          SurfaceSIF(SIF755=2.0, slope=0.01+h, wavelength_nm=λnm)
+            sm = k == 1 ? SurfaceSIF(SIF755=2.0-h, slope=0.01, wavelength_nm=λnm) :
+                          SurfaceSIF(SIF755=2.0, slope=0.01-h, wavelength_nm=λnm)
+            fd = (CoreRT.prepare_source(sp, Float64, 3, 3, Array).SIF₀ .-
+                  CoreRT.prepare_source(sm, Float64, 3, 3, Array).SIF₀) ./ (2h)
+            @test fd ≈ prep.SIḞ₀[:, :, k] rtol=1e-8 atol=1e-9
+        end
+    end
+
     @testset "(1/π)·SIF₀ injection magnitude" begin
         SIF_I = FT(0.01)
         sif_spec = zeros(FT, pol_type.n, nSpec); sif_spec[1, :] .= SIF_I

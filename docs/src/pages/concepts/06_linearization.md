@@ -171,6 +171,8 @@ struct ParameterLayout
     n_aerosols::Int
     n_gases::Int
     n_surface::Int
+    n_sif::Int              # = 2 for [SIF755, slope], otherwise 0
+    n_canopy::Int
 end
 
 n_total(layout)             # total number of Jacobian columns
@@ -179,6 +181,7 @@ gas_range(layout)           # column indices for gas VMRs
 gas_profile_range(layout, igas, Nz) # all layers for one gas
 gas_layer_index(layout, igas, iz, Nz) # one gas/layer column
 surface_range(layout)       # column indices for surface params
+sif_range(layout)           # [SIF755, slope], referenced to 755 nm
 ```
 
 Always use these accessors instead of hand-writing arithmetic like

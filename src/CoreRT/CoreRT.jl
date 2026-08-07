@@ -163,7 +163,7 @@ export OpticalPropertyJacobian,               # AD boundary struct alias
        ParameterLayout,                       # Jacobian parameter layout descriptor
        n_total, aerosol_range, gas_range,     # ParameterLayout accessors
        gas_profile_range, gas_layer_index,
-       surface_range, surface_index,
+       surface_range, surface_index, sif_range, sif755_index, sif_slope_index,
        atmosphere_range, psurf_index,
        surface_parameter_count,
        canopy_range, n_layer_params
@@ -187,7 +187,8 @@ export AbstractSource, AbstractPreparedSource,
 # Phase 5: SurfaceSIF + double-dispatch surface_source_contribute!
 # v0.7 Phase A: ThermalEmission per-layer Planck volume source + contribute! seam
 export SolarBeam, PreparedSolarBeam, prepare_source, prepare_sources, BlackbodySource,
-       SurfaceSIF, PreparedSurfaceSIF, surface_source_contribute!,
+       SurfaceSIF, PreparedSurfaceSIF, surface_source_contribute!, surface_source_contribute_lin!,
+       surface_sif_parameter_count, validate_sif_solar_spectrum,
        ThermalEmission, PreparedThermalEmission, contribute!, has_thermal_emission
 
 # Export types to show easily

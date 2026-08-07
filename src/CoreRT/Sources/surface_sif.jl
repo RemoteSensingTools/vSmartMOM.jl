@@ -35,7 +35,7 @@ applied downstream in `postprocessing_vza!`.
 =#
 
 """
-    SurfaceSIF(; SIF₀ = nothing) <: AbstractSource
+    SurfaceSIF(; SIF₀=nothing, SIF755=nothing, slope=0, wavelength_nm=nothing) <: AbstractSource
 
 User-facing surface fluorescence source. Carries an isotropic emission
 spectrum and (optionally) is composed with other sources via `+`:
@@ -49,6 +49,18 @@ hemispheric irradiance (mW · m⁻² · cm⁻¹). The unpolarized component is
 typically `SIF₀[1, :]`; higher Stokes components are zero unless the
 canopy emission is polarized.
 
+Alternatively, `SIF755` and `slope` define the retrievable unpolarized
+radiance
+
+``L_SIF(λ) = SIF755 + slope * (λ_nm - 755)``.
+
+Both coefficients are appended to the Jacobian state vector, in that order.
+`SIF755` has the same spectral-radiance units as the output Stokes vector;
+`slope` has radiance-per-nm units. `wavelength_nm` must contain the model spectral grid.
+For nonzero `SIF755`, the source set must also contain a `SolarBeam` with an
+explicit non-unit Fraunhofer `F₀`; unit-normalized radiances and physical SIF
+must not be mixed.
+
 When `SIF₀ === nothing`, [`prepare_source`](@ref) materialises a zero
 matrix — the source is a no-op (useful as a placeholder).
 
@@ -60,14 +72,28 @@ matrix — the source is a no-op (useful as a placeholder).
 """
 struct SurfaceSIF <: AbstractSource
     SIF₀ :: Union{Nothing, AbstractMatrix}
+    SIF755 :: Union{Nothing, Real}
+    slope :: Real
+    wavelength_nm :: Union{Nothing, AbstractVector}
 end
 
-SurfaceSIF(; SIF₀=nothing) = SurfaceSIF(SIF₀)
+function SurfaceSIF(; SIF₀=nothing, SIF755=nothing, slope=0, wavelength_nm=nothing)
+    SIF₀ !== nothing && SIF755 !== nothing && throw(ArgumentError(
+        "SurfaceSIF accepts either prescribed SIF₀ or retrievable SIF755, not both."))
+    SIF755 !== nothing && wavelength_nm === nothing && throw(ArgumentError(
+        "SurfaceSIF(SIF755=...) requires wavelength_nm on the model spectral grid."))
+    return SurfaceSIF(SIF₀, SIF755, slope, wavelength_nm)
+end
+
+# Preserve the original positional constructor.
+SurfaceSIF(SIF₀::Union{Nothing,AbstractMatrix}) = SurfaceSIF(SIF₀, nothing, 0, nothing)
 
 source_ad_mode(::SurfaceSIF) = AnalyticSourceJacobian()
 
 Base.show(io::IO, s::SurfaceSIF) =
-    print(io, "SurfaceSIF(SIF₀=", s.SIF₀ === nothing ? "zeros" : summary(s.SIF₀), ")")
+    s.SIF755 === nothing ?
+        print(io, "SurfaceSIF(SIF₀=", s.SIF₀ === nothing ? "zeros" : summary(s.SIF₀), ")") :
+        print(io, "SurfaceSIF(SIF755=", s.SIF755, ", slope=", s.slope, ", λref=755 nm)")
 
 """
     PreparedSurfaceSIF{FT, AT} <: AbstractPreparedSource
@@ -76,8 +102,10 @@ Kernel-ready surface-fluorescence payload. `SIF₀` is materialised on the
 model's array type at the right `(pol_type.n, nSpec)` shape and `FT`
 precision.
 """
-struct PreparedSurfaceSIF{FT<:AbstractFloat, AT<:AbstractMatrix} <: AbstractPreparedSource
+struct PreparedSurfaceSIF{FT<:AbstractFloat, AT<:AbstractMatrix, JT<:AbstractArray} <: AbstractPreparedSource
     SIF₀ :: AT
+    SIḞ₀ :: JT
+    n_parameters :: Int
 end
 
 source_ad_mode(::PreparedSurfaceSIF) = AnalyticSourceJacobian()
@@ -95,17 +123,56 @@ materialises a zero matrix on the active architecture; a user-supplied
 """
 function prepare_source(s::SurfaceSIF, FT::Type{<:AbstractFloat},
                         pol_n::Integer, nSpec::Integer, arr_type)
-    if s.SIF₀ === nothing
+    if s.SIF755 !== nothing
+        length(s.wavelength_nm) == nSpec || throw(ArgumentError(
+            "SurfaceSIF: wavelength_nm length $(length(s.wavelength_nm)) does not match nSpec=$nSpec."))
+        Δλ = FT.(s.wavelength_nm) .- FT(755)
+        L = FT(s.SIF755) .+ FT(s.slope) .* Δλ
+        # The surface kernel consumes hemispheric irradiance.  A Lambertian
+        # radiance L corresponds to πL, hence this conversion at the seam.
         SIF₀ = zeros(FT, pol_n, nSpec)
-        return PreparedSurfaceSIF{FT, typeof(arr_type(SIF₀))}(arr_type(SIF₀))
-    else
+        SIḞ₀ = zeros(FT, pol_n, nSpec, 2)
+        @views SIF₀[1, :] .= FT(π) .* L
+        @views SIḞ₀[1, :, 1] .= FT(π)
+        @views SIḞ₀[1, :, 2] .= FT(π) .* Δλ
+        dev = arr_type(SIF₀)
+        dotdev = arr_type(SIḞ₀)
+        return PreparedSurfaceSIF{FT, typeof(dev), typeof(dotdev)}(dev, dotdev, 2)
+    elseif s.SIF₀ !== nothing
         size(s.SIF₀) == (pol_n, nSpec) || error(
             "SurfaceSIF: SIF₀ shape $(size(s.SIF₀)) does not match required " *
             "(pol_type.n, nSpec) = ($pol_n, $nSpec). Reshape your SIF spectrum " *
             "to match the model's polarization and spectral grid.")
         SIF₀_dev = arr_type(convert(Array{FT,2}, s.SIF₀))
-        return PreparedSurfaceSIF{FT, typeof(SIF₀_dev)}(SIF₀_dev)
+        dotdev = arr_type(zeros(FT, pol_n, nSpec, 0))
+        return PreparedSurfaceSIF{FT, typeof(SIF₀_dev), typeof(dotdev)}(SIF₀_dev, dotdev, 0)
+    else
+        SIF₀ = zeros(FT, pol_n, nSpec)
+        dev = arr_type(SIF₀)
+        dotdev = arr_type(zeros(FT, pol_n, nSpec, 0))
+        return PreparedSurfaceSIF{FT, typeof(dev), typeof(dotdev)}(dev, dotdev, 0)
     end
+end
+
+surface_sif_parameter_count(::NoSource) = 0
+surface_sif_parameter_count(s::SurfaceSIF) = s.SIF755 === nothing ? 0 : 2
+surface_sif_parameter_count(::AbstractSource) = 0
+surface_sif_parameter_count(s::SourceSet) = sum(surface_sif_parameter_count, s.sources)
+
+function validate_sif_solar_spectrum(srcs::AbstractSource)
+    surface_sif_parameter_count(srcs) == 0 && return nothing
+    sif_nonzero = any(s -> s isa SurfaceSIF && s.SIF755 !== nothing &&
+                           (!iszero(s.SIF755) || !iszero(s.slope)),
+                      srcs isa SourceSet ? srcs.sources : (srcs,))
+    sif_nonzero || return nothing
+    sources = srcs isa SourceSet ? srcs.sources : (srcs,)
+    beam = findfirst(s -> s isa SolarBeam, sources)
+    beam === nothing && throw(ArgumentError(
+        "Nonzero SIF requires SolarBeam(F₀=...) with an explicitly supplied, non-unit Fraunhofer spectrum."))
+    F₀ = sources[beam].F₀
+    (F₀ === nothing || all(isone, @view(F₀[1, :]))) && throw(ArgumentError(
+        "Nonzero SIF requires an explicitly supplied Fraunhofer F₀; the default/unit F₀=1 is not allowed."))
+    return nothing
 end
 
 # ============================================================================
@@ -177,6 +244,43 @@ function surface_source_contribute!(prep::PreparedSurfaceSIF,
     arr_type = array_type(architecture)
     Nquad = size(surface_added_layer.j₀⁻, 1) ÷ pol_type.n
     surface_added_layer.j₀⁻[:, 1, :] .+= FT(2) .* arr_type(repeat(FT.(prep.SIF₀), Nquad))
+    return nothing
+end
+
+
+function surface_source_contribute_lin!(::NoSource, ::AbstractSurfaceType,
+        _layer, _layer_lin, _m, _pol, _arch, _sif_range)
+    return nothing
+end
+
+function surface_source_contribute_lin!(sources::SourceSet, surface::AbstractSurfaceType,
+        layer, layer_lin, m, pol, arch, indices)
+    offset = 0
+    for src in sources.sources
+        n = src isa PreparedSurfaceSIF ? src.n_parameters : 0
+        local_indices = n == 0 ? (1:0) : (first(indices) + offset):(first(indices) + offset + n - 1)
+        surface_source_contribute_lin!(src, surface, layer, layer_lin, m, pol, arch, local_indices)
+        offset += n
+    end
+    return nothing
+end
+
+surface_source_contribute_lin!(::AbstractPreparedSource, ::AbstractSurfaceType,
+        _layer, _layer_lin, _m, _pol, _arch, _indices) = nothing
+
+function surface_source_contribute_lin!(prep::PreparedSurfaceSIF,
+        ::Union{LambertianSurfaceScalar, LambertianSurfaceSpectrum,
+                LambertianSurfaceLegendre, LambertianSurfaceSpline},
+        layer, layer_lin, m::Integer, pol_type, architecture, indices)
+    m == 0 || return nothing
+    prep.n_parameters == 0 && return nothing
+    FT = eltype(layer.j₀⁻)
+    Nquad = size(layer.j₀⁻, 1) ÷ pol_type.n
+    arr_type = array_type(architecture)
+    for (k, p) in enumerate(indices)
+        @views layer_lin.ap_J̇₀⁻[:, 1, :, p] .+=
+            FT(2) .* arr_type(repeat(FT.(prep.SIḞ₀[:, :, k]), Nquad))
+    end
     return nothing
 end
 

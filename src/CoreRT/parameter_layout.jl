@@ -8,7 +8,8 @@ arithmetic goes through this struct. Each aerosol carries `aerosol_params`
 sub-parameters (currently 7: `τ_ref, nᵣ, nᵢ, rₘ, σ_g`, profile location,
 profile width), followed by the layer-resolved gas VMR columns and surface parameters.
 Gas columns are flattened species-major: all TOA-to-BOA layers for gas 1,
-then all layers for gas 2, and so on.
+then all layers for gas 2, and so on. Surface parameters are followed by the
+optional two-column SIF block `[SIF755, slope]`, then canopy parameters.
 The final two columns are `(p₀, σ_p)` for a pressure-form `Normal` profile and
 `(z₀, σ₀)` for an altitude-form `LogNormal` profile.
 
@@ -29,16 +30,17 @@ struct ParameterLayout
     n_aerosols::Int
     n_gases::Int
     n_surface::Int
+    n_sif::Int
     n_canopy::Int
 end
 
 ParameterLayout(; n_atmosphere::Int=1, aerosol_params::Int=7, n_aerosols::Int=0, n_gases::Int=0,
-                  n_surface::Int=1, n_canopy::Int=0) =
-    ParameterLayout(n_atmosphere, aerosol_params, n_aerosols, n_gases, n_surface, n_canopy)
+                  n_surface::Int=1, n_sif::Int=0, n_canopy::Int=0) =
+    ParameterLayout(n_atmosphere, aerosol_params, n_aerosols, n_gases, n_surface, n_sif, n_canopy)
 
 "Total number of retrieval parameters."
 @inline n_total(pl::ParameterLayout) =
-    pl.n_atmosphere + pl.aerosol_params * pl.n_aerosols + pl.n_gases + pl.n_surface + pl.n_canopy
+    pl.n_atmosphere + pl.aerosol_params * pl.n_aerosols + pl.n_gases + pl.n_surface + pl.n_sif + pl.n_canopy
 
 "Atmospheric-state range; column 1 is surface pressure."
 @inline atmosphere_range(pl::ParameterLayout) = 1:pl.n_atmosphere
@@ -83,12 +85,21 @@ end
 surface_parameter_count(::AbstractSurfaceType) = 1
 surface_parameter_count(s::LambertianSurfaceLegendre) = length(s.legendre_coeff)
 
+"Index range for SIF parameters: radiance at 755 nm, then spectral slope."
+@inline function sif_range(pl::ParameterLayout)
+    start = last(surface_range(pl)) + 1
+    return start:(start + pl.n_sif - 1)
+end
+
+@inline sif755_index(pl::ParameterLayout) = first(sif_range(pl))
+@inline sif_slope_index(pl::ParameterLayout) = first(sif_range(pl)) + 1
+
 "Number of layer-level parameters (aerosol + gas, excluding surface and canopy)."
 @inline n_layer_params(pl::ParameterLayout) =
     pl.n_atmosphere + pl.aerosol_params * pl.n_aerosols + pl.n_gases
 
 """Index range for canopy parameters (LAI, leaf_R, leaf_T, ...)."""
 @inline function canopy_range(pl::ParameterLayout)
-    start = pl.n_atmosphere + pl.aerosol_params * pl.n_aerosols + pl.n_gases + pl.n_surface + 1
+    start = pl.n_atmosphere + pl.aerosol_params * pl.n_aerosols + pl.n_gases + pl.n_surface + pl.n_sif + 1
     return start:(start + pl.n_canopy - 1)
 end

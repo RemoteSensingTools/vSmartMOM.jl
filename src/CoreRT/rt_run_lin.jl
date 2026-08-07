@@ -27,7 +27,7 @@ Perform linearized Radiative Transfer and return both radiances and their Jacobi
 
 Computes the reflected and transmitted Stokes vectors at the top and bottom of the
 atmosphere, along with analytic derivatives with respect to
-`Nparams = 1 + NAer×7 + NGasLayer + NSurf` parameters, where
+`Nparams = 1 + NAer×7 + NGasLayer + NSurf + NSIF` parameters, where
 `NGasLayer = NGasSpecies×Nz`.
 physical parameters via the linearized Matrix Operator Method.
 
@@ -53,9 +53,11 @@ The `Nparams` derivative dimension is ordered as:
    `Normal` and `(z₀, σ₀)` for `LogNormal`.
 3. **Gas VMR parameters**, species-major with all `Nz` layers for each gas.
 4. **Surface parameters**.
+5. **SIF parameters**, when `SurfaceSIF(SIF755=...)` is present:
+   `[SIF755, slope]`, referenced to 755 nm.
 
 Use `result.layout` with `psurf_index`, `aerosol_range`, `gas_profile_range`,
-`gas_layer_index`, and `surface_range`; do not hard-code offsets.
+`gas_layer_index`, `surface_range`, and `sif_range`; do not hard-code offsets.
 
 # Theory
 The forward model solves the vector radiative transfer equation via the discrete ordinate
@@ -91,8 +93,10 @@ Convenience alias for the linearized `rt_run` overload.  Equivalent to
 `rt_run(model, lin_model, NAer, NGas, NSurf; i_band)`.
 """
 rt_run_lin(model, lin_model,
-           NAer::Int, NGas::Int, NSurf::Int; i_band::Integer = 1) =
-    rt_run(model, lin_model, NAer, NGas, NSurf; i_band)
+           NAer::Int, NGas::Int, NSurf::Int;
+           i_band::Integer = 1,
+           sources::Union{Nothing,AbstractSource} = nothing) =
+    rt_run(model, lin_model, NAer, NGas, NSurf; i_band, sources)
 
 # Just to make sure we still have it:
 function rt_run_test(RS_type::AbstractRamanType,
@@ -163,16 +167,17 @@ function rt_run(RS_type::AbstractRamanType,
     SFI = true                          # SFI flag
     NquadN = Nquad * pol_type.n         # Nquad (multiplied by Stokes n)
     dims = (NquadN,NquadN)              # nxn dims
-    layout = ParameterLayout(aerosol_params=7, n_aerosols=NAer,
-                              n_gases=NGas, n_surface=NSurf)
-    Nparams = n_total(layout)
-
     # Resolve sources (v0.6 source-term refactor). Resolution: kwarg >
     # model.sources > pre-set `RS_type.F₀` for back-compat. See `rt_run`.
     # `prepared_sources` is now hoisted outside the conditional so it's
     # in scope for the surface step (`surface_source_contribute!`) that
     # routes SurfaceSIF / future per-source surface contributions.
     effective_sources = sources === nothing ? model.sources : sources
+    validate_sif_solar_spectrum(effective_sources)
+    NSIF = surface_sif_parameter_count(effective_sources)
+    layout = ParameterLayout(aerosol_params=7, n_aerosols=NAer,
+                              n_gases=NGas, n_surface=NSurf, n_sif=NSIF)
+    Nparams = n_total(layout)
     if !isempty(model.obs_geom.sensor_levels)
         _multisensor_source_supported(effective_sources) || throw(ArgumentError(
             "linearized interior-height radiances currently support " *
@@ -367,6 +372,9 @@ function rt_run(RS_type::AbstractRamanType,
         # out into the same dispatch table.
         surface_source_contribute!(prepared_sources, brdf, added_surface_layer,
                                    m, pol_type, CoreRT.architecture(model))
+        surface_source_contribute_lin!(prepared_sources, brdf,
+                                       added_surface_layer, added_surface_layer_lin,
+                                       m, pol_type, CoreRT.architecture(model), sif_range(layout))
 
         # Close every lower subcolumn with the same linearized surface layer.
         # Treat the surface as a potentially reflecting added layer even when
