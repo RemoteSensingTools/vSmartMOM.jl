@@ -306,7 +306,7 @@
               { "$ref": "#/definitions/numberArray" }
             ]
           },
-          "description": "Volume mixing ratios by molecule name. Each value is a scalar, an N-value layer profile, or an N+1-value pressure-interface profile."
+          "description": "Dry-air molar ratios (mol species per mol dry air) by non-H2O molecule name. Each value is a scalar, an N-value layer profile, or an N+1-value pressure-interface profile. H2O is derived from atmospheric_profile.q."
         },
         "broadening": {
           "type": "string",
@@ -334,6 +334,51 @@
         },
         "wing_cutoff": {
           "type": "integer"
+        },
+        "cia_files": {
+          "type": "array",
+          "description": "HITRAN CIA files. A bare path is accepted only when reference-family coverage is unambiguous on the requested grid; otherwise use an object to select reference_codes.",
+          "items": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["path"],
+                "properties": {
+                  "path": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "reference_codes": {
+                    "oneOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      {
+                        "type": "array",
+                        "minItems": 1,
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      }
+                    ]
+                  },
+                  "negative_policy": {
+                    "type": "string",
+                    "enum": ["error", "clamp_zero"]
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "mtckd_file": {
+          "type": "string"
         }
       }
     },

@@ -147,13 +147,12 @@ function model_from_parameters(lin::LinMode,
         if !isnothing(params.q) && any(!iszero, params.q)
             jac_idx = 1
             if !isnothing(abs_params) && !isempty(abs_params.h2o_lut) && abs_params.h2o_lut[i_band] !== nothing
-                @timeit "Absorption Coeff H2O"  compute_absorption_profile!(
+                @timeit "Absorption Coeff H2O"  compute_h2o_absorption_profile!(
                     τ_abs[i_band],
                     τ̇_abs[i_band],
                     jac_idx,
                     abs_params.h2o_lut[i_band],
                     params.spec_bands[i_band],
-                    profile.vmr_h2o,
                     profile)
             else
                 @timeit "Read HITRAN" lines_h2o = AtmosphericAbsorption.load_lines(AtmosphericAbsorption.HitranPort(artifact("H2O")); FT)
@@ -167,13 +166,12 @@ function model_from_parameters(lin::LinMode,
                     cpf = cef,
                     architecture = _to_aa_arch(params.architecture),
                     vmr = 0)
-                @timeit "Absorption Coeff H2O"  compute_absorption_profile!(
+                @timeit "Absorption Coeff H2O"  compute_h2o_absorption_profile!(
                     τ_abs[i_band],
                     τ̇_abs[i_band],
                     jac_idx,
                     absorption_model,
                     params.spec_bands[i_band],
-                    profile.vmr_h2o,
                     profile)
             end
         end
@@ -246,34 +244,53 @@ function model_from_parameters(lin::LinMode,
             end
         end
 
-        # Collision-induced absorption (HITRAN .cia files), if any.
-        # CIA is treated as a fixed contribution — no Jacobian (τ̇_abs unchanged).
+        # The pressure tangent holds cross sections, T, q, and VMR fixed for
+        # ordinary line absorption, so its bottom-layer dependence is through
+        # molecular column only. CIA and MT_CKD also scale with midpoint
+        # pressure and receive that additional analytic factor below.
+        dry_ratio_dot =
+            psurf_tangents.vcd_dry_dot[end] / profile.vcd_dry[end]
+        τ̇_abs_psurf[i_band][:, end] .=
+            τ_abs[i_band][:, end] .* dry_ratio_dot
+        midpoint_pressure_ratio_dot = FT(0.5) / profile.p_full[end]
+        binary_ratio_dot = dry_ratio_dot + midpoint_pressure_ratio_dot
+
+        # Collision-induced absorption (HITRAN .cia files), if any. CIA is
+        # fixed with respect to the gas-profile Jacobian τ̇_abs, but its
+        # surface-pressure tangent is exact at fixed T and composition:
+        # τ_CIA ∝ n_midpoint * N_column.
         if !isnothing(abs_params)
-            for cia_path in abs_params.cia_files
+            for (cia_i, cia_path) in enumerate(abs_params.cia_files)
                 @timeit "CIA $(basename(cia_path))" begin
-                    cia_table = Absorption.load_cia_table(cia_path,
-                                                         params.spec_bands[i_band];
-                                                         FT = FT)
-                    Absorption.compute_τ_cia!(τ_abs[i_band], cia_table, profile,
+                    cia_table = _load_configured_cia_table(
+                        abs_params, cia_i, params.spec_bands[i_band], FT)
+                    τ_cia = zeros(eltype(τ_abs[i_band]), size(τ_abs[i_band]))
+                    Absorption.compute_τ_cia!(τ_cia, cia_table, profile,
                                                profile.vmr)
+                    τ_abs[i_band] .+= τ_cia
+                    @views τ̇_abs_psurf[i_band][:, end] .+=
+                        τ_cia[:, end] .* binary_ratio_dot
                 end
             end
 
             # MT_CKD H₂O continuum, if a reference table is configured.
-            # Treated as fixed (no Jacobian wrt H₂O VMR for now).
+            # It is fixed with respect to the H₂O-profile Jacobian for now,
+            # but τ_cont ∝ p_midpoint * N_H2O gives the same exact pressure
+            # factor as CIA when q and T are held fixed.
             if !isempty(abs_params.mtckd_file)
                 @timeit "MT_CKD H2O continuum" begin
                     mtckd_table = Absorption.load_mtckd(abs_params.mtckd_file)
-                    Absorption.compute_τ_h2o_continuum!(τ_abs[i_band], mtckd_table,
-                                                         params.spec_bands[i_band], profile,
-                                                         profile.vmr_h2o)
+                    τ_continuum = zeros(
+                        eltype(τ_abs[i_band]), size(τ_abs[i_band]))
+                    Absorption.compute_τ_h2o_continuum!(
+                        τ_continuum, mtckd_table, params.spec_bands[i_band],
+                        profile, profile.vmr_h2o)
+                    τ_abs[i_band] .+= τ_continuum
+                    @views τ̇_abs_psurf[i_band][:, end] .+=
+                        τ_continuum[:, end] .* binary_ratio_dot
                 end
             end
         end
-        # Cross sections, T, q, and VMR are fixed for this tangent. Absorption
-        # changes only through the bottom-layer dry molecular column.
-        dry_ratio_dot = psurf_tangents.vcd_dry_dot[end] / profile.vcd_dry[end]
-        τ̇_abs_psurf[i_band][:, end] .= τ_abs[i_band][:, end] .* dry_ratio_dot
     end
 
     aerosol_optics = [Array{AerosolOptics}(undef, (n_aer)) for i=1:n_bands]
