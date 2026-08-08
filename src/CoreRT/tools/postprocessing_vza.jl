@@ -37,6 +37,32 @@ function _precompute_vza_weights(vza, vaz, qp_μ, pol_type, m, weight)
 end
 
 """
+    postprocessing_vza_toa!(composite_layer, vza, qp_μ, m, vaz,
+                             pol_type, weight, R_TOA)
+
+Accumulate only the upwelling SFI source at TOA. This is the lean output path
+for disk-integrated exoplanet calculations: no BOA directional field and no
+HDR/BHR diagnostics are constructed or postprocessed.
+"""
+function postprocessing_vza_toa!(composite_layer, vza, qp_μ, m, vaz,
+                                  pol_type, weight, R_TOA)
+    vza_info = _precompute_vza_weights(vza, vaz, qp_μ, pol_type, m, weight)
+    J₀⁻ = _to_cpu(composite_layer.J₀⁻)
+    @inbounds for i in eachindex(vza)
+        istart, iend, w = vza_info[i]
+        @views R_TOA[i, :, :] .+= w * J₀⁻[istart:iend, 1, :]
+    end
+    for cslot in values(composite_layer.J₀_by_src)
+        J⁻_src = _to_cpu(cslot.J₀⁻)
+        @inbounds for i in eachindex(vza)
+            istart, iend, w = vza_info[i]
+            @views R_TOA[i, :, :] .+= w * J⁻_src[istart:iend, 1, :]
+        end
+    end
+    return nothing
+end
+
+"""
     postprocessing_vza!(RS_type::noRS, iμ₀, pol_type, composite_layer, vza, qp_μ, m, vaz, μ₀, weight, nSpec, SFI, R, R_SFI, T, T_SFI, ieR_SFI, ieT_SFI)
 
 Azimuthally-weight RT matrices for elastic (no Raman) scattering.

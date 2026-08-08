@@ -27,7 +27,8 @@ loop in [`rt_run`](@ref).  Passed as `cache=` to
 host↔device copies, and fScattRayleigh recomputation on every moment.
 
 # Fields
-- `μ_host`: host copy of quadrature cosines — avoids `collect(qp_μ)` per moment.
+- `μ_host`: host copy of the phase-evaluation cosines. In external-solar
+  SFI this is the diffuse/operator grid augmented by exact `μ₀`.
 - `rayl_τ_dev[iBi][iz]`: device τ_rayl slice per band-index/layer — avoids re-upload.
 - `rayl_ϖ_Cabannes[iBi]`: ϖ_Cabannes per band (scalar or device array) — avoids
   re-upload.
@@ -72,7 +73,7 @@ function build_m_invariant_cache(RS_type::AbstractRamanType, iBand, model)
     pol_type = CoreRT.polarization_type(model)
     FT       = CoreRT.float_type(model)
 
-    μ_host = collect(model.quad_points.qp_μ)
+    μ_host = collect(model.quad_points.phase_qp_μ)
     nAero  = size(τ_aer[iBand[1]], 1)
     nZ     = size(τ_rayl[1], 2)
     nBands = length(iBand)
@@ -160,7 +161,10 @@ function constructCoreOpticalProperties(RS_type::AbstractRamanType, iBand, m, mo
     pol_type = CoreRT.polarization_type(model)
 
     # Quadrature points:
-    μ = collect(model.quad_points.qp_μ)
+    # Phase matrices may carry one extra solar column/row beyond the square
+    # diffuse operator. The elemental R/T kernel consumes the leading diffuse
+    # block; the SFI source kernel consumes the exact μ₀ phase column.
+    μ = collect(model.quad_points.phase_qp_μ)
     N = length(model.quad_points.qp_μN)
     # Number of Aerosols:
     nAero = size(τ_aer[iBand[1]],1)

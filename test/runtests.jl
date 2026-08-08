@@ -66,6 +66,10 @@ try
 # distinct from augmented `Nquad`). See docs/src/pages/conventions.md §6.
 @testset "QuadPoints streams" begin include("test_quadpoints_streams.jl") end
 
+# Direct SFI keeps the collimated solar direction external to the diffuse
+# operator. Five weighted streams + one VZA therefore means 18×18 for IQU.
+@testset "External solar SFI" begin include("test_external_solar_sfi.jl") end
+
 # Phase B — forward and lin paths must derive the same per-band Fourier
 # loop bound. Regression for the previous lin-only precedence bug at
 # even `l_max`; both paths now flow through `_derive_m_max_bands`.

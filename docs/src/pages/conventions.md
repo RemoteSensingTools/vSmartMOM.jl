@@ -201,13 +201,11 @@ source already agree.
 
 ---
 
-## 6. Quadrature streams: `Nstreams` vs `Nquad`
+## 6. Quadrature streams and the direct solar direction
 
-Two distinct stream counts live on `QuadPoints`. Surfacing the
-distinction prevents the kind of silent mismatch that bit the Natraj
-2009 benchmark (where `l_trunc=20` derived 11 nodes in Gauss but 10 in
-Radau because of a per-scheme formula difference; see commit
-`f9403eb`).
+Two diffuse-grid counts and one phase-evaluation grid live on `QuadPoints`.
+Keeping them distinct prevents both stream-resolution mismatches and the
+accidental treatment of the collimated Sun as diffuse radiation.
 
 - **`Nstreams`** — count of nonzero weights (`count(!iszero, wt_μ)`).
   This is the user-facing **resolving-power** knob. The public
@@ -222,17 +220,25 @@ Radau because of a per-scheme formula difference; see commit
   engine guarantees `2·N - 1` resolving order regardless of which
   quadrature scheme is chosen.
 
-- **`Nquad`** — total node count, including zero-weight SZA/VZA
-  *output nodes* appended for postprocessing. Used for kernel
-  workspace sizing (`NquadN = Nquad · n_stokes`). Always satisfies
-  `Nquad ≥ Nstreams + length(unique([sza; vza]))`.
+- **`Nquad`** — total node count in the square **diffuse operator**. It
+  includes the weighted streams and any distinct zero-weight viewing nodes;
+  the default legacy Gauss representation also includes the distinct SZA.
+  It sets the matrix workspace size
+  `NquadN = Nquad · n_stokes`.
+
+- **`phase_qp_μ`** — directions used to evaluate phase matrices. It is
+  identical to `qp_μ` in the legacy representation. In opt-in
+  external-solar SFI, it additionally contains exact ``μ₀`` so the source
+  kernel can consume ``Z_m(μ_i,μ_0)`` without making ``μ₀`` a diffuse
+  ordinate. `iμ₀_phase` indexes this source column.
 
 ### Per-scheme construction
 
-| Scheme | Weighted-streams construction | Nstreams (pre-augmentation) |
-|--------|-------------------------------|-----------------------------|
-| `GaussLegQuad` | Gauss-Legendre on `[0, 1]`, `(Ltrunc+2)÷2` nodes (Sanghavi: `+2` form avoids zero streams at `Ltrunc=0`) | `(Ltrunc+2)÷2` |
-| `RadauQuad` | Gauss-Radau on subintervals around μ₀; SZA-on-node branch builds `(Ltrunc+1)÷2` nodes, SZA-not-on-node branch builds `2·((Ltrunc+1)÷2)` weighted nodes split around μ₀ | `count(!iszero, wt_μ)` after construction |
+| Scheme | Weighted-streams construction | Solar treatment |
+|--------|-------------------------------|-----------------|
+| `GaussLegQuad` (default/legacy) | Gauss-Legendre on `[0, 1]`, `(Ltrunc+2)÷2` nodes (Sanghavi: `+2` form avoids zero streams at `Ltrunc=0`) | SZA and VZAs are appended as zero-weight operator nodes. |
+| `GaussLegQuad` with `external_solar=true` | Same weighted Gauss nodes | Only VZAs are appended to the operator; scalar ``μ₀`` is retained on `phase_qp_μ` for the exact source column. |
+| `RadauQuad` | Gauss-Radau on subintervals around μ₀; the SZA-on-node branch builds `(Ltrunc+1)÷2` nodes, while the usual SZA-not-on-node branch builds `2·((Ltrunc+1)÷2)` weighted nodes split around μ₀ | ``μ₀`` is a weighted quadrature node; external-solar mode is not supported. VZAs are appended with zero weight. |
 
 Because Radau allocates a different number of weighted nodes
 depending on whether μ₀ lands on a Gauss-Radau abscissa, the
@@ -244,14 +250,47 @@ reason Radau is more expensive; Sanghavi recommends `GaussLegQuad`
 as the default. Radau remains available for users who need an
 SZA-on-node quadrature but is documented as expert/legacy.
 
-After SZA + VZAs are appended as zero-weight output nodes, both
-schemes report the same fields:
+All representations report:
 
 - `qp.Nstreams` = weighted streams (resolving power)
-- `qp.Nquad` = augmented total (kernel size)
-- `qp.wt_μ` carries explicit zeros at the appended SZA/VZA positions
+- `qp.Nquad` = diffuse-operator total (kernel size)
+- `qp.wt_μ` carries explicit zeros at appended viewing directions and,
+  in legacy Gauss mode, at SZA
+- `qp.phase_qp_μ` and `qp.iμ₀_phase` identify the exact solar source
+  coupling
 
 The `RTModel` `Base.show` summary prints both: `"Nstreams=N, Nquad=M"`.
+
+### External-solar SFI and the 18×18 exoplanet operator
+
+`external_solar=true` is opt-in; legacy embedded-``μ₀`` behavior remains
+the default. In external mode, ``μ₀`` is a scalar propagation direction and
+a phase-source column, not a zero-weight diffuse stream. The legacy operator
+indices `iμ₀` and `iμ₀Nstart` are therefore zero sentinels; source coupling
+uses `iμ₀_phase`.
+
+For five weighted Gauss streams, one distinct VZA, and `Stokes_IQU`, the
+diffuse operator dimension is
+
+```
+(5 weighted + 1 VZA) · 3 Stokes = 18,
+```
+
+so adding/doubling works on ``18×18`` matrices. The phase-evaluation grid also
+contains exact ``μ₀`` and supplies its source column, but that does not enlarge
+the diffuse operator. The legacy representation would include the distinct
+SZA as a seventh node and therefore use ``21×21`` matrices.
+
+The external-solar implementation is deliberately narrow at present:
+
+- `GaussLegQuad`, source-function integration, forward elastic `noRS`, and a
+  Lambertian surface only;
+- no linearized, Raman/VRS, single-scatter-only, non-Lambertian, or interior
+  sensor path;
+- call `rt_run_toa(model)`, which returns only directional upwelling TOA
+  Stokes radiance. It does not allocate or postprocess BOA, HDR, or BHR
+  products. Atmospheric multiple scattering and surface reflection are still
+  solved because both contribute to TOA radiance.
 
 ---
 

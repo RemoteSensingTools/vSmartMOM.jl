@@ -116,6 +116,9 @@ function rt_run(RS_type::AbstractRamanType,
                     NAer::Int, NGas::Int, NSurf::Int,
                     iBand;
                     sources::Union{Nothing, AbstractSource} = nothing)
+    model.quad_points.external_solar && throw(ArgumentError(
+        "external-solar SFI is currently forward-only; linearized RT retains " *
+        "the embedded-μ₀ operator path"))
     if InelasticScattering.has_inelastic(RS_type)
         throw(ArgumentError(
             "Linearized Raman-active RT is intentionally unsupported. " *

@@ -59,6 +59,27 @@ function rt_run(model; i_band::Integer = 1,
 end
 
 """
+    rt_run_toa(model; i_band=1, sources=nothing)
+
+Run the lean, forward-elastic SFI path and return only directional upwelling
+Stokes radiance at TOA. This entry point is intended for disk-integrated
+exoplanet calculations using `QuadPoints.external_solar=true`: the collimated
+solar direction is not a diffuse stream, and BOA, HDR, BHR, and inelastic
+output arrays are neither allocated nor postprocessed. Atmospheric and surface
+interactions are still solved in full because both contribute to TOA radiance.
+"""
+function rt_run_toa(model; i_band::Integer = 1,
+                    sources::Union{Nothing, AbstractSource} = nothing)
+    model.quad_points.external_solar || throw(ArgumentError(
+        "rt_run_toa requires QuadPoints.external_solar=true"))
+    isempty(model.obs_geom.sensor_levels) || throw(ArgumentError(
+        "rt_run_toa does not support interior-height outputs"))
+    return _rt_run_column(
+        InelasticScattering.noRS{float_type(model)}(), model, [Int(i_band)];
+        sources, toa_only=true)
+end
+
+"""
     StreamRTResult{FT}
 
 Per-Fourier-moment radiative-transfer result at all internal quadrature
@@ -263,7 +284,8 @@ SFI kernel call. Phase 5 will remove the `RS_type.F₀` indirection.
 """
 function _rt_run_column(RS_type::AbstractRamanType, model, iBand;
                         sources::Union{Nothing, AbstractSource} = nothing,
-                        streams_callback::Union{Nothing, Function} = nothing)
+                        streams_callback::Union{Nothing, Function} = nothing,
+                        toa_only::Bool = false)
     _warn_explicit_depol_raman(RS_type, model)
 
     # Apply the per-model BLAS thread cap once per `rt_run` invocation
@@ -294,6 +316,23 @@ function _rt_run_column(RS_type::AbstractRamanType, model, iBand;
         @info "More than one band has been chosen, be aware that multiple BRDFs are not yet implemented and only the first one will be used!"
     end
 
+    if quad_points.external_solar
+        toa_only || throw(ArgumentError(
+            "external-solar SFI is a TOA-only path; call rt_run_toa(model)"))
+        RS_type isa noRS || throw(ArgumentError(
+            "external-solar SFI currently supports forward elastic noRS only; " *
+            "Raman/VRS retains the embedded-μ₀ path"))
+        brdf isa Union{LambertianSurfaceScalar,
+                      LambertianSurfaceSpectrum,
+                      LambertianSurfaceLegendre,
+                      LambertianSurfaceSpline} || throw(ArgumentError(
+            "external-solar SFI currently supports Lambertian surfaces only"))
+        streams_callback === nothing || throw(ArgumentError(
+            "external-solar SFI does not yet support streams_callback"))
+        isempty(model.obs_geom.sensor_levels) || throw(ArgumentError(
+            "external-solar SFI does not yet support interior-height outputs"))
+    end
+
     (; ϖ_Cabannes) = RS_type
 
     # Normalize ϖ_λ₁λ₀ so its sum equals the Raman fraction of scattering
@@ -318,17 +357,20 @@ function _rt_run_column(RS_type::AbstractRamanType, model, iBand;
     NquadN =  Nquad * pol_type.n         # Nquad (multiplied by Stokes n)
     dims   = (NquadN,NquadN)              # nxn dims
 
-    # Output arrays for reflected and transmitted solar irradiation at TOA and BOA
-    @timeit "Arrays"  R       = zeros(FT, length(vza), pol_type.n, nSpec)
-    @timeit "Arrays"  T       = zeros(FT, length(vza), pol_type.n, nSpec)
+    # TOA source accumulation is always required. The dedicated exoplanet path
+    # intentionally does not allocate BOA, inelastic, HDR, or BHR outputs.
     @timeit "Arrays"  R_SFI   = zeros(FT, length(vza), pol_type.n, nSpec)
-    @timeit "Arrays"  T_SFI   = zeros(FT, length(vza), pol_type.n, nSpec)
-    @timeit "Arrays"  ieR_SFI = zeros(FT, length(vza), pol_type.n, nSpec)
-    @timeit "Arrays"  ieT_SFI = zeros(FT, length(vza), pol_type.n, nSpec)
-    @timeit "Arrays"  hdr     = zeros(FT, length(vza), pol_type.n, nSpec)
-    @timeit "Arrays"  bhr_dw     = zeros(FT, pol_type.n, nSpec)
-    @timeit "Arrays"  bhr_uw     = zeros(FT, pol_type.n, nSpec)
-    @timeit "Arrays"  hdr_J₀⁻    = zeros(FT, length(vza), pol_type.n, nSpec)
+    R = T = T_SFI = ieR_SFI = ieT_SFI = hdr = bhr_dw = bhr_uw = nothing
+    if !toa_only
+        @timeit "Arrays" R       = zeros(FT, length(vza), pol_type.n, nSpec)
+        @timeit "Arrays" T       = zeros(FT, length(vza), pol_type.n, nSpec)
+        @timeit "Arrays" T_SFI   = zeros(FT, length(vza), pol_type.n, nSpec)
+        @timeit "Arrays" ieR_SFI = zeros(FT, length(vza), pol_type.n, nSpec)
+        @timeit "Arrays" ieT_SFI = zeros(FT, length(vza), pol_type.n, nSpec)
+        @timeit "Arrays" hdr     = zeros(FT, length(vza), pol_type.n, nSpec)
+        @timeit "Arrays" bhr_dw  = zeros(FT, pol_type.n, nSpec)
+        @timeit "Arrays" bhr_uw  = zeros(FT, pol_type.n, nSpec)
+    end
     # Notify user of processing parameters
     msg =
     """
@@ -435,7 +477,7 @@ function _rt_run_column(RS_type::AbstractRamanType, model, iBand;
     # The original `similar(composite_layer.J₀⁻)` inside the loop allocated a
     # fresh array each moment (and the pre-allocated hdr_J₀⁻ at line 303 was
     # never used because it has shape (nVZA, pol_n, nSpec), not (NquadN,1,nSpec)).
-    hdr_J₀⁻ = similar(composite_layer.J₀⁻)
+    hdr_J₀⁻ = toa_only ? nothing : similar(composite_layer.J₀⁻)
 
     # Loop over fourier moments
     for m = 0:m_max
@@ -520,33 +562,25 @@ function _rt_run_column(RS_type::AbstractRamanType, model, iBand;
                                     added_layer_surface,
                                     I_static;
                                     workspace=_interaction_ws)
-        # hdr_J₀⁻ is pre-allocated before the m loop (avoids one similar() per moment).
-        @timeit "interaction_HDRF" interaction_hdrf!(#RS_type,
-                                    #bandSpecLim,
-                                    #scattering_interfaces_all[end], 
-                                    SFI, 
-                                    composite_layer, 
-                                    added_layer_surface, 
-                                    m, pol_type, quad_points,
-                                    hdr_J₀⁻, bhr_uw, bhr_dw)
-        
-        # Postprocess and weight according to vza
-        @timeit "Postprocessing VZA" postprocessing_vza!(RS_type, 
-                            iμ₀, pol_type, 
-                            composite_layer, 
-                            vza, qp_μ, m, vaz, μ₀, 
-                            weight, nSpec, 
-                            SFI, 
-                            R, R_SFI, 
-                            T, T_SFI,
-                            ieR_SFI, ieT_SFI)
+        if toa_only
+            @timeit "Postprocessing TOA" postprocessing_vza_toa!(
+                composite_layer, vza, qp_μ, m, vaz, pol_type, weight, R_SFI)
+        else
+            # HDR/BHR are diagnostics and are deliberately absent from the
+            # TOA-only exoplanet path.
+            @timeit "interaction_HDRF" interaction_hdrf!(
+                SFI, composite_layer, added_layer_surface,
+                m, pol_type, quad_points, hdr_J₀⁻, bhr_uw, bhr_dw)
 
-        @timeit "Postprocessing HDRF" postprocessing_vza_hdrf!(RS_type,
-            iμ₀, pol_type,
-            hdr_J₀⁻,
-            vza, qp_μ, m, vaz, μ₀,
-            weight, nSpec,
-            hdr)
+            @timeit "Postprocessing VZA" postprocessing_vza!(RS_type,
+                iμ₀, pol_type, composite_layer,
+                vza, qp_μ, m, vaz, μ₀, weight, nSpec, SFI,
+                R, R_SFI, T, T_SFI, ieR_SFI, ieT_SFI)
+
+            @timeit "Postprocessing HDRF" postprocessing_vza_hdrf!(
+                RS_type, iμ₀, pol_type, hdr_J₀⁻,
+                vza, qp_μ, m, vaz, μ₀, weight, nSpec, hdr)
+        end
 
         # Phase H — per-moment streams export hook (v0.7+).
         # Optional callback called once per Fourier moment AFTER the layer
@@ -588,6 +622,8 @@ function _rt_run_column(RS_type::AbstractRamanType, model, iBand;
     # `RTNumericalParameters`; default false to keep production loops quiet).
     model.numerics.verbose && print_timer()
     reset_timer!()
+
+    toa_only && return R_SFI
 
     # Return R_SFI or R, depending on the flag
     return SFI ? (R_SFI, T_SFI, ieR_SFI, ieT_SFI, hdr, bhr_uw[1,:], bhr_dw[1,:]) : (R, T)
@@ -698,6 +734,9 @@ function rt_run(RS_type::AbstractRamanType, model, iBand;
                 streams_callback::Union{Nothing, Function} = nothing)
     bands = iBand isa Integer ? [Int(iBand)] : collect(Int, iBand)
     geom = model.obs_geom
+    model.quad_points.external_solar && !isempty(geom.sensor_levels) &&
+        throw(ArgumentError(
+            "external-solar SFI does not yet support multisensor/interior-height outputs"))
 
     # The stream-export callback needs the production composite-layer path.
     # It is independent of observer selection and intentionally captures the
@@ -782,6 +821,8 @@ Single-scatter approximation driver with explicit Raman type. See
 function rt_run_ss(RS_type::AbstractRamanType, model, iBand;
                    sources::Union{Nothing, AbstractSource} = nothing)
     _require_endpoint_observers(model, "rt_run_ss")
+    model.quad_points.external_solar && throw(ArgumentError(
+        "external-solar SFI is implemented only for the full multiple-scattering forward solver"))
     _warn_explicit_depol_raman(RS_type, model)
 
     # Per-model BLAS thread cap (see `rt_run` body for rationale).

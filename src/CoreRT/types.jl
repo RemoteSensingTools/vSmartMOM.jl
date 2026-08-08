@@ -999,8 +999,10 @@ end
     QuadPoints{FT}
 
 Gauss or Gauss-Radau quadrature points and weights used for the angular
-discretisation of the radiative transfer equation.  Also stores the cosine
-of the solar zenith angle (`μ₀`) and its index within the quadrature grid.
+discretisation of the radiative transfer equation. Also stores the cosine
+of the solar zenith angle (`μ₀`). In the legacy representation `iμ₀` indexes
+that direction in the diffuse grid; external-solar models instead use a zero
+sentinel there and `iμ₀_phase` for the exact phase-source column.
 
 # Fields
 $(DocStringExtensions.FIELDS)
@@ -1008,22 +1010,37 @@ $(DocStringExtensions.FIELDS)
 struct QuadPoints{FT}
     "μ₀, cos(SZA)"
     μ₀::FT
-    "Index in quadrature points with sun"
+    "Index of μ₀ in the diffuse grid, or zero when the solar direction is external"
     iμ₀::Int
-    "Index in quadrature points with sun (in qp_μN)"
+    "First Stokes index of μ₀ in qp_μN, or zero for external-solar models"
     iμ₀Nstart::Int
-    "Quadrature points"
+    "Diffuse-operator quadrature points"
     qp_μ::AbstractArray{FT,1}
-    "Weights of quadrature points"
+    "Weights of diffuse-operator quadrature points"
     wt_μ::AbstractArray{FT,1}
     "Quadrature points (repeated for polarizations)"
     qp_μN::AbstractArray{FT,1}
     "Weights of quadrature points (repeated for polarizations)"
     wt_μN::AbstractArray{FT,1}
-    "Total number of quadrature points (weighted streams + zero-weight SZA/VZA output nodes)"
+    "Total diffuse-grid nodes (weighted streams + zero-weight VZAs, and legacy SZA)"
     Nquad::Int
     "Number of weighted streams per hemisphere (count of nonzero weights). Public contract: stream_l_cap = 2·Nstreams - 1."
     Nstreams::Int
+    "Angular grid used to construct phase matrices; may additionally contain the external solar direction."
+    phase_qp_μ::AbstractArray{FT,1}
+    "Index of μ₀ in `phase_qp_μ`."
+    iμ₀_phase::Int
+    "First Stokes index of μ₀ in the polarization-expanded phase grid."
+    iμ₀Nstart_phase::Int
+    "Whether the direct solar direction is external to the diffuse-operator quadrature grid."
+    external_solar::Bool
+end
+
+"Backward-compatible constructor for the historical embedded-μ₀ layout."
+function QuadPoints(μ₀, iμ₀, iμ₀Nstart, qp_μ, wt_μ, qp_μN, wt_μN,
+                    Nquad, Nstreams)
+    return QuadPoints(μ₀, iμ₀, iμ₀Nstart, qp_μ, wt_μ, qp_μN, wt_μN,
+                      Nquad, Nstreams, qp_μ, iμ₀, iμ₀Nstart, false)
 end
 
 # ============================================================================

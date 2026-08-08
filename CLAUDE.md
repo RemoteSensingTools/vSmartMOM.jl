@@ -57,6 +57,7 @@ YAML/TOML/Dict
     → read_parameters()        → vSmartMOM_Parameters   (unified entry point)
     → model_from_parameters()  → RTModel
     → rt_run(model)            → ObserverRTResult (named endpoint/level radiances)
+    → rt_run_toa(model)        → TOA upwelling only (opt-in external-solar SFI)
 ```
 
 `parameters_from_yaml(path)` is the YAML-specific alias and still works; use `read_parameters` for TOML or `Dict` inputs.
@@ -65,6 +66,15 @@ With the default `obs_alt: [0]`, `ObserverRTResult` iterates as the historical
 forward tuple, so `R, T = rt_run(model)` still binds TOA upwelling and BOA
 downwelling. Interior-height radiances are available through
 `result.levels`.
+
+`rt_run_toa` requires `model.quad_points.external_solar == true`. In this
+opt-in Gauss/SFI representation, scalar `μ₀` is excluded from the diffuse
+operator and retained on `phase_qp_μ` as the exact direct-beam source column.
+The path currently supports forward elastic `noRS` with Lambertian surfaces;
+it does not allocate or postprocess BOA, HDR, or BHR, and it does not support
+linearized, Raman/VRS, `rt_run_ss`, non-Lambertian, or interior-sensor runs.
+The embedded-`μ₀` representation remains the default; unsupported paths
+reject external-solar models rather than falling back silently.
 
 Linearized variant: `model_from_parameters(LinMode(), params)` then
 `rt_run(model, lin_model, NAer, NGas, NSurf)` returns an
@@ -80,7 +90,7 @@ RTModel{ARCH, FT} <: AbstractRTModel{ARCH, FT}
 ├── architecture :: ARCH                    # CPU() or GPU()
 ├── solver       :: SolverConfig{FT}        # polarization, quadrature, truncation, m_max_bands
 ├── geometry     :: ObsGeometry{FT}         # angles + resolved observer interfaces
-├── quad_points  :: QuadPoints{FT}          # μ₀, qp_μ, wt_μ, Nquad, Nstreams (v0.7)
+├── quad_points  :: QuadPoints{FT}          # diffuse qp_μ/wt_μ + phase_qp_μ; optional external μ₀
 ├── atmosphere   :: Atmosphere{FT}          # profile + spec_bands
 ├── optics       :: Optics{FT}             # ALL optical properties
 │   ├── rayleigh :: RayleighScattering{FT}  # greek_rayleigh, greek_cabannes, ϖ_Cabannes
@@ -123,7 +133,7 @@ For each Fourier moment m = 0..m_max_bands[iBand] (v0.7 — order-semantics; tra
 | `LevelRadiance` | `src/CoreRT/types.jl` | Co-located up/down radiances at one interior interface |
 | `ObserverRTResultLin` | `src/CoreRT/types_lin.jl` | Named endpoint and interior-height linearized outputs |
 | `LevelRadianceLin` | `src/CoreRT/types_lin.jl` | Co-located radiances and analytic Jacobians at one interior interface |
-| `QuadPoints` | `src/CoreRT/types.jl` | Quadrature points, weights, mu0 |
+| `QuadPoints` | `src/CoreRT/types.jl` | Diffuse quadrature, phase-evaluation grid, scalar μ₀, and external-solar flag |
 | `CompositeLayer` | `src/CoreRT/types.jl` | Accumulated R, T, J matrices (uppercase) |
 | `AddedLayer` | `src/CoreRT/types.jl` | Single-layer r, t, j matrices (lowercase) |
 | `Aerosol` | `src/Scattering/types.jl` | Size distribution + refractive index (nr, ni) |
@@ -160,7 +170,14 @@ All surfaces implement `create_surface_layer!()`. Linearized variants have `_lin
 - **Unicode variables**: `τ` (optical depth), `ϖ` (SSA), `μ` (cosine zenith) used directly
 - **Sign convention**: `+` = incoming/downward, `-` = outgoing/upward
 - **Layer naming**: CompositeLayer uses uppercase (R, T, J), AddedLayer uses lowercase (r, t, j)
-- **3D matrices**: RT matrices are `(NquadN, NquadN, nSpec)` where `NquadN = Nquad * n_stokes`
+- **3D matrices**: diffuse RT matrices are `(NquadN, NquadN, nSpec)` where
+  `NquadN = Nquad * n_stokes`. External-solar phase matrices may carry one
+  additional exact μ₀ row/column, while the diffuse operators remain square
+  on `qp_μ`.
+- **External solar is not a stream**: with `external_solar=true`, scalar μ₀ and
+  `iμ₀_phase` provide `Zₘ(μᵢ,μ₀)` source coupling; legacy operator indices
+  `iμ₀`/`iμ₀Nstart` are zero sentinels. Five weighted streams plus one
+  distinct VZA in IQU gives an 18×18 diffuse operator.
 - **Spectral units**: wavenumber in cm⁻¹ internally; wavelength in micrometers for Mie
 - **Vertical units**: profile pressure is hPa; `obs_alt` is geometric km above BOA
 - **Profile direction**: TOA to BOA (top of atmosphere to bottom)
