@@ -35,9 +35,12 @@ DISCRETIZE   Fourier in azimuth (m=0..m_max_bands[iBand]; v0.7: per-component
              trait dispatch — Rayleigh→2, Lambertian→0, Cox-Munk→user_l_cap),
              Gauss/Radau quadrature in μ. User knob is `nstreams` (weighted
              streams per hemisphere); public contract `stream_l_cap = 2·N-1`.
+             Opt-in external-solar SFI keeps scalar μ₀ outside the diffuse
+             operator and evaluates its exact phase-source column separately;
+             the legacy embedded-μ₀ representation remains the default.
              Schema: docs/src/pages/IO/Schema/.
-             Per Fourier moment m, each layer reduces to FOUR ARRAYS of
-             shape (NquadN, NquadN, nSpec):
+             Per Fourier moment m, each layer reduces to FOUR VARIABLES
+             (phase arrays share the diffuse shape in legacy mode):
                τ      — optical depth          ϖ      — single-scatter albedo
                Z⁺⁺   — forward phase matrix    Z⁻⁺   — backscatter phase matrix
                 │
@@ -180,6 +183,8 @@ material when explaining the package:
 | Surface coupling | `src/CoreRT/CoreKernel/interaction_hdrf.jl:1–42` |
 | Postprocessing (azimuth, VZA) | `src/CoreRT/tools/postprocessing_vza*.jl:23–99` |
 | Quadrature (Gauss / Radau) | `src/CoreRT/tools/rt_set_streams.jl:24–110` |
+| External direct-solar phase coupling | `src/CoreRT/CoreKernel/elemental.jl::get_elem_rt_SFI!` |
+| External-solar TOA-only entry point | `src/CoreRT/rt_run.jl::rt_run_toa` |
 | Linearization kernels | `src/CoreRT/CoreKernel/{elemental,doubling,interaction}_lin.jl` |
 | Chain-rule expansion (fused) | `src/CoreRT/CoreKernel/elemental_lin.jl:456–591` (`get_elem_rt_fused!`), `602–815` (`get_elem_rt_SFI_fused!`) |
 | Jacobian column layout | `src/CoreRT/parameter_layout.jl:1–67` |
@@ -204,7 +209,16 @@ material when explaining the package:
 - **Unicode in identifiers** is used directly: `τ`, `ϖ`, `μ`, `μ₀`, `Z⁺⁺`, `Z⁻⁺`, `R⁻⁺`, `T⁺⁺`, `r⁻⁺`, `t⁺⁺`. Don't romanize.
 - **Sign convention:** `+` = incoming/downward, `−` = outgoing/upward.
 - **Layer naming:** `CompositeLayer` fields are uppercase (`R, T, J`); `AddedLayer` fields are lowercase (`r, t, j`).
-- **3D RT array layout:** `(NquadN, NquadN, nSpec)` where `NquadN = Nquad * n_stokes`. The third dim is **spectral** — that's what enables batched-matmul over wavelengths.
+- **3D RT array layout:** diffuse operators use `(NquadN, NquadN, nSpec)`
+  where `NquadN = Nquad * n_stokes`. The third dim is **spectral** — that's
+  what enables batched-matmul over wavelengths. In external-solar SFI, phase
+  matrices may be evaluated on one additional μ₀ direction; only its exact
+  source column lies outside the diffuse block.
+- **External-solar scope:** `external_solar=true` is opt-in and currently
+  supports forward elastic SFI with Gauss quadrature and Lambertian surfaces
+  through `rt_run_toa`. That entry point returns TOA upwelling only and does
+  not allocate/postprocess BOA, HDR, or BHR. Other solver paths require the
+  embedded-μ₀ representation and reject external-solar models.
 - **Spectral units:** wavenumber (cm⁻¹) internally; wavelength (μm) for Mie.
 - **Observer heights:** `obs_alt` is geometric km above BOA. Scalar `0` means
   BOA only; vector `[0]` means TOA + BOA. Strict-interior heights are exact
@@ -245,7 +259,7 @@ cd docs && julia --project=. make.jl
 
 1. **What is the package about?** → Read the spine above (top of this file).
 2. **What does this code do?** → Find it in the code-anchor table above; read the relevant Concepts page; cross-reference `theory_references.md` for the paper equation.
-3. **Why is the code shaped this way?** → Check the **design-choice passages** at the bottom of `theory_references.md`. They explain non-obvious trade-offs (no solar SFI in J, constant-`N_doubl`, Cabannes vs Rayleigh greek, Raman Rayleigh fraction, linear-in-inelastic, `rt_run_ss` raison d'être, δBGE-fit vs δ-m, exact finite-δ elemental).
+3. **Why is the code shaped this way?** → Check the **design-choice passages** at the bottom of `theory_references.md`. They explain non-obvious trade-offs (historical no-solar-SFI origin vs current embedded/external SFI representations, constant-`N_doubl`, Cabannes vs Rayleigh greek, Raman Rayleigh fraction, linear-in-inelastic, `rt_run_ss` raison d'être, δBGE-fit vs δ-m, exact finite-δ elemental).
 4. **Where does this paper equation map in the code?** → `theory_references.md` Sections A–J.
 5. **How should I write a new feature?** → Check `CLAUDE.md` for the "Common Workflows" patterns (adding a surface BRDF, adding a test, modifying YAML parsing).
 

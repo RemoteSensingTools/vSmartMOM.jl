@@ -151,7 +151,7 @@ include("component_m_max.jl")
 # Functions to export
 export model_from_parameters,               # Converting the parameters to model
        model_from_parameters_lin,           # Convenience alias for linearized model
-       rt_run, rt_run_lin, rt_run_ss,       # Run the RT code (forward, linearized, single scatter)
+       rt_run, rt_run_toa, rt_run_lin, rt_run_ss, # Run RT (forward, TOA-only, linearized, single scatter)
        rt_run_streams, StreamRTResult,      # Per-Fourier-moment quadrature-stream RT (Phase H)
        default_parameters,                  # Set of default parameters
        BatchContext, update_model!,         # Batch-processing context + scene updater

@@ -5,7 +5,7 @@ and target Concepts pages. This file is the **source of truth** for paper
 citations and `file.jl:LINE` references that the Concepts arc draws from.
 
 Built by reading each PDF in targeted mode (equations + design-decision
-passages only, no benchmarks/intros). Updated 2026-04-30.
+passages only, no benchmarks/intros). Updated 2026-08-07.
 
 ## Canonical references
 
@@ -57,12 +57,12 @@ passages only, no benchmarks/intros). Updated 2026-04-30.
 | **S2014 (18)** | Layer operator form: `⟨I_Δ⁻; I_0⁺⟩ = T_Δ I_0 + R_Δ I_Δ + J_Δ`. | `src/CoreRT/rt_run.jl::rt_kernel!` call site |
 | **S2014 (19)** | `T_δ,m = (E − M⁻¹[E − (ϖ₀/2)Z̄ₘ⁽⁺⁺⁾C])·δ` — elemental transmission for `m=0` thermal-only. | `src/CoreRT/CoreKernel/elemental.jl::get_elem_rt!` lines 113–139 |
 | **S2014 (20)** | `R_δ,m = M⁻¹·(ϖ₀/2)·Z̄ₘ⁽⁻⁺⁾·C·δ` — elemental reflection. | `src/CoreRT/CoreKernel/elemental.jl::get_elem_rt!` lines 113–139 |
-| **S2014 (21)** | `J_δ,m = δ_0m·(E − T − R)·B(T)·1` — elemental thermal source (no solar SFI here, see §2.2). | `src/CoreRT/CoreKernel/elemental.jl::get_elem_rt_SFI!` |
+| **S2014 (21)** | `J_δ,m = δ_0m·(E − T − R)·B(T)·1` — elemental thermal source in the paper's historical no-solar-SFI formulation. This is not `get_elem_rt_SFI!`, which is the current direct-solar source kernel. | `src/CoreRT/Sources/thermal_emission.jl` (current finite-δ thermal source implementation) |
 | **S2014 (22)** | Elemental-thickness bound `0 < δ < min(μ_i)/(1 − ϖ₀/2)` — guarantees non-negative operators. | `src/CoreRT/tools/rt_helper_functions.jl::doubling_number`, consumed in `rt_kernel.jl::get_dtau_ndoubl` (lines 245–253) |
-| **S2014 §2.2** | **Design choice (echo verbatim)**: vSmartMOM does *not* include solar single-scatter in `J`. Trade-off: simpler doubling/adding, no off-quadrature SFI integration; recovered via Block-Radau (App. B). | `src/CoreRT/CoreKernel/rt_kernel.jl` (no solar term in elemental J for `m>0` thermal-only path) |
+| **S2014 §2.2** | **Historical paper design choice**: the 2014 formulation does *not* include solar single scatter in `J`. Trade-off: simpler doubling/adding, with off-quadrature geometry recovered through Block-Radau (App. B). Do not state this as a limitation of the current solver, whose SFI kernel operates with either an embedded or external `μ₀` representation. | Historical rationale for the DNI/Block-Radau lineage; current SFI is `src/CoreRT/CoreKernel/elemental.jl::get_elem_rt_SFI!`. |
 | **SF2023-II (8)–(9)** | **Constant-`N_doubl` trick** for absorbing bands: `δτ = δτ_abs + δτ_scatt`; doubling sized by `δτ_scatt` only, so `N_doubl` is held constant across the spectral grid even when `τ_abs` swings over orders of magnitude. | `src/CoreRT/tools/atmo_prof.jl::construct_atm_layer` lines ~340–376; `rt_kernel.jl::get_dtau_ndoubl` lines 245–253 |
 | **SF2023-II (10)–(11)** | Explicit elastic R, T, J for elemental layer with absorption baked into `δτ = δτ_abs + δτ_scatt`. Includes `1 − exp(−δτ(1/μ_i+1/μ_j))` and `exp(−δτ/μ_i) − exp(−δτ/μ_j)` factors. | `src/CoreRT/CoreKernel/elemental.jl` lines 207–252 (the `expm1` / `expdiff_neg` numerical-stability forms) |
-| **Fell 1997 Eqs. 1.52–1.56** | Single-scatter elemental r/t/J formulas in the form vSmartMOM implements (matches SF2023-II (10)–(11)). | Already cited verbatim in `src/CoreRT/CoreKernel/elemental.jl` source comments |
+| **Fell 1997 Eqs. 1.52–1.56** | Single-scatter elemental r/t/J formulas in the form vSmartMOM implements (matches SF2023-II (10)–(11)). The direct-solar `J₀±` terms use scalar `μ₀` and exact `Zₘ(μᵢ,μ₀)` coupling, including the `μᵢ=μ₀` L'Hôpital limit. | `src/CoreRT/CoreKernel/elemental.jl::get_elem_rt_SFI!` |
 
 ### C. Doubling and adding (S2014 §2.1, Eqs. 23–32; SF2023-II §3.3) → Concepts/04
 
@@ -99,7 +99,8 @@ passages only, no benchmarks/intros). Updated 2026-04-30.
 | Paper Eq. | What it says | Source file:line |
 |---|---|---|
 | **S2014 (B.1)–(B.2)** | Block-Radau scheme: composite `(N₁+N₂)`-point quadrature where solar `μ₀` is included as a quadrature root with non-zero weight (a true Radau node), and viewing angles `μ_v` are appended as zero-weight dummy nodes. Eliminates interpolation error between quadrature points for direct ray tracing. | `src/CoreRT/tools/rt_set_streams.jl::RadauQuad` lines 24–110 |
-| **S2014 App. B (text)** | Without DNI/Radau, off-quadrature solar/viewing angles need interpolation between roots → error. The Radau construction is the cost paid for the §2.2 design choice (no solar SFI in J). | (design-rationale callout for Concepts/02) |
+| **S2014 App. B (text)** | In the historical DNI/no-solar-SFI formulation, off-quadrature solar/viewing angles require interpolation; Block-Radau removes the solar interpolation by making `μ₀` a weighted root. | (historical design-rationale callout for Concepts/02) |
+| **Current external-solar SFI** | Opt-in Gauss mode keeps `μ₀` outside the diffuse quadrature. `phase_qp_μ` carries exact `μ₀` for the phase-source column, while scalar `μ₀` controls attenuation and propagation. Five weighted streams plus one distinct VZA in IQU therefore gives an 18×18 diffuse operator. | `src/CoreRT/tools/rt_set_streams.jl` (`external_solar=true`); `src/CoreRT/CoreKernel/elemental.jl::get_elem_rt_SFI!`; `src/CoreRT/rt_run.jl::rt_run_toa` |
 
 ### F. Layer optical-property assembly → Concepts/03 + 03a + 03b + 03c
 
@@ -197,10 +198,18 @@ These are not equations but explicit decisions made in the papers that the
 docs should quote (or paraphrase tightly) so users understand *why* the code
 is shaped as it is:
 
-1. **No solar SFI in J** (S2014 §2.2). The matrix-operator Eqs. (23)–(28)
-   suffice instead of (23)–(33); for thermal-only `m=0`, `J` is isotropic
-   so its computations can be reused. The cost is needing Block-Radau
-   (App. B) for off-quadrature angles. → Concepts/02 + Concepts/04.
+1. **Historical no-solar-SFI choice, plus the current opt-in alternative.**
+   S2014 §2.2 omits direct-solar single scatter from `J`, allowing the
+   matrix-operator Eqs. (23)–(28) instead of (23)–(33), at the cost of
+   Block-Radau (App. B) for exact off-quadrature solar geometry. The current
+   solver implements Fell-style SFI in both angular representations. In the
+   opt-in external form, `μ₀` is a scalar and exact phase-source column, not a
+   diffuse stream. The lean
+   `rt_run_toa` path is presently Gauss + Lambertian + noRS only and does not
+   construct BOA/HDR/BHR outputs. Legacy embedded-`μ₀` behavior remains the
+   default; linearized, Raman/VRS, non-Lambertian, single-scatter-only, and
+   interior-sensor paths require it and reject external-solar models.
+   → Concepts/02 + Concepts/04.
 2. **Constant-`N_doubl` across the spectral grid** (SF2023-II §3.2,
    Eqs. 8–9). `N_doubl` is sized by the scattering optical depth, not the
    total. Lets line-by-line on hyperspectral grids run on GPU at one
