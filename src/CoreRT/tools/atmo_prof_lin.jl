@@ -15,11 +15,12 @@ function psurf_profile_tangents(profile::AtmosphericProfile{FT}; g₀=FT(9.80324
     Nₐ = FT(6.02214179e23)
     R = FT(8.3144598)
     vmr_h2o = profile.vmr_h2o[end]
-    vmr_dry = one(FT) - vmr_h2o
-    M = vmr_dry * dry_mass + vmr_h2o * wet_mass
+    x_dry = inv(one(FT) + vmr_h2o)
+    x_h2o = vmr_h2o * x_dry
+    M = x_dry * dry_mass + x_h2o * wet_mass
     vcd_dot = Nₐ / (M * g₀ * FT(100)^2) * FT(100)
-    vcd_dry_dot[end] = vmr_dry * vcd_dot
-    vcd_h2o_dot[end] = vmr_h2o * vcd_dot
+    vcd_dry_dot[end] = x_dry * vcd_dot
+    vcd_h2o_dot[end] = x_h2o * vcd_dot
     Δz_dot[end] = R * profile.T[end] / (g₀ * M * profile.p_half[end])
     return (; vcd_dry_dot, vcd_h2o_dot, Δz_dot)
 end
@@ -240,6 +241,8 @@ function compute_absorption_profile!(τ_abs::Array{FT,2},
                                     grid,
                                     vmr,
                                     profile::AtmosphericProfile,
+                                    ;
+                                    self_broadener_vmr=nothing,
                                     ) where FT 
 
     # The array to store the cross-sections must be same length as number of layers
@@ -253,6 +256,8 @@ function compute_absorption_profile!(τ_abs::Array{FT,2},
 
         # Either use the current layer's vmr, or use the uniform vmr
         vmr_curr = vmr isa AbstractArray ? vmr[iz] : vmr
+        broadener_curr = self_broadener_vmr isa AbstractArray ?
+            self_broadener_vmr[iz] : self_broadener_vmr
 
         # Changed index order
         # @show iz,p,T,profile.vcd_dry[iz], vmr_curr
@@ -261,12 +266,32 @@ function compute_absorption_profile!(τ_abs::Array{FT,2},
         #temp = collect(absorption_cross_section(absorption_model, grid, p, T)) * profile.vcd_dry[iz] * vmr_curr
         #@show minimum(temp), p, T, profile.vcd_dry[iz] * vmr_curr
         #@show iz, profile.vcd_dry[iz], vmr_curr, p, T
-        τ_abs[:,iz] += collect(absorption_cross_section(absorption_model, grid, p, T)) * profile.vcd_dry[iz] * vmr_curr
+        σ = collect(_layer_absorption_cross_section(
+            absorption_model, grid, p, T, broadener_curr))
+        τ_abs[:,iz] += σ * profile.vcd_dry[iz] * vmr_curr
         # Species-major flattened ordering: (igas - 1) * Nz + iz.
         # Keeping all other layers zero yields dτ(z)/dVMR(igas, iz).
         gas_layer_idx = (jac_idx - 1) * length(profile.p_full) + iz
-        τ̇_abs[gas_layer_idx,:,iz] =
-            collect(absorption_cross_section(absorption_model, grid, p, T)) * profile.vcd_dry[iz]
+        τ̇_abs[gas_layer_idx,:,iz] = σ * profile.vcd_dry[iz]
     end
     
+end
+
+"""
+    compute_h2o_absorption_profile!(τ_abs, τ̇_abs, jac_idx,
+                                    absorption_model, grid, profile)
+
+Linearized H₂O line-absorption accumulation using the same layerwise moist
+H₂O mole fraction for self broadening as the forward path.
+"""
+function compute_h2o_absorption_profile!(τ_abs::Array{FT,2},
+                                         τ̇_abs::Array{FT,3},
+                                         jac_idx::Integer,
+                                         absorption_model,
+                                         grid,
+                                         profile::AtmosphericProfile) where FT
+    x_h2o = _h2o_moist_mole_fraction.(profile.vmr_h2o)
+    return compute_absorption_profile!(
+        τ_abs, τ̇_abs, jac_idx, absorption_model, grid,
+        profile.vmr_h2o, profile; self_broadener_vmr=x_h2o)
 end

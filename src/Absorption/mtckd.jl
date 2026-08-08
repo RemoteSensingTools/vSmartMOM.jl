@@ -2,13 +2,13 @@
 # mtckd.jl — MT_CKD water-vapor continuum (self + foreign).
 #
 # Reads the AER-distributed reference NetCDF (`absco-ref_wv-mt-ckd.nc`,
-# MT_CKD v4.2/4.3) and adds the H₂O continuum optical depth to τ_abs at
+# with its version read from the file metadata) and adds the H₂O continuum optical depth to τ_abs at
 # model build time. Implementation follows the standard LBLRTM convention:
 #
 #   σ_self(ν, T, p_h2o) = C_self_ref(ν) · radterm(ν, T) ·
 #                          (p_h2o / p_ref) · (T_ref / T)^texp(ν)
 #   σ_for(ν, T, p_dry)  = C_for_ref(ν)  · radterm(ν, T) · (p_dry / p_ref)
-#   τ_layer(ν)          = (σ_self + σ_for) · n_h2o · Δz
+#   τ_layer(ν)          = (σ_self + σ_for) · N_h2o
 #
 # where  radterm(ν, T) = ν · tanh(c₂ ν / 2T)  with c₂ = 1.4388 cm·K
 # converts the AER "continuum coefficient" (cm²/molec/cm⁻¹) into a true
@@ -35,7 +35,12 @@ struct MTCKDTable
     self_texp::Vector{Float64}    # dimensionless
     p_ref::Float64                # mbar (= hPa)
     T_ref::Float64                # K
+    title::String                 # file-global Title attribute
+    version_description::String   # file-global Version_description attribute
 end
+
+MTCKDTable(ν, C_self, C_for, self_texp, p_ref, T_ref) =
+    MTCKDTable(ν, C_self, C_for, self_texp, p_ref, T_ref, "", "")
 
 """
     MTCKDBand
@@ -63,7 +68,15 @@ function load_mtckd(path::AbstractString)
     texp    = Float64.(NetCDF.ncread(path, "self_texp"))
     p_ref   = Float64(NetCDF.ncread(path, "ref_press")[])
     T_ref   = Float64(NetCDF.ncread(path, "ref_temp")[])
-    return MTCKDTable(ν, C_self, C_for, texp, p_ref, T_ref)
+    title = strip(string(something(
+        NetCDF.ncgetatt(path, "Global", "Title"), "")))
+    version_description = strip(string(something(
+        NetCDF.ncgetatt(path, "Global", "Version_description"), "")))
+    isempty(title) && error("MT_CKD file lacks its global Title attribute: $path")
+    isempty(version_description) && error(
+        "MT_CKD file lacks its global Version_description attribute: $path")
+    return MTCKDTable(ν, C_self, C_for, texp, p_ref, T_ref,
+                      title, version_description)
 end
 
 """
@@ -103,8 +116,11 @@ end
 
 Add the MT_CKD H₂O self+foreign continuum optical depth to `τ_abs[ν, layer]`.
 
-`vmr_h2o` is per-layer or scalar. `profile.p_full` is in hPa, `profile.T`
-in K, `profile.Δz` in m. All intermediate arithmetic is Float64; the
+`vmr_h2o` is the H2O/dry-air molar ratio, per-layer or scalar.
+`profile.p_full` is total moist pressure in hPa and `profile.T` is in K.
+`profile.vcd_h2o` supplies the hydrostatically integrated H2O column,
+making the result invariant to layer subdivision for constant coefficients.
+All intermediate arithmetic is Float64; the
 result is converted to `eltype(τ_abs)` only at accumulation.
 """
 function compute_τ_h2o_continuum!(τ_abs::AbstractMatrix,
@@ -122,13 +138,13 @@ function compute_τ_h2o_continuum!(τ_abs::AbstractMatrix,
         T   = Float64(profile.T[iz])
         P   = Float64(profile.p_full[iz])
         v_h = Float64(vmr_h2o isa AbstractVector ? vmr_h2o[iz] : vmr_h2o)
-        # Number densities (molec/cm³)
-        n_air = P * 1e2 / (1.380649e-23 * T) * 1e-6
-        n_h2o = v_h * n_air
+        r_profile = Float64(profile.vcd_h2o[iz] / profile.vcd_dry[iz])
+        isapprox(v_h, r_profile; rtol=5e-7, atol=1e-12) || error(
+            "H2O dry-air molar ratio disagrees with the profile column in layer $iz")
         # Partial pressures (hPa)
-        p_h2o = v_h * P
-        p_dry = P - p_h2o
-        Δz_cm = Float64(profile.Δz[iz]) * 100.0
+        p_dry = P / (1.0 + v_h)
+        p_h2o = v_h * p_dry
+        N_h2o = Float64(profile.vcd_h2o[iz])
         # Layer-constant pressure scaling
         self_pscale = p_h2o / p_ref
         for_pscale  = p_dry / p_ref
@@ -139,7 +155,7 @@ function compute_τ_h2o_continuum!(τ_abs::AbstractMatrix,
             σ_self  = band.C_self[k] * radterm * self_pscale *
                       (T_ref / T)^band.texp[k]
             σ_for   = band.C_for[k]  * radterm * for_pscale
-            τ_abs[k, iz] += FT_τ((σ_self + σ_for) * n_h2o * Δz_cm)
+            τ_abs[k, iz] += FT_τ((σ_self + σ_for) * N_h2o)
         end
     end
     return τ_abs

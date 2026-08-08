@@ -328,8 +328,8 @@ function _compute_band_absorption!(τ_abs_band, absorption_models_band, h2o_mode
 
     # H₂O line absorption (driven by q / vmr_h2o)
     if q_nonzero && h2o_model !== nothing
-        compute_absorption_profile!(τ_abs_band, h2o_model, spec_band,
-                                    profile.vmr_h2o, profile)
+        compute_h2o_absorption_profile!(τ_abs_band, h2o_model, spec_band,
+                                        profile)
     end
 end
 
@@ -666,9 +666,9 @@ function update_model!(ctx::BatchContext;
             # vmr changes exactly as a fresh model_from_parameters build with the
             # changed vmr would. compute_τ_cia! falls back to USS defaults for
             # any collider species absent from the dict.
-            for cia_path in ap.cia_files
-                cia_table = Absorption.load_cia_table(
-                    cia_path, params.spec_bands[i_band]; FT)
+            for (cia_i, cia_path) in enumerate(ap.cia_files)
+                cia_table = _load_configured_cia_table(
+                    ap, cia_i, params.spec_bands[i_band], FT)
                 Absorption.compute_τ_cia!(
                     model.optics.τ_abs[i_band], cia_table, new_profile,
                     new_profile.vmr)

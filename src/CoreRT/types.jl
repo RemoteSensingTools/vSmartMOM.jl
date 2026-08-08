@@ -45,7 +45,7 @@ struct AtmosphericProfile{FT, VMR <: Union{Real, Vector}}
     q::Array{FT,1}
     "Pressure Levels"
     p_half::Array{FT,1}
-    "H2O Volume Mixing Ratio Profile"
+    "H2O/dry-air molar-ratio profile"
     vmr_h2o::Array{FT,1}
     "Vertical Column Density (Dry)"
     vcd_dry::Array{FT,1}
@@ -791,8 +791,28 @@ mutable struct AbsorptionParameters{FM,VM,V,BF,CE,LT,HL}
     h2o_lut::HL
     "Optional list of HITRAN CIA file paths (one per collision pair)"
     cia_files::Vector{String}
+    "Per-CIA-file HITRAN reference-code selection; `nothing` requires unambiguous coverage"
+    cia_reference_codes::Vector{Union{Nothing,Vector{String}}}
+    "Per-CIA-file handling of negative tabulated cross sections (`:error` or `:clamp_zero`)"
+    cia_negative_policies::Vector{Symbol}
     "Optional path to AER MT_CKD water-vapor continuum NetCDF (e.g. absco-ref_wv-mt-ckd.nc)"
     mtckd_file::String
+end
+
+# Preserve the pre-reference-selection positional constructor used by external
+# callers. Bare file paths remain valid, but `load_cia_table` now rejects them
+# if multiple HITRAN reference families overlap on the requested model grid.
+function AbsorptionParameters(fixed_molecules, variable_molecules, vmr,
+                              broadening_function, CEF, wing_cutoff, luts,
+                              h2o_lut, cia_files::Vector{String},
+                              mtckd_file::String)
+    reference_codes = Union{Nothing,Vector{String}}[
+        nothing for _ in cia_files]
+    negative_policies = fill(:error, length(cia_files))
+    return AbsorptionParameters(
+        fixed_molecules, variable_molecules, vmr, broadening_function, CEF,
+        wing_cutoff, luts, h2o_lut, cia_files, reference_codes,
+        negative_policies, mtckd_file)
 end
 
 """

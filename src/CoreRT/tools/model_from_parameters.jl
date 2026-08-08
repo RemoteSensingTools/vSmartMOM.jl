@@ -8,6 +8,17 @@ like optical thicknesses, from the input parameters. Produces an RTModel object.
 "Generate default set of parameters for Radiative Transfer calculations (from ModelParameters/)"
 default_parameters() = vSmartMOM.IO.parameters_from_yaml(joinpath(dirname(pathof(vSmartMOM)), "CoreRT", "DefaultParameters.yaml"))
 
+"Load one CIA table with the reference and negative-value policy parsed for it."
+function _load_configured_cia_table(ap::AbsorptionParameters, cia_i::Integer,
+                                    ν_grid::AbstractVector,
+                                    ::Type{FT}) where {FT}
+    return Absorption.load_cia_table(
+        ap.cia_files[cia_i], ν_grid;
+        FT,
+        reference_codes=ap.cia_reference_codes[cia_i],
+        negative_policy=ap.cia_negative_policies[cia_i])
+end
+
 """
     _resolved_truncation(params, FT)
 
@@ -327,9 +338,9 @@ function model_from_parameters(params::vSmartMOM_Parameters;
         # parser found one inside LUTfiles; otherwise fall back to artifact.
         if any(!iszero, params.q)
             if ap.h2o_lut[i_band] !== nothing
-                @timeit "Absorption Coeff H2O" compute_absorption_profile!(
+                @timeit "Absorption Coeff H2O" compute_h2o_absorption_profile!(
                     τ_abs[i_band], ap.h2o_lut[i_band],
-                    params.spec_bands[i_band], profile.vmr_h2o, profile)
+                    params.spec_bands[i_band], profile)
             else
                 @timeit "Read HITRAN H2O" lines_h2o = AtmosphericAbsorption.load_lines(AtmosphericAbsorption.HitranPort(artifact("H2O")); FT)
                 @debug "Computing profile for H2O (q-driven) for band #$(i_band)"
@@ -339,16 +350,16 @@ function model_from_parameters(params::vSmartMOM_Parameters;
                     cpf = ap.CEF,
                     architecture = _to_aa_arch(params.architecture),
                     vmr = 0)
-                @timeit "Absorption Coeff H2O" compute_absorption_profile!(τ_abs[i_band], h2o_model, params.spec_bands[i_band], profile.vmr_h2o, profile)
+                @timeit "Absorption Coeff H2O" compute_h2o_absorption_profile!(
+                    τ_abs[i_band], h2o_model, params.spec_bands[i_band], profile)
             end
         end
 
         # Collision-induced absorption (HITRAN .cia files), if any.
-        for cia_path in ap.cia_files
+        for (cia_i, cia_path) in enumerate(ap.cia_files)
             @timeit "CIA $(basename(cia_path))" begin
-                cia_table = Absorption.load_cia_table(cia_path,
-                                                     params.spec_bands[i_band];
-                                                     FT = FT)
+                cia_table = _load_configured_cia_table(
+                    ap, cia_i, params.spec_bands[i_band], FT)
                 Absorption.compute_τ_cia!(τ_abs[i_band], cia_table, profile,
                                            profile.vmr)
             end
@@ -736,9 +747,9 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
         # parser found one inside LUTfiles; otherwise fall back to artifact.
         if any(!iszero, params.q)
             if ap.h2o_lut[i_band] !== nothing
-                @timeit "Absorption Coeff H2O" compute_absorption_profile!(
+                @timeit "Absorption Coeff H2O" compute_h2o_absorption_profile!(
                     τ_abs[i_band], ap.h2o_lut[i_band],
-                    params.spec_bands[i_band], profile.vmr_h2o, profile)
+                    params.spec_bands[i_band], profile)
             else
                 @timeit "Read HITRAN H2O" lines_h2o = AtmosphericAbsorption.load_lines(AtmosphericAbsorption.HitranPort(artifact("H2O")); FT)
                 @debug "Computing profile for H2O (q-driven) for band #$(i_band)"
@@ -748,16 +759,16 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
                     cpf = ap.CEF,
                     architecture = _to_aa_arch(params.architecture),
                     vmr = 0)
-                @timeit "Absorption Coeff H2O" compute_absorption_profile!(τ_abs[i_band], h2o_model, params.spec_bands[i_band], profile.vmr_h2o, profile)
+                @timeit "Absorption Coeff H2O" compute_h2o_absorption_profile!(
+                    τ_abs[i_band], h2o_model, params.spec_bands[i_band], profile)
             end
         end
 
         # Collision-induced absorption (HITRAN .cia files), if any.
-        for cia_path in ap.cia_files
+        for (cia_i, cia_path) in enumerate(ap.cia_files)
             @timeit "CIA $(basename(cia_path))" begin
-                cia_table = Absorption.load_cia_table(cia_path,
-                                                     params.spec_bands[i_band];
-                                                     FT = FT_vrs)
+                cia_table = _load_configured_cia_table(
+                    ap, cia_i, params.spec_bands[i_band], FT_vrs)
                 Absorption.compute_τ_cia!(τ_abs[i_band], cia_table, profile,
                                            profile.vmr)
             end

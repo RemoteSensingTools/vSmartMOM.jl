@@ -19,7 +19,7 @@ Computes atmospheric profile fields, including volume mixing ratios (VMR) of H2O
 # Returns
 - `p_full`: Pressure at full levels (hPa).
 - `p_half`: Pressure at half levels (hPa), same as input.
-- `vmr_h2o`: Volume mixing ratio of H2O (unitless).
+- `vmr_h2o`: H2O/dry-air molar ratio (unitless).
 - `vcd_dry`: Dry volume column density (molec/cm²).
 - `vcd_h2o`: Wet volume column density (molec/cm²).
 - `new_vmr`: Interpolated volume mixing ratios of trace gases (Dictionary).
@@ -28,7 +28,7 @@ Computes atmospheric profile fields, including volume mixing ratios (VMR) of H2O
 # Description
 This function calculates various atmospheric profile fields given temperature, pressure, specific humidity, and initial volume mixing ratios of trace gases. It computes:
 1. Pressure at full levels.
-2. Volume mixing ratio of H2O from specific humidity.
+2. H2O/dry-air molar ratio from specific humidity.
 3. Dry and wet volume column densities (VCDs).
 4. Layer thicknesses (Δz).
 5. Interpolated volume mixing ratios for other trace gases.
@@ -50,7 +50,7 @@ function compute_atmos_profile_fields(T::AbstractArray{FT,1}, p_half::AbstractAr
     ratio = dry_mass / wet_mass
     n_layers = length(T)
 
-    # Also get a VMR vector of H2O (volumetric!)
+    # Also get the H2O/dry-air molar-ratio vector.
     vmr_h2o = zeros(FT, n_layers, )
     vcd_dry = zeros(FT, n_layers, )
     vcd_h2o = zeros(FT, n_layers, )
@@ -58,12 +58,17 @@ function compute_atmos_profile_fields(T::AbstractArray{FT,1}, p_half::AbstractAr
     # Now actually compute the layer VCDs
     for i = 1:n_layers 
         Δp = p_half[i + 1] - p_half[i]
-        vmr_h2o[i] = q[i]/(1-q[i]) * ratio# dry_mass/(dry_mass-wet_mass*(1-1/q[i]))
-        vmr_dry = 1 - vmr_h2o[i]
-        M  = vmr_dry * dry_mass + vmr_h2o[i] * wet_mass
+        # `vmr_h2o` is the dry-air molar ratio r = N_H2O/N_dry. Convert to
+        # moist-air mole fractions before computing the mixture molar mass and
+        # splitting the hydrostatic total column. Treating r itself as the
+        # moist-air mole fraction biases H2O continua at percent-level wetness.
+        vmr_h2o[i] = q[i]/(1-q[i]) * ratio
+        x_dry = 1 / (1 + vmr_h2o[i])
+        x_h2o = vmr_h2o[i] * x_dry
+        M  = x_dry * dry_mass + x_h2o * wet_mass
         vcd = Nₐ * Δp / (M  * g₀ * 100^2) * 100
-        vcd_dry[i] = vmr_dry    * vcd   # includes m2->cm2
-        vcd_h2o[i] = vmr_h2o[i] * vcd
+        vcd_dry[i] = x_dry * vcd   # includes m2->cm2
+        vcd_h2o[i] = x_h2o * vcd
         Δz[i] =  (log(p_half[i + 1]) - log(p_half[i])) / (g₀ * M  / (R * T[i]) )
         #@show Δz, T[i], M, Δp
     end
@@ -501,11 +506,12 @@ function reduce_profile(n::Int, profile::AtmosphericProfile{FT}; binavg::Bool=fa
     Δz_     = zeros(FT, n)
     for i = 1:n
         Δp      = p_half[i+1] - p_half[i]
-        vmr_dry = FT(1) - vmr_h2o[i]
-        M       = vmr_dry * dry_mass + vmr_h2o[i] * wet_mass
+        x_dry   = inv(FT(1) + vmr_h2o[i])
+        x_h2o   = vmr_h2o[i] * x_dry
+        M       = x_dry * dry_mass + x_h2o * wet_mass
         vcd     = Nₐ * Δp / (M * g₀ * FT(100)^2) * FT(100)
-        vcd_dry[i] = vmr_dry    * vcd
-        vcd_h2o[i] = vmr_h2o[i] * vcd
+        vcd_dry[i] = x_dry * vcd
+        vcd_h2o[i] = x_h2o * vcd
         Δz_[i]  = (log(p_half[i+1]) - log(p_half[i])) / (g₀ * M / (R * T[i]))
     end
 
@@ -653,13 +659,34 @@ function getAerosolLayerOptProp(total_τ::FT, dist::Distribution, profile::Atmos
     τAer  =  (total_τ / sum(ρ)) * ρ
 end
 
+@inline _h2o_moist_mole_fraction(r::Real) = r / (one(r) + r)
+
+# Legacy vSmartMOM interpolation tables have their broadener abundance fixed
+# when the table is built, so their ordinary cross-section call remains the
+# fallback. AtmosphericAbsorption's line-by-line model supports a per-call
+# moist-air mole fraction and must receive it for H₂O self broadening.
+_layer_absorption_cross_section(model, grid, p, T, ::Nothing) =
+    absorption_cross_section(model, grid, p, T)
+
+_layer_absorption_cross_section(
+    model::AtmosphericAbsorption.LineByLineModel, grid, p, T,
+    self_broadener_vmr::Real) =
+    absorption_cross_section(model, grid, p, T; vmr=self_broadener_vmr)
+
+_layer_absorption_cross_section(model, grid, p, T, ::Real) =
+    absorption_cross_section(model, grid, p, T)
+
 "Given the CrossSectionModel, the grid, and the AtmosphericProfile, fill up the τ_abs array with the cross section at each layer
-(using pressures/temperatures) from the profile" 
+(using pressures/temperatures) from the profile. `self_broadener_vmr`, when
+provided, is a moist-air mole fraction passed to AtmosphericAbsorption's
+line-by-line cross-section call."
 function compute_absorption_profile!(τ_abs::Array{FT,2}, 
                                      absorption_model, 
                                      grid,
                                      vmr,
                                      profile::AtmosphericProfile,
+                                     ;
+                                     self_broadener_vmr=nothing,
                                      ) where FT 
 
     # The array to store the cross-sections must be same length as number of layers
@@ -673,8 +700,30 @@ function compute_absorption_profile!(τ_abs::Array{FT,2},
         T = profile.T[iz]
         # Either use the current layer's vmr, or use the uniform vmr
         vmr_curr = vmr isa AbstractArray ? vmr[iz] : vmr
+        broadener_curr = self_broadener_vmr isa AbstractArray ?
+            self_broadener_vmr[iz] : self_broadener_vmr
         #@show vmr_curr
-        τ_abs[:,iz] += collect(absorption_cross_section(absorption_model, grid, p, T)) * profile.vcd_dry[iz] * vmr_curr
+        σ = collect(_layer_absorption_cross_section(
+            absorption_model, grid, p, T, broadener_curr))
+        τ_abs[:,iz] += σ * profile.vcd_dry[iz] * vmr_curr
     end
     
+end
+
+"""
+    compute_h2o_absorption_profile!(τ_abs, absorption_model, grid, profile)
+
+Accumulate H₂O line optical depth. `profile.vmr_h2o` stores the dry-air
+molar ratio `r = N_H2O/N_dry`, which remains the abundance multiplying the dry
+column. Line broadening instead requires the moist-air H₂O mole fraction
+`x_H2O = r/(1+r)`.
+"""
+function compute_h2o_absorption_profile!(τ_abs::Array{FT,2},
+                                         absorption_model,
+                                         grid,
+                                         profile::AtmosphericProfile) where FT
+    x_h2o = _h2o_moist_mole_fraction.(profile.vmr_h2o)
+    return compute_absorption_profile!(
+        τ_abs, absorption_model, grid, profile.vmr_h2o, profile;
+        self_broadener_vmr=x_h2o)
 end

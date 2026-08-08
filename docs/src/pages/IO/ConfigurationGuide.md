@@ -141,7 +141,7 @@ optical depth enters.
 
 ```toml
 [absorption]
-fixed_molecules    = [["O2"]]          # one list per band; no Jacobian
+fixed_molecules    = [["O2"]]          # one list per band; no abundance Jacobian
 variable_molecules = [[]]              # one list per band; Jacobian computed
 vmr                = { O2 = 0.21 }     # volume mixing ratio per molecule
 broadening         = "Voigt()"
@@ -164,7 +164,8 @@ cfg["absorption"] = Dict(
 `variable_molecules[ib]` each hold the molecules active in band `ib`. There is
 **one list per spectral band** — band 1 might carry `O2`, band 2 `CO2`, etc.
 
-- **fixed** — abundance held constant, *no* Jacobian computed.
+- **fixed** — abundance held constant, so no gas-abundance Jacobian is
+  computed (other configured state derivatives remain available).
 - **variable** — abundance is a state-vector element, Jacobian computed (the
   linearized path differentiates these).
 
@@ -175,11 +176,15 @@ cfg["absorption"] = Dict(
 - Each molecule must actually have lines inside its band's wavenumber range —
   a molecule with no lines in-band contributes nothing.
 
-**VMR sources.** A `vmr` value is either
+**VMR sources.** For every non-H₂O gas, `vmr` means moles of species per
+mole of **dry air**. A value is either
 - a **scalar** (e.g. `O2 = 0.21`) — constant with height, or
 - a **vector** with either one value per layer (`N`) or one value per pressure
   interface (`N+1`). Interface values are mapped to layer centers in log
   pressure before any observer-height interfaces are inserted.
+
+H₂O is derived from `q` and stored internally as the dry-air molar ratio
+``N_\mathrm{H2O}/N_\mathrm{dry}``, not as a moist-air mole fraction.
 
 **Line shape.** `broadening` ∈ `Voigt()` (default; Doppler+pressure, the right
 choice through the troposphere/stratosphere), `Lorentz()` (pressure limit),
@@ -192,6 +197,23 @@ HITRAN on the fly. With `LUTfiles` (one vector per band, parallel to the
 molecule lists) the precomputed look-up tables are used instead — much faster,
 and the production pipeline path. `cia_files` / `mtckd_file` add
 collision-induced and continuum absorption.
+
+For a CIA file containing more than one HITRAN reference family, select the
+source explicitly:
+
+```yaml
+cia_files:
+  - path: "/data/HITRAN_CIA/O2-O2_2024.cia"
+    reference_codes: ["54"]
+    negative_policy: error
+  - "/data/HITRAN_CIA/O2-N2_2024.cia"
+```
+
+`reference_codes` accepts one string or a nonempty list. A bare path remains
+valid when its reference families do not overlap on the requested spectral
+grid; overlapping families without an explicit selection are rejected.
+`negative_policy` is `error` by default. Use `clamp_zero` only as an explicit,
+documented decision to replace negative tabulated cross sections by zero.
 
 > **Legacy form.** Older configs use a single `molecules = [[O2], [CO2]]`
 > list (all treated as fixed) instead of `fixed_molecules`/`variable_molecules`.

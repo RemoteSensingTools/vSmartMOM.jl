@@ -928,6 +928,77 @@ function _parse_obs_alt(raw, FT)
     return convert(Vector{FT}, values)
 end
 
+"""
+    _parse_cia_files(abs_dict)
+
+Parse `absorption.cia_files`. Each entry may be a legacy path string, or a
+mapping with `path`, optional `reference_codes` (one string or a nonempty list
+of strings), and optional `negative_policy` (`error` or `clamp_zero`).
+"""
+function _parse_cia_files(abs_dict::AbstractDict)
+    haskey(abs_dict, "cia_files") || return (
+        String[], Union{Nothing,Vector{String}}[], Symbol[])
+
+    entries = abs_dict["cia_files"]
+    _require_config(entries isa AbstractVector,
+        "absorption/cia_files must be a list of paths or configuration mappings")
+
+    paths = String[]
+    reference_codes = Union{Nothing,Vector{String}}[]
+    negative_policies = Symbol[]
+    allowed_keys = Set(["path", "reference_codes", "negative_policy"])
+
+    for (i, entry) in enumerate(entries)
+        if entry isa AbstractString
+            path = String(entry)
+            refs = nothing
+            policy = :error
+        else
+            _require_config(entry isa AbstractDict,
+                "absorption/cia_files[$i] must be a path string or mapping")
+            keys_string = Set(String.(keys(entry)))
+            unknown = setdiff(keys_string, allowed_keys)
+            _require_config(isempty(unknown),
+                "absorption/cia_files[$i] has unknown field(s): $(join(sort!(collect(unknown)), ", "))")
+            _require_config(haskey(entry, "path"),
+                "absorption/cia_files[$i] mapping requires `path`")
+            _require_config(entry["path"] isa AbstractString,
+                "absorption/cia_files[$i]/path must be a string")
+            path = String(entry["path"])
+
+            raw_refs = get(entry, "reference_codes", nothing)
+            if raw_refs === nothing
+                refs = nothing
+            elseif raw_refs isa AbstractString
+                refs = [strip(String(raw_refs))]
+            else
+                _require_config(raw_refs isa AbstractVector && !isempty(raw_refs),
+                    "absorption/cia_files[$i]/reference_codes must be a nonempty string or list of strings")
+                _require_config(all(code -> code isa AbstractString, raw_refs),
+                    "absorption/cia_files[$i]/reference_codes entries must be strings")
+                refs = unique(strip.(String.(raw_refs)))
+            end
+            _require_config(refs === nothing ||
+                            (!isempty(refs) && all(!isempty, refs)),
+                "absorption/cia_files[$i]/reference_codes must not contain empty codes")
+
+            raw_policy = get(entry, "negative_policy", "error")
+            _require_config(raw_policy isa AbstractString || raw_policy isa Symbol,
+                "absorption/cia_files[$i]/negative_policy must be `error` or `clamp_zero`")
+            policy = Symbol(raw_policy)
+            _require_config(policy in (:error, :clamp_zero),
+                "absorption/cia_files[$i]/negative_policy must be `error` or `clamp_zero`")
+        end
+
+        _require_config(!isempty(strip(path)),
+            "absorption/cia_files[$i]/path must not be empty")
+        push!(paths, path)
+        push!(reference_codes, refs)
+        push!(negative_policies, policy)
+    end
+    return paths, reference_codes, negative_policies
+end
+
 function _parse_absorption(params_dict::Dict, FT, q=nothing)
     if !haskey(params_dict, "absorption")
         return nothing
@@ -1019,16 +1090,17 @@ function _parse_absorption(params_dict::Dict, FT, q=nothing)
         end
     end
 
-    cia_files = haskey(abs_dict, "cia_files") ?
-                String.(Array(abs_dict["cia_files"])) :
-                String[]
+    cia_files, cia_reference_codes, cia_negative_policies =
+        _parse_cia_files(abs_dict)
     mtckd_file = haskey(abs_dict, "mtckd_file") ?
                  String(abs_dict["mtckd_file"]) :
                  ""
 
     return AbsorptionParameters(fixed_molecules, variable_molecules, vmr,
                                 broadening_function, CEF, wing_cutoff,
-                                luts, h2o_lut, cia_files, mtckd_file)
+                                luts, h2o_lut, cia_files,
+                                cia_reference_codes, cia_negative_policies,
+                                mtckd_file)
 end
 
 function _parse_scattering(params_dict::Dict, FT::Type{<:AbstractFloat}=Float64)

@@ -19,6 +19,8 @@ try
 
 # Core module tests
 @testset "Absorption" begin include("test_Absorption.jl") end
+@testset "Absorption column integration" begin include("test_absorption_column_integration.jl") end
+@testset "H2O self broadening" begin include("test_h2o_self_broadening.jl") end
 @testset "Scattering" begin include("test_Scattering.jl") end
 @testset "CoreRT" begin include("test_CoreRT.jl") end
 @testset "Batched Kernels" begin include("test_batched_kernels.jl") end
