@@ -20,6 +20,11 @@ try
 # Core module tests
 @testset "Absorption" begin include("test_Absorption.jl") end
 @testset "Scattering" begin include("test_Scattering.jl") end
+
+# Caller-defined-node bulk Mie API (Sol plan phase 1) -- caller-node
+# compute_aerosol_optical_properties_nodes/_gpu; delegation refactor of the
+# log-normal NAI2 path via the shared _nai2_bulk_optics core.
+@testset "Mie caller-node API" begin include("test_mie_nodes.jl") end
 @testset "CoreRT" begin include("test_CoreRT.jl") end
 @testset "Batched Kernels" begin include("test_batched_kernels.jl") end
 @testset "SolarModel" begin include("test_SolarModel.jl") end

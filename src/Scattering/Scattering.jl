@@ -39,6 +39,7 @@ include("compute_NAI2.jl")                # Compute phase function w/ NAI2
 include("compute_NAI2_lin.jl")            # Linearized NAI2 computation
 include("gpu_mie_kernels.jl")            # KernelAbstractions Mie kernels (CPU+GPU)
 include("compute_NAI2_gpu.jl")           # GPU-accelerated NAI2 entry point
+include("compute_NAI2_nodes.jl")         # Caller-defined-node bulk Mie API (CPU+GPU)
 include("compute_PCW.jl")                 # Compute phase function w/ PCW
 include("phase_function_autodiff.jl")     # Auto-differentiation
 include("show_utils.jl")                  # Pretty-print
@@ -73,5 +74,10 @@ export compute_aerosol_optical_properties_gpu,
        MiePrecisionPolicy, NativeFloat64, DSEmulated,
        DoubleSingle, ComplexDS, NeumaierAccum,
        neumaier_add, neumaier_sum
+
+# Caller-defined-node bulk Mie API (Sol plan phase 1) — the seam for
+# sectional/tabulated size distributions (GCHPIO TOMAS is the first consumer).
+export compute_aerosol_optical_properties_nodes,
+       compute_aerosol_optical_properties_nodes_gpu
 
 end
