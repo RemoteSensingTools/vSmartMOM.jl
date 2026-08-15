@@ -82,7 +82,7 @@ matrix moments (Sanghavi, 2014).
 function compute_aerosol_optical_properties(model::MieModel{FDT,FT}, FT_out::Type) where {FDT <: NAI2, FT}
 
     # Unpack the model
-    (; computation_type, aerosol, λ, polarization_type, truncation_type, r_max, nquad_radius, wigner_A, wigner_B) = model
+    (; aerosol, λ, r_max, nquad_radius) = model
 
     # Extract variables from aerosol struct:
     (; size_distribution, nᵣ, nᵢ) = aerosol
@@ -119,6 +119,74 @@ function compute_aerosol_optical_properties(model::MieModel{FDT,FT}, FT_out::Typ
     # phase functions:
     n_mu = 2n_max - 1;
 
+    # Standardized weights for the size distribution (in IC):
+    wₓ = compute_wₓ(size_distribution, wᵣ, r, IC(r_max))
+
+    # Delegate the per-node Mie series + bulk reduction + Greek projection to
+    # the shared core (also used by the caller-node API in compute_NAI2_nodes.jl).
+    core = _nai2_bulk_optics(r, wₓ, nᵣ, nᵢ, λ, n_max, n_mu, IC)
+
+    # Convert internal Float64 results to the requested output type FT_out.
+    # For ForwardDiff Dual types (IC == FT, not AbstractFloat), skip conversion
+    # to preserve derivative tangents through the computation.
+    if IC <: AbstractFloat && FT_out <: AbstractFloat
+        greek_coefs = GreekCoefs(convert.(FT_out, core.α),
+                                 convert.(FT_out, core.β),
+                                 convert.(FT_out, core.γ),
+                                 convert.(FT_out, core.δ),
+                                 convert.(FT_out, core.ϵ),
+                                 convert.(FT_out, core.ζ))
+        return AerosolOptics(greek_coefs=greek_coefs, ω̃=FT_out(core.bulk_C_sca / core.bulk_C_ext), k=FT_out(core.bulk_C_ext), fᵗ=FT_out(1))
+    else
+        greek_coefs = GreekCoefs(core.α, core.β, core.γ, core.δ, core.ϵ, core.ζ)
+        return AerosolOptics(greek_coefs=greek_coefs, ω̃=(core.bulk_C_sca / core.bulk_C_ext), k=(core.bulk_C_ext), fᵗ=one(eltype(core.α)))
+    end
+end
+
+@doc raw"""
+    _nai2_bulk_optics(r, wₓ, nᵣ, nᵢ, λ, n_max, n_mu, ::Type{IC}) where {IC}
+
+Internal shared core of the Siewert NAI-2 computation (not exported).
+
+Given radius quadrature nodes `r` and NORMALIZED weights `wₓ` (summing to 1 —
+already the product of a size-distribution pdf and quadrature weights, see
+[`compute_wₓ`](@ref), or a caller-normalized node ensemble), the complex
+refractive index (`nᵣ, nᵢ`; convention `n = nᵣ - i·nᵢ`, `nᵢ ≥ 0`), the
+wavelength `λ`, and the pre-determined angular resolution (`n_max`, the Mie
+series truncation order for the largest supplied size parameter; `n_mu`, the
+number of Gauss-Legendre angular quadrature points, conventionally
+`2n_max - 1`), this runs the per-node Mie series (aₙ, bₙ, S₁, S₂,
+f₁₁/f₁₂/f₃₃/f₃₄), the weighted bulk reduction over nodes, and the
+Greek-coefficient angular projection — all in internal computation type `IC`.
+
+This is the seam shared by:
+- the log-normal size-distribution path
+  ([`compute_aerosol_optical_properties`](@ref) for `MieModel{<:NAI2}`), which
+  generates `(r, wₓ)` via `gauleg_log` + `compute_wₓ` and delegates here;
+- the caller-defined-node path
+  ([`compute_aerosol_optical_properties_nodes`](@ref), in
+  `compute_NAI2_nodes.jl`), which accepts `(radii, weights)` directly from the
+  caller (e.g. sectional/tabulated size distributions), normalizes `weights`
+  to sum to 1, and delegates here with **no radius cap** — `n_max`/`n_mu` are
+  derived from the actual largest supplied radius.
+
+Returns a `NamedTuple` `(bulk_C_ext, bulk_C_sca, α, β, γ, δ, ϵ, ζ, μ, w_μ)` in
+`IC` precision; narrowing to a caller-desired output type is the caller's
+responsibility (matching the existing `FT_out` convention).
+"""
+function _nai2_bulk_optics(r::AbstractVector, wₓ::AbstractVector, nᵣ, nᵢ, λ,
+                            n_max::Int, n_mu::Int, ::Type{IC}) where {IC}
+
+    nquad_radius = length(r)
+    @assert length(wₓ) == nquad_radius "radii and weights must have the same length"
+    @assert nᵢ ≥ 0 "Imaginary part of the refractive index must be ≥ 0 (convention n = nᵣ - i·nᵢ)"
+
+    # Wavenumber (in IC precision)
+    k = IC(2π) / IC(λ)
+
+    # Size parameter
+    x_size_param = k .* r # (2πr/λ)
+
     # Obtain Gauss-Legendre quadrature points and weights for phase function
     μ, w_μ = gausslegendre(n_mu)
     # Promote μ/w_μ to IC (they come out as Float64 from gausslegendre, which is
@@ -131,7 +199,7 @@ function compute_aerosol_optical_properties(model::MieModel{FDT,FT}, FT_out::Typ
 
     # Pre-allocate internal arrays in IC (Float64 for plain-float models).
     # These carry the full-precision Mie amplitudes and cross-section integrands;
-    # they are converted to FT_out only at the very end.
+    # they are converted to the caller's desired output type only at the very end.
     S₁    = zeros(Complex{IC}, n_mu, nquad_radius)
     S₂    = zeros(Complex{IC}, n_mu, nquad_radius)
     f₁₁   = zeros(IC, n_mu, nquad_radius)
@@ -141,12 +209,9 @@ function compute_aerosol_optical_properties(model::MieModel{FDT,FT}, FT_out::Typ
     C_ext = zeros(IC, nquad_radius)
     C_sca = zeros(IC, nquad_radius)
 
-    # Standardized weights for the size distribution (in IC):
-    wₓ = compute_wₓ(size_distribution, wᵣ, r, IC(r_max))
-
     # Pre-allocate buffers for the inner loop (sized for the largest particle).
     # m_ref is built in IC so the Complex arithmetic in compute_mie_ab! stays
-    # in full precision regardless of the aerosol's nᵣ/nᵢ element type.
+    # in full precision regardless of the refractive index's element type.
     m_ref = IC(nᵣ) - IC(nᵢ) * im
     y_max = maximum(x_size_param) * abs(m_ref)
     nmx_max = round(Int, max(n_max, y_max) + 51)
@@ -159,6 +224,7 @@ function compute_aerosol_optical_properties(model::MieModel{FDT,FT}, FT_out::Typ
     for i = 1:length(x_size_param)
 
         n_max_i = get_n_max(x_size_param[i])
+        @assert n_max_i ≤ n_max "supplied n_max=$n_max is too small for radius index $i (needs $n_max_i); n_max must come from the largest size parameter in the node set"
 
         # Zero the views that will be used
         an_v = view(an, 1:n_max_i)
@@ -170,12 +236,12 @@ function compute_aerosol_optical_properties(model::MieModel{FDT,FT}, FT_out::Typ
         # Compute aₙ,bₙ and S₁,S₂
         compute_mie_ab!(x_size_param[i], m_ref, an_v, bn_v, Dₙ)
         compute_mie_S₁S₂!(an_v, bn_v, leg_π, leg_τ, view(S₁, :, i), view(S₂, :, i))
-        
+
         # Compute Extinction and scattering cross sections using pre-allocated n_
         n_v = view(n_, 1:n_max_i)
         @inbounds C_sca[i] = 2π / k^2 * dot(n_v, abs2.(an_v) .+ abs2.(bn_v))
         @inbounds C_ext[i] = 2π / k^2 * dot(n_v, real.(an_v .+ bn_v))
-       
+
         # Compute scattering matrix components per size parameter (in-place).
         # inv_x2 is computed in IC (Float64) so all products stay in full precision.
         inv_x2 = IC(0.5) / x_size_param[i]^2
@@ -191,24 +257,24 @@ function compute_aerosol_optical_properties(model::MieModel{FDT,FT}, FT_out::Typ
     # Calculate bulk scattering and extinction cross-sections
     bulk_C_sca =  sum(wₓ .* C_sca)
     bulk_C_ext =  sum(wₓ .* C_ext)
-    
-    # Compute bulk scattering 
-    wr = (4π * r.^2 .*  wₓ) 
+
+    # Compute bulk scattering
+    wr = (4π * r.^2 .*  wₓ)
     bulk_f₁₁   =  f₁₁ * wr
     bulk_f₃₃   =  f₃₃ * wr
     bulk_f₁₂   =  f₁₂ * wr
     bulk_f₃₄   =  f₃₄ * wr
 
     # Normalize Phase function with bulk scattering cross section.
-    bulk_f₁₁ /= bulk_C_sca 
+    bulk_f₁₁ /= bulk_C_sca
     bulk_f₃₃ /= bulk_C_sca
     bulk_f₁₂ /= bulk_C_sca
     bulk_f₃₄ /= bulk_C_sca
-    
+
     # Range of l-values
     l_max = length(μ);
 
-    # Get legendre polynomials for l-max 
+    # Get legendre polynomials for l-max
     P, P², R², T² = compute_legendre_poly(μ, l_max)
 
     # Compute Greek coefficients in IC (Float64 for plain-float models).
@@ -237,21 +303,8 @@ function compute_aerosol_optical_properties(model::MieModel{FDT,FT}, FT_out::Typ
         α[l + 1] = fac      * w_μ' * (bulk_f₁₁ .* R²[:,l + 1] + bulk_f₃₃ .* T²[:,l + 1])
     end
 
-    # Convert internal Float64 results to the requested output type FT_out.
-    # For ForwardDiff Dual types (IC == FT, not AbstractFloat), skip conversion
-    # to preserve derivative tangents through the computation.
-    if IC <: AbstractFloat && FT_out <: AbstractFloat
-        greek_coefs = GreekCoefs(convert.(FT_out, α),
-                                 convert.(FT_out, β),
-                                 convert.(FT_out, γ),
-                                 convert.(FT_out, δ),
-                                 convert.(FT_out, ϵ),
-                                 convert.(FT_out, ζ))
-        return AerosolOptics(greek_coefs=greek_coefs, ω̃=FT_out(bulk_C_sca / bulk_C_ext), k=FT_out(bulk_C_ext), fᵗ=FT_out(1))
-    else
-        greek_coefs = GreekCoefs(α, β, γ, δ, ϵ, ζ)
-        return AerosolOptics(greek_coefs=greek_coefs, ω̃=(bulk_C_sca / bulk_C_ext), k=(bulk_C_ext), fᵗ=one(eltype(α)))
-    end
+    return (bulk_C_ext=bulk_C_ext, bulk_C_sca=bulk_C_sca,
+            α=α, β=β, γ=γ, δ=δ, ϵ=ϵ, ζ=ζ, μ=μ, w_μ=w_μ)
 end
 
 @doc raw"""

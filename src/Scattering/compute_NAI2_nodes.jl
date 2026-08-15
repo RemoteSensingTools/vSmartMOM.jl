@@ -1,0 +1,419 @@
+#=
+=====================================================================
+Caller-defined-size-distribution ("caller-node") bulk Mie API.
+=====================================================================
+
+`compute_aerosol_optical_properties_nodes` is the public entry point: given
+an arbitrary set of (radius, weight) nodes — e.g. a sectional/tabulated size
+distribution such as GCHPIO's TOMAS two-moment bins — plus one complex
+refractive index for the whole ensemble, it returns the BULK AerosolOptics
+(number-mean cross sections, ω̃, and all six Greek coefficient arrays), using
+exactly the same Siewert NAI-2 physics and Hovenier/Greek conventions as the
+log-normal path in `compute_NAI2.jl`.
+
+Key differences from the log-normal (`MieModel`) entry point:
+- The caller supplies radii/weights directly; weights need not be normalized
+  (they are normalized internally to number-mean properties).
+- The angular resolution (`n_max`/`n_mu`) is derived from the ACTUAL largest
+  supplied radius — no artificial `r_max` cap.
+- The GPU path launches the previously-unused device-resident reduction and
+  Greek-projection kernels (`size_reduction_kernel!`, `weighted_sum_kernel!`,
+  `greek_coefficients_kernel!` in `gpu_mie_kernels.jl`) so that only the bulk
+  Greek arrays + ω̃/k are copied back to the host — no per-node aₙ/bₙ or
+  angular arrays are cached or returned.
+
+This is the intended seam for sectional/tabulated aerosol size distributions;
+GCHPIO's TOMAS two-moment bins are the first consumer (see
+`proposals/gchp_aerosol_optics/`).
+=====================================================================
+=#
+
+"""
+    _slice_greek(a::AerosolOptics, l_max::Int) -> AerosolOptics
+
+Truncate (or leave unchanged, if `l_max` is already ≥ the natural length) all
+six Greek coefficient arrays of `a` to `min(l_max, length(a.greek_coefs.β))`
+terms. Plain array slicing — no re-fitting (`δBGE` re-fitting is a distinct,
+separate step, see [`truncate_phase`](@ref)).
+"""
+function _slice_greek(a::AerosolOptics, l_max::Int)
+    gc = a.greek_coefs
+    L = min(l_max, length(gc.β))
+    greek_coefs = GreekCoefs(gc.α[1:L], gc.β[1:L], gc.γ[1:L],
+                             gc.δ[1:L], gc.ϵ[1:L], gc.ζ[1:L])
+    return AerosolOptics(greek_coefs=greek_coefs, ω̃=a.ω̃, k=a.k, fᵗ=a.fᵗ, derivs=a.derivs)
+end
+
+"""
+    _apply_requested_truncation(raw::AerosolOptics, truncation::AbstractTruncationType) -> AerosolOptics
+
+Apply `truncation` the same way the RT pipeline does downstream of the raw
+Mie call (see `src/CoreRT/tools/model_from_parameters.jl` /
+`update_model.jl`): a `δBGE` truncation is actually fit only if it would
+shorten the Greek series (`length(β) > truncation.l_max`); otherwise (and for
+`NoTruncation`/`AutoTruncation`) the identity `truncate_phase(NoTruncation(), raw)`
+is applied, which resets `fᵗ` from the raw "untruncated yet" sentinel (`1`) to
+the true no-op value (`0`).
+"""
+function _apply_requested_truncation(raw::AerosolOptics, truncation::AbstractTruncationType)
+    β_len = length(raw.greek_coefs.β)
+    if truncation isa δBGE && β_len > truncation.l_max
+        return truncate_phase(truncation, raw)
+    else
+        return truncate_phase(NoTruncation(), raw)
+    end
+end
+
+@doc raw"""
+    compute_aerosol_optical_properties_nodes(radii, weights, n_real, n_imag,
+        wavelength, polarization, truncation;
+        architecture = Architectures.CPU(),
+        l_max = nothing,
+        precision_policy = nothing) -> AerosolOptics
+
+Bulk Mie aerosol optics for a CALLER-DEFINED set of size-distribution nodes,
+using the Siewert NAI-2 formulation (same physics/conventions as
+[`compute_aerosol_optical_properties`](@ref) for a log-normal `MieModel`, and
+the same [`AerosolOptics`](@ref)/[`GreekCoefs`](@ref) output shape).
+
+This is the intended seam for **sectional or tabulated size distributions**
+that are not naturally expressed as a `Distributions.jl` continuous
+distribution — e.g. GCHPIO's TOMAS two-moment sectional bins. No log-normal
+(or any other analytic) size distribution is assumed anywhere in this path.
+
+# Arguments
+- `radii::AbstractVector`: wet particle radii, one per node, **[μm]**.
+- `weights::AbstractVector`: non-negative node weights (number-mixing-ratio
+  or number-concentration weights). **Need not be normalized** — they are
+  divided by their sum internally, so the returned bulk quantities are
+  number-mean properties and are invariant to a uniform rescaling of
+  `weights` (e.g. `weights .* 7.3` gives the identical `AerosolOptics`).
+- `n_real, n_imag`: the ONE complex refractive index shared by the whole
+  node ensemble, using vSmartMOM's convention `n = n_real - i·n_imag`
+  (`n_imag ≥ 0`; positive `n_imag` is absorption — same convention as
+  [`Aerosol`](@ref) and asserted identically).
+- `wavelength`: wavelength, same units as `radii` (μm internally).
+- `polarization::AbstractPolarizationType`: accepted for API parity with
+  [`make_mie_model`](@ref) / `MieModel`; as in the existing NAI2 path, all six
+  Greek coefficient arrays are always computed regardless of polarization
+  type (the type does not currently gate the computation — matching
+  `compute_aerosol_optical_properties`'s existing behavior).
+- `truncation::AbstractTruncationType`: applied to the raw bulk Greek
+  coefficients via [`truncate_phase`](@ref), exactly mirroring how the RT
+  pipeline (`model_from_parameters`/`update_model`) applies a `MieModel`'s
+  `truncation_type` downstream of the raw Mie call: a `δBGE` is fit only if it
+  would shorten the natural (node-driven) Greek series; otherwise (including
+  `NoTruncation`) the untruncated series passes through with `fᵗ = 0`.
+
+# Keyword arguments
+- `architecture`: `Architectures.CPU()` (default) or a GPU architecture with a
+  registered Mie pipeline (`Architectures.has_gpu_mie`, e.g. CUDA `GPU()`) —
+  same architecture routing as `compute_aerosol_optical_properties(model)`.
+  Non-CPU architectures without a GPU Mie pipeline warn once and fall back to
+  CPU (mirroring the existing `MieModel` router).
+- `l_max`: optional cap on the number of OUTPUT Greek terms, applied by plain
+  array slicing (`min(l_max, series_length)`) AFTER `truncation` is applied —
+  a `δBGE` fit always sees the full natural series, and the cap then shortens
+  whatever the truncation produced. This is an efficiency knob, independent of
+  `truncation`: because angular resolution here scales with the largest
+  supplied node (no `r_max` cap), a very wide node ensemble can produce a long
+  natural Greek series; `l_max` lets a caller who does not need the full
+  series avoid paying for it downstream, without engaging `δBGE`'s
+  forward-peak re-fit. `nothing` (default) keeps the full length.
+- `precision_policy`: GPU-only, see [`MiePrecisionPolicy`](@ref)
+  (`NativeFloat64`/`DSEmulated`); `nothing` (default) auto-selects via
+  `Architectures.default_mie_precision_policy` exactly as the `MieModel` GPU
+  path does. Ignored on the CPU path.
+
+# Angular resolution
+`n_max` is `get_n_max(maximum(2π .* radii ./ wavelength))` — i.e. derived from
+the size parameter of the ACTUAL largest supplied radius, with **no
+artificial cap**. `n_mu = 2n_max - 1`, exactly as the existing NAI2 path
+computes it from `r_max` when the size distribution comes from a
+log-normal `MieModel`.
+
+# Returns
+[`AerosolOptics`](@ref) with `greek_coefs`, number-mean `ω̃`, number-mean `k`,
+and `fᵗ` from the requested `truncation`.
+"""
+function compute_aerosol_optical_properties_nodes(
+    radii::AbstractVector, weights::AbstractVector,
+    n_real::Real, n_imag::Real,
+    wavelength::Real,
+    polarization::AbstractPolarizationType,
+    truncation::AbstractTruncationType;
+    architecture::Architectures.AbstractArchitecture = Architectures.CPU(),
+    l_max::Union{Nothing,Integer} = nothing,
+    precision_policy::Union{Nothing,MiePrecisionPolicy} = nothing,
+)
+    @assert length(radii) == length(weights) "radii and weights must have the same length"
+    @assert length(radii) ≥ 1 "need at least one size-distribution node"
+    @assert all(w -> w ≥ 0, weights) "weights must be ≥ 0"
+    @assert sum(weights) > 0 "weights must not sum to zero"
+    @assert n_imag ≥ 0 "Imaginary part of the refractive index must be ≥ 0 (convention n = n_real - i·n_imag)"
+
+    # Output float type: promoted user type of all numeric inputs (mirrors
+    # _mie_output_type's role for the MieModel path).
+    FT = float(promote_type(eltype(radii), eltype(weights),
+                            typeof(n_real), typeof(n_imag), typeof(wavelength)))
+
+    raw = if architecture isa Architectures.CPU
+        _aerosol_optical_properties_nodes_cpu(radii, weights, n_real, n_imag, wavelength, FT)
+    elseif Architectures.has_gpu_mie(architecture)
+        backend = Architectures.ka_backend(architecture)
+        policy = precision_policy === nothing ?
+                 Architectures.default_mie_precision_policy(architecture, FT) :
+                 precision_policy
+        compute_aerosol_optical_properties_nodes_gpu(radii, weights, n_real, n_imag,
+                                                      wavelength, backend;
+                                                      precision_policy = policy, l_max = nothing)
+    else
+        if !_WARNED_NO_GPU_MIE_NODES[]
+            @warn "no GPU Mie pipeline for $(architecture); computing caller-node Mie on CPU"
+            _WARNED_NO_GPU_MIE_NODES[] = true
+        end
+        _aerosol_optical_properties_nodes_cpu(radii, weights, n_real, n_imag, wavelength, FT)
+    end
+
+    # Truncation FIRST (on the full raw series — a δBGE fit must see every
+    # natural Greek term), output-length cap AFTER. The reverse order would
+    # let a small `l_max` silently disable or distort a requested δBGE fit
+    # (the fit would run on — or be skipped because of — a pre-sliced series).
+    out = _apply_requested_truncation(raw, truncation)
+    return l_max === nothing ? out : _slice_greek(out, Int(l_max))
+end
+
+# One-time warning state, mirroring `_WARNED_NO_GPU_MIE` in phase_function_autodiff.jl
+# but scoped to the node API (kept independent so tests for one don't clear the other).
+const _WARNED_NO_GPU_MIE_NODES = Ref(false)
+
+"""
+    _aerosol_optical_properties_nodes_cpu(radii, weights, n_real, n_imag, λ, FT) -> AerosolOptics
+
+CPU implementation backing [`compute_aerosol_optical_properties_nodes`](@ref).
+Normalizes `weights`, derives `(n_max, n_mu)` from the actual node radii (no
+cap), and delegates to the shared [`_nai2_bulk_optics`](@ref) core — the same
+core the log-normal `MieModel` NAI2 path uses. Internal computation always
+runs in Float64 (`IC`), narrowed to `FT` only at the end, exactly mirroring
+`compute_aerosol_optical_properties`'s IC/FT_out convention.
+"""
+function _aerosol_optical_properties_nodes_cpu(radii, weights, n_real, n_imag, λ, FT::Type)
+    IC = FT <: AbstractFloat ? Float64 : FT
+
+    r = IC.(radii)
+    w = IC.(weights)
+    w = w ./ sum(w)   # normalize to number-mean weights (unnormalized-weight invariance)
+
+    k = IC(2π) / IC(λ)
+    x_size_param = k .* r
+    n_max = get_n_max(maximum(x_size_param))
+    n_mu  = 2n_max - 1
+
+    core = _nai2_bulk_optics(r, w, IC(n_real), IC(n_imag), IC(λ), n_max, n_mu, IC)
+
+    if IC <: AbstractFloat && FT <: AbstractFloat
+        greek_coefs = GreekCoefs(convert.(FT, core.α), convert.(FT, core.β),
+                                 convert.(FT, core.γ), convert.(FT, core.δ),
+                                 convert.(FT, core.ϵ), convert.(FT, core.ζ))
+        return AerosolOptics(greek_coefs=greek_coefs,
+                             ω̃=FT(core.bulk_C_sca / core.bulk_C_ext),
+                             k=FT(core.bulk_C_ext), fᵗ=FT(1))
+    else
+        greek_coefs = GreekCoefs(core.α, core.β, core.γ, core.δ, core.ϵ, core.ζ)
+        return AerosolOptics(greek_coefs=greek_coefs,
+                             ω̃=(core.bulk_C_sca / core.bulk_C_ext),
+                             k=(core.bulk_C_ext), fᵗ=one(eltype(core.α)))
+    end
+end
+
+@doc raw"""
+    compute_aerosol_optical_properties_nodes_gpu(radii, weights, n_real, n_imag,
+        wavelength, backend; precision_policy = NativeFloat64(), l_max = nothing)
+        -> AerosolOptics
+
+GPU/KernelAbstractions implementation backing
+[`compute_aerosol_optical_properties_nodes`](@ref) — takes an explicit KA
+`backend` (e.g. `KernelAbstractions.CPU()` or `CUDA.CUDABackend()`), mirroring
+[`compute_aerosol_optical_properties_gpu`](@ref)'s calling convention so it can
+be exercised directly in tests on a CPU backend without a real GPU device.
+
+Reuses the existing per-node kernels from `gpu_mie_kernels.jl`
+(`mie_coefficients_kernel_f64!`/`_ds!`, `amplitude_phase_kernel!`,
+`cross_sections_kernel!`) UNCHANGED. The weighted bulk reduction across nodes
+and the Greek-coefficient angular projection additionally launch the
+previously-unused device-resident kernels `weighted_sum_kernel!`,
+`size_reduction_kernel!`, and `greek_coefficients_kernel!` — so, unlike
+[`compute_aerosol_optical_properties_gpu`](@ref) (which copies the per-node
+phase-matrix/cross-section arrays back to the host and reduces there), this
+path keeps the reduction device-resident and copies back only the six bulk
+Greek arrays plus the two bulk scalars (`ω̃`, `k`).
+
+**Precision**: the per-node kernels (1-3) run in the kernel's native float
+type `FT = eltype(radii)` (Float32 under `DSEmulated`, matching the existing
+GPU path's speed rationale). The reduction/Greek kernels (4-5) always
+accumulate in `RA = FT === Float32 ? Float64 : FT` — i.e. Float64-widened +
+Neumaier-compensated for a Float32 kernel, exactly like
+`compute_aerosol_optical_properties_gpu`'s host-side reduction — except here
+the widened reduction runs as device arrays/kernels rather than after an
+`Array()` copy-back, so the previously-unused device kernels are genuinely
+exercised while preserving the established accuracy profile.
+"""
+function compute_aerosol_optical_properties_nodes_gpu(
+    radii::AbstractVector, weights::AbstractVector,
+    n_real::Real, n_imag::Real, wavelength::Real, backend;
+    precision_policy::MiePrecisionPolicy = NativeFloat64(),
+    l_max::Union{Nothing,Integer} = nothing,
+)
+    @assert length(radii) == length(weights) "radii and weights must have the same length"
+    @assert n_imag ≥ 0 "Imaginary part of the refractive index must be ≥ 0 (convention n = n_real - i·n_imag)"
+
+    FT = float(promote_type(eltype(radii), eltype(weights),
+                            typeof(n_real), typeof(n_imag), typeof(wavelength)))
+    # Reduction/Greek accumulator type: Float64-widened + Neumaier-compensated
+    # for a Float32 kernel, matching compute_aerosol_optical_properties_gpu's
+    # RA convention (see that function's docstring/comments).
+    RA = FT === Float32 ? Float64 : FT
+
+    r = FT.(radii)
+    # Normalize in Float64 BEFORE narrowing to the kernel type: a Float32 sum
+    # of large-but-finite weights can overflow to Inf (zeroing every weight and
+    # poisoning ω̃/Greek output with NaNs), and normalized weights are O(1) so
+    # the narrowed copy is safe. The CPU path gets this for free via IC=Float64.
+    w_sum = sum(Float64.(weights))
+    @assert isfinite(w_sum) && w_sum > 0 "weights must sum to a positive, finite value"
+    w = FT.(Float64.(weights) ./ w_sum)
+
+    k_wavenum = FT(2π / wavelength)
+    x_size_param = k_wavenum .* r
+    n_max_global = get_n_max(maximum(x_size_param))
+    n_mu = 2n_max_global - 1
+    nquad_radius = length(r)
+
+    μ, w_μ = gausslegendre(n_mu)
+    leg_π, leg_τ = compute_mie_π_τ(FT.(μ), n_max_global)
+
+    m_ref_re = FT(n_real)
+    m_ref_im = FT(-n_imag)  # convention: n = n_real - i*n_imag, so m_im is negative
+
+    nmax_per_r = [get_n_max(x) for x in x_size_param]
+    y_max = maximum(x_size_param) * sqrt(m_ref_re^2 + m_ref_im^2)
+    nmx_max = round(Int, max(n_max_global, y_max) + 51)
+
+    AT = KernelAbstractions.allocate
+
+    # --- Per-node arrays: native kernel precision FT (speed) ---
+    x_dev       = AT(backend, FT, nquad_radius)
+    nmax_dev    = AT(backend, Int, nquad_radius)
+    an_dev      = AT(backend, Complex{FT}, (nquad_radius, n_max_global))
+    bn_dev      = AT(backend, Complex{FT}, (nquad_radius, n_max_global))
+    f11_dev     = AT(backend, FT, (n_mu, nquad_radius))
+    f33_dev     = AT(backend, FT, (n_mu, nquad_radius))
+    f12_dev     = AT(backend, FT, (n_mu, nquad_radius))
+    f34_dev     = AT(backend, FT, (n_mu, nquad_radius))
+    C_sca_dev   = AT(backend, FT, nquad_radius)
+    C_ext_dev   = AT(backend, FT, nquad_radius)
+    leg_pi_dev  = AT(backend, FT, (n_mu, n_max_global))
+    leg_tau_dev = AT(backend, FT, (n_mu, n_max_global))
+
+    KernelAbstractions.copyto!(backend, x_dev, FT.(x_size_param))
+    KernelAbstractions.copyto!(backend, nmax_dev, nmax_per_r)
+    KernelAbstractions.copyto!(backend, leg_pi_dev, FT.(leg_π))
+    KernelAbstractions.copyto!(backend, leg_tau_dev, FT.(leg_τ))
+
+    fill!(an_dev, zero(Complex{FT}))
+    fill!(bn_dev, zero(Complex{FT}))
+
+    # --- Kernel 1: Mie coefficients (unchanged, existing kernel) ---
+    if precision_policy isa NativeFloat64
+        @assert FT === Float64 "NativeFloat64 Mie precision policy requires Float64 node inputs; use DSEmulated() for Float32."
+        kernel1 = mie_coefficients_kernel_f64!(backend)
+    else
+        kernel1 = mie_coefficients_kernel_ds!(backend)
+    end
+    kernel1(an_dev, bn_dev, x_dev, m_ref_re, m_ref_im, nmax_dev, nmx_max; ndrange=nquad_radius)
+    KernelAbstractions.synchronize(backend)
+
+    # --- Kernel 2+3: amplitude functions + phase matrix (unchanged, existing kernel) ---
+    kernel23 = amplitude_phase_kernel!(backend)
+    kernel23(f11_dev, f33_dev, f12_dev, f34_dev,
+             an_dev, bn_dev, leg_pi_dev, leg_tau_dev,
+             x_dev, nmax_dev; ndrange=(n_mu, nquad_radius))
+    KernelAbstractions.synchronize(backend)
+
+    # --- Kernel 4a: per-node cross-sections (unchanged, existing kernel) ---
+    kernel4a = cross_sections_kernel!(backend)
+    kernel4a(C_sca_dev, C_ext_dev, an_dev, bn_dev, k_wavenum, nmax_dev; ndrange=nquad_radius)
+    KernelAbstractions.synchronize(backend)
+
+    # --- Device-resident weighted reduction across nodes (RA precision) ---
+    # These kernels (weighted_sum_kernel!, size_reduction_kernel!) already existed
+    # in gpu_mie_kernels.jl but had no call sites before this API.
+    w_dev  = AT(backend, RA, nquad_radius); KernelAbstractions.copyto!(backend, w_dev, RA.(w))
+    wr_dev = AT(backend, RA, nquad_radius); KernelAbstractions.copyto!(backend, wr_dev, RA.(4π .* r.^2 .* w))
+
+    bulk_Csca_dev = AT(backend, RA, 1)
+    bulk_Cext_dev = AT(backend, RA, 1)
+    wsum = weighted_sum_kernel!(backend)
+    wsum(bulk_Csca_dev, C_sca_dev, w_dev; ndrange=1)
+    wsum(bulk_Cext_dev, C_ext_dev, w_dev; ndrange=1)
+    KernelAbstractions.synchronize(backend)
+
+    bulk_f11_dev = AT(backend, RA, n_mu)
+    bulk_f33_dev = AT(backend, RA, n_mu)
+    bulk_f12_dev = AT(backend, RA, n_mu)
+    bulk_f34_dev = AT(backend, RA, n_mu)
+    sred = size_reduction_kernel!(backend)
+    sred(bulk_f11_dev, f11_dev, wr_dev; ndrange=n_mu)
+    sred(bulk_f33_dev, f33_dev, wr_dev; ndrange=n_mu)
+    sred(bulk_f12_dev, f12_dev, wr_dev; ndrange=n_mu)
+    sred(bulk_f34_dev, f34_dev, wr_dev; ndrange=n_mu)
+    KernelAbstractions.synchronize(backend)
+
+    # Normalize the bulk phase matrix by the bulk scattering cross section.
+    # A single scalar is pulled back to host to drive the broadcast (negligible
+    # cost; the phase-matrix ARRAYS themselves stay device-resident).
+    bulk_C_sca_host = Array(bulk_Csca_dev)[1]
+    bulk_C_ext_host = Array(bulk_Cext_dev)[1]
+    inv_bulk_C_sca = one(RA) / bulk_C_sca_host
+    bulk_f11_dev .*= inv_bulk_C_sca
+    bulk_f33_dev .*= inv_bulk_C_sca
+    bulk_f12_dev .*= inv_bulk_C_sca
+    bulk_f34_dev .*= inv_bulk_C_sca
+
+    # --- Device-resident Greek-coefficient projection (RA precision) ---
+    P, P², R², T² = compute_legendre_poly(RA.(μ), n_mu)
+    P_dev  = AT(backend, RA, (n_mu, n_mu)); KernelAbstractions.copyto!(backend, P_dev,  RA.(P))
+    P2_dev = AT(backend, RA, (n_mu, n_mu)); KernelAbstractions.copyto!(backend, P2_dev, RA.(P²))
+    R2_dev = AT(backend, RA, (n_mu, n_mu)); KernelAbstractions.copyto!(backend, R2_dev, RA.(R²))
+    T2_dev = AT(backend, RA, (n_mu, n_mu)); KernelAbstractions.copyto!(backend, T2_dev, RA.(T²))
+    wmu_dev = AT(backend, RA, n_mu); KernelAbstractions.copyto!(backend, wmu_dev, RA.(w_μ))
+
+    α_dev = AT(backend, RA, n_mu); β_dev = AT(backend, RA, n_mu)
+    γ_dev = AT(backend, RA, n_mu); δ_dev = AT(backend, RA, n_mu)
+    ϵ_dev = AT(backend, RA, n_mu); ζ_dev = AT(backend, RA, n_mu)
+
+    greek_kernel = greek_coefficients_kernel!(backend)
+    greek_kernel(α_dev, β_dev, γ_dev, δ_dev, ϵ_dev, ζ_dev,
+                 bulk_f11_dev, bulk_f33_dev, bulk_f12_dev, bulk_f34_dev,
+                 P_dev, P2_dev, R2_dev, T2_dev, wmu_dev, n_mu; ndrange=n_mu)
+    KernelAbstractions.synchronize(backend)
+
+    # --- Copy back ONLY bulk quantities: 6 Greek vectors + 2 scalars ---
+    α = Array(α_dev); β = Array(β_dev); γ = Array(γ_dev)
+    δ = Array(δ_dev); ϵ = Array(ϵ_dev); ζ = Array(ζ_dev)
+
+    if RA !== FT
+        greek_coefs = GreekCoefs(convert.(FT, α), convert.(FT, β), convert.(FT, γ),
+                                 convert.(FT, δ), convert.(FT, ϵ), convert.(FT, ζ))
+        raw = AerosolOptics(greek_coefs=greek_coefs,
+                            ω̃=FT(bulk_C_sca_host / bulk_C_ext_host),
+                            k=FT(bulk_C_ext_host), fᵗ=FT(1))
+    else
+        greek_coefs = GreekCoefs(α, β, γ, δ, ϵ, ζ)
+        raw = AerosolOptics(greek_coefs=greek_coefs,
+                            ω̃=(bulk_C_sca_host / bulk_C_ext_host),
+                            k=bulk_C_ext_host, fᵗ=one(FT))
+    end
+
+    return l_max === nothing ? raw : _slice_greek(raw, Int(l_max))
+end

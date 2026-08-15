@@ -8,6 +8,7 @@ and phase-matrix reconstructions used by the RT core.
 ```@docs
 vSmartMOM.Scattering.make_mie_model
 vSmartMOM.Scattering.compute_aerosol_optical_properties
+vSmartMOM.Scattering.compute_aerosol_optical_properties_nodes
 vSmartMOM.Scattering.truncate_phase
 ```
 
