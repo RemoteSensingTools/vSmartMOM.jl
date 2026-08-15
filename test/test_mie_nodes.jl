@@ -342,6 +342,20 @@ end
         [1.0, 2.0], [0.0, 0.0], _nr, _ni, _lam, pol, NoTruncation())     # all-zero weights
     @test_throws AssertionError compute_aerosol_optical_properties_nodes(
         [1.0, 2.0], [1.0, 1.0], _nr, -0.001, _lam, pol, NoTruncation())  # ni < 0
+
+    # The DIRECTLY-callable _gpu entry point must enforce the SAME validation
+    # list (shared _validate_node_inputs) — a negative weight passed only to
+    # the GPU seam would otherwise yield silently wrong bulk optics.
+    @test_throws AssertionError compute_aerosol_optical_properties_nodes_gpu(
+        [1.0, 2.0], [1.0], _nr, _ni, _lam, _KA_CPU())                    # length mismatch
+    @test_throws AssertionError compute_aerosol_optical_properties_nodes_gpu(
+        [1.0, 2.0], [1.0, -1.0], _nr, _ni, _lam, _KA_CPU())              # negative weight
+    @test_throws AssertionError compute_aerosol_optical_properties_nodes_gpu(
+        Float64[], Float64[], _nr, _ni, _lam, _KA_CPU())                 # empty node set
+    @test_throws AssertionError compute_aerosol_optical_properties_nodes_gpu(
+        [1.0, 2.0], [1.0, 1.0], _nr, -0.001, _lam, _KA_CPU())            # ni < 0
+    @test_throws AssertionError compute_aerosol_optical_properties_nodes_gpu(
+        [1.0, 2.0], [0.0, 0.0], _nr, _ni, _lam, _KA_CPU())               # all-zero weights
 end
 
 # Minimal architecture with no ka_backend/precision-policy/Mie hooks,

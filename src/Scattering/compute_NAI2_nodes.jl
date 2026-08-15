@@ -36,7 +36,7 @@ six Greek coefficient arrays of `a` to `min(l_max, length(a.greek_coefs.β))`
 terms. Plain array slicing — no re-fitting (`δBGE` re-fitting is a distinct,
 separate step, see [`truncate_phase`](@ref)).
 """
-function _slice_greek(a::AerosolOptics, l_max::Int)
+function _slice_greek(a::AerosolOptics, l_max::Integer)
     gc = a.greek_coefs
     L = min(l_max, length(gc.β))
     greek_coefs = GreekCoefs(gc.α[1:L], gc.β[1:L], gc.γ[1:L],
@@ -146,11 +146,8 @@ function compute_aerosol_optical_properties_nodes(
     l_max::Union{Nothing,Integer} = nothing,
     precision_policy::Union{Nothing,MiePrecisionPolicy} = nothing,
 )
-    @assert length(radii) == length(weights) "radii and weights must have the same length"
-    @assert length(radii) ≥ 1 "need at least one size-distribution node"
-    @assert all(w -> w ≥ 0, weights) "weights must be ≥ 0"
+    _validate_node_inputs(radii, weights, n_imag)
     @assert sum(weights) > 0 "weights must not sum to zero"
-    @assert n_imag ≥ 0 "Imaginary part of the refractive index must be ≥ 0 (convention n = n_real - i·n_imag)"
 
     # Output float type: promoted user type of all numeric inputs (mirrors
     # _mie_output_type's role for the MieModel path).
@@ -180,12 +177,31 @@ function compute_aerosol_optical_properties_nodes(
     # let a small `l_max` silently disable or distort a requested δBGE fit
     # (the fit would run on — or be skipped because of — a pre-sliced series).
     out = _apply_requested_truncation(raw, truncation)
-    return l_max === nothing ? out : _slice_greek(out, Int(l_max))
+    return l_max === nothing ? out : _slice_greek(out, l_max)
 end
 
 # One-time warning state, mirroring `_WARNED_NO_GPU_MIE` in phase_function_autodiff.jl
 # but scoped to the node API (kept independent so tests for one don't clear the other).
 const _WARNED_NO_GPU_MIE_NODES = Ref(false)
+
+"""
+    _validate_node_inputs(radii, weights, n_imag)
+
+Shared input validation for BOTH exported caller-node entry points
+([`compute_aerosol_optical_properties_nodes`](@ref) and
+[`compute_aerosol_optical_properties_nodes_gpu`](@ref)) — one list, so the two
+public seams cannot drift apart (a negative weight passed only to the `_gpu`
+entry point would otherwise produce silently wrong bulk optics rather than an
+error). `@assert` matches this module's established input-validation
+convention (see `compute_NAI2.jl`/`compute_NAI2_gpu.jl`).
+"""
+@inline function _validate_node_inputs(radii, weights, n_imag)
+    @assert length(radii) == length(weights) "radii and weights must have the same length"
+    @assert length(radii) ≥ 1 "need at least one size-distribution node"
+    @assert all(w -> w ≥ 0, weights) "weights must be ≥ 0"
+    @assert n_imag ≥ 0 "Imaginary part of the refractive index must be ≥ 0 (convention n = n_real - i·n_imag)"
+    return nothing
+end
 
 """
     _aerosol_optical_properties_nodes_cpu(radii, weights, n_real, n_imag, λ, FT) -> AerosolOptics
@@ -201,8 +217,8 @@ function _aerosol_optical_properties_nodes_cpu(radii, weights, n_real, n_imag, �
     IC = FT <: AbstractFloat ? Float64 : FT
 
     r = IC.(radii)
-    w = IC.(weights)
-    w = w ./ sum(w)   # normalize to number-mean weights (unnormalized-weight invariance)
+    w = IC.(weights)          # broadcast always materializes a fresh copy, so
+    w ./= sum(w)              # in-place normalization never aliases the input
 
     k = IC(2π) / IC(λ)
     x_size_param = k .* r
@@ -264,8 +280,7 @@ function compute_aerosol_optical_properties_nodes_gpu(
     precision_policy::MiePrecisionPolicy = NativeFloat64(),
     l_max::Union{Nothing,Integer} = nothing,
 )
-    @assert length(radii) == length(weights) "radii and weights must have the same length"
-    @assert n_imag ≥ 0 "Imaginary part of the refractive index must be ≥ 0 (convention n = n_real - i·n_imag)"
+    _validate_node_inputs(radii, weights, n_imag)
 
     FT = float(promote_type(eltype(radii), eltype(weights),
                             typeof(n_real), typeof(n_imag), typeof(wavelength)))
@@ -279,9 +294,11 @@ function compute_aerosol_optical_properties_nodes_gpu(
     # of large-but-finite weights can overflow to Inf (zeroing every weight and
     # poisoning ω̃/Greek output with NaNs), and normalized weights are O(1) so
     # the narrowed copy is safe. The CPU path gets this for free via IC=Float64.
-    w_sum = sum(Float64.(weights))
+    w64 = Float64.(weights)
+    w_sum = sum(w64)
     @assert isfinite(w_sum) && w_sum > 0 "weights must sum to a positive, finite value"
-    w = FT.(Float64.(weights) ./ w_sum)
+    w64 ./= w_sum
+    w = FT.(w64)
 
     k_wavenum = FT(2π / wavelength)
     x_size_param = k_wavenum .* r
@@ -415,5 +432,5 @@ function compute_aerosol_optical_properties_nodes_gpu(
                             k=bulk_C_ext_host, fᵗ=one(FT))
     end
 
-    return l_max === nothing ? raw : _slice_greek(raw, Int(l_max))
+    return l_max === nothing ? raw : _slice_greek(raw, l_max)
 end
