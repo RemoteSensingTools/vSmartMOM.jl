@@ -41,6 +41,7 @@ vSmartMOM.Absorption.compute_τ_h2o_continuum!
 vSmartMOM.Scattering.greek_coefficients_from_scattering_matrix
 vSmartMOM.Scattering.compute_aerosol_optical_properties_gpu
 vSmartMOM.Scattering.compute_aerosol_optical_properties_nodes_gpu
+vSmartMOM.Scattering.compute_aerosol_extinction_nodes_gpu
 vSmartMOM.Scattering.MiePrecisionPolicy
 vSmartMOM.Scattering.NativeFloat64
 vSmartMOM.Scattering.DSEmulated

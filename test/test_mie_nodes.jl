@@ -389,3 +389,159 @@ struct _NoMieArchNodes <: vSmartMOM.Architectures.AbstractArchitecture end
     @test fb2.k == ref.k
     @test fb1.greek_coefs.β == ref.greek_coefs.β
 end
+
+#=
+=====================================================================
+compute_aerosol_extinction_nodes / _gpu (EXTINCTION-ONLY fast path) tests.
+=====================================================================
+=#
+
+@testset "compute_aerosol_extinction_nodes: bitwise k-equality vs full API (a)" begin
+    dist = LogNormal(log(_mu_aer), log(_sigma_aer))
+    r_min = max(quantile(dist, 1e-8), 1e-6 * _r_max)
+    r, wr = vSmartMOM.Scattering.gauleg_log(_nquad, r_min, _r_max; norm=false)
+    wx = vSmartMOM.Scattering.compute_wₓ(dist, wr, r, _r_max)
+    pol = Stokes_IQUV()
+
+    full = compute_aerosol_optical_properties_nodes(r, wx, _nr, _ni, _lam, pol, NoTruncation())
+    k_only = compute_aerosol_extinction_nodes(r, wx, _nr, _ni, _lam)
+
+    # BIT-IDENTICAL, not merely isapprox -- same normalization/arithmetic order.
+    @test k_only === full.k
+    @test k_only == full.k
+
+    # A δBGE truncation must not perturb k (truncation only touches Greek/fᵗ).
+    trunc = δBGE(10, 10.0)
+    full_trunc = compute_aerosol_optical_properties_nodes(r, wx, _nr, _ni, _lam, pol, trunc)
+    @test k_only == full_trunc.k
+
+    # wide-range (TOMAS-like) node set (same fixture as the "wide-range
+    # ensemble" testset above).
+    nr = 1.5; ni = 0.005; lam = 0.55
+    fine_r = exp.(range(log(0.005), log(0.05), length=40))
+    fine_w = pdf.(LogNormal(log(0.02), log(1.6)), fine_r)
+    coarse_r = exp.(range(log(1.0), log(6.0), length=25))
+    coarse_w = pdf.(LogNormal(log(2.0), log(1.5)), coarse_r) .* 1e-3
+    wide_r = vcat(fine_r, coarse_r)
+    wide_w = vcat(fine_w, coarse_w)
+
+    wide_full = compute_aerosol_optical_properties_nodes(wide_r, wide_w, nr, ni, lam, pol, NoTruncation())
+    wide_k = compute_aerosol_extinction_nodes(wide_r, wide_w, nr, ni, lam)
+    @test wide_k === wide_full.k
+    @test wide_k == wide_full.k
+end
+
+@testset "compute_aerosol_extinction_nodes: unnormalized-weight invariance (b)" begin
+    dist = LogNormal(log(_mu_aer), log(_sigma_aer))
+    r_min = max(quantile(dist, 1e-8), 1e-6 * _r_max)
+    r, wr = vSmartMOM.Scattering.gauleg_log(_nquad, r_min, _r_max; norm=false)
+    wx = vSmartMOM.Scattering.compute_wₓ(dist, wr, r, _r_max)
+
+    a = compute_aerosol_extinction_nodes(r, wx, _nr, _ni, _lam)
+    b = compute_aerosol_extinction_nodes(r, wx .* 7.3, _nr, _ni, _lam)
+    @test isapprox(a, b, rtol=1e-13)
+end
+
+@testset "compute_aerosol_extinction_nodes: KA-CPU vs CPU, real-CUDA vs KA-CPU (c)" begin
+    dist = LogNormal(log(_mu_aer), log(_sigma_aer))
+    r_min = max(quantile(dist, 1e-8), 1e-6 * _r_max)
+    r, wr = vSmartMOM.Scattering.gauleg_log(_nquad, r_min, _r_max; norm=false)
+    wx = vSmartMOM.Scattering.compute_wₓ(dist, wr, r, _r_max)
+
+    cpu_k = compute_aerosol_extinction_nodes(r, wx, _nr, _ni, _lam)
+    ka_k = compute_aerosol_extinction_nodes_gpu(r, wx, _nr, _ni, _lam, _KA_CPU();
+                                                 precision_policy=NativeFloat64())
+    @test isapprox(ka_k, cpu_k, rtol=1e-12)
+
+    # top-level dispatch: architecture=CPU() (default) matches the direct CPU call.
+    top = compute_aerosol_extinction_nodes(r, wx, _nr, _ni, _lam)
+    @test top == cpu_k
+
+    if !_CUDA_FUNCTIONAL
+        @test_skip "CUDA not functional on this host — real-GPU extinction-only test skipped"
+    else
+        cu_k = compute_aerosol_extinction_nodes_gpu(r, wx, _nr, _ni, _lam, _CUDA_BACKEND;
+                                                     precision_policy=NativeFloat64())
+        @test isapprox(cu_k, ka_k, rtol=1e-10)
+
+        top_gpu_k = compute_aerosol_extinction_nodes(r, wx, _nr, _ni, _lam;
+                                                      architecture=Architectures.GPU())
+        @test isapprox(top_gpu_k, cpu_k, rtol=1e-6)
+    end
+end
+
+@testset "compute_aerosol_extinction_nodes: Float32 + DSEmulated sanity (d)" begin
+    dist = LogNormal(log(_mu_aer), log(_sigma_aer))
+    r_min = max(quantile(dist, 1e-8), 1e-6 * _r_max)
+    r, wr = vSmartMOM.Scattering.gauleg_log(_nquad, r_min, _r_max; norm=false)
+    wx = vSmartMOM.Scattering.compute_wₓ(dist, wr, r, _r_max)
+
+    ref_k = compute_aerosol_extinction_nodes(r, wx, _nr, _ni, _lam)
+
+    r32 = Float32.(r); wx32 = Float32.(wx)
+    k32 = compute_aerosol_extinction_nodes_gpu(r32, wx32, Float32(_nr), Float32(_ni), Float32(_lam),
+                                                _KA_CPU(); precision_policy=DSEmulated())
+    @test k32 isa Float32
+    @test isapprox(Float64(k32), ref_k, rtol=1e-4)
+end
+
+@testset "compute_aerosol_extinction_nodes: input validation, both entry points (e)" begin
+    @test_throws AssertionError compute_aerosol_extinction_nodes(
+        [1.0, 2.0], [1.0], _nr, _ni, _lam)                                # length mismatch
+    @test_throws AssertionError compute_aerosol_extinction_nodes(
+        [1.0, 2.0], [1.0, -1.0], _nr, _ni, _lam)                          # negative weight
+    @test_throws AssertionError compute_aerosol_extinction_nodes(
+        [1.0, 2.0], [0.0, 0.0], _nr, _ni, _lam)                           # all-zero weights
+    @test_throws AssertionError compute_aerosol_extinction_nodes(
+        [1.0, 2.0], [1.0, 1.0], _nr, -0.001, _lam)                       # ni < 0
+    @test_throws AssertionError compute_aerosol_extinction_nodes(
+        Float64[], Float64[], _nr, _ni, _lam)                            # empty node set
+
+    # The DIRECTLY-callable _gpu entry point must enforce the SAME validation
+    # list (shared _validate_node_inputs) as the public entry point above.
+    @test_throws AssertionError compute_aerosol_extinction_nodes_gpu(
+        [1.0, 2.0], [1.0], _nr, _ni, _lam, _KA_CPU())                    # length mismatch
+    @test_throws AssertionError compute_aerosol_extinction_nodes_gpu(
+        [1.0, 2.0], [1.0, -1.0], _nr, _ni, _lam, _KA_CPU())              # negative weight
+    @test_throws AssertionError compute_aerosol_extinction_nodes_gpu(
+        Float64[], Float64[], _nr, _ni, _lam, _KA_CPU())                 # empty node set
+    @test_throws AssertionError compute_aerosol_extinction_nodes_gpu(
+        [1.0, 2.0], [1.0, 1.0], _nr, -0.001, _lam, _KA_CPU())            # ni < 0
+    @test_throws AssertionError compute_aerosol_extinction_nodes_gpu(
+        [1.0, 2.0], [0.0, 0.0], _nr, _ni, _lam, _KA_CPU())               # all-zero weights
+end
+
+@testset "extinction _gpu: Float32 weights with Float32-overflowing sum (Codex P2 mirror)" begin
+    # Mirrors the full API's P2 regression (julia-reviewer nit): the extinction
+    # GPU entry copied the Float64-widen-before-narrow normalization fix, so it
+    # must survive weights whose Float32 sum overflows — bit-identical to the
+    # exactly-[0.5, 0.5] normalized case.
+    r32 = Float32[0.1, 0.2]
+    big = compute_aerosol_extinction_nodes_gpu(r32, Float32[3f38, 3f38],
+              1.3f0, 0.001f0, 0.55f0, _KA_CPU(); precision_policy=DSEmulated())
+    ref = compute_aerosol_extinction_nodes_gpu(r32, Float32[0.5, 0.5],
+              1.3f0, 0.001f0, 0.55f0, _KA_CPU(); precision_policy=DSEmulated())
+    @test isfinite(big) && big > 0
+    @test big == ref
+end
+
+@testset "compute_aerosol_extinction_nodes: timing sanity, extinction-only vs full API (f)" begin
+    dist = LogNormal(log(_mu_aer), log(_sigma_aer))
+    r_min = max(quantile(dist, 1e-8), 1e-6 * _r_max)
+    r, wr = vSmartMOM.Scattering.gauleg_log(_nquad, r_min, _r_max; norm=false)
+    wx = vSmartMOM.Scattering.compute_wₓ(dist, wr, r, _r_max)
+    pol = Stokes_IQUV()
+
+    # Warm up (compile) both paths before timing so @elapsed measures
+    # execution, not JIT compilation.
+    compute_aerosol_extinction_nodes(r, wx, _nr, _ni, _lam)
+    compute_aerosol_optical_properties_nodes(r, wx, _nr, _ni, _lam, pol, NoTruncation())
+
+    t_ext  = @elapsed compute_aerosol_extinction_nodes(r, wx, _nr, _ni, _lam)
+    t_full = @elapsed compute_aerosol_optical_properties_nodes(r, wx, _nr, _ni, _lam, pol, NoTruncation())
+
+    # Sanity line only -- NOT asserted (timing is inherently noisy in CI).
+    println("compute_aerosol_extinction_nodes vs full API timing (standard node set, nquad=$_nquad): ",
+            "t_ext=$(t_ext)s  t_full=$(t_full)s  speedup(full/ext)=$(round(t_full / t_ext, digits=2))x")
+    @test t_ext >= 0 && t_full >= 0
+end

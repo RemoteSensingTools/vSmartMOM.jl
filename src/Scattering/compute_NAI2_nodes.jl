@@ -208,7 +208,7 @@ end
 
 CPU implementation backing [`compute_aerosol_optical_properties_nodes`](@ref).
 Normalizes `weights`, derives `(n_max, n_mu)` from the actual node radii (no
-cap), and delegates to the shared [`_nai2_bulk_optics`](@ref) core — the same
+cap), and delegates to the shared `_nai2_bulk_optics` core — the same
 core the log-normal `MieModel` NAI2 path uses. Internal computation always
 runs in Float64 (`IC`), narrowed to `FT` only at the end, exactly mirroring
 `compute_aerosol_optical_properties`'s IC/FT_out convention.
@@ -433,4 +433,300 @@ function compute_aerosol_optical_properties_nodes_gpu(
     end
 
     return l_max === nothing ? raw : _slice_greek(raw, l_max)
+end
+
+#=
+=====================================================================
+EXTINCTION-ONLY fast path.
+=====================================================================
+Motivation: a downstream hybrid consumer (GCHPIO's `:parametric_exact_tau`
+mode) needs only the number-mean extinction cross-section from ONE node set
+(e.g. a per-layer sectional/tabulated size distribution) while taking its
+phase-matrix SHAPE (Greek coefficients) from a DIFFERENT node set (e.g. a
+representative parametric ensemble). Before this existed, that consumer had
+to call the full `compute_aerosol_optical_properties_nodes` API and
+immediately discard the amplitude matrices (S₁/S₂) and all six Greek series —
+work that dominates the cost at large angular orders (`n_mu = 2·n_max - 1`
+scales with the size parameter of the largest node, and the Greek projection
+is `O(n_mu × l_max)`), while `k` itself only needs the per-node Mie
+coefficients (aₙ, bₙ) and a single weighted sum — no angular quadrature at
+all.
+=====================================================================
+=#
+
+# Sibling warn-once state for `compute_aerosol_extinction_nodes`, kept
+# independent of `_WARNED_NO_GPU_MIE_NODES` (same rationale as that Ref's own
+# comment: independent state so tests for one entry point don't clear the
+# other's already-warned flag).
+const _WARNED_NO_GPU_MIE_EXTINCTION_NODES = Ref(false)
+
+@doc raw"""
+    compute_aerosol_extinction_nodes(radii, weights, n_real, n_imag, wavelength;
+        architecture = Architectures.CPU(),
+        precision_policy = nothing) -> k
+
+EXTINCTION-ONLY fast path for the caller-node Mie seam: returns just the
+number-mean bulk extinction cross-section `k` **[μm²]** — the SAME quantity,
+same convention, and (on the CPU path) the SAME arithmetic as `.k` from
+[`compute_aerosol_optical_properties_nodes`](@ref) — without computing any
+amplitude matrices, phase-matrix elements, or the six Greek coefficient
+series.
+
+# Motivation
+A downstream hybrid consumer (GCHPIO's `:parametric_exact_tau` mode) needs
+only the number-mean extinction cross-section from ONE node set while taking
+shapes (Greek coefficients) from another. Today it would have to call the
+full [`compute_aerosol_optical_properties_nodes`](@ref) API and discard the
+amplitude matrices and all six Greek series, which dominate the cost at large
+angular orders. This function computes only what `k` actually depends on: the
+per-node Mie coefficients (aₙ, bₙ) and a weighted sum over nodes — no
+Gauss-Legendre angular quadrature, π/τ functions, amplitude functions, or
+Greek-coefficient projection anywhere in this path.
+
+# Arguments
+Same node-ensemble arguments as
+[`compute_aerosol_optical_properties_nodes`](@ref), EXCEPT there is no
+`polarization`/`truncation`/`l_max` — none of these are relevant to a bare
+extinction cross-section (there is no phase matrix or Greek series to
+polarize, truncate, or length-cap).
+- `radii::AbstractVector`: wet particle radii, one per node, **[μm]**.
+- `weights::AbstractVector`: non-negative node weights (number-mixing-ratio or
+  number-concentration weights). **Need not be normalized** — divided by
+  their sum internally, so `k` is invariant to a uniform rescaling of
+  `weights`.
+- `n_real, n_imag`: the ONE complex refractive index shared by the whole node
+  ensemble, convention `n = n_real - i·n_imag` (`n_imag ≥ 0`).
+- `wavelength`: same units as `radii` (μm internally).
+
+# Keyword arguments
+- `architecture`: `Architectures.CPU()` (default) or a GPU architecture with a
+  registered Mie pipeline (`Architectures.has_gpu_mie`) — identical routing to
+  [`compute_aerosol_optical_properties_nodes`](@ref) (CPU / GPU / warn-once
+  CPU fallback for an architecture without a GPU Mie pipeline).
+- `precision_policy`: GPU-only, see [`MiePrecisionPolicy`](@ref); ignored on
+  the CPU path.
+
+# Returns
+The number-mean bulk extinction cross-section `k` **[μm²]**, as a scalar of
+the promoted float type of the inputs.
+
+# Validation
+Identical to [`compute_aerosol_optical_properties_nodes`](@ref):
+`_validate_node_inputs` plus `sum(weights) > 0`.
+
+# Numerics (CPU path)
+Internal computation runs in `IC = Float64` (same IC/FT narrowing convention
+as the rest of this module). Per node, this computes exactly the SAME
+`C_ext` expression the shared NAI-2 core uses —
+`2π/k² * dot(n_v, real.(an_v .+ bn_v))` (the internal `_nai2_bulk_optics`
+core's `C_ext` formula) — in the SAME arithmetic order, weighted by the SAME normalized weights (same
+normalization step), so `k` is bit-identical to
+`compute_aerosol_optical_properties_nodes(...).k` given identical
+`(radii, weights, n_real, n_imag, wavelength)`.
+"""
+function compute_aerosol_extinction_nodes(
+    radii::AbstractVector, weights::AbstractVector,
+    n_real::Real, n_imag::Real,
+    wavelength::Real;
+    architecture::Architectures.AbstractArchitecture = Architectures.CPU(),
+    precision_policy::Union{Nothing,MiePrecisionPolicy} = nothing,
+)
+    _validate_node_inputs(radii, weights, n_imag)
+    @assert sum(weights) > 0 "weights must not sum to zero"
+
+    # Output float type: promoted user type of all numeric inputs (mirrors
+    # compute_aerosol_optical_properties_nodes's FT convention).
+    FT = float(promote_type(eltype(radii), eltype(weights),
+                            typeof(n_real), typeof(n_imag), typeof(wavelength)))
+
+    if architecture isa Architectures.CPU
+        return _aerosol_extinction_nodes_cpu(radii, weights, n_real, n_imag, wavelength, FT)
+    elseif Architectures.has_gpu_mie(architecture)
+        backend = Architectures.ka_backend(architecture)
+        policy = precision_policy === nothing ?
+                 Architectures.default_mie_precision_policy(architecture, FT) :
+                 precision_policy
+        return compute_aerosol_extinction_nodes_gpu(radii, weights, n_real, n_imag,
+                                                     wavelength, backend;
+                                                     precision_policy = policy)
+    else
+        if !_WARNED_NO_GPU_MIE_EXTINCTION_NODES[]
+            @warn "no GPU Mie pipeline for $(architecture); computing caller-node Mie extinction on CPU"
+            _WARNED_NO_GPU_MIE_EXTINCTION_NODES[] = true
+        end
+        return _aerosol_extinction_nodes_cpu(radii, weights, n_real, n_imag, wavelength, FT)
+    end
+end
+
+"""
+    _aerosol_extinction_nodes_cpu(radii, weights, n_real, n_imag, λ, FT) -> k
+
+CPU implementation backing [`compute_aerosol_extinction_nodes`](@ref).
+Normalizes `weights` and derives `n_max` from the actual node radii (no cap),
+exactly as `_aerosol_optical_properties_nodes_cpu` does, but computes
+ONLY the per-node extinction cross-section (`compute_mie_ab!` then the SAME
+`C_ext` expression `_nai2_bulk_optics` uses) and the weighted bulk
+sum — no scattering cross-section, amplitude, or phase-matrix arrays are
+ever allocated. Same IC=Float64-internal convention; narrowed to `FT` only at
+the end.
+"""
+function _aerosol_extinction_nodes_cpu(radii, weights, n_real, n_imag, λ, FT::Type)
+    IC = FT <: AbstractFloat ? Float64 : FT
+
+    r = IC.(radii)
+    w = IC.(weights)          # broadcast always materializes a fresh copy, so
+    w ./= sum(w)              # in-place normalization never aliases the input
+
+    k = IC(2π) / IC(λ)
+    x_size_param = k .* r
+    n_max = get_n_max(maximum(x_size_param))
+
+    nquad_radius = length(r)
+
+    # m_ref, nmx_max, and the pre-allocated buffers below mirror
+    # _nai2_bulk_optics exactly (same formulas, same order) so that C_ext[i]
+    # comes out bit-identical.
+    m_ref = IC(n_real) - IC(n_imag) * im
+    y_max = maximum(x_size_param) * abs(m_ref)
+    nmx_max = round(Int, max(n_max, y_max) + 51)
+    an  = zeros(Complex{IC}, n_max)
+    bn  = zeros(Complex{IC}, n_max)
+    Dₙ  = zeros(Complex{IC}, nmx_max)
+    n_  = IC.(2 .* collect(1:n_max) .+ 1)
+
+    C_ext = zeros(IC, nquad_radius)
+
+    for i = 1:nquad_radius
+
+        n_max_i = get_n_max(x_size_param[i])
+        @assert n_max_i ≤ n_max "supplied n_max=$n_max is too small for radius index $i (needs $n_max_i); n_max must come from the largest size parameter in the node set"
+
+        an_v = view(an, 1:n_max_i)
+        bn_v = view(bn, 1:n_max_i)
+        fill!(an_v, 0)
+        fill!(bn_v, 0)
+        fill!(Dₙ, 0)
+
+        compute_mie_ab!(x_size_param[i], m_ref, an_v, bn_v, Dₙ)
+
+        n_v = view(n_, 1:n_max_i)
+        @inbounds C_ext[i] = 2π / k^2 * dot(n_v, real.(an_v .+ bn_v))
+    end
+
+    bulk_C_ext = sum(w .* C_ext)
+
+    return IC <: AbstractFloat && FT <: AbstractFloat ? FT(bulk_C_ext) : bulk_C_ext
+end
+
+@doc raw"""
+    compute_aerosol_extinction_nodes_gpu(radii, weights, n_real, n_imag,
+        wavelength, backend; precision_policy = NativeFloat64()) -> k
+
+GPU/KernelAbstractions implementation backing
+[`compute_aerosol_extinction_nodes`](@ref) — takes an explicit KA `backend`
+(e.g. `KernelAbstractions.CPU()` or `CUDA.CUDABackend()`), mirroring
+[`compute_aerosol_optical_properties_nodes_gpu`](@ref)'s calling convention so
+it can be exercised directly in tests on a CPU backend without a real GPU
+device.
+
+Launches ONLY the per-node Mie-coefficient kernel
+(`mie_coefficients_kernel_f64!`/`_ds!`, selected by `precision_policy` exactly
+as the sibling function does) and the per-node `cross_sections_kernel!`
+(which computes `C_ext` AND `C_sca` together in one fused pass — cheaper to
+keep fused than to add a `C_ext`-only kernel variant; the unused `C_sca`
+output is simply not reduced), then the device-resident `weighted_sum_kernel!`
+reduction across nodes. UNLIKE [`compute_aerosol_optical_properties_nodes_gpu`](@ref),
+this path launches no `amplitude_phase_kernel!`, `size_reduction_kernel!`, or
+`greek_coefficients_kernel!`, and needs no angular grid at all (no
+`gausslegendre`, `compute_mie_π_τ`, or `compute_legendre_poly` calls), since
+none of them affect `k`. Only the single scalar `bulk_C_ext` is copied back to
+the host.
+
+**Precision**: identical convention to
+[`compute_aerosol_optical_properties_nodes_gpu`](@ref) — the per-node kernels
+run in the kernel's native float type `FT = eltype(radii)` (Float32 under
+`DSEmulated`); the reduction accumulates in
+`RA = FT === Float32 ? Float64 : FT` (Float64-widened + Neumaier-compensated
+for a Float32 kernel), narrowed back to `FT` only for the returned scalar.
+"""
+function compute_aerosol_extinction_nodes_gpu(
+    radii::AbstractVector, weights::AbstractVector,
+    n_real::Real, n_imag::Real, wavelength::Real, backend;
+    precision_policy::MiePrecisionPolicy = NativeFloat64(),
+)
+    _validate_node_inputs(radii, weights, n_imag)
+
+    FT = float(promote_type(eltype(radii), eltype(weights),
+                            typeof(n_real), typeof(n_imag), typeof(wavelength)))
+    # Reduction accumulator type: Float64-widened + Neumaier-compensated for a
+    # Float32 kernel, matching compute_aerosol_optical_properties_nodes_gpu's
+    # RA convention.
+    RA = FT === Float32 ? Float64 : FT
+
+    r = FT.(radii)
+    # Normalize in Float64 BEFORE narrowing to the kernel type: a Float32 sum
+    # of large-but-finite weights can overflow to Inf (see the sibling
+    # function's Codex P2 regression comment); normalized weights are O(1) so
+    # the narrowed copy is safe.
+    w64 = Float64.(weights)
+    w_sum = sum(w64)
+    @assert isfinite(w_sum) && w_sum > 0 "weights must sum to a positive, finite value"
+    w64 ./= w_sum
+    w = FT.(w64)
+
+    k_wavenum = FT(2π / wavelength)
+    x_size_param = k_wavenum .* r
+    n_max_global = get_n_max(maximum(x_size_param))
+    nquad_radius = length(r)
+
+    m_ref_re = FT(n_real)
+    m_ref_im = FT(-n_imag)  # convention: n = n_real - i*n_imag, so m_im is negative
+
+    nmax_per_r = [get_n_max(x) for x in x_size_param]
+    y_max = maximum(x_size_param) * sqrt(m_ref_re^2 + m_ref_im^2)
+    nmx_max = round(Int, max(n_max_global, y_max) + 51)
+
+    AT = KernelAbstractions.allocate
+
+    # --- Per-node arrays: native kernel precision FT (speed) ---
+    x_dev     = AT(backend, FT, nquad_radius)
+    nmax_dev  = AT(backend, Int, nquad_radius)
+    an_dev    = AT(backend, Complex{FT}, (nquad_radius, n_max_global))
+    bn_dev    = AT(backend, Complex{FT}, (nquad_radius, n_max_global))
+    C_sca_dev = AT(backend, FT, nquad_radius)  # required output slot of the fused kernel; never reduced
+    C_ext_dev = AT(backend, FT, nquad_radius)
+
+    KernelAbstractions.copyto!(backend, x_dev, FT.(x_size_param))
+    KernelAbstractions.copyto!(backend, nmax_dev, nmax_per_r)
+
+    fill!(an_dev, zero(Complex{FT}))
+    fill!(bn_dev, zero(Complex{FT}))
+
+    # --- Kernel 1: Mie coefficients (unchanged, existing kernel) ---
+    if precision_policy isa NativeFloat64
+        @assert FT === Float64 "NativeFloat64 Mie precision policy requires Float64 node inputs; use DSEmulated() for Float32."
+        kernel1 = mie_coefficients_kernel_f64!(backend)
+    else
+        kernel1 = mie_coefficients_kernel_ds!(backend)
+    end
+    kernel1(an_dev, bn_dev, x_dev, m_ref_re, m_ref_im, nmax_dev, nmx_max; ndrange=nquad_radius)
+    KernelAbstractions.synchronize(backend)
+
+    # --- Kernel: per-node cross-sections (unchanged, existing kernel) ---
+    kernel4a = cross_sections_kernel!(backend)
+    kernel4a(C_sca_dev, C_ext_dev, an_dev, bn_dev, k_wavenum, nmax_dev; ndrange=nquad_radius)
+    KernelAbstractions.synchronize(backend)
+
+    # --- Device-resident weighted reduction across nodes (RA precision) ---
+    w_dev = AT(backend, RA, nquad_radius)
+    KernelAbstractions.copyto!(backend, w_dev, RA.(w))
+    bulk_Cext_dev = AT(backend, RA, 1)
+    wsum = weighted_sum_kernel!(backend)
+    wsum(bulk_Cext_dev, C_ext_dev, w_dev; ndrange=1)
+    KernelAbstractions.synchronize(backend)
+
+    # --- Copy back ONLY the one bulk scalar ---
+    bulk_C_ext_host = Array(bulk_Cext_dev)[1]
+
+    return RA !== FT ? FT(bulk_C_ext_host) : bulk_C_ext_host
 end
