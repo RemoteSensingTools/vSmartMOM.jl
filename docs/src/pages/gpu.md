@@ -173,32 +173,56 @@ column). Segmented, order-preserving reductions then recombine each
 group's per-node results into per-ensemble bulk optics, and results are
 reassembled in the caller's original ensemble order.
 
-By construction (same arithmetic order and same per-ensemble normalize-once
-semantics as the single-ensemble path, just re-grouped into batched kernel
-launches), the batched path is **bit-for-bit identical** to calling
-`compute_aerosol_optical_properties_nodes`/`compute_aerosol_extinction_nodes`
-once per ensemble — verified on the portable KA-CPU backend (all three
-precision policies, full and extinction-only variants, mixed-RI and
-mixed-size fixtures). On real CUDA hardware, batched-vs-single agree to
-near machine precision but not bit-for-bit, because the two code paths
-launch kernels over different `ndrange` shapes (grouped-batch size vs
-single-ensemble size) and CUDA's compiler is free to generate different
-PTX/SASS (loop unrolling, FMA contraction, register allocation) for
-logically identical, race-free source code compiled for a different
-launch configuration — a well-known GPU characteristic, not a logic bug
-(confirmed by exhaustive same-shape manual verification finding zero
-divergence at every intermediate stage). Measured on an A100: `k`/`ω̃`
-relative errors ~1e-16 to ~1.4e-7 and Greek-coefficient absolute
-differences ~1e-15 to ~8e-6 depending on precision policy, consistent with
-this codebase's existing KA-CPU-vs-real-CUDA tolerances elsewhere. See
-`test/test_mie_nodes_batched.jl`'s `_run_bitwise_gate` docstring for the
-exact numbers and the `exact=false` real-CUDA tolerance rationale.
+**Public bit-compatibility contract (precise, by backend):**
+- **CPU (`Architectures.CPU()`) and KA-CPU (any KernelAbstractions backend
+  that isn't real CUDA/Metal hardware)**: the batched path is **bit-for-bit
+  identical** (`==`) to calling
+  `compute_aerosol_optical_properties_nodes`/`compute_aerosol_extinction_nodes`
+  once per ensemble — by construction (same arithmetic order and the same
+  per-ensemble normalize-once semantics, just re-grouped into batched kernel
+  launches / a `Threads.@threads` loop over ensembles on CPU). Verified for
+  all three precision policies, full and extinction-only variants, mixed-RI
+  and mixed-size fixtures, AND — as of this seam's Float32-output-contract
+  fix — Float32 CPU inputs/outputs specifically (not just Float64).
+- **Real CUDA hardware**: batched-vs-single agree to **near machine
+  precision, NOT bit-for-bit**, because the two code paths launch kernels
+  over different `ndrange` shapes (grouped-batch size vs single-ensemble
+  size) and CUDA's compiler is free to generate different PTX/SASS (loop
+  unrolling, FMA contraction, register allocation) for logically identical,
+  race-free source code compiled for a different launch configuration — a
+  well-known GPU characteristic, not a logic bug (confirmed by exhaustive
+  same-shape manual verification finding zero divergence at every
+  intermediate stage). Measured on an A100: `k`/`ω̃` relative errors ~1e-16
+  to ~1.4e-7 and Greek-coefficient absolute differences ~1e-15 to ~8e-6
+  depending on precision policy, consistent with this codebase's existing
+  KA-CPU-vs-real-CUDA tolerances elsewhere. See
+  `test/test_mie_nodes_batched.jl`'s `_run_bitwise_gate` docstring for the
+  exact numbers and the `exact=false` real-CUDA tolerance rationale.
+- **The one invariant that IS exact (`==`) even on real CUDA, for all three
+  precision policies**: `compute_aerosol_extinction_nodes_batched[_gpu]`'s
+  result for ensemble `e` equals
+  `compute_aerosol_optical_properties_nodes_batched[_gpu]`'s `.k` for that
+  SAME ensemble — the full and extinction-only batched kernels share the
+  identical Kernel-1 + cross-section + segmented-weighted-sum code path
+  (extinction-only just stops there instead of continuing into
+  amplitude/phase/Greek), so this invariant does not depend on the
+  launch-shape-sensitive downstream reduction at all. This is the exact
+  invariant GCHPIO's hybrid exact-τ mechanism (extinction-only for most of
+  the spectrum, full optics where Greek coefficients are actually needed)
+  rests on; it has its own dedicated strict (zero-tolerance `==`) real-CUDA
+  regression testset (`test_mie_nodes_batched.jl`'s "Gate 1 (CUDA, STRICT
+  exact): full-batched .k == extinction-only-batched k") rather than being
+  folded into the tolerance-based comparisons above.
 
-A `MieBatchWorkspace` (grow-only buffers, keyed on backend instance + FT +
+A `MieBatchWorkspace` (grow-only buffers, keyed on backend VALUE + FT +
 reduction type, single-owner) lets repeated calls across many wavelengths
 reuse device allocations even though group membership changes from one
 wavelength to the next (group boundaries depend on the wavenumber-scaled
-size parameter, so they are NOT fixed across a spectral loop).
+size parameter, so they are NOT fixed across a spectral loop). Note: the
+backend-VALUE key does not distinguish CUDA devices/streams (KA backend
+structs are `isbits` values that don't encode which physical GPU is
+active) — single-device, single-stream usage only; see
+`MieBatchWorkspace`'s docstring.
 
 Benchmark on this host (A100, synthetic 882-ensemble × 96-node inventory
 mirroring the real GCHPIO TOMAS-wet-range column, ~130+ distinct `nmax`

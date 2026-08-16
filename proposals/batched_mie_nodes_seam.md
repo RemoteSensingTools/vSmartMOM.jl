@@ -130,8 +130,15 @@ ensembles reusing per-task workspaces; grouping is a GPU concern.
 
 ## Acceptance gates
 
-1. Bitwise `==` batched-vs-single per ensemble, all three policies, KA-CPU
-   + real CUDA (Metal wired, hardware-gated); full + extinction variants.
+1. Equivalence batched-vs-single per ensemble, all three policies, full +
+   extinction variants — with the backend-precise contract (corrected
+   post-implementation; the original "bitwise everywhere" wording was too
+   broad): CPU and KA-CPU = bitwise `==`; real CUDA = tolerance-equivalent
+   (identical logic compiles differently under different launch configs;
+   measured F64 Greek ~7e-15); PLUS the strict invariant that IS exact on
+   real CUDA and carries GCHPIO's hybrid exact-τ mechanism: full-batched
+   `.k` == extinction-only-batched `k`, zero tolerance, all three policies
+   (its own regression testset). Metal wired, hardware-gated.
 2. Batching invariance: splitting one batch arbitrarily (including across
    group boundaries) changes no ensemble's result (bitwise).
 3. Workspace-reuse invariance: warm == cold, and reuse across λs (regroup
