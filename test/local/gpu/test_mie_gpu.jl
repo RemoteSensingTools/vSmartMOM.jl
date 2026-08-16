@@ -548,41 +548,45 @@ end
 end
 
 # ============================================================================
-# P2 regression: Float32 aerosol params + Float64 r_max/λ → auto-selects DSEmulated
+# P2: Float32 aerosol + Float64 r_max/λ LITERALS — make_mie_model converts
+# r_max/λ to the AEROSOL's element type
 # ============================================================================
-# The reviewer's exact case: Aerosol(dist, 1.3f0, 0.001f0) combined with a
-# Float64 r_max (30.0) and Float64 λ (0.55). In this model:
-#   - _mie_output_type  → Float64  (r_max's type drives the MieModel FT parameter)
-#   - _mie_kernel_type  → Float32  (eltype(nᵣ) — how compute_NAI2_gpu derives FT)
-# Before the fix the router passed FT2 (Float64) to default_mie_precision_policy,
-# returning NativeFloat64(), whose GPU kernel asserts FT === Float64 — but
-# FT = eltype(nᵣ) = Float32 → assertion failure. The fix uses _mie_kernel_type
-# (Float32) for the policy decision, returning DSEmulated(), which is the
-# Float32-native path and must run without error and match the CPU reference.
-@testset "P2: Float32 aerosol + Float64 r_max — auto-selects DSEmulated" begin
+# UPDATED (2026-08-16): the original "P2 regression" comment below described
+# a MieModel{NAI2, Float64, GPU} with a Float32 kernel type as the reviewer's
+# reported bug scenario. That is now a STALE expectation, not a live bug:
+# make_mie_model.jl intentionally converts `r_max`/`λ` to the aerosol's own
+# element type (`FT_r = typeof(FT(r_max))` where `FT = eltype(aerosol.nᵣ)`),
+# so passing Float64 LITERALS for r_max/λ alongside a Float32 aerosol does
+# NOT produce a "mixed" model at all -- it produces a FULLY Float32
+# MieModel{NAI2, Float32, GPU} (both `_mie_output_type` and `_mie_kernel_type`
+# agree on Float32). This testset now documents and asserts THAT (intended)
+# semantics, and still exercises the auto-select-policy path end to end
+# (FT_kernel = Float32 -> DSEmulated, matching the CPU Float64 reference
+# within the established DS tolerances).
+@testset "P2: Float32 aerosol + Float64 r_max/λ literals — converts to aerosol's FT" begin
     if !CUDA_FUNCTIONAL
         @test_skip "CUDA not functional — P2 mixed-precision policy test skipped"
     else
-        # The reviewer's exact construction: Float32 nᵣ/nᵢ, Float64 r_max/λ.
+        # Float32 nᵣ/nᵢ; r_max/λ/δBGE.Δ_angle given as Float64 LITERALS but
+        # converted to Float32 by make_mie_model (see comment above).
         aero_mixed = Aerosol(LogNormal(log(0.3), log(2.1)), 1.3f0, 0.001f0)
         m_mixed = make_mie_model(NAI2(), aero_mixed, 0.55, Stokes_IQUV(),
                                  δBGE(10, 10.0), 30.0, 500;
                                  architecture = GPU())
 
-        # Confirm the type-level situation that triggered the bug:
-        #   FT (r_max type) = Float64  →  MieModel{NAI2, Float64, GPU}
-        #   eltype(nᵣ) = Float32       →  kernel must run Float32 (DSEmulated)
-        @test m_mixed isa MieModel{NAI2, Float64, GPU}
-        @test eltype(m_mixed.aerosol.nᵣ) === Float32   # kernel precision axis
+        # Confirm the converts-to-aerosol-FT semantics: FT and the kernel
+        # precision axis (eltype(nᵣ)) AGREE (both Float32) -- there is no
+        # "mixed" FT2-vs-FT_kernel situation left to construct this way.
+        @test m_mixed isa MieModel{NAI2, Float32, GPU}
+        @test eltype(m_mixed.aerosol.nᵣ) === Float32
         @test m_mixed.precision_policy === nothing       # nothing → auto
 
-        # Before the fix this would @assert-fail with "NativeFloat64 … requires Float64".
         gpu_mixed = compute_aerosol_optical_properties(m_mixed)
 
-        # The auto policy must have resolved to DSEmulated (Float32-native path).
-        # Verify indirectly: output type rides on FT2 = Float64 (r_max type).
-        @test gpu_mixed.ω̃ isa Float64
-        @test eltype(gpu_mixed.greek_coefs.β) === Float64
+        # Output type rides on FT2 = _mie_output_type(model) = Float32 (the
+        # model's own FT parameter, per the above).
+        @test gpu_mixed.ω̃ isa Float32
+        @test eltype(gpu_mixed.greek_coefs.β) === Float32
 
         # Float64 CPU reference at identical physical parameters.
         aero64 = Aerosol(LogNormal(log(0.3), log(2.1)), 1.3, 0.001)
@@ -591,12 +595,12 @@ end
 
         # DSEmulated tolerance (Float32 kernel, Float64-widened host reduction):
         # SSA/k within 1e-4, Greek coefficients within 1e-3.
-        @test abs(gpu_mixed.ω̃ - ref.ω̃) / abs(ref.ω̃) < 1e-4
-        @test abs(gpu_mixed.k  - ref.k)  / abs(ref.k)  < 1e-4
+        @test abs(Float64(gpu_mixed.ω̃) - ref.ω̃) / abs(ref.ω̃) < 1e-4
+        @test abs(Float64(gpu_mixed.k)  - ref.k)  / abs(ref.k)  < 1e-4
 
         L = min(length(gpu_mixed.greek_coefs.β), length(ref.greek_coefs.β))
         for field in (:α, :β, :γ, :δ, :ϵ, :ζ)
-            g = getproperty(gpu_mixed.greek_coefs, field)[1:L]
+            g = Float64.(getproperty(gpu_mixed.greek_coefs, field)[1:L])
             r = getproperty(ref.greek_coefs,       field)[1:L]
             @test maximum(abs.(g .- r)) < 1e-3
         end

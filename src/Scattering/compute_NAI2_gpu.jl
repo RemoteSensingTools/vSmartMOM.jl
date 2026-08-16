@@ -15,7 +15,7 @@ using FastGaussQuadrature
 """
     compute_aerosol_optical_properties_gpu(model::MieModel{<:NAI2,FT}, backend;
                                            precision_policy=NativeFloat64(),
-                                           FT2=FT)
+                                           FT2=Float64)
 
 GPU-accelerated version of `compute_aerosol_optical_properties` for the NAI2 method.
 
@@ -31,9 +31,16 @@ GPU-accelerated version of `compute_aerosol_optical_properties` for the NAI2 met
   On `MetalGPU()`, `NativeFloat64()` (any `FT === Float64` model, in fact)
   throws a clear `ArgumentError` rather than attempting an unsupported
   Float64 device array.
-- `FT2`: output float type. **Defaults to the model's `FT` type parameter** so that a
-  Float32 model produces Float32 greek coefficients without any explicit override.
-  Pass an explicit type only to force an output-precision override (rare).
+- `FT2`: output float type. **Defaults to `Float64`, NOT the model's `FT`
+  type parameter** — this low-level, direct-backend entry point does not read
+  `model.architecture`/`model.FT` for this default (unlike the single-verb
+  `compute_aerosol_optical_properties(model)` router in
+  `phase_function_autodiff.jl`'s `_dispatch_aerosol_optics`, which always
+  supplies `FT2 = _mie_output_type(model)` explicitly, so a Float32 model
+  produces Float32 greek coefficients through THAT entry point without any
+  explicit override). Calling this function directly (bypassing the router,
+  e.g. in tests) for a Float32 model REQUIRES passing `FT2 = Float32`
+  explicitly, or the output silently comes back in `Float64`.
 
 # Returns
 - `AerosolOptics` with greek_coefs, SSA, extinction, truncation factor
