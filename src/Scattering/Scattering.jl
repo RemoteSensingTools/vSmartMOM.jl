@@ -80,4 +80,10 @@ export compute_aerosol_optical_properties_gpu,
 export compute_aerosol_optical_properties_nodes,
        compute_aerosol_optical_properties_nodes_gpu
 
+# Extinction-only fast path on the caller-node seam (no amplitude/Greek work) —
+# for hybrid consumers (e.g. GCHPIO :parametric_exact_tau) that need only the
+# number-mean extinction cross-section from one node set.
+export compute_aerosol_extinction_nodes,
+       compute_aerosol_extinction_nodes_gpu
+
 end
