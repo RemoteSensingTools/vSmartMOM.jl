@@ -13,6 +13,20 @@ vSmartMOM.Scattering.compute_aerosol_extinction_nodes
 vSmartMOM.Scattering.truncate_phase
 ```
 
+## Batched Caller-Node Mie Seam
+
+Exact-`nmax`-grouped GPU batching + reusable single-owner workspace for
+many-ensemble columns (e.g. GCHPIO's per-layer TOMAS inventory). See
+`proposals/batched_mie_nodes_seam.md` for the full design rationale.
+
+```@docs
+vSmartMOM.Scattering.prepare_mie_node_geometry
+vSmartMOM.Scattering.MieNodeGeometry
+vSmartMOM.Scattering.compute_aerosol_optical_properties_nodes_batched
+vSmartMOM.Scattering.compute_aerosol_extinction_nodes_batched
+vSmartMOM.Scattering.MieBatchWorkspace
+```
+
 ## Phase Matrix Reconstruction
 
 ```@docs

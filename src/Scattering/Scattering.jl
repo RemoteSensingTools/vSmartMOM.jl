@@ -40,6 +40,7 @@ include("compute_NAI2_lin.jl")            # Linearized NAI2 computation
 include("gpu_mie_kernels.jl")            # KernelAbstractions Mie kernels (CPU+GPU)
 include("compute_NAI2_gpu.jl")           # GPU-accelerated NAI2 entry point
 include("compute_NAI2_nodes.jl")         # Caller-defined-node bulk Mie API (CPU+GPU)
+include("compute_NAI2_nodes_batched.jl") # Batched caller-node Mie seam (exact-nmax grouping + workspace)
 include("compute_PCW.jl")                 # Compute phase function w/ PCW
 include("phase_function_autodiff.jl")     # Auto-differentiation
 include("show_utils.jl")                  # Pretty-print
@@ -85,5 +86,15 @@ export compute_aerosol_optical_properties_nodes,
 # number-mean extinction cross-section from one node set.
 export compute_aerosol_extinction_nodes,
        compute_aerosol_extinction_nodes_gpu
+
+# Batched caller-node Mie seam (proposals/batched_mie_nodes_seam.md v2) —
+# exact-nmax grouped GPU batching + reusable single-owner workspace, for
+# many-ensemble columns (e.g. GCHPIO's per-layer TOMAS inventory).
+export prepare_mie_node_geometry, MieNodeGeometry,
+       compute_aerosol_optical_properties_nodes_batched,
+       compute_aerosol_optical_properties_nodes_batched_gpu,
+       compute_aerosol_extinction_nodes_batched,
+       compute_aerosol_extinction_nodes_batched_gpu,
+       MieBatchWorkspace
 
 end

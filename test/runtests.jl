@@ -25,6 +25,10 @@ try
 # compute_aerosol_optical_properties_nodes/_gpu; delegation refactor of the
 # log-normal NAI2 path via the shared _nai2_bulk_optics core.
 @testset "Mie caller-node API" begin include("test_mie_nodes.jl") end
+
+# Batched caller-node Mie seam (proposals/batched_mie_nodes_seam.md v2) --
+# exact-nmax grouped GPU batching + reusable single-owner workspace.
+@testset "Mie caller-node batched API" begin include("test_mie_nodes_batched.jl") end
 @testset "CoreRT" begin include("test_CoreRT.jl") end
 @testset "Batched Kernels" begin include("test_batched_kernels.jl") end
 @testset "SolarModel" begin include("test_SolarModel.jl") end

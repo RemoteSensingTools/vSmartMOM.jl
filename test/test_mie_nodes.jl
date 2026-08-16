@@ -1043,6 +1043,26 @@ compute_NAI2_nodes.jl) for where these numbers get recorded doc-side.
     scat_angles_deg = 0:1:180
     μgrid = cos.(deg2rad.(collect(Float64, scat_angles_deg)))
 
+    # Ratio metrics for one phase-matrix element pair (e.g. f₁₂), given the
+    # SAME grid's F64-reference P11 (`p11_64`): the raw max ratio error is
+    # dominated by grid points where P11 is tiny (near-zero-intensity angles,
+    # where "no photons scatter" so the RATIO is numerically fragile but
+    # PHYSICALLY negligible). The P11-WEIGHTED RMS (weight = p11_64 /
+    # sum(p11_64), i.e. proportional to how many photons actually scatter at
+    # that angle) and the element-wise absolute error normalized by the PEAK
+    # P11 (avoiding division by a near-zero LOCAL P11 entirely) are the
+    # physically meaningful companions to the raw max -- they answer "how
+    # wrong is the polarization where it matters" rather than "how wrong can
+    # the ratio get in the forward/backward nulls".
+    function _ratio_metrics(f32_elem, f64_elem, p11_32, p11_64, p11_weight, p11_peak)
+        ratio64 = f64_elem ./ p11_64
+        ratio32 = Float64.(f32_elem) ./ p11_32
+        raw_max = maximum(abs.(ratio32 .- ratio64))
+        w_rms = sqrt(sum(p11_weight .* (ratio32 .- ratio64) .^ 2))
+        elem_normpeak = maximum(abs.(Float64.(f32_elem) .- f64_elem)) / p11_peak
+        return (raw_max=raw_max, w_rms=w_rms, elem_normpeak=elem_normpeak)
+    end
+
     function _phase_matrix_errors(label, rr, ww, nr_, ni_, lam_)
         f64 = compute_aerosol_optical_properties_nodes(rr, ww, nr_, ni_, lam_, Stokes_IQUV(), NoTruncation())
         rr32 = Float32.(rr); ww32 = Float32.(ww)
@@ -1057,22 +1077,18 @@ compute_NAI2_nodes.jl) for where these numbers get recorded doc-side.
         p11_32 = Float64.(sm32.f₁₁)
         p11_abserr = maximum(abs.(p11_32 .- p11_64))
         p11_relerr = maximum(abs.(p11_32 .- p11_64) ./ abs.(p11_64))
+        p11_peak = maximum(p11_64)
+        p11_weight = p11_64 ./ sum(p11_64)
 
-        ratio64_12 = sm64.f₁₂ ./ sm64.f₁₁
-        ratio32_12 = Float64.(sm32.f₁₂) ./ Float64.(sm32.f₁₁)
-        err_12 = maximum(abs.(ratio32_12 .- ratio64_12))
+        m12 = _ratio_metrics(sm32.f₁₂, sm64.f₁₂, p11_32, p11_64, p11_weight, p11_peak)
+        m33 = _ratio_metrics(sm32.f₃₃, sm64.f₃₃, p11_32, p11_64, p11_weight, p11_peak)
+        m34 = _ratio_metrics(sm32.f₃₄, sm64.f₃₄, p11_32, p11_64, p11_weight, p11_peak)
 
-        ratio64_33 = sm64.f₃₃ ./ sm64.f₁₁
-        ratio32_33 = Float64.(sm32.f₃₃) ./ Float64.(sm32.f₁₁)
-        err_33 = maximum(abs.(ratio32_33 .- ratio64_33))
-
-        ratio64_34 = sm64.f₃₄ ./ sm64.f₁₁
-        ratio32_34 = Float64.(sm32.f₃₄) ./ Float64.(sm32.f₁₁)
-        err_34 = maximum(abs.(ratio32_34 .- ratio64_34))
-
-        println("  $label: P11 maxabs=$(p11_abserr) (max relerr=$(p11_relerr))  ",
-                "P12/P11 maxabs=$(err_12)  P33/P11 maxabs=$(err_33)  P34/P11 maxabs=$(err_34)")
-        return (p11_abserr=p11_abserr, p11_relerr=p11_relerr, err_12=err_12, err_33=err_33, err_34=err_34)
+        println("  $label: P11 maxabs=$(p11_abserr) (max relerr=$(p11_relerr))")
+        println("    P12/P11: raw max=$(m12.raw_max)  P11-weighted RMS=$(m12.w_rms)  |Δf12|/peak(P11)=$(m12.elem_normpeak)")
+        println("    P33/P11: raw max=$(m33.raw_max)  P11-weighted RMS=$(m33.w_rms)  |Δf33|/peak(P11)=$(m33.elem_normpeak)")
+        println("    P34/P11: raw max=$(m34.raw_max)  P11-weighted RMS=$(m34.w_rms)  |Δf34|/peak(P11)=$(m34.elem_normpeak)")
+        return (p11_abserr=p11_abserr, p11_relerr=p11_relerr, m12=m12, m33=m33, m34=m34)
     end
 
     dist = LogNormal(log(_mu_aer), log(_sigma_aer))
@@ -1093,17 +1109,36 @@ compute_NAI2_nodes.jl) for where these numbers get recorded doc-side.
     errs_wide = _phase_matrix_errors("wide TOMAS", wide_r, wide_w, nr_w, ni_w, lam_w)
 
     # Measured (this host, 2026-08-16): P11 max relerr ~0.2-0.9%, P12/P11 and
-    # P34/P11 maxabs ~2-3e-4 (tiny), P33/P11 maxabs ~1.4-3.8% (the dominant
-    # polarized-error term -- consistent with α/δ/ζ being the largest-error
-    # Greek coefficients measured in the "NativeFloat32: accuracy..." testset
-    # above, since f₃₃ derives from δ AND α/ζ via R²/T²). Asserted with a
-    # ~2-3x margin over measured, not a vacuous bound.
+    # P34/P11 raw maxabs ~2-3e-4 (tiny), P33/P11 raw maxabs ~1.4-3.8% -- but
+    # that raw P33/P11 maximum occurs where P11 is only ~0.09-0.15% of its
+    # peak (i.e. essentially no scattered intensity there); the physically
+    # meaningful P11-weighted RMS of every ratio's error is ~0.033-0.078%,
+    # two orders of magnitude tighter. |Δf|/peak(P11): ~1e-7-1e-6 for
+    # P12/P34, ~5.5e-3 (standard set) / ~9.2e-5 (wide set) for P33 -- P33 is
+    # consistently the largest polarized-error channel (traces to α/δ/ζ being
+    # the largest-error Greek coefficients), so it gets its own, looser
+    # (still measured-with-margin, not vacuous) threshold. Asserted with
+    # margin over BOTH the raw max (kept, not weakened) and the new
+    # weighted/peak-normalized metrics.
     @test errs_std.p11_relerr  < 0.02
-    @test errs_std.err_12      < 1e-3
-    @test errs_std.err_33      < 0.10
-    @test errs_std.err_34      < 1e-3
+    @test errs_std.m12.raw_max < 1e-3
+    @test errs_std.m33.raw_max < 0.10
+    @test errs_std.m34.raw_max < 1e-3
+    @test errs_std.m12.w_rms   < 5e-3
+    @test errs_std.m33.w_rms   < 5e-3
+    @test errs_std.m34.w_rms   < 5e-3
+    @test errs_std.m12.elem_normpeak < 1e-5
+    @test errs_std.m33.elem_normpeak < 1e-2
+    @test errs_std.m34.elem_normpeak < 1e-5
+
     @test errs_wide.p11_relerr < 0.02
-    @test errs_wide.err_12     < 1e-3
-    @test errs_wide.err_33     < 0.10
-    @test errs_wide.err_34     < 1e-3
+    @test errs_wide.m12.raw_max < 1e-3
+    @test errs_wide.m33.raw_max < 0.10
+    @test errs_wide.m34.raw_max < 1e-3
+    @test errs_wide.m12.w_rms   < 5e-3
+    @test errs_wide.m33.w_rms   < 5e-3
+    @test errs_wide.m34.w_rms   < 5e-3
+    @test errs_wide.m12.elem_normpeak < 1e-5
+    @test errs_wide.m33.elem_normpeak < 1e-2
+    @test errs_wide.m34.elem_normpeak < 1e-5
 end

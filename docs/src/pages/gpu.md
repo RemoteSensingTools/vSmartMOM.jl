@@ -86,9 +86,13 @@ log-normal set (nquad=300) and a wide-range (0.005-6 μm) TOMAS-like set:
 | `ω̃` (SSA) relerr | 7.8e-8 | 1.9e-8 |
 | Greek coefficients, max abs (α/β/δ/ζ worst) | 5.0e-3 | 4.3e-3 |
 | P11 (reconstructed phase function), max relerr | 0.89% | 0.19% |
-| P12/P11, max abs | 1.6e-4 | 2.5e-4 |
-| P33/P11, max abs | **1.4%** | **3.8%** |
-| P34/P11, max abs | 3.1e-4 | 2.8e-4 |
+| P12/P11, raw max abs | 1.6e-4 | 2.5e-4 |
+| P33/P11, raw max abs | **1.4%** | **3.8%** |
+| P34/P11, raw max abs | 3.1e-4 | 2.8e-4 |
+| P12/P11, P11-weighted RMS | 6.6e-6 | 6.1e-6 |
+| P33/P11, P11-weighted RMS | 3.3e-4 | 7.8e-4 |
+| P34/P11, P11-weighted RMS | 1.5e-5 | 9.8e-6 |
+| \|Δf₃₃\| / peak(P11) | 5.5e-3 | 9.2e-5 |
 
 `k`/`ω̃` land close to `DSEmulated`'s established floor (both are dominated by
 Neumaier-compensated summation, not the Dₙ recursion). Greek coefficients and
@@ -96,9 +100,15 @@ the P33/P11 polarized ratio are the clearest signal of `NativeFloat32`'s
 reduced accuracy vs `DSEmulated` (no double-single Dₙ emulation, and — unlike
 the log-normal `MieModel` GPU path below — the reduction itself is never
 Float64-widened, by design, to keep zero Float64 device arrays). P12/P11 and
-P34/P11 stay small throughout. See `test/test_mie_nodes.jl`'s "NativeFloat32:
-accuracy..." and "NativeFloat32: polarized phase-matrix validation gate"
-testsets for the exact reproduction recipe.
+P34/P11 stay small throughout. The RAW max ratio errors above are dominated by
+grid angles where P11 is tiny (near-null scattering angles — physically
+negligible, numerically fragile as a RATIO denominator); the P11-WEIGHTED RMS
+and peak-normalized absolute-element rows are the physically meaningful
+companions (weight ∝ how many photons actually scatter at that angle) and are
+1-2 orders of magnitude tighter than the raw max in every case. See
+`test/test_mie_nodes.jl`'s "NativeFloat32: accuracy..." and "NativeFloat32:
+polarized phase-matrix validation gate" testsets for the exact reproduction
+recipe.
 
 On the log-normal `MieModel` GPU path (`compute_aerosol_optical_properties_gpu`),
 `NativeFloat32` lands at `k`/`ω̃` relerr ~1-2e-7 and Greek coefficients ~7e-5
@@ -144,6 +154,75 @@ Float64-widened regardless of precision policy (see `test/local/gpu/test_mie_gpu
   the sole supported absorption dependency going forward, with its own backend
   dispatch. The internal standalone `Absorption` module is legacy-only and will
   be removed; do not use its GPU Voigt kernel for new work.
+
+## Batched caller-node Mie seam (exact-`nmax` grouping)
+
+For many-ensemble columns (e.g. GCHPIO's per-layer TOMAS size-distribution
+inventory: hundreds of ensembles × tens of nodes each, one ensemble per
+aerosol population per layer), launching one GPU Mie call per ensemble pays
+kernel-launch overhead hundreds of times per spectral point. The batched
+seam (`prepare_mie_node_geometry` + `compute_aerosol_optical_properties_nodes_batched`
+/ `compute_aerosol_extinction_nodes_batched`, see
+[Batched Caller-Node Mie Seam](@ref) and
+`proposals/batched_mie_nodes_seam.md`) groups ensembles by their EXACT
+Mie `nmax` term count at the current wavelength and issues one kernel-1
+launch per group, instead of per ensemble or a single global-max-padded
+launch (the padded design was rejected: it breaks bit-identity with the
+single-ensemble reference and inflates memory ~8× on the real GCHPIO
+column). Segmented, order-preserving reductions then recombine each
+group's per-node results into per-ensemble bulk optics, and results are
+reassembled in the caller's original ensemble order.
+
+By construction (same arithmetic order and same per-ensemble normalize-once
+semantics as the single-ensemble path, just re-grouped into batched kernel
+launches), the batched path is **bit-for-bit identical** to calling
+`compute_aerosol_optical_properties_nodes`/`compute_aerosol_extinction_nodes`
+once per ensemble — verified on the portable KA-CPU backend (all three
+precision policies, full and extinction-only variants, mixed-RI and
+mixed-size fixtures). On real CUDA hardware, batched-vs-single agree to
+near machine precision but not bit-for-bit, because the two code paths
+launch kernels over different `ndrange` shapes (grouped-batch size vs
+single-ensemble size) and CUDA's compiler is free to generate different
+PTX/SASS (loop unrolling, FMA contraction, register allocation) for
+logically identical, race-free source code compiled for a different
+launch configuration — a well-known GPU characteristic, not a logic bug
+(confirmed by exhaustive same-shape manual verification finding zero
+divergence at every intermediate stage). Measured on an A100: `k`/`ω̃`
+relative errors ~1e-16 to ~1.4e-7 and Greek-coefficient absolute
+differences ~1e-15 to ~8e-6 depending on precision policy, consistent with
+this codebase's existing KA-CPU-vs-real-CUDA tolerances elsewhere. See
+`test/test_mie_nodes_batched.jl`'s `_run_bitwise_gate` docstring for the
+exact numbers and the `exact=false` real-CUDA tolerance rationale.
+
+A `MieBatchWorkspace` (grow-only buffers, keyed on backend instance + FT +
+reduction type, single-owner) lets repeated calls across many wavelengths
+reuse device allocations even though group membership changes from one
+wavelength to the next (group boundaries depend on the wavenumber-scaled
+size parameter, so they are NOT fixed across a spectral loop).
+
+Benchmark on this host (A100, synthetic 882-ensemble × 96-node inventory
+mirroring the real GCHPIO TOMAS-wet-range column, ~130+ distinct `nmax`
+groups):
+
+| Path | Time |
+|---|---|
+| CPU, 16-thread `Threads.@threads` (existing ensemble-level path) | ~1.6 s |
+| KA-CPU grouped batched (portable backend, no GPU hardware) | ~1.2 s |
+| A100, grouped batched (`NativeFloat64`) | ~0.34 s |
+| A100, serial single-call-per-ensemble loop (pre-batching baseline) | ~1.7 s |
+| A100, grouped batched (`DSEmulated`) | ~0.34 s |
+| A100, grouped batched (`NativeFloat32`) | ~0.23 s |
+
+i.e. ~4.9× over the serial single-call CUDA loop and ~4.6× over the
+16-thread CPU path on this synthetic column; see
+`test/test_mie_nodes_batched.jl`'s Gate 5 benchmark testset for the exact
+reproduction recipe and group histogram. These numbers are upstream signal
+only — the actual go/no-go bar is judged against the real GCHPIO column
+once wired in.
+
+The CPU path for the batched API does not itself group ensembles (grouping
+is a GPU-launch-overhead concern); it dispatches to the same
+`Threads.@threads` ensemble-level loop as the non-batched CPU path.
 
 ## CPU fallback
 
