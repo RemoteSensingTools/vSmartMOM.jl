@@ -198,6 +198,47 @@ end
 end
 
 # ============================================================================
+# Gate 1 (CUDA, STRICT exact): full-batched .k == extinction-only-batched k
+# ============================================================================
+# The narrower invariant that IS exact (`==`) on real CUDA hardware, for all
+# three precision policies (independently verified by Codex's review): the
+# extinction-only batched call and the full batched call share the IDENTICAL
+# Kernel-1 + cross-section + segmented-weighted-sum code path -- extinction-
+# only simply never continues into the launch-shape-sensitive amplitude/
+# phase/Greek reduction that breaks bitwise equality between batched and
+# single-ensemble elsewhere on real CUDA (see the tolerance-based testset
+# above). This is the exact invariant GCHPIO's hybrid exact-τ mechanism
+# (extinction-only for most of the spectrum, full optics only where Greek
+# coefficients are actually needed) depends on, so it gets its OWN dedicated
+# STRICT (zero-tolerance `==`) regression test rather than being folded into
+# the isapprox-based comparisons above (where it was previously only
+# incidentally exercised via `@test isapprox(ext_batched[e], batched[e].k;
+# rtol=rtol_scalar)`, an inexact check that could mask a real regression).
+# ============================================================================
+@testset "Gate 1 (CUDA, STRICT exact): full-batched .k == extinction-only-batched k" begin
+    if !_BATCHED_CUDA_FUNCTIONAL
+        @test_skip "CUDA not functional on this host — strict real-CUDA k-equality regression skipped"
+    else
+        fx = _mixed_ensemble_fixture()
+        radii, weights, offsets = _concat_fixture(fx)
+        pol = Stokes_IQUV(); trunc = NoTruncation()
+
+        for (policy, FT) in ((NativeFloat64(), Float64), (DSEmulated(), Float32), (NativeFloat32(), Float32))
+            radii_c = FT.(radii); weights_c = FT.(weights)
+            ens_nr_c = FT.(fx.ens_nr); ens_ni_c = FT.(fx.ens_ni); lam_c = FT(0.55)
+            geom = prepare_mie_node_geometry(radii_c, weights_c, offsets; architecture=Architectures.GPU())
+            batched = compute_aerosol_optical_properties_nodes_batched_gpu(
+                geom, lam_c, ens_nr_c, ens_ni_c, pol, trunc, _BATCHED_CUDA_BACKEND; precision_policy=policy)
+            ext_batched = compute_aerosol_extinction_nodes_batched_gpu(
+                geom, lam_c, ens_nr_c, ens_ni_c, _BATCHED_CUDA_BACKEND; precision_policy=policy)
+            for e in 1:fx.E
+                @test ext_batched[e] == batched[e].k
+            end
+        end
+    end
+end
+
+# ============================================================================
 # Gate 1 (CPU dispatch path): closes the coverage gap flagged in review --
 # `_run_bitwise_gate` above only exercises the explicit-backend `_batched_gpu`
 # functions (mirroring the GPU-focused acceptance-gate wording), never the
@@ -208,23 +249,44 @@ end
 # `architecture` kwarg at all downstream). Compares against the single-
 # ensemble CPU entry points (`compute_aerosol_optical_properties_nodes`/
 # `compute_aerosol_extinction_nodes`, themselves defaulting to
-# `Architectures.CPU()`), bitwise, on the mixed-RI multi-group fixture.
+# `Architectures.CPU()`), bitwise (VALUE) AND type-equal (Codex CPU
+# Float32-output-contract regression: `prepare_mie_node_geometry` used to
+# force GFT=Float64 for CPU geometries and the batched CPU output-type
+# formula read that forced Float64 back off `geometry.radii_host`, so a
+# batched CPU call with Float32 inputs silently returned Float64 while the
+# single-ensemble call correctly returned Float32 -- GCHPIO's consumer code
+# had to add a `_narrow_greek` workaround for exactly this. Fixed via
+# `MieNodeGeometry.output_FT`, captured from the caller's ORIGINAL
+# radii/weights eltype before any internal Float64 forcing; this test locks
+# the fix in place for both Float64 and Float32), on the mixed-RI
+# multi-group fixture.
 # ============================================================================
-@testset "Gate 1: bitwise batched-vs-single, Architectures.CPU() dispatch path" begin
+function _run_cpu_dispatch_gate(::Type{FT}) where {FT}
     fx = _mixed_ensemble_fixture()
     radii, weights, offsets = _concat_fixture(fx)
-    lam = 0.55
+    radii_c = FT.(radii); weights_c = FT.(weights)
+    ens_r_c = [FT.(r) for r in fx.ens_r]; ens_w_c = [FT.(w) for w in fx.ens_w]
+    ens_nr_c = FT.(fx.ens_nr); ens_ni_c = FT.(fx.ens_ni); lam_c = FT(0.55)
     pol = Stokes_IQUV(); trunc = NoTruncation()
 
-    geom_cpu = prepare_mie_node_geometry(radii, weights, offsets; architecture=Architectures.CPU())
-    batched = compute_aerosol_optical_properties_nodes_batched(geom_cpu, lam, fx.ens_nr, fx.ens_ni, pol, trunc)
-    ext_batched = compute_aerosol_extinction_nodes_batched(geom_cpu, lam, fx.ens_nr, fx.ens_ni)
+    geom_cpu = prepare_mie_node_geometry(radii_c, weights_c, offsets; architecture=Architectures.CPU())
+    batched = compute_aerosol_optical_properties_nodes_batched(geom_cpu, lam_c, ens_nr_c, ens_ni_c, pol, trunc)
+    ext_batched = compute_aerosol_extinction_nodes_batched(geom_cpu, lam_c, ens_nr_c, ens_ni_c)
 
     @test length(batched) == fx.E && length(ext_batched) == fx.E
     for e in 1:fx.E
-        single = compute_aerosol_optical_properties_nodes(fx.ens_r[e], fx.ens_w[e], fx.ens_nr[e], fx.ens_ni[e], lam, pol, trunc)
-        single_k = compute_aerosol_extinction_nodes(fx.ens_r[e], fx.ens_w[e], fx.ens_nr[e], fx.ens_ni[e], lam)
+        single = compute_aerosol_optical_properties_nodes(ens_r_c[e], ens_w_c[e], ens_nr_c[e], ens_ni_c[e], lam_c, pol, trunc)
+        single_k = compute_aerosol_extinction_nodes(ens_r_c[e], ens_w_c[e], ens_nr_c[e], ens_ni_c[e], lam_c)
 
+        # TYPE equality first -- this is exactly what the Codex-reported bug
+        # broke (batched CPU F32 input silently returning Float64 output).
+        @test typeof(batched[e].k) === FT === typeof(single.k)
+        @test typeof(batched[e].ω̃) === FT === typeof(single.ω̃)
+        @test eltype(batched[e].greek_coefs.β) === FT === eltype(single.greek_coefs.β)
+        @test typeof(ext_batched[e]) === FT === typeof(single_k)
+
+        # VALUE equality (bitwise), to the same standard the single CPU path
+        # itself meets (both compute internally in Float64 and narrow once).
         @test batched[e].k == single.k
         @test batched[e].ω̃ == single.ω̃
         for field in (:α, :β, :γ, :δ, :ϵ, :ζ)
@@ -233,6 +295,13 @@ end
         @test ext_batched[e] == single_k
         @test ext_batched[e] == batched[e].k
     end
+end
+
+@testset "Gate 1: bitwise batched-vs-single, Architectures.CPU() dispatch path, Float64" begin
+    _run_cpu_dispatch_gate(Float64)
+end
+@testset "Gate 1: bitwise+type-equal batched-vs-single, Architectures.CPU() dispatch path, Float32 (Codex F32-output-contract regression)" begin
+    _run_cpu_dispatch_gate(Float32)
 end
 
 # ============================================================================

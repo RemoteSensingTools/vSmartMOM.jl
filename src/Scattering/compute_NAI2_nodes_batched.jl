@@ -78,6 +78,34 @@ called directly on that ensemble's raw (radii, weights): both normalize the
 SAME raw weights via the SAME Float64 arithmetic exactly ONCE (geometry does
 it at construction time instead of at call time), so there is no
 double-normalization rounding perturbation to break bitwise equality.
+Internal CPU compute always runs in Float64 (`IC = Float64`, matching the
+single-ensemble CPU path exactly) regardless of the CALLER's own
+radii/weights element type -- but the OUTPUT still narrows to the caller's
+own type (`MieNodeGeometry.output_FT`, captured from the caller's ORIGINAL
+radii/weights eltype at `prepare_mie_node_geometry` time, kept separate from
+any internal-compute forcing): an all-`Float32` CPU call returns `Float32`,
+exactly matching what `compute_aerosol_optical_properties_nodes` itself
+would return for the same inputs.
+
+**Public bit-compatibility contract, precisely, by backend** (see
+`docs/src/pages/gpu.md`'s "Batched caller-node Mie seam" section for the
+full writeup and measured numbers): `Architectures.CPU()` and any portable
+KA backend (KA-CPU) achieve TRUE bitwise (`==`) batched-vs-single equality,
+by construction, as argued above. Real CUDA/Metal hardware do NOT reproduce
+this bitwise -- only near-machine-precision -- because the batched and
+single-ensemble calls launch kernels over different `ndrange` shapes, and a
+GPU compiler is free to generate different (but equally valid) machine code
+for logically identical, race-free source compiled for a different launch
+configuration. The one invariant that DOES hold exactly (`==`), even on real
+CUDA, for all three precision policies, is
+`compute_aerosol_extinction_nodes_batched`'s per-ensemble result equalling
+`compute_aerosol_optical_properties_nodes_batched`'s `.k` for that SAME
+ensemble (the two share the identical Kernel-1 + cross-section +
+segmented-weighted-sum path; extinction-only just never continues into the
+launch-shape-sensitive amplitude/phase/Greek reduction) -- this is the exact
+invariant GCHPIO's hybrid exact-τ mechanism rests on, and it has its own
+dedicated strict real-CUDA regression test (not folded into the
+tolerance-based comparisons) in `test/test_mie_nodes_batched.jl`.
 =====================================================================
 =#
 
@@ -100,6 +128,24 @@ do not construct or mutate directly)
 - `architecture`: fixed at construction; determines `GFT` and whether `radii`/
   `weights`/`node_to_ensemble` are device-resident copies (GPU) or identical
   to the host arrays (CPU — no copy is made).
+- `backend`: the ACTUAL KA backend `radii`/`weights`/`node_to_ensemble` were
+  built on (`nothing` for `Architectures.CPU()`) — may be an explicit
+  override passed to [`prepare_mie_node_geometry`](@ref)'s `backend` keyword,
+  NOT necessarily `Architectures.ka_backend(architecture)`. The top-level
+  batched dispatchers (`compute_aerosol_optical_properties_nodes_batched`/
+  `compute_aerosol_extinction_nodes_batched`) launch kernels on THIS stored
+  backend rather than re-deriving one from `architecture`, so an overridden
+  geometry stays internally consistent no matter which entry point is used.
+- `output_FT`: the CALLER's ORIGINAL `radii`/`weights` promoted element type
+  (`float(promote_type(eltype(radii), eltype(weights)))`, captured BEFORE any
+  internal-compute forcing) — this is what the batched CPU output narrows to
+  (together with `n_real`/`n_imag`/`wavelength`'s own eltypes), exactly
+  mirroring [`compute_aerosol_optical_properties_nodes`](@ref)'s own output-type
+  formula. Distinct from `GFT` for `Architectures.CPU()` geometries, where
+  `GFT` is forced to `Float64` for internal compute regardless of the
+  caller's actual `radii`/`weights` eltype (e.g. an all-`Float32` CPU call
+  must still return `Float32`, not `Float64`) — for GPU architectures
+  `output_FT === GFT` trivially, since `GFT` is never forced there.
 - `n_ensembles`, `n_nodes`: `E` and total node count.
 - `offsets::Vector{Int}`: length `E+1`, ALWAYS host-resident (needed for
   per-λ host-side grouping and the CPU threaded loop regardless of
@@ -126,6 +172,15 @@ architectures (matching the single-ensemble GPU path's kernel type `FT`).
 struct MieNodeGeometry{GFT<:AbstractFloat, ARCH<:Architectures.AbstractArchitecture,
                         RV<:AbstractVector{GFT}, IV<:AbstractVector{Int}}
     architecture::ARCH
+    backend::Any                 # the ACTUAL KA backend geometry's device arrays were built on
+                                  # (`nothing` for Architectures.CPU()); reused by the top-level
+                                  # dispatchers so they never re-derive a (possibly DIFFERENT)
+                                  # backend from `architecture` -- see prepare_mie_node_geometry's
+                                  # `backend` keyword docstring.
+    output_FT::Type               # caller's ORIGINAL radii/weights promoted eltype, independent of
+                                  # any internal compute-precision forcing (e.g. CPU geometries force
+                                  # GFT=Float64 for internal compute, but a Float32 CALLER must still
+                                  # get a Float32 OUTPUT -- see _batched_cpu_full/_batched_cpu_extinction)
     n_ensembles::Int
     n_nodes::Int
     offsets::Vector{Int}
@@ -174,13 +229,22 @@ uploads the result once.
 - `backend`: `nothing` (default) derives the device-array backend from
   `architecture` (`Architectures.ka_backend`) whenever `architecture` is
   NON-CPU, exactly like every other GPU entry point in this module. Pass an
-  EXPLICIT KA backend (e.g. `KernelAbstractions.CPU()`) to override this —
-  the only reason to do so is testing a GPU-style geometry (`architecture`
-  non-CPU, so `GFT` is the caller's Float32/Float64 choice rather than the
-  CPU path's forced `Float64`) on a portable backend without real GPU
-  hardware, mirroring how [`compute_aerosol_optical_properties_nodes_gpu`](@ref)
-  takes an explicit `backend` decoupled from any "architecture" concept.
-  Ignored (must be left `nothing`) when `architecture isa Architectures.CPU`.
+  EXPLICIT KA backend (e.g. `KernelAbstractions.CPU()`) to override this — the
+  main use case is testing a GPU-style geometry (`architecture` non-CPU, so
+  `GFT` is the caller's Float32/Float64 choice rather than the CPU path's
+  forced `Float64`) on a portable backend without real GPU hardware,
+  mirroring how [`compute_aerosol_optical_properties_nodes_gpu`](@ref) takes
+  an explicit `backend` decoupled from any "architecture" concept. Whichever
+  backend is resolved here (the override, or the `architecture`-derived
+  default) is STORED on the returned geometry (`MieNodeGeometry.backend`) and
+  reused verbatim by every later call, INCLUDING the top-level
+  `compute_aerosol_optical_properties_nodes_batched`/
+  `compute_aerosol_extinction_nodes_batched` dispatchers — they launch
+  kernels on this stored backend rather than re-deriving one from
+  `architecture`, so an overridden geometry stays internally consistent no
+  matter which entry point (top-level or the explicit-backend `_gpu` sibling)
+  is used on it afterward. Ignored (must be left `nothing`) when
+  `architecture isa Architectures.CPU`.
 
 # Returns
 [`MieNodeGeometry`](@ref), reusable across arbitrarily many
@@ -204,6 +268,14 @@ function prepare_mie_node_geometry(radii::AbstractVector, weights::AbstractVecto
     @assert all(w -> w ≥ 0, weights) "weights must be ≥ 0"
     @assert all(r -> r > 0, radii) "radii must be > 0"
     @assert !(architecture isa Architectures.CPU) || backend === nothing "backend override is only meaningful for a non-CPU architecture (a CPU-architecture geometry never has device arrays)"
+
+    # Caller's ORIGINAL radii/weights promoted type, captured BEFORE any
+    # internal-compute forcing below -- this is the type the batched CPU
+    # output must narrow to (see MieNodeGeometry's `output_FT` field and
+    # _batched_cpu_full/_batched_cpu_extinction). For GPU architectures this
+    # equals GFT trivially (GFT is never forced away from the caller's choice
+    # there), so `output_FT` costs nothing extra on that path.
+    output_FT = float(promote_type(eltype(radii), eltype(weights)))
 
     GFT = architecture isa Architectures.CPU ? Float64 :
           float(promote_type(eltype(radii), eltype(weights)))
@@ -249,7 +321,7 @@ function prepare_mie_node_geometry(radii::AbstractVector, weights::AbstractVecto
     end
 
     if architecture isa Architectures.CPU
-        return MieNodeGeometry(architecture, E, n_nodes, offsets_v, radii_host, weights_host,
+        return MieNodeGeometry(architecture, backend, output_FT, E, n_nodes, offsets_v, radii_host, weights_host,
                                 radii_host, weights_host, node_to_ensemble_host)
     else
         AT = KernelAbstractions.allocate
@@ -259,7 +331,7 @@ function prepare_mie_node_geometry(radii::AbstractVector, weights::AbstractVecto
         KernelAbstractions.copyto!(backend, radii_dev, radii_host)
         KernelAbstractions.copyto!(backend, weights_dev, weights_host)
         KernelAbstractions.copyto!(backend, n2e_dev, node_to_ensemble_host)
-        return MieNodeGeometry(architecture, E, n_nodes, offsets_v, radii_host, weights_host,
+        return MieNodeGeometry(architecture, backend, output_FT, E, n_nodes, offsets_v, radii_host, weights_host,
                                 radii_dev, weights_dev, n2e_dev)
     end
 end
@@ -272,11 +344,25 @@ end
     MieBatchWorkspace(backend, FT::Type, RA::Type)
 
 Reusable, GROW-ONLY GPU scratch space for the batched caller-node Mie API,
-keyed on the **backend instance** (`objectid(backend)` — a distinct CUDA
-stream or Metal device gets its own workspace) plus `FT` (kernel precision)
-and `RA` (reduction precision, see `_mie_reduction_type`) — NOT
+keyed on the **backend VALUE** (`objectid(backend)`) plus `FT` (kernel
+precision) and `RA` (reduction precision, see `_mie_reduction_type`) — NOT
 polarization: polarization does not change the raw kernel-1/reduction scratch
 layout, so there is no separate workspace per `AbstractPolarizationType`.
+
+**`objectid(backend)` is backend-VALUE identity, not device/stream identity**:
+KA backend structs (`KernelAbstractions.CPU()`, `CUDA.CUDABackend()`,
+Metal's backend) are `isbits` values carrying only backend-TYPE/config
+fields (e.g. `CUDABackend`'s `prefer_blocks`/`always_inline` flags) — NOT
+which physical GPU or CUDA stream is currently active. Two separately
+constructed `CUDA.CUDABackend()` values are `objectid`-EQUAL regardless of
+`CUDA.device()`/`CUDA.stream()` (verified: same `objectid` across 2 distinct
+GPUs on a multi-GPU host). This check therefore catches genuinely different
+backend TYPES/configs (a KA-CPU workspace handed a CUDA launch, or vice
+versa) but does **NOT** catch a workspace built while one CUDA device/stream
+was active being reused while a DIFFERENT device/stream is active — that is
+a real gap, not yet closed: true device/stream-aware keying (e.g.
+incorporating `CUDA.device()`/`CUDA.stream()` into the key) is future work.
+Single-device, single-stream usage (the common case) is unaffected.
 
 Capacities are tracked independently PER SCRATCH ARRAY (grouped-node count,
 coefficient count, node-angle scratch, Greek-table size): a request larger
@@ -298,11 +384,13 @@ check is UNCONDITIONAL (every `_ws_array!` call, not gated behind
 bounds-checking) — it is one field compare (plus, on first use, one field
 write), cheap enough that making it a debug-only check would only trade a
 negligible cost saving for the ability to silently disable safety via
-`@inbounds`. Every use also verifies `objectid(backend) === backend_id`
-(the instance the workspace was constructed for): a workspace built for one
-CUDA stream / Metal device / KA backend instance can never be handed to a
-launch against a different one, since their device arrays are not
-interchangeable.
+`@inbounds`. Every use also verifies `objectid(backend) === backend_id` (the
+backend VALUE the workspace was constructed for): this catches a workspace
+built for one backend TYPE/config being handed to a launch against a
+DIFFERENT one (e.g. KA-CPU vs CUDA vs Metal, or a differently-configured
+`CUDABackend`). It does **NOT** distinguish CUDA devices or streams (see the
+caveat above) — single-device, single-stream usage only; true device/stream
+keying is future work.
 """
 mutable struct MieBatchWorkspace
     backend_id::UInt64
@@ -321,17 +409,23 @@ end
     # field compare plus, on first use, one field write, which is cheap enough
     # that gating it behind bounds-checking (silently disabled by an
     # `@inbounds` caller) is not worth the risk of (a) a workspace's cached
-    # device arrays being reused across a DIFFERENT backend instance (a
-    # distinct CUDA stream / Metal device / KA backend never shares device
-    # memory with another), or (b) two concurrent tasks/streams silently
-    # corrupting scratch shared by grow-only reuse (one task's buffer can be
-    # resized out from under another's in-flight kernel).
+    # device arrays being reused across a DIFFERENT backend VALUE (backend
+    # TYPE/config -- KA-CPU vs CUDA vs Metal, or a differently-configured
+    # CUDABackend -- NOT device/stream identity: KA backend structs are
+    # isbits values that do not encode which physical GPU/stream is active,
+    # so this does NOT catch a workspace reused across two CUDA devices/
+    # streams with an otherwise-identical CUDABackend() value; see
+    # MieBatchWorkspace's docstring), or (b) two concurrent tasks/streams
+    # silently corrupting scratch shared by grow-only reuse (one task's
+    # buffer can be resized out from under another's in-flight kernel).
     if objectid(backend) !== ws.backend_id
         throw(ArgumentError(
-            "MieBatchWorkspace was built for a different backend instance (objectid " *
+            "MieBatchWorkspace was built for a different backend VALUE (objectid " *
             "mismatch): its cached device arrays cannot be reused across a different " *
-            "CUDA stream / Metal device / KA backend. Construct a new MieBatchWorkspace " *
-            "for this backend."))
+            "backend type/config (e.g. KA-CPU vs CUDA vs Metal). Construct a new " *
+            "MieBatchWorkspace for this backend. Note: this does NOT detect a workspace " *
+            "reused across different CUDA devices/streams sharing the same CUDABackend() " *
+            "value -- see MieBatchWorkspace's docstring."))
     end
     t = current_task()
     if ws.owner_task === nothing
@@ -413,12 +507,22 @@ function _batched_cpu_full(geometry::MieNodeGeometry, λ, n_real::AbstractVector
     r_all = geometry.radii_host   # IC = Float64 for a CPU geometry
     w_all = geometry.weights_host # pre-normalized, IC = Float64
 
-    # FT_out depends only on the ELEMENT TYPES of r_all/n_real/n_imag/λ (not on
-    # e), so it is loop-invariant -- hoisted out of the Threads.@threads loop
-    # both to avoid recomputing it E times and so `results` can be a concretely
-    # typed `Vector{AerosolOptics{FT_out}}` (an untyped `Vector{AerosolOptics}`
-    # would box every element, since `AerosolOptics{FT}` is parametric).
-    FT_out = float(promote_type(eltype(r_all), eltype(n_real), eltype(n_imag), typeof(λ)))
+    # FT_out is the CALLER's output type: promote_type of geometry's ORIGINAL
+    # (pre-forcing) radii/weights eltype (`output_FT`, NOT `eltype(r_all)` --
+    # `r_all` is geometry's INTERNAL Float64 compute mirror, forced to Float64
+    # for every CPU geometry regardless of the caller's own radii/weights
+    # eltype; using it here would silently return Float64 even for an
+    # all-Float32 call -- the exact bug this comment guards against, see
+    # MieNodeGeometry's `output_FT` field and this module's top-of-file
+    # docstring) together with n_real/n_imag/λ, EXACTLY mirroring
+    # `compute_aerosol_optical_properties_nodes`'s own `FT = float(promote_type(
+    # eltype(radii), eltype(weights), typeof(n_real), typeof(n_imag),
+    # typeof(wavelength)))` formula. Loop-invariant (not e-dependent) -- hoisted
+    # out of the Threads.@threads loop both to avoid recomputing it E times and
+    # so `results` can be a concretely typed `Vector{AerosolOptics{FT_out}}`
+    # (an untyped `Vector{AerosolOptics}` would box every element, since
+    # `AerosolOptics{FT}` is parametric).
+    FT_out = float(promote_type(geometry.output_FT, eltype(n_real), eltype(n_imag), typeof(λ)))
     results = Vector{AerosolOptics{FT_out}}(undef, E)
     Threads.@threads for e in 1:E
         lo = offsets[e] + 1
@@ -458,10 +562,13 @@ function _batched_cpu_extinction(geometry::MieNodeGeometry, λ, n_real::Abstract
     r_all = geometry.radii_host
     w_all = geometry.weights_host
 
-    # See _batched_cpu_full for why FT_out is hoisted (loop-invariant, and lets
-    # `results` be a concretely typed Vector{FT_out} rather than boxing through
-    # a Vector{Any} + identity.() narrowing pass).
-    FT_out = float(promote_type(eltype(r_all), eltype(n_real), eltype(n_imag), typeof(λ)))
+    # See _batched_cpu_full for why FT_out uses geometry.output_FT (the
+    # caller's ORIGINAL radii/weights eltype) rather than eltype(r_all)
+    # (geometry's internal Float64 compute mirror) -- using the latter would
+    # silently return Float64 for an all-Float32 call. Hoisted (loop-invariant)
+    # so `results` can be a concretely typed Vector{FT_out} rather than boxing
+    # through a Vector{Any} + identity.() narrowing pass.
+    FT_out = float(promote_type(geometry.output_FT, eltype(n_real), eltype(n_imag), typeof(λ)))
     results = Vector{FT_out}(undef, E)
     Threads.@threads for e in 1:E
         lo = offsets[e] + 1
@@ -915,10 +1022,39 @@ end
 Batched sibling of [`compute_aerosol_optical_properties_nodes`](@ref): given a
 [`MieNodeGeometry`](@ref) (`E` ensembles, prepared once via
 [`prepare_mie_node_geometry`](@ref)) and ONE wavelength, returns a
-`Vector{AerosolOptics}` of length `E` — element `e` is EXACTLY what
+`Vector{AerosolOptics}` of length `E` — element `e` is what
 `compute_aerosol_optical_properties_nodes(radii_e, weights_e, n_real[e],
 n_imag[e], wavelength, polarization, truncation; l_max, precision_policy)`
 would return for ensemble `e`'s own (raw) nodes, in ORIGINAL ensemble order.
+**Output type**: `AerosolOptics{FT_out}` where `FT_out` is derived from
+`geometry`'s ORIGINAL `radii`/`weights` eltype (`MieNodeGeometry.output_FT`,
+captured before any internal-compute-precision forcing) promoted with
+`n_real`/`n_imag`/`wavelength`'s eltypes — an all-`Float32` CPU call returns
+`Float32`, matching `compute_aerosol_optical_properties_nodes` exactly (this
+is a load-bearing contract: GCHPIO's consumer code narrows to its own
+working precision and must be able to rely on this without a manual
+post-hoc narrowing pass).
+
+# Bit-compatibility contract (precise, by backend)
+- **`Architectures.CPU()` and KA-CPU** (portable KernelAbstractions backends
+  that aren't real CUDA/Metal hardware): bit-for-bit identical (`==`) to the
+  single-ensemble path, by construction (same arithmetic order, same
+  per-ensemble normalize-once semantics — see this file's top-of-file module
+  docstring for the full argument).
+- **Real CUDA hardware**: near-machine-precision, NOT bit-for-bit (different
+  `ndrange` launch shapes between the batched and single-ensemble kernel
+  invocations can produce different, but equally valid, PTX/SASS for
+  logically identical code — see `docs/src/pages/gpu.md`'s "Batched
+  caller-node Mie seam" section for the measured magnitudes).
+- **Exact even on real CUDA**: `compute_aerosol_extinction_nodes_batched`'s
+  result for ensemble `e` equals THIS function's `.k` for that same ensemble
+  — the invariant GCHPIO's hybrid exact-τ mechanism depends on (see
+  [`compute_aerosol_extinction_nodes_batched`](@ref)).
+
+See `test/test_mie_nodes_batched.jl` for the acceptance-gate tests (bitwise
+batched-vs-single on CPU/KA-CPU, batching-split invariance, workspace-reuse
+invariance, original-order reassembly, and the dedicated strict real-CUDA
+`.k`-equality regression test).
 
 # GPU: exact-`n_max_global` grouping
 For a GPU `geometry.architecture`, ensembles are grouped by EXACT
@@ -926,11 +1062,7 @@ For a GPU `geometry.architecture`, ensembles are grouped by EXACT
 between wavelengths; recomputed fresh every call), and one kernel-1 launch
 covers each group's concatenated nodes (per-ensemble refractive index via a
 `node_to_ensemble` index — see `gpu_mie_kernels.jl`'s `_batched` sibling
-kernels). This is bitwise-equal to the single-ensemble path by construction:
-see this file's top-of-file module docstring for the full argument, and
-`test/test_mie_nodes_batched.jl` for the acceptance-gate tests (bitwise
-batched-vs-single, batching-split invariance, workspace-reuse invariance,
-original-order reassembly).
+kernels).
 
 # CPU: no grouping
 For `Architectures.CPU()`, this is a `Threads.@threads` loop over ensembles
@@ -978,7 +1110,13 @@ function compute_aerosol_optical_properties_nodes_batched(
         return _batched_cpu_full(geometry, wavelength, n_real, n_imag, truncation, l_max)
     elseif Architectures.has_gpu_mie(architecture)
         FT = eltype(geometry.radii_host)
-        backend = Architectures.ka_backend(architecture)
+        # geometry.backend -- the ACTUAL backend `geometry`'s device arrays
+        # were built on -- NOT a fresh Architectures.ka_backend(architecture)
+        # re-derivation: `prepare_mie_node_geometry`'s `backend` keyword can
+        # override the natural backend (see its docstring), and re-deriving
+        # here would silently ignore that override, launching kernels against
+        # a DIFFERENT backend than the one geometry's arrays actually live on.
+        backend = geometry.backend
         policy = precision_policy === nothing ?
                  Architectures.default_mie_precision_policy(architecture, FT) : precision_policy
         return _batched_gpu_full(geometry, wavelength, n_real, n_imag, truncation, l_max, backend, policy, workspace)
@@ -1033,11 +1171,22 @@ Batched, extinction-only sibling of [`compute_aerosol_extinction_nodes`](@ref)
 — same `geometry`/grouping/workspace story as
 [`compute_aerosol_optical_properties_nodes_batched`](@ref), but returns just
 `Vector{k}` (length `E`, one number-mean bulk extinction cross-section per
-ensemble, ORIGINAL order), computing none of the amplitude matrices,
-phase-matrix elements, or Greek coefficients — see
+ensemble, ORIGINAL order, output type from `geometry.output_FT` promoted
+with `n_real`/`n_imag`/`wavelength` -- same load-bearing Float32-output
+contract as the full API, see its docstring), computing none of the
+amplitude matrices, phase-matrix elements, or Greek coefficients — see
 [`compute_aerosol_extinction_nodes`](@ref)'s own docstring for the
 motivation (GCHPIO's hybrid exact-τ leg is the intended consumer of this
 batched variant).
+
+# Exact-even-on-CUDA invariant
+`compute_aerosol_extinction_nodes_batched`'s result for ensemble `e` equals
+[`compute_aerosol_optical_properties_nodes_batched`](@ref)'s `.k` for that
+SAME ensemble EXACTLY (`==`), on EVERY backend including real CUDA, for all
+three precision policies — see that function's "Bit-compatibility contract"
+section for why (shared Kernel-1 + cross-section + segmented-weighted-sum
+code path). GCHPIO's hybrid exact-τ mechanism rests on this; see the
+dedicated strict real-CUDA regression test in `test/test_mie_nodes_batched.jl`.
 """
 function compute_aerosol_extinction_nodes_batched(
     geometry::MieNodeGeometry, wavelength::Real,
@@ -1052,7 +1201,13 @@ function compute_aerosol_extinction_nodes_batched(
         return _batched_cpu_extinction(geometry, wavelength, n_real, n_imag)
     elseif Architectures.has_gpu_mie(architecture)
         FT = eltype(geometry.radii_host)
-        backend = Architectures.ka_backend(architecture)
+        # geometry.backend -- the ACTUAL backend `geometry`'s device arrays
+        # were built on -- NOT a fresh Architectures.ka_backend(architecture)
+        # re-derivation: `prepare_mie_node_geometry`'s `backend` keyword can
+        # override the natural backend (see its docstring), and re-deriving
+        # here would silently ignore that override, launching kernels against
+        # a DIFFERENT backend than the one geometry's arrays actually live on.
+        backend = geometry.backend
         policy = precision_policy === nothing ?
                  Architectures.default_mie_precision_policy(architecture, FT) : precision_policy
         return _batched_gpu_extinction(geometry, wavelength, n_real, n_imag, backend, policy, workspace)
