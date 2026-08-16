@@ -45,6 +45,7 @@ vSmartMOM.Scattering.compute_aerosol_extinction_nodes_gpu
 vSmartMOM.Scattering.MiePrecisionPolicy
 vSmartMOM.Scattering.NativeFloat64
 vSmartMOM.Scattering.DSEmulated
+vSmartMOM.Scattering.NativeFloat32
 vSmartMOM.Scattering.DoubleSingle
 vSmartMOM.Scattering.ComplexDS
 vSmartMOM.Scattering.NeumaierAccum

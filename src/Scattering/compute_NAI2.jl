@@ -233,14 +233,22 @@ function _nai2_bulk_optics(r::AbstractVector, wₓ::AbstractVector, nᵣ, nᵢ, 
         fill!(bn_v, 0)
         fill!(Dₙ, 0)
 
-        # Compute aₙ,bₙ and S₁,S₂
-        compute_mie_ab!(x_size_param[i], m_ref, an_v, bn_v, Dₙ)
+        # Compute aₙ,bₙ and the per-node extinction cross-section via the
+        # shared helper (also used by _aerosol_extinction_nodes_cpu in
+        # compute_NAI2_nodes.jl) -- same fill!/compute_mie_ab!/dot(...) FLOP
+        # sequence either way, so C_ext[i] is bit-identical to what the
+        # extinction-only path computes for the same node.
+        an_v, bn_v, C_ext_i = _mie_node_ab_and_C_ext!(an, bn, Dₙ, n_, x_size_param[i], n_max_i, m_ref, k)
+        @inbounds C_ext[i] = C_ext_i
+
         compute_mie_S₁S₂!(an_v, bn_v, leg_π, leg_τ, view(S₁, :, i), view(S₂, :, i))
 
-        # Compute Extinction and scattering cross sections using pre-allocated n_
+        # Compute scattering cross section using pre-allocated n_ (independent
+        # of C_ext[i] above -- reordering these two relative to the pre-refactor
+        # code has no numerical effect, since they read the same an_v/bn_v/n_v
+        # but write to disjoint output arrays).
         n_v = view(n_, 1:n_max_i)
         @inbounds C_sca[i] = 2π / k^2 * dot(n_v, abs2.(an_v) .+ abs2.(bn_v))
-        @inbounds C_ext[i] = 2π / k^2 * dot(n_v, real.(an_v .+ bn_v))
 
         # Compute scattering matrix components per size parameter (in-place).
         # inv_x2 is computed in IC (Float64) so all products stay in full precision.
@@ -305,6 +313,45 @@ function _nai2_bulk_optics(r::AbstractVector, wₓ::AbstractVector, nᵣ, nᵢ, 
 
     return (bulk_C_ext=bulk_C_ext, bulk_C_sca=bulk_C_sca,
             α=α, β=β, γ=γ, δ=δ, ϵ=ϵ, ζ=ζ, μ=μ, w_μ=w_μ)
+end
+
+"""
+    _mie_node_ab_and_C_ext!(an, bn, Dₙ, n_, x_i, n_max_i, m_ref, k) -> (an_v, bn_v, C_ext_i)
+
+Shared per-node building block, extracted (ADDITIVELY -- no arithmetic added,
+removed, or reordered) from what [`_nai2_bulk_optics`](@ref) and
+`_aerosol_extinction_nodes_cpu` (in `compute_NAI2_nodes.jl`) each executed
+inline before: reset the active `1:n_max_i` views of the pre-allocated,
+loop-reused buffers `an`/`bn`/`Dₙ` to zero, compute this node's Mie
+coefficients via `compute_mie_ab!`, and return the per-node extinction
+cross-section
+
+```math
+C_{\\mathrm{ext},i} = \\frac{2\\pi}{k^2}\\sum_{n=1}^{n_{\\max,i}}(2n+1)\\,\\Re(a_n+b_n)
+```
+
+(`n_ = IC.(2 .* (1:n_max) .+ 1)`, pre-built once by the caller; `n_v =
+view(n_, 1:n_max_i)`).
+
+Both call sites now literally share this one FLOP sequence, which is what
+lets `compute_aerosol_extinction_nodes(...)`'s `k` stay BIT-IDENTICAL (`===`)
+to `compute_aerosol_optical_properties_nodes(...).k` on identical inputs.
+Returns the `an`/`bn` views too (not just `C_ext_i`) since
+[`_nai2_bulk_optics`](@ref) needs them afterward for `compute_mie_S₁S₂!` and
+`C_sca`; the extinction-only caller simply discards them.
+"""
+@inline function _mie_node_ab_and_C_ext!(an, bn, Dₙ, n_, x_i, n_max_i::Int, m_ref, k)
+    an_v = view(an, 1:n_max_i)
+    bn_v = view(bn, 1:n_max_i)
+    fill!(an_v, 0)
+    fill!(bn_v, 0)
+    fill!(Dₙ, 0)
+
+    compute_mie_ab!(x_i, m_ref, an_v, bn_v, Dₙ)
+
+    n_v = view(n_, 1:n_max_i)
+    C_ext_i = 2π / k^2 * dot(n_v, real.(an_v .+ bn_v))
+    return an_v, bn_v, C_ext_i
 end
 
 @doc raw"""

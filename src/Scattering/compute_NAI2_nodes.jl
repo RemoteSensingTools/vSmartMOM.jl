@@ -121,9 +121,10 @@ distribution — e.g. GCHPIO's TOMAS two-moment sectional bins. No log-normal
   series avoid paying for it downstream, without engaging `δBGE`'s
   forward-peak re-fit. `nothing` (default) keeps the full length.
 - `precision_policy`: GPU-only, see [`MiePrecisionPolicy`](@ref)
-  (`NativeFloat64`/`DSEmulated`); `nothing` (default) auto-selects via
-  `Architectures.default_mie_precision_policy` exactly as the `MieModel` GPU
-  path does. Ignored on the CPU path.
+  (`NativeFloat64`/`DSEmulated`/`NativeFloat32`); `nothing` (default)
+  auto-selects via `Architectures.default_mie_precision_policy` exactly as the
+  `MieModel` GPU path does (`NativeFloat32` on `MetalGPU()`, since Metal has no
+  Float64 hardware at all). Ignored on the CPU path.
 
 # Angular resolution
 `n_max` is `get_n_max(maximum(2π .* radii ./ wavelength))` — i.e. derived from
@@ -242,52 +243,58 @@ function _aerosol_optical_properties_nodes_cpu(radii, weights, n_real, n_imag, �
     end
 end
 
-@doc raw"""
-    compute_aerosol_optical_properties_nodes_gpu(radii, weights, n_real, n_imag,
-        wavelength, backend; precision_policy = NativeFloat64(), l_max = nothing)
-        -> AerosolOptics
-
-GPU/KernelAbstractions implementation backing
-[`compute_aerosol_optical_properties_nodes`](@ref) — takes an explicit KA
-`backend` (e.g. `KernelAbstractions.CPU()` or `CUDA.CUDABackend()`), mirroring
-[`compute_aerosol_optical_properties_gpu`](@ref)'s calling convention so it can
-be exercised directly in tests on a CPU backend without a real GPU device.
-
-Reuses the existing per-node kernels from `gpu_mie_kernels.jl`
-(`mie_coefficients_kernel_f64!`/`_ds!`, `amplitude_phase_kernel!`,
-`cross_sections_kernel!`) UNCHANGED. The weighted bulk reduction across nodes
-and the Greek-coefficient angular projection additionally launch the
-previously-unused device-resident kernels `weighted_sum_kernel!`,
-`size_reduction_kernel!`, and `greek_coefficients_kernel!` — so, unlike
-[`compute_aerosol_optical_properties_gpu`](@ref) (which copies the per-node
-phase-matrix/cross-section arrays back to the host and reduces there), this
-path keeps the reduction device-resident and copies back only the six bulk
-Greek arrays plus the two bulk scalars (`ω̃`, `k`).
-
-**Precision**: the per-node kernels (1-3) run in the kernel's native float
-type `FT = eltype(radii)` (Float32 under `DSEmulated`, matching the existing
-GPU path's speed rationale). The reduction/Greek kernels (4-5) always
-accumulate in `RA = FT === Float32 ? Float64 : FT` — i.e. Float64-widened +
-Neumaier-compensated for a Float32 kernel, exactly like
-`compute_aerosol_optical_properties_gpu`'s host-side reduction — except here
-the widened reduction runs as device arrays/kernels rather than after an
-`Array()` copy-back, so the previously-unused device kernels are genuinely
-exercised while preserving the established accuracy profile.
 """
-function compute_aerosol_optical_properties_nodes_gpu(
-    radii::AbstractVector, weights::AbstractVector,
-    n_real::Real, n_imag::Real, wavelength::Real, backend;
-    precision_policy::MiePrecisionPolicy = NativeFloat64(),
-    l_max::Union{Nothing,Integer} = nothing,
-)
+    _prepare_node_mie_gpu(radii, weights, n_real, n_imag, wavelength, backend,
+                          precision_policy) -> NamedTuple
+
+Shared GPU preamble for BOTH [`compute_aerosol_optical_properties_nodes_gpu`](@ref)
+and [`compute_aerosol_extinction_nodes_gpu`](@ref): validates inputs, derives
+the output float type `FT` and the size-distribution-reduction accumulator
+type `RA` (policy-dependent, see [`MiePrecisionPolicy`](@ref) /
+[`_mie_reduction_type`](@ref)), builds the per-node size parameters and Mie
+recursion inputs, allocates the per-node device arrays, and launches Kernel 1
+(Mie coefficients aₙ, bₙ). Everything downstream of Kernel 1
+(amplitude/phase-matrix/cross-section/reduction/Greek kernels) differs between
+the two callers and is NOT part of this shared preamble.
+
+`RA` is the key lever for [`NativeFloat32`](@ref): unlike
+[`NativeFloat64`](@ref) (`RA = Float64` always) and [`DSEmulated`](@ref)
+(`RA = Float64` when `FT === Float32`, matching the historical Float64-widened
++ Neumaier-compensated reduction), `NativeFloat32` sets `RA = Float32` — so the
+caller allocates Float32 reduction/Greek/Legendre device arrays instead of
+Float64 ones. This is what makes the node GPU pipeline allocate ZERO Float64
+device arrays under `NativeFloat32` (required for Apple Metal, which has no
+Float64 hardware support at all, and for consumer CUDA with crippled FP64
+throughput).
+
+On a backend that "looks like" Metal (`_is_metal_backend`, recognized by
+`nameof(typeof(backend)) === :MetalBackend` so this module never needs a hard
+`Metal.jl` dependency), this throws `ArgumentError` if `FT === Float64` or
+`RA === Float64` — i.e. Metal only supports `NativeFloat32` this round
+(`DSEmulated`-on-Metal, which would need Float32-COMPENSATED reductions
+instead of the Float64-widened ones used elsewhere, is not implemented yet;
+see [`MiePrecisionPolicy`](@ref)).
+"""
+function _prepare_node_mie_gpu(radii::AbstractVector, weights::AbstractVector,
+                                n_real::Real, n_imag::Real, wavelength::Real, backend,
+                                precision_policy::MiePrecisionPolicy)
     _validate_node_inputs(radii, weights, n_imag)
 
     FT = float(promote_type(eltype(radii), eltype(weights),
                             typeof(n_real), typeof(n_imag), typeof(wavelength)))
-    # Reduction/Greek accumulator type: Float64-widened + Neumaier-compensated
-    # for a Float32 kernel, matching compute_aerosol_optical_properties_gpu's
-    # RA convention (see that function's docstring/comments).
-    RA = FT === Float32 ? Float64 : FT
+    _check_policy_ft(precision_policy, FT)
+    RA = _mie_reduction_type(precision_policy, FT)
+
+    if _is_metal_backend(backend) && (FT === Float64 || RA === Float64)
+        throw(ArgumentError(
+            "Metal has no Float64 hardware support: $(nameof(typeof(precision_policy))) " *
+            "with node element type $FT would need a Float64 device array (the " *
+            "Mie-coefficient kernel and/or the size-distribution reduction). On " *
+            "MetalGPU(), use Float32 node inputs with NativeFloat32() -- NativeFloat64() " *
+            "is unsupported on Metal entirely, and DSEmulated-on-Metal (a Float32-" *
+            "COMPENSATED reduction, instead of the Float64-widened one used elsewhere) " *
+            "is not implemented yet (tracked as a follow-up)."))
+    end
 
     r = FT.(radii)
     # Normalize in Float64 BEFORE narrowing to the kernel type: a Float32 sum
@@ -303,11 +310,7 @@ function compute_aerosol_optical_properties_nodes_gpu(
     k_wavenum = FT(2π / wavelength)
     x_size_param = k_wavenum .* r
     n_max_global = get_n_max(maximum(x_size_param))
-    n_mu = 2n_max_global - 1
     nquad_radius = length(r)
-
-    μ, w_μ = gausslegendre(n_mu)
-    leg_π, leg_τ = compute_mie_π_τ(FT.(μ), n_max_global)
 
     m_ref_re = FT(n_real)
     m_ref_im = FT(-n_imag)  # convention: n = n_real - i*n_imag, so m_im is negative
@@ -319,10 +322,81 @@ function compute_aerosol_optical_properties_nodes_gpu(
     AT = KernelAbstractions.allocate
 
     # --- Per-node arrays: native kernel precision FT (speed) ---
-    x_dev       = AT(backend, FT, nquad_radius)
-    nmax_dev    = AT(backend, Int, nquad_radius)
-    an_dev      = AT(backend, Complex{FT}, (nquad_radius, n_max_global))
-    bn_dev      = AT(backend, Complex{FT}, (nquad_radius, n_max_global))
+    x_dev    = AT(backend, FT, nquad_radius)
+    nmax_dev = AT(backend, Int, nquad_radius)
+    an_dev   = AT(backend, Complex{FT}, (nquad_radius, n_max_global))
+    bn_dev   = AT(backend, Complex{FT}, (nquad_radius, n_max_global))
+
+    KernelAbstractions.copyto!(backend, x_dev, FT.(x_size_param))
+    KernelAbstractions.copyto!(backend, nmax_dev, nmax_per_r)
+
+    fill!(an_dev, zero(Complex{FT}))
+    fill!(bn_dev, zero(Complex{FT}))
+
+    # --- Kernel 1: Mie coefficients (unchanged, existing kernel; policy selects
+    #     mie_coefficients_kernel_f64! for BOTH NativeFloat64 and NativeFloat32,
+    #     mie_coefficients_kernel_ds! for DSEmulated -- see _mie_kernel1) ---
+    kernel1 = _mie_kernel1(precision_policy, backend)
+    kernel1(an_dev, bn_dev, x_dev, m_ref_re, m_ref_im, nmax_dev, nmx_max; ndrange=nquad_radius)
+    KernelAbstractions.synchronize(backend)
+
+    return (FT=FT, RA=RA, r=r, w=w, k_wavenum=k_wavenum, n_max_global=n_max_global,
+            nquad_radius=nquad_radius, x_dev=x_dev, nmax_dev=nmax_dev, an_dev=an_dev, bn_dev=bn_dev)
+end
+
+@doc raw"""
+    compute_aerosol_optical_properties_nodes_gpu(radii, weights, n_real, n_imag,
+        wavelength, backend; precision_policy = NativeFloat64(), l_max = nothing)
+        -> AerosolOptics
+
+GPU/KernelAbstractions implementation backing
+[`compute_aerosol_optical_properties_nodes`](@ref) — takes an explicit KA
+`backend` (e.g. `KernelAbstractions.CPU()` or `CUDA.CUDABackend()`), mirroring
+[`compute_aerosol_optical_properties_gpu`](@ref)'s calling convention so it can
+be exercised directly in tests on a CPU backend without a real GPU device.
+
+Shares its preamble (validation, `FT`/`RA` derivation, per-node arrays, Kernel
+1) with [`compute_aerosol_extinction_nodes_gpu`](@ref) via the internal
+`_prepare_node_mie_gpu` helper. Reuses the existing per-node kernels from
+`gpu_mie_kernels.jl` (`mie_coefficients_kernel_f64!`/`_ds!`,
+`amplitude_phase_kernel!`, `cross_sections_kernel!`) UNCHANGED. The weighted
+bulk reduction across nodes and the Greek-coefficient angular projection
+additionally launch the previously-unused device-resident kernels
+`weighted_sum_kernel!`, `size_reduction_kernel!`, and
+`greek_coefficients_kernel!` — so, unlike
+[`compute_aerosol_optical_properties_gpu`](@ref) (which copies the per-node
+phase-matrix/cross-section arrays back to the host and reduces there), this
+path keeps the reduction device-resident and copies back only the six bulk
+Greek arrays plus the two bulk scalars (`ω̃`, `k`).
+
+**Precision**: the per-node kernels (1-3) run in the kernel's native float
+type `FT = eltype(radii)` (Float32 under `DSEmulated`/`NativeFloat32`,
+matching the existing GPU path's speed rationale). The reduction/Greek
+kernels (4-5) accumulate in `RA = _mie_reduction_type(precision_policy, FT)`
+— `Float64` for `NativeFloat64` always, `Float64` for `DSEmulated` when
+`FT === Float32` (Float64-widened + Neumaier-compensated, exactly like
+`compute_aerosol_optical_properties_gpu`'s host-side reduction — except here
+the widened reduction runs as device arrays/kernels rather than after an
+`Array()` copy-back), and — new — `Float32` (never widened) for
+`NativeFloat32`, so the entire pipeline allocates zero Float64 device arrays
+under that policy. See [`MiePrecisionPolicy`](@ref) for the full table.
+"""
+function compute_aerosol_optical_properties_nodes_gpu(
+    radii::AbstractVector, weights::AbstractVector,
+    n_real::Real, n_imag::Real, wavelength::Real, backend;
+    precision_policy::MiePrecisionPolicy = NativeFloat64(),
+    l_max::Union{Nothing,Integer} = nothing,
+)
+    (; FT, RA, r, w, k_wavenum, n_max_global, nquad_radius, x_dev, nmax_dev, an_dev, bn_dev) =
+        _prepare_node_mie_gpu(radii, weights, n_real, n_imag, wavelength, backend, precision_policy)
+
+    n_mu = 2n_max_global - 1
+    μ, w_μ = gausslegendre(n_mu)
+    leg_π, leg_τ = compute_mie_π_τ(FT.(μ), n_max_global)
+
+    AT = KernelAbstractions.allocate
+
+    # --- Remaining per-node arrays: native kernel precision FT (speed) ---
     f11_dev     = AT(backend, FT, (n_mu, nquad_radius))
     f33_dev     = AT(backend, FT, (n_mu, nquad_radius))
     f12_dev     = AT(backend, FT, (n_mu, nquad_radius))
@@ -332,23 +406,8 @@ function compute_aerosol_optical_properties_nodes_gpu(
     leg_pi_dev  = AT(backend, FT, (n_mu, n_max_global))
     leg_tau_dev = AT(backend, FT, (n_mu, n_max_global))
 
-    KernelAbstractions.copyto!(backend, x_dev, FT.(x_size_param))
-    KernelAbstractions.copyto!(backend, nmax_dev, nmax_per_r)
     KernelAbstractions.copyto!(backend, leg_pi_dev, FT.(leg_π))
     KernelAbstractions.copyto!(backend, leg_tau_dev, FT.(leg_τ))
-
-    fill!(an_dev, zero(Complex{FT}))
-    fill!(bn_dev, zero(Complex{FT}))
-
-    # --- Kernel 1: Mie coefficients (unchanged, existing kernel) ---
-    if precision_policy isa NativeFloat64
-        @assert FT === Float64 "NativeFloat64 Mie precision policy requires Float64 node inputs; use DSEmulated() for Float32."
-        kernel1 = mie_coefficients_kernel_f64!(backend)
-    else
-        kernel1 = mie_coefficients_kernel_ds!(backend)
-    end
-    kernel1(an_dev, bn_dev, x_dev, m_ref_re, m_ref_im, nmax_dev, nmx_max; ndrange=nquad_radius)
-    KernelAbstractions.synchronize(backend)
 
     # --- Kernel 2+3: amplitude functions + phase matrix (unchanged, existing kernel) ---
     kernel23 = amplitude_phase_kernel!(backend)
@@ -467,10 +526,13 @@ const _WARNED_NO_GPU_MIE_EXTINCTION_NODES = Ref(false)
 
 EXTINCTION-ONLY fast path for the caller-node Mie seam: returns just the
 number-mean bulk extinction cross-section `k` **[μm²]** — the SAME quantity,
-same convention, and (on the CPU path) the SAME arithmetic as `.k` from
+same convention, and the SAME arithmetic as `.k` from
 [`compute_aerosol_optical_properties_nodes`](@ref) — without computing any
 amplitude matrices, phase-matrix elements, or the six Greek coefficient
-series.
+series. This equality is EXACT (not merely close) on the CPU path, on CUDA
+(real hardware and the KA-CPU KernelAbstractions backend), and on the
+KA-CPU backend under every precision policy — see "Numerics" below for
+exactly what "exact" means on each path and how it is tested.
 
 # Motivation
 A downstream hybrid consumer (GCHPIO's `:parametric_exact_tau` mode) needs
@@ -503,8 +565,8 @@ polarize, truncate, or length-cap).
   registered Mie pipeline (`Architectures.has_gpu_mie`) — identical routing to
   [`compute_aerosol_optical_properties_nodes`](@ref) (CPU / GPU / warn-once
   CPU fallback for an architecture without a GPU Mie pipeline).
-- `precision_policy`: GPU-only, see [`MiePrecisionPolicy`](@ref); ignored on
-  the CPU path.
+- `precision_policy`: GPU-only, see [`MiePrecisionPolicy`](@ref)
+  (`NativeFloat64`/`DSEmulated`/`NativeFloat32`); ignored on the CPU path.
 
 # Returns
 The number-mean bulk extinction cross-section `k` **[μm²]**, as a scalar of
@@ -514,15 +576,32 @@ the promoted float type of the inputs.
 Identical to [`compute_aerosol_optical_properties_nodes`](@ref):
 `_validate_node_inputs` plus `sum(weights) > 0`.
 
-# Numerics (CPU path)
-Internal computation runs in `IC = Float64` (same IC/FT narrowing convention
-as the rest of this module). Per node, this computes exactly the SAME
-`C_ext` expression the shared NAI-2 core uses —
+# Numerics
+**CPU path**: internal computation runs in `IC = Float64` (same IC/FT
+narrowing convention as the rest of this module). Per node, this computes
+exactly the SAME `C_ext` expression the shared NAI-2 core uses —
 `2π/k² * dot(n_v, real.(an_v .+ bn_v))` (the internal `_nai2_bulk_optics`
-core's `C_ext` formula) — in the SAME arithmetic order, weighted by the SAME normalized weights (same
-normalization step), so `k` is bit-identical to
+core's `C_ext` formula, via the shared `_mie_node_ab_and_C_ext!` helper) — in
+the SAME arithmetic order, weighted by the SAME normalized weights (same
+normalization step), so `k` is BIT-IDENTICAL (`===`) to
 `compute_aerosol_optical_properties_nodes(...).k` given identical
 `(radii, weights, n_real, n_imag, wavelength)`.
+
+**GPU path** ([`compute_aerosol_extinction_nodes_gpu`](@ref)): shares its
+preamble (validation, `FT`/`RA`, per-node arrays, Kernel 1) with
+[`compute_aerosol_optical_properties_nodes_gpu`](@ref) via the internal
+`_prepare_node_mie_gpu` helper, so both entry points run `cross_sections_kernel!`
+and the single-thread (`ndrange=1`) `weighted_sum_kernel!` reduction on
+IDENTICAL per-node/weight device arrays. `k` is confirmed EXACT-EQUALITY
+(`==`, not merely `isapprox`) tested for all three precision policies
+(`NativeFloat64`, `DSEmulated`, `NativeFloat32`) on both the standard and
+wide-range TOMAS-like node sets — CPU path (`===`), the KA-CPU
+KernelAbstractions backend (`==`), and real CUDA hardware (`==`), all in
+`test/test_mie_nodes.jl`. On `MetalGPU()` (`NativeFloat32` only, see
+[`MiePrecisionPolicy`](@ref)) the same exact-equality test is wired in and
+expected to hold by the same reasoning, but is unverified on real Metal
+hardware (this package's CI has none); the test is written to activate
+automatically the first time it runs on a Mac with a functional Metal device.
 """
 function compute_aerosol_extinction_nodes(
     radii::AbstractVector, weights::AbstractVector,
@@ -563,12 +642,12 @@ end
 
 CPU implementation backing [`compute_aerosol_extinction_nodes`](@ref).
 Normalizes `weights` and derives `n_max` from the actual node radii (no cap),
-exactly as `_aerosol_optical_properties_nodes_cpu` does, but computes
-ONLY the per-node extinction cross-section (`compute_mie_ab!` then the SAME
-`C_ext` expression `_nai2_bulk_optics` uses) and the weighted bulk
-sum — no scattering cross-section, amplitude, or phase-matrix arrays are
-ever allocated. Same IC=Float64-internal convention; narrowed to `FT` only at
-the end.
+exactly as `_aerosol_optical_properties_nodes_cpu` does, but computes ONLY the
+per-node extinction cross-section (via the [`_nai2_bulk_optics`](@ref)-shared
+helper `_mie_node_ab_and_C_ext!`, defined in `compute_NAI2.jl`) and the
+weighted bulk sum — no scattering cross-section, amplitude, or phase-matrix
+arrays are ever allocated. Same IC=Float64-internal convention; narrowed to
+`FT` only at the end.
 """
 function _aerosol_extinction_nodes_cpu(radii, weights, n_real, n_imag, λ, FT::Type)
     IC = FT <: AbstractFloat ? Float64 : FT
@@ -601,16 +680,12 @@ function _aerosol_extinction_nodes_cpu(radii, weights, n_real, n_imag, λ, FT::T
         n_max_i = get_n_max(x_size_param[i])
         @assert n_max_i ≤ n_max "supplied n_max=$n_max is too small for radius index $i (needs $n_max_i); n_max must come from the largest size parameter in the node set"
 
-        an_v = view(an, 1:n_max_i)
-        bn_v = view(bn, 1:n_max_i)
-        fill!(an_v, 0)
-        fill!(bn_v, 0)
-        fill!(Dₙ, 0)
-
-        compute_mie_ab!(x_size_param[i], m_ref, an_v, bn_v, Dₙ)
-
-        n_v = view(n_, 1:n_max_i)
-        @inbounds C_ext[i] = 2π / k^2 * dot(n_v, real.(an_v .+ bn_v))
+        # Same shared helper _nai2_bulk_optics uses for its own an_v/bn_v/C_ext_i
+        # (see compute_NAI2.jl) -- literally the same FLOP sequence, not just a
+        # textual copy, which is what makes k bit-identical (===) to
+        # compute_aerosol_optical_properties_nodes(...).k.
+        _, _, C_ext_i = _mie_node_ab_and_C_ext!(an, bn, Dₙ, n_, x_size_param[i], n_max_i, m_ref, k)
+        @inbounds C_ext[i] = C_ext_i
     end
 
     bulk_C_ext = sum(w .* C_ext)
@@ -629,14 +704,15 @@ GPU/KernelAbstractions implementation backing
 it can be exercised directly in tests on a CPU backend without a real GPU
 device.
 
-Launches ONLY the per-node Mie-coefficient kernel
-(`mie_coefficients_kernel_f64!`/`_ds!`, selected by `precision_policy` exactly
-as the sibling function does) and the per-node `cross_sections_kernel!`
-(which computes `C_ext` AND `C_sca` together in one fused pass — cheaper to
-keep fused than to add a `C_ext`-only kernel variant; the unused `C_sca`
-output is simply not reduced), then the device-resident `weighted_sum_kernel!`
-reduction across nodes. UNLIKE [`compute_aerosol_optical_properties_nodes_gpu`](@ref),
-this path launches no `amplitude_phase_kernel!`, `size_reduction_kernel!`, or
+Shares its preamble (validation, `FT`/`RA` derivation, per-node arrays, Kernel
+1) with [`compute_aerosol_optical_properties_nodes_gpu`](@ref) via the
+internal `_prepare_node_mie_gpu` helper. Launches ONLY the per-node
+`cross_sections_kernel!` on top of that shared preamble (which computes
+`C_ext` AND `C_sca` together in one fused pass — cheaper to keep fused than to
+add a `C_ext`-only kernel variant; the unused `C_sca` output is simply not
+reduced), then the device-resident `weighted_sum_kernel!` reduction across
+nodes. UNLIKE [`compute_aerosol_optical_properties_nodes_gpu`](@ref), this path
+launches no `amplitude_phase_kernel!`, `size_reduction_kernel!`, or
 `greek_coefficients_kernel!`, and needs no angular grid at all (no
 `gausslegendre`, `compute_mie_π_τ`, or `compute_legendre_poly` calls), since
 none of them affect `k`. Only the single scalar `bulk_C_ext` is copied back to
@@ -645,72 +721,23 @@ the host.
 **Precision**: identical convention to
 [`compute_aerosol_optical_properties_nodes_gpu`](@ref) — the per-node kernels
 run in the kernel's native float type `FT = eltype(radii)` (Float32 under
-`DSEmulated`); the reduction accumulates in
-`RA = FT === Float32 ? Float64 : FT` (Float64-widened + Neumaier-compensated
-for a Float32 kernel), narrowed back to `FT` only for the returned scalar.
+`DSEmulated`/`NativeFloat32`); the reduction accumulates in
+`RA = _mie_reduction_type(precision_policy, FT)`, narrowed back to `FT` only
+for the returned scalar. Under `NativeFloat32`, `RA === FT === Float32`, so
+this function allocates ZERO Float64 device arrays end to end.
 """
 function compute_aerosol_extinction_nodes_gpu(
     radii::AbstractVector, weights::AbstractVector,
     n_real::Real, n_imag::Real, wavelength::Real, backend;
     precision_policy::MiePrecisionPolicy = NativeFloat64(),
 )
-    _validate_node_inputs(radii, weights, n_imag)
-
-    FT = float(promote_type(eltype(radii), eltype(weights),
-                            typeof(n_real), typeof(n_imag), typeof(wavelength)))
-    # Reduction accumulator type: Float64-widened + Neumaier-compensated for a
-    # Float32 kernel, matching compute_aerosol_optical_properties_nodes_gpu's
-    # RA convention.
-    RA = FT === Float32 ? Float64 : FT
-
-    r = FT.(radii)
-    # Normalize in Float64 BEFORE narrowing to the kernel type: a Float32 sum
-    # of large-but-finite weights can overflow to Inf (see the sibling
-    # function's Codex P2 regression comment); normalized weights are O(1) so
-    # the narrowed copy is safe.
-    w64 = Float64.(weights)
-    w_sum = sum(w64)
-    @assert isfinite(w_sum) && w_sum > 0 "weights must sum to a positive, finite value"
-    w64 ./= w_sum
-    w = FT.(w64)
-
-    k_wavenum = FT(2π / wavelength)
-    x_size_param = k_wavenum .* r
-    n_max_global = get_n_max(maximum(x_size_param))
-    nquad_radius = length(r)
-
-    m_ref_re = FT(n_real)
-    m_ref_im = FT(-n_imag)  # convention: n = n_real - i*n_imag, so m_im is negative
-
-    nmax_per_r = [get_n_max(x) for x in x_size_param]
-    y_max = maximum(x_size_param) * sqrt(m_ref_re^2 + m_ref_im^2)
-    nmx_max = round(Int, max(n_max_global, y_max) + 51)
+    (; FT, RA, w, k_wavenum, nquad_radius, nmax_dev, an_dev, bn_dev) =
+        _prepare_node_mie_gpu(radii, weights, n_real, n_imag, wavelength, backend, precision_policy)
 
     AT = KernelAbstractions.allocate
 
-    # --- Per-node arrays: native kernel precision FT (speed) ---
-    x_dev     = AT(backend, FT, nquad_radius)
-    nmax_dev  = AT(backend, Int, nquad_radius)
-    an_dev    = AT(backend, Complex{FT}, (nquad_radius, n_max_global))
-    bn_dev    = AT(backend, Complex{FT}, (nquad_radius, n_max_global))
     C_sca_dev = AT(backend, FT, nquad_radius)  # required output slot of the fused kernel; never reduced
     C_ext_dev = AT(backend, FT, nquad_radius)
-
-    KernelAbstractions.copyto!(backend, x_dev, FT.(x_size_param))
-    KernelAbstractions.copyto!(backend, nmax_dev, nmax_per_r)
-
-    fill!(an_dev, zero(Complex{FT}))
-    fill!(bn_dev, zero(Complex{FT}))
-
-    # --- Kernel 1: Mie coefficients (unchanged, existing kernel) ---
-    if precision_policy isa NativeFloat64
-        @assert FT === Float64 "NativeFloat64 Mie precision policy requires Float64 node inputs; use DSEmulated() for Float32."
-        kernel1 = mie_coefficients_kernel_f64!(backend)
-    else
-        kernel1 = mie_coefficients_kernel_ds!(backend)
-    end
-    kernel1(an_dev, bn_dev, x_dev, m_ref_re, m_ref_im, nmax_dev, nmx_max; ndrange=nquad_radius)
-    KernelAbstractions.synchronize(backend)
 
     # --- Kernel: per-node cross-sections (unchanged, existing kernel) ---
     kernel4a = cross_sections_kernel!(backend)
