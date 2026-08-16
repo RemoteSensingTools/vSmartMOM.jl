@@ -703,6 +703,107 @@ end
     end
 end
 
+# Minimal mock backend registering `Scattering._is_metal_backend(...) = true`
+# (real dispatch, not name matching -- see gpu_precision.jl), so the
+# Metal-only-NativeFloat32 guard in compute_aerosol_optical_properties_gpu can
+# be exercised WITHOUT installing Metal.jl. Defined at top level (structs
+# cannot be declared inside a function/testset body before Julia 1.12).
+struct _FakeMetalBackendMie end
+vSmartMOM.Scattering._is_metal_backend(::_FakeMetalBackendMie) = true
+
+# ============================================================================
+# NativeFloat32 (log-normal MieModel GPU path): genuine kernel-1 dispatch
+# ============================================================================
+# Metal-capability-leak fix follow-up: `has_gpu_mie` is a single
+# architecture-level trait shared by this log-normal path
+# (compute_aerosol_optical_properties_gpu) and the caller-node GPU path, so
+# registering Metal for one registers it for both. This path's Kernel 1 now
+# dispatches via the SAME `Scattering._mie_kernel1(policy, backend)` helper
+# the caller-node path uses (NativeFloat64/NativeFloat32 -> native kernel,
+# DSEmulated -> double-single kernel), and carries the same Metal-only
+# Float64-device-array guard (`Scattering._is_metal_backend`). UNLIKE the
+# caller-node path, this path's host-side size-distribution reduction is
+# ALWAYS Float64-widened regardless of policy (see the `RA` comment in
+# compute_NAI2_gpu.jl), so `NativeFloat32` here is expected to land close to
+# `DSEmulated`'s accuracy (not the node path's ~5e-3 Greek floor) -- only the
+# Dₙ-recursion kernel differs (native Float32 vs Float32 double-single
+# pairs), and that recursion is not the accuracy bottleneck once the
+# reduction itself is Float64-compensated.
+@testset "NativeFloat32 (log-normal MieModel GPU path): KA-CPU accuracy + kernel dispatch" begin
+    aero64 = Aerosol(LogNormal(log(0.3), log(2.1)), 1.3, 0.001)
+    m64 = make_mie_model(NAI2(), aero64, 0.55, Stokes_IQUV(), δBGE(10, 10.0), 30.0, 500)
+    ref = compute_aerosol_optical_properties(m64)
+
+    aero32 = Aerosol(LogNormal(log(0.3f0), log(2.1f0)), 1.3f0, 0.001f0)
+    m32 = make_mie_model(NAI2(), aero32, 0.55f0, Stokes_IQUV(), δBGE(10, 10.0f0), 30.0f0, 500)
+    @test m32 isa MieModel{NAI2, Float32, CPU}
+
+    # FT2 defaults to Float64 on this low-level entry point (unlike the
+    # single-verb compute_aerosol_optical_properties(model), which supplies
+    # FT2 = _mie_output_type(model) automatically) -- pass it explicitly so
+    # the Float32 model's output stays Float32, matching the sibling
+    # "Float32 GPU compensated-reduction accuracy" testset's expectations.
+    gpu_native = compute_aerosol_optical_properties_gpu(m32, KA_CPU(); precision_policy=NativeFloat32(), FT2=Float32)
+    gpu_ds     = compute_aerosol_optical_properties_gpu(m32, KA_CPU(); precision_policy=DSEmulated(), FT2=Float32)
+
+    @test eltype(gpu_native.greek_coefs.β) === Float32
+    @test gpu_native.ω̃ isa Float32
+
+    k_relerr_native = abs(Float64(gpu_native.k) - ref.k) / ref.k
+    ω_relerr_native = abs(Float64(gpu_native.ω̃) - ref.ω̃) / ref.ω̃
+    @printf("  NativeFloat32 (log-normal, KA-CPU): k relerr=%.2e  ω̃ relerr=%.2e\n", k_relerr_native, ω_relerr_native)
+
+    # Same Float64-widened host reduction regardless of policy => NativeFloat32
+    # lands close to (not necessarily better/worse than) DSEmulated, both at
+    # the ~1e-6/1e-4 established DS tolerances -- NOT the node path's looser
+    # ~1e-2 Greek floor (that path's reduction is never widened for
+    # NativeFloat32, by design; this path's is, always).
+    @test k_relerr_native < 1e-6
+    @test ω_relerr_native < 1e-6
+    L = min(length(gpu_native.greek_coefs.β), length(ref.greek_coefs.β))
+    for field in (:α, :β, :γ, :δ, :ϵ, :ζ)
+        g = Float64.(getproperty(gpu_native.greek_coefs, field)[1:L])
+        r_ = getproperty(ref.greek_coefs, field)[1:L]
+        @test maximum(abs.(g .- r_)) < 1e-3
+    end
+
+    # Metal-only-NativeFloat32 guard (mock backend, no real Metal.jl needed):
+    # NativeFloat64 (or any FT===Float64 model) on a Metal-shaped backend must
+    # throw ArgumentError -- proves the guard added to compute_NAI2_gpu.jl
+    # actually fires on this path too, not just the caller-node path.
+    @test_throws ArgumentError compute_aerosol_optical_properties_gpu(
+        m64, _FakeMetalBackendMie(); precision_policy=NativeFloat64())
+end
+
+@testset "NativeFloat32 (log-normal MieModel GPU path): real CUDA (gated)" begin
+    if !CUDA_FUNCTIONAL
+        @test_skip "CUDA not functional — NativeFloat32 log-normal real-GPU test skipped"
+    else
+        aero64 = Aerosol(LogNormal(log(0.3), log(2.1)), 1.3, 0.001)
+        m64 = make_mie_model(NAI2(), aero64, 0.55, Stokes_IQUV(), δBGE(10, 10.0), 30.0, 500)
+        ref = compute_aerosol_optical_properties(m64)
+
+        aero32 = Aerosol(LogNormal(log(0.3f0), log(2.1f0)), 1.3f0, 0.001f0)
+        m32 = make_mie_model(NAI2(), aero32, 0.55f0, Stokes_IQUV(), δBGE(10, 10.0f0), 30.0f0, 500)
+
+        ka_native = compute_aerosol_optical_properties_gpu(m32, KA_CPU(); precision_policy=NativeFloat32(), FT2=Float32)
+        cu_native = compute_aerosol_optical_properties_gpu(m32, CUDA_BACKEND; precision_policy=NativeFloat32(), FT2=Float32)
+
+        @test isapprox(cu_native.k, ka_native.k, rtol=1e-6)
+        @test isapprox(cu_native.ω̃, ka_native.ω̃, rtol=1e-6)
+        for field in (:α, :β, :γ, :δ, :ϵ, :ζ)
+            @test isapprox(getproperty(cu_native.greek_coefs, field),
+                           getproperty(ka_native.greek_coefs, field), atol=1e-4)
+        end
+
+        k_relerr = abs(Float64(cu_native.k) - ref.k) / ref.k
+        ω_relerr = abs(Float64(cu_native.ω̃) - ref.ω̃) / ref.ω̃
+        @printf("  NativeFloat32 (log-normal, real CUDA): k relerr=%.2e  ω̃ relerr=%.2e\n", k_relerr, ω_relerr)
+        @test k_relerr < 1e-6
+        @test ω_relerr < 1e-6
+    end
+end
+
 # ============================================================================
 # Performance Benchmarks
 # ============================================================================

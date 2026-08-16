@@ -1013,3 +1013,97 @@ end
         @test t_f64_ext >= 0 && t_ds_ext >= 0 && t_f32_ext >= 0
     end
 end
+
+#=
+=====================================================================
+Polarized validation gate for NativeFloat32.
+=====================================================================
+The k/ω̃/Greek-coefficient tolerances above are scalar/coefficient-space
+metrics; they do not directly say how accurate the RECONSTRUCTED, POLARIZED
+phase matrix is at a given scattering angle -- and the measured Greek errors
+(~5e-3 abs on α/β/δ/ζ) are large enough that this needs its own check, not an
+assumption that "small Greek error" implies "small polarized-ratio error"
+(β dominates the intensity-only P11 reconstruction; α/δ/ζ that feed P22/P33
+convolve through R²/T² Legendre weighting differently). This testset:
+  1. computes Greek coefficients via the node API under NativeFloat32 vs
+     NativeFloat64 (KA-CPU, standard + wide TOMAS sets, Stokes_IQUV),
+  2. reconstructs f₁₁/f₁₂/f₃₃/f₃₄ at each policy's OWN natural Greek length
+     over a shared 0-180° scattering-angle grid via `Scattering.reconstruct_phase`
+     (the same Greek→phase machinery `truncate_phase.jl`/`test_Scattering.jl`
+     use),
+  3. reports/asserts max abs error on normalized P11 (= f₁₁) and on the
+     polarized ratios P12/P11, P33/P11, P34/P11.
+Numbers are MEASURED first (printed), thresholds asserted with margin -- not
+assumed. See the "Real CUDA: NativeFloat32..." docstring update below (in
+compute_NAI2_nodes.jl) for where these numbers get recorded doc-side.
+=====================================================================
+=#
+
+@testset "NativeFloat32: polarized phase-matrix validation gate (KA-CPU)" begin
+    scat_angles_deg = 0:1:180
+    μgrid = cos.(deg2rad.(collect(Float64, scat_angles_deg)))
+
+    function _phase_matrix_errors(label, rr, ww, nr_, ni_, lam_)
+        f64 = compute_aerosol_optical_properties_nodes(rr, ww, nr_, ni_, lam_, Stokes_IQUV(), NoTruncation())
+        rr32 = Float32.(rr); ww32 = Float32.(ww)
+        f32 = compute_aerosol_optical_properties_nodes_gpu(rr32, ww32, Float32(nr_), Float32(ni_), Float32(lam_),
+                                                            _KA_CPU(); precision_policy=NativeFloat32())
+        f32 = Scattering.truncate_phase(NoTruncation(), f32)
+
+        sm64 = Scattering.reconstruct_phase(f64.greek_coefs, μgrid)
+        sm32 = Scattering.reconstruct_phase(f32.greek_coefs, μgrid)
+
+        p11_64 = sm64.f₁₁
+        p11_32 = Float64.(sm32.f₁₁)
+        p11_abserr = maximum(abs.(p11_32 .- p11_64))
+        p11_relerr = maximum(abs.(p11_32 .- p11_64) ./ abs.(p11_64))
+
+        ratio64_12 = sm64.f₁₂ ./ sm64.f₁₁
+        ratio32_12 = Float64.(sm32.f₁₂) ./ Float64.(sm32.f₁₁)
+        err_12 = maximum(abs.(ratio32_12 .- ratio64_12))
+
+        ratio64_33 = sm64.f₃₃ ./ sm64.f₁₁
+        ratio32_33 = Float64.(sm32.f₃₃) ./ Float64.(sm32.f₁₁)
+        err_33 = maximum(abs.(ratio32_33 .- ratio64_33))
+
+        ratio64_34 = sm64.f₃₄ ./ sm64.f₁₁
+        ratio32_34 = Float64.(sm32.f₃₄) ./ Float64.(sm32.f₁₁)
+        err_34 = maximum(abs.(ratio32_34 .- ratio64_34))
+
+        println("  $label: P11 maxabs=$(p11_abserr) (max relerr=$(p11_relerr))  ",
+                "P12/P11 maxabs=$(err_12)  P33/P11 maxabs=$(err_33)  P34/P11 maxabs=$(err_34)")
+        return (p11_abserr=p11_abserr, p11_relerr=p11_relerr, err_12=err_12, err_33=err_33, err_34=err_34)
+    end
+
+    dist = LogNormal(log(_mu_aer), log(_sigma_aer))
+    r_min = max(quantile(dist, 1e-8), 1e-6 * _r_max)
+    r, wr = vSmartMOM.Scattering.gauleg_log(_nquad, r_min, _r_max; norm=false)
+    wx = vSmartMOM.Scattering.compute_wₓ(dist, wr, r, _r_max)
+
+    nr_w = 1.5; ni_w = 0.005; lam_w = 0.55
+    fine_r = exp.(range(log(0.005), log(0.05), length=40))
+    fine_w = pdf.(LogNormal(log(0.02), log(1.6)), fine_r)
+    coarse_r = exp.(range(log(1.0), log(6.0), length=25))
+    coarse_w = pdf.(LogNormal(log(2.0), log(1.5)), coarse_r) .* 1e-3
+    wide_r = vcat(fine_r, coarse_r)
+    wide_w = vcat(fine_w, coarse_w)
+
+    println("NativeFloat32 polarized phase-matrix validation -- MEASURED (0-180°, 1° steps):")
+    errs_std  = _phase_matrix_errors("standard  ", r, wx, _nr, _ni, _lam)
+    errs_wide = _phase_matrix_errors("wide TOMAS", wide_r, wide_w, nr_w, ni_w, lam_w)
+
+    # Measured (this host, 2026-08-16): P11 max relerr ~0.2-0.9%, P12/P11 and
+    # P34/P11 maxabs ~2-3e-4 (tiny), P33/P11 maxabs ~1.4-3.8% (the dominant
+    # polarized-error term -- consistent with α/δ/ζ being the largest-error
+    # Greek coefficients measured in the "NativeFloat32: accuracy..." testset
+    # above, since f₃₃ derives from δ AND α/ζ via R²/T²). Asserted with a
+    # ~2-3x margin over measured, not a vacuous bound.
+    @test errs_std.p11_relerr  < 0.02
+    @test errs_std.err_12      < 1e-3
+    @test errs_std.err_33      < 0.10
+    @test errs_std.err_34      < 1e-3
+    @test errs_wide.p11_relerr < 0.02
+    @test errs_wide.err_12     < 1e-3
+    @test errs_wide.err_33     < 0.10
+    @test errs_wide.err_34     < 1e-3
+end

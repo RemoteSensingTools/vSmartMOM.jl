@@ -22,7 +22,15 @@ GPU-accelerated version of `compute_aerosol_optical_properties` for the NAI2 met
 # Arguments
 - `model`: MieModel configured for NAI2 computation
 - `backend`: KernelAbstractions backend (e.g., `CPU()`, `CUDABackend()`)
-- `precision_policy`: `NativeFloat64()` for A100/V100, `DSEmulated()` for Float32/Metal
+- `precision_policy`: `NativeFloat64()` for A100/V100, `DSEmulated()` for Float32
+  double-single Dₙ, or `NativeFloat32()` for a native-Float32 Dₙ kernel (same
+  kernel-1 dispatch as the caller-node GPU path, via `_mie_kernel1`) — all
+  three share the SAME Float64-widened host-side reduction/Greek quadrature
+  regardless of policy (see the `RA` comment in the function body for why
+  that is Metal-safe and NOT policy-dependent, unlike the caller-node path).
+  On `MetalGPU()`, `NativeFloat64()` (any `FT === Float64` model, in fact)
+  throws a clear `ArgumentError` rather than attempting an unsupported
+  Float64 device array.
 - `FT2`: output float type. **Defaults to the model's `FT` type parameter** so that a
   Float32 model produces Float32 greek coefficients without any explicit override.
   Pass an explicit type only to force an output-precision override (rare).
@@ -43,6 +51,26 @@ function compute_aerosol_optical_properties_gpu(
     @assert nᵢ >= 0
 
     FT = eltype(nᵣ)
+
+    # Metal has no Float64 hardware support at all: an_dev/bn_dev/x_dev/... are
+    # ALWAYS allocated in FT (never in the reduction type RA -- see below), so
+    # the one real device-array risk on this path is FT === Float64 itself
+    # (a Complex{Float64} device array), regardless of `precision_policy`.
+    # Same guard as the caller-node GPU path's `_prepare_node_mie_gpu`
+    # (`Scattering._is_metal_backend`), kept here too since this function can
+    # be called directly (bypassing `Architectures.default_mie_precision_policy`'s
+    # own Metal+Float64 `ArgumentError`).
+    if _is_metal_backend(backend) && FT === Float64
+        throw(ArgumentError(
+            "Metal has no Float64 hardware support: a Float64 MieModel (FT=$FT) " *
+            "would need a Float64 device array here. Use a Float32 MieModel on " *
+            "MetalGPU() (which auto-selects NativeFloat32() -- or, on this direct " *
+            "backend-taking entry point, pass Float32 aerosol/λ/r_max explicitly)."))
+    end
+    # FT-vs-policy validation, shared with the caller-node GPU path (asserts
+    # NativeFloat64 ⟹ FT===Float64, NativeFloat32 ⟹ FT===Float32; DSEmulated
+    # has no restriction).
+    _check_policy_ft(precision_policy, FT)
 
     # --- Setup (same as CPU path) ---
     r_min = max(quantile(size_distribution, 1e-8), 1e-6 * r_max)
@@ -96,24 +124,12 @@ function compute_aerosol_optical_properties_gpu(
     fill!(bn_dev, zero(Complex{FT}))
 
     # --- Kernel 1: Mie coefficients ---
-    # FOLLOW-UP: this inline selector predates NativeFloat32 (added for the
-    # caller-node GPU path in compute_NAI2_nodes.jl, which now dispatches
-    # kernel-1 via the shared `_mie_kernel1(policy, backend)` helper in
-    # gpu_mie_kernels.jl instead). Any non-`NativeFloat64` policy here --
-    # including `NativeFloat32` -- currently falls into the `DSEmulated`
-    # branch: CORRECTNESS-safe (mie_coefficients_kernel_ds! is pure Float32
-    # arithmetic, so results are at least as accurate as native Float32) but
-    # not the fastest possible kernel-1 for a `NativeFloat32` model (e.g. on
-    # MetalGPU(), see ext/vSmartMOMMetalExt.jl). Swapping this block for
-    # `kernel1 = _mie_kernel1(precision_policy, backend)` (with its own
-    # FT-vs-policy assert via `_check_policy_ft`) would make this path
-    # NativeFloat32-aware too, mirroring the caller-node refactor.
-    if precision_policy isa NativeFloat64
-        @assert FT === Float64 "NativeFloat64 Mie precision policy requires Float64 model inputs; use DSEmulated() for Float32."
-        kernel1 = mie_coefficients_kernel_f64!(backend)
-    else
-        kernel1 = mie_coefficients_kernel_ds!(backend)
-    end
+    # Shared dispatch helper (gpu_mie_kernels.jl), same as the caller-node GPU
+    # path: NativeFloat64 and NativeFloat32 both launch the generic native
+    # kernel (mie_coefficients_kernel_f64!, despite the name -- see its
+    # docstring), DSEmulated launches the double-single kernel. FT-vs-policy
+    # validation already ran above (`_check_policy_ft`).
+    kernel1 = _mie_kernel1(precision_policy, backend)
     kernel1(an_dev, bn_dev, x_dev, m_ref_re, m_ref_im, nmax_dev, nmx_max;
             ndrange=nquad_radius)
     KernelAbstractions.synchronize(backend)
@@ -136,15 +152,25 @@ function compute_aerosol_optical_properties_gpu(
     # (These are relatively small arrays, so the transfer is cheap)
     #
     # Host-side reduction-accumulator type. The GPU kernels run in `FT` (Float32
-    # for the DSEmulated path — that is where the speed comes from), but the
-    # *host-side* size-distribution reduction and the Greek-coefficient angular
-    # quadrature are cheap and accuracy-critical. Float32 here would lose ~3-4
-    # digits in the Greek coefficients even with Neumaier compensation, because
-    # the per-term products round before the compensated sum can help. So we
-    # widen Float32 → Float64 for ALL host reductions (Neumaier still applies,
-    # now in Float64) and only narrow to the requested `FT2` at the very end.
-    # For Float64 models this is a no-op (RA === FT === Float64), so the
-    # NativeFloat64 path is unchanged.
+    # for the DSEmulated/NativeFloat32 paths — that is where the speed comes
+    # from), but the *host-side* size-distribution reduction and the
+    # Greek-coefficient angular quadrature are cheap and accuracy-critical.
+    # Float32 here would lose ~3-4 digits in the Greek coefficients even with
+    # Neumaier compensation, because the per-term products round before the
+    # compensated sum can help. So we widen Float32 → Float64 for ALL host
+    # reductions (Neumaier still applies, now in Float64) and only narrow to
+    # the requested `FT2` at the very end. For Float64 models this is a no-op
+    # (RA === FT === Float64), so the NativeFloat64 path is unchanged.
+    #
+    # UNLIKE the caller-node GPU path's `RA` (`_mie_reduction_type`, which
+    # governs DEVICE array element types and therefore must never be Float64
+    # under `NativeFloat32` on a no-Float64-hardware backend like Metal), `RA`
+    # HERE never drives a device allocation at all -- every array above
+    # (`f11_dev`, ..., `C_ext_dev`) is `Array(...)`-copied to the HOST before
+    # `RA.(...)` is applied, so this Float64 widening is plain CPU arithmetic
+    # and is Metal-safe (and strictly more accurate) regardless of
+    # `precision_policy`, including `NativeFloat32`. Intentionally NOT
+    # policy-dependent, unlike `_mie_reduction_type`.
     RA = FT === Float32 ? Float64 : FT
 
     f11_host = RA.(Array(f11_dev))

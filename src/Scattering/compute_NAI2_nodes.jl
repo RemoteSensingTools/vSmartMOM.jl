@@ -267,9 +267,11 @@ device arrays under `NativeFloat32` (required for Apple Metal, which has no
 Float64 hardware support at all, and for consumer CUDA with crippled FP64
 throughput).
 
-On a backend that "looks like" Metal (`_is_metal_backend`, recognized by
-`nameof(typeof(backend)) === :MetalBackend` so this module never needs a hard
-`Metal.jl` dependency), this throws `ArgumentError` if `FT === Float64` or
+On a Metal backend (`_is_metal_backend`, a capability trait defaulting to
+`false` on `Any` and refined to `true` for `Metal.MetalBackend` by the weakly
+loaded `vSmartMOMMetalExt` extension — real dispatch, not name/string
+matching, the same precompile-safe pattern as `Architectures.ka_backend` /
+`has_gpu_mie`), this throws `ArgumentError` if `FT === Float64` or
 `RA === Float64` — i.e. Metal only supports `NativeFloat32` this round
 (`DSEmulated`-on-Metal, which would need Float32-COMPENSATED reductions
 instead of the Float64-widened ones used elsewhere, is not implemented yet;
