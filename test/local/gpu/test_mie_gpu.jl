@@ -607,11 +607,18 @@ end
 # Non-CPU architecture WITHOUT a GPU Mie pipeline → warn-once CPU fallback
 # ============================================================================
 # Regression for the P1 finding: a non-CPU architecture that has no GPU Mie
-# pipeline (the trait `has_gpu_mie` is false — e.g. MetalGPU(), which defines no
-# Mie kernels) must NOT route through the GPU branch (which would call
-# ka_backend on an architecture with no backend hook and error). Instead the
-# router must warn ONCE and compute Mie on the CPU, returning results bit-
-# identical to the CPU path (RT arrays are unaffected; only Mie falls back).
+# pipeline (the trait `has_gpu_mie` is false) must NOT route through the GPU
+# branch (which would call ka_backend on an architecture with no backend hook
+# and error). Instead the router must warn ONCE and compute Mie on the CPU,
+# returning results bit-identical to the CPU path (RT arrays are unaffected;
+# only Mie falls back).
+#
+# NOTE: as of the NativeFloat32 + Metal Mie registration work, `MetalGPU()`
+# itself is NO LONGER an example of this situation once `vSmartMOMMetalExt` is
+# loaded -- the Metal extension now registers `has_gpu_mie(::MetalGPU) = true`
+# (NativeFloat32 route; see ext/vSmartMOMMetalExt.jl). This testset instead
+# uses a minimal LOCAL architecture type that genuinely has no registered GPU
+# Mie pipeline, to keep exercising the fallback trait mechanism itself.
 #
 # We test the trait mechanism directly with a minimal local AbstractArchitecture
 # subtype: `has_gpu_mie` defaults to false on the abstract supertype, so the
@@ -619,7 +626,6 @@ end
 #
 # Minimal architecture with NO ka_backend / precision-policy / Mie hooks, defined
 # at top level (structs cannot be declared inside the function `@testset` wraps).
-# Mirrors MetalGPU()'s situation (Metal ext defines no Mie path).
 struct _NoMieArch <: vSmartMOM.Architectures.AbstractArchitecture end
 
 @testset "Non-CPU no-GPU-Mie architecture → warn-once CPU fallback" begin

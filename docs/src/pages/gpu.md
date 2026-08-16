@@ -58,10 +58,21 @@ matching package loaded throws an actionable error (`Architectures.ka_backend`,
 
 ## Float32 vs Float64
 
-- `MetalGPU()` requires `Float32` scene parameters (`float_type: Float32`).
+- `MetalGPU()` requires `Float32` scene parameters (`float_type: Float32`) —
+  Metal has no Float64 hardware support at all. `default_mie_precision_policy`
+  auto-selects `NativeFloat32` (pure Float32, never Float64-widened) for
+  Float32 inputs on Metal, and throws a clear `ArgumentError` for Float64
+  inputs rather than silently failing inside a device-array allocation.
 - `GPU()` (CUDA) supports both. The GPU Mie precision policy auto-selects
   `NativeFloat64` for `Float64` models and a Float32-native double-single
   path (`DSEmulated`) for `Float32` models (`default_mie_precision_policy`).
+  Consumer/F32-throughput-limited CUDA GPUs can opt into `NativeFloat32`
+  explicitly (`precision_policy = Scattering.NativeFloat32()`) for the
+  caller-node Mie API (`compute_aerosol_optical_properties_nodes`/
+  `compute_aerosol_extinction_nodes`) — end-to-end Float32, zero Float64
+  device arrays, at a further accuracy cost vs `DSEmulated` (see
+  `vSmartMOM.Scattering.MiePrecisionPolicy` and `test/test_mie_nodes.jl` for
+  measured error bands).
 - `CPU()` supports both, with no precision-policy distinction.
 
 ## What is GPU-safe today
@@ -83,8 +94,16 @@ matching package loaded throws an actionable error (`Architectures.ka_backend`,
   GPU-built cache replays on GPU without a host round-trip.
 - **Mie scattering** — automatic GPU path on CUDA
   (`make_mie_model(...; architecture=GPU())`, NAI2 only; PCW and the
-  ForwardDiff AD path fall back to CPU). Always CPU on Metal — faster than
-  the Metal multi-kernel path for typical aerosol loads anyway.
+  ForwardDiff AD path fall back to CPU). `MetalGPU()` now also has a
+  registered GPU Mie pipeline (`has_gpu_mie(::MetalGPU) = true`, Float32-only,
+  `NativeFloat32`); the log-normal `MieModel` path routes through it too
+  (`has_gpu_mie` is a single architecture-level trait shared by both APIs) but
+  does not yet select a native-Float32 kernel-1 there specifically (it uses
+  the `DSEmulated` double-single kernel regardless, which is
+  correctness-safe, just not the fastest possible on Metal — a follow-up).
+  The caller-node Mie API (`compute_aerosol_optical_properties_nodes`/
+  `compute_aerosol_extinction_nodes`) IS fully `NativeFloat32`-aware end to
+  end and is the primary target of the Metal Mie route.
 - **Gas absorption** — the production pipeline (`model_from_parameters` →
   `rt_run`) computes line-by-line absorption via
   [AtmosphericAbsorption.jl](https://github.com/RemoteSensingTools/AtmosphericAbsorption.jl),

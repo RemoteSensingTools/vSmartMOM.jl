@@ -18,7 +18,43 @@ All functions are @inline and allocation-free for GPU kernel compatibility.
 # Precision policy dispatch -- selects Tier 1 strategy per GPU capability
 # ============================================================================
 
-"""Abstract precision policy for Mie GPU kernels."""
+"""
+    MiePrecisionPolicy
+
+Abstract precision policy for the Mie GPU kernels (both the log-normal
+`MieModel` GPU path in `compute_NAI2_gpu.jl` and the caller-node GPU path in
+`compute_NAI2_nodes.jl`). Three concrete policies:
+
+| Policy           | Dₙ recursion            | Size-distribution reduction / Greek projection | Target hardware |
+|:-----------------|:-------------------------|:-------------------------------------------------|:-----------------|
+| `NativeFloat64`   | native Float64            | Float64 (`RA = Float64`)                          | A100/V100 (full FP64 throughput) |
+| `DSEmulated`      | Float32 double-single      | Float64-**widened** + Neumaier (`RA = Float64` when the kernel runs in Float32) | consumer CUDA (L40S etc.) — FP32-only Dₙ, but reduction can still afford Float64 |
+| `NativeFloat32`   | native Float32             | Float32 + Neumaier (`RA = Float32`, **never** widened) | Apple Metal (NO Float64 hardware at all) and F32-only-throughput consumer CUDA |
+
+The caller-node GPU path (`compute_aerosol_optical_properties_nodes_gpu` /
+`compute_aerosol_extinction_nodes_gpu`) keeps its size-distribution reduction
+and Greek-coefficient projection device-resident (see
+`_prepare_node_mie_gpu`), so the reduction accumulator type `RA` is not just an
+accuracy knob but determines whether Float64 DEVICE ARRAYS get allocated at
+all. `NativeFloat32` is the ONLY policy under which the node GPU pipeline
+allocates zero Float64 device arrays end to end — required for backends with
+no Float64 hardware support (Metal) or crippled FP64 throughput (consumer
+CUDA). `NativeFloat64`/`DSEmulated` semantics and tolerances are UNCHANGED by
+`NativeFloat32`'s introduction.
+
+**Backend-dependent reduction discipline (Metal note)**: on `MetalGPU()`,
+`default_mie_precision_policy` resolves ONLY to `NativeFloat32` for `Float32`
+inputs (`Float64` throws `ArgumentError` — Metal has no Float64 hardware at
+all). `DSEmulated`'s Dₙ-recursion kernel is pure Float32 arithmetic and IS
+Metal-compatible, but `DSEmulated`'s historical reduction discipline widens to
+`RA = Float64`, which is illegal on Metal device arrays. Making
+`DSEmulated`-on-Metal correct would require a Float32-COMPENSATED (not
+widened) reduction variant, which is NOT implemented this round — the node GPU
+preamble (`_prepare_node_mie_gpu`) detects a Metal-shaped backend and throws a
+clear `ArgumentError` if the resolved policy/element-type combination would
+need a Float64 device array, so `DSEmulated` on Metal fails loudly rather than
+crashing inside `KernelAbstractions.allocate`. Use `NativeFloat32` on Metal.
+"""
 abstract type MiePrecisionPolicy end
 
 """Use native Float64 for the Dn recursion (A100, V100 -- full FP64 throughput)."""
@@ -26,6 +62,70 @@ struct NativeFloat64 <: MiePrecisionPolicy end
 
 """Use DoubleSingle emulation for the Dn recursion (L40S, consumer GPUs -- FP32 only)."""
 struct DSEmulated    <: MiePrecisionPolicy end
+
+"""
+Use native Float32 END TO END: the Dₙ recursion AND the size-distribution
+reduction AND the Greek-coefficient projection all run in plain Float32
+(Neumaier-compensated, never Float64-widened). The only policy that allocates
+ZERO Float64 device arrays anywhere in the caller-node GPU pipeline -- for
+Apple Metal (no Float64 hardware support at all) and F32-only-throughput
+consumer CUDA. Strictly less accurate than `DSEmulated` (no double-single
+emulation for Dₙ, no Float64-widened reduction) -- see the caller-node GPU
+functions' docstrings and `test/test_mie_nodes.jl` for measured error bands.
+"""
+struct NativeFloat32 <: MiePrecisionPolicy end
+
+# ============================================================================
+# Policy-dependent dispatch helpers shared by the caller-node GPU path
+# (`_prepare_node_mie_gpu` in compute_NAI2_nodes.jl). Kept here, co-located
+# with the policy types themselves, rather than as an if/elseif chain at the
+# call site -- new policies slot in by adding one method each, not by editing
+# existing branches.
+# ============================================================================
+
+"""
+    _mie_reduction_type(policy::MiePrecisionPolicy, ::Type{FT}) -> Type
+
+The size-distribution-reduction / Greek-projection accumulator type `RA` for
+`policy` given per-node kernel element type `FT`. See the [`MiePrecisionPolicy`](@ref)
+table for the three cases. `NativeFloat64` and `DSEmulated`'s behavior here is
+UNCHANGED from before `NativeFloat32` existed (same `RA` values, same
+tolerances); `NativeFloat32` is the new `RA = Float32` (never widened) case.
+"""
+_mie_reduction_type(::NativeFloat64, ::Type{FT}) where {FT} = Float64
+_mie_reduction_type(::DSEmulated,    ::Type{FT}) where {FT} = FT === Float32 ? Float64 : FT
+_mie_reduction_type(::NativeFloat32, ::Type{FT}) where {FT} = Float32
+
+"""
+    _check_policy_ft(policy::MiePrecisionPolicy, ::Type{FT})
+
+Assert that `FT` (the per-node kernel element type) is compatible with
+`policy`, mirroring this module's `@assert`-based validation convention
+(throws `AssertionError`, matching the pre-existing inline `NativeFloat64`
+check). `DSEmulated` has no FT restriction (unchanged).
+"""
+_check_policy_ft(::NativeFloat64, ::Type{FT}) where {FT} =
+    @assert FT === Float64 "NativeFloat64 Mie precision policy requires Float64 node inputs; use DSEmulated() or NativeFloat32() for Float32."
+_check_policy_ft(::NativeFloat32, ::Type{FT}) where {FT} =
+    @assert FT === Float32 "NativeFloat32 Mie precision policy requires Float32 node inputs; use NativeFloat64() for Float64."
+_check_policy_ft(::DSEmulated, ::Type{FT}) where {FT} = nothing
+
+"""
+    _is_metal_backend(backend) -> Bool
+
+Capability trait: is `backend` a Metal KernelAbstractions backend? Defaults to
+`false` for every backend, with NO hard `Metal.jl` dependency here -- the same
+precompile-safe weak-dependency pattern as `Architectures.ka_backend` /
+`has_gpu_mie` / `default_mie_precision_policy`. The (weakly loaded)
+`vSmartMOMMetalExt` extension adds the concrete refinement
+`_is_metal_backend(::Metal.MetalBackend) = true` once Metal.jl is actually
+loaded; a more-specific method is a refinement, not a method overwrite, so
+this stays safe to precompile without Metal.jl present. Tests exercise the
+Metal-only-`NativeFloat32` guard in `_prepare_node_mie_gpu` with a mock
+backend type that registers its OWN `_is_metal_backend` method (real dispatch,
+not name-matching), even when Metal.jl itself is not installed (e.g. Linux CI).
+"""
+@inline _is_metal_backend(::Any) = false
 
 # ============================================================================
 # DoubleSingle{T} -- error-free arithmetic building blocks

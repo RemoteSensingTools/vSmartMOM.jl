@@ -152,10 +152,13 @@ end
 """
     mie_coefficients_kernel_f64!(an, bn, x_params, m_re, m_im, nmax_per_r, nmx_max)
 
-Native floating-point Mie coefficient kernel used by the `NativeFloat64`
-policy. The host launcher restricts this path to `Float64` arrays; inside the
-kernel all scalar work uses `eltype(x_params)` so the device code itself does
-not hardcode a floating-point type.
+Native floating-point Mie coefficient kernel used by BOTH the `NativeFloat64`
+policy (`Float64` arrays) and the `NativeFloat32` policy (`Float32` arrays):
+despite the `_f64!` name (historical -- it predates `NativeFloat32`), every
+scalar operation inside uses `eltype(x_params)`, so the kernel body never
+hardcodes a floating-point type and is reused VERBATIM for plain native-Float32
+arithmetic. The host launcher (`_mie_kernel1` in `gpu_precision.jl`) restricts
+`NativeFloat64` to `Float64` arrays and `NativeFloat32` to `Float32` arrays.
 """
 @kernel function mie_coefficients_kernel_f64!(
     an, bn,                     # output: (nquad_radius, nmax_global) Complex{FT}
@@ -257,6 +260,19 @@ not hardcode a floating-point type.
         ξ₁_re = ψ₁; ξ₁_im = χ₁
     end
 end
+
+"""
+    _mie_kernel1(policy::MiePrecisionPolicy, backend)
+
+Select the Kernel-1 (Mie coefficients) KA kernel for `policy`, used by the
+caller-node GPU preamble (`_prepare_node_mie_gpu`). `NativeFloat64` and
+`NativeFloat32` both launch the SAME generic native kernel
+(`mie_coefficients_kernel_f64!` -- see its docstring for why the name doesn't
+restrict it to Float64); `DSEmulated` launches the double-single kernel.
+"""
+_mie_kernel1(::NativeFloat64, backend) = mie_coefficients_kernel_f64!(backend)
+_mie_kernel1(::NativeFloat32, backend) = mie_coefficients_kernel_f64!(backend)
+_mie_kernel1(::DSEmulated,    backend) = mie_coefficients_kernel_ds!(backend)
 
 # ============================================================================
 # Kernel 2+3 (fused): Amplitude functions S1,S2 + phase matrix elements

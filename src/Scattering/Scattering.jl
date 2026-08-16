@@ -71,7 +71,7 @@ export GreekCoefs, compute_mie_π_τ,
 
 # GPU Mie exports
 export compute_aerosol_optical_properties_gpu,
-       MiePrecisionPolicy, NativeFloat64, DSEmulated,
+       MiePrecisionPolicy, NativeFloat64, DSEmulated, NativeFloat32,
        DoubleSingle, ComplexDS, NeumaierAccum,
        neumaier_add, neumaier_sum
 

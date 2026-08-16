@@ -96,6 +96,18 @@ function compute_aerosol_optical_properties_gpu(
     fill!(bn_dev, zero(Complex{FT}))
 
     # --- Kernel 1: Mie coefficients ---
+    # FOLLOW-UP: this inline selector predates NativeFloat32 (added for the
+    # caller-node GPU path in compute_NAI2_nodes.jl, which now dispatches
+    # kernel-1 via the shared `_mie_kernel1(policy, backend)` helper in
+    # gpu_mie_kernels.jl instead). Any non-`NativeFloat64` policy here --
+    # including `NativeFloat32` -- currently falls into the `DSEmulated`
+    # branch: CORRECTNESS-safe (mie_coefficients_kernel_ds! is pure Float32
+    # arithmetic, so results are at least as accurate as native Float32) but
+    # not the fastest possible kernel-1 for a `NativeFloat32` model (e.g. on
+    # MetalGPU(), see ext/vSmartMOMMetalExt.jl). Swapping this block for
+    # `kernel1 = _mie_kernel1(precision_policy, backend)` (with its own
+    # FT-vs-policy assert via `_check_policy_ft`) would make this path
+    # NativeFloat32-aware too, mirroring the caller-node refactor.
     if precision_policy isa NativeFloat64
         @assert FT === Float64 "NativeFloat64 Mie precision policy requires Float64 model inputs; use DSEmulated() for Float32."
         kernel1 = mie_coefficients_kernel_f64!(backend)

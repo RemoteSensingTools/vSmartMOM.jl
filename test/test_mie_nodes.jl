@@ -545,3 +545,471 @@ end
             "t_ext=$(t_ext)s  t_full=$(t_full)s  speedup(full/ext)=$(round(t_full / t_ext, digits=2))x")
     @test t_ext >= 0 && t_full >= 0
 end
+
+#=
+=====================================================================
+NativeFloat32 (pure Float32 end-to-end) + Metal Mie registration tests.
+=====================================================================
+NativeFloat32 is the ONLY MiePrecisionPolicy under which the caller-node GPU
+pipeline allocates zero Float64 device arrays -- required for Apple Metal (no
+Float64 hardware at all) and F32-only-throughput consumer CUDA. Accuracy is
+measured (not assumed) below on both the standard log-normal set and the
+wide-range TOMAS-like set, then asserted with margin over the measured
+numbers. DSEmulated/NativeFloat64 tolerances established above are untouched
+by any of this -- see the "identical-node bit-compat" and
+"Float64/Float32 GPU node-API tolerances" testsets, still green.
+=====================================================================
+=#
+
+@testset "NativeFloat32: accuracy vs Float64 CPU reference (measured + margin)" begin
+    # --- Standard log-normal set (same fixture as the rest of this file) ---
+    dist = LogNormal(log(_mu_aer), log(_sigma_aer))
+    r_min = max(quantile(dist, 1e-8), 1e-6 * _r_max)
+    r, wr = vSmartMOM.Scattering.gauleg_log(_nquad, r_min, _r_max; norm=false)
+    wx = vSmartMOM.Scattering.compute_wₓ(dist, wr, r, _r_max)
+    pol = Stokes_IQUV()
+
+    ref = compute_aerosol_optical_properties_nodes(r, wx, _nr, _ni, _lam, pol, NoTruncation())
+
+    r32 = Float32.(r); wx32 = Float32.(wx)
+    gpu32 = compute_aerosol_optical_properties_nodes_gpu(r32, wx32, Float32(_nr), Float32(_ni), Float32(_lam),
+                                                          _KA_CPU(); precision_policy=NativeFloat32())
+    gpu32 = Scattering.truncate_phase(NoTruncation(), gpu32)
+
+    k_relerr_std   = abs(Float64(gpu32.k) - ref.k) / ref.k
+    ω_relerr_std   = abs(Float64(gpu32.ω̃) - ref.ω̃) / ref.ω̃
+    L_std = min(length(gpu32.greek_coefs.β), length(ref.greek_coefs.β))
+    greek_maxabs_std = maximum(
+        maximum(abs.(Float64.(getproperty(gpu32.greek_coefs, f)[1:L_std]) .-
+                     getproperty(ref.greek_coefs, f)[1:L_std]))
+        for f in (:α, :β, :γ, :δ, :ϵ, :ζ)
+    )
+
+    # --- Wide-range TOMAS-like set (same fixture as the "wide-range ensemble" testset) ---
+    nr_w = 1.5; ni_w = 0.005; lam_w = 0.55
+    fine_r = exp.(range(log(0.005), log(0.05), length=40))
+    fine_w = pdf.(LogNormal(log(0.02), log(1.6)), fine_r)
+    coarse_r = exp.(range(log(1.0), log(6.0), length=25))
+    coarse_w = pdf.(LogNormal(log(2.0), log(1.5)), coarse_r) .* 1e-3
+    wide_r = vcat(fine_r, coarse_r)
+    wide_w = vcat(fine_w, coarse_w)
+
+    ref_wide = compute_aerosol_optical_properties_nodes(wide_r, wide_w, nr_w, ni_w, lam_w, pol, NoTruncation())
+
+    wide_r32 = Float32.(wide_r); wide_w32 = Float32.(wide_w)
+    gpu32_wide = compute_aerosol_optical_properties_nodes_gpu(wide_r32, wide_w32, Float32(nr_w), Float32(ni_w),
+                                                               Float32(lam_w), _KA_CPU();
+                                                               precision_policy=NativeFloat32())
+    gpu32_wide = Scattering.truncate_phase(NoTruncation(), gpu32_wide)
+
+    k_relerr_wide = abs(Float64(gpu32_wide.k) - ref_wide.k) / ref_wide.k
+    ω_relerr_wide = abs(Float64(gpu32_wide.ω̃) - ref_wide.ω̃) / ref_wide.ω̃
+    L_wide = min(length(gpu32_wide.greek_coefs.β), length(ref_wide.greek_coefs.β))
+    greek_maxabs_wide = maximum(
+        maximum(abs.(Float64.(getproperty(gpu32_wide.greek_coefs, f)[1:L_wide]) .-
+                     getproperty(ref_wide.greek_coefs, f)[1:L_wide]))
+        for f in (:α, :β, :γ, :δ, :ϵ, :ζ)
+    )
+
+    println("NativeFloat32 vs Float64 CPU reference -- MEASURED accuracy:")
+    println("  standard set   (nquad=$_nquad): k relerr=$(k_relerr_std)  ω̃ relerr=$(ω_relerr_std)  Greek maxabs=$(greek_maxabs_std)")
+    println("  wide TOMAS set (n=$(length(wide_r))):     k relerr=$(k_relerr_wide)  ω̃ relerr=$(ω_relerr_wide)  Greek maxabs=$(greek_maxabs_wide)")
+
+    # Measured (this host, 2026-08-15): k/ω̃ relerr ~1e-8, Greek maxabs ~5e-3 on
+    # BOTH sets (dominated by the native-Float32 Dₙ recursion feeding the Greek
+    # angular projection -- k/ω̃ are simple Neumaier-compensated weighted sums
+    # and stay accurate even without DS emulation; Greek coefficients are
+    # noticeably WORSE than DSEmulated's established ~1e-3 floor, exactly as
+    # expected for a policy with no double-single Dₙ emulation at all).
+    # Asserted with a ~100x margin on k/ω̃ and ~2x margin on Greek to absorb
+    # BLAS/libm cross-platform noise without being a vacuous bound.
+    @test k_relerr_std   < 1e-6
+    @test ω_relerr_std   < 1e-6
+    @test greek_maxabs_std < 1e-2
+    @test k_relerr_wide   < 1e-6
+    @test ω_relerr_wide   < 1e-6
+    @test greek_maxabs_wide < 1e-2
+
+    # Sanity: NativeFloat32 must not be MORE accurate on Greek than the
+    # established DSEmulated floor by construction (it has strictly less
+    # numerical machinery) -- not asserted numerically (measured margins above
+    # already suffice), just documented here as the expected ordering.
+end
+
+@testset "NativeFloat32: zero Float64 device arrays (mechanical check)" begin
+    dist = LogNormal(log(_mu_aer), log(_sigma_aer))
+    r_min = max(quantile(dist, 1e-8), 1e-6 * _r_max)
+    r, wr = vSmartMOM.Scattering.gauleg_log(_nquad, r_min, _r_max; norm=false)
+    wx = vSmartMOM.Scattering.compute_wₓ(dist, wr, r, _r_max)
+    r32 = Float32.(r); wx32 = Float32.(wx)
+
+    # White-box: _prepare_node_mie_gpu's returned FT/RA and per-node device
+    # array eltypes directly prove no Float64 buffer is allocated -- EVERY
+    # downstream reduction/Greek/Legendre device array in both public GPU
+    # functions is typed by this SAME `RA`.
+    prep = Scattering._prepare_node_mie_gpu(r32, wx32, Float32(_nr), Float32(_ni), Float32(_lam),
+                                             _KA_CPU(), NativeFloat32())
+    @test prep.FT === Float32
+    @test prep.RA === Float32     # THE key lever: never widened to Float64
+    @test eltype(prep.x_dev)    === Float32
+    @test eltype(prep.an_dev)   === Complex{Float32}
+    @test eltype(prep.bn_dev)   === Complex{Float32}
+    @test eltype(prep.nmax_dev) === Int
+
+    # Black-box corroboration: the full end-to-end output stays Float32
+    # throughout (RA === FT means no convert.(FT, ...) narrowing branch is
+    # even taken), consistent with an all-Float32 device pipeline.
+    full = compute_aerosol_optical_properties_nodes_gpu(r32, wx32, Float32(_nr), Float32(_ni), Float32(_lam),
+                                                          _KA_CPU(); precision_policy=NativeFloat32())
+    @test full.k isa Float32
+    @test full.ω̃ isa Float32
+    @test eltype(full.greek_coefs.β) === Float32
+
+    k_only = compute_aerosol_extinction_nodes_gpu(r32, wx32, Float32(_nr), Float32(_ni), Float32(_lam),
+                                                   _KA_CPU(); precision_policy=NativeFloat32())
+    @test k_only isa Float32
+    @test k_only == full.k   # both entry points share _prepare_node_mie_gpu
+end
+
+@testset "NativeFloat32: policy/type validation" begin
+    dist = LogNormal(log(_mu_aer), log(_sigma_aer))
+    r_min = max(quantile(dist, 1e-8), 1e-6 * _r_max)
+    r, wr = vSmartMOM.Scattering.gauleg_log(_nquad, r_min, _r_max; norm=false)
+    wx = vSmartMOM.Scattering.compute_wₓ(dist, wr, r, _r_max)
+
+    # Float64 nodes with NativeFloat32 policy must assert (mirrors the
+    # existing NativeFloat64-requires-Float64 check).
+    @test_throws AssertionError compute_aerosol_optical_properties_nodes_gpu(
+        r, wx, _nr, _ni, _lam, _KA_CPU(); precision_policy=NativeFloat32())
+    @test_throws AssertionError compute_aerosol_extinction_nodes_gpu(
+        r, wx, _nr, _ni, _lam, _KA_CPU(); precision_policy=NativeFloat32())
+
+    # Float32 nodes with NativeFloat32 must NOT assert (sanity: the policy
+    # actually accepts its own intended input type).
+    r32 = Float32.(r); wx32 = Float32.(wx)
+    @test compute_aerosol_optical_properties_nodes_gpu(
+        r32, wx32, Float32(_nr), Float32(_ni), Float32(_lam), _KA_CPU();
+        precision_policy=NativeFloat32()) isa AerosolOptics
+    @test compute_aerosol_extinction_nodes_gpu(
+        r32, wx32, Float32(_nr), Float32(_ni), Float32(_lam), _KA_CPU();
+        precision_policy=NativeFloat32()) isa Float32
+end
+
+# Minimal Metal-backend mock: `_is_metal_backend` defaults to `false` on
+# `Any` (real-dispatch trait, refined to `true` for `Metal.MetalBackend` only
+# by the weakly-loaded `vSmartMOMMetalExt` extension -- see gpu_precision.jl).
+# This mock registers its OWN `_is_metal_backend` method (real dispatch, not
+# name/string matching) so the Metal-only-NativeFloat32 guard in
+# `_prepare_node_mie_gpu` can be exercised WITHOUT installing Metal.jl -- the
+# guard fires before any KernelAbstractions call, so this mock never needs to
+# implement a real KA backend interface. Defined at top level (structs cannot
+# be declared inside a function/testset body before Julia 1.12); named
+# distinctly from `Metal.MetalBackend` since matching is now by dispatch, not
+# by name, so no collision risk even when Metal.jl IS loaded.
+struct MockMetalBackend end
+Scattering._is_metal_backend(::MockMetalBackend) = true
+
+@testset "Metal-only-NativeFloat32 guard (mock backend, no real Metal.jl needed)" begin
+    @test Scattering._is_metal_backend(MockMetalBackend()) == true
+    @test Scattering._is_metal_backend(_KA_CPU()) == false
+
+    dist = LogNormal(log(_mu_aer), log(_sigma_aer))
+    r_min = max(quantile(dist, 1e-8), 1e-6 * _r_max)
+    r, wr = vSmartMOM.Scattering.gauleg_log(_nquad, r_min, _r_max; norm=false)
+    wx = vSmartMOM.Scattering.compute_wₓ(dist, wr, r, _r_max)
+
+    # NativeFloat64 (Float64 nodes) on a Metal-shaped backend: Metal has NO
+    # Float64 hardware at all -- must throw ArgumentError (not a cryptic
+    # failure inside KernelAbstractions.allocate, which this mock cannot even
+    # perform).
+    @test_throws ArgumentError compute_aerosol_optical_properties_nodes_gpu(
+        r, wx, _nr, _ni, _lam, MockMetalBackend(); precision_policy=NativeFloat64())
+    @test_throws ArgumentError compute_aerosol_extinction_nodes_gpu(
+        r, wx, _nr, _ni, _lam, MockMetalBackend(); precision_policy=NativeFloat64())
+
+    # DSEmulated (Float32 nodes) on a Metal-shaped backend: DSEmulated's
+    # historical reduction discipline widens to RA=Float64 for a Float32
+    # kernel -- illegal on Metal device arrays -- must ALSO throw
+    # ArgumentError. DSEmulated-on-Metal (a Float32-COMPENSATED, not widened,
+    # reduction) is a documented follow-up, not implemented this round.
+    r32 = Float32.(r); wx32 = Float32.(wx)
+    @test_throws ArgumentError compute_aerosol_optical_properties_nodes_gpu(
+        r32, wx32, Float32(_nr), Float32(_ni), Float32(_lam), MockMetalBackend(); precision_policy=DSEmulated())
+    @test_throws ArgumentError compute_aerosol_extinction_nodes_gpu(
+        r32, wx32, Float32(_nr), Float32(_ni), Float32(_lam), MockMetalBackend(); precision_policy=DSEmulated())
+
+    # NativeFloat32: RA === FT === Float32, so the guard's `FT === Float64 ||
+    # RA === Float64` condition is trivially false for ANY backend -- proven
+    # directly at the policy-dispatch level (a mock with no real KA backend
+    # interface cannot run the full kernel pipeline to show this end to end).
+    @test Scattering._mie_reduction_type(NativeFloat32(), Float32) === Float32
+    @test Scattering._check_policy_ft(NativeFloat32(), Float32) === nothing
+end
+
+#=
+=====================================================================
+GPU exact k-identity: full API vs extinction-only sibling.
+=====================================================================
+The CPU path asserts `===` bitwise identity (see "compute_aerosol_extinction_nodes:
+bitwise k-equality vs full API (a)" above). On the GPU paths this was
+previously only checked with tolerances -- but compute_aerosol_optical_properties_nodes_gpu
+and compute_aerosol_extinction_nodes_gpu now share `_prepare_node_mie_gpu`
+(same Kernel-1 launch producing the SAME an_dev/bn_dev/x_dev/nmax_dev), and
+each then launches `cross_sections_kernel!` + `weighted_sum_kernel!` (the
+latter always `ndrange=1` -- a single-thread Neumaier loop, so no parallel-
+reduction nondeterminism) on the SAME per-node/weight arrays. So `k` should be
+EXACTLY the same number between the two entry points, not just close.
+
+NOT `===`: two independent device->host copies (`Array(bulk_Cext_dev)[1]`,
+narrowed to `FT`) are different objects/moments in each call, so `===` does
+not apply the way it does for the CPU path's shared-buffer case -- exact
+numeric equality (`==`) is the right bar here, confirmed measured (not just
+assumed) on KA-CPU and real CUDA below for all three precision policies.
+=====================================================================
+=#
+
+"""
+    _assert_gpu_k_exact_equal(backend, rr, ww, nr_, ni_, lam_, policy, FT)
+
+Shared check used by the KA-CPU/CUDA/Metal exact-k-identity testsets: computes
+`compute_aerosol_optical_properties_nodes_gpu(...).k` and
+`compute_aerosol_extinction_nodes_gpu(...)` on IDENTICAL inputs/backend/policy
+and asserts `==` exact equality. On failure, prints the policy/backend and the
+numeric difference so a real regression is easy to diagnose (rather than
+silently loosening the bound).
+"""
+function _assert_gpu_k_exact_equal(backend, rr, ww, nr_, ni_, lam_, policy, FT)
+    rr2 = FT.(rr); ww2 = FT.(ww)
+    full = compute_aerosol_optical_properties_nodes_gpu(rr2, ww2, FT(nr_), FT(ni_), FT(lam_), backend;
+                                                         precision_policy=policy)
+    ext  = compute_aerosol_extinction_nodes_gpu(rr2, ww2, FT(nr_), FT(ni_), FT(lam_), backend;
+                                                 precision_policy=policy)
+    if full.k != ext
+        println("GPU exact k-identity FAILED: backend=$(typeof(backend)) policy=$(typeof(policy)) ",
+                "full.k=$(full.k) ext=$(ext) diff=$(Float64(full.k) - Float64(ext))")
+    end
+    @test full.k == ext
+end
+
+# Standard + wide-range (TOMAS-like) node sets, shared by the three
+# exact-k-identity testsets below (KA-CPU, real CUDA, real Metal).
+const _dist_std = LogNormal(log(_mu_aer), log(_sigma_aer))
+const _rmin_std = max(quantile(_dist_std, 1e-8), 1e-6 * _r_max)
+const (_r_std, _wr_std) = vSmartMOM.Scattering.gauleg_log(_nquad, _rmin_std, _r_max; norm=false)
+const _wx_std = vSmartMOM.Scattering.compute_wₓ(_dist_std, _wr_std, _r_std, _r_max)
+
+const _nr_wide = 1.5; const _ni_wide = 0.005; const _lam_wide = 0.55
+const _fine_r_ex = exp.(range(log(0.005), log(0.05), length=40))
+const _fine_w_ex = pdf.(LogNormal(log(0.02), log(1.6)), _fine_r_ex)
+const _coarse_r_ex = exp.(range(log(1.0), log(6.0), length=25))
+const _coarse_w_ex = pdf.(LogNormal(log(2.0), log(1.5)), _coarse_r_ex) .* 1e-3
+const _wide_r_ex = vcat(_fine_r_ex, _coarse_r_ex)
+const _wide_w_ex = vcat(_fine_w_ex, _coarse_w_ex)
+
+const _EXACT_K_NODE_SETS = (
+    ("standard",   _r_std,    _wx_std,    _nr,      _ni,      _lam),
+    ("wide TOMAS", _wide_r_ex, _wide_w_ex, _nr_wide, _ni_wide, _lam_wide),
+)
+const _EXACT_K_POLICIES = (
+    (NativeFloat64(), Float64),
+    (DSEmulated(),    Float32),
+    (NativeFloat32(), Float32),
+)
+
+@testset "GPU exact k-identity: full API vs extinction-only, KA-CPU (all 3 policies, both sets)" begin
+    for (label, rr, ww, nr_, ni_, lam_) in _EXACT_K_NODE_SETS, (policy, FT) in _EXACT_K_POLICIES
+        @testset "$label / $(typeof(policy))" begin
+            _assert_gpu_k_exact_equal(_KA_CPU(), rr, ww, nr_, ni_, lam_, policy, FT)
+        end
+    end
+end
+
+# ============================================================================
+# Real Metal hardware (gated on a functional Metal backend, like the CUDA
+# gating above). This host has none (Linux) -- these testsets skip cleanly;
+# the user validates on a Mac.
+# ============================================================================
+const _METAL_FUNCTIONAL = try
+    @eval import Metal
+    Metal.functional()
+catch
+    false
+end
+const _METAL_BACKEND = _METAL_FUNCTIONAL ? Metal.MetalBackend() : nothing
+
+if _METAL_FUNCTIONAL
+    @info "test_mie_nodes: Metal is functional — running real-Metal node-API testsets."
+else
+    @info "test_mie_nodes: Metal not functional — real-Metal node-API testsets are skipped (KA-CPU/mock coverage above still runs)."
+end
+
+@testset "Real Metal: NativeFloat32 vs KA-CPU NativeFloat32 and Float64 reference (gated)" begin
+    if !_METAL_FUNCTIONAL
+        @test_skip "Metal not functional on this host — real-Metal node-API test skipped"
+    else
+        dist = LogNormal(log(_mu_aer), log(_sigma_aer))
+        r_min = max(quantile(dist, 1e-8), 1e-6 * _r_max)
+        r, wr = vSmartMOM.Scattering.gauleg_log(_nquad, r_min, _r_max; norm=false)
+        wx = vSmartMOM.Scattering.compute_wₓ(dist, wr, r, _r_max)
+        r32 = Float32.(r); wx32 = Float32.(wx)
+
+        ref = compute_aerosol_optical_properties_nodes(r, wx, _nr, _ni, _lam, Stokes_IQUV(), NoTruncation())
+
+        ka32 = compute_aerosol_optical_properties_nodes_gpu(r32, wx32, Float32(_nr), Float32(_ni), Float32(_lam),
+                                                             _KA_CPU(); precision_policy=NativeFloat32())
+        ka32 = Scattering.truncate_phase(NoTruncation(), ka32)
+        mt32 = compute_aerosol_optical_properties_nodes_gpu(r32, wx32, Float32(_nr), Float32(_ni), Float32(_lam),
+                                                             _METAL_BACKEND; precision_policy=NativeFloat32())
+        mt32 = Scattering.truncate_phase(NoTruncation(), mt32)
+
+        @test isapprox(mt32.k, ka32.k, rtol=1e-5)
+        @test isapprox(mt32.ω̃, ka32.ω̃, rtol=1e-5)
+        for f in (:α, :β, :γ, :δ, :ϵ, :ζ)
+            @test isapprox(getproperty(mt32.greek_coefs, f), getproperty(ka32.greek_coefs, f), atol=1e-3)
+        end
+        @test isapprox(Float64(mt32.k), ref.k, rtol=1e-6)
+        @test isapprox(Float64(mt32.ω̃), ref.ω̃, rtol=1e-6)
+
+        # Top-level dispatch: architecture=MetalGPU() auto-selects NativeFloat32.
+        top = compute_aerosol_optical_properties_nodes(r32, wx32, Float32(_nr), Float32(_ni), Float32(_lam),
+                                                        Stokes_IQUV(), NoTruncation();
+                                                        architecture=Architectures.MetalGPU())
+        @test isapprox(top.k, ka32.k, rtol=1e-5)
+
+        # Float64 on Metal must throw (auto-select path).
+        @test_throws ArgumentError compute_aerosol_optical_properties_nodes(
+            r, wx, _nr, _ni, _lam, Stokes_IQUV(), NoTruncation(); architecture=Architectures.MetalGPU())
+    end
+end
+
+@testset "Real Metal: exact k-identity full API vs extinction-only (NativeFloat32, both sets, gated)" begin
+    if !_METAL_FUNCTIONAL
+        @test_skip "Metal not functional on this host — real-Metal exact k-identity test skipped"
+    else
+        # Metal only supports NativeFloat32 this round (NativeFloat64/DSEmulated
+        # both throw ArgumentError via the Metal-only-NativeFloat32 guard in
+        # _prepare_node_mie_gpu -- see the "Metal-only-NativeFloat32 guard"
+        # testset above), so only that one policy is exercised here.
+        for (label, rr, ww, nr_, ni_, lam_) in _EXACT_K_NODE_SETS
+            @testset "$label / NativeFloat32" begin
+                _assert_gpu_k_exact_equal(_METAL_BACKEND, rr, ww, nr_, ni_, lam_, NativeFloat32(), Float32)
+            end
+        end
+    end
+end
+
+# ============================================================================
+# Real CUDA: NativeFloat32 accuracy (gated, like the other real-CUDA testsets)
+# ============================================================================
+@testset "Real CUDA: NativeFloat32 vs KA-CPU NativeFloat32 and Float64 reference (gated)" begin
+    if !_CUDA_FUNCTIONAL
+        @test_skip "CUDA not functional on this host — NativeFloat32 real-GPU test skipped"
+    else
+        dist = LogNormal(log(_mu_aer), log(_sigma_aer))
+        r_min = max(quantile(dist, 1e-8), 1e-6 * _r_max)
+        r, wr = vSmartMOM.Scattering.gauleg_log(_nquad, r_min, _r_max; norm=false)
+        wx = vSmartMOM.Scattering.compute_wₓ(dist, wr, r, _r_max)
+        r32 = Float32.(r); wx32 = Float32.(wx)
+
+        ref = compute_aerosol_optical_properties_nodes(r, wx, _nr, _ni, _lam, Stokes_IQUV(), NoTruncation())
+
+        ka32 = compute_aerosol_optical_properties_nodes_gpu(r32, wx32, Float32(_nr), Float32(_ni), Float32(_lam),
+                                                             _KA_CPU(); precision_policy=NativeFloat32())
+        ka32 = Scattering.truncate_phase(NoTruncation(), ka32)
+        cu32 = compute_aerosol_optical_properties_nodes_gpu(r32, wx32, Float32(_nr), Float32(_ni), Float32(_lam),
+                                                             _CUDA_BACKEND; precision_policy=NativeFloat32())
+        cu32 = Scattering.truncate_phase(NoTruncation(), cu32)
+
+        # KA-CPU vs real CUDA, SAME policy: tight (same FLOP sequence/precision,
+        # different device -- not necessarily bit-identical CPU vs GPU FPUs).
+        @test isapprox(cu32.k, ka32.k, rtol=1e-6)
+        @test isapprox(cu32.ω̃, ka32.ω̃, rtol=1e-6)
+        for f in (:α, :β, :γ, :δ, :ϵ, :ζ)
+            @test isapprox(getproperty(cu32.greek_coefs, f), getproperty(ka32.greek_coefs, f), atol=1e-4)
+        end
+
+        # vs Float64 CPU reference: the measured NativeFloat32 error band (see
+        # the KA-CPU accuracy testset above for the exact numbers on this host).
+        @test isapprox(Float64(cu32.k), ref.k, rtol=1e-6)
+        @test isapprox(Float64(cu32.ω̃), ref.ω̃, rtol=1e-6)
+        L = min(length(cu32.greek_coefs.β), length(ref.greek_coefs.β))
+        for f in (:α, :β, :γ, :δ, :ϵ, :ζ)
+            g = Float64.(getproperty(cu32.greek_coefs, f)[1:L])
+            rr = getproperty(ref.greek_coefs, f)[1:L]
+            @test maximum(abs.(g .- rr)) < 1e-2
+        end
+
+        # Extinction-only sibling: same NativeFloat32 policy, real CUDA vs KA-CPU.
+        k_ka32 = compute_aerosol_extinction_nodes_gpu(r32, wx32, Float32(_nr), Float32(_ni), Float32(_lam),
+                                                       _KA_CPU(); precision_policy=NativeFloat32())
+        k_cu32 = compute_aerosol_extinction_nodes_gpu(r32, wx32, Float32(_nr), Float32(_ni), Float32(_lam),
+                                                       _CUDA_BACKEND; precision_policy=NativeFloat32())
+        @test isapprox(k_cu32, k_ka32, rtol=1e-6)
+        @test isapprox(Float64(k_cu32), ref.k, rtol=1e-6)
+    end
+end
+
+@testset "Real CUDA: exact k-identity full API vs extinction-only (all 3 policies, both sets, gated)" begin
+    if !_CUDA_FUNCTIONAL
+        @test_skip "CUDA not functional on this host — real-CUDA exact k-identity test skipped"
+    else
+        for (label, rr, ww, nr_, ni_, lam_) in _EXACT_K_NODE_SETS, (policy, FT) in _EXACT_K_POLICIES
+            @testset "$label / $(typeof(policy))" begin
+                _assert_gpu_k_exact_equal(_CUDA_BACKEND, rr, ww, nr_, ni_, lam_, policy, FT)
+            end
+        end
+    end
+end
+
+# ============================================================================
+# A100 timing table: NativeFloat32 vs DSEmulated vs NativeFloat64 (gated,
+# reported only -- @elapsed is inherently noisy, so only >=0 is asserted).
+# ============================================================================
+@testset "Real CUDA: precision-policy timing table (report only)" begin
+    if !_CUDA_FUNCTIONAL
+        @test_skip "CUDA not functional on this host — precision-policy timing table skipped"
+    else
+        gpu_name = try
+            CUDA.name(CUDA.device())
+        catch
+            "unknown CUDA device"
+        end
+
+        dist = LogNormal(log(_mu_aer), log(_sigma_aer))
+        r_min = max(quantile(dist, 1e-8), 1e-6 * _r_max)
+        r, wr = vSmartMOM.Scattering.gauleg_log(_nquad, r_min, _r_max; norm=false)
+        wx = vSmartMOM.Scattering.compute_wₓ(dist, wr, r, _r_max)
+        r32 = Float32.(r); wx32 = Float32.(wx)
+
+        # Warm up (compile) all three policies before timing.
+        compute_aerosol_optical_properties_nodes_gpu(r, wx, _nr, _ni, _lam, _CUDA_BACKEND;
+                                                      precision_policy=NativeFloat64())
+        compute_aerosol_optical_properties_nodes_gpu(r32, wx32, Float32(_nr), Float32(_ni), Float32(_lam),
+                                                      _CUDA_BACKEND; precision_policy=DSEmulated())
+        compute_aerosol_optical_properties_nodes_gpu(r32, wx32, Float32(_nr), Float32(_ni), Float32(_lam),
+                                                      _CUDA_BACKEND; precision_policy=NativeFloat32())
+
+        t_f64 = @elapsed compute_aerosol_optical_properties_nodes_gpu(
+            r, wx, _nr, _ni, _lam, _CUDA_BACKEND; precision_policy=NativeFloat64())
+        t_ds  = @elapsed compute_aerosol_optical_properties_nodes_gpu(
+            r32, wx32, Float32(_nr), Float32(_ni), Float32(_lam), _CUDA_BACKEND; precision_policy=DSEmulated())
+        t_f32 = @elapsed compute_aerosol_optical_properties_nodes_gpu(
+            r32, wx32, Float32(_nr), Float32(_ni), Float32(_lam), _CUDA_BACKEND; precision_policy=NativeFloat32())
+
+        # Extinction-only sibling too (the cheaper path GCHPIO's hybrid mode
+        # actually wants for a "shape-elsewhere" node set).
+        t_f64_ext = @elapsed compute_aerosol_extinction_nodes_gpu(
+            r, wx, _nr, _ni, _lam, _CUDA_BACKEND; precision_policy=NativeFloat64())
+        t_ds_ext  = @elapsed compute_aerosol_extinction_nodes_gpu(
+            r32, wx32, Float32(_nr), Float32(_ni), Float32(_lam), _CUDA_BACKEND; precision_policy=DSEmulated())
+        t_f32_ext = @elapsed compute_aerosol_extinction_nodes_gpu(
+            r32, wx32, Float32(_nr), Float32(_ni), Float32(_lam), _CUDA_BACKEND; precision_policy=NativeFloat32())
+
+        println("Real-CUDA ($gpu_name) precision-policy timings (nquad=$_nquad, standard set):")
+        println("  full API:        NativeFloat64=$(t_f64)s  DSEmulated=$(t_ds)s  NativeFloat32=$(t_f32)s")
+        println("  extinction-only: NativeFloat64=$(t_f64_ext)s  DSEmulated=$(t_ds_ext)s  NativeFloat32=$(t_f32_ext)s")
+
+        @test t_f64 >= 0 && t_ds >= 0 && t_f32 >= 0
+        @test t_f64_ext >= 0 && t_ds_ext >= 0 && t_f32_ext >= 0
+    end
+end
