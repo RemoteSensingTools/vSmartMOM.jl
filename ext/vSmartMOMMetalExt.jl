@@ -80,20 +80,18 @@ Architectures.default_mie_precision_policy(::vSmartMOM.Architectures.MetalGPU,
 # Metal now has a GPU Mie pipeline (NativeFloat32 only -- see above), unlike
 # before this trait was refined: `has_gpu_mie` is a single architecture-level
 # capability trait shared by the log-normal `MieModel` GPU router AND the
-# caller-node GPU functions, so this opts BOTH in. The log-normal path
-# (`compute_aerosol_optical_properties_gpu` in compute_NAI2_gpu.jl) does not
-# yet special-case `NativeFloat32` in its own kernel-1 selection -- it still
-# has the OLD inline `if precision_policy isa NativeFloat64 ... else ...`
-# selector (compute_NAI2_gpu.jl:99-103) instead of the shared
-# `Scattering._mie_kernel1(policy, backend)` dispatch helper that the
-# caller-node path was refactored onto, so it treats any non-`NativeFloat64`
-# policy (including `NativeFloat32`) as `DSEmulated`. This is CORRECTNESS-safe
-# on Metal (the DS-emulated kernel is pure Float32 arithmetic, Metal-
-# compatible, and at least as accurate as native Float32) but not yet the
-# fastest possible kernel-1 for that path; FOLLOW-UP: replace that inline
-# selector with `_mie_kernel1(policy, backend)` so the log-normal path is also
-# `NativeFloat32`-aware. The caller-node GPU path (this task's actual target)
-# is fully `NativeFloat32`-aware end to end (see `Scattering._prepare_node_mie_gpu`).
+# caller-node GPU functions, so this opts BOTH in. This is safe for BOTH:
+# `compute_aerosol_optical_properties_gpu` (compute_NAI2_gpu.jl, the
+# log-normal path) now dispatches Kernel 1 via the SAME shared
+# `Scattering._mie_kernel1(policy, backend)` helper the caller-node path uses
+# (NativeFloat64/NativeFloat32 -> native kernel, DSEmulated -> double-single
+# kernel) and carries its own Metal-only Float64 device-array guard
+# (`Scattering._is_metal_backend`) -- its host-side size-distribution
+# reduction is plain `Array`-copied-back CPU arithmetic regardless of policy,
+# so (unlike the caller-node path's device-resident reduction) it was never at
+# risk of an illegal Float64 DEVICE array in the first place. The caller-node
+# GPU path is fully `NativeFloat32`-aware end to end (see
+# `Scattering._prepare_node_mie_gpu`).
 Architectures.has_gpu_mie(::vSmartMOM.Architectures.MetalGPU) = true
 
 "Return the backing Metal array used to allocate outputs for arrays or views."

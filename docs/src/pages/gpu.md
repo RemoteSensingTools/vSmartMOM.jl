@@ -75,6 +75,38 @@ matching package loaded throws an actionable error (`Architectures.ka_backend`,
   measured error bands).
 - `CPU()` supports both, with no precision-policy distinction.
 
+### `NativeFloat32` measured accuracy (caller-node Mie API, vs Float64 CPU reference)
+
+Measured on this host (A100, `test/test_mie_nodes.jl`), KA-CPU backend, standard
+log-normal set (nquad=300) and a wide-range (0.005-6 μm) TOMAS-like set:
+
+| Metric | standard set | wide TOMAS set |
+|---|---|---|
+| `k` (extinction) relerr | 8.1e-8 | 7.3e-9 |
+| `ω̃` (SSA) relerr | 7.8e-8 | 1.9e-8 |
+| Greek coefficients, max abs (α/β/δ/ζ worst) | 5.0e-3 | 4.3e-3 |
+| P11 (reconstructed phase function), max relerr | 0.89% | 0.19% |
+| P12/P11, max abs | 1.6e-4 | 2.5e-4 |
+| P33/P11, max abs | **1.4%** | **3.8%** |
+| P34/P11, max abs | 3.1e-4 | 2.8e-4 |
+
+`k`/`ω̃` land close to `DSEmulated`'s established floor (both are dominated by
+Neumaier-compensated summation, not the Dₙ recursion). Greek coefficients and
+the P33/P11 polarized ratio are the clearest signal of `NativeFloat32`'s
+reduced accuracy vs `DSEmulated` (no double-single Dₙ emulation, and — unlike
+the log-normal `MieModel` GPU path below — the reduction itself is never
+Float64-widened, by design, to keep zero Float64 device arrays). P12/P11 and
+P34/P11 stay small throughout. See `test/test_mie_nodes.jl`'s "NativeFloat32:
+accuracy..." and "NativeFloat32: polarized phase-matrix validation gate"
+testsets for the exact reproduction recipe.
+
+On the log-normal `MieModel` GPU path (`compute_aerosol_optical_properties_gpu`),
+`NativeFloat32` lands at `k`/`ω̃` relerr ~1-2e-7 and Greek coefficients ~7e-5
+abs — much closer to `NativeFloat64` than to the caller-node path's numbers
+above — because that path's host-side size-distribution reduction is ALWAYS
+Float64-widened regardless of precision policy (see `test/local/gpu/test_mie_gpu.jl`'s
+"NativeFloat32 (log-normal MieModel GPU path)" testsets).
+
 ## What is GPU-safe today
 
 - **Forward elastic RT** (elemental → doubling → interaction, `noRS`) —
@@ -96,14 +128,16 @@ matching package loaded throws an actionable error (`Architectures.ka_backend`,
   (`make_mie_model(...; architecture=GPU())`, NAI2 only; PCW and the
   ForwardDiff AD path fall back to CPU). `MetalGPU()` now also has a
   registered GPU Mie pipeline (`has_gpu_mie(::MetalGPU) = true`, Float32-only,
-  `NativeFloat32`); the log-normal `MieModel` path routes through it too
-  (`has_gpu_mie` is a single architecture-level trait shared by both APIs) but
-  does not yet select a native-Float32 kernel-1 there specifically (it uses
-  the `DSEmulated` double-single kernel regardless, which is
-  correctness-safe, just not the fastest possible on Metal — a follow-up).
-  The caller-node Mie API (`compute_aerosol_optical_properties_nodes`/
-  `compute_aerosol_extinction_nodes`) IS fully `NativeFloat32`-aware end to
-  end and is the primary target of the Metal Mie route.
+  `NativeFloat32`); `has_gpu_mie` is a single architecture-level trait shared
+  by the log-normal `MieModel` GPU path AND the caller-node Mie API, so both
+  route through Metal — and BOTH are `NativeFloat32`-aware end to end (shared
+  `_mie_kernel1` Kernel-1 dispatch, shared Metal-only-Float64-device-array
+  guard). The caller-node Mie API (`compute_aerosol_optical_properties_nodes`/
+  `compute_aerosol_extinction_nodes`) is the primary target of the Metal Mie
+  route (device-resident reduction, so its `RA` reduction type must never be
+  Float64 under `NativeFloat32`); the log-normal path's reduction is
+  host-side regardless of policy, so it was never at risk of an illegal
+  Float64 device array in the first place.
 - **Gas absorption** — the production pipeline (`model_from_parameters` →
   `rt_run`) computes line-by-line absorption via
   [AtmosphericAbsorption.jl](https://github.com/RemoteSensingTools/AtmosphericAbsorption.jl),
