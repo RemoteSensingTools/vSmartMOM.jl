@@ -18,14 +18,24 @@ Acceptance gates exercised here:
      signal only, the 2x go/no-go bar is judged in GCHPIO later).
 =#
 
-if !@isdefined(phase_function)
-    using Test
-    using vSmartMOM
-    using vSmartMOM.Scattering
-    using vSmartMOM.Architectures
-    using Distributions
-    using Random
-end
+# Imports are UNCONDITIONAL — deliberately not wrapped in the
+# `if !@isdefined(...)` standalone-run guard some sibling test files use.
+# That guard is unsound here: it tested `@isdefined(phase_function)`, but
+# `phase_function` is EXPORTED by `vSmartMOM.Scattering`, so under
+# `runtests.jl` (where an earlier file has already done
+# `using vSmartMOM.Scattering`) the guard evaluated false and its entire
+# body — including `using Random` — was skipped, making every testset in
+# this file die with `UndefVarError: MersenneTwister`. The file still
+# passed standalone, so the breakage was invisible outside a full-suite
+# run. `using` is idempotent in Julia, so importing unconditionally costs
+# nothing and makes this file's imports independent of whatever its
+# caller happens to have imported.
+using Test
+using vSmartMOM
+using vSmartMOM.Scattering
+using vSmartMOM.Architectures
+using Distributions
+using Random
 
 import KernelAbstractions
 const _BKA_CPU = KernelAbstractions.CPU
