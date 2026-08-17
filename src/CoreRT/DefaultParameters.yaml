@@ -31,7 +31,11 @@ radiative_transfer:
   # Optional: forward-peak exclusion angle for δBGE [deg]. Defaults to 0
   # (no exclusion) when omitted. Ignored when `truncation` resolves to
   # NoTruncation(). Set explicitly only when reproducing VLIDORT's
-  # `DO_DELTAM_SCALING = 2°` behaviour or matching legacy benchmarks:
+  # `DO_DELTAM_SCALING = 2°` behaviour or matching legacy benchmarks.
+  # ⚠ Leave at the default 0 for LINEARIZED (Jacobian) runs: the
+  # linearized δBGE fit does not apply the exclusion cone, so a non-zero
+  # Δ_angle makes the Jacobians describe a different truncated phase
+  # function than the forward model uses. See δBGE's docstring.
   # Δ_angle:          2.0
   # Depolarization factor.
   #   -1  → auto: derived per band from N₂/O₂ molecular constants (default).

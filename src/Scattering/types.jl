@@ -278,9 +278,46 @@ $(DocStringExtensions.FIELDS)
 struct δBGE{FT} <: AbstractTruncationType
     "Truncation length for Legendre terms"
     l_max::Int
-    "Exclusion angle for forward peak (in fitting procedure) `[degrees]`"
+    """
+    Exclusion angle for forward peak (in fitting procedure) `[degrees]`.
+
+    Defaults to `0.0` via the YAML/TOML path (no forward-peak exclusion);
+    set it non-zero only to reproduce VLIDORT's `DO_DELTAM_SCALING = 2°`
+    or to match legacy benchmarks.
+
+    ⚠ **NOT honoured by the linearized path.** `truncate_phase` (forward)
+    restricts its least-squares fit to `μ < cosd(Δ_angle)`, but
+    `truncate_phase_lin` computes that index set and then uses it only for
+    `reportFit` diagnostics — its normal equations are assembled over the
+    full `μ` range. So for `Δ_angle > 0` the linearized run's truncated
+    Greek coefficients differ from the forward run's, i.e. the Jacobians
+    describe a slightly different forward model than `rt_run` evaluates.
+    At the default `Δ_angle = 0` the two paths agree and the discrepancy
+    is dormant — which is the reason to leave the default at zero.
+    Fixing the linearized path to honour the exclusion cone is tracked as
+    a follow-up.
+    """
     Δ_angle::FT
 end
+
+"""
+    δBGE{FT}(l_max)
+    δBGE(l_max)
+
+Convenience constructors defaulting `Δ_angle = 0` — no forward-peak
+exclusion. Zero is the default everywhere else too (the YAML/TOML path
+uses `get(..., "Δ_angle", 0.0)`), and these make it expressible for
+direct construction so a call site never has to state it just to get the
+default. The untyped form yields `δBGE{Float64}`; use the parameterised
+form to match a `Float32` model.
+
+Prefer these over `δBGE(l_max, 0.0)`. Pass `Δ_angle` explicitly only to
+reproduce VLIDORT's `DO_DELTAM_SCALING = 2°` or legacy benchmarks — and
+see the `Δ_angle` field docs for why non-zero values are unsafe with the
+linearized path.
+"""
+δBGE{FT}(l_max::Integer) where {FT} = δBGE{FT}(Int(l_max), zero(FT))
+δBGE(l_max::Integer) = δBGE{Float64}(Int(l_max), 0.0)
 
 """
     AutoTruncation()
