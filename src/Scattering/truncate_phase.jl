@@ -46,8 +46,11 @@ truncate_phase_lowconf(::NoTruncation, aero::AerosolOptics; kwargs...) =
 Legacy/low-confidence δ-BGE truncation variant.
 
 Fits truncated coefficients outside the forward exclusion cone (`Δ_angle`) and
-rescales by retained scattering fraction ``c_0``. The returned truncation factor
-is:
+rescales by retained scattering fraction ``c_0``. All six Greek families are
+renormalised by ``1/c_0``; the ``(\beta_l - c_l)`` forward-peak subtraction
+applies only to the diagonal families ``\alpha, \beta, \delta, \zeta`` because
+the Dirac spike has ``\gamma_l^\delta = \epsilon_l^\delta = 0``. The returned
+truncation factor is:
 
 ```math
 f^t = 1 - c_0.
@@ -115,6 +118,17 @@ function truncate_phase_lowconf(mod::δBGE, aero::AerosolOptics{FT}; reportFit=f
     δᵗ = (δ[1:l_max] .- (β[1:l_max] .- cl)) / c₀    # Eq. 38b, derived from β
     αᵗ = (α[1:l_max] .- (β[1:l_max] .- cl)) / c₀    # Eq. 38c, derived from β
     ζᵗ = (ζ[1:l_max] .- (β[1:l_max] .- cl)) / c₀    # Eq. 38d, derived from β
+    # γᵗ / ϵᵗ: the least-squares fits above reproduce the *untruncated*
+    # b₁(μ), b₂(μ). The δBGE phase matrix is Zᵗ = (Z − fᵗ·δ(cosΘ−1)·E)/(1−fᵗ)
+    # (SS2015 Eq. 8), so **all six** Greek families carry the same 1/c₀
+    # renormalisation. Unlike α/β/δ/ζ there is no peak subtraction here,
+    # because the forward δ-spike is diagonal: γ_l^δ = ϵ_l^δ = 0
+    # (S2014 Eqs. A.5–A.10). Compare SS2015 Eqs. (27e,f) — the δ-m analogue —
+    # which read γⁿ_l = γ_l/(1−f_tr), ϵⁿ_l = ϵ_l/(1−f_tr). Omitting the 1/c₀
+    # dilutes the truncated degree of linear polarisation f₁₂/f₁₁ by exactly
+    # c₀ (a 29 % Q error at fᵗ = 0.29). No-op when fᵗ = 0 ⇒ c₀ = 1.
+    γᵗ = γᵗ / c₀
+    ϵᵗ = ϵᵗ / c₀
 
     # Truncated Greek coefficients only — ω̃ and k pass through. The
     # τ / ω rescaling per Sanghavi & Stephens 2015 Eq. 8 is applied
@@ -145,8 +159,18 @@ angles outside `Δ_angle`, then renormalizes with retained scattering fraction
 \beta^t = \frac{c}{c_0},\qquad
 \delta^t,\alpha^t,\zeta^t \text{ adjusted consistently from } \beta^t,
 \qquad
+\gamma^t = \frac{g}{c_0},\quad \epsilon^t = \frac{e}{c_0},
+\qquad
 f^t = 1-c_0.
 ```
+
+All six families share the ``1/c_0`` renormalisation (SS2015 Eq. 8:
+``Z^t = (Z - f^t\delta(\cos\Theta-1)E)/(1-f^t)``). Only the diagonal families
+additionally have the forward-peak amount ``(\beta_l - c_l)`` removed — the
+Dirac spike is diagonal, so ``\gamma_l^\delta = \epsilon_l^\delta = 0``
+(S2014 Eqs. A.5–A.10; cf. SS2015 Eqs. 27e,f for the δ-m analogue). This keeps
+the degree of linear polarisation ``-f_{12}/f_{11}`` invariant under
+truncation outside the exclusion cone.
 
 Returns a new [`AerosolOptics`](@ref) with truncated coefficients and updated
 `fᵗ`.
@@ -268,6 +292,17 @@ function truncate_phase(mod::δBGE, aero::AerosolOptics{FT}; reportFit=false) wh
     δᵗ = (δ[1:l_tr] .- (β[1:l_tr] .- cl)) / c₀    # Eq. 38b, derived from β
     αᵗ = (α[1:l_tr] .- (β[1:l_tr] .- cl)) / c₀    # Eq. 38c, derived from β
     ζᵗ = (ζ[1:l_tr] .- (β[1:l_tr] .- cl)) / c₀    # Eq. 38d, derived from β
+    # γᵗ / ϵᵗ: the normal-equation fits above reproduce the *untruncated*
+    # b₁(μ), b₂(μ). The δBGE phase matrix is Zᵗ = (Z − fᵗ·δ(cosΘ−1)·E)/(1−fᵗ)
+    # (SS2015 Eq. 8), so **all six** Greek families carry the same 1/c₀
+    # renormalisation. Unlike α/β/δ/ζ there is no peak subtraction here,
+    # because the forward δ-spike is diagonal: γ_l^δ = ϵ_l^δ = 0
+    # (S2014 Eqs. A.5–A.10). Compare SS2015 Eqs. (27e,f) — the δ-m analogue —
+    # which read γⁿ_l = γ_l/(1−f_tr), ϵⁿ_l = ϵ_l/(1−f_tr). Omitting the 1/c₀
+    # dilutes the truncated degree of linear polarisation f₁₂/f₁₁ by exactly
+    # c₀ (a 29 % Q error at fᵗ = 0.29). No-op when fᵗ = 0 ⇒ c₀ = 1.
+    γᵗ = γᵗ / c₀
+    ϵᵗ = ϵᵗ / c₀
 
     # Truncated Greek coefficients only — ω̃ and k pass through. The
     # τ / ω rescaling per Sanghavi & Stephens 2015 Eq. 8 is applied

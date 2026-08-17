@@ -21,6 +21,8 @@ using vSmartMOM
 using vSmartMOM.CoreRT
 using vSmartMOM.Scattering
 using CanopyOptics
+using Distributions
+using Statistics
 
 @testset "Truncation invariants" begin
 
@@ -195,6 +197,114 @@ using CanopyOptics
         @test_throws ArgumentError build("println(\"pwned\")")
         @test_throws ArgumentError build("run(`whoami`)")
         @test_throws ArgumentError build("Foo()")
+    end
+
+    @testset "δBGE renormalises all six Greek families (DoLP invariance)" begin
+        # SS2015 Eq. 8: the δBGE phase matrix is
+        #     Zᵗ = (Z − fᵗ·δ(cosΘ−1)·E) / (1 − fᵗ),      c₀ ≡ 1 − fᵗ,
+        # so *every* Greek family is renormalised by 1/c₀. Only the diagonal
+        # families α/β/δ/ζ additionally lose the forward-peak amount
+        # (β_l − c_l), because the Dirac spike is diagonal:
+        # γ_l^δ = ϵ_l^δ = 0 (S2014 Eqs. A.5–A.10; cf. SS2015 Eqs. 27e,f for
+        # the δ-m analogue γⁿ_l = γ_l/(1−f_tr)).
+        #
+        # Observable consequence: since γᵗ builds f₁₂ and βᵗ builds f₁₁, and
+        # both fits reproduce the untruncated functions outside the exclusion
+        # cone, the degree of linear polarisation −f₁₂/f₁₁ must be *invariant*
+        # under truncation. Dropping the 1/c₀ on γᵗ dilutes DoLP by exactly
+        # c₀ — a ~29 % error for the coarse aerosol below, and ~30 % on the
+        # TOA Stokes Q of a τ=0.5 coarse-dust layer.
+        function coarse_optics(; μ_r = 1.5, σ_r = 1.3, r_max = 4.0, l_tr = 32,
+                                 Δ_angle = 2.0, nquad_radius = 800)
+            aero = Scattering.Aerosol(LogNormal(log(μ_r), log(σ_r)), 1.55, 0.005)
+            mie = Scattering.MieModel(computation_type = Scattering.NAI2(),
+                                      aerosol = aero, λ = 0.55,
+                                      polarization_type = Stokes_IQUV(),
+                                      truncation_type = δBGE{Float64}(l_tr, Δ_angle),
+                                      r_max = r_max, nquad_radius = nquad_radius)
+            raw = Scattering.compute_aerosol_optical_properties(mie, Float64)
+            return raw, Scattering.truncate_phase(δBGE{Float64}(l_tr, Δ_angle), raw)
+        end
+
+        "DoLP = −f₁₂/f₁₁ reconstructed from Greek coefs on a θ grid [deg]."
+        function dolp_of(greek, θ)
+            sm = Scattering.reconstruct_phase(greek, cosd.(θ))
+            return -sm.f₁₂ ./ sm.f₁₁
+        end
+
+        # ── coarse aerosol: genuine forward peak, fᵗ ≈ 0.29 ──────────────
+        raw, tr = coarse_optics()
+        c₀ = 1 - tr.fᵗ
+        @test tr.fᵗ > 0.2                       # a real peak to remove
+
+        # Sample well outside the 2° exclusion cone, away from the DoLP
+        # sign changes where the ratio is numerically meaningless.
+        θ = collect(range(10.0, 180.0, length = 341))
+        d_raw = dolp_of(raw.greek_coefs, θ)
+        d_tr  = dolp_of(tr.greek_coefs,  θ)
+        keep  = abs.(d_raw) .> 0.02
+        @test count(keep) > 100                 # the comparison has support
+        ratio = d_tr[keep] ./ d_raw[keep]
+
+        # The invariant: DoLP is preserved (residual is δBGE *fit* error at
+        # l_tr = 32, not a systematic rescaling).
+        @test median(ratio) ≈ 1 atol = 0.05
+        @test median(abs.(d_tr[keep] .- d_raw[keep])) < 0.02
+        # …and it is emphatically NOT diluted by c₀, which is what the
+        # un-normalised γᵗ produced (median ratio ≈ 0.65 pre-fix).
+        @test abs(median(ratio) - c₀) > 0.15
+
+        # ── fine aerosol: fᵗ = 0 ⇒ c₀ = 1 ⇒ strict no-op ────────────────
+        raw0, tr0 = coarse_optics(μ_r = 0.1, σ_r = 1.5, r_max = 1.0)
+        @test tr0.fᵗ < 1e-6
+        d0_raw = dolp_of(raw0.greek_coefs, θ)
+        d0_tr  = dolp_of(tr0.greek_coefs,  θ)
+        keep0  = abs.(d0_raw) .> 0.02
+        # 1/c₀ with c₀ = 1 changes nothing: DoLP agreement at roundoff level.
+        @test maximum(abs.(d0_tr[keep0] .- d0_raw[keep0])) < 1e-7
+    end
+
+    @testset "δBGE linearised path: γ̇ᵗ/ϵ̇ᵗ carry the 1/c₀ chain rule" begin
+        # `truncate_phase(δBGE, aero, lin_aero)` must supply derivatives of the
+        # *renormalised* coefficients, i.e. including the −xᵗ·ċ₀ term with
+        # ċ₀ = ẋβ[:,1]. Verified by central finite differences of the very same
+        # function, so the check is independent of the (pre-existing) fact that
+        # the linearised fits sum over the full μ range while the two-argument
+        # `truncate_phase` restricts them to the `Δ_angle` exclusion cone.
+        # Derivative order is (nᵣ, nᵢ, rₚ, σₚ); we finite-difference nᵣ.
+        l_tr, Δ_angle = 24, 2.0
+        mk(nᵣ) = Scattering.MieModel(
+            computation_type = Scattering.NAI2(),
+            aerosol = Scattering.Aerosol(LogNormal(log(0.8), log(1.3)), nᵣ, 0.005),
+            λ = 0.55, polarization_type = Stokes_IQUV(),
+            truncation_type = δBGE{Float64}(l_tr, Δ_angle),
+            r_max = 2.5, nquad_radius = 600)
+        # truncated Greek coefs via the *linearised* method at refractive index nᵣ
+        function trunc_lin_at(nᵣ)
+            a, la = Scattering.compute_aerosol_optical_properties(
+                LinMode(), mk(nᵣ), Float64)
+            return Scattering.truncate_phase(δBGE{Float64}(l_tr, Δ_angle), a, la)
+        end
+
+        nᵣ, h = 1.55, 1e-5
+        tr0, lin0 = trunc_lin_at(nᵣ)
+        trp, _    = trunc_lin_at(nᵣ + h)
+        trm, _    = trunc_lin_at(nᵣ - h)
+
+        @test tr0.fᵗ > 0.01                       # non-trivial c₀ = 1 − fᵗ
+
+        # β̇ᵗ is the family that already carried the full chain rule — it is the
+        # control. γ̇ᵗ / ϵ̇ᵗ are the ones this fix repaired; pre-fix they were
+        # off by both the 1/c₀ factor and the −xᵗ·ċ₀ term.
+        for (f, fd) in ((:β, :β̇), (:γ, :γ̇), (:ϵ, :ϵ̇), (:α, :α̇), (:δ, :δ̇), (:ζ, :ζ̇))
+            fd_ref   = (getfield(trp.greek_coefs, f) .- getfield(trm.greek_coefs, f)) ./ (2h)
+            analytic = getfield(lin0.lin_greek_coefs, fd)[1, :]
+            scale    = maximum(abs, fd_ref)
+            @test maximum(abs, analytic .- fd_ref) < 1e-3 * scale
+        end
+
+        # ḟᵗ = −ċ₀ must be consistent with the same finite difference.
+        @test lin0.ḟᵗ[1] ≈ (trp.fᵗ - trm.fᵗ) / (2h) rtol = 1e-3
     end
 
     @testset "δ-M Eq. 8 invariants (delta_m_forward)" begin
