@@ -96,7 +96,22 @@ const _nquad = 300
     nodes_trunc = compute_aerosol_optical_properties_nodes(r, wx, _nr, _ni, _lam, pol, trunc)
     manual_trunc = Scattering.truncate_phase(trunc, ref)
     # Same re-normalization caveat as above -> tight isapprox, not exact ==.
-    @test isapprox(nodes_trunc.fᵗ, manual_trunc.fᵗ, rtol=1e-12)
+    #
+    # rtol=1e-10 (NOT 1e-12) deliberately, and it is the loosest tolerance in
+    # this testset for a reason: `fᵗ = 1 - c₀` with `c₀ = cl[1]`, and `cl`
+    # comes out of δBGE's least-squares solve (`A\b`) inside
+    # `truncate_phase`. That makes it the one quantity compared here whose
+    # last bits depend on the BLAS build — unlike `k`/`ω̃` above, which are
+    # deterministic weighted reductions and hold at 1e-13. Measured: this
+    # assertion PASSES at 1e-12 under `julia --project=test runtests.jl` but
+    # FAILS under `Pkg.test()` on the same machine and code
+    # (0.34408782694472373 vs 0.34408782694411744, 1.76e-12 relative),
+    # because the Pkg.test sandbox resolves a different environment and hence
+    # a different BLAS. CI's macOS-ARM and Windows-OpenBLAS legs are more
+    # exposed still. 1e-10 matches the tolerance this file already uses for
+    # its other cross-path comparisons, and 1e-10 on fᵗ≈0.34 is 3e-11
+    # absolute — far below anything physically meaningful.
+    @test isapprox(nodes_trunc.fᵗ, manual_trunc.fᵗ, rtol=1e-10)
     @test maximum(abs.(nodes_trunc.greek_coefs.β .- manual_trunc.greek_coefs.β)) < 1e-11
     @test maximum(abs.(nodes_trunc.greek_coefs.α .- manual_trunc.greek_coefs.α)) < 1e-11
 end
