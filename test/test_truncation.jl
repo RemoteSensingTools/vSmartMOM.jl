@@ -205,7 +205,7 @@ using Statistics
         # so *every* Greek family is renormalised by 1/c₀. Only the diagonal
         # families α/β/δ/ζ additionally lose the forward-peak amount
         # (β_l − c_l), because the Dirac spike is diagonal:
-        # γ_l^δ = ϵ_l^δ = 0 (S2014 Eqs. A.5–A.10; cf. SS2015 Eqs. 27e,f for
+        # γ_l^δ = ϵ_l^δ = 0 (S2014 Eqs. A.5–A.10; cf. SS2015 Eqs. 27c,d for
         # the δ-m analogue γⁿ_l = γ_l/(1−f_tr)).
         #
         # Observable consequence: since γᵗ builds f₁₂ and βᵗ builds f₁₁, and

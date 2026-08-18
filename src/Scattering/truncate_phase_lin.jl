@@ -198,7 +198,7 @@ function truncate_phase(mod::δBGE, aero::AerosolOptics{FT}, lin_aero::linAeroso
     # The δBGE phase matrix is Zᵗ = (Z − fᵗ·δ(cosΘ−1)·E)/(1−fᵗ) (SS2015 Eq. 8),
     # so **all six** Greek families carry the same 1/c₀ renormalisation. Unlike
     # α/β/δ/ζ there is no forward-peak subtraction here, because the Dirac spike
-    # is diagonal: γ_l^δ = ϵ_l^δ = 0 (S2014 Eqs. A.5–A.10; cf. SS2015 Eqs. 27e,f
+    # is diagonal: γ_l^δ = ϵ_l^δ = 0 (S2014 Eqs. A.5–A.10; cf. SS2015 Eqs. 27c,d
     # for the δ-m analogue γⁿ_l = γ_l/(1−f_tr), ϵⁿ_l = ϵ_l/(1−f_tr)).
     γᵗ = γᵗ_fit / c₀
     ϵᵗ = ϵᵗ_fit / c₀
