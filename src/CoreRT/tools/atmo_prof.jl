@@ -659,6 +659,32 @@ function getAerosolLayerOptProp(total_τ::FT, dist::Distribution, profile::Atmos
     τAer  =  (total_τ / sum(ρ)) * ρ
 end
 
+"CDF of an altitude-form lognormal, including the z=0 lower boundary."
+@inline function _altitude_lognormal_cdf(z, dist::LogNormal)
+    z <= zero(z) && return zero(z + dist.μ + dist.σ)
+    a = (log(z) - dist.μ) / dist.σ
+    return erfc(-a / sqrt(oftype(a, 2))) / oftype(a, 2)
+end
+
+"""
+Allocate an altitude-form lognormal aerosol by exact geometric-layer integrals.
+
+`LogNormal(log(z₀), σ₀)` is defined in altitude `z` [km].  The returned layer
+fractions are CDF differences between geometric interfaces, normalized over
+the finite model column so their sum is exactly `total_τ`.
+"""
+function getAerosolLayerOptProp(total_τ::FT, dist::LogNormal,
+                                profile::AtmosphericProfile) where FT
+    z_half = half_level_altitudes(profile)
+    ρ = [_altitude_lognormal_cdf(z_half[i], dist) -
+         _altitude_lognormal_cdf(z_half[i + 1], dist)
+         for i in eachindex(profile.Δz)]
+    norm_ρ = sum(ρ)
+    iszero(norm_ρ) && throw(ArgumentError(
+        "altitude-lognormal aerosol has zero mass inside the model column"))
+    return total_τ .* ρ ./ norm_ρ
+end
+
 @inline _h2o_moist_mole_fraction(r::Real) = r / (one(r) + r)
 
 # Legacy vSmartMOM interpolation tables have their broadener abundance fixed

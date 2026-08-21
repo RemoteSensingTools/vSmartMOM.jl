@@ -17,7 +17,7 @@ cd "${REPO_ROOT}"
 : "${VZA_BLOCKS:?Set VZA_BLOCKS, e.g. VZA_BLOCKS=\"2:3 4:5 6:7\"}"
 
 CUDA_DEVICE="${CUDA_DEVICE:-0}"
-OUTROOT="${OUTROOT:-/home/sanghavi/data/RamanSIFgrid/o2a_raman_lut_vza_psurf1000}"
+OUTROOT="${OUTROOT:-/home/sanghavi/data/RamanSIFgrid/O2ABand/o2a_raman_lut_vza_psurf1000}"
 CHUNK_ALBEDOS="${CHUNK_ALBEDOS:-21}"
 JULIA_FLAGS="${JULIA_FLAGS:---pkgimages=no}"
 TEE_CHUNK_LOGS="${TEE_CHUNK_LOGS:-0}"

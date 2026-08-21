@@ -21,6 +21,6 @@ export END_SZA_IDX="${END_SZA_IDX:-14}"
 export CHUNK_ALBEDOS="${CHUNK_ALBEDOS:-4}"
 export SKIP_COMPLETED="${SKIP_COMPLETED:-1}"
 export TEE_CHUNK_LOGS="${TEE_CHUNK_LOGS:-0}"
-export OUTDIR="${OUTDIR:-/home/sanghavi/data/RamanSIFgrid/o2a_raman_lut_chunked_psurf0500}"
+export OUTDIR="${OUTDIR:-/home/sanghavi/data/RamanSIFgrid/O2ABand/o2a_raman_lut_chunked_psurf0500}"
 
 exec "${SCRIPT_DIR}/run_remaining_RamanLUT_O2A_chunked.sh"

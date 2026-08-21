@@ -1,0 +1,40 @@
+Category endmembers are unweighted means of the files listed below.
+Sahara dust proxy: mean of the downloaded Syrian and Jordanian aridisol spectra.
+
+[concrete_paving]
+manmade.concrete.pavingconcrete.solid.all.0425uuuasp.jhu.becknic.spectrum.txt
+
+[grass]
+vegetation.grass.avena.fatua.vswir.vh353.ucsb.asd.spectrum.txt
+
+[roofing]
+manmade.roofingmaterial.metal.solid.all.0681uuucop.jhu.becknic.spectrum.txt
+manmade.roofingmaterial.shingle.solid.all.0597uuuasp.jhu.becknic.spectrum.txt
+manmade.roofingmaterial.tile.solid.all.0484uuupot.jhu.becknic.spectrum.txt
+
+[sahara_dust_proxy]
+soil.aridisol.calciorthid.none.all.84p3721.jhu.becknic.spectrum.txt
+soil.aridisol.gypsiorthid.none.all.82p2695.jhu.becknic.spectrum.txt
+
+[trees]
+vegetation.tree.abies.concolor.vswir.vh053.ucsb.asd.spectrum.txt
+vegetation.tree.bambusa.beecheyana.vswir.jpl238.jpl.asd.spectrum.txt
+vegetation.tree.beaucarnea.recurvata.vswir.jpl070.jpl.asd.spectrum.txt
+vegetation.tree.calodendrum.capense.vswir.jpl123.jpl.asd.spectrum.txt
+vegetation.tree.cedrus.atlantica.vswir.jpl152.jpl.asd.spectrum.txt
+vegetation.tree.eucalyptus.kartzoffiana.vswir.jpl151.jpl.asd.spectrum.txt
+vegetation.tree.ficus.craterostoma.vswir.jpl158.jpl.asd.spectrum.txt
+vegetation.tree.jacaranda.mimosifolia.vswir.jpl161.jpl.asd.spectrum.txt
+vegetation.tree.macadamia.integrifolia.vswir.jpl211.jpl.asd.spectrum.txt
+vegetation.tree.magnolia.grandiflora.vswir.jpl182.jpl.asd.spectrum.txt
+vegetation.tree.pinus.lambertiana.vswir.vh258.ucsb.asd.spectrum.txt
+vegetation.tree.pinus.ponderosa.vswir.vh067.ucsb.asd.spectrum.txt
+vegetation.tree.prunus.serotina.vswir.prse-1-63.ucsb.asd.spectrum.txt
+vegetation.tree.quercus.agrifolia.vswir.vh076.ucsb.asd.spectrum.txt
+vegetation.tree.quercus.douglasii.vswir.vh082.ucsb.asd.spectrum.txt
+
+[scene mixtures]
+urban: 30.0% concrete_paving, 50.0% roofing, 20.0% trees
+rural: 50.0% grass, 30.0% roofing, 20.0% trees
+desert: 100.0% sahara_dust_proxy
+forest: 100.0% trees

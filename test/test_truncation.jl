@@ -83,7 +83,9 @@ using CanopyOptics
                 LAD = CanopyOptics.planophile_leaves2(Float64),
                 leaf_reflectance = R_leaf, leaf_transmittance = T_leaf,
                 leaf_optics_grid = [685.0, 800.0], grid_unit = :nm)
-            model = model_from_parameters(params)
+            # This invariant intentionally exercises legacy Radau quadrature,
+            # whose solar node is embedded in the angular operator.
+            model = model_from_parameters(params; external_solar=false)
             for τ in model.τ_rayl; fill!(τ, 0); end
             for τ in model.τ_abs;  fill!(τ, 0); end
             for τ in model.τ_aer;  fill!(τ, 0); end

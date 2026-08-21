@@ -17,7 +17,7 @@ set -euo pipefail
 #   END_SZA_IDX=14
 #   CHUNK_ALBEDOS=4
 #   SKIP_COMPLETED=1
-#   OUTDIR=/home/sanghavi/data/RamanSIFgrid/o2a_raman_lut_chunked_psurf${PSURF}
+#   OUTDIR=/home/sanghavi/data/RamanSIFgrid/O2ABand/o2a_raman_lut_chunked_psurf${PSURF}
 #   LOGDIR=$OUTDIR/logs
 #   JULIA_BIN=julia
 #   JULIA_FLAGS="--pkgimages=no"
@@ -34,7 +34,7 @@ cd "${REPO_ROOT}"
 CUDA_DEVICE="${CUDA_DEVICE:-1}"
 END_SZA_IDX="${END_SZA_IDX:-14}"
 CHUNK_ALBEDOS="${CHUNK_ALBEDOS:-4}"
-OUTDIR="${OUTDIR:-/home/sanghavi/data/RamanSIFgrid/o2a_raman_lut_chunked_psurf${PSURF}}"
+OUTDIR="${OUTDIR:-/home/sanghavi/data/RamanSIFgrid/O2ABand/o2a_raman_lut_chunked_psurf${PSURF}}"
 LOGDIR="${LOGDIR:-${OUTDIR}/logs}"
 JULIA_BIN="${JULIA_BIN:-julia}"
 JULIA_FLAGS="${JULIA_FLAGS:---pkgimages=no}"

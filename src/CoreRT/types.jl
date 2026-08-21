@@ -250,6 +250,29 @@ struct SFI <:AbstractSourceType end
 abstract type AbstractLayer end
 
 """
+    SolarColumnOperators{FT}
+
+Rectangular layer operators coupling the fixed solar direction to every
+diffuse output stream.  Their array layout is
+`(NquadN, nStokes, nSpec)`: the second axis is the incident solar Stokes
+component, not an angular quadrature axis.
+"""
+Base.@kwdef struct SolarColumnOperators{FT}
+    R₀⁻⁺::AbstractArray{FT,3}
+    R₀⁺⁻::AbstractArray{FT,3}
+    T₀⁺⁺::AbstractArray{FT,3}
+    T₀⁻⁻::AbstractArray{FT,3}
+end
+
+"""Raman solar-column operators with layout `(NquadN,nStokes,nSpec,nRaman)`."""
+Base.@kwdef struct RamanSolarColumnOperators{FT}
+    ieR₀⁻⁺::AbstractArray{FT,4}
+    ieR₀⁺⁻::AbstractArray{FT,4}
+    ieT₀⁺⁺::AbstractArray{FT,4}
+    ieT₀⁻⁻::AbstractArray{FT,4}
+end
+
+"""
     CompositeLayer{FT} <: AbstractLayer
 
 Accumulated (composite) layer matrices produced by the interaction step of the
@@ -343,6 +366,8 @@ Base.@kwdef struct AddedLayer{FT} <: AbstractLayer
     # Empty NT in solar-only runs → bit-equal to pre-A.2a behaviour.
     "Per-source j₀ slots (v0.7 Phase A.2a, NamedTuple{(:thermal, …)} of SourceSlot)"
     j₀_by_src::NamedTuple = (;)
+    "Optional rectangular direct-solar elemental operators"
+    solar_columns::Union{SolarColumnOperators{FT},Nothing} = nothing
 end
 
 """
@@ -448,6 +473,10 @@ struct AddedLayerRS{FT} <: AbstractLayer
     ieJ₀⁺::AbstractArray{FT,4}
     "Added layer source matrix ieJ (in - direction)"
     ieJ₀⁻::AbstractArray{FT,4}
+    "Optional elastic direct-solar columns"
+    solar_columns::Union{SolarColumnOperators{FT},Nothing}
+    "Optional direct-solar Raman columns; diffuse redistribution remains square"
+    raman_solar_columns::Union{RamanSolarColumnOperators{FT},Nothing}
 end
 # Multisensor Composite layers 
 # Elastic
@@ -993,6 +1022,14 @@ mutable struct vSmartMOM_Parameters{FT<:Real}
     `stream_l_cap` from `nstreams` instead."
     legacy_l_cap_override::Union{Int, Nothing}
 
+    "Optional post-Mie Fourier-support cutoff based specifically on the
+    magnitude of the integrated aerosol Greek coefficient `β_l`. The largest
+    degree satisfying `abs(β_l) >= greek_beta_cutoff` is retained for each
+    aerosol; the per-band maximum enters the component trait aggregator.
+    This changes Fourier-loop support after Mie integration but does not resize
+    the previously selected quadrature. `nothing` disables the cutoff."
+    greek_beta_cutoff::Union{FT, Nothing}
+
 end
 
 """
@@ -1289,7 +1326,7 @@ Rayleigh and aerosol) or `*` (vertical concatenation).
 - `Z⁺⁺::FT3`: forward-scattering Z matrix
 - `Z⁻⁺::FT3`: backward-scattering Z matrix
 """
-Base.@kwdef struct CoreScatteringOpticalProperties{FT,FT2,FT3} <:  AbstractOpticalProperties
+Base.@kwdef struct CoreScatteringOpticalProperties{FT,FT2,FT3,FT4} <:  AbstractOpticalProperties
     "Absorption optical depth (scalar or wavelength dependent)"
     τ::FT 
     "Single scattering albedo"
@@ -1298,7 +1335,14 @@ Base.@kwdef struct CoreScatteringOpticalProperties{FT,FT2,FT3} <:  AbstractOptic
     Z⁺⁺::FT3 
     "Z scattering matrix (backward)"
     Z⁻⁺::FT3
+    "Solar-direction forward phase block [NquadN × nStokes × nSpec], or nothing"
+    Z₀⁺::FT4 = nothing
+    "Solar-direction backward phase block [NquadN × nStokes × nSpec], or nothing"
+    Z₀⁻::FT4 = nothing
 end
+
+CoreScatteringOpticalProperties(τ, ϖ, Z⁺⁺, Z⁻⁺) =
+    CoreScatteringOpticalProperties(τ, ϖ, Z⁺⁺, Z⁻⁺, nothing, nothing)
 
 # Core optical Properties COP with directional cross section 
 Base.@kwdef struct CoreDirectionalScatteringOpticalProperties{FT,FT2,FT3,FT4} <:  AbstractOpticalProperties
@@ -1320,9 +1364,8 @@ Base.@kwdef struct CoreAbsorptionOpticalProperties{FT} <:  AbstractOpticalProper
 end
 
 # Adding Core Optical Properties, can have mixed dimensions!
-function Base.:+( x::CoreScatteringOpticalProperties{xFT, xFT2, xFT3}, 
-                  y::CoreScatteringOpticalProperties{yFT, yFT2, yFT3} 
-                ) where {xFT, xFT2, xFT3, yFT, yFT2, yFT3} 
+function Base.:+(x::CoreScatteringOpticalProperties,
+                 y::CoreScatteringOpticalProperties)
     # Predefine some arrays:            
     xZ⁺⁺ = x.Z⁺⁺
     xZ⁻⁺ = x.Z⁻⁺
@@ -1336,8 +1379,8 @@ function Base.:+( x::CoreScatteringOpticalProperties{xFT, xFT2, xFT3},
     ϖ  = w ./ ifelse.(τ .> zero.(τ), τ, one.(τ))
     
     #@show xFT, xFT2, xFT3
-    all(wx .== 0.0) ? (return CoreScatteringOpticalProperties(τ, ϖ, y.Z⁺⁺, y.Z⁻⁺)) : nothing
-    all(wy .== 0.0) ? (return CoreScatteringOpticalProperties(τ, ϖ, x.Z⁺⁺, x.Z⁻⁺)) : nothing
+    all(wx .== 0.0) ? (return CoreScatteringOpticalProperties(τ, ϖ, y.Z⁺⁺, y.Z⁻⁺, y.Z₀⁺, y.Z₀⁻)) : nothing
+    all(wy .== 0.0) ? (return CoreScatteringOpticalProperties(τ, ϖ, x.Z⁺⁺, x.Z⁻⁺, x.Z₀⁺, x.Z₀⁻)) : nothing
 
     n = length(w);
     
@@ -1349,7 +1392,16 @@ function Base.:+( x::CoreScatteringOpticalProperties{xFT, xFT2, xFT3},
     Z⁺⁺ = (wx .* xZ⁺⁺ .+ wy .* yZ⁺⁺) 
     Z⁻⁺ = (wx .* xZ⁻⁺ .+ wy .* yZ⁻⁺)
 
-    CoreScatteringOpticalProperties(τ, ϖ, Z⁺⁺, Z⁻⁺)  
+    (x.Z₀⁺ === nothing) == (y.Z₀⁺ === nothing) || throw(ArgumentError(
+        "cannot mix scattering optics with inconsistent solar phase columns"))
+    if x.Z₀⁺ === nothing
+        Z₀⁺ = Z₀⁻ = nothing
+    else
+        Z₀⁺ = wx .* x.Z₀⁺ .+ wy .* y.Z₀⁺
+        Z₀⁻ = wx .* x.Z₀⁻ .+ wy .* y.Z₀⁻
+    end
+
+    CoreScatteringOpticalProperties(τ, ϖ, Z⁺⁺, Z⁻⁺, Z₀⁺, Z₀⁻)
 end
 
 # Concatenate Core Optical Properties, can have mixed dimensions!
@@ -1358,7 +1410,10 @@ function Base.:*( x::CoreScatteringOpticalProperties, y::CoreScatteringOpticalPr
     # expand_Z=true: cat along dim=3 requires both operands to have size(Z,3)==nSpec
     x = expandOpticalProperties(x, arr_type; expand_Z=true);
     y = expandOpticalProperties(y, arr_type; expand_Z=true);
-    CoreScatteringOpticalProperties([x.τ; y.τ],[x.ϖ; y.ϖ],cat(x.Z⁺⁺,y.Z⁺⁺, dims=3), cat(x.Z⁻⁺,y.Z⁻⁺, dims=3) )
+    Z₀⁺ = x.Z₀⁺ === nothing ? nothing : cat(x.Z₀⁺, y.Z₀⁺; dims=3)
+    Z₀⁻ = x.Z₀⁻ === nothing ? nothing : cat(x.Z₀⁻, y.Z₀⁻; dims=3)
+    CoreScatteringOpticalProperties([x.τ; y.τ], [x.ϖ; y.ϖ],
+        cat(x.Z⁺⁺, y.Z⁺⁺; dims=3), cat(x.Z⁻⁺, y.Z⁻⁺; dims=3), Z₀⁺, Z₀⁻)
 end
 
 function Base.:+( x::CoreScatteringOpticalProperties, y::CoreAbsorptionOpticalProperties ) 
@@ -1366,7 +1421,7 @@ function Base.:+( x::CoreScatteringOpticalProperties, y::CoreAbsorptionOpticalPr
     wx = x.τ .* x.ϖ 
     #@show size(wx), size(τ)
     ϖ  = wx ./ ifelse.(τ .> zero.(τ), τ, one.(τ))
-    CoreScatteringOpticalProperties(τ, ϖ, x.Z⁺⁺, x.Z⁻⁺)
+    CoreScatteringOpticalProperties(τ, ϖ, x.Z⁺⁺, x.Z⁻⁺, x.Z₀⁺, x.Z₀⁻)
 end
 
 function Base.:+(  y::CoreAbsorptionOpticalProperties, x::CoreScatteringOpticalProperties ) 

@@ -39,12 +39,19 @@ end
 
 function aerosol_profile_psurf_tangent(dist::LogNormal, profile::AtmosphericProfile,
                                         Δz_dot)
-    p = profile.p_full
-    ρ = pdf.(dist, p) .* profile.Δz
-    ρdot = zero(ρ)
-    pdot = one(eltype(p)) / 2
-    slope = -inv(p[end]) - (log(p[end]) - dist.μ) / (dist.σ^2 * p[end])
-    ρdot[end] = pdf(dist, p[end]) * Δz_dot[end] + ρ[end] * slope * pdot
+    z_half = half_level_altitudes(profile)
+    FT = eltype(z_half)
+    z_half_dot = zeros(FT, length(z_half))
+    for i in length(profile.Δz):-1:1
+        z_half_dot[i] = z_half_dot[i + 1] + Δz_dot[i] / FT(1000)
+    end
+    cdf_slope(z) = z <= zero(FT) ? zero(FT) : pdf(dist, z)
+    ρ = [_altitude_lognormal_cdf(z_half[i], dist) -
+         _altitude_lognormal_cdf(z_half[i + 1], dist)
+         for i in eachindex(profile.Δz)]
+    ρdot = [cdf_slope(z_half[i]) * z_half_dot[i] -
+            cdf_slope(z_half[i + 1]) * z_half_dot[i + 1]
+            for i in eachindex(profile.Δz)]
     return (ρdot .- ρ .* (sum(ρdot) / sum(ρ))) ./ sum(ρ)
 end
 
@@ -211,12 +218,23 @@ end
 
 function getAerosolLayerOptProp(::LinMode, total_τ, dist::LogNormal,
                                 profile::AtmosphericProfile)
-    (; p_full, Δz) = profile
-    ρ = pdf.(dist, p_full) .* Δz
-    log_offset = log.(p_full) .- dist.μ
+    z_half = half_level_altitudes(profile)
     z₀ = exp(dist.μ)
-    dρ_dz₀ = ρ .* log_offset ./ (dist.σ^2 * z₀)
-    dρ_dσ₀ = ρ .* (log_offset.^2 ./ dist.σ^3 .- inv(dist.σ))
+    FT = eltype(z_half)
+    function cdf_and_tangents(z)
+        z <= zero(FT) && return (zero(FT), zero(FT), zero(FT))
+        a = (log(z) - dist.μ) / dist.σ
+        φ = exp(-a^2 / FT(2)) / sqrt(FT(2π))
+        F = _altitude_lognormal_cdf(z, dist)
+        return F, -φ / (dist.σ * z₀), -φ * a / dist.σ
+    end
+    vals = cdf_and_tangents.(z_half)
+    F = first.(vals)
+    dF_dz₀ = getindex.(vals, 2)
+    dF_dσ₀ = getindex.(vals, 3)
+    ρ = F[1:end-1] .- F[2:end]
+    dρ_dz₀ = dF_dz₀[1:end-1] .- dF_dz₀[2:end]
+    dρ_dσ₀ = dF_dσ₀[1:end-1] .- dF_dσ₀[2:end]
     return _normalized_aerosol_profile_tangents(
         total_τ, dist, profile, ρ, dρ_dz₀, dρ_dσ₀)
 end

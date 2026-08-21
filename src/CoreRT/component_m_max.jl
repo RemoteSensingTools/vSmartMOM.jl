@@ -21,8 +21,10 @@
 # - LambertianSurface*  → 0   (m=0 is exact for any Lambertian)
 # - CoxMunk/rpv/RossLi/Canopy → ctx.user_l_cap (no scheme-imposed cap)
 # - RayleighScattering  → 2   (β₀, β₁, β₂ exhaust the phase function)
-# - AerosolOptics       → length(greek.β) - 1 (under NoTruncation),
-#                          clamped to user_l_cap (under δBGE)
+# - AerosolOptics       → largest retained β degree. By default this is
+#                          length(greek.β)-1; when `greek_beta_cutoff` is set,
+#                          it is the last l with |β_l| >= cutoff at any band
+#                          wavelength, subsequently capped by user_l_cap.
 # - SolarBeam           → 0   (neutral — see note below)
 # - SurfaceSIF          → 0   (isotropic)
 # - NoSource            → 0
@@ -39,9 +41,10 @@
 
 Maximum Fourier order this component contributes to. Used by
 [`_aggregate_m_max`](@ref) when `SolverConfig.use_component_traits == true`.
-The `ctx` NamedTuple carries `user_l_cap`, `stream_l_cap`, and
-`truncation` so each component can decide whether to defer to the
-projection cap or to declare a tighter bound of its own.
+The `ctx` NamedTuple carries `user_l_cap`, `stream_l_cap`, `truncation`, and
+optionally `greek_beta_cutoff`, so each component can declare a tighter bound.
+The aerosol cutoff applies only to `abs(β_l)`; the other Greek families are
+not Fourier-support tests.
 """
 function component_m_max end
 
@@ -84,14 +87,34 @@ component_m_max(::CanopySurface, ctx) = ctx.user_l_cap
 component_m_max(::RayleighScattering, ctx) = 2
 component_m_max(::Type{RayleighScattering}, ctx) = 2
 
-# AerosolOptics: rely on the truncated greek-coef array length.
+# AerosolOptics uses a two-stage support estimate. Mie integration first
+# allocates the conservative series implied by the maximum size parameter.
+# The optional post-integration filter then removes a numerically negligible
+# high-l tail by finding the last |β_l| above `greek_beta_cutoff`.
 # Under δBGE the array is already clamped to `user_l_cap`. Under
 # NoTruncation the length reflects the Mie series; we let it through
 # (a coarse aerosol with too many coefs will hit the parser's
 # validate-against-`user_l_cap` guard at config time, not here).
 function component_m_max(a::Scattering.AerosolOptics, ctx)
     β = a.greek_coefs.β
-    return max(length(β) - 1, 0)
+    full_support = max(size(β, 1) - 1, 0)
+    cutoff = haskey(ctx, :greek_beta_cutoff) ? ctx.greek_beta_cutoff : nothing
+    cutoff === nothing && return full_support
+
+    # β can be `(l,)` or `(l,nSpec)`. Retain l when at least one spectral point
+    # reaches the threshold, making the decision conservative over the band.
+    # Use magnitude because β_l can be signed. Do not use α/γ/δ/ϵ/ζ: those
+    # families may legitimately be zero or change sign and are not the scalar
+    # phase-function support benchmark. β₀ is normalized to one, so a valid
+    # positive cutoff always leaves at least m=0.
+    βhost = Array(β)
+    retained = if ndims(βhost) == 1
+        findlast(x -> abs(x) >= cutoff, βhost)
+    else
+        findlast(il -> maximum(abs, @view(βhost[il, :])) >= cutoff,
+                 axes(βhost, 1))
+    end
+    return retained === nothing ? 0 : retained - 1
 end
 
 """

@@ -105,7 +105,8 @@ using .Aerosols
 # SIF emission data + loaders
 import DataInterpolations: ExtrapolationType
 include("SIF_emission/sif_loader.jl")
-export load_sif_spectrum, load_ficus_reflectance, sif_data_path, build_sif_source
+export load_sif_spectrum, sif_reference_state, load_ficus_reflectance,
+       sif_data_path, build_sif_source
 
 # Export some vSmartMOM functions
 export default_parameters, parameters_from_file, parameters_from_source,

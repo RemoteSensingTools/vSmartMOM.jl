@@ -14,7 +14,7 @@ using Dates
 using NCDatasets
 using Printf
 
-const DATA_ROOT = get(ENV, "DATA_ROOT", "/home/sanghavi/data/RamanSIFgrid")
+const DATA_ROOT = get(ENV, "DATA_ROOT", "/home/sanghavi/data/RamanSIFgrid/O2ABand")
 const OUT_NC = get(ENV, "OUT_NC", joinpath(DATA_ROOT, "o2a_raman_lut_unified.nc"))
 const REPORT_TXT = get(ENV, "REPORT_TXT", replace(OUT_NC, r"\.nc$" => "_compile_report.txt"))
 const DRY_RUN = lowercase(get(ENV, "DRY_RUN", "0")) in ("1", "true", "yes", "y", "on")

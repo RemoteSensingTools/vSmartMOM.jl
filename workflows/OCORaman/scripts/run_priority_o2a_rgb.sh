@@ -11,11 +11,11 @@ set -euo pipefail
 # Typical launch via psurf-specific thin wrappers:
 #   CUDA_HOME=/usr/local/cuda CUDA_DEVICE=1 \
 #   nohup workflows/OCORaman/scripts/run_priority_o2a_psurf1000_rgb.sh \
-#     > /home/sanghavi/data/RamanSIFgrid/o2a_raman_lut_priority_psurf1000_rgb/logs/nohup_driver.log 2>&1 &
+#     > /home/sanghavi/data/RamanSIFgrid/O2ABand/o2a_raman_lut_priority_psurf1000_rgb/logs/nohup_driver.log 2>&1 &
 #
 #   CUDA_HOME=/usr/local/cuda CUDA_DEVICE=1 \
 #   nohup workflows/OCORaman/scripts/run_priority_o2a_psurf750_rgb.sh \
-#     > /home/sanghavi/data/RamanSIFgrid/o2a_raman_lut_priority_psurf0750_rgb/logs/nohup_driver.log 2>&1 &
+#     > /home/sanghavi/data/RamanSIFgrid/O2ABand/o2a_raman_lut_priority_psurf0750_rgb/logs/nohup_driver.log 2>&1 &
 #
 # Optional environment:
 #   PSURF=1000 or 750
@@ -23,7 +23,7 @@ set -euo pipefail
 #   END_SZA_IDX=14
 #   ALBEDO_IDXS=1,7,21
 #   SKIP_COMPLETED=1
-#   OUTDIR=/home/sanghavi/data/RamanSIFgrid/o2a_raman_lut_priority_psurfXXXX_rgb
+#   OUTDIR=/home/sanghavi/data/RamanSIFgrid/O2ABand/o2a_raman_lut_priority_psurfXXXX_rgb
 #   JULIA_BIN=julia
 #   JULIA_FLAGS="--pkgimages=no"
 #   DRY_RUN=1
@@ -45,7 +45,7 @@ SKIP_COMPLETED="${SKIP_COMPLETED:-1}"
 JULIA_FLAGS_ARRAY=(${JULIA_FLAGS})
 
 PSURF_TAG="$(printf '%04.0f' "${PSURF}")"
-OUTDIR="${OUTDIR:-/home/sanghavi/data/RamanSIFgrid/o2a_raman_lut_priority_psurf${PSURF_TAG}_rgb}"
+OUTDIR="${OUTDIR:-/home/sanghavi/data/RamanSIFgrid/O2ABand/o2a_raman_lut_priority_psurf${PSURF_TAG}_rgb}"
 LOGDIR="${LOGDIR:-${OUTDIR}/logs}"
 
 mkdir -p "${OUTDIR}" "${LOGDIR}"

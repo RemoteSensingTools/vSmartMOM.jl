@@ -12,7 +12,7 @@ set -euo pipefail
 #
 # Typical:
 #   CUDA_DEVICE=0 nohup workflows/OCORaman/scripts/run_o2a_psurf1000_vza_block.sh \
-#       > /home/sanghavi/data/RamanSIFgrid/o2a_raman_lut_vza_psurf1000/vza002-003/logs/nohup.out 2>&1 &
+#       > /home/sanghavi/data/RamanSIFgrid/O2ABand/o2a_raman_lut_vza_psurf1000/vza002-003/logs/nohup.out 2>&1 &
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
@@ -25,7 +25,7 @@ FULL_VZAS="${FULL_VZAS:-sza}"
 RAZS="${RAZS:-0:15:345}"
 CHUNK_ALBEDOS="${CHUNK_ALBEDOS:-21}"
 JULIA_FLAGS="${JULIA_FLAGS:---pkgimages=no}"
-OUTROOT="${OUTROOT:-/home/sanghavi/data/RamanSIFgrid/o2a_raman_lut_vza_psurf1000}"
+OUTROOT="${OUTROOT:-/home/sanghavi/data/RamanSIFgrid/O2ABand/o2a_raman_lut_vza_psurf1000}"
 TEE_CHUNK_LOGS="${TEE_CHUNK_LOGS:-0}"
 # The generic chunk completeness checker is only keyed by psurf/SZA/albedo and
 # is not VZA-aware.  Keep VZA blocks non-skipping by default; block allocation

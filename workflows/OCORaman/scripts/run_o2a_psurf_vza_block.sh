@@ -46,7 +46,7 @@ EOF
 fi
 
 printf -v PSURF_TAG '%04.0f' "${PSURF}"
-OUTROOT="${OUTROOT:-/home/sanghavi/data/RamanSIFgrid/o2a_raman_lut_vza_psurf${PSURF_TAG}}"
+OUTROOT="${OUTROOT:-/home/sanghavi/data/RamanSIFgrid/O2ABand/o2a_raman_lut_vza_psurf${PSURF_TAG}}"
 
 vza_tag() {
   printf 'vza%s' "$1" | tr ',' '_' | tr ':' '-'

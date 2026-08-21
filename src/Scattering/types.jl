@@ -434,17 +434,17 @@ $(DocStringExtensions.FIELDS)
 """
 mutable struct GreekCoefs{FT<:Real}
     "Greek matrix coefficient α, is in B[2,2]"
-    α::Array{FT,1} 
+    α::AbstractArray{FT}
     "Greek matrix coefficient β, is in `B[1,1]` (only important one for scalar!)"
-    β::Array{FT,1}
+    β::AbstractArray{FT}
     "Greek matrix coefficient γ, is in B[2,1],B[1,2]"
-    γ::Array{FT,1}
+    γ::AbstractArray{FT}
     "Greek matrix coefficient δ, is in B[4,4]"
-    δ::Array{FT,1}
+    δ::AbstractArray{FT}
     "Greek matrix coefficient ϵ, is in B[3,4] and - in B[4,3]"
-    ϵ::Array{FT,1}
+    ϵ::AbstractArray{FT}
     "Greek matrix coefficient ζ, is in B[3,3]"
-    ζ::Array{FT,1}
+    ζ::AbstractArray{FT}
 end
 
 """ Extend Base.isapprox (≈) to compare two GreekCoefs """
@@ -493,6 +493,10 @@ Base.@kwdef struct AerosolOptics{FT<:Real}
     fᵗ::Union{FT, AbstractArray{FT}}
     "Derivatives"
     derivs = zeros(1)
+    "Wavenumber nodes (cm⁻¹) at which the post-truncation phase coefficients were evaluated"
+    phase_ν::Union{Nothing,Vector{FT}} = nothing
+    "Post-truncation Greek coefficients at `phase_ν`; retained so Z is evaluated only at these nodes"
+    phase_greek::Union{Nothing,Vector{GreekCoefs{FT}}} = nothing
 end
 
 """ Extend Base.isapprox (≈) to compare two AerosolOptics """

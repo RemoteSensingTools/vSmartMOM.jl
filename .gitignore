@@ -51,3 +51,16 @@ test/scratch*.jl
 
 # Local plot output directories
 plots/
+
+# RRS/XCO2 workflow products are reproducible and can be large or actively
+# updated during remote runs. Keep source/configuration/provenance in Git and
+# force-add only small reference tables that form part of the documented input.
+RRS_XCO2/output/
+RRS_XCO2/truth_map/logs/
+RRS_XCO2/truth_map/*.log
+RRS_XCO2/truth_map/aerosol_chunked/
+RRS_XCO2/truth_map/hiressim_*.nc
+RRS_XCO2/truth_map/sims_12layer*/
+RRS_XCO2/truth_map_aerosols/*.jld2
+RRS_XCO2/truth_map_aerosols/*.log
+RRS_XCO2/scripts/__pycache__/

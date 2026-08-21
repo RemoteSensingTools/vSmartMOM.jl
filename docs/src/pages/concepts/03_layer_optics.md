@@ -27,6 +27,36 @@ one "core variable" because they share the same Greek expansion). Everything
 upstream is plumbing to build them; everything downstream is linear algebra
 over them. See [Concepts/06](06_linearization.md).
 
+## The solar direction is a rectangular operator, not a diffuse stream
+
+With `external_solar=true`, the collimated direction ``\mu_0`` is not added
+to the quadrature grid. The square ``\mathbf Z`` arrays above remain purely
+diffuse-to-diffuse. Separate phase columns
+``\mathbf Z_0^{++},\mathbf Z_0^{-+}``, shaped
+`(NquadN,nStokes,nSpec)`, map the fixed solar Stokes vector into every diffuse
+output stream.
+
+The elemental solver converts these phase columns into four explicit solar
+column operators:
+
+| Operator | Meaning | Shape |
+|---|---|---|
+| ``R_0^{-+},R_0^{+-}`` | direct-solar to diffuse reflection | `(NquadN,nStokes,nSpec)` |
+| ``T_0^{++},T_0^{--}`` | direct-solar to diffuse scattered transmission | `(NquadN,nStokes,nSpec)` |
+
+``T_0`` contains only radiation scattered out of the collimated beam. The
+unscattered beam remains the analytic quantity
+``F_0\exp(-\tau/\mu_0)``. The layer source is formed only after the operators
+are built, e.g.
+
+```math
+J_0^- = R_0^{-+}F_0\exp(-\tau_{\rm above}/\mu_0),\qquad
+J_0^+ = T_0^{++}F_0\exp(-\tau_{\rm above}/\mu_0).
+```
+
+This representation avoids dummy zero-weight solar nodes and gives elastic
+and Raman SFI the same operator contract.
+
 ## How the four arrays are built (the operator chain)
 
 The Julia type that carries them is `CoreScatteringOpticalProperties`, and

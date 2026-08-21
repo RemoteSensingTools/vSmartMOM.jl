@@ -110,6 +110,11 @@
           "minimum": 0,
           "description": "v0.7 explicit Fourier loop bound (order). Optional override clamping the trait-derived bound from above. Default null."
         },
+        "greek_beta_cutoff": {
+          "type": ["number", "null"],
+          "exclusiveMinimum": 0,
+          "description": "Optional second-stage aerosol Fourier-support cutoff. The maximum size parameter first sets the conservative Mie coefficient ceiling; after size-distribution integration, each aerosol retains through the last degree satisfying abs(beta_l) >= cutoff at any wavelength in the band. Only beta is tested (not alpha/gamma/delta/epsilon/zeta). The maximum across aerosol species enters the component aggregator before stream/user caps. This reduces Fourier moments but does not change nstreams. Null/omitted disables the cutoff."
+        },
         "max_m": {
           "type": "integer",
           "minimum": 0,

@@ -12,7 +12,7 @@ function _height_model(obs_alt; reduction=-1)
     params = parameters_from_yaml(_MS_CONFIG)
     params.obs_alt = obs_alt
     params.profile_reduction_n = reduction
-    return model_from_parameters(params)
+    return model_from_parameters(params; external_solar=false)
 end
 
 @testset "observer-height aerosol profile linearization parity" begin
@@ -87,6 +87,11 @@ end
     alt_lin, dτ_dz₀, dτ_dσ₀ = CoreRT.getAerosolLayerOptProp(
         LinMode(), one(alt_FT), alt_dist, alt_profile)
     @test alt_lin == alt_fwd
+    @test sum(alt_fwd) ≈ one(alt_FT) rtol=2eps(alt_FT)
+    alt_z_half = CoreRT.half_level_altitudes(alt_profile)
+    peak_layer = argmax(alt_fwd)
+    @test alt_z_half[peak_layer] >= exp(alt_dist.μ) >=
+          alt_z_half[peak_layer + 1]
 
     z₀ = exp(alt_dist.μ)
     δz₀ = alt_FT(1e-3)
@@ -124,7 +129,7 @@ function _direct_height_model(::Type{FT}, obs_alt;
     params.vza = Float64.(vza)
     params.vaz = Float64.(vaz)
     params.polarization_type = polarization
-    return model_from_parameters(params)
+    return model_from_parameters(params; external_solar=false)
 end
 
 "Build the artifact-free quickstart scene and its analytic tangent model."
@@ -133,7 +138,7 @@ function _linear_height_model(obs_alt; albedo=0.15, polarization=nothing)
     params.obs_alt = obs_alt
     params.brdf = [LambertianSurfaceScalar(albedo)]
     polarization === nothing || (params.polarization_type = polarization)
-    return model_from_parameters(LinMode(), params)
+    return model_from_parameters(LinMode(), params; external_solar=false)
 end
 
 "Run the artifact-free forward multisensor scene at one Lambertian albedo."
@@ -142,7 +147,7 @@ function _surface_height_result(obs_alt, albedo; polarization=nothing)
     params.obs_alt = obs_alt
     params.brdf = [LambertianSurfaceScalar(albedo)]
     polarization === nothing || (params.polarization_type = polarization)
-    return rt_run(model_from_parameters(params))
+    return rt_run(model_from_parameters(params; external_solar=false))
 end
 
 "Direct-beam attenuation above one quickstart observer interface."
@@ -214,7 +219,7 @@ end
     interface_params = parameters_from_yaml(_MS_CONFIG)
     interface_params.obs_alt = 5.0
     interface_params.q = [0.0, 0.01, 0.02]
-    interface_model = model_from_parameters(interface_params)
+    interface_model = model_from_parameters(interface_params; external_solar=false)
     @test length(interface_model.profile.q) == 3
     @test CoreRT.half_level_altitudes(interface_model.profile)[
         only(interface_model.obs_geom.sensor_levels) + 1] ≈ 5.0 atol=1e-7
@@ -232,7 +237,7 @@ end
     )
     vmr_params = parameters_from_dict(vmr_config)
     vmr_params.obs_alt = 5.0
-    vmr_model = model_from_parameters(vmr_params)
+    vmr_model = model_from_parameters(vmr_params; external_solar=false)
     input_p_full = (vmr_params.p[1:end-1] .+ vmr_params.p[2:end]) ./ 2
     X_layer = CoreRT._layer_centered_input(
         "VMR X", [1.0, 2.0, 4.0], vmr_params.p)
@@ -288,7 +293,7 @@ end
         params.obs_alt = 5.0
         @test length(params.absorption_params.vmr["X"]) == 2
 
-        model = model_from_parameters(params)
+        model = model_from_parameters(params; external_solar=false)
         @test length(model.profile.T) == 3
         @test length(model.profile.vmr["X"]) == 3
 
@@ -309,7 +314,7 @@ end
     params.obs_alt = [2.0, 6.0]
     params.profile_reduction_n = 1
 
-    model = @test_logs (:warn, r"increasing layer count") model_from_parameters(params)
+    model = @test_logs (:warn, r"increasing layer count") model_from_parameters(params; external_solar=false)
     @test length(model.profile.T) == 3  # N=2 interior H_i requires N+1 layers
     @test model.obs_geom.sensor_altitudes == [6.0, 2.0]
     @test CoreRT.half_level_altitudes(model.profile)[
@@ -319,7 +324,7 @@ end
     # requested reduction target equals K.
     equal_target = deepcopy(params)
     equal_target.profile_reduction_n = 2
-    equal_model = @test_logs (:warn, r"increasing layer count") model_from_parameters(equal_target)
+    equal_model = @test_logs (:warn, r"increasing layer count") model_from_parameters(equal_target; external_solar=false)
     @test length(equal_model.profile.T) == 3
 
     # A reduction request larger than the naturally H-framed profile must not
@@ -345,7 +350,7 @@ end
     # must interpolate it to the three-layer grid created by inserting H.
     B_input = reshape([1.0, 3.0], 2, 1)
     sources = SolarBeam() + ThermalEmission(B_layer=B_input)
-    model = model_from_parameters(params; sources=sources)
+    model = model_from_parameters(params; sources=sources, external_solar=false)
     thermal = only(filter(source -> source isa ThermalEmission,
                           model.sources.sources))
     @test size(thermal.B_layer) == (length(model.profile.T), 1) == (3, 1)
@@ -362,7 +367,7 @@ end
     params_new = deepcopy(params)
     params_new.T .+= 2.0
     params_new.p .*= 1.01
-    fresh = model_from_parameters(params_new; sources=sources)
+    fresh = model_from_parameters(params_new; sources=sources, external_solar=false)
     update_model!(ctx; T=params_new.T, p_half=params_new.p, q=params_new.q)
 
     thermal_ctx = only(filter(source -> source isa ThermalEmission,
@@ -497,7 +502,8 @@ end
     @test result.layout.n_aerosols == NAer
     @test result.layout.n_gases == NGas
     @test result.layout.n_surface == NSurf
-    @test CoreRT.n_total(result.layout) == 2
+    nparams = CoreRT.n_total(result.layout)
+    @test nparams == 5  # surface pressure + three gas-layer columns + albedo
 
     # Preserve the historical four-slot destructuring and indexing contract.
     R, T, dR, dT = result
@@ -515,9 +521,9 @@ end
     @test level.boundary_index == only(model.obs_geom.sensor_levels)
     @test size(level.upwelling) == (1, 1, 1)
     @test size(level.downwelling) == (1, 1, 1)
-    @test size(level.upwelling_jacobian) == (1, 1, 1, 2)
-    @test size(level.downwelling_jacobian) == (1, 1, 1, 2)
-    @test size(level.unscattered_downwelling_jacobian) == (1, 1, 1, 2)
+    @test size(level.upwelling_jacobian) == (1, 1, 1, nparams)
+    @test size(level.downwelling_jacobian) == (1, 1, 1, nparams)
+    @test size(level.unscattered_downwelling_jacobian) == (1, 1, 1, nparams)
     @test total_downwelling(level) ==
           level.downwelling .+ level.unscattered_downwelling
     @test total_downwelling_jacobian(level) ==
@@ -529,12 +535,12 @@ end
     result_summary = sprint(summary, result)
     result_text = sprint(show, MIME("text/plain"), result)
     level_text = sprint(show, MIME("text/plain"), level)
-    @test occursin("ObserverRTResultLin(2 endpoint(s), 1 interior level(s), 2 parameter(s))",
+    @test occursin("ObserverRTResultLin(2 endpoint(s), 1 interior level(s), $nparams parameter(s))",
                    result_summary)
-    @test occursin("parameters: 2", result_text)
+    @test occursin("parameters: $nparams", result_text)
     @test occursin("interior levels: 1", result_text)
     @test occursin("LevelRadianceLin at 5.0 km above BOA", level_text)
-    @test occursin("Jacobians: (1, 1, 1, 2)", level_text)
+    @test occursin("Jacobians: (1, 1, 1, $nparams)", level_text)
 
     # The analytic path must reproduce the independently assembled forward
     # multisensor field before its tangent is assessed.
@@ -774,10 +780,10 @@ end
     params = parameters_from_yaml(_MS_CONFIG)
     params.float_type = Float32
     params.obs_alt = [0.0, 5.0]
-    model, lin_model = model_from_parameters(LinMode(), params)
+    model, lin_model = model_from_parameters(LinMode(), params; external_solar=false)
     result = rt_run(model, lin_model, 0, size(lin_model.τ̇_abs[1], 1), 1;
                     i_band=1)
-    forward = rt_run(model_from_parameters(params))
+    forward = rt_run(model_from_parameters(params; external_solar=false))
     level = only(result.levels)
     forward_level = only(forward.levels)
 

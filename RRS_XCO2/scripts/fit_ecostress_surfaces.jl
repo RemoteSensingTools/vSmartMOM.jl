@@ -1,0 +1,161 @@
+#!/usr/bin/env julia
+
+# Construct the four truth-map Lambertian surfaces from the ECOSTRESS spectra
+# bundled under RRS_XCO2/data/ecostress, then fit P0--P2 independently on each
+# native 0.1 cm^-1 OCO basis grid.
+using DelimitedFiles
+using LinearAlgebra
+using NCDatasets
+using Printf
+
+const ROOT = normpath(joinpath(@__DIR__, ".."))
+const DATA = joinpath(ROOT, "data", "ecostress")
+const OUT = joinpath(ROOT, "surface_albedos")
+const BAND_NAMES = ("o2a", "weak_co2", "strong_co2")
+const BANDS = (collect((1e7 / 773):0.1:(1e7 / 757)),
+               collect((1e7 / 1622):0.1:(1e7 / 1589)),
+               collect((1e7 / 2084):0.1:(1e7 / 2042)))
+
+files_matching(prefix) = sort(filter(f -> startswith(basename(f), prefix) &&
+    endswith(f, ".spectrum.txt"), readdir(DATA; join=true)))
+
+const END_MEMBER_FILES = Dict(
+    "grass" => files_matching("vegetation.grass."),
+    "trees" => files_matching("vegetation.tree."),
+    "roofing" => files_matching("manmade.roofingmaterial."),
+    "concrete_paving" => files_matching("manmade.concrete.pavingconcrete."),
+    # No downloaded ECOSTRESS entry is explicitly named Sahara. These two
+    # dry regional aridisols form the documented Sahara-dust surface proxy.
+    "sahara_dust_proxy" => files_matching("soil.aridisol."),
+)
+
+const SURFACE_MIXES = Dict(
+    "urban" => Dict("trees" => 0.20, "roofing" => 0.50,
+                    "concrete_paving" => 0.30),
+    "rural" => Dict("grass" => 0.50, "roofing" => 0.30,
+                    "trees" => 0.20),
+    "desert" => Dict("sahara_dust_proxy" => 1.00),
+    "forest" => Dict("trees" => 1.00),
+)
+
+function read_ecostress(path)
+    λ, ρ = Float64[], Float64[]
+    for line in eachline(path)
+        fields = split(strip(line))
+        length(fields) == 2 || continue
+        x = tryparse(Float64, fields[1])
+        y = tryparse(Float64, fields[2])
+        (x === nothing || y === nothing) && continue
+        isfinite(x) && isfinite(y) || continue
+        push!(λ, x * 1000)       # μm -> nm
+        push!(ρ, y / 100)        # percent -> unitless
+    end
+    order = sortperm(λ)
+    return λ[order], ρ[order]
+end
+
+function interp_linear(x, xp, fp)
+    xp[1] <= x <= xp[end] || error("$x nm outside ECOSTRESS range")
+    hi = searchsortedfirst(xp, x)
+    hi == 1 && return fp[1]
+    hi > length(xp) && return fp[end]
+    lo = hi - 1
+    return fp[lo] + (fp[hi] - fp[lo]) * (x - xp[lo]) / (xp[hi] - xp[lo])
+end
+
+function category_spectrum(category, λ_nm)
+    files = END_MEMBER_FILES[category]
+    isempty(files) && error("No ECOSTRESS spectra selected for $category")
+    spectra = map(files) do path
+        λ, ρ = read_ecostress(path)
+        [interp_linear(x, λ, ρ) for x in λ_nm]
+    end
+    return reduce(+, spectra) ./ length(spectra)
+end
+
+legendre_matrix(x) = hcat(ones(length(x)), x, (3 .* x.^2 .- 1) ./ 2)
+
+mkpath(OUT)
+coeff_rows = Vector{Any}[Any["surface", "band", "P0", "P1", "P2", "rmse", "max_abs_error"]]
+spectral_rows = Vector{Any}[Any["surface", "band", "wavenumber_cm-1", "wavelength_nm", "ecostress_mix", "P0-P2_fit"]]
+
+for surface in ("urban", "rural", "desert", "forest")
+    mix = SURFACE_MIXES[surface]
+    @assert isapprox(sum(values(mix)), 1; atol=1e-14)
+
+    # All selected ECOSTRESS endmembers overlap from 420 to 2500 nm. Store a
+    # convenient 1-nm mixture independently of the much finer RT basis grids.
+    λ_full = collect(420.0:1.0:2500.0)
+    components = Dict(category => category_spectrum(category, λ_full)
+                      for category in keys(mix))
+    ρ_full = sum(fraction .* components[category]
+                 for (category, fraction) in mix)
+    NCDataset(joinpath(OUT, "$(surface)_surface_albedo.nc"), "c") do ds
+        defDim(ds, "wavelength", length(λ_full))
+        wavelength = defVar(ds, "wavelength", Float64, ("wavelength",),
+            attrib=Dict("units" => "nm", "long_name" => "vacuum wavelength"))
+        albedo = defVar(ds, "surface_albedo", Float64, ("wavelength",),
+            attrib=Dict("units" => "1", "long_name" => "area-weighted Lambertian surface albedo"))
+        wavelength[:] = λ_full
+        albedo[:] = ρ_full
+        for category in sort(collect(keys(mix)))
+            var = defVar(ds, "component_$(category)", Float64, ("wavelength",),
+                attrib=Dict("units" => "1", "mixture_weight" => mix[category],
+                            "long_name" => "unweighted category-mean ECOSTRESS reflectance"))
+            var[:] = components[category]
+        end
+        ds.attrib["title"] = "ECOSTRESS-derived $(surface) Lambertian surface albedo"
+        ds.attrib["source"] = "NASA/JPL ECOSTRESS Spectral Library files listed in PROVENANCE.md"
+        ds.attrib["recipe"] = join(["$(mix[k]) * $k" for k in sort(collect(keys(mix)))], " + ")
+        ds.attrib["spectral_processing"] = "linear interpolation in wavelength; category means then area-weighted mixture"
+        ds.attrib["history"] = "generated by RRS_XCO2/scripts/fit_ecostress_surfaces.jl"
+    end
+    for (band_name, ν) in zip(BAND_NAMES, BANDS)
+        λ_nm = 1e7 ./ ν
+        ρ = zeros(length(ν))
+        for (category, fraction) in mix
+            ρ .+= fraction .* category_spectrum(category, λ_nm)
+        end
+        x = collect(range(-1.0, 1.0, length=length(ν)))
+        A = legendre_matrix(x)
+        coeff = A \ ρ
+        fitted = A * coeff
+        rmse = sqrt(sum(abs2, fitted .- ρ) / length(ρ))
+        maxerr = maximum(abs.(fitted .- ρ))
+        push!(coeff_rows, Any[surface, band_name, coeff..., rmse, maxerr])
+        for i in eachindex(ν)
+            push!(spectral_rows, Any[surface, band_name, ν[i], λ_nm[i], ρ[i], fitted[i]])
+        end
+        @printf("%-6s %-10s  P=[%.9f, %.9f, %.9f]  RMSE=%.3e max=%.3e\n",
+                surface, band_name, coeff..., rmse, maxerr)
+    end
+end
+
+writedlm(joinpath(OUT, "surface_legendre_coefficients.csv"),
+         reduce(vcat, permutedims.(coeff_rows)), ',')
+writedlm(joinpath(OUT, "surface_spectra_and_fits.csv"),
+         reduce(vcat, permutedims.(spectral_rows)), ',')
+
+open(joinpath(OUT, "lambertian_legendre_inputs.dat"), "w") do io
+    println(io, "# vSmartMOM bandwise LambertianSurfaceLegendre inputs")
+    println(io, "# x=-1 is the longest wavelength and x=+1 the shortest wavelength")
+    println(io, "# surface band P0 P1 P2 rmse max_abs_error")
+    for row in coeff_rows[2:end]
+        @printf(io, "%-7s %-10s % .12e % .12e % .12e %.6e %.6e\n",
+                row[1], row[2], row[3], row[4], row[5], row[6], row[7])
+    end
+end
+
+open(joinpath(OUT, "ecostress_manifest.txt"), "w") do io
+    println(io, "Category endmembers are unweighted means of the files listed below.")
+    println(io, "Sahara dust proxy: mean of the downloaded Syrian and Jordanian aridisol spectra.")
+    for category in sort(collect(keys(END_MEMBER_FILES)))
+        println(io, "\n[$category]")
+        foreach(path -> println(io, basename(path)), END_MEMBER_FILES[category])
+    end
+    println(io, "\n[scene mixtures]")
+    for surface in ("urban", "rural", "desert", "forest")
+        terms = ["$(100fraction)% $category" for (category, fraction) in sort(collect(SURFACE_MIXES[surface]))]
+        println(io, surface, ": ", join(terms, ", "))
+    end
+end

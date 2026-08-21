@@ -57,7 +57,7 @@ YAML/TOML/Dict
     → read_parameters()        → vSmartMOM_Parameters   (unified entry point)
     → model_from_parameters()  → RTModel
     → rt_run(model)            → ObserverRTResult (named endpoint/level radiances)
-    → rt_run_toa(model)        → TOA upwelling only (opt-in external-solar SFI)
+    → rt_run_toa(model)        → TOA upwelling only (default external-solar SFI)
 ```
 
 `parameters_from_yaml(path)` is the YAML-specific alias and still works; use `read_parameters` for TOML or `Dict` inputs.
@@ -68,13 +68,15 @@ downwelling. Interior-height radiances are available through
 `result.levels`.
 
 `rt_run_toa` requires `model.quad_points.external_solar == true`. In this
-opt-in Gauss/SFI representation, scalar `μ₀` is excluded from the diffuse
-operator and retained on `phase_qp_μ` as the exact direct-beam source column.
-The path currently supports forward elastic `noRS` with Lambertian surfaces;
-it does not allocate or postprocess BOA, HDR, or BHR, and it does not support
-linearized, Raman/VRS, `rt_run_ss`, non-Lambertian, or interior-sensor runs.
-The embedded-`μ₀` representation remains the default; unsupported paths
-reject external-solar models rather than falling back silently.
+default Gauss/SFI representation, scalar `μ₀` is excluded from the diffuse
+operator and evaluated through rectangular direct-beam phase/operator columns.
+The path supports elastic `noRS`, analytic elastic linearization, and forward
+rotational Raman `RRS` with Lambertian surfaces. It does not allocate or
+postprocess BOA, HDR, or BHR, and it does not support Raman linearization,
+VRS, `rt_run_ss`, non-Lambertian, or interior-sensor runs.
+The embedded-`μ₀` representation remains available through
+`external_solar=false`; unsupported paths reject external-solar models rather
+than falling back silently.
 
 Linearized variant: `model_from_parameters(LinMode(), params)` then
 `rt_run(model, lin_model, NAer, NGas, NSurf)` returns an
@@ -111,7 +113,12 @@ RTModel{ARCH, FT} <: AbstractRTModel{ARCH, FT}
 
 ### CoreRT Solver Flow (Adding-Doubling)
 
-For each Fourier moment m = 0..m_max_bands[iBand] (v0.7 — order-semantics; trait-derived per-component bound):
+For each Fourier moment m = 0..m_max_bands[iBand] (v0.7 — order-semantics;
+trait-derived per-component bound). Aerosol traits may use a two-stage bound:
+the maximum size parameter sets the allocated Mie-series ceiling, then
+`greek_beta_cutoff` selects the last `l` with `abs(β_l)` above threshold at any
+band wavelength. Only β is tested, and the maximum across aerosol species is
+combined with other component traits before stream/user caps are applied.
 1. **Elemental** — single-scattering layer → AddedLayer (r, t, j)
 2. **Doubling** — double thin layers ndoubl times to full optical depth
 3. **Interaction** — combine layers top-to-bottom: CompositeLayer (R, T, J) + AddedLayer
@@ -175,7 +182,7 @@ All surfaces implement `create_surface_layer!()`. Linearized variants have `_lin
   additional exact μ₀ row/column, while the diffuse operators remain square
   on `qp_μ`.
 - **External solar is not a stream**: with `external_solar=true`, scalar μ₀ and
-  `iμ₀_phase` provide `Zₘ(μᵢ,μ₀)` source coupling; legacy operator indices
+  rectangular `Z₀ → R₀/T₀` operators provide direct-beam coupling; legacy indices
   `iμ₀`/`iμ₀Nstart` are zero sentinels. Five weighted streams plus one
   distinct VZA in IQU gives an 18×18 diffuse operator.
 - **Spectral units**: wavenumber in cm⁻¹ internally; wavelength in micrometers for Mie

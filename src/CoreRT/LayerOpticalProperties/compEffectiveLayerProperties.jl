@@ -8,6 +8,40 @@ Cabannes coefficients because Raman redistribution is handled explicitly.
 _rayleigh_greek_source(::Union{noRS, noRS_plus}, greek_rayleigh, greek_cabannes) = greek_rayleigh
 _rayleigh_greek_source(::AbstractRamanType, greek_rayleigh, greek_cabannes) = greek_cabannes
 
+_same_greek_coefficients(a, b) =
+    all(name -> getfield(a, name) == getfield(b, name), fieldnames(typeof(a)))
+
+"Compute diffuse phase operators and, for external solar, direct μ₀ blocks."
+function _compute_phase_blocks(model, greek, m, arr_type)
+    q = model.quad_points
+    pol = CoreRT.polarization_type(model)
+    if q.external_solar
+        μdiff = collect(q.qp_μ)
+        Z⁺⁺, Z⁻⁺ = Scattering.compute_Z_moments(pol, μdiff, greek, m;
+                                                  arr_type=arr_type)
+        Z₀⁺, Z₀⁻ = Scattering.compute_Z_source_moments(
+            pol, μdiff, q.μ₀, greek, m; arr_type=arr_type)
+        return Z⁺⁺, Z⁻⁺, Z₀⁺, Z₀⁻
+    end
+    Z⁺⁺, Z⁻⁺ = Scattering.compute_Z_moments(
+        pol, collect(q.phase_qp_μ), greek, m; arr_type=arr_type)
+    return Z⁺⁺, Z⁻⁺, nothing, nothing
+end
+
+"Evaluate aerosol phase operators only at retained optical nodes, then interpolate in ν."
+function _compute_aerosol_phase_blocks(model, optics, ν_spec, m, arr_type)
+    optics.phase_ν === nothing && return _compute_phase_blocks(
+        model, optics.greek_coefs, m, arr_type)
+    blocks = [_compute_phase_blocks(model, g, m, Array) for g in optics.phase_greek]
+    interp(k) = arr_type(_interpolate_phase_nodes(ν_spec, optics.phase_ν,
+                                                   [b[k] for b in blocks]))
+    Z⁺⁺, Z⁻⁺ = interp(1), interp(2)
+    if blocks[1][3] === nothing
+        return Z⁺⁺, Z⁻⁺, nothing, nothing
+    end
+    return Z⁺⁺, Z⁻⁺, interp(3), interp(4)
+end
+
 """
     _rayleigh_fraction_of_total_extinction(rayleigh_layer, total_layer)
 
@@ -117,16 +151,19 @@ function build_m_invariant_cache(RS_type::AbstractRamanType, iBand, model)
 
         # Compute fScattRayleigh once using m=0 Z moments.
         # τ/ϖ mixing in the `+` operator is Z-independent, so this is valid for all m.
-        Rayl𝐙⁺⁺_m0, Rayl𝐙⁻⁺_m0 = Scattering.compute_Z_moments(pol_type, μ_host, gr, 0,
-                                                                  arr_type=arr_type)
+        Rayl𝐙⁺⁺_m0, Rayl𝐙⁻⁺_m0, RaylZ₀⁺_m0, RaylZ₀⁻_m0 =
+            _compute_phase_blocks(model, gr, 0, arr_type)
         rayl_m0 = [CoreScatteringOpticalProperties(rayl_τ_dev_iB[iz],
-                    rayl_ϖ_Cabannes_iB, Rayl𝐙⁺⁺_m0, Rayl𝐙⁻⁺_m0) for iz=1:nZ]
+                    rayl_ϖ_Cabannes_iB, Rayl𝐙⁺⁺_m0, Rayl𝐙⁻⁺_m0,
+                    RaylZ₀⁺_m0, RaylZ₀⁻_m0) for iz=1:nZ]
         combo_m0 = rayl_m0
         for i = 1:nAero
-            AerZ⁺⁺_m0, AerZ⁻⁺_m0 = Scattering.compute_Z_moments(
-                pol_type, μ_host, aerosol_optics[iB][i].greek_coefs, 0, arr_type=arr_type)
+            AerZ⁺⁺_m0, AerZ⁻⁺_m0, AerZ₀⁺_m0, AerZ₀⁻_m0 =
+                _compute_aerosol_phase_blocks(model, aerosol_optics[iB][i],
+                                              get_spec_bands(model)[iB], 0, arr_type)
             aer_m0 = [CoreScatteringOpticalProperties(aer_τ_mod_iB[i][iz],
-                         aer_ϖ_mod_iB[i], AerZ⁺⁺_m0, AerZ⁻⁺_m0) for iz=1:nZ]
+                         aer_ϖ_mod_iB[i], AerZ⁺⁺_m0, AerZ⁻⁺_m0,
+                         AerZ₀⁺_m0, AerZ₀⁻_m0) for iz=1:nZ]
             combo_m0 = combo_m0 .+ aer_m0
         end
         # Device→host: needed for _expand_layer_rayleigh! (Raman path). Done once.
@@ -182,23 +219,21 @@ function constructCoreOpticalProperties(RS_type::AbstractRamanType, iBand, m, mo
     for iB in iBand
         gr_source = _rayleigh_greek_source(RS_type, greek_rayleigh, greek_cabannes)
         gr = gr_source isa AbstractVector ? gr_source[iB] : gr_source
-        Rayl𝐙⁺⁺, Rayl𝐙⁻⁺ = Scattering.compute_Z_moments(pol_type, μ, gr, m,
-                                                        arr_type = arr_type)
+        Rayl𝐙⁺⁺, Rayl𝐙⁻⁺, RaylZ₀⁺, RaylZ₀⁻ =
+            _compute_phase_blocks(model, gr, m, arr_type)
         rayl = [CoreScatteringOpticalProperties(arr_type(τ_rayl[iB][:,i]), RS_type.ϖ_Cabannes[iB],
-                Rayl𝐙⁺⁺, Rayl𝐙⁻⁺) for i=1:nZ]
+                Rayl𝐙⁺⁺, Rayl𝐙⁻⁺, RaylZ₀⁺, RaylZ₀⁻) for i=1:nZ]
 
         combo = rayl
 
         for i=1:nAero
-            AerZ⁺⁺, AerZ⁻⁺ = Scattering.compute_Z_moments(
-                                pol_type, μ,
-                                aerosol_optics[iB][i].greek_coefs,
-                                m, arr_type=arr_type)
+            AerZ⁺⁺, AerZ⁻⁺, AerZ₀⁺, AerZ₀⁻ = _compute_aerosol_phase_blocks(
+                model, aerosol_optics[iB][i], get_spec_bands(model)[iB], m, arr_type)
             # τ_aer[iB] is now 3-D [iAer, nSpec, iLayer]; extract per-spectral
             # τ vector for layer iz matching the Rayleigh pattern: arr_type(τ_rayl[iB][:,iz]).
             aer = [createAero(arr_type(τ_aer[iB][i,:,iz]),
                                aerosol_optics[iB][i],
-                               AerZ⁺⁺, AerZ⁻⁺) for iz=1:nZ]
+                               AerZ⁺⁺, AerZ⁻⁺, AerZ₀⁺, AerZ₀⁻) for iz=1:nZ]
             combo = combo .+ aer
         end
 
@@ -243,27 +278,40 @@ function constructCoreOpticalProperties(RS_type::AbstractRamanType, iBand, m, mo
 
     band_layer_props = Vector{Vector{CoreScatteringOpticalProperties}}()
 
+    gr_source = _rayleigh_greek_source(RS_type, greek_rayleigh, greek_cabannes)
+    selected_rayleigh = [gr_source isa AbstractVector ? gr_source[iB] : gr_source
+                         for iB in iBand]
+    # Rayleigh has no intrinsic wavelength dependence once its Greek
+    # coefficients are fixed. Auto depolarization and update_model! may still
+    # make those coefficients band-specific, so share only after an explicit
+    # equality check.
+    shared_rayleigh = length(selected_rayleigh) > 1 && all(
+        g -> _same_greek_coefficients(g, selected_rayleigh[1]), selected_rayleigh)
+    shared_blocks = shared_rayleigh ?
+        _compute_phase_blocks(model, selected_rayleigh[1], m, arr_type) : nothing
+
     for (iBi, iB) in enumerate(iBand)
-        gr_source = _rayleigh_greek_source(RS_type, greek_rayleigh, greek_cabannes)
         gr = gr_source isa AbstractVector ? gr_source[iB] : gr_source
 
         # Compute Z moments for this m (only m-dependent work)
-        Rayl𝐙⁺⁺, Rayl𝐙⁻⁺ = Scattering.compute_Z_moments(pol_type, μ, gr, m,
-                                                           arr_type=arr_type)
+        Rayl𝐙⁺⁺, Rayl𝐙⁻⁺, RaylZ₀⁺, RaylZ₀⁻ = shared_blocks === nothing ?
+            _compute_phase_blocks(model, gr, m, arr_type) : shared_blocks
 
         # Use cached device τ/ϖ uploads — avoids arr_type(τ_rayl[iB][:,i]) per layer
         rayl = [CoreScatteringOpticalProperties(cache.rayl_τ_dev[iBi][iz],
-                    cache.rayl_ϖ_Cabannes[iBi], Rayl𝐙⁺⁺, Rayl𝐙⁻⁺) for iz=1:nZ]
+                    cache.rayl_ϖ_Cabannes[iBi], Rayl𝐙⁺⁺, Rayl𝐙⁻⁺,
+                    RaylZ₀⁺, RaylZ₀⁻) for iz=1:nZ]
 
         combo = rayl
         for i = 1:nAero
-            AerZ⁺⁺, AerZ⁻⁺ = Scattering.compute_Z_moments(
-                pol_type, μ, aerosol_optics[iB][i].greek_coefs, m, arr_type=arr_type)
+            AerZ⁺⁺, AerZ⁻⁺, AerZ₀⁺, AerZ₀⁻ = _compute_aerosol_phase_blocks(
+                model, aerosol_optics[iB][i], get_spec_bands(model)[iB], m, arr_type)
             # Use cached pre-corrected δ-M values — avoids createAero recomputing fᵗ/ω̃.
             # aer_τ_mod[iBi][i][iz] is an nSpec device vector (or scalar for single-λ bands);
             # aer_ϖ_mod[iBi][i] is an nSpec vector (or scalar); both broadcast in CoreScatteringOpticalProperties.
             aer = [CoreScatteringOpticalProperties(cache.aer_τ_mod[iBi][i][iz],
-                       cache.aer_ϖ_mod[iBi][i], AerZ⁺⁺, AerZ⁻⁺) for iz=1:nZ]
+                       cache.aer_ϖ_mod[iBi][i], AerZ⁺⁺, AerZ⁻⁺,
+                       AerZ₀⁺, AerZ₀⁻) for iz=1:nZ]
             combo = combo .+ aer
         end
 
@@ -279,7 +327,8 @@ function constructCoreOpticalProperties(RS_type::AbstractRamanType, iBand, m, mo
     return layer_opt, fscat_opt
 end
 
-function createAero(τAer, aerosol_optics, AerZ⁺⁺, AerZ⁻⁺)
+function createAero(τAer, aerosol_optics, AerZ⁺⁺, AerZ⁻⁺,
+                    AerZ₀⁺=nothing, AerZ₀⁻=nothing)
     (; fᵗ, ω̃) = aerosol_optics
     # Device-type ω̃ and fᵗ to match τAer when they are host Vectors (multi-λ band
     # on GPU: τAer is already a device array, but ω̃/fᵗ remain host Vector{FT}).
@@ -288,7 +337,8 @@ function createAero(τAer, aerosol_optics, AerZ⁺⁺, AerZ⁻⁺)
     fᵗd = fᵗ isa AbstractArray ? oftype(τAer, fᵗ) : fᵗ
     τ_mod = (1 .- fᵗd .* ω̃d) .* τAer
     ϖ_mod = (1 .- fᵗd) .* ω̃d ./ (1 .- fᵗd .* ω̃d)
-    CoreScatteringOpticalProperties(τ_mod, ϖ_mod, AerZ⁺⁺, AerZ⁻⁺)
+    CoreScatteringOpticalProperties(τ_mod, ϖ_mod, AerZ⁺⁺, AerZ⁻⁺,
+                                    AerZ₀⁺, AerZ₀⁻)
 end
 
 # Extract scattering definitions and integrated absorptions for the source function!
@@ -347,7 +397,13 @@ When `Z` is already 3-D the array is returned unchanged (no allocation).
 
 function expandOpticalProperties(in::CoreScatteringOpticalProperties, arr_type;
                                   expand_Z::Bool = false)
-    (; τ, ϖ, Z⁺⁺, Z⁻⁺) = in
+    (; τ, ϖ, Z⁺⁺, Z⁻⁺, Z₀⁺, Z₀⁻) = in
+    solar_plus = Z₀⁺ === nothing ? nothing : _to_device(arr_type, _ensure_3d(Z₀⁺))
+    solar_minus = Z₀⁻ === nothing ? nothing : _to_device(arr_type, _ensure_3d(Z₀⁻))
+    if expand_Z && solar_plus !== nothing && size(solar_plus, 3) == 1
+        solar_plus = _repeat(solar_plus, 1, 1, length(τ))
+        solar_minus = _repeat(solar_minus, 1, 1, length(τ))
+    end
     @assert length(τ) == length(ϖ) "τ and ϖ sizes need to match"
     if size(Z⁺⁺, 3) == 1
         if expand_Z
@@ -357,7 +413,8 @@ function expandOpticalProperties(in::CoreScatteringOpticalProperties, arr_type;
             Z⁻⁺ = _repeat(Z⁻⁺, 1, 1, length(τ))
             return CoreScatteringOpticalProperties(
                 _to_device(arr_type, τ), _to_device(arr_type, ϖ),
-                _to_device(arr_type, Z⁺⁺), _to_device(arr_type, Z⁻⁺))
+                _to_device(arr_type, Z⁺⁺), _to_device(arr_type, Z⁻⁺),
+                solar_plus, solar_minus)
         else
             # Fast path: all elemental/doubling kernels branch on size(Z,3)
             # and use index n2=1 when size==1, so no replication is needed.
@@ -366,13 +423,15 @@ function expandOpticalProperties(in::CoreScatteringOpticalProperties, arr_type;
             Z3⁺⁺ = _to_device(arr_type, _ensure_3d(Z⁺⁺))
             Z3⁻⁺ = _to_device(arr_type, _ensure_3d(Z⁻⁺))
             return CoreScatteringOpticalProperties(
-                _to_device(arr_type, τ), _to_device(arr_type, ϖ), Z3⁺⁺, Z3⁻⁺)
+                _to_device(arr_type, τ), _to_device(arr_type, ϖ), Z3⁺⁺, Z3⁻⁺,
+                solar_plus, solar_minus)
         end
     else
         @assert size(Z⁺⁺, 3) == length(τ) "Z and τ dimensions need to match"
         return CoreScatteringOpticalProperties(
             _to_device(arr_type, τ), _to_device(arr_type, ϖ),
-            _to_device(arr_type, Z⁺⁺), _to_device(arr_type, Z⁻⁺))
+            _to_device(arr_type, Z⁺⁺), _to_device(arr_type, Z⁻⁺),
+            solar_plus, solar_minus)
     end
 end
 

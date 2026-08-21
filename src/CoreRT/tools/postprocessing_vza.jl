@@ -62,6 +62,21 @@ function postprocessing_vza_toa!(composite_layer, vza, qp_μ, m, vaz,
     return nothing
 end
 
+"""TOA-only elastic and Raman source accumulation for an `RRS` composite."""
+function postprocessing_vza_toa!(composite_layer::CompositeLayerRS,
+                                  vza, qp_μ, m, vaz, pol_type, weight,
+                                  R_TOA, ieR_TOA)
+    vza_info = _precompute_vza_weights(vza, vaz, qp_μ, pol_type, m, weight)
+    J₀⁻ = _to_cpu(composite_layer.J₀⁻)
+    ieJ₀⁻ = _to_cpu(dropdims(sum(composite_layer.ieJ₀⁻, dims=4), dims=4))
+    @inbounds for i in eachindex(vza)
+        istart, iend, w = vza_info[i]
+        @views R_TOA[i,:,:] .+= w * J₀⁻[istart:iend,1,:]
+        @views ieR_TOA[i,:,:] .+= w * ieJ₀⁻[istart:iend,1,:]
+    end
+    nothing
+end
+
 """
     postprocessing_vza!(RS_type::noRS, iμ₀, pol_type, composite_layer, vza, qp_μ, m, vaz, μ₀, weight, nSpec, SFI, R, R_SFI, T, T_SFI, ieR_SFI, ieT_SFI)
 

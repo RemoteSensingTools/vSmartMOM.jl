@@ -164,6 +164,7 @@ export OpticalPropertyJacobian,               # AD boundary struct alias
        n_total, aerosol_range, gas_range,     # ParameterLayout accessors
        gas_profile_range, gas_layer_index,
        surface_range, surface_index, sif_range, sif755_index, sif_slope_index,
+       sif760_index, msif_index,
        atmosphere_range, psurf_index,
        surface_parameter_count,
        canopy_range, n_layer_params

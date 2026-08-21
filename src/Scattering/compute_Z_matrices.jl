@@ -25,6 +25,20 @@ Compute moments of the phase matrix
 """
 function compute_Z_moments(mod::AbstractPolarizationType, μ, greek_coefs::GreekCoefs, m::Int ; arr_type = Array)
     (; α, β, γ, δ, ϵ, ζ) = greek_coefs
+    if ndims(β) == 2
+        n_spec = size(β, 2)
+        moments = map(1:n_spec) do iν
+            gc = GreekCoefs(collect(@view(α[:, iν])), collect(@view(β[:, iν])),
+                            collect(@view(γ[:, iν])), collect(@view(δ[:, iν])),
+                            collect(@view(ϵ[:, iν])), collect(@view(ζ[:, iν])))
+            compute_Z_moments(mod, μ, gc, m; arr_type=Array)
+        end
+        Z⁺⁺ = cat((z[1] for z in moments)...; dims=3)
+        Z⁻⁺ = cat((z[2] for z in moments)...; dims=3)
+        return arr_type(Z⁺⁺), arr_type(Z⁻⁺)
+    elseif ndims(β) != 1
+        throw(DimensionMismatch("Greek coefficients must be (l,) or (l,nSpec); got $(size(β))"))
+    end
     FT = eltype(β)
     n = length(μ)
 
@@ -102,3 +116,82 @@ function compute_Z_moments(mod::AbstractPolarizationType, μ, greek_coefs::Greek
     return arr_type(𝐙⁺⁺), arr_type(𝐙⁻⁺)
 end
 
+"""
+    compute_Z_source_moments(mod, μ_out, μ₀, greek_coefs, m; arr_type=Array)
+
+Evaluate the two Fourier phase blocks coupling one collimated incident
+direction `μ₀` to the diffuse output directions `μ_out`, without constructing
+an augmented square angular matrix. The angular shape is `length(μ_out) × 1`;
+after Stokes expansion the returned arrays have shape
+`(length(μ_out)*nStokes, nStokes[, nSpec])`.
+
+Keeping the complete incident Stokes block preserves support for polarized
+collimated sources. For the usual unpolarized solar beam only column one is
+used, so its contraction is an `NquadN × 1` source vector.
+"""
+function compute_Z_source_moments(mod::AbstractPolarizationType, μ_out,
+                                  μ₀::Real, greek_coefs::GreekCoefs, m::Int;
+                                  arr_type=Array)
+    (; α, β, γ, δ, ϵ, ζ) = greek_coefs
+    if ndims(β) == 2
+        moments = map(axes(β, 2)) do iν
+            gc = GreekCoefs(collect(@view(α[:, iν])), collect(@view(β[:, iν])),
+                            collect(@view(γ[:, iν])), collect(@view(δ[:, iν])),
+                            collect(@view(ϵ[:, iν])), collect(@view(ζ[:, iν])))
+            compute_Z_source_moments(mod, μ_out, μ₀, gc, m; arr_type=Array)
+        end
+        return arr_type(cat((z[1] for z in moments)...; dims=3)),
+               arr_type(cat((z[2] for z in moments)...; dims=3))
+    elseif ndims(β) != 1
+        throw(DimensionMismatch(
+            "Greek coefficients must be (l,) or (l,nSpec); got $(size(β))"))
+    end
+
+    FT = promote_type(eltype(β), eltype(μ_out), typeof(μ₀))
+    μ = FT.(μ_out)
+    μ0 = FT(μ₀)
+    @assert all(zero(FT) .< μ .<= one(FT))
+    @assert zero(FT) < μ0 <= one(FT)
+
+    fact = m == 0 ? FT(0.5) : one(FT)
+    m1 = m + 1
+    l_max = length(β)
+    # Evaluate the output and solar directions in one recurrence. Besides
+    # sharing work, this is bit-identical to the historical augmented-angle
+    # evaluation and avoids endpoint-sensitive singleton recurrence behavior.
+    μ_eval = vcat(μ, μ0)
+    P, R, T = compute_associated_legendre_PRT(μ_eval, l_max)
+    Pm, Rm, Tm = compute_associated_legendre_PRT(-μ_eval, l_max)
+    B_all = [construct_B_matrix(mod, α, β, γ, δ, ϵ, ζ, l)
+             for l in 1:l_max]
+    nstokes = Int(sqrt(length(B_all[1])))
+    Aplus = zeros(FT, nstokes, nstokes, length(μ))
+    Aminus = zeros(FT, nstokes, nstokes, length(μ))
+
+    for l in m1:l_max
+        B = B_all[l]
+        Π = construct_Π_matrix(mod, P, R, T, l, m1)
+        Πm = construct_Π_matrix(mod, Pm, Rm, Tm, l, m1)
+        Π0 = Π[end]
+        Π0m = Πm[end]
+        for iμ in eachindex(μ)
+            if nstokes == 1
+                Aplus[1, 1, iμ] += Π[iμ] * B * Π0
+                Aminus[1, 1, iμ] += Π[iμ] * B * Π0m
+            else
+                Aplus[:, :, iμ] .+= Π[iμ] * B * Π0
+                Aminus[:, :, iμ] .+= Π[iμ] * B * Π0m
+            end
+        end
+    end
+
+    Z0plus = zeros(FT, nstokes * length(μ), nstokes)
+    Z0minus = similar(Z0plus)
+    for iμ in eachindex(μ), j in 1:nstokes, i in 1:nstokes
+        row = (iμ - 1) * nstokes + i
+        Z0plus[row, j] = 2fact * Aplus[i, j, iμ]
+        cross_qu = (i <= 2 && j >= 3) || (i >= 3 && j <= 2)
+        Z0minus[row, j] = (cross_qu ? -2fact : 2fact) * Aminus[i, j, iμ]
+    end
+    return arr_type(Z0plus), arr_type(Z0minus)
+end

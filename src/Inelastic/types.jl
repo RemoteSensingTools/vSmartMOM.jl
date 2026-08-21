@@ -37,6 +37,9 @@ Base.@kwdef mutable struct RRS{FT<:AbstractFloat} <: AbstractRamanType
     iBand = 1
     F₀::Array{FT,2} # Solar/Stellar irradiation Stokes vector of size (pol_type.n, nSpec)
     SIF₀::Array{FT,2} # Solar/Stellar irradiation Stokes vector of size (pol_type.n, nSpec)
+    "Direct-solar Raman phase columns, `(NquadN,nStokes)`; diffuse Z remains square"
+    Z₀⁻⁺_λ₁λ₀::Array{FT,2} = zeros(eltype(F₀),1,1)
+    Z₀⁺⁺_λ₁λ₀::Array{FT,2} = zeros(eltype(F₀),1,1)
 end
 
 """

@@ -375,28 +375,34 @@ component_m_max(::CanopySurface, ctx) = ctx.user_l_cap
 For Rayleigh, this makes the current implicit behavior explicit. Rayleigh
 Greek coefficients have length 3, so terms above `m = 2` are exactly zero.
 
-For aerosols, validate before capping:
+For aerosols, the implemented effective-support rule is:
 
 ```julia
 phase_lmax(greek) = length(greek.β) - 1
 
-function validate_phase_resolution!(greek, ctx)
-    if ctx.truncation isa Scattering.NoTruncation &&
-       phase_lmax(greek) > ctx.user_l_cap
-        throw(ArgumentError(
-            "NoTruncation cannot fit l=$(phase_lmax(greek)) into " *
-            "user_l_cap=$(ctx.user_l_cap); increase nstreams or use δBGE."))
-    end
+function beta_lmax(greek, cutoff)
+    cutoff === nothing && return phase_lmax(greek)
+    # For spectral beta[l,nu], retain l if any nu passes.
+    return last_l_satisfying(maximum(abs.(greek.β[l, :])) >= cutoff)
 end
 
 effective_lmax(greek, ctx) =
-    ctx.truncation isa Scattering.NoTruncation ?
-        phase_lmax(greek) :
-        min(phase_lmax(greek), ctx.user_l_cap)
+    min(beta_lmax(greek, ctx.greek_beta_cutoff), ctx.user_l_cap)
 ```
 
-Later, `effective_lmax` can use coefficient-tail criteria or phase-function
-error estimates. Today, length-and-ceiling is enough.
+This is a two-stage calculation. The maximum Mie size parameter determines
+the conservative allocated coefficient length. After the size distribution is
+integrated, `greek_beta_cutoff` optionally finds the last degree satisfying
+`abs(β_l) >= cutoff`. The last passing degree is used, so isolated signed or
+non-monotone tail coefficients are not missed. For spectral coefficients the
+test is satisfied at any wavelength in the band. Only β is inspected: the
+other Greek families may legitimately be non-positive and are not the scalar
+phase-function support benchmark.
+
+Aggregation takes the maximum effective support across aerosol species and all
+other active components, then applies the stream and user caps. This currently
+shortens the Fourier loop only; quadrature has already been constructed, so
+`nstreams` and angular-operator memory do not shrink automatically.
 
 ## Per-Band Aggregation
 
@@ -410,7 +416,8 @@ user_l_cap = something(params.m_max_override,
 
 ctx = (; stream_l_cap,
        user_l_cap,
-       truncation = params.truncation)
+       truncation = params.truncation,
+       greek_beta_cutoff = params.greek_beta_cutoff)
 
 l_required = maximum(component_m_max(component, ctx)
                      for component in active_components_for_band)

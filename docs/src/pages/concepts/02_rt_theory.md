@@ -71,11 +71,11 @@ After Fourier decomposition, each per-moment integral over ``\mu' \in [-1, 1]``
 is replaced by a finite sum. vSmartMOM offers two quadrature schemes
 ([`src/CoreRT/tools/rt_set_streams.jl`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/tools/rt_set_streams.jl)):
 
-- **`GaussLegQuad`** — half-space Gauss-Legendre on ``[0,1]``. The default,
-  backward-compatible representation appends the solar and viewing zenith
-  angles as zero-weight operator nodes. With opt-in `external_solar=true`,
-  only the viewing directions are appended to the diffuse operator; exact
+- **`GaussLegQuad`** — half-space Gauss-Legendre on ``[0,1]``. By default,
+  only viewing directions are appended to the diffuse operator; exact
   ``μ_0`` remains a scalar source direction and a phase-evaluation column.
+  The backward-compatible embedded representation, requested with
+  `external_solar=false`, also appends the solar direction as a zero-weight node.
 - **`RadauQuad`** — block-Radau composite on ``[0, \mu_0] \cup [\mu_0, 1]``
   with ``\mu_0`` as a true quadrature node carrying non-zero weight (Sanghavi
   2014 App. B, Eqs. B.1–B.2). This is the historical DNI-oriented solution to
@@ -92,20 +92,17 @@ about today's SFI kernel.
 The current solver computes direct-beam source-function integration (SFI).
 Its backward-compatible default keeps ``μ_0`` in the operator grid as a
 zero-weight node because several solver paths still depend on that layout.
-The opt-in external-solar form removes this representational relic: ``μ_0`` is
-**not a diffuse stream**. `get_elem_rt_SFI!` receives it as a scalar
-propagation direction and uses the exact phase coupling
-``Z_m(μ_i,μ_0)`` to construct the direct-beam source vectors with the finite-layer
-Fell formulas. `phase_qp_μ` may therefore contain one more direction than the
-square operator grid: its exact solar column feeds ``\mathbf{J}``, while the
-diffuse R/T operators use only the leading square block.
+The default external-solar form removes this representational relic: ``μ_0`` is
+**not a diffuse stream**. The elemental solver receives it as a scalar
+propagation direction. Exact rectangular ``Z_0(μ_i,μ_0)`` columns generate
+finite-layer ``R_0/T_0`` operators, which are then contracted into
+``\mathbf J``. Diffuse R/T operators remain square on the diffuse grid.
 
-This path is currently restricted to Gauss quadrature, forward elastic
-`noRS`, a Lambertian surface, and endpoint TOA output. Call
-`rt_run_toa(model)`; BOA, HDR, and BHR arrays are not allocated or
-postprocessed. Linearized, Raman/VRS, single-scatter-only, non-Lambertian, and
-interior-sensor calculations require the embedded-``μ_0`` representation and
-reject external-solar models.
+This path is restricted to Gauss quadrature, elastic forward/linearized
+`noRS`, forward rotational Raman `RRS`, Lambertian surfaces, and endpoint TOA
+output. Call `rt_run_toa(model)` or `rt_run_toa(rs,model)`; BOA, HDR, and BHR
+arrays are not allocated. Raman Jacobians, VRS, single-scatter-only,
+non-Lambertian, and interior-sensor calculations retain embedded ``μ_0``.
 :::
 
 ## The supermatrix form (per Fourier moment)
