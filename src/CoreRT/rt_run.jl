@@ -449,6 +449,15 @@ function rt_run(RS_type::AbstractRamanType, model, iBand;
     # never used because it has shape (nVZA, pol_n, nSpec), not (NquadN,1,nSpec)).
     hdr_J₀⁻ = similar(composite_layer.J₀⁻)
 
+    # Per-layer max(τ·ϖ), computed ONCE on m = 0 and reused for every Fourier
+    # moment: τ and ϖ are m-independent (only the Z matrices change with m),
+    # yet the scatter test + dτ/ndoubl derivation historically re-reduced
+    # τ·ϖ on the device 3× per (layer, m) — each a broadcast + reduction +
+    # BLOCKING scalar read, ~3·Nz·(m_max+1) GPU round trips per solve
+    # (nsys-measured as the dominant sync-bound term). Same scalar, same
+    # downstream arithmetic ⇒ bitwise-identical results.
+    max_τϖ_all = _M_INVARIANT_DTAU_CACHE_ENABLED[] ? fill(FT(NaN), Nz) : nothing
+
     # Loop over fourier moments
     for m = 0:m_max
 
@@ -480,6 +489,16 @@ function rt_run(RS_type::AbstractRamanType, model, iBand;
             @timeit "OpticalProps" layer_opt =
                 expandOpticalProperties(layer_opt_props[iz], arr_type)
 
+            # m-invariant max(τ·ϖ) for this layer (see the cache's comment
+            # above the m-loop): one device reduction per layer on m = 0,
+            # host-cached scalar thereafter.
+            if max_τϖ_all !== nothing
+                m == 0 && (max_τϖ_all[iz] = FT(maximum(layer_opt.τ .* layer_opt.ϖ)))
+                mτϖ_iz = max_τϖ_all[iz]
+            else
+                mτϖ_iz = nothing
+            end
+
             # Perform Core RT (doubling/elemental/interaction)
             @timeit "RT Kernel" rt_kernel!(RS_type, pol_type, SFI,
                         added_layer, composite_layer,
@@ -493,7 +512,8 @@ function rt_run(RS_type::AbstractRamanType, model, iBand;
                         workspace=_interaction_ws,
                         prepared_sources=prepared_sources,
                         dτ_max_threshold=dτ_max_threshold,
-                        dτ_min_floor=dτ_min_floor)
+                        dτ_min_floor=dτ_min_floor,
+                        max_τϖ=mτϖ_iz)
         end
 
         # Atmosphere/surface split (`rt_run_atmosphere` / `rt_run_surface`).

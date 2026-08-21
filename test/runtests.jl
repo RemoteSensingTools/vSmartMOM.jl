@@ -140,6 +140,9 @@ try
 # Z-moment tables — bitwise contract, Π auto-build (silent-zero regression),
 # μ-mismatch rejection, kill-switch default.
 @testset "Z-moment tables" begin include("test_z_tables.jl") end
+# m-invariant max(τ·ϖ) cache — one per-layer device reduction on m=0 instead
+# of 3 blocking round trips per (layer, m); bitwise rt_run A/B.
+@testset "m-invariant dτ cache" begin include("test_m_invariant_dtau.jl") end
 
 # NOTE: GPU/Metal tests live in test/local/gpu/ and run via
 # `julia --project=test test/local/runtests.jl` (the local-only suite); they are
