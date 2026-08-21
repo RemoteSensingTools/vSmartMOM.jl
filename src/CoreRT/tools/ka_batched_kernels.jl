@@ -893,6 +893,9 @@ const _FUSED_INTERACTION_MODE = Ref{Symbol}(:auto)
 "Gate: GPU backend, mode/backend policy allows it, and the 2N² tile fits."
 @inline function _use_fused_interaction(X::AbstractArray{FT,3}) where {FT}
     mode = _FUSED_INTERACTION_MODE[]
+    # A typo like :of must not silently fall through as forced-on.
+    mode in (:auto, :on, :off) ||
+        throw(ArgumentError("invalid _FUSED_INTERACTION_MODE: $mode (use :auto | :on | :off)"))
     mode === :off && return false
     backend = KernelAbstractions.get_backend(X)
     backend isa KernelAbstractions.CPU && return false

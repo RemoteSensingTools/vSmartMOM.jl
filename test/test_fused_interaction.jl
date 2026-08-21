@@ -45,6 +45,10 @@ function run_case(FT, to_dev, I_static; rtol)
     # actually track the mode, not silently stay on one path.
     default = _FUSED_INTERACTION_MODE[]
     @test default === :auto
+    # invalid modes throw instead of silently meaning "on"
+    _FUSED_INTERACTION_MODE[] = :of
+    @test_throws ArgumentError _use_fused_interaction(a.r⁻⁺)
+    _FUSED_INTERACTION_MODE[] = default
     @test _fused_interaction_default(KernelAbstractions.get_backend(a.r⁻⁺)) == false  # CUDA ext override
     @test !_use_fused_interaction(a.r⁻⁺)                 # :auto → CUDA backend policy → off
     _FUSED_INTERACTION_MODE[] = :off
