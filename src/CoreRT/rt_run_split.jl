@@ -194,7 +194,11 @@ function rt_run_atmosphere(model;
                              SCI}(
         c.pol_type, c.quad_points, c.iμ₀, FT(c.μ₀),
         FT.(collect(c.vza)), FT.(collect(c.vaz)),
-        c.nSpec, m_max_cache, user_l_cap, c.NquadN, resolved_cache_mode,
+        # The cache's m_max is the count of moments ACTUALLY snapshotted
+        # (one weight pushed per moment), not the preset ceiling — Fourier
+        # convergence (IntensityConvergence) may terminate the loop before
+        # m_max_cache, and the surface replay must loop over what's stored.
+        c.nSpec, length(weights) - 1, user_l_cap, c.NquadN, resolved_cache_mode,
         iBand, weights,
         c.arr_type, c.arch, c.SFI, c.RS_type, c.prepared_sources, c.I_static,
         AT3[R⁻⁺...], AT3[R⁺⁻...],
