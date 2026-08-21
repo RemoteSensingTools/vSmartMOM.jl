@@ -866,8 +866,19 @@ end
 ka_fused_interaction_localmem_bytes(::Type{FT}, N::Integer) where {FT} =
     (2 * N * N + 4 * N) * sizeof(FT)
 
-"Runtime kill-switch for the fused interaction kernels. Default `true`."
-const _FUSED_INTERACTION_ENABLED = Ref(true)
+"""
+Runtime switch for the fused interaction kernels. Default `false`, from
+measurement: on the production satellite solve (801 pts, nstr=8, IQU, F32,
+A100) the wired fused path measured 3.27 s vs 2.89 s for the `_bmm!` ladder
+(max rel radiance diff 9.3e-7). Unlike the doubling ladder (many tiny
+broadcasts, launch-bound) and the fused LU solve (replaces an expensive
+inverse+GEMM chain), the interaction updates are plain batched GEMMs at
+N≈36 — exactly what cuBLAS is best at — so the one-workgroup-per-λ KA
+kernels lose on CUDA. They remain available (and wired via
+`interaction_helper!`) for cuBLAS-free backends (Metal) and for CUDA-graph
+capture experiments, where a cuBLAS-free interaction step is a prerequisite.
+"""
+const _FUSED_INTERACTION_ENABLED = Ref(false)
 
 "Gate: GPU backend, kill-switch on, and the 2N² tile fits the device budget."
 @inline function _use_fused_interaction(X::AbstractArray{FT,3}) where {FT}
