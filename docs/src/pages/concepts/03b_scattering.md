@@ -94,6 +94,29 @@ struct AerosolOptics{FT}
 end
 ```
 
+### Effective aerosol Fourier support
+
+The maximum particle size parameter determines a conservative Mie-series
+length, but the extreme-radius tail of an integrated size distribution can
+carry negligible weight. The optional `radiative_transfer.greek_beta_cutoff`
+therefore applies a second test after size-distribution integration:
+
+```math
+l_{\beta,a} = \max\{l : |\beta_{a,l}(\nu)| \geq \epsilon_\beta
+\text{ for at least one } \nu \text{ in the band}\}.
+```
+
+This is evaluated separately for each aerosol `a`; their maximum contributes
+to the band-level `m_max` alongside Rayleigh, surface, and source support. The
+absolute value is intentional because β can be signed. Only β is tested: the
+other five Greek families can be zero or change sign and are not used as the
+scalar phase-function support benchmark. The last passing degree is retained,
+so the implementation does not assume monotonic decay.
+
+The maximum-size result remains the allocation ceiling, and stream/user caps
+are still applied after component aggregation. This criterion shortens the
+Fourier loop but does not itself reduce `nstreams` or angular-operator size.
+
 ## Phase matrix `Z` from Greek + μ
 
 Once the Greek coefficients are in hand, the per-Fourier-moment phase

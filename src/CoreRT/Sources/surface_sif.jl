@@ -35,7 +35,9 @@ applied downstream in `postprocessing_vza!`.
 =#
 
 """
-    SurfaceSIF(; SIF₀=nothing, SIF755=nothing, slope=0, wavelength_nm=nothing) <: AbstractSource
+    SurfaceSIF(; SIF₀=nothing, SIF760=nothing, mSIF=0,
+               wavenumber_cm1=nothing,
+               SIF755=nothing, slope=0, wavelength_nm=nothing) <: AbstractSource
 
 User-facing surface fluorescence source. Carries an isotropic emission
 spectrum and (optionally) is composed with other sources via `+`:
@@ -49,15 +51,16 @@ hemispheric irradiance (mW · m⁻² · cm⁻¹). The unpolarized component is
 typically `SIF₀[1, :]`; higher Stokes components are zero unless the
 canopy emission is polarized.
 
-Alternatively, `SIF755` and `slope` define the retrievable unpolarized
-radiance
+Alternatively, `SIF760` and `mSIF` define the retrievable unpolarized
+spectral radiance
 
-``L_SIF(λ) = SIF755 + slope * (λ_nm - 755)``.
+``L_SIF(ν) = SIF760 + mSIF * (ν - ν₇₆₀)``.
 
 Both coefficients are appended to the Jacobian state vector, in that order.
-`SIF755` has the same spectral-radiance units as the output Stokes vector;
-`slope` has radiance-per-nm units. `wavelength_nm` must contain the model spectral grid.
-For nonzero `SIF755`, the source set must also contain a `SolarBeam` with an
+`SIF760` is in mW m⁻² sr⁻¹ (cm⁻¹)⁻¹ and `mSIF` is in those units per cm⁻¹.
+`wavenumber_cm1` must contain the model spectral grid. The legacy
+`SIF755`/wavelength-domain `slope` interface remains supported.
+For nonzero retrievable SIF, the source set must also contain a `SolarBeam` with an
 explicit non-unit Fraunhofer `F₀`; unit-normalized radiances and physical SIF
 must not be mixed.
 
@@ -75,24 +78,41 @@ struct SurfaceSIF <: AbstractSource
     SIF755 :: Union{Nothing, Real}
     slope :: Real
     wavelength_nm :: Union{Nothing, AbstractVector}
+    SIF760 :: Union{Nothing, Real}
+    mSIF :: Real
+    wavenumber_cm1 :: Union{Nothing, AbstractVector}
+    ν_ref :: Real
 end
 
-function SurfaceSIF(; SIF₀=nothing, SIF755=nothing, slope=0, wavelength_nm=nothing)
-    SIF₀ !== nothing && SIF755 !== nothing && throw(ArgumentError(
-        "SurfaceSIF accepts either prescribed SIF₀ or retrievable SIF755, not both."))
+function SurfaceSIF(; SIF₀=nothing, SIF760=nothing, SIF_ref=nothing, mSIF=0,
+                    wavenumber_cm1=nothing, ν_ref=1e7/760,
+                    SIF755=nothing, slope=0, wavelength_nm=nothing)
+    SIF760 !== nothing && SIF_ref !== nothing && throw(ArgumentError(
+        "Use SIF760, not both SIF760 and the deprecated SIF_ref alias."))
+    SIF760 === nothing && (SIF760 = SIF_ref)
+    SIF₀ !== nothing && (SIF755 !== nothing || SIF760 !== nothing) && throw(ArgumentError(
+        "SurfaceSIF accepts either prescribed SIF₀ or retrievable SIF, not both."))
+    SIF755 !== nothing && SIF760 !== nothing && throw(ArgumentError(
+        "Use either legacy SIF755 or wavenumber-based SIF760, not both."))
     SIF755 !== nothing && wavelength_nm === nothing && throw(ArgumentError(
         "SurfaceSIF(SIF755=...) requires wavelength_nm on the model spectral grid."))
-    return SurfaceSIF(SIF₀, SIF755, slope, wavelength_nm)
+    SIF760 !== nothing && wavenumber_cm1 === nothing && throw(ArgumentError(
+        "SurfaceSIF(SIF760=...) requires wavenumber_cm1 on the model spectral grid."))
+    return SurfaceSIF(SIF₀, SIF755, slope, wavelength_nm,
+                      SIF760, mSIF, wavenumber_cm1, ν_ref)
 end
 
 # Preserve the original positional constructor.
-SurfaceSIF(SIF₀::Union{Nothing,AbstractMatrix}) = SurfaceSIF(SIF₀, nothing, 0, nothing)
+SurfaceSIF(SIF₀::Union{Nothing,AbstractMatrix}) = SurfaceSIF(SIF₀=SIF₀)
 
 source_ad_mode(::SurfaceSIF) = AnalyticSourceJacobian()
 
 Base.show(io::IO, s::SurfaceSIF) =
-    s.SIF755 === nothing ?
+    s.SIF755 === nothing && s.SIF760 === nothing ?
         print(io, "SurfaceSIF(SIF₀=", s.SIF₀ === nothing ? "zeros" : summary(s.SIF₀), ")") :
+    s.SIF760 !== nothing ?
+        print(io, "SurfaceSIF(SIF760=", s.SIF760, ", mSIF=", s.mSIF,
+              ", ν₇₆₀=", s.ν_ref, " cm⁻¹)") :
         print(io, "SurfaceSIF(SIF755=", s.SIF755, ", slope=", s.slope, ", λref=755 nm)")
 
 """
@@ -123,7 +143,19 @@ materialises a zero matrix on the active architecture; a user-supplied
 """
 function prepare_source(s::SurfaceSIF, FT::Type{<:AbstractFloat},
                         pol_n::Integer, nSpec::Integer, arr_type)
-    if s.SIF755 !== nothing
+    if s.SIF760 !== nothing
+        length(s.wavenumber_cm1) == nSpec || throw(ArgumentError(
+            "SurfaceSIF: wavenumber_cm1 length $(length(s.wavenumber_cm1)) does not match nSpec=$nSpec."))
+        Δν = FT.(s.wavenumber_cm1) .- FT(s.ν_ref)
+        L = FT(s.SIF760) .+ FT(s.mSIF) .* Δν
+        SIF₀ = zeros(FT, pol_n, nSpec)
+        SIḞ₀ = zeros(FT, pol_n, nSpec, 2)
+        @views SIF₀[1, :] .= FT(π) .* L
+        @views SIḞ₀[1, :, 1] .= FT(π)
+        @views SIḞ₀[1, :, 2] .= FT(π) .* Δν
+        dev, dotdev = arr_type(SIF₀), arr_type(SIḞ₀)
+        return PreparedSurfaceSIF{FT, typeof(dev), typeof(dotdev)}(dev, dotdev, 2)
+    elseif s.SIF755 !== nothing
         length(s.wavelength_nm) == nSpec || throw(ArgumentError(
             "SurfaceSIF: wavelength_nm length $(length(s.wavelength_nm)) does not match nSpec=$nSpec."))
         Δλ = FT.(s.wavelength_nm) .- FT(755)
@@ -155,14 +187,16 @@ function prepare_source(s::SurfaceSIF, FT::Type{<:AbstractFloat},
 end
 
 surface_sif_parameter_count(::NoSource) = 0
-surface_sif_parameter_count(s::SurfaceSIF) = s.SIF755 === nothing ? 0 : 2
+surface_sif_parameter_count(s::SurfaceSIF) =
+    s.SIF755 === nothing && s.SIF760 === nothing ? 0 : 2
 surface_sif_parameter_count(::AbstractSource) = 0
 surface_sif_parameter_count(s::SourceSet) = sum(surface_sif_parameter_count, s.sources)
 
 function validate_sif_solar_spectrum(srcs::AbstractSource)
     surface_sif_parameter_count(srcs) == 0 && return nothing
-    sif_nonzero = any(s -> s isa SurfaceSIF && s.SIF755 !== nothing &&
-                           (!iszero(s.SIF755) || !iszero(s.slope)),
+    sif_nonzero = any(s -> s isa SurfaceSIF &&
+                           ((s.SIF755 !== nothing && (!iszero(s.SIF755) || !iszero(s.slope))) ||
+                            (s.SIF760 !== nothing && (!iszero(s.SIF760) || !iszero(s.mSIF)))),
                       srcs isa SourceSet ? srcs.sources : (srcs,))
     sif_nonzero || return nothing
     sources = srcs isa SourceSet ? srcs.sources : (srcs,)

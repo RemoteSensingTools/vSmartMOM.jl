@@ -222,22 +222,22 @@ accidental treatment of the collimated Sun as diffuse radiation.
 
 - **`Nquad`** — total node count in the square **diffuse operator**. It
   includes the weighted streams and any distinct zero-weight viewing nodes;
-  the default legacy Gauss representation also includes the distinct SZA.
+  the explicitly requested legacy Gauss representation also includes the distinct SZA.
   It sets the matrix workspace size
   `NquadN = Nquad · n_stokes`.
 
 - **`phase_qp_μ`** — directions used to evaluate phase matrices. It is
-  identical to `qp_μ` in the legacy representation. In opt-in
-  external-solar SFI, it additionally contains exact ``μ₀`` so the source
-  kernel can consume ``Z_m(μ_i,μ_0)`` without making ``μ₀`` a diffuse
-  ordinate. `iμ₀_phase` indexes this source column.
+  identical to `qp_μ` in the legacy representation. In the default
+  external-solar SFI, it additionally records exact ``μ₀`` as compatibility
+  metadata. Production source kernels evaluate rectangular ``Z₀`` columns
+  directly and do not index ``μ₀`` as an operator node.
 
 ### Per-scheme construction
 
 | Scheme | Weighted-streams construction | Solar treatment |
 |--------|-------------------------------|-----------------|
-| `GaussLegQuad` (default/legacy) | Gauss-Legendre on `[0, 1]`, `(Ltrunc+2)÷2` nodes (Sanghavi: `+2` form avoids zero streams at `Ltrunc=0`) | SZA and VZAs are appended as zero-weight operator nodes. |
-| `GaussLegQuad` with `external_solar=true` | Same weighted Gauss nodes | Only VZAs are appended to the operator; scalar ``μ₀`` is retained on `phase_qp_μ` for the exact source column. |
+| `GaussLegQuad` (default, `external_solar=true`) | Gauss-Legendre on `[0, 1]`, `(Ltrunc+2)÷2` nodes (Sanghavi: `+2` form avoids zero streams at `Ltrunc=0`) | Only VZAs are appended to the operator; scalar ``μ₀`` is evaluated directly into rectangular ``Z₀`` columns. |
+| `GaussLegQuad` with `external_solar=false` (legacy) | Same weighted Gauss nodes | SZA and VZAs are appended as zero-weight operator nodes. |
 | `RadauQuad` | Gauss-Radau on subintervals around μ₀; the SZA-on-node branch builds `(Ltrunc+1)÷2` nodes, while the usual SZA-not-on-node branch builds `2·((Ltrunc+1)÷2)` weighted nodes split around μ₀ | ``μ₀`` is a weighted quadrature node; external-solar mode is not supported. VZAs are appended with zero weight. |
 
 Because Radau allocates a different number of weighted nodes
@@ -256,15 +256,15 @@ All representations report:
 - `qp.Nquad` = diffuse-operator total (kernel size)
 - `qp.wt_μ` carries explicit zeros at appended viewing directions and,
   in legacy Gauss mode, at SZA
-- `qp.phase_qp_μ` and `qp.iμ₀_phase` identify the exact solar source
-  coupling
+- `qp.μ₀` supplies the exact external-solar propagation direction;
+  `phase_qp_μ/iμ₀_phase` remain compatibility metadata for the embedded path
 
 The `RTModel` `Base.show` summary prints both: `"Nstreams=N, Nquad=M"`.
 
 ### External-solar SFI and the 18×18 exoplanet operator
 
-`external_solar=true` is opt-in; legacy embedded-``μ₀`` behavior remains
-the default. In external mode, ``μ₀`` is a scalar propagation direction and
+`external_solar=true` is the model-construction default; legacy embedded-``μ₀``
+behavior requires `external_solar=false`. In external mode, ``μ₀`` is a scalar propagation direction and
 a phase-source column, not a zero-weight diffuse stream. The legacy operator
 indices `iμ₀` and `iμ₀Nstart` are therefore zero sentinels; source coupling
 uses `iμ₀_phase`.
@@ -276,18 +276,19 @@ diffuse operator dimension is
 (5 weighted + 1 VZA) · 3 Stokes = 18,
 ```
 
-so adding/doubling works on ``18×18`` matrices. The phase-evaluation grid also
-contains exact ``μ₀`` and supplies its source column, but that does not enlarge
-the diffuse operator. The legacy representation would include the distinct
+so adding/doubling works on ``18×18`` matrices. Rectangular ``Z₀`` phase
+columns and ``R₀/T₀`` elemental operators supply exact solar coupling without
+enlarging the diffuse operator. The legacy representation would include the distinct
 SZA as a seventh node and therefore use ``21×21`` matrices.
 
 The external-solar implementation is deliberately narrow at present:
 
-- `GaussLegQuad`, source-function integration, forward elastic `noRS`, and a
-  Lambertian surface only;
-- no linearized, Raman/VRS, single-scatter-only, non-Lambertian, or interior
+- `GaussLegQuad`, source-function integration, elastic forward/linearized
+  `noRS`, forward rotational Raman `RRS`, and Lambertian surfaces;
+- no Raman Jacobian, VRS, single-scatter-only, non-Lambertian, or interior
   sensor path;
-- call `rt_run_toa(model)`, which returns only directional upwelling TOA
+- call `rt_run_toa(model)` for elastic or `rt_run_toa(rs, model)` for RRS;
+  these return only directional upwelling TOA
   Stokes radiance. It does not allocate or postprocess BOA, HDR, or BHR
   products. Atmospheric multiple scattering and surface reflection are still
   solved because both contribute to TOA radiance.

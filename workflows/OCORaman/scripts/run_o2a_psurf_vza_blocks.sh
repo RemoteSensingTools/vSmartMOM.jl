@@ -24,7 +24,7 @@ JULIA_FLAGS="${JULIA_FLAGS:---pkgimages=no}"
 TEE_CHUNK_LOGS="${TEE_CHUNK_LOGS:-0}"
 
 printf -v PSURF_TAG '%04.0f' "${PSURF}"
-OUTROOT="${OUTROOT:-/home/sanghavi/data/RamanSIFgrid/o2a_raman_lut_vza_psurf${PSURF_TAG}}"
+OUTROOT="${OUTROOT:-/home/sanghavi/data/RamanSIFgrid/O2ABand/o2a_raman_lut_vza_psurf${PSURF_TAG}}"
 mkdir -p "${OUTROOT}/logs"
 
 printf 'O2A psurf=%s multi-VZA-block run\n' "${PSURF}"

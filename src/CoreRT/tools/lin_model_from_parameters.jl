@@ -1,17 +1,27 @@
 "Set a common l_max in a given band for each aerosol type"
-function set_uniform_lmax!(lmax::Vector{Int}, aerosol_optics)
+function set_uniform_lmax!(lmax::Vector{Int}, aerosol_optics, lin_aerosol_optics=nothing)
     n_bands = length(lmax)
     n_aer = length(aerosol_optics[1])
     for i_band = 1:n_bands
         pref_lmax = lmax[i_band]
         for i_aer = 1:n_aer
-            aer_lmax = length(aerosol_optics[i_band][i_aer].greek_coefs.β)
+            aer_lmax = size(aerosol_optics[i_band][i_aer].greek_coefs.β, 1)
             if aer_lmax < pref_lmax
                 for fname in (:α, :β, :γ, :δ, :ϵ, :ζ)
                     old = getfield(aerosol_optics[i_band][i_aer].greek_coefs, fname)
-                    new_arr = zeros(eltype(old), pref_lmax)
-                    new_arr[1:aer_lmax] .= old
+                    new_arr = zeros(eltype(old), pref_lmax, size(old)[2:end]...)
+                    view(new_arr, 1:aer_lmax, ntuple(_ -> Colon(), ndims(old)-1)...) .= old
                     setfield!(aerosol_optics[i_band][i_aer].greek_coefs, fname, new_arr)
+                end
+                if lin_aerosol_optics !== nothing
+                    for fname in (:α̇, :β̇, :γ̇, :δ̇, :ϵ̇, :ζ̇)
+                        old = getfield(lin_aerosol_optics[i_band][i_aer].lin_greek_coefs, fname)
+                        new_arr = zeros(eltype(old), size(old,1), pref_lmax, size(old)[3:end]...)
+                        view(new_arr, :, 1:aer_lmax,
+                             ntuple(_ -> Colon(), ndims(old)-2)...) .= old
+                        setfield!(lin_aerosol_optics[i_band][i_aer].lin_greek_coefs,
+                                  fname, new_arr)
+                    end
                 end
             end
         end
@@ -53,7 +63,8 @@ This is the **linearized** counterpart of `model_from_parameters(params)`. It co
 """
 function model_from_parameters(lin::LinMode,
     params::vSmartMOM_Parameters;
-    sources::AbstractSource = SolarBeam())
+    sources::AbstractSource = SolarBeam(),
+    external_solar::Bool = true)
     FT = params.float_type
     n_bands = length(params.spec_bands)
     n_aer = isnothing(params.scattering_params) ? 0 : length(params.scattering_params.rt_aerosols)
@@ -79,7 +90,8 @@ function model_from_parameters(lin::LinMode,
         observation.sensor_levels, observation.interior_altitudes,
         observation.include_toa, observation.include_boa, observation.toa_altitude)
     quad_points = rt_set_streams(params.quadrature_type, params.l_trunc, obs_geom,
-                                 params.polarization_type, array_type(params.architecture))
+                                 params.polarization_type, array_type(params.architecture);
+                                 external_solar)
     rayleigh_molecular_T = (profile.vcd_dry' * profile.T) / sum(profile.vcd_dry)
 
     greek_cabannes = Vector{vSmartMOM.Scattering.GreekCoefs{FT}}()
@@ -331,6 +343,7 @@ function model_from_parameters(lin::LinMode,
         for i_band=1:n_bands
 
             curr_band_λ = params.float_type(1e4) ./ params.spec_bands[i_band]
+            already_truncated = false
 
             if length(curr_band_λ)==1
                 mie_model = _mie((maximum(curr_band_λ)+minimum(curr_band_λ))/2)
@@ -351,67 +364,34 @@ function model_from_parameters(lin::LinMode,
                 @timeit "Mie calc"  aerosol_optics_raw_1, lin_aerosol_optics_raw_1 =
                                 compute_aerosol_optical_properties(lin, mie_model_1, FT2)
 
-                Nl  = length(aerosol_optics_raw_1.greek_coefs.α)
-                Nl_ = length(aerosol_optics_raw_0.greek_coefs.α)
-                gc0 = aerosol_optics_raw_0.greek_coefs
-                gc1 = aerosol_optics_raw_1.greek_coefs
-                lgc0 = lin_aerosol_optics_raw_0.lin_greek_coefs
-                lgc1 = lin_aerosol_optics_raw_1.lin_greek_coefs
-
-                greek_arrs = Dict{Symbol,Vector{Float64}}()
-                lin_greek_arrs = Dict{Symbol,Matrix{Float64}}()
-                for (fn, lfn) in zip((:α,:β,:γ,:δ,:ϵ,:ζ), (:α̇,:β̇,:γ̇,:δ̇,:ϵ̇,:ζ̇))
-                    g0 = getfield(gc0, fn); g1 = getfield(gc1, fn)
-                    arr = zeros(Nl)
-                    arr[1:Nl_]     .= 0.5 .* (g0[1:Nl_] .+ g1[1:Nl_])
-                    arr[1+Nl_:Nl]  .= 0.5 .* g1[1+Nl_:Nl]
-                    greek_arrs[fn] = arr
-
-                    lg0 = getfield(lgc0, lfn); lg1 = getfield(lgc1, lfn)
-                    darr = zeros(4, Nl)
-                    darr[:, 1:Nl_]    .= 0.5 .* (lg0[:, 1:Nl_] .+ lg1[:, 1:Nl_])
-                    darr[:, 1+Nl_:Nl] .= 0.5 .* lg1[:, 1+Nl_:Nl]
-                    lin_greek_arrs[lfn] = darr
-                end
-
-                greek_coeffs = GreekCoefs(greek_arrs[:α], greek_arrs[:β], greek_arrs[:γ],
-                                          greek_arrs[:δ], greek_arrs[:ϵ], greek_arrs[:ζ])
-                lin_greek_coeffs = linGreekCoefs(lin_greek_arrs[:α̇], lin_greek_arrs[:β̇], lin_greek_arrs[:γ̇],
-                                  lin_greek_arrs[:δ̇], lin_greek_arrs[:ϵ̇], lin_greek_arrs[:ζ̇])
-                ν_grid = [1e4/curr_band_λ[1], 1e4/curr_band_λ[end]]
-                kext_grid = [aerosol_optics_raw_0.k, aerosol_optics_raw_1.k]
-                ksca_grid = [aerosol_optics_raw_0.k*aerosol_optics_raw_0.ω̃, aerosol_optics_raw_1.k*aerosol_optics_raw_1.ω̃]
-                interp_linear_kext = LinearInterpolation(ν_grid, kext_grid)
-                interp_linear_ksca = LinearInterpolation(ν_grid, ksca_grid)
-                k = zeros(n_spec)
-                ω̃ = zeros(n_spec)
-                fᵗ = zeros(n_spec)
-                for i = 1:n_spec
-                    k[i] = interp_linear_kext(1e4/curr_band_λ[i])
-                    ω̃[i] = interp_linear_ksca(1e4/curr_band_λ[i])/k[i]
-                end
-                k̇ = zeros(4, n_spec)
-                ω̃̇ = zeros(4, n_spec)
-                ḟᵗ= zeros(4, n_spec)
-                for ctr=1:4
-                    k̇ext_grid = [lin_aerosol_optics_raw_0.k̇[ctr], lin_aerosol_optics_raw_1.k̇[ctr]]
-                    # Interpolate dk_sca/dp using product rule: d(k·ω̃)/dp = dk/dp·ω̃ + k·dω̃/dp
-                    k̇sca_grid = [lin_aerosol_optics_raw_0.k̇[ctr] * aerosol_optics_raw_0.ω̃ +
-                                  aerosol_optics_raw_0.k * lin_aerosol_optics_raw_0.ω̃̇[ctr],
-                                  lin_aerosol_optics_raw_1.k̇[ctr] * aerosol_optics_raw_1.ω̃ +
-                                  aerosol_optics_raw_1.k * lin_aerosol_optics_raw_1.ω̃̇[ctr]]
-                    interp_linear_k̇ext = LinearInterpolation(ν_grid, k̇ext_grid)
-                    interp_linear_k̇sca = LinearInterpolation(ν_grid, k̇sca_grid)
-
-                    for i = 1:n_spec
-                        k̇[ctr,i] = interp_linear_k̇ext(1e4/curr_band_λ[i])
-                        # Recover dω̃/dp via quotient rule: d(k_sca/k_ext)/dp = (dk_sca/dp − ω̃·dk_ext/dp)/k_ext
-                        ω̃̇[ctr,i] = (interp_linear_k̇sca(1e4/curr_band_λ[i]) - ω̃[i] * k̇[ctr,i]) / k[i]
+                function truncate_endpoint(a, la)
+                    if truncation_type isa Scattering.δBGE &&
+                       length(a.greek_coefs.β) > truncation_type.l_max
+                        return Scattering.truncate_phase(
+                            truncation_type, a, la; reportFit=false)
                     end
+                    return Scattering.truncate_phase(
+                        Scattering.NoTruncation(), a, la)
                 end
-
-                aerosol_optics_raw = AerosolOptics(greek_coefs=greek_coeffs, ω̃=ω̃, k=k, fᵗ=fᵗ)
-                lin_aerosol_optics_raw = linAerosolOptics(lin_greek_coefs=lin_greek_coeffs, ω̃̇=ω̃̇, k̇=k̇, ḟᵗ=ḟᵗ)
+                endpoint₀, lin_endpoint₀ = truncate_endpoint(
+                    aerosol_optics_raw_0, lin_aerosol_optics_raw_0)
+                endpoint₁, lin_endpoint₁ = truncate_endpoint(
+                    aerosol_optics_raw_1, lin_aerosol_optics_raw_1)
+                ν_spec = FT2.(params.spec_bands[i_band])
+                ν_ref_phase = FT2(1e4) / scat.λ_ref
+                endpoint_ref = lin_endpoint_ref = nothing
+                if first(extrema(ν_spec)) < ν_ref_phase < last(extrema(ν_spec))
+                    @timeit "Mie calc" aerosol_optics_raw_ref, lin_aerosol_optics_raw_ref =
+                        compute_aerosol_optical_properties(lin, _mie(scat.λ_ref), FT2)
+                    endpoint_ref, lin_endpoint_ref = truncate_endpoint(
+                        aerosol_optics_raw_ref, lin_aerosol_optics_raw_ref)
+                end
+                aerosol_optics_raw, lin_aerosol_optics_raw =
+                    _spectralize_truncated_endpoints(
+                        endpoint₀, lin_endpoint₀, endpoint₁, lin_endpoint₁, ν_spec;
+                        reference=endpoint_ref, lin_reference=lin_endpoint_ref,
+                        ν_ref=ν_ref_phase)
+                already_truncated = true
             end
 
             # Always go through `truncate_phase`. For NoTruncation this
@@ -420,8 +400,12 @@ function model_from_parameters(lin::LinMode,
             # `delta_m_truncation_lin` doesn't silently kill the
             # aerosol SSA. For δBGE the existing least-squares fit runs
             # only when the Greek expansion is long enough to truncate.
-            β_len = length(aerosol_optics_raw.greek_coefs.β)
-            if truncation_type isa Scattering.δBGE && β_len > truncation_type.l_max
+            β_len = size(aerosol_optics_raw.greek_coefs.β, 1)
+            if already_truncated
+                aerosol_optics[i_band][i_aer] = aerosol_optics_raw
+                lin_aerosol_optics[i_band][i_aer] = lin_aerosol_optics_raw
+                l_max_aer[i_aer, i_band] = β_len
+            elseif truncation_type isa Scattering.δBGE && β_len > truncation_type.l_max
                 aerosol_optics[i_band][i_aer], lin_aerosol_optics[i_band][i_aer] =
                     Scattering.truncate_phase(truncation_type,
                                 aerosol_optics_raw, lin_aerosol_optics_raw; reportFit=false)
@@ -435,11 +419,30 @@ function model_from_parameters(lin::LinMode,
 
             k_band = aerosol_optics[i_band][i_aer].k
             k̇_band = lin_aerosol_optics[i_band][i_aer].k̇
+            ν_spec = FT2.(params.spec_bands[i_band])
+            ν_ref = FT2(1e4) / scat.λ_ref
+            aod_scale = _aod_spectral_scale(ν_spec, k_band, k_ref, ν_ref)
+            aod_scale_dot = zeros(FT2, 4, length(ν_spec))
+            if first(extrema(ν_spec)) < ν_ref < last(extrema(ν_spec))
+                for ctr in 1:4
+                    q̇₀ = k̇_band[ctr, 1] / k_ref -
+                          k_band[1] * k̇_ref[ctr] / k_ref^2
+                    q̇₁ = k̇_band[ctr, end] / k_ref -
+                          k_band[end] * k̇_ref[ctr] / k_ref^2
+                    aod_scale_dot[ctr, :] .= _natural_cubic_three(
+                        ν_spec, [first(ν_spec), ν_ref, last(ν_spec)],
+                        [q̇₀, zero(FT2), q̇₁])
+                end
+            else
+                for ctr in 1:4
+                    aod_scale_dot[ctr, :] .= k̇_band[ctr, :] ./ k_ref .-
+                        k_band .* k̇_ref[ctr] ./ k_ref^2
+                end
+            end
 
-            # Match the production forward profile discretization exactly:
-            # pdf(profile, p_full) weighted by geometric layer thickness Δz.
-            # Dispatch on the stored Distribution so LogNormal altitude-form
-            # profiles are not silently reconstructed as pressure Normals.
+            # Match the production forward profile discretization exactly.
+            # Normal profiles use pressure; altitude-form LogNormal profiles
+            # use exact CDF differences at geometric layer interfaces.
             τₚ, dτₚdp₀, dτₚdσp =
                 getAerosolLayerOptProp(lin, 1, c_aero.profile, profile)
             dτₚdpsurf = aerosol_profile_psurf_tangent(
@@ -456,22 +459,20 @@ function model_from_parameters(lin::LinMode,
             #   6-7: p₀,σₚ  → only τₚ(z) depends on these:
             #        ∂τ_aer/∂p = (τ_ref/k_ref)·k(λ)·∂τₚ/∂p
             # ────────────────────────────────────────────────────────────────
-            τ_aer[i_band][i_aer,:,:] =
-                (τ_ref/k_ref) * k_band * τₚ'
+            τ_aer[i_band][i_aer,:,:] = τ_ref .* aod_scale .* τₚ'
             τ̇_aer_psurf[i_band][i_aer, :, :] .=
-                (τ_ref/k_ref) * k_band * dτₚdpsurf'
+                τ_ref .* aod_scale .* dτₚdpsurf'
 
             τ̇_aer[i_band][i_aer,1,:,:] .=
-                (k_band/k_ref) * τₚ'
+                aod_scale .* τₚ'
 
             for ctr=1:4
                 τ̇_aer[i_band][i_aer,ctr+1,:,:] =
-                    ((τ_ref/k_ref) * k̇_band[ctr,:] .-
-                    (τ_ref/k_ref^2) * k̇_ref[ctr] .* k_band)*τₚ'
+                    τ_ref .* aod_scale_dot[ctr, :] .* τₚ'
             end
             for ctr=5:6
                 τ̇_aer[i_band][i_aer,ctr+1,:,:] =
-                    (τ_ref/k_ref) * k_band *
+                    τ_ref .* aod_scale .*
                     (ctr==5 ? dτₚdp₀' : dτₚdσp')
             end
 
@@ -482,7 +483,7 @@ function model_from_parameters(lin::LinMode,
         l_max[i_band] = n_aer > 0 ? maximum(l_max_aer[:,i_band]) : params.l_trunc
     end
     if n_aer > 0
-        set_uniform_lmax!(l_max, aerosol_optics)
+        set_uniform_lmax!(l_max, aerosol_optics, lin_aerosol_optics)
     end
 
     # Per-band Fourier loop bound (order). Phase C: trait-based aggregator
@@ -492,7 +493,8 @@ function model_from_parameters(lin::LinMode,
                             for i_band in 1:n_bands]
     m_max_bands = _derive_m_max_bands_via_traits(l_max, params.max_m,
                                                   components_per_band,
-                                                  quad_points.Nstreams)
+                                                  quad_points.Nstreams;
+                                                  greek_beta_cutoff=params.greek_beta_cutoff)
     n_fourier_moments_bands = m_max_bands .+ 1
 
     # Build the hierarchical RTModel

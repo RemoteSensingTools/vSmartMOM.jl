@@ -2,7 +2,7 @@
 Quadrature streams for the RT model. Supported types: `GaussLegQuad`,
 `RadauQuad`. VZAs are appended as zero-weight output nodes. In the default
 legacy Gauss representation, SZA is also appended as a zero-weight operator
-node. With opt-in `external_solar=true`, scalar `μ₀` remains outside the
+node. In the default model-construction path (`external_solar=true`), scalar `μ₀` remains outside the
 diffuse operator and is appended only to the phase-evaluation grid, where it
 provides the exact direct-beam source column (see
 `docs/src/pages/conventions.md`). Radau always embeds μ₀ as a weighted node.
@@ -14,19 +14,19 @@ Two stream counts live on the resulting `QuadPoints`:
   For Radau the value is implementation-derived because the SZA-not-on-node
   branch builds `2·Nquad_subinterval` weighted nodes around μ₀.
 - `Nquad` — total diffuse-operator node count, including zero-weight VZAs and,
-  in the default legacy Gauss representation, the zero-weight SZA. The
+  only in the explicitly requested legacy Gauss representation, the zero-weight SZA. The
   external-solar phase grid is tracked separately by `phase_qp_μ` and does not
   enlarge the square diffuse operators.
 =#
 
 """
     rt_set_streams(::GaussLegQuad, Ltrunc, obs_geom, pol_type, arr_type;
-                   external_solar=false)
+                   external_solar=true)
 
 Half-space Gauss-Legendre quadrature on `[0, 1]` for the upper hemisphere.
 Builds `(Ltrunc + 2) ÷ 2` weighted nodes (Sanghavi: the `+2` avoids
 collapsing to zero streams when `Ltrunc = 0`). All VZAs are appended as
-zero-weight output nodes. The default `external_solar=false` also appends SZA
+zero-weight output nodes. Explicit `external_solar=false` also appends SZA
 to the square operator grid and preserves the historical representation.
 
 With `external_solar=true`, the collimated solar direction is instead a scalar
@@ -41,7 +41,7 @@ function rt_set_streams(::GaussLegQuad,
                         obs_geom::ObsGeometry{FT},
                         pol_type,
                         arr_type;
-                        external_solar::Bool = false) where {FT}
+                        external_solar::Bool = true) where {FT}
     (; sza, vza) = obs_geom
     Nquad = (Ltrunc + 2) ÷ 2
 
@@ -49,7 +49,7 @@ function rt_set_streams(::GaussLegQuad,
     μ₀ = cosd.(sza)
 
     # VZAs are diffuse-operator output nodes. In the legacy representation,
-    # the solar direction is also an operator node. The opt-in external-solar
+    # the solar direction is also an operator node. The default external-solar
     # representation keeps μ₀ only on the phase grid so the square
     # diffuse operators do not carry its zero-weight row and column.
     qp_μ = external_solar ? unique(FT[qp_μ; cosd.(vza)]) :
@@ -180,23 +180,23 @@ end
 
 """
     rt_set_streams(::GaussLegQuad, obs_geom, pol_type, arr_type;
-                   nstreams::Int, external_solar=false)
+                   nstreams::Int, external_solar=true)
 
 Build a half-space Gauss-Legendre quadrature with exactly `nstreams`
 weighted nodes per hemisphere. Equivalent to the positional form with
 `Ltrunc = 2·nstreams - 2` (so `(Ltrunc+2)÷2 == nstreams` matches the
 inverse of Sanghavi's even-`Ltrunc` formula).
 
-Set `external_solar=true` to keep the direct solar direction outside the
-diffuse operator while retaining its exact phase-matrix source column. The
-default is `false` for backward compatibility.
+By default, the direct solar direction remains outside the diffuse operator
+while retaining its exact phase-matrix source column. Pass
+`external_solar=false` explicitly for the legacy embedded-μ₀ representation.
 """
 function rt_set_streams(q::GaussLegQuad,
                         obs_geom::ObsGeometry,
                         pol_type,
                         arr_type;
                         nstreams::Int,
-                        external_solar::Bool = false)
+                        external_solar::Bool = true)
     nstreams >= 1 || throw(ArgumentError("nstreams must be ≥ 1; got $nstreams"))
     Ltrunc = 2 * nstreams - 2
     return rt_set_streams(q, Ltrunc, obs_geom, pol_type, arr_type;

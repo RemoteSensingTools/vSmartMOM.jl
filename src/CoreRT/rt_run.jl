@@ -80,6 +80,20 @@ function rt_run_toa(model; i_band::Integer = 1,
 end
 
 """
+    rt_run_toa(rs::RRS, model; i_band=1, sources=nothing)
+
+Run TOA-only rotational Raman SFI with an external solar direction. Returns a
+named tuple `(elastic, inelastic)`; the latter sums the Raman-transition axis
+in the same manner as the full-column Raman postprocessor.
+"""
+function rt_run_toa(rs::RRS, model; i_band::Integer=1,
+                    sources::Union{Nothing,AbstractSource}=nothing)
+    model.quad_points.external_solar || throw(ArgumentError(
+        "rt_run_toa(rs, model) requires QuadPoints.external_solar=true"))
+    return _rt_run_column(rs, model, [Int(i_band)]; sources, toa_only=true)
+end
+
+"""
     StreamRTResult{FT}
 
 Per-Fourier-moment radiative-transfer result at all internal quadrature
@@ -319,9 +333,9 @@ function _rt_run_column(RS_type::AbstractRamanType, model, iBand;
     if quad_points.external_solar
         toa_only || throw(ArgumentError(
             "external-solar SFI is a TOA-only path; call rt_run_toa(model)"))
-        RS_type isa noRS || throw(ArgumentError(
-            "external-solar SFI currently supports forward elastic noRS only; " *
-            "Raman/VRS retains the embedded-μ₀ path"))
+        RS_type isa Union{noRS,RRS} || throw(ArgumentError(
+            "external-solar SFI currently supports elastic noRS and rotational Raman RRS; " *
+            "vibrational Raman variants retain the embedded-μ₀ path"))
         brdf isa Union{LambertianSurfaceScalar,
                       LambertianSurfaceSpectrum,
                       LambertianSurfaceLegendre,
@@ -360,6 +374,7 @@ function _rt_run_column(RS_type::AbstractRamanType, model, iBand;
     # TOA source accumulation is always required. The dedicated exoplanet path
     # intentionally does not allocate BOA, inelastic, HDR, or BHR outputs.
     @timeit "Arrays"  R_SFI   = zeros(FT, length(vza), pol_type.n, nSpec)
+    ieR_TOA = toa_only && RS_type isa RRS ? zeros(FT, length(vza), pol_type.n, nSpec) : nothing
     R = T = T_SFI = ieR_SFI = ieT_SFI = hdr = bhr_dw = bhr_uw = nothing
     if !toa_only
         @timeit "Arrays" R       = zeros(FT, length(vza), pol_type.n, nSpec)
@@ -396,13 +411,17 @@ function _rt_run_column(RS_type::AbstractRamanType, model, iBand;
     # (e.g. `:thermal`) get allocated alongside the legacy solar buffers.
     @timeit "Creating layers" added_layer         =
         make_added_layer(RS_type, FT, arr_type, dims, nSpec;
-                         prepared_sources=prepared_sources)
+                         prepared_sources=prepared_sources,
+                         external_solar=quad_points.external_solar,
+                         nStokes=pol_type.n)
     # Just for now, only use noRS here. The surface added-layer needs the
     # same per-source slots so per-source j₀⁻ injection works at the surface
     # (Phase A.2c will wire surface-emission contributions here).
     @timeit "Creating layers" added_layer_surface =
         make_added_layer(RS_type, FT, arr_type, dims, nSpec;
-                         prepared_sources=prepared_sources)
+                         prepared_sources=prepared_sources,
+                         external_solar=quad_points.external_solar,
+                         nStokes=pol_type.n)
     @timeit "Creating layers" composite_layer     =
         make_composite_layer(RS_type, FT, arr_type, dims, nSpec;
                              prepared_sources=prepared_sources)
@@ -485,7 +504,11 @@ function _rt_run_column(RS_type::AbstractRamanType, model, iBand;
         # Azimuthal weighting
         weight = m == 0 ? FT(0.5/π) : FT(1.0/π)
         # Set the Zλᵢλₒ interaction parameters for Raman (or nothing for noRS)
-        @timeit "IE"  InelasticScattering.computeRamanZλ!(RS_type, pol_type,collect(qp_μ), m, arr_type)
+        @timeit "IE" if quad_points.external_solar && RS_type isa RRS
+            InelasticScattering.computeRamanZλ!(RS_type, pol_type, qp_μ, m, arr_type, μ₀)
+        else
+            InelasticScattering.computeRamanZλ!(RS_type, pol_type, collect(qp_μ), m, arr_type)
+        end
         # Compute the core layer optical properties (cache-aware: only Z moments
         # are recomputed; τ/ϖ uploads and fScattRayleigh come from _m_inv_cache).
         @timeit "OpticalProps" layer_opt_props, fScattRayleigh   =
@@ -563,8 +586,14 @@ function _rt_run_column(RS_type::AbstractRamanType, model, iBand;
                                     I_static;
                                     workspace=_interaction_ws)
         if toa_only
-            @timeit "Postprocessing TOA" postprocessing_vza_toa!(
-                composite_layer, vza, qp_μ, m, vaz, pol_type, weight, R_SFI)
+            if RS_type isa RRS
+                @timeit "Postprocessing TOA" postprocessing_vza_toa!(
+                    composite_layer, vza, qp_μ, m, vaz, pol_type, weight,
+                    R_SFI, ieR_TOA)
+            else
+                @timeit "Postprocessing TOA" postprocessing_vza_toa!(
+                    composite_layer, vza, qp_μ, m, vaz, pol_type, weight, R_SFI)
+            end
         else
             # HDR/BHR are diagnostics and are deliberately absent from the
             # TOA-only exoplanet path.
@@ -623,7 +652,7 @@ function _rt_run_column(RS_type::AbstractRamanType, model, iBand;
     model.numerics.verbose && print_timer()
     reset_timer!()
 
-    toa_only && return R_SFI
+    toa_only && return (RS_type isa RRS ? (elastic=R_SFI, inelastic=ieR_TOA) : R_SFI)
 
     # Return R_SFI or R, depending on the flag
     return SFI ? (R_SFI, T_SFI, ieR_SFI, ieT_SFI, hdr, bhr_uw[1,:], bhr_dw[1,:]) : (R, T)

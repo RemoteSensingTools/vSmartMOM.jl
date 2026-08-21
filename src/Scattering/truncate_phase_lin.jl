@@ -181,6 +181,9 @@ function truncate_phase(mod::δBGE, aero::AerosolOptics{FT}, lin_aero::linAeroso
     
     # Compute truncated greek coefficients:
     βᵗ = cl / c₀                                    # Eq. 38a, B in δ-BGR (β)
+    # γᵗ/ϵᵗ currently hold the unnormalised least-squares solutions.
+    γᵗ ./= c₀
+    ϵᵗ ./= c₀
     δᵗ = (δ[1:l_tr] .- (β[1:l_tr] .- cl)) / c₀    # Eq. 38b, derived from β
     αᵗ = (α[1:l_tr] .- (β[1:l_tr] .- cl)) / c₀    # Eq. 38c, derived from β
     ζᵗ = (ζ[1:l_tr] .- (β[1:l_tr] .- cl)) / c₀    # Eq. 38d, derived from β
@@ -190,6 +193,9 @@ function truncate_phase(mod::δBGE, aero::AerosolOptics{FT}, lin_aero::linAeroso
     α̇ᵗ = zeros(4,l_tr)
     ζ̇ᵗ = zeros(4,l_tr)
     for ctr=1:4
+        # If gᵗ=g_fit/c₀, then dgᵗ=(dg_fit-gᵗ dc₀)/c₀; likewise for ϵ.
+        γ̇ᵗ[ctr, :] = (γ̇ᵗ[ctr, :] .- γᵗ .* ẋβ[ctr,1]) ./ c₀
+        ϵ̇ᵗ[ctr, :] = (ϵ̇ᵗ[ctr, :] .- ϵᵗ .* ẋβ[ctr,1]) ./ c₀
         β̇ᵗ[ctr,:] = (ẋβ[ctr,:] - βᵗ*ẋβ[ctr,1]) / c₀
         δ̇ᵗ[ctr,:] = (δ̇[ctr,1:l_tr] - (β̇[ctr,1:l_tr] - ẋβ[ctr,:]) - δᵗ*ẋβ[ctr,1]) / c₀
         α̇ᵗ[ctr,:] = (α̇[ctr,1:l_tr] - (β̇[ctr,1:l_tr] - ẋβ[ctr,:]) - αᵗ*ẋβ[ctr,1]) / c₀

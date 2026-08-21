@@ -534,12 +534,9 @@ When (z₀, σ₀) is provided (altitude-form, preferred), the profile is stored
 signature. When (p₀, σp) is provided (pressure-form, legacy), the profile is
 stored as `Normal(p₀, σp)` and consumed by the pressure-space signature.
 
-NOTE (Phase 1b): the altitude-form → pressure-grid integration path in
-`getAerosolLayerOptProp(total_τ, dist::Distribution, profile::AtmosphericProfile)`
-still interprets `dist` in pressure space. When τ_ref = 0 (e.g. the Phase 1b
-regression gate), this is a no-op. Proper altitude-form dispatch will land in a
-follow-up alongside the aerosol-module wire-in (Phase 1d) or the workspace
-landing (Phase 4), whichever proves more natural."""
+Altitude-form `LogNormal` profiles are integrated exactly between geometric
+layer interfaces; pressure-form `Normal` profiles retain pressure-space
+discretization."""
 function aerosol_params_to_obj(aerosols, FT)
     rt_aerosol_obj_list = RT_Aerosol{FT}[]
     for aerosol in aerosols
@@ -600,6 +597,7 @@ function validate_yaml_parameters(params)
         (["radiative_transfer", "l_trunc"], Integer),            # Legacy
         (["radiative_transfer", "nstreams"], Integer),           # Phase D primary knob
         (["radiative_transfer", "m_max"], Union{Integer, Nothing}),  # Phase D explicit override
+        (["radiative_transfer", "greek_beta_cutoff"], Union{Real, Nothing}),
     ]
     section_fields = [
         (["absorption", "vmr"], Dict),
@@ -646,6 +644,23 @@ function validate_yaml_parameters(params)
     rt = params["radiative_transfer"]
     if haskey(rt, "nstreams") && haskey(rt, "l_trunc")
         @warn "Both `nstreams` and `l_trunc` set in radiative_transfer; `l_trunc` is legacy and will be ignored. Use only `nstreams` for new configs."
+    end
+    if haskey(rt, "greek_beta_cutoff") && rt["greek_beta_cutoff"] !== nothing
+        cutoff = rt["greek_beta_cutoff"]
+        _require_config(cutoff isa Real && !(cutoff isa Bool) &&
+                        isfinite(cutoff) && cutoff > 0,
+                        "radiative_transfer/greek_beta_cutoff must be a finite positive number or null")
+    end
+
+    # Migration guard for the two-stage aerosol Fourier-support rule.  Keep
+    # omission backward compatible with `null`, but require users to make the
+    # computationally important choice visible when they next touch an
+    # aerosol YAML/TOML file.  Analytic and Mie aerosols are both included:
+    # the cutoff is harmless when their beta series is already compact.
+    scattering = get(params, "scattering", nothing)
+    aerosols = scattering isa AbstractDict ? get(scattering, "aerosols", Any[]) : Any[]
+    if !isempty(aerosols) && !haskey(rt, "greek_beta_cutoff")
+        @warn "Aerosol configuration omits `radiative_transfer.greek_beta_cutoff`. Update this input file for the two-stage Greek-beta support rule: set `greek_beta_cutoff: 1.0e-5` (or another validated positive threshold) to discard insignificant high-l beta tails, or set `greek_beta_cutoff: null` to explicitly retain the full Mie-series support. Omission remains equivalent to `null` for backward compatibility."
     end
 
     if "scattering" in keys(params)
@@ -1158,6 +1173,10 @@ function parameters_from_dict(params_dict::Dict)
     Δ_angle = FT(get(params_dict["radiative_transfer"], "Δ_angle", 0.0))
     truncation = _parse_truncation(params_dict, res.l_trunc, Δ_angle, FT)
     numerics = _parse_numerics(params_dict, FT)
+    greek_beta_cutoff_raw = get(params_dict["radiative_transfer"],
+                                "greek_beta_cutoff", nothing)
+    greek_beta_cutoff = greek_beta_cutoff_raw === nothing ? nothing :
+                        FT(greek_beta_cutoff_raw)
 
     return vSmartMOM_Parameters(
         spec_bands, BRDF_per_band, quadrature_type, polarization_type,
@@ -1170,6 +1189,7 @@ function parameters_from_dict(params_dict::Dict)
         T, p, q, profile_reduction,
         absorption_params, scattering_params,
         res.nstreams, res.m_max_override, res.stream_l_cap, res.legacy_l_cap_override,
+        greek_beta_cutoff,
     )
 end
 

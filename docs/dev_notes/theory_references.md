@@ -90,7 +90,7 @@ passages only, no benchmarks/intros). Updated 2026-08-07.
 | **SS2015 (26)** | `f_tr = β_{L_tr}/(2L_tr+1)` — Wiscombe choice of truncation factor. | `src/Scattering/truncate_phase.jl` |
 | **SS2015 (27a–f)** | **Modified Greek coefficients** `β_l*, δ_l*, γ_l*, ϵ_l*, α_l*, ζ_l*` at truncation order `L_tr`. The exact formulas to quote in Concepts/03c. | `src/Scattering/truncate_phase.jl`; `src/CoreRT/LayerOpticalProperties/delta_m_truncation.jl` |
 | **SS2015 §2.4** | Two error sources: **DSE** (delta-separation error, from setting all `B_l = 0` for `l > L_tr`) and **PTE** (phase-truncation error, from approximating the forward peak as a Dirac delta). | (design-rationale callout for Concepts/03c) |
-| **SS2015 §3, Eqs. (38a–d)** | **δBGE-fit** (δ Beta-Gamma-Epsilon fit) — vector extension of Hu et al. δ-fit; `β_l*, δ_l*, α_l*, ζ_l*` from SVD of a least-squares system on `b_1(μ), b_2(μ)`. Used as default for accurate hyperspectral retrievals near backscatter. | `src/CoreRT/LayerOpticalProperties/` (δBGE-fit selector) |
+| **SS2015 §3, Eqs. (38a–d)** | **δBGE-fit** (δ Beta-Gamma-Epsilon fit) — vector extension of Hu et al. δ-fit. The independently fitted `β`, `γ`, and `ϵ` coefficient sets all target the unnormalized original matrix outside the forward cone and are therefore all divided by the common retained fraction `c₀`; `δ`, `α`, and `ζ` are adjusted consistently from `β`. This ensures `c₀ Fᵗ ≈ F` element by element and prevents dilution of polarization. | `src/Scattering/truncate_phase.jl`; `src/Scattering/truncate_phase_lin.jl`; `src/CoreRT/LayerOpticalProperties/` |
 | **SS2015 §4.1** | **Critical for retrievals**: δ-m distorts O₂ A-band line shapes near exact backscatter (ϑ_view ≈ −60° in principal plane); δBGE-fit eliminates this. Worth one-paragraph callout in Concepts/03c. | (design-rationale callout) |
 | **SS2015 §5** | TMS (Nakajima & Tanaka) single-scattering correction reduces remaining truncation error by ~3× near exact backscatter. | (rt_run_ss connection — Concepts/04 also) |
 
@@ -100,7 +100,7 @@ passages only, no benchmarks/intros). Updated 2026-08-07.
 |---|---|---|
 | **S2014 (B.1)–(B.2)** | Block-Radau scheme: composite `(N₁+N₂)`-point quadrature where solar `μ₀` is included as a quadrature root with non-zero weight (a true Radau node), and viewing angles `μ_v` are appended as zero-weight dummy nodes. Eliminates interpolation error between quadrature points for direct ray tracing. | `src/CoreRT/tools/rt_set_streams.jl::RadauQuad` lines 24–110 |
 | **S2014 App. B (text)** | In the historical DNI/no-solar-SFI formulation, off-quadrature solar/viewing angles require interpolation; Block-Radau removes the solar interpolation by making `μ₀` a weighted root. | (historical design-rationale callout for Concepts/02) |
-| **Current external-solar SFI** | Opt-in Gauss mode keeps `μ₀` outside the diffuse quadrature. `phase_qp_μ` carries exact `μ₀` for the phase-source column, while scalar `μ₀` controls attenuation and propagation. Five weighted streams plus one distinct VZA in IQU therefore gives an 18×18 diffuse operator. | `src/CoreRT/tools/rt_set_streams.jl` (`external_solar=true`); `src/CoreRT/CoreKernel/elemental.jl::get_elem_rt_SFI!`; `src/CoreRT/rt_run.jl::rt_run_toa` |
+| **Current external-solar SFI** | Opt-in Gauss mode keeps `μ₀` outside the diffuse quadrature. Rectangular `Z₀` phase columns generate explicit `R₀/T₀` (and Raman `ieR₀/ieT₀`) operators, while scalar `μ₀` controls attenuation. Five weighted streams plus one distinct VZA in IQU therefore gives an 18×18 diffuse operator. | `src/CoreRT/tools/rt_set_streams.jl`; `src/CoreRT/CoreKernel/elemental.jl::get_elem_rt_solar_columns!`; `src/CoreRT/CoreKernel/elemental_inelastic.jl::get_elem_rt_solar_columns_RRS!` |
 
 ### F. Layer optical-property assembly → Concepts/03 + 03a + 03b + 03c
 
@@ -203,7 +203,7 @@ is shaped as it is:
    matrix-operator Eqs. (23)–(28) instead of (23)–(33), at the cost of
    Block-Radau (App. B) for exact off-quadrature solar geometry. The current
    solver implements Fell-style SFI in both angular representations. In the
-   opt-in external form, `μ₀` is a scalar and exact phase-source column, not a
+   default external form, `μ₀` is a scalar and exact phase-source column, not a
    diffuse stream. The lean
    `rt_run_toa` path is presently Gauss + Lambertian + noRS only and does not
    construct BOA/HDR/BHR outputs. Legacy embedded-`μ₀` behavior remains the

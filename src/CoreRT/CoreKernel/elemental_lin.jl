@@ -97,9 +97,9 @@ function elemental!(pol_type, SFI::Bool,
 
     (; r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻) = added_layer
     (; ṙ⁺⁻, ṙ⁻⁺, ṫ⁻⁻, ṫ⁺⁺, J̇₀⁺, J̇₀⁻) = added_layer_lin
-    (; qp_μ, iμ₀, wt_μN, qp_μN) = quad_points
-    (; τ, ϖ, Z⁺⁺, Z⁻⁺) = computed_layer_properties
-    (; τ̇, ϖ̇, Ż⁺⁺, Ż⁻⁺) = computed_layer_properties_lin
+    (; qp_μ, iμ₀, μ₀, wt_μN, qp_μN) = quad_points
+    (; τ, ϖ, Z⁺⁺, Z⁻⁺, Z₀⁺, Z₀⁻) = computed_layer_properties
+    (; τ̇, ϖ̇, Ż⁺⁺, Ż⁻⁺, Ż₀⁺, Ż₀⁻) = computed_layer_properties_lin
 
     arr_type = array_type(architecture)
     qp_μN = arr_type(qp_μN)
@@ -160,18 +160,51 @@ function elemental!(pol_type, SFI::Bool,
         # The legacy `if SFI` block is gone; a single dispatch line handles
         # every scene. Bit-equal to the previous inline path when
         # prepared_sources is the default (SFI ? SolarBeam : NoSource).
-        source_tangent!(prepared_sources,
+        solar_external = Z₀⁺ !== nothing
+        if solar_external && has_solar_beam(prepared_sources)
+            columns = added_layer.solar_columns
+            columns_lin = added_layer_lin.solar_columns
+            (columns === nothing || columns_lin === nothing) && throw(ArgumentError(
+                "external-solar linearization requires forward and tangent solar-column carriers"))
+            Dpol = arr_type(pol_type.D)
+            kernel! = get_elem_rt_solar_columns!(device)
+            kernel!(columns.R₀⁻⁺, columns.R₀⁺⁻, columns.T₀⁺⁺, columns.T₀⁻⁻,
+                    ϖ, dτ, Z₀⁻, Z₀⁺, qp_μN, μ₀, wct02, pol_type.n, Dpol,
+                    ndrange=size(columns.R₀⁻⁺))
+            synchronize_if_gpu()
+            kernel! = get_elem_rt_solar_columns_lin!(device)
+            kernel!(columns_lin.Ṙ₀⁻⁺, columns_lin.Ṙ₀⁺⁻,
+                    columns_lin.Ṫ₀⁺⁺, columns_lin.Ṫ₀⁻⁻,
+                    ϖ, dτ, Z₀⁻, Z₀⁺, dτ̇_dev, ϖ̇_dev,
+                    arr_type(Ż₀⁻), arr_type(Ż₀⁺), qp_μN, μ₀,
+                    wct02, pol_type.n, Dpol,
+                    ndrange=(size(columns_lin.Ṙ₀⁻⁺,1), size(columns_lin.Ṙ₀⁻⁺,2),
+                             size(columns_lin.Ṙ₀⁻⁺,3), nparams))
+            synchronize_if_gpu()
+            kernel! = apply_solar_columns_lin!(device)
+            kernel!(j₀⁺, j₀⁻, added_layer_lin.ap_J̇₀⁺, added_layer_lin.ap_J̇₀⁻,
+                    columns.R₀⁻⁺, columns.T₀⁺⁺,
+                    columns_lin.Ṙ₀⁻⁺, columns_lin.Ṫ₀⁺⁺,
+                    arr_type(F₀), τ_sum, τ̇_sum, μ₀, ndoubl, pol_type.n, Dpol,
+                    ndrange=(size(added_layer_lin.ap_J̇₀⁺,1), 1,
+                             size(added_layer_lin.ap_J̇₀⁺,3), nparams))
+            synchronize_if_gpu()
+        else
+            source_tangent!(prepared_sources,
             j₀⁺, j₀⁻,
             J̇₀⁺, J̇₀⁻,
             added_layer_lin.ap_J̇₀⁺, added_layer_lin.ap_J̇₀⁻,
             ϖ, dτ,
             τ_sum, τ̇_sum,
-            Z⁻⁺, Z⁺⁺,
-            dτ̇_dev, ϖ̇_dev, Ż⁻⁺_dev, Ż⁺⁺_dev,
+            solar_external ? Z₀⁻ : Z⁻⁺, solar_external ? Z₀⁺ : Z⁺⁺,
+            dτ̇_dev, ϖ̇_dev,
+            solar_external ? arr_type(Ż₀⁻) : Ż⁻⁺_dev,
+            solar_external ? arr_type(Ż₀⁺) : Ż⁺⁺_dev,
             qp_μN, ndoubl, wct02,
-            pol_type.n, I₀, iμ₀, D, nparams,
+            pol_type.n, I₀, μ₀, solar_external ? 1 : iμ₀, D, nparams,
             architecture)
-        synchronize_if_gpu()
+            synchronize_if_gpu()
+        end
 
         # Apply D Matrix to forward quantities (fused kernel handles derivative D internally)
         apply_D_matrix_elemental!(ndoubl, pol_type.n, r⁻⁺, t⁺⁺, r⁺⁻, t⁻⁻)
@@ -611,7 +644,7 @@ Eliminates the separate chain-rule pass for SFI terms and the per-parameter
                 @Const(dτ̇), @Const(ϖ̇),
                 @Const(Ż⁻⁺), @Const(Ż⁺⁺_lin),
                 @Const(qp_μN), ndoubl, wct02, nStokes,
-                @Const(I₀), iμ0, @Const(D), nparams)
+                @Const(I₀), μ0, iμ0, @Const(D), nparams)
     i_start  = nStokes*(iμ0-1) + 1
     i_end    = nStokes*iμ0
 
@@ -640,31 +673,31 @@ Eliminates the separate chain-rule pass for SFI terms and the per-parameter
     # ---- J₀⁺ and 3-core scalars ----
     J̇⁺_tau = FT(0); J̇⁺_w = FT(0); J̇⁺_Z = FT(0)
 
-    if (i >= i_start) & (i <= i_end)
-        J₀⁺[i, 1, n] = wct02 * ϖ_λ[n] * Z⁺⁺_I₀ * (dτ_λ[n] / qp_μN[i]) * exp(-dτ_λ[n] / qp_μN[i])
-        J̇⁺_tau = J₀⁺[i, 1, n]*(1/dτ_λ[n] - 1/qp_μN[i])
+    if qp_μN[i] == μ0
+        J₀⁺[i, 1, n] = wct02 * ϖ_λ[n] * Z⁺⁺_I₀ * (dτ_λ[n] / μ0) * exp(-dτ_λ[n] / μ0)
+        J̇⁺_tau = J₀⁺[i, 1, n]*(1/dτ_λ[n] - 1/μ0)
         J̇⁺_w = ϖ_λ[n] == 0 ? FT(0) : J₀⁺[i, 1, n] / ϖ_λ[n]
         J̇⁺_Z = Z⁺⁺_I₀ == 0 ? FT(0) : J₀⁺[i, 1, n] / Z⁺⁺_I₀
     else
         J₀⁺[i, 1, n] = wct02 * ϖ_λ[n] * Z⁺⁺_I₀ *
-            (qp_μN[i_start] / (qp_μN[i] - qp_μN[i_start])) * expdiff_neg(dτ_λ[n] / qp_μN[i], dτ_λ[n] / qp_μN[i_start])
-        J̇⁺_tau = - wct02 * ϖ_λ[n] * Z⁺⁺_I₀ * (qp_μN[i_start] / (qp_μN[i] - qp_μN[i_start])) *
-            (exp(-dτ_λ[n] / qp_μN[i]) / qp_μN[i] - exp(-dτ_λ[n] / qp_μN[i_start]) / qp_μN[i_start])
+            (μ0 / (qp_μN[i] - μ0)) * expdiff_neg(dτ_λ[n] / qp_μN[i], dτ_λ[n] / μ0)
+        J̇⁺_tau = - wct02 * ϖ_λ[n] * Z⁺⁺_I₀ * (μ0 / (qp_μN[i] - μ0)) *
+            (exp(-dτ_λ[n] / qp_μN[i]) / qp_μN[i] - exp(-dτ_λ[n] / μ0) / μ0)
         J̇⁺_w = ϖ_λ[n] == 0 ? FT(0) : J₀⁺[i, 1, n] / ϖ_λ[n]
         J̇⁺_Z = Z⁺⁺_I₀ == 0 ? FT(0) : J₀⁺[i, 1, n] / Z⁺⁺_I₀
     end
 
     # ---- J₀⁻ and 3-core scalars ----
-    J₀⁻[i, 1, n] = wct02 * ϖ_λ[n] * Z⁻⁺_I₀ * (qp_μN[i_start] / (qp_μN[i] + qp_μN[i_start])) *
-            -expm1(-dτ_λ[n] * ((1 / qp_μN[i]) + (1 / qp_μN[i_start])))
-    J̇⁻_tau = wct02 * ϖ_λ[n] * Z⁻⁺_I₀ * (qp_μN[i_start] / (qp_μN[i] + qp_μN[i_start])) *
-            exp(-dτ_λ[n] * ((1 / qp_μN[i]) + (1 / qp_μN[i_start]))) *
-            ((1 / qp_μN[i]) + (1 / qp_μN[i_start]))
+    J₀⁻[i, 1, n] = wct02 * ϖ_λ[n] * Z⁻⁺_I₀ * (μ0 / (qp_μN[i] + μ0)) *
+            -expm1(-dτ_λ[n] * ((1 / qp_μN[i]) + (1 / μ0)))
+    J̇⁻_tau = wct02 * ϖ_λ[n] * Z⁻⁺_I₀ * (μ0 / (qp_μN[i] + μ0)) *
+            exp(-dτ_λ[n] * ((1 / qp_μN[i]) + (1 / μ0))) *
+            ((1 / qp_μN[i]) + (1 / μ0))
     J̇⁻_w = ϖ_λ[n] == 0 ? FT(0) : J₀⁻[i, 1, n] / ϖ_λ[n]
     J̇⁻_Z = Z⁻⁺_I₀ == 0 ? FT(0) : J₀⁻[i, 1, n] / Z⁻⁺_I₀
 
     # ---- Apply beam attenuation exp(-τ_sum/μ₀) ----
-    beam_atten = exp(-τ_sum[n]/qp_μN[i_start])
+    beam_atten = exp(-τ_sum[n]/μ0)
     J₀⁺[i, 1, n] *= beam_atten
     J₀⁻[i, 1, n] *= beam_atten
     J̇⁺_tau *= beam_atten
@@ -709,10 +742,91 @@ Eliminates the separate chain-rule pass for SFI terms and the per-parameter
 
         # Bug 22 fix: per-parameter τ̇_sum beam attenuation derivative
         # d(exp(-τ_sum/μ₀))/dp_j * J₀ = -τ̇_sum[j]/μ₀ * J₀
-        ap_J̇₀⁺[i, 1, n, iparam] += J₀⁺[i, 1, n] * (-τ̇_sum[n, iparam] / qp_μN[i_start])
-        ap_J̇₀⁻[i, 1, n, iparam] += J₀⁻[i, 1, n] * (-τ̇_sum[n, iparam] / qp_μN[i_start])
+        ap_J̇₀⁺[i, 1, n, iparam] += J₀⁺[i, 1, n] * (-τ̇_sum[n, iparam] / μ0)
+        ap_J̇₀⁻[i, 1, n, iparam] += J₀⁻[i, 1, n] * (-τ̇_sum[n, iparam] / μ0)
     end
 
+    nothing
+end
+
+"""
+Tangent-linear counterpart of `get_elem_rt_solar_columns!`.
+
+The output layout is `(NquadN, nStokes, nSpec, nParams)`.  Derivatives include
+the elemental optical-depth, single-scatter-albedo, and phase-column terms,
+but intentionally exclude attenuation above the layer; that final chain-rule
+term is applied when the columns are contracted into `J₀±`.
+"""
+@kernel function get_elem_rt_solar_columns_lin!(Ṙ₀⁻⁺, Ṙ₀⁺⁻, Ṫ₀⁺⁺, Ṫ₀⁻⁻,
+                                                 @Const(ϖ), @Const(dτ),
+                                                 @Const(Z₀⁻), @Const(Z₀⁺),
+                                                 @Const(dτ̇), @Const(ϖ̇),
+                                                 @Const(Ż₀⁻), @Const(Ż₀⁺),
+                                                 @Const(μ), μ₀, wct02,
+                                                 nStokes, @Const(Dpol))
+    i, s, n, p = @index(Global, NTuple)
+    iz = size(Z₀⁺,3) == 1 ? 1 : n
+    izd = size(Ż₀⁺,3) == 1 ? 1 : n
+    μᵢ = μ[i]
+    if μᵢ == μ₀
+        x = dτ[n]/μ₀
+        f_t = x * exp(-x)
+        df_t = exp(-x) * (1-x) / μ₀
+    else
+        c = μ₀/(μᵢ-μ₀)
+        f_t = c * expdiff_neg(dτ[n]/μᵢ, dτ[n]/μ₀)
+        df_t = c * (-exp(-dτ[n]/μᵢ)/μᵢ + exp(-dτ[n]/μ₀)/μ₀)
+    end
+    q = (1/μᵢ) + (1/μ₀)
+    c_r = μ₀/(μᵢ+μ₀)
+    f_r = c_r * (-expm1(-dτ[n]*q))
+    df_r = c_r * exp(-dτ[n]*q) * q
+    common_t = ϖ̇[n,p]*Z₀⁺[i,s,iz] + ϖ[n]*Ż₀⁺[i,s,izd,p]
+    common_r = ϖ̇[n,p]*Z₀⁻[i,s,iz] + ϖ[n]*Ż₀⁻[i,s,izd,p]
+    td = wct02 * (common_t*f_t + ϖ[n]*Z₀⁺[i,s,iz]*df_t*dτ̇[n,p])
+    rd = wct02 * (common_r*f_r + ϖ[n]*Z₀⁻[i,s,iz]*df_r*dτ̇[n,p])
+    Ṫ₀⁺⁺[i,s,n,p] = td
+    Ṙ₀⁻⁺[i,s,n,p] = rd
+    parity = Dpol[mod1(i,nStokes)] * Dpol[s]
+    Ṫ₀⁻⁻[i,s,n,p] = parity * td
+    Ṙ₀⁺⁻[i,s,n,p] = parity * rd
+    nothing
+end
+
+"""Contract forward/tangent solar columns and add the above-layer extinction tangent."""
+@kernel function apply_solar_columns_lin!(J₀⁺, J₀⁻, J̇₀⁺, J̇₀⁻,
+                                          @Const(R₀⁻⁺), @Const(T₀⁺⁺),
+                                          @Const(Ṙ₀⁻⁺), @Const(Ṫ₀⁺⁺),
+                                          @Const(F₀), @Const(τ_above), @Const(τ̇_above),
+                                          μ₀, ndoubl, nStokes, @Const(Dpol))
+    i, _, n, p = @index(Global, NTuple)
+    FT = eltype(J̇₀⁺)
+    down = zero(FT); up = zero(FT)
+    down_dot = zero(FT); up_dot = zero(FT)
+    for s in 1:size(R₀⁻⁺,2)
+        f = F₀[s,n]
+        down += T₀⁺⁺[i,s,n] * f
+        up += R₀⁻⁺[i,s,n] * f
+        down_dot += Ṫ₀⁺⁺[i,s,n,p] * f
+        up_dot += Ṙ₀⁻⁺[i,s,n,p] * f
+    end
+    beam = exp(-τ_above[n]/μ₀)
+    jplus = down * beam
+    jminus = up * beam
+    jdplus = beam * (down_dot - down*τ̇_above[n,p]/μ₀)
+    jdminus = beam * (up_dot - up*τ̇_above[n,p]/μ₀)
+    if ndoubl >= 1
+        parity = Dpol[mod1(i,nStokes)]
+        jminus *= parity
+        jdminus *= parity
+    end
+    # Avoid a same-address write race across the parameter workitems on GPU.
+    if p == 1
+        J₀⁺[i,1,n] = jplus
+        J₀⁻[i,1,n] = jminus
+    end
+    J̇₀⁺[i,1,n,p] = jdplus
+    J̇₀⁻[i,1,n,p] = jdminus
     nothing
 end
 

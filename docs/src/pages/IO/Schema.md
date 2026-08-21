@@ -32,8 +32,15 @@ resolution knob:
 radiative_transfer:
   nstreams: 8           # weighted streams per hemisphere
                         # public contract: stream_l_cap = 2·nstreams - 1
+  greek_beta_cutoff: 1e-5 # optional beta-only effective aerosol support
   truncation: auto      # NoTruncation if phase fits, δBGE otherwise
 ```
+
+For aerosols, `greek_beta_cutoff` is evaluated after Mie integration over the
+size distribution. It selects the last order satisfying `abs(β_l) >= cutoff`
+at any wavelength in the band; it never tests the other Greek families. See
+[`radiative_transfer.md`](Schema/radiative_transfer.md) for the complete
+two-stage `m_max` evaluation and cap precedence.
 
 Legacy `max_m` / `l_trunc` configs **continue to work**; the parser
 detects the legacy schema by the presence of either field and applies

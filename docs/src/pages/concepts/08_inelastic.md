@@ -50,6 +50,14 @@ Architecturally:
   dispatches on `RS_type` to choose which set runs (see
   [`src/CoreRT/CoreKernel/rt_kernel.jl:48–229`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/CoreKernel/rt_kernel.jl#L48-L229)). The elastic kernel
   *also* runs alongside — Raman is additive on top.
+- **Diffuse redistribution and direct-solar excitation use different angular
+  shapes.** Raman diffuse operators remain square
+  `(NquadN,NquadN,nSpec,nRaman)` because they redistribute an arbitrary
+  diffuse incident field. With external-solar SFI, separate
+  ``ieR_0^{-+},ieR_0^{+-},ieT_0^{++},ieT_0^{--}`` arrays have shape
+  `(NquadN,nStokes,nSpec,nRaman)`. They couple only the fixed ``\mu_0`` beam
+  to diffuse streams and are contracted with ``F_0(:,\lambda_0)`` before the
+  ordinary Raman source-vector doubling recurrence.
 - **`fScattRayleigh` means Rayleigh over total extinction**, not Rayleigh
   over scattering extinction:
   ``f_\mathrm{Rayl}(\lambda,z)=\tau_\mathrm{Rayl}(\lambda,z)/

@@ -21,7 +21,7 @@ const CORE_RT_BENCHMARK_DIR = joinpath(@__DIR__, "benchmarks")
                 parameters.vaz = repeat([azs[az_i]], 16)
                 parameters.sza = szas[sza_i]
                 parameters.brdf = [vSmartMOM.CoreRT.LambertianSurfaceScalar(ρ)]
-                model = model_from_parameters(parameters);
+                model = model_from_parameters(parameters; external_solar=false);
                 model.τ_rayl[1] .= τ
                 # rt_run returns radiance factor L = I/F₀; 6SV1 reference is reflectance R = πL/μ₀.
                 R_modeled[sza_i, az_i, :] = π * vSmartMOM.CoreRT.rt_run(model, i_band=1)[1][:,1,1] / model.quad_points.μ₀
@@ -58,13 +58,15 @@ end
     parameters.sza = acosd(0.2)
 
     # Direct rt_run (the reference output)
-    model_a = model_from_parameters(parameters)
+    # Stream export and full-column rt_run intentionally use the embedded
+    # solar representation; the external-solar path is TOA-only.
+    model_a = model_from_parameters(parameters; external_solar=false)
     model_a.τ_rayl[1] .= 0.5
     R_direct, _T_direct = vSmartMOM.CoreRT.rt_run(model_a)
 
     # Streams output (separate model — both build from the same
     # `parameters` so optical depth + Fourier-loop bounds match)
-    model_b = model_from_parameters(parameters)
+    model_b = model_from_parameters(parameters; external_solar=false)
     model_b.τ_rayl[1] .= 0.5
     streams = vSmartMOM.CoreRT.rt_run_streams(model_b)
 
@@ -129,7 +131,7 @@ end
 
     for ϕ_i in 1:length(ϕs)
         parameters.vaz = repeat([ϕs[ϕ_i]], 16)
-        model = model_from_parameters(parameters);
+        model = model_from_parameters(parameters; external_solar=false);
         model.τ_rayl[1] .= τ
 
         # rt_run returns radiance factor L = I/F₀; Natraj table is reflectance R = πL.

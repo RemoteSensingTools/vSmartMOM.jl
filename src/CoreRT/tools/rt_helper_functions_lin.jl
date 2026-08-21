@@ -9,6 +9,12 @@ default_matrix(FT, lin::LinMode, arr_type, Nparams, dims, nSpec)   = arr_type(ze
 "Default J matrix in linRT calculation (zeros)"
 default_J_matrix(FT, lin::LinMode, arr_type, Nparams, dims, nSpec) = arr_type(zeros(FT, tuple(dims[1], 1, nSpec, Nparams)))
 
+@inline function default_solar_columns_lin(FT, arr_type, dims, nStokes, nSpec, nParams)
+    make_column() = arr_type(zeros(FT, dims[1], nStokes, nSpec, nParams))
+    SolarColumnOperatorsLin(Ṙ₀⁻⁺=make_column(), Ṙ₀⁺⁻=make_column(),
+                            Ṫ₀⁺⁺=make_column(), Ṫ₀⁻⁻=make_column())
+end
+
 """
     seed_composite_from_added!(composite, composite_lin, added, added_lin)
 
@@ -40,7 +46,8 @@ end
 
 
 "Make an added layer and its linearized counterpart, supplying all default matrices"
-function make_added_layer(lin::LinMode, RS_type::Union{noRS, noRS_plus}, FT, arr_type, Nparams, dims, nSpec) 
+function make_added_layer(lin::LinMode, RS_type::Union{noRS, noRS_plus}, FT, arr_type, Nparams, dims, nSpec;
+                          external_solar::Bool=false, nStokes::Int=1)
     t1 = default_matrix(FT, arr_type, dims, nSpec)
     t2 = default_matrix(FT, arr_type, dims, nSpec)
     t1_ptr = batched_pointer_cache(t1)
@@ -56,6 +63,8 @@ function make_added_layer(lin::LinMode, RS_type::Union{noRS, noRS_plus}, FT, arr
         dbl_gp_refl = default_matrix(FT, arr_type, dims, nSpec),
         dbl_j₁⁺ = default_J_matrix(FT, arr_type, dims, nSpec),
         dbl_j₁⁻ = default_J_matrix(FT, arr_type, dims, nSpec),
+        solar_columns = external_solar ?
+            default_solar_columns(FT, arr_type, dims, nStokes, nSpec) : nothing,
     ), 
     AddedLayerLin(
         # derivatives wrt τ, ϖ and Z
@@ -82,6 +91,8 @@ function make_added_layer(lin::LinMode, RS_type::Union{noRS, noRS_plus}, FT, arr
         dbl_ap_J̇₁⁻         = default_J_matrix(FT, lin, arr_type, Nparams, dims, nSpec),
         dbl_gp_refl        = arr_type(zeros(FT, dims[1], dims[2], nSpec)),
         dbl_tt_gp_refl     = arr_type(zeros(FT, dims[1], dims[2], nSpec)),
+        solar_columns      = external_solar ?
+            default_solar_columns_lin(FT, arr_type, dims, nStokes, nSpec, Nparams) : nothing,
     )
 end
 

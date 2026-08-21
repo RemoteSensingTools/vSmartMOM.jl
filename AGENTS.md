@@ -35,9 +35,14 @@ DISCRETIZE   Fourier in azimuth (m=0..m_max_bands[iBand]; v0.7: per-component
              trait dispatch — Rayleigh→2, Lambertian→0, Cox-Munk→user_l_cap),
              Gauss/Radau quadrature in μ. User knob is `nstreams` (weighted
              streams per hemisphere); public contract `stream_l_cap = 2·N-1`.
-             Opt-in external-solar SFI keeps scalar μ₀ outside the diffuse
-             operator and evaluates its exact phase-source column separately;
-             the legacy embedded-μ₀ representation remains the default.
+             Aerosol support is two-stage: maximum size parameter sets the
+             Mie-series ceiling, then optional `greek_beta_cutoff` retains
+             through the last |β_l| above threshold at any band wavelength.
+             Only β is tested; the maximum across aerosol species contributes
+             before the user/stream caps are applied.
+             External-solar SFI keeps scalar μ₀ outside the diffuse operator
+             by default and evaluates its exact phase-source column separately;
+             legacy embedded-μ₀ requires `external_solar=false`.
              Schema: docs/src/pages/IO/Schema/.
              Per Fourier moment m, each layer reduces to FOUR VARIABLES
              (phase arrays share the diffuse shape in legacy mode):
@@ -211,14 +216,13 @@ material when explaining the package:
 - **Layer naming:** `CompositeLayer` fields are uppercase (`R, T, J`); `AddedLayer` fields are lowercase (`r, t, j`).
 - **3D RT array layout:** diffuse operators use `(NquadN, NquadN, nSpec)`
   where `NquadN = Nquad * n_stokes`. The third dim is **spectral** — that's
-  what enables batched-matmul over wavelengths. In external-solar SFI, phase
-  matrices may be evaluated on one additional μ₀ direction; only its exact
-  source column lies outside the diffuse block.
-- **External-solar scope:** `external_solar=true` is opt-in and currently
-  supports forward elastic SFI with Gauss quadrature and Lambertian surfaces
-  through `rt_run_toa`. That entry point returns TOA upwelling only and does
-  not allocate/postprocess BOA, HDR, or BHR. Other solver paths require the
-  embedded-μ₀ representation and reject external-solar models.
+  what enables batched-matmul over wavelengths. External-solar SFI uses
+  rectangular `Z₀ → R₀/T₀` columns outside the diffuse block.
+- **External-solar scope:** `external_solar=true` is the default and currently
+  supports elastic forward/linearized SFI and forward rotational Raman `RRS`
+  with Gauss quadrature and Lambertian surfaces. TOA-only entry points do not
+  allocate/postprocess BOA, HDR, or BHR. VRS, Raman Jacobians, `rt_run_ss`,
+  non-Lambertian, and interior-sensor paths retain embedded μ₀.
 - **Spectral units:** wavenumber (cm⁻¹) internally; wavelength (μm) for Mie.
 - **Observer heights:** `obs_alt` is geometric km above BOA. Scalar `0` means
   BOA only; vector `[0]` means TOA + BOA. Strict-interior heights are exact

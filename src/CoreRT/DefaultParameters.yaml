@@ -21,6 +21,13 @@ radiative_transfer:
   # NoTruncation() if the phase function fits stream_l_cap, δBGE(N, Δ)
   # otherwise. Logged at @info level so the choice is visible.
   truncation:         auto
+  # Optional second-stage aerosol Fourier-order filter. Maximum size parameter
+  # sets the Mie allocation ceiling; after size-distribution integration this
+  # retains through the last |beta_l| passing at any band wavelength. It tests
+  # beta only and shortens the Fourier loop, not nstreams/operator dimensions.
+  # Set a positive value such as 1.0e-5 to enable it. Explicit null preserves
+  # full Mie-series support and documents that the choice was intentional.
+  greek_beta_cutoff: null
   # Quadrature scheme. Optional — defaults to GaussLegQuad() (Sanghavi:
   # cheaper and 5–50× more accurate per stream than RadauQuad on
   # Rayleigh-only setups). Uncomment to override:

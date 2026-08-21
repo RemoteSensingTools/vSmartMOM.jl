@@ -112,6 +112,12 @@ function truncate_phase_lowconf(mod::δBGE, aero::AerosolOptics{FT}; reportFit=f
     
     # Compute truncated greek coefficients:
     βᵗ = cl / c₀                                    # Eq. 38a, B in δ-BGR (β)
+    # The γ/ϵ least-squares systems fit the unnormalised original f₁₂/f₃₄
+    # outside the forward cone, just as `cl` fits the unnormalised f₁₁.
+    # Every smooth-remainder coefficient must therefore be divided by the
+    # same retained scattering fraction: c₀ Fᵗ ≈ F element by element.
+    γᵗ ./= c₀
+    ϵᵗ ./= c₀
     δᵗ = (δ[1:l_max] .- (β[1:l_max] .- cl)) / c₀    # Eq. 38b, derived from β
     αᵗ = (α[1:l_max] .- (β[1:l_max] .- cl)) / c₀    # Eq. 38c, derived from β
     ζᵗ = (ζ[1:l_max] .- (β[1:l_max] .- cl)) / c₀    # Eq. 38d, derived from β
@@ -143,13 +149,17 @@ angles outside `Δ_angle`, then renormalizes with retained scattering fraction
 
 ```math
 \beta^t = \frac{c}{c_0},\qquad
+\gamma^t = \frac{g}{c_0},\qquad
+\epsilon^t = \frac{e}{c_0},\qquad
 \delta^t,\alpha^t,\zeta^t \text{ adjusted consistently from } \beta^t,
 \qquad
 f^t = 1-c_0.
 ```
 
 Returns a new [`AerosolOptics`](@ref) with truncated coefficients and updated
-`fᵗ`.
+`fᵗ`. The common `1/c₀` normalization is required because all three fits
+target the unnormalized original matrix outside the forward cone; downstream
+δ-scaling multiplies the smooth remainder by `c₀ = 1-fᵗ`.
 """
 function truncate_phase(mod::δBGE, aero::AerosolOptics{FT}; reportFit=false) where {FT}
     (; greek_coefs, ω̃, k) = aero
@@ -265,6 +275,11 @@ function truncate_phase(mod::δBGE, aero::AerosolOptics{FT}; reportFit=false) wh
     
     # Compute truncated greek coefficients:
     βᵗ = cl / c₀                                    # Eq. 38a, B in δ-BGR (β)
+    # γᵗ and ϵᵗ were fitted directly to the unnormalised f₁₂ and f₃₄.
+    # Normalise the entire smooth phase matrix uniformly so c₀ Fᵗ ≈ F
+    # outside the excluded forward cone and β₀ᵗ = 1.
+    γᵗ ./= c₀
+    ϵᵗ ./= c₀
     δᵗ = (δ[1:l_tr] .- (β[1:l_tr] .- cl)) / c₀    # Eq. 38b, derived from β
     αᵗ = (α[1:l_tr] .- (β[1:l_tr] .- cl)) / c₀    # Eq. 38c, derived from β
     ζᵗ = (ζ[1:l_tr] .- (β[1:l_tr] .- cl)) / c₀    # Eq. 38d, derived from β

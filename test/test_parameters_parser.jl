@@ -1,4 +1,5 @@
 using Test
+using Logging
 using vSmartMOM
 using vSmartMOM.IO
 using vSmartMOM.CoreRT
@@ -151,7 +152,11 @@ end
         "decomp_type" => "NAI2()",
     )
 
-    params = parameters_from_dict(cfg)
+    params = @test_logs (:warn, r"Aerosol configuration omits.*greek_beta_cutoff") match_mode=:any parameters_from_dict(cfg)
+    # An explicit null documents the decision to keep full series support and
+    # suppresses the migration warning in subsequent parses of this fixture.
+    cfg["radiative_transfer"]["greek_beta_cutoff"] = nothing
+    @test_logs min_level=Logging.Warn parameters_from_dict(cfg)
     aer = params.scattering_params.rt_aerosols[1]
     @test aer.phase_function isa vSmartMOM.Scattering.SyntheticPolarizedHenyeyGreensteinPhaseFunction
     @test aer.ϖ == 0.92

@@ -50,6 +50,40 @@ recommended path; legacy `max_m` + `l_trunc` configs keep working.
   bound (order). When set, clamps the trait-aggregator output below
   `stream_l_cap`. Useful when you want to truncate the loop more
   aggressively than the per-component traits would.
+- **`greek_beta_cutoff`** — *optional positive number, default `null`*.
+  Applies a second-stage Fourier-support filter after each aerosol size
+  distribution has been integrated into Greek coefficients. For every aerosol,
+  the retained support ends at the largest degree satisfying
+  ``|β_l| ≥ greek_beta_cutoff`` at any wavelength in the band; the maximum
+  across aerosols enters the component trait aggregator. This tightens the
+  conservative maximum-size-parameter ceiling when the particle distribution
+  has a very weak large-radius tail. It does not inspect α, γ, δ, ϵ, or ζ.
+  Omit it or set it to `null` to preserve the full coefficient-length support.
+
+  The resulting aerosol rule is deliberately two-stage:
+
+  1. The maximum Mie size parameter determines the conservative coefficient
+     allocation ceiling.
+  2. After integration over the complete size distribution, the last
+     significant β coefficient determines effective Fourier support.
+
+  The scan uses magnitude because β may be signed, and uses the last passing
+  degree rather than assuming a monotonic tail. For spectrally resolved β, a
+  degree is retained if it passes at **any** wavelength in the band. The
+  maximum support across aerosol species is combined with Rayleigh, surface,
+  and source traits. Finally, `m_max`, `stream_l_cap`, and available
+  coefficient length act as upper caps.
+
+  **Aerosol input migration:** aerosol YAML/TOML files should now state this
+  choice explicitly. Use `greek_beta_cutoff: 1.0e-5` (or another validated
+  positive threshold) to remove insignificant high-degree β tails, or use
+  `greek_beta_cutoff: null` to retain the complete Mie-series support. For
+  backward compatibility, omission still behaves as `null`, but the parser
+  emits a warning so legacy aerosol inputs are not silently left unreviewed.
+
+  This reduces the number of Fourier moments evaluated. It does **not** reduce
+  `nstreams` or rebuild a smaller angular operator; choose `nstreams`
+  separately when those memory savings are desired.
 - **`truncation`** — *optional, default `auto`*. Controls how the
   aerosol phase function is treated relative to the projection cap:
   - `"auto"` *(default)*: VLIDORT-`DO_DELTAM_SCALING`-style. With no

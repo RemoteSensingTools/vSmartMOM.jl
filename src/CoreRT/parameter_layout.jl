@@ -85,7 +85,7 @@ end
 surface_parameter_count(::AbstractSurfaceType) = 1
 surface_parameter_count(s::LambertianSurfaceLegendre) = length(s.legendre_coeff)
 
-"Index range for SIF parameters: radiance at 755 nm, then spectral slope."
+"Index range for SIF parameters: per-wavenumber radiance at 760 nm, then dSIF/dν."
 @inline function sif_range(pl::ParameterLayout)
     start = last(surface_range(pl)) + 1
     return start:(start + pl.n_sif - 1)
@@ -93,6 +93,8 @@ end
 
 @inline sif755_index(pl::ParameterLayout) = first(sif_range(pl))
 @inline sif_slope_index(pl::ParameterLayout) = first(sif_range(pl)) + 1
+@inline sif760_index(pl::ParameterLayout) = first(sif_range(pl))
+@inline msif_index(pl::ParameterLayout) = first(sif_range(pl)) + 1
 
 "Number of layer-level parameters (aerosol + gas, excluding surface and canopy)."
 @inline n_layer_params(pl::ParameterLayout) =

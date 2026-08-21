@@ -4,7 +4,7 @@ set -uo pipefail
 REPO="${REPO:-/home/sanghavi/code/github/uni_vSmartMOM}"
 PSURF="${PSURF:-750}"
 CUDA_DEVICE="${CUDA_DEVICE:-1}"
-OUT_NC="${OUT_NC:-/home/sanghavi/data/RamanSIFgrid/o2a_raman_lut_psurf${PSURF}.nc}"
+OUT_NC="${OUT_NC:-/home/sanghavi/data/RamanSIFgrid/O2ABand/o2a_raman_lut_psurf${PSURF}.nc}"
 INTERVAL_SECONDS="${INTERVAL_SECONDS:-600}"
 LOGDIR="${LOGDIR:-$(dirname "$OUT_NC")}"
 TAG="${TAG:-psurf${PSURF}}"

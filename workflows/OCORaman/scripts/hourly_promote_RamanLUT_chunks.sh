@@ -9,7 +9,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
 cd "${REPO_ROOT}"
 
-DATA_ROOT="${DATA_ROOT:-/home/sanghavi/data/RamanSIFgrid}"
+DATA_ROOT="${DATA_ROOT:-/home/sanghavi/data/RamanSIFgrid/O2ABand}"
 PSURFS="${PSURFS:-1000,750}"
 INTERVAL_SECONDS="${INTERVAL_SECONDS:-3600}"
 MIN_AGE_SECONDS="${MIN_AGE_SECONDS:-60}"

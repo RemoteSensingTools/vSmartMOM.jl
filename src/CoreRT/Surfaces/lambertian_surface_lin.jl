@@ -69,6 +69,12 @@ function create_surface_layer!(RS_type::noRS,
     tmp = arr_type(ones(pol_type.n*Nquad))
     T_surf = Diagonal(tmp)
     i₀ = iμ₀Nstart:iμ₀Nstart+n-1
+    # Surface source Jacobians are Fourier-local work arrays.  In particular,
+    # Lambertian m>0 contributes exactly zero; clear the complete state-vector
+    # slabs here so values from m=0 (or uninitialized storage) cannot leak into
+    # later moments.
+    added_layer_lin.ap_J̇₀⁺ .= zero(FT)
+    added_layer_lin.ap_J̇₀⁻ .= zero(FT)
     if m == 0
         # Albedo normalized by π (and factor 2 for 0th Fourier Moment)
         ρ = FT(2) * lambertian.albedo#/FT(π)
@@ -90,24 +96,36 @@ function create_surface_layer!(RS_type::noRS,
         # Source function of surface:
         if SFI
             unweight = FT(2π) #this is multiplied to all non-solar, isotropic source functions to exclude them from the azimuthal weighting applied in the postprocessing step
-            F₀_NquadN = arr_type(zeros(length(qp_μN),length(τ_sum)));
-            Ḟ₀_NquadN = arr_type(zeros(length(qp_μN),length(τ_sum),nparams+1));
-            #F₀_NquadN[:] .=0;
-            tmpF = (F₀ .* arr_type(exp.(-τ_sum/μ₀))');
-            F₀_NquadN[i₀,:] .= tmpF 
-            Ḟ₀_NquadN[i₀,:,1:nparams] .= -reshape(tmpF,n,nspec,1).*reshape(τ̇_sum, 1, nspec, nparams)/μ₀ # , arr_type(zeros(1, n, nspec)); dims=1)
-
-            added_layer.j₀⁺[:,:,:] .= zero(FT);#
-            added_layer.j₀⁻[:,1,:] .= μ₀*(R_surf*F₀_NquadN)#/FT(π);
-            #added_layer_lin.J̇₀⁺[:,:,:,:] .= 0.;#
-            
-
-            added_layer_lin.ap_J̇₀⁺ .= zero(FT)
-            for ii=1:nspec
-                for ctr=1:nparams
-                    added_layer_lin.ap_J̇₀⁻[:,1,ii,ctr] .= μ₀*R_surf*Ḟ₀_NquadN[:,ii,ctr]#/FT(π);
+            if quad_points.external_solar
+                direct = _direct_solar_at_surface(
+                    F₀, FT, pol_type, quad_points, τ_sum, architecture)
+                incident_I = reshape(@view(direct[1, :]), 1, :)
+                rows_I = 1:n:size(added_layer.r⁻⁺, 1)
+                added_layer.j₀⁺ .= zero(FT)
+                added_layer.j₀⁻ .= zero(FT)
+                @views added_layer.j₀⁻[rows_I,1,:] .=
+                    μ₀ .* FT(2) .* lambertian.albedo .* incident_I
+                for ctr in 1:nparams
+                    @views added_layer_lin.ap_J̇₀⁻[rows_I,1,:,ctr] .=
+                        -added_layer.j₀⁻[rows_I,1,:] .*
+                        reshape(τ̇_sum[:,ctr], 1, :) ./ μ₀
                 end
-                added_layer_lin.ap_J̇₀⁻[:,1,ii,iparam]  .= μ₀*Ṙ_surf[:,:]*F₀_NquadN[:,ii]#/FT(π);
+                @views added_layer_lin.ap_J̇₀⁻[rows_I,1,:,iparam] .=
+                    μ₀ .* FT(2) .* incident_I
+            else
+                F₀_NquadN = arr_type(zeros(length(qp_μN),length(τ_sum)))
+                Ḟ₀_NquadN = arr_type(zeros(length(qp_μN),length(τ_sum),nparams+1))
+                tmpF = F₀ .* arr_type(exp.(-τ_sum/μ₀))'
+                F₀_NquadN[i₀,:] .= tmpF
+                Ḟ₀_NquadN[i₀,:,1:nparams] .= -reshape(tmpF,n,nspec,1) .* reshape(τ̇_sum, 1, nspec, nparams) / μ₀
+                added_layer.j₀⁺ .= zero(FT)
+                added_layer.j₀⁻[:,1,:] .= μ₀ * (R_surf * F₀_NquadN)
+                for ii=1:nspec
+                    for ctr=1:nparams
+                        added_layer_lin.ap_J̇₀⁻[:,1,ii,ctr] .= μ₀ * R_surf * Ḟ₀_NquadN[:,ii,ctr]
+                    end
+                    added_layer_lin.ap_J̇₀⁻[:,1,ii,iparam] .= μ₀ * Ṙ_surf * F₀_NquadN[:,ii]
+                end
             end
         # for SIF
             #reinstate the following line after linearization works
@@ -200,9 +218,15 @@ function create_surface_layer!(RS_type::noRS,
 
     # Atmospheric columns enter the reflected direct beam through attenuation.
     if SFI
-        beam = _surface_beam_at_surface(F₀, FT, pol_type, quad_points,
-                                        τ_sum, architecture)
-        incident_I = reshape(@view(beam[iμ₀Nstart, :]), 1, :)
+        incident_I = if quad_points.external_solar
+            direct = _direct_solar_at_surface(
+                F₀, FT, pol_type, quad_points, τ_sum, architecture)
+            reshape(@view(direct[1, :]), 1, :)
+        else
+            beam = _surface_beam_at_surface(F₀, FT, pol_type, quad_points,
+                                            τ_sum, architecture)
+            reshape(@view(beam[iμ₀Nstart, :]), 1, :)
+        end
         rows_I = 1:pol_type.n:size(added_layer.r⁻⁺, 1)
         for p in axes(τ̇_sum, 2)
             @views added_layer_lin.ap_J̇₀⁻[rows_I, 1, :, p] .=

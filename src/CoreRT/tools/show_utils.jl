@@ -259,7 +259,7 @@ function Base.show(io::IO, ::MIME"text/plain", o::Optics{FT}) where FT
             for (ia, ao) in enumerate(aer_ops)
                 ω_str = ao.ω̃ isa Number ? "$(round(ao.ω̃, digits=4))" : "$(round(minimum(ao.ω̃), digits=4))–$(round(maximum(ao.ω̃), digits=4))"
                 fᵗ_str = ao.fᵗ isa Number ? "$(round(ao.fᵗ, digits=4))" : "$(round(minimum(ao.fᵗ), digits=4))–$(round(maximum(ao.fᵗ), digits=4))"
-                l_max = length(ao.greek_coefs.β) - 1
+                l_max = size(ao.greek_coefs.β, 1) - 1
                 connector = (ia < length(aer_ops)) ? _TREE_MID : _TREE_END
                 println(io, _TREE_PIPE, connector, "aerosol #$ia: ω̃=$ω_str, fᵗ=$fᵗ_str, l_max=$l_max")
             end

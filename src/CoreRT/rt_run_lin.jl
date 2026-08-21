@@ -116,9 +116,6 @@ function rt_run(RS_type::AbstractRamanType,
                     NAer::Int, NGas::Int, NSurf::Int,
                     iBand;
                     sources::Union{Nothing, AbstractSource} = nothing)
-    model.quad_points.external_solar && throw(ArgumentError(
-        "external-solar SFI is currently forward-only; linearized RT retains " *
-        "the embedded-μ₀ operator path"))
     if InelasticScattering.has_inelastic(RS_type)
         throw(ArgumentError(
             "Linearized Raman-active RT is intentionally unsupported. " *
@@ -220,11 +217,15 @@ function rt_run(RS_type::AbstractRamanType,
 
     # Create arrays
     @timeit "Creating layers" added_layer, added_layer_lin          = 
-        make_added_layer(lin, RS_type, FT, arr_type, Nparams, dims, nSpec)
+        make_added_layer(lin, RS_type, FT, arr_type, Nparams, dims, nSpec;
+                         external_solar=quad_points.external_solar,
+                         nStokes=pol_type.n)
     # Just for now, only use noRS here
 
     @timeit "Creating layers" added_surface_layer, added_surface_layer_lin = 
-        make_added_layer(lin, RS_type, FT, arr_type, Nparams, dims, nSpec)
+        make_added_layer(lin, RS_type, FT, arr_type, Nparams, dims, nSpec;
+                         external_solar=quad_points.external_solar,
+                         nStokes=pol_type.n)
     @timeit "Creating layers" composite_layer, composite_layer_lin  = 
         make_composite_layer(lin, RS_type, FT, arr_type, Nparams, dims, nSpec)
     # Each interior observer owns two ordinary forward/tangent composites:
@@ -249,6 +250,12 @@ function rt_run(RS_type::AbstractRamanType,
     τ_sum_endpoint = nothing
     τ̇_sum_endpoint = nothing
 
+    # τ, ϖ, their physical-parameter tangents, and gas objects do not depend
+    # on Fourier order. Build them once; each moment attaches only Z(m), Ż(m),
+    # Z₀(m), and Ż₀(m) before the analytic RT propagation.
+    @timeit "OpticalProps invariant" m_invariant_cache =
+        build_m_invariant_cache_lin(iBand, model, lin_model)
+
     # Loop over fourier moments
     for m = 0:m_max
 
@@ -259,7 +266,8 @@ function rt_run(RS_type::AbstractRamanType,
         #InelasticScattering.computeRamanZλ!(RS_type, pol_type,Array(qp_μ), m, arr_type)
         # Compute the core layer optical properties:
         @timeit "OpticalProps" layer_opt_props, layer_opt_props_lin, fScattRayleigh   = 
-            constructCoreOpticalProperties(RS_type, iBand, m, model, lin_model);
+            constructCoreOpticalProperties(RS_type, iBand, m, model, lin_model,
+                                           m_invariant_cache);
             # Determine the scattering interface definitions:
         scattering_interfaces_all, τ_sum_all, τ̇_sum_all = 
             extractEffectiveProps(layer_opt_props, layer_opt_props_lin);

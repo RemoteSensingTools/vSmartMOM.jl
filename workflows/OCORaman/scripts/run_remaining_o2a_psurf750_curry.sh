@@ -19,6 +19,6 @@ export START_SZA_IDX="${START_SZA_IDX:-3}"
 export START_ALBEDO_IDX="${START_ALBEDO_IDX:-15}"
 export END_SZA_IDX="${END_SZA_IDX:-14}"
 export CHUNK_ALBEDOS="${CHUNK_ALBEDOS:-4}"
-export OUTDIR="${OUTDIR:-/home/sanghavi/data/RamanSIFgrid/o2a_raman_lut_chunked_psurf0750}"
+export OUTDIR="${OUTDIR:-/home/sanghavi/data/RamanSIFgrid/O2ABand/o2a_raman_lut_chunked_psurf0750}"
 
 exec "${SCRIPT_DIR}/run_remaining_RamanLUT_O2A_chunked.sh"

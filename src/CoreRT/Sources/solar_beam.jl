@@ -344,7 +344,7 @@ function source_tangent!(prep::PreparedSolarBeam,
                          ϖ_λ, dτ_λ, τ_sum, τ̇_sum,
                          Z⁻⁺, Z⁺⁺,
                          dτ̇, ϖ̇, Ż⁻⁺, Ż⁺⁺,
-                         qp_μN, ndoubl, wct02, nStokes, I₀, iμ0, D, nparams,
+                         qp_μN, ndoubl, wct02, nStokes, I₀, μ0, iμ0, D, nparams,
                          architecture)
     # Reuse the existing fused SFI + chain-rule kernel. `get_elem_rt_SFI_fused!`
     # is forward-referenced here — its definition lives in
@@ -358,7 +358,7 @@ function source_tangent!(prep::PreparedSolarBeam,
             Z⁻⁺, Z⁺⁺, prep.F₀,
             dτ̇, ϖ̇, Ż⁻⁺, Ż⁺⁺,
             qp_μN, ndoubl, wct02,
-            nStokes, I₀, iμ0, D, nparams,
+            nStokes, I₀, μ0, iμ0, D, nparams,
             ndrange = size(j₀⁺))
     return nothing
 end

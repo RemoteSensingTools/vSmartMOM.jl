@@ -61,6 +61,23 @@ computed by a hand-coded tangent-linear partner of the forward kernel.
 ``\dot{\mathbf{R}}, \dot{\mathbf{T}}, \dot{\mathbf{J}}`` propagate together
 through the same adding-doubling sequence.
 
+For an external solar direction, the tangent-linear solver also carries
+rectangular solar-column derivatives
+``\dot R_0^{-+},\dot R_0^{+-},\dot T_0^{++},\dot T_0^{--}`` with layout
+`(NquadN,nStokes,nSpec,nParams)`. They contain the local ``\dot\tau``,
+``\dot\varpi`` and ``\dot Z_0`` contributions. The derivative of direct-beam
+extinction above the layer is added only when the columns are contracted:
+
+```math
+\dot J_0 = \dot O_0 F_0e^{-\tau_a/\mu_0}
+          + O_0F_0e^{-\tau_a/\mu_0}
+            \left(-\frac{\dot\tau_a}{\mu_0}\right),
+```
+
+where ``O_0`` denotes the applicable ``R_0`` or ``T_0`` column operator.
+Keeping these terms separate prevents the solar direction from re-entering
+the diffuse angular operator during linearization.
+
 The split has three benefits:
 
 1. **The hot loop stays pure-`FT`.** No `Dual{T,V,N}` arithmetic in the

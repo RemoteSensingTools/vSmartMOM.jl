@@ -13,7 +13,7 @@ using Dates
 using NCDatasets
 using Printf
 
-const DATA_ROOT = get(ENV, "DATA_ROOT", "/home/sanghavi/data/RamanSIFgrid")
+const DATA_ROOT = get(ENV, "DATA_ROOT", "/home/sanghavi/data/RamanSIFgrid/O2ABand")
 const OUTDIR = get(ENV, "OUTDIR", joinpath(DATA_ROOT, "o2a_raman_lut_by_psurf_sza"))
 const DRY_RUN = lowercase(get(ENV, "DRY_RUN", "0")) in ("1", "true", "yes", "y", "on")
 const OVERWRITE = lowercase(get(ENV, "OVERWRITE", "0")) in ("1", "true", "yes", "y", "on")

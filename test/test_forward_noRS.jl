@@ -21,7 +21,8 @@ println("CUDA available for GPU tests: $CAN_USE_GPU")
 
 function run_forward_noRS_smoke(params)
     Nbands = length(params.spec_bands)
-    model = model_from_parameters(params)
+    # This smoke test exercises the full-column rt_run return contract.
+    model = model_from_parameters(params; external_solar=false)
     @test !isnothing(model)
     @test length(model.atmosphere.spec_bands) == Nbands
     @test all(isfinite.(model.profile.T))
@@ -67,7 +68,7 @@ println("Configuration loaded: $(Nbands) band(s)")
 
 # Build model once for CPU test (forward-only, no linearization)
 println("\nBuilding forward model (CPU)...")
-@time model = model_from_parameters(params_default)
+@time model = model_from_parameters(params_default; external_solar=false)
 println("Model built successfully.")
 println("  Layers: $(length(model.profile.T))")
 println("  Quadrature points: $(model.quad_points.Nquad)")
