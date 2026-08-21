@@ -103,6 +103,14 @@ function compute_Z_moments(mod::AbstractPolarizationType, μ, greek_coefs::Greek
         length(μ) == length(tables.μ) && all(μ .== tables.μ) ||
             throw(ArgumentError("compute_Z_moments: `tables` were built for a " *
                                 "different μ than the one supplied"))
+        # An undersized table would silently truncate the l-sum at t.l_max —
+        # build tables at the GLOBAL maximum over all scatterers (as
+        # build_m_invariant_cache does) or per-expansion.
+        length(greek_coefs.β) ≤ tables.l_max ||
+            throw(ArgumentError("compute_Z_moments: `tables` (l_max=$(tables.l_max)) " *
+                                "are shorter than the Greek expansion " *
+                                "(l_max=$(length(greek_coefs.β))) — the phase-matrix " *
+                                "sum would be silently truncated"))
         # Callers that batch over scatterers pass the per-m Π lists explicitly
         # (built once, shared); a lone call may omit them — build them here
         # rather than silently skipping the accumulation (Z ≡ 0 bug).
@@ -203,7 +211,7 @@ function _compute_Z_moments_tabulated(mod::AbstractPolarizationType, μ,
     # Prefactor from the azimuthal expansion: the m = 0 term carries 1/2.
     fact = (m == 0) ? 0.5 : 1.0
     m1 = m + 1                                   # 1-indexed Fourier moment
-    l_max = min(length(β), t.l_max)
+    l_max = length(β)          # guarded ≤ t.l_max at the compute_Z_moments boundary
 
     # B matrices — the only scatterer-dependent factor (Sanghavi eq. 16).
     𝐁_all = [construct_B_matrix(mod, α, β, γ, δ, ϵ, ζ, l) for l in 1:l_max]
