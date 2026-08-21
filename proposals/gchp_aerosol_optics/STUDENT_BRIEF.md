@@ -285,7 +285,7 @@ Bruggeman; core/shell for BC coating?); (iii) height-varying size shape vs loadi
 - Bulk writers: `gchp-io:src/IO/Benchmark/{aod_diagnostic,netcdf_writer}.jl`
 - Core Mie + optics: `src/Scattering/{types.jl,make_mie_model.jl}`,
   `compute_aerosol_optical_properties`
-- Band-endpoint Mie + k(λ) interp (the RI-fixed Sanghavi path): 
+- Band-endpoint Mie + k(λ) interp (the RI-fixed Sanghavi path):
   `src/CoreRT/tools/model_from_parameters.jl:447-520`
 - Aerosol parameter file shape: `src/CoreRT/DefaultParameters.yaml` (`aerosols:` block)
 - Example to run: `gchp-io:examples/gchp_aod_diagnostic.jl`
