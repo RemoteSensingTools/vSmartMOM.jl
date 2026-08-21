@@ -97,8 +97,19 @@ function compute_Z_moments(mod::AbstractPolarizationType, μ, greek_coefs::Greek
                            arr_type = Array,
                            tables::Union{Nothing, ZMomentTables} = nothing,
                            Π_pair = nothing)
-    tables !== nothing && return _compute_Z_moments_tabulated(mod, μ, greek_coefs, m,
-                                                              arr_type, tables, Π_pair)
+    if tables !== nothing
+        # The tables are only valid for the μ they were built on — a mismatch
+        # would silently evaluate the phase matrix at the wrong stream angles.
+        length(μ) == length(tables.μ) && all(μ .== tables.μ) ||
+            throw(ArgumentError("compute_Z_moments: `tables` were built for a " *
+                                "different μ than the one supplied"))
+        # Callers that batch over scatterers pass the per-m Π lists explicitly
+        # (built once, shared); a lone call may omit them — build them here
+        # rather than silently skipping the accumulation (Z ≡ 0 bug).
+        Π_pair === nothing && (Π_pair = make_Π_lists(mod, tables, m))
+        return _compute_Z_moments_tabulated(mod, μ, greek_coefs, m,
+                                            arr_type, tables, Π_pair)
+    end
     (; α, β, γ, δ, ϵ, ζ) = greek_coefs
     FT = eltype(β)
     n = length(μ)

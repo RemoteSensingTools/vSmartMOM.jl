@@ -59,10 +59,39 @@ end
     end
 end
 
-@testset "kill-switch: cache built with tables disabled still solves" begin
-    # _Z_TABLES_ENABLED=false ⇒ z_tables===nothing ⇒ every call falls back to
-    # the plain method; the cache-aware overload must not error.
-    @test vSmartMOM.CoreRT._Z_TABLES_ENABLED[] == true   # default on
+@testset "tables without Π_pair auto-build (silent-zero regression)" begin
+    # Passing `tables` while omitting `Π_pair` must NOT silently skip the
+    # accumulation and return Z ≡ 0 — the method builds the Π lists itself.
+    μ = collect(range(0.05, 0.995; length = 8))
+    pol = Stokes_IQU{Float64}()
+    gr = synthetic_greeks(17)
+    tables = ZMomentTables(μ, 17)
+    for m in (0, 1, 4)
+        Z⁺⁺_ref, Z⁻⁺_ref = compute_Z_moments(pol, μ, gr, m)
+        Z⁺⁺_tab, Z⁻⁺_tab = compute_Z_moments(pol, μ, gr, m; tables = tables)
+        @test Z⁺⁺_tab == Z⁺⁺_ref            # not zeros — bitwise equal
+        @test Z⁻⁺_tab == Z⁻⁺_ref
+        @test any(!iszero, Z⁺⁺_tab)
+    end
+end
+
+@testset "tables built for a different μ are rejected" begin
+    μ  = collect(range(0.05, 0.995; length = 8))
+    μ2 = collect(range(0.10, 0.90;  length = 8))   # same length, different nodes
+    μ3 = collect(range(0.05, 0.995; length = 6))   # different length
+    pol = Stokes_IQU{Float64}()
+    gr = synthetic_greeks(17)
+    tables = ZMomentTables(μ, 17)
+    @test_throws ArgumentError compute_Z_moments(pol, μ2, gr, 1; tables = tables)
+    @test_throws ArgumentError compute_Z_moments(pol, μ3, gr, 1; tables = tables)
+end
+
+@testset "kill-switch default" begin
+    # _Z_TABLES_ENABLED=false ⇒ build_m_invariant_cache stores z_tables===nothing
+    # ⇒ every call falls back to the plain method. The end-to-end radiance A/B
+    # (tables on vs off, R_on == R_off bitwise) runs in the GPU benchmark
+    # harness; here we pin the default so CI catches an accidental flip.
+    @test vSmartMOM.CoreRT._Z_TABLES_ENABLED[] == true
 end
 
 println("test_z_tables: done")
