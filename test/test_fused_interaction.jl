@@ -3,7 +3,8 @@
 using Test
 using vSmartMOM
 using vSmartMOM.CoreRT: ka_fused_interaction_down!, ka_fused_interaction_up!,
-                        interaction_helper!, ScatteringInterface_11,
+                        interaction_helper!, _interaction_11_fused!,
+                        _use_fused_interaction, ScatteringInterface_11,
                         AddedLayer, CompositeLayer,
                         _FUSED_INTERACTION_ENABLED, _FUSED_GP_ENABLED
 using KernelAbstractions
@@ -36,13 +37,26 @@ copy_comp(c) = CompositeLayer(R⁻⁺ = copy(c.R⁻⁺), R⁺⁻ = copy(c.R⁺�
 function run_case(FT, to_dev, I_static; rtol)
     a, c = mk_layers(FT, to_dev)
     c_ref = copy_comp(c)
-    # reference: kill-switch forces the Phase-0 _bmm! interaction path
+    c_dir = copy_comp(c)
+    # default is OFF (cuBLAS wins on CUDA at production sizes) — the switch
+    # must flip the gate both ways on this device. This is the guard that
+    # was missing when the kernels were left unwired: the gate result must
+    # actually track the switch, not silently stay on one path.
+    default = _FUSED_INTERACTION_ENABLED[]
+    @test default == false
     _FUSED_INTERACTION_ENABLED[] = false
-    interaction_helper!(ScatteringInterface_11(), true, c_ref, a, I_static)
+    @test !_use_fused_interaction(a.r⁻⁺)
+    interaction_helper!(ScatteringInterface_11(), true, c_ref, a, I_static)  # _bmm! ladder
     _FUSED_INTERACTION_ENABLED[] = true
-    interaction_helper!(ScatteringInterface_11(), true, c, a, I_static)
+    @test _use_fused_interaction(a.r⁻⁺)
+    interaction_helper!(ScatteringInterface_11(), true, c, a, I_static)      # fused branch
+    # the dedicated fused function, called directly, must agree with the
+    # gated dispatch (same inputs → same launches)
+    _interaction_11_fused!(c_dir, a, I_static)
+    _FUSED_INTERACTION_ENABLED[] = default
     for f in (:R⁻⁺, :R⁺⁻, :T⁺⁺, :T⁻⁻, :J₀⁺, :J₀⁻)
         @test isapprox(Array(getproperty(c, f)), Array(getproperty(c_ref, f)); rtol = rtol)
+        @test Array(getproperty(c_dir, f)) == Array(getproperty(c, f))
     end
 end
 

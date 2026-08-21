@@ -217,6 +217,15 @@ function interaction_helper!(::ScatteringInterface_11, SFI,
                                 added_layer::AddedLayer{FT},
                                 I_static::AbstractArray{FT2}) where {FT<:Real,FT2}
 
+    # Fused path: both adding halves in one KA launch each (see
+    # _interaction_11_fused!). OFF by default — on CUDA the _bmm! ladder is
+    # measurably faster (see _FUSED_INTERACTION_ENABLED); enable for
+    # cuBLAS-free backends or graph-capture experiments. Falls through on
+    # CPU or when the 2N² tile exceeds local memory.
+    if _use_fused_interaction(added_layer.r⁻⁺)
+        return _interaction_11_fused!(composite_layer, added_layer, I_static)
+    end
+
     (; r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻, j₀_by_src,
        temp1, temp2, temp1_ptr, temp2_ptr) = added_layer     #these are aliases to the respective struct elements
     (; R⁻⁺, R⁺⁻, T⁺⁺, T⁻⁻, J₀⁺, J₀⁻, J₀_by_src) = composite_layer #these are aliases to the respective struct elements
@@ -291,6 +300,93 @@ function interaction_helper!(::ScatteringInterface_11, SFI,
     # R₀₂ = R₁₂ + T₂₁(1-R₀₁R₂₁)⁻¹R₀₁T₁₂
     _bmm!(temp1, T21_inv, R⁺⁻)
     _bmm!(temp2, temp1, t⁻⁻); R⁺⁻ .= r⁺⁻ .+ temp2
+end
+
+"""
+    _interaction_11_fused!(composite_layer, added_layer, I_static)
+
+Fused-kernel form of the `ScatteringInterface_11` adding step: the same
+Sanghavi et al. (2014) Eqs. (23)–(28) as the `_bmm!` ladder above, with each
+adding half collapsed into ONE KernelAbstractions launch
+([`ka_fused_interaction_down!`](@ref) / [`ka_fused_interaction_up!`](@ref)).
+Tolerance-equivalent, NOT bitwise: the in-kernel mat-vec reduction order
+differs from cuBLAS (same contract as the Phase-1 fused doubling kernels).
+
+Ordering is load-bearing — both geometric-series factors share the `mA`
+scratch buffer, and the UP half overwrites composite operators that the
+factors and the per-source slots still need:
+
+1. `G₁ = T⁻⁻·(E − r⁻⁺R⁺⁻)⁻¹` — consumes the PRE-down `T⁻⁻`.
+2. Fused DOWN launch — accumulates `J₀⁻`, `R⁻⁺`; overwrites `T⁻⁻` (Eqs. 28/24/25).
+3. Per-source DOWN slots — reuse `G₁`; `r⁻⁺` and the slots' `J₀⁺` are untouched
+   by step 2, so this may run after the launch.
+4. `G₂ = t⁺⁺·(E − R⁺⁻r⁻⁺)⁻¹` — MUST read the PRE-up `R⁺⁻` (step 6 overwrites
+   it) and reuses `mA`, so every `G₁` consumer has already run.
+5. Per-source UP slots — need the PRE-up `R⁺⁻`, so they run BEFORE step 6.
+6. Fused UP launch — overwrites `J₀⁺`, `T⁺⁺`, `R⁺⁻` (Eqs. 27/23/26).
+"""
+function _interaction_11_fused!(composite_layer::CompositeLayer{FT},
+                                added_layer::AddedLayer{FT},
+                                I_static::AbstractArray{FT2}) where {FT<:Real,FT2}
+    (; r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻, j₀_by_src,
+       temp1, temp2, temp1_ptr, temp2_ptr) = added_layer
+    (; R⁻⁺, R⁺⁻, T⁺⁺, T⁻⁻, J₀⁺, J₀⁻, J₀_by_src) = composite_layer
+    mA, v1, v2 = _interaction_scratch(added_layer)
+    backend = KernelAbstractions.get_backend(mA)
+
+    # 1. G₁ = T⁻⁻·(E − r⁻⁺·R⁺⁻)⁻¹   (Eq. 24 factor "T₀₁(I − R₂₁R₀₁)⁻¹")
+    if _use_fused_solve(temp1)
+        @timeit "interaction inv1 fused" ka_fused_solve!(mA, r⁻⁺, R⁺⁻, T⁻⁻, backend)
+    else
+        _bmm!(temp1, r⁻⁺, R⁺⁻)
+        temp2 .= I_static .- temp1
+        @timeit "interaction inv1 bla" batch_inv!(temp1, temp2, temp1_ptr, temp2_ptr)
+        _bmm!(mA, T⁻⁻, temp1)
+    end
+    G₁ = mA
+
+    # 2. DOWN half, one launch:
+    #    J₀⁻ ← J₀⁻ + G₁·(r⁻⁺·J₀⁺ + j₀⁻)   Eq. 28   (pre-up J₀⁺)
+    #    R⁻⁺ ← R⁻⁺ + G₁·r⁻⁺·T⁺⁺           Eq. 24   (pre-up T⁺⁺)
+    #    T⁻⁻ ← G₁·t⁻⁻                     Eq. 25
+    @timeit "interaction down fused" ka_fused_interaction_down!(
+        J₀⁻, R⁻⁺, T⁻⁻, G₁, r⁻⁺, J₀⁺, j₀⁻, T⁺⁺, t⁻⁻, backend)
+
+    # 3. Per-source J₀⁻ slots (Eq. 28 with G₁ reused; r⁻⁺ and the slots' J₀⁺
+    #    are pre-up here — step 2 mutated neither)
+    for (key, slot) in pairs(j₀_by_src)
+        cslot = J₀_by_src[key]
+        _bmm!(v1, r⁻⁺, cslot.J₀⁺); v1 .= v1 .+ slot.j₀⁻
+        _bmm!(v2, G₁, v1);         cslot.J₀⁻ .= cslot.J₀⁻ .+ v2
+    end
+
+    # 4. G₂ = t⁺⁺·(E − R⁺⁻·r⁻⁺)⁻¹   (Eq. 23 factor "T₂₁(I − R₀₁R₂₁)⁻¹");
+    #    reads the pre-up R⁺⁻ and overwrites mA — all G₁ consumers are done.
+    if _use_fused_solve(temp1)
+        @timeit "interaction inv2 fused" ka_fused_solve!(mA, R⁺⁻, r⁻⁺, t⁺⁺, backend)
+    else
+        _bmm!(temp1, R⁺⁻, r⁻⁺)
+        temp2 .= I_static .- temp1
+        @timeit "interaction inv2" batch_inv!(temp1, temp2, temp1_ptr, temp2_ptr)
+        _bmm!(mA, t⁺⁺, temp1)
+    end
+    G₂ = mA
+
+    # 5. Per-source J₀⁺ slots (Eq. 27 with G₂ reused) — BEFORE step 6
+    #    overwrites the composite R⁺⁻ they read.
+    for (key, slot) in pairs(j₀_by_src)
+        cslot = J₀_by_src[key]
+        _bmm!(v1, R⁺⁻, slot.j₀⁻); v1 .= cslot.J₀⁺ .+ v1
+        _bmm!(v2, G₂, v1);        cslot.J₀⁺ .= slot.j₀⁺ .+ v2
+    end
+
+    # 6. UP half, one launch:
+    #    J₀⁺ ← j₀⁺ + G₂·(J₀⁺ + R⁺⁻·j₀⁻)   Eq. 27
+    #    T⁺⁺ ← G₂·T⁺⁺                     Eq. 23
+    #    R⁺⁻ ← r⁺⁻ + G₂·R⁺⁻·t⁻⁻           Eq. 26
+    @timeit "interaction up fused" ka_fused_interaction_up!(
+        J₀⁺, T⁺⁺, R⁺⁻, G₂, j₀⁺, j₀⁻, r⁺⁻, t⁻⁻, backend)
+    return nothing
 end
 
 """
