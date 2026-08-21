@@ -168,6 +168,13 @@ end of each iteration so the layer thickness doubles. `tt_gp` is the helper
 Common to the forward, linearized, and inelastic paths.
 """
 @inline function doubling_source_update!(j₀⁺, j₀⁻, j₁⁺, j₁⁻, r⁻⁺, tt_gp, expk, v1, v2)
+    # Phase-1 fused single-launch path (GPU; tolerance-equivalent to the
+    # _bmm! path — see ka_batched_kernels.jl contract + test_fused_doubling.jl).
+    if _use_fused_doubling_source(tt_gp)
+        ka_fused_doubling_source!(j₀⁺, j₀⁻, j₁⁺, j₁⁻, r⁻⁺, tt_gp, expk,
+                                  KernelAbstractions.get_backend(tt_gp))
+        return nothing
+    end
     @inbounds @views j₁⁺[:,1,:] .= j₀⁺[:,1,:] .* expk'
     @inbounds @views j₁⁻[:,1,:] .= j₀⁻[:,1,:] .* expk'
     # In-place (Phase 0) restatement of
@@ -214,6 +221,15 @@ between iterations: `n` doublings give layer thickness `2ⁿ · δτ`. That's
 the **logarithmic-in-τ** scaling that makes MOM cheap for thick atmospheres.
 """
 @inline function doubling_rt_update!(r⁻⁺, t⁺⁺, tt_gp, expk, m1, m2)
+    # Phase-1 fused single-launch path (GPU; tolerance-equivalent — see
+    # ka_batched_kernels.jl contract + test_fused_doubling.jl). Includes the
+    # expk squaring, preserving the legacy op order (source update reads
+    # expk BEFORE rt_update squares it).
+    if _use_fused_doubling_rt(tt_gp)
+        ka_fused_doubling_rt!(r⁻⁺, t⁺⁺, tt_gp, expk,
+                              KernelAbstractions.get_backend(tt_gp))
+        return nothing
+    end
     # In-place (Phase 0) restatement of
     #   r⁻⁺ .= r⁻⁺ .+ (tt_gp ⊠ r⁻⁺ ⊠ t⁺⁺)   (⊠ is left-associative)
     #   t⁺⁺ .= tt_gp ⊠ t⁺⁺
