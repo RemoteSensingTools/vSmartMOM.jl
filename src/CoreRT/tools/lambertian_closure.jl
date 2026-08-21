@@ -206,7 +206,10 @@ array shaped `(n_vza, pol_n, nSpec)`, matching `rt_run_surface`'s `R_SFI`.
 """
 function (c::LambertianClosure{FT})(a::Union{Real, AbstractVector{<:Real}}) where {FT}
     _check_albedo_domain(a, c.S̄)
-    coeff = @. FT(2) * a * c.E_dw / (1 - a * c.S̄)
+    # Evaluate in the cache's FT: a Float64 albedo literal (`clos(0.15)`)
+    # must not promote an entire Float32 run's radiances to Float64.
+    aFT = a isa Real ? FT(a) : FT.(a)
+    coeff = @. FT(2) * aFT * c.E_dw / (1 - aFT * c.S̄)
     return c.R_black .+ reshape(coeff, 1, 1, :) .* c.t_up
 end
 
@@ -219,7 +222,8 @@ directly — `R_black` doesn't depend on `a`, so it drops out.
 """
 function albedo_jacobian(c::LambertianClosure{FT}, a::Union{Real, AbstractVector{<:Real}}) where {FT}
     _check_albedo_domain(a, c.S̄)
-    coeff = @. FT(2) * c.E_dw / (1 - a * c.S̄)^2
+    aFT = a isa Real ? FT(a) : FT.(a)     # same FT-stability rule as the functor
+    coeff = @. FT(2) * c.E_dw / (1 - aFT * c.S̄)^2
     return reshape(coeff, 1, 1, :) .* c.t_up
 end
 
