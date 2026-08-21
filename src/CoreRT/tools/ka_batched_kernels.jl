@@ -829,3 +829,230 @@ end
         j₀⁺[tid, 1, k] = xp[tid] * e + tw2
     end
 end
+
+# ==============================================================================
+# Phase-2 fused interaction kernels (perf/fused-adding-kernels).
+#
+# The MOM adding step for two scattering layers (interaction_helper!,
+# ScatteringInterface_11 — the interface EVERY Rayleigh-bearing layer takes)
+# applies Sanghavi et al. 2014 Eqs. 23–28 with the geometric-series factors
+#
+#     G₁ = T01_inv = T⁻⁻·(E − r⁻⁺·R⁺⁻)⁻¹      (fused solve, 1 launch)
+#     G₂ = T21_inv = t⁺⁺·(E − R⁺⁻·r⁻⁺)⁻¹      (fused solve, 1 launch)
+#
+# and six update equations. After Phase 0 those six lines still cost ~15
+# batched products (each a cuBLAS pointer-array gemm = 4 device events)
+# plus broadcasts. These two kernels collapse each half into ONE launch:
+#
+#   DOWN half (uses G₁; composite quantities are uppercase):
+#     J₀⁻ ← J₀⁻ + G₁·(r⁻⁺·J₀⁺ + j₀⁻)          Eq. 28  (J₀₂⁻)
+#     R⁻⁺ ← R⁻⁺ + G₁·r⁻⁺·T⁺⁺                  Eq. 24  (R₂₀)
+#     T⁻⁻ ← G₁·t⁻⁻                            Eq. 25  (T₀₂)
+#   UP half (uses G₂; pre-update J₀⁺/R⁺⁻/T⁺⁺ on the RHS):
+#     J₀⁺ ← j₀⁺ + G₂·(J₀⁺ + R⁺⁻·j₀⁻)          Eq. 27  (J₂₀⁺)
+#     T⁺⁺ ← G₂·T⁺⁺                            Eq. 23  (T₂₀)
+#     R⁺⁻ ← r⁺⁻ + G₂·R⁺⁻·t⁻⁻                  Eq. 26  (R₀₂)
+#
+# Triple products are evaluated column-wise via associativity, e.g.
+# (G₁·r⁻⁺)·T⁺⁺[:,j] = G₁·(r⁻⁺·T⁺⁺[:,j]) — two mat-vecs per column, no N×N
+# intermediate. One workgroup per spectral point; each workitem serves as
+# ROW tid for the source-vector update and COLUMN tid for the matrix
+# updates. Shared tiles hold the pre-update cross-thread inputs, so global
+# writes never race reads. Same tolerance (NOT bitwise) contract as the
+# Phase-1 doubling kernels; validated in test/test_fused_interaction.jl.
+# ==============================================================================
+
+"Local-memory bytes for either fused interaction half: two N×N tiles + O(N) vectors."
+ka_fused_interaction_localmem_bytes(::Type{FT}, N::Integer) where {FT} =
+    (2 * N * N + 4 * N) * sizeof(FT)
+
+"Runtime kill-switch for the fused interaction kernels. Default `true`."
+const _FUSED_INTERACTION_ENABLED = Ref(true)
+
+"Gate: GPU backend, kill-switch on, and the 2N² tile fits the device budget."
+@inline function _use_fused_interaction(X::AbstractArray{FT,3}) where {FT}
+    _FUSED_INTERACTION_ENABLED[] || return false
+    backend = KernelAbstractions.get_backend(X)
+    backend isa KernelAbstractions.CPU && return false
+    return ka_fused_interaction_localmem_bytes(FT, size(X, 1)) <= _gp_fused_localmem_limit(backend)
+end
+
+"""
+    ka_fused_interaction_down!(J₀⁻, R⁻⁺, T⁻⁻, G₁, r⁻⁺, J₀⁺, j₀⁻, T⁺⁺, t⁻⁻, backend)
+
+DOWN half of the ScatteringInterface_11 adding step in one launch
+(Eqs. 28/24/25 above). Consumes the PRE-update `J₀⁺`/`T⁺⁺` and writes
+`J₀⁻` (accumulate), `R⁻⁺` (accumulate), and `T⁻⁻` (overwrite).
+"""
+function ka_fused_interaction_down!(J₀⁻, R⁻⁺, T⁻⁻, G₁, r⁻⁺, J₀⁺, j₀⁻, T⁺⁺, t⁻⁻, backend)
+    N = size(G₁, 1); batch = size(G₁, 3)
+    kernel! = _fused_interaction_down_kernel!(backend, N)
+    kernel!(J₀⁻, R⁻⁺, T⁻⁻, G₁, r⁻⁺, J₀⁺, j₀⁻, T⁺⁺, t⁻⁻, Val(N); ndrange=(N * batch,))
+    backend isa KernelAbstractions.CPU && KernelAbstractions.synchronize(backend)
+    return nothing
+end
+
+@kernel function _fused_interaction_down_kernel!(J₀⁻, R⁻⁺, T⁻⁻,
+                                                 @Const(G₁), @Const(r⁻⁺), @Const(J₀⁺),
+                                                 @Const(j₀⁻), @Const(T⁺⁺), @Const(t⁻⁻),
+                                                 ::Val{N}) where {N}
+    k   = @index(Group, Linear)
+    tid = @index(Local, Linear)
+
+    Gsh = @localmem eltype(G₁) (N, N)   # G₁ = T⁻⁻·(E − r⁻⁺R⁺⁻)⁻¹
+    Rsh = @localmem eltype(G₁) (N, N)   # r⁻⁺ (added layer, never mutated here)
+    Jp  = @localmem eltype(G₁) (N,)     # pre-update composite J₀⁺
+    w   = @localmem eltype(G₁) (N,)     # r⁻⁺·J₀⁺ + j₀⁻
+    u   = @private eltype(G₁) (N,)
+    c   = @private eltype(G₁) (N,)
+
+    @inbounds begin
+        for j in 1:N
+            Gsh[tid, j] = G₁[tid, j, k]
+            Rsh[tid, j] = r⁻⁺[tid, j, k]
+        end
+        Jp[tid] = J₀⁺[tid, 1, k]
+    end
+    @synchronize()
+
+    # Stage 1 — row tid of the source bracket:  w = r⁻⁺·J₀⁺ + j₀⁻   (Eq. 28 inner)
+    @inbounds begin
+        acc = zero(eltype(G₁))
+        for m in 1:N
+            acc += Rsh[tid, m] * Jp[m]
+        end
+        w[tid] = acc + j₀⁻[tid, 1, k]
+    end
+    @synchronize()
+
+    @inbounds begin
+        # J₀⁻[tid] ← J₀⁻[tid] + (G₁·w)[tid]                        (Eq. 28)
+        acc = zero(eltype(G₁))
+        for m in 1:N
+            acc += Gsh[tid, m] * w[m]
+        end
+        J₀⁻[tid, 1, k] += acc
+
+        # Column tid:  u = r⁻⁺·T⁺⁺[:,tid]  (pre-update T⁺⁺), then
+        # R⁻⁺[:,tid] ← R⁻⁺[:,tid] + G₁·u                            (Eq. 24)
+        for m in 1:N
+            c[m] = T⁺⁺[m, tid, k]
+        end
+        for l in 1:N
+            acc2 = zero(eltype(G₁))
+            for m in 1:N
+                acc2 += Rsh[l, m] * c[m]
+            end
+            u[l] = acc2
+        end
+        for m in 1:N
+            c[m] = t⁻⁻[m, tid, k]
+        end
+        for l in 1:N
+            acc_r = zero(eltype(G₁))
+            acc_t = zero(eltype(G₁))
+            for m in 1:N
+                acc_r += Gsh[l, m] * u[m]
+                acc_t += Gsh[l, m] * c[m]   # T⁻⁻[:,tid] = G₁·t⁻⁻[:,tid]  (Eq. 25)
+            end
+            R⁻⁺[l, tid, k] += acc_r
+            T⁻⁻[l, tid, k] = acc_t
+        end
+    end
+end
+
+"""
+    ka_fused_interaction_up!(J₀⁺, T⁺⁺, R⁺⁻, G₂, j₀⁺, j₀⁻, r⁺⁻, t⁻⁻, backend)
+
+UP half of the ScatteringInterface_11 adding step in one launch
+(Eqs. 27/23/26 above). Consumes the PRE-update `J₀⁺`/`R⁺⁻`/`T⁺⁺` and
+overwrites all three.
+"""
+function ka_fused_interaction_up!(J₀⁺, T⁺⁺, R⁺⁻, G₂, j₀⁺, j₀⁻, r⁺⁻, t⁻⁻, backend)
+    N = size(G₂, 1); batch = size(G₂, 3)
+    kernel! = _fused_interaction_up_kernel!(backend, N)
+    kernel!(J₀⁺, T⁺⁺, R⁺⁻, G₂, j₀⁺, j₀⁻, r⁺⁻, t⁻⁻, Val(N); ndrange=(N * batch,))
+    backend isa KernelAbstractions.CPU && KernelAbstractions.synchronize(backend)
+    return nothing
+end
+
+@kernel function _fused_interaction_up_kernel!(J₀⁺, T⁺⁺, R⁺⁻,
+                                               @Const(G₂), @Const(j₀⁺), @Const(j₀⁻),
+                                               @Const(r⁺⁻), @Const(t⁻⁻),
+                                               ::Val{N}) where {N}
+    k   = @index(Group, Linear)
+    tid = @index(Local, Linear)
+
+    Gsh = @localmem eltype(G₂) (N, N)   # G₂ = t⁺⁺·(E − R⁺⁻r⁻⁺)⁻¹
+    Psh = @localmem eltype(G₂) (N, N)   # PRE-update composite R⁺⁻
+    Jp  = @localmem eltype(G₂) (N,)     # pre-update composite J₀⁺
+    jm  = @localmem eltype(G₂) (N,)     # added-layer j₀⁻
+    w   = @localmem eltype(G₂) (N,)     # J₀⁺ + R⁺⁻·j₀⁻
+    u   = @private eltype(G₂) (N,)
+    c   = @private eltype(G₂) (N,)
+
+    @inbounds begin
+        for j in 1:N
+            Gsh[tid, j] = G₂[tid, j, k]
+            Psh[tid, j] = R⁺⁻[tid, j, k]
+        end
+        Jp[tid] = J₀⁺[tid, 1, k]
+        jm[tid] = j₀⁻[tid, 1, k]
+    end
+    @synchronize()
+
+    # Stage 1 — row tid of the source bracket:  w = J₀⁺ + R⁺⁻·j₀⁻  (Eq. 27 inner)
+    @inbounds begin
+        acc = zero(eltype(G₂))
+        for m in 1:N
+            acc += Psh[tid, m] * jm[m]
+        end
+        w[tid] = Jp[tid] + acc
+    end
+    @synchronize()
+
+    @inbounds begin
+        # J₀⁺[tid] ← j₀⁺[tid] + (G₂·w)[tid]                        (Eq. 27)
+        acc = zero(eltype(G₂))
+        for m in 1:N
+            acc += Gsh[tid, m] * w[m]
+        end
+        J₀⁺[tid, 1, k] = j₀⁺[tid, 1, k] + acc
+
+        # Column tid:  T⁺⁺[:,tid] ← G₂·T⁺⁺[:,tid]                  (Eq. 23)
+        # (own column read into a private buffer BEFORE overwrite)
+        for m in 1:N
+            c[m] = T⁺⁺[m, tid, k]
+        end
+        for l in 1:N
+            acc2 = zero(eltype(G₂))
+            for m in 1:N
+                acc2 += Gsh[l, m] * c[m]
+            end
+            u[l] = acc2
+        end
+        for l in 1:N
+            T⁺⁺[l, tid, k] = u[l]
+        end
+
+        # Column tid:  u = R⁺⁻·t⁻⁻[:,tid] (pre-update R⁺⁻ from the tile),
+        # then R⁺⁻[:,tid] ← r⁺⁻[:,tid] + G₂·u                       (Eq. 26)
+        for m in 1:N
+            c[m] = t⁻⁻[m, tid, k]
+        end
+        for l in 1:N
+            acc3 = zero(eltype(G₂))
+            for m in 1:N
+                acc3 += Psh[l, m] * c[m]
+            end
+            u[l] = acc3
+        end
+        for l in 1:N
+            acc4 = zero(eltype(G₂))
+            for m in 1:N
+                acc4 += Gsh[l, m] * u[m]
+            end
+            R⁺⁻[l, tid, k] = r⁺⁻[l, tid, k] + acc4
+        end
+    end
+end
