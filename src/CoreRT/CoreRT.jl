@@ -38,6 +38,7 @@ using DocStringExtensions          # For documenting
 using YAML                         # For reading properties files 
 using ForwardDiff                  # Automatic Differentiation
 using NNlib                        # For batched multiplications
+import NNlib                       # module handle (batched_mul! for the in-place hot path)
 import NNlib.batched_mul           # Required to overwrite batched_mul for Duals
 using NCDatasets                   # For loading absco lookup tables
 using QuadGK

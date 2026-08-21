@@ -43,7 +43,14 @@ prof("expk view scaling  j₁[:,1,:] .= j₀[:,1,:].*k'",
 prof("geometric progression (fused-or-fallback)",
      () -> vSmartMOM.CoreRT.compute_geometric_progression!(tmp, tt, r, t, Istat, A(), nothing, nothing))
 prof("Bool reduce        any(isnan, r)",          () -> any(isnan, r))
-prof("full doubling_source_update!",
+prof("full doubling_source_update! (allocating)",
      () -> vSmartMOM.CoreRT.doubling_source_update!(j0p, j0m, j1p, j1m, r, tt, expk))
-prof("full doubling_rt_update!",
+prof("full doubling_rt_update!     (allocating)",
      () -> vSmartMOM.CoreRT.doubling_rt_update!(r, t, tt, expk))
+# Phase-0 in-place variants (preallocated temps)
+let sv1 = V(), sv2 = V(), sm1 = A(), sm2 = A()
+    prof("doubling_source_update! (in-place, Phase 0)",
+         () -> vSmartMOM.CoreRT.doubling_source_update!(j0p, j0m, j1p, j1m, r, tt, expk, sv1, sv2))
+    prof("doubling_rt_update!     (in-place, Phase 0)",
+         () -> vSmartMOM.CoreRT.doubling_rt_update!(r, t, tt, expk, sm1, sm2))
+end

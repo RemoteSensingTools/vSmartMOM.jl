@@ -78,6 +78,32 @@ checks that historically used `1e-6`.
 @inline rt_loose_tol(::Type{Float64}) = 1e-6
 
 """
+    _bmm!(C, A, B)
+
+In-place batched matrix multiply `C = A ⊠ B` (NNlib dispatch: CUBLAS on
+CUDA, threaded BLAS on CPU, generic fallback elsewhere). `C` must not
+alias `A` or `B`. Phase-0 preallocation seam: the Phase-1 fused KA
+kernels replace calls to this helper wholesale, so keep hot-path batched
+products routed through it.
+"""
+@inline _bmm!(C, A, B) = NNlib.batched_mul!(C, A, B)
+
+"""
+    _interaction_scratch(added_layer) -> (mA, v1, v2)
+
+Phase-0 scratch for the in-place interaction step: one matrix buffer and
+two J-shaped buffers. Reuses the doubling workspace (`dbl_gp_refl`,
+`dbl_v1`, `dbl_v2`) — dead by the time interaction runs — and falls back
+to `similar` for AddedLayers built without it (e.g. the lin path).
+"""
+@inline function _interaction_scratch(added_layer)
+    mA = added_layer.dbl_gp_refl === nothing ? similar(added_layer.t⁺⁺) : added_layer.dbl_gp_refl
+    v1 = added_layer.dbl_v1 === nothing ? similar(added_layer.j₀⁺) : added_layer.dbl_v1
+    v2 = added_layer.dbl_v2 === nothing ? similar(added_layer.j₀⁺) : added_layer.dbl_v2
+    return mA, v1, v2
+end
+
+"""
     compute_geometric_progression!(gp_refl, tt_gp, r⁻⁺, t⁺⁺, I_static, temp2, temp1_ptr, temp2_ptr)
 
 Compute the matrix geometric-series factor `(E − R·R)⁻¹` that captures all
@@ -99,6 +125,7 @@ call covers all spectral points; see [Concepts/07](../../docs/src/pages/concepts
 
 Mutates `gp_refl` and `tt_gp` in place.
 """
+
 @inline function compute_geometric_progression!(gp_refl, tt_gp, r⁻⁺, t⁺⁺, I_static, temp2, temp1_ptr, temp2_ptr)
     if _use_fused_gp(tt_gp)
         # Fused single-kernel path: build (E − R·R), LU-factorise it, and
@@ -109,9 +136,12 @@ Mutates `gp_refl` and `tt_gp` in place.
         # the 3N² local-memory tile exceeds the device budget (large N) or on CPU.
         ka_fused_gp_solve!(tt_gp, r⁻⁺, t⁺⁺, KernelAbstractions.get_backend(tt_gp))
     else
-        temp2 .= I_static .- r⁻⁺ ⊠ r⁻⁺                  # (E − R·R)
+        # In-place (Phase 0): tt_gp doubles as scratch for R·R before its
+        # final assignment — no allocation, no extra buffer.
+        _bmm!(tt_gp, r⁻⁺, r⁻⁺)                           # R·R (scratch use)
+        temp2 .= I_static .- tt_gp                       # (E − R·R)
         batch_inv!(gp_refl, temp2, temp1_ptr, temp2_ptr) # (E − R·R)⁻¹
-        tt_gp .= t⁺⁺ ⊠ gp_refl                          # T · (E − R·R)⁻¹
+        _bmm!(tt_gp, t⁺⁺, gp_refl)                       # T · (E − R·R)⁻¹
     end
     return nothing
 end
@@ -137,13 +167,28 @@ end of each iteration so the layer thickness doubles. `tt_gp` is the helper
 
 Common to the forward, linearized, and inelastic paths.
 """
-@inline function doubling_source_update!(j₀⁺, j₀⁻, j₁⁺, j₁⁻, r⁻⁺, tt_gp, expk)
+@inline function doubling_source_update!(j₀⁺, j₀⁻, j₁⁺, j₁⁻, r⁻⁺, tt_gp, expk, v1, v2)
     @inbounds @views j₁⁺[:,1,:] .= j₀⁺[:,1,:] .* expk'
     @inbounds @views j₁⁻[:,1,:] .= j₀⁻[:,1,:] .* expk'
-    j₀⁻ .= j₀⁻ .+ (tt_gp ⊠ (j₁⁻ .+ r⁻⁺ ⊠ j₀⁺))
-    j₀⁺ .= j₁⁺ .+ (tt_gp ⊠ (j₀⁺ .+ r⁻⁺ ⊠ j₁⁻))
+    # In-place (Phase 0) restatement of
+    #   j₀⁻ .= j₀⁻ .+ (tt_gp ⊠ (j₁⁻ .+ r⁻⁺ ⊠ j₀⁺))
+    #   j₀⁺ .= j₁⁺ .+ (tt_gp ⊠ (j₀⁺ .+ r⁻⁺ ⊠ j₁⁻))
+    # Identical operation order (each ⊠ replaced by the same batched GEMM,
+    # each dotted chain by the same fused broadcast), so results are
+    # bit-identical; only the ⊠ output allocations are gone. Note the j₀⁺
+    # update reads the PRE-update j₀⁺ — v1 snapshots the RHS before the
+    # assignment, exactly as the allocating form did.
+    _bmm!(v1, r⁻⁺, j₀⁺);  v1 .= j₁⁻ .+ v1
+    _bmm!(v2, tt_gp, v1); j₀⁻ .= j₀⁻ .+ v2
+    _bmm!(v1, r⁻⁺, j₁⁻);  v1 .= j₀⁺ .+ v1
+    _bmm!(v2, tt_gp, v1); j₀⁺ .= j₁⁺ .+ v2
     return nothing
 end
+
+# Back-compat allocating wrapper (non-hot callers / external code).
+@inline doubling_source_update!(j₀⁺, j₀⁻, j₁⁺, j₁⁻, r⁻⁺, tt_gp, expk) =
+    doubling_source_update!(j₀⁺, j₀⁻, j₁⁺, j₁⁻, r⁻⁺, tt_gp, expk,
+                            similar(j₀⁺), similar(j₀⁺))
 
 """
     doubling_rt_update!(r⁻⁺, t⁺⁺, tt_gp, expk)
@@ -168,12 +213,21 @@ collapses both updates to:
 between iterations: `n` doublings give layer thickness `2ⁿ · δτ`. That's
 the **logarithmic-in-τ** scaling that makes MOM cheap for thick atmospheres.
 """
-@inline function doubling_rt_update!(r⁻⁺, t⁺⁺, tt_gp, expk)
-    r⁻⁺ .= r⁻⁺ .+ (tt_gp ⊠ r⁻⁺ ⊠ t⁺⁺)
-    t⁺⁺ .= tt_gp ⊠ t⁺⁺
+@inline function doubling_rt_update!(r⁻⁺, t⁺⁺, tt_gp, expk, m1, m2)
+    # In-place (Phase 0) restatement of
+    #   r⁻⁺ .= r⁻⁺ .+ (tt_gp ⊠ r⁻⁺ ⊠ t⁺⁺)   (⊠ is left-associative)
+    #   t⁺⁺ .= tt_gp ⊠ t⁺⁺
+    # Same GEMMs in the same order — bit-identical, allocation-free.
+    _bmm!(m1, tt_gp, r⁻⁺)
+    _bmm!(m2, m1, t⁺⁺);  r⁻⁺ .= r⁻⁺ .+ m2
+    _bmm!(m1, tt_gp, t⁺⁺); t⁺⁺ .= m1
     expk .= expk .^ 2
     return nothing
 end
+
+# Back-compat allocating wrapper (non-hot callers / external code).
+@inline doubling_rt_update!(r⁻⁺, t⁺⁺, tt_gp, expk) =
+    doubling_rt_update!(r⁻⁺, t⁺⁺, tt_gp, expk, similar(t⁺⁺), similar(t⁺⁺))
 
 """
     zero_added_noscat!(added_layer, τ_λ, qp_μN)

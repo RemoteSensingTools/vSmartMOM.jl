@@ -139,6 +139,8 @@ function make_added_layer(RS_type::Union{noRS, noRS_plus}, FT, arr_type, dims, n
         dbl_gp_refl = default_matrix(FT, arr_type, dims, nSpec),
         dbl_j₁⁺ = default_J_matrix(FT, arr_type, dims, nSpec),
         dbl_j₁⁻ = default_J_matrix(FT, arr_type, dims, nSpec),
+        dbl_v1  = default_J_matrix(FT, arr_type, dims, nSpec),
+        dbl_v2  = default_J_matrix(FT, arr_type, dims, nSpec),
         j₀_by_src = j₀_by_src,
     )
 end
