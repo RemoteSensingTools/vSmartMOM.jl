@@ -7,6 +7,7 @@ using Unitful
 using UnitfulEquivalences
 using CanopyOptics
 using ..CoreRT: vSmartMOM_Parameters, RTNumericalParameters, AbsorptionParameters, ScatteringParameters, RT_Aerosol, AtmosphericProfile
+using ..CoreRT   # qualified access for strategy types (CoreRT.AllFourierMoments etc.)
 using ..Absorption: load_interpolation_model
 import AtmosphericAbsorption
 using ..Scattering
@@ -1243,6 +1244,22 @@ function _parse_numerics(params_dict, FT)
     end
     if haskey(n, "verbose")
         kwargs[:verbose] = Bool(n["verbose"])
+    end
+    if haskey(n, "fourier_convergence")
+        fc = n["fourier_convergence"]
+        fcs = fc === nothing ? "all" : lowercase(String(fc))
+        if fcs in ("all", "none")
+            kwargs[:fourier_convergence] = CoreRT.AllFourierMoments()
+        elseif fcs == "intensity"
+            # VLIDORT defaults: LIDORT_ACCURACY-style tolerance 1e-4,
+            # DO_DOUBLE_CONVTEST-style two consecutive passing moments.
+            tol   = FT(get(n, "fourier_tolerance", 1e-4))
+            ncons = Int(get(n, "fourier_n_consecutive", 2))
+            kwargs[:fourier_convergence] =
+                CoreRT.IntensityConvergence(tol; n_consecutive = ncons)
+        else
+            error("numerics.fourier_convergence must be 'all' or 'intensity' (got '$fc')")
+        end
     end
     return RTNumericalParameters{FT}(; kwargs...)
 end

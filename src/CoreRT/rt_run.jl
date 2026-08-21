@@ -458,6 +458,23 @@ function rt_run(RS_type::AbstractRamanType, model, iBand;
     # downstream arithmetic ⇒ bitwise-identical results.
     max_τϖ_all = _M_INVARIANT_DTAU_CACHE_ENABLED[] ? fill(FT(NaN), Nz) : nothing
 
+    # Azimuthal Fourier convergence (VLIDORT-style — see
+    # AbstractFourierConvergence). AllFourierMoments (default) keeps the
+    # historical full loop, bit-identical. IntensityConvergence tests each
+    # moment's Stokes-I contribution against the accumulated radiance:
+    # on the monolithic path via the R_SFI/T_SFI accumulators (host arrays —
+    # the test is free), on the atmosphere-only path via the view-extracted
+    # TOA J₀⁻ proxy (exact for Lambertian surfaces, whose m>0 surface term
+    # vanishes). `fc_npass` is VLIDORT's TESTCONV counter.
+    fconv = model.numerics.fourier_convergence
+    fc_active = fconv isa IntensityConvergence && SFI
+    fc_npass  = 0
+    fc_R_prev = fc_active && !stop_after_atmosphere ? copy(R_SFI) : nothing
+    fc_T_prev = fc_active && !stop_after_atmosphere ? copy(T_SFI) : nothing
+    fc_I_acc  = fc_active && stop_after_atmosphere ?
+                zeros(FT, length(vza), nSpec) : nothing
+    _LAST_FOURIER_M_USED[] = m_max
+
     # Loop over fourier moments
     for m = 0:m_max
 
@@ -543,6 +560,20 @@ function rt_run(RS_type::AbstractRamanType, model, iBand;
             ))
         end
         if stop_after_atmosphere
+            # Fourier convergence on the atmosphere-only path: test the
+            # azimuth-weighted TOA Stokes-I contribution of this moment at
+            # the user view angles (the snapshot for m is already taken, so
+            # the cache stays consistent with the accumulated series).
+            if fc_active
+                pass = _fourier_proxy_passes!(fconv, fc_I_acc, composite_layer.J₀⁻,
+                                              vza, vaz, qp_μ, pol_type, m, weight)
+                fc_npass = pass ? fc_npass + 1 : 0
+                if fc_npass ≥ fconv.n_consecutive
+                    _LAST_FOURIER_M_USED[] = m
+                    @info "Fourier series converged (atmosphere path)" m_used = m m_max tolerance = fconv.tolerance
+                    break
+                end
+            end
             continue
         end
 
@@ -630,6 +661,21 @@ function rt_run(RS_type::AbstractRamanType, model, iBand;
             streams_callback((;
                 m, weight, pol_type, qp_μ, iμ₀, μ₀,
                 composite_layer, nSpec))
+        end
+
+        # Fourier convergence on the monolithic path: this moment's
+        # contribution is R_SFI − fc_R_prev (idem T) — the postprocessing
+        # accumulators already carry the cos(mΔφ) azimuth weighting, exactly
+        # the TAZM that LIDORT_CONVERGE examines.
+        if fc_active && !stop_after_atmosphere
+            pass = _fourier_full_passes(fconv, R_SFI, fc_R_prev, T_SFI, fc_T_prev)
+            copyto!(fc_R_prev, R_SFI); copyto!(fc_T_prev, T_SFI)
+            fc_npass = pass ? fc_npass + 1 : 0
+            if fc_npass ≥ fconv.n_consecutive
+                _LAST_FOURIER_M_USED[] = m
+                @info "Fourier series converged" m_used = m m_max tolerance = fconv.tolerance
+                break
+            end
         end
     end
 
