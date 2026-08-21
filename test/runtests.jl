@@ -124,6 +124,23 @@ try
 # proposals/surface_split_albedo_sweep.md §6-7 (PR 3).
 @testset "Scenario sweep" begin include("test_scenario_sweep.jl") end
 
+# Performance-path regressions (perf/fused-adding-kernels). Each file's GPU
+# arm self-skips when CUDA is unavailable; the CPU arms (bitwise contracts,
+# gates, kill-switch defaults) always run.
+# Phase 0 — in-place _bmm! rewiring of doubling/interaction (bit-identical).
+@testset "Phase 0 in-place" begin include("test_phase0_inplace.jl") end
+# Phase 1 — fused KA doubling kernels vs the _bmm! ladder (tolerance contract).
+@testset "Fused doubling" begin include("test_fused_doubling.jl") end
+# Phase 2 — fused KA interaction kernels, incl. the gate assertion that the
+# production interaction_helper! actually dispatches to the fused branch.
+@testset "Fused interaction" begin include("test_fused_interaction.jl") end
+# Sparse (layer-resolved) aerosol combine vs dense — bitwise A/B in both the
+# dense and the one-mode-per-layer regimes.
+@testset "Sparse aerosol combine" begin include("test_sparse_combine.jl") end
+# Z-moment tables — bitwise contract, Π auto-build (silent-zero regression),
+# μ-mismatch rejection, kill-switch default.
+@testset "Z-moment tables" begin include("test_z_tables.jl") end
+
 # NOTE: GPU/Metal tests live in test/local/gpu/ and run via
 # `julia --project=test test/local/runtests.jl` (the local-only suite); they are
 # NOT part of this CI suite. Likewise, configs needing external LUTs/ABSCO data
