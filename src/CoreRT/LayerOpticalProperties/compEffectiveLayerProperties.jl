@@ -50,6 +50,34 @@ struct MInvariantCache{FT}
     aer_ϖ_mod       :: Vector{Vector}         # [iBi][iAer]    → plain FT scalar
     τ_abs_dev       :: Vector{Vector}         # [iBi][iz]      → device nSpec vector
     fScattRayleigh  :: Vector{Vector{Vector}} # [iBi][iz]      → host FT vector
+    "Per band: `mode_layers[i]` = the ONLY layer aerosol mode `i` occupies (layer-
+    resolved diagonal τ structure), 0 for an all-zero mode; `nothing` when modes
+    genuinely overlap layers (dense combine required). Detected from the host τ_aer
+    once — enables the O(nAero) sparse combine instead of O(nAero × nZ)."
+    mode_layers     :: Vector{Union{Nothing, Vector{Int}}}
+end
+
+"""
+Runtime kill-switch for the sparse (layer-resolved) aerosol combine. Default
+`true`. NOTE the sparse path is tolerance-equivalent, not bitwise: the dense
+path's zero-τ combines each round through `(ϖ·τ + 0)/τ`, which the sparse path
+skips (making it marginally MORE exact).
+"""
+const _SPARSE_AERO_COMBINE_ENABLED = Ref(true)
+
+"Detect the layer-resolved diagonal structure of `τ_aer_band` [iAer, nSpec, iz]."
+function _detect_mode_layers(τ_aer_band)
+    τ_host = τ_aer_band isa Array ? τ_aer_band : Array(τ_aer_band)
+    nAero, _, nZ = size(τ_host)
+    out = zeros(Int, nAero)
+    for i in 1:nAero
+        layers = [iz for iz in 1:nZ if any(!iszero, @view τ_host[i, :, iz])]
+        if length(layers) > 1
+            return nothing            # overlapping modes → dense combine
+        end
+        out[i] = isempty(layers) ? 0 : layers[1]
+    end
+    return out
 end
 
 """
@@ -83,6 +111,7 @@ function build_m_invariant_cache(RS_type::AbstractRamanType, iBand, model)
     aer_ϖ_mod       = Vector{Vector}(undef, nBands)
     τ_abs_dev       = Vector{Vector}(undef, nBands)
     fScattRayleigh  = Vector{Vector{Vector}}(undef, nBands)
+    mode_layers     = Vector{Union{Nothing, Vector{Int}}}(undef, nBands)
 
     for (iBi, iB) in enumerate(iBand)
         gr_source = _rayleigh_greek_source(RS_type, greek_rayleigh, greek_cabannes)
@@ -120,13 +149,26 @@ function build_m_invariant_cache(RS_type::AbstractRamanType, iBand, model)
                                                                   arr_type=arr_type)
         rayl_m0 = [CoreScatteringOpticalProperties(rayl_τ_dev_iB[iz],
                     rayl_ϖ_Cabannes_iB, Rayl𝐙⁺⁺_m0, Rayl𝐙⁻⁺_m0) for iz=1:nZ]
-        combo_m0 = rayl_m0
+        ml = _SPARSE_AERO_COMBINE_ENABLED[] ? _detect_mode_layers(τ_aer[iB]) : nothing
+        mode_layers[iBi] = ml
+        combo_m0 = Vector{CoreScatteringOpticalProperties}(rayl_m0)
         for i = 1:nAero
+            ml !== nothing && ml[i] == 0 && continue   # all-zero mode
             AerZ⁺⁺_m0, AerZ⁻⁺_m0 = Scattering.compute_Z_moments(
                 pol_type, μ_host, aerosol_optics[iB][i].greek_coefs, 0, arr_type=arr_type)
-            aer_m0 = [CoreScatteringOpticalProperties(aer_τ_mod_iB[i][iz],
-                         aer_ϖ_mod_iB[i], AerZ⁺⁺_m0, AerZ⁻⁺_m0) for iz=1:nZ]
-            combo_m0 = combo_m0 .+ aer_m0
+            if ml === nothing
+                # Dense combine: modes may overlap layers.
+                aer_m0 = [CoreScatteringOpticalProperties(aer_τ_mod_iB[i][iz],
+                             aer_ϖ_mod_iB[i], AerZ⁺⁺_m0, AerZ⁻⁺_m0) for iz=1:nZ]
+                combo_m0 = combo_m0 .+ aer_m0
+            else
+                # Sparse combine: layer-resolved diagonal τ — mode i lives ONLY
+                # in layer ml[i]; adding its zero τ to every other layer is a
+                # no-op the dense path pays O(nZ) device broadcasts for.
+                iz = ml[i]
+                combo_m0[iz] = combo_m0[iz] + CoreScatteringOpticalProperties(
+                    aer_τ_mod_iB[i][iz], aer_ϖ_mod_iB[i], AerZ⁺⁺_m0, AerZ⁻⁺_m0)
+            end
         end
         # Device→host: needed for _expand_layer_rayleigh! (Raman path). Done once.
         # Denominator is the TOTAL extinction (incl. gas absorption), matching the
@@ -148,7 +190,8 @@ function build_m_invariant_cache(RS_type::AbstractRamanType, iBand, model)
     end
 
     return MInvariantCache{FT}(μ_host, rayl_τ_dev, rayl_ϖ_Cabannes,
-                                aer_τ_mod, aer_ϖ_mod, τ_abs_dev, fScattRayleigh)
+                                aer_τ_mod, aer_ϖ_mod, τ_abs_dev, fScattRayleigh,
+                               mode_layers)
 end
 
 function constructCoreOpticalProperties(RS_type::AbstractRamanType, iBand, m, model)
@@ -251,16 +294,27 @@ function constructCoreOpticalProperties(RS_type::AbstractRamanType, iBand, m, mo
         rayl = [CoreScatteringOpticalProperties(cache.rayl_τ_dev[iBi][iz],
                     cache.rayl_ϖ_Cabannes[iBi], Rayl𝐙⁺⁺, Rayl𝐙⁻⁺) for iz=1:nZ]
 
-        combo = rayl
+        ml = cache.mode_layers[iBi]
+        combo = Vector{CoreScatteringOpticalProperties}(rayl)
         for i = 1:nAero
+            ml !== nothing && ml[i] == 0 && continue   # all-zero mode
             AerZ⁺⁺, AerZ⁻⁺ = Scattering.compute_Z_moments(
                 pol_type, μ, aerosol_optics[iB][i].greek_coefs, m, arr_type=arr_type)
             # Use cached pre-corrected δ-M values — avoids createAero recomputing fᵗ/ω̃.
-            # aer_τ_mod[iBi][i][iz] is an nSpec device vector (or scalar for single-λ bands);
-            # aer_ϖ_mod[iBi][i] is an nSpec vector (or scalar); both broadcast in CoreScatteringOpticalProperties.
-            aer = [CoreScatteringOpticalProperties(cache.aer_τ_mod[iBi][i][iz],
-                       cache.aer_ϖ_mod[iBi][i], AerZ⁺⁺, AerZ⁻⁺) for iz=1:nZ]
-            combo = combo .+ aer
+            if ml === nothing
+                # Dense combine (overlapping modes): every layer gets every mode.
+                aer = [CoreScatteringOpticalProperties(cache.aer_τ_mod[iBi][i][iz],
+                           cache.aer_ϖ_mod[iBi][i], AerZ⁺⁺, AerZ⁻⁺) for iz=1:nZ]
+                combo = combo .+ aer
+            else
+                # Sparse combine (layer-resolved diagonal τ): mode i occupies ONLY
+                # layer ml[i]; the dense path would add its zero τ to the other
+                # nZ−1 layers — O(nAero × nZ) wasted device broadcasts per moment
+                # (measured 83% of the whole solve at nAero = nZ = 72).
+                iz = ml[i]
+                combo[iz] = combo[iz] + CoreScatteringOpticalProperties(
+                    cache.aer_τ_mod[iBi][i][iz], cache.aer_ϖ_mod[iBi][i], AerZ⁺⁺, AerZ⁻⁺)
+            end
         end
 
         # Add cached device τ_abs uploads — avoids arr_type(τ_abs[iB][:,i]) per layer
