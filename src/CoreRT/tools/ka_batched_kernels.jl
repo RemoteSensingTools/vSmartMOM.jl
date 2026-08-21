@@ -35,7 +35,12 @@ function ka_batched_mul!(C::AbstractArray{FT,3},
     @assert size(C) == (size(A, 1), size(B, 2), size(A, 3))
     kernel! = _batched_mul_kernel!(backend)
     kernel!(C, A, B, Val(size(A, 2)); ndrange=size(C))
-    KernelAbstractions.synchronize(backend)
+    # Host-side sync only where it is semantically needed: KA's CPU backend
+    # runs kernels as async tasks, so consumers need the barrier. On GPU the
+    # pipeline is single-stream — stream ordering already sequences every
+    # consumer — and the eager sync both wastes a full-stream round trip per
+    # call AND invalidates CUDA stream capture (graph replay). Phase-0 fix.
+    backend isa KernelAbstractions.CPU && KernelAbstractions.synchronize(backend)
     return C
 end
 
@@ -79,7 +84,12 @@ function ka_batch_inv_lu!(X::AbstractArray{FT,3},
     batch = size(A, 3)
     kernel! = _batched_inv_lu_par_kernel!(backend, N)
     kernel!(X, A, Val(N); ndrange=(N * batch,))
-    KernelAbstractions.synchronize(backend)
+    # Host-side sync only where it is semantically needed: KA's CPU backend
+    # runs kernels as async tasks, so consumers need the barrier. On GPU the
+    # pipeline is single-stream — stream ordering already sequences every
+    # consumer — and the eager sync both wastes a full-stream round trip per
+    # call AND invalidates CUDA stream capture (graph replay). Phase-0 fix.
+    backend isa KernelAbstractions.CPU && KernelAbstractions.synchronize(backend)
     return X
 end
 
@@ -300,7 +310,12 @@ function ka_fused_gp_solve!(X::AbstractArray{FT,3},
     batch = size(A, 3)
     kernel! = _fused_gp_solve_kernel!(backend, N)
     kernel!(X, A, B, Val(N); ndrange=(N * batch,))
-    KernelAbstractions.synchronize(backend)
+    # Host-side sync only where it is semantically needed: KA's CPU backend
+    # runs kernels as async tasks, so consumers need the barrier. On GPU the
+    # pipeline is single-stream — stream ordering already sequences every
+    # consumer — and the eager sync both wastes a full-stream round trip per
+    # call AND invalidates CUDA stream capture (graph replay). Phase-0 fix.
+    backend isa KernelAbstractions.CPU && KernelAbstractions.synchronize(backend)
     return X
 end
 
@@ -485,7 +500,12 @@ function ka_fused_solve!(X::AbstractArray{FT,3},
     batch = size(A1, 3)
     kernel! = _fused_solve_kernel!(backend, N)
     kernel!(X, A1, A2, B, Val(N); ndrange=(N * batch,))
-    KernelAbstractions.synchronize(backend)
+    # Host-side sync only where it is semantically needed: KA's CPU backend
+    # runs kernels as async tasks, so consumers need the barrier. On GPU the
+    # pipeline is single-stream — stream ordering already sequences every
+    # consumer — and the eager sync both wastes a full-stream round trip per
+    # call AND invalidates CUDA stream capture (graph replay). Phase-0 fix.
+    backend isa KernelAbstractions.CPU && KernelAbstractions.synchronize(backend)
     return X
 end
 
