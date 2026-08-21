@@ -55,6 +55,10 @@ struct MInvariantCache{FT}
     genuinely overlap layers (dense combine required). Detected from the host τ_aer
     once — enables the O(nAero) sparse combine instead of O(nAero × nZ)."
     mode_layers     :: Vector{Union{Nothing, Vector{Int}}}
+    "Scatterer-independent Z-moment precompute (generalised spherical functions
+    P/R/T on ±μ up to the global l_max) — see `Scattering.ZMomentTables`. Built
+    once per solve; `nothing` when `_Z_TABLES_ENABLED[] == false`."
+    z_tables        :: Union{Nothing, Scattering.ZMomentTables}
 end
 
 """
@@ -64,6 +68,14 @@ path's zero-τ combines each round through `(ϖ·τ + 0)/τ`, which the sparse p
 skips (making it marginally MORE exact).
 """
 const _SPARSE_AERO_COMBINE_ENABLED = Ref(true)
+
+"""
+Runtime kill-switch for the tabulated Z-moment path (per-solve `ZMomentTables`
++ per-m shared Π lists instead of rebuilding the generalised spherical
+functions for every (scatterer, m) pair). Default `true`. The tabulated path
+is bitwise-identical to the plain one — same sums in the same order.
+"""
+const _Z_TABLES_ENABLED = Ref(true)
 
 "Detect the layer-resolved diagonal structure of `τ_aer_band` [iAer, nSpec, iz]."
 function _detect_mode_layers(τ_aer_band)
@@ -113,6 +125,27 @@ function build_m_invariant_cache(RS_type::AbstractRamanType, iBand, model)
     fScattRayleigh  = Vector{Vector{Vector}}(undef, nBands)
     mode_layers     = Vector{Union{Nothing, Vector{Int}}}(undef, nBands)
 
+    # Z-moment precompute: P/R/T depend only on (μ, l), Π only on (l, m) —
+    # neither on the scatterer — so one table at the global l_max (longest
+    # Greek expansion over Rayleigh + every aerosol mode, all bands) serves
+    # every compute_Z_moments call of this solve.
+    z_tables = nothing
+    if _Z_TABLES_ENABLED[]
+        l_max_global = 0
+        for iB in iBand
+            gr_source = _rayleigh_greek_source(RS_type, greek_rayleigh, greek_cabannes)
+            gr = gr_source isa AbstractVector ? gr_source[iB] : gr_source
+            l_max_global = max(l_max_global, length(gr.β))
+            for i in 1:size(τ_aer[iB], 1)
+                l_max_global = max(l_max_global,
+                                   length(aerosol_optics[iB][i].greek_coefs.β))
+            end
+        end
+        z_tables = Scattering.ZMomentTables(μ_host, l_max_global)
+    end
+    Π_m0 = z_tables === nothing ? nothing :
+           Scattering.make_Π_lists(pol_type, z_tables, 0)
+
     for (iBi, iB) in enumerate(iBand)
         gr_source = _rayleigh_greek_source(RS_type, greek_rayleigh, greek_cabannes)
         gr = gr_source isa AbstractVector ? gr_source[iB] : gr_source
@@ -146,7 +179,8 @@ function build_m_invariant_cache(RS_type::AbstractRamanType, iBand, model)
         # Compute fScattRayleigh once using m=0 Z moments.
         # τ/ϖ mixing in the `+` operator is Z-independent, so this is valid for all m.
         Rayl𝐙⁺⁺_m0, Rayl𝐙⁻⁺_m0 = Scattering.compute_Z_moments(pol_type, μ_host, gr, 0,
-                                                                  arr_type=arr_type)
+                                                                  arr_type=arr_type,
+                                                                  tables=z_tables, Π_pair=Π_m0)
         rayl_m0 = [CoreScatteringOpticalProperties(rayl_τ_dev_iB[iz],
                     rayl_ϖ_Cabannes_iB, Rayl𝐙⁺⁺_m0, Rayl𝐙⁻⁺_m0) for iz=1:nZ]
         ml = _SPARSE_AERO_COMBINE_ENABLED[] ? _detect_mode_layers(τ_aer[iB]) : nothing
@@ -155,7 +189,8 @@ function build_m_invariant_cache(RS_type::AbstractRamanType, iBand, model)
         for i = 1:nAero
             ml !== nothing && ml[i] == 0 && continue   # all-zero mode
             AerZ⁺⁺_m0, AerZ⁻⁺_m0 = Scattering.compute_Z_moments(
-                pol_type, μ_host, aerosol_optics[iB][i].greek_coefs, 0, arr_type=arr_type)
+                pol_type, μ_host, aerosol_optics[iB][i].greek_coefs, 0, arr_type=arr_type,
+                tables=z_tables, Π_pair=Π_m0)
             if ml === nothing
                 # Dense combine: modes may overlap layers.
                 aer_m0 = [CoreScatteringOpticalProperties(aer_τ_mod_iB[i][iz],
@@ -191,7 +226,7 @@ function build_m_invariant_cache(RS_type::AbstractRamanType, iBand, model)
 
     return MInvariantCache{FT}(μ_host, rayl_τ_dev, rayl_ϖ_Cabannes,
                                 aer_τ_mod, aer_ϖ_mod, τ_abs_dev, fScattRayleigh,
-                               mode_layers)
+                               mode_layers, z_tables)
 end
 
 function constructCoreOpticalProperties(RS_type::AbstractRamanType, iBand, m, model)
@@ -282,13 +317,19 @@ function constructCoreOpticalProperties(RS_type::AbstractRamanType, iBand, m, mo
 
     band_layer_props = Vector{Vector{CoreScatteringOpticalProperties}}()
 
+    # Π matrices for this m are scatterer-independent — assemble once from the
+    # cached P/R/T tables and share across Rayleigh + every aerosol mode below.
+    Π_m = cache.z_tables === nothing ? nothing :
+          Scattering.make_Π_lists(pol_type, cache.z_tables, m)
+
     for (iBi, iB) in enumerate(iBand)
         gr_source = _rayleigh_greek_source(RS_type, greek_rayleigh, greek_cabannes)
         gr = gr_source isa AbstractVector ? gr_source[iB] : gr_source
 
         # Compute Z moments for this m (only m-dependent work)
         Rayl𝐙⁺⁺, Rayl𝐙⁻⁺ = Scattering.compute_Z_moments(pol_type, μ, gr, m,
-                                                           arr_type=arr_type)
+                                                           arr_type=arr_type,
+                                                           tables=cache.z_tables, Π_pair=Π_m)
 
         # Use cached device τ/ϖ uploads — avoids arr_type(τ_rayl[iB][:,i]) per layer
         rayl = [CoreScatteringOpticalProperties(cache.rayl_τ_dev[iBi][iz],
@@ -299,7 +340,8 @@ function constructCoreOpticalProperties(RS_type::AbstractRamanType, iBand, m, mo
         for i = 1:nAero
             ml !== nothing && ml[i] == 0 && continue   # all-zero mode
             AerZ⁺⁺, AerZ⁻⁺ = Scattering.compute_Z_moments(
-                pol_type, μ, aerosol_optics[iB][i].greek_coefs, m, arr_type=arr_type)
+                pol_type, μ, aerosol_optics[iB][i].greek_coefs, m, arr_type=arr_type,
+                tables=cache.z_tables, Π_pair=Π_m)
             # Use cached pre-corrected δ-M values — avoids createAero recomputing fᵗ/ω̃.
             if ml === nothing
                 # Dense combine (overlapping modes): every layer gets every mode.
