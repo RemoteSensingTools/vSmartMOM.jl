@@ -4,9 +4,9 @@ using Test
 using vSmartMOM
 using vSmartMOM.CoreRT: ka_fused_interaction_down!, ka_fused_interaction_up!,
                         interaction_helper!, _interaction_11_fused!,
-                        _use_fused_interaction, ScatteringInterface_11,
-                        AddedLayer, CompositeLayer,
-                        _FUSED_INTERACTION_ENABLED, _FUSED_GP_ENABLED
+                        _use_fused_interaction, _fused_interaction_default,
+                        ScatteringInterface_11, AddedLayer, CompositeLayer,
+                        _FUSED_INTERACTION_MODE, _FUSED_GP_ENABLED
 using KernelAbstractions
 using LinearAlgebra
 using Random
@@ -38,25 +38,65 @@ function run_case(FT, to_dev, I_static; rtol)
     a, c = mk_layers(FT, to_dev)
     c_ref = copy_comp(c)
     c_dir = copy_comp(c)
-    # default is OFF (cuBLAS wins on CUDA at production sizes) — the switch
-    # must flip the gate both ways on this device. This is the guard that
+    # Mode policy: default :auto defers to the backend — the CUDA ext opts
+    # OUT (cuBLAS wins at production sizes), so :auto must gate false here.
+    # :on/:off must flip the gate both ways on this device — the guard that
     # was missing when the kernels were left unwired: the gate result must
-    # actually track the switch, not silently stay on one path.
-    default = _FUSED_INTERACTION_ENABLED[]
-    @test default == false
-    _FUSED_INTERACTION_ENABLED[] = false
+    # actually track the mode, not silently stay on one path.
+    default = _FUSED_INTERACTION_MODE[]
+    @test default === :auto
+    @test _fused_interaction_default(KernelAbstractions.get_backend(a.r⁻⁺)) == false  # CUDA ext override
+    @test !_use_fused_interaction(a.r⁻⁺)                 # :auto → CUDA backend policy → off
+    _FUSED_INTERACTION_MODE[] = :off
     @test !_use_fused_interaction(a.r⁻⁺)
     interaction_helper!(ScatteringInterface_11(), true, c_ref, a, I_static)  # _bmm! ladder
-    _FUSED_INTERACTION_ENABLED[] = true
+    _FUSED_INTERACTION_MODE[] = :on
     @test _use_fused_interaction(a.r⁻⁺)
     interaction_helper!(ScatteringInterface_11(), true, c, a, I_static)      # fused branch
     # the dedicated fused function, called directly, must agree with the
     # gated dispatch (same inputs → same launches)
     _interaction_11_fused!(c_dir, a, I_static)
-    _FUSED_INTERACTION_ENABLED[] = default
+    _FUSED_INTERACTION_MODE[] = default
     for f in (:R⁻⁺, :R⁺⁻, :T⁺⁺, :T⁻⁻, :J₀⁺, :J₀⁻)
         @test isapprox(Array(getproperty(c, f)), Array(getproperty(c_ref, f)); rtol = rtol)
         @test Array(getproperty(c_dir, f)) == Array(getproperty(c, f))
+    end
+end
+
+@testset "fused kernels on the KA-CPU backend vs plain matrix algebra" begin
+    # Direct kernel calls on KernelAbstractions.CPU() — GPU-less CI compiles
+    # and validates the retained kernels (the gated production path never
+    # reaches them on CPU, so without this they'd be dead code in CI).
+    # Reference = the adding equations written as plain matrix algebra:
+    #   DOWN: J₀⁻ += G₁(r⁻⁺J₀⁺ + j₀⁻);  R⁻⁺ += G₁r⁻⁺T⁺⁺;  T⁻⁻ = G₁t⁻⁻
+    #   UP:   J₀⁺ = j₀⁺ + G₂(J₀⁺ + R⁺⁻j₀⁻);  T⁺⁺ = G₂T⁺⁺;  R⁺⁻ = r⁺⁻ + G₂R⁺⁻t⁻⁻
+    n, s = 6, 4
+    cpu = KernelAbstractions.CPU()
+    mk()  = 0.1 .* rand(n, n, s)
+    mkv() = rand(n, 1, s)
+    G₁, G₂ = mk(), mk()
+    r⁻⁺, r⁺⁻, t⁻⁻, T⁺⁺, R⁻⁺, R⁺⁻ = mk(), mk(), mk(), mk(), mk(), mk()
+    J₀⁺, J₀⁻, j₀⁺, j₀⁻ = mkv(), mkv(), mkv(), mkv()
+
+    # DOWN half
+    J₀⁻d, R⁻⁺d, T⁻⁻d = copy(J₀⁻), copy(R⁻⁺), copy(t⁻⁻ .* 0)
+    T⁻⁻d .= mk()   # arbitrary pre-state; kernel overwrites it
+    ka_fused_interaction_down!(J₀⁻d, R⁻⁺d, T⁻⁻d, G₁, r⁻⁺, J₀⁺, j₀⁻, T⁺⁺, t⁻⁻, cpu)
+    for k in 1:s
+        w = r⁻⁺[:, :, k] * J₀⁺[:, 1, k] .+ j₀⁻[:, 1, k]
+        @test J₀⁻d[:, 1, k] ≈ J₀⁻[:, 1, k] .+ G₁[:, :, k] * w            rtol = 1e-12
+        @test R⁻⁺d[:, :, k] ≈ R⁻⁺[:, :, k] .+ G₁[:, :, k] * r⁻⁺[:, :, k] * T⁺⁺[:, :, k] rtol = 1e-12
+        @test T⁻⁻d[:, :, k] ≈ G₁[:, :, k] * t⁻⁻[:, :, k]                 rtol = 1e-12
+    end
+
+    # UP half (kernel overwrites J₀⁺/T⁺⁺/R⁺⁻ — feed copies, keep originals as pre-state)
+    J₀⁺u, T⁺⁺u, R⁺⁻u = copy(J₀⁺), copy(T⁺⁺), copy(R⁺⁻)
+    ka_fused_interaction_up!(J₀⁺u, T⁺⁺u, R⁺⁻u, G₂, j₀⁺, j₀⁻, r⁺⁻, t⁻⁻, cpu)
+    for k in 1:s
+        w = J₀⁺[:, 1, k] .+ R⁺⁻[:, :, k] * j₀⁻[:, 1, k]
+        @test J₀⁺u[:, 1, k] ≈ j₀⁺[:, 1, k] .+ G₂[:, :, k] * w            rtol = 1e-12
+        @test T⁺⁺u[:, :, k] ≈ G₂[:, :, k] * T⁺⁺[:, :, k]                 rtol = 1e-12
+        @test R⁺⁻u[:, :, k] ≈ r⁺⁻[:, :, k] .+ G₂[:, :, k] * R⁺⁻[:, :, k] * t⁻⁻[:, :, k] rtol = 1e-12
     end
 end
 

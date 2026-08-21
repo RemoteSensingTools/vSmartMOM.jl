@@ -218,10 +218,11 @@ function interaction_helper!(::ScatteringInterface_11, SFI,
                                 I_static::AbstractArray{FT2}) where {FT<:Real,FT2}
 
     # Fused path: both adding halves in one KA launch each (see
-    # _interaction_11_fused!). OFF by default — on CUDA the _bmm! ladder is
-    # measurably faster (see _FUSED_INTERACTION_ENABLED); enable for
-    # cuBLAS-free backends or graph-capture experiments. Falls through on
-    # CPU or when the 2N² tile exceeds local memory.
+    # _interaction_11_fused!). Backend policy under :auto — on CUDA the _bmm!
+    # ladder is measurably faster so the CUDA ext opts out; cuBLAS-free GPU
+    # backends (Metal) default in (see _fused_interaction_default /
+    # _FUSED_INTERACTION_MODE). Falls through on CPU or when the 2N² tile
+    # exceeds local memory.
     if _use_fused_interaction(added_layer.r⁻⁺)
         return _interaction_11_fused!(composite_layer, added_layer, I_static)
     end
