@@ -867,24 +867,36 @@ ka_fused_interaction_localmem_bytes(::Type{FT}, N::Integer) where {FT} =
     (2 * N * N + 4 * N) * sizeof(FT)
 
 """
-Runtime switch for the fused interaction kernels. Default `false`, from
-measurement: on the production satellite solve (801 pts, nstr=8, IQU, F32,
-A100) the wired fused path measured 3.27 s vs 2.89 s for the `_bmm!` ladder
-(max rel radiance diff 9.3e-7). Unlike the doubling ladder (many tiny
-broadcasts, launch-bound) and the fused LU solve (replaces an expensive
-inverse+GEMM chain), the interaction updates are plain batched GEMMs at
-N≈36 — exactly what cuBLAS is best at — so the one-workgroup-per-λ KA
-kernels lose on CUDA. They remain available (and wired via
-`interaction_helper!`) for cuBLAS-free backends (Metal) and for CUDA-graph
-capture experiments, where a cuBLAS-free interaction step is a prerequisite.
-"""
-const _FUSED_INTERACTION_ENABLED = Ref(false)
+    _fused_interaction_default(backend) -> Bool
 
-"Gate: GPU backend, kill-switch on, and the 2N² tile fits the device budget."
+Backend policy for the fused interaction kernels, consulted when
+`_FUSED_INTERACTION_MODE[] === :auto`. The generic GPU default is `true`:
+on cuBLAS-free backends (Metal) the fused kernels are the only single-launch
+option and the `_bmm!` ladder has no vendor GEMM to lean on. The CUDA
+extension overrides this to `false`, from measurement: on the production
+satellite solve (801 pts, nstr=8, IQU, F32, A100) the fused path measured
+3.27 s vs 2.89 s for the `_bmm!` ladder (max rel radiance diff 9.3e-7).
+Unlike the launch-bound doubling ladder and the inverse-replacing fused
+solve, the interaction updates are plain batched GEMMs at N≈36 — exactly
+what cuBLAS is best at — so the one-workgroup-per-λ kernels lose there.
+"""
+_fused_interaction_default(::KernelAbstractions.Backend) = true
+
+"""
+Mode switch for the fused interaction kernels: `:auto` (backend policy via
+[`_fused_interaction_default`](@ref)) | `:on` (force, e.g. for CUDA-graph
+capture experiments, where a cuBLAS-free interaction step is a prerequisite)
+| `:off` (force the `_bmm!` ladder).
+"""
+const _FUSED_INTERACTION_MODE = Ref{Symbol}(:auto)
+
+"Gate: GPU backend, mode/backend policy allows it, and the 2N² tile fits."
 @inline function _use_fused_interaction(X::AbstractArray{FT,3}) where {FT}
-    _FUSED_INTERACTION_ENABLED[] || return false
+    mode = _FUSED_INTERACTION_MODE[]
+    mode === :off && return false
     backend = KernelAbstractions.get_backend(X)
     backend isa KernelAbstractions.CPU && return false
+    mode === :auto && !_fused_interaction_default(backend) && return false
     return ka_fused_interaction_localmem_bytes(FT, size(X, 1)) <= _gp_fused_localmem_limit(backend)
 end
 
