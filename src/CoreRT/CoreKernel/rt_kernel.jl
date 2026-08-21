@@ -27,6 +27,17 @@ Multiple methods are dispatched on the Raman-scattering type (`noRS`, `RRS`,
 """
 
 """
+Runtime kill-switch for the m-invariant max(τ·ϖ) cache in the Fourier loop
+(`rt_run`): when `true` (default), the scatter test and dτ/ndoubl derivation
+reuse one per-layer device reduction from m = 0 instead of re-reducing τ·ϖ
+3× per (layer, m) — each historical evaluation was a broadcast + reduction +
+BLOCKING scalar read (~3·Nz·(m_max+1) GPU round trips per solve; nsys-measured
+as the dominant sync-bound term). Same scalar, same downstream arithmetic ⇒
+bitwise-identical radiances. `false` restores the historical inline path.
+"""
+const _M_INVARIANT_DTAU_CACHE_ENABLED = Ref(true)
+
+"""
     _set_transmission_noscat!(t⁺⁺, t⁻⁻, τ_vals, qp_μN)
 
 Set transmission matrices for non-scattering layers using Beer's law.
@@ -186,7 +197,8 @@ function rt_kernel!(RS_type::noRS{FT},
                     workspace=nothing,
                     prepared_sources::AbstractSource = NoSource(),
                     dτ_max_threshold::Union{Nothing,Real} = nothing,
-                    dτ_min_floor::Union{Nothing,Real} = nothing) where {FT,M}
+                    dτ_min_floor::Union{Nothing,Real} = nothing,
+                    max_τϖ::Union{Nothing,Real} = nothing) where {FT,M}
     #@show array_type(architecture)
 
     (; qp_μ, μ₀) = quad_points
@@ -194,13 +206,21 @@ function rt_kernel!(RS_type::noRS{FT},
     # Just unpack core optical properties from
     (; τ, ϖ, Z⁺⁺, Z⁻⁺) = computed_layer_properties
 
-    scatter = maximum(τ .* ϖ) > 2eps(FT)
+    # Scattering test on max(τ·ϖ). τ·ϖ is Fourier-moment-INDEPENDENT, so the
+    # caller may pass `max_τϖ` precomputed once per (layer, solve) — the
+    # inline fallback costs a device broadcast + reduction + BLOCKING scalar
+    # read per (layer, m), and the same value is needed 3× per call
+    # (here + twice in get_dtau_ndoubl): measured ~3·Nz·(m_max+1) GPU round
+    # trips per solve, the dominant sync-bound term on latency-limited GPUs.
+    mτϖ = max_τϖ === nothing ? maximum(τ .* ϖ) : FT(max_τϖ)
+    scatter = mτϖ > 2eps(FT)
 
     # If there is scattering, perform the elemental and doubling steps
     if scatter
         dτ, ndoubl, expk = init_layer(computed_layer_properties, quad_points, pol_type, architecture;
                                       dτ_max_threshold = dτ_max_threshold,
-                                      dτ_min_floor = dτ_min_floor)
+                                      dτ_min_floor = dτ_min_floor,
+                                      max_τϖ = mτϖ)
         #@show typeof(computed_layer_properties)
         @timeit "elemental" elemental!(pol_type, SFI,
                                 τ_sum, dτ, F₀,
@@ -265,7 +285,8 @@ Uses `doubling_number` to determine `ndoubl` from the maximum allowed `dτ_max`.
 """
 @inline function get_dtau_ndoubl(computed_layer_properties::CoreScatteringOpticalProperties, quad_points::QuadPoints{FT};
                                   dτ_max_threshold::Union{Nothing,Real} = nothing,
-                                  dτ_min_floor::Union{Nothing,Real} = nothing) where {FT}
+                                  dτ_min_floor::Union{Nothing,Real} = nothing,
+                                  max_τϖ::Union{Nothing,Real} = nothing) where {FT}
     (; qp_μ, wt_μ) = quad_points
     (; τ, ϖ) = computed_layer_properties
     # Constrain `dτ_max` using only the TRUE quadrature streams (positive
@@ -277,10 +298,14 @@ Uses `doubling_number` to determine `ndoubl` from the maximum allowed `dτ_max`.
     floor_val = FT(dτ_min_floor === nothing ? 1024 * eps(FT) : dτ_min_floor)
     real_streams = qp_μ[Array(wt_μ) .> eps(FT)]
     μ_min = isempty(real_streams) ? minimum(qp_μ) : minimum(real_streams)
+    # max(τ·ϖ) — same scalar both places below; take it precomputed when the
+    # caller has it (m-invariant; see rt_kernel!'s note), otherwise reduce
+    # once instead of the historical twice (identical value either way).
+    mτϖ = max_τϖ === nothing ? maximum(τ .* ϖ) : FT(max_τϖ)
     # Absolute floor caps `ndoubl` from above so the elemental dτ never
     # collapses below FT precision regardless of geometry/threshold.
-    dτ_max = max(floor_val, minimum([maximum(τ .* ϖ), threshold * μ_min]))
-    _, ndoubl = doubling_number(dτ_max, maximum(τ .* ϖ))
+    dτ_max = max(floor_val, minimum([mτϖ, threshold * μ_min]))
+    _, ndoubl = doubling_number(dτ_max, mτϖ)
     # Compute dτ vector
     dτ = τ ./ 2^ndoubl
     return dτ, ndoubl
@@ -324,7 +349,12 @@ and beam attenuation factor ``e^{-d\\tau/\\mu_0}`` (or ``e^{-d\\tau \\cdot G/\\m
 """
 @inline function init_layer(computed_layer_properties::CoreDirectionalScatteringOpticalProperties, quad_points, pol_type, architecture;
                             dτ_max_threshold::Union{Nothing,Real} = nothing,
-                            dτ_min_floor::Union{Nothing,Real} = nothing)
+                            dτ_min_floor::Union{Nothing,Real} = nothing,
+                            # Accepted for dispatch parity but NOT substituted here:
+                            # the directional dτ_max uses max((gfct·τ)·ϖ), and
+                            # gfct·max(τ·ϖ) rounds differently (per-element multiply
+                            # order) — substituting would break the bitwise contract.
+                            max_τϖ::Union{Nothing,Real} = nothing)
     arr_type = array_type(architecture)
     (; μ₀, iμ₀) = quad_points
     (; G) = computed_layer_properties
@@ -338,12 +368,14 @@ end
 
 @inline function init_layer(computed_layer_properties::CoreScatteringOpticalProperties, quad_points, pol_type, architecture;
                             dτ_max_threshold::Union{Nothing,Real} = nothing,
-                            dτ_min_floor::Union{Nothing,Real} = nothing)
+                            dτ_min_floor::Union{Nothing,Real} = nothing,
+                            max_τϖ::Union{Nothing,Real} = nothing)
     arr_type = array_type(architecture)
     (; μ₀) = quad_points
     dτ, ndoubl = get_dtau_ndoubl(computed_layer_properties, quad_points;
                                  dτ_max_threshold = dτ_max_threshold,
-                                 dτ_min_floor = dτ_min_floor)
+                                 dτ_min_floor = dτ_min_floor,
+                                 max_τϖ = max_τϖ)
     expk = exp.(-dτ/μ₀)
     return dτ, ndoubl, arr_type(expk)
 end
@@ -353,15 +385,19 @@ function rt_kernel!(RS_type::Union{RRS{FT}, VS_0to1{FT}, VS_1to0{FT}}, pol_type,
                     workspace::Union{InteractionWorkspace, Nothing}=nothing,
                     prepared_sources::AbstractSource = NoSource(),
                     dτ_max_threshold::Union{Nothing,Real} = nothing,
-                    dτ_min_floor::Union{Nothing,Real} = nothing)  where {FT}
+                    dτ_min_floor::Union{Nothing,Real} = nothing,
+                    max_τϖ::Union{Nothing,Real} = nothing)  where {FT}
     (; μ₀) = quad_points
     # Just unpack core optical properties from
     (; τ, ϖ, Z⁺⁺, Z⁻⁺) = computed_layer_properties
     # Centralised dτ/ndoubl: filters zero-weight user-VZA/SZA streams and
     # applies the absolute floor — same formula as the noRS rt_kernel! above.
+    # `max_τϖ` is the m-invariant max(τ·ϖ) precomputed by the caller (see the
+    # noRS variant's note); `nothing` falls back to the inline reduction.
     dτ, ndoubl = get_dtau_ndoubl(computed_layer_properties, quad_points;
                                  dτ_max_threshold = dτ_max_threshold,
-                                 dτ_min_floor = dτ_min_floor)
+                                 dτ_min_floor = dτ_min_floor,
+                                 max_τϖ = max_τϖ)
     scatter = true # edit later
     arr_type = array_type(architecture)
     expk = arr_type(exp.(-dτ /μ₀))
