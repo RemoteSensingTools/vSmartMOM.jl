@@ -218,6 +218,10 @@ Base.@kwdef struct AddedLayer{FT} <: AbstractLayer
     dbl_j₁⁺::Union{AbstractArray{FT,3}, Nothing} = nothing
     "Doubling workspace: source temp -"
     dbl_j₁⁻::Union{AbstractArray{FT,3}, Nothing} = nothing
+    "In-place ⊠ workspace: J-shaped scratch 1 (doubling + interaction; Phase-0 preallocation)"
+    dbl_v1::Union{AbstractArray{FT,3}, Nothing} = nothing
+    "In-place ⊠ workspace: J-shaped scratch 2 (doubling + interaction; Phase-0 preallocation)"
+    dbl_v2::Union{AbstractArray{FT,3}, Nothing} = nothing
     # v0.7 Phase A.2a — per-source j₀ slots. Each non-solar source contributes
     # its own [`SourceSlot`](@ref) (j₀⁺/j₀⁻ + per-source `expk` for doubling +
     # j₁ workspace). The doubling/interaction routines iterate this NT to

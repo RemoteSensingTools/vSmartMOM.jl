@@ -55,20 +55,22 @@ function interaction_helper!(::ScatteringInterface_00, SFI,
                                 I_static::AbstractArray{FT2}) where {FT<:Real,FT2}
     (; r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻, j₀_by_src) = added_layer
     (; R⁻⁺, R⁺⁻, T⁺⁺, T⁻⁻, J₀⁺, J₀⁻, J₀_by_src) = composite_layer
+    mA, v1, v2 = _interaction_scratch(added_layer)
 
-    # Source Function — legacy solar slot
-    J₀⁺ .= j₀⁺ .+ t⁺⁺ ⊠ J₀⁺
-    J₀⁻ .= J₀⁻ .+ T⁻⁻ ⊠ j₀⁻
+    # Source Function — legacy solar slot (in-place Phase 0; same GEMMs and
+    # broadcasts in the same order as the allocating form — bit-identical)
+    _bmm!(v1, t⁺⁺, J₀⁺); J₀⁺ .= j₀⁺ .+ v1
+    _bmm!(v1, T⁻⁻, j₀⁻); J₀⁻ .= J₀⁻ .+ v1
     # Per-source slots (same formula; uses pre-mutation T⁻⁻)
     for (key, slot) in pairs(j₀_by_src)
         cslot = J₀_by_src[key]
-        cslot.J₀⁺ .= slot.j₀⁺ .+ t⁺⁺ ⊠ cslot.J₀⁺
-        cslot.J₀⁻ .= cslot.J₀⁻ .+ T⁻⁻ ⊠ slot.j₀⁻
+        _bmm!(v1, t⁺⁺, cslot.J₀⁺); cslot.J₀⁺ .= slot.j₀⁺ .+ v1
+        _bmm!(v1, T⁻⁻, slot.j₀⁻);  cslot.J₀⁻ .= cslot.J₀⁻ .+ v1
     end
 
     # Batched multiplication between added and composite
-    T⁻⁻  .= t⁻⁻ ⊠ T⁻⁻
-    T⁺⁺  .= t⁺⁺ ⊠ T⁺⁺
+    _bmm!(mA, t⁻⁻, T⁻⁻); T⁻⁻ .= mA
+    _bmm!(mA, t⁺⁺, T⁺⁺); T⁺⁺ .= mA
 end
 
 """
@@ -99,22 +101,25 @@ function interaction_helper!(::ScatteringInterface_01, SFI,
                                 I_static::AbstractArray{FT2}) where {FT<:Real,FT2}
     (; r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻, j₀_by_src) = added_layer
     (; R⁻⁺, R⁺⁻, T⁺⁺, T⁻⁻, J₀⁺, J₀⁻, J₀_by_src) = composite_layer
+    mA, v1, v2 = _interaction_scratch(added_layer)
 
-    # Source Function — legacy solar slot
-    J₀⁻ .= J₀⁻ .+ T⁻⁻ ⊠ (r⁻⁺ ⊠ J₀⁺ .+ j₀⁻)
-    J₀⁺ .= j₀⁺ .+ t⁺⁺ ⊠ J₀⁺
+    # Source Function — legacy solar slot (in-place Phase 0)
+    _bmm!(v1, r⁻⁺, J₀⁺); v1 .= v1 .+ j₀⁻
+    _bmm!(v2, T⁻⁻, v1);  J₀⁻ .= J₀⁻ .+ v2
+    _bmm!(v1, t⁺⁺, J₀⁺); J₀⁺ .= j₀⁺ .+ v1
     # Per-source slots (uses pre-mutation T⁻⁻ and r⁻⁺)
     for (key, slot) in pairs(j₀_by_src)
         cslot = J₀_by_src[key]
-        cslot.J₀⁻ .= cslot.J₀⁻ .+ T⁻⁻ ⊠ (r⁻⁺ ⊠ cslot.J₀⁺ .+ slot.j₀⁻)
-        cslot.J₀⁺ .= slot.j₀⁺ .+ t⁺⁺ ⊠ cslot.J₀⁺
+        _bmm!(v1, r⁻⁺, cslot.J₀⁺); v1 .= v1 .+ slot.j₀⁻
+        _bmm!(v2, T⁻⁻, v1);        cslot.J₀⁻ .= cslot.J₀⁻ .+ v2
+        _bmm!(v1, t⁺⁺, cslot.J₀⁺); cslot.J₀⁺ .= slot.j₀⁺ .+ v1
     end
 
     # Batched multiplication between added and composite
-    R⁻⁺ .= T⁻⁻ ⊠ r⁻⁺ ⊠ T⁺⁺
+    _bmm!(mA, T⁻⁻, r⁻⁺); _bmm!(R⁻⁺, mA, T⁺⁺)   # R⁻⁺ is a pure output here
     R⁺⁻ .= r⁺⁻
-    T⁺⁺ .= t⁺⁺ ⊠ T⁺⁺
-    T⁻⁻ .= T⁻⁻ ⊠ t⁻⁻
+    _bmm!(mA, t⁺⁺, T⁺⁺); T⁺⁺ .= mA
+    _bmm!(mA, T⁻⁻, t⁻⁻); T⁻⁻ .= mA
 end
 
 """
@@ -144,21 +149,24 @@ function interaction_helper!(::ScatteringInterface_10, SFI,
                                 I_static::AbstractArray{FT2}) where {FT<:Real,FT2}
     (; r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻, j₀_by_src) = added_layer
     (; R⁻⁺, R⁺⁻, T⁺⁺, T⁻⁻, J₀⁺, J₀⁻, J₀_by_src) = composite_layer
+    mA, v1, v2 = _interaction_scratch(added_layer)
 
-    # Source Function — legacy solar slot
-    J₀⁺ .= j₀⁺ .+ t⁺⁺ ⊠ (J₀⁺ .+ R⁺⁻ ⊠ j₀⁻)
-    J₀⁻ .= J₀⁻ .+ T⁻⁻ ⊠ j₀⁻
+    # Source Function — legacy solar slot (in-place Phase 0)
+    _bmm!(v1, R⁺⁻, j₀⁻); v1 .= J₀⁺ .+ v1
+    _bmm!(v2, t⁺⁺, v1);  J₀⁺ .= j₀⁺ .+ v2
+    _bmm!(v1, T⁻⁻, j₀⁻); J₀⁻ .= J₀⁻ .+ v1
     # Per-source slots (uses pre-mutation R⁺⁻ and T⁻⁻)
     for (key, slot) in pairs(j₀_by_src)
         cslot = J₀_by_src[key]
-        cslot.J₀⁺ .= slot.j₀⁺ .+ t⁺⁺ ⊠ (cslot.J₀⁺ .+ R⁺⁻ ⊠ slot.j₀⁻)
-        cslot.J₀⁻ .= cslot.J₀⁻ .+ T⁻⁻ ⊠ slot.j₀⁻
+        _bmm!(v1, R⁺⁻, slot.j₀⁻); v1 .= cslot.J₀⁺ .+ v1
+        _bmm!(v2, t⁺⁺, v1);       cslot.J₀⁺ .= slot.j₀⁺ .+ v2
+        _bmm!(v1, T⁻⁻, slot.j₀⁻); cslot.J₀⁻ .= cslot.J₀⁻ .+ v1
     end
 
     # Batched multiplication between added and composite
-    T⁺⁺ .= t⁺⁺ ⊠ T⁺⁺
-    T⁻⁻ .= T⁻⁻ ⊠ t⁻⁻
-    R⁺⁻ .= t⁺⁺ ⊠ R⁺⁻ ⊠ t⁻⁻
+    _bmm!(mA, t⁺⁺, T⁺⁺); T⁺⁺ .= mA
+    _bmm!(mA, T⁻⁻, t⁻⁻); T⁻⁻ .= mA
+    _bmm!(mA, t⁺⁺, R⁺⁻); _bmm!(R⁺⁻, mA, t⁻⁻)   # R⁺⁻ read before overwrite
 end
 
 """
@@ -212,6 +220,10 @@ function interaction_helper!(::ScatteringInterface_11, SFI,
     (; r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻, j₀_by_src,
        temp1, temp2, temp1_ptr, temp2_ptr) = added_layer     #these are aliases to the respective struct elements
     (; R⁻⁺, R⁺⁻, T⁺⁺, T⁻⁻, J₀⁺, J₀⁻, J₀_by_src) = composite_layer #these are aliases to the respective struct elements
+    # Phase-0 in-place scratch: the T01_inv/T21_inv products live in mA so
+    # temp1/temp2 remain free GEMM scratch on BOTH the fused and fallback
+    # paths (the fallback needs them for the explicit inverse).
+    mA, v1, v2 = _interaction_scratch(added_layer)
 
     # X₂₁ refers to added layer, X₁₀ to composite layer!
 
@@ -221,56 +233,64 @@ function interaction_helper!(::ScatteringInterface_11, SFI,
     # explicit inverse, no separate GEMM); fall back to inverse-then-multiply for
     # large N / on CPU. `temp1` is repurposed as the T01_inv output.
     if _use_fused_solve(temp1)
-        @timeit "interaction inv1 fused" ka_fused_solve!(temp1, r⁻⁺, R⁺⁻, T⁻⁻,
-                                                         KernelAbstractions.get_backend(temp1))
-        T01_inv = temp1
+        @timeit "interaction inv1 fused" ka_fused_solve!(mA, r⁻⁺, R⁺⁻, T⁻⁻,
+                                                         KernelAbstractions.get_backend(mA))
     else
-        temp2 .= I_static .- r⁻⁺ ⊠ R⁺⁻
+        _bmm!(temp1, r⁻⁺, R⁺⁻)
+        temp2 .= I_static .- temp1
         @timeit "interaction inv1 bla" batch_inv!(temp1, temp2, temp1_ptr, temp2_ptr)
-        T01_inv = T⁻⁻ ⊠ temp1
+        _bmm!(mA, T⁻⁻, temp1)
     end
+    T01_inv = mA
 
     # J₀₂⁻ = J₀₁⁻ + T₀₁(1-R₂₁R₀₁)⁻¹(R₂₁J₁₀⁺+J₁₂⁻) — legacy solar slot
-    J₀⁻ .= J₀⁻ .+ T01_inv ⊠ (r⁻⁺ ⊠ J₀⁺ .+ j₀⁻)
+    _bmm!(v1, r⁻⁺, J₀⁺); v1 .= v1 .+ j₀⁻
+    _bmm!(v2, T01_inv, v1); J₀⁻ .= J₀⁻ .+ v2
     # Per-source J₀⁻ slots (same formula, T01_inv reused; uses pre-mutation r⁻⁺)
     for (key, slot) in pairs(j₀_by_src)
         cslot = J₀_by_src[key]
-        cslot.J₀⁻ .= cslot.J₀⁻ .+ T01_inv ⊠ (r⁻⁺ ⊠ cslot.J₀⁺ .+ slot.j₀⁻)
+        _bmm!(v1, r⁻⁺, cslot.J₀⁺); v1 .= v1 .+ slot.j₀⁻
+        _bmm!(v2, T01_inv, v1);    cslot.J₀⁻ .= cslot.J₀⁻ .+ v2
     end
 
     # R₂₀ = R₁₀ + T₀₁(I-R₂₁R₀₁)⁻¹ R₂₁T₁₀
-    R⁻⁺ .= R⁻⁺ .+ T01_inv ⊠ r⁻⁺ ⊠ T⁺⁺
+    _bmm!(temp1, T01_inv, r⁻⁺)
+    _bmm!(temp2, temp1, T⁺⁺); R⁻⁺ .= R⁻⁺ .+ temp2
 
     # T₀₂ = T₀₁(1-R₂₁R₀₁)⁻¹T₁₂
-    T⁻⁻ .= T01_inv ⊠ t⁻⁻
+    _bmm!(temp1, T01_inv, t⁻⁻); T⁻⁻ .= temp1
 
     # Repeating for mirror-reflected directions
 
     # T21_inv = t⁺⁺·(E − R⁺⁻·r⁻⁺)⁻¹ — reused by the J₀⁺, T⁺⁺ and R⁺⁻ updates below.
     # Same fused LU + right-solve as inv1 (temp1 reused as the T21_inv output).
     if _use_fused_solve(temp1)
-        @timeit "interaction inv2 fused" ka_fused_solve!(temp1, R⁺⁻, r⁻⁺, t⁺⁺,
-                                                         KernelAbstractions.get_backend(temp1))
-        T21_inv = temp1
+        @timeit "interaction inv2 fused" ka_fused_solve!(mA, R⁺⁻, r⁻⁺, t⁺⁺,
+                                                         KernelAbstractions.get_backend(mA))
     else
-        temp2 .= I_static .- R⁺⁻ ⊠ r⁻⁺
+        _bmm!(temp1, R⁺⁻, r⁻⁺)
+        temp2 .= I_static .- temp1
         @timeit "interaction inv2" batch_inv!(temp1, temp2, temp1_ptr, temp2_ptr)
-        T21_inv = t⁺⁺ ⊠ temp1
+        _bmm!(mA, t⁺⁺, temp1)
     end
+    T21_inv = mA
 
     # J₂₀⁺ = J₂₁⁺ + T₂₁(I-R₀₁R₂₁)⁻¹(J₁₀ + R₀₁J₁₂⁻ ) — legacy solar slot
-    J₀⁺ .= j₀⁺ .+ T21_inv ⊠ (J₀⁺ .+ R⁺⁻ ⊠ j₀⁻)
+    _bmm!(v1, R⁺⁻, j₀⁻); v1 .= J₀⁺ .+ v1
+    _bmm!(v2, T21_inv, v1); J₀⁺ .= j₀⁺ .+ v2
     # Per-source J₀⁺ slots (same formula, T21_inv reused; uses pre-mutation R⁺⁻)
     for (key, slot) in pairs(j₀_by_src)
         cslot = J₀_by_src[key]
-        cslot.J₀⁺ .= slot.j₀⁺ .+ T21_inv ⊠ (cslot.J₀⁺ .+ R⁺⁻ ⊠ slot.j₀⁻)
+        _bmm!(v1, R⁺⁻, slot.j₀⁻); v1 .= cslot.J₀⁺ .+ v1
+        _bmm!(v2, T21_inv, v1);   cslot.J₀⁺ .= slot.j₀⁺ .+ v2
     end
 
     # T₂₀ = T₂₁(I-R₀₁R₂₁)⁻¹T₁₀
-    T⁺⁺ .= T21_inv  ⊠ T⁺⁺
+    _bmm!(temp1, T21_inv, T⁺⁺); T⁺⁺ .= temp1
 
     # R₀₂ = R₁₂ + T₂₁(1-R₀₁R₂₁)⁻¹R₀₁T₁₂
-    R⁺⁻ .= r⁺⁻ .+ T21_inv ⊠ R⁺⁻ ⊠ t⁻⁻
+    _bmm!(temp1, T21_inv, R⁺⁻)
+    _bmm!(temp2, temp1, t⁻⁻); R⁺⁻ .= r⁺⁻ .+ temp2
 end
 
 """

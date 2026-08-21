@@ -44,7 +44,7 @@ function doubling_helper!(pol_type,
                           architecture) where {FT,M}
 
     (; r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻, temp1, temp2, temp1_ptr, temp2_ptr,
-       dbl_gp_refl, dbl_j₁⁺, dbl_j₁⁻, j₀_by_src) = added_layer
+       dbl_gp_refl, dbl_j₁⁺, dbl_j₁⁻, dbl_v1, dbl_v2, j₀_by_src) = added_layer
     dev = devi(architecture)
 
     ndoubl == 0 && return nothing
@@ -53,6 +53,14 @@ function doubling_helper!(pol_type,
     tt⁺⁺_gp_refl = dbl_gp_refl === nothing ? similar(t⁺⁺) : dbl_gp_refl
     j₁⁺ = dbl_j₁⁺ === nothing ? similar(j₀⁺) : dbl_j₁⁺
     j₁⁻ = dbl_j₁⁻ === nothing ? similar(j₀⁻) : dbl_j₁⁻
+    # Phase-0 in-place ⊠ scratch. v1/v2 are J-shaped; the matrix scratch for
+    # doubling_rt_update! reuses temp1/temp2, which are DEAD at that point in
+    # every iteration (the gp fallback finishes with them before the source
+    # update runs, and the fused-gp path never touches them).
+    v1 = dbl_v1 === nothing ? similar(j₀⁺) : dbl_v1
+    v2 = dbl_v2 === nothing ? similar(j₀⁺) : dbl_v2
+    m1 = temp1 === nothing ? similar(t⁺⁺) : temp1
+    m2 = temp2 === nothing ? similar(t⁺⁺) : temp2
     end
     #temp = similar(t⁺⁺)
     # Pointers to avoid memory allocation in CUBLAS routines
@@ -62,7 +70,7 @@ function doubling_helper!(pol_type,
     for n = 1:ndoubl
         @timeit "Batch Inv Doubling" compute_geometric_progression!(temp1, tt⁺⁺_gp_refl, r⁻⁺, t⁺⁺, I_static, temp2, temp1_ptr, temp2_ptr)
         # Legacy solar j₀± doubling (uses the solar `expk = exp(-dτ/μ₀)`)
-        @timeit "source_update" doubling_source_update!(j₀⁺, j₀⁻, j₁⁺, j₁⁻, r⁻⁺, tt⁺⁺_gp_refl, expk)
+        @timeit "source_update" doubling_source_update!(j₀⁺, j₀⁻, j₁⁺, j₁⁻, r⁻⁺, tt⁺⁺_gp_refl, expk, v1, v2)
         # v0.7 Phase A.2a — per-source j₀± doubling for non-solar sources.
         # Each slot carries its OWN `expk` (e.g. `ones` for thermal — the
         # bottom-sub-layer's emission is not pre-attenuated, matching the
@@ -72,14 +80,14 @@ function doubling_helper!(pol_type,
             for slot in values(j₀_by_src)
                 doubling_source_update!(slot.j₀⁺, slot.j₀⁻,
                                         slot.dbl_j₁⁺, slot.dbl_j₁⁻,
-                                        r⁻⁺, tt⁺⁺_gp_refl, slot.expk)
+                                        r⁻⁺, tt⁺⁺_gp_refl, slot.expk, v1, v2)
                 # Square the per-source expk so it tracks the doubled layer
                 # thickness from the source's reference frame (no-op for
                 # thermal whose expk is `ones`).
                 slot.expk .= slot.expk .^ 2
             end
         end
-        @timeit "rt_update" doubling_rt_update!(r⁻⁺, t⁺⁺, tt⁺⁺_gp_refl, expk)
+        @timeit "rt_update" doubling_rt_update!(r⁻⁺, t⁺⁺, tt⁺⁺_gp_refl, expk, m1, m2)
     end
     @timeit "sync_doubling" synchronize_if_gpu()
 
