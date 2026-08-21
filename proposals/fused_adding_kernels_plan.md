@@ -70,6 +70,30 @@ policies — mirroring the batched-Mie-seam validation discipline.
 Isolated speed tests live in `test/benchmarks/launch_attribution_benchmark.jl`
 (this branch); extend it with fused-vs-unfused A/B rows as kernels land.
 
+## Status (2026-08-20)
+
+Phase 0 ✔ and Phase 1 (doubling) ✔ landed on this branch:
+
+| per call, 24×24×801 F32 | kernels | GPU time | host API |
+|---|---|---|---|
+| source_update, Phase 0 (_bmm!) | 18 | 0.090 ms | 0.220 ms |
+| **source_update, Phase 1 fused** | **1** | **0.009 ms** | 0.066 ms |
+| rt_update, Phase 0 (_bmm!) | 12 | 0.115 ms | 0.151 ms |
+| **rt_update, Phase 1 fused** | **1** | **0.058 ms** | 0.076 ms |
+
+A doubling step is now 3 kernels (fused GP + fused source + fused rt) vs
+~32, at ~0.19 ms/step eager — and with cuBLAS out of the captured region
+the full 12-step ladder capture/instantiate/RELAUNCHES as a CUDA graph
+(all five bisect stages OK; see perf/cuda-graph-capture).
+
+Validation: tolerance-equivalence tests on KA-CPU + real CUDA, F64@1e-13 /
+F32@2e-5 (test_fused_doubling.jl); END-TO-END GPU rt_run A/B fused vs
+kill-switch on DefaultParameters: max rel diff 1.1e-15. Kernels written
+math-visible (adding equations inline at each compute block, Sanghavi
+et al. 2014 Eq. references) per collaborator requirement.
+
+Remaining: Phase 2 (interaction ⊠ chains, 32 sites — same recipe).
+
 ## Expected effect
 
 Launches per doubling step: ~30–50 → ~3–5. End-to-end solve ceiling

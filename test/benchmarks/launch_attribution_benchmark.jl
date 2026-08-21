@@ -47,10 +47,17 @@ prof("full doubling_source_update! (allocating)",
      () -> vSmartMOM.CoreRT.doubling_source_update!(j0p, j0m, j1p, j1m, r, tt, expk))
 prof("full doubling_rt_update!     (allocating)",
      () -> vSmartMOM.CoreRT.doubling_rt_update!(r, t, tt, expk))
-# Phase-0 in-place variants (preallocated temps)
+# Phase-0 in-place variants (preallocated temps; kill-switch forces _bmm!)
 let sv1 = V(), sv2 = V(), sm1 = A(), sm2 = A()
+    vSmartMOM.CoreRT._FUSED_DOUBLING_ENABLED[] = false
     prof("doubling_source_update! (in-place, Phase 0)",
          () -> vSmartMOM.CoreRT.doubling_source_update!(j0p, j0m, j1p, j1m, r, tt, expk, sv1, sv2))
     prof("doubling_rt_update!     (in-place, Phase 0)",
+         () -> vSmartMOM.CoreRT.doubling_rt_update!(r, t, tt, expk, sm1, sm2))
+    vSmartMOM.CoreRT._FUSED_DOUBLING_ENABLED[] = true
+    # Phase-1 fused single-launch kernels (the production GPU path)
+    prof("doubling_source_update! (FUSED, Phase 1)",
+         () -> vSmartMOM.CoreRT.doubling_source_update!(j0p, j0m, j1p, j1m, r, tt, expk, sv1, sv2))
+    prof("doubling_rt_update!     (FUSED, Phase 1)",
          () -> vSmartMOM.CoreRT.doubling_rt_update!(r, t, tt, expk, sm1, sm2))
 end

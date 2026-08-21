@@ -1,0 +1,26 @@
+name = "GCHPAerosolOptics"
+uuid = "00000000-0000-0000-0000-000000000000"  # TODO: generate with `using UUIDs; uuid4()`
+authors = ["<student name> <email>"]
+version = "0.0.1-dev"
+
+# ── Dependency direction rule ────────────────────────────────────────────────
+# This package DEPENDS ON vSmartMOM. vSmartMOM must never depend back on it.
+# It consumes vSmartMOM.Scattering (make_mie_model, compute_aerosol_optical_properties,
+# compute_mie_ab!, Aerosol, GreekCoefs, AerosolOptics).
+[deps]
+vSmartMOM = "7ba11eeb-0a61-4a04-a413-bf612cc2007e"  # then: `pkg> dev /path/to/vSmartMOM.jl`
+NCDatasets = "85f8d34a-cbdd-5861-8df4-14fed0d494ab"
+Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
+Interpolations = "a98d9a8b-a2ab-59e6-89dd-64a1c18fca59"
+YAML = "ddb6d928-2868-570f-bddf-ab3f9cf99eb6"
+StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"  # for the EOF/SVD reduction
+
+[compat]
+julia = "1.10"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test"]
