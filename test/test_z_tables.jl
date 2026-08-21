@@ -75,6 +75,16 @@ end
     end
 end
 
+@testset "undersized tables are rejected (silent-truncation regression)" begin
+    # Reverse of "global table serves shorter expansions": a table SHORTER
+    # than the Greek expansion must throw, not silently truncate the l-sum.
+    μ = collect(range(0.05, 0.995; length = 8))
+    pol = Stokes_IQU{Float64}()
+    gr_long = synthetic_greeks(40)
+    tables_short = ZMomentTables(μ, 17)
+    @test_throws ArgumentError compute_Z_moments(pol, μ, gr_long, 1; tables = tables_short)
+end
+
 @testset "tables built for a different μ are rejected" begin
     μ  = collect(range(0.05, 0.995; length = 8))
     μ2 = collect(range(0.10, 0.90;  length = 8))   # same length, different nodes
