@@ -846,6 +846,67 @@ mutable struct ScatteringParameters{FT<:Real}
 end
 
 """
+    AbstractFourierConvergence
+
+Termination strategy for the azimuthal Fourier loop in `rt_run`. The output
+radiances are azimuthal Fourier series,
+
+    I(μ, φ) = Σₘ wₘ Iₘ(μ) · cos m(φ₀ − φ),        m = 0 … m_max,
+
+truncated by default at the stream-derived bound `m_max ≈ 2·Nstreams − 1`.
+For near-nadir viewing and smooth phase functions the series converges much
+earlier, so LIDORT/VLIDORT test each moment's contribution as it is
+accumulated and stop when it becomes negligible (`LIDORT_CONVERGE` in
+`lidort_intensity.f90`). Concrete strategies: [`AllFourierMoments`](@ref)
+(the full series — VLIDORT's `DO_ALL_FOURIER`) and
+[`IntensityConvergence`](@ref) (the VLIDORT accuracy test). Selected via
+`RTNumericalParameters.fourier_convergence` (YAML:
+`numerics.fourier_convergence: all | intensity`).
+"""
+abstract type AbstractFourierConvergence end
+
+"""
+    AllFourierMoments()
+
+Run every Fourier moment `0:m_max` — the historical behavior and the
+default (bit-identical to the pre-strategy code path). VLIDORT analogue:
+`DO_ALL_FOURIER = .TRUE.`.
+"""
+struct AllFourierMoments <: AbstractFourierConvergence end
+
+"""
+    IntensityConvergence(tolerance; n_consecutive = 2)
+
+VLIDORT-style Fourier convergence (mirrors `LIDORT_CONVERGE`): moment `m`
+PASSES when every tested output — Stokes-I at every view angle and every
+spectral point (and both R/T directions on the monolithic path) — satisfies
+
+    |ΔIₘ| ≤ tolerance · |I_accumulated|        (zero contributions pass),
+
+where ΔIₘ is the azimuth-weighted contribution of moment `m`. After
+`n_consecutive` passing moments the loop terminates (VLIDORT's
+`DO_DOUBLE_CONVTEST` ≡ 2; its single test ≡ 1); a failing moment resets the
+counter, exactly like VLIDORT's `TESTCONV`. The moment actually used is
+logged and stored in `CoreRT._LAST_FOURIER_M_USED[]` (VLIDORT's
+`FOURIER_SAVED`).
+
+Caveats (both shared with VLIDORT): Q/U/V are truncated at the m chosen by
+the intensity test; and on the atmosphere-only path (`rt_run_atmosphere`)
+the test sees the atmospheric contribution only — EXACT for
+Lambertian-family surfaces (their m > 0 surface term is identically zero),
+approximate for azimuthally-structured BRDFs (Cox-Munk glint).
+"""
+struct IntensityConvergence{FT<:AbstractFloat} <: AbstractFourierConvergence
+    tolerance::FT
+    n_consecutive::Int
+    function IntensityConvergence(tolerance::AbstractFloat; n_consecutive::Int = 2)
+        tolerance > 0 || throw(ArgumentError("IntensityConvergence: tolerance must be > 0"))
+        n_consecutive ≥ 1 || throw(ArgumentError("IntensityConvergence: n_consecutive must be ≥ 1"))
+        return new{typeof(tolerance)}(tolerance, n_consecutive)
+    end
+end
+
+"""
     RTNumericalParameters{FT}
 
 Centralised home for tunable numerical knobs that were previously hardcoded
@@ -899,6 +960,14 @@ Base.@kwdef struct RTNumericalParameters{FT<:AbstractFloat}
     messages were demoted to `@debug` and are silent unless you set
     `ENV[\"JULIA_DEBUG\"] = \"vSmartMOM\"`."
     verbose::Bool = false
+
+    "Azimuthal Fourier-loop termination strategy — see
+    [`AbstractFourierConvergence`](@ref). Default [`AllFourierMoments`](@ref)
+    (full series, historical behavior). Set [`IntensityConvergence`](@ref)
+    for the VLIDORT accuracy test; YAML keys
+    `numerics.fourier_convergence: intensity`,
+    `numerics.fourier_tolerance: 1e-4`, `numerics.fourier_n_consecutive: 2`."
+    fourier_convergence::AbstractFourierConvergence = AllFourierMoments()
 end
 
 """

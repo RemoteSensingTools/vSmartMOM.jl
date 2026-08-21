@@ -143,6 +143,10 @@ try
 # m-invariant max(τ·ϖ) cache — one per-layer device reduction on m=0 instead
 # of 3 blocking round trips per (layer, m); bitwise rt_run A/B.
 @testset "m-invariant dτ cache" begin include("test_m_invariant_dtau.jl") end
+# VLIDORT-style Fourier convergence (AbstractFourierConvergence strategies):
+# default bitwise, unreachable-tolerance bitwise, early-exit within tolerance,
+# YAML wiring, FOURIER_SAVED diagnostic.
+@testset "Fourier convergence" begin include("test_fourier_convergence.jl") end
 
 # NOTE: GPU/Metal tests live in test/local/gpu/ and run via
 # `julia --project=test test/local/runtests.jl` (the local-only suite); they are

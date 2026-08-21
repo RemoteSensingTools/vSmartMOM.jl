@@ -100,6 +100,7 @@ include("CoreKernel/rt_kernel_multisensor.jl") # Multi-sensor RT kernel
 
 # Postprocessing
 include("tools/postprocessing_vza.jl")               # Postprocess (Azimuthal Weighting)
+include("tools/fourier_convergence.jl")              # VLIDORT-style Fourier-loop convergence (LIDORT_CONVERGE analog)
 include("tools/postprocessing_vza_lin.jl")           # Postprocess linearized
 include("tools/postprocessing_vza_ms.jl")
 
@@ -196,6 +197,7 @@ export SolarBeam, PreparedSolarBeam, prepare_source, prepare_sources, BlackbodyS
        ThermalEmission, PreparedThermalEmission, contribute!, has_thermal_emission
 
 # Export types to show easily
+export AbstractFourierConvergence, AllFourierMoments, IntensityConvergence
 export RadauQuad, GaussLegQuad,
        LambertianSurfaceScalar, LambertianSurfaceSpectrum,
        CanopySurface, CanopySurface_from_prospect, invalidate_canopy_cache!,
