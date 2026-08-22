@@ -35,9 +35,17 @@ function reflectance(RossLi::RossLiSurfaceScalar{FT},n, μᵢ::FT, μᵣ::FT, d�
     # Function was defined for RAMI definition, have to reverse here:
     dϕ = π - dϕ
     # Convert cosines to angles for Ross-Li kernels
-    # clamp: F32 rounding can push cosines an ulp past ±1 → acos = NaN
-    θᵢ   = acos(clamp(μᵢ, FT(-1), FT(1))) #assert 0<=θᵢ<=π/2
-    θᵣ   = acos(clamp(μᵣ, FT(-1), FT(1))) #assert 0<=θᵣ<=π/2
+    # clamp: F32 rounding can push cosines an ulp past ±1 → acos = NaN.
+    # ALSO cap the kernel zenith angles at 80°: the LiSparse geometric kernel
+    # grows like sec θ·sec θ' and reaches reflectances of O(100) at the
+    # grazing discrete-ordinate nodes (θ ≈ 89.4°) — far outside the kernel's
+    # validity (MODIS MCD43 weights are retrieved for θ ≲ 65°) — which makes
+    # the surface-interaction geometric series (E − r⁻⁺R⁺⁻)⁻¹ near-singular
+    # and NaN-prone in Float32. Capping evaluation angles is the standard
+    # MODIS/VLIDORT practice for the invalid grazing regime.
+    θ_cap = FT(80) * FT(π) / FT(180)
+    θᵢ   = min(acos(clamp(μᵢ, FT(-1), FT(1))), θ_cap) #assert 0<=θᵢ<=π/2
+    θᵣ   = min(acos(clamp(μᵣ, FT(-1), FT(1))), θ_cap) #assert 0<=θᵣ<=π/2
 
     if n==1
         return fiso * RossLi_K_iso() + 
