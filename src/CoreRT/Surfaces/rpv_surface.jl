@@ -158,7 +158,11 @@ function reflectance(brdf::AbstractSurfaceType, pol_type, μ::AbstractArray{FT},
         # more clumsy now with quadrature:
         # TODO clean this up a bit
         b = f.(ϕ)
-        c = similar(Rsurf[n:pol_type.n:end,n:pol_type.n:end]) * FT(0)
+        # fill!, NOT `similar(...) * 0`: similar returns UNINITIALIZED memory
+        # and 0 * NaN = NaN — recycled heap/GPU blocks containing NaN/Inf bit
+        # patterns poisoned isolated Fourier-matrix entries nondeterministically
+        # (cell/band/run/device-dependent all-NaN BRDF surfaces downstream).
+        c = fill!(similar(Rsurf[n:pol_type.n:end,n:pol_type.n:end]), FT(0))
         for i in eachindex(b)
             c += w[i] * b[i]
         end
