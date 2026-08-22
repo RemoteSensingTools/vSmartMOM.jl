@@ -30,6 +30,9 @@ vSmartMOM.CoreRT.QuadPoints
 vSmartMOM.CoreRT.CompositeLayer
 vSmartMOM.CoreRT.AddedLayer
 vSmartMOM.CoreRT.RTNumericalParameters
+vSmartMOM.CoreRT.AbstractFourierConvergence
+vSmartMOM.CoreRT.AllFourierMoments
+vSmartMOM.CoreRT.IntensityConvergence
 ```
 
 > Source-term types (`SolarBeam`, `BlackbodySource`, `SurfaceSIF`,
