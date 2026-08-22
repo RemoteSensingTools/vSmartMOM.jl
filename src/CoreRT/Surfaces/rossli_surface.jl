@@ -35,8 +35,9 @@ function reflectance(RossLi::RossLiSurfaceScalar{FT},n, μᵢ::FT, μᵣ::FT, d�
     # Function was defined for RAMI definition, have to reverse here:
     dϕ = π - dϕ
     # Convert cosines to angles for Ross-Li kernels
-    θᵢ   = acos(μᵢ) #assert 0<=θᵢ<=π/2
-    θᵣ   = acos(μᵣ) #assert 0<=θᵣ<=π/2
+    # clamp: F32 rounding can push cosines an ulp past ±1 → acos = NaN
+    θᵢ   = acos(clamp(μᵢ, FT(-1), FT(1))) #assert 0<=θᵢ<=π/2
+    θᵣ   = acos(clamp(μᵣ, FT(-1), FT(1))) #assert 0<=θᵣ<=π/2
 
     if n==1
         return fiso * RossLi_K_iso() + 
@@ -58,7 +59,11 @@ Ross Thick volumetric kernel: models dense vegetation scattering.
 ``K_{\\text{vol}} = ((\\pi/2 - \\xi)\\cos\\xi + \\sin\\xi)/(\\cos\\theta_i + \\cos\\theta_r) - \\pi/4``
 """
 function RossLi_K_vol(θᵢ::FT, θᵣ::FT, dϕ::FT) where FT
-    ξ = acos(cos(θᵢ)*cos(θᵣ) + sin(θᵢ)*sin(θᵣ)*cos(dϕ))
+    # cos ξ = cosθᵢcosθᵣ + sinθᵢsinθᵣ cos Δφ ∈ [-1,1] exactly in ℝ, but F32
+    # rounding exceeds 1 by an ulp on the θᵢ≈θᵣ, Δφ≈0 diagonal (quadrature
+    # node pairs hit this for some SZA values) → acos = NaN poisoning the
+    # whole surface layer. Clamp — the same guard the author applied to `ct`.
+    ξ = acos(clamp(cos(θᵢ)*cos(θᵣ) + sin(θᵢ)*sin(θᵣ)*cos(dϕ), FT(-1), FT(1)))
     #@show ξ
     K_vol = ((π/FT(2) - ξ)*cos(ξ) + sin(ξ))/(cos(θᵢ)+cos(θᵣ)) - (π/FT(4))
     #@show K_vol
@@ -78,9 +83,10 @@ function RossLi_K_geo(θᵢ::FT, θᵣ::FT, dϕ::FT) where FT
     θᵢᵖ = atan(tan(θᵢ)*b_by_r)
     θᵣᵖ = atan(tan(θᵣ)*b_by_r)
     #@show θᵢᵖ, θᵣᵖ
-    ξᵖ = acos(cos(θᵢᵖ)*cos(θᵣᵖ) + sin(θᵢᵖ)*sin(θᵣᵖ)*cos(dϕ))
+    ξᵖ = acos(clamp(cos(θᵢᵖ)*cos(θᵣᵖ) + sin(θᵢᵖ)*sin(θᵣᵖ)*cos(dϕ), FT(-1), FT(1)))  # same ulp guard as ξ
     #@show ξᵖ
-    D = sqrt(tan(θᵢᵖ)^2 + tan(θᵣᵖ)^2 - 2tan(θᵢᵖ)*tan(θᵣᵖ)*cos(dϕ))
+    # D² = (tanθᵢᵖ − tanθᵣᵖ)² ≥ 0 in ℝ at Δφ = 0, but rounds negative in F32
+    D = sqrt(max(tan(θᵢᵖ)^2 + tan(θᵣᵖ)^2 - 2tan(θᵢᵖ)*tan(θᵣᵖ)*cos(dϕ), FT(0)))
     #@show  D
     ct = h_by_b * sqrt(D^2 + (tan(θᵢᵖ)*tan(θᵣᵖ)*sin(dϕ))^2)/(sec(θᵢᵖ)+sec(θᵣᵖ))
     if ct>FT(1) 

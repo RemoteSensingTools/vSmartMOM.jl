@@ -106,10 +106,12 @@ function reflectance(rpv::rpvSurfaceScalar{FT},  n, μᵢ::FT, μᵣ::FT, dϕ::F
     (; ρ₀, ρ_c, k, Θ) = rpv
     # Convert cosines to angles for RPV formula
     if n==1
-        θᵢ   = acos(μᵢ) #assert 0<=θᵢ<=π/2
-        θᵣ   = acos(μᵣ) #assert 0<=θᵣ<=π/2
+        θᵢ   = acos(clamp(μᵢ, FT(-1), FT(1))) #assert 0<=θᵢ<=π/2 (ulp guard)
+        θᵣ   = acos(clamp(μᵣ, FT(-1), FT(1))) #assert 0<=θᵣ<=π/2
         cosg = -μᵢ*μᵣ + sin(θᵢ)*sin(θᵣ)*cos(dϕ) #RAMI form: μᵢ*μᵣ + sin(θᵢ)*sin(θᵣ)*cos(dϕ) (vSmartMOM sign convention is compatible with that of Rahman, Pinty, Verstraete, 1993) 
-        G    = (tan(θᵢ)^2 + tan(θᵣ)^2 + 2*tan(θᵢ)*tan(θᵣ)*cos(dϕ))^FT(0.5) #RAMI form: (tan(θᵢ)^2 + tan(θᵣ)^2 - 2*tan(θᵢ)*tan(θᵣ)*cos(dϕ))^FT(0.5)
+        # G² ≥ 0 in ℝ but rounds negative in F32 on the tanθᵢ≈tanθᵣ,
+        # cosΔφ≈−1 diagonal → NaN (the round-1 review's non-finite RPV)
+        G    = sqrt(max(tan(θᵢ)^2 + tan(θᵣ)^2 + 2*tan(θᵢ)*tan(θᵣ)*cos(dϕ), FT(0))) #RAMI form: (tan(θᵢ)^2 + tan(θᵣ)^2 - 2*tan(θᵢ)*tan(θᵣ)*cos(dϕ))^FT(0.5)
         return ρ₀ * rpvM(μᵢ, μᵣ, k) * rpvF(Θ, cosg) * rpvH(ρ_c, G)
     else
         return FT(0)
