@@ -13,8 +13,12 @@ using vSmartMOM.Architectures
 using vSmartMOM.Scattering
 using Test
 
+# Qualified: the shared runtests session also loads AtmosphericAbsorption,
+# whose Architectures module exports CPU/GPU too — the bare names are
+# ambiguous in Main.
 const EXTERNAL_SOLAR_TEST_ARCH =
-    get(ENV, "EXTERNAL_SOLAR_TEST_GPU", "0") == "1" ? GPU() : CPU()
+    get(ENV, "EXTERNAL_SOLAR_TEST_GPU", "0") == "1" ?
+    vSmartMOM.Architectures.GPU() : vSmartMOM.Architectures.CPU()
 
 function _external_solar_model(model; nstreams=5)
     q = CoreRT.rt_set_streams(
@@ -55,7 +59,7 @@ end
     for case in cases
         p = _parity_parameters(; case...)
         legacy = model_from_parameters(p; external_solar=false)
-        external = model_from_parameters(p)
+        external = model_from_parameters(p; external_solar=true)
         q = external.quad_points
 
         @test q.external_solar
@@ -114,7 +118,8 @@ end
         if case == first(cases)
             legacy_fwd, legacy_lin = model_from_parameters(
                 LinMode(), p; external_solar=false)
-            external_fwd, external_lin = model_from_parameters(LinMode(), p)
+            external_fwd, external_lin = model_from_parameters(LinMode(), p;
+                                                               external_solar=true)
             ngas = size(legacy_lin.τ̇_abs[1], 1)
             old_lin = rt_run(legacy_fwd, legacy_lin, 0, ngas, 1; i_band=1)
             new_lin = rt_run(external_fwd, external_lin, 0, ngas, 1; i_band=1)
