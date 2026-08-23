@@ -136,6 +136,12 @@ when `SolverConfig.use_component_traits == true`.
 band — typically `(rayleigh, aerosols..., surface, sources)`. The
 aggregator takes the maximum Fourier support, then clamps to
 `ctx.user_l_cap` and (if non-nothing) `ctx.m_max_override`.
+
+Note the naming collision with `rt_run`'s `m_max_override` keyword, which
+has the OPPOSITE sense: here (model build) the override NARROWS the trait
+ceiling; there (runtime, used by `rt_run_atmosphere` to size surface-replay
+caches) it only WIDENS the loop bound. They are independent knobs that
+happen to share a name.
 """
 function _aggregate_m_max(active_components, ctx)
     isempty(active_components) && return 0

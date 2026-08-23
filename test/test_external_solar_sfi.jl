@@ -125,6 +125,12 @@ end
             new_lin = rt_run(external_fwd, external_lin, 0, ngas, 1; i_band=1)
             @test new_lin.toa ≈ old_lin.toa rtol=3e-13 atol=3e-15
             @test new_lin.toa_jacobian ≈ old_lin.toa_jacobian rtol=2e-11 atol=2e-13
+            # External-solar is TOA-only: the linearized result must report the
+            # BOA endpoint as unavailable rather than return a downwelling
+            # field that lacks the direct component.
+            @test new_lin.boa === nothing
+            @test new_lin.boa_jacobian === nothing
+            @test old_lin.boa !== nothing  # legacy path keeps full BOA output
         end
     end
 end

@@ -1039,8 +1039,9 @@ source, and scatterer declares the highest Fourier order it can contribute;
 the band bound is their maximum). The traits set the ceiling `m_max` from
 what the scene *could* require; the convergence strategy stops below that
 ceiling when the accumulated intensity shows the scene *did not* require it.
-Both default on: traits via `SolverConfig.use_component_traits`, early exit
-via the YAML key above.
+The traits are on by default (`SolverConfig.use_component_traits`); early
+exit is opt-in — the default strategy is [`AllFourierMoments`](@ref), and
+[`IntensityConvergence`](@ref) is selected via the YAML key above.
 """
 abstract type AbstractFourierConvergence end
 
