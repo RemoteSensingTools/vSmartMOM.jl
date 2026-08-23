@@ -30,7 +30,6 @@ radiative_transfer:
   quadrature_type:    GaussLegQuad()
   polarization_type:  Stokes_I()
   max_m:              16          # NSTREAMS=8 ⇒ Fourier moments m=0..15
-  Δ_angle:            2.0
   # l_trunc matches VLIDORT NMOMENTS = 2·NSTREAMS−1 = 15 (NSTREAMS=8 in cfg).
   # vSmartMOM GaussLegQuad has 8 non-zero-weight streams, plus user
   # VZAs/SZA appended as zero-weight nodes.

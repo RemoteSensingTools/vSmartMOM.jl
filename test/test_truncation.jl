@@ -166,7 +166,7 @@ using Statistics
         resolved = vSmartMOM.CoreRT._resolved_truncation(p, Float64)
         @test resolved isa δBGE
         @test resolved.l_max == 40
-        @test resolved.Δ_angle == 5.0
+        @test resolved.Δ_angle == 0   # Δ_angle is retired — always stored as 0
     end
 
     @testset "String parser whitelist (no eval)" begin
@@ -269,23 +269,23 @@ using Statistics
     @testset "δBGE linearised path: γ̇ᵗ/ϵ̇ᵗ carry the 1/c₀ chain rule" begin
         # `truncate_phase(δBGE, aero, lin_aero)` must supply derivatives of the
         # *renormalised* coefficients, i.e. including the −xᵗ·ċ₀ term with
-        # ċ₀ = ẋβ[:,1]. Verified by central finite differences of the very same
-        # function, so the check is independent of the (pre-existing) fact that
-        # the linearised fits sum over the full μ range while the two-argument
-        # `truncate_phase` restricts them to the `Δ_angle` exclusion cone.
+        # ċ₀ = ẋβ[:,1]. Verified by central finite differences. Since the
+        # Δ_angle exclusion cone is retired, the forward and linearised fits
+        # share one (full) angular domain — the tangents differentiate
+        # exactly the production fit.
         # Derivative order is (nᵣ, nᵢ, rₚ, σₚ); we finite-difference nᵣ.
-        l_tr, Δ_angle = 24, 2.0
+        l_tr = 24
         mk(nᵣ) = Scattering.MieModel(
             computation_type = Scattering.NAI2(),
             aerosol = Scattering.Aerosol(LogNormal(log(0.8), log(1.3)), nᵣ, 0.005),
             λ = 0.55, polarization_type = Stokes_IQUV(),
-            truncation_type = δBGE{Float64}(l_tr, Δ_angle),
+            truncation_type = δBGE{Float64}(l_tr),
             r_max = 2.5, nquad_radius = 600)
         # truncated Greek coefs via the *linearised* method at refractive index nᵣ
         function trunc_lin_at(nᵣ)
             a, la = Scattering.compute_aerosol_optical_properties(
                 LinMode(), mk(nᵣ), Float64)
-            return Scattering.truncate_phase(δBGE{Float64}(l_tr, Δ_angle), a, la)
+            return Scattering.truncate_phase(δBGE{Float64}(l_tr), a, la)
         end
 
         nᵣ, h = 1.55, 1e-5

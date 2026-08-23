@@ -279,45 +279,35 @@ struct δBGE{FT} <: AbstractTruncationType
     "Truncation length for Legendre terms"
     l_max::Int
     """
-    Exclusion angle for forward peak (in fitting procedure) `[degrees]`.
-
-    Defaults to `0.0` via the YAML/TOML path (no forward-peak exclusion);
-    set it non-zero only to reproduce VLIDORT's `DO_DELTAM_SCALING = 2°`
-    or to match legacy benchmarks.
-
-    ⚠ **NOT honoured by the linearized path.** `truncate_phase` (forward)
-    restricts its least-squares fit to `μ < cosd(Δ_angle)`, but
-    `truncate_phase_lin` computes that index set and then uses it only for
-    `reportFit` diagnostics — its normal equations are assembled over the
-    full `μ` range. So for `Δ_angle > 0` the linearized run's truncated
-    Greek coefficients differ from the forward run's, i.e. the Jacobians
-    describe a slightly different forward model than `rt_run` evaluates.
-    At the default `Δ_angle = 0` the two paths agree and the discrepancy
-    is dormant — which is the reason to leave the default at zero.
-    Fixing the linearized path to honour the exclusion cone is tracked as
-    a follow-up.
+    RETIRED — always `0` (design decision 2026-08-23). The δBGE
+    least-squares fit always uses the full angular domain; the former
+    forward-peak exclusion cone was honoured only by the forward
+    `truncate_phase`, never by the linearized overload, so any non-zero
+    value made LinMode Jacobians differentiate a different truncated
+    phase function than the forward model evaluated. The field remains
+    (fixed at zero) only so stored objects and printing stay compatible.
     """
     Δ_angle::FT
+    function δBGE{FT}(l_max::Integer, Δ_angle::Real = zero(FT)) where {FT}
+        iszero(Δ_angle) || @warn(
+            "δBGE's Δ_angle is retired and forced to 0 — the fit always " *
+            "uses the full angular domain (a non-zero cone was never " *
+            "honoured by the linearized path).", maxlog = 1)
+        return new{FT}(Int(l_max), zero(FT))
+    end
 end
 
 """
-    δBGE{FT}(l_max)
     δBGE(l_max)
+    δBGE{FT}(l_max)
 
-Convenience constructors defaulting `Δ_angle = 0` — no forward-peak
-exclusion. Zero is the default everywhere else too (the YAML/TOML path
-uses `get(..., "Δ_angle", 0.0)`), and these make it expressible for
-direct construction so a call site never has to state it just to get the
-default. The untyped form yields `δBGE{Float64}`; use the parameterised
-form to match a `Float32` model.
-
-Prefer these over `δBGE(l_max, 0.0)`. Pass `Δ_angle` explicitly only to
-reproduce VLIDORT's `DO_DELTAM_SCALING = 2°` or legacy benchmarks — and
-see the `Δ_angle` field docs for why non-zero values are unsafe with the
-linearized path.
+Canonical constructors. A legacy second `Δ_angle` argument is still
+accepted for backward compatibility but is retired: non-zero values warn
+once and are forced to `0` (see the field docs). The untyped form yields
+`δBGE{Float64}`; use the parameterised form to match a `Float32` model.
 """
-δBGE{FT}(l_max::Integer) where {FT} = δBGE{FT}(Int(l_max), zero(FT))
-δBGE(l_max::Integer) = δBGE{Float64}(Int(l_max), 0.0)
+δBGE(l_max::Integer) = δBGE{Float64}(Int(l_max))
+δBGE(l_max::Integer, Δ_angle::Real) = δBGE{Float64}(Int(l_max), Δ_angle)
 
 """
     AutoTruncation()

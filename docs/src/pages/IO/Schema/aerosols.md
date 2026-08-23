@@ -133,7 +133,7 @@ When `radiative_transfer.truncation = auto` (the v0.7 default):
 
 - No `scattering` block ⇒ `NoTruncation()` (Rayleigh only fits any
   `stream_l_cap`).
-- `scattering` block present ⇒ `δBGE(stream_l_cap, Δ_angle)` (Mie
+- `scattering` block present ⇒ `δBGE(stream_l_cap)` (Mie
   phase functions typically have hundreds of Greek moments).
 
 The choice is logged at `@info` level so you always see what was

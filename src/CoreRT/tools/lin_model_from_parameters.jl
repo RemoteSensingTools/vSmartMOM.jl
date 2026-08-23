@@ -525,8 +525,17 @@ function model_from_parameters(lin::LinMode,
     optics = Optics(rayleigh_s, aerosols_s, τ_abs_ft, τ_rayl)
     numerics = _convert_numerics(params.numerics, FT)
     model = RTModel(params.architecture, solver, numerics, obs_geom, quad_points, atm, optics, params.brdf, sources)
-    return model, RTModelLin(τ̇_abs, τ̇_aer, lin_aerosol_optics,
-                             τ̇_rayl_psurf, τ̇_aer_psurf, τ̇_abs_psurf)
+    # Tangent storage type: FT2 exists so ForwardDiff Duals in the VMR can
+    # flow through the tangents — preserve it in that case. When FT2 is a
+    # plain float that merely differs from the model float type (Float64
+    # YAML VMR in a Float32 model), coerce the stored tangents to FT so a
+    # Float32/GPU model never carries Float64 tangent arrays into kernels.
+    _to_model_ft(x) = (FT2 <: AbstractFloat && FT2 !== FT) ?
+        map(a -> convert(Array{FT, ndims(a)}, a), x) : x
+    return model, RTModelLin(_to_model_ft(τ̇_abs), _to_model_ft(τ̇_aer), lin_aerosol_optics,
+                             _to_model_ft(τ̇_rayl_psurf),
+                             _to_model_ft(τ̇_aer_psurf),
+                             _to_model_ft(τ̇_abs_psurf))
 end
 
 """

@@ -19,12 +19,9 @@ defaults are, and which legacy aliases still work.
 - **`polarization_type`** — `String`. One of `"Stokes_I()"`,
   `"Stokes_IQ()"`, `"Stokes_IQU()"`, `"Stokes_IQUV()"`. Sets the Stokes
   vector dimension (1/2/3/4 channels respectively).
-- **`Δ_angle`** — `Real`, **optional** (default `0.0`). Forward-peak
-  exclusion angle in degrees, consumed by `δBGE` truncation. Ignored
-  when `truncation: NoTruncation()` or when `truncation: auto` resolves
-  to `NoTruncation()`. Legacy YAMLs commonly set `2.0` to reproduce
-  VLIDORT's `DO_DELTAM_SCALING` default — set explicitly when matching
-  a benchmark that pins this value.
+- **`Δ_angle`** — `Real`, **retired** (parsed for backward
+  compatibility; non-zero values warn once and are treated as `0`).
+  The δBGE fit always uses the full angular domain.
 - **`depol`** — `Real`. Rayleigh depolarization factor (0 = no
   depolarization, the Natraj-2009 idealization).
 - **`float_type`** — `String`. `"Float64"` or `"Float32"`. Float32 is
@@ -90,7 +87,7 @@ recommended path; legacy `max_m` + `l_trunc` configs keep working.
   aerosol phase function is treated relative to the projection cap:
   - `"auto"` *(default)*: VLIDORT-`DO_DELTAM_SCALING`-style. With no
     aerosols, resolves to `NoTruncation()`. With aerosols, picks
-    `δBGE(stream_l_cap, Δ_angle)` and the per-band Mie loop applies
+    `δBGE(stream_l_cap)` and the per-band Mie loop applies
     it only when `length(greek.β) > stream_l_cap` — short phase
     functions automatically fall back to `NoTruncation()` so the
     truncation step can never crash on a fits-the-cap series.
@@ -152,7 +149,7 @@ radiative_transfer:
   surface:
     - LambertianSurfaceScalar(0.0)
   polarization_type: Stokes_IQU()
-  Δ_angle: 2.0
+  # Δ_angle is retired (always 0)
   depol: 0.0
   float_type: Float64
   architecture: Architectures.CPU()
@@ -172,7 +169,7 @@ radiative_transfer:
   polarization_type: Stokes_IQU()
   nstreams: 16          # 16 weighted streams ⇒ stream_l_cap = 31
   truncation: auto      # auto → δBGE(31, 2.0) once Mie aerosol is added
-  Δ_angle: 2.0
+  # Δ_angle is retired (always 0)
   depol: 0.0
   float_type: Float64
   architecture: Architectures.CPU()

@@ -119,7 +119,10 @@ mutable struct BatchContext
     absorption_models::Vector{Vector{Any}}      # [i_band][molec_i]
     "Cached H₂O LineByLineModel per band (nothing only when no absorption_params)"
     h2o_models::Vector{Any}                     # [i_band]
-    "Reference-wavelength extinction coefficient per aerosol species (Phase 2)"
+    """Reference-wavelength extinction coefficient per aerosol species.
+    Stored at Float64 (full Mie precision, independent of the model float
+    type); every consumer converts with `FT(...)` at the point of use so no
+    Float64 temporaries leak into FT arithmetic."""
     k_ref::Vector{Float64}
     "Current unreduced temperature profile [K] (FT-converted)"
     current_T::Vector
@@ -636,7 +639,7 @@ function update_model!(ctx::BatchContext;
                     τ_profile = getAerosolLayerOptProp(one(FT), dist, new_profile)
                     # Shared with the fresh model build — bit-exact by construction.
                     model.optics.aerosols.τ_aer[i_band][i_aer, :, :] .=
-                        _aerosol_τ_slice(τ_eff, k_aer, k_ref_aer, τ_profile,
+                        _aerosol_τ_slice(τ_eff, k_aer, FT(k_ref_aer), τ_profile,
                                          FT.(params.spec_bands[i_band]),
                                          FT(1e4) / params.scattering_params.λ_ref)
                 end
@@ -863,7 +866,7 @@ function update_aerosol_loading!(ctx::BatchContext, i_aer::Int;
             τ_profile = getAerosolLayerOptProp(one(FT), dist, profile)
             # Shared with the fresh model build — bit-exact by construction.
             model.optics.aerosols.τ_aer[i_band][i_aer, :, :] .=
-                _aerosol_τ_slice(τ_eff, k_aer, k_ref_aer, τ_profile,
+                _aerosol_τ_slice(τ_eff, k_aer, FT(k_ref_aer), τ_profile,
                                  FT.(ctx.params.spec_bands[i_band]),
                                  FT(1e4) / ctx.params.scattering_params.λ_ref)
         end

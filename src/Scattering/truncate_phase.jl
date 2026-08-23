@@ -45,7 +45,7 @@ truncate_phase_lowconf(::NoTruncation, aero::AerosolOptics; kwargs...) =
 
 Legacy/low-confidence δ-BGE truncation variant.
 
-Fits truncated coefficients outside the forward exclusion cone (`Δ_angle`) and
+Fits truncated coefficients over the full angular domain and
 rescales by retained scattering fraction ``c_0``. All six Greek families are
 renormalised by ``1/c_0``; the ``(\beta_l - c_l)`` forward-peak subtraction
 applies only to the diagonal families ``\alpha, \beta, \delta, \zeta`` because
@@ -59,8 +59,7 @@ f^t = 1 - c_0.
 function truncate_phase_lowconf(mod::δBGE, aero::AerosolOptics{FT}; reportFit=false) where {FT}
     (; greek_coefs, ω̃, k) = aero
     (; α, β, γ, δ, ϵ, ζ) = greek_coefs
-    (; l_max, Δ_angle) = mod
-
+    (; l_max) = mod
 
     # Obtain Gauss-Legendre quadrature points and weights for phase function:
     μ, w_μ = gausslegendre(length(β));
@@ -70,29 +69,26 @@ function truncate_phase_lowconf(mod::δBGE, aero::AerosolOptics{FT}; reportFit=f
 
     (; f₁₁, f₁₂, f₂₂, f₃₃, f₃₄, f₄₄) = scattering_matrix
 
-    # Find elements that exclude the peak (if wanted!)
-    iμ = findall(x -> x < cosd(Δ_angle), μ)
-
     # Prefactor for P2:
     fac = zeros(FT,l_max);
     for l = 2:l_max - 1
         fac[l + 1] = sqrt(FT(1) / ( ( l - FT(1)) * l * (l + FT(1)) * (l + FT(2)) ));
     end
 
-    # Create subsets (for Ax=y weighted least-squares fits):
-    y₁₁ = view(f₁₁, iμ)
-    y₁₂ = view(f₁₂, iμ)
-    y₃₄ = view(f₃₄, iμ)
-    A   = view(P, iμ, 1:l_max)
-    B   = fac[3:end]' .* view(P², iμ, 3:l_max)
+    # Ax=y weighted least-squares fits over the FULL angular domain (the
+    # forward-peak exclusion cone Δ_angle is retired; the Gauss nodes are
+    # strictly interior, so this is identical to the historical Δ_angle=0):
+    y₁₁ = f₁₁
+    y₁₂ = f₁₂
+    y₃₄ = f₃₄
+    A   = view(P, :, 1:l_max)
+    B   = fac[3:end]' .* view(P², :, 3:l_max)
 
     # Weights (also avoid division by 0)
-    minY = zeros(length(iμ)) .+ FT(1e-8);
-    W₁₁ = Diagonal(w_μ[iμ] ./ max(abs.(y₁₁), minY));
-    W₁₂ = Diagonal(w_μ[iμ] ./ max(abs.(y₁₂), minY));
-    W₃₄ = Diagonal(w_μ[iμ] ./ max(abs.(y₃₄), minY));
-    # W₁₂ = Diagonal(w_μ[iμ]);
-    # W₃₄ = Diagonal(w_μ[iμ]);
+    minY = zeros(length(μ)) .+ FT(1e-8);
+    W₁₁ = Diagonal(w_μ ./ max.(abs.(y₁₁), minY));
+    W₁₂ = Diagonal(w_μ ./ max.(abs.(y₁₂), minY));
+    W₃₄ = Diagonal(w_μ ./ max.(abs.(y₃₄), minY));
     # Julia backslash operator for least squares (just like Matlab);
     cl = ((W₁₁ * A) \ (W₁₁ * y₁₁))   # B in δ-BGR (β)
     γᵗ = similar(cl); γᵗ[1:2] .=0
@@ -152,7 +148,7 @@ end
 Apply δ-BGE truncation to aerosol Greek coefficients.
 
 The method removes/approximates the forward peak using a least-squares fit over
-angles outside `Δ_angle`, then renormalizes with retained scattering fraction
+all quadrature angles, then renormalizes with retained scattering fraction
 ``c_0``:
 
 ```math
@@ -182,7 +178,7 @@ target the unnormalized original matrix outside the forward cone; downstream
 function truncate_phase(mod::δBGE, aero::AerosolOptics{FT}; reportFit=false) where {FT}
     (; greek_coefs, ω̃, k) = aero
     (; α, β, γ, δ, ϵ, ζ) = greek_coefs
-    (; l_max, Δ_angle) = mod
+    (; l_max) = mod
 
     l_tr = l_max
     # Obtain Gauss-Legendre quadrature points and weights for phase function:
@@ -193,23 +189,23 @@ function truncate_phase(mod::δBGE, aero::AerosolOptics{FT}; reportFit=false) wh
 
     (; f₁₁, f₁₂, f₂₂, f₃₃, f₃₄, f₄₄) = scattering_matrix
 
-    # Find elements that exclude the peak (if wanted!)
-    iμ = findall(x -> x < cosd(Δ_angle), μ)
-
     # Prefactor for P2:
     fac = zeros(FT,l_tr);
     for l = 2:l_tr - 1
         fac[l + 1] = sqrt(FT(1) / ( ( l - FT(1)) * l * (l + FT(1)) * (l + FT(2)) ));
     end
 
-    # Restrict all fit sums to the iμ subset (outside the forward exclusion cone),
-    # mirroring truncate_phase_lowconf and Sanghavi & Stephens 2015 §3.
-    w_μ_sub  = w_μ[iμ]
-    P_sub    = view(P,  iμ, :)
-    P²_sub   = view(P², iμ, :)
-    y₁₁     = view(f₁₁, iμ)
-    y₁₂     = view(f₁₂, iμ)
-    y₃₄     = view(f₃₄, iμ)
+    # Fit sums run over the FULL angular domain: the forward-peak exclusion
+    # cone (δBGE.Δ_angle) is retired, and the Gauss nodes are strictly
+    # interior, so this is identical to the historical Δ_angle = 0 default.
+    # Keeping one domain also makes truncate_phase_lin's tangents
+    # differentiate exactly this fit.
+    w_μ_sub  = w_μ
+    P_sub    = P
+    P²_sub   = P²
+    y₁₁     = f₁₁
+    y₁₂     = f₁₂
+    y₃₄     = f₃₄
 
     #= for β
        Ax=b, where
