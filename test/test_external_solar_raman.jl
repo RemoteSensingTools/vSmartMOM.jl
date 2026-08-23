@@ -5,7 +5,8 @@ using Statistics
 using Test
 
 const EXTERNAL_RAMAN_TEST_ARCH =
-    get(ENV, "EXTERNAL_SOLAR_TEST_GPU", "0") == "1" ? GPU() : CPU()
+    get(ENV, "EXTERNAL_SOLAR_TEST_GPU", "0") == "1" ?
+    vSmartMOM.Architectures.GPU() : vSmartMOM.Architectures.CPU()
 
 function _small_rrs(model)
     FT = CoreRT.float_type(model)
@@ -32,7 +33,7 @@ end
     p = parameters_from_yaml("test_parameters/Phase1b_RRS_761-764nm.yaml")
     p.architecture = EXTERNAL_RAMAN_TEST_ARCH
     legacy = model_from_parameters(p; external_solar=false)
-    external = model_from_parameters(p)
+    external = model_from_parameters(p; external_solar=true)
     rs_legacy = _small_rrs(legacy)
     rs_external = _small_rrs(external)
 
