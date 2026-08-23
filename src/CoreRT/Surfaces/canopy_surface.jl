@@ -248,8 +248,8 @@ function _build_spectral_canopy_cache(canopy::CanopySurface{FT},
     leaf_R  = leaf_R[sp]
     leaf_T  = leaf_T[sp]
 
-    itp_R = LinearInterpolation(leaf_wn, leaf_R)
-    itp_T = LinearInterpolation(leaf_wn, leaf_T)
+    itp_R = linear_interpolation(leaf_wn, leaf_R)
+    itp_T = linear_interpolation(leaf_wn, leaf_T)
     leaf_wn_min, leaf_wn_max = extrema(leaf_wn)
 
     R_interp = FT[clamp(itp_R(clamp(wn, leaf_wn_min, leaf_wn_max)), FT(0), FT(1))
@@ -333,8 +333,8 @@ function _interpolate_Z_spectral(Z_coarse_pp::Array{FT,4}, Z_coarse_mp::Array{FT
     Z_mp_out = zeros(FT, Nq, Nq, nSpec)
 
     for i in 1:Nq, j in 1:Nq
-        itp_pp = LinearInterpolation(Z_coarse_wn, Z_coarse_pp[i, j, :, m_idx])
-        itp_mp = LinearInterpolation(Z_coarse_wn, Z_coarse_mp[i, j, :, m_idx])
+        itp_pp = linear_interpolation(Z_coarse_wn, Z_coarse_pp[i, j, :, m_idx])
+        itp_mp = linear_interpolation(Z_coarse_wn, Z_coarse_mp[i, j, :, m_idx])
         for s in 1:nSpec
             wn = clamp(spec_wn[s], Z_coarse_wn[1], Z_coarse_wn[end])
             Z_pp_out[i, j, s] = itp_pp(wn)

@@ -162,13 +162,13 @@ function make_interpolation_model(
     xs = absco.σ
     index_p = 1:length(p)
     index_t = 1:size(T,1)
-    inter_p = LinearInterpolation(p, collect(index_p), extrapolation_bc = Flat())
+    inter_p = linear_interpolation(p, collect(index_p), extrapolation_bc = Flat())
     # Calculate all the cross-sections at the pressure and temperature grids
     @showprogress 1 "Computing Cross Sections for Interpolation..." for i in 1:length(p_grid)
         p_ref = p_grid[i]
         fractional_index_p = inter_p(p_ref)
-        inter_T_top    = LinearInterpolation(T[:,Int(ceil(fractional_index_p))] , collect(index_t), extrapolation_bc = Flat())
-        inter_T_bottom = LinearInterpolation(T[:,Int(floor(fractional_index_p))], collect(index_t), extrapolation_bc = Flat())
+        inter_T_top    = linear_interpolation(T[:,Int(ceil(fractional_index_p))] , collect(index_t), extrapolation_bc = Flat())
+        inter_T_bottom = linear_interpolation(T[:,Int(floor(fractional_index_p))], collect(index_t), extrapolation_bc = Flat())
       
         for j in 1:length(t_grid)
             
@@ -184,7 +184,7 @@ function make_interpolation_model(
             xs_interp_p2 = (1-a1)*xs[:,1, Int(ceil(fractional_index_T_bottom)), Int(floor(fractional_index_p))] + a1 * xs[:,1,Int(floor(fractional_index_T_bottom)), Int(floor(fractional_index_p))]
             a1 = ceil(fractional_index_p)-fractional_index_p
             xs_interp = a1*xs_interp_p2+(1-a1)*xs_interp_p1 
-            interp_xs = LinearInterpolation(absco.ν, xs_interp, extrapolation_bc = Flat())
+            interp_xs = linear_interpolation(absco.ν, xs_interp, extrapolation_bc = Flat())
             cs_matrix[:,i,j] = collect(interp_xs(ν_grid))
         end
     end
@@ -258,7 +258,7 @@ function make_interpolation_model_test(
     # final interpolation routine on equidistant grid
     #full_interp = CubicSplineInterpolation((absco_grid,p, t_grid),cs_matrix_temp, extrapolation_bc = Flat());
     # This only works in Linear interpolation so far for irregular grids, need to update at a certain point:
-    full_interp = LinearInterpolation((absco_grid,p, t_grid),cs_matrix_temp, extrapolation_bc = Flat());
+    full_interp = linear_interpolation((absco_grid,p, t_grid),cs_matrix_temp, extrapolation_bc = Flat());
     cs_matrix[:,:,:] = full_interp(ν_grid, p_grid, t_grid);
     
     # Perform the interpolation (can add a switch whether quadratic or cubic later, ideally in the setup file)

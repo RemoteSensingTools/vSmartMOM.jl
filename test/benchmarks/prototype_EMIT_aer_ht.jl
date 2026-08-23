@@ -73,7 +73,7 @@ const _solar_out_path = get(ENV, "SOLAR_OUT",
     joinpath(pkgdir(vSmartMOM), "src", "SolarModel", "solar.out"))
 Tsolar_interp = if isfile(_solar_out_path)
     solar_dat = solar_transmission_from_file(_solar_out_path)
-    LinearInterpolation(solar_dat[4:end, 2], solar_dat[4:end, 1];
+    linear_interpolation(solar_dat[4:end, 2], solar_dat[4:end, 1];
                         extrapolation=ExtrapolationType.Linear)
 else
     @warn "solar.out not found at $(_solar_out_path); using unit solar transmission"

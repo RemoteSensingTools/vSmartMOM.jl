@@ -74,6 +74,13 @@ for, keyed by what changes between runs.
 Merged into `feat/surface-split` from the multi-sensor branch; ships together
 with the section above.
 
+Note on defaults after the merge: `model_from_parameters` builds the
+embedded-μ₀ representation (`external_solar=false`) by default, so
+`R, T = rt_run(model)`, observer heights, and the atmosphere/surface split
+all work out of the box. The external-solar SFI representation
+(`external_solar=true`) is an opt-in TOA-only fast path consumed through
+`rt_run_toa`.
+
 `geometry.obs_alt` is now a geometric height selection in **km above BOA**,
 not a pressure. Scalar and vector forms distinguish a single observing level
 from the historical full-column output:

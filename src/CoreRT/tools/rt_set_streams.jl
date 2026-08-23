@@ -1,8 +1,9 @@
 #=
 Quadrature streams for the RT model. Supported types: `GaussLegQuad`,
 `RadauQuad`. VZAs are appended as zero-weight output nodes. In the default
-legacy Gauss representation, SZA is also appended as a zero-weight operator
-node. In the default model-construction path (`external_solar=true`), scalar `μ₀` remains outside the
+Gauss representation (`external_solar=false`), SZA is also appended as a
+zero-weight operator node. In the opt-in external-solar path
+(`external_solar=true`, TOA-only), scalar `μ₀` remains outside the
 diffuse operator and is appended only to the phase-evaluation grid, where it
 provides the exact direct-beam source column (see
 `docs/src/pages/conventions.md`). Radau always embeds μ₀ as a weighted node.
@@ -26,8 +27,8 @@ Two stream counts live on the resulting `QuadPoints`:
 Half-space Gauss-Legendre quadrature on `[0, 1]` for the upper hemisphere.
 Builds `(Ltrunc + 2) ÷ 2` weighted nodes (Sanghavi: the `+2` avoids
 collapsing to zero streams when `Ltrunc = 0`). All VZAs are appended as
-zero-weight output nodes. Explicit `external_solar=false` also appends SZA
-to the square operator grid and preserves the historical representation.
+zero-weight output nodes. The default (`external_solar=false`) also appends
+SZA to the square operator grid — the historical representation.
 
 With `external_solar=true`, the collimated solar direction is instead a scalar
 source geometry plus the exact `Zₘ(μᵢ,μ₀)` column on `phase_qp_μ`; it is not a
@@ -41,7 +42,7 @@ function rt_set_streams(::GaussLegQuad,
                         obs_geom::ObsGeometry{FT},
                         pol_type,
                         arr_type;
-                        external_solar::Bool = true) where {FT}
+                        external_solar::Bool = false) where {FT}
     (; sza, vza) = obs_geom
     Nquad = (Ltrunc + 2) ÷ 2
 
@@ -196,7 +197,7 @@ function rt_set_streams(q::GaussLegQuad,
                         pol_type,
                         arr_type;
                         nstreams::Int,
-                        external_solar::Bool = true)
+                        external_solar::Bool = false)
     nstreams >= 1 || throw(ArgumentError("nstreams must be ≥ 1; got $nstreams"))
     Ltrunc = 2 * nstreams - 2
     return rt_set_streams(q, Ltrunc, obs_geom, pol_type, arr_type;

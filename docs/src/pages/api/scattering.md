@@ -44,6 +44,8 @@ external-solar SFI mode.
 ```@docs
 vSmartMOM.Scattering.compute_Z_moments
 vSmartMOM.Scattering.compute_Z_source_moments
+vSmartMOM.Scattering.ZMomentTables
+vSmartMOM.Scattering.make_Π_lists
 ```
 
 ## Convenience Computations

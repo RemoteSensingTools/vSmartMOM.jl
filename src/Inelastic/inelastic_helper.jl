@@ -442,8 +442,8 @@ function apply_lineshape!(Δνᵢ, σᵢ,  # discrete transitions
     grid_min = minimum(Δν_out) 
 
     # Interpolators from grid bounds to index values
-    grid_idx_interp_low  = LinearInterpolation(Δν_out, 1:1:length(Δν_out), extrapolation_bc=1)
-    grid_idx_interp_high = LinearInterpolation(Δν_out, 1:1:length(Δν_out), extrapolation_bc=length(Δν_out))
+    grid_idx_interp_low  = linear_interpolation(Δν_out, 1:1:length(Δν_out), extrapolation_bc=1)
+    grid_idx_interp_high = linear_interpolation(Δν_out, 1:1:length(Δν_out), extrapolation_bc=length(Δν_out))
 
     S_sum=0.0
     # Loop through all transition lines:
@@ -510,8 +510,8 @@ function apply_gridlines!(Δνᵢ, σᵢ,  # discrete transitions
     grid_min = minimum(Δν_in) 
 
     # Interpolators from grid bounds to index values
-    #grid_idx_interp_low  = LinearInterpolation(Δν_out, 1:1:length(Δν_out), extrapolation_bc=1) 
-    #grid_idx_interp_high = LinearInterpolation(Δν_out, 1:1:length(Δν_out), extrapolation_bc=length(Δν_out))
+    #grid_idx_interp_low  = linear_interpolation(Δν_out, 1:1:length(Δν_out), extrapolation_bc=1) 
+    #grid_idx_interp_high = linear_interpolation(Δν_out, 1:1:length(Δν_out), extrapolation_bc=length(Δν_out))
     S_sum = 0.0
     # Loop through all transition lines:
     for j in eachindex(Δνᵢ)

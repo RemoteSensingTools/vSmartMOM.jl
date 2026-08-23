@@ -110,7 +110,7 @@ function itp_solar_to_ν_grid(solar, ν_grid)
 
     solar_subset = solar[solar_idx_start:solar_idx_end, :]
 
-    itp = LinearInterpolation(solar_subset[:, 1], 
+    itp = linear_interpolation(solar_subset[:, 1], 
                               solar_subset[:, 2])
 
     return itp.(ν_grid)

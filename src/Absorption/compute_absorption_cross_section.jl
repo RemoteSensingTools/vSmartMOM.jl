@@ -71,8 +71,8 @@ function compute_absorption_cross_section(
     # Interpolators from grid bounds to index values
     N_grid = length(grid)
     if N_grid > 1
-        grid_idx_interp_low  = LinearInterpolation(grid, 1:1:N_grid, extrapolation_bc=1)
-        grid_idx_interp_high = LinearInterpolation(grid, 1:1:N_grid, extrapolation_bc=N_grid)
+        grid_idx_interp_low  = linear_interpolation(grid, 1:1:N_grid, extrapolation_bc=1)
+        grid_idx_interp_high = linear_interpolation(grid, 1:1:N_grid, extrapolation_bc=N_grid)
     end
 
     # --- Pre-compute line parameters on CPU (Steps 1b + 3: batch + cache qoft) ---
