@@ -328,7 +328,7 @@ end
     aero = Aerosol(size_distribution, nᵣ, nᵢ)
 
     polarization_type = Stokes_IQUV()
-    truncation_type = δBGE(10, 10.0)
+    truncation_type = δBGE(10)
 
     for nquad in [100, 500, 1000]
         model = make_mie_model(NAI2(), aero, λ, polarization_type, truncation_type,
@@ -385,7 +385,7 @@ end
         nᵣ = 1.3; nᵢ = 0.001; λ = 0.55
         aero = Aerosol(LogNormal(log(μ_aer), log(σ_aer)), nᵣ, nᵢ)
         polarization_type = Stokes_IQUV()
-        truncation_type   = δBGE(10, 10.0)
+        truncation_type   = δBGE(10)
 
         for nquad in [100, 500, 1000]
             model = make_mie_model(NAI2(), aero, λ, polarization_type,
@@ -422,7 +422,7 @@ end
         μ_aer = 0.3; σ_aer = 2.1; r_max = 30.0
         nᵣ = 1.3; nᵢ = 0.001; λ = 0.55
         aero = Aerosol(LogNormal(log(μ_aer), log(σ_aer)), nᵣ, nᵢ)
-        pol = Stokes_IQUV(); trunc = δBGE(10, 10.0)
+        pol = Stokes_IQUV(); trunc = δBGE(10)
 
         for nquad in [100, 500]
             m_cpu = make_mie_model(NAI2(), aero, λ, pol, trunc, r_max, nquad)
@@ -463,12 +463,12 @@ end
     else
         # Float64 reference at identical physical parameters
         aero64 = Aerosol(LogNormal(log(0.3),  log(2.1)),  1.3,   0.001)
-        m64 = make_mie_model(NAI2(), aero64, 0.55, Stokes_IQUV(), δBGE(10, 10.0), 30.0, 500)
+        m64 = make_mie_model(NAI2(), aero64, 0.55, Stokes_IQUV(), δBGE(10), 30.0, 500)
         ref = compute_aerosol_optical_properties(m64)
 
         # True Float32 model on the GPU with DSEmulated (Float32) Dn recursion
         aero32 = Aerosol(LogNormal(log(0.3f0), log(2.1f0)), 1.3f0, 0.001f0)
-        m32 = make_mie_model(NAI2(), aero32, 0.55f0, Stokes_IQUV(), δBGE(10, 10.0f0),
+        m32 = make_mie_model(NAI2(), aero32, 0.55f0, Stokes_IQUV(), δBGE{Float32}(10),
                              30.0f0, 500; architecture = GPU(),
                              precision_policy = DSEmulated())
         gpu32 = compute_aerosol_optical_properties(m32)
@@ -515,7 +515,7 @@ end
 
         # 2) Float64 reference at identical physical parameters
         aero64 = Aerosol(LogNormal(log(0.3), log(2.1)), 1.3, 0.001)
-        m64 = make_mie_model(NAI2(), aero64, 0.55, Stokes_IQUV(), δBGE(10, 10.0), 30.0, 500)
+        m64 = make_mie_model(NAI2(), aero64, 0.55, Stokes_IQUV(), δBGE(10), 30.0, 500)
         ref = compute_aerosol_optical_properties(m64)
 
         # 3) Float32 GPU model with NO explicit policy (precision_policy = nothing).
@@ -523,7 +523,7 @@ end
         #    router resolves nothing → DSEmulated() via the FT-aware default — not
         #    trip the NativeFloat64 FT === Float64 assert.
         aero32 = Aerosol(LogNormal(log(0.3f0), log(2.1f0)), 1.3f0, 0.001f0)
-        m32 = make_mie_model(NAI2(), aero32, 0.55f0, Stokes_IQUV(), δBGE(10, 10.0f0),
+        m32 = make_mie_model(NAI2(), aero32, 0.55f0, Stokes_IQUV(), δBGE{Float32}(10),
                              30.0f0, 500; architecture = GPU())
         @test m32 isa MieModel{NAI2, Float32, GPU}
         @test m32.precision_policy === nothing   # auto
@@ -571,7 +571,7 @@ end
         # converted to Float32 by make_mie_model (see comment above).
         aero_mixed = Aerosol(LogNormal(log(0.3), log(2.1)), 1.3f0, 0.001f0)
         m_mixed = make_mie_model(NAI2(), aero_mixed, 0.55, Stokes_IQUV(),
-                                 δBGE(10, 10.0), 30.0, 500;
+                                 δBGE(10), 30.0, 500;
                                  architecture = GPU())
 
         # Confirm the converts-to-aerosol-FT semantics: FT and the kernel
@@ -590,7 +590,7 @@ end
 
         # Float64 CPU reference at identical physical parameters.
         aero64 = Aerosol(LogNormal(log(0.3), log(2.1)), 1.3, 0.001)
-        m64    = make_mie_model(NAI2(), aero64, 0.55, Stokes_IQUV(), δBGE(10, 10.0), 30.0, 500)
+        m64    = make_mie_model(NAI2(), aero64, 0.55, Stokes_IQUV(), δBGE(10), 30.0, 500)
         ref    = compute_aerosol_optical_properties(m64)
 
         # DSEmulated tolerance (Float32 kernel, Float64-widened host reduction):
@@ -637,7 +637,7 @@ struct _NoMieArch <: vSmartMOM.Architectures.AbstractArchitecture end
     @test vSmartMOM.Architectures.has_gpu_mie(_NoMieArch()) == false
 
     aero = Aerosol(LogNormal(log(0.3), log(2.1)), 1.3, 0.001)
-    pol  = Stokes_IQUV(); trunc = δBGE(10, 10.0)
+    pol  = Stokes_IQUV(); trunc = δBGE(10)
 
     m_cpu  = make_mie_model(NAI2(), aero, 0.55, pol, trunc, 30.0, 200)
     m_fall = make_mie_model(NAI2(), aero, 0.55, pol, trunc, 30.0, 200;
@@ -735,11 +735,11 @@ vSmartMOM.Scattering._is_metal_backend(::_FakeMetalBackendMie) = true
 # reduction itself is Float64-compensated.
 @testset "NativeFloat32 (log-normal MieModel GPU path): KA-CPU accuracy + kernel dispatch" begin
     aero64 = Aerosol(LogNormal(log(0.3), log(2.1)), 1.3, 0.001)
-    m64 = make_mie_model(NAI2(), aero64, 0.55, Stokes_IQUV(), δBGE(10, 10.0), 30.0, 500)
+    m64 = make_mie_model(NAI2(), aero64, 0.55, Stokes_IQUV(), δBGE(10), 30.0, 500)
     ref = compute_aerosol_optical_properties(m64)
 
     aero32 = Aerosol(LogNormal(log(0.3f0), log(2.1f0)), 1.3f0, 0.001f0)
-    m32 = make_mie_model(NAI2(), aero32, 0.55f0, Stokes_IQUV(), δBGE(10, 10.0f0), 30.0f0, 500)
+    m32 = make_mie_model(NAI2(), aero32, 0.55f0, Stokes_IQUV(), δBGE{Float32}(10), 30.0f0, 500)
     @test m32 isa MieModel{NAI2, Float32, CPU}
 
     # FT2 defaults to Float64 on this low-level entry point (unlike the
@@ -784,11 +784,11 @@ end
         @test_skip "CUDA not functional — NativeFloat32 log-normal real-GPU test skipped"
     else
         aero64 = Aerosol(LogNormal(log(0.3), log(2.1)), 1.3, 0.001)
-        m64 = make_mie_model(NAI2(), aero64, 0.55, Stokes_IQUV(), δBGE(10, 10.0), 30.0, 500)
+        m64 = make_mie_model(NAI2(), aero64, 0.55, Stokes_IQUV(), δBGE(10), 30.0, 500)
         ref = compute_aerosol_optical_properties(m64)
 
         aero32 = Aerosol(LogNormal(log(0.3f0), log(2.1f0)), 1.3f0, 0.001f0)
-        m32 = make_mie_model(NAI2(), aero32, 0.55f0, Stokes_IQUV(), δBGE(10, 10.0f0), 30.0f0, 500)
+        m32 = make_mie_model(NAI2(), aero32, 0.55f0, Stokes_IQUV(), δBGE{Float32}(10), 30.0f0, 500)
 
         ka_native = compute_aerosol_optical_properties_gpu(m32, KA_CPU(); precision_policy=NativeFloat32(), FT2=Float32)
         cu_native = compute_aerosol_optical_properties_gpu(m32, CUDA_BACKEND; precision_policy=NativeFloat32(), FT2=Float32)
@@ -828,7 +828,7 @@ if get(ENV, "VSMARTMOM_MIE_BENCH", "0") == "1"
     size_distribution = LogNormal(log(μ_aer), log(σ_aer))
     aero = Aerosol(size_distribution, nᵣ, nᵢ)
     polarization_type = Stokes_IQUV()
-    truncation_type = δBGE(10, 10.0)
+    truncation_type = δBGE(10)
 
     println("\n" * "="^70)
     println("Performance Benchmarks: CPU baseline vs GPU kernels (CPU backend)")
@@ -887,7 +887,7 @@ end
     size_distribution = LogNormal(log(μ_aer), log(σ_aer))
     aero = Aerosol(size_distribution, nᵣ, nᵢ)
     polarization_type = Stokes_IQUV()
-    truncation_type = δBGE(10, 10.0)
+    truncation_type = δBGE(10)
 
     model = make_mie_model(NAI2(), aero, λ, polarization_type, truncation_type,
                            r_max, nquad)

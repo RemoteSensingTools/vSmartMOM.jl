@@ -17,7 +17,7 @@ All six truncated families carry the `1/c₀` renormalisation of SS2015 Eq. 8
 `-xᵗ·ċ₀` chain-rule term with `ċ₀ = ẋβ[:,1]`.
 
 # Arguments
-- `mod`: [`δBGE`](@ref) with `l_max` and `Δ_angle`
+- `mod`: [`δBGE`](@ref) with `l_max`
 - `aero`: [`AerosolOptics`](@ref) to truncate
 - `lin_aero`: [`linAerosolOptics`](@ref) with derivatives w.r.t. state (e.g. nᵣ, nᵢ, r)
 - `reportFit`: if `true`, print RMS fit errors
@@ -30,7 +30,7 @@ function truncate_phase(mod::δBGE, aero::AerosolOptics{FT}, lin_aero::linAeroso
     (; α, β, γ, δ, ϵ, ζ) = greek_coefs
     (; lin_greek_coefs, ω̃̇, k̇) = lin_aero
     (; α̇, β̇, γ̇, δ̇, ϵ̇, ζ̇) = lin_greek_coefs
-    (; l_max, Δ_angle) = mod
+    (; l_max) = mod
 
     l_tr = l_max
     # Obtain Gauss-Legendre quadrature points and weights for phase function:
@@ -41,8 +41,6 @@ function truncate_phase(mod::δBGE, aero::AerosolOptics{FT}, lin_aero::linAeroso
 
     (; f₁₁, f₁₂, f₂₂, f₃₃, f₃₄, f₄₄) = scattering_matrix
     (; ḟ₁₁, ḟ₁₂, ḟ₂₂, ḟ₃₃, ḟ₃₄, ḟ₄₄) = lin_scattering_matrix
-    # Find elements that exclude the peak (if wanted!)
-    iμ = findall(x -> x < cosd(Δ_angle), μ)
 
     # Prefactor for P2:
     fac = zeros(FT,l_tr);
@@ -50,10 +48,13 @@ function truncate_phase(mod::δBGE, aero::AerosolOptics{FT}, lin_aero::linAeroso
         fac[l + 1] = sqrt(FT(1) / ( ( l - FT(1)) * l * (l + FT(1)) * (l + FT(2)) ));
     end
 
-    # Create subsets (for Ax=y weighted least-squares fits):
-    y₁₁ = view(f₁₁, iμ)
-    y₁₂ = view(f₁₂, iμ)
-    y₃₄ = view(f₃₄, iμ)
+    # The fits and their tangents run over the FULL angular domain — the
+    # same domain the forward `truncate_phase` uses now that the
+    # forward-peak exclusion cone (δBGE.Δ_angle) is retired, so these
+    # tangents differentiate exactly the production fit.
+    y₁₁ = f₁₁
+    y₁₂ = f₁₂
+    y₃₄ = f₃₄
     
     #= for β
        Ax=b, where
@@ -140,7 +141,7 @@ function truncate_phase(mod::δBGE, aero::AerosolOptics{FT}, lin_aero::linAeroso
         println("Errors in δ-BGE fits:")
         # Evaluate the fitted expansion on the outside-cone sample points
         # (same domain as y₁₂) — mirrors B_sub in truncate_phase.jl.
-        B_sub = fac[3:end]' .* view(P², iμ, 3:l_tr)
+        B_sub = fac[3:end]' .* view(P², :, 3:l_tr)
         mod_γ = convert.(FT, B_sub * γᵗ_fit[3:end])
         @show StatsBase.rmsd(mod_γ, y₁₂; normalize=true)
     end
@@ -185,7 +186,7 @@ function truncate_phase(mod::δBGE, aero::AerosolOptics{FT}, lin_aero::linAeroso
     
     if reportFit
         println("Errors in δ-BGE fits:")
-        B_sub = fac[3:end]' .* view(P², iμ, 3:l_tr)
+        B_sub = fac[3:end]' .* view(P², :, 3:l_tr)
         mod_ϵ = convert.(FT, B_sub * ϵᵗ_fit[3:end])
         @show StatsBase.rmsd(mod_ϵ, y₃₄; normalize=true)
     end

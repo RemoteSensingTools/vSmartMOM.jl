@@ -22,7 +22,6 @@ radiative_transfer:
   quadrature_type:    GaussLegQuad()
   polarization_type:  Stokes_IQU()
   max_m:              16          # NSTREAMS=8 ⇒ Fourier moments m=0..15
-  Δ_angle:            2.0
   l_trunc:            15          # match VLIDORT NMOMENTS = 2·NSTREAMS−1 = 15 (L=0..15)
   truncation:         "NoTruncation()"
   depol:              0.01072

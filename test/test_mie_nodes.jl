@@ -92,7 +92,7 @@ const _nquad = 300
     # δBGE truncation applied by the node API must match calling truncate_phase
     # manually on the same raw AerosolOptics (consistency with the existing
     # model_from_parameters/update_model convention).
-    trunc = δBGE(10, 10.0)
+    trunc = δBGE(10)
     nodes_trunc = compute_aerosol_optical_properties_nodes(r, wx, _nr, _ni, _lam, pol, trunc)
     manual_trunc = Scattering.truncate_phase(trunc, ref)
     # Same re-normalization caveat as above -> tight isapprox, not exact ==.
@@ -323,7 +323,7 @@ end
     # requested δBGE — truncation is applied to the FULL raw series first,
     # the output cap slices afterward. In particular l_max < δBGE.l_max
     # previously skipped the fit entirely (fᵗ came back 0).
-    trunc = δBGE(20, 10.0)
+    trunc = δBGE(20)
     full_t   = compute_aerosol_optical_properties_nodes(r, wx, _nr, _ni, _lam, pol, trunc)
     capped_t = compute_aerosol_optical_properties_nodes(r, wx, _nr, _ni, _lam, pol, trunc; l_max=10)
     @test full_t.fᵗ > 0
@@ -426,7 +426,7 @@ compute_aerosol_extinction_nodes / _gpu (EXTINCTION-ONLY fast path) tests.
     @test k_only == full.k
 
     # A δBGE truncation must not perturb k (truncation only touches Greek/fᵗ).
-    trunc = δBGE(10, 10.0)
+    trunc = δBGE(10)
     full_trunc = compute_aerosol_optical_properties_nodes(r, wx, _nr, _ni, _lam, pol, trunc)
     @test k_only == full_trunc.k
 

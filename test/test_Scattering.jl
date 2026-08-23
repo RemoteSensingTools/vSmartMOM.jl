@@ -153,7 +153,7 @@ end
 
     λ = 0.55   # Incident wavelength
     polarization_type = Stokes_IQUV()
-    truncation_type = δBGE(10, 10)
+    truncation_type = δBGE(10)
     model_NAI2 = make_mie_model(NAI2(), aero, λ, polarization_type, truncation_type, r_max, nquad_radius)
 
     # STEP 3: Perform the Mie Calculations and compare against saved PCW reference
@@ -183,10 +183,10 @@ end
 # Use the saved PCW reference (a large, forward-peaked aerosol with ~760 Greek
 # modes) and l_max=10.  The normal equations are then 750+ observations × 10
 # unknowns — strongly overdetermined and numerically stable on every platform.
-# Using l_max ≈ length(β) (as the original test did with a small aerosol)
-# makes the system nearly rank-deficient after the forward-cone exclusion
-# removes a handful of GL points, causing c₀ to blow up outside [0,1].
-@testset "δBGE forward-cone exclusion" begin
+# The forward-peak exclusion cone (Δ_angle) is RETIRED: the constructor
+# forces it to zero (with a one-time warning), so the legacy two-argument
+# form must produce optics identical to the canonical single-argument form.
+@testset "δBGE Δ_angle retirement" begin
     @load "test_pcw/PCW_AerosolOptics_v2.jld" aerosol_optics_PCW
     aerosol_optics_PCW = AerosolOptics(
         greek_coefs=aerosol_optics_PCW.greek_coefs,
@@ -195,19 +195,25 @@ end
     # aerosol_optics_PCW carries raw Greek coefficients (fᵗ=1 sentinel).
     l_max = 10   # << length(β) ≈ 760 → strongly overdetermined → stable
 
-    aop_tr0  = Scattering.truncate_phase(δBGE(l_max, 0.0),  aerosol_optics_PCW)
-    aop_tr10 = Scattering.truncate_phase(δBGE(l_max, 10.0), aerosol_optics_PCW)
+    aop_tr0  = Scattering.truncate_phase(δBGE(l_max), aerosol_optics_PCW)
+    # The legacy two-argument form is forced to the same full angular
+    # domain (the constructor warns once per session, maxlog=1 — not
+    # asserted here to stay order-independent) — its result must be
+    # IDENTICAL, not merely close.
+    @test δBGE(l_max, 10.0).Δ_angle == 0
+    aop_legacy = Scattering.truncate_phase(δBGE(l_max, 10.0), aerosol_optics_PCW)
 
     # SSA and extinction unchanged by truncation:
     @test aop_tr0.ω̃ ≈ aerosol_optics_PCW.ω̃
     @test aop_tr0.k  ≈ aerosol_optics_PCW.k
     # fᵗ = 1 - c₀ must be non-negative; with l_max=10 the 10-mode fit of the
-    # large aerosol's 760-mode series gives fᵗ ≈ 0.33 even at Δ_angle=0.
+    # large aerosol's 760-mode series gives fᵗ ≈ 0.33.
     @test aop_tr0.fᵗ  ≥ -1e-10
-    @test 0 ≤ aop_tr10.fᵗ ≤ 1
-    # fᵗ changes when the exclusion cone is applied (proves iμ subset is used):
-    @test aop_tr10.fᵗ > 0.1   # Δ_angle=10° should give non-trivial truncation for large aerosol
-    println("  δBGE fᵗ: Δ_angle=0° → $(round(aop_tr0.fᵗ, sigdigits=6)), Δ_angle=10° → $(round(aop_tr10.fᵗ, sigdigits=6))")
+    @test aop_legacy.fᵗ == aop_tr0.fᵗ
+    @test aop_legacy.greek_coefs.β == aop_tr0.greek_coefs.β
+    @test aop_legacy.greek_coefs.γ == aop_tr0.greek_coefs.γ
+    @test aop_legacy.greek_coefs.ϵ == aop_tr0.greek_coefs.ϵ
+    println("  δBGE fᵗ (full domain): $(round(aop_tr0.fᵗ, sigdigits=6))")
 end
 
 @testset "δBGE uniformly normalizes polarized matrix elements" begin
@@ -216,7 +222,7 @@ end
         greek_coefs=aerosol_optics_PCW.greek_coefs,
         ω̃=aerosol_optics_PCW.ω̃, k=aerosol_optics_PCW.k,
         fᵗ=aerosol_optics_PCW.fᵗ)
-    mod = δBGE(10, 10.0)
+    mod = δBGE(10)
     μ, wμ = Scattering.gausslegendre(
         length(aerosol_optics_PCW.greek_coefs.β))
     outside = findall(x -> x < cosd(mod.Δ_angle), μ)
