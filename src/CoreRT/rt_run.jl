@@ -656,7 +656,11 @@ function _rt_run_column(RS_type::AbstractRamanType, model, iBand;
                         dτ_max_threshold=dτ_max_threshold,
                         dτ_min_floor=dτ_min_floor,
                         max_τϖ=mτϖ_iz,
-                        beam_view_mask=beam_view_mask)
+                        # Only the noRS kernel accepts the TMS mask kwarg
+                        # (TMS is guarded to noRS above); Raman kernels
+                        # must not receive an unknown keyword.
+                        (beam_view_mask === nothing ? NamedTuple() :
+                         (; beam_view_mask))...)
         end
 
         # Atmosphere/surface split (`rt_run_atmosphere` / `rt_run_surface`).
