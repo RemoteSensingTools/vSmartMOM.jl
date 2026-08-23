@@ -646,6 +646,16 @@ function validate_yaml_parameters(params)
     if haskey(rt, "nstreams") && haskey(rt, "l_trunc")
         @warn "Both `nstreams` and `l_trunc` set in radiative_transfer; `l_trunc` is legacy and will be ignored. Use only `nstreams` for new configs."
     end
+    if haskey(rt, "max_m") && haskey(rt, "m_max")
+        # Silent precedence would be a schema-migration trap: adding the
+        # documented `m_max` to an old config would have no effect and could
+        # leave structured surfaces under-resolved.
+        _require_config(false,
+            "Both legacy `max_m` (a count) and `m_max` (an order) are set in " *
+            "radiative_transfer; they conflict. Remove `max_m` from migrated " *
+            "configs (keep `m_max`), or remove `m_max` to stay on the legacy " *
+            "schema.")
+    end
     if haskey(rt, "greek_beta_cutoff") && rt["greek_beta_cutoff"] !== nothing
         cutoff = rt["greek_beta_cutoff"]
         _require_config(cutoff isa Real && !(cutoff isa Bool) &&

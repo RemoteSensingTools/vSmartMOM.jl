@@ -1015,8 +1015,11 @@ function update_aerosol_microphysics!(ctx::BatchContext, i_aer::Int, aerosol::Ae
             model.optics.aerosols.aerosol_optics[i_band][i_aer] = new_ao
 
             τ_profile = getAerosolLayerOptProp(one(FT), dist, profile)
+            # Shared with the fresh model build — bit-exact by construction.
             model.optics.aerosols.τ_aer[i_band][i_aer, 1, :] .=
-                (τ_eff / new_k_ref) * new_ao.k * τ_profile
+                vec(_aerosol_τ_slice(τ_eff, new_ao.k, FT(new_k_ref), τ_profile,
+                                     FT.(params.spec_bands[i_band]),
+                                     FT(1e4) / sp.λ_ref))
 
         else
             # ── Multi-wavelength band: endpoint Mie + linear interpolation ──
@@ -1048,9 +1051,10 @@ function update_aerosol_microphysics!(ctx::BatchContext, i_aer::Int, aerosol::Ae
             model.optics.aerosols.aerosol_optics[i_band][i_aer] = new_ao
 
             τ_profile = getAerosolLayerOptProp(one(FT), dist, profile)
+            # Shared with the fresh model build — bit-exact by construction.
             model.optics.aerosols.τ_aer[i_band][i_aer, :, :] .=
-                τ_eff .* _aod_spectral_scale(ν_spec, new_ao.k, FT(new_k_ref),
-                                              FT(1e4/sp.λ_ref)) .* τ_profile'
+                _aerosol_τ_slice(τ_eff, new_ao.k, FT(new_k_ref), τ_profile,
+                                 ν_spec, FT(1e4) / sp.λ_ref)
         end
     end
 

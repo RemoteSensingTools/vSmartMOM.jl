@@ -185,6 +185,16 @@ function rt_run(RS_type::AbstractRamanType,
             "require linearized multisensor source-slot propagation"))
         _require_multisensor_surfaces(model, (iBand,))
     end
+    # External-solar SFI is TOA-only (see the forward driver's guard): the
+    # interior/BOA direct carrier selects views via the embedded-solar iμ₀
+    # node, which is a deliberate sentinel (0) in external mode. Interior
+    # heights therefore fail loudly here, and the BOA endpoint is reported
+    # as unavailable (`nothing`) at result assembly below instead of
+    # returning a radiance that silently lacks the direct field.
+    model.quad_points.external_solar && !isempty(model.obs_geom.sensor_levels) &&
+        throw(ArgumentError(
+            "external-solar SFI does not support interior sensor heights; " *
+            "build the model with external_solar=false (the default)"))
     prepared_sources = prepare_sources(effective_sources, FT, pol_type.n, nSpec, arr_type)
     if sources === nothing && size(F₀) == (pol_type.n, nSpec) && !iszero(F₀)
         # User pre-set F₀ honored — F₀ already in scope from RS_type unpack.
@@ -291,13 +301,8 @@ function rt_run(RS_type::AbstractRamanType,
         # Loop over vertical layers: 
         @showprogress 1 "Looping over layers ..." for iz = 1:Nz  # Count from TOA to BOA
             
-            # Construct the atmospheric layer
-            # From Rayleigh and aerosol τ, ϖ, compute overall layer τ, ϖ
-            # Suniti: modified to return fscattRayl as the last element of  computed_atmosphere_properties
-            #if !(typeof(RS_type) <: noRS)
-            #    RS_type.fscattRayl = expandBandScalars(RS_type, fScattRayleigh[iz]) 
-            #end
-            
+            # Construct the atmospheric layer:
+            # from Rayleigh and aerosol τ, ϖ, compute overall layer τ, ϖ.
             # Expand all layer optical properties to their full dimension:
             @timeit "OpticalProps" layer_opt, layer_opt_lin = 
                 expandOpticalProperties(layer_opt_props[iz], layer_opt_props_lin[iz], arr_type)
@@ -453,6 +458,12 @@ function rt_run(RS_type::AbstractRamanType,
     # per-height radiance/Jacobian records.
     R_out, T_out = _select_observer_endpoints(model, R, T)
     Ṙ_out, Ṫ_out = _select_observer_endpoints(model, Ṙ, Ṫ)
+    if model.quad_points.external_solar
+        # TOA-only representation: the BOA field would be missing its direct
+        # component (external μ₀ has no operator node) — report unavailable.
+        T_out = nothing
+        Ṫ_out = nothing
+    end
     level_type = isempty(sensor_levels) ?
         LevelRadianceLin{FT,Nothing,Nothing,Nothing,Nothing} :
         typeof(LevelRadianceLin(

@@ -22,7 +22,7 @@ Two stream counts live on the resulting `QuadPoints`:
 
 """
     rt_set_streams(::GaussLegQuad, Ltrunc, obs_geom, pol_type, arr_type;
-                   external_solar=true)
+                   external_solar=false)
 
 Half-space Gauss-Legendre quadrature on `[0, 1]` for the upper hemisphere.
 Builds `(Ltrunc + 2) ÷ 2` weighted nodes (Sanghavi: the `+2` avoids
@@ -49,10 +49,11 @@ function rt_set_streams(::GaussLegQuad,
     qp_μ, wt_μ = Scattering.gauleg(Nquad, zero(FT), one(FT))
     μ₀ = cosd.(sza)
 
-    # VZAs are diffuse-operator output nodes. In the legacy representation,
-    # the solar direction is also an operator node. The default external-solar
-    # representation keeps μ₀ only on the phase grid so the square
-    # diffuse operators do not carry its zero-weight row and column.
+    # VZAs are diffuse-operator output nodes. In the default (embedded-μ₀)
+    # representation, the solar direction is also an operator node. The
+    # opt-in external-solar representation keeps μ₀ only on the phase grid
+    # so the square diffuse operators do not carry its zero-weight row and
+    # column.
     qp_μ = external_solar ? unique(FT[qp_μ; cosd.(vza)]) :
                               unique(FT[qp_μ; cosd.(vza); μ₀])
     wt_μ = FT[wt_μ; zeros(FT, length(qp_μ) - length(wt_μ))]
@@ -181,7 +182,7 @@ end
 
 """
     rt_set_streams(::GaussLegQuad, obs_geom, pol_type, arr_type;
-                   nstreams::Int, external_solar=true)
+                   nstreams::Int, external_solar=false)
 
 Build a half-space Gauss-Legendre quadrature with exactly `nstreams`
 weighted nodes per hemisphere. Equivalent to the positional form with

@@ -71,11 +71,12 @@ After Fourier decomposition, each per-moment integral over ``\mu' \in [-1, 1]``
 is replaced by a finite sum. vSmartMOM offers two quadrature schemes
 ([`src/CoreRT/tools/rt_set_streams.jl`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/tools/rt_set_streams.jl)):
 
-- **`GaussLegQuad`** — half-space Gauss-Legendre on ``[0,1]``. By default,
-  only viewing directions are appended to the diffuse operator; exact
-  ``μ_0`` remains a scalar source direction and a phase-evaluation column.
-  The backward-compatible embedded representation, requested with
-  `external_solar=false`, also appends the solar direction as a zero-weight node.
+- **`GaussLegQuad`** — half-space Gauss-Legendre on ``[0,1]``. By default
+  (`external_solar=false`), the solar direction is appended to the diffuse
+  operator as a zero-weight node alongside the viewing directions. With the
+  opt-in `external_solar=true` (TOA-only), only viewing directions are
+  appended; exact ``μ_0`` remains a scalar source direction and a
+  phase-evaluation column.
 - **`RadauQuad`** — block-Radau composite on ``[0, \mu_0] \cup [\mu_0, 1]``
   with ``\mu_0`` as a true quadrature node carrying non-zero weight (Sanghavi
   2014 App. B, Eqs. B.1–B.2). This is the historical DNI-oriented solution to
@@ -92,7 +93,8 @@ about today's SFI kernel.
 The current solver computes direct-beam source-function integration (SFI).
 Its backward-compatible default keeps ``μ_0`` in the operator grid as a
 zero-weight node because several solver paths still depend on that layout.
-The default external-solar form removes this representational relic: ``μ_0`` is
+The opt-in external-solar form (`external_solar=true`, a TOA-only path
+consumed through `rt_run_toa`) removes this representational relic: ``μ_0`` is
 **not a diffuse stream**. The elemental solver receives it as a scalar
 propagation direction. Exact rectangular ``Z_0(μ_i,μ_0)`` columns generate
 finite-layer ``R_0/T_0`` operators, which are then contracted into
