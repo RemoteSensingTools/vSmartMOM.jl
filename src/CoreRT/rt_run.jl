@@ -61,10 +61,12 @@ function rt_run(model; i_band::Integer = 1,
                 streams_callback::Union{Nothing, Function} = nothing,
                 atm_snapshot_callback::Union{Nothing, Function} = nothing,
                 stop_after_atmosphere::Bool = false,
-                m_max_override::Union{Nothing, Int} = nothing)
+                m_max_override::Union{Nothing, Int} = nothing,
+                fourier_convergence_override::Union{Nothing, AbstractFourierConvergence} = nothing)
     rt_run(InelasticScattering.noRS{float_type(model)}(), model, i_band;
            sources, streams_callback,
-           atm_snapshot_callback, stop_after_atmosphere, m_max_override)
+           atm_snapshot_callback, stop_after_atmosphere, m_max_override,
+           fourier_convergence_override)
 end
 
 """
@@ -336,6 +338,7 @@ function _rt_run_column(RS_type::AbstractRamanType, model, iBand;
                         atm_snapshot_callback::Union{Nothing, Function} = nothing,
                         stop_after_atmosphere::Bool = false,
                         m_max_override::Union{Nothing, Int} = nothing,
+                        fourier_convergence_override::Union{Nothing, AbstractFourierConvergence} = nothing,
                         toa_only::Bool = false)
     _warn_explicit_depol_raman(RS_type, model)
 
@@ -559,7 +562,14 @@ function _rt_run_column(RS_type::AbstractRamanType, model, iBand;
     # the test is free), on the atmosphere-only path via the view-extracted
     # TOA J₀⁻ proxy (exact for Lambertian surfaces, whose m>0 surface term
     # vanishes). `fc_npass` is VLIDORT's TESTCONV counter.
-    fconv = model.numerics.fourier_convergence
+    # `fourier_convergence_override` lets rt_run_atmosphere force the full
+    # Fourier series when the cache must serve structured (non-Lambertian)
+    # target BRDFs: the atmosphere-path convergence proxy only observes the
+    # atmosphere's TOA source and is blind to any surface a later replay
+    # will attach, so early exit could truncate the cache below a declared
+    # target's Fourier support.
+    fconv = fourier_convergence_override === nothing ?
+        model.numerics.fourier_convergence : fourier_convergence_override
     fc_active = fconv isa IntensityConvergence && SFI
     fc_npass  = 0
     fc_R_prev = fc_active && !stop_after_atmosphere ? copy(R_SFI) : nothing
@@ -914,7 +924,8 @@ function rt_run(RS_type::AbstractRamanType, model, iBand;
                 streams_callback::Union{Nothing, Function} = nothing,
                 atm_snapshot_callback::Union{Nothing, Function} = nothing,
                 stop_after_atmosphere::Bool = false,
-                m_max_override::Union{Nothing, Int} = nothing)
+                m_max_override::Union{Nothing, Int} = nothing,
+                fourier_convergence_override::Union{Nothing, AbstractFourierConvergence} = nothing)
     bands = iBand isa Integer ? [Int(iBand)] : collect(Int, iBand)
     geom = model.obs_geom
     model.quad_points.external_solar && !isempty(geom.sensor_levels) &&
@@ -926,14 +937,14 @@ function rt_run(RS_type::AbstractRamanType, model, iBand;
     # consumes the per-moment snapshots via the callback, not the observer
     # wrapping, and interior sensor levels are out of scope for the split.
     if atm_snapshot_callback !== nothing || stop_after_atmosphere ||
-       m_max_override !== nothing
+       m_max_override !== nothing || fourier_convergence_override !== nothing
         isempty(geom.sensor_levels) || throw(ArgumentError(
             "atmosphere/surface-split keywords are not supported together " *
             "with interior sensor levels (multisensor)"))
         result = _rt_run_column(RS_type, model, bands;
                                 sources, streams_callback,
                                 atm_snapshot_callback, stop_after_atmosphere,
-                                m_max_override)
+                                m_max_override, fourier_convergence_override)
         stop_after_atmosphere && return result
         return _observer_result_from_column(model, result)
     end

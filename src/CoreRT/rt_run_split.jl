@@ -111,9 +111,9 @@ function rt_run_atmosphere(model;
     # :auto -> :slim iff every target BRDF is Lambertian-family
     # (component_m_max == 0 — the only case where the m>0 surface layer is
     # provably zero, see proposal §4). Otherwise :full.
+    targets_lambertian = all(==(0), (component_m_max(b, ctx) for b in brdfs))
     resolved_cache_mode = cache_mode == :auto ?
-        (all(==(0), (component_m_max(b, ctx) for b in brdfs)) ? :slim : :full) :
-        cache_mode
+        (targets_lambertian ? :slim : :full) : cache_mode
     slim = resolved_cache_mode == :slim
 
     # Collection slots — filled by the callback below, one push per Fourier
@@ -167,10 +167,20 @@ function rt_run_atmosphere(model;
         return nothing
     end
 
+    # Runtime Fourier convergence (IntensityConvergence) tests only the
+    # atmosphere's TOA source proxy on this path — it cannot see the target
+    # BRDFs a later replay will attach. For Lambertian-family targets that is
+    # safe (their surface layer is zero for m > 0, so a series converged on
+    # the atmosphere is converged with the surface). For structured targets
+    # (Cox-Munk / RPV / RossLi) an early exit could snapshot fewer moments
+    # than the target's declared Fourier support and the replay would throw —
+    # force the full series up to m_max_cache instead.
     rt_run(model; i_band = i_band, sources = sources,
                   stop_after_atmosphere = true,
                   atm_snapshot_callback = cb,
-                  m_max_override = m_max_cache)
+                  m_max_override = m_max_cache,
+                  fourier_convergence_override =
+                      targets_lambertian ? nothing : AllFourierMoments())
 
     captured_ctx[] === nothing &&
         error("rt_run_atmosphere: callback never fired — the atmosphere phase produced no Fourier moments.")
@@ -195,9 +205,12 @@ function rt_run_atmosphere(model;
         c.pol_type, c.quad_points, c.iμ₀, FT(c.μ₀),
         FT.(collect(c.vza)), FT.(collect(c.vaz)),
         # The cache's m_max is the count of moments ACTUALLY snapshotted
-        # (one weight pushed per moment), not the preset ceiling — Fourier
-        # convergence (IntensityConvergence) may terminate the loop before
-        # m_max_cache, and the surface replay must loop over what's stored.
+        # (one weight pushed per moment), not the preset ceiling. With
+        # Lambertian-family targets, Fourier convergence (IntensityConvergence)
+        # may terminate the loop before m_max_cache and the surface replay
+        # loops over what's stored. With structured targets the run above
+        # forces the full series, so the count equals m_max_cache + 1 and
+        # every declared target's Fourier support is guaranteed present.
         c.nSpec, length(weights) - 1, user_l_cap, c.NquadN, resolved_cache_mode,
         iBand, weights,
         c.arr_type, c.arch, c.SFI, c.RS_type, c.prepared_sources, c.I_static,
