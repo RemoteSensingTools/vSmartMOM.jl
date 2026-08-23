@@ -709,6 +709,15 @@ _layer_absorption_cross_section(model::AtmosphericAbsorption.AbscoLUT, grid, p, 
     AtmosphericAbsorption.compute_cross_section(model, grid, p, T;
                                                 vmr=h2o_vmr, interp=:linear)
 
+# When the caller supplies no explicit broadener, only models with a
+# tabulated H₂O-broadener axis (native ABSCO) draw it from the profile;
+# legacy interpolation tables and line-by-line models keep their broadener
+# semantics untouched (LBL self-broadening is an explicit, moist-air mole
+# fraction supplied by `compute_h2o_absorption_profile!`).
+_default_broadener(model, profile, iz) = nothing
+_default_broadener(::AtmosphericAbsorption.AbscoLUT, profile, iz) =
+    profile.vmr_h2o[iz]
+
 "Given the CrossSectionModel, the grid, and the AtmosphericProfile, fill up the τ_abs array with the cross section at each layer
 (using pressures/temperatures) from the profile. `self_broadener_vmr`, when
 provided, is a moist-air mole fraction passed to AtmosphericAbsorption's
@@ -729,7 +738,7 @@ function compute_absorption_profile!(τ_abs::Array{FT,2},
     @assert size(τ_abs,2) == length(profile.p_full)
     @assert length(vmr) ==1 || length(vmr) == length(profile.p_full)  "Length of VMR array has to match profile size or be uniform"
     #@show grid
-    @showprogress 1 for iz in 1:length(profile.p_full)
+    @showprogress 1 for iz in eachindex(profile.p_full)
 
         # Pa -> hPa
         p = profile.p_full[iz]
@@ -739,12 +748,13 @@ function compute_absorption_profile!(τ_abs::Array{FT,2},
         broadener_curr = self_broadener_vmr isa AbstractArray ?
             self_broadener_vmr[iz] : self_broadener_vmr
         #@show vmr_curr
-        # explicit kwarg wins (multisensor LBL self-broadening); otherwise the
-        # per-layer H₂O VMR feeds the broadener-aware model dispatches (ABSCO).
-        broadener_curr = broadener_curr === nothing ? profile.vmr_h2o[iz] : broadener_curr
+        # An explicit kwarg wins (LBL self-broadening); otherwise the model
+        # type decides whether the profile supplies a broadener (ABSCO only).
+        broadener_curr = broadener_curr === nothing ?
+            _default_broadener(absorption_model, profile, iz) : broadener_curr
         σ = collect(_layer_absorption_cross_section(
             absorption_model, grid, p, T, broadener_curr))
-        τ_abs[:,iz] += σ * profile.vcd_dry[iz] * vmr_curr
+        @views τ_abs[:,iz] .+= σ .* (profile.vcd_dry[iz] * vmr_curr)
     end
     
 end

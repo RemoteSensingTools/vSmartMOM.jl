@@ -1029,6 +1029,15 @@ accumulated and stop when it becomes negligible (`LIDORT_CONVERGE` in
 [`IntensityConvergence`](@ref) (the VLIDORT accuracy test). Selected via
 `RTNumericalParameters.fourier_convergence` (YAML:
 `numerics.fourier_convergence: all | intensity`).
+
+This runtime test is complementary to the *static* per-band loop bound
+derived at model build from [`component_m_max`](@ref) traits (each surface,
+source, and scatterer declares the highest Fourier order it can contribute;
+the band bound is their maximum). The traits set the ceiling `m_max` from
+what the scene *could* require; the convergence strategy stops below that
+ceiling when the accumulated intensity shows the scene *did not* require it.
+Both default on: traits via `SolverConfig.use_component_traits`, early exit
+via the YAML key above.
 """
 abstract type AbstractFourierConvergence end
 

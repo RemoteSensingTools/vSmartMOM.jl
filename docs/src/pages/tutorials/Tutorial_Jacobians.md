@@ -110,14 +110,13 @@ println("dR/d(albedo) at nadir, first 5 spectral points: ",
         round.(dR_albedo[1, 1:min(5,end)], digits=6))
 ```
 
-Gas VMR Jacobians are vertical profiles. Layers follow the internal
-TOA-to-BOA ordering:
+Gas VMR Jacobians are vertical profiles in TOA-to-BOA layer order:
 
 ```julia
 if NGas > 0
     Nz = length(model.profile.p_full)
     gas1 = CoreRT.gas_profile_range(layout, 1, Nz)
-    dR_gas1 = dR[:, 1, :, gas1] # VZA × spectral × vertical layer
+    dR_gas1 = dR[:, 1, :, gas1]
     iz = Nz
     println("dR/d(gas₁ VMR in bottom layer), first 5 points: ",
             round.(dR_gas1[1, 1:min(5,end), iz], digits=6))
@@ -176,3 +175,4 @@ systematically for all parameter types.
 ---
 
 *This page was generated using [Literate.jl](https://github.com/fredrikekre/Literate.jl).*
+

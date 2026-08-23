@@ -35,6 +35,33 @@ vSmartMOM.CoreRT.AllFourierMoments
 vSmartMOM.CoreRT.IntensityConvergence
 ```
 
+## Fourier Loop Bound
+
+The azimuthal Fourier loop bound is derived per band at model build: each
+active component (surface, sources, Rayleigh, aerosol modes) declares the
+highest Fourier order it can contribute via the `component_m_max` trait, and
+the band bound is their maximum, clamped by the user's `max_m`. At run time,
+the [`IntensityConvergence`](@ref vSmartMOM.CoreRT.IntensityConvergence)
+strategy above may terminate the loop below that ceiling once the accumulated
+Stokes-I contribution at the user view angles stabilises — the two mechanisms
+compose.
+
+```@docs
+vSmartMOM.CoreRT.component_m_max
+vSmartMOM.CoreRT._aggregate_m_max
+```
+
+## Column Core and TOA Fast Path
+
+Every public forward entry point funnels into the internal single-column
+solver `_rt_run_column`; `rt_run_toa` is the lean TOA-only wrapper used by
+retrieval loops that never consume BOA or interior fields.
+
+```@docs
+vSmartMOM.CoreRT._rt_run_column
+vSmartMOM.CoreRT.rt_run_toa
+```
+
 ## Height-Aware Forward and Linearized Output
 
 `rt_run` returns a named `ObserverRTResult`. Endpoint fields are `nothing`
@@ -120,10 +147,16 @@ vSmartMOM.CoreRT.ParameterLayout
 vSmartMOM.CoreRT.n_total
 vSmartMOM.CoreRT.aerosol_range
 vSmartMOM.CoreRT.gas_range
+vSmartMOM.CoreRT.gas_profile_range
+vSmartMOM.CoreRT.gas_layer_index
 vSmartMOM.CoreRT.surface_range
 vSmartMOM.CoreRT.surface_index
+vSmartMOM.CoreRT.surface_parameter_count
+vSmartMOM.CoreRT.sif_range
+vSmartMOM.CoreRT.atmosphere_range
 vSmartMOM.CoreRT.n_layer_params
 vSmartMOM.CoreRT.canopy_range
+vSmartMOM.sif_reference_state
 ```
 
 ## Quadrature Types

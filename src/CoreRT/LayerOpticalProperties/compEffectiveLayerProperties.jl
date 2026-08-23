@@ -11,26 +11,46 @@ _rayleigh_greek_source(::AbstractRamanType, greek_rayleigh, greek_cabannes) = gr
 _same_greek_coefficients(a, b) =
     all(name -> getfield(a, name) == getfield(b, name), fieldnames(typeof(a)))
 
-"Compute diffuse phase operators and, for external solar, direct μ₀ blocks."
+"""
+    _matched_tables(tables, Π_pair, μ) -> (tables′, Π_pair′)
+
+Tabulated P/R/T (see `Scattering.ZMomentTables`) are only valid on the μ grid
+they were built for. Return the pair unchanged when the grids match, and
+`(nothing, nothing)` otherwise — the caller then falls back to the direct
+(untabulated) `compute_Z_moments` path, which is bitwise-identical.
+"""
+_matched_tables(tables, Π_pair, μ) =
+    (tables !== nothing && tables.μ == μ) ? (tables, Π_pair) : (nothing, nothing)
+
+"""
+    _compute_phase_blocks(model, greek, m, arr_type; tables=nothing, Π_pair=nothing)
+        -> (Z⁺⁺, Z⁻⁺, Z₀⁺, Z₀⁻)
+
+Compute the diffuse phase operators for Fourier moment `m` and, under
+external solar, the direct-μ₀ source columns (otherwise `Z₀⁺ = Z₀⁻ =
+nothing`). The optional `tables`/`Π_pair` reuse the per-solve
+`Scattering.ZMomentTables` precompute (built once in
+[`build_m_invariant_cache`](@ref)); they are consulted only when their μ grid
+matches the evaluation grid — external solar evaluates the diffuse blocks on
+`qp_μ`, all other modes on `phase_qp_μ`.
+"""
 function _compute_phase_blocks(model, greek, m, arr_type; tables=nothing, Π_pair=nothing)
     q = model.quad_points
     pol = CoreRT.polarization_type(model)
     if q.external_solar
         μdiff = collect(q.qp_μ)
-        # Tabulated P/R/T are valid only on the grid they were built for.
-        t = (tables !== nothing && tables.μ == μdiff) ? tables : nothing
+        t, Π = _matched_tables(tables, Π_pair, μdiff)
         Z⁺⁺, Z⁻⁺ = Scattering.compute_Z_moments(pol, μdiff, greek, m;
-                                                  arr_type=arr_type, tables=t,
-                                                  Π_pair=(t === nothing ? nothing : Π_pair))
+                                                  arr_type=arr_type,
+                                                  tables=t, Π_pair=Π)
         Z₀⁺, Z₀⁻ = Scattering.compute_Z_source_moments(
             pol, μdiff, q.μ₀, greek, m; arr_type=arr_type)
         return Z⁺⁺, Z⁻⁺, Z₀⁺, Z₀⁻
     end
     μphase = collect(q.phase_qp_μ)
-    t = (tables !== nothing && tables.μ == μphase) ? tables : nothing
+    t, Π = _matched_tables(tables, Π_pair, μphase)
     Z⁺⁺, Z⁻⁺ = Scattering.compute_Z_moments(
-        pol, μphase, greek, m; arr_type=arr_type, tables=t,
-        Π_pair=(t === nothing ? nothing : Π_pair))
+        pol, μphase, greek, m; arr_type=arr_type, tables=t, Π_pair=Π)
     return Z⁺⁺, Z⁻⁺, nothing, nothing
 end
 
@@ -281,6 +301,16 @@ function build_m_invariant_cache(RS_type::AbstractRamanType, iBand, model)
                                mode_layers, z_tables)
 end
 
+"""
+    constructCoreOpticalProperties(RS_type, iBand, m, model)
+
+Assemble the per-layer core optical properties `(τ_λ, ϖ_λ, Z⁺⁺, Z⁻⁺[, Z₀⁺,
+Z₀⁻])` for Fourier moment `m`: Rayleigh + δ-M-corrected aerosols mixed via
+the τϖ-weighted `+` operator, plus gas absorption. This is the reference
+path that recomputes everything per call; the cache-aware method below
+(selected by passing an [`MInvariantCache`](@ref)) skips the m-independent
+work inside the Fourier loop.
+"""
 function constructCoreOpticalProperties(RS_type::AbstractRamanType, iBand, m, model)
     (; τ_rayl, τ_aer, τ_abs, aerosol_optics, greek_rayleigh, greek_cabannes) = model
     @assert all(iBand .≤ length(τ_rayl)) "iBand exceeded number of bands"
@@ -345,15 +375,19 @@ function constructCoreOpticalProperties(RS_type::AbstractRamanType, iBand, m, mo
 end
 
 """
-    constructCoreOpticalProperties(RS_type, iBand, m, model; cache=nothing)
+    constructCoreOpticalProperties(RS_type, iBand, m, model, cache::MInvariantCache)
 
-Cache-aware overload: when `cache::MInvariantCache` is supplied, skip all
-m-independent work (τ/ϖ device uploads, `collect(qp_μ)`, fScattRayleigh
-computation) and only compute the Fourier-moment-dependent Z matrices.
+Cache-aware method: skips all m-independent work (τ/ϖ device uploads,
+`collect(qp_μ)`, fScattRayleigh computation) and only computes the
+Fourier-moment-dependent Z matrices. Callers select this method by passing
+the fifth positional `cache` argument; callers that never build a cache
+(the lin path, `rt_run_ss`, etc.) call the 4-argument method above, which
+recomputes everything and is the bit-exact reference path.
 
-When `cache === nothing` the function falls through to the original method
-that recomputes everything — this preserves bit-exact backward compatibility
-for callers that do not supply a cache (the lin path, rt_run_ss, etc.).
+Adds two optimizations the reference method deliberately does not carry:
+the sparse layer-resolved aerosol combine (via `cache.mode_layers`) and the
+cross-band sharing of Rayleigh Z blocks when the per-band Greek coefficients
+are identical.
 """
 function constructCoreOpticalProperties(RS_type::AbstractRamanType, iBand, m, model,
                                          cache::MInvariantCache)
