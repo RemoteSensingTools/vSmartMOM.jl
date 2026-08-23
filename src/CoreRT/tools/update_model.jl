@@ -634,9 +634,11 @@ function update_model!(ctx::BatchContext;
                     # k_aer may be a scalar (single-λ band) or nSpec vector (multi-λ band).
                     k_aer = model.optics.aerosols.aerosol_optics[i_band][i_aer].k
                     τ_profile = getAerosolLayerOptProp(one(FT), dist, new_profile)
-                    # k_aer .* τ_profile' broadcasts to (nSpec × nLayers).
+                    # Shared with the fresh model build — bit-exact by construction.
                     model.optics.aerosols.τ_aer[i_band][i_aer, :, :] .=
-                        (τ_eff / k_ref_aer) .* k_aer .* τ_profile'
+                        _aerosol_τ_slice(τ_eff, k_aer, k_ref_aer, τ_profile,
+                                         FT.(params.spec_bands[i_band]),
+                                         FT(1e4) / params.scattering_params.λ_ref)
                 end
             end
         end
@@ -859,8 +861,11 @@ function update_aerosol_loading!(ctx::BatchContext, i_aer::Int;
         for i_band in 1:ctx.n_bands
             k_aer     = model.optics.aerosols.aerosol_optics[i_band][i_aer].k
             τ_profile = getAerosolLayerOptProp(one(FT), dist, profile)
+            # Shared with the fresh model build — bit-exact by construction.
             model.optics.aerosols.τ_aer[i_band][i_aer, :, :] .=
-                (τ_eff / k_ref_aer) .* k_aer .* τ_profile'
+                _aerosol_τ_slice(τ_eff, k_aer, k_ref_aer, τ_profile,
+                                 FT.(ctx.params.spec_bands[i_band]),
+                                 FT(1e4) / ctx.params.scattering_params.λ_ref)
         end
     end
 
