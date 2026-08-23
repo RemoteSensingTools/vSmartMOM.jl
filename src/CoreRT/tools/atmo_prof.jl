@@ -83,7 +83,7 @@ function compute_atmos_profile_fields(T::AbstractArray{FT,1}, p_half::AbstractAr
             else
                 @info "Warning, make sure that the VMR is interpolated correctly! Right now, it might be tricky"
                 pressure_grid = collect(range(minimum(p_full), maximum(p_full), length=length(vmr[molec_i])))
-                interp_linear = LinearInterpolation(pressure_grid, vmr[molec_i])
+                interp_linear = linear_interpolation(pressure_grid, vmr[molec_i])
                 new_vmr[molec_i] = [interp_linear(x) for x in p_full]
             end
         else
@@ -116,7 +116,7 @@ function _layer_centered_input(name::AbstractString,
         return FT.(values)
     elseif length(values) == length(p_half)
         p_full = (p_half[1:end-1] .+ p_half[2:end]) ./ FT(2)
-        interpolation = LinearInterpolation(log.(p_half), FT.(values))
+        interpolation = linear_interpolation(log.(p_half), FT.(values))
         return FT.(interpolation.(log.(p_full)))
     end
     throw(ArgumentError(
@@ -146,7 +146,7 @@ function _interp_layer_field(old_p::AbstractVector{FT}, data::AbstractVector,
                              new_p::AbstractVector{FT}) where {FT}
     length(data) == length(old_p) || throw(ArgumentError(
         "vertical field has $(length(data)) entries but the profile has $(length(old_p)) layers"))
-    itp = LinearInterpolation(log.(old_p), FT.(data); extrapolation_bc=Flat())
+    itp = linear_interpolation(log.(old_p), FT.(data); extrapolation_bc=Flat())
     return FT.(itp.(log.(new_p)))
 end
 
@@ -339,7 +339,7 @@ function _pressures_at_altitudes(profile::AtmosphericProfile{FT},
                                  altitudes::AbstractVector{FT}) where {FT}
     isempty(altitudes) && return FT[]
     # `z_half` descends while interpolation grids must ascend.
-    logp_of_z = LinearInterpolation(reverse(z_half), reverse(log.(profile.p_half)))
+    logp_of_z = linear_interpolation(reverse(z_half), reverse(log.(profile.p_half)))
     pressures = FT[]
     for height in altitudes
         index = _matching_height_index(z_half, height)
@@ -422,7 +422,7 @@ function prepare_observer_profile(T::Vector{FT}, p_half::Vector{FT}, q::Vector{F
         base
     else
         p_new = sort!(unique!(vcat(copy(base.p_half), requested_p)))
-        z_of_logp = LinearInterpolation(log.(base.p_half), z_base)
+        z_of_logp = linear_interpolation(log.(base.p_half), z_base)
         z_new = FT.(z_of_logp.(log.(p_new)))
         for (h, p_h) in zip(selection.interior_altitudes, requested_p)
             z_new[argmin(abs.(p_new .- p_h))] = h
@@ -440,7 +440,7 @@ function prepare_observer_profile(T::Vector{FT}, p_half::Vector{FT}, q::Vector{F
         end
         effective_n >= length(natural_profile.T) ? natural_profile : begin
             p_new = _anchored_pressure_grid(base, effective_n, requested_p)
-            z_of_logp = LinearInterpolation(log.(base.p_half), z_base)
+            z_of_logp = linear_interpolation(log.(base.p_half), z_base)
             z_new = FT.(z_of_logp.(log.(p_new)))
             for (h, p_h) in zip(selection.interior_altitudes, requested_p)
                 z_new[argmin(abs.(p_new .- p_h))] = h
@@ -492,7 +492,7 @@ function reduce_profile(n::Int, profile::AtmosphericProfile{FT}; binavg::Bool=fa
     old_p = profile.p_full
     function _interp(data::AbstractVector)
         grid = collect(range(minimum(old_p), maximum(old_p), length=length(data)))
-        itp  = LinearInterpolation(grid, data)
+        itp  = linear_interpolation(grid, data)
         return FT.(itp.(p_full))
     end
 

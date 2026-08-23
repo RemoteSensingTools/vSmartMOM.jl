@@ -284,9 +284,11 @@ function compute_absorption_profile!(τ_abs::Array{FT,2},
         #temp = collect(absorption_cross_section(absorption_model, grid, p, T)) * profile.vcd_dry[iz] * vmr_curr
         #@show minimum(temp), p, T, profile.vcd_dry[iz] * vmr_curr
         #@show iz, profile.vcd_dry[iz], vmr_curr, p, T
-        # explicit kwarg wins; else the per-layer H₂O VMR feeds the
-        # broadener-aware dispatches (ABSCO) — same rule as atmo_prof.jl.
-        broadener_curr = broadener_curr === nothing ? profile.vmr_h2o[iz] : broadener_curr
+        # An explicit kwarg wins (LBL self-broadening); otherwise the model
+        # type decides whether the profile supplies a broadener (ABSCO only)
+        # — same `_default_broadener` rule as the forward path in atmo_prof.jl.
+        broadener_curr = broadener_curr === nothing ?
+            _default_broadener(absorption_model, profile, iz) : broadener_curr
         σ = collect(_layer_absorption_cross_section(
             absorption_model, grid, p, T, broadener_curr))
         τ_abs[:,iz] += σ * profile.vcd_dry[iz] * vmr_curr

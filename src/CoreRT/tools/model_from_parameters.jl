@@ -211,7 +211,7 @@ end
 
 """
     model_from_parameters(params::vSmartMOM_Parameters;
-                          sources=SolarBeam(), external_solar=true) -> RTModel
+                          sources=SolarBeam(), external_solar=false) -> RTModel
 
 Construct an [`RTModel`](@ref) from user-supplied [`vSmartMOM_Parameters`](@ref).
 
@@ -224,10 +224,13 @@ Computes all derived quantities needed by the RT solver:
 
 # Arguments
 - `params::vSmartMOM_Parameters`: Configuration struct (typically from `parameters_from_yaml`).
-- `external_solar::Bool=true`: Keep the direct solar direction outside the
-  diffuse operator. This requires Gauss quadrature and is consumed through
-  [`rt_run_toa`](@ref). Pass `false` explicitly for legacy embedded-μ₀
-  workflows such as Radau quadrature or interior/BOA diagnostics.
+- `external_solar::Bool=false`: When `true`, keep the direct solar direction
+  outside the diffuse operator (rectangular `Z₀` source columns instead of an
+  embedded zero-weight μ₀ node). This is an opt-in, TOA-only fast path — it
+  requires Gauss quadrature and is consumed through [`rt_run_toa`](@ref).
+  The default embedded-μ₀ mode supports every entry point: full `R, T`
+  output, interior/BOA observer heights, the atmosphere/surface split, and
+  Radau quadrature.
 
 # Returns
 - `model::RTModel{ARCH, FT}`: Hierarchical model ready for `rt_run(model)`.
@@ -238,7 +241,7 @@ Computes all derived quantities needed by the RT solver:
 """
 function model_from_parameters(params::vSmartMOM_Parameters;
                                sources::AbstractSource = SolarBeam(),
-                               external_solar::Bool = true)
+                               external_solar::Bool = false)
     FT = params.float_type
     #@show FT
     # Number of total bands and aerosols (for convenience)

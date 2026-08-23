@@ -595,7 +595,11 @@ end
     lin_model.τ̇_abs[1] .= 0
     @views lin_model.τ̇_abs[1][1, :, :] .= κ
 
-    result = rt_run(model, lin_model, 0, 1, 1; i_band=1)
+    # NGas counts flattened gas-LAYER parameter columns (NGasSpecies × Nz),
+    # matching the species-major rows of τ̇_abs — same convention as the
+    # endpoint testset above.
+    result = rt_run(model, lin_model, 0, size(lin_model.τ̇_abs[1], 1), 1;
+                    i_band=1)
     level = only(result.levels)
     gas_column = first(CoreRT.gas_range(result.layout))
     surface_column = CoreRT.surface_index(result.layout)

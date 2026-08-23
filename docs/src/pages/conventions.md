@@ -241,8 +241,8 @@ accidental treatment of the collimated Sun as diffuse radiation.
 
 | Scheme | Weighted-streams construction | Solar treatment |
 |--------|-------------------------------|-----------------|
-| `GaussLegQuad` (default, `external_solar=true`) | Gauss-Legendre on `[0, 1]`, `(Ltrunc+2)÷2` nodes (Sanghavi: `+2` form avoids zero streams at `Ltrunc=0`) | Only VZAs are appended to the operator; scalar ``μ₀`` is evaluated directly into rectangular ``Z₀`` columns. |
-| `GaussLegQuad` with `external_solar=false` (legacy) | Same weighted Gauss nodes | SZA and VZAs are appended as zero-weight operator nodes. |
+| `GaussLegQuad` with `external_solar=true` (opt-in, TOA-only) | Gauss-Legendre on `[0, 1]`, `(Ltrunc+2)÷2` nodes (Sanghavi: `+2` form avoids zero streams at `Ltrunc=0`) | Only VZAs are appended to the operator; scalar ``μ₀`` is evaluated directly into rectangular ``Z₀`` columns. |
+| `GaussLegQuad` (default, `external_solar=false`) | Same weighted Gauss nodes | SZA and VZAs are appended as zero-weight operator nodes. |
 | `RadauQuad` | Gauss-Radau on subintervals around μ₀; the SZA-on-node branch builds `(Ltrunc+1)÷2` nodes, while the usual SZA-not-on-node branch builds `2·((Ltrunc+1)÷2)` weighted nodes split around μ₀ | ``μ₀`` is a weighted quadrature node; external-solar mode is not supported. VZAs are appended with zero weight. |
 
 Because Radau allocates a different number of weighted nodes
@@ -268,8 +268,10 @@ The `RTModel` `Base.show` summary prints both: `"Nstreams=N, Nquad=M"`.
 
 ### External-solar SFI and the 18×18 exoplanet operator
 
-`external_solar=true` is the model-construction default; legacy embedded-``μ₀``
-behavior requires `external_solar=false`. In external mode, ``μ₀`` is a scalar propagation direction and
+Embedded-``μ₀`` (`external_solar=false`) is the model-construction default —
+it supports every entry point (full `R, T`, observer heights, the
+atmosphere/surface split). `external_solar=true` is the opt-in TOA-only fast
+path consumed through `rt_run_toa`. In external mode, ``μ₀`` is a scalar propagation direction and
 a phase-source column, not a zero-weight diffuse stream. The legacy operator
 indices `iμ₀` and `iμ₀Nstart` are therefore zero sentinels; source coupling
 uses `iμ₀_phase`.

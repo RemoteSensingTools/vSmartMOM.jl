@@ -64,7 +64,7 @@ This is the **linearized** counterpart of `model_from_parameters(params)`. It co
 function model_from_parameters(lin::LinMode,
     params::vSmartMOM_Parameters;
     sources::AbstractSource = SolarBeam(),
-    external_solar::Bool = true)
+    external_solar::Bool = false)
     FT = params.float_type
     n_bands = length(params.spec_bands)
     n_aer = isnothing(params.scattering_params) ? 0 : length(params.scattering_params.rt_aerosols)
@@ -151,7 +151,10 @@ function model_from_parameters(lin::LinMode,
         total = vec(sum(τ_rayl[i_band], dims=2))
         totaldot = total ./ profile.p_half[end]
         frac = dry ./ sum(dry)
-        fracdot = (drydot .* sum(dry) .- dry .* sum(drydot)) ./ sum(dry)^2
+        # Quotient rule written without sum(dry)^2: column densities are
+        # O(1e25) molec/cm², so the square overflows Float32 (max ~3.4e38)
+        # and poisons the surface-pressure Jacobian with NaN.
+        fracdot = (drydot .- frac .* sum(drydot)) ./ sum(dry)
         τ̇_rayl_psurf[i_band] .= totaldot * frac' .+ total * fracdot'
 
         (isnothing(abs_params) && isnothing(params.q)) && continue
