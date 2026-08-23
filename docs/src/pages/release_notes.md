@@ -12,7 +12,12 @@ a migration guide, not as a complete git history.
 Work in progress on the `feat/surface-split` branch — not yet merged to
 `main`, not yet tagged or released. Summarized here ahead of the PR so the
 migration story stays contiguous; fold this section under a version heading
-once it ships.
+once it ships. This branch now also carries the merged multi-sensor work
+(next section); the two Fourier-loop mechanisms they introduce compose —
+the per-component support traits
+([`component_m_max`](@ref vSmartMOM.CoreRT.component_m_max)) fix the loop
+ceiling at model build, and the runtime intensity-convergence strategy may
+exit below it.
 
 ### AtmosphericAbsorption is the supported absorption dependency
 
@@ -65,6 +70,9 @@ for which of the above (or the existing `BatchContext` / `update_model!` /
 for, keyed by what changes between runs.
 
 ## Unreleased — observer height selection and multi-level radiances
+
+Merged into `feat/surface-split` from the multi-sensor branch; ships together
+with the section above.
 
 `geometry.obs_alt` is now a geometric height selection in **km above BOA**,
 not a pressure. Scalar and vector forms distinguish a single observing level

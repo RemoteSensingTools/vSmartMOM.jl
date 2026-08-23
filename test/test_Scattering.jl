@@ -266,7 +266,13 @@ end
     # Δ=0 makes the forward and legacy linearized fit domains identical.
     mod = δBGE(10, 0.0)
     _, lin_out = Scattering.truncate_phase(mod, raw, raw_lin)
-    h = 1e-5
+    # Central-difference step. The δ-BGE normal equations are ill-conditioned,
+    # so the FD noise floor scales as O(eps·cond/h) and even flips with
+    # compiler flags (Pkg.test's --check-bounds=yes changes SIMD summation
+    # order); with the tangent direction 0.01·g, h = 1e-2 gives a 1e-4
+    # relative step — large enough to dominate that noise, small enough that
+    # the O(h²) truncation stays far below the tolerance below.
+    h = 1e-2
     function perturbed(sign)
         gp = GreekCoefs((getproperty(g, f) .+
                          sign * h .* directions[f] for f in fields)...)

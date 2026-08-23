@@ -10,6 +10,14 @@
 #
 # Phase C lands the dispatch *infrastructure* behind the flag
 # `SolverConfig.use_component_traits` — **default `true`** in v2.1.
+#
+# Relation to the runtime Fourier-convergence test: these traits fix the
+# STATIC per-band ceiling `m_max` at model build (what the scene could
+# require); `RTNumericalParameters.fourier_convergence` (see
+# `AbstractFourierConvergence`) may then terminate the loop BELOW that
+# ceiling at run time, once the accumulated Stokes-I contribution at the
+# user view angles stabilises. The two are independent and compose:
+# traits bound the loop, convergence exits it early.
 # Cox-Munk / RossLi / RPV / canopy now run to their full
 # `user_l_cap` Fourier resolution instead of being silently
 # half-truncated by the legacy aggregator.  Flip to `false` to fall

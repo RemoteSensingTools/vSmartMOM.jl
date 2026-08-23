@@ -33,6 +33,19 @@ vSmartMOM.Scattering.MieBatchWorkspace
 vSmartMOM.Scattering.reconstruct_phase
 ```
 
+## Fourier Z-Moment Assembly
+
+Per-Fourier-moment phase operators on the quadrature grid: `compute_Z_moments`
+builds the diffuse `Z⁺⁺`/`Z⁻⁺` blocks from Greek coefficients (optionally via
+the per-solve `ZMomentTables` precompute), and `compute_Z_source_moments`
+builds the rectangular direct-solar `Z₀⁺`/`Z₀⁻` columns used by the
+external-solar SFI mode.
+
+```@docs
+vSmartMOM.Scattering.compute_Z_moments
+vSmartMOM.Scattering.compute_Z_source_moments
+```
+
 ## Convenience Computations
 
 Useful for cross-sections or scalar phase-function outputs without running

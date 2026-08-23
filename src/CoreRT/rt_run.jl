@@ -294,28 +294,42 @@ function _warn_explicit_depol_raman(RS_type::AbstractRamanType, model)
 end
 
 """
-    rt_run(RS_type, model::RTModel, iBand; sources=nothing)
+    _rt_run_column(RS_type, model::RTModel, iBand; kwargs...)
 
-Perform Radiative Transfer calculations with explicit Raman type.
+Internal single-column solver: the Fourier loop over elemental → doubling →
+interaction → surface for one full atmosphere/surface column. Every public
+entry point ([`rt_run`](@ref), [`rt_run_toa`](@ref),
+[`rt_run_atmosphere`](@ref)) funnels into this function; user code should
+call those instead — they own the observer conventions and result wrapping.
 
-Accepts an optional `sources::AbstractSource` argument (v0.6 source-term
-refactor, Phase 2). When `nothing`, the legacy F₀ default is preserved
-bit-for-bit. When a [`SourceSet`](@ref) (or a single
-[`AbstractSource`](@ref)) is supplied, the F₀ carried by the first
-[`SolarBeam`](@ref) is routed into `RS_type.F₀` ahead of the existing
-SFI kernel call. Phase 5 will remove the `RS_type.F₀` indirection.
+Returns the raw SFI tuple `(R, T, ieR, ieT, hdr, bhr_uw, bhr_dw)`
+(or `(R, T)` without SFI; only `R` — elastic and inelastic — under
+`toa_only`).
 
-Also accepts the atmosphere/surface-split hooks consumed by
-[`rt_run_atmosphere`](@ref): `atm_snapshot_callback` (fired once per Fourier
-moment right after the layer loop, before the surface step),
-`stop_after_atmosphere` (skip the surface step + postprocessing for this
-call), and `m_max_override` (widen, never narrow, the Fourier loop bound).
-All three default to a no-op / bit-exact-compatible value.
+# Keyword arguments
+- `sources::AbstractSource`: optional source-term set (v0.6 source-term
+  refactor, Phase 2). When `nothing`, the legacy F₀ default is preserved
+  bit-for-bit; when a [`SourceSet`](@ref) or single [`AbstractSource`](@ref)
+  is supplied, the F₀ carried by the first [`SolarBeam`](@ref) is routed
+  into `RS_type.F₀` ahead of the SFI kernel call.
+- `streams_callback`: fires with the per-moment stream state (used by
+  [`rt_run_streams`](@ref)).
+- Atmosphere/surface-split hooks consumed by [`rt_run_atmosphere`](@ref):
+  `atm_snapshot_callback` (fired once per Fourier moment right after the
+  layer loop, before the surface step), `stop_after_atmosphere` (skip the
+  surface step + postprocessing), and `m_max_override` (widen, never
+  narrow, the Fourier loop bound). All three default to a no-op /
+  bit-exact-compatible value.
+- `toa_only::Bool`: skip BOA/transmittance postprocessing and return only
+  the TOA field (multisensor fast path).
+
+The Fourier loop bound comes from the model build
+([`component_m_max`](@ref) traits aggregated per band); within the loop,
+`model.numerics.fourier_convergence` (an
+[`AbstractFourierConvergence`](@ref) strategy) may terminate the series
+early once the observed Stokes-I contribution stabilises. The two
+mechanisms compose: traits set the ceiling, convergence stops below it.
 """
-
-# Union of the surface-split kwargs (atm_snapshot_callback /
-# stop_after_atmosphere / m_max_override) and the multisensor rename +
-# toa_only fast path — the two branches extended the same column core.
 function _rt_run_column(RS_type::AbstractRamanType, model, iBand;
                         sources::Union{Nothing, AbstractSource} = nothing,
                         streams_callback::Union{Nothing, Function} = nothing,
@@ -878,11 +892,22 @@ end
 end
 
 """
-    rt_run(RS_type, model, iBand; sources=nothing)
+    rt_run(RS_type, model, iBand; sources=nothing) -> ObserverRTResult
 
-Run height-aware forward RT. The observer convention stored in
-`model.obs_geom` selects optional TOA/BOA endpoints and any exact interior
-interfaces. See [`ObserverRTResult`](@ref).
+Run height-aware forward RT with an explicit Raman type. The observer
+convention stored in `model.obs_geom` selects optional TOA/BOA endpoints and
+any exact interior interfaces. See [`ObserverRTResult`](@ref).
+
+Advanced keywords:
+- `sources`, `streams_callback`: forwarded to the column core — see
+  [`_rt_run_column`](@ref).
+- Atmosphere/surface-split hooks (`atm_snapshot_callback`,
+  `stop_after_atmosphere`, `m_max_override`): when any is active, the call
+  routes straight to the column core so [`rt_run_atmosphere`](@ref) can
+  capture per-moment snapshots. These are mutually exclusive with interior
+  sensor levels (an `ArgumentError` is thrown); under
+  `stop_after_atmosphere` the raw column tuple is returned unwrapped, since
+  the caller consumes the snapshots, not the radiances.
 """
 function rt_run(RS_type::AbstractRamanType, model, iBand;
                 sources::Union{Nothing, AbstractSource} = nothing,

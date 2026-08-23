@@ -1052,7 +1052,18 @@ function _parse_cia_files(abs_dict::AbstractDict)
     return paths, reference_codes, negative_policies
 end
 
-function _parse_absorption(params_dict::Dict, FT, q, spec_bands, architecture)
+"""
+    _parse_absorption(params_dict, FT, q=nothing, spec_bands=nothing,
+                      architecture=nothing)
+
+Parse the `absorption:` YAML block. `spec_bands` and `architecture` are only
+required when the block requests direct LUT ingestion (`LUTfiles` with ABSCO
+HDF entries) — the band range selects the ABSCO band and the architecture
+places the table; every other absorption path (line-by-line, legacy
+interpolation tables, CIA, MT_CKD) parses without them.
+"""
+function _parse_absorption(params_dict::Dict, FT, q=nothing, spec_bands=nothing,
+                           architecture=nothing)
     if !haskey(params_dict, "absorption")
         return nothing
     end
@@ -1126,6 +1137,9 @@ function _parse_absorption(params_dict::Dict, FT, q, spec_bands, architecture)
     luts = []
     h2o_lut = Vector{Any}(nothing, n_bands)
     if haskey(abs_dict, "LUTfiles")
+        _require_config(spec_bands !== nothing && architecture !== nothing,
+            "absorption.LUTfiles requires the spectral bands and compute " *
+            "architecture to be parsed first (band selection + table placement)")
         files_lut = Array(abs_dict["LUTfiles"])
         _require_config(length(files_lut) == n_bands,
             "LUTfiles must have one entry per band ($(n_bands)); got $(length(files_lut))")
