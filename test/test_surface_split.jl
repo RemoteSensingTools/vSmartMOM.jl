@@ -249,6 +249,66 @@ using LinearAlgebra: BLAS
     end
 
     # ---------------------------------------------------------------------
+    # 3b. Runtime Fourier convergence must not truncate a cache below a
+    #     structured target's declared Fourier support. The atmosphere-path
+    #     convergence proxy cannot see the replay surface, so
+    #     rt_run_atmosphere forces the full series for non-Lambertian
+    #     targets; the cache must come out at full width and the replay must
+    #     succeed and agree with the monolithic (converged) run to within
+    #     the convergence tolerance.
+    # ---------------------------------------------------------------------
+    @testset "IntensityConvergence vs structured-target cache" begin
+        function _rpv_params_fc()
+            p = parameters_from_yaml("../config/vegetation_rpv.yaml")
+            p.architecture = arch
+            p.l_trunc = 5
+            p.max_m   = 6
+            p.numerics = CoreRT.RTNumericalParameters{p.float_type}(
+                dτ_max_threshold    = p.numerics.dτ_max_threshold,
+                dτ_min_floor        = p.numerics.dτ_min_floor,
+                blas_threads        = p.numerics.blas_threads,
+                verbose             = p.numerics.verbose,
+                fourier_convergence = CoreRT.IntensityConvergence(1e-4))
+            return p
+        end
+        _finite_t(t) = all(x -> all(isfinite, x), t)
+
+        n_blas = BLAS.get_num_threads()
+        BLAS.set_num_threads(1)
+        try
+            local model_fc, cache_fc, res_fc, ref_fc
+            clean = false
+            for attempt in 1:8   # same pre-existing RPV nondeterminism as above
+                try
+                    model_fc = model_from_parameters(_rpv_params_fc())
+                    cache_fc = rt_run_atmosphere(model_fc)  # RPV target ⇒ full series
+                    res_fc   = rt_run_surface(cache_fc, model_fc.surfaces[1])
+                    ref_fc   = rt_run(model_fc)             # monolithic, MAY converge early
+                    if _finite_t(res_fc) && _finite_t(ref_fc)
+                        clean = true
+                        break
+                    end
+                    @warn "convergence-cache testset: attempt $attempt non-finite — retrying"
+                catch e
+                    @warn "convergence-cache testset: attempt $attempt threw — retrying" exception=e
+                end
+            end
+            clean || error("convergence-cache testset: 8 attempts all failed")
+
+            # The regression: with IntensityConvergence configured, the cache
+            # must still hold every moment the RPV target declares (early exit
+            # here used to shrink cache.m_max and make the replay throw).
+            @test cache_fc.m_max == model_fc.solver.m_max_bands[1]
+            # Replay (full series) vs monolithic (surface-aware convergence,
+            # may stop early): equal within the configured tolerance.
+            @test res_fc[1] ≈ ref_fc[1] rtol=5e-3
+            @test res_fc[2] ≈ ref_fc[2] rtol=5e-3
+        finally
+            BLAS.set_num_threads(n_blas)
+        end
+    end
+
+    # ---------------------------------------------------------------------
     # 4. Guards.
     # ---------------------------------------------------------------------
     @testset "Guards" begin
