@@ -139,7 +139,13 @@ function truncate_phase_lowconf(mod::δBGE, aero::AerosolOptics{FT}; reportFit=f
     # mirroring the Mie generators (internal Float64, output FT).
     greek_coefs = GreekCoefs(convert.(FT, αᵗ), convert.(FT, βᵗ), convert.(FT, γᵗ),
                              convert.(FT, δᵗ), convert.(FT, ϵᵗ), convert.(FT, ζᵗ))
-    return AerosolOptics(greek_coefs=greek_coefs, ω̃=ω̃, k=k, fᵗ=(FT(1) - c₀))
+    # Retain the untruncated Greek set so the TMS single-scattering
+    # correction can evaluate the exact phase function at view geometries
+    # without re-running Mie (see AbstractSingleScatteringCorrection).
+    return AerosolOptics(greek_coefs=greek_coefs, ω̃=ω̃, k=k, fᵗ=(FT(1) - c₀),
+                         phase_greek_raw=[GreekCoefs(convert.(FT, α), convert.(FT, β),
+                                                     convert.(FT, γ), convert.(FT, δ),
+                                                     convert.(FT, ϵ), convert.(FT, ζ))])
 end
 
 @doc raw"""
@@ -317,5 +323,11 @@ function truncate_phase(mod::δBGE, aero::AerosolOptics{FT}; reportFit=false) wh
     # mirroring the Mie generators (internal Float64, output FT).
     greek_coefs = GreekCoefs(convert.(FT, αᵗ), convert.(FT, βᵗ), convert.(FT, γᵗ),
                              convert.(FT, δᵗ), convert.(FT, ϵᵗ), convert.(FT, ζᵗ))
-    return AerosolOptics(greek_coefs=greek_coefs, ω̃=ω̃, k=k, fᵗ=(FT(1) - c₀))
+    # Retain the untruncated Greek set so the TMS single-scattering
+    # correction can evaluate the exact phase function at view geometries
+    # without re-running Mie (see AbstractSingleScatteringCorrection).
+    return AerosolOptics(greek_coefs=greek_coefs, ω̃=ω̃, k=k, fᵗ=(FT(1) - c₀),
+                         phase_greek_raw=[GreekCoefs(convert.(FT, α), convert.(FT, β),
+                                                     convert.(FT, γ), convert.(FT, δ),
+                                                     convert.(FT, ϵ), convert.(FT, ζ))])
 end

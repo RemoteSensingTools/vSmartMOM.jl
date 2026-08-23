@@ -687,6 +687,7 @@ RTModel float type. No-op when types already match."
         blas_threads     = n.blas_threads,
         verbose          = n.verbose,
         fourier_convergence = n.fourier_convergence,
+        ss_correction    = n.ss_correction,
     )
 end
 
@@ -1066,8 +1067,17 @@ function _spectralize_truncated_endpoints(a₀::AerosolOptics,
     node_ν = reference === nothing ? FT[ν₀, ν₁] : FT[ν₀, ν_ref, ν₁]
     node_greek = reference === nothing ? [a₀.greek_coefs, a₁.greek_coefs] :
                                            [a₀.greek_coefs, reference.greek_coefs, a₁.greek_coefs]
+    # Untruncated node Greeks (for the TMS exact-SS evaluation), carried
+    # through from truncate_phase; nothing when any endpoint was not
+    # actually truncated (exact == truncated there).
+    node_endpoints = reference === nothing ? (a₀, a₁) : (a₀, reference, a₁)
+    _gc_ft(g) = GreekCoefs(FT.(g.α), FT.(g.β), FT.(g.γ),
+                           FT.(g.δ), FT.(g.ϵ), FT.(g.ζ))
+    node_raw = all(e -> e.phase_greek_raw !== nothing, node_endpoints) ?
+        [_gc_ft(e.phase_greek_raw[1]) for e in node_endpoints] : nothing
     return AerosolOptics(greek_coefs=gc, ω̃=ω̃, k=k, fᵗ=fᵗ,
-                          phase_ν=node_ν, phase_greek=node_greek)
+                          phase_ν=node_ν, phase_greek=node_greek,
+                          phase_greek_raw=node_raw)
 end
 
 function _spectralize_truncated_endpoints(a₀::AerosolOptics,

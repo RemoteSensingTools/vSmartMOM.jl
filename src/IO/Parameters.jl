@@ -1408,6 +1408,17 @@ function _parse_numerics(params_dict, FT)
             error("numerics.fourier_convergence must be 'all' or 'intensity' (got '$fc')")
         end
     end
+    if haskey(n, "ss_correction")
+        sc = n["ss_correction"]
+        scs = sc === nothing ? "none" : lowercase(String(sc))
+        if scs == "none"
+            kwargs[:ss_correction] = CoreRT.NoSSCorrection()
+        elseif scs == "tms"
+            kwargs[:ss_correction] = CoreRT.TMSCorrection()
+        else
+            error("numerics.ss_correction must be 'none' or 'tms' (got '$sc')")
+        end
+    end
     return RTNumericalParameters{FT}(; kwargs...)
 end
 

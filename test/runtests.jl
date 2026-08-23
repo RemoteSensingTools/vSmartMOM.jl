@@ -157,6 +157,11 @@ try
 # YAML wiring, FOURIER_SAVED diagnostic.
 @testset "Fourier convergence" begin include("test_fourier_convergence.jl") end
 
+# TMS single-scattering correction: strategy types, f=0 no-op at machine
+# precision, parity-policy rejections, exact-SS reference, truncation-order
+# convergence (see docs/dev_notes/TMS_DISCOVERY.md).
+@testset "TMS SS correction" begin include("test_tms.jl") end
+
 # NOTE: GPU/Metal tests live in test/local/gpu/ and run via
 # `julia --project=test test/local/runtests.jl` (the local-only suite); they are
 # NOT part of this CI suite. Likewise, configs needing external LUTs/ABSCO data

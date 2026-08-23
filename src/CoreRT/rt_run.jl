@@ -570,6 +570,24 @@ function _rt_run_column(RS_type::AbstractRamanType, model, iBand;
     # target's Fourier support.
     fconv = fourier_convergence_override === nothing ?
         model.numerics.fourier_convergence : fourier_convergence_override
+    # Single-scattering correction strategy (see
+    # AbstractSingleScatteringCorrection). Forward/lin parity policy: every
+    # unsupported combination is rejected here, never silently ignored.
+    ssc = model.numerics.ss_correction
+    if ssc isa TMSCorrection
+        RS_type isa noRS || throw(ArgumentError(
+            "TMSCorrection is implemented for the forward-elastic (noRS) " *
+            "solver only; Raman paths must use NoSSCorrection"))
+        SFI || throw(ArgumentError(
+            "TMSCorrection requires the SFI path"))
+        stop_after_atmosphere && throw(ArgumentError(
+            "TMSCorrection is not yet wired into the atmosphere/surface " *
+            "split cache build (the post-sum SS addition must move to the " *
+            "replay); build the cache with NoSSCorrection"))
+        _require_unpolarized_solar(RS_type.F₀, "TMSCorrection")
+    end
+    beam_view_mask = ssc isa TMSCorrection ?
+        _view_node_beam_mask(quad_points, arr_type, FT) : nothing
     fc_active = fconv isa IntensityConvergence && SFI
     fc_npass  = 0
     fc_R_prev = fc_active && !stop_after_atmosphere ? copy(R_SFI) : nothing
@@ -637,7 +655,8 @@ function _rt_run_column(RS_type::AbstractRamanType, model, iBand;
                         prepared_sources=prepared_sources,
                         dτ_max_threshold=dτ_max_threshold,
                         dτ_min_floor=dτ_min_floor,
-                        max_τϖ=mτϖ_iz)
+                        max_τϖ=mτϖ_iz,
+                        beam_view_mask=beam_view_mask)
         end
 
         # Atmosphere/surface split (`rt_run_atmosphere` / `rt_run_surface`).
@@ -797,6 +816,20 @@ function _rt_run_column(RS_type::AbstractRamanType, model, iBand;
             Array(τ_sum_all[:,end]), m_max, nSpec)
     end
 
+    # TMS "then add": exact single scattering from the untruncated phase
+    # functions, evaluated at the physical scattering angles (no Fourier
+    # moments involved), accumulated with the solver's own δ-scaled τ_sum —
+    # which IS the Nakajima–Tanaka scaling. Counterpart of the view-node
+    # beam mask applied inside rt_kernel!.
+    if ssc isa TMSCorrection && SFI && !stop_after_atmosphere
+        @timeit "TMS Correction" begin
+            R_host = Array(R_SFI)
+            tms_correction!(R_host, model, iBand, Array(τ_sum_all),
+                            Array(RS_type.F₀))
+            copyto!(R_SFI, R_host)
+        end
+    end
+
     # Show timing statistics (only when the user asked — verbose flag in
     # `RTNumericalParameters`; default false to keep production loops quiet).
     model.numerics.verbose && print_timer()
@@ -931,6 +964,12 @@ function rt_run(RS_type::AbstractRamanType, model, iBand;
     model.quad_points.external_solar && !isempty(geom.sensor_levels) &&
         throw(ArgumentError(
             "external-solar SFI does not yet support multisensor/interior-height outputs"))
+    # Parity policy: the multisensor path bypasses the column core, where
+    # the TMS mask/addition live — reject rather than silently omit.
+    model.numerics.ss_correction isa TMSCorrection && !isempty(geom.sensor_levels) &&
+        throw(ArgumentError(
+            "TMSCorrection is not implemented for interior sensor heights; " *
+            "use NoSSCorrection with multisensor output"))
 
     # Atmosphere/surface-split keywords route straight to the column core:
     # the split cache machinery (`rt_run_atmosphere` / `rt_run_surface`)

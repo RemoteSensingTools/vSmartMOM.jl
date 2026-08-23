@@ -524,10 +524,21 @@ Base.@kwdef struct AerosolOptics{FT<:Real}
     phase_ν::Union{Nothing,Vector{FT}} = nothing
     "Post-truncation Greek coefficients at `phase_ν`; retained so Z is evaluated only at these nodes"
     phase_greek::Union{Nothing,Vector{GreekCoefs{FT}}} = nothing
+    "UNTRUNCATED Greek coefficients at `phase_ν` (or at the single Mie
+    wavelength when `phase_ν === nothing`). Retained when δ-BGE truncation
+    actually removed a forward peak, so the TMS single-scattering correction
+    can evaluate the exact phase function at the view geometries without a
+    rebuild. `nothing` when no truncation occurred (exact == truncated)."
+    phase_greek_raw::Union{Nothing,Vector{GreekCoefs{FT}}} = nothing
 end
 
 """ Extend Base.isapprox (≈) to compare two AerosolOptics """
-function Base.:isapprox(aerosol_optics_a::AerosolOptics, aerosol_optics_b::AerosolOptics) 
-    field_names = fieldnames(AerosolOptics)
-    return all([getproperty(aerosol_optics_a, field) ≈ getproperty(aerosol_optics_b, field) for field in field_names])
+function Base.:isapprox(aerosol_optics_a::AerosolOptics, aerosol_optics_b::AerosolOptics)
+    # Optional fields may legitimately be `nothing` on both sides;
+    # `nothing ≈ nothing` throws, so treat that pair as equal.
+    _approx(a, b) = a === nothing && b === nothing ? true :
+                    (a === nothing || b === nothing ? false : a ≈ b)
+    return all(_approx(getproperty(aerosol_optics_a, f),
+                       getproperty(aerosol_optics_b, f))
+               for f in fieldnames(AerosolOptics))
 end
