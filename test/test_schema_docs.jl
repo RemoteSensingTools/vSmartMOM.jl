@@ -57,6 +57,9 @@ const _VSCODE_EXTENSIONS = joinpath(@__DIR__, "..", ".vscode", "extensions.json"
         @test occursin("\"max_m\"", s)
         @test occursin("\"l_trunc\"", s)
         @test occursin("\"quadrature_type\"", s)
+        @test occursin("\"cia_files\"", s)
+        @test occursin("\"reference_codes\"", s)
+        @test occursin("\"negative_policy\"", s)
         # Sanghavi's nstreams≥3 minimum is enforced in the schema.
         # Match the JSON region for `nstreams` and verify "minimum": 3
         # appears within it.

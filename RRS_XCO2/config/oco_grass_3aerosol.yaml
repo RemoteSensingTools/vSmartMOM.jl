@@ -1,0 +1,106 @@
+# OCO-like O2 A, weak-CO2, and strong-CO2 scene.
+# Uniform 0.1 cm^-1 basis grids for later OCO-2 ILS convolution/resampling.
+radiative_transfer:
+  spec_bands:
+    - (1e7/773):0.1:(1e7/757)
+    - (1e7/1622):0.1:(1e7/1589)
+    - (1e7/2084):0.1:(1e7/2042)
+  surface:
+    # c0*P0(x) + c1*P1(x) + c2*P2(x), x follows spectral index (-1 to 1).
+    # Coefficients are generated and checked by scripts/fit_grass_surface.jl.
+    - LambertianSurfaceLegendre([0.4583333333333333, 0.025, -0.003333333333333336])
+    - LambertianSurfaceLegendre([0.36, -0.02, 0.0])
+    - LambertianSurfaceLegendre([0.2016666666666667, -0.035, 0.003333333333333336])
+  polarization_type: Stokes_IQU()
+  # Aerosol production resolution: δBGE retains 16 Greek coefficients.
+  # Nine weighted streams give stream_l_cap=17, sufficient for this explicit
+  # l_trunc while keeping Nquad (which also includes viewing nodes) separate.
+  nstreams: 9
+  truncation: δBGE(16, 0.0)
+  greek_beta_cutoff: 1.0e-5
+  depol: -1
+  float_type: Float64
+  architecture: GPU()
+
+geometry:
+  sza: 32.5
+  vza: [0.0]
+  vaz: [0.0]
+  obs_alt: [0]
+
+atmospheric_profile:
+  # Midlatitude profile, ordered TOA to BOA.
+  T: [231.62, 244.33, 251.34, 258.09, 264.25, 269.15,
+      272.59, 274.07, 273.30, 269.65, 264.27, 258.11,
+      251.52, 245.22, 239.20, 234.05, 229.71, 225.70,
+      222.70, 220.62, 219.32, 217.93, 216.98, 217.10,
+      218.35, 223.33, 234.19, 249.34, 264.12, 277.20,
+      280.77, 282.60, 284.40, 285.80]
+  p: [0.14, 0.22, 0.30, 0.39, 0.53, 0.71,
+      0.96, 1.28, 1.70, 2.27, 3.03, 4.03,
+      5.44, 7.26, 9.67, 12.90, 17.23, 23.30,
+      31.00, 42.07, 56.09, 74.78, 99.69, 131.00,
+      176.85, 236.64, 314.58, 418.87, 557.76, 735.00,
+      800.12, 849.00, 912.00, 980.00, 1005.0]
+  # Representative midlatitude specific humidity (kg/kg); H2O absorption is
+  # derived from q and therefore is not listed as a fixed/variable molecule.
+  q: [2.0e-6, 2.0e-6, 2.1e-6, 2.2e-6, 2.3e-6, 2.5e-6,
+      2.8e-6, 3.2e-6, 3.8e-6, 4.8e-6, 6.5e-6, 9.0e-6,
+      1.3e-5, 2.0e-5, 3.2e-5, 5.0e-5, 8.0e-5, 1.3e-4,
+      2.0e-4, 3.0e-4, 4.5e-4, 6.5e-4, 9.0e-4, 1.2e-3,
+      1.6e-3, 2.1e-3, 2.8e-3, 3.6e-3, 4.5e-3, 5.3e-3,
+      5.8e-3, 6.2e-3, 6.6e-3, 7.0e-3]
+  profile_reduction: 12
+
+absorption:
+  fixed_molecules:
+    - [O2]
+    - []
+    - []
+  variable_molecules:
+    - []
+    - [CO2]
+    - [CO2]
+  LUTfiles:
+    - ["${ENV:O2_LUT}"]
+    - ["${ENV:H2O_LUT}", "${ENV:CO2_LUT}"]
+    - ["${ENV:H2O_LUT}", "${ENV:CO2_LUT}"]
+  vmr:
+    O2: 0.2105
+    CO2: 420.0e-6
+  broadening: Voigt()
+  CEF: HumlicekWeidemann32SDErrorFunction()
+  wing_cutoff: 20
+
+scattering:
+  aerosols:
+    # Tropospheric sulfate: true altitude mode 1.2 km. LogNormal takes the
+    # median, z0=z_mode*exp(sigma0^2). Its density is <1e-4 of peak at 10 km.
+    - τ_ref: 0.06
+      μ: 0.10
+      σ: 1.60
+      nᵣ: 1.43
+      nᵢ: 1.0e-8
+      z₀: 1.525652
+      σ₀: 0.49
+    # Organic carbon: true altitude mode 1.8 km, with the same 10-km tail criterion.
+    - τ_ref: 0.04
+      μ: 0.20
+      σ: 1.80
+      nᵣ: 1.53
+      nᵢ: 0.01
+      z₀: 2.112320
+      σ₀: 0.40
+    # Enhanced UTLS sulfate with its true extinction mode fixed at 12 km;
+    # this is not intended to represent the background Junge layer.
+    - τ_ref: 0.01
+      μ: 0.15
+      σ: 1.50
+      nᵣ: 1.45
+      nᵢ: 1.0e-8
+      z₀: 12.120602
+      σ₀: 0.10
+  r_max: 10.0
+  nquad_radius: 300
+  λ_ref: 0.55
+  decomp_type: NAI2()

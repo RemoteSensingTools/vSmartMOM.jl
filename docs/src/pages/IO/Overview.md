@@ -45,11 +45,17 @@ cfg = Dict(
     "float_type" => "Float64",
     "architecture" => "default_architecture",
   ),
-  "geometry" => Dict("sza"=>60, "vza"=>[60,45,30,15,0,15,30,45,60], "vaz"=>[180,180,180,180,0,0,0,0,0], "obs_alt"=>1000.0),
+  "geometry" => Dict("sza"=>60, "vza"=>[60,45,30,15,0,15,30,45,60], "vaz"=>[180,180,180,180,0,0,0,0,0], "obs_alt"=>[0.0]),
   "atmospheric_profile" => Dict("T"=>fill(260.0,34), "p"=>collect(range(0.14, stop=1005.0, length=35)), "profile_reduction"=>-1),
 )
 params2 = read_parameters(cfg)
 ```
+
+`obs_alt` uses geometric km above BOA. `[0]` requests the standard TOA and
+BOA outputs; scalar `0` requests BOA only, while an interior scalar height
+requests upwelling and downwelling radiances at that exact atmospheric
+interface. See the [`geometry` schema](Schema/geometry.md) for all scalar and
+vector forms.
 
 ## Formats
 

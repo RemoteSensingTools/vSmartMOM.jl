@@ -56,12 +56,32 @@ GPU is a weak dependency via `ext/vSmartMOMCUDAExt.jl` (loads when CUDA.jl is pr
 YAML/TOML/Dict
     → read_parameters()        → vSmartMOM_Parameters   (unified entry point)
     → model_from_parameters()  → RTModel
-    → rt_run(model)            → (R, T) reflectance/transmittance
+    → rt_run(model)            → ObserverRTResult (named endpoint/level radiances)
+    → rt_run_toa(model)        → TOA upwelling only (default external-solar SFI)
 ```
 
 `parameters_from_yaml(path)` is the YAML-specific alias and still works; use `read_parameters` for TOML or `Dict` inputs.
 
-Linearized variant: `model_from_parameters(LinMode(), params)` then `rt_run(model, lin_model, NAer, NGas, NSurf)` returns `(R, T, dR, dT)`.
+With the default `obs_alt: [0]`, `ObserverRTResult` iterates as the historical
+forward tuple, so `R, T = rt_run(model)` still binds TOA upwelling and BOA
+downwelling. Interior-height radiances are available through
+`result.levels`.
+
+`rt_run_toa` requires `model.quad_points.external_solar == true`. In this
+default Gauss/SFI representation, scalar `μ₀` is excluded from the diffuse
+operator and evaluated through rectangular direct-beam phase/operator columns.
+The path supports elastic `noRS`, analytic elastic linearization, and forward
+rotational Raman `RRS` with Lambertian surfaces. It does not allocate or
+postprocess BOA, HDR, or BHR, and it does not support Raman linearization,
+VRS, `rt_run_ss`, non-Lambertian, or interior-sensor runs.
+The embedded-`μ₀` representation remains available through
+`external_solar=false`; unsupported paths reject external-solar models rather
+than falling back silently.
+
+Linearized variant: `model_from_parameters(LinMode(), params)` then
+`rt_run(model, lin_model, NAer, NGas, NSurf)` returns an
+`ObserverRTResultLin`. It remains iterable as `(R, T, dR, dT)` and exposes
+strict-interior radiances/Jacobians through `result.levels`.
 
 ### RTModel Hierarchy (Oceananigans-style)
 
@@ -71,8 +91,8 @@ Linearized variant: `model_from_parameters(LinMode(), params)` then `rt_run(mode
 RTModel{ARCH, FT} <: AbstractRTModel{ARCH, FT}
 ├── architecture :: ARCH                    # CPU() or GPU()
 ├── solver       :: SolverConfig{FT}        # polarization, quadrature, truncation, m_max_bands
-├── geometry     :: ObsGeometry{FT}         # sza, vza, vaz, obs_alt
-├── quad_points  :: QuadPoints{FT}          # μ₀, qp_μ, wt_μ, Nquad, Nstreams (v0.7)
+├── geometry     :: ObsGeometry{FT}         # angles + resolved observer interfaces
+├── quad_points  :: QuadPoints{FT}          # diffuse qp_μ/wt_μ + phase_qp_μ; optional external μ₀
 ├── atmosphere   :: Atmosphere{FT}          # profile + spec_bands
 ├── optics       :: Optics{FT}             # ALL optical properties
 │   ├── rayleigh :: RayleighScattering{FT}  # greek_rayleigh, greek_cabannes, ϖ_Cabannes
@@ -93,7 +113,12 @@ RTModel{ARCH, FT} <: AbstractRTModel{ARCH, FT}
 
 ### CoreRT Solver Flow (Adding-Doubling)
 
-For each Fourier moment m = 0..m_max_bands[iBand] (v0.7 — order-semantics; trait-derived per-component bound):
+For each Fourier moment m = 0..m_max_bands[iBand] (v0.7 — order-semantics;
+trait-derived per-component bound). Aerosol traits may use a two-stage bound:
+the maximum size parameter sets the allocated Mie-series ceiling, then
+`greek_beta_cutoff` selects the last `l` with `abs(β_l)` above threshold at any
+band wavelength. Only β is tested, and the maximum across aerosol species is
+combined with other component traits before stream/user caps are applied.
 1. **Elemental** — single-scattering layer → AddedLayer (r, t, j)
 2. **Doubling** — double thin layers ndoubl times to full optical depth
 3. **Interaction** — combine layers top-to-bottom: CompositeLayer (R, T, J) + AddedLayer
@@ -110,8 +135,12 @@ For each Fourier moment m = 0..m_max_bands[iBand] (v0.7 — order-semantics; tra
 | `Atmosphere` | `src/CoreRT/types.jl` | AtmosphericProfile + spec_bands |
 | `Optics` | `src/CoreRT/types.jl` | All optical properties (rayleigh, aerosol, abs, rayl) |
 | `AtmosphericProfile` | `src/CoreRT/types.jl` | T, p, q, VMR profiles |
-| `ObsGeometry` | `src/CoreRT/types.jl` | SZA, VZA, VAZ, observer altitude |
-| `QuadPoints` | `src/CoreRT/types.jl` | Quadrature points, weights, mu0 |
+| `ObsGeometry` | `src/CoreRT/types.jl` | SZA, VZA, VAZ, requested/resolved observer heights |
+| `ObserverRTResult` | `src/CoreRT/types.jl` | Named TOA, BOA, and interior-height forward outputs |
+| `LevelRadiance` | `src/CoreRT/types.jl` | Co-located up/down radiances at one interior interface |
+| `ObserverRTResultLin` | `src/CoreRT/types_lin.jl` | Named endpoint and interior-height linearized outputs |
+| `LevelRadianceLin` | `src/CoreRT/types_lin.jl` | Co-located radiances and analytic Jacobians at one interior interface |
+| `QuadPoints` | `src/CoreRT/types.jl` | Diffuse quadrature, phase-evaluation grid, scalar μ₀, and external-solar flag |
 | `CompositeLayer` | `src/CoreRT/types.jl` | Accumulated R, T, J matrices (uppercase) |
 | `AddedLayer` | `src/CoreRT/types.jl` | Single-layer r, t, j matrices (lowercase) |
 | `Aerosol` | `src/Scattering/types.jl` | Size distribution + refractive index (nr, ni) |
@@ -148,9 +177,16 @@ All surfaces implement `create_surface_layer!()`. Linearized variants have `_lin
 - **Unicode variables**: `τ` (optical depth), `ϖ` (SSA), `μ` (cosine zenith) used directly
 - **Sign convention**: `+` = incoming/downward, `-` = outgoing/upward
 - **Layer naming**: CompositeLayer uses uppercase (R, T, J), AddedLayer uses lowercase (r, t, j)
-- **3D matrices**: RT matrices are `(NquadN, NquadN, nSpec)` where `NquadN = Nquad * n_stokes`
+- **3D matrices**: diffuse RT matrices are `(NquadN, NquadN, nSpec)` where
+  `NquadN = Nquad * n_stokes`. External-solar phase matrices may carry one
+  additional exact μ₀ row/column, while the diffuse operators remain square
+  on `qp_μ`.
+- **External solar is not a stream**: with `external_solar=true`, scalar μ₀ and
+  rectangular `Z₀ → R₀/T₀` operators provide direct-beam coupling; legacy indices
+  `iμ₀`/`iμ₀Nstart` are zero sentinels. Five weighted streams plus one
+  distinct VZA in IQU gives an 18×18 diffuse operator.
 - **Spectral units**: wavenumber in cm⁻¹ internally; wavelength in micrometers for Mie
-- **Pressure**: hPa in YAML configs; Pa for obs_alt
+- **Vertical units**: profile pressure is hPa; `obs_alt` is geometric km above BOA
 - **Profile direction**: TOA to BOA (top of atmosphere to bottom)
 
 ## File Structure

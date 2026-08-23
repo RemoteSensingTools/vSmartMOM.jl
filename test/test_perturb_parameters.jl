@@ -15,6 +15,7 @@
 
 using Test
 using vSmartMOM, vSmartMOM.CoreRT
+using Distributions: LogNormal
 
 # Pull in the ported utility. File is intentionally unincluded from the
 # main module (matches sanghavi's usage pattern).
@@ -63,5 +64,29 @@ include(joinpath(pkgdir(vSmartMOM), "src", "Testing", "perturb_parameters.jl"))
         if !isnothing(params.q)
             @test all(isfinite, params.q)
         end
+    end
+
+    @testset "profile perturbation uses public parameters" begin
+        location_idx = q_off + Nmol + 6
+        width_idx = q_off + Nmol + 7
+
+        # Pressure form: column 6 is p₀=μ and column 7 is σp=σ.
+        pressure_profile = only(params.scattering_params.rt_aerosols).profile
+        pressure_location = pert[location_idx].scattering_params.rt_aerosols[1].profile
+        pressure_width = pert[width_idx].scattering_params.rt_aerosols[1].profile
+        @test pressure_location.μ ≈ pressure_profile.μ * (1 + ppct / 100)
+        @test pressure_width.σ ≈ pressure_profile.σ * (1 + ppct / 100)
+
+        # Altitude form: column 6 is z₀=exp(μ), not LogNormal's internal μ.
+        altitude_params = deepcopy(params)
+        altitude_params.scattering_params.rt_aerosols[1].profile =
+            LogNormal(log(2.0), 0.4)
+        altitude_pert = perturb_parameters(altitude_params, ppct)
+        altitude_location =
+            altitude_pert[location_idx].scattering_params.rt_aerosols[1].profile
+        altitude_width =
+            altitude_pert[width_idx].scattering_params.rt_aerosols[1].profile
+        @test exp(altitude_location.μ) ≈ 2.0 * (1 + ppct / 100)
+        @test altitude_width.σ ≈ 0.4 * (1 + ppct / 100)
     end
 end

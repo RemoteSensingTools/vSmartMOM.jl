@@ -31,7 +31,7 @@ geometry:
   sza:                45.0
   vza:                [0.0, 30.0]
   vaz:                [0.0, 0.0]
-  obs_alt:            1000.0
+  obs_alt:            [0]
 
 atmospheric_profile: 
   T: [231.62, 244.33, 251.34, 258.09, 264.25, 269.15, 

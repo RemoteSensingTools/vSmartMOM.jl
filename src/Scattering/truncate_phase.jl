@@ -157,6 +157,8 @@ angles outside `Δ_angle`, then renormalizes with retained scattering fraction
 
 ```math
 \beta^t = \frac{c}{c_0},\qquad
+\gamma^t = \frac{g}{c_0},\qquad
+\epsilon^t = \frac{e}{c_0},\qquad
 \delta^t,\alpha^t,\zeta^t \text{ adjusted consistently from } \beta^t,
 \qquad
 \gamma^t = \frac{g}{c_0},\quad \epsilon^t = \frac{e}{c_0},
@@ -173,7 +175,9 @@ the degree of linear polarisation ``-f_{12}/f_{11}`` invariant under
 truncation outside the exclusion cone.
 
 Returns a new [`AerosolOptics`](@ref) with truncated coefficients and updated
-`fᵗ`.
+`fᵗ`. The common `1/c₀` normalization is required because all three fits
+target the unnormalized original matrix outside the forward cone; downstream
+δ-scaling multiplies the smooth remainder by `c₀ = 1-fᵗ`.
 """
 function truncate_phase(mod::δBGE, aero::AerosolOptics{FT}; reportFit=false) where {FT}
     (; greek_coefs, ω̃, k) = aero

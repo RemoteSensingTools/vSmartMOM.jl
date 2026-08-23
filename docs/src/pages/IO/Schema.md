@@ -11,7 +11,7 @@ top-level block has its own detail page.
 | Block                                         | Required | Purpose |
 |-----------------------------------------------|:--------:|---------|
 | [`radiative_transfer`](Schema/radiative_transfer.md) | ✓ | RT solver, quadrature, polarization, Fourier resolution (v0.7 `nstreams` knob), truncation |
-| [`geometry`](Schema/geometry.md)              | ✓        | SZA, VZA(s), VAZ(s), observer altitude |
+| [`geometry`](Schema/geometry.md)              | ✓        | SZA, VZA(s), VAZ(s), observer heights and output levels |
 | [`atmospheric_profile`](Schema/atmospheric_profile.md) | ✓ | T, p, q, profile reduction |
 | [`absorption`](Schema/absorption.md)          | ◯        | Gas absorption: VMRs, broadening, HITRAN edition pointer |
 | [`scattering`](Schema/aerosols.md)            | ◯        | Mie aerosol size distribution, phase-function, decomposition |
@@ -32,8 +32,15 @@ resolution knob:
 radiative_transfer:
   nstreams: 8           # weighted streams per hemisphere
                         # public contract: stream_l_cap = 2·nstreams - 1
+  greek_beta_cutoff: 1e-5 # optional beta-only effective aerosol support
   truncation: auto      # NoTruncation if phase fits, δBGE otherwise
 ```
+
+For aerosols, `greek_beta_cutoff` is evaluated after Mie integration over the
+size distribution. It selects the last order satisfying `abs(β_l) >= cutoff`
+at any wavelength in the band; it never tests the other Greek families. See
+[`radiative_transfer.md`](Schema/radiative_transfer.md) for the complete
+two-stage `m_max` evaluation and cap precedence.
 
 Legacy `max_m` / `l_trunc` configs **continue to work**; the parser
 detects the legacy schema by the presence of either field and applies
@@ -116,7 +123,7 @@ geometry:
   sza: 30
   vza: [10, 20, 40]
   vaz: [0, 0, 0]
-  obs_alt: 1000.0
+  obs_alt: [0]          # TOA upwelling + BOA downwelling
 
 atmospheric_profile:
   T: [260, 262, 264]

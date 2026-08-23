@@ -60,8 +60,8 @@ geometry:
   vaz:                [0] # [180, 180, 180, 180, 0, 0, 0, 0, 0]
   # Solar zenith angle
   sza:                60
-  # Observation altitude
-  obs_alt:            1000.0
+  # Observer height selection (km above BOA)
+  obs_alt:            [0]
 
 atmospheric_profile: 
   # File path to atmospheric profile (yaml file)

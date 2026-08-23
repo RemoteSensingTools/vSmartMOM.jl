@@ -21,7 +21,7 @@ function docs_minimal_parameter_dict()
             "sza" => 30.0,
             "vza" => [0.0],
             "vaz" => [0.0],
-            "obs_alt" => 1000.0,
+            "obs_alt" => [0.0],
         ),
         "atmospheric_profile" => Dict(
             "T" => [260.0, 280.0],

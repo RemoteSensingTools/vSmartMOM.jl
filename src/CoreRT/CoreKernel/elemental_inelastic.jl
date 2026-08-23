@@ -37,7 +37,7 @@ function elemental_inelastic!(RS_type::RRS,
                             architecture) where {FT<:Union{AbstractFloat, ForwardDiff.Dual},FT2}
 
     @unpack ier⁺⁻, ier⁻⁺, iet⁻⁻, iet⁺⁺, ieJ₀⁺, ieJ₀⁻ = added_layer
-    @unpack qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart, iμ₀ = quad_points
+    @unpack qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart, iμ₀, μ₀, external_solar = quad_points
     arr_type = array_type(architecture)
     τ_sum = arr_type(τ_sum)
     # Need to check with paper nomenclature. This is basically eqs. 19-20 in vSmartMOM
@@ -65,11 +65,21 @@ function elemental_inelastic!(RS_type::RRS,
             dτ_λ, ϖ_λ, Z⁻⁺_λ₁λ₀, Z⁺⁺_λ₁λ₀, qp_μN, wct2)
 
         if SFI
-            get_elem_rt_SFI!(RS_type, ieJ₀⁺, ieJ₀⁻,
-                τ_sum, dτ_λ, ϖ_λ, Z⁻⁺_λ₁λ₀, Z⁺⁺_λ₁λ₀,
-                F₀,
-                qp_μN, ndoubl,wct02, pol_type.n,
-                arr_type(pol_type.I₀), iμ₀, D);
+            if external_solar
+                columns = added_layer.raman_solar_columns
+                columns === nothing && throw(ArgumentError(
+                    "external Raman SFI requires RamanSolarColumnOperators"))
+                get_elem_rt_solar_columns!(RS_type, columns, dτ_λ,
+                    RS_type.Z₀⁻⁺_λ₁λ₀, RS_type.Z₀⁺⁺_λ₁λ₀,
+                    qp_μN, μ₀, wct02, pol_type)
+                apply_raman_solar_columns!(RS_type, columns, ieJ₀⁺, ieJ₀⁻,
+                    τ_sum, F₀, μ₀, ndoubl, pol_type)
+            else
+                get_elem_rt_SFI!(RS_type, ieJ₀⁺, ieJ₀⁻,
+                    τ_sum, dτ_λ, ϖ_λ, Z⁻⁺_λ₁λ₀, Z⁺⁺_λ₁λ₀,
+                    F₀, qp_μN, ndoubl,wct02, pol_type.n,
+                    arr_type(pol_type.I₀), iμ₀, D)
+            end
         end
         # Apply D Matrix
         apply_D_matrix_elemental!(RS_type, ndoubl, pol_type.n,
@@ -436,6 +446,102 @@ end
 end
 =#
 #  TODO: Nov 30, 2021
+"""
+Construct rotational-Raman direct-solar columns without embedding μ₀ in the
+diffuse quadrature. The four arrays have layout
+`(NquadN,nStokes,nSpec,nRaman)`; `nSpec` is the Raman output wavelength and
+each transition identifies its incident wavelength through `i_λ₁λ₀`.
+"""
+function get_elem_rt_solar_columns!(RS_type::RRS, columns::RamanSolarColumnOperators,
+                                    dτ_λ, Z₀⁻⁺, Z₀⁺⁺, qp_μN, μ₀,
+                                    wct02, pol_type)
+    arch = architecture(columns.ieR₀⁻⁺)
+    aType = array_type(arch)
+    kernel! = get_elem_rt_solar_columns_RRS!(devi(arch))
+    kernel!(aType(RS_type.fscattRayl), aType(RS_type.ϖ_λ₁λ₀),
+            aType(RS_type.i_λ₁λ₀),
+            columns.ieR₀⁻⁺, columns.ieR₀⁺⁻,
+            columns.ieT₀⁺⁺, columns.ieT₀⁻⁻,
+            dτ_λ, aType(Z₀⁻⁺), aType(Z₀⁺⁺), qp_μN, μ₀,
+            wct02, pol_type.n, aType(pol_type.D),
+            ndrange=size(columns.ieR₀⁻⁺))
+    synchronize_if_gpu()
+    nothing
+end
+
+@kernel function get_elem_rt_solar_columns_RRS!(@Const(fscattRayl), @Const(ϖ_λ₁λ₀),
+                                                 @Const(i_λ₁λ₀),
+                                                 ieR₀⁻⁺, ieR₀⁺⁻, ieT₀⁺⁺, ieT₀⁻⁻,
+                                                 @Const(dτ), @Const(Z₀⁻⁺), @Const(Z₀⁺⁺),
+                                                 @Const(μ), μ₀, wct02,
+                                                 nStokes, @Const(Dpol))
+    i, s, n₁, Δn = @index(Global, NTuple)
+    FT = eltype(ieR₀⁻⁺)
+    n₀ = n₁ + i_λ₁λ₀[Δn]
+    t = zero(FT); r = zero(FT)
+    if 1 <= n₀ <= length(dτ)
+        μᵢ = μ[i]
+        scale = wct02 * ϖ_λ₁λ₀[Δn] * fscattRayl[n₀]
+        if μᵢ == μ₀
+            if abs(dτ[n₀]-dτ[n₁]) > rt_close_tol(eltype(dτ))
+                f_t = expdiff_neg(dτ[n₁]/μᵢ, dτ[n₀]/μᵢ) /
+                      (1-(dτ[n₁]/dτ[n₀]))
+            else
+                f_t = (dτ[n₀]/μᵢ) * exp(-dτ[n₀]/μᵢ)
+            end
+        elseif abs((μᵢ/μ₀)-(dτ[n₁]/dτ[n₀])) < rt_close_tol(eltype(dτ))
+            f_t = (dτ[n₀]/μᵢ) * exp(-dτ[n₀]/μ₀)
+        else
+            f_t = expdiff_neg(dτ[n₁]/μᵢ, dτ[n₀]/μ₀) /
+                  ((μᵢ/μ₀)-(dτ[n₁]/dτ[n₀]))
+        end
+        f_r = -expm1(-(dτ[n₁]/μᵢ + dτ[n₀]/μ₀)) /
+              ((μᵢ/μ₀)+(dτ[n₁]/dτ[n₀]))
+        t = scale * Z₀⁺⁺[i,s] * f_t
+        r = scale * Z₀⁻⁺[i,s] * f_r
+    end
+    ieT₀⁺⁺[i,s,n₁,Δn] = t
+    ieR₀⁻⁺[i,s,n₁,Δn] = r
+    parity = Dpol[mod1(i,nStokes)] * Dpol[s]
+    ieT₀⁻⁻[i,s,n₁,Δn] = parity*t
+    ieR₀⁺⁻[i,s,n₁,Δn] = parity*r
+    nothing
+end
+
+function apply_raman_solar_columns!(RS_type::RRS, columns::RamanSolarColumnOperators,
+                                    ieJ₀⁺, ieJ₀⁻, τ_above, F₀, μ₀,
+                                    ndoubl, pol_type)
+    arch = architecture(ieJ₀⁺); aType = array_type(arch)
+    kernel! = apply_raman_solar_columns_RRS!(devi(arch))
+    kernel!(aType(RS_type.i_λ₁λ₀), ieJ₀⁺, ieJ₀⁻,
+            columns.ieR₀⁻⁺, columns.ieT₀⁺⁺, aType(F₀), τ_above,
+            μ₀, ndoubl, pol_type.n, aType(pol_type.D), ndrange=size(ieJ₀⁺))
+    synchronize_if_gpu()
+    nothing
+end
+
+@kernel function apply_raman_solar_columns_RRS!(@Const(i_λ₁λ₀), ieJ₀⁺, ieJ₀⁻,
+                                                 @Const(ieR₀⁻⁺), @Const(ieT₀⁺⁺),
+                                                 @Const(F₀), @Const(τ_above), μ₀,
+                                                 ndoubl, nStokes, @Const(Dpol))
+    i, _, n₁, Δn = @index(Global, NTuple)
+    FT = eltype(ieJ₀⁺)
+    n₀ = n₁ + i_λ₁λ₀[Δn]
+    jp = zero(FT); jm = zero(FT)
+    if 1 <= n₀ <= size(F₀,2)
+        for s in 1:size(ieR₀⁻⁺,2)
+            jp += ieT₀⁺⁺[i,s,n₁,Δn] * F₀[s,n₀]
+            jm += ieR₀⁻⁺[i,s,n₁,Δn] * F₀[s,n₀]
+        end
+        beam = exp(-τ_above[n₀]/μ₀)
+        jp *= beam; jm *= beam
+        ndoubl >= 1 && (jm *= Dpol[mod1(i,nStokes)])
+    end
+    ieJ₀⁺[i,1,n₁,Δn] = jp
+    ieJ₀⁻[i,1,n₁,Δn] = jm
+    nothing
+end
+
 function get_elem_rt_SFI!(RS_type::RRS,
                         ieJ₀⁺, ieJ₀⁻,
                         τ_sum, dτ_λ, ϖ_λ,

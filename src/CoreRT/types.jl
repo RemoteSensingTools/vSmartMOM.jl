@@ -29,7 +29,7 @@ dry and wet vertical column densities, and volume mixing ratios for
 trace gases.  Constructed internally by [`model_from_parameters`](@ref)
 from the raw arrays in [`vSmartMOM_Parameters`](@ref).
 
-`p_full` has `N` levels; `p_half` has `N-1` layer-boundary pressures.
+`p_full` has `N` levels; `p_half` has `N+1` layer-boundary pressures.
 `T`, `q`, `vmr_h2o`, `vcd_dry`, `vcd_h2o`, and `Δz` are layer quantities
 of length `N`.
 
@@ -45,7 +45,7 @@ struct AtmosphericProfile{FT, VMR <: Union{Real, Vector}}
     q::Array{FT,1}
     "Pressure Levels"
     p_half::Array{FT,1}
-    "H2O Volume Mixing Ratio Profile"
+    "H2O/dry-air molar-ratio profile"
     vmr_h2o::Array{FT,1}
     "Vertical Column Density (Dry)"
     vcd_dry::Array{FT,1}
@@ -60,17 +60,135 @@ end
 "Types for describing atmospheric parameters"
 abstract type AbstractObsGeometry end
 
-"Observation Geometry (basics)" 
-Base.@kwdef struct ObsGeometry{FT} <: AbstractObsGeometry
+"Observation geometry, including the resolved vertical-output interfaces."
+Base.@kwdef mutable struct ObsGeometry{FT} <: AbstractObsGeometry
     "Solar Zenith Angle `[Degree]`"
     sza::FT
     "Viewing Zenith Angle(s) `[Degree]`" 
     vza::Array{FT,1}
     "Viewing Azimuth Angle(s) `[Degree]`" 
     vaz::Array{FT,1}
-    "Altitude of Observer `[Pa]`"
-    obs_alt::FT
+    "Requested observer altitude(s) `[km above BOA]`; scalar and vector forms have distinct semantics"
+    obs_alt::Union{FT, Vector{FT}}
+    "Strictly interior atmospheric interface indices (number of layers above each sensor)"
+    sensor_levels::Vector{Int} = Int[]
+    "Geometric altitudes corresponding to `sensor_levels` `[km above BOA]`"
+    sensor_altitudes::Vector{FT} = FT[]
+    "Whether the requested output includes TOA upwelling radiance"
+    include_toa::Bool = false
+    "Whether the requested output includes BOA downwelling radiance"
+    include_boa::Bool = false
+    "Resolved top-of-atmosphere altitude `[km above BOA]`"
+    toa_altitude::FT = zero(FT)
 end
+
+# Preserve the long-standing four-argument construction seam used by tests and
+# downstream callers.  Model construction replaces this unresolved geometry
+# with one carrying the sensor-interface metadata after the profile is framed.
+function ObsGeometry{FT}(sza, vza, vaz, obs_alt) where {FT}
+    alt = obs_alt isa Real ? FT(obs_alt) : convert(Vector{FT}, collect(obs_alt))
+    has_zero = alt isa AbstractVector ? any(iszero, alt) : iszero(alt)
+    include_boa = alt isa AbstractVector ? has_zero : iszero(alt)
+    include_toa = alt isa AbstractVector && has_zero
+    return ObsGeometry{FT}(FT(sza), convert(Vector{FT}, vza),
+                           convert(Vector{FT}, vaz), alt,
+                           Int[], FT[], include_toa, include_boa, zero(FT))
+end
+
+function ObsGeometry(sza::FT, vza, vaz, obs_alt) where {FT<:Real}
+    return ObsGeometry{FT}(sza, vza, vaz, obs_alt)
+end
+
+"""
+    LevelRadiance
+
+Radiances at one strict-interior atmospheric interface. `upwelling` and
+`downwelling` are the diffuse elastic fields solved by MOM.
+`unscattered_downwelling` is the separately reported attenuated collimated
+solar beam at the solar ordinate (zero for other viewing zenith angles).
+Use [`total_downwelling`](@ref) to add the diffuse and unscattered components.
+"""
+struct LevelRadiance{FT,U,D,IU,ID}
+    "Geometric height in km above model BOA"
+    height_km::FT
+    "Interface index: number of atmospheric layers above this level"
+    boundary_index::Int
+    upwelling::U
+    downwelling::D
+    unscattered_downwelling::D
+    inelastic_upwelling::IU
+    inelastic_downwelling::ID
+end
+
+"Allocate a zero direct-beam component matching an existing downwelling field."
+_zero_unscattered_downwelling(::Nothing) = nothing
+function _zero_unscattered_downwelling(downwelling)
+    direct = similar(downwelling)
+    fill!(direct, zero(eltype(direct)))
+    return direct
+end
+
+# Preserve the original six-argument construction seam for downstream callers.
+function LevelRadiance(height_km, boundary_index, upwelling, downwelling,
+                       inelastic_upwelling, inelastic_downwelling)
+    return LevelRadiance(height_km, boundary_index, upwelling, downwelling,
+                         _zero_unscattered_downwelling(downwelling),
+                         inelastic_upwelling, inelastic_downwelling)
+end
+
+function LevelRadiance{FT,U,D,IU,ID}(height_km::FT, boundary_index::Int,
+                                     upwelling::U, downwelling::D,
+                                     inelastic_upwelling::IU,
+                                     inelastic_downwelling::ID) where {FT,U,D,IU,ID}
+    return LevelRadiance{FT,U,D,IU,ID}(
+        height_km, boundary_index, upwelling, downwelling,
+        _zero_unscattered_downwelling(downwelling),
+        inelastic_upwelling, inelastic_downwelling)
+end
+
+"""
+    total_downwelling(level::LevelRadiance)
+
+Return the total elastic downwelling radiance at an interior level: the MOM
+diffuse field plus the separately reported unscattered solar beam.
+"""
+function total_downwelling(level::LevelRadiance)
+    level.unscattered_downwelling === nothing && return level.downwelling
+    return level.downwelling .+ level.unscattered_downwelling
+end
+
+"""
+    ObserverRTResult
+
+Height-aware forward-RT result. `toa` is upwelling at TOA, `boa` is
+downwelling at BOA, and `levels` contains co-located diffuse up/down radiances
+plus a separate unscattered solar component at requested interior heights.
+Unrequested endpoints are `nothing`.
+
+The result remains iterable/indexable over the historical seven forward
+slots `(toa, boa, inelastic_toa, inelastic_boa, hdr, bhr_uw, bhr_dw)` so
+the default `obs_alt: [0]` preserves historical destructuring and indexing.
+"""
+struct ObserverRTResult{FT,TOA,BOA,IET,IEB,L,H,U,D}
+    toa::TOA
+    boa::BOA
+    inelastic_toa::IET
+    inelastic_boa::IEB
+    levels::Vector{L}
+    toa_altitude_km::FT
+    hdr::H
+    bhr_uw::U
+    bhr_dw::D
+end
+
+@inline _observer_legacy_tuple(r::ObserverRTResult) =
+    (r.toa, r.boa, r.inelastic_toa, r.inelastic_boa, r.hdr, r.bhr_uw, r.bhr_dw)
+Base.length(::ObserverRTResult) = 7
+Base.firstindex(::ObserverRTResult) = 1
+Base.lastindex(::ObserverRTResult) = 7
+Base.getindex(r::ObserverRTResult, indices...) = getindex(_observer_legacy_tuple(r), indices...)
+Base.iterate(r::ObserverRTResult, state...) = iterate(_observer_legacy_tuple(r), state...)
+Base.Tuple(r::ObserverRTResult) = _observer_legacy_tuple(r)
 
 """
     RT_Aerosol{FT}
@@ -130,6 +248,29 @@ struct SFI <:AbstractSourceType end
 
 "Abstract Type for Layer R,T and J matrices"
 abstract type AbstractLayer end
+
+"""
+    SolarColumnOperators{FT}
+
+Rectangular layer operators coupling the fixed solar direction to every
+diffuse output stream.  Their array layout is
+`(NquadN, nStokes, nSpec)`: the second axis is the incident solar Stokes
+component, not an angular quadrature axis.
+"""
+Base.@kwdef struct SolarColumnOperators{FT}
+    R₀⁻⁺::AbstractArray{FT,3}
+    R₀⁺⁻::AbstractArray{FT,3}
+    T₀⁺⁺::AbstractArray{FT,3}
+    T₀⁻⁻::AbstractArray{FT,3}
+end
+
+"""Raman solar-column operators with layout `(NquadN,nStokes,nSpec,nRaman)`."""
+Base.@kwdef struct RamanSolarColumnOperators{FT}
+    ieR₀⁻⁺::AbstractArray{FT,4}
+    ieR₀⁺⁻::AbstractArray{FT,4}
+    ieT₀⁺⁺::AbstractArray{FT,4}
+    ieT₀⁻⁻::AbstractArray{FT,4}
+end
 
 """
     CompositeLayer{FT} <: AbstractLayer
@@ -229,6 +370,8 @@ Base.@kwdef struct AddedLayer{FT} <: AbstractLayer
     # Empty NT in solar-only runs → bit-equal to pre-A.2a behaviour.
     "Per-source j₀ slots (v0.7 Phase A.2a, NamedTuple{(:thermal, …)} of SourceSlot)"
     j₀_by_src::NamedTuple = (;)
+    "Optional rectangular direct-solar elemental operators"
+    solar_columns::Union{SolarColumnOperators{FT},Nothing} = nothing
 end
 
 """
@@ -334,6 +477,10 @@ struct AddedLayerRS{FT} <: AbstractLayer
     ieJ₀⁺::AbstractArray{FT,4}
     "Added layer source matrix ieJ (in - direction)"
     ieJ₀⁻::AbstractArray{FT,4}
+    "Optional elastic direct-solar columns"
+    solar_columns::Union{SolarColumnOperators{FT},Nothing}
+    "Optional direct-solar Raman columns; diffuse redistribution remains square"
+    raman_solar_columns::Union{RamanSolarColumnOperators{FT},Nothing}
 end
 # Multisensor Composite layers 
 # Elastic
@@ -821,8 +968,28 @@ mutable struct AbsorptionParameters{FM,VM,V,BF,CE,LT,HL}
     h2o_lut::HL
     "Optional list of HITRAN CIA file paths (one per collision pair)"
     cia_files::Vector{String}
+    "Per-CIA-file HITRAN reference-code selection; `nothing` requires unambiguous coverage"
+    cia_reference_codes::Vector{Union{Nothing,Vector{String}}}
+    "Per-CIA-file handling of negative tabulated cross sections (`:error` or `:clamp_zero`)"
+    cia_negative_policies::Vector{Symbol}
     "Optional path to AER MT_CKD water-vapor continuum NetCDF (e.g. absco-ref_wv-mt-ckd.nc)"
     mtckd_file::String
+end
+
+# Preserve the pre-reference-selection positional constructor used by external
+# callers. Bare file paths remain valid, but `load_cia_table` now rejects them
+# if multiple HITRAN reference families overlap on the requested model grid.
+function AbsorptionParameters(fixed_molecules, variable_molecules, vmr,
+                              broadening_function, CEF, wing_cutoff, luts,
+                              h2o_lut, cia_files::Vector{String},
+                              mtckd_file::String)
+    reference_codes = Union{Nothing,Vector{String}}[
+        nothing for _ in cia_files]
+    negative_policies = fill(:error, length(cia_files))
+    return AbsorptionParameters(
+        fixed_molecules, variable_molecules, vmr, broadening_function, CEF,
+        wing_cutoff, luts, h2o_lut, cia_files, reference_codes,
+        negative_policies, mtckd_file)
 end
 
 """
@@ -1022,8 +1189,8 @@ mutable struct vSmartMOM_Parameters{FT<:Real}
     vza::AbstractArray{FT}
     "Viewing azimuthal angles [deg]"
     vaz::AbstractArray{FT}
-    "Altitude of observer [Pa]"
-    obs_alt::FT
+    "Observer altitude(s) [km above BOA]; scalar and vector forms have distinct output semantics"
+    obs_alt::Union{FT, Vector{FT}}
 
     # atmospheric_profile group
     "Temperature Profile [K]"
@@ -1072,14 +1239,24 @@ mutable struct vSmartMOM_Parameters{FT<:Real}
     `stream_l_cap` from `nstreams` instead."
     legacy_l_cap_override::Union{Int, Nothing}
 
+    "Optional post-Mie Fourier-support cutoff based specifically on the
+    magnitude of the integrated aerosol Greek coefficient `β_l`. The largest
+    degree satisfying `abs(β_l) >= greek_beta_cutoff` is retained for each
+    aerosol; the per-band maximum enters the component trait aggregator.
+    This changes Fourier-loop support after Mie integration but does not resize
+    the previously selected quadrature. `nothing` disables the cutoff."
+    greek_beta_cutoff::Union{FT, Nothing}
+
 end
 
 """
     QuadPoints{FT}
 
 Gauss or Gauss-Radau quadrature points and weights used for the angular
-discretisation of the radiative transfer equation.  Also stores the cosine
-of the solar zenith angle (`μ₀`) and its index within the quadrature grid.
+discretisation of the radiative transfer equation. Also stores the cosine
+of the solar zenith angle (`μ₀`). In the legacy representation `iμ₀` indexes
+that direction in the diffuse grid; external-solar models instead use a zero
+sentinel there and `iμ₀_phase` for the exact phase-source column.
 
 # Fields
 $(DocStringExtensions.FIELDS)
@@ -1087,22 +1264,37 @@ $(DocStringExtensions.FIELDS)
 struct QuadPoints{FT}
     "μ₀, cos(SZA)"
     μ₀::FT
-    "Index in quadrature points with sun"
+    "Index of μ₀ in the diffuse grid, or zero when the solar direction is external"
     iμ₀::Int
-    "Index in quadrature points with sun (in qp_μN)"
+    "First Stokes index of μ₀ in qp_μN, or zero for external-solar models"
     iμ₀Nstart::Int
-    "Quadrature points"
+    "Diffuse-operator quadrature points"
     qp_μ::AbstractArray{FT,1}
-    "Weights of quadrature points"
+    "Weights of diffuse-operator quadrature points"
     wt_μ::AbstractArray{FT,1}
     "Quadrature points (repeated for polarizations)"
     qp_μN::AbstractArray{FT,1}
     "Weights of quadrature points (repeated for polarizations)"
     wt_μN::AbstractArray{FT,1}
-    "Total number of quadrature points (weighted streams + zero-weight SZA/VZA output nodes)"
+    "Total diffuse-grid nodes (weighted streams + zero-weight VZAs, and legacy SZA)"
     Nquad::Int
     "Number of weighted streams per hemisphere (count of nonzero weights). Public contract: stream_l_cap = 2·Nstreams - 1."
     Nstreams::Int
+    "Angular grid used to construct phase matrices; may additionally contain the external solar direction."
+    phase_qp_μ::AbstractArray{FT,1}
+    "Index of μ₀ in `phase_qp_μ`."
+    iμ₀_phase::Int
+    "First Stokes index of μ₀ in the polarization-expanded phase grid."
+    iμ₀Nstart_phase::Int
+    "Whether the direct solar direction is external to the diffuse-operator quadrature grid."
+    external_solar::Bool
+end
+
+"Backward-compatible constructor for the historical embedded-μ₀ layout."
+function QuadPoints(μ₀, iμ₀, iμ₀Nstart, qp_μ, wt_μ, qp_μN, wt_μN,
+                    Nquad, Nstreams)
+    return QuadPoints(μ₀, iμ₀, iμ₀Nstart, qp_μ, wt_μ, qp_μN, wt_μN,
+                      Nquad, Nstreams, qp_μ, iμ₀, iμ₀Nstart, false)
 end
 
 # ============================================================================
@@ -1325,7 +1517,7 @@ physical state vector.
 $(DocStringExtensions.FIELDS)
 """
 struct OpticsLin{A, B, C}
-    "∂τ_abs/∂x per band: Vector of arrays [NGas × nSpec × nLayers]"
+    "∂τ_abs/∂VMR(gas,z): [NGas*Nz × nSpec × Nz], species-major"
     τ̇_abs::A
     "∂τ_aer/∂x per band: Vector of arrays [NAer × 7 × nSpec × nLayers]"
     τ̇_aer::B
@@ -1351,7 +1543,7 @@ Rayleigh and aerosol) or `*` (vertical concatenation).
 - `Z⁺⁺::FT3`: forward-scattering Z matrix
 - `Z⁻⁺::FT3`: backward-scattering Z matrix
 """
-Base.@kwdef struct CoreScatteringOpticalProperties{FT,FT2,FT3} <:  AbstractOpticalProperties
+Base.@kwdef struct CoreScatteringOpticalProperties{FT,FT2,FT3,FT4} <:  AbstractOpticalProperties
     "Absorption optical depth (scalar or wavelength dependent)"
     τ::FT 
     "Single scattering albedo"
@@ -1360,7 +1552,14 @@ Base.@kwdef struct CoreScatteringOpticalProperties{FT,FT2,FT3} <:  AbstractOptic
     Z⁺⁺::FT3 
     "Z scattering matrix (backward)"
     Z⁻⁺::FT3
+    "Solar-direction forward phase block [NquadN × nStokes × nSpec], or nothing"
+    Z₀⁺::FT4 = nothing
+    "Solar-direction backward phase block [NquadN × nStokes × nSpec], or nothing"
+    Z₀⁻::FT4 = nothing
 end
+
+CoreScatteringOpticalProperties(τ, ϖ, Z⁺⁺, Z⁻⁺) =
+    CoreScatteringOpticalProperties(τ, ϖ, Z⁺⁺, Z⁻⁺, nothing, nothing)
 
 # Core optical Properties COP with directional cross section 
 Base.@kwdef struct CoreDirectionalScatteringOpticalProperties{FT,FT2,FT3,FT4} <:  AbstractOpticalProperties
@@ -1382,9 +1581,8 @@ Base.@kwdef struct CoreAbsorptionOpticalProperties{FT} <:  AbstractOpticalProper
 end
 
 # Adding Core Optical Properties, can have mixed dimensions!
-function Base.:+( x::CoreScatteringOpticalProperties{xFT, xFT2, xFT3}, 
-                  y::CoreScatteringOpticalProperties{yFT, yFT2, yFT3} 
-                ) where {xFT, xFT2, xFT3, yFT, yFT2, yFT3} 
+function Base.:+(x::CoreScatteringOpticalProperties,
+                 y::CoreScatteringOpticalProperties)
     # Predefine some arrays:            
     xZ⁺⁺ = x.Z⁺⁺
     xZ⁻⁺ = x.Z⁻⁺
@@ -1398,8 +1596,8 @@ function Base.:+( x::CoreScatteringOpticalProperties{xFT, xFT2, xFT3},
     ϖ  = w ./ ifelse.(τ .> zero.(τ), τ, one.(τ))
     
     #@show xFT, xFT2, xFT3
-    all(wx .== 0.0) ? (return CoreScatteringOpticalProperties(τ, ϖ, y.Z⁺⁺, y.Z⁻⁺)) : nothing
-    all(wy .== 0.0) ? (return CoreScatteringOpticalProperties(τ, ϖ, x.Z⁺⁺, x.Z⁻⁺)) : nothing
+    all(wx .== 0.0) ? (return CoreScatteringOpticalProperties(τ, ϖ, y.Z⁺⁺, y.Z⁻⁺, y.Z₀⁺, y.Z₀⁻)) : nothing
+    all(wy .== 0.0) ? (return CoreScatteringOpticalProperties(τ, ϖ, x.Z⁺⁺, x.Z⁻⁺, x.Z₀⁺, x.Z₀⁻)) : nothing
 
     n = length(w);
     
@@ -1411,7 +1609,16 @@ function Base.:+( x::CoreScatteringOpticalProperties{xFT, xFT2, xFT3},
     Z⁺⁺ = (wx .* xZ⁺⁺ .+ wy .* yZ⁺⁺) 
     Z⁻⁺ = (wx .* xZ⁻⁺ .+ wy .* yZ⁻⁺)
 
-    CoreScatteringOpticalProperties(τ, ϖ, Z⁺⁺, Z⁻⁺)  
+    (x.Z₀⁺ === nothing) == (y.Z₀⁺ === nothing) || throw(ArgumentError(
+        "cannot mix scattering optics with inconsistent solar phase columns"))
+    if x.Z₀⁺ === nothing
+        Z₀⁺ = Z₀⁻ = nothing
+    else
+        Z₀⁺ = wx .* x.Z₀⁺ .+ wy .* y.Z₀⁺
+        Z₀⁻ = wx .* x.Z₀⁻ .+ wy .* y.Z₀⁻
+    end
+
+    CoreScatteringOpticalProperties(τ, ϖ, Z⁺⁺, Z⁻⁺, Z₀⁺, Z₀⁻)
 end
 
 # Concatenate Core Optical Properties, can have mixed dimensions!
@@ -1420,7 +1627,10 @@ function Base.:*( x::CoreScatteringOpticalProperties, y::CoreScatteringOpticalPr
     # expand_Z=true: cat along dim=3 requires both operands to have size(Z,3)==nSpec
     x = expandOpticalProperties(x, arr_type; expand_Z=true);
     y = expandOpticalProperties(y, arr_type; expand_Z=true);
-    CoreScatteringOpticalProperties([x.τ; y.τ],[x.ϖ; y.ϖ],cat(x.Z⁺⁺,y.Z⁺⁺, dims=3), cat(x.Z⁻⁺,y.Z⁻⁺, dims=3) )
+    Z₀⁺ = x.Z₀⁺ === nothing ? nothing : cat(x.Z₀⁺, y.Z₀⁺; dims=3)
+    Z₀⁻ = x.Z₀⁻ === nothing ? nothing : cat(x.Z₀⁻, y.Z₀⁻; dims=3)
+    CoreScatteringOpticalProperties([x.τ; y.τ], [x.ϖ; y.ϖ],
+        cat(x.Z⁺⁺, y.Z⁺⁺; dims=3), cat(x.Z⁻⁺, y.Z⁻⁺; dims=3), Z₀⁺, Z₀⁻)
 end
 
 function Base.:+( x::CoreScatteringOpticalProperties, y::CoreAbsorptionOpticalProperties ) 
@@ -1428,7 +1638,7 @@ function Base.:+( x::CoreScatteringOpticalProperties, y::CoreAbsorptionOpticalPr
     wx = x.τ .* x.ϖ 
     #@show size(wx), size(τ)
     ϖ  = wx ./ ifelse.(τ .> zero.(τ), τ, one.(τ))
-    CoreScatteringOpticalProperties(τ, ϖ, x.Z⁺⁺, x.Z⁻⁺)
+    CoreScatteringOpticalProperties(τ, ϖ, x.Z⁺⁺, x.Z⁻⁺, x.Z₀⁺, x.Z₀⁻)
 end
 
 function Base.:+(  y::CoreAbsorptionOpticalProperties, x::CoreScatteringOpticalProperties ) 

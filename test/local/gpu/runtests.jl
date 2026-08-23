@@ -44,6 +44,7 @@ try
         end
 
         if CUDA_AVAILABLE
+            @testset "Multisensor GPU" begin include("local/gpu/test_multisensor_heights_gpu.jl") end
             @testset "Raman GPU"     begin include("local/gpu/test_forward_raman_gpu.jl") end
             @testset "Jacobians GPU" begin include("local/gpu/test_jacobians_GPU.jl")     end
         else

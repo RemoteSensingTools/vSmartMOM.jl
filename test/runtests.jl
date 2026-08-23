@@ -19,6 +19,8 @@ try
 
 # Core module tests
 @testset "Absorption" begin include("test_Absorption.jl") end
+@testset "Absorption column integration" begin include("test_absorption_column_integration.jl") end
+@testset "H2O self broadening" begin include("test_h2o_self_broadening.jl") end
 @testset "Scattering" begin include("test_Scattering.jl") end
 
 # Caller-defined-node bulk Mie API (Sol plan phase 1) -- caller-node
@@ -35,6 +37,9 @@ try
 
 # Forward model tests (these require YAML parameter files + data)
 @testset "Forward noRS" begin include("test_forward_noRS.jl") end
+
+# Restored scalar/vector observer-height convention and exact interior levels.
+@testset "Multi-sensor heights" begin include("test_multisensor_heights.jl") end
 
 # Molecular Rayleigh/Cabannes/RRS optical-property identities.
 @testset "Rayleigh/Cabannes Raman" begin include("test_ray_cab_raman.jl") end
@@ -69,6 +74,10 @@ try
 # Phase A — `Nstreams` field on `QuadPoints` (count of nonzero weights;
 # distinct from augmented `Nquad`). See docs/src/pages/conventions.md §6.
 @testset "QuadPoints streams" begin include("test_quadpoints_streams.jl") end
+
+# Direct SFI keeps the collimated solar direction external to the diffuse
+# operator. Five weighted streams + one VZA therefore means 18×18 for IQU.
+@testset "External solar SFI" begin include("test_external_solar_sfi.jl") end
 
 # Phase B — forward and lin paths must derive the same per-band Fourier
 # loop bound. Regression for the previous lin-only precedence bug at
@@ -157,6 +166,7 @@ try
 # Skipped by default on CPU-only machines (run takes ~3 min); set
 # PHASE1B_CPU=1 or have CUDA available to actually run.
 @testset "Phase 1b RRS regression" begin include("test_forward_raman_phase1b.jl") end
+@testset "External-solar RRS columns" begin include("test_external_solar_raman.jl") end
 
 # Phase 1c single-scatter driver smoke test.
 @testset "Phase 1c SS driver" begin include("test_forward_ss.jl") end

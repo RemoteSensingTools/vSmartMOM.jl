@@ -535,12 +535,9 @@ When (z₀, σ₀) is provided (altitude-form, preferred), the profile is stored
 signature. When (p₀, σp) is provided (pressure-form, legacy), the profile is
 stored as `Normal(p₀, σp)` and consumed by the pressure-space signature.
 
-NOTE (Phase 1b): the altitude-form → pressure-grid integration path in
-`getAerosolLayerOptProp(total_τ, dist::Distribution, profile::AtmosphericProfile)`
-still interprets `dist` in pressure space. When τ_ref = 0 (e.g. the Phase 1b
-regression gate), this is a no-op. Proper altitude-form dispatch will land in a
-follow-up alongside the aerosol-module wire-in (Phase 1d) or the workspace
-landing (Phase 4), whichever proves more natural."""
+Altitude-form `LogNormal` profiles are integrated exactly between geometric
+layer interfaces; pressure-form `Normal` profiles retain pressure-space
+discretization."""
 function aerosol_params_to_obj(aerosols, FT)
     rt_aerosol_obj_list = RT_Aerosol{FT}[]
     for aerosol in aerosols
@@ -585,7 +582,7 @@ function validate_yaml_parameters(params)
         (["geometry", "sza"], Real),
         (["geometry", "vza"], Array{<:Real}),
         (["geometry", "vaz"], Array{<:Real}),
-        (["geometry", "obs_alt"], Real),
+        (["geometry", "obs_alt"], Union{Real, AbstractVector}),
         (["atmospheric_profile", "T"], Array{<:Real}),
         (["atmospheric_profile", "p"], Array{<:Real}),
         (["atmospheric_profile", "profile_reduction"], Union{Integer, Nothing}),
@@ -601,6 +598,7 @@ function validate_yaml_parameters(params)
         (["radiative_transfer", "l_trunc"], Integer),            # Legacy
         (["radiative_transfer", "nstreams"], Integer),           # Phase D primary knob
         (["radiative_transfer", "m_max"], Union{Integer, Nothing}),  # Phase D explicit override
+        (["radiative_transfer", "greek_beta_cutoff"], Union{Real, Nothing}),
     ]
     section_fields = [
         (["absorption", "vmr"], Dict),
@@ -648,6 +646,23 @@ function validate_yaml_parameters(params)
     if haskey(rt, "nstreams") && haskey(rt, "l_trunc")
         @warn "Both `nstreams` and `l_trunc` set in radiative_transfer; `l_trunc` is legacy and will be ignored. Use only `nstreams` for new configs."
     end
+    if haskey(rt, "greek_beta_cutoff") && rt["greek_beta_cutoff"] !== nothing
+        cutoff = rt["greek_beta_cutoff"]
+        _require_config(cutoff isa Real && !(cutoff isa Bool) &&
+                        isfinite(cutoff) && cutoff > 0,
+                        "radiative_transfer/greek_beta_cutoff must be a finite positive number or null")
+    end
+
+    # Migration guard for the two-stage aerosol Fourier-support rule.  Keep
+    # omission backward compatible with `null`, but require users to make the
+    # computationally important choice visible when they next touch an
+    # aerosol YAML/TOML file.  Analytic and Mie aerosols are both included:
+    # the cutoff is harmless when their beta series is already compact.
+    scattering = get(params, "scattering", nothing)
+    aerosols = scattering isa AbstractDict ? get(scattering, "aerosols", Any[]) : Any[]
+    if !isempty(aerosols) && !haskey(rt, "greek_beta_cutoff")
+        @warn "Aerosol configuration omits `radiative_transfer.greek_beta_cutoff`. Update this input file for the two-stage Greek-beta support rule: set `greek_beta_cutoff: 1.0e-5` (or another validated positive threshold) to discard insignificant high-l beta tails, or set `greek_beta_cutoff: null` to explicitly retain the full Mie-series support. Omission remains equivalent to `null` for backward compatibility."
+    end
 
     if "scattering" in keys(params)
         validate_aerosols(params["scattering"]["aerosols"])
@@ -656,6 +671,16 @@ function validate_yaml_parameters(params)
         ab = params["absorption"]
         @assert haskey(ab, "molecules") || haskey(ab, "fixed_molecules") || haskey(ab, "variable_molecules") "absorption section must define `fixed_molecules` and/or `variable_molecules` (or legacy `molecules`)"
     end
+
+
+    obs_alt = params["geometry"]["obs_alt"]
+    values = obs_alt isa AbstractVector ? obs_alt : (obs_alt,)
+    _require_config(!(obs_alt isa AbstractVector) || !isempty(obs_alt),
+                    "geometry/obs_alt must not be an empty vector")
+    _require_config(all(x -> x isa Real && !(x isa Bool), values),
+                    "geometry/obs_alt must be a number or a vector of numbers")
+    _require_config(all(x -> isfinite(x) && x >= 0, values),
+                    "geometry/obs_alt values must be finite, nonnegative heights in km above BOA")
 end
 
 "Build parameters from a Dict (e.g., parsed YAML)"
@@ -894,7 +919,10 @@ function _parse_atmosphere(params_dict::Dict, FT)
     T = convert.(FT, params_dict["atmospheric_profile"]["T"]) # Level
     p = convert.(FT, params_dict["atmospheric_profile"]["p"]) # Boundaries
     q = haskey(params_dict["atmospheric_profile"], "q") ? convert.(FT, params_dict["atmospheric_profile"]["q"]) : zeros(FT, length(T))
-    prof_red = params_dict["atmospheric_profile"]["profile_reduction"]
+    raw_prof_red = params_dict["atmospheric_profile"]["profile_reduction"]
+    prof_red = raw_prof_red === nothing ? -1 : Int(raw_prof_red)
+    _require_config(prof_red == -1 || prof_red > 0,
+                    "atmospheric_profile/profile_reduction must be -1, null, or a positive integer")
     return T, p, q, prof_red
 end
 
@@ -933,6 +961,95 @@ function _load_absorption_lut(path::AbstractString, spec_band, FT, architecture)
         return lut
     end
     return load_interpolation_model(path)
+end
+
+"Parse observer heights without collapsing the scalar/vector distinction."
+function _parse_obs_alt(raw, FT)
+    if raw isa Real && !(raw isa Bool)
+        value = FT(raw)
+        _require_config(isfinite(value) && value >= zero(FT),
+                        "geometry/obs_alt must be finite and nonnegative")
+        return value
+    end
+    _require_config(raw isa AbstractVector && !isempty(raw),
+                    "geometry/obs_alt must be a number or a nonempty vector of numbers")
+    _require_config(all(x -> x isa Real && !(x isa Bool), raw),
+                    "geometry/obs_alt vector entries must be numbers")
+    values = FT.(raw)
+    _require_config(all(x -> isfinite(x) && x >= zero(FT), values),
+                    "geometry/obs_alt values must be finite, nonnegative heights in km above BOA")
+    return convert(Vector{FT}, values)
+end
+
+"""
+    _parse_cia_files(abs_dict)
+
+Parse `absorption.cia_files`. Each entry may be a legacy path string, or a
+mapping with `path`, optional `reference_codes` (one string or a nonempty list
+of strings), and optional `negative_policy` (`error` or `clamp_zero`).
+"""
+function _parse_cia_files(abs_dict::AbstractDict)
+    haskey(abs_dict, "cia_files") || return (
+        String[], Union{Nothing,Vector{String}}[], Symbol[])
+
+    entries = abs_dict["cia_files"]
+    _require_config(entries isa AbstractVector,
+        "absorption/cia_files must be a list of paths or configuration mappings")
+
+    paths = String[]
+    reference_codes = Union{Nothing,Vector{String}}[]
+    negative_policies = Symbol[]
+    allowed_keys = Set(["path", "reference_codes", "negative_policy"])
+
+    for (i, entry) in enumerate(entries)
+        if entry isa AbstractString
+            path = String(entry)
+            refs = nothing
+            policy = :error
+        else
+            _require_config(entry isa AbstractDict,
+                "absorption/cia_files[$i] must be a path string or mapping")
+            keys_string = Set(String.(keys(entry)))
+            unknown = setdiff(keys_string, allowed_keys)
+            _require_config(isempty(unknown),
+                "absorption/cia_files[$i] has unknown field(s): $(join(sort!(collect(unknown)), ", "))")
+            _require_config(haskey(entry, "path"),
+                "absorption/cia_files[$i] mapping requires `path`")
+            _require_config(entry["path"] isa AbstractString,
+                "absorption/cia_files[$i]/path must be a string")
+            path = String(entry["path"])
+
+            raw_refs = get(entry, "reference_codes", nothing)
+            if raw_refs === nothing
+                refs = nothing
+            elseif raw_refs isa AbstractString
+                refs = [strip(String(raw_refs))]
+            else
+                _require_config(raw_refs isa AbstractVector && !isempty(raw_refs),
+                    "absorption/cia_files[$i]/reference_codes must be a nonempty string or list of strings")
+                _require_config(all(code -> code isa AbstractString, raw_refs),
+                    "absorption/cia_files[$i]/reference_codes entries must be strings")
+                refs = unique(strip.(String.(raw_refs)))
+            end
+            _require_config(refs === nothing ||
+                            (!isempty(refs) && all(!isempty, refs)),
+                "absorption/cia_files[$i]/reference_codes must not contain empty codes")
+
+            raw_policy = get(entry, "negative_policy", "error")
+            _require_config(raw_policy isa AbstractString || raw_policy isa Symbol,
+                "absorption/cia_files[$i]/negative_policy must be `error` or `clamp_zero`")
+            policy = Symbol(raw_policy)
+            _require_config(policy in (:error, :clamp_zero),
+                "absorption/cia_files[$i]/negative_policy must be `error` or `clamp_zero`")
+        end
+
+        _require_config(!isempty(strip(path)),
+            "absorption/cia_files[$i]/path must not be empty")
+        push!(paths, path)
+        push!(reference_codes, refs)
+        push!(negative_policies, policy)
+    end
+    return paths, reference_codes, negative_policies
 end
 
 function _parse_absorption(params_dict::Dict, FT, q, spec_bands, architecture)
@@ -1027,16 +1144,17 @@ function _parse_absorption(params_dict::Dict, FT, q, spec_bands, architecture)
         end
     end
 
-    cia_files = haskey(abs_dict, "cia_files") ?
-                String.(Array(abs_dict["cia_files"])) :
-                String[]
+    cia_files, cia_reference_codes, cia_negative_policies =
+        _parse_cia_files(abs_dict)
     mtckd_file = haskey(abs_dict, "mtckd_file") ?
                  String(abs_dict["mtckd_file"]) :
                  ""
 
     return AbsorptionParameters(fixed_molecules, variable_molecules, vmr,
                                 broadening_function, CEF, wing_cutoff,
-                                luts, h2o_lut, cia_files, mtckd_file)
+                                luts, h2o_lut, cia_files,
+                                cia_reference_codes, cia_negative_policies,
+                                mtckd_file)
 end
 
 function _parse_scattering(params_dict::Dict, FT::Type{<:AbstractFloat}=Float64)
@@ -1094,6 +1212,10 @@ function parameters_from_dict(params_dict::Dict)
     Δ_angle = FT(get(params_dict["radiative_transfer"], "Δ_angle", 0.0))
     truncation = _parse_truncation(params_dict, res.l_trunc, Δ_angle, FT)
     numerics = _parse_numerics(params_dict, FT)
+    greek_beta_cutoff_raw = get(params_dict["radiative_transfer"],
+                                "greek_beta_cutoff", nothing)
+    greek_beta_cutoff = greek_beta_cutoff_raw === nothing ? nothing :
+                        FT(greek_beta_cutoff_raw)
 
     return vSmartMOM_Parameters(
         spec_bands, BRDF_per_band, quadrature_type, polarization_type,
@@ -1102,10 +1224,11 @@ function parameters_from_dict(params_dict::Dict)
         numerics, FT,
         architecture,
         FT(params_dict["geometry"]["sza"]), convert.(FT, params_dict["geometry"]["vza"]),
-        convert.(FT, params_dict["geometry"]["vaz"]), FT(params_dict["geometry"]["obs_alt"]),
+        convert.(FT, params_dict["geometry"]["vaz"]), _parse_obs_alt(params_dict["geometry"]["obs_alt"], FT),
         T, p, q, profile_reduction,
         absorption_params, scattering_params,
         res.nstreams, res.m_max_override, res.stream_l_cap, res.legacy_l_cap_override,
+        greek_beta_cutoff,
     )
 end
 

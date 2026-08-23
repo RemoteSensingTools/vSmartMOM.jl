@@ -61,6 +61,23 @@ computed by a hand-coded tangent-linear partner of the forward kernel.
 ``\dot{\mathbf{R}}, \dot{\mathbf{T}}, \dot{\mathbf{J}}`` propagate together
 through the same adding-doubling sequence.
 
+For an external solar direction, the tangent-linear solver also carries
+rectangular solar-column derivatives
+``\dot R_0^{-+},\dot R_0^{+-},\dot T_0^{++},\dot T_0^{--}`` with layout
+`(NquadN,nStokes,nSpec,nParams)`. They contain the local ``\dot\tau``,
+``\dot\varpi`` and ``\dot Z_0`` contributions. The derivative of direct-beam
+extinction above the layer is added only when the columns are contracted:
+
+```math
+\dot J_0 = \dot O_0 F_0e^{-\tau_a/\mu_0}
+          + O_0F_0e^{-\tau_a/\mu_0}
+            \left(-\frac{\dot\tau_a}{\mu_0}\right),
+```
+
+where ``O_0`` denotes the applicable ``R_0`` or ``T_0`` column operator.
+Keeping these terms separate prevents the solar direction from re-entering
+the diffuse angular operator during linearization.
+
 The split has three benefits:
 
 1. **The hot loop stays pure-`FT`.** No `Dual{T,V,N}` arithmetic in the
@@ -166,20 +183,27 @@ is centralized in [`src/CoreRT/parameter_layout.jl:1–67`](https://github.com/R
 
 ```julia
 struct ParameterLayout
-    aerosol_params::Int     # = 7   (τ_ref, n_r, n_i, r_m, σ_g, p₀, σ_p)
+    n_atmosphere::Int      # = 1   (p_surf)
+    aerosol_params::Int     # = 7   (τ_ref, n_r, n_i, r_m, σ_g, profile location/width)
     n_aerosols::Int
     n_gases::Int
     n_surface::Int
+    n_sif::Int              # = 2 for [SIF755, slope], otherwise 0
+    n_canopy::Int
 end
 
 n_total(layout)             # total number of Jacobian columns
 aerosol_range(layout, iaer) # column indices for aerosol iaer (length 7)
 gas_range(layout)           # column indices for gas VMRs
+gas_profile_range(layout, igas, Nz) # all layers for one gas
+gas_layer_index(layout, igas, iz, Nz) # one gas/layer column
 surface_range(layout)       # column indices for surface params
+sif_range(layout)           # [SIF755, slope], referenced to 755 nm
 ```
 
 Always use these accessors instead of hand-writing arithmetic like
-`7*NAer + NGas + 1`. The seven aerosol parameters per mode are:
+`1 + 7*NAer + NGasSpecies*Nz + NSurf`. Column 1 is `p_surf`; the seven aerosol
+parameters per mode follow:
 
 | # | Parameter | Meaning |
 |---|---|---|
@@ -188,12 +212,12 @@ Always use these accessors instead of hand-writing arithmetic like
 | 3 | `n_i`   | imaginary refractive index |
 | 4 | `r_m`   | median radius of size distribution |
 | 5 | `σ_g`   | geometric standard deviation of size distribution |
-| 6 | `p₀`    | central pressure of vertical Gaussian |
-| 7 | `σ_p`   | width of vertical Gaussian |
+| 6 | `p₀` / `z₀` | profile location for pressure-form `Normal` / altitude-form `LogNormal` |
+| 7 | `σ_p` / `σ₀` | corresponding profile width |
 
-A run with two aerosol modes, four gases, and one surface parameter has a
-Jacobian with `2·7 + 4 + 1 = 19` columns, and `aerosol_range(layout, 2)`
-returns `8:14`.
+A run with two aerosol modes, four gases, `Nz` layers, and one surface
+parameter has `1 + 2·7 + 4·Nz + 1` Jacobian columns. Gas columns use
+TOA-to-BOA layer order within each species.
 
 ## What goes through ForwardDiff vs analytic
 
@@ -205,7 +229,7 @@ new parameters):
 | Lambertian albedo | analytic | trivial: ``\partial r/\partial \rho = 1/\pi`` |
 | RPV / Ross-Li / Cox-Munk BRDF | ForwardDiff | low-dimensional, simple surface code |
 | `τ_ref` (aerosol OD) | analytic | trivial: ``\partial \tau/\partial \tau_\mathrm{ref} = \tau/\tau_\mathrm{ref}`` |
-| `p₀, σ_p` (aerosol height) | analytic | already in `atmo_prof_lin.jl` |
+| profile location/width (`p₀, σ_p` or `z₀, σ₀`) | analytic | already in `atmo_prof_lin.jl` |
 | `n_r, n_i` (refractive index) | analytic Mie | Mie series is AD-hostile (recurrences) |
 | `r_m, σ_g` (size distribution) | analytic Mie | same |
 | Gas VMR scaling | analytic | ``\partial \tau_\mathrm{abs}/\partial \mathrm{VMR} = \sigma`` |

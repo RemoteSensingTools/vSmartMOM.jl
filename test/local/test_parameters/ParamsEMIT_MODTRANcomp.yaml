@@ -42,7 +42,7 @@ geometry:
   sza:                39.583965990615404    # MISC.SZA
   vza:                [0.0]                 # nadir viewing
   vaz:                [81.49773971061641]   # MISC.RAA
-  obs_alt:            0                     # observer at TOA
+  obs_alt:            [0]                     # default TOA + BOA outputs
 
 # =================================================================
 # Atmospheric Profile — LUT-aligned (54 pressure levels, 53 layers)

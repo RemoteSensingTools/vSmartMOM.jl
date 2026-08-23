@@ -22,16 +22,20 @@ function interaction_ss!(SFI::Bool,
             composite_layer::Union{CompositeLayer{FT},CompositeLayerRS{FT}},
             added_layer::Union{AddedLayer{FT},AddedLayerRS{FT}},
             τ_sum::AbstractArray,
-            τ_λ::AbstractArray{FT,1},
+            τ_λ::AbstractVector,
             quad_points::QuadPoints{FT2},
             architecture) where {FT<:Real, FT2}
 
     (; qp_μN) = quad_points
     arr_type = array_type(architecture)
     device = devi(architecture)
-    qp_μN = arr_type(qp_μN)
-    τ_sum = arr_type(τ_sum)
-    τ_λ = arr_type(τ_λ)
+    # Optical construction can legitimately promote τ to a wider type than
+    # the operator workspace (for example Float64 Mie optics in a Float32 RT
+    # model).  The interaction kernel writes into FT composite arrays, so cast
+    # all attenuation inputs to that authoritative workspace type here.
+    qp_μN = arr_type(FT.(qp_μN))
+    τ_sum = arr_type(FT.(τ_sum))
+    τ_λ = arr_type(FT.(τ_λ))
 
     kernel! = get_interaction_ss!(device)
     event = kernel!(τ_sum, τ_λ, qp_μN,
@@ -47,7 +51,7 @@ function interaction_inelastic_ss!(RS_type::RRS,
     composite_layer::Union{CompositeLayer{FT},CompositeLayerRS{FT}},
     added_layer::Union{AddedLayer{FT},AddedLayerRS{FT}},
     τ_sum::AbstractArray,
-    τ_λ::AbstractArray{FT,1},
+    τ_λ::AbstractVector,
     quad_points::QuadPoints{FT2},
     architecture) where {FT<:Real, FT2}
 
@@ -56,9 +60,9 @@ function interaction_inelastic_ss!(RS_type::RRS,
 
     atype = array_type(architecture)
     device = devi(architecture)
-    qp_μN = atype(qp_μN)
-    τ_sum = atype(τ_sum)
-    τ_λ = atype(τ_λ)
+    qp_μN = atype(FT.(qp_μN))
+    τ_sum = atype(FT.(τ_sum))
+    τ_λ = atype(FT.(τ_λ))
     kernel! = get_interaction_ss_RRS!(device)
     event = kernel!(τ_sum, τ_λ, qp_μN, atype(i_λ₁λ₀),
                 atype(added_layer.ieJ₀⁺), atype(added_layer.ieJ₀⁻),
@@ -95,7 +99,7 @@ function interaction_inelastic_ss!(
     composite_layer::Union{CompositeLayer{FT},CompositeLayerRS{FT}},
     added_layer::Union{AddedLayer{FT},AddedLayerRS{FT}},
     τ_sum::AbstractArray,
-    τ_λ::AbstractArray{FT,1},
+    τ_λ::AbstractVector,
     quad_points::QuadPoints{FT2},
     architecture) where {FT<:Real, FT2}
 
@@ -104,9 +108,9 @@ function interaction_inelastic_ss!(
 
 atype = array_type(architecture)
 device = devi(architecture)
-qp_μN = atype(qp_μN)
-τ_sum = atype(τ_sum)
-τ_λ = atype(τ_λ)
+qp_μN = atype(FT.(qp_μN))
+τ_sum = atype(FT.(τ_sum))
+τ_λ = atype(FT.(τ_λ))
 
 kernel! = get_interaction_ss_VS!(device)
 event = kernel!(τ_sum, τ_λ, qp_μN, atype(i_λ₁λ₀_all),

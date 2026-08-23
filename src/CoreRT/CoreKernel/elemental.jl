@@ -78,7 +78,7 @@ function elemental!(pol_type, SFI::Bool,
                             architecture) where {FT<:Real,FT2}
 
     (; r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, J₀⁺, J₀⁻) = added_layer
-    (; qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart, iμ₀) = quad_points
+    (; qp_μ, wt_μ, qp_μN, wt_μN, iμ₀_phase, μ₀) = quad_points
     #@unpack ϖ_Cabannes = RS_type
     arr_type = array_type(architecture)
     # Need to check with paper nomenclature. This is basically eqs. 19-20 in vSmartMOM
@@ -90,10 +90,6 @@ function elemental!(pol_type, SFI::Bool,
     Z⁻⁺_ = reshape(Z⁻⁺, (size(Z⁺⁺,1), size(Z⁺⁺,2),1))
 
     D = Diagonal(arr_type(repeat(pol_type.D, size(qp_μ,1))))
-    I₀_NquadN = arr_type(zeros(FT,size(qp_μN,1))); #incident irradiation
-    i_end     = pol_type.n*iμ₀
-    I₀_NquadN[iμ₀Nstart:i_end] = pol_type.I₀
-
     device = devi(architecture)
 
     # If in scattering mode:
@@ -121,7 +117,10 @@ function elemental!(pol_type, SFI::Bool,
 
         if SFI
             kernel! = get_elem_rt_SFI!(device)
-            event = kernel!(J₀⁺, J₀⁻, ϖ_λ, dτ_λ, τ_sum, Z⁻⁺, Z⁺⁺, arr_type(F₀), qp_μN, ndoubl, wct02, pol_type.n, arr_type(pol_type.I₀), iμ₀, D, ndrange=size(J₀⁺))
+            event = kernel!(J₀⁺, J₀⁻, ϖ_λ, dτ_λ, τ_sum, Z⁻⁺, Z⁺⁺,
+                            arr_type(F₀), qp_μN, μ₀, ndoubl, wct02,
+                            pol_type.n, iμ₀_phase, D,
+                            ndrange=size(J₀⁺))
             synchronize_if_gpu()
         end
 
@@ -162,13 +161,12 @@ function elemental!(pol_type, SFI::Bool,
     (; r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺) = added_layer
     j₀⁺ = added_layer.j₀⁺
     j₀⁻ = added_layer.j₀⁻
-    (; qp_μ, iμ₀, wt_μN, qp_μN) = quad_points
-    (; τ, ϖ, Z⁺⁺, Z⁻⁺) = computed_layer_properties
+    (; qp_μ, iμ₀_phase, μ₀, wt_μN, qp_μN) = quad_points
+    (; τ, ϖ, Z⁺⁺, Z⁻⁺, Z₀⁺, Z₀⁻) = computed_layer_properties
     #@show M
     arr_type = array_type(architecture)
 
     # Need to check with paper nomenclature. This is basically eqs. 19-20 in vSmartMOM
-    I₀    = arr_type(pol_type.I₀)
     D     = Diagonal(arr_type(repeat(pol_type.D, size(qp_μ,1))))
 
     device = devi(architecture)
@@ -188,8 +186,30 @@ function elemental!(pol_type, SFI::Bool,
         synchronize_if_gpu()
 
         # SFI part
-        kernel! = get_elem_rt_SFI!(device)
-        event = kernel!(j₀⁺, j₀⁻, ϖ, dτ, arr_type(τ_sum), Z⁻⁺, Z⁺⁺, arr_type(F₀), qp_μN, ndoubl, wct02, pol_type.n, I₀, iμ₀, D, ndrange=size(j₀⁺))
+        if Z₀⁺ === nothing
+            kernel! = get_elem_rt_SFI!(device)
+            event = kernel!(j₀⁺, j₀⁻, ϖ, dτ, arr_type(τ_sum), Z⁻⁺, Z⁺⁺,
+                            arr_type(F₀), qp_μN, μ₀, ndoubl, wct02,
+                            pol_type.n, iμ₀_phase, D,
+                            ndrange=size(j₀⁺))
+        else
+            columns = added_layer.solar_columns
+            columns === nothing && throw(ArgumentError(
+                "external-solar elemental RT requires SolarColumnOperators"))
+            Dpol = arr_type(pol_type.D)
+            kernel! = get_elem_rt_solar_columns!(device)
+            event = kernel!(columns.R₀⁻⁺, columns.R₀⁺⁻,
+                            columns.T₀⁺⁺, columns.T₀⁻⁻,
+                            ϖ, dτ, Z₀⁻, Z₀⁺, qp_μN, μ₀,
+                            wct02, pol_type.n, Dpol,
+                            ndrange=size(columns.R₀⁻⁺))
+            synchronize_if_gpu()
+            kernel! = apply_solar_columns!(device)
+            event = kernel!(j₀⁺, j₀⁻, columns.R₀⁻⁺, columns.T₀⁺⁺,
+                            arr_type(F₀), arr_type(τ_sum), μ₀,
+                            ndoubl, pol_type.n, Dpol,
+                            ndrange=size(j₀⁺))
+        end
         #wait(device, event)
         synchronize_if_gpu()
         
@@ -204,6 +224,7 @@ function elemental!(pol_type, SFI::Bool,
         t⁻⁻ .= Diagonal{exp(-τ ./ qp_μN)}
     end    
 end
+
 
 """
     get_elem_rt!(r⁻⁺, t⁺⁺, ϖ_λ, dτ_λ, Z⁻⁺, Z⁺⁺, μ, wct)
@@ -311,22 +332,26 @@ end
 
 """
     get_elem_rt_SFI!(J₀⁺, J₀⁻, ϖ_λ, dτ_λ, τ_sum, Z⁻⁺, Z⁺⁺, F₀, μ,
-                     ndoubl, wct02, nStokes, I₀, iμ0, D)
+                     μ₀, ndoubl, wct02, nStokes, iμ₀_phase, D)
 
 KernelAbstractions elemental source-function kernel for the direct solar beam.
-Each workitem owns one stream/spectral element `(i, n)`, forms the local
-`Z⁺⁺ * F₀` and `Z⁻⁺ * F₀` Stokes contractions for the incident solar stream,
-then writes the exact finite-δ downwelling and upwelling source vectors. The
-kernel applies cumulative beam attenuation `exp(-τ_sum / μ₀)` and the
-D-matrix sign for upwelling source terms when the elemental layer will be
-doubled.
+Each workitem owns one diffuse/output stream and spectral element `(i, n)`.
+The diffuse operator grid is allowed to omit the collimated solar direction;
+`iμ₀_phase` selects the exact solar column from the (possibly augmented)
+phase-matrix grid, while scalar `μ₀` supplies the propagation geometry.
+The kernel forms the local `Z⁺⁺(μᵢ,μ₀) * F₀` and
+`Z⁻⁺(μᵢ,μ₀) * F₀` contractions, writes the exact finite-δ source
+vectors, applies cumulative beam attenuation `exp(-τ_sum / μ₀)`, and
+applies the D-matrix sign required by the doubling path.
 """
-@kernel function get_elem_rt_SFI!(J₀⁺, J₀⁻, @Const(ϖ_λ), @Const(dτ_λ), @Const(τ_sum), @Const(Z⁻⁺), @Const(Z⁺⁺), @Const(F₀), @Const(μ), ndoubl, wct02, nStokes, @Const(I₀), iμ0, @Const(D))
-    i_start  = nStokes*(iμ0-1) + 1 
-    i_end    = nStokes*iμ0
+@kernel function get_elem_rt_SFI!(J₀⁺, J₀⁻, @Const(ϖ_λ), @Const(dτ_λ), @Const(τ_sum),
+                                  @Const(Z⁻⁺), @Const(Z⁺⁺), @Const(F₀), @Const(μ), μ₀,
+                                  ndoubl, wct02, nStokes, iμ₀_phase, @Const(D))
+    i_start = nStokes * (iμ₀_phase - 1) + 1
+    i_end   = nStokes * iμ₀_phase
     
     i, _, n = @index(Global, NTuple) ##Suniti: What are Global and Ntuple?
-    FT = eltype(I₀)
+    FT = eltype(J₀⁺)
     J₀⁺[i, 1, n] = zero(FT)
     J₀⁻[i, 1, n] = zero(FT)
     n2=1
@@ -345,28 +370,93 @@ doubled.
         Z⁻⁺_I₀ += Z⁻⁺[i,ii,n2] * F₀[ii-i_start+1,n]
     end
 
-    if (i >= i_start) & (i <= i_end)
-        ctr = i-i_start+1
+    if μ[i] == μ₀
         # See Eq. 1.54 in Fell
         # J₀⁺ = 0.25*(1+δ(m,0)) * ϖ(λ) * Z⁺⁺ * I₀ * (dτ(λ)/μ₀) * exp(-dτ(λ)/μ₀)
-        J₀⁺[i, 1, n] = wct02 * ϖ_λ[n] * Z⁺⁺_I₀ * (dτ_λ[n] / μ[i]) * exp(-dτ_λ[n] / μ[i])
+        J₀⁺[i, 1, n] = wct02 * ϖ_λ[n] * Z⁺⁺_I₀ * (dτ_λ[n] / μ₀) * exp(-dτ_λ[n] / μ₀)
     else
         # J₀⁺ = 0.25*(1+δ(m,0)) * ϖ(λ) * Z⁺⁺ * I₀ * [μ₀ / (μᵢ - μ₀)] * [exp(-dτ(λ)/μᵢ) - exp(-dτ(λ)/μ₀)]
         # See Eq. 1.53 in Fell
         J₀⁺[i, 1, n] = 
-        wct02 * ϖ_λ[n] * Z⁺⁺_I₀ * (μ[i_start] / (μ[i] - μ[i_start])) * 
-        expdiff_neg(dτ_λ[n] / μ[i], dτ_λ[n] / μ[i_start])
+        wct02 * ϖ_λ[n] * Z⁺⁺_I₀ * (μ₀ / (μ[i] - μ₀)) *
+        expdiff_neg(dτ_λ[n] / μ[i], dτ_λ[n] / μ₀)
     end
     #J₀⁻ = 0.25*(1+δ(m,0)) * ϖ(λ) * Z⁻⁺ * I₀ * [μ₀ / (μᵢ + μ₀)] * [1 - exp{-dτ(λ)(1/μᵢ + 1/μ₀)}]
     # See Eq. 1.52 in Fell
-    J₀⁻[i, 1, n] = wct02 * ϖ_λ[n] * Z⁻⁺_I₀ * (μ[i_start] / (μ[i] + μ[i_start])) * (-expm1(-dτ_λ[n] * ((1 / μ[i]) + (1 / μ[i_start]))))
+    J₀⁻[i, 1, n] = wct02 * ϖ_λ[n] * Z⁻⁺_I₀ * (μ₀ / (μ[i] + μ₀)) *
+                    (-expm1(-dτ_λ[n] * ((1 / μ[i]) + (1 / μ₀))))
 
-    J₀⁺[i, 1, n] *= exp(-τ_sum[n]/μ[i_start])
-    J₀⁻[i, 1, n] *= exp(-τ_sum[n]/μ[i_start])
+    J₀⁺[i, 1, n] *= exp(-τ_sum[n] / μ₀)
+    J₀⁻[i, 1, n] *= exp(-τ_sum[n] / μ₀)
 
     if ndoubl >= 1
         J₀⁻[i, 1, n] = D[i,i]*J₀⁻[i, 1, n] #D = Diagonal{1,1,-1,-1,...Nquad times}
     end  
+    nothing
+end
+
+"""
+    get_elem_rt_solar_columns!(R₀⁻⁺, R₀⁺⁻, T₀⁺⁺, T₀⁻⁻, ...)
+
+Construct exact finite-elemental-layer operators mapping the fixed solar
+direction into all diffuse output streams. Arrays have layout
+`(NquadN, nStokes, nSpec)`: the second axis contains incident solar Stokes
+components, never angular quadrature nodes.
+
+`T₀⁺⁺` is only the diffuse field created by scattering of the direct beam.
+The unscattered beam remains the analytic `F₀ exp(-τ/μ₀)` term. The reverse
+columns are retained explicitly and follow the same Hovenier D-matrix
+symmetry as the square diffuse operators.
+"""
+@kernel function get_elem_rt_solar_columns!(R₀⁻⁺, R₀⁺⁻, T₀⁺⁺, T₀⁻⁻,
+                                             @Const(ϖ), @Const(dτ),
+                                             @Const(Z₀⁻), @Const(Z₀⁺),
+                                             @Const(μ), μ₀, wct02,
+                                             nStokes, @Const(Dpol))
+    i, s, n = @index(Global, NTuple)
+    iz = size(Z₀⁺, 3) == 1 ? 1 : n
+    μᵢ = μ[i]
+    t = if μᵢ == μ₀
+        wct02 * ϖ[n] * Z₀⁺[i,s,iz] * (dτ[n]/μ₀) * exp(-dτ[n]/μ₀)
+    else
+        wct02 * ϖ[n] * Z₀⁺[i,s,iz] * (μ₀/(μᵢ-μ₀)) *
+            expdiff_neg(dτ[n]/μᵢ, dτ[n]/μ₀)
+    end
+    r = wct02 * ϖ[n] * Z₀⁻[i,s,iz] * (μ₀/(μᵢ+μ₀)) *
+        (-expm1(-dτ[n] * ((1/μᵢ) + (1/μ₀))))
+    T₀⁺⁺[i,s,n] = t
+    R₀⁻⁺[i,s,n] = r
+    parity = Dpol[mod1(i,nStokes)] * Dpol[s]
+    T₀⁻⁻[i,s,n] = parity * t
+    R₀⁺⁻[i,s,n] = parity * r
+    nothing
+end
+
+"""
+    apply_solar_columns!(J₀⁺, J₀⁻, R₀⁻⁺, T₀⁺⁺, F₀, τ_above, μ₀)
+
+Contract the rectangular elemental operators with the incident solar Stokes
+vector and apply only the direct-beam attenuation above the layer. D-matrix
+conditioning for doubling remains in `apply_D_matrix_elemental_SFI!`.
+"""
+@kernel function apply_solar_columns!(J₀⁺, J₀⁻,
+                                      @Const(R₀⁻⁺), @Const(T₀⁺⁺),
+                                      @Const(F₀), @Const(τ_above), μ₀,
+                                      ndoubl, nStokes, @Const(Dpol))
+    i, _, n = @index(Global, NTuple)
+    FT = eltype(J₀⁺)
+    down = zero(FT)
+    up = zero(FT)
+    for s in 1:size(R₀⁻⁺, 2)
+        down += T₀⁺⁺[i,s,n] * F₀[s,n]
+        up += R₀⁻⁺[i,s,n] * F₀[s,n]
+    end
+    beam = exp(-τ_above[n]/μ₀)
+    J₀⁺[i,1,n] = down * beam
+    J₀⁻[i,1,n] = up * beam
+    if ndoubl >= 1
+        J₀⁻[i,1,n] *= Dpol[mod1(i,nStokes)]
+    end
     nothing
 end
 

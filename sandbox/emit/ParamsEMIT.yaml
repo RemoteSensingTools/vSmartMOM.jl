@@ -69,7 +69,7 @@ geometry:
   # Viewing azimuth angles (degrees)
   vaz:                [0.]
   # Observation altitude (km)
-  obs_alt:            0
+  obs_alt:            [0]
 
 # =================================================================
 # Atmospheric Profile

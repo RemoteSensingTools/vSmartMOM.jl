@@ -70,7 +70,7 @@ architecture      = "CPU()"
 sza     = 60.0
 vza     = [60.0]
 vaz     = [180.0]
-obs_alt = 1000.0                                # Pa
+obs_alt = [0.0]                                 # TOA + BOA radiances
 
 [atmospheric_profile]
 T = [250.0, 275.0]                              # K, full levels (layer centers)
@@ -91,7 +91,7 @@ cfg = Dict(
     "float_type"        => "Float64",
     "architecture"      => "CPU()"),
   "geometry" => Dict(
-    "sza" => 60.0, "vza" => [60.0], "vaz" => [180.0], "obs_alt" => 1000.0),
+    "sza" => 60.0, "vza" => [60.0], "vaz" => [180.0], "obs_alt" => [0.0]),
   "atmospheric_profile" => Dict(
     "T" => [250.0, 275.0], "p" => [100.0, 500.0, 1000.0],
     "profile_reduction" => -1))
@@ -112,7 +112,12 @@ R, T   = rt_run(model)
   2·nstreams − 1`. Minimum 3.
 - `T` has length `#layers`; `p` (half levels) has length `#layers + 1`. They
   define the layering — get this off-by-one right.
-- `obs_alt` is in **Pa** (the profile `p` is in **hPa**). TOA→BOA ordering.
+- `obs_alt` is a height selection in **km above BOA**. `[0]` requests the
+  standard TOA-upwelling and BOA-downwelling pair. Scalar `0` requests BOA
+  only; a scalar interior `H` requests both directions at `H`; `[0, H]`
+  requests TOA, BOA, and `H`. See the
+  [`geometry` schema](Schema/geometry.md) for the complete scalar/vector
+  convention and the named `ObserverRTResult` output.
 
 ---
 
@@ -141,7 +146,7 @@ optical depth enters.
 
 ```toml
 [absorption]
-fixed_molecules    = [["O2"]]          # one list per band; no Jacobian
+fixed_molecules    = [["O2"]]          # one list per band; no abundance Jacobian
 variable_molecules = [[]]              # one list per band; Jacobian computed
 vmr                = { O2 = 0.21 }     # volume mixing ratio per molecule
 broadening         = "Voigt()"
@@ -164,7 +169,8 @@ cfg["absorption"] = Dict(
 `variable_molecules[ib]` each hold the molecules active in band `ib`. There is
 **one list per spectral band** — band 1 might carry `O2`, band 2 `CO2`, etc.
 
-- **fixed** — abundance held constant, *no* Jacobian computed.
+- **fixed** — abundance held constant, so no gas-abundance Jacobian is
+  computed (other configured state derivatives remain available).
 - **variable** — abundance is a state-vector element, Jacobian computed (the
   linearized path differentiates these).
 
@@ -175,10 +181,15 @@ cfg["absorption"] = Dict(
 - Each molecule must actually have lines inside its band's wavenumber range —
   a molecule with no lines in-band contributes nothing.
 
-**VMR sources.** A `vmr` value is either
+**VMR sources.** For every non-H₂O gas, `vmr` means moles of species per
+mole of **dry air**. A value is either
 - a **scalar** (e.g. `O2 = 0.21`) — constant with height, or
-- a **vector** — a per-layer profile; its length must match the atmospheric
-  profile layers (it is interpolated in pressure with a warning if it does not).
+- a **vector** with either one value per layer (`N`) or one value per pressure
+  interface (`N+1`). Interface values are mapped to layer centers in log
+  pressure before any observer-height interfaces are inserted.
+
+H₂O is derived from `q` and stored internally as the dry-air molar ratio
+``N_\mathrm{H2O}/N_\mathrm{dry}``, not as a moist-air mole fraction.
 
 **Line shape.** `broadening` ∈ `Voigt()` (default; Doppler+pressure, the right
 choice through the troposphere/stratosphere), `Lorentz()` (pressure limit),
@@ -192,9 +203,26 @@ molecule lists) the precomputed look-up tables are used instead — much faster,
 and the production pipeline path. `cia_files` / `mtckd_file` add
 collision-induced and continuum absorption.
 
-> **Legacy form.** Older configs use a single `molecules = [[O2], [H2O,CO2]]`
+For a CIA file containing more than one HITRAN reference family, select the
+source explicitly:
+
+```yaml
+cia_files:
+  - path: "/data/HITRAN_CIA/O2-O2_2024.cia"
+    reference_codes: ["54"]
+    negative_policy: error
+  - "/data/HITRAN_CIA/O2-N2_2024.cia"
+```
+
+`reference_codes` accepts one string or a nonempty list. A bare path remains
+valid when its reference families do not overlap on the requested spectral
+grid; overlapping families without an explicit selection are rejected.
+`negative_policy` is `error` by default. Use `clamp_zero` only as an explicit,
+documented decision to replace negative tabulated cross sections by zero.
+
+> **Legacy form.** Older configs use a single `molecules = [[O2], [CO2]]`
 > list (all treated as fixed) instead of `fixed_molecules`/`variable_molecules`.
-> It still parses; prefer the explicit split for new work.
+> It still parses for non-H₂O species; prefer the explicit split for new work.
 
 ---
 
@@ -221,14 +249,13 @@ vmr_h2o = q / (1 − q) · (M_dry / M_H₂O)
 ```
 
 and adds the H₂O line absorption automatically (HITRAN on the fly, or the H₂O
-LUT if supplied). `q` has length `#layers` (same as `T`); all-zero `q` (the
-default) means a dry atmosphere.
+LUT if supplied). `q` may contain `N` layer-center values (same as `T`) or
+`N+1` pressure-interface values; interface values are mapped to layer centers
+in log pressure. All-zero `q` (the default) means a dry atmosphere.
 
-> **q vs. an explicit H₂O molecule.** The legacy `molecules` form *can* list
-> `H2O` with its own `vmr` (constant), which bypasses `q`. Mixing both —
-> setting `q` *and* listing `H2O` — double-specifies water. Prefer `q` for the
-> modern path. (If you set `q` where a profile source already provided one, a
-> warning is emitted; a full config-level override is not yet wired.)
+> **H₂O is driven only by `q`.** Do not list `H2O` in `fixed_molecules`,
+> `variable_molecules`, or the legacy `molecules` form; the parser rejects it
+> to prevent double-specifying water vapor.
 
 ---
 

@@ -123,13 +123,13 @@ rebuilt HITRAN H2O LUT.
 Suggested distributed pressure slices:
 
 ```bash
-CUDA_DEVICE=1 PSURFS=1000 OUT_NC=/home/sanghavi/data/RamanSIFgrid/o2a_raman_lut_psurf1000.nc \
+CUDA_DEVICE=1 PSURFS=1000 OUT_NC=/home/sanghavi/data/RamanSIFgrid/O2ABand/o2a_raman_lut_psurf1000.nc \
   julia --project=. workflows/OCORaman/scripts/createRamanLUT_O2A.jl
 
-CUDA_DEVICE=1 PSURFS=750 OUT_NC=/home/sanghavi/data/RamanSIFgrid/o2a_raman_lut_psurf750.nc \
+CUDA_DEVICE=1 PSURFS=750 OUT_NC=/home/sanghavi/data/RamanSIFgrid/O2ABand/o2a_raman_lut_psurf750.nc \
   julia --project=. workflows/OCORaman/scripts/createRamanLUT_O2A.jl
 
-CUDA_DEVICE=1 PSURFS=500 OUT_NC=/home/sanghavi/data/RamanSIFgrid/o2a_raman_lut_psurf0500.nc \
+CUDA_DEVICE=1 PSURFS=500 OUT_NC=/home/sanghavi/data/RamanSIFgrid/O2ABand/o2a_raman_lut_psurf0500.nc \
   julia --project=. workflows/OCORaman/scripts/createRamanLUT_O2A.jl
 ```
 

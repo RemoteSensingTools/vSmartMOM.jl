@@ -52,8 +52,8 @@ geometry:
   vza:                [0.0] #[30., 30., 30., 30., 30.] #[0, 30, 60, 30] #[15, 30, 45, 60] #[32.4436] #[0.072]
   # Viewing azimuth angles (degrees)
   vaz:                [0.0] #[0.0, 45., 90., 135., 180.] #, 0.0, 0.0, 180.] #[0.0, 0.0, 180., 180.]
-  # Observation altitude (Pa)
-  obs_alt:            0 #1000.0
+  # Observer height selection (km above BOA)
+  obs_alt:            [0] # default TOA + BOA outputs
 
 # =================================================================
 # Atmospheric Profile

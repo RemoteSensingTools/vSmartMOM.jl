@@ -71,7 +71,8 @@ params = parameters_from_dict(config)
 The `geoschem_to_dict` function automatically:
 - ✅ Reads NetCDF4 files using NCDatasets.jl
 - ✅ Extracts atmospheric profiles (T, p, q)
-- ✅ Reads trace gas VMRs (CO2, CO, CH4, N2O, C2H6, H2O)
+- ✅ Reads trace gas VMRs (CO2, CO, CH4, N2O, C2H6); H2O is derived from
+  `Met_SPHU` and O2 is supplied at a fixed dry-air abundance
 - ✅ Flips vertical indexing (GCHP BOA→TOA to vSmartMOM TOA→BOA)
 - ✅ Computes pressure grid from surface pressure + layer thicknesses
 - ✅ Returns Dict compatible with `parameters_from_dict`
