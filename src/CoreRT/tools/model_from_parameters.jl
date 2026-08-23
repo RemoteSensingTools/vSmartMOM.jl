@@ -1098,30 +1098,34 @@ function _spectralize_truncated_endpoints(a₀::AerosolOptics,
     end
     lgc = linGreekCoefs(fields[:α̇], fields[:β̇], fields[:γ̇],
                         fields[:δ̇], fields[:ϵ̇], fields[:ζ̇])
+    # `_interpolate_phase_nodes` keeps the (n_param, 1) node shape and returns
+    # (n_param, 1, n_spec); collapse the singleton node axis so both branches
+    # hand downstream code the same (n_param, n_spec) layout.
+    _drop_node_axis(x) = dropdims(x; dims=2)
     k̇₀ = reshape(l₀.k̇, n_param, 1)
     k̇₁ = reshape(l₁.k̇, n_param, 1)
     ω̃̇₀ = reshape(l₀.ω̃̇, n_param, 1)
     ω̃̇₁ = reshape(l₁.ω̃̇, n_param, 1)
     k̇ = lin_reference === nothing ?
         k̇₀ .* reshape(one(FT) .- w, 1, n_spec) .+ k̇₁ .* reshape(w, 1, n_spec) :
-        _interpolate_phase_nodes(ν_spec, a.phase_ν,
-            [k̇₀, reshape(lin_reference.k̇, n_param, 1), k̇₁])
+        _drop_node_axis(_interpolate_phase_nodes(ν_spec, a.phase_ν,
+            [k̇₀, reshape(lin_reference.k̇, n_param, 1), k̇₁]))
     kscȧ₀ = k̇₀ .* a₀.ω̃ .+ a₀.k .* ω̃̇₀
     kscȧ₁ = k̇₁ .* a₁.ω̃ .+ a₁.k .* ω̃̇₁
     kscȧ = lin_reference === nothing ?
         kscȧ₀ .* reshape(one(FT) .- w, 1, n_spec) .+ kscȧ₁ .* reshape(w, 1, n_spec) :
-        _interpolate_phase_nodes(ν_spec, a.phase_ν,
+        _drop_node_axis(_interpolate_phase_nodes(ν_spec, a.phase_ν,
             [kscȧ₀,
              reshape(lin_reference.k̇ .* reference.ω̃ .+
-                     reference.k .* lin_reference.ω̃̇, n_param, 1), kscȧ₁])
+                     reference.k .* lin_reference.ω̃̇, n_param, 1), kscȧ₁]))
     ω̃̇ = (kscȧ .- reshape(a.ω̃, 1, n_spec) .* k̇) ./
           reshape(a.k, 1, n_spec)
     ḟᵗ = lin_reference === nothing ?
         reshape(l₀.ḟᵗ, n_param, 1) .* reshape(one(FT) .- w, 1, n_spec) .+
         reshape(l₁.ḟᵗ, n_param, 1) .* reshape(w, 1, n_spec) :
-        _interpolate_phase_nodes(ν_spec, a.phase_ν,
+        _drop_node_axis(_interpolate_phase_nodes(ν_spec, a.phase_ν,
             [reshape(l₀.ḟᵗ,n_param,1), reshape(lin_reference.ḟᵗ,n_param,1),
-             reshape(l₁.ḟᵗ,n_param,1)])
+             reshape(l₁.ḟᵗ,n_param,1)]))
     node_lin = lin_reference === nothing ?
         [l₀.lin_greek_coefs, l₁.lin_greek_coefs] :
         [l₀.lin_greek_coefs, lin_reference.lin_greek_coefs, l₁.lin_greek_coefs]
