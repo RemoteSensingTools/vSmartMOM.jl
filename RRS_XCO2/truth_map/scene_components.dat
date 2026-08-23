@@ -1,0 +1,55 @@
+# Human-readable component catalog for true_states.dat
+# All surface reflectances are Lambertian. AOD550 is the model reference input.
+# Radius and wavelength units are micron; altitude units are km.
+
+[AEROSOL_CASES]
+# case          sulfate_AOD550 organic_AOD550 utls_sulfate_AOD550 total_AOD550 sulfate_AOD760 organic_AOD760 utls_sulfate_AOD760 total_AOD760
+none            0.0000000000   0.0000000000   0.0000000000         0.0000000000 0.0000000000   0.0000000000   0.0000000000         0.0000000000
+aod760_0p28     0.3665052845   0.0824636890   0.0091626321         0.4581316056 0.1935471100   0.0807084200   0.0057444777         0.2800000077
+# The 550-nm partition is 8:1.8:0.2. The common scale is normalized against
+# the species-specific Mie optics after the same endpoint interpolation used
+# on the Raman-shouldered production O2 grid. The tiny departure of the listed
+# Float32 sum from 0.28 is numerical rounding. The aerosol-off case retains
+# the species and sets all AODs to zero.
+
+[AEROSOL_SPECIES]
+# species          composition_proxy          median_radius geometric_sigma n_real n_imag vertical_mode_km vertical_median_km vertical_log_sigma description
+sulfate            sulfate_accumulation       0.10          1.60            1.43   1.0e-8 1.2              1.525             0.49               lower-tropospheric weakly absorbing mode
+organic_carbon     absorbing_organic_carbon    0.20          1.80            1.53   1.0e-2 1.8              2.112             0.40               somewhat elevated tropospheric pollution/transport mode
+utls_sulfate       sulfate_droplet             0.15          1.50            1.45   1.0e-8 12.0             12.121            0.10               narrow enhanced UTLS mode; not background Junge aerosol
+# Particle radius and altitude are separate lognormal distributions. Radius
+# columns give r_median [micron] and dimensionless geometric sigma. Vertical
+# columns distinguish the true extinction mode from the LogNormal median input.
+# The tropospheric extinction density at 10 km is <=1e-4 of its modal value.
+# Mie scattering assumes homogeneous spheres, r_max=10 micron, 300 radius
+# quadrature points, and lambda_ref=0.55 micron. Refractive indices are fixed
+# m=n_real+i*n_imag proxies, without wavelength, RH, temperature, or aging
+# dependence. See ../truth_map_aerosols/README.md for equations and provenance.
+
+[SURFACE_TYPES]
+# surface recipe
+urban   0.20*trees + 0.50*roofing + 0.30*concrete_paving
+rural   0.50*grassland + 0.30*roofing + 0.20*trees
+desert  1.00*sahara_dust_proxy
+forest  1.00*trees
+# Trees are the mean of 15 live-tree ECOSTRESS spectra; roofing is the mean
+# of metal, asphalt-shingle, and tile spectra; grassland is Avena fatua;
+# concrete paving is asphaltic paving concrete. The Sahara proxy is the mean
+# of two dry regional aridisols because no downloaded spectrum is explicitly
+# labelled Sahara. See ../surface_albedos/PROVENANCE.md for exact files.
+
+[SURFACE_LEGENDRE_COEFFICIENTS]
+# rho(x)=P0+P1*x+P2*(3*x^2-1)/2; x=-1 longest wavelength, x=+1 shortest.
+# surface band       P0                 P1                  P2
+urban     o2a        2.715374708583e-01 -1.200504636272e-03 -2.299576457171e-04
+urban     weak_co2   2.522486169619e-01 -2.142459711455e-03 -1.317753254698e-04
+urban     strong_co2 2.176911056292e-01 -1.859347500215e-03 -1.138927333851e-04
+rural     o2a        4.316337681355e-01 -1.132406147968e-03 -5.113281428668e-04
+rural     weak_co2   2.649756999501e-01 -7.815572876593e-03 -4.045537002265e-04
+rural     strong_co2 1.335417267332e-01 -7.346018628075e-03  5.798463175187e-05
+desert    o2a        4.186071552534e-01 -3.356987808217e-04 -5.529607382857e-05
+desert    weak_co2   4.972482231007e-01 -1.598624892135e-03  5.177341280743e-03
+desert    strong_co2 4.821355300133e-01 -2.153405391580e-03 -4.615076186362e-04
+forest    o2a        4.682630263673e-01 -3.395734379890e-03 -9.477610409607e-04
+forest    weak_co2   2.557722421504e-01 -8.976038364694e-03 -5.051202091652e-04
+forest    strong_co2 1.100470188428e-01 -7.300987656445e-03  1.377656166909e-04

@@ -521,10 +521,12 @@ function _compute_canopy_atm_tau!(canopy::CanopySurface{FT},
     dry_mass = FT(0.028964)  # dry air molar mass [kg/mol]
 
     vmr_h2o_bot = profile.vmr_h2o[Nz]
-    vmr_dry = FT(1) - vmr_h2o_bot
+    x_dry = inv(FT(1) + vmr_h2o_bot)
+    x_h2o = vmr_h2o_bot * x_dry
     wet_mass = FT(0.018015)
-    M = vmr_dry * dry_mass + vmr_h2o_bot * wet_mass
-    vcd_canopy = Nₐ * FT(dp) / (M * g₀ * FT(100^2)) * FT(100)
+    M = x_dry * dry_mass + x_h2o * wet_mass
+    vcd_canopy_total = Nₐ * FT(dp) / (M * g₀ * FT(100^2)) * FT(100)
+    vcd_canopy_dry = x_dry * vcd_canopy_total
 
     nSpec = length(spec_bands_wn)
     τ_canopy = zeros(FT, nSpec)
@@ -535,7 +537,7 @@ function _compute_canopy_atm_tau!(canopy::CanopySurface{FT},
         τ_bot_layer = τ_abs_band[:, Nz]
         vcd_bot = profile.vcd_dry[Nz]
         if vcd_bot > FT(0)
-            scale = vcd_canopy / vcd_bot
+            scale = vcd_canopy_dry / vcd_bot
             for j in 1:nB
                 @inbounds τ_canopy[offset + j] += τ_bot_layer[j] * scale
             end

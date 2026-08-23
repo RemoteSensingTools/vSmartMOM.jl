@@ -29,7 +29,7 @@ function parse_list(::Type{T}, text::AbstractString) where {T}
     return vals
 end
 
-const DATA_ROOT = get(ENV, "DATA_ROOT", "/home/sanghavi/data/RamanSIFgrid")
+const DATA_ROOT = get(ENV, "DATA_ROOT", "/home/sanghavi/data/RamanSIFgrid/O2ABand")
 const PSURFS = parse_list(Float64, get(ENV, "PSURFS", "1000,750"))
 const DRY_RUN = parse_bool(get(ENV, "DRY_RUN", "0"))
 const OVERWRITE = parse_bool(get(ENV, "OVERWRITE", "0"))

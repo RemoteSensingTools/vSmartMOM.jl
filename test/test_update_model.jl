@@ -184,8 +184,8 @@ inA = scene_A_inputs(paramsA)
         for i_band in 1:n_bands
             result_ctx = rt_run(ctx.model; i_band)
             result_ref = rt_run(modelB;    i_band)
-            R_ctx = result_ctx isa Tuple ? result_ctx[1] : result_ctx
-            R_ref = result_ref isa Tuple ? result_ref[1] : result_ref
+            R_ctx = result_ctx[1]
+            R_ref = result_ref[1]
 
             max_abs_diff = maximum(abs.(R_ctx .- R_ref))
             max_ref      = maximum(abs.(R_ref))
@@ -209,7 +209,7 @@ inA = scene_A_inputs(paramsA)
 
         # 4b: wrong-length q
         q_bad = paramsB.q[1:end-1]
-        @test_throws ErrorException update_model!(ctx; q=q_bad)
+        @test_throws ArgumentError update_model!(ctx; q=q_bad)
 
         # 4c: unknown VMR key
         if !isnothing(ctx.params.absorption_params)
@@ -316,8 +316,8 @@ l_max_A2_snap = copy(ctx2.model.solver.l_max)
         for i_band in 1:ctx2.n_bands
             res_ctx = rt_run(ctx2.model; i_band)
             res_ref = rt_run(modelL2_ref; i_band)
-            R_ctx = res_ctx isa Tuple ? res_ctx[1] : res_ctx
-            R_ref = res_ref isa Tuple ? res_ref[1] : res_ref
+            R_ctx = res_ctx[1]
+            R_ref = res_ref[1]
             max_diff = maximum(abs.(R_ctx .- R_ref))
             max_ref  = maximum(abs.(R_ref))
             rtol_ach = max_ref > 0 ? max_diff / max_ref : max_diff
@@ -403,8 +403,8 @@ end  # @testset Phase 2 loading
         for i_band in 1:ctx2.n_bands
             res_ctx = rt_run(ctx2.model; i_band)
             res_ref = rt_run(modelM_ref; i_band)
-            R_ctx = res_ctx isa Tuple ? res_ctx[1] : res_ctx
-            R_ref = res_ref isa Tuple ? res_ref[1] : res_ref
+            R_ctx = res_ctx[1]
+            R_ref = res_ref[1]
             max_diff = maximum(abs.(R_ctx .- R_ref))
             max_ref  = maximum(abs.(R_ref))
             rtol_ach = max_ref > 0 ? max_diff / max_ref : max_diff
@@ -481,8 +481,8 @@ end  # @testset Phase 2 loading
         for i_band in 1:ctx_nt.n_bands
             res_ctx = rt_run(ctx_nt.model; i_band)
             res_ref = rt_run(modelNT_large_ref; i_band)
-            R_ctx = res_ctx isa Tuple ? res_ctx[1] : res_ctx
-            R_ref = res_ref isa Tuple ? res_ref[1] : res_ref
+            R_ctx = res_ctx[1]
+            R_ref = res_ref[1]
             max_diff = maximum(abs.(R_ctx .- R_ref))
             max_ref  = maximum(abs.(R_ref))
             rtol_ach = max_ref > 0 ? max_diff / max_ref : max_diff

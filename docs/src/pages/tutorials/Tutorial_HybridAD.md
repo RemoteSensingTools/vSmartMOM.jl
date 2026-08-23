@@ -75,7 +75,8 @@ println("dR shape: ", size(dR_cpu), "  (nVZA × nStokes × nSpec × nParams)")
 ## 3) Understanding ParameterLayout
 
 The Jacobian dimension of `dR` is ordered by `ParameterLayout`:
-each aerosol gets 7 sub-parameters, followed by gas VMRs, then surface.
+surface pressure comes first, then each aerosol gets 7 sub-parameters,
+followed by gas VMRs and surface parameters.
 
 ```julia
 layout = CoreRT.ParameterLayout(aerosol_params=7, n_aerosols=NAer,
@@ -83,12 +84,14 @@ layout = CoreRT.ParameterLayout(aerosol_params=7, n_aerosols=NAer,
 
 println("\nParameter layout:")
 println("  Total parameters: ", CoreRT.n_total(layout))
+println("  Surface pressure: index ", CoreRT.psurf_index(layout))
 for ia in 1:NAer
     rng = CoreRT.aerosol_range(layout, ia)
     println("  Aerosol $ia: indices $rng  [τ_ref, nᵣ, nᵢ, rₘ, σ_g, p₀, σ_p]")
 end
 if NGas > 0
-    println("  Gas VMRs:  indices ", CoreRT.gas_range(layout))
+    Nz = length(model_cpu.profile.p_full)
+    println("  Gas 1 VMR profile: indices ", CoreRT.gas_profile_range(layout, 1, Nz))
 end
 println("  Surface:   indices ", CoreRT.surface_range(layout))
 ```
@@ -242,4 +245,3 @@ a clean boundary where any upstream derivative method can plug in.
 ---
 
 *This page was generated using [Literate.jl](https://github.com/fredrikekre/Literate.jl).*
-

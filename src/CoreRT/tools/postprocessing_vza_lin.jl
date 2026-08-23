@@ -50,3 +50,67 @@ function postprocessing_vza!(RS_type::noRS,
         end
     end
 end
+
+"""
+    postprocessing_vza_ms_lin!(RS_type, top_layers, top_layers_lin,
+                               bottom_layers, bottom_layers_lin, ...)
+
+Solve and azimuthally reconstruct the diffuse radiance and analytic Jacobian
+at each strict-interior observer interface.  Each top/bottom pair represents
+the independently accumulated atmospheric subcolumns on either side of that
+interface.  The coupled interlayer field is solved on the model architecture;
+only the completed source vectors are transferred to the host outputs.
+"""
+function postprocessing_vza_ms_lin!(RS_type::noRS,
+                    top_layers, top_layers_lin,
+                    bottom_layers, bottom_layers_lin,
+                    pol_type, vza, qp_μ, m, vaz, weight, nSpec,
+                    uwJ, dwJ, uwJ_lin, dwJ_lin,
+                    I_static, arr_type)
+
+    isempty(top_layers) && return nothing
+    vza_info = _precompute_vza_weights(vza, vaz, qp_μ, pol_type, m, weight)
+
+    nμ = size(first(top_layers).J₀⁺, 1)
+    Nparams = size(first(top_layers_lin).J̇₀⁺, 4)
+    FT = eltype(first(top_layers).J₀⁺)
+
+    tuwJ = [arr_type(zeros(FT, nμ, 1, nSpec)) for _ in top_layers]
+    tdwJ = [arr_type(zeros(FT, nμ, 1, nSpec)) for _ in top_layers]
+    tuwJ_lin = [arr_type(zeros(FT, nμ, 1, nSpec, Nparams)) for _ in top_layers]
+    tdwJ_lin = [arr_type(zeros(FT, nμ, 1, nSpec, Nparams)) for _ in top_layers]
+
+    for ims in eachindex(top_layers)
+        top = top_layers[ims]
+        top_lin = top_layers_lin[ims]
+        bottom = bottom_layers[ims]
+        bottom_lin = bottom_layers_lin[ims]
+        compute_interlayer_flux!(RS_type, I_static,
+            top.R⁺⁻, bottom.R⁻⁺,
+            top.J₀⁺, bottom.J₀⁻,
+            tdwJ[ims], tuwJ[ims],
+            top_lin.Ṙ⁺⁻, bottom_lin.Ṙ⁻⁺,
+            top_lin.J̇₀⁺, bottom_lin.J̇₀⁻,
+            tdwJ_lin[ims], tuwJ_lin[ims], arr_type)
+    end
+
+    tuwJ_cpu = _to_cpu.(tuwJ)
+    tdwJ_cpu = _to_cpu.(tdwJ)
+    tuwJ_lin_cpu = _to_cpu.(tuwJ_lin)
+    tdwJ_lin_cpu = _to_cpu.(tdwJ_lin)
+
+    @inbounds for i in eachindex(vza)
+        istart, iend, w = vza_info[i]
+        for ims in eachindex(top_layers)
+            @views uwJ[ims][i, :, :] .+= w * tuwJ_cpu[ims][istart:iend, 1, :]
+            @views dwJ[ims][i, :, :] .+= w * tdwJ_cpu[ims][istart:iend, 1, :]
+            for iparam in 1:Nparams
+                @views uwJ_lin[ims][i, :, :, iparam] .+=
+                    w * tuwJ_lin_cpu[ims][istart:iend, 1, :, iparam]
+                @views dwJ_lin[ims][i, :, :, iparam] .+=
+                    w * tdwJ_lin_cpu[ims][istart:iend, 1, :, iparam]
+            end
+        end
+    end
+    return nothing
+end

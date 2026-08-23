@@ -25,11 +25,15 @@ cfg = Dict(
     "float_type" => "Float32",
     "architecture" => "CPU()",
   ),
-  "geometry" => Dict("sza"=>30, "vza"=>[0, 30, 60], "vaz"=>[0, 0, 0], "obs_alt"=>1000.0),
+  "geometry" => Dict("sza"=>30, "vza"=>[0, 30, 60], "vaz"=>[0, 0, 0], "obs_alt"=>[0.0]),
   "atmospheric_profile" => Dict("T"=>fill(255.0,3), "p"=>[0.1, 500.0, 900.0, 1005.0], "profile_reduction"=>-1),
 )
 params = read_parameters(cfg)
 ```
+
+Here `[0.0]` requests TOA upwelling and BOA downwelling. To add radiances at
+5 km above BOA, use `"obs_alt" => [0.0, 5.0]` and read the interior pair from
+`rt_run(model).levels`.
 
 ## Surfaces (BRDF)
 

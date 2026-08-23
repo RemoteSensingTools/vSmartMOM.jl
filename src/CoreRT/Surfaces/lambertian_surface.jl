@@ -43,11 +43,12 @@ suites. We unify them as follows:
     field from below because the lower boundary is opaque in these RT
     applications, while the downward pass-through keeps legacy diagnostics
     and surface coupling conventions intact.
-  • `j₀⁺ = attenuated direct beam` (μ-selector · exp(-τ/μ₀)). This is the
-    Scalar/generic convention and is REQUIRED: at m=0 the surface's `j₀⁺`
-    is consumed by `interaction_hdrf!` (the BHR-downward flux diagnostic,
-    `bhr_J₀⁺ += j₀⁺[iμ₀]·μ₀`). The old Legendre/Spline path zeroed it
-    (a "Suniti double-check" stub) and silently broke that diagnostic.
+  • Legacy embedded-solar mode uses
+    `j₀⁺ = attenuated direct beam` (μ-selector · exp(-τ/μ₀)). At m=0 this is
+    consumed by `interaction_hdrf!` for the BHR-downward diagnostic. The old
+    Legendre/Spline path zeroed it and silently broke that diagnostic.
+    External-solar `rt_run_toa` instead keeps the direct beam outside the
+    diffuse vector, sets `j₀⁺ = 0`, and does not construct BHR output.
   • `j₀⁻ = μ₀ · R_surf · I₀ · exp(-τ/μ₀)` (the reflected direct beam).
   • m > 0: everything zero (`r⁻⁺ = r⁺⁻ = 0`, `j₀± = 0`) with `t⁺⁺ = I`
     and `t⁻⁻ = 0`.
@@ -135,6 +136,22 @@ function _surface_solar_F₀(F₀, FT, pol_type, nSpec::Integer, arr_type)
 end
 
 """
+    _direct_solar_at_surface(F₀, FT, pol_type, quad_points, τ_sum, architecture)
+
+Return the attenuated collimated Stokes vector at BOA with shape
+`(nStokes, nSpec)`.  Unlike [`_surface_beam_at_surface`](@ref), this carrier
+does not embed the direct beam in the diffuse ordinate vector.  It is the
+authoritative representation for opt-in external-solar SFI.
+"""
+function _direct_solar_at_surface(F₀, FT, pol_type, quad_points, τ_sum, architecture)
+    (; μ₀) = quad_points
+    arr_type = array_type(architecture)
+    nSpec = length(τ_sum)
+    F₀_dev = _surface_solar_F₀(F₀, FT, pol_type, nSpec, arr_type)
+    return F₀_dev .* reshape(exp.(-τ_sum ./ μ₀), 1, :)
+end
+
+"""
     _surface_beam_at_surface(F₀, FT, pol_type, quad_points, τ_sum, architecture)
 
 Attenuated direct solar beam arriving at the surface, shape `(NquadN, nSpec)`:
@@ -144,12 +161,15 @@ unit-`I₀` beam bit-for-bit; with a real `F₀` it carries the true solar
 spectrum into the surface source (Raman/Ring at the surface).
 """
 function _surface_beam_at_surface(F₀, FT, pol_type, quad_points, τ_sum, architecture)
+    quad_points.external_solar && throw(ArgumentError(
+        "external-solar SFI has no in-operator μ₀ slot; use " *
+        "_direct_solar_at_surface instead"))
     (; qp_μN, iμ₀Nstart, iμ₀, μ₀) = quad_points
     arr_type = array_type(architecture)
     nSpec = length(τ_sum)
     beam = arr_type(zeros(FT, length(qp_μN), nSpec))
-    F₀_dev = _surface_solar_F₀(F₀, FT, pol_type, nSpec, arr_type)
-    beam[iμ₀Nstart:pol_type.n*iμ₀, :] .= F₀_dev .* exp.(-τ_sum / μ₀)'
+    direct = _direct_solar_at_surface(F₀, FT, pol_type, quad_points, τ_sum, architecture)
+    beam[iμ₀Nstart:pol_type.n*iμ₀, :] .= direct
     return beam
 end
 
@@ -165,10 +185,21 @@ its reflection. `F₀ === nothing` falls back to the flat unit-`I₀` beam.
 """
 function _surface_source!(added_layer, R_surf, τ_sum, quad_points, pol_type, ::Type{FT},
                           architecture; F₀=nothing) where {FT}
+    quad_points.external_solar && throw(ArgumentError(
+        "external-solar SFI currently supports Lambertian surfaces only"))
     (; μ₀) = quad_points
     beam = _surface_beam_at_surface(F₀, FT, pol_type, quad_points, τ_sum, architecture)
     added_layer.j₀⁺[:, 1, :] .= beam
     added_layer.j₀⁻[:, 1, :] .= μ₀ * (R_surf * beam)
+    return nothing
+end
+
+function _lambertian_reflect_external_beam!(j₀⁻, direct_at_surface, ρ, μ₀,
+                                             pol_type)
+    j₀⁻ .= zero(eltype(j₀⁻))
+    incident_I = reshape(@view(direct_at_surface[1, :]), 1, :)
+    ρ_row = reshape(ρ .+ zero.(@view(direct_at_surface[1, :])), 1, :)
+    @views j₀⁻[1:pol_type.n:end, 1, :] .= μ₀ .* ρ_row .* incident_I
     return nothing
 end
 
@@ -289,12 +320,25 @@ function create_surface_layer!(lambertian::Union{LambertianSurfaceScalar,
         # vs. broadcasting it in afterwards gives identical bits.
         if SFI
             (; μ₀) = quad_points
-            # Band-resolved solar beam at the surface (flat unit-I₀ when F₀ is
-            # nothing — then bit-identical to the historical Scalar path).
-            beam = _surface_beam_at_surface(F₀, FT, pol_type, quad_points, τ_sum, architecture)
-            added_layer.j₀⁺[:, 1, :] .= beam
-            _lambertian_reflect_direct_beam!(added_layer.j₀⁻, beam, ρ, μ₀,
-                                             pol_type, quad_points.iμ₀Nstart)
+            if quad_points.external_solar
+                # Keep the collimated beam outside the diffuse operator. Only
+                # its Lambertian reflection is a diffuse source; the lean
+                # external-solar path intentionally produces no BOA output.
+                direct = _direct_solar_at_surface(
+                    F₀, FT, pol_type, quad_points, τ_sum, architecture)
+                added_layer.j₀⁺ .= zero(FT)
+                _lambertian_reflect_external_beam!(
+                    added_layer.j₀⁻, direct, ρ, μ₀, pol_type)
+            else
+                # Band-resolved solar beam at the surface (flat unit-I₀ when
+                # F₀ is nothing — bit-identical to the historical path).
+                beam = _surface_beam_at_surface(
+                    F₀, FT, pol_type, quad_points, τ_sum, architecture)
+                added_layer.j₀⁺[:, 1, :] .= beam
+                _lambertian_reflect_direct_beam!(
+                    added_layer.j₀⁻, beam, ρ, μ₀,
+                    pol_type, quad_points.iμ₀Nstart)
+            end
         end
 
         # Spline pattern: weight the unit selector once, broadcast ρ in.

@@ -14,7 +14,17 @@ are denoted by 0<VZA<90.
 function rt_run_test_ms(RS_type::AbstractRamanType,
                         sensor_levels::Vector{Int64},
                         model, iBand)
+    model.quad_points.external_solar && throw(ArgumentError(
+        "external-solar SFI does not yet support multisensor RT"))
     _warn_explicit_depol_raman(RS_type, model)
+
+    Nz = length(model.profile.p_full)
+    isempty(sensor_levels) && throw(ArgumentError("sensor_levels must not be empty"))
+    all(level -> level == 0 || 1 <= level < Nz, sensor_levels) ||
+        throw(ArgumentError("sensor_levels must contain only sentinel 0 or interior interfaces 1:$(Nz - 1)"))
+    length(unique(sensor_levels)) == length(sensor_levels) ||
+        throw(ArgumentError("sensor_levels must be unique"))
+    InelasticScattering.normalize_raman_weights!(RS_type, model, iBand)
 
     (; obs_alt, sza, vza, vaz) = model.obs_geom   # Observational geometry properties
     (; qp_μ, wt_μ, qp_μN, wt_μN, iμ₀Nstart, μ₀, iμ₀, Nquad) = model.quad_points # All quadrature points
@@ -60,6 +70,7 @@ function rt_run_test_ms(RS_type::AbstractRamanType,
     # Output arrays for up/downwelling flux at each sensor level
     uwJ   = [zeros(FT, (length(vza), pol_type.n, nSpec)) for i=1:length(sensor_levels)]
     dwJ   = [zeros(FT, (length(vza), pol_type.n, nSpec)) for i=1:length(sensor_levels)]
+    direct_dwJ = [zeros(FT, (length(vza), pol_type.n, nSpec)) for i=1:length(sensor_levels)]
     uwieJ = [zeros(FT, (length(vza), pol_type.n, nSpec)) for i=1:length(sensor_levels)]
     dwieJ = [zeros(FT, (length(vza), pol_type.n, nSpec)) for i=1:length(sensor_levels)]
     # Notify user of processing parameters
@@ -100,6 +111,14 @@ function rt_run_test_ms(RS_type::AbstractRamanType,
         # Determine the scattering interface definitions:
         scattering_interfaces_all, τ_sum_all = 
             extractEffectiveProps(layer_opt_props, quad_points);
+
+        # The unscattered solar beam is not part of the diffuse MOM field.
+        # Report it once, separately, using the m=0/BOA normalization.
+        if m == 0
+            _set_unscattered_downwelling!(direct_dwJ, sensor_levels, τ_sum_all,
+                                           RS_type.F₀, vza, qp_μ, iμ₀, μ₀,
+                                           pol_type)
+        end
 
         # Loop over vertical layers: 
         @showprogress 1 "Looping over layers ..." for iz = 1:Nz  # Count from TOA to BOA
@@ -190,6 +209,5 @@ function rt_run_test_ms(RS_type::AbstractRamanType,
     model.numerics.verbose && print_timer()
     reset_timer!()
 
-    # Return R_SFI or R, depending on the flag
-    return uwJ, dwJ, uwieJ, dwieJ #SFI ? (R_SFI, T_SFI, ieR_SFI, ieT_SFI) : (R, T)
+    return uwJ, dwJ, direct_dwJ, uwieJ, dwieJ
 end

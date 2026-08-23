@@ -13,7 +13,7 @@ using NCDatasets
 using Printf
 
 const FILL_LIMIT = Float32(1e20)
-const DATA_ROOT = get(ENV, "DATA_ROOT", "/home/sanghavi/data/RamanSIFgrid")
+const DATA_ROOT = get(ENV, "DATA_ROOT", "/home/sanghavi/data/RamanSIFgrid/O2ABand")
 const OUTDIR = get(ENV, "OUTDIR", "")
 
 function parse_selector(text::AbstractString)

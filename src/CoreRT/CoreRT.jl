@@ -156,7 +156,7 @@ include("component_m_max.jl")
 # Functions to export
 export model_from_parameters,               # Converting the parameters to model
        model_from_parameters_lin,           # Convenience alias for linearized model
-       rt_run, rt_run_lin, rt_run_ss,       # Run the RT code (forward, linearized, single scatter)
+       rt_run, rt_run_toa, rt_run_lin, rt_run_ss, # Run RT (forward, TOA-only, linearized, single scatter)
        rt_run_streams, StreamRTResult,      # Per-Fourier-moment quadrature-stream RT (Phase H)
        rt_run_atmosphere, rt_run_surface,   # Atmosphere/surface split — cache the atmosphere,
        rt_run_multi_surface, AtmosphereRTCache, # replay/sweep the surface phase
@@ -173,14 +173,20 @@ export OpticalPropertyJacobian,               # AD boundary struct alias
        delta_m_forward, delta_m_truncation_lin, # δ-M truncation functions
        ParameterLayout,                       # Jacobian parameter layout descriptor
        n_total, aerosol_range, gas_range,     # ParameterLayout accessors
-       surface_range, surface_index,
+       gas_profile_range, gas_layer_index,
+       surface_range, surface_index, sif_range, sif755_index, sif_slope_index,
+       sif760_index, msif_index,
+       atmosphere_range, psurf_index,
+       surface_parameter_count,
        canopy_range, n_layer_params
 
 # Export new hierarchical model types
 export AbstractRTModel, RTModel,
        SolverConfig, RTNumericalParameters,
        Atmosphere, RayleighScattering, AerosolState, Optics, OpticsLin,
-       RTModelLin
+       RTModelLin, ObserverRTResult, LevelRadiance,
+       ObserverRTResultLin, LevelRadianceLin,
+       total_downwelling, total_downwelling_jacobian
 
 # v0.6 source-term vocabulary (Phase 1: types only; behaviour lands in Phase 2+)
 export AbstractSource, AbstractPreparedSource,
@@ -193,7 +199,8 @@ export AbstractSource, AbstractPreparedSource,
 # Phase 5: SurfaceSIF + double-dispatch surface_source_contribute!
 # v0.7 Phase A: ThermalEmission per-layer Planck volume source + contribute! seam
 export SolarBeam, PreparedSolarBeam, prepare_source, prepare_sources, BlackbodySource,
-       SurfaceSIF, PreparedSurfaceSIF, surface_source_contribute!,
+       SurfaceSIF, PreparedSurfaceSIF, surface_source_contribute!, surface_source_contribute_lin!,
+       surface_sif_parameter_count, validate_sif_solar_spectrum,
        ThermalEmission, PreparedThermalEmission, contribute!, has_thermal_emission
 
 # Export types to show easily

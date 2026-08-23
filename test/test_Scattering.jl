@@ -188,6 +188,10 @@ end
 # removes a handful of GL points, causing c₀ to blow up outside [0,1].
 @testset "δBGE forward-cone exclusion" begin
     @load "test_pcw/PCW_AerosolOptics_v2.jld" aerosol_optics_PCW
+    aerosol_optics_PCW = AerosolOptics(
+        greek_coefs=aerosol_optics_PCW.greek_coefs,
+        ω̃=aerosol_optics_PCW.ω̃, k=aerosol_optics_PCW.k,
+        fᵗ=aerosol_optics_PCW.fᵗ)
     # aerosol_optics_PCW carries raw Greek coefficients (fᵗ=1 sentinel).
     l_max = 10   # << length(β) ≈ 760 → strongly overdetermined → stable
 
@@ -204,4 +208,76 @@ end
     # fᵗ changes when the exclusion cone is applied (proves iμ subset is used):
     @test aop_tr10.fᵗ > 0.1   # Δ_angle=10° should give non-trivial truncation for large aerosol
     println("  δBGE fᵗ: Δ_angle=0° → $(round(aop_tr0.fᵗ, sigdigits=6)), Δ_angle=10° → $(round(aop_tr10.fᵗ, sigdigits=6))")
+end
+
+@testset "δBGE uniformly normalizes polarized matrix elements" begin
+    @load "test_pcw/PCW_AerosolOptics_v2.jld" aerosol_optics_PCW
+    aerosol_optics_PCW = AerosolOptics(
+        greek_coefs=aerosol_optics_PCW.greek_coefs,
+        ω̃=aerosol_optics_PCW.ω̃, k=aerosol_optics_PCW.k,
+        fᵗ=aerosol_optics_PCW.fᵗ)
+    mod = δBGE(10, 10.0)
+    μ, wμ = Scattering.gausslegendre(
+        length(aerosol_optics_PCW.greek_coefs.β))
+    outside = findall(x -> x < cosd(mod.Δ_angle), μ)
+    original = Scattering.reconstruct_phase(
+        aerosol_optics_PCW.greek_coefs, μ)
+
+    for (truncator, lowconf) in ((Scattering.truncate_phase, false),
+                                 (Scattering.truncate_phase_lowconf, true))
+        truncated = truncator(mod, aerosol_optics_PCW)
+        reconstructed = Scattering.reconstruct_phase(
+            truncated.greek_coefs, μ)
+        c₀ = 1 - truncated.fᵗ
+
+        # The fit targets the original, unnormalised f12/f34. After removal
+        # of the delta spike, the retained smooth matrix must therefore obey
+        # c₀ Fᵗ ≈ F for every fitted element outside the forward cone.
+        for field in (:f₁₂, :f₃₄)
+            truth = getproperty(original, field)[outside]
+            scaled = c₀ .* getproperty(reconstructed, field)[outside]
+            unscaled = getproperty(reconstructed, field)[outside]
+            floor = fill(1e-8, length(truth))
+            denominator = max.(abs.(truth), floor)
+            # Main solver objective: Σw (residual/y)^2. Low-confidence
+            # solver applies W=diag(w/|y|) before least squares, hence W².
+            weights = lowconf ? (wμ[outside] ./ denominator).^2 :
+                                wμ[outside] ./ denominator.^2
+            objective(x) = sum(weights .* (x .- truth).^2)
+            @test objective(scaled) ≤ objective(unscaled)
+        end
+        @test truncated.greek_coefs.β[1] ≈ 1 atol=1e-10
+    end
+end
+
+@testset "δBGE polarized normalization tangent matches finite difference" begin
+    @load "test_pcw/PCW_AerosolOptics_v2.jld" aerosol_optics_PCW
+    raw = AerosolOptics(greek_coefs=aerosol_optics_PCW.greek_coefs,
+        ω̃=aerosol_optics_PCW.ω̃, k=aerosol_optics_PCW.k,
+        fᵗ=aerosol_optics_PCW.fᵗ)
+    g = raw.greek_coefs
+    fields = (:α, :β, :γ, :δ, :ϵ, :ζ)
+    directions = Dict(f => 0.01 .* getproperty(g, f) for f in fields)
+    tangent(a) = vcat(reshape(a, 1, :), zeros(3, length(a)))
+    lg = linGreekCoefs((tangent(directions[f]) for f in fields)...)
+    raw_lin = linAerosolOptics(lin_greek_coefs=lg,
+        ω̃̇=zeros(4), k̇=zeros(4), ḟᵗ=zeros(4))
+
+    # Δ=0 makes the forward and legacy linearized fit domains identical.
+    mod = δBGE(10, 0.0)
+    _, lin_out = Scattering.truncate_phase(mod, raw, raw_lin)
+    h = 1e-5
+    function perturbed(sign)
+        gp = GreekCoefs((getproperty(g, f) .+
+                         sign * h .* directions[f] for f in fields)...)
+        Scattering.truncate_phase(mod,
+            AerosolOptics(greek_coefs=gp, ω̃=raw.ω̃, k=raw.k, fᵗ=raw.fᵗ))
+    end
+    plus, minus = perturbed(1), perturbed(-1)
+    for (field, tangent_field) in ((:γ, :γ̇), (:ϵ, :ϵ̇))
+        fd = (getproperty(plus.greek_coefs, field) .-
+              getproperty(minus.greek_coefs, field)) ./ (2h)
+        analytic = getproperty(lin_out.lin_greek_coefs, tangent_field)[1, :]
+        @test analytic ≈ fd rtol=2e-4 atol=2e-7
+    end
 end

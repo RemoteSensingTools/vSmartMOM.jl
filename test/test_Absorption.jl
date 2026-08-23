@@ -157,6 +157,25 @@ end
     @test absorption_cross_section(model, grid, 1000.1, 296.1) ≈ reverse(absorption_cross_section(model, reverse(1e7 ./ collect(grid)), 1000.1, 296.1, wavelength_flag=true));
 end
 
+@testset "interpolation_model_wavelength_order" begin
+    ν_grid = 20000.0:1000.0:25000.0
+    p_grid = range(100.0, 1000.0; length=2)
+    t_grid = range(200.0, 300.0; length=2)
+    coefs = zeros(Float64, length(ν_grid), length(p_grid), length(t_grid))
+    for i in eachindex(ν_grid)
+        coefs[i, :, :] .= ν_grid[i]
+    end
+    model = InterpolationModel(interpolate(coefs, BSpline(Linear())),
+                               999, 1, ν_grid, p_grid, t_grid)
+    λ_grid = [400.0, 500.0] # increasing wavelength -> decreasing wavenumber
+    σλ = compute_absorption_cross_section(model, λ_grid, 500.0, 250.0;
+                                           wavelength_flag=true)
+    @test σλ == [25000.0, 20000.0]
+    @test σλ == [only(compute_absorption_cross_section(model, [1e7 / λ],
+                                                        500.0, 250.0))
+                 for λ in λ_grid]
+end
+
 # Regression test: the wing-cutoff line-admission window must be computed in
 # wavenumber space. Previously, with wavelength_flag=true, ±wing_cutoff was
 # added to the grid bounds while still in nm units (±40 nm at ~760 nm is

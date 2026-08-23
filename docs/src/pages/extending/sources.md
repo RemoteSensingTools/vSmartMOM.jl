@@ -88,6 +88,8 @@ integral), `DiffuseBoundary`, and (later) `LidarPulse`.
 |----------------------------|-----------------------------------|
 | `SolarBeam.F₀`             | mW · m⁻² · cm⁻¹                   |
 | `SurfaceSIF.SIF₀`          | mW · m⁻² · cm⁻¹                   |
+| `SurfaceSIF.SIF755`        | same radiance unit as output Stokes I/Q/U/V |
+| `SurfaceSIF.slope`         | output radiance unit per nm          |
 | `rt_run` output (R, T, J)  | mW · m⁻² · sr⁻¹ · cm⁻¹            |
 | `SolarBeam(F₀ = ones(...))`| 1 mW · m⁻² · cm⁻¹ per spectral pt |
 
@@ -95,6 +97,12 @@ All sources in a `SourceSet` should share these units so additive
 composition makes physical sense. `BlackbodySource` defaults to `factor =
 π` (Lambertian-disk → hemispheric irradiance) so its `F₀` is comparable
 to a `SolarBeam(F₀ = 1)` baseline.
+
+For retrievals, `SurfaceSIF(SIF755=..., slope=..., wavelength_nm=...)`
+uses `L_SIF(λ) = SIF755 + slope*(λ_nm-755)`. These two values are
+state-vector parameters in radiance units. A nonzero `SIF755` requires an
+explicit non-unit Fraunhofer spectrum in `SolarBeam(F₀=...)`; the unit default
+is rejected because it cannot establish physical radiance units.
 
 ## Differentiation
 

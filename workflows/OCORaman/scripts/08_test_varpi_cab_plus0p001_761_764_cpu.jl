@@ -108,7 +108,7 @@ geometry:
   sza: 19.0
   vza: [0.0]
   vaz: [0.0]
-  obs_alt: 0
+  obs_alt: [0]
 
 atmospheric_profile:
   T: $(yaml_array(T_PROFILE))

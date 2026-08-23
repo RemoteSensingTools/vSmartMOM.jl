@@ -7,10 +7,15 @@ for clear-sky / Rayleigh-only / canopy-only runs.
 
 ## Required when present
 
-- **`vmr`** — `Dict{String, Union{Real, Vector{Real}}}`. Volume mixing
-  ratios per molecule, on the same vertical grid as
-  `atmospheric_profile.T`. Scalar = uniform VMR; vector = profile.
-  Example: `{ O2: 0.21, H2O: [1e-6, 1e-5, 1e-4, 1e-3] }`.
+- **`vmr`** — `Dict{String, Union{Real, Vector{Real}}}`. Dry-air molar
+  ratios (mol species per mol dry air) for non-H₂O molecules. Scalar =
+  uniform VMR; a vector may use the `N`
+  layer centers or the `N+1` pressure interfaces. Interface-defined vectors
+  are interpolated to layer centers in log pressure before observer-height
+  reframing.
+  Example: `{ O2: 0.21, CO2: [3.8e-4, 3.9e-4, 4.0e-4, 4.1e-4] }`.
+  H₂O is derived from the atmospheric-profile `q` field; a legacy H₂O key in
+  this dictionary is ignored.
 - **`broadening`** — `String`. Line shape function. One of
   `"Voigt()"`, `"Doppler()"`, `"Lorentz()"`. Voigt is correct across
   the troposphere and stratosphere; Doppler/Lorentz are diagnostic
@@ -35,7 +40,38 @@ for clear-sky / Rayleigh-only / canopy-only runs.
   `variable_molecules` in new configs.
 
 H₂O is auto-handled when `q` is set in the profile — don't list it
-manually.
+manually. Its internal `vmr_h2o` value is also a dry-air molar ratio,
+`N_H2O/N_dry`, rather than a moist-air mole fraction.
+
+## Optional CIA and continuum fields
+
+- **`cia_files`** — list of HITRAN CIA inputs. An entry may be a legacy path
+  string, or a mapping with:
+  - **`path`** — required CIA file path.
+  - **`reference_codes`** — optional reference-code string or nonempty list
+    of strings, such as `"54"` or `["54"]`.
+  - **`negative_policy`** — optional `error` (default) or `clamp_zero`.
+- **`mtckd_file`** — optional AER MT_CKD H₂O-continuum NetCDF path.
+
+A bare CIA path is accepted only when different HITRAN reference families do
+not overlap on the requested model grid. Ambiguous overlap fails closed and
+must be resolved with `reference_codes`. Negative cross sections likewise
+fail by default; `clamp_zero` must be requested explicitly.
+
+The surface-pressure tangent includes the hydrostatic-column and midpoint-
+pressure response of CIA and MT_CKD at fixed temperature, humidity, and VMR.
+Their abundance Jacobians are not yet implemented. Likewise, the analytic
+line-absorption pressure tangent currently holds the pressure-dependent line
+cross section fixed. Forward calculations at independently specified pressure
+states recompute every opacity and are unaffected by these derivative limits.
+
+```yaml
+cia_files:
+  - path: "/data/HITRAN_CIA/O2-O2_2024.cia"
+    reference_codes: ["54"]
+    negative_policy: error
+  - "/data/HITRAN_CIA/O2-N2_2024.cia"
+```
 
 ## ABSCO LUT files
 

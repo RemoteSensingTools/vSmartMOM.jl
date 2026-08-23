@@ -70,9 +70,10 @@ fig
 #
 # | Index range                | Parameter                        |
 # |:---------------------------|:---------------------------------|
-# | `1 : NAer*7`               | Aerosol properties (7 per type)  |
-# | `NAer*7+1 : NAer*7+NGas`   | Gas VMRs (per variable molecule) |
-# | `NAer*7+NGas+1 : end`      | Surface albedo                   |
+# | `1`                         | Surface pressure `p_surf`        |
+# | `aerosol_range(layout, i)`  | Aerosol properties (7 per type)  |
+# | `gas_profile_range(layout, i, Nz)` | Gas VMRs for every layer of gas `i` |
+# | `surface_range(layout)`     | Surface parameters               |
 #
 # For this test case:
 
@@ -91,13 +92,15 @@ dR_albedo = dR[:, 1, :, surface_idx]
 println("dR/d(albedo) at nadir, first 5 spectral points: ",
         round.(dR_albedo[1, 1:min(5,end)], digits=6))
 
-# Gas VMR Jacobians:
+# Gas VMR Jacobians are vertical profiles in TOA-to-BOA layer order:
 
 if NGas > 0
-    igas_start = first(CoreRT.gas_range(layout))
-    dR_gas1 = dR[:, 1, :, igas_start]
-    println("dR/d(gas₁ VMR) at nadir, first 5 points: ",
-            round.(dR_gas1[1, 1:min(5,end)], digits=6))
+    Nz = length(model.profile.p_full)
+    gas1 = CoreRT.gas_profile_range(layout, 1, Nz)
+    dR_gas1 = dR[:, 1, :, gas1]
+    iz = Nz
+    println("dR/d(gas₁ VMR in bottom layer), first 5 points: ",
+            round.(dR_gas1[1, 1:min(5,end), iz], digits=6))
 end
 
 # Plot the aerosol optical depth Jacobian (`τ_ref`, the first aerosol

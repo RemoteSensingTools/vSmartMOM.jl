@@ -34,7 +34,7 @@ for scene in scenes
     update_model!(ctx;
         T      = scene.T,        # length-Nz temperature profile [K]
         p_half = scene.p_half,   # length-(Nz+1) half-level pressures [hPa]
-        q      = scene.q,        # length-Nz specific humidity [kg/kg]
+        q      = scene.q,        # length-Nz or -(Nz+1) specific humidity [kg/kg]
         vmr    = scene.vmr)      # Dict{String,Any} — same keys as params.absorption_params.vmr
     R, T = rt_run(ctx.model)
     # ... process R, T ...
@@ -103,9 +103,12 @@ run parallel scenes, create one `BatchContext` per worker thread (each
   `params` and written by both `update_aerosol_loading!` and
   `update_aerosol_microphysics!`. `update_model!`'s τ_aer redistribution reads
   these so a prior loading update is not silently wiped.
+- `input_sources`: the user-supplied source tree on the unreframed input grid;
+  vertically resolved fields are re-interpolated from this stable copy on each
+  scene update (avoids cumulative interpolation drift).
 - `n_bands`, `n_aerosols`, `Nz`: scene-invariant dimension bookmarks
-- `profile_reduction_n`: reduction target passed to `reduce_profile`; `-1` means
-  no reduction
+- `profile_reduction_n`: reduction target passed to the anchored
+  `prepare_observer_profile` path; `-1` means no reduction
 """
 mutable struct BatchContext
     "The RTModel updated in place by update_model!"
@@ -130,11 +133,13 @@ mutable struct BatchContext
     current_τ_ref::Vector
     "Current vertical pressure distribution per aerosol species"
     current_profile_dist::Vector{Any}
+    "Original source inputs on the unreframed atmospheric grid"
+    input_sources::AbstractSource
     "Number of spectral bands (scene-invariant)"
     n_bands::Int
     "Number of aerosol species (scene-invariant)"
     n_aerosols::Int
-    "Number of atmospheric layers after profile reduction (scene-invariant)"
+    "Number of atmospheric layers after observer reframing/reduction (scene-invariant)"
     Nz::Int
     "Profile reduction target (-1 = no reduction)"
     profile_reduction_n::Int
@@ -157,7 +162,8 @@ function BatchContext(params::vSmartMOM_Parameters;
     FT = params.float_type
 
     # ── 1. Build the full RTModel (expensive; done once) ───────────────────
-    model = model_from_parameters(params; sources)
+    input_sources = deepcopy(sources)
+    model = model_from_parameters(params; sources=deepcopy(input_sources))
 
     n_bands    = length(params.spec_bands)
     n_aerosols = isnothing(params.scattering_params) ? 0 :
@@ -262,7 +268,8 @@ function BatchContext(params::vSmartMOM_Parameters;
     # repeated updates do not re-convert or drift.
     current_T      = convert(Vector{FT}, params.T)
     current_p_half = convert(Vector{FT}, params.p)
-    current_q      = convert(Vector{FT}, params.q)
+    current_q      = _layer_centered_input(
+        "specific humidity", convert(Vector{FT}, params.q), current_p_half)
     current_vmr    = isnothing(params.absorption_params) ?
                      Dict{String, Any}() :
                      Dict{String, Any}(params.absorption_params.vmr)
@@ -285,6 +292,7 @@ function BatchContext(params::vSmartMOM_Parameters;
                         k_ref_vec,
                         current_T, current_p_half, current_q, current_vmr,
                         current_τ_ref, current_profile_dist,
+                        input_sources,
                         n_bands, n_aerosols, Nz, profile_reduction_n)
 end
 
@@ -328,8 +336,8 @@ function _compute_band_absorption!(τ_abs_band, absorption_models_band, h2o_mode
 
     # H₂O line absorption (driven by q / vmr_h2o)
     if q_nonzero && h2o_model !== nothing
-        compute_absorption_profile!(τ_abs_band, h2o_model, spec_band,
-                                    profile.vmr_h2o, profile)
+        compute_h2o_absorption_profile!(τ_abs_band, h2o_model, spec_band,
+                                        profile)
     end
 end
 
@@ -378,11 +386,13 @@ After this call `rt_run(ctx.model)` will produce radiances for the new scene.
 - `p_half::AbstractVector`: Half-level pressures [hPa], length `Nz + 1` (or
   `N_orig + 1` before reduction). Must be strictly positive and monotonically
   increasing (TOA to BOA, i.e. `p_half[end]` is surface pressure).
-- `q::AbstractVector`: Specific humidity [kg/kg], length `Nz` (or `N_orig`).
+- `q::AbstractVector`: Specific humidity [kg/kg], with either `Nz` layer-center
+  values or `Nz + 1` interface values on the unreframed input grid.
 - `vmr::Dict{String,Any}`: Trace-gas volume mixing ratios. **Keys must be a
   subset of the configured molecules** — supplying an unknown species key raises
   an error (add it to `params.absorption_params.vmr` and rebuild the context
-  instead). Values may be scalars or length-`Nz` vectors.
+  instead). Values may be scalars, length-`Nz` layer vectors, or length-`Nz+1`
+  interface vectors.
 
 # Thread safety
 
@@ -420,7 +430,8 @@ function update_model!(ctx::BatchContext;
 
     # ── 0. Validate and merge inputs ────────────────────────────────────────
     # The public API always accepts **unreduced** profile inputs (i.e. the
-    # same length as params.T / params.p / params.q). This is necessary for
+    # same atmospheric grid as params.T / params.p; interface-defined q is
+    # normalized to layer centers). This is necessary for
     # partial updates: if the user supplies only T (no p_half), we fall back to
     # the CURRENT stored scene value (unreduced) — NOT the original params — so
     # that successive partial updates compose incrementally (true incremental
@@ -431,20 +442,19 @@ function update_model!(ctx::BatchContext;
     #
     # Rule: if a field is `nothing`, use the current stored value (unreduced);
     # otherwise convert the supplied value to FT.
-    T_new      = T      === nothing ? ctx.current_T      : convert(Vector{FT}, T)
-    q_new      = q      === nothing ? ctx.current_q      : convert(Vector{FT}, q)
     p_half_new = p_half === nothing ? ctx.current_p_half : convert(Vector{FT}, p_half)
+    T_new      = T      === nothing ? ctx.current_T      : convert(Vector{FT}, T)
+    q_input    = q      === nothing ? ctx.current_q      : convert(Vector{FT}, q)
+    q_new      = _layer_centered_input("specific humidity", q_input, p_half_new)
 
-    # Validate p_half length: it must be Nz+1 (post-reduction) or N_orig
-    # (params.p is already the half-level array; it has length Nz_orig + 1,
-    #  which equals length(params.T) + 1 — the same thing as length(params.p)).
-    n_half_ok = (length(p_half_new) == ctx.Nz + 1) ||
-                (ctx.profile_reduction_n != -1 && length(p_half_new) == length(params.p))
+    # Public scene inputs always live on the original, unreframed grid. The
+    # final model can have additional observer interfaces even when profile
+    # reduction is disabled, so validating against `ctx.Nz + 1` would reject
+    # exactly the interior-height case this API must support.
+    n_half_ok = length(p_half_new) == length(params.p)
     n_half_ok || error(
         "update_model!: p_half length $(length(p_half_new)) does not match " *
-        "expected Nz+1 = $(ctx.Nz + 1)" *
-        (ctx.profile_reduction_n != -1 ?
-            " or unreduced length $(length(params.p))" : ""))
+        "the unreframed input-grid length $(length(params.p))")
 
     # T and q must match p_half (they are full-level quantities: length(p_half) - 1)
     n_T_expect = length(p_half_new) - 1
@@ -492,26 +502,34 @@ function update_model!(ctx::BatchContext;
         d
     end
 
-    # compute_atmos_profile_fields: same call as in model_from_parameters
-    p_full_new, p_half_out, vmr_h2o_new, vcd_dry_new, vcd_h2o_new, new_vmr, Δz_new =
-        compute_atmos_profile_fields(T_new, p_half_new, q_new, vmr_merged)
+    # Use the same height-aware framing path as initial model construction.
+    # This inserts each strict-interior H as an exact interface, preserves it
+    # through profile reduction, and recomputes every derived vertical field.
+    obs_alt = params.obs_alt isa Real ? FT(params.obs_alt) :
+              convert(Vector{FT}, params.obs_alt)
+    new_profile, observation = prepare_observer_profile(
+        T_new, p_half_new, q_new, vmr_merged, obs_alt,
+        ctx.profile_reduction_n)
 
-    new_profile_unreduced = AtmosphericProfile(
-        T_new, p_full_new, q_new, p_half_out, vmr_h2o_new,
-        vcd_dry_new, vcd_h2o_new, new_vmr, Δz_new)
-
-    # Apply profile reduction if needed
-    new_profile = if ctx.profile_reduction_n != -1
-        reduce_profile(ctx.profile_reduction_n, new_profile_unreduced)
-    else
-        new_profile_unreduced
-    end
+    # Reframe per-layer source inputs from the current scene's input pressure
+    # coordinate. Always start from the stable original source values stored on
+    # the context, not the previously interpolated model copy.
+    input_p_full = (p_half_new[1:end-1] .+ p_half_new[2:end]) ./ FT(2)
+    new_sources = reframe_vertical_sources(
+        ctx.input_sources, input_p_full, new_profile.p_full)
 
     Nz_new = length(new_profile.p_full)
     Nz_new == ctx.Nz || error(
-        "update_model!: profile reduction produced Nz=$Nz_new layers but " *
+        "update_model!: observer-profile framing produced Nz=$Nz_new layers but " *
         "BatchContext was built with Nz=$(ctx.Nz). This should not happen; " *
         "check that p_half spans the same column.")
+
+    length(observation.sensor_levels) == length(model.geometry.sensor_levels) ||
+        error("update_model!: observer-interface count changed; rebuild BatchContext")
+    observation.include_toa == model.geometry.include_toa ||
+        error("update_model!: TOA output selection changed; rebuild BatchContext")
+    observation.include_boa == model.geometry.include_boa ||
+        error("update_model!: BOA output selection changed; rebuild BatchContext")
 
     # Copy new profile into the existing profile arrays in-place.
     # RTModel/Atmosphere structs are immutable but every leaf Array is mutable.
@@ -537,6 +555,16 @@ function update_model!(ctx::BatchContext;
             cur.vmr[k] = v
         end
     end
+
+    # The same geometric H can move to a different interface index when a
+    # scene changes pressure/temperature. Keep the solver metadata aligned
+    # with the newly reframed profile and refresh all vertical source buffers.
+    model.geometry.sensor_levels .= observation.sensor_levels
+    model.geometry.sensor_altitudes .= observation.interior_altitudes
+    model.geometry.include_toa = observation.include_toa
+    model.geometry.include_boa = observation.include_boa
+    model.geometry.toa_altitude = observation.toa_altitude
+    _copy_vertical_sources!(model.sources, new_sources)
 
     # ── 2. Recompute τ_rayl in place per band ──────────────────────────────
     # Use the same depol logic as model_from_parameters — including the SAME
@@ -646,9 +674,9 @@ function update_model!(ctx::BatchContext;
             # vmr changes exactly as a fresh model_from_parameters build with the
             # changed vmr would. compute_τ_cia! falls back to USS defaults for
             # any collider species absent from the dict.
-            for cia_path in ap.cia_files
-                cia_table = Absorption.load_cia_table(
-                    cia_path, params.spec_bands[i_band]; FT)
+            for (cia_i, cia_path) in enumerate(ap.cia_files)
+                cia_table = _load_configured_cia_table(
+                    ap, cia_i, params.spec_bands[i_band], FT)
                 Absorption.compute_τ_cia!(
                     model.optics.τ_abs[i_band], cia_table, new_profile,
                     new_profile.vmr)
@@ -716,11 +744,11 @@ function _rewrite_solver_fourier_bounds!(ctx::BatchContext)
             l_max_aer[i_aer, i_band] =
                 if _has_analytic_phase_function(c_aero)
                     # analytic path: length of the stored greek series
-                    length(ao.greek_coefs.β)
+                    size(ao.greek_coefs.β, 1)
                 elseif truncation_type isa Scattering.δBGE
-                    min(length(ao.greek_coefs.β), truncation_type.l_max)
+                    min(size(ao.greek_coefs.β, 1), truncation_type.l_max)
                 else
-                    length(ao.greek_coefs.β)
+                    size(ao.greek_coefs.β, 1)
                 end
         end
     end
@@ -736,7 +764,8 @@ function _rewrite_solver_fourier_bounds!(ctx::BatchContext)
     components_per_band = [_band_components(params, ae_optics, model.sources, i_band)
                            for i_band in 1:n_bands]
     new_m_max_bands = _derive_m_max_bands_via_traits(
-        new_l_max, params.max_m, components_per_band, model.quad_points.Nstreams)
+        new_l_max, params.max_m, components_per_band, model.quad_points.Nstreams;
+        greek_beta_cutoff=params.greek_beta_cutoff)
     new_n_fourier   = new_m_max_bands .+ 1
 
     # Write back into the mutable Vector fields in-place.
@@ -992,65 +1021,31 @@ function update_aerosol_microphysics!(ctx::BatchContext, i_aer::Int, aerosol::Ae
             mie_model_1 = _mie_fwd(curr_band_λ[end])
             aerosol_optics_raw_1 = compute_aerosol_optical_properties(mie_model_1, FT)
 
-            # Average Greek coefs from both endpoints (matching forward path).
-            # Robust to either ordering of series length (descending bands).
-            Nl0 = length(aerosol_optics_raw_0.greek_coefs.α)
-            Nl1 = length(aerosol_optics_raw_1.greek_coefs.α)
-            Nlo, Nhi = min(Nl0, Nl1), max(Nl0, Nl1)
-            gc0 = aerosol_optics_raw_0.greek_coefs
-            gc1 = aerosol_optics_raw_1.greek_coefs
-            greek_arrs = Dict{Symbol,Vector{FT}}()
-            for fn in (:α, :β, :γ, :δ, :ϵ, :ζ)
-                g0 = getfield(gc0, fn); g1 = getfield(gc1, fn)
-                arr = zeros(FT, Nhi)
-                arr[1:Nlo] .= FT(0.5) .* (g0[1:Nlo] .+ g1[1:Nlo])
-                if Nl0 > Nlo
-                    arr[1+Nlo:Nhi] .= FT(0.5) .* g0[1+Nlo:Nl0]
-                elseif Nl1 > Nlo
-                    arr[1+Nlo:Nhi] .= FT(0.5) .* g1[1+Nlo:Nl1]
-                end
-                greek_arrs[fn] = arr
+            _truncate(ao) = truncation_type isa Scattering.δBGE &&
+                            size(ao.greek_coefs.β, 1) > truncation_type.l_max ?
+                Scattering.truncate_phase(truncation_type, ao; reportFit=false) :
+                Scattering.truncate_phase(Scattering.NoTruncation(), ao)
+            # BGE is nonlinear: truncate each physical endpoint first, then
+            # linearly interpolate the resulting Greek coefficients, k_ext,
+            # k_sca, and fᵗ in wavenumber.
+            ao0 = _truncate(aerosol_optics_raw_0)
+            ao1 = _truncate(aerosol_optics_raw_1)
+            ν_spec = FT.(params.spec_bands[i_band])
+            ν_ref_phase = FT(1e4 / sp.λ_ref)
+            ao_ref = nothing
+            if first(extrema(ν_spec)) < ν_ref_phase < last(extrema(ν_spec))
+                ao_ref = _truncate(compute_aerosol_optical_properties(
+                    _mie_fwd(sp.λ_ref), FT))
             end
-            greek_coeffs = GreekCoefs(greek_arrs[:α], greek_arrs[:β], greek_arrs[:γ],
-                                       greek_arrs[:δ], greek_arrs[:ϵ], greek_arrs[:ζ])
-
-            # Linearly interpolate k_ext and k_sca in wavenumber across the band.
-            # Sort endpoints by wavenumber (bands may be descending) — mirrors
-            # model_from_parameters.jl.
-            ν0, ν1 = 1e4/curr_band_λ[1], 1e4/curr_band_λ[end]
-            asc = ν0 <= ν1
-            ν_grid    = asc ? [ν0, ν1] : [ν1, ν0]
-            kext_grid = asc ? [aerosol_optics_raw_0.k, aerosol_optics_raw_1.k] :
-                              [aerosol_optics_raw_1.k, aerosol_optics_raw_0.k]
-            ksca_grid = asc ?
-                [aerosol_optics_raw_0.k * aerosol_optics_raw_0.ω̃,
-                 aerosol_optics_raw_1.k * aerosol_optics_raw_1.ω̃] :
-                [aerosol_optics_raw_1.k * aerosol_optics_raw_1.ω̃,
-                 aerosol_optics_raw_0.k * aerosol_optics_raw_0.ω̃]
-            interp_kext = LinearInterpolation(ν_grid, kext_grid)
-            interp_ksca = LinearInterpolation(ν_grid, ksca_grid)
-            k_spec  = FT[interp_kext(1e4/curr_band_λ[i]) for i=1:n_spec]
-            ω̃_spec  = FT[interp_ksca(1e4/curr_band_λ[i])/k_spec[i] for i=1:n_spec]
-            fᵗ_spec = zeros(FT, n_spec)
-
-            aerosol_optics_raw_interp = AerosolOptics(greek_coefs=greek_coeffs,
-                                                       ω̃=ω̃_spec, k=k_spec, fᵗ=fᵗ_spec)
-
-            β_len = length(aerosol_optics_raw_interp.greek_coefs.β)
-            new_ao =
-                if truncation_type isa Scattering.δBGE && β_len > truncation_type.l_max
-                    Scattering.truncate_phase(truncation_type,
-                                              aerosol_optics_raw_interp; reportFit=false)
-                else
-                    Scattering.truncate_phase(Scattering.NoTruncation(),
-                                              aerosol_optics_raw_interp)
-                end
+            new_ao = _spectralize_truncated_endpoints(ao0, ao1, ν_spec;
+                reference=ao_ref, ν_ref=ν_ref_phase)
 
             model.optics.aerosols.aerosol_optics[i_band][i_aer] = new_ao
 
             τ_profile = getAerosolLayerOptProp(one(FT), dist, profile)
             model.optics.aerosols.τ_aer[i_band][i_aer, :, :] .=
-                (τ_eff / new_k_ref) .* new_ao.k .* τ_profile'
+                τ_eff .* _aod_spectral_scale(ν_spec, new_ao.k, FT(new_k_ref),
+                                              FT(1e4/sp.λ_ref)) .* τ_profile'
         end
     end
 

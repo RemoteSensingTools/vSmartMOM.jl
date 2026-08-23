@@ -867,6 +867,27 @@ function computeRamanZλ!(RS_type::RRS, pol_type, qp_μ, m, arr_type)
     nothing
 end
 
+
+"""
+    computeRamanZλ!(rs::RRS, pol_type, qp_μ, m, arr_type, μ₀)
+
+Build separate angular representations for Raman scattering. The square
+`Zλ₁λ₀` matrices couple diffuse incident and output streams. With
+`external_solar=true`, the fixed solar direction is excluded from those
+matrices and evaluated independently as rectangular `Z₀` columns. Host arrays
+are retained in `RRS`; elemental kernels transfer them to the active backend,
+matching the historical Raman storage contract.
+"""
+function computeRamanZλ!(RS_type::RRS, pol_type, qp_μ, m, arr_type, μ₀)
+    μ = Array(qp_μ)
+    RS_type.Z⁺⁺_λ₁λ₀, RS_type.Z⁻⁺_λ₁λ₀ =
+        Scattering.compute_Z_moments(pol_type, μ, RS_type.greek_raman, m)
+    RS_type.Z₀⁺⁺_λ₁λ₀, RS_type.Z₀⁻⁺_λ₁λ₀ =
+        Scattering.compute_Z_source_moments(
+            pol_type, μ, μ₀, RS_type.greek_raman, m)
+    nothing
+end
+
 function computeRamanZλ!(RS_type::Union{noRS_plus, noRS}, pol_type, qp_μ, m, arr_type)
     nothing
 end

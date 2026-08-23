@@ -66,7 +66,7 @@ end
 # ── AerosolOptics ─────────────────────────────────────────────────────────
 
 function Base.show(io::IO, ::MIME"text/plain", x::AerosolOptics{FT}) where FT
-    l_max = length(x.greek_coefs.β) - 1
+    l_max = size(x.greek_coefs.β, 1) - 1
     println(io, "AerosolOptics{$FT}")
     println(io, _S_TREE_MID, "ω̃ (SSA): ", _scalar_or_range(x.ω̃))
     println(io, _S_TREE_MID, "k (extinction): ", _scalar_or_range(x.k))

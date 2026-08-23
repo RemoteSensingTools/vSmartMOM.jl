@@ -52,7 +52,8 @@ function run_benchmark(arch; yaml=YAML, nruns=NRUNS)
     NAer  = length(params0.scattering_params.rt_aerosols)
     NGas  = size(lm0.τ̇_abs[1], 1)
     NSurf = 1
-    Nparams = NAer * 7 + NGas + NSurf
+    Nparams = CoreRT.n_total(CoreRT.ParameterLayout(
+        n_aerosols=NAer, n_gases=NGas, n_surface=NSurf))
 
     @printf("  nSpec=%d  nLayers=%d  nQuad=%d (nStokes=%d)  Nparams=%d\n",
             nSpec, nLayers, nQuad, nStokes, Nparams)

@@ -105,13 +105,17 @@ using .Aerosols
 # SIF emission data + loaders
 import DataInterpolations: ExtrapolationType
 include("SIF_emission/sif_loader.jl")
-export load_sif_spectrum, load_ficus_reflectance, sif_data_path, build_sif_source
+export load_sif_spectrum, sif_reference_state, load_ficus_reflectance,
+       sif_data_path, build_sif_source
 
 # Export some vSmartMOM functions
 export default_parameters, parameters_from_file, parameters_from_source,
        parameters_from_yaml, parameters_from_dict,
-       model_from_parameters, rt_run, read_parameters,
-       read_atmos_profile, read_atmos_profile_dict
+       model_from_parameters, rt_run, rt_run_toa, read_parameters,
+       read_atmos_profile, read_atmos_profile_dict,
+       ObserverRTResult, LevelRadiance,
+       ObserverRTResultLin, LevelRadianceLin,
+       total_downwelling, total_downwelling_jacobian
 # Export linearized RT functions
 export rt_run_lin, model_from_parameters_lin
 # Atmosphere/surface split (cache the atmosphere phase, sweep the surface phase)

@@ -98,6 +98,18 @@ end
 "Default J matrix in ieRT calculation (zeros)"
 @inline default_J_matrix_ie(FT, arr_type, dims, nSpec, nRaman) = arr_type(zeros(FT, (dims[1], 1, nSpec, nRaman)))
 
+@inline function default_solar_columns(FT, arr_type, dims, nStokes, nSpec)
+    make_column() = arr_type(zeros(FT, dims[1], nStokes, nSpec))
+    SolarColumnOperators(R₀⁻⁺=make_column(), R₀⁺⁻=make_column(),
+                         T₀⁺⁺=make_column(), T₀⁻⁻=make_column())
+end
+
+@inline function default_raman_solar_columns(FT, arr_type, dims, nStokes, nSpec, nRaman)
+    make_column() = arr_type(zeros(FT, dims[1], nStokes, nSpec, nRaman))
+    RamanSolarColumnOperators(ieR₀⁻⁺=make_column(), ieR₀⁺⁻=make_column(),
+                              ieT₀⁺⁺=make_column(), ieT₀⁻⁻=make_column())
+end
+
 "Default matrix in RT calculation (zeros) — multi-sensor variant"
 @inline default_matrix(FT, arr_type, NSens, dims, nSpec) = [arr_type(zeros(FT, (dims[1], dims[2], nSpec))) for _ in 1:NSens]
 "Default matrix in ieRT calculation (zeros) — multi-sensor variant"
@@ -121,7 +133,9 @@ SFI and surface SIF use the legacy `j₀⁺/j₀⁻` fields, so they don't get a
 separate slot. Empty prepared-sources → empty NT, bit-equal to pre-A.2a.
 """
 function make_added_layer(RS_type::Union{noRS, noRS_plus}, FT, arr_type, dims, nSpec;
-                          prepared_sources::AbstractSource = NoSource())
+                          prepared_sources::AbstractSource = NoSource(),
+                          external_solar::Bool = false,
+                          nStokes::Int = 1)
     t1 = default_matrix(FT, arr_type, dims, nSpec)
     t2 = default_matrix(FT, arr_type, dims, nSpec)
     t1_ptr = batched_pointer_cache(t1)
@@ -142,6 +156,8 @@ function make_added_layer(RS_type::Union{noRS, noRS_plus}, FT, arr_type, dims, n
         dbl_v1  = default_J_matrix(FT, arr_type, dims, nSpec),
         dbl_v2  = default_J_matrix(FT, arr_type, dims, nSpec),
         j₀_by_src = j₀_by_src,
+        solar_columns = external_solar ?
+            default_solar_columns(FT, arr_type, dims, nStokes, nSpec) : nothing,
     )
 end
 
@@ -215,7 +231,8 @@ variant but ignored here. Source payloads are applied later by the RT driver:
 solar F₀ is copied into `RS_type.F₀`, while surface emission enters through
 `SurfaceSIF` dispatch."""
 make_added_layer(RS_type::Union{RRS, VS_0to1_plus, VS_1to0_plus}, FT, arr_type, dims, nSpec;
-                 prepared_sources::AbstractSource = NoSource())  = AddedLayerRS(
+                 prepared_sources::AbstractSource = NoSource(),
+                 external_solar::Bool=false, nStokes::Int=1)  = AddedLayerRS(
                                                 default_matrix(FT, arr_type, dims, nSpec), 
                                                 default_matrix(FT, arr_type, dims, nSpec), 
                                                 default_matrix(FT, arr_type, dims, nSpec),
@@ -227,7 +244,11 @@ make_added_layer(RS_type::Union{RRS, VS_0to1_plus, VS_1to0_plus}, FT, arr_type, 
                                                 default_matrix_ie(FT, arr_type, dims, nSpec, RS_type.n_Raman),
                                                 default_matrix_ie(FT, arr_type, dims, nSpec, RS_type.n_Raman),
                                                 default_J_matrix_ie(FT, arr_type, dims, nSpec, RS_type.n_Raman),
-                                                default_J_matrix_ie(FT, arr_type, dims, nSpec, RS_type.n_Raman)
+                                                default_J_matrix_ie(FT, arr_type, dims, nSpec, RS_type.n_Raman),
+                                                external_solar ? default_solar_columns(
+                                                    FT, arr_type, dims, nStokes, nSpec) : nothing,
+                                                external_solar ? default_raman_solar_columns(
+                                                    FT, arr_type, dims, nStokes, nSpec, RS_type.n_Raman) : nothing
                                                 )
                                                          
 

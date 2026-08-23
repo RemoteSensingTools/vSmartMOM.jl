@@ -19,6 +19,9 @@ Validate GEOS-Chem NetCDF metadata and raise `ArgumentError` when invalid.
 """
 @inline _require_geoschem(cond, msg) = cond ? nothing : _geoschem_error(msg)
 
+"Convert GEOS-Chem specific humidity from g/kg to the internal kg/kg mass fraction."
+_geoschem_specific_humidity(values) = Float64.(values) ./ 1000
+
 """
     geoschem_to_dict(src::GeosChemSource) -> Dict
 
@@ -73,15 +76,19 @@ function geoschem_to_dict(src::GeosChemSource)
     _require_geoschem(ds["Met_T"].attrib["units"] == "K", "Expected temperature in Kelvin")
     temperature = reverse(ds["Met_T"].var[idx, idy, idf, :, 1])
     
-    # Specific humidity [g/kg] - flip from BOA→TOA to TOA→BOA
+    # Specific humidity is stored in g/kg. Convert to the kg/kg mass fraction
+    # used by compute_atmos_profile_fields, then flip BOA→TOA to TOA→BOA.
     _require_geoschem(ds["Met_SPHU"].attrib["units"] == "g kg-1", "Expected specific humidity in g/kg")
-    q = reverse(ds["Met_SPHU"].var[idx, idy, idf, :, 1])
+    q = reverse(_geoschem_specific_humidity(
+        ds["Met_SPHU"].var[idx, idy, idf, :, 1]))
     
     # Read volume mixing ratios for trace gases
-    vmr = Dict{String, Vector{Float64}}()
+    vmr = Dict{String, Union{Float64, Vector{Float64}}}()
     
     # Define molecules to extract (all available in GEOSChem)
-    molecules_to_read = ["N2O", "CH4", "C2H6", "CO2", "CO", "H2O"]
+    # H2O is intentionally omitted: vSmartMOM derives it from Met_SPHU (`q`)
+    # and rejects a second H2O entry in the absorption molecule list.
+    molecules_to_read = ["N2O", "CH4", "C2H6", "CO2", "CO"]
     molecules_available = String[]
     
     for molecule in molecules_to_read
@@ -96,8 +103,12 @@ function geoschem_to_dict(src::GeosChemSource)
     
     close(ds)
     
-    # Build the configuration dictionary
-    config = Dict{String, Any}()
+    # Start from the package's complete one-band defaults so the returned
+    # dictionary is immediately consumable by `parameters_from_source`. Users
+    # can still replace radiative_transfer/geometry before parsing.
+    default_config_path = normpath(joinpath(
+        @__DIR__, "..", "..", "CoreRT", "DefaultParameters.yaml"))
+    config = YAML.load_file(default_config_path)
     
     # Atmospheric profile section
     config["atmospheric_profile"] = Dict{String, Any}(
@@ -108,18 +119,19 @@ function geoschem_to_dict(src::GeosChemSource)
         "profile_reduction" => nothing  # No reduction by default
     )
     
-    # Absorption section (if molecules are available)
-    if !isempty(molecules_available)
-        # Always include O2 (not in GEOSChem output, will use default)
-        all_molecules = [["O2", molecules_available...]]
-        config["absorption"] = Dict{String, Any}(
-            "molecules" => all_molecules,
-            "vmr" => vmr,
-            "broadening" => "Voigt()",
-            "CEF" => "HumlicekWeidemann32SDErrorFunction()",
-            "wing_cutoff" => 25
-        )
-    end
+    # O2 is not carried by GEOS-Chem SpeciesConcVV output. Supply the standard
+    # dry-air abundance explicitly so the generated absorption block satisfies
+    # the same validation as hand-written configurations.
+    vmr["O2"] = 0.2095
+    all_molecules = unique(["O2"; molecules_available])
+    config["absorption"] = Dict{String, Any}(
+        "fixed_molecules" => [all_molecules],
+        "variable_molecules" => [String[]],
+        "vmr" => vmr,
+        "broadening" => "Voigt()",
+        "CEF" => "HumlicekWeidemann32SDErrorFunction()",
+        "wing_cutoff" => 25
+    )
     
     # Add metadata for reference
     config["_metadata"] = Dict{String, Any}(

@@ -6,7 +6,8 @@ leaf-reflectance samples bundled under `src/SIF_emission/`.
 using DelimitedFiles: readdlm
 using DataInterpolations: LinearInterpolation
 
-export load_sif_spectrum, load_ficus_reflectance, sif_data_path, build_sif_source
+export load_sif_spectrum, sif_reference_state, load_ficus_reflectance,
+       sif_data_path, build_sif_source
 
 """
     sif_data_path(filename) -> String
@@ -61,6 +62,46 @@ function load_sif_spectrum(path::AbstractString = sif_data_path("sif-spectra.csv
     jSIF .*= 1e7 ./ (ν .^ 2)
 
     return ν, jSIF
+end
+
+"""
+    sif_reference_state(; total_sif=0.5, reference_wavelength_nm=760,
+                        column=:SIF_OLD, path=sif_data_path("sif-spectra.csv"))
+
+Normalize the supplied SIF shape so that its wavelength-space integral is
+`total_sif` (mW m⁻² sr⁻¹), convert it to spectral radiance per cm⁻¹, and
+return the local wavenumber-linear state at `reference_wavelength_nm`:
+
+`(SIF760=SIF(ν₇₆₀), mSIF=dSIF/dν|₇₆₀, ν_ref=ν₇₆₀, ν, spectrum)`.
+
+The `SIF760` property retains that name for the retrieval convention even if
+a different diagnostic reference wavelength is requested. The slope is a
+centered secant through the nearest tabulated samples bracketing the reference.
+"""
+function sif_reference_state(; total_sif::Real=0.5,
+                             reference_wavelength_nm::Real=760,
+                             column::Symbol=:SIF_OLD,
+                             path::AbstractString=sif_data_path("sif-spectra.csv"))
+    total_sif >= 0 || throw(ArgumentError("total_sif must be nonnegative"))
+    ν, shape_ν = load_sif_spectrum(path; column, rescale_to_peak=false)
+    area = sum(((@view shape_ν[1:end-1]) .+ (@view shape_ν[2:end])) .* diff(ν)) / 2
+    area > 0 || throw(ArgumentError("SIF spectrum has nonpositive integrated area"))
+    spectrum = shape_ν .* (total_sif / area)
+    ν_ref = 1e7 / reference_wavelength_nm
+    ihi = searchsortedfirst(ν, ν_ref)
+    1 < ihi <= length(ν) || throw(ArgumentError(
+        "reference wavelength $reference_wavelength_nm nm lies outside the SIF spectrum"))
+    ilo = ihi - 1
+    SIF760 = spectrum[ilo] + (spectrum[ihi] - spectrum[ilo]) *
+             (ν_ref - ν[ilo]) / (ν[ihi] - ν[ilo])
+    # Use one sample on either side of an exact tabulated reference so the
+    # derivative is centered rather than selecting one piecewise-linear side.
+    if isapprox(ν[ihi], ν_ref; rtol=0, atol=8eps(ν_ref)) && ihi < length(ν)
+        ilo = ihi - 1
+        ihi += 1
+    end
+    mSIF = (spectrum[ihi] - spectrum[ilo]) / (ν[ihi] - ν[ilo])
+    return (; SIF760, mSIF, ν_ref, ν, spectrum)
 end
 
 """

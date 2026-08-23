@@ -33,34 +33,187 @@ NAer = isnothing(params.scattering_params) ? 0 : length(params.scattering_params
 NGas = size(lin_model.τ̇_abs[1], 1)
 NSurf = 1
 
-R, T, dR, dT = rt_run_lin(model, lin_model, NAer, NGas, NSurf)
+result = rt_run_lin(model, lin_model, NAer, NGas, NSurf)
+R, T, dR, dT = result
 ```
 
-The outputs are:
+`result` is an [`ObserverRTResultLin`](@ref). Its named endpoint fields are:
 
-- `R`: reflected Stokes field, shaped `nVZA × nStokes × nSpec`
-- `T`: transmitted Stokes field, shaped like `R`
-- `dR`: derivative of `R`, shaped `nVZA × nStokes × nSpec × nParams`
-- `dT`: derivative of `T`, shaped like `dR`
+- `result.toa`: reflected Stokes field, shaped `nVZA × nStokes × nSpec`
+- `result.boa`: transmitted Stokes field, shaped like `result.toa`
+- `result.toa_jacobian`: derivative of `result.toa`, shaped
+  `nVZA × nStokes × nSpec × nParams`
+- `result.boa_jacobian`: derivative of `result.boa`, shaped like the TOA
+  Jacobian
+
+An endpoint field and its Jacobian are `nothing` when that endpoint was not
+selected by `obs_alt`. Historical four-value destructuring remains available,
+as shown above.
+
+## Interior-Height Jacobians
+
+Strict-interior observer heights are supported by the analytic elastic
+multiple-scatter solver. Configure them through `obs_alt` before building the
+forward and linearized models:
+
+```julia
+height_params = deepcopy(params)
+height_params.obs_alt = [0.0, 5.0]  # endpoints plus one interior interface
+
+height_model, height_lin_model = model_from_parameters_lin(height_params)
+height_result = rt_run_lin(
+    height_model, height_lin_model, NAer, NGas, NSurf)
+
+level = only(height_result.levels)
+level.height_km
+level.boundary_index
+
+level.upwelling
+level.downwelling
+level.unscattered_downwelling
+
+level.upwelling_jacobian
+level.downwelling_jacobian
+level.unscattered_downwelling_jacobian
+
+total_down = total_downwelling(level)
+total_down_jacobian = total_downwelling_jacobian(level)
+```
+
+The radiance fields have shape `nVZA × nStokes × nSpec`; each Jacobian
+adds `nParams` as its last axis. The parameter order is stored directly in
+`height_result.layout`.
+
+The unscattered solar contribution remains separate from the diffuse MOM
+field. For fixed solar irradiance and geometry its atmospheric tangent is
+
+```math
+\frac{\partial L_{\mathrm{direct}}}{\partial x_j}
+= -\frac{L_{\mathrm{direct}}}{\mu_0}
+  \frac{\partial \tau_{\mathrm{above}}}{\partial x_j}.
+```
+
+It is zero for non-solar output ordinates and for surface-parameter columns.
+The BOA endpoint `result.boa` and `result.boa_jacobian` retain the historical
+total-radiance convention and therefore already include the direct carrier;
+the separate fields apply to strict-interior records.
+Raman/inelastic linearization remains unsupported. The separate
+single-scatter driver `rt_run_ss` continues to reject strict-interior observer
+requests. Interior linearized runs currently accept `SolarBeam` or `NoSource`;
+thermal and surface-emission sources, plus `CanopySurface`, are rejected
+explicitly until their multisensor tangent/source-slot propagation is
+implemented.
 
 ## Slice The Parameter Dimension
 
-Use [`ParameterLayout`](@ref) rather than hard-coded offsets.
+Use [`ParameterLayout`](@ref) rather than hard-coded offsets. The last axis of
+every full-RT Jacobian has this stable block ordering:
+
+| Block | Accessor | Columns within block | Derivative units |
+|:--|:--|:--|:--|
+| Surface pressure | `psurf_index(layout)` | one scalar `p_surf` | per hPa |
+| Aerosols | `aerosol_range(layout, iaer)` | seven columns per aerosol | parameter-dependent |
+| Trace gases | `gas_profile_range(layout, igas, Nz)` | `Nz` columns per gas, TOA to BOA | per unit VMR |
+| Surface | `surface_range(layout)` | surface-model parameters | parameter-dependent |
+| Canopy | `canopy_range(layout)` | canopy-model parameters, when present | parameter-dependent |
+
+Thus the state vector is
+
+```text
+x = [p_surf,
+     aerosol₁[1:7], ..., aerosol_NAer[1:7],
+     VMR₁(z₁), ..., VMR₁(z_Nz),
+     ...,
+     VMR_NGas(z₁), ..., VMR_NGas(z_Nz),
+     surface parameters,
+     canopy parameters]
+```
+
+Here `z₁` is the top atmospheric layer and `z_Nz` is the bottom layer. Gas
+VMR means dimensionless mole fraction; a derivative “per ppm” is therefore
+`1e-6 .* dR_dVMR`. Pressure, temperature, dry-air column, and absorption
+cross section are held fixed for a gas-VMR derivative. Surface-pressure
+derivatives are a separate state column.
 
 ```julia
-layout = CoreRT.ParameterLayout(aerosol_params = 7,
-                                n_aerosols = NAer,
-                                n_gases = NGas,
-                                n_surface = NSurf)
+layout = result.layout
+Nz = length(model.profile.p_full)
 
 surface_idx = CoreRT.surface_index(layout)
 gas_block = CoreRT.gas_range(layout)
+gas1_profile = CoreRT.gas_profile_range(layout, 1, Nz)
+gas1_bottom = CoreRT.gas_layer_index(layout, 1, Nz, Nz)
 aerosol1_block = NAer > 0 ? CoreRT.aerosol_range(layout, 1) : 1:0
 
 dR_surface = dR[:, 1, :, surface_idx]
+dR_dgas1_profile = dR[:, :, :, gas1_profile]
+dT_dgas1_bottom = dT[:, :, :, gas1_bottom]
 ```
 
-The current ordering is aerosol parameters first, then gas VMR parameters, then surface parameters. Each aerosol contributes seven derivative slots: `τ_ref`, `nᵣ`, `nᵢ`, mean radius, geometric width, vertical-location parameter, and vertical-width parameter.
+`NGas = size(lin_model.τ̇_abs[1], 1)` is the number of flattened gas-layer
+columns, not merely the number of molecular species. Consequently,
+`NGas % Nz == 0`, and the number of gas slots is `NGas ÷ Nz`. Do not pass the
+number of species to `rt_run_lin`; pass the flattened dimension exactly as
+shown in the setup example.
+
+Each aerosol contributes seven derivative slots in this order:
+
+1. reference optical depth `τ_ref`;
+2. real refractive index `nᵣ`;
+3. imaginary refractive index `nᵢ`;
+4. median radius `rₘ`;
+5. geometric width `σ_g`;
+6. vertical-profile location (`p₀` or `z₀`);
+7. vertical-profile width (`σ_p` or `σ₀`).
+
+The array dimensions should always satisfy:
+
+```julia
+@assert size(dR)[1:3] == size(R)
+@assert size(dT)[1:3] == size(T)
+@assert size(dR, 4) == CoreRT.n_total(layout)
+@assert size(dT, 4) == CoreRT.n_total(layout)
+@assert NGas % Nz == 0
+```
+
+### Parsing into named retrieval blocks
+
+The following pattern avoids embedding any column offsets in downstream
+retrieval or diagnostic code:
+
+```julia
+function parse_jacobian(J, model, layout, NAer, NGas)
+    Nz = length(model.profile.p_full)
+    @assert NGas % Nz == 0
+    n_gas_species = NGas ÷ Nz
+
+    aerosols = [@view J[:, :, :, CoreRT.aerosol_range(layout, ia)]
+                for ia in 1:NAer]
+    gases = [@view J[:, :, :, CoreRT.gas_profile_range(layout, ig, Nz)]
+             for ig in 1:n_gas_species]
+
+    return (
+        psurf = @view(J[:, :, :, CoreRT.psurf_index(layout)]),
+        aerosols = aerosols,
+        gases = gases, # each entry: nVZA × nStokes × nSpec × Nz
+        surface = @view(J[:, :, :, CoreRT.surface_range(layout)]),
+    )
+end
+
+dR_named = parse_jacobian(dR, model, layout, NAer, NGas)
+dT_named = parse_jacobian(dT, model, layout, NAer, NGas)
+```
+
+When applying a physical profile perturbation, contract over the final axis:
+
+```julia
+delta_vmr = fill(1e-6, Nz) # +1 ppm in every layer
+delta_R = dropdims(sum(dR_named.gases[1] .* reshape(delta_vmr, 1, 1, 1, Nz),
+                       dims=4), dims=4)
+```
+
+This contraction recovers a column-wide perturbation while retaining the
+ability to apply arbitrary nonuniform vertical profiles.
 
 For a longer walkthrough with plots and finite-difference checks, use [Tutorial: Jacobians](tutorials/Tutorial_Jacobians.md). The hybrid AD notes are in [Tutorial: HybridAD](tutorials/Tutorial_HybridAD.md).
 

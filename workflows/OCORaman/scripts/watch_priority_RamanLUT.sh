@@ -16,11 +16,11 @@ set -uo pipefail
 # Typical:
 #   PSURF=750 CUDA_HOME=/usr/local/cuda CUDA_DEVICE=1 \
 #   nohup workflows/OCORaman/scripts/watch_priority_RamanLUT.sh \
-#     > /home/sanghavi/data/RamanSIFgrid/o2a_raman_lut_priority_psurf0750_rgb/logs/watchdog.out 2>&1 &
+#     > /home/sanghavi/data/RamanSIFgrid/O2ABand/o2a_raman_lut_priority_psurf0750_rgb/logs/watchdog.out 2>&1 &
 #
 #   PSURF=1000 CUDA_HOME=/usr/local/cuda CUDA_DEVICE=1 \
 #   nohup workflows/OCORaman/scripts/watch_priority_RamanLUT.sh \
-#     > /home/sanghavi/data/RamanSIFgrid/o2a_raman_lut_priority_psurf1000_rgb/logs/watchdog.out 2>&1 &
+#     > /home/sanghavi/data/RamanSIFgrid/O2ABand/o2a_raman_lut_priority_psurf1000_rgb/logs/watchdog.out 2>&1 &
 
 REPO="${REPO:-/home/sanghavi/code/github/uni_vSmartMOM}"
 PSURF="${PSURF:-750}"
@@ -34,7 +34,7 @@ PRIORITY_ALBEDO_IDXS="${PRIORITY_ALBEDO_IDXS:-1,7,21}"
 
 PSURF_TAG="$(printf '%04.0f' "${PSURF}")"
 PSURF_WRAPPER_TAG="$(printf '%.0f' "${PSURF}")"
-OUTDIR="${OUTDIR:-/home/sanghavi/data/RamanSIFgrid/o2a_raman_lut_priority_psurf${PSURF_TAG}_rgb}"
+OUTDIR="${OUTDIR:-/home/sanghavi/data/RamanSIFgrid/O2ABand/o2a_raman_lut_priority_psurf${PSURF_TAG}_rgb}"
 LOGDIR="${LOGDIR:-${OUTDIR}/logs}"
 WATCH_LOG="${WATCH_LOG:-${LOGDIR}/priority_psurf${PSURF_TAG}_watchdog.log}"
 SNAPSHOT_CSV="${SNAPSHOT_CSV:-${LOGDIR}/priority_psurf${PSURF_TAG}_timing_snapshots.csv}"

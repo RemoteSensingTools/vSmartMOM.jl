@@ -76,7 +76,7 @@ using Statistics
                 "geometry" => Dict{String,Any}("sza" => 30.0,
                     "vza" => [30.0, 0.0, 30.0],
                     "vaz" => [180.0, 0.0, 0.0],
-                    "obs_alt" => 1000.0),
+                    "obs_alt" => [0.0]),
                 "atmospheric_profile" => Dict{String,Any}(
                     "T" => [285.0], "p" => [1012.99, 1013.0],
                     "profile_reduction" => -1)))
@@ -85,7 +85,9 @@ using Statistics
                 LAD = CanopyOptics.planophile_leaves2(Float64),
                 leaf_reflectance = R_leaf, leaf_transmittance = T_leaf,
                 leaf_optics_grid = [685.0, 800.0], grid_unit = :nm)
-            model = model_from_parameters(params)
+            # This invariant intentionally exercises legacy Radau quadrature,
+            # whose solar node is embedded in the angular operator.
+            model = model_from_parameters(params; external_solar=false)
             for τ in model.τ_rayl; fill!(τ, 0); end
             for τ in model.τ_abs;  fill!(τ, 0); end
             for τ in model.τ_aer;  fill!(τ, 0); end
@@ -156,7 +158,7 @@ using Statistics
         p = parameters_from_dict(Dict{String,Any}(
             "radiative_transfer" => rt,
             "geometry" => Dict{String,Any}("sza" => 30.0, "vza" => [0.0],
-                                            "vaz" => [0.0], "obs_alt" => 1000.0),
+                                            "vaz" => [0.0], "obs_alt" => [0.0]),
             "atmospheric_profile" => Dict{String,Any}(
                 "T" => [285.0], "p" => [1012.99, 1013.0], "profile_reduction" => -1)))
         @test p.truncation isa δBGE                  # legacy default
@@ -182,7 +184,7 @@ using Statistics
             parameters_from_dict(Dict{String,Any}(
                 "radiative_transfer" => rt,
                 "geometry" => Dict{String,Any}("sza" => 30.0, "vza" => [0.0],
-                                                "vaz" => [0.0], "obs_alt" => 1000.0),
+                                                "vaz" => [0.0], "obs_alt" => [0.0]),
                 "atmospheric_profile" => Dict{String,Any}(
                     "T" => [285.0], "p" => [1012.99, 1013.0], "profile_reduction" => -1)))
         end

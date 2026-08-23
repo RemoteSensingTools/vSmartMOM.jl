@@ -37,7 +37,7 @@ geometry:
   sza:     30.0
   vza:     [0.0, 30.0, 60.0]
   vaz:     [0.0, 0.0, 0.0]
-  obs_alt: 1000.0
+  obs_alt: [0]
 
 # Vanishingly thin "atmosphere" sitting on top of the canopy — only there
 # so model_from_parameters has a valid bottom-layer absorption to scale

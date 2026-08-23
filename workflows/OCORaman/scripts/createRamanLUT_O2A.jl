@@ -36,11 +36,11 @@
 #       workflows/OCORaman/scripts/createRamanLUT_O2A.jl
 #
 #   # Suggested distributed runs:
-#   CUDA_DEVICE=1 PSURFS=1000 OUT_NC=/home/sanghavi/data/RamanSIFgrid/o2a_raman_lut_psurf1000.nc \
+#   CUDA_DEVICE=1 PSURFS=1000 OUT_NC=/home/sanghavi/data/RamanSIFgrid/O2ABand/o2a_raman_lut_psurf1000.nc \
 #       julia --project=. workflows/OCORaman/scripts/createRamanLUT_O2A.jl
-#   CUDA_DEVICE=1 PSURFS=750 OUT_NC=/home/sanghavi/data/RamanSIFgrid/o2a_raman_lut_psurf750.nc \
+#   CUDA_DEVICE=1 PSURFS=750 OUT_NC=/home/sanghavi/data/RamanSIFgrid/O2ABand/o2a_raman_lut_psurf750.nc \
 #       julia --project=. workflows/OCORaman/scripts/createRamanLUT_O2A.jl
-#   CUDA_DEVICE=1 PSURFS=500 OUT_NC=/home/sanghavi/data/RamanSIFgrid/o2a_raman_lut_psurf0500.nc \
+#   CUDA_DEVICE=1 PSURFS=500 OUT_NC=/home/sanghavi/data/RamanSIFgrid/O2ABand/o2a_raman_lut_psurf0500.nc \
 #       julia --project=. workflows/OCORaman/scripts/createRamanLUT_O2A.jl
 
 using Dates
@@ -292,7 +292,7 @@ function write_case_yaml(path::AbstractString, profile::ProfileCase, sza::Real, 
         println(io, "  sza: $(Float64(sza))")
         println(io, "  vza: [0.0]")
         println(io, "  vaz: [0.0]")
-        println(io, "  obs_alt: 0")
+        println(io, "  obs_alt: [0]")
         println(io)
         println(io, "atmospheric_profile:")
         println(io, "  T: $(yaml_array(profile.T))")

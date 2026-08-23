@@ -21,7 +21,7 @@ using Test
 @testset "Phase 1c single-scatter driver smoke" begin
     params = parameters_from_yaml("test_parameters/Phase1b_RRS_761-764nm.yaml")
     params.architecture = vSmartMOM.Architectures.CPU()
-    model = model_from_parameters(params)
+    model = model_from_parameters(params; external_solar=false)
 
     nVza = length(model.obs_geom.vza)
     nPol = CoreRT.polarization_type(model).n
@@ -59,6 +59,15 @@ using Test
         @test all(hem_T .>= 0)
         @test maximum(hem_R) < 1.0
         @test maximum(hem_T) < 1.0
+    end
+
+    @testset "promoted optical inputs in Float32 workspace" begin
+        p32 = deepcopy(params)
+        p32.float_type = Float32
+        model32 = model_from_parameters(p32; external_solar=false)
+        result32 = CoreRT.rt_run_ss(model32; i_band=1)
+        @test eltype(result32[1]) == Float32
+        @test all(isfinite, result32[1])
     end
 
     @testset "SS ≤ full MS on Stokes I" begin

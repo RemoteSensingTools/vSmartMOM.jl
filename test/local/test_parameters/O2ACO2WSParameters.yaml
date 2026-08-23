@@ -50,8 +50,8 @@ geometry:
   vza:                [0.]#, 60., 30., 30.] #[32.4436] #[0.072]
   # Viewing azimuth angles (degrees)
   vaz:                [0.0]#, 180., 0.0, 180.]
-  # Observation altitude (Pa)
-  obs_alt:            1000.0
+  # Observer height selection (km above BOA)
+  obs_alt:            [0]
 
 # =================================================================
 # Atmospheric Profile
