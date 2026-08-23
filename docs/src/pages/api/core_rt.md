@@ -35,6 +35,15 @@ vSmartMOM.CoreRT.AllFourierMoments
 vSmartMOM.CoreRT.IntensityConvergence
 ```
 
+## Single-Scattering Correction
+
+```@docs
+vSmartMOM.CoreRT.AbstractSingleScatteringCorrection
+vSmartMOM.CoreRT.NoSSCorrection
+vSmartMOM.CoreRT.TMSCorrection
+vSmartMOM.CoreRT.rt_run_ss_exact
+```
+
 ## Fourier Loop Bound
 
 The azimuthal Fourier loop bound is derived per band at model build: each

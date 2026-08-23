@@ -108,6 +108,7 @@ include("tools/postprocessing_vza_ms.jl")
 include("rt_run.jl")                           # Starting point for RT
 include("rt_run_lin.jl")                       # Linearized RT run
 include("rt_run_multisensor.jl")
+include("tools/single_scattering.jl")         # Exact-SS engine: TMS correction + rt_run_ss_exact
 include("rt_run_split.jl")                     # Atmosphere/surface split: rt_run_atmosphere/_surface/_multi_surface
 include("tools/lambertian_closure.jl")         # Analytic O(1)-per-albedo Lambertian closure (surface_split_albedo_sweep.md §3)
 include("tools/scenario_sweep.jl")             # SZA × view-pair × BRDF scenario sweeps (surface_split_albedo_sweep.md §6/§7 PR 3)
@@ -157,6 +158,7 @@ include("component_m_max.jl")
 export model_from_parameters,               # Converting the parameters to model
        model_from_parameters_lin,           # Convenience alias for linearized model
        rt_run, rt_run_toa, rt_run_lin, rt_run_ss, # Run RT (forward, TOA-only, linearized, single scatter)
+       rt_run_ss_exact,                     # Exact (untruncated, real-space) first-order reference
        rt_run_streams, StreamRTResult,      # Per-Fourier-moment quadrature-stream RT (Phase H)
        rt_run_atmosphere, rt_run_surface,   # Atmosphere/surface split — cache the atmosphere,
        rt_run_multi_surface, AtmosphereRTCache, # replay/sweep the surface phase
@@ -205,6 +207,7 @@ export SolarBeam, PreparedSolarBeam, prepare_source, prepare_sources, BlackbodyS
 
 # Export types to show easily
 export AbstractFourierConvergence, AllFourierMoments, IntensityConvergence
+export AbstractSingleScatteringCorrection, NoSSCorrection, TMSCorrection
 export RadauQuad, GaussLegQuad,
        LambertianSurfaceScalar, LambertianSurfaceSpectrum,
        CanopySurface, CanopySurface_from_prospect, invalidate_canopy_cache!,

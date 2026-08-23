@@ -195,6 +195,14 @@ function rt_run(RS_type::AbstractRamanType,
         throw(ArgumentError(
             "external-solar SFI does not support interior sensor heights; " *
             "build the model with external_solar=false (the default)"))
+    # Forward/lin parity policy: the TMS correction is not implemented in
+    # the linearized driver yet, so it is rejected — never silently ignored
+    # (the forward and linearized radiances of one configured model must
+    # not diverge). See docs/dev_notes/forward_lin_parity_policy.md.
+    model.numerics.ss_correction isa TMSCorrection && throw(ArgumentError(
+        "TMSCorrection is not implemented in the linearized driver; " *
+        "use NoSSCorrection for LinMode runs (parity policy: features are " *
+        "matched or rejected, never silently divergent)"))
     prepared_sources = prepare_sources(effective_sources, FT, pol_type.n, nSpec, arr_type)
     if sources === nothing && size(F₀) == (pol_type.n, nSpec) && !iszero(F₀)
         # User pre-set F₀ honored — F₀ already in scope from RS_type unpack.

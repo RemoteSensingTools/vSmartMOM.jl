@@ -198,7 +198,8 @@ function rt_kernel!(RS_type::noRS{FT},
                     prepared_sources::AbstractSource = NoSource(),
                     dτ_max_threshold::Union{Nothing,Real} = nothing,
                     dτ_min_floor::Union{Nothing,Real} = nothing,
-                    max_τϖ::Union{Nothing,Real} = nothing) where {FT,M}
+                    max_τϖ::Union{Nothing,Real} = nothing,
+                    beam_view_mask::Union{Nothing,AbstractVector} = nothing) where {FT,M}
     #@show array_type(architecture)
 
     (; qp_μ, μ₀) = quad_points
@@ -227,6 +228,12 @@ function rt_kernel!(RS_type::noRS{FT},
                                 computed_layer_properties,
                                 m, ndoubl, scatter, quad_points,
                                 added_layer,  architecture)
+        # TMS "never generate": zero the truncated direct-beam source at the
+        # zero-weight view rows of the fresh elemental layer, BEFORE
+        # doubling and BEFORE volume-source contribute! (which fills
+        # separate per-source slots) — see single_scattering.jl. `nothing`
+        # (the default) is bit-identical to the historical solver.
+        beam_view_mask === nothing || _mask_view_node_beam!(added_layer, beam_view_mask)
         # v0.7 Phase A.2a — reset per-source slot.j₀ before contribute!.
         # The slots persist across the (m, layer) iteration; sources whose
         # `contribute!` gates out at m > 0 (e.g. ThermalEmission, isotropic

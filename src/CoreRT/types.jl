@@ -1087,6 +1087,57 @@ struct IntensityConvergence{FT<:AbstractFloat} <: AbstractFourierConvergence
 end
 
 """
+    AbstractSingleScatteringCorrection
+
+Strategy for correcting the single-scattering (first-order) part of the
+radiance for phase-function truncation. δ-M/δ-BGE truncation removes the
+aerosol forward peak from the Fourier-expanded optics — harmless for the
+multiple-scattered field but visibly wrong for the first-order term at the
+view geometries (aureole, rainbow/glory structure). Concrete strategies:
+
+- [`NoSSCorrection`](@ref) — historical behavior, bit-identical to the
+  uncorrected solver (default).
+- [`TMSCorrection`](@ref) — Nakajima & Tanaka (1988) TMS: the truncated
+  direct-beam source is zeroed at the zero-weight view nodes in every
+  Fourier mode, and the exact (untruncated) single scattering is added in
+  real space after the Fourier sum, using the solver's own δ-scaled
+  transmittances.
+
+Selected via `RTNumericalParameters.ss_correction` (YAML:
+`numerics.ss_correction: none | tms`). The hierarchy is open for future
+variants (e.g. an IMS-augmented correction, canopy hot-spot or sun-glint
+corrections) — add a subtype, never a boolean flag.
+
+Forward/linearized parity policy: a strategy must either be implemented in
+BOTH the forward and linearized drivers or be explicitly rejected by the
+one that lacks it — silent divergence between the two is a bug by
+definition (see docs/dev_notes/forward_lin_parity_policy.md).
+"""
+abstract type AbstractSingleScatteringCorrection end
+
+"""
+    NoSSCorrection()
+
+No single-scattering correction — the truncated Fourier solution is
+returned as-is. Bit-identical to the historical solver. Default.
+"""
+struct NoSSCorrection <: AbstractSingleScatteringCorrection end
+
+"""
+    TMSCorrection()
+
+Nakajima–Tanaka TMS single-scattering correction ("never generate, then
+add"): zero the truncated beam source at zero-weight view nodes in every
+Fourier mode; add the exact single scattering post-Fourier-sum from the
+untruncated phase functions, with the N–T scaling `ω/(1−ωf)` paired with
+δ-scaled optical depths (implemented as `β_scat/Δτ′`, which is
+algebraically identical and reuses the solver's own scaled `τ_sum`).
+Requires an unpolarized solar source; currently forward-elastic (`noRS`)
+only — the linearized driver and Raman paths reject it explicitly.
+"""
+struct TMSCorrection <: AbstractSingleScatteringCorrection end
+
+"""
     RTNumericalParameters{FT}
 
 Centralised home for tunable numerical knobs that were previously hardcoded
@@ -1148,6 +1199,13 @@ Base.@kwdef struct RTNumericalParameters{FT<:AbstractFloat}
     `numerics.fourier_convergence: intensity`,
     `numerics.fourier_tolerance: 1e-4`, `numerics.fourier_n_consecutive: 2`."
     fourier_convergence::AbstractFourierConvergence = AllFourierMoments()
+
+    "Single-scattering (first-order) truncation correction — see
+    [`AbstractSingleScatteringCorrection`](@ref). Default
+    [`NoSSCorrection`](@ref) (bit-identical historical behavior). Set
+    [`TMSCorrection`](@ref) for the Nakajima–Tanaka correction; YAML key
+    `numerics.ss_correction: tms`."
+    ss_correction::AbstractSingleScatteringCorrection = NoSSCorrection()
 end
 
 """
