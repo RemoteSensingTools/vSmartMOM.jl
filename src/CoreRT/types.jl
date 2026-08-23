@@ -189,6 +189,9 @@ Base.lastindex(::ObserverRTResult) = 7
 Base.getindex(r::ObserverRTResult, indices...) = getindex(_observer_legacy_tuple(r), indices...)
 Base.iterate(r::ObserverRTResult, state...) = iterate(_observer_legacy_tuple(r), state...)
 Base.Tuple(r::ObserverRTResult) = _observer_legacy_tuple(r)
+# `keys` completes the indexable-collection protocol (`eachindex`, generic
+# element-wise comparison loops over the legacy tuple positions).
+Base.keys(r::ObserverRTResult) = keys(_observer_legacy_tuple(r))
 
 """
     RT_Aerosol{FT}

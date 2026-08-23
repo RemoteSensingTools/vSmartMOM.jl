@@ -82,6 +82,7 @@ Base.getindex(r::ObserverRTResultLin, indices...) =
 Base.iterate(r::ObserverRTResultLin, state...) =
     iterate(_observer_lin_legacy_tuple(r), state...)
 Base.Tuple(r::ObserverRTResultLin) = _observer_lin_legacy_tuple(r)
+Base.keys(r::ObserverRTResultLin) = keys(_observer_lin_legacy_tuple(r))
 
 """
     CompositeLayerLin{FT} <: AbstractLayerLin
