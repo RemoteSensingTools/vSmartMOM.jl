@@ -503,9 +503,11 @@ function model_from_parameters(params::vSmartMOM_Parameters;
                         length(aerosol_optics[i_band][i_aer].greek_coefs.β)
 
                 τ_profile = getAerosolLayerOptProp(1, c_aero.profile, profile)
-                τ_aer[i_band][i_aer, 1, :] =
-                    params.scattering_params.rt_aerosols[i_aer].τ_ref *
-                    (aerosol_optics[i_band][i_aer].k / k_ref) * τ_profile
+                τ_aer[i_band][i_aer, 1, :] = vec(_aerosol_τ_slice(
+                    params.scattering_params.rt_aerosols[i_aer].τ_ref,
+                    aerosol_optics[i_band][i_aer].k, k_ref, τ_profile,
+                    FT.(params.spec_bands[i_band]),
+                    FT(1e4) / params.scattering_params.λ_ref))
                 @debug "AOD at band $i_band (single-λ): $(sum(τ_aer[i_band][i_aer,:,:])), truncation factor = $(aerosol_optics[i_band][i_aer].fᵗ)"
 
             else
@@ -546,14 +548,11 @@ function model_from_parameters(params::vSmartMOM_Parameters;
                 l_max_aer[i_aer, i_band] =
                     size(aerosol_optics[i_band][i_aer].greek_coefs.β, 1)
 
-                # Per-spectral τ_aer: (τ_ref/k_ref) * k(λ) * τ_profile'  → shape (nSpec × nLayers)
                 τ_profile = getAerosolLayerOptProp(1, c_aero.profile, profile)
-                aod_scale = _aod_spectral_scale(
-                    ν_spec, aerosol_optics[i_band][i_aer].k, k_ref,
-                    FT(1e4) / params.scattering_params.λ_ref)
-                τ_aer[i_band][i_aer, :, :] =
-                    params.scattering_params.rt_aerosols[i_aer].τ_ref .*
-                    aod_scale .* τ_profile'
+                τ_aer[i_band][i_aer, :, :] = _aerosol_τ_slice(
+                    params.scattering_params.rt_aerosols[i_aer].τ_ref,
+                    aerosol_optics[i_band][i_aer].k, k_ref, τ_profile,
+                    ν_spec, FT(1e4) / params.scattering_params.λ_ref)
                 @debug "AOD at band $i_band (multi-λ): $(sum(τ_aer[i_band][i_aer,:,:])), truncation factor = $(aerosol_optics[i_band][i_aer].fᵗ)"
             end
         end
@@ -1149,6 +1148,20 @@ function _natural_cubic_three(x, knots, values)
     return [xv <= x₁ ? segment(xv, x₀, x₁, y₀, y₁, zero(M₁), M₁) :
                        segment(xv, x₁, x₂, y₁, y₂, M₁, zero(M₁)) for xv in x]
 end
+
+"""
+    _aerosol_τ_slice(τ_ref, k, k_ref, τ_profile, ν_spec, ν_ref)
+
+The (nSpec × nLayers) aerosol optical-depth slice
+`τ_ref · aod_scale(λ) · τ_profile'`, shared by the fresh model build and the
+`update_model!`/`update_aerosol_loading!` fast paths. A single definition is
+what makes scene updates bit-exact against a freshly built model — do not
+inline this product elsewhere. `k` may be a scalar (single-λ band) or an
+nSpec vector; the spectral scale reduces to `k/k_ref` unless λ_ref falls
+inside the band (three-node natural cubic, see `_aod_spectral_scale`).
+"""
+_aerosol_τ_slice(τ_ref, k, k_ref, τ_profile, ν_spec, ν_ref) =
+    τ_ref .* _aod_spectral_scale(ν_spec, k, k_ref, ν_ref) .* τ_profile'
 
 "AOD spectral scale, with exact unity at an in-band reference wavenumber."
 function _aod_spectral_scale(ν_spec, k_spec, k_ref, ν_ref)
