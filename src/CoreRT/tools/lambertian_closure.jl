@@ -47,7 +47,11 @@ inversion, no Fourier loop.
 - `R_black :: Array{FT,3}` — TOA reflectance at `a = 0` (`(n_vza, pol_n,
   nSpec)`), i.e. `rt_run_surface(cache, LambertianSurfaceScalar(0))[1]`.
   Includes every Fourier moment (only `m=0` depends on `a`; `m>0` is
-  albedo-independent and folded in here).
+  albedo-independent and folded in here). When the cache was built with
+  [`TMSCorrection`](@ref), the surface-independent exact
+  single-scattering term is already folded in here too (via
+  `rt_run_surface`), so every albedo of the sweep carries the TMS
+  correction at no extra cost.
 - `t_up :: Array{FT,3}` — `T⁻⁻u` restricted to the view-direction rows and
   pre-weighted by the exact `m=0` azimuthal/Stokes factor that
   `postprocessing_vza!` applies (`w₀ · Diagonal([1,1,0,0][1:pol_n])`, i.e.

@@ -186,6 +186,21 @@ function rt_run_atmosphere(model;
         error("rt_run_atmosphere: callback never fired — the atmosphere phase produced no Fourier moments.")
     c = captured_ctx[]
 
+    # TMS exact single-scattering term: computed ONCE here — it is
+    # surface-independent (pure atmospheric first order), so one array
+    # serves every replayed BRDF and the Lambertian closure. Uses the same
+    # tms_correction! the monolithic solver uses (single-definition policy),
+    # fed the run's own δ-scaled τ_sum_all captured in the snapshot.
+    tms_ss = if model.numerics.ss_correction isa TMSCorrection
+        FTm = float_type(model)
+        buf = zeros(FTm, length(c.vza), c.pol_type.n, c.nSpec)
+        tms_correction!(buf, model, iBand, Array(c.τ_sum_all),
+                        Array(c.RS_type.F₀))
+        buf
+    else
+        nothing
+    end
+
     FT  = float_type(model)
     AT3 = typeof(R⁻⁺[1])
     τ_surf_arr = deepcopy(c.τ_sum_surf)
@@ -218,7 +233,7 @@ function rt_run_atmosphere(model;
         AT3[T⁺⁺...], AT3[T⁻⁻...],
         AT3[J₀⁺...], AT3[J₀⁻...],
         J0_by_src, SCI[sci_surf...],
-        τ_surf_arr, F₀_arr)
+        τ_surf_arr, F₀_arr, tms_ss)
 end
 
 # Per-source J₀ NamedTuple deepcopy helper. Each slot is a
@@ -420,6 +435,11 @@ function rt_run_surface(cache::AtmosphereRTCache{FT}, brdf;
         @timeit "SS Correction" apply_ss_correction!(R_SFI, brdf, pol_type, vza, vaz, μ₀,
                              Array(cache.τ_sum_surf), cache.m_max, nSpec)
     end
+
+    # TMS exact single scattering: surface-independent, precomputed once at
+    # cache-build time (its truncated counterpart was masked out of the
+    # snapshots) — add it to every replayed radiance.
+    cache.tms_ss === nothing || (R_SFI .+= cache.tms_ss)
 
     verbose && print_timer()
 
