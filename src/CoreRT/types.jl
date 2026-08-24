@@ -723,6 +723,13 @@ struct AtmosphereRTCache{FT, AT3, AT1, AT2, AT, PT, QT, ARCH, RS, PS, IS,
     "Device-resident surface-incident solar F₀ (`(pol_n, nSpec)`), consumed
     by `create_surface_layer!`'s `F₀=` kwarg during replay"
     surface_F₀::AT2
+    "TMS exact single-scattering term `(nvza, nStokes, nSpec)` — computed
+    once at cache-build time (it is SURFACE-INDEPENDENT: pure atmospheric
+    first order) and added to every replayed radiance and to the Lambertian
+    closure's `R_black`. `nothing` when the cache was built with
+    `NoSSCorrection` (then the truncated SS is still in the snapshots and
+    nothing extra is added — historical behavior)."
+    tms_ss::Union{Nothing, Array{FT, 3}}
 end
 
 Base.show(io::IO, c::AtmosphereRTCache{FT}) where {FT} = print(io,

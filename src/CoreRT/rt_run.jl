@@ -580,10 +580,6 @@ function _rt_run_column(RS_type::AbstractRamanType, model, iBand;
             "solver only; Raman paths must use NoSSCorrection"))
         SFI || throw(ArgumentError(
             "TMSCorrection requires the SFI path"))
-        stop_after_atmosphere && throw(ArgumentError(
-            "TMSCorrection is not yet wired into the atmosphere/surface " *
-            "split cache build (the post-sum SS addition must move to the " *
-            "replay); build the cache with NoSSCorrection"))
         _require_unpolarized_solar(RS_type.F₀, "TMSCorrection")
     end
     beam_view_mask = ssc isa TMSCorrection ?
@@ -684,6 +680,10 @@ function _rt_run_column(RS_type::AbstractRamanType, model, iBand;
                 # τ_sum_all[:, end] instead would hand rt_run_surface a CPU
                 # Vector to broadcast against device arrays on GPU models.
                 τ_sum_surf = τ_sum_end_dev,
+                # Full scaled cumulative-τ profile — rt_run_atmosphere needs
+                # it to evaluate the TMS exact-SS term without re-deriving
+                # the layer optics (single-definition policy).
+                τ_sum_all,
                 surface_F₀,
                 arr_type, arch, RS_type, prepared_sources, I_static,
                 quad_points,
@@ -827,9 +827,15 @@ function _rt_run_column(RS_type::AbstractRamanType, model, iBand;
     # beam mask applied inside rt_kernel!.
     if ssc isa TMSCorrection && SFI && !stop_after_atmosphere
         @timeit "TMS Correction" begin
+            # Accumulate into a zero buffer first, then add — the SAME
+            # summation order as the split path (which adds the cache's
+            # precomputed tms_ss buffer), so monolithic and replay stay
+            # bit-exact.
             R_host = Array(R_SFI)
-            tms_correction!(R_host, model, iBand, Array(τ_sum_all),
+            ss_buf = zeros(FT, size(R_host))
+            tms_correction!(ss_buf, model, iBand, Array(τ_sum_all),
                             Array(RS_type.F₀))
+            R_host .+= ss_buf
             copyto!(R_SFI, R_host)
         end
     end

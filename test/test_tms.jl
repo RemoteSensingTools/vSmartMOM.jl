@@ -77,10 +77,6 @@ end
     @test_throws ArgumentError rt_run(model_fwd, model_lin, 0,
                                       size(model_lin.τ̇_abs[1], 1), 1; i_band = 1)
 
-    # Atmosphere/surface split cache build.
-    model = model_from_parameters(deepcopy(params))
-    @test_throws ArgumentError rt_run_atmosphere(model)
-
     # Interior sensor heights (multisensor path bypasses the column core).
     params_ms = deepcopy(params)
     params_ms.obs_alt = [0.0, 5.0]
@@ -100,6 +96,36 @@ end
     # First order can never exceed the full multiple-scattering field over
     # a black surface.
     @test all(ss[:, 1, :] .<= R[:, 1, :])
+end
+
+@testset "TMS through the split and the Lambertian closure" begin
+    # The exact-SS term is surface-independent, computed once at cache-build
+    # time, added by rt_run_surface — and therefore folded into the
+    # closure's R_black automatically. All three routes must agree with the
+    # monolithic TMS run bit-exactly (identical mask, identical addition).
+    params = parameters_from_yaml(joinpath(_TMS_TD,
+        "test_parameters/PureRayleighParameters.yaml"))
+    params.brdf[1] = LambertianSurfaceScalar(0.2)
+    _tms_set_numerics!(params, TMSCorrection())
+    model = model_from_parameters(deepcopy(params))
+
+    ref = rt_run(model)                                   # monolithic TMS
+    cache = rt_run_atmosphere(model)
+    @test cache.tms_ss !== nothing
+    res = rt_run_surface(cache, model.surfaces[1])        # replay TMS
+    for i in eachindex(ref)
+        @test ref[i] == res[i]
+    end
+
+    clos = lambertian_closure(cache)                      # closure TMS
+    R_clos = clos(0.2)
+    @test R_clos ≈ ref[1] rtol = 1e-12
+
+    # A NoSSCorrection cache stores no term and stays historical.
+    params_off = deepcopy(params)
+    _tms_set_numerics!(params_off, NoSSCorrection())
+    cache_off = rt_run_atmosphere(model_from_parameters(params_off))
+    @test cache_off.tms_ss === nothing
 end
 
 @testset "exact engine vs full-kernel Fourier SS (aerosol)" begin
