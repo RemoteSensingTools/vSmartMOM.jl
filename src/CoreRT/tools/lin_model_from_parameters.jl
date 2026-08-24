@@ -283,10 +283,11 @@ function model_from_parameters(lin::LinMode,
                     Absorption.compute_τ_cia!(τ_cia, cia_table, profile,
                                                profile.vmr)
                     τ_abs[i_band] .+= τ_cia
-                    # NOTE: keep this a single line — Julia 1.10's parser
-                    # rejects `@views lhs .+=` split across lines
-                    # ("invalid let syntax").
-                    @views τ̇_abs_psurf[i_band][:, end] .+= τ_cia[:, end] .* binary_ratio_dot
+                    # No @views here: Julia 1.10.12's lowering rejects this
+                    # particular `@views lhs .+=` in situ ("invalid let
+                    # syntax"; fine on 1.11+). An indexed `.+=` LHS is already
+                    # in-place via dotview, so only the RHS slice needs @view.
+                    τ̇_abs_psurf[i_band][:, end] .+= @view(τ_cia[:, end]) .* binary_ratio_dot
                 end
             end
 
@@ -303,8 +304,10 @@ function model_from_parameters(lin::LinMode,
                         τ_continuum, mtckd_table, params.spec_bands[i_band],
                         profile, profile.vmr_h2o)
                     τ_abs[i_band] .+= τ_continuum
-                    @views τ̇_abs_psurf[i_band][:, end] .+=
-                        τ_continuum[:, end] .* binary_ratio_dot
+                    # Same 1.10.12 lowering quirk as the CIA block above:
+                    # indexed `.+=` is already in-place; @view the RHS only.
+                    τ̇_abs_psurf[i_band][:, end] .+=
+                        @view(τ_continuum[:, end]) .* binary_ratio_dot
                 end
             end
         end
