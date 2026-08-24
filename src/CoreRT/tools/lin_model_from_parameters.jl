@@ -283,8 +283,10 @@ function model_from_parameters(lin::LinMode,
                     Absorption.compute_τ_cia!(τ_cia, cia_table, profile,
                                                profile.vmr)
                     τ_abs[i_band] .+= τ_cia
-                    @views τ̇_abs_psurf[i_band][:, end] .+=
-                        τ_cia[:, end] .* binary_ratio_dot
+                    # NOTE: keep this a single line — Julia 1.10's parser
+                    # rejects `@views lhs .+=` split across lines
+                    # ("invalid let syntax").
+                    @views τ̇_abs_psurf[i_band][:, end] .+= τ_cia[:, end] .* binary_ratio_dot
                 end
             end
 
