@@ -2,6 +2,13 @@ name: AutomatedTests
 
 on: [push, pull_request]
 
+# One active run per ref: a superseded push cancels the in-flight matrix
+# (18 jobs) instead of queueing a duplicate — reduces runner contention,
+# which has evicted long jobs mid-run ("runner received a shutdown signal").
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
     runs-on: ${{ matrix.os }}

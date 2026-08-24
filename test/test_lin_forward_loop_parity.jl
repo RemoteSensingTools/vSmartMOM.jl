@@ -27,6 +27,18 @@ const _PARAMS_DIR = joinpath(@__DIR__, "test_parameters")
 _yaml_paths() = filter(p -> endswith(p, ".yaml"), readdir(_PARAMS_DIR; join = true))
 
 @testset "Phase B — forward/lin m_max_bands parity" begin
+    # aarch64 macOS CI runners overflow the default task stack deep inside
+    # the HITRAN line-by-line absorption build for the Raman configs
+    # (x86-64 survives — the recursion depth sits near the limit). Run each
+    # model build on a 64 MiB task stack; behaviorally identical elsewhere.
+    # Root-causing the deep recursion in the ARM absorption path is tracked
+    # as a follow-up.
+    function _build_big_stack(f)
+        t = Task(f, 64 << 20)
+        schedule(t)
+        return fetch(t)
+    end
+
     n_compared = 0
     for path in _yaml_paths()
         cfg = basename(path)
@@ -39,15 +51,15 @@ _yaml_paths() = filter(p -> endswith(p, ".yaml"), readdir(_PARAMS_DIR; join = tr
         end
 
         fwd = try
-            model_from_parameters(params)
+            _build_big_stack(() -> model_from_parameters(params))
         catch err
             @error "CI config failed to build forward — fix it, or move it to test/local/test_parameters/ if it needs local data/LUTs" config=cfg exception=(err, catch_backtrace())
             @test false
             continue
         end
 
-        # lin-build failures are real bugs — not wrapped.
-        lin_model, _ = model_from_parameters(LinMode(), params)
+        # lin-build failures are real bugs — not wrapped in @test-false.
+        lin_model, _ = _build_big_stack(() -> model_from_parameters(LinMode(), params))
 
         fwd_m = CoreRT.m_max_bands(fwd)
         lin_m = CoreRT.m_max_bands(lin_model)
