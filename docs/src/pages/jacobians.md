@@ -50,6 +50,93 @@ An endpoint field and its Jacobian are `nothing` when that endpoint was not
 selected by `obs_alt`. Historical four-value destructuring remains available,
 as shown above.
 
+## Retrieval-Selected Jacobians
+
+Use a retrieval flavour when the inverse problem needs only a subset of the
+physical derivatives. The flavour is compiled into a generic `JacobianPlan`;
+the elemental, doubling, and interaction kernels see only its compact
+band-local tangent dimension.
+
+```julia
+model, lin_model = model_from_parameters(OCO_RRS_synth(), params)
+
+# Application code supplies SolarBeam + SurfaceSIF in band 1 and SolarBeam
+# alone in bands 2 and 3.
+result = rt_run_lin(model, lin_model;
+                    i_band=1,
+                    sources=sources_for_band(params, 1))
+
+local_names = parameter_names(result.layout)
+K_global = globalize_jacobian(result.toa_jacobian, result.layout)
+global_names = parameter_names(lin_model.plan)
+```
+
+`OCO_RRS_synth` defines one 30-column active retrieval state for the current
+16-layer experiment. Its band-local dimensions are:
+
+| Band | Active columns | Contents |
+|:--|--:|:--|
+| O2 A | 12 | pressure, 3×(native aerosol `tau_ref`/`z0`), 3 surface coefficients, 2 SIF coefficients |
+| weak CO2 | 22 | pressure, 12 active CO2 layers, 3×(native aerosol `tau_ref`/`z0`), 3 surface coefficients |
+| strong CO2 | 22 | same structure as weak CO2 |
+
+The exact global order is:
+
+| Columns | Meaning |
+|:--|:--|
+| 1 | surface pressure |
+| 2:13 | CO2 VMR in active layers 5:16 |
+| 14:16 | native `tau_ref` for sulfate, organic carbon, and UTLS sulfate |
+| 17:19 | physical `z0` for those three aerosol profiles |
+| 20:22 | O2 A-band surface `P0:P2` |
+| 23:25 | weak-CO2 surface `P0:P2` |
+| 26:28 | strong-CO2 surface `P0:P2` |
+| 29:30 | `SIF760,mSIF` |
+
+Band-local atmospheric columns stay in kernel/native order: pressure,
+`(tau_ref,z0)` for each aerosol, then the active CO2 layers. Surface and SIF
+blocks follow. Consequently the O2 A local layout is
+`pressure + 6 aerosol + 3 surface + 2 SIF`, whereas each CO2 layout is
+`pressure + 6 aerosol + 12 CO2 + 3 surface`. The key-based
+`local_to_global` map performs the cross-band reordering.
+
+The four CO2 layers above 10 km have zero prior variance in this experiment,
+so they remain part of the forward absorption but have no tangent columns.
+H2O, aerosol refractive index, size distribution, and profile width likewise
+remain fixed forward-model inputs. Because aerosol microphysics is inactive,
+the flavour also skips the linearized Mie calculation and constructs only the
+forward aerosol phase functions.
+
+This is not a mask applied to the returned array. Selection is split into
+component-local aerosol/gas indices while building the Fourier-invariant
+optical cache. Inactive columns therefore never enter the combined
+`CoreScatteringOpticalPropertiesLin` phase tensor or the large 4-D tangent
+operators. If no aerosol Mie parameter is selected, only the forward phase
+blocks are computed. `globalize_jacobian` then scatters a band-local result
+into the shared 30-column order, filling parameters inactive in that band with
+exact zeros.
+
+New retrievals extend
+`jacobian_plan(::MyRetrievalFlavor, params, model, lin_model)` and optionally
+the two upstream-work traits
+`requires_aerosol_microphysics_jacobians` and `requires_h2o_jacobians`. The RT
+kernels require no retrieval-specific methods.
+
+The returned aerosol columns remain derivatives with respect to vSmartMOM's
+native physical `tau_ref` and profile location. Transformations such as
+`dF/dln(q) = q*dF/dq`, and conversion between reference-AOD conventions,
+belong in the retrieval-state mapping rather than in the RT kernels.
+
+For fixed aerosol microphysics, if `AOD760 = s760*tau_ref`, then
+`dF/dAOD760 = (dF/dtau_ref)/s760` and
+`dF/dlog(AOD760) = tau_ref*dF/dtau_ref`. Likewise,
+`dF/dlog(z0) = z0*dF/dz0`. CO2 Jacobians are per unit VMR; multiply by
+`1e-6` for a ppm state coordinate.
+
+The complete implementation contract, mappings, units, limitations, and
+finite-difference record are in
+[`docs/dev_notes/selective_jacobian_plans.md`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/docs/dev_notes/selective_jacobian_plans.md).
+
 ## Interior-Height Jacobians
 
 Strict-interior observer heights are supported by the analytic elastic

@@ -98,6 +98,31 @@ rt_run_lin(model, lin_model,
            sources::Union{Nothing,AbstractSource} = nothing) =
     rt_run(model, lin_model, NAer, NGas, NSurf; i_band, sources)
 
+"""
+    rt_run(model, lin_model::PlannedRTModelLin; i_band=1, sources=nothing)
+
+Run a retrieval-selected linearized calculation. The selected band layout is
+compiled by the retrieval flavour and its compact tangent dimension is used
+throughout the MOM kernels. Use [`globalize_jacobian`](@ref) to scatter the
+returned band-local Jacobian into the shared retrieval state.
+"""
+function rt_run(model, lin_model::PlannedRTModelLin;
+                i_band::Integer=1,
+                sources::Union{Nothing,AbstractSource}=nothing)
+    layout = band_layout(lin_model.plan, i_band)
+    NAer = CoreRT.n_aerosols(model)
+    NGas = size(lin_model.base.τ̇_abs[i_band], 1)
+    NSurf = surface_parameter_count(get_surface(model, i_band))
+    return rt_run(InelasticScattering.noRS{float_type(model)}(),
+                  model, lin_model.base, NAer, NGas, NSurf, i_band;
+                  sources, active_layout=layout)
+end
+
+rt_run_lin(model, lin_model::PlannedRTModelLin;
+           i_band::Integer=1,
+           sources::Union{Nothing,AbstractSource}=nothing) =
+    rt_run(model, lin_model; i_band, sources)
+
 # Just to make sure we still have it:
 function rt_run_test(RS_type::AbstractRamanType,
         model,
@@ -115,7 +140,8 @@ function rt_run(RS_type::AbstractRamanType,
                     lin_model,
                     NAer::Int, NGas::Int, NSurf::Int,
                     iBand;
-                    sources::Union{Nothing, AbstractSource} = nothing)
+                    sources::Union{Nothing, AbstractSource} = nothing,
+                    active_layout::Union{Nothing,ActiveParameterLayout} = nothing)
     if InelasticScattering.has_inelastic(RS_type)
         throw(ArgumentError(
             "Linearized Raman-active RT is intentionally unsupported. " *
@@ -175,8 +201,18 @@ function rt_run(RS_type::AbstractRamanType,
     effective_sources = sources === nothing ? model.sources : sources
     validate_sif_solar_spectrum(effective_sources)
     NSIF = surface_sif_parameter_count(effective_sources)
-    layout = ParameterLayout(aerosol_params=7, n_aerosols=NAer,
-                              n_gases=NGas, n_surface=NSurf, n_sif=NSIF)
+    layout = active_layout === nothing ?
+        ParameterLayout(aerosol_params=7, n_aerosols=NAer,
+                        n_gases=NGas, n_surface=NSurf, n_sif=NSIF) :
+        active_layout
+    if active_layout !== nothing
+        length(surface_range(layout)) == expected_nsurf || throw(ArgumentError(
+            "active layout has $(length(surface_range(layout))) surface columns; " *
+            "$expected_nsurf are required by $(typeof(brdf))"))
+        length(sif_range(layout)) == NSIF || throw(ArgumentError(
+            "active layout has $(length(sif_range(layout))) SIF columns but " *
+            "the selected sources expose $NSIF"))
+    end
     Nparams = n_total(layout)
     if !isempty(model.obs_geom.sensor_levels)
         _multisensor_source_supported(effective_sources) || throw(ArgumentError(
@@ -254,7 +290,8 @@ function rt_run(RS_type::AbstractRamanType,
     # on Fourier order. Build them once; each moment attaches only Z(m), Ż(m),
     # Z₀(m), and Ż₀(m) before the analytic RT propagation.
     @timeit "OpticalProps invariant" m_invariant_cache =
-        build_m_invariant_cache_lin(iBand, model, lin_model)
+        build_m_invariant_cache_lin(iBand, model, lin_model;
+                                    active_layout)
 
     # Loop over fourier moments
     for m = 0:m_max
@@ -268,6 +305,13 @@ function rt_run(RS_type::AbstractRamanType,
         @timeit "OpticalProps" layer_opt_props, layer_opt_props_lin, fScattRayleigh   = 
             constructCoreOpticalProperties(RS_type, iBand, m, model, lin_model,
                                            m_invariant_cache);
+        if active_layout !== nothing
+            actual = size(layer_opt_props_lin[1].τ̇, 2)
+            expected = n_layer_params(active_layout)
+            actual == expected || throw(DimensionMismatch(
+                "selective optical-property assembly returned $actual layer " *
+                "columns; the active layout requires $expected"))
+        end
             # Determine the scattering interface definitions:
         scattering_interfaces_all, τ_sum_all, τ̇_sum_all = 
             extractEffectiveProps(layer_opt_props, layer_opt_props_lin);

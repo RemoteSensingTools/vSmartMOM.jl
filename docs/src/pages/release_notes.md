@@ -7,6 +7,33 @@
 This page summarizes the user-visible changes in the 2.0 line. It is written as
 a migration guide, not as a complete git history.
 
+## Unreleased — retrieval-selected analytic Jacobians
+
+Retrievals can now define a zero-field subtype of `AbstractJacobianFlavor`
+and compile named, band-local derivative layouts through `JacobianPlan`.
+Calling `model_from_parameters(flavor, params)` returns a
+`PlannedRTModelLin`; `rt_run_lin` then allocates and propagates only the
+selected physical columns. `globalize_jacobian` scatters each band result into
+the plan's common cross-band order and fills inactive parameters with exact
+zeros.
+
+Selection occurs during the Fourier-invariant aerosol/gas cache build, before
+combined phase tangents and MOM operator workspaces are allocated. Retrieval
+traits may also suppress q-H2O and aerosol-microphysics tangent generation
+while retaining their complete forward absorption/scattering physics.
+
+`OCO_RRS_synth` is the first built-in flavor. For the current 16-layer
+three-band experiment it propagates 12 columns in O2 A and 22 in each CO2
+band, mapping them into a shared 30-column physical basis. The four CO2 layers
+above 10 km, H2O, aerosol microphysics, and aerosol profile widths are fixed.
+Native `tau_ref`/`z0` derivatives are deliberately not mislabeled as
+`log(AOD760)`/`log(z0)` derivatives; those reference-wavelength, unit, and
+log-coordinate chain rules remain explicit at the retrieval boundary.
+
+Every selected parameter family is regression-tested against two-sided finite
+differences, in addition to exact comparison with corresponding full native
+Jacobian columns. See [Compute Jacobians](jacobians.md) for usage.
+
 ## Unreleased — observer height selection and multi-level radiances
 
 `geometry.obs_alt` is now a geometric height selection in **km above BOA**,

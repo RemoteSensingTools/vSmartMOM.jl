@@ -50,6 +50,10 @@ Marker selecting the linearized model construction path used for Jacobians.
 """
 struct LinMode <: RT_Mode end
 export FwdMode, LinMode
+export AbstractJacobianFlavor, OCO_RRS_synth, JacobianPlan,
+       ActiveParameterLayout, ParameterKey, jacobian_plan, band_layout,
+       parameter_names, local_to_global, n_global, globalize_jacobian,
+       requires_aerosol_microphysics_jacobians, requires_h2o_jacobians
 
 export HenyeyGreensteinPhaseFunction,
        SyntheticPolarizedHenyeyGreensteinPhaseFunction,

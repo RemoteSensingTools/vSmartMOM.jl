@@ -54,6 +54,21 @@ end
 The aliases `OpticalPropertyJacobian = CoreScatteringOpticalPropertiesLin`
 make this the explicit AD-boundary handoff struct.
 
+Retrieval-specific Jacobian plans may project this handoff onto a compact
+active parameter basis before it enters the RT kernels. A plan stores named
+physical parameter keys, one local-to-global map per spectral band, and the
+native optical-property columns needed by that band. The downstream analytic
+formulas are unchanged; only the trailing tangent dimension becomes smaller.
+See [Compute Jacobians → Retrieval-Selected Jacobians](../jacobians.md#retrieval-selected-jacobians).
+
+Selection is performed during the moment-invariant aerosol/gas cache build,
+not after a full mixed tangent has been formed. Each native column is first
+assigned to pressure, a component-local aerosol block, or the gas block.
+Only those compact blocks are mixed into the Fourier-dependent phase
+derivative, and every subsequent elemental/doubling/interaction allocation
+uses the band-local count. Fixed forward physics is retained even when its
+tangent is omitted.
+
 **Downstream — the pure-`FT` zone** (elemental, doubling, interaction).
 Here every kernel is plain `Float32` or `Float64` and every derivative is
 computed by a hand-coded tangent-linear partner of the forward kernel.

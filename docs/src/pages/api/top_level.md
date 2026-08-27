@@ -20,6 +20,7 @@ vSmartMOM.default_parameters
 ```@docs
 vSmartMOM.model_from_parameters
 vSmartMOM.rt_run
+vSmartMOM.rt_run_toa
 ```
 
 ## Batch Scene Processing

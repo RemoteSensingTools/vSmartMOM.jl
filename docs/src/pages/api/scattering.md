@@ -24,6 +24,8 @@ vSmartMOM.Scattering.AerosolOptics
 ```@docs
 vSmartMOM.Scattering.NAI2
 vSmartMOM.Scattering.PCW
+vSmartMOM.Scattering.compute_Z_moments
+vSmartMOM.Scattering.compute_Z_source_moments
 ```
 
 ## Phase-function Truncation
