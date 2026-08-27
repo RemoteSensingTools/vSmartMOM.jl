@@ -83,12 +83,39 @@ vSmartMOM.CoreRT.rt_run_streams(::Any)
 ## Jacobian Parameter Layout
 
 ```@docs
+vSmartMOM.CoreRT.AbstractParameterLayout
 vSmartMOM.CoreRT.ParameterLayout
+vSmartMOM.CoreRT.ParameterKey
+vSmartMOM.CoreRT.ActiveParameterLayout
 vSmartMOM.CoreRT.n_total
 vSmartMOM.CoreRT.aerosol_range
 vSmartMOM.CoreRT.gas_range
+vSmartMOM.CoreRT.gas_profile_range
+vSmartMOM.CoreRT.gas_layer_index
+vSmartMOM.CoreRT.atmosphere_range
 vSmartMOM.CoreRT.surface_range
 vSmartMOM.CoreRT.surface_index
+vSmartMOM.CoreRT.sif_range
 vSmartMOM.CoreRT.n_layer_params
 vSmartMOM.CoreRT.canopy_range
+vSmartMOM.CoreRT.surface_parameter_count
+```
+
+## Retrieval-Selected Jacobian Plans
+
+The policy types below compile a retrieval definition into a small band-local
+tangent space before the layer optical properties and MOM operators are
+allocated. See [Compute Jacobians](../jacobians.md#Retrieval-Selected-Jacobians)
+for the `OCO_RRS_synth` state ordering, units, and chain rules.
+
+```@docs
+vSmartMOM.CoreRT.AbstractJacobianFlavor
+vSmartMOM.CoreRT.OCO_RRS_synth
+vSmartMOM.CoreRT.JacobianPlan
+vSmartMOM.CoreRT.PlannedRTModelLin
+vSmartMOM.CoreRT.jacobian_plan
+vSmartMOM.CoreRT.requires_aerosol_microphysics_jacobians
+vSmartMOM.CoreRT.requires_h2o_jacobians
+vSmartMOM.CoreRT.globalize_jacobian
+vSmartMOM.sif_reference_state
 ```
