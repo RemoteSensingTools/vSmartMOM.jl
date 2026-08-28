@@ -1022,7 +1022,18 @@ function _interpolate_phase_nodes(ν_spec, ν_nodes, values)
     else
         [_natural_cubic_three((ν,), x, y)[1] for ν in ν_spec]
     end
-    return cat(samples...; dims=ndims(first(y)) + 1)
+    # Write columns into a preallocated dense array instead of
+    # `cat(samples...; dims=...)`: splatting 12301 arrays into one cat call is
+    # quadratic-ish in dispatch and shape recursion (and routes through
+    # SparseArrays' _cat), and profiled as ~80% of an entire model build —
+    # the dominant term of the 19x post-merge build regression. The per-point
+    # sample values above are untouched, so results are bit-identical.
+    proto = first(samples)
+    out = Array{eltype(proto)}(undef, size(proto)..., length(samples))
+    for (i, sample) in enumerate(samples)
+        selectdim(out, ndims(out), i) .= sample
+    end
+    return out
 end
 
 function _pad_moment(v::AbstractVector, n::Int)
