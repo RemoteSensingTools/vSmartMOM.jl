@@ -351,7 +351,11 @@ function model_from_parameters(params::vSmartMOM_Parameters;
                     vmr = 0)
                 @timeit "Absorption Coeff" compute_absorption_profile!(τ_abs[i_band], absorption_model, params.spec_bands[i_band], profile.vmr[mol_name], profile)
             else
-                compute_absorption_profile!(τ_abs[i_band], ap.luts[i_band][molec_i], params.spec_bands[i_band], profile.vmr[mol_name], profile)
+                # TIMED: this branch used to be the only unmeasured stage in the
+                # model build, which is how a 19x regression in it went unnoticed
+                # (a verbose run reported "Tot / % measured: 11.3%", with the whole
+                # LUT absorption cost sitting in the unmeasured remainder).
+                @timeit "Absorption Coeff LUT" compute_absorption_profile!(τ_abs[i_band], ap.luts[i_band][molec_i], params.spec_bands[i_band], profile.vmr[mol_name], profile)
             end
         end
 
@@ -796,7 +800,11 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
                     vmr = 0)
                 @timeit "Absorption Coeff" compute_absorption_profile!(τ_abs[i_band], absorption_model, params.spec_bands[i_band], profile.vmr[mol_name], profile)
             else
-                compute_absorption_profile!(τ_abs[i_band], ap.luts[i_band][molec_i], params.spec_bands[i_band], profile.vmr[mol_name], profile)
+                # TIMED: this branch used to be the only unmeasured stage in the
+                # model build, which is how a 19x regression in it went unnoticed
+                # (a verbose run reported "Tot / % measured: 11.3%", with the whole
+                # LUT absorption cost sitting in the unmeasured remainder).
+                @timeit "Absorption Coeff LUT" compute_absorption_profile!(τ_abs[i_band], ap.luts[i_band][molec_i], params.spec_bands[i_band], profile.vmr[mol_name], profile)
             end
         end
 
