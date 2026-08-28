@@ -732,12 +732,37 @@ function compute_absorption_profile!(τ_abs::Array{FT,2},
                                      profile::AtmosphericProfile,
                                      ;
                                      self_broadener_vmr=nothing,
+                                     batched::Bool=true,
                                      ) where FT 
 
     # The array to store the cross-sections must be same length as number of layers
     @assert size(τ_abs,2) == length(profile.p_full)
     @assert length(vmr) ==1 || length(vmr) == length(profile.p_full)  "Length of VMR array has to match profile size or be uniform"
-    #@show grid
+
+    # BATCHED fast path for the tabulated models: the whole profile in ONE
+    # kernel via `compute_cross_section_profile`, instead of a host loop whose
+    # per-layer query cost ~7 broadcast launches, a grid upload, a full device
+    # synchronize and a device->host copy — ~10 launches and 3 sync/transfer
+    # points per layer, x72 layers x2 builds per cell-band-window. Per-element
+    # arithmetic (bracket/clamp semantics, blend order, zero outside the nu
+    # range, and the vcd*vmr weighting below) is IDENTICAL to the loop, so CPU
+    # results are bit-exact; see AtmosphericAbsorption/test_profile_batch.jl.
+    # The point axis is flat, so this same call can batch MANY cells' layers
+    # at once when a caller concatenates them.
+    if batched && _supports_batched_profile(absorption_model)
+        n = length(profile.p_full)
+        broadeners = _batched_broadener(absorption_model, profile,
+                                        self_broadener_vmr, n)
+        σmat = Array(AtmosphericAbsorption.compute_cross_section_profile(
+            absorption_model, grid, profile.p_full, profile.T;
+            vmr = broadeners, interp = :linear))
+        @inbounds for iz in 1:n
+            vmr_curr = vmr isa AbstractArray ? vmr[iz] : vmr
+            @views τ_abs[:, iz] .+= σmat[:, iz] .* (profile.vcd_dry[iz] * vmr_curr)
+        end
+        return
+    end
+
     @showprogress 1 for iz in eachindex(profile.p_full)
 
         # Pa -> hPa
@@ -757,6 +782,29 @@ function compute_absorption_profile!(τ_abs::Array{FT,2},
         @views τ_abs[:,iz] .+= σ .* (profile.vcd_dry[iz] * vmr_curr)
     end
     
+end
+
+# The batched path exists for the tabulated models when the installed
+# AtmosphericAbsorption ships `compute_cross_section_profile` (>= the 2026-08
+# profile-batch addition); anything else keeps the per-layer loop. LBL models
+# stay on the loop deliberately: their per-layer state (self-broadening) is
+# already a single fused kernel per layer.
+_supports_batched_profile(model) =
+    isdefined(AtmosphericAbsorption, :compute_cross_section_profile) &&
+    (model isa AtmosphericAbsorption.AbscoLUT ||
+     model isa AtmosphericAbsorption.InterpolationModel)
+
+# Per-layer broadener vector for the batched call, mirroring the loop exactly:
+# an explicit kwarg wins (vector used as-is, scalar broadcast); otherwise
+# ABSCO draws the profile's own H2O and everything else passes nothing (an
+# InterpolationModel tabulates a fixed vmr, and its scalar path ignores any
+# broadener — dispatch `_layer_absorption_cross_section(model, _, _, _, ::Real)`
+# falls through to the broadener-free query).
+function _batched_broadener(model, profile, self_broadener_vmr, n)
+    model isa AtmosphericAbsorption.InterpolationModel && return nothing
+    self_broadener_vmr isa AbstractArray && return self_broadener_vmr
+    self_broadener_vmr !== nothing && return fill(self_broadener_vmr, n)
+    return profile.vmr_h2o
 end
 
 """
