@@ -68,7 +68,10 @@ function _exact_phase_columns(greek::Scattering.GreekCoefs,
     node_cols = [Scattering.phase_matrix_first_column(g, μ₀, μv, Δϕ, Val(n))
                  for g in phase_greek]
     for (is, ν) in enumerate(ν_spec)
-        hi = something(findfirst(x -> x >= ν, phase_ν), length(phase_ν))
+        # searchsortedfirst == findfirst(>=(ν)) on a sorted axis, without
+        # allocating a closure per spectral point (this ran nSpec x nviews x
+        # n_aer times).
+        hi = min(searchsortedfirst(phase_ν, ν), length(phase_ν))
         hi = max(hi, 2)
         lo = hi - 1
         t = clamp((ν - phase_ν[lo]) / (phase_ν[hi] - phase_ν[lo]),
@@ -121,6 +124,27 @@ function _exact_ss_accumulate!(ΔI::AbstractArray{FT,3}, model, iBand,
     n_aer  = size(τ_aer, 1)
     aer_optics = model.optics.aerosols.aerosol_optics[iB]
 
+    nS_rayl = size(τ_rayl, 1)
+    nS_aer  = size(τ_aer, 2)
+
+    # SPARSITY. In the layer-resolved aerosol injection every active LAYER is
+    # registered as its own aerosol "mode", so `τ_aer` is diagonal in
+    # (mode, layer): mode ia is non-zero in exactly one iz. Walking the full
+    # (iz, s, ia) cross-product therefore spends ~98.6% of its iterations
+    # multiplying a structural zero — at C90/OCO scale that is 319 M inner
+    # iterations where 4.4 M suffice. The pattern depends only on τ_aer, not on
+    # geometry, so it is built once here and reused for every view.
+    aer_active = falses(n_aer, nZ)
+    @inbounds for iz in 1:nZ, ia in 1:n_aer
+        for s in 1:nS_aer
+            if !iszero(τ_aer[ia, s, iz])
+                aer_active[ia, iz] = true
+                break
+            end
+        end
+    end
+    scale_s = Vector{FT}(undef, nSpec)
+
     for iv in eachindex(vza)
         view_selected !== nothing && !view_selected[iv] && continue
         μv = FT(cosd(vza[iv]))
@@ -141,25 +165,47 @@ function _exact_ss_accumulate!(ΔI::AbstractArray{FT,3}, model, iBand,
                                                 μ₀, μv, Δϕ, ν_spec, pol_n)
         end
 
-        for iz in 1:nZ, s in 1:nSpec
-            Δτ = FT(Δτ_layer[s, iz])
-            Δτ <= zero(FT) && continue
-            pf = _ss_path_factor(FT(τ_above[s, iz]), Δτ, μv, μ₀)
-            # β-weighted exact source, unnormalized: Σ β_s · Zcol_s
-            # (β_rayleigh = τ_rayl since ω_ray = 1; β_aer = ω̃·τ_aer unscaled).
-            scale = F₀_I[s] * pf / (Δτ * FT(4π))
-            βr = FT(τ_rayl[min(s, size(τ_rayl, 1)), iz])
-            for j in 1:pol_n
-                ΔI[iv, j, s] += scale * βr * ray_col[j, s]
+        @inbounds for iz in 1:nZ
+            # Per-(iz, s) geometry factor, computed ONCE and shared by the
+            # Rayleigh and aerosol passes below (it used to be recomputed
+            # inside a fused (iz, s) loop).
+            for s in 1:nSpec
+                Δτ = FT(Δτ_layer[s, iz])
+                if Δτ <= zero(FT)
+                    scale_s[s] = zero(FT)
+                else
+                    pf = _ss_path_factor(FT(τ_above[s, iz]), Δτ, μv, μ₀)
+                    scale_s[s] = F₀_I[s] * pf / (Δτ * FT(4π))
+                end
             end
-            for ia in 1:n_aer
-                ω̃ = aer_optics[ia].ω̃
-                ω̃s = ω̃ isa AbstractArray ? FT(ω̃[s]) : FT(ω̃)
-                β = ω̃s * FT(τ_aer[ia, min(s, size(τ_aer, 2)), iz])
-                iszero(β) && continue
-                col = aer_cols[ia]
+
+            # β_rayleigh = τ_rayl (ω_ray ≡ 1).
+            for s in 1:nSpec
+                sc = scale_s[s]
+                iszero(sc) && continue
+                βr = FT(τ_rayl[min(s, nS_rayl), iz])
                 for j in 1:pol_n
-                    ΔI[iv, j, s] += scale * β * col[j, s]
+                    ΔI[iv, j, s] += sc * βr * ray_col[j, s]
+                end
+            end
+
+            # β_aer = ω̃·τ_aer (unscaled), only for scatterers that actually
+            # live in this layer — see `aer_active` above.
+            for ia in 1:n_aer
+                aer_active[ia, iz] || continue
+                ω̃ = aer_optics[ia].ω̃
+                ω̃_arr = ω̃ isa AbstractArray        # hoisted: was tested per (s, iz)
+                ω̃_const = ω̃_arr ? zero(FT) : FT(ω̃)
+                col = aer_cols[ia]
+                for s in 1:nSpec
+                    sc = scale_s[s]
+                    iszero(sc) && continue
+                    ω̃s = ω̃_arr ? FT(ω̃[s]) : ω̃_const
+                    β = ω̃s * FT(τ_aer[ia, min(s, nS_aer), iz])
+                    iszero(β) && continue
+                    for j in 1:pol_n
+                        ΔI[iv, j, s] += sc * β * col[j, s]
+                    end
                 end
             end
         end
