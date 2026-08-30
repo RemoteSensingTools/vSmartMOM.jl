@@ -28,6 +28,29 @@ function set_uniform_lmax!(lmax::Vector{Int}, aerosol_optics, lin_aerosol_optics
     end
 end
 
+@inline function _zero_lin_greek(greek, ::Type{FT}) where {FT<:AbstractFloat}
+    make_zero(field) = zeros(FT, 4, size(getfield(greek, field))...)
+    return linGreekCoefs(make_zero(:α), make_zero(:β), make_zero(:γ),
+                         make_zero(:δ), make_zero(:ϵ), make_zero(:ζ))
+end
+
+@inline function _zero_microphysics_field(value, ::Type{FT}) where {FT<:AbstractFloat}
+    return value isa Number ? zeros(FT, 4) : zeros(FT, 4, size(value)...)
+end
+
+"Create structurally valid zero Mie tangents when microphysics is fixed."
+function _zero_aerosol_microphysics_jacobian(aerosol, ::Type{FT}) where {FT<:AbstractFloat}
+    phase_lin = aerosol.phase_greek === nothing ? nothing :
+        [_zero_lin_greek(greek, FT) for greek in aerosol.phase_greek]
+    return linAerosolOptics(
+        lin_greek_coefs=_zero_lin_greek(aerosol.greek_coefs, FT),
+        ω̃̇=_zero_microphysics_field(aerosol.ω̃, FT),
+        k̇=_zero_microphysics_field(aerosol.k, FT),
+        ḟᵗ=_zero_microphysics_field(aerosol.fᵗ, FT),
+        phase_ν=aerosol.phase_ν === nothing ? nothing : FT.(aerosol.phase_ν),
+        phase_lin_greek=phase_lin)
+end
+
 """
     model_from_parameters(::LinMode, params::vSmartMOM_Parameters)
 
@@ -60,11 +83,18 @@ This is the **linearized** counterpart of `model_from_parameters(params)`. It co
 - Aerosol Mie calculations use `ForwardDiff.Dual` numbers to simultaneously obtain
   derivatives of the extinction cross-section, single-scattering albedo, truncation
   factor, and greek coefficients with respect to `[nᵣ, nᵢ, rₘ, σᵣ]`.
+- Set `compute_aerosol_microphysics_jacobians=false` when all four Mie
+  parameters are fixed. The forward aerosol optics are retained and
+  structurally valid zero tangents are supplied to the downstream mixer.
+- Set `compute_h2o_jacobians=false` when the q-driven H2O profile is fixed.
+  Its forward absorption is retained without generating H2O tangent entries.
 """
 function model_from_parameters(lin::LinMode,
     params::vSmartMOM_Parameters;
     sources::AbstractSource = SolarBeam(),
-    external_solar::Bool = false)
+    external_solar::Bool = false,
+    compute_aerosol_microphysics_jacobians::Bool = true,
+    compute_h2o_jacobians::Bool = true)
     FT = params.float_type
     n_bands = length(params.spec_bands)
     n_aer = isnothing(params.scattering_params) ? 0 : length(params.scattering_params.rt_aerosols)
@@ -162,13 +192,15 @@ function model_from_parameters(lin::LinMode,
         if !isnothing(params.q) && any(!iszero, params.q)
             jac_idx = 1
             if !isnothing(abs_params) && !isempty(abs_params.h2o_lut) && abs_params.h2o_lut[i_band] !== nothing
-                @timeit "Absorption Coeff H2O"  compute_h2o_absorption_profile!(
-                    τ_abs[i_band],
-                    τ̇_abs[i_band],
-                    jac_idx,
-                    abs_params.h2o_lut[i_band],
-                    params.spec_bands[i_band],
-                    profile)
+                if compute_h2o_jacobians
+                    @timeit "Absorption Coeff H2O" compute_h2o_absorption_profile!(
+                        τ_abs[i_band], τ̇_abs[i_band], jac_idx,
+                        abs_params.h2o_lut[i_band], params.spec_bands[i_band], profile)
+                else
+                    @timeit "Absorption Coeff H2O" compute_h2o_absorption_profile!(
+                        τ_abs[i_band], abs_params.h2o_lut[i_band],
+                        params.spec_bands[i_band], profile)
+                end
             else
                 @timeit "Read HITRAN" lines_h2o = AtmosphericAbsorption.load_lines(AtmosphericAbsorption.HitranPort(artifact("H2O")); FT)
                 @debug "Computing profile for water vapor (q-driven) in band #$(i_band)"
@@ -181,13 +213,15 @@ function model_from_parameters(lin::LinMode,
                     cpf = cef,
                     architecture = _to_aa_arch(params.architecture),
                     vmr = 0)
-                @timeit "Absorption Coeff H2O"  compute_h2o_absorption_profile!(
-                    τ_abs[i_band],
-                    τ̇_abs[i_band],
-                    jac_idx,
-                    absorption_model,
-                    params.spec_bands[i_band],
-                    profile)
+                if compute_h2o_jacobians
+                    @timeit "Absorption Coeff H2O" compute_h2o_absorption_profile!(
+                        τ_abs[i_band], τ̇_abs[i_band], jac_idx,
+                        absorption_model, params.spec_bands[i_band], profile)
+                else
+                    @timeit "Absorption Coeff H2O" compute_h2o_absorption_profile!(
+                        τ_abs[i_band], absorption_model,
+                        params.spec_bands[i_band], profile)
+                end
             end
         end
 
@@ -346,7 +380,23 @@ function model_from_parameters(lin::LinMode,
         # the linearized forward/Jacobian normalization uses the aerosol index here while
         # the non-linear forward uses n_ref — a small inconsistency for that niche config.
         mie_model_ref_lin = _mie(scat.λ_ref)
-        k_ref, k̇_ref   = compute_ref_aerosol_extinction(lin, mie_model_ref_lin, params.float_type)
+        if compute_aerosol_microphysics_jacobians
+            k_ref, k̇_ref = compute_ref_aerosol_extinction(
+                lin, mie_model_ref_lin, params.float_type)
+        else
+            k_ref = compute_ref_aerosol_extinction(
+                mie_model_ref_lin, params.float_type)
+            k̇_ref = zeros(FT2, 4)
+        end
+
+        function aerosol_pair(λ)
+            mie_model = _mie(λ)
+            if compute_aerosol_microphysics_jacobians
+                return compute_aerosol_optical_properties(lin, mie_model, FT2)
+            end
+            aerosol = compute_aerosol_optical_properties(mie_model)
+            return aerosol, _zero_aerosol_microphysics_jacobian(aerosol, FT2)
+        end
 
         for i_band=1:n_bands
 
@@ -354,9 +404,8 @@ function model_from_parameters(lin::LinMode,
             already_truncated = false
 
             if length(curr_band_λ)==1
-                mie_model = _mie((maximum(curr_band_λ)+minimum(curr_band_λ))/2)
                 @timeit "Mie calc"  aerosol_optics_raw, lin_aerosol_optics_raw =
-                                compute_aerosol_optical_properties(lin, mie_model, FT2)
+                                aerosol_pair((maximum(curr_band_λ)+minimum(curr_band_λ))/2)
 
             else
                 # Multi-spectral band: compute Mie properties at band edges (λ[1], λ[end]) and
@@ -364,13 +413,11 @@ function model_from_parameters(lin::LinMode,
                 # the band. Greek coefficients are averaged. This avoids a full Mie calculation
                 # at every spectral point (Mie varies smoothly with λ).
                 n_spec = length(curr_band_λ)
-                mie_model_0 = _mie(curr_band_λ[1])
                 @timeit "Mie calc"  aerosol_optics_raw_0, lin_aerosol_optics_raw_0 =
-                                compute_aerosol_optical_properties(lin, mie_model_0, FT2)
+                                aerosol_pair(curr_band_λ[1])
 
-                mie_model_1 = _mie(curr_band_λ[end])
                 @timeit "Mie calc"  aerosol_optics_raw_1, lin_aerosol_optics_raw_1 =
-                                compute_aerosol_optical_properties(lin, mie_model_1, FT2)
+                                aerosol_pair(curr_band_λ[end])
 
                 function truncate_endpoint(a, la)
                     if truncation_type isa Scattering.δBGE &&
@@ -390,7 +437,7 @@ function model_from_parameters(lin::LinMode,
                 endpoint_ref = lin_endpoint_ref = nothing
                 if first(extrema(ν_spec)) < ν_ref_phase < last(extrema(ν_spec))
                     @timeit "Mie calc" aerosol_optics_raw_ref, lin_aerosol_optics_raw_ref =
-                        compute_aerosol_optical_properties(lin, _mie(scat.λ_ref), FT2)
+                        aerosol_pair(scat.λ_ref)
                     endpoint_ref, lin_endpoint_ref = truncate_endpoint(
                         aerosol_optics_raw_ref, lin_aerosol_optics_raw_ref)
                 end

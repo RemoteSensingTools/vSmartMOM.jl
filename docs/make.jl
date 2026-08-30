@@ -117,22 +117,25 @@ end
 function _quickstart_plot()
     params = read_parameters(joinpath(pkgdir(vSmartMOM), "config", "quickstart.yaml"))
     params.architecture = vSmartMOM.Architectures.CPU()
-    R, T = _quietly() do
+    # `external_solar=true` is the production default. Exercise its lean
+    # TOA-only entry point here instead of silently opting this documentation
+    # asset back into the legacy embedded-solar full-column operator.
+    R = _quietly() do
         model = model_from_parameters(params)
-        rt_run(model)
+        rt_run_toa(model)
     end
 
     data = [
         (;
             type = "bar",
-            x = ["TOA reflectance R", "BOA transmittance T"],
-            y = Float64[R[1, 1, 1], T[1, 1, 1]],
-            marker = (; color = ["#2563eb", "#16a34a"]),
+            x = ["TOA reflectance R"],
+            y = Float64[R[1, 1, 1]],
+            marker = (; color = ["#2563eb"]),
             hovertemplate = "%{x}<br>Stokes I=%{y:.6f}<extra></extra>",
         ),
     ]
     layout = (;
-        title = (; text = "Quickstart RT Output", x = 0.02),
+        title = (; text = "Quickstart TOA RT Output", x = 0.02),
         margin = (; l = 56, r = 18, t = 72, b = 52),
         xaxis = (; title = ""),
         yaxis = (; title = "Stokes I", rangemode = "tozero"),
@@ -149,9 +152,9 @@ function _core_rt_vza_plot()
     params.architecture = vSmartMOM.Architectures.CPU()
     params.max_m = 2
     params.l_trunc = 20
-    R, _ = _quietly() do
+    R = _quietly() do
         model = model_from_parameters(params)
-        rt_run(model)
+        rt_run_toa(model)
     end
 
     signed_vza = ifelse.(Float64.(params.vaz) .≈ 180.0,
