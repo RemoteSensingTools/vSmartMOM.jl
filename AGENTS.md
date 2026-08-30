@@ -193,6 +193,7 @@ material when explaining the package:
 | Linearization kernels | `src/CoreRT/CoreKernel/{elemental,doubling,interaction}_lin.jl` |
 | Chain-rule expansion (fused) | `src/CoreRT/CoreKernel/elemental_lin.jl:456–591` (`get_elem_rt_fused!`), `602–815` (`get_elem_rt_SFI_fused!`) |
 | Jacobian column layout | `src/CoreRT/parameter_layout.jl:1–67` |
+| Retrieval-selected Jacobian plans (`OCO_RRS_synth`) | `src/CoreRT/parameter_layout.jl`, `src/CoreRT/tools/jacobian_plans.jl` |
 | Architecture types | `src/Architectures.jl:1–98` |
 | `@kernel` apply_D! (D-matrix) | `src/CoreRT/CoreKernel/doubling.jl:85–110` |
 | `@kernel` line shape | `src/Absorption/compute_absorption_cross_section.jl:229–280` |
@@ -266,6 +267,7 @@ cd docs && julia --project=. make.jl
 3. **Why is the code shaped this way?** → Check the **design-choice passages** at the bottom of `theory_references.md`. They explain non-obvious trade-offs (historical no-solar-SFI origin vs current embedded/external SFI representations, constant-`N_doubl`, Cabannes vs Rayleigh greek, Raman Rayleigh fraction, linear-in-inelastic, `rt_run_ss` raison d'être, δBGE-fit vs δ-m, exact finite-δ elemental).
 4. **Where does this paper equation map in the code?** → `theory_references.md` Sections A–J.
 5. **How should I write a new feature?** → Check `CLAUDE.md` for the "Common Workflows" patterns (adding a surface BRDF, adding a test, modifying YAML parsing).
+6. **How do retrieval-selective Jacobians work?** → Read `docs/dev_notes/selective_jacobian_plans.md` for the exact local/global layouts, early-selection allocation path, coordinate transforms, extension contract, and finite-difference record.
 
 ## Maintenance contract for this file
 

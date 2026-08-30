@@ -69,7 +69,7 @@ struct ObserverRTResultLin{FT,TOA,BOA,JTOA,JBOA,L}
     boa_jacobian::JBOA
     levels::Vector{L}
     toa_altitude_km::FT
-    layout::ParameterLayout
+    layout::AbstractParameterLayout
 end
 
 @inline _observer_lin_legacy_tuple(r::ObserverRTResultLin) =
@@ -203,6 +203,28 @@ mutable struct RTModelLin{A,B,C,D,E,F}
     τ̇_aer_psurf::E
     "∂τ_abs/∂p_surf per band: [nSpec × nLayers]"
     τ̇_abs_psurf::F
+end
+
+"""
+    PlannedRTModelLin
+
+Backward-compatible wrapper pairing the ordinary physical-derivative model
+with a compiled [`JacobianPlan`](@ref). Unknown properties are forwarded to
+`base`, so diagnostic code written for `RTModelLin` continues to work.
+"""
+struct PlannedRTModelLin{M,P<:JacobianPlan}
+    base::M
+    plan::P
+end
+
+function Base.getproperty(model::PlannedRTModelLin, name::Symbol)
+    name === :base && return getfield(model, :base)
+    name === :plan && return getfield(model, :plan)
+    return getproperty(getfield(model, :base), name)
+end
+
+function Base.propertynames(model::PlannedRTModelLin, private::Bool=false)
+    return (:base, :plan, propertynames(getfield(model, :base), private)...)
 end
 abstract type AbstractOpticalPropertiesLin end
 

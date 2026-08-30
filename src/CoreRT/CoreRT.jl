@@ -131,6 +131,7 @@ _to_aa_arch(arch::AtmosphericAbsorption.AbstractArchitecture) = arch  # already 
 
 include("tools/model_from_parameters.jl")         # Converting parameters to derived model attributes
 include("tools/lin_model_from_parameters.jl")     # Linearized model from parameters
+include("tools/jacobian_plans.jl")                # Retrieval-selective Jacobian layouts
 include("tools/update_model.jl")                  # BatchContext + update_model! for batch processing
 include("tools/show_utils.jl")                    # Pretty-printing objects
 include("LayerOpticalProperties/compEffectiveLayerProperties.jl")
@@ -173,7 +174,11 @@ export model_from_parameters,               # Converting the parameters to model
 export OpticalPropertyJacobian,               # AD boundary struct alias
        RawAerosolJacobian,                    # AD boundary for raw aerosol derivatives
        delta_m_forward, delta_m_truncation_lin, # δ-M truncation functions
-       ParameterLayout,                       # Jacobian parameter layout descriptor
+       AbstractParameterLayout, ParameterLayout, ActiveParameterLayout,
+       ParameterKey, AbstractJacobianFlavor, OCO_RRS_synth, JacobianPlan,
+       PlannedRTModelLin, jacobian_plan, band_layout, parameter_names,
+       local_to_global, native_layer_columns, n_global, globalize_jacobian,
+       requires_aerosol_microphysics_jacobians, requires_h2o_jacobians,
        n_total, aerosol_range, gas_range,     # ParameterLayout accessors
        gas_profile_range, gas_layer_index,
        surface_range, surface_index, sif_range, sif755_index, sif_slope_index,
