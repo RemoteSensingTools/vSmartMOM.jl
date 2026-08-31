@@ -116,8 +116,6 @@ vSmartMOM.Scattering.linAerosolOptics
 ```@docs
 vSmartMOM.Scattering.NAI2
 vSmartMOM.Scattering.PCW
-vSmartMOM.Scattering.compute_Z_moments
-vSmartMOM.Scattering.compute_Z_source_moments
 ```
 
 ## Polarization Types
