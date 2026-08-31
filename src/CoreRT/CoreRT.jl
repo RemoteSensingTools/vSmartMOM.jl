@@ -101,6 +101,7 @@ include("CoreKernel/rt_kernel_multisensor.jl") # Multi-sensor RT kernel
 include("tools/postprocessing_vza.jl")               # Postprocess (Azimuthal Weighting)
 include("tools/postprocessing_vza_lin.jl")           # Postprocess linearized
 include("tools/postprocessing_vza_ms.jl")
+include("tools/fourier_convergence.jl")               # Optional Fourier-loop early exit
 
 # RT Run entry points
 include("rt_run.jl")                           # Starting point for RT 
@@ -177,6 +178,8 @@ export OpticalPropertyJacobian,               # AD boundary struct alias
 # Export new hierarchical model types
 export AbstractRTModel, RTModel,
        SolverConfig, RTNumericalParameters,
+       AbstractFourierConvergence, AllFourierMoments, IntensityConvergence,
+       StokesConvergence,
        Atmosphere, RayleighScattering, AerosolState, Optics, OpticsLin,
        RTModelLin, ObserverRTResult, LevelRadiance,
        ObserverRTResultLin, LevelRadianceLin,

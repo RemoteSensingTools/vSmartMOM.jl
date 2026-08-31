@@ -156,9 +156,10 @@ end
 """
     _band_components(params, aerosol_optics, sources, i_band) -> Vector
 
-Build the per-band component list consumed by the trait aggregator.
-Always includes Rayleigh (m_max=2 floor) plus the band's surface BRDF,
-any truncated aerosol optics, and the active source(s) — typically a
+Build the per-band component list consumed by the trait aggregator. Includes
+Rayleigh (m_max=2) only when the already-computed Rayleigh optical depth is
+nonzero in this band, plus the band's surface BRDF, any truncated aerosol
+optics, and the active source(s) — typically a
 `SolarBeam` (m_max=0, neutral) but may include `SurfaceSIF` or a
 future thermal source whose Fourier support is non-trivial.
 
@@ -171,8 +172,10 @@ Codex review of Phase C (P2) flagged that omitting `sources` here
 would silently drop source-driven Fourier moments for any future
 source whose trait isn't `0`.
 """
-function _band_components(params, aerosol_optics, sources, i_band)
-    comps = Any[RayleighScattering, params.brdf[i_band], sources]
+function _band_components(params, aerosol_optics, sources, i_band;
+                          rayleigh_active::Bool=true)
+    comps = Any[params.brdf[i_band], sources]
+    rayleigh_active && pushfirst!(comps, RayleighScattering)
     if !isempty(aerosol_optics) && i_band <= length(aerosol_optics)
         for ao in aerosol_optics[i_band]
             push!(comps, ao)
@@ -180,6 +183,9 @@ function _band_components(params, aerosol_optics, sources, i_band)
     end
     return comps
 end
+
+"Rayleigh contributes Fourier support only when its band optical depth is nonzero."
+_rayleigh_active(τ_rayl_band) = !all(iszero, τ_rayl_band)
 
 function _finite_truncation_lmax(params, truncation_type)
     fallback = max(1, Int(params.l_trunc), 2 * Int(params.max_m) - 1)
@@ -228,6 +234,12 @@ Computes all derived quantities needed by the RT solver:
   diffuse operator. This requires Gauss quadrature and is consumed through
   [`rt_run_toa`](@ref). Pass `false` explicitly for legacy embedded-μ₀
   workflows such as Radau quadrature or interior/BOA diagnostics.
+- `aerosol_anchor_bands=nothing`: Optional vector of canonical wavenumber
+  grids, one per solve band. Aerosol phase, extinction, and single-scattering
+  albedo endpoint calculations use these grids while the interpolated result
+  is evaluated on `params.spec_bands`. Supply this when a solve grid is a
+  spectral chunk or includes Raman/ILS shoulders, so changing those temporary
+  endpoints cannot change aerosol optics in the retained physical band.
 
 # Returns
 - `model::RTModel{ARCH, FT}`: Hierarchical model ready for `rt_run(model)`.
@@ -238,12 +250,19 @@ Computes all derived quantities needed by the RT solver:
 """
 function model_from_parameters(params::vSmartMOM_Parameters;
                                sources::AbstractSource = SolarBeam(),
-                               external_solar::Bool = true)
+                               external_solar::Bool = true,
+                               aerosol_anchor_bands=nothing)
     FT = params.float_type
     #@show FT
     # Number of total bands and aerosols (for convenience)
     n_bands = length(params.spec_bands)
     n_aer = isnothing(params.scattering_params) ? 0 : length(params.scattering_params.rt_aerosols)
+    aerosol_bands = aerosol_anchor_bands === nothing ? params.spec_bands :
+                     aerosol_anchor_bands
+    length(aerosol_bands) == n_bands || throw(DimensionMismatch(
+        "aerosol_anchor_bands must have one grid per spectral band"))
+    all(!isempty, aerosol_bands) || throw(ArgumentError(
+        "aerosol interpolation anchor grids must be nonempty"))
 
     # Truncation method (typed; NoTruncation, δBGE, ...). The legacy
     # `params.Δ_angle` is only consulted via the default δBGE built in
@@ -354,8 +373,13 @@ function model_from_parameters(params::vSmartMOM_Parameters;
 
         # H₂O line absorption (driven by q). Use the band's H2O LUT if the
         # parser found one inside LUTfiles; otherwise fall back to artifact.
+        # `:disabled` is an explicit per-band opt-out that preserves q for the
+        # hydrostatic/dry-column calculation without inventing a non-ABSCO
+        # water-vapor cross section where no table exists.
         if any(!iszero, params.q)
-            if ap.h2o_lut[i_band] !== nothing
+            if ap.h2o_lut[i_band] === :disabled
+                nothing
+            elseif ap.h2o_lut[i_band] !== nothing
                 @timeit "Absorption Coeff H2O" compute_h2o_absorption_profile!(
                     τ_abs[i_band], ap.h2o_lut[i_band],
                     params.spec_bands[i_band], profile)
@@ -477,9 +501,11 @@ function model_from_parameters(params::vSmartMOM_Parameters;
 
             # i'th spectral band wavelengths (convert from cm⁻¹ to μm)
             curr_band_λ = FT.(1e4 ./ params.spec_bands[i_band])
+            anchor_ν = FT.(aerosol_bands[i_band])
+            anchor_band_λ = FT.(1e4 ./ anchor_ν)
             n_spec = length(curr_band_λ)
 
-            if n_spec == 1
+            if n_spec == 1 && length(anchor_band_λ) == 1
                 # ── Single-wavelength band: Mie at band center (bit-identical to old behavior) ──
                 mie_model = _mie_fwd((maximum(curr_band_λ)+minimum(curr_band_λ))/2)
                 @timeit "Mie calc"  aerosol_optics_raw = compute_aerosol_optical_properties(mie_model)
@@ -512,10 +538,12 @@ function model_from_parameters(params::vSmartMOM_Parameters;
                 # quadratic (3-point) interpolation. With smaller spectral bands,
                 # in-band aerosol dispersion is negligible and linear interpolation
                 # introduces at most ~(Δk/k)²/8 relative error in τ.
-                mie_model_0 = _mie_fwd(curr_band_λ[1])
+                length(anchor_band_λ) > 1 || throw(ArgumentError(
+                    "a multi-wavelength solve grid requires at least two aerosol anchors"))
+                mie_model_0 = _mie_fwd(anchor_band_λ[1])
                 @timeit "Mie calc"  aerosol_optics_raw_0 = compute_aerosol_optical_properties(mie_model_0)
 
-                mie_model_1 = _mie_fwd(curr_band_λ[end])
+                mie_model_1 = _mie_fwd(anchor_band_λ[end])
                 @timeit "Mie calc"  aerosol_optics_raw_1 = compute_aerosol_optical_properties(mie_model_1)
 
                 # Truncate each Mie endpoint independently, then interpolate the
@@ -532,14 +560,15 @@ function model_from_parameters(params::vSmartMOM_Parameters;
                 ν_spec = FT.(params.spec_bands[i_band])
                 ν_ref_phase = FT(1e4) / params.scattering_params.λ_ref
                 endpoint_ref = nothing
-                if first(extrema(ν_spec)) < ν_ref_phase < last(extrema(ν_spec))
+                if first(extrema(anchor_ν)) < ν_ref_phase < last(extrema(anchor_ν))
                     @timeit "Mie calc" aerosol_optics_raw_ref =
                         compute_aerosol_optical_properties(_mie_fwd(params.scattering_params.λ_ref))
                     endpoint_ref = truncate_endpoint(aerosol_optics_raw_ref)
                 end
                 aerosol_optics[i_band][i_aer] =
                     _spectralize_truncated_endpoints(endpoint₀, endpoint₁, ν_spec;
-                        reference=endpoint_ref, ν_ref=ν_ref_phase)
+                        reference=endpoint_ref, ν_ref=ν_ref_phase,
+                        ν_endpoints=(first(anchor_ν), last(anchor_ν)))
                 l_max_aer[i_aer, i_band] =
                     size(aerosol_optics[i_band][i_aer].greek_coefs.β, 1)
 
@@ -568,14 +597,15 @@ function model_from_parameters(params::vSmartMOM_Parameters;
     # Per-band Fourier loop bound (order). Phase C: per-component traits via
     # `component_m_max(c, ctx)` (see src/CoreRT/component_m_max.jl). Each band's
     # component list contains:
-    #   - RayleighScattering (always present, contributes m_max=2)
+    #   - RayleighScattering when τ_rayl is nonzero (contributes m_max=2)
     #   - the band's truncated AerosolOptics list (contributes length(β)-1)
     #   - the band's surface BRDF (contributes 0 for Lambertian, user_l_cap for
     #     Cox-Munk / RossLi / RPV / canopy)
     # Codex review of Phase B (P1) flagged that the previous count-only
     # aggregator silently half-truncated Cox-Munk forward — traits restore the
     # full surface-driven Fourier resolution.
-    components_per_band = [_band_components(params, aerosol_optics, sources, i_band)
+    components_per_band = [_band_components(params, aerosol_optics, sources, i_band;
+                                rayleigh_active=_rayleigh_active(τ_rayl[i_band]))
                             for i_band in 1:n_bands]
     m_max_bands = _derive_m_max_bands_via_traits(l_max, params.max_m,
                                                   components_per_band,
@@ -614,6 +644,15 @@ RTModel float type. No-op when types already match."
         dτ_min_floor     = FT(n.dτ_min_floor),
         blas_threads     = n.blas_threads,
         verbose          = n.verbose,
+        fourier_convergence = n.fourier_convergence isa IntensityConvergence ?
+            IntensityConvergence(FT(n.fourier_convergence.tolerance);
+                min_m=n.fourier_convergence.min_m,
+                n_consecutive=n.fourier_convergence.n_consecutive) :
+            n.fourier_convergence isa StokesConvergence ?
+            StokesConvergence(FT(n.fourier_convergence.tolerance);
+                min_m=n.fourier_convergence.min_m,
+                n_consecutive=n.fourier_convergence.n_consecutive) :
+            AllFourierMoments(),
     )
 end
 
@@ -729,7 +768,9 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
         # H₂O line absorption (driven by q). Use the band's H2O LUT if the
         # parser found one inside LUTfiles; otherwise fall back to artifact.
         if any(!iszero, params.q)
-            if ap.h2o_lut[i_band] !== nothing
+            if ap.h2o_lut[i_band] === :disabled
+                nothing
+            elseif ap.h2o_lut[i_band] !== nothing
                 @timeit "Absorption Coeff H2O" compute_h2o_absorption_profile!(
                     τ_abs[i_band], ap.h2o_lut[i_band],
                     params.spec_bands[i_band], profile)
@@ -880,7 +921,8 @@ function model_from_parameters(RS_type::Union{VS_0to1_plus, VS_1to0_plus},
     if length(params.brdf) == 1 && n_bands > 1
         params.brdf = [params.brdf[1] for _ in 1:n_bands]
     end
-    components_per_band = [_band_components(params, aerosol_optics, sources, i_band)
+    components_per_band = [_band_components(params, aerosol_optics, sources, i_band;
+                                rayleigh_active=_rayleigh_active(τ_rayl[i_band]))
                             for i_band in 1:n_bands]
     m_max_bands = _derive_m_max_bands_via_traits(l_max, params.max_m,
                                                   components_per_band,
@@ -960,9 +1002,13 @@ function _spectralize_truncated_endpoints(a₀::AerosolOptics,
                                           a₁::AerosolOptics,
                                           ν_spec;
                                           reference::Union{Nothing,AerosolOptics}=nothing,
-                                          ν_ref=nothing)
+                                          ν_ref=nothing,
+                                          ν_endpoints=nothing)
     FT = promote_type(eltype(ν_spec), typeof(a₀.k), typeof(a₁.k))
-    ν₀, ν₁ = FT(first(ν_spec)), FT(last(ν_spec))
+    endpoints = ν_endpoints === nothing ?
+                (first(ν_spec), last(ν_spec)) : ν_endpoints
+    ν₀, ν₁ = FT(first(endpoints)), FT(last(endpoints))
+    ν₀ != ν₁ || throw(ArgumentError("aerosol interpolation anchors must differ"))
     w = FT[_spectral_weight(ν, ν₀, ν₁) for ν in ν_spec]
     n_spec = length(w)
     n_l = maximum(length(x.greek_coefs.β) for x in
@@ -1004,11 +1050,13 @@ function _spectralize_truncated_endpoints(a₀::AerosolOptics,
                                           ν_spec;
                                           reference::Union{Nothing,AerosolOptics}=nothing,
                                           lin_reference::Union{Nothing,linAerosolOptics}=nothing,
-                                          ν_ref=nothing)
+                                          ν_ref=nothing,
+                                          ν_endpoints=nothing)
     a = _spectralize_truncated_endpoints(a₀, a₁, ν_spec;
-                                         reference, ν_ref)
+                                         reference, ν_ref, ν_endpoints)
     FT = eltype(a.k)
-    w = FT[_spectral_weight(ν, first(ν_spec), last(ν_spec)) for ν in ν_spec]
+    ν₀, ν₁ = first(a.phase_ν), last(a.phase_ν)
+    w = FT[_spectral_weight(ν, ν₀, ν₁) for ν in ν_spec]
     n_spec = length(w)
     n_param = size(l₀.lin_greek_coefs.β̇, 1)
     n_l = size(a.greek_coefs.β, 1)

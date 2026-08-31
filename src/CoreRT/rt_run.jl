@@ -498,6 +498,27 @@ function _rt_run_column(RS_type::AbstractRamanType, model, iBand;
     # never used because it has shape (nVZA, pol_n, nSpec), not (NquadN,1,nSpec)).
     hdr_J₀⁻ = toa_only ? nothing : similar(composite_layer.J₀⁻)
 
+    # The full-series default is unchanged. A configured convergence strategy
+    # monitors every directional output produced by this path (Stokes I only
+    # or every propagated component, according to the selected strategy). For
+    # RRS this includes both the elastic Cabannes and inelastic RRS fields.
+    # Stream callbacks remain full-series diagnostics by contract and therefore
+    # disable early exit.
+    fourier_convergence = streams_callback === nothing ?
+        model.numerics.fourier_convergence : AllFourierMoments()
+    convergence_outputs = if toa_only
+        RS_type isa RRS ? _fourier_outputs(R_SFI, ieR_TOA) :
+                          _fourier_outputs(R_SFI)
+    elseif InelasticScattering.has_inelastic(RS_type)
+        _fourier_outputs(R_SFI, T_SFI, ieR_SFI, ieT_SFI)
+    else
+        _fourier_outputs(R_SFI, T_SFI)
+    end
+    convergence_snapshots = _fourier_convergence_active(fourier_convergence) ?
+        _fourier_snapshots(convergence_outputs) : ()
+    convergence_passes = 0
+    m_used = m_max
+
     # Loop over fourier moments
     for m = 0:m_max
 
@@ -632,7 +653,19 @@ function _rt_run_column(RS_type::AbstractRamanType, model, iBand;
                 m, weight, pol_type, qp_μ, iμ₀, μ₀,
                 composite_layer, nSpec))
         end
+
+        if _fourier_convergence_active(fourier_convergence)
+            stop, convergence_passes = _fourier_convergence_step!(
+                fourier_convergence, convergence_outputs,
+                convergence_snapshots, convergence_passes, m, m_max)
+            if stop
+                m_used = m
+                @info "Fourier series converged" m_used=m m_max=m_max tolerance=fourier_convergence.tolerance guard_through_m=_fourier_guard_through_m(fourier_convergence, m_max) n_consecutive=fourier_convergence.n_consecutive
+                break
+            end
+        end
     end
+    _LAST_FOURIER_M_USED[] = m_used
 
     # Single-scattering correction for Cox-Munk specular hotspot (TMS).
     # LIMITATION: this TMS correction assumes a unit incident beam per spectral
@@ -644,7 +677,7 @@ function _rt_run_column(RS_type::AbstractRamanType, model, iBand;
     if brdf isa CoxMunkSurface && SFI
         @timeit "SS Correction" apply_ss_correction!(
             R_SFI, brdf, pol_type, vza, vaz, μ₀,
-            Array(τ_sum_all[:,end]), m_max, nSpec)
+            Array(τ_sum_all[:,end]), m_used, nSpec)
     end
 
     # Show timing statistics (only when the user asked — verbose flag in
