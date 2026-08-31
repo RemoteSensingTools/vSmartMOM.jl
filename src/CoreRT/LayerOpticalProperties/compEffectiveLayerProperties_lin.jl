@@ -196,16 +196,26 @@ function _attach_aerosol_phase(inv::LinAerosolInvariant,
         if Z === nothing || ndims(Z) == 3
             out = arr_type(zeros(FT, nrow, ncol, length(active_columns)))
             if Z !== nothing
-                for (iout, column) in enumerate(active_columns)
-                    2 <= column <= 5 || continue
-                    out[:,:,iout] .= @view Z[column - 1, :, :]
+                if columns === nothing
+                    # Full-Jacobian path: keep the single vectorized assign
+                    # (one launch) instead of per-column copies.
+                    out[:,:,2:5] .= permutedims(Z, (2, 3, 1))
+                else
+                    for (iout, column) in enumerate(active_columns)
+                        2 <= column <= 5 || continue
+                        out[:,:,iout] .= @view Z[column - 1, :, :]
+                    end
                 end
             end
         else
             out = arr_type(zeros(FT, nrow, ncol, n, length(active_columns)))
-            for (iout, column) in enumerate(active_columns)
-                2 <= column <= 5 || continue
-                out[:,:,:,iout] .= @view Z[column - 1, :, :, :]
+            if columns === nothing
+                out[:,:,:,2:5] .= permutedims(Z, (2, 3, 4, 1))
+            else
+                for (iout, column) in enumerate(active_columns)
+                    2 <= column <= 5 || continue
+                    out[:,:,:,iout] .= @view Z[column - 1, :, :, :]
+                end
             end
         end
         return out
