@@ -60,7 +60,10 @@ end
     aerosol = only(params.scattering_params.rt_aerosols)
     aerosol.profile = LogNormal(log(z₀), σ₀)
 
+    # rt_run_toa (used for the FD references below) requires the
+    # external-solar SFI representation, which is opt-in.
     model, lin_model = model_from_parameters(LinMode(), params;
+        external_solar=true,
         compute_aerosol_microphysics_jacobians=false,
         compute_h2o_jacobians=false)
     Nz = length(model.profile.p_full)
@@ -95,7 +98,7 @@ end
     # BatchContext changes aerosol loading/profile while reusing identical
     # forward Mie optics, keeping these central differences independent of the
     # linearized optical-property builder and inexpensive enough for CI.
-    context = BatchContext(params)
+    context = BatchContext(params; external_solar=true)
     τₒ = aerosol.τ_ref
     hτ = τₒ * 1e-3
     update_aerosol_loading!(context, 1;
@@ -137,6 +140,7 @@ end
     params.brdf = CoreRT.AbstractSurfaceType[
         CoreRT.LambertianSurfaceLegendre(coeff)]
     model, lin_model = model_from_parameters(LinMode(), params;
+        external_solar=true,
         compute_aerosol_microphysics_jacobians=false,
         compute_h2o_jacobians=false)
 
@@ -169,8 +173,8 @@ end
     hp = 0.01
     pp = deepcopy(params); pp.p[end] += hp
     pm = deepcopy(params); pm.p[end] -= hp
-    fd_pressure = (rt_run_toa(model_from_parameters(pp); sources) .-
-                   rt_run_toa(model_from_parameters(pm); sources)) ./ (2hp)
+    fd_pressure = (rt_run_toa(model_from_parameters(pp; external_solar=true); sources) .-
+                   rt_run_toa(model_from_parameters(pm; external_solar=true); sources)) ./ (2hp)
     _test_selective_fd("surface pressure", selected.toa_jacobian[:, :, :, 1],
                        fd_pressure; rtol=2e-4, atol=2e-8, threshold=1e-8)
 
@@ -184,8 +188,8 @@ end
             CoreRT.LambertianSurfaceLegendre(cp)]
         pminus.brdf = CoreRT.AbstractSurfaceType[
             CoreRT.LambertianSurfaceLegendre(cm)]
-        fd_surface = (rt_run_toa(model_from_parameters(pplus); sources) .-
-                      rt_run_toa(model_from_parameters(pminus); sources)) ./ (2hc)
+        fd_surface = (rt_run_toa(model_from_parameters(pplus; external_solar=true); sources) .-
+                      rt_run_toa(model_from_parameters(pminus; external_solar=true); sources)) ./ (2hc)
         _test_selective_fd("surface P$(icoeff - 1)",
                            selected.toa_jacobian[:, :, :, 1 + icoeff],
                            fd_surface; rtol=3e-4, atol=2e-8, threshold=1e-8)

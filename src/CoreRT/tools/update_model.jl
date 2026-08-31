@@ -149,7 +149,9 @@ mutable struct BatchContext
 end
 
 """
-    BatchContext(params::vSmartMOM_Parameters; sources::AbstractSource = SolarBeam()) -> BatchContext
+    BatchContext(params::vSmartMOM_Parameters;
+                 sources::AbstractSource = SolarBeam(),
+                 external_solar::Bool = false) -> BatchContext
 
 Build a `BatchContext` from the given parameters.
 
@@ -158,15 +160,19 @@ This is the **expensive** constructor: it calls `model_from_parameters(params)`
 caches the `AtmosphericAbsorption.LineByLineModel` objects so that subsequent
 [`update_model!`](@ref) calls can skip HITRAN re-parsing entirely.
 
-Keyword argument `sources` is forwarded to `model_from_parameters`.
+Keyword arguments `sources` and `external_solar` are forwarded to
+`model_from_parameters`; pass `external_solar=true` when the batched scenes
+are consumed through the TOA-only fast path [`rt_run_toa`](@ref).
 """
 function BatchContext(params::vSmartMOM_Parameters;
-                      sources::AbstractSource = SolarBeam())
+                      sources::AbstractSource = SolarBeam(),
+                      external_solar::Bool = false)
     FT = params.float_type
 
     # ── 1. Build the full RTModel (expensive; done once) ───────────────────
     input_sources = deepcopy(sources)
-    model = model_from_parameters(params; sources=deepcopy(input_sources))
+    model = model_from_parameters(params; sources=deepcopy(input_sources),
+                                  external_solar)
 
     n_bands    = length(params.spec_bands)
     n_aerosols = isnothing(params.scattering_params) ? 0 :
