@@ -17,8 +17,8 @@
 <body>
   <div id="plot"></div>
   <script>
-    const data = [{"type":"bar","x":["TOA reflectance R","BOA transmittance T"],"y":[0.02848592913380708,0.1557755644589617],"marker":{"color":["#2563eb","#16a34a"]},"hovertemplate":"%{x}<br>Stokes I=%{y:.6f}<extra></extra>"}];
-    const layout = {"title":{"text":"Quickstart RT Output","x":0.02},"margin":{"l":56,"r":18,"t":72,"b":52},"xaxis":{"title":""},"yaxis":{"title":"Stokes I","rangemode":"tozero"},"paper_bgcolor":"#ffffff","plot_bgcolor":"#ffffff","font":{"family":"Inter, system-ui, sans-serif"}};
+    const data = [{"type":"bar","x":["TOA reflectance R"],"y":[0.02848592913380708],"marker":{"color":["#2563eb"]},"hovertemplate":"%{x}<br>Stokes I=%{y:.6f}<extra></extra>"}];
+    const layout = {"title":{"text":"Quickstart TOA RT Output","x":0.02},"margin":{"l":56,"r":18,"t":72,"b":52},"xaxis":{"title":""},"yaxis":{"title":"Stokes I","rangemode":"tozero"},"paper_bgcolor":"#ffffff","plot_bgcolor":"#ffffff","font":{"family":"Inter, system-ui, sans-serif"}};
     const config = {"responsive":true,"displaylogo":false,"modeBarButtonsToRemove":["lasso2d","select2d"]};
     Plotly.newPlot("plot", data, layout, config);
   </script>
