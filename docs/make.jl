@@ -117,11 +117,11 @@ end
 function _quickstart_plot()
     params = read_parameters(joinpath(pkgdir(vSmartMOM), "config", "quickstart.yaml"))
     params.architecture = vSmartMOM.Architectures.CPU()
-    # `external_solar=true` is the production default. Exercise its lean
-    # TOA-only entry point here instead of silently opting this documentation
-    # asset back into the legacy embedded-solar full-column operator.
+    # Exercise the opt-in external-solar SFI path and its lean TOA-only
+    # entry point (`external_solar=false`, the embedded-μ₀ full-column
+    # operator, is the default; `rt_run_toa` requires the opt-in).
     R = _quietly() do
-        model = model_from_parameters(params)
+        model = model_from_parameters(params; external_solar = true)
         rt_run_toa(model)
     end
 
@@ -153,7 +153,7 @@ function _core_rt_vza_plot()
     params.max_m = 2
     params.l_trunc = 20
     R = _quietly() do
-        model = model_from_parameters(params)
+        model = model_from_parameters(params; external_solar = true)
         rt_run_toa(model)
     end
 

@@ -63,12 +63,12 @@ vSmartMOM.CoreRT._aggregate_m_max
 ## Column Core and TOA Fast Path
 
 Every public forward entry point funnels into the internal single-column
-solver `_rt_run_column`; `rt_run_toa` is the lean TOA-only wrapper used by
-retrieval loops that never consume BOA or interior fields.
+solver `_rt_run_column`; [`rt_run_toa`](@ref vSmartMOM.rt_run_toa) is the
+lean TOA-only wrapper used by retrieval loops that never consume BOA or
+interior fields (documented under the top-level API).
 
 ```@docs
 vSmartMOM.CoreRT._rt_run_column
-vSmartMOM.CoreRT.rt_run_toa
 ```
 
 ## Height-Aware Forward and Linearized Output
