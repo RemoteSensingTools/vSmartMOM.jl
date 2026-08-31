@@ -59,8 +59,17 @@ end
 end
 
 using CUDA
-if CUDA.functional()
-    CUDA.device!(parse(Int, get(ENV, "BENCH_DEV", "1")))
+# Default to CUDA's device 0 and tolerate an unacquirable device (e.g. a
+# colleague's job saturating it) — a CI-registered test must not hard-fail
+# on shared-machine GPU state. Override with BENCH_DEV.
+_fused_gpu_ok = CUDA.functional() && try
+    CUDA.device!(parse(Int, get(ENV, "BENCH_DEV", "0")))
+    true
+catch err
+    @warn "Skipping CUDA fused-doubling tests: cannot acquire GPU" err
+    false
+end
+if _fused_gpu_ok
     @testset "fused doubling kernels vs _bmm! (CUDA)" begin
         run_case(Float64, CuArray, CUDA.CUDABackend(); rtol = 1e-13)
         run_case(Float32, CuArray, CUDA.CUDABackend(); rtol = 2e-5)

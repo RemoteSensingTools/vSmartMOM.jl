@@ -116,8 +116,16 @@ end
 end
 
 using CUDA
-if CUDA.functional()
-    CUDA.device!(parse(Int, get(ENV, "BENCH_DEV", "1")))
+# See test_fused_doubling.jl: device 0 default, skip gracefully when the
+# device cannot be acquired on a shared machine. Override with BENCH_DEV.
+_fused_int_gpu_ok = CUDA.functional() && try
+    CUDA.device!(parse(Int, get(ENV, "BENCH_DEV", "0")))
+    true
+catch err
+    @warn "Skipping CUDA fused-interaction tests: cannot acquire GPU" err
+    false
+end
+if _fused_int_gpu_ok
     @testset "fused interaction _11 vs _bmm! (CUDA)" begin
         I64 = CuArray(repeat(Matrix{Float64}(I, N, N), 1, 1, 1))
         I32 = CuArray(repeat(Matrix{Float32}(I, N, N), 1, 1, 1))
