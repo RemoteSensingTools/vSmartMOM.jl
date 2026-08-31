@@ -438,7 +438,8 @@ function Base.show(io::IO, ::MIME"text/plain", x::vSmartMOM_Parameters{FT}) wher
     if !isnothing(x.absorption_params)
         ap = x.absorption_params
         mol_strs = unique(vcat(ap.fixed_molecules..., ap.variable_molecules...))
-        h2o_active = !isempty(ap.h2o_lut) && any(!isnothing, ap.h2o_lut)
+        h2o_active = !isempty(ap.h2o_lut) &&
+                     any(x -> x !== nothing && x !== :disabled, ap.h2o_lut)
         all_mols = h2o_active ? vcat(["H2O (q-driven)"], mol_strs) : mol_strs
         bf_name = typeof(ap.broadening_function).name.name
         println(io, _TREE_MID, "absorption: $(length(all_mols)) molecule(s) [$(join(all_mols, ", "))], $bf_name, wing_cutoff=$(ap.wing_cutoff) cm⁻¹")

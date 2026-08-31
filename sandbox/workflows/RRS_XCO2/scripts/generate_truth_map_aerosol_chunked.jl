@@ -17,9 +17,11 @@ Environment controls:
 - `TRUTH_OUT` (default `RRS_XCO2/truth_map/aerosol_chunked`)
 - `O2_CHUNK_POINTS` (default 256 output points)
 - `CO2_CHUNK_POINTS` (default 512 output points)
-- `RAMAN_SHOULDER_CM` (default 250 cm-1 on each side)
+- `RAMAN_SHOULDER_CM` (default 234 cm-1 on each side)
 - `CUDA_DEVICE` (default 1)
 - `FIRST_STATE`, `LAST_STATE` (default 1, 64; aerosol-off states are skipped)
+- `SIF_CASE_FILTER` (`all`, `off`, or `on`; default `all`)
+- `TRUTH_SZA_DEG`, `TRUTH_VZA_DEG`, `TRUTH_RELATIVE_AZIMUTH_DEG`
 - `FORCE=1` recreates output files and clears the checkpoint
 """
 
@@ -33,6 +35,12 @@ const AEROSOL_OUT = OUT
 const AEROSOL_CHECKPOINT = joinpath(AEROSOL_OUT, "aerosol_chunks_checkpoint.jld2")
 const O2_CHUNK_POINTS = parse(Int, get(ENV, "O2_CHUNK_POINTS", "256"))
 const CO2_CHUNK_POINTS = parse(Int, get(ENV, "CO2_CHUNK_POINTS", "512"))
+const SURFACE_COORDINATE_VERSION = 1
+# Version 2 means that the retained O2 core is inserted verbatim between
+# independently constructed Raman shoulders.  In particular, a Float32
+# range that starts at the left shoulder is no longer allowed to reconstruct
+# (and slightly shift) the output-band nodes.
+const O2_CORE_GRID_VERSION = 2
 
 O2_CHUNK_POINTS > 0 || error("O2_CHUNK_POINTS must be positive")
 CO2_CHUNK_POINTS > 0 || error("CO2_CHUNK_POINTS must be positive")
@@ -46,7 +54,14 @@ function checkpoint!(completed::Set{String})
             o2_chunk_points=O2_CHUNK_POINTS,
             co2_chunk_points=CO2_CHUNK_POINTS,
             psurf_hpa=1000.0, nlayers=NLAYERS,
-            float_type=string(FT))
+            float_type=string(FT),
+            sza_deg=SZA_DEG, vza_deg=VZA_DEG,
+            relative_azimuth_deg=RELATIVE_AZIMUTH_DEG,
+            sif_case_filter=SIF_CASE_FILTER,
+            surface_coordinate_version=SURFACE_COORDINATE_VERSION,
+            o2_core_grid_version=O2_CORE_GRID_VERSION,
+            raman_shoulder_cm=SHOULDER_CM,
+            absco_version=RRSXCO2Common.ABSCO_VERSION)
     mv(tmp, AEROSOL_CHECKPOINT; force=true)
 end
 
@@ -60,6 +75,20 @@ function load_checkpoint()
     saved["psurf_hpa"] == 1000.0 || error("checkpoint surface pressure is stale")
     saved["nlayers"] == NLAYERS || error("checkpoint layer count differs")
     saved["float_type"] == string(FT) || error("checkpoint float type differs")
+    get(saved, "sza_deg", FT(30)) == SZA_DEG || error("checkpoint SZA differs")
+    get(saved, "vza_deg", zero(FT)) == VZA_DEG || error("checkpoint VZA differs")
+    get(saved, "relative_azimuth_deg", zero(FT)) == RELATIVE_AZIMUTH_DEG ||
+        error("checkpoint relative azimuth differs")
+    get(saved, "sif_case_filter", "all") == SIF_CASE_FILTER ||
+        error("checkpoint SIF selection differs")
+    get(saved, "surface_coordinate_version", 0) == SURFACE_COORDINATE_VERSION ||
+        error("checkpoint predates full-band surface normalization; restart with FORCE=1")
+    get(saved, "o2_core_grid_version", 0) == O2_CORE_GRID_VERSION ||
+        error("checkpoint predates exact retained O2 core nodes; restart with FORCE=1")
+    get(saved, "raman_shoulder_cm", nothing) == SHOULDER_CM ||
+        error("checkpoint Raman shoulder differs from requested width")
+    get(saved, "absco_version", "") == RRSXCO2Common.ABSCO_VERSION ||
+        error("checkpoint spectroscopy differs from ABSCO $(RRSXCO2Common.ABSCO_VERSION)")
     return Set{String}(saved["completed"])
 end
 
@@ -71,6 +100,8 @@ function initialize_scene!(state, grids)
         return path
     end
     NCDataset(path, "c") do ds
+        RRSXCO2Common.write_absco_provenance!(ds.attrib)
+        RRSXCO2Common.write_fourier_convergence_provenance!(ds.attrib)
         defDim(ds, "stokes", 3)
         for (name, ν) in zip(("o2a", "weak_co2", "strong_co2"), grids)
             defDim(ds, name, length(ν))
@@ -91,8 +122,11 @@ function initialize_scene!(state, grids)
         ds.attrib["sif_case"] = state.sif_case
         ds.attrib["xco2_ppm"] = state.xco2_ppm
         ds.attrib["psurf_hpa"] = 1000.0
-        ds.attrib["sza_deg"] = 30.0
-        ds.attrib["vza_deg"] = 0.0
+        ds.attrib["sza_deg"] = SZA_DEG
+        ds.attrib["vza_deg"] = VZA_DEG
+        ds.attrib["relative_azimuth_deg"] = RELATIVE_AZIMUTH_DEG
+        ds.attrib["strong_co2_short_shoulder_points"] = Int32(8)
+        ds.attrib["strong_co2_convolution_support_sigma"] = 6.0
         ds.attrib["atmospheric_layers"] = Int32(NLAYERS)
         ds.attrib["aod550_sulfate"] = state.aod550[1]
         ds.attrib["aod550_organic_carbon"] = state.aod550[2]
@@ -101,6 +135,11 @@ function initialize_scene!(state, grids)
         ds.attrib["source_state_table"] = "true_states.dat"
         ds.attrib["spectral_chunking"] =
             "O2 cores carry ±$(SHOULDER_CM) cm-1 Raman shoulders; CO2 has no shoulders"
+        ds.attrib["o2_core_grid_version"] = Int32(O2_CORE_GRID_VERSION)
+        ds.attrib["o2_core_grid_construction"] =
+            "retained output nodes inserted verbatim between independently built shoulders"
+        ds.attrib["surface_coordinate"] =
+            "Legendre x is defined once over each complete output band before chunking"
         ds.attrib["created"] = string(now())
     end
     return path
@@ -153,7 +192,9 @@ function run_o2_chunks!(states, output_ν, solar_T, completed)
             coreν = output_ν[irange]
             solveν, keep = o2_solve_grid(coreν)
             @info "aerosol O2 Raman chunk" key ichunk nchunks=length(ranges) ncore=length(coreν) nsolve=length(solveν)
-            result = simulate_o2(representative, (coreν, solveν, keep), solar_T)
+            # Surface normalization is defined by the complete output band;
+            # only its already-defined spectrum is partitioned into chunks.
+            result = simulate_o2(representative, (output_ν, solveν, keep), solar_T)
             write_o2_chunk!(members, irange, result)
             push!(completed, tag)
             checkpoint!(completed)
@@ -171,7 +212,7 @@ function run_co2_chunks!(states, iband, band, output_ν, solar_T, completed)
             tag in completed && continue
             ν = output_ν[irange]
             @info "aerosol CO2 chunk" band key ichunk nchunks=length(ranges) nsolve=length(ν)
-            result = simulate_co2(representative, iband, ν, solar_T)
+            result = simulate_co2(representative, iband, output_ν, ν, solar_T)
             write_co2_chunk!(members, band, irange, result)
             push!(completed, tag)
             checkpoint!(completed)
@@ -184,8 +225,7 @@ function main_aerosol_chunked()
     mkpath(AEROSOL_OUT)
     CUDA.functional() || error("CUDA is not functional")
     CUDA.device!(DEVICE)
-    all_states = read_states()
-    selected = all_states[FIRST_STATE:LAST_STATE]
+    selected = selected_states()
     states = filter(s -> any(>(0), s.aod550), selected)
     isempty(states) && error("selected state range contains no aerosol-on scenes")
 
@@ -213,6 +253,10 @@ function main_aerosol_chunked()
     run_co2_chunks!(states, 3, "strong_co2", grids[3], solar_T, completed)
     for state in states
         NCDataset(scene_path(state), "a") do ds
+            # Also stamp files created before Fourier convergence was enabled
+            # when a checkpointed calculation is resumed.
+            RRSXCO2Common.write_fourier_convergence_provenance!(ds.attrib)
+            ds.attrib["simulation_complete"] = Int32(1)
             ds.attrib["chunked_simulation_complete"] = Int32(1)
             ds.attrib["completed"] = string(now())
         end

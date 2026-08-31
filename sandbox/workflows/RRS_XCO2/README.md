@@ -17,10 +17,27 @@ Set spectroscopy paths individually or set their common directory:
 
 ```bash
 export VSMARTMOM_HITRAN_LUT_DIR=$HOME/data/HITRAN_LUTs
-julia --project=. RRS_XCO2/scripts/fit_grass_surface.jl
-julia --project=. RRS_XCO2/scripts/run_forward.jl
-python RRS_XCO2/scripts/plot_results.py
+julia --project=. sandbox/workflows/RRS_XCO2/scripts/fit_grass_surface.jl
+julia --project=. sandbox/workflows/RRS_XCO2/scripts/run_forward.jl
+python sandbox/workflows/RRS_XCO2/scripts/plot_results.py
 ```
+
+Workflow source and generated data are deliberately separable. By default,
+small reference inputs and outputs are resolved below this workflow directory.
+To use the historical top-level data tree while running code from this branch,
+set:
+
+```bash
+export RRS_XCO2_DATA_ROOT=/home/sanghavi/code/github/uni_vSmartMOM/RRS_XCO2
+export VSMARTMOM_SIF_DATA_DIR=/home/sanghavi/code/github/uni_vSmartMOM/src/SIF_emission
+```
+
+`RRS_XCO2_CONFIG` can independently override the YAML configuration. This
+boundary prevents a branch change or source-tree reorganization from moving,
+overwriting, or silently orphaning expensive truth and retrieval products.
+`VSMARTMOM_SIF_DATA_DIR` is required for a source-only checkout when the SIF
+CSV/DAT resources are maintained externally rather than committed with the
+package.
 
 The basis grid is uniformly spaced at 0.1 cm^-1 and the atmospheric profile is
 reduced to 12 layers. Forward calculations use external-solar SFI: with five

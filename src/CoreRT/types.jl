@@ -974,7 +974,7 @@ mutable struct AbsorptionParameters{FM,VM,V,BF,CE,LT,HL}
     wing_cutoff::Real
     "Lookup table per (band, position-in-fixed_molecules ∪ variable_molecules)"
     luts::LT
-    "Optional H₂O LUT (one per band). `nothing` means HITRAN-on-the-fly fallback."
+    "H₂O setting per band: LUT object, `nothing` for HITRAN fallback, or `:disabled`."
     h2o_lut::HL
     "Optional list of HITRAN CIA file paths (one per collision pair)"
     cia_files::Vector{String}
@@ -1025,71 +1025,86 @@ end
 """
     AbstractFourierConvergence
 
-Termination strategy for the azimuthal Fourier loop in `rt_run`. The output
-radiances are azimuthal Fourier series,
-
-    I(μ, φ) = Σₘ wₘ Iₘ(μ) · cos m(φ₀ − φ),        m = 0 … m_max,
-
-truncated by default at the stream-derived bound `m_max ≈ 2·Nstreams − 1`.
-For near-nadir viewing and smooth phase functions the series converges much
-earlier, so LIDORT/VLIDORT test each moment's contribution as it is
-accumulated and stop when it becomes negligible (`LIDORT_CONVERGE` in
-`lidort_intensity.f90`). Concrete strategies: [`AllFourierMoments`](@ref)
-(the full series — VLIDORT's `DO_ALL_FOURIER`) and
-[`IntensityConvergence`](@ref) (the VLIDORT accuracy test). Selected via
-`RTNumericalParameters.fourier_convergence` (YAML:
-`numerics.fourier_convergence: all | intensity`).
-
-This runtime test is complementary to the *static* per-band loop bound
-derived at model build from [`component_m_max`](@ref) traits (each surface,
-source, and scatterer declares the highest Fourier order it can contribute;
-the band bound is their maximum). The traits set the ceiling `m_max` from
-what the scene *could* require; the convergence strategy stops below that
-ceiling when the accumulated intensity shows the scene *did not* require it.
-The traits are on by default (`SolverConfig.use_component_traits`); early
-exit is opt-in — the default strategy is [`AllFourierMoments`](@ref), and
-[`IntensityConvergence`](@ref) is selected via the YAML key above.
+Termination strategy for the azimuthal Fourier loop. The static component
+traits first determine the highest order the scene can contribute; a runtime
+strategy may then stop below that ceiling after the accumulated directional
+radiances have converged. [`AllFourierMoments`](@ref) retains the complete
+trait-selected series, [`IntensityConvergence`](@ref) monitors Stokes I, and
+[`StokesConvergence`](@ref) monitors every propagated Stokes component.
 """
 abstract type AbstractFourierConvergence end
 
 """
     AllFourierMoments()
 
-Run every Fourier moment `0:m_max` — the historical behavior and the
-default (bit-identical to the pre-strategy code path). VLIDORT analogue:
-`DO_ALL_FOURIER = .TRUE.`.
+Evaluate every Fourier moment through the scene's resolved `m_max`. This is
+the package default and is bit-identical to the historical full loop.
 """
 struct AllFourierMoments <: AbstractFourierConvergence end
 
-"""
-    IntensityConvergence(tolerance; n_consecutive = 2)
+raw"""
+    IntensityConvergence(tolerance; min_m=3, n_consecutive=2)
 
-VLIDORT-style Fourier convergence (mirrors `LIDORT_CONVERGE`): moment `m`
-PASSES when every tested output — Stokes-I at every view angle and every
-spectral point (and both R/T directions on the monolithic path) — satisfies
+Terminate after `n_consecutive` eligible Fourier moments satisfy
 
-    |ΔIₘ| ≤ tolerance · |I_accumulated|        (zero contributions pass),
+```math
+|\Delta I_m| \leq \epsilon |I_{0:m}|
+```
 
-where ΔIₘ is the azimuth-weighted contribution of moment `m`. After
-`n_consecutive` passing moments the loop terminates (VLIDORT's
-`DO_DOUBLE_CONVTEST` ≡ 2; its single test ≡ 1); a failing moment resets the
-counter, exactly like VLIDORT's `TESTCONV`. The moment actually used is
-logged and stored in `CoreRT._LAST_FOURIER_M_USED[]` (VLIDORT's
-`FOURIER_SAVED`).
-
-Caveats (both shared with VLIDORT): Q/U/V are truncated at the m chosen by
-the intensity test; and on the atmosphere-only path (`rt_run_atmosphere`)
-the test sees the atmospheric contribution only — EXACT for
-Lambertian-family surfaces (their m > 0 surface term is identically zero),
-approximate for azimuthally-structured BRDFs (Cox-Munk glint).
+at every monitored view and wavelength. A failing moment resets the counter.
+The test is disabled through `min(min_m-1, m_max)`: the default `min_m=3`
+prevents a structural zero at `m=1` from hiding a nonzero `m=2` contribution,
+without manufacturing moments beyond a physically shorter precomputed series.
+The combined analytic-linearization path follows the same forward stopping
+moment and propagates all Jacobian contributions through it.
 """
 struct IntensityConvergence{FT<:AbstractFloat} <: AbstractFourierConvergence
     tolerance::FT
+    min_m::Int
     n_consecutive::Int
-    function IntensityConvergence(tolerance::AbstractFloat; n_consecutive::Int = 2)
-        tolerance > 0 || throw(ArgumentError("IntensityConvergence: tolerance must be > 0"))
-        n_consecutive ≥ 1 || throw(ArgumentError("IntensityConvergence: n_consecutive must be ≥ 1"))
-        return new{typeof(tolerance)}(tolerance, n_consecutive)
+    function IntensityConvergence(tolerance::AbstractFloat;
+                                  min_m::Int=3,
+                                  n_consecutive::Int=2)
+        isfinite(tolerance) && tolerance > 0 || throw(ArgumentError(
+            "IntensityConvergence tolerance must be finite and positive"))
+        min_m >= 3 || throw(ArgumentError(
+            "IntensityConvergence min_m must be at least 3 so a structural " *
+            "m=1 zero cannot suppress a nonzero m=2 term"))
+        n_consecutive >= 1 || throw(ArgumentError(
+            "IntensityConvergence requires at least one passing moment"))
+        return new{typeof(tolerance)}(tolerance, min_m, n_consecutive)
+    end
+end
+
+raw"""
+    StokesConvergence(tolerance; min_m=3, n_consecutive=2)
+
+Terminate after `n_consecutive` eligible Fourier moments satisfy
+
+```math
+|\Delta S_{k,m}| \leq \epsilon |S_{k,0:m}|
+```
+
+independently for every propagated Stokes component at every monitored view
+and wavelength. Thus an I/Q/U solve must converge in I, Q, and U. The same
+low-order guard and forward/linearized stopping contract as
+[`IntensityConvergence`](@ref) apply.
+"""
+struct StokesConvergence{FT<:AbstractFloat} <: AbstractFourierConvergence
+    tolerance::FT
+    min_m::Int
+    n_consecutive::Int
+    function StokesConvergence(tolerance::AbstractFloat;
+                               min_m::Int=3,
+                               n_consecutive::Int=2)
+        isfinite(tolerance) && tolerance > 0 || throw(ArgumentError(
+            "StokesConvergence tolerance must be finite and positive"))
+        min_m >= 3 || throw(ArgumentError(
+            "StokesConvergence min_m must be at least 3 so structural " *
+            "low-order zeros cannot suppress a nonzero m=2 term"))
+        n_consecutive >= 1 || throw(ArgumentError(
+            "StokesConvergence requires at least one passing moment"))
+        return new{typeof(tolerance)}(tolerance, min_m, n_consecutive)
     end
 end
 
@@ -1199,12 +1214,10 @@ Base.@kwdef struct RTNumericalParameters{FT<:AbstractFloat}
     `ENV[\"JULIA_DEBUG\"] = \"vSmartMOM\"`."
     verbose::Bool = false
 
-    "Azimuthal Fourier-loop termination strategy — see
-    [`AbstractFourierConvergence`](@ref). Default [`AllFourierMoments`](@ref)
-    (full series, historical behavior). Set [`IntensityConvergence`](@ref)
-    for the VLIDORT accuracy test; YAML keys
-    `numerics.fourier_convergence: intensity`,
-    `numerics.fourier_tolerance: 1e-4`, `numerics.fourier_n_consecutive: 2`."
+    "Azimuthal Fourier-loop termination strategy. The package-wide default
+    runs all moments. Retrieval/truth workflows may explicitly select
+    `IntensityConvergence` or `StokesConvergence` after validating the omitted
+    tail for their viewing geometry."
     fourier_convergence::AbstractFourierConvergence = AllFourierMoments()
 
     "Single-scattering (first-order) truncation correction — see

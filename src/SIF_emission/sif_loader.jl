@@ -12,11 +12,14 @@ export load_sif_spectrum, sif_reference_state, load_ficus_reflectance,
 """
     sif_data_path(filename) -> String
 
-Absolute path to `filename` inside `src/SIF_emission/`. Benchmark scripts
-should use this helper rather than hardcoded absolute paths so that the
-package remains relocatable via `pkgdir(vSmartMOM)`.
+Absolute path to `filename` inside the SIF data directory. The directory is
+`src/SIF_emission/` by default and can be overridden with
+`VSMARTMOM_SIF_DATA_DIR` when the external CSV/DAT resources are intentionally
+kept out of a source-only checkout. Benchmark scripts should use this helper
+rather than hardcoded absolute paths.
 """
-sif_data_path(filename::AbstractString) = joinpath(@__DIR__, filename)
+sif_data_path(filename::AbstractString) = joinpath(
+    get(ENV, "VSMARTMOM_SIF_DATA_DIR", @__DIR__), filename)
 
 """
     load_sif_spectrum(path=sif_data_path("sif-spectra.csv"); column=:SIF_OLD,

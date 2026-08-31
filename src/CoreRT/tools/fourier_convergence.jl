@@ -1,76 +1,133 @@
-# ==============================================================================
-# Azimuthal Fourier-loop convergence — the VLIDORT accuracy test.
-#
-# See AbstractFourierConvergence / IntensityConvergence in types.jl for the
-# strategy contract and LIDORT_CONVERGE (lidort_intensity.f90, LIDORT 3.7)
-# for the reference semantics this mirrors:
-#
-#   moment m passes  ⇔  |ΔIₘ| ≤ tolerance·|I_accumulated|  at EVERY tested
-#   output (zero contributions pass); n_consecutive passing moments end the
-#   loop; a failing moment resets the counter (VLIDORT's TESTCONV).
-# ==============================================================================
+# Azimuthal Fourier-series convergence helpers.
 
-"""
-Diagnostic: the highest Fourier moment actually computed by the most recent
-`rt_run` on this task (VLIDORT's `FOURIER_SAVED`). Equals the stream-derived
-`m_max` when the full series ran ([`AllFourierMoments`](@ref) or no early
-convergence); smaller when [`IntensityConvergence`](@ref) terminated early.
-"""
+"Highest Fourier order completed by the most recent forward/linearized solve."
 const _LAST_FOURIER_M_USED = Ref{Int}(-1)
 
-# One tested output combination: pass ⇔ |Δ| ≤ tol·|new| (LIDORT's ACCUR test,
-# with TAZM == 0 ⇒ pass because the inequality then reads 0 ≤ tol·|new|).
-@inline _fc_pass(Δ, new, tol) = abs(Δ) ≤ tol * abs(new)
+_fourier_convergence_active(::AllFourierMoments) = false
+_fourier_convergence_active(::IntensityConvergence) = true
+_fourier_convergence_active(::StokesConvergence) = true
 
 """
-    _fourier_full_passes(c, R_SFI, R_prev, T_SFI, T_prev) -> Bool
+Highest order protected from convergence testing for this solve.
 
-Monolithic-path test: the accumulators R_SFI/T_SFI (host arrays, shape
-`(nVZA, pol_n, nSpec)`) already carry this moment's azimuth-weighted
-contribution; the previous-moment snapshots give ΔIₘ by difference. Tests
-Stokes-I (slot 1) at every view angle and spectral point, both directions —
-LIDORT's "ALL directions AND ALL stream values AND ALL azimuths".
+`convergence.min_m - 1` is the configured low-order safety guard. Clamping it
+to `m_max` means a physically shorter series is evaluated in full rather than
+being extended solely to exercise the runtime test.
 """
-function _fourier_full_passes(c::IntensityConvergence, R_SFI, R_prev, T_SFI, T_prev)
-    tol = c.tolerance
-    for (A, A0) in ((R_SFI, R_prev), (T_SFI, T_prev))
-        @inbounds for s in axes(A, 3), v in axes(A, 1)
-            _fc_pass(A[v, 1, s] - A0[v, 1, s], A[v, 1, s], tol) || return false
+@inline _fourier_guard_through_m(convergence, m_max::Int) =
+    min(convergence.min_m - 1, m_max)
+
+"Drop unavailable diagnostics while retaining a stable tuple of output arrays."
+_fourier_outputs(outputs...) = Tuple(output for output in outputs if output !== nothing)
+
+"Create previous-partial-sum snapshots used to isolate the next m term."
+_fourier_snapshots(outputs::Tuple) = map(copy, outputs)
+
+"Copy current accumulated outputs into reusable previous-moment snapshots."
+function _update_fourier_snapshots!(snapshots::Tuple, outputs::Tuple)
+    length(snapshots) == length(outputs) || throw(DimensionMismatch(
+        "Fourier convergence snapshot/output counts differ"))
+    foreach(copyto!, snapshots, outputs)
+    return snapshots
+end
+
+@inline _fourier_component_indices(::IntensityConvergence, output) = 1:1
+@inline _fourier_component_indices(::StokesConvergence, output) = axes(output, 2)
+
+"""
+Return `true` when the latest contribution passes for every component selected
+by `convergence`, at every view and wavelength in every supplied output.
+Directional radiance arrays use the package layout `(view, stokes, spectral)`.
+"""
+function _fourier_outputs_pass(convergence::Union{IntensityConvergence,StokesConvergence},
+                               outputs::Tuple,
+                               snapshots::Tuple)
+    length(outputs) == length(snapshots) || throw(DimensionMismatch(
+        "Fourier convergence snapshot/output counts differ"))
+    tolerance = convergence.tolerance
+    for (output, previous) in zip(outputs, snapshots)
+        ndims(output) == 3 || throw(DimensionMismatch(
+            "Fourier convergence expects (view, stokes, spectral) arrays; " *
+            "received size $(size(output))"))
+        size(output) == size(previous) || throw(DimensionMismatch(
+            "Fourier convergence snapshot shape differs from its output"))
+        for component in _fourier_component_indices(convergence, output)
+            current_component = selectdim(output, 2, component)
+            previous_component = selectdim(previous, 2, component)
+            @inbounds for index in eachindex(current_component, previous_component)
+                delta = current_component[index] - previous_component[index]
+                abs(delta) <= tolerance * abs(current_component[index]) || return false
+            end
         end
     end
     return true
 end
 
-"""
-    _fourier_proxy_passes!(c, I_acc, J₀⁻, vza, vaz, qp_μ, pol_type, m, weight) -> Bool
+"Update the pass counter and report whether the Fourier loop may stop."
+function _fourier_convergence_step!(
+    convergence::Union{IntensityConvergence,StokesConvergence},
+    outputs::Tuple,
+    snapshots::Tuple,
+    consecutive_passes::Int,
+    m::Int,
+    m_max::Int)
+    if m <= _fourier_guard_through_m(convergence, m_max)
+        _update_fourier_snapshots!(snapshots, outputs)
+        return false, 0
+    end
+    passed = _fourier_outputs_pass(convergence, outputs, snapshots)
+    _update_fourier_snapshots!(snapshots, outputs)
+    consecutive_passes = passed ? consecutive_passes + 1 : 0
+    return consecutive_passes >= convergence.n_consecutive, consecutive_passes
+end
 
-Atmosphere-only-path test (`stop_after_atmosphere = true`, i.e.
-`rt_run_atmosphere`): postprocessing never runs there, so this moment's
-TOA Stokes-I contribution at the user view angles is extracted directly from
-the composite layer's upwelling source `J₀⁻` with the SAME nearest-stream
-lookup and `weight·cos(m·Δφ)` azimuth factor postprocessing would apply
-(`_precompute_vza_weights` IS the production helper). The contribution is
-accumulated into the host buffer `I_acc (nVZA, nSpec)` and tested against it.
-Exact for Lambertian-family surfaces (zero m > 0 surface term); see the
-[`IntensityConvergence`](@ref) caveat for structured BRDFs.
 """
-function _fourier_proxy_passes!(c::IntensityConvergence, I_acc, J₀⁻,
-                                vza, vaz, qp_μ, pol_type, m, weight)
-    tol = c.tolerance
+    _fourier_proxy_step!(convergence, accumulated, J₀⁻, ...)
+
+Atmosphere-only convergence step used while constructing a reusable
+`AtmosphereRTCache`. Postprocessing is intentionally skipped on that path, so
+this helper extracts the current moment at the requested view nodes using the
+same nearest-stream indices and azimuthal Stokes weights as production
+postprocessing. The cache callback runs before this test, ensuring the retained
+moment set and the accumulated proxy remain synchronized.
+
+The proxy sees the atmosphere-only source. It is exact for Lambertian-family
+surface replays (their `m>0` surface term is zero) and must be overridden to a
+full series when the cache targets an azimuthally structured surface.
+"""
+function _fourier_proxy_step!(
+    convergence::Union{IntensityConvergence,StokesConvergence},
+    accumulated,
+    J₀⁻,
+    vza,
+    vaz,
+    qp_μ,
+    pol_type,
+    m::Int,
+    weight,
+    consecutive_passes::Int,
+    m_max::Int)
     vza_info = _precompute_vza_weights(vza, vaz, qp_μ, pol_type, m, weight)
-    pass = true
+    source = Array(J₀⁻)
+    passed = true
     @inbounds for i in eachindex(vza)
-        istart, _, w = vza_info[i]
-        # Stokes-I row of this view's stream block; w's I-diagonal entry is
-        # weight·cos(m·Δφ) for both scalar and vector polarization types.
-        wI = pol_type.n == 1 ? w : w.diag[1]
-        Ji = Array(@view J₀⁻[istart, 1, :])          # (nSpec,) host copy
-        for s in eachindex(Ji)
-            Δ = wI * Ji[s]
-            new = I_acc[i, s] + Δ
-            I_acc[i, s] = new
-            pass &= _fc_pass(Δ, new, tol)
+        istart, iend, w = vza_info[i]
+        contribution = w * @view(source[istart:iend, 1, :])
+        current = @view accumulated[i, :, :]
+        current .+= contribution
+        if m > _fourier_guard_through_m(convergence, m_max)
+            for component in _fourier_component_indices(convergence, accumulated)
+                for spectral_index in axes(current, 2)
+                    delta = contribution[component, spectral_index]
+                    new = current[component, spectral_index]
+                    passed &= abs(delta) <= convergence.tolerance * abs(new)
+                end
+            end
         end
     end
-    return pass
+    if m <= _fourier_guard_through_m(convergence, m_max)
+        return false, 0
+    end
+    consecutive_passes = passed ? consecutive_passes + 1 : 0
+    return consecutive_passes >= convergence.n_consecutive, consecutive_passes
 end

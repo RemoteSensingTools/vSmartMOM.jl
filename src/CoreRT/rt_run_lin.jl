@@ -311,19 +311,21 @@ function rt_run(RS_type::AbstractRamanType,
         build_m_invariant_cache_lin(iBand, model, lin_model;
                                     active_layout)
 
-    # Runtime Fourier convergence — the linearized driver follows the
-    # forward driver's lead exactly: the SAME IntensityConvergence test on
-    # the SAME azimuth-weighted forward accumulators (R, T), so a combined
-    # forward+Jacobian run uses the same number of moments as `rt_run(model)`
-    # for the same configured model, and the Jacobian series stops with its
-    # forward radiance. Interior sensor levels stay full-series, mirroring
-    # the forward multisensor path (which has no runtime convergence).
-    fconv = model.numerics.fourier_convergence
-    fc_active = fconv isa IntensityConvergence && SFI && isempty(sensor_levels)
-    fc_npass  = 0
-    fc_R_prev = fc_active ? copy(R) : nothing
-    fc_T_prev = fc_active ? copy(T) : nothing
-    _LAST_FOURIER_M_USED[] = m_max
+    # The combined forward/analytic-linearization path uses the same forward
+    # convergence decision as `rt_run` (I only or all Stokes components,
+    # according to the selected strategy). Jacobian fields are accumulated
+    # through the accepted moment and stop at that identical m; they do not
+    # select a separate, potentially inconsistent Fourier range. Interior
+    # sensor solves retain the complete series, matching the forward
+    # multisensor contract.
+    fourier_convergence = model.numerics.fourier_convergence
+    convergence_active = _fourier_convergence_active(fourier_convergence) &&
+                         SFI && isempty(sensor_levels)
+    convergence_outputs = convergence_active ? _fourier_outputs(R, T) : ()
+    convergence_snapshots = convergence_active ?
+        _fourier_snapshots(convergence_outputs) : ()
+    convergence_passes = 0
+    m_used = m_max
 
     # Loop over fourier moments
     for m = 0:m_max
@@ -498,19 +500,18 @@ function rt_run(RS_type::AbstractRamanType,
             level_uw, level_dw, level_uw_lin, level_dw_lin,
             I_static, arr_type)
 
-        # Identical criterion to the forward driver: this moment's
-        # azimuth-weighted contribution is R − fc_R_prev (idem T).
-        if fc_active
-            pass = _fourier_full_passes(fconv, R, fc_R_prev, T, fc_T_prev)
-            copyto!(fc_R_prev, R); copyto!(fc_T_prev, T)
-            fc_npass = pass ? fc_npass + 1 : 0
-            if fc_npass ≥ fconv.n_consecutive
-                _LAST_FOURIER_M_USED[] = m
-                @info "Fourier series converged (linearized path)" m_used = m m_max tolerance = fconv.tolerance
+        if convergence_active
+            stop, convergence_passes = _fourier_convergence_step!(
+                fourier_convergence, convergence_outputs,
+                convergence_snapshots, convergence_passes, m, m_max)
+            if stop
+                m_used = m
+                @info "Linearized Fourier series converged" m_used=m m_max=m_max tolerance=fourier_convergence.tolerance guard_through_m=_fourier_guard_through_m(fourier_convergence, m_max) n_consecutive=fourier_convergence.n_consecutive
                 break
             end
         end
     end
+    _LAST_FOURIER_M_USED[] = m_used
 
     # `J₀⁺` is the diffuse SFI field; the historical BOA forward output also
     # carries the attenuated collimated beam when a requested VZA resolves to

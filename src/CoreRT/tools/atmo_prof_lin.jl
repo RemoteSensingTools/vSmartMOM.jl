@@ -25,6 +25,21 @@ function psurf_profile_tangents(profile::AtmosphericProfile{FT}; g₀=FT(9.80324
     return (; vcd_dry_dot, vcd_h2o_dot, Δz_dot)
 end
 
+"""
+Return a normalized column fraction and its tangent without squaring the
+column total. The factored quotient rule is algebraically equivalent to
+`(x_dot*sum(x) - x*sum(x_dot))/sum(x)^2`, but remains finite in `Float32` for
+atmospheric molecular columns of order `1e25`.
+"""
+function _normalized_column_fraction_tangent(column, column_dot)
+    total = sum(column)
+    isfinite(total) && total > zero(total) || throw(ArgumentError(
+        "column total must be finite and positive"))
+    fraction = column ./ total
+    fraction_dot = (column_dot .- fraction .* sum(column_dot)) ./ total
+    return fraction, fraction_dot
+end
+
 "Derivative of a normalized aerosol allocation with respect to p_surf."
 function aerosol_profile_psurf_tangent(dist::Normal, profile::AtmosphericProfile,
                                         Δz_dot)

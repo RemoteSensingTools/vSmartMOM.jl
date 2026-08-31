@@ -554,22 +554,12 @@ function _rt_run_column(RS_type::AbstractRamanType, model, iBand;
     # downstream arithmetic ⇒ bitwise-identical results.
     max_τϖ_all = _M_INVARIANT_DTAU_CACHE_ENABLED[] ? fill(FT(NaN), Nz) : nothing
 
-    # Azimuthal Fourier convergence (VLIDORT-style — see
-    # AbstractFourierConvergence). AllFourierMoments (default) keeps the
-    # historical full loop, bit-identical. IntensityConvergence tests each
-    # moment's Stokes-I contribution against the accumulated radiance:
-    # on the monolithic path via the R_SFI/T_SFI accumulators (host arrays —
-    # the test is free), on the atmosphere-only path via the view-extracted
-    # TOA J₀⁻ proxy (exact for Lambertian surfaces, whose m>0 surface term
-    # vanishes). `fc_npass` is VLIDORT's TESTCONV counter.
-    # `fourier_convergence_override` lets rt_run_atmosphere force the full
-    # Fourier series when the cache must serve structured (non-Lambertian)
-    # target BRDFs: the atmosphere-path convergence proxy only observes the
-    # atmosphere's TOA source and is blind to any surface a later replay
-    # will attach, so early exit could truncate the cache below a declared
-    # target's Fourier support.
-    fconv = fourier_convergence_override === nothing ?
+    # `fourier_convergence_override` lets `rt_run_atmosphere` force the full
+    # series when a reusable cache must serve an azimuthally structured target
+    # surface. Moment-stream callbacks also require the full series by contract.
+    fourier_convergence = fourier_convergence_override === nothing ?
         model.numerics.fourier_convergence : fourier_convergence_override
+    streams_callback === nothing || (fourier_convergence = AllFourierMoments())
     # Single-scattering correction strategy (see
     # AbstractSingleScatteringCorrection). Forward/lin parity policy: every
     # unsupported combination is rejected here, never silently ignored.
@@ -584,13 +574,24 @@ function _rt_run_column(RS_type::AbstractRamanType, model, iBand;
     end
     beam_view_mask = ssc isa TMSCorrection ?
         _view_node_beam_mask(quad_points, arr_type, FT) : nothing
-    fc_active = fconv isa IntensityConvergence && SFI
-    fc_npass  = 0
-    fc_R_prev = fc_active && !stop_after_atmosphere ? copy(R_SFI) : nothing
-    fc_T_prev = fc_active && !stop_after_atmosphere ? copy(T_SFI) : nothing
-    fc_I_acc  = fc_active && stop_after_atmosphere ?
-                zeros(FT, length(vza), nSpec) : nothing
-    _LAST_FOURIER_M_USED[] = m_max
+    convergence_active =
+        _fourier_convergence_active(fourier_convergence) && SFI
+    convergence_outputs = if !convergence_active || stop_after_atmosphere
+        ()
+    elseif toa_only
+        RS_type isa RRS ? _fourier_outputs(R_SFI, ieR_TOA) :
+                          _fourier_outputs(R_SFI)
+    elseif InelasticScattering.has_inelastic(RS_type)
+        _fourier_outputs(R_SFI, T_SFI, ieR_SFI, ieT_SFI)
+    else
+        _fourier_outputs(R_SFI, T_SFI)
+    end
+    convergence_snapshots = convergence_active && !stop_after_atmosphere ?
+        _fourier_snapshots(convergence_outputs) : ()
+    convergence_passes = 0
+    convergence_proxy = convergence_active && stop_after_atmosphere ?
+        zeros(FT, length(vza), pol_type.n, nSpec) : nothing
+    m_used = m_max
 
     # Loop over fourier moments
     for m = 0:m_max
@@ -690,17 +691,18 @@ function _rt_run_column(RS_type::AbstractRamanType, model, iBand;
             ))
         end
         if stop_after_atmosphere
-            # Fourier convergence on the atmosphere-only path: test the
-            # azimuth-weighted TOA Stokes-I contribution of this moment at
-            # the user view angles (the snapshot for m is already taken, so
-            # the cache stays consistent with the accumulated series).
-            if fc_active
-                pass = _fourier_proxy_passes!(fconv, fc_I_acc, composite_layer.J₀⁻,
-                                              vza, vaz, qp_μ, pol_type, m, weight)
-                fc_npass = pass ? fc_npass + 1 : 0
-                if fc_npass ≥ fconv.n_consecutive
-                    _LAST_FOURIER_M_USED[] = m
-                    @info "Fourier series converged (atmosphere path)" m_used = m m_max tolerance = fconv.tolerance
+            # The atmosphere cache callback above has already retained this
+            # moment. Apply the same I-only or full-Stokes criterion to the
+            # view-extracted atmospheric source before deciding whether the
+            # reusable cache can stop here.
+            if convergence_active
+                stop, convergence_passes = _fourier_proxy_step!(
+                    fourier_convergence, convergence_proxy,
+                    composite_layer.J₀⁻, vza, vaz, qp_μ, pol_type,
+                    m, weight, convergence_passes, m_max)
+                if stop
+                    m_used = m
+                    @info "Fourier series converged (atmosphere path)" m_used=m m_max=m_max tolerance=fourier_convergence.tolerance guard_through_m=_fourier_guard_through_m(fourier_convergence, m_max) n_consecutive=fourier_convergence.n_consecutive
                     break
                 end
             end
@@ -791,21 +793,18 @@ function _rt_run_column(RS_type::AbstractRamanType, model, iBand;
                 composite_layer, nSpec))
         end
 
-        # Fourier convergence on the monolithic path: this moment's
-        # contribution is R_SFI − fc_R_prev (idem T) — the postprocessing
-        # accumulators already carry the cos(mΔφ) azimuth weighting, exactly
-        # the TAZM that LIDORT_CONVERGE examines.
-        if fc_active && !stop_after_atmosphere
-            pass = _fourier_full_passes(fconv, R_SFI, fc_R_prev, T_SFI, fc_T_prev)
-            copyto!(fc_R_prev, R_SFI); copyto!(fc_T_prev, T_SFI)
-            fc_npass = pass ? fc_npass + 1 : 0
-            if fc_npass ≥ fconv.n_consecutive
-                _LAST_FOURIER_M_USED[] = m
-                @info "Fourier series converged" m_used = m m_max tolerance = fconv.tolerance
+        if convergence_active
+            stop, convergence_passes = _fourier_convergence_step!(
+                fourier_convergence, convergence_outputs,
+                convergence_snapshots, convergence_passes, m, m_max)
+            if stop
+                m_used = m
+                @info "Fourier series converged" m_used=m m_max=m_max tolerance=fourier_convergence.tolerance guard_through_m=_fourier_guard_through_m(fourier_convergence, m_max) n_consecutive=fourier_convergence.n_consecutive
                 break
             end
         end
     end
+    _LAST_FOURIER_M_USED[] = m_used
 
     # Single-scattering correction for Cox-Munk specular hotspot (TMS).
     # LIMITATION: this TMS correction assumes a unit incident beam per spectral
@@ -817,7 +816,7 @@ function _rt_run_column(RS_type::AbstractRamanType, model, iBand;
     if brdf isa CoxMunkSurface && SFI && !stop_after_atmosphere
         @timeit "SS Correction" apply_ss_correction!(
             R_SFI, brdf, pol_type, vza, vaz, μ₀,
-            Array(τ_sum_all[:,end]), m_max, nSpec)
+            Array(τ_sum_all[:,end]), m_used, nSpec)
     end
 
     # TMS "then add": exact single scattering from the untruncated phase

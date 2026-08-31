@@ -190,6 +190,8 @@ export OpticalPropertyJacobian,               # AD boundary struct alias
 # Export new hierarchical model types
 export AbstractRTModel, RTModel,
        SolverConfig, RTNumericalParameters,
+       AbstractFourierConvergence, AllFourierMoments, IntensityConvergence,
+       StokesConvergence,
        Atmosphere, RayleighScattering, AerosolState, Optics, OpticsLin,
        RTModelLin, ObserverRTResult, LevelRadiance,
        ObserverRTResultLin, LevelRadianceLin,
@@ -211,7 +213,6 @@ export SolarBeam, PreparedSolarBeam, prepare_source, prepare_sources, BlackbodyS
        ThermalEmission, PreparedThermalEmission, contribute!, has_thermal_emission
 
 # Export types to show easily
-export AbstractFourierConvergence, AllFourierMoments, IntensityConvergence
 export AbstractSingleScatteringCorrection, NoSSCorrection, TMSCorrection
 export RadauQuad, GaussLegQuad,
        LambertianSurfaceScalar, LambertianSurfaceSpectrum,

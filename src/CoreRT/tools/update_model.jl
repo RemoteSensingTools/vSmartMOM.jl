@@ -223,7 +223,9 @@ function BatchContext(params::vSmartMOM_Parameters;
         # branch in model_from_parameters. We are already inside the
         # `isnothing(params.absorption_params) && continue` guard above, so
         # absorption is configured here.
-        if ap.h2o_lut[i_band] !== nothing
+        if ap.h2o_lut[i_band] === :disabled
+            h2o_models[i_band] = nothing
+        elseif ap.h2o_lut[i_band] !== nothing
             h2o_models[i_band] = ap.h2o_lut[i_band]
         else
             lines_h2o = AtmosphericAbsorption.load_lines(
@@ -772,7 +774,9 @@ function _rewrite_solver_fourier_bounds!(ctx::BatchContext)
     end
 
     # Re-derive m_max_bands via the same trait aggregator as model_from_parameters.
-    components_per_band = [_band_components(params, ae_optics, model.sources, i_band)
+    components_per_band = [_band_components(params, ae_optics, model.sources, i_band;
+                                rayleigh_active=_rayleigh_active(
+                                    model.optics.τ_rayl[i_band]))
                            for i_band in 1:n_bands]
     new_m_max_bands = _derive_m_max_bands_via_traits(
         new_l_max, params.max_m, components_per_band, model.quad_points.Nstreams;

@@ -19,6 +19,24 @@ struct _MockOCOJacobianModel
     surfaces
 end
 
+@testset "Float32 normalized column tangent is overflow-safe" begin
+    column = Float32[1.2e24, 3.4e24, 8.1e24, 1.7e25]
+    column_dot = Float32[0, 0, 0, 1.3e22]
+    fraction, fraction_dot = CoreRT._normalized_column_fraction_tangent(
+        column, column_dot)
+    @test all(isfinite, fraction)
+    @test all(isfinite, fraction_dot)
+    @test sum(fraction) ≈ 1f0 rtol=2f-7
+    @test sum(fraction_dot) ≈ 0f0 atol=2f-10
+
+    reference_column = Float64.(column)
+    reference_dot = Float64.(column_dot)
+    total = sum(reference_column)
+    reference = (reference_dot .* total .-
+                 reference_column .* sum(reference_dot)) ./ total^2
+    @test Float64.(fraction_dot) ≈ reference rtol=5e-6 atol=1e-12
+end
+
 function _selective_fd_metrics(analytic, finite_difference; threshold=1e-10)
     absolute = abs.(analytic .- finite_difference)
     mask = abs.(finite_difference) .> threshold
