@@ -108,12 +108,9 @@ function jacobian_plan(flavor::OCO_RRS_synth, params, model, lin_model)
     abs_params = params.absorption_params
     abs_params === nothing && throw(ArgumentError(
         "OCO_RRS_synth requires configured CO2 absorption"))
-    variable_species = unique(Iterators.flatten(abs_params.variable_molecules))
-    ico2 = findfirst(==("CO2"), variable_species)
-    ico2 === nothing && throw(ArgumentError(
-        "OCO_RRS_synth requires CO2 in variable_molecules"))
-    # The native gas block reserves species 1 for q-driven H2O.
-    native_co2_species = 1 + ico2
+    any(bands -> "CO2" in bands, abs_params.variable_molecules) ||
+        throw(ArgumentError(
+            "OCO_RRS_synth requires CO2 in variable_molecules"))
 
     global_keys = _oco_global_keys(n_aerosol, n_band, active_co2_layers)
     global_names = _oco_parameter_name.(global_keys)
@@ -124,8 +121,6 @@ function jacobian_plan(flavor::OCO_RRS_synth, params, model, lin_model)
         n_native_gas % Nz == 0 || throw(DimensionMismatch(
             "native gas derivative count $n_native_gas is not divisible by Nz=$Nz"))
         native_gas_species = n_native_gas ÷ Nz
-        native_co2_species <= native_gas_species || throw(ArgumentError(
-            "native CO2 gas block is absent in band $i_band"))
         native = ParameterLayout(aerosol_params=7, n_aerosols=n_aerosol,
                                  n_gases=n_native_gas, n_surface=3)
 
@@ -139,8 +134,15 @@ function jacobian_plan(flavor::OCO_RRS_synth, params, model, lin_model)
             append!(native_columns, (arange[1], arange[6]))
         end
 
-        co2_active_in_band = "CO2" in abs_params.variable_molecules[i_band]
-        if co2_active_in_band
+        # The native gas block is per-band positional (`jac_idx = molec_i + 1`
+        # over variable_molecules[i_band], slot 1 reserved for q-driven H2O),
+        # so the CO2 species slot must be derived per band, not from the
+        # cross-band unique() order.
+        ico2_band = findfirst(==("CO2"), abs_params.variable_molecules[i_band])
+        if ico2_band !== nothing
+            native_co2_species = 1 + ico2_band
+            native_co2_species <= native_gas_species || throw(ArgumentError(
+                "native CO2 gas block is absent in band $i_band"))
             for iz in active_co2_layers
                 push!(keys, _oco_gas_key(iz))
                 push!(native_columns,
