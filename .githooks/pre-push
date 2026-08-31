@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+
+# Reject pushes whose reachable history contains protected research paths.
+# This catches old commits and non-branch recovery refs that pre-commit cannot.
+
+set -eu
+
+if [ "${VSMARTMOM_ALLOW_PRIVATE_PATHS:-0}" = "1" ]; then
+    exit 0
+fi
+
+zero_oid=0000000000000000000000000000000000000000
+
+while read -r local_ref local_oid remote_ref remote_oid; do
+    if [ "$local_oid" = "$zero_oid" ]; then
+        continue
+    fi
+
+    blocked_paths="$(
+        git rev-list --objects "$local_oid" |
+        grep -E '^[0-9a-f]+ (RRS_XCO2/(resources|manuscript)/|TODO/PRIVATE_)' || true
+    )"
+
+    if [ -n "$blocked_paths" ]; then
+        printf '%s\n' \
+            "ERROR: refusing to push $local_ref to $remote_ref." \
+            'Its reachable history contains paths protected by the privacy guard:' \
+            "$blocked_paths" \
+            '' \
+            'Rewrite or remove the private history before pushing.' >&2
+        exit 1
+    fi
+done
+
+exit 0
