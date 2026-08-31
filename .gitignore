@@ -55,6 +55,14 @@ plots/
 # RRS/XCO2 workflow products are reproducible and can be large or actively
 # updated during remote runs. Keep source/configuration/provenance in Git and
 # force-add only small reference tables that form part of the documented input.
+#
+# PRIVACY BOUNDARY: manuscripts and locally collected resources are maintained
+# outside this public repository under ~/RRS_XCO2. Never stage either tree,
+# including with `git add -f` (the repository pre-commit guard also rejects it).
+RRS_XCO2/resources/
+RRS_XCO2/manuscript/
+# Private research handoffs belong in ~/RRS_XCO2/private_notes, not Git.
+TODO/PRIVATE_*
 RRS_XCO2/output/
 RRS_XCO2/truth_map/logs/
 RRS_XCO2/truth_map/*.log
