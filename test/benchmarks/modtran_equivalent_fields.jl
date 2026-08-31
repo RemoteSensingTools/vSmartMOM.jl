@@ -7,7 +7,7 @@
 #     ρ_TOA(ρ_s) = ρ_atm + T↓(μ_s) · ρ_s · T↑(μ_v) / (1 − ρ_s · S)
 #
 # The full derivation, including the flux-based closure for S, is in
-# plans/MODTRAN_equivalent_equations.md.
+# docs/dev_notes/plans/MODTRAN_equivalent_equations.md.
 #
 # Output fields (one per (H2O, AOT, GNDALT, TSZ) scenario × wavelength):
 #   rhoatm           — path reflectance  (π·L₀/μ_s with ρ_s=0)
@@ -94,7 +94,7 @@ function write_modtran_equiv_nc(path, h2o_axis, aot_axis, gndalt_axis, tsz_axis,
                                 transm_up_dir, transm_up_dif, sphalb, metadata)
     ds = NCDataset(path, "c")
     ds.attrib["title"]       = "vSmartMOM MODTRAN-equivalent atmospheric LUT"
-    ds.attrib["description"] = "Lambertian two-albedo decomposition of paired vSmartMOM noRS runs (ρ_s=0 and ρ_s=0.2). See plans/MODTRAN_equivalent_equations.md."
+    ds.attrib["description"] = "Lambertian two-albedo decomposition of paired vSmartMOM noRS runs (ρ_s=0 and ρ_s=0.2). See docs/dev_notes/plans/MODTRAN_equivalent_equations.md."
     ds.attrib["source"]      = "vSmartMOM.jl"
     ds.attrib["alb0_jld2"]   = metadata["alb0_jld2"]
     ds.attrib["alb02_jld2"]  = metadata["alb02_jld2"]

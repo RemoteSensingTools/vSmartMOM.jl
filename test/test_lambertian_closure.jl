@@ -1,6 +1,6 @@
 # =========================================================================
 # LambertianClosure — analytic O(1)-per-albedo Lambertian surface closure
-# (proposals/surface_split_albedo_sweep.md §3) + the :slim AtmosphereRTCache
+# (docs/dev_notes/proposals/surface_split_albedo_sweep.md §3) + the :slim AtmosphereRTCache
 # (§4).
 # =========================================================================
 #

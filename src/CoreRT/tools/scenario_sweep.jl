@@ -1,6 +1,6 @@
 # =============================================================================
 # Scenario sweeps: SZA × view-pair × BRDF over one scene
-# (proposals/surface_split_albedo_sweep.md §6/§7, PR 3)
+# (docs/dev_notes/proposals/surface_split_albedo_sweep.md §6/§7, PR 3)
 #
 # Declarative description of the cross product (SZA × view-pair × BRDF) to
 # evaluate for one scene, plus a driver that executes it efficiently:

@@ -12,7 +12,7 @@ adding step (`CoreKernel/interaction.jl`'s
 `J₀⁻ ← J₀⁻ + T⁻⁻·(E − r⁻⁺R⁺⁻)⁻¹·(r⁻⁺J₀⁺ + j₀⁻)`) collapses via
 Sherman-Morrison to a scalar rational function of the albedo `a` — once
 three scalars/vectors are read from the cached m=0 atmosphere block, no
-matrix algebra is needed at all. See `proposals/surface_split_albedo_sweep.md`
+matrix algebra is needed at all. See `docs/dev_notes/proposals/surface_split_albedo_sweep.md`
 §3 for the full derivation; this file implements it.
 
 Derivation summary (all quantities per spectral point `s`; `u` = Stokes-I
@@ -107,7 +107,7 @@ function lambertian_closure(cache::AtmosphereRTCache{FT}) where {FT}
     isempty(cache.J₀_by_src_per_m[1]) || throw(ArgumentError(
         "lambertian_closure: cache carries per-source J₀ slots (e.g. thermal " *
         "emission) — the analytic closure only covers the solar-only path " *
-        "today (proposals/surface_split_albedo_sweep.md §3); extending (†) to " *
+        "today (docs/dev_notes/proposals/surface_split_albedo_sweep.md §3); extending (†) to " *
         "the extra source terms is a follow-up."))
     has_surface_sif(cache.prepared_sources) && throw(ArgumentError(
         "lambertian_closure: cache carries a SurfaceSIF source — SIF is " *

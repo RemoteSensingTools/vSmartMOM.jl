@@ -1,5 +1,5 @@
 #=
-Batched caller-node Mie seam tests (proposals/batched_mie_nodes_seam.md v2).
+Batched caller-node Mie seam tests (docs/dev_notes/proposals/batched_mie_nodes_seam.md v2).
 
 Acceptance gates exercised here:
   1. Bitwise `==` batched-vs-single per ensemble: all three precision

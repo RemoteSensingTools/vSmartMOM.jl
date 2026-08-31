@@ -13,7 +13,7 @@
 #   * Single-scattering outputs removed. The MODTRAN-equivalent decomposition
 #     now uses the two-albedo flux closure (bhr_dw at α=0 and α=0.2) and no
 #     longer needs a single-scatter proxy for the spherical albedo. See
-#     `plans/MODTRAN_equivalent_equations.md` for the derivation.
+#     `docs/dev_notes/plans/MODTRAN_equivalent_equations.md` for the derivation.
 #   * Total column τ (absorption + Rayleigh + aerosol extinction, vertical)
 #     is written as a spectrum per scenario.
 #   * Default YAML switched to ParamsEMIT_MODTRANcomp_newLUT.yaml (rebuilt

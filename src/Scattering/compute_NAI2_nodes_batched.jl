@@ -2,7 +2,7 @@
 =====================================================================
 Batched caller-node Mie seam (exact-nmax grouping + reusable GPU workspace).
 =====================================================================
-Implements proposals/batched_mie_nodes_seam.md (v2). See that file for the
+Implements docs/dev_notes/proposals/batched_mie_nodes_seam.md (v2). See that file for the
 full design rationale (why v1's global-max-padded batch was rejected, the
 memory-amplification numbers, the review findings this design encodes).
 

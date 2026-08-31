@@ -1,6 +1,6 @@
 # =========================================================================
 # Atmosphere/surface split — rt_run_atmosphere / rt_run_surface /
-# rt_run_multi_surface (see `proposals/surface_split_albedo_sweep.md`)
+# rt_run_multi_surface (see `docs/dev_notes/proposals/surface_split_albedo_sweep.md`)
 # =========================================================================
 #
 # `rt_run`'s Fourier loop touches the surface at exactly one point per

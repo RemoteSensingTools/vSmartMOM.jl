@@ -680,7 +680,7 @@ struct AtmosphereRTCache{FT, AT3, AT1, AT2, AT, PT, QT, ARCH, RS, PS, IS,
     "`:full` (all six blocks at every m) or `:slim` (six blocks at m=0 only;
     `J₀⁺`/`J₀⁻`/per-source slots only at m>0 — valid only when every
     replayed BRDF is Lambertian-family, see the memory-footprint note
-    above and `proposals/surface_split_albedo_sweep.md` §4)."
+    above and `docs/dev_notes/proposals/surface_split_albedo_sweep.md` §4)."
     cache_mode::Symbol
     "Spectral band index this cache was built for (single-element; see the
     module-level scope note in `rt_run_split.jl`)"
