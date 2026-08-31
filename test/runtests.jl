@@ -28,7 +28,7 @@ try
 # log-normal NAI2 path via the shared _nai2_bulk_optics core.
 @testset "Mie caller-node API" begin include("test_mie_nodes.jl") end
 
-# Batched caller-node Mie seam (proposals/batched_mie_nodes_seam.md v2) --
+# Batched caller-node Mie seam (docs/dev_notes/proposals/batched_mie_nodes_seam.md v2) --
 # exact-nmax grouped GPU batching + reusable single-owner workspace.
 @testset "Mie caller-node batched API" begin include("test_mie_nodes_batched.jl") end
 @testset "CoreRT" begin include("test_CoreRT.jl") end
@@ -120,18 +120,18 @@ try
 
 # Atmosphere/surface split — rt_run_atmosphere / rt_run_surface /
 # rt_run_multi_surface. Bit-exactness regression against monolithic rt_run
-# (same kernels, same inputs); see proposals/surface_split_albedo_sweep.md.
+# (same kernels, same inputs); see docs/dev_notes/proposals/surface_split_albedo_sweep.md.
 @testset "Surface split" begin include("test_surface_split.jl") end
 
 # Analytic Lambertian-albedo closure (O(1) per albedo) over a cached
 # atmosphere, + the :slim AtmosphereRTCache mode; see
-# proposals/surface_split_albedo_sweep.md §3-4.
+# docs/dev_notes/proposals/surface_split_albedo_sweep.md §3-4.
 @testset "Lambertian closure" begin include("test_lambertian_closure.jl") end
 
 # SZA × view-pair × BRDF scenario sweeps: `remake_geometry`'s bit-exactness
 # vs a full `model_from_parameters` rebuild, plus `run_sweep`'s output
 # against a monolithic `rt_run` reference; see
-# proposals/surface_split_albedo_sweep.md §6-7 (PR 3).
+# docs/dev_notes/proposals/surface_split_albedo_sweep.md §6-7 (PR 3).
 @testset "Scenario sweep" begin include("test_scenario_sweep.jl") end
 
 # Performance-path regressions (perf/fused-adding-kernels). Each file's GPU

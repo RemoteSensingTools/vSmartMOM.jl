@@ -3,7 +3,7 @@
 #
 # Exercises the `perturb_parameters` utility ported from sanghavi at
 # src/Testing/perturb_parameters.jl in Phase 1e of the sanghavi-unified
-# merge (see plans/IMPLEMENTATION_PLAN_v2.md). The utility produces a
+# merge (see docs/dev_notes/plans/IMPLEMENTATION_PLAN_v2.md). The utility produces a
 # vector of perturbed `vSmartMOM_Parameters` copies suitable for FD-Jacobian
 # verification against the analytic linearized RT output.
 #

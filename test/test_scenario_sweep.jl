@@ -1,6 +1,6 @@
 # =========================================================================
 # Scenario sweeps: SZA × view-pair × BRDF over one scene
-# (see `proposals/surface_split_albedo_sweep.md` §6/§7, PR 3)
+# (see `docs/dev_notes/proposals/surface_split_albedo_sweep.md` §6/§7, PR 3)
 # =========================================================================
 #
 # Two things are under test here:

@@ -68,7 +68,7 @@ function batched_mul(A::Array{T,3}, B::Array{T,3}) where {T<:LinearAlgebra.BLAS.
     # Singleton-batch defers to NNlib's generic path. The threaded `mul!` loop
     # over `1:1` was empirically producing wrong (≈ 1/50) intensities in
     # multi-layer Stokes_I + per-layer-injection elastic RT — surfaced by the
-    # VLIDORT baseline Case B (see dev_notes/nspec1_multilayer_stokesI_bug.md).
+    # VLIDORT baseline Case B (see docs/dev_notes/nspec1_multilayer_stokesI_bug.md).
     if size(A, 3) == 1
         return invoke(NNlib.batched_mul,
                       Tuple{AbstractArray{T,3}, AbstractArray{T,3}},

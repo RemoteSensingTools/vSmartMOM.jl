@@ -10,7 +10,7 @@
 #   - Hemispheric integrals non-negative and bounded.
 #
 # The driver was ported from sanghavi-branch `rt_run_ss` in Phase 1c of the
-# sanghavi-unified merge (see plans/IMPLEMENTATION_PLAN_v2.md). Before the
+# sanghavi-unified merge (see docs/dev_notes/plans/IMPLEMENTATION_PLAN_v2.md). Before the
 # port, unified exported `rt_run_ss` without defining it — calling it raised
 # `UndefVarError`. This smoke test guards against regressing the fix.
 

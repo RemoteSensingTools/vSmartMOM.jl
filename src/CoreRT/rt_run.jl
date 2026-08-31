@@ -398,7 +398,7 @@ function _rt_run_column(RS_type::AbstractRamanType, model, iBand;
 
     # Normalize ϖ_λ₁λ₀ so its sum equals the Raman fraction of scattering
     # (1 - ϖ_Cabannes) for this band. Missing on unified → inelastic ieR/ieT
-    # was off by ~4× relative to sanghavi reference (see plans/PHASE_1B_STAGING.md §8).
+    # was off by ~4× relative to sanghavi reference (see docs/dev_notes/plans/PHASE_1B_STAGING.md §8).
     # Ported from sanghavi/src/CoreRT/rt_run.jl:293.
     InelasticScattering.normalize_raman_weights!(RS_type, model, iBand)
 
@@ -1044,7 +1044,7 @@ complete RT solution (multiple scattering is dropped).
 
 Equivalent to `rt_run_ss(noRS(), model, i_band)`.
 
-Ported from sanghavi-branch `rt_run_ss` (see `plans/IMPLEMENTATION_PLAN_v2.md`
+Ported from sanghavi-branch `rt_run_ss` (see `docs/dev_notes/plans/IMPLEMENTATION_PLAN_v2.md`
 Phase 1c).
 
 # Arguments

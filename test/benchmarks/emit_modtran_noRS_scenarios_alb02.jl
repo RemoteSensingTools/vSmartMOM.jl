@@ -4,7 +4,7 @@
 # Paired companion to emit_modtran_noRS_scenarios.jl. Writes exactly the same
 # per-scenario fields (R_tot, T_tot, tau_total, hemR_tot, hemT_tot) so that
 # modtran_equivalent_fields.jl can assemble the MODTRAN-equivalent fields via
-# the two-albedo Lambertian closure (see plans/MODTRAN_equivalent_equations.md).
+# the two-albedo Lambertian closure (see docs/dev_notes/plans/MODTRAN_equivalent_equations.md).
 #
 # 2026-04-24 rewrite:
 #   * Default YAML switched to ParamsEMIT_MODTRANcomp_newLUT_alb02.yaml

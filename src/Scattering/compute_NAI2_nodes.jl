@@ -24,7 +24,7 @@ Key differences from the log-normal (`MieModel`) entry point:
 
 This is the intended seam for sectional/tabulated aerosol size distributions;
 GCHPIO's TOMAS two-moment bins are the first consumer (see
-`proposals/gchp_aerosol_optics/`).
+`docs/dev_notes/proposals/gchp_aerosol_optics/`).
 =====================================================================
 =#
 

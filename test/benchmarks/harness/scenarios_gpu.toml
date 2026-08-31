@@ -3,7 +3,7 @@
 # Mirrors scenarios.toml but sets architecture = "gpu". Used to establish
 # GPU baselines post-Phase 4 InteractionWorkspace port: if the numbers
 # show significant headroom remaining beyond sanghavi, Phase 5 is real;
-# otherwise the phase exits as a no-op (dev_notes/phase5_headroom.md).
+# otherwise the phase exits as a no-op (docs/dev_notes/phase5_headroom.md).
 
 [[scenario]]
 name        = "phase1b_RRS_761-764nm_gpu"

@@ -87,7 +87,7 @@ export compute_aerosol_optical_properties_nodes,
 export compute_aerosol_extinction_nodes,
        compute_aerosol_extinction_nodes_gpu
 
-# Batched caller-node Mie seam (proposals/batched_mie_nodes_seam.md v2) —
+# Batched caller-node Mie seam (docs/dev_notes/proposals/batched_mie_nodes_seam.md v2) —
 # exact-nmax grouped GPU batching + reusable single-owner workspace, for
 # many-ensemble columns (e.g. GCHPIO's per-layer TOMAS inventory).
 export prepare_mie_node_geometry, MieNodeGeometry,

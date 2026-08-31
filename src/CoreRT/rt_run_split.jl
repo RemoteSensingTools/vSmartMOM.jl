@@ -13,7 +13,7 @@
 # `O(NquadN^3 · nSpec)` per moment instead of `O(Nz · NquadN^3 · nSpec)`.
 #
 # Ported from the `gchp-io` branch prototype (see
-# `proposals/surface_split_albedo_sweep.md` §1-2) and re-mirrored against
+# `docs/dev_notes/proposals/surface_split_albedo_sweep.md` §1-2) and re-mirrored against
 # the current `rt_run.jl` surface block. The two blocks must stay in
 # lockstep: when `rt_run.jl`'s surface block changes, update the mirrored
 # calls in `rt_run_surface` below (same call order, same kwargs).

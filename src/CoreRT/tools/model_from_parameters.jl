@@ -665,7 +665,7 @@ between geometries — that's expected and harmless, since `rt_run` sizes
 its per-call `NquadN` from `model.quad_points.Nquad` fresh on every
 call, not from anything cached at model-build time.
 
-See `proposals/surface_split_albedo_sweep.md` §6/§7 (PR 3) for the
+See `docs/dev_notes/proposals/surface_split_albedo_sweep.md` §6/§7 (PR 3) for the
 design context — this is the seam `run_sweep` uses to amortise the
 per-SZA HITRAN/Mie rebuild across a scenario sweep.
 """
