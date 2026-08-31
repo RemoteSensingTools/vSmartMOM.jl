@@ -29,7 +29,7 @@ function main()
     CUDA.reclaim()
     free_before = CUDA.available_memory()
     t0 = time_ns()
-    result = simulate_o2(state, (coreν, solveν, keep), solar_T)
+    result = simulate_o2(state, (grids[1], solveν, keep), solar_T)
     CUDA.synchronize()
     elapsed = (time_ns() - t0) / 1e9
     free_after = CUDA.available_memory()

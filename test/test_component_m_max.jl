@@ -86,6 +86,13 @@ const _CTX_30 = (; user_l_cap = 30, stream_l_cap = 30,
         as = Scattering.AerosolOptics(greek_coefs=gs, ω̃=[1.0, 1.0],
                                       k=[1.0, 1.0], fᵗ=[0.0, 0.0])
         @test CoreRT.component_m_max(as, ctx) == 4
+
+        # A spherical/isotropic phase function has only β₀ support.
+        giso = Scattering.GreekCoefs(zeros(1), ones(1), zeros(1),
+                                     zeros(1), zeros(1), zeros(1))
+        aiso = Scattering.AerosolOptics(
+            greek_coefs=giso, ω̃=1.0, k=1.0, fᵗ=0.0)
+        @test CoreRT.component_m_max(aiso, _CTX_30) == 0
     end
 end
 
@@ -144,4 +151,13 @@ end
     # PureRayleighParameters.yaml has max_m=3, so order cap = 2.
     @test m.solver.m_max_bands == fill(2, length(m.solver.m_max_bands))
     @test m.solver.n_fourier_moments_bands == fill(3, length(m.solver.n_fourier_moments_bands))
+
+    @test !CoreRT._rayleigh_active(zeros(2, 3))
+    @test CoreRT._rayleigh_active([0.0 0.0; 0.0 1e-12])
+    vacuum_components = CoreRT._band_components(
+        params, Any[], CoreRT.SolarBeam(), 1; rayleigh_active=false)
+    vacuum_ctx = (; user_l_cap=30, stream_l_cap=30,
+                  m_max_override=nothing, truncation=nothing,
+                  greek_beta_cutoff=nothing)
+    @test CoreRT._aggregate_m_max(vacuum_components, vacuum_ctx) == 0
 end

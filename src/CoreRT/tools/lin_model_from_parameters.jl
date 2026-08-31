@@ -88,16 +88,28 @@ This is the **linearized** counterpart of `model_from_parameters(params)`. It co
   structurally valid zero tangents are supplied to the downstream mixer.
 - Set `compute_h2o_jacobians=false` when the q-driven H2O profile is fixed.
   Its forward absorption is retained without generating H2O tangent entries.
+- `aerosol_anchor_bands` has the same meaning as in the forward constructor:
+  it fixes aerosol spectral endpoint calculations to canonical full-band
+  grids while evaluating the interpolated optics on chunked or
+  shoulder-expanded solve grids. Forward and tangent optics always share the
+  same anchors.
 """
 function model_from_parameters(lin::LinMode,
     params::vSmartMOM_Parameters;
     sources::AbstractSource = SolarBeam(),
     external_solar::Bool = true,
+    aerosol_anchor_bands=nothing,
     compute_aerosol_microphysics_jacobians::Bool = true,
     compute_h2o_jacobians::Bool = true)
     FT = params.float_type
     n_bands = length(params.spec_bands)
     n_aer = isnothing(params.scattering_params) ? 0 : length(params.scattering_params.rt_aerosols)
+    aerosol_bands = aerosol_anchor_bands === nothing ? params.spec_bands :
+                     aerosol_anchor_bands
+    length(aerosol_bands) == n_bands || throw(DimensionMismatch(
+        "aerosol_anchor_bands must have one grid per spectral band"))
+    all(!isempty, aerosol_bands) || throw(ArgumentError(
+        "aerosol interpolation anchor grids must be nonempty"))
     scat = params.scattering_params
     abs_params = params.absorption_params
     if scat !== nothing && any(_has_analytic_phase_function, scat.rt_aerosols)
@@ -180,22 +192,28 @@ function model_from_parameters(lin::LinMode,
         drydot = psurf_tangents.vcd_dry_dot
         total = vec(sum(τ_rayl[i_band], dims=2))
         totaldot = total ./ profile.p_half[end]
-        frac = dry ./ sum(dry)
-        fracdot = (drydot .* sum(dry) .- dry .* sum(drydot)) ./ sum(dry)^2
+        # Use the factored quotient rule: the direct form squares the total
+        # dry column (~1e25), which overflows in Float32 and makes the entire
+        # surface-pressure Jacobian NaN.
+        frac, fracdot = _normalized_column_fraction_tangent(dry, drydot)
         τ̇_rayl_psurf[i_band] .= totaldot * frac' .+ total * fracdot'
 
         (isnothing(abs_params) && isnothing(params.q)) && continue
 
         if !isnothing(params.q) && any(!iszero, params.q)
             jac_idx = 1
-            if !isnothing(abs_params) && !isempty(abs_params.h2o_lut) && abs_params.h2o_lut[i_band] !== nothing
+            h2o_setting = isnothing(abs_params) || isempty(abs_params.h2o_lut) ?
+                          nothing : abs_params.h2o_lut[i_band]
+            if h2o_setting === :disabled
+                nothing
+            elseif h2o_setting !== nothing
                 if compute_h2o_jacobians
                     @timeit "Absorption Coeff H2O" compute_h2o_absorption_profile!(
                         τ_abs[i_band], τ̇_abs[i_band], jac_idx,
-                        abs_params.h2o_lut[i_band], params.spec_bands[i_band], profile)
+                        h2o_setting, params.spec_bands[i_band], profile)
                 else
                     @timeit "Absorption Coeff H2O" compute_h2o_absorption_profile!(
-                        τ_abs[i_band], abs_params.h2o_lut[i_band],
+                        τ_abs[i_band], h2o_setting,
                         params.spec_bands[i_band], profile)
                 end
             else
@@ -371,13 +389,25 @@ function model_from_parameters(lin::LinMode,
         # KNOWN LIMITATION: for an explicit n_ref that differs from the aerosol's index,
         # the linearized forward/Jacobian normalization uses the aerosol index here while
         # the non-linear forward uses n_ref — a small inconsistency for that niche config.
-        mie_model_ref_lin = _mie(scat.λ_ref)
         if compute_aerosol_microphysics_jacobians
+            mie_model_ref_lin = _mie(scat.λ_ref)
             k_ref, k̇_ref = compute_ref_aerosol_extinction(
                 lin, mie_model_ref_lin, params.float_type)
         else
+            # The selective OCO plan fixes aerosol microphysics. Match the
+            # nonlinear forward constructor exactly: its AOD reference
+            # normalization uses the configured common `n_ref`, not each
+            # aerosol's in-band refractive index. This distinction matters for
+            # species 2/3 and is required for truth/linearized-forward closure.
+            ref_aerosol = Aerosol(size_distribution,
+                                  real(scat.n_ref), -imag(scat.n_ref))
+            mie_model_ref = make_mie_model(
+                scat.decomp_type, ref_aerosol, scat.λ_ref,
+                params.polarization_type, truncation_type,
+                scat.r_max, scat.nquad_radius;
+                architecture=Architectures.CPU())
             k_ref = compute_ref_aerosol_extinction(
-                mie_model_ref_lin, params.float_type)
+                mie_model_ref, params.float_type)
             k̇_ref = zeros(FT2, 4)
         end
 
@@ -393,9 +423,11 @@ function model_from_parameters(lin::LinMode,
         for i_band=1:n_bands
 
             curr_band_λ = params.float_type(1e4) ./ params.spec_bands[i_band]
+            anchor_ν = FT2.(aerosol_bands[i_band])
+            anchor_band_λ = FT2(1e4) ./ anchor_ν
             already_truncated = false
 
-            if length(curr_band_λ)==1
+            if length(curr_band_λ) == 1 && length(anchor_band_λ) == 1
                 @timeit "Mie calc"  aerosol_optics_raw, lin_aerosol_optics_raw =
                                 aerosol_pair((maximum(curr_band_λ)+minimum(curr_band_λ))/2)
 
@@ -405,11 +437,13 @@ function model_from_parameters(lin::LinMode,
                 # the band. Greek coefficients are averaged. This avoids a full Mie calculation
                 # at every spectral point (Mie varies smoothly with λ).
                 n_spec = length(curr_band_λ)
+                length(anchor_band_λ) > 1 || throw(ArgumentError(
+                    "a multi-wavelength solve grid requires at least two aerosol anchors"))
                 @timeit "Mie calc"  aerosol_optics_raw_0, lin_aerosol_optics_raw_0 =
-                                aerosol_pair(curr_band_λ[1])
+                                aerosol_pair(anchor_band_λ[1])
 
                 @timeit "Mie calc"  aerosol_optics_raw_1, lin_aerosol_optics_raw_1 =
-                                aerosol_pair(curr_band_λ[end])
+                                aerosol_pair(anchor_band_λ[end])
 
                 function truncate_endpoint(a, la)
                     if truncation_type isa Scattering.δBGE &&
@@ -427,7 +461,7 @@ function model_from_parameters(lin::LinMode,
                 ν_spec = FT2.(params.spec_bands[i_band])
                 ν_ref_phase = FT2(1e4) / scat.λ_ref
                 endpoint_ref = lin_endpoint_ref = nothing
-                if first(extrema(ν_spec)) < ν_ref_phase < last(extrema(ν_spec))
+                if first(extrema(anchor_ν)) < ν_ref_phase < last(extrema(anchor_ν))
                     @timeit "Mie calc" aerosol_optics_raw_ref, lin_aerosol_optics_raw_ref =
                         aerosol_pair(scat.λ_ref)
                     endpoint_ref, lin_endpoint_ref = truncate_endpoint(
@@ -437,7 +471,8 @@ function model_from_parameters(lin::LinMode,
                     _spectralize_truncated_endpoints(
                         endpoint₀, lin_endpoint₀, endpoint₁, lin_endpoint₁, ν_spec;
                         reference=endpoint_ref, lin_reference=lin_endpoint_ref,
-                        ν_ref=ν_ref_phase)
+                        ν_ref=ν_ref_phase,
+                        ν_endpoints=(first(anchor_ν), last(anchor_ν)))
                 already_truncated = true
             end
 
@@ -536,7 +571,8 @@ function model_from_parameters(lin::LinMode,
     # Per-band Fourier loop bound (order). Phase C: trait-based aggregator
     # via `component_m_max(c, ctx)`. Same helper as the forward path so
     # forward and lin can never silently disagree.
-    components_per_band = [_band_components(params, aerosol_optics, sources, i_band)
+    components_per_band = [_band_components(params, aerosol_optics, sources, i_band;
+                                rayleigh_active=_rayleigh_active(τ_rayl[i_band]))
                             for i_band in 1:n_bands]
     m_max_bands = _derive_m_max_bands_via_traits(l_max, params.max_m,
                                                   components_per_band,

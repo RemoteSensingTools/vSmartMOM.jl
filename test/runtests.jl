@@ -76,6 +76,11 @@ try
 # even `l_max`; both paths now flow through `_derive_m_max_bands`.
 @testset "Forward/lin m_max parity" begin include("test_lin_forward_loop_parity.jl") end
 
+# Optional VLIDORT-style early exit. The package default remains the complete
+# Fourier sum; configured nadir workflows require two passing I moments so the
+# polarized m=2 term cannot be omitted after an m=1 intensity zero.
+@testset "Fourier convergence" begin include("test_fourier_convergence.jl") end
+
 # Phase C — `component_m_max(c, ctx)` trait dispatch + flag-gated
 # aggregator. **Default flag is `true`** in v2.1: Cox-Munk / RossLi /
 # RPV / canopy run to their full `user_l_cap`. The flag exists as an

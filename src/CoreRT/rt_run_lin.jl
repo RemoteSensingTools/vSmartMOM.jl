@@ -293,6 +293,19 @@ function rt_run(RS_type::AbstractRamanType,
         build_m_invariant_cache_lin(iBand, model, lin_model;
                                     active_layout)
 
+    # The combined forward/analytic-linearization path uses the same forward
+    # convergence decision as `rt_run` (I only or all Stokes components,
+    # according to the selected strategy). Jacobian fields are accumulated
+    # through the accepted moment and stop at that identical m; they do not
+    # select a separate, potentially inconsistent Fourier range.
+    fourier_convergence = model.numerics.fourier_convergence
+    convergence_outputs = _fourier_outputs(
+        R, T, level_uw..., level_dw...)
+    convergence_snapshots = _fourier_convergence_active(fourier_convergence) ?
+        _fourier_snapshots(convergence_outputs) : ()
+    convergence_passes = 0
+    m_used = m_max
+
     # Loop over fourier moments
     for m = 0:m_max
 
@@ -470,7 +483,19 @@ function rt_run(RS_type::AbstractRamanType,
             pol_type, vza, qp_μ, m, vaz, weight, nSpec,
             level_uw, level_dw, level_uw_lin, level_dw_lin,
             I_static, arr_type)
+
+        if _fourier_convergence_active(fourier_convergence)
+            stop, convergence_passes = _fourier_convergence_step!(
+                fourier_convergence, convergence_outputs,
+                convergence_snapshots, convergence_passes, m, m_max)
+            if stop
+                m_used = m
+                @info "Linearized Fourier series converged" m_used=m m_max=m_max tolerance=fourier_convergence.tolerance guard_through_m=_fourier_guard_through_m(fourier_convergence, m_max) n_consecutive=fourier_convergence.n_consecutive
+                break
+            end
+        end
     end
+    _LAST_FOURIER_M_USED[] = m_used
 
     # `J₀⁺` is the diffuse SFI field; the historical BOA forward output also
     # carries the attenuated collimated beam when a requested VZA resolves to

@@ -6,7 +6,10 @@ using Distributions
 using Unitful
 using UnitfulEquivalences
 using CanopyOptics
-using ..CoreRT: vSmartMOM_Parameters, RTNumericalParameters, AbsorptionParameters, ScatteringParameters, RT_Aerosol, AtmosphericProfile
+using ..CoreRT: vSmartMOM_Parameters, RTNumericalParameters,
+                AllFourierMoments, IntensityConvergence, StokesConvergence,
+                AbsorptionParameters, ScatteringParameters, RT_Aerosol,
+                AtmosphericProfile
 using ..Absorption: load_interpolation_model
 import AtmosphericAbsorption
 using ..Scattering
@@ -1087,6 +1090,11 @@ function _parse_absorption(params_dict::Dict, FT, q=nothing)
     #    `vcat(fixed_molecules[band], variable_molecules[band])`. ───────────
     luts = []
     h2o_lut = Vector{Any}(nothing, n_bands)
+    h2o_absorption = haskey(abs_dict, "h2o_absorption") ?
+        Bool.(Array(abs_dict["h2o_absorption"])) : fill(true, n_bands)
+    _require_config(length(h2o_absorption) == n_bands,
+        "h2o_absorption must have one Boolean entry per band ($n_bands); " *
+        "got $(length(h2o_absorption))")
     if haskey(abs_dict, "LUTfiles")
         files_lut = Array(abs_dict["LUTfiles"])
         _require_config(length(files_lut) == n_bands,
@@ -1095,6 +1103,8 @@ function _parse_absorption(params_dict::Dict, FT, q=nothing)
             band_models = [load_interpolation_model(_expand_env_path(f)) for f in files_lut[ib]]
             h2o_idx = findfirst(m -> getfield(m, :mol) == 1, band_models)
             if h2o_idx !== nothing
+                _require_config(h2o_absorption[ib],
+                    "band $ib disables H2O absorption but also supplies an H2O LUT")
                 h2o_lut[ib] = band_models[h2o_idx]
                 deleteat!(band_models, h2o_idx)
             end
@@ -1103,6 +1113,9 @@ function _parse_absorption(params_dict::Dict, FT, q=nothing)
                 "LUTfiles for band $ib has $(length(band_models)) non-H2O entries but fixed+variable_molecules sum is $(expected)")
             push!(luts, band_models)
         end
+    end
+    for ib in 1:n_bands
+        h2o_absorption[ib] || (h2o_lut[ib] = :disabled)
     end
 
     cia_files, cia_reference_codes, cia_negative_policies =
@@ -1328,6 +1341,36 @@ function _parse_numerics(params_dict, FT)
     end
     if haskey(n, "verbose")
         kwargs[:verbose] = Bool(n["verbose"])
+    end
+    if haskey(n, "fourier_convergence")
+        selection = n["fourier_convergence"]
+        name = selection === nothing ? "all" : lowercase(String(selection))
+        if name in ("all", "none")
+            kwargs[:fourier_convergence] = AllFourierMoments()
+        elseif name == "intensity"
+            tolerance = FT(get(n, "fourier_tolerance", 1e-5))
+            min_m = Int(get(n, "fourier_min_m", 3))
+            n_consecutive = Int(get(n, "fourier_n_consecutive", 2))
+            kwargs[:fourier_convergence] = IntensityConvergence(
+                tolerance; min_m, n_consecutive)
+        elseif name in ("stokes", "iqu")
+            tolerance = FT(get(n, "fourier_tolerance", 1e-5))
+            min_m = Int(get(n, "fourier_min_m", 3))
+            n_consecutive = Int(get(n, "fourier_n_consecutive", 2))
+            kwargs[:fourier_convergence] = StokesConvergence(
+                tolerance; min_m, n_consecutive)
+        else
+            throw(ArgumentError(
+                "numerics.fourier_convergence must be 'all', 'intensity', " *
+                "or 'stokes'; " *
+                "received '$selection'"))
+        end
+    elseif haskey(n, "fourier_tolerance") ||
+           haskey(n, "fourier_min_m") ||
+           haskey(n, "fourier_n_consecutive")
+        throw(ArgumentError(
+            "fourier_tolerance/fourier_min_m/fourier_n_consecutive require " *
+            "numerics.fourier_convergence: intensity or stokes"))
     end
     return RTNumericalParameters{FT}(; kwargs...)
 end

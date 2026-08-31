@@ -252,6 +252,25 @@ end
     end
 end
 
+@testset "per-band H2O absorption switch" begin
+    cfg = _minimal_parameter_dict()
+    cfg["atmospheric_profile"]["q"] = [0.01]
+    cfg["absorption"] = Dict(
+        "fixed_molecules" => [String[]],
+        "variable_molecules" => [String[]],
+        "h2o_absorption" => [false],
+        "vmr" => Dict{String,Any}(),
+        "broadening" => "Voigt()",
+        "CEF" => "HumlicekWeidemann32SDErrorFunction()",
+        "wing_cutoff" => 20,
+    )
+    params = parameters_from_dict(cfg)
+    @test params.absorption_params.h2o_lut == Any[:disabled]
+
+    cfg["absorption"]["h2o_absorption"] = [false, true]
+    @test_throws ArgumentError parameters_from_dict(cfg)
+end
+
 @testset "invalid configuration raises ArgumentError" begin
     cfg = _minimal_parameter_dict(float_type = "Float16")
     @test_throws ArgumentError parameters_from_dict(cfg)

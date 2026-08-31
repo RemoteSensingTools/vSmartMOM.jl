@@ -816,7 +816,7 @@ mutable struct AbsorptionParameters{FM,VM,V,BF,CE,LT,HL}
     wing_cutoff::Real
     "Lookup table per (band, position-in-fixed_molecules ∪ variable_molecules)"
     luts::LT
-    "Optional H₂O LUT (one per band). `nothing` means HITRAN-on-the-fly fallback."
+    "H₂O setting per band: LUT object, `nothing` for HITRAN fallback, or `:disabled`."
     h2o_lut::HL
     "Optional list of HITRAN CIA file paths (one per collision pair)"
     cia_files::Vector{String}
@@ -862,6 +862,93 @@ mutable struct ScatteringParameters{FT<:Real}
     n_ref::Complex{FT}
     "Algorithm to use for fourier decomposition (NAI2/PCW)"
     decomp_type::AbstractFourierDecompositionType
+end
+
+"""
+    AbstractFourierConvergence
+
+Strategy controlling termination of the azimuthal Fourier loop. The default
+[`AllFourierMoments`](@ref) evaluates the complete trait-selected series.
+[`IntensityConvergence`](@ref) permits an early exit after successive
+Fourier-order contributions to every monitored Stokes-I output are small.
+[`StokesConvergence`](@ref) applies the same componentwise test to every
+Stokes component carried by those outputs (I/Q/U for `Stokes_IQU`).
+"""
+abstract type AbstractFourierConvergence end
+
+"Run the complete Fourier series through the model's selected `m_max`."
+struct AllFourierMoments <: AbstractFourierConvergence end
+
+raw"""
+    IntensityConvergence(tolerance; min_m=3, n_consecutive=2)
+
+Terminate after `n_consecutive` Fourier moments satisfy
+
+```math
+|\Delta I_m| \leq \epsilon |I_{0:m}|
+```
+
+at every monitored view and wavelength. A failing moment resets the
+consecutive-pass counter. The runtime guard protects orders through
+`min(min_m-1, m_max)`. With the default `min_m=3`, this prevents a structural
+zero at `m=1` (for example scalar Rayleigh, where `beta_1 = 0`) from terminating
+the series before a nonzero `m=2` term, while a physically shorter series is
+simply evaluated through its precomputed `m_max`. The decision is based on
+forward Stokes I; a combined analytic-linearization run follows the same
+stopping moment and propagates all Stokes/Jacobian contributions through it.
+"""
+struct IntensityConvergence{FT<:AbstractFloat} <: AbstractFourierConvergence
+    tolerance::FT
+    min_m::Int
+    n_consecutive::Int
+    function IntensityConvergence(tolerance::AbstractFloat;
+                                  min_m::Int=3,
+                                  n_consecutive::Int=2)
+        isfinite(tolerance) && tolerance > 0 || throw(ArgumentError(
+            "IntensityConvergence tolerance must be finite and positive"))
+        min_m >= 3 || throw(ArgumentError(
+            "IntensityConvergence min_m must be at least 3 so a structural " *
+            "m=1 zero cannot suppress a nonzero m=2 term"))
+        n_consecutive >= 1 || throw(ArgumentError(
+            "IntensityConvergence requires at least one passing moment"))
+        return new{typeof(tolerance)}(tolerance, min_m, n_consecutive)
+    end
+end
+
+raw"""
+    StokesConvergence(tolerance; min_m=3, n_consecutive=2)
+
+Terminate after `n_consecutive` Fourier moments satisfy
+
+```math
+|\Delta S_{k,m}| \leq \epsilon |S_{k,0:m}|
+```
+
+at every monitored view and wavelength for every propagated Stokes component
+``S_k``. Thus an I/Q/U calculation must converge independently in I, Q, and
+U. A failing component resets the shared consecutive-pass counter. The
+convergence test is disabled through `min(min_m-1, m_max)`; the enforced
+`min_m >= 3` protects scalar and reduced-polarization modes from structural
+low-order zeros without extending a physically shorter series. The
+combined analytic-linearization run follows the forward-field stopping moment
+and propagates all Jacobian contributions through that moment.
+"""
+struct StokesConvergence{FT<:AbstractFloat} <: AbstractFourierConvergence
+    tolerance::FT
+    min_m::Int
+    n_consecutive::Int
+    function StokesConvergence(tolerance::AbstractFloat;
+                               min_m::Int=3,
+                               n_consecutive::Int=2)
+        isfinite(tolerance) && tolerance > 0 || throw(ArgumentError(
+            "StokesConvergence tolerance must be finite and positive"))
+        min_m >= 3 || throw(ArgumentError(
+            "StokesConvergence min_m must be at least 3 so structural " *
+            "low-order zeros cannot suppress a nonzero m=2 term"))
+        n_consecutive >= 1 || throw(ArgumentError(
+            "StokesConvergence requires at least one passing moment"))
+        return new{typeof(tolerance)}(tolerance, min_m, n_consecutive)
+    end
 end
 
 """
@@ -918,6 +1005,12 @@ Base.@kwdef struct RTNumericalParameters{FT<:AbstractFloat}
     messages were demoted to `@debug` and are silent unless you set
     `ENV[\"JULIA_DEBUG\"] = \"vSmartMOM\"`."
     verbose::Bool = false
+
+    "Azimuthal Fourier-loop termination strategy. The package-wide default
+    runs all moments. Retrieval/truth workflows may explicitly select
+    `IntensityConvergence` or `StokesConvergence` after validating the omitted
+    tail for their viewing geometry."
+    fourier_convergence::AbstractFourierConvergence = AllFourierMoments()
 end
 
 """

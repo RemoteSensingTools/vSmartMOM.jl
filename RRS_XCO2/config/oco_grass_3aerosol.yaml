@@ -18,6 +18,16 @@ radiative_transfer:
   nstreams: 9
   truncation: δBGE(16, 0.0)
   greek_beta_cutoff: 1.0e-5
+  # Require every propagated Stokes component (I/Q/U here) to satisfy the
+  # successive-Fourier-moment test. Keep two consecutive passes so an isolated
+  # small moment cannot terminate the series before a later polarization term.
+  numerics:
+    fourier_convergence: stokes
+    fourier_tolerance: 1.0e-5
+    # Guard through min(2,m_max): beta_1=0 but beta_2 is nonzero for Rayleigh.
+    fourier_min_m: 3
+    # Exact-nadir validation shows m>=3 vanishes; one confirmation is enough.
+    fourier_n_consecutive: 1
   depol: -1
   float_type: Float64
   architecture: GPU()
@@ -50,7 +60,10 @@ atmospheric_profile:
       2.0e-4, 3.0e-4, 4.5e-4, 6.5e-4, 9.0e-4, 1.2e-3,
       1.6e-3, 2.1e-3, 2.8e-3, 3.6e-3, 4.5e-3, 5.3e-3,
       5.8e-3, 6.2e-3, 6.6e-3, 7.0e-3]
-  profile_reduction: 12
+  # Production truth and retrieval both use the same materialized 16-layer
+  # p/T/q profile. The shared constructors subsequently set this to -1 after
+  # materialization so it cannot be reduced a second time.
+  profile_reduction: 16
 
 absorption:
   fixed_molecules:
@@ -62,11 +75,15 @@ absorption:
     - [CO2]
     - [CO2]
   LUTfiles:
-    - ["${ENV:O2_LUT}"]
-    - ["${ENV:H2O_LUT}", "${ENV:CO2_LUT}"]
-    - ["${ENV:H2O_LUT}", "${ENV:CO2_LUT}"]
+    - ["${ENV:O2_ABSCO_LUT}", "${ENV:O2_H2O_LUT}"]
+    - ["${ENV:WEAK_H2O_ABSCO_LUT}", "${ENV:WEAK_CO2_ABSCO_LUT}"]
+    - ["${ENV:STRONG_H2O_ABSCO_LUT}", "${ENV:STRONG_CO2_ABSCO_LUT}"]
+  # ABSCO v5.2 has no A-band H2O table. Use the same rebuilt HITRAN H2O LUT
+  # used by the regenerated ABSCO-O2 truth spectra so the retrieval forward
+  # model closes against the active calculations.
+  h2o_absorption: [true, true, true]
   vmr:
-    O2: 0.2105
+    O2: 0.21
     CO2: 420.0e-6
   broadening: Voigt()
   CEF: HumlicekWeidemann32SDErrorFunction()
