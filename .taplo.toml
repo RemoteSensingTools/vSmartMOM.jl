@@ -12,6 +12,9 @@ include = [
 ]
 exclude = [
   "**/Manifest.toml",
+  "**/Project.toml",
+  "**/JuliaProject.toml",
+  "**/Artifacts.toml",
   "docs/build/**",
   "test/benchmarks/harness/**/*.toml",
 ]
@@ -36,6 +39,9 @@ include = [
 ]
 exclude = [
   "**/Manifest.toml",
+  "**/Project.toml",
+  "**/JuliaProject.toml",
+  "**/Artifacts.toml",
   "docs/build/**",
   "test/benchmarks/harness/**/*.toml",
 ]
