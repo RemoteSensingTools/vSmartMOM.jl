@@ -63,6 +63,12 @@ RRS_XCO2/resources/
 RRS_XCO2/manuscript/
 # Private research handoffs belong in ~/RRS_XCO2/private_notes, not Git.
 TODO/PRIVATE_*
+# Generated RRS/XCO2 science products are private working data. Keep the code,
+# configuration, and prose in Git, but never publish plots or numeric datasets.
+RRS_XCO2/**/*.png
+RRS_XCO2/**/*.dat
+RRS_XCO2/**/*.nc
+RRS_XCO2/**/*.csv
 RRS_XCO2/output/
 RRS_XCO2/truth_map/logs/
 RRS_XCO2/truth_map/*.log

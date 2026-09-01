@@ -4,15 +4,16 @@ The `pre-commit` hook rejects newly staged files under:
 
 - `RRS_XCO2/resources/`
 - `RRS_XCO2/manuscript/`
+- RRS/XCO2 generated `*.png`, `*.dat`, `*.nc`, and `*.csv` products
 - `TODO/PRIVATE_*`
 
 It also rejects common credential and private-key filenames. This complements
 `.gitignore`: unlike an ignore rule, the hook still catches `git add -f`.
 
 The `pre-push` hook examines the complete history reachable from every pushed
-ref and rejects any history containing the protected research paths. This also
-guards against accidentally publishing local recovery refs with
-`git push --mirror`.
+ref and rejects any history containing the protected research paths or
+generated RRS/XCO2 products. This also guards against accidentally publishing
+local recovery refs with `git push --mirror`.
 
 Enable the repository hooks once per clone/worktree with:
 

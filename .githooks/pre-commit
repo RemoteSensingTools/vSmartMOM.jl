@@ -17,6 +17,9 @@ blocked_paths="$(
             RRS_XCO2/resources/*|RRS_XCO2/manuscript/*|TODO/PRIVATE_*)
                 printf '%s\n' "$path"
                 ;;
+            RRS_XCO2/*.png|RRS_XCO2/*.dat|RRS_XCO2/*.nc|RRS_XCO2/*.csv)
+                printf '%s\n' "$path"
+                ;;
             .env|.env.*|*/.env|*/.env.*|*.pem|*.key|*.p12|*.pfx|*/credentials|*/credentials.*|*/secrets|*/secrets.*|*/tokens|*/tokens.*)
                 printf '%s\n' "$path"
                 ;;
@@ -29,7 +32,7 @@ if [ -n "$blocked_paths" ]; then
         'ERROR: refusing to commit paths protected by the privacy guard:' \
         "$blocked_paths" \
         '' \
-        'Keep manuscripts/resources under ~/RRS_XCO2, outside this repository.' \
+        'Keep manuscripts, resources, and generated products outside this repository.' \
         'If every listed path is intentionally public, review it and rerun with' \
         'VSMARTMOM_ALLOW_PRIVATE_PATHS=1 for that one commit.' >&2
     exit 1
