@@ -14,10 +14,10 @@ blocked_paths="$(
     git diff --cached --name-only --diff-filter=ACMR -z |
     while IFS= read -r -d '' path; do
         case "$path" in
-            RRS_XCO2/resources/*|RRS_XCO2/manuscript/*|TODO/PRIVATE_*)
+            RRS_XCO2/resources/*|*/RRS_XCO2/resources/*|RRS_XCO2/manuscript/*|*/RRS_XCO2/manuscript/*|TODO/PRIVATE_*|*/TODO/PRIVATE_*|species_rayleigh_raman_todo.md|*/species_rayleigh_raman_todo.md)
                 printf '%s\n' "$path"
                 ;;
-            RRS_XCO2/*.png|RRS_XCO2/*.dat|RRS_XCO2/*.nc|RRS_XCO2/*.csv)
+            RRS_XCO2/*.png|*/RRS_XCO2/*.png|RRS_XCO2/*.dat|*/RRS_XCO2/*.dat|RRS_XCO2/*.nc|*/RRS_XCO2/*.nc|RRS_XCO2/*.csv|*/RRS_XCO2/*.csv)
                 printf '%s\n' "$path"
                 ;;
             .env|.env.*|*/.env|*/.env.*|*.pem|*.key|*.p12|*.pfx|*/credentials|*/credentials.*|*/secrets|*/secrets.*|*/tokens|*/tokens.*)
