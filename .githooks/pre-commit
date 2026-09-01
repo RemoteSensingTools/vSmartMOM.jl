@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+
+# Prevent accidental publication of local manuscripts, collected resources,
+# credentials, and explicitly private planning files. `.gitignore` alone is
+# insufficient because `git add -f` can bypass it.
+
+set -eu
+
+if [ "${VSMARTMOM_ALLOW_PRIVATE_PATHS:-0}" = "1" ]; then
+    exit 0
+fi
+
+blocked_paths="$(
+    git diff --cached --name-only --diff-filter=ACMR -z |
+    while IFS= read -r -d '' path; do
+        case "$path" in
+            RRS_XCO2/resources/*|*/RRS_XCO2/resources/*|RRS_XCO2/manuscript/*|*/RRS_XCO2/manuscript/*|TODO/PRIVATE_*|*/TODO/PRIVATE_*|species_rayleigh_raman_todo.md|*/species_rayleigh_raman_todo.md)
+                printf '%s\n' "$path"
+                ;;
+            RRS_XCO2/*.png|*/RRS_XCO2/*.png|RRS_XCO2/*.dat|*/RRS_XCO2/*.dat|RRS_XCO2/*.nc|*/RRS_XCO2/*.nc|RRS_XCO2/*.csv|*/RRS_XCO2/*.csv)
+                printf '%s\n' "$path"
+                ;;
+            .env|.env.*|*/.env|*/.env.*|*.pem|*.key|*.p12|*.pfx|*/credentials|*/credentials.*|*/secrets|*/secrets.*|*/tokens|*/tokens.*)
+                printf '%s\n' "$path"
+                ;;
+        esac
+    done
+)"
+
+if [ -n "$blocked_paths" ]; then
+    printf '%s\n' \
+        'ERROR: refusing to commit paths protected by the privacy guard:' \
+        "$blocked_paths" \
+        '' \
+        'Keep manuscripts, resources, and generated products outside this repository.' \
+        'If every listed path is intentionally public, review it and rerun with' \
+        'VSMARTMOM_ALLOW_PRIVATE_PATHS=1 for that one commit.' >&2
+    exit 1
+fi
+
+exit 0

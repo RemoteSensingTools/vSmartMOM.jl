@@ -55,6 +55,18 @@ plots/
 # RRS/XCO2 workflow products are reproducible and can be large or actively
 # updated during remote runs. Keep source/configuration/provenance in Git and
 # force-add only small reference tables that form part of the documented input.
+#
+# PRIVACY BOUNDARY: manuscripts and locally collected resources are maintained
+# outside this public repository under ~/RRS_XCO2. Match the workflow at any
+# repository depth so a directory reorganization cannot bypass this boundary.
+**/RRS_XCO2/resources/
+**/RRS_XCO2/manuscript/
+TODO/PRIVATE_*
+**/species_rayleigh_raman_todo.md
+**/RRS_XCO2/**/*.png
+**/RRS_XCO2/**/*.dat
+**/RRS_XCO2/**/*.nc
+**/RRS_XCO2/**/*.csv
 sandbox/workflows/RRS_XCO2/output/
 sandbox/workflows/RRS_XCO2/truth_map/logs/
 sandbox/workflows/RRS_XCO2/truth_map/*.log
