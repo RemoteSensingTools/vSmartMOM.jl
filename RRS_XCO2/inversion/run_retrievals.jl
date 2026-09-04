@@ -62,11 +62,14 @@ using .RetrievalOutput
 env_flag(name, default="0") = lowercase(get(ENV, name, default)) in
     ("1", "true", "yes", "on")
 
-function output_complete(path)
+function output_complete(path, truth=nothing)
     isfile(path) || return false
     try
         return NCDataset(path) do dataset
-            get(dataset.attrib, "retrieval_complete", 0) == 1
+            get(dataset.attrib, "retrieval_complete", 0) == 1 || return false
+            isnothing(truth) || validated_sif_provenance(
+                dataset.attrib, truth.sif_case; source=path)
+            return true
         end
     catch
         return false
@@ -180,7 +183,7 @@ function main()
     for (sequence, experiment) in enumerate(experiments)
         output_path = retrieval_output_path(
             experiment; inversion_root=output_root)
-        if output_complete(output_path) && !force
+        if output_complete(output_path, experiment.truth) && !force
             println("[$sequence/$(length(experiments))] skip complete $output_path")
             continue
         end

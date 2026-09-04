@@ -176,7 +176,8 @@ function main()
     state_index = parse(Int, get(ENV, "CLOSURE_STATE", "9"))
     state = read_states()[state_index]
     any(>(0), state.aod550) || error("closure state must contain aerosols")
-    iszero(state.sif_total) || error("closure state must have SIF=0")
+    iszero(state.sif_angular_integral760) ||
+        error("closure state must have SIF=0")
 
     retrieval_params = VSmartMOMForward.prepare_retrieval_parameters(;
         architecture=:GPU, float_type=Float32, nstreams=9)

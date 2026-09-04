@@ -31,7 +31,8 @@ Environment variables:
 - `OCO_STOKES_COEFFICIENTS`: representative coefficient NetCDF.
 - `SUPPLEMENTAL_SHOULDER_DIR`: optional legacy/staging convolution-shoulder
   directory (default `RRS_XCO2/truth_map/convolution_shoulders`). Merged truth
-  files already contain these samples and need no auxiliary directory.
+  files already contain these samples and need no auxiliary directory. Set it
+  explicitly to `none` to disable auxiliary-shoulder lookup.
 - `BANDS`: comma-separated subset of `o2a,weak_co2,strong_co2`.
 - `FIRST_STATE`, `LAST_STATE`: inclusive scene-index limits.
 - `ALLOW_INCOMPLETE=1`: development-only override of the completed-scene
@@ -46,7 +47,9 @@ using NCDatasets
 using Printf
 
 include(joinpath(@__DIR__, "SyntheticOCO2.jl"))
+include(joinpath(@__DIR__, "..", "RetrievalCases.jl"))
 using .SyntheticOCO2
+using .RetrievalCases: validated_sif_provenance, matching_sif_provenance
 
 const INVERSION_ROOT = normpath(joinpath(@__DIR__, ".."))
 const RRS_ROOT = normpath(joinpath(INVERSION_ROOT, ".."))
@@ -55,6 +58,40 @@ const DEFAULT_OUTPUT = joinpath(DEFAULT_TRUTH_ROOT, "OCO_radiances")
 const DEFAULT_COEFFICIENTS = joinpath(@__DIR__, "representative_stokes_coefficients.nc")
 const DEFAULT_SUPPLEMENTAL_SHOULDERS = joinpath(DEFAULT_TRUTH_ROOT, "convolution_shoulders")
 const SUPPORT_SIGMA = 6.0
+const BOTTOM_LAYER_PROVENANCE_ATTRIBUTES = (
+    "campaign",
+    "source_state_table",
+    "column_xco2_ppm",
+    "background_co2_ppm",
+    "bottom_co2_ppm",
+    "bottom_co2_index",
+    "bottom_co2_layer_index",
+    "co2_profile_order",
+    "co2_profile_definition",
+    "co2_profile_ppm",
+    "bottom_layer_dry_column_fraction",
+    "state_table_sha256",
+    "full_column_source_state",
+    "full_column_source_scene",
+    "full_column_source_sha256",
+    "full_column_state_table_sha256",
+    "bottom_co2_truth_mode",
+    "co2_truth_reuse_source",
+    "producer_script",
+    "producer_script_sha256",
+    "bottom_layer_truth_complete",
+    "sif_definition_version",
+    "sif_definition",
+    "sif_case_on_label",
+    "sif_reference_wavelength_nm",
+    "sif_upwelling_solid_angle_sr",
+    "sif_angular_integral_760_mW_m-2_nm-1",
+    "sif_radiance_760_mW_m-2_sr-1_nm-1",
+    "sif_cosine_weighted_irradiance_760_mW_m-2_nm-1",
+    "sif_SIF760_mW_m-2_sr-1_per_cm-1",
+    "sif_mSIF_mW_m-2_sr-1_per_cm-2",
+    "sif_template_wavelength_integral_mW_m-2_sr-1",
+)
 
 env_flag(name) = lowercase(get(ENV, name, "0")) in ("1", "true", "yes", "on")
 
@@ -119,12 +156,21 @@ function read_stokes(dataset, variable_name)
     return stokes
 end
 
+function read_sif_provenance(path)
+    return NCDataset(path) do dataset
+        sif_case = Symbol(get(dataset.attrib, "sif_case", "off"))
+        validated_sif_provenance(
+            dataset.attrib, sif_case; source=path)
+    end
+end
+
 function append_supplemental_shoulders(source_wavelength,
                                        source_stokes,
                                        supplemental_directory,
                                        index,
                                        band::Symbol,
                                        component::Symbol)
+    isnothing(supplemental_directory) && return source_wavelength, source_stokes
     path = joinpath(supplemental_directory,
                     @sprintf("hires_shoulders_%03d.nc", index))
     isfile(path) || return source_wavelength, source_stokes
@@ -192,6 +238,9 @@ function process_scene(scene_path, output_path, coefficient_path,
         for key in keys(dataset.attrib)
             source_attributes[String(key)] = dataset.attrib[key]
         end
+        validated_sif_provenance(
+            dataset.attrib, Symbol(get(dataset.attrib, "sif_case", "off"));
+            source=scene_path)
 
         if :o2a in bands
             spec = band_spec(:o2a)
@@ -281,6 +330,7 @@ function process_scene(scene_path, output_path, coefficient_path,
 
         for key in ("state_index", "surface", "aerosol_case", "sif_case",
                     "xco2_ppm", "psurf_hpa", "sza_deg", "vza_deg",
+                    "relative_azimuth_deg",
                     "atmospheric_layers", "spectroscopy_database",
                     "spectroscopy_version", "o2_absco_lut",
                     "o2_h2o_lut", "o2_truth_reused",
@@ -290,7 +340,8 @@ function process_scene(scene_path, output_path, coefficient_path,
                     "strong_h2o_absco_lut", "strong_co2_absco_lut",
                     "h2o_line_absorption_by_band", "o2_vmr",
                     "atmospheric_profile_configuration",
-                    "profile_preparation")
+                    "profile_preparation",
+                    BOTTOM_LAYER_PROVENANCE_ATTRIBUTES...)
             haskey(source_attributes, key) &&
                 (output.attrib[key] = source_attributes[key])
         end
@@ -299,7 +350,8 @@ function process_scene(scene_path, output_path, coefficient_path,
         shoulder_provenance = if get(
             source_attributes, "strong_co2_short_shoulder_merged", 0) == 1
             "embedded in source truth strong_co2 grid"
-        elseif isdir(supplemental_directory)
+        elseif !isnothing(supplemental_directory) &&
+                isdir(supplemental_directory)
             abspath(supplemental_directory)
         else
             "none"
@@ -332,8 +384,10 @@ function main()
                                split(get(ENV, "TRUTH_INPUT_DIRS", input_default), ':'))
     output_directory = get(ENV, "SYNTHETIC_OCO_OUT", DEFAULT_OUTPUT)
     coefficient_path = get(ENV, "OCO_STOKES_COEFFICIENTS", DEFAULT_COEFFICIENTS)
-    supplemental_directory = get(
-        ENV, "SUPPLEMENTAL_SHOULDER_DIR", DEFAULT_SUPPLEMENTAL_SHOULDERS)
+    supplemental_value = strip(get(
+        ENV, "SUPPLEMENTAL_SHOULDER_DIR", DEFAULT_SUPPLEMENTAL_SHOULDERS))
+    supplemental_directory = lowercase(supplemental_value) == "none" ?
+        nothing : supplemental_value
     bands = selected_bands()
     first_state = parse(Int, get(ENV, "FIRST_STATE", "1"))
     last_state = parse(Int, get(ENV, "LAST_STATE", "64"))
@@ -346,6 +400,10 @@ function main()
     for (index, scene_path) in scenes
         output_path = joinpath(output_directory, @sprintf("OCO2sims_%03d.nc", index))
         if isfile(output_path) && !force
+            matching_sif_provenance(
+                read_sif_provenance(scene_path),
+                read_sif_provenance(output_path);
+                first_source=scene_path, second_source=output_path)
             @info "skip existing synthetic OCO scene" index output_path
             continue
         end

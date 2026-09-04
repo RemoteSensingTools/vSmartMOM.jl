@@ -17,6 +17,9 @@ export TruthCase,
        external_sif_ownership_marker,
        enforce_sif_ownership,
        paired_uniform_draw,
+       validated_sif_provenance,
+       matching_sif_provenance,
+       SIF_PROVENANCE_ATTRIBUTES,
        load_measurement_realization,
        write_experiment_manifest,
        PERTURBED_REALIZATIONS,
@@ -30,6 +33,29 @@ const PERTURBED_REALIZATIONS = 10
 const UNPERTURBED_INDEX = 11
 const EXTERNAL_SIF_OWNERSHIP_MARKER = joinpath(
     ".control", "sif_owned_externally")
+const REQUIRED_SIF_CASE_ON = :angular_integral760_0p5
+const REQUIRED_SIF_DEFINITION_VERSION = 2
+const REQUIRED_SIF_REFERENCE_WAVELENGTH_NM = 760.0
+const REQUIRED_SIF_UPWELLING_SOLID_ANGLE_SR = 2π
+const REQUIRED_SIF_ANGULAR_INTEGRAL_760 = 0.5
+const REQUIRED_SIF_DEFINITION =
+    "isotropic BOA radiance normalized by 2pi*L_lambda(760 nm)=0.5"
+const REQUIRED_SIF_RADIANCE_760 =
+    REQUIRED_SIF_ANGULAR_INTEGRAL_760 /
+    REQUIRED_SIF_UPWELLING_SOLID_ANGLE_SR
+const SIF_PROVENANCE_ATTRIBUTES = (
+    "sif_definition_version",
+    "sif_definition",
+    "sif_case_on_label",
+    "sif_reference_wavelength_nm",
+    "sif_upwelling_solid_angle_sr",
+    "sif_angular_integral_760_mW_m-2_nm-1",
+    "sif_radiance_760_mW_m-2_sr-1_nm-1",
+    "sif_cosine_weighted_irradiance_760_mW_m-2_nm-1",
+    "sif_SIF760_mW_m-2_sr-1_per_cm-1",
+    "sif_mSIF_mW_m-2_sr-1_per_cm-2",
+    "sif_template_wavelength_integral_mW_m-2_sr-1",
+)
 
 default_truth_table() = joinpath(RRS_ROOT, "truth_map", "true_states.dat")
 default_measurement_directory() = joinpath(
@@ -116,6 +142,116 @@ struct MeasurementRealization
     normalized_draw::Vector{Float64}
     wavelength_nm::Vector{Float64}
     band_ranges::Vector{UnitRange{Int}}
+    provenance::Dict{String,Any}
+end
+
+# Preserve the original constructor for no-SIF callers and lightweight tests.
+# A SIF-on retrieval is rejected later unless the versioned provenance is
+# supplied by `load_measurement_realization`.
+MeasurementRealization(noiseless, perturbed, noise_std, variance,
+                       normalized_draw, wavelength_nm, band_ranges) =
+    MeasurementRealization(
+        noiseless, perturbed, noise_std, variance, normalized_draw,
+        wavelength_nm, band_ranges, Dict{String,Any}())
+
+function _required_attribute(attributes, key, source)
+    haskey(attributes, key) || error(
+        "$source is missing required corrected-SIF provenance attribute $key")
+    return attributes[key]
+end
+
+function _require_close(value, expected, key, source;
+                        atol=1e-14, rtol=1e-12)
+    numeric = Float64(value)
+    isfinite(numeric) && isapprox(numeric, expected; atol, rtol) || error(
+        "$source has $key=$numeric; expected $expected for corrected SIF")
+    return numeric
+end
+
+"""
+    validated_sif_provenance(attributes, sif_case; source="input")
+
+Return a portable copy of the version-2 SIF normalization record.  Every
+SIF-on retrieval input must state the campaign convention
+`2π Lλ(760 nm) = 0.5 mW m⁻² nm⁻¹` and must be internally
+consistent.  SIF-off products intentionally return an empty dictionary so
+older no-SIF products that predate this metadata remain valid.
+"""
+function validated_sif_provenance(attributes, sif_case;
+                                  source::AbstractString="input")
+    case = Symbol(sif_case)
+    case == :off && return Dict{String,Any}()
+    case == REQUIRED_SIF_CASE_ON || error(
+        "$source uses stale or unsupported SIF case '$case'; expected " *
+        "'$REQUIRED_SIF_CASE_ON'")
+
+    provenance = Dict{String,Any}(
+        key => _required_attribute(attributes, key, source)
+        for key in SIF_PROVENANCE_ATTRIBUTES)
+    Int(provenance["sif_definition_version"]) ==
+        REQUIRED_SIF_DEFINITION_VERSION || error(
+        "$source does not use sif_definition_version=" *
+        "$REQUIRED_SIF_DEFINITION_VERSION")
+    String(provenance["sif_definition"]) == REQUIRED_SIF_DEFINITION || error(
+        "$source has an unexpected sif_definition for version " *
+        "$REQUIRED_SIF_DEFINITION_VERSION")
+    String(provenance["sif_case_on_label"]) ==
+        String(REQUIRED_SIF_CASE_ON) || error(
+        "$source has a SIF case-label/provenance mismatch")
+
+    reference = _require_close(
+        provenance["sif_reference_wavelength_nm"],
+        REQUIRED_SIF_REFERENCE_WAVELENGTH_NM,
+        "sif_reference_wavelength_nm", source)
+    solid_angle = _require_close(
+        provenance["sif_upwelling_solid_angle_sr"],
+        REQUIRED_SIF_UPWELLING_SOLID_ANGLE_SR,
+        "sif_upwelling_solid_angle_sr", source)
+    angular_integral = _require_close(
+        provenance["sif_angular_integral_760_mW_m-2_nm-1"],
+        REQUIRED_SIF_ANGULAR_INTEGRAL_760,
+        "sif_angular_integral_760_mW_m-2_nm-1", source)
+    radiance = _require_close(
+        provenance["sif_radiance_760_mW_m-2_sr-1_nm-1"],
+        REQUIRED_SIF_RADIANCE_760,
+        "sif_radiance_760_mW_m-2_sr-1_nm-1", source)
+    cosine_irradiance = Float64(
+        provenance["sif_cosine_weighted_irradiance_760_mW_m-2_nm-1"])
+    isapprox(cosine_irradiance, π * radiance; atol=1e-14, rtol=1e-12) ||
+        error("$source has inconsistent cosine-weighted SIF irradiance")
+    isapprox(angular_integral, solid_angle * radiance;
+             atol=1e-14, rtol=1e-12) ||
+        error("$source has inconsistent SIF angular integral and radiance")
+
+    native_sif760 = Float64(
+        provenance["sif_SIF760_mW_m-2_sr-1_per_cm-1"])
+    isapprox(native_sif760, radiance * reference^2 / 1e7;
+             atol=1e-14, rtol=1e-12) ||
+        error("$source has inconsistent wavelength/wavenumber SIF760 units")
+    for key in ("sif_mSIF_mW_m-2_sr-1_per_cm-2",
+                "sif_template_wavelength_integral_mW_m-2_sr-1")
+        isfinite(Float64(provenance[key])) || error(
+            "$source has a non-finite corrected-SIF provenance value $key")
+    end
+    return provenance
+end
+
+"""Require two versioned SIF records to describe the identical truth source."""
+function matching_sif_provenance(first, second;
+                                 first_source::AbstractString="first input",
+                                 second_source::AbstractString="second input")
+    Set(keys(first)) == Set(keys(second)) || error(
+        "$first_source and $second_source carry different SIF provenance fields")
+    for key in keys(first)
+        left, right = first[key], second[key]
+        matches = left isa Real && right isa Real ?
+            isapprox(Float64(left), Float64(right); atol=1e-14, rtol=1e-12) :
+            string(left) == string(right)
+        matches || error(
+            "SIF provenance attribute $key differs between " *
+            "$first_source and $second_source")
+    end
+    return Dict{String,Any}(first)
 end
 
 function _truth_rows(path)
@@ -368,12 +504,33 @@ end
 """Load one frozen `S_epsilon` product and apply its deterministic pair draw."""
 function load_measurement_realization(experiment::RetrievalExperiment)
     label = String(experiment.measurement_class)
+    truth = experiment.truth
+    measurement_provenance = NCDataset(experiment.measurement_path) do dataset
+        get(dataset.attrib, "instrument_processing_complete", 0) == 1 || error(
+            "measurement file is not marked complete: " *
+            experiment.measurement_path)
+        Int(dataset.attrib["state_index"]) == truth.state_index || error(
+            "measurement-file state metadata disagrees with experiment")
+        measurement_sif = Symbol(get(dataset.attrib, "sif_case", "off"))
+        measurement_sif == truth.sif_case || error(
+            "measurement-file SIF case disagrees with experiment")
+        validated_sif_provenance(
+            dataset.attrib, measurement_sif; source=experiment.measurement_path)
+    end
     return NCDataset(experiment.noise_path) do dataset
         get(dataset.attrib, "noise_covariance_complete", 0) == 1 || error(
             "noise file is not marked complete: $(experiment.noise_path)")
         Int(dataset.attrib["state_index"]) == experiment.truth.state_index || error(
             "noise-file state metadata disagrees with experiment")
-        truth = experiment.truth
+        noise_sif = Symbol(get(dataset.attrib, "sif_case", "off"))
+        noise_sif == truth.sif_case || error(
+            "noise-file SIF case disagrees with experiment")
+        noise_provenance = validated_sif_provenance(
+            dataset.attrib, noise_sif; source=experiment.noise_path)
+        provenance = matching_sif_provenance(
+            measurement_provenance, noise_provenance;
+            first_source=experiment.measurement_path,
+            second_source=experiment.noise_path)
         if truth.co2_profile_mode == :bottom_layer
             get(dataset.attrib, "campaign", "") == String(truth.campaign) || error(
                 "noise-file campaign metadata disagrees with bottom-layer experiment")
@@ -407,7 +564,8 @@ function load_measurement_realization(experiment::RetrievalExperiment)
             paired_uniform_draw(experiment.random_seed, length(noiseless))
         perturbed = noiseless + noise_std .* draw
         return MeasurementRealization(
-            noiseless, perturbed, noise_std, variance, draw, wavelength, ranges)
+            noiseless, perturbed, noise_std, variance, draw, wavelength, ranges,
+            provenance)
     end
 end
 

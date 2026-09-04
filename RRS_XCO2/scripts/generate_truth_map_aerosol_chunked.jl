@@ -41,6 +41,7 @@ const SURFACE_COORDINATE_VERSION = 1
 # range that starts at the left shoulder is no longer allowed to reconstruct
 # (and slightly shift) the output-band nodes.
 const O2_CORE_GRID_VERSION = 2
+const SIF_DEFINITION_VERSION = RRSXCO2Common.SIF_DEFINITION_VERSION
 
 O2_CHUNK_POINTS > 0 || error("O2_CHUNK_POINTS must be positive")
 CO2_CHUNK_POINTS > 0 || error("CO2_CHUNK_POINTS must be positive")
@@ -58,6 +59,11 @@ function checkpoint!(completed::Set{String})
             sza_deg=SZA_DEG, vza_deg=VZA_DEG,
             relative_azimuth_deg=RELATIVE_AZIMUTH_DEG,
             sif_case_filter=SIF_CASE_FILTER,
+            sif_definition_version=SIF_DEFINITION_VERSION,
+            sif_case_on=RRSXCO2Common.SIF_CASE_ON,
+            sif_angular_integral_760=
+                RRSXCO2Common.SIF_ANGULAR_INTEGRAL_760,
+            sif_radiance_760=RRSXCO2Common.SIF_RADIANCE_760,
             surface_coordinate_version=SURFACE_COORDINATE_VERSION,
             o2_core_grid_version=O2_CORE_GRID_VERSION,
             raman_shoulder_cm=SHOULDER_CM,
@@ -81,6 +87,16 @@ function load_checkpoint()
         error("checkpoint relative azimuth differs")
     get(saved, "sif_case_filter", "all") == SIF_CASE_FILTER ||
         error("checkpoint SIF selection differs")
+    get(saved, "sif_definition_version", 0) == SIF_DEFINITION_VERSION ||
+        error("checkpoint predates the corrected 760-nm SIF normalization; restart with FORCE=1")
+    get(saved, "sif_case_on", "") == RRSXCO2Common.SIF_CASE_ON ||
+        error("checkpoint SIF case label differs")
+    get(saved, "sif_angular_integral_760", NaN) ==
+        RRSXCO2Common.SIF_ANGULAR_INTEGRAL_760 ||
+        error("checkpoint SIF angular integral differs")
+    get(saved, "sif_radiance_760", NaN) ==
+        RRSXCO2Common.SIF_RADIANCE_760 ||
+        error("checkpoint SIF stream radiance differs")
     get(saved, "surface_coordinate_version", 0) == SURFACE_COORDINATE_VERSION ||
         error("checkpoint predates full-band surface normalization; restart with FORCE=1")
     get(saved, "o2_core_grid_version", 0) == O2_CORE_GRID_VERSION ||
@@ -131,7 +147,8 @@ function initialize_scene!(state, grids)
         ds.attrib["aod550_sulfate"] = state.aod550[1]
         ds.attrib["aod550_organic_carbon"] = state.aod550[2]
         ds.attrib["aod550_stratospheric"] = state.aod550[3]
-        ds.attrib["sif_total_mW_m-2_sr-1"] = state.sif_total
+        RRSXCO2Common.write_sif_provenance!(
+            ds.attrib, state.sif_angular_integral760 > 0)
         ds.attrib["source_state_table"] = "true_states.dat"
         ds.attrib["spectral_chunking"] =
             "O2 cores carry ±$(SHOULDER_CM) cm-1 Raman shoulders; CO2 has no shoulders"

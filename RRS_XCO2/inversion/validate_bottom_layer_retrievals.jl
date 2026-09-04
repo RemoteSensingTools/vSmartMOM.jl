@@ -221,6 +221,8 @@ function validate_one(path, truth, perturbation, measurement_class, prior_path;
             "Jacobian flavor mismatch in $path")
         String(dataset.attrib["retrieval_forward_scattering"]) == "noRS" || error(
             "forward-scattering mode mismatch in $path")
+        validated_sif_provenance(
+            dataset.attrib, truth.sif_case; source=path)
 
         final_chi_squared = finite_array(
             dataset, "final_band_reduced_chi_squared")

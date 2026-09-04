@@ -25,13 +25,17 @@ Environment controls:
 
 include(joinpath(@__DIR__, "generate_truth_map.jl"))
 using JLD2
+using SHA
 
-# Version 2 invalidates checkpoints made before the mandatory m>=3 Fourier
-# convergence guard. Those chunks can contain an m=2 result selected after a
-# structural m=1 zero and must not be silently reused.
-const O2_REGEN_VERSION = 2
+# Version 2 invalidated checkpoints made before the mandatory m>=3 Fourier
+# convergence guard. Version 3 additionally invalidates every checkpoint made
+# with the superseded wavelength-integrated-SIF normalization. Without this
+# bump, a corrected SIF-on run could accept all old chunk tags and publish the
+# old radiances under new state-table metadata without executing any RT.
+const O2_REGEN_VERSION = 3
 const O2_CORE_GRID_VERSION = 2
 const SURFACE_COORDINATE_VERSION = 1
+const CAMPAIGN_SIF_STATE = RRSXCO2Common.campaign_sif_state()
 const DEFAULT_O2_CHUNK_POINTS = AEROSOL_CASE_FILTER == "aerosol" ? 64 : 2735
 const O2_CHUNK_POINTS = parse(Int, get(
     ENV, "O2_CHUNK_POINTS", string(DEFAULT_O2_CHUNK_POINTS)))
@@ -82,6 +86,15 @@ function save_checkpoint!(completed::Set{String})
         sza_deg=SZA_DEG,
         vza_deg=VZA_DEG,
         relative_azimuth_deg=RELATIVE_AZIMUTH_DEG,
+        sif_definition_version=RRSXCO2Common.SIF_DEFINITION_VERSION,
+        sif_case_on=RRSXCO2Common.SIF_CASE_ON,
+        sif_angular_integral_760=
+            RRSXCO2Common.SIF_ANGULAR_INTEGRAL_760,
+        sif_radiance_760=RRSXCO2Common.SIF_RADIANCE_760,
+        sif760_native=CAMPAIGN_SIF_STATE.SIF760,
+        msif_native=CAMPAIGN_SIF_STATE.mSIF,
+        sif_template_wavelength_integral=
+            CAMPAIGN_SIF_STATE.wavelength_integral,
         raman_shoulder_cm=SHOULDER_CM,
         o2_core_grid_version=O2_CORE_GRID_VERSION,
         surface_coordinate_version=SURFACE_COORDINATE_VERSION,
@@ -104,6 +117,15 @@ function load_checkpoint()
         ("sza_deg", SZA_DEG),
         ("vza_deg", VZA_DEG),
         ("relative_azimuth_deg", RELATIVE_AZIMUTH_DEG),
+        ("sif_definition_version", RRSXCO2Common.SIF_DEFINITION_VERSION),
+        ("sif_case_on", RRSXCO2Common.SIF_CASE_ON),
+        ("sif_angular_integral_760",
+         RRSXCO2Common.SIF_ANGULAR_INTEGRAL_760),
+        ("sif_radiance_760", RRSXCO2Common.SIF_RADIANCE_760),
+        ("sif760_native", CAMPAIGN_SIF_STATE.SIF760),
+        ("msif_native", CAMPAIGN_SIF_STATE.mSIF),
+        ("sif_template_wavelength_integral",
+         CAMPAIGN_SIF_STATE.wavelength_integral),
         ("raman_shoulder_cm", SHOULDER_CM),
         ("o2_core_grid_version", O2_CORE_GRID_VERSION),
         ("surface_coordinate_version", SURFACE_COORDINATE_VERSION),
@@ -124,11 +146,90 @@ function finite_complete_variable(dataset, name)
     return nothing
 end
 
+"Validate that a state row carries exactly the current campaign SIF definition."
+function validate_state_sif(state)
+    if state.sif_index == 1
+        state.sif_case == "off" || error(
+            "state $(state.index) has SIF index 1 but case $(state.sif_case)")
+        all(iszero, (state.sif_angular_integral760,
+                     state.sif760, state.msif)) || error(
+            "state $(state.index) has nonzero SIF coordinates in the off case")
+        return false
+    elseif state.sif_index == 2
+        state.sif_case == RRSXCO2Common.SIF_CASE_ON || error(
+            "state $(state.index) uses stale/unknown SIF case $(state.sif_case); " *
+            "expected $(RRSXCO2Common.SIF_CASE_ON)")
+        state.sif_angular_integral760 ==
+            RRSXCO2Common.SIF_ANGULAR_INTEGRAL_760 || error(
+            "state $(state.index) has the wrong 760-nm SIF angular integral")
+        isapprox(state.sif760, CAMPAIGN_SIF_STATE.SIF760;
+                 atol=5e-15, rtol=0) || error(
+            "state $(state.index) has stale SIF760=$(state.sif760)")
+        isapprox(state.msif, CAMPAIGN_SIF_STATE.mSIF;
+                 atol=5e-16, rtol=0) || error(
+            "state $(state.index) has stale mSIF=$(state.msif)")
+        return true
+    end
+    error("state $(state.index) has unsupported SIF index $(state.sif_index)")
+end
+
+"Rewrite, then verify, every version-2 campaign SIF attribute on a scene."
+function write_and_validate_sif_provenance!(attributes, state, path)
+    enabled = validate_state_sif(state)
+    attributes["sif_case"] = state.sif_case
+    RRSXCO2Common.write_sif_provenance!(attributes, enabled)
+
+    # This legacy attribute encoded the superseded wavelength-integrated 0.5
+    # control variable. Leaving it in an otherwise corrected file would make
+    # the metadata internally contradictory.
+    haskey(attributes, "sif_total_mW_m-2_sr-1") &&
+        delete!(attributes, "sif_total_mW_m-2_sr-1")
+
+    String(attributes["sif_case"]) == state.sif_case || error(
+        "failed to rewrite SIF case metadata in $path")
+    Int(attributes["sif_definition_version"]) ==
+        RRSXCO2Common.SIF_DEFINITION_VERSION || error(
+        "failed to rewrite SIF definition version in $path")
+    String(attributes["sif_case_on_label"]) ==
+        RRSXCO2Common.SIF_CASE_ON || error(
+        "failed to rewrite the SIF-on label in $path")
+    String(attributes["sif_definition"]) ==
+        "isotropic BOA radiance normalized by 2pi*L_lambda(760 nm)=0.5" ||
+        error("failed to rewrite the SIF definition in $path")
+
+    active = enabled ? 1.0 : 0.0
+    expected = (
+        ("sif_reference_wavelength_nm",
+         RRSXCO2Common.SIF_REFERENCE_WAVELENGTH_NM),
+        ("sif_upwelling_solid_angle_sr",
+         RRSXCO2Common.SIF_UPWELLING_SOLID_ANGLE_SR),
+        ("sif_angular_integral_760_mW_m-2_nm-1",
+         active * RRSXCO2Common.SIF_ANGULAR_INTEGRAL_760),
+        ("sif_radiance_760_mW_m-2_sr-1_nm-1",
+         active * CAMPAIGN_SIF_STATE.radiance_760),
+        ("sif_cosine_weighted_irradiance_760_mW_m-2_nm-1",
+         active * pi * CAMPAIGN_SIF_STATE.radiance_760),
+        ("sif_SIF760_mW_m-2_sr-1_per_cm-1",
+         active * CAMPAIGN_SIF_STATE.SIF760),
+        ("sif_mSIF_mW_m-2_sr-1_per_cm-2",
+         active * CAMPAIGN_SIF_STATE.mSIF),
+        ("sif_template_wavelength_integral_mW_m-2_sr-1",
+         active * CAMPAIGN_SIF_STATE.wavelength_integral),
+    )
+    for (name, value) in expected
+        isapprox(Float64(attributes[name]), Float64(value);
+                 atol=5e-15, rtol=0) || error(
+            "failed to rewrite SIF provenance attribute $name in $path")
+    end
+    return enabled
+end
+
 function prepare_scene!(state)
     path = scene_path(state)
     isfile(path) || error(
         "missing active scene $path; this producer will not recreate files " *
         "because doing so could destroy the completed CO2 bands")
+    validate_state_sif(state)
     NCDataset(path, "a") do ds
         Int(ds.attrib["state_index"]) == state.index || error(
             "state-index mismatch in $path")
@@ -149,6 +250,7 @@ function prepare_scene!(state)
         if haskey(ds.attrib, "chunked_simulation_complete")
             ds.attrib["chunked_simulation_complete"] = Int32(0)
         end
+        write_and_validate_sif_provenance!(ds.attrib, state, path)
     end
     return path
 end
@@ -171,6 +273,16 @@ function finalize_scene!(state)
         end
         RRSXCO2Common.write_absco_provenance!(ds.attrib)
         RRSXCO2Common.write_fourier_convergence_provenance!(ds.attrib)
+        write_and_validate_sif_provenance!(ds.attrib, state, scene_path(state))
+        # Seed files were copied from the superseded campaign and therefore
+        # still point at its state table.  A corrected scene must identify the
+        # exact version-2 table that drove this direct solve; the release gate
+        # rejects stale source-table provenance.  The checksum is portable
+        # across hosts even when the absolute producer path is not.
+        ds.attrib["source_state_table"] = abspath(STATE_FILE)
+        ds.attrib["source_state_table_sha256"] = open(STATE_FILE, "r") do io
+            bytes2hex(sha256(io))
+        end
         ds.attrib["o2_truth_reused"] = Int32(0)
         ds.attrib["o2_truth_reuse_source"] = "none; regenerated from current model"
         ds.attrib["o2_truth_regenerated"] = Int32(1)

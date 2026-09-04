@@ -1,20 +1,54 @@
 #!/usr/bin/env julia
 
-"""Validate all 64 diagonal OCO-2 noise covariance products."""
+"""Validate selected diagonal OCO-2 noise covariance products.
+
+Set `EXPECTED_STATES` to a comma-separated list of indices and/or inclusive
+ranges (for example `1-5,21-25`) when validating a campaign subset. The
+historical default remains `1-64`.
+"""
 
 using NCDatasets
 using Printf
 
 include(joinpath(@__DIR__, "SyntheticOCO2.jl"))
 include(joinpath(@__DIR__, "OCO2Noise.jl"))
+include(joinpath(@__DIR__, "..", "RetrievalCases.jl"))
 using .SyntheticOCO2
 using .OCO2Noise
+using .RetrievalCases: validated_sif_provenance,
+                       matching_sif_provenance
 
 const RRS_ROOT = normpath(joinpath(@__DIR__, "..", ".."))
 const DEFAULT_SYNTHETIC_DIR = joinpath(RRS_ROOT, "truth_map", "OCO_radiances")
 const DEFAULT_NOISE_DIR = joinpath(DEFAULT_SYNTHETIC_DIR, "noise_covariances")
 const DEFAULT_COEFFICIENTS = joinpath(@__DIR__, "representative_snr_coefficients.nc")
 const CLASSES = (:corrected, :uncorrected)
+const BOTTOM_LAYER_PROVENANCE_ATTRIBUTES = (
+    "campaign", "source_state_table", "column_xco2_ppm", "background_co2_ppm",
+    "bottom_co2_ppm", "bottom_co2_index", "bottom_co2_layer_index",
+    "co2_profile_order", "co2_profile_definition", "co2_profile_ppm",
+    "bottom_layer_dry_column_fraction", "state_table_sha256",
+    "full_column_source_state", "full_column_source_scene",
+    "full_column_source_sha256", "full_column_state_table_sha256",
+    "bottom_co2_truth_mode", "co2_truth_reuse_source", "producer_script",
+    "producer_script_sha256", "bottom_layer_truth_complete",
+)
+
+function expected_states(value=get(ENV, "EXPECTED_STATES", "1-64"))
+    result = Int[]
+    for token in split(value, ',')
+        fields = split(strip(token), '-'; limit=2)
+        if length(fields) == 1
+            push!(result, parse(Int, only(fields)))
+        else
+            append!(result, parse(Int, fields[1]):parse(Int, fields[2]))
+        end
+    end
+    isempty(result) && error("EXPECTED_STATES selected no states")
+    length(unique(result)) == length(result) || error(
+        "EXPECTED_STATES contains duplicate indices")
+    return sort!(result)
+end
 
 function finite_vector(dataset, name)
     haskey(dataset, name) || error("missing $name")
@@ -37,6 +71,25 @@ function validate_file(path, synthetic_path, coefficients, expected_state)
                 error("$path is not marked noise_covariance_complete=1")
             Int(noise.attrib["state_index"]) == expected_state ||
                 error("state metadata mismatch in $path")
+            synthetic_sif = Symbol(get(synthetic.attrib, "sif_case", "off"))
+            noise_sif = Symbol(get(noise.attrib, "sif_case", "off"))
+            synthetic_provenance = validated_sif_provenance(
+                synthetic.attrib, synthetic_sif; source=synthetic_path)
+            noise_provenance = validated_sif_provenance(
+                noise.attrib, noise_sif; source=path)
+            matching_sif_provenance(
+                synthetic_provenance, noise_provenance;
+                first_source=synthetic_path, second_source=path)
+            if get(synthetic.attrib, "campaign", "") == "bottom_layer_XCO2"
+                for key in BOTTOM_LAYER_PROVENANCE_ATTRIBUTES
+                    haskey(noise.attrib, key) || error(
+                        "$path is missing bottom-layer provenance attribute $key")
+                    haskey(synthetic.attrib, key) || error(
+                        "$synthetic_path is missing bottom-layer provenance attribute $key")
+                    noise.attrib[key] == synthetic.attrib[key] || error(
+                        "$key differs between $path and its synthetic-radiance source")
+                end
+            end
             Int.(noise["band_start_index"][:]) == band_start ||
                 error("wrong band starts in $path")
             Int.(noise["band_end_index"][:]) == band_end ||
@@ -116,7 +169,8 @@ function main()
     global_above = Dict(class => 0 for class in CLASSES)
     global_snr = Dict(class => (Inf, -Inf) for class in CLASSES)
 
-    for state in 1:64
+    states = expected_states()
+    for state in states
         noise_path = joinpath(noise_directory, @sprintf("OCO2noise_%03d.nc", state))
         synthetic_path = joinpath(
             synthetic_directory, @sprintf("OCO2sims_%03d.nc", state))
@@ -134,7 +188,7 @@ function main()
         end
     end
 
-    @info "validated diagonal OCO-2 noise covariances" directory=noise_directory files=64
+    @info "validated diagonal OCO-2 noise covariances" directory=noise_directory files=length(states) states
     for class in CLASSES
         @printf("%-11s SNR range %.8g to %.8g; below MinMS=%d; above MaxMS=%d\n",
                 class, global_snr[class]..., global_below[class],

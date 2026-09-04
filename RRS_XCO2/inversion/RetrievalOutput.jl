@@ -128,6 +128,10 @@ function write_retrieval_result(experiment::RetrievalExperiment,
         realization.perturbed == realization.noiseless || error(
             "unperturbed experiment differs from its noiseless measurement")
     end
+    sif_provenance = validated_sif_provenance(
+        realization.provenance, experiment.truth.sif_case;
+        source="retrieval realization for truth state " *
+               string(experiment.truth.state_index))
 
     mkpath(dirname(output_path))
     isfile(output_path) && rm(output_path)
@@ -316,11 +320,14 @@ function write_retrieval_result(experiment::RetrievalExperiment,
         output.attrib["final_evaluation_seconds"] = result.final_evaluation_seconds
         output.attrib["source_measurement"] = abspath(experiment.measurement_path)
         output.attrib["source_noise_covariance"] = abspath(experiment.noise_path)
-        for (key, value) in provenance
-            key_string = String(key)
-            haskey(output.attrib, key_string) && throw(ArgumentError(
-                "provenance key would replace retrieval metadata: $key_string"))
-            output.attrib[key_string] = value
+        for record in (sif_provenance, provenance)
+            for (key, value) in record
+                key_string = String(key)
+                haskey(output.attrib, key_string) && throw(ArgumentError(
+                    "provenance key would replace retrieval metadata: " *
+                    key_string))
+                output.attrib[key_string] = value
+            end
         end
         output.attrib["created_utc"] = string(now(UTC))
         output.attrib["retrieval_complete"] = 1

@@ -26,8 +26,12 @@ using Statistics
 
 include(joinpath(@__DIR__, "SyntheticOCO2.jl"))
 include(joinpath(@__DIR__, "OCO2Noise.jl"))
+include(joinpath(@__DIR__, "..", "RetrievalCases.jl"))
 using .SyntheticOCO2
 using .OCO2Noise
+using .RetrievalCases: SIF_PROVENANCE_ATTRIBUTES,
+                       validated_sif_provenance,
+                       matching_sif_provenance
 
 const RRS_ROOT = normpath(joinpath(@__DIR__, "..", ".."))
 const DEFAULT_SYNTHETIC_DIR = joinpath(RRS_ROOT, "truth_map", "OCO_radiances")
@@ -36,6 +40,30 @@ const DEFAULT_COEFFICIENTS = joinpath(@__DIR__, "representative_snr_coefficients
 const CLASSES = (:corrected, :uncorrected)
 const RADIANCE_UNITS = "mW m-2 sr-1 nm-1"
 const VARIANCE_UNITS = "(mW m-2 sr-1 nm-1)^2"
+const BOTTOM_LAYER_PROVENANCE_ATTRIBUTES = (
+    "campaign",
+    "source_state_table",
+    "column_xco2_ppm",
+    "background_co2_ppm",
+    "bottom_co2_ppm",
+    "bottom_co2_index",
+    "bottom_co2_layer_index",
+    "co2_profile_order",
+    "co2_profile_definition",
+    "co2_profile_ppm",
+    "bottom_layer_dry_column_fraction",
+    "state_table_sha256",
+    "full_column_source_state",
+    "full_column_source_scene",
+    "full_column_source_sha256",
+    "full_column_state_table_sha256",
+    "bottom_co2_truth_mode",
+    "co2_truth_reuse_source",
+    "producer_script",
+    "producer_script_sha256",
+    "bottom_layer_truth_complete",
+    SIF_PROVENANCE_ATTRIBUTES...,
+)
 
 env_flag(name) = lowercase(get(ENV, name, "0")) in ("1", "true", "yes", "on")
 
@@ -75,7 +103,8 @@ function copy_scene_attributes(dataset)
     attributes = Dict{String,Any}()
     for key in ("state_index", "surface", "aerosol_case", "sif_case",
                 "xco2_ppm", "psurf_hpa", "sza_deg", "vza_deg",
-                "atmospheric_layers")
+                "relative_azimuth_deg", "atmospheric_layers",
+                BOTTOM_LAYER_PROVENANCE_ATTRIBUTES...)
         haskey(dataset.attrib, key) && (attributes[key] = dataset.attrib[key])
     end
     return attributes
@@ -113,6 +142,9 @@ function process_noise_file(input_path, output_path, coefficient_path, coefficie
         Int(input.attrib["state_index"]) == index ||
             error("state metadata disagrees with filename: $input_path")
         attributes = copy_scene_attributes(input)
+        validated_sif_provenance(
+            input.attrib, Symbol(get(input.attrib, "sif_case", "off"));
+            source=input_path)
 
         for spec in specs
             name = spec.name
@@ -149,9 +181,11 @@ function process_noise_file(input_path, output_path, coefficient_path, coefficie
 
     wavelength = vcat((band_wavelength[spec.name] for spec in specs)...)
     function canonical_band_index(spec)
-        index = findfirst(candidate -> candidate.name == spec.name, BAND_SPECS)
-        isnothing(index) && error("$(spec.name) is not a canonical OCO band")
-        return index
+        band_position = findfirst(
+            candidate -> candidate.name == spec.name, BAND_SPECS)
+        isnothing(band_position) && error(
+            "$(spec.name) is not a canonical OCO band")
+        return band_position
     end
     band_index = vcat((fill(Int8(canonical_band_index(spec)),
                             length(band_wavelength[spec.name]))
@@ -285,11 +319,24 @@ function process_noise_file(input_path, output_path, coefficient_path, coefficie
              attributes=attributes) for class in CLASSES]
 end
 
-function summarize_existing(path)
+function summarize_existing(path, input_path)
+    source_provenance = NCDataset(input_path) do input
+        Int(input.attrib["state_index"]) == state_index(input_path) || error(
+            "state metadata disagrees with filename: $input_path")
+        validated_sif_provenance(
+            input.attrib, Symbol(get(input.attrib, "sif_case", "off"));
+            source=input_path)
+    end
     NCDataset(path) do dataset
         get(dataset.attrib, "noise_covariance_complete", 0) == 1 ||
             error("existing output is incomplete: $path")
         index = Int(dataset.attrib["state_index"])
+        sif_case = Symbol(get(dataset.attrib, "sif_case", "off"))
+        noise_provenance = validated_sif_provenance(
+            dataset.attrib, sif_case; source=path)
+        matching_sif_provenance(
+            source_provenance, noise_provenance;
+            first_source=input_path, second_source=path)
         attributes = copy_scene_attributes(dataset)
         return [(state=index,
                  class=class,
@@ -307,12 +354,12 @@ function write_manifest(path, summaries)
         println(io, "# state surface aerosol sif xco2_ppm class min_snr median_snr max_snr below_MinMS above_MaxMS")
         for summary in sort(summaries; by=value -> (value.state, value.class))
             attributes = summary.attributes
-            @printf(io, "%03d %s %s %s %d %s %.10g %.10g %.10g %d %d\n",
+            @printf(io, "%03d %s %s %s %.12f %s %.10g %.10g %.10g %d %d\n",
                     summary.state,
                     get(attributes, "surface", "unknown"),
                     get(attributes, "aerosol_case", "unknown"),
                     get(attributes, "sif_case", "unknown"),
-                    Int(get(attributes, "xco2_ppm", -1)),
+                    Float64(get(attributes, "xco2_ppm", -1)),
                     summary.class,
                     summary.minimum_snr, summary.median_snr,
                     summary.maximum_snr, summary.below_min,
@@ -341,7 +388,7 @@ function main()
             output_directory, @sprintf("OCO2noise_%03d.nc", index))
         if isfile(output_path) && !force
             @info "skip existing OCO noise covariance" index output_path
-            append!(summaries, summarize_existing(output_path))
+            append!(summaries, summarize_existing(output_path, input_path))
         else
             @info "generate OCO noise covariance" index input_path output_path
             append!(summaries, process_noise_file(

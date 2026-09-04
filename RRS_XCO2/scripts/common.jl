@@ -10,7 +10,10 @@ export ROOT, CONFIG, BAND_NAMES, ABSCO_VERSION, configure_absco_luts!,
        configure_luts!, absco_lut_paths, load_parameters, wavelengths_nm,
        truncate_profile_to_surface!, materialize_profile!, prepare_shared_profile!,
        surface_basis_grids, basis_grids, raman_solve_grid,
-       solar_interpolator, sources_for_band,
+       solar_interpolator, sources_for_band, campaign_sif_state,
+       write_sif_provenance!, SIF_CASE_ON, SIF_DEFINITION_VERSION,
+       SIF_REFERENCE_WAVELENGTH_NM, SIF_ANGULAR_INTEGRAL_760,
+       SIF_UPWELLING_SOLID_ANGLE_SR, SIF_RADIANCE_760,
        write_absco_provenance!, write_fourier_convergence_provenance!
 
 const ROOT = normpath(joinpath(@__DIR__, ".."))
@@ -19,10 +22,84 @@ const BAND_NAMES = ("o2a", "weak_co2", "strong_co2")
 const ABSCO_VERSION = "5.2"
 const DEFAULT_SURFACE_PRESSURE_HPA = 1000.0
 const DEFAULT_PROFILE_LAYERS = 16
+const SIF_CASE_ON = "angular_integral760_0p5"
+const SIF_DEFINITION_VERSION = 2
+const SIF_REFERENCE_WAVELENGTH_NM = 760.0
+const SIF_ANGULAR_INTEGRAL_760 = 0.5
+const SIF_UPWELLING_SOLID_ANGLE_SR = 2π
+const SIF_RADIANCE_760 =
+    SIF_ANGULAR_INTEGRAL_760 / SIF_UPWELLING_SOLID_ANGLE_SR
 const SOLAR_OUT = get(ENV, "SOLAR_OUT",
     joinpath(homedir(), "Raman_misc", "workflows", "worktrees",
              "uni_vSmartMOM_sanghavi_2025-03-18", "src", "SolarModel", "solar.out"))
 const _SOLAR_INTERPOLATORS = Dict{DataType,Any}()
+
+"""
+    campaign_sif_state()
+
+Return the SIF spectrum used by the RRS-XCO2 truth campaigns.  Its existing
+CSV spectral shape is scaled so that the *unweighted upward-solid-angle
+integral* specified for this experiment satisfies
+
+`2π * L_lambda(760 nm) = 0.5 mW m^-2 nm^-1`.
+
+Thus every isotropic upwelling BOA stream has
+`L_lambda(760 nm) = 0.5/(2π) mW m^-2 sr^-1 nm^-1`.  This is deliberately not
+called hemispheric irradiance: the cosine-weighted Lambertian irradiance is
+`πL = 0.25 mW m^-2 nm^-1` for the stated radiance.  The returned full
+spectrum retains the original SIF template shape, while `SIF760` and `mSIF`
+are the matching local wavenumber-linear retrieval coordinates.
+"""
+function campaign_sif_state()
+    shape = sif_reference_state(
+        total_sif=1.0,
+        reference_wavelength_nm=SIF_REFERENCE_WAVELENGTH_NM,
+    )
+    target_SIF760 = SIF_RADIANCE_760 *
+        SIF_REFERENCE_WAVELENGTH_NM^2 / 1.0e7
+    scale = target_SIF760 / shape.SIF760
+    spectrum = shape.spectrum .* scale
+    mSIF = shape.mSIF * scale
+    wavelength_integral = scale # `shape.spectrum` integrates to one.
+    return (;
+        SIF760=target_SIF760,
+        mSIF,
+        ν_ref=shape.ν_ref,
+        ν=shape.ν,
+        spectrum,
+        wavelength_integral,
+        radiance_760=SIF_RADIANCE_760,
+        angular_integral_760=SIF_ANGULAR_INTEGRAL_760,
+        scale,
+    )
+end
+
+"Write an unambiguous, versioned SIF normalization record to NetCDF attrs."
+function write_sif_provenance!(attributes, enabled::Bool)
+    state = campaign_sif_state()
+    active = enabled ? 1.0 : 0.0
+    attributes["sif_definition_version"] = Int32(SIF_DEFINITION_VERSION)
+    attributes["sif_definition"] =
+        "isotropic BOA radiance normalized by 2pi*L_lambda(760 nm)=0.5"
+    attributes["sif_case_on_label"] = SIF_CASE_ON
+    attributes["sif_reference_wavelength_nm"] =
+        SIF_REFERENCE_WAVELENGTH_NM
+    attributes["sif_upwelling_solid_angle_sr"] =
+        SIF_UPWELLING_SOLID_ANGLE_SR
+    attributes["sif_angular_integral_760_mW_m-2_nm-1"] =
+        active * SIF_ANGULAR_INTEGRAL_760
+    attributes["sif_radiance_760_mW_m-2_sr-1_nm-1"] =
+        active * state.radiance_760
+    attributes["sif_cosine_weighted_irradiance_760_mW_m-2_nm-1"] =
+        active * π * state.radiance_760
+    attributes["sif_SIF760_mW_m-2_sr-1_per_cm-1"] =
+        active * state.SIF760
+    attributes["sif_mSIF_mW_m-2_sr-1_per_cm-2"] =
+        active * state.mSIF
+    attributes["sif_template_wavelength_integral_mW_m-2_sr-1"] =
+        active * state.wavelength_integral
+    return attributes
+end
 
 "Return the spectroscopy tables used by the three-band experiment."
 function absco_lut_paths()
@@ -266,7 +343,7 @@ function sources_for_band(params, iband; SIF760=nothing, mSIF=nothing,
     @views F₀[1, :] .= solar
     beam = CoreRT.SolarBeam(F₀=F₀)
     iband == 1 || return beam
-    state = sif_reference_state(total_sif=0.5, reference_wavelength_nm=760)
+    state = campaign_sif_state()
     SIF760 === nothing && (SIF760 = state.SIF760)
     mSIF === nothing && (mSIF = state.mSIF)
     return beam + CoreRT.SurfaceSIF(SIF760=FT(SIF760), mSIF=FT(mSIF),

@@ -17,7 +17,7 @@ NAer = length(params.scattering_params.rt_aerosols)
 NGas = size(lin_model.τ̇_abs[1], 1)
 NSurf = length(params.brdf[1].legendre_coeff)
 
-state = sif_reference_state(total_sif=0.5, reference_wavelength_nm=760)
+state = RRSXCO2Common.campaign_sif_state()
 base_ref, base_slope = state.SIF760, state.mSIF
 sources = sources_for_band(params, 1; SIF760=base_ref, mSIF=base_slope)
 analytic = rt_run(model, lin_model, NAer, NGas, NSurf;
@@ -41,4 +41,16 @@ end
     end
     @test CoreRT.surface_sif_parameter_count(sources_for_band(params, 2)) == 0
     @test CoreRT.surface_sif_parameter_count(sources_for_band(params, 3)) == 0
+end
+
+@testset "SIF amplitude linear superposition" begin
+    legacy = sif_reference_state(total_sif=0.5, reference_wavelength_nm=760)
+    scale = base_ref / legacy.SIF760
+    no_sif = forward(0.0, 0.0)
+    legacy_sif = forward(legacy.SIF760, legacy.mSIF)
+    corrected_direct = forward(base_ref, base_slope)
+    corrected_reconstructed =
+        no_sif .+ scale .* (legacy_sif .- no_sif)
+    @test isapprox(corrected_reconstructed, corrected_direct;
+                   rtol=2e-13, atol=2e-14)
 end
