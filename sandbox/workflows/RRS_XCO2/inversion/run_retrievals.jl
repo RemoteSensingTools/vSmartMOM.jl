@@ -140,6 +140,12 @@ function main()
         aerosol_case_filter == "all" ||
             (aerosol_case_filter == "aerosol") == truth_has_aerosol
     end
+    # A SIF-on retrieval must never observe a partly published truth chain.
+    # The release receipt covers the complete SIF half of the campaign, not
+    # merely this worker's state slice, so run the barrier before experiment
+    # construction or any forward-model allocation.
+    require_sif_release_barrier(
+        truth_table, truth_cases, measurement_directory, noise_directory)
     all_experiments = build_experiments(
         truth_cases; measurement_directory, noise_directory)
     experiments = filter(all_experiments) do experiment

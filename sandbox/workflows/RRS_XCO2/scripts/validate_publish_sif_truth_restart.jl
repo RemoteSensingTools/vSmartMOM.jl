@@ -37,12 +37,16 @@ Environment paths:
 * `SIF_RESTART_ROOT` (default `<truth root>/.sif_v2_restart`)
 * `SIF_OBSOLETE_ROOT` (default
   `RRS_XCO2/obsolete/sif_wavelength_integral_0p5_20260904`)
+* `SIF_EXTERNAL_INPUT_MANIFEST` must name the transferred
+  `external_inputs.sha256` used by the eight Gattaca producer tasks (the
+  default is `<restart root>/external_inputs.sha256`).
 """
 
 module SIFTruthReleaseGate
 
 using Dates
 using DelimitedFiles
+using JLD2
 using NCDatasets
 using Printf
 using SHA
@@ -66,6 +70,27 @@ const CO2_VARIABLES = (
 const LEGACY_CASE = "total_0p5"
 const CONFIRMATION = "publish_32_direct_sif_scenes"
 const RELEASE_SCHEMA = 1
+const DEFAULT_APPROVED_PRODUCER_SHA =
+    "a2968e26e472d202983b8e53b1c68853bbf885ae"
+const O2_REGEN_VERSION = 3
+const PRODUCER_PARTITIONS = (
+    (task=0, class="clear", filter="none", first=1, last=16,
+     chunks=1, surface=1),
+    (task=1, class="clear", filter="none", first=17, last=32,
+     chunks=1, surface=2),
+    (task=2, class="clear", filter="none", first=33, last=48,
+     chunks=1, surface=3),
+    (task=3, class="clear", filter="none", first=49, last=64,
+     chunks=1, surface=4),
+    (task=4, class="aerosol", filter="aerosol", first=1, last=16,
+     chunks=43, surface=1),
+    (task=5, class="aerosol", filter="aerosol", first=17, last=32,
+     chunks=43, surface=2),
+    (task=6, class="aerosol", filter="aerosol", first=33, last=48,
+     chunks=43, surface=3),
+    (task=7, class="aerosol", filter="aerosol", first=49, last=64,
+     chunks=43, surface=4),
+)
 const PHYSICAL_SCALE = let corrected = RRSXCO2Common.campaign_sif_state()
     legacy = sif_reference_state(
         total_sif=0.5, reference_wavelength_nm=760)
@@ -194,6 +219,202 @@ publication_marker(paths::ReleasePaths) =
     joinpath(paths.truth_root, ".sif_v2_publication_in_progress")
 publication_lock(paths::ReleasePaths) =
     joinpath(paths.restart_root, ".sif_v2_publication_lock")
+
+producer_checkpoint(paths::ReleasePaths, partition) = joinpath(
+    paths.restart_root, partition.class,
+    "o2_exact_grid_$(partition.filter)_$(partition.first)_$(partition.last)_checkpoint.jld2")
+
+function parse_producer_log(path)
+    values = Dict{String,String}()
+    hashes = Dict{String,String}()
+    for line in eachline(path)
+        stripped = strip(line)
+        isempty(stripped) && continue
+        hash_match = match(r"^([0-9a-f]{64})\s+(.+)$", stripped)
+        if hash_match !== nothing
+            digest, source = hash_match.captures
+            hashes[basename(source)] = digest
+            continue
+        end
+        fields = split(stripped, '='; limit=2)
+        length(fields) == 2 && (values[fields[1]] = fields[2])
+    end
+    return (; values, hashes)
+end
+
+"Verify every transferred external input relative to its manifest directory."
+function validate_external_input_manifest(path)
+    isfile(path) || error("missing external-input manifest: $path")
+    root = realpath(dirname(path))
+    entries = Dict{String,String}()
+    for line in eachline(path)
+        isempty(strip(line)) && continue
+        matched = match(r"^([0-9a-f]{64}) [ *](.+)$", line)
+        matched === nothing && error(
+            "malformed external-input manifest line in $path: $line")
+        digest, relative = matched.captures
+        isabspath(relative) && error(
+            "external-input manifest path must be relative: $relative")
+        normalized = normpath(relative)
+        (normalized == ".." || startswith(
+            normalized, "..$(Base.Filesystem.path_separator)")) && error(
+            "external-input manifest path escapes its directory: $relative")
+        haskey(entries, normalized) && error(
+            "duplicate external-input manifest path: $relative")
+        target = joinpath(root, normalized)
+        isfile(target) || error(
+            "missing external input listed by $path: $target")
+        resolved = realpath(target)
+        contains_path(root, resolved) || error(
+            "external-input manifest target escapes through a symlink: $relative")
+        file_sha256(resolved) == digest || error(
+            "external input checksum mismatch: $target")
+        entries[normalized] = digest
+    end
+    isempty(entries) && error("external-input manifest is empty: $path")
+    return entries
+end
+
+function require_checkpoint_value(checkpoint, key, expected, path)
+    actual = get(checkpoint, key, nothing)
+    actual == expected || error(
+        "$path has checkpoint $key=$(repr(actual)); expected $(repr(expected))")
+end
+
+"""Bind staged products to all eight completed Gattaca producer partitions."""
+function validate_producer_provenance(paths::ReleasePaths;
+                                      approved_sha=get(
+                                          ENV,
+                                          "APPROVED_SIF_TRUTH_CHECKPOINT_SHA",
+                                          DEFAULT_APPROVED_PRODUCER_SHA))
+    occursin(r"^[0-9a-f]{40}$", approved_sha) || error(
+        "APPROVED_SIF_TRUTH_CHECKPOINT_SHA must be a full lowercase Git SHA")
+    logs_root = joinpath(paths.restart_root, "logs")
+    isdir(logs_root) || error("missing Gattaca producer log directory: $logs_root")
+    log_paths = sort(filter(
+        path -> endswith(path, ".provenance.txt"),
+        joinpath.(logs_root, readdir(logs_root))))
+    isempty(log_paths) && error("no Gattaca producer provenance logs were found")
+    parsed_logs = Dict(path => parse_producer_log(path) for path in log_paths)
+    selected_logs = String[]
+    checkpoint_hashes = Dict{String,String}()
+    common_hashes = Dict{String,Set{String}}(
+        name => Set{String}() for name in
+        ("external_inputs.sha256", "Manifest.toml",
+         "lambertian_legendre_inputs.dat", "true_states.dat",
+         "sif-spectra.csv"))
+
+    current_sif = RRSXCO2Common.campaign_sif_state()
+    for partition in PRODUCER_PARTITIONS
+        candidates = filter(log_paths) do path
+            record = parsed_logs[path]
+            values = record.values
+            get(values, "completed_utc", "") != "" &&
+            get(values, "source_sha", "") == approved_sha &&
+            get(values, "slurm_array_task_id", "") == string(partition.task) &&
+            get(values, "aerosol_filter", "") == partition.filter &&
+            get(values, "state_range", "") ==
+                "$(partition.first):$(partition.last)" &&
+            get(values, "force", "") == "0"
+        end
+        length(candidates) == 1 || error(
+            "expected exactly one completed producer provenance log for task " *
+            "$(partition.task), found $(length(candidates))")
+        log = only(candidates)
+        push!(selected_logs, log)
+        for name in keys(common_hashes)
+            digest = get(parsed_logs[log].hashes, name, "")
+            length(digest) == 64 || error("$log lacks a SHA-256 record for $name")
+            push!(common_hashes[name], digest)
+        end
+
+        checkpoint_path = producer_checkpoint(paths, partition)
+        isfile(checkpoint_path) || error(
+            "missing version-3 producer checkpoint: $checkpoint_path")
+        checkpoint = JLD2.load(checkpoint_path)
+        required = (
+            ("version", O2_REGEN_VERSION),
+            ("aerosol_case_filter", partition.filter),
+            ("first_state", partition.first),
+            ("last_state", partition.last),
+            ("o2_chunk_points", partition.filter == "aerosol" ? 64 : 2735),
+            ("float_type", "Float32"),
+            ("nstreams", partition.filter == "aerosol" ? 9 : 5),
+            ("psurf_hpa", 1000.0),
+            ("nlayers", 16),
+            ("sza_deg", Float32(30)),
+            ("vza_deg", Float32(0)),
+            ("relative_azimuth_deg", Float32(0)),
+            ("sif_definition_version", RRSXCO2Common.SIF_DEFINITION_VERSION),
+            ("sif_case_on", RRSXCO2Common.SIF_CASE_ON),
+            ("sif_angular_integral_760", RRSXCO2Common.SIF_ANGULAR_INTEGRAL_760),
+            ("sif_radiance_760", RRSXCO2Common.SIF_RADIANCE_760),
+            ("sif760_native", current_sif.SIF760),
+            ("msif_native", current_sif.mSIF),
+            ("sif_template_wavelength_integral",
+             current_sif.wavelength_integral),
+            ("raman_shoulder_cm", 234.0),
+            ("o2_core_grid_version", 2),
+            ("surface_coordinate_version", 1),
+            ("absco_version", RRSXCO2Common.ABSCO_VERSION),
+        )
+        for (key, expected) in required
+            require_checkpoint_value(checkpoint, key, expected, checkpoint_path)
+        end
+        expected_tags = Set(
+            "o2_surface$(partition.surface)_sif2_chunk$chunk"
+            for chunk in 1:partition.chunks)
+        Set(String.(get(checkpoint, "completed", String[]))) == expected_tags ||
+            error("$checkpoint_path does not contain its exact completed v3 tag set")
+        checkpoint_hashes[checkpoint_path] = file_sha256(checkpoint_path)
+    end
+
+    for (name, digests) in common_hashes
+        length(digests) == 1 || error(
+            "completed producer tasks disagree on the $name checksum")
+    end
+    local_inputs = Dict(
+        "Manifest.toml" => normpath(joinpath(@__DIR__, "..", "..", "Manifest.toml")),
+        "lambertian_legendre_inputs.dat" => normpath(joinpath(
+            @__DIR__, "..", "surface_albedos", "lambertian_legendre_inputs.dat")),
+        "true_states.dat" => corrected_table(paths),
+        "sif-spectra.csv" => normpath(joinpath(
+            @__DIR__, "..", "..", "src", "SIF_emission", "sif-spectra.csv")),
+    )
+    for (name, local_path) in local_inputs
+        isfile(local_path) || error("missing local producer input: $local_path")
+        only(common_hashes[name]) == file_sha256(local_path) || error(
+            "producer provenance hash for $name differs from the local input")
+    end
+    external = get(ENV, "SIF_EXTERNAL_INPUT_MANIFEST",
+                   joinpath(paths.restart_root, "external_inputs.sha256"))
+    isfile(external) || error(
+        "missing transferred Gattaca external-input manifest: $external; " *
+        "set SIF_EXTERNAL_INPUT_MANIFEST to its verified transfer path")
+    only(common_hashes["external_inputs.sha256"]) == file_sha256(external) ||
+        error("external-input manifest differs from Gattaca provenance")
+    external_entries = validate_external_input_manifest(external)
+
+    provenance_lines = String["approved_sha $approved_sha"]
+    append!(provenance_lines,
+        "log $(basename(path)) $(file_sha256(path))" for path in selected_logs)
+    append!(provenance_lines,
+        "checkpoint $(relpath(path, paths.restart_root)) $digest"
+        for (path, digest) in sort!(collect(checkpoint_hashes); by=first))
+    for name in sort!(collect(keys(common_hashes)))
+        push!(provenance_lines, "input $name $(only(common_hashes[name]))")
+    end
+    for (relative, digest) in sort!(collect(external_entries); by=first)
+        push!(provenance_lines, "external $relative $digest")
+    end
+    provenance_digest = bytes2hex(sha256(
+        join(sort!(provenance_lines), '\n') * "\n"))
+    return (; approved_sha, selected_logs, checkpoint_hashes,
+            input_hashes=Dict(name => only(values)
+                              for (name, values) in common_hashes),
+            external_entries,
+            provenance_digest)
+end
 
 function require_attr(attributes, key, path)
     haskey(attributes, key) || error("$path lacks required attribute $key")
@@ -349,9 +570,9 @@ end
 # The producer's absolute source-table path may differ after a cross-host data
 # transfer.  Its basename and content checksum, rather than its host path, are
 # therefore the portable provenance contract.
-function validate_direct_scene(paths, state; expected_o2_points=2735)
-    path = staged_scene(paths, state)
-    isfile(path) || error("missing staged corrected scene: $path")
+function validate_direct_scene(paths, state; expected_o2_points=2735,
+                               path=staged_scene(paths, state))
+    isfile(path) || error("missing corrected direct-RT scene: $path")
     arrays = NCDataset(path, "r") do dataset
         validate_sif_provenance(dataset, state, path)
         source = String(require_attr(dataset.attrib, "source_state_table", path))
@@ -497,7 +718,8 @@ function write_atomic(writer::Function, path)
 end
 
 function write_validation_receipt(paths, selected, scene_hashes, staged_hashes,
-                                  corrected_table_hash)
+                                  corrected_table_hash, legacy_table_hash,
+                                  producer)
     path = release_receipt(paths)
     write_atomic(path) do io
         println(io, "# corrected SIF truth release validation")
@@ -507,7 +729,10 @@ function write_validation_receipt(paths, selected, scene_hashes, staged_hashes,
         println(io, "# sif_definition_version ", RRSXCO2Common.SIF_DEFINITION_VERSION)
         println(io, "# sif_case ", RRSXCO2Common.SIF_CASE_ON)
         println(io, "# corrected_state_table_sha256 ", corrected_table_hash)
-        println(io, "# archived_state_table_sha256 ", file_sha256(archived_table(paths)))
+        println(io, "# archived_state_table_sha256 ", legacy_table_hash)
+        println(io, "# approved_producer_git_sha ", producer.approved_sha)
+        println(io, "# producer_provenance_sha256 ",
+                producer.provenance_digest)
         println(io, "# index class staged_sha256 archived_sha256 canonical_destination")
         for state in selected
             @printf(io, "%03d %s %s %s %s\n",
@@ -522,10 +747,16 @@ end
 function validate_release(paths::ReleasePaths=ReleasePaths();
                           expected_o2_points=2735,
                           require_legacy_canonical=true,
-                          write_receipt=true)
+                          write_receipt=true,
+                          require_producer_provenance=true)
     corrected, legacy, selected = validate_corrected_table(paths)
     scene_hashes = parse_archive_manifest(paths, selected)
     corrected_table_hash = file_sha256(corrected_table(paths))
+    legacy_table_hash = file_sha256(archived_table(paths))
+    producer = require_producer_provenance ?
+        validate_producer_provenance(paths) :
+        (approved_sha="synthetic-test-bypass",
+         provenance_digest="synthetic-test-bypass")
     staged_hashes = Dict(
         state.index => file_sha256(staged_scene(paths, state))
         for state in selected)
@@ -567,9 +798,10 @@ function validate_release(paths::ReleasePaths=ReleasePaths();
     end
     receipt = write_receipt ?
         write_validation_receipt(paths, selected, scene_hashes, staged_hashes,
-                                 corrected_table_hash) : nothing
+                                 corrected_table_hash, legacy_table_hash,
+                                 producer) : nothing
     return (; corrected, legacy, selected, scene_hashes, staged_hashes,
-            corrected_table_hash, receipt)
+            corrected_table_hash, legacy_table_hash, producer, receipt)
 end
 
 function verified_sidecar(source, destination, release_id;
@@ -591,7 +823,7 @@ function atomic_replace(source, destination)
     return destination
 end
 
-function restore_archive!(paths, selected)
+function restore_archive!(paths, selected, scene_hashes, legacy_table_hash)
     release_id = "rollback-$(getpid())-$(uuid4())"
     pairs = Tuple{String,String}[]
     try
@@ -599,12 +831,14 @@ function restore_archive!(paths, selected)
         # table first, so a corrected table is never visible while scenes are
         # being returned to their archived versions.
         push!(pairs, (verified_sidecar(
-            archived_table(paths), canonical_table(paths), release_id),
+            archived_table(paths), canonical_table(paths), release_id;
+            expected_hash=legacy_table_hash),
             canonical_table(paths)))
         for state in selected
             push!(pairs, (verified_sidecar(
                 archived_scene(paths, state), canonical_scene(paths, state),
-                release_id), canonical_scene(paths, state)))
+                release_id; expected_hash=scene_hashes[state.index]),
+                canonical_scene(paths, state)))
         end
         for (temporary, destination) in pairs
             atomic_replace(temporary, destination)
@@ -617,13 +851,14 @@ function restore_archive!(paths, selected)
 end
 
 function validate_published(paths, validation; expected_o2_points=2735)
-    file_sha256(canonical_table(paths)) == file_sha256(corrected_table(paths)) ||
+    file_sha256(canonical_table(paths)) == validation.corrected_table_hash ||
         error("published canonical state table differs from validated table")
     for state in validation.selected
         destination = canonical_scene(paths, state)
-        file_sha256(destination) == file_sha256(staged_scene(paths, state)) ||
+        file_sha256(destination) == validation.staged_hashes[state.index] ||
             error("published state $(state.index) differs from staged source")
-        validate_direct_scene(paths, state; expected_o2_points)
+        validate_direct_scene(
+            paths, state; expected_o2_points, path=destination)
     end
 end
 
@@ -635,7 +870,7 @@ function publish_release(paths::ReleasePaths=ReleasePaths();
     marker = publication_marker(paths)
     lock = publication_lock(paths)
     resume = get(ENV, "SIF_RELEASE_RESUME", "0") == "1"
-    resume && !isfile(marker) && error(
+    resume && !ispath(marker) && error(
         "SIF_RELEASE_RESUME=1 requires an existing interruption marker")
     if isdir(lock)
         resume && get(ENV, "SIF_RELEASE_BREAK_STALE_LOCK", "0") == "1" ||
@@ -648,7 +883,9 @@ function publish_release(paths::ReleasePaths=ReleasePaths();
     committed = false
     promotions_started = false
     try
-        if isfile(marker)
+        if ispath(marker)
+            isfile(marker) || error(
+                "publication marker exists but is not a regular file: $marker")
             resume || error(
                 "an interrupted publication marker exists: $marker; audit and resume explicitly")
             # No unknown canonical content is accepted during recovery.
@@ -699,10 +936,19 @@ function publish_release(paths::ReleasePaths=ReleasePaths();
         validate_published(paths, validation; expected_o2_points)
         write_atomic(canonical_receipt(paths)) do io
             println(io, "# corrected SIF truth publication complete")
+            println(io, "release_schema $RELEASE_SCHEMA")
+            println(io, "sif_definition_version ",
+                    RRSXCO2Common.SIF_DEFINITION_VERSION)
             println(io, "release_id $release_id")
             println(io, "completed_utc ",
                     Dates.format(now(UTC), dateformat"yyyy-mm-ddTHH:MM:SS"), "Z")
             println(io, "validation_receipt_sha256 ", file_sha256(validation.receipt))
+            println(io, "corrected_state_table_sha256 ",
+                    validation.corrected_table_hash)
+            println(io, "approved_producer_git_sha ",
+                    validation.producer.approved_sha)
+            println(io, "producer_provenance_sha256 ",
+                    validation.producer.provenance_digest)
         end
         rm(marker)
         committed = true
@@ -710,7 +956,9 @@ function publish_release(paths::ReleasePaths=ReleasePaths();
     catch exception
         if validation !== nothing && promotions_started
             try
-                restore_archive!(paths, validation.selected)
+                restore_archive!(paths, validation.selected,
+                                 validation.scene_hashes,
+                                 validation.legacy_table_hash)
             catch rollback_exception
                 @error("automatic rollback failed; immutable archive remains intact",
                        rollback_exception)

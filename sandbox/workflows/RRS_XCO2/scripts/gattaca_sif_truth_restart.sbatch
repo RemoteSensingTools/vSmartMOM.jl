@@ -8,8 +8,6 @@
 # run_sif_truth_restart_partition.sh, which resumes versioned chunk checkpoints
 # with FORCE=0 and holds an atomic claim for its partition.
 
-#SBATCH --account=cmml
-#SBATCH --qos=normal
 #SBATCH --partition=gpu
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=4
@@ -17,8 +15,8 @@
 #SBATCH --time=2-00:00:00
 #SBATCH --array=0-7%2
 #SBATCH --job-name=rrs_sif_truth_v2
-#SBATCH --output=/home/sanghavi/RRS_XCO2_private/results/.sif_v2_restart/slurm/%x-%A_%a.out
-#SBATCH --error=/home/sanghavi/RRS_XCO2_private/results/.sif_v2_restart/slurm/%x-%A_%a.err
+# Account, QOS, and absolute log destinations are intentionally supplied by
+# the private host runbook at submission time, not embedded in tracked source.
 
 set -euo pipefail
 umask 077
@@ -153,6 +151,18 @@ for required in "${required_files[@]}"; do
         exit 1
     }
 done
+
+# The transfer manifest is itself recorded below, but hashing only the
+# manifest would not detect a post-transfer mutation of one of its inputs.
+# Its paths are relative to private_root; verify every listed byte before any
+# producer process is launched.
+if ! (
+    cd "${private_root}"
+    sha256sum --check --quiet external_inputs.sha256
+); then
+    echo "one or more transferred external inputs failed SHA-256 validation" >&2
+    exit 1
+fi
 
 # A transferred restart contains four SIF-on scenes for each array task.  The
 # Julia producer performs the authoritative variable/metadata checks, while
