@@ -64,18 +64,54 @@ plots/
 # Private research handoffs belong in ~/RRS_XCO2/private_notes, not Git.
 TODO/PRIVATE_*
 **/species_rayleigh_raman_todo.md
+# Host/account-specific institutional runbooks are private operational notes.
+RRS_XCO2/inversion/for_gattaca.md
 # Generated RRS/XCO2 science products are private working data. Keep the code,
 # configuration, and prose in Git, but never publish plots or numeric datasets.
 **/RRS_XCO2/**/*.png
 **/RRS_XCO2/**/*.dat
 **/RRS_XCO2/**/*.nc
 **/RRS_XCO2/**/*.csv
+**/RRS_XCO2/**/*.jld
+**/RRS_XCO2/**/*.jld2
+**/RRS_XCO2/**/*.log
+**/RRS_XCO2/**/*.h5
+**/RRS_XCO2/**/*.hdf5
+**/RRS_XCO2/**/*.nc4
+**/RRS_XCO2/**/*.zip
 RRS_XCO2/output/
 RRS_XCO2/truth_map/logs/
 RRS_XCO2/truth_map/*.log
+RRS_XCO2/truth_map/.absco_pipeline_failed
+RRS_XCO2/truth_map/ABSCO_PIPELINE_STATUS.md
 RRS_XCO2/truth_map/aerosol_chunked/
 RRS_XCO2/truth_map/hiressim_*.nc
 RRS_XCO2/truth_map/sims_12layer*/
+# Land-glint products are large and reproducible; retain only their guide.
+RRS_XCO2/truth_map/land_glint/**
+!RRS_XCO2/truth_map/land_glint/
+!RRS_XCO2/truth_map/land_glint/README.md
+# Superseded truth products are retained locally for provenance, but never
+# stage their large payloads. Keep directory-level README files visible.
+RRS_XCO2/obsolete/**
+!RRS_XCO2/obsolete/
+!RRS_XCO2/obsolete/**/
+!RRS_XCO2/obsolete/**/README.md
 RRS_XCO2/truth_map_aerosols/*.jld2
 RRS_XCO2/truth_map_aerosols/*.log
 RRS_XCO2/scripts/__pycache__/
+# Bottom-layer campaign runtime state and private generated products.  The
+# campaign README and producer code remain trackable.
+RRS_XCO2/bottom_layer_XCO2_retrievals/truth/
+RRS_XCO2/bottom_layer_XCO2_retrievals/logs/
+RRS_XCO2/bottom_layer_XCO2_retrievals/retrievals/
+RRS_XCO2/bottom_layer_XCO2_retrievals/retrieval_setup/*.nc
+RRS_XCO2/bottom_layer_XCO2_retrievals/retrieval_setup/*.dat
+RRS_XCO2/bottom_layer_XCO2_retrievals/RETRIEVAL_RESTART_SIGMA_LNAOD_0P75.md
+RRS_XCO2/inversion/ACTIVE_CAMPAIGN_STATUS.md
+RRS_XCO2/inversion/spectral_fit_visualization_trial/trial_manifest.txt
+# Host-specific Julia caches used by the dual-host RRS-XCO2 production jobs.
+RRS_XCO2/.julia_depot_wurst/
+RRS_XCO2/.julia_depot_curry/
+# Empty shell-redirection typo observed at the repository root.
+/[}]

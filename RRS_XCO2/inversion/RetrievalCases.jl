@@ -10,16 +10,26 @@ export TruthCase,
        default_truth_table,
        default_measurement_directory,
        default_noise_directory,
+       read_truth_cases,
        read_no_sif_truth_cases,
+       select_sif_truth_cases,
        build_experiments,
+       external_sif_ownership_marker,
+       enforce_sif_ownership,
        paired_uniform_draw,
        load_measurement_realization,
-       write_experiment_manifest
+       write_experiment_manifest,
+       PERTURBED_REALIZATIONS,
+       UNPERTURBED_INDEX
 
 const INVERSION_ROOT = @__DIR__
 const RRS_ROOT = normpath(joinpath(INVERSION_ROOT, ".."))
 const DEFAULT_MASTER_SEED = UInt64(0x4f434f5f525253)
 const MEASUREMENT_CLASSES = (:corrected, :uncorrected)
+const PERTURBED_REALIZATIONS = 10
+const UNPERTURBED_INDEX = 11
+const EXTERNAL_SIF_OWNERSHIP_MARKER = joinpath(
+    ".control", "sif_owned_externally")
 
 default_truth_table() = joinpath(RRS_ROOT, "truth_map", "true_states.dat")
 default_measurement_directory() = joinpath(
@@ -27,18 +37,65 @@ default_measurement_directory() = joinpath(
 default_noise_directory() = joinpath(
     default_measurement_directory(), "noise_covariances")
 
-"""The identifying metadata for one selected no-SIF truth scene."""
+"""Return the marker that delegates SIF-on work away from an output tree."""
+function external_sif_ownership_marker(output_root::AbstractString)
+    configured = get(
+        ENV, "RETRIEVAL_EXTERNAL_SIF_OWNERSHIP_MARKER",
+        joinpath(output_root, EXTERNAL_SIF_OWNERSHIP_MARKER))
+    return abspath(configured)
+end
+
+"""
+    enforce_sif_ownership(output_root, experiments)
+
+Refuse a selected SIF-on retrieval when the output tree contains the durable
+external-ownership marker.  Host launchers start a fresh Julia runner for each
+block, so this guard safely disarms their later SIF phase without interrupting
+an already-running no-SIF block.  An external worker remains unaffected when
+it uses its own isolated output root.
+"""
+function enforce_sif_ownership(output_root::AbstractString, experiments)
+    any(experiment -> experiment.truth.sif_case != :off, experiments) ||
+        return nothing
+    marker = external_sif_ownership_marker(output_root)
+    isfile(marker) || return nothing
+    owner = strip(read(marker, String))
+    isempty(owner) && (owner = "external owner not recorded")
+    error(
+        "SIF-on retrievals are delegated outside output root " *
+        "$(abspath(output_root)); ownership marker=$marker; $owner")
+end
+
+"""The identifying metadata for one selected truth scene."""
 struct TruthCase
     state_index::Int
     surface_index::Int
     surface::Symbol
     aerosol_index::Int
     aerosol_case::Symbol
+    sif_case::Symbol
     xco2_index::Int
     xco2_ppm::Float64
+    campaign::Symbol
+    co2_profile_mode::Symbol
+    fixed_upper_co2_ppm::Float64
+    background_co2_ppm::Float64
+    bottom_layer_index::Int
+    bottom_co2_ppm::Float64
 end
 
-"""One of 640 retrieval solves (320 noise draws times two measurement classes)."""
+# Preserve the original public constructor for callers describing a uniform
+# full-column truth scene. Bottom-layer scenes are constructed by the table
+# parser below because they require additional profile metadata.
+TruthCase(state_index::Int, surface_index::Int, surface::Symbol,
+          aerosol_index::Int, aerosol_case::Symbol, sif_case::Symbol,
+          xco2_index::Int, xco2_ppm::Real) = TruthCase(
+    state_index, surface_index, surface, aerosol_index, aerosol_case,
+    sif_case, xco2_index, Float64(xco2_ppm), :full_column_XCO2,
+    :uniform_column, Float64(xco2_ppm), Float64(xco2_ppm), 0,
+    Float64(xco2_ppm))
+
+"""One retrieval solve from a paired corrected/uncorrected experiment."""
 struct RetrievalExperiment
     retrieval_index::Int
     pair_index::Int
@@ -82,31 +139,154 @@ function _truth_rows(path)
     return rows
 end
 
-"""Read and validate the 4 surface x 2 aerosol x 4 CO2 no-SIF truth subset."""
-function read_no_sif_truth_cases(path::AbstractString=default_truth_table())
-    selected = TruthCase[]
+function _required_float(row, name)
+    haskey(row, name) || error("truth-state table is missing required column $name")
+    value = parse(Float64, row[name])
+    isfinite(value) || error("truth-state column $name contains a non-finite value")
+    return value
+end
+
+function _required_int(row, name)
+    haskey(row, name) || error("truth-state table is missing required column $name")
+    return parse(Int, row[name])
+end
+
+"""Infer the uniform or bottom-layer CO2 profile metadata for one table row."""
+function _co2_metadata(row)
+    is_bottom_layer = haskey(row, "bottom_co2_ppm") ||
+        haskey(row, "bottom_co2_index") || haskey(row, "background_co2_ppm")
+    if is_bottom_layer
+        bottom_index = _required_int(row, "bottom_co2_index")
+        background = _required_float(row, "background_co2_ppm")
+        bottom_layer = _required_int(row, "bottom_layer_index")
+        bottom = _required_float(row, "bottom_co2_ppm")
+        campaign = Symbol(get(row, "campaign", "bottom_layer_XCO2"))
+        return (; xco2_index=bottom_index, campaign,
+                co2_profile_mode=:bottom_layer,
+                fixed_upper_co2_ppm=background,
+                background_co2_ppm=background,
+                bottom_layer_index=bottom_layer,
+                bottom_co2_ppm=bottom)
+    end
+
+    xco2_index = _required_int(row, "xco2_index")
+    xco2 = _required_float(row, "xco2_ppm")
+    campaign = Symbol(get(row, "campaign", "full_column_XCO2"))
+    return (; xco2_index, campaign, co2_profile_mode=:uniform_column,
+            fixed_upper_co2_ppm=xco2, background_co2_ppm=xco2,
+            bottom_layer_index=0, bottom_co2_ppm=xco2)
+end
+
+function _validate_truth_cases(cases, path)
+    length(unique(case.state_index for case in cases)) == length(cases) || error(
+        "truth-state indices are not unique in $path")
+    sort([case.state_index for case in cases]) == collect(1:length(cases)) || error(
+        "truth-state indices in $path must be contiguous from 1")
+    length(unique(case.surface for case in cases)) == 4 || error(
+        "truth table does not contain four surfaces")
+    length(unique(case.aerosol_index for case in cases)) == 2 || error(
+        "truth table does not contain aerosol/no-aerosol cases")
+    length(unique(case.sif_case for case in cases)) == 2 || error(
+        "truth table does not contain two SIF cases")
+
+    modes = unique(case.co2_profile_mode for case in cases)
+    length(modes) == 1 || error(
+        "truth table mixes incompatible CO2 profile modes: $(join(modes, ", "))")
+    mode = only(modes)
+    expected_co2_cases = mode == :uniform_column ? 4 :
+        mode == :bottom_layer ? 5 : error("unsupported CO2 profile mode $mode")
+    length(unique(case.xco2_index for case in cases)) == expected_co2_cases || error(
+        "$mode truth table does not contain $expected_co2_cases CO2 cases")
+    expected_count = 4 * 2 * 2 * expected_co2_cases
+    length(cases) == expected_count || error(
+        "expected $expected_count $mode truth cases; found $(length(cases))")
+    combinations = Set((case.surface_index, case.aerosol_index,
+                        case.sif_case, case.xco2_index) for case in cases)
+    length(combinations) == expected_count || error(
+        "truth table does not contain a complete surface/aerosol/SIF/CO2 grid")
+
+    if mode == :bottom_layer
+        length(unique(case.background_co2_ppm for case in cases)) == 1 || error(
+            "bottom-layer truth table has inconsistent background CO2")
+        length(unique(case.bottom_layer_index for case in cases)) == 1 || error(
+            "bottom-layer truth table has inconsistent perturbed-layer indices")
+        all(case -> case.fixed_upper_co2_ppm == case.background_co2_ppm,
+            cases) || error("bottom-layer fixed-upper and background CO2 differ")
+        length(unique(case.bottom_co2_ppm for case in cases)) == 5 || error(
+            "bottom-layer truth table does not contain five bottom-layer VMRs")
+    else
+        all(case -> case.fixed_upper_co2_ppm == case.xco2_ppm &&
+                    case.background_co2_ppm == case.xco2_ppm &&
+                    case.bottom_co2_ppm == case.xco2_ppm, cases) || error(
+            "uniform truth metadata is internally inconsistent")
+    end
+    return cases
+end
+
+"""
+Read a complete full-column (64-state) or bottom-layer (80-state) truth table.
+
+The original defaults and `xco2_index` field remain unchanged for the
+full-column campaign. A bottom-layer table supplies `bottom_co2_index`
+instead; it is exposed through the same generic case-index field and carries
+the 400 ppm background/fixed-upper value separately from column XCO2.
+"""
+function read_truth_cases(path::AbstractString=default_truth_table())
+    cases = TruthCase[]
     for row in _truth_rows(path)
-        row["sif_case"] == "off" || continue
-        push!(selected, TruthCase(
+        co2 = _co2_metadata(row)
+        push!(cases, TruthCase(
             parse(Int, row["index"]),
             parse(Int, row["surface_index"]),
             Symbol(row["surface"]),
             parse(Int, row["aerosol_index"]),
             Symbol(row["aerosol_case"]),
-            parse(Int, row["xco2_index"]),
-            parse(Float64, row["xco2_ppm"]),
+            Symbol(row["sif_case"]),
+            co2.xco2_index,
+            _required_float(row, "xco2_ppm"),
+            co2.campaign,
+            co2.co2_profile_mode,
+            co2.fixed_upper_co2_ppm,
+            co2.background_co2_ppm,
+            co2.bottom_layer_index,
+            co2.bottom_co2_ppm,
         ))
     end
-    sort!(selected; by=case -> (
-        case.surface_index, case.aerosol_index, case.xco2_index))
-    length(selected) == 32 || error(
-        "expected 32 no-SIF truth cases; found $(length(selected))")
+    sort!(cases; by=case -> case.state_index)
+    return _validate_truth_cases(cases, path)
+end
+
+"""
+Select truth scenes by SIF state.
+
+`sif_filter` accepts `off`, `on`, or `all` as either a string or symbol. `on`
+means any named SIF case other than `off`, so the selector remains usable if
+additional nonzero-SIF truth amplitudes are introduced later.
+"""
+function select_sif_truth_cases(cases, sif_filter)
+    normalized = Symbol(lowercase(String(sif_filter)))
+    normalized in (:off, :on, :all) || throw(ArgumentError(
+        "SIF case filter must be off, on, or all"))
+    normalized == :all && return collect(cases)
+    want_sif = normalized == :on
+    return filter(case -> (case.sif_case != :off) == want_sif, cases)
+end
+
+"""Read and validate the no-SIF half of either supported truth campaign."""
+function read_no_sif_truth_cases(path::AbstractString=default_truth_table())
+    cases = read_truth_cases(path)
+    selected = select_sif_truth_cases(cases, :off)
+    length(selected) == length(cases) ÷ 2 || error(
+        "expected $(length(cases) ÷ 2) no-SIF truth cases; " *
+        "found $(length(selected))")
     length(unique(case.surface for case in selected)) == 4 || error(
         "no-SIF truth subset does not contain four surfaces")
     length(unique(case.aerosol_index for case in selected)) == 2 || error(
         "no-SIF truth subset does not contain aerosol/no-aerosol cases")
-    length(unique(case.xco2_ppm for case in selected)) == 4 || error(
-        "no-SIF truth subset does not contain four CO2 values")
+    expected_co2_cases = only(unique(case.co2_profile_mode for case in selected)) ==
+        :bottom_layer ? 5 : 4
+    length(unique(case.xco2_index for case in selected)) == expected_co2_cases ||
+        error("no-SIF truth subset does not contain $expected_co2_cases CO2 cases")
     return selected
 end
 
@@ -116,36 +296,57 @@ end
     return master_seed + UInt64(10_000state_index + noise_index)
 end
 
-"""Build the canonical 640-solve experiment sequence with adjacent pairs."""
+"""
+Build the canonical experiment sequence with adjacent class pairs.
+
+Indices 1:10 are independent unit-variance uniform noise draws. Index 11 is
+the unperturbed experiment and has an exact zero injected-noise vector. When
+it is included, index 11 is scheduled first within each truth state, followed
+by indices 1:10; stored indices and random seeds are unchanged.
+"""
 function build_experiments(cases=read_no_sif_truth_cases();
-                           noise_realizations::Int=10,
+                           noise_realizations::Int=PERTURBED_REALIZATIONS,
+                           include_unperturbed::Bool=true,
                            master_seed::UInt64=DEFAULT_MASTER_SEED,
                            measurement_directory::AbstractString=
                                default_measurement_directory(),
                            noise_directory::AbstractString=
-                               default_noise_directory())
-    noise_realizations > 0 || throw(ArgumentError(
-        "noise_realizations must be positive"))
+                               default_noise_directory(),
+                           validate_inputs::Bool=true)
+    noise_realizations == PERTURBED_REALIZATIONS || throw(ArgumentError(
+        "production suite requires exactly $PERTURBED_REALIZATIONS perturbed realizations"))
+    perturbation_indices = collect(1:noise_realizations)
+    include_unperturbed && pushfirst!(perturbation_indices, UNPERTURBED_INDEX)
     experiments = RetrievalExperiment[]
-    pair_index = 0
-    retrieval_index = 0
-    for truth in cases, noise_index in 1:noise_realizations
-        pair_index += 1
-        seed = _pair_seed(master_seed, truth.state_index, noise_index)
+    pairs_per_case = length(perturbation_indices)
+    classes_per_pair = length(MEASUREMENT_CLASSES)
+    for (case_position, truth) in enumerate(cases),
+            noise_index in perturbation_indices
+        # IDs retain their canonical numeric-perturbation mapping even though
+        # execution begins with perturbation 11. This keeps existing products
+        # and manifests comparable across the scheduling change.
+        pair_index = (case_position - 1) * pairs_per_case + noise_index
+        # The seed is deliberately zero for the unperturbed member so its
+        # manifest cannot be misread as identifying a random realization.
+        seed = noise_index == UNPERTURBED_INDEX ? UInt64(0) :
+            _pair_seed(master_seed, truth.state_index, noise_index)
         measurement_path = joinpath(
             measurement_directory, @sprintf("OCO2sims_%03d.nc", truth.state_index))
         noise_path = joinpath(
             noise_directory, @sprintf("OCO2noise_%03d.nc", truth.state_index))
-        isfile(measurement_path) || error("missing measurement file: $measurement_path")
-        isfile(noise_path) || error("missing noise file: $noise_path")
-        for measurement_class in MEASUREMENT_CLASSES
-            retrieval_index += 1
+        if validate_inputs
+            isfile(measurement_path) || error("missing measurement file: $measurement_path")
+            isfile(noise_path) || error("missing noise file: $noise_path")
+        end
+        for (class_position, measurement_class) in enumerate(MEASUREMENT_CLASSES)
+            retrieval_index = (pair_index - 1) * classes_per_pair + class_position
             push!(experiments, RetrievalExperiment(
                 retrieval_index, pair_index, truth, noise_index,
                 measurement_class, seed, measurement_path, noise_path))
         end
     end
-    expected = length(cases) * noise_realizations * length(MEASUREMENT_CLASSES)
+    expected = length(cases) * length(perturbation_indices) *
+        classes_per_pair
     length(experiments) == expected || error("experiment-count construction failed")
     return experiments
 end
@@ -172,6 +373,23 @@ function load_measurement_realization(experiment::RetrievalExperiment)
             "noise file is not marked complete: $(experiment.noise_path)")
         Int(dataset.attrib["state_index"]) == experiment.truth.state_index || error(
             "noise-file state metadata disagrees with experiment")
+        truth = experiment.truth
+        if truth.co2_profile_mode == :bottom_layer
+            get(dataset.attrib, "campaign", "") == String(truth.campaign) || error(
+                "noise-file campaign metadata disagrees with bottom-layer experiment")
+            Float64(get(dataset.attrib, "background_co2_ppm", NaN)) ==
+                truth.background_co2_ppm || error(
+                "noise-file background CO2 disagrees with bottom-layer experiment")
+            Int(get(dataset.attrib, "bottom_co2_layer_index", -1)) ==
+                truth.bottom_layer_index || error(
+                "noise-file bottom-layer index disagrees with experiment")
+            Float64(get(dataset.attrib, "bottom_co2_ppm", NaN)) ==
+                truth.bottom_co2_ppm || error(
+                "noise-file bottom-layer VMR disagrees with experiment")
+            isapprox(Float64(get(dataset.attrib, "xco2_ppm", NaN)),
+                     truth.xco2_ppm; atol=1e-12, rtol=0) || error(
+                "noise-file column XCO2 disagrees with bottom-layer experiment")
+        end
         noiseless = _finite_vector(dataset, "measurement_$label")
         noise_std = _finite_vector(dataset, "noise_std_$label")
         variance = _finite_vector(dataset, "Se_diagonal_$label")
@@ -184,7 +402,9 @@ function load_measurement_realization(experiment::RetrievalExperiment)
         ranges = UnitRange{Int}[first:last for (first, last) in zip(starts, stops)]
         reduce(vcat, collect.(ranges)) == collect(eachindex(noiseless)) || error(
             "stored band ranges do not partition the measurement vector")
-        draw = paired_uniform_draw(experiment.random_seed, length(noiseless))
+        draw = experiment.noise_index == UNPERTURBED_INDEX ?
+            zeros(Float64, length(noiseless)) :
+            paired_uniform_draw(experiment.random_seed, length(noiseless))
         perturbed = noiseless + noise_std .* draw
         return MeasurementRealization(
             noiseless, perturbed, noise_std, variance, draw, wavelength, ranges)
@@ -192,30 +412,50 @@ function load_measurement_realization(experiment::RetrievalExperiment)
 end
 
 """Write a human-readable, whitespace-separated catalog of all solves."""
-function write_experiment_manifest(experiments;
-                                   output_path=joinpath(
-                                       INVERSION_ROOT, "retrieval_manifest.dat"))
+function write_experiment_manifest(
+        experiments;
+        output_path::Union{Nothing,AbstractString}=nothing,
+        inversion_root::AbstractString=INVERSION_ROOT)
+    output_path = isnothing(output_path) ?
+        joinpath(inversion_root, "retrieval_manifest.dat") : String(output_path)
     mkpath(dirname(output_path))
     open(output_path, "w") do io
-        println(io, "# RRS-XCO2 first retrieval suite: paired corrected/uncorrected solves")
-        println(io, "# Noise: sigma_i*u_i, u_i uniform on [-sqrt(3),sqrt(3)]; " *
-                    "the same u is used within each pair.")
-        println(io, "# retrieval pair state surface aerosol xco2_ppm perturbation class " *
+        println(io, "# RRS-XCO2 retrieval suite: paired corrected/uncorrected solves")
+        println(io, "# Perturbations 01:10: noise_i=sigma_i*u_i, " *
+                    "u_i uniform on [-sqrt(3),sqrt(3)]; the same u is used within each pair.")
+        println(io, "# Perturbation 11: unperturbed measurement; u_i=noise_i=0 exactly.")
+        println(io, "# Execution order within each state: 11, then 01:10; canonical IDs are unchanged.")
+        println(io, "# retrieval pair state surface aerosol sif campaign co2_profile " *
+                    "co2_case xco2_ppm fixed_upper_co2_ppm background_co2_ppm " *
+                    "bottom_layer bottom_co2_ppm perturbation noise_injected inputs_ready class " *
                     "seed output_file measurement_file noise_file")
         for experiment in experiments
             truth = experiment.truth
             output_file = joinpath(
-                INVERSION_ROOT, String(experiment.measurement_class),
+                inversion_root, String(experiment.measurement_class),
                 @sprintf("retrieval_state%03d_perturbation%02d.nc",
                          truth.state_index, experiment.noise_index))
-            @printf(io, "%04d %03d %03d %-7s %-12s %6.1f %02d %-11s %020u %s %s %s\n",
+            noise_injected = experiment.noise_index != UNPERTURBED_INDEX
+            inputs_ready = isfile(experiment.measurement_path) &&
+                isfile(experiment.noise_path)
+            @printf(io, "%04d %03d %03d %-7s %-12s %-10s %-18s %-12s %02d %.12f %.12f %.12f %02d %.12f %02d %d %d %-11s %020u %s %s %s\n",
                     experiment.retrieval_index,
                     experiment.pair_index,
                     truth.state_index,
                     String(truth.surface),
                     String(truth.aerosol_case),
+                    String(truth.sif_case),
+                    String(truth.campaign),
+                    String(truth.co2_profile_mode),
+                    truth.xco2_index,
                     truth.xco2_ppm,
+                    truth.fixed_upper_co2_ppm,
+                    truth.background_co2_ppm,
+                    truth.bottom_layer_index,
+                    truth.bottom_co2_ppm,
                     experiment.noise_index,
+                    noise_injected,
+                    inputs_ready,
                     String(experiment.measurement_class),
                     experiment.random_seed,
                     output_file,

@@ -13,8 +13,8 @@ const INVERSION_ROOT = @__DIR__
 
 function retrieval_output_path(experiment::RetrievalExperiment;
                                inversion_root::AbstractString=INVERSION_ROOT)
-    1 <= experiment.noise_index <= 10 || throw(ArgumentError(
-        "production perturbation index must lie in 1:10"))
+    1 <= experiment.noise_index <= UNPERTURBED_INDEX || throw(ArgumentError(
+        "production perturbation index must lie in 1:$UNPERTURBED_INDEX"))
     directory = joinpath(inversion_root, String(experiment.measurement_class))
     filename = @sprintf(
         "retrieval_state%03d_perturbation%02d.nc",
@@ -109,6 +109,25 @@ function write_retrieval_result(experiment::RetrievalExperiment,
         "terminal Jacobian has an unexpected shape"))
     size(result.gain_matrix) == (nstate, nmeasurement) || throw(DimensionMismatch(
         "gain matrix has an unexpected shape"))
+    for (name, values) in (
+            ("noiseless measurement", realization.noiseless),
+            ("noise standard deviation", realization.noise_std),
+            ("normalized noise draw", realization.normalized_draw),
+            ("wavelength", realization.wavelength_nm))
+        length(values) == nmeasurement || throw(DimensionMismatch(
+            "$name length differs from the measurement vector"))
+    end
+    injected_noise = realization.noise_std .* realization.normalized_draw
+    realization.perturbed == realization.noiseless + injected_noise || error(
+        "perturbed measurement is inconsistent with the stored noise realization")
+    if experiment.noise_index == UNPERTURBED_INDEX
+        all(iszero, realization.normalized_draw) || error(
+            "unperturbed experiment has a nonzero normalized noise draw")
+        all(iszero, injected_noise) || error(
+            "unperturbed experiment has nonzero injected measurement noise")
+        realization.perturbed == realization.noiseless || error(
+            "unperturbed experiment differs from its noiseless measurement")
+    end
 
     mkpath(dirname(output_path))
     isfile(output_path) && rm(output_path)
@@ -159,6 +178,9 @@ function write_retrieval_result(experiment::RetrievalExperiment,
                        "measurement"; units="mW m-2 sr-1 nm-1")
         _define_vector(output, "normalized_noise_draw", realization.normalized_draw,
                        "measurement"; units="1")
+        _define_vector(output, "injected_measurement_noise", injected_noise,
+                       "measurement"; units="mW m-2 sr-1 nm-1",
+                       long_name="exact additive noise injected into the noiseless truth measurement")
         _define_vector(output, "noise_standard_deviation", realization.noise_std,
                        "measurement"; units="mW m-2 sr-1 nm-1")
         variance = _define_vector(output, "Se_diagonal", realization.variance,
@@ -251,12 +273,26 @@ function write_retrieval_result(experiment::RetrievalExperiment,
         output.attrib["measurement_class"] = String(experiment.measurement_class)
         output.attrib["surface"] = String(truth.surface)
         output.attrib["aerosol_case"] = String(truth.aerosol_case)
+        output.attrib["sif_case"] = String(truth.sif_case)
+        output.attrib["campaign"] = String(truth.campaign)
+        output.attrib["co2_profile_mode"] = String(truth.co2_profile_mode)
         output.attrib["truth_xco2_ppm"] = truth.xco2_ppm
         output.attrib["fixed_upper_co2_layers"] = "1:4"
-        output.attrib["fixed_upper_co2_ppm"] = truth.xco2_ppm
-        output.attrib["fixed_upper_co2_source"] = "uniform truth-scene XCO2"
+        output.attrib["fixed_upper_co2_ppm"] = truth.fixed_upper_co2_ppm
+        output.attrib["fixed_upper_co2_source"] =
+            truth.co2_profile_mode == :bottom_layer ?
+            "bottom-layer campaign background CO2" :
+            "uniform truth-scene XCO2"
+        if truth.co2_profile_mode == :bottom_layer
+            output.attrib["truth_bottom_co2_layer_index"] =
+                truth.bottom_layer_index
+            output.attrib["truth_bottom_co2_ppm"] = truth.bottom_co2_ppm
+        end
         output.attrib["random_seed_uint64"] = string(experiment.random_seed)
-        output.attrib["random_distribution"] = "Uniform(-sqrt(3),sqrt(3))"
+        noise_injected = experiment.noise_index != UNPERTURBED_INDEX
+        output.attrib["noise_injected"] = Int(noise_injected)
+        output.attrib["random_distribution"] = noise_injected ?
+            "Uniform(-sqrt(3),sqrt(3))" : "none; exact zero-noise measurement"
         output.attrib["parameter_names"] = join(parameter_names, " ")
         output.attrib["state_dimension"] = nstate
         output.attrib["nstreams"] = 9

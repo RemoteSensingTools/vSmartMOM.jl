@@ -18,7 +18,7 @@ while read -r local_ref local_oid remote_ref remote_oid; do
 
     blocked_paths="$(
         git rev-list --objects "$local_oid" |
-        grep -Ei '^[0-9a-f]+ ((.*/)?RRS_XCO2/(resources|manuscript)/|(.*/)?RRS_XCO2/.*\.(png|dat|nc|csv)$|(.*/)?TODO/PRIVATE_|(.*/)?species_rayleigh_raman_todo\.md$)' || true
+        grep -Ei '^[0-9a-f]+ ((.*/)?RRS_XCO2/(resources|manuscript)/|(.*/)?RRS_XCO2/inversion/for_gattaca\.md$|(.*/)?RRS_XCO2/.*\.(png|dat|nc|nc4|csv|jld|jld2|log|h5|hdf5|pdf|zip)$|(.*/)?RRS_XCO2/truth_map/(\.absco_pipeline_failed|ABSCO_PIPELINE_STATUS\.md)$|(.*/)?RRS_XCO2/inversion/(ACTIVE_CAMPAIGN_STATUS\.md|spectral_fit_visualization_trial/trial_manifest\.txt)$|(.*/)?RRS_XCO2/bottom_layer_XCO2_retrievals/RETRIEVAL_RESTART_SIGMA_LNAOD_0P75\.md$|(.*/)?TODO/PRIVATE_|(.*/)?species_rayleigh_raman_todo\.md$)' || true
     )"
 
     if [ -n "$blocked_paths" ]; then
