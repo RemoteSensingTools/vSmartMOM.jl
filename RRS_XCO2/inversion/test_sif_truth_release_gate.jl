@@ -130,6 +130,74 @@ function create_scene(path, state; corrected=false, source_table=nothing)
     end
 end
 
+function write_producer_fixture(paths)
+    logs = joinpath(paths.restart_root, "logs")
+    mkpath(logs)
+    external = joinpath(paths.restart_root, "external_inputs.sha256")
+    external_input = joinpath(paths.restart_root, "rrs_inputs", "test.bin")
+    mkpath(dirname(external_input))
+    write(external_input, "synthetic external producer input\n")
+    open(external, "w") do io
+        println(io, Gate.file_sha256(external_input), "  rrs_inputs/test.bin")
+    end
+    local_inputs = (
+        normpath(joinpath(@__DIR__, "..", "..", "Manifest.toml")),
+        normpath(joinpath(@__DIR__, "..", "surface_albedos",
+                          "lambertian_legendre_inputs.dat")),
+        Gate.corrected_table(paths),
+        normpath(joinpath(@__DIR__, "..", "..", "src", "SIF_emission",
+                          "sif-spectra.csv")),
+        external,
+    )
+    current = Gate.RRSXCO2Common.campaign_sif_state()
+    for partition in Gate.PRODUCER_PARTITIONS
+        checkpoint_path = Gate.producer_checkpoint(paths, partition)
+        mkpath(dirname(checkpoint_path))
+        completed = [
+            "o2_surface$(partition.surface)_sif2_chunk$chunk"
+            for chunk in 1:partition.chunks]
+        Gate.JLD2.jldsave(checkpoint_path;
+            completed,
+            version=Gate.O2_REGEN_VERSION,
+            aerosol_case_filter=partition.filter,
+            first_state=partition.first,
+            last_state=partition.last,
+            o2_chunk_points=partition.filter == "aerosol" ? 64 : 2735,
+            float_type="Float32",
+            nstreams=partition.filter == "aerosol" ? 9 : 5,
+            psurf_hpa=1000.0,
+            nlayers=16,
+            sza_deg=Float32(30),
+            vza_deg=Float32(0),
+            relative_azimuth_deg=Float32(0),
+            sif_definition_version=Gate.RRSXCO2Common.SIF_DEFINITION_VERSION,
+            sif_case_on=Gate.RRSXCO2Common.SIF_CASE_ON,
+            sif_angular_integral_760=Gate.RRSXCO2Common.SIF_ANGULAR_INTEGRAL_760,
+            sif_radiance_760=Gate.RRSXCO2Common.SIF_RADIANCE_760,
+            sif760_native=current.SIF760,
+            msif_native=current.mSIF,
+            sif_template_wavelength_integral=current.wavelength_integral,
+            raman_shoulder_cm=Float32(234),
+            o2_core_grid_version=2,
+            surface_coordinate_version=1,
+            absco_version=Gate.RRSXCO2Common.ABSCO_VERSION)
+        log = joinpath(logs, "task_$(partition.task).provenance.txt")
+        open(log, "w") do io
+            println(io, "started_utc=2026-09-04T00:00:00Z")
+            println(io, "source_sha=$(Gate.DEFAULT_APPROVED_PRODUCER_SHA)")
+            println(io, "slurm_array_task_id=$(partition.task)")
+            println(io, "aerosol_filter=$(partition.filter)")
+            println(io, "state_range=$(partition.first):$(partition.last)")
+            println(io, "force=0")
+            for path in local_inputs
+                println(io, Gate.file_sha256(path), "  ", path)
+            end
+            println(io, "completed_utc=2026-09-04T01:00:00Z")
+        end
+    end
+    return external
+end
+
 function fixture(root)
     truth = joinpath(root, "truth_map")
     restart = joinpath(truth, ".sif_v2_restart")
@@ -175,6 +243,7 @@ function fixture(root)
         println(io, "# corrected_staging_true_states_sha256 ",
                 Gate.file_sha256(Gate.corrected_table(paths)))
     end
+    write_producer_fixture(paths)
     return paths, selected
 end
 
@@ -202,6 +271,34 @@ end
         @test length(result.selected) == 32
         @test isfile(result.receipt)
 
+        # Producer provenance is a mandatory input, not advisory text copied
+        # into the receipt.
+        external_manifest = joinpath(paths.restart_root,
+                                     "external_inputs.sha256")
+        external_contents = read(external_manifest)
+        write(external_manifest, "tampered producer manifest\n")
+        @test_throws ErrorException validate_release(
+            paths; expected_o2_points=N_O2_TEST, write_receipt=false)
+        write(external_manifest, external_contents)
+        external_input = joinpath(paths.restart_root, "rrs_inputs", "test.bin")
+        external_input_contents = read(external_input)
+        write(external_input, "tampered external producer input\n")
+        @test_throws ErrorException validate_release(
+            paths; expected_o2_points=N_O2_TEST, write_receipt=false)
+        write(external_input, external_input_contents)
+
+        producer_log = first(sort(filter(
+            path -> endswith(path, ".provenance.txt"),
+            joinpath.(joinpath(paths.restart_root, "logs"),
+                      readdir(joinpath(paths.restart_root, "logs"))))))
+        producer_contents = read(producer_log, String)
+        write(producer_log, replace(
+            producer_contents,
+            Gate.DEFAULT_APPROVED_PRODUCER_SHA => repeat("f", 40)))
+        @test_throws ErrorException validate_release(
+            paths; expected_o2_points=N_O2_TEST, write_receipt=false)
+        write(producer_log, producer_contents)
+
         # A changed CO2 element must fail before any canonical publication.
         state = first(result.selected)
         staged = Gate.staged_scene(paths, state)
@@ -220,10 +317,18 @@ end
             dataset[Gate.CO2_VARIABLES[1]][1, 1] = original
         end
 
+        @test_throws ErrorException publish_release(
+            paths; expected_o2_points=N_O2_TEST)
+
         old_confirmation = get(ENV, "CONFIRM_SIF_V2_PUBLICATION", nothing)
         old_resume = get(ENV, "SIF_RELEASE_RESUME", nothing)
         ENV["CONFIRM_SIF_V2_PUBLICATION"] = Gate.CONFIRMATION
         try
+            mkdir(Gate.publication_lock(paths))
+            @test_throws ErrorException publish_release(
+                paths; expected_o2_points=N_O2_TEST)
+            rm(Gate.publication_lock(paths))
+
             # A fault after several scene promotions rolls every canonical
             # scene back and leaves the legacy table plus a visible marker.
             @test_throws ErrorException publish_release(

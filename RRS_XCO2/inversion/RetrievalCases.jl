@@ -3,6 +3,7 @@ module RetrievalCases
 using NCDatasets
 using Printf
 using Random
+using SHA
 
 export TruthCase,
        RetrievalExperiment,
@@ -16,6 +17,7 @@ export TruthCase,
        build_experiments,
        external_sif_ownership_marker,
        enforce_sif_ownership,
+       require_sif_release_barrier,
        paired_uniform_draw,
        validated_sif_provenance,
        matching_sif_provenance,
@@ -43,6 +45,12 @@ const REQUIRED_SIF_DEFINITION =
 const REQUIRED_SIF_RADIANCE_760 =
     REQUIRED_SIF_ANGULAR_INTEGRAL_760 /
     REQUIRED_SIF_UPWELLING_SOLID_ANGLE_SR
+const FULL_SIF_RELEASE_MARKER = ".sif_v2_publication_in_progress"
+const FULL_SIF_RELEASE_RECEIPT = "sif_v2_release_complete.dat"
+const BOTTOM_SIF_RELEASE_MARKER =
+    ".bottom_layer_sif_v2_publication_in_progress"
+const BOTTOM_SIF_RELEASE_RECEIPT =
+    "bottom_layer_sif_v2_release_complete.dat"
 const SIF_PROVENANCE_ATTRIBUTES = (
     "sif_definition_version",
     "sif_definition",
@@ -84,12 +92,193 @@ function enforce_sif_ownership(output_root::AbstractString, experiments)
     any(experiment -> experiment.truth.sif_case != :off, experiments) ||
         return nothing
     marker = external_sif_ownership_marker(output_root)
-    isfile(marker) || return nothing
+    ispath(marker) || return nothing
+    isfile(marker) || error(
+        "SIF ownership marker exists but is not a regular file: $marker")
     owner = strip(read(marker, String))
     isempty(owner) && (owner = "external owner not recorded")
     error(
         "SIF-on retrievals are delegated outside output root " *
         "$(abspath(output_root)); ownership marker=$marker; $owner")
+end
+
+_sha256_file(path::AbstractString) = open(path, "r") do io
+    bytes2hex(sha256(io))
+end
+
+function _required_receipt_hash(values, key, receipt)
+    value = get(values, key, "")
+    occursin(r"^[0-9a-f]{64}$", value) || error(
+        "$receipt lacks a valid $key")
+    return value
+end
+
+function _release_receipt(path)
+    isfile(path) || error("missing required corrected-SIF release receipt: $path")
+    values = Dict{String,String}()
+    rows = Vector{Vector{String}}()
+    for line in eachline(path)
+        fields = split(strip(line))
+        isempty(fields) && continue
+        if first(fields) == "#"
+            length(fields) == 3 && (values[fields[2]] = fields[3])
+        elseif length(fields) == 2
+            values[fields[1]] = fields[2]
+        else
+            push!(rows, fields)
+        end
+    end
+    return values, rows
+end
+
+"""
+    require_sif_release_barrier(truth_table, cases,
+                                measurement_directory, noise_directory)
+
+Refuse every SIF-on retrieval unless the corresponding all-scene publication
+transaction is complete and its receipt still matches the authoritative state
+table and current truth/measurement/noise files.  This is independent of the
+external-ownership guard: ownership prevents two writers, while this barrier
+prevents any writer from consuming a partial or superseded SIF campaign.
+"""
+function require_sif_release_barrier(
+        truth_table::AbstractString, cases,
+        measurement_directory::AbstractString,
+        noise_directory::AbstractString)
+    selected = filter(case -> case.sif_case != :off, cases)
+    isempty(selected) && return nothing
+    modes = unique(case.campaign for case in selected)
+    length(modes) == 1 || error(
+        "one SIF retrieval selection cannot mix truth campaigns")
+    truth_root = dirname(abspath(truth_table))
+
+    if only(modes) == :bottom_layer_XCO2
+        marker = joinpath(truth_root, BOTTOM_SIF_RELEASE_MARKER)
+        ispath(marker) && error(
+            "bottom-layer corrected-SIF publication is in progress: $marker")
+        receipt = joinpath(truth_root, BOTTOM_SIF_RELEASE_RECEIPT)
+        values, rows = _release_receipt(receipt)
+        get(values, "release_schema", "") == "1" || error(
+            "unsupported bottom-layer SIF release schema in $receipt")
+        get(values, "sif_definition_version", "") ==
+            string(REQUIRED_SIF_DEFINITION_VERSION) || error(
+            "bottom-layer receipt is not corrected SIF definition version 2")
+        get(values, "bottom_state_table_sha256", "") ==
+            _sha256_file(truth_table) || error(
+            "bottom-layer truth table differs from its SIF release receipt")
+        _required_receipt_hash(
+            values, "legacy_bottom_state_table_sha256", receipt)
+        _required_receipt_hash(
+            values, "legacy_archive_manifest_sha256", receipt)
+        _required_receipt_hash(
+            values, "no_sif_triplet_set_sha256", receipt)
+        get(values, "legacy_bottom_state_table_archive_relative", "") ==
+            joinpath("truth", "true_states.dat") || error(
+            "bottom-layer receipt has an unexpected legacy-table archive identity")
+        get(values, "no_sif_byte_preservation_policy", "") ==
+            "preserve_truth_measurement_noise_bytes_and_legacy_state_table_hash_attributes" ||
+            error("bottom-layer receipt lacks the no-SIF byte-preservation policy")
+        _required_receipt_hash(values, "input_set_sha256", receipt)
+        full_truth_root = abspath(get(
+            ENV, "FULL_COLUMN_TRUTH_ROOT",
+            joinpath(@__DIR__, "..", "truth_map")))
+        full_marker = joinpath(full_truth_root, FULL_SIF_RELEASE_MARKER)
+        ispath(full_marker) && error(
+            "full-column corrected-SIF publication is in progress: $full_marker")
+        full_receipt = joinpath(full_truth_root, FULL_SIF_RELEASE_RECEIPT)
+        isfile(full_receipt) || error(
+            "missing published full-column SIF source receipt: $full_receipt")
+        _sha256_file(full_receipt) == _required_receipt_hash(
+            values, "full_column_release_receipt_sha256", receipt) || error(
+            "bottom-layer receipt no longer matches its full-column source release")
+        hashes = Dict{Int,NTuple{3,String}}()
+        for fields in rows
+            length(fields) == 4 || error(
+                "malformed bottom-layer SIF release row in $receipt")
+            index = parse(Int, fields[1])
+            haskey(hashes, index) && error(
+                "duplicate state $index in bottom-layer SIF release receipt")
+            hashes[index] = (fields[2], fields[3], fields[4])
+        end
+        expected = sort([case.state_index for case in read_truth_cases(truth_table)
+                         if case.sif_case != :off])
+        sort!(collect(keys(hashes))) == expected || error(
+            "bottom-layer release receipt does not enumerate every SIF-on state")
+        all_cases = Dict(case.state_index => case
+                         for case in read_truth_cases(truth_table))
+        for index in expected
+            truth = all_cases[index]
+            truth_directory = truth.aerosol_case == :none ? truth_root :
+                joinpath(truth_root, "aerosol_chunked")
+            truth_path = joinpath(
+                truth_directory, @sprintf("hiressim_%03d.nc", index))
+            measurement_path = joinpath(
+                measurement_directory, @sprintf("OCO2sims_%03d.nc", index))
+            noise_path = joinpath(
+                noise_directory, @sprintf("OCO2noise_%03d.nc", index))
+            expected_hashes = hashes[index]
+            for (kind, path, expected_hash) in (
+                    ("truth", truth_path, expected_hashes[1]),
+                    ("measurement", measurement_path, expected_hashes[2]),
+                    ("noise", noise_path, expected_hashes[3]))
+                isfile(path) || error("missing released SIF $kind product: $path")
+                _sha256_file(path) == expected_hash || error(
+                    "released SIF $kind state $index differs from its receipt")
+            end
+        end
+        return receipt
+    end
+
+    only(modes) == :full_column_XCO2 || error(
+        "unsupported SIF retrieval campaign $(only(modes))")
+    marker = joinpath(truth_root, FULL_SIF_RELEASE_MARKER)
+    ispath(marker) && error(
+        "full-column corrected-SIF publication is in progress: $marker")
+    receipt = joinpath(truth_root, FULL_SIF_RELEASE_RECEIPT)
+    values, _ = _release_receipt(receipt)
+    get(values, "release_schema", "") == "1" || error(
+        "unsupported full-column SIF release schema in $receipt")
+    get(values, "sif_definition_version", "") ==
+        string(REQUIRED_SIF_DEFINITION_VERSION) || error(
+        "full-column receipt is not corrected SIF definition version 2")
+    get(values, "corrected_state_table_sha256", "") ==
+        _sha256_file(truth_table) || error(
+        "full-column truth table differs from its SIF release receipt")
+    validation_receipt = abspath(get(
+        ENV, "FULL_COLUMN_SIF_VALIDATION_RECEIPT",
+        joinpath(truth_root, ".sif_v2_restart",
+                 "sif_v2_release_validation.dat")))
+    isfile(validation_receipt) || error(
+        "missing full-column SIF validation receipt: $validation_receipt")
+    _sha256_file(validation_receipt) == _required_receipt_hash(
+        values, "validation_receipt_sha256", receipt) || error(
+        "full-column validation receipt differs from publication receipt")
+    _, validation_rows = _release_receipt(validation_receipt)
+    hashes = Dict{Int,String}()
+    for fields in validation_rows
+        length(fields) == 5 || error(
+            "malformed full-column SIF validation row in $validation_receipt")
+        index = parse(Int, fields[1])
+        haskey(hashes, index) && error(
+            "duplicate state $index in full-column SIF validation receipt")
+        hashes[index] = fields[3]
+    end
+    all_cases = read_truth_cases(truth_table)
+    expected = sort([case.state_index for case in all_cases
+                     if case.sif_case != :off])
+    sort!(collect(keys(hashes))) == expected || error(
+        "full-column validation receipt does not enumerate every SIF-on state")
+    cases_by_index = Dict(case.state_index => case for case in all_cases)
+    for index in expected
+        truth = cases_by_index[index]
+        directory = truth.aerosol_case == :none ? truth_root :
+            joinpath(truth_root, "aerosol_chunked")
+        path = joinpath(directory, @sprintf("hiressim_%03d.nc", index))
+        isfile(path) || error("missing released full-column SIF truth: $path")
+        _sha256_file(path) == hashes[index] || error(
+            "released full-column SIF truth state $index differs from its receipt")
+    end
+    return receipt
 end
 
 """The identifying metadata for one selected truth scene."""

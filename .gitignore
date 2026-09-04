@@ -66,6 +66,9 @@ TODO/PRIVATE_*
 **/species_rayleigh_raman_todo.md
 # Host/account-specific institutional runbooks are private operational notes.
 RRS_XCO2/inversion/for_gattaca.md
+# Host/account-specific Gattaca operational runbooks remain private working
+# notes.  Keep portable source launchers and tests tracked separately.
+RRS_XCO2/inversion/GATTACA_TAPERED_SIF_RETRIEVALS.md
 # Generated RRS/XCO2 science products are private working data. Keep the code,
 # configuration, and prose in Git, but never publish plots or numeric datasets.
 **/RRS_XCO2/**/*.png
@@ -82,6 +85,11 @@ RRS_XCO2/inversion/for_gattaca.md
 RRS_XCO2/output/
 RRS_XCO2/truth_map/logs/
 RRS_XCO2/truth_map/*.log
+# Laptop-bridge transfer bundles and their checksum sidecars are private data,
+# not source artifacts.
+RRS_XCO2/truth_map/*.tar
+RRS_XCO2/truth_map/*.tar.sha256
+RRS_XCO2/truth_map/.sif_v2_restart/
 RRS_XCO2/truth_map/.absco_pipeline_failed
 RRS_XCO2/truth_map/ABSCO_PIPELINE_STATUS.md
 RRS_XCO2/truth_map/aerosol_chunked/
@@ -104,7 +112,12 @@ RRS_XCO2/scripts/__pycache__/
 # campaign README and producer code remain trackable.
 RRS_XCO2/bottom_layer_XCO2_retrievals/truth/
 RRS_XCO2/bottom_layer_XCO2_retrievals/logs/
+RRS_XCO2/bottom_layer_XCO2_retrievals/.sif_v2_restart/
 RRS_XCO2/bottom_layer_XCO2_retrievals/retrievals/
+# Isolated tapered-CO2 no-SIF retrieval round (runtime claims, manifests, and
+# products).  Gattaca SIF-on output lives outside the checkout, but the local
+# Curry/Wurst counterpart is intentionally private working data as well.
+RRS_XCO2/bottom_layer_XCO2_retrievals/retrievals_acos_mapped_tapered_vertical_correlation_nosif/
 RRS_XCO2/bottom_layer_XCO2_retrievals/retrieval_setup/*.nc
 RRS_XCO2/bottom_layer_XCO2_retrievals/retrieval_setup/*.dat
 RRS_XCO2/bottom_layer_XCO2_retrievals/RETRIEVAL_RESTART_SIGMA_LNAOD_0P75.md

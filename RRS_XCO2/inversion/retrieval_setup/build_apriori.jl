@@ -36,6 +36,14 @@ Environment variables:
 - `SIF_SLOPE_SIGMA_MW_NM2`: absolute wavelength-space SIF-slope 1-sigma
   width. Its historical default is `0.00875*0.1 = 8.75e-4`; the bottom-layer
   campaign uses three times that value, `2.625e-3`.
+- `CO2_COVARIANCE_MODEL`: CO2 prior-covariance construction. The default
+  `acos_mapped` is unchanged. The opt-in
+  `acos_mapped_tapered_vertical_correlation` preserves every mapped-ACOS
+  marginal variance while progressively weakening interlayer correlations
+  toward the surface with a positive-definite Schur taper. Always use a
+  distinct `APRIORI_OUTPUT` and `APRIORI_SUMMARY` when selecting the opt-in
+  model; this script cannot determine whether an existing output is being used
+  by active campaign workers.
 """
 
 using Dates
@@ -59,7 +67,24 @@ const DEFAULT_SIF_SLOPE_SIGMA_MW_NM2 =
     0.25 * abs(DEFAULT_SIF_FRACTIONAL_SLOPE_PER_NM) *
     DEFAULT_SIF_REFERENCE_RADIANCE_MW_NM
 const CO2_COVARIANCE_FILE = joinpath(@__DIR__, "co2_prior_covariances.dat")
-const CO2_COVARIANCE_MODEL = "acos_mapped"
+const ACOS_MAPPED_CO2_COVARIANCE_MODEL = "acos_mapped"
+const TAPERED_CO2_COVARIANCE_MODEL =
+    "acos_mapped_tapered_vertical_correlation"
+const DEFAULT_CO2_COVARIANCE_MODEL = ACOS_MAPPED_CO2_COVARIANCE_MODEL
+# Backward-compatible name retained for scripts that included this file before
+# CO2 covariance selection became configurable. It is intentionally the
+# unchanged production default, not the value of ENV["CO2_COVARIANCE_MODEL"].
+const CO2_COVARIANCE_MODEL = DEFAULT_CO2_COVARIANCE_MODEL
+const CO2_ACTIVE_LAYERS = 5:16
+
+# Nonstationary AR(1) adjacent retention factors for the opt-in Schur taper,
+# ordered from layer pair 5--6 (uppermost active pair) through 15--16
+# (bottommost pair). The linear 0.98 -> 0.55 decrease makes the retained
+# interlayer coupling strongest aloft and weakest near the surface.
+const CO2_TAPER_ADJACENT_RETENTION = ntuple(
+    index -> 0.98 + (index - 1) * (0.55 - 0.98) / 10,
+    11,
+)
 const DEFAULT_AEROSOL_LN_AOD_SIGMA = 0.75
 const DEFAULT_SURFACE_P1_SIGMA = 1e-3
 const DEFAULT_SURFACE_P2_SIGMA = 1e-4
@@ -129,9 +154,9 @@ const PARAMETER_UNITS = vcat(
 length(PARAMETER_NAMES) == N_PARAMETER || error("parameter-name layout is inconsistent")
 length(PARAMETER_UNITS) == N_PARAMETER || error("parameter-unit layout is inconsistent")
 
-"""Read one symmetric 16-layer CO2 covariance from the comparison table."""
-function read_co2_covariance(model::AbstractString;
-                             path::AbstractString=CO2_COVARIANCE_FILE)
+"""Read one tabulated symmetric 16-layer CO2 covariance."""
+function read_tabulated_co2_covariance(model::AbstractString;
+                                       path::AbstractString=CO2_COVARIANCE_FILE)
     isfile(path) || throw(ArgumentError("missing CO2 covariance table: $path"))
     covariance_ppm2 = zeros(Float64, 16, 16)
     seen = Set{Tuple{Int,Int}}()
@@ -157,9 +182,133 @@ function read_co2_covariance(model::AbstractString;
     isempty(seen) && error("CO2 covariance model '$model' is absent from $path")
     all(iszero, covariance_ppm2[1:4, :]) || error(
         "$model covariance must keep CO2 layers 1:4 fixed")
-    active = Symmetric(covariance_ppm2[5:16, 5:16])
+    active = Symmetric(covariance_ppm2[CO2_ACTIVE_LAYERS,
+                                      CO2_ACTIVE_LAYERS])
     isposdef(active) || error("$model active CO2 covariance is not positive definite")
     return covariance_ppm2 .* 1e-12 # ppm^2 -> (mol mol^-1)^2
+end
+
+"""
+Construct a nonstationary AR(1) correlation matrix.
+
+`adjacent[i]` is the correlation between coordinates `i` and `i+1`, and each
+non-adjacent correlation is the product of the intervening adjacent values.
+For finite `abs.(adjacent) .< 1`, this is the correlation of a Markov chain
+with positive innovation variances and is therefore strictly positive
+definite.
+"""
+function nonstationary_ar1_correlation(adjacent::AbstractVector{<:Real})
+    all(value -> isfinite(value) && abs(value) < 1, adjacent) ||
+        throw(ArgumentError(
+            "nonstationary AR(1) adjacent correlations must be finite with absolute value below one"))
+    n = length(adjacent) + 1
+    correlation = Matrix{Float64}(I, n, n)
+    for row in 1:n - 1
+        product = 1.0
+        for column in row + 1:n
+            product *= Float64(adjacent[column - 1])
+            correlation[row, column] = product
+            correlation[column, row] = product
+        end
+    end
+    isposdef(Symmetric(correlation)) || error(
+        "constructed nonstationary AR(1) taper is not positive definite")
+    return correlation
+end
+
+"""Return the correlations between consecutive rows of a covariance."""
+function adjacent_correlations(covariance::AbstractMatrix)
+    size(covariance, 1) == size(covariance, 2) ||
+        throw(DimensionMismatch("covariance must be square"))
+    sigma = sqrt.(diag(covariance))
+    all(value -> isfinite(value) && value > 0, sigma) || error(
+        "all covariance marginal standard deviations must be finite and positive")
+    return [covariance[index, index + 1] /
+            (sigma[index] * sigma[index + 1])
+            for index in 1:length(sigma) - 1]
+end
+
+"""
+Build one selectable CO2 covariance and its construction provenance.
+
+The opt-in tapered model starts with the mapped-ACOS active covariance
+`S=D*R*D`. It forms a strictly positive-definite nonstationary-AR(1) taper
+`T`, applies the Schur product `R_tapered=R .* T`, and reconstructs
+`S_tapered=D*R_tapered*D`. The Schur product theorem guarantees positive
+definiteness because both `R` and `T` are positive definite. Its unit diagonal
+also preserves every mapped-ACOS marginal variance.
+"""
+function build_co2_covariance(model::AbstractString;
+                              path::AbstractString=CO2_COVARIANCE_FILE)
+    selected_model = String(model)
+    base_model = selected_model == TAPERED_CO2_COVARIANCE_MODEL ?
+        ACOS_MAPPED_CO2_COVARIANCE_MODEL : selected_model
+    base_covariance = read_tabulated_co2_covariance(base_model; path)
+    base_active = Matrix(Symmetric(base_covariance[CO2_ACTIVE_LAYERS,
+                                                   CO2_ACTIVE_LAYERS]))
+    base_adjacent = adjacent_correlations(base_active)
+
+    if selected_model == TAPERED_CO2_COVARIANCE_MODEL
+        marginal_sigma = sqrt.(diag(base_active))
+        D = Diagonal(marginal_sigma)
+        D_inverse = Diagonal(inv.(marginal_sigma))
+        base_correlation = Matrix(Symmetric(
+            D_inverse * base_active * D_inverse))
+        taper_adjacent = collect(Float64, CO2_TAPER_ADJACENT_RETENTION)
+        taper = nonstationary_ar1_correlation(taper_adjacent)
+        tapered_correlation = base_correlation .* taper
+        isposdef(Symmetric(tapered_correlation)) || error(
+            "Schur-tapered mapped-ACOS correlation is not positive definite")
+        tapered_active = Matrix(Symmetric(
+            D * tapered_correlation * D))
+        # Make the stated marginal-variance invariant exact in the serialized
+        # prior, rather than allowing roundoff from D*R*D to change a diagonal
+        # entry by one or two ulps.
+        for index in axes(tapered_active, 1)
+            tapered_active[index, index] = base_active[index, index]
+        end
+        isposdef(Symmetric(tapered_active)) || error(
+            "Schur-tapered mapped-ACOS covariance is not positive definite")
+        isapprox(diag(tapered_active), diag(base_active);
+                 atol=4eps(maximum(diag(base_active))), rtol=4eps(Float64)) ||
+            error("Schur taper changed mapped-ACOS marginal variances")
+
+        covariance = zeros(Float64, 16, 16)
+        covariance[CO2_ACTIVE_LAYERS, CO2_ACTIVE_LAYERS] .= tapered_active
+        construction =
+            "S=D*R*D from acos_mapped; T is nonstationary AR(1) with adjacent retention linearly decreasing from 0.98 at layers 5-6 to 0.55 at layers 15-16 and nonadjacent entries equal to intervening products; R_selected=R.*T; S_selected=D*R_selected*D"
+        return (;
+            covariance,
+            model=selected_model,
+            base_model,
+            construction,
+            taper_type="nonstationary_ar1_schur",
+            taper_adjacent_retention=taper_adjacent,
+            base_adjacent_correlation=base_adjacent,
+            selected_adjacent_correlation=adjacent_correlations(tapered_active),
+            base_xco2_sigma_ppm=co2_xco2_sigma_ppm(base_covariance),
+            selected_xco2_sigma_ppm=co2_xco2_sigma_ppm(covariance),
+        )
+    end
+
+    return (;
+        covariance=base_covariance,
+        model=selected_model,
+        base_model,
+        construction="tabulated covariance read without a correlation taper",
+        taper_type="none",
+        taper_adjacent_retention=ones(Float64, length(base_adjacent)),
+        base_adjacent_correlation=base_adjacent,
+        selected_adjacent_correlation=base_adjacent,
+        base_xco2_sigma_ppm=co2_xco2_sigma_ppm(base_covariance),
+        selected_xco2_sigma_ppm=co2_xco2_sigma_ppm(base_covariance),
+    )
+end
+
+"""Read or derive one selectable symmetric 16-layer CO2 covariance."""
+function read_co2_covariance(model::AbstractString;
+                             path::AbstractString=CO2_COVARIANCE_FILE)
+    return build_co2_covariance(model; path).covariance
 end
 
 function co2_xco2_sigma_ppm(covariance_vmr2::AbstractMatrix)
@@ -187,6 +336,8 @@ function sif_transform()
 end
 
 function build_prior(surface::Symbol, slope_reference_radiance_mw_nm::Real;
+                     co2_covariance_model::AbstractString=
+                         DEFAULT_CO2_COVARIANCE_MODEL,
                      sif_wavelength_slope_mean::Real=
                          DEFAULT_SIF_FRACTIONAL_SLOPE_PER_NM *
                          slope_reference_radiance_mw_nm,
@@ -224,11 +375,18 @@ function build_prior(surface::Symbol, slope_reference_radiance_mw_nm::Real;
     Sa[1, 1] = 50.0^2
 
     xa[2:17] .= 400e-6
-    co2_covariance = read_co2_covariance(CO2_COVARIANCE_MODEL)
+    co2_specification = build_co2_covariance(co2_covariance_model)
+    co2_covariance = co2_specification.covariance
     Sa[2:17, 2:17] .= co2_covariance
-    isapprox(co2_xco2_sigma_ppm(co2_covariance), 13.71563311;
-             atol=1e-7, rtol=0) || error(
-        "mapped ACOS covariance failed its XCO2-uncertainty regression")
+    if co2_specification.model == ACOS_MAPPED_CO2_COVARIANCE_MODEL
+        isapprox(co2_xco2_sigma_ppm(co2_covariance), 13.71563311;
+                 atol=1e-7, rtol=0) || error(
+            "mapped ACOS covariance failed its XCO2-uncertainty regression")
+    elseif co2_specification.model == TAPERED_CO2_COVARIANCE_MODEL
+        isapprox(co2_xco2_sigma_ppm(co2_covariance), 9.309754891;
+                 atol=1e-7, rtol=0) || error(
+            "tapered mapped-ACOS covariance failed its XCO2-uncertainty regression")
+    end
 
     # Positivity-preserving retrieval coordinates u=ln(q). Earlier widths of
     # sigma_u=5 and then 2 allowed numerically extreme aerosol trial loadings.
@@ -277,13 +435,32 @@ function build_prior(surface::Symbol, slope_reference_radiance_mw_nm::Real;
             sif_wavelength_slope_sigma=Float64(sif_wavelength_slope_sigma),
             aerosol_ln_aod_sigma=Float64(aerosol_ln_aod_sigma),
             surface_p1_sigmas=Tuple(Float64.(surface_p1_sigmas)),
-            surface_p2_sigmas=Tuple(Float64.(surface_p2_sigmas)))
+            surface_p2_sigmas=Tuple(Float64.(surface_p2_sigmas)),
+            co2_covariance_model=co2_specification.model,
+            co2_covariance_base_model=co2_specification.base_model,
+            co2_covariance_construction=co2_specification.construction,
+            co2_correlation_taper_type=co2_specification.taper_type,
+            co2_correlation_taper_adjacent_retention=
+                co2_specification.taper_adjacent_retention,
+            co2_base_adjacent_correlation=
+                co2_specification.base_adjacent_correlation,
+            co2_selected_adjacent_correlation=
+                co2_specification.selected_adjacent_correlation,
+            co2_base_xco2_sigma_ppm=
+                co2_specification.base_xco2_sigma_ppm,
+            co2_selected_xco2_sigma_ppm=
+                co2_specification.selected_xco2_sigma_ppm)
 end
 
 function write_netcdf(priors; output_path=OUTPUT)
     mkpath(dirname(output_path))
     isfile(output_path) && rm(output_path)
-    n_active = count(first(values(priors)).active)
+    reference_prior = first(values(priors))
+    all(prior -> prior.co2_covariance_model ==
+                     reference_prior.co2_covariance_model,
+        values(priors)) || error(
+            "all surfaces must use the same CO2 covariance model")
+    n_active = count(reference_prior.active)
     NCDataset(output_path, "c") do output
         defDim(output, "parameter", N_PARAMETER)
         defDim(output, "parameter_2", N_PARAMETER)
@@ -291,6 +468,8 @@ function write_netcdf(priors; output_path=OUTPUT)
         defDim(output, "active_parameter_2", n_active)
         defDim(output, "surface", length(SURFACES))
         defDim(output, "sif_wavelength_parameter", 2)
+        defDim(output, "co2_adjacent_layer_pair",
+               length(reference_prior.co2_selected_adjacent_correlation))
 
         xa = defVar(output, "xa", Float64, ("parameter", "surface"))
         xa.attrib["long_name"] = "surface-specific retrieval-coordinate a priori state"
@@ -335,6 +514,27 @@ function write_netcdf(priors; output_path=OUTPUT)
             output, "sif_wavelength_sigma", Float64,
             ("sif_wavelength_parameter", "surface"))
         sif_wavelength_sigma.attrib["order"] = "sigma_Llambda_760 sigma_dLlambda_dlambda_760"
+        taper_retention = defVar(
+            output, "co2_correlation_taper_adjacent_retention", Float64,
+            ("co2_adjacent_layer_pair",))
+        taper_retention.attrib["long_name"] =
+            "Schur-taper retention applied to each active adjacent-layer CO2 correlation"
+        taper_retention.attrib["layer_pair_order"] =
+            join(["$layer-$(layer + 1)" for layer in 5:15], " ")
+        taper_retention[:] =
+            reference_prior.co2_correlation_taper_adjacent_retention
+        base_adjacent = defVar(
+            output, "co2_base_adjacent_correlation", Float64,
+            ("co2_adjacent_layer_pair",))
+        base_adjacent.attrib["long_name"] =
+            "adjacent-layer correlation in the untapered base CO2 covariance"
+        base_adjacent[:] = reference_prior.co2_base_adjacent_correlation
+        selected_adjacent = defVar(
+            output, "co2_selected_adjacent_correlation", Float64,
+            ("co2_adjacent_layer_pair",))
+        selected_adjacent.attrib["long_name"] =
+            "adjacent-layer correlation in the selected CO2 covariance"
+        selected_adjacent[:] = reference_prior.co2_selected_adjacent_correlation
 
         for (isurface, surface) in enumerate(SURFACES)
             prior = priors[surface]
@@ -358,15 +558,26 @@ function write_netcdf(priors; output_path=OUTPUT)
             first(values(priors)).aerosol_ln_aod_sigma
         output.attrib["uncertainty_convention"] = "quoted +/- interpreted as one standard deviation"
         output.attrib["correlation_convention"] =
-            "mapped ACOS covariance among active CO2 layers; exact 2x2 SIF coefficient transform; other blocks independent"
-        output.attrib["co2_covariance_model"] = CO2_COVARIANCE_MODEL
+            "selected covariance among active CO2 layers; exact 2x2 SIF coefficient transform; other blocks independent"
+        output.attrib["co2_covariance_model"] =
+            reference_prior.co2_covariance_model
+        output.attrib["co2_covariance_base_model"] =
+            reference_prior.co2_covariance_base_model
+        output.attrib["co2_covariance_construction"] =
+            reference_prior.co2_covariance_construction
+        output.attrib["co2_correlation_taper_type"] =
+            reference_prior.co2_correlation_taper_type
         output.attrib["co2_covariance_source_file"] = abspath(CO2_COVARIANCE_FILE)
         output.attrib["co2_covariance_source_dataset"] =
             "RetrievalResults/apriori_covariance_matrix[1:20,1:20] from the four oco_gain.jl orbit files"
         output.attrib["co2_covariance_mapping"] =
             "linear interpolation H in normalized pressure; S16=H*S20*transpose(H); active marginal block layers 5:16"
+        output.attrib["co2_covariance_base_xco2_sigma_ppm_at_1000hpa"] =
+            reference_prior.co2_base_xco2_sigma_ppm
         output.attrib["co2_prior_xco2_sigma_ppm_at_1000hpa"] =
-            co2_xco2_sigma_ppm(first(values(priors)).Sa[2:17, 2:17])
+            reference_prior.co2_selected_xco2_sigma_ppm
+        output.attrib["co2_prior_xco2_variance_ppm2_at_1000hpa"] =
+            reference_prior.co2_selected_xco2_sigma_ppm^2
         output.attrib["sif_slope_reference_radiance_mw_m2_sr_nm"] =
             first(values(priors)).slope_reference_radiance_mw_nm
         output.attrib["sif_wavelength_slope_prior_mw_m2_sr_nm2"] =
@@ -402,13 +613,34 @@ end
 
 function write_summary(priors; output_path=SUMMARY)
     mkpath(dirname(output_path))
+    reference_prior = first(values(priors))
+    all(prior -> prior.co2_covariance_model ==
+                     reference_prior.co2_covariance_model,
+        values(priors)) || error(
+            "all surfaces must use the same CO2 covariance model")
     open(output_path, "w") do io
         println(io, "# Retrieval-coordinate 34-element a priori states and marginal sigmas.")
         println(io, "# Aerosol AOD and z0 entries are natural logarithms of physical values.")
-        println(io, "# CO2 layers 5:16 use the mapped ACOS off-diagonal covariance.")
+        println(io, "# CO2 covariance model: ",
+                reference_prior.co2_covariance_model)
+        println(io, "# CO2 covariance base model: ",
+                reference_prior.co2_covariance_base_model)
+        println(io, "# CO2 covariance construction: ",
+                reference_prior.co2_covariance_construction)
+        println(io, "# CO2 adjacent-layer correlation taper retention (pairs 5-6 through 15-16): ",
+                join((@sprintf("%.12f", value) for value in
+                      reference_prior.co2_correlation_taper_adjacent_retention),
+                     " "))
+        println(io, "# CO2 selected adjacent-layer correlations (pairs 5-6 through 15-16): ",
+                join((@sprintf("%.12f", value) for value in
+                      reference_prior.co2_selected_adjacent_correlation),
+                     " "))
         println(io, "# The SIF block is also correlated; use the NetCDF or covariance table for full matrices.")
+        @printf(io, "# CO2-only sigma(XCO2) consequence: base=%.9f selected=%.9f ppm\n",
+                reference_prior.co2_base_xco2_sigma_ppm,
+                reference_prior.co2_selected_xco2_sigma_ppm)
         @printf(io, "# CO2-only sigma(XCO2) at 1000 hPa = %.9f ppm\n",
-                co2_xco2_sigma_ppm(first(values(priors)).Sa[2:17, 2:17]))
+                reference_prior.co2_selected_xco2_sigma_ppm)
         @printf(io, "# Aerosol ln(AOD760) sigma: %.12e\n",
                 first(values(priors)).aerosol_ln_aod_sigma)
         @printf(io, "# Surface P1 sigmas: O2A=%.12e weak_CO2=%.12e strong_CO2=%.12e\n",
@@ -453,6 +685,8 @@ function main(args=ARGS)
     aerosol_ln_aod_sigma = parse(
         Float64, get(ENV, "AEROSOL_LN_AOD_SIGMA",
                      string(DEFAULT_AEROSOL_LN_AOD_SIGMA)))
+    co2_covariance_model = get(
+        ENV, "CO2_COVARIANCE_MODEL", DEFAULT_CO2_COVARIANCE_MODEL)
     common_surface_p1_sigma = parse(
         Float64, get(ENV, "SURFACE_P1_SIGMA",
                      string(DEFAULT_SURFACE_P1_SIGMA)))
@@ -478,6 +712,7 @@ function main(args=ARGS)
     priors = Dict(
         surface => build_prior(
             surface, slope_reference;
+            co2_covariance_model=co2_covariance_model,
             sif_wavelength_slope_mean=sif_wavelength_slope_mean,
             sif_wavelength_slope_sigma=sif_wavelength_slope_sigma,
             aerosol_ln_aod_sigma=aerosol_ln_aod_sigma,

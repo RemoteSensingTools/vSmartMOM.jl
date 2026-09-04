@@ -2,6 +2,8 @@
 
 using Test
 using NCDatasets
+using Printf
+using SHA
 
 include(joinpath(@__DIR__, "RetrievalCases.jl"))
 using .RetrievalCases
@@ -79,6 +81,58 @@ function test_experiment(truth, measurement_path, noise_path)
     return RetrievalExperiment(
         1, 1, truth, UNPERTURBED_INDEX, :corrected, UInt64(0),
         measurement_path, noise_path)
+end
+
+test_sha256(path) = open(path, "r") do io
+    bytes2hex(sha256(io))
+end
+
+function write_bottom_release_fixture(directory, table, cases)
+    measurement_directory = joinpath(directory, "OCO_radiances")
+    noise_directory = joinpath(measurement_directory, "noise_covariances")
+    rows = String[]
+    for truth in filter(case -> case.sif_case != :off, cases)
+        truth_directory = truth.aerosol_case == :none ? directory :
+            joinpath(directory, "aerosol_chunked")
+        truth_path = joinpath(
+            truth_directory, @sprintf("hiressim_%03d.nc", truth.state_index))
+        measurement_path = joinpath(
+            measurement_directory, @sprintf("OCO2sims_%03d.nc", truth.state_index))
+        noise_path = joinpath(
+            noise_directory, @sprintf("OCO2noise_%03d.nc", truth.state_index))
+        for (path, label) in ((truth_path, "truth"),
+                              (measurement_path, "measurement"),
+                              (noise_path, "noise"))
+            mkpath(dirname(path))
+            write(path, "$label $(truth.state_index)\n")
+        end
+        push!(rows, @sprintf("%03d %s %s %s", truth.state_index,
+                            test_sha256(truth_path),
+                            test_sha256(measurement_path),
+                            test_sha256(noise_path)))
+    end
+    full_truth_root = joinpath(directory, "full_truth")
+    mkpath(full_truth_root)
+    full_receipt = joinpath(full_truth_root, "sif_v2_release_complete.dat")
+    write(full_receipt, "synthetic full-column release receipt\n")
+    receipt = joinpath(directory, "bottom_layer_sif_v2_release_complete.dat")
+    open(receipt, "w") do io
+        println(io, "# release_schema 1")
+        println(io, "# sif_definition_version 2")
+        println(io, "# full_column_release_receipt_sha256 ",
+                test_sha256(full_receipt))
+        println(io, "# bottom_state_table_sha256 ", test_sha256(table))
+        println(io, "# legacy_bottom_state_table_sha256 ", repeat("b", 64))
+        println(io, "# legacy_bottom_state_table_archive_relative truth/true_states.dat")
+        println(io, "# legacy_archive_manifest_sha256 ", repeat("c", 64))
+        println(io, "# no_sif_byte_preservation_policy preserve_truth_measurement_noise_bytes_and_legacy_state_table_hash_attributes")
+        println(io, "# no_sif_triplet_set_sha256 ", repeat("d", 64))
+        println(io, "# input_set_sha256 ", repeat("a", 64))
+        println(io, "# state truth_sha256 measurement_sha256 noise_sha256")
+        foreach(line -> println(io, line), rows)
+    end
+    return (; receipt, measurement_directory, noise_directory,
+            full_truth_root)
 end
 
 function write_test_truth_table(path; bottom_layer=false)
@@ -229,6 +283,50 @@ end
         withenv("RETRIEVAL_EXTERNAL_SIF_OWNERSHIP_MARKER" => alternate) do
             @test external_sif_ownership_marker(output_root) == alternate
             @test isnothing(enforce_sif_ownership(output_root, with_sif))
+        end
+    end
+end
+
+@testset "SIF retrievals require an intact all-scene release receipt" begin
+    mktempdir() do directory
+        table = write_test_truth_table(
+            joinpath(directory, "true_states.dat"); bottom_layer=true)
+        cases = read_truth_cases(table)
+        no_sif = select_sif_truth_cases(cases, :off)
+        with_sif = select_sif_truth_cases(cases, :on)
+        measurement_directory = joinpath(directory, "OCO_radiances")
+        noise_directory = joinpath(measurement_directory, "noise_covariances")
+
+        # No-SIF work remains independent of the corrected-SIF publication.
+        @test isnothing(require_sif_release_barrier(
+            table, no_sif, measurement_directory, noise_directory))
+        @test_throws ErrorException require_sif_release_barrier(
+            table, with_sif, measurement_directory, noise_directory)
+
+        fixture = write_bottom_release_fixture(directory, table, cases)
+        withenv("FULL_COLUMN_TRUTH_ROOT" => fixture.full_truth_root) do
+            @test require_sif_release_barrier(
+                table, with_sif, fixture.measurement_directory,
+                fixture.noise_directory) == fixture.receipt
+        end
+
+        marker = joinpath(
+            directory, ".bottom_layer_sif_v2_publication_in_progress")
+        write(marker, "test interrupted publication\n")
+        withenv("FULL_COLUMN_TRUTH_ROOT" => fixture.full_truth_root) do
+            @test_throws ErrorException require_sif_release_barrier(
+                table, with_sif, fixture.measurement_directory,
+                fixture.noise_directory)
+        end
+        rm(marker)
+
+        tampered = joinpath(
+            fixture.measurement_directory, "OCO2sims_006.nc")
+        write(tampered, "tampered\n")
+        withenv("FULL_COLUMN_TRUTH_ROOT" => fixture.full_truth_root) do
+            @test_throws ErrorException require_sif_release_barrier(
+                table, with_sif, fixture.measurement_directory,
+                fixture.noise_directory)
         end
     end
 end
