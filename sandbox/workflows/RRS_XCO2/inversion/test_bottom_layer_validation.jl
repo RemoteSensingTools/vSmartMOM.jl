@@ -1,8 +1,35 @@
 #!/usr/bin/env julia
 
 using Test
+using vSmartMOM
+using vSmartMOM.CoreRT
 
 include(joinpath(@__DIR__, "validate_bottom_layer_retrievals.jl"))
+include(joinpath(@__DIR__, "..", "scripts", "common.jl"))
+using .RRSXCO2Common
+
+@testset "760-nm angular-integral SIF normalization" begin
+    state = RRSXCO2Common.campaign_sif_state()
+    L760 = state.SIF760 * 1.0e7 /
+        RRSXCO2Common.SIF_REFERENCE_WAVELENGTH_NM^2
+    @test RRSXCO2Common.SIF_CASE_ON == "angular_integral760_0p5"
+    @test isapprox(L760, 0.5 / (2π); atol=2e-16, rtol=0)
+    @test isapprox(2π * L760, 0.5; atol=2e-15, rtol=0)
+    @test isapprox(state.SIF760, 0.004596394756493938;
+                   atol=2e-18, rtol=0)
+    @test isapprox(state.mSIF, 1.2291230681458325e-5;
+                   atol=2e-19, rtol=0)
+
+    source = SurfaceSIF(
+        SIF760=state.SIF760,
+        mSIF=state.mSIF,
+        wavenumber_cm1=[state.ν_ref],
+    )
+    prepared = CoreRT.prepare_source(source, Float64, 3, 1, Array)
+    @test prepared.SIF₀[1, 1] == π * state.SIF760
+    @test (0.5 / π) * (2 * prepared.SIF₀[1, 1]) == state.SIF760
+    @test all(iszero, prepared.SIF₀[2:3, :])
+end
 
 function outcome_attributes(outcome, converged, fit_quality_ok)
     return Dict{String,Any}(
@@ -77,7 +104,8 @@ end
         bottom_co2_ppm=400.0,
         fixed_upper_co2_ppm=400.0,
     )
-    aerosol_on = merge(aerosol_off, (sif_case=:total_0p5,))
+    aerosol_on = merge(
+        aerosol_off, (sif_case=:angular_integral760_0p5,))
     truth = Dict(13 => aerosol_off, 18 => aerosol_on)
     @test isnothing(validate_aerosol_controls_selection([13], [11], truth))
     @test isnothing(validate_aerosol_controls_selection([18], [11], truth))
@@ -142,9 +170,13 @@ end
 
 @testset "cross-host structural barrier scene selection" begin
     clear_nosif = (aerosol_case=:none, sif_case=:off)
-    clear_sif = (aerosol_case=:none, sif_case=:total_0p5)
+    clear_sif = (
+        aerosol_case=:none, sif_case=:angular_integral760_0p5)
     aerosol_nosif = (aerosol_case=:aod760_0p28, sif_case=:off)
-    aerosol_sif = (aerosol_case=:aod760_0p28, sif_case=:total_0p5)
+    aerosol_sif = (
+        aerosol_case=:aod760_0p28,
+        sif_case=:angular_integral760_0p5,
+    )
 
     for (state, truth) in enumerate(
             (clear_nosif, clear_sif, aerosol_nosif, aerosol_sif))

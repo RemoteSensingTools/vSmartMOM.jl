@@ -1,11 +1,85 @@
 #!/usr/bin/env julia
 
 using Test
+using NCDatasets
 
 include(joinpath(@__DIR__, "RetrievalCases.jl"))
 using .RetrievalCases
 
 const TEST_SURFACES = (:urban, :rural, :desert, :forest)
+
+function corrected_sif_provenance()
+    radiance = 0.5 / (2π)
+    return Dict{String,Any}(
+        "sif_definition_version" => Int32(2),
+        "sif_definition" =>
+            "isotropic BOA radiance normalized by 2pi*L_lambda(760 nm)=0.5",
+        "sif_case_on_label" => "angular_integral760_0p5",
+        "sif_reference_wavelength_nm" => 760.0,
+        "sif_upwelling_solid_angle_sr" => 2π,
+        "sif_angular_integral_760_mW_m-2_nm-1" => 0.5,
+        "sif_radiance_760_mW_m-2_sr-1_nm-1" => radiance,
+        "sif_cosine_weighted_irradiance_760_mW_m-2_nm-1" => π * radiance,
+        "sif_SIF760_mW_m-2_sr-1_per_cm-1" =>
+            radiance * 760.0^2 / 1e7,
+        "sif_mSIF_mW_m-2_sr-1_per_cm-2" => 1.2291230681458325e-5,
+        "sif_template_wavelength_integral_mW_m-2_sr-1" =>
+            15.368806005166872,
+    )
+end
+
+function write_test_measurement(path, truth; provenance=Dict{String,Any}())
+    mkpath(dirname(path))
+    NCDataset(path, "c") do dataset
+        dataset.attrib["instrument_processing_complete"] = 1
+        dataset.attrib["state_index"] = truth.state_index
+        dataset.attrib["sif_case"] = String(truth.sif_case)
+        for (key, value) in provenance
+            dataset.attrib[key] = value
+        end
+    end
+    return path
+end
+
+function write_test_noise(path, truth; provenance=Dict{String,Any}())
+    mkpath(dirname(path))
+    NCDataset(path, "c") do dataset
+        defDim(dataset, "measurement", 3)
+        defDim(dataset, "band", 3)
+        for class in ("corrected", "uncorrected")
+            defVar(dataset, "measurement_$class", Float64,
+                   ("measurement",))[:] = [1.0, 2.0, 3.0]
+            defVar(dataset, "noise_std_$class", Float64,
+                   ("measurement",))[:] = fill(0.1, 3)
+            defVar(dataset, "Se_diagonal_$class", Float64,
+                   ("measurement",))[:] = fill(0.01, 3)
+        end
+        defVar(dataset, "wavelength", Float64,
+               ("measurement",))[:] = [760.0, 1600.0, 2050.0]
+        defVar(dataset, "band_start_index", Int32,
+               ("band",))[:] = Int32[1, 2, 3]
+        defVar(dataset, "band_end_index", Int32,
+               ("band",))[:] = Int32[1, 2, 3]
+        dataset.attrib["noise_covariance_complete"] = 1
+        dataset.attrib["state_index"] = truth.state_index
+        dataset.attrib["sif_case"] = String(truth.sif_case)
+        dataset.attrib["campaign"] = String(truth.campaign)
+        dataset.attrib["background_co2_ppm"] = truth.background_co2_ppm
+        dataset.attrib["bottom_co2_layer_index"] = truth.bottom_layer_index
+        dataset.attrib["bottom_co2_ppm"] = truth.bottom_co2_ppm
+        dataset.attrib["xco2_ppm"] = truth.xco2_ppm
+        for (key, value) in provenance
+            dataset.attrib[key] = value
+        end
+    end
+    return path
+end
+
+function test_experiment(truth, measurement_path, noise_path)
+    return RetrievalExperiment(
+        1, 1, truth, UNPERTURBED_INDEX, :corrected, UInt64(0),
+        measurement_path, noise_path)
+end
 
 function write_test_truth_table(path; bottom_layer=false)
     mkpath(dirname(path))
@@ -23,7 +97,8 @@ function write_test_truth_table(path; bottom_layer=false)
                                     (380, 400, 420, 440)
         for (surface_index, surface) in enumerate(TEST_SURFACES),
                 (aerosol_index, aerosol) in enumerate((:none, :aod760_0p28)),
-                (sif_index, sif) in enumerate((:off, :total_0p5)),
+                (sif_index, sif) in enumerate((
+                    :off, :angular_integral760_0p5)),
                 (co2_index, co2) in enumerate(co2_values)
             index += 1
             if bottom_layer
@@ -38,6 +113,49 @@ function write_test_truth_table(path; bottom_layer=false)
         end
     end
     return path
+end
+
+@testset "versioned SIF provenance gates retrieval inputs" begin
+    mktempdir() do directory
+        table = write_test_truth_table(
+            joinpath(directory, "bottom.dat"); bottom_layer=true)
+        truths = read_truth_cases(table)
+        sif_on = truths[6]
+        no_sif = truths[1]
+
+        measurement = joinpath(directory, "OCO2sims_006.nc")
+        noise = joinpath(directory, "OCO2noise_006.nc")
+        provenance = corrected_sif_provenance()
+        write_test_measurement(measurement, sif_on; provenance)
+        write_test_noise(noise, sif_on; provenance)
+        realization = load_measurement_realization(
+            test_experiment(sif_on, measurement, noise))
+        @test realization.provenance["sif_definition_version"] == 2
+        @test realization.provenance[
+            "sif_angular_integral_760_mW_m-2_nm-1"] == 0.5
+
+        stale = copy(provenance)
+        stale["sif_definition_version"] = Int32(1)
+        write_test_measurement(measurement, sif_on; provenance=stale)
+        @test_throws ErrorException load_measurement_realization(
+            test_experiment(sif_on, measurement, noise))
+
+        mismatched = copy(provenance)
+        mismatched["sif_mSIF_mW_m-2_sr-1_per_cm-2"] *= 2
+        write_test_measurement(measurement, sif_on; provenance)
+        write_test_noise(noise, sif_on; provenance=mismatched)
+        @test_throws ErrorException load_measurement_realization(
+            test_experiment(sif_on, measurement, noise))
+
+        # No-SIF products do not need the metadata introduced by definition 2.
+        clear_measurement = joinpath(directory, "OCO2sims_001.nc")
+        clear_noise = joinpath(directory, "OCO2noise_001.nc")
+        write_test_measurement(clear_measurement, no_sif)
+        write_test_noise(clear_noise, no_sif)
+        clear = load_measurement_realization(
+            test_experiment(no_sif, clear_measurement, clear_noise))
+        @test isempty(clear.provenance)
+    end
 end
 
 @testset "full-column and bottom-layer truth case schemas" begin

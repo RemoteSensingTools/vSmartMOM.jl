@@ -18,7 +18,8 @@ using vSmartMOM.SolarModel
 const ROOT = normpath(joinpath(@__DIR__, ".."))
 const TRUTH_ROOT = joinpath(ROOT, "truth_map")
 const OUT = get(ENV, "TRUTH_OUT", TRUTH_ROOT)
-const STATE_FILE = joinpath(TRUTH_ROOT, "true_states.dat")
+const STATE_FILE = get(
+    ENV, "TRUTH_STATE_FILE", joinpath(TRUTH_ROOT, "true_states.dat"))
 const DEVICE = parse(Int, get(ENV, "CUDA_DEVICE", "1"))
 const FIRST_STATE = parse(Int, get(ENV, "FIRST_STATE", "1"))
 const LAST_STATE = parse(Int, get(ENV, "LAST_STATE", "64"))
@@ -63,7 +64,7 @@ struct TruthState
     xco2_index::Int
     xco2_ppm::Int
     aod550::NTuple{3,Float64}
-    sif_total::Float64
+    sif_angular_integral760::Float64
     sif760::Float64
     msif::Float64
     coeff::NTuple{3,NTuple{3,Float64}}
@@ -82,6 +83,29 @@ function read_states(path=STATE_FILE)
              (Float64(r[25]), Float64(r[26]), Float64(r[27])))))
     end
     length(states) == 64 || error("Expected 64 truth states, found $(length(states))")
+    expected_sif = RRSXCO2Common.campaign_sif_state()
+    for state in states
+        if state.sif_index == 1
+            state.sif_case == "off" || error(
+                "SIF-off state $(state.index) has case $(state.sif_case)")
+            all(iszero, (state.sif_angular_integral760,
+                         state.sif760, state.msif)) || error(
+                "SIF-off state $(state.index) has nonzero SIF coordinates")
+        else
+            state.sif_case == RRSXCO2Common.SIF_CASE_ON || error(
+                "SIF-on state $(state.index) has stale case $(state.sif_case)")
+            isapprox(state.sif_angular_integral760,
+                     RRSXCO2Common.SIF_ANGULAR_INTEGRAL_760;
+                     atol=1e-14, rtol=0) || error(
+                "SIF-on state $(state.index) has the wrong angular integral")
+            isapprox(state.sif760, expected_sif.SIF760;
+                     atol=5e-15, rtol=0) || error(
+                "SIF-on state $(state.index) has the wrong SIF760")
+            isapprox(state.msif, expected_sif.mSIF;
+                     atol=5e-16, rtol=0) || error(
+                "SIF-on state $(state.index) has the wrong mSIF")
+        end
+    end
     return states
 end
 
@@ -96,9 +120,9 @@ function selected_states(path=STATE_FILE)
         filter!(state -> any(>(0), state.aod550), selected)
     end
     if SIF_CASE_FILTER == "off"
-        filter!(state -> iszero(state.sif_total), selected)
+        filter!(state -> iszero(state.sif_angular_integral760), selected)
     elseif SIF_CASE_FILTER == "on"
-        filter!(state -> !iszero(state.sif_total), selected)
+        filter!(state -> !iszero(state.sif_angular_integral760), selected)
     end
     isempty(selected) && error(
         "state selection is empty after AEROSOL_CASE_FILTER=" *
@@ -123,6 +147,21 @@ function select_band!(params, iband, ν, surface)
         ap.cia_reference_codes = [ap.cia_reference_codes[iband]]
         ap.cia_negative_policies = [ap.cia_negative_policies[iband]]
     end
+    return params
+end
+
+"""
+    prepare_truth_co2_profile!(params, state)
+
+Install the CO2 profile carried by a truth-state record and materialize the
+shared 1000-hPa, 16-layer atmospheric grid.  The default truth map stores a
+single, vertically uniform CO2 VMR.  Campaign-specific state types can add a
+more-specific method (for example, the bottom-layer CO2 campaign) without
+duplicating the geometry, stream, aerosol, or profile setup in `set_common!`.
+"""
+function prepare_truth_co2_profile!(params, state)
+    params.absorption_params.vmr["CO2"] = FT(state.xco2_ppm * 1e-6)
+    RRSXCO2Common.prepare_shared_profile!(params; psurf=1000.0, nlayers=NLAYERS)
     return params
 end
 
@@ -153,8 +192,7 @@ function set_common!(params, state)
         params.legacy_l_cap_override = nothing
         params.truncation = vSmartMOM.Scattering.NoTruncation()
     end
-    params.absorption_params.vmr["CO2"] = FT(state.xco2_ppm * 1e-6)
-    RRSXCO2Common.prepare_shared_profile!(params; psurf=1000.0, nlayers=NLAYERS)
+    prepare_truth_co2_profile!(params, state)
     for (aer, τ) in zip(params.scattering_params.rt_aerosols, state.aod550)
         aer.τ_ref = FT(τ)
     end
@@ -236,7 +274,7 @@ function source_set(ν, sif_on, solar_T)
     F0[1, :] .= FT.(solar_T.(ν)) .* P
     SIF0 = zeros(FT, nPol, length(ν))
     if sif_on
-        state = sif_reference_state(total_sif=0.5, reference_wavelength_nm=760)
+        state = RRSXCO2Common.campaign_sif_state()
         build_sif_source(SIF0, collect(ν), state.ν, FT(π) .* state.spectrum)
     end
     return F0, SolarBeam(F₀=F0) + SurfaceSIF(SIF₀=SIF0)
@@ -297,7 +335,8 @@ end
 function simulate_o2(state, grids, solar_T; rayleigh_core_only::Bool=true)
     bandν, solveν, keep = grids
     model = build_o2(state, bandν, solveν)
-    F0, sources = source_set(solveν, state.sif_total > 0, solar_T)
+    F0, sources = source_set(
+        solveν, state.sif_angular_integral760 > 0, solar_T)
     rrs_result = CoreRT.rt_run_toa(make_rrs(model,F0), model;
                                    i_band=1, sources)
     cabannes = toa3(rrs_result.elastic, keep)
@@ -318,7 +357,8 @@ function simulate_o2(state, grids, solar_T; rayleigh_core_only::Bool=true)
         GC.gc()
         CUDA.reclaim()
         ray_model = build_o2(state, bandν, coreν)
-        _, ray_sources = source_set(coreν, state.sif_total > 0, solar_T)
+        _, ray_sources = source_set(
+            coreν, state.sif_angular_integral760 > 0, solar_T)
         ray_result = CoreRT.rt_run_toa(ray_model; i_band=1, sources=ray_sources)
         rayleigh = toa3(ray_result)
     else
@@ -386,7 +426,8 @@ function write_scene(state, grids, o2, weak, strong)
         ds.attrib["aod550_sulfate"] = state.aod550[1]
         ds.attrib["aod550_organic_carbon"] = state.aod550[2]
         ds.attrib["aod550_stratospheric"] = state.aod550[3]
-        ds.attrib["sif_total_mW_m-2_sr-1"] = state.sif_total
+        RRSXCO2Common.write_sif_provenance!(
+            ds.attrib, state.sif_angular_integral760 > 0)
         ds.attrib["source_state_table"] = "true_states.dat"
         ds.attrib["created"] = string(now())
         # Written only after every spectral variable has been populated, so

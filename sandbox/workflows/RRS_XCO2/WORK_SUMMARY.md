@@ -57,9 +57,15 @@ titles. Three vertical panels correspond to the three bands.
   `creategrid*.jl` workflow.
 - The state variables are `SIF760`, referenced at 760 nm, and the local slope
   with respect to wavenumber.
-- A total wavelength-integrated SIF of `0.5 mW nm^-1 sr^-1 m^-2` is converted
-  consistently into wavenumber space before determining `SIF760` and its
-  slope.
+- The truth spectrum is normalized at 760 nm so that the unweighted integral
+  over the upward hemisphere is
+  `2pi * L_lambda(760) = 0.5 mW m^-2 nm^-1`. Thus every isotropic upwelling
+  BOA stream has
+  `L_lambda(760) = 0.5/(2pi) mW m^-2 sr^-1 nm^-1`.
+- This is a reference-wavelength angular normalization, not a
+  wavelength-integrated SIF area. The supplied high-resolution spectral shape
+  is retained and converted consistently into the native `SIF760` and `mSIF`
+  wavenumber coordinates.
 - Analytic SIF Jacobians were tested against finite differences.
 - SIF is included only in the O2 A band for this experiment.
 
@@ -118,7 +124,8 @@ parameters, and plots are documented in `truth_map_aerosols/README.md`.
 The 64 scenes span:
 
 - Uniform CO2 VMR: 380, 400, 420, or 440 ppm
-- SIF: absent or total 0.5 mW nm^-1 sr^-1 m^-2
+- SIF: absent, or isotropic with
+  `2pi * L_lambda(760 nm) = 0.5 mW m^-2 nm^-1`
 - Aerosol: absent or the three-component 0.28-AOD case
 - Surface: urban, rural, desert, or forest
 
