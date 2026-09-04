@@ -15,9 +15,27 @@ Environment controls:
 - `RETRIEVAL_CLASS=corrected|uncorrected|paired` (required). `paired` runs
   adjacent corrected/uncorrected experiments on
   the same host, recreating their identical deterministic normalized draw.
-- `FIRST_STATE`, `LAST_STATE` (default 1,64; only no-SIF states are selected)
+- `FIRST_STATE`, `LAST_STATE` (default 1,64)
+- `SIF_CASE_FILTER=off|on|all` (default `off`). `on` selects every nonzero-SIF
+  truth case; `off` preserves the original no-SIF campaign behavior.
 - `AEROSOL_CASE_FILTER=all|none|aerosol` (default `all`)
-- `FIRST_PERTURBATION`, `LAST_PERTURBATION` (default 1,10)
+- `RETRIEVAL_TRUTH_TABLE`: alternate campaign truth-state table.
+- `RETRIEVAL_MEASUREMENT_DIR`: alternate synthetic OCO-radiance directory.
+- `RETRIEVAL_NOISE_DIR`: alternate frozen-noise directory.
+- `RETRIEVAL_PRIOR_PATH`: alternate generated a-priori NetCDF.
+- `RETRIEVAL_OUTPUT_ROOT`: alternate root containing `corrected/`,
+  `uncorrected/`, and the retrieval manifest. Campaigns must use distinct
+  roots; this prevents products with reused state indices from colliding.
+- `RETRIEVAL_EXTERNAL_SIF_OWNERSHIP_MARKER`: optional path to a durable
+  handoff marker. It defaults to
+  `<RETRIEVAL_OUTPUT_ROOT>/.control/sif_owned_externally`. If the marker exists,
+  any selection containing SIF-on work is refused before model allocation;
+  no-SIF selections remain unaffected.
+- `RETRIEVAL_WRITE_MANIFEST=0` suppresses manifest writing for a secondary
+  worker sharing an output root (default `1`).
+- `FIRST_PERTURBATION`, `LAST_PERTURBATION` (default 1,11). Indices 1:10
+  inject paired noise; index 11 is the exact unperturbed measurement. When it
+  is selected, index 11 is computed first for each state, followed by 1:10.
 - `RETRIEVAL_ARCH=GPU|CPU` (default GPU)
 - `RETRIEVAL_FLOAT_TYPE=Float32|Float64` (default Float32)
 - `CUDA_DEVICE` (default 1)
@@ -74,9 +92,9 @@ function main()
     first_state = parse(Int, get(ENV, "FIRST_STATE", "1"))
     last_state = parse(Int, get(ENV, "LAST_STATE", "64"))
     first_perturbation = parse(Int, get(ENV, "FIRST_PERTURBATION", "1"))
-    last_perturbation = parse(Int, get(ENV, "LAST_PERTURBATION", "10"))
-    1 <= first_perturbation <= last_perturbation <= 10 || error(
-        "perturbation limits must lie in 1:10")
+    last_perturbation = parse(Int, get(ENV, "LAST_PERTURBATION", "11"))
+    1 <= first_perturbation <= last_perturbation <= UNPERTURBED_INDEX || error(
+        "perturbation limits must lie in 1:$UNPERTURBED_INDEX")
     architecture_name = uppercase(get(ENV, "RETRIEVAL_ARCH", "GPU"))
     architecture_name in ("CPU", "GPU") || error(
         "RETRIEVAL_ARCH must be CPU or GPU")
@@ -84,16 +102,43 @@ function main()
     float_type = selected_float_type()
     force = env_flag("FORCE")
     fail_fast = env_flag("FAIL_FAST", "1")
+    sif_case_filter = lowercase(get(ENV, "SIF_CASE_FILTER", "off"))
+    sif_case_filter in ("off", "on", "all") || error(
+        "SIF_CASE_FILTER must be off, on, or all")
     aerosol_case_filter = lowercase(get(ENV, "AEROSOL_CASE_FILTER", "all"))
     aerosol_case_filter in ("all", "none", "aerosol") || error(
         "AEROSOL_CASE_FILTER must be all, none, or aerosol")
 
-    truth_cases = filter(read_no_sif_truth_cases()) do truth
+    truth_table = abspath(get(
+        ENV, "RETRIEVAL_TRUTH_TABLE", default_truth_table()))
+    measurement_directory = abspath(get(
+        ENV, "RETRIEVAL_MEASUREMENT_DIR", default_measurement_directory()))
+    noise_directory = abspath(get(
+        ENV, "RETRIEVAL_NOISE_DIR", default_noise_directory()))
+    prior_path = abspath(get(
+        ENV, "RETRIEVAL_PRIOR_PATH", RetrievalState.DEFAULT_PRIOR_PATH))
+    output_root = abspath(get(ENV, "RETRIEVAL_OUTPUT_ROOT", @__DIR__))
+
+    parsed_truth_cases = read_truth_cases(truth_table)
+    if only(unique(case.co2_profile_mode for case in parsed_truth_cases)) ==
+            :bottom_layer
+        # Reused state indices make accidental fallback to the full-column
+        # inputs especially dangerous: those files exist and would otherwise
+        # pass a simple existence test. Require every campaign-local path.
+        for variable in ("RETRIEVAL_MEASUREMENT_DIR", "RETRIEVAL_NOISE_DIR",
+                         "RETRIEVAL_PRIOR_PATH", "RETRIEVAL_OUTPUT_ROOT")
+            haskey(ENV, variable) || error(
+                "$variable is required for a bottom-layer CO2 campaign")
+        end
+    end
+    truth_cases = filter(
+            select_sif_truth_cases(parsed_truth_cases, sif_case_filter)) do truth
         truth_has_aerosol = truth.aerosol_case != :none
         aerosol_case_filter == "all" ||
             (aerosol_case_filter == "aerosol") == truth_has_aerosol
     end
-    all_experiments = build_experiments(truth_cases)
+    all_experiments = build_experiments(
+        truth_cases; measurement_directory, noise_directory)
     experiments = filter(all_experiments) do experiment
         (measurement_class == :paired ||
          experiment.measurement_class == measurement_class) &&
@@ -101,6 +146,7 @@ function main()
         first_perturbation <= experiment.noise_index <= last_perturbation
     end
     isempty(experiments) && error("the requested subset contains no experiments")
+    enforce_sif_ownership(output_root, experiments)
     settings = OESettings()
 
     println("="^78)
@@ -110,34 +156,49 @@ function main()
             "float_type=$float_type CUDA_DEVICE=$cuda_device")
     println("experiments=$(length(experiments)) state_range=$first_state:$last_state " *
             "perturbations=$first_perturbation:$last_perturbation " *
+            "sif_case_filter=$sif_case_filter " *
             "aerosol_case_filter=$aerosol_case_filter nstreams=9")
+    println("truth_table=$truth_table")
+    println("measurement_directory=$measurement_directory")
+    println("noise_directory=$noise_directory")
+    println("prior_path=$prior_path")
+    println("output_root=$output_root")
     println("started_utc=$(now(UTC))")
     println("="^78)
+
+    if env_flag("RETRIEVAL_WRITE_MANIFEST", "1")
+        write_experiment_manifest(
+            all_experiments;
+            output_path=joinpath(output_root, "retrieval_manifest.dat"),
+            inversion_root=output_root)
+    end
 
     evaluator = OCOForwardEvaluator(;
         architecture, float_type, nstreams=9)
     failures = 0
     completed = 0
     for (sequence, experiment) in enumerate(experiments)
-        output_path = retrieval_output_path(experiment)
+        output_path = retrieval_output_path(
+            experiment; inversion_root=output_root)
         if output_complete(output_path) && !force
             println("[$sequence/$(length(experiments))] skip complete $output_path")
             continue
         end
         truth = experiment.truth
         # Layers 1:4 have zero prior variance and are not part of the active
-        # state. The synthetic truth profiles are vertically uniform, so fix
-        # these layers to this scene's truth value rather than an unconditional
-        # 400 ppm. This keeps every 380/400/420/440 ppm scene representable.
-        set_fixed_upper_co2_ppm!(evaluator, truth.xco2_ppm)
-        @printf("[%d/%d] state=%03d perturbation=%02d class=%s surface=%s aerosol=%s XCO2=%.0f\n",
+        # state. Uniform-column cases use their scene VMR; bottom-layer cases
+        # use the separately tabulated 400 ppm background. Never infer this
+        # fixed value from column XCO2, which is not a layer VMR.
+        set_fixed_upper_co2_ppm!(evaluator, truth.fixed_upper_co2_ppm)
+        @printf("[%d/%d] state=%03d perturbation=%02d class=%s surface=%s aerosol=%s sif=%s XCO2=%.6f\n",
                 sequence, length(experiments), truth.state_index,
                 experiment.noise_index, String(experiment.measurement_class),
-                String(truth.surface), String(truth.aerosol_case), truth.xco2_ppm)
+                String(truth.surface), String(truth.aerosol_case),
+                String(truth.sif_case), truth.xco2_ppm)
         @printf("  fixed_upper_co2_layers=1:4 fixed_upper_co2_ppm=%.1f\n",
-                truth.xco2_ppm)
+                truth.fixed_upper_co2_ppm)
         try
-            prior = load_retrieval_prior(truth.surface)
+            prior = load_retrieval_prior(truth.surface; path=prior_path)
             realization = load_measurement_realization(experiment)
             callback = record -> @printf(
                 "  trial=%d iteration=%d accepted=%d gamma=%.4g d_sigma_scaled=%.5g chi2=(%.4g,%.4g,%.4g) time=%.3fs\n",
@@ -162,6 +223,9 @@ function main()
             VSmartMOMForward.RRSXCO2Common.write_absco_provenance!(provenance)
             VSmartMOMForward.RRSXCO2Common.write_fourier_convergence_provenance!(
                 provenance)
+            provenance["retrieval_campaign"] = String(truth.campaign)
+            provenance["source_truth_table"] = truth_table
+            provenance["source_apriori"] = prior_path
             write_retrieval_result(
                 experiment, realization, result, prior.xa, prior.Sa,
                 prior.parameter_names; output_path, settings,
