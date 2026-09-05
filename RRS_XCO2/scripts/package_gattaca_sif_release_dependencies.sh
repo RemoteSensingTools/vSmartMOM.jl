@@ -29,6 +29,7 @@ readonly repo_manifest_name="gattaca_sif_release_repo_dependencies.sha256"
 readonly archive_manifest_name="gattaca_sif_release_full_legacy_archive.sha256"
 readonly metadata_name="BUNDLE_METADATA.dat"
 readonly envelope_name="TRANSFER_SHA256SUMS"
+readonly packager_relative_path="RRS_XCO2/scripts/package_gattaca_sif_release_dependencies.sh"
 
 die() {
     printf 'STOP: %s\n' "$*" >&2
@@ -41,9 +42,12 @@ Usage:
   package_gattaca_sif_release_dependencies.sh package OUTPUT_DIRECTORY
   package_gattaca_sif_release_dependencies.sh install BUNDLE_DIRECTORY
 
-Package mode requires EXPECTED_SIF_OWNERSHIP_SHA256 and a clean tracked Git
-checkout. Install mode requires RRS_PRIVATE_ROOT. RRS_REPO defaults to the Git
-top level containing this script.
+Package mode requires EXPECTED_SIF_OWNERSHIP_SHA256 and requires this helper
+itself to match the version committed at HEAD. Unrelated tracked edits outside
+the explicitly enumerated data payload do not block packaging; every payload
+byte is independently hashed and the completed archives are re-extracted and
+verified. Install mode requires RRS_PRIVATE_ROOT and a clean tracked checkout.
+RRS_REPO defaults to the Git top level containing this script.
 EOF
 }
 
@@ -51,6 +55,8 @@ script_repo="$({ git -C "$(dirname "$0")" rev-parse --show-toplevel; } 2>/dev/nu
     die "this script must be run from a vSmartMOM Git checkout"
 repo_root="$(realpath "${RRS_REPO:-$script_repo}")"
 [[ -d "$repo_root/.git" ]] || die "RRS_REPO is not a Git checkout: $repo_root"
+readonly packager_path="$(realpath "$0")"
+readonly expected_packager_path="$(realpath -m "$repo_root/$packager_relative_path")"
 
 require_file() {
     [[ -f "$1" ]] || die "missing required file: $1"
@@ -72,6 +78,29 @@ require_count() {
 
 sha_of() {
     sha256sum "$1" | awk '{print $1}'
+}
+
+# Package metadata names the Git checkpoint whose source will be used on the
+# disconnected host.  A dirty, unrelated tracked file in the authoritative
+# data worktree must not prevent a data-only handoff, but the helper defining
+# that handoff must be byte-for-byte identical to its version at that exact
+# checkpoint.  Comparing Git blob IDs is independent of the index state and
+# therefore catches both staged and unstaged edits to this script.
+require_packager_at_head() {
+    local head_blob worktree_blob object_type
+    [[ "$packager_path" == "$expected_packager_path" ]] ||
+        die "run the canonical packager from $expected_packager_path"
+    head_blob="$(git -C "$repo_root" rev-parse --verify \
+        "HEAD:$packager_relative_path")" ||
+        die "packager is absent from the current Git checkpoint"
+    object_type="$(git -C "$repo_root" cat-file -t "$head_blob")" ||
+        die "cannot inspect the committed packager object"
+    [[ "$object_type" == blob ]] || die "committed packager object is not a file"
+    worktree_blob="$(git -C "$repo_root" hash-object -- "$packager_path")" ||
+        die "cannot hash the working packager"
+    [[ "$worktree_blob" == "$head_blob" ]] ||
+        die "packager differs from $packager_relative_path at HEAD"
+    sha_of "$packager_path"
 }
 
 validate_legacy_full_column_archive() {
@@ -120,6 +149,51 @@ validate_legacy_full_column_archive() {
     done < "$manifest"
     [[ "$row_count" -eq 32 ]] ||
         die "full-column archive manifest contains $row_count scene rows; expected 32"
+}
+
+# Build the legacy payload from the validated manifest, not from a recursive
+# directory sweep.  This makes an unexpected note, credential, or intermediate
+# file a hard failure instead of silently adding it to a transfer bundle.
+collect_archive_files() {
+    local obsolete_root="$repo_root/RRS_XCO2/obsolete"
+    local legacy_root="$obsolete_root/$archive_name"
+    local manifest="$legacy_root/full_column_input_manifest.dat"
+    local off_index on_index expected_hash name relative
+    local -a actual_files
+
+    ARCHIVE_FILES=(
+        "$archive_name/README.md"
+        "$archive_name/full_column_input_manifest.dat"
+        "$archive_name/truth_map/true_states.dat"
+    )
+    while read -r off_index on_index expected_hash _; do
+        [[ -n "${off_index:-}" ]] || continue
+        [[ "$off_index" == "#" ]] && continue
+        name="hiressim_${on_index}.nc"
+        if [[ -f "$legacy_root/truth_map/$name" ]]; then
+            relative="$archive_name/truth_map/$name"
+        elif [[ -f "$legacy_root/truth_map/aerosol_chunked/$name" ]]; then
+            relative="$archive_name/truth_map/aerosol_chunked/$name"
+        else
+            die "validated legacy archive lost SIF state $on_index"
+        fi
+        ARCHIVE_FILES+=("$relative")
+    done < "$manifest"
+    mapfile -t ARCHIVE_FILES < <(
+        printf '%s\n' "${ARCHIVE_FILES[@]}" | LC_ALL=C sort -u)
+    [[ "${#ARCHIVE_FILES[@]}" -eq 35 ]] ||
+        die "legacy archive allowlist has ${#ARCHIVE_FILES[@]} files; expected 35"
+
+    mapfile -t actual_files < <(
+        cd "$obsolete_root"
+        find "$archive_name" -type f -print | LC_ALL=C sort
+    )
+    [[ "${#actual_files[@]}" -eq "${#ARCHIVE_FILES[@]}" ]] ||
+        die "legacy archive contains files outside its 35-member allowlist"
+    for index in "${!ARCHIVE_FILES[@]}"; do
+        [[ "${actual_files[$index]}" == "${ARCHIVE_FILES[$index]}" ]] ||
+            die "unexpected legacy archive file: ${actual_files[$index]}"
+    done
 }
 
 collect_repo_files() {
@@ -186,17 +260,16 @@ package_bundle() {
     local bottom_truth="$repo_root/RRS_XCO2/bottom_layer_XCO2_retrievals/truth"
     local obsolete_root="$repo_root/RRS_XCO2/obsolete"
     local legacy_root="$obsolete_root/$archive_name"
-    local source_sha created_utc path
-    local -a archive_files
+    local source_sha packager_sha256 created_utc path
 
     [[ "$expected_ownership" =~ ^[0-9a-f]{64}$ ]] ||
         die "EXPECTED_SIF_OWNERSHIP_SHA256 must be a lowercase SHA-256"
-    git -C "$repo_root" diff --quiet -- ||
-        die "tracked checkout has unstaged changes"
-    git -C "$repo_root" diff --cached --quiet -- ||
-        die "tracked checkout has staged changes"
+    packager_sha256="$(require_packager_at_head)"
     source_sha="$(git -C "$repo_root" rev-parse HEAD)"
     [[ "$source_sha" =~ ^[0-9a-f]{40}$ ]] || die "cannot resolve source checkpoint"
+    case "$output_directory/" in
+        "$repo_root/"*) die "bundle output must be outside the Git checkout" ;;
+    esac
 
     require_absent "$full_truth/sif_v2_release_complete.dat"
     require_absent "$full_truth/.sif_v2_publication_in_progress"
@@ -212,14 +285,8 @@ package_bundle() {
         "$bottom_truth/true_states.dat" ||
         die "bottom-layer table does not contain exactly 40 legacy SIF-on rows"
     validate_legacy_full_column_archive
+    collect_archive_files
     collect_repo_files
-
-    mapfile -d '' -t archive_files < <(
-        cd "$obsolete_root"
-        find "$archive_name" -type f -print0 | LC_ALL=C sort -z
-    )
-    [[ "${#archive_files[@]}" -ge 35 ]] ||
-        die "immutable full-column archive is unexpectedly incomplete"
 
     [[ ! -e "$output_directory" ]] ||
         die "output directory already exists: $output_directory"
@@ -232,7 +299,7 @@ package_bundle() {
     ) > "$output_directory/$repo_manifest_name"
     (
         cd "$obsolete_root"
-        sha256sum "${archive_files[@]}"
+        sha256sum "${ARCHIVE_FILES[@]}"
     ) > "$output_directory/$archive_manifest_name"
     (
         cd "$repo_root"
@@ -242,18 +309,25 @@ package_bundle() {
     )
     (
         cd "$obsolete_root"
-        printf '%s\0' "${archive_files[@]}" | \
+        printf '%s\0' "${ARCHIVE_FILES[@]}" | \
             tar --null --no-recursion --files-from=- -cf \
                 "$output_directory/$archive_tar_name"
     )
 
+    # Detect any source mutation between manifest creation and tar capture and
+    # prove that each completed tar contains exactly the bytes authorized by
+    # its manifest before describing the bundle as verified.
+    verify_packaged_archives "$output_directory"
+
     created_utc="$(date -u +%FT%TZ)"
     {
-        printf 'bundle_schema=1\n'
+        printf 'bundle_schema=2\n'
         printf 'source_checkpoint=%s\n' "$source_sha"
+        printf 'packager_path=%s\n' "$packager_relative_path"
+        printf 'packager_sha256=%s\n' "$packager_sha256"
         printf 'created_utc=%s\n' "$created_utc"
         printf 'repository_file_count=%s\n' "${#REPO_FILES[@]}"
-        printf 'archive_file_count=%s\n' "${#archive_files[@]}"
+        printf 'archive_file_count=%s\n' "${#ARCHIVE_FILES[@]}"
         printf 'ownership_marker_sha256=%s\n' "$expected_ownership"
         printf 'repository_manifest_sha256=%s\n' \
             "$(sha_of "$output_directory/$repo_manifest_name")"
@@ -351,10 +425,30 @@ verify_tree() {
     )
 }
 
+verify_packaged_archives() {
+    local bundle_directory="$1"
+    local validation_root repo_stage archive_stage
+    safe_tar_members "$bundle_directory/$repo_tar_name"
+    safe_tar_members "$bundle_directory/$archive_tar_name"
+    validation_root="$(mktemp -d \
+        "$(dirname "$bundle_directory")/.sif_bundle_verify.XXXXXX")"
+    repo_stage="$validation_root/repo"
+    archive_stage="$validation_root/archive"
+    mkdir "$repo_stage" "$archive_stage"
+    tar --no-same-owner --no-same-permissions \
+        -xf "$bundle_directory/$repo_tar_name" -C "$repo_stage"
+    tar --no-same-owner --no-same-permissions \
+        -xf "$bundle_directory/$archive_tar_name" -C "$archive_stage"
+    verify_tree "$repo_stage" "$bundle_directory/$repo_manifest_name"
+    verify_tree "$archive_stage" "$bundle_directory/$archive_manifest_name"
+    rm -rf -- "$validation_root"
+}
+
 install_bundle() {
     local bundle_directory="$(realpath "$1")"
     local private_root="${RRS_PRIVATE_ROOT:-}"
-    local source_sha actual_sha bundle_digest stage_root
+    local bundle_schema source_sha actual_sha bundle_digest stage_root
+    local metadata_packager_path metadata_packager_sha256 local_packager_sha256
     local repo_stage archive_stage
 
     [[ -n "$private_root" ]] || die "RRS_PRIVATE_ROOT is required in install mode"
@@ -373,6 +467,22 @@ install_bundle() {
         cd "$bundle_directory"
         sha256sum --check --strict "$envelope_name"
     )
+    bundle_schema="$(awk -F= '$1 == "bundle_schema" {print $2}' \
+        "$bundle_directory/$metadata_name")"
+    [[ "$bundle_schema" == 2 ]] ||
+        die "unsupported static-release bundle schema: $bundle_schema"
+    metadata_packager_path="$(awk -F= '$1 == "packager_path" {print $2}' \
+        "$bundle_directory/$metadata_name")"
+    [[ "$metadata_packager_path" == "$packager_relative_path" ]] ||
+        die "bundle names an unexpected packager path: $metadata_packager_path"
+    metadata_packager_sha256="$(awk -F= \
+        '$1 == "packager_sha256" {print $2}' \
+        "$bundle_directory/$metadata_name")"
+    [[ "$metadata_packager_sha256" =~ ^[0-9a-f]{64}$ ]] ||
+        die "bundle lacks a valid packager checksum"
+    local_packager_sha256="$(require_packager_at_head)"
+    [[ "$local_packager_sha256" == "$metadata_packager_sha256" ]] ||
+        die "bundle and checkout use different packager bytes"
     source_sha="$(awk -F= '$1 == "source_checkpoint" {print $2}' \
         "$bundle_directory/$metadata_name")"
     actual_sha="$(git -C "$repo_root" rev-parse HEAD)"
