@@ -54,7 +54,8 @@ EOF
 script_repo="$({ git -C "$(dirname "$0")" rev-parse --show-toplevel; } 2>/dev/null)" ||
     die "this script must be run from a vSmartMOM Git checkout"
 repo_root="$(realpath "${RRS_REPO:-$script_repo}")"
-[[ -d "$repo_root/.git" ]] || die "RRS_REPO is not a Git checkout: $repo_root"
+[[ "$(git -C "$repo_root" rev-parse --is-inside-work-tree 2>/dev/null)" == true ]] ||
+    die "RRS_REPO is not a Git worktree: $repo_root"
 readonly packager_path="$(realpath "$0")"
 readonly expected_packager_path="$(realpath -m "$repo_root/$packager_relative_path")"
 
