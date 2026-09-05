@@ -353,6 +353,26 @@ end
     end
     @test isnothing(match(r"/home/[A-Za-z0-9_.-]+", packager_source))
     @test occursin("EXPECTED_SIF_OWNERSHIP_SHA256", packager_source)
+    @test occursin("require_packager_at_head", packager_source)
+    @test occursin("git -C \"\$repo_root\" hash-object", packager_source)
+    @test occursin("verify_packaged_archives", packager_source)
+    @test occursin("bundle_schema=2", packager_source)
+    @test occursin("collect_archive_files", packager_source)
+    @test occursin("outside its 35-member allowlist", packager_source)
+    @test occursin("bundle output must be outside the Git checkout",
+                   packager_source)
+
+    package_start = first(findfirst("package_bundle()", packager_source))
+    package_end = first(findnext(
+        "safe_tar_members()", packager_source, package_start)) - 1
+    package_source = packager_source[package_start:package_end]
+    @test !occursin("tracked checkout has unstaged changes", package_source)
+    @test !occursin("tracked checkout has staged changes", package_source)
+
+    install_start = first(findfirst("install_bundle()", packager_source))
+    install_source = packager_source[install_start:end]
+    @test occursin("tracked checkout has unstaged changes", install_source)
+    @test occursin("tracked checkout has staged changes", install_source)
 end
 
 @testset "cross-host provenance paths retain canonical semantic tails" begin
