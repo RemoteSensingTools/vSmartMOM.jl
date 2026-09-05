@@ -354,6 +354,8 @@ end
     @test isnothing(match(r"/home/[A-Za-z0-9_.-]+", packager_source))
     @test occursin("EXPECTED_SIF_OWNERSHIP_SHA256", packager_source)
     @test occursin("require_packager_at_head", packager_source)
+    @test occursin("rev-parse --is-inside-work-tree", packager_source)
+    @test !occursin("[[ -d \"\$repo_root/.git\" ]]", packager_source)
     @test occursin("git -C \"\$repo_root\" hash-object", packager_source)
     @test occursin("verify_packaged_archives", packager_source)
     @test occursin("bundle_schema=2", packager_source)
