@@ -363,6 +363,12 @@ end
     @test occursin("outside its 35-member allowlist", packager_source)
     @test occursin("bundle output must be outside the Git checkout",
                    packager_source)
+    for required_private_input in (
+            "RRS_XCO2/inversion/retrieval_setup/co2_prior_covariances.dat",
+            "RRS_XCO2/bottom_layer_XCO2_retrievals/retrieval_setup/apriori_states.nc",
+            "RRS_XCO2/surface_albedos/lambertian_legendre_inputs.dat")
+        @test occursin(required_private_input, packager_source)
+    end
 
     package_start = first(findfirst("package_bundle()", packager_source))
     package_end = first(findnext(

@@ -217,8 +217,17 @@ collect_repo_files() {
         "RRS_XCO2/bottom_layer_XCO2_retrievals/truth/aerosol_chunked/sim_wavelength.nc"
         "RRS_XCO2/bottom_layer_XCO2_retrievals/truth/OCO_radiances/noise_covariances/noise_covariance_manifest.dat"
         "RRS_XCO2/bottom_layer_XCO2_retrievals/retrievals/.control/sif_owned_externally"
+        # Private, ignored inputs required after publication to construct and
+        # independently validate the tapered retrieval prior.  The reference
+        # prior is consumed by the readiness gate; the covariance table is
+        # consumed directly by build_apriori.jl.
+        "RRS_XCO2/bottom_layer_XCO2_retrievals/retrieval_setup/apriori_states.nc"
+        "RRS_XCO2/inversion/retrieval_setup/co2_prior_covariances.dat"
         "RRS_XCO2/inversion/instrument/representative_stokes_coefficients.nc"
         "RRS_XCO2/inversion/instrument/representative_snr_coefficients.nc"
+        # Required by the direct-SIF release validator because every producer
+        # provenance log binds this exact surface-input file.
+        "RRS_XCO2/surface_albedos/lambertian_legendre_inputs.dat"
     )
 
     require_count 32 "$full_truth" 'hiressim_*.nc'
