@@ -80,6 +80,7 @@ include("CoreKernel/elemental_canopy.jl")
 
 # Solvers -- Doubling
 include("CoreKernel/doubling.jl")              # Doubling (elastic)
+include("CoreKernel/jacobian_batched.jl")      # Batched physical-parameter propagation
 include("CoreKernel/doubling_lin.jl")          # Doubling (linearized)
 include("CoreKernel/doubling_inelastic.jl")    # Doubling for elastic + inelastic scattering 
 

@@ -37,7 +37,7 @@ using the product rule, with the closed-form
 ``\\dot{\\mathbf{G}} = \\mathbf{G}\\,\\dot{(\\mathbf{R}\\mathbf{R})}\\,\\mathbf{G}``
 identity. No AD through the batched matrix inversion; the chain rule on
 ``(\\mathbf{E} - \\mathbf{R}\\mathbf{R})^{-1}`` is closed-form, which keeps
-the Jacobian numerically stable and roughly forward-cost.
+the inverse derivative analytic while reusing the forward factorization.
 
 The ``\\mathbf{ap\\_*}`` fields on `AddedLayerLin` carry the chain-rule
 expansion to the **physical state vector** ``\\mathbf{x}`` — written
@@ -221,6 +221,11 @@ function interaction_helper!(::ScatteringInterface_11, SFI,
                                 added_layer::AddedLayer{FT},
                                 added_layer_lin::AddedLayerLin{FT},
                                 I_static::AbstractArray{FT2}) where {FT<:Real,FT2}
+
+    if _use_batched_jacobians(added_layer_lin)
+        return interaction_batched_lin!(composite_layer, composite_layer_lin,
+            added_layer, added_layer_lin, I_static)
+    end
 
     (; r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺) = added_layer #these are aliases to the respective struct elements
     (; R⁻⁺, R⁺⁻, T⁺⁺, T⁻⁻, J₀⁺, J₀⁻) = composite_layer #these are aliases to the respective struct elements

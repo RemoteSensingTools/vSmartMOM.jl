@@ -1,6 +1,30 @@
 "Abstract Type for Layer Ṙ,Ṫ and J̇ matrices"
 abstract type AbstractLayerLin end
 
+"Reusable scratch for batched physical-parameter doubling and interaction."
+struct JacobianPropagationWorkspace{M,V,DM,DV}
+    G::M
+    H::M
+    m1::M
+    m2::M
+    R::M
+    T::M
+    v1::V
+    v2::V
+    Jminus::V
+    Jplus::V
+    dG::DM
+    dH::DM
+    dm1::DM
+    dm2::DM
+    dR::DM
+    dT::DM
+    dv1::DV
+    dv2::DV
+    dJminus::DV
+    dJplus::DV
+end
+
 """
     SolarColumnOperatorsLin{FT}
 
@@ -177,6 +201,8 @@ Base.@kwdef struct AddedLayerLin{FT} <: AbstractLayerLin
     dbl_gp_refl::Union{AbstractArray{FT,3}, Nothing} = nothing
     "Doubling workspace: T⁺⁺·gp_refl (forward) [nμ × nμ × nSpec]"
     dbl_tt_gp_refl::Union{AbstractArray{FT,3}, Nothing} = nothing
+    "Scratch shared across doubling and interaction; nothing retains the reference path"
+    propagation_workspace::Union{JacobianPropagationWorkspace,Nothing} = nothing
     "Optional physical-parameter tangents of direct-solar columns"
     solar_columns::Union{SolarColumnOperatorsLin{FT},Nothing} = nothing
 end

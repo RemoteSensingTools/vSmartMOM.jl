@@ -40,17 +40,12 @@ For each core parameter ``c \\in \\{\\tau, \\varpi, \\mathbf{Z}\\}``:
 \\dot{\\mathbf{R}}_{2\\tau,c} = \\dot{\\mathbf{R}}_c + \\dot{\\mathbf{T}}_c\\,\\mathbf{G}\\,\\mathbf{R}\\,\\mathbf{T} + \\ldots
 ```
 
-The closed-form ``\\dot{\\mathbf{G}} = -\\mathbf{G}\\,\\dot{(\\mathbf{R}\\mathbf{R})}\\,\\mathbf{G}`` derivation
-keeps the linearization analytic — no AD through the batched matrix
-inversion. **Crucially, ``\\mathbf{G}`` is the same inverse the forward
-doubling step already computed**, so the linearized partner *reuses* it
-rather than recomputing. The marginal cost per linearized iteration is
-two extra batched matmuls per core parameter, not another LU. This is
-why a combined forward + linearized run costs **less than 2× a forward-only
-run** — the dominant ``N_\\mathrm{quad}^3`` LU work is paid once. ForwardDiff
-through `batch_inv!` would force ``(1+N_\\mathrm{params})`` evaluations of the
-inverse; finite differences would force ``(1+N_\\mathrm{state})`` full forward
-runs. See [Concepts/06 — Linearization § Why this is fast](../../docs/src/pages/concepts/06_linearization.md#why-this-is-fast-the-matrix-inversion-is-reused).
+The inverse tangent reuses the forward geometric progression. Physical
+parameter columns still require product-rule matrix multiplications and source
+updates; their cost depends on the active layout and backend. The batched path
+in `jacobian_batched.jl` groups wavelength and parameter in each GPU launch and
+reuses propagation scratch. The reference path remains available for numerical
+A/B checks and larger GPU operators. See Concepts/06 for the cost model.
 
 The D-matrix symmetry from Sanghavi 2014 Eqs. (C.17)–(C.18) is preserved on
 the derivatives too (`apply_D_matrix!` is reused), halving the linearized
@@ -224,6 +219,11 @@ function doubling_allparams_helper!(pol_type,
                           dτ̇::AbstractArray,
                           μ₀::FT;
                           N_active::Int=0) where {FT}
+
+    if _use_batched_jacobians(added_layer_lin)
+        return doubling_batched_lin!(pol_type, expk, ndoubl, added_layer,
+            added_layer_lin, I_static, dτ̇, μ₀; N_active)
+    end
 
     # Unpack the added layer (forward)
     (; r⁺⁻, r⁻⁺, t⁻⁻, t⁺⁺, j₀⁺, j₀⁻) = added_layer
@@ -455,4 +455,3 @@ function apply_D_matrix_SFI!(n_stokes::Int,
     synchronize_if_gpu();
     nothing
 end
-

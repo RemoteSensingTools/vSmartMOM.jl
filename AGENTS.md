@@ -133,7 +133,7 @@ bandwidth.
 Not marketing — each claim has a `file:line`. Mirror this list in user-facing
 material when explaining the package:
 
-1. **Operator-level analytic linearization.** RT kernel itself is hand-differentiated; AD is upstream-only. **Combined forward + linearized run costs less than 2× a forward-only run** — the closed-form chain rule on adding-doubling reuses the already-computed batched matrix inverses, so the dominant LU work is paid once. ForwardDiff would pay `(1+N_params)×`; finite differences `(1+N_state)×`. — `src/CoreRT/CoreKernel/elemental_lin.jl` (`get_elem_rt_fused!:456–591`, `get_elem_rt_SFI_fused!:602–815`), `{elemental,doubling,interaction}_lin.jl`. See `docs/src/pages/concepts/06_linearization.md` § "Why this is fast". *Status: production codebase implements the kernel-level fast path; a cleaner AD-upstream → analytic-downstream boundary (more idiomatic handoff struct, less manual chain-rule expansion in upstream code) is in active development.*
+1. **Operator-level analytic linearization.** The RT kernel is hand-differentiated; AD is upstream-only. Forward inverses are reused for all requested Jacobian columns. Cost still grows with active parameter count and depends on operator size, spectral batch and backend; do not promise a universal forward/Jacobian ratio. Small GPU operators batch product rules over wavelength × parameter, and doubling/general interaction reuse scratch. — `src/CoreRT/CoreKernel/{elemental,doubling,interaction}_lin.jl`, `src/CoreRT/CoreKernel/jacobian_batched.jl`. See `docs/src/pages/concepts/06_linearization.md` § "Why this is fast".
 2. **One `@kernel` source compiles for CPU, CUDA, and Metal.** — `src/Architectures.jl:33–96`, `ext/vSmartMOMCUDAExt.jl:21–27`, `ext/vSmartMOMMetalExt.jl:19–22`.
 3. **Hybrid AD across the GPU boundary.** `ForwardDiff.Dual` flows through `NNlib.batched_mul` on `CuArray`. — `ext/gpu_batched_cuda.jl:141–177`.
 4. **Polarization is a type, not a runtime branch.** `Stokes_I/IQ/IQU/IQUV` specialize the kernels at compile time. — `src/Scattering/types.jl:92–143`.
@@ -190,6 +190,7 @@ material when explaining the package:
 | Quadrature (Gauss / Radau) | `src/CoreRT/tools/rt_set_streams.jl:24–110` |
 | External direct-solar phase coupling | `src/CoreRT/CoreKernel/elemental.jl::get_elem_rt_SFI!` |
 | External-solar TOA-only entry point | `src/CoreRT/rt_run.jl::rt_run_toa` |
+| Batched physical-parameter propagation | `src/CoreRT/CoreKernel/jacobian_batched.jl` |
 | Linearization kernels | `src/CoreRT/CoreKernel/{elemental,doubling,interaction}_lin.jl` |
 | Chain-rule expansion (fused) | `src/CoreRT/CoreKernel/elemental_lin.jl:456–591` (`get_elem_rt_fused!`), `602–815` (`get_elem_rt_SFI_fused!`) |
 | Jacobian column layout | `src/CoreRT/parameter_layout.jl:1–67` |

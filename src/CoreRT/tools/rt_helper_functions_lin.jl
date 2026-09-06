@@ -91,6 +91,7 @@ function make_added_layer(lin::LinMode, RS_type::Union{noRS, noRS_plus}, FT, arr
         dbl_ap_J̇₁⁻         = default_J_matrix(FT, lin, arr_type, Nparams, dims, nSpec),
         dbl_gp_refl        = arr_type(zeros(FT, dims[1], dims[2], nSpec)),
         dbl_tt_gp_refl     = arr_type(zeros(FT, dims[1], dims[2], nSpec)),
+        propagation_workspace = make_jacobian_workspace(t1, Nparams),
         solar_columns      = external_solar ?
             default_solar_columns_lin(FT, arr_type, dims, nStokes, nSpec, Nparams) : nothing,
     )

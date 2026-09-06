@@ -46,6 +46,7 @@ try
 
 # Jacobian unit tests
 @testset "Jacobian Unit" begin include("test_jacobians_unit.jl") end
+@testset "Batched Jacobians" begin include("test_jacobian_batched.jl") end
 @testset "Selective Jacobians" begin include("test_selective_jacobians.jl") end
 
 # Type stability tests (no external data)

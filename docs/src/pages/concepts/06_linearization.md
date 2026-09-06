@@ -109,63 +109,39 @@ The split has three benefits:
 
 ## Why this is fast: the matrix inversion is reused
 
-> **A combined forward + linearized run costs *less than 2×* a forward-only
-> run.** Not `1 + N_params×forward`. Not even `2× forward`. **Less than
-> 2×.** This is the production-impact property of operator-level analytic
-> linearization in MOM, and it's the headline reason vSmartMOM is usable
-> inside Levenberg-Marquardt loops with hundreds of state vector elements.
-
-The dominant cost in the forward solver is the batched matrix inversion at
-each doubling step (the geometric-series factor
-``\mathbf{G} = (\mathbf{E} - \mathbf{R}\mathbf{R})^{-1}``) and at each
-inhomogeneous-adding step (the two `T*_inv` factors in
-[Concepts/04 § Adding](04_mom_solver.md#adding--interaction)).
-``N_\mathrm{quad}^3`` per spectral point per layer per Fourier moment,
-LU-decomp + back-substitution, dispatched to CUBLAS / KA-LU.
-
-The linearized partner needs the derivative of that inverse:
+The forward solver computes the geometric-series inverse
+``\mathbf{G}=(\mathbf{E}-\mathbf{R}\mathbf{R})^{-1}`` at each doubling
+step. Its tangent follows directly from the inverse rule:
 
 ```math
-\dot{\mathbf{G}} = -\mathbf{G}\,\dot{(\mathbf{R}\mathbf{R})}\,\mathbf{G}.
+\dot{\mathbf{G}} = \mathbf{G}\,\dot{(\mathbf{R}\mathbf{R})}\,\mathbf{G}.
 ```
 
-It **reuses the already-computed** ``\mathbf{G}``. No second LU, no second
-back-substitution. The marginal cost of the linearized step is two extra
-batched *matmuls* (cheap, well-parallelized, full GPU bandwidth) per core
-parameter ``c \in \{\tau, \varpi, \mathbf{Z}\}``, not another inversion.
+The positive sign comes from differentiating ``\mathbf{E}-\mathbf{R}\mathbf{R}``.
+The same forward inverse is reused for every active physical parameter.
+This saves repeated factorizations, but each parameter still requires matrix
+products and source propagation. The total cost depends on the number of
+requested columns, operator size, spectral batch, precision and backend;
+there is no universal ratio to the forward-only runtime.
 
-Compare:
+The batched propagation path evaluates product-rule terms across wavelength
+and parameter together. It fuses ``\dot{A}B+A\dot{B}`` on supported small GPU
+operators and reuses scratch arrays through doubling and general layer
+interaction. Larger GPU operators retain the reference BLAS path until their
+performance is validated. CPU propagation uses in-place BLAS products.
+Selecting only the retrieval's requested Jacobian columns avoids propagating
+unneeded derivatives through either path.
 
-| Approach | Cost ratio (lin+fwd : fwd) |
+| Approach | Work required |
 |---|---|
-| **vSmartMOM analytic linearization (this codebase)** | **< 2×** |
-| ForwardDiff `Dual{T,V,N}` through the kernels | `(1 + N) ×` (every operation, including the inversion, picks up `N` partial slabs) |
-| Finite differences | `(1 + N_state) ×` (one full forward per parameter) |
+| Analytic operator derivatives | Reused forward inverses plus products for the active parameter columns |
+| ForwardDiff through the RT kernel | Values and derivative slabs flow through kernel arithmetic; cost depends on chunk size and backend |
+| Forward finite differences | One baseline solve plus one perturbed solve per parameter |
 
-For a typical OCO-2 retrieval with ``N_\mathrm{state} \approx 30``, this is
-the difference between a Jacobian costing ~2 forward runs and one costing
-~30. Inside a Levenberg-Marquardt loop that hits the forward model ~10
-times to converge, the savings are dispositive — 20 forward equivalents vs
-300+.
-
-That property holds at the *kernel* level (one doubling iteration, one
-adding step) and aggregates through the entire RT solve. It is preserved
-on GPU because both ``\mathbf{G}`` and the matmuls dispatch through the
-same `batched_mul` / `batch_inv!` interface — see [Concepts/07](07_architecture.md).
-
-::: info Status — refined AD→analytic boundary in progress
-The current production codebase runs the production-fast linearized path
-described above; a **cleaner AD-upstream → hand-coded-analytic-downstream
-boundary** is in active development. The goal is to make the seam between
-the two zones (the `CoreScatteringOpticalPropertiesLin` handoff struct,
-δ-M chain-rule expansion, microphysical parameter forwarding) more
-idiomatic — fewer manual chain-rule expansions in upstream code,
-cleaner extension points for adding new state-vector parameters. None of
-this changes the *production performance* claim above (the matrix-inversion
-reuse is the kernel-level guarantee and stays put); it cleans up the
-ergonomics of the AD boundary. See `docs/dev_notes/` for the work-in-progress
-plans.
-:::
+Benchmark the actual retrieval workload, including model construction when it
+changes between iterations. Matrix-inversion reuse is an algorithmic property;
+end-to-end speedup is a measured result. Refining the upstream AD boundary can
+improve construction cost independently of the RT propagation kernels.
 
 ## The chain rule on adding-doubling
 
