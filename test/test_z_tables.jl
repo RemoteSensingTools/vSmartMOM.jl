@@ -6,10 +6,13 @@
 # runs on static blocks instead of allocating slices — so the contract is
 # bitwise equality (0.0), not a tolerance.
 using Test
+using YAML
 using vSmartMOM
 using vSmartMOM.Scattering
 using vSmartMOM.Scattering: compute_Z_moments, ZMomentTables, make_Π_lists, GreekCoefs
 using vSmartMOM.CoreRT: Stokes_I, Stokes_IQ, Stokes_IQU, Stokes_IQUV
+using vSmartMOM.CoreRT: LinMode, build_m_invariant_cache
+using vSmartMOM.InelasticScattering: noRS
 
 # Deterministic synthetic Greek coefficients of length l_max (values are
 # irrelevant for the equality contract; use a smooth decaying sequence).
@@ -105,3 +108,30 @@ end
 end
 
 println("test_z_tables: done")
+
+@testset "spectral Greek arrays do not enlarge angular tables" begin
+    d = YAML.load_file("test_parameters/JacobianTestFast.yaml")
+    delete!(d, "absorption")
+    d["radiative_transfer"]["greek_beta_cutoff"] = nothing
+    d["scattering"]["r_max"] = 3.0
+    d["scattering"]["aerosols"][1]["μ"] = 0.15
+    d["scattering"]["aerosols"][1]["σ"] = 1.4
+    p = read_parameters(d)
+    p.spec_bands[1] = collect(range(first(p.spec_bands[1]),last(p.spec_bands[1]);length=7))
+    model, _ = model_from_parameters(LinMode(),p)
+    β = model.aerosol_optics[1][1].greek_coefs.β
+    @test size(β,2) == 7
+    cache = build_m_invariant_cache(noRS(),[1],model)
+    @test cache.z_tables.l_max == max(size(β,1),size(model.greek_rayleigh[1].β,1))
+    @test size(cache.z_tables.P,2) == cache.z_tables.l_max
+    on = rt_run(model)
+    old = vSmartMOM.CoreRT._Z_TABLES_ENABLED[]
+    try
+        vSmartMOM.CoreRT._Z_TABLES_ENABLED[] = false
+        off = rt_run(model)
+        @test on[1] == off[1]
+        @test on[2] == off[2]
+    finally
+        vSmartMOM.CoreRT._Z_TABLES_ENABLED[] = old
+    end
+end

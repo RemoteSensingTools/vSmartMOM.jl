@@ -198,10 +198,10 @@ function build_m_invariant_cache(RS_type::AbstractRamanType, iBand, model)
         for iB in iBand
             gr_source = _rayleigh_greek_source(RS_type, greek_rayleigh, greek_cabannes)
             gr = gr_source isa AbstractVector ? gr_source[iB] : gr_source
-            l_max_global = max(l_max_global, length(gr.β))
+            l_max_global = max(l_max_global, size(gr.β, 1))
             for i in 1:size(τ_aer[iB], 1)
                 l_max_global = max(l_max_global,
-                                   length(aerosol_optics[iB][i].greek_coefs.β))
+                                   size(aerosol_optics[iB][i].greek_coefs.β, 1))
             end
         end
         # Build on the grid the diffuse Z blocks are evaluated on: qp_μ under
