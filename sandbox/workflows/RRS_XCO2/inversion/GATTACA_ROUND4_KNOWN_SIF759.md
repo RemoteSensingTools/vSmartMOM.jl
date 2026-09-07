@@ -82,24 +82,30 @@ The fresh source checkout therefore needs no copied truth or ignored data.
 
 ## 3. Small private prior inputs
 
-After the round-4 code is committed, transfer only these newly generated files
-into the new private campaign's `retrieval_setup/` directory:
+After the round-4 code is committed, transfer these three files into the new
+private campaign's `retrieval_setup/` directory:
 
 ```text
 apriori_states_round4_known_sif759_on_acos_mapped_tapered_vertical_correlation.nc
 apriori_states_round4_known_sif759_on_acos_mapped_tapered_vertical_correlation.dat
+source_apriori_states_acos_mapped_tapered_vertical_correlation.nc
 ```
 
-The readiness gate also pins the existing source round-3 prior:
+The last file is a byte-exact copy of the Curry file named
+`apriori_states_acos_mapped_tapered_vertical_correlation.nc`, from which the
+reduced round-4 prior was constructed. Rename it with the `source_` prefix
+when installing it. It lives in the dedicated round-4 namespace rather than
+being read from or written over the completed round-3 campaign. Raw hashes of
+independently generated NetCDF priors can differ because their metadata
+contains a creation timestamp and an absolute source path, so round 4 pins
+this exact copy. Its expected SHA-256 is:
 
 ```text
-$RRS_PRIVATE_ROOT/results/
-  bottom_layer_sif_acos_mapped_tapered_vertical_correlation_v1/
-  retrieval_setup/apriori_states_acos_mapped_tapered_vertical_correlation.nc
+34c0e81b7a853af157b68bb879db0771342a9579460835675f92df8aab7f9375
 ```
 
-Transfer that source prior only if it is missing. Record the SHA-256 of all
-three files. No truth, measurement, noise, ABSCO, solar, corrected-v2 release,
+Record the SHA-256 of all three files. No truth, measurement, noise, ABSCO,
+solar, corrected-v2 release,
 Stokes-coefficient, component-catalog, or SIF-template file needs another
 transfer when the existing round-3 installation is retained.
 
