@@ -4,7 +4,11 @@ Investigated 2026-09-07 against production code at `3d5bd106`. This extends the
 matched-control end-to-end probe in [README.md](README.md). Both saved terminal
 states of `state035_corrected_siffalse` are used; the O2 band has 2,735 solve
 nodes and 934 instrument samples. All results below are CUDA results. Noise
-normalization uses the original retrieval observation variance.
+normalization uses the original retrieval observation variance. All
+noise-normalized comparisons below are **after the study's Gaussian instrument
+convolution and detector sampling**, including the Jacobian predictions. The
+[explicit convolution audit](convolution_accuracy.md) reconstructs those
+measurements from the saved high-resolution spectra and compares each stage.
 
 ## Frozen boundary experiment
 

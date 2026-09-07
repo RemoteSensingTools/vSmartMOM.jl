@@ -1,0 +1,422 @@
+fwhm_nm = 0.04
+detector_samples = 934
+detector_spacing_nm = 0.015
+dense_samples = 4666
+support_sigma = 6
+exact_saved_measurement_checks = 10
+band = "o2a"
+
+[[post_convolution_jacobian_remainders]]
+max_noise_sigma = 0.01727668783072165
+rms_noise_sigma = 0.003126261143841399
+configuration = "p32r32"
+[[post_convolution_jacobian_remainders]]
+max_noise_sigma = 3.84761199158295e-5
+rms_noise_sigma = 2.154312682864565e-5
+configuration = "p32r64"
+[[post_convolution_jacobian_remainders]]
+max_noise_sigma = 0.013934926254843225
+rms_noise_sigma = 0.0030364850234388566
+configuration = "p64r32"
+[[post_convolution_jacobian_remainders]]
+max_noise_sigma = 4.79535216716325e-6
+rms_noise_sigma = 2.081260307427834e-6
+configuration = "p64r64"
+[[post_convolution_jacobian_remainders]]
+max_noise_sigma = 4.799304189946093e-6
+rms_noise_sigma = 2.0814673693340994e-6
+configuration = "grid32"
+
+[[records]]
+comparison = "RT_only_preparation32"
+convolution_linearity_max_absolute = 3.270951218214968e-14
+state = "reference"
+
+    [records.convolved_dense]
+    n_samples = 4666
+    mean_signed = -0.0016852405901230801
+    max_absolute = 0.005374143908412066
+    rms_absolute = 0.0020712600864813174
+    relative_l2 = 3.779404557062393e-5
+    max_relative_to_reference_peak = 7.207798595768506e-5
+    worst_wavelength_nm = 770.939
+
+    [records.convolved_detector]
+    mean_signed = -0.0016862657827808867
+    max_absolute = 0.00535722751098433
+    samples_above_0p01_noise_sigma = 748
+    relative_l2 = 3.77967373132441e-5
+    max_relative_to_reference_peak = 7.1856366658814e-5
+    max_noise_sigma = 0.04783676227022338
+    rms_noise_sigma = 0.021960624688357938
+    n_samples = 934
+    passes_0p01_noise_sigma = false
+    rms_absolute = 0.002072125770035652
+    worst_wavelength_nm = 770.945
+
+    [records.before_convolution]
+    n_samples = 2392
+    mean_signed = -0.001679861060982254
+    max_absolute = 0.009182965494531459
+    rms_absolute = 0.002677008839278272
+    relative_l2 = 4.833850025777136e-5
+    max_relative_to_reference_peak = 0.00012306759873918305
+    worst_wavelength_nm = 768.3731027693773
+[[records]]
+comparison = "RT_only_preparation64"
+convolution_linearity_max_absolute = 3.541698184728048e-14
+state = "reference"
+
+    [records.convolved_dense]
+    n_samples = 4666
+    mean_signed = -0.0017106757737420473
+    max_absolute = 0.00539279003170634
+    rms_absolute = 0.0020991831675680295
+    relative_l2 = 3.8304349141191745e-5
+    max_relative_to_reference_peak = 7.232811968530182e-5
+    worst_wavelength_nm = 770.939
+
+    [records.convolved_detector]
+    mean_signed = -0.0017116410441696817
+    max_absolute = 0.005371292138306671
+    samples_above_0p01_noise_sigma = 750
+    relative_l2 = 3.8305282506817466e-5
+    max_relative_to_reference_peak = 7.204506850063997e-5
+    max_noise_sigma = 0.05171596664612141
+    rms_noise_sigma = 0.022264175243057262
+    n_samples = 934
+    passes_0p01_noise_sigma = false
+    rms_absolute = 0.002099962195325814
+    worst_wavelength_nm = 770.945
+
+    [records.before_convolution]
+    n_samples = 2392
+    mean_signed = -0.001705063662575952
+    max_absolute = 0.009187478150636252
+    rms_absolute = 0.002716291307553354
+    relative_l2 = 4.904835292717341e-5
+    max_relative_to_reference_peak = 0.00012312801545192543
+    worst_wavelength_nm = 768.3731106905481
+[[records]]
+comparison = "preparation_matched_grid_RT64"
+convolution_linearity_max_absolute = 3.02478447020485e-14
+state = "reference"
+
+    [records.convolved_dense]
+    n_samples = 4666
+    mean_signed = -6.501687249647978e-5
+    max_absolute = 0.013787384785963752
+    rms_absolute = 0.0012773945521791492
+    relative_l2 = 2.3309275831794322e-5
+    max_relative_to_reference_peak = 0.0001849228609554557
+    worst_wavelength_nm = 770.099
+
+    [records.convolved_detector]
+    mean_signed = -6.493415099565158e-5
+    max_absolute = 0.012975468811092128
+    samples_above_0p01_noise_sigma = 88
+    relative_l2 = 2.3291221229606917e-5
+    max_relative_to_reference_peak = 0.00017404517294241278
+    max_noise_sigma = 0.14483505391939142
+    rms_noise_sigma = 0.014014461816829285
+    n_samples = 934
+    passes_0p01_noise_sigma = false
+    rms_absolute = 0.0012768476498861289
+    worst_wavelength_nm = 770.105
+
+    [records.before_convolution]
+    n_samples = 2392
+    mean_signed = -6.283561273929527e-5
+    max_absolute = 0.10666526551163713
+    rms_absolute = 0.006108504048046155
+    relative_l2 = 0.00011030449802299324
+    max_relative_to_reference_peak = 0.0014295752435978543
+    worst_wavelength_nm = 770.100950909223
+[[records]]
+comparison = "full_workflow_matched_grid"
+convolution_linearity_max_absolute = 3.022625552628888e-14
+state = "reference"
+
+    [records.convolved_dense]
+    n_samples = 4666
+    mean_signed = -0.00175025746261956
+    max_absolute = 0.015086810420264385
+    rms_absolute = 0.0025221948912701134
+    relative_l2 = 4.602220130673935e-5
+    max_relative_to_reference_peak = 0.0002023442111246668
+    worst_wavelength_nm = 770.099
+
+    [records.convolved_detector]
+    mean_signed = -0.0017511999337765382
+    max_absolute = 0.014192021267717791
+    samples_above_0p01_noise_sigma = 724
+    relative_l2 = 4.601231199031568e-5
+    max_relative_to_reference_peak = 0.00019035724761583657
+    max_noise_sigma = 0.15841448162380864
+    rms_noise_sigma = 0.02665019171910428
+    n_samples = 934
+    passes_0p01_noise_sigma = false
+    rms_absolute = 0.0025225271859813407
+    worst_wavelength_nm = 770.105
+
+    [records.before_convolution]
+    n_samples = 2392
+    mean_signed = -0.001742696673721549
+    max_absolute = 0.10741957710580152
+    rms_absolute = 0.006698812172510925
+    relative_l2 = 0.0001209598299327922
+    max_relative_to_reference_peak = 0.0014396078717558148
+    worst_wavelength_nm = 770.100950909223
+[[records]]
+comparison = "full_workflow_native_grids"
+state = "reference"
+
+    [records.convolved_dense]
+    n_samples = 4666
+    mean_signed = -0.003041476733245025
+    max_absolute = 0.07117119243948622
+    rms_absolute = 0.009026276685521152
+    relative_l2 = 0.0001647014368751627
+    max_relative_to_reference_peak = 0.000954547607334309
+    worst_wavelength_nm = 769.7959999999999
+
+    [records.convolved_detector]
+    mean_signed = -0.0030413792492103705
+    max_absolute = 0.06570664786731584
+    samples_above_0p01_noise_sigma = 791
+    relative_l2 = 0.00016458136073053218
+    max_relative_to_reference_peak = 0.0008813217231104516
+    max_noise_sigma = 0.90874920932122
+    rms_noise_sigma = 0.12932041023010857
+    n_samples = 934
+    passes_0p01_noise_sigma = false
+    rms_absolute = 0.009022823213837834
+    worst_wavelength_nm = 769.79
+[[records]]
+comparison = "RT_only_preparation32"
+convolution_linearity_max_absolute = 2.6686118592689212e-14
+state = "optimized"
+
+    [records.convolved_dense]
+    n_samples = 4666
+    mean_signed = -0.0016911410950469976
+    max_absolute = 0.005685779531589219
+    rms_absolute = 0.0020830079966728766
+    relative_l2 = 3.8008403956633415e-5
+    max_relative_to_reference_peak = 7.625694184345526e-5
+    worst_wavelength_nm = 770.939
+
+    [records.convolved_detector]
+    mean_signed = -0.0016924188689986346
+    max_absolute = 0.005670175418018175
+    samples_above_0p01_noise_sigma = 744
+    relative_l2 = 3.801867496221291e-5
+    max_relative_to_reference_peak = 7.605324977940794e-5
+    max_noise_sigma = 0.05063119551037363
+    rms_noise_sigma = 0.022001496532082453
+    n_samples = 934
+    passes_0p01_noise_sigma = false
+    rms_absolute = 0.0020842932833408695
+    worst_wavelength_nm = 770.945
+
+    [records.before_convolution]
+    n_samples = 2392
+    mean_signed = -0.0016859059783195466
+    max_absolute = 0.009568792398908954
+    rms_absolute = 0.002718383077357629
+    relative_l2 = 4.9085585258571514e-5
+    max_relative_to_reference_peak = 0.00012823902374462195
+    worst_wavelength_nm = 770.3145448550624
+[[records]]
+comparison = "RT_only_preparation64"
+convolution_linearity_max_absolute = 3.1688844256971826e-14
+state = "optimized"
+
+    [records.convolved_dense]
+    n_samples = 4666
+    mean_signed = -0.0017044936580470967
+    max_absolute = 0.005680292129113695
+    rms_absolute = 0.00208459047906653
+    relative_l2 = 3.803807931528924e-5
+    max_relative_to_reference_peak = 7.6183362036512e-5
+    worst_wavelength_nm = 770.936
+
+    [records.convolved_detector]
+    mean_signed = -0.0017057564486703052
+    max_absolute = 0.005653055195992351
+    samples_above_0p01_noise_sigma = 744
+    relative_l2 = 3.8048209077178895e-5
+    max_relative_to_reference_peak = 7.582363802316721e-5
+    max_noise_sigma = 0.050580577408172706
+    rms_noise_sigma = 0.02209884145225206
+    n_samples = 934
+    passes_0p01_noise_sigma = false
+    rms_absolute = 0.0020858686252286716
+    worst_wavelength_nm = 770.945
+
+    [records.before_convolution]
+    n_samples = 2392
+    mean_signed = -0.0016990765202951226
+    max_absolute = 0.00903283201596139
+    rms_absolute = 0.0027205818036463714
+    relative_l2 = 4.912583562043331e-5
+    max_relative_to_reference_peak = 0.00012105621216172516
+    worst_wavelength_nm = 758.9723467296338
+[[records]]
+comparison = "preparation_matched_grid_RT64"
+convolution_linearity_max_absolute = 2.853984808017288e-14
+state = "optimized"
+
+    [records.convolved_dense]
+    n_samples = 4666
+    mean_signed = -6.335286131365203e-5
+    max_absolute = 0.013785392981802147
+    rms_absolute = 0.0012773009791541632
+    relative_l2 = 2.3307569917155422e-5
+    max_relative_to_reference_peak = 0.0001848961707867705
+    worst_wavelength_nm = 770.099
+
+    [records.convolved_detector]
+    mean_signed = -6.326951947400959e-5
+    max_absolute = 0.012973733264239229
+    samples_above_0p01_noise_sigma = 89
+    relative_l2 = 2.3289517553276105e-5
+    max_relative_to_reference_peak = 0.0001740219165536769
+    max_noise_sigma = 0.1448156813613992
+    rms_noise_sigma = 0.01401386359237798
+    n_samples = 934
+    passes_0p01_noise_sigma = false
+    rms_absolute = 0.0012767541673855466
+    worst_wavelength_nm = 770.105
+
+    [records.before_convolution]
+    n_samples = 2392
+    mean_signed = -6.117587461342239e-5
+    max_absolute = 0.10666391391417562
+    rms_absolute = 0.006108493788949358
+    relative_l2 = 0.0001103043197453605
+    max_relative_to_reference_peak = 0.0014295573516343203
+    worst_wavelength_nm = 770.100950909223
+[[records]]
+comparison = "full_workflow_matched_grid"
+convolution_linearity_max_absolute = 2.6806248193400606e-14
+state = "optimized"
+
+    [records.convolved_dense]
+    n_samples = 4666
+    mean_signed = -0.0017544939563606495
+    max_absolute = 0.015222736770986955
+    rms_absolute = 0.0025220271177791033
+    relative_l2 = 4.601913465298423e-5
+    max_relative_to_reference_peak = 0.0002041653824588089
+    worst_wavelength_nm = 770.099
+
+    [records.convolved_detector]
+    mean_signed = -0.0017556883884726443
+    max_absolute = 0.014272778905187522
+    samples_above_0p01_noise_sigma = 717
+    relative_l2 = 4.6015728760379116e-5
+    max_relative_to_reference_peak = 0.00019143873674050974
+    max_noise_sigma = 0.15931591624228902
+    rms_noise_sigma = 0.026580915059884688
+    n_samples = 934
+    passes_0p01_noise_sigma = false
+    rms_absolute = 0.002522714809987974
+    worst_wavelength_nm = 770.105
+
+    [records.before_convolution]
+    n_samples = 2392
+    mean_signed = -0.0017470818529329692
+    max_absolute = 0.10759363349076523
+    rms_absolute = 0.006705723226449422
+    relative_l2 = 0.00012108460793988494
+    max_relative_to_reference_peak = 0.0014419481523672336
+    worst_wavelength_nm = 770.100950909223
+[[records]]
+comparison = "full_workflow_native_grids"
+state = "optimized"
+
+    [records.convolved_dense]
+    n_samples = 4666
+    mean_signed = -0.003045713171207998
+    max_absolute = 0.07100614099928748
+    rms_absolute = 0.009014512665063108
+    relative_l2 = 0.0001644867611613467
+    max_relative_to_reference_peak = 0.0009523252061793182
+    worst_wavelength_nm = 769.7959999999999
+
+    [records.convolved_detector]
+    mean_signed = -0.0030458676482152842
+    max_absolute = 0.06553914541342465
+    samples_above_0p01_noise_sigma = 790
+    relative_l2 = 0.0001643687054553288
+    max_relative_to_reference_peak = 0.0008790671591247314
+    max_noise_sigma = 0.9069823302407986
+    rms_noise_sigma = 0.12913872473726085
+    n_samples = 934
+    passes_0p01_noise_sigma = false
+    rms_absolute = 0.009011165936542534
+    worst_wavelength_nm = 769.79
+
+[[bigfloat_arithmetic_checks]]
+state = "reference"
+n_checked = 13
+max_noise_sigma = 1.377767900371818e-13
+configuration = "p32r32"
+[[bigfloat_arithmetic_checks]]
+state = "reference"
+n_checked = 13
+max_noise_sigma = 1.377767900371818e-13
+configuration = "p32r64"
+[[bigfloat_arithmetic_checks]]
+state = "reference"
+n_checked = 13
+max_noise_sigma = 1.2713017853039376e-13
+configuration = "p64r32"
+[[bigfloat_arithmetic_checks]]
+state = "reference"
+n_checked = 13
+max_noise_sigma = 1.4918396041971868e-13
+configuration = "p64r64"
+[[bigfloat_arithmetic_checks]]
+state = "reference"
+n_checked = 13
+max_noise_sigma = 1.4918396041971868e-13
+configuration = "grid32"
+[[bigfloat_arithmetic_checks]]
+state = "optimized"
+n_checked = 13
+max_noise_sigma = 1.586247047318579e-13
+configuration = "p32r32"
+[[bigfloat_arithmetic_checks]]
+state = "optimized"
+n_checked = 13
+max_noise_sigma = 1.4726615385009556e-13
+configuration = "p32r64"
+[[bigfloat_arithmetic_checks]]
+state = "optimized"
+n_checked = 13
+max_noise_sigma = 1.2713017853039376e-13
+configuration = "p64r32"
+[[bigfloat_arithmetic_checks]]
+state = "optimized"
+n_checked = 13
+max_noise_sigma = 1.4726615385009556e-13
+configuration = "p64r64"
+[[bigfloat_arithmetic_checks]]
+state = "optimized"
+n_checked = 13
+max_noise_sigma = 7.931235236592894e-14
+configuration = "grid32"
+
+[input_sha256]
+"frozen-optimized-prep32-rt64.jld2" = "1666cdb63d15a16391e09f4a8ee34f70decbce755b31c262ed868518620fbce4"
+"frozen-optimized-prep32-rt32.jld2" = "98bfee4bdb72d0a4eac364e076eebabd7ba96a192083e604f1342ce3e63bcad8"
+"frozen-reference-prep32-rt64.jld2" = "196357ee8b49e4811d06e61e77967e2b02b18601f286d3ee498ad14ea7c02ea0"
+"frozen-reference-prep32-rt32.jld2" = "811d4ffd233200e2138589a7e02b6f2f57abd1e2334922b0e7c358efc3e6e6cf"
+"frozen-optimized-prep64-rt32.jld2" = "a86f4698a07b3d4d66e9ab775356d5d7620ad3191181d56bb74d7a111a17207c"
+"precision64-grid32-optimized.jld2" = "8f23766dcf134b280daffeb123113b52e4d3d61f00814532c81ad279107bb394"
+"frozen-reference-prep64-rt64.jld2" = "af05dc4363840dd894f63790381a7b4182fb6830f8cfdf6f7f8a808366738d10"
+"frozen-reference-prep64-rt32.jld2" = "b40a613525dddd118eee0c029a1cbbaecf29befa913ed1cf50125883bdbe8950"
+"precision64-grid32-reference.jld2" = "a6f96bbeadf06ca62469f64b42e01f5365a9e6614658bf7b720b90722552437f"
+"frozen-optimized-prep64-rt64.jld2" = "2c8217ebcca6e0d8b5b9bc856bec9cf7ea5a60d596c1431dd3b79ac61bdaafec"

@@ -124,6 +124,14 @@ Promoting selected intermediate calculations is a possible next optimization,
 but the responsible stage must first be isolated with the same inputs and
 discretization. The current review does not implement mixed precision.
 
+Measure retrieval accuracy **after instrument convolution and detector
+sampling**, using maximum and RMS differences normalized by detector noise.
+Propagate Jacobians through that same operator. High-resolution comparisons
+remain useful stage diagnostics. The [convolution audit](evidence/convergence/convolution_accuracy.md)
+confirms the reported precision gaps and local remainders already include the
+study's Gaussian instrument; convolution smooths them but does not eliminate
+them. Keep input spectral convergence distinct from dense output sampling.
+
 ### 1. Freeze retrieval meaning, validate model compatibility
 
 Compile active keys once for an inversion. The OCO flavor currently selects
