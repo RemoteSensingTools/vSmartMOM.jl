@@ -35,7 +35,7 @@ const SOLAR_OUT = get(ENV, "SOLAR_OUT",
 const _SOLAR_INTERPOLATORS = Dict{DataType,Any}()
 
 """
-    campaign_sif_state()
+    campaign_sif_state(; sif_template_path=...)
 
 Return the SIF spectrum used by the RRS-XCO2 truth campaigns.  Its existing
 CSV spectral shape is scaled so that the *unweighted upward-solid-angle
@@ -48,12 +48,18 @@ Thus every isotropic upwelling BOA stream has
 called hemispheric irradiance: the cosine-weighted Lambertian irradiance is
 `πL = 0.25 mW m^-2 nm^-1` for the stated radiance.  The returned full
 spectrum retains the original SIF template shape, while `SIF760` and `mSIF`
-are the matching local wavenumber-linear retrieval coordinates.
+are the matching local wavenumber-linear retrieval coordinates. The template
+path defaults to `RRS_XCO2_SIF_TEMPLATE_PATH` when set, otherwise to the
+package-local historical CSV.
 """
-function campaign_sif_state()
+function campaign_sif_state(;
+        sif_template_path::AbstractString=get(
+            ENV, "RRS_XCO2_SIF_TEMPLATE_PATH",
+            sif_data_path("sif-spectra.csv")))
     shape = sif_reference_state(
         total_sif=1.0,
         reference_wavelength_nm=SIF_REFERENCE_WAVELENGTH_NM,
+        path=sif_template_path,
     )
     target_SIF760 = SIF_RADIANCE_760 *
         SIF_REFERENCE_WAVELENGTH_NM^2 / 1.0e7

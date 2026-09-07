@@ -147,7 +147,8 @@ function OCOForwardEvaluator(;
         float_type::DataType=Float32,
         nstreams::Int=9,
         fixed_upper_co2_ppm::Real=400.0,
-        coefficient_path::AbstractString=DEFAULT_COEFFICIENT_PATH)
+        coefficient_path::AbstractString=DEFAULT_COEFFICIENT_PATH,
+        component_path::AbstractString=DEFAULT_COMPONENT_PATH)
     isfinite(fixed_upper_co2_ppm) && 0 < fixed_upper_co2_ppm < 10_000 ||
         throw(ArgumentError("fixed upper-atmosphere CO2 must lie in (0,10000) ppm"))
     params = prepare_retrieval_parameters(;
@@ -162,7 +163,7 @@ function OCOForwardEvaluator(;
     coefficients = read_representative_coefficients(coefficient_path)
     solar_transmission = RRSXCO2Common.solar_interpolator(float_type)
     return OCOForwardEvaluator(
-        params, coefficients, tau_ref_per_aod760(),
+        params, coefficients, tau_ref_per_aod760(component_path),
         Float64(fixed_upper_co2_ppm) * 1e-6, solar_transmission,
         synchronize_backend)
 end

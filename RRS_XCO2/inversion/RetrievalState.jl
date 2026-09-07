@@ -27,7 +27,16 @@ function retrieval_parameter_names(dataset, active_to_full)
     return full_names[active_to_full]
 end
 
-"""Load the generated 30-element prior for one of the four surface classes."""
+"""
+Load the generated active prior for one of the four surface classes.
+
+Legacy retrieval priors contain 30 active coordinates.  New retrieval
+experiments may deliberately fix additional entries and advertise their
+solver dimension through the `active_state_count` global attribute.  Keeping
+the active-to-full mapping in the prior file lets those experiments reuse the
+same output and optimal-estimation machinery without pretending that a
+zero-variance parameter is invertible.
+"""
 function load_retrieval_prior(surface::Symbol;
                               path::AbstractString=DEFAULT_PRIOR_PATH)
     isfile(path) || throw(ArgumentError(
@@ -40,11 +49,17 @@ function load_retrieval_prior(surface::Symbol;
         isnothing(surface_index) && throw(ArgumentError(
             "surface $surface is absent from $path"))
         active_to_full = Int.(dataset["active_parameter_index"][:])
-        length(active_to_full) == ACTIVE_STATE_COUNT || error(
-            "expected $ACTIVE_STATE_COUNT active parameters")
+        expected_count = Int(get(
+            dataset.attrib, "active_state_count", ACTIVE_STATE_COUNT))
+        length(active_to_full) == expected_count || error(
+            "prior advertises $expected_count active parameters but stores " *
+            "$(length(active_to_full)) active indices")
         xa_full = Float64.(dataset["xa"][:, surface_index])
         xa = xa_full[active_to_full]
         Sa = Float64.(dataset["Sa_active"][:, :, surface_index])
+        size(Sa) == (expected_count, expected_count) || error(
+            "active covariance has size $(size(Sa)); expected " *
+            "($expected_count,$expected_count)")
         names = retrieval_parameter_names(dataset, active_to_full)
         return RetrievalPrior(surface, xa, Sa, active_to_full, names)
     end
