@@ -210,6 +210,39 @@ probe; removing that copy is now a substantial remaining evaluation cost.
 See [the selected-basis evidence](evidence/selected_basis/README.md) for the
 timings, logs, array hashes and independent NumPy/HDF5 verification.
 
+## Read-only LUT sharing across trial copies
+
+`copy_parameters(params; share_luts=true)` now provides an explicit trial-copy
+operation. It deep-copies mutable atmospheric, aerosol and surface state and
+the LUT container lists while retaining loaded table storage as read-only.
+Ordinary `deepcopy`, and the helper's default, retain full-copy semantics.
+
+A same-process replay with the five-direction/source-adding solver compares
+the original `deepcopy` with this helper. Medians of three warmed A100 evaluations:
+
+| Parameter copy | Complete evaluation | RT/Jacobian | Host allocations |
+|---|---:|---:|---:|
+| Deep-copy LUTs | 8.305 s | 5.041 s | 4.670 GB |
+| Share read-only LUT storage | **5.368 s** | 4.873 s | **0.954 GB** |
+
+The copy change saves **35% of evaluation time** and **80% of host allocations**.
+The isolated copy probe decreases from 3.190 s and 3.716 GB to 0.328 ms and
+44,832 bytes. The solver itself is unchanged; its timing variation does not
+represent an additional RT optimization.
+
+Both the archived state and a perturbed state give bitwise-identical
+measurements and all 30 Jacobian columns with either copy policy. An A → B → A
+sequence reproduces A exactly, and checks confirm that the template and every
+loaded coefficient-array hash remain unchanged. The 53 portable copy/model
+checks and strict docs build pass. All 154 study source/configuration hashes
+remain unchanged; this is still an isolated adapter replay, not a migrated
+campaign or a complete inversion-convergence test.
+
+The [LUT-sharing evidence](evidence/shared_luts/README.md) includes the precise
+integration patch, which passed `git apply --check` against the inspected
+study checkout. The patch enables source adding and the shared copy policy;
+it requires the optimized package and has not been applied to the active study.
+
 ## Integration priorities
 
 1. **Completed in `00e670e1`:** enable surface SIF in equivalent-source adding,
@@ -225,7 +258,7 @@ timings, logs, array hashes and independent NumPy/HDF5 verification.
    only those selected phase derivatives enter the compact RT basis. Forward
    phase evaluation skips the derivative path when a species has no selected
    microphysics. See [the follow-up evidence](evidence/selected_basis/README.md).
-3. Share immutable loaded LUTs across trial-state copies. Cache fixed forward
+3. **LUT sharing implemented and validated in the isolated adapter.** Cache fixed forward
    Mie/truncated Greek/phase-node data across iterations with explicit keys for
    all microphysical, spectral and truncation settings.
 4. Cache repeated initial-state evaluations where the entire forward state is

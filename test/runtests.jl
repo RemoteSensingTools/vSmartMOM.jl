@@ -20,6 +20,7 @@ try
 # Core module tests
 @testset "Absorption" begin include("test_Absorption.jl") end
 @testset "HITRAN cache" begin include("test_hitran_cache.jl") end
+@testset "Parameter copies" begin include("test_copy_parameters.jl") end
 @testset "Absorption column integration" begin include("test_absorption_column_integration.jl") end
 @testset "H2O self broadening" begin include("test_h2o_self_broadening.jl") end
 @testset "Scattering" begin include("test_Scattering.jl") end

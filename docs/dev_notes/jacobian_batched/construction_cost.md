@@ -1,5 +1,13 @@
 # Model construction: spectroscopy reuse and Mie derivatives
 
+For trial templates that already own loaded absorption LUTs, use
+`copy_parameters(params; share_luts=true)` to keep independent mutable state
+without copying the table storage. Shared tables must remain read-only.
+The [Sanghavi replay](suniti_inversions.md#Read-only-LUT-sharing-across-trial-copies)
+measures 8.305 → 5.368 s per complete evaluation and 4.670 → 0.954 GB of host
+allocation with this explicit copy policy. This is separate from parsed-HITRAN
+caching below; state-dependent optical depths are still recomputed.
+
 Before spectroscopy caching, the full-rebuild benchmark paid mostly for
 repeated HITRAN text parsing. Downloaded files were already present, but each constructor called `load_lines`
 again for CO₂, CH₄ and H₂O. Neither constructor supplies a wavelength-window

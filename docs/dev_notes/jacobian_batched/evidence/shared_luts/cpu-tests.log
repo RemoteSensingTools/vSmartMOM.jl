@@ -1,0 +1,9 @@
+Precompiling packages...
+  26184.0 ms  ✓ vSmartMOM
+  13360.3 ms  ✓ vSmartMOM → vSmartMOMCUDAExt
+  2 dependencies successfully precompiled in 41 seconds. 274 already precompiled.
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:14[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:09[K
+Test Summary:                             | Pass  Total   Time
+Trial parameter copies and read-only LUTs |   42     42  18.7s
+Test Summary:                                                | Pass  Total     Time
+Shared LUT model construction preserves tables and Jacobians |   11     11  1m22.3s

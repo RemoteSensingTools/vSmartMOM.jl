@@ -133,6 +133,27 @@ The window `istart_arr[j] ... istop_arr[j]` is the wavenumber sub-range
 where line `j` contributes non-negligibly — pre-computed to avoid evaluating
 distant lines.
 
+## Reusing loaded tables across retrieval trials
+
+A parameter template may own gigabytes of absorption lookup tables. When
+those tables are fixed, use [`copy_parameters`](@ref) to give each trial its
+own mutable state while sharing the table storage:
+
+```julia
+trial = copy_parameters(template; share_luts=true)
+trial.p[end] = new_surface_pressure
+model, lin_model = model_from_parameters(LinMode(), trial)
+```
+
+Atmospheric profiles, gas VMRs, aerosols, surfaces, and the LUT container lists
+are copied. The loaded gas and H₂O tables remain shared and must be treated as
+read-only, including their coefficients, grids and mutable metadata. Replacing
+a table entry in a trial's list does not alter the template. Absorption optical
+depths are still recomputed for each trial's pressure, temperature and abundance;
+this is storage reuse, not reuse of state-dependent opacities. The default
+`copy_parameters(template)` and ordinary `deepcopy(template)` copy table
+storage too.
+
 ## Where `τ_abs` enters the layer-optics pipeline
 
 After the kernel produces ``\sigma(\nu, T, p)`` per layer, multiplication by

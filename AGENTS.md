@@ -184,6 +184,7 @@ material when explaining the package:
 | Phase matrix Z from Greek + μ | `src/Scattering/compute_Z_matrices.jl::compute_Z_moments` |
 | HITRAN absorption | `src/Absorption/compute_absorption_cross_section.jl:32–280` |
 | Shared parsed HITRAN cache (forward, linearized, BatchContext) | `src/CoreRT/tools/hitran_cache.jl`; `clear_spectroscopy_cache!` releases cached ownership; see `docs/dev_notes/jacobian_batched/construction_cost.md` |
+| Independent trial parameters with opt-in read-only absorption LUT sharing | `src/CoreRT/tools/copy_parameters.jl::copy_parameters` |
 | Elemental (r, t, j) | `src/CoreRT/CoreKernel/elemental.jl:207–252` |
 | Doubling (geom series + D-symmetry) | `src/CoreRT/CoreKernel/doubling.jl + rt_helpers.jl:88–122` |
 | Interaction (4 cases) | `src/CoreRT/CoreKernel/interaction.jl:14–136` |

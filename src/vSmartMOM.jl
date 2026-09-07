@@ -115,7 +115,7 @@ export load_sif_spectrum, sif_reference_state, load_ficus_reflectance,
 # Export some vSmartMOM functions
 export default_parameters, parameters_from_file, parameters_from_source,
        parameters_from_yaml, parameters_from_dict,
-       model_from_parameters, rt_run, rt_run_toa, read_parameters,
+       model_from_parameters, copy_parameters, rt_run, rt_run_toa, read_parameters,
        read_atmos_profile, read_atmos_profile_dict,
        ObserverRTResult, LevelRadiance,
        ObserverRTResultLin, LevelRadianceLin,

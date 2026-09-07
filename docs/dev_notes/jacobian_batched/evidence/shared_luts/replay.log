@@ -1,0 +1,16 @@
+PACKAGE /home/cfranken/code/gitHub/vSmartMOM-jacobian-perf/src/vSmartMOM.jl
+PREPARED grids=[2735, 1281, 995]
+COPY_PROBES Dict{Any, Any}("true" => Dict("bytes" => 44832.0, "seconds" => 0.000328017), "false" => Dict("bytes" => 3.715869744e9, "seconds" => 3.19023071))
+WARM mode=copied
+Looping over layers ...  12%|███▌                        |  ETA: 0:02:21[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:20[K
+SAMPLE mode=copied Dict{String, Any}("timing" => Dict("model_build_seconds" => 0.484160443, "forward_seconds" => 5.525287407, "instrument_seconds" => 0.059127400999999996, "jacobian_seconds" => 5.041126964, "rt_linearized_seconds" => 5.041126964), "trial" => 1, "seconds" => 9.3806329, "host_bytes" => 4672400304)
+SAMPLE mode=copied Dict{String, Any}("timing" => Dict("model_build_seconds" => 0.403620936, "forward_seconds" => 5.3947937050000005, "instrument_seconds" => 0.062859469, "jacobian_seconds" => 4.991172769, "rt_linearized_seconds" => 4.991172769), "trial" => 2, "seconds" => 7.893950691, "host_bytes" => 4669975072)
+SAMPLE mode=copied Dict{String, Any}("timing" => Dict("model_build_seconds" => 0.398179244, "forward_seconds" => 5.578075741, "instrument_seconds" => 0.058124576, "jacobian_seconds" => 5.1798964970000005, "rt_linearized_seconds" => 5.1798964970000005), "trial" => 3, "seconds" => 8.304788965, "host_bytes" => 4670103200)
+WARM mode=shared
+Looping over layers ...  69%|███████████████████▎        |  ETA: 0:00:01[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+SAMPLE mode=shared Dict{String, Any}("timing" => Dict("model_build_seconds" => 0.422425729, "forward_seconds" => 5.2584347430000005, "instrument_seconds" => 0.058255751999999994, "jacobian_seconds" => 4.836009014, "rt_linearized_seconds" => 4.836009014), "trial" => 1, "seconds" => 5.367628512, "host_bytes" => 956052248)
+SAMPLE mode=shared Dict{String, Any}("timing" => Dict("model_build_seconds" => 0.416085259, "forward_seconds" => 5.377747116, "instrument_seconds" => 0.061487219999999995, "jacobian_seconds" => 4.961661857, "rt_linearized_seconds" => 4.961661857), "trial" => 2, "seconds" => 5.445260774, "host_bytes" => 954170128)
+SAMPLE mode=shared Dict{String, Any}("timing" => Dict("model_build_seconds" => 0.422582254, "forward_seconds" => 5.295847191, "instrument_seconds" => 0.059747839, "jacobian_seconds" => 4.873264937, "rt_linearized_seconds" => 4.873264937), "trial" => 3, "seconds" => 5.360929588, "host_bytes" => 954111488)
+ISOLATION A -> B -> A
+Looping over layers ...  69%|███████████████████▎        |  ETA: 0:00:01[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+PASS: exact outputs for both states; template and LUT coefficients unchanged.

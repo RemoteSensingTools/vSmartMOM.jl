@@ -170,7 +170,9 @@ include("Surfaces/coxmunk_surface_lin.jl")           # Linearized Cox-Munk (Jaco
 include("component_m_max.jl")
 
 # Functions to export
+include("tools/copy_parameters.jl")
 export model_from_parameters,               # Converting the parameters to model
+       copy_parameters,                    # Trial-state copy with opt-in read-only LUT sharing
        model_from_parameters_lin,           # Convenience alias for linearized model
        rt_run, rt_run_toa, rt_run_lin, rt_run_ss, # Run RT (forward, TOA-only, linearized, single scatter)
        rt_run_ss_exact,                     # Exact (untruncated, real-space) first-order reference

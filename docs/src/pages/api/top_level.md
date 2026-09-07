@@ -13,6 +13,7 @@ vSmartMOM.parameters_from_source
 vSmartMOM.parameters_from_dict
 vSmartMOM.parameters_from_yaml
 vSmartMOM.default_parameters
+vSmartMOM.copy_parameters
 ```
 
 ## Model Construction and Solver Entry Points
