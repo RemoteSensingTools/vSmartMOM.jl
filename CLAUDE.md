@@ -33,7 +33,7 @@ julia --project=test -e 'using vSmartMOM; include("test/test_Scattering.jl")'
 julia --project=test -e 'using Pkg; Pkg.test()'
 ```
 
-No linter or formatter configured. Julia compatibility: 1.9-1.12.
+No linter or formatter configured. Julia compatibility: 1.10-1.12.
 
 ## Architecture
 
@@ -57,7 +57,7 @@ YAML/TOML/Dict
     → read_parameters()        → vSmartMOM_Parameters   (unified entry point)
     → model_from_parameters()  → RTModel
     → rt_run(model)            → ObserverRTResult (named endpoint/level radiances)
-    → rt_run_toa(model)        → TOA upwelling only (default external-solar SFI)
+    → rt_run_toa(model)        → TOA upwelling only (opt-in external-solar SFI)
 ```
 
 `parameters_from_yaml(path)` is the YAML-specific alias and still works; use `read_parameters` for TOML or `Dict` inputs.
@@ -67,21 +67,24 @@ forward tuple, so `R, T = rt_run(model)` still binds TOA upwelling and BOA
 downwelling. Interior-height radiances are available through
 `result.levels`.
 
-`rt_run_toa` requires `model.quad_points.external_solar == true`. In this
-default Gauss/SFI representation, scalar `μ₀` is excluded from the diffuse
+`rt_run_toa` requires `model_from_parameters(...; external_solar=true)`;
+this constructor keyword is not a YAML setting. In this optional Gauss/SFI
+representation, scalar `μ₀` is excluded from the diffuse
 operator and evaluated through rectangular direct-beam phase/operator columns.
 The path supports elastic `noRS`, analytic elastic linearization, and forward
 rotational Raman `RRS` with Lambertian surfaces. It does not allocate or
 postprocess BOA, HDR, or BHR, and it does not support Raman linearization,
 VRS, `rt_run_ss`, non-Lambertian, or interior-sensor runs.
-The embedded-`μ₀` representation remains available through
-`external_solar=false`; unsupported paths reject external-solar models rather
+The embedded-`μ₀` representation remains the default
+(`external_solar=false`); unsupported paths reject external-solar models rather
 than falling back silently.
 
 Linearized variant: `model_from_parameters(LinMode(), params)` then
 `rt_run(model, lin_model, NAer, NGas, NSurf)` returns an
 `ObserverRTResultLin`. It remains iterable as `(R, T, dR, dT)` and exposes
 strict-interior radiances/Jacobians through `result.levels`.
+For external-solar elastic Jacobians, use this same linearized `rt_run`
+entry point; it returns TOA fields and `nothing` for unavailable BOA fields.
 
 ### RTModel Hierarchy (Oceananigans-style)
 

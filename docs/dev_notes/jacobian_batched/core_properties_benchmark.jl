@@ -32,11 +32,10 @@ function main()
     delete!(cfg,"absorption"); delete!(cfg,"scattering")
     cfg["radiative_transfer"]["architecture"] = use_gpu ? "GPU()" : "CPU()"
     cfg["radiative_transfer"]["polarization_type"] = get(ENV,"AUDIT_POL","IQU") == "I" ? "Stokes_I()" : "Stokes_IQU()"
-    cfg["radiative_transfer"]["external_solar"] = false
     cfg["geometry"]["vaz"] = [0.0,parse(Float64,get(ENV,"AUDIT_AZIMUTH","0"))]
     par=read_parameters(cfg)
     par.spec_bands[1]=collect(range(12987.,13000.;length=ns))
-    model=quiet(()->model_from_parameters(par))
+    model=quiet(()->model_from_parameters(par;external_solar=false))
     pol=C.polarization_type(model); q=model.quad_points
     n=length(q.qp_μN); nz=5; FT=Float64
     rs=vSmartMOM.InelasticScattering.noRS{FT}()

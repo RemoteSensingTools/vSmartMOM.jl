@@ -205,12 +205,15 @@ is shaped as it is:
    matrix-operator Eqs. (23)–(28) instead of (23)–(33), at the cost of
    Block-Radau (App. B) for exact off-quadrature solar geometry. The current
    solver implements Fell-style SFI in both angular representations. In the
-   default external form, `μ₀` is a scalar and exact phase-source column, not a
-   diffuse stream. The lean
-   `rt_run_toa` path is presently Gauss + Lambertian + noRS only and does not
-   construct BOA/HDR/BHR outputs. Legacy embedded-`μ₀` behavior remains the
-   default; linearized, Raman/VRS, non-Lambertian, single-scatter-only, and
-   interior-sensor paths require it and reject external-solar models.
+   optional external form, `μ₀` is a scalar and exact phase-source column
+   outside the diffuse streams. Enable it with the constructor keyword
+   `model_from_parameters(...; external_solar=true)`, not a YAML entry.
+   The Gauss + Lambertian `rt_run_toa` path supports elastic and forward
+   rotational Raman `RRS`; elastic Jacobians use linearized `rt_run`.
+   These paths do not construct BOA/HDR/BHR outputs. Embedded-`μ₀` behavior
+   remains the default; Raman Jacobians, VRS, non-Lambertian,
+   single-scatter-only, and interior-sensor paths require it and reject
+   external-solar models.
    → Concepts/02 + Concepts/04.
 2. **Constant-`N_doubl` across the spectral grid** (SF2023-II §3.2,
    Eqs. 8–9). `N_doubl` is sized by the scattering optical depth, not the
