@@ -367,3 +367,16 @@ one linear factor removed. Dividing j by ϖ or ZF₀ and substituting zero for
 reflection/transmission partials in (10). The boundary regression compares
 these derivatives to independent forward-kernel finite differences at zero
 albedo, zero thickness and a zero projected phase entry.
+
+### Equivalent-source tangent adding (opt-in)
+
+`CoreKernel/source_adding_lin.jl` applies S2014 (C.6) to each complete doubled
+layer at fixed incident fields: `f⁻=dr⁻⁺D+dt⁻⁻U+dj⁻`, with the corresponding
+downward expression. A backward interface solve supplies D,U; S2014 (27)–(28)
+/ SF2023-II (12) then propagate these equivalent sources through fixed forward
+operators. Local forcing vectors are contracted to retrieval columns before
+this source solve. Solar attenuation above each layer is restored once as
+`−j dτ_above/μ₀`. The Lambertian boundary uses only its own albedo directions
+and appends the full-column solar tangent once. This ordering is a derivation
+of the affine adding equations, not an attribution to the historical code.
+See [source adding](jacobian_batched/source_adding.md) for scope and memory cost.

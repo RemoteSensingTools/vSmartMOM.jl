@@ -28,7 +28,16 @@ runs.
 
 - **`n_ref`** — `Complex`. Reference refractive index for the AOD
   normalization. Defaults to the first aerosol's `(nᵣ, nᵢ)` if
-  omitted.
+  omitted. Once parsed, this is fixed configuration shared by all aerosol
+  modes; changing a mode's refractive index does not change `n_ref`.
+  Forward and analytic runs use the same reference extinction, evaluated
+  with each mode's size distribution and the common `n_ref`. Size derivatives
+  therefore include the reference-extinction derivative; refractive-index
+  derivatives hold `n_ref` fixed. When rebuilding a configuration for finite
+  differences, set `n_ref` explicitly to its baseline value.
+  The AOD scale is `k(λ)/k_ref` throughout the band, including at `λ_ref`.
+  If a mode's actual refractive index differs from `n_ref`, that scale need
+  not equal one at `λ_ref`; no separate unity interpolation anchor is imposed.
 
 ## Per-aerosol fields
 

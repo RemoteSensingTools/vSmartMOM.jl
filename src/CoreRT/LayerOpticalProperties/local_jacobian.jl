@@ -23,7 +23,8 @@ end
     local_phase_basis(rayleigh, aerosol_blocks)
 
 Shared matrix directions `[0, 0, Z₁-Zᵣ, dZ₁/dnᵣ₁, …]`, with the four
-microphysical directions ordered as `(nᵣ, nᵢ, rₘ, σ_g)`. The Rayleigh reference
+microphysical directions ordered as `(nᵣ, nᵢ, μ_logr, σ_logr)`, where the size
+coordinates are those of `LogNormal(μ_logr, σ_logr)`. The Rayleigh reference
 is independent of layer height, so this array is built only once per Fourier
 order. See [`build_local_jacobian_cache`](@ref) for the mixture derivative.
 Each microphysical tangent differentiates the **truncated** phase matrix.
@@ -63,8 +64,8 @@ end
 
 Attach one shared phase basis to the Fourier-independent scalar chain rule.
 All layers reuse the same local optical seeds. No phase tensor is allocated
-with a retrieval-column dimension; the RT driver contracts complete doubled
-operator tangents at the boundary to atmospheric adding.
+with a retrieval-column dimension. After doubling, matrix adding contracts
+complete operator tangents; source adding contracts equivalent-source vectors.
 """
 function construct_local_optical_jacobians(rs, band, m, model, lin_model,
                                          cache::LocalOpticalJacobianCache)

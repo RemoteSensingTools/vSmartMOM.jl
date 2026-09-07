@@ -112,6 +112,12 @@ end
         surface_columns=5:5)
     plan = JacobianPlan(OCO_RRS_synth(), keys, names, [layout])
     selected = rt_run(model, PlannedRTModelLin(lin_model, plan); i_band=1)
+    selected_source = rt_run(model, PlannedRTModelLin(lin_model, plan);
+        i_band=1, jacobian_basis=:local, jacobian_adding=:source)
+    @test selected_source.toa ≈ selected.toa rtol=2e-10 atol=1e-12
+    @test selected_source.toa_jacobian ≈ selected.toa_jacobian rtol=2e-10 atol=1e-12
+    @test parameter_names(selected_source.layout) == parameter_names(selected.layout)
+
 
     # BatchContext changes aerosol loading/profile while reusing identical
     # forward Mie optics, keeping these central differences independent of the

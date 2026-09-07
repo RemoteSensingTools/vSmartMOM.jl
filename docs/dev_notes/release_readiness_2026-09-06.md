@@ -45,6 +45,19 @@ Required remedy: define reference-index semantics once and share the forward cal
 
 Evidence: [probes.jl](release_audit_2026_09_06/probes.jl), [extra_probes.jl](release_audit_2026_09_06/extra_probes.jl).
 
+**Jacobian subbranch update:** the full analytic constructor now honors the
+same fixed common `n_ref` as the forward and selective constructors. Reference
+extinction keeps its size derivatives and has zero derivatives with respect
+to the retrieved aerosol index. An additional inconsistency was found during
+Float32 validation: the AOD interpolation forced unity at an interior `λ_ref`
+even for different reference and actual indices, producing negative optical
+depths near a band endpoint. The scale now consistently uses `k(λ)/k_ref`,
+and near-duplicate reference phase knots are omitted at grid precision.
+Independent constructor parity and refractive-index/size finite differences
+are covered in `test/test_aerosol_reference.jl`; Float32 two-mode coverage is
+in `test/test_source_adding.jl`. The original candidate result above remains
+historical; the integration branch has not been changed by this local fix.
+
 ### R2 — Cox–Munk adds glint with no illumination and violates solar scaling (P1)
 
 Locations: `src/CoreRT/rt_run.jl:809`, `src/CoreRT/rt_run_split.jl:435`, `src/CoreRT/Surfaces/coxmunk_surface.jl:509`.

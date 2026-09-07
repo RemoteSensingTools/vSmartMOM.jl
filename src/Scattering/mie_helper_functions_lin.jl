@@ -232,6 +232,10 @@ function reconstruct_phase(greek_coefs, lin_greek_coefs, μ; returnLeg=false)
     return returnLeg ? (scattering_matrix, lin_scattering_matrix, P, P²) : (scattering_matrix, lin_scattering_matrix, nothing, nothing)
 end
 
+# LogNormal's native coordinates are μ=log(median radius), σ=log(geometric
+# width). For its density f(r), ∂f/∂μ = f(log r-μ)/σ² and
+# ∂f/∂σ = f[(log r-μ)²/σ³-1/σ]. These are the two size directions
+# returned by the Mie Jacobian; they are not derivatives of exp(μ), exp(σ).
 function compute_wₓ(lin::LinMode, size_distribution, wᵣ, r, r_max)
 
     wₓ = pdf.(size_distribution,r)      # Weights from distribution
@@ -243,9 +247,13 @@ function compute_wₓ(lin::LinMode, size_distribution, wᵣ, r, r_max)
     ẇₓ[1,:] .*= wᵣ
     ẇₓ[2,:] .*= wᵣ
 
-    wₓ /= sum(wₓ)
-    for ctr = 1:2
-        ẇₓ[ctr,:] .= ẇₓ[ctr,:]./sum(wₓ) .- (sum(ẇₓ[ctr,:]) * wₓ)./(sum(wₓ)^2)
+    # For raw quadrature weights u and S=Σu, w=u/S gives
+    # dw=(du-w Σdu)/S. Save S before normalizing; replacing it by Σw=1
+    # incorrectly scales size tangents when r_max cuts a distribution's tail.
+    normalization = sum(wₓ)
+    wₓ /= normalization
+    for ctr in 1:2
+        @views ẇₓ[ctr,:] .= (ẇₓ[ctr,:] .- sum(ẇₓ[ctr,:]) .* wₓ) ./ normalization
     end
     @debug "Fraction of size distribution cut by max radius: $((1-cdf.(size_distribution,r_max))*100) %"
 

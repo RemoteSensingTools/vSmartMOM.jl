@@ -1,6 +1,7 @@
 # Batched Jacobian propagation
 
-Latest investigation: [local optical basis and remaining adding cost](local_basis.md).
+Latest implementation: [equivalent-source adding and spectral phase costs](source_adding.md).
+Local optical basis: [factorization and remaining adding cost](local_basis.md).
 Previous investigation: [IQU bottlenecks and core-optics cost](iqu_followup.md).
 Scientific review: [core derivatives, truncation and state-vector scaling](paper_review.md).
 Historical implementation: [Fortran ordering and ideas retained for Julia](fortran_ordering.md).
@@ -278,3 +279,6 @@ extending the current gate.
 Reuse of upstream Mie/phase tangents and more general active layouts remain
 separate opportunities. Each extension needs parity and finite-difference checks
 as well as warmed runtime, allocation and launch-count measurements.
+
+The opt-in [equivalent-source adding path](source_adding.md) integrates local
+forcing vectors with Lambertian surface derivatives in the normal RT driver.

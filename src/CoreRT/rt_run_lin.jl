@@ -41,6 +41,9 @@ physical parameters via the linearized Matrix Operator Method.
 - `NGas::Int`: Number of layer-resolved gas VMR parameters (`NGasSpecies×Nz`).
 - `NSurf::Int`: Number of surface parameters (typically 1 for Lambertian albedo).
 - `i_band::Integer=1`: Spectral band index.
+- `jacobian_adding=:matrix`: Use established matrix-tangent adding. Opt in to
+  `:source` with a local basis for solar/Lambertian endpoint solves; atmospheric
+  adding then propagates equivalent-source vectors instead of matrix tangents.
 - `jacobian_basis=:auto`: Double a local optical basis when smaller than the
   atmospheric retrieval layout. `:physical` propagates retrieval columns
   directly; `:local` forces the local basis for a single-band solve.
@@ -54,7 +57,7 @@ radiances and Jacobians at requested strict-interior observer heights.
 The `Nparams` derivative dimension is ordered as:
 1. **Surface pressure** `p_surf` (hPa): column 1.
 2. **Aerosol sub-parameters** (7 per aerosol type):
-   `[τ_ref, nᵣ, nᵢ, rₘ, σᵣ, profile_location, profile_width]` for each
+   `[τ_ref, nᵣ, nᵢ, μ_logr, σ_logr, profile_location, profile_width]` for each
    aerosol. The profile pair is `(p₀, σp)` for
    `Normal` and `(z₀, σ₀)` for `LogNormal`.
 3. **Gas VMR parameters**, species-major with all `Nz` layers for each gas.
@@ -93,8 +96,9 @@ function rt_run(model,
         NAer::Int, NGas::Int, NSurf::Int;
         i_band::Integer = 1,
         sources::Union{Nothing, AbstractSource} = nothing,
-        jacobian_basis::Symbol=:auto)
-    rt_run(InelasticScattering.noRS{float_type(model)}(), model, lin_model, NAer, NGas, NSurf, i_band; sources, jacobian_basis)
+        jacobian_basis::Symbol=:auto,
+        jacobian_adding::Symbol=:matrix)
+    rt_run(InelasticScattering.noRS{float_type(model)}(), model, lin_model, NAer, NGas, NSurf, i_band; sources, jacobian_basis, jacobian_adding)
 end
 
 """
@@ -107,8 +111,9 @@ rt_run_lin(model, lin_model,
            NAer::Int, NGas::Int, NSurf::Int;
            i_band::Integer = 1,
            sources::Union{Nothing,AbstractSource} = nothing,
-           jacobian_basis::Symbol=:auto) =
-    rt_run(model, lin_model, NAer, NGas, NSurf; i_band, sources, jacobian_basis)
+           jacobian_basis::Symbol=:auto,
+           jacobian_adding::Symbol=:matrix) =
+    rt_run(model, lin_model, NAer, NGas, NSurf; i_band, sources, jacobian_basis, jacobian_adding)
 
 """
     rt_run(model, lin_model::PlannedRTModelLin; i_band=1, sources=nothing)
@@ -121,21 +126,23 @@ returned band-local Jacobian into the shared retrieval state.
 function rt_run(model, lin_model::PlannedRTModelLin;
                 i_band::Integer=1,
                 sources::Union{Nothing,AbstractSource}=nothing,
-                jacobian_basis::Symbol=:auto)
+                jacobian_basis::Symbol=:auto,
+                jacobian_adding::Symbol=:matrix)
     layout = band_layout(lin_model.plan, i_band)
     NAer = CoreRT.n_aerosols(model)
     NGas = size(lin_model.base.τ̇_abs[i_band], 1)
     NSurf = surface_parameter_count(get_surface(model, i_band))
     return rt_run(InelasticScattering.noRS{float_type(model)}(),
                   model, lin_model.base, NAer, NGas, NSurf, i_band;
-                  sources, active_layout=layout, jacobian_basis)
+                  sources, active_layout=layout, jacobian_basis, jacobian_adding)
 end
 
 rt_run_lin(model, lin_model::PlannedRTModelLin;
            i_band::Integer=1,
            sources::Union{Nothing,AbstractSource}=nothing,
-           jacobian_basis::Symbol=:auto) =
-    rt_run(model, lin_model; i_band, sources, jacobian_basis)
+           jacobian_basis::Symbol=:auto,
+           jacobian_adding::Symbol=:matrix) =
+    rt_run(model, lin_model; i_band, sources, jacobian_basis, jacobian_adding)
 
 # Just to make sure we still have it:
 function rt_run_test(RS_type::AbstractRamanType,
@@ -156,7 +163,8 @@ function rt_run(RS_type::AbstractRamanType,
                     iBand;
                     sources::Union{Nothing, AbstractSource} = nothing,
                     active_layout::Union{Nothing,ActiveParameterLayout} = nothing,
-                    jacobian_basis::Symbol = :auto)
+                    jacobian_basis::Symbol = :auto,
+                    jacobian_adding::Symbol = :matrix)
     if InelasticScattering.has_inelastic(RS_type)
         throw(ArgumentError(
             "Linearized Raman-active RT is intentionally unsupported. " *
@@ -285,24 +293,33 @@ function rt_run(RS_type::AbstractRamanType,
     @info msg
 
     local_basis = use_local_jacobian(jacobian_basis, layout, iBand, NAer)
-    local_workspace = local_basis ? make_local_jacobian_workspace(
+    source_adding = use_source_adding(jacobian_adding,model,effective_sources,SFI,local_basis,brdf)
+    local_workspace = local_basis && !source_adding ? make_local_jacobian_workspace(
         RS_type, FT, arr_type, local_jacobian_size(NAer), dims, nSpec,
         quad_points, pol_type) : nothing
 
     # Create arrays
     @timeit "Creating layers" added_layer, added_layer_lin          = 
-        make_added_layer(lin, RS_type, FT, arr_type, Nparams, dims, nSpec;
+        make_added_layer(lin, RS_type, FT, arr_type,
+                         source_adding ? local_jacobian_size(NAer) : Nparams, dims, nSpec;
                          external_solar=quad_points.external_solar,
-                         nStokes=pol_type.n, doubling_scratch=!local_basis,
-                         core_partials=!local_basis)
+                         nStokes=pol_type.n, doubling_scratch=source_adding || !local_basis,
+                         core_partials=source_adding || !local_basis)
     # Just for now, only use noRS here
 
     @timeit "Creating layers" added_surface_layer, added_surface_layer_lin = 
-        make_added_layer(lin, RS_type, FT, arr_type, Nparams, dims, nSpec;
+        make_added_layer(lin, RS_type, FT, arr_type,
+                         source_adding ? NSurf : Nparams, dims, nSpec;
                          external_solar=quad_points.external_solar,
-                         nStokes=pol_type.n, doubling_scratch=false)
-    @timeit "Creating layers" composite_layer, composite_layer_lin  = 
-        make_composite_layer(lin, RS_type, FT, arr_type, Nparams, dims, nSpec)
+                         nStokes=pol_type.n, doubling_scratch=false,
+                         core_partials=!source_adding)
+    source_workspace = source_adding ? make_source_adding_workspace(
+        added_layer,added_layer_lin,Nparams,NSurf,Nz,arr_type) : nothing
+    @timeit "Creating layers" composite_layer, composite_layer_lin = if source_adding
+        (make_composite_layer(RS_type,FT,arr_type,dims,nSpec),source_workspace.result)
+    else
+        make_composite_layer(lin,RS_type,FT,arr_type,Nparams,dims,nSpec)
+    end
     # Each interior observer owns two ordinary forward/tangent composites:
     # the atmosphere above it and the atmosphere below it. Reusing the
     # production CompositeLayer types means every per-layer Jacobian continues
@@ -400,20 +417,19 @@ function rt_run(RS_type::AbstractRamanType,
             @timeit "OpticalProps" layer_opt, layer_opt_lin = 
                 expandOpticalProperties(layer_opt_props[iz], layer_opt_props_lin[iz], arr_type)
             # Perform Core RT (doubling/elemental/interaction)
-            rt_kernel!(RS_type::noRS, pol_type, SFI,
-                        #bandSpecLim,
-                        added_layer, added_layer_lin,
-                        composite_layer, composite_layer_lin,
-                        layer_opt, layer_opt_lin,
-                        scattering_interfaces_all[iz],
-                        τ_sum_all[:,iz], τ̇_sum_all[:,:,iz],
-                        m, quad_points,
-                        I_static,
-                        CoreRT.architecture(model),
-                        qp_μN, iz;
-                        dτ_max_threshold=dτ_max_threshold,
-                        dτ_min_floor=dτ_min_floor,
-                        local_workspace=local_workspace)
+            if source_adding
+                source_adding_layer!(source_workspace,iz,composite_layer,
+                    added_layer,added_layer_lin,RS_type,pol_type,layer_opt,layer_opt_lin,
+                    τ_sum_all[:,iz],m,quad_points,I_static,CoreRT.architecture(model),
+                    scattering_interfaces_all[iz];dτ_max_threshold,dτ_min_floor)
+            else
+                rt_kernel!(RS_type::noRS, pol_type, SFI,
+                    added_layer, added_layer_lin, composite_layer, composite_layer_lin,
+                    layer_opt, layer_opt_lin, scattering_interfaces_all[iz],
+                    τ_sum_all[:,iz], τ̇_sum_all[:,:,iz], m, quad_points,
+                    I_static, CoreRT.architecture(model), qp_μN, iz;
+                    dτ_max_threshold, dτ_min_floor, local_workspace)
+            end
 
             # Reuse the completed current added layer to grow the two
             # subcolumns belonging to every interior observer. The top
@@ -458,8 +474,8 @@ function rt_run(RS_type::AbstractRamanType,
         # at the first surface slot, regardless of which atmospheric band this
         # rt_run call is processing. (Earlier code passed `iBand` here, which
         # blew through the surface block when iBand>1.)
-        iparam = brdf isa LambertianSurfaceLegendre ?
-                 surface_range(layout) : surface_index(layout, 1)
+        surface_columns = source_adding ? (1:NSurf) : surface_range(layout)
+        iparam = brdf isa LambertianSurfaceLegendre ? surface_columns : first(surface_columns)
         create_surface_layer!(RS_type, brdf, #brdf_lin,
                             added_surface_layer,
                             added_surface_layer_lin,
@@ -468,7 +484,8 @@ function rt_run(RS_type::AbstractRamanType,
                             pol_type,
                             quad_points,
                             arr_type(τ_sum_all[:,end]),
-                            arr_type(τ̇_sum_all[:,:,end]),
+                            source_adding ? source_workspace.surface_zero_above :
+                                arr_type(τ̇_sum_all[:,:,end]),
                             arr_type(F₀),
                             CoreRT.architecture(model));
 
@@ -496,14 +513,20 @@ function rt_run(RS_type::AbstractRamanType,
                          added_surface_layer, added_surface_layer_lin, I_static)
         end
         
-        @timeit "interaction" interaction!(#RS_type,
-                                    #bandSpecLim,
-                                    scattering_interfaces_all[end], 
-                                    SFI, 
-                                    #computed_layer_properties, computed_layer_properties_lin, 
-                                    composite_layer, composite_layer_lin,
-                                    added_surface_layer, added_surface_layer_lin,
-                                    I_static)
+        if source_adding
+            # Surface closure uses the same forward operator and physical
+            # surface tangents as matrix adding; atmosphere adds only vectors.
+            interaction!(scattering_interfaces_all[end],SFI,composite_layer,
+                added_surface_layer,I_static)
+            source_incident_fields!(source_workspace,added_surface_layer,I_static)
+            source_adding_tangents!(source_workspace,added_surface_layer,
+                added_surface_layer_lin,layer_opt_props_lin,τ̇_sum_all,quad_points,arr_type,
+                surface_range(layout))
+        else
+            @timeit "interaction" interaction!(scattering_interfaces_all[end], SFI,
+                composite_layer, composite_layer_lin,
+                added_surface_layer, added_surface_layer_lin, I_static)
+        end
 
         # Postprocess and weight according to vza
         postprocessing_vza!(RS_type, 

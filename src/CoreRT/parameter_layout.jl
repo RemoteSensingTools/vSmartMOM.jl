@@ -8,8 +8,12 @@ Describes the ordering of physical parameters in the Jacobian derivative dimensi
 
 Instead of hardcoding `1 + 7*NAer + NGas + NSurf` throughout the codebase, all index
 arithmetic goes through this struct. Each aerosol carries `aerosol_params`
-sub-parameters (currently 7: `τ_ref, nᵣ, nᵢ, rₘ, σ_g`, profile location,
+sub-parameters (currently 7: `τ_ref, nᵣ, nᵢ, μ_logr, σ_logr`, profile location,
 profile width), followed by the layer-resolved gas VMR columns and surface parameters.
+The native size columns differentiate `LogNormal(μ_logr, σ_logr)`: the YAML
+median radius and geometric width are `exp(μ_logr)` and `exp(σ_logr)`.
+Convert to derivatives with respect to those YAML values by dividing the native
+columns by the median radius and geometric width, respectively.
 Gas columns are flattened species-major: all TOA-to-BOA layers for gas 1,
 then all layers for gas 2, and so on. Surface parameters are followed by the
 optional two-column SIF block `[SIF755, slope]`, then canopy parameters.

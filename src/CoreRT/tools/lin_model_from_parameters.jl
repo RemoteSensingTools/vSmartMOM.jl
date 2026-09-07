@@ -387,32 +387,22 @@ function model_from_parameters(lin::LinMode,
             params.polarization_type, truncation_type, scat.r_max, scat.nquad_radius;
             architecture = Architectures.CPU())
 
-        # k_ref normalization at λ_ref uses the aerosol's own nᵣ/nᵢ so the Jacobian
-        # chain w.r.t. nᵣ/nᵢ stays intact — the FD test perturbs the aerosol's nᵣ, and a
-        # fixed-n_ref k_ref would zero ∂k_ref/∂nᵣ. For the common case (n_ref unset →
-        # defaults to the aerosol's own index) this equals the forward path's k_ref value.
-        # KNOWN LIMITATION: for an explicit n_ref that differs from the aerosol's index,
-        # the linearized forward/Jacobian normalization uses the aerosol index here while
-        # the non-linear forward uses n_ref — a small inconsistency for that niche config.
+        # Use the same AOD convention as the forward constructor:
+        # q(λ) = k(λ; n, size) / k_ref(λ_ref; n_ref, size).
+        # n_ref is fixed configuration (even when the parser initialized it
+        # from aerosol 1). Thus ∂k_ref/∂n = 0, while its size derivatives
+        # remain in the quotient rule. See the aerosols schema for the contract.
+        ref_aerosol = Aerosol(size_distribution, real(scat.n_ref), -imag(scat.n_ref))
+        mie_model_ref = make_mie_model(
+            scat.decomp_type, ref_aerosol, scat.λ_ref,
+            params.polarization_type, truncation_type,
+            scat.r_max, scat.nquad_radius; architecture=Architectures.CPU())
         if compute_aerosol_microphysics_jacobians
-            mie_model_ref_lin = _mie(scat.λ_ref)
             k_ref, k̇_ref = compute_ref_aerosol_extinction(
-                lin, mie_model_ref_lin, params.float_type)
+                lin, mie_model_ref, params.float_type)
+            k̇_ref[1:2] .= 0  # The reference index is not a retrieved aerosol index.
         else
-            # The selective OCO plan fixes aerosol microphysics. Match the
-            # nonlinear forward constructor exactly: its AOD reference
-            # normalization uses the configured common `n_ref`, not each
-            # aerosol's in-band refractive index. This distinction matters for
-            # species 2/3 and is required for truth/linearized-forward closure.
-            ref_aerosol = Aerosol(size_distribution,
-                                  real(scat.n_ref), -imag(scat.n_ref))
-            mie_model_ref = make_mie_model(
-                scat.decomp_type, ref_aerosol, scat.λ_ref,
-                params.polarization_type, truncation_type,
-                scat.r_max, scat.nquad_radius;
-                architecture=Architectures.CPU())
-            k_ref = compute_ref_aerosol_extinction(
-                mie_model_ref, params.float_type)
+            k_ref = compute_ref_aerosol_extinction(mie_model_ref, params.float_type)
             k̇_ref = zeros(FT2, 4)
         end
 
@@ -466,7 +456,7 @@ function model_from_parameters(lin::LinMode,
                 ν_spec = FT2.(params.spec_bands[i_band])
                 ν_ref_phase = FT2(1e4) / scat.λ_ref
                 endpoint_ref = lin_endpoint_ref = nothing
-                if first(extrema(anchor_ν)) < ν_ref_phase < last(extrema(anchor_ν))
+                if _interior_reference_node(anchor_ν, ν_ref_phase)
                     @timeit "Mie calc" aerosol_optics_raw_ref, lin_aerosol_optics_raw_ref =
                         aerosol_pair(scat.λ_ref)
                     endpoint_ref, lin_endpoint_ref = truncate_endpoint(
@@ -510,21 +500,11 @@ function model_from_parameters(lin::LinMode,
             ν_ref = FT2(1e4) / scat.λ_ref
             aod_scale = _aod_spectral_scale(ν_spec, k_band, k_ref, ν_ref)
             aod_scale_dot = zeros(FT2, 4, length(ν_spec))
-            if first(extrema(ν_spec)) < ν_ref < last(extrema(ν_spec))
-                for ctr in 1:4
-                    q̇₀ = k̇_band[ctr, 1] / k_ref -
-                          k_band[1] * k̇_ref[ctr] / k_ref^2
-                    q̇₁ = k̇_band[ctr, end] / k_ref -
-                          k_band[end] * k̇_ref[ctr] / k_ref^2
-                    aod_scale_dot[ctr, :] .= _natural_cubic_three(
-                        ν_spec, [first(ν_spec), ν_ref, last(ν_spec)],
-                        [q̇₀, zero(FT2), q̇₁])
-                end
-            else
-                for ctr in 1:4
-                    aod_scale_dot[ctr, :] .= k̇_band[ctr, :] ./ k_ref .-
-                        k_band .* k̇_ref[ctr] ./ k_ref^2
-                end
+            # Interpolation is already part of k_band and k̇_band. Apply the
+            # same quotient rule at every wavelength, including λ_ref.
+            for ctr in 1:4
+                aod_scale_dot[ctr, :] .= k̇_band[ctr, :] ./ k_ref .-
+                    k_band .* k̇_ref[ctr] ./ k_ref^2
             end
 
             # Match the production forward profile discretization exactly.

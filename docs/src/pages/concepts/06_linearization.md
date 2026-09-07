@@ -17,7 +17,7 @@ ForwardDiff used *only* upstream at the optical-property boundary.
 
 ```
    State parameters x:                ForwardDiff
-   τ_ref, n_r, n_i, r_m, σ_g,    ──────(upstream)──────►
+   τ_ref, n_r, n_i, μ_logr, σ_logr,    ──────(upstream)──────►
    VMR, BRDF, ...
 
            CoreScatteringOpticalPropertiesLin per layer
@@ -120,8 +120,8 @@ step. Its tangent follows directly from the inverse rule:
 The positive sign comes from differentiating ``\mathbf{E}-\mathbf{R}\mathbf{R}``.
 The same forward inverse is reused for every supplied tangent direction.
 Doubling uses local optical directions when they are fewer than retrieval
-columns. Adding still requires matrix products and source propagation for
-each retrieval column. The total cost depends on the number of
+columns. Default matrix adding still propagates matrix tangents for each
+retrieval column; the opt-in source path below propagates vectors. The total cost depends on the number of
 requested columns, operator size, spectral batch, precision and backend;
 there is no universal ratio to the forward-only runtime.
 
@@ -140,6 +140,19 @@ single-band solve whenever it reduces the atmospheric tangent dimension.
 Use `:physical` to retain direct physical-column propagation for comparison,
 or `:local` to force the factored path. Multi-band concatenated solves retain
 the physical path; `:local` rejects them explicitly.
+
+For solar illumination over Lambertian surfaces, the opt-in
+`jacobian_adding=:source` path converts local doubled matrix tangents into
+source perturbations at the full-column incident fields. It contracts those
+vectors to retrieval columns and propagates them through fixed forward
+operators. This removes retrieval-sized matrix tangents from atmospheric
+adding and surface closure; source vectors and outputs still grow with the
+number of requested columns. Use it with `jacobian_basis=:local`. It supports
+endpoint observers only and retains external solar's TOA-only contract.
+The default `jacobian_adding=:matrix` keeps the established general path.
+The new path caches local layer tangents for a backward illumination pass,
+so memory still grows with layer count and spectral batch size.
+
 
 Sanghavi et al. (2014), (C.25)–(C.26), factor microphysical derivatives through
 ``(τ_i,ω_i,Z_i,f_i)``; their truncation symbol ``β_i`` is the code's ``f^t``,
@@ -209,7 +222,7 @@ The full derivation is Sanghavi 2014 App. C. The structure (skipping arithmetic)
 | (C.17)–(C.20) | D-matrix symmetry on derivatives — halves the linearized doubling cost | `doubling_lin.jl` |
 | (C.21) | Final assembled derivative form — written directly by `get_elem_rt_fused!` / `get_elem_rt_SFI_fused!` into the `ap_*` arrays during the elemental step | `elemental_fused_lin.jl` |
 | (C.22)–(C.24) | Layer-averaged ``\bar{\tau}``, ``\bar{\varpi}_0``, ``\bar{\mathbf{Z}}`` definitions | `compEffectiveLayerProperties.jl` (forward); `compEffectiveLayerProperties_lin.jl` (lin) |
-| (C.25)–(C.26) | Chain rule from the elemental SS variables to the microphysical parameters ``(n_r, n_i, r_m, \sigma)`` | `elemental_fused_lin.jl` + `Scattering/types_lin.jl` |
+| (C.25)–(C.26) | Chain rule from the elemental SS variables to the microphysical parameters ``(n_r, n_i, μ_{logr}, σ_{logr})`` | `elemental_fused_lin.jl` + `Scattering/types_lin.jl` |
 | (C.27)–(C.31) | δ derivatives (elemental thickness from `N_doubl`) | `compEffectiveLayerProperties_lin.jl` |
 | (C.32)–(C.39) | ``\bar{\varpi}_0`` and ``\bar{\mathbf{Z}}`` derivatives (post-truncation) | same |
 | (C.40) | ``\dot{\mathbf{Z}}_m`` from generalized spherical harmonics | `compute_Z_matrices_lin.jl` |
@@ -229,7 +242,7 @@ is centralized in [`src/CoreRT/parameter_layout.jl:1–67`](https://github.com/R
 ```julia
 struct ParameterLayout
     n_atmosphere::Int      # = 1   (p_surf)
-    aerosol_params::Int     # = 7   (τ_ref, n_r, n_i, r_m, σ_g, profile location/width)
+    aerosol_params::Int     # = 7   (τ_ref, n_r, n_i, μ_logr, σ_logr, profile location/width)
     n_aerosols::Int
     n_gases::Int
     n_surface::Int
@@ -255,8 +268,8 @@ parameters per mode follow:
 | 1 | `τ_ref` | aerosol optical depth at reference wavelength |
 | 2 | `n_r`   | real refractive index |
 | 3 | `n_i`   | imaginary refractive index |
-| 4 | `r_m`   | median radius of size distribution |
-| 5 | `σ_g`   | geometric standard deviation of size distribution |
+| 4 | `μ_logr` | log of median radius (`LogNormal.μ`) |
+| 5 | `σ_logr` | log of geometric standard deviation (`LogNormal.σ`) |
 | 6 | `p₀` / `z₀` | profile location for pressure-form `Normal` / altitude-form `LogNormal` |
 | 7 | `σ_p` / `σ₀` | corresponding profile width |
 
@@ -276,7 +289,7 @@ new parameters):
 | `τ_ref` (aerosol OD) | analytic | trivial: ``\partial \tau/\partial \tau_\mathrm{ref} = \tau/\tau_\mathrm{ref}`` |
 | profile location/width (`p₀, σ_p` or `z₀, σ₀`) | analytic | already in `atmo_prof_lin.jl` |
 | `n_r, n_i` (refractive index) | analytic Mie | Mie series is AD-hostile (recurrences) |
-| `r_m, σ_g` (size distribution) | analytic Mie | same |
+| `μ_logr, σ_logr` (size distribution) | analytic Mie | same |
 | Gas VMR scaling | analytic | ``\partial \tau_\mathrm{abs}/\partial \mathrm{VMR} = \sigma`` |
 | Surface pressure | ForwardDiff | affects many code paths (Rayleigh, profile, absorption) |
 | Temperature profile | ForwardDiff (future) | affects absorption cross-sections nonlinearly |

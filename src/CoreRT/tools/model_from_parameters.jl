@@ -570,7 +570,7 @@ function model_from_parameters(params::vSmartMOM_Parameters;
                 ν_spec = FT.(params.spec_bands[i_band])
                 ν_ref_phase = FT(1e4) / params.scattering_params.λ_ref
                 endpoint_ref = nothing
-                if first(extrema(anchor_ν)) < ν_ref_phase < last(extrema(anchor_ν))
+                if _interior_reference_node(anchor_ν, ν_ref_phase)
                     @timeit "Mie calc" aerosol_optics_raw_ref =
                         compute_aerosol_optical_properties(_mie_fwd(params.scattering_params.λ_ref))
                     endpoint_ref = truncate_endpoint(aerosol_optics_raw_ref)
@@ -1234,19 +1234,28 @@ The (nSpec × nLayers) aerosol optical-depth slice
 `update_model!`/`update_aerosol_loading!` fast paths. A single definition is
 what makes scene updates bit-exact against a freshly built model — do not
 inline this product elsewhere. `k` may be a scalar (single-λ band) or an
-nSpec vector; the spectral scale reduces to `k/k_ref` unless λ_ref falls
-inside the band (three-node natural cubic, see `_aod_spectral_scale`).
+nSpec vector. The spectral scale is always `k/k_ref`; any interpolation of
+extinction, including an interior reference node, has already been applied to
+`k`. A separate unity anchor would violate the configured `n_ref` convention.
 """
 _aerosol_τ_slice(τ_ref, k, k_ref, τ_profile, ν_spec, ν_ref) =
     τ_ref .* _aod_spectral_scale(ν_spec, k, k_ref, ν_ref) .* τ_profile'
 
-"AOD spectral scale, with exact unity at an in-band reference wavenumber."
-function _aod_spectral_scale(ν_spec, k_spec, k_ref, ν_ref)
-    νlo, νhi = extrema(ν_spec)
-    if νlo < ν_ref < νhi
-        return _natural_cubic_three(ν_spec,
-            [first(ν_spec), ν_ref, last(ν_spec)],
-            [first(k_spec) / k_ref, one(eltype(k_spec)), last(k_spec) / k_ref])
-    end
-    return k_spec ./ k_ref
+"AOD scale for the configured reference extinction, independent of band endpoints."
+_aod_spectral_scale(ν_spec, k_spec, k_ref, ν_ref) = k_spec ./ k_ref
+
+"""
+    _interior_reference_node(ν_spec, ν_ref)
+
+Insert a reference interpolation knot only when distinct from both band ends
+at the spectral grid's precision. In Float32, λ→ν conversion can move an
+endpoint by one ulp; a nearly duplicate cubic knot magnifies round-off in the
+nodal Mie values and their tangents. The endpoint node already represents that
+wavenumber to the precision of the grid.
+"""
+function _interior_reference_node(ν_spec, ν_ref)
+    lo, hi = extrema(ν_spec)
+    FT = eltype(ν_spec)
+    tolerance = 8eps(FT) * max(abs(lo),abs(hi),abs(ν_ref))
+    return lo + tolerance < ν_ref < hi - tolerance
 end

@@ -5,6 +5,7 @@ backend = get(ENV,"AUDIT_BACKEND","cpu")
 n_spec = parse(Int,get(ENV,"AUDIT_NSPEC","64"))
 const chunks = parse(Int,get(ENV,"AUDIT_CHUNKS","1"))
 const external_solar = get(ENV,"AUDIT_EXTERNAL_SOLAR","false")=="true"
+const end_to_end = get(ENV,"AUDIT_END_TO_END","false")=="true"
 label = "$(backend)-n$(n_spec)-t$(Threads.nthreads())"
 if backend == "cuda"
     @eval using CUDA
@@ -22,10 +23,13 @@ function quiet(f)
         end
     end
 end
-function measure(f)
+function measure(f; phase_times=nothing)
     quiet(f); sync_backend() # warm this exact path
     results = map(1:3) do _
         GC.gc(); sync_backend()
+        pool = backend == "cuda" && CUDA.stream_ordered(CUDA.device()) ?
+            CUDA.pool_create(CUDA.device()) : nothing
+        pool === nothing || CUDA.attribute!(pool,CUDA.MEMPOOL_ATTR_USED_MEM_HIGH,UInt64(0))
         t = if backend == "cuda"
             device_timed(()->quiet(f))
         else
@@ -33,8 +37,11 @@ function measure(f)
         end
         sync_backend()
         (;time=t.time, bytes=backend == "cuda" ? t.cpu_bytes : t.bytes,
+          phases=phase_times === nothing ? nothing : phase_times[],
           gctime=backend == "cuda" ? t.cpu_gctime : t.gctime,
-          gpu_bytes=backend == "cuda" ? t.gpu_bytes : 0)
+          gpu_bytes=backend == "cuda" ? t.gpu_bytes : 0,
+          peak_pool_bytes=pool === nothing ? 0 :
+              Int(CUDA.attribute(UInt64,pool,CUDA.MEMPOOL_ATTR_USED_MEM_HIGH)))
     end
     return results
 end
@@ -42,7 +49,7 @@ end
 # Timing starts at rt_run: Mie, spectroscopy, and upstream optical derivatives
 # are prepared before warming. Optical mixing and the complete surface-coupled
 # atmospheric solve are included. Chunking is identical for both tangent paths.
-function fixture(chunk)
+function fixture_parameters(chunk)
     cfg=YAML.load_file(joinpath(pkgdir(vSmartMOM),"test/test_parameters/JacobianTestFast.yaml"))
     gases=filter(!isempty,split(get(ENV,"AUDIT_GASES",""),","))
     if isempty(gases)
@@ -74,9 +81,36 @@ function fixture(chunk)
     hi=parse(Float64,get(ENV,"AUDIT_NU_MAX",string(last(p.spec_bands[1]))))
     grid=range(lo,hi;length=n_spec*chunks)
     p.spec_bands[1]=collect(grid[(chunk-1)*n_spec+1:chunk*n_spec])
+    return p
+end
+function fixture(chunk)
+    p=fixture_parameters(chunk)
     model,lin=quiet(()->model_from_parameters(LinMode(),p;external_solar))
     @assert model.quad_points.external_solar == external_solar
     return model,lin
+end
+
+# The end-to-end boundary includes parsing and independent model construction,
+# including Mie, absorption and (for LinMode) optical-property derivatives.
+# Downloads/JIT are warm. Synchronize the phase boundary to attribute GPU work
+# to the constructor rather than the subsequent solve.
+function fresh_solve(chunk, mode, phase_times)
+    started = time_ns()
+    p = fixture_parameters(chunk)
+    model,lin = mode === :forward ?
+        (model_from_parameters(p;external_solar),nothing) :
+        model_from_parameters(LinMode(),p;external_solar)
+    sync_backend()
+    constructed = time_ns()
+    result = mode === :forward ?
+        (external_solar ? (rt_run_toa(model),nothing) : rt_run(model)) :
+        rt_run(model,lin,1,size(lin.τ̇_abs[1],1),1;
+            jacobian_basis=:local,jacobian_adding=:source)
+    sync_backend()
+    finished = time_ns()
+    phase_times[] = (construction=(constructed-started)/1e9,
+                     solve=(finished-constructed)/1e9)
+    return result
 end
 function main()
     compare_medium=get(ENV,"AUDIT_COMPARE_MEDIUM","false")=="true"
@@ -86,7 +120,12 @@ function main()
     modes=compare_vendor ? (:blocked,:physical,:local,:forward) :
         (compare_medium || compare_tiles) ?
             (:reference,:physical,:local,:forward) : (:physical,:local,:forward)
-    get(ENV,"AUDIT_PROFILE_ONLY","false")=="true" && (modes=(:local,:forward))
+    get(ENV,"AUDIT_COMPARE_SOURCE","false")=="true" && (modes=(:local,:source,:forward))
+    end_to_end && (modes=(:source,:forward))
+    profile_mode=Symbol(get(ENV,"AUDIT_PROFILE_MODE",end_to_end ? "source" : "local"))
+    end_to_end && profile_mode != :source && throw(ArgumentError(
+        "end-to-end profiling requires AUDIT_PROFILE_MODE=source"))
+    get(ENV,"AUDIT_PROFILE_ONLY","false")=="true" && (modes=(profile_mode,:forward))
     totals=Dict(string(k)=>zeros(3) for k in modes if k != :blocked)
     records=Any[]
     for chunk in 1:chunks
@@ -107,12 +146,15 @@ function main()
                 CoreRT._TILED_JACOBIANS_ENABLED[] = mode != :reference
             end
             f=mode == :forward ? ()->(external_solar ? (rt_run_toa(model),nothing) : rt_run(model)) :
-                ()->rt_run(model,lin,1,ng,1;jacobian_basis=mode in (:reference,:blocked) ? :physical : mode)
+                ()->rt_run(model,lin,1,ng,1;jacobian_basis=mode in (:reference,:blocked) ? :physical : mode == :source ? :local : mode,
+                    jacobian_adding=mode == :source ? :source : :matrix)
+            phase_times = Ref((construction=0.0,solve=0.0))
+            end_to_end && (f=()->fresh_solve(chunk,mode,phase_times))
             println("MEASURE_BEGIN chunk=$chunk mode=$mode");flush(stdout)
             GC.gc(); backend == "cuda" && CUDA.reclaim()
             # The blocked parity reference is evaluated once. Its warmed
             # timings were measured separately; do not report a fake zero time.
-            ts=mode == :blocked ? [] : measure(f)
+            ts=mode == :blocked ? [] : measure(f;phase_times=end_to_end ? phase_times : nothing)
             mode == :blocked || (totals[string(mode)] .+= [t.time for t in ts])
             out=quiet(f); sync_backend()
             err=0.0
@@ -131,10 +173,15 @@ function main()
             end
             record=Dict("chunk"=>chunk,"mode"=>string(mode),"seconds"=>[t.time for t in ts],
                 "host_bytes"=>[t.bytes for t in ts],"device_allocated_bytes"=>[t.gpu_bytes for t in ts],
+                "peak_pool_used_bytes"=>[t.peak_pool_bytes for t in ts],
                 "max_parity_error"=>err)
+            if end_to_end
+                record["construction_seconds"] = [t.phases.construction for t in ts]
+                record["solve_seconds"] = [t.phases.solve for t in ts]
+            end
             push!(records,record)
             println("MEASURE ",record);flush(stdout)
-            if mode == :local && get(ENV,"AUDIT_PROFILE_ONLY","false")=="true"
+            if mode == profile_mode && get(ENV,"AUDIT_PROFILE_ONLY","false")=="true"
                 if backend == "cuda"
                     println("CUDA_PROFILE_BEGIN")
                     prof=device_profile(()->quiet(f));sync_backend()
@@ -160,7 +207,8 @@ function main()
     result=Dict("julia_version"=>string(VERSION),"threads"=>Threads.nthreads(),
         "source_sha256"=>bytes2hex(sha256(fingerprint)),
         "configuration"=>Dict(k=>v for (k,v) in ENV if startswith(k,"AUDIT_")),
-        "backend"=>backend,"spectral_points"=>n_spec*chunks,"chunk_size"=>n_spec,
+        "backend"=>backend,"end_to_end"=>end_to_end,
+        "spectral_points"=>n_spec*chunks,"chunk_size"=>n_spec,
         "measurements"=>records,"totals_seconds"=>totals,
         "medians_seconds"=>Dict(k=>median(v) for (k,v) in totals))
     println("TOTAL ",result["medians_seconds"])

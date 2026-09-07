@@ -99,6 +99,7 @@ include("CoreKernel/interlayer_flux.jl")       # Interlayer flux
 
 # Solvers -- RT Kernels
 include("CoreKernel/rt_kernel.jl")             # Handle Core RT (Elemental/Doubling/Interaction)
+include("CoreKernel/source_adding_lin.jl")
 include("CoreKernel/local_jacobian.jl")        # Local doubling and delayed contraction
 include("CoreKernel/rt_kernel_lin.jl")         # Linearized RT kernel
 include("CoreKernel/rt_kernel_ss.jl")          # Single scattering RT kernel

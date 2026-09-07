@@ -220,6 +220,11 @@ function create_surface_layer!(RS_type::noRS,
     # Use the common forward scaffold, then populate its analytic tangent.
     create_surface_layer!(surface, added_layer, SFI, m, pol_type,
                           quad_points, τ_sum, architecture; F₀)
+    # The forward surface scaffold carries the collimated BOA beam in j₀⁺
+    # for its hemispheric diagnostics. Linearized SFI keeps this slot diffuse:
+    # rt_run adds exp(-τ_sum/μ₀) F₀ and its tangent once, after the Fourier sum.
+    # Match the scalar Lambertian convention to avoid counting that beam twice.
+    added_layer.j₀⁺ .= zero(FT)
     added_layer_lin.ap_ṙ⁻⁺ .= zero(FT)
     added_layer_lin.ap_ṙ⁺⁻ .= zero(FT)
     added_layer_lin.ap_ṫ⁺⁺ .= zero(FT)

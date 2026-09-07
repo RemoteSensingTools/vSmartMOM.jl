@@ -1,0 +1,906 @@
+Precompiling packages...
+  25111.0 ms  ✓ vSmartMOM
+  13224.6 ms  ✓ vSmartMOM → vSmartMOMCUDAExt
+  2 dependencies successfully precompiled in 40 seconds. 274 already precompiled.
+
+Testing HAPI equivalence (On CO2 Band)...  40%|████      |  ETA: 0:00:28
+Testing HAPI equivalence (On CO2 Band)...  60%|██████    |  ETA: 0:00:15
+Testing HAPI equivalence (On CO2 Band)...  80%|████████  |  ETA: 0:00:06
+Testing HAPI equivalence (On CO2 Band)... 100%|██████████| Time: 0:00:27
+
+Testing HAPI equivalence (On Other Molecules)...  40%|█▎ |  ETA: 0:00:11
+Testing HAPI equivalence (On Other Molecules)...  60%|█▊ |  ETA: 0:00:07
+Testing HAPI equivalence (On Other Molecules)...  80%|██▍|  ETA: 0:00:03
+Testing HAPI equivalence (On Other Molecules)... 100%|███| Time: 0:00:12
+┌ Info: Note: Cross-section reported to wavelength grid
+└ (will internally convert to wavenumber grid for calculations)
+┌ Info: Note: Cross-section reported to wavelength grid
+└ (will internally convert to wavenumber grid for calculations)
+┌ Info: Note: Cross-section reported to wavelength grid
+└ (will internally convert to wavenumber grid for calculations)
+┌ Info: Note: Cross-section reported to wavelength grid
+└ (will internally convert to wavenumber grid for calculations)
+
+Computing Cross Sections for Interpolation...  40%|██▍   |  ETA: 0:00:09
+Computing Cross Sections for Interpolation...  60%|███▋  |  ETA: 0:00:06
+Computing Cross Sections for Interpolation...  80%|████▊ |  ETA: 0:00:03
+Computing Cross Sections for Interpolation... 100%|██████| Time: 0:00:15
+┌ Warning: saved type AerosolOptics{Float64} is missing field phase_ν in workspace type; reconstructing
+└ @ JLD2 ~/.julia/packages/JLD2/r2pdD/src/data/reconstructing_datatypes.jl:197
+┌ Warning: saved type AerosolOptics{Float64} is missing field phase_ν in workspace type; reconstructing
+└ @ JLD2 ~/.julia/packages/JLD2/r2pdD/src/data/reconstructing_datatypes.jl:197
+┌ Warning: δBGE's Δ_angle is retired and forced to 0 — the fit always uses the full angular domain (a non-zero cone was never honoured by the linearized path).
+└ @ vSmartMOM.Scattering ~/code/gitHub/vSmartMOM-jacobian-perf/src/Scattering/types.jl:292
+┌ Warning: saved type AerosolOptics{Float64} is missing field phase_ν in workspace type; reconstructing
+└ @ JLD2 ~/.julia/packages/JLD2/r2pdD/src/data/reconstructing_datatypes.jl:197
+┌ Warning: saved type AerosolOptics{Float64} is missing field phase_ν in workspace type; reconstructing
+└ @ JLD2 ~/.julia/packages/JLD2/r2pdD/src/data/reconstructing_datatypes.jl:197
+[ Info: test_mie_nodes: CUDA not functional — real-GPU node-API testsets are skipped (KA-CPU still runs).
+[ Info: test_mie_nodes: Metal not functional — real-Metal node-API testsets are skipped (KA-CPU/mock coverage above still runs).
+[ Info: test_mie_nodes_batched: CUDA not functional — real-GPU batched testsets are skipped (KA-CPU coverage above still runs).
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (108, 108, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (108, 108, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (108, 108, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (112, 112, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (112, 112, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (112, 112, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (108, 108, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (108, 108, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (108, 108, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (112, 112, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (112, 112, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (112, 112, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (112, 112, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (112, 112, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (112, 112, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (108, 108, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (108, 108, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (108, 108, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (112, 112, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (112, 112, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (112, 112, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (112, 112, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (112, 112, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (112, 112, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (108, 108, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (108, 108, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (108, 108, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (108, 108, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (108, 108, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (108, 108, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (112, 112, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (112, 112, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (112, 112, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (108, 108, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (108, 108, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (108, 108, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (108, 108, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (108, 108, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (108, 108, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (112, 112, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (112, 112, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (112, 112, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (108, 108, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (108, 108, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (108, 108, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (112, 112, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (112, 112, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (112, 112, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (112, 112, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (112, 112, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (112, 112, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (108, 108, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (108, 108, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (108, 108, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (64, 64, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (64, 64, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (108, 108, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (108, 108, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (108, 108, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (108, 108, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (108, 108, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (108, 108, 2)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (108, 108, 2)
+[ Info: Skipping local Metal batched-kernel smoke on non-Mac or without Metal.jl in the active environment.
+┌ Warning: Aerosol configuration omits `radiative_transfer.greek_beta_cutoff`. Update this input file for the two-stage Greek-beta support rule: set `greek_beta_cutoff: 1.0e-5` (or another validated positive threshold) to discard insignificant high-l beta tails, or set `greek_beta_cutoff: null` to explicitly retain the full Mie-series support. Omission remains equivalent to `null` for backward compatibility.
+└ @ vSmartMOM.IO ~/code/gitHub/vSmartMOM-jacobian-perf/src/IO/Parameters.jl:677
+[ Info: truncation: auto → δBGE(stream_l_cap=5, Δ_angle=0.0) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (18, 18, 17)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (18, 18, 6)
+┌ Warning: Aerosol configuration omits `radiative_transfer.greek_beta_cutoff`. Update this input file for the two-stage Greek-beta support rule: set `greek_beta_cutoff: 1.0e-5` (or another validated positive threshold) to discard insignificant high-l beta tails, or set `greek_beta_cutoff: null` to explicitly retain the full Mie-series support. Omission remains equivalent to `null` for backward compatibility.
+└ @ vSmartMOM.IO ~/code/gitHub/vSmartMOM-jacobian-perf/src/IO/Parameters.jl:677
+┌ Warning: Aerosol configuration omits `radiative_transfer.greek_beta_cutoff`. Update this input file for the two-stage Greek-beta support rule: set `greek_beta_cutoff: 1.0e-5` (or another validated positive threshold) to discard insignificant high-l beta tails, or set `greek_beta_cutoff: null` to explicitly retain the full Mie-series support. Omission remains equivalent to `null` for backward compatibility.
+└ @ vSmartMOM.IO ~/code/gitHub/vSmartMOM-jacobian-perf/src/IO/Parameters.jl:677
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (3, 3, 1)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (3, 3, 1)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (3, 3, 1)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (3, 3, 1)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (1, 3, 3, 1)
+
+Looping over layers ...  67%|██████████████████▋         |  ETA: 0:00:01
+Looping over layers ... 100%|████████████████████████████| Time: 0:00:02
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (3, 3, 1)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (1, 3, 3, 1)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (3, 3, 1)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (2, 3, 3, 1)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (3, 3, 1)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (2, 3, 3, 1)
+┌ Info: Single-scatter mode — processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (3, 3, 1)
+┌ Info: Single-scatter mode — processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (3, 3, 1)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (3, 3, 1)
+
+Looping over layers ...  67%|██████████████████▋         |  ETA: 0:00:04
+Looping over layers ... 100%|████████████████████████████| Time: 0:00:07
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (2, 3, 3, 1)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (2, 3, 3, 1)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (2, 3, 3, 1)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (3, 3, 1)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (3, 3, 1)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (2, 3, 3, 1)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (2, 3, 3, 1)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (3, 3, 1)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (3, 3, 1)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (9, 9, 1)
+
+Looping over layers ...  67%|██████████████████▋         |  ETA: 0:00:01
+Looping over layers ... 100%|████████████████████████████| Time: 0:00:01
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (2, 9, 9, 1)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (2, 9, 9, 1)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (2, 9, 9, 1)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (3, 3, 1)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (2, 3, 3, 1)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (2, 3, 3, 1)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (3, 3, 1)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (2, 3, 3, 1)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (2, 3, 3, 1)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float32
+│ Source Function Integration: true
+└ Dimensions: (3, 3, 1)
+
+Looping over layers ...  67%|██████████████████▋         |  ETA: 0:00:05
+Looping over layers ... 100%|████████████████████████████| Time: 0:00:09
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float32
+│ Source Function Integration: true
+└ Dimensions: (2, 3, 3, 1)
+
+Looping over layers ...  67%|██████████████████▋         |  ETA: 0:00:02
+Looping over layers ... 100%|████████████████████████████| Time: 0:00:04
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (2, 5, 5, 1)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (2, 3, 3, 1)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float32
+│ Source Function Integration: true
+└ Dimensions: (2, 5, 5, 1)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float32
+│ Source Function Integration: true
+└ Dimensions: (2, 3, 3, 1)
+
+Looping over layers ...  67%|██████████████████▋         |  ETA: 0:00:01
+Looping over layers ... 100%|████████████████████████████| Time: 0:00:02
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (1, 3, 3, 1)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (1, 3, 3, 1)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (1, 12, 12, 1)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (2, 3, 3, 1)
+┌ Warning: Aerosol configuration omits `radiative_transfer.greek_beta_cutoff`. Update this input file for the two-stage Greek-beta support rule: set `greek_beta_cutoff: 1.0e-5` (or another validated positive threshold) to discard insignificant high-l beta tails, or set `greek_beta_cutoff: null` to explicitly retain the full Mie-series support. Omission remains equivalent to `null` for backward compatibility.
+└ @ vSmartMOM.IO ~/code/gitHub/vSmartMOM-jacobian-perf/src/IO/Parameters.jl:677
+[ Info: truncation: auto → δBGE(stream_l_cap=5, Δ_angle=0.0) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (6, 6, 4)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (18, 18, 2)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (18, 18, 2)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (18, 18, 2)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (6, 6, 4)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (6, 6, 4)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (6, 6, 4)
+┌ Warning: Aerosol configuration omits `radiative_transfer.greek_beta_cutoff`. Update this input file for the two-stage Greek-beta support rule: set `greek_beta_cutoff: 1.0e-5` (or another validated positive threshold) to discard insignificant high-l beta tails, or set `greek_beta_cutoff: null` to explicitly retain the full Mie-series support. Omission remains equivalent to `null` for backward compatibility.
+└ @ vSmartMOM.IO ~/code/gitHub/vSmartMOM-jacobian-perf/src/IO/Parameters.jl:677
+[ Info: truncation: auto → δBGE(stream_l_cap=5, Δ_angle=0.0) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (6, 6, 4)
+┌ Warning: Aerosol configuration omits `radiative_transfer.greek_beta_cutoff`. Update this input file for the two-stage Greek-beta support rule: set `greek_beta_cutoff: 1.0e-5` (or another validated positive threshold) to discard insignificant high-l beta tails, or set `greek_beta_cutoff: null` to explicitly retain the full Mie-series support. Omission remains equivalent to `null` for backward compatibility.
+└ @ vSmartMOM.IO ~/code/gitHub/vSmartMOM-jacobian-perf/src/IO/Parameters.jl:677
+[ Info: truncation: auto → δBGE(stream_l_cap=5, Δ_angle=0.0) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (6, 6, 4)
+┌ Warning: Aerosol configuration omits `radiative_transfer.greek_beta_cutoff`. Update this input file for the two-stage Greek-beta support rule: set `greek_beta_cutoff: 1.0e-5` (or another validated positive threshold) to discard insignificant high-l beta tails, or set `greek_beta_cutoff: null` to explicitly retain the full Mie-series support. Omission remains equivalent to `null` for backward compatibility.
+└ @ vSmartMOM.IO ~/code/gitHub/vSmartMOM-jacobian-perf/src/IO/Parameters.jl:677
+[ Info: truncation: auto → δBGE(stream_l_cap=5, Δ_angle=0.0) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (6, 6, 4)
+┌ Warning: Aerosol configuration omits `radiative_transfer.greek_beta_cutoff`. Update this input file for the two-stage Greek-beta support rule: set `greek_beta_cutoff: 1.0e-5` (or another validated positive threshold) to discard insignificant high-l beta tails, or set `greek_beta_cutoff: null` to explicitly retain the full Mie-series support. Omission remains equivalent to `null` for backward compatibility.
+└ @ vSmartMOM.IO ~/code/gitHub/vSmartMOM-jacobian-perf/src/IO/Parameters.jl:677
+[ Info: truncation: auto → δBGE(stream_l_cap=5, Δ_angle=0.0) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (6, 6, 4)
+┌ Warning: Aerosol configuration omits `radiative_transfer.greek_beta_cutoff`. Update this input file for the two-stage Greek-beta support rule: set `greek_beta_cutoff: 1.0e-5` (or another validated positive threshold) to discard insignificant high-l beta tails, or set `greek_beta_cutoff: null` to explicitly retain the full Mie-series support. Omission remains equivalent to `null` for backward compatibility.
+└ @ vSmartMOM.IO ~/code/gitHub/vSmartMOM-jacobian-perf/src/IO/Parameters.jl:677
+[ Info: truncation: auto → δBGE(stream_l_cap=5, Δ_angle=0.0) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)
+┌ Info: Processing on: vSmartMOM.Architectures.CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (6, 6, 4)
+
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:02
+Looping over layers ... 100%|████████████████████████████| Time: 0:00:01
+
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:03
+Looping over layers ... 100%|████████████████████████████| Time: 0:00:01
+
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:03
+Looping over layers ... 100%|████████████████████████████| Time: 0:00:02
+
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:02
+Looping over layers ... 100%|████████████████████████████| Time: 0:00:01
+
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:02
+Looping over layers ... 100%|████████████████████████████| Time: 0:00:01
+
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:02
+Looping over layers ... 100%|████████████████████████████| Time: 0:00:01
+
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:03
+Looping over layers ... 100%|████████████████████████████| Time: 0:00:01
+
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:02
+Looping over layers ... 100%|████████████████████████████| Time: 0:00:01
+ERROR: LoadError: Some tests did not pass: 1631 passed, 3 failed, 0 errored, 0 broken.
+in expression starting at /home/cfranken/code/gitHub/vSmartMOM-jacobian-perf/test/runtests.jl:18
+Testing read_hitran...
+Testing absorption_cross_section_hitran...
+Testing absorption_cross_section_wavelengths...
+Testing wing-cutoff admission window (wavenumber vs wavelength units)...
+Testing absorption_cross_section_interpolator...
+Testing GPU vs CPU cross-section match...
+Test Summary: | Pass  Total     Time
+Absorption    |  116    116  1m48.4s
+Test Summary:                 | Pass  Total  Time
+Absorption column integration |   35     35  9.2s
+Test Summary:       | Pass  Total  Time
+H2O self broadening |   12     12  6.0s
+Testing NAI2 and PCW equivalence...
+  δBGE fᵗ (full domain): 0.330444
+Test Summary: | Pass  Total   Time
+Scattering    |   47     47  20.9s
+compute_aerosol_extinction_nodes vs full API timing (standard node set, nquad=300): t_ext=0.004610208s  t_full=0.091032525s  speedup(full/ext)=19.75x
+NativeFloat32 vs Float64 CPU reference -- MEASURED accuracy:
+  standard set   (nquad=300): k relerr=8.114656362083295e-8  ω̃ relerr=7.753014356941077e-8  Greek maxabs=0.004967025079646413
+  wide TOMAS set (n=65):     k relerr=7.250680770608149e-9  ω̃ relerr=1.8948728151792644e-8  Greek maxabs=0.004294728385371943
+NativeFloat32 polarized phase-matrix validation -- MEASURED (0-180°, 1° steps):
+  standard  : P11 maxabs=1.0002179309958876 (max relerr=0.008942229112624848)
+    P12/P11: raw max=0.00016055758713984236  P11-weighted RMS=6.59589247173847e-6  |Δf12|/peak(P11)=4.3872708406345756e-7
+    P33/P11: raw max=0.014047713776403792  P11-weighted RMS=0.0003313113133111911  |Δf33|/peak(P11)=0.0054622907768810255
+    P34/P11: raw max=0.00030618958286532383  P11-weighted RMS=1.4577829542489623e-5  |Δf34|/peak(P11)=1.250354290075944e-6
+  wide TOMAS: P11 maxabs=0.07521632919178955 (max relerr=0.0018639654586168745)
+    P12/P11: raw max=0.00025341926418487315  P11-weighted RMS=6.058344115842482e-6  |Δf12|/peak(P11)=1.381545347511935e-7
+    P33/P11: raw max=0.037522189082704493  P11-weighted RMS=0.0007794307262606225  |Δf33|/peak(P11)=9.172437411877228e-5
+    P34/P11: raw max=0.0002761504467246878  P11-weighted RMS=9.840890547979617e-6  |Δf34|/peak(P11)=9.47605469753106e-7
+Test Summary:       | Pass  Broken  Total   Time
+Mie caller-node API |  165       7    172  19.0s
+batched fixture: n_max_per_ensemble = [4, 44, 4, 95, 8, 38, 5, 120]  -> 7 distinct nmax groups
+Gate 5 benchmark: n_max group histogram (nmax => n_ensembles), 133 distinct groups:
+  nmax=2  n_ensembles=6
+  nmax=3  n_ensembles=50
+  nmax=4  n_ensembles=50
+  nmax=5  n_ensembles=38
+  nmax=6  n_ensembles=42
+  nmax=7  n_ensembles=29
+  nmax=8  n_ensembles=23
+  nmax=9  n_ensembles=28
+  nmax=10  n_ensembles=19
+  nmax=11  n_ensembles=16
+  nmax=12  n_ensembles=15
+  nmax=13  n_ensembles=13
+  nmax=14  n_ensembles=18
+  nmax=15  n_ensembles=13
+  nmax=16  n_ensembles=12
+  nmax=17  n_ensembles=6
+  nmax=26  n_ensembles=2
+  nmax=27  n_ensembles=10
+  nmax=28  n_ensembles=7
+  nmax=29  n_ensembles=3
+  nmax=30  n_ensembles=7
+  nmax=31  n_ensembles=6
+  nmax=32  n_ensembles=9
+  nmax=33  n_ensembles=10
+  nmax=34  n_ensembles=8
+  nmax=35  n_ensembles=8
+  nmax=36  n_ensembles=11
+  nmax=37  n_ensembles=5
+  nmax=38  n_ensembles=8
+  nmax=39  n_ensembles=4
+  nmax=40  n_ensembles=9
+  nmax=41  n_ensembles=7
+  nmax=42  n_ensembles=6
+  nmax=43  n_ensembles=1
+  nmax=44  n_ensembles=3
+  nmax=45  n_ensembles=6
+  nmax=46  n_ensembles=6
+  nmax=47  n_ensembles=4
+  nmax=48  n_ensembles=6
+  nmax=49  n_ensembles=2
+  nmax=50  n_ensembles=1
+  nmax=51  n_ensembles=4
+  nmax=52  n_ensembles=1
+  nmax=53  n_ensembles=1
+  nmax=54  n_ensembles=7
+  nmax=55  n_ensembles=3
+  nmax=56  n_ensembles=1
+  nmax=57  n_ensembles=4
+  nmax=58  n_ensembles=1
+  nmax=59  n_ensembles=4
+  nmax=60  n_ensembles=3
+  nmax=61  n_ensembles=2
+  nmax=62  n_ensembles=3
+  nmax=63  n_ensembles=3
+  nmax=64  n_ensembles=1
+  nmax=65  n_ensembles=1
+  nmax=66  n_ensembles=3
+  nmax=67  n_ensembles=2
+  nmax=68  n_ensembles=4
+  nmax=69  n_ensembles=2
+  nmax=70  n_ensembles=1
+  nmax=71  n_ensembles=6
+  nmax=72  n_ensembles=1
+  nmax=73  n_ensembles=4
+  nmax=74  n_ensembles=1
+  nmax=75  n_ensembles=3
+  nmax=76  n_ensembles=2
+  nmax=78  n_ensembles=2
+  nmax=79  n_ensembles=2
+  nmax=80  n_ensembles=2
+  nmax=81  n_ensembles=2
+  nmax=82  n_ensembles=2
+  nmax=85  n_ensembles=2
+  nmax=86  n_ensembles=1
+  nmax=87  n_ensembles=2
+  nmax=90  n_ensembles=2
+  nmax=91  n_ensembles=2
+  nmax=92  n_ensembles=2
+  nmax=93  n_ensembles=2
+  nmax=94  n_ensembles=1
+  nmax=95  n_ensembles=2
+  nmax=96  n_ensembles=1
+  nmax=97  n_ensembles=1
+  nmax=98  n_ensembles=3
+  nmax=99  n_ensembles=1
+  nmax=100  n_ensembles=2
+  nmax=101  n_ensembles=1
+  nmax=102  n_ensembles=2
+  nmax=103  n_ensembles=1
+  nmax=105  n_ensembles=1
+  nmax=107  n_ensembles=1
+  nmax=108  n_ensembles=4
+  nmax=109  n_ensembles=3
+  nmax=110  n_ensembles=2
+  nmax=111  n_ensembles=1
+  nmax=112  n_ensembles=1
+  nmax=113  n_ensembles=1
+  nmax=114  n_ensembles=1
+  nmax=115  n_ensembles=3
+  nmax=116  n_ensembles=3
+  nmax=118  n_ensembles=1
+  nmax=119  n_ensembles=3
+  nmax=120  n_ensembles=5
+  nmax=122  n_ensembles=1
+  nmax=123  n_ensembles=3
+  nmax=124  n_ensembles=1
+  nmax=125  n_ensembles=1
+  nmax=127  n_ensembles=1
+  nmax=131  n_ensembles=1
+  nmax=132  n_ensembles=1
+  nmax=134  n_ensembles=2
+  nmax=135  n_ensembles=1
+  nmax=137  n_ensembles=1
+  nmax=138  n_ensembles=1
+  nmax=139  n_ensembles=1
+  nmax=141  n_ensembles=1
+  nmax=142  n_ensembles=2
+  nmax=143  n_ensembles=1
+  nmax=147  n_ensembles=1
+  nmax=148  n_ensembles=1
+  nmax=149  n_ensembles=2
+  nmax=151  n_ensembles=1
+  nmax=153  n_ensembles=1
+  nmax=155  n_ensembles=1
+  nmax=156  n_ensembles=1
+  nmax=157  n_ensembles=2
+  nmax=158  n_ensembles=1
+  nmax=159  n_ensembles=2
+  nmax=160  n_ensembles=1
+  nmax=161  n_ensembles=2
+  nmax=162  n_ensembles=1
+  nmax=164  n_ensembles=2
+  nmax=168  n_ensembles=181
+Gate 5 benchmark: Threads.nthreads() = 4
+Gate 5 benchmark timings (nquad=96, E=882):
+  CPU (Threads.@threads, 4 threads): 2.297323975 s
+  KA-CPU grouped batched (portable backend):             1.624908553 s
+Test Summary:               | Pass  Broken  Total   Time
+Mie caller-node batched API |  711       3    714  38.7s
+size(R) = (16, 4, 2)
+size(R) = (16, 4, 2)
+size(R) = (16, 4, 2)
+size(R) = (16, 4, 2)
+size(R) = (16, 4, 2)
+size(R) = (16, 4, 2)
+size(R) = (16, 4, 2)
+Test Summary: | Pass  Total     Time
+CoreRT        |   17     17  1m01.7s
+Test Summary:   | Pass  Total  Time
+Batched Kernels |   13     13  4.6s
+Verifying planck function correctness...
+Test Summary: | Pass  Total  Time
+SolarModel    |    9      9  0.7s
+============================================================
+Forward Model Smoke Test (noRS)
+============================================================
+CUDA available for GPU tests: false
+Configuration loaded: 2 band(s)
+
+Building forward model (CPU)...
+  4.630437 seconds (4.71 M allocations: 1002.213 MiB, 9.79% gc time, 55.23% compilation time)
+Model built successfully.
+  Layers: 5
+  Quadrature points: 6
+
+  Running RT for band 1...
+  6.103691 seconds (10.54 M allocations: 550.855 MiB, 0.67% gc time, 99.09% compilation time)
+  Output shape: ((2, 3, 17))
+  nStokes=3, nVza=2, nSpec=17
+  I: min=0.0810147451774546, max=0.0840126572674661, mean=0.08365307797151837
+  Q: min=0.0003166715620072485, max=0.0024901715777062333
+
+  Running RT for band 2...
+  0.350174 seconds (460.66 k allocations: 24.740 MiB, 11.07% gc time, 84.17% compilation time)
+  Output shape: ((2, 3, 6))
+  nStokes=3, nVza=2, nSpec=6
+  I: min=0.006863344901540807, max=0.05466467609930068, mean=0.04427281608291909
+  Q: min=8.510886816893115e-6, max=0.00028475866224244087
+
+============================================================
+Forward noRS smoke test complete.
+============================================================
+Test Summary: | Pass  Broken  Total   Time
+Forward noRS  |   32       1     33  14.2s
+Test Summary:        | Pass  Total     Time
+Multi-sensor heights |  227    227  1m56.5s
+Test Summary:           | Pass  Total  Time
+Rayleigh/Cabannes Raman |   38     38  0.7s
+Setting up base model (with Mie)...
+  R: (2, 1, 4), dR: (2, 1, 4, 14), Nparams=14
+  nλ=4, nVZA=2, nStokes=1, Nparams=14
+  ✓ Mie interpolation outputs are finite and bounded
+  Surface albedo: max_rel=5.82e-6, mean_rel=5.72e-6
+  τ_ref: max_rel=2.37e-5, mean_rel=1.42e-5
+  p₀: max_rel=0.0607, mean_rel=0.0352
+  nᵣ: max_rel=0.00136, mean_rel=0.0013
+  σ_dist: max_rel=0.0173, mean_rel=0.0123
+
+All Jacobian unit tests complete.
+Test Summary: | Pass  Total   Time
+Jacobian Unit |   36     36  28.4s
+Test Summary:     | Pass  Total   Time
+Batched Jacobians |  416    416  15.5s
+Test Summary:                | Pass  Total  Time
+Elemental boundary Jacobians |  160    160  5.2s
+Test Summary:       | Total  Time
+CUDA Jacobian plans |     0  0.0s
+Test Summary:     | Pass  Total  Time
+Blocked Jacobians |  192    192  9.5s
+Test Summary:       | Pass  Total   Time
+Phase interpolation |   81     81  12.6s
+Test Summary:     | Pass  Total   Time
+Aerosol reference |   46     46  24.5s
+Local optical basis CPU: Test Failed at /home/cfranken/code/gitHub/vSmartMOM-jacobian-perf/test/test_local_jacobian.jl:36
+  Expression: all(isapprox.(a, b; rtol = tol, atol = 10 * eps(FT)))
+
+Stacktrace:
+ [1] macro expansion
+   @ ~/.julia/juliaup/julia-1.12.6+0.x64.linux.gnu/share/julia/stdlib/v1.12/Test/src/Test.jl:680 [inlined]
+ [2] check_local_jacobian(FT::Type{Float64}, polarized::Bool, external::Bool; gpu::Bool, n_aerosols::Int64)
+   @ Main ~/code/gitHub/vSmartMOM-jacobian-perf/test/test_local_jacobian.jl:36
+ [3] check_local_jacobian
+   @ ~/code/gitHub/vSmartMOM-jacobian-perf/test/test_local_jacobian.jl:6 [inlined]
+ [4] (::var"#166#167")()
+   @ Main ~/code/gitHub/vSmartMOM-jacobian-perf/test/test_local_jacobian.jl:109
+ [5] with_logstate(f::var"#166#167", logstate::Base.CoreLogging.LogState)
+   @ Base.CoreLogging ./logging/logging.jl:542
+ [6] with_logger(f::Function, logger::NullLogger)
+   @ Base.CoreLogging ./logging/logging.jl:653
+ [7] top-level scope
+   @ ~/code/gitHub/vSmartMOM-jacobian-perf/test/test_local_jacobian.jl:104
+ [8] macro expansion
+   @ ~/.julia/juliaup/julia-1.12.6+0.x64.linux.gnu/share/julia/stdlib/v1.12/Test/src/Test.jl:1777 [inlined]
+ [9] macro expansion
+   @ ~/code/gitHub/vSmartMOM-jacobian-perf/test/test_local_jacobian.jl:104 [inlined]
+Local optical basis CPU: Test Failed at /home/cfranken/code/gitHub/vSmartMOM-jacobian-perf/test/test_local_jacobian.jl:36
+  Expression: all(isapprox.(a, b; rtol = tol, atol = 10 * eps(FT)))
+
+Stacktrace:
+ [1] macro expansion
+   @ ~/.julia/juliaup/julia-1.12.6+0.x64.linux.gnu/share/julia/stdlib/v1.12/Test/src/Test.jl:680 [inlined]
+ [2] check_local_jacobian(FT::Type{Float64}, polarized::Bool, external::Bool; gpu::Bool, n_aerosols::Int64)
+   @ Main ~/code/gitHub/vSmartMOM-jacobian-perf/test/test_local_jacobian.jl:36
+ [3] check_local_jacobian
+   @ ~/code/gitHub/vSmartMOM-jacobian-perf/test/test_local_jacobian.jl:6 [inlined]
+ [4] (::var"#166#167")()
+   @ Main ~/code/gitHub/vSmartMOM-jacobian-perf/test/test_local_jacobian.jl:109
+ [5] with_logstate(f::var"#166#167", logstate::Base.CoreLogging.LogState)
+   @ Base.CoreLogging ./logging/logging.jl:542
+ [6] with_logger(f::Function, logger::NullLogger)
+   @ Base.CoreLogging ./logging/logging.jl:653
+ [7] top-level scope
+   @ ~/code/gitHub/vSmartMOM-jacobian-perf/test/test_local_jacobian.jl:104
+ [8] macro expansion
+   @ ~/.julia/juliaup/julia-1.12.6+0.x64.linux.gnu/share/julia/stdlib/v1.12/Test/src/Test.jl:1777 [inlined]
+ [9] macro expansion
+   @ ~/code/gitHub/vSmartMOM-jacobian-perf/test/test_local_jacobian.jl:104 [inlined]
+Local optical basis CPU: Test Failed at /home/cfranken/code/gitHub/vSmartMOM-jacobian-perf/test/test_local_jacobian.jl:36
+  Expression: all(isapprox.(a, b; rtol = tol, atol = 10 * eps(FT)))
+
+Stacktrace:
+ [1] macro expansion
+   @ ~/.julia/juliaup/julia-1.12.6+0.x64.linux.gnu/share/julia/stdlib/v1.12/Test/src/Test.jl:680 [inlined]
+ [2] check_local_jacobian(FT::Type{Float64}, polarized::Bool, external::Bool; gpu::Bool, n_aerosols::Int64)
+   @ Main ~/code/gitHub/vSmartMOM-jacobian-perf/test/test_local_jacobian.jl:36
+ [3] check_local_jacobian
+   @ ~/code/gitHub/vSmartMOM-jacobian-perf/test/test_local_jacobian.jl:6 [inlined]
+ [4] (::var"#166#167")()
+   @ Main ~/code/gitHub/vSmartMOM-jacobian-perf/test/test_local_jacobian.jl:109
+ [5] with_logstate(f::var"#166#167", logstate::Base.CoreLogging.LogState)
+   @ Base.CoreLogging ./logging/logging.jl:542
+ [6] with_logger(f::Function, logger::NullLogger)
+   @ Base.CoreLogging ./logging/logging.jl:653
+ [7] top-level scope
+   @ ~/code/gitHub/vSmartMOM-jacobian-perf/test/test_local_jacobian.jl:104
+ [8] macro expansion
+   @ ~/.julia/juliaup/julia-1.12.6+0.x64.linux.gnu/share/julia/stdlib/v1.12/Test/src/Test.jl:1777 [inlined]
+ [9] macro expansion
+   @ ~/code/gitHub/vSmartMOM-jacobian-perf/test/test_local_jacobian.jl:104 [inlined]
+Test Summary:             | Pass  Fail  Total     Time
+Local optical Jacobians   | 1631     3   1634  1m22.4s
+  Local optical basis CPU | 1631     3   1634  1m22.3s
+RNG of the outermost testset: Xoshiro(0x5744fa9edd569500, 0x17a9d5df64a18012, 0xd8410ede21daae2c, 0x881051af8b0a77d4, 0x8ffa026081c9c2de)
