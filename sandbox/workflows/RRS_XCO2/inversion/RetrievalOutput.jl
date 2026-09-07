@@ -92,6 +92,8 @@ function write_retrieval_result(experiment::RetrievalExperiment,
                                     retrieval_output_path(experiment),
                                 settings::OESettings=OESettings(),
                                 solar_spectrum_path::AbstractString="",
+                                jacobian_flavor::AbstractString="OCO_RRS_synth",
+                                active_to_core=nothing,
                                 xco2_diagnostics=nothing,
                                 provenance::AbstractDict=Dict{String,Any}(),
                                 overwrite::Bool=false)
@@ -105,6 +107,15 @@ function write_retrieval_result(experiment::RetrievalExperiment,
     size(Sa) == (nstate, nstate) || throw(DimensionMismatch("Sa shape differs from state"))
     length(parameter_names) == nstate || throw(DimensionMismatch(
         "parameter-name count differs from state"))
+    if !isnothing(active_to_core)
+        length(active_to_core) == nstate || throw(DimensionMismatch(
+            "active-to-core mapping length differs from state"))
+        indices = Int.(active_to_core)
+        all(>(0), indices) || throw(ArgumentError(
+            "active-to-core mapping must contain positive indices"))
+        length(unique(indices)) == nstate || throw(ArgumentError(
+            "active-to-core mapping must not contain duplicate indices"))
+    end
     size(result.final_jacobian) == (nmeasurement, nstate) || throw(DimensionMismatch(
         "terminal Jacobian has an unexpected shape"))
     size(result.gain_matrix) == (nstate, nmeasurement) || throw(DimensionMismatch(
@@ -156,6 +167,14 @@ function write_retrieval_result(experiment::RetrievalExperiment,
                        long_name="active a priori state")
         _define_vector(output, "final_state", result.final_state, "state";
                        long_name="terminal active retrieval state")
+        if !isnothing(active_to_core)
+            mapping = defVar(
+                output, "active_core_parameter_index", Int16, ("state",))
+            mapping.attrib["long_name"] =
+                "one-based source column in the wrapped core Jacobian"
+            mapping.attrib["index_convention"] = "one-based"
+            mapping[:] = Int16.(active_to_core)
+        end
         prior_covariance = defVar(output, "a_priori_covariance", Float64,
                                   ("state", "state_2"))
         prior_covariance[:, :] = Sa
@@ -300,7 +319,7 @@ function write_retrieval_result(experiment::RetrievalExperiment,
         output.attrib["parameter_names"] = join(parameter_names, " ")
         output.attrib["state_dimension"] = nstate
         output.attrib["nstreams"] = 9
-        output.attrib["jacobian_flavor"] = "OCO_RRS_synth"
+        output.attrib["jacobian_flavor"] = String(jacobian_flavor)
         output.attrib["retrieval_forward_scattering"] = "noRS"
         output.attrib["solar_source"] =
             "solar.out high-resolution transmission * Planck(5777 K)"

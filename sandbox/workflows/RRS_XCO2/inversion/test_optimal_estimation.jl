@@ -133,6 +133,8 @@ end
         write_retrieval_result(
             experiment, realization, result, xa, Sa, ["x1", "x2"];
             output_path=path, xco2_diagnostics,
+            jacobian_flavor="test_boundary_chain",
+            active_to_core=[1, 30],
             provenance=Dict("spectroscopy_database" => "ABSCO"))
         @test isfile(path)
         NCDataset(path) do dataset
@@ -141,6 +143,10 @@ end
             @test dataset.attrib["perturbation_index"] == 1
             @test dataset.attrib["sif_case"] == "off"
             @test dataset.attrib["spectroscopy_database"] == "ABSCO"
+            @test dataset.attrib["jacobian_flavor"] == "test_boundary_chain"
+            @test dataset["active_core_parameter_index"][:] == [1, 30]
+            @test dataset["active_core_parameter_index"].attrib[
+                "index_convention"] == "one-based"
             @test size(dataset["final_jacobian"]) == (4, 2)
             @test size(dataset["gain_matrix"]) == (2, 4)
             @test length(dataset["trial_index"]) == length(result.records)
@@ -150,6 +156,27 @@ end
             @test dataset["XCO2"].attrib["units"] == "ppm"
             @test dataset["injected_measurement_noise"][:] == zeros(4)
             @test dataset.attrib["noise_injected"] == 1
+        end
+
+        # Existing 30-coordinate retrievals remain writable without supplying
+        # the optional round-4 active/core mapping.
+        K30 = zeros(Float64, 4, 30)
+        K30[:, 1:2] .= K
+        xa30 = zeros(30)
+        Sa30 = Matrix{Float64}(I, 30, 30)
+        result30 = solve_optimal_estimation(
+            x -> ForwardEvaluation(K30 * x, K30, ranges),
+            measurement, variance, xa30, Sa30)
+        legacy_path = joinpath(
+            directory, "legacy30", "retrieval_state001_perturbation01.nc")
+        write_retrieval_result(
+            experiment, realization, result30, xa30, Sa30,
+            ["legacy_$index" for index in 1:30]; output_path=legacy_path)
+        NCDataset(legacy_path) do dataset
+            @test dataset.attrib["state_dimension"] == 30
+            @test dataset.attrib["jacobian_flavor"] == "OCO_RRS_synth"
+            @test !haskey(dataset, "active_core_parameter_index")
+            @test size(dataset["final_jacobian"]) == (4, 30)
         end
     end
 end
