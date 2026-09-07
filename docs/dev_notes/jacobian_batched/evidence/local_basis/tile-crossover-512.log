@@ -1,0 +1,10 @@
+TILE_CROSSOVER FT=Float64 n=6 ns=512 directions=3 plain=1.82513e-5 tiled=1.875125e-5 speedup=0.9733377774815012 max_error=0.0
+TILE_CROSSOVER FT=Float64 n=9 ns=512 directions=3 plain=2.46754e-5 tiled=1.961035e-5 speedup=1.258284528323054 max_error=0.0
+TILE_CROSSOVER FT=Float64 n=12 ns=512 directions=3 plain=3.54702e-5 tiled=2.2055450000000002e-5 speedup=1.60822835172259 max_error=0.0
+TILE_CROSSOVER FT=Float64 n=15 ns=512 directions=3 plain=6.598005e-5 tiled=3.4159700000000004e-5 speedup=1.931517255713604 max_error=0.0
+TILE_CROSSOVER FT=Float64 n=18 ns=512 directions=3 plain=8.05254e-5 tiled=5.3256150000000003e-5 speedup=1.5120394545982014 max_error=0.0
+TILE_CROSSOVER FT=Float32 n=6 ns=512 directions=3 plain=1.869565e-5 tiled=1.9922e-5 speedup=0.9384424254592912 max_error=0.0
+TILE_CROSSOVER FT=Float32 n=9 ns=512 directions=3 plain=2.773615e-5 tiled=2.04039e-5 speedup=1.3593553193262073 max_error=0.0
+TILE_CROSSOVER FT=Float32 n=12 ns=512 directions=3 plain=3.62772e-5 tiled=2.0392850000000002e-5 speedup=1.7789176108292855 max_error=0.0
+TILE_CROSSOVER FT=Float32 n=15 ns=512 directions=3 plain=5.8848099999999997e-5 tiled=2.667465e-5 speedup=2.2061432858537975 max_error=0.0
+TILE_CROSSOVER FT=Float32 n=18 ns=512 directions=3 plain=8.288535e-5 tiled=3.4366600000000004e-5 speedup=2.4117995379234487 max_error=0.0

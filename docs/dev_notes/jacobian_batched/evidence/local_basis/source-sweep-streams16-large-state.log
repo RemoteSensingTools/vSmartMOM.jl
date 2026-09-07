@@ -1,0 +1,4 @@
+RESPONSE_METHOD sweep
+RESPONSE_SCENE streams=16 operator_size=57 layers=20 wavelengths=512
+RESPONSE_TIME nSpec=512 layers=20 nparams=1 combined=(median = 4.190996569, samples = [4.190996569, 4.189320057, 4.205249843]) forward=(median = 1.996923332, samples = [1.981361245, 2.007633497, 1.996923332]) ratio=2.098726827335202 dense_comparison=false
+RESPONSE_TIME nSpec=512 layers=20 nparams=60 combined=(median = 4.285989746, samples = [4.285989746, 4.30166434, 4.28280865]) forward=(median = 1.975492488, samples = [1.975406526, 1.990517062, 1.975492488]) ratio=2.169580381618743 dense_comparison=false

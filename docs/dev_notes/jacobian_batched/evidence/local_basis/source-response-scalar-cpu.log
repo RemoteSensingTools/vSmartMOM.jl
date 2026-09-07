@@ -1,0 +1,9 @@
+RESPONSE_METHOD source
+RESPONSE_PARITY nparams=60 field=R error=0.0
+RESPONSE_PARITY nparams=60 field=T error=0.0
+RESPONSE_PARITY nparams=60 field=dR error=3.382710778154774e-17
+RESPONSE_PARITY nparams=60 field=dT error=1.734723475976807e-17
+RESPONSE_TIME nSpec=5 layers=20 nparams=60 combined=(median = 0.082744047, samples = [0.082744047, 0.082929096, 0.082369303]) ratio=3.227793862428199
+CORE_LOCAL nSpec=5 layers=20 pol=1 nparams=60 local_directions=3 combined=(median = 0.212843401, samples = [0.212843401, 0.211837781, 0.215764904]) ratio=8.302888827834877 speedup=4.636146116646576
+CORE_MEASURE nSpec=5 pol=1 nparams=60 forward=(median = 0.025634861, samples = [0.026193732, 0.025136454, 0.025634861]) combined=(median = 0.986773107, samples = [0.985670422, 0.986773107, 0.990546168]) ratio=38.49340579611491
+CORE_FD_PASS nparams=60 all_columns=true endpoints=R,T azimuth=[0.0, 37.0]

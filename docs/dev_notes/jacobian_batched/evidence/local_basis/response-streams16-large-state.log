@@ -1,0 +1,4 @@
+RESPONSE_METHOD source
+RESPONSE_SCENE streams=16 operator_size=57 layers=20 wavelengths=512
+RESPONSE_TIME nSpec=512 layers=20 nparams=1 combined=(median = 4.515846726, samples = [4.504329726, 4.515846726, 4.517014331]) forward=(median = 1.976765252, samples = [1.986478404, 1.976765252, 1.976291029]) ratio=2.2844628219921788 dense_comparison=false
+RESPONSE_TIME nSpec=512 layers=20 nparams=60 combined=(median = 4.513991718, samples = [4.51287785, 4.523698754, 4.513991718]) forward=(median = 1.972573917, samples = [1.992235018, 1.972573917, 1.967888248]) ratio=2.2883764603686583 dense_comparison=false

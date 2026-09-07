@@ -1,0 +1,112 @@
+CORE_LOCAL nSpec=10000 layers=20 pol=3 nparams=8 local_directions=3 combined=(median = 4.958022327, samples = [4.941774431, 4.958022327, 4.971064845]) ratio=6.191992917241243 speedup=1.7921391659759665
+CORE_MEASURE nSpec=10000 pol=3 nparams=8 forward=(median = 0.800715116, samples = [0.797687285, 0.800715116, 0.841258322]) combined=(median = 8.885465998, samples = [8.871162005, 8.885465998, 8.914945447]) ratio=11.096913022433812
+CORE_PROFILE nparams=8 forward
+─────────────────────────────────────────────────────────────────────────────────────
+                                            Time                    Allocations
+                                   ───────────────────────   ────────────────────────
+         Tot / % measured:              1.94s /  39.9%           76.6MiB /   6.3%
+
+Section                    ncalls     time    %tot     avg     alloc    %tot      avg
+─────────────────────────────────────────────────────────────────────────────────────
+doubling                       60    633ms   81.9%  10.5ms   2.57MiB   52.9%  43.8KiB
+  sync_doubling                60    589ms   76.2%  9.81ms    243KiB    4.9%  4.05KiB
+  apply_D_matrix               60   13.3ms    1.7%   222μs    294KiB    5.9%  4.90KiB
+  source_update               630   12.7ms    1.6%  20.1μs    837KiB   16.8%  1.33KiB
+  rt_update                   630   8.63ms    1.1%  13.7μs    650KiB   13.1%  1.03KiB
+  Batch Inv Doubling          630   8.59ms    1.1%  13.6μs    591KiB   11.9%     960B
+  source_update_by_src        630   79.3μs    0.0%   126ns     0.00B    0.0%    0.00B
+  doubling_allocs              60   7.99μs    0.0%   133ns     0.00B    0.0%    0.00B
+interaction                    57    111ms   14.4%  1.95ms   1.51MiB   31.2%  27.2KiB
+  interaction inv1 fused       57   1.41ms    0.2%  24.7μs   59.7KiB    1.2%  1.05KiB
+  interaction inv2 fused       57   1.06ms    0.1%  18.5μs   59.7KiB    1.2%  1.05KiB
+elemental                      60   28.2ms    3.6%   470μs    796KiB   16.0%  13.3KiB
+volume_source                  60   2.16μs    0.0%  35.9ns     0.00B    0.0%    0.00B
+─────────────────────────────────────────────────────────────────────────────────────
+CORE_PROFILE nparams=8 combined
+────────────────────────────────────────────────────────────────────────
+                               Time                    Allocations
+                      ───────────────────────   ────────────────────────
+  Tot / % measured:        9.18s /  96.3%            158MiB /  36.5%
+
+Section       ncalls     time    %tot     avg     alloc    %tot      avg
+────────────────────────────────────────────────────────────────────────
+doubling          60    7.36s   83.3%   123ms   49.4MiB   85.6%   844KiB
+interaction       57    1.21s   13.7%  21.2ms   5.49MiB    9.5%  98.7KiB
+elemental         60    270ms    3.1%  4.50ms   2.84MiB    4.9%  48.5KiB
+────────────────────────────────────────────────────────────────────────
+CORE_LOCAL nSpec=10000 layers=20 pol=3 nparams=20 local_directions=3 combined=(median = 6.977743111, samples = [6.977743111, 6.97830146, 6.949208133]) ratio=8.835288170601265 speedup=2.9612206848696645
+CORE_MEASURE nSpec=10000 pol=3 nparams=20 forward=(median = 0.789758407, samples = [0.789758407, 0.796952592, 0.788876269]) combined=(median = 20.662637234, samples = [20.655567678, 20.662637234, 20.678132517]) ratio=26.163238087568725
+CORE_PROFILE nparams=20 forward
+─────────────────────────────────────────────────────────────────────────────────────
+                                            Time                    Allocations
+                                   ───────────────────────   ────────────────────────
+         Tot / % measured:              800ms /  97.0%           17.5MiB /  27.8%
+
+Section                    ncalls     time    %tot     avg     alloc    %tot      avg
+─────────────────────────────────────────────────────────────────────────────────────
+doubling                       60    637ms   82.1%  10.6ms   2.58MiB   52.8%  43.9KiB
+  sync_doubling                60    597ms   77.0%  10.0ms    243KiB    4.9%  4.05KiB
+  apply_D_matrix               60   13.0ms    1.7%   216μs    301KiB    6.0%  5.02KiB
+  source_update               630   9.20ms    1.2%  14.6μs    837KiB   16.8%  1.33KiB
+  Batch Inv Doubling          630   8.11ms    1.0%  12.9μs    591KiB   11.8%     960B
+  rt_update                   630   8.06ms    1.0%  12.8μs    650KiB   13.0%  1.03KiB
+  source_update_by_src        630   76.5μs    0.0%   121ns     0.00B    0.0%    0.00B
+  doubling_allocs              60   8.09μs    0.0%   135ns     0.00B    0.0%    0.00B
+interaction                    57    111ms   14.3%  1.95ms   1.51MiB   31.1%  27.2KiB
+  interaction inv1 fused       57   1.25ms    0.2%  21.9μs   59.7KiB    1.2%  1.05KiB
+  interaction inv2 fused       57    935μs    0.1%  16.4μs   59.7KiB    1.2%  1.05KiB
+elemental                      60   28.0ms    3.6%   467μs    804KiB   16.1%  13.4KiB
+volume_source                  60   2.04μs    0.0%  34.1ns     0.00B    0.0%    0.00B
+─────────────────────────────────────────────────────────────────────────────────────
+CORE_PROFILE nparams=20 combined
+────────────────────────────────────────────────────────────────────────
+                               Time                    Allocations
+                      ───────────────────────   ────────────────────────
+  Tot / % measured:        20.8s /  98.7%            290MiB /  19.9%
+
+Section       ncalls     time    %tot     avg     alloc    %tot      avg
+────────────────────────────────────────────────────────────────────────
+doubling          60    17.1s   83.6%   286ms   49.5MiB   85.4%   844KiB
+interaction       57    2.82s   13.8%  49.5ms   5.49MiB    9.5%  98.7KiB
+elemental         60    531ms    2.6%  8.85ms   2.94MiB    5.1%  50.2KiB
+────────────────────────────────────────────────────────────────────────
+CORE_LOCAL nSpec=10000 layers=20 pol=3 nparams=60 local_directions=3 combined=(median = 13.479726389, samples = [13.479726389, 13.513404389, 13.44042828]) ratio=15.001382452193576 speedup=4.441812810893547
+CORE_MEASURE nSpec=10000 pol=3 nparams=60 forward=(median = 0.898565611, samples = [0.84717635, 0.901405369, 0.898565611]) combined=(median = 59.874421362, samples = [59.874421362, 59.879283878, 59.806052313]) ratio=66.63333275726707
+Precompiling packages...
+  25787.2 ms  ✓ vSmartMOM
+  11438.9 ms  ✓ vSmartMOM → vSmartMOMCUDAExt
+  2 dependencies successfully precompiled in 39 seconds. 274 already precompiled.
+CORE_PROFILE nparams=60 forward
+─────────────────────────────────────────────────────────────────────────────────────
+                                            Time                    Allocations
+                                   ───────────────────────   ────────────────────────
+         Tot / % measured:              898ms /  97.4%           17.6MiB /  28.0%
+
+Section                    ncalls     time    %tot     avg     alloc    %tot      avg
+─────────────────────────────────────────────────────────────────────────────────────
+doubling                       60    631ms   72.1%  10.5ms   2.59MiB   52.6%  44.1KiB
+  sync_doubling                60    593ms   67.9%  9.89ms    250KiB    5.0%  4.17KiB
+  apply_D_matrix               60   13.3ms    1.5%   221μs    305KiB    6.1%  5.09KiB
+  source_update               630   8.14ms    0.9%  12.9μs    837KiB   16.6%  1.33KiB
+  Batch Inv Doubling          630   7.42ms    0.8%  11.8μs    591KiB   11.7%     960B
+  rt_update                   630   7.27ms    0.8%  11.5μs    650KiB   12.9%  1.03KiB
+  source_update_by_src        630   75.1μs    0.0%   119ns     0.00B    0.0%    0.00B
+  doubling_allocs              60   7.76μs    0.0%   129ns     0.00B    0.0%    0.00B
+interaction                    57    216ms   24.7%  3.79ms   1.54MiB   31.3%  27.6KiB
+  interaction inv1 fused       57   1.37ms    0.2%  24.0μs   59.7KiB    1.2%  1.05KiB
+  interaction inv2 fused       57   1.08ms    0.1%  19.0μs   59.7KiB    1.2%  1.05KiB
+elemental                      60   27.8ms    3.2%   464μs    812KiB   16.1%  13.5KiB
+volume_source                  60   2.04μs    0.0%  34.1ns     0.00B    0.0%    0.00B
+─────────────────────────────────────────────────────────────────────────────────────
+CORE_PROFILE nparams=60 combined
+────────────────────────────────────────────────────────────────────────
+                               Time                    Allocations
+                      ───────────────────────   ────────────────────────
+  Tot / % measured:        60.0s /  98.7%            730MiB /   8.0%
+
+Section       ncalls     time    %tot     avg     alloc    %tot      avg
+────────────────────────────────────────────────────────────────────────
+doubling          60    49.4s   83.4%   823ms   49.8MiB   85.4%   850KiB
+interaction       57    8.27s   14.0%   145ms   5.51MiB    9.5%  99.0KiB
+elemental         60    1.59s    2.7%  26.5ms   3.00MiB    5.1%  51.2KiB
+────────────────────────────────────────────────────────────────────────

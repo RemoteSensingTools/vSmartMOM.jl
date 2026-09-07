@@ -1,0 +1,54 @@
+backend = "cuda"
+julia_version = "1.12.6"
+threads = 4
+chunk_size = 512
+source_sha256 = "0a6930825546a71930f87ee0a74031927b1ecf27eef2ad23a4ac8250938548a8"
+spectral_points = 512
+
+[[measurements]]
+device_allocated_bytes = [352289458563, 352289458563, 352289458563]
+mode = "reference"
+chunk = 1
+seconds = [26.302875183, 26.320919564, 26.366682396]
+max_parity_error = 0.0
+host_bytes = [651364656, 649592816, 649586672]
+[[measurements]]
+device_allocated_bytes = [352025364867, 352025364867, 352025364867]
+mode = "physical"
+chunk = 1
+seconds = [26.450652188, 26.447593285, 26.450935589]
+max_parity_error = 0.0
+host_bytes = [642997616, 643001504, 643000384]
+[[measurements]]
+device_allocated_bytes = [53351508355, 53351508355, 53351508355]
+mode = "local"
+chunk = 1
+seconds = [16.537993802, 16.591388936, 16.604994304]
+max_parity_error = 3.885780586188048e-16
+host_bytes = [616247520, 616247712, 616242176]
+[[measurements]]
+device_allocated_bytes = [5630719563, 5630719563, 5630719563]
+mode = "forward"
+chunk = 1
+seconds = [5.769784716, 5.794618865, 5.820888622]
+max_parity_error = 1.0408340855860843e-17
+host_bytes = [890404560, 890266400, 890290240]
+
+[totals_seconds]
+local = [16.537993802, 16.591388936, 16.604994304]
+forward = [5.769784716, 5.794618865, 5.820888622]
+reference = [26.302875183, 26.320919564, 26.366682396]
+physical = [26.450652188, 26.447593285, 26.450935589]
+
+[medians_seconds]
+local = 16.591388936
+forward = 5.794618865
+reference = 26.320919564
+physical = 26.450652188
+
+[configuration]
+AUDIT_BACKEND = "cuda"
+AUDIT_OUTPUT = "/tmp/vsmartmom-jacobian-evidence/cached-inverse-streams16.toml"
+AUDIT_STREAMS = "16"
+AUDIT_NSPEC = "512"
+AUDIT_COMPARE_INVERSE = "true"

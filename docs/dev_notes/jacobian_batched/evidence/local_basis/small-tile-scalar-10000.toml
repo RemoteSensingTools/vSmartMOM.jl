@@ -1,0 +1,54 @@
+backend = "cuda"
+julia_version = "1.12.6"
+threads = 4
+chunk_size = 10000
+source_sha256 = "10e676e049a7be64063279200772a6a0328c12d8e5918aea61989a630d501a04"
+spectral_points = 10000
+
+[[measurements]]
+device_allocated_bytes = [13948713428, 13948713428, 13948713428]
+mode = "reference"
+chunk = 1
+seconds = [0.983443678, 0.843130426, 0.847670913]
+max_parity_error = 0.0
+host_bytes = [171878352, 171870416, 171861968]
+[[measurements]]
+device_allocated_bytes = [13948713428, 13948713428, 13948713428]
+mode = "physical"
+chunk = 1
+seconds = [0.763771015, 0.766608508, 0.781503653]
+max_parity_error = 0.0
+host_bytes = [171276880, 171274208, 171264720]
+[[measurements]]
+device_allocated_bytes = [3666233428, 3666233428, 3666233428]
+mode = "local"
+chunk = 1
+seconds = [0.504904192, 0.495724284, 0.497657969]
+max_parity_error = 4.440892098500626e-16
+host_bytes = [159377816, 159374856, 159383048]
+[[measurements]]
+device_allocated_bytes = [321185280, 321185280, 321185280]
+mode = "forward"
+chunk = 1
+seconds = [0.11113357, 0.107838314, 0.108242274]
+max_parity_error = 5.377642775528102e-17
+host_bytes = [19175336, 19165704, 19165784]
+
+[totals_seconds]
+local = [0.504904192, 0.495724284, 0.497657969]
+forward = [0.11113357, 0.107838314, 0.108242274]
+reference = [0.983443678, 0.843130426, 0.847670913]
+physical = [0.763771015, 0.766608508, 0.781503653]
+
+[medians_seconds]
+local = 0.497657969
+forward = 0.108242274
+reference = 0.847670913
+physical = 0.766608508
+
+[configuration]
+AUDIT_OUTPUT = "/tmp/vsmartmom-jacobian-evidence/small-tile-scalar-10000.toml"
+AUDIT_BACKEND = "cuda"
+AUDIT_COMPARE_TILES = "true"
+AUDIT_NSPEC = "10000"
+AUDIT_POL = "Stokes_I()"

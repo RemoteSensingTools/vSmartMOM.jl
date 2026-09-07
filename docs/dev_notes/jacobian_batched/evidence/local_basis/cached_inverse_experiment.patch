@@ -1,0 +1,104 @@
+diff --git a/ext/gpu_jacobian_cuda.jl b/ext/gpu_jacobian_cuda.jl
+index b2b3e0c9..ae1c505f 100644
+--- a/ext/gpu_jacobian_cuda.jl
++++ b/ext/gpu_jacobian_cuda.jl
+@@ -5 +5 @@
+-struct CUDAJacobianProducts{P}
++struct CUDAJacobianProducts{P,V,I}
+@@ -6,0 +7,2 @@ struct CUDAJacobianProducts{P}
++    pivot::V
++    info::I
+@@ -13 +15,29 @@ function CoreRT.make_jacobian_products(A::CuArray{FT,3,CUDA.DeviceMemory}, np) w
+-    CUDAJacobianProducts(Dict{NTuple{5,UInt},Tuple{Any,P}}())
++    CUDAJacobianProducts(Dict{NTuple{5,UInt},Tuple{Any,P}}(),
++        CuArray{Cint}(undef,size(A,1),size(A,3)),CuArray{Cint}(undef,size(A,3)))
++end
++
++# As in the forward pointer-based inverse, LU and inverse construction share
++# one CUDA stream. The plan owns pivots/info as well as matrix pointers, so
++# different solves never share mutable factorization scratch.
++for (FT,factor,invert) in ((Float64,:cublasDgetrfBatched,:cublasDgetriBatched),
++                           (Float32,:cublasSgetrfBatched,:cublasSgetriBatched))
++    @eval function _vendor_jacobian_inverse!(cache,G::AbstractArray{$FT},A)
++        n,ns=size(G,1),size(G,3)
++        Ap=_jacobian_pointers!(cache,A,ns,1)
++        Gp=_jacobian_pointers!(cache,G,ns,1)
++        CUDA.CUBLAS.$factor(CUDA.CUBLAS.handle(),n,Ap,n,cache.pivot,cache.info,ns)
++        CUDA.CUBLAS.$invert(CUDA.CUBLAS.handle(),n,Ap,n,cache.pivot,Gp,n,cache.info,ns)
++        return G
++    end
++end
++
++function CoreRT._jacobian_inverse_with_plan!(cache::CUDAJacobianProducts,G,tmp,A,B,I_static)
++    n,ns=size(G,1),size(G,3)
++    compatible = ndims(G)==3 && size(cache.pivot)==(n,ns) &&
++        size(G)==size(tmp)==size(A)==size(B) &&
++        stride(G,1)==stride(tmp,1)==1 && stride(G,2)==stride(tmp,2)==n
++    (CoreRT._CACHED_JACOBIAN_INVERSE_ENABLED[] && compatible) ||
++        return CoreRT._jacobian_geometric_inverse!(G,tmp,A,B,I_static)
++    CoreRT._bmm!(tmp,A,B)
++    tmp .= I_static .- tmp
++    return _vendor_jacobian_inverse!(cache,G,tmp)
+@@ -84 +114 @@ function Base.deepcopy_internal(cache::CUDAJacobianProducts, stack::IdDict)
+-    copy = CUDAJacobianProducts(empty(cache.pointers))
++    copy = CUDAJacobianProducts(empty(cache.pointers),similar(cache.pivot),similar(cache.info))
+diff --git a/src/CoreRT/CoreKernel/jacobian_batched.jl b/src/CoreRT/CoreKernel/jacobian_batched.jl
+index 1b518af2..6e594bd3 100644
+--- a/src/CoreRT/CoreKernel/jacobian_batched.jl
++++ b/src/CoreRT/CoreKernel/jacobian_batched.jl
+@@ -17,0 +18 @@ const _VENDOR_JACOBIANS_ENABLED = Ref(true)
++const _CACHED_JACOBIAN_INVERSE_ENABLED = Ref(false)
+@@ -34,3 +35,4 @@ _jacobian_tiles_supported(::Any) = false
+-Optional backend plan for matrix products in one Jacobian solve. The portable
+-path needs no plan. CUDA specializes this factory to reuse spectral/parameter
+-pointer batches for medium square operators; the workspace owns their lifetime.
++Optional backend plan for matrix products and inverses in one Jacobian solve.
++The portable path needs no plan. CUDA specializes this factory to reuse
++spectral/parameter pointer batches and LU scratch for medium square operators;
++the workspace owns their lifetime.
+@@ -225,0 +228,5 @@ end
++@inline _jacobian_geometric_inverse!(w::JacobianPropagationWorkspace,R₁,R₂,I_static) =
++    _jacobian_inverse_with_plan!(w.products,w.G,w.m1,R₁,R₂,I_static)
++_jacobian_inverse_with_plan!(::Nothing,G,tmp,R₁,R₂,I_static) =
++    _jacobian_geometric_inverse!(G,tmp,R₁,R₂,I_static)
++
+@@ -263 +270 @@ function doubling_batched_lin!(pol_type, expk, ndoubl, a, da, I_static, dτ, μ
+-        _jacobian_geometric_inverse!(w.G, w.m1, r, r, I_static)
++        _jacobian_geometric_inverse!(w, r, r, I_static)
+@@ -337 +344 @@ function _interaction_direction_lin!(w, R, dR, Rout, dRout, Tleft, dTleft,
+-    _jacobian_geometric_inverse!(w.G, w.m1, R, Rout, I_static)
++    _jacobian_geometric_inverse!(w, R, Rout, I_static)
+diff --git a/src/CoreRT/types_lin.jl b/src/CoreRT/types_lin.jl
+index f442afc4..0bfb2755 100644
+--- a/src/CoreRT/types_lin.jl
++++ b/src/CoreRT/types_lin.jl
+@@ -11 +11 @@ The last tangent axis holds either local optical directions or retrieval
+-columns. `products` owns optional backend multiplication metadata; it shares
++columns. `products` owns optional backend multiplication metadata and LU scratch; it shares
+diff --git a/test/test_jacobian_vendor.jl b/test/test_jacobian_vendor.jl
+index 7bd2423f..4941044b 100644
+--- a/test/test_jacobian_vendor.jl
++++ b/test/test_jacobian_vendor.jl
+@@ -1 +1 @@
+-using Test, Random, vSmartMOM
++using Test, Random, LinearAlgebra, vSmartMOM
+@@ -46,0 +47,19 @@ if get(ENV,"VSMARTMOM_JACOBIAN_GPU_TEST","false") == "true"
++        # Reuse the same LU buffers over changing matrices; check the defining
++        # inverse identity against an independent host solve, including a copied
++        # plan. This catches stale pointer/pivot reuse across successive calls.
++        inverse_flag=C._CACHED_JACOBIAN_INVERSE_ENABLED[]
++        try
++            C._CACHED_JACOBIAN_INVERSE_ENABLED[]=true
++            ident=CuArray(Matrix{FT}(I,n,n))
++            for cache in (w.products,copy), scale in (FT(0.01),FT(0.03))
++                left,right=A.*scale,B.*scale
++                C._jacobian_inverse_with_plan!(cache,w.G,w.m1,left,right,ident)
++                hG,hA,hB=Array(w.G),Array(left),Array(right)
++                @test all(s->isapprox(hG[:,:,s],inv(I-hA[:,:,s]*hB[:,:,s]);
++                    rtol=300eps(FT),atol=300eps(FT)),1:ns)
++            end
++            @test pointer(copy.pivot) != pointer(w.products.pivot)
++            @test pointer(copy.info) != pointer(w.products.info)
++        finally
++            C._CACHED_JACOBIAN_INVERSE_ENABLED[]=inverse_flag
++        end

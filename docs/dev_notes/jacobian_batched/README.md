@@ -1,6 +1,7 @@
 # Batched Jacobian propagation
 
-Latest investigation: [IQU bottlenecks and core-optics cost](iqu_followup.md).
+Latest investigation: [local optical basis and remaining adding cost](local_basis.md).
+Previous investigation: [IQU bottlenecks and core-optics cost](iqu_followup.md).
 Scientific review: [core derivatives, truncation and state-vector scaling](paper_review.md).
 Historical implementation: [Fortran ordering and ideas retained for Julia](fortran_ordering.md).
 
@@ -23,9 +24,12 @@ Jacobian layouts stay the same.
 On GPU, wavelength and parameter form one launch axis. A forward 3D matrix is
 shared directly across parameters; a derivative operand stays 4D. There are no
 per-column CuArray views to materialize and no duplicated forward matrices or
-host-generated pointer arrays for these products. For CUDA square operators of size 16–32 and at least 512 wavelengths, a
-workgroup stages operands in shared memory for reuse across all output entries.
-Small operators and source-vector products use the simpler element kernel. CPU uses in-place BLAS slices, with a serial path for
+host-generated pointer arrays for these products. For CUDA square operators of
+size 6–32 and at least 512 wavelengths, a workgroup stages operands in shared
+memory for reuse across all output entries. Sizes 33–64 use solve-owned cuBLAS
+pointer batches generated on the device, with portable blocked kernels as the
+layout fallback. Smaller operators and source-vector products use the simpler
+element kernel. CPU uses in-place BLAS slices, with a serial path for
 small work and a coarser wavelength × parameter partition for larger work.
 
 The propagation workspace lives with `AddedLayerLin` and is reused across layers
@@ -35,11 +39,13 @@ before committing the new composite; the two directions share one implementation
 of the product-rule algebra. The forward inverse is computed once per direction
 and reused for every parameter.
 
-The new path is enabled for Float32/Float64 CPU arrays and GPU operators up to
-32×32. Larger GPU operators, other numeric types and manually constructed layers
-without the workspace use the existing implementation. The 32×32 boundary is a
-conservative development limit, not a measured crossover. Metal uses the portable
-kernel machinery but was not hardware-tested here.
+The path is enabled for Float32/Float64 CPU arrays and GPU operators up to
+32×32. CUDA additionally uses 16×16 blocked products for operators 33–64
+with at least 512 wavelengths, validated in the 8/16-stream IQU follow-up.
+Larger operators, smaller batches above 32, other numeric types and manually
+constructed layers without the workspace use the existing implementation.
+These are conservative measured coverage limits, not universal crossover
+points. Metal uses the portable kernel machinery but was not hardware-tested here.
 
 `CoreRT._BATCHED_JACOBIANS_ENABLED[]` is a private diagnostic switch for A/B tests.
 Do not change it concurrently with RT solves. The reference equations remain in
@@ -266,8 +272,9 @@ and mixing work is now a higher priority. See `evidence/timer-new-cuda.log`.
 
 The remaining launches include source attenuation, broadcasts and writeback,
 forward products/inverses, and the special interaction cases. Further fusion
-should target these measured costs. For larger GPU operators, compare tiled
-product-rule kernels with vendor batched BLAS before changing the current gate.
+should target these measured costs. For operators beyond the measured CUDA
+range, compare tiled product-rule kernels with vendor batched BLAS before
+extending the current gate.
 Reuse of upstream Mie/phase tangents and more general active layouts remain
 separate opportunities. Each extension needs parity and finite-difference checks
 as well as warmed runtime, allocation and launch-count measurements.

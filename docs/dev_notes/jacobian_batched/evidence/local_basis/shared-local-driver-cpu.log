@@ -1,0 +1,3 @@
+CORE_LOCAL nSpec=2 layers=20 pol=3 nparams=2 local_directions=3 combined=(median = 0.122470305, samples = [0.122470305, 0.119728169, 0.136681123]) ratio=2.8344677502158535 speedup=0.7883558630804423
+CORE_MEASURE nSpec=2 pol=3 nparams=2 forward=(median = 0.043207514, samples = [0.046264171, 0.03573743, 0.043207514]) combined=(median = 0.096550183, samples = [0.100240821, 0.08919297, 0.096550183]) ratio=2.2345692695950983
+CORE_FD_PASS nparams=2 all_columns=true endpoints=R,T azimuth=[0.0, 37.0]

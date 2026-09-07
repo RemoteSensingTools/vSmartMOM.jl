@@ -1,0 +1,19 @@
+Precompiling packages...
+  14181.3 ms  ✓ vSmartMOM → vSmartMOMCUDAExt
+  1 dependency successfully precompiled in 15 seconds. 275 already precompiled.
+
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:32[K
+Looping over layers ... 100%|████████████████████████████| Time: 0:00:21[K
+
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:10[K
+Looping over layers ... 100%|████████████████████████████| Time: 0:00:06[K
+
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:23[K
+Looping over layers ... 100%|████████████████████████████| Time: 0:00:15[K
+
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:05[K
+Looping over layers ... 100%|████████████████████████████| Time: 0:00:03[K
+Test Summary:              | Pass  Total     Time
+Actual external/local CUDA |  311    311  4m47.9s
+Test Summary:               | Pass  Total   Time
+CUDA Jacobian pointer plans |  108    108  16.0s
