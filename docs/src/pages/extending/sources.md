@@ -106,6 +106,18 @@ is rejected because it cannot establish physical radiance units.
 
 ## Differentiation
 
+Forward source support and a declared AD mode do not establish end-to-end
+Jacobian support. The current linearized driver accepts `SolarBeam`,
+`SurfaceSIF`, `NoSource`, and compositions of these. It rejects thermal and
+other source types whose complete tangent propagation is not implemented.
+The opt-in `jacobian_adding=:source` path additionally restricts surfaces and
+observers to its supported Lambertian endpoint configurations.
+
+To extend this support, implement source values and derivatives through
+elemental construction, doubling, adding, surface coupling, and output
+reconstruction, then validate against forward finite differences. Merely
+declaring `AnalyticSourceJacobian` or `ForwardDiffSourceJacobian` is insufficient.
+
 `AbstractSourceADMode` traits declare how each source's parameters
 participate in linearized RT:
 

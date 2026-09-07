@@ -204,8 +204,8 @@ build**, including independent finite differences and mixed selections.
 
 The shared shift from the historical archive remains unchanged: 0.01375 noise
 units and about 0.146% in the worst Jacobian column, caused by the preceding
-precision repair. Full inversion convergence remains untested. Parameter
-deepcopy still copies 3.767 GB of LUT data and took 2.96 s in the isolated copy
+precision repair. At this stage full inversion convergence was untested. Parameter
+deepcopy copied 3.767 GB of LUT data and took 2.96 s in the isolated copy
 probe; removing that copy is now a substantial remaining evaluation cost.
 See [the selected-basis evidence](evidence/selected_basis/README.md) for the
 timings, logs, array hashes and independent NumPy/HDF5 verification.
@@ -235,13 +235,39 @@ measurements and all 30 Jacobian columns with either copy policy. An A → B →
 sequence reproduces A exactly, and checks confirm that the template and every
 loaded coefficient-array hash remain unchanged. The 53 portable copy/model
 checks and strict docs build pass. All 154 study source/configuration hashes
-remain unchanged; this is still an isolated adapter replay, not a migrated
-campaign or a complete inversion-convergence test.
+remain unchanged; this particular experiment tested isolated evaluations,
+not complete inversion convergence (see the subsequent comparison below).
 
 The [LUT-sharing evidence](evidence/shared_luts/README.md) includes the precise
 integration patch, which passed `git apply --check` against the inspected
 study checkout. The patch enables source adding and the shared copy policy;
 it requires the optimized package and has not been applied to the active study.
+
+## Full retrieval comparison and extension review
+
+The subsequent [convergence comparison](evidence/convergence/README.md) runs
+six pairs through the unchanged study OE solver: clear/aerosol corrected and
+uncorrected archived observations, plus two controlled synthetic SIF additions.
+All twelve inversions converge with the same accepted/rejected sequences in
+each pair. The largest XCO2 difference between direct physical/matrix and
+optimized local/source/shared-LUT propagation is **0.000449 ppm**; the largest
+prior-scaled state difference is **0.000236 σ**. Priors, noise and stopping
+settings are preserved.
+
+The full predeclared comparison gate **does not pass**. Three aerosol pairs
+exceed its 0.01-noise spectral threshold, reaching 0.02076 noise units, despite
+passing the XCO2, state, cost, posterior and decision criteria. Keep this
+limitation visible before migrating a campaign; the evidence includes a
+focused same-state/discretization diagnostic. The SIF additions are a controlled
+linear-SIF test, not a released full-template Raman/SIF truth replay.
+
+The [extension review](extension_review.md) recommends preserving the supplied-
+tangent analytic MOM core while strengthening parameter identity, upstream
+derivative availability, component descriptors, source propagation and
+measurement-coordinate boundaries. Two immediate gaps are fixed: compiled
+plans cannot select disabled upstream derivatives, and unsupported sources
+cannot silently enter the linearized driver. The new contract tests and
+existing selective/source regressions pass 166 checks; strict docs pass.
 
 ## Integration priorities
 

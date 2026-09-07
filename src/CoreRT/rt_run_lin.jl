@@ -23,6 +23,13 @@ the model. The latter should generally be used by users.
 
 =#
 
+# A forward source implementation or an AD-mode declaration does not establish
+# end-to-end tangent support. New source types must first be wired through
+# elemental, doubling, adding, and output propagation before opting in here.
+_linearized_source_supported(::AbstractSource) = false
+_linearized_source_supported(::Union{SolarBeam,SurfaceSIF,NoSource}) = true
+_linearized_source_supported(s::SourceSet) = all(_linearized_source_supported, s.sources)
+
 """
     rt_run(model::RTModel, lin_model, NAer, NGas, NSurf; i_band=1)
 
@@ -224,6 +231,10 @@ function rt_run(RS_type::AbstractRamanType,
     # in scope for the surface step (`surface_source_contribute!`) that
     # routes SurfaceSIF / future per-source surface contributions.
     effective_sources = sources === nothing ? model.sources : sources
+    _linearized_source_supported(effective_sources) || throw(ArgumentError(
+        "Linearized RT supports SolarBeam, SurfaceSIF, and NoSource only; " *
+        "$(typeof(effective_sources)) requires end-to-end source tangent propagation. " *
+        "A source_ad_mode declaration alone does not provide this implementation."))
     validate_sif_solar_spectrum(effective_sources)
     NSIF = surface_sif_parameter_count(effective_sources)
     layout = active_layout === nothing ?

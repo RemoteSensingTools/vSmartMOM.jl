@@ -279,6 +279,7 @@ cd docs && julia --project=. make.jl
 4. **Where does this paper equation map in the code?** → `theory_references.md` Sections A–J.
 5. **How should I write a new feature?** → Check `CLAUDE.md` for the "Common Workflows" patterns (adding a surface BRDF, adding a test, modifying YAML parsing).
 6. **How do retrieval-selective Jacobians work?** → Read `docs/dev_notes/selective_jacobian_plans.md` for the exact local/global layouts, early-selection allocation path, coordinate transforms, extension contract, and finite-difference record.
+7. **How should Jacobians extend to new physics or retrievals?** → Read `docs/dev_notes/jacobian_batched/extension_review.md` for the current boundaries, implementation gaps, and validation contract. Forward source support and an AD-mode declaration do not prove linearized support; selected columns must have enabled upstream derivatives.
 
 ## Maintenance contract for this file
 

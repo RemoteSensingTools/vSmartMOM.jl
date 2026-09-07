@@ -255,6 +255,17 @@ covariances.
 No retrieval-specific method should be added to elemental, doubling, or
 interaction kernels.
 
+Model construction validates that the compiled plan does not select native
+microphysics or q-driven H2O columns disabled by the effective upstream
+options (including explicit keyword overrides). Disabled tangents are not
+valid zero sensitivities. Manually wrapping supplied tangents in
+`PlannedRTModelLin` retains caller responsibility for their provenance.
+
+For extensions beyond selection of existing native fields, see the
+[Jacobian architecture review](jacobian_batched/extension_review.md): it covers
+stable retrieval identities, optical tangent providers, source capabilities,
+coordinate maps, and a staged validation contract.
+
 ## Validation record
 
 The regression is `test/test_selective_jacobians.jl`. Run it from `test/`:

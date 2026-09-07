@@ -1,0 +1,352 @@
+{
+  "limits": {
+    "xco2_ppm": 0.01,
+    "state_prior_sigma": 0.01,
+    "measurement_noise_sigma": 0.01,
+    "relative_cost": 0.001,
+    "scaled_posterior_relative_l2": 0.001
+  },
+  "checks": [
+    {
+      "case": "state001_corrected_siffalse",
+      "metrics": {
+        "xco2_ppm": 3.7526521623476583e-06,
+        "state_prior_sigma": 9.057075063437935e-06,
+        "measurement_noise_sigma": 0.0002974890808884655,
+        "relative_cost": 2.302743298201393e-06,
+        "scaled_posterior_relative_l2": 1.004022180377045e-06
+      },
+      "same_decisions": true,
+      "passed": true,
+      "archive_comparison": {
+        "xco2_change_ppm": -1.1535209694102377e-05,
+        "archived_outcome": 1,
+        "archived_trials": 3,
+        "archived_rejected": 0
+      },
+      "reference": {
+        "xco2_ppm": 397.5837922013509,
+        "synthetic_sif": false,
+        "mode": "reference",
+        "chi_squared": [
+          1.0411539684413877,
+          1.0342559886628175,
+          0.9889578355416869
+        ],
+        "rejected": 0,
+        "case": "state001_corrected_siffalse",
+        "outcome": 1,
+        "converged": true,
+        "input_sha256": "f17e19c8f17382a163cf91dccb86461935250a67dc84253b244ef2e9e399a06f",
+        "input": "/home/sanghavi/code/github/uni_vSmartMOM/RRS_XCO2/bottom_layer_XCO2_retrievals/retrievals_acos_mapped_tapered_vertical_correlation_nosif/corrected/retrieval_state001_perturbation10.nc",
+        "seconds": 223.011824425,
+        "cost": 2825.8878282501005,
+        "trials": 3
+      },
+      "optimized": {
+        "xco2_ppm": 397.58379595400305,
+        "synthetic_sif": false,
+        "mode": "optimized",
+        "chi_squared": [
+          1.041156731771741,
+          1.0342611644157667,
+          0.9889575191901031
+        ],
+        "rejected": 0,
+        "case": "state001_corrected_siffalse",
+        "outcome": 1,
+        "converged": true,
+        "input_sha256": "f17e19c8f17382a163cf91dccb86461935250a67dc84253b244ef2e9e399a06f",
+        "input": "/home/sanghavi/code/github/uni_vSmartMOM/RRS_XCO2/bottom_layer_XCO2_retrievals/retrievals_acos_mapped_tapered_vertical_correlation_nosif/corrected/retrieval_state001_perturbation10.nc",
+        "seconds": 31.205453035,
+        "cost": 2825.8943355443585,
+        "trials": 3
+      }
+    },
+    {
+      "case": "state001_uncorrected_siffalse",
+      "metrics": {
+        "xco2_ppm": 1.876258579613932e-06,
+        "state_prior_sigma": 3.1663599232937636e-06,
+        "measurement_noise_sigma": 0.0002463977487708091,
+        "relative_cost": 9.823101287213085e-07,
+        "scaled_posterior_relative_l2": 4.5500615306242015e-07
+      },
+      "same_decisions": true,
+      "passed": true,
+      "archive_comparison": {
+        "xco2_change_ppm": 7.302333125380756e-05,
+        "archived_outcome": 1,
+        "archived_trials": 3,
+        "archived_rejected": 0
+      },
+      "reference": {
+        "xco2_ppm": 397.57750046095487,
+        "synthetic_sif": false,
+        "mode": "reference",
+        "chi_squared": [
+          1.0380458279029687,
+          1.0343763886851183,
+          0.9891029229590205
+        ],
+        "rejected": 0,
+        "case": "state001_uncorrected_siffalse",
+        "outcome": 1,
+        "converged": true,
+        "input_sha256": "0e5b4ab6af5d71791186f4a968c823c6cd465446ce2ac7db61d462d972c1e823",
+        "input": "/home/sanghavi/code/github/uni_vSmartMOM/RRS_XCO2/bottom_layer_XCO2_retrievals/retrievals_acos_mapped_tapered_vertical_correlation_nosif/uncorrected/retrieval_state001_perturbation10.nc",
+        "seconds": 68.886821075,
+        "cost": 2818.7730463535972,
+        "trials": 3
+      },
+      "optimized": {
+        "xco2_ppm": 397.5774985846963,
+        "synthetic_sif": false,
+        "mode": "optimized",
+        "chi_squared": [
+          1.0380434290012435,
+          1.0343767351940147,
+          0.9891021543164742
+        ],
+        "rejected": 0,
+        "case": "state001_uncorrected_siffalse",
+        "outcome": 1,
+        "converged": true,
+        "input_sha256": "0e5b4ab6af5d71791186f4a968c823c6cd465446ce2ac7db61d462d972c1e823",
+        "input": "/home/sanghavi/code/github/uni_vSmartMOM/RRS_XCO2/bottom_layer_XCO2_retrievals/retrievals_acos_mapped_tapered_vertical_correlation_nosif/uncorrected/retrieval_state001_perturbation10.nc",
+        "seconds": 20.692115357,
+        "cost": 2818.7702774442832,
+        "trials": 3
+      }
+    },
+    {
+      "case": "state035_corrected_siffalse",
+      "metrics": {
+        "xco2_ppm": 0.0004489890797572116,
+        "state_prior_sigma": 0.0002359113402633506,
+        "measurement_noise_sigma": 0.017238189118121312,
+        "relative_cost": 4.940374807612236e-05,
+        "scaled_posterior_relative_l2": 2.2674886551025812e-05
+      },
+      "same_decisions": true,
+      "passed": false,
+      "archive_comparison": {
+        "xco2_change_ppm": 0.0010116385952301243,
+        "archived_outcome": 1,
+        "archived_trials": 5,
+        "archived_rejected": 1
+      },
+      "reference": {
+        "xco2_ppm": 402.82687450307304,
+        "synthetic_sif": false,
+        "mode": "reference",
+        "chi_squared": [
+          1.0000141810744678,
+          1.0620620040396576,
+          1.0049279425154831
+        ],
+        "rejected": 1,
+        "case": "state035_corrected_siffalse",
+        "outcome": 1,
+        "converged": true,
+        "input_sha256": "b9765c0f58a6da5e798f6788a2a4c893f8474e0804aeff298f62cc18a1659e52",
+        "input": "/home/sanghavi/code/github/uni_vSmartMOM/RRS_XCO2/bottom_layer_XCO2_retrievals/retrievals_acos_mapped_tapered_vertical_correlation_nosif/corrected/retrieval_state035_perturbation10.nc",
+        "seconds": 119.450962826,
+        "cost": 2840.8065179838936,
+        "trials": 5
+      },
+      "optimized": {
+        "xco2_ppm": 402.8264255139933,
+        "synthetic_sif": false,
+        "mode": "optimized",
+        "chi_squared": [
+          1.0002367504082723,
+          1.0620292181089013,
+          1.004887561163835
+        ],
+        "rejected": 1,
+        "case": "state035_corrected_siffalse",
+        "outcome": 1,
+        "converged": true,
+        "input_sha256": "b9765c0f58a6da5e798f6788a2a4c893f8474e0804aeff298f62cc18a1659e52",
+        "input": "/home/sanghavi/code/github/uni_vSmartMOM/RRS_XCO2/bottom_layer_XCO2_retrievals/retrievals_acos_mapped_tapered_vertical_correlation_nosif/corrected/retrieval_state035_perturbation10.nc",
+        "seconds": 36.652541876,
+        "cost": 2840.946864473441,
+        "trials": 5
+      }
+    },
+    {
+      "case": "state035_corrected_siftrue",
+      "metrics": {
+        "xco2_ppm": 0.00011083894150942797,
+        "state_prior_sigma": 0.00010973064917655945,
+        "measurement_noise_sigma": 0.02075519975739446,
+        "relative_cost": 0.0001078610800430592,
+        "scaled_posterior_relative_l2": 2.4255434509477458e-05
+      },
+      "same_decisions": true,
+      "passed": false,
+      "archive_comparison": null,
+      "reference": {
+        "xco2_ppm": 402.8545830859814,
+        "synthetic_sif": true,
+        "mode": "reference",
+        "chi_squared": [
+          0.9989237405269689,
+          1.062213019428962,
+          1.0048609129683743
+        ],
+        "rejected": 1,
+        "case": "state035_corrected_siftrue",
+        "outcome": 1,
+        "converged": true,
+        "input_sha256": "b9765c0f58a6da5e798f6788a2a4c893f8474e0804aeff298f62cc18a1659e52",
+        "input": "/home/sanghavi/code/github/uni_vSmartMOM/RRS_XCO2/bottom_layer_XCO2_retrievals/retrievals_acos_mapped_tapered_vertical_correlation_nosif/corrected/retrieval_state035_perturbation10.nc",
+        "seconds": 114.129385807,
+        "cost": 2839.3394459224514,
+        "trials": 5
+      },
+      "optimized": {
+        "xco2_ppm": 402.8546939249229,
+        "synthetic_sif": true,
+        "mode": "optimized",
+        "chi_squared": [
+          0.9991493690199391,
+          1.0623439579725382,
+          1.0048504914897411
+        ],
+        "rejected": 1,
+        "case": "state035_corrected_siftrue",
+        "outcome": 1,
+        "converged": true,
+        "input_sha256": "b9765c0f58a6da5e798f6788a2a4c893f8474e0804aeff298f62cc18a1659e52",
+        "input": "/home/sanghavi/code/github/uni_vSmartMOM/RRS_XCO2/bottom_layer_XCO2_retrievals/retrievals_acos_mapped_tapered_vertical_correlation_nosif/corrected/retrieval_state035_perturbation10.nc",
+        "seconds": 35.320120846,
+        "cost": 2839.6457001416975,
+        "trials": 5
+      }
+    },
+    {
+      "case": "state035_uncorrected_siffalse",
+      "metrics": {
+        "xco2_ppm": 5.446182314017278e-05,
+        "state_prior_sigma": 5.5371480081286596e-05,
+        "measurement_noise_sigma": 0.008716945297781817,
+        "relative_cost": 1.940245776657323e-05,
+        "scaled_posterior_relative_l2": 6.6582421192797445e-06
+      },
+      "same_decisions": true,
+      "passed": true,
+      "archive_comparison": {
+        "xco2_change_ppm": 0.0005030473376450573,
+        "archived_outcome": 1,
+        "archived_trials": 5,
+        "archived_rejected": 1
+      },
+      "reference": {
+        "xco2_ppm": 402.95884354295316,
+        "synthetic_sif": false,
+        "mode": "reference",
+        "chi_squared": [
+          1.0063908915281154,
+          1.0623235878969555,
+          1.0065002053539445
+        ],
+        "rejected": 1,
+        "case": "state035_uncorrected_siffalse",
+        "outcome": 1,
+        "converged": true,
+        "input_sha256": "988b14772d174e12936ba2968a8b53c40641f2235609f0f3472017c60646cfbd",
+        "input": "/home/sanghavi/code/github/uni_vSmartMOM/RRS_XCO2/bottom_layer_XCO2_retrievals/retrievals_acos_mapped_tapered_vertical_correlation_nosif/uncorrected/retrieval_state035_perturbation10.nc",
+        "seconds": 116.35494687,
+        "cost": 2846.3340430309086,
+        "trials": 5
+      },
+      "optimized": {
+        "xco2_ppm": 402.95878908113,
+        "synthetic_sif": false,
+        "mode": "optimized",
+        "chi_squared": [
+          1.0063724499665692,
+          1.0622855272122669,
+          1.0064932803380844
+        ],
+        "rejected": 1,
+        "case": "state035_uncorrected_siffalse",
+        "outcome": 1,
+        "converged": true,
+        "input_sha256": "988b14772d174e12936ba2968a8b53c40641f2235609f0f3472017c60646cfbd",
+        "input": "/home/sanghavi/code/github/uni_vSmartMOM/RRS_XCO2/bottom_layer_XCO2_retrievals/retrievals_acos_mapped_tapered_vertical_correlation_nosif/uncorrected/retrieval_state035_perturbation10.nc",
+        "seconds": 35.80151733,
+        "cost": 2846.278817154849,
+        "trials": 5
+      }
+    },
+    {
+      "case": "state035_uncorrected_siftrue",
+      "metrics": {
+        "xco2_ppm": 0.00014244366661841923,
+        "state_prior_sigma": 0.00022338575317282748,
+        "measurement_noise_sigma": 0.013306101134413025,
+        "relative_cost": 2.0676708403201408e-05,
+        "scaled_posterior_relative_l2": 1.2516520991156866e-05
+      },
+      "same_decisions": true,
+      "passed": false,
+      "archive_comparison": null,
+      "reference": {
+        "xco2_ppm": 402.9873324783554,
+        "synthetic_sif": true,
+        "mode": "reference",
+        "chi_squared": [
+          1.0082865704279331,
+          1.0626106843172307,
+          1.0068107709749685
+        ],
+        "rejected": 1,
+        "case": "state035_uncorrected_siftrue",
+        "outcome": 1,
+        "converged": true,
+        "input_sha256": "988b14772d174e12936ba2968a8b53c40641f2235609f0f3472017c60646cfbd",
+        "input": "/home/sanghavi/code/github/uni_vSmartMOM/RRS_XCO2/bottom_layer_XCO2_retrievals/retrievals_acos_mapped_tapered_vertical_correlation_nosif/uncorrected/retrieval_state035_perturbation10.nc",
+        "seconds": 113.500956354,
+        "cost": 2848.247317639225,
+        "trials": 5
+      },
+      "optimized": {
+        "xco2_ppm": 402.9871900346888,
+        "synthetic_sif": true,
+        "mode": "optimized",
+        "chi_squared": [
+          1.0083757325923368,
+          1.0625665490158431,
+          1.0068219756385968
+        ],
+        "rejected": 1,
+        "case": "state035_uncorrected_siftrue",
+        "outcome": 1,
+        "converged": true,
+        "input_sha256": "988b14772d174e12936ba2968a8b53c40641f2235609f0f3472017c60646cfbd",
+        "input": "/home/sanghavi/code/github/uni_vSmartMOM/RRS_XCO2/bottom_layer_XCO2_retrievals/retrievals_acos_mapped_tapered_vertical_correlation_nosif/uncorrected/retrieval_state035_perturbation10.nc",
+        "seconds": 34.820644363,
+        "cost": 2848.306210018472,
+        "trials": 5
+      }
+    }
+  ],
+  "output_sha256": {
+    "state001_corrected_siffalse-optimized.jld2": "3a2e960cab4293701a023e84268442615872e515b6f0210954dc03b72fd2eead",
+    "state001_corrected_siffalse-reference.jld2": "67e61b94e321f9bc36babd0dd7def8a1a81609b86b224fab736bf97e0f14ff6a",
+    "state001_uncorrected_siffalse-optimized.jld2": "ac9b12ad551e2b29b5b3a39defed5f18d7e4bf37f56456468ad4bcaab547abf3",
+    "state001_uncorrected_siffalse-reference.jld2": "a31b110f58f7f1945e8b5f0d4b750b1dcf0d9a92267e28c565fece99616fe8f8",
+    "state035_corrected_siffalse-optimized.jld2": "67f86b4ece33da5b8e4dab894b80e833150d49cf65fb861e3e46456f93676340",
+    "state035_corrected_siffalse-reference.jld2": "6a60aca2ad2dcfcb0b157fc9463e71931cfefde1efbe93fc881a47fa9383cbff",
+    "state035_corrected_siftrue-optimized.jld2": "98536f1f4b35222865900d4851c028bba904ee6b747eb8e338469301b4a1e1ce",
+    "state035_corrected_siftrue-reference.jld2": "bab9446ed70c75626828d9c3904fa81852e72209b4dff99b6d52870384e9a901",
+    "state035_uncorrected_siffalse-optimized.jld2": "4e5ce3d976fb61cbff72bdb4ac084e541ff39d6cac423cdb8f18e735f7db5633",
+    "state035_uncorrected_siffalse-reference.jld2": "308f18560e1b9413025dbefe7a704d2a12501784a57bb716c661309c6798e44e",
+    "state035_uncorrected_siftrue-optimized.jld2": "bb77541d9cb6a6f8ec280233edd3897f4b04e62723b50bd85796ab38853c9482",
+    "state035_uncorrected_siftrue-reference.jld2": "75ffbfb39b1070d2e073447dcbcb7693af546d5377778493b6a456698a2dce2e"
+  },
+  "passed": false
+}

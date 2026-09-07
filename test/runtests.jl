@@ -63,6 +63,7 @@ end
 @testset "Tabulated phase Jacobians" begin include("test_z_jacobian_tables.jl") end
 @testset "Batched Lambertian Jacobians" begin include("test_lambertian_jacobian_batched.jl") end
 @testset "Selective Jacobians" begin include("test_selective_jacobians.jl") end
+@testset "Jacobian upstream contract" begin include("test_jacobian_upstream_contract.jl") end
 
 # Type stability tests (no external data)
 @testset "Type Stability" begin include("test_type_stability.jl") end

@@ -184,7 +184,37 @@ function model_from_parameters(flavor::AbstractJacobianFlavor, params; kwargs...
     options = merge(defaults, (; kwargs...))
     model, base_lin = model_from_parameters(LinMode(), params; options...)
     plan = jacobian_plan(flavor, params, model, base_lin)
+    _validate_plan_upstream(plan, CoreRT.n_aerosols(model),
+        length(model.profile.p_full), [size(t, 1) for t in base_lin.τ̇_abs];
+        compute_aerosol_microphysics_jacobians=options.compute_aerosol_microphysics_jacobians,
+        compute_h2o_jacobians=options.compute_h2o_jacobians)
     return model, PlannedRTModelLin(base_lin, plan)
+end
+
+# Validate structural availability, never numerical nonzero sensitivity. A
+# selected derivative can legitimately vanish at a particular trial state.
+function _validate_plan_upstream(plan::JacobianPlan, n_aerosols, nz, gas_counts;
+        compute_aerosol_microphysics_jacobians::Bool,
+        compute_h2o_jacobians::Bool)
+    length(plan.bands) == length(gas_counts) || throw(DimensionMismatch(
+        "Jacobian plan must contain one layout per model band"))
+    for (ib, layout) in enumerate(plan.bands)
+        selection = _native_layer_selection(layout, n_aerosols, gas_counts[ib])
+        if !compute_aerosol_microphysics_jacobians &&
+                any(cols -> any(p -> 2 <= p <= 5, cols), selection.aerosol_columns)
+            throw(ArgumentError("Jacobian plan band $ib requests aerosol microphysics " *
+                "derivatives disabled by compute_aerosol_microphysics_jacobians=false; " *
+                "enable upstream derivatives or remove these parameters from the plan"))
+        end
+        # The first native gas species is the q-driven H2O block. A separately
+        # configured variable H2O molecule occupies a later, independent block.
+        if !compute_h2o_jacobians && any(p -> p <= nz, selection.gas_columns)
+            throw(ArgumentError("Jacobian plan band $ib requests q-driven H2O " *
+                "derivatives disabled by compute_h2o_jacobians=false; " *
+                "enable upstream derivatives or remove these parameters from the plan"))
+        end
+    end
+    return nothing
 end
 
 """
