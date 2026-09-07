@@ -1,0 +1,74 @@
+driver_sha256 = "65ebe2f47e8ee7a4d5b769544cc3863ac77b22c5365936c0b71fd52ca59ac73c"
+
+[[records]]
+ndoubl = [4, 4, 5, 6, 6, 4, 4, 5, 6, 7, 8, 9, 9, 10, 9, 6]
+sha256 = "811d4ffd233200e2138589a7e02b6f2f57abd1e2334922b0e7c358efc3e6e6cf"
+rt = "Float32"
+m_used = 3
+file = "frozen-reference-prep32-rt32.jld2"
+identity_checked = true
+preparation = "Float32"
+state = "reference"
+[[records]]
+ndoubl = [4, 4, 5, 6, 6, 4, 4, 5, 6, 7, 8, 9, 9, 10, 9, 6]
+sha256 = "196357ee8b49e4811d06e61e77967e2b02b18601f286d3ee498ad14ea7c02ea0"
+rt = "Float64"
+m_used = 3
+file = "frozen-reference-prep32-rt64.jld2"
+identity_checked = false
+preparation = "Float32"
+state = "reference"
+[[records]]
+ndoubl = [4, 4, 5, 6, 6, 4, 4, 5, 6, 7, 8, 9, 9, 10, 9, 6]
+sha256 = "af05dc4363840dd894f63790381a7b4182fb6830f8cfdf6f7f8a808366738d10"
+rt = "Float64"
+m_used = 3
+file = "frozen-reference-prep64-rt64.jld2"
+identity_checked = true
+preparation = "Float64"
+state = "reference"
+[[records]]
+ndoubl = [4, 4, 5, 6, 6, 4, 4, 5, 6, 7, 8, 9, 9, 10, 9, 6]
+sha256 = "b40a613525dddd118eee0c029a1cbbaecf29befa913ed1cf50125883bdbe8950"
+rt = "Float32"
+m_used = 3
+file = "frozen-reference-prep64-rt32.jld2"
+identity_checked = false
+preparation = "Float64"
+state = "reference"
+[[records]]
+ndoubl = [4, 4, 5, 6, 6, 4, 4, 5, 6, 7, 8, 9, 9, 10, 9, 6]
+sha256 = "98bfee4bdb72d0a4eac364e076eebabd7ba96a192083e604f1342ce3e63bcad8"
+rt = "Float32"
+m_used = 3
+file = "frozen-optimized-prep32-rt32.jld2"
+identity_checked = true
+preparation = "Float32"
+state = "optimized"
+[[records]]
+ndoubl = [4, 4, 5, 6, 6, 4, 4, 5, 6, 7, 8, 9, 9, 10, 9, 6]
+sha256 = "1666cdb63d15a16391e09f4a8ee34f70decbce755b31c262ed868518620fbce4"
+rt = "Float64"
+m_used = 3
+file = "frozen-optimized-prep32-rt64.jld2"
+identity_checked = false
+preparation = "Float32"
+state = "optimized"
+[[records]]
+ndoubl = [4, 4, 5, 6, 6, 4, 4, 5, 6, 7, 8, 9, 9, 10, 9, 6]
+sha256 = "2c8217ebcca6e0d8b5b9bc856bec9cf7ea5a60d596c1431dd3b79ac61bdaafec"
+rt = "Float64"
+m_used = 3
+file = "frozen-optimized-prep64-rt64.jld2"
+identity_checked = true
+preparation = "Float64"
+state = "optimized"
+[[records]]
+ndoubl = [4, 4, 5, 6, 6, 4, 4, 5, 6, 7, 8, 9, 9, 10, 9, 6]
+sha256 = "a86f4698a07b3d4d66e9ab775356d5d7620ad3191181d56bb74d7a111a17207c"
+rt = "Float32"
+m_used = 3
+file = "frozen-optimized-prep64-rt32.jld2"
+identity_checked = false
+preparation = "Float64"
+state = "optimized"

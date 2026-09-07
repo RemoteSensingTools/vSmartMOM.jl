@@ -162,10 +162,14 @@ RT, including casts of fixed profile/optical inputs; it is not an isolated
 RT-kernel precision test or an independent accuracy reference. A full Float64
 retrieval was not run, so its effect on retrieved XCO2 is not established.
 
-The next investigation should hold the same supplied core optics fixed while
-varying RT precision, then separately vary upstream optical preparation and
-input casts. That will distinguish accumulated MOM rounding from preparation
-sensitivity and guide any mixed-precision change. Preserve the original
-spectral gate failure and defer campaign migration while this accuracy budget
-is unresolved. No numerical tolerances, truth files, priors, or live study
-sources were changed to obtain a pass.
+The [follow-up precision investigation](precision_investigation.md) now holds
+supplied core optics and other boundary inputs fixed while varying RT
+arithmetic. RT-only differences reach 0.048–0.052 noise σ, and promoting RT
+alone reduces the local remainder about 449-fold. Independently constructed
+spectral grids explain much of the larger absolute gap: rebuilding Float64 at
+the exact Float32 nodes reduces the full-workflow maximum from 0.909 to 0.158 σ.
+A remaining preparation difference of 0.145 σ and the responsible RT stages
+still need isolation before selecting a mixed-precision policy. Preserve the
+original spectral gate failure and defer campaign migration while this
+accuracy budget is unresolved. No numerical tolerances, truth files, priors,
+or live study sources were changed to obtain a pass.

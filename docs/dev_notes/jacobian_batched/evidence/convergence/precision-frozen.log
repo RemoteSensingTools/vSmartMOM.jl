@@ -1,0 +1,19 @@
+PREPARE evaluator Float32
+PREPARE evaluator Float64
+BUILD state=reference preparation=Float32
+Looping over layers ...  12%|███▌                        |  ETA: 0:02:24[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:21[K
+SOLVE state=reference preparation=Float32 RT=Float32
+SOLVE state=reference preparation=Float32 RT=Float64
+Looping over layers ...  12%|███▌                        |  ETA: 0:02:05[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:18[K
+BUILD state=reference preparation=Float64
+Looping over layers ...  12%|███▌                        |  ETA: 0:00:17[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:03[K
+SOLVE state=reference preparation=Float64 RT=Float64
+SOLVE state=reference preparation=Float64 RT=Float32
+Looping over layers ...  12%|███▌                        |  ETA: 0:00:16[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:02[K
+BUILD state=optimized preparation=Float32
+SOLVE state=optimized preparation=Float32 RT=Float32
+SOLVE state=optimized preparation=Float32 RT=Float64
+BUILD state=optimized preparation=Float64
+SOLVE state=optimized preparation=Float64 RT=Float64
+SOLVE state=optimized preparation=Float64 RT=Float32
+FROZEN PRECISION COMPLETE

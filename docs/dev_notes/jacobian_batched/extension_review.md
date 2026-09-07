@@ -98,10 +98,15 @@ With matched elemental controls and doubling counts, the O2 local remainder
 falls from 0.0173 noise σ in Float32 to 0.0000048 σ in Float64. However, the
 absolute cross-precision radiance difference reaches 0.909 noise σ. This is
 an end-to-end precision comparison, including preparation/input casts; it
-does not identify an individual faulty kernel. Isolating RT precision with
-identical supplied core optics, then upstream preparation precision, is the
-next accuracy priority before campaign migration. Full Float64 retrieval
-convergence and its XCO2 effect remain untested.
+does not identify an individual faulty kernel. The subsequent
+[frozen-boundary investigation](evidence/convergence/precision_investigation.md)
+isolates RT-only differences of 0.048–0.052 noise σ and a 449-fold reduction of
+the local remainder when only RT is promoted. Matching the spectral grid
+reduces the full-workflow difference from 0.909 to 0.158 σ; a preparation
+difference of 0.145 σ remains at fixed Float64 RT. Spectral coordinates,
+preparation, and RT arithmetic need separate controls. Tracing individual
+preparation/RT stages is the next priority before campaign migration. Full
+Float64 retrieval convergence and its XCO2 effect remain untested.
 
 An extension must be judged against the complete state-to-measurement map,
 not only algebraic tangent equivalence. Record precision, intermediate casts,

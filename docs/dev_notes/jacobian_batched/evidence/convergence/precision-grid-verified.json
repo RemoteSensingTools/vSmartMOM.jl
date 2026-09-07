@@ -1,0 +1,92 @@
+{
+  "metadata": {
+    "grid_max_difference_cm_inverse": 0.000647083197691245,
+    "n_spectral_points": 2735,
+    "grid_max_difference_nm": 3.866450185796566e-05,
+    "records": [
+      {
+        "ndoubl": [
+          4,
+          4,
+          5,
+          6,
+          6,
+          4,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          9,
+          10,
+          9,
+          6
+        ],
+        "sha256": "a6f96bbeadf06ca62469f64b42e01f5365a9e6614658bf7b720b90722552437f",
+        "file": "precision64-grid32-reference.jld2",
+        "m_used": 3,
+        "state": "reference"
+      },
+      {
+        "ndoubl": [
+          4,
+          4,
+          5,
+          6,
+          6,
+          4,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          9,
+          10,
+          9,
+          6
+        ],
+        "sha256": "8f23766dcf134b280daffeb123113b52e4d3d61f00814532c81ad279107bb394",
+        "file": "precision64-grid32-optimized.jld2",
+        "m_used": 3,
+        "state": "optimized"
+      }
+    ]
+  },
+  "fixed_state": {
+    "reference": {
+      "grid_change_Float64": {
+        "max_noise_sigma": 0.8906162532955094,
+        "rms_noise_sigma": 0.12402000514932608
+      },
+      "preparation_RT64_with_grid_matched": {
+        "max_noise_sigma": 0.14483505391939142,
+        "rms_noise_sigma": 0.014014461816829287
+      },
+      "Float32_vs_Float64_with_grid_matched": {
+        "max_noise_sigma": 0.15841448162380864,
+        "rms_noise_sigma": 0.026650191719104283
+      }
+    },
+    "optimized": {
+      "grid_change_Float64": {
+        "max_noise_sigma": 0.8906168889174041,
+        "rms_noise_sigma": 0.124020056271183
+      },
+      "preparation_RT64_with_grid_matched": {
+        "max_noise_sigma": 0.1448156813613992,
+        "rms_noise_sigma": 0.014013863592377981
+      },
+      "Float32_vs_Float64_with_grid_matched": {
+        "max_noise_sigma": 0.15931591624228902,
+        "rms_noise_sigma": 0.026580915059884688
+      }
+    }
+  },
+  "between_states": {
+    "max_noise_sigma": 0.00042608520933695525,
+    "prediction_max_noise_sigma": 0.00042439631480880235,
+    "remainder_max_noise_sigma": 4.799304189946093e-06
+  }
+}

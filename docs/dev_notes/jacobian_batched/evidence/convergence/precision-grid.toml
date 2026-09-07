@@ -1,0 +1,16 @@
+grid_max_difference_cm_inverse = 0.000647083197691245
+n_spectral_points = 2735
+grid_max_difference_nm = 3.866450185796566e-5
+
+[[records]]
+ndoubl = [4, 4, 5, 6, 6, 4, 4, 5, 6, 7, 8, 9, 9, 10, 9, 6]
+sha256 = "a6f96bbeadf06ca62469f64b42e01f5365a9e6614658bf7b720b90722552437f"
+file = "precision64-grid32-reference.jld2"
+m_used = 3
+state = "reference"
+[[records]]
+ndoubl = [4, 4, 5, 6, 6, 4, 4, 5, 6, 7, 8, 9, 9, 10, 9, 6]
+sha256 = "8f23766dcf134b280daffeb123113b52e4d3d61f00814532c81ad279107bb394"
+file = "precision64-grid32-optimized.jld2"
+m_used = 3
+state = "optimized"
