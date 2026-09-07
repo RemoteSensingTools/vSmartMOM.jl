@@ -98,6 +98,9 @@ agreement alone does not establish it.
 
 The existing strict retrieval comparison failures remain recorded. This audit
 changes no production/study code, noise model, or acceptance threshold.
+The [noise and retrieval-impact follow-up](precision_retrieval_impact.md)
+defines the covariance normalization, measures the systematic component, and
+reports actual three-band inversion shifts between precision configurations.
 
 From `test/`, with `STUDY_ROOT` and the saved output directory:
 

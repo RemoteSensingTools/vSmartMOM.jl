@@ -8,6 +8,42 @@ The optimization work is in `perf/jacobian-batched-propagation`, starting at
 `075b3412` for this comparison. SIF support is committed as `00e670e1`; the
 optical-precision and absorption-phase repairs are committed as `4284e13a`.
 
+## Overall speedup for the study
+
+The final historical comparison supports approximately **19–20× faster aerosol
+inversions** and **12× faster clear inversions** in the cases below. A complete
+forward/Jacobian evaluation at the matched archived aerosol state falls from
+117.289 s to a warmed median of 5.36763 s, a **21.85×** ratio.
+
+| Archived case | Historical evaluation total per inversion | Optimized inversion | Historical ratio |
+|---|---:|---:|---:|
+| Clear 001, uncorrected | 247.42 s | 20.69 s | 11.96× |
+| Aerosol 035, corrected | 698.15 s | 36.65 s | 19.05× |
+| Aerosol 035, uncorrected | 702.04 s | 35.80 s | 19.61× |
+
+These include complete spectral batches, preparation, Jacobians, convolution,
+and the converged terminal evaluation. Iteration-decision counts match. The
+historical denominator sums recorded model evaluations; the new number is the
+complete OE solve, so its tiny matrix-algebra cost is also included. Startup,
+table loading, and campaign I/O are excluded. The first clear corrected pair
+includes compilation and is not used for the warmed summary.
+
+**This is an archived-campaign versus isolated-replay comparison**, not a
+fresh old-branch A/B under matched worker load. Do not promise the same campaign
+throughput ratio independently of hardware, contention, or startup policy.
+The controlled current-code physical/matrix versus final local/source/shared-LUT
+comparison is approximately **3.25–3.33×** for warmed cases. Its reference already
+contains the earlier batched-kernel improvements, so it measures only the
+additional optimization layers. It is not the cumulative gain over the archive.
+
+The gains come from batched tangent propagation, selecting five useful local
+directions instead of seventeen, equivalent-source adding, and avoiding
+multi-gigabyte LUT copies on every trial. The separate Mie derivative speedup
+does not contribute here because the study already disables those derivatives.
+The optimization adapter patch is prepared but has not been applied to the
+running study. See [machine-readable timings](evidence/convergence/speedup-summary.json)
+and `summarize_speedup.py` for the exact timing boundaries and source checks.
+
 ## What the inversions compute
 
 The study measures the XCO₂ retrieval bias caused by rotational Raman scattering.
@@ -267,9 +303,14 @@ discrepancy also occurs between the nearby states using either solver alone.
 Matched-floor/count Float64 O2 evaluations reduce the local linearization
 remainder from 0.0173 to 0.0000048 noise σ, pointing to precision sensitivity.
 Absolute Float32/Float64 O2 radiances still differ by as much as 0.909 noise σ.
-The experiment includes precision-specific optical preparation/input casts;
-isolating preparation versus RT rounding is the next accuracy task, and a
-full Float64 inversion has not been tested. The original gate remains failed.
+The [subsequent precision isolation](evidence/convergence/precision_investigation.md)
+separates RT arithmetic and spectral-grid effects. All noise-normalized
+differences include instrument convolution and detector sampling. For case 035,
+[full three-band precision retrievals](evidence/convergence/precision_retrieval_impact.md)
+converge with XCO2 shifts of −0.018396 ppm on native Float64 grids and
++0.002494 ppm on exact promoted Float32 grids. Individual preparation/RT stages
+and broader scene/noise coverage remain to be investigated. The original
+Jacobian-implementation comparison's gate remains failed.
 
 The [extension review](extension_review.md) recommends preserving the supplied-
 tangent analytic MOM core while strengthening parameter identity, upstream

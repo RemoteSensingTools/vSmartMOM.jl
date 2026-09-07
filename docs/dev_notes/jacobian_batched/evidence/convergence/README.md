@@ -159,8 +159,11 @@ at a fixed terminal state (0.88164 σ with Float64's default floor). Matching
 the elemental controls therefore does not eliminate the absolute difference.
 This is a comparison of complete precision-specific model construction and
 RT, including casts of fixed profile/optical inputs; it is not an isolated
-RT-kernel precision test or an independent accuracy reference. A full Float64
-retrieval was not run, so its effect on retrieved XCO2 is not established.
+RT-kernel precision test or an independent accuracy reference. The later
+[paired full-precision retrievals](precision_retrieval_impact.md) quantify its
+effect for this case: −0.018396 ppm with native Float64 grids, +0.002494 ppm
+with exact promoted Float32 grids. Those runs include all three bands and
+the complete instrument convolution, with observation and prior held fixed.
 
 The [follow-up precision investigation](precision_investigation.md) now holds
 supplied core optics and other boundary inputs fixed while varying RT

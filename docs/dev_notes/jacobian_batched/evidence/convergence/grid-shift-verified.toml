@@ -1,0 +1,102 @@
+[[records]]
+state = "reference"
+comparison = "grid_only_Float64"
+derivative_half_step_relative_l2 = 4.727515884262688e-6
+
+    [records.shift_only]
+    max_noise_sigma = 0.8874201355666494
+    weighted_squared_difference_fraction_removed = 0.001191678624514081
+    rms_noise_sigma = 0.12394608712655528
+    fitted_shift_nm = 6.989109946633532e-7
+
+    [records.shift_and_stretch]
+    fitted_stretch = -9.80414049496719e-8
+    max_noise_sigma = 0.8863733077343057
+    weighted_squared_difference_fraction_removed = 0.0013404795981565298
+    rms_noise_sigma = 0.12393685413108767
+    fitted_shift_nm = 5.667885808972783e-7
+
+    [records.before]
+    max_noise_sigma = 0.8906162532955094
+    rms_noise_sigma = 0.12402000514932608
+[[records]]
+state = "reference"
+comparison = "full_native_grids"
+derivative_half_step_relative_l2 = 4.736228765168297e-6
+
+    [records.shift_only]
+    max_noise_sigma = 0.9053191155457575
+    weighted_squared_difference_fraction_removed = 0.0012567854942845402
+    rms_noise_sigma = 0.12923912067334864
+    fitted_shift_nm = -7.483890583726301e-7
+
+    [records.shift_and_stretch]
+    fitted_stretch = 6.95413987575771e-8
+    max_noise_sigma = 0.9045750245817337
+    weighted_squared_difference_fraction_removed = 0.0013256194622102146
+    rms_noise_sigma = 0.12923466697862346
+    fitted_shift_nm = -6.546510532590137e-7
+
+    [records.before]
+    max_noise_sigma = 0.90874920932122
+    rms_noise_sigma = 0.12932041023010857
+[[records]]
+state = "optimized"
+comparison = "grid_only_Float64"
+derivative_half_step_relative_l2 = 4.727515931528041e-6
+
+    [records.shift_only]
+    max_noise_sigma = 0.8874207582738542
+    weighted_squared_difference_fraction_removed = 0.0011916857354069554
+    rms_noise_sigma = 0.12394613777673306
+    fitted_shift_nm = 6.989130117248238e-7
+
+    [records.shift_and_stretch]
+    fitted_stretch = -9.804180523702637e-8
+    max_noise_sigma = 0.8863739255802289
+    weighted_squared_difference_fraction_removed = 0.0013404878701208656
+    rms_noise_sigma = 0.1239369047053803
+    fitted_shift_nm = 5.667899226044915e-7
+
+    [records.before]
+    max_noise_sigma = 0.8906168889174041
+    rms_noise_sigma = 0.124020056271183
+[[records]]
+state = "optimized"
+comparison = "full_native_grids"
+derivative_half_step_relative_l2 = 4.736239178177848e-6
+
+    [records.shift_only]
+    max_noise_sigma = 0.9035741450810744
+    weighted_squared_difference_fraction_removed = 0.0012443215039776856
+    rms_noise_sigma = 0.12905835468183804
+    fitted_shift_nm = -7.436226810211075e-7
+
+    [records.shift_and_stretch]
+    fitted_stretch = 8.343560087785632e-8
+    max_noise_sigma = 0.9026814032493832
+    weighted_squared_difference_fraction_removed = 0.0013436882164969965
+    rms_noise_sigma = 0.12905193448133806
+    fitted_shift_nm = -6.311560009820337e-7
+
+    [records.before]
+    max_noise_sigma = 0.9069823302407986
+    rms_noise_sigma = 0.12913872473726085
+
+[coordinate_difference_Float32_minus_Float64.wavenumber_cm_inverse]
+affine_remainder_max = 0.0003910523761798353
+max_absolute = 0.000647083197691245
+affine_offset_at_mean = -0.0002564581984188408
+rms_about_mean = 0.00027621358614375114
+mean = -0.00025645819841884076
+affine_slope = 3.1332617846857545e-9
+affine_remainder_rms = 0.0002762134753661961
+
+[coordinate_difference_Float32_minus_Float64.wavelength_nm]
+affine_remainder_max = 2.3363789034519708e-5
+max_absolute = 3.866450185796566e-5
+affine_offset_at_mean = 1.50071432510274e-5
+rms_about_mean = 1.616521348126944e-5
+mean = 1.5007143251027404e-5
+affine_slope = 4.2371523397695846e-8
+affine_remainder_rms = 1.6164028221958502e-5

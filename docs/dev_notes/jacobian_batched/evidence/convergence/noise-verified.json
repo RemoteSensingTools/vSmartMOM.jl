@@ -1,0 +1,66 @@
+{
+  "definition": "sigma_i = sqrt(Se_diagonal_i)",
+  "units": "mW m-2 sr-1 nm-1",
+  "noise_frozen_during_retrieval": true,
+  "diagonal_covariance": true,
+  "covariance_matches_noise_source": true,
+  "photon_background_noise_reconstruction_max_relative": 0.0,
+  "o2_sigma_min": 0.01086092954843164,
+  "o2_sigma_median": 0.09292376865751334,
+  "o2_sigma_max": 0.11581589533905294,
+  "o2_snr_median": 630.3644930643787,
+  "signed_residuals": [
+    {
+      "state": "reference",
+      "comparison": "RT_only",
+      "mean_noise_sigma": -0.019264181878085214,
+      "rms_noise_sigma": 0.021960624688357938,
+      "fraction_negative": 0.9807280513918629,
+      "lag1_correlation": 0.9025326195579813
+    },
+    {
+      "state": "reference",
+      "comparison": "full_matched_grid",
+      "mean_noise_sigma": -0.019749956630597112,
+      "rms_noise_sigma": 0.026650191719104283,
+      "fraction_negative": 0.9539614561027837,
+      "lag1_correlation": 0.8361473973682741
+    },
+    {
+      "state": "reference",
+      "comparison": "full_native_grids",
+      "mean_noise_sigma": -0.039020109855769265,
+      "rms_noise_sigma": 0.12932041023010857,
+      "fraction_negative": 0.7762312633832976,
+      "lag1_correlation": 0.8277172838699913
+    },
+    {
+      "state": "optimized",
+      "comparison": "RT_only",
+      "mean_noise_sigma": -0.01928183407201645,
+      "rms_noise_sigma": 0.022001496532082453,
+      "fraction_negative": 0.9817987152034261,
+      "lag1_correlation": 0.9030549238802031
+    },
+    {
+      "state": "optimized",
+      "comparison": "full_matched_grid",
+      "mean_noise_sigma": -0.019748926075257803,
+      "rms_noise_sigma": 0.026580915059884688,
+      "fraction_negative": 0.9507494646680942,
+      "lag1_correlation": 0.8350449832683816
+    },
+    {
+      "state": "optimized",
+      "comparison": "full_native_grids",
+      "mean_noise_sigma": -0.039019075665428005,
+      "rms_noise_sigma": 0.12913872473726085,
+      "fraction_negative": 0.7730192719486081,
+      "lag1_correlation": 0.8276511322588503
+    }
+  ],
+  "input_sha256": {
+    "/home/sanghavi/code/github/uni_vSmartMOM/RRS_XCO2/bottom_layer_XCO2_retrievals/retrievals_acos_mapped_tapered_vertical_correlation_nosif/corrected/retrieval_state035_perturbation10.nc": "b9765c0f58a6da5e798f6788a2a4c893f8474e0804aeff298f62cc18a1659e52",
+    "/home/sanghavi/code/github/uni_vSmartMOM/RRS_XCO2/bottom_layer_XCO2_retrievals/truth/OCO_radiances/noise_covariances/OCO2noise_035.nc": "c225a469a1492978c93ec9593f4a1dccc7b3d5f8172f44f3a434afea1c4e5be6"
+  }
+}

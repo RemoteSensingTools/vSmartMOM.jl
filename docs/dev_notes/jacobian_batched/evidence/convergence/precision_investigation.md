@@ -112,8 +112,10 @@ Float32 RT sensitivity in this diagnostic.
 The original three strict spectral-gate failures remain recorded. No gate,
 truth data, priors, production kernels, or live study sources were changed.
 Float64 is an internal precision control here, not an independent accuracy
-reference. Full Float64 retrieval convergence and the effect on XCO2 remain
-untested.
+reference. The subsequent [full three-band retrieval test](precision_retrieval_impact.md)
+converges for this case with XCO2 shifts of −0.018396 ppm for native Float64
+grids and +0.002494 ppm for exact promoted Float32 grids. Broader scenes/noise
+realizations and individual preparation/RT stages still require investigation.
 
 Future precision controls should distinguish spectral/input coordinates,
 optical preparation, operator arithmetic, and numerical discretization.

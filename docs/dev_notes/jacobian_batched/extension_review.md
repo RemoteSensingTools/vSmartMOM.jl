@@ -105,8 +105,12 @@ the local remainder when only RT is promoted. Matching the spectral grid
 reduces the full-workflow difference from 0.909 to 0.158 σ; a preparation
 difference of 0.145 σ remains at fixed Float64 RT. Spectral coordinates,
 preparation, and RT arithmetic need separate controls. Tracing individual
-preparation/RT stages is the next priority before campaign migration. Full
-Float64 retrieval convergence and its XCO2 effect remain untested.
+preparation/RT stages is the next priority before campaign migration.
+[Full three-band retrievals for this case](evidence/convergence/precision_retrieval_impact.md)
+now converge with XCO2 changes of −0.018396 ppm on native Float64 grids and
++0.002494 ppm on exact promoted Float32 grids. The convolved differences have
+a coherent component; inspect their signed structure and retrieval projection
+as well as pixelwise magnitude. Broader scene/noise coverage remains untested.
 
 An extension must be judged against the complete state-to-measurement map,
 not only algebraic tangent equivalence. Record precision, intermediate casts,
