@@ -261,6 +261,16 @@ limitation visible before migrating a campaign; the evidence includes a
 focused same-state/discretization diagnostic. The SIF additions are a controlled
 linear-SIF test, not a released full-template Raman/SIF truth replay.
 
+At identical states, the two propagation implementations agree within
+0.000067 noise σ and 1.12e-5 worst-column relative L2. The larger spectral
+discrepancy also occurs between the nearby states using either solver alone.
+Matched-floor/count Float64 O2 evaluations reduce the local linearization
+remainder from 0.0173 to 0.0000048 noise σ, pointing to precision sensitivity.
+Absolute Float32/Float64 O2 radiances still differ by as much as 0.909 noise σ.
+The experiment includes precision-specific optical preparation/input casts;
+isolating preparation versus RT rounding is the next accuracy task, and a
+full Float64 inversion has not been tested. The original gate remains failed.
+
 The [extension review](extension_review.md) recommends preserving the supplied-
 tangent analytic MOM core while strengthening parameter identity, upstream
 derivative availability, component descriptors, source propagation and

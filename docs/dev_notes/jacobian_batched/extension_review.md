@@ -84,6 +84,41 @@ validating its complete path, not merely overriding this predicate. Reserved
 
 ## Priorities for future development
 
+### 0. Define a precision and smoothness contract for retrievals
+
+The full retrieval comparison in this review passes all state, XCO2, cost,
+posterior and decision criteria but fails its strict spectral criterion in
+three Float32 pairs. In a focused case, both propagation implementations agree
+closely at an identical state, while either implementation shows a much larger
+between-state difference than its local Jacobian predicts. Fourier orders and
+doubling counts do not change. See the diagnostic evidence for the precision
+comparison and its limits.
+
+With matched elemental controls and doubling counts, the O2 local remainder
+falls from 0.0173 noise σ in Float32 to 0.0000048 σ in Float64. However, the
+absolute cross-precision radiance difference reaches 0.909 noise σ. This is
+an end-to-end precision comparison, including preparation/input casts; it
+does not identify an individual faulty kernel. Isolating RT precision with
+identical supplied core optics, then upstream preparation precision, is the
+next accuracy priority before campaign migration. Full Float64 retrieval
+convergence and its XCO2 effect remain untested.
+
+An extension must be judged against the complete state-to-measurement map,
+not only algebraic tangent equivalence. Record precision, intermediate casts,
+numerical thresholds and adaptive decisions. In particular, the default
+elemental floor is `1024eps(FT)`: switching Float32 to Float64 also changes
+discretization unless that floor is explicitly held fixed. Vary perturbation
+size and precision under matched controls before interpreting a small-step
+finite-difference discrepancy as a missing chain-rule term.
+
+Use separate tolerances for fixed-state solver equivalence, derivative
+consistency, forward accuracy, and retrieval convergence. A small XCO2 change
+does not prove a smooth forward map; an overly small finite-difference step
+can probe numerical variation instead of a useful physical derivative.
+Promoting selected intermediate calculations is a possible next optimization,
+but the responsible stage must first be isolated with the same inputs and
+discretization. The current review does not implement mixed precision.
+
 ### 1. Freeze retrieval meaning, validate model compatibility
 
 Compile active keys once for an inversion. The OCO flavor currently selects

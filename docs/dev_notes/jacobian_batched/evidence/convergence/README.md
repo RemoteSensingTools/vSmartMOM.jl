@@ -102,3 +102,70 @@ unresolved spectral gate. Raw JLD2 arrays remain under
 The extension guards passed 29 focused checks; the existing selective
 Jacobian/finite-difference tests passed 51 checks and source regressions passed
 86 checks (166 distinct checks total). The strict documentation build passed.
+
+## Focused diagnosis of the corrected aerosol discrepancy
+
+`diagnose.jl` evaluates both solvers at both terminal states of the corrected
+aerosol/SIF-off pair. At a fixed state, their measurements differ by at most
+**0.00006694 noise σ**, and the worst Jacobian-column relative L2 difference
+is **1.12e-5**. Repeating the original reference and optimized evaluations
+reproduces their stored measurements and Jacobians **bitwise**.
+
+The 0.017-noise difference also occurs between the two nearby terminal states
+using the **same** reference solver (0.0172521 σ) or optimized solver
+(0.0172337 σ). The linearized prediction is only 0.0004244 σ. This isolates
+the larger discrepancy from fixed-state equivalence of the two propagation
+implementations; it does not yet identify which part of the complete
+state-to-measurement map causes it.
+
+All four evaluations stop at Fourier order 3 in each band. Running all moments
+through order 15 leaves the optimized between-state discrepancy unchanged.
+All 16 per-layer doubling counts also agree between the two states in each
+band. Thus neither a changed Fourier stopping order nor a changed doubling
+count explains this case. The table/template isolation checks pass again.
+
+`diagnostic-verification.json` records the independent HDF5 comparisons,
+moment/count traces, and raw-array hashes. Reproduce with `diagnose.jl` and
+`verify_diagnostic.py` using the same environment and output directory as the
+full replay. `precision.jl` provides a focused Float64 O2-band check at these
+same two states to distinguish finite-precision behavior from a missing
+derivative dependency; it retains the full three-band model configuration but
+only solves/processes the affected first band.
+
+## Precision follow-up
+
+The O2-only Float64 evaluation makes the local state response agree closely
+with the analytic Jacobian:
+
+| O2 configuration | Between-state change (max noise σ) | Linearized prediction (max noise σ) | Remainder (max noise σ) |
+|---|---:|---:|---:|
+| Float32, campaign settings | 0.0172337 | 0.000424401 | 0.0172767 |
+| Float64, own default elemental floor | 0.000426570 | 0.000424886 | 0.000004796 |
+| Float64, matched Float32 floor/threshold | 0.000425881 | 0.000424197 | 0.000004795 |
+
+The matched run uses `dτ_min_floor=0.0001220703125` and
+`dτ_max_threshold=0.0010000000474974513`. All sixteen O2 doubling counts match
+both Float32 states exactly. `precision_matched.jl` reproduces that control;
+`verify_precision.py OUTPUT precision64-matched` verifies the counts and arrays.
+The results support precision sensitivity of the end-to-end Float32 map as
+the explanation for this diagnostic's large local remainder, rather than a
+fixed-state disagreement introduced by local/source propagation. They do not
+locate the responsible intermediate calculation or validate all parameter
+classes globally.
+
+There is also a **larger absolute cross-precision difference**: up to
+**0.90875 noise σ** between Float32 and matched-floor Float64 O2 radiances
+at a fixed terminal state (0.88164 σ with Float64's default floor). Matching
+the elemental controls therefore does not eliminate the absolute difference.
+This is a comparison of complete precision-specific model construction and
+RT, including casts of fixed profile/optical inputs; it is not an isolated
+RT-kernel precision test or an independent accuracy reference. A full Float64
+retrieval was not run, so its effect on retrieved XCO2 is not established.
+
+The next investigation should hold the same supplied core optics fixed while
+varying RT precision, then separately vary upstream optical preparation and
+input casts. That will distinguish accumulated MOM rounding from preparation
+sensitivity and guide any mixed-precision change. Preserve the original
+spectral gate failure and defer campaign migration while this accuracy budget
+is unresolved. No numerical tolerances, truth files, priors, or live study
+sources were changed to obtain a pass.
