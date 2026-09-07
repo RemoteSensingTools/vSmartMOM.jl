@@ -13,7 +13,7 @@
 # Keep the reference propagation available for numerical/performance A/B checks.
 const _BATCHED_JACOBIANS_ENABLED = Ref(true)
 const _TILED_JACOBIANS_ENABLED = Ref(true)
-const _MEDIUM_JACOBIANS_ENABLED = Ref(false) # Enable only after operator/scene benchmarks.
+const _MEDIUM_JACOBIANS_ENABLED = Ref(true)
 const _JACOBIAN_FUSED_INVERSE_ENABLED = Ref(true)
 _jacobian_tiles_supported(::Any) = false
 
@@ -24,16 +24,17 @@ _jacobian_tiles_supported(::Any) = false
 
 @inline _use_blocked_jacobians(backend,C,A,B) =
     _MEDIUM_JACOBIANS_ENABLED[] && _jacobian_tiles_supported(backend) &&
-    32 < size(C,1) <= 64 && size(C,3) >= 64 &&
+    32 < size(C,1) <= 64 && size(C,3) >= 512 &&
     size(C,1) == size(C,2) == size(A,1) == size(A,2) == size(B,1) == size(B,2)
 
 function make_jacobian_workspace(A::AbstractArray{FT,3}, nparams) where {FT}
     FT <: Union{Float32,Float64} || return nothing
-    # The portable GPU products are intended for small diffuse operators.
-    # Larger operators retain vendor-BLAS propagation until benchmarked.
+    # CUDA tiles are validated for operators up to 64 with at least 512
+    # spectral points. Smaller batches above 32 and larger operators keep
+    # vendor-BLAS propagation; Metal retains the existing 32-operator limit.
     backend = KernelAbstractions.get_backend(A)
     gpu_limit = _MEDIUM_JACOBIANS_ENABLED[] && _jacobian_tiles_supported(backend) &&
-                size(A,3) >= 64 ? 64 : 32
+                size(A,3) >= 512 ? 64 : 32
     backend isa KernelAbstractions.CPU || size(A, 1) <= gpu_limit || return nothing
     n, _, ns = size(A)
     matrix() = similar(A)
