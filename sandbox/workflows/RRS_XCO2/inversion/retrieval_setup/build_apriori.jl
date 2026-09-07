@@ -67,7 +67,8 @@ const DEFAULT_SIF_SLOPE_MEAN_MW_NM2 =
 const DEFAULT_SIF_SLOPE_SIGMA_MW_NM2 =
     0.25 * abs(DEFAULT_SIF_FRACTIONAL_SLOPE_PER_NM) *
     DEFAULT_SIF_REFERENCE_RADIANCE_MW_NM
-const CO2_COVARIANCE_FILE = joinpath(@__DIR__, "co2_prior_covariances.dat")
+const CO2_COVARIANCE_FILE = get(ENV, "CO2_COVARIANCE_FILE",
+    joinpath(RRS_ROOT, "inversion", "retrieval_setup", "co2_prior_covariances.dat"))
 const ACOS_MAPPED_CO2_COVARIANCE_MODEL = "acos_mapped"
 const TAPERED_CO2_COVARIANCE_MODEL =
     "acos_mapped_tapered_vertical_correlation"

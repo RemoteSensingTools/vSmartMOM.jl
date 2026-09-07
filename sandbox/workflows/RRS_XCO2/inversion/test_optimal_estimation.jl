@@ -57,6 +57,7 @@ using .RetrievalState
 end
 
 @testset "mapped ACOS CO2 prior covariance" begin
+    if isfile(RetrievalState.DEFAULT_PRIOR_PATH)
     prior = load_retrieval_prior(:urban)
     @test length(prior.xa) == 30
     @test isposdef(Symmetric(prior.Sa))
@@ -65,6 +66,9 @@ end
     @test sqrt(co2[1, 1]) * 1e6 ≈ 6.839421605168 rtol=1e-11
     @test sqrt(co2[end, end]) * 1e6 ≈ 43.52698551448 rtol=1e-11
     @test maximum(abs.(co2 - Diagonal(diag(co2)))) * 1e12 > 1400
+    else
+        @test_skip "Mapped ACOS prior regression requires external covariance data"
+    end
 end
 
 @testset "Connor-style optimal estimation" begin
@@ -114,7 +118,7 @@ end
     # having completed all 32 no-SIF measurements. Construct one synthetic
     # experiment record directly; build_experiments deliberately enforces
     # completeness and is tested separately against production inputs.
-    truth = TruthCase(1, 1, :urban, 1, :none, 1, 380.0)
+    truth = TruthCase(1, 1, :urban, 1, :none, :off, 1, 380.0)
     experiment = RetrievalExperiment(
         1, 1, truth, 1, :corrected, UInt64(1),
         "synthetic_measurement.nc", "synthetic_noise.nc")

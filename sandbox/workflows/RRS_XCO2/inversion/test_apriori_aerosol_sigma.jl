@@ -6,7 +6,7 @@ using Test
 
 include(joinpath(@__DIR__, "retrieval_setup", "build_apriori.jl"))
 include(joinpath(@__DIR__, "RetrievalState.jl"))
-include(joinpath(@__DIR__, "preflight_bottom_layer_aerosol_retrievals.jl"))
+include(joinpath(@__DIR__, "GattacaTaperedSIFReadiness.jl"))
 using .RetrievalState
 
 @testset "isolated aerosol ln(AOD) prior width" begin
@@ -57,17 +57,17 @@ using .RetrievalState
             @test Float64.(dataset["Sa_active"][14:16, 14:16, 1]) ==
                 Diagonal(fill(0.75^2, 3))
         end
-        @test isnothing(validate_prior(netcdf_path))
+        @test size(GattacaTaperedSIFReadiness._prior_snapshot(netcdf_path).Sa_active) == (30, 30, 4)
 
         NCDataset(netcdf_path, "a") do dataset
             dataset.attrib["aerosol_ln_aod_sigma"] = 2.0
         end
-        @test_throws ErrorException validate_prior(netcdf_path)
+        @test_throws ErrorException GattacaTaperedSIFReadiness._prior_snapshot(netcdf_path)
         NCDataset(netcdf_path, "a") do dataset
             dataset.attrib["aerosol_ln_aod_sigma"] = 0.75
             dataset["Sa_active"][14, 14, 4] = 4.0
         end
-        @test_throws ErrorException validate_prior(netcdf_path)
+        @test_throws ErrorException GattacaTaperedSIFReadiness._prior_snapshot(netcdf_path)
 
         @test occursin(
             "Aerosol ln(AOD760) sigma: 7.500000000000e-01",

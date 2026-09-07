@@ -2,6 +2,8 @@
 
 using LinearAlgebra
 using NCDatasets
+import vSmartMOM
+using vSmartMOM: sif_data_path
 using Test
 
 module Round3PriorFixture
@@ -58,8 +60,7 @@ function fixture_paths(root)
     write(stokes, "representative-stokes-fixture\n")
     write(components,
           "aod760_0p28 0.224 0.0504 0.0056 0.28 0.224 0.0504 0.0056 0.28\n")
-    cp(joinpath(@__DIR__, "..", "..", "src", "SIF_emission",
-                "sif-spectra.csv"), sif_template)
+    cp(sif_data_path("sif-spectra.csv"), sif_template)
     run(`git -C $repo init -q`)
     run(`git -C $legacy_repo init -q`)
     return Round4ReadinessPaths(
@@ -344,7 +345,7 @@ end
         # Use the real checkout only for the read-only code-set digest.
         paths0 = fixture_paths(root)
         paths = Round4ReadinessPaths(
-            repo_root=normpath(joinpath(@__DIR__, "..", "..")),
+            repo_root=pkgdir(vSmartMOM),
             private_root=paths0.private_root,
             full_truth_root=paths0.full_truth_root,
             restart_root=paths0.restart_root,

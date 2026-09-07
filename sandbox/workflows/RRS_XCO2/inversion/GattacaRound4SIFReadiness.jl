@@ -482,15 +482,20 @@ function validate_release_barrier(
 end
 
 function _codeset_paths(repo_root)
+    # Preserve the canonical two-checkout contract while supporting the public
+    # package's sandbox relocation of workflow source.
+    workflow_prefix = isdir(joinpath(repo_root, "RRS_XCO2")) ? "" : "sandbox/workflows/"
+    source_path(relative) = joinpath(repo_root,
+        startswith(relative, "RRS_XCO2/") ? workflow_prefix * relative : relative)
     paths = String[]
     for relative in ("Project.toml", "Manifest.toml",
                      "RRS_XCO2/config/oco_grass_3aerosol.yaml")
-        path = joinpath(repo_root, relative)
+        path = source_path(relative)
         _require_file(path, "round-4 code-set input")
         push!(paths, path)
     end
     for relative_root in ("src", "ext", "RRS_XCO2/scripts")
-        root = joinpath(repo_root, relative_root)
+        root = source_path(relative_root)
         for (directory, _, files) in walkdir(root), file in files
             endswith(file, ".jl") && push!(paths, joinpath(directory, file))
         end
@@ -511,7 +516,7 @@ function _codeset_paths(repo_root)
             "RRS_XCO2/inversion/retrieval_setup/build_round4_known_sif_apriori.jl",
             "RRS_XCO2/inversion/gattaca_round4_known_sif759_retrievals.sbatch",
             "RRS_XCO2/inversion/submit_gattaca_round4_known_sif759_retrievals.sh")
-        path = joinpath(repo_root, relative)
+        path = source_path(relative)
         _require_file(path, "round-4 code-set input")
         push!(paths, path)
     end

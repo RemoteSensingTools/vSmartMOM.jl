@@ -37,12 +37,23 @@ Environment paths:
 * `SIF_RESTART_ROOT` (default `<truth root>/.sif_v2_restart`)
 * `SIF_OBSOLETE_ROOT` (default
   `RRS_XCO2/obsolete/sif_wavelength_integral_0p5_20260904`)
+* `SIF_PRODUCER_ALBEDO` names the producer surface coefficients; defaults to
+  `<RRS_XCO2_DATA_ROOT>/surface_albedos/lambertian_legendre_inputs.dat`.
+* `SIF_PRODUCER_MANIFEST` names the exact producer Manifest.toml; defaults to
+  the package checkout manifest. Its checksum must match producer provenance.
 * `SIF_EXTERNAL_INPUT_MANIFEST` must name the transferred
   `external_inputs.sha256` used by the eight Gattaca producer tasks (the
   default is `<restart root>/external_inputs.sha256`).
 """
 
 module SIFTruthReleaseGate
+
+import vSmartMOM
+using vSmartMOM: sif_data_path
+
+# The producer manifest may be transferred separately from the package checkout.
+producer_manifest_path() = get(ENV, "SIF_PRODUCER_MANIFEST",
+    joinpath(pkgdir(vSmartMOM), "Manifest.toml"))
 
 using Dates
 using DelimitedFiles
@@ -55,6 +66,9 @@ using vSmartMOM: sif_reference_state
 
 include(joinpath(@__DIR__, "common.jl"))
 using .RRSXCO2Common
+
+producer_albedo_path() = get(ENV, "SIF_PRODUCER_ALBEDO",
+    joinpath(RRSXCO2Common.ROOT, "surface_albedos", "lambertian_legendre_inputs.dat"))
 
 export ReleasePaths, validate_release, publish_release, main
 
@@ -374,12 +388,10 @@ function validate_producer_provenance(paths::ReleasePaths;
             "completed producer tasks disagree on the $name checksum")
     end
     local_inputs = Dict(
-        "Manifest.toml" => normpath(joinpath(@__DIR__, "..", "..", "Manifest.toml")),
-        "lambertian_legendre_inputs.dat" => normpath(joinpath(
-            @__DIR__, "..", "surface_albedos", "lambertian_legendre_inputs.dat")),
+        "Manifest.toml" => producer_manifest_path(),
+        "lambertian_legendre_inputs.dat" => producer_albedo_path(),
         "true_states.dat" => corrected_table(paths),
-        "sif-spectra.csv" => normpath(joinpath(
-            @__DIR__, "..", "..", "src", "SIF_emission", "sif-spectra.csv")),
+        "sif-spectra.csv" => sif_data_path("sif-spectra.csv"),
     )
     for (name, local_path) in local_inputs
         isfile(local_path) || error("missing local producer input: $local_path")

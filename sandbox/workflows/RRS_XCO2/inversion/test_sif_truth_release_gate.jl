@@ -2,7 +2,8 @@ using Test
 using NCDatasets
 using Printf
 using SHA
-using vSmartMOM: sif_reference_state
+import vSmartMOM
+using vSmartMOM: sif_reference_state, sif_data_path
 
 include(joinpath(@__DIR__, "..", "scripts",
                  "validate_publish_sif_truth_restart.jl"))
@@ -141,12 +142,10 @@ function write_producer_fixture(paths)
         println(io, Gate.file_sha256(external_input), "  rrs_inputs/test.bin")
     end
     local_inputs = (
-        normpath(joinpath(@__DIR__, "..", "..", "Manifest.toml")),
-        normpath(joinpath(@__DIR__, "..", "surface_albedos",
-                          "lambertian_legendre_inputs.dat")),
+        Gate.producer_manifest_path(),
+        Gate.producer_albedo_path(),
         Gate.corrected_table(paths),
-        normpath(joinpath(@__DIR__, "..", "..", "src", "SIF_emission",
-                          "sif-spectra.csv")),
+        sif_data_path("sif-spectra.csv"),
         external,
     )
     current = Gate.RRSXCO2Common.campaign_sif_state()
