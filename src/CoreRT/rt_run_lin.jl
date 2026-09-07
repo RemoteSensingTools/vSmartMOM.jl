@@ -46,7 +46,8 @@ physical parameters via the linearized Matrix Operator Method.
   prescribed or retrievable surface SIF; atmospheric
   adding then propagates equivalent-source vectors instead of matrix tangents.
 - `jacobian_basis=:auto`: Double a local optical basis when smaller than the
-  atmospheric retrieval layout. `:physical` propagates retrieval columns
+  atmospheric retrieval layout, retaining only microphysical directions
+  selected by an active Jacobian plan. `:physical` propagates retrieval columns
   directly; `:local` forces the local basis for a single-band solve.
 
 # Returns
@@ -293,16 +294,22 @@ function rt_run(RS_type::AbstractRamanType,
     """
     @info msg
 
-    local_basis = use_local_jacobian(jacobian_basis, layout, iBand, NAer)
+    # Compile the selected component columns before allocating tangent
+    # workspaces: fixed microphysics must not consume local RT directions.
+    @timeit "OpticalProps invariant" m_invariant_cache =
+        build_m_invariant_cache_lin(iBand, model, lin_model; active_layout)
+    nb = local_jacobian_size(NAer,m_invariant_cache.selection)
+    local_basis = use_local_jacobian(jacobian_basis, layout, iBand, NAer,
+                                     m_invariant_cache.selection)
     source_adding = use_source_adding(jacobian_adding,model,effective_sources,SFI,local_basis,brdf)
     local_workspace = local_basis && !source_adding ? make_local_jacobian_workspace(
-        RS_type, FT, arr_type, local_jacobian_size(NAer), dims, nSpec,
+        RS_type, FT, arr_type, nb, dims, nSpec,
         quad_points, pol_type) : nothing
 
     # Create arrays
     @timeit "Creating layers" added_layer, added_layer_lin          = 
         make_added_layer(lin, RS_type, FT, arr_type,
-                         source_adding ? local_jacobian_size(NAer) : Nparams, dims, nSpec;
+                         source_adding ? nb : Nparams, dims, nSpec;
                          external_solar=quad_points.external_solar,
                          nStokes=pol_type.n, doubling_scratch=source_adding || !local_basis,
                          core_partials=source_adding || !local_basis)
@@ -346,9 +353,6 @@ function rt_run(RS_type::AbstractRamanType,
     # τ, ϖ, their physical-parameter tangents, and gas objects do not depend
     # on Fourier order. Build them once; each moment attaches only Z(m), Ż(m),
     # Z₀(m), and Ż₀(m) before the analytic RT propagation.
-    @timeit "OpticalProps invariant" m_invariant_cache =
-        build_m_invariant_cache_lin(iBand, model, lin_model;
-                                    active_layout)
     if local_basis
         @timeit "OpticalProps invariant" m_invariant_cache =
             build_local_jacobian_cache(iBand, model, lin_model, m_invariant_cache)

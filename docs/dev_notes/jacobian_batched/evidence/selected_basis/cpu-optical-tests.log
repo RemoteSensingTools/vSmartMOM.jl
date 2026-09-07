@@ -1,0 +1,14 @@
+Precompiling packages...
+  26521.9 ms  ✓ vSmartMOM
+  13098.2 ms  ✓ vSmartMOM → vSmartMOMCUDAExt
+  2 dependencies successfully precompiled in 41 seconds. 274 already precompiled.
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:18[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:11[K
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:02[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:05[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:03[K
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:02[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:03[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:02[K
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:14[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:09[K
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:02[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:03[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:02[K
+Test Summary:           | Pass  Total     Time
+Local optical basis CPU | 5164   5164  4m45.7s

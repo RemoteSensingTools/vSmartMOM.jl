@@ -137,7 +137,7 @@ basis, 284 SIF, 92 solar-only source adding) and **1,397 CUDA checks** (1,021
 optical basis, 284 SIF, 92 solar-only source adding). A strict
 Documenter/Vitepress build also passes. Metal was not hardware-tested.
 
-## Final replay after the precision repairs
+## Replay after the precision repairs, before basis pruning
 
 Same archived state, all 5,011 wavelengths and the complete instrument operator;
 medians of three warmed evaluations on the A100:
@@ -152,8 +152,8 @@ deepcopy and other adapter work outside the component timers. Host allocations
 are 4.750 GB and 4.723 GB per evaluation, respectively. The all-band source path
 is **1.086× faster** than the current matrix path for this selected layout.
 SIF support is now available, but its addition alone does not materially improve
-on the earlier mixed O₂-matrix/CO₂-source configuration; pruning the unused
-microphysics directions remains the next main RT opportunity.
+on the earlier mixed O₂-matrix/CO₂-source configuration. This motivated the
+selected-microphysics basis reduction described below.
 
 Current source/matrix measurement differences are at most **5.0e-5 detector
 standard deviations** (relative L2 2.00e-8). The largest relative L2 difference
@@ -172,6 +172,44 @@ Complete inversion convergence and campaign products have not been revalidated.
 Raw timings, per-column comparisons, source hashes and reproduction commands are
 in [the evidence directory](evidence/suniti_replay/README.md).
 
+## Retrieval-selected local basis: 17 → 5 directions
+
+A fresh before/after replay on 2026-09-07 compares `6cbaccc1` against the
+selected-microphysics implementation using the same saved state, dependency
+manifest, A100 GPU 0, and three warmed samples per mode. GPU runs were
+sequential. All 154 recorded study source/configuration hashes matched both
+before and after the comparison; the study checkout and campaign were untouched.
+
+| Solver configuration | Complete evaluation | RT/Jacobian |
+|---|---:|---:|
+| Before pruning: automatic basis, matrix adding | 15.911 s | 12.293 s |
+| Selected basis, matrix adding | 11.254 s | 7.977 s |
+| Before pruning: local basis, source adding | 14.081 s | 11.273 s |
+| Selected basis, source adding | **8.194 s** | **4.905 s** |
+
+Source adding now takes **42% less evaluation time** (1.72× faster); its
+RT/Jacobian portion is **2.30× faster**. The source replay's measurements and
+all 30 instrument-level Jacobian columns are **bitwise identical** before and
+after pruning. Automatic matrix adding also preserves measurements bitwise;
+its worst Jacobian-column relative L2 change is 1.03e-5 because O₂ now uses the
+local rather than physical basis. The new source/matrix paths differ by at most
+5.0e-5 detector-noise units and 5.83e-6 per-column relative L2.
+
+This is a reduction of unused tangent work, with the same selected physical
+coordinates and forward optics. Mixture directions stay present for all
+species, even when their own microphysics are fixed. Partial microphysics
+selection uses only the requested directions for each species. The regression
+record contains **5,591 CPU checks, 2,563 CUDA checks, and a passing strict docs
+build**, including independent finite differences and mixed selections.
+
+The shared shift from the historical archive remains unchanged: 0.01375 noise
+units and about 0.146% in the worst Jacobian column, caused by the preceding
+precision repair. Full inversion convergence remains untested. Parameter
+deepcopy still copies 3.767 GB of LUT data and took 2.96 s in the isolated copy
+probe; removing that copy is now a substantial remaining evaluation cost.
+See [the selected-basis evidence](evidence/selected_basis/README.md) for the
+timings, logs, array hashes and independent NumPy/HDF5 verification.
+
 ## Integration priorities
 
 1. **Completed in `00e670e1`:** enable surface SIF in equivalent-source adding,
@@ -179,11 +217,14 @@ in [the evidence directory](evidence/suniti_replay/README.md).
    The boundary
    derivative must distinguish reflected solar attenuation from locally emitted
    fluorescence. See [the source-adding derivation](source_adding.md).
-2. Prune fixed microphysics directions from the local basis. With three aerosols
-   the current basis has 17 directions, although this study needs only the two
-   scalar optical directions and three phase-mixture directions. O₂ has only
-   seven selected atmospheric columns already, so forcing 17 local directions
-   is not automatically faster. Pruning could reduce its doubling basis to five.
+2. **Implemented:** prune fixed microphysics directions from the local basis.
+   This study now uses two scalar optical directions and three phase-mixture
+   directions, reducing the doubling basis from 17 to 5. Automatic selection
+   now chooses the local basis for O₂'s seven atmospheric columns as well as
+   both CO₂ bands. Microphysics can still be selected independently per species;
+   only those selected phase derivatives enter the compact RT basis. Forward
+   phase evaluation skips the derivative path when a species has no selected
+   microphysics. See [the follow-up evidence](evidence/selected_basis/README.md).
 3. Share immutable loaded LUTs across trial-state copies. Cache fixed forward
    Mie/truncated Greek/phase-node data across iterations with explicit keys for
    all microphysical, spectral and truncation settings.

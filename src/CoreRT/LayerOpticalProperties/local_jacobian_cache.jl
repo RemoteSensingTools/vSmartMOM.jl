@@ -3,6 +3,7 @@ struct LocalOpticalJacobianCache{L,T}
     layers::L
     basis_tau::T
     basis_omega::T
+    microphysics_columns::Vector{Vector{Int}}
 end
 
 """
@@ -21,6 +22,10 @@ independent of layer height: all layers share one phase basis per Fourier
 order. Only small scalar coefficients carry retrieval columns. Gas columns
 have dS=dSᵢ=0, hence exactly zero phase coefficients.
 
+The active selection determines the retained microphysical phase directions
+for each species. Mixture directions stay present for every species, including
+fixed or zero-loading aerosols; their weights can respond to other parameters.
+
 The aerosol cache supplies δ-M-modified values and derivatives, including
 both dfᵗ terms in τ/ϖ. Truncated phase tangents supply the remaining dfᵗ
 normalization. No truncation chain term is dropped at this boundary.
@@ -36,7 +41,9 @@ function build_local_jacobian_cache(band, model, lin_model, cache::LinMInvariant
     columns = [selection === nothing ? collect(1:7) : selection.aerosol_columns[i] for i in 1:na]
     ng = size(cache.lin_gas[1][1].τ̇,2)
     np = Int(pressure) + sum(length,columns; init=0) + ng
-    nb = local_jacobian_size(na)
+    microphysics_columns = local_microphysics_columns(na,selection)
+    nb = local_jacobian_size(na,selection)
+    mixture_columns = 3 .+ cumsum(vcat(0, [1+length(c) for c in microphysics_columns]))[1:na]
     layers = map(1:nz) do z
         ray_tau = cache.rayl_τ_dev[1][z]
         components = [cache.aerosol[1][i][z] for i in 1:na]
@@ -76,14 +83,15 @@ function build_local_jacobian_cache(band, model, lin_model, cache::LinMInvariant
         offset = Int(pressure)
         for (i,a) in enumerate(components)
             ix = offset .+ (1:length(columns[i]))
-            b = 3 + 5(i-1)
+            b = mixture_columns[i]
             scatterdot = a.τ̇ .* a.ϖ .+ a.τ .* a.ϖ̇
             dt[:,ix] .= a.τ̇
             dS[:,ix] .= scatterdot
             component_dS[i][:,ix] .= scatterdot
             for (j,native) in enumerate(columns[i])
                 if 2 <= native <= 5
-                    C[:,b+native-1,offset+j] .= weights[i]
+                    micro = findfirst(==(native-1),microphysics_columns[i])
+                    C[:,b+micro,offset+j] .= weights[i]
                 end
             end
             if pressure
@@ -104,7 +112,7 @@ function build_local_jacobian_cache(band, model, lin_model, cache::LinMInvariant
         C[:,1,:] .= dt
         C[:,2,:] .= dw
         for i in 1:na
-            C[:,3+5(i-1),:] .= (component_dS[i] .- weights[i] .* dS) .* invS
+            C[:,mixture_columns[i],:] .= (component_dS[i] .- weights[i] .* dS) .* invS
         end
         (;τ,ϖ,τ̇=dt,ϖ̇=dw,coefficients=C,weights,mixing_weights,rayleigh_fraction=ray_tau ./ τ)
     end
@@ -113,5 +121,5 @@ function build_local_jacobian_cache(band, model, lin_model, cache::LinMInvariant
     basis_omega = zero(basis_tau)
     basis_tau[:,1] .= one(FT)
     basis_omega[:,2] .= one(FT)
-    return LocalOpticalJacobianCache(layers,basis_tau,basis_omega)
+    return LocalOpticalJacobianCache(layers,basis_tau,basis_omega,microphysics_columns)
 end

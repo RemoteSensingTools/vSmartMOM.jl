@@ -174,9 +174,13 @@ Z=Z_r+\sum_i α_i(Z_i-Z_r),\qquad
 \dot Z=\sum_i[\dot α_i(Z_i-Z_r)+α_i\dot Z_i].
 ```
 
-Thus `2 + 5Naer` directions suffice: optical depth, albedo, and for each
+Thus at most `2 + 5Naer` directions suffice: optical depth, albedo, and for each
 aerosol its phase difference from Rayleigh plus four truncated Mie phase
-tangents. All layers share these phase directions at each Fourier order.
+tangents. A retrieval plan removes unselected Mie directions before workspace
+allocation, leaving `2 + Naer + N_selected_microphysics`. Three aerosols with
+fixed microphysics need only five local directions. Their forward phases and
+mixture-weight derivatives are retained. All layers share these phase
+directions at each Fourier order.
 Small scalar coefficient arrays, prepared once before the Fourier loop,
 map the local directions to retrieval columns. Gas and profile parameters
 introduce no additional phase directions under this fixed phase model.

@@ -1,0 +1,36 @@
+PACKAGE /tmp/vsmartmom-jacobian-basis-baseline/src/vSmartMOM.jl
+PREPARED grids=[2735, 1281, 995]
+PARAMETER_COPY seconds=2.602709182 bytes=3767193448 lut_type=vSmartMOM.Absorption.InterpolationModel same_lut=false same_interpolator=false
+WARM mode=matrix
+Precompiling packages...
+  26415.2 ms  ✓ vSmartMOM
+  13470.6 ms  ✓ vSmartMOM → vSmartMOMCUDAExt
+  2 dependencies successfully precompiled in 41 seconds. 274 already precompiled.
+Looping over layers ...  12%|███▌                        |  ETA: 0:02:13[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:19[K
+Looping over layers ...  12%|███▌                        |  ETA: 0:00:12[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:02[K
+WARM_DONE mode=matrix timing=(model_build_seconds = 24.161814557, rt_linearized_seconds = 114.87808281, instrument_seconds = 1.685992485, forward_seconds = 139.03989736699998, jacobian_seconds = 114.87808281) archived_y_error=0.0013206396281191246 archived_K_error=0.014483098594837429 noise_scaled_error=0.013738543463287874
+SAMPLE mode=matrix Dict{String, Any}("timing" => Dict("model_build_seconds" => 0.425826544, "forward_seconds" => 12.718733842999999, "instrument_seconds" => 0.04576756, "jacobian_seconds" => 12.292907299, "rt_linearized_seconds" => 12.292907299), "trial" => 1, "max_noise_scaled_error" => 0.013738543463287874, "max_y_error" => 0.0013206396281191246, "seconds" => 15.91136103, "gctime" => 0.826061287, "max_K_error" => 0.014483098594837429, "host_bytes" => 4750007184)
+SAMPLE mode=matrix Dict{String, Any}("timing" => Dict("model_build_seconds" => 0.386069033, "forward_seconds" => 12.810902565000001, "instrument_seconds" => 0.043843124000000004, "jacobian_seconds" => 12.424833532000001, "rt_linearized_seconds" => 12.424833532000001), "trial" => 2, "max_noise_scaled_error" => 0.013738543463287874, "max_y_error" => 0.0013206396281191246, "seconds" => 16.031027363, "gctime" => 0.803986896, "max_K_error" => 0.014483098594837429, "host_bytes" => 4750224032)
+SAMPLE mode=matrix Dict{String, Any}("timing" => Dict("model_build_seconds" => 0.419464822, "forward_seconds" => 12.709309852999999, "instrument_seconds" => 0.053540342, "jacobian_seconds" => 12.289845030999999, "rt_linearized_seconds" => 12.289845030999999), "trial" => 3, "max_noise_scaled_error" => 0.013738543463287874, "max_y_error" => 0.0013206396281191246, "seconds" => 15.006989504, "gctime" => 0.801457431, "max_K_error" => 0.014483098594837429, "host_bytes" => 4750051360)
+WARM mode=source
+Looping over layers ...  12%|███▌                        |  ETA: 0:00:13[KLooping over layers ...  81%|██████████████████████▊     |  ETA: 0:00:01[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:03[K
+Looping over layers ...  69%|███████████████████▎        |  ETA: 0:00:00[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+Looping over layers ...  75%|█████████████████████       |  ETA: 0:00:00[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+Looping over layers ...  75%|█████████████████████       |  ETA: 0:00:00[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+WARM_DONE mode=source timing=(model_build_seconds = 0.393400441, rt_linearized_seconds = 16.778371304, instrument_seconds = 0.052204118, forward_seconds = 17.171771745, jacobian_seconds = 16.778371304) archived_y_error=0.0013216887485754114 archived_K_error=0.014485879505627963 noise_scaled_error=0.01374945740731926
+Looping over layers ...  69%|███████████████████▎        |  ETA: 0:00:00[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+Looping over layers ...  62%|█████████████████▌          |  ETA: 0:00:01[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+Looping over layers ...  75%|█████████████████████       |  ETA: 0:00:00[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+Looping over layers ...  75%|█████████████████████       |  ETA: 0:00:00[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+SAMPLE mode=source Dict{String, Any}("timing" => Dict("model_build_seconds" => 0.421408127, "forward_seconds" => 11.828683326, "instrument_seconds" => 0.052356665, "jacobian_seconds" => 11.407275199, "rt_linearized_seconds" => 11.407275199), "trial" => 1, "max_noise_scaled_error" => 0.01374945740731926, "max_y_error" => 0.0013216887485754114, "seconds" => 14.642823385, "gctime" => 0.990439638, "max_K_error" => 0.014485879505627963, "host_bytes" => 4723201368)
+Looping over layers ...  75%|█████████████████████       |  ETA: 0:00:00[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+Looping over layers ...  62%|█████████████████▌          |  ETA: 0:00:01[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+Looping over layers ...  75%|█████████████████████       |  ETA: 0:00:00[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+Looping over layers ...  75%|█████████████████████       |  ETA: 0:00:00[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+SAMPLE mode=source Dict{String, Any}("timing" => Dict("model_build_seconds" => 0.459410265, "forward_seconds" => 11.732433429000002, "instrument_seconds" => 0.050821148999999996, "jacobian_seconds" => 11.273023164000001, "rt_linearized_seconds" => 11.273023164000001), "trial" => 2, "max_noise_scaled_error" => 0.01374945740731926, "max_y_error" => 0.0013216887485754114, "seconds" => 14.080789549, "gctime" => 0.923199202, "max_K_error" => 0.014485879505627963, "host_bytes" => 4723213912)
+Looping over layers ...  69%|███████████████████▎        |  ETA: 0:00:00[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+Looping over layers ...  62%|█████████████████▌          |  ETA: 0:00:01[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+Looping over layers ...  75%|█████████████████████       |  ETA: 0:00:00[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+Looping over layers ...  75%|█████████████████████       |  ETA: 0:00:00[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+SAMPLE mode=source Dict{String, Any}("timing" => Dict("model_build_seconds" => 0.450654292, "forward_seconds" => 11.560123659, "instrument_seconds" => 0.04855049, "jacobian_seconds" => 11.109469367, "rt_linearized_seconds" => 11.109469367), "trial" => 3, "max_noise_scaled_error" => 0.01374945740731926, "max_y_error" => 0.0013216887485754114, "seconds" => 13.909650119, "gctime" => 0.78622224, "max_K_error" => 0.014485879505627963, "host_bytes" => 4723201480)
+PARITY noise_units=4.9997069603304724e-5 max_column_relative_l2=1.1229387609437674e-5

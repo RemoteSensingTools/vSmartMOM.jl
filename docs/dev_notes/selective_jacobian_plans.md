@@ -127,6 +127,15 @@ globalize_jacobian(K_local, result.layout)
 Forward aerosol optics and H2O absorption are never removed. Only their
 derivatives are omitted when the retrieval declares them fixed.
 
+The local optical basis honors this same selection before allocating MOM
+workspaces. It contains two scalar directions, one aerosol/Rayleigh phase
+difference per species, and only the selected microphysical phase derivatives.
+For the three fixed-microphysics species in `OCO_RRS_synth`, this reduces the
+local basis from 17 to 5 directions. Automatic basis selection uses the reduced
+count, including in the O₂ band. Species without selected microphysics use
+forward-only phase evaluation. The physical output layout and its global
+coordinate mapping are unchanged.
+
 ## `OCO_RRS_synth` state mappings
 
 The current 16-layer prior fixes layers 1--4 because their centers are above

@@ -3,16 +3,36 @@ using vSmartMOM.CoreRT
 
 include("local_jacobian_fixture.jl")
 
-function check_local_jacobian(FT,polarized,external; gpu=false, n_aerosols=1)
+function check_local_jacobian(FT,polarized,external; gpu=false, n_aerosols=1,
+                              selected_columns=nothing, expected_basis=nothing)
     model,lin = local_jacobian_fixture(FT,polarized,external;gpu,n_aerosols)
     AT = CoreRT.array_type(model)
     ng = size(lin.τ̇_abs[1],1)
-    cache = CoreRT.build_m_invariant_cache_lin(1,model,lin)
+    layout = if selected_columns === nothing
+        nothing
+    else
+        names = ["native_$p" for p in selected_columns]
+        keys = [ParameterKey(:atmosphere,Symbol(name)) for name in names]
+        push!(names,"albedo")
+        push!(keys,ParameterKey(:surface,:albedo;component=1,band=1))
+        np = length(selected_columns)
+        ActiveParameterLayout(keys,names,keys,names,selected_columns,np;
+                              surface_columns=np+1:np+1)
+    end
+    cache = CoreRT.build_m_invariant_cache_lin(1,model,lin;active_layout=layout)
+    local_cache = CoreRT.build_local_jacobian_cache(1,model,lin,cache)
+    if expected_basis !== nothing
+        @test size(local_cache.basis_tau,2) == expected_basis
+        @test all(size(l.coefficients,2) == expected_basis for l in local_cache.layers)
+        @test CoreRT.local_jacobian_size(n_aerosols,cache.selection) == expected_basis
+        @test CoreRT.use_local_jacobian(:auto,layout,1,n_aerosols,cache.selection) ==
+              (expected_basis < length(selected_columns))
+    end
     rs = vSmartMOM.InelasticScattering.noRS{FT}()
     tol = FT === Float32 ? FT(3e-4) : FT(2e-10)
     for m in (0,1,2)
         physical,dp,_ = CoreRT.constructCoreOpticalProperties(rs,1,m,model,lin,cache)
-        factored,df,_ = CoreRT.construct_local_optical_jacobians(rs,1,m,model,lin,cache)
+        factored,df,_ = CoreRT.construct_local_optical_jacobians(rs,1,m,model,lin,local_cache)
         for z in eachindex(physical)
             fp,jp = CoreRT.expandOpticalProperties(physical[z],dp[z],AT)
             fl,jl = factored[z],df[z]
@@ -50,13 +70,33 @@ function check_local_jacobian(FT,polarized,external; gpu=false, n_aerosols=1)
                 # three-aerosol case has ~2e-6 differences at ~1e-3 entries.
                 phase_atol = (FT === Float64 ? 32 : 10max(1,n_aerosols)) * eps(FT)
                 @test all(isapprox.(a,b;rtol=tol,atol=phase_atol))
-                @test all(iszero, a[:,:,:,2+7n_aerosols:end])
-                @test all(iszero, b[:,:,:,2+7n_aerosols:end])
+                gas_start = selected_columns === nothing ? 2+7n_aerosols :
+                    1+count(p->p<=1+7n_aerosols,selected_columns)
+                @test all(iszero, a[:,:,:,gas_start:end])
+                @test all(iszero, b[:,:,:,gas_start:end])
             end
         end
     end
-    early = rt_run(model,lin,n_aerosols,ng,1;jacobian_basis=:physical)
-    late = rt_run(model,lin,n_aerosols,ng,1;jacobian_basis=:local)
+    run_basis(mode;kwargs...) = if layout === nothing
+        rt_run(model,lin,n_aerosols,ng,1;jacobian_basis=mode,kwargs...)
+    else
+        plan = JacobianPlan(OCO_RRS_synth(),layout.keys,layout.parameter_names,[layout])
+        rt_run(model,PlannedRTModelLin(lin,plan);jacobian_basis=mode,kwargs...)
+    end
+    early = run_basis(:physical)
+    late = run_basis(:local)
+    if layout !== nothing
+        source = run_basis(:local;jacobian_adding=:source)
+        auto = run_basis(:auto)
+        for result in (source,auto)
+            @test result.toa ≈ early.toa rtol=tol atol=10eps(FT)
+            @test result.toa_jacobian ≈ early.toa_jacobian rtol=tol atol=10eps(FT)
+            if !external
+                @test result.boa ≈ early.boa rtol=tol atol=10eps(FT)
+                @test result.boa_jacobian ≈ early.boa_jacobian rtol=tol atol=10eps(FT)
+            end
+        end
+    end
     for (x,y) in zip(early,late)
         if x === nothing || y === nothing
             @test x === y
@@ -64,7 +104,8 @@ function check_local_jacobian(FT,polarized,external; gpu=false, n_aerosols=1)
             @test x ≈ y rtol=tol atol=10eps(FT)
         end
     end
-    if FT === Float64
+    gas_native = 1+7n_aerosols+2
+    if FT === Float64 && (selected_columns === nothing || gas_native in selected_columns)
         # Independent gas finite difference through the forward solver,
         # including the beam attenuation above every subsequent layer.
         z=2; h=1e-5
@@ -75,7 +116,7 @@ function check_local_jacobian(FT,polarized,external; gpu=false, n_aerosols=1)
         model.τ_abs[1][:,z] .= original .- h.*direction
         minus=local_jacobian_forward(model)
         model.τ_abs[1][:,z] .= original
-        p=1+7n_aerosols+z
+        p=selected_columns === nothing ? gas_native : findfirst(==(gas_native),selected_columns)
         @test late.toa_jacobian[:,:,:,p] ≈ (plus.toa-minus.toa)/(2h) rtol=2e-6 atol=1e-9
         if !external
             @test late.boa_jacobian[:,:,:,p] ≈ (plus.boa-minus.boa)/(2h) rtol=2e-6 atol=1e-9
@@ -126,6 +167,19 @@ end
             check_local_jacobian(Float64,true,true;n_aerosols=na)
         end
         check_local_jacobian(Float32,true,true;n_aerosols=3)
+        # Three fixed-microphysics species need only τ, ϖ and three mixture
+        # directions. A mixed plan retains noncontiguous microphysics from
+        # different species, exercising both phase and coefficient indexing.
+        fixed = [1,2,7,9,14,16,21,24]
+        mixed = [1,2,7,9,10,13,14,16,19,21,24]
+        for external in (false,true)
+            check_local_jacobian(Float64,true,external;n_aerosols=3,
+                selected_columns=fixed,expected_basis=5)
+        end
+        check_local_jacobian(Float32,true,true;n_aerosols=3,
+            selected_columns=fixed,expected_basis=5)
+        check_local_jacobian(Float64,true,true;n_aerosols=3,
+            selected_columns=mixed,expected_basis=8)
         for external in (false,true)
             check_zero_aerosol_jacobian(external)
         end
@@ -139,6 +193,10 @@ if get(ENV,"VSMARTMOM_JACOBIAN_GPU_TEST","false") == "true"
             check_local_jacobian(Float64,true,true;gpu=true)
             check_local_jacobian(Float32,true,false;gpu=true)
             check_local_jacobian(Float32,true,true;gpu=true,n_aerosols=3)
+            check_local_jacobian(Float32,true,true;gpu=true,n_aerosols=3,
+                selected_columns=[1,2,7,9,14,16,21,24],expected_basis=5)
+            check_local_jacobian(Float64,true,true;gpu=true,n_aerosols=3,
+                selected_columns=[1,2,7,9,10,13,14,16,19,21,24],expected_basis=8)
         end
     end
 end

@@ -36,10 +36,19 @@ These are derivatives of S2014 (C.22)–(C.24), with the chain rule of
 The choice of a fixed Rayleigh reference is an implementation derivation,
 not a claim about the historical Fortran ordering.
 
-There are **2 + 5 N_aerosol** directions: τ, ϖ, and one phase difference plus
-four truncated microphysical phase tangents per aerosol. One aerosol therefore
-needs seven directions, independent of the number of gas/profile columns.
-This count uses the existing four microphysical parameters per aerosol.
+There are at most **2 + 5 N_aerosol** directions: τ, ϖ, and one phase difference
+plus four truncated microphysical phase tangents per aerosol. An active
+retrieval layout retains only its selected microphysical directions, giving
+**2 + N_aerosol + N_selected_microphysics**. Three species with fixed
+microphysics therefore need five directions instead of seventeen. Selection
+is compiled before workspace allocation and applies to both matrix and source
+adding; `:auto` compares this reduced count with the atmospheric layout.
+When a species has no selected microphysics, only its forward phase is evaluated.
+All species' mixture directions remain: changing one scattering contribution
+also changes the normalized weights of the others. Selection is structural,
+so a zero aerosol loading does not discard its potentially nonzero derivative.
+An unselected native layout still carries all four microphysical directions
+per aerosol, independent of the number of gas/profile columns.
 An independently retrieved phase shape or truncation parameter would require
 its complete phase direction and coefficient map; it is not a free extra
 column. The generic `LocalOpticalJacobian` boundary accepts supplied bases.
