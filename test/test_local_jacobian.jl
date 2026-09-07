@@ -94,6 +94,35 @@ function check_local_jacobian(FT,polarized,external; gpu=false, n_aerosols=1)
     end
 end
 
+# A zero aerosol column has Rayleigh-only forward phase moments, including
+# exact zeros above m=2. Its AOT derivative can still introduce those moments.
+# Use a one-sided, second-order difference to stay at nonnegative aerosol depth.
+function check_zero_aerosol_jacobian(external)
+    model,lin = local_jacobian_fixture(Float64,true,external)
+    ng = size(lin.τ̇_abs[1],1)
+    direction = copy(lin.τ̇_aer[1][1,1,:,:])
+    model.τ_aer[1] .= 0
+    lin.τ̇_aer[1][:,2:end,:,:] .= 0
+    lin.τ̇_aer_psurf[1] .= 0
+    base = rt_run(model)
+    h = 1e-6
+    model.τ_aer[1][1,:,:] .= h .* direction
+    one_step = rt_run(model)
+    model.τ_aer[1][1,:,:] .= 2h .* direction
+    two_steps = rt_run(model)
+    model.τ_aer[1] .= 0
+    for mode in (:physical,:local)
+        result = rt_run(model,lin,1,ng,1;jacobian_basis=mode)
+        @test result.toa ≈ base.toa rtol=1e-10 atol=1e-12
+        @test result.boa ≈ base.boa rtol=1e-10 atol=1e-12
+        for (field,jac) in ((:toa,:toa_jacobian),(:boa,:boa_jacobian))
+            fd = (-3getproperty(base,field) .+ 4getproperty(one_step,field) .-
+                  getproperty(two_steps,field)) ./ (2h)
+            @test getproperty(result,jac)[:,:,:,2] ≈ fd rtol=3e-5 atol=2e-8
+        end
+    end
+end
+
 @testset "Local optical basis CPU" begin
     with_logger(NullLogger()) do
         for FT in (Float64,Float32), polarized in (false,true), external in (false,true)
@@ -101,6 +130,9 @@ end
         end
         for na in (0,2)
             check_local_jacobian(Float64,true,true;n_aerosols=na)
+        end
+        for external in (false,true)
+            check_zero_aerosol_jacobian(external)
         end
     end
 end

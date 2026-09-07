@@ -37,7 +37,8 @@ Zero-weight quadrature columns receive Beer-law diagonal transmission only.
             (1/qp_μN[i]) * wct[j] * 
             exp(-dτ_λ[n] * ((1 / qp_μN[i]) + (1 / qp_μN[j]))) 
         # derivative wrt ϖ
-        ṙ⁻⁺[i,j,n,2] = ϖ_λ[n] == 0 ? FT(0) : r⁻⁺[i, j, n] / ϖ_λ[n]
+        ṙ⁻⁺[i,j,n,2] = Z⁻⁺[i,j,n2] * (qp_μN[j]/(qp_μN[i]+qp_μN[j])) * wct[j] *
+            -expm1(-dτ_λ[n]*(inv(qp_μN[i])+inv(qp_μN[j])))
         # derivative wrt Z
         # derivative wrt Z: direct formula avoids 0/0 when Z=0
         ṙ⁻⁺[i,j,n,3] = ϖ_λ[n] * 
@@ -77,7 +78,8 @@ Zero-weight quadrature columns receive Beer-law diagonal transmission only.
                         ϖ_λ[n] * Z⁺⁺[i,j,n2] / qp_μN[i]) * 
                         (1 - dτ_λ[n] / qp_μN[j]) * wct[j]
                 # derivative wrt ϖ_λ
-                ṫ⁺⁺[i,j,n,2] = ϖ_λ[n] == 0 ? FT(0) : t⁺⁺[i, j, n] / ϖ_λ[n]
+                ṫ⁺⁺[i,j,n,2] = exp(-dτ_λ[n]/qp_μN[j]) *
+                    Z⁺⁺[i,j,n2] * (dτ_λ[n]/qp_μN[i]) * wct[j]
                 # derivative wrt Z
                 # derivative wrt Z: direct formula avoids 0/0
                 ṫ⁺⁺[i,j,n,3] = exp(-dτ_λ[n] / qp_μN[j]) *
@@ -99,7 +101,8 @@ Zero-weight quadrature columns receive Beer-law diagonal transmission only.
                 (exp(-dτ_λ[n] / qp_μN[i])/ qp_μN[i] - 
                 exp(-dτ_λ[n] / qp_μN[j])/ qp_μN[j]) 
             # derivative wrt ϖ_λ
-            ṫ⁺⁺[i,j,n,2] = ϖ_λ[n] == 0 ? FT(0) : t⁺⁺[i, j, n] / ϖ_λ[n]
+            ṫ⁺⁺[i,j,n,2] = Z⁺⁺[i,j,n2] * (qp_μN[j]/(qp_μN[i]-qp_μN[j])) * wct[j] *
+                expdiff_neg(dτ_λ[n]/qp_μN[i],dτ_λ[n]/qp_μN[j])
             # derivative wrt Z
             # derivative wrt Z: direct formula avoids 0/0
             ṫ⁺⁺[i,j,n,3] = ϖ_λ[n] * 
@@ -167,39 +170,16 @@ included in both the forward and derivative outputs.
         Z⁻⁺_I₀ += Z⁻⁺[i,ii,n2] * F₀[ii-i_start+1,n] #I₀[ii-i_start+1] 
     end
 
-    if (i >= i_start) & (i <= i_end)
-        ctr = i-i_start+1
-        # J₀⁺ = 0.25*(1+δ(m,0)) * ϖ(λ) * Z⁺⁺ * I₀ * (dτ(λ)/μ₀) * exp(-dτ(λ)/μ₀)
-        J₀⁺[i, 1, n] = wct02 * ϖ_λ[n] * Z⁺⁺_I₀ * (dτ_λ[n] / qp_μN[i]) * exp(-dτ_λ[n] / qp_μN[i])
-        # derivative wrt τ
-        J̇₀⁺[i, 1, n, 1] = J₀⁺[i, 1, n]*(1/dτ_λ[n] - 1/qp_μN[i])
-        # derivative wrt ϖ
-        J̇₀⁺[i, 1, n, 2] = ϖ_λ[n] == 0 ? FT(0) : J₀⁺[i, 1, n] / ϖ_λ[n]
-        # derivative wrt Z (safe division: 0/0 → 0)
-        J̇₀⁺[i, 1, n, 3] = Z⁺⁺_I₀ == 0 ? FT(0) : J₀⁺[i, 1, n] / Z⁺⁺_I₀
-    else
-        # J₀⁺ = 0.25*(1+δ(m,0)) * ϖ(λ) * Z⁺⁺ * I₀ * [μ₀ / (μᵢ - μ₀)] * [exp(-dτ(λ)/μᵢ) - exp(-dτ(λ)/μ₀)]
-        J₀⁺[i, 1, n] = wct02 * ϖ_λ[n] * Z⁺⁺_I₀ * 
-            (qp_μN[i_start] / (qp_μN[i] - qp_μN[i_start])) * expdiff_neg(dτ_λ[n] / qp_μN[i], dτ_λ[n] / qp_μN[i_start])
-        # derivative wrt τ
-        J̇₀⁺[i, 1, n, 1] = - wct02 * ϖ_λ[n] * Z⁺⁺_I₀ * (qp_μN[i_start] / (qp_μN[i] - qp_μN[i_start])) * 
-            (exp(-dτ_λ[n] / qp_μN[i]) / qp_μN[i] - exp(-dτ_λ[n] / qp_μN[i_start]) / qp_μN[i_start])
-        # derivative wrt ϖ
-        J̇₀⁺[i, 1, n, 2] = ϖ_λ[n] == 0 ? FT(0) : J₀⁺[i, 1, n] / ϖ_λ[n]
-        # derivative wrt Z (safe division: 0/0 → 0)
-        J̇₀⁺[i, 1, n, 3] = Z⁺⁺_I₀ == 0 ? FT(0) : J₀⁺[i, 1, n] / Z⁺⁺_I₀
-    end
-    #J₀⁻ = 0.25*(1+δ(m,0)) * ϖ(λ) * Z⁻⁺ * I₀ * [μ₀ / (μᵢ + μ₀)] * [1 - exp{-dτ(λ)(1/μᵢ + 1/μ₀)}]
-    J₀⁻[i, 1, n] = wct02 * ϖ_λ[n] * Z⁻⁺_I₀ * (qp_μN[i_start] / (qp_μN[i] + qp_μN[i_start])) * 
-            -expm1(-dτ_λ[n] * ((1 / qp_μN[i]) + (1 / qp_μN[i_start])))
-    # derivative wrt τ
-    J̇₀⁻[i, 1, n, 1] = wct02 * ϖ_λ[n] * Z⁻⁺_I₀ * (qp_μN[i_start] / (qp_μN[i] + qp_μN[i_start])) * 
-            exp(-dτ_λ[n] * ((1 / qp_μN[i]) + (1 / qp_μN[i_start]))) *
-            ((1 / qp_μN[i]) + (1 / qp_μN[i_start]))
-    # derivative wrt ϖ
-    J̇₀⁻[i, 1, n, 2] = ϖ_λ[n] == 0 ? FT(0) : J₀⁻[i, 1, n] / ϖ_λ[n]
-    # derivative wrt Z (safe division: 0/0 → 0)
-    J̇₀⁻[i, 1, n, 3] = Z⁻⁺_I₀ == 0 ? FT(0) : J₀⁻[i, 1, n] / Z⁻⁺_I₀
+    # Direct products preserve the τ=0, ϖ=0 and projected-Z=0 limits.
+    f⁺,f⁻,df⁺,df⁻ = _single_scatter_source_factors(dτ_λ[n],qp_μN[i],qp_μN[i_start])
+    J₀⁺[i,1,n] = wct02 * ϖ_λ[n] * Z⁺⁺_I₀ * f⁺
+    J₀⁻[i,1,n] = wct02 * ϖ_λ[n] * Z⁻⁺_I₀ * f⁻
+    J̇₀⁺[i,1,n,1] = wct02 * ϖ_λ[n] * Z⁺⁺_I₀ * df⁺
+    J̇₀⁻[i,1,n,1] = wct02 * ϖ_λ[n] * Z⁻⁺_I₀ * df⁻
+    J̇₀⁺[i,1,n,2] = wct02 * Z⁺⁺_I₀ * f⁺
+    J̇₀⁻[i,1,n,2] = wct02 * Z⁻⁺_I₀ * f⁻
+    J̇₀⁺[i,1,n,3] = wct02 * ϖ_λ[n] * f⁺
+    J̇₀⁻[i,1,n,3] = wct02 * ϖ_λ[n] * f⁻
 
     # TODO: Move this out until after doubling (it is not necessary to consider this here already if Raman scattering is not involved)
     J₀⁺[i, 1, n] *= exp(-τ_sum[n]/qp_μN[i_start])

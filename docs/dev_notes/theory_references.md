@@ -353,3 +353,14 @@ The scalar truncation chain remains in
 coefficients. Backend-native interpolation in `phase_interpolation.jl` is
 linear at fixed wavenumber knots and therefore acts identically on these
 values and tangents.
+
+### Regular elemental limits
+
+`elemental_fused_lin.jl::_single_scatter_source_factors` evaluates the finite-δ
+SF2023-II (11) factors and their τ partials, including the equal-μ limit at
+τ=0. Since j=wₘϖ(ZF₀)f, its ϖ and projected-phase partials are products with
+one linear factor removed. Dividing j by ϖ or ZF₀ and substituting zero for
+0/0 loses nonzero tangents. The same principle applies to the diffuse
+reflection/transmission partials in (10). The boundary regression compares
+these derivatives to independent forward-kernel finite differences at zero
+albedo, zero thickness and a zero projected phase entry.

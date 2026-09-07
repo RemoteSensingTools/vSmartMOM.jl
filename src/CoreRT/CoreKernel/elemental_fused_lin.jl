@@ -1,3 +1,27 @@
+"""
+Finite-thickness solar-source factors from SF2023-II (11) and their thickness
+partials. With j± = wₘ ϖ (Z± F₀) f±, the other partials follow by removing
+one linear factor: ∂j±/∂ϖ = wₘ (Z± F₀) f± and ∂j±/∂(Z±F₀) = wₘ ϖ f±.
+Evaluate these products directly: dividing j by a vanishing factor would
+incorrectly erase a nonzero derivative. The equal-μ limit is regular at τ=0.
+"""
+@inline function _single_scatter_source_factors(τ, μᵢ, μ₀)
+    if μᵢ == μ₀
+        x = τ/μ₀
+        f⁺ = x * exp(-x)
+        df⁺ = exp(-x) * (one(x)-x) / μ₀
+    else
+        c = μ₀/(μᵢ-μ₀)
+        f⁺ = c * expdiff_neg(τ/μᵢ,τ/μ₀)
+        df⁺ = c * (-exp(-τ/μᵢ)/μᵢ + exp(-τ/μ₀)/μ₀)
+    end
+    q = inv(μᵢ)+inv(μ₀)
+    c = μ₀/(μᵢ+μ₀)
+    f⁻ = c * (-expm1(-τ*q))
+    df⁻ = c * exp(-τ*q) * q
+    return f⁺,f⁻,df⁺,df⁻
+end
+
 # Finite-thickness elemental evaluation and supplied-direction chain rule.
 # ============================================================================
 # Fused kernels: combine elemental RT + chain rule in a single pass.
@@ -68,7 +92,8 @@ compatibility with the 3-core doubling path.
         ṙ_tau = ϖ_λ[n] * Z⁻⁺[i,j,n2] *
             (1/qp_μN[i]) * wct[j] *
             exp(-dτ_λ[n] * ((1 / qp_μN[i]) + (1 / qp_μN[j])))
-        ṙ_w = ϖ_λ[n] == 0 ? FT(0) : r⁻⁺[i,j,n] / ϖ_λ[n]
+        ṙ_w = Z⁻⁺[i,j,n2] * (qp_μN[j] / (qp_μN[i] + qp_μN[j])) * wct[j] *
+            -expm1(-dτ_λ[n] * ((1 / qp_μN[i]) + (1 / qp_μN[j])))
         ṙ_Z = ϖ_λ[n] *
             (qp_μN[j] / (qp_μN[i] + qp_μN[j])) * wct[j] *
             -expm1(-dτ_λ[n] * ((1 / qp_μN[i]) + (1 / qp_μN[j])))
@@ -102,7 +127,8 @@ compatibility with the 3-core doubling path.
                 ṫ_tau = (exp(-dτ_λ[n] / qp_μN[j]) *
                         ϖ_λ[n] * Z⁺⁺[i,j,n2] / qp_μN[i]) *
                         (1 - dτ_λ[n] / qp_μN[j]) * wct[j]
-                ṫ_w = ϖ_λ[n] == 0 ? FT(0) : t⁺⁺[i,j,n] / ϖ_λ[n]
+                ṫ_w = exp(-dτ_λ[n] / qp_μN[j]) *
+                    Z⁺⁺[i,j,n2] * (dτ_λ[n] / qp_μN[i]) * wct[j]
                 ṫ_Z = exp(-dτ_λ[n] / qp_μN[j]) *
                     ϖ_λ[n] * (dτ_λ[n] / qp_μN[i]) * wct[j]
             end
@@ -115,7 +141,8 @@ compatibility with the 3-core doubling path.
                 (qp_μN[j] / (qp_μN[i] - qp_μN[j])) * wct[j] *
                 (exp(-dτ_λ[n] / qp_μN[i])/ qp_μN[i] -
                 exp(-dτ_λ[n] / qp_μN[j])/ qp_μN[j])
-            ṫ_w = ϖ_λ[n] == 0 ? FT(0) : t⁺⁺[i,j,n] / ϖ_λ[n]
+            ṫ_w = Z⁺⁺[i,j,n2] * (qp_μN[j] / (qp_μN[i] - qp_μN[j])) * wct[j] *
+                expdiff_neg(dτ_λ[n] / qp_μN[i], dτ_λ[n] / qp_μN[j])
             ṫ_Z = ϖ_λ[n] *
                 (qp_μN[j] / (qp_μN[i] - qp_μN[j])) * wct[j] *
                 expdiff_neg(dτ_λ[n] / qp_μN[i], dτ_λ[n] / qp_μN[j])
@@ -169,7 +196,7 @@ end
     get_elem_rt_SFI_fused!(...)
 
 Fused SFI source kernel: computes J₀⁺, J₀⁻ and their per-parameter derivatives
-ap_J̇₀⁺, ap_J̇₀⁻ in a single pass, including the Bug 22 beam attenuation fix.
+ap_J̇₀⁺, ap_J̇₀⁻ in a single pass, including above-layer beam attenuation.
 
 Eliminates the separate chain-rule pass for SFI terms and the per-parameter
 τ̇_sum correction loop in rt_kernel!.
@@ -215,30 +242,15 @@ Eliminates the separate chain-rule pass for SFI terms and the per-parameter
     # f⁻ = μ₀/(μᵢ+μ₀) [1-exp(-dτ(1/μᵢ+1/μ₀))].
     # At μᵢ=μ₀, f⁺ = (dτ/μ₀) exp(-dτ/μ₀). The three local
     # partials differentiate dτ, ϖ, and the projected phase column Z F₀.
-    J̇⁺_tau = FT(0); J̇⁺_w = FT(0); J̇⁺_Z = FT(0)
-
-    if qp_μN[i] == μ0
-        J₀⁺[i, 1, n] = wct02 * ϖ_λ[n] * Z⁺⁺_I₀ * (dτ_λ[n] / μ0) * exp(-dτ_λ[n] / μ0)
-        J̇⁺_tau = J₀⁺[i, 1, n]*(1/dτ_λ[n] - 1/μ0)
-        J̇⁺_w = ϖ_λ[n] == 0 ? FT(0) : J₀⁺[i, 1, n] / ϖ_λ[n]
-        J̇⁺_Z = Z⁺⁺_I₀ == 0 ? FT(0) : J₀⁺[i, 1, n] / Z⁺⁺_I₀
-    else
-        J₀⁺[i, 1, n] = wct02 * ϖ_λ[n] * Z⁺⁺_I₀ *
-            (μ0 / (qp_μN[i] - μ0)) * expdiff_neg(dτ_λ[n] / qp_μN[i], dτ_λ[n] / μ0)
-        J̇⁺_tau = - wct02 * ϖ_λ[n] * Z⁺⁺_I₀ * (μ0 / (qp_μN[i] - μ0)) *
-            (exp(-dτ_λ[n] / qp_μN[i]) / qp_μN[i] - exp(-dτ_λ[n] / μ0) / μ0)
-        J̇⁺_w = ϖ_λ[n] == 0 ? FT(0) : J₀⁺[i, 1, n] / ϖ_λ[n]
-        J̇⁺_Z = Z⁺⁺_I₀ == 0 ? FT(0) : J₀⁺[i, 1, n] / Z⁺⁺_I₀
-    end
-
-    # ---- J₀⁻ and 3-core scalars ----
-    J₀⁻[i, 1, n] = wct02 * ϖ_λ[n] * Z⁻⁺_I₀ * (μ0 / (qp_μN[i] + μ0)) *
-            -expm1(-dτ_λ[n] * ((1 / qp_μN[i]) + (1 / μ0)))
-    J̇⁻_tau = wct02 * ϖ_λ[n] * Z⁻⁺_I₀ * (μ0 / (qp_μN[i] + μ0)) *
-            exp(-dτ_λ[n] * ((1 / qp_μN[i]) + (1 / μ0))) *
-            ((1 / qp_μN[i]) + (1 / μ0))
-    J̇⁻_w = ϖ_λ[n] == 0 ? FT(0) : J₀⁻[i, 1, n] / ϖ_λ[n]
-    J̇⁻_Z = Z⁻⁺_I₀ == 0 ? FT(0) : J₀⁻[i, 1, n] / Z⁻⁺_I₀
+    f⁺,f⁻,df⁺,df⁻ = _single_scatter_source_factors(dτ_λ[n],qp_μN[i],μ0)
+    J₀⁺[i,1,n] = wct02 * ϖ_λ[n] * Z⁺⁺_I₀ * f⁺
+    J₀⁻[i,1,n] = wct02 * ϖ_λ[n] * Z⁻⁺_I₀ * f⁻
+    J̇⁺_tau = wct02 * ϖ_λ[n] * Z⁺⁺_I₀ * df⁺
+    J̇⁻_tau = wct02 * ϖ_λ[n] * Z⁻⁺_I₀ * df⁻
+    J̇⁺_w = wct02 * Z⁺⁺_I₀ * f⁺
+    J̇⁻_w = wct02 * Z⁻⁺_I₀ * f⁻
+    J̇⁺_Z = wct02 * ϖ_λ[n] * f⁺
+    J̇⁻_Z = wct02 * ϖ_λ[n] * f⁻
 
     # ---- Apply beam attenuation exp(-τ_sum/μ₀) ----
     beam_atten = exp(-τ_sum[n]/μ0)
@@ -289,7 +301,7 @@ Eliminates the separate chain-rule pass for SFI terms and the per-parameter
         ap_J̇₀⁺[i, 1, n, iparam] = J̇⁺_tau * dτ̇[n,iparam] + J̇⁺_w * ϖ̇[n,iparam] + J̇⁺_Z * Ż⁺⁺_I₀_p
         ap_J̇₀⁻[i, 1, n, iparam] = J̇⁻_tau * dτ̇[n,iparam] + J̇⁻_w * ϖ̇[n,iparam] + J̇⁻_Z * Ż⁻⁺_I₀_p
 
-        # Bug 22 fix: per-parameter τ̇_sum beam attenuation derivative
+        # Per-direction above-layer beam attenuation derivative
         # d(exp(-τ_sum/μ₀))/dp_j * J₀ = -τ̇_sum[j]/μ₀ * J₀
         ap_J̇₀⁺[i, 1, n, iparam] += J₀⁺[i, 1, n] * (-τ̇_sum[n, iparam] / μ0)
         ap_J̇₀⁻[i, 1, n, iparam] += J₀⁻[i, 1, n] * (-τ̇_sum[n, iparam] / μ0)
@@ -317,19 +329,7 @@ term is applied when the columns are contracted into `J₀±`.
     iz = size(Z₀⁺,3) == 1 ? 1 : n
     izd = size(Ż₀⁺,3) == 1 ? 1 : n
     μᵢ = μ[i]
-    if μᵢ == μ₀
-        x = dτ[n]/μ₀
-        f_t = x * exp(-x)
-        df_t = exp(-x) * (1-x) / μ₀
-    else
-        c = μ₀/(μᵢ-μ₀)
-        f_t = c * expdiff_neg(dτ[n]/μᵢ, dτ[n]/μ₀)
-        df_t = c * (-exp(-dτ[n]/μᵢ)/μᵢ + exp(-dτ[n]/μ₀)/μ₀)
-    end
-    q = (1/μᵢ) + (1/μ₀)
-    c_r = μ₀/(μᵢ+μ₀)
-    f_r = c_r * (-expm1(-dτ[n]*q))
-    df_r = c_r * exp(-dτ[n]*q) * q
+    f_t,f_r,df_t,df_r = _single_scatter_source_factors(dτ[n],μᵢ,μ₀)
     common_t = ϖ̇[n,p]*Z₀⁺[i,s,iz] + ϖ[n]*Ż₀⁺[i,s,izd,p]
     common_r = ϖ̇[n,p]*Z₀⁻[i,s,iz] + ϖ[n]*Ż₀⁻[i,s,izd,p]
     td = wct02 * (common_t*f_t + ϖ[n]*Z₀⁺[i,s,iz]*df_t*dτ̇[n,p])
