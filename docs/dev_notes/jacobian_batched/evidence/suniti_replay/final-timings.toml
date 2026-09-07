@@ -1,0 +1,99 @@
+package = "/home/cfranken/code/gitHub/vSmartMOM-jacobian-perf/src/vSmartMOM.jl"
+saved_state = "/home/sanghavi/code/github/uni_vSmartMOM/RRS_XCO2/bottom_layer_XCO2_retrievals/retrievals_acos_mapped_tapered_vertical_correlation_nosif/corrected/retrieval_state035_perturbation10.nc"
+
+[[records]]
+mode = "matrix"
+
+    [[records.samples]]
+    trial = 1
+    max_noise_scaled_error = 0.013738543463287874
+    max_y_error = 0.0013206396281191246
+    seconds = 16.254071671
+    gctime = 0.738477127
+    max_K_error = 0.014483098594837429
+    host_bytes = 4749851400
+
+        [records.samples.timing]
+        model_build_seconds = 0.454936335
+        forward_seconds = 12.897030716
+        instrument_seconds = 0.048254356
+        jacobian_seconds = 12.442094381
+        rt_linearized_seconds = 12.442094381
+    [[records.samples]]
+    trial = 2
+    max_noise_scaled_error = 0.013738543463287874
+    max_y_error = 0.0013206396281191246
+    seconds = 15.410393799
+    gctime = 0.80213321
+    max_K_error = 0.014483098594837429
+    host_bytes = 4750038392
+
+        [records.samples.timing]
+        model_build_seconds = 0.45113627
+        forward_seconds = 13.059926386999999
+        instrument_seconds = 0.063594227
+        jacobian_seconds = 12.608790117
+        rt_linearized_seconds = 12.608790117
+    [[records.samples]]
+    trial = 3
+    max_noise_scaled_error = 0.013738543463287874
+    max_y_error = 0.0013206396281191246
+    seconds = 16.03819194
+    gctime = 0.812688579
+    max_K_error = 0.014483098594837429
+    host_bytes = 4749868728
+
+        [records.samples.timing]
+        model_build_seconds = 0.423884371
+        forward_seconds = 12.947272066
+        instrument_seconds = 0.048546436
+        jacobian_seconds = 12.523387695
+        rt_linearized_seconds = 12.523387695
+[[records]]
+mode = "source"
+
+    [[records.samples]]
+    trial = 1
+    max_noise_scaled_error = 0.01374945740731926
+    max_y_error = 0.0013216887485754114
+    seconds = 15.216670326
+    gctime = 0.916197561
+    max_K_error = 0.014485879505627963
+    host_bytes = 4723145472
+
+        [records.samples.timing]
+        model_build_seconds = 0.47949546
+        forward_seconds = 11.835123346000001
+        instrument_seconds = 0.04734146
+        jacobian_seconds = 11.355627886
+        rt_linearized_seconds = 11.355627886
+    [[records.samples]]
+    trial = 2
+    max_noise_scaled_error = 0.01374945740731926
+    max_y_error = 0.0013216887485754114
+    seconds = 14.177808597
+    gctime = 0.991187103
+    max_K_error = 0.014485879505627963
+    host_bytes = 4723190672
+
+        [records.samples.timing]
+        model_build_seconds = 0.495706039
+        forward_seconds = 11.82852448
+        instrument_seconds = 0.044849555
+        jacobian_seconds = 11.332818441
+        rt_linearized_seconds = 11.332818441
+    [[records.samples]]
+    trial = 3
+    max_noise_scaled_error = 0.01374945740731926
+    max_y_error = 0.0013216887485754114
+    seconds = 14.766279818
+    gctime = 0.925117313
+    max_K_error = 0.014485879505627963
+    host_bytes = 4723182592
+
+        [records.samples.timing]
+        model_build_seconds = 0.453398413
+        forward_seconds = 11.775231899000001
+        instrument_seconds = 0.047783731
+        jacobian_seconds = 11.321833486000001
+        rt_linearized_seconds = 11.321833486000001

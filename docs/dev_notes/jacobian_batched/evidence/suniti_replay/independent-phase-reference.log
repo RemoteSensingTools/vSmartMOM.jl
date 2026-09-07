@@ -1,0 +1,9 @@
+PHASE_FAIL m=0 z=3 name=Ż⁺⁺ count=2 max_abs=2.527237e-5
+ENTRY CartesianIndex(14, 2, 1, 16) local=-0.0013711452 physical=-0.0013698511 ref64=-0.0013711273546326266 local_error=-1.789378045930802e-8 physical_error=1.2762953522907263e-6
+ENTRY CartesianIndex(14, 2, 4, 16) local=-0.0015574694 physical=-0.0015559043 ref64=-0.0015575349126307418 local_error=6.554464978473888e-8 physical_error=1.6306322364260505e-6
+PHASE_FAIL m=0 z=4 name=Ż₀⁺ count=3 max_abs=7.867813e-6
+ENTRY CartesianIndex(1, 1, 1, 2) local=0.00189394 physical=0.0018951782 ref64=0.0018939398775769173 local_error=1.5488287822412738e-10 physical_error=1.2383482458295028e-6
+ENTRY CartesianIndex(1, 1, 4, 2) local=0.0017824795 physical=0.0017844498 ref64=0.0017824800059086949 local_error=-5.427635580562695e-10 physical_error=1.9697865583628155e-6
+ENTRY CartesianIndex(1, 1, 5, 2) local=0.0017450763 physical=0.0017472891 ref64=0.0017450736405169522 local_error=2.627463086945364e-9 physical_error=2.2154499003733223e-6
+Test Summary:                      | Pass  Total     Time
+Read-only Float32 phase diagnostic |  316    316  1m28.5s

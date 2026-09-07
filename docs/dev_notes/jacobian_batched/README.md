@@ -2,6 +2,7 @@
 
 [First-to-current speed comparison](overall_progress.md).
 
+Study replay: [Suniti's inversions, SIF Jacobians, and remaining costs](suniti_inversions.md).
 Latest implementation: [equivalent-source adding and spectral phase costs](source_adding.md).
 Constructor optimization: [spectroscopy reuse and Mie derivative specialization](construction_cost.md).
 Local optical basis: [factorization and remaining adding cost](local_basis.md).

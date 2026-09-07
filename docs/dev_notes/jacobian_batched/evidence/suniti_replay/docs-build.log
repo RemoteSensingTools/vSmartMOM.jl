@@ -1,0 +1,59 @@
+
+> env
+> env vitepress build /home/cfranken/code/gitHub/vSmartMOM-jacobian-perf/docs/build/.documenter
+
+
+  vitepress v1.6.4
+
+- building client + server bundles...
+[32m✓[0m building client + server bundles...
+- rendering pages...
+[32m✓[0m rendering pages...
+build complete in 17.08s.
+[ Info: generating markdown page from `~/code/gitHub/vSmartMOM-jacobian-perf/docs/src/pages/tutorials/Tutorial_QuickStart.jl`
+[ Info: writing result to `~/code/gitHub/vSmartMOM-jacobian-perf/docs/src/pages/tutorials/Tutorial_QuickStart.md`
+[ Info: generating markdown page from `~/code/gitHub/vSmartMOM-jacobian-perf/docs/src/pages/tutorials/Tutorial_Absorption.jl`
+[ Info: writing result to `~/code/gitHub/vSmartMOM-jacobian-perf/docs/src/pages/tutorials/Tutorial_Absorption.md`
+[ Info: generating markdown page from `~/code/gitHub/vSmartMOM-jacobian-perf/docs/src/pages/tutorials/Tutorial_Scattering.jl`
+[ Info: writing result to `~/code/gitHub/vSmartMOM-jacobian-perf/docs/src/pages/tutorials/Tutorial_Scattering.md`
+[ Info: generating markdown page from `~/code/gitHub/vSmartMOM-jacobian-perf/docs/src/pages/tutorials/Tutorial_MieDeepDive.jl`
+[ Info: writing result to `~/code/gitHub/vSmartMOM-jacobian-perf/docs/src/pages/tutorials/Tutorial_MieDeepDive.md`
+[ Info: generating markdown page from `~/code/gitHub/vSmartMOM-jacobian-perf/docs/src/pages/tutorials/Tutorial_IO.jl`
+[ Info: writing result to `~/code/gitHub/vSmartMOM-jacobian-perf/docs/src/pages/tutorials/Tutorial_IO.md`
+[ Info: generating markdown page from `~/code/gitHub/vSmartMOM-jacobian-perf/docs/src/pages/tutorials/Tutorial_CoreRT.jl`
+[ Info: writing result to `~/code/gitHub/vSmartMOM-jacobian-perf/docs/src/pages/tutorials/Tutorial_CoreRT.md`
+[ Info: generating markdown page from `~/code/gitHub/vSmartMOM-jacobian-perf/docs/src/pages/tutorials/Tutorial_Surfaces.jl`
+[ Info: writing result to `~/code/gitHub/vSmartMOM-jacobian-perf/docs/src/pages/tutorials/Tutorial_Surfaces.md`
+[ Info: generating markdown page from `~/code/gitHub/vSmartMOM-jacobian-perf/docs/src/pages/tutorials/Tutorial_Canopy.jl`
+[ Info: writing result to `~/code/gitHub/vSmartMOM-jacobian-perf/docs/src/pages/tutorials/Tutorial_Canopy.md`
+[ Info: generating markdown page from `~/code/gitHub/vSmartMOM-jacobian-perf/docs/src/pages/tutorials/Tutorial_Jacobians.jl`
+[ Info: writing result to `~/code/gitHub/vSmartMOM-jacobian-perf/docs/src/pages/tutorials/Tutorial_Jacobians.md`
+[ Info: generating markdown page from `~/code/gitHub/vSmartMOM-jacobian-perf/docs/src/pages/tutorials/Tutorial_HybridAD.jl`
+[ Info: writing result to `~/code/gitHub/vSmartMOM-jacobian-perf/docs/src/pages/tutorials/Tutorial_HybridAD.md`
+[ Info: SetupBuildDirectory: setting up build directory.
+[ Info: Doctest: running doctests.
+[ Info: ExpandTemplates: expanding markdown templates.
+[ Info: CrossReferences: building cross-references.
+[ Info: CheckDocument: running document checks.
+[ Info: Populate: populating indices.
+[ Info: RenderDocument: rendering document.
+[ Info: DocumenterVitepress: rendering MarkdownVitepress pages.
+[ Info: Automatic `version="2.1.0"` for inventory from ../Project.toml
+[ Info: Bases that will be built: [""]
+[ Info: DocumenterVitepress: Did not detect `docs/src/.vitepress/config.mts` file. Substituting in the default file.
+[ Info: DocumenterVitepress: Did not detect `docs/src/.vitepress/mathjax-plugin.ts` file. Substituting in the default file.
+[ Info: DocumenterVitepress: Did not detect `docs/src/.vitepress/julia-repl-transformer.ts` file. Substituting in the default file.
+[ Info: DocumenterVitepress: Did not detect `docs/src/.vitepress/theme/index.ts` file. Substituting in the default file.
+[ Info: DocumenterVitepress: Did not detect `docs/src/.vitepress/theme/style.css` file. Substituting in the default file.
+[ Info: DocumenterVitepress: Did not detect `docs/src/.vitepress/theme/docstrings.css` file. Substituting in the default file.
+[ Info: DocumenterVitepress: Did not detect `docs/src/.vitepress/theme/overrides.css` file. Substituting in the default file.
+[ Info: Base is "" and ENV["CI"] is not set so this is a local build. Not adding any additional base prefix based on the repository or deploy url and instead using absolute path "/" to facilitate serving docs locally.
+[ Info: DocumenterVitepress: building Vitepress site 1 of 1 with base "".
+┌ Warning: δBGE's Δ_angle is retired and forced to 0 — the fit always uses the full angular domain (a non-zero cone was never honoured by the linearized path).
+└ @ vSmartMOM.Scattering ~/code/gitHub/vSmartMOM-jacobian-perf/src/Scattering/types.jl:292
+┌ Warning: Aerosol configuration omits `radiative_transfer.greek_beta_cutoff`. Update this input file for the two-stage Greek-beta support rule: set `greek_beta_cutoff: 1.0e-5` (or another validated positive threshold) to discard insignificant high-l beta tails, or set `greek_beta_cutoff: null` to explicitly retain the full Mie-series support. Omission remains equivalent to `null` for backward compatibility.
+└ @ vSmartMOM.IO ~/code/gitHub/vSmartMOM-jacobian-perf/src/IO/Parameters.jl:677
+Copied: /home/cfranken/code/gitHub/vSmartMOM-jacobian-perf/docs/build/.documenter/components/AuthorBadge.vue
+Copied: /home/cfranken/code/gitHub/vSmartMOM-jacobian-perf/docs/build/.documenter/components/Authors.vue
+Copied: /home/cfranken/code/gitHub/vSmartMOM-jacobian-perf/docs/build/.documenter/components/SidebarDrawerToggle.vue
+Copied: /home/cfranken/code/gitHub/vSmartMOM-jacobian-perf/docs/build/.documenter/components/VersionPicker.vue

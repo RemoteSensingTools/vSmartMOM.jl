@@ -1,0 +1,26 @@
+{
+  "aod760_0p28": {
+    "files": 32,
+    "trials": 177,
+    "rejected": 34,
+    "rt_fraction": 0.9653253274292113,
+    "median_evaluation_seconds": 108.169410472,
+    "median_model_build_seconds": 1.303551257,
+    "median_rt_linearized_seconds": 105.164867411,
+    "median_instrument_seconds": 0.052149747999999996,
+    "median_linear_algebra_seconds": 0.000487146,
+    "median_other_seconds": 2.0807258900000005
+  },
+  "none": {
+    "files": 32,
+    "trials": 112,
+    "rejected": 0,
+    "rt_fraction": 0.9659895057233342,
+    "median_evaluation_seconds": 62.7149043875,
+    "median_model_build_seconds": 0.744096959,
+    "median_rt_linearized_seconds": 61.1025235365,
+    "median_instrument_seconds": 0.030338734,
+    "median_linear_algebra_seconds": 0.0003991925,
+    "median_other_seconds": 0.7432759934999975
+  }
+}

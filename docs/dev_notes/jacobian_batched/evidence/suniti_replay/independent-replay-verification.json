@@ -1,0 +1,31 @@
+{
+  "matrix": {
+    "seconds": 16.03819194,
+    "rt_linearized_seconds": 12.523387695
+  },
+  "source": {
+    "seconds": 14.766279818,
+    "rt_linearized_seconds": 11.332818441
+  },
+  "source_vs_matrix": {
+    "max_noise_units": 4.9997069603304724e-05,
+    "relative_y_l2": 2.0010518523117812e-08,
+    "max_column_relative_l2": 1.1229387609437674e-05
+  },
+  "source_vs_archive": {
+    "max_noise_units": 0.01374945740731926,
+    "relative_y_l2": 8.203375598768895e-06,
+    "max_column_relative_l2": 0.001455177017619252
+  },
+  "matrix_vs_archive": {
+    "max_noise_units": 0.013738543463287874,
+    "relative_y_l2": 8.206752914554044e-06,
+    "max_column_relative_l2": 0.0014511536566887975
+  },
+  "verification": "Independently recomputed from JLD2/NetCDF arrays using h5py/numpy, and medians from the TOML samples.",
+  "output_sha256": {
+    "matrix-output.jld2": "229eae0d6e47c3eb7c5dffafcc2eca92eb4463cd7db8a14d7afcff7b6219ea8f",
+    "source-output.jld2": "1d5912dbdeab9e62afe400ff062c1e352493c4975cdcb0c5cdae7134b4d48b77",
+    "timings.toml": "e962c4c8a7c045972b53eaf78a7ad38689af97a713e57f82f048adf56c5d154b"
+  }
+}

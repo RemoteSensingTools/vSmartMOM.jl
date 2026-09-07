@@ -1,0 +1,18 @@
+PACKAGE /home/cfranken/code/gitHub/vSmartMOM-jacobian-perf/src/vSmartMOM.jl
+PREPARED grids=[2735, 1281, 995]
+NUMERICS vSmartMOM.CoreRT.RTNumericalParameters{Float32}(0.001f0, 0.00012207031f0, nothing, false, vSmartMOM.CoreRT.StokesConvergence{Float32}(1.0f-5, 3, 1), vSmartMOM.CoreRT.NoSSCorrection())
+Looping over layers ...  12%|███▌                        |  ETA: 0:02:21[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:21[K
+MODE physical seconds=123.982577363 m_used=3
+Looping over layers ...  12%|███▌                        |  ETA: 0:00:27[KLooping over layers ...  69%|███████████████████▎        |  ETA: 0:00:02[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:05[K
+Looping over layers ...  69%|███████████████████▎        |  ETA: 0:00:01[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+Looping over layers ...  69%|███████████████████▎        |  ETA: 0:00:01[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+Looping over layers ...  69%|███████████████████▎        |  ETA: 0:00:01[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+MODE local_matrix seconds=21.666414574 m_used=3
+Looping over layers ...  12%|███▌                        |  ETA: 0:00:07[KLooping over layers ...  81%|██████████████████████▊     |  ETA: 0:00:00[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:02[K
+Looping over layers ...  69%|███████████████████▎        |  ETA: 0:00:00[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+Looping over layers ...  75%|█████████████████████       |  ETA: 0:00:00[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+Looping over layers ...  75%|█████████████████████       |  ETA: 0:00:00[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+MODE source seconds=11.839097006 m_used=3
+COMPARE local_matrix y=0.0001745224 K=0.0019683838
+COMPARE source y=0.0001745224 K=0.0019683838
+LOCAL_SOURCE y=1.9073486e-6 K=3.0517578e-5
