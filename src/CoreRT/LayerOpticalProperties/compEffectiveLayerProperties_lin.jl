@@ -119,7 +119,9 @@ function constructCoreOpticalProperties(RS_type, iBand, m, model, lin_model,
     for (iBi, iB) in enumerate(bands)
         Rayl𝐙⁺⁺, Rayl𝐙⁻⁺, RaylZ₀⁺, RaylZ₀⁻ = shared_blocks === nothing ?
             _compute_phase_blocks(model, greek_rayleigh[iB], m, arr_type) : shared_blocks
-        rayl = [CoreScatteringOpticalProperties(cache.rayl_τ_dev[iBi][iz], 1.0,
+        # Rayleigh is conservative in the model's precision. A Float64 1.0
+        # silently promotes every mixed ϖ and Z in an otherwise Float32 solve.
+        rayl = [CoreScatteringOpticalProperties(cache.rayl_τ_dev[iBi][iz], one(FT),
             Rayl𝐙⁺⁺, Rayl𝐙⁻⁺, RaylZ₀⁺, RaylZ₀⁻) for iz in 1:nZ]
         combrella = [UmbrellaCoreScatteringOpticalProperties(rayl[iz], nothing)
                      for iz in 1:nZ]

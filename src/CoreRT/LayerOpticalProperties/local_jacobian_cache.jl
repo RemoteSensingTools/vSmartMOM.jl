@@ -40,13 +40,27 @@ function build_local_jacobian_cache(band, model, lin_model, cache::LinMInvariant
     layers = map(1:nz) do z
         ray_tau = cache.rayl_τ_dev[1][z]
         components = [cache.aerosol[1][i][z] for i in 1:na]
-        τ = copy(ray_tau)
-        S = copy(ray_tau)
+        # Preserve the forward optical algebra's evaluation order. Rebuilding
+        # S as a flat sum is mathematically equivalent, but changes Float32 ϖ
+        # by an ulp; repeated doubling can amplify that into a radiance change.
+        # These spectral weights also reproduce the ordinary successive phase
+        # mixtures without constructing retrieval-sized phase tangents.
+        τ_scat = copy(ray_tau)
+        ϖ_scat = one.(ray_tau)
+        mixing_weights = Tuple{typeof(ray_tau),typeof(ray_tau)}[]
         for a in components
-            τ .+= a.τ
-            S .+= a.τ .* a.ϖ
+            wx = τ_scat .* ϖ_scat
+            wy = a.τ .* a.ϖ
+            τ_scat = τ_scat .+ a.τ
+            S_mix = wx .+ wy
+            ϖ_scat = S_mix ./ τ_scat
+            # Use division, as in the forward + operator, rather than a
+            # reciprocal multiply with a different rounding sequence.
+            denominator = ifelse.(S_mix .> zero(FT), S_mix, one(FT))
+            push!(mixing_weights,(wx ./ denominator, wy ./ denominator))
         end
-        τ .+= cache.gas[1][z].τ
+        S = τ_scat .* ϖ_scat
+        τ = τ_scat .+ cache.gas[1][z].τ
         ϖ = S ./ τ
         invS = ifelse.(S .> zero(FT), one(FT) ./ S, zero(FT))
         weights = [a.τ .* a.ϖ .* invS for a in components]
@@ -92,7 +106,7 @@ function build_local_jacobian_cache(band, model, lin_model, cache::LinMInvariant
         for i in 1:na
             C[:,3+5(i-1),:] .= (component_dS[i] .- weights[i] .* dS) .* invS
         end
-        (;τ,ϖ,τ̇=dt,ϖ̇=dw,coefficients=C,weights,rayleigh_fraction=ray_tau ./ τ)
+        (;τ,ϖ,τ̇=dt,ϖ̇=dw,coefficients=C,weights,mixing_weights,rayleigh_fraction=ray_tau ./ τ)
     end
     seed = first(layers).τ
     basis_tau = _zero_tangent(seed,length(seed),nb)

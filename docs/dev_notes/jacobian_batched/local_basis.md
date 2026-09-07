@@ -79,7 +79,25 @@ A100 PCIe 40 GB, Float64, four Julia threads, one BLAS thread. Timings are
 three warmed samples with explicit CUDA synchronization. Upstream Mie and
 spectroscopy are prepared before timing; optical mixing, all Fourier orders,
 adding–doubling, the Lambertian surface and endpoint output are included.
-The physical and local modes use the same forward implementation.
+The physical and local modes use the same forward implementation. Forward
+optical mixtures retain the same successive weighted-average order as optical
+property `+`, including the intermediate `τ·ϖ` products. The local derivative
+basis still uses phase differences `Zᵢ-Zᵣ`, but the forward mixture is not
+reconstructed by subtracting and adding the Rayleigh reference. In Float32,
+these mathematically equivalent reorderings can change an optical input by an
+ulp and produce a larger radiance difference after repeated doubling. Cached
+spectral mixing weights preserve the forward order with one phase output array
+per layer/block; no retrieval-sized phase tangent is introduced. Regression
+checks require identical forward τ, ϖ and phase arrays across the two modes.
+Rayleigh's conservative albedo is `one(FT)` in the physical Jacobian path;
+the former literal `1.0` promoted its Float32 mixtures to Float64. That hidden
+promotion was exposed by the O₂/SIF study replay and violated the common
+precision contract before elemental propagation.
+Adding pure absorption preserves both `Z` and its existing scattering
+derivatives. The physical path now appends exact zero gas-phase columns,
+matching the local basis, instead of expanding and cancelling a quotient. This
+implements `dZ_after = [dZ_before, 0_gas]` directly and avoids both Float32
+cancellation residues and large temporary phase tensors.
 The five-layer fixtures are absorption-free: their fourteen-column layout
 contains five zero gas columns. They exercise aerosol/surface derivatives,
 but the larger gas case below is needed to assess active profile columns.

@@ -21,6 +21,7 @@ aerosol = C._compute_aerosol_phase_blocks_lin(model,optics,tangent,C.get_spec_ba
 make_basis() = ntuple(k->C.local_phase_basis(ray[k],
     [(aerosol[(1,2,5,6)[k]],aerosol[(3,4,7,8)[k]])]),4)
 basis = make_basis()
+forward_phases = map(k->[aerosol[k]],(1,2,5,6))
 function measure_phase(f)
     f(); CUDA.synchronize()
     times, allocations = Float64[], Int[]
@@ -38,7 +39,8 @@ stages = Dict(
     "angular_nodes_and_spectral_expansion"=>()->C._compute_aerosol_phase_blocks_lin(
         model,optics,tangent,C.get_spec_bands(model)[1],m,AT),
     "local_basis"=>make_basis,
-    "all_layer_mixtures"=>()->[ntuple(k->C.mix_local_phase(ray[k],basis[k],layer.weights),4)
+    "all_layer_mixtures"=>()->[ntuple(k->C.mix_local_forward_phase(
+        ray[k],forward_phases[k],layer.mixing_weights),4)
         for layer in cache.layers],
     "complete_phase_assembly"=>()->C.construct_local_optical_jacobians(rs,1,m,model,lin,cache))
 records = Dict(name=>measure_phase(f) for (name,f) in stages)

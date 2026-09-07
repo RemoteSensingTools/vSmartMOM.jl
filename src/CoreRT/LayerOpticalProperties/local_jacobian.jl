@@ -46,15 +46,24 @@ function local_phase_basis(rayleigh, aerosol_blocks)
     return out
 end
 
-"Mix a phase block using cached scattering fractions and shared phase differences."
-function mix_local_phase(rayleigh, basis, weights)
+"""
+    mix_local_forward_phase(rayleigh, aerosol_phases, mixing_weights)
+
+Build the forward phase with the same successive weighted averages as optical
+property `+` (S2014 (C.24)). The derivative basis still uses `Zᵢ-Zᵣ`; using that
+subtraction to reconstruct the *forward* mixture introduces avoidable Float32
+roundoff. Cached weights let this pass reuse one output array per layer/block.
+"""
+function mix_local_forward_phase(rayleigh, aerosol_phases, mixing_weights)
     rayleigh === nothing && return nothing
     ray = _ensure_3d(rayleigh)
-    isempty(weights) && return ray
-    out = similar(basis,size(basis,1),size(basis,2),length(first(weights)))
+    isempty(mixing_weights) && return ray
+    ns = length(first(mixing_weights)[1])
+    out = similar(ray,size(ray,1),size(ray,2),ns)
     out .= ray
-    for (i,weight) in enumerate(weights)
-        @views out .+= reshape(weight,1,1,length(weight)) .* basis[:,:,:,3+5(i-1)]
+    for (aerosol,(wx,wy)) in zip(aerosol_phases,mixing_weights)
+        out .= reshape(wx,1,1,ns) .* out .+
+               reshape(wy,1,1,ns) .* _ensure_3d(aerosol)
     end
     return out
 end
@@ -80,8 +89,12 @@ function construct_local_optical_jacobians(rs, band, m, model, lin_model,
     phase_basis(k,dk,rk) = local_phase_basis(ray[rk],[(a[k],a[dk]) for a in aeros])
     phase = (phase_basis(1,3,1),phase_basis(2,4,2),phase_basis(5,7,3),phase_basis(6,8,4))
     basis = CoreScatteringOpticalPropertiesLin(cache.basis_tau,cache.basis_omega,phase...)
+    forward_phases = map(k->[a[k] for a in aeros],(1,2,5,6))
     layers = map(cache.layers) do layer
-        blocks = ntuple(k->mix_local_phase(ray[k],phase[k],layer.weights),4)
+        # Aerosol tuples interleave forward/tangent diffuse blocks before the
+        # external-solar blocks: (Z++, Z-+, dZ++, dZ-+, Z₀+, Z₀-, ...).
+        blocks = ntuple(k->mix_local_forward_phase(ray[k],
+            forward_phases[k],layer.mixing_weights),4)
         CoreScatteringOpticalProperties(layer.τ,layer.ϖ,blocks...)
     end
     derivatives = [LocalOpticalJacobian(l.τ̇,l.ϖ̇,basis,l.coefficients) for l in cache.layers]

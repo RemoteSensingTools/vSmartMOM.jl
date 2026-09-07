@@ -386,3 +386,16 @@ SIF does not carry direct-solar attenuation. The fixed incident fields include
 SIF, retaining its atmospheric and albedo derivatives. This ordering is a derivation
 of the affine adding equations, not an attribution to the historical code.
 See [source adding](jacobian_batched/source_adding.md) for scope and memory cost.
+
+The local derivative basis does not change the floating-point evaluation order
+of the forward mixture. `local_jacobian_cache.jl` retains the successive `τ·ϖ`
+weights of optical-property `+`; `mix_local_forward_phase` applies those weights
+in the same order. Phase differences remain derivative directions only. This
+is an implementation choice for Float32 parity, not a different form of
+S2014 (C.22)–(C.26).
+
+For pure absorption, S2014 (C.22)–(C.24) reduce to `S_after=S_before` and
+`Z_after=Z_before`. The scattering-plus-absorption `+` method in `types_lin.jl`
+therefore preserves existing phase derivatives and appends exact zero gas
+directions through `_append_absorption_phase_columns`. It does not evaluate
+the cancelling expanded quotient in floating-point arithmetic.

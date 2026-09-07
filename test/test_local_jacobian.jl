@@ -16,8 +16,20 @@ function check_local_jacobian(FT,polarized,external; gpu=false, n_aerosols=1)
         for z in eachindex(physical)
             fp,jp = CoreRT.expandOpticalProperties(physical[z],dp[z],AT)
             fl,jl = factored[z],df[z]
-            @test Array(fp.τ) ≈ Array(fl.τ) rtol=tol
-            @test Array(fp.ϖ) ≈ Array(fl.ϖ) rtol=tol
+            # Choosing derivative coordinates must not change the forward
+            # mixture, even by an ulp before repeated Float32 doubling.
+            @test Array(fp.τ) == Array(fl.τ)
+            @test Array(fp.ϖ) == Array(fl.ϖ)
+            @test eltype(fp.ϖ) === eltype(fl.ϖ) === FT
+            for name in (:Z⁺⁺,:Z⁻⁺,:Z₀⁺,:Z₀⁻)
+                a,b = getproperty(fp,name),getproperty(fl,name)
+                if a === nothing
+                    @test b === nothing
+                else
+                    @test eltype(a) === eltype(b) === FT
+                    @test Array(a) == Array(b)
+                end
+            end
             @test Array(jp.τ̇) ≈ Array(jl.τ̇) rtol=tol atol=eps(FT)
             @test Array(jp.ϖ̇) ≈ Array(jl.ϖ̇) rtol=tol atol=eps(FT)
             for name in (:Ż⁺⁺,:Ż⁻⁺,:Ż₀⁺,:Ż₀⁻)
@@ -29,13 +41,17 @@ function check_local_jacobian(FT,polarized,external; gpu=false, n_aerosols=1)
                 out = similar(basis,size(basis,1),size(basis,2),ns,size(jp.τ̇,2))
                 CoreRT.contract_local_jacobian!(out,basis,jl.coefficients)
                 a, b = Array(out), Array(target)
-                # The dense mixing quotient leaves up to ~3e-15 cancellation
-                # residue in gas dZ, whereas the factored gas dZ is exactly
-                # zero. Use elementwise tolerances, not an array norm whose
-                # absolute floor grows with the number of phase entries.
-                phase_atol = (FT === Float64 ? 32 : 10) * eps(FT)
+                # Use elementwise tolerances, not an array norm whose absolute
+                # floor grows with the number of phase entries. Absorption
+                # must add exactly zero phase columns in both representations.
+                # Each Float32 scatterer addition rounds another quotient.
+                # Allow 10 eps per addition near cancelled phase entries;
+                # retain the relative bound on resolved derivatives. The
+                # three-aerosol case has ~2e-6 differences at ~1e-3 entries.
+                phase_atol = (FT === Float64 ? 32 : 10max(1,n_aerosols)) * eps(FT)
                 @test all(isapprox.(a,b;rtol=tol,atol=phase_atol))
                 @test all(iszero, a[:,:,:,2+7n_aerosols:end])
+                @test all(iszero, b[:,:,:,2+7n_aerosols:end])
             end
         end
     end
@@ -109,6 +125,7 @@ end
         for na in (0,2)
             check_local_jacobian(Float64,true,true;n_aerosols=na)
         end
+        check_local_jacobian(Float32,true,true;n_aerosols=3)
         for external in (false,true)
             check_zero_aerosol_jacobian(external)
         end
@@ -121,6 +138,7 @@ if get(ENV,"VSMARTMOM_JACOBIAN_GPU_TEST","false") == "true"
         with_logger(NullLogger()) do
             check_local_jacobian(Float64,true,true;gpu=true)
             check_local_jacobian(Float32,true,false;gpu=true)
+            check_local_jacobian(Float32,true,true;gpu=true,n_aerosols=3)
         end
     end
 end

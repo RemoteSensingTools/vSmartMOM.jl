@@ -335,6 +335,15 @@ end
 @inline _spectral_Zdot4(Z::AbstractArray{T,3}, n) where {T} = reshape(Z, size(Z,1), size(Z,2), 1, size(Z,3))
 @inline _spectral_Zdot4(Z::AbstractArray{T,4}, n) where {T} = Z
 
+"Append exactly zero gas-phase directions; pure absorption leaves scattering Z unchanged."
+function _append_absorption_phase_columns(Ż, n, n_absorption)
+    phase = _spectral_Zdot4(Ż,n)
+    n_scattering = size(phase,4)
+    out = _zero_tangent(phase,size(phase,1),size(phase,2),n,n_scattering+n_absorption)
+    @views out[:,:,:,1:n_scattering] .= phase
+    return out
+end
+
 """
     Base.:+(a::UmbrellaCoreScatteringOpticalProperties, b::UmbrellaCoreScatteringOpticalProperties)
 
@@ -551,18 +560,12 @@ function Base.:+(a::UmbrellaCoreScatteringOpticalProperties,
         n1 = size(ẋ.τ̇,2)
         n2 = size(ẏ.τ̇,2)
         
-        # S2014 (C.22)–(C.24), with purely absorbing gas: S=τϖ=Sₓ,
-        # Z=Sₓ Zₓ/S, so dZ=[d(Sₓ Zₓ)-Z dS]/S. The gas parameter
-        # block contributes zero to the scattering numerator (second block).
-        Ż⁺⁺ = (cat(
-            reshape(ẋ.τ̇ .* x.ϖ .+ x.τ.*ẋ.ϖ̇, 1, 1, n, n1).*reshape(xZ⁺⁺,nμ,nμ,n,1) .+ reshape(x.τ.*x.ϖ,1,1,n,1).*ẋ.Ż⁺⁺,
-            _zero_tangent(xZ⁺⁺, nμ, nμ, n, n2),
-                dims=4) .- reshape(τ.*ϖ̇ .+ τ̇.*ϖ, 1, 1, n, n1+n2).*reshape(Z⁺⁺,nμ,nμ,n,1))./reshape(τ.*ϖ,1,1,n,1)
-
-        Ż⁻⁺ = (cat(
-            reshape(ẋ.τ̇ .* x.ϖ .+ x.τ.*ẋ.ϖ̇, 1, 1, n, n1).*reshape(xZ⁻⁺,nμ,nμ,n,1) .+ reshape(x.τ.*x.ϖ,1,1,n,1).*ẋ.Ż⁻⁺,
-            _zero_tangent(xZ⁻⁺, nμ, nμ, n, n2),
-                dims=4) .- reshape(τ.*ϖ̇ .+ τ̇.*ϖ, 1, 1, n, n1+n2).*reshape(Z⁻⁺,nμ,nμ,n,1))./reshape(τ.*ϖ,1,1,n,1)
+        # S2014 (C.22)–(C.24): adding pure absorption changes τ and ϖ,
+        # but S=τϖ=Sₓ and Z=Zₓ. Therefore dZ=[dZₓ, 0] exactly.
+        # Expanding the quotient and then cancelling its numerator creates
+        # spurious gas-phase derivatives in Float32 and extra large tensors.
+        Ż⁺⁺ = _append_absorption_phase_columns(ẋ.Ż⁺⁺,n,n2)
+        Ż⁻⁺ = _append_absorption_phase_columns(ẋ.Ż⁻⁺,n,n2)
     end
     if x.Z₀⁺ === nothing
         Ż₀⁺ = Ż₀⁻ = nothing
@@ -570,12 +573,8 @@ function Base.:+(a::UmbrellaCoreScatteringOpticalProperties,
         Ż₀⁺ = _zero_tangent(x.Z₀⁺, size(x.Z₀⁺,1), size(x.Z₀⁺,2), n, n2)
         Ż₀⁻ = _zero_tangent(x.Z₀⁻, size(x.Z₀⁻,1), size(x.Z₀⁻,2), n, n2)
     else
-        Xp = _spectral_Zdot4(ẋ.Ż₀⁺, n)
-        Xm = _spectral_Zdot4(ẋ.Ż₀⁻, n)
-        Ż₀⁺ = cat(Xp, similar(Xp, size(Xp,1), size(Xp,2), n, n2); dims=4)
-        Ż₀⁻ = cat(Xm, similar(Xm, size(Xm,1), size(Xm,2), n, n2); dims=4)
-        fill!(@view(Ż₀⁺[:,:,:,n1+1:end]), zero(eltype(Ż₀⁺)))
-        fill!(@view(Ż₀⁻[:,:,:,n1+1:end]), zero(eltype(Ż₀⁻)))
+        Ż₀⁺ = _append_absorption_phase_columns(ẋ.Ż₀⁺,n,n2)
+        Ż₀⁻ = _append_absorption_phase_columns(ẋ.Ż₀⁻,n,n2)
     end
     return UmbrellaCoreScatteringOpticalProperties(
         CoreScatteringOpticalProperties(τ, ϖ, Z⁺⁺, Z⁻⁺, x.Z₀⁺, x.Z₀⁻),
