@@ -1,0 +1,80 @@
+BENCH_BEGIN cpu-n512-t1
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:13[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:09[K
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:13[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:10[K
+Looping over layers ...  60%|████████████████▊           |  ETA: 0:00:01[KLooping over layers ...  80%|██████████████████████▍     |  ETA: 0:00:01[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:02[K
+Looping over layers ...  80%|██████████████████████▍     |  ETA: 0:00:00[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+Looping over layers ...  60%|████████████████▊           |  ETA: 0:00:01[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:02[K
+Looping over layers ...  80%|██████████████████████▍     |  ETA: 0:00:00[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+Looping over layers ...  60%|████████████████▊           |  ETA: 0:00:01[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+Looping over layers ...  60%|████████████████▊           |  ETA: 0:00:01[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:02[K
+Looping over layers ...  80%|██████████████████████▍     |  ETA: 0:00:00[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:02[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:02[K
+Looping over layers ...  80%|██████████████████████▍     |  ETA: 0:00:00[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+Looping over layers ...  60%|████████████████▊           |  ETA: 0:00:01[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+Looping over layers ...  60%|████████████████▊           |  ETA: 0:00:01[KLooping over layers ...  80%|██████████████████████▍     |  ETA: 0:00:01[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:02[K
+Looping over layers ...  80%|██████████████████████▍     |  ETA: 0:00:00[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+Looping over layers ...  60%|████████████████▊           |  ETA: 0:00:01[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:02[K
+Looping over layers ...  80%|██████████████████████▍     |  ETA: 0:00:00[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+Looping over layers ...  60%|████████████████▊           |  ETA: 0:00:01[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+Looping over layers ...  60%|████████████████▊           |  ETA: 0:00:01[KLooping over layers ...  80%|██████████████████████▍     |  ETA: 0:00:01[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:02[K
+Looping over layers ...  80%|██████████████████████▍     |  ETA: 0:00:00[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+Looping over layers ...  80%|██████████████████████▍     |  ETA: 0:00:00[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:02[K
+Looping over layers ...  80%|██████████████████████▍     |  ETA: 0:00:00[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:02[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:02[K
+Looping over layers ...  80%|██████████████████████▍     |  ETA: 0:00:00[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:02[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:02[K
+Looping over layers ...  80%|██████████████████████▍     |  ETA: 0:00:00[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:02[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:02[K
+MODEL nSpec=512 nLayers=5 operator=6 full_columns=14 selected_columns=4
+PARITY forward=5.204170427930421e-18 selected_radiance=0.0 selected_jacobian=0.0
+MEASURE cpu-n512-t1 build_forward median_seconds=0.005395073 median_host_bytes=6.642184e6 median_gc_seconds=0.0 samples=[(time = 0.005395073, bytes = 6642184, gctime = 0.0), (time = 0.004868503, bytes = 6642184, gctime = 0.0), (time = 0.006035718, bytes = 6642184, gctime = 0.0)]
+MEASURE cpu-n512-t1 build_full median_seconds=0.109243142 median_host_bytes=9.015768e7 median_gc_seconds=0.0 samples=[(time = 0.109983944, bytes = 90157680, gctime = 0.0), (time = 0.106104121, bytes = 90157680, gctime = 0.0), (time = 0.109243142, bytes = 90157680, gctime = 0.0)]
+MEASURE cpu-n512-t1 build_fixed_microphysics median_seconds=0.008317528 median_host_bytes=9.143496e6 median_gc_seconds=0.0 samples=[(time = 0.008317528, bytes = 9143496, gctime = 0.0), (time = 0.008550284, bytes = 9143496, gctime = 0.0), (time = 0.007123072, bytes = 9143496, gctime = 0.0)]
+MEASURE cpu-n512-t1 solve_forward median_seconds=3.527832939 median_host_bytes=2.936742552e9 median_gc_seconds=0.862867047 samples=[(time = 4.338806472, bytes = 2936743640, gctime = 1.663608414), (time = 3.507316898, bytes = 2936742520, gctime = 0.819999455), (time = 3.527832939, bytes = 2936742552, gctime = 0.862867047)]
+MEASURE cpu-n512-t1 solve_full median_seconds=11.417393632 median_host_bytes=1.1934722104e10 median_gc_seconds=2.272295717 samples=[(time = 11.526762094, bytes = 11934720232, gctime = 2.338214454), (time = 11.417393632, bytes = 11934722136, gctime = 2.272295717), (time = 11.208944467, bytes = 11934722104, gctime = 2.198204166)]
+MEASURE cpu-n512-t1 solve_selected median_seconds=2.654218338 median_host_bytes=3.429335568e9 median_gc_seconds=0.146664313 samples=[(time = 2.83446259, bytes = 3429335632, gctime = 0.304755209), (time = 2.654218338, bytes = 3429335536, gctime = 0.146664313), (time = 2.616868127, bytes = 3429335568, gctime = 0.146030827)]
+RATIO full_forward=3.2363759365647216 full_selected=4.301603025093709
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:02[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:02[K
+Looping over layers ...  80%|██████████████████████▍     |  ETA: 0:00:00[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:02[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:02[K
+Looping over layers ...  80%|██████████████████████▍     |  ETA: 0:00:00[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:02[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:02[K
+Looping over layers ...  60%|████████████████▊           |  ETA: 0:00:01[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:02[K
+Looping over layers ...  60%|████████████████▊           |  ETA: 0:00:01[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+Looping over layers ...  60%|████████████████▊           |  ETA: 0:00:01[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:02[K
+Looping over layers ...  80%|██████████████████████▍     |  ETA: 0:00:00[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+Looping over layers ...  60%|████████████████▊           |  ETA: 0:00:01[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:02[K
+Looping over layers ...  60%|████████████████▊           |  ETA: 0:00:01[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+Looping over layers ...  60%|████████████████▊           |  ETA: 0:00:01[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:02[K
+Looping over layers ...  80%|██████████████████████▍     |  ETA: 0:00:00[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+Looping over layers ...  80%|██████████████████████▍     |  ETA: 0:00:00[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:02[K
+Looping over layers ...  80%|██████████████████████▍     |  ETA: 0:00:00[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+Looping over layers ...  60%|████████████████▊           |  ETA: 0:00:01[KLooping over layers ...  80%|██████████████████████▍     |  ETA: 0:00:01[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:02[K
+Looping over layers ...  80%|██████████████████████▍     |  ETA: 0:00:00[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+Looping over layers ...  60%|████████████████▊           |  ETA: 0:00:01[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:02[K
+Looping over layers ...  80%|██████████████████████▍     |  ETA: 0:00:00[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+Looping over layers ...  60%|████████████████▊           |  ETA: 0:00:01[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:02[K
+Looping over layers ...  80%|██████████████████████▍     |  ETA: 0:00:00[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:02[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:02[K
+Looping over layers ...  80%|██████████████████████▍     |  ETA: 0:00:00[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:02[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:02[K
+Looping over layers ...  80%|██████████████████████▍     |  ETA: 0:00:00[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+TIMER_BREAKDOWN_FULL cpu-n512-t1
+───────────────────────────────────────────────────────────────────────────────────
+                                          Time                    Allocations
+                                 ───────────────────────   ────────────────────────
+        Tot / % measured:             14.3s /  82.7%           11.3GiB /  98.6%
+
+Section                  ncalls     time    %tot     avg     alloc    %tot      avg
+───────────────────────────────────────────────────────────────────────────────────
+doubling                     25    9.04s   76.6%   362ms   7.19GiB   64.8%   295MiB
+interaction                  25    2.21s   18.7%  88.3ms   3.14GiB   28.3%   128MiB
+  interaction inv1           25   26.3ms    0.2%  1.05ms   45.9MiB    0.4%  1.84MiB
+  interaction inv2           25   24.9ms    0.2%   996μs   45.9MiB    0.4%  1.84MiB
+OpticalProps                 30    363ms    3.1%  12.1ms    604MiB    5.3%  20.1MiB
+elemental                    25    182ms    1.5%  7.28ms   98.3MiB    0.9%  3.93MiB
+Creating layers               3   9.38ms    0.1%  3.13ms   84.0MiB    0.7%  28.0MiB
+OpticalProps invariant        1    883μs    0.0%   883μs   1.68MiB    0.0%  1.68MiB
+Creating arrays               1   20.6μs    0.0%  20.6μs      832B    0.0%     832B
+───────────────────────────────────────────────────────────────────────────────────
+BENCH_DONE cpu-n512-t1

@@ -1,0 +1,900 @@
+ Count  Overhead File                    Line Function
+ =====  ======== ====                    ==== ========
+     5         5 @juliasrc/gc-stock.c    736 jl_gc_small_alloc_inner
+     5         5 @juliasrc/iddict.c      116 jl_table_peek_bp
+     5         0 @juliasrc/builtins.c   1560 jl_f_apply_type
+     5         4 @juliasrc/builtins.c   1538 jl_valid_type_param
+     5         0 @Base/task.jl          1084 yield()
+     5         5 @juliasrc/iddict.c      113 jl_table_peek_bp
+     5         1 @GPUCompiler/src/execution.jl  148 cached_compilation(cache::Dict{An…
+     5         0 @vSmartMOM/…ayerProperties_lin.jl  531 constructCoreOpticalProperties(RS…
+     5         0 @Base/abstractarray.jl 1740 _typed_hcat(::Type{Float64}, A::T…
+     5         0 @vSmartMOM/…ayerProperties_lin.jl  223 _attach_aerosol_phase(inv::vSmart…
+     5         0 @juliasrc/gc-stock.c    806 jl_gc_alloc_
+     5         5 @juliasrc/julia.h       133 jl_set_typeof
+     5         5 @juliasrc/builtins.c    732 jl_f__apply_iterate
+     5         0 @Base/hashing.jl         50 hash_64_64
+     5         4 @Base/dict.jl           241 ht_keyindex
+     5         0 @Base/arraymath.jl       24 *(A::CuArray{Float64, 1, CUDA.Dev…
+     5         0 @vSmartMOM/…ernel/doubling_lin.jl  311 doubling_allparams_helper!(pol_ty…
+     5         0 @juliasrc/jltypes.c    1805 typekey_hash
+     5         0 @juliasrc/builtins.c    414 immut_id_
+     5         0 @juliasrc/jltypes.c    2396 inst_datatype_inner
+     5         0 @juliasrc/builtins.c    341 hash_svec
+     5         5 @juliasrc/jltypes.c    1042 lookup_type_set
+     5         5 @juliasrc/julia.h      1916 jl_is_concrete_type
+     5         0 @vSmartMOM/…ayerProperties_lin.jl  224 _attach_aerosol_phase(inv::vSmart…
+     5         0 @Base/array.jl          994 setindex!(::Array{Float64, 5}, ::…
+     5         0 @CUDA/…ib/cublas/wrappers.jl 2343 getri_strided_batched!(A::CuArray…
+     5         0 @CUDA/…ib/cublas/wrappers.jl 1363 unsafe_strided_batch
+     5         0 @Base/dict.jl           133 isslotempty
+     5         5 @juliasrc/datatype.c   1865 set_nth_field
+     5         0 @CUDA/…ib/cudadrv/libcuda.jl 5086 unchecked_cuStreamQuery
+     5         0 @vSmartMOM/…rnel/rt_kernel_lin.jl   83 rt_kernel!(RS_type::vSmartMOM.Ine…
+     5         0 @Base/abstractarray.jl 1859 _cat_t
+     5         0 @vSmartMOM/…reKernel/rt_kernel.jl  311 #get_dtau_ndoubl#98
+     5         0 @CUDA/src/memory.jl     264 pool_mark!
+     5         0 @Base/refvalue.jl        60 setindex!
+     5         0 @juliasrc/typemap.c    1187 jl_typemap_level_assoc_exact
+     5         0 @CUDA/…rv/synchronization.jl  197 synchronize(stream::CuStream; blo…
+     5         0 @GPUToolbox/src/ccalls.jl   33 cuStreamSynchronize
+     5         0 @GPUToolbox/src/ccalls.jl   34 #cuStreamSynchronize##0
+     5         0 @vSmartMOM/…ertian_surface_lin.jl  127 create_surface_layer!(RS_type::vS…
+     5         5 @juliasrc/builtins.c     88 compare_svec
+     5         5 @juliasrc/iddict.c      119 jl_table_peek_bp
+     5         5 @GPUToolbox/src/threading.jl   44 get!(constructor::Function, x::GP…
+     5         2 @juliasrc/julia.h      1586 jl_field_offset
+     5         0 @vSmartMOM/…c/CoreRT/types_lin.jl  498 +(a::vSmartMOM.CoreRT.UmbrellaCor…
+     5         0 @Base/abstractarray.jl  824 similar
+     5         5 @CUDA/lib/cudadrv/state.jl    ? get!(constructor::CUDA.var"#memor…
+     5         5 /lib64/libc.so.6          ? __memcmp_avx2_movbe
+     5         0 @Base/tuple.jl          657 prod
+     5         0 @Base/operators.jl      642 *
+     5         0 @CUDA/lib/cudadrv/state.jl  165 #context!#567
+     5         0 @CUDA/lib/cudadrv/state.jl   86 task_local_state
+     5         5 @juliasrc/gc-stock.h    177 try_pop_lf_back
+     5         0 @juliasrc/gc-stock.c    953 gc_sweep_page
+     5         5 @juliasrc/support/arraylist.c   70 arraylist_push
+     5         0 @juliasrc/gc-stock.c   2567 gc_mark_and_steal
+     6         6 @juliasrc/typemap.c    1130 jl_typemap_entry_assoc_exact
+     6         0 @vSmartMOM/…rnel/elemental_lin.jl  155 elemental!(pol_type::vSmartMOM.Sc…
+     6         0 @CUDA/…rv/synchronization.jl   90 spinning_synchronization(f::typeo…
+     6         0 @vSmartMOM/…el/interaction_lin.jl  328 interaction_helper!(::vSmartMOM.C…
+     6         1 @Base/subarray.jl        22 SubArray
+     6         6 @Base/essentials.jl       ? get!(constructor::CUDA.var"#memor…
+     6         6 @juliasrc/jltypes.c     958 typekey_eq
+     6         0 @Base/lock.jl           272 unlock
+     6         6 @juliasrc/gc-stock.c    722 jl_gc_small_alloc_inner
+     6         0 @juliasrc/jltypes.c    1811 typekey_hash
+     6         6 …t-12/cli/loader_exe.c   15 jl_get_pgcstack_static
+     6         0 @Base/dict.jl          1000 get
+     6         0 @Base/hamt.jl            93 HashState
+     6         0 @Base/abstractarray.jl 1700 typed_hcat
+     6         0 @Base/abstractarray.jl 1176 copyto_axcheck!
+     6         0 @CUDA/src/array.jl      567 copyto!
+     6         0 @vSmartMOM/…c/CoreRT/types_lin.jl  360 +(a::vSmartMOM.CoreRT.UmbrellaCor…
+     6         0 @CUDA/src/array.jl      442 CuArray
+     6         0 @juliasrc/julia.h      1773 jl_is_genericmemory
+     6         0 @CUDA/…ib/cublas/wrappers.jl 2344 getri_strided_batched!(A::CuArray…
+     6         0 @Base/lock.jl           195 lock
+     6         6 @juliasrc/gf.c         4208 ijl_apply_generic
+     6         0 @vSmartMOM/…ayerProperties_lin.jl  766 extractEffectiveProps(lods::Vecto…
+     6         6 @juliasrc/builtins.c    283 ijl_egal__bitstag
+     6         6 @juliasrc/datatype.c   1809 ijl_get_nth_field
+     6         0 @Base/dict.jl           274 ht_keyindex2_shorthash!(h::Dict{C…
+     6         0 @Base/tuple.jl          359 map
+     6         0 @juliasrc/typemap.c     250 sig_match_simple
+     6         0 @CUDA/…ib/cudadrv/libcuda.jl   36 check
+     6         0 @CEnum/src/operators.jl    7 ==
+     6         6 @juliasrc/support/hashing.c   31 int64hash
+     6         0 @CUDA/src/array.jl      616 #697
+     6         0 @CUDA/src/array.jl      493 synchronize(x::CuArray{Float64, 1…
+     6         0 @CUDA/src/memory.jl     527 synchronize
+     6         0 @CUDA/lib/cudadrv/stream.jl  128 isdone
+     6         0 @CUDA/…/cudadrv/execution.jl    ? #542
+     6         0 @CUDA/src/refpointer.jl   47 CUDA.CuRefValue{Float64}()
+     6         0 @Base/abstractarray.jl 2114 #cat#108
+     6         0 @Base/abstractarray.jl 2116 _cat(::Int64, ::CuArray{Float64, …
+     6         0 @Base/hashing.jl         45 hash_64_64
+     6         0 @juliasrc/builtins.c   1043 jl_f_getfield
+     6         6 @juliasrc/julia_internal.h  644 undefref_check
+     6         6 @juliasrc/support/hashing.c   38 int64hash
+     6         0 @CUDA/src/refpointer.jl   58 CuRefValue
+     6         0 @CUDA/…compiler/execution.jl  377 macro expansion
+     6         0 @CUDA/…rv/module/function.jl   27 hash
+     6         6 /lib64/libpthread.so.0    ? pthread_once
+     6         0 @juliasrc/subtype.c    1548 subtype
+     6         0 @juliasrc/subtype.c    1374 subtype_tuple
+     6         0 @juliasrc/datatype.c   1652 ijl_new_structv
+     6         0 @CUDA/…ib/cudadrv/version.jl   21 driver_version
+     6         0 @Base/refvalue.jl        59 getindex
+     6         0 @GPUArrays/src/host/broadcast.jl   43 materialize!(::CUDA.CuArrayStyle{…
+     6         1 @Base/multidimensional.jl  462 length(iter::CartesianIndices{3, …
+     6         6 @Base/int.jl             88 *
+     6         0 @juliasrc/gc-common.c   162 schedule_finalization
+     7         0 @vSmartMOM/…el/interaction_lin.jl  239 interaction_helper!(::vSmartMOM.C…
+     7         0 @CUDA/src/memory.jl     175 memory_limits()
+     7         0 @CUDA/src/array.jl      451 CuArray
+     7         0 @Adapt/src/wrappers.jl   30 adapt_structure
+     7         0 @Base/hashing.jl         88 hash
+     7         0 @Base/hashing.jl         51 hash_64_64
+     7         3 @CUDA/lib/cublas/CUBLAS.jl   83 handle()
+     7         0 @CUDA/src/array.jl      451 CuArray(A::CuArray{Float64, 1, CU…
+     7         0 @vSmartMOM/…ernel/doubling_lin.jl  289 doubling_allparams_helper!(pol_ty…
+     7         7 @juliasrc/gc-stock.c    775 ijl_gc_small_alloc
+     7         0 @Base/abstractarray.jl  689 checkbounds
+     7         0 @GPUArrays/src/host/indexing.jl  145 checkindex
+     7         0 @Base/boot.jl           674 Array
+     7         0 @vSmartMOM/…ayerProperties_lin.jl  211 (::vSmartMOM.CoreRT.var"#lift_pha…
+     7         7 @juliasrc/gf.c         3990 _jl_invoke
+     7         0 @Adapt/src/wrappers.jl   10 adapt_structure
+     7         0 @CUDA/…ib/cublas/wrappers.jl 2182 getrf_strided_batched!(A::CuArray…
+     7         0 @KernelAbstractions/src/nditeration.jl   64 blocks
+     7         7 @juliasrc/builtins.c    244 ijl_egal__bitstag
+     7         1 @juliasrc/gf.c         1499 lookup_leafcache
+     7         0 @juliasrc/builtins.c    228 jl_types_egal
+     7         0 @juliasrc/builtins.c    223 egal_types
+     7         7 @juliasrc/datatype.c   1785 ijl_field_index
+     7         7 @juliasrc/iddict.c      125 jl_table_peek_bp
+     7         7 @juliasrc/julia_internal.h 1155 jl_vararg_kind
+     7         0 @GPUToolbox/src/threading.jl   28 get!(constructor::Function, x::GP…
+     7         0 @CUDA/…mpiler/compilation.jl  171 compiler_config(dev::CuDevice; kw…
+     7         0 @Base/dict.jl           504 get
+     7         0 @GPUArrays/src/host/mapreduce.jl   35 #mapreduce#46
+     7         0 @GPUArrays/src/host/mapreduce.jl   40 _mapreduce
+     7         2 @GPUArrays/…host/abstractarray.jl   58 DataRef
+     7         0 @CUDA/lib/cublas/CUBLAS.jl   79 handle()
+     7         0 @Base/gcutils.jl         86 finalizer
+     7         0 @juliasrc/subtype.c    2132 obvious_subtype
+     7         0 @juliasrc/typemap.c    1195 jl_typemap_level_assoc_exact
+     7         0 @Base/array.jl          596 zeros(::Type{Float64}, dims::NTup…
+     7         0 @Base/array.jl          329 fill!
+     7         0 @Base/array.jl          333 _fill!
+     7         0 @Base/array.jl          986 setindex!
+     7         0 @Base/array.jl          991 _setindex!
+     7         7 @juliasrc/builtins.c    710 jl_f__apply_iterate
+     7         7 @juliasrc/builtins.c    246 ijl_egal__bitstag
+     7         7 none                      ? kwcall(::@NamedTuple{threads::Int…
+     7         7 @juliasrc/gf.c         3992 _jl_invoke
+     7         7 @Base/Base_compiler.jl   58 setproperty!
+     7         7 @Base/Base_compiler.jl    ? task_local_state!()
+     7         4 @CUDA/…/cudadrv/execution.jl   58 launch(::CuFunction, ::CUDA.Kerne…
+     7         0 …3e79/lib/libcublas.so    ? cublasDgemv_v2_64
+     7         7 /lib64/libc.so.6          ? memcpy
+     7         4 @juliasrc/typemap.c     212 sig_match_simple
+     7         0 @Base/hashing.jl         79 hash_uint
+     7         0 @Base/broadcast.jl      902 materialize!
+     7         0 @GPUArrays/…host/abstractarray.jl   75 getindex
+     7         0 @GPUArrays/…host/abstractarray.jl   48 getindex
+     7         4 @juliasrc/gc-stock.h    342 page_metadata
+     7         0 @juliasrc/gc-stock.c   2923 sweep_finalizer_list
+     8         0 @juliasrc/builtins.c     93 compare_svec
+     8         0 @vSmartMOM/src/Architectures.jl  187 synchronize_if_gpu
+     8         0 @vSmartMOM/src/Architectures.jl   28 sync_device()
+     8         0 @CUDA/…rv/synchronization.jl  194 synchronize()
+     8         1 @CUDA/src/memory.jl     193 memory_limit_exceeded(bytes::Int6…
+     8         0 @juliasrc/datatype.c   1811 ijl_get_nth_field
+     8         0 @CUDA/src/array.jl      455 CuArray
+     8         8 @GPUArrays/…host/abstractarray.jl   72 getindex
+     8         8 @juliasrc/julia.h      1882 jl_egal_
+     8         1 @Base/dict.jl           990 get
+     8         0 @GPUArrays/src/host/indexing.jl   73 vectorized_getindex!
+     8         1 @Base/abstractarray.jl  699 checkbounds
+     8         0 @CUDA/lib/cudadrv/memory.jl  414 #unsafe_copyto!#518
+     8         0 @GPUToolbox/src/ccalls.jl   33 cuMemcpyDtoHAsync_v2
+     8         0 @GPUToolbox/src/ccalls.jl   34 #cuMemcpyDtoHAsync_v2##0
+     8         0 @CUDA/…ib/cudadrv/libcuda.jl  536 macro expansion
+     8         8 @juliasrc/gc-alloc-profiler.h   42 maybe_record_alloc_to_profile
+     8         8 @CUDA/lib/cudadrv/state.jl   69 task_local_state!()
+     8         8 @juliasrc/iddict.c      129 jl_table_peek_bp
+     8         8 @juliasrc/julia.h      1309 jl_svecref
+     8         0 @CUDA/…compiler/execution.jl  114 macro expansion
+     8         8 @juliasrc/support/hashing.c   33 int64hash
+     8         0 @juliasrc/gc-stock.c    794 jl_gc_alloc_
+     8         8 @juliasrc/julia_internal.h  536 jl_gc_szclass
+     8         0 @juliasrc/julia_internal.h  368 memassign_safe
+     8         8 @juliasrc/julia_internal.h  353 memmove_refs
+     8         0 @juliasrc/jltypes.c    1011 typekeyvalue_eq
+     8         0 @juliasrc/datatype.c   1844 ijl_get_nth_field
+     8         0 @juliasrc/subtype.c     965 subtype_unionall
+     8         0 @Base/abstractarray.jl  697 checkbounds(::Array{Float64, 5}, …
+     8         0 @juliasrc/typemap.c     858 jl_typemap_entry_assoc_by_type
+     8         8 /lib64/libc.so.6          ? unlink_chunk.isra.2
+     8         8 /lib64/libc.so.6          ? cfree
+     9         9 @juliasrc/iddict.c      159 ijl_eqtable_get
+     9         9 @CUDA/lib/cudadrv/state.jl   79 task_local_state!()
+     9         0 @juliasrc/jltypes.c    2498 jl_inst_arg_tuple_type
+     9         0 @vSmartMOM/…ernel/doubling_lin.jl  270 doubling_allparams_helper!(pol_ty…
+     9         0 @CUDA/…compiler/execution.jl  378 macro expansion
+     9         9 @Base/promotion.jl        ? isvalid(ctx::CuContext)
+     9         9 @juliasrc/support/hashing.c   30 int64hash
+     9         9 /lib64/libc.so.6          ? __memcpy_sse2_unaligned_erms
+     9         0 @vSmartMOM/…reKernel/rt_kernel.jl  306 #get_dtau_ndoubl#98
+     9         0 @GPUArrays/src/host/mapreduce.jl   83 _mapreduce(f::typeof(isnan), op::…
+     9         0 @CUDA/src/mapreduce.jl  168 mapreducedim!
+     9         0 @CUDA/…compiler/execution.jl  366 cufunction(f::GPUArrays.var"#gpu_…
+     9         0 @CUDA/…compiler/execution.jl  370 macro expansion
+     9         0 @CUDA/…mpiler/compilation.jl  159 compiler_cache
+     9         0 @vSmartMOM/…rnel/rt_kernel_lin.jl   86 rt_kernel!(RS_type::vSmartMOM.Ine…
+     9         0 @KernelAbstractions/src/nditeration.jl   62 workitems
+     9         0 @juliasrc/julia_threads.h  342 maybe_collect
+     9         9 @juliasrc/julia_threads.h  349 jl_gc_state_set
+     9         0 none                      ? AbstractKernel
+     9         9 @juliasrc/julia.h      1885 jl_egal_
+     9         0 @juliasrc/jltypes.c     982 typekey_eq
+     9         1 @juliasrc/subtype.c    2323 ijl_types_equal
+     9         1 @Base/dict.jl           453 get!(default::CUDA.CUBLAS.var"#ha…
+     9         1 @juliasrc/subtype.c    1936 obvious_subtype
+     9         0 @Base/views.jl          149 maybeview(::CuArray{Float64, 4, C…
+     9         0 @juliasrc/subtype.c    1820 forall_exists_subtype
+     9         0 @juliasrc/subtype.c    1791 exists_subtype
+     9         0 @juliasrc/subtype.c    1511 subtype
+     9         0 @CUDA/lib/cudadrv/state.jl  144 context!(ctx::CuContext)
+    10        10 @juliasrc/julia.h       981 jl_to_typeof
+    10         0 @Base/multidimensional.jl 1099 mightalias
+    10         0 @Base/multidimensional.jl 1114 _parentsmatch
+    10         0 @Base/subarray.jl        32 SubArray
+    10        10 /lib64/libc.so.6          ? __memcpy_avx_unaligned
+    10         0 @CUDA/…ib/cublas/wrappers.jl 2176 getrf_strided_batched!
+    10         0 @Base/abstractarraymath.jl  283 -(A::CuArray{Float64, 1, CUDA.Dev…
+    10         5 @julialib/julia/sys.so    ? jfptr_div_50837.1
+    10         0 @juliasrc/builtins.c    475 jl_object_id__cold
+    10         0 @vSmartMOM/…c/CoreRT/types_lin.jl  515 +(a::vSmartMOM.CoreRT.UmbrellaCor…
+    10         0 @vSmartMOM/…ayerProperties_lin.jl  472 constructCoreOpticalProperties(RS…
+    10         0 @Base/hashing.jl         89 hash
+    10         0 @CUDA/…compiler/execution.jl  365 cufunction
+    10         1 @juliasrc/support/timefuncs.c   29 jl_gettimeofday
+    10        10 linux-vdso.so.1           ? __vdso_gettimeofday
+    10         2 @CUDA/lib/cudadrv/state.jl  434 get_values(x::CUDA.PerDevice{CUDA…
+    10         2 @julialib/julia/sys.so    ? jfptr_MUL._49963.1
+    10         1 @CUDA/lib/cudadrv/state.jl  358 stream(state::CUDA.TaskLocalState)
+    10         0 @CUDA/…ib/cublas/wrappers.jl 1367 unsafe_strided_batch
+    10         0 @CUDA/lib/cublas/CUBLAS.jl  100 handle()
+    10        10 @Base/Base_compiler.jl   94 modifyproperty!
+    10         0 @juliasrc/subtype.c    2279 ijl_subtype_env
+    10        10 @juliasrc/builtins.c    300 ijl_egal__bitstag
+    10         0 @juliasrc/gc-stock.c   1453 gc_sweep_pool
+    10         0 @juliasrc/gc-stock.c   1321 gc_free_pages
+    10         0 @juliasrc/gc-pages.c    199 jl_gc_free_page
+    10        10 /lib64/libc.so.6          ? madvise
+    10         0 @juliasrc/gc-stock.c   1270 gc_sweep_pool_parallel
+    10        10 @juliasrc/gc-stock.c   2240 gc_mark_outrefs
+    11         0 @vSmartMOM/…/CoreRT/rt_run_lin.jl  485 rt_run(RS_type::vSmartMOM.Inelast…
+    11         8 @juliasrc/gf.c         4127 jl_lookup_generic_
+    11        11 @Base/task.jl           268 get_task_tls
+    11         0 @juliasrc/gf.c         1837 jl_mt_find_cache_entry
+    11        11 @juliasrc/datatype.c   1893 set_nth_field
+    11         0 @Adapt/src/base.jl       14 _adapt_tuple_structure(to::CUDA.K…
+    11        11 @juliasrc/support/hashing.c   35 int64hash
+    11        11 @CUDA/lib/cudadrv/state.jl   58 validate_task_local_state(state::…
+    11         0 @CUDA/src/array.jl      619 #697
+    11         0 @Base/hashing.jl         87 hash
+    11         0 @GPUArrays/src/host/mapreduce.jl   88 _mapreduce(f::typeof(isnan), op::…
+    11         0 @GPUArraysCore/src/GPUArraysCore.jl  206 macro expansion
+    11         0 @GPUArrays/src/host/indexing.jl   19 _getindex
+    11         0 @GPUArrays/src/host/indexing.jl   36 scalar_getindex
+    11         0 @GPUArrays/src/host/indexing.jl   52 getindex
+    11         2 @Base/essentials.jl     504 argtail(::Int64, ::Int64, ::Varar…
+    11         6 @CUDA/lib/cudadrv/state.jl  458 get!(constructor::CUDA.var"#pool_…
+    11         4 @Base/operators.jl      448 <=(x::VersionNumber, y::VersionNu…
+    11         0 @juliasrc/typemap.c     993 jl_typemap_assoc_by_type
+    11         0 @juliasrc/typemap.c    1092 jl_typemap_assoc_by_type
+    12         0 @CUDA/…rv/synchronization.jl  196 synchronize(stream::CuStream; blo…
+    12        12 @Base/atomics.jl        365 getindex
+    12         0 @vSmartMOM/…ernel/doubling_lin.jl  285 doubling_allparams_helper!(pol_ty…
+    12        12 @Base/essentials.jl     386 getindex
+    12         0 @vSmartMOM/…t/gpu_batched_cuda.jl  108 batch_inv!(X::CuArray{Float64, 3,…
+    12         0 @vSmartMOM/…ernel/doubling_lin.jl  324 doubling_allparams_helper!(pol_ty…
+    12        12 @CUDA/lib/cudadrv/state.jl  361 stream(state::CUDA.TaskLocalState)
+    12        12 /lib64/libpthread.so.0    ? __pthread_rwlock_wrlock
+    12         3 @GPUArrays/…host/abstractarray.jl   23 RefCounted
+    12         3 @GPUCompiler/src/interface.jl  174 hash
+    12         0 @GPUArrays/src/host/mapreduce.jl   97 any(f::Function, A::CuArray{Float…
+    12        11 @juliasrc/datatype.c   1871 set_nth_field
+    12        12 @juliasrc/typemap.c    1129 jl_typemap_entry_assoc_exact
+    12        12 @Base/dict.jl           249 ht_keyindex
+    12         1 @CUDA/src/array.jl      102 _
+    12         0 @CUDA/lib/cudadrv/state.jl  166 #context!#567
+    12         0 @GPUArrays/…host/abstractarray.jl   37 release
+    12         0 @juliasrc/gc-stock.c   1394 gc_sweep_pool
+    12         0 @juliasrc/gc-stock.c    316 gc_setmark
+    13        13 @juliasrc/julia_internal.h  379 memassign_safe
+    13         0 @vSmartMOM/…rnel/rt_kernel_lin.jl  120 rt_kernel!(RS_type::vSmartMOM.Ine…
+    13         0 @CUDA/src/memory.jl     641 (::CUDA.var"#_pool_alloc##0#_pool…
+    13         0 @GPUArrays/src/host/indexing.jl  115 vectorized_setindex!(::CuArray{Fl…
+    13         1 @juliasrc/jltypes.c    1823 typekeyvalue_hash
+    13        13 @Base/int.jl             87 +
+    13         0 @Base/arraymath.jl        8 +(A::CuArray{Float64, 1, CUDA.Dev…
+    13         0 @vSmartMOM/…ernel/doubling_lin.jl  307 doubling_allparams_helper!(pol_ty…
+    13        13 @juliasrc/support/hashing.c   36 int64hash
+    13        11 …lib/libcublasLt.so.12    ? cublasLtGetProperty
+    13         0 @CUDA/src/array.jl       99 CuArray
+    13         0 @juliasrc/gc-stock.c   2448 gc_mark_outrefs
+    14        11 @juliasrc/datatype.c   1814 ijl_get_nth_field
+    14         0 @CUDA/…ib/cudadrv/libcuda.jl 5908 macro expansion
+    14         0 @vSmartMOM/…ernel/doubling_lin.jl  325 doubling_allparams_helper!(pol_ty…
+    14        14 @juliasrc/iddict.c      156 ijl_eqtable_get
+    14         0 @GPUToolbox/src/threading.jl   28 get!
+    14         0 @CUDA/src/CUDAKernels.jl  115 kwcall(::@NamedTuple{ndrange::Int…
+    14         0 @CUDA/lib/cudadrv/state.jl  126 context
+    14         0 @Base/tuple.jl          358 map
+    14         0 @juliasrc/builtins.c    502 ijl_object_id_
+    14         0 @GPUArrays/src/host/mapreduce.jl   35 mapreduce(::Function, ::Function,…
+    14         0 @GPUArrays/src/host/mapreduce.jl   40 kwcall(::@NamedTuple{dims::Colon,…
+    14         0 @juliasrc/support/timefuncs.c   39 jl_clock_now
+    14         0 @CUDA/lib/cudadrv/state.jl   99 prepare_cuda_state()
+    14         0 @juliasrc/jltypes.c    1832 typekeyvalue_hash
+    14        14 @juliasrc/julia.h      1852 jl_is_type_type
+    14         0 @juliasrc/gc-stock.c    309 gc_setmark_pool
+    15         2 @CUDA/src/array.jl       94 CuArray{Float64, 3, CUDA.DeviceMe…
+    15         0 @vSmartMOM/…ernel/doubling_lin.jl  308 doubling_allparams_helper!(pol_ty…
+    15         1 @Base/abstractarray.jl 1530 unalias(dest::SubArray{Float64, 2…
+    15         0 @CUDA/src/CUDAKernels.jl  146 (::KernelAbstractions.Kernel{CUDA…
+    15         0 @juliasrc/builtins.c   2092 jl_f__compute_sparams
+    15         0 @CUDA/lib/cudadrv/state.jl   70 task_local_state!()
+    15         0 @Base/task.jl           263 task_local_storage
+    15         0 @vSmartMOM/…t/gpu_batched_cuda.jl  110 batch_inv!(X::CuArray{Float64, 3,…
+    15         0 @vSmartMOM/…el/interaction_lin.jl  321 interaction_helper!(::vSmartMOM.C…
+    15         0 @CUDA/src/CUDAKernels.jl  149 (::KernelAbstractions.Kernel{CUDA…
+    15         1 @Base/abstractarray.jl 3047 _sub2ind(::Array{Float64, 5}, ::I…
+    15         0 @Base/pointer.jl        310 ==
+    15         0 @juliasrc/subtype.c    4580 jl_type_intersection_env_s
+    15         2 @GPUToolbox/src/memoization.jl   69 macro expansion
+    15         0 @CUDA/src/array.jl      108 storage
+    15         0 @CUDA/src/memory.jl     725 _pool_free
+    15        15 @juliasrc/gc-stock.c    240 gc_try_setmark_tag
+    16         0 @CUDA/src/memory.jl      70 maybe_collect(will_block::Bool)
+    16         0 @Base/libc.jl           294 time
+    16         1 @CUDA/src/CUDAKernels.jl  152 (::KernelAbstractions.Kernel{CUDA…
+    16         0 @CUDA/…b/cublas/libcublas.jl 4449 macro expansion
+    16         0 @juliasrc/gf.c         4021 ijl_invoke
+    16        15 @juliasrc/builtins.c    462 jl_object_id__cold
+    16         4 @Base/scopedvalues.jl   159 get
+    16         0 @Base/hashing.jl         78 hash_uint64
+    16         0 @GPUArrays/…host/abstractarray.jl   64 DataRef
+    16         0 @vSmartMOM/…rnel/rt_kernel_lin.jl   79 rt_kernel!(RS_type::vSmartMOM.Ine…
+    16         0 @vSmartMOM/…reKernel/rt_kernel.jl  293 get_dtau_ndoubl
+    16         0 @vSmartMOM/…ernel/doubling_lin.jl  288 doubling_allparams_helper!(pol_ty…
+    16         1 @juliasrc/subtype.c    2528 ijl_isa
+    17         0 @CUDA/…rv/synchronization.jl  194 synchronize
+    17        17 @juliasrc/support/hashing.c   32 int64hash
+    17         0 @vSmartMOM/…ernel/doubling_lin.jl  257 doubling_allparams_helper!(pol_ty…
+    17         0 @CUDA/src/array.jl      563 copyto!
+    17         0 @CUDA/src/array.jl      611 unsafe_copyto!(dest::Vector{Float…
+    17         0 @juliasrc/gf.c         1843 jl_mt_find_cache_entry
+    17         0 @juliasrc/jltypes.c    1121 lookup_type
+    17         0 @CUDA/src/memory.jl     261 pool_mark!
+    17         0 @GPUArrays/src/host/base.jl  366 unsafe_view
+    17         0 @GPUArrays/src/host/base.jl  371 unsafe_contiguous_view
+    17         0 @CUDA/src/memory.jl       ? _pool_free
+    18         0 @juliasrc/gc-stock.c    765 jl_gc_small_alloc_inner
+    18         0 @juliasrc/gc-stock.c    707 gc_add_page
+    18        18 @juliasrc/gc-stock.h    350 set_page_metadata
+    18        18 @juliasrc/support/hashing.c   34 int64hash
+    18         0 @juliasrc/jltypes.c    2469 ijl_apply_tuple_type_v
+    18         1 @juliasrc/jltypes.c    2459 jl_apply_tuple_type_v_
+    18         7 …3e79/lib/libcublas.so    ? cublasGetProperty
+    18         0 @CUDA/src/array.jl      857 derive
+    19         0 @vSmartMOM/…ernel/doubling_lin.jl  306 doubling_allparams_helper!(pol_ty…
+    19         3 @juliasrc/jltypes.c    1044 lookup_type_set
+    19         0 @Base/tuple.jl          162 indexed_iterate
+    19         0 @GPUArrays/src/host/mapreduce.jl   35 mapreduce
+    19        19 @CUDA/…ib/cudadrv/context.jl   69 isvalid(ctx::CuContext)
+    19         0 @CUDA/…ib/cublas/wrappers.jl   40 cublasGetProperty
+    19         0 @GPUToolbox/src/ccalls.jl   33 cublasGetProperty
+    19         0 @GPUToolbox/src/ccalls.jl   34 #cublasGetProperty##0
+    19         0 @CUDA/…b/cublas/libcublas.jl 3083 macro expansion
+    19        15 @juliasrc/jltypes.c    1822 typekeyvalue_hash
+    19         0 @CUDA/src/memory.jl     220 stream_ordered(dev::CuDevice)
+    19         0 @CUDA/…ib/cublas/wrappers.jl  530 gemv!(trans::Char, alpha::Float64…
+    19         0 @GPUToolbox/src/ccalls.jl   33 cublasDgemv_v2_64
+    19         0 @GPUToolbox/src/ccalls.jl   34 #cublasDgemv_v2_64##0
+    19         0 @CUDA/…b/cublas/libcublas.jl 1890 macro expansion
+    20        20 @Base/Base_compiler.jl    ? convert(::Type{CuPtr{Float64}}, m…
+    20         0 @juliasrc/builtins.c   1051 jl_f_getfield
+    20         1 @Base/abstractarray.jl 3078 _sub2ind_recurse(::NTuple{5, Base…
+    20         0 @juliasrc/gc-stock.c   2196 gc_mark_finlist_
+    20         5 @juliasrc/gc-stock.c   1685 gc_try_claim_and_push
+    21         6 @CUDA/lib/cudadrv/state.jl  434 get_values
+    21         0 @juliasrc/datatype.c   1145 ijl_new_bits
+    21         0 @Base/tuple.jl          361 map
+    21         0 @juliasrc/builtins.c   2095 jl_f__compute_sparams
+    21         0 @vSmartMOM/…ayerProperties_lin.jl  480 constructCoreOpticalProperties(RS…
+    21         0 none                      ? (::vSmartMOM.CoreRT.var"#construc…
+    21         0 @CUDA/src/memory.jl     636 _pool_alloc
+    21         0 @LinearAlgebra/src/matmul.jl 1294 _mat_vec_scalar
+    21         0 @LinearAlgebra/src/matmul.jl   71 mul!
+    21         0 @GPUArrays/src/host/linalg.jl  581 _mul!
+    21         0 @LinearAlgebra/src/matmul.jl   74 _mul!
+    21         0 @CUDA/lib/cublas/linalg.jl  284 generic_matvecmul!(Y::CuArray{Flo…
+    21        21 @juliasrc/gc-stock.c    913 gc_sweep_page
+    21         0 @juliasrc/gc-stock.c   2530 gc_drain_own_chunkqueue
+    21         0 @juliasrc/gc-stock.c   2048 gc_mark_chunk
+    22        22 @Base/essentials.jl     920 getindex
+    22         2 @Base/tuple.jl          361 map(f::typeof(cudaconvert), t::Tu…
+    22         0 @CUDA/src/memory.jl     637 _pool_alloc
+    22         0 @Base/hashing.jl         37 hash
+    22        18 /lib64/libc.so.6          ? _int_free
+    23         0 @juliasrc/datatype.c   1907 set_nth_field
+    23         0 @CUDA/src/memory.jl     668 _pool_alloc
+    23        15 @juliasrc/datatype.c   1531 ijl_box_int64
+    23         3 @Base/scopedvalues.jl   168 getindex
+    23         1 @juliasrc/subtype.c    2417 jl_tuple1_isa
+    23         0 @CUDA/src/CUDAKernels.jl  150 (::KernelAbstractions.Kernel{CUDA…
+    23         0 @vSmartMOM/…ernel/doubling_lin.jl  284 doubling_allparams_helper!(pol_ty…
+    23         0 @juliasrc/gc-stock.c   3187 _jl_gc_collect
+    24         1 @CUDA/src/CUDAKernels.jl  110 #threads_to_workgroupsize##0
+    24         2 @Base/runtime_internals.jl  856 objectid
+    24         0 @CUDA/…ib/cublas/wrappers.jl    ? gemm_strided_batched!(transA::Cha…
+    24         0 @CUDA/…ib/cublas/wrappers.jl 1625 gemm_strided_batched!(transA::Cha…
+    24         1 @CUDA/…ib/cublas/wrappers.jl   44 version()
+    24         6 @GPUArrays/src/host/base.jl  358 view(::CuArray{Float64, 4, CUDA.D…
+    24         0 @juliasrc/typemap.c    1148 jl_typemap_entry_assoc_exact
+    25         0 @vSmartMOM/…el/interaction_lin.jl  320 interaction_helper!(::vSmartMOM.C…
+    25         0 @GPUArrays/src/host/indexing.jl   24 setindex!
+    25        25 @juliasrc/jltypes.c     997 typekeyvalue_eq
+    25         0 @juliasrc/jltypes.c    1124 lookup_type
+    25         3 @juliasrc/gf.c         4045 sig_match_fast
+    25         0 @GPUArrays/…c/host/alloc_cache.jl   34 cached_alloc(f::CUDA.var"#671#672…
+    25        25 /lib64/libpthread.so.0    ? pthread_rwlock_rdlock
+    25         0 @LinearAlgebra/src/matmul.jl 1260 *(α::Float64, B::CuArray{Float64,…
+    25         0 @LinearAlgebra/src/matmul.jl 1288 mat_vec_scalar
+    25        25 @juliasrc/gc-stock.c   2907 sweep_finalizer_list
+    27         0 @vSmartMOM/…rnel/rt_kernel_lin.jl   90 rt_kernel!(RS_type::vSmartMOM.Ine…
+    27         0 @vSmartMOM/…rnel/elemental_lin.jl   78 elemental!(pol_type::vSmartMOM.Sc…
+    27         0 @GPUArrays/src/host/indexing.jl   17 getindex
+    28        15 @CUDA/src/memory.jl     519 _
+    28         1 @juliasrc/iddict.c      118 jl_table_peek_bp
+    28         2 @KernelAbstractions/…KernelAbstractions.jl  776 partition(kernel::KernelAbstracti…
+    28         0 @GPUArrays/src/host/base.jl  359 view(::CuArray{Float64, 3, CUDA.D…
+    28         0 @juliasrc/gf.c         4036 sig_match_fast
+    28         1 @CUDA/lib/cudadrv/state.jl  111 active_state
+    28         0 @juliasrc/subtype.c    2267 ijl_subtype_env
+    28         0 @Base/timing.jl         460 macro expansion
+    29         0 @CUDA/src/array.jl      192 copy
+    29         0 @CUDA/src/array.jl      184 similar
+    29         0 @CUDA/…ib/cudadrv/libcuda.jl  528 macro expansion
+    29         0 @Base/timing.jl         462 macro expansion
+    30         0 @CUDA/src/memory.jl     638 _pool_alloc
+    30         1 @CUDA/src/memory.jl     228 pool_create
+    30         0 @Base/abstractdict.jl   545 hash
+    30         0 @Base/iterators.jl      290 iterate
+    30         0 @Base/iterators.jl      283 _pairs_elt
+    30         2 @Base/namedtuple.jl     166 getindex
+    30         0 @juliasrc/gf.c         3086 ijl_method_lookup_by_tt
+    30         1 @juliasrc/gf.c         1850 jl_mt_assoc_by_type
+    30        30 @juliasrc/julia.h       983 jl_to_typeof
+    30         1 @juliasrc/typemap.c    1152 jl_typemap_entry_assoc_exact
+    30        30 @juliasrc/iddict.c      126 jl_table_peek_bp
+    30         1 @vSmartMOM/…lper_functions_lin.jl  385 compute_Z_moments(mod::vSmartMOM.…
+    31         0 @GPUCompiler/src/jlgen.jl   85 methodinstance
+    31         0 @vSmartMOM/…ayerProperties_lin.jl  771 extractEffectiveProps(lods::Vecto…
+    31         0 @vSmartMOM/…lper_functions_lin.jl  379 compute_Z_moments(mod::vSmartMOM.…
+    32         0 @CUDA/…mpiler/compilation.jl  170 compiler_config(dev::CuDevice; kw…
+    32         2 @CUDA/lib/cudadrv/memory.jl   79 alloc(::Type{CUDA.DeviceMemory}, …
+    32         0 @Base/broadcast.jl      883 broadcast_preserving_zero_d
+    32        32 @juliasrc/gc-stock.c   1704 gc_mark_obj8
+    33         0 @CUDA/src/refpointer.jl   19 unsafe_convert
+    33         0 @CUDA/src/memory.jl     634 _pool_alloc
+    33         2 @Base/iddict.jl          97 getindex
+    33        33 @juliasrc/julia.h      1515 jl_is_layout_opaque
+    33         1 @juliasrc/datatype.c   1143 ijl_new_bits
+    33         0 @juliasrc/gc-stock.c   3088 _jl_gc_collect
+    34        27 @juliasrc/gf.c         4125 jl_lookup_generic_
+    34         0 @juliasrc/gc-stock.c   3652 jl_parallel_gc_threadfun
+    35         6 @CUDA/lib/cudadrv/state.jl  193 device_contexts
+    35         0 @Base/tuple.jl          580 hash
+    35         0 @Base/operators.jl      321 !=
+    35         0 @juliasrc/gc-stock.c   1275 gc_sweep_pool_parallel
+    35         0 @juliasrc/gc-stock.c    983 gc_sweep_pool_page
+    36         0 @juliasrc/jltypes.c    1405 inst_datatype_env
+    36         4 @juliasrc/julia.h      1523 jl_datatype_layout
+    36         0 @CUDA/lib/cudadrv/state.jl  455 get!(constructor::CUDA.var"#memor…
+    36         0 @CUDA/lib/cudadrv/state.jl  197 device_context
+    36         0 @vSmartMOM/…ernel/doubling_lin.jl  269 doubling_allparams_helper!(pol_ty…
+    36         1 @Base/multidimensional.jl  919 to_indices
+    37         0 @CUDA/…ib/cudadrv/libcuda.jl  543 macro expansion
+    37         0 @CUDA/…compiler/execution.jl  371 macro expansion
+    37         0 @GPUCompiler/src/jlgen.jl   82 methodinstance
+    38         0 @CUDA/lib/cudadrv/memory.jl  426 unsafe_copyto!(dst::CuPtr{Float64…
+    38         0 @GPUToolbox/src/ccalls.jl   33 cuMemcpyDtoDAsync_v2
+    38         0 @GPUToolbox/src/ccalls.jl   34 #cuMemcpyDtoDAsync_v2##0
+    39        39 @juliasrc/jltypes.c    1065 lookup_type_setvalue
+    39         0 @Base/multidimensional.jl  891 ensure_indexable
+    39         0 @vSmartMOM/…/CoreRT/rt_run_lin.jl  350 rt_run(RS_type::vSmartMOM.Inelast…
+    39         0 @Base/array.jl         1002 _setindex!(::Array{Float64, 5}, :…
+    40         0 @juliasrc/jltypes.c    1425 ijl_apply_type
+    40         0 @juliasrc/jltypes.c    1409 inst_datatype_env
+    40         2 @CUDA/lib/cudadrv/state.jl  357 stream
+    40         0 @Base/dict.jl           242 ht_keyindex
+    41         0 @juliasrc/typemap.c    1193 jl_typemap_level_assoc_exact
+    41         0 @CUDA/lib/cudadrv/memory.jl  420 unsafe_copyto!
+    41         0 @CUDA/…compiler/execution.jl  372 macro expansion
+    41         0 @CUDA/…mpiler/compilation.jl  169 compiler_config
+    41         0 @CUDA/lib/cudadrv/state.jl   97 prepare_cuda_state()
+    42        42 /lib64/libc.so.6          ? __memset_avx2_unaligned
+    42        42 @juliasrc/gf.c         4211 ijl_apply_generic
+    42         0 @Base/refpointer.jl     146 Ref
+    42        11 @Base/refvalue.jl         7 RefValue
+    42         0 @juliasrc/builtins.c    940 arg_tuple
+    42         0 @CUDA/…ib/cudadrv/libcuda.jl 4737 macro expansion
+    42         0 @juliasrc/gc-stock.c   2463 gc_mark_outrefs
+    43        43 linux-vdso.so.1           ? clock_gettime
+    44         0 @juliasrc/datatype.c   1858 ijl_get_nth_field_checked
+    44         0 @Adapt/src/base.jl       17 _adapt_tuple_structure
+    44         0 @Base/dict.jl           128 hashindex
+    45         0 @CUDA/src/array.jl      635 (::CUDA.var"#700#701"{Float64, Cu…
+    45        45 /lib64/libpthread.so.0    ? pthread_rwlock_unlock
+    46        15 @CUDA/lib/cudadrv/state.jl  453 get!(constructor::CUDA.var"#pool_…
+    46         1 @juliasrc/jltypes.c    2138 inst_datatype_inner
+    46         0 @CUDA/src/array.jl      193 copy
+    46         0 @CUDA/src/array.jl      633 unsafe_copyto!(dest::CuArray{Floa…
+    46         0 @CUDA/src/memory.jl     631 pool_alloc
+    46         0 @CUDA/src/memory.jl     515 Managed
+    46         0 @Base/abstractarray.jl  681 checkbounds(::Type{Bool}, ::Array…
+    46         3 @Base/abstractarray.jl  725 checkbounds_indices
+    47         0 @CUDA/src/array.jl      581 copyto!
+    47         0 @CUDA/src/array.jl      577 copyto!
+    47         1 @CUDA/lib/cudadrv/memory.jl    ? alloc(::Type{CUDA.DeviceMemory}, …
+    47         2 …ibuv/src/unix/linux.c 1591 uv__hrtime
+    48         2 @Base/indices.jl        359 to_indices
+    49         1 @Base/boot.jl           792 NamedTuple
+    49         1 @CUDA/…libcuda_deprecated.jl   48 macro expansion
+    49         1 @CUDA/src/CUDAKernels.jl  115 (::KernelAbstractions.Kernel{CUDA…
+    49         0 @GPUArrays/src/host/base.jl  375 unsafe_view
+    49         0 @Base/subarray.jl       249 unsafe_view
+    49         0 @Base/subarray.jl        28 SubArray
+    49         7 /lib64/libc.so.6          ? __clock_gettime
+    50         0 @juliasrc/typemap.c     308 mtcache_hash_lookup
+    50        18 @juliasrc/typemap.c     312 mtcache_hash_lookup
+    51         0 @Base/essentials.jl     522 tail
+    52         0 @CUDA/src/refpointer.jl   70 setindex!
+    52         5 @CUDA/src/CUDAKernels.jl  109 #threads_to_workgroupsize##0
+    52         0 @Base/tuple.jl          360 map(f::typeof(cudaconvert), t::Tu…
+    53         0 @Base/Base_compiler.jl  195 time_ns
+    53         0 …libuv/src/unix/core.c  134 uv_hrtime
+    54         0 @GPUCompiler/src/execution.jl  155 cached_compilation(cache::Dict{An…
+    54         0 @Base/array.jl          928 getindex(::Array{Float64, 5}, ::I…
+    55         0 @CUDA/src/memory.jl      69 maybe_collect(will_block::Bool)
+    57         0 @CUDA/src/array.jl      119 mightalias(A::CuArray{Float64, 3,…
+    57         1 @CUDA/lib/cudadrv/state.jl  189 device
+    57        41 @Base/Base_compiler.jl   54 getproperty
+    57        57 @juliasrc/gf.c         3991 _jl_invoke
+    58         0 @CUDA/src/array.jl      118 mightalias(A::CuArray{Float64, 1,…
+    59         4 @Base/abstractarray.jl 3081 _sub2ind_recurse(::NTuple{5, Base…
+    60        60 /lib64/libpthread.so.0    ? __pthread_mutex_unlock_usercnt
+    62         0 @juliasrc/gf.c         4214 ijl_apply_generic
+    62         0 @Adapt/src/base.jl       14 _adapt_tuple_structure
+    63        10 @juliasrc/jltypes.c    1830 typekeyvalue_hash
+    64         0 @Base/abstractarray.jl  699 checkbounds(::Array{Float64, 5}, …
+    65         0 @vSmartMOM/…el/interaction_lin.jl  288 interaction_helper!(::vSmartMOM.C…
+    65         0 @GPUToolbox/src/ccalls.jl   34 #cuCtxGetCurrent##0
+    65        14 @CUDA/…ib/cudadrv/libcuda.jl 4072 macro expansion
+    65         0 @Adapt/src/base.jl       63 adapt_structure
+    66         0 @CUDA/…compiler/execution.jl  373 macro expansion
+    66         0 @vSmartMOM/…el/interaction_lin.jl  291 interaction_helper!(::vSmartMOM.C…
+    66         0 @CUDA/…ib/cudadrv/libcuda.jl   35 check(f::CUDA.var"#cuCtxGetCurren…
+    66         0 @Adapt/src/base.jl       60 adapt_structure
+    66         0 @Adapt/src/base.jl        9 adapt_structure
+    67         1 @vSmartMOM/…el/interaction_lin.jl  255 interaction_helper!(::vSmartMOM.C…
+    67         0 @CUDA/src/array.jl      115 unaliascopy
+    67        67 /lib64/libpthread.so.0    ? __pthread_getspecific
+    67         0 @CUDA/src/CUDAKernels.jl  145 (::KernelAbstractions.Kernel{CUDA…
+    68         0 @juliasrc/datatype.c   1842 ijl_get_nth_field
+    69         2 @GPUArrays/src/host/base.jl  362 view(::CuArray{Float64, 4, CUDA.D…
+    70         0 @juliasrc/builtins.c    780 jl_f__apply_iterate
+    70         0 @Base/broadcast.jl      975 preprocess
+    70        70 @Base/promotion.jl      637 ==
+    71         1 @vSmartMOM/…el/interaction_lin.jl  247 interaction_helper!(::vSmartMOM.C…
+    71         3 @juliasrc/builtins.c    942 arg_tuple
+    71         0 @juliasrc/gc-stock.c   2531 gc_drain_own_chunkqueue
+    72         2 @Base/dict.jl           503 get
+    73         1 @CUDA/lib/cudadrv/state.jl   71 task_local_state!()
+    73         0 @juliasrc/gc-stock.c   2519 gc_mark_loop_serial_
+    76         0 @Base/tuple.jl          360 map
+    77        77 @juliasrc/gc-stock.c    737 jl_gc_small_alloc_inner
+    77         0 @Base/abstractdict.jl    19 haskey
+    77         0 @Base/iddict.jl         182 in
+    77        44 @Base/iddict.jl          92 get
+    79         4 @GPUToolbox/src/ccalls.jl   33 cuCtxGetCurrent(pctx::Base.RefVal…
+    80         0 @Base/hashing.jl         28 hash
+    80         0 @vSmartMOM/…ertian_surface_lin.jl  125 create_surface_layer!(RS_type::vS…
+    84         0 @juliasrc/julia_internal.h 1816 jl_typemap_assoc_exact
+    85         0 @CUDA/src/memory.jl     621 pool_alloc
+    85         6 @CUDA/src/memory.jl      65 maybe_collect
+    85         1 @CUDA/src/refpointer.jl   61 unsafe_convert
+    85         5 @juliasrc/support/hashing.h   31 bitmix
+    86        86 @juliasrc/julia.h      1884 jl_egal_
+    87         4 @Base/abstractarray.jl 3065 _sub2ind(::NTuple{5, Base.OneTo{I…
+    88         5 @CUDA/lib/cudadrv/state.jl   98 prepare_cuda_state()
+    89         0 @vSmartMOM/…ernel/doubling_lin.jl  293 doubling_allparams_helper!(pol_ty…
+    90         0 @CUDA/src/broadcast.jl   25 similar
+    91         2 @CUDA/src/memory.jl      58 memory_stats
+    91         0 @Base/broadcast.jl      227 similar
+    91         0 @Base/abstractarray.jl  866 similar
+    91         1 @Base/abstractarray.jl  867 similar
+    91         0 @vSmartMOM/…/CoreRT/rt_run_lin.jl  439 rt_run(RS_type::vSmartMOM.Inelast…
+    92         0 @Base/broadcast.jl      894 materialize
+    93        93 @juliasrc/gc-stock.h    332 gc_page_data
+    93         0 @CUDA/src/CUDAKernels.jl  108 threads_to_workgroupsize
+    94         1 @juliasrc/gc-stock.c    739 jl_gc_small_alloc_inner
+    94        84 @Base/operators.jl      472 >=
+    94         0 @Base/broadcast.jl     1250 dotview
+    96         0 @CUDA/…compiler/execution.jl  111 macro expansion
+    96         0 @CUDA/src/CUDAKernels.jl  144 (::KernelAbstractions.Kernel{CUDA…
+    96         0 @juliasrc/gc-stock.c   3112 _jl_gc_collect
+    98         1 @CUDA/…ib/cudadrv/libcuda.jl 5909 macro expansion
+   102         0 @vSmartMOM/…el/interaction_lin.jl  287 interaction_helper!(::vSmartMOM.C…
+   103         0 @CUDA/…ib/cudadrv/context.jl   71 isvalid(ctx::CuContext)
+   105         0 @vSmartMOM/…ernel/doubling_lin.jl  295 doubling_allparams_helper!(pol_ty…
+   108         0 @juliasrc/typemap.c    1196 jl_typemap_level_assoc_exact
+   108         1 @Base/abstractarray.jl 3049 _sub2ind(::Array{Float64, 5}, ::I…
+   110         0 @GPUToolbox/src/ccalls.jl   34 #cuOccupancyMaxPotentialBlockSize…
+   110       110 /lib64/libc.so.6          ? __memset_avx2_unaligned_erms
+   111         0 @CUDA/src/CUDAKernels.jl  133 (::KernelAbstractions.Kernel{CUDA…
+   111         0 @CUDA/…/cudadrv/occupancy.jl   62 #launch_configuration#557
+   112         0 @juliasrc/jltypes.c    1136 lookup_typevalue
+   113         0 @vSmartMOM/…el/interaction_lin.jl  246 interaction_helper!(::vSmartMOM.C…
+   113         1 @GPUArrays/src/host/indexing.jl   24 setindex!(::CuArray{Float64, 4, C…
+   114         0 @GPUToolbox/src/ccalls.jl   33 cuOccupancyMaxPotentialBlockSize
+   115         0 @CUDA/…/cudadrv/occupancy.jl   56 launch_configuration
+   117         0 @GPUArrays/src/host/indexing.jl  115 vectorized_setindex!
+   118       100 @juliasrc/gf.c         4124 jl_lookup_generic_
+   120         0 @vSmartMOM/…el/interaction_lin.jl  249 interaction_helper!(::vSmartMOM.C…
+   121       121 /lib64/libc.so.6          ? __memmove_avx_unaligned_erms
+   127         0 @Base/broadcast.jl      978 preprocess_args
+   128         0 @CUDA/…ib/cudadrv/context.jl   73 isvalid(ctx::CuContext)
+   128         9 @CUDA/…ib/cudadrv/libcuda.jl 4094 unchecked_cuCtxGetId
+   131        90 @juliasrc/jltypes.c    1067 lookup_type_setvalue
+   131         0 @vSmartMOM/…el/interaction_lin.jl  294 interaction_helper!(::vSmartMOM.C…
+   133         0 @Base/broadcast.jl      975 preprocess(dest::CuArray{Float64,…
+   134         0 @GPUArrays/src/host/indexing.jl   28 _setindex!
+   134         0 @CUDA/src/memory.jl     544 convert(::Type{CuPtr{Float64}}, m…
+   137         1 @vSmartMOM/…el/interaction_lin.jl  300 interaction_helper!(::vSmartMOM.C…
+   137       137 @juliasrc/builtins.c     90 compare_svec
+   141         0 @vSmartMOM/…el/interaction_lin.jl  264 interaction_helper!(::vSmartMOM.C…
+   145         0 @juliasrc/julia_internal.h 1820 jl_typemap_assoc_exact
+   145         4 @juliasrc/builtins.c    935 arg_tuple
+   148         0 @juliasrc/gf.c         4147 jl_lookup_generic_
+   148         6 @juliasrc/jltypes.c    2479 jl_inst_arg_tuple_type
+   149         0 @juliasrc/gf.c         4141 jl_lookup_generic_
+   149         1 @juliasrc/gf.c         3072 lookup_arg_type_tuple
+   155         3 @CUDA/lib/cudadrv/state.jl  110 active_state
+   156         0 @juliasrc/gc-stock.c   3475 ijl_gc_collect
+   158         0 @GPUArrays/src/host/indexing.jl   81 vectorized_getindex
+   158         0 @Base/abstractarray.jl  822 similar
+   158         0 @CUDA/…compiler/execution.jl  164 adapt_storage
+   158         0 @CUDA/src/array.jl      486 unsafe_convert
+   159         0 @CUDA/…compiler/execution.jl  200 cudaconvert
+   160         0 @Adapt/src/Adapt.jl      50 adapt_structure
+   161         0 @Adapt/src/Adapt.jl      40 adapt
+   162         0 @Base/array.jl         1003 _setindex!(::Array{Float64, 5}, :…
+   164         0 @juliasrc/gc-stock.c    776 ijl_gc_small_alloc
+   164         0 @CUDA/src/array.jl      188 similar
+   169         0 @Base/lock.jl           376 macro expansion
+   171         1 …lib/libcublasLt.so.12    ? cublasLtDDDMatmulAlgoGetHeuristic
+   172         1 @Base/array.jl          929 getindex(::Array{Float64, 5}, ::I…
+   173         0 @vSmartMOM/…ernel/doubling_lin.jl  292 doubling_allparams_helper!(pol_ty…
+   174         0 @juliasrc/jltypes.c    1139 lookup_typevalue
+   175       171 /lib64/libc.so.6          ? _int_malloc
+   176         0 @CUDA/…compiler/execution.jl  368 cufunction(f::GPUArrays.var"#gpu_…
+   179         2 @CUDA/…compiler/execution.jl  365 kwcall(::@NamedTuple{always_inlin…
+   185         0 @Base/abstractarray.jl 1530 unalias
+   186         0 @juliasrc/julia.h      1877 jl_egal__unboxed_
+   190         0 @juliasrc/julia.h      1887 jl_egal_
+   190         0 @vSmartMOM/…lper_functions_lin.jl  348 compute_Z_moments(mod::vSmartMOM.…
+   193         0 @CUDA/…libcuda_deprecated.jl   47 macro expansion
+   195         0 @Base/broadcast.jl      977 preprocess_args
+   196        19 @CUDA/lib/cudadrv/state.jl   94 prepare_cuda_state()
+   200         0 @Base/broadcast.jl      968 broadcast_unalias
+   204         0 @GPUArrays/src/host/broadcast.jl   58 _copyto!
+   204         0 @Base/broadcast.jl      974 preprocess
+   208         0 @vSmartMOM/…/CoreRT/rt_run_lin.jl  475 rt_run(RS_type::vSmartMOM.Inelast…
+   208         0 @vSmartMOM/…el/interaction_lin.jl  354 interaction!(scattering_interface…
+   208         2 @Base/array.jl          997 setindex!(::Array{Float64, 5}, ::…
+   217         0 @vSmartMOM/…lper_functions_lin.jl  349 compute_Z_moments(mod::vSmartMOM.…
+   231         0 @Base/views.jl          149 maybeview
+   232        16 /lib64/libc.so.6          ? __libc_calloc
+   233         0 @vSmartMOM/…ernel/doubling_lin.jl  275 doubling_allparams_helper!(pol_ty…
+   235         0 @CUDA/src/memory.jl     695 pool_free(managed::CUDA.Managed{C…
+   242         0 @CUDA/lib/cudadrv/graph.jl  161 is_capturing
+   242         0 @CUDA/lib/cudadrv/graph.jl  156 capture_status
+   242         0 @GPUToolbox/src/ccalls.jl   33 cuStreamGetCaptureInfo
+   242         0 @GPUToolbox/src/ccalls.jl   34 #cuStreamGetCaptureInfo##0
+   243         1 @CUDA/src/memory.jl     545 convert(::Type{CuPtr{Float64}}, m…
+   243         1 @GPUArrays/…host/abstractarray.jl   42 release
+   248         8 @CUDA/…compiler/execution.jl  110 macro expansion
+   255         2 @CUDA/lib/cudadrv/state.jl   61 validate_task_local_state(state::…
+   257         0 @GPUArrays/…host/abstractarray.jl  100 unsafe_free!
+   263         1 @Base/abstractarray.jl 1377 _to_linear_index(::Array{Float64,…
+   264         0 @Base/array.jl          790 collect(itr::Base.Generator{UnitR…
+   272         0 @CUDA/…compiler/execution.jl  112 macro expansion
+   272         1 @GPUArrays/…host/abstractarray.jl  115 unsafe_free!(x::CuArray{Float64, …
+   291         0 @CUDA/src/array.jl      416 pointer
+   291         1 @CUDA/src/array.jl      424 #pointer#691
+   295         0 @CUDA/src/memory.jl     695 pool_free
+   296         9 @juliasrc/iddict.c      128 jl_table_peek_bp
+   298         0 @CUDA/…ib/cudadrv/libcuda.jl   21 initialize_context
+   304         0 @CUDA/src/refpointer.jl   48 (::CUDA.var"#719#720"{CUDA.Manage…
+   310         0 @CUDA/…ib/cublas/wrappers.jl 1640 gemm_strided_batched
+   310         0 @CUDA/src/array.jl      186 similar
+   312        12 @CUDA/lib/cudadrv/state.jl   72 task_local_state!()
+   314         0 @juliasrc/gf.c         4143 jl_lookup_generic_
+   316         0 @juliasrc/gf.c         1492 lookup_leafcache
+   332       332 /lib64/libpthread.so.0    ? __pthread_mutex_lock
+   350         7 @CUDA/src/array.jl      466 unsafe_convert(typ::Type{CuPtr{Fl…
+   394         0 @juliasrc/iddict.c      157 ijl_eqtable_get
+   413         5 @CUDA/…ib/cudadrv/libcuda.jl 4738 macro expansion
+   440         0 @CUDA/src/refpointer.jl   45 CUDA.CuRefValue{Float64}()
+   449         1 @CUDA/src/refpointer.jl   54 CuRefValue
+   450         0 @GPUArrays/src/host/broadcast.jl   49 copyto!
+   451         0 @Base/broadcast.jl      894 materialize(bc::Base.Broadcast.Br…
+   455         0 @CUDA/src/memory.jl     714 #_pool_free##0
+   455         0 @CUDA/lib/cudadrv/memory.jl   82 free
+   455         0 @CUDA/lib/cudadrv/memory.jl   87 #free#512
+   455         0 @GPUToolbox/src/ccalls.jl   33 cuMemFreeAsync
+   455         0 @GPUToolbox/src/ccalls.jl   34 #cuMemFreeAsync##0
+   461         0 @GPUToolbox/src/ccalls.jl   34 #cuLaunchKernel##0
+   461         1 @CUDA/…ib/cudadrv/libcuda.jl 5255 macro expansion
+   462         0 @CUDA/…/cudadrv/execution.jl   72 #542
+   462         0 @GPUToolbox/src/ccalls.jl   33 cuLaunchKernel
+   469         0 @CUDA/…/cudadrv/execution.jl   39 macro expansion
+   473         0 @vSmartMOM/…lper_functions_lin.jl  259 kwcall(::@NamedTuple{arr_type::Un…
+   474         0 none                      ? pack_arguments(::CUDA.var"#542#54…
+   474         0 @vSmartMOM/…ayerProperties_lin.jl   43 _compute_aerosol_phase_blocks_lin…
+   474         0 none                      ? #_compute_aerosol_phase_blocks_li…
+   474         0 @vSmartMOM/…ayerProperties_lin.jl   30 _compute_phase_blocks_lin(model::…
+   475         0 @CUDA/src/memory.jl     713 _pool_free
+   476         1 @CUDA/…/cudadrv/execution.jl   65 launch(::CuFunction, ::CUDA.Kerne…
+   476         0 @vSmartMOM/…ernel/doubling_lin.jl  319 doubling_allparams_helper!(pol_ty…
+   477         0 @vSmartMOM/…ayerProperties_lin.jl  457 constructCoreOpticalProperties(RS…
+   483         0 @vSmartMOM/…ernel/doubling_lin.jl  274 doubling_allparams_helper!(pol_ty…
+   490         0 @CUDA/…/cudadrv/execution.jl  193 cudacall
+   490         0 @CUDA/…/cudadrv/execution.jl  197 #cudacall#547
+   490         0 none                      ? convert_arguments
+   490         0 @CUDA/…/cudadrv/execution.jl  155 macro expansion
+   490         0 @CUDA/…/cudadrv/execution.jl  195 #549
+   490         0 @CUDA/…/cudadrv/execution.jl   58 launch
+   509         3 …lib/libcublasLt.so.12    ? cublasLtDDDMatmul
+   523         0 @CUDA/lib/cudadrv/state.jl  168 #context!#567
+   535         0 @vSmartMOM/…ernel/doubling_lin.jl  300 doubling_allparams_helper!(pol_ty…
+   540         0 @GPUArrays/…c/host/alloc_cache.jl   36 cached_alloc(f::CUDA.var"#671#672…
+   540         0 @CUDA/src/array.jl       92 (::CUDA.var"#671#672"{CUDA.Device…
+   540         0 @GPUArrays/src/host/broadcast.jl   34 copy
+   541         0 @CUDA/lib/cudadrv/state.jl  163 context!
+   554         0 @GPUToolbox/src/ccalls.jl   34 #cuMemAllocFromPoolAsync##0
+   554         0 @CUDA/…ib/cudadrv/libcuda.jl 4814 macro expansion
+   557         0 @CUDA/lib/cudadrv/memory.jl   71 alloc(::Type{CUDA.DeviceMemory}, …
+   557         0 @GPUToolbox/src/ccalls.jl   33 cuMemAllocFromPoolAsync
+   569         1 none                      ? kwcall(::@NamedTuple{threads::Int…
+   577         0 none                      ? #_#732
+   577         0 none                      ? macro expansion
+   577         0 @CUDA/…compiler/execution.jl  272 macro expansion
+   583         1 @CUDA/src/array.jl       91 CuArray{Float64, 3, CUDA.DeviceMe…
+   591         1 @vSmartMOM/…ernel/doubling_lin.jl  297 doubling_allparams_helper!(pol_ty…
+   606         0 @CUDA/src/CUDAKernels.jl  129 (::KernelAbstractions.Kernel{CUDA…
+   625         0 @GPUArrays/src/host/indexing.jl   75 vectorized_getindex!
+   626         2 @CUDA/…ib/cudadrv/libcuda.jl  529 macro expansion
+   627         0 @juliasrc/gc-common.c   180 run_finalizer
+   632         0 @juliasrc/gc-common.c   316 run_finalizers
+   632         0 @juliasrc/gc-common.c   270 jl_gc_run_finalizers_in_list
+   633         0 @GPUArrays/src/host/indexing.jl   82 vectorized_getindex
+   633         0 @juliasrc/gc-stock.c   3497 ijl_gc_collect
+   639         0 @CUDA/lib/cudadrv/memory.jl   61 alloc
+   642         2 @CUDA/src/memory.jl     645 (::CUDA.var"#_pool_alloc##0#_pool…
+   655         0 @GPUToolbox/src/ccalls.jl   34 #cuMemcpyHtoDAsync_v2##0
+   656         0 @CUDA/lib/cudadrv/memory.jl  414 #unsafe_copyto!#519
+   656         0 @GPUToolbox/src/ccalls.jl   33 cuMemcpyHtoDAsync_v2
+   659         0 @CUDA/src/memory.jl     640 _pool_alloc
+   670         0 @CUDA/src/refpointer.jl   71 setindex!
+   683         1 @CUDA/lib/cudadrv/memory.jl  411 kwcall(::@NamedTuple{async::Bool}…
+   695       193 …lib/libcublasLt.so.12    ? [unknown function]
+   709         2 @CUDA/src/CUDAKernels.jl  157 (::KernelAbstractions.Kernel{CUDA…
+   722         0 @CUDA/src/refpointer.jl   55 CuRefValue
+   726         8 …3e79/lib/libcublas.so    ? cublasDgemmStridedBatched_64
+   727        33 …3e79/lib/libcublas.so    ? [unknown function]
+   736         0 @Base/broadcast.jl      902 materialize!(dest::CuArray{Float6…
+   736         0 @GPUArrays/src/host/broadcast.jl   43 materialize!
+   756         0 @vSmartMOM/…ernel/doubling_lin.jl  315 doubling_allparams_helper!(pol_ty…
+   788         0 @juliasrc/gf.c         4210 ijl_apply_generic
+   789         0 @CUDA/src/memory.jl     623 macro expansion
+   789         0 @juliasrc/gc-stock.c    351 maybe_collect
+   790         0 @juliasrc/genericmemory.c   41 jl_alloc_genericmemory_unchecked
+   791         0 @Base/array.jl          590 zeros
+   791         0 @Base/array.jl          592 zeros
+   791         0 @Base/array.jl          595 zeros(::Type{Float64}, dims::NTup…
+   792         0 @GPUArrays/src/host/indexing.jl   21 _getindex
+   792         0 @Base/boot.jl           663 Array
+   792         0 @Base/boot.jl           657 Array
+   793         0 @Base/boot.jl           604 new_as_memoryref
+   794         1 @Base/boot.jl           588 GenericMemory
+   800         0 @vSmartMOM/…c/CoreRT/types_lin.jl  520 +(a::vSmartMOM.CoreRT.UmbrellaCor…
+   800         0 @juliasrc/gc-stock.c    727 jl_gc_small_alloc_inner
+   802         0 @GPUArrays/src/host/indexing.jl   17 getindex(::CuArray{Float64, 4, CU…
+   823         0 @vSmartMOM/…ayerProperties_lin.jl  484 constructCoreOpticalProperties(RS…
+   823         0 none                      ? (::vSmartMOM.CoreRT.var"#construc…
+   824         0 @CUDA/src/memory.jl     622 pool_alloc
+   851         0 @juliasrc/gc-stock.c    799 jl_gc_alloc_
+   851         0 @juliasrc/gc-stock.c    785 jl_gc_small_alloc_noinline
+   886         0 @vSmartMOM/…rnel/rt_kernel_lin.jl  169 rt_kernel!(RS_type::vSmartMOM.Ine…
+   886         0 @vSmartMOM/…el/interaction_lin.jl  354 interaction!
+   988         0 @GPUArrays/src/host/broadcast.jl   79 _copyto!
+  1066         0 @Base/array.jl          800 collect(itr::Base.Generator{UnitR…
+  1066         0 @Base/array.jl          826 collect_to_with_first!(dest::Vect…
+  1066         0 @Base/array.jl          848 collect_to!(dest::Vector{Vector{F…
+  1171         0 @Base/essentials.jl     687 cconvert
+  1171         0 @CUDA/src/refpointer.jl   30 convert
+  1171         0 @CUDA/src/refpointer.jl   28 CuRef
+  1200         0 @juliasrc/builtins.c    868 jl_f__apply_iterate
+  1297         0 @Base/timing.jl         461 macro expansion
+  1331         0 @Base/generator.jl       48 iterate
+  1352         0 @vSmartMOM/…/CoreRT/rt_run_lin.jl  339 rt_run(RS_type::vSmartMOM.Inelast…
+  1736        10 @CUDA/src/CUDAKernels.jl  115 Kernel
+  1974         1 @CUDA/…b/cublas/libcublas.jl 4450 macro expansion
+  1990         0 @GPUToolbox/src/ccalls.jl   34 #cublasDgemmStridedBatched_64##0
+  1992         0 @CUDA/…ib/cublas/wrappers.jl 1626 gemm_strided_batched!(transA::Cha…
+  1992         0 @GPUToolbox/src/ccalls.jl   33 cublasDgemmStridedBatched_64
+  2034         0 @CUDA/…b/cublas/libcublas.jl   22 check
+  2046         0 @CUDA/…ib/cublas/wrappers.jl 1647 gemm_strided_batched
+  2356         0 @vSmartMOM/…t/gpu_batched_cuda.jl  218 batched_mul(A::CuArray{Float64, 3…
+  2356         0 @CUDA/…ib/cublas/wrappers.jl 1651 gemm_strided_batched
+  2408         0 @CUDA/src/memory.jl     434 retry_reclaim
+  2534         0 @CUDA/…ib/cudadrv/libcuda.jl   35 check
+  2743      1928 /lib64/libcuda.so.1       ? [unknown function]
+  3651         0 @vSmartMOM/…rnel/rt_kernel_lin.jl  112 rt_kernel!(RS_type::vSmartMOM.Ine…
+  3651         0 @vSmartMOM/…ernel/doubling_lin.jl  354 kwcall(::@NamedTuple{N_active::In…
+  3651         0 @vSmartMOM/…ernel/doubling_lin.jl  361 #doubling_allparams!#83
+  3651         0 @vSmartMOM/…ernel/doubling_lin.jl  216 doubling_allparams_helper!
+  4626         0 @vSmartMOM/…rnel/rt_kernel_lin.jl   50 kwcall(::@NamedTuple{dτ_max_thres…
+  4628         0 @vSmartMOM/…/CoreRT/rt_run_lin.jl  380 macro expansion
+  4631         0 @vSmartMOM/…/CoreRT/rt_run_lin.jl  370 rt_run(RS_type::vSmartMOM.Inelast…
+  4631         0 @ProgressMeter/src/ProgressMeter.jl 1026 macro expansion
+  6341         0 …ysdeps/x86_64/start.S  123 [unknown function]
+  6341         0 /lib64/libc.so.6          ? __libc_start_main
+  6341         0 …t-12/cli/loader_exe.c   58 main
+  6341         0 @juliasrc/jlapi.c      1139 jl_repl_entrypoint
+  6341         0 @juliasrc/jlapi.c       971 true_main
+  6341         0 @julialib/julia/sys.so    ? jfptr__start_63319.1
+  6341         0 @Base/client.jl         550 _start()
+  6341         0 @Base/client.jl         317 exec_options(opts::Base.JLOptions)
+  6341         0 @Base/Base.jl           306 include(mod::Module, _path::Strin…
+  6341         0 @Base/loading.jl       2934 _include(mapexpr::Function, mod::…
+  6341         0 @Base/loading.jl       2874 include_string(mapexpr::typeof(id…
+  6341         0 @Base/boot.jl           489 eval(m::Module, e::Any)
+  6341         0 @juliasrc/toplevel.c   1092 ijl_toplevel_eval_in
+  6341         0 @juliasrc/toplevel.c   1047 ijl_toplevel_eval
+  6341         0 @juliasrc/toplevel.c    975 jl_toplevel_eval_flex
+  6341         0 @juliasrc/toplevel.c   1035 jl_toplevel_eval_flex
+  6341         0 @juliasrc/interpreter.c  898 jl_interpret_toplevel_thunk
+  6341         0 @juliasrc/interpreter.c  707 eval_body
+  6341         0 @juliasrc/interpreter.c  194 eval_stmt_value
+  6341         0 @juliasrc/interpreter.c  243 eval_value
+  6341         0 @juliasrc/interpreter.c  123 do_call
+  6341         0 …e/jacobian_profile.jl   86 main()
+  6341         0 @Profile/src/Profile.jl   60 macro expansion
+  6341         0 …e/jacobian_profile.jl   87 macro expansion
+  6341         0 …e/jacobian_profile.jl   14 quiet(f::var"#main##10#main##11"{…
+  6341         0 @Base/stream.jl        1464 (::Base.RedirectStdStream)(thunk:…
+  6341         0 …e/jacobian_profile.jl   15 #quiet##0
+  6341         0 @Base/logging/logging.jl  653 with_logger
+  6341         0 @Base/logging/logging.jl  542 with_logstate(f::var"#quiet##2#qu…
+  6341         0 …e/jacobian_profile.jl   16 #quiet##2
+  6341         0 …e/jacobian_profile.jl   60 #main##10
+  6341         0 @vSmartMOM/…/CoreRT/rt_run_lin.jl   81 rt_run
+  6341         0 @vSmartMOM/…/CoreRT/rt_run_lin.jl   86 #rt_run#151
+  6341         0 @vSmartMOM/…/CoreRT/rt_run_lin.jl  138 rt_run
+  6371        42 [any unknown stackframes]
+ 19109         0 @juliasrc/gc-stock.c   3640 jl_parallel_gc_threadfun
+ 19146         0 /lib64/libc.so.6          ? clone
+ 19146         0 /lib64/libpthread.so.0    ? start_thread
+ 25528         0 @juliasrc/task.c       1263 start_task
+ 25528         0 @juliasrc/task.c        341 jl_finish_task
+ 25528         0 @julialib/julia/sys.so    ? jfptr_task_done_hook_59905.1
+ 25528         0 @Base/task.jl           868 task_done_hook(t::Task)
+ 25528         0 @Base/task.jl          1228 wait()
+ 25528         0 @Base/task.jl          1216 poptask(W::Base.IntrusiveLinkedLi…
+ 25528         0 @juliasrc/scheduler.c   523 ijl_task_get_next
+ 31869         1 @juliasrc/julia.h      2391 jl_apply
+ 44637         0 …buv/src/unix/thread.c  822 uv_cond_wait
+ 44637     44637 /lib64/libpthread.so.0    ? pthread_cond_wait
+Total snapshots: 51056. Utilization: 50% across all threads and tasks. Use the `groupby` kwarg to break down by thread and/or task.

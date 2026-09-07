@@ -1,0 +1,31 @@
+BENCH_BEGIN cpu-n64-t1
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:12[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:08[K
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:11[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:07[K
+MODEL nSpec=64 nLayers=5 operator=6 full_columns=14 selected_columns=4
+PARITY forward=5.204170427930421e-18 selected_radiance=0.0 selected_jacobian=0.0
+MEASURE cpu-n64-t1 build_forward median_seconds=0.004756784 median_host_bytes=6.329992e6 median_gc_seconds=0.0 samples=[(time = 0.00646851, bytes = 6329992, gctime = 0.0), (time = 0.004710406, bytes = 6329992, gctime = 0.0), (time = 0.004756784, bytes = 6329992, gctime = 0.0)]
+MEASURE cpu-n64-t1 build_full median_seconds=0.093825826 median_host_bytes=8.8837728e7 median_gc_seconds=0.0 samples=[(time = 0.104717315, bytes = 88837728, gctime = 0.0), (time = 0.093825826, bytes = 88837728, gctime = 0.0), (time = 0.090567359, bytes = 88837728, gctime = 0.0)]
+MEASURE cpu-n64-t1 build_fixed_microphysics median_seconds=0.007878563 median_host_bytes=7.82348e6 median_gc_seconds=0.0 samples=[(time = 0.007708153, bytes = 7823480, gctime = 0.0), (time = 0.008268176, bytes = 7823480, gctime = 0.0), (time = 0.007878563, bytes = 7823480, gctime = 0.0)]
+MEASURE cpu-n64-t1 solve_forward median_seconds=0.088803694 median_host_bytes=9.2675984e7 median_gc_seconds=0.0 samples=[(time = 0.098380972, bytes = 92676080, gctime = 0.0), (time = 0.087945771, bytes = 92675984, gctime = 0.0), (time = 0.088803694, bytes = 92675984, gctime = 0.0)]
+MEASURE cpu-n64-t1 solve_full median_seconds=1.567741513 median_host_bytes=1.549738336e9 median_gc_seconds=0.102183268 samples=[(time = 1.620713223, bytes = 1549738336, gctime = 0.109641874), (time = 1.567741513, bytes = 1549738336, gctime = 0.102183268), (time = 1.542200369, bytes = 1549738368, gctime = 0.088090976)]
+MEASURE cpu-n64-t1 solve_selected median_seconds=0.44991135 median_host_bytes=4.39607016e8 median_gc_seconds=0.01492603 samples=[(time = 0.447527867, bytes = 439607016, gctime = 0.013541016), (time = 0.508731971, bytes = 439606984, gctime = 0.01492603), (time = 0.44991135, bytes = 439607016, gctime = 0.015374854)]
+RATIO full_forward=17.65401237700765 full_selected=3.484556486516733
+TIMER_BREAKDOWN_FULL cpu-n64-t1
+───────────────────────────────────────────────────────────────────────────────────
+                                          Time                    Allocations
+                                 ───────────────────────   ────────────────────────
+        Tot / % measured:             3.97s /  40.7%           1.58GiB /  90.9%
+
+Section                  ncalls     time    %tot     avg     alloc    %tot      avg
+───────────────────────────────────────────────────────────────────────────────────
+doubling                     25    1.09s   67.4%  43.6ms    947MiB   64.2%  37.9MiB
+interaction                  25    361ms   22.3%  14.4ms    409MiB   27.7%  16.4MiB
+  interaction inv1           25   3.45ms    0.2%   138μs   5.76MiB    0.4%   236KiB
+  interaction inv2           25   3.45ms    0.2%   138μs   5.76MiB    0.4%   236KiB
+OpticalProps                 30    145ms    9.0%  4.82ms   95.9MiB    6.5%  3.20MiB
+elemental                    25   19.2ms    1.2%   770μs   12.4MiB    0.8%   506KiB
+Creating layers               3   2.29ms    0.1%   764μs   10.5MiB    0.7%  3.50MiB
+OpticalProps invariant        1    331μs    0.0%   331μs    231KiB    0.0%   231KiB
+Creating arrays               1   17.1μs    0.0%  17.1μs      832B    0.0%     832B
+───────────────────────────────────────────────────────────────────────────────────
+BENCH_DONE cpu-n64-t1

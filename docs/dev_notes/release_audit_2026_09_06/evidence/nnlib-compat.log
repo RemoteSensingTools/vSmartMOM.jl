@@ -1,0 +1,14 @@
+BEFORE_VSMARTMOM batched_mul shape=(2, 2, 3)
+AFTER_VSMARTMOM ERROR=AssertionError: batch dim mismatch: 3 vs 1
+Stacktrace:
+ [1] batched_mul(A::Array{Float64, 3}, B::Array{Float64, 3})
+   @ vSmartMOM.CoreRT /tmp/vsmartmom-release-review/src/CoreRT/tools/cpu_batched.jl:66
+ [2] top-level scope
+   @ /tmp/vsmartmom-release-evidence/nnlib_compat.jl:6
+ [3] include(mod::Module, _path::String)
+   @ Base ./Base.jl:306
+ [4] exec_options(opts::Base.JLOptions)
+   @ Base ./client.jl:317
+ [5] _start()
+   @ Base ./client.jl:550
+DISPATCH=batched_mul(A::Array{T, 3}, B::Array{T, 3}) where T<:Union{Float32, Float64, ComplexF64, ComplexF32} @ vSmartMOM.CoreRT /tmp/vsmartmom-release-review/src/CoreRT/tools/cpu_batched.jl:65

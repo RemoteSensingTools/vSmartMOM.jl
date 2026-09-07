@@ -1,0 +1,7 @@
+BENCH_BEGIN cpu-n512-t1
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:13[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:09[K
+GREEK_BETA shape=(5, 512) length=2560 angular_rows=5
+TABLE_BASE_BYTES actual=1887436800 corrected=7200
+CACHE_OFF median_seconds=0.459754861 median_host_bytes=4.16585944e8 samples=[(time = 0.440396336, bytes = 416588888, gctime = 0.029634864), (time = 0.459754861, bytes = 416585944, gctime = 0.025695497), (time = 0.476982078, bytes = 416585880, gctime = 0.025321094)]
+CACHE_PARITY R=0.0 T=0.0
+CACHE_PROBE_DONE cpu-n512-t1

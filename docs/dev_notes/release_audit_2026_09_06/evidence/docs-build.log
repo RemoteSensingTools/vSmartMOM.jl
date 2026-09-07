@@ -1,0 +1,96 @@
+Precompiling packages...
+    Makie Being precompiled by another process (pid: 2304133, pidfile: /home/cfranken/.julia/compiled/v1.12/Makie/iZ1Bl_BLbwW.ji.pidfile)
+  51512.0 ms  ✓ Makie
+    CairoMakie Being precompiled by another process (pid: 2304133, pidfile: /home/cfranken/.julia/compiled/v1.12/CairoMakie/9mSey_BLbwW.ji.pidfile)
+  55831.1 ms  ✓ CairoMakie
+  2 dependencies successfully precompiled in 108 seconds. 283 already precompiled.
+[ Info: generating markdown page from `/tmp/vsmartmom-release-review/docs/src/pages/tutorials/Tutorial_QuickStart.jl`
+[ Info: writing result to `/tmp/vsmartmom-release-review/docs/src/pages/tutorials/Tutorial_QuickStart.md`
+[ Info: generating markdown page from `/tmp/vsmartmom-release-review/docs/src/pages/tutorials/Tutorial_Absorption.jl`
+[ Info: writing result to `/tmp/vsmartmom-release-review/docs/src/pages/tutorials/Tutorial_Absorption.md`
+[ Info: generating markdown page from `/tmp/vsmartmom-release-review/docs/src/pages/tutorials/Tutorial_Scattering.jl`
+[ Info: writing result to `/tmp/vsmartmom-release-review/docs/src/pages/tutorials/Tutorial_Scattering.md`
+[ Info: generating markdown page from `/tmp/vsmartmom-release-review/docs/src/pages/tutorials/Tutorial_MieDeepDive.jl`
+[ Info: writing result to `/tmp/vsmartmom-release-review/docs/src/pages/tutorials/Tutorial_MieDeepDive.md`
+[ Info: generating markdown page from `/tmp/vsmartmom-release-review/docs/src/pages/tutorials/Tutorial_IO.jl`
+[ Info: writing result to `/tmp/vsmartmom-release-review/docs/src/pages/tutorials/Tutorial_IO.md`
+[ Info: generating markdown page from `/tmp/vsmartmom-release-review/docs/src/pages/tutorials/Tutorial_CoreRT.jl`
+[ Info: writing result to `/tmp/vsmartmom-release-review/docs/src/pages/tutorials/Tutorial_CoreRT.md`
+[ Info: generating markdown page from `/tmp/vsmartmom-release-review/docs/src/pages/tutorials/Tutorial_Surfaces.jl`
+[ Info: writing result to `/tmp/vsmartmom-release-review/docs/src/pages/tutorials/Tutorial_Surfaces.md`
+[ Info: generating markdown page from `/tmp/vsmartmom-release-review/docs/src/pages/tutorials/Tutorial_Canopy.jl`
+[ Info: writing result to `/tmp/vsmartmom-release-review/docs/src/pages/tutorials/Tutorial_Canopy.md`
+[ Info: generating markdown page from `/tmp/vsmartmom-release-review/docs/src/pages/tutorials/Tutorial_Jacobians.jl`
+[ Info: writing result to `/tmp/vsmartmom-release-review/docs/src/pages/tutorials/Tutorial_Jacobians.md`
+[ Info: generating markdown page from `/tmp/vsmartmom-release-review/docs/src/pages/tutorials/Tutorial_HybridAD.jl`
+[ Info: writing result to `/tmp/vsmartmom-release-review/docs/src/pages/tutorials/Tutorial_HybridAD.md`
+[ Info: SetupBuildDirectory: setting up build directory.
+[ Info: Doctest: running doctests.
+[ Info: ExpandTemplates: expanding markdown templates.
+┌ Error: no docs found for 'vSmartMOM.CoreRT.IntensityConvergence' in `@docs` block in src/pages/api/core_rt.md:17-36
+│ ```@docs
+│ vSmartMOM.AbstractRTModel
+│ vSmartMOM.RTModel
+│ vSmartMOM.SolverConfig
+│ vSmartMOM.Atmosphere
+│ vSmartMOM.RayleighScattering
+│ vSmartMOM.AerosolState
+│ vSmartMOM.Optics
+│ vSmartMOM.OpticsLin
+│ vSmartMOM.CoreRT.vSmartMOM_Parameters
+│ vSmartMOM.CoreRT.AtmosphericProfile
+│ vSmartMOM.CoreRT.ObsGeometry
+│ vSmartMOM.CoreRT.QuadPoints
+│ vSmartMOM.CoreRT.CompositeLayer
+│ vSmartMOM.CoreRT.AddedLayer
+│ vSmartMOM.CoreRT.RTNumericalParameters
+│ vSmartMOM.CoreRT.AbstractFourierConvergence
+│ vSmartMOM.CoreRT.AllFourierMoments
+│ vSmartMOM.CoreRT.IntensityConvergence
+│ ```
+└ @ Documenter ~/.julia/packages/Documenter/13nbQ/src/utilities/utilities.jl:47
+[ Info: CrossReferences: building cross-references.
+┌ Error: Cannot resolve @ref for md"[`IntensityConvergence`](@ref)" in src/pages/api/core_rt.md.
+│ - No docstring found in doc for binding `vSmartMOM.CoreRT.IntensityConvergence`.
+│ - No docstring found in doc for binding `vSmartMOM.CoreRT.IntensityConvergence`.
+└ @ Documenter ~/.julia/packages/Documenter/13nbQ/src/utilities/utilities.jl:47
+┌ Error: Cannot resolve @ref for md"[`StokesConvergence`](@ref)" in src/pages/api/core_rt.md.
+│ - No docstring found in doc for binding `vSmartMOM.CoreRT.StokesConvergence`.
+│ - No docstring found in doc for binding `vSmartMOM.CoreRT.StokesConvergence`.
+└ @ Documenter ~/.julia/packages/Documenter/13nbQ/src/utilities/utilities.jl:47
+┌ Error: Cannot resolve @ref for md"[`IntensityConvergence`](@ref vSmartMOM.CoreRT.IntensityConvergence)" in src/pages/api/core_rt.md.
+│ - No docstring found in doc for binding `vSmartMOM.CoreRT.IntensityConvergence`.
+└ @ Documenter ~/.julia/packages/Documenter/13nbQ/src/utilities/utilities.jl:47
+[ Info: CheckDocument: running document checks.
+[ Info: Populate: populating indices.
+ERROR: LoadError: `makedocs` encountered errors [:docs_block, :cross_references] -- terminating build before rendering.
+Stacktrace:
+  [1] error(s::String)
+    @ Base ./error.jl:44
+  [2] runner(::Type{Documenter.Builder.RenderDocument}, doc::Documenter.Document)
+    @ Documenter ~/.julia/packages/Documenter/13nbQ/src/builder_pipeline.jl:259
+  [3] dispatch(::Type{Documenter.Builder.DocumentPipeline}, x::Documenter.Document)
+    @ Documenter.Selectors ~/.julia/packages/Documenter/13nbQ/src/utilities/Selectors.jl:170
+  [4] #101
+    @ ~/.julia/packages/Documenter/13nbQ/src/makedocs.jl:283 [inlined]
+  [5] withenv(::Documenter.var"#101#102"{Documenter.Document}, ::Pair{String, Nothing}, ::Vararg{Pair{String, Nothing}})
+    @ Base ./env.jl:265
+  [6] #99
+    @ ~/.julia/packages/Documenter/13nbQ/src/makedocs.jl:282 [inlined]
+  [7] cd(f::Documenter.var"#99#100"{Documenter.Document}, dir::String)
+    @ Base.Filesystem ./file.jl:112
+  [8] makedocs(; debug::Bool, format::MarkdownVitepress, kwargs::@Kwargs{sitename::String, clean::Bool, modules::Vector{Module}, pages::Vector{Any}, checkdocs::Symbol})
+    @ Documenter ~/.julia/packages/Documenter/13nbQ/src/makedocs.jl:281
+  [9] makedocs
+    @ ~/.julia/packages/Documenter/13nbQ/src/makedocs.jl:274 [inlined]
+ [10] build()
+    @ Main /tmp/vsmartmom-release-review/docs/make.jl:697
+ [11] top-level scope
+    @ /tmp/vsmartmom-release-review/docs/make.jl:711
+ [12] include(mod::Module, _path::String)
+    @ Base ./Base.jl:306
+ [13] exec_options(opts::Base.JLOptions)
+    @ Base ./client.jl:317
+ [14] _start()
+    @ Base ./client.jl:550
+in expression starting at /tmp/vsmartmom-release-review/docs/make.jl:711

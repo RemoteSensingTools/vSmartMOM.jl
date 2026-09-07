@@ -1,0 +1,41 @@
+BENCH_BEGIN cpu-n512-t1
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:14[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:09[K
+FORWARD_TIMER_DIAGNOSTIC cpu-n512-t1
+───────────────────────────────────────────────────────────────────────────────────────
+                                              Time                    Allocations
+                                     ───────────────────────   ────────────────────────
+          Tot / % measured:               4.54s /  93.0%           2.76GiB /  99.1%
+
+Section                      ncalls     time    %tot     avg     alloc    %tot      avg
+───────────────────────────────────────────────────────────────────────────────────────
+CacheInit                         1    3.14s   74.3%   3.14s   2.35GiB   85.8%  2.35GiB
+RT Kernel                        25    1.06s   25.2%  42.6ms    369MiB   13.2%  14.7MiB
+  doubling                       25    979ms   23.2%  39.2ms    296MiB   10.6%  11.8MiB
+    Batch Inv Doubling          165    872ms   20.6%  5.28ms    296MiB   10.6%  1.79MiB
+    rt_update                   165   57.1ms    1.4%   346μs     0.00B    0.0%    0.00B
+    source_update               165   49.1ms    1.2%   298μs     0.00B    0.0%    0.00B
+    apply_D_matrix               25    425μs    0.0%  17.0μs     0.00B    0.0%    0.00B
+    source_update_by_src        165   45.6μs    0.0%   277ns     0.00B    0.0%    0.00B
+    sync_doubling                25   11.8μs    0.0%   470ns     0.00B    0.0%    0.00B
+    doubling_allocs              25   5.87μs    0.0%   235ns     0.00B    0.0%    0.00B
+  interaction                    20   63.1ms    1.5%  3.16ms   71.7MiB    2.6%  3.59MiB
+    interaction inv2             20   16.8ms    0.4%   839μs   35.9MiB    1.3%  1.79MiB
+    interaction inv1 bla         20   16.8ms    0.4%   838μs   35.9MiB    1.3%  1.79MiB
+  elemental                      25   21.8ms    0.5%   873μs    248KiB    0.0%  9.94KiB
+  volume_source                  25    791ns    0.0%  31.6ns     0.00B    0.0%    0.00B
+interaction                       5   10.2ms    0.2%  2.04ms   5.97MiB    0.2%  1.19MiB
+  interaction inv2                5   1.52ms    0.0%   303μs   2.98MiB    0.1%   611KiB
+  interaction inv1 bla            5   1.51ms    0.0%   302μs   2.98MiB    0.1%   611KiB
+OpticalProps                     30   6.84ms    0.2%   228μs   16.1MiB    0.6%   550KiB
+Creating layers                   3   3.40ms    0.1%  1.13ms   5.73MiB    0.2%  1.91MiB
+Create Surface                    5    722μs    0.0%   144μs    228KiB    0.0%  45.5KiB
+interaction_HDRF                  5    672μs    0.0%   134μs    246KiB    0.0%  49.2KiB
+Extract Optical Properties        1    255μs    0.0%   255μs   85.5KiB    0.0%  85.5KiB
+Postprocessing VZA                5    252μs    0.0%  50.4μs   93.8KiB    0.0%  18.8KiB
+Postprocessing HDRF               5   58.5μs    0.0%  11.7μs   48.0KiB    0.0%  9.59KiB
+Arrays                            9   34.9μs    0.0%  3.87μs   65.1KiB    0.0%  7.23KiB
+Creating arrays                   1   14.6μs    0.0%  14.6μs      672B    0.0%     672B
+IE                                5   3.07μs    0.0%   613ns      560B    0.0%     112B
+Expand Bands                     25   1.03μs    0.0%  41.2ns     0.00B    0.0%    0.00B
+───────────────────────────────────────────────────────────────────────────────────────
+FORWARD_DIAGNOSTIC_DONE cpu-n512-t1

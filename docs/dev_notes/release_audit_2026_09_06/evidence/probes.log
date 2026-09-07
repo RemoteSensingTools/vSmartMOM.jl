@@ -1,0 +1,85 @@
+
+AUDIT_PROBE_BEGIN quickstart and documented external-solar default
+quickstart R=[0.02848592913380708;;;] T=[0.1557755644589617;;;] external_solar=false
+default model rt_run_toa: ArgumentError: rt_run_toa requires QuadPoints.external_solar=true
+explicit external TOA finite=true R=[0.02848592913380708;;;]
+AUDIT_PROBE_COMPLETE quickstart and documented external-solar default
+
+AUDIT_PROBE_BEGIN Cox-Munk source linearity
+R1=[0.016614814273431693 0.024388368372927117 0.0;;;] R2=[0.028891389143558904 0.021281216251889185 0.0;;;] dark R0=[0.004338239403304484 0.02749552049396505 0.0;;;]
+solar doubling relative defect=0.5637015169183499
+AUDIT_PROBE_COMPLETE Cox-Munk source linearity
+
+AUDIT_PROBE_BEGIN reference-index forward/linearized optics parity
+AOD forward=[0.014582932937055197, 0.014596937480825217, 0.014610942024595237, 0.014624946568365264] lin=[0.040000000000000036, 0.040038413517583825, 0.04007682703516762, 0.04011524055275142] fixed_microphysics=[0.014582932937055197, 0.014596937480825217, 0.014610942024595237, 0.014624946568365264]
+AOD relative defect=1.7429324521105163
+radiance relative defect=0.04065425569305324
+AUDIT_PROBE_COMPLETE reference-index forward/linearized optics parity
+
+AUDIT_PROBE_BEGIN README ocean linearized snippet
+scattering_params=nothing
+AUDIT_PROBE_ERROR README ocean linearized snippet FieldError: type Nothing has no field `rt_aerosols`; Nothing has no fields at all.
+Stacktrace:
+ [1] getproperty
+   @ ./Base_compiler.jl:54 [inlined]
+ [2] (::var"#11#12")()
+   @ Main /tmp/vsmartmom-release-evidence/probes.jl:63
+ [3] probe(f::var"#11#12", name::String)
+   @ Main /tmp/vsmartmom-release-evidence/probes.jl:8
+ [4] top-level scope
+   @ /tmp/vsmartmom-release-evidence/probes.jl:60
+ [5] include(mod::Module, _path::String)
+   @ Base ./Base.jl:306
+ [6] exec_options(opts::Base.JLOptions)
+   @ Base ./client.jl:317
+ [7] _start()
+   @ Base ./client.jl:550
+
+AUDIT_PROBE_BEGIN retired delta-BGE angle
+requested angle=2.0; actual=0.0
+AUDIT_PROBE_COMPLETE retired delta-BGE angle
+Precompiling packages...
+    AtmosphericAbsorption → AtmosphericAbsorptionCUDAExt Being precompiled by another process (pid: 2305236, pidfile: /home/cfranken/.julia/compiled/v1.12/AtmosphericAbsorptionCUDAExt/1LyFZ_BLbwW.ji.pidfile)
+    NNlib → NNlibCUDAExt Being precompiled by another process (pid: 2305236, pidfile: /home/cfranken/.julia/compiled/v1.12/NNlibCUDAExt/Ieugx_BLbwW.ji.pidfile)
+   4754.6 ms  ✓ NNlib → NNlibCUDAExt
+   5487.3 ms  ✓ AtmosphericAbsorption → AtmosphericAbsorptionCUDAExt
+    vSmartMOM Being precompiled by another process (pid: 2305236, pidfile: /home/cfranken/.julia/compiled/v1.12/vSmartMOM/bplNx_BLbwW.ji.pidfile)
+  53724.0 ms  ✓ vSmartMOM
+    vSmartMOM → vSmartMOMCUDAExt Being precompiled by another process (pid: 2305236, pidfile: /home/cfranken/.julia/compiled/v1.12/vSmartMOMCUDAExt/55o5k_BLbwW.ji.pidfile)
+  13080.4 ms  ✓ vSmartMOM → vSmartMOMCUDAExt
+  4 dependencies successfully precompiled in 74 seconds. 272 already precompiled.
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (3, 3, 1)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (3, 3, 1)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (12, 12, 1)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (12, 12, 1)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (12, 12, 1)
+┌ Warning: Aerosol configuration omits `radiative_transfer.greek_beta_cutoff`. Update this input file for the two-stage Greek-beta support rule: set `greek_beta_cutoff: 1.0e-5` (or another validated positive threshold) to discard insignificant high-l beta tails, or set `greek_beta_cutoff: null` to explicitly retain the full Mie-series support. Omission remains equivalent to `null` for backward compatibility.
+└ @ vSmartMOM.IO /tmp/vsmartmom-release-review/src/IO/Parameters.jl:677
+[ Info: truncation: auto → δBGE(stream_l_cap=5, Δ_angle=0.0) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)
+[ Info: truncation: auto → δBGE(stream_l_cap=5, Δ_angle=0.0) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)
+[ Info: truncation: auto → δBGE(stream_l_cap=5, Δ_angle=0.0) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (6, 6, 4)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (6, 6, 4)
+┌ Warning: δBGE's Δ_angle is retired and forced to 0 — the fit always uses the full angular domain (a non-zero cone was never honoured by the linearized path).
+└ @ vSmartMOM.Scattering /tmp/vsmartmom-release-review/src/Scattering/types.jl:292

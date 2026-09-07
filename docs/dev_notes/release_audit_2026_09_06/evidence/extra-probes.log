@@ -1,0 +1,14 @@
+┌ Warning: Aerosol configuration omits `radiative_transfer.greek_beta_cutoff`. Update this input file for the two-stage Greek-beta support rule: set `greek_beta_cutoff: 1.0e-5` (or another validated positive threshold) to discard insignificant high-l beta tails, or set `greek_beta_cutoff: null` to explicitly retain the full Mie-series support. Omission remains equivalent to `null` for backward compatibility.
+└ @ vSmartMOM.IO /tmp/vsmartmom-release-review/src/IO/Parameters.jl:677
+[ Info: truncation: auto → δBGE(stream_l_cap=5, Δ_angle=0.0) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)
+[ Info: truncation: auto → δBGE(stream_l_cap=5, Δ_angle=0.0) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:12[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:08[K
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:10[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:07[K
+DEFAULT_MULTI_AER n_ref=1.3 - 1.0e-8im
+AOD_FWD=[0.040000000000000036 0.040038413517583825 0.04007682703516762 0.04011524055275142; 0.10971730066954853 0.10981244329868045 0.10990758592781233 0.11000272855694422;;;]
+AOD_LIN=[0.040000000000000036 0.040038413517583825 0.04007682703516762 0.04011524055275142; 0.040000000000000036 0.04003468646368492 0.04006937292736976 0.04010405939105464;;;]
+MULTI_AER_RADIANCE_RELATIVE_DEFECT=0.13268858985770174
+SAME_MODEL_FWD_LIN_RELATIVE_DEFECT=2.3631406554337843e-16
+JACOBIAN_SHAPE=(2, 1, 4, 21)
+FORWARD_SECONDS=[0.012379289, 0.01014072, 0.010414134] LINEARIZED_SECONDS=[1.417953386, 1.438293887, 1.435511484]
+WARM_SOLVE_RATIO=137.84261696651876
