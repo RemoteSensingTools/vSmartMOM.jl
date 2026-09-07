@@ -1,0 +1,65 @@
+{
+  "implementation_commit": "27cc1c1d6fa2912daab3b147eb300e533ce375d7",
+  "cpu_full": {
+    "passed": 12429,
+    "failed": 1,
+    "errored": 1,
+    "skipped": 14,
+    "log": "cpu-release.log"
+  },
+  "cpu_corrected_groups": {
+    "passed": 96,
+    "failed": 0,
+    "log": "cpu-harness-corrections.log"
+  },
+  "cpu_combined": {
+    "passed": 12441,
+    "skipped": 14,
+    "scope": "Unaffected full-suite groups plus corrected groups; not a single post-fix full-suite run"
+  },
+  "gpu": {
+    "passed": 20301,
+    "failed": 0,
+    "log": "gpu-release.log"
+  },
+  "workflow_extended": {
+    "passed": 1139,
+    "failed": 0,
+    "log": "workflow-complete.log"
+  },
+  "workflow_portable": {
+    "passed": 120,
+    "skipped": 14
+  },
+  "readme": {
+    "passed": 7
+  },
+  "api": {
+    "exports": 475,
+    "registered_docstrings": 999,
+    "failures": 0
+  },
+  "ambiguities": {
+    "julia_110": 0,
+    "julia_112": 0
+  },
+  "schema": {
+    "scenes": 74,
+    "cases": 11
+  },
+  "taplo": {
+    "version": "0.10.0",
+    "lint": "passed",
+    "format": "passed"
+  },
+  "docs": {
+    "strict_build": "passed",
+    "npm_vulnerabilities": 0
+  },
+  "jet": {
+    "findings": 285,
+    "historical_baseline": 232,
+    "strict_baseline_met": false
+  },
+  "publication": "not performed"
+}

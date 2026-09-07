@@ -11,8 +11,9 @@ It removes misleading placeholder aerosol optics and adds pinned Taplo, scene
 schema/parser checks, export/docstring inventories, and executable README checks.
 
 Validation details and limits: [release validation](release_validation_2026-09-07.md).
-The exact CPU/CUDA totals in that record must be final before opening this PR.
-The hosted platform matrix should then run on the PR tip.
+CUDA passed 20,301/20,301. The full CPU run passed 12,429 assertions and exposed
+two harness defects; their corrected groups passed 96/96 with the conflicting
+imports reproduced. The complete hosted platform matrix must run on the PR tip.
 
 Merge with a merge commit to preserve the scientific-author records. Version
 2.2.0 preserves the existing 2.1.0 tag; registration requires the package-author

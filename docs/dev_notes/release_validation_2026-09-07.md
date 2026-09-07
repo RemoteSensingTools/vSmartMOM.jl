@@ -1,6 +1,6 @@
 # v2.2.0 candidate validation — 2026-09-07
 
-**Status: final CPU run in progress; CUDA and the other local gates pass. Nothing has been published.**
+**Status: integration and local validation complete; final hosted CI and publication gates remain. Nothing has been published.**
 
 Worktree: `vSmartMOM-release`; branch: `integration/release-candidate`.
 This record supersedes the defect status in the September 6 audit of `b524a0d8`.
@@ -16,7 +16,7 @@ credit. Eight later Suniti workflow commits were ported with author metadata int
 | Fresh Julia 1.10.12 resolution/install | Passed; no copied Manifest. Shipped quickstart forward RT finite. Shared depot/artifact cache used. |
 | Fresh Julia 1.12.6 resolution/install | Passed; no copied Manifest. Shipped quickstart analytic Jacobians finite. Shared depot/artifact cache used. |
 | Registered dependencies | Both resolve AtmosphericAbsorption 0.1.2, CanopyOptics 0.2.0, CUDA 5.11.3; only vSmartMOM is developed from the local candidate. |
-| Complete CPU suite, optional Raman enabled | Final run pending (`cpu-release.log`). |
+| Complete CPU suite, optional Raman enabled | Full run: **12,429 passed, 1 failed, 1 errored, 14 skipped** in 25m10.9s. Both issues were test-harness defects (ambiguous CPU import and obsolete Taplo scope assertion). After test-only fixes, the affected groups passed **96/96**, reproducing the conflicting imports. No complete post-fix CPU rerun was performed; hosted CI must confirm the final tip. Combining the unaffected groups and corrected groups covers 12,441 passing assertions and 14 skips. |
 | Complete CUDA runner | Final shipped runner passed **20,301/20,301** in 7m13.2s, including new no-pointer inverse dispatch coverage (`gpu-release.log`). |
 | Cox–Munk exact/source/Jacobian contracts | 10/10 CPU and 10/10 CUDA. Checks exact pure-absorption radiance, whitecap/Lambertian normalization, incident-source scaling, dark source, cache replay, forward/linearized parity, and wind/optical-depth finite differences. |
 | Scene schema | 74 YAML/TOML scenes plus 11 positive/negative contract cases passed. Includes public and local/data-dependent scene structure; no external spectroscopy is loaded by this check. |
@@ -73,8 +73,11 @@ not new end-to-end measurements from this release-validation pass.
 - The exact final candidate still needs the hosted Julia 1.10/1.11/1.12 ×
   Linux/macOS/Windows CI matrix. Earlier base-commit CI is historical evidence,
   not validation of this tip. Metal device execution was unavailable locally.
-- JET is advisory by default; the historical strict baseline is not a release
-  pass. Do not describe a passing default suite as clean static analysis.
+- JET reports **285 findings versus its historical baseline of 232** in this
+  environment. It is advisory by default; the strict baseline is not met.
+  Counts vary with Julia/JET versions, so the difference is not automatically
+  53 new runtime defects. Do not describe a passing default suite as clean
+  static analysis.
 - General's latest registered version was 1.1.0 when checked. Existing public
   `v2.1.0` is preserved; 2.2.0 skips the registry's sequential-version
   guideline. RegistryCI supports a package-author approval override; otherwise
@@ -108,7 +111,10 @@ the later evidence-only commit changes no numerical code.
 
 The first CPU attempt exposed an obsolete exact-error-message assertion. A
 subsequent run was superseded when dispatch fixes enabled Aqua ambiguity checks;
-`cpu-release.log` is the authoritative final run. An initial combined CUDA no-pointer overload passed Julia 1.12 static detection
+`cpu-release.log` records the completed full run;
+`cpu-harness-corrections.log` records the subsequent 96/96 affected-group rerun.
+The two failing/erroring groups are superseded by this focused rerun, not
+represented as an originally successful full-suite process. An initial combined CUDA no-pointer overload passed Julia 1.12 static detection
 but failed its direct GPU regression and Julia 1.10 static detection; separate
 Float32/Float64 overloads fixed it. Earlier workflow harness
 attempts failed on missing private inputs and relocated paths; only the final

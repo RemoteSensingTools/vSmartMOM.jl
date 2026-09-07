@@ -1,6 +1,7 @@
 # Release consolidation — working record, 2026-09-07
 
-Status: preparation in progress; this is not a release-readiness sign-off.
+Status: local integration and validation complete. Final hosted CI and
+publication checks remain; see the validation record below.
 The isolated branch `integration/release-candidate` was created from `0540d37a`,
 including the integration base `b524a0d8` and subsequent Jacobian optimization,
 correctness, convergence, convolution, and precision investigations.

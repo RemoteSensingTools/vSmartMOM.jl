@@ -1,0 +1,2 @@
+Test Summary:                         | Pass  Total     Time
+Portable retrieval workflow contracts | 1139   1139  1m59.3s
