@@ -127,7 +127,8 @@ there is no universal ratio to the forward-only runtime.
 The batched propagation path evaluates product-rule terms across wavelength
 and parameter together. It fuses ``\dot{A}B+A\dot{B}`` on supported small GPU
 operators and reuses scratch arrays through doubling and general layer
-interaction. Larger GPU operators retain the reference BLAS path until their
+interaction. Embedded-solar Lambertian source tangents also batch all
+wavelengths and parameters into matrix products. Larger GPU operators retain the reference BLAS path until their
 performance is validated. CPU propagation uses in-place BLAS products.
 Selecting only the retrieval's requested Jacobian columns avoids propagating
 unneeded derivatives through either path.

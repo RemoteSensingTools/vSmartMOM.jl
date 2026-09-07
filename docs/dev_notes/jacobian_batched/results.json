@@ -1,0 +1,275 @@
+{
+  "benchmark-cpu-n64.log": {
+    "model": "MODEL backend=cpu nSpec=64 operator=6 full_columns=14 selected_columns=4",
+    "measurements": [
+      {
+        "enabled": false,
+        "kind": "full",
+        "seconds": 1.529757786,
+        "host_bytes": 1553430304.0
+      },
+      {
+        "enabled": false,
+        "kind": "selected",
+        "seconds": 0.409885192,
+        "host_bytes": 440841160.0
+      },
+      {
+        "enabled": true,
+        "kind": "full",
+        "seconds": 1.033958836,
+        "host_bytes": 181014376.0
+      },
+      {
+        "enabled": true,
+        "kind": "selected",
+        "seconds": 0.265804497,
+        "host_bytes": 75080864.0
+      }
+    ],
+    "parity": "PARITY R=0.0 T=0.0 dR=1.3877787807814457e-17 dT=1.6653345369377348e-16 forward_R=5.204170427930421e-18",
+    "stage": "batched propagation, before Lambertian source batching"
+  },
+  "benchmark-cuda-n64.log": {
+    "model": "MODEL backend=cuda nSpec=64 operator=6 full_columns=14 selected_columns=4",
+    "measurements": [
+      {
+        "enabled": false,
+        "kind": "full",
+        "seconds": 2.918051265,
+        "host_bytes": 263965952.0
+      },
+      {
+        "enabled": false,
+        "kind": "selected",
+        "seconds": 0.810586485,
+        "host_bytes": 68942760.0
+      },
+      {
+        "enabled": true,
+        "kind": "full",
+        "seconds": 0.428551946,
+        "host_bytes": 73448688.0
+      },
+      {
+        "enabled": true,
+        "kind": "selected",
+        "seconds": 0.25024655,
+        "host_bytes": 28560408.0
+      }
+    ],
+    "parity": "PARITY R=3.469446951953614e-18 T=6.938893903907228e-18 dR=5.551115123125783e-17 dT=2.220446049250313e-16 forward_R=3.2959746043559335e-17",
+    "stage": "batched propagation, before Lambertian source batching"
+  },
+  "benchmark-cuda-n512.log": {
+    "model": "MODEL backend=cuda nSpec=512 operator=6 full_columns=14 selected_columns=4",
+    "measurements": [
+      {
+        "enabled": false,
+        "kind": "full",
+        "seconds": 3.564614307,
+        "host_bytes": 429553000.0
+      },
+      {
+        "enabled": false,
+        "kind": "selected",
+        "seconds": 0.893223513,
+        "host_bytes": 98092760.0
+      },
+      {
+        "enabled": true,
+        "kind": "full",
+        "seconds": 0.762937966,
+        "host_bytes": 232920888.0
+      },
+      {
+        "enabled": true,
+        "kind": "selected",
+        "seconds": 0.342085662,
+        "host_bytes": 57070792.0
+      }
+    ],
+    "parity": "PARITY R=5.204170427930421e-18 T=1.0408340855860843e-17 dR=5.551115123125783e-17 dT=4.440892098500626e-16 forward_R=5.551115123125783e-17",
+    "stage": "batched propagation, before Lambertian source batching"
+  },
+  "benchmark-cpu-iqu.log": {
+    "model": "MODEL backend=cpu nSpec=64 operator=18 full_columns=14 selected_columns=4",
+    "measurements": [
+      {
+        "enabled": false,
+        "kind": "full",
+        "seconds": 7.697103617,
+        "host_bytes": 12591716840.0
+      },
+      {
+        "enabled": false,
+        "kind": "selected",
+        "seconds": 1.45055577,
+        "host_bytes": 3416148928.0
+      },
+      {
+        "enabled": true,
+        "kind": "full",
+        "seconds": 3.931980957,
+        "host_bytes": 1118430480.0
+      },
+      {
+        "enabled": true,
+        "kind": "selected",
+        "seconds": 1.036344711,
+        "host_bytes": 365952696.0
+      }
+    ],
+    "parity": "PARITY R=0.0 T=0.0 dR=1.3877787807814457e-17 dT=2.7755575615628914e-16 forward_R=5.204170427930421e-18",
+    "stage": "batched propagation, before Lambertian source batching"
+  },
+  "benchmark-cuda-iqu.log": {
+    "model": "MODEL backend=cuda nSpec=64 operator=18 full_columns=14 selected_columns=4",
+    "measurements": [
+      {
+        "enabled": false,
+        "kind": "full",
+        "seconds": 3.330213968,
+        "host_bytes": 440815448.0
+      },
+      {
+        "enabled": false,
+        "kind": "selected",
+        "seconds": 0.83387149,
+        "host_bytes": 92945952.0
+      },
+      {
+        "enabled": true,
+        "kind": "full",
+        "seconds": 0.593374706,
+        "host_bytes": 246256376.0
+      },
+      {
+        "enabled": true,
+        "kind": "selected",
+        "seconds": 0.255584209,
+        "host_bytes": 52040736.0
+      }
+    ],
+    "parity": "PARITY R=5.204170427930421e-18 T=6.938893903907228e-18 dR=5.551115123125783e-17 dT=2.220446049250313e-16 forward_R=4.85722573273506e-17",
+    "stage": "batched propagation, before Lambertian source batching"
+  },
+  "benchmark-cuda-n10000.log": {
+    "model": "MODEL backend=cuda nSpec=10000 operator=6 full_columns=14 selected_columns=4",
+    "measurements": [
+      {
+        "enabled": false,
+        "kind": "full",
+        "seconds": 16.716343587,
+        "host_bytes": 3819167976.0,
+        "gpu_bytes": 223740120486.0
+      },
+      {
+        "enabled": false,
+        "kind": "selected",
+        "seconds": 4.263098872,
+        "host_bytes": 697736392.0,
+        "gpu_bytes": 59209893476.0
+      },
+      {
+        "enabled": true,
+        "kind": "full",
+        "seconds": 10.461651525,
+        "host_bytes": 3622534248.0,
+        "gpu_bytes": 14411254886.0
+      },
+      {
+        "enabled": true,
+        "kind": "selected",
+        "seconds": 2.734513936,
+        "host_bytes": 654933944.0,
+        "gpu_bytes": 3417683876.0
+      }
+    ],
+    "parity": "PARITY R=6.938893903907228e-18 T=1.3877787807814457e-17 dR=8.326672684688674e-17 dT=4.440892098500626e-16 forward_R=5.377642775528102e-17",
+    "forward_seconds": 0.154860012,
+    "stage": "batched propagation, before Lambertian source batching"
+  },
+  "benchmark-cuda-iqu-n10000.log": {
+    "model": "MODEL backend=cuda nSpec=10000 operator=18 full_columns=14 selected_columns=4",
+    "measurements": [
+      {
+        "enabled": false,
+        "kind": "full",
+        "seconds": 38.2678245,
+        "host_bytes": 26578660632.0,
+        "gpu_bytes": 1911633131014.0
+      },
+      {
+        "enabled": false,
+        "kind": "selected",
+        "seconds": 8.163754543,
+        "host_bytes": 3837571952.0,
+        "gpu_bytes": 503093534404.0
+      },
+      {
+        "enabled": true,
+        "kind": "full",
+        "seconds": 25.767834234,
+        "host_bytes": 26380151120.0,
+        "gpu_bytes": 121985865414.0
+      },
+      {
+        "enabled": true,
+        "kind": "selected",
+        "seconds": 6.487683074,
+        "host_bytes": 3795776896.0,
+        "gpu_bytes": 27382924804.0
+      }
+    ],
+    "parity": "PARITY R=6.938893903907228e-18 T=1.3877787807814457e-17 dR=8.326672684688674e-17 dT=3.885780586188048e-16 forward_R=6.938893903907228e-17",
+    "forward_seconds": 0.80078693,
+    "stage": "batched propagation, before Lambertian source batching"
+  },
+  "benchmark-final-cuda-n10000.log": {
+    "stage": "batched propagation and Lambertian source tangents",
+    "reference_measurements": "benchmark-cuda-n10000.log",
+    "model": "MODEL backend=cuda nSpec=10000 operator=6 full_columns=14 selected_columns=4",
+    "measurements": [
+      {
+        "enabled": true,
+        "kind": "full",
+        "seconds": 1.816357518,
+        "host_bytes": 3126715400.0,
+        "gpu_bytes": 14396054918.0
+      },
+      {
+        "enabled": true,
+        "kind": "selected",
+        "seconds": 0.512796306,
+        "host_bytes": 514461400.0,
+        "gpu_bytes": 3413683908.0
+      }
+    ],
+    "parity": "PARITY R=6.938893903907228e-18 T=1.3877787807814457e-17 dR=8.326672684688674e-17 dT=4.440892098500626e-16 forward_R=5.377642775528102e-17",
+    "forward_seconds": 0.136243754
+  },
+  "benchmark-final-cuda-iqu-n10000.log": {
+    "stage": "batched propagation and Lambertian source tangents",
+    "reference_measurements": "benchmark-cuda-iqu-n10000.log",
+    "model": "MODEL backend=cuda nSpec=10000 operator=18 full_columns=14 selected_columns=4",
+    "measurements": [
+      {
+        "enabled": true,
+        "kind": "full",
+        "seconds": 16.441107792,
+        "host_bytes": 25884223856.0,
+        "gpu_bytes": 121944745446.0
+      },
+      {
+        "enabled": true,
+        "kind": "selected",
+        "seconds": 4.118935922,
+        "host_bytes": 3654135712.0,
+        "gpu_bytes": 27372204836.0
+      }
+    ],
+    "parity": "PARITY R=6.938893903907228e-18 T=1.3877787807814457e-17 dR=8.326672684688674e-17 dT=3.885780586188048e-16 forward_R=6.938893903907228e-17",
+    "forward_seconds": 0.636329893
+  }
+}

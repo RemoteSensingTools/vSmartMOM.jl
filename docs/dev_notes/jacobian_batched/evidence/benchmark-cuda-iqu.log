@@ -1,0 +1,12 @@
+BENCH_BEGIN cuda-n64-t4
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:35[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:23[K
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:06[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:04[K
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:10[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:06[K
+MODEL backend=cuda nSpec=64 operator=18 full_columns=14 selected_columns=4
+PARITY R=5.204170427930421e-18 T=6.938893903907228e-18 dR=5.551115123125783e-17 dT=2.220446049250313e-16 forward_R=4.85722573273506e-17
+MEASURE enabled=false kind=full median_seconds=3.330213968 median_bytes=4.40815448e8 samples=[(time = 3.488015919, bytes = 441164344, gctime = 0.071605837), (time = 3.269452131, bytes = 440607576, gctime = 0.06276327), (time = 3.330213968, bytes = 440815448, gctime = 0.070762522)]
+MEASURE enabled=false kind=selected median_seconds=0.83387149 median_bytes=9.2945952e7 samples=[(time = 0.828094971, bytes = 93773496, gctime = 0.0), (time = 0.839821316, bytes = 92945952, gctime = 0.0), (time = 0.83387149, bytes = 92938688, gctime = 0.0)]
+MEASURE enabled=true kind=full median_seconds=0.593374706 median_bytes=2.46256376e8 samples=[(time = 0.621077197, bytes = 246647784, gctime = 0.026200026), (time = 0.593374706, bytes = 246256376, gctime = 0.0), (time = 0.577404662, bytes = 246186616, gctime = 0.0)]
+MEASURE enabled=true kind=selected median_seconds=0.255584209 median_bytes=5.2040736e7 samples=[(time = 0.254248057, bytes = 52288144, gctime = 0.0), (time = 0.255584209, bytes = 52040736, gctime = 0.0), (time = 0.25711098, bytes = 52040144, gctime = 0.0)]
+FORWARD median_seconds=0.072952875
+BENCH_DONE cuda-n64-t4

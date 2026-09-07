@@ -1,0 +1,12 @@
+BENCH_BEGIN cpu-n64-t1
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:18[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:12[K
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:06[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:03[K
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:05[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:03[K
+MODEL backend=cpu nSpec=64 operator=6 full_columns=14 selected_columns=4
+PARITY R=0.0 T=0.0 dR=1.3877787807814457e-17 dT=1.6653345369377348e-16 forward_R=5.204170427930421e-18
+MEASURE enabled=false kind=full median_seconds=1.529757786 median_bytes=1.553430304e9 samples=[(time = 1.672560469, bytes = 1553430432, gctime = 0.103348341), (time = 1.529757786, bytes = 1553430304, gctime = 0.085757492), (time = 1.482572078, bytes = 1553430144, gctime = 0.067186805)]
+MEASURE enabled=false kind=selected median_seconds=0.409885192 median_bytes=4.4084116e8 samples=[(time = 0.403374003, bytes = 440841128, gctime = 0.013601177), (time = 0.409885192, bytes = 440841160, gctime = 0.014286906), (time = 0.41916656, bytes = 440841160, gctime = 0.014321391)]
+MEASURE enabled=true kind=full median_seconds=1.033958836 median_bytes=1.81014376e8 samples=[(time = 1.033958836, bytes = 181014376, gctime = 0.0), (time = 1.053410521, bytes = 181014376, gctime = 0.0), (time = 1.01651161, bytes = 181014376, gctime = 0.0)]
+MEASURE enabled=true kind=selected median_seconds=0.265804497 median_bytes=7.5080864e7 samples=[(time = 0.264858869, bytes = 75080864, gctime = 0.0), (time = 0.287145793, bytes = 75080864, gctime = 0.0), (time = 0.265804497, bytes = 75080864, gctime = 0.0)]
+FORWARD median_seconds=0.051558877
+BENCH_DONE cpu-n64-t1

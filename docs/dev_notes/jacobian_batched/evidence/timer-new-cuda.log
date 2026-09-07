@@ -1,0 +1,22 @@
+BENCH_BEGIN cuda-n64-t4
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:33[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:21[K
+───────────────────────────────────────────────────────────────────────────────────
+                                          Time                    Allocations
+                                 ───────────────────────   ────────────────────────
+        Tot / % measured:             801ms /  40.5%           94.8MiB /  65.9%
+
+Section                  ncalls     time    %tot     avg     alloc    %tot      avg
+───────────────────────────────────────────────────────────────────────────────────
+OpticalProps                 30    160ms   49.3%  5.33ms   39.7MiB   63.6%  1.32MiB
+doubling                     25    122ms   37.5%  4.87ms   13.6MiB   21.7%   556KiB
+  getri_strided             165   4.74ms    1.5%  28.7μs    444KiB    0.7%  2.69KiB
+  getrf_strided             165   4.02ms    1.2%  24.4μs    289KiB    0.5%  1.75KiB
+interaction                  25   24.6ms    7.6%   986μs   2.56MiB    4.1%   105KiB
+  getri_strided              50   1.39ms    0.4%  27.8μs    134KiB    0.2%  2.69KiB
+  getrf_strided              50   1.12ms    0.3%  22.4μs   87.8KiB    0.1%  1.76KiB
+elemental                    25   13.3ms    4.1%   532μs   1.09MiB    1.7%  44.7KiB
+Creating layers               3   2.78ms    0.9%   927μs   5.30MiB    8.5%  1.77MiB
+OpticalProps invariant        1   1.77ms    0.5%  1.77ms    254KiB    0.4%   254KiB
+Creating arrays               1    205μs    0.1%   205μs   4.30KiB    0.0%  4.30KiB
+───────────────────────────────────────────────────────────────────────────────────
+TIMER_DONE

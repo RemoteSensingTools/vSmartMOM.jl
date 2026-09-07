@@ -1,0 +1,25 @@
+[ Info: truncation: auto → δBGE(stream_l_cap=5, Δ_angle=0.0) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (6, 6, 7)
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:13[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:08[K
+┌ Info: Processing on: CPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (6, 6, 7)
+Test Summary:                          | Pass  Total   Time
+tabulated Z moments == plain (bitwise) |  144    144  11.0s
+Test Summary:                                   | Pass  Total  Time
+tables at global l_max serve shorter expansions |    6      6  0.0s
+Test Summary:                                             | Pass  Total  Time
+tables without Π_pair auto-build (silent-zero regression) |    9      9  5.0s
+Test Summary:                                                 | Pass  Total  Time
+undersized tables are rejected (silent-truncation regression) |    1      1  0.1s
+Test Summary:                               | Pass  Total  Time
+tables built for a different μ are rejected |    2      2  0.0s
+Test Summary:       | Pass  Total  Time
+kill-switch default |    1      1  0.0s
+test_z_tables: done
+Test Summary:                                       | Pass  Total     Time
+spectral Greek arrays do not enlarge angular tables |    5      5  1m17.7s

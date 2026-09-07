@@ -1,0 +1,21 @@
+BENCH_BEGIN cpu-n64-t1
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:21[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:14[K
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:02[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:02[K
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:02[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:02[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+Looping over layers ...  80%|██████████████████████▍     |  ETA: 0:00:00[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:02[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:02[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+Looping over layers ...  80%|██████████████████████▍     |  ETA: 0:00:00[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:02[K
+Looping over layers ...  80%|██████████████████████▍     |  ETA: 0:00:00[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:02[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:06[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:04[K
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:07[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:04[K
+MODEL backend=cpu nSpec=64 operator=18 full_columns=14 selected_columns=4
+PARITY R=0.0 T=0.0 dR=1.3877787807814457e-17 dT=2.7755575615628914e-16 forward_R=5.204170427930421e-18
+MEASURE enabled=false kind=full median_seconds=7.697103617 median_bytes=1.259171684e10 samples=[(time = 7.697103617, bytes = 12591716520, gctime = 2.069919684), (time = 7.86958764, bytes = 12591721144, gctime = 2.122690493), (time = 7.675025171, bytes = 12591716840, gctime = 2.149093367)]
+MEASURE enabled=false kind=selected median_seconds=1.45055577 median_bytes=3.416148928e9 samples=[(time = 1.449639927, bytes = 3416148960, gctime = 0.102738658), (time = 1.45055577, bytes = 3416148928, gctime = 0.091084238), (time = 1.461528308, bytes = 3416148896, gctime = 0.091193012)]
+MEASURE enabled=true kind=full median_seconds=3.931980957 median_bytes=1.11843048e9 samples=[(time = 4.01667408, bytes = 1118430608, gctime = 0.010970996), (time = 3.931980957, bytes = 1118430224, gctime = 0.02825017), (time = 3.895435452, bytes = 1118430480, gctime = 0.019591412)]
+MEASURE enabled=true kind=selected median_seconds=1.036344711 median_bytes=3.65952696e8 samples=[(time = 1.102742259, bytes = 365952760, gctime = 0.014413588), (time = 1.021840433, bytes = 365952696, gctime = 0.0), (time = 1.036344711, bytes = 365952696, gctime = 0.0)]
+FORWARD median_seconds=0.236257686
+BENCH_DONE cpu-n64-t1
