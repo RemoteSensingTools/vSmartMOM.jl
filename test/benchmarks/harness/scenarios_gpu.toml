@@ -6,25 +6,25 @@
 # otherwise the phase exits as a no-op (docs/dev_notes/phase5_headroom.md).
 
 [[scenario]]
-name        = "phase1b_RRS_761-764nm_gpu"
-yaml        = "test_parameters/Phase1b_RRS_761-764nm.yaml"
+name = "phase1b_RRS_761-764nm_gpu"
+yaml = "test_parameters/Phase1b_RRS_761-764nm.yaml"
 architecture = "gpu"
-rs_type     = "RRS"
-driver      = "rt_run"
-n_samples   = 1
+rs_type = "RRS"
+driver = "rt_run"
+n_samples = 1
 
 [[scenario]]
-name        = "phase1b_noRS_761-764nm_gpu"
-yaml        = "test_parameters/Phase1b_RRS_761-764nm.yaml"
+name = "phase1b_noRS_761-764nm_gpu"
+yaml = "test_parameters/Phase1b_RRS_761-764nm.yaml"
 architecture = "gpu"
-rs_type     = "noRS"
-driver      = "rt_run"
-n_samples   = 3
+rs_type = "noRS"
+driver = "rt_run"
+n_samples = 3
 
 [[scenario]]
-name        = "phase1b_ss_761-764nm_gpu"
-yaml        = "test_parameters/Phase1b_RRS_761-764nm.yaml"
+name = "phase1b_ss_761-764nm_gpu"
+yaml = "test_parameters/Phase1b_RRS_761-764nm.yaml"
 architecture = "gpu"
-rs_type     = "noRS"
-driver      = "rt_run_ss"
-n_samples   = 3
+rs_type = "noRS"
+driver = "rt_run_ss"
+n_samples = 3

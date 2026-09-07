@@ -1,23 +1,20 @@
-# Taplo is scoped to vSmartMOM scene/setup TOML files only.
-# Julia Project/Artifacts TOML, manifests, and benchmark harness metadata are
-# intentionally outside this schema association.
+# Lint/format maintained TOML, including Julia package metadata. Associate the
+# RT schema only with scene locations via the rule below. Archived numerical
+# evidence and generated dependency manifests are not formatter inputs.
 include = [
+  "*.toml",
+  ".taplo.toml",
   "config/**/*.toml",
   "configs/**/*.toml",
   "examples/**/*.toml",
   "sandbox/**/*.toml",
-  "test/test_parameters/**/*.toml",
-  "test/benchmarks/*.toml",
-  "test/vlidort_baseline/configs/**/*.toml",
+  "test/**/*.toml",
+  "docs/Project.toml",
 ]
-exclude = [
-  "**/Manifest.toml",
-  "**/Project.toml",
-  "**/JuliaProject.toml",
-  "**/Artifacts.toml",
-  "docs/build/**",
-  "test/benchmarks/harness/**/*.toml",
-]
+exclude = ["**/Manifest.toml", "docs/build/**"]
+
+[schema]
+enabled = false
 
 [formatting]
 align_comments = true
@@ -47,4 +44,5 @@ exclude = [
 ]
 
 [rule.schema]
+enabled = true
 path = "./schemas/vsmartmom-parameters.schema.json"

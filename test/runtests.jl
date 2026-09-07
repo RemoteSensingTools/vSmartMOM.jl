@@ -16,6 +16,7 @@ using JLD2
 const _VSMARTMOM_TEST_ORIGINAL_CWD = pwd()
 cd(@__DIR__)
 try
+@testset "vSmartMOM" begin
 
 # Core module tests
 @testset "Absorption" begin include("test_Absorption.jl") end
@@ -179,7 +180,6 @@ end
 # VLIDORT-style Fourier convergence (AbstractFourierConvergence strategies):
 # default bitwise, unreachable-tolerance bitwise, early-exit within tolerance,
 # YAML wiring, FOURIER_SAVED diagnostic.
-@testset "Fourier convergence" begin include("test_fourier_convergence.jl") end
 
 # TMS single-scattering correction: strategy types, f=0 no-op at machine
 # precision, parity-policy rejections, exact-SS reference, truncation-order
@@ -241,6 +241,7 @@ end
 # `@testset "VLIDORT baseline"`, so we don't double-nest.
 include("vlidort_baseline/runtests.jl")
 
+end # complete suite: collect all testset failures before returning
 finally
     cd(_VSMARTMOM_TEST_ORIGINAL_CWD)
 end

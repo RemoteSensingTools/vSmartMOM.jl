@@ -112,7 +112,8 @@
         },
         "greek_beta_cutoff": {
           "type": ["number", "null"],
-          "exclusiveMinimum": 0,
+          "minimum": 0,
+          "exclusiveMinimum": true,
           "description": "Optional second-stage aerosol Fourier-support cutoff. The maximum size parameter first sets the conservative Mie coefficient ceiling; after size-distribution integration, each aerosol retains through the last degree satisfying abs(beta_l) >= cutoff at any wavelength in the band. Only beta is tested (not alpha/gamma/delta/epsilon/zeta). The maximum across aerosol species enters the component aggregator before stream/user caps. This reduces Fourier moments but does not change nstreams. Null/omitted disables the cutoff."
         },
         "max_m": {
@@ -122,7 +123,7 @@
         },
         "Δ_angle": {
           "type": "number",
-          "description": "Optional forward-peak exclusion angle in degrees consumed by δBGE truncation. Defaults to 0.0 (no forward-peak excluded) when omitted; legacy YAMLs may still set 2.0 explicitly. In TOML, quote the Unicode key as \"Δ_angle\" = 0.0."
+          "description": "Legacy compatibility field. The forward-peak exclusion cone is retired: the current δBGE calculation uses the full angular interval, regardless of this value. Defaults to 0.0. In TOML, quote the Unicode key as \"Δ_angle\" = 0.0."
         },
         "l_trunc": {
           "type": "integer",
@@ -153,7 +154,7 @@
               "description": "YAML only. Same as NoTruncation(). TOML has no null value, so use NoTruncation() or omit the key depending on intent."
             }
           ],
-          "examples": ["auto", "NoTruncation()", "δBGE(20, 2.0)"]
+          "examples": ["auto", "NoTruncation()", "δBGE(20, 0.0)"]
         },
         "depol": {
           "type": "number",
@@ -209,13 +210,118 @@
               "description": "Absolute floor on dτ_max as a multiple of eps(FT). Default 1024·eps(FT) ≈ 1.2e-4 for Float32 and 2.3e-13 for Float64."
             },
             "blas_threads": {
-              "type": ["integer", "null"],
+              "type": [
+                "integer",
+                "null"
+              ],
               "minimum": 1,
               "description": "Per-model BLAS thread cap. null = leave global BLAS alone (default). Recommend 4-8 for batched runs."
             },
             "verbose": {
               "type": "boolean",
               "description": "When true, rt_run prints the TimerOutputs timing tree at the end of each call. Default false (quiet). Useful for profiling, noisy in batched loops."
+            },
+            "dtau_max_threshold": {
+              "type": "number",
+              "minimum": 0,
+              "description": "ASCII alias of dτ_max_threshold."
+            },
+            "dtau_min_floor": {
+              "type": "number",
+              "minimum": 0,
+              "description": "ASCII alias of dτ_min_floor; an absolute optical-depth floor."
+            },
+            "fourier_convergence": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "all",
+                "none",
+                "intensity",
+                "stokes",
+                "iqu",
+                null
+              ],
+              "default": "all",
+              "description": "All moments, intensity convergence, or joint I/Q/U convergence. none/null aliases all; iqu aliases stokes."
+            },
+            "fourier_tolerance": {
+              "type": "number",
+              "minimum": 0,
+              "exclusiveMinimum": true,
+              "default": 1e-05,
+              "description": "Positive convergence tolerance; requires intensity or stokes convergence."
+            },
+            "fourier_min_m": {
+              "type": "integer",
+              "minimum": 3,
+              "default": 3,
+              "description": "First eligible convergence order; guard includes the polarized Rayleigh m=2 term."
+            },
+            "fourier_n_consecutive": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 2,
+              "description": "Number of consecutive eligible passing Fourier moments."
+            },
+            "ss_correction": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "none",
+                "tms",
+                null
+              ],
+              "default": "none",
+              "description": "Optional aerosol TMS correction; forward elastic SFI only. Cox–Munk glint correction is built in separately."
+            }
+          },
+          "dependencies": {
+            "fourier_tolerance": {
+              "required": [
+                "fourier_convergence"
+              ],
+              "properties": {
+                "fourier_convergence": {
+                  "enum": [
+                    "intensity",
+                    "stokes",
+                    "iqu"
+                  ]
+                }
+              }
+            },
+            "fourier_min_m": {
+              "required": [
+                "fourier_convergence"
+              ],
+              "properties": {
+                "fourier_convergence": {
+                  "enum": [
+                    "intensity",
+                    "stokes",
+                    "iqu"
+                  ]
+                }
+              }
+            },
+            "fourier_n_consecutive": {
+              "required": [
+                "fourier_convergence"
+              ],
+              "properties": {
+                "fourier_convergence": {
+                  "enum": [
+                    "intensity",
+                    "stokes",
+                    "iqu"
+                  ]
+                }
+              }
             }
           }
         }

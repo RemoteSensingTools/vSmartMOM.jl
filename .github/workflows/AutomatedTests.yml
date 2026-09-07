@@ -3,7 +3,7 @@ name: AutomatedTests
 on: [push, pull_request]
 
 # One active run per ref: a superseded push cancels the in-flight matrix
-# (18 jobs) instead of queueing a duplicate — reduces runner contention,
+# (9 jobs) instead of queueing a duplicate — reduces runner contention,
 # which has evicted long jobs mid-run ("runner received a shutdown signal").
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -37,10 +37,40 @@ jobs:
       - name: Install Taplo
         run: |
           install_dir="${RUNNER_TEMP}/taplo"
-          mkdir -p "$install_dir"
-          curl -fsSL https://github.com/tamasfe/taplo/releases/latest/download/taplo-linux-x86_64.gz \
-            | gunzip > "$install_dir/taplo"
-          chmod +x "$install_dir/taplo"
+          bash tools/install_taplo.sh "$install_dir"
           echo "$install_dir" >> "$GITHUB_PATH"
-      - name: Lint setup TOML files
+      - name: Lint TOML and validate scene TOML
         run: taplo lint
+      - name: Check TOML formatting
+        run: taplo format --check
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate scene schemas and negative cases
+        run: |
+          python -m pip install -r tools/requirements-checks.txt
+          python tools/check_schema.py
+
+  api-and-workflows:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: '1.12'
+      - uses: julia-actions/cache@v2
+      - name: Instantiate test environment
+        run: julia --project=test -e 'using Pkg; Pkg.develop(path="."); Pkg.instantiate()'
+      - name: Audit exports and registered docstrings
+        run: julia --project=test tools/audit_api.jl api-inventory.json
+      - name: Execute README examples
+        working-directory: test
+        run: julia --project=. ../tools/check_examples.jl
+      - name: Run portable retrieval workflow contracts
+        working-directory: test
+        run: julia --project=. local/workflows/runtests.jl
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: api-inventory
+          path: api-inventory.json

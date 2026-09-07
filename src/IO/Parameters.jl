@@ -1387,6 +1387,18 @@ function _parse_numerics(params_dict, FT)
         return RTNumericalParameters{FT}()
     end
     n = rt["numerics"]
+    n isa AbstractDict || throw(ArgumentError("radiative_transfer.numerics must be a mapping"))
+    allowed = ("dτ_max_threshold", "dtau_max_threshold", "dτ_min_floor",
+               "dtau_min_floor", "blas_threads", "verbose", "fourier_convergence",
+               "fourier_tolerance", "fourier_min_m", "fourier_n_consecutive", "ss_correction")
+    unknown = setdiff(collect(keys(n)), allowed)
+    isempty(unknown) || throw(ArgumentError("Unknown numerics keys: $(join(unknown, ", "))"))
+    for (unicode, ascii) in (("dτ_max_threshold", "dtau_max_threshold"),
+                             ("dτ_min_floor", "dtau_min_floor"))
+        if haskey(n, unicode) && haskey(n, ascii) && n[unicode] != n[ascii]
+            throw(ArgumentError("Conflicting numerics aliases $unicode and $ascii"))
+        end
+    end
     kwargs = Dict{Symbol, Any}()
     if haskey(n, "dτ_max_threshold") || haskey(n, "dtau_max_threshold")
         v = haskey(n, "dτ_max_threshold") ? n["dτ_max_threshold"] : n["dtau_max_threshold"]
@@ -1409,6 +1421,8 @@ function _parse_numerics(params_dict, FT)
         selection = n["fourier_convergence"]
         name = selection === nothing ? "all" : lowercase(String(selection))
         if name in ("all", "none")
+            any(k -> haskey(n, k), ("fourier_tolerance", "fourier_min_m", "fourier_n_consecutive")) &&
+                throw(ArgumentError("Fourier convergence thresholds require intensity or stokes convergence"))
             kwargs[:fourier_convergence] = AllFourierMoments()
         elseif name == "intensity"
             tolerance = FT(get(n, "fourier_tolerance", 1e-5))

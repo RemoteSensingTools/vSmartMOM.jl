@@ -17,7 +17,7 @@ YAML = "ddb6d928-2868-570f-bddf-ab3f9cf99eb6"
 vSmartMOM = "7ba11eeb-0a61-4a04-a413-bf612cc2007e"
 
 [sources]
-vSmartMOM = {path = "../.."}
+vSmartMOM = { path = "../.." }
 
 [compat]
 CUDA = "5.5, 6"

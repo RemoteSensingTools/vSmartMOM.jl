@@ -285,3 +285,32 @@ end
     delete!(cfg["geometry"], "sza")
     @test_throws ArgumentError parameters_from_dict(cfg)
 end
+
+
+@testset "numerics schema/parser contract" begin
+    for FT in (Float32, Float64)
+        parse_numerics(n) = vSmartMOM.IO._parse_numerics(
+            Dict("radiative_transfer" => Dict("numerics" => n)), FT)
+        for selection in ("all", "none", nothing)
+            @test parse_numerics(Dict("fourier_convergence" => selection)).fourier_convergence isa AllFourierMoments
+        end
+        for (selection, expected) in (("intensity", IntensityConvergence),
+                                      ("stokes", StokesConvergence), ("iqu", StokesConvergence))
+            @test parse_numerics(Dict("fourier_convergence" => selection,
+                "fourier_tolerance" => 1e-5, "fourier_min_m" => 3,
+                "fourier_n_consecutive" => 2)).fourier_convergence isa expected
+        end
+        @test parse_numerics(Dict("dtau_max_threshold" => 0.001)).dτ_max_threshold === FT(0.001)
+        for n in (Dict("fourier_convergence" => "all", "fourier_tolerance" => 1e-5),
+                  Dict("fourier_tolerance" => 1e-5),
+                  Dict("fourier_convergence" => "intensity", "fourier_tolerance" => 0),
+                  Dict("fourier_convergence" => "stokes", "fourier_min_m" => 2),
+                  Dict("fourier_convergence" => "stokes", "fourier_n_consecutive" => 0),
+                  Dict("fourier_convergence" => "unknown"), Dict("ss_correction" => "unknown"),
+                  Dict("fourier_tolernace" => 1e-5),
+                  Dict("dtau_max_threshold" => 0.001, "dτ_max_threshold" => 0.002))
+            @test_throws ArgumentError parse_numerics(n)
+        end
+        @test_throws ArgumentError parse_numerics("all")
+    end
+end

@@ -774,10 +774,8 @@ end
         caught
     end
     @test err isa ArgumentError
-    @test sprint(showerror, err) ==
-          "ArgumentError: linearized interior-height radiances currently " *
-          "support SolarBeam/NoSource only; thermal and surface-emission " *
-          "sources require linearized multisensor source-slot propagation"
+    @test occursin("ThermalEmission", sprint(showerror, err))
+    @test occursin("source tangent propagation", sprint(showerror, err))
 end
 
 @testset "linearized multisensor Float32" begin

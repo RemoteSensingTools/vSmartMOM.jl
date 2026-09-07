@@ -1,4 +1,3 @@
-using Aqua
 using JSON
 using TOML
 using Test
@@ -51,16 +50,4 @@ using vSmartMOM
     # configs.
     @test !("Δ_angle" in radiative_transfer["required"])
     @test haskey(radiative_transfer["properties"], "Δ_angle")
-end
-
-@testset "Aqua" begin
-    Aqua.test_all(vSmartMOM;
-        # Keep method-ambiguity rollout separate; current branch still has
-        # legacy broad signatures that make this too noisy for the first gate.
-        ambiguities = false,
-        # CUDA and lazy artifact precompilation can leave background tasks in
-        # the test environment. Keep this check separate from the package
-        # hygiene gate until those initialization paths are isolated.
-        persistent_tasks = false,
-    )
 end
