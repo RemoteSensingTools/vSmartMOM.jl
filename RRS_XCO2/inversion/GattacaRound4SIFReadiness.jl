@@ -45,9 +45,7 @@ const PRIOR_FILENAME =
     "acos_mapped_tapered_vertical_correlation.nc"
 const SUMMARY_FILENAME = replace(PRIOR_FILENAME, r"\.nc$" => ".dat")
 const SOURCE_PRIOR_FILENAME =
-    "apriori_states_acos_mapped_tapered_vertical_correlation.nc"
-const ROUND3_GATTACA_CAMPAIGN_ID =
-    "bottom_layer_sif_acos_mapped_tapered_vertical_correlation_v1"
+    "source_apriori_states_acos_mapped_tapered_vertical_correlation.nc"
 const EXPECTED_SIF_STATES = copy(
     GattacaTaperedSIFReadiness.EXPECTED_SIF_STATES)
 const EXPECTED_ACTIVE_TO_FULL = vcat(1, collect(6:32), 34)
@@ -103,7 +101,7 @@ required_prior_path(private_root::AbstractString) = resolved_target(joinpath(
 required_summary_path(private_root::AbstractString) = resolved_target(joinpath(
     private_root, "results", CAMPAIGN_ID, "retrieval_setup", SUMMARY_FILENAME))
 required_source_prior_path(private_root::AbstractString) = resolved_target(joinpath(
-    private_root, "results", ROUND3_GATTACA_CAMPAIGN_ID,
+    private_root, "results", CAMPAIGN_ID,
     "retrieval_setup", SOURCE_PRIOR_FILENAME))
 
 function Round4ReadinessPaths(;
@@ -243,7 +241,7 @@ function validate_checkout_separation(paths::Round4ReadinessPaths)
             ("round-4 output", paths.output_root),
             ("round-4 prior", paths.prior_path),
             ("round-4 prior summary", paths.summary_path),
-            ("round-3 source prior", paths.source_prior_path))
+            ("byte-exact round-4 source-prior copy", paths.source_prior_path))
         contains_path(code_repo, path) && error(
             "$description must not be stored in the round-4 Git checkout: $path")
         contains_path(legacy_repo, path) && error(
@@ -317,7 +315,7 @@ function _validate_prior_isolation(paths::Round4ReadinessPaths)
     paths.summary_path == required_summary_path(paths.private_root) || error(
         "ROUND4_PRIOR_SUMMARY_PATH must be the dedicated round-4 summary path")
     paths.source_prior_path == required_source_prior_path(paths.private_root) ||
-        error("ROUND4_SOURCE_PRIOR_PATH must be the pinned private round-3 prior")
+        error("ROUND4_SOURCE_PRIOR_PATH must be the dedicated round-4 source-prior copy")
     for path in (paths.prior_path, paths.summary_path, paths.source_prior_path)
         contains_path(paths.private_root, path) || error(
             "private prior input is outside RRS_PRIVATE_ROOT: $path")
@@ -345,7 +343,8 @@ function validate_prior_identity(paths::Round4ReadinessPaths;
     _require_hash(source_prior_sha256, "ROUND4_SOURCE_PRIOR_SHA256")
     _require_file(paths.prior_path, "round-4 SIF-on prior")
     _require_file(paths.summary_path, "round-4 SIF-on prior summary")
-    _require_file(paths.source_prior_path, "source round-3 tapered prior")
+    _require_file(paths.source_prior_path,
+                  "byte-exact round-4 source-prior copy")
     basename(paths.prior_path) == PRIOR_FILENAME || error(
         "round-4 prior must use filename $PRIOR_FILENAME")
     basename(paths.summary_path) == SUMMARY_FILENAME || error(
@@ -355,7 +354,7 @@ function validate_prior_identity(paths::Round4ReadinessPaths;
     file_sha256(paths.summary_path) == summary_sha256 || error(
         "round-4 prior-summary SHA-256 mismatch")
     file_sha256(paths.source_prior_path) == source_prior_sha256 || error(
-        "source round-3 prior SHA-256 mismatch")
+        "round-4 source-prior-copy SHA-256 mismatch")
 
     convention = _round4_truth_convention(paths)
     known_Lnu = Float64(convention.diagnostic.Lnu)

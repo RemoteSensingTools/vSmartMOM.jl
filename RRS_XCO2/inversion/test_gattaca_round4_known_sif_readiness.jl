@@ -190,6 +190,12 @@ end
     @test occursin("RETRIEVAL_STOKES_COEFFICIENT_PATH", launcher)
     @test occursin("RETRIEVAL_SCENE_COMPONENTS_PATH", launcher)
     @test occursin("RRS_XCO2_SIF_TEMPLATE_PATH", launcher)
+    @test occursin(
+        "source_apriori_states_acos_mapped_tapered_vertical_correlation.nc",
+        launcher)
+    @test !occursin(
+        "results/bottom_layer_sif_acos_mapped_tapered_vertical_correlation_v1/retrieval_setup/apriori_states",
+        launcher)
     @test !occursin(
         "bottom_campaign=\"\${repo_root}/RRS_XCO2/bottom_layer_XCO2_retrievals\"",
         launcher)
@@ -261,6 +267,14 @@ end
 @testset "Gattaca round-4 29-D prior identity" begin
     mktempdir() do root
         paths = fixture_paths(root)
+        @test dirname(paths.source_prior_path) == dirname(paths.prior_path)
+        @test basename(paths.source_prior_path) ==
+            "source_apriori_states_acos_mapped_tapered_vertical_correlation.nc"
+        @test !GattacaRound4SIFReadiness.contains_path(
+            legacy_input_repo_root(paths), paths.source_prior_path)
+        @test paths.source_prior_path !=
+            GattacaRound4SIFReadiness.GattacaTaperedSIFReadiness.
+                required_prior_path(paths.private_root)
         hashes = install_prior_fixture(paths)
         identity = validate_prior_identity(paths; hashes...)
         @test identity.active == vcat(1, collect(6:32), 34)
