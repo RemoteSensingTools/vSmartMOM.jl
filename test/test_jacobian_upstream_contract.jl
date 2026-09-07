@@ -41,7 +41,7 @@ struct _UnimplementedJacobianSource <: AbstractSource end
     @test !CoreRT._linearized_source_supported(ThermalEmission())
     @test CoreRT._linearized_source_supported(SolarBeam() + SurfaceSIF())
     params = parameters_from_yaml("test_parameters/JacobianTestFast.yaml")
-    params.architecture = CPU()
+    params.architecture = vSmartMOM.CPU()
     @test_throws ArgumentError model_from_parameters(_ContractFlavor(), params;
         compute_h2o_jacobians=false)
     model, lin = model_from_parameters(LinMode(), params;

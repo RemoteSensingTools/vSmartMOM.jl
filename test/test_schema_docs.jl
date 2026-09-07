@@ -13,6 +13,7 @@
 # entry).
 
 using Test
+using TOML
 
 const _SCHEMA_DOCS = joinpath(@__DIR__, "..", "docs", "src", "pages", "IO", "Schema")
 const _SCHEMA_INDEX = joinpath(@__DIR__, "..", "docs", "src", "pages", "IO", "Schema.md")
@@ -96,7 +97,14 @@ const _VSCODE_EXTENSIONS = joinpath(@__DIR__, "..", ".vscode", "extensions.json"
         )
             @test occursin(path_glob, t)
         end
-        @test !occursin("\"test/**/*.toml\"", t)
+        # Formatting includes all maintained test TOML. Only scene-specific
+        # rules may apply the RT schema, so Project/harness TOML stays valid.
+        parsed = TOML.parse(t)
+        @test "test/**/*.toml" in parsed["include"]
+        @test parsed["schema"]["enabled"] == false
+        schema_rules = filter(rule -> get(get(rule, "schema", Dict()), "enabled", false), parsed["rule"])
+        @test !isempty(schema_rules)
+        @test all(rule -> "test/**/*.toml" ∉ get(rule, "include", String[]), schema_rules)
         @test !occursin("**/*params*.toml", t)
         @test occursin("test/benchmarks/harness/**/*.toml", t)
     end
