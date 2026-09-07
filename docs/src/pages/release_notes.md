@@ -7,6 +7,25 @@
 This page summarizes the user-visible changes in the 2.0 line. It is written as
 a migration guide, not as a complete git history.
 
+## Scientific development and contributions
+
+**Scientific authorship for the linearization and Raman work is credited to
+Suniti Sanghavi**, including the radiative-transfer formulations, analytic
+derivatives, and retrieval methodology. This release builds on her development
+of the vector matrix-operator radiative-transfer method and atmospheric Raman
+modeling. Her implementation contributions to this release include
+height-resolved observer radiances and their Jacobians, surface-pressure and
+gas-profile Jacobians, Lambertian Legendre surface Jacobians, the external-solar
+TOA path, retrieval-selected Jacobian plans, Fourier convergence, and the OCO
+retrieval workflow.
+
+Christian Frankenberg assists Suniti with performance optimization, backend
+engineering, integration, packaging, and release tooling. These supporting
+contributions receive separate implementation credit. Git author records
+provide implementation provenance; commit counts do not measure the scientific
+contribution. The published software and method references remain listed in
+the repository's `CITATION.bib`, with their original publication author order.
+
 ## Unreleased (on `feat/surface-split`)
 
 Work in progress on the `feat/surface-split` branch — not yet merged to

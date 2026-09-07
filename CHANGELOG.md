@@ -2,6 +2,13 @@
 
 ## Unreleased — externalAbsorption branch (targeting v2.2.0)
 
+Scientific authorship of the linearization and Raman work, including the
+formulations, analytic derivatives, and retrieval methodology, is credited to
+**Suniti Sanghavi**. Christian Frankenberg assists with performance optimization,
+backend engineering, integration, packaging, and release tooling. See the
+release manual's contribution statement
+and the published references in `CITATION.bib`.
+
 ### Summary
 
 - **RRS GPU performance (~90× on the O2A Raman LUT; ~120× whole-`rt_run`).**
