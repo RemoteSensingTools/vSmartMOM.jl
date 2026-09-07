@@ -8,7 +8,6 @@ function local_jacobian_fixture(FT, polarized, external; gpu=false, n_aerosols=1
     rt["float_type"] = string(FT)
     rt["architecture"] = gpu ? "GPU()" : "CPU()"
     rt["polarization_type"] = polarized ? "Stokes_IQU()" : "Stokes_I()"
-    rt["external_solar"] = external
     rt["surface"] = ["LambertianSurfaceScalar{$FT}(0.05)"]
     rt["greek_beta_cutoff"] = nothing
     cfg["geometry"]["vaz"] = [0.0,37.0]
@@ -24,7 +23,8 @@ function local_jacobian_fixture(FT, polarized, external; gpu=false, n_aerosols=1
     end
     p = read_parameters(cfg)
     p.spec_bands[1] = FT.(range(first(p.spec_bands[1]),last(p.spec_bands[1]);length=5))
-    model, lin = model_from_parameters(LinMode(),p)
+    model, lin = model_from_parameters(LinMode(),p;external_solar=external)
+    @test model.quad_points.external_solar == external
     # Supplied absorption isolates propagation from spectroscopy. Each of the
     # five gas columns changes one layer, and overlying beam derivatives are
     # nonzero below it. This is not a line-list/spectroscopy benchmark.
@@ -36,6 +36,9 @@ function local_jacobian_fixture(FT, polarized, external; gpu=false, n_aerosols=1
     end
     return model,lin
 end
+
+local_jacobian_forward(model) = model.quad_points.external_solar ?
+    (;toa=rt_run_toa(model),boa=nothing) : rt_run(model)
 
 function check_local_jacobian(FT,polarized,external; gpu=false, n_aerosols=1)
     model,lin = local_jacobian_fixture(FT,polarized,external;gpu,n_aerosols)
@@ -75,7 +78,11 @@ function check_local_jacobian(FT,polarized,external; gpu=false, n_aerosols=1)
     early = rt_run(model,lin,n_aerosols,ng,1;jacobian_basis=:physical)
     late = rt_run(model,lin,n_aerosols,ng,1;jacobian_basis=:local)
     for (x,y) in zip(early,late)
-        @test x ≈ y rtol=tol atol=10eps(FT)
+        if x === nothing || y === nothing
+            @test x === y
+        else
+            @test x ≈ y rtol=tol atol=10eps(FT)
+        end
     end
     if FT === Float64
         # Independent gas finite difference through the forward solver,
@@ -84,13 +91,15 @@ function check_local_jacobian(FT,polarized,external; gpu=false, n_aerosols=1)
         original=copy(model.τ_abs[1][:,z])
         direction=copy(lin.τ̇_abs[1][z,:,z])
         model.τ_abs[1][:,z] .= original .+ h.*direction
-        plus=rt_run(model)
+        plus=local_jacobian_forward(model)
         model.τ_abs[1][:,z] .= original .- h.*direction
-        minus=rt_run(model)
+        minus=local_jacobian_forward(model)
         model.τ_abs[1][:,z] .= original
         p=1+7n_aerosols+z
         @test late.toa_jacobian[:,:,:,p] ≈ (plus.toa-minus.toa)/(2h) rtol=2e-6 atol=1e-9
-        @test late.boa_jacobian[:,:,:,p] ≈ (plus.boa-minus.boa)/(2h) rtol=2e-6 atol=1e-9
+        if !external
+            @test late.boa_jacobian[:,:,:,p] ≈ (plus.boa-minus.boa)/(2h) rtol=2e-6 atol=1e-9
+        end
     end
 end
 
@@ -104,18 +113,23 @@ function check_zero_aerosol_jacobian(external)
     model.τ_aer[1] .= 0
     lin.τ̇_aer[1][:,2:end,:,:] .= 0
     lin.τ̇_aer_psurf[1] .= 0
-    base = rt_run(model)
+    base = local_jacobian_forward(model)
     h = 1e-6
     model.τ_aer[1][1,:,:] .= h .* direction
-    one_step = rt_run(model)
+    one_step = local_jacobian_forward(model)
     model.τ_aer[1][1,:,:] .= 2h .* direction
-    two_steps = rt_run(model)
+    two_steps = local_jacobian_forward(model)
     model.τ_aer[1] .= 0
     for mode in (:physical,:local)
         result = rt_run(model,lin,1,ng,1;jacobian_basis=mode)
         @test result.toa ≈ base.toa rtol=1e-10 atol=1e-12
-        @test result.boa ≈ base.boa rtol=1e-10 atol=1e-12
+        if external
+            @test result.boa === nothing
+        else
+            @test result.boa ≈ base.boa rtol=1e-10 atol=1e-12
+        end
         for (field,jac) in ((:toa,:toa_jacobian),(:boa,:boa_jacobian))
+            getproperty(base,field) === nothing && continue
             fd = (-3getproperty(base,field) .+ 4getproperty(one_step,field) .-
                   getproperty(two_steps,field)) ./ (2h)
             @test getproperty(result,jac)[:,:,:,2] ≈ fd rtol=3e-5 atol=2e-8
