@@ -109,6 +109,8 @@ Locations: `src/CoreRT/types.jl:1045`, `src/CoreRT/types.jl:1079`, `docs/src/pag
 
 The local strict build terminates with `makedocs encountered errors [:docs_block, :cross_references]`. The bare `raw` string blocks preceding the convergence types are not registered as the docstrings Documenter expects; `StokesConvergence` also needs an API documentation entry. Attach the docstrings explicitly and include both public strategies in the manual. Keep strict checking enabled.
 
+**Jacobian subbranch update:** `IntensityConvergence` and `StokesConvergence` now use explicit `@doc raw` attachment, and both appear in the API manual. The strict local documentation build passed on Julia 1.12.6 with deployment disabled. This resolves the local R5 build defect on the performance subbranch; it does not change the candidate-commit result above.
+
 The docs workflow's push branch list excludes the integration branch. That explains why green candidate CI did not expose this failure. Require a successful Documentation check on the actual release candidate, through a PR or an appropriate branch trigger.
 
 ### R6 — Release identity and registry history disagree (release gate)

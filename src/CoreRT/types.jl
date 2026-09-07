@@ -1042,7 +1042,7 @@ the package default and is bit-identical to the historical full loop.
 """
 struct AllFourierMoments <: AbstractFourierConvergence end
 
-raw"""
+@doc raw"""
     IntensityConvergence(tolerance; min_m=3, n_consecutive=2)
 
 Terminate after `n_consecutive` eligible Fourier moments satisfy
@@ -1076,7 +1076,7 @@ struct IntensityConvergence{FT<:AbstractFloat} <: AbstractFourierConvergence
     end
 end
 
-raw"""
+@doc raw"""
     StokesConvergence(tolerance; min_m=3, n_consecutive=2)
 
 Terminate after `n_consecutive` eligible Fourier moments satisfy

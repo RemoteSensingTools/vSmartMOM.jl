@@ -33,6 +33,7 @@ vSmartMOM.CoreRT.RTNumericalParameters
 vSmartMOM.CoreRT.AbstractFourierConvergence
 vSmartMOM.CoreRT.AllFourierMoments
 vSmartMOM.CoreRT.IntensityConvergence
+vSmartMOM.CoreRT.StokesConvergence
 ```
 
 ## Single-Scattering Correction
