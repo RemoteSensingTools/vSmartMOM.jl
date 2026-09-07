@@ -93,6 +93,7 @@ Architectures.has_gpu_mie(::vSmartMOM.Architectures.GPU) = true
 
 # Include GPU-specific batched operations
 include("gpu_batched_cuda.jl")
+include("gpu_jacobian_cuda.jl")
 
 # Module initialization - called when extension is loaded
 function __init__()

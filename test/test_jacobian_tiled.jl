@@ -5,7 +5,7 @@ CUDA.allowscalar(false)
 @testset "Shared-memory Jacobian products" begin
     old = _JT._TILED_JACOBIANS_ENABLED[]
     try
-        for FT in (Float32,Float64), n in (16,18,32)
+        for FT in (Float32,Float64), n in (6,9,12,15,16,18,32)
             ns, np = 512, 3
             A = CUDA.rand(FT,n,n,ns); B = CUDA.rand(FT,n,n,ns)
             da = CUDA.rand(FT,n,n,ns,np+1); db = CUDA.rand(FT,n,n,ns,np+1)

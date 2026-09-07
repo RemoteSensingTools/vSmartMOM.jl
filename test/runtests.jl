@@ -48,6 +48,10 @@ try
 @testset "Jacobian Unit" begin include("test_jacobians_unit.jl") end
 @testset "Batched Jacobians" begin include("test_jacobian_batched.jl") end
 @testset "Elemental boundary Jacobians" begin include("test_elemental_boundary_jacobians.jl") end
+@testset "CUDA Jacobian plans" begin include("test_jacobian_vendor.jl") end
+if get(ENV,"VSMARTMOM_JACOBIAN_GPU_TEST","false") == "true"
+    @testset "CUDA Jacobian tiles" begin include("test_jacobian_tiled.jl") end
+end
 @testset "Blocked Jacobians" begin include("test_jacobian_blocked.jl") end
 @testset "Phase interpolation" begin include("test_phase_interpolation.jl") end
 @testset "Local optical Jacobians" begin include("test_local_jacobian.jl") end

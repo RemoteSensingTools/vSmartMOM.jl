@@ -14,18 +14,28 @@
 const _BATCHED_JACOBIANS_ENABLED = Ref(true)
 const _TILED_JACOBIANS_ENABLED = Ref(true)
 const _MEDIUM_JACOBIANS_ENABLED = Ref(true)
+const _VENDOR_JACOBIANS_ENABLED = Ref(true)
 const _JACOBIAN_FUSED_INVERSE_ENABLED = Ref(true)
 _jacobian_tiles_supported(::Any) = false
 
 @inline _use_jacobian_tiles(backend, C, A, B) =
     _TILED_JACOBIANS_ENABLED[] && _jacobian_tiles_supported(backend) &&
-    16 <= size(C,1) <= 32 && size(C,3) >= 512 &&
+    6 <= size(C,1) <= 32 && size(C,3) >= 512 &&
     size(C,1) == size(C,2) == size(A,1) == size(A,2) == size(B,1) == size(B,2)
 
 @inline _use_blocked_jacobians(backend,C,A,B) =
     _MEDIUM_JACOBIANS_ENABLED[] && _jacobian_tiles_supported(backend) &&
     32 < size(C,1) <= 64 && size(C,3) >= 512 &&
     size(C,1) == size(C,2) == size(A,1) == size(A,2) == size(B,1) == size(B,2)
+
+"""
+    make_jacobian_products(A, nparams)
+
+Optional backend plan for matrix products in one Jacobian solve. The portable
+path needs no plan. CUDA specializes this factory to reuse spectral/parameter
+pointer batches for medium square operators; the workspace owns their lifetime.
+"""
+make_jacobian_products(A,nparams) = nothing
 
 function make_jacobian_workspace(A::AbstractArray{FT,3}, nparams) where {FT}
     FT <: Union{Float32,Float64} || return nothing
@@ -43,7 +53,8 @@ function make_jacobian_workspace(A::AbstractArray{FT,3}, nparams) where {FT}
     source_tangent() = similar(A, n, 1, ns, nparams)
     return JacobianPropagationWorkspace(
         ntuple(_ -> matrix(), 6)..., ntuple(_ -> vector(), 4)...,
-        ntuple(_ -> tangent(), 5)..., ntuple(_ -> source_tangent(), 4)...)
+        ntuple(_ -> tangent(), 5)..., ntuple(_ -> source_tangent(), 4)...,
+        make_jacobian_products(A,nparams))
 end
 
 @inline _use_batched_jacobians(a::AddedLayerLin) =
@@ -212,6 +223,15 @@ function _jacobian_geometric_inverse!(G, tmp, R₁, R₂, I_static)
     return G
 end
 
+# A backend may attach a product plan to this solve's workspace. Array-only
+# callers retain the portable implementation; source vectors use it as well.
+@inline _jmul!(w::JacobianPropagationWorkspace,C,A,B,β=zero(eltype(C))) =
+    _jmul_with_plan!(w.products,C,A,B,β)
+@inline _jprod!(w::JacobianPropagationWorkspace,C,A,dA,B,dB) =
+    _jprod_with_plan!(w.products,C,A,dA,B,dB)
+_jmul_with_plan!(::Nothing,C,A,B,β) = _jmul!(C,A,B,β)
+_jprod_with_plan!(::Nothing,C,A,dA,B,dB) = _jprod!(C,A,dA,B,dB)
+
 function doubling_batched_lin!(pol_type, expk, ndoubl, a, da, I_static, dτ, μ₀;
                                N_active=0)
     ndoubl == 0 && return nothing
@@ -242,10 +262,10 @@ function doubling_batched_lin!(pol_type, expk, ndoubl, a, da, I_static, dτ, μ�
         # keeping matrix order intact. The two inverse-rule signs cancel.
         _jacobian_geometric_inverse!(w.G, w.m1, r, r, I_static)
         _bmm!(w.H, t, w.G)
-        _jprod!(dm1, r, dr, r, dr)
-        _jmul!(dm2, w.H, dm1)
+        _jprod!(w, dm1, r, dr, r, dr)
+        _jmul!(w, dm2, w.H, dm1)
         dm2 .+= dt
-        _jmul!(dH, dm2, w.G)
+        _jmul!(w, dH, dm2, w.G)
 
         # Solar-source adding, SF2023-II (12), with identical half layers:
         # v₁ = r j⁺ + e j⁻,  v₂ = r(e j⁻) + j⁺,
@@ -261,12 +281,12 @@ function doubling_batched_lin!(pol_type, expk, ndoubl, a, da, I_static, dτ, μ�
         dJ1m .= djm .* e4 .+ jm .* de4
         _bmm!(w.v1, r, jp); w.v1 .+= w.Jminus
         _bmm!(w.v2, r, w.Jminus); w.v2 .+= jp
-        _jprod!(dv1, r, dr, jp, djp); dv1 .+= dJ1m
-        _jprod!(dv2, w.H, dH, w.v1, dv1)
+        _jprod!(w, dv1, r, dr, jp, djp); dv1 .+= dJ1m
+        _jprod!(w, dv2, w.H, dH, w.v1, dv1)
         dJm .= djm .+ dv2
-        _jprod!(dv1, r, dr, w.Jminus, dJ1m)
+        _jprod!(w, dv1, r, dr, w.Jminus, dJ1m)
         dv1 .+= djp
-        _jprod!(dv2, w.H, dH, w.v2, dv1)
+        _jprod!(w, dv2, w.H, dH, w.v2, dv1)
         dJp .+= dv2
         _bmm!(w.Jminus, w.H, w.v1); w.Jminus .+= jm
         _bmm!(w.Jplus, w.H, w.v2); w.Jplus .+= jp .* e3
@@ -276,9 +296,9 @@ function doubling_batched_lin!(pol_type, expk, ndoubl, a, da, I_static, dτ, μ�
         # dr_new = dr + dH(r t) + H(dr t + r dt),
         # dt_new = dH t + H dt; cf. (C.11)–(C.12).
         _bmm!(w.m1, r, t)
-        _jprod!(dm1, r, dr, t, dt)
-        _jprod!(dR, w.H, dH, w.m1, dm1); dR .+= dr
-        _jprod!(dT, w.H, dH, t, dt)
+        _jprod!(w, dm1, r, dr, t, dt)
+        _jprod!(w, dR, w.H, dH, w.m1, dm1); dR .+= dr
+        _jprod!(w, dT, w.H, dH, t, dt)
         _bmm!(w.R, w.H, w.m1); w.R .+= r
         _bmm!(w.T, w.H, t)
         r .= w.R; t .= w.T
@@ -315,20 +335,20 @@ function _interaction_direction_lin!(w, R, dR, Rout, dRout, Tleft, dTleft,
                                      Tright, dTright, Tother, dTother,
                                      Jbase, dJbase, Jin, dJin, j, dj, I_static)
     _jacobian_geometric_inverse!(w.G, w.m1, R, Rout, I_static)
-    _jprod!(w.dm1, R, dR, Rout, dRout)
+    _jprod!(w, w.dm1, R, dR, Rout, dRout)
     _bmm!(w.H, Tleft, w.G)
-    _jmul!(w.dm2, w.H, w.dm1)
+    _jmul!(w, w.dm2, w.H, w.dm1)
     w.dm2 .+= dTleft
-    _jmul!(w.dH, w.dm2, w.G)
+    _jmul!(w, w.dH, w.dm2, w.G)
     _bmm!(w.m1, R, Tright)
-    _jprod!(w.dm1, R, dR, Tright, dTright)
-    _jprod!(w.dm2, w.H, w.dH, w.m1, w.dm1)
+    _jprod!(w, w.dm1, R, dR, Tright, dTright)
+    _jprod!(w, w.dm2, w.H, w.dH, w.m1, w.dm1)
     _bmm!(w.m2, w.H, w.m1)
-    _jprod!(w.dm1, w.H, w.dH, Tother, dTother)
+    _jprod!(w, w.dm1, w.H, w.dH, Tother, dTother)
     _bmm!(w.T, w.H, Tother)
     _bmm!(w.v1, R, Jin); w.v1 .+= j
-    _jprod!(w.dv1, R, dR, Jin, dJin); w.dv1 .+= dj
-    _jprod!(w.dv2, w.H, w.dH, w.v1, w.dv1); w.dv2 .+= dJbase
+    _jprod!(w, w.dv1, R, dR, Jin, dJin); w.dv1 .+= dj
+    _jprod!(w, w.dv2, w.H, w.dH, w.v1, w.dv1); w.dv2 .+= dJbase
     _bmm!(w.v2, w.H, w.v1); w.v2 .+= Jbase
     return nothing
 end

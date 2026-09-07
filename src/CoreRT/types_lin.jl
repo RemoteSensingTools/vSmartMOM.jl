@@ -5,8 +5,13 @@ abstract type AbstractLayerLin end
 # the CPU merely to copy it to a GPU. This also preserves the floating type.
 _zero_tangent(A, dims...) = fill!(similar(A, dims...), zero(eltype(A)))
 
-"Reusable scratch for batched physical-parameter doubling and interaction."
-struct JacobianPropagationWorkspace{M,V,DM,DV}
+"""
+Reusable forward and tangent scratch for batched doubling and interaction.
+The last tangent axis holds either local optical directions or retrieval
+columns. `products` owns optional backend multiplication metadata; it shares
+the workspace lifetime and contains no physical state or derivative formulas.
+"""
+struct JacobianPropagationWorkspace{M,V,DM,DV,P}
     G::M
     H::M
     m1::M
@@ -26,6 +31,7 @@ struct JacobianPropagationWorkspace{M,V,DM,DV}
     dv2::DV
     dJminus::DV
     dJplus::DV
+    products::P
 end
 
 """
