@@ -377,6 +377,12 @@ downward expression. A backward interface solve supplies D,U; S2014 (27)–(28)
 operators. Local forcing vectors are contracted to retrieval columns before
 this source solve. Solar attenuation above each layer is restored once as
 `−j dτ_above/μ₀`. The Lambertian boundary uses only its own albedo directions
-and appends the full-column solar tangent once. This ordering is a derivation
+and appends the full-column solar tangent once, using the reflected solar source
+saved before emission is injected. Surface SIF and its amplitude/slope derivatives
+enter as independent boundary vectors (`2 SIF₀` and `2 ∂SIF₀/∂p` at `m=0`),
+consistent with the affine boundary in S2014 (33)–(37). The factor two is the
+package's Fourier normalization, documented in `Sources/surface_sif.jl`;
+SIF does not carry direct-solar attenuation. The fixed incident fields include
+SIF, retaining its atmospheric and albedo derivatives. This ordering is a derivation
 of the affine adding equations, not an attribution to the historical code.
 See [source adding](jacobian_batched/source_adding.md) for scope and memory cost.

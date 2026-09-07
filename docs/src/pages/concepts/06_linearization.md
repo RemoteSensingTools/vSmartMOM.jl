@@ -149,6 +149,12 @@ operators. This removes retrieval-sized matrix tangents from atmospheric
 adding and surface closure; source vectors and outputs still grow with the
 number of requested columns. Use it with `jacobian_basis=:local`. It supports
 endpoint observers only and retains external solar's TOA-only contract.
+Prescribed or retrievable `SurfaceSIF` can accompany the solar beam. SIF
+amplitude and slope derivatives enter as boundary source vectors; they add no
+matrix directions to atmospheric doubling. The incident fields include emitted
+light, so atmospheric and surface-albedo Jacobians retain its multiple scattering.
+Only reflected sunlight receives the direct-beam attenuation derivative at the
+surface; emitted SIF is transported from that boundary through the atmosphere.
 The default `jacobian_adding=:matrix` keeps the established general path.
 The new path caches local layer tangents for a backward illumination pass,
 so memory still grows with layer count and spectral batch size.

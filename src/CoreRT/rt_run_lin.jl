@@ -42,7 +42,8 @@ physical parameters via the linearized Matrix Operator Method.
 - `NSurf::Int`: Number of surface parameters (typically 1 for Lambertian albedo).
 - `i_band::Integer=1`: Spectral band index.
 - `jacobian_adding=:matrix`: Use established matrix-tangent adding. Opt in to
-  `:source` with a local basis for solar/Lambertian endpoint solves; atmospheric
+  `:source` with a local basis for solar/Lambertian endpoint solves, including
+  prescribed or retrievable surface SIF; atmospheric
   adding then propagates equivalent-source vectors instead of matrix tangents.
 - `jacobian_basis=:auto`: Double a local optical basis when smaller than the
   atmospheric retrieval layout. `:physical` propagates retrieval columns
@@ -314,7 +315,7 @@ function rt_run(RS_type::AbstractRamanType,
                          nStokes=pol_type.n, doubling_scratch=false,
                          core_partials=!source_adding)
     source_workspace = source_adding ? make_source_adding_workspace(
-        added_layer,added_layer_lin,Nparams,NSurf,Nz,arr_type) : nothing
+        added_layer,added_layer_lin,Nparams,NSurf,NSIF,Nz,arr_type) : nothing
     @timeit "Creating layers" composite_layer, composite_layer_lin = if source_adding
         (make_composite_layer(RS_type,FT,arr_type,dims,nSpec),source_workspace.result)
     else
@@ -495,9 +496,13 @@ function rt_run(RS_type::AbstractRamanType,
         # at m=0. SolarBeam contributions to surface j₀⁻ stay inside
         # `create_surface_layer!` for back-compat; Phase 5c will move them
         # out into the same dispatch table.
+        # Source adding retains the solar-only attenuation source and forms
+        # SIF derivative vectors before emission is added to the forward field.
+        source_adding && prepare_source_adding_surface!(source_workspace,
+            added_surface_layer,prepared_sources,brdf,m,pol_type,CoreRT.architecture(model))
         surface_source_contribute!(prepared_sources, brdf, added_surface_layer,
                                    m, pol_type, CoreRT.architecture(model))
-        surface_source_contribute_lin!(prepared_sources, brdf,
+        source_adding || surface_source_contribute_lin!(prepared_sources, brdf,
                                        added_surface_layer, added_surface_layer_lin,
                                        m, pol_type, CoreRT.architecture(model), sif_range(layout))
 
@@ -521,7 +526,7 @@ function rt_run(RS_type::AbstractRamanType,
             source_incident_fields!(source_workspace,added_surface_layer,I_static)
             source_adding_tangents!(source_workspace,added_surface_layer,
                 added_surface_layer_lin,layer_opt_props_lin,τ̇_sum_all,quad_points,arr_type,
-                surface_range(layout))
+                surface_range(layout),sif_range(layout))
         else
             @timeit "interaction" interaction!(scattering_interfaces_all[end], SFI,
                 composite_layer, composite_layer_lin,

@@ -10,8 +10,9 @@ result = rt_run(model, lin_model, NAer, NGas, NSurf;
                 jacobian_basis=:local, jacobian_adding=:source)
 ```
 
-Supported configurations are elastic solar illumination, scalar/Legendre
-Lambertian surfaces, and endpoint observers. Embedded solar provides TOA and BOA;
+Supported configurations are elastic solar illumination with optional surface
+SIF, scalar/Legendre Lambertian surfaces, and endpoint observers. Both prescribed
+SIF spectra and retrievable amplitude/slope sources are supported. Embedded solar provides TOA and BOA;
 external solar retains the existing TOA-only contract. Other source and observer
 configurations are rejected explicitly. The keyword is also forwarded by
 `rt_run_lin` and the planned-Jacobian entry point.
@@ -50,7 +51,41 @@ configurations are rejected explicitly. The keyword is also forwarded by
 6. The surface is the last affine operator. Only its albedo directions are
    constructed as matrix tangents. Their forcing vectors are scattered into
    retrieval slots, and the total-column solar-attenuation tangent is appended
-   once. The surface convention `t⁺⁺=I` preserves BOA downwelling.
+   once using the reflected solar source saved **before** SIF injection.
+   For `m=0`, emission adds `j_SIF⁻=2 SIF₀` and its parameter derivatives
+   directly as source vectors. The full solar + SIF field is used when recovering
+   incident illumination in step 3, so atmospheric and albedo Jacobians include
+   transport and multiple reflection of the emitted light. SIF at the boundary
+   receives no direct-beam attenuation factor. This applies the affine boundary
+   equations S2014 (33)–(37); the SIF normalization is our source convention,
+   documented in `surface_source_contribute!`. The surface convention `t⁺⁺=I`
+   preserves BOA downwelling.
+
+For example, using an explicit physical solar spectrum on the model grid:
+
+```julia
+sources = SolarBeam(F₀=solar_spectrum) +
+          SurfaceSIF(SIF760=0.01, mSIF=0, wavenumber_cm1=get_spec_bands(model)[1])
+result = rt_run_lin(model, lin_model; i_band=1, sources,
+                    jacobian_basis=:local, jacobian_adding=:source)
+```
+
+SIF amplitude and slope columns follow the surface columns in the ordinary
+parameter layout. Their derivatives remain nonzero when the current SIF is zero.
+The legacy `SIF755`/wavelength-slope parameterization uses the same source-vector
+dispatch. `:local` is explicit here: `:auto` can select physical directions in
+a retrieval with few atmospheric columns, which the source-adding path currently
+does not accept.
+
+The SIF extension passes 284 targeted checks on CPU and 284 on CUDA, alongside
+all 92 preexisting solar-only source-adding checks on each backend. Tests cover
+Float32/Float64, scalar/IQU, embedded/external solar, both supported surfaces,
+zero/nonzero SIF, prescribed emission, and multiple SIF sources. Independent
+forward finite differences check amplitude, slope, gas absorption and albedo;
+complete Jacobians are compared with matrix adding. A strict documentation build
+also passes. Metal has not been hardware-tested for this extension. The realistic
+OCO study replay and reproduction commands are recorded in
+[the inversion audit](suniti_inversions.md).
 
 The implementation is in
 [`source_adding_lin.jl`](../../../src/CoreRT/CoreKernel/source_adding_lin.jl).

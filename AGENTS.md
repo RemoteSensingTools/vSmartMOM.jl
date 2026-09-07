@@ -199,7 +199,7 @@ material when explaining the package:
 | Chain-rule expansion (fused) | `src/CoreRT/CoreKernel/elemental_fused_lin.jl::{get_elem_rt_fused!,get_elem_rt_SFI_fused!}` |
 | Tabulated phase Jacobians (shared angular tables) | `src/Scattering/compute_Z_matrices_lin.jl` |
 | Local optical basis and Fourier-independent coefficients | `src/CoreRT/LayerOpticalProperties/local_jacobian{,_cache}.jl` |
-| Equivalent-source adding (opt-in) | `src/CoreRT/CoreKernel/source_adding_lin.jl`, `docs/dev_notes/jacobian_batched/source_adding.md` |
+| Equivalent-source adding (opt-in; SolarBeam + prescribed/retrievable SurfaceSIF, scalar/Legendre Lambertian endpoints) | `src/CoreRT/CoreKernel/source_adding_lin.jl`, `docs/dev_notes/jacobian_batched/source_adding.md` |
 | Local doubling → retrieval contraction → adding | `src/CoreRT/CoreKernel/local_jacobian.jl`, `rt_kernel_lin.jl` |
 | Backend-native phase-node interpolation | `src/CoreRT/LayerOpticalProperties/phase_interpolation.jl` |
 | Jacobian column layout | `src/CoreRT/parameter_layout.jl:1–67` |
