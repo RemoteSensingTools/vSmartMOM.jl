@@ -94,24 +94,41 @@ ported or author-corrected commits should have an explicit provenance map.
   history back in.
 - The original checkout has an unresolved `.gitignore` conflict and staged
   privacy hooks; it is left intact.
-- Later `origin/suniti_multi_sensor` work includes SIF normalization/restart
-  corrections and retrieval campaign tooling. Review and port relevant public
-  source/test changes with their authorship intact; workflow relocation makes
-  a blind whole-branch merge inappropriate. This integration is outstanding.
-- Other feature branches still need an ancestry/patch-equivalence inventory.
+- Eight later Suniti commits, from `6f1cba9b` through `630c9190`, were ported
+  into `sandbox/workflows/RRS_XCO2/`, retaining author identity/date and commit
+  messages. The [port map](release_workflow_ports_2026-09-07.json) records the
+  relocated sources. Synthetic tests exercise the public workflow without
+  importing private campaign products.
+- Already incorporated ancestry includes `main`, `externalAbsorption`,
+  `feat/mie-node-api`, the fused-performance branch, `RamanLuT`, `SS-exact`,
+  `TOMAS-aerosols`, the unified branches, and the older develop/IO branches.
+  The [ref inventory](release_branch_inventory_2026-09-07.json) retains the
+  inspected tips and raw ahead/behind counts. Counts alone do not detect
+  rewritten or selectively ported history.
+- `pr222` is patch-equivalent; `fix-docs` adds documentation entries already
+  present in the candidate. Neither needs a duplicate merge.
+- `perf/cuda-graph-capture` contains an unsuccessful graph experiment. Its
+  required KernelAbstractions synchronization fix is already incorporated;
+  the failed experimental benchmark is not promoted to production.
+- `origin/gchp-io` has four unique commits with sectional aerosol/AOD work and
+  obsolete solver changes. It remains a separate experimental workstream,
+  consistent with the checked-in GCHP adapter proposal. Its bridge to full
+  scattering/RT optics is incomplete; a blind merge would overwrite newer RT.
+  The inherited placeholder `Aerosols.compute_optical_properties` entry point
+  now rejects calls explicitly instead of returning misleading optical data.
+- Older `linMom`/`sanghavi` divergent development histories remain available as
+  provenance archives; current scientific ports are in the unified ancestry.
+  No unsanitized research-product history was merged back into the candidate.
 
-## Outstanding release gates
+## Integration fixes and release checks
 
-Revalidate the earlier [release audit](release_readiness_2026-09-06.md) against
-this candidate. Its aerosol-reference normalization, strict-docs attachment,
-and angular-cache dimension defects have fixes on the Jacobian branch.
-Cox–Munk source scaling and forward/Jacobian consistency, NNlib coexistence,
-and the shipped GPU runner still require work. The candidate is not yet ready
-to register.
+The earlier [release audit](release_readiness_2026-09-06.md) describes defects
+in `b524a0d8`; its verdict is historical, not a verdict on the current candidate.
+The release branch includes the aerosol-normalization/angular-cache repairs,
+Cox–Munk absolute normalization/source/tangent corrections, NNlib isolation,
+and the repaired functional-hardware GPU runner.
 
-Remaining work includes complete public-API/docstring inventory, executable
-documentation examples, schema/parser agreement, pinned Taplo lint/format
-checks, version/migration reconciliation, release automation, fresh dependency
-resolution, and CPU/CUDA plus available platform validation on the final
-candidate. The existing `v2.1.0` tag must not be reused. No release version has
-been selected and no tag, push, registration, or publication has been made.
+Candidate version: **2.2.0**. The existing `v2.1.0` tag is preserved. The
+[final validation record](release_validation_2026-09-07.md) distinguishes local
+checks, data-dependent checks, and remaining publication gates. No tag, push,
+registration, or publication has been made.

@@ -1,0 +1,10 @@
+{
+  ".taplo.toml": "semantic edit",
+  "Artifacts.toml": "format-only (same parsed TOML)",
+  "Project.toml": "semantic edit",
+  "docs/Project.toml": "format-only (same parsed TOML)",
+  "sandbox/workflows/OCORaman/Project.toml": "format-only (same parsed TOML)",
+  "test/Project.toml": "semantic edit",
+  "test/benchmarks/harness/scenarios.toml": "format-only (same parsed TOML)",
+  "test/benchmarks/harness/scenarios_gpu.toml": "format-only (same parsed TOML)"
+}
