@@ -1,3 +1,9 @@
+> Historical development note. This file records prototype/design work and
+> is not the current API contract. The ingestion framework does not implement
+> scheme-to-optics conversion; placeholder optical calculations now raise errors.
+> See the [current aerosol documentation](../../../docs/src/pages/Aerosols/Overview.md) and the production
+> `Scattering` APIs for supported calculations.
+
 # NK Number Size Distribution Exploration Scripts
 
 This directory contains scripts to analyze TOMAS-15 aerosol number concentration (NK) data from GEOSChem output files.
