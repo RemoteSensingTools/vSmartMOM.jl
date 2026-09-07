@@ -1,7 +1,7 @@
 # GPU / Metal test suite — NOT part of the CI unit suite (test/runtests.jl).
 #
 # Run locally with:
-#     julia --project=test test/local/gpu/runtests.jl
+#     cd test && julia --project=. local/gpu/runtests.jl
 # (or as part of the full local suite: test/local/runtests.jl)
 #
 # - test_mie_gpu.jl runs on the KernelAbstractions CPU backend (no GPU required)
@@ -30,11 +30,11 @@ cd(normpath(joinpath(@__DIR__, "..", "..")))
 try
     @testset "GPU / Metal" begin
         # GPU Mie kernels via the KA CPU backend — no CUDA required.
-        @testset "Mie GPU kernels" begin include("local/gpu/test_mie_gpu.jl") end
+        @testset "Mie GPU kernels" begin include("test_mie_gpu.jl") end
 
         # Fused RRS kernels vs batched_mul reference (per-kernel + integration).
         # Self-guards on CUDA (GPU-only path); skips cleanly without a device.
-        @testset "Raman fused kernels" begin include("local/gpu/test_raman_fused_kernels.jl") end
+        @testset "Raman fused kernels" begin include("test_raman_fused_kernels.jl") end
 
         CUDA_AVAILABLE = try
             using CUDA
@@ -44,9 +44,9 @@ try
         end
 
         if CUDA_AVAILABLE
-            @testset "Multisensor GPU" begin include("local/gpu/test_multisensor_heights_gpu.jl") end
-            @testset "Raman GPU"     begin include("local/gpu/test_forward_raman_gpu.jl") end
-            @testset "Jacobians GPU" begin include("local/gpu/test_jacobians_GPU.jl")     end
+            @testset "Multisensor GPU" begin include("test_multisensor_heights_gpu.jl") end
+            @testset "Raman GPU"     begin include("test_forward_raman_gpu.jl") end
+            @testset "Jacobians GPU" begin include("test_jacobians_GPU.jl")     end
         else
             @info "CUDA not available — skipping CUDA-only GPU tests (Raman GPU, Jacobians GPU)."
         end

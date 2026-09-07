@@ -72,19 +72,9 @@ end
         end
         println("  ✓ GPU Jacobian tests passed.")
     catch e
-        errmsg = sprint(showerror, e)
-        if e isa UndefVarError && (isdefined(e, :var) && e.var == :CUBLAS)
-            @test_skip "Linearized RT on GPU requires CUBLAS in CoreRT"
-            println("  Skipping: CUBLAS not set in CoreRT.")
-        elseif occursin("InvalidIRError", errmsg) || occursin("unsupported use of an undefined name", errmsg) || occursin("gpu_get_elem_rt!", errmsg)
-            @test_skip "Linearized RT GPU kernels have device limits (elemental_lin.jl: FT/globals)"
-            println("  Skipping: GPU kernel compilation failed (elemental_lin uses globals).")
-        elseif occursin("Scalar indexing is disallowed", errmsg) || occursin("scalar indexing of a GPU array", errmsg)
-            @test_skip "Linearized RT on GPU hits scalar indexing in doubling/batched_mul path"
-            println("  Skipping: GPU linearized RT triggers scalar indexing (e.g. doubling_lin.jl).")
-        else
-            rethrow(e)
-        end
+        # Functional hardware must expose compilation, scalar-indexing, and
+        # numerical failures to the runner. Only absent hardware is skipped.
+        rethrow()
     end
     end  # has_gpu
 end

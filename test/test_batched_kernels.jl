@@ -1,3 +1,6 @@
+using Test, LinearAlgebra
+using vSmartMOM: CoreRT
+import NNlib
 using KernelAbstractions
 
 @testset "Portable KA batched kernels" begin
@@ -135,4 +138,17 @@ end
         @info "Skipping local Metal batched-kernel smoke on non-Mac or without Metal.jl in the active environment."
         @test true
     end
+end
+
+@testset "Package-owned batched multiplication and NNlib coexistence" begin
+    @test CoreRT.batched_mul !== NNlib.batched_mul
+    for FT in (Float32, Float64, ComplexF64), (a, b) in ((3, 1), (1, 3), (3, 3), (1, 1))
+        A = reshape(FT.(1:4a), 2, 2, a)
+        B = reshape(FT.(1:4b), 2, 2, b)
+        expected = cat([A[:, :, min(k,a)] * B[:, :, min(k,b)]
+                        for k in 1:max(a,b)]...; dims=3)
+        @test NNlib.batched_mul(A, B) ≈ expected
+        @test CoreRT.batched_mul(A, B) ≈ expected
+    end
+    @test_throws DimensionMismatch CoreRT.batched_mul(ones(2, 2, 3), ones(2, 2, 2))
 end

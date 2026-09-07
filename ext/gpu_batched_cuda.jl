@@ -2,12 +2,11 @@
 # This file defines CuArray-specific methods when CUDA is available
 
 using TimerOutputs
-using NNlib
+import NNlib
 using ForwardDiff
 using LinearAlgebra: I
 
-# Import the ⊠ operator (batched multiply) from CoreRT if needed
-import NNlib: batched_mul
+# RT backend specializations belong to CoreRT, leaving NNlib dispatch intact.
 
 # Note: synchronize() in CoreRT already uses Architectures.synchronize_if_gpu()
 # which calls CUDA.synchronize() when CUDA is available (via _sync_gpu Ref)
@@ -205,8 +204,11 @@ function vSmartMOM.CoreRT.make_gpu_rt_workspace(FT::Type, NquadN::Int, nSpec::In
     )
 end
 
-"Batched matrix multiply using CUBLAS (overwrite NNlib definition)"
+"Package-owned batched matrix multiply using CUBLAS."
 function vSmartMOM.CoreRT.batched_mul(A::CuArray{FT,3}, B::CuArray{FT,3}) where {FT}
+    if size(A,3) != size(B,3) || size(A,2) != size(B,1)
+        return NNlib.batched_mul(A, B)
+    end
     # Singleton-batch guard: CUBLAS `gemm_strided_batched` has correctness
     # issues at batchSize=1 (mirrors the CPU singleton-batch bug fixed in
     # `src/CoreRT/tools/cpu_batched.jl`). Fall back to non-batched gemm.
@@ -222,15 +224,15 @@ end
 @inline _as_cuarray3(A::SubArray{FT,3,<:CuArray}) where {FT} = copy(A)
 
 function vSmartMOM.CoreRT.batched_mul(A::SubArray{FT,3,<:CuArray}, B::CuArray{FT,3}) where {FT}
-    CUDA.CUBLAS.gemm_strided_batched('N', 'N', _as_cuarray3(A), B)
+    vSmartMOM.CoreRT.batched_mul(_as_cuarray3(A), B)
 end
 
 function vSmartMOM.CoreRT.batched_mul(A::CuArray{FT,3}, B::SubArray{FT,3,<:CuArray}) where {FT}
-    CUDA.CUBLAS.gemm_strided_batched('N', 'N', A, _as_cuarray3(B))
+    vSmartMOM.CoreRT.batched_mul(A, _as_cuarray3(B))
 end
 
 function vSmartMOM.CoreRT.batched_mul(A::SubArray{FT,3,<:CuArray}, B::SubArray{FT,3,<:CuArray}) where {FT}
-    CUDA.CUBLAS.gemm_strided_batched('N', 'N', _as_cuarray3(A), _as_cuarray3(B))
+    vSmartMOM.CoreRT.batched_mul(_as_cuarray3(A), _as_cuarray3(B))
 end
 
 "Define batched matrix multiply for GPU and Duals"
