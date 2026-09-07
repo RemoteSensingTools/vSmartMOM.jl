@@ -2,6 +2,7 @@
 
 Latest investigation: [IQU bottlenecks and core-optics cost](iqu_followup.md).
 Scientific review: [core derivatives, truncation and state-vector scaling](paper_review.md).
+Historical implementation: [Fortran ordering and ideas retained for Julia](fortran_ordering.md).
 
 Development branch: `perf/jacobian-batched-propagation`, based on integration
 commit `b524a0d85ae36ab0eecf8b23a939f4d6ce62c456`.

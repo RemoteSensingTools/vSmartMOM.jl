@@ -1,0 +1,63 @@
+{
+  "inspected": "2026-09-06",
+  "root": "/home/sanghavi/data/vSmartMOM1.6_lbl_OCO2",
+  "scope": "read-only static source inspection; no historical executable provenance asserted",
+  "files": {
+    "makefile": {
+      "sha256": "af93f48e2164fcf33f42e784ed5fbfb5ce20cbf5a49d9ab88336a3746f2dde6d",
+      "bytes": 9825
+    },
+    "parameter_block.f90": {
+      "sha256": "83b7a22092c02b5527f0e872dd267752b1e22fc3139e1db89745f7215127b035",
+      "bytes": 4504
+    },
+    "misr_image_4_new3.f90": {
+      "sha256": "45678fbfc9e07c38119c56d41d400395928be170417ea6006fa2b6e04505e390",
+      "bytes": 109466
+    },
+    "rt_atmo_new2_homog.f90": {
+      "sha256": "56123386e045f51f25f553b251d9e082bbb212391ffe6fe1f272438b5a43a047",
+      "bytes": 21239
+    },
+    "rt_elemental.f90": {
+      "sha256": "2fd3517ca4de3722062d58be18d7c09748e94d751f397ce248bac44e65090fea",
+      "bytes": 46617
+    },
+    "rt_doubling.f90": {
+      "sha256": "6e3ce629f23e265b5c81b1d9b1db2e816e8362cb67f5e203322b64d23d4b7b0e",
+      "bytes": 22951
+    },
+    "rt_interaction.f90": {
+      "sha256": "a169b1b7f04c7ec5b190ccae5c036156ff29b56f85148515d9ed81db355da464",
+      "bytes": 32053
+    },
+    "rt_atmo_surf3.f90": {
+      "sha256": "01dd75a8fad1921846eee9ddb2667067ec43aa9fe1f122aa2ad35dd6b5067292",
+      "bytes": 33443
+    },
+    "atmo_prop_new6.f90": {
+      "sha256": "fc9f1c7d5fc879852bdda0c2d30a3a647a6a32644f1ad18bcb8d2547b8d3c1b8",
+      "bytes": 22305
+    },
+    "phase_function_new.f90": {
+      "sha256": "308dfcf45b632582c08fff64d04e07e30d532cb1200ac7aa15e80c272791e227",
+      "bytes": 40648
+    },
+    "aerosol.cpp": {
+      "sha256": "ad0f2bb489c52cd761776a0665401b4683094a91746f299cc8c1de5ba1b49460",
+      "bytes": 208465
+    },
+    "matrix_multiply.f90": {
+      "sha256": "c8253f86b15e4ca541d455905fcaab92d4b4fdd27a38c8806217ff9bb878b203",
+      "bytes": 9134
+    },
+    "invert_matrix.f90": {
+      "sha256": "b72981a8a624fd81fc8af531a09f0838e312d640ccfccf631cd121fc7bc9dcef",
+      "bytes": 9390
+    },
+    "spl_quad_pts.f90": {
+      "sha256": "a4c74f60ea14d054b34ac4e4ad1cb47a1616185c3c0ef2b4bd87eea3f83a99d9",
+      "bytes": 5351
+    }
+  }
+}

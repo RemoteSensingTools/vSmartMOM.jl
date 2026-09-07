@@ -1,5 +1,10 @@
 # Sanghavi core derivatives and the Claude review
 
+Follow-up: the user supplied an older Fortran/C++ implementation. Its
+[verified call ordering](fortran_ordering.md) shows delayed molecular-optics
+contraction after doubling, alongside early aerosol-parameter expansion.
+It provides architectural evidence, not a replacement numerical baseline.
+
 Checked 2026-09-06 against the local paper PDFs and the active implementation on
 `origin/sanghavi`, commit `fc74e3f0685b6cdaac9db963278fa3ecfe10cb8d`.
 
