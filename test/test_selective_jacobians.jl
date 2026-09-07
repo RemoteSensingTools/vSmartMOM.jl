@@ -272,7 +272,10 @@ end
 
     ngas = size(lin_full.τ̇_abs[1], 1)
     full_layout = ParameterLayout(n_aerosols=1, n_gases=ngas, n_surface=1)
-    full = rt_run(model_full, lin_full, 1, ngas, 1)
+    # Preserve the exact early-selection regression within one contraction
+    # order. Local-basis contraction changes arithmetic association; test
+    # its agreement separately below with near-roundoff tolerances.
+    full = rt_run(model_full, lin_full, 1, ngas, 1; jacobian_basis=:physical)
 
     keys = [
         ParameterKey(:atmosphere, :surface_pressure),
@@ -297,4 +300,13 @@ end
     @test size(selected.toa_jacobian, 4) == 4
     @test selected.toa_jacobian == full.toa_jacobian[:, :, :, native_columns]
     @test selected.boa_jacobian == full.boa_jacobian[:, :, :, native_columns]
+
+    factored_full = rt_run(model_full, lin_full, 1, ngas, 1; jacobian_basis=:local)
+    factored_selected = rt_run(model_fixed, PlannedRTModelLin(lin_fixed, plan);
+                               jacobian_basis=:local)
+    for field in (:toa,:boa,:toa_jacobian,:boa_jacobian)
+        @test getproperty(factored_selected,field) ≈ getproperty(selected,field) rtol=1e-12 atol=1e-15
+    end
+    @test factored_selected.toa_jacobian ≈ factored_full.toa_jacobian[:,:,:,native_columns] rtol=1e-12 atol=1e-15
+    @test factored_selected.boa_jacobian ≈ factored_full.boa_jacobian[:,:,:,native_columns] rtol=1e-12 atol=1e-15
 end

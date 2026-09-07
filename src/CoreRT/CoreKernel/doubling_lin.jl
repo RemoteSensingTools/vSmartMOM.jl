@@ -201,16 +201,15 @@ end
     doubling_allparams_helper!(pol_type, SFI, expk, ndoubl, added_layer, 
                                added_layer_lin, I_static, architecture, dτ̇, μ₀)
 
-Propagate **N physical-parameter** derivatives through the doubling method (Bug 19 fix).
+Propagate the supplied complete matrix directions through doubling.
 
-Unlike `doubling_helper!` which propagates only the 3 core derivatives (τ, ϖ, Z),
-this function propagates the `ap_` (all-params) fields through doubling. This is 
-necessary because the Z chain rule must be applied at the **elemental** level 
-(where it is correctly element-wise), not after doubling (where matrix products 
-have mixed the Z indices).
-
-The chain rule (`lin_added_layer_all_params!`) should be called BEFORE this function
-to fill the `ap_ṙ⁻⁺`, `ap_ṫ⁺⁺`, `ap_J̇₀⁺`, `ap_J̇₀⁻` fields.
+The `ap_` fields can carry physical retrieval columns or a compact local
+optical basis. The elemental kernel initializes them by the chain rule on
+finite-thickness single scattering. Doubling then differentiates each matrix
+product and inverse, preserving angular coupling (S2014, Appendix C).
+A local basis may be contracted to physical columns after doubling because
+this tangent map is linear at a fixed forward state; an elementwise phase
+partial may not. See [`build_doubled_layer_lin!`](@ref).
 
 For SFI, the beam attenuation derivative `d(e^{-τ/μ₀})/dp_j = -e^{-τ/μ₀}/μ₀ ⋅ ∂τ/∂p_j`
 is per-parameter, handled via `dτ̇` (the elemental τ derivative per parameter).

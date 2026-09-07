@@ -59,6 +59,7 @@ include("Sources/types.jl")                    # v0.6 AbstractSource / SourceSet
 include("types.jl")
 include("parameter_layout.jl")                 # ParameterLayout struct for Jacobian indexing
 include("types_lin.jl")                        # Types for linearized RT
+include("LayerOpticalProperties/local_jacobian_types.jl")
 include("Sources/solar_beam.jl")               # v0.6 SolarBeam + PreparedSolarBeam (Phase 2)
 include("Sources/surface_sif.jl")              # v0.6 SurfaceSIF + PreparedSurfaceSIF (Phase 5)
 include("Sources/thermal_emission.jl")         # v0.7 Phase A: ThermalEmission per-layer Planck volume source
@@ -73,13 +74,16 @@ include("CoreKernel/fused_raman_kernels.jl") # Fused KA kernels for RRS per-Δn 
 
 # Solvers -- Elemental
 include("CoreKernel/elemental.jl")             # Elemental (elastic)
-include("CoreKernel/elemental_lin.jl")         # Elemental (linearized)
+include("CoreKernel/elemental_partials_lin.jl") # Reference elemental core partials
+include("CoreKernel/elemental_fused_lin.jl")    # Fused elemental tangent kernels
+include("CoreKernel/elemental_lin.jl")          # Elemental dispatch and symmetry
 include("CoreKernel/elemental_inelastic.jl")   # Elemental for inelastic scattering
 include("CoreKernel/elemental_inelastic_plus.jl")   # Elemental for inelastic scattering (VS/RVRS)
 include("CoreKernel/elemental_canopy.jl")
 
 # Solvers -- Doubling
 include("CoreKernel/doubling.jl")              # Doubling (elastic)
+include("CoreKernel/jacobian_blocked.jl")
 include("CoreKernel/jacobian_batched.jl")      # Batched physical-parameter propagation
 include("CoreKernel/doubling_lin.jl")          # Doubling (linearized)
 include("CoreKernel/doubling_inelastic.jl")    # Doubling for elastic + inelastic scattering 
@@ -95,6 +99,7 @@ include("CoreKernel/interlayer_flux.jl")       # Interlayer flux
 
 # Solvers -- RT Kernels
 include("CoreKernel/rt_kernel.jl")             # Handle Core RT (Elemental/Doubling/Interaction)
+include("CoreKernel/local_jacobian.jl")        # Local doubling and delayed contraction
 include("CoreKernel/rt_kernel_lin.jl")         # Linearized RT kernel
 include("CoreKernel/rt_kernel_ss.jl")          # Single scattering RT kernel
 include("CoreKernel/rt_kernel_multisensor.jl") # Multi-sensor RT kernel
@@ -135,9 +140,14 @@ include("tools/lin_model_from_parameters.jl")     # Linearized model from parame
 include("tools/jacobian_plans.jl")                # Retrieval-selective Jacobian layouts
 include("tools/update_model.jl")                  # BatchContext + update_model! for batch processing
 include("tools/show_utils.jl")                    # Pretty-printing objects
+include("LayerOpticalProperties/phase_interpolation.jl")
 include("LayerOpticalProperties/compEffectiveLayerProperties.jl")
 include("LayerOpticalProperties/delta_m_truncation.jl")         # δ-M truncation + chain rule
+include("LayerOpticalProperties/phase_blocks_lin.jl")
+include("LayerOpticalProperties/optical_jacobian_cache.jl")
 include("LayerOpticalProperties/compEffectiveLayerProperties_lin.jl")
+include("LayerOpticalProperties/local_jacobian_cache.jl")
+include("LayerOpticalProperties/local_jacobian.jl")
 
 # Surfaces
 include("Surfaces/lambertian_surface.jl")            # Lambertian Surface 

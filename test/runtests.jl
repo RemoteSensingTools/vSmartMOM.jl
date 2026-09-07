@@ -47,6 +47,9 @@ try
 # Jacobian unit tests
 @testset "Jacobian Unit" begin include("test_jacobians_unit.jl") end
 @testset "Batched Jacobians" begin include("test_jacobian_batched.jl") end
+@testset "Blocked Jacobians" begin include("test_jacobian_blocked.jl") end
+@testset "Phase interpolation" begin include("test_phase_interpolation.jl") end
+@testset "Local optical Jacobians" begin include("test_local_jacobian.jl") end
 @testset "Tabulated phase Jacobians" begin include("test_z_jacobian_tables.jl") end
 @testset "Batched Lambertian Jacobians" begin include("test_lambertian_jacobian_batched.jl") end
 @testset "Selective Jacobians" begin include("test_selective_jacobians.jl") end

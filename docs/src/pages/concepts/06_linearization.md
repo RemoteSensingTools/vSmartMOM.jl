@@ -64,9 +64,9 @@ See [Compute Jacobians → Retrieval-Selected Jacobians](../jacobians.md#retriev
 Selection is performed during the moment-invariant aerosol/gas cache build,
 not after a full mixed tangent has been formed. Each native column is first
 assigned to pressure, a component-local aerosol block, or the gas block.
-Only those compact blocks are mixed into the Fourier-dependent phase
-derivative, and every subsequent elemental/doubling/interaction allocation
-uses the band-local count. Fixed forward physics is retained even when its
+Only those compact blocks enter optical assembly. Elemental/doubling
+propagation may use a still smaller local optical basis; adding and output
+accumulation use the band-local retrieval count. Fixed forward physics is retained even when its
 tangent is omitted.
 
 **Downstream — the pure-`FT` zone** (elemental, doubling, interaction).
@@ -118,10 +118,10 @@ step. Its tangent follows directly from the inverse rule:
 ```
 
 The positive sign comes from differentiating ``\mathbf{E}-\mathbf{R}\mathbf{R}``.
-In the current directional implementation, the same forward inverse is reused
-for every active physical parameter.
-This saves repeated factorizations, but each parameter still requires matrix
-products and source propagation. The total cost depends on the number of
+The same forward inverse is reused for every supplied tangent direction.
+Doubling uses local optical directions when they are fewer than retrieval
+columns. Adding still requires matrix products and source propagation for
+each retrieval column. The total cost depends on the number of
 requested columns, operator size, spectral batch, precision and backend;
 there is no universal ratio to the forward-only runtime.
 
@@ -135,14 +135,40 @@ Three stored elemental partial arrays do not represent the dense phase-matrix
 Jacobian after multiple scattering. The dedicated core-properties benchmark in
 `docs/dev_notes/jacobian_batched/` records its derivative basis explicitly.
 
-This directional implementation is one choice of chain-rule contraction order.
+The default `jacobian_basis=:auto` chooses a local optical basis for a
+single-band solve whenever it reduces the atmospheric tangent dimension.
+Use `:physical` to retain direct physical-column propagation for comparison,
+or `:local` to force the factored path. Multi-band concatenated solves retain
+the physical path; `:local` rejects them explicitly.
+
 Sanghavi et al. (2014), (C.25)–(C.26), factor microphysical derivatives through
 ``(τ_i,ω_i,Z_i,f_i)``; their truncation symbol ``β_i`` is the code's ``f^t``,
-not a Greek expansion coefficient. Here ``f^t`` and its derivative enter the
-modified optical depth, albedo and phase upstream. A separately assembled core
-Jacobian could be reused for different retrieval mappings, provided its phase
-basis represents the required matrix-valued derivatives. The current benchmark
-does not implement or time that alternative.
+not a Greek expansion coefficient. Both the scalar truncation chain and the
+normalized truncated-Greek tangents include ``df^t`` upstream.
+
+For the current fixed Rayleigh phase, write scattering fractions
+``α_i=S_i/S``, where ``S_i=τ_iϖ_i`` and ``S`` includes Rayleigh scattering.
+Differentiating the mixture definitions (C.22)–(C.24) gives
+
+```math
+Z=Z_r+\sum_i α_i(Z_i-Z_r),\qquad
+\dot Z=\sum_i[\dot α_i(Z_i-Z_r)+α_i\dot Z_i].
+```
+
+Thus `2 + 5Naer` directions suffice: optical depth, albedo, and for each
+aerosol its phase difference from Rayleigh plus four truncated Mie phase
+tangents. All layers share these phase directions at each Fourier order.
+Small scalar coefficient arrays, prepared once before the Fourier loop,
+map the local directions to retrieval columns. Gas and profile parameters
+introduce no additional phase directions under this fixed phase model.
+
+The elemental and doubling kernels propagate these **complete matrix
+directions**. After doubling, a scalar-weighted contraction produces the
+physical operator tangents for adding. This is valid by linearity of the
+tangent map at fixed forward state; it does not apply an elementwise phase
+partial after multiple scattering. Above-layer solar attenuation is held
+fixed during local propagation and appended once as
+``-J\dot τ_{above}/μ_0`` after contraction.
 
 An adjoint is therefore an option, not a prerequisite for sub-2× performance.
 The scalar [Sanghavi et al. (2013)](https://doi.org/10.1016/j.jqsrt.2012.10.021)
@@ -178,12 +204,12 @@ The full derivation is Sanghavi 2014 App. C. The structure (skipping arithmetic)
 | Eq. | What it says | Source file |
 |---|---|---|
 | (C.5)–(C.7) | Differentiation rules for matrix products and inverses | (foundation; used everywhere below) |
-| (C.8)–(C.10) | Infinitesimal elemental/thermal derivatives; current finite-δ solar kernels differentiate SF2023-II (10)–(11) using the same calculus | `elemental_lin.jl` |
+| (C.8)–(C.10) | Infinitesimal elemental/thermal derivatives; current finite-δ solar kernels differentiate SF2023-II (10)–(11) using the same calculus | `elemental_fused_lin.jl` |
 | (C.11)–(C.16) | Doubling/adding derivatives — same shape as the forward Eqs (23)–(28), tangent-linear | `doubling_lin.jl`, `interaction_lin.jl` |
 | (C.17)–(C.20) | D-matrix symmetry on derivatives — halves the linearized doubling cost | `doubling_lin.jl` |
-| (C.21) | Final assembled derivative form — written directly by `get_elem_rt_fused!` / `get_elem_rt_SFI_fused!` into the `ap_*` arrays during the elemental step | `elemental_lin.jl` |
+| (C.21) | Final assembled derivative form — written directly by `get_elem_rt_fused!` / `get_elem_rt_SFI_fused!` into the `ap_*` arrays during the elemental step | `elemental_fused_lin.jl` |
 | (C.22)–(C.24) | Layer-averaged ``\bar{\tau}``, ``\bar{\varpi}_0``, ``\bar{\mathbf{Z}}`` definitions | `compEffectiveLayerProperties.jl` (forward); `compEffectiveLayerProperties_lin.jl` (lin) |
-| (C.25)–(C.26) | Chain rule from the elemental SS variables to the microphysical parameters ``(n_r, n_i, r_m, \sigma)`` | `elemental_lin.jl` + `Scattering/types_lin.jl` |
+| (C.25)–(C.26) | Chain rule from the elemental SS variables to the microphysical parameters ``(n_r, n_i, r_m, \sigma)`` | `elemental_fused_lin.jl` + `Scattering/types_lin.jl` |
 | (C.27)–(C.31) | δ derivatives (elemental thickness from `N_doubl`) | `compEffectiveLayerProperties_lin.jl` |
 | (C.32)–(C.39) | ``\bar{\varpi}_0`` and ``\bar{\mathbf{Z}}`` derivatives (post-truncation) | same |
 | (C.40) | ``\dot{\mathbf{Z}}_m`` from generalized spherical harmonics | `compute_Z_matrices_lin.jl` |
@@ -274,7 +300,9 @@ involving `rt_run`.
 | Elemental derivatives | [`src/CoreRT/CoreKernel/elemental_lin.jl`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/CoreKernel/elemental_lin.jl) |
 | Doubling derivatives | [`src/CoreRT/CoreKernel/doubling_lin.jl`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/CoreKernel/doubling_lin.jl) |
 | Interaction derivatives | [`src/CoreRT/CoreKernel/interaction_lin.jl`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/CoreKernel/interaction_lin.jl) |
-| Chain-rule expansion to all parameters | [`src/CoreRT/CoreKernel/elemental_lin.jl`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/CoreKernel/elemental_lin.jl) — fused kernels `get_elem_rt_fused!` / `get_elem_rt_SFI_fused!` write `ap_*` directly |
+| Elemental tangent chain rule | `src/CoreRT/CoreKernel/elemental_fused_lin.jl` |
+| Local-basis contraction after doubling | `src/CoreRT/CoreKernel/local_jacobian.jl` |
+| Local optical coefficients and shared phase basis | `src/CoreRT/LayerOpticalProperties/local_jacobian_cache.jl`, `local_jacobian.jl` |
 | Three-core-variable lin type | [`src/CoreRT/types_lin.jl:119–149`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/types_lin.jl#L119-L149) |
 | Optical-property Jacobian boundary | `src/CoreRT/types.jl::CoreScatteringOpticalPropertiesLin` |
 | ParameterLayout | [`src/CoreRT/parameter_layout.jl:1–67`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/parameter_layout.jl#L1-L67) |

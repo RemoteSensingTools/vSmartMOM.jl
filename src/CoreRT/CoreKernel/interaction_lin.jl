@@ -44,8 +44,8 @@ the inverse derivative analytic while reusing the forward factorization.
 
 The ``\\mathbf{ap\\_*}`` fields on `AddedLayerLin` carry the chain-rule
 expansion to the **physical state vector** ``\\mathbf{x}`` — written
-directly by the fused elemental kernels `get_elem_rt_fused!` and
-`get_elem_rt_SFI_fused!` before this interaction kernel runs; the
+by direct elemental/doubling propagation or by contraction of complete
+local-basis tangents before this interaction kernel runs; the
 `AddedLayerLin` fields without `ap_` retain elemental core partials.
 The dotted fields on `CompositeLayerLin` already carry the full supplied
 parameter axis, just like the added layer's `ap_` fields.

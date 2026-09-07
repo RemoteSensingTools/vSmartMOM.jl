@@ -61,8 +61,8 @@ function _compute_aerosol_phase_blocks(model, optics, ν_spec, m, arr_type;
         model, optics.greek_coefs, m, arr_type; tables, Π_pair)
     blocks = [_compute_phase_blocks(model, g, m, Array; tables, Π_pair)
               for g in optics.phase_greek]
-    interp(k) = arr_type(_interpolate_phase_nodes(ν_spec, optics.phase_ν,
-                                                   [b[k] for b in blocks]))
+    interp(k) = interpolate_phase_blocks(ν_spec, optics.phase_ν,
+                                          [b[k] for b in blocks], arr_type)
     Z⁺⁺, Z⁻⁺ = interp(1), interp(2)
     if blocks[1][3] === nothing
         return Z⁺⁺, Z⁻⁺, nothing, nothing

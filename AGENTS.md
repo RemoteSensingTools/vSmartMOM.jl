@@ -133,7 +133,7 @@ bandwidth.
 Not marketing — each claim has a `file:line`. Mirror this list in user-facing
 material when explaining the package:
 
-1. **Operator-level analytic linearization.** The RT kernel is hand-differentiated; AD is upstream-only. Forward inverses are reused for all requested Jacobian columns. Cost still grows with active parameter count and depends on operator size, spectral batch and backend. The development target of <2× forward concerns the full solve from supplied core optics, excluding upstream Mie/mixing; benchmark the tangent basis explicitly and do not present the target as a measured guarantee. Small GPU operators batch product rules over wavelength × parameter, and doubling/general interaction reuse scratch. — `src/CoreRT/CoreKernel/{elemental,doubling,interaction}_lin.jl`, `src/CoreRT/CoreKernel/jacobian_batched.jl`. See `docs/src/pages/concepts/06_linearization.md` § "Why this is fast".
+1. **Operator-level analytic linearization.** The RT kernel is hand-differentiated; AD is upstream-only. Forward inverses are reused for all requested Jacobian columns. A compact local optical basis is doubled independently of retrieval size; complete doubled tangents are contracted before adding. Adding still grows with active parameter count. Cost depends on operator size, spectral batch and backend. The development target of <2× forward concerns the full solve from supplied core optics, excluding upstream Mie/mixing; benchmark the tangent basis explicitly and do not present the target as a measured guarantee. Small GPU operators batch product rules over wavelength × parameter, and doubling/general interaction reuse scratch. — `src/CoreRT/CoreKernel/{elemental,doubling,interaction}_lin.jl`, `src/CoreRT/CoreKernel/jacobian_batched.jl`. See `docs/src/pages/concepts/06_linearization.md` § "Why this is fast".
 2. **One `@kernel` source compiles for CPU, CUDA, and Metal.** — `src/Architectures.jl:33–96`, `ext/vSmartMOMCUDAExt.jl:21–27`, `ext/vSmartMOMMetalExt.jl:19–22`.
 3. **Hybrid AD across the GPU boundary.** `ForwardDiff.Dual` flows through `NNlib.batched_mul` on `CuArray`. — `ext/gpu_batched_cuda.jl:141–177`.
 4. **Polarization is a type, not a runtime branch.** `Stokes_I/IQ/IQU/IQUV` specialize the kernels at compile time. — `src/Scattering/types.jl:92–143`.
@@ -192,8 +192,11 @@ material when explaining the package:
 | External-solar TOA-only entry point | `src/CoreRT/rt_run.jl::rt_run_toa` |
 | Batched supplied-tangent propagation | `src/CoreRT/CoreKernel/jacobian_batched.jl` |
 | Linearization kernels | `src/CoreRT/CoreKernel/{elemental,doubling,interaction}_lin.jl` |
-| Chain-rule expansion (fused) | `src/CoreRT/CoreKernel/elemental_lin.jl:456–591` (`get_elem_rt_fused!`), `602–815` (`get_elem_rt_SFI_fused!`) |
+| Chain-rule expansion (fused) | `src/CoreRT/CoreKernel/elemental_fused_lin.jl::{get_elem_rt_fused!,get_elem_rt_SFI_fused!}` |
 | Tabulated phase Jacobians (shared angular tables) | `src/Scattering/compute_Z_matrices_lin.jl` |
+| Local optical basis and Fourier-independent coefficients | `src/CoreRT/LayerOpticalProperties/local_jacobian{,_cache}.jl` |
+| Local doubling → retrieval contraction → adding | `src/CoreRT/CoreKernel/local_jacobian.jl`, `rt_kernel_lin.jl` |
+| Backend-native phase-node interpolation | `src/CoreRT/LayerOpticalProperties/phase_interpolation.jl` |
 | Jacobian column layout | `src/CoreRT/parameter_layout.jl:1–67` |
 | Retrieval-selected Jacobian plans (`OCO_RRS_synth`) | `src/CoreRT/parameter_layout.jl`, `src/CoreRT/tools/jacobian_plans.jl` |
 | Architecture types | `src/Architectures.jl:1–98` |

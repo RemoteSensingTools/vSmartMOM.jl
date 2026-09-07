@@ -13,6 +13,7 @@
 # Keep the reference propagation available for numerical/performance A/B checks.
 const _BATCHED_JACOBIANS_ENABLED = Ref(true)
 const _TILED_JACOBIANS_ENABLED = Ref(true)
+const _MEDIUM_JACOBIANS_ENABLED = Ref(false) # Enable only after operator/scene benchmarks.
 const _JACOBIAN_FUSED_INVERSE_ENABLED = Ref(true)
 _jacobian_tiles_supported(::Any) = false
 
@@ -21,12 +22,19 @@ _jacobian_tiles_supported(::Any) = false
     16 <= size(C,1) <= 32 && size(C,3) >= 512 &&
     size(C,1) == size(C,2) == size(A,1) == size(A,2) == size(B,1) == size(B,2)
 
+@inline _use_blocked_jacobians(backend,C,A,B) =
+    _MEDIUM_JACOBIANS_ENABLED[] && _jacobian_tiles_supported(backend) &&
+    32 < size(C,1) <= 64 && size(C,3) >= 64 &&
+    size(C,1) == size(C,2) == size(A,1) == size(A,2) == size(B,1) == size(B,2)
+
 function make_jacobian_workspace(A::AbstractArray{FT,3}, nparams) where {FT}
     FT <: Union{Float32,Float64} || return nothing
     # The portable GPU products are intended for small diffuse operators.
     # Larger operators retain vendor-BLAS propagation until benchmarked.
     backend = KernelAbstractions.get_backend(A)
-    backend isa KernelAbstractions.CPU || size(A, 1) <= 32 || return nothing
+    gpu_limit = _MEDIUM_JACOBIANS_ENABLED[] && _jacobian_tiles_supported(backend) &&
+                size(A,3) >= 64 ? 64 : 32
+    backend isa KernelAbstractions.CPU || size(A, 1) <= gpu_limit || return nothing
     n, _, ns = size(A)
     matrix() = similar(A)
     vector() = similar(A, n, 1, ns)
@@ -142,6 +150,11 @@ function _jmul!(C, A, B, β=zero(eltype(C)))
         _jac_cpu_batches!(C, size(A,2)) do s, p
             mul!(_jac_slice(C,s,p), _jac_slice(A,s,p), _jac_slice(B,s,p), one(eltype(C)), β)
         end
+    elseif _use_blocked_jacobians(backend,C,A,B)
+        n = size(C,1)
+        side = 16cld(n,16)
+        _jac_mul_blocked!(backend,(16,16,1))(C,A,B,β,Val(n);
+            ndrange=(side,side,size(C,3)*size(C,4)))
     elseif _use_jacobian_tiles(backend,C,A,B)
         n = size(C,1)
         _jac_mul_tiled!(backend,n*n)(C,A,B,β,Val(n);
@@ -163,6 +176,11 @@ function _jprod!(dC, A, dA, B, dB)
             mul!(C, _jac_slice(dA,s,p), _jac_slice(B,s,p))
             mul!(C, _jac_slice(A,s,p), _jac_slice(dB,s,p), one(eltype(C)), one(eltype(C)))
         end
+    elseif _use_blocked_jacobians(backend,dC,A,B)
+        n = size(dC,1)
+        side = 16cld(n,16)
+        _jac_product_blocked!(backend,(16,16,1))(dC,A,dA,B,dB,Val(n);
+            ndrange=(side,side,size(dC,3)*size(dC,4)))
     elseif _use_jacobian_tiles(backend,dC,A,B)
         n = size(dC,1)
         _jac_product_tiled!(backend,n*n)(dC,A,dA,B,dB,Val(n);

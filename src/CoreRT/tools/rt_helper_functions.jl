@@ -88,18 +88,21 @@ Stokes-scaled indices for quadrature point `iμ`. Returns `(st_iμ, istart, iend
     return st_iμ, istart, iend
 end
 
+"Allocate and zero RT storage on its target backend, without a host-sized temporary."
+_backend_zeros(FT, AT, dims...) = fill!(similar(AT(FT[]), dims...), zero(FT))
+
 """Allocate zero matrix for RT reflection/transmission: `[nμ, nμ, nSpec]`."""
-@inline default_matrix(FT, arr_type, dims, nSpec) = arr_type(zeros(FT, (dims[1], dims[2], nSpec)))
+@inline default_matrix(FT, arr_type, dims, nSpec) = _backend_zeros(FT, arr_type, dims[1], dims[2], nSpec)
 "Default matrix in ieRT calculation (zeros)"
 @inline default_matrix_ie(FT, arr_type, dims, nSpec, nRaman) = arr_type(zeros(FT, (dims[1], dims[2], nSpec, nRaman)))
 
 "Default J matrix in RT calculation (zeros)"
-@inline default_J_matrix(FT, arr_type, dims, nSpec) = arr_type(zeros(FT, (dims[1], 1, nSpec)))
+@inline default_J_matrix(FT, arr_type, dims, nSpec) = _backend_zeros(FT, arr_type, dims[1], 1, nSpec)
 "Default J matrix in ieRT calculation (zeros)"
 @inline default_J_matrix_ie(FT, arr_type, dims, nSpec, nRaman) = arr_type(zeros(FT, (dims[1], 1, nSpec, nRaman)))
 
 @inline function default_solar_columns(FT, arr_type, dims, nStokes, nSpec)
-    make_column() = arr_type(zeros(FT, dims[1], nStokes, nSpec))
+    make_column() = _backend_zeros(FT, arr_type, dims[1], nStokes, nSpec)
     SolarColumnOperators(R₀⁻⁺=make_column(), R₀⁺⁻=make_column(),
                          T₀⁺⁺=make_column(), T₀⁻⁻=make_column())
 end
@@ -111,12 +114,12 @@ end
 end
 
 "Default matrix in RT calculation (zeros) — multi-sensor variant"
-@inline default_matrix(FT, arr_type, NSens, dims, nSpec) = [arr_type(zeros(FT, (dims[1], dims[2], nSpec))) for _ in 1:NSens]
+@inline default_matrix(FT, arr_type, NSens, dims, nSpec) = [_backend_zeros(FT, arr_type, dims[1], dims[2], nSpec) for _ in 1:NSens]
 "Default matrix in ieRT calculation (zeros) — multi-sensor variant"
 @inline default_matrix_ie(FT, arr_type, NSens, dims, nSpec, nRaman) = [zeros(FT, (dims[1], dims[2], nSpec, nRaman)) for _ in 1:NSens]
 
 "Default J matrix in RT calculation (zeros) — multi-sensor variant"
-@inline default_J_matrix(FT, arr_type, NSens, dims, nSpec) = [arr_type(zeros(FT, (dims[1], 1, nSpec))) for _ in 1:NSens]
+@inline default_J_matrix(FT, arr_type, NSens, dims, nSpec) = [_backend_zeros(FT, arr_type, dims[1], 1, nSpec) for _ in 1:NSens]
 "Default J matrix in ieRT calculation (zeros) — multi-sensor variant"
 @inline default_J_matrix_ie(FT, arr_type, NSens, dims, nSpec, nRaman) = [zeros(FT, (dims[1], 1, nSpec, nRaman)) for _ in 1:NSens]
 

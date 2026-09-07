@@ -41,6 +41,9 @@ physical parameters via the linearized Matrix Operator Method.
 - `NGas::Int`: Number of layer-resolved gas VMR parameters (`NGasSpecies×Nz`).
 - `NSurf::Int`: Number of surface parameters (typically 1 for Lambertian albedo).
 - `i_band::Integer=1`: Spectral band index.
+- `jacobian_basis=:auto`: Double a local optical basis when smaller than the
+  atmospheric retrieval layout. `:physical` propagates retrieval columns
+  directly; `:local` forces the local basis for a single-band solve.
 
 # Returns
 An [`ObserverRTResultLin`](@ref). It remains iterable as the historical
@@ -71,7 +74,8 @@ Layers are then combined via the adding (interaction) method from TOA to surface
 
 At the elemental boundary the code contracts core-optics partials with the
 supplied tangent directions, then propagates those directional derivatives
-through every doubling and adding step. Schematically, for all layers:
+through doubling. A local optical basis is contracted to retrieval columns
+before adding, as described in `build_doubled_layer_lin!`. Schematically, for all layers:
 ```math
 \\frac{\\partial \\mathbf{R}}{\\partial p_j} = 
   \\sum_k \\left[\\frac{\\partial \\mathbf{R}}{\\partial \\tau_k} \\frac{\\partial \\tau_k}{\\partial p_j} +
@@ -88,8 +92,9 @@ function rt_run(model,
         lin_model,
         NAer::Int, NGas::Int, NSurf::Int;
         i_band::Integer = 1,
-        sources::Union{Nothing, AbstractSource} = nothing)
-    rt_run(InelasticScattering.noRS{float_type(model)}(), model, lin_model, NAer, NGas, NSurf, i_band; sources)
+        sources::Union{Nothing, AbstractSource} = nothing,
+        jacobian_basis::Symbol=:auto)
+    rt_run(InelasticScattering.noRS{float_type(model)}(), model, lin_model, NAer, NGas, NSurf, i_band; sources, jacobian_basis)
 end
 
 """
@@ -101,8 +106,9 @@ Convenience alias for the linearized `rt_run` overload.  Equivalent to
 rt_run_lin(model, lin_model,
            NAer::Int, NGas::Int, NSurf::Int;
            i_band::Integer = 1,
-           sources::Union{Nothing,AbstractSource} = nothing) =
-    rt_run(model, lin_model, NAer, NGas, NSurf; i_band, sources)
+           sources::Union{Nothing,AbstractSource} = nothing,
+           jacobian_basis::Symbol=:auto) =
+    rt_run(model, lin_model, NAer, NGas, NSurf; i_band, sources, jacobian_basis)
 
 """
     rt_run(model, lin_model::PlannedRTModelLin; i_band=1, sources=nothing)
@@ -114,20 +120,22 @@ returned band-local Jacobian into the shared retrieval state.
 """
 function rt_run(model, lin_model::PlannedRTModelLin;
                 i_band::Integer=1,
-                sources::Union{Nothing,AbstractSource}=nothing)
+                sources::Union{Nothing,AbstractSource}=nothing,
+                jacobian_basis::Symbol=:auto)
     layout = band_layout(lin_model.plan, i_band)
     NAer = CoreRT.n_aerosols(model)
     NGas = size(lin_model.base.τ̇_abs[i_band], 1)
     NSurf = surface_parameter_count(get_surface(model, i_band))
     return rt_run(InelasticScattering.noRS{float_type(model)}(),
                   model, lin_model.base, NAer, NGas, NSurf, i_band;
-                  sources, active_layout=layout)
+                  sources, active_layout=layout, jacobian_basis)
 end
 
 rt_run_lin(model, lin_model::PlannedRTModelLin;
            i_band::Integer=1,
-           sources::Union{Nothing,AbstractSource}=nothing) =
-    rt_run(model, lin_model; i_band, sources)
+           sources::Union{Nothing,AbstractSource}=nothing,
+           jacobian_basis::Symbol=:auto) =
+    rt_run(model, lin_model; i_band, sources, jacobian_basis)
 
 # Just to make sure we still have it:
 function rt_run_test(RS_type::AbstractRamanType,
@@ -147,7 +155,8 @@ function rt_run(RS_type::AbstractRamanType,
                     NAer::Int, NGas::Int, NSurf::Int,
                     iBand;
                     sources::Union{Nothing, AbstractSource} = nothing,
-                    active_layout::Union{Nothing,ActiveParameterLayout} = nothing)
+                    active_layout::Union{Nothing,ActiveParameterLayout} = nothing,
+                    jacobian_basis::Symbol = :auto)
     if InelasticScattering.has_inelastic(RS_type)
         throw(ArgumentError(
             "Linearized Raman-active RT is intentionally unsupported. " *
@@ -275,17 +284,23 @@ function rt_run(RS_type::AbstractRamanType,
     """
     @info msg
 
+    local_basis = use_local_jacobian(jacobian_basis, layout, iBand, NAer)
+    local_workspace = local_basis ? make_local_jacobian_workspace(
+        RS_type, FT, arr_type, local_jacobian_size(NAer), dims, nSpec,
+        quad_points, pol_type) : nothing
+
     # Create arrays
     @timeit "Creating layers" added_layer, added_layer_lin          = 
         make_added_layer(lin, RS_type, FT, arr_type, Nparams, dims, nSpec;
                          external_solar=quad_points.external_solar,
-                         nStokes=pol_type.n)
+                         nStokes=pol_type.n, doubling_scratch=!local_basis,
+                         core_partials=!local_basis)
     # Just for now, only use noRS here
 
     @timeit "Creating layers" added_surface_layer, added_surface_layer_lin = 
         make_added_layer(lin, RS_type, FT, arr_type, Nparams, dims, nSpec;
                          external_solar=quad_points.external_solar,
-                         nStokes=pol_type.n)
+                         nStokes=pol_type.n, doubling_scratch=false)
     @timeit "Creating layers" composite_layer, composite_layer_lin  = 
         make_composite_layer(lin, RS_type, FT, arr_type, Nparams, dims, nSpec)
     # Each interior observer owns two ordinary forward/tangent composites:
@@ -316,6 +331,10 @@ function rt_run(RS_type::AbstractRamanType,
     @timeit "OpticalProps invariant" m_invariant_cache =
         build_m_invariant_cache_lin(iBand, model, lin_model;
                                     active_layout)
+    if local_basis
+        @timeit "OpticalProps invariant" m_invariant_cache =
+            build_local_jacobian_cache(iBand, model, lin_model, m_invariant_cache)
+    end
 
     # The combined forward/analytic-linearization path uses the same forward
     # convergence decision as `rt_run` (I only or all Stokes components,
@@ -343,8 +362,8 @@ function rt_run(RS_type::AbstractRamanType,
         #InelasticScattering.computeRamanZλ!(RS_type, pol_type,Array(qp_μ), m, arr_type)
         # Compute the core layer optical properties:
         @timeit "OpticalProps" layer_opt_props, layer_opt_props_lin, fScattRayleigh   = 
-            constructCoreOpticalProperties(RS_type, iBand, m, model, lin_model,
-                                           m_invariant_cache);
+            (local_basis ? construct_local_optical_jacobians : constructCoreOpticalProperties)(
+                RS_type, iBand, m, model, lin_model, m_invariant_cache);
         if active_layout !== nothing
             actual = size(layer_opt_props_lin[1].τ̇, 2)
             expected = n_layer_params(active_layout)
@@ -380,8 +399,6 @@ function rt_run(RS_type::AbstractRamanType,
             # Expand all layer optical properties to their full dimension:
             @timeit "OpticalProps" layer_opt, layer_opt_lin = 
                 expandOpticalProperties(layer_opt_props[iz], layer_opt_props_lin[iz], arr_type)
-            #aa = Array(layer_opt.Z⁺⁺[:,:,1]) #Array(RS_type.ϖ_Cabannes[1]*layer_opt.Z⁺⁺[:,:,1]) .+ (sum(RS_type.ϖ_λ₁λ₀)*RS_type.Z⁺⁺_λ₁λ₀)
-            #bb = Array(layer_opt.Z⁻⁺[:,:,1]) #Array(RS_type.ϖ_Cabannes[1]*layer_opt.Z⁻⁺[:,:,1]) .+ (sum(RS_type.ϖ_λ₁λ₀)*RS_type.Z⁻⁺_λ₁λ₀)
             # Perform Core RT (doubling/elemental/interaction)
             rt_kernel!(RS_type::noRS, pol_type, SFI,
                         #bandSpecLim,
@@ -395,7 +412,8 @@ function rt_run(RS_type::AbstractRamanType,
                         CoreRT.architecture(model),
                         qp_μN, iz;
                         dτ_max_threshold=dτ_max_threshold,
-                        dτ_min_floor=dτ_min_floor)
+                        dτ_min_floor=dτ_min_floor,
+                        local_workspace=local_workspace)
 
             # Reuse the completed current added layer to grow the two
             # subcolumns belonging to every interior observer. The top

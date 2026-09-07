@@ -1,0 +1,103 @@
+"Fourier-independent optical values, retrieval coefficients, and shared scalar seeds."
+struct LocalOpticalJacobianCache{L,T}
+    layers::L
+    basis_tau::T
+    basis_omega::T
+end
+
+"""
+    build_local_jacobian_cache(band, model, lin_model, cache)
+
+Prepare the scalar chain rule once per solve. Write Sᵢ=τᵢϖᵢ, S=ΣSᵢ,
+αᵢ=Sᵢ/S for aerosol i, and use Rayleigh as the fixed phase reference:
+
+    Z = Zᵣ + Σᵢ αᵢ (Zᵢ-Zᵣ)
+    dZ = Σᵢ [dαᵢ (Zᵢ-Zᵣ) + αᵢ dZᵢ]
+    dαᵢ = (dSᵢ-αᵢ dS)/S,  dϖ = (dS-ϖ dτ)/τ.
+
+These follow by differentiating the mixture definitions S2014 (C.22)–(C.24)
+and applying (C.25)–(C.26). The reference choice makes the phase directions
+independent of layer height: all layers share one phase basis per Fourier
+order. Only small scalar coefficients carry retrieval columns. Gas columns
+have dS=dSᵢ=0, hence exactly zero phase coefficients.
+
+The aerosol cache supplies δ-M-modified values and derivatives, including
+both dfᵗ terms in τ/ϖ. Truncated phase tangents supply the remaining dfᵗ
+normalization. No truncation chain term is dropped at this boundary.
+"""
+function build_local_jacobian_cache(band, model, lin_model, cache::LinMInvariantCache)
+    iB = band isa Integer ? band : only(band)
+    AT = array_type(model)
+    FT = eltype(model.τ_rayl[iB])
+    na = length(cache.aerosol[1])
+    nz = length(cache.rayl_τ_dev[1])
+    selection = cache.selection
+    pressure = selection === nothing || selection.include_pressure
+    columns = [selection === nothing ? collect(1:7) : selection.aerosol_columns[i] for i in 1:na]
+    ng = size(cache.lin_gas[1][1].τ̇,2)
+    np = Int(pressure) + sum(length,columns; init=0) + ng
+    nb = local_jacobian_size(na)
+    layers = map(1:nz) do z
+        ray_tau = cache.rayl_τ_dev[1][z]
+        components = [cache.aerosol[1][i][z] for i in 1:na]
+        τ = copy(ray_tau)
+        S = copy(ray_tau)
+        for a in components
+            τ .+= a.τ
+            S .+= a.τ .* a.ϖ
+        end
+        τ .+= cache.gas[1][z].τ
+        ϖ = S ./ τ
+        invS = ifelse.(S .> zero(FT), one(FT) ./ S, zero(FT))
+        weights = [a.τ .* a.ϖ .* invS for a in components]
+        dt = _zero_tangent(τ,length(S),np)
+        dS = zero(dt)
+        component_dS = [zero(dt) for _ in 1:na]
+        C = _zero_tangent(τ,length(S),nb,np)
+        if pressure
+            raydot = _to_device(AT,lin_model.τ̇_rayl_psurf[iB][:,z])
+            dt[:,1] .= raydot .+ _to_device(AT,lin_model.τ̇_abs_psurf[iB][:,z])
+            dS[:,1] .= raydot
+        end
+        offset = Int(pressure)
+        for (i,a) in enumerate(components)
+            ix = offset .+ (1:length(columns[i]))
+            b = 3 + 5(i-1)
+            scatterdot = a.τ̇ .* a.ϖ .+ a.τ .* a.ϖ̇
+            dt[:,ix] .= a.τ̇
+            dS[:,ix] .= scatterdot
+            component_dS[i][:,ix] .= scatterdot
+            for (j,native) in enumerate(columns[i])
+                if 2 <= native <= 5
+                    C[:,b+native-1,offset+j] .= weights[i]
+                end
+            end
+            if pressure
+                optics = model.aerosol_optics[iB][i]
+                factor = one(FT) .- optics.fᵗ .* optics.ω̃
+                factor = factor isa Number ? factor : _to_device(AT,factor)
+                rawdot = _to_device(AT,lin_model.τ̇_aer_psurf[iB][i,:,z])
+                tdot = factor .* rawdot
+                sdot = tdot .* a.ϖ
+                dt[:,1] .+= tdot
+                dS[:,1] .+= sdot
+                component_dS[i][:,1] .= sdot
+            end
+            offset += length(columns[i])
+        end
+        dt[:,offset+1:np] .= cache.lin_gas[1][z].τ̇
+        dw = (dS .- ϖ .* dt) ./ τ
+        C[:,1,:] .= dt
+        C[:,2,:] .= dw
+        for i in 1:na
+            C[:,3+5(i-1),:] .= (component_dS[i] .- weights[i] .* dS) .* invS
+        end
+        (;τ,ϖ,τ̇=dt,ϖ̇=dw,coefficients=C,weights,rayleigh_fraction=ray_tau ./ τ)
+    end
+    seed = first(layers).τ
+    basis_tau = _zero_tangent(seed,length(seed),nb)
+    basis_omega = zero(basis_tau)
+    basis_tau[:,1] .= one(FT)
+    basis_omega[:,2] .= one(FT)
+    return LocalOpticalJacobianCache(layers,basis_tau,basis_omega)
+end

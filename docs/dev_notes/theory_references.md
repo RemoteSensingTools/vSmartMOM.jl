@@ -135,7 +135,7 @@ passages only, no benchmarks/intros). Updated 2026-08-07.
 |---|---|---|
 | **S2014 (C.1)–(C.4)** | Differentiated RTE and boundary conditions; linearization is exact at the operator level. | `src/CoreRT/rt_run_lin.jl` |
 | **S2014 (C.5)–(C.7)** | Differentiation rules for matrix products and inverses (used everywhere in the chain rule). | (foundation) |
-| **S2014 (C.8)–(C.10)** | **Infinitesimal elemental derivatives** and thermal-source derivatives. The current finite-δ and solar-source derivatives apply the same calculus to **SF2023-II (10)–(11)**; they are not literal implementations of the infinitesimal expressions. | `src/CoreRT/CoreKernel/elemental_lin.jl::get_elem_rt_fused!`, `get_elem_rt_SFI_fused!` |
+| **S2014 (C.8)–(C.10)** | **Infinitesimal elemental derivatives** and thermal-source derivatives. The current finite-δ and solar-source derivatives apply the same calculus to **SF2023-II (10)–(11)**; they are not literal implementations of the infinitesimal expressions. | `src/CoreRT/CoreKernel/elemental_fused_lin.jl::get_elem_rt_fused!`, `get_elem_rt_SFI_fused!` |
 | **S2014 (C.11)–(C.16)** | **Derivatives propagated through doubling/adding**: same shape as Eqs. (23)–(28) but for tangent-linear operators. | `src/CoreRT/CoreKernel/jacobian_batched.jl::{doubling_batched_lin!,_interaction_direction_lin!}`; reference in `{doubling,interaction}_lin.jl` |
 | **S2014 (C.17)–(C.18)** | **D-matrix symmetry on derivatives**: `Ṫ_ab = D·Ṫ_ba·D`, `Ṙ_ab = D·Ṙ_ba·D` — halves the linearized doubling cost too. | `doubling_lin.jl::apply_D_lin!` (or equivalent) |
 | **S2014 (C.19)** | `Ṙ*_10 = D·Ṙ_10` — the fast linearized doubling counterpart of (31). | `doubling_lin.jl` |
@@ -148,7 +148,7 @@ passages only, no benchmarks/intros). Updated 2026-08-07.
 | **S2014 (C.40)**; **SF2014 (14)–(16)** | `Ż_m(μ_i, μ_j)`: at fixed geometry replace Greek `B_l` with `dB_l` in the spherical-function expansion. Angular tables are shared by all wavelengths and tangent directions. | `src/Scattering/compute_Z_matrices_lin.jl::_phase_column_tabulated!`; reference in `mie_helper_functions_lin.jl::compute_Z_moments` |
 | **S2014 (C.41)–(C.42)** | `β̇*` and `Ḃ*_l` for the truncated case — chain rule through the δ-M factor `f_tr`. | `delta_m_truncation_lin.jl` |
 | **S2013 (35)–(46)** | Scalar predecessor of S2014 App. C — same structure for scalar `(τ, ϖ_0, P)`. Useful as the simpler-derivation reference for readers learning the chain rule. | (theory anchor for Concepts/06 history paragraph) |
-| **S2013 (61)–(67)** | δ-M chain rule for scalar (`P_mod`, `τ_mod`, `ϖ_mod`). | `compEffectiveLayerProperties_lin.jl` |
+| **S2013 (61)–(67)** | δ-M chain rule for scalar (`P_mod`, `τ_mod`, `ϖ_mod`). | `optical_jacobian_cache.jl::_createAero_invariant` |
 | **S2013 (90)** | `N_aer = τ_λ / k_λ` — number density invariant w.r.t. wavelength. | `compEffectiveLayerProperties.jl` |
 | **S2014 §C.2.2 / S2013 §3.2.2** | Surface BRDF derivatives (Lambertian, mRPV, Cox-Munk wind speed). | `Surfaces/{lambertian,rpv,coxmunk}_surface_lin.jl` |
 
@@ -336,3 +336,20 @@ is shaped as it is:
   year = {1997}
 }
 ```
+
+### Local optical basis and contraction order
+
+`LayerOpticalProperties/local_jacobian_cache.jl` differentiates the mixture
+definitions S2014 (C.22)–(C.24) using a fixed Rayleigh reference. This is an
+algebraic choice of basis, not a claim about the 2013 Fortran implementation.
+`local_jacobian.jl` shares its complete phase directions across layers;
+`CoreKernel/local_jacobian.jl::build_doubled_layer_lin!` applies the
+(C.25)–(C.26) chain rule after local tangent propagation. The contraction is
+linear in complete doubled matrices; it is never an elementwise dR/dZ product.
+The independent attenuation term follows directly from J=exp(-τ_above/μ₀) Ĵ.
+The scalar truncation chain remains in
+`LayerOpticalProperties/optical_jacobian_cache.jl::_createAero_invariant`, and
+`phase_blocks_lin.jl` receives derivatives of the normalized truncated Greek
+coefficients. Backend-native interpolation in `phase_interpolation.jl` is
+linear at fixed wavenumber knots and therefore acts identically on these
+values and tangents.
