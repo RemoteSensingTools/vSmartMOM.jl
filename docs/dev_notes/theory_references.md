@@ -135,8 +135,8 @@ passages only, no benchmarks/intros). Updated 2026-08-07.
 |---|---|---|
 | **S2014 (C.1)–(C.4)** | Differentiated RTE and boundary conditions; linearization is exact at the operator level. | `src/CoreRT/rt_run_lin.jl` |
 | **S2014 (C.5)–(C.7)** | Differentiation rules for matrix products and inverses (used everywhere in the chain rule). | (foundation) |
-| **S2014 (C.8)–(C.10)** | **Elemental derivatives**: `Ṫ_δ,m`, `Ṙ_δ,m`, `J̇_δ,m` w.r.t. the three core layer variables `(τ, ϖ, Z)`. | `src/CoreRT/CoreKernel/elemental_lin.jl` |
-| **S2014 (C.11)–(C.16)** | **Derivatives propagated through doubling/adding**: same shape as Eqs. (23)–(28) but for tangent-linear operators. | `src/CoreRT/CoreKernel/{doubling,interaction}_lin.jl` |
+| **S2014 (C.8)–(C.10)** | **Infinitesimal elemental derivatives** and thermal-source derivatives. The current finite-δ and solar-source derivatives apply the same calculus to **SF2023-II (10)–(11)**; they are not literal implementations of the infinitesimal expressions. | `src/CoreRT/CoreKernel/elemental_lin.jl::get_elem_rt_fused!`, `get_elem_rt_SFI_fused!` |
+| **S2014 (C.11)–(C.16)** | **Derivatives propagated through doubling/adding**: same shape as Eqs. (23)–(28) but for tangent-linear operators. | `src/CoreRT/CoreKernel/jacobian_batched.jl::{doubling_batched_lin!,_interaction_direction_lin!}`; reference in `{doubling,interaction}_lin.jl` |
 | **S2014 (C.17)–(C.18)** | **D-matrix symmetry on derivatives**: `Ṫ_ab = D·Ṫ_ba·D`, `Ṙ_ab = D·Ṙ_ba·D` — halves the linearized doubling cost too. | `doubling_lin.jl::apply_D_lin!` (or equivalent) |
 | **S2014 (C.19)** | `Ṙ*_10 = D·Ṙ_10` — the fast linearized doubling counterpart of (31). | `doubling_lin.jl` |
 | **S2014 (C.21)** | Final assembled derivative form `⟨İ_Δ⁻; İ_0⁺⟩ = J̇_Δ + Ṙ_Δ I_Δ + T_Δ İ_0 + …`. | `src/CoreRT/CoreKernel/lin_added_layer_all_params.jl` lines 1–100 |
@@ -145,7 +145,7 @@ passages only, no benchmarks/intros). Updated 2026-08-07.
 | **S2014 (C.27)** | `δ = τ̄ / 2^N_dbl` — elemental thickness used in derivatives. | `rt_kernel.jl::get_dtau_ndoubl` |
 | **S2014 (C.28)–(C.31)** | Derivatives of `δ` w.r.t. `τ_i`, `ϖ_0,i`, `Z_i`, `β_i`. | `compEffectiveLayerProperties_lin.jl` |
 | **S2014 (C.32)–(C.39)** | Derivatives of `ϖ̄_0` and `Z̄` (post-truncation forms). | same |
-| **S2014 (C.40)** | `Ż_m(μ_i, μ_j)` formula via generalized spherical harmonics. | `compute_Z_matrices.jl` (linearized variant) |
+| **S2014 (C.40)**; **SF2014 (14)–(16)** | `Ż_m(μ_i, μ_j)`: at fixed geometry replace Greek `B_l` with `dB_l` in the spherical-function expansion. Angular tables are shared by all wavelengths and tangent directions. | `src/Scattering/compute_Z_matrices_lin.jl::_phase_column_tabulated!`; reference in `mie_helper_functions_lin.jl::compute_Z_moments` |
 | **S2014 (C.41)–(C.42)** | `β̇*` and `Ḃ*_l` for the truncated case — chain rule through the δ-M factor `f_tr`. | `delta_m_truncation_lin.jl` |
 | **S2013 (35)–(46)** | Scalar predecessor of S2014 App. C — same structure for scalar `(τ, ϖ_0, P)`. Useful as the simpler-derivation reference for readers learning the chain rule. | (theory anchor for Concepts/06 history paragraph) |
 | **S2013 (61)–(67)** | δ-M chain rule for scalar (`P_mod`, `τ_mod`, `ϖ_mod`). | `compEffectiveLayerProperties_lin.jl` |
@@ -186,6 +186,7 @@ citations. Listed here so the Concepts/07 page can grep this file.)
 | `@kernel` line shape (Doppler/Lorentz/Voigt) | `src/Absorption/compute_absorption_cross_section.jl:229–280` |
 | `@kernel` Mie coefficients (DoubleSingle precision for FP32 GPU) | `src/Scattering/gpu_mie_kernels.jl:30–100` |
 | `@kernel` portable LU inverse with `@localmem` | `src/CoreRT/tools/ka_batched_kernels.jl:100–178` |
+| CUDA shared-memory tangent products (wavelength × parameter batches) | `src/CoreRT/CoreKernel/jacobian_batched.jl::_jac_product_tiled!` |
 | Batched matmul CPU (threaded BLAS) | `src/CoreRT/tools/cpu_batched.jl:24–73` |
 | Batched matmul CUDA (CUBLAS strided) | `ext/gpu_batched_cuda.jl:122–139` |
 | Batched matmul Metal (KA portable) | `ext/vSmartMOMMetalExt.jl:29–54` |

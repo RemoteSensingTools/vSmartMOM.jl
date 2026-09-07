@@ -1,0 +1,6 @@
+CORE_MEASURE nSpec=16 pol=3 nparams=1 forward=(median = 0.037110648, samples = [0.037110648, 0.038537188, 0.036317548]) combined=(median = 0.082382912, samples = [0.082382912, 0.085201979, 0.081801499]) ratio=2.2199265289035104
+CORE_FD_PASS nparams=1 all_columns=true endpoints=R,T azimuth=[0.0, 37.0]
+CORE_MEASURE nSpec=16 pol=3 nparams=3 forward=(median = 0.042781594, samples = [0.042781594, 0.038534413, 0.044063662]) combined=(median = 0.164851784, samples = [0.164851784, 0.165273426, 0.16433864]) ratio=3.8533343100773667
+CORE_FD_PASS nparams=3 all_columns=true endpoints=R,T azimuth=[0.0, 37.0]
+CORE_MEASURE nSpec=16 pol=3 nparams=15 forward=(median = 0.038550564, samples = [0.038550564, 0.036349358, 0.043697304]) combined=(median = 0.613077087, samples = [0.613077087, 0.623911754, 0.611020623]) ratio=15.903193712029736
+CORE_FD_PASS nparams=15 all_columns=true endpoints=R,T azimuth=[0.0, 37.0]

@@ -1,6 +1,10 @@
 "Abstract Type for Layer Ṙ,Ṫ and J̇ matrices"
 abstract type AbstractLayerLin end
 
+# Allocate/zero on the array's backend; never stage a large zero tensor on
+# the CPU merely to copy it to a GPU. This also preserves the floating type.
+_zero_tangent(A, dims...) = fill!(similar(A, dims...), zero(eltype(A)))
+
 "Reusable scratch for batched physical-parameter doubling and interaction."
 struct JacobianPropagationWorkspace{M,V,DM,DV}
     G::M
@@ -13,7 +17,6 @@ struct JacobianPropagationWorkspace{M,V,DM,DV}
     v2::V
     Jminus::V
     Jplus::V
-    dG::DM
     dH::DM
     dm1::DM
     dm2::DM
@@ -425,6 +428,10 @@ function Base.:+(a::UmbrellaCoreScatteringOpticalProperties,
         nμ = size(xZ⁺⁺,1)
         n1 = size(ẋ.τ̇,2)
         n2 = size(ẏ.τ̇,2)
+        # Differentiate normalized phase mixing, S2014 (C.22)–(C.24):
+        # S = τϖ = Sₓ+Sᵧ, Z = (Sₓ Zₓ+Sᵧ Zᵧ)/S,
+        # dZ = [d(Sₓ Zₓ+Sᵧ Zᵧ) - Z dS]/S. Each component's
+        # independent parameter block contributes to the numerator and S.
         Ż⁺⁺ = (cat(
             reshape(ẋ.τ̇.*x.ϖ .+ x.τ.*ẋ.ϖ̇, 1, 1, n, n1).*_spectral_Z4(xZ⁺⁺, n) .+ reshape(x.τ.*x.ϖ,1,1,n,1).*_spectral_Zdot4(ẋ.Ż⁺⁺, n),
             reshape(ẏ.τ̇.*y.ϖ .+ y.τ.*ẏ.ϖ̇, 1, 1, n, n2).*_spectral_Z4(yZ⁺⁺, n) .+ reshape(y.τ.*y.ϖ,1,1,n,1).*_spectral_Zdot4(ẏ.Ż⁺⁺, n),
@@ -510,8 +517,8 @@ function Base.:+(a::UmbrellaCoreScatteringOpticalProperties,
         nμ = size(xZ⁺⁺,1)
         n1 = 0
         n2 = size(ẏ.τ̇,2)
-        Ż⁺⁺ = zeros(nμ, nμ, n, n2)
-        Ż⁻⁺ = zeros(nμ, nμ, n, n2)
+        Ż⁺⁺ = _zero_tangent(xZ⁺⁺, nμ, nμ, n, n2)
+        Ż⁻⁺ = _zero_tangent(xZ⁻⁺, nμ, nμ, n, n2)
 
     else
         τ  = x.τ .+ y.τ
@@ -538,21 +545,24 @@ function Base.:+(a::UmbrellaCoreScatteringOpticalProperties,
         n1 = size(ẋ.τ̇,2)
         n2 = size(ẏ.τ̇,2)
         
+        # S2014 (C.22)–(C.24), with purely absorbing gas: S=τϖ=Sₓ,
+        # Z=Sₓ Zₓ/S, so dZ=[d(Sₓ Zₓ)-Z dS]/S. The gas parameter
+        # block contributes zero to the scattering numerator (second block).
         Ż⁺⁺ = (cat(
             reshape(ẋ.τ̇ .* x.ϖ .+ x.τ.*ẋ.ϖ̇, 1, 1, n, n1).*reshape(xZ⁺⁺,nμ,nμ,n,1) .+ reshape(x.τ.*x.ϖ,1,1,n,1).*ẋ.Ż⁺⁺,
-            zeros(nμ, nμ, n, n2),
+            _zero_tangent(xZ⁺⁺, nμ, nμ, n, n2),
                 dims=4) .- reshape(τ.*ϖ̇ .+ τ̇.*ϖ, 1, 1, n, n1+n2).*reshape(Z⁺⁺,nμ,nμ,n,1))./reshape(τ.*ϖ,1,1,n,1)
 
         Ż⁻⁺ = (cat(
             reshape(ẋ.τ̇ .* x.ϖ .+ x.τ.*ẋ.ϖ̇, 1, 1, n, n1).*reshape(xZ⁻⁺,nμ,nμ,n,1) .+ reshape(x.τ.*x.ϖ,1,1,n,1).*ẋ.Ż⁻⁺,
-            zeros(nμ, nμ, n, n2),
+            _zero_tangent(xZ⁻⁺, nμ, nμ, n, n2),
                 dims=4) .- reshape(τ.*ϖ̇ .+ τ̇.*ϖ, 1, 1, n, n1+n2).*reshape(Z⁻⁺,nμ,nμ,n,1))./reshape(τ.*ϖ,1,1,n,1)
     end
     if x.Z₀⁺ === nothing
         Ż₀⁺ = Ż₀⁻ = nothing
     elseif ẋ === nothing
-        Ż₀⁺ = zeros(eltype(x.Z₀⁺), size(x.Z₀⁺,1), size(x.Z₀⁺,2), n, n2)
-        Ż₀⁻ = zeros(eltype(x.Z₀⁻), size(x.Z₀⁻,1), size(x.Z₀⁻,2), n, n2)
+        Ż₀⁺ = _zero_tangent(x.Z₀⁺, size(x.Z₀⁺,1), size(x.Z₀⁺,2), n, n2)
+        Ż₀⁻ = _zero_tangent(x.Z₀⁻, size(x.Z₀⁻,1), size(x.Z₀⁻,2), n, n2)
     else
         Xp = _spectral_Zdot4(ẋ.Ż₀⁺, n)
         Xm = _spectral_Zdot4(ẋ.Ż₀⁻, n)

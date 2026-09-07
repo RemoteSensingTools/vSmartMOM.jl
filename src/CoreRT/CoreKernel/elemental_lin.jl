@@ -35,8 +35,11 @@ page for the side-by-side comparison.
 
 # Linearization (Sanghavi 2014 App. C)
 
-Implements Sanghavi 2014 Eqs. (C.8)–(C.10). For each matrix element, three
-partial derivatives are stored along the parameter axis:
+Uses the product/chain-rule framework of Sanghavi 2014 App. C on the
+finite-δ formulas above. Eqs. (C.8)–(C.10) give the infinitesimal-layer
+and thermal-source versions; the finite-δ and direct-solar expressions
+here follow by differentiating SF2023-II (10)–(11). For each matrix
+element, three local partials are stored along the last axis:
 
 - ``\\dot{\\mathbf{M}}[\\,..,1]``: ``\\partial \\mathbf{M}/\\partial(d\\tau)`` — optical-depth derivative
 - ``\\dot{\\mathbf{M}}[\\,..,2]``: ``\\partial \\mathbf{M}/\\partial\\varpi`` — single-scatter albedo derivative
@@ -527,7 +530,12 @@ compatibility with the 3-core doubling path.
     ṫ_tau = FT(0); ṫ_w = FT(0); ṫ_Z = FT(0)
 
     if (wct[j] > eps(FT))
-        # ---- R⁻⁺(μᵢ, μⱼ) ----
+        # SF2023-II (10), with Fourier quadrature weight wct[j]:
+        # rᵢⱼ = ϖ Zᵢⱼ cᵢⱼ (1-exp(-aᵢⱼ dτ)),
+        # cᵢⱼ = μⱼ wct[j]/(μᵢ+μⱼ), aᵢⱼ = 1/μᵢ+1/μⱼ.
+        # ∂r/∂dτ = ϖ Zᵢⱼ wct[j] exp(-aᵢⱼ dτ)/μᵢ;
+        # ∂r/∂ϖ and ∂r/∂Z remove the corresponding linear factor.
+        # These Z partials are element-local ONLY before doubling.
         r⁻⁺[i,j,n] =
             ϖ_λ[n] * Z⁻⁺[i,j,n2] *
             (qp_μN[j] / (qp_μN[i] + qp_μN[j])) * wct[j] *
@@ -546,7 +554,10 @@ compatibility with the 3-core doubling path.
         ṙ⁻⁺[i,j,n,2] = ṙ_w
         ṙ⁻⁺[i,j,n,3] = ṙ_Z
 
-        # ---- T⁺⁺(μᵢ, μⱼ) ----
+        # SF2023-II (10): transmission adds δᵢⱼ exp(-dτ/μᵢ) to
+        # ϖ Zᵢⱼ wct[j] μⱼ/(μᵢ-μⱼ) [exp(-dτ/μᵢ)-exp(-dτ/μⱼ)].
+        # For equal μ, use its finite limit (dτ/μ) exp(-dτ/μ).
+        # Different Stokes rows can share μ without sharing δᵢⱼ.
         if (qp_μN[i] == qp_μN[j])
             if i == j
                 t⁺⁺[i,j,n] =
@@ -591,7 +602,11 @@ compatibility with the 3-core doubling path.
         ṫ⁺⁺[i,j,n,2] = ṫ_w
         ṫ⁺⁺[i,j,n,3] = ṫ_Z
 
-        # ---- Fused chain rule: ap_ = ṙ_tau*dτ̇ + ṙ_w*ϖ̇ + ṙ_Z*Ż ----
+        # S2014 (C.25)–(C.26), applied before matrix products mix indices:
+        # drᵢⱼ/dp = (∂rᵢⱼ/∂dτ) dτ/dp + (∂rᵢⱼ/∂ϖ) dϖ/dp
+        #           + (∂rᵢⱼ/∂Zᵢⱼ) dZᵢⱼ/dp; likewise for t.
+        # This contraction also accepts arbitrary supplied core-optics
+        # directions; p need not denote an aerosol or gas parameter.
         for iparam = 1:nparams
             val_r = ṙ_tau * dτ̇[n,iparam] + ṙ_w * ϖ̇[n,iparam] + ṙ_Z * Ż⁻⁺[i,j,n2_lin,iparam]
             val_t = ṫ_tau * dτ̇[n,iparam] + ṫ_w * ϖ̇[n,iparam] + ṫ_Z * Ż⁺⁺_lin[i,j,n2_lin,iparam]
@@ -670,7 +685,12 @@ Eliminates the separate chain-rule pass for SFI terms and the per-parameter
         Z⁻⁺_I₀ += Z⁻⁺[i,ii,n2] * F₀[ii-i_start+1,n]
     end
 
-    # ---- J₀⁺ and 3-core scalars ----
+    # SF2023-II (11), direct solar term at the top of this layer:
+    # j± = wₘ ϖ (Z± F₀) f±(dτ), where
+    # f⁺ = μ₀/(μᵢ-μ₀) [exp(-dτ/μᵢ)-exp(-dτ/μ₀)],
+    # f⁻ = μ₀/(μᵢ+μ₀) [1-exp(-dτ(1/μᵢ+1/μ₀))].
+    # At μᵢ=μ₀, f⁺ = (dτ/μ₀) exp(-dτ/μ₀). The three local
+    # partials differentiate dτ, ϖ, and the projected phase column Z F₀.
     J̇⁺_tau = FT(0); J̇⁺_w = FT(0); J̇⁺_Z = FT(0)
 
     if qp_μN[i] == μ0
@@ -726,7 +746,12 @@ Eliminates the separate chain-rule pass for SFI terms and the per-parameter
         J̇₀⁻[i, 1, n, 3] = J̇⁻_Z
     end
 
-    # ---- Fused chain rule + Bug 22 fix ----
+    # Complete solar tangent, by S2014 (C.6) applied to SF2023-II (11):
+    # dj±/dp = e_top [j±_τ dτ/dp + j±_ϖ dϖ/dp + j±_Z (dZ±/dp) F₀]
+    #          - j±_attenuated (dτ_sum/dp)/μ₀.
+    # Above, e_top has already been applied to each local partial. The
+    # last term differentiates OVERLYING attenuation, distinct from the
+    # current layer's thickness derivative; both are required for SFI.
     for iparam = 1:nparams
         # Compute Ż·I₀ dot products for this parameter
         Ż⁺⁺_I₀_p = FT(0)

@@ -1,0 +1,6 @@
+Precompiling packages...
+  24948.3 ms  ✓ vSmartMOM
+  12115.4 ms  ✓ vSmartMOM → vSmartMOMCUDAExt
+  2 dependencies successfully precompiled in 39 seconds. 274 already precompiled.
+Test Summary:                                              | Pass  Total   Time
+Eight core directions → sixty state columns after doubling |   96     96  21.1s

@@ -83,4 +83,19 @@ if get(ENV,"VSMARTMOM_JACOBIAN_GPU_TEST","false") == "true"
         check_jacobian_propagation(Float64,CuArray;rtol=1e-10)
         check_jacobian_propagation(Float32,CuArray;rtol=2e-5)
     end
+    @testset "Tangent zeros stay on the device" begin
+        for FT in (Float32,Float64)
+            make_zero() = CoreRT.default_matrix(FT,LinMode(),CuArray,4,(18,18),1024)
+            make_zero(); CUDA.synchronize() # compile before measuring allocations
+            GC.gc()
+            host_bytes = @allocated a = make_zero()
+            @test a isa CuArray{FT,4}
+            @test size(a) == (18,18,1024,4)
+            @test all(iszero,a)
+            # The output is 5–10 MiB. Staging zeros through Array would exceed
+            # this bound even though the final result is a CuArray.
+            @test host_bytes < 1024^2
+        end
+    end
+    include("test_jacobian_tiled.jl")
 end

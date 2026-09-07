@@ -271,5 +271,73 @@
     ],
     "parity": "PARITY R=6.938893903907228e-18 T=1.3877787807814457e-17 dR=8.326672684688674e-17 dT=3.885780586188048e-16 forward_R=6.938893903907228e-17",
     "forward_seconds": 0.636329893
+  },
+  "iqu-fused-inverse-final.log": {
+    "stage": "phase tables, backend allocation, tiled products, factored dH, fused inverse",
+    "model": "MODEL backend=cuda nSpec=10000 operator=18 full_columns=14 selected_columns=4",
+    "parity": "PARITY R=3.8163916471489756e-17 T=3.122502256758253e-17 dR=5.447031714567174e-16 dT=6.661338147750939e-16 forward_R=5.898059818321144e-17",
+    "measurements": [
+      {
+        "enabled": true,
+        "kind": "full",
+        "seconds": 7.131469116,
+        "host_bytes": 3635031000.0,
+        "cumulative_gpu_bytes": 120995382006.0
+      },
+      {
+        "enabled": true,
+        "kind": "selected",
+        "seconds": 1.872606794,
+        "host_bytes": 1296859624.0,
+        "cumulative_gpu_bytes": 26941241396.0
+      }
+    ],
+    "forward_seconds": 0.572516585
+  },
+  "scalar-fused-inverse-final.log": {
+    "stage": "phase tables, backend allocation, tiled products, factored dH, fused inverse",
+    "model": "MODEL backend=cuda nSpec=10000 operator=6 full_columns=14 selected_columns=4",
+    "parity": "PARITY R=8.673617379884035e-18 T=1.3877787807814457e-17 dR=1.1102230246251565e-16 dT=4.440892098500626e-16 forward_R=5.377642775528102e-17",
+    "measurements": [
+      {
+        "enabled": true,
+        "kind": "full",
+        "seconds": 1.082120343,
+        "host_bytes": 587237544.0,
+        "cumulative_gpu_bytes": 14195011478.0
+      },
+      {
+        "enabled": true,
+        "kind": "selected",
+        "seconds": 0.414064398,
+        "host_bytes": 235637784.0,
+        "cumulative_gpu_bytes": 3270240468.0
+      }
+    ],
+    "forward_seconds": 0.141330102
+  },
+  "core-iqu-fused-inverse.log": {
+    "stage": "fused inverse, final directional core benchmark",
+    "scope": "post-truncation supplied core directions; five layers, black lower boundary; no reusable full core-Jacobian assembly",
+    "measurements": [
+      {
+        "directions": 1,
+        "forward_seconds": 0.188812439,
+        "combined_seconds": 0.490974019,
+        "ratio": 2.600326660681503
+      },
+      {
+        "directions": 3,
+        "forward_seconds": 0.187219063,
+        "combined_seconds": 0.923897796,
+        "ratio": 4.934848947513427
+      },
+      {
+        "directions": 15,
+        "forward_seconds": 0.184702121,
+        "combined_seconds": 3.528532654,
+        "ratio": 19.103909770478488
+      }
+    ]
   }
 }

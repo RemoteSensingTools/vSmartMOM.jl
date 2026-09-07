@@ -1,0 +1,10 @@
+┌ Warning: saved type AerosolOptics{Float64} is missing field phase_ν in workspace type; reconstructing
+└ @ JLD2 ~/.julia/packages/JLD2/r2pdD/src/data/reconstructing_datatypes.jl:197
+TRUNCATION_FD family=α absolute_error=5.445074252596882e-11
+TRUNCATION_FD family=β absolute_error=4.526823103108597e-11
+TRUNCATION_FD family=γ absolute_error=2.949249329318613e-11
+TRUNCATION_FD family=δ absolute_error=4.55157694032645e-11
+TRUNCATION_FD family=ϵ absolute_error=4.740785411808113e-11
+TRUNCATION_FD family=ζ absolute_error=5.445074252596882e-11
+Test Summary:                      | Pass  Total  Time
+Truncated phase and scalar f chain |   22     22  9.9s

@@ -21,14 +21,17 @@ case (see also `interaction.jl` for the forward methods):
 **Forward adding equations (`ScatteringInterface_11`):**
 
 ```math
-\\mathbf{G} = (\\mathbf{E} - \\mathbf{R}^{-+}_\\text{add} \\, \\mathbf{R}^{+-}_\\text{comp})^{-1}
+\\mathbf{G}_\\uparrow = (\\mathbf{E} - \\mathbf{R}^{-+}_\\text{add} \\, \\mathbf{R}^{+-}_\\text{comp})^{-1}
 ```
 ```math
-\\mathbf{T}^{++}_\\text{new} = \\mathbf{T}^{++}_\\text{add} \\, \\mathbf{G} \\, \\mathbf{T}^{++}_\\text{comp}
+\\mathbf{G}_\\downarrow = (\\mathbf{E} - \\mathbf{R}^{+-}_\\text{comp} \\, \\mathbf{R}^{-+}_\\text{add})^{-1}
+```
+```math
+\\mathbf{T}^{++}_\\text{new} = \\mathbf{T}^{++}_\\text{add} \\, \\mathbf{G}_\\downarrow \\, \\mathbf{T}^{++}_\\text{comp}
 ```
 ```math
 \\mathbf{R}^{-+}_\\text{new} = \\mathbf{R}^{-+}_\\text{comp} +
-  \\mathbf{T}^{--}_\\text{comp} \\, \\mathbf{G} \\, \\mathbf{R}^{-+}_\\text{add} \\, \\mathbf{T}^{++}_\\text{comp}
+  \\mathbf{T}^{--}_\\text{comp} \\, \\mathbf{G}_\\uparrow \\, \\mathbf{R}^{-+}_\\text{add} \\, \\mathbf{T}^{++}_\\text{comp}
 ```
 
 **Linearized versions (Sanghavi 2014 Eqs. C.11–C.16):** propagate the full
@@ -43,8 +46,9 @@ The ``\\mathbf{ap\\_*}`` fields on `AddedLayerLin` carry the chain-rule
 expansion to the **physical state vector** ``\\mathbf{x}`` — written
 directly by the fused elemental kernels `get_elem_rt_fused!` and
 `get_elem_rt_SFI_fused!` before this interaction kernel runs; the
-``\\dot{\\mathbf{*}}`` fields carry the three-core derivatives w.r.t.
-``(\\tau, \\varpi, \\mathbf{Z})``.
+`AddedLayerLin` fields without `ap_` retain elemental core partials.
+The dotted fields on `CompositeLayerLin` already carry the full supplied
+parameter axis, just like the added layer's `ap_` fields.
 
 See [`Concepts/06 — Linearization`](../../docs/src/pages/concepts/06_linearization.md)
 for the three-tier Jacobian diagram, the parameter-strategy table, and the

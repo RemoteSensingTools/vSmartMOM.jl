@@ -35,6 +35,13 @@ end
 "Evaluate forward/tangent aerosol phase blocks at 2–3 retained nodes and interpolate."
 function _compute_aerosol_phase_blocks_lin(model, optics, lin_optics, ν_spec,
                                             m, arr_type)
+    # Both routes receive derivatives of the TRUNCATED Greek coefficients:
+    # lin_model_from_parameters truncates each value/tangent pair before
+    # storing it (or its spectral nodes). truncate_phase_lin differentiates
+    # the fit and all six families' 1/(1-fᵗ) normalization. Consequently these
+    # Z tangents contain the phase part of dfᵗ, not only the raw Mie dZ.
+    # At fixed interpolation knots, angular evaluation and node interpolation
+    # are linear in those coefficients, so the same maps act on the tangents.
     optics.phase_ν === nothing && return _compute_phase_blocks_lin(
         model, optics.greek_coefs, lin_optics.lin_greek_coefs, m, arr_type)
     length(optics.phase_ν) == length(optics.phase_greek) ==
@@ -126,6 +133,15 @@ function _createAero_invariant(τAer, aerosol_optics, τ̇Aer,
     fᵗ = fᵗ isa Number ? arr_type(fill(fᵗ, n)) : _to_device(arr_type, fᵗ)
     ω̃̇_block = _lift_mie_param_to_n_x_4(ω̃̇, n, arr_type)
     ḟᵗ_block = _lift_mie_param_to_n_x_4(ḟᵗ, n, arr_type)
+    # Truncation is part of the optical-property chain rule, not a missing RT
+    # tangent. With f = fᵗ, ω = ω̃ and a = 1-fω, the transformed aerosol has
+    # τ* = aτ and ω* = (1-f)ω/a (Sanghavi et al. 2014, Appendix A, Eq. A.3).
+    # Therefore dτ* = a dτ - τ(f dω + ω df), and
+    # dω* = [(1-f)dω - ω(1-ω)df]/a². These are evaluated below for every
+    # microphysical direction; cf. the mixed-layer partials C.28–C.35.
+    # The truncated phase derivative is supplied separately by Scattering.
+    # Its normalization also includes df. The paper's truncation β_i is fᵗ
+    # here, distinct from the degree-indexed Greek coefficient β_l.
     fω = fᵗ .* ω̃
     τ_mod = (1 .- fω) .* τAer
     ϖ_mod = (1 .- fᵗ) .* ω̃ ./ (1 .- fω)
@@ -191,10 +207,15 @@ function _attach_aerosol_phase(inv::LinAerosolInvariant,
         columns::Union{Nothing,AbstractVector{<:Integer}}=nothing)
     n = length(inv.τ)
     active_columns = columns === nothing ? collect(1:7) : collect(columns)
+    # Chain-rule boundary, S2014 (C.25)–(C.26): the four Mie phase tangents
+    # (nᵣ,nᵢ,rₘ,σᵣ) occupy aerosol columns 2:5. Loading and vertical-profile
+    # parameters change τ/ϖ and mixing weights, not this species' normalized
+    # phase matrix. Their direct dZ entries are therefore zero here; mixing
+    # later supplies their contribution to the effective layer phase matrix.
     function lift_phase_dot(Z, nrow, ncol)
         FT = Z === nothing ? eltype(inv.τ) : eltype(Z)
         if Z === nothing || ndims(Z) == 3
-            out = arr_type(zeros(FT, nrow, ncol, length(active_columns)))
+            out = fill!(similar(inv.τ, FT, nrow, ncol, length(active_columns)), zero(FT))
             if Z !== nothing
                 if columns === nothing
                     # Full-Jacobian path: keep the single vectorized assign
@@ -208,7 +229,7 @@ function _attach_aerosol_phase(inv::LinAerosolInvariant,
                 end
             end
         else
-            out = arr_type(zeros(FT, nrow, ncol, n, length(active_columns)))
+            out = fill!(similar(inv.τ, FT, nrow, ncol, n, length(active_columns)), zero(FT))
             if columns === nothing
                 out[:,:,:,2:5] .= permutedims(Z, (2, 3, 4, 1))
             else

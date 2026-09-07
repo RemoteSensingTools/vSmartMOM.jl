@@ -261,6 +261,13 @@ function compute_Z_moments(mod::AbstractPolarizationType,
             greek_coefs::GreekCoefs,
             lin_greek_coefs::linGreekCoefs,
             m::Int ; arr_type = Array)
+    if _Z_JACOBIAN_TABLES_ENABLED[] && m >= 0 &&
+       eltype(greek_coefs.β) <: Union{Float32,Float64} &&
+       eltype(greek_coefs.β) === eltype(lin_greek_coefs.β̇) &&
+       size(lin_greek_coefs.β̇, 1) == 4
+        return _compute_Z_moments_lin_tabulated(
+            mod, μ, greek_coefs, lin_greek_coefs, m, arr_type)
+    end
     (; α, β, γ, δ, ϵ, ζ) = greek_coefs
     (; α̇, β̇, γ̇, δ̇, ϵ̇, ζ̇) = lin_greek_coefs
     if ndims(β) == 2

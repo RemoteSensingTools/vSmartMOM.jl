@@ -4,13 +4,15 @@ This file contains helper functions that are used throughout the linearized vSma
 
 =#
 "Default matrix in linRT calculation (zeros)"
-default_matrix(FT, lin::LinMode, arr_type, Nparams, dims, nSpec)   = arr_type(zeros(FT, tuple(dims[1], dims[2], nSpec, Nparams)))
+default_matrix(FT, lin::LinMode, arr_type, Nparams, dims, nSpec) =
+    _zero_tangent(arr_type(FT[]), dims[1], dims[2], nSpec, Nparams)
 
 "Default J matrix in linRT calculation (zeros)"
-default_J_matrix(FT, lin::LinMode, arr_type, Nparams, dims, nSpec) = arr_type(zeros(FT, tuple(dims[1], 1, nSpec, Nparams)))
+default_J_matrix(FT, lin::LinMode, arr_type, Nparams, dims, nSpec) =
+    _zero_tangent(arr_type(FT[]), dims[1], 1, nSpec, Nparams)
 
 @inline function default_solar_columns_lin(FT, arr_type, dims, nStokes, nSpec, nParams)
-    make_column() = arr_type(zeros(FT, dims[1], nStokes, nSpec, nParams))
+    make_column() = _zero_tangent(arr_type(FT[]), dims[1], nStokes, nSpec, nParams)
     SolarColumnOperatorsLin(Ṙ₀⁻⁺=make_column(), Ṙ₀⁺⁻=make_column(),
                             Ṫ₀⁺⁺=make_column(), Ṫ₀⁻⁻=make_column())
 end

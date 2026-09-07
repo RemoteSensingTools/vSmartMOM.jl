@@ -45,6 +45,7 @@ include("compute_PCW.jl")                 # Compute phase function w/ PCW
 include("phase_function_autodiff.jl")     # Auto-differentiation
 include("show_utils.jl")                  # Pretty-print
 include("compute_Z_matrices.jl")
+include("compute_Z_matrices_lin.jl")
 
 # Export make functions/types
 export make_mie_model, reconstruct_phase, greek_coefficients,

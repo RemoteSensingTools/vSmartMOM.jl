@@ -127,6 +127,12 @@ function create_surface_layer!(RS_type::noRS,
                     # Reshape the owning arrays before viewing the prefix so
                     # CUDA sees contiguous matrix storage, not a generic
                     # ReshapedArray around a dropped singleton dimension.
+                    # j⁻ = μ₀ R_surf F, F = exp(-τ_sum/μ₀) F₀.
+                    # Atmospheric p: dj⁻/dp = μ₀ R_surf dF/dp, with
+                    # dF/dp = -F (dτ_sum/dp)/μ₀. Albedo a instead gives
+                    # dj⁻/da = μ₀ (dR_surf/da) F (next assignment).
+                    # These are the product rule, S2014 (C.6), applied to
+                    # the direct-beam surface source in our Fourier convention.
                     incident_matrix = reshape(Ḟ₀_NquadN, length(qp_μN), :)
                     reflected_matrix = reshape(added_layer_lin.ap_J̇₀⁻, length(qp_μN), :)
                     incident_tangents = @view incident_matrix[:,1:nspec*nparams]

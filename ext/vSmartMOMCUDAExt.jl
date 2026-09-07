@@ -60,6 +60,7 @@ Architectures.ka_backend(::vSmartMOM.Architectures.GPU) = CUDA.CUDABackend()
 # still forces the fused path (needed for cuBLAS-free CUDA-graph capture).
 # Non-CUDA GPU backends keep CoreRT's generic `true` default.
 CoreRT._fused_interaction_default(::CUDA.CUDABackend) = false
+CoreRT._jacobian_tiles_supported(::CUDA.CUDABackend) = true
 
 # Default GPU Mie precision policy, FT-aware:
 #   Float64 → NativeFloat64 (hardware FP64 Dₙ recursion) — right for datacenter

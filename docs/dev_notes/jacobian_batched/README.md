@@ -1,5 +1,8 @@
 # Batched Jacobian propagation
 
+Latest investigation: [IQU bottlenecks and core-optics cost](iqu_followup.md).
+Scientific review: [core derivatives, truncation and state-vector scaling](paper_review.md).
+
 Development branch: `perf/jacobian-batched-propagation`, based on integration
 commit `b524a0d85ae36ab0eecf8b23a939f4d6ce62c456`.
 
@@ -19,8 +22,9 @@ Jacobian layouts stay the same.
 On GPU, wavelength and parameter form one launch axis. A forward 3D matrix is
 shared directly across parameters; a derivative operand stays 4D. There are no
 per-column CuArray views to materialize and no duplicated forward matrices or
-host-generated pointer arrays for these products. Each output element owns its
-dot-product reduction. CPU uses in-place BLAS slices, with a serial path for
+host-generated pointer arrays for these products. For CUDA square operators of size 16–32 and at least 512 wavelengths, a
+workgroup stages operands in shared memory for reuse across all output entries.
+Small operators and source-vector products use the simpler element kernel. CPU uses in-place BLAS slices, with a serial path for
 small work and a coarser wavelength × parameter partition for larger work.
 
 The propagation workspace lives with `AddedLayerLin` and is reused across layers
@@ -38,8 +42,9 @@ kernel machinery but was not hardware-tested here.
 
 `CoreRT._BATCHED_JACOBIANS_ENABLED[]` is a private diagnostic switch for A/B tests.
 Do not change it concurrently with RT solves. The reference equations remain in
-their original files. Special interaction cases 00/01/10 and upstream optical
-derivative construction retain their existing implementations.
+their original files. Special interaction cases 00/01/10 retain their existing implementations. Phase-tangent construction now shares
+angular tables and uses static Stokes-block accumulators; zero tangent buffers
+are allocated directly on their backend.
 
 The workspace trades persistent scratch for much lower cumulative allocation.
 The reference A/B path also constructs this scratch, so measurements compare
@@ -58,7 +63,7 @@ It also keeps the incident work arrays in `FT` rather than accidentally using
 Float64 for Float32 scenes. The private A/B switch covers this surface change
 as well; external-solar surface construction keeps its existing implementation.
 
-## Final 10,000-wavelength results
+## Results after surface batching (before the IQU follow-up)
 
 With both propagation and Lambertian source batching, commit `8aa6079e`:
 

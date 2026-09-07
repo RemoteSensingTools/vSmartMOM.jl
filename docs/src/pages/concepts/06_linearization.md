@@ -118,11 +118,38 @@ step. Its tangent follows directly from the inverse rule:
 ```
 
 The positive sign comes from differentiating ``\mathbf{E}-\mathbf{R}\mathbf{R}``.
-The same forward inverse is reused for every active physical parameter.
+In the current directional implementation, the same forward inverse is reused
+for every active physical parameter.
 This saves repeated factorizations, but each parameter still requires matrix
 products and source propagation. The total cost depends on the number of
 requested columns, operator size, spectral batch, precision and backend;
 there is no universal ratio to the forward-only runtime.
+
+Keep the **core-optics solve** separate from the **physical-parameter solve**
+when evaluating the development target of combined forward + Jacobians below
+2× forward. The former starts with supplied ``(τ,ϖ,Z^{++},Z^{-+})`` and tangent
+directions, excluding Mie, optical mixing and upstream derivative construction.
+It still includes every elemental, doubling and adding step. A phase matrix is
+not a scalar parameter: specify the phase perturbation basis and layer count.
+Three stored elemental partial arrays do not represent the dense phase-matrix
+Jacobian after multiple scattering. The dedicated core-properties benchmark in
+`docs/dev_notes/jacobian_batched/` records its derivative basis explicitly.
+
+This directional implementation is one choice of chain-rule contraction order.
+Sanghavi et al. (2014), (C.25)–(C.26), factor microphysical derivatives through
+``(τ_i,ω_i,Z_i,f_i)``; their truncation symbol ``β_i`` is the code's ``f^t``,
+not a Greek expansion coefficient. Here ``f^t`` and its derivative enter the
+modified optical depth, albedo and phase upstream. A separately assembled core
+Jacobian could be reused for different retrieval mappings, provided its phase
+basis represents the required matrix-valued derivatives. The current benchmark
+does not implement or time that alternative.
+
+An adjoint is therefore an option, not a prerequisite for sub-2× performance.
+The scalar [Sanghavi et al. (2013)](https://doi.org/10.1016/j.jqsrt.2012.10.021)
+§4.6 measured 1.29–1.98× for 14–16 parameters with tangent linearization;
+the vector [Sanghavi et al. (2014)](https://doi.org/10.1016/j.jqsrt.2013.09.004)
+§5.3 measured about 5× for ten parameters. These are implementation-specific
+measurements, not a state-count-independent complexity bound.
 
 The batched propagation path evaluates product-rule terms across wavelength
 and parameter together. It fuses ``\dot{A}B+A\dot{B}`` on supported small GPU
@@ -151,7 +178,7 @@ The full derivation is Sanghavi 2014 App. C. The structure (skipping arithmetic)
 | Eq. | What it says | Source file |
 |---|---|---|
 | (C.5)–(C.7) | Differentiation rules for matrix products and inverses | (foundation; used everywhere below) |
-| (C.8)–(C.10) | Elemental derivatives ``\dot{\mathbf{T}}_\delta``, ``\dot{\mathbf{R}}_\delta``, ``\dot{\mathbf{J}}_\delta`` w.r.t. the three core layer variables ``(\tau, \varpi_0, \mathbf{Z})`` | `elemental_lin.jl` |
+| (C.8)–(C.10) | Infinitesimal elemental/thermal derivatives; current finite-δ solar kernels differentiate SF2023-II (10)–(11) using the same calculus | `elemental_lin.jl` |
 | (C.11)–(C.16) | Doubling/adding derivatives — same shape as the forward Eqs (23)–(28), tangent-linear | `doubling_lin.jl`, `interaction_lin.jl` |
 | (C.17)–(C.20) | D-matrix symmetry on derivatives — halves the linearized doubling cost | `doubling_lin.jl` |
 | (C.21) | Final assembled derivative form — written directly by `get_elem_rt_fused!` / `get_elem_rt_SFI_fused!` into the `ap_*` arrays during the elemental step | `elemental_lin.jl` |
@@ -159,7 +186,7 @@ The full derivation is Sanghavi 2014 App. C. The structure (skipping arithmetic)
 | (C.25)–(C.26) | Chain rule from the elemental SS variables to the microphysical parameters ``(n_r, n_i, r_m, \sigma)`` | `elemental_lin.jl` + `Scattering/types_lin.jl` |
 | (C.27)–(C.31) | δ derivatives (elemental thickness from `N_doubl`) | `compEffectiveLayerProperties_lin.jl` |
 | (C.32)–(C.39) | ``\bar{\varpi}_0`` and ``\bar{\mathbf{Z}}`` derivatives (post-truncation) | same |
-| (C.40) | ``\dot{\mathbf{Z}}_m`` from generalized spherical harmonics | `compute_Z_matrices.jl` (linearized variant) |
+| (C.40) | ``\dot{\mathbf{Z}}_m`` from generalized spherical harmonics | `compute_Z_matrices_lin.jl` |
 | (C.41)–(C.42) | ``\dot{\beta}^*`` and ``\dot{\mathbf{B}}_l^*`` for the truncated case | `delta_m_truncation_lin.jl` |
 
 The `_lin.jl` files in `src/CoreRT/CoreKernel/` are tangent-linear partners

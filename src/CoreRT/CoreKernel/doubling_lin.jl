@@ -13,6 +13,13 @@ doubles the elemental layer ``n_d`` times to reach the full homogeneous-layer
 optical depth, **and simultaneously propagates derivatives** with respect to
 the three core layer variables ``(\\tau, \\varpi, \\mathbf{Z})``.
 
+This is the legacy three-slot helper. Production uses `doubling_allparams!`
+with supplied tangent directions contracted at the elemental boundary. In
+particular, the third elemental slot is an entry-local phase partial; passing
+it through matrix multiplication does not construct the full fourth-rank
+phase-matrix derivative. It must not be used to justify a full core-Jacobian
+cost estimate or a post-doubling elementwise Z chain rule.
+
 # Forward (Sanghavi 2014, Eqs. 23–28; restated for homogeneous case)
 
 ```math

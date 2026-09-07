@@ -1,0 +1,57 @@
+BENCH_BEGIN cuda-n10000-t4
+BENCH_PHASE reference parity only
+
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:36[K
+Looping over layers ...  80%|██████████████████████▍     |  ETA: 0:00:06[K
+Looping over layers ... 100%|████████████████████████████| Time: 0:00:26[K
+
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:02[K
+Looping over layers ...  80%|██████████████████████▍     |  ETA: 0:00:01[K
+Looping over layers ... 100%|████████████████████████████| Time: 0:00:03[K
+
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:02[K
+Looping over layers ...  80%|██████████████████████▍     |  ETA: 0:00:01[K
+Looping over layers ... 100%|████████████████████████████| Time: 0:00:03[K
+
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:02[K
+Looping over layers ...  80%|██████████████████████▍     |  ETA: 0:00:01[K
+Looping over layers ... 100%|████████████████████████████| Time: 0:00:03[K
+
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:02[K
+Looping over layers ...  80%|██████████████████████▍     |  ETA: 0:00:01[K
+Looping over layers ... 100%|████████████████████████████| Time: 0:00:03[K
+BENCH_PHASE enabled=true kind=full
+
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:07[K
+Looping over layers ... 100%|████████████████████████████| Time: 0:00:05[K
+BENCH_PHASE enabled=true kind=selected
+BENCH_PHASE kind=forward
+
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:10[K
+Looping over layers ... 100%|████████████████████████████| Time: 0:00:06[K
+SELECTED_PARITY dR=0.0
+MODEL backend=cuda nSpec=10000 operator=18 full_columns=14 selected_columns=4
+PARITY R=6.938893903907228e-18 T=1.3877787807814457e-17 dR=8.326672684688674e-17 dT=3.885780586188048e-16 forward_R=6.938893903907228e-17
+MEASURE enabled=true kind=full median_seconds=8.660588653 median_bytes=3.635577088e9 median_gpu_bytes=1.21944745446e11 samples=[(time = 8.636015718, bytes = 3635577088, gctime = 1.361032379, gpu_bytes = 121944745446), (time = 8.660588653, bytes = 3635557112, gctime = 1.861233309, gpu_bytes = 121944745446), (time = 8.908470509, bytes = 3636140688, gctime = 1.865577192, gpu_bytes = 121944745446)]
+MEASURE enabled=true kind=selected median_seconds=2.601470539 median_bytes=1.297209464e9 median_gpu_bytes=2.7372204836e10 samples=[(time = 2.752014472, bytes = 1297396776, gctime = 0.17260826, gpu_bytes = 27372204836), (time = 2.601470539, bytes = 1297209464, gctime = 0.127934688, gpu_bytes = 27372204836), (time = 2.582584456, bytes = 1297205016, gctime = 0.121615577, gpu_bytes = 27372204836)]
+FORWARD median_seconds=0.795006777
+───────────────────────────────────────────────────────────────────────────────────
+                                          Time                    Allocations
+                                 ───────────────────────   ────────────────────────
+        Tot / % measured:             11.2s /  70.1%           3.59GiB /  84.6%
+
+Section                  ncalls     time    %tot     avg     alloc    %tot      avg
+───────────────────────────────────────────────────────────────────────────────────
+doubling                     25    3.43s   43.6%   137ms   13.3MiB    0.4%   547KiB
+  getri_strided             165   5.82ms    0.1%  35.3μs    391KiB    0.0%  2.37KiB
+  getrf_strided             165   4.87ms    0.1%  29.5μs    256KiB    0.0%  1.55KiB
+OpticalProps                 30    3.02s   38.3%   101ms   2.45GiB   80.7%  83.6MiB
+interaction                  25    1.00s   12.7%  40.1ms   2.51MiB    0.1%   103KiB
+  getrf_strided              50   2.10ms    0.0%  42.0μs   76.7KiB    0.0%  1.53KiB
+  getri_strided              50   2.09ms    0.0%  41.9μs    119KiB    0.0%  2.38KiB
+Creating layers               3    210ms    2.7%  70.1ms    565MiB   18.2%   188MiB
+elemental                    25    206ms    2.6%  8.26ms   1.28MiB    0.0%  52.3KiB
+OpticalProps invariant        1   6.82ms    0.1%  6.82ms   18.8MiB    0.6%  18.8MiB
+Creating arrays               1    193μs    0.0%   193μs   4.39KiB    0.0%  4.39KiB
+───────────────────────────────────────────────────────────────────────────────────
+BENCH_DONE cuda-n10000-t4

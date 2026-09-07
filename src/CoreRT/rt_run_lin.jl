@@ -5,13 +5,16 @@ This file contains the entry point for running the linearized RT simulation, `rt
 The linearized RT computes both the forward radiance and its analytic Jacobians with
 respect to physical parameters (aerosol properties, gas absorption, surface albedo)
 using the Matrix Operator Method (MOM) of Plass, Hansen & Kattawar (1973) with the
-linearization approach of Sanghavi & Stephens (2013), Sanghavi, Davis & Eldering (2014).
+linearization approach of Sanghavi, Davis & Eldering (2014), following the
+scalar formulation of Sanghavi, Martonchik, Davis & Diner (2013).
 
 **References:**
-- Sanghavi, S. & Stephens, G. (2013). "Adaptation of the delta-M and Successive
-  Order of Scattering methods to the matrix operator method." *JQSRT*, 117, 1–12.
-- Sanghavi, S., Davis, A. & Eldering, A. (2014). "vSmartMOM: A linearized discrete 
-  ordinate radiative transfer implementation." *JQSRT*, 146, 182–207.
+- Sanghavi, S., Davis, A.B. & Eldering, A. (2014). "vSmartMOM: A vector matrix
+  operator method-based radiative transfer model linearized with respect to
+  aerosol properties." *JQSRT*, 133, 412–433; Eqs. (23)–(28), App. C.
+- Sanghavi, S. & Frankenberg, C. (2023). "Raman scattering in the Earth's
+  atmosphere, Part II: Radiative transfer modeling for remote sensing
+  applications." *JQSRT*, 311, 108791; elastic Eqs. (10)–(12).
 - de Haan, J.F., Bosma, P.B. & Hovenier, J.W. (1987). "The adding method for
   multiple scattering calculations of polarized light." *A&A*, 183, 371–391.
 
@@ -66,15 +69,18 @@ elemental reflection ``\\mathbf{r}`` and transmission ``\\mathbf{t}`` matrices a
 from single-scattering, then doubled ``n_d`` times to obtain the full-layer matrices.
 Layers are then combined via the adding (interaction) method from TOA to surface.
 
-The linearized version simultaneously propagates derivatives with respect to three core
-optical properties per layer:
+At the elemental boundary the code contracts core-optics partials with the
+supplied tangent directions, then propagates those directional derivatives
+through every doubling and adding step. Schematically, for all layers:
 ```math
 \\frac{\\partial \\mathbf{R}}{\\partial p_j} = 
-  \\frac{\\partial \\mathbf{R}}{\\partial \\tau_k} \\frac{\\partial \\tau_k}{\\partial p_j} +
+  \\sum_k \\left[\\frac{\\partial \\mathbf{R}}{\\partial \\tau_k} \\frac{\\partial \\tau_k}{\\partial p_j} +
   \\frac{\\partial \\mathbf{R}}{\\partial \\varpi_k} \\frac{\\partial \\varpi_k}{\\partial p_j} +
-  \\frac{\\partial \\mathbf{R}}{\\partial \\mathbf{Z}_k} \\frac{\\partial \\mathbf{Z}_k}{\\partial p_j}
+  \\frac{\\partial \\mathbf{R}}{\\partial \\mathbf{Z}_k} \\frac{\\partial \\mathbf{Z}_k}{\\partial p_j}\\right]
 ```
-where ``p_j`` is any physical parameter in the state vector.
+where ``p_j`` is any physical parameter in the state vector. The Z term
+denotes contraction over both forward/backward phase-matrix indices; after
+doubling it cannot be represented by an elementwise scalar partial.
 """
 
 # Mockup if no Raman type is chosen:

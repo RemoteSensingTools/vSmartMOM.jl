@@ -1,0 +1,42 @@
+Precompiling packages...
+  25570.7 ms  ✓ vSmartMOM
+  11934.1 ms  ✓ vSmartMOM → vSmartMOMCUDAExt
+  2 dependencies successfully precompiled in 39 seconds. 274 already precompiled.
+┌ Info: Processing on: GPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (21, 21, 2)
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:28[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:18[K
+┌ Info: Processing on: GPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (18, 18, 2)
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:05[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:03[K
+┌ Info: Processing on: GPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (21, 21, 2)
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:21[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:14[K
+┌ Info: Processing on: GPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (18, 18, 2)
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:04[KLooping over layers ... 100%|████████████████████████████| Time: 0:00:02[K
+┌ Info: Processing on: GPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (21, 21, 2)
+┌ Info: Processing on: GPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (18, 18, 2)
+┌ Info: Processing on: GPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (18, 18, 2)
+┌ Info: Processing on: GPU()
+│ With FT: Float64
+│ Source Function Integration: true
+└ Dimensions: (18, 18, 2)
+Test Summary:                            | Pass  Total     Time
+External solar SFI (mu0 is not a stream) |   73     73  2m48.1s

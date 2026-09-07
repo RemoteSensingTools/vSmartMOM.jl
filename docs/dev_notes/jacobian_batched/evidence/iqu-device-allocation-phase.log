@@ -1,0 +1,148 @@
+BENCH_BEGIN cuda-n10000-t4
+BENCH_PHASE reference parity only
+Precompiling packages...
+  24180.6 ms  ✓ vSmartMOM
+  11752.2 ms  ✓ vSmartMOM → vSmartMOMCUDAExt
+  2 dependencies successfully precompiled in 37 seconds. 274 already precompiled.
+
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:37[K
+Looping over layers ...  80%|██████████████████████▍     |  ETA: 0:00:07[K
+Looping over layers ... 100%|████████████████████████████| Time: 0:00:27[K
+
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:02[K
+Looping over layers ...  80%|██████████████████████▍     |  ETA: 0:00:01[K
+Looping over layers ... 100%|████████████████████████████| Time: 0:00:03[K
+
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:02[K
+Looping over layers ...  80%|██████████████████████▍     |  ETA: 0:00:01[K
+Looping over layers ... 100%|████████████████████████████| Time: 0:00:03[K
+
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:02[K
+Looping over layers ...  80%|██████████████████████▍     |  ETA: 0:00:01[K
+Looping over layers ... 100%|████████████████████████████| Time: 0:00:03[K
+
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:02[K
+Looping over layers ...  80%|██████████████████████▍     |  ETA: 0:00:01[K
+Looping over layers ... 100%|████████████████████████████| Time: 0:00:04[K
+BENCH_PHASE enabled=true kind=full
+
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:06[K
+Looping over layers ... 100%|████████████████████████████| Time: 0:00:05[K
+
+Looping over layers ...  80%|██████████████████████▍     |  ETA: 0:00:00[K
+Looping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+
+Looping over layers ...  80%|██████████████████████▍     |  ETA: 0:00:00[K
+Looping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+
+Looping over layers ...  80%|██████████████████████▍     |  ETA: 0:00:00[K
+Looping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+
+Looping over layers ...  80%|██████████████████████▍     |  ETA: 0:00:00[K
+Looping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+
+Looping over layers ...  80%|██████████████████████▍     |  ETA: 0:00:00[K
+Looping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+
+Looping over layers ...  80%|██████████████████████▍     |  ETA: 0:00:00[K
+Looping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+
+Looping over layers ...  60%|████████████████▊           |  ETA: 0:00:01[K
+Looping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+
+Looping over layers ...  80%|██████████████████████▍     |  ETA: 0:00:00[K
+Looping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+
+Looping over layers ...  80%|██████████████████████▍     |  ETA: 0:00:00[K
+Looping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+
+Looping over layers ...  80%|██████████████████████▍     |  ETA: 0:00:00[K
+Looping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+
+Looping over layers ...  80%|██████████████████████▍     |  ETA: 0:00:00[K
+Looping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+
+Looping over layers ...  80%|██████████████████████▍     |  ETA: 0:00:00[K
+Looping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+
+Looping over layers ...  80%|██████████████████████▍     |  ETA: 0:00:00[K
+Looping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+
+Looping over layers ...  80%|██████████████████████▍     |  ETA: 0:00:00[K
+Looping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+
+Looping over layers ...  80%|██████████████████████▍     |  ETA: 0:00:00[K
+Looping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+
+Looping over layers ...  80%|██████████████████████▍     |  ETA: 0:00:00[K
+Looping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+
+Looping over layers ...  80%|██████████████████████▍     |  ETA: 0:00:00[K
+Looping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+
+Looping over layers ...  80%|██████████████████████▍     |  ETA: 0:00:00[K
+Looping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+
+Looping over layers ...  80%|██████████████████████▍     |  ETA: 0:00:00[K
+Looping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+BENCH_PHASE enabled=true kind=selected
+
+Looping over layers ...  80%|██████████████████████▍     |  ETA: 0:00:00[K
+Looping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+
+Looping over layers ...  80%|██████████████████████▍     |  ETA: 0:00:00[K
+Looping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+
+Looping over layers ...  80%|██████████████████████▍     |  ETA: 0:00:00[K
+Looping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+
+Looping over layers ...  80%|██████████████████████▍     |  ETA: 0:00:00[K
+Looping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+
+Looping over layers ...  80%|██████████████████████▍     |  ETA: 0:00:00[K
+Looping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+BENCH_PHASE kind=forward
+
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:10[K
+Looping over layers ... 100%|████████████████████████████| Time: 0:00:06[K
+
+Looping over layers ...  80%|██████████████████████▍     |  ETA: 0:00:00[K
+Looping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+
+Looping over layers ...  80%|██████████████████████▍     |  ETA: 0:00:00[K
+Looping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+
+Looping over layers ...  80%|██████████████████████▍     |  ETA: 0:00:00[K
+Looping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+
+Looping over layers ...  80%|██████████████████████▍     |  ETA: 0:00:00[K
+Looping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+
+Looping over layers ...  80%|██████████████████████▍     |  ETA: 0:00:00[K
+Looping over layers ... 100%|████████████████████████████| Time: 0:00:01[K
+SELECTED_PARITY dR=0.0
+MODEL backend=cuda nSpec=10000 operator=18 full_columns=14 selected_columns=4
+PARITY R=6.938893903907228e-18 T=1.3877787807814457e-17 dR=8.326672684688674e-17 dT=3.885780586188048e-16 forward_R=6.938893903907228e-17
+MEASURE enabled=true kind=full median_seconds=11.34046989 median_bytes=3.63621416e9 median_gpu_bytes=1.21944745446e11 samples=[(time = 11.656329692, bytes = 3636263480, gctime = 1.62723852, gpu_bytes = 121944745446), (time = 11.122219357, bytes = 3636214160, gctime = 1.061968781, gpu_bytes = 121944745446), (time = 11.34046989, bytes = 3636194360, gctime = 1.557929427, gpu_bytes = 121944745446)]
+MEASURE enabled=true kind=selected median_seconds=3.366256868 median_bytes=1.298055192e9 median_gpu_bytes=2.7372204836e10 samples=[(time = 3.359229577, bytes = 1298074056, gctime = 0.121707278, gpu_bytes = 27372204836), (time = 3.366256868, bytes = 1298055192, gctime = 0.153142152, gpu_bytes = 27372204836), (time = 3.384460861, bytes = 1297979832, gctime = 0.136415769, gpu_bytes = 27372204836)]
+FORWARD median_seconds=0.660882573
+───────────────────────────────────────────────────────────────────────────────────
+                                          Time                    Allocations
+                                 ───────────────────────   ────────────────────────
+        Tot / % measured:             14.4s /  74.9%           3.59GiB /  84.6%
+
+Section                  ncalls     time    %tot     avg     alloc    %tot      avg
+───────────────────────────────────────────────────────────────────────────────────
+doubling                     25    5.94s   55.2%   238ms   13.9MiB    0.4%   568KiB
+  getri_strided             165   5.51ms    0.1%  33.4μs    415KiB    0.0%  2.51KiB
+  getrf_strided             165   4.60ms    0.0%  27.8μs    270KiB    0.0%  1.64KiB
+OpticalProps                 30    2.60s   24.1%  86.6ms   2.45GiB   80.7%  83.6MiB
+interaction                  25    1.86s   17.3%  74.3ms   2.66MiB    0.1%   109KiB
+  getrf_strided              50   1.89ms    0.0%  37.7μs   78.4KiB    0.0%  1.57KiB
+  getri_strided              50   1.83ms    0.0%  36.5μs    123KiB    0.0%  2.46KiB
+elemental                    25    202ms    1.9%  8.09ms   1.27MiB    0.0%  51.9KiB
+Creating layers               3    158ms    1.5%  52.6ms    565MiB   18.2%   188MiB
+OpticalProps invariant        1   8.00ms    0.1%  8.00ms   18.8MiB    0.6%  18.8MiB
+Creating arrays               1    141μs    0.0%   141μs   4.39KiB    0.0%  4.39KiB
+───────────────────────────────────────────────────────────────────────────────────
+BENCH_DONE cuda-n10000-t4
