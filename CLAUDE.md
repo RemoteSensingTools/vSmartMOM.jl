@@ -24,16 +24,18 @@ vSmartMOM.jl is a Julia package for vectorized atmospheric radiative transfer us
 
 ```bash
 # Run full test suite
-julia --project=test test/runtests.jl
+cd test && julia --project=. runtests.jl
 
 # Run a single test file
-julia --project=test -e 'using vSmartMOM; include("test/test_Scattering.jl")'
+cd test && julia --project=. -e 'using vSmartMOM; include("test_Scattering.jl")'
 
 # Run via Pkg
-julia --project=test -e 'using Pkg; Pkg.test()'
+cd test && julia --project=. -e 'using Pkg; Pkg.test()'
 ```
 
-No linter or formatter configured. Julia compatibility: 1.10-1.12.
+TOML lint/format checks use Taplo 0.10.0 via `tools/install_taplo.sh`.
+Run `taplo lint` and `taplo format --check` from the repository root.
+Julia compatibility: 1.10-1.12; no automatic Julia source formatter is required.
 
 ## Architecture
 
@@ -48,7 +50,9 @@ No linter or formatter configured. Julia compatibility: 1.10-1.12.
 7. **SolarModel** (`src/SolarModel/SolarModel.jl`) — Solar irradiance spectrum
 8. **IO** (`src/IO/IO.jl`) — YAML config parsing, NetCDF readers, GEOSChem integration
 
-GPU is a weak dependency via `ext/vSmartMOMCUDAExt.jl` (loads when CUDA.jl is present).
+CUDA support is implemented in `ext/vSmartMOMCUDAExt.jl`. CUDA is currently a
+direct package dependency; CPU execution does not require a working CUDA
+device. Metal is an optional weak dependency.
 
 ### Main Pipeline
 

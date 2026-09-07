@@ -13,11 +13,11 @@ the model. The latter should generally be used by users.
 """
     rt_run(model::RTModel; i_band=1) -> ObserverRTResult
 
-Run the forward radiative transfer solver for one or more spectral bands.
+Run the forward radiative transfer solver for the selected spectral band.
 
 Performs polarized adding-doubling RT through the atmosphere defined in `model`,
-computing top-of-atmosphere (TOA) reflectance and bottom-of-atmosphere (BOA)
-transmittance.  The solver iterates over azimuthal Fourier moments
+computing top-of-atmosphere (TOA) upwelling and bottom-of-atmosphere (BOA)
+downwelling Stokes radiances.  The solver iterates over azimuthal Fourier moments
 `m = 0, …, max_m-1`, building layer R/T/J matrices via elemental → doubling →
 interaction steps, then applies surface coupling and postprocessing.
 
@@ -25,11 +25,11 @@ Equivalent to `rt_run(noRS(), model, i_band)` (no Raman scattering).
 
 # Arguments
 - `model::RTModel`: Pre-built model from [`model_from_parameters`](@ref).
-- `i_band::Integer=1`: Spectral band index (or vector of indices) to compute.
+- `i_band::Integer=1`: Spectral band index to compute.
 
 # Returns
 An [`ObserverRTResult`](@ref). With the default `obs_alt: [0]`, its `toa` and
-`boa` fields contain the historical TOA reflectance and BOA transmittance,
+`boa` fields contain TOA upwelling and BOA downwelling radiances,
 each shaped `[nVZA × nStokes × nSpec]`. Strict-interior outputs are stored in
 `result.levels` as [`LevelRadiance`](@ref) records.
 
@@ -41,10 +41,10 @@ R, T = rt_run(model)
 
 # Example
 ```julia
-params = parameters_from_yaml("config/my_scene.yaml")
+params = parameters_from_yaml(joinpath(pkgdir(vSmartMOM), "config", "quickstart.yaml"))
 model = model_from_parameters(params)
 R, T = rt_run(model)
-R[1, 1, :]  # Stokes-I reflectance at first VZA across the spectrum
+R[1, 1, :]  # Stokes-I TOA radiance at first VZA across the spectrum
 ```
 
 # See also

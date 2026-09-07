@@ -248,10 +248,15 @@ Each aerosol contributes seven derivative slots in this order:
 1. reference optical depth `τ_ref`;
 2. real refractive index `nᵣ`;
 3. imaginary refractive index `nᵢ`;
-4. median radius `rₘ`;
-5. geometric width `σ_g`;
+4. native lognormal location `μ_logr = log(rₘ)`;
+5. native lognormal width `σ_logr = log(σ_g)`;
 6. vertical-profile location (`p₀` or `z₀`);
 7. vertical-profile width (`σ_p` or `σ₀`).
+
+For derivatives with respect to the YAML median radius and geometric width,
+divide the native size columns by `rₘ` and `σ_g`, respectively. This upstream
+coordinate convention is independent of the retrieval-specific transformations
+performed by a selected Jacobian plan.
 
 The array dimensions should always satisfy:
 

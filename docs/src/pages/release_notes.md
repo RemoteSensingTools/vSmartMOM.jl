@@ -1,11 +1,12 @@
 # Release Notes and Migration
 
-**For:** users moving to the registration-ready vSmartMOM 2.0 interface.
+**For:** users upgrading from registered vSmartMOM 1.1.0 or the public 2.1.0
+tag to the 2.2.0 release candidate.
 
 **Next:** [Quick Start](quickstart.md), [Configure a Scene (step by step)](IO/ConfigurationGuide.md), [Compute Jacobians](jacobians.md).
 
-This page summarizes the user-visible changes in the 2.0 line. It is written as
-a migration guide, not as a complete git history.
+This page summarizes the user-visible changes in 2.2.0. The version is a
+release candidate until registration and publication are complete.
 
 ## Scientific development and contributions
 
@@ -26,17 +27,41 @@ provide implementation provenance; commit counts do not measure the scientific
 contribution. The published software and method references remain listed in
 the repository's `CITATION.bib`, with their original publication author order.
 
-## Unreleased (on `feat/surface-split`)
+## Upgrade checklist
 
-Work in progress on the `feat/surface-split` branch — not yet merged to
-`main`, not yet tagged or released. Summarized here ahead of the PR so the
-migration story stays contiguous; fold this section under a version heading
-once it ships. This branch now also carries the merged multi-sensor work
-(next section); the two Fourier-loop mechanisms they introduce compose —
-the per-component support traits
-([`component_m_max`](@ref vSmartMOM.CoreRT.component_m_max)) fix the loop
-ceiling at model build, and the runtime intensity-convergence strategy may
-exit below it.
+- Use Julia 1.10 or newer. CPU execution needs no CUDA device, although CUDA
+  is currently installed as a direct dependency. Metal remains optional.
+- Load bundled examples with `joinpath(pkgdir(vSmartMOM), "config", ...)`.
+  Both `quickstart.yaml` and `quickstart.toml` are portable installed-package
+  examples.
+- Forward results are `ObserverRTResult`; Jacobian results are
+  `ObserverRTResultLin`. Tuple iteration/indexing remains available. Prefer
+  `.toa`, `.boa`, `.levels`, `.toa_jacobian`, and `.layout` for new code.
+- Use `nstreams` and explicit truncation/convergence settings for new scenes.
+  Legacy field access and solver defaults should be reviewed against the
+  configuration guide when reproducing an older retrieval.
+- External-solar geometry is opt-in: build with `external_solar=true` before
+  calling `rt_run_toa`. The normal constructor defaults to embedded solar.
+- Nonzero δBGE `Δ_angle` is retired and coerced to zero with a warning.
+  Forward and linearized truncation now share the same domain.
+- Revalidate ocean results: Cox–Munk normalization and direct-glint attenuation
+  were corrected. The incident spectrum scales the correction, and full
+  Jacobians include its wind/optical-depth derivatives. The direct-glint
+  correction requires unpolarized incident illumination.
+- Raman Jacobians, linearized thermal sources, and linearized aerosol
+  `TMSCorrection` are explicitly unsupported. Forward Raman and forward
+  atmospheric thermal emission remain separate supported paths.
+- The OCO campaign sources include updated SIF normalization and prior/restart
+  checks. Full campaign execution requires separately supplied spectroscopy,
+  solar spectra, covariance tables, and truth products. Package installation
+  does not supply or publish those research datasets.
+
+## Solver and workflow additions
+
+Per-component support traits
+([`component_m_max`](@ref vSmartMOM.CoreRT.component_m_max)) set the Fourier
+ceiling at model construction. Runtime intensity or Stokes convergence may
+exit below that ceiling using the configured guard and consecutive-pass count.
 
 ### AtmosphericAbsorption is the supported absorption dependency
 
@@ -87,7 +112,7 @@ call at the new geometry.
 for which of the above (or the existing `BatchContext` / `update_model!` /
 `update_aerosol_loading!` / `update_aerosol_microphysics!` family) to reach
 for, keyed by what changes between runs.
-## Unreleased — retrieval-selected analytic Jacobians
+## Retrieval-selected analytic Jacobians
 
 Retrievals can now define a zero-field subtype of `AbstractJacobianFlavor`
 and compile named, band-local derivative layouts through `JacobianPlan`.
@@ -282,8 +307,9 @@ for the design rationale.
 
 ## Platform Support
 
-vSmartMOM 2.0 supports Julia 1.10 and newer Julia 1.x releases listed in
-`Project.toml`. CUDA is an optional weak dependency, and the package includes
+vSmartMOM 2.2 supports Julia 1.10 and newer Julia 1.x releases listed in
+`Project.toml`. CUDA is a direct dependency that does not require a functional GPU for CPU
+execution. Metal is an optional weak dependency, and the package includes
 compatibility with CUDA.jl 6.
 
 CPU remains the default portable path:
@@ -458,14 +484,10 @@ human-readable citation guide.
 The following bugs were silently wrong in earlier releases; all are fixed in
 the current codebase.
 
-- **δBGE forward-cone exclusion (`Δ_angle`) now applied in production.**
-  The `Δ_angle` parameter of `δBGE(N, Δ_angle)` controls how much of the
-  forward-scattering peak is excluded before fitting the truncation coefficient.
-  Previously, `Δ_angle` was accepted in the constructor but silently ignored
-  during the production truncation fit inside `model_from_parameters`.
-  It is now applied correctly.  The **default `Δ_angle = 0` is unchanged**,
-  so most users see no numerical change.  Users who explicitly set `Δ_angle > 0`
-  in their configs should re-validate their results against this release.
+- **δBGE forward-cone exclusion (`Δ_angle`) retired.** Nonzero values warn
+  and are forced to zero. This resolves the inconsistent forward/linearized
+  fitting domains; workflows that previously requested a nonzero angle must
+  revalidate their results.
 
 - **`LambertianSurfaceSpectrum` surface layer now works.**
   Calling `rt_run` on a model with a `LambertianSurfaceSpectrum` surface
@@ -538,14 +560,19 @@ the current codebase.
   stabilized.
 - Internal export cleanup is intentionally deferred; this release does not
   tighten public API surface area at the same time as the registration cutover.
-- Unified offline source-function integration and thermal emission are design
-  topics, not implemented user-facing features in this release line.
+- Forward `ThermalEmission` is implemented. Its end-to-end analytic
+  Jacobians and additional diffuse/lidar source types remain future work.
 
 ## Future Developments
 
-- Mixed automatic differentiation and hand-coded linearization.
+- Broader source and observer support across the existing hybrid
+  upstream-AD / analytic-RT linearization boundary.
 - Coupled ocean-atmosphere radiative transfer.
 - More line-shape and line-mixing functionality, including expansion to more
   spectral databases.
 - Raman performance and memory-pressure improvements.
 - Correlated-k and other spectral dimension-reduction methods.
+
+### Experimental aerosol ingestion
+
+`Aerosols.compute_optical_properties` now rejects calls instead of returning placeholder optical properties. Aerosol readers and refractive-index lookup remain available; production Mie and RT aerosol calculations use `Scattering` and CoreRT. The separate GCHP sectional-AOD branch remains an experimental integration workstream.

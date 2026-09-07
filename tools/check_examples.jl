@@ -11,7 +11,7 @@ text = read(joinpath(pkgdir(vSmartMOM), "README.md"), String)
         if occursin("Linearized", heading)
             @test all(isfinite, Base.invokelatest(getfield, mod, :dR))
             @test all(isfinite, Base.invokelatest(getfield, mod, :dT))
-            @test size(Base.invokelatest(getfield, mod, :dR), 4) == 1
+            @test size(Base.invokelatest(getfield, mod, :dR))[1:3] == size(Base.invokelatest(getfield, mod, :R))
         end
     end
 end

@@ -139,7 +139,7 @@ material when explaining the package:
 3. **Hybrid AD across the GPU boundary.** `ForwardDiff.Dual` flows through `NNlib.batched_mul` on `CuArray`. — `ext/gpu_batched_cuda.jl:141–177`.
 4. **Polarization is a type, not a runtime branch.** `Stokes_I/IQ/IQU/IQUV` specialize the kernels at compile time. — `src/Scattering/types.jl:92–143`.
 5. **Optical properties as algebra.** `+` mixes scatterers; `*` stacks layers. — `src/CoreRT/types.jl:1063–1101`.
-6. **Weak GPU dependency** (Julia 1.9+ package extensions). CPU-only installs first-class. — `ext/vSmartMOMCUDAExt.jl`.
+6. **GPU package extensions.** CPU execution works without a CUDA device; CUDA is currently a direct dependency and Metal is optional. — `ext/vSmartMOMCUDAExt.jl`.
 7. **Three `(τ, ϖ, Z)` core variables per layer.** RT kernel differentiates against these directly. — `src/CoreRT/types_lin.jl:119–149`.
 8. **Exact finite-δ elemental** (point #1 above). — `src/CoreRT/CoreKernel/elemental.jl:207–252`.
 
@@ -287,7 +287,7 @@ When the docs evolve, this file evolves with them. Specifically:
 
 - If a new Concepts page is added or the arc reorders, update the Concepts arc table.
 - If a kernel's source location moves, update the code-anchor table.
-- If a new differentiator is added or a current claim no longer holds, update the differentiator list. Note: GPU Mie is now architecture-dispatched production reality for CUDA (`has_gpu_mie(::GPU) = true`; `make_mie_model(...; architecture=GPU())` runs on-GPU for CUDA). The differentiator list item "One `@kernel` source" already covers this; update item 6 ("Weak GPU dependency") if the Metal/CPU fallback path changes.
+- If a new differentiator is added or a current claim no longer holds, update the differentiator list. Note: GPU Mie is now architecture-dispatched production reality for CUDA (`has_gpu_mie(::GPU) = true`; `make_mie_model(...; architecture=GPU())` runs on-GPU for CUDA). The differentiator list item "One `@kernel` source" already covers this; update item 6 ("GPU dependency status") if the Metal/CPU fallback path changes.
 - If a new design-choice passage is added to `theory_references.md`, add it to "When in doubt" §3.
 
 This file is for agents who don't have time to read the whole codebase. If it's stale, it's actively misleading. Keep it honest.

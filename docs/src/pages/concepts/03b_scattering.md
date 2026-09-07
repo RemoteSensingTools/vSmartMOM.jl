@@ -197,7 +197,7 @@ calculation. vSmartMOM ships with two microphysics schemes (in the
 `Aerosols` module):
 
 - `TOMAS15Scheme` — TOMAS-15-bin sectional scheme used in CESM/GEOS-Chem.
-- `TwoMomentScheme` — two-moment lognormal scheme (median radius + width).
+- `TwoMomentScheme` — two-moment bulk scheme (AOD + effective radius, with fixed geometric width).
 
 Plus a refractive-index database for common aerosol species (sulfate, dust,
 black carbon, organic carbon, sea salt). See [Aerosols (microphysics)](../Aerosols/Overview.md)

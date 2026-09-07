@@ -73,3 +73,25 @@ Each gas column contributes to all three band-output blocks. The
 forward and analytic-linearized calculations both use external-solar SFI, so
 the diffuse IQU operator remains 18×18 and the direct solar coupling is carried
 by rectangular source-column operators.
+
+
+## Release validation and source layout
+
+Run `cd test && julia --project=. local/workflows/runtests.jl` from the package
+checkout to validate portable optimal-estimation and campaign contracts with
+synthetic temporary products. Set `CO2_COVARIANCE_FILE` and
+`VSMARTMOM_SIF_DATA_DIR` to the original study inputs for the extended suite;
+missing inputs are reported as skips. No canonical study products are changed.
+
+The round-4 code digest accepts both historical `RRS_XCO2/` and the public
+`sandbox/workflows/RRS_XCO2/` source location. The HPC submission scripts still
+encode the canonical two-checkout campaign layout; their fixture tests verify
+that contract, but no scheduler submission or production campaign is executed
+by the release checks. Assemble and validate the transfer bundle before a new
+HPC run.
+
+For transferred producer provenance, `SIF_PRODUCER_MANIFEST` and
+`SIF_PRODUCER_ALBEDO` explicitly select the producer dependency manifest and
+surface-coefficient file. Their checksums must match the producer receipts.
+The test harness supplies clearly synthetic files solely to exercise checksum
+and publication/rollback contracts in temporary directories.

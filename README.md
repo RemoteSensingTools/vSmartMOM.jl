@@ -32,7 +32,11 @@
 </div>
 This project aims to revamp and modernize key atmospheric remote sensing tools. Specifically, it will enable the fast computation of atmospheric optical properties, full-polarized radiative transfer simulations, and commonly-used inversion routines.
 
-The core of the code is based on recent publications:
+The scientific development of vSmartMOM, including its linearization and Raman
+formulations, is led by Suniti Sanghavi. Christian Frankenberg contributes
+software engineering, performance improvements, and release integration.
+
+The core of the code is based on these publications:
 
 - Sanghavi, S., Davis, A. B., & Eldering, A. (2014). vSmartMOM: A vector matrix operator method-based radiative transfer model linearized with respect to aerosol properties. Journal of Quantitative Spectroscopy and Radiative Transfer, 133, 412-433. [Download](https://www.sciencedirect.com/science/article/pii/S0022407313003592)
 
@@ -73,26 +77,26 @@ The vSmartMOM module allows end-to-end simulation of radiative transfer (RT) thr
   - `parameters_from_yaml(filepath::String)`: YAML-specific alias (still works; raises `ArgumentError` for `.toml` paths).
   - `default_parameters()`: Load a default set of RT parameters.
   - `model_from_parameters(params::vSmartMOM_Parameters)`: Build an `RTModel` with all derived optical properties (cross-section profiles, scattering phase functions, etc.) ready for simulation.
-  - `rt_run(model::RTModel)`: Perform forward RT simulation, returning reflectance and transmittance.
+  - `rt_run(model::RTModel)`: Perform forward RT simulation, returning named TOA/BOA Stokes radiances and optional observer levels.
   - `model_from_parameters(LinMode(), params)`: Build both an `RTModel` and an `RTModelLin` for analytic Jacobian computation.
-  - `rt_run(model, lin_model, NAer, NGas, NSurf)`: Linearized RT returning `(R, T, dR, dT)` with exact Jacobians.
+  - `rt_run(model, lin_model, NAer, NGas, NSurf)`: Linearized RT returning named radiances/Jacobians; iterable as `(R, T, dR, dT)` for compatibility.
 
 #### Forward run (minimal)
 
 ```julia
 using vSmartMOM
-params = read_parameters("config/quickstart.yaml")        # YAML, TOML, or Dict
+params = read_parameters(joinpath(pkgdir(vSmartMOM), "config", "quickstart.yaml"))        # YAML, TOML, or Dict
 model  = model_from_parameters(params)
-R, T   = rt_run(model)                                    # reflectance, transmittance
+R, T   = rt_run(model)                                    # TOA upwelling, BOA downwelling
 ```
 
 #### Linearized run (analytic Jacobians)
 
 ```julia
 using vSmartMOM
-params = read_parameters("config/ocean_coxmunk.yaml")
+params = read_parameters(joinpath(pkgdir(vSmartMOM), "config", "quickstart.toml"))
 model, lin_model = model_from_parameters(LinMode(), params)
-NAer  = length(params.scattering_params.rt_aerosols)
+NAer  = params.scattering_params === nothing ? 0 : length(params.scattering_params.rt_aerosols)
 NGas  = size(lin_model.τ̇_abs[1], 1)
 NSurf = 1
 R, T, dR, dT = rt_run(model, lin_model, NAer, NGas, NSurf)

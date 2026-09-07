@@ -132,7 +132,12 @@ end
 # Resolve the intersection with the generic CPU no-pointer overload. CUDA
 # callers without pointer caches use the strided device implementation.
 function vSmartMOM.CoreRT.batch_inv!(X::CuArray{FT,3}, A::CuArray{FT,3},
-                                    ::Nothing, ::Nothing) where {FT<:Union{Float32,Float64}}
+                                    ::Nothing, ::Nothing) where {FT<:Float32}
+    return vSmartMOM.CoreRT.batch_inv!(X, A)
+end
+
+function vSmartMOM.CoreRT.batch_inv!(X::CuArray{FT,3}, A::CuArray{FT,3},
+                                    ::Nothing, ::Nothing) where {FT<:Float64}
     return vSmartMOM.CoreRT.batch_inv!(X, A)
 end
 

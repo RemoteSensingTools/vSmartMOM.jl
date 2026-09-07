@@ -79,8 +79,9 @@ source kernels is type-stable on both CPU and GPU.
 Use it for Carbon-I-like scenes (hot lab source illuminating CO₂/CH₄/H₂O
 absorption in the 2-2.4 µm range).
 
-Future versions will add `ThermalEmission` (atmospheric volume Planck
-integral), `DiffuseBoundary`, and (later) `LidarPulse`.
+`ThermalEmission` implements the atmospheric volume Planck source in forward
+RT. Its end-to-end Jacobians remain unsupported. `DiffuseBoundary` and
+`LidarPulse` are future source types.
 
 ## Units convention
 

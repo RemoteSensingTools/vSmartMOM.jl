@@ -30,8 +30,8 @@ defaults are, and which legacy aliases still work.
   full precision.
 - **`architecture`** — `String`. `"Architectures.CPU()"`,
   `"Architectures.GPU()"`, or `"Architectures.MetalGPU()"`. The CUDA
-  GPU path is loaded via the `vSmartMOMCUDAExt` weak-dependency
-  extension (`using CUDA` activates it).
+  GPU path is implemented by the `vSmartMOMCUDAExt` extension. CUDA is
+  currently a direct dependency; CPU execution needs no CUDA device.
 
 ## Resolution knobs (Phase D — v0.7)
 
@@ -131,10 +131,25 @@ legacy `l_trunc` is ignored and `nstreams` wins.
     grazing-VZA configs from collapsing dτ below FT precision.
   - `blas_threads`     *(default `null`)*  — per-model BLAS thread
     cap. `null` leaves `BLAS.get_num_threads()` alone; an integer
-    pins it for the duration of `rt_run`. See commit `37390d2`.
+    sets the process-wide BLAS thread count when `rt_run` starts; it is not
+    restored after the call.
   - `verbose`          *(default `false`)*  — when `true`, `rt_run`
     prints the `TimerOutputs` timing tree at the end of each call
     (useful for profiling, noisy in batched loops).
+  - `fourier_convergence` *(default `all`)* — `all` evaluates every allowed
+    moment; `intensity` checks I, and `stokes` checks I/Q/U. Aliases are `none`
+    for `all`, and `iqu` for `stokes`.
+  - `fourier_tolerance` *(default `1e-5`)*, `fourier_min_m` *(default `3`,
+    minimum `3`)*, and `fourier_n_consecutive` *(default `2`, minimum `1`)*
+    control the convergence test. These keys require `intensity` or `stokes`;
+    they are rejected with `all` so a requested threshold cannot be ignored.
+  - `ss_correction` *(default `none`)* — `tms` enables the aerosol
+    exact-single-scattering correction for forward elastic SFI. Raman and
+    linearized drivers reject this strategy. Cox–Munk's direct glint correction
+    is separate and is included in forward and linearized ocean solves.
+
+Unknown numerics keys are rejected. The ASCII aliases `dtau_max_threshold`
+and `dtau_min_floor` are accepted; conflicting Unicode/ASCII values are rejected.
 
 ## Example — minimal new schema
 

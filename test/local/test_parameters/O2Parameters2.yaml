@@ -28,16 +28,10 @@ radiative_transfer:
 # =================================================================
 # -----------------------------------------------------------------
 # AZIMUTH CONVENTION (vSmartMOM):
-#   `vaz` is the relative azimuth between the satellite-detector
-#   and the Sun, measured in the principal plane.
-#     vaz =   0°  -> Sun and satellite on *opposite* sides of zenith
-#                    in the principal plane (vSmartMOM convention).
-#     vaz = 180°  -> Sun directly *behind* the satellite (same side
-#                    of zenith). This is the geometry that many
-#                    third-party models — including MODTRAN — call
-#                    "RAA = 0".
-#   To compare with a model whose RAA = 0 means Sun-behind-satellite
-#   (e.g. MODTRAN), set vaz = RAA + 180° (mod 360°).
+#   vaz = phi_view - phi_sun, in degrees.
+#   0 degrees: Sun behind satellite; 180 degrees: opposite sides of zenith.
+#   See docs/src/pages/conventions.md for the authoritative convention and
+#   cross-code conversion guidance; do not infer a conversion from labels alone.
 # -----------------------------------------------------------------
 geometry: 
   # Solar zenith angle (degrees)

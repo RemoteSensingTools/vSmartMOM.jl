@@ -32,15 +32,15 @@ Load a SIF emission spectrum from a CSV file and return
 - `jSIF` is the SIF flux in mW/m²/cm⁻¹ (converted from mW/m²/nm via the
   dλ/dν = 1e7/ν² Jacobian).
 
-`column` selects which SIF spectrum to read — the `sif-spectra.csv`
-file ships three: `:SIF_OLD`, `:SIF_NEW`, `:SIF_DEF`. Defaults to
+`column` selects which SIF spectrum to read. The externally supplied study
+`SIF` table (`sif-spectra.csv`) provides three columns: `:SIF_OLD`, `:SIF_NEW`, `:SIF_DEF`. Defaults to
 `:SIF_OLD` to match the benchmark scripts.
 
-TODO: The (0.5π / maximum(J_SIF)) rescaling is an intentional hack to
-make SIF magnitude data-independent for grid generation. This normalizes
-shape but discards absolute physical magnitude. Revisit: confirm the
-downstream physics depends only on SIF shape (not absolute flux), or
-replace with physical units (mW/m²/cm⁻¹). Not a merge blocker.
+With `rescale_to_peak=true`, the wavelength-space spectrum is normalized
+to a peak of `0.5π` before conversion to wavenumber density. This is a shape
+normalization, not a calibration of physical SIF amplitude. Use
+`rescale_to_peak=false` to preserve the supplied amplitude, or
+[`sif_reference_state`](@ref) for the explicit 760-nm campaign convention.
 """
 function load_sif_spectrum(path::AbstractString = sif_data_path("sif-spectra.csv");
                            column::Symbol = :SIF_OLD,

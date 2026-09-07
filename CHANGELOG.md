@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased — externalAbsorption branch (targeting v2.2.0)
+## 2.2.0 — release candidate (unreleased)
 
 Scientific authorship of the linearization and Raman work, including the
 formulations, analytic derivatives, and retrieval methodology, is credited to
@@ -9,7 +9,44 @@ backend engineering, integration, packaging, and release tooling. See the
 release manual's contribution statement
 and the published references in `CITATION.bib`.
 
-### Summary
+### Consolidated release
+
+This candidate combines the surface/multisensor integration, Suniti's updated
+retrieval workflows, and the validated Jacobian improvements. It preserves the
+published `v2.1.0` tag. The migration baseline for registry users is **1.1.0**;
+2.0/2.1 were not registered in General. Registration of 2.2.0 will require
+review of General's sequential-version rule.
+
+- Named endpoint/interior radiance results retain tuple-style iteration.
+- Retrieval-selected, local-optical, and equivalent-source analytic Jacobians
+  support efficient elastic inversions, including surface SIF.
+- Historical Sanghavi inversion logs versus optimized replays show about
+  **12–20×** lower retrieval wall time in the tested cases. These are workload
+  measurements, not a universal Jacobian/forward cost ratio. See
+  `docs/dev_notes/jacobian_batched/suniti_inversions.md` for timing and precision
+  conditions, and the retained convergence/convolution accuracy evidence.
+- Cox–Munk glint now uses the incident spectrum, both atmospheric transits,
+  and consistent Fourier/BRDF normalization. Forward and analytic Jacobian
+  runs apply the same correction, including wind and optical-depth tangents.
+  **Ocean radiances change**; revalidate prior ocean baselines. The direct
+  glint correction supports unpolarized incident light.
+- Shared aerosol reference normalization and spectral angular-cache sizing
+  fixes restore constructor parity and avoid spectral-quadratic cache growth.
+- The experimental aerosol ingestion adapter now rejects calls that previously
+  returned placeholder optics. Production Mie calculations remain in `Scattering`.
+- Numerical conversion and CUDA inverse dispatch ambiguities are resolved;
+  Aqua's ambiguity check is enabled.
+- RT batched multiplication is package-owned, preserving NNlib's behavior in
+  other packages. GPU tests fail on compilation/scalar-indexing errors when
+  hardware is functional.
+- Taplo 0.10.0 is pinned and checksum-verified; CI checks maintained TOML
+  formatting, scene schemas, and negative configuration cases.
+- Fourier convergence options are represented in the schema. Unknown numerics
+  keys and convergence thresholds supplied with `all` now raise errors.
+- Documentation distinguishes supported elastic Jacobians, forward Raman,
+  forward thermal sources, and data-dependent experimental retrieval campaigns.
+
+### Earlier integrated changes
 
 - **RRS GPU performance (~90× on the O2A Raman LUT; ~120× whole-`rt_run`).**
   The rotational-Raman adding–doubling GPU path was rewritten: fused
@@ -35,7 +72,8 @@ and the published references in `CITATION.bib`.
   (> ~500 K) may differ slightly from earlier releases.
 
 - **GPU Mie dispatch (10.7–12.9×).** `make_mie_model(...; architecture=GPU())`
-  now runs NAI-2 Mie on GPU automatically; Metal/PCW fall back to CPU.
+  now runs NAI-2 Mie on GPU automatically. Metal supports the native
+  Float32 policy; PCW retains its CPU path.
 
 - **`BatchContext` batch API.** `BatchContext` / `update_model!` /
   `update_aerosol_loading!` / `update_aerosol_microphysics!` enable efficient
@@ -47,8 +85,8 @@ and the published references in `CITATION.bib`.
   - Canopy soil-albedo Jacobian axis fixed.
   - VS Raman call-chain + atomic-mass factor corrected (vibrational Raman
     results change; RRS unaffected).
-  - δBGE `Δ_angle` now applied in production truncation fit (was silently
-    ignored; default `Δ_angle = 0` unchanged).
+  - Nonzero δBGE `Δ_angle` is retired: it warns and is forced to zero so
+    forward and linearized truncation share one angular domain.
   - `LambertianSurfaceSpectrum` surface layer now works (missing
     `create_surface_layer!` method added, including Lambertian scaffold).
   - Mie Dₙ recurrence: Dual-number-safe initialization restores correct
@@ -64,7 +102,8 @@ and the published references in `CITATION.bib`.
 
 - **Folded PRs #222–#225.**
 
-Release tag (v2.2.0) to be cut by S. Sanghavi.
+Release publication is to be coordinated with S. Sanghavi after the candidate
+passes the release gates; no tag or registration is implied by this entry.
 
 ---
 

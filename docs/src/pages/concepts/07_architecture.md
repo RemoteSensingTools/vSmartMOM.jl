@@ -113,9 +113,10 @@ end
 
 Three things to notice:
 
-1. **No CUDA in `Project.toml`** — CUDA is a `weakdep`, not a hard dependency.
-   Users who don't have CUDA installed get a clean `using vSmartMOM` with no
-   error.
+1. **CPU execution does not require a working CUDA device.** CUDA is
+   currently a direct dependency in `Project.toml`, and is also required by
+   CanopyOptics. Installing the package therefore resolves CUDA even on a
+   CPU-only machine. Metal is an optional weak dependency.
 2. **The dispatch is three method overrides.** The kernels themselves don't
    change.
 3. **`CUDA.allowscalar(false)`** enforces that no kernel does `A[1,1,1] = …`
