@@ -134,6 +134,7 @@ end
 
 # Cox-Munk ocean surface tests
 @testset "Cox-Munk Surface" begin include("test_coxmunk.jl") end
+@testset "Cox-Munk RT contract" begin include("test_coxmunk_rt_contract.jl") end
 
 # Lambertian surface scaffold — cross-flavor consistency (Scalar/Legendre/
 # Spline/Spectrum share one create_surface_layer!), m>0 conventions, and the

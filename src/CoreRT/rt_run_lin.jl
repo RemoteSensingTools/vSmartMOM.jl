@@ -580,6 +580,13 @@ function rt_run(RS_type::AbstractRamanType,
     end
     _LAST_FOURIER_M_USED[] = m_used
 
+    if brdf isa CoxMunkSurface
+        @timeit "SS Correction" apply_ss_correction!(
+            R, Ṙ, Array(τ̇_sum_endpoint[:,:,end]), first(surface_range(layout)),
+            brdf, pol_type, vza, vaz, μ₀, Array(τ_sum_endpoint[:,end]),
+            m_used, nSpec; F₀)
+    end
+
     # `J₀⁺` is the diffuse SFI field; the historical BOA forward output also
     # carries the attenuated collimated beam when a requested VZA resolves to
     # the solar ordinate. Add that carrier and its optical-depth tangent once

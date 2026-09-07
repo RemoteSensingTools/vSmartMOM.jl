@@ -430,10 +430,10 @@ function rt_run_surface(cache::AtmosphereRTCache{FT}, brdf;
 
     # Single-scattering correction for Cox-Munk specular hotspot (TMS) —
     # replayed per BRDF, using the cache's τ_sum_surf / m_max (mirrors
-    # rt_run.jl's post-loop block; see its LIMITATION note re: non-unit F₀).
+    # rt_run.jl's post-loop block and its incident-source normalization).
     if brdf isa CoxMunkSurface && SFI
         @timeit "SS Correction" apply_ss_correction!(R_SFI, brdf, pol_type, vza, vaz, μ₀,
-                             Array(cache.τ_sum_surf), cache.m_max, nSpec)
+                             Array(cache.τ_sum_surf), cache.m_max, nSpec; F₀=Array(cache.surface_F₀))
     end
 
     # TMS exact single scattering: surface-independent, precomputed once at

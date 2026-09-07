@@ -367,6 +367,8 @@ Fourier moment `m` of the Cox-Munk BRDF reflectance matrix **and** its
 analytical derivative w.r.t. wind speed U, computed in a single pass over
 the azimuthal quadrature.
 
+The RT operator convention is `π * BRDF`, matching the generic surface
+builder and its final `1/π` radiance reconstruction.
 Returns `(R, dR_dU)` — both `[Nμ·n_stokes, Nμ·n_stokes]` dense matrices.
 """
 function reflectance_and_deriv(surf::CoxMunkSurface{FT}, pol_type,
@@ -398,7 +400,7 @@ function reflectance_and_deriv(surf::CoxMunkSurface{FT}, pol_type,
     end
 
     ff = m == 0 ? FT(1.0) : FT(2.0)
-    return ff * Rsurf / FT(π), ff * dRsurf / FT(π)
+    return ff * Rsurf, ff * dRsurf
 end
 
 """Whitecap Mueller matrix: unpolarized Lambertian (only M[1,1] = albedo/π)."""
@@ -457,7 +459,8 @@ end
 Fourier moment `m` of the Cox-Munk BRDF reflectance matrix for quadrature
 directions `μ`.
 
-Returns `[Nμ·n_stokes, Nμ·n_stokes]` matrix including all Stokes coupling
+Returns the Fourier moments of `π * BRDF` as an
+`[Nμ·n_stokes, Nμ·n_stokes]` matrix, including all Stokes coupling
 (I-Q, U-V off-diagonal blocks).  Uses Gauss-Legendre quadrature over
 azimuth [0, π] with 100 points.
 """
@@ -487,7 +490,7 @@ function reflectance(surf::CoxMunkSurface{FT}, pol_type, μ::AbstractArray{FT}, 
     end
 
     ff = m == 0 ? FT(1.0) : FT(2.0)
-    return ff * Rsurf / FT(π)
+    return ff * Rsurf
 end
 
 # ──────────────────────────────────────────────────────────────────────
@@ -495,58 +498,85 @@ end
 # ──────────────────────────────────────────────────────────────────────
 
 """
+    _coxmunk_glint_residual(surf, n, μ_v, μ₀, dϕ, m_max, n_water)
+
+Exact minus truncated direct-solar BRDF column and its analytic wind tangent.
+The surface builder doubles the zeroth moment and postprocessing halves it;
+there is no additional half-weight in this physical BRDF reconstruction.
+"""
+function _coxmunk_glint_residual(surf::CoxMunkSurface{FT}, n, μ_v, μ₀,
+                                  dϕ, m_max, n_water) where FT
+    exact, dexact = coxmunk_brdf_mueller_and_deriv(
+        surf, n, μ_v, μ₀, dϕ; n_water)
+    truncated = zeros(FT, n)
+    dtruncated = zeros(FT, n)
+    ϕ, w = CanopyOptics.gauleg(100, zero(FT), FT(π))
+    for i in eachindex(ϕ)
+        M, dM = coxmunk_brdf_mueller_and_deriv(
+            surf, n, μ_v, μ₀, ϕ[i]; n_water)
+        for m in 0:m_max, si in 1:n
+            scale = (m == 0 ? one(FT) : FT(2)) * w[i] / FT(π)
+            az = _azimuthal_kernel(si, 1, m, dϕ) *
+                 _azimuthal_kernel(si, 1, m, ϕ[i])
+            truncated[si] += scale * az * M[si, 1]
+            dtruncated[si] += scale * az * dM[si, 1]
+        end
+    end
+    return exact[:, 1] - truncated, dexact[:, 1] - dtruncated
+end
+
+"""
     apply_ss_correction!(R_SFI, surf, pol_type, vza, vaz, μ₀, τ_total, m_max, nSpec;
-                         n_water)
+                         F₀, n_water)
 
-Truncated Multiple Scattering (TMS) correction for the specular sun glint peak.
-`m_max` is the Fourier loop bound in **order semantics** (loop runs `m = 0:m_max`).
+Add exact minus Fourier-truncated Cox–Munk direct-solar reflection at TOA.
+`m_max` is the last included Fourier order. `F₀` is the incident Stokes spectrum
+with shape `(n_stokes, nSpec)`; the direct-solar correction currently requires
+unpolarized illumination. Both downward and upward paths use `τ_total`, the
+solver's cumulative optical depth. A zero incident spectrum adds zero glint.
 
-After the Fourier loop, adds the difference between the exact single-scattering
-surface contribution and the truncated Fourier reconstruction at each viewing geometry.
-
-Modifies `R_SFI` in place.
+The linearized overload additionally accepts `(Ṙ, τ̇_total, wind_column)`
+before `surf`. Its atmospheric columns follow `τ̇_total` and `wind_column`
+selects the surface wind-speed column in `Ṙ`.
 """
 function apply_ss_correction!(R_SFI::AbstractArray{FT,3},
                                surf::CoxMunkSurface{FT},
                                pol_type, vza, vaz, μ₀::FT,
                                τ_total::AbstractVector{FT},
                                m_max::Int, nSpec::Int;
+                               F₀,
                                n_water::Complex{FT} = _get_n_water(surf, FT(550))) where FT
-    n = pol_type.n
+    return apply_ss_correction!(R_SFI, nothing, nothing, 0, surf, pol_type,
+        vza, vaz, μ₀, τ_total, m_max, nSpec; F₀, n_water)
+end
 
+function apply_ss_correction!(R_SFI::AbstractArray{FT,3}, Ṙ,
+                               τ̇_total, wind_column::Int,
+                               surf::CoxMunkSurface{FT},
+                               pol_type, vza, vaz, μ₀::FT,
+                               τ_total::AbstractVector{FT},
+                               m_max::Int, nSpec::Int;
+                               F₀,
+                               n_water::Complex{FT} = _get_n_water(surf, FT(550))) where FT
+    _require_unpolarized_solar(F₀, "Cox–Munk direct-solar correction")
     for iv in eachindex(vza)
         μ_v = FT(cosd(vza[iv]))
-        dϕ  = FT(deg2rad(vaz[iv]))
-
-        # ── Exact single-scattering surface BRDF ──
-        M_exact = coxmunk_brdf_mueller(surf, n, μ_v, μ₀, dϕ; n_water=n_water)
-
-        # ── Fourier-reconstructed BRDF at this geometry ──
-        M_fourier = zeros(FT, n, n)
-        for m in 0:m_max
-            weight_m = m == 0 ? FT(0.5) : FT(1.0)
-            for si in 1:n, sj in 1:n
-                az = _azimuthal_kernel(si, sj, m, dϕ)
-                # Re-evaluate the Fourier coefficient at the specific (μ_v, μ₀) pair
-                # via the same quadrature used in reflectance()
-                M_fourier[si, sj] += weight_m * az * _fourier_coeff_element(
-                    surf, n, si, sj, μ_v, μ₀, m; n_water=n_water)
-            end
-        end
-
-        # Apply the azimuthal weight (matching postprocessing_vza.jl)
-        cos_m0_ϕ = one(FT)  # reconstruction at the actual azimuth is already done above
-        # The Fourier coefficients were already weighted by cos/sin(m*dϕ) in the loop
-
-        # Correction for each spectral point
-        for s in 1:nSpec
-            atten = μ₀ * exp(-τ_total[s] / μ₀)
-            for si in 1:n
-                correction = atten * (M_exact[si, 1] - M_fourier[si, 1])
-                R_SFI[iv, si, s] += correction
+        residual, dresidual = _coxmunk_glint_residual(
+            surf, pol_type.n, μ_v, μ₀, FT(deg2rad(vaz[iv])), m_max, n_water)
+        airmass = inv(μ₀) + inv(μ_v)
+        for s in 1:nSpec, si in 1:pol_type.n
+            atten = μ₀ * F₀[1,s] * exp(-τ_total[s] * airmass)
+            correction = atten * residual[si]
+            R_SFI[iv,si,s] += correction
+            if Ṙ !== nothing
+                for p in axes(τ̇_total, 2)
+                    Ṙ[iv,si,s,p] -= airmass * τ̇_total[s,p] * correction
+                end
+                Ṙ[iv,si,s,wind_column] += atten * dresidual[si]
             end
         end
     end
+    return nothing
 end
 
 """
