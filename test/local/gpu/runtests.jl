@@ -44,6 +44,7 @@ try
         end
 
         if CUDA_AVAILABLE
+            include("test_batched_inverse_dispatch.jl")
             @testset "Multisensor GPU" begin include("test_multisensor_heights_gpu.jl") end
             @testset "Raman GPU"     begin include("test_forward_raman_gpu.jl") end
             @testset "Jacobians GPU" begin include("test_jacobians_GPU.jl")     end

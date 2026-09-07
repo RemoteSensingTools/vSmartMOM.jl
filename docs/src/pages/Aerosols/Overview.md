@@ -4,7 +4,7 @@
 
 **Next:** [Configure a Scene (step by step)](../IO/ConfigurationGuide.md), [Mie & Rayleigh (Concepts)](../concepts/03b_scattering.md), [Library](../api_reference.md).
 
-The `Aerosols` module is a user-facing framework for aerosol input data, refractive-index lookup tables, and scheme-specific optical-property preparation. This API is still being stabilized after the `sanghavi-unified` merge, so treat it as available but more likely to evolve than the CoreRT, Absorption, and Scattering APIs.
+The `Aerosols` module is a user-facing framework for aerosol input data, refractive-index lookup tables, and scheme metadata. This API is still being stabilized after the `sanghavi-unified` merge, so treat it as available but more likely to evolve than the CoreRT, Absorption, and Scattering APIs.
 
 ## Supported Schemes
 
@@ -30,7 +30,7 @@ Wavelengths are in micrometers. `get_refractive_index` interpolates the real and
 
 ## Relationship To Scattering
 
-`Aerosols` handles data ingestion and scheme organization. The lower-level Mie and Greek-coefficient calculations are explained in [Mie & Rayleigh (Concepts)](../concepts/03b_scattering.md). In a complete workflow, aerosol input data are converted into optical properties that the CoreRT layer assembly can consume.
+`Aerosols` handles data ingestion and scheme organization. The lower-level Mie and Greek-coefficient calculations are explained in [Mie & Rayleigh (Concepts)](../concepts/03b_scattering.md). The adapter from ingested aerosol schemes to CoreRT optics is not implemented. `compute_optical_properties` now throws an explicit error: earlier versions returned placeholder Mie efficiencies, concentration conversions, and a constant asymmetry parameter. Use the production `Scattering` APIs and CoreRT aerosol configuration for scientific calculations.
 
 ## Current Caveats
 

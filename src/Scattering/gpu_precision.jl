@@ -154,7 +154,7 @@ end
     DoubleSingle{T}(hi, lo)
 end
 
-@inline Base.convert(::Type{T}, ds::DoubleSingle{T}) where {T} = ds.hi + ds.lo
+@inline Base.convert(::Type{T}, ds::DoubleSingle{T}) where {T<:AbstractFloat} = ds.hi + ds.lo
 @inline Base.convert(::Type{Float64}, ds::DoubleSingle{Float32}) = Float64(ds.hi) + Float64(ds.lo)
 
 # --- Error-free transformations ---

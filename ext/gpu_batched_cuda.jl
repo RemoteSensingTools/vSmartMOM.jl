@@ -129,6 +129,13 @@ function vSmartMOM.CoreRT.batch_inv!(X::CuArray{FT,3}, A::CuArray{FT,3},
     CUDA.CUBLAS.getri_strided_batched!(A, X, pivot)
 end
 
+# Resolve the intersection with the generic CPU no-pointer overload. CUDA
+# callers without pointer caches use the strided device implementation.
+function vSmartMOM.CoreRT.batch_inv!(X::CuArray{FT,3}, A::CuArray{FT,3},
+                                    ::Nothing, ::Nothing) where {FT<:Union{Float32,Float64}}
+    return vSmartMOM.CoreRT.batch_inv!(X, A)
+end
+
 "Given 3D CuArray A with pointers, fill in X[:,:,k] = A[:,:,k] \\ I (Float32 version)"
 function vSmartMOM.CoreRT.batch_inv!(X::CuArray{FT,3}, A::CuArray{FT,3}, Xptrs, Aptrs) where {FT<:Float32}
     if size(A, 3) == 1

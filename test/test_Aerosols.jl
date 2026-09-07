@@ -235,83 +235,28 @@ const RI_DATABASE = joinpath(TEST_DATA_DIR, "data", "refractive_indices_database
         @test r_med_back ≈ r_med rtol=1e-10
     end
     
-    @testset "Mie Scattering Approximations" begin
-        # Test Rayleigh regime
-        x_small = 0.05
-        n = ComplexF64(1.5, 0.01)
-        Q_ext, Q_sca, Q_abs, g = Aerosols.compute_mie_efficiencies(x_small, n)
-        
-        # Scattering dominates in Rayleigh; equality (Q_sca == Q_ext) possible
-        # when the approximate implementation treats weak absorption as zero
-        # at very small size parameters.
-        @test Q_sca <= Q_ext
-        @test Q_abs >= 0.0
-        @test g ≈ 0.0  # Rayleigh scattering is symmetric
-        @test Q_ext ≈ Q_sca + Q_abs
-        
-        # Test geometric optics regime
-        x_large = 50.0
-        Q_ext, Q_sca, Q_abs, g = Aerosols.compute_mie_efficiencies(x_large, n)
-        
-        @test Q_ext ≈ 2.0 rtol=0.1  # Approaches 2 in geometric optics
-        @test g > 0.5  # Forward scattering dominates
-        @test Q_ext ≈ Q_sca + Q_abs
-        
-        # Test intermediate regime
-        x_mid = 5.0
-        Q_ext, Q_sca, Q_abs, g = Aerosols.compute_mie_efficiencies(x_mid, n)
-        
-        @test 0.0 < Q_ext < 3.0  # Reasonable range
-        @test 0.0 <= g <= 1.0
-        @test Q_ext ≈ Q_sca + Q_abs
-    end
-    
-    @testset "Optical Properties (TOMAS-15)" begin
-        if isfile(TOMAS_FILE)
-            @info "Testing optical property calculations for TOMAS-15"
-            
-            # Read data
-            data = read_aerosol_data(TOMAS_CONFIG, TOMAS_FILE)
-            
-            # Load RI database
-            ri_db = load_refractive_index_database(RI_DATABASE)
-            
-            # Compute optical properties at a few wavelengths
-            wavelengths = [0.55, 0.86, 1.0]  # μm
-            
-            opt_props = compute_optical_properties(data, wavelengths, ri_db)
-            
-            # Check structure
-            @test haskey(opt_props, "extinction")
-            @test haskey(opt_props, "scattering")
-            @test haskey(opt_props, "absorption")
-            @test haskey(opt_props, "ssa")
-            @test haskey(opt_props, "asymmetry_parameter")
-            
-            # Check dimensions
-            n_levels = 72
-            n_wavelengths = 3
-            @test size(opt_props["extinction"]) == (n_levels, n_wavelengths)
-            @test size(opt_props["ssa"]) == (n_levels, n_wavelengths)
-            
-            # Physical constraints
-            @test all(opt_props["extinction"] .>= 0.0)
-            @test all(opt_props["scattering"] .>= 0.0)
-            @test all(opt_props["absorption"] .>= 0.0)
-            @test all(0.0 .<= opt_props["ssa"] .<= 1.0)
-            @test all(-1.0 .<= opt_props["asymmetry_parameter"] .<= 1.0)
-            
-            # Conservation: extinction = scattering + absorption
-            ext_check = opt_props["scattering"] .+ opt_props["absorption"]
-            @test all(isapprox.(opt_props["extinction"], ext_check, rtol=1e-6))
-        else
-            @warn "Skipping optical properties test: file not found"
-        end
-    end
-    
+
 end
 
 # Print summary
 println("\n" * "="^60)
 println("Aerosol module test suite completed")
 println("="^60)
+
+
+@testset "Unimplemented aerosol optics cannot return placeholder physics" begin
+    for FT in (Float32, Float64)
+        db = RefractiveIndexDatabase{FT}(Dict{String,RefractiveIndexLUT{FT}}())
+        for (config, constructor) in ((TOMAS_CONFIG, TOMAS15Scheme),
+                                      (TWOMOM_CONFIG, TwoMomentScheme))
+            scheme = constructor(YAML.load_file(config), FT)
+            data = AerosolData(scheme, Dict{String,AerosolSpeciesData}(),
+                               Dict{String,Array}(), Dict{String,Any}())
+            @test_throws ArgumentError compute_optical_properties(data, FT[0.55], db)
+            @test_throws ArgumentError vSmartMOM.Aerosols.integrate_phase_function(
+                data, FT(0.55), db, FT[0, 90, 180])
+        end
+        @test_throws ArgumentError vSmartMOM.Aerosols.compute_mie_efficiencies(
+            FT(1), Complex{FT}(1.5, 0.01))
+    end
+end
