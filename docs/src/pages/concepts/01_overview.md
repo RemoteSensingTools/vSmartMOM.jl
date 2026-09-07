@@ -158,7 +158,7 @@ SURFACE      BRDF as the bottom-most AddedLayer (RT basics 5).
                 v
 LINEARIZE    Operator-level chain rule on adding-doubling.
              ParameterLayout names the Jacobian columns.
-             Forward + linearized < 2× forward-only (RT basics 6).
+             Reuse forward inverses; batch active Jacobian columns (RT basics 6).
                 |
                 v
 EVERYWHERE   One @kernel source compiles for CPU + CUDA + Metal.

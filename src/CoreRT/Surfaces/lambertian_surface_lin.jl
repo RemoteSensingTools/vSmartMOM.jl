@@ -113,18 +113,35 @@ function create_surface_layer!(RS_type::noRS,
                 @views added_layer_lin.ap_J̇₀⁻[rows_I,1,:,iparam] .=
                     μ₀ .* FT(2) .* incident_I
             else
-                F₀_NquadN = arr_type(zeros(length(qp_μN),length(τ_sum)))
-                Ḟ₀_NquadN = arr_type(zeros(length(qp_μN),length(τ_sum),nparams+1))
+                F₀_NquadN = arr_type(zeros(FT,length(qp_μN),length(τ_sum)))
+                Ḟ₀_NquadN = arr_type(zeros(FT,length(qp_μN),length(τ_sum),nparams+1))
                 tmpF = F₀ .* arr_type(exp.(-τ_sum/μ₀))'
                 F₀_NquadN[i₀,:] .= tmpF
                 Ḟ₀_NquadN[i₀,:,1:nparams] .= -reshape(tmpF,n,nspec,1) .* reshape(τ̇_sum, 1, nspec, nparams) / μ₀
                 added_layer.j₀⁺ .= zero(FT)
                 added_layer.j₀⁻[:,1,:] .= μ₀ * (R_surf * F₀_NquadN)
-                for ii=1:nspec
-                    for ctr=1:nparams
-                        added_layer_lin.ap_J̇₀⁻[:,1,ii,ctr] .= μ₀ * R_surf * Ḟ₀_NquadN[:,ii,ctr]
+                if _BATCHED_JACOBIANS_ENABLED[]
+                    # Each spectral/parameter column uses the same surface
+                    # matrix. Flatten those axes into one BLAS product rather
+                    # than launching a matrix-vector product for each pair.
+                    # Reshape the owning arrays before viewing the prefix so
+                    # CUDA sees contiguous matrix storage, not a generic
+                    # ReshapedArray around a dropped singleton dimension.
+                    incident_matrix = reshape(Ḟ₀_NquadN, length(qp_μN), :)
+                    reflected_matrix = reshape(added_layer_lin.ap_J̇₀⁻, length(qp_μN), :)
+                    incident_tangents = @view incident_matrix[:,1:nspec*nparams]
+                    reflected_tangents = @view reflected_matrix[:,1:nspec*nparams]
+                    isempty(reflected_tangents) ||
+                        mul!(reflected_tangents, R_surf, incident_tangents, μ₀, zero(FT))
+                    @views added_layer_lin.ap_J̇₀⁻[:,1,:,iparam] .=
+                        μ₀ .* (Ṙ_surf * F₀_NquadN)
+                else
+                    for ii=1:nspec
+                        for ctr=1:nparams
+                            added_layer_lin.ap_J̇₀⁻[:,1,ii,ctr] .= μ₀ * R_surf * Ḟ₀_NquadN[:,ii,ctr]
+                        end
+                        added_layer_lin.ap_J̇₀⁻[:,1,ii,iparam] .= μ₀ * Ṙ_surf * F₀_NquadN[:,ii]
                     end
-                    added_layer_lin.ap_J̇₀⁻[:,1,ii,iparam] .= μ₀ * Ṙ_surf * F₀_NquadN[:,ii]
                 end
             end
         # for SIF
