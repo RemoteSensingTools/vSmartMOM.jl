@@ -1,6 +1,7 @@
 # Warmed complete-solve comparison of physical and local optical directions.
 using TOML, SHA
 using vSmartMOM, vSmartMOM.CoreRT, YAML, LinearAlgebra, Statistics, Logging, Profile
+include(joinpath(@__DIR__,"benchmark_luts.jl"))
 backend = get(ENV,"AUDIT_BACKEND","cpu")
 n_spec = parse(Int,get(ENV,"AUDIT_NSPEC","64"))
 const chunks = parse(Int,get(ENV,"AUDIT_CHUNKS","1"))
@@ -81,7 +82,7 @@ function fixture_parameters(chunk)
     hi=parse(Float64,get(ENV,"AUDIT_NU_MAX",string(last(p.spec_bands[1]))))
     grid=range(lo,hi;length=n_spec*chunks)
     p.spec_bands[1]=collect(grid[(chunk-1)*n_spec+1:chunk*n_spec])
-    return p
+    return set_benchmark_luts!(p,gases)
 end
 function fixture(chunk)
     p=fixture_parameters(chunk)

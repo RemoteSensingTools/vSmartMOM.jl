@@ -220,6 +220,25 @@ R, T = rt_run(model)
 
 No changes to YAML configuration files are required.
 
+### Reusing parsed spectroscopy
+
+Forward and linearized constructors and `BatchContext` share a process-local
+cache of parsed HITRAN line databases, keyed by resolved file path and floating
+point type. Rebuilding a scene or changing its wavelength grid reuses these
+read-only line arrays. Pressure, temperature, broadening settings and backend
+remain properties of each independently constructed absorption model.
+
+The cache retains each database until explicitly cleared or the process exits;
+it does not automatically reload or evict data. Switching editions selects a
+different path. After replacing a downloaded file at the same path, clear the
+cache before constructing a model with the replacement data. Existing models
+keep their original data. LUTs loaded into parameters are caller-owned and are
+unaffected by this cache.
+
+```@docs
+clear_spectroscopy_cache!
+```
+
 ## HITRAN API Rate Limits
 
 The HITRAN API at hitran.org imposes a daily query limit. If you exceed it, you will see:

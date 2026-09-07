@@ -1,6 +1,7 @@
 # Batched Jacobian propagation
 
 Latest implementation: [equivalent-source adding and spectral phase costs](source_adding.md).
+Constructor optimization: [spectroscopy reuse and Mie derivative specialization](construction_cost.md).
 Local optical basis: [factorization and remaining adding cost](local_basis.md).
 Previous investigation: [IQU bottlenecks and core-optics cost](iqu_followup.md).
 Scientific review: [core derivatives, truncation and state-vector scaling](paper_review.md).

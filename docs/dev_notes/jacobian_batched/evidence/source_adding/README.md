@@ -83,3 +83,27 @@ LinMode model construction, and the complete solve. This mode compares source
 adding with an independently built forward-only model and records synchronized
 construction/solve subtimers. JIT compilation and artifact downloads are warmed;
 Mie, spectroscopy and upstream optical derivatives are inside the timed call.
+
+
+## Subsequent construction optimization
+
+See [construction report](../../construction_cost.md) for the shared HITRAN
+cache, Mie function boundary and warmed LUT/direct-HITRAN comparisons.
+`construction-profile.log` is the baseline before these changes.
+`mie-before.log` and `mie-after.log` isolate CPU NAI-2 values and derivatives;
+`mie-parity.log` records bitwise comparisons with the implementation at
+`8bc60941` for Float32/Float64, wavelengths 0.76/1.626 μm and imaginary indices
+0/0.01, including all six Greek arrays, extinction, SSA and their tangents.
+
+`lut-end-to-end.toml` and `.log` record the cached legacy LUT run and one-time
+load metadata. This is the updated full-construction timing boundary with LUT
+startup excluded, not the earlier repeated-HITRAN-parsing boundary.
+`regressions.log` contains 161 successful targeted CPU checks (initial cache,
+aerosol reference finite differences, source adding, H₂O self broadening).
+`construction-cache-final.log` records the extended 13-check cache regression,
+including BatchContext object reuse. `construction-docs.log` records the
+successful strict local docs build. No deployment was performed.
+
+`hitran-cached-end-to-end.toml` and `.log` record the corresponding direct-HITRAN
+run with shared parsed data: 3.174 s forward / 6.473 s with Jacobians (2.039×).
+Both current benchmark tables record source fingerprints and all three samples.

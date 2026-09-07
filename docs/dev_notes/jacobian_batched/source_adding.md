@@ -124,7 +124,7 @@ trace times are not a partition of the uninstrumented median. The remaining
 work is concentrated in matrix propagation and allocations; reducing phase
 interpolation alone would not address those costs.
 
-## Model construction plus the complete solve
+## Baseline model construction plus the complete solve (before caching)
 
 The `AUDIT_END_TO_END=true` run independently rebuilds both models from the
 same parameters. It includes parameter parsing, Mie, absorption, upstream
@@ -141,6 +141,13 @@ The maximum forward-radiance difference between independently constructed
 models is 4.16×10⁻¹⁷. This meets the <3× end-to-end milestone for this scene
 with the opt-in source-adding path. It does not establish a universal ratio
 across stream counts, aerosol populations, or output/source configurations.
+
+These timings precede spectroscopy caching. The [construction optimization
+report](construction_cost.md) identifies repeated HITRAN parsing as roughly 90%
+of this setup cost and replaces it with shared parsed data. Updated totals are
+3.174 s forward / 6.473 s with Jacobians (2.039×) for cached direct HITRAN, and
+1.834 / 5.263 s (2.870×) with caller-owned LUTs. The latter spectroscopy setup
+has different table-generation assumptions; see that report for scope.
 
 Construction dominates this particular full-rebuild workload: synchronized
 construction subtimers are 26.1563 s (forward) and 24.8286 s (LinMode); solve

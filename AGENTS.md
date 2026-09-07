@@ -180,8 +180,10 @@ material when explaining the package:
 | Vertical layer stacking (`*`) | `src/CoreRT/types.jl:1096+` |
 | δ-M truncation | `src/CoreRT/LayerOpticalProperties/delta_m_truncation.jl:44–48` |
 | Mie / Greek (NAI-2 vs PCW) | `src/Scattering/compute_NAI2.jl:44`, `compute_PCW.jl:28` |
+| Native Mie tangents (quadrature preparation → specialized integration) | `src/Scattering/compute_NAI2_lin.jl::_nai2_bulk_optics_lin` |
 | Phase matrix Z from Greek + μ | `src/Scattering/compute_Z_matrices.jl::compute_Z_moments` |
 | HITRAN absorption | `src/Absorption/compute_absorption_cross_section.jl:32–280` |
+| Shared parsed HITRAN cache (forward, linearized, BatchContext) | `src/CoreRT/tools/hitran_cache.jl`; `clear_spectroscopy_cache!` releases cached ownership; see `docs/dev_notes/jacobian_batched/construction_cost.md` |
 | Elemental (r, t, j) | `src/CoreRT/CoreKernel/elemental.jl:207–252` |
 | Doubling (geom series + D-symmetry) | `src/CoreRT/CoreKernel/doubling.jl + rt_helpers.jl:88–122` |
 | Interaction (4 cases) | `src/CoreRT/CoreKernel/interaction.jl:14–136` |

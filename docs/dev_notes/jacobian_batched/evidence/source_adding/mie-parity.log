@@ -1,0 +1,9 @@
+Precompiling packages...
+  25743.3 ms  ✓ vSmartMOM
+  12876.2 ms  ✓ vSmartMOM → vSmartMOMCUDAExt
+  2 dependencies successfully precompiled in 40 seconds. 274 already precompiled.
+Precompiling packages...
+  13412.0 ms  ✓ vSmartMOM → vSmartMOMCUDAExt
+  1 dependency successfully precompiled in 15 seconds. 275 already precompiled.
+Test Summary:                        | Pass  Total   Time
+Mie function barrier baseline parity |    8      8  14.5s

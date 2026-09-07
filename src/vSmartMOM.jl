@@ -131,7 +131,7 @@ export LambertianClosure, lambertian_closure, albedo_jacobian, invert_albedo
 # rebuild (remake_geometry) — surface_split_albedo_sweep.md §6/§7 PR 3
 export remake_geometry, ScenarioSweep, SweepResult, run_sweep
 # Export batch-processing API
-export BatchContext, update_model!,
+export BatchContext, update_model!, clear_spectroscopy_cache!,
        update_aerosol_loading!, update_aerosol_microphysics!
 # Export standalone exact single-scattering API
 export StandaloneSS, run_exact_ss, ExactSSConfig, SSGeometry,

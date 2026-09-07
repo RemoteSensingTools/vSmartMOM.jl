@@ -46,6 +46,8 @@ using CanopyOptics
 using SpecialFunctions: erfc         # For Smith (1967) shadowing in Cox-Munk
 using StaticArrays                   # For Fresnel/Cox-Munk Mueller matrices
 
+include("tools/hitran_cache.jl")       # Shared read-only spectroscopy across builds
+
 import Base.show                   # For overloading show for custom types
 
 #using InelasticScattering
@@ -181,6 +183,7 @@ export model_from_parameters,               # Converting the parameters to model
        ScenarioSweep, SweepResult, run_sweep,   # SZA × view-pair × BRDF scenario sweeps
        default_parameters,                  # Set of default parameters
        BatchContext, update_model!,         # Batch-processing context + scene updater
+       clear_spectroscopy_cache!,           # Release parsed HITRAN data, not downloads
        update_aerosol_loading!,             # Phase 2: cheap τ_ref / profile update (no Mie)
        update_aerosol_microphysics!         # Phase 2: expensive Mie re-run + Fourier re-derivation
 export OpticalPropertyJacobian,               # AD boundary struct alias

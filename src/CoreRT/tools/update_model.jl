@@ -155,10 +155,10 @@ end
 
 Build a `BatchContext` from the given parameters.
 
-This is the **expensive** constructor: it calls `model_from_parameters(params)`
-(which runs Mie, builds the aerosol optics, and reads HITRAN files), then
-caches the `AtmosphericAbsorption.LineByLineModel` objects so that subsequent
-[`update_model!`](@ref) calls can skip HITRAN re-parsing entirely.
+This constructor calls `model_from_parameters(params)` to prepare Mie optics
+and absorption, then retains `AtmosphericAbsorption.LineByLineModel` objects
+for subsequent [`update_model!`](@ref) calls. Both steps share the process-local
+parsed HITRAN cache; only the first request for a file/type parses its data.
 
 Keyword arguments `sources` and `external_solar` are forwarded to
 `model_from_parameters`; pass `external_solar=true` when the batched scenes
@@ -197,8 +197,7 @@ function BatchContext(params::vSmartMOM_Parameters;
 
         for (molec_i, mol_name) in enumerate(all_species)
             if isempty(ap.luts)
-                lines = AtmosphericAbsorption.load_lines(
-                    AtmosphericAbsorption.HitranPort(artifact(mol_name)); FT)
+                lines = _hitran_lines(mol_name, FT)
                 absorption_model = AtmosphericAbsorption.LineByLineModel(lines;
                     profile      = ap.broadening_function,
                     wing_cutoff  = ap.wing_cutoff,
@@ -228,8 +227,7 @@ function BatchContext(params::vSmartMOM_Parameters;
         elseif ap.h2o_lut[i_band] !== nothing
             h2o_models[i_band] = ap.h2o_lut[i_band]
         else
-            lines_h2o = AtmosphericAbsorption.load_lines(
-                AtmosphericAbsorption.HitranPort(artifact("H2O")); FT)
+            lines_h2o = _hitran_lines("H2O", FT)
             h2o_models[i_band] = AtmosphericAbsorption.LineByLineModel(lines_h2o;
                 profile      = ap.broadening_function,
                 wing_cutoff  = ap.wing_cutoff,

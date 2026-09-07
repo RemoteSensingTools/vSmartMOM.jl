@@ -9,10 +9,11 @@ This file specifies how to compute aerosol optical properties using the Siewert-
 
 Reference: Suniti Sanghavi 2014, https://doi.org/10.1016/j.jqsrt.2013.12.015
 
-Compute the aerosol optical properties and their derivatives (w.r.t. nᵣ, nᵢ, rₚ, σₚ)
+Compute the aerosol optical properties and their derivatives (w.r.t. nᵣ, nᵢ
+and the native `LogNormal` log-radius location and width)
 using the Siewert-NAI2 linearized method.
 
-The second argument `FT2` sets the **output** float type for both the forward greek
+The third argument `FT2` sets the **output** float type for both the forward Greek
 coefficients and the derivative (lin) greek coefficients. It must be passed
 explicitly — there is no default.  The internal computation always runs in Float64 for
 numerical stability of the Dₙ recursion (same rationale as the forward path).
@@ -22,23 +23,35 @@ Output: (AerosolOptics, linAerosolOptics)
 """
 function compute_aerosol_optical_properties(lin::LinMode, model::MieModel{FDT,FT}, FT2::Type) where {FDT <: NAI2, FT}
 
-    # Unpack the model
-    (; computation_type, aerosol, λ, polarization_type, truncation_type, r_max, nquad_radius, wigner_A, wigner_B) = model
-
-    # Extract variables from aerosol struct:
-    (; size_distribution, nᵣ, nᵢ) = aerosol
-    
-    # Imaginary part of the refractive index must be ≥ 0
-    @assert nᵢ ≥ 0
-
-    # Internal computation precision: Float64 for plain floats (numerical stability of
-    # the Dₙ downward recursion and S₁/S₂/Cₑₓₜ sums), native arithmetic for Dual types.
-    # See compute_aerosol_optical_properties (forward path) for the detailed rationale.
+    (; aerosol, r_max, nquad_radius) = model
+    size_distribution = aerosol.size_distribution
+    @assert aerosol.nᵢ ≥ 0
     IC = FT <: AbstractFloat ? Float64 : FT
-
-    # Get radius quadrature points and weights using log-space quadrature
     r_min = max(quantile(size_distribution, 1e-8), 1e-6 * IC(r_max))
     r, wᵣ = gauleg_log(nquad_radius, IC(r_min), IC(r_max); norm=false)
+    wₓ, ẇₓ = compute_wₓ(lin, size_distribution, wᵣ, r, IC(r_max))
+    return _nai2_bulk_optics_lin(model, FT2, r, wₓ, ẇₓ)
+end
+
+"""
+    _nai2_bulk_optics_lin(model, FT_out, r, w, dw)
+
+Integrate Mie values and four native optical directions on a prepared radius
+quadrature. The two refractive-index directions differentiate amplitudes; the
+lognormal size directions differentiate normalized quadrature weights. All
+phase normalization terms retain the quotient rule below.
+
+This function boundary makes the quadrature and weight array types concrete.
+`Aerosol.size_distribution` supports arbitrary distribution subtypes; allowing
+that dynamic dispatch to flow into the radius/angular loops boxes scalar
+arithmetic and obscures the actual cost of the analytic derivatives.
+"""
+function _nai2_bulk_optics_lin(model::MieModel{FDT,FT}, ::Type{FT2},
+                               r::AbstractVector{IC}, wₓ::AbstractVector,
+                               ẇₓ::AbstractMatrix) where {FDT<:NAI2,FT,FT2,IC}
+    (; aerosol, λ) = model
+    (; nᵣ, nᵢ) = aerosol
+    nquad_radius = length(r)
 
     # Wavenumber (IC precision)
     k = IC(2π) / IC(λ)
@@ -92,9 +105,6 @@ function compute_aerosol_optical_properties(lin::LinMode, model::MieModel{FDT,FT
     bulk_ḟ₃₃   = zeros(IC, 4, n_mu)
     bulk_ḟ₁₂   = zeros(IC, 4, n_mu)
     bulk_ḟ₃₄   = zeros(IC, 4, n_mu)
-
-    # Standardized weights for the size distribution (in IC):
-    wₓ, ẇₓ = compute_wₓ(lin, size_distribution, wᵣ, r, IC(r_max))
 
     # Pre-allocate buffers for the inner loop (sized for the largest particle).
     # m_ref in IC keeps the Mie recursion in full precision.
@@ -202,7 +212,11 @@ function compute_aerosol_optical_properties(lin::LinMode, model::MieModel{FDT,FT
     bulk_f₁₂   =  f₁₂ * wr
     bulk_f₃₄   =  f₃₄ * wr
 
-    # Normalize Phase function with bulk scattering cross section.
+    # Normalize by bulk scattering: P = F / C_sca. For each native direction,
+    # dP = (dF - P*dC_sca) / C_sca; refractive-index directions enter F through
+    # amplitudes, and size directions through radius weights. This is the
+    # untruncated phase tangent; delta_m_truncation_lin applies the subsequent
+    # f_t chain rule (S2014 Eqs. (C.41)-(C.42)).
     bulk_f₁₁ /= bulk_C_sca 
     bulk_f₃₃ /= bulk_C_sca
     bulk_f₁₂ /= bulk_C_sca
@@ -248,7 +262,9 @@ function compute_aerosol_optical_properties(lin::LinMode, model::MieModel{FDT,FT
         fac = l ≥ 2 ? (2l + 1) / 2 * sqrt(1 / ((l - 1) * (l) * (l + 1) * (l + 2))) : 0
 
         # Compute Greek coefficients 
-        # Eq 17 in Sanghavi 2014
+        # SF2014 Eq. (17), "Revisiting the Fourier expansion of Mie scattering
+        # matrices": the angular projection is linear, so its tangent uses
+        # the same quadrature with df_ij in place of f_ij.
 
         δ[l + 1] = (2l + 1) / 2 * w_μ' * (bulk_f₃₃ .* P[:,l + 1])
         β[l + 1] = (2l + 1) / 2 * w_μ' * (bulk_f₁₁ .* P[:,l + 1])

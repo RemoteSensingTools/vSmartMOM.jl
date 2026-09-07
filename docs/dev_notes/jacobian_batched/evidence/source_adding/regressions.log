@@ -1,0 +1,26 @@
+Precompiling packages...
+    vSmartMOM Being precompiled by another process (pid: 2797607, pidfile: /home/cfranken/.julia/compiled/v1.12/vSmartMOM/bplNx_BLbwW.ji.pidfile)
+  25560.6 ms  ✓ vSmartMOM
+    vSmartMOM → vSmartMOMCUDAExt Being precompiled by another process (pid: 2797607, pidfile: /home/cfranken/.julia/compiled/v1.12/vSmartMOMCUDAExt/55o5k_BLbwW.ji.pidfile)
+  13414.4 ms  ✓ vSmartMOM → vSmartMOMCUDAExt
+  2 dependencies successfully precompiled in 41 seconds. 274 already precompiled.
+
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:16
+Looping over layers ... 100%|████████████████████████████| Time: 0:00:10
+
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:06
+Looping over layers ... 100%|████████████████████████████| Time: 0:00:03
+
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:04
+Looping over layers ... 100%|████████████████████████████| Time: 0:00:02
+
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:02
+Looping over layers ... 100%|████████████████████████████| Time: 0:00:01
+
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:14
+Looping over layers ... 100%|████████████████████████████| Time: 0:00:09
+
+Looping over layers ...  40%|███████████▎                |  ETA: 0:00:02
+Looping over layers ... 100%|████████████████████████████| Time: 0:00:01
+Test Summary:            | Pass  Total     Time
+Construction regressions |  161    161  4m53.4s

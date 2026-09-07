@@ -217,7 +217,7 @@ function model_from_parameters(lin::LinMode,
                         params.spec_bands[i_band], profile)
                 end
             else
-                @timeit "Read HITRAN" lines_h2o = AtmosphericAbsorption.load_lines(AtmosphericAbsorption.HitranPort(artifact("H2O")); FT)
+                @timeit "Read HITRAN" lines_h2o = _hitran_lines("H2O", FT)
                 @debug "Computing profile for water vapor (q-driven) in band #$(i_band)"
                 bf  = isnothing(abs_params) ? AtmosphericAbsorption.Voigt() : abs_params.broadening_function
                 cef = isnothing(abs_params) ? AtmosphericAbsorption.HumlicekWeideman32() : abs_params.CEF
@@ -245,7 +245,7 @@ function model_from_parameters(lin::LinMode,
                 for molec_i in 1:length(abs_params.fixed_molecules[i_band])
                     mol_name = abs_params.fixed_molecules[i_band][molec_i]
                     if isempty(abs_params.luts)
-                        @timeit "Read HITRAN" lines = AtmosphericAbsorption.load_lines(AtmosphericAbsorption.HitranPort(artifact(mol_name)); FT)
+                        @timeit "Read HITRAN" lines = _hitran_lines(mol_name, FT)
 
                         @debug "Computing profile for $(mol_name) with vmr $(profile.vmr[mol_name]) for band #$(i_band)"
                         absorption_model = AtmosphericAbsorption.LineByLineModel(lines;
@@ -277,7 +277,7 @@ function model_from_parameters(lin::LinMode,
                     mol_name = abs_params.variable_molecules[i_band][molec_i]
                     jac_idx = molec_i + 1
                     if isempty(abs_params.luts)
-                        @timeit "Read HITRAN" lines = AtmosphericAbsorption.load_lines(AtmosphericAbsorption.HitranPort(artifact(mol_name)); FT)
+                        @timeit "Read HITRAN" lines = _hitran_lines(mol_name, FT)
                         @debug "Computing profile for $(mol_name) with vmr $(profile.vmr[mol_name]) for band #$(i_band)"
 
                         absorption_model = AtmosphericAbsorption.LineByLineModel(lines;

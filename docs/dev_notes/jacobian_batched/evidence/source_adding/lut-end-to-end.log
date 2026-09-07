@@ -1,0 +1,86 @@
+PREPARE chunk=1/10
+LUT_LOADED molecule=CO2 path=/home/sanghavi/data/HITRAN_LUTs/CO2.jld2 seconds=4.661101955 bytes=2038677456 ν=(2857.1428571428573, 35714.282857142854) nν=3285715 p=(0.01, 1080.01) T=(180.0, 360.0) isotope=1
+LUT_LOADED molecule=CH4 path=/home/sanghavi/data/HITRAN_LUTs/CH4.jld2 seconds=2.977599163 bytes=1971949720 ν=(2857.1428571428573, 35714.282857142854) nν=3285715 p=(0.01, 1080.01) T=(180.0, 360.0) isotope=-1
+LUT_LOADED molecule=H2O path=/home/sanghavi/data/HITRAN_LUTs/H2O.jld2 seconds=2.738638236 bytes=1971532712 ν=(2857.1428571428573, 35714.282857142854) nν=3285715 p=(0.01, 1080.01) T=(180.0, 360.0) isotope=-1
+ABSORPTION minmax=(6.264272805627881e-7, 0.003646098260238016) nonzero_gas_columns=60/60
+MEASURE_BEGIN chunk=1 mode=source
+Precompiling packages...
+  24946.6 ms  ✓ vSmartMOM
+  13364.0 ms  ✓ vSmartMOM → vSmartMOMCUDAExt
+  2 dependencies successfully precompiled in 40 seconds. 274 already precompiled.
+
+Looping over layers ...  10%|██▊                         |  ETA: 0:01:59
+Looping over layers ...  60%|████████████████▊           |  ETA: 0:00:13
+Looping over layers ... 100%|████████████████████████████| Time: 0:00:20
+MEASURE Dict{String, Any}("solve_seconds" => [0.605271489, 0.560874259, 0.529414443], "construction_seconds" => [0.031533634, 0.029413719, 0.02811118], "device_allocated_bytes" => [7124617904, 7124617904, 7124617904], "peak_pool_used_bytes" => [7124618336, 7124618336, 7124618336], "mode" => "source", "chunk" => 1, "seconds" => [0.637414379, 0.592437459, 0.558122706], "max_parity_error" => 0.0, "host_bytes" => [233477864, 233273256, 233292872])
+MEASURE_BEGIN chunk=1 mode=forward
+
+Looping over layers ...  10%|██▊                         |  ETA: 0:00:25
+Looping over layers ...  60%|████████████████▊           |  ETA: 0:00:04
+Looping over layers ... 100%|████████████████████████████| Time: 0:00:05
+MEASURE Dict{String, Any}("solve_seconds" => [0.202478088, 0.187478919, 0.174831892], "construction_seconds" => [0.01804757, 0.019374235, 0.016229733], "device_allocated_bytes" => [726583648, 726583648, 726583648], "peak_pool_used_bytes" => [726584080, 726584080, 726584080], "mode" => "forward", "chunk" => 1, "seconds" => [0.221027992, 0.207222177, 0.191430378], "max_parity_error" => 2.0816681711721685e-17, "host_bytes" => [26668496, 26136784, 25954224])
+SCENE nSpec=10000 chunk_size=1000 layers=20 streams=3 stokes=3 external_solar=false columns=69
+PREPARE chunk=2/10
+ABSORPTION minmax=(4.368601825596984e-7, 0.0026932557710144765) nonzero_gas_columns=60/60
+MEASURE_BEGIN chunk=2 mode=source
+MEASURE Dict{String, Any}("solve_seconds" => [0.508082188, 0.499167307, 0.499500103], "construction_seconds" => [0.025663939, 0.029826515, 0.025793463], "device_allocated_bytes" => [7124617904, 7124617904, 7124617904], "peak_pool_used_bytes" => [7124618336, 7124618336, 7124618336], "mode" => "source", "chunk" => 2, "seconds" => [0.534621062, 0.529659695, 0.525977322], "max_parity_error" => 0.0, "host_bytes" => [233290152, 233317704, 233282440])
+MEASURE_BEGIN chunk=2 mode=forward
+MEASURE Dict{String, Any}("solve_seconds" => [0.160106988, 0.169598353, 0.15621423], "construction_seconds" => [0.017495322, 0.016411715, 0.016711198], "device_allocated_bytes" => [726583648, 726583648, 726583648], "peak_pool_used_bytes" => [726584080, 726584080, 726584080], "mode" => "forward", "chunk" => 2, "seconds" => [0.177977857, 0.186391053, 0.173292448], "max_parity_error" => 5.204170427930421e-18, "host_bytes" => [25809120, 25815632, 25837392])
+SCENE nSpec=10000 chunk_size=1000 layers=20 streams=3 stokes=3 external_solar=false columns=69
+PREPARE chunk=3/10
+ABSORPTION minmax=(1.2084024695381625e-6, 0.008794191755584343) nonzero_gas_columns=60/60
+MEASURE_BEGIN chunk=3 mode=source
+MEASURE Dict{String, Any}("solve_seconds" => [0.531551181, 0.527805378, 0.517692957], "construction_seconds" => [0.025089359, 0.02590389, 0.024326014], "device_allocated_bytes" => [7124618544, 7124618544, 7124618544], "peak_pool_used_bytes" => [7124618976, 7124618976, 7124618976], "mode" => "source", "chunk" => 3, "seconds" => [0.557447737, 0.554408053, 0.542680965], "max_parity_error" => 0.0, "host_bytes" => [233694584, 233724856, 233735560])
+MEASURE_BEGIN chunk=3 mode=forward
+MEASURE Dict{String, Any}("solve_seconds" => [0.165486372, 0.165209531, 0.165373509], "construction_seconds" => [0.016942733, 0.017143651, 0.017828008], "device_allocated_bytes" => [726583648, 726583648, 726583648], "peak_pool_used_bytes" => [726584080, 726584080, 726584080], "mode" => "forward", "chunk" => 3, "seconds" => [0.182789553, 0.182962237, 0.183610076], "max_parity_error" => 2.0816681711721685e-17, "host_bytes" => [25821312, 25839712, 25826992])
+SCENE nSpec=10000 chunk_size=1000 layers=20 streams=3 stokes=3 external_solar=false columns=69
+PREPARE chunk=4/10
+ABSORPTION minmax=(2.2341505375739717e-6, 0.024281478615367023) nonzero_gas_columns=60/60
+MEASURE_BEGIN chunk=4 mode=source
+MEASURE Dict{String, Any}("solve_seconds" => [0.486184399, 0.487103487, 0.482542722], "construction_seconds" => [0.025611641, 0.026098727, 0.027792541], "device_allocated_bytes" => [7124618544, 7124618544, 7124618544], "peak_pool_used_bytes" => [7124618976, 7124618976, 7124618976], "mode" => "source", "chunk" => 4, "seconds" => [0.512447354, 0.513800979, 0.511081446], "max_parity_error" => 0.0, "host_bytes" => [233678856, 233707512, 233714312])
+MEASURE_BEGIN chunk=4 mode=forward
+MEASURE Dict{String, Any}("solve_seconds" => [0.164486532, 0.16029371, 0.167297657], "construction_seconds" => [0.016198725, 0.016128111, 0.016416394], "device_allocated_bytes" => [726583648, 726583648, 726583648], "peak_pool_used_bytes" => [726584080, 726584080, 726584080], "mode" => "forward", "chunk" => 4, "seconds" => [0.181058088, 0.176811714, 0.184092032], "max_parity_error" => 3.9898639947466563e-17, "host_bytes" => [25814624, 25846256, 25830880])
+SCENE nSpec=10000 chunk_size=1000 layers=20 streams=3 stokes=3 external_solar=false columns=69
+PREPARE chunk=5/10
+ABSORPTION minmax=(2.9000294213583856e-6, 0.15106195567714886) nonzero_gas_columns=60/60
+MEASURE_BEGIN chunk=5 mode=source
+MEASURE Dict{String, Any}("solve_seconds" => [0.481444297, 0.488003308, 0.490589731], "construction_seconds" => [0.026294595, 0.027753488, 0.026772313], "device_allocated_bytes" => [7124618544, 7124618544, 7124618544], "peak_pool_used_bytes" => [7124618976, 7124618976, 7124618976], "mode" => "source", "chunk" => 5, "seconds" => [0.50840245, 0.516435222, 0.518157329], "max_parity_error" => 0.0, "host_bytes" => [233694200, 233678648, 233662088])
+MEASURE_BEGIN chunk=5 mode=forward
+MEASURE Dict{String, Any}("solve_seconds" => [0.162305763, 0.16390024, 0.162420999], "construction_seconds" => [0.016873452, 0.016841353, 0.016992346], "device_allocated_bytes" => [726583648, 726583648, 726583648], "peak_pool_used_bytes" => [726584080, 726584080, 726584080], "mode" => "forward", "chunk" => 5, "seconds" => [0.179546305, 0.181124292, 0.179789392], "max_parity_error" => 4.163336342344337e-17, "host_bytes" => [25821472, 25843232, 25830560])
+SCENE nSpec=10000 chunk_size=1000 layers=20 streams=3 stokes=3 external_solar=false columns=69
+PREPARE chunk=6/10
+ABSORPTION minmax=(6.674031152653282e-6, 0.35809447940304234) nonzero_gas_columns=60/60
+MEASURE_BEGIN chunk=6 mode=source
+MEASURE Dict{String, Any}("solve_seconds" => [0.486747147, 0.492468644, 0.483672626], "construction_seconds" => [0.025332055, 0.027056848, 0.025858836], "device_allocated_bytes" => [7124618544, 7124618544, 7124618544], "peak_pool_used_bytes" => [7124618976, 7124618976, 7124618976], "mode" => "source", "chunk" => 6, "seconds" => [0.512740215, 0.520261957, 0.510195311], "max_parity_error" => 0.0, "host_bytes" => [233699672, 233698664, 233689272])
+MEASURE_BEGIN chunk=6 mode=forward
+MEASURE Dict{String, Any}("solve_seconds" => [0.164918374, 0.170341339, 0.168387255], "construction_seconds" => [0.017363404, 0.016250412, 0.01639821], "device_allocated_bytes" => [726583648, 726583648, 726583648], "peak_pool_used_bytes" => [726584080, 726584080, 726584080], "mode" => "forward", "chunk" => 6, "seconds" => [0.182669166, 0.186961296, 0.185173945], "max_parity_error" => 4.163336342344337e-17, "host_bytes" => [25816304, 25846640, 25795552])
+SCENE nSpec=10000 chunk_size=1000 layers=20 streams=3 stokes=3 external_solar=false columns=69
+PREPARE chunk=7/10
+ABSORPTION minmax=(1.6559005406976375e-5, 0.4208246478697398) nonzero_gas_columns=60/60
+MEASURE_BEGIN chunk=7 mode=source
+MEASURE Dict{String, Any}("solve_seconds" => [0.498966309, 0.483728342, 0.484811578], "construction_seconds" => [0.026086154, 0.024900093, 0.026416875], "device_allocated_bytes" => [7124618544, 7124618544, 7124618544], "peak_pool_used_bytes" => [7124618976, 7124618976, 7124618976], "mode" => "source", "chunk" => 7, "seconds" => [0.525723494, 0.509245455, 0.512128836], "max_parity_error" => 0.0, "host_bytes" => [233696488, 233705560, 233676008])
+MEASURE_BEGIN chunk=7 mode=forward
+MEASURE Dict{String, Any}("solve_seconds" => [0.161976002, 0.163329597, 0.164808317], "construction_seconds" => [0.016768696, 0.017054343, 0.017603255], "device_allocated_bytes" => [726583648, 726583648, 726583648], "peak_pool_used_bytes" => [726584080, 726584080, 726584080], "mode" => "forward", "chunk" => 7, "seconds" => [0.179106188, 0.180751271, 0.182781708], "max_parity_error" => 1.214306433183765e-17, "host_bytes" => [25829168, 25826432, 25821792])
+SCENE nSpec=10000 chunk_size=1000 layers=20 streams=3 stokes=3 external_solar=false columns=69
+PREPARE chunk=8/10
+ABSORPTION minmax=(4.4566251827152515e-6, 0.2974647791337187) nonzero_gas_columns=60/60
+MEASURE_BEGIN chunk=8 mode=source
+MEASURE Dict{String, Any}("solve_seconds" => [0.490049135, 0.474754651, 0.486553093], "construction_seconds" => [0.027681432, 0.024464885, 0.026006313], "device_allocated_bytes" => [7124618544, 7124618544, 7124618544], "peak_pool_used_bytes" => [7124618976, 7124618976, 7124618976], "mode" => "source", "chunk" => 8, "seconds" => [0.518443287, 0.499843669, 0.513358939], "max_parity_error" => 0.0, "host_bytes" => [233681352, 233729736, 233669816])
+MEASURE_BEGIN chunk=8 mode=forward
+MEASURE Dict{String, Any}("solve_seconds" => [0.162926459, 0.162914757, 0.156891774], "construction_seconds" => [0.017322577, 0.016482739, 0.016181261], "device_allocated_bytes" => [726583648, 726583648, 726583648], "peak_pool_used_bytes" => [726584080, 726584080, 726584080], "mode" => "forward", "chunk" => 8, "seconds" => [0.18063947, 0.179780826, 0.173443952], "max_parity_error" => 1.9081958235744878e-17, "host_bytes" => [25827600, 25851632, 25847920])
+SCENE nSpec=10000 chunk_size=1000 layers=20 streams=3 stokes=3 external_solar=false columns=69
+PREPARE chunk=9/10
+ABSORPTION minmax=(1.5114905947853285e-5, 0.4465720764728668) nonzero_gas_columns=60/60
+MEASURE_BEGIN chunk=9 mode=source
+MEASURE Dict{String, Any}("solve_seconds" => [0.478932606, 0.482955128, 0.483275159], "construction_seconds" => [0.026629284, 0.025077437, 0.025950899], "device_allocated_bytes" => [7124618544, 7124618544, 7124618544], "peak_pool_used_bytes" => [7124618976, 7124618976, 7124618976], "mode" => "source", "chunk" => 9, "seconds" => [0.506340494, 0.508685081, 0.509900196], "max_parity_error" => 0.0, "host_bytes" => [233730040, 233704376, 233689048])
+MEASURE_BEGIN chunk=9 mode=forward
+MEASURE Dict{String, Any}("solve_seconds" => [0.164073245, 0.163237134, 0.162720282], "construction_seconds" => [0.017715746, 0.016463642, 0.017833528], "device_allocated_bytes" => [726583648, 726583648, 726583648], "peak_pool_used_bytes" => [726584080, 726584080, 726584080], "mode" => "forward", "chunk" => 9, "seconds" => [0.18214983, 0.180060192, 0.180925899], "max_parity_error" => 3.8163916471489756e-17, "host_bytes" => [25820592, 25820096, 25822704])
+SCENE nSpec=10000 chunk_size=1000 layers=20 streams=3 stokes=3 external_solar=false columns=69
+PREPARE chunk=10/10
+ABSORPTION minmax=(1.6853297587817076e-5, 0.4404975256517917) nonzero_gas_columns=60/60
+MEASURE_BEGIN chunk=10 mode=source
+MEASURE Dict{String, Any}("solve_seconds" => [0.487789035, 0.492128485, 0.490959607], "construction_seconds" => [0.025894804, 0.025878392, 0.025654762], "device_allocated_bytes" => [7124618544, 7124618544, 7124618544], "peak_pool_used_bytes" => [7124618976, 7124618976, 7124618976], "mode" => "source", "chunk" => 10, "seconds" => [0.514366001, 0.518675304, 0.517244052], "max_parity_error" => 0.0, "host_bytes" => [233668824, 233628728, 233624584])
+MEASURE_BEGIN chunk=10 mode=forward
+MEASURE Dict{String, Any}("solve_seconds" => [0.154511078, 0.155165909, 0.156296645], "construction_seconds" => [0.017513636, 0.016379444, 0.016577286], "device_allocated_bytes" => [726583648, 726583648, 726583648], "peak_pool_used_bytes" => [726584080, 726584080, 726584080], "mode" => "forward", "chunk" => 10, "seconds" => [0.172407674, 0.171919006, 0.17325656], "max_parity_error" => 3.8163916471489756e-17, "host_bytes" => [25859744, 25859648, 25856720])
+SCENE nSpec=10000 chunk_size=1000 layers=20 streams=3 stokes=3 external_solar=false columns=69
+TOTAL Dict("forward" => 1.833984064, "source" => 5.263452874)
