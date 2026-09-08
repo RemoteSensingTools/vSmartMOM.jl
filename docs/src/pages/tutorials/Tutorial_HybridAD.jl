@@ -201,7 +201,7 @@ println("  dω̃/d[nᵣ,nᵢ,μ_logr,σ_logr] = ", round.(lin_aer_optics.ω̃̇,
 # | RT kernels | Analytic (linearized adding-doubling) | Performance, GPU, batched matmul |
 # | Mie optics | Hand-linearized `LinMode()` | Supported production path |
 # | Surface albedo | Analytic (trivial) | Simple scalar derivative |
-# | Surface pressure | Analytic profile/column response | Ordinary line cross sections are held fixed; see the Jacobian guide |
+# | Surface pressure | Profile/column plus line/LUT pressure response | Fixed final grid except its bottom interface; see the Jacobian guide |
 # | Gas VMR | Analytic (trivial: ∂τ_abs/∂VMR = cross_section) | Simple scaling |
 # | Aerosol profiles | Analytic | Already validated in atmo_prof_lin.jl |
 #

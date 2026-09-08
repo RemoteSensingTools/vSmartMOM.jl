@@ -8,6 +8,10 @@ revision, not necessarily the current implementation.
 **Resume work:** [Current session handoff](SESSION_HANDOFF.md).
 
 Current release follow-up: [deep documentation audit, 2026-09-08](documentation_audit_2026-09-08.md).
+The subsequent [code-quality follow-up](code_quality_followup_2026-09-08.md)
+records the bounded v2.2 implementation work and remaining evidence gates.
+The latest [review corrections](review_corrections_2026-09-08.md) record the
+priority fixes, full A100 rerun and remaining release gates.
 The preceding [release validation](release_validation_2026-09-07.md) records
 CPU/CUDA numerical checks and their precise limits.
 

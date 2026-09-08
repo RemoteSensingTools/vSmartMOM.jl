@@ -50,7 +50,10 @@ function reflectance(surface::MySurface{FT}, n, mu_i::FT, mu_r::FT, dphi::FT) wh
 end
 ```
 
-The generic Fourier-moment method in `src/CoreRT/Surfaces/rpv_surface.jl` can then integrate over azimuth and return the quadrature-space reflectance matrix.
+The generic Fourier-moment method and inherited `create_surface_layer!` in
+`src/CoreRT/Surfaces/analytic_surface.jl` integrate over azimuth and assemble the
+surface operator. A scalar analytic BRDF needs only the reflectance hook above;
+specialize the layer builder only for a different operator construction.
 
 Check the normalization before using this hook: its scalar angular value is
 `π * BRDF`, so a Lambertian albedo `a` returns `a`, not `a/π`. The Fourier

@@ -118,9 +118,15 @@ exact zeros.
 
 New retrievals extend
 `jacobian_plan(::MyRetrievalFlavor, params, model, lin_model)` and optionally
-the two upstream-work traits
-`requires_aerosol_microphysics_jacobians` and `requires_h2o_jacobians`. The RT
+the upstream-work traits `requires_aerosol_microphysics_jacobians`,
+`requires_h2o_jacobians` and `requires_pressure_jacobians`. The RT
 kernels require no retrieval-specific methods.
+
+For fixed-pressure retrievals, return `false` from the pressure trait (or pass
+`compute_pressure_jacobians=false`) and omit pressure from the plan. Forward
+absorbers then need no pressure derivative implementation. Disabled pressure
+fields are `nothing`; full-layout solves or plans requesting pressure reject
+them rather than returning an incomplete sensitivity.
 
 The returned aerosol columns remain derivatives with respect to vSmartMOM's
 native physical `tau_ref` and profile location. Transformations such as
@@ -282,15 +288,23 @@ Here `z₁` is the top atmospheric layer and `z_Nz` is the bottom layer. Gas
 VMR means dimensionless mole fraction; a derivative “per ppm” is therefore
 `1e-6 .* dR_dVMR`. Pressure, temperature, dry-air column, and absorption
 cross section are held fixed for a gas-VMR derivative. Surface-pressure
-derivatives are a separate state column. **For ordinary line absorption that
-column currently holds pressure-dependent line cross sections fixed** and
-accounts for the changing molecular column. It therefore omits the line-shape
-pressure response present when rebuilding the forward model at a perturbed
-pressure. CIA/MT_CKD include their separate pressure-scaling terms, but their
-abundance derivatives are also incomplete. See the
-[absorption contract](IO/Schema/absorption.md). Treat the pressure column as
-this explicitly limited derivative, and validate a pressure-retrieving
-application against complete forward perturbations before relying on it.
+derivatives are a separate state column, defined on the **final model grid**:
+only the bottom pressure interface changes, while all other interfaces,
+layer temperatures, humidity and VMRs remain fixed. Thus
+`∂p_full[end]/∂p_surf = 1/2`. Ordinary line absorption includes both the
+molecular-column response and pressure-dependent cross-section response.
+Line-by-line models differentiate their prepared line shapes upstream;
+legacy interpolation tables differentiate their interpolant; native ABSCO
+uses the exact pressure-interval slope with each node's own temperature grid.
+
+ABSCO selects the right interval at an interior pressure knot and zero slope
+at or outside the clamped pressure endpoints. Hard line-wing cutoffs and LUT
+knots are not differentiable at their jumps/kinks; a centered difference
+there need not match the chosen local derivative. Regridding the atmosphere,
+interpolating composition, or moving other interfaces with pressure adds a
+separate coordinate transformation that this column does not include.
+CIA/MT_CKD include their pressure-scaling terms, but their abundance derivatives
+remain incomplete. See the [absorption contract](IO/Schema/absorption.md).
 
 ```julia
 layout = result.layout

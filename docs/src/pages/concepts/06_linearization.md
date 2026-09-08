@@ -301,7 +301,7 @@ new parameters):
 | profile location/width | analytic | physical profile coordinates; see `atmo_prof_lin.jl` |
 | `n_r, n_i, μ_logr, σ_logr` | hand-linearized Mie | `compute_aerosol_optical_properties(LinMode(), model, FT)` |
 | Gas VMR | analytic line-absorption scaling | `∂τ_abs/∂VMR = σ*N_dry`; CIA/continuum abundance response is incomplete |
-| Surface pressure | analytic profile/column response | ordinary line cross sections are held fixed; pressure broadening is omitted |
+| Surface pressure | profile/column response plus upstream line/LUT pressure response | only the bottom interface of the final grid moves, at fixed layer temperature/composition |
 | Temperature profile | future extension | no general end-to-end temperature Jacobian |
 
 A new upstream AD implementation can populate the optical-property tangent

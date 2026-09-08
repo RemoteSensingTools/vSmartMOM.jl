@@ -119,6 +119,10 @@ R, T = rt_run(ctx.model)
 placement; `update_aerosol_microphysics!` accepts `τ_ref` alongside the new
 `Aerosol` — see the docstrings.)
 
+Both aerosol updaters stage all bands before committing live optics, remembered
+loading and (for microphysics) Fourier bounds. If a calculation throws, the
+previous scene remains usable; internal scratch buffers may contain trial data.
+
 ## Changing trace gases or thermodynamic profiles
 
 `update_model!` re-evaluates absorption cross-sections from *cached* HITRAN
@@ -140,6 +144,12 @@ end
 Partial updates compose: pass only the keywords that changed; the rest fall
 back to the previous scene state. Adding a new *species* (or changing the
 band set) needs a fresh `BatchContext`.
+
+The context owns copies of profiles and configuration containers. Loaded
+absorption LUT payloads are shared read-only with the input parameters to avoid
+duplicating large tables; do not mutate their coefficients, grids or metadata
+while a context uses them. `update_model!` also commits only after all candidate
+scene calculations succeed.
 
 ## Changing geometry
 
@@ -202,7 +212,9 @@ Practical notes:
   `AtmosphereRTCache` across threads that replay concurrently into it.
 - **BLAS threads:** for large spectral batches, cap BLAS
   (`radiative_transfer.numerics.blas_threads: 4` in the config) — oversubscription
-  with Julia threads degrades the batched kernels.
+  with Julia threads degrades the batched kernels. This changes the
+  process-wide BLAS setting and is not restored after a solve; use one value for
+  concurrently executed contexts in the same process.
 - **Cache memory:** a full cache stores 4 matrices of size `NquadN² × nSpec`
   per Fourier moment. Lambertian-only caches are automatically stored slim
   (full matrices at `m = 0` only, ~`(m_max+1)×` smaller); see

@@ -129,10 +129,11 @@ legacy `l_trunc` is ignored and `nstreams` wins.
   - `dτ_min_floor`     *(default `1024·eps(FT)`)* — absolute floor on
     `dτ_max`. ~`1.2e-4` for Float32 / `2.3e-13` for Float64. Prevents
     grazing-VZA configs from collapsing dτ below FT precision.
-  - `blas_threads`     *(default `null`)*  — per-model BLAS thread
-    cap. `null` leaves `BLAS.get_num_threads()` alone; an integer
-    sets the process-wide BLAS thread count when `rt_run` starts; it is not
-    restored after the call.
+  - `blas_threads`     *(default `null`)* — selects the process-wide BLAS
+    thread count when `rt_run` starts. `null` leaves the current setting alone;
+    an integer persists after the call. Treat it as an application-level
+    choice: models with different values must not run concurrently in one
+    process.
   - `verbose`          *(default `false`)*  — when `true`, `rt_run`
     prints the `TimerOutputs` timing tree at the end of each call
     (useful for profiling, noisy in batched loops).

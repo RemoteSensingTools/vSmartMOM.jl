@@ -258,7 +258,10 @@ test/
 ### Adding a New Surface Model
 
 1. Define struct subtyping `AbstractSurfaceType` in `src/CoreRT/types.jl`
-2. Create `src/CoreRT/Surfaces/mysurf_surface.jl` implementing `create_surface_layer!()`
+2. Create `src/CoreRT/Surfaces/mysurf_surface.jl`. Scalar analytic BRDFs implement
+   `reflectance(surface, stokes_index, μᵢ, μᵣ, Δϕ)` and inherit Fourier integration
+   and `create_surface_layer!` from `analytic_surface.jl`. Specialize the layer
+   builder only when the model needs a different operator construction.
 3. Include the file in `src/CoreRT/CoreRT.jl`
 4. Add type name to `BRDF_MAP` in `src/IO/Parameters.jl`
 5. Export the type from `CoreRT.jl`

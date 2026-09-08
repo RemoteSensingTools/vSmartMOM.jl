@@ -49,6 +49,12 @@ model = model_from_parameters(params; sources = SolarBeam() + SurfaceSIF())
 The `sources=` kwarg on `rt_run` overrides `model.sources` for that
 specific solve; both flow through the same dispatch.
 
+At solve time, an explicit `SolarBeam.sza` must match the model geometry.
+Change `params.sza` before construction or use `remake_geometry` to change
+the illumination angle. Multiple solar/blackbody beams throw `ArgumentError`;
+for one geometry, sum their irradiance matrices into one `SolarBeam`.
+These checks also cover linearized, single-scatter, TOA and split solves.
+
 ## Composition
 
 Sources compose via `+` and are stored as a type-stable `SourceSet` of
@@ -191,7 +197,18 @@ handled:
 | `PreparedSourceSet`   | any                     | iterate                                |
 | `PreparedSolarBeam`   | any                     | (currently in `create_surface_layer!`; will move to dispatch in a later sub-phase) |
 | `PreparedSurfaceSIF`  | `LambertianSurface*`    | factor-2 SIF₀ broadcast (m=0 only)     |
-| `PreparedSurfaceSIF`  | non-Lambertian          | unsupported combination; currently no-op                                  |
+| `PreparedSurfaceSIF`  | non-Lambertian          | nonzero/retrievable SIF rejected at solve time |
+
+Zero prescribed SIF is a valid placeholder on any surface. Retrievable SIF
+requires injection support even at zero amplitude because its derivatives
+are nonzero. Split surface replay validates the cached prepared sources
+against the replacement surface.
+
+To support fluorescence on a new surface, implement both
+`surface_source_contribute!` and `surface_source_contribute_lin!` for
+`PreparedSurfaceSIF` and your surface type, then specialize
+`CoreRT.supports_surface_sif(::YourSurface) = true`. The shared validation
+uses this trait before entering the kernels.
 
 ## Architecture invariants
 
@@ -254,6 +271,7 @@ vSmartMOM.CoreRT.source_ad_mode(::vSmartMOM.CoreRT.AbstractSource)
 ### Dispatch entry points
 
 ```@docs
+vSmartMOM.CoreRT.supports_surface_sif
 vSmartMOM.CoreRT.prepare_source(::vSmartMOM.CoreRT.SolarBeam, ::Type{<:AbstractFloat}, ::Integer, ::Integer, ::Any)
 vSmartMOM.CoreRT.prepare_source(::vSmartMOM.CoreRT.SurfaceSIF, ::Type{<:AbstractFloat}, ::Integer, ::Integer, ::Any)
 vSmartMOM.CoreRT.prepare_sources(::vSmartMOM.CoreRT.NoSource, ::Type{<:AbstractFloat}, ::Integer, ::Integer, ::Any)

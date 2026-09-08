@@ -1,27 +1,95 @@
 # Resume v2.2 integration and Jacobian work
 
-Saved 2026-09-08 at the user's request before logging off. This is the current
-session handoff; older dated audits retain their historical findings.
+Updated 2026-09-08 after completing the pressure/source priorities and an
+independent source-quality review. Older dated audits retain their historical
+findings; the latest implementation/validation record is linked below.
+
+## Commit and review checkpoint
+
+The user authorized committing and pushing this work on 2026-09-08.
+Implementation and regression tests are committed as **36e7d1e0**; the
+accompanying documentation commit contains this handoff and the audit records.
+The push target is `origin/integration/release-candidate`. Check the branch's
+upstream status for synchronization; no tag, release or registration is part
+of this operation. The follow-up review range begins after **41f0a053**.
+
+## Latest follow-up — completed
+
+**Priority review corrections:** see
+[corrections and final-tree validation](review_corrections_2026-09-08.md) for
+LUT ownership, mixed-precision geometry, retrieval-selective pressure work,
+transactional aerosol updates, dependency pinning and migration-doc fixes.
+Validation results listed below describe the preceding tranche, not these
+latest corrections.
+
+The correction pass completed with **20,323/20,323** full A100 GPU tests,
+**213/213** pressure assertions on Julia 1.12/CUDA, **205 pressure assertions
+plus one CUDA skip** on a fresh Julia 1.10 environment, and passing source,
+transactional, selective-Jacobian, parameter-copy, batch-update and Aqua checks.
+Strict docs also pass. The report separates the grouped runs from the corrected
+pressure-file reruns; the complete CPU suite was not rerun for this pass.
+All correction-pass validation processes have finished. See the commit/review
+checkpoint above for repository status.
+
+- [Pressure/source changes and validation](pressure_source_followup_2026-09-08.md):
+  ordinary absorption now includes the pressure-dependent line/LUT response;
+  shared source guards reject ignored requests; exact-SS honors irradiance.
+- [Scientific readability / Julia quality audit](source_quality_audit_2026-09-08.md):
+  ten ranked work areas, with bounded refactors and verified examples.
+- [Code-quality follow-up](code_quality_followup_2026-09-08.md): transactional
+  batch updates, strict HITRAN parsing, Julia interfaces, batched-algebra
+  contracts, shared surface dispatch and explicit remaining design gates.
+- Complete combined CPU suite after the code-quality follow-up:
+  **12,743 passed, 16 broken/skipped, zero failures/errors**, 25m07.6s.
+- Complete GPU runner before the code-quality tranche: **20,301/20,301**.
+  Focused pressure CUDA run: **203/203**; subsequent batched ownership check:
+  **32/32** on A100.
+- Julia 1.10 pressure/source/Aqua: **252 passed, one CUDA skip**; a fresh
+  Julia 1.10 resolution also passed the new interface checks **6/6**.
+  Strict docs build and **20/20** executable doc contracts passed again after
+  the combined changes.
+- JET remains **285 advisory findings**, unchanged from the preceding audit.
+- These earlier validation records used baseline **41f0a053** plus local
+  changes, now included in the implementation commit above.
+
+The first audit tranche is implemented: `BatchContext.update_model!` is
+transactional, standalone HITRAN parsing is strict, batched mutation contracts
+are explicit, small Julia interfaces are complete, generic analytic-surface
+dispatch is separated, and standalone profile readers preserve an explicitly
+requested floating type. Focused checks are recorded in the code-quality
+follow-up, including the green complete CPU/docs rerun.
+
+**Next implementation after validation:** choose one measured concrete-carrier
+boundary or one shared absorption/Rayleigh preparation stage. Do not start a
+large type-parameter, Raman-state or driver rewrite without profiling and
+scientific review.
+
+The pressure coordinate moves only the final grid's bottom interface at fixed
+layer temperature/composition; regridding needs a separate chain rule.
+CIA/MT_CKD abundance tangents, Metal hardware and hosted/publication gates
+remain outstanding.
 
 ## Start here
 
 - **Working checkout:** `/home/cfranken/code/gitHub/vSmartMOM-release`
 - **Branch:** `integration/release-candidate`
 - **Last implementation/documentation commits before this handoff:**
+  - `36e7d1e0` — pressure/source contracts, transactional updates and regressions.
   - `3c1add99` — execute documentation examples and record deep audit (cfranken).
   - `7ae92577` — align scientific guides with supported v2.2 contracts (Suniti).
   - `326c1e91` — preceding integrated-release validation checkpoint.
 - Package version is **2.2.0, an unpublished local release candidate**.
-- No push, tag, release publication, registration, or external message was sent.
+- No tag, release publication, registration, or external message is authorized.
+  The branch push is separately authorized in the checkpoint above.
 - The user asked to preserve context and resume further changes after returning.
   No additional scientific implementation is running in the background.
 
 Read `AGENTS.md`, `CLAUDE.md`, then:
 
-1. [Deep documentation audit](documentation_audit_2026-09-08.md): latest findings,
+1. [Deep documentation audit](documentation_audit_2026-09-08.md): preceding findings,
    what was fixed, what remains, coverage limits and validation.
 2. [Release validation](release_validation_2026-09-07.md): full integration's
-   numerical checks, exact CPU caveat and outstanding publication gates.
+   numerical checks and publication gates; its CPU caveat is superseded above.
 3. [Release consolidation](release_consolidation_2026-09-07.md): branch inclusion,
    workflow ports, provenance, release plan.
 4. [Selective Jacobian contract](selective_jacobian_plans.md) and
@@ -57,41 +125,21 @@ performance, integration and release plumbing. Preserve this distinction.
   JSON maps are in this directory; do not repeat those operations.
 - Scientific docs corrections are in `7ae92577`, maintenance checks in `3c1add99`.
 
-## Highest-priority next implementation
+## Prior implementation priorities — now completed
 
-These are recommendations for the next work session, **not completed fixes**.
+### A. Pressure-dependent line absorption
 
-### A. Complete pressure-dependent line-absorption derivatives
+Completed for AA direct line models, native ABSCO, regular AA tables and legacy
+BSpline LUTs. The molecular-column and cross-section terms are both present.
+Full-forward optical, RT and fixed-convolution finite differences pass; see
+[the exact coordinate, boundaries and evidence](pressure_source_followup_2026-09-08.md).
 
-`src/CoreRT/tools/lin_model_from_parameters.jl` around the comment
-"The pressure tangent holds cross sections" constructs `τ̇_abs_psurf` from the
-bottom molecular-column change while holding ordinary line cross sections fixed.
-A full forward rebuild changes pressure-dependent line shapes/LUT interpolation.
-The missing upstream response matters for a full surface-pressure retrieval;
-it does not invalidate the analytic RT operator chain rule itself.
+### B. Source requests that silently lost physics
 
-Start with a centered full-forward pressure finite-difference reproduction for
-small direct-line and ABSCO cases. Establish the pressure/profile coordinate
-contract, then add the missing cross-section/LUT pressure response at the
-upstream optical-property boundary. Keep optical and detector/convolution tests
-separate. CIA/MT_CKD have separate pressure-scaling terms and incomplete
-abundance tangents. No new ppm bias for this omission has been measured yet.
-
-### B. Reject source requests that currently lose physics silently
-
-The tracked reproduction is
-[documentation_audit_2026-09-08/source_contract_probe.jl](documentation_audit_2026-09-08/source_contract_probe.jl).
-It demonstrated on CPU:
-
-- `SolarBeam(sza=75)` ignores that source angle and uses model geometry.
-- `SolarBeam()+SolarBeam()` yields exactly one beam: **0.5 times** the radiance
-  of a single beam with correctly summed irradiance.
-- Nonzero prescribed `SurfaceSIF` over an RPV surface is silently ignored.
-
-Current source docs explain these limits. Runtime guards are **not** added yet.
-Implement shared validation across forward, linearized, split and TOA paths;
-test unsupported combinations explicitly. Multiple source geometries are a
-larger feature; same-geometry irradiance can be summed into one beam today.
+Completed shared guards for geometry, duplicate beams and unsupported SIF,
+including split replay. The exact-SS reference now honors irradiation/dark
+sources and rejects unsupported emissions. Source composition remains usable;
+unsupported physical combinations reject at solve time. **47/47** focused tests.
 
 ### C. Other valuable follow-ups
 
@@ -112,7 +160,7 @@ larger feature; same-geometry irradiance can be summed into one beam today.
   bridge and obsolete RT changes. Port a bounded adapter; do not blindly merge it.
 - Thermal/Raman Jacobians remain unsupported; AD traits alone do not implement them.
 
-## What the latest documentation pass completed
+## What the preceding documentation pass completed
 
 Manual-wide text/path scan: 63 Markdown pages, 12,017 lines, 202 ordinary Julia
 fences. Targeted semantic review and execution found/fixed retired Mie AD calls,
@@ -121,7 +169,7 @@ radiance labels, source/backend support claims and stale legacy SIF behavior.
 
 The Jacobian guide now explains instrument convolution and its shift/width chain
 rule, noise covariance whitening, matched/native grids and the local retrieval
-state-displacement estimate. The pressure tangent limitation is prominent.
+state-displacement estimate. The pressure coordinate and interpolation-boundary conventions are now explicit.
 
 **Coverage is not universal scientific certification:** not every equation,
 historical note or all 999 docstrings have been independently reviewed. Ordinary
@@ -154,7 +202,8 @@ workflow tests, parser/schema/Taplo, docs dependencies and release CI updates.
   **1,139/1,139**; portable mode 120 passes/14 skips. No new production inversion.
 - Full CPU run: **12,429 passes, one failure, one error, 14 skips**. Both issues
   were test-harness defects; fixes passed all **96 affected-group assertions**.
-  **There was no complete green CPU rerun after those two fixes.** Do not claim one.
+  **There was no complete green CPU rerun in that earlier pass.** The new full
+  follow-up run above passes; do not rewrite the earlier result as green.
 - Fresh Julia 1.10/1.12 resolution and smoke checks passed.
 - JET reported **285 advisory findings** versus historical 232; not all reviewed.
 - npm audit was zero findings after pinned dependency updates; Taplo/schema checks

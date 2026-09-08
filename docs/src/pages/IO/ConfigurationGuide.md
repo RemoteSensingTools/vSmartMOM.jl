@@ -518,8 +518,10 @@ cfg["radiative_transfer"]["numerics"] =
 
 `Float32` roughly halves memory and speeds the kernels at the cost of per-pixel
 precision; `GPU()` dispatches the adding-doubling kernels to CUDA when
-available. `numerics.blas_threads` caps BLAS threads (4–8, or 1 for large
-spectral batches).
+available. `numerics.blas_threads` sets the process-wide BLAS thread count
+(often 4–8, or 1 for large spectral batches). The value persists after the
+solve, so select it consistently at application startup rather than varying it
+between concurrently executed models.
 
 ---
 

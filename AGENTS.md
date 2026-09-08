@@ -185,6 +185,8 @@ material when explaining the package:
 | Native Mie tangents (quadrature preparation → specialized integration) | `src/Scattering/compute_NAI2_lin.jl::_nai2_bulk_optics_lin` |
 | Phase matrix Z from Greek + μ | `src/Scattering/compute_Z_matrices.jl::compute_Z_moments` |
 | HITRAN absorption | `src/Absorption/compute_absorption_cross_section.jl:32–280` |
+| Pressure-dependent line/LUT cross sections (fixed final-grid bottom-interface coordinate) | `src/CoreRT/tools/absorption_pressure.jl`; `docs/dev_notes/pressure_source_followup_2026-09-08.md` |
+| Shared source/geometry/surface validation | `src/CoreRT/Sources/validation.jl` |
 | Shared parsed HITRAN cache (forward, linearized, BatchContext) | `src/CoreRT/tools/hitran_cache.jl`; `clear_spectroscopy_cache!` releases cached ownership; see `docs/dev_notes/jacobian_batched/construction_cost.md` |
 | Independent trial parameters with opt-in read-only absorption LUT sharing | `src/CoreRT/tools/copy_parameters.jl::copy_parameters` |
 | Elemental (r, t, j) | `src/CoreRT/CoreKernel/elemental.jl:207–252` |

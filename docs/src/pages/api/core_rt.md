@@ -187,6 +187,7 @@ vSmartMOM.CoreRT.PlannedRTModelLin
 vSmartMOM.CoreRT.jacobian_plan
 vSmartMOM.CoreRT.requires_aerosol_microphysics_jacobians
 vSmartMOM.CoreRT.requires_h2o_jacobians
+vSmartMOM.CoreRT.requires_pressure_jacobians
 vSmartMOM.CoreRT.globalize_jacobian
 ```
 

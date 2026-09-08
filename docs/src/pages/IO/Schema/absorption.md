@@ -60,10 +60,15 @@ fail by default; `clamp_zero` must be requested explicitly.
 
 The surface-pressure tangent includes the hydrostatic-column and midpoint-
 pressure response of CIA and MT_CKD at fixed temperature, humidity, and VMR.
-Their abundance Jacobians are not yet implemented. Likewise, the analytic
-line-absorption pressure tangent currently holds the pressure-dependent line
-cross section fixed. Forward calculations at independently specified pressure
-states recompute every opacity and are unaffected by these derivative limits.
+Their abundance Jacobians are not yet implemented. Ordinary line absorption
+includes the pressure-dependent cross-section response as well as molecular
+column scaling. This is the derivative with only the final grid's bottom
+pressure interface moving, at fixed layer temperature, humidity and VMR;
+it does not differentiate profile reduction or observer-interface insertion.
+Native ABSCO uses the active pressure-interval slope (right-sided at interior
+knots, zero at/outside clamped endpoints); legacy LUTs differentiate their
+interpolant. Line-by-line derivatives retain the active wing windows, whose
+hard boundaries are discontinuous. See the [Jacobian guide](../../jacobians.md).
 
 ```yaml
 cia_files:

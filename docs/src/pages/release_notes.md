@@ -48,10 +48,24 @@ the repository's `CITATION.bib`, with their original publication author order.
   were corrected. The incident spectrum scales the correction, and full
   Jacobians include its wind/optical-depth derivatives. The direct-glint
   correction requires unpolarized incident illumination.
-- Surface-pressure Jacobians hold ordinary line cross sections fixed; they
-  omit pressure-induced line-shape changes. Validate pressure retrievals
-  against complete forward perturbations. CIA/MT_CKD abundance tangents are
-  also incomplete; see the absorption schema.
+- Surface-pressure Jacobians include pressure-induced line-shape and LUT
+  changes at fixed final-grid temperature/composition, with only the bottom
+  pressure interface moving. Profile regridding needs a separate chain rule.
+  CIA/MT_CKD abundance tangents remain incomplete; see the absorption schema.
+- Retrievals with fixed pressure can disable its upstream derivatives with
+  `requires_pressure_jacobians(::MyFlavor) = false` or the constructor keyword
+  `compute_pressure_jacobians=false`. Such plans must omit pressure; full-layout
+  solves reject unavailable pressure tangents. Unsupported absorbers still fail
+  explicitly when a pressure derivative is requested.
+- A source-specific `SolarBeam(sza=...)` must match model geometry at the
+  narrower floating-point precision. Change geometry through model construction
+  or `remake_geometry`. Multiple beams are rejected; for a common geometry,
+  sum their irradiance spectra into one `SolarBeam`.
+- Nonzero or retrievable `SurfaceSIF` requires a supported Lambertian surface.
+  Unsupported source/surface combinations now throw instead of ignoring SIF.
+- The legacy HITRAN reader rejects malformed required fields and non-ASCII or
+  short records. Isotopologue characters `0`, `A`, `B` map to IDs 10, 11, 12;
+  replace an old `iso=0` selection with `iso=10`.
 - Raman Jacobians, linearized thermal sources, and linearized aerosol
   `TMSCorrection` are explicitly unsupported. Forward Raman and forward
   atmospheric thermal emission remain separate supported paths.
@@ -73,6 +87,12 @@ exit below that ceiling using the configured guard and consecutive-pass count.
 is the sole supported absorption dependency going forward. The internal
 `vSmartMOM.Absorption` implementation remains temporarily for legacy compatibility, should
 not be used for new work, and will be removed in a future release.
+
+The release candidate temporarily pins AtmosphericAbsorption to 0.1.2 because
+line-pressure tangents use its internal prepared-line interface. Updating this
+dependency requires pressure regressions until an upstream public derivative
+API replaces that coupling. Development checkouts must also record their exact
+revision; a version string alone does not identify a modified source tree.
 
 ### Atmosphere/surface split
 
@@ -386,7 +406,8 @@ Highlights:
   across the elastic linearized path. Surfaces use a parallel
   `surface_source_contribute!(prepared_sources, surface, …)` double-
   dispatch table for surface-side contributions (SIF on Lambertian
-  surfaces today; non-Lambertian dispatches to a no-op).
+  surfaces today; nonzero or retrievable SIF on other surfaces is rejected
+  at solve time).
 - The Sanghavi 2014 App. C analytic tangents and the Bug-22 beam-
   attenuation chain-rule fix are unchanged inside
   `get_elem_rt_SFI_fused!`; they're now reached via

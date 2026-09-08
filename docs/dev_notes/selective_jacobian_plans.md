@@ -241,11 +241,12 @@ covariances.
 4. For every band, place atmospheric keys first in native component order,
    followed by contiguous surface/source blocks.
 5. Supply the corresponding sorted native atmospheric column indices.
-6. Override either upstream-work trait when appropriate:
+6. Override upstream-work traits when appropriate:
 
    ```julia
    requires_aerosol_microphysics_jacobians(::MyFlavor) = false
    requires_h2o_jacobians(::MyFlavor) = false
+   requires_pressure_jacobians(::MyFlavor) = false
    ```
 
 7. Test the local/global maps, compact allocation dimensions, exact equality
@@ -256,10 +257,20 @@ No retrieval-specific method should be added to elemental, doubling, or
 interaction kernels.
 
 Model construction validates that the compiled plan does not select native
-microphysics or q-driven H2O columns disabled by the effective upstream
+microphysics, q-driven H2O or surface-pressure columns disabled by the effective upstream
 options (including explicit keyword overrides). Disabled tangents are not
 valid zero sensitivities. Manually wrapping supplied tangents in
 `PlannedRTModelLin` retains caller responsibility for their provenance.
+
+Pressure defaults to enabled, including for `OCO_RRS_synth`. A fixed-pressure
+flavor skips all pressure tangent construction before compiling its plan, so
+forward-only absorber extensions remain usable. The explicit constructor
+keyword is `compute_pressure_jacobians=false`; pressure fields then contain
+`nothing`, and the optical-cache boundary also rejects full or manually wrapped
+layouts that request them. Supported pressure providers are AtmosphericAbsorption
+line-by-line, ABSCO and regular interpolation models, plus legacy BSpline LUTs;
+other absorbers must implement `_absorption_pressure_derivative` before pressure
+can be selected. A forward method alone does not establish derivative support.
 
 For extensions beyond selection of existing native fields, see the
 [Jacobian architecture review](jacobian_batched/extension_review.md): it covers
