@@ -5,6 +5,8 @@ contributors need beyond the public docs. Dated audits and historical design
 notes are retained as evidence; their status statements describe their original
 revision, not necessarily the current implementation.
 
+**Resume work:** [Current session handoff](SESSION_HANDOFF.md).
+
 Current release follow-up: [deep documentation audit, 2026-09-08](documentation_audit_2026-09-08.md).
 The preceding [release validation](release_validation_2026-09-07.md) records
 CPU/CUDA numerical checks and their precise limits.

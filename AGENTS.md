@@ -5,6 +5,8 @@ work on vSmartMOM.jl. The goal is a 3-minute orientation: what the package is,
 the narrative thread it's organized around, where to find each concept, and the
 conventions that keep the codebase coherent.
 
+**Current session handoff:** [Resume v2.2 integration and Jacobian work](docs/dev_notes/SESSION_HANDOFF.md) — checkout, accepted decisions, validation limits, and next steps (saved 2026-09-08).
+
 **Sister files:**
 - [CLAUDE.md](CLAUDE.md) — project conventions, build/test commands, file structure.
 - **⚠ [docs/src/pages/conventions.md](docs/src/pages/conventions.md)** — Hovenier-style γ sign, Stokes Q/U/V signs, azimuth (Δφ) definition, and the sign-flip checklist for VLIDORT cross-validation. **Read this before any cross-code comparison or data import.**
