@@ -1,0 +1,41 @@
+{
+  "pages": 63,
+  "markdown_lines": 12017,
+  "ordinary_julia_fences": 202,
+  "missing_repository_blob_paths": [],
+  "scope": "Manual-wide text/link scan; targeted semantic review. No claim of complete independent equation/docstring validation.",
+  "source_probe": {
+    "ignored_sza": true,
+    "two_beams_equal_one": true,
+    "two_beams_to_summed_irradiance_ratio": 0.5,
+    "rpv_prescribed_sif_ignored": true
+  },
+  "source_probe_scope": "CPU, shipped quickstart; RPV surface variant; see source_contract_probe.jl",
+  "api_audit": {
+    "exports": 475,
+    "registered_docstrings": 999,
+    "structural_failures": 0,
+    "metal_loaded": false
+  },
+  "validation": {
+    "julia": "1.12.6",
+    "backend": "CPU",
+    "tutorials": {
+      "count": 10,
+      "assertions_passed": 26,
+      "exit_code": 0,
+      "seconds": 230.8,
+      "cuda_sections": false,
+      "optional_gifs": false
+    },
+    "documentation_contracts": {
+      "assertions_passed": 20,
+      "exit_code": 0
+    },
+    "strict_documentation_build": {
+      "exit_code": 0,
+      "deploy": false
+    },
+    "hosted_ci_run": false
+  }
+}

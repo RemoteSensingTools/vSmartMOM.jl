@@ -1,8 +1,13 @@
 # docs/dev_notes/ — Living Developer References
 
 This directory holds **long-lived technical references** that agents and
-contributors need beyond the public docs. Session handoffs, phase plans, and
-commit drafts are deleted after the work lands; git history preserves them.
+contributors need beyond the public docs. Dated audits and historical design
+notes are retained as evidence; their status statements describe their original
+revision, not necessarily the current implementation.
+
+Current release follow-up: [deep documentation audit, 2026-09-08](documentation_audit_2026-09-08.md).
+The preceding [release validation](release_validation_2026-09-07.md) records
+CPU/CUDA numerical checks and their precise limits.
 
 ## Kept files
 
@@ -14,7 +19,7 @@ commit drafts are deleted after the work lands; git history preserves them.
 | `OCO_RETRIEVAL_LINEARIZATION_HANDOFF.md` | Handoff and acceptance plan for a 33-state, three-band OCO-like retrieval with four aerosols, CO₂/H₂O profile scales, and bandwise Lambertian surfaces. |
 | `raman_gpu_optimization.md` | GPU performance audit for the Raman (inelastic) path. Parked for S. Sanghavi; ~19,000 allocations/run identified. |
 | `RAMAN_CODE_HANDOFF.md` | Orientation for the Raman code author: forward vs linearized paths, Raman dispatch map, what to check. |
-| `MieGPUSpeedup.md` | GPU Mie implementation plan (DoubleSingle, Neumaier, five kernels). Prototype on CPU backend; full GPU pipeline unlanded. |
+| `MieGPUSpeedup.md` | GPU Mie implementation plan (DoubleSingle, Neumaier, five kernels). Historical implementation plan; CUDA and Float32 Metal pipelines now exist. |
 | `batched_kernel_benchmarks.md` | Benchmark results (A100, L40S) for custom KA kernels vs cuBLAS for batched matmul and inversion. |
 | `ocean.md` | Coupled atmosphere-ocean RT design (Fresnel interface, quadrature grid mismatch, OceanOptics.jl spinoff). Phase 1 only; remaining phases deferred. |
 | `vsmartmom_vs_vlidort_audit.md` | Technical comparison of vSmartMOM vs vLIDORT: feature gaps, community trust, and hardening roadmap. |

@@ -31,6 +31,18 @@ function docs_minimal_parameter_dict()
     )
 end
 
+@testset "published source configuration example" begin
+    path = joinpath(pkgdir(vSmartMOM), "docs", "src", "pages", "IO", "Schema", "sources.md")
+    code = match(r"```julia\n(.*?)```"s, read(path, String)).captures[1]
+    example = Module(gensym(:SourceExample))
+    Base.include_string(example, code, path)
+    R = Base.invokelatest(getfield, example, :R)
+    R_sif = Base.invokelatest(getfield, example, :R_sif)
+    @test all(isfinite, R)
+    @test all(isfinite, R_sif)
+    @test all(R_sif .> R)
+end
+
 @testset "docs quickstart" begin
     scene = joinpath(pkgdir(vSmartMOM), "config", "quickstart.yaml")
     @test isfile(scene)
@@ -67,11 +79,11 @@ end
                                     n_gases = 3,
                                     n_surface = 1)
 
-    @test CoreRT.n_total(layout) == 18
-    @test CoreRT.aerosol_range(layout, 1) == 1:7
-    @test CoreRT.aerosol_range(layout, 2) == 8:14
-    @test CoreRT.gas_range(layout) == 15:17
-    @test CoreRT.surface_index(layout) == 18
+    @test CoreRT.n_total(layout) == 19
+    @test CoreRT.aerosol_range(layout, 1) == 2:8
+    @test CoreRT.aerosol_range(layout, 2) == 9:15
+    @test CoreRT.gas_range(layout) == 16:18
+    @test CoreRT.surface_index(layout) == 19
 end
 
 @testset "docs StandaloneSS vector Jacobian example" begin

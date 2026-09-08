@@ -245,10 +245,10 @@ src/
     Sources.jl                # GeosChemSource, NetCDFGridSource
     NetCDF/                   # GEOSChem NetCDF reader
 ext/
-  vSmartMOMCUDAExt.jl         # CUDA weak dependency extension
+  vSmartMOMCUDAExt.jl         # CUDA extension (CUDA is a direct dependency)
 config/                       # Example YAML configurations
 test/
-  runtests.jl                 # Test orchestrator (11 test sets)
+  runtests.jl                 # Test orchestrator
   test_helpers.jl             # run_lin_rt, rel_errors, fd_jacobian_R
   test_parameters/            # Test YAML configs
 ```

@@ -43,3 +43,26 @@ The npm lockfile overrides Vite to 6.4.3 and xmldom to 0.9.12 to address the
 September 2026 dependency audit. Vite lies outside VitePress 1.6.4's declared
 Vite range; keep the strict build and development/preview smoke checks when
 updating either package. Do not remove the override without repeating the audit.
+
+Execute the public source configuration example and small documentation contracts:
+
+```bash
+cd test
+julia --project=../docs ../docs/test_examples.jl
+```
+
+The strict renderer does not execute ordinary Julia code fences. Execute the
+maintained Literate tutorials separately (all ten by default; names select
+a subset):
+
+```bash
+cd test
+julia --project=../docs ../tools/check_tutorials.jl
+# Example: select the optics/surface tutorials, including plots:
+julia --project=../docs ../tools/check_tutorials.jl Absorption Scattering Surfaces Canopy MieDeepDive
+```
+
+These runs need the docs environment and cached/downloadable spectroscopy for
+absorption examples. CUDA sections run only with functional hardware. Optional
+GIF generation requires `VSMARTMOM_RUN_HEAVY_DOCS=true` and is excluded from the
+normal check; it writes next to the tutorial source.

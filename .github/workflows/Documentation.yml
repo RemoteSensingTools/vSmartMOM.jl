@@ -31,6 +31,15 @@ jobs:
             Pkg.instantiate()
           '
           npm ci --prefix docs
+      - name: Execute documentation contracts
+        working-directory: test
+        run: julia --project=../docs ../docs/test_examples.jl
+      - name: Execute all ten Literate tutorials
+        working-directory: test
+        env:
+          JULIA_NUM_THREADS: 4
+          OPENBLAS_NUM_THREADS: 1
+        run: julia --project=../docs ../tools/check_tutorials.jl
       - name: Build and deploy
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
