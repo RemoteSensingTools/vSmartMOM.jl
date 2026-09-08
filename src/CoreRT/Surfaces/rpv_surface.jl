@@ -140,7 +140,7 @@ end
 Fourier moment `m` of the BRDF reflectance matrix for quadrature directions `μ`.
 
 Computes ``R_{ij} = (f/\\pi) \\int_0^\\pi \\rho(n, \\mu_i, \\mu_j, \\phi) \\cos(m\\phi) \\, d\\phi``
-with `f = 2` for m=0, `f = 1` otherwise. Returns `[nμ·n_stokes, nμ·n_stokes]` matrix.
+with `f = 1` for m=0, `f = 2` otherwise. Returns `[nμ·n_stokes, nμ·n_stokes]` matrix.
 """
 function reflectance(brdf::AbstractSurfaceType, pol_type, μ::AbstractArray{FT}, m::Int) where FT
     # Hardcoded nQuad for now, needs to go into brdf in the future!

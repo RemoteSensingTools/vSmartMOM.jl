@@ -48,6 +48,10 @@ the repository's `CITATION.bib`, with their original publication author order.
   were corrected. The incident spectrum scales the correction, and full
   Jacobians include its wind/optical-depth derivatives. The direct-glint
   correction requires unpolarized incident illumination.
+- Surface-pressure Jacobians hold ordinary line cross sections fixed; they
+  omit pressure-induced line-shape changes. Validate pressure retrievals
+  against complete forward perturbations. CIA/MT_CKD abundance tangents are
+  also incomplete; see the absorption schema.
 - Raman Jacobians, linearized thermal sources, and linearized aerosol
   `TMSCorrection` are explicitly unsupported. Forward Raman and forward
   atmospheric thermal emission remain separate supported paths.
@@ -228,7 +232,7 @@ example uses `nstreams` + `truncation: auto` now.
 The new public input is **`nstreams`** (weighted streams per
 hemisphere). The schema-generation v0.7 label persists in some docs
 (`stream_l_cap = 2·nstreams - 1` and the per-band trait dispatch);
-the package version on the registry is v2.1.0.
+the public repository tag is v2.1.0; the registered upgrade baseline is v1.1.0.
 
 ### What changed for users
 
@@ -363,7 +367,7 @@ R, T = rt_run(model; sources = SolarBeam() + SurfaceSIF(SIF₀ = sif_spec))
 
 # Thermal-IR / Carbon-I-style scene (1500 K blackbody at 2-2.4 µm):
 spec_band = collect(model.atmosphere.spec_bands[1])
-R, T = rt_run(model; sources = BlackbodySource(1500, spec_band))
+R, T = rt_run(model; sources = BlackbodySource(1500, spec_band; pol_n=params.polarization_type.n))
 ```
 
 Highlights:
@@ -399,13 +403,10 @@ Highlights:
   `factor = π` (Lambertian-disk → hemisphere irradiance) so its `F₀` is
   comparable to a unit `SolarBeam(F₀ = 1)` baseline.
 
-Legacy compatibility: the `inject_surface_SIF!(brdf, …, SIF₀, arch)` path
-that consumes `RS_type.SIF₀` still runs in parallel for back-compat with
-existing `rs.SIF₀ = …; rt_run_test_ss(rs, model, 1)` test patterns. If a
-user supplies BOTH `model.sources` containing a `SurfaceSIF` AND sets
-`RS_type.SIF₀`, the surface SIF is double-counted; choose one API at a
-time. A future PR will retire `RS_type.F₀` / `RS_type.SIF₀` ownership in
-favour of the dispatch system.
+Legacy compatibility: the main `rt_run` path ignores `RS_type.SIF₀` and
+uses `SurfaceSIF` through `sources=`. Migrate old callers to that API.
+Historical diagnostic entry points may still consume the legacy field;
+do not infer their behavior from the main driver's contract.
 
 Full architecture writeup: [Sources](extending/sources.md). Test coverage
 is in `test/test_sources.jl` (Phase 1 → 5b regression, 86/86 pass).
@@ -533,7 +534,9 @@ the current codebase.
   **10.7–12.9×** vs CPU for typical aerosol grids (1 500 quadrature points,
   NAI2 decomposition).  `NativeFloat64` is the default precision policy;
   `DSEmulated` is available for extended-precision Float32 accumulation.
-  Metal and other architectures fall back to CPU Mie automatically.
+  Metal also implements NAI2 Mie for Float32 with `NativeFloat32`; other
+  architectures without a Mie pipeline fall back to CPU. Metal hardware was
+  not available for this release-candidate validation.
 
 - **Flat-Z zero-copy path** — Rayleigh-only and analytic-phase-function layers
   share a single pre-computed Z matrix across all Fourier moments rather than

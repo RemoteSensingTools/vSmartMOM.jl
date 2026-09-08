@@ -6,7 +6,9 @@
 
 Raman support is selected by dispatch on `AbstractRamanType`. Adding a new mode should mean adding methods for that mode, not adding new `isa` branches inside the main RT loop.
 
-This guide covers Raman/Cabannes extension points only. Solar-induced fluorescence remains a product/data-policy decision and should not get a public extension guide until its fixtures and supported workflows are settled.
+This guide covers Raman/Cabannes extension points. Surface fluorescence uses
+the separate [source interface](sources.md); external SIF data helpers retain
+their experimental product/data status.
 
 ## Current Dispatch Layers
 

@@ -13,7 +13,7 @@ optical-property derivation see Sanghavi 2022 (Part I).
 
 vSmartMOM supports rotational Raman (RRS) and vibrational Raman (VRS,
 RVRS) inelastic scattering as a **parallel kernel path** next to the
-elastic one. Selection is via the `RS_type` configured in YAML: `noRS`
+elastic one. Pass the configured mode object as `rt_run(rs, model)`: `noRS`
 (default; pure elastic), `RRS`, `VS_0to1`, `VS_1to0`, plus `_plus`
 variants for multi-band runs that share spectral structure. The bulk of
 retrievals (NIR shortwave for greenhouse gases, polarized aerosol over
@@ -72,7 +72,7 @@ Architecturally:
   linear-in-inelastic approximation usable in absorbing bands. Not a
   debug helper; it's the *production* tool for fast O₂ A-band Raman
   corrections.
-- **Linearized Raman is currently elastic-only**. The `_lin.jl` files
+- **Raman Jacobians are unsupported**. The `_lin.jl` files
   cover the elastic path only; ``\partial \mathbf{R}/\partial \mathbf{x}`` derivatives
   through inelastic scattering are not yet implemented.
 

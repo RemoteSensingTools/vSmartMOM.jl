@@ -1,96 +1,82 @@
-# Sources (v0.6 source-term refactor)
+# Source configuration
 
-The radiative-transfer source term — what drives the affine RHS of the
-MOM operator equation. v0.6 introduced an `AbstractSource` hierarchy
-so multiple sources (solar + SIF, solar + thermal, etc.) can compose
-cleanly. v0.7 surfaces the source list through the trait dispatch in
-`component_m_max(...)`.
+Sources are configured programmatically through `sources=` on
+`model_from_parameters` or `rt_run`. A YAML/TOML `sources:` list is not
+implemented. The default is `SolarBeam()` with unit Stokes-I irradiance.
 
-## Default
-
-If no source is configured, `model_from_parameters` defaults to
-`SolarBeam()` — equivalent to the pre-v0.6 fixed-solar-only behavior.
-
-## Programmatic API (recommended)
-
-Sources are first-class types under `vSmartMOM.CoreRT`. The cleanest
-way to set them is via the `sources=` kwarg on `model_from_parameters`
-or `rt_run`:
+## Runnable example
 
 ```julia
-using vSmartMOM, vSmartMOM.CoreRT
+using vSmartMOM
+using vSmartMOM.CoreRT
 
-# Solar-only (default)
+params = read_parameters(joinpath(pkgdir(vSmartMOM), "config", "quickstart.yaml"))
 model = model_from_parameters(params)
+ν = collect(model.atmosphere.spec_bands[1])
+pol_n = params.polarization_type.n
 
-# Solar + surface SIF
-model = model_from_parameters(params; sources = SolarBeam() + SurfaceSIF())
+# A collimated external source with a Planck-shaped spectrum.
+beam = BlackbodySource(1500.0, ν; pol_n=pol_n)
+R, T = rt_run(model; sources=beam)
 
-# Per-call override
-R, T = rt_run(model; sources = BlackbodySource(temperature=300.0,
-                                                spec_band=1))
+# A prescribed hemispheric surface-emission spectrum over a Lambertian surface.
+sif = SurfaceSIF(SIF₀=fill(0.01, pol_n, length(ν)))
+R_sif, T_sif = rt_run(model; sources=beam + sif)
 ```
 
-## YAML configuration
+`BlackbodySource` requires a temperature and a vector of wavenumbers as
+positional arguments. Set `pol_n` to match the scene (its default is 3).
+It returns a `SolarBeam`; it does not emit from the atmosphere or surface.
+`F₀ = factor * scale * B(ν,T)`, with `factor=π` and `scale=1` by default.
 
-A YAML-side `sources:` list is **forthcoming** (Phase 7-ish, not
-shipping in v0.7). For now, configure sources programmatically after
-`parameters_from_yaml`. The reason is that some source types (e.g.
-`BlackbodySource`) need a model-resolved spectral band that doesn't
-exist until after `model_from_parameters` runs.
+## Supported vocabulary
 
-## Source vocabulary
+| Type | Physical meaning | Current scope |
+|---|---|---|
+| `SolarBeam(; F₀=nothing, sza=nothing)` | Collimated incident Stokes irradiance, matrix `(nStokes, nSpec)` | Uses model geometry; `sza` is reserved metadata and does not change it |
+| `BlackbodySource(T, ν; pol_n=3, factor=π, scale=1)` | Planck-shaped collimated `SolarBeam` | Same restrictions as `SolarBeam` |
+| `SurfaceSIF(; SIF₀=nothing)` | Prescribed hemispheric surface emission | Lambertian scalar/spectrum/Legendre/spline surfaces; no emission is injected on other surfaces |
+| `SurfaceSIF(; SIF760, mSIF=0, wavenumber_cm1)` | Retrievable radiance `SIF760 + mSIF*(ν-1e7/760)` | Two source columns; see [Jacobians](../../jacobians.md) |
+| `SurfaceSIF(; SIF755, slope=0, wavelength_nm)` | Retrievable radiance `SIF755 + slope*(λ_nm-755)` | Alternate coordinate convention; do not interchange the two slopes |
+| `ThermalEmission(T_layers, ν)` | Atmospheric volume Planck emission | Forward endpoint RT; thermal Jacobians and interior observers are unsupported |
+| `NoSource()` | No incident/emitted source | Also the identity for source composition |
+| `SourceSet((s₁, s₂, ...))` | Ordered source composition, also built with `+` | Use at most one solar/blackbody beam; see the limitations below |
 
-| Type | Purpose | `component_m_max(::T, ctx)` |
-|------|---------|-----------------------------|
-| `SolarBeam(; F₀=nothing, sza=nothing)` | Direct solar beam at the model's `sza` (or `obs_geom.sza` if not overridden). `F₀` is the per-spectral-point Stokes-vector solar irradiance (default Stokes-I unit if not set). | `0` (neutral — doesn't pin the loop) |
-| `SurfaceSIF(; SIF₀=nothing)` | Sun-induced fluorescence at the lower boundary. Adds isotropically to `j₀⁻[:, 1, :]`. | `0` (m=0 only) |
-| `BlackbodySource(temperature, spec_band; factor=π)` | Boundary/surface Planck emission at `T`. The `factor=π` default makes its `F₀` directly comparable to a unit `SolarBeam(F₀=1)`. | `0` (isotropic) |
-| `NoSource()` | Identity / no-op source. Use as an explicit "I disabled the source" marker. | `0` |
-| `SourceSet((s₁, s₂, ...))` | Tuple-typed composition. Built by `s₁ + s₂` operator. | `maximum(component_m_max.(sources, Ref(ctx)))` |
-| `ThermalEmission` | **Type stub only in v0.6**, not yet wired. The atmospheric volume Planck integral. Reserved name. | — |
-| `DiffuseBoundary` | **Type stub only**. Reserved for diffuse top-of-atmosphere or surface boundary sources. | — |
+`DiffuseBoundary` and `LidarPulse` are reserved extension types, not complete
+RT capabilities. Source AD traits describe an extension seam; they do not
+promise that all downstream tangent kernels exist.
 
-`SolarBeam → 0` is intentional — the trait aggregator takes a `max` over
-components, so `0` is "neutral, let surfaces/scatterers drive". An
-earlier draft used `typemax(Int)` and would have pinned every run to
-`user_l_cap`; that was a Codex-flagged bug fixed before Phase C landed.
+## Units and coordinates
 
-## Source-unit convention (v0.6)
+`SolarBeam.F₀` and prescribed `SurfaceSIF.SIF₀` are spectral irradiances.
+With inputs in mW per m² per cm⁻¹, output Stokes values are spectral radiances
+in mW per m² per sr per cm⁻¹. They are not dimensionless reflectances.
+`ThermalEmission.B_layer` and retrievable SIF amplitudes are already radiances.
+The source preparer converts retrievable SIF to hemispheric irradiance with π.
 
-All source intensities are in **mW · m⁻² · cm⁻¹**. `rt_run` output
-(reflectance / transmittance) is in **mW · m⁻² · sr⁻¹ · cm⁻¹**.
-`BlackbodySource` defaults `factor=π` so a unit Planck source is
-comparable to `SolarBeam(F₀=1)`.
+The wavelength coordinate in the `SIF755` form does not convert a spectral
+radiance density from per cm⁻¹ to per nm. That density conversion is a separate
+operation, and must be applied consistently to all sources and outputs.
 
-## Composability
+A nonzero retrievable SIF amplitude **or slope** requires an explicitly supplied,
+non-unit `SolarBeam.F₀` spectrum. The guard checks that a spectrum is supplied
+and is not identically one; the caller must supply the physically calibrated
+Fraunhofer structure. It does not validate calibration or spectral structure.
 
-```julia
-src1 = SolarBeam()
-src2 = SurfaceSIF()
-src3 = BlackbodySource(temperature=300.0, spec_band=1)
+## Composition limits
 
-# `+` flattens; no nested SourceSet
-combined = src1 + src2 + src3   # SourceSet((src1, src2, src3))
+`+` flattens source tuples, but the current solar extraction uses only the
+first beam. Do not compose two solar/blackbody beams; for the same geometry,
+sum their irradiance matrices into one `SolarBeam(F₀=F₁+F₂)`.
 
-# NoSource is identity
-combined + NoSource() == combined   # true
+Prescribed SIF on non-Lambertian surfaces currently reaches a no-op surface
+method. Treat that combination as unsupported, even if the solve completes.
+Strict-interior observers reject surface emission explicitly. Use the
+[full source guide](../../extending/sources.md) for the supported tangent and
+surface extension hooks.
 
-# Iteration order is deterministic (a Tuple, not a Set)
-for s in combined.sources
-    println(typeof(s).name.name)
-end
-```
+The main `rt_run` path ignores legacy `RS_type.SIF₀`; configure `SurfaceSIF`
+through `sources=`. Historical diagnostic entry points may retain the old field.
 
-`SourceSet` is materialized to a concrete `Tuple` at
-`model_from_parameters` time so the hot RT loop sees a fully
-type-stable iterable.
-
-## See also
-
-- [`docs/src/pages/extending/sources.md`](../../extending/sources.md) —
-  full architecture writeup (how to add a new source type)
-- [`docs/src/pages/release_notes.md`](../../release_notes.md) — v0.6
-  source-term refactor section
-- [`Schema/radiative_transfer.md`](radiative_transfer.md) — Fourier
-  loop bound interaction with source traits
+To change solar geometry, set `params.sza` before model construction or use
+`remake_geometry`. The `SolarBeam.sza` field has no numerical effect today.

@@ -37,7 +37,7 @@ default.
 # Fields
 - `F₀ :: Union{Nothing, AbstractMatrix}`: solar irradiance Stokes vector
   or `nothing` for the unit default. Stored without an `eltype`
-  constraint so users can pass a `Vector{Float32}` matrix into a
+  constraint so users can pass a `Matrix{Float32}` into a
   `Float64` model (or vice versa) — the conversion happens once in
   `prepare_source`.
 - `sza :: Union{Nothing, Real}`: **advisory only in v0.6.** vSmartMOM
@@ -57,7 +57,7 @@ provides the analytic `source_tangent!` body (relocated from
 
 ```julia
 sb = SolarBeam()                                   # default unit Stokes I
-sb = SolarBeam(; sza = 35.0)                       # override SZA
+sb = SolarBeam(; sza = 35.0)                       # reserved metadata; does not override model SZA
 sb = SolarBeam(; F₀ = my_solar_irradiance)         # custom spectrum
 ```
 """
@@ -156,9 +156,8 @@ end
 Return the `F₀` matrix carried by the first
 [`PreparedSolarBeam`](@ref) in `prepared` (a [`PreparedSolarBeam`](@ref),
 a `SourceSet` of prepared sources, or [`NoSource`](@ref)). When no
-`PreparedSolarBeam` is present, return the unit Stokes-I default — the
-same matrix today's `rt_run` would have allocated when
-`size(RS_type.F₀) != (pol_type.n, nSpec)`.
+`PreparedSolarBeam` is present, return zeros. The unit Stokes-I default
+comes from a default `SolarBeam()`, not from the absence of a beam.
 
 This helper is the Phase-2 bridge between the new source vocabulary and
 the legacy `RS_type.F₀` channel still consumed by the kernels. Phase 5

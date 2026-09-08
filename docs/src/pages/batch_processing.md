@@ -48,6 +48,8 @@ replay only the surface phase per BRDF — bit-exact against a monolithic
 
 ```julia
 using vSmartMOM
+using vSmartMOM.CoreRT
+using vSmartMOM.CoreRT: rpvSurfaceScalar
 
 params = read_parameters("config/lambertian_land.yaml")
 model  = model_from_parameters(params)
@@ -70,7 +72,7 @@ results = rt_run_multi_surface(model, surfaces)
 
 Each replay costs ~`1/Nz` of a full run. Scope: elastic (`noRS`), single
 band, non-canopy surfaces (guarded with `ArgumentError`). A cache built from
-a Lambertian-only model holds only the `m = 0` moment — pass non-Lambertian
+a Lambertian-only cache retains full diffuse operators only at `m = 0` — pass non-Lambertian
 BRDFs via `target_brdfs` so the cache is sized for them.
 
 ## Lambertian albedo sweeps and retrievals
@@ -106,6 +108,8 @@ for τ in (0.05, 0.1, 0.2, 0.5)
 end
 
 # Size distribution / refractive index — re-runs Mie for that aerosol only:
+using Distributions: LogNormal
+using vSmartMOM.Scattering: Aerosol
 new_aer = Aerosol(LogNormal(log(0.2), log(1.8)), 1.4, 1e-6)   # dist, nᵣ, nᵢ
 update_aerosol_microphysics!(ctx, 1, new_aer)
 R, T = rt_run(ctx.model)

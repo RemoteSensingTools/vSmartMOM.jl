@@ -70,8 +70,10 @@ model_PCW = make_mie_model(PCW(), aero, λ, Stokes_IQUV(), δBGE(20, 2.0), 30.0,
 ### 3. Parameter Selection Guide
 
 **`r_max`** — Upper bound for the size-distribution integral. Must cover the bulk of the
-distribution; truncating too low biases cross-sections. Use ``\sim 5\sigma \cdot r_m``
-for lognormal; check the info message about the fraction cut.
+distribution; truncating too low biases cross-sections. For a lognormal distribution, select a high distribution quantile
+and check convergence of extinction, SSA, and phase coefficients as the
+bound increases; a small omitted number fraction can still carry substantial
+cross section.
 
 **`nquad_radius`** — Gauss–Legendre points over ``[0, r_{\max}]``. More points → better
 accuracy for broad size distributions. Typical: 500–2000; narrow distributions need fewer.
@@ -137,10 +139,10 @@ approximates the forward peak and renormalizes, reducing the effective expansion
 **Truncation factor** ``f^t``: fraction of scattered energy moved to the "delta" term:
 ``f^t = 1 - c_0``, where ``c_0`` is the retained scattering fraction. The RT solver uses
 ``f^t`` to adjust the single-scattering albedo and phase function so that the truncated
-expansion matches the original phase function outside the exclusion cone ``\Delta_\theta``.
+expansion approximates the original phase function on the fitted domain.
 
-Larger ``\Delta_\mathrm{angle}`` → more of the peak is fitted → smaller ``f^t`` and
-fewer required streams. Typical: 1–3°.
+``Δ_angle`` is retired and forced to zero. Do not tune an exclusion cone;
+choose the stream/truncation order and validate the resulting phase/radiance.
 
 ---
 

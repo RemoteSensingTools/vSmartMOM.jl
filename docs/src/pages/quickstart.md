@@ -28,6 +28,12 @@ params.architecture = vSmartMOM.Architectures.CPU()
 
 ## Inspect The Output
 
+`R` is TOA upwelling radiance and `T` is BOA downwelling radiance. With
+unit incident irradiance they are radiances per unit irradiance, not
+dimensionless reflectance/transmittance. For unpolarized illumination, the
+TOA reflectance factor is `π .* R[:, 1, :] ./ (cosd(params.sza) .* F₀_I)`,
+where `F₀_I` is the incident Stokes-I spectrum, broadcast over views.
+
 `R` and `T` are three-dimensional arrays:
 
 ```julia

@@ -17,7 +17,8 @@ Use `read_parameters` as the user-facing entry point. It dispatches on the input
 
 The explicit aliases `parameters_from_file`, `parameters_from_dict`, and `parameters_from_source` remain available when code wants the call site to state the input kind. `parameters_from_yaml` is also supported for YAML files.
 
-- `read_atmos_profile(path|dict)` loads an atmospheric profile only.
+- `read_atmos_profile(path)` loads a YAML atmospheric profile;
+  `read_atmos_profile_dict(dict)` loads its profile block from memory.
 - Format registry: `IO.Formats` selects a loader based on source/extension (YAML and TOML supported).
 - Safe parsing: enums and types are parsed with explicit maps. Surfaces (BRDF) and spectral band ranges are parsed without `eval`.
 

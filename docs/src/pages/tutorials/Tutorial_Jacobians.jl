@@ -51,15 +51,16 @@ NAer  = isnothing(params.scattering_params) ? 0 : length(params.scattering_param
 NGas  = size(lin_model.τ̇_abs[1], 1)
 NSurf = 1
 
-R, T, dR, dT = rt_run_lin(model, lin_model, NAer, NGas, NSurf)
+result = rt_run_lin(model, lin_model, NAer, NGas, NSurf)
+R, T, dR, dT = result
 
 println("R  shape: ", size(R))
 println("dR shape: ", size(dR))
 
-# Plot the forward reflectance spectrum:
+# Plot the forward radiance spectrum:
 
 fig = Figure(size=(700, 400))
-ax = Axis(fig[1,1], xlabel="Spectral index", ylabel="TOA Reflectance (Stokes I)")
+ax = Axis(fig[1,1], xlabel="Spectral index", ylabel="TOA radiance (Stokes I)")
 lines!(ax, R[1, 1, :], label="Nadir")
 axislegend(ax, position=:rt)
 fig
@@ -77,8 +78,7 @@ fig
 #
 # For this test case:
 
-layout = CoreRT.ParameterLayout(aerosol_params=7, n_aerosols=NAer,
-                                n_gases=NGas, n_surface=NSurf)
+layout = result.layout
 Nparams = CoreRT.n_total(layout)
 println("Total Jacobian parameters: ", Nparams,
         " (NAer×7=", NAer*7, ", NGas=", NGas, ", NSurf=", NSurf, ")")
@@ -125,7 +125,7 @@ axislegend(ax, position=:rt)
 fig
 
 # The rendered docs use Plotly for the visible figure. The top panel shows the
-# forward reflectance; the bottom panel shows the `τ_ref` Jacobian for the same
+# forward radiance; the bottom panel shows the `τ_ref` Jacobian for the same
 # viewing angles.
 #
 # ```@raw html

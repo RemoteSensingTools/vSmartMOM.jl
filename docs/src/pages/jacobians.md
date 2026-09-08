@@ -137,6 +137,68 @@ The complete implementation contract, mappings, units, limitations, and
 finite-difference record are in
 [`docs/dev_notes/selective_jacobian_plans.md`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/docs/dev_notes/selective_jacobian_plans.md).
 
+## Instrument convolution and retrieval accuracy
+
+The RT Jacobian differentiates high-resolution radiance on the configured
+spectral grid. The retrieval must also differentiate its measurement operator.
+For a fixed linear convolution/resampling operator `C`, apply the **same**
+operator to every radiance and Jacobian column: `y = C*R`, `K_y = C*K_R`.
+Use the same grid ordering, boundary treatment, quadrature weights, and
+spectral-density units in both operations. Convolving reflectance and then
+multiplying by a sampled solar spectrum generally differs from convolving
+the physical radiance, especially across Fraunhofer lines.
+
+When a fitted shift, dispersion, or line-shape width changes `C`, the chain
+rule also contains its derivative:
+
+```math
+\frac{\partial y}{\partial x_j}
+= C(x)\frac{\partial R}{\partial x_j}
++ \frac{\partial C(x)}{\partial x_j}R(x).
+```
+
+Grid-coordinate changes may also change `R(x)` itself. State which grid is
+fixed when evaluating a derivative; avoid counting a shift twice. Validate
+the complete mapping from retrieval state to detector samples with centered
+finite differences, including shift and width columns. These operations live
+at the retrieval/instrument boundary, outside the RT kernels.
+
+For a precision comparison, retain two measurements: native Float32 versus
+Float64 grids (the operational difference), and identical physical grid
+locations in both runs (to isolate arithmetic error). Check high-resolution
+radiance, convolved radiance, convolved Jacobians, and converged retrievals.
+Lower spectral residuals alone do not establish a lower retrieval bias.
+
+“Noise sigma” means the measurement standard deviation used by the retrieval.
+It is neither a floating-point tolerance nor a line-shape width. For independent
+errors, report `(y_fast-y_reference) ./ sigma`; for correlated errors, whiten
+with the measurement covariance `S_e = L*L'`, giving `L \ delta_y`.
+A coherent model discrepancy is systematic even when every sample is smaller
+than one sigma.
+
+For the same observations and prior, define
+`delta_y = F_fast(x_reference)-F_reference(x_reference)`. The local
+Gauss–Newton estimate of the resulting state displacement is
+
+```math
+\delta x \approx
+-\left(K^T S_e^{-1}K + S_a^{-1}\right)^{-1}
+ K^T S_e^{-1}\delta y.
+```
+
+This is a linear estimate with a fixed Jacobian and prior; rerun the inversion
+to assess nonlinear convergence, changed stopping decisions, or fitted shifts.
+Report both the displacement in physical units and its size relative to the
+posterior uncertainty. The archived OCO precision/convolution experiments are
+in [the Jacobian investigation](https://github.com/RemoteSensingTools/vSmartMOM.jl/tree/main/docs/dev_notes/jacobian_batched);
+their acceptance thresholds and outcomes are fixture-specific.
+
+Analytic derivatives also hold the selected discrete representation fixed.
+Changing a Fourier ceiling, truncation support, quadrature, layer count, or
+adaptive stopping decision can introduce a discontinuity. Use fixed numerical
+settings for finite-difference validation, then assess any adaptive policy
+separately on the final retrieval.
+
 ## Interior-Height Jacobians
 
 Strict-interior observer heights are supported by the analytic elastic
@@ -220,7 +282,15 @@ Here `z₁` is the top atmospheric layer and `z_Nz` is the bottom layer. Gas
 VMR means dimensionless mole fraction; a derivative “per ppm” is therefore
 `1e-6 .* dR_dVMR`. Pressure, temperature, dry-air column, and absorption
 cross section are held fixed for a gas-VMR derivative. Surface-pressure
-derivatives are a separate state column.
+derivatives are a separate state column. **For ordinary line absorption that
+column currently holds pressure-dependent line cross sections fixed** and
+accounts for the changing molecular column. It therefore omits the line-shape
+pressure response present when rebuilding the forward model at a perturbed
+pressure. CIA/MT_CKD include their separate pressure-scaling terms, but their
+abundance derivatives are also incomplete. See the
+[absorption contract](IO/Schema/absorption.md). Treat the pressure column as
+this explicitly limited derivative, and validate a pressure-retrieving
+application against complete forward perturbations before relying on it.
 
 ```julia
 layout = result.layout

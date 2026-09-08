@@ -12,7 +12,7 @@ using vSmartMOM
 params = vSmartMOM.read_parameters(joinpath(pkgdir(vSmartMOM), "config", "quickstart.yaml"))
 model  = vSmartMOM.model_from_parameters(params)
 R, T   = vSmartMOM.rt_run(model)
-println("Reflectance shape: ", size(R))
+println("Radiance shape: ", size(R))
 
 # ## 2) From a Dict
 
@@ -39,7 +39,7 @@ cfg = Dict(
 params2 = vSmartMOM.read_parameters(cfg)
 model2  = vSmartMOM.model_from_parameters(params2)
 R2, T2  = vSmartMOM.rt_run(model2)
-println("Dict-based reflectance shape: ", size(R2))
+println("Dict-based radiance shape: ", size(R2))
 
 # ## Mandatory vs optional
 # Mandatory top-level sections: `radiative_transfer`, `geometry`, `atmospheric_profile`.

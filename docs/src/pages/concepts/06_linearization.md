@@ -97,11 +97,11 @@ The split has three benefits:
 
 1. **The hot loop stays pure-`FT`.** No `Dual{T,V,N}` arithmetic in the
    inner kernels — those would multiply work by `1+N`.
-2. **Analytic derivatives are numerically stable** through batched matrix
+2. **The inverse derivative reuses forward work** through batched matrix
    inversion. ForwardDiff through `batch_inv!` works (and is supported on
    GPU), but the analytic chain rule on `(E − R·R)⁻¹` is closed-form
-   ``\partial A^{-1} = -A^{-1}\,\partial A\,A^{-1}`` and avoids accumulating
-   AD round-off.
+   ``\partial A^{-1} = -A^{-1}\,\partial A\,A^{-1}`` and reuses the computed inverse. This does not by itself establish an
+   accuracy advantage over AD implementing the same identity.
 3. **The chain rule on adding-doubling is closed-form.** Sanghavi 2014
    App. C derives compact expressions for the tangent-linear adding/doubling
    updates. They're roughly the same shape as the forward updates — same
@@ -236,7 +236,7 @@ The full derivation is Sanghavi 2014 App. C. The structure (skipping arithmetic)
 | (C.27)–(C.31) | δ derivatives (elemental thickness from `N_doubl`) | `compEffectiveLayerProperties_lin.jl` |
 | (C.32)–(C.39) | ``\bar{\varpi}_0`` and ``\bar{\mathbf{Z}}`` derivatives (post-truncation) | same |
 | (C.40) | ``\dot{\mathbf{Z}}_m`` from generalized spherical harmonics | `compute_Z_matrices_lin.jl` |
-| (C.41)–(C.42) | ``\dot{\beta}^*`` and ``\dot{\mathbf{B}}_l^*`` for the truncated case | `delta_m_truncation_lin.jl` |
+| (C.41)–(C.42) | ``\dot{\beta}^*`` and ``\dot{\mathbf{B}}_l^*`` for the truncated case | `delta_m_truncation.jl` |
 
 The `_lin.jl` files in `src/CoreRT/CoreKernel/` are tangent-linear partners
 of `elemental.jl`, `doubling.jl`, `interaction.jl`. Each forward kernel has
@@ -294,25 +294,22 @@ new parameters):
 
 | Parameter | Recommended path | Reason |
 |---|---|---|
-| Lambertian albedo | analytic | trivial: ``\partial r/\partial \rho = 1/\pi`` |
-| RPV / Ross-Li / Cox-Munk BRDF | ForwardDiff | low-dimensional, simple surface code |
-| `τ_ref` (aerosol OD) | analytic | trivial: ``\partial \tau/\partial \tau_\mathrm{ref} = \tau/\tau_\mathrm{ref}`` |
-| profile location/width (`p₀, σ_p` or `z₀, σ₀`) | analytic | already in `atmo_prof_lin.jl` |
-| `n_r, n_i` (refractive index) | analytic Mie | Mie series is AD-hostile (recurrences) |
-| `μ_logr, σ_logr` (size distribution) | analytic Mie | same |
-| Gas VMR scaling | analytic | ``\partial \tau_\mathrm{abs}/\partial \mathrm{VMR} = \sigma`` |
-| Surface pressure | ForwardDiff | affects many code paths (Rayleigh, profile, absorption) |
-| Temperature profile | ForwardDiff (future) | affects absorption cross-sections nonlinearly |
+| Lambertian albedo | analytic | surface BRDF derivative `1/π`; full radiance derivative includes atmospheric coupling |
+| Cox-Munk wind | analytic | includes Fourier and exact direct-glint derivatives |
+| RPV / Ross-Li | forward surface models | complete parameter tangents are not supplied by a generic AD switch |
+| `τ_ref` (aerosol OD) | analytic | fixed-microphysics loading response |
+| profile location/width | analytic | physical profile coordinates; see `atmo_prof_lin.jl` |
+| `n_r, n_i, μ_logr, σ_logr` | hand-linearized Mie | `compute_aerosol_optical_properties(LinMode(), model, FT)` |
+| Gas VMR | analytic line-absorption scaling | `∂τ_abs/∂VMR = σ*N_dry`; CIA/continuum abundance response is incomplete |
+| Surface pressure | analytic profile/column response | ordinary line cross sections are held fixed; pressure broadening is omitted |
+| Temperature profile | future extension | no general end-to-end temperature Jacobian |
 
-For parameters in the "ForwardDiff" rows, the *upstream* code carries
-`Dual{T,V,N}` numbers; the resulting `CoreScatteringOpticalPropertiesLin`
-arrays are real-valued (the Dual partials having been extracted at the
-boundary) and the analytic RT chain rule takes over. This is the
-**hybrid AD** pattern from [Concepts/07](07_architecture.md), and it's why
-ForwardDiff Duals need to flow through `batched_mul` and `batch_inv!` on
-GPU — both for the upstream Mie/profile/surface code (when the user picks
-ForwardDiff for those) and for forward-mode AD of higher-level functions
-involving `rt_run`.
+A new upstream AD implementation can populate the optical-property tangent
+boundary, but it must propagate every dependency and validate its coordinates
+against complete forward perturbations. CUDA Dual-array algebra is a separate
+capability; the production analytic RT path does not need Dual numbers in its
+kernels. See the [Jacobian guide](../jacobians.md) for pressure limitations,
+instrument convolution, and retrieval-level validation.
 
 ## Code anchors
 
@@ -331,7 +328,7 @@ involving `rt_run`.
 | ParameterLayout | [`src/CoreRT/parameter_layout.jl:1–67`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/parameter_layout.jl#L1-L67) |
 | Mie linearization (analytic) | [`src/Scattering/types_lin.jl`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/Scattering/types_lin.jl) |
 | Linearized atmospheric profile | [`src/CoreRT/tools/atmo_prof_lin.jl`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/tools/atmo_prof_lin.jl) |
-| Linearized δ-M truncation | [`src/CoreRT/LayerOpticalProperties/delta_m_truncation_lin.jl`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/LayerOpticalProperties/delta_m_truncation_lin.jl) |
+| Linearized δ-M truncation | [`src/CoreRT/LayerOpticalProperties/delta_m_truncation.jl`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/LayerOpticalProperties/delta_m_truncation.jl) |
 | Linearized Cox-Munk | [`src/CoreRT/Surfaces/coxmunk_surface_lin.jl`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/Surfaces/coxmunk_surface_lin.jl) |
 
 See also [User Guide → Compute Jacobians](../jacobians.md) for the runnable

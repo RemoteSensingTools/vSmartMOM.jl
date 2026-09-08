@@ -128,7 +128,7 @@ function _quickstart_plot()
     data = [
         (;
             type = "bar",
-            x = ["TOA reflectance R"],
+            x = ["TOA radiance R"],
             y = Float64[R[1, 1, 1]],
             marker = (; color = ["#2563eb"]),
             hovertemplate = "%{x}<br>Stokes I=%{y:.6f}<extra></extra>",
@@ -187,7 +187,7 @@ function _core_rt_vza_plot()
         title = (; text = "Pure-Rayleigh Reflectance by Viewing Angle", x = 0.02),
         margin = (; l = 60, r = 20, t = 78, b = 92),
         xaxis = (; title = "Signed viewing zenith angle (deg)"),
-        yaxis = (; title = "TOA reflectance", zeroline = true),
+        yaxis = (; title = "TOA radiance", zeroline = true),
         legend = _bottom_legend(),
         paper_bgcolor = "#ffffff",
         plot_bgcolor = "#ffffff",
@@ -399,7 +399,7 @@ function _absorption_temperature_plot()
         ),
     ]
     layout = (;
-        title = (; text = "Temperature Redistribution Across a CO2 Band", x = 0.02),
+        title = (; text = "Illustrative Temperature Redistribution (synthetic lines)", x = 0.02),
         margin = (; l = 64, r = 20, t = 78, b = 96),
         xaxis = (; title = "Wavenumber (cm^-1)"),
         yaxis = (; title = "Normalized cross section", domain = [0.48, 1.0]),
@@ -479,7 +479,7 @@ function _jacobian_aod_plot()
         title = (; text = "Aerosol Optical Depth Jacobian", x = 0.02),
         margin = (; l = 72, r = 20, t = 78, b = 104),
         xaxis = (; title = "Spectral grid index"),
-        yaxis = (; title = "TOA reflectance", domain = [0.54, 1.0]),
+        yaxis = (; title = "TOA radiance", domain = [0.54, 1.0]),
         yaxis2 = (; title = "dR_I / dtau_ref", domain = [0.0, 0.34], zeroline = true),
         legend = _bottom_legend(),
         paper_bgcolor = "#ffffff",
@@ -502,7 +502,7 @@ function _surface_brdf_plot()
         (; type = "scatter", mode = "lines", name = "Cox-Munk glint", x = vza, y = coxmunk, line = (; color = "#f59e0b", width = 3)),
     ]
     layout = (;
-        title = (; text = "Surface BRDF Angular Slices", x = 0.02),
+        title = (; text = "Illustrative Surface Angular Shapes (synthetic)", x = 0.02),
         margin = (; l = 64, r = 20, t = 78, b = 96),
         xaxis = (; title = "Signed view zenith angle (deg)"),
         yaxis = (; title = "Relative BRDF / reflectance"),
@@ -523,11 +523,11 @@ function _canopy_spectral_plot()
     data = [
         (; type = "scatter", mode = "lines", name = "Leaf reflectance", x = λ, y = leaf_reflectance, line = (; color = "#16a34a", width = 3)),
         (; type = "scatter", mode = "lines", name = "Leaf transmittance", x = λ, y = leaf_transmittance, line = (; color = "#65a30d", width = 3, dash = "dash")),
-        (; type = "scatter", mode = "lines", name = "Canopy TOA response", x = λ, y = canopy_toa, line = (; color = "#2563eb", width = 3)),
+        (; type = "scatter", mode = "lines", name = "Illustrative canopy response", x = λ, y = canopy_toa, line = (; color = "#2563eb", width = 3)),
         (; type = "scatter", mode = "lines", name = "Bare soil", x = λ, y = bare_soil, line = (; color = "#92400e", width = 3)),
     ]
     layout = (;
-        title = (; text = "Canopy Red-Edge Response", x = 0.02),
+        title = (; text = "Illustrative Red Edge (synthetic curves)", x = 0.02),
         margin = (; l = 64, r = 20, t = 78, b = 96),
         xaxis = (; title = "Wavelength (nm)"),
         yaxis = (; title = "Reflectance / transmittance", range = [0, 0.55]),

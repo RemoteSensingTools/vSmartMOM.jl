@@ -155,6 +155,16 @@ Float64-widened regardless of precision policy (see `test/local/gpu/test_mie_gpu
   dispatch. The internal standalone `Absorption` module is legacy-only and will
   be removed; do not use its GPU Voigt kernel for new work.
 
+### Metal absorption boundary
+
+The package's AtmosphericAbsorption architecture adapter currently defines
+CPU and CUDA methods only (`CoreRT._to_aa_arch`). There is no corresponding
+Metal adapter in `vSmartMOMMetalExt`. Consequently the production absorption
+construction paths that use this adapter are not supported on Metal yet.
+Do not interpret portable RT/Mie kernels as validated end-to-end Metal gas
+retrieval support. Use CPU or CUDA for those scenes until the adapter and
+its forward/linearized tests are implemented and run on Apple hardware.
+
 ## Batched caller-node Mie seam (exact-`nmax` grouping)
 
 For many-ensemble columns (e.g. GCHPIO's per-layer TOMAS size-distribution

@@ -18,6 +18,7 @@ This tutorial shows the standard Mie workflow in `vSmartMOM.Scattering`:
 ### Load packages
 
 ```julia
+using vSmartMOM
 using vSmartMOM.Scattering
 using Distributions
 using FastGaussQuadrature
@@ -159,15 +160,15 @@ fig
 
 ---
 
-### AD mode
+### Analytic Mie Jacobians
 
-`autodiff=true` returns one `AerosolOptics` object.
-The Jacobian is stored in `derivs` with columns corresponding to:
-`[rₘ, σ, nᵣ, nᵢ]`.
+`LinMode()` returns forward and linearized optics. The native columns are
+`[nᵣ, nᵢ, μ_logr, σ_logr]`; the historical `autodiff=true` wrapper is retired.
 
 ```julia
-aerosol_optics_ad = compute_aerosol_optical_properties(model_NAI2; autodiff=true)
-println("AD derivs size: ", size(aerosol_optics_ad.derivs))
+aerosol_optics, aerosol_optics_lin = compute_aerosol_optical_properties(
+    vSmartMOM.LinMode(), model_NAI2, Float64)
+println("SSA derivative shape: ", size(aerosol_optics_lin.ω̃̇))
 ```
 
 ---

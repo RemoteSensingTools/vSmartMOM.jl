@@ -33,8 +33,8 @@ R, T = rt_run(model)
 
 ## 4) Interpret results
 
-- **R** = reflectance at top-of-atmosphere (TOA) `[nVZA × nStokes × nSpec]`
-- **T** = transmittance at bottom-of-atmosphere (BOA)
+- **R** = upwelling radiance at top-of-atmosphere (TOA) `[nVZA × nStokes × nSpec]`
+- **T** = downwelling radiance at bottom-of-atmosphere (BOA)
 
 Dimensions: view zenith angles × Stokes components (I,Q,U,V) × spectral points.
 

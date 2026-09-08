@@ -97,10 +97,11 @@ weights ``I, Q`` by ``\cos(m \, \Delta\varphi)`` and ``U, V`` by
 ``\sin(m \, \Delta\varphi)`` for each Fourier moment ``m``. This is the
 de Haan–Bosma–Hovenier (1987) convention.
 
-Consequence: at ``Δφ = 0°`` (and ``180°``), ``\sin(m \, \Delta\varphi) = 0``
+For a mirror-symmetric atmosphere and surface with unpolarized illumination,
+at ``Δφ = 0°`` (and ``180°``), ``\sin(m \, \Delta\varphi) = 0``
 for all ``m``, so **U and V are identically zero in the principal plane
-under this convention**. If a comparison code reports non-zero U/V at the
-principal plane, it is using a different rotation convention.
+under this convention**. For more general incident polarization or a symmetry-breaking medium,
+nonzero principal-plane U/V need not be a convention error.
 
 ---
 
@@ -131,9 +132,10 @@ existing test reference files.
 
 ### 4.2 Stokes Q, U, V signs
 
-Because vSmartMOM and VLIDORT use opposite γ sign conventions internally,
-**Q, U, AND V come out with opposite signs** when you compare a
-vSmartMOM run to a VLIDORT-produced reference table.
+For the VLIDORT reference drivers and saved tables used by this repository,
+the validated comparison applies opposite signs to Q, U, and V. This is a
+contract for those fixtures; check the full phase-matrix and reference-plane
+definitions before applying it to another driver or dataset.
 
 When validating against a VLIDORT-format truth (e.g.
 `results_solar_tester_IQU0.all`, `results_Siewert2000_validation.all`),

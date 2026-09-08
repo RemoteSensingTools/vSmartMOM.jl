@@ -93,12 +93,12 @@ r^{-+}_{ij}
 
 ```math
 t^{++}_{ij} = \varpi_\lambda\,Z^{++}_{ij}\,\frac{\mu_j}{\mu_i-\mu_j}\,w_j\,\bigl[e^{-\delta\tau/\mu_i} - e^{-\delta\tau/\mu_j}\bigr]
-\qquad (i \ne j)
+\qquad (\mu_i \ne \mu_j)
 ```
 
 ```math
-t^{++}_{ii} = e^{-\delta\tau/\mu_i}\,\Bigl[1 + \varpi_\lambda\,Z^{++}_{ii}\,\frac{\delta\tau}{\mu_i}\,w_i\Bigr]
-\qquad (i = j,\ \text{L'Hôpital limit}).
+t^{++}_{ij} = e^{-\delta\tau/\mu_i}\,\Bigl[\delta_{ij} + \varpi_\lambda\,Z^{++}_{ij}\,\frac{\delta\tau}{\mu_i}\,w_j\Bigr]
+\qquad (\mu_i = \mu_j,\ \text{L'Hôpital limit}).
 ```
 
 These two forms agree as ``\delta \to 0``. For finite ``\delta`` they don't,
@@ -121,8 +121,9 @@ r⁻⁺[i,j,n] = ϖ_λ[n] * Z⁻⁺[i,j,n2] *
              -expm1(-dτ_λ[n] * (1/μ[i] + 1/μ[j]))   # 1 - exp(-x), stable
 
 if μ[i] == μ[j]
+    # Distinct Stokes components can share the same directional cosine.
     t⁺⁺[i,j,n] = exp(-dτ_λ[n]/μ[i]) *
-                 (1 + ϖ_λ[n] * Z⁺⁺[i,i,n2] * (dτ_λ[n]/μ[i]) * wct[i])
+                 ((i == j) + ϖ_λ[n] * Z⁺⁺[i,j,n2] * (dτ_λ[n]/μ[i]) * wct[j])
 else
     t⁺⁺[i,j,n] = ϖ_λ[n] * Z⁺⁺[i,j,n2] *
                  (μ[j] / (μ[i] - μ[j])) * wct[j] *
@@ -196,7 +197,7 @@ end
 end
 ```
 
-The operator `⊠ = NNlib.batched_mul` is batched over the spectral axis. One
+The operator `⊠ = CoreRT.batched_mul` is batched over the spectral axis. One
 call covers all wavelengths.
 
 After ``N_\mathrm{doubl}`` iterations, the layer thickness is ``2^{N_\mathrm{doubl}}\,\delta\tau``.

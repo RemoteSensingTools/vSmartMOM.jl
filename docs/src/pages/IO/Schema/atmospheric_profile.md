@@ -59,12 +59,14 @@ For real GEOSChem outputs, use the high-level reader rather than YAML:
 
 ```julia
 using vSmartMOM
-src = vSmartMOM.GeosChemSource("/path/to/geoschem.nc4")
-profile = vSmartMOM.IO.read_atmosphere(src; level_lon=120, level_lat=30)
+src = vSmartMOM.GeosChemSource("/path/to/geoschem.nc4", 10, 20, 1) # x, y, face indices
+config = vSmartMOM.geoschem_to_dict(src)
+profile = vSmartMOM.read_atmos_profile_dict(config["atmospheric_profile"])
 ```
 
-The reader produces an `AtmosphericProfile` directly; bypass the YAML
-`atmospheric_profile` block when using it.
+`geoschem_to_dict` returns a complete configuration dictionary.
+`read_atmos_profile_dict` converts its profile block to an `AtmosphericProfile`;
+use `read_parameters(src)` when building a complete RT scene.
 
 ## See also
 

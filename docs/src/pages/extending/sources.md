@@ -1,8 +1,7 @@
 # Source terms
 
 `vSmartMOM` v0.6 introduces a first-class **source-term** abstraction.
-Solar beams, surface fluorescence, and (in the near future) thermal
-emission and lidar pulses are all concrete subtypes of
+Solar beams, surface fluorescence, atmospheric thermal emission, and future lidar pulses are all concrete subtypes of
 `AbstractSource`, composed via `+`, and dispatched per layer through
 multiple dispatch — no `if SFI` branching, no `RS_type.F₀`/`RS_type.SIF₀`
 ownership leak.
@@ -23,7 +22,7 @@ that explicit at the type level.
 using vSmartMOM
 using vSmartMOM.CoreRT
 
-params = parameters_from_yaml("config/o2_a_band.yaml")
+params = read_parameters(joinpath(pkgdir(vSmartMOM), "config", "quickstart.yaml"))
 model  = model_from_parameters(params)
 
 # Default — RTModel.sources defaults to a SolarBeam (unit Stokes I irradiance).
@@ -37,7 +36,7 @@ R, T = rt_run(model; sources = SolarBeam() + SurfaceSIF(SIF₀ = sif_spec))
 
 # Thermal-IR / Carbon-I-style scene (1500 K blackbody source at 2-2.4 µm).
 spec_band = collect(model.atmosphere.spec_bands[1])   # cm⁻¹
-sources   = BlackbodySource(1500, spec_band)          # SolarBeam with Planck F₀
+sources   = BlackbodySource(1500, spec_band; pol_n=params.polarization_type.n)          # SolarBeam with Planck F₀
 R, T = rt_run(model; sources = sources)
 ```
 
@@ -71,7 +70,7 @@ source kernels is type-stable on both CPU and GPU.
 |-------------------|--------------------------------------------|-------------------------------------------------------|
 | `NoSource`        | nowhere                                    | identity for source composition                       |
 | `SolarBeam`       | atmospheric layer `j₀±` per Fourier moment | exact finite-δ single-scatter (Fell 1997 Eqs. 1.52-1.54) |
-| `BlackbodySource` | atmospheric layer `j₀±`                    | sugar around `SolarBeam` with `F₀ = factor · π · B(ν, T)` |
+| `BlackbodySource` | atmospheric layer `j₀±`                    | sugar around `SolarBeam` with `F₀ = factor · scale · B(ν, T)` |
 | `SurfaceSIF`      | surface layer `j₀⁻` at m=0                 | factor-2 broadcast across Nquad streams (Lambertian only) |
 
 `BlackbodySource(T, spec_band)` is a constructor that returns a
@@ -101,9 +100,13 @@ to a `SolarBeam(F₀ = 1)` baseline.
 
 For retrievals, `SurfaceSIF(SIF755=..., slope=..., wavelength_nm=...)`
 uses `L_SIF(λ) = SIF755 + slope*(λ_nm-755)`. These two values are
-state-vector parameters in radiance units. A nonzero `SIF755` requires an
+state-vector parameters in radiance units. A nonzero SIF amplitude or slope requires an
 explicit non-unit Fraunhofer spectrum in `SolarBeam(F₀=...)`; the unit default
-is rejected because it cannot establish physical radiance units.
+is rejected. This checks for supplied non-unit irradiance; it does not validate
+calibration or Fraunhofer structure. The modern OCO parameterization uses
+`SIF760`, `mSIF`, and `wavenumber_cm1`; see the
+[source configuration reference](../IO/Schema/sources.md) for both coordinate
+conventions, units, and current composition restrictions.
 
 ## Differentiation
 
@@ -188,7 +191,7 @@ handled:
 | `PreparedSourceSet`   | any                     | iterate                                |
 | `PreparedSolarBeam`   | any                     | (currently in `create_surface_layer!`; will move to dispatch in a later sub-phase) |
 | `PreparedSurfaceSIF`  | `LambertianSurface*`    | factor-2 SIF₀ broadcast (m=0 only)     |
-| `PreparedSurfaceSIF`  | non-Lambertian          | no-op                                  |
+| `PreparedSurfaceSIF`  | non-Lambertian          | unsupported combination; currently no-op                                  |
 
 ## Architecture invariants
 
@@ -212,7 +215,7 @@ handled:
 - [`src/CoreRT/Sources/solar_beam.jl`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/Sources/solar_beam.jl) — `SolarBeam`, `PreparedSolarBeam`, `BlackbodySource`, `source_tangent!`.
 - [`src/CoreRT/Sources/surface_sif.jl`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/Sources/surface_sif.jl) — `SurfaceSIF`, `surface_source_contribute!`.
 - [`test/test_sources.jl`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/test/test_sources.jl) — per-phase regression tests with end-to-end bit-equality assertions.
-- The original v0.6 design note: [`dev_notes/source_terms_architecture_v0_6.md`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/dev_notes/source_terms_architecture_v0_6.md).
+- The original v0.6 design note: [`dev_notes/source_terms_architecture_v0_6.md`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/docs/dev_notes/source_terms_architecture_v0_6.md).
 
 ## API reference
 

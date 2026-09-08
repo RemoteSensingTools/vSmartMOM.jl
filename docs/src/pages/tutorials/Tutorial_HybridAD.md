@@ -66,7 +66,8 @@ Run linearized RT: returns (R, T, dR, dT)
 NAer  = length(params.scattering_params.rt_aerosols)
 NGas  = size(lin_model.τ̇_abs[1], 1)
 NSurf = 1
-R_cpu, T_cpu, dR_cpu, dT_cpu = rt_run_lin(model, lin_model, NAer, NGas, NSurf)
+result_cpu = rt_run_lin(model, lin_model, NAer, NGas, NSurf)
+R_cpu, T_cpu, dR_cpu, dT_cpu = result_cpu
 
 println("R  shape: ", size(R_cpu), "  (nVZA × nStokes × nSpec)")
 println("dR shape: ", size(dR_cpu), "  (nVZA × nStokes × nSpec × nParams)")
@@ -79,18 +80,17 @@ surface pressure comes first, then each aerosol gets 7 sub-parameters,
 followed by gas VMRs and surface parameters.
 
 ```julia
-layout = CoreRT.ParameterLayout(aerosol_params=7, n_aerosols=NAer,
-                                 n_gases=NGas, n_surface=NSurf)
+layout = result_cpu.layout
 
 println("\nParameter layout:")
 println("  Total parameters: ", CoreRT.n_total(layout))
 println("  Surface pressure: index ", CoreRT.psurf_index(layout))
 for ia in 1:NAer
     rng = CoreRT.aerosol_range(layout, ia)
-    println("  Aerosol $ia: indices $rng  [τ_ref, nᵣ, nᵢ, rₘ, σ_g, p₀, σ_p]")
+    println("  Aerosol $ia: indices $rng  [τ_ref, nᵣ, nᵢ, μ_logr, σ_logr, profile location, profile width]")
 end
 if NGas > 0
-    Nz = length(model_cpu.profile.p_full)
+    Nz = length(model.profile.p_full)
     println("  Gas 1 VMR profile: indices ", CoreRT.gas_profile_range(layout, 1, Nz))
 end
 println("  Surface:   indices ", CoreRT.surface_range(layout))
@@ -140,12 +140,12 @@ else
 end
 ```
 
-## 5) ForwardDiff for Mie Optical Properties
+## 5) Analytic Mie Optical Properties
 
-The Mie code supports ForwardDiff through
-`compute_aerosol_optical_properties(model; autodiff=true)`.
-This wraps the NAI2 computation in `ForwardDiff.jacobian` with respect
-to the 4 Mie-sensitive parameters [rₘ, σ, nᵣ, nᵢ].
+The production Mie Jacobians use the hand-linearized `LinMode()` path.
+The historical `autodiff=true` wrapper is retired and throws an error.
+Upstream AD remains an extension mechanism; it is not a supported switch
+on this Mie entry point.
 
 ```julia
 using vSmartMOM.Scattering
@@ -176,18 +176,12 @@ aer_optics_analytic, lin_aer_optics = compute_aerosol_optical_properties(
 
 println("\nAnalytic Mie derivatives:")
 println("  ω̃  = ", round(aer_optics_analytic.ω̃, digits=6))
-println("  dω̃/d[nᵣ,nᵢ,rₘ,σ] = ", round.(lin_aer_optics.ω̃̇, digits=6))
+println("  dω̃/d[nᵣ,nᵢ,μ_logr,σ_logr] = ", round.(lin_aer_optics.ω̃̇, digits=6))
 ```
 
-ForwardDiff derivatives (for validation / custom parameters)
-
-```julia
-aer_optics_ad = compute_aerosol_optical_properties(mie_model; autodiff=true)
-
-println("\nForwardDiff Mie derivatives stored in AerosolOptics.derivs:")
-println("  derivs shape: ", size(aer_optics_ad.derivs))
-println("  (rows = flattened [α;β;γ;δ;ϵ;ζ;ω̃;k], cols = [rₘ,σ,nᵣ,nᵢ])")
-```
+The four native derivative columns are `[nᵣ, nᵢ, μ_logr, σ_logr]`.
+Divide the last two by the median radius and geometric width to obtain
+derivatives with respect to those physical input coordinates.
 
 ## 6) The δ-M Truncation Chain Rule
 
@@ -232,9 +226,9 @@ The hybrid AD architecture gives you flexibility:
 | Component | Method | Why |
 |:----------|:-------|:----|
 | RT kernels | Analytic (linearized adding-doubling) | Performance, GPU, batched matmul |
-| Mie optics | Analytic (keep for speed) or ForwardDiff (for validation) | Mie series is AD-hostile |
+| Mie optics | Hand-linearized `LinMode()` | Supported production path |
 | Surface albedo | Analytic (trivial) | Simple scalar derivative |
-| Surface pressure | ForwardDiff (planned) | Affects many paths simultaneously |
+| Surface pressure | Analytic profile/column response | Ordinary line cross sections are held fixed; see the Jacobian guide |
 | Gas VMR | Analytic (trivial: ∂τ_abs/∂VMR = cross_section) | Simple scaling |
 | Aerosol profiles | Analytic | Already validated in atmo_prof_lin.jl |
 

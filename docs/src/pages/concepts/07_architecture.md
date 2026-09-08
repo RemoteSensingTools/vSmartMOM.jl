@@ -232,8 +232,10 @@ the array type. Adding a fourth backend (e.g. ROCm/AMD) would mean writing
 
 ## ForwardDiff Duals through the GPU path
 
-The hybrid AD story (Concepts/06) requires ForwardDiff `Dual` numbers to flow
-through `batched_mul` on `CuArray`. That's set up in
+The CUDA batched algebra also supports ForwardDiff `Dual` arrays for callers
+that need them. This is separate from the production analytic RT tangent
+path, which propagates plain floating-point values and derivative arrays.
+The overload is defined in
 [`ext/gpu_batched_cuda.jl:141–177`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/ext/gpu_batched_cuda.jl#L141-L177):
 
 ```julia
@@ -260,8 +262,9 @@ Both the value slab and each partial slab are batched-mul'd on GPU; nothing
 goes back to host until the final result. The same overload is provided for
 `batch_inv!` using the matrix identity ``\partial A^{-1}/\partial x = -A^{-1}(\partial A/\partial x)A^{-1}``.
 
-This is what lets aerosol microphysics derivatives propagate through a GPU
-RT solve and come back as Jacobian columns without manual handling.
+Production aerosol microphysics derivatives use the hand-linearized Mie
+`LinMode()` path and are handed to the analytic RT kernels as ordinary arrays.
+The retired Mie `autodiff=true` wrapper is not enabled by these CUDA overloads.
 
 ## Allocation pattern
 

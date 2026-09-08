@@ -63,7 +63,7 @@ OPTICS       │ Gas opacity  │    │ Scattering (Rayleigh+aerosol)│
                   CoreScatteringOpticalProperties)
                 • δ-M truncation (forward-peak removal)
                 • Add gas absorption to total τ
-                • Vertical concatenation of layers   (operator *)
+                • Concatenation of spectral bands   (operator *)
                 → Vector{CoreScatteringOpticalProperties}, one per layer
                 │
                 ▼
@@ -88,7 +88,7 @@ LINEARIZE    Each operator (elemental/doubling/interaction) has an EXACT
              ParameterLayout names the Jacobian columns.
                 │
                 ▼
-EVERYWHERE   ONE source tree, three GPU backends. Kernels written once with
+EVERYWHERE   ONE source tree, three execution backends (CPU, CUDA, Metal). Kernels written once with
 ON ANY       KernelAbstractions @kernel. CUDA / Metal injected via Julia 1.9+
 HARDWARE     package extensions. ALL WAVELENGTHS PROCESSED IN PARALLEL: the
              third array dim is spectral; batched_mul broadcasts over it.
@@ -136,9 +136,9 @@ material when explaining the package:
 
 1. **Operator-level analytic linearization.** The RT kernel is hand-differentiated; AD is upstream-only. Forward inverses are reused for all requested Jacobian columns. A compact local optical basis is doubled independently of retrieval size; complete doubled tangents are contracted before adding. Default matrix adding still grows with active parameter count. Opt-in `jacobian_adding=:source` carries only source vectors through solar/Lambertian endpoint adding; it retains local layer tangents for a backward illumination pass. Cost depends on operator size, spectral batch and backend. The development target of <2× forward concerns the full solve from supplied core optics, excluding upstream Mie/mixing; benchmark the tangent basis explicitly and do not present the target as a measured guarantee. Small GPU operators batch product rules over wavelength × parameter, and doubling/general interaction reuse scratch. — `src/CoreRT/CoreKernel/{elemental,doubling,interaction}_lin.jl`, `src/CoreRT/CoreKernel/jacobian_batched.jl`. See `docs/src/pages/concepts/06_linearization.md` § "Why this is fast".
 2. **One `@kernel` source compiles for CPU, CUDA, and Metal.** — `src/Architectures.jl:33–96`, `ext/vSmartMOMCUDAExt.jl:21–27`, `ext/vSmartMOMMetalExt.jl:19–22`.
-3. **Hybrid AD across the GPU boundary.** `ForwardDiff.Dual` flows through `NNlib.batched_mul` on `CuArray`. — `ext/gpu_batched_cuda.jl:141–177`.
+3. **Hybrid AD across the GPU boundary.** `ForwardDiff.Dual` flows through the package-owned `CoreRT.batched_mul` on `CuArray`. — `ext/gpu_batched_cuda.jl:141–177`.
 4. **Polarization is a type, not a runtime branch.** `Stokes_I/IQ/IQU/IQUV` specialize the kernels at compile time. — `src/Scattering/types.jl:92–143`.
-5. **Optical properties as algebra.** `+` mixes scatterers; `*` stacks layers. — `src/CoreRT/types.jl:1063–1101`.
+5. **Optical properties as algebra.** `+` mixes scatterers; `*` concatenates spectral bands. — `src/CoreRT/types.jl:1063–1101`.
 6. **GPU package extensions.** CPU execution works without a CUDA device; CUDA is currently a direct dependency and Metal is optional. — `ext/vSmartMOMCUDAExt.jl`.
 7. **Three `(τ, ϖ, Z)` core variables per layer.** RT kernel differentiates against these directly. — `src/CoreRT/types_lin.jl:119–149`.
 8. **Exact finite-δ elemental** (point #1 above). — `src/CoreRT/CoreKernel/elemental.jl:207–252`.
@@ -263,7 +263,7 @@ julia --project=. -e '
   params = parameters_from_yaml("config/ocean_coxmunk.yaml")
   model, lin_model = model_from_parameters(LinMode(), params)
   NAer = length(params.scattering_params.rt_aerosols)
-  NGas = size(lin_model.tau_dot_abs[1], 1)
+  NGas = size(lin_model.τ̇_abs[1], 1)
   R, T, dR, dT = rt_run(model, lin_model, NAer, NGas, 1)
 '
 
