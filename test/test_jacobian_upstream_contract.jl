@@ -12,13 +12,15 @@ end
 CoreRT.requires_aerosol_microphysics_jacobians(::_ContractFlavor) = false
 CoreRT.jacobian_plan(::_ContractFlavor, params, model, lin) = _contract_plan([3])
 @testset "Selected derivatives require upstream availability" begin
-    validate(columns; micro=false, h2o=false) = CoreRT._validate_plan_upstream(
+    validate(columns; micro=false, h2o=false, pressure=true) = CoreRT._validate_plan_upstream(
         _contract_plan(columns), 1, 2, [4];
         compute_aerosol_microphysics_jacobians=micro,
-        compute_h2o_jacobians=h2o)
+        compute_h2o_jacobians=h2o, compute_pressure_jacobians=pressure)
     # Native: pressure 1; aerosol 2:8; q-H2O 9:10; variable gas 11:12.
     @test validate([1,2,7,8,11,12]) === nothing
     @test validate(Int[]) === nothing
+    @test validate([2,7,8,11,12]; pressure=false) === nothing
+    @test_throws ArgumentError validate([1]; pressure=false)
     for micro_column in 3:6
         @test_throws ArgumentError validate([micro_column])
         @test validate([micro_column]; micro=true) === nothing

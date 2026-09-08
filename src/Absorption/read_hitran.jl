@@ -26,60 +26,101 @@ Uses fixed-width column parsing per the HITRAN format specification.
 
 # Throws
 - `HitranEmptyError`: If no lines match the filter criteria
+- `ArgumentError`: If a record is short, non-ASCII, or contains a malformed
+  required numeric field. Blank upper/lower degeneracies are accepted as zero.
 """
 function read_hitran(filepath::String; mol::Int=-1, iso::Int=-1, 
                      ν_min::Real=0, ν_max::Real=Inf, 
                      min_strength::Real=0)
+    FT = typeof(float(ν_min))
+    columns = (
+        mol=Int[], iso=Int[], νᵢ=FT[], Sᵢ=FT[], Aᵢ=FT[], γ_air=FT[],
+        γ_self=FT[], E″=FT[], n_air=FT[], δ_air=FT[],
+        global_upper_quanta=String[], global_lower_quanta=String[],
+        local_upper_quanta=String[], local_lower_quanta=String[],
+        ierr=String[], iref=String[], line_mixing_flag=String[],
+        g′=FT[], g″=FT[])
 
-    # Infer type from input ν_min
-    FT = eltype(AbstractFloat(ν_min))
-
-    # Declare some constant properties of the hitran line parameters, such as
-    # names, lengths, and types
-    varNames = ["molec_id", "local_iso_id", "nu", "sw", "a", "gamma_air",
-                "gamma_self", "elower", "n_air", "delta_air", "global_upper_quanta",
-                "global_lower_quanta", "local_upper_quanta", "local_lower_quanta",
-                "ierr", "iref", "line_mixing_flag", "gp", "gpp"]
-    varLengths = [2, 1, 12, 10, 10, 5, 5, 10, 4, 8, 15, 15, 15, 15, 6, 12, 1, 7, 7]
-    varTypes = [Int64, Int64, FT, FT, FT, FT, FT, FT, FT, FT, String, String, String, String, String, String, String, FT, FT]
-
-    # Take the line parameters' lengths and assemble an index-ranges list
-    # Each value is the starting index, minus 1, of var i and ending index of var i-1
-    # i.e.
-    #   [0, 2, 3, 15, 25, 35, 40, 45, 55, 59, 67, 82, 97, 112, 127, 133, 145, 146, 153, 160]
-    # Starting at 0 correctly produces (1,2), (3,3), (4,15), ..., (154, 160)
-    idxRanges = append!([0], [sum(varLengths[1:i]) for i in 1:length(varLengths)])
-
-    # Open the file specified
     open(filepath, "r") do file
+        for (line_number, record) in enumerate(eachline(file))
+            fields = _hitran_fields(record, filepath, line_number)
+            molecule = _parse_hitran_number(Int, fields[1], filepath, line_number, "molec_id")
+            isotopologue = _parse_hitran_isotopologue(
+                fields[2], filepath, line_number)
+            νᵢ = _parse_hitran_number(FT, fields[3], filepath, line_number, "nu")
+            Sᵢ = _parse_hitran_number(FT, fields[4], filepath, line_number, "sw")
 
-        # Where to hold the matching rows
-        rows = []
+            (mol == -1 || molecule == mol) || continue
+            (iso == -1 || isotopologue == iso) || continue
+            ν_min <= νᵢ <= ν_max || continue
+            Sᵢ >= min_strength || continue
 
-        # Loop through every line
-        for ln in eachline(file)
-
-            # Go from a line to a list of values
-            values = [varTypes[i] == String ? ln[(idxRanges[i]+1):idxRanges[i+1]] : something(tryparse(varTypes[i], ln[(idxRanges[i]+1):idxRanges[i+1]]), varTypes[i](0)) for i in 1:(length(varLengths))]
-
-            # Check that the search criteria are met (molecule, isotope, wavenumber range, and min. line-strength)
-            if((values[1] == mol || mol == -1) && (values[2] == iso || iso == -1) 
-                && (ν_min <= values[3] <= ν_max) && values[4] >= min_strength)
-
-                # Add this row to the list of rows
-                rows = append!(rows, [values])
-            end
+            push!(columns.mol, molecule)
+            push!(columns.iso, isotopologue)
+            push!(columns.νᵢ, νᵢ)
+            push!(columns.Sᵢ, Sᵢ)
+            push!(columns.Aᵢ, _parse_hitran_number(FT, fields[5], filepath, line_number, "a"))
+            push!(columns.γ_air, _parse_hitran_number(FT, fields[6], filepath, line_number, "gamma_air"))
+            push!(columns.γ_self, _parse_hitran_number(FT, fields[7], filepath, line_number, "gamma_self"))
+            push!(columns.E″, _parse_hitran_number(FT, fields[8], filepath, line_number, "elower"))
+            push!(columns.n_air, _parse_hitran_number(FT, fields[9], filepath, line_number, "n_air"))
+            push!(columns.δ_air, _parse_hitran_number(FT, fields[10], filepath, line_number, "delta_air"))
+            push!(columns.global_upper_quanta, fields[11])
+            push!(columns.global_lower_quanta, fields[12])
+            push!(columns.local_upper_quanta, fields[13])
+            push!(columns.local_lower_quanta, fields[14])
+            push!(columns.ierr, fields[15])
+            push!(columns.iref, fields[16])
+            push!(columns.line_mixing_flag, fields[17])
+            push!(columns.g′, _parse_hitran_number(FT, fields[18], filepath, line_number, "gp"; blank_is_zero=true))
+            push!(columns.g″, _parse_hitran_number(FT, fields[19], filepath, line_number, "gpp"; blank_is_zero=true))
         end
-
-        # Convert the row-major list of lists to a column-major list of lists
-        cols = [[rows[i][j] for i in 1:length(rows)] for j in 1:length(varNames)]
-
-        # Check that there is at least 1 matching record in the HITRAN file
-        length(cols[1]) == 0 ? throw(HitranEmptyError()) : nothing
-
-        # Return a HitranTable struct populated with the obtained columns
-        return HitranTable(mol=cols[1], iso=cols[2], νᵢ=cols[3], Sᵢ=cols[4], Aᵢ=cols[5], γ_air=cols[6], γ_self=cols[7], E″=cols[8], n_air=cols[9], δ_air=cols[10], global_upper_quanta=cols[11], global_lower_quanta=cols[12], local_upper_quanta=cols[13], local_lower_quanta=cols[14], ierr=cols[15], iref=cols[16], line_mixing_flag=cols[17], g′=cols[18], g″=cols[19])
-
     end
 
+    isempty(columns.mol) && throw(HitranEmptyError())
+    return HitranTable(; columns...)
+end
+
+const _HITRAN_FIELD_WIDTHS = (2, 1, 12, 10, 10, 5, 5, 10, 4, 8,
+                              15, 15, 15, 15, 6, 12, 1, 7, 7)
+const _HITRAN_FIELD_ENDS = Tuple(cumsum(collect(_HITRAN_FIELD_WIDTHS)))
+const _HITRAN_RECORD_LENGTH = last(_HITRAN_FIELD_ENDS)
+
+function _hitran_fields(record::AbstractString, filepath, line_number)
+    isascii(record) || throw(ArgumentError(
+        "$filepath:$line_number: HITRAN records must contain ASCII text"))
+    ncodeunits(record) >= _HITRAN_RECORD_LENGTH || throw(ArgumentError(
+        "$filepath:$line_number: short HITRAN record ($(ncodeunits(record)) bytes; " *
+        "expected at least $_HITRAN_RECORD_LENGTH)"))
+    bytes = codeunits(record)
+    return ntuple(length(_HITRAN_FIELD_WIDTHS)) do index
+        first_byte = index == 1 ? 1 : _HITRAN_FIELD_ENDS[index - 1] + 1
+        String(view(bytes, first_byte:_HITRAN_FIELD_ENDS[index]))
+    end
+end
+
+function _parse_hitran_number(::Type{T}, field, filepath, line_number, name;
+                              blank_is_zero::Bool=false) where {T<:Real}
+    text = strip(field)
+    isempty(text) && blank_is_zero && return zero(T)
+    value = tryparse(T, text)
+    value === nothing && throw(ArgumentError(
+        "$filepath:$line_number: invalid HITRAN $name field $(repr(field))"))
+    return value
+end
+
+function _parse_hitran_isotopologue(field, filepath, line_number)
+    text = strip(field)
+    ncodeunits(text) == 1 || throw(ArgumentError(
+        "$filepath:$line_number: invalid HITRAN local_iso_id field $(repr(field))"))
+    code = only(codeunits(text))
+    if UInt8('1') <= code <= UInt8('9')
+        return Int(code - UInt8('0'))
+    elseif code == UInt8('0')
+        return 10
+    elseif UInt8('A') <= code <= UInt8('Z')
+        return 11 + Int(code - UInt8('A'))
+    end
+    throw(ArgumentError(
+        "$filepath:$line_number: invalid HITRAN local_iso_id field $(repr(field))"))
 end

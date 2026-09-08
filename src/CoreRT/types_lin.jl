@@ -232,11 +232,11 @@ mutable struct RTModelLin{A,B,C,D,E,F}
     τ̇_aer::B
     "Linearized aerosol optics per band per aerosol: Vector{Vector{linAerosolOptics}}"
     lin_aerosol_optics::C
-    "∂τ_rayl/∂p_surf per band: [nSpec × nLayers]"
+    "∂τ_rayl/∂p_surf per band: [nSpec × nLayers]; nothing when pressure is disabled"
     τ̇_rayl_psurf::D
-    "∂τ_aer/∂p_surf per band: [NAer × nSpec × nLayers]"
+    "∂τ_aer/∂p_surf per band: [NAer × nSpec × nLayers]; nothing when disabled"
     τ̇_aer_psurf::E
-    "∂τ_abs/∂p_surf per band: [nSpec × nLayers]"
+    "∂τ_abs/∂p_surf per band: [nSpec × nLayers]; nothing when pressure is disabled"
     τ̇_abs_psurf::F
 end
 

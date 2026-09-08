@@ -71,7 +71,7 @@ function vSmartMOM.CoreRT.batched_pointer_cache(A::CuArray)
     return vSmartMOM.CoreRT.CUBLAS_ref[].unsafe_strided_batch(A)
 end
 
-"Given 3D CuArrays A and B, fill in X[:,:,k] = A[:,:,k] \\ B[:,:,k]"
+"CUDA implementation of `batch_solve!`; `A` is factorization scratch."
 function vSmartMOM.CoreRT.batch_solve!(X::CuArray{FT,3}, A::CuArray{FT,3}, B::CuArray{FT,3}) where {FT}
     # Singleton-batch guard: CUBLAS `*_strided_batched` routines mis-handle
     # batchSize=1 (mirrors the CPU singleton-batch bug fixed in
@@ -93,9 +93,10 @@ function vSmartMOM.CoreRT.batch_solve!(X::CuArray{FT,3}, A::CuArray{FT,3}, B::Cu
 
     # X = inv(A) * B — also device-only; no host sync needed before return.
     NNlib.batched_mul!(X, temp, B)
+    return X
 end
 
-"Given 3D CuArray A, fill in X[:,:,k] = A[:,:,k] \\ I"
+"CUDA implementation of `batch_inv!`; multi-slice calls overwrite `A`."
 function vSmartMOM.CoreRT.batch_inv!(X::CuArray{FT,3}, A::CuArray{FT,3}) where {FT}
     # Singleton-batch guard: see comment in `batch_solve!` above.
     if size(A, 3) == 1
@@ -107,13 +108,16 @@ function vSmartMOM.CoreRT.batch_inv!(X::CuArray{FT,3}, A::CuArray{FT,3}) where {
     @timeit "getrf_strided" pivot, info = CUDA.CUBLAS.getrf_strided_batched!(A, true)
     # Invert LU factorization of A
     @timeit "getri_strided" CUDA.CUBLAS.getri_strided_batched!(A, X, pivot)
+    return X
 end
 
 """
     batch_inv!(X, A, ws::RTWorkspace)
 
-Workspace-aware batch inversion using pre-allocated pivot/info arrays.
-Eliminates repeated GPU memory allocations in tight loops.
+Compatibility overload accepting an `RTWorkspace`. The current CUBLAS
+strided-batch API allocates its pivot/status arrays internally, so this method
+does not yet reuse `ws.pivot` or `ws.info`. Like the plain CUDA method, it
+overwrites `A` when the batch has more than one slice.
 """
 function vSmartMOM.CoreRT.batch_inv!(X::CuArray{FT,3}, A::CuArray{FT,3},
                                       ws::vSmartMOM.CoreRT.RTWorkspace) where {FT}
@@ -127,6 +131,7 @@ function vSmartMOM.CoreRT.batch_inv!(X::CuArray{FT,3}, A::CuArray{FT,3},
     pivot, info = CUDA.CUBLAS.getrf_strided_batched!(A, true)
     # Invert LU factorization of A using pre-allocated output
     CUDA.CUBLAS.getri_strided_batched!(A, X, pivot)
+    return X
 end
 
 # Resolve the intersection with the generic CPU no-pointer overload. CUDA

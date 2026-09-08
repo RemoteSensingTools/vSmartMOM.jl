@@ -53,7 +53,8 @@ export FwdMode, LinMode
 export AbstractJacobianFlavor, OCO_RRS_synth, JacobianPlan,
        ActiveParameterLayout, ParameterKey, jacobian_plan, band_layout,
        parameter_names, local_to_global, n_global, globalize_jacobian,
-       requires_aerosol_microphysics_jacobians, requires_h2o_jacobians
+       requires_aerosol_microphysics_jacobians, requires_h2o_jacobians,
+       requires_pressure_jacobians
 
 export HenyeyGreensteinPhaseFunction,
        SyntheticPolarizedHenyeyGreensteinPhaseFunction,

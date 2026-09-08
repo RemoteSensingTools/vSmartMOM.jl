@@ -21,14 +21,31 @@ Portable KernelAbstractions backends, including Metal, use `nothing`.
 """
 @inline batched_pointer_cache(::AbstractArray) = nothing
 
-"Given 3D Julia Arrays A and B, fill in X[:,:,k] = A[:,:,k] \\ B[:,:,k]"
+"""
+    batch_solve!(X, A, B) -> X
+
+Solve `X[:, :, k] = A[:, :, k] \\ B[:, :, k]` for each batch slice.
+`X` is overwritten, `A` is factorization scratch and may be destroyed, and `B`
+is read-only. The three operands must not alias. All matrices must have
+compatible dimensions and the same batch count. Singular-system handling is
+delegated to the active backend.
+"""
 function batch_solve!(X::AbstractArray{FT,3}, A::AbstractArray{FT,3}, B::AbstractArray{FT,3}) where {FT}
     Threads.@threads for i = 1:size(A, 3)
         @views ldiv!(X[:,:,i], qr!(A[:,:,i]), B[:,:,i])
     end
+    return X
 end
 
-"Given 3D Julia Array A, fill in X[:,:,k] = A[:,:,k] \\ I"
+"""
+    batch_inv!(X, A[, workspace_or_pointer_metadata...]) -> X
+
+Fill `X[:, :, k]` with the inverse of `A[:, :, k]`. `X` is overwritten and
+must not alias `A`. Callers must treat `A` as factorization scratch: some CPU or
+singleton implementations currently preserve it, while multi-slice CUDA
+implementations overwrite it. Matrices must be square with matching shapes.
+Singular-system handling is delegated to the active backend.
+"""
 function batch_inv!(X::AbstractArray{FT,3}, A::AbstractArray{FT,3}) where {FT}
     Threads.@threads for i = 1:size(A, 3)
         @views X[:,:,i] = A[:,:,i]\I
@@ -36,12 +53,12 @@ function batch_inv!(X::AbstractArray{FT,3}, A::AbstractArray{FT,3}) where {FT}
     return X
 end
 
-"Given 3D Julia Array A, fill in X[:,:,k] = A[:,:,k] \\ I (pointer version, ignores pointers for CPU)" 
+"Pointer-metadata overload; CPU arrays ignore both metadata arguments."
 function batch_inv!(X::AbstractArray{FT,3}, A::AbstractArray{FT,3}, xx::Nothing, yy::Nothing) where {FT}
     batch_inv!(X, A)
 end
 
-"Workspace-aware batch_inv! (CPU fallback: workspace ignored, just calls plain version)"
+"Compatibility workspace overload; the CPU implementation needs no workspace."
 function batch_inv!(X::AbstractArray{FT,3}, A::AbstractArray{FT,3}, ws::RTWorkspace) where {FT}
     batch_inv!(X, A)
 end

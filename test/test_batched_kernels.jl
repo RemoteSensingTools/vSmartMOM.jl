@@ -3,6 +3,33 @@ using vSmartMOM: CoreRT
 import NNlib
 using KernelAbstractions
 
+@testset "Batched solve/inverse mutation contract" begin
+    A = reshape(Float64[
+        3, 1, 1, 2,
+        4, 1, 2, 3,
+    ], 2, 2, 2)
+    B = reshape(Float64[
+        1, 2, 3, 4,
+        2, 1, 4, 3,
+    ], 2, 2, 2)
+    A_original = copy(A)
+    B_original = copy(B)
+
+    X = similar(B)
+    @test CoreRT.batch_solve!(X, copy(A), B) === X
+    @test B == B_original
+    for k in axes(A, 3)
+        @test X[:, :, k] ≈ A_original[:, :, k] \ B_original[:, :, k]
+    end
+
+    Ainv = copy(A_original)
+    Xinv = similar(Ainv)
+    @test CoreRT.batch_inv!(Xinv, Ainv) === Xinv
+    for k in axes(Ainv, 3)
+        @test Xinv[:, :, k] ≈ inv(A_original[:, :, k])
+    end
+end
+
 @testset "Portable KA batched kernels" begin
     FT = Float32
     n = 4

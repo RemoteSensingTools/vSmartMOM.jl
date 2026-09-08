@@ -276,6 +276,7 @@ function compute_absorption_profile!(τ_abs::Array{FT,2},
                                     profile::AtmosphericProfile,
                                     ;
                                     self_broadener_vmr=nothing,
+                                    pressure_tangent=nothing,
                                     ) where FT 
 
     # The array to store the cross-sections must be same length as number of layers
@@ -312,6 +313,8 @@ function compute_absorption_profile!(τ_abs::Array{FT,2},
         gas_layer_idx = (jac_idx - 1) * length(profile.p_full) + iz
         τ̇_abs[gas_layer_idx,:,iz] = σ * profile.vcd_dry[iz]
     end
+    _accumulate_absorption_pressure!(pressure_tangent, absorption_model,
+        grid, vmr, profile, self_broadener_vmr)
     
 end
 
@@ -327,9 +330,10 @@ function compute_h2o_absorption_profile!(τ_abs::Array{FT,2},
                                          jac_idx::Integer,
                                          absorption_model,
                                          grid,
-                                         profile::AtmosphericProfile) where FT
+                                         profile::AtmosphericProfile;
+                                         pressure_tangent=nothing) where FT
     x_h2o = _h2o_moist_mole_fraction.(profile.vmr_h2o)
     return compute_absorption_profile!(
         τ_abs, τ̇_abs, jac_idx, absorption_model, grid,
-        profile.vmr_h2o, profile; self_broadener_vmr=x_h2o)
+        profile.vmr_h2o, profile; self_broadener_vmr=x_h2o, pressure_tangent)
 end

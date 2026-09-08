@@ -235,7 +235,7 @@ function rt_run(RS_type::AbstractRamanType,
         "Linearized RT supports SolarBeam, SurfaceSIF, and NoSource only; " *
         "$(typeof(effective_sources)) requires end-to-end source tangent propagation. " *
         "A source_ad_mode declaration alone does not provide this implementation."))
-    validate_sif_solar_spectrum(effective_sources)
+    validate_source_requests(effective_sources, model.geometry.sza, brdf)
     NSIF = surface_sif_parameter_count(effective_sources)
     layout = active_layout === nothing ?
         ParameterLayout(aerosol_params=7, n_aerosols=NAer,

@@ -69,8 +69,8 @@ function getRamanAtmoConstants(ν̃::AbstractFloat, T::AbstractFloat, vmr_n2::Ab
 end
 
 function compute_ϖ_Cabannes(RS_type::noRS, depol, λ₀)
-    RS_type.ϖ_Cabannes = 1.0;
-    return RS_type.ϖ_Cabannes;
+    fill!(RS_type.ϖ_Cabannes, one(eltype(RS_type.ϖ_Cabannes)))
+    return RS_type.ϖ_Cabannes
 end
 
 #=function compute_ϖ_Cabannes(

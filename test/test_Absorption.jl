@@ -73,6 +73,60 @@ using NCDatasets
 
 end
 
+@testset "read_hitran rejects malformed required fields" begin
+    valid_record = first(eachline("test_profiles/testCO2.data"))
+
+    function replace_field(record, first_byte, last_byte, value)
+        width = last_byte - first_byte + 1
+        replacement = rpad(value, width)
+        ncodeunits(replacement) == width || error("replacement must fit its field")
+        bytes = collect(codeunits(record))
+        bytes[first_byte:last_byte] .= codeunits(replacement)
+        return String(bytes)
+    end
+
+    function parse_record(record; kwargs...)
+        return mktemp() do path, io
+            write(io, record, '\n')
+            close(io)
+            Absorption.read_hitran(path; kwargs...)
+        end
+    end
+
+    malformed_ν = replace_field(valid_record, 4, 15, "BROKEN")
+    error = try
+        parse_record(malformed_ν)
+        nothing
+    catch exception
+        exception
+    end
+    @test error isa ArgumentError
+    @test occursin(":1: invalid HITRAN nu field", sprint(showerror, error))
+
+    @test_throws ArgumentError parse_record(valid_record[1:159])
+    @test_throws ArgumentError parse_record("é" * valid_record[2:end])
+    @test_throws ArgumentError parse_record(replace_field(valid_record, 1, 2, "X"))
+    @test_throws ArgumentError parse_record(replace_field(valid_record, 3, 3, "?"))
+    @test_throws ArgumentError parse_record(replace_field(valid_record, 26, 35, "bad"))
+
+    # HITRAN permits missing statistical weights. Preserve the established
+    # zero representation for these two optional numeric fields only.
+    blank_weights = replace_field(replace_field(valid_record, 147, 153, ""),
+                                  154, 160, "")
+    parsed = parse_record(blank_weights)
+    @test parsed.g′ == [0.0]
+    @test parsed.g″ == [0.0]
+
+    # The one-character traditional format encodes local isotopologues 10, 11,
+    # and 12 as 0, A, and B respectively.
+    @test only(parse_record(replace_field(valid_record, 3, 3, "0")).iso) == 10
+    @test only(parse_record(replace_field(valid_record, 3, 3, "A")).iso) == 11
+    @test only(parse_record(replace_field(valid_record, 3, 3, "B")).iso) == 12
+
+    @test_throws Absorption.HitranEmptyError parse_record(
+        valid_record; ν_min=1.0e6)
+end
+
 # Test that absorption cross sections are calculated correctly 
 # (Not using pre-saved interpolator)
 

@@ -66,6 +66,7 @@ include("types_lin.jl")                        # Types for linearized RT
 include("LayerOpticalProperties/local_jacobian_types.jl")
 include("Sources/solar_beam.jl")               # v0.6 SolarBeam + PreparedSolarBeam (Phase 2)
 include("Sources/surface_sif.jl")              # v0.6 SurfaceSIF + PreparedSurfaceSIF (Phase 5)
+include("Sources/validation.jl")               # Shared source/geometry/surface contract
 include("Sources/thermal_emission.jl")         # v0.7 Phase A: ThermalEmission per-layer Planck volume source
 
 # Note: Raman types (AbstractRamanType, noRS, RRS, etc.) come from 
@@ -130,6 +131,7 @@ include("tools/cpu_batched.jl")                   # CPU batched linear algebra o
 
 # Utilities / Helper Functions
 include("tools/atmo_prof.jl")                     # Helper Functions for Handling Atmospheric Profiles
+include("tools/absorption_pressure.jl")            # Upstream line/LUT pressure derivatives
 include("tools/atmo_prof_lin.jl")                 # Linearized atmosphere profile
 include("tools/rt_helper_functions.jl")           # Miscellaneous Utility Functions
 include("tools/rt_helper_functions_lin.jl")       # Linearized helper functions
@@ -157,6 +159,7 @@ include("LayerOpticalProperties/local_jacobian.jl")
 # Surfaces
 include("Surfaces/lambertian_surface.jl")            # Lambertian Surface 
 include("Surfaces/lambertian_surface_lin.jl")        # Linearized Lambertian Surface
+include("Surfaces/analytic_surface.jl")              # Shared analytic-BRDF assembly
 include("Surfaces/rpv_surface.jl")                   # RPV Surface 
 include("Surfaces/rossli_surface.jl")                # Ross-Li Surface
 include("Surfaces/canopy_surface.jl")                # Canopy + soil composite surface
@@ -198,6 +201,7 @@ export OpticalPropertyJacobian,               # AD boundary struct alias
        PlannedRTModelLin, jacobian_plan, band_layout, parameter_names,
        local_to_global, native_layer_columns, n_global, globalize_jacobian,
        requires_aerosol_microphysics_jacobians, requires_h2o_jacobians,
+       requires_pressure_jacobians,
        n_total, aerosol_range, gas_range,     # ParameterLayout accessors
        gas_profile_range, gas_layer_index,
        surface_range, surface_index, sif_range, sif755_index, sif_slope_index,
@@ -228,7 +232,7 @@ export AbstractSource, AbstractPreparedSource,
 # v0.7 Phase A: ThermalEmission per-layer Planck volume source + contribute! seam
 export SolarBeam, PreparedSolarBeam, prepare_source, prepare_sources, BlackbodySource,
        SurfaceSIF, PreparedSurfaceSIF, surface_source_contribute!, surface_source_contribute_lin!,
-       surface_sif_parameter_count, validate_sif_solar_spectrum,
+       surface_sif_parameter_count, validate_sif_solar_spectrum, supports_surface_sif,
        ThermalEmission, PreparedThermalEmission, contribute!, has_thermal_emission
 
 # Export types to show easily

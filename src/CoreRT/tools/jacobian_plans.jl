@@ -28,6 +28,15 @@ gas derivative columns zero and therefore eligible for omission by the plan.
 requires_h2o_jacobians(::AbstractJacobianFlavor) = true
 requires_h2o_jacobians(::OCO_RRS_synth) = false
 
+"""
+    requires_pressure_jacobians(flavor)
+
+Upstream-work trait. Return `false` when surface pressure is fixed. All
+forward absorption is retained, including absorbers without a pressure
+derivative implementation. A plan may not select pressure when disabled.
+"""
+requires_pressure_jacobians(::AbstractJacobianFlavor) = true
+
 const _OCO_RRS_AEROSOL_NAMES =
     ("sulfate", "organic_carbon", "utls_sulfate")
 
@@ -180,6 +189,7 @@ function model_from_parameters(flavor::AbstractJacobianFlavor, params; kwargs...
         compute_aerosol_microphysics_jacobians =
             requires_aerosol_microphysics_jacobians(flavor),
         compute_h2o_jacobians = requires_h2o_jacobians(flavor),
+        compute_pressure_jacobians = requires_pressure_jacobians(flavor),
     )
     options = merge(defaults, (; kwargs...))
     model, base_lin = model_from_parameters(LinMode(), params; options...)
@@ -187,7 +197,8 @@ function model_from_parameters(flavor::AbstractJacobianFlavor, params; kwargs...
     _validate_plan_upstream(plan, CoreRT.n_aerosols(model),
         length(model.profile.p_full), [size(t, 1) for t in base_lin.τ̇_abs];
         compute_aerosol_microphysics_jacobians=options.compute_aerosol_microphysics_jacobians,
-        compute_h2o_jacobians=options.compute_h2o_jacobians)
+        compute_h2o_jacobians=options.compute_h2o_jacobians,
+        compute_pressure_jacobians=options.compute_pressure_jacobians)
     return model, PlannedRTModelLin(base_lin, plan)
 end
 
@@ -195,11 +206,17 @@ end
 # selected derivative can legitimately vanish at a particular trial state.
 function _validate_plan_upstream(plan::JacobianPlan, n_aerosols, nz, gas_counts;
         compute_aerosol_microphysics_jacobians::Bool,
-        compute_h2o_jacobians::Bool)
+        compute_h2o_jacobians::Bool,
+        compute_pressure_jacobians::Bool=true)
     length(plan.bands) == length(gas_counts) || throw(DimensionMismatch(
         "Jacobian plan must contain one layout per model band"))
     for (ib, layout) in enumerate(plan.bands)
         selection = _native_layer_selection(layout, n_aerosols, gas_counts[ib])
+        if !compute_pressure_jacobians && selection.include_pressure
+            throw(ArgumentError("Jacobian plan band $ib requests surface-pressure " *
+                "derivatives disabled by compute_pressure_jacobians=false; " *
+                "enable upstream derivatives or remove pressure from the plan"))
+        end
         if !compute_aerosol_microphysics_jacobians &&
                 any(cols -> any(p -> 2 <= p <= 5, cols), selection.aerosol_columns)
             throw(ArgumentError("Jacobian plan band $ib requests aerosol microphysics " *

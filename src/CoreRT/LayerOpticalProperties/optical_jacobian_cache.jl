@@ -122,6 +122,12 @@ function build_m_invariant_cache_lin(iBand, model, lin_model;
     nGas = size(τ̇_abs[first(bands)], 1)
     selection = active_layout === nothing ? nothing :
         _native_layer_selection(active_layout, nAero, nGas)
+    if (selection === nothing || selection.include_pressure) &&
+            any(isnothing, (lin_model.τ̇_rayl_psurf, lin_model.τ̇_aer_psurf,
+                            lin_model.τ̇_abs_psurf))
+        throw(ArgumentError("Surface-pressure derivatives are unavailable; rebuild " *
+            "with compute_pressure_jacobians=true or use a plan without pressure"))
+    end
     rayl = Vector{Vector}(undef, length(bands))
     aeros = Vector{Vector{Vector}}(undef, length(bands))
     gas = Vector{Vector}(undef, length(bands))
@@ -142,4 +148,3 @@ function build_m_invariant_cache_lin(iBand, model, lin_model;
     end
     return LinMInvariantCache(rayl, aeros, gas, lin_gas, selection)
 end
-

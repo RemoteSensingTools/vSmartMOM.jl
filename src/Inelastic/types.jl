@@ -10,8 +10,9 @@ abstract type AbstractRamanType  end
 # parameterized by FT.
 
 """
-    struct RRS{FT<:AbstractFloat}
-A struct which defines Rotational Raman Scattering parameters
+    VS_0to1{FT<:AbstractFloat}
+
+Vibrational Raman transition from the ground to first excited state.
 # Fields
 $(DocStringExtensions.FIELDS)
 """
@@ -43,8 +44,9 @@ Base.@kwdef mutable struct RRS{FT<:AbstractFloat} <: AbstractRamanType
 end
 
 """
-    struct RRS{FT<:AbstractFloat}
-A struct which defines Rotational Raman Scattering parameters
+    VS_1to0{FT<:AbstractFloat}
+
+Vibrational Raman transition from the first excited to ground state.
 # Fields
 $(DocStringExtensions.FIELDS)
 """

@@ -9,6 +9,11 @@ measurements.
 Sensors are labeled from TOA->BOA, and each share the same set of viewing angles.
 Upward looking viewing angles are denoted by -90<VZA<0 and downward viewing angles
 are denoted by 0<VZA<90.
+
+Internal legacy transport routine: call `rt_run(model; sources=...)` for the
+public source contract. That wrapper validates the sources, populates the
+Raman irradiance carrier, and scales this routine's unit-beam elastic output.
+Calling this routine directly does not resolve `model.sources`.
 """
 
 function rt_run_test_ms(RS_type::AbstractRamanType,

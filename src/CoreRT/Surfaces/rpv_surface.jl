@@ -23,10 +23,8 @@ Free parameters (in `rpvSurfaceScalar`):
     ρ₀    overall albedo                 ρ_c    bowl-shape amplitude
     k     Minnaert exponent              Θ     hot-spot width
 
-`reflectance(rpv, μ, m)` does the azimuthal Fourier integral over Δϕ to
-get the m-th moment used in the adding-doubling solver; the generic
-`reflectance(::AbstractSurfaceType, pol_type, μ, m)` below performs the
-same Gauss-Legendre quadrature for any analytic BRDF.
+`reflectance(rpv, μ, m)` uses the common analytic-surface quadrature in
+`analytic_surface.jl` to obtain the Fourier moments used by adding-doubling.
 
 Polarized RT: only the I → I block is non-zero (RPV is a scalar model),
 so for n_stokes > 1 the function returns 0 in the off-diagonal Stokes
@@ -34,58 +32,6 @@ slots.  See `rossli_surface.jl` and `coxmunk_surface.jl` for the
 polarization-aware analogues.
 ============================================================================
 =#
-
-"""
-    create_surface_layer!(brdf::AbstractSurfaceType, added_layer, SFI, m,
-                          pol_type, quad_points, τ_sum, architecture)
-
-Generic surface-layer builder for any analytic BRDF (RPV, Ross-Li, …) via
-its Fourier-moment `reflectance(brdf, pol_type, μ, m)`. Computes (in place)
-the surface optical properties as an [`AddedLayer`](@ref), sharing the
-source-fill (`_surface_source!`) and r/t-fill (`_fill_surface_layer!`)
-helpers with the Lambertian scaffold (`lambertian_surface.jl`).
-
-    - `brdf` any [`AbstractSurfaceType`](@ref) with a `reflectance` method
-    - `SFI` bool if SFI (Source Function Integration) is used
-    - `m` Fourier moment (starting at 0; factor-2 normalization applied at m=0)
-    - `pol_type` Polarization type struct
-    - `quad_points` Quadrature points struct
-    - `τ_sum` total optical thickness from TOA to the surface
-    - `architecture` Compute architecture (GPU,CPU)
-"""
-function create_surface_layer!(brdf::AbstractSurfaceType,
-                               added_layer::Union{AddedLayer,AddedLayerRS},
-                               SFI,
-                               m::Int,
-                               pol_type,
-                               quad_points,
-                               τ_sum,
-                               architecture;
-                               F₀=nothing)
-
-    (; qp_μ, wt_μ, qp_μN, wt_μN) = quad_points
-    FT = eltype(qp_μN)
-    # Get size of added layer
-    Nquad = size(added_layer.r⁻⁺,1) ÷ pol_type.n
-    arr_type = array_type(architecture)
-    T_surf = arr_type(Diagonal(ones(FT, pol_type.n*Nquad)))
-
-    # Fourier-m reflectance from the analytic BRDF, with the factor-2 m=0
-    # normalization (Albedo normalized by π → 1/π·2π for the 0th moment).
-    ρ = (m == 0 ? 2 : 1) * vSmartMOM.CoreRT.reflectance(brdf, pol_type, collect(qp_μ), m)
-    # Dense reflectance matrix on device.
-    R_surf = arr_type(ρ)
-
-    # Source function of surface (m=0 source fill shared with the Lambertian
-    # scaffold; uses the attenuated direct beam — see lambertian_surface.jl).
-    if SFI
-        _surface_source!(added_layer, R_surf, τ_sum, quad_points, pol_type, FT, architecture; F₀=F₀)
-    end
-
-    # Quadrature-weight, then fill r/t via the shared scaffold helper.
-    _fill_surface_layer!(added_layer, R_surf * Diagonal(qp_μN.*wt_μN), T_surf)
-
-end
 
 """
     reflectance(rpv::rpvSurfaceScalar, n, μᵢ, μᵣ, dϕ)
@@ -133,45 +79,3 @@ function rpvF(θ::FT, cosg::FT) where FT
     θ = -θ #for RAMI only
     return (1 - θ^2) /  (1 + θ^2 + 2θ * cosg)^FT(1.5) #RAMI form: (1 - Θ^2) /  (1 + Θ^2 + 2Θ * cosg)^FT(1.5)
 end
-
-"""
-    reflectance(brdf::AbstractSurfaceType, pol_type, μ, m)
-
-Fourier moment `m` of the BRDF reflectance matrix for quadrature directions `μ`.
-
-Computes ``R_{ij} = (f/\\pi) \\int_0^\\pi \\rho(n, \\mu_i, \\mu_j, \\phi) \\cos(m\\phi) \\, d\\phi``
-with `f = 1` for m=0, `f = 2` otherwise. Returns `[nμ·n_stokes, nμ·n_stokes]` matrix.
-"""
-function reflectance(brdf::AbstractSurfaceType, pol_type, μ::AbstractArray{FT}, m::Int) where FT
-    # Hardcoded nQuad for now, needs to go into brdf in the future!
-    nQuad = 100
-
-    ty = array_type(architecture(μ))
-    # Size of Matrix
-    nn = length(μ) * pol_type.n
-    Rsurf = ty(zeros(FT,nn,nn)) 
-    ff = m==0 ? FT(1.0) : FT(2.0)
-    #@show ff
-    for n = 1:pol_type.n
-        f(x) = reflectance.((brdf,),n, μ, μ', x) * cos(m*x)
-        ϕ,w  = CanopyOptics.gauleg(nQuad,   FT(0),  FT(π));
-        # more clumsy now with quadrature:
-        # TODO clean this up a bit
-        b = f.(ϕ)
-        # fill!, NOT `similar(...) * 0`: similar returns UNINITIALIZED memory
-        # and 0 * NaN = NaN — recycled heap/GPU blocks containing NaN/Inf bit
-        # patterns poisoned isolated Fourier-matrix entries nondeterministically
-        # (cell/band/run/device-dependent all-NaN BRDF surfaces downstream).
-        c = fill!(similar(Rsurf[n:pol_type.n:end,n:pol_type.n:end]), FT(0))
-        for i in eachindex(b)
-            c += w[i] * b[i]
-        end
-
-        #@show size(c), size(b[1]),  size(reflectance.((brdf,),n, μ, μ', 1.0))
-        Rsurf[n:pol_type.n:end,n:pol_type.n:end] .= c/π
-        # use quadgk before, was a bit slow 
-        # quadgk(f, 0, π, rtol=1e-4)[1] / π
-    end
-    return ff * Rsurf
-end
-

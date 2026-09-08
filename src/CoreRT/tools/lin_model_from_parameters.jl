@@ -88,6 +88,10 @@ This is the **linearized** counterpart of `model_from_parameters(params)`. It co
   structurally valid zero tangents are supplied to the downstream mixer.
 - Set `compute_h2o_jacobians=false` when the q-driven H2O profile is fixed.
   Its forward absorption is retained without generating H2O tangent entries.
+- Set `compute_pressure_jacobians=false` for a retrieval with fixed pressure.
+  Pressure tangent fields are then `nothing`, not zero sensitivities; use a
+  `PlannedRTModelLin` whose layout omits pressure. Full-layout solves reject
+  these models. Forward-only absorber extensions remain usable in such plans.
 - `aerosol_anchor_bands` has the same meaning as in the forward constructor:
   it fixes aerosol spectral endpoint calculations to canonical full-band
   grids while evaluating the interpolated optics on chunked or
@@ -100,7 +104,8 @@ function model_from_parameters(lin::LinMode,
     external_solar::Bool = false,
     aerosol_anchor_bands=nothing,
     compute_aerosol_microphysics_jacobians::Bool = true,
-    compute_h2o_jacobians::Bool = true)
+    compute_h2o_jacobians::Bool = true,
+    compute_pressure_jacobians::Bool = true)
     FT = params.float_type
     n_bands = length(params.spec_bands)
     n_aer = isnothing(params.scattering_params) ? 0 : length(params.scattering_params.rt_aerosols)
@@ -152,14 +157,18 @@ function model_from_parameters(lin::LinMode,
     Nz = length(profile.p_full)
     τ̇_abs     = [zeros(FT2, N_gas_species * Nz,
                         length(params.spec_bands[i]), Nz) for i in 1:n_bands]
-    τ̇_rayl_psurf = [zeros(FT2, length(params.spec_bands[i]), length(profile.p_full)) for i in 1:n_bands]
-    τ̇_abs_psurf = [zeros(FT2, length(params.spec_bands[i]), length(profile.p_full)) for i in 1:n_bands]
-    τ̇_aer_psurf = [zeros(FT2, n_aer, length(params.spec_bands[i]), length(profile.p_full)) for i in 1:n_bands]
-    psurf_tangents = psurf_profile_tangents(profile)
+    τ̇_rayl_psurf = compute_pressure_jacobians ?
+        [zeros(FT2, length(params.spec_bands[i]), Nz) for i in 1:n_bands] : nothing
+    τ̇_abs_psurf = compute_pressure_jacobians ?
+        [zeros(FT2, length(params.spec_bands[i]), Nz) for i in 1:n_bands] : nothing
+    τ̇_aer_psurf = compute_pressure_jacobians ?
+        [zeros(FT2, n_aer, length(params.spec_bands[i]), Nz) for i in 1:n_bands] : nothing
+    psurf_tangents = compute_pressure_jacobians ? psurf_profile_tangents(profile) : nothing
     l_max = zeros(Int, n_bands)
     l_max_aer = zeros(Int, n_aer, n_bands)
 
     for i_band=1:n_bands
+        pressure_tangent = compute_pressure_jacobians ? τ̇_abs_psurf[i_band] : nothing
 
         # `params` may have been parsed as Float64 and subsequently switched
         # to Float32 by a caller. Keep the wavelength grid consistent with the
@@ -188,15 +197,17 @@ function model_from_parameters(lin::LinMode,
                                 curr_band_λ,
                                 depol_use_Ray, profile.vcd_dry)
         # τ_rayl = τ_total(p_surf) * vcd_dry/sum(vcd_dry).
-        dry = profile.vcd_dry
-        drydot = psurf_tangents.vcd_dry_dot
-        total = vec(sum(τ_rayl[i_band], dims=2))
-        totaldot = total ./ profile.p_half[end]
-        # Use the factored quotient rule: the direct form squares the total
-        # dry column (~1e25), which overflows in Float32 and makes the entire
-        # surface-pressure Jacobian NaN.
-        frac, fracdot = _normalized_column_fraction_tangent(dry, drydot)
-        τ̇_rayl_psurf[i_band] .= totaldot * frac' .+ total * fracdot'
+        if compute_pressure_jacobians
+            dry = profile.vcd_dry
+            drydot = psurf_tangents.vcd_dry_dot
+            total = vec(sum(τ_rayl[i_band], dims=2))
+            totaldot = total ./ profile.p_half[end]
+            # Use the factored quotient rule: the direct form squares the total
+            # dry column (~1e25), which overflows in Float32 and makes the entire
+            # surface-pressure Jacobian NaN.
+            frac, fracdot = _normalized_column_fraction_tangent(dry, drydot)
+            τ̇_rayl_psurf[i_band] .= totaldot * frac' .+ total * fracdot'
+        end
 
         (isnothing(abs_params) && isnothing(params.q)) && continue
 
@@ -210,11 +221,13 @@ function model_from_parameters(lin::LinMode,
                 if compute_h2o_jacobians
                     @timeit "Absorption Coeff H2O" compute_h2o_absorption_profile!(
                         τ_abs[i_band], τ̇_abs[i_band], jac_idx,
-                        h2o_setting, params.spec_bands[i_band], profile)
+                        h2o_setting, params.spec_bands[i_band], profile;
+                        pressure_tangent)
                 else
                     @timeit "Absorption Coeff H2O" compute_h2o_absorption_profile!(
                         τ_abs[i_band], h2o_setting,
-                        params.spec_bands[i_band], profile)
+                        params.spec_bands[i_band], profile;
+                        pressure_tangent)
                 end
             else
                 @timeit "Read HITRAN" lines_h2o = _hitran_lines("H2O", FT)
@@ -231,11 +244,13 @@ function model_from_parameters(lin::LinMode,
                 if compute_h2o_jacobians
                     @timeit "Absorption Coeff H2O" compute_h2o_absorption_profile!(
                         τ_abs[i_band], τ̇_abs[i_band], jac_idx,
-                        absorption_model, params.spec_bands[i_band], profile)
+                        absorption_model, params.spec_bands[i_band], profile;
+                        pressure_tangent)
                 else
                     @timeit "Absorption Coeff H2O" compute_h2o_absorption_profile!(
                         τ_abs[i_band], absorption_model,
-                        params.spec_bands[i_band], profile)
+                        params.spec_bands[i_band], profile;
+                        pressure_tangent)
                 end
             end
         end
@@ -259,13 +274,13 @@ function model_from_parameters(lin::LinMode,
                                 absorption_model,
                                 params.spec_bands[i_band],
                                 profile.vmr[mol_name],
-                                profile)
+                                profile; pressure_tangent)
                     else
                         compute_absorption_profile!(τ_abs[i_band],
                             abs_params.luts[i_band][molec_i],
                             params.spec_bands[i_band],
                             profile.vmr[mol_name],
-                            profile)
+                            profile; pressure_tangent)
                     end
                 end
             end
@@ -293,7 +308,7 @@ function model_from_parameters(lin::LinMode,
                                 absorption_model,
                                 params.spec_bands[i_band],
                                 profile.vmr[mol_name],
-                                profile)
+                                profile; pressure_tangent)
                     else
                         compute_absorption_profile!(
                             τ_abs[i_band],
@@ -302,20 +317,22 @@ function model_from_parameters(lin::LinMode,
                             abs_params.luts[i_band][lut_offset + molec_i],
                             params.spec_bands[i_band],
                             profile.vmr[mol_name],
-                            profile)
+                            profile; pressure_tangent)
                     end
                 end
             end
         end
 
-        # The pressure tangent holds cross sections, T, q, and VMR fixed for
-        # ordinary line absorption, so its bottom-layer dependence is through
-        # molecular column only. CIA and MT_CKD also scale with midpoint
-        # pressure and receive that additional analytic factor below.
-        dry_ratio_dot =
-            psurf_tangents.vcd_dry_dot[end] / profile.vcd_dry[end]
-        τ̇_abs_psurf[i_band][:, end] .=
-            τ_abs[i_band][:, end] .* dry_ratio_dot
+        # At fixed final-grid T, q, and VMR, dτ/dp_surf contains both the
+        # cross-section response (accumulated above) and molecular-column
+        # response. Only the bottom interface moves: dp_full[end]/dp_surf=1/2.
+        # CIA and MT_CKD receive their separate density scaling below.
+        dry_ratio_dot = compute_pressure_jacobians ?
+            psurf_tangents.vcd_dry_dot[end] / profile.vcd_dry[end] : zero(FT)
+        if compute_pressure_jacobians
+            τ̇_abs_psurf[i_band][:, end] .+=
+                τ_abs[i_band][:, end] .* dry_ratio_dot
+        end
         midpoint_pressure_ratio_dot = FT(0.5) / profile.p_full[end]
         binary_ratio_dot = dry_ratio_dot + midpoint_pressure_ratio_dot
 
@@ -336,7 +353,9 @@ function model_from_parameters(lin::LinMode,
                     # particular `@views lhs .+=` in situ ("invalid let
                     # syntax"; fine on 1.11+). An indexed `.+=` LHS is already
                     # in-place via dotview, so only the RHS slice needs @view.
-                    τ̇_abs_psurf[i_band][:, end] .+= @view(τ_cia[:, end]) .* binary_ratio_dot
+                    if compute_pressure_jacobians
+                        τ̇_abs_psurf[i_band][:, end] .+= @view(τ_cia[:, end]) .* binary_ratio_dot
+                    end
                 end
             end
 
@@ -355,8 +374,10 @@ function model_from_parameters(lin::LinMode,
                     τ_abs[i_band] .+= τ_continuum
                     # Same 1.10.12 lowering quirk as the CIA block above:
                     # indexed `.+=` is already in-place; @view the RHS only.
-                    τ̇_abs_psurf[i_band][:, end] .+=
-                        @view(τ_continuum[:, end]) .* binary_ratio_dot
+                    if compute_pressure_jacobians
+                        τ̇_abs_psurf[i_band][:, end] .+=
+                            @view(τ_continuum[:, end]) .* binary_ratio_dot
+                    end
                 end
             end
         end
@@ -512,8 +533,6 @@ function model_from_parameters(lin::LinMode,
             # use exact CDF differences at geometric layer interfaces.
             τₚ, dτₚdp₀, dτₚdσp =
                 getAerosolLayerOptProp(lin, 1, c_aero.profile, profile)
-            dτₚdpsurf = aerosol_profile_psurf_tangent(
-                c_aero.profile, profile, psurf_tangents.Δz_dot)
 
             # ────────────────────────────────────────────────────────────────
             # Aerosol optical depth per layer:
@@ -527,8 +546,12 @@ function model_from_parameters(lin::LinMode,
             #        ∂τ_aer/∂p = (τ_ref/k_ref)·k(λ)·∂τₚ/∂p
             # ────────────────────────────────────────────────────────────────
             τ_aer[i_band][i_aer,:,:] = τ_ref .* aod_scale .* τₚ'
-            τ̇_aer_psurf[i_band][i_aer, :, :] .=
-                τ_ref .* aod_scale .* dτₚdpsurf'
+            if compute_pressure_jacobians
+                dτₚdpsurf = aerosol_profile_psurf_tangent(
+                    c_aero.profile, profile, psurf_tangents.Δz_dot)
+                τ̇_aer_psurf[i_band][i_aer, :, :] .=
+                    τ_ref .* aod_scale .* dτₚdpsurf'
+            end
 
             τ̇_aer[i_band][i_aer,1,:,:] .=
                 aod_scale .* τₚ'
@@ -598,9 +621,9 @@ function model_from_parameters(lin::LinMode,
     _to_model_ft(x) = (FT2 <: AbstractFloat && FT2 !== FT) ?
         map(a -> convert(Array{FT, ndims(a)}, a), x) : x
     return model, RTModelLin(_to_model_ft(τ̇_abs), _to_model_ft(τ̇_aer), lin_aerosol_optics,
-                             _to_model_ft(τ̇_rayl_psurf),
-                             _to_model_ft(τ̇_aer_psurf),
-                             _to_model_ft(τ̇_abs_psurf))
+                             compute_pressure_jacobians ? _to_model_ft(τ̇_rayl_psurf) : nothing,
+                             compute_pressure_jacobians ? _to_model_ft(τ̇_aer_psurf) : nothing,
+                             compute_pressure_jacobians ? _to_model_ft(τ̇_abs_psurf) : nothing)
 end
 
 """

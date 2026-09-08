@@ -440,7 +440,7 @@ end  # @testset Phase 2 loading
     # ── Test M2b: SolverConfig l_max re-derivation with NoTruncation ─────────
     # With δBGE truncation the stream_l_cap clamps l_max so small and large
     # particles produce the same l_max.  This sub-test uses NoTruncation to
-    # expose the raw Greek-series length and proves that _rewrite_solver_fourier_bounds!
+    # expose the raw Greek-series length and proves that _updated_solver_fourier_bounds
     # actually tracks the change.
     @testset "M2b — SolverConfig l_max changes under NoTruncation" begin
         println("\n  M2b: SolverConfig l_max change with NoTruncation")

@@ -20,8 +20,8 @@ SIF now enters through clean double-dispatch:
 | `PreparedNoSource`    | any                                            | no-op                                                |
 | `PreparedSourceSet`   | any                                            | iterate over members                                 |
 | `PreparedSolarBeam`   | any                                            | no-op (solar surface reflection still in `create_surface_layer!`; moves out in 5c) |
-| `PreparedSurfaceSIF`  | `LambertianSurfaceScalar/Legendre/Spline`      | factor 2 · SIF₀ broadcast to all Nquad streams (m=0) |
-| `PreparedSurfaceSIF`  | other (`rpv`, `RossLi`, `CoxMunk`, `Canopy`)   | no-op (no SIF emission model for non-Lambertian)     |
+| `PreparedSurfaceSIF`  | `LambertianSurfaceScalar/Spectrum/Legendre/Spline` | factor 2 · SIF₀ broadcast to all Nquad streams (m=0) |
+| `PreparedSurfaceSIF`  | other (`rpv`, `RossLi`, `CoxMunk`, `Canopy`)   | nonzero/retrievable SIF rejected at the solve boundary |
 
 # Units convention
 
@@ -66,6 +66,11 @@ must not be mixed.
 
 When `SIF₀ === nothing`, [`prepare_source`](@ref) materialises a zero
 matrix — the source is a no-op (useful as a placeholder).
+Nonzero prescribed emission and retrievable coefficients require a scalar,
+spectral, Legendre, or spline Lambertian surface. Unsupported combinations
+throw `ArgumentError` at solve time, including split surface replay. A zero
+prescribed source is allowed on any surface; zero retrievable amplitudes still
+require SIF support because their derivatives are nonzero.
 
 # Fields
 - `SIF₀ :: Union{Nothing, AbstractMatrix}`: surface emission Stokes

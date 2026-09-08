@@ -100,6 +100,15 @@ end
         "q" => [0.0, 0.01],
         "vmr" => Dict("CO2" => [4.0e-4, 4.1e-4], "O2" => 0.2095),
     ))
+    profile32 = read_atmos_profile_dict(Dict(
+        "T" => [250, 260],
+        "p_half" => [100, 500, 1000],
+        "q" => [0.0, 0.01],
+        "vmr" => Dict("CO2" => [4e-4, 4.1e-4]),
+    ); FT=Float32)
+    @test eltype(profile32.T) === Float32
+    @test eltype(profile32.p_half) === Float32
+    @test eltype(profile32.vmr["CO2"]) === Float32
     @test profile.T == [240.0, 280.0]
     @test profile.q == [0.0, 0.01]
     @test profile.p_full == [300.0, 750.0]

@@ -1189,8 +1189,7 @@ Base.@kwdef struct RTNumericalParameters{FT<:AbstractFloat}
     dτ_min_floor::FT = FT(1024) * eps(FT)
 
     "BLAS thread cap applied at every `rt_run` invocation. `nothing`
-    means leave the BLAS thread setting alone (use whatever
-    `LinearAlgebra.BLAS.get_num_threads()` returned at session start).
+    means leave the current BLAS thread setting alone.
     Why cap: the batched-GEMM call sites in `cpu_batched.jl` and the
     elemental/doubling/interaction kernels operate on small matrices
     (NSTREAMS·n_stokes ≈ 12-48 per side) tiled across a wide spectral
@@ -1199,8 +1198,11 @@ Base.@kwdef struct RTNumericalParameters{FT<:AbstractFloat}
     The VLIDORT baseline harness empirically picked 8 as the sweet spot
     on a 128-thread machine; `1` is the most defensive choice when a
     single process owns all spectral points and threading happens at
-    the batched outer level. Set via the `numerics.blas_threads` YAML
-    key, or programmatically with
+    the batched outer level. This is a process-wide, persistent setting,
+    despite being selected from a model: it is not restored after the run and
+    models with different values must not execute concurrently in one process.
+    Set it once for an application via the `numerics.blas_threads` YAML key,
+    or programmatically with
     `RTNumericalParameters{FT}(blas_threads = 8)`."
     blas_threads::Union{Nothing, Int} = nothing
 
@@ -1581,6 +1583,10 @@ get_spec_bands(m::RTModel) = m.atmosphere.spec_bands
 # Allows shorthand access (model.τ_abs, model.profile, model.obs_geom, etc.)
 # on RTModel, forwarding to the appropriate sub-struct field.
 
+const _RTMODEL_PROPERTY_ALIASES = (
+    :τ_abs, :τ_rayl, :τ_aer, :aerosol_optics, :greek_rayleigh,
+    :greek_cabannes, :ϖ_Cabannes, :obs_geom, :profile, :l_max)
+
 function Base.getproperty(m::RTModel, s::Symbol)
     s === :τ_abs && return m.optics.τ_abs
     s === :τ_rayl && return m.optics.τ_rayl
@@ -1594,6 +1600,9 @@ function Base.getproperty(m::RTModel, s::Symbol)
     s === :l_max && return m.solver.l_max
     return getfield(m, s)
 end
+
+Base.propertynames(m::RTModel, private::Bool=false) =
+    (fieldnames(typeof(m))..., _RTMODEL_PROPERTY_ALIASES...)
 
 # ── Linearized optics ────────────────────────────────────────────────────
 

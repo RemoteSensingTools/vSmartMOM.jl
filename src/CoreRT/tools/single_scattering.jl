@@ -313,7 +313,7 @@ function tms_correction!(R_SFI::AbstractArray{FT,3}, model, iBand,
 end
 
 """
-    rt_run_ss_exact(model; i_band=1) -> Array (nvza × nStokes × nSpec)
+    rt_run_ss_exact(model; i_band=1, sources=nothing) -> Array (nvza × nStokes × nSpec)
 
 Standalone exact (untruncated) single-scattering TOA radiance — the
 analytic first-order reference. Uses the same engine as the TMS
@@ -322,14 +322,30 @@ untruncated phase functions, no Fourier loop at all
 (O(nlayers × ngeom × nSpec)). This is the exact-SS reference the
 Fourier-space `rt_run_ss` (which runs on truncated per-mode optics)
 cannot be: the azimuth expansion of a peaked kernel converges too slowly.
+
+Uses `model.sources` unless overridden by `sources`. Supports one unpolarized
+`SolarBeam` with its supplied irradiance, or `NoSource` for zero radiance.
+This atmosphere-only reference includes no surface reflection or emission;
+nonzero/retrievable `SurfaceSIF`, thermal sources, and polarized incident beams
+throw `ArgumentError`.
 """
-function rt_run_ss_exact(model; i_band::Integer = 1)
+function rt_run_ss_exact(model; i_band::Integer = 1,
+                         sources::Union{Nothing,AbstractSource} = nothing)
     FT = float_type(model)
     iB = Int(i_band)
     (; vza) = model.obs_geom
     pol_n = polarization_type(model).n
     nSpec = size(model.τ_abs[iB], 1)
     nZ    = size(model.τ_abs[iB], 2)
+
+    effective_sources = sources === nothing ? model.sources : sources
+    validate_source_requests(effective_sources, model.geometry.sza, get_surface(model, iB))
+    _exact_ss_source_supported(effective_sources) || throw(ArgumentError(
+        "rt_run_ss_exact is an atmosphere-only solar-scattering reference; " *
+        "nonzero/retrievable SurfaceSIF and thermal emission are unsupported."))
+    prepared = prepare_sources(effective_sources, FT, pol_n, nSpec, Array)
+    F₀ = extract_solar_F₀(prepared, FT, pol_n, nSpec, Array)
+    _require_unpolarized_solar(F₀, "rt_run_ss_exact")
 
     # UNSCALED cumulative optical depth: gas + Rayleigh + raw aerosol.
     Δτ = Matrix{FT}(undef, nSpec, nZ)
@@ -344,6 +360,12 @@ function rt_run_ss_exact(model; i_band::Integer = 1)
     τ_above = hcat(zeros(FT, nSpec), cumsum(Δτ, dims = 2)[:, 1:end-1])
 
     ΔI = zeros(FT, length(vza), pol_n, nSpec)
-    _exact_ss_accumulate!(ΔI, model, iB, τ_above, Δτ; untruncated = true)
+    _exact_ss_accumulate!(ΔI, model, iB, τ_above, Δτ;
+                          untruncated = true, F₀_I = @view(F₀[1, :]))
     return ΔI
 end
+
+_exact_ss_source_supported(::AbstractSource) = false
+_exact_ss_source_supported(::Union{SolarBeam,NoSource}) = true
+_exact_ss_source_supported(s::SurfaceSIF) = !_requires_surface_sif(s)
+_exact_ss_source_supported(s::SourceSet) = all(_exact_ss_source_supported, s.sources)

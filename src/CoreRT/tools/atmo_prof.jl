@@ -234,21 +234,39 @@ end
 "Copy reframed vertical source fields into an existing model source tree."
 _copy_vertical_sources!(::AbstractSource, ::AbstractSource) = nothing
 
-function _copy_vertical_sources!(destination::ThermalEmission,
-                                 source::ThermalEmission)
+"Validate that a reframed source tree can be copied without mutating the destination."
+_validate_vertical_source_copy(::AbstractSource, ::AbstractSource) = nothing
+
+function _validate_vertical_source_copy(destination::ThermalEmission,
+                                        source::ThermalEmission)
     source.B_layer === nothing && return nothing
     destination.B_layer === nothing && throw(ArgumentError(
         "cannot add a per-layer ThermalEmission to an existing zero-placeholder source"))
     size(destination.B_layer) == size(source.B_layer) || throw(ArgumentError(
         "updated ThermalEmission grid has size $(size(source.B_layer)); " *
         "BatchContext was built with size $(size(destination.B_layer))"))
+    return nothing
+end
+
+function _validate_vertical_source_copy(destination::SourceSet, source::SourceSet)
+    length(destination) == length(source) || throw(ArgumentError(
+        "updated source composition differs from the BatchContext source composition"))
+    for (dest, src) in zip(destination.sources, source.sources)
+        _validate_vertical_source_copy(dest, src)
+    end
+    return nothing
+end
+
+function _copy_vertical_sources!(destination::ThermalEmission,
+                                 source::ThermalEmission)
+    _validate_vertical_source_copy(destination, source)
+    source.B_layer === nothing && return nothing
     destination.B_layer .= source.B_layer
     return nothing
 end
 
 function _copy_vertical_sources!(destination::SourceSet, source::SourceSet)
-    length(destination) == length(source) || throw(ArgumentError(
-        "updated source composition differs from the BatchContext source composition"))
+    _validate_vertical_source_copy(destination, source)
     for (dest, src) in zip(destination.sources, source.sources)
         _copy_vertical_sources!(dest, src)
     end
@@ -702,6 +720,15 @@ _layer_absorption_cross_section(
 _layer_absorption_cross_section(model, grid, p, T, ::Real) =
     absorption_cross_section(model, grid, p, T)
 
+# AA's regular table has a fixed broadener abundance, as does the legacy
+# BSpline table. Match the batched forward path in scalar/linearized queries.
+_layer_absorption_cross_section(model::AtmosphericAbsorption.InterpolationModel,
+                                grid, p, T, ::Nothing) =
+    AtmosphericAbsorption.compute_cross_section(model, grid, p, T)
+_layer_absorption_cross_section(model::AtmosphericAbsorption.InterpolationModel,
+                                grid, p, T, ::Real) =
+    AtmosphericAbsorption.compute_cross_section(model, grid, p, T)
+
 # Native ABSCO tables carry a tabulated H₂O-broadener axis — route the
 # per-layer broadener VMR into the LUT lookup (surface-split behavior).
 _layer_absorption_cross_section(model::AtmosphericAbsorption.AbscoLUT, grid, p, T,
@@ -733,6 +760,7 @@ function compute_absorption_profile!(τ_abs::Array{FT,2},
                                      ;
                                      self_broadener_vmr=nothing,
                                      batched::Bool=true,
+                                     pressure_tangent=nothing,
                                      ) where FT 
 
     # The array to store the cross-sections must be same length as number of layers
@@ -760,6 +788,8 @@ function compute_absorption_profile!(τ_abs::Array{FT,2},
             vmr_curr = vmr isa AbstractArray ? vmr[iz] : vmr
             @views τ_abs[:, iz] .+= σmat[:, iz] .* (profile.vcd_dry[iz] * vmr_curr)
         end
+        _accumulate_absorption_pressure!(pressure_tangent, absorption_model,
+            grid, vmr, profile, self_broadener_vmr)
         return
     end
 
@@ -781,6 +811,8 @@ function compute_absorption_profile!(τ_abs::Array{FT,2},
             absorption_model, grid, p, T, broadener_curr))
         @views τ_abs[:,iz] .+= σ .* (profile.vcd_dry[iz] * vmr_curr)
     end
+    _accumulate_absorption_pressure!(pressure_tangent, absorption_model,
+        grid, vmr, profile, self_broadener_vmr)
     
 end
 
@@ -818,9 +850,10 @@ column. Line broadening instead requires the moist-air H₂O mole fraction
 function compute_h2o_absorption_profile!(τ_abs::Array{FT,2},
                                          absorption_model,
                                          grid,
-                                         profile::AtmosphericProfile) where FT
+                                         profile::AtmosphericProfile;
+                                         pressure_tangent=nothing) where FT
     x_h2o = _h2o_moist_mole_fraction.(profile.vmr_h2o)
     return compute_absorption_profile!(
         τ_abs, absorption_model, grid, profile.vmr_h2o, profile;
-        self_broadener_vmr=x_h2o)
+        self_broadener_vmr=x_h2o, pressure_tangent)
 end

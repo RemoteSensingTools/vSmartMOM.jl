@@ -281,6 +281,7 @@ surface would ever be replayed; rebuild with `cache_mode = :full`.
 """
 function rt_run_surface(cache::AtmosphereRTCache{FT}, brdf;
                         verbose::Bool = false) where {FT}
+    validate_source_surface(cache.prepared_sources, brdf)
     if brdf isa CanopySurface
         throw(ArgumentError("rt_run_surface does not support CanopySurface (deferred — see the module-level scope note in rt_run_split.jl)."))
     end

@@ -22,7 +22,9 @@ try
 @testset "Absorption" begin include("test_Absorption.jl") end
 @testset "HITRAN cache" begin include("test_hitran_cache.jl") end
 @testset "Parameter copies" begin include("test_copy_parameters.jl") end
+@testset "Idiomatic Julia interfaces" begin include("test_julia_interfaces.jl") end
 @testset "Absorption column integration" begin include("test_absorption_column_integration.jl") end
+@testset "Absorption pressure derivatives" begin include("test_absorption_pressure.jl") end
 @testset "H2O self broadening" begin include("test_h2o_self_broadening.jl") end
 @testset "Scattering" begin include("test_Scattering.jl") end
 
@@ -222,12 +224,14 @@ end
 # Validates bit-equality of optical depths and radiances across scene updates,
 # round-trip consistency, and guard rails.
 @testset "BatchContext update_model!" begin include("test_update_model.jl") end
+@testset "BatchContext failure-state integrity" begin include("test_update_model_transaction.jl") end
 
 # v0.6 source-term refactor — AbstractSource vocabulary, SolarBeam, BlackbodySource,
 # SurfaceSIF, surface_source_contribute! double-dispatch, prepared_sources flow.
 # Includes the full Phase 1 → 5b regression assertions and end-to-end bit-equality
 # checks via small CPU rt_run scenarios on PureRayleighParameters.
 @testset "Sources (v0.6)" begin include("test_sources.jl") end
+@testset "Source request validation" begin include("test_source_validation.jl") end
 
 # v0.7 Phase A — ThermalEmission per-layer Planck volume source.
 # Pins the corrected TIR weight rule (overrides REFACTOR_SPEC_v6 §2.11):

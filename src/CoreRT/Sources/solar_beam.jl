@@ -40,13 +40,12 @@ default.
   constraint so users can pass a `Matrix{Float32}` into a
   `Float64` model (or vice versa) — the conversion happens once in
   `prepare_source`.
-- `sza :: Union{Nothing, Real}`: **advisory only in v0.6.** vSmartMOM
-  currently always reads SZA from `RTModel.obs_geom.sza` (which is fixed
-  at model construction by `parameters_from_yaml(...).sza`). The
-  `SolarBeam.sza` field is reserved for a future per-source-geometry
-  override (rt_run will rebuild quad_points from this when set), but
-  setting it today is a no-op — the model's geometry wins. To change
-  SZA today, set `params.sza` before `model_from_parameters(params)`.
+- `sza :: Union{Nothing, Real}`: optional solar zenith angle in degrees.
+  When supplied, it must match the model geometry at the model's floating-point
+  precision; a mismatch throws `ArgumentError` at solve time. To change SZA,
+  set `params.sza` before `model_from_parameters(params)` or use
+  `remake_geometry`. A solve supports at most one `SolarBeam` (including
+  `BlackbodySource`); sum irradiance spectra into one beam for a shared geometry.
 
 # AD mode
 [`source_ad_mode`](@ref) returns [`AnalyticSourceJacobian`](@ref); Phase 3
@@ -57,7 +56,7 @@ provides the analytic `source_tangent!` body (relocated from
 
 ```julia
 sb = SolarBeam()                                   # default unit Stokes I
-sb = SolarBeam(; sza = 35.0)                       # reserved metadata; does not override model SZA
+sb = SolarBeam(; sza = 35.0)                       # requires model SZA = 35 degrees
 sb = SolarBeam(; F₀ = my_solar_irradiance)         # custom spectrum
 ```
 """

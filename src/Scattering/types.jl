@@ -474,10 +474,10 @@ mutable struct GreekCoefs{FT<:Real}
     ζ::AbstractArray{FT}
 end
 
-""" Extend Base.isapprox (≈) to compare two GreekCoefs """
-function Base.:isapprox(greek_coefs_a::GreekCoefs, greek_coefs_b::GreekCoefs) 
-    field_names = fieldnames(GreekCoefs)
-    return all([getproperty(greek_coefs_a, field) ≈ getproperty(greek_coefs_b, field) for field in field_names])
+"""Compare each physical coefficient array, forwarding standard tolerances."""
+function Base.isapprox(a::GreekCoefs, b::GreekCoefs; kwargs...)
+    return all(field -> isapprox(getproperty(a, field), getproperty(b, field); kwargs...),
+               fieldnames(typeof(a)))
 end
 
 """ 
