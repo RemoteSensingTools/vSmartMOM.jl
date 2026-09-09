@@ -1,7 +1,24 @@
 # RRS–XCO2 work summary
 
-Last updated: 2026-08-19  
-Working branch: `suniti_multi_sensor`
+Last updated: 2026-09-09
+Working branch: `integration/round5-jacobian-speedup`
+
+## Current retrieval rounds
+
+- Round 4 fixes the SIF radiance at 759 nm and retrieves its slope for SIF-on
+  scenes.
+- Round 5 fixes both the 759-nm SIF radiance and its slope. It tightens only
+  the UTLS sulfate `ln(AOD760)` and `ln(z0/km)` standard deviations by a
+  factor of ten and uses a 28-coordinate retrieval state.
+- The complete CO2 prior mean and covariance are exactly unchanged between
+  rounds 4 and 5. A more flexible vertical CO2 covariance is reserved for a
+  separately validated round 6.
+
+The authoritative definition is
+[`inversion/retrieval_setup/ROUND5_FIXED_SIF_PRIOR.md`](inversion/retrieval_setup/ROUND5_FIXED_SIF_PRIOR.md).
+The controlled migration onto the optimized analytical-Jacobian lineage is
+documented in
+[`inversion/retrieval_setup/ANALYTICAL_JACOBIAN_SPEEDUP_INTEGRATION.md`](inversion/retrieval_setup/ANALYTICAL_JACOBIAN_SPEEDUP_INTEGRATION.md).
 
 ## Objective
 

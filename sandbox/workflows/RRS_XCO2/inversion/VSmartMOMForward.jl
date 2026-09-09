@@ -318,7 +318,7 @@ end
 """Evaluate noRS vSmartMOM and its selected Jacobian through the OCO operator."""
 function evaluate_oco_forward(evaluator::OCOForwardEvaluator,
                               state::AbstractVector)
-    params = deepcopy(evaluator.base_parameters)
+    params = copy_parameters(evaluator.base_parameters; share_luts=true)
     physical = apply_retrieval_state!(
         params, state, evaluator.tau_ref_scale;
         fixed_upper_co2_vmr=evaluator.fixed_upper_co2_vmr)
@@ -341,7 +341,10 @@ function evaluate_oco_forward(evaluator::OCOForwardEvaluator,
             solar_T=evaluator.solar_transmission)
         result = nothing
         rt_seconds += @elapsed begin
-            result = rt_run_lin(model, lin_model; i_band=iband, sources)
+            result = rt_run_lin(
+                model, lin_model; i_band=iband, sources,
+                jacobian_basis=:local,
+                jacobian_adding=:source)
             evaluator.synchronize_backend()
         end
         stokes, local_jacobian = _canonical_toa(result)
