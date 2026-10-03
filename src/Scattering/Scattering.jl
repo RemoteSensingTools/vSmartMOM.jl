@@ -26,6 +26,7 @@ using ..vSmartMOM: RT_Mode, FwdMode, LinMode
 
 include("types.jl")                       # All types used in this module
 include("types_lin.jl")                   # Derivative types for linearization
+include("molecular_rayleigh.jl")          # Pure-gas Rayleigh dispersion + depolarization
 include("gpu_precision.jl")              # DS arithmetic, Neumaier accumulators (GPU-compatible)
 include("mie_helper_functions.jl")        # Mie file-related functions
 include("analytic_phase_functions.jl")    # Analytic phase functions -> Greek coefficients
@@ -47,7 +48,8 @@ include("compute_Z_matrices.jl")
 # Export make functions/types
 export make_mie_model, reconstruct_phase, greek_coefficients,
        greek_coefficients_from_scattering_matrix, analytic_aerosol_optics,
-       phase_matrix_first_column, scattering_matrix
+       phase_matrix_first_column, scattering_matrix,
+       molecular_rayleigh_properties, molecular_rayleigh_cross_section_ratio
 
 # Export types
 export NAI2, PCW, Aerosol, MieModel, Stokes_IQUV, Stokes_I, Stokes_IQ,

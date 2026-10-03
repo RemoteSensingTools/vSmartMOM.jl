@@ -58,7 +58,8 @@ export AbstractJacobianFlavor, OCO_RRS_synth, JacobianPlan,
 export HenyeyGreensteinPhaseFunction,
        SyntheticPolarizedHenyeyGreensteinPhaseFunction,
        greek_coefficients, analytic_aerosol_optics,
-       phase_matrix_first_column
+       phase_matrix_first_column,
+       molecular_rayleigh_properties, molecular_rayleigh_cross_section_ratio
 
 # GPU/CPU Architecture (from Oceanigans)
 include("Architectures.jl")
@@ -77,7 +78,9 @@ include("Scattering/Scattering.jl")
 using .Scattering: HenyeyGreensteinPhaseFunction,
                    SyntheticPolarizedHenyeyGreensteinPhaseFunction,
                    greek_coefficients, analytic_aerosol_optics,
-                   phase_matrix_first_column
+                   phase_matrix_first_column,
+                   molecular_rayleigh_properties,
+                   molecular_rayleigh_cross_section_ratio
 
 # Inelastic Scattering module:
 include("Inelastic/InelasticScattering.jl")

@@ -179,6 +179,7 @@ material when explaining the package:
 | Vertical layer stacking (`*`) | `src/CoreRT/types.jl:1096+` |
 | δ-M truncation | `src/CoreRT/LayerOpticalProperties/delta_m_truncation.jl:44–48` |
 | Mie / Greek (NAI-2 vs PCW) | `src/Scattering/compute_NAI2.jl:44`, `compute_PCW.jl:28` |
+| Pure-gas elastic Rayleigh properties (He/Ar/N₂/O₂/CO₂) | `src/Scattering/molecular_rayleigh.jl` |
 | Phase matrix Z from Greek + μ | `src/Scattering/compute_Z_matrices.jl::compute_Z_moments` |
 | HITRAN absorption | `src/Absorption/compute_absorption_cross_section.jl:32–280` |
 | Elemental (r, t, j) | `src/CoreRT/CoreKernel/elemental.jl:207–252` |

@@ -22,6 +22,7 @@ try
 @testset "Absorption column integration" begin include("test_absorption_column_integration.jl") end
 @testset "H2O self broadening" begin include("test_h2o_self_broadening.jl") end
 @testset "Scattering" begin include("test_Scattering.jl") end
+@testset "Molecular Rayleigh" begin include("test_molecular_rayleigh.jl") end
 @testset "CoreRT" begin include("test_CoreRT.jl") end
 @testset "Batched Kernels" begin include("test_batched_kernels.jl") end
 @testset "SolarModel" begin include("test_SolarModel.jl") end

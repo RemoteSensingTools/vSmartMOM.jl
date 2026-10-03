@@ -167,6 +167,46 @@ that dominate aerosol retrievals over ocean. Selection is via the
 
 ## Rayleigh and the Cabannes choice
 
+### Pure-gas elastic Rayleigh data
+
+`molecular_rayleigh_properties(species, wavelength_nm)` supplies reviewed
+UV-visible elastic-Rayleigh inputs for pure `He`, `Ar`, `N2`, `O2`, and `CO2`:
+the refractive index, King factor, solver depolarization ratio, and scattering
+cross section in cm² molecule⁻¹. The companion
+`molecular_rayleigh_cross_section_ratio(species, λ, λ_ref)` is useful for a
+matched-reference-optical-depth experiment,
+
+```math
+\tau_R(\lambda) = \tau_R(\lambda_{ref})
+                  \frac{\sigma_R(\lambda)}{\sigma_R(\lambda_{ref})}.
+```
+
+The cross section follows the refractive-index/King-factor expression compiled
+and UV-visible validated by [He et al. (2021)](https://doi.org/10.5194/acp-21-14927-2021):
+
+```math
+\sigma_R = \frac{24\pi^3\nu^4}{N^2}
+           \left(\frac{n^2-1}{n^2+2}\right)^2 F_K,
+\qquad
+\rho = \frac{6(F_K-1)}{7F_K+3}.
+```
+
+Here ``\rho`` is exactly the depolarization convention consumed by
+`get_greek_rayleigh`. He and Ar are monatomic, so ``F_K=1`` and ``\rho=0``;
+they still have different cross-section dispersion. These helpers deliberately
+do not infer pressure, mean molecular mass, or layer column. They also do not
+turn on Raman redistribution. A caller comparing gases at fixed
+``\tau_R(\lambda_{ref})`` must set the optical-depth profile explicitly and
+build the Greek phase source from the returned depolarization at each
+wavelength (or place wavelengths with distinct depolarization in separate
+bands).
+
+This is the first elastic component of composition-sensitive molecular
+scattering. The existing automatic `model_from_parameters` Rayleigh optical
+depth remains the terrestrial N₂/O₂ Bodhaine path until the atmospheric
+composition schema is connected to molecular columns and scattering-weighted
+phase-matrix mixing.
+
 For the molecular contribution (no aerosols, just air molecules):
 
 - **Pure-elastic runs** (`noRS`) use the *full Rayleigh* Greek expansion. In
