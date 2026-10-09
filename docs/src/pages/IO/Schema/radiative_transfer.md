@@ -136,6 +136,36 @@ legacy `l_trunc` is ignored and `nstreams` wins.
   - `verbose`          *(default `false`)*  — when `true`, `rt_run`
     prints the `TimerOutputs` timing tree at the end of each call
     (useful for profiling, noisy in batched loops).
+  - `fourier_convergence` *(default `all`)* — `all` evaluates the complete
+    component-selected Fourier series. `intensity` enables a successive-moment
+    test, requiring `|ΔI_m| ≤ fourier_tolerance·|I_{0:m}|` at every monitored
+    view and wavelength. `stokes` applies the corresponding componentwise test
+    `|ΔS_{k,m}| ≤ fourier_tolerance·|S_{k,0:m}|` to every propagated Stokes
+    component (I/Q/U for `Stokes_IQU`). Forward RRS tests both its elastic and
+    inelastic outputs. Combined analytic-linearization uses the same
+    forward-derived stopping moment and retains every Jacobian contribution
+    through that moment.
+  - `fourier_tolerance` *(default `1e-5` when convergence is selected)* —
+    positive relative threshold for each monitored Fourier contribution.
+  - `fourier_min_m` *(default and minimum `3`)* — the convergence guard extends
+    through `min(fourier_min_m-1, m_max)`, where the per-band `m_max` is already
+    resolved from the active scatterers, surface, source, and numerical caps.
+    Thus scalar Rayleigh retains `m=2` despite its structural `beta_1=0`, while
+    an exact `m_max=0` Lambertian-vacuum or isotropic-scattering case evaluates
+    only `m=0`; the convergence rule never creates extra moments. For a series
+    with `m_max>=3`, the default two-pass rule can first exit after `m=4`.
+  - `fourier_n_consecutive` *(default `2`, minimum `1`)* — number of successive
+    passing moments required after the protected low-order range. The
+    `fourier_min_m` guard—not this counter—ensures that a vanishing `m=1`
+    cannot discard Rayleigh's nonzero `m=2`. Use one confirmation only after
+    validating that isolated higher-order gaps cannot occur for the selected
+    geometry; the OCO nadir workflow does so and exits after a negligible
+    `m=3` contribution.
+
+  Fourier convergence is opt-in because off-nadir and azimuthally structured
+  scenes need their own accuracy validation. A stream callback (`rt_run_streams`)
+  always evaluates the complete series so per-moment diagnostics remain
+  available even when the model otherwise enables convergence.
 
 ## Example — minimal new schema
 

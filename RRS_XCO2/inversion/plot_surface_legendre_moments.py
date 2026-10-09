@@ -10,6 +10,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 from netCDF4 import Dataset
 
+from co2_plot_metadata import co2_case_label
+from retrieval_plot_schema import RetrievalPlotSchema
+
 
 DEFAULT_TRUTH_TABLE = Path(__file__).resolve().parents[1] / "truth_map" / "true_states.dat"
 BANDS = (
@@ -57,10 +60,17 @@ def main():
         state_index = int(dataset.getncattr("truth_state_index"))
         perturbation_index = int(dataset.getncattr("perturbation_index"))
         retrieval_class = str(dataset.getncattr("measurement_class"))
+        truth_xco2 = float(dataset.getncattr("truth_xco2_ppm"))
+        truth_bottom_co2 = (
+            float(dataset.getncattr("truth_bottom_co2_ppm"))
+            if "truth_bottom_co2_ppm" in dataset.ncattrs() else None
+        )
         prior = dict(zip(names, np.asarray(dataset["a_priori_state"][:], float)))
         retrieved = dict(zip(names, np.asarray(dataset["final_state"][:], float)))
+        schema = RetrievalPlotSchema.from_dataset(dataset, str(args.retrieval))
 
     truth = read_truth_row(args.truth_table, state_index)
+    schema.validate_truth_row(truth, str(args.truth_table))
     fig, axes = plt.subplots(3, 3, figsize=(15, 10), constrained_layout=True)
     moment_labels = ("$c_0P_0(x)$", "$c_1P_1(x)$", "$c_2P_2(x)$")
 
@@ -102,7 +112,9 @@ def main():
     fig.suptitle(
         f"{retrieval_class.capitalize()} retrieval: state {state_index:03d}, "
         f"perturbation {perturbation_index:02d}\n"
-        "Surface Legendre contributions; $x$ is normalized wavenumber",
+        + co2_case_label(truth_bottom_co2, truth_xco2) + "\n"
+        + "Surface Legendre contributions; $x$ is normalized wavenumber\n"
+        + schema.description(),
         fontsize=15,
     )
     output.parent.mkdir(parents=True, exist_ok=True)

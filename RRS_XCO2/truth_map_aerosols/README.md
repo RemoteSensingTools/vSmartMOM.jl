@@ -163,6 +163,10 @@ values are 0.49 and 0.40, respectively.
 
 ## Files and reproduction
 
+- `MEASUREMENT_FINDINGS.md`: quantitative note on the approximately 25%
+  aerosol-polarization effect in the synthetic OCO analyzer, its potential for
+  aerosol-sensitive polarimetry, the near-insensitivity of the depolarized
+  pure RRS component, and the measurement-vector normalization convention.
 - `aerosol_vertical_profiles.dat`: exact boundaries, parameters, CDF layer
   fractions, and layer AOD for both the 12- and 16-layer grids.
 - `continuous_vertical_profiles.png`: continuous extinction/AOD-density

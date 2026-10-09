@@ -43,6 +43,20 @@ H₂O is auto-handled when `q` is set in the profile — don't list it
 manually. Its internal `vmr_h2o` value is also a dry-air molar ratio,
 `N_H2O/N_dry`, rather than a moist-air mole fraction.
 
+- **`h2o_absorption`** — optional `Vector{Bool}`, one entry per spectral
+  band; defaults to `true` for every band. Set an entry to `false` only when
+  the humidity profile must still participate in the moist/dry hydrostatic
+  column but H₂O line absorption is intentionally absent in that band. A
+  disabled band stores an explicit `:disabled` marker, so neither the forward
+  nor linearized constructor can silently fall back to an unrelated HITRAN
+  line calculation. Supplying an H₂O LUT for a disabled band is an error.
+
+  For example, a three-band ABSCO experiment with no A-band H₂O table can use:
+
+  ```yaml
+  h2o_absorption: [false, true, true]
+  ```
+
 ## Optional CIA and continuum fields
 
 - **`cia_files`** — list of HITRAN CIA inputs. An entry may be a legacy path

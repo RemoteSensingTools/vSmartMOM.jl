@@ -1,5 +1,13 @@
 # Three-aerosol OCO XCO2 experiment
 
+Cross-campaign retrieval visualizations are launched from
+[`visualization/`](visualization/).  The central physical-ensemble command
+takes a required index (1=full column, 2=tight bottom layer, 3=loose bottom
+layer, 4=loose bottom layer with the round-4 reduced SIF state) and writes into
+the selected campaign's plot directory.  Full usage and examples are in the
+[visualization guide](visualization/README.md); the durable option-by-option
+reference is the [plotting cheatsheet](visualization/CHEATSHEET.md).
+
 This workflow defines OCO-like O2 A (757–773 nm), weak CO2 (1589–1622 nm),
 and strong CO2 (2042–2084 nm) bands with three Mie aerosol modes:
 

@@ -1,6 +1,11 @@
 #!/usr/bin/env julia
 
-"""Validate every production synthetic OCO radiance file."""
+"""Validate every selected production synthetic OCO radiance file.
+
+Set `EXPECTED_STATES` to a comma-separated list of indices and/or inclusive
+ranges (for example `1-5,21-25`) when validating a campaign subset. The
+historical default remains `1-64`.
+"""
 
 using NCDatasets
 using Printf
@@ -10,6 +15,32 @@ using .SyntheticOCO2
 
 const DEFAULT_OUTPUT = normpath(joinpath(
     @__DIR__, "..", "..", "truth_map", "OCO_radiances"))
+const BOTTOM_LAYER_PROVENANCE_ATTRIBUTES = (
+    "campaign", "source_state_table", "column_xco2_ppm", "background_co2_ppm",
+    "bottom_co2_ppm", "bottom_co2_index", "bottom_co2_layer_index",
+    "co2_profile_order", "co2_profile_definition", "co2_profile_ppm",
+    "bottom_layer_dry_column_fraction", "state_table_sha256",
+    "full_column_source_state", "full_column_source_scene",
+    "full_column_source_sha256", "full_column_state_table_sha256",
+    "bottom_co2_truth_mode", "co2_truth_reuse_source", "producer_script",
+    "producer_script_sha256", "bottom_layer_truth_complete",
+)
+
+function expected_states(value=get(ENV, "EXPECTED_STATES", "1-64"))
+    result = Int[]
+    for token in split(value, ',')
+        fields = split(strip(token), '-'; limit=2)
+        if length(fields) == 1
+            push!(result, parse(Int, only(fields)))
+        else
+            append!(result, parse(Int, fields[1]):parse(Int, fields[2]))
+        end
+    end
+    isempty(result) && error("EXPECTED_STATES selected no states")
+    length(unique(result)) == length(result) || error(
+        "EXPECTED_STATES contains duplicate indices")
+    return sort!(result)
+end
 
 function output_files(directory)
     isdir(directory) || error("missing OCO radiance directory: $directory")
@@ -43,6 +74,19 @@ function validate_file(path, expected_state)
             error("state metadata does not match filename for $path")
         source_path = String(dataset.attrib["source_truth_scene"])
         isfile(source_path) || error("source truth scene is missing for $path")
+
+        if get(dataset.attrib, "campaign", "") == "bottom_layer_XCO2"
+            NCDataset(source_path) do source
+                for key in BOTTOM_LAYER_PROVENANCE_ATTRIBUTES
+                    haskey(dataset.attrib, key) || error(
+                        "$path is missing bottom-layer provenance attribute $key")
+                    haskey(source.attrib, key) || error(
+                        "$source_path is missing bottom-layer provenance attribute $key")
+                    dataset.attrib[key] == source.attrib[key] || error(
+                        "$key differs between $path and its source truth scene")
+                end
+            end
+        end
 
         for spec in BAND_SPECS
             grid = synthetic_grid(spec)
@@ -83,8 +127,9 @@ function main()
     directory = get(ENV, "SYNTHETIC_OCO_OUT", DEFAULT_OUTPUT)
     files = output_files(directory)
     states = state_from_name.(files)
-    states == collect(1:64) || error(
-        "expected states 001:064, found $(join(states, ','))")
+    expected = expected_states()
+    states == expected || error(
+        "expected states $(join(expected, ',')), found $(join(states, ','))")
 
     global_extrema = Dict(spec.name => (Inf, -Inf) for spec in BAND_SPECS)
     for (path, state) in zip(files, states)
@@ -98,7 +143,7 @@ function main()
         end
     end
 
-    @info "validated synthetic OCO radiances" directory files=length(files)
+    @info "validated synthetic OCO radiances" directory files=length(files) states
     for spec in BAND_SPECS
         minimum_value, maximum_value = global_extrema[spec.name]
         @printf("%-10s uncorrected I_OCO range: %.9g to %.9g mW m-2 sr-1 nm-1\n",

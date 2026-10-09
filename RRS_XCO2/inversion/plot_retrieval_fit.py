@@ -10,6 +10,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 from netCDF4 import Dataset
 
+from co2_plot_metadata import co2_case_label
+from retrieval_plot_schema import RetrievalPlotSchema
+
 
 BAND_LABELS = ("O$_2$ A band", "Weak CO$_2$ band", "Strong CO$_2$ band")
 
@@ -42,6 +45,14 @@ def main() -> None:
         retrieval_class = str(dataset.getncattr("measurement_class"))
         state_index = int(dataset.getncattr("truth_state_index"))
         perturbation_index = int(dataset.getncattr("perturbation_index"))
+        truth_xco2 = float(dataset.getncattr("truth_xco2_ppm"))
+        truth_bottom_co2 = (
+            float(dataset.getncattr("truth_bottom_co2_ppm"))
+            if "truth_bottom_co2_ppm" in dataset.ncattrs() else None
+        )
+        schema_description = RetrievalPlotSchema.from_dataset(
+            dataset, str(args.retrieval)
+        ).description()
 
     if not (
         wavelength.shape == measurement.shape == noise.shape == forward.shape
@@ -107,10 +118,11 @@ def main() -> None:
     axes[0, 1].legend(loc="best", frameon=False)
     axes[-1, 0].set_xlabel("Wavelength (nm)")
     axes[-1, 1].set_xlabel("Wavelength (nm)")
+    co2_label = co2_case_label(truth_bottom_co2, truth_xco2)
     fig.suptitle(
         f"{retrieval_class.capitalize()} retrieval: state {state_index:03d}, "
-        f"perturbation {perturbation_index:02d}",
-        fontsize=14,
+        f"perturbation {perturbation_index:02d}\n{co2_label}\n"
+        f"{schema_description}", fontsize=14,
     )
     output.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(output, dpi=180)

@@ -1,7 +1,25 @@
 # RRS–XCO2 work summary
 
-Last updated: 2026-08-19  
+Last updated: 2026-09-10
 Working branch: `suniti_multi_sensor`
+
+## Current retrieval rounds
+
+- Round 4 fixes the SIF radiance at 759 nm and retrieves its slope for SIF-on
+  scenes.
+- Round 5 fixes both the 759-nm SIF radiance and its slope. It also tightens
+  only the UTLS sulfate `ln(AOD760)` and `ln(z0/km)` standard deviations by a
+  factor of ten. Its 28-coordinate state and dedicated prior/runner are under
+  `RRS_XCO2/inversion/`.
+- Round 6 fixes both SIF coefficients but restores the original round-3/4
+  UTLS prior. Every non-SIF mean and covariance, including the complete CO2
+  block, is unchanged. The earlier CO2-relaxation proposal is not round 6.
+
+The authoritative round-5 definition is
+`inversion/retrieval_setup/ROUND5_FIXED_SIF_PRIOR.md`.
+The round-6 definition and launch instructions are
+`inversion/retrieval_setup/ROUND6_FIXED_SIF_PRIOR.md` and
+`inversion/GATTACA_ROUND6_FIXED_SIF.md`.
 
 ## Objective
 

@@ -19,6 +19,7 @@ have residual-radiance units.  They are the amplitudes that would be *added to
 the forward model*; the post-fit residual is therefore ``r + E*c``.
 """
 
+import argparse
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
@@ -72,12 +73,44 @@ def as_float(variable, key=slice(None)):
     return np.asarray(values, dtype=np.float64)
 
 
-def completed_retrievals():
+def parse_args():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--inversion-root", type=Path, default=INVERSION_ROOT,
+        help=(
+            "Directory containing corrected/ and uncorrected/ retrieval "
+            "products (default: the full-column inversion directory)"
+        ),
+    )
+    parser.add_argument(
+        "--output-root", type=Path,
+        help=(
+            "Directory for EOF-fit NetCDF, table, and plot products "
+            "(default: --inversion-root/eof_residual_fits)"
+        ),
+    )
+    parser.add_argument(
+        "--oco-root", type=Path,
+        default=Path(
+            __import__("os").environ.get("OCO_JACOBIAN_ROOT", DEFAULT_OCO_ROOT)
+        ),
+        help=(
+            "Directory containing l2_oco_eof.h5 and the four L1B files "
+            "(default: OCO_JACOBIAN_ROOT or the historical local path)"
+        ),
+    )
+    args = parser.parse_args()
+    if args.output_root is None:
+        args.output_root = args.inversion_root / "eof_residual_fits"
+    return args
+
+
+def completed_retrievals(inversion_root=INVERSION_ROOT):
     """Return complete retrieval paths indexed by class, state, perturbation."""
     result = {retrieval_class: defaultdict(dict) for retrieval_class in CLASSES}
     pattern = re.compile(r"retrieval_state(\d{3})_perturbation(\d{2})\.nc$")
     for retrieval_class in CLASSES:
-        for path in sorted((INVERSION_ROOT / retrieval_class).glob(
+        for path in sorted((inversion_root / retrieval_class).glob(
             "retrieval_state*_perturbation*.nc"
         )):
             match = pattern.match(path.name)
@@ -289,7 +322,7 @@ def plot_representative_basis(path, grids, source):
     plt.close(fig)
 
 
-def save_representative_basis(path, grids, source):
+def save_representative_basis(path, grids, source, oco_root=DEFAULT_OCO_ROOT):
     path.parent.mkdir(parents=True, exist_ok=True)
     with Dataset(path, "w") as dataset:
         dataset.createDimension("orbit", len(L1B_FILES))
@@ -325,7 +358,7 @@ def save_representative_basis(path, grids, source):
                 f"{band.key}_minimum_orbit_coverage_fraction", "f8", (dimension,)
             )
             coverage[:] = source["coverage"][band.key]
-        dataset.source_eof_file = str(DEFAULT_OCO_ROOT / EOF_FILE)
+        dataset.source_eof_file = str(oco_root / EOF_FILE)
         dataset.source_l1b_dispersion_files = " ".join(L1B_FILES)
         dataset.eof_components = "1 2 3"
         dataset.eof_region = "Land"
@@ -351,6 +384,10 @@ def mean_retrieval_residual(paths):
                     "surface": str(dataset.getncattr("surface")),
                     "aerosol_case": str(dataset.getncattr("aerosol_case")),
                     "truth_xco2_ppm": float(dataset.getncattr("truth_xco2_ppm")),
+                    "truth_bottom_co2_ppm": (
+                        float(dataset.getncattr("truth_bottom_co2_ppm"))
+                        if "truth_bottom_co2_ppm" in dataset.ncattrs() else np.nan
+                    ),
                 }
             elif not (
                 np.array_equal(band_index, reference[1])
@@ -370,6 +407,16 @@ def mean_retrieval_residual(paths):
         "metadata": metadata,
         "count": len(paths),
     }
+
+
+def co2_metadata_label(metadata):
+    bottom = metadata.get("truth_bottom_co2_ppm", np.nan)
+    if np.isfinite(bottom):
+        return (
+            "bottom-layer CO$_2$=%g ppm $\\rightarrow$ "
+            "column XCO$_2$=%.4f ppm"
+        ) % (bottom, metadata["truth_xco2_ppm"])
+    return "truth XCO$_2$=%g ppm" % metadata["truth_xco2_ppm"]
 
 
 def fit_band(residual, noise, basis, fit_mask):
@@ -413,7 +460,11 @@ def fit_band(residual, noise, basis, fit_mask):
     }
 
 
-def save_state_result(path, state, perturbations, class_data, fits, source):
+def save_state_result(
+        path, state, perturbations, class_data, fits, source,
+        representative_eof_path=None):
+    if representative_eof_path is None:
+        representative_eof_path = path.parent / "representative_oco2_eofs.nc"
     measurement_count = class_data["corrected"]["wavelength"].size
     with Dataset(path, "w") as dataset:
         dataset.createDimension("retrieval_class", 2)
@@ -490,9 +541,7 @@ def save_state_result(path, state, perturbations, class_data, fits, source):
         dataset.matched_perturbation_count = len(perturbations)
         dataset.residual_sign = "F(x) - y"
         dataset.fit_definition = "minimize ||(r + E*c)/sigma||_2 independently per band"
-        dataset.source_representative_eof = str(
-            OUTPUT_ROOT / "representative_oco2_eofs.nc"
-        )
+        dataset.source_representative_eof = str(representative_eof_path)
         for key, value in class_data["corrected"]["metadata"].items():
             setattr(dataset, key, value)
 
@@ -618,7 +667,7 @@ def plot_state_band(path, state, band, perturbations, class_data,
         f"State {state:03d}, {band.title}: mean terminal residual and "
         "joint OCO-2 EOF fit\n"
         f"{metadata['surface']}, {metadata['aerosol_case']}, "
-        f"truth XCO$_2$={metadata['truth_xco2_ppm']:.0f} ppm",
+        + co2_metadata_label(metadata),
         fontsize=15,
         y=0.985,
     )
@@ -690,7 +739,7 @@ def plot_state(path, state, perturbations, class_data, fits, source):
     fig.suptitle(
         f"State {state:03d}: mean residual versus OCO-2 three-EOF fit\n"
         f"{metadata['surface']}, {metadata['aerosol_case']}, "
-        f"truth XCO$_2$={metadata['truth_xco2_ppm']:.0f} ppm; "
+        + co2_metadata_label(metadata) + "; "
         f"matched perturbations={len(perturbations)}",
         fontsize=15,
         y=0.985,
@@ -784,11 +833,9 @@ def write_coefficient_ensemble_summary(path, state_results):
 
 
 def main():
-    oco_root = Path(
-        __import__("os").environ.get("OCO_JACOBIAN_ROOT", DEFAULT_OCO_ROOT)
-    )
-    OUTPUT_ROOT.mkdir(parents=True, exist_ok=True)
-    retrievals = completed_retrievals()
+    args = parse_args()
+    args.output_root.mkdir(parents=True, exist_ok=True)
+    retrievals = completed_retrievals(args.inversion_root)
     states = matched_state_paths(retrievals)
     if not states:
         raise RuntimeError("no states have matched complete corrected/uncorrected retrievals")
@@ -797,11 +844,13 @@ def main():
     _, _, grids = target_grid(first_retrieval)
 
     print(f"matched states: {list(states)}", flush=True)
-    source = representative_eof_basis(oco_root, grids)
-    representative_path = OUTPUT_ROOT / "representative_oco2_eofs.nc"
-    save_representative_basis(representative_path, grids, source)
+    source = representative_eof_basis(args.oco_root, grids)
+    representative_path = args.output_root / "representative_oco2_eofs.nc"
+    save_representative_basis(
+        representative_path, grids, source, args.oco_root
+    )
     plot_representative_basis(
-        OUTPUT_ROOT / "representative_oco2_eofs.png", grids, source
+        args.output_root / "representative_oco2_eofs.png", grids, source
     )
 
     state_results = {}
@@ -835,15 +884,16 @@ def main():
             "source": source,
         }
         save_state_result(
-            OUTPUT_ROOT / f"state{state:03d}_eof_residual_fit.nc",
+            args.output_root / f"state{state:03d}_eof_residual_fit.nc",
             state,
             perturbations,
             class_data,
             fits,
             source,
+            representative_path,
         )
         plot_state(
-            OUTPUT_ROOT / f"state{state:03d}_eof_residual_fit.png",
+            args.output_root / f"state{state:03d}_eof_residual_fit.png",
             state,
             perturbations,
             class_data,
@@ -852,7 +902,8 @@ def main():
         )
         for band in BANDS:
             plot_state_band(
-                OUTPUT_ROOT / f"state{state:03d}_{band.key}_eof_residual_fit.png",
+                args.output_root /
+                f"state{state:03d}_{band.key}_eof_residual_fit.png",
                 state,
                 band,
                 perturbations,
@@ -862,10 +913,10 @@ def main():
                 source,
             )
 
-    summary_path = OUTPUT_ROOT / "eof_fit_summary.dat"
+    summary_path = args.output_root / "eof_fit_summary.dat"
     write_summary(summary_path, state_results)
     coefficient_summary_path = (
-        OUTPUT_ROOT / "eof_coefficient_ensemble_summary.dat"
+        args.output_root / "eof_coefficient_ensemble_summary.dat"
     )
     write_coefficient_ensemble_summary(coefficient_summary_path, state_results)
     print(representative_path)

@@ -7,6 +7,8 @@ from pathlib import Path
 import numpy as np
 from netCDF4 import Dataset
 
+from retrieval_plot_schema import RetrievalPlotSchema
+
 DEFAULT_TRUTH_TABLE = Path(__file__).resolve().parents[1] / "truth_map" / "true_states.dat"
 BAND_SURFACE_NAMES = {
     "o2a": "o2a",
@@ -49,7 +51,7 @@ def read_truth_row(path, state_index):
     raise RuntimeError(f"truth state {state_index} was not found in {path}")
 
 
-def physical_state(names, state):
+def physical_state(names, state, sif759_native=None):
     output_names = []
     output_values = []
     for name, value in zip(names, state):
@@ -71,6 +73,12 @@ def physical_state(names, state):
         else:
             output_names.append(name)
             output_values.append(value)
+    if sif759_native is not None:
+        output_names.extend(["SIF759_per_cm1", "SIF759_per_nm"])
+        output_values.extend([
+            sif759_native,
+            sif759_native * 1.0e7 / 759.0**2,
+        ])
     return output_names, np.asarray(output_values, dtype=float)
 
 
@@ -86,11 +94,15 @@ def main():
     with Dataset(args.retrieval) as dataset:
         if int(dataset.getncattr("retrieval_complete")) != 1:
             raise RuntimeError(f"retrieval is not marked complete: {args.retrieval}")
-        names = str(dataset.getncattr("parameter_names")).split()
+        schema = RetrievalPlotSchema.from_dataset(dataset, str(args.retrieval))
+        names = schema.canonical_names
         state_index = int(dataset.getncattr("truth_state_index"))
-        prior = np.asarray(dataset["a_priori_state"][:], dtype=float)
-        final = np.asarray(dataset["final_state"][:], dtype=float)
-        states = np.asarray(dataset["state_at_trial"][:], dtype=float)
+        active_prior = np.asarray(dataset["a_priori_state"][:], dtype=float)
+        active_final = np.asarray(dataset["final_state"][:], dtype=float)
+        active_states = np.asarray(dataset["state_at_trial"][:], dtype=float)
+        prior = schema.expand_absolute_state(active_prior)
+        final = schema.expand_absolute_state(active_final)
+        states = schema.expand_absolute_state(active_states)
         trial = np.asarray(dataset["trial_index"][:], dtype=int)
         iteration = np.asarray(dataset["iteration_index"][:], dtype=int)
         accepted = np.asarray(dataset["trial_accepted"][:], dtype=int)
@@ -102,11 +114,19 @@ def main():
             dataset["final_band_reduced_chi_squared"][:], dtype=float
         )
 
-    if states.shape != (len(trial), len(names)):
+    if active_states.shape != (len(trial), len(schema.active_names)):
         raise RuntimeError("state trajectory dimensions disagree with metadata")
-    physical_names, physical_prior = physical_state(names, prior)
+    def sif759_for(expanded_state):
+        if schema.is_round4:
+            return schema.known_lnu
+        native = dict(zip(names, expanded_state))
+        return native["SIF760"] - schema._legacy_delta_nu() * native["mSIF"]
+
+    physical_names, physical_prior = physical_state(
+        names, prior, sif759_for(prior)
+    )
     physical_states = np.vstack(
-        [physical_state(names, state)[1] for state in states]
+        [physical_state(names, state, sif759_for(state))[1] for state in states]
     )
 
     metadata_names = [
@@ -117,7 +137,7 @@ def main():
         [0, 0, 0, 1, 0, np.nan, np.nan, np.nan, np.nan, np.nan], dtype=float
     )
     terminal = np.zeros(len(trial), dtype=int)
-    final_is_last_trial = np.array_equal(final, states[-1])
+    final_is_last_trial = np.array_equal(active_final, active_states[-1])
     if final_is_last_trial:
         terminal[-1] = 1
     trial_metadata = np.column_stack(
@@ -128,7 +148,7 @@ def main():
         *np.column_stack([trial_metadata, physical_states]),
     ]
     if not final_is_last_trial:
-        _, physical_final = physical_state(names, final)
+        _, physical_final = physical_state(names, final, sif759_for(final))
         final_metadata = np.array(
             [trial[-1] + 1, iteration[-1] + 1, 1, 1, 0, np.nan, np.nan,
              *final_chi_squared],
@@ -136,6 +156,12 @@ def main():
         )
         rows.append(np.concatenate([final_metadata, physical_final]))
     table = np.vstack(rows)
+
+    # Validate campaign identity before creating either output file.  This is
+    # especially important for round-4 SIF-on products because the historical
+    # bottom-layer table uses the obsolete total_0p5 convention.
+    truth = read_truth_row(args.truth_table, state_index)
+    schema.validate_truth_row(truth, str(args.truth_table))
 
     output.parent.mkdir(parents=True, exist_ok=True)
     with output.open("w", encoding="utf-8") as stream:
@@ -148,10 +174,10 @@ def main():
         )
         stream.write("# CO2 is ppm; AOD760 is dimensionless; aerosol z0 is km.\n")
         stream.write("# SIF760 is reported in both native per-cm^-1 and per-nm units.\n")
+        stream.write("# SIF759 is reported explicitly; %s.\n" % schema.description())
         stream.write("# " + " ".join(metadata_names + physical_names) + "\n")
         np.savetxt(stream, table, fmt="%.12g")
 
-    truth = read_truth_row(args.truth_table, state_index)
     state_lookup = dict(zip(names, final))
     prior_lookup = dict(zip(names, prior))
     surface_output.parent.mkdir(parents=True, exist_ok=True)

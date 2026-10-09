@@ -13,6 +13,7 @@ does not apply the division by M11=0.5 used only in diagnostic plots.
 import argparse
 from collections import defaultdict, namedtuple
 from pathlib import Path
+import sys
 
 import matplotlib
 matplotlib.use("Agg")
@@ -21,11 +22,15 @@ import numpy as np
 from netCDF4 import Dataset
 
 
+SCRIPT_DIR = Path(__file__).resolve().parent
+sys.path.insert(0, str(SCRIPT_DIR.parent))
+from co2_plot_metadata import bottom_layer_mapping_note
+
+
 PLANCK = 6.62607015e-34  # J s, exact SI definition
 LIGHT_SPEED = 299792458.0  # m s-1, exact SI definition
 SAMPLES = np.arange(1.0, 1017.0)
 
-SCRIPT_DIR = Path(__file__).resolve().parent
 RRS_ROOT = SCRIPT_DIR.parents[1]
 DEFAULT_SYNTHETIC_ROOT = RRS_ROOT / "truth_map" / "OCO_radiances"
 DEFAULT_OUTPUT_ROOT = DEFAULT_SYNTHETIC_ROOT / "validation_against_OCO2"
@@ -86,10 +91,19 @@ def contiguous_chunks(indices, chunk_size):
         yield indices[start:start + chunk_size]
 
 
-def synthetic_wavelength_ranges(synthetic_root):
+def synthetic_files(synthetic_root, expected_scene_count):
+    """Return the complete synthetic-scene inventory for one campaign."""
     files = sorted(synthetic_root.glob("OCO2sims_[0-9][0-9][0-9].nc"))
-    if len(files) != 64:
-        raise RuntimeError(f"expected 64 synthetic files in {synthetic_root}; found {len(files)}")
+    if len(files) != expected_scene_count:
+        raise RuntimeError(
+            f"expected {expected_scene_count} synthetic files in "
+            f"{synthetic_root}; found {len(files)}"
+        )
+    return files
+
+
+def synthetic_wavelength_ranges(synthetic_root, expected_scene_count=64):
+    files = synthetic_files(synthetic_root, expected_scene_count)
 
     ranges = {}
     with Dataset(files[0]) as dataset:
@@ -128,10 +142,9 @@ def common_wavelength_ranges(l1b_root, native_ranges):
     return ranges
 
 
-def read_synthetic_scenes(synthetic_root, wavelength_ranges):
-    files = sorted(synthetic_root.glob("OCO2sims_[0-9][0-9][0-9].nc"))
-    if len(files) != 64:
-        raise RuntimeError(f"expected 64 synthetic files in {synthetic_root}; found {len(files)}")
+def read_synthetic_scenes(
+        synthetic_root, wavelength_ranges, expected_scene_count=64):
+    files = synthetic_files(synthetic_root, expected_scene_count)
 
     scenes = []
     for path in files:
@@ -144,7 +157,11 @@ def read_synthetic_scenes(synthetic_root, wavelength_ranges):
                 "surface": str(dataset.surface),
                 "aerosol": str(dataset.aerosol_case),
                 "sif": str(dataset.sif_case),
-                "xco2_ppm": int(dataset.xco2_ppm),
+                "xco2_ppm": float(dataset.xco2_ppm),
+                "bottom_co2_ppm": (
+                    float(dataset.bottom_co2_ppm)
+                    if "bottom_co2_ppm" in dataset.ncattrs() else None
+                ),
             }
             for band in BANDS:
                 wavelength = as_float(dataset.variables[band.wavelength_variable], slice(None))
@@ -282,7 +299,8 @@ def comparison_class(value: float, observed_vector: np.ndarray):
 def write_synthetic_metrics(path, scenes, observed):
     with path.open("w", encoding="utf-8") as handle:
         handle.write(
-            "# state surface aerosol sif xco2_ppm band spectral_p05 spectral_median "
+            "# state surface aerosol sif bottom_co2_ppm xco2_ppm band "
+            "spectral_p05 spectral_median "
             "spectral_p95 spectral_mean spectral_max obs_median_q0p5 obs_median_q50 "
             "obs_median_q99p5 median_ratio median_range factor2_median "
             "obs_p95_q0p5 obs_p95_q50 obs_p95_q99p5 p95_ratio p95_range "
@@ -297,7 +315,9 @@ def write_synthetic_metrics(path, scenes, observed):
             unit_flag = "yes" if (median_check[-1] == "yes" or p95_check[-1] == "yes") else "no"
             handle.write(
                 f"{scene['state']:03d} {scene['surface']} {scene['aerosol']} "
-                f"{scene['sif']} {scene['xco2_ppm']} {scene['band']} "
+                f"{scene['sif']} "
+                f"{('NA' if scene['bottom_co2_ppm'] is None else scene['bottom_co2_ppm'])} "
+                f"{scene['xco2_ppm']} {scene['band']} "
             )
             handle.write(" ".join(f"{scene[name]:.10g}" for name in METRIC_NAMES))
             handle.write(
@@ -371,11 +391,17 @@ def plot_comparison(path, scenes, observed):
 
     axes[0, 0].legend(loc="upper left", fontsize=8)
     axes[0, 1].legend(loc="upper left", fontsize=8)
-    figures.suptitle(
+    mapping_note = bottom_layer_mapping_note([
+        (scene["bottom_co2_ppm"], scene["xco2_ppm"])
+        for scene in scenes
+    ])
+    title = (
         "Synthetic analyzer radiances vs OCO-2 valid land soundings\n"
-        "OCO-2 subset: SZA 30±5°, VZA≤10°; synthetic values are not divided by M11",
-        fontsize=14,
+        "OCO-2 subset: SZA 30±5°, VZA≤10°; synthetic values are not divided by M11"
     )
+    if mapping_note:
+        title += "\n" + mapping_note
+    figures.suptitle(title, fontsize=14)
     figures.savefig(path, dpi=180)
     plt.close(figures)
 
@@ -392,6 +418,7 @@ def print_summary(scenes, observed):
             oq = np.percentile(pool[:, column], SUMMARY_PERCENTILES)
             synthetic_values = np.asarray([scene[metric_name] for scene in band_scenes])
             ratios = synthetic_values / oq[2]
+            scene_count = len(synthetic_values)
             outside = np.count_nonzero((synthetic_values < oq[0]) |
                                        (synthetic_values > oq[-1]))
             factor2 = np.count_nonzero((ratios < 0.5) | (ratios > 2.0))
@@ -400,7 +427,8 @@ def print_summary(scenes, observed):
                 f"  {metric_name:16s} OCO q0.5/q50/q99.5="
                 f"{oq[0]:.4g}/{oq[2]:.4g}/{oq[-1]:.4g}; "
                 f"synthetic={synthetic_values.min():.4g}..{synthetic_values.max():.4g}; "
-                f"outside={outside}/64 factor2={factor2}/64 unit-scale={unit_scale}/64"
+                f"outside={outside}/{scene_count} factor2={factor2}/{scene_count} "
+                f"unit-scale={unit_scale}/{scene_count}"
             )
 
 
@@ -410,6 +438,13 @@ def parse_args():
     parser.add_argument("--synthetic-root", type=Path, default=DEFAULT_SYNTHETIC_ROOT)
     parser.add_argument("--output-root", type=Path, default=DEFAULT_OUTPUT_ROOT)
     parser.add_argument("--chunk-size", type=int, default=512)
+    parser.add_argument(
+        "--expected-scene-count", type=int, default=64,
+        help=(
+            "Number of OCO2sims_NNN.nc files required in --synthetic-root "
+            "(default: 64 for the full-column campaign)"
+        ),
+    )
     return parser.parse_args()
 
 
@@ -417,11 +452,17 @@ def main():
     args = parse_args()
     if args.chunk_size < 1:
         raise ValueError("--chunk-size must be positive")
+    if args.expected_scene_count < 1:
+        raise ValueError("--expected-scene-count must be positive")
     args.output_root.mkdir(parents=True, exist_ok=True)
 
-    native_ranges = synthetic_wavelength_ranges(args.synthetic_root)
+    native_ranges = synthetic_wavelength_ranges(
+        args.synthetic_root, args.expected_scene_count
+    )
     wavelength_ranges = common_wavelength_ranges(args.l1b_root, native_ranges)
-    scenes = read_synthetic_scenes(args.synthetic_root, wavelength_ranges)
+    scenes = read_synthetic_scenes(
+        args.synthetic_root, wavelength_ranges, args.expected_scene_count
+    )
     observed, geometry_counts = read_observed_metrics(
         args.l1b_root, wavelength_ranges, args.chunk_size)
 

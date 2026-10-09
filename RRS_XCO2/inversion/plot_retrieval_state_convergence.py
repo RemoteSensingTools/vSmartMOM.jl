@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """Plot a compact retrieval-state path together with OE convergence diagnostics.
 
-Layer-resolved CO2 is represented by the saved dry-air-column XCO2 diagnostic.
-Logarithmic aerosol coordinates are transformed back to AOD and height.  The
-terminal state, which is evaluated once after the final accepted LM proposal,
-is shown explicitly after the trial-state history.
+Layer-resolved CO2 is represented by both the bottom-layer VMR and the saved
+dry-air-column XCO2 diagnostic.  Logarithmic aerosol coordinates are
+transformed back to AOD and height.  The terminal state, which is evaluated
+once after the final accepted LM proposal, is shown explicitly after the
+trial-state history.
 """
 
 import argparse
@@ -16,12 +17,16 @@ import matplotlib.pyplot as plt
 import numpy as np
 from netCDF4 import Dataset
 
+from co2_plot_metadata import co2_case_label
+from retrieval_plot_schema import RetrievalPlotSchema
+
 
 HERE = Path(__file__).resolve().parent
 TRUTH_TABLE = HERE.parent / "truth_map" / "true_states.dat"
 SCENE_COMPONENTS = HERE.parent / "truth_map" / "scene_components.dat"
 
 PARAMETERS = (
+    ("bottom_co2", "Bottom-layer CO$_2$ (ppm)"),
     ("XCO2", "XCO$_2$ (ppm)"),
     ("psurf", "$p_s$ (hPa)"),
     ("sulfate_aod760", "Sulphate AOD$_{760}$"),
@@ -53,6 +58,14 @@ def parse_args():
     parser.add_argument(
         "--table-output", type=Path,
         help="Whitespace table of the compact physical state trajectory",
+    )
+    parser.add_argument(
+        "--truth-table", type=Path, default=TRUTH_TABLE,
+        help="Campaign true_states.dat (default: full-column truth map)",
+    )
+    parser.add_argument(
+        "--scene-components", type=Path, default=SCENE_COMPONENTS,
+        help="Campaign scene_components.dat (default: full-column truth map)",
     )
     return parser.parse_args()
 
@@ -99,7 +112,11 @@ def aerosol_aod760(path, aerosol_case):
 
 def physical_state(names, state, xco2):
     native = dict(zip(names, state))
-    values = {"XCO2": float(xco2), "psurf": native["psurf"]}
+    values = {
+        "bottom_co2": 1.0e6 * native["co2_vmr_layer16"],
+        "XCO2": float(xco2),
+        "psurf": native["psurf"],
+    }
     for species in ("sulfate", "organic_carbon", "utls_sulfate"):
         values[f"{species}_aod760"] = np.exp(native[f"ln_{species}_aod760"])
         values[f"{species}_z0"] = np.exp(native[f"ln_{species}_z0"])
@@ -112,14 +129,29 @@ def physical_state(names, state, xco2):
     return values
 
 
-def truth_values(row, aerosol_truth, prior):
+def truth_values(row, aerosol_truth, prior, schema=None):
+    """Build truth values in the same coordinate system as the plotted state.
+
+    Round-4 retrievals know the exact SIF at 759 nm.  Their comparable
+    ``SIF760`` truth coordinate is therefore the affine state-space value
+    implied by that anchor and the truth slope, not the full-template value
+    tabulated independently at 760 nm.
+    """
     truth = dict(prior)
     truth.update(aerosol_truth)
+    if schema is None:
+        truth_msif = float(row["mSIF"])
+        truth_sif760 = float(row["SIF760"])
+    else:
+        truth_sif = schema.truth_sif_coordinates(row)
+        truth_msif = truth_sif["mSIF"]
+        truth_sif760 = truth_sif["SIF760"]
     truth.update({
+        "bottom_co2": float(row.get("bottom_co2_ppm", row["xco2_ppm"])),
         "XCO2": float(row["xco2_ppm"]),
         "psurf": float(row["psurf_hpa"]),
-        "SIF760": float(row["SIF760"]) * 1.0e7 / 760.0**2,
-        "mSIF": float(row["mSIF"]),
+        "SIF760": truth_sif760 * 1.0e7 / 760.0**2,
+        "mSIF": truth_msif,
     })
     for state_band, truth_band in (
         ("o2a", "o2a"), ("weak_co2", "weak"), ("strong_co2", "strong")
@@ -131,8 +163,16 @@ def truth_values(row, aerosol_truth, prior):
     return truth
 
 
+def co2_truth_label(row):
+    """Describe either a uniform-column or bottom-layer CO2 truth state."""
+    return co2_case_label(
+        row.get("bottom_co2_ppm"), row["xco2_ppm"], truth=True
+    )
+
+
 def write_state_table(path, truth, prior_state, trial_states, final_state,
-                      prior_native, first_trial_native, trials):
+                      prior_native, first_trial_native, trials,
+                      schema_description):
     """Write parameters as rows and distinct retrieval states as columns."""
     merge_prior = np.array_equal(prior_native, first_trial_native)
     if merge_prior:
@@ -148,6 +188,7 @@ def write_state_table(path, truth, prior_state, trial_states, final_state,
     state_values.append(final_state)
     units = {
         "XCO2": "ppm",
+        "bottom_co2": "ppm",
         "psurf": "hPa",
         "sulfate_aod760": "1",
         "organic_carbon_aod760": "1",
@@ -161,12 +202,14 @@ def write_state_table(path, truth, prior_state, trial_states, final_state,
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8") as stream:
         stream.write(
-            "# Compact physical state trajectory; layer CO2 is replaced by XCO2.\n"
+            "# Compact physical state trajectory; layer CO2 is summarized by "
+            "bottom-layer VMR and XCO2.\n"
         )
         stream.write(
             "# The a priori and trial 01 are merged only when their native state "
             "vectors are exactly identical.\n"
         )
+        stream.write("# State schema: %s\n" % schema_description)
         stream.write(
             "# parameter units truth " + " ".join(state_labels) + "\n"
         )
@@ -187,10 +230,14 @@ def main():
     with Dataset(args.retrieval) as dataset:
         if int(dataset.getncattr("retrieval_complete")) != 1:
             raise RuntimeError(f"retrieval is not complete: {args.retrieval}")
-        names = str(dataset.getncattr("parameter_names")).split()
-        states = np.asarray(dataset["state_at_trial"][:], dtype=float)
-        final_state = np.asarray(dataset["final_state"][:], dtype=float)
-        prior_state = np.asarray(dataset["a_priori_state"][:], dtype=float)
+        schema = RetrievalPlotSchema.from_dataset(dataset, args.retrieval)
+        active_states = np.asarray(dataset["state_at_trial"][:], dtype=float)
+        active_final_state = np.asarray(
+            dataset["final_state"][:], dtype=float
+        )
+        active_prior_state = np.asarray(
+            dataset["a_priori_state"][:], dtype=float
+        )
         xco2 = np.asarray(dataset["XCO2_at_trial"][:], dtype=float)
         final_xco2 = float(dataset["XCO2"][:])
         prior_xco2 = float(dataset["a_priori_XCO2"][:])
@@ -214,6 +261,10 @@ def main():
         fit_threshold = float(dataset.getncattr("maximum_band_chi_squared"))
         converged = bool(dataset.getncattr("converged"))
 
+    names = schema.canonical_names
+    states = schema.expand_absolute_state(active_states)
+    final_state = schema.expand_absolute_state(active_final_state)
+    prior_state = schema.expand_absolute_state(active_prior_state)
     physical_trials = [
         physical_state(names, state, column_xco2)
         for state, column_xco2 in zip(states, xco2)
@@ -221,16 +272,18 @@ def main():
     physical_final = physical_state(names, final_state, final_xco2)
     physical_prior = physical_state(names, prior_state, prior_xco2)
     points = np.append(trials, trials[-1] + 1)
-    row = table_row(TRUTH_TABLE, state_index)
+    row = table_row(args.truth_table, state_index)
+    schema.validate_truth_row(row, str(args.truth_table))
     truth = truth_values(
-        row, aerosol_aod760(SCENE_COMPONENTS, aerosol_case), physical_prior
+        row, aerosol_aod760(args.scene_components, aerosol_case), physical_prior,
+        schema=schema,
     )
     write_state_table(
         table_output, truth, physical_prior, physical_trials, physical_final,
-        prior_state, states[0], trials,
+        active_prior_state, active_states[0], trials, schema.description(),
     )
 
-    fig, axes = plt.subplots(5, 5, figsize=(21, 19))
+    fig, axes = plt.subplots(6, 5, figsize=(21, 22))
     axes = axes.ravel()
     for axis, (key, label) in zip(axes, PARAMETERS):
         values = np.asarray(
@@ -257,7 +310,7 @@ def main():
         axis.grid(alpha=0.22)
         axis.ticklabel_format(axis="y", style="sci", scilimits=(-3, 4))
 
-    axis = axes[19]
+    axis = axes[20]
     for column, (label, color) in enumerate(zip(BAND_LABELS, BAND_COLORS)):
         axis.plot(
             points, np.append(chi[:, column], final_chi[column]), marker="o",
@@ -268,7 +321,7 @@ def main():
     axis.set_title("Reduced $\\chi^2$ by band")
     axis.legend(frameon=False, fontsize=8)
 
-    axis = axes[20]
+    axis = axes[21]
     axis.plot(trials, d_sigma, color="#9467bd", marker="o", linewidth=1.6)
     axis.axhline(
         convergence_threshold, color="black", linestyle="--", linewidth=1.1,
@@ -279,7 +332,7 @@ def main():
     axis.set_ylabel("$d_\\sigma^2/N_{eff}$")
     axis.legend(frameon=False, fontsize=8)
 
-    axis = axes[21]
+    axis = axes[22]
     axis.plot(trials, gamma, color="#ff7f0e", marker="o", label="$\\gamma$")
     finite = np.isfinite(ratio)
     twin = axis.twinx()
@@ -291,43 +344,46 @@ def main():
     axis.set_ylabel("$\\gamma$")
     twin.set_ylabel("actual / forecast reduction")
 
-    axis = axes[22]
+    axis = axes[23]
     axis.plot(trials, cost, color="#8c564b", marker="o", linewidth=1.6)
     axis.set_yscale("log")
     axis.set_title("OE total cost")
 
-    axis = axes[23]
+    axis = axes[24]
     axis.bar(trials, seconds, color="#17becf", alpha=0.8)
     axis.set_title("Forward + Jacobian evaluation time")
     axis.set_ylabel("seconds")
 
-    for axis in axes[19:24]:
-        axis.set_xticks(trials if axis is not axes[19] else points)
-        axis.set_xlabel("Trial" if axis is not axes[19] else "Trial / terminal")
+    for axis in axes[20:25]:
+        axis.set_xticks(trials if axis is not axes[20] else points)
+        axis.set_xlabel("Trial" if axis is not axes[20] else "Trial / terminal")
         axis.grid(alpha=0.22)
 
-    axes[24].axis("off")
-    axes[24].plot([], [], color="black", linewidth=1.35, label="Truth")
-    axes[24].plot([], [], color="0.5", linestyle=":", label="A priori")
-    axes[24].plot([], [], color="#1f77b4", marker="o", label="Evaluated state")
-    axes[24].scatter(
+    axes[25].axis("off")
+    axes[25].plot([], [], color="black", linewidth=1.35, label="Truth")
+    axes[25].plot([], [], color="0.5", linestyle=":", label="A priori")
+    axes[25].plot([], [], color="#1f77b4", marker="o", label="Evaluated state")
+    axes[25].scatter(
         [], [], facecolors="none", edgecolors="#1f77b4", marker="o", s=90,
         label="Terminal state",
     )
-    axes[24].legend(frameon=False, loc="upper center", fontsize=10)
-    axes[24].text(
+    axes[25].legend(frameon=False, loc="upper center", fontsize=10)
+    axes[25].text(
         0.5, 0.32,
         f"converged = {converged}\n"
         f"final $d_\\sigma^2/N_{{eff}}$ = {d_sigma[-1]:.3g}\n"
         f"final band $\\chi_r^2$ = "
         + ", ".join(f"{value:.3f}" for value in final_chi),
-        ha="center", va="center", transform=axes[24].transAxes, fontsize=10,
+        ha="center", va="center", transform=axes[25].transAxes, fontsize=10,
     )
+    for axis in axes[26:]:
+        axis.axis("off")
 
     fig.suptitle(
         f"{retrieval_class.capitalize()} retrieval: state {state_index:03d}, "
         f"perturbation {perturbation:02d}\n"
-        "Compact state evolution and convergence diagnostics",
+        f"{co2_truth_label(row)}; compact state evolution and convergence "
+        f"diagnostics\n{schema.description()}",
         fontsize=16, y=0.992,
     )
     fig.subplots_adjust(

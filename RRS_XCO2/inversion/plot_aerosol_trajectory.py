@@ -10,6 +10,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 from netCDF4 import Dataset
 
+from co2_plot_metadata import co2_case_label
+from retrieval_plot_schema import RetrievalPlotSchema
+
 
 DEFAULT_COMPONENTS = (
     Path(__file__).resolve().parents[1] / "truth_map" / "scene_components.dat"
@@ -79,6 +82,14 @@ def main():
         perturbation_index = int(dataset.getncattr("perturbation_index"))
         retrieval_class = str(dataset.getncattr("measurement_class"))
         aerosol_case = str(dataset.getncattr("aerosol_case"))
+        truth_xco2 = float(dataset.getncattr("truth_xco2_ppm"))
+        truth_bottom_co2 = (
+            float(dataset.getncattr("truth_bottom_co2_ppm"))
+            if "truth_bottom_co2_ppm" in dataset.ncattrs() else None
+        )
+        schema_description = RetrievalPlotSchema.from_dataset(
+            dataset, str(args.retrieval)
+        ).description()
 
     truth_aod = read_truth_aod760(args.scene_components, aerosol_case)
     accepted_trials = trials[accepted]
@@ -127,7 +138,9 @@ def main():
     fig.suptitle(
         f"{retrieval_class.capitalize()} retrieval: state {state_index:03d}, "
         f"perturbation {perturbation_index:02d}\n"
-        "Aerosol height and optical-depth trajectory",
+        + co2_case_label(truth_bottom_co2, truth_xco2) + "\n"
+        + "Aerosol height and optical-depth trajectory\n"
+        + schema_description,
         fontsize=15,
     )
     output.parent.mkdir(parents=True, exist_ok=True)

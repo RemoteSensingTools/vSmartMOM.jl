@@ -1,0 +1,28 @@
+{
+  "name": "rrs-ensemble-viewer",
+  "displayName": "RRS Ensemble Viewer",
+  "description": "Synchronized 2-by-4 ensemble plots for retrieval rounds 3 through 6.",
+  "version": "0.1.0",
+  "publisher": "sanghavi-local",
+  "license": "UNLICENSED",
+  "private": true,
+  "engines": { "vscode": "^1.85.0" },
+  "categories": ["Visualization"],
+  "extensionKind": ["workspace"],
+  "main": "./extension.js",
+  "activationEvents": [],
+  "capabilities": {
+    "untrustedWorkspaces": { "supported": true },
+    "virtualWorkspaces": true
+  },
+  "contributes": {
+    "commands": [
+      { "command": "rrsEnsemble.open", "title": "RRS: Open Ensemble Comparison" },
+      { "command": "rrsEnsemble.refresh", "title": "RRS: Refresh Ensemble Comparison" }
+    ]
+  },
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "package": "node package.js"
+  }
+}

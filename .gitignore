@@ -36,6 +36,7 @@ GEOSChem.Custom.20190702_0000z.nc4
 .mcp.json
 .mcp.local.json
 nohup.out
+/.round*-resume-audit.*/
 # Claude Code local tooling/config — not project content
 .claude/
 
@@ -114,6 +115,11 @@ RRS_XCO2/bottom_layer_XCO2_retrievals/truth/
 RRS_XCO2/bottom_layer_XCO2_retrievals/logs/
 RRS_XCO2/bottom_layer_XCO2_retrievals/.sif_v2_restart/
 RRS_XCO2/bottom_layer_XCO2_retrievals/retrievals/
+# Per-campaign ownership/lock state and generated transfer bundles are runtime
+# products.  Canonical launchers, packagers, and documentation live under
+# RRS_XCO2/inversion and remain trackable.
+RRS_XCO2/bottom_layer_XCO2_retrievals/**/.control/
+RRS_XCO2/bottom_layer_XCO2_retrievals/round*/deployment/
 # Isolated tapered-CO2 no-SIF retrieval round (runtime claims, manifests, and
 # products).  Gattaca SIF-on output lives outside the checkout, but the local
 # Curry/Wurst counterpart is intentionally private working data as well.
