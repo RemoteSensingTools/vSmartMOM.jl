@@ -154,6 +154,15 @@ end
 
 A unit test pins the bit-exact agreement of this reconstruction against
 `rt_run` for one published-figure geometry.
+
+Two `rt_run` terms are applied after the Fourier sum at the requested views
+and therefore cannot appear in per-moment streams:
+- `TMSCorrection` (exact single scattering): `rt_run_streams` rejects it with
+  an `ArgumentError`.
+- the Cox–Munk exact direct-solar glint residual (`apply_ss_correction!`): the
+  streams of a `CoxMunkSurface` model hold the Fourier-truncated glint only, so
+  a reconstruction differs from `rt_run` near the specular direction. Add the
+  residual for each reconstructed geometry if it is needed.
 """
 struct StreamRTResult{FT}
     qp_μ      :: Vector{FT}
@@ -189,6 +198,9 @@ once per Fourier moment.
 Stream output is intrinsically full-column. `geometry.obs_alt` still affects
 the atmospheric grid (interior heights are exact interfaces), but it does not
 filter the TOA/BOA stream matrices stored in `StreamRTResult`.
+
+`TMSCorrection` models are rejected, and the Cox–Munk glint residual is not
+included; see [`StreamRTResult`](@ref).
 """
 function rt_run_streams(model; i_band::Integer = 1,
                          sources::Union{Nothing, AbstractSource} = nothing)
@@ -279,6 +291,91 @@ _interaction_workspace(::AbstractRamanType, composite_layer, added_layer, arch) 
 # to-end @ nSpec=10000). The CUDA extension overrides the GPU method to fall back to
 # staged ONLY when the non-staged footprint would not fit the device's free memory.
 _use_staged_interaction(arch, composite_layer) = false
+
+# The kernels still read the solar irradiance from the legacy `RS_type.F₀`
+# carrier, which the drivers overwrite with the resolved `SolarBeam` F₀. A
+# nonzero, correctly shaped `RS_type.F₀` is honoured as a deliberate legacy
+# preset (`rs.F₀ = ...; rt_run(rs, model, ...)`), so the drivers must be able
+# to tell such a preset from their own earlier write: otherwise an RS object
+# reused after `rt_run(rs, model; sources=SolarBeam(F₀=2F))` would silently
+# keep the 2F beam in a later default call. The record is keyed by object
+# identity (weakly, so RS objects are not kept alive) and stores the written
+# array plus a snapshot, so a later in-place user edit still counts as a preset.
+const _DRIVER_WRITTEN_F₀ = WeakKeyDict{Any,Any}()
+
+"True when `RS_type.F₀` is a user preset rather than an earlier driver write."
+function _user_preset_F₀(RS_type, pol_n::Integer, nSpec::Integer)
+    F₀ = RS_type.F₀
+    # The noRS constructor's zero 1×1 placeholder happens to have the correct
+    # shape for scalar single-wavelength runs and must not count as a preset.
+    (size(F₀) == (pol_n, nSpec) && !iszero(F₀)) || return false
+    written = get(_DRIVER_WRITTEN_F₀, RS_type, nothing)
+    return written === nothing || !(F₀ === written[1] && F₀ == written[2])
+end
+
+"Store a driver-resolved solar spectrum in the legacy `RS_type.F₀` carrier."
+function _write_driver_F₀!(RS_type, F₀::Matrix)
+    RS_type.F₀ = F₀
+    # Record what the field now holds: assignment converts to the carrier's
+    # own eltype (e.g. a Float32 model spectrum into a Float64 `noRS()`).
+    stored = RS_type.F₀
+    _DRIVER_WRITTEN_F₀[RS_type] = (stored, copy(stored))
+    return stored
+end
+
+"""
+    _require_azimuth_even_F₀(F₀)
+
+The Fourier reconstruction weights I/Q by `cos(mΔφ)` and U/V by `sin(mΔφ)`
+(`_precompute_vza_weights`), which is the parity of an incident beam whose
+Stokes vector has only I and Q. A U- or V-polarized incident beam has the
+opposite parity and would be reconstructed with the wrong azimuth dependence,
+so it is rejected.
+"""
+function _require_azimuth_even_F₀(F₀::AbstractMatrix)
+    size(F₀, 1) <= 2 && return nothing
+    all(iszero, @view F₀[3:end, :]) || throw(ArgumentError(
+        "solar F₀ with nonzero U or V (Stokes rows 3–4) is unsupported: the " *
+        "Fourier azimuth reconstruction assumes an incident beam with I and Q " *
+        "only (cos(mΔφ) parity); U/V incidence has sin(mΔφ) parity"))
+    return nothing
+end
+
+"""
+    _resolve_solar_F₀!(RS_type, sources, prepared_sources, FT, pol_n, nSpec, arr_type)
+        -> Matrix
+
+Resolve the solar irradiance every driver feeds to the kernels and store it
+in the legacy `RS_type.F₀` carrier (host memory). Precedence: an explicit
+`sources=` keyword, then a user-preset `RS_type.F₀` (see
+[`_user_preset_F₀`](@ref)), then `model.sources` (already folded into
+`prepared_sources` by the caller).
+"""
+function _resolve_solar_F₀!(RS_type, sources, prepared_sources,
+                            ::Type{FT}, pol_n::Integer, nSpec::Integer,
+                            arr_type) where {FT}
+    if !(sources === nothing && _user_preset_F₀(RS_type, pol_n, nSpec))
+        F₀_dev = extract_solar_F₀(prepared_sources, FT, pol_n, nSpec, arr_type)
+        _write_driver_F₀!(RS_type, Array{FT, 2}(F₀_dev))
+    end
+    _require_azimuth_even_F₀(RS_type.F₀)
+    return RS_type.F₀
+end
+
+"""
+    _reject_thermal_source(prepared_sources, path)
+
+Throw when a non-placeholder `ThermalEmission` reaches a solver path that
+never calls the volume-source `contribute!` seam (it would be silently
+dropped).
+"""
+function _reject_thermal_source(prepared_sources, path::AbstractString)
+    _thermal_source_active(prepared_sources) && throw(ArgumentError(
+        "ThermalEmission is not supported by $path: this path does not inject " *
+        "volume sources, so the thermal emission would be silently ignored. " *
+        "Use the elastic multiple-scattering rt_run(model; sources=...)"))
+    return nothing
+end
 
 """
     _expand_layer_rayleigh!(rs, fScattRayleigh, iz)
@@ -444,15 +541,17 @@ function _rt_run_column(RS_type::AbstractRamanType, model, iBand;
     @info msg
 
     # Resolve sources EARLY so the layer allocators can size per-source slots
-    # (v0.7 Phase A.2a). Resolution order is unchanged: explicit `sources=`
-    # kwarg > `model.sources` > legacy `RS_type.F₀` (only when the latter is
-    # already user-shaped, to preserve the historical
-    # `rs.F₀ = ...; rt_run(rs, model, ...)` test pattern).
+    # (v0.7 Phase A.2a). Solar precedence (see `_resolve_solar_F₀!`):
+    # explicit `sources=` kwarg > a user-preset `RS_type.F₀` (the historical
+    # `rs.F₀ = ...; rt_run(rs, model, ...)` pattern) > `model.sources`.
     # Legacy `RS_type.SIF₀` is no longer consumed by rt_run; use SurfaceSIF.
-    # `RS_type.F₀` remains a compatibility fallback when no SolarBeam is supplied.
     effective_sources = sources === nothing ? model.sources : sources
     validate_source_requests(effective_sources, model.geometry.sza, brdf)
+    validate_thermal_layers(effective_sources, Nz)
     prepared_sources = prepare_sources(effective_sources, FT, pol_type.n, nSpec, arr_type)
+    # Only the elastic noRS kernel calls the volume-source `contribute!` seam.
+    RS_type isa noRS || _reject_thermal_source(prepared_sources,
+        "the Raman ($(nameof(typeof(RS_type)))) solver")
 
     # Create arrays — pass `prepared_sources` so per-source j₀ / J₀ slots
     # (e.g. `:thermal`) get allocated alongside the legacy solar buffers.
@@ -496,17 +595,7 @@ function _rt_run_column(RS_type::AbstractRamanType, model, iBand;
         @timeit "Canopy atm tau" _compute_canopy_atm_tau!(brdf, model, _canopy_spec_wn)
     end
 
-    if sources === nothing && size(RS_type.F₀) == (pol_type.n, nSpec) && !iszero(RS_type.F₀)
-        # User has pre-set a nonzero RS_type.F₀; leave it alone for back-compat.
-        # The noRS constructor's zero 1×1 placeholder happens to have the
-        # correct shape for scalar/single-wavelength runs and must not suppress
-        # the default unit SolarBeam.
-    else
-        F₀_dev = extract_solar_F₀(prepared_sources, FT, pol_type.n, nSpec, arr_type)
-        # `RS_type.F₀` historically lives on host memory; keep that contract by
-        # converting back through Array. (Cheap: F₀ is (pol_n, nSpec).)
-        RS_type.F₀ = Array{FT, 2}(F₀_dev)
-    end
+    _resolve_solar_F₀!(RS_type, sources, prepared_sources, FT, pol_type.n, nSpec, arr_type)
     surface_F₀ = arr_type(FT.(RS_type.F₀))
 
     # Phase 4: allocate the InteractionWorkspace once before the layer loop for
@@ -570,6 +659,14 @@ function _rt_run_column(RS_type::AbstractRamanType, model, iBand;
             "solver only; Raman paths must use NoSSCorrection"))
         SFI || throw(ArgumentError(
             "TMSCorrection requires the SFI path"))
+        # The view-node beam mask acts in every Fourier moment, but the exact
+        # single scattering is added back only to the post-processed views
+        # (R_SFI): per-moment stream exports would lack it.
+        streams_callback === nothing || throw(ArgumentError(
+            "TMSCorrection is not supported with streams_callback / " *
+            "rt_run_streams: the exact single scattering is added after the " *
+            "Fourier sum at the requested views only, so the exported " *
+            "per-moment streams would omit it; use NoSSCorrection"))
         _require_unpolarized_solar(RS_type.F₀, "TMSCorrection")
     end
     beam_view_mask = ssc isa TMSCorrection ?
@@ -812,7 +909,7 @@ function _rt_run_column(RS_type::AbstractRamanType, model, iBand;
     if brdf isa CoxMunkSurface && SFI && !stop_after_atmosphere
         @timeit "SS Correction" apply_ss_correction!(
             R_SFI, brdf, pol_type, vza, vaz, μ₀,
-            Array(τ_sum_all[:,end]), m_used, nSpec; F₀=Array(surface_F₀))
+            FT.(Array(τ_sum_all[:,end])), m_used, nSpec; F₀=Array(surface_F₀))
     end
 
     # TMS "then add": exact single scattering from the untruncated phase
@@ -862,14 +959,10 @@ function _prepare_multisensor_F₀!(RS_type, model, iBand, sources)
     _multisensor_source_supported(effective_sources) || throw(ArgumentError(
         "interior-height radiances currently support SolarBeam/NoSource only; " *
         "thermal and surface-emission sources require multisensor source-slot propagation"))
-    if sources === nothing && size(RS_type.F₀) == (pol_n, nSpec) &&
-       !iszero(RS_type.F₀)
-        # Match the production full-column path: a deliberately pre-populated
-        # Raman carrier takes precedence when no source override was supplied.
-        return nothing
-    end
+    # Same precedence as the production full-column path: a deliberately
+    # pre-populated carrier wins when no source override was supplied.
     prepared = prepare_sources(effective_sources, FT, pol_n, nSpec, arr_type)
-    RS_type.F₀ = Array{FT, 2}(extract_solar_F₀(prepared, FT, pol_n, nSpec, arr_type))
+    _resolve_solar_F₀!(RS_type, sources, prepared, FT, pol_n, nSpec, arr_type)
     return nothing
 end
 
@@ -1051,9 +1144,14 @@ Phase 1c).
 6-tuple `(R_SFI, T_SFI, ieR_SFI, ieT_SFI, hem_R, hem_T)`:
 - `R_SFI`, `T_SFI`, `ieR_SFI`, `ieT_SFI`: shape `(nVza, nStokes, nSpec)` — same
   per-direction outputs as [`rt_run`](@ref).
-- `hem_R`, `hem_T`: hemispherical-integrated TOA reflectance / BOA transmittance,
-  shape `(nSpec,)`. Computed from the m=0 Fourier coefficient of the Stokes-I
-  source function over the full upper hemisphere (Σⱼ J₀[j, 1, λ] · μⱼ · wⱼ).
+- `hem_R`, `hem_T`: hemispherically integrated single-scatter Stokes-I
+  *fluxes*, shape `(nSpec,)`: the diffuse upwelling flux at TOA and the
+  diffuse downwelling flux at BOA, in the units of `F₀` (they are not
+  normalized by the incident flux `μ₀F₀`, so they are not reflectances or
+  transmittances). Computed from the m=0 Fourier coefficient of the Stokes-I
+  source function over the hemisphere (Σⱼ J₀[j, 1, λ] · μⱼ · wⱼ). The
+  unscattered direct beam is excluded from `hem_T` for every quadrature
+  scheme; add `μ₀ F₀ exp(−τ/μ₀)` for the total downwelling flux.
 """
 function rt_run_ss(model; i_band::Integer = 1, sources::Union{Nothing, AbstractSource} = nothing)
     rt_run_ss(InelasticScattering.noRS{float_type(model)}(), model, i_band; sources)
@@ -1141,18 +1239,14 @@ function rt_run_ss(RS_type::AbstractRamanType, model, iBand;
     @timeit "Creating layers" composite_layer     = make_composite_layer(RS_type, FT, arr_type, dims, nSpec)
     @timeit "Creating arrays" I_static            = Diagonal(arr_type(Diagonal{FT}(ones(dims[1]))))
 
-    # Resolve sources (v0.6 source-term refactor). Resolution: kwarg >
-    # model.sources > pre-set `RS_type.F₀` for back-compat. See `rt_run`.
+    # Resolve sources (v0.6 source-term refactor); same solar precedence as
+    # `rt_run` (see `_resolve_solar_F₀!`).
     effective_sources = sources === nothing ? model.sources : sources
     validate_source_requests(effective_sources, model.geometry.sza, brdf)
     prepared_sources = prepare_sources(effective_sources, FT, pol_type.n, nSpec, arr_type)
-    if sources === nothing && size(RS_type.F₀) == (pol_type.n, nSpec) &&
-       !iszero(RS_type.F₀)
-        # User-pre-set F₀ honored.
-    else
-        F₀_dev = extract_solar_F₀(prepared_sources, FT, pol_type.n, nSpec, arr_type)
-        RS_type.F₀ = Array{FT, 2}(F₀_dev)
-    end
+    # `rt_kernel_ss!` never calls the volume-source `contribute!` seam.
+    _reject_thermal_source(prepared_sources, "rt_run_ss")
+    _resolve_solar_F₀!(RS_type, sources, prepared_sources, FT, pol_type.n, nSpec, arr_type)
     surface_F₀ = arr_type(FT.(RS_type.F₀))
 
     τ_sum_all = nothing
@@ -1223,16 +1317,23 @@ function rt_run_ss(RS_type::AbstractRamanType, model, iBand;
         # Hemispherical integration — only m=0 contributes under 2π azimuthal
         # integration (higher Fourier moments vanish). Weight factor
         # (0.5/π) × 2π = 1 makes the raw Σⱼ J₀[j,1,λ] · μⱼ · wⱼ direct.
+        # `interaction_ss!` adds the surface layer's `j₀⁺` (the attenuated
+        # direct beam at the μ₀ rows) to the composite J₀⁺. It is not a
+        # diffuse radiance, so exclude it: otherwise hem_T would gain the
+        # arbitrary fraction w_μ₀·μ₀ of it whenever μ₀ is a weighted node
+        # (Gauss with the SZA on a node, every Radau run).
         if m == 0 && SFI
             J₀⁻_cpu = Array(composite_layer.J₀⁻)
             J₀⁺_cpu = Array(composite_layer.J₀⁺)
+            j₀⁺_surf = Array(added_layer_surface.j₀⁺)
             μ_arr = Array(qp_μ)
             w_arr = Array(wt_μ)
             nStokes = pol_type.n
             @inbounds for s = 1:nSpec, j = 1:Nquad
                 j_I = (j - 1) * nStokes + 1
                 hem_R[s] += J₀⁻_cpu[j_I, 1, s] * μ_arr[j] * w_arr[j]
-                hem_T[s] += J₀⁺_cpu[j_I, 1, s] * μ_arr[j] * w_arr[j]
+                hem_T[s] += (J₀⁺_cpu[j_I, 1, s] - j₀⁺_surf[j_I, 1, s]) *
+                            μ_arr[j] * w_arr[j]
             end
         end
     end

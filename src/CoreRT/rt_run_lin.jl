@@ -71,7 +71,10 @@ The `Nparams` derivative dimension is ordered as:
    `Normal` and `(z₀, σ₀)` for `LogNormal`.
 3. **Gas VMR parameters**, species-major with all `Nz` layers for each gas.
 4. **Surface parameters**.
-5. **SIF parameters**, when `SurfaceSIF(SIF755=...)` is present:
+5. **SIF parameters**, when a retrievable `SurfaceSIF` is present:
+   `[SIF760, mSIF]` for the default `SurfaceSIF(SIF760=..., mSIF=...)`
+   (radiance at the 760 nm reference wavenumber and its slope in
+   wavenumber); the legacy `SurfaceSIF(SIF755=...)` interface gives
    `[SIF755, slope]`, referenced to 755 nm.
 
 Use `result.layout` with `psurf_index`, `aerosol_range`, `gas_profile_range`,
@@ -210,8 +213,6 @@ function rt_run(RS_type::AbstractRamanType,
     NSurf == expected_nsurf || throw(ArgumentError(
         "NSurf=$NSurf does not match $(typeof(brdf)), which has " *
         "$expected_nsurf linearized surface parameter(s)."))
-    (; F₀) = RS_type
-
     FT = eltype(sza)                    # Get the float-type to use
 
     Nz = length(model.profile.p_full)   # Number of vertical slices
@@ -231,8 +232,8 @@ function rt_run(RS_type::AbstractRamanType,
     SFI = true                          # SFI flag
     NquadN = Nquad * pol_type.n         # Nquad (multiplied by Stokes n)
     dims = (NquadN,NquadN)              # nxn dims
-    # Resolve sources (v0.6 source-term refactor). Resolution: kwarg >
-    # model.sources > pre-set `RS_type.F₀` for back-compat. See `rt_run`.
+    # Resolve sources (v0.6 source-term refactor); same solar precedence as
+    # the forward driver (see `_resolve_solar_F₀!`).
     # `prepared_sources` is now hoisted outside the conditional so it's
     # in scope for the surface step (`surface_source_contribute!`) that
     # routes SurfaceSIF / future per-source surface contributions.
@@ -242,6 +243,11 @@ function rt_run(RS_type::AbstractRamanType,
         "$(typeof(effective_sources)) requires end-to-end source tangent propagation. " *
         "A source_ad_mode declaration alone does not provide this implementation."))
     validate_source_requests(effective_sources, model.geometry.sza, brdf)
+    supports_linearized_surface(brdf) || throw(ArgumentError(
+        "Linearized RT does not support $(nameof(typeof(brdf))): it has no " *
+        "linearized surface layer (see supports_linearized_surface). " *
+        "Supported surfaces: LambertianSurfaceScalar, " *
+        "LambertianSurfaceLegendre, CoxMunkSurface, CanopySurface."))
     NSIF = surface_sif_parameter_count(effective_sources)
     layout = active_layout === nothing ?
         ParameterLayout(aerosol_params=7, n_aerosols=NAer,
@@ -282,13 +288,8 @@ function rt_run(RS_type::AbstractRamanType,
         "use NoSSCorrection for LinMode runs (parity policy: features are " *
         "matched or rejected, never silently divergent)"))
     prepared_sources = prepare_sources(effective_sources, FT, pol_type.n, nSpec, arr_type)
-    if sources === nothing && size(F₀) == (pol_type.n, nSpec) && !iszero(F₀)
-        # User pre-set F₀ honored — F₀ already in scope from RS_type unpack.
-    else
-        F₀_dev = extract_solar_F₀(prepared_sources, FT, pol_type.n, nSpec, arr_type)
-        F₀ = Array{FT, 2}(F₀_dev)
-        RS_type.F₀ = F₀
-    end
+    F₀ = _resolve_solar_F₀!(RS_type, sources, prepared_sources, FT,
+                            pol_type.n, nSpec, arr_type)
 
     R       = zeros(FT, length(vza), pol_type.n, nSpec)
     T       = zeros(FT, length(vza), pol_type.n, nSpec)
@@ -590,7 +591,7 @@ function rt_run(RS_type::AbstractRamanType,
     if brdf isa CoxMunkSurface
         @timeit "SS Correction" apply_ss_correction!(
             R, Ṙ, Array(τ̇_sum_endpoint[:,:,end]), first(surface_range(layout)),
-            brdf, pol_type, vza, vaz, μ₀, Array(τ_sum_endpoint[:,end]),
+            brdf, pol_type, vza, vaz, μ₀, eltype(R).(Array(τ_sum_endpoint[:,end])),
             m_used, nSpec; F₀)
     end
 

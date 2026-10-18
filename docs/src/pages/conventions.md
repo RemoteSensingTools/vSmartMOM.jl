@@ -274,6 +274,13 @@ reason Radau is more expensive; Sanghavi recommends `GaussLegQuad`
 as the default. Radau remains available for users who need an
 SZA-on-node quadrature but is documented as expert/legacy.
 
+Appended ordinates (VZAs and, when embedded, μ₀) that lie within
+`4·eps(1)` of a node already on the grid are merged into that node rather
+than added as a numerically coincident second ordinate, and a node that
+close to μ₀ is moved onto the exact μ₀ (keeping its weight). A cosine one rounding error from a node (for
+example `sza = acosd(node)`) therefore gives the on-node result; grids
+without such a near-coincidence are unchanged.
+
 All representations report:
 
 - `qp.Nstreams` = weighted streams (resolving power)

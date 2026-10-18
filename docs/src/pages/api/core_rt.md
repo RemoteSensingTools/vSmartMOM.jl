@@ -165,6 +165,7 @@ vSmartMOM.CoreRT.gas_layer_index
 vSmartMOM.CoreRT.surface_range
 vSmartMOM.CoreRT.surface_index
 vSmartMOM.CoreRT.surface_parameter_count
+vSmartMOM.CoreRT.supports_linearized_surface
 vSmartMOM.CoreRT.sif_range
 vSmartMOM.CoreRT.atmosphere_range
 vSmartMOM.CoreRT.n_layer_params

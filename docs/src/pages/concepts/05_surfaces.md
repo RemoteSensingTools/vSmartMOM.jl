@@ -93,16 +93,28 @@ reflectance factor (HDRF) and bi-hemispherical reflectance (BHR) instead
 of (or alongside) per-VZA radiances. `interaction_hdrf!`:
 
 ```julia
-# src/CoreRT/CoreKernel/interaction_hdrf.jl:1–42
-hdr_J₀⁻ = r⁻⁺ ⊠ J₀⁺ .+ j₀⁻                     # HDRF (per quadrature node)
+# src/CoreRT/CoreKernel/interaction_hdrf.jl (interaction_hdrf!)
+J₀⁺_diffuse = J₀⁺ .- j₀⁺                       # remove the surface's direct beam
+hdr_J₀⁻ = r⁻⁺ ⊠ J₀⁺_diffuse .+ j₀⁻             # HDR (per quadrature node)
 if m == 0
-    bhr_J₀⁻[i, λ] = sum( hdr_J₀⁻[j, λ] * w[j] * μ[j]  for j in nodes )  # BHR
+    bhr_J₀⁻[i, λ] = sum( hdr_J₀⁻[j, λ] * w[j] * μ[j]  for j in nodes )      # BHR up
+    bhr_J₀⁺[i, λ] = sum( J₀⁺_diffuse[j, λ] * w[j] * μ[j]  for j in nodes ) +
+                    j₀⁺[iμ₀, λ] * μ₀                                         # BHR down
 end
 ```
 
-HDRF is the per-VZA (or per-quadrature) reflectance into the upper
-hemisphere normalized by incident solar flux; BHR is its hemispherical
-integral, only well-defined for `m=0`.
+After the final surface interaction the composite `J₀⁺` also carries the
+surface layer's `j₀⁺` (the attenuated direct beam at the μ₀ rows). Its
+reflection is already `j₀⁻`, and its flux enters BHR-down explicitly, so it
+is removed first; otherwise it is counted twice whenever μ₀ is a weighted
+quadrature node (Gauss with the SZA on a node, every Radau run).
+
+The `hdr` output is the per-VZA upwelling radiance just above the surface,
+and `bhr_uw` / `bhr_dw` are the hemispherical upwelling / downwelling fluxes
+there (only the `m=0` moment contributes). They are **not** normalized by
+the incident solar flux: for a Lambertian surface of albedo `A` under a
+vacuum, `hdr = μ₀ F₀ A/π`, `bhr_dw = μ₀ F₀` and `bhr_uw = A μ₀ F₀`. Divide
+by `μ₀ F₀/π` (HDRF) or by `bhr_dw` (BHR) to form reflectance factors.
 
 ## Sweeping surfaces over a cached atmosphere
 
@@ -161,7 +173,7 @@ all BRDFs.
 |---|---|
 | Surface BRDF kernels | `src/CoreRT/Surfaces/` (10 files) |
 | `create_surface_layer!` interface | implemented per BRDF in `Surfaces/*.jl` |
-| Surface coupling step | [`src/CoreRT/CoreKernel/interaction_hdrf.jl:1–42`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/CoreKernel/interaction_hdrf.jl#L1-L42) |
+| Surface coupling step | [`src/CoreRT/CoreKernel/interaction_hdrf.jl`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/CoreKernel/interaction_hdrf.jl) (`interaction_hdrf!`) |
 | Polarized Cox–Munk Mueller blocks | [`src/CoreRT/Surfaces/coxmunk_surface.jl`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/Surfaces/coxmunk_surface.jl) + `fresnel.jl` |
 | Canopy pre-solver | [`src/CoreRT/Surfaces/canopy_surface.jl`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/Surfaces/canopy_surface.jl) |
 | Surface BRDF map (YAML) | `src/IO/Parameters.jl::BRDF_MAP` |

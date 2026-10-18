@@ -7,6 +7,9 @@ zero-weight operator node. In the opt-in external-solar path
 diffuse operator and is appended only to the phase-evaluation grid, where it
 provides the exact direct-beam source column (see
 `docs/src/pages/conventions.md`). Radau always embeds μ₀ as a weighted node.
+Appended ordinates (VZAs and an embedded μ₀) within `4·eps(1)` of a node are
+merged into it, and a node that close to μ₀ is moved onto the exact μ₀
+(`_build_output_grid`); weighted nodes are not merged with each other.
 
 Two stream counts live on the resulting `QuadPoints`:
 - `Nstreams` — count of nonzero weights, the user-facing resolving-power
@@ -15,10 +18,59 @@ Two stream counts live on the resulting `QuadPoints`:
   For Radau the value is implementation-derived because the SZA-not-on-node
   branch builds `2·Nquad_subinterval` weighted nodes around μ₀.
 - `Nquad` — total diffuse-operator node count, including zero-weight VZAs and,
-  only in the explicitly requested legacy Gauss representation, the zero-weight SZA. The
+  in the default embedded Gauss representation, the zero-weight SZA. The
   external-solar phase grid is tracked separately by `phase_qp_μ` and does not
   enlarge the square diffuse operators.
 =#
+
+# Ordinates closer than `_NODE_MERGE_ULPS · eps(1)` (absolute, on μ ∈ [0, 1])
+# are treated as one direction. Distinct but numerically equal ordinates are
+# harmful: kernels with 1/(μᵢ − μⱼ) or 1/(μᵢ − μ₀) cancellation lose all
+# precision, so a μ₀ or VZA one rounding error from a node would give a
+# visibly different answer from both the on-node and the clearly-off cases
+# (e.g. `sza = acosd(node)`, whose cosine is not exactly `node`).
+const _NODE_MERGE_ULPS = 4
+
+_nodes_coincide(a, b) = abs(a - b) <=
+    _NODE_MERGE_ULPS * max(eps(one(typeof(a))), eps(one(typeof(b))))
+
+"""
+    _build_output_grid(FT, nodes, μ_vza, μ₀; append_μ₀) -> Vector{FT}
+
+Append the VZA cosines `μ_vza` (and, when `append_μ₀`, the solar cosine `μ₀`)
+to the quadrature `nodes`, so that no two distinct ordinates of the result
+coincide (`_nodes_coincide`) and `μ₀` is kept exact:
+
+1. unless `μ₀` is already a node, a node coinciding with `μ₀` is moved onto
+   `μ₀`, keeping its weight, so the kernels see `μᵢ == μ₀` exactly, as for an
+   SZA exactly on the node, instead of a rounding-error difference that their
+   `1/(μᵢ − μ₀)` terms cannot resolve (the node moves by at most
+   `_NODE_MERGE_ULPS · eps(1)`);
+2. each VZA coinciding with `μ₀` is represented by `μ₀` itself; a VZA
+   coinciding with a node already present is skipped (served by that node
+   through `nearest_point`); any other VZA is appended;
+3. `μ₀` is appended if requested and not yet present.
+
+Doing μ₀ first means a moved node cannot end up next to an already-appended
+VZA. Exact duplicates are skipped as `unique` did and the order is unchanged,
+so the grid is identical to `unique([nodes; μ_vza; μ₀])` unless a
+near-coincidence occurs.
+"""
+function _build_output_grid(::Type{FT}, nodes, μ_vza, μ₀::FT;
+                            append_μ₀::Bool) where {FT}
+    grid = collect(FT, nodes)
+    if !(μ₀ in grid)
+        i = findfirst(y -> _nodes_coincide(y, μ₀), grid)
+        i === nothing || (grid[i] = μ₀)
+    end
+    for v in μ_vza
+        v = FT(v)
+        μ = _nodes_coincide(v, μ₀) ? μ₀ : v
+        any(y -> _nodes_coincide(y, μ), grid) || push!(grid, μ)
+    end
+    append_μ₀ && !(μ₀ in grid) && push!(grid, μ₀)
+    return grid
+end
 
 """
     rt_set_streams(::GaussLegQuad, Ltrunc, obs_geom, pol_type, arr_type;
@@ -54,8 +106,10 @@ function rt_set_streams(::GaussLegQuad,
     # opt-in external-solar representation keeps μ₀ only on the phase grid
     # so the square diffuse operators do not carry its zero-weight row and
     # column.
-    qp_μ = external_solar ? unique(FT[qp_μ; cosd.(vza)]) :
-                              unique(FT[qp_μ; cosd.(vza); μ₀])
+    # Ordinates within a few ulps of each other are merged, keeping μ₀ exact
+    # (`_build_output_grid`), so the kernels see the on-node geometry.
+    qp_μ = _build_output_grid(FT, qp_μ, cosd.(vza), μ₀;
+                              append_μ₀ = !external_solar)
     wt_μ = FT[wt_μ; zeros(FT, length(qp_μ) - length(wt_μ))]
     Nquad = length(qp_μ)
     Nstreams = count(!iszero, wt_μ)
@@ -130,7 +184,9 @@ function rt_set_streams(::RadauQuad,
     # maps to μ = 1, i.e. SZA = 0).
     qp_μ₀_mapped = (1 .+ qp_μ₀) ./ 2
 
-    if μ₀ ∈ qp_μ₀_mapped
+    # A μ₀ within a few ulps of a node counts as on the node; that node is
+    # then moved onto the exact μ₀ (`_build_output_grid`).
+    if any(y -> _nodes_coincide(y, μ₀), qp_μ₀_mapped)
 
         qp_μ = zeros(FT, Nquad)
         wt_μ = zeros(FT, Nquad)
@@ -144,8 +200,9 @@ function rt_set_streams(::RadauQuad,
         Ncam = length(vza)
         μ = cosd.(vza) # check for degree to radian conversion
         
-        # Screen out duplicate camera zenith angles
-        qp_μ = unique([qp_μ; cosd.(vza)])
+        # Screen out duplicate (and few-ulp-coincident) camera zenith angles;
+        # μ₀ is already a node of this grid (or moved onto it).
+        qp_μ = _build_output_grid(FT, qp_μ, cosd.(vza), μ₀; append_μ₀ = false)
 
         # Assign zero-weights to remaining camera zenith angles
         wt_μ = FT[wt_μ; zeros(length(qp_μ) - length(wt_μ))]
@@ -172,8 +229,9 @@ function rt_set_streams(::RadauQuad,
         Ncam = length(vza)
         μ = cosd.(vza) # check for degree to radian conversion
 
-        # Screen out duplicate camera zenith angles
-        qp_μ = unique([qp_μ; cosd.(vza)])
+        # Screen out duplicate (and few-ulp-coincident) camera zenith angles;
+        # μ₀ is already a node of this grid (or moved onto it).
+        qp_μ = _build_output_grid(FT, qp_μ, cosd.(vza), μ₀; append_μ₀ = false)
 
         # Assign zero-weights to remaining camera zenith angles
         wt_μ = FT[wt_μ; zeros(length(qp_μ) - length(wt_μ))]

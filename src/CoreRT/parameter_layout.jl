@@ -234,6 +234,19 @@ end
 surface_parameter_count(::AbstractSurfaceType) = 1
 surface_parameter_count(s::LambertianSurfaceLegendre) = length(s.legendre_coeff)
 
+"""
+    supports_linearized_surface(surface) -> Bool
+
+Whether the linearized driver can build the surface layer and its tangent
+(a linearized `create_surface_layer!` method). Checked at the linearized solve
+boundary so unsupported surfaces fail with an `ArgumentError` naming the
+surface, not a deep `MethodError`. A surface that adds a linearized layer
+builder should also specialize this trait. The default is `false`.
+"""
+supports_linearized_surface(::AbstractSurfaceType) = false
+supports_linearized_surface(::Union{LambertianSurfaceScalar, LambertianSurfaceLegendre,
+                                    CoxMunkSurface, CanopySurface}) = true
+
 "Index range for SIF parameters: per-wavenumber radiance at 760 nm, then dSIF/dν."
 @inline function sif_range(pl::ParameterLayout)
     start = last(surface_range(pl)) + 1
