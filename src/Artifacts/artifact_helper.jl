@@ -59,6 +59,7 @@ function artifact(molecule::AbstractString,
         try
             return fetch_hitran(molecule; edition=edition, force=true)
         catch err
+            err isa InterruptException && rethrow()
             error("artifact(\"$molecule\") needs the full HITRAN dataset for edition " *
                   "\"$edition\" ($(_HITRAN_FULL_NUMIN)–$(_HITRAN_FULL_NUMAX) cm⁻¹, all " *
                   "isotopologues). The cache was not usable ($reason) and the download " *

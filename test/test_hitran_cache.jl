@@ -52,6 +52,20 @@ end
 hitran_file(records...) = join(records, "\n") * "\n"
 
 const CO2_IDS = Int[7, 8, 9, 10, 11, 12, 13, 14, 121, 15, 120, 122]
+
+# Body of a live hitran.org response for O2, 13000-13010 cm⁻¹ (23 LF-terminated
+# records). Its Content-Length counted CRLF line endings, so curl reported
+# "end of response with 23 bytes missing" (error 18) for this complete body.
+const LIVE_O2_BODY = read(joinpath(@__DIR__, "reference", "hitran_api_O2_13000-13010.par"), String)
+const API_URL = "https://hitran.org/lbl/api"
+api_response(status, content_length=nothing) = vSmartMOM.Downloads.Response(
+    "https", API_URL, status, "HTTP/1.1 $status",
+    content_length === nothing ? Pair{String,String}[] : ["content-length" => string(content_length)])
+function transport_error(body; declared, code=18, status=200)
+    message = "end of response with $(declared - ncodeunits(body)) bytes missing"
+    return vSmartMOM.Downloads.RequestError(API_URL, code, message, api_response(status, declared))
+end
+crlf_length(body) = ncodeunits(body) + count(==('\n'), body)
 const CO2_NARROW = hitran_file(hitran_record(2, 1, 6200.0), hitran_record(2, 2, 6201.0))
 const CO2_FULL = hitran_file(hitran_record(2, 1, 2349.0), hitran_record(2, 1, 6200.0),
                              hitran_record(2, 2, 6201.0))
@@ -301,16 +315,98 @@ end
     @test vSmartMOM._hitran_cache_status("CO2", edition, CO2_IDS, 6000, 6400)[1]
 end
 
-@testset "transport errors fail even with a 2xx status" begin
+@testset "transport errors: only hitran.org's newline shortfall is accepted" begin
     check = vSmartMOM._check_hitran_response
-    url = "https://hitran.org/lbl/api"
-    ok = vSmartMOM.Downloads.Response("https", url, 200, "HTTP/1.1 200 OK", Pair{String,String}[])
-    @test check(ok) === nothing
-    partial = vSmartMOM.Downloads.RequestError(url, 18, "transfer closed with outstanding read data remaining", ok)
-    @test_throws ErrorException check(partial)
-    @test_throws ErrorException check(vSmartMOM.Downloads.Response("https", url, 500, "", Pair{String,String}[]))
-    limited = vSmartMOM.Downloads.Response("https", url, 403, "", Pair{String,String}[])
-    @test_throws r"rate limit" check(limited)
+    body = LIVE_O2_BODY
+    @test count(==('\n'), body) == 23
+    @test all(line -> ncodeunits(line) == 160, split(chomp(body), '\n'))
+    mktempdir() do dir
+        path = joinpath(dir, "body.par")
+        write(path, body)
+        @test check(api_response(200, ncodeunits(body)), path) === nothing
+        # The live signature: 2xx, error 18, deficit of one byte per record.
+        @test check(transport_error(body; declared=crlf_length(body)), path) === nothing
+        # A different deficit means bytes really are missing.
+        @test_throws ErrorException check(transport_error(body; declared=crlf_length(body) + 162), path)
+        @test_throws ErrorException check(transport_error(body; declared=crlf_length(body) - 1), path)
+        # Other transport errors, a missing Content-Length, or a failed status.
+        @test_throws ErrorException check(transport_error(body; declared=crlf_length(body), code=56), path)
+        @test_throws ErrorException check(vSmartMOM.Downloads.RequestError(API_URL, 18,
+            "transfer closed with outstanding read data remaining", api_response(200)), path)
+        @test_throws ErrorException check(transport_error(body; declared=crlf_length(body), status=500), path)
+        # A body cut inside a record, even with a matching declared length.
+        cut = body[1:end-1]
+        write(path, cut)
+        @test_throws ErrorException check(transport_error(cut; declared=crlf_length(cut)), path)
+        write(path, "")
+        @test_throws ErrorException check(transport_error(""; declared=0), path)
+        # Conflicting Content-Length headers are ambiguous framing.
+        write(path, body)
+        headers = ["content-length" => string(crlf_length(body) + 162),
+                   "content-length" => string(crlf_length(body))]
+        conflicting = vSmartMOM.Downloads.RequestError(API_URL, 18, "bytes missing",
+            vSmartMOM.Downloads.Response("https", API_URL, 200, "HTTP/1.1 200", headers))
+        @test_throws ErrorException check(conflicting, path)
+        # A correctly declared CRLF response of 163 records cut after 162 has
+        # size + newlines == declared length; CR bytes rule it out.
+        crlf = join(fill(hitran_record(2, 1, 6200.0) * "\r\n", 162))
+        write(path, crlf)
+        @test crlf_length(crlf) == 163 * 162
+        @test_throws ErrorException check(transport_error(crlf; declared=163 * 162), path)
+        @test_throws r"rate limit" check(api_response(403), path)
+        @test_throws ErrorException check(api_response(500), path)
+    end
+end
+
+@testset "a live hitran.org body with the newline shortfall is cached" begin
+    # Replay the live transport: the real body, then the real error signature.
+    function live_server(body)
+        declared = crlf_length(LIVE_O2_BODY)
+        FixtureServer(String[], path -> begin
+            write(path, body)
+            vSmartMOM._check_hitran_response(transport_error(body; declared=declared), path)
+        end)
+    end
+    o2_ids = vSmartMOM._molecule_iso_ids("O2")
+    path = with_server(live_server(LIVE_O2_BODY)) do
+        fetch_hitran("O2"; numin=13000, numax=13010, edition="live")
+    end
+    @test read(path, String) == LIVE_O2_BODY
+    @test vSmartMOM._hitran_cache_status("O2", "live", o2_ids, 13000, 13010)[1]
+    # The same response truncated after a complete record is rejected.
+    records = split(LIVE_O2_BODY, '\n'; keepempty=false)
+    truncated = join(records[1:end-1], '\n') * "\n"
+    @test_throws ErrorException with_server(live_server(truncated)) do
+        fetch_hitran("O2"; numin=13000, numax=13010, edition="live_truncated")
+    end
+    @test !isfile(vSmartMOM._hitran_par_path("O2", "live_truncated"))
+    @test isempty(readdir(dirname(vSmartMOM._hitran_par_path("O2", "live_truncated"))))
+end
+
+@testset "interrupts are not converted into cache errors" begin
+    set_hitran_edition!("interrupt")
+    with_server(failing(InterruptException())) do
+        @test_throws InterruptException artifact("CO2")
+    end
+end
+
+@testset "stale temporary and backup files are removed" begin
+    par = seed_cache!("CO2", "stale", CO2_FULL)
+    meta = vSmartMOM._hitran_meta_path("CO2", "stale")
+    dir = dirname(par)
+    leftovers = [".CO2.par.tmp.123-0123456789ab", ".CO2.par.bak.45-abcdefghijkl",
+                 ".CO2.meta.toml.tmp.6-zzzzzzzzzzzz"]
+    # Another entry's temporary file, and a cache entry whose label happens to
+    # start like a CO2 sidecar name, are left alone.
+    others = [".CO2_main.par.tmp.123-0123456789ab", ".CO2.par.tmp.other.par",
+              ".CO2.par.tmp.other.meta.toml", "CO2.meta.toml", "CO2.par"]
+    foreach(file -> touch(joinpath(dir, file)), [leftovers; others[1:3]])
+    @test occursin(vSmartMOM._HITRAN_SIDECAR_SUFFIX,
+                   replace(basename(vSmartMOM._hitran_sidecar_path(par, "tmp")), ".CO2.par" => ""))
+    vSmartMOM._remove_stale_hitran_files(par, meta)        # all are fresh
+    @test sort(readdir(dir)) == sort([leftovers; others])
+    vSmartMOM._remove_stale_hitran_files(par, meta; max_age=-60)
+    @test sort(readdir(dir)) == sort(others)
 end
 
 @testset "failed replacement restores the previous pair" begin
@@ -322,13 +418,18 @@ end
         tmp_par, tmp_meta = tempname(dirname(par)), tempname(dirname(par))
         write(tmp_par, CO2_NARROW)
         write(tmp_meta, "replacement metadata\n")
-        rename = (src, dst) -> dst == failing_target ? error("injected rename failure") :
-                                                       vSmartMOM._atomic_rename(src, dst)
+        data_present = Bool[]
+        rename = function (src, dst)
+            push!(data_present, isfile(par))
+            dst == failing_target && error("injected rename failure")
+            vSmartMOM._atomic_rename(src, dst)
+        end
         @test_throws ErrorException vSmartMOM._replace_hitran_cache!(
             tmp_par, par, tmp_meta, meta; rename=rename)
         @test read(par, String) == CO2_FULL
         @test read(meta, String) == old_meta
         @test hitran_is_cached("CO2", edition)
+        @test all(data_present)  # the data file never disappears
         rm(tmp_par; force=true); rm(tmp_meta; force=true)
         @test cache_files(edition) == ["CO2.meta.toml", "CO2.par"]
     end

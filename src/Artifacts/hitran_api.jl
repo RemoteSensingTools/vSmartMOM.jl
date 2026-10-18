@@ -154,13 +154,14 @@ function fetch_hitran_by_ids(name::AbstractString, iso_ids::Vector{Int};
 
     edition_dir = dirname(par_path)
     mkpath(edition_dir)
+    _remove_stale_hitran_files(par_path, meta_path)
 
     @info "Downloading HITRAN data for $name from hitran.org..." url=url
 
     # Download and describe the new file in temporary files next to the cache
     # (same file system, so the final renames are atomic).
-    tmp_par  = tempname(edition_dir; cleanup=false)
-    tmp_meta = tempname(edition_dir; cleanup=false)
+    tmp_par  = _hitran_sidecar_path(par_path, "tmp")
+    tmp_meta = _hitran_sidecar_path(meta_path, "tmp")
     try
         _HITRAN_DOWNLOAD[](url, tmp_par)
         _validate_hitran_download(tmp_par, iso_ids, numin, numax)
@@ -219,6 +220,7 @@ function _hitran_cache_status(name::AbstractString, edition::AbstractString,
         try
             _check_hitran_cache(name, edition, iso_ids, numin, numax)
         catch err
+            err isa InterruptException && rethrow()
             (false, "cache could not be checked: $(sprint(showerror, err))")
         end
     end
@@ -301,27 +303,66 @@ end
     _download_hitran(url, path)
 
 Download `url` into `path`, throwing unless the transfer completed with a 2xx
-HTTP status. A transport error is a failure even when the server had already
-sent a 2xx status line: the body may be truncated at a record boundary, which
-record validation alone cannot detect.
+HTTP status. Transport errors are failures, because a body truncated at a
+record boundary passes record validation. The one exception is hitran.org's
+known length mismatch (see `_is_hitran_newline_shortfall`); the body is still
+checked record by record by `_validate_hitran_download` before use.
 """
 function _download_hitran(url::AbstractString, path::AbstractString)
     resp = open(path, "w") do output
         Downloads.request(url; output=output, throw=false)
     end
-    _check_hitran_response(resp)
+    _check_hitran_response(resp, path)
     return path
 end
 
-function _check_hitran_response(resp)
+function _check_hitran_response(resp, path::AbstractString)
     status = resp isa Downloads.Response ? resp.status :
              resp isa Downloads.RequestError ? resp.response.status : 0
     status == 403 && error("HITRAN API rate limit exceeded. You have exceeded the daily limit of API queries. Try again tomorrow.")
-    resp isa Downloads.RequestError &&
+    if resp isa Downloads.RequestError
+        200 <= status < 300 && _is_hitran_newline_shortfall(resp, path) && return nothing
         error("HITRAN download failed: $(resp.message)" *
               (status > 0 ? " (after HTTP status $status)" : ""))
+    end
     200 <= status < 300 || error("HITRAN API request failed with HTTP status $status")
     return nothing
+end
+
+"""
+    _is_hitran_newline_shortfall(err::Downloads.RequestError, path)
+
+hitran.org declares a Content-Length that counts two bytes (CRLF) per line but
+sends LF-terminated lines, so curl ends a complete transfer with error 18
+("N bytes missing"), N being the number of records. Accept exactly that case:
+error code 18; every Content-Length header agreeing on a length equal to the
+received size plus the number of newlines; LF-only line endings; and a body
+ending in a newline. Each record then accounts for 162 declared and 161
+received bytes, so the equality means every declared record arrived, provided
+the server over-counts as observed. A response whose declared length were
+correct for LF endings and that lost exactly one record in 162 at a record
+boundary would also match; this cannot be told apart from the server defect.
+Any other transport error remains a failure.
+"""
+function _is_hitran_newline_shortfall(err, path::AbstractString)
+    err.code == 18 || return false
+    lengths = [tryparse(Int, strip(v)) for (k, v) in err.response.headers
+               if lowercase(k) == "content-length"]
+    (isempty(lengths) || any(isnothing, lengths) || !allequal(lengths)) && return false
+    declared = first(lengths)
+    nbytes = filesize(path)
+    nbytes == 0 && return false
+    newlines, carriage_returns, last_byte = open(path) do io
+        n, r = 0, 0
+        while !eof(io)
+            chunk = read(io, 1 << 20)
+            n += count(==(UInt8('\n')), chunk)
+            r += count(==(UInt8('\r')), chunk)
+        end
+        seekend(io); skip(io, -1)
+        n, r, read(io, UInt8)
+    end
+    return carriage_returns == 0 && last_byte == UInt8('\n') && declared == nbytes + newlines
 end
 
 # Download callable used by `fetch_hitran_by_ids`; `(url, path) -> path`.
@@ -375,28 +416,29 @@ end
     _replace_hitran_cache!(tmp_par, par_path, tmp_meta, meta_path; rename, remove)
 
 Move a validated data file and its metadata into place; callers hold
-`_HITRAN_CACHE_LOCK`. The previous data file is moved to a uniquely named
-backup until both renames succeed; if either fails, it is restored, so a
-failed replacement leaves the previous pair intact. A crash part-way through
-can leave no data file (the previous one survives as a `jl_*` backup in the
-same directory) or new data beside old metadata; the cache check then reports
-"no cached file" or a SHA-256 mismatch, so the data are downloaded again
-rather than reused. The same check catches a mismatched pair left by two
-processes replacing the same file at once.
+`_HITRAN_CACHE_LOCK`. The previous data file is first hard-linked (or copied)
+to a `.<name>.par.bak.*` backup, so `par_path` exists throughout. The data
+file is then replaced in one rename, followed by the metadata. If either
+rename fails, the backup is renamed back, so a failed replacement leaves the
+previous pair intact. A crash in between can leave new data beside old
+metadata; the cache check then reports a SHA-256 mismatch and the data are
+downloaded again rather than reused. The same check catches a mismatched pair
+left by two processes replacing the same file at once.
 """
 function _replace_hitran_cache!(tmp_par, par_path, tmp_meta, meta_path;
                                 rename=_atomic_rename, remove=rm)
-    backup = tempname(dirname(par_path); cleanup=false)
-    had_previous = isfile(par_path)
-    had_previous && rename(par_path, backup)
+    backup = _hitran_sidecar_path(par_path, "bak")
+    had_previous = _backup_hitran_file(par_path, backup)
     try
         rename(tmp_par, par_path)
         rename(tmp_meta, meta_path)
     catch
-        if had_previous
-            _atomic_rename(backup, par_path)
-        else
+        if !had_previous
             rm(par_path; force=true)
+        elseif ispath(par_path) && samefile(backup, par_path)
+            rm(backup; force=true)  # data file never replaced; rename(2) would be a no-op
+        else
+            _atomic_rename(backup, par_path)
         end
         rethrow()
     end
@@ -407,6 +449,52 @@ function _replace_hitran_cache!(tmp_par, par_path, tmp_meta, meta_path;
         @warn "Could not remove previous HITRAN file $backup" exception=err
     end
     return par_path
+end
+
+"""Link (or, where hard links are unsupported, copy) `path` to `backup`; `false` if `path` does not exist."""
+function _backup_hitran_file(path, backup)
+    try
+        hardlink(path, backup)
+    catch err
+        err isa Base.IOError && err.code == Base.UV_ENOENT && return false
+        isfile(path) || return false
+        cp(path, backup)
+    end
+    return true
+end
+
+"""
+Return a unique hidden temporary/backup path `.<file>.<kind>.<pid>-<random>`
+next to `path`, recognisable by `_remove_stale_hitran_files`. The random part
+uses `Libc.rand`, leaving the user's random-number streams untouched.
+"""
+function _hitran_sidecar_path(path, kind)
+    chars = "0123456789abcdefghijklmnopqrstuvwxyz"
+    suffix = String([chars[Libc.rand() % 36 + 1] for _ in 1:12])
+    return joinpath(dirname(path), ".$(basename(path)).$(kind).$(getpid())-$(suffix)")
+end
+
+const _HITRAN_SIDECAR_SUFFIX = r"^\.(tmp|bak)\.[0-9]+-[0-9a-z]{12}$"
+
+"""
+Delete temporary and backup files of this cache entry left by an interrupted
+download or replacement, once they are older than `max_age` seconds. Only
+names produced by `_hitran_sidecar_path` for these two files are touched.
+"""
+function _remove_stale_hitran_files(par_path, meta_path; max_age=86400)
+    dir = dirname(par_path)
+    stems = (".$(basename(par_path))", ".$(basename(meta_path))")
+    for file in readdir(dir)
+        any(stem -> startswith(file, stem) &&
+                    occursin(_HITRAN_SIDECAR_SUFFIX, file[ncodeunits(stem)+1:end]), stems) || continue
+        path = joinpath(dir, file)
+        try
+            st = stat(path)
+            max(st.mtime, st.ctime) < time() - max_age && rm(path; force=true)
+        catch err
+            @warn "Could not remove stale HITRAN file $path" exception=err
+        end
+    end
 end
 
 """
