@@ -79,9 +79,13 @@ if _fused_gpu_ok
         x = CUDA.rand(Float32, 24, 24, 8)
         @test _use_fused_doubling_rt(x)
         @test _use_fused_doubling_source(x)
-        _FUSED_DOUBLING_ENABLED[] = false
-        @test !_use_fused_doubling_rt(x)
-        _FUSED_DOUBLING_ENABLED[] = true
+        was = _FUSED_DOUBLING_ENABLED[]
+        try
+            _FUSED_DOUBLING_ENABLED[] = false
+            @test !_use_fused_doubling_rt(x)
+        finally
+            _FUSED_DOUBLING_ENABLED[] = was
+        end
     end
 else
     @info "CUDA unavailable — GPU arm skipped"

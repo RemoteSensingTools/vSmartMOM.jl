@@ -45,22 +45,25 @@ function run_case(FT, to_dev, I_static; rtol)
     # actually track the mode, not silently stay on one path.
     default = _FUSED_INTERACTION_MODE[]
     @test default === :auto
-    # invalid modes throw instead of silently meaning "on"
-    _FUSED_INTERACTION_MODE[] = :of
-    @test_throws ArgumentError _use_fused_interaction(a.r⁻⁺)
-    _FUSED_INTERACTION_MODE[] = default
-    @test _fused_interaction_default(KernelAbstractions.get_backend(a.r⁻⁺)) == false  # CUDA ext override
-    @test !_use_fused_interaction(a.r⁻⁺)                 # :auto → CUDA backend policy → off
-    _FUSED_INTERACTION_MODE[] = :off
-    @test !_use_fused_interaction(a.r⁻⁺)
-    interaction_helper!(ScatteringInterface_11(), true, c_ref, a, I_static)  # _bmm! ladder
-    _FUSED_INTERACTION_MODE[] = :on
-    @test _use_fused_interaction(a.r⁻⁺)
-    interaction_helper!(ScatteringInterface_11(), true, c, a, I_static)      # fused branch
-    # the dedicated fused function, called directly, must agree with the
-    # gated dispatch (same inputs → same launches)
-    _interaction_11_fused!(c_dir, a, I_static)
-    _FUSED_INTERACTION_MODE[] = default
+    try
+        # invalid modes throw instead of silently meaning "on"
+        _FUSED_INTERACTION_MODE[] = :of
+        @test_throws ArgumentError _use_fused_interaction(a.r⁻⁺)
+        _FUSED_INTERACTION_MODE[] = default
+        @test _fused_interaction_default(KernelAbstractions.get_backend(a.r⁻⁺)) == false  # CUDA ext override
+        @test !_use_fused_interaction(a.r⁻⁺)                 # :auto → CUDA backend policy → off
+        _FUSED_INTERACTION_MODE[] = :off
+        @test !_use_fused_interaction(a.r⁻⁺)
+        interaction_helper!(ScatteringInterface_11(), true, c_ref, a, I_static)  # _bmm! ladder
+        _FUSED_INTERACTION_MODE[] = :on
+        @test _use_fused_interaction(a.r⁻⁺)
+        interaction_helper!(ScatteringInterface_11(), true, c, a, I_static)      # fused branch
+        # the dedicated fused function, called directly, must agree with the
+        # gated dispatch (same inputs → same launches)
+        _interaction_11_fused!(c_dir, a, I_static)
+    finally
+        _FUSED_INTERACTION_MODE[] = default
+    end
     for f in (:R⁻⁺, :R⁺⁻, :T⁺⁺, :T⁻⁻, :J₀⁺, :J₀⁻)
         @test isapprox(Array(getproperty(c, f)), Array(getproperty(c_ref, f)); rtol = rtol)
         @test Array(getproperty(c_dir, f)) == Array(getproperty(c, f))

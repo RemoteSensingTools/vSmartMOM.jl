@@ -222,6 +222,7 @@ Run from `test/` after instantiating its environment against this checkout:
 julia --project=. test_jacobian_batched.jl
 julia --project=. test_lambertian_jacobian_batched.jl
 VSMARTMOM_JACOBIAN_GPU_TEST=true julia --project=. test_jacobian_batched.jl
+julia --project=. test_jacobian_tiled.jl   # CUDA only; runtests.jl owns it under the flag
 VSMARTMOM_JACOBIAN_GPU_TEST=true julia --project=. test_lambertian_jacobian_batched.jl
 julia --project=. ../docs/dev_notes/jacobian_batched/gpu_runner.jl
 

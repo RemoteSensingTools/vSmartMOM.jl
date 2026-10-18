@@ -40,11 +40,16 @@ end
 
 "Run the full m-loop's constructCoreOpticalProperties A/B and compare bitwise."
 function ab_layers(model, m)
-    cache_on  = (_SPARSE_AERO_COMBINE_ENABLED[] = true;  build_m_invariant_cache(RS, [1], model))
-    lp_on,  _ = constructCoreOpticalProperties(RS, [1], m, model, cache_on)
-    cache_off = (_SPARSE_AERO_COMBINE_ENABLED[] = false; build_m_invariant_cache(RS, [1], model))
-    lp_off, _ = constructCoreOpticalProperties(RS, [1], m, model, cache_off)
-    _SPARSE_AERO_COMBINE_ENABLED[] = true
+    was = _SPARSE_AERO_COMBINE_ENABLED[]
+    local lp_on, lp_off
+    try
+        cache_on  = (_SPARSE_AERO_COMBINE_ENABLED[] = true;  build_m_invariant_cache(RS, [1], model))
+        lp_on,  _ = constructCoreOpticalProperties(RS, [1], m, model, cache_on)
+        cache_off = (_SPARSE_AERO_COMBINE_ENABLED[] = false; build_m_invariant_cache(RS, [1], model))
+        lp_off, _ = constructCoreOpticalProperties(RS, [1], m, model, cache_off)
+    finally
+        _SPARSE_AERO_COMBINE_ENABLED[] = was
+    end
     same = true
     for (a, b) in zip(lp_on, lp_off)
         same &= Array(a.τ) == Array(b.τ) && Array(a.ϖ) == Array(b.ϖ) &&
