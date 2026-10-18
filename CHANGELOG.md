@@ -129,6 +129,11 @@ review of General's sequential-version rule.
   Henyey–Greenstein and synthetic polarized Henyey–Greenstein phase
   functions; those elements truncate to zero. The linearized form rejects a
   nonzero tangent of such an element, for which the fit has no derivative.
+- `update_aerosol_microphysics!` (BatchContext) uses the constructor's
+  anchor wavelengths, reference-wavelength node rule and interpolation
+  endpoints for multi-wavelength bands. In Float32 it previously inserted an
+  extra knot one ulp from the band edge, so even an identical update changed
+  k, fᵗ and the radiance (~1e-4) instead of reproducing a fresh build.
 - HITRAN, partition-sum, HAPI, CIA and MT_CKD references added to
   `CITATION.bib`, the References page and the README, with guidance on which
   HITRAN edition a calculation used.

@@ -11,6 +11,7 @@ using Test
 using vSmartMOM, vSmartMOM.CoreRT
 using Distributions
 using Statistics
+import YAML
 
 # Bring Aerosol into scope for Phase-2 microphysics tests. Use a `using`
 # binding (not `const Aerosol = ...`): this file shares `Main` with the other
@@ -489,6 +490,32 @@ end  # @testset Phase 2 loading
             println("  Band $i_band rt_run (NoTrunc): max|ΔR|/|R_ref| = $(round(rtol_ach, sigdigits=4))")
             @test R_ctx ≈ R_ref  rtol=1e-14 atol=0
         end
+    end
+
+    # ── Test M2c: an identical update reproduces the build in Float32 ────────
+    # The update must use the build's anchor wavelengths, reference-node rule
+    # and interpolation endpoints; in Float32 the λ_ref knot otherwise lands
+    # one ulp inside the band edge and perturbs k, fᵗ and the radiance.
+    @testset "M2c — identical microphysics update is bit-exact in Float32" begin
+        println("\n  M2c: identical Float32 microphysics update vs fresh build")
+        d32 = YAML.load_file(YAML_BATCH)
+        delete!(d32, "absorption")
+        d32["radiative_transfer"]["float_type"] = "Float32"
+        aer32 = d32["scattering"]["aerosols"][1]
+        aer32["μ"] = 0.05; aer32["σ"] = 1.4; aer32["nᵣ"] = 1.4; aer32["nᵢ"] = 0.003
+        params32 = read_parameters(d32)
+        ctx32 = BatchContext(params32)
+        τ0 = copy(ctx32.model.optics.aerosols.τ_aer[1])
+        ao0 = ctx32.model.optics.aerosols.aerosol_optics[1][1]
+        k0, f0 = copy(ao0.k), copy(ao0.fᵗ)
+        R0 = rt_run(ctx32.model).toa
+        update_aerosol_microphysics!(ctx32, 1,
+            params32.scattering_params.rt_aerosols[1].aerosol)
+        ao1 = ctx32.model.optics.aerosols.aerosol_optics[1][1]
+        @test ao1.k == k0
+        @test ao1.fᵗ == f0
+        @test ctx32.model.optics.aerosols.τ_aer[1] == τ0
+        @test rt_run(ctx32.model).toa == R0
     end
 
     # ── Test M3: guard — i_aer out of range ──────────────────────────────────

@@ -1078,10 +1078,16 @@ function update_aerosol_microphysics!(ctx::BatchContext, i_aer::Int, aerosol::Ae
 
         else
             # ── Multi-wavelength band: endpoint Mie + linear interpolation ──
-            mie_model_0 = _mie_fwd(curr_band_λ[1])
+            # Anchor wavelengths, reference node and interpolation endpoints
+            # follow model_from_parameters with its default anchors (the
+            # band's own grid; BatchContext builds without custom anchors),
+            # so an identical CPU update is bit-exact in Float32 as well.
+            ν_spec = FT.(params.spec_bands[i_band])
+            anchor_λ = FT.(1e4 ./ ν_spec)
+            mie_model_0 = _mie_fwd(anchor_λ[1])
             aerosol_optics_raw_0 = compute_aerosol_optical_properties(mie_model_0, FT)
 
-            mie_model_1 = _mie_fwd(curr_band_λ[end])
+            mie_model_1 = _mie_fwd(anchor_λ[end])
             aerosol_optics_raw_1 = compute_aerosol_optical_properties(mie_model_1, FT)
 
             _truncate(ao) = truncation_type isa Scattering.δBGE &&
@@ -1093,15 +1099,15 @@ function update_aerosol_microphysics!(ctx::BatchContext, i_aer::Int, aerosol::Ae
             # k_sca, and fᵗ in wavenumber.
             ao0 = _truncate(aerosol_optics_raw_0)
             ao1 = _truncate(aerosol_optics_raw_1)
-            ν_spec = FT.(params.spec_bands[i_band])
-            ν_ref_phase = FT(1e4 / sp.λ_ref)
+            ν_ref_phase = FT(1e4) / sp.λ_ref
             ao_ref = nothing
-            if first(extrema(ν_spec)) < ν_ref_phase < last(extrema(ν_spec))
+            if _interior_reference_node(ν_spec, ν_ref_phase)
                 ao_ref = _truncate(compute_aerosol_optical_properties(
                     _mie_fwd(sp.λ_ref), FT))
             end
             new_ao = _spectralize_truncated_endpoints(ao0, ao1, ν_spec;
-                reference=ao_ref, ν_ref=ν_ref_phase)
+                reference=ao_ref, ν_ref=ν_ref_phase,
+                ν_endpoints=(first(ν_spec), last(ν_spec)))
 
             trial_optics[i_band][i_aer] = new_ao
 
