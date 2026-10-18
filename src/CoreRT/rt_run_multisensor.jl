@@ -183,7 +183,7 @@ function rt_run_test_ms(RS_type::AbstractRamanType,
             #else
             @timeit "interaction_multisensor" interaction_bot!(
                     ims, RS_type, 
-                    scattering_interfaces_all[end], 
+                    surface_scattering_interface(scattering_interfaces_all[end]), 
                     SFI, 
                     composite_layer, 
                     added_layer_surface, 

@@ -96,6 +96,9 @@ end
 # Phase A — `Nstreams` field on `QuadPoints` (count of nonzero weights;
 # distinct from augmented `Nquad`). See docs/src/pages/conventions.md §6.
 @testset "QuadPoints streams" begin include("test_quadpoints_streams.jl") end
+# Radau with the sun at zenith: halved single-interval weights, mapped-node
+# solar test, and continuity with a slightly oblique sun.
+@testset "Radau overhead sun" begin include("test_radau_overhead_sun.jl") end
 
 # Direct SFI keeps the collimated solar direction external to the diffuse
 # operator. Five weighted streams + one VZA therefore means 18×18 for IQU.
@@ -242,6 +245,10 @@ end
 # Pins the corrected TIR weight rule (overrides REFACTOR_SPEC_v6 §2.11):
 # isotropic source fires only at m=0 with 2π factor to undo downstream 0.5/π.
 @testset "ThermalEmission (v0.7 Phase A)" begin include("test_thermal_emission.jl") end
+
+# Non-scattering layers (τ·ϖ ≤ 2eps): no stale sources, surface added as a
+# reflecting layer, thermal emission kept — column, multisensor and lin paths.
+@testset "Non-scattering layers" begin include("test_nonscattering_layers.jl") end
 
 # VLIDORT 2.8.3 baseline validation suite — Siewert 2000 PROBLEM_IIA Stokes-I,
 # solar_tester scalar (Task 1), solar_tester vector (Task 1, IQU). Reference

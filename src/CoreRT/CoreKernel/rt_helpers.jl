@@ -250,11 +250,25 @@ end
 
 Zero out reflectance/source fields and set Beer-law transmission for a
 non-scattering layer.  Replaces the repeated pattern in `rt_kernel!` methods.
+
+The added-layer buffer is reused across layers and Fourier moments, so BOTH
+source directions (`j₀⁺`, `j₀⁻`) and every per-source slot are cleared here;
+otherwise the previous layer's sources would be re-added. The caller injects
+any volume sources (thermal) afterwards, as the elastic `rt_kernel!` does
+with `contribute!`.
 """
 @inline function zero_added_noscat!(added_layer, τ_λ, qp_μN)
     added_layer.r⁻⁺[:] .= 0
     added_layer.r⁺⁻[:] .= 0
+    added_layer.j₀⁺[:] .= 0
     added_layer.j₀⁻[:] .= 0
+    # AddedLayerRS carries no per-source slots.
+    if hasproperty(added_layer, :j₀_by_src)
+        for slot in values(added_layer.j₀_by_src)
+            fill!(slot.j₀⁺, zero(eltype(slot.j₀⁺)))
+            fill!(slot.j₀⁻, zero(eltype(slot.j₀⁻)))
+        end
+    end
     _set_transmission_noscat!(added_layer.t⁺⁺, added_layer.t⁻⁻, τ_λ, qp_μN)
     return nothing
 end

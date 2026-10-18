@@ -675,7 +675,8 @@ function _rt_run_column(RS_type::AbstractRamanType, model, iBand;
                 m, weight, pol_type, qp_μ, iμ₀, μ₀,
                 vza, vaz, nSpec, NquadN, iBand, SFI,
                 composite_layer,
-                scattering_interface_surf = scattering_interfaces_all[end],
+                scattering_interface_surf =
+                    surface_scattering_interface(scattering_interfaces_all[end]),
                 # Device-resident — the same array the monolithic surface
                 # step consumes below. Snapshotting the host slice
                 # τ_sum_all[:, end] instead would hand rt_run_surface a CPU
@@ -737,9 +738,10 @@ function _rt_run_column(RS_type::AbstractRamanType, model, iBand;
         # double-counting when a `SurfaceSIF` source is also present.
         surface_source_contribute!(prepared_sources, brdf, added_layer_surface, m, pol_type, arch)
 
-        # One last interaction with surface:
+        # One last interaction with surface (surface reflects; composite
+        # scatters iff any atmospheric layer does):
         @timeit "interaction" interaction!(RS_type,
-                                    scattering_interfaces_all[end],
+                                    surface_scattering_interface(scattering_interfaces_all[end]),
                                     SFI,
                                     composite_layer,
                                     added_layer_surface,

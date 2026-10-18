@@ -78,6 +78,19 @@ function rt_set_streams(::GaussLegQuad,
 end
 
 """
+    _merge_coincident_nodes(qp_μ, wt_μ)
+
+Merge exactly coincident quadrature ordinates, summing their weights; the
+first-occurrence order of `qp_μ` is kept.
+"""
+function _merge_coincident_nodes(qp_μ::AbstractVector, wt_μ::AbstractVector)
+    allunique(qp_μ) && return qp_μ, wt_μ
+    nodes = unique(qp_μ)
+    weights = [sum(wt_μ[qp_μ .== μ]) for μ in nodes]
+    return nodes, weights
+end
+
+"""
 $(FUNCTIONNAME)(::RadauQuad, 
                         Ltrunc::Int, 
                         obs_geom::ObsGeometry, 
@@ -112,15 +125,20 @@ function rt_set_streams(::RadauQuad,
     qp_μ₀ = -reverse(tqp_μ₀)
     wt_μ₀ =  reverse(twt_μ₀)
     μ₀ = cosd(sza) # check for degree to radian conversion
-    
-    if μ₀ ∈ qp_μ₀
+
+    # μ₀ is tested against the nodes MAPPED to [0,1] (the fixed Radau node
+    # maps to μ = 1, i.e. SZA = 0).
+    qp_μ₀_mapped = (1 .+ qp_μ₀) ./ 2
+
+    if μ₀ ∈ qp_μ₀_mapped
 
         qp_μ = zeros(FT, Nquad)
         wt_μ = zeros(FT, Nquad)
 
+        # Map [-1,1] → [0,1]: μ = (1 + x)/2, dμ = dx/2 (as in the split branch).
         for i = 1:Nquad
-            qp_μ[i] = (1 + qp_μ₀[i]) / 2
-            wt_μ[i] = wt_μ₀[i] 
+            qp_μ[i] = qp_μ₀_mapped[i]
+            wt_μ[i] = wt_μ₀[i] / 2
         end
 
         Ncam = length(vza)
@@ -145,6 +163,11 @@ function rt_set_streams(::RadauQuad,
             qp_μ[Nquad + i] = ((1 + μ₀) + (1 - μ₀) * qp_μ₀[i]) / 2
             wt_μ[Nquad + i] = (1 - μ₀) * wt_μ₀[i] / 2
         end
+        # Near-overhead sun: the sub-interval [μ₀, 1] can be narrower than the
+        # FT spacing of its nodes, which then coincide (with each other, with
+        # μ₀ or with 1). Merge coincident ordinates, summing their weights, so
+        # each ordinate appears once and ∑w = 1 is kept.
+        qp_μ, wt_μ = _merge_coincident_nodes(qp_μ, wt_μ)
 
         Ncam = length(vza)
         μ = cosd.(vza) # check for degree to radian conversion

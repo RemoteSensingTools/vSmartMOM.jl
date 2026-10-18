@@ -262,7 +262,15 @@ function rt_kernel!(RS_type::noRS{FT},
     #println("Doubling done...")
     else # This might not work yet on GPU!
         # If not, there is no reflectance. Assign r/t appropriately
+        # (this also clears j₀⁺/j₀⁻ and every per-source slot).
         zero_added_noscat!(added_layer, τ, qp_μN)
+        # Volume sources still emit from a non-scattering layer. Without
+        # scattering there is no doubling (ndoubl = 0 ⇒ dτ = τ), so the
+        # elemental thermal source evaluated on the whole layer,
+        # (1-ϖ)·B·(1 - exp(-τ/μ)), is exact.
+        @timeit "volume_source" contribute!(prepared_sources, added_layer,
+                                            ϖ, τ, iz, m,
+                                            pol_type, quad_points, architecture)
     end
 
     # @assert !any(isnan.(added_layer.t⁺⁺))
@@ -422,7 +430,7 @@ function rt_kernel!(RS_type::Union{RRS{FT}, VS_0to1{FT}, VS_1to0{FT}}, pol_type,
         @timeit "elemental" elemental!(pol_type, SFI, τ_sum, dτ, RS_type.F₀, computed_layer_properties, m, ndoubl, scatter, quad_points,  added_layer,  architecture)
         @timeit "doubling_inelastic" doubling_inelastic!(RS_type, pol_type, SFI, expk, ndoubl, added_layer, I_static, architecture)
     else
-        zero_added_noscat_ie!(added_layer, τ_λ, qp_μN)
+        zero_added_noscat_ie!(added_layer, τ, qp_μN)
     end
 
     if (iz == 1)

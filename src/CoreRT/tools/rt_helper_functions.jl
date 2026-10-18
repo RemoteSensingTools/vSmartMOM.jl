@@ -33,6 +33,25 @@ Determine the `ScatteringInterface` type for layer `iz` based on previous interf
 end
 
 """
+    surface_scattering_interface(atmosphere_interface)
+
+`ScatteringInterface` for adding the surface below the complete atmosphere,
+given the interface of the LAST atmospheric layer. The surface is always a
+reflecting added layer (a surface-parameter tangent can be nonzero even when
+its reflectance is zero), and the composite above it scatters iff ANY
+atmospheric layer scatters, i.e. iff `atmosphere_interface` is not `_00`:
+
+- column scatters → `ScatteringInterface_11`
+- column non-scattering → `ScatteringInterface_01`
+
+Reusing the last layer's own interface instead drops surface–atmosphere
+coupling whenever the lowest (or every upper) layer does not scatter.
+"""
+@inline surface_scattering_interface(atmosphere_interface) =
+    atmosphere_interface isa ScatteringInterface_00 ?
+        ScatteringInterface_01() : ScatteringInterface_11()
+
+"""
     doubling_number(dτ_max, τ_end)
 
 Compute elemental optical depth and doubling count for the adding-doubling method.
