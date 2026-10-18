@@ -159,6 +159,26 @@ review of General's sequential-version rule.
   (photons s⁻¹ m⁻² µm⁻¹, not `SolarBeam` F₀ units), and the `BlackbodySource`
   `factor = π` is described as the exitance πB of a Lambertian emitter (use
   `scale = (R/d)²` for a distant disk).
+- Layers that do not scatter (τϖ ≤ 2eps, common in Float32 and wherever
+  Rayleigh is zeroed) no longer re-add the previous layer's sources, and the
+  surface is coupled to the whole atmosphere above it (previously the lowest
+  layer's scattering trait was reused, dropping surface–atmosphere coupling),
+  in the forward, split, multisensor and linearized paths. In the forward
+  path such layers now also emit their thermal source (1−ϖ)B(1−e^{−τ/μ}).
+  **Radiances change for columns with non-scattering layers**: BOA was
+  overestimated by ≈ 51 % at one view in a three-layer test, and Float32
+  thermal-IR TOA was ≈ 3× too large (it now matches Float64).
+- `RadauQuad` at SZA = 0 uses correctly mapped, halved weights (they summed
+  to 2 and gave negative radiances); near-overhead suns no longer throw:
+  coincident nodes are merged and μ₀ is kept.
+- Cox–Munk BRDFs return 0 instead of NaN at extreme grazing in Float32,
+  where the slope PDF and the weight denominator underflow together.
+- Tests: the Jacobian/forward helpers are one `VSmartMOMTestSupport` module
+  (`run_linearized_rt`, `linearized_R`, `run_forward_rt`, `forward_R`,
+  fail-closed `rel_errors`); NaN-tolerant accuracy checks now require finite
+  values; tiled CUDA Jacobian tests run once and global switches are restored
+  in `finally`; the local data runner fails on unexpected errors and pins
+  documented legacy failures; `test/README.md` lists every test file.
 - HITRAN, partition-sum, HAPI, CIA and MT_CKD references added to
   `CITATION.bib`, the References page and the README, with guidance on which
   HITRAN edition a calculation used.

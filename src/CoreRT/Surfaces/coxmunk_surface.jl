@@ -258,7 +258,9 @@ function coxmunk_brdf_mueller(surf::CoxMunkSurface{FT}, n_stokes::Int,
 
     # Cox-Munk BRDF weighting
     P = cox_munk_pdf(geom.zx, geom.zy, σ²)
-    prefactor = P / (FT(4) * μᵢ * μᵣ * geom.cos_β^4)
+    # At extreme grazing P underflows to 0 while 4μᵢμᵣcos⁴β can underflow too
+    # (Float32); the glint term is then exactly 0, not 0·Inf = NaN.
+    prefactor = iszero(P) ? zero(FT) : P / (FT(4) * μᵢ * μᵣ * geom.cos_β^4)
 
     # Shadow masking
     if surf.shadowing
@@ -299,11 +301,12 @@ function coxmunk_brdf_mueller_and_deriv(surf::CoxMunkSurface{FT}, n_stokes::Int,
     (; cos_β, zx, zy) = geom
     M_facet = coxmunk_facet_mueller(geom, n_water, n_stokes)
 
-    geom_weight = one(FT) / (FT(4) * μᵢ * μᵣ * cos_β^4)
-
     # ── Forward + derivative of slope PDF ──
     P      = cox_munk_pdf(zx, zy, σ²)
     dP_dσ² = cox_munk_pdf_dσ²(zx, zy, σ²)
+    # P and dP/dσ² vanish together at extreme grazing, where the weight
+    # 1/(4μᵢμᵣcos⁴β) can overflow (Float32): the glint terms are then 0.
+    geom_weight = iszero(P) ? zero(FT) : one(FT) / (FT(4) * μᵢ * μᵣ * cos_β^4)
 
     # ── Forward + derivative of shadow factor ──
     if surf.shadowing

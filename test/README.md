@@ -44,6 +44,7 @@ CPU; they do not add cases.
 | `test_absorption_batched.jl` | optional | Batched vs per-layer absorption on a real ABSCO table; activates the package environment, needs an AtmosphericAbsorption API newer than the pinned 0.1.2, and exits 0 without testing when that API or the table is absent |
 | `test_absorption_column_integration.jl` | active | Column-exact CIA and MT_CKD integration; external-file cases are `@test_skip` when `VSMARTMOM_TEST_O2_O2_CIA` / `VSMARTMOM_TEST_MTCKD` files are absent |
 | `test_absorption_pressure.jl` | active + flagged | Pressure derivatives of line/LUT cross sections; CUDA arm under `CUDA` |
+| `test_abundance_jacobian_contract.jl` | active | Gas-abundance Jacobian contract: columns whose forward absorption also responds to the abundance (self broadening, ABSCO broadener axes, MT_CKD, CIA) are rejected unless `abundance_jacobians=:frozen_cross_section` |
 | `test_aerosol_reference.jl` | active | Normalized size-distribution tangents |
 | `test_aqua.jl` | active | Aqua package health |
 | `test_batched_kernels.jl` | active + flagged | Batched solve/inverse mutation contract; smoke arm under `Metal` |
@@ -83,6 +84,7 @@ CPU; they do not add cases.
 | `test_lambertian_closure.jl` | active | Analytic Lambertian-albedo closure |
 | `test_lambertian_jacobian_batched.jl` | active + flagged | Batched Lambertian Jacobians on CPU; CUDA arm under `GPU` |
 | `test_lambertian_surfaces.jl` | active | Lambertian surface flavours |
+| `test_lin_band_selection.jl` | active | Linearized RT solves one band per call: a one-element band vector matches the integer band, and several bands are rejected |
 | `test_lin_forward_loop_parity.jl` | active | Forward/linearized Fourier loop-bound parity |
 | `test_local_jacobian.jl` | active + flagged | Local optical-basis Jacobians on CPU (uses `local_jacobian_fixture.jl`); CUDA arm under `GPU` |
 | `test_m_invariant_dtau.jl` | active | m-invariant dτ cache, bitwise A/B |
@@ -90,6 +92,7 @@ CPU; they do not add cases.
 | `test_mie_nodes_batched.jl` | active + flagged | Batched caller-node Mie API; CUDA arm under `CUDA` |
 | `test_molecular_rayleigh.jl` | active | Molecular Rayleigh optical properties |
 | `test_multisensor_heights.jl` | active | Observer heights and interior levels |
+| `test_nonscattering_layers.jl` | active | Layers with zero scattering optical depth: equality with vanishing scattering and with the merged column at TOA and BOA, and with vanishing scattering at interior levels (IQU, albedo 0 and 0.3), the pure-absorber thermal closed form, Float32/Float64 thermal parity, and linearized parity |
 | `test_parameters_parser.jl` | active | Parameter parser regressions |
 | `test_performance.jl` | benchmark | Forward vs linearized timing report (no `@testset`) |
 | `test_perturb_parameters.jl` | active | `perturb_parameters` utility |
@@ -98,6 +101,7 @@ CPU; they do not add cases.
 | `test_phase_interpolation.jl` | active + flagged | Phase interpolation on CPU; CUDA arm under `GPU` |
 | `test_quadpoints_streams.jl` | active | `QuadPoints.Nstreams` |
 | `test_quality.jl` | active | Taplo schema configuration |
+| `test_radau_overhead_sun.jl` | active | RadauQuad near an overhead sun: weights and geometry at SZA 0 in Float32/Float64, and continuity from SZA 0 to 1e-6, 1e-4 and Gauss |
 | `test_ray_cab_raman.jl` | active | Rayleigh/Cabannes/RRS identities |
 | `test_scenario_sweep.jl` | active | Scenario sweeps vs monolithic `rt_run` |
 | `test_schema_docs.jl` | active | Schema documentation invariants |

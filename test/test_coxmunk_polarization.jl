@@ -77,6 +77,16 @@ end
                                       Float32(μᵣ), Float32(Δϕ); n_water = ComplexF32(1.33))
         @test maximum(abs.(M32 .- M64)) / M64[1, 1] < 1e-4
     end
+    # Extreme grazing backscatter: the slope PDF underflows to 0 and so does
+    # 4μᵢμᵣcos⁴β in Float32; the glint (and its wind derivative) is 0, not NaN.
+    for FT in (Float32, Float64)
+        surf = surface(FT(7), Complex{FT}(1.33))
+        M = CM.coxmunk_brdf_mueller(surf, 3, FT(1e-8), FT(1e-8), FT(π);
+                                    n_water = Complex{FT}(1.33))
+        M_d, dM = CM.coxmunk_brdf_mueller_and_deriv(surf, 3, FT(1e-8), FT(1e-8), FT(π);
+                                                    n_water = Complex{FT}(1.33))
+        @test all(iszero, M) && all(iszero, M_d) && all(iszero, dM)
+    end
 end
 
 @testset "Facet Mueller matrix vs Jones reference ($FT)" for FT in (Float64, Float32)
