@@ -272,15 +272,16 @@ results or definitions and wait for a decision.
   standard Hovenier convention". Please confirm the matrix against
   Sanghavi (2014) Mie-Fourier Eq. 16 and whether that wording is right.
 
-- [ ] **MT_CKD density factor (prepared, not merged).** AER's `mt_ckd_h2o`
-  scales both continuum terms with the number-density ratio
-  `(p/p_ref)(T_ref/T)`; `compute_τ_h2o_continuum!` applies only `p/p_ref`, so
-  the continuum is low by `T/T_ref` (−26 % at 220 K, 0 at 296 K). Proposed fix
-  on branch `proposal/mtckd-density-ratio`
-  (`run_worktrees/vSmartMOM-mtckd-proposal`). MT_CKD is used by the
+- [x] **MT_CKD density factor (approved by Suniti 2026-10-18, merged).**
+  AER's `mt_ckd_h2o` scales both continuum terms with the number-density
+  ratio `(p/p_ref)(T_ref/T)`; `compute_τ_h2o_continuum!` applied only
+  `p/p_ref`, so the continuum was low by `T/T_ref` (−26 % at 220 K, 0 at
+  296 K). The fix from branch `proposal/mtckd-density-ratio` is merged into
+  the release. MT_CKD is used by the
   `ParamsEMIT_MODTRANcomp_newLUT*` local configs and the OCORaman LUT script
   (when `MTCKD_FILE` is set); ExoOptics computes its MT_CKD continuum
-  separately. uni_vSmartMOM's own copy has the same omission.
+  separately. uni_vSmartMOM's own copy has the same omission (not changed
+  here).
 - [ ] **`Stokes_IQ` phase-matrix moments.** The I/Q truncation of Π and B drops
   the U-mediated `T ζ T′` term from the Q←Q element for m ≥ 1, so IQ Z
   moments are not the I/Q block of the IQU moments (m = 0 and Rayleigh-like

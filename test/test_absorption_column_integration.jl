@@ -131,11 +131,31 @@ end
         p_dry = P / (1 + r)
         p_h2o = r * p_dry
         radterm = only(ν) * tanh(1.4388 * only(ν) / (2T))
+        # AER mt_ckd_h2o: both terms scale with the number-density ratio
+        # (p/p_ref)·(T_ref/T); here T = 250 K ≠ T_ref = 296 K.
+        density_ratio = band.T_ref / T
         sigma = (only(band.C_self) * p_h2o / band.p_ref +
-                 only(band.C_for) * p_dry / band.p_ref) * radterm
+                 only(band.C_for) * p_dry / band.p_ref) * density_ratio * radterm
         expected_continuum[1, iz] = sigma * coarse_wet.vcd_h2o[iz]
     end
     @test τ_cont_coarse ≈ expected_continuum rtol=2e-15
+
+    # Self and foreign terms separately, with a nonzero self temperature
+    # exponent: τ_self ∝ (p_h2o/p_ref)(T_ref/T)^(1+texp), τ_for ∝ (p_dry/p_ref)(T_ref/T).
+    for (C_self, C_for, texp) in ((1e-27, 0.0, 4.5), (0.0, 2e-27, 4.5))
+        b = Absorption.MTCKDBand([C_self], [C_for], [texp], 1013.0, 296.0)
+        τ = zeros(Float64, 1, length(coarse_wet.T))
+        Absorption.compute_τ_h2o_continuum!(τ, b, ν, coarse_wet, coarse_wet.vmr_h2o)
+        for iz in eachindex(coarse_wet.T)
+            r, P, T = coarse_wet.vmr_h2o[iz], coarse_wet.p_full[iz], coarse_wet.T[iz]
+            p_dry = P / (1 + r)
+            radterm = only(ν) * tanh(1.4388 * only(ν) / (2T))
+            expected = (C_self * (r * p_dry / 1013.0) * (296.0 / T)^(1 + texp) +
+                        C_for * (p_dry / 1013.0) * (296.0 / T)) *
+                       radterm * coarse_wet.vcd_h2o[iz]
+            @test τ[1, iz] ≈ expected rtol=2e-15
+        end
+    end
 
     # At fixed temperature, humidity, and composition, both CIA and MT_CKD
     # scale as midpoint density/pressure times hydrostatic column.  The
