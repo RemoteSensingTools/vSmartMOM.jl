@@ -542,14 +542,15 @@ function rt_run(RS_type::AbstractRamanType,
         if source_adding
             # Surface closure uses the same forward operator and physical
             # surface tangents as matrix adding; atmosphere adds only vectors.
-            interaction!(scattering_interfaces_all[end],SFI,composite_layer,
-                added_surface_layer,I_static)
+            interaction!(surface_scattering_interface(scattering_interfaces_all[end]),
+                SFI,composite_layer,added_surface_layer,I_static)
             source_incident_fields!(source_workspace,added_surface_layer,I_static)
             source_adding_tangents!(source_workspace,added_surface_layer,
                 added_surface_layer_lin,layer_opt_props_lin,τ̇_sum_all,quad_points,arr_type,
                 surface_range(layout),sif_range(layout))
         else
-            @timeit "interaction" interaction!(scattering_interfaces_all[end], SFI,
+            @timeit "interaction" interaction!(
+                surface_scattering_interface(scattering_interfaces_all[end]), SFI,
                 composite_layer, composite_layer_lin,
                 added_surface_layer, added_surface_layer_lin, I_static)
         end
