@@ -8,9 +8,9 @@
 #
 # LEGACY / HISTORICAL — not an accuracy gate and not in runtests.jl.
 # Its thresholds (1–50 % mean relative error) and `|| isnan(mean_e)`
-# allowances record historical bug-era residuals; a NaN statistic from an
-# empty comparison (no |FD| above threshold) still passes here, although
-# non-finite inputs fail. Do not cite a pass as Jacobian accuracy evidence. The default-suite gates are
+# allowances record historical bug-era residuals. The allowances are paired
+# with finiteness checks, so non-finite inputs fail. Do not cite a pass as
+# Jacobian accuracy evidence. The default-suite gates are
 # test_jacobians_unit.jl and the batched/local Jacobian tests.
 # =================================================================
 
@@ -22,9 +22,9 @@ include("../src/Testing/perturb_parameters.jl")
 using Printf
 using Statistics
 
-# `rel_errors` returns NaN statistics for non-finite input as well as for
-# "nothing comparable"; the legacy `|| isnan(mean_e)` allowances below must
-# only cover the latter, so each one is paired with this finiteness check.
+# `rel_errors` returns NaN statistics for non-finite input; the legacy
+# `|| isnan(mean_e)` allowances below must not accept that, so each one is
+# paired with this finiteness check.
 _finite_pair(a, b) = all(isfinite, a) && all(isfinite, b)
 
 println("="^70)

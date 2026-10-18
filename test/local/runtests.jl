@@ -26,6 +26,7 @@
 using vSmartMOM
 using vSmartMOM.CoreRT
 using Test
+using YAML
 
 const _LOCAL_CUDA_OK = try
     @eval using CUDA
@@ -34,8 +35,14 @@ catch
     false
 end
 
+# `Array(LUTfiles)` failing on exactly this file's per-molecule LUTfiles dict.
+_lutfiles_dict_error(err, path) =
+    err.f === Array && length(err.args) == 1 &&
+    err.args[1] == YAML.load_file(path)["absorption"]["LUTfiles"]
+
 # Documented in local/README.md: the config-level H2O override is parked, and
-# the legacy reference scenes predate the current schema. Each entry pins the
+# the legacy reference scenes (including the two *_SIF_grid LUT-dict scenes)
+# predate the current schema. Each entry pins the
 # exact current failure; an unexpected pass or a different error fails.
 const _LOCAL_KNOWN_FAILURES = Dict(
     "2BandParameters.yaml"             => (:parse, ArgumentError, "H2O must not appear in"),
@@ -46,6 +53,9 @@ const _LOCAL_KNOWN_FAILURES = Dict(
     "ParamsEMIT_MODTRANcomp_alb02.yaml"=> (:parse, ArgumentError, "H2O must not appear in"),
     "ThreeBandsParameters.yaml"        => (:parse, ArgumentError, "radiative_transfer/spec_bands"),
     "O2ParametersVS.yaml"              => (:build, BoundsError, "AbstractSurfaceType} at index [2]"),
+    # `absorption.LUTfiles` is a per-molecule dict; the parser expects per-band lists.
+    "O2_parameters2_SIF_grid.yaml"     => (:parse, MethodError, _lutfiles_dict_error),
+    "WCO2_parameters_SIF_grid.yaml"    => (:parse, MethodError, _lutfiles_dict_error),
 )
 
 """Unresolved absolute paths and `\${ENV:VAR}` references in non-comment YAML text."""
@@ -80,7 +90,9 @@ function _check_known_failure(path, (stage, errtype, fragment))
         e
     end
     @test_broken err === nothing
-    @test err === nothing || (err isa errtype && occursin(fragment, _error_text(err)))
+    matches(e) = fragment isa AbstractString ? occursin(fragment, _error_text(e)) :
+                                               fragment(e, path)
+    @test err === nothing || (err isa errtype && matches(err))
 end
 
 @testset "local (GPU + data-dependent)" begin

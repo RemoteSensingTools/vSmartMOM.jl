@@ -13,8 +13,9 @@
 #   linearized_R       TOA radiance from the linearized solver only
 #   run_forward_rt     ordinary forward solver (`model_from_parameters(params)`)
 #   forward_R          TOA radiance from the ordinary forward solver only
-#   rel_errors         relative-error statistics; fails closed (NaN) on
-#                      non-finite input or when no entry can be compared
+#   rel_errors         relative errors where |fd| > threshold, absolute check
+#                      elsewhere; NaN on non-finite input, Inf on a near-zero
+#                      mismatch
 # =================================================================
 
 module VSmartMOMTestSupport
@@ -80,26 +81,38 @@ TOA radiance array from the ordinary forward solver (`run_forward_rt(params).R`)
 forward_R(params; i_band::Integer=1) = run_forward_rt(params; i_band=i_band).R
 
 """
-    rel_errors(analytic, fd; threshold=1e-12)
+    rel_errors(analytic, fd; threshold=1e-12, atol=threshold)
 
 Relative errors `|analytic - fd| / |fd|` over the entries with
-`|fd| > threshold`. Returns `(max, mean, median, n)`, where `n` is the number
-of entries compared.
+`|fd| > threshold`. Entries with `|fd| ≤ threshold` are checked on absolute
+error instead: each must satisfy `|analytic - fd| ≤ atol`.
 
-Fails closed: if either input contains a non-finite value, or no entry exceeds
-`threshold`, all statistics are `NaN` (and `n == 0`), so any `err.max < tol`
-assertion fails. Matching NaNs can therefore never pass an accuracy check.
-Positional destructuring `max_e, mean_e = rel_errors(...)` takes `(max, mean)`.
+Returns `(max, mean, median, n, max_abs_masked)`: relative-error statistics,
+the number `n` of entries compared relatively, and the largest absolute error
+among the near-zero entries (`0.0` if there are none).
+- Non-finite input in either array: every statistic is `NaN` (`n == 0`).
+- A near-zero entry with `|analytic - fd| > atol`: `max`, `mean` and `median`
+  are `Inf`, so a large analytic value against `fd ≈ 0` cannot pass.
+- All entries near zero and within `atol` (a legitimately all-zero
+  Jacobian): `max`, `mean` and `median` are `0.0` with `n == 0`.
+Any `err.max < tol` assertion therefore fails on NaN, Inf, or a masked
+mismatch; matching NaNs can never pass an accuracy check. Positional
+destructuring `max_e, mean_e = rel_errors(...)` takes `(max, mean)`.
 """
-function rel_errors(analytic, fd; threshold=1e-12)
+function rel_errors(analytic, fd; threshold=1e-12, atol=threshold)
     size(analytic) == size(fd) ||
         throw(DimensionMismatch("analytic $(size(analytic)) vs fd $(size(fd))"))
-    failed = (max=NaN, mean=NaN, median=NaN, n=0)
-    (all(isfinite, analytic) && all(isfinite, fd)) || return failed
+    (all(isfinite, analytic) && all(isfinite, fd)) ||
+        return (max=NaN, mean=NaN, median=NaN, n=0, max_abs_masked=NaN)
     mask = abs.(fd) .> threshold
-    any(mask) || return failed
+    max_abs_masked = maximum(abs.(analytic[.!mask] .- fd[.!mask]); init=0.0)
+    n = count(mask)
+    max_abs_masked > atol &&
+        return (max=Inf, mean=Inf, median=Inf, n=n, max_abs_masked=max_abs_masked)
+    n == 0 && return (max=0.0, mean=0.0, median=0.0, n=0, max_abs_masked=max_abs_masked)
     errs = abs.(analytic[mask] .- fd[mask]) ./ abs.(fd[mask])
-    return (max=maximum(errs), mean=mean(errs), median=median(errs), n=count(mask))
+    return (max=maximum(errs), mean=mean(errs), median=median(errs), n=n,
+            max_abs_masked=max_abs_masked)
 end
 
 """

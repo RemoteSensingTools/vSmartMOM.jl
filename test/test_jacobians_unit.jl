@@ -64,6 +64,7 @@ println("  nλ=$(size(R_base,3)), nVZA=$(size(R_base,1)), nStokes=$(size(R_base,
     pm = deepcopy(p); pm.p[end] -= δp
     fd = (linearized_R(pp) .- linearized_R(pm)) ./ (2δp)
     err = rel_errors(analytic, fd)
+    @test err.n > 0   # nonzero sensitivity was actually compared
     @test err.max < 1e-4
     @test err.mean < 1e-5
 end
@@ -98,7 +99,9 @@ end
     fdR = (Rp .- Rm) ./ (2δvmr)
     fdT = (Tp .- Tm) ./ (2δvmr)
     errR = rel_errors(dR[:, :, :, idx], fdR; threshold=1e-10)
+    @test errR.n > 0   # nonzero sensitivity was actually compared
     errT = rel_errors(dT[:, :, :, idx], fdT; threshold=1e-10)
+    @test errT.n > 0   # nonzero sensitivity was actually compared
     @test errR.max < 1e-4
     @test errT.max < 1e-4
 end
@@ -145,6 +148,7 @@ end
     fd = (R_pert .- R_base) ./ δ
     
     err = rel_errors(analytic, fd)
+    @test err.n > 0   # nonzero sensitivity was actually compared
     println("  Surface albedo: max_rel=$(round(err.max, sigdigits=3)), mean_rel=$(round(err.mean, sigdigits=3))")
     
     @test err.max < 1e-3   # Surface albedo Jacobian max rel error
@@ -165,6 +169,7 @@ end
     fd = (R_pert .- R_base) ./ δ
     
     err = rel_errors(analytic, fd)
+    @test err.n > 0   # nonzero sensitivity was actually compared
     println("  τ_ref: max_rel=$(round(err.max, sigdigits=3)), mean_rel=$(round(err.mean, sigdigits=3))")
     
     @test err.max < 0.50   # τ_ref Jacobian max rel error < 50%
@@ -184,6 +189,7 @@ end
     fd = (R_pert .- R_base) ./ δ
     
     err = rel_errors(analytic, fd)
+    @test err.n > 0   # nonzero sensitivity was actually compared
     println("  p₀: max_rel=$(round(err.max, sigdigits=3)), mean_rel=$(round(err.mean, sigdigits=3))")
     
     # NOTE: p₀ is a profile redistribution parameter (Σ τ̇ ≈ 0 across layers),
@@ -211,6 +217,7 @@ end
     fd = (R_pert .- R_base) ./ δ
     
     err = rel_errors(analytic, fd)
+    @test err.n > 0   # nonzero sensitivity was actually compared
     println("  nᵣ: max_rel=$(round(err.max, sigdigits=3)), mean_rel=$(round(err.mean, sigdigits=3))")
     
     @test err.max < 1.0    # nᵣ Jacobian max rel error < 100%
@@ -231,6 +238,7 @@ end
     fd = (R_pert .- R_base) ./ δ
     
     err = rel_errors(analytic, fd)
+    @test err.n > 0   # nonzero sensitivity was actually compared
     println("  σ_dist: max_rel=$(round(err.max, sigdigits=3)), mean_rel=$(round(err.mean, sigdigits=3))")
     
     @test err.max < 1.0    # σ_dist Jacobian max rel error < 100%
