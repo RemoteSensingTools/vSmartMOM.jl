@@ -124,6 +124,12 @@ review of General's sequential-version rule.
   Cox–Munk `apply_back_correction!` results change accordingly. Its azimuth
   rule grows with the requested number of moments (at least 100 nodes,
   2·max_m above 50 moments).
+- MT_CKD H₂O continuum: the self and foreign terms now carry the
+  number-density ratio `(p/p_ref)(T_ref/T)` of AER's `mt_ckd_h2o` (4.3);
+  only the pressure ratio was applied. **Continuum optical depths increase
+  by T_ref/T − 1 per layer** (≈ +3 % at 288 K, ≈ +37 % at a 217 K
+  tropopause; ≈ +6.7 % for a 33-layer US-standard column at 1.6 and 2.0 µm);
+  runs at 296 K are unchanged.
 - HITRAN, partition-sum, HAPI, CIA and MT_CKD references added to
   `CITATION.bib`, the References page and the README, with guidance on which
   HITRAN edition a calculation used.

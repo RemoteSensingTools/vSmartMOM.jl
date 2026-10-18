@@ -6,9 +6,16 @@
 # model build time. Implementation follows the standard LBLRTM convention:
 #
 #   σ_self(ν, T, p_h2o) = C_self_ref(ν) · radterm(ν, T) ·
-#                          (p_h2o / p_ref) · (T_ref / T)^texp(ν)
-#   σ_for(ν, T, p_dry)  = C_for_ref(ν)  · radterm(ν, T) · (p_dry / p_ref)
+#                          (p_h2o / p_ref) · (T_ref / T) · (T_ref / T)^texp(ν)
+#   σ_for(ν, T, p_dry)  = C_for_ref(ν)  · radterm(ν, T) ·
+#                          (p_dry / p_ref) · (T_ref / T)
 #   τ_layer(ν)          = (σ_self + σ_for) · N_h2o
+#
+# The coefficients are normalized to the reference number density of the
+# collision partner at (p_ref, T_ref); the partial-pressure ratio times
+# T_ref/T is that number-density ratio (`rho_rat = (p/p_ref)·(T_ref/T)` in
+# AER's mt_ckd_h2o module, v4.3), applied to both the self and the foreign
+# terms.
 #
 # where  radterm(ν, T) = ν · tanh(c₂ ν / 2T)  with c₂ = 1.4388 cm·K
 # converts the AER "continuum coefficient" (cm²/molec/cm⁻¹) into a true
@@ -145,9 +152,9 @@ function compute_τ_h2o_continuum!(τ_abs::AbstractMatrix,
         p_dry = P / (1.0 + v_h)
         p_h2o = v_h * p_dry
         N_h2o = Float64(profile.vcd_h2o[iz])
-        # Layer-constant pressure scaling
-        self_pscale = p_h2o / p_ref
-        for_pscale  = p_dry / p_ref
+        # Layer-constant number-density scaling relative to (p_ref, T_ref)
+        self_pscale = (p_h2o / p_ref) * (T_ref / T)
+        for_pscale  = (p_dry / p_ref) * (T_ref / T)
         # Loop over ν
         for k in 1:nλ
             ν       = Float64(ν_grid[k])
