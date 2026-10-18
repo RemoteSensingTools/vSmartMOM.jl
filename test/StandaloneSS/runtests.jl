@@ -387,12 +387,11 @@ end
         @test size(cox_result.path2) == (2, 3, 1)
         @test all(isfinite.(cox_result.path2))
 
+        # CoreRT models reject Stokes_IQ; the I/Q single-scattering paths
+        # remain available through ExactSSConfig (tested below).
         iq_cox_cfg = deepcopy(cox_cfg)
         iq_cox_cfg["radiative_transfer"]["polarization_type"] = "Stokes_IQ()"
-        iq_cox_model = model_from_parameters(parameters_from_dict(iq_cox_cfg))
-        iq_cox_result = run_exact_ss(iq_cox_model; paths=:path2)
-        @test size(iq_cox_result.path2) == (2, 2, 1)
-        @test all(isfinite.(iq_cox_result.path2))
+        @test_throws ArgumentError model_from_parameters(parameters_from_dict(iq_cox_cfg))
     end
 
     @testset "Rayleigh path 1 and Lambertian path 2" begin

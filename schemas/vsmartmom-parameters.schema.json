@@ -95,7 +95,7 @@
           ],
           "enumDescriptions": [
             "Scalar intensity only. Fastest option; suitable for scalar surfaces and unpolarized diagnostics.",
-            "Intensity plus linear Q polarization. Useful when U/V are known to be unnecessary.",
+            "Intensity plus linear Q polarization. Parsed, but rejected by the RT solvers (neglecting U can cause intensity errors of several percent); use Stokes_IQU().",
             "Intensity plus both linear polarization components. Good default for polarized reflection without circular polarization.",
             "Full Stokes vector including circular polarization V. Most complete and most expensive option."
           ]

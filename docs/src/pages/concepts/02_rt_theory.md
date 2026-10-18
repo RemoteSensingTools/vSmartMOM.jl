@@ -171,6 +171,11 @@ The kernels specialize on the type at compile time. There is no
 `if pol_type.n == 4` branch inside the inner loops — Julia's multiple dispatch
 emits separate code paths for each polarization at JIT time. Adding `Stokes_IQ`
 took adding one struct definition; the kernels picked it up automatically.
+(The RT solvers now reject `Stokes_IQ`: dropping U from multiple scattering
+can cause intensity errors of several percent; in the tested aerosol scene
+they were largest in the principal plane.
+The type remains for the Scattering-level functions and StandaloneSS
+`ExactSSConfig` runs.)
 
 ## Code anchors
 

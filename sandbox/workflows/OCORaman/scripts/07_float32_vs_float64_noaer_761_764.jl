@@ -8,6 +8,8 @@
 #   - solar Fraunhofer structure + O2 absorption, with q-driven H2O enabled
 #   - solve with Raman shoulders, but write/plot only 761--764 nm
 #   - VZA=0, vSmartMOM vaz=0, SZA in {0, 30, 60, 70}
+#   - Stokes_IQU (the RT solvers reject Stokes_IQ since v2.2; earlier
+#     outputs of this script used Stokes_IQ)
 #
 # Output data columns:
 #   wn, Icab, Qcab, IRRS, QRRS, IRayl, QRayl, F0,
@@ -113,7 +115,7 @@ radiative_transfer:
     - $(SOLVE_WN_MIN):$(WN_STEP):$(SOLVE_WN_MAX)
   surface:
     - LambertianSurfaceScalar{$(ft)}(0.0)
-  polarization_type: Stokes_IQ()
+  polarization_type: Stokes_IQU()
   nstreams: 3
   truncation: auto
   depol: -1
@@ -221,9 +223,15 @@ function valid_output(path)
     end
 end
 
+# Outputs from before the Stokes_IQU switch carry no polarization record.
+function iqu_metadata(::Type{FT}, sza::Float64) where {FT}
+    meta = metadata_path(FT, sza)
+    return isfile(meta) && "polarization_type=Stokes_IQU" in readlines(meta)
+end
+
 function run_case!(::Type{FT}, sza::Float64) where {FT}
     path = out_path(FT, sza)
-    if !FORCE && valid_output(path)
+    if !FORCE && valid_output(path) && iqu_metadata(FT, sza)
         @info "Skipping existing valid output" path
         return
     end
@@ -277,6 +285,7 @@ function run_case!(::Type{FT}, sza::Float64) where {FT}
         println(io, "project=$(Base.active_project())")
         println(io, "git_commit=$(readchomp(`git rev-parse HEAD`))")
         println(io, "float_type=$(ft_name(FT))")
+        println(io, "polarization_type=Stokes_IQU")
         println(io, "architecture=$ARCH")
         println(io, "cuda_device=$(ARCH == "GPU" ? string(GPU_DEVICE) : "none")")
         println(io, "sza=$sza")

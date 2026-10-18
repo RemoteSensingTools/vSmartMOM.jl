@@ -441,6 +441,7 @@ function _rt_run_column(RS_type::AbstractRamanType, model, iBand;
                         m_max_override::Union{Nothing, Int} = nothing,
                         fourier_convergence_override::Union{Nothing, AbstractFourierConvergence} = nothing,
                         toa_only::Bool = false)
+    _require_rt_polarization(polarization_type(model))
     _warn_explicit_depol_raman(RS_type, model)
 
     # Apply the per-model BLAS thread cap once per `rt_run` invocation
@@ -1058,7 +1059,9 @@ function rt_run(RS_type::AbstractRamanType, model, iBand;
                 m_max_override::Union{Nothing, Int} = nothing,
                 fourier_convergence_override::Union{Nothing, AbstractFourierConvergence} = nothing)
     bands = iBand isa Integer ? [Int(iBand)] : collect(Int, iBand)
-    common_band_surface(model, bands)   # reject before any path mutates RS_type
+    # Reject before any path mutates RS_type.
+    _require_rt_polarization(polarization_type(model))
+    common_band_surface(model, bands)
     geom = model.obs_geom
     model.quad_points.external_solar && !isempty(geom.sensor_levels) &&
         throw(ArgumentError(
@@ -1174,6 +1177,9 @@ Single-scatter approximation driver with explicit Raman type. See
 """
 function rt_run_ss(RS_type::AbstractRamanType, model, iBand;
                    sources::Union{Nothing, AbstractSource} = nothing)
+    # Single scattering needs no U coupling, but this path uses the IQ phase
+    # moments, which omit the T ζ T′ term; the RT-wide rejection applies.
+    _require_rt_polarization(polarization_type(model))
     _require_endpoint_observers(model, "rt_run_ss")
     model.quad_points.external_solar && throw(ArgumentError(
         "external-solar SFI is implemented only for the full multiple-scattering forward solver"))

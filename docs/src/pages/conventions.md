@@ -53,7 +53,8 @@ convention used in Sanghavi's vSmartMOM theory papers
 
 The polarization-type variants `Stokes_I`, `Stokes_IQ`, `Stokes_IQU`,
 `Stokes_IQUV` simply truncate this vector — they don't change the
-sign convention.
+sign convention. (The RT solvers reject `Stokes_IQ`; it remains available
+in StandaloneSS `ExactSSConfig` runs and the Scattering-level functions.)
 
 ---
 

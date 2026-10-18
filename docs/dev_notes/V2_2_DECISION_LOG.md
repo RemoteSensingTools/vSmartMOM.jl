@@ -282,11 +282,19 @@ results or definitions and wait for a decision.
   (when `MTCKD_FILE` is set); ExoOptics computes its MT_CKD continuum
   separately. uni_vSmartMOM's own copy has the same omission (not changed
   here).
-- [ ] **`Stokes_IQ` phase-matrix moments.** The I/Q truncation of Π and B drops
-  the U-mediated `T ζ T′` term from the Q←Q element for m ≥ 1, so IQ Z
-  moments are not the I/Q block of the IQU moments (m = 0 and Rayleigh-like
-  cases without ζ are unaffected). Decide whether IQ should be the exact I/Q
-  block (needs Π as 2×3 and a transposed product in the Z-moment kernels).
+- [x] **`Stokes_IQ` (decided by Suniti 2026-10-18: disabled in the RT
+  solvers).** The I/Q truncation of Π and B drops the U-mediated `T ζ T′`
+  term from the Q←Q element for m ≥ 1, so IQ Z moments are not the I/Q
+  block of the IQU moments (m = 0 and Rayleigh-like cases without ζ are
+  unaffected). A comparison (770 nm, aerosol τ = 0.3, μ = 0.2, SZA 40°,
+  VZA 35°, 12 streams, albedo 0.05) showed the larger problem is the IQ
+  approximation itself: with the exact I/Q block (identical to `Stokes_IQU`
+  with its U coupling removed), I still differs from `Stokes_IQU` by up to
+  4.2 % and Q by up to 6.4 % of I, largest in the principal plane (scalar
+  `Stokes_I`: up to 5.7 %). A principal-plane restriction would therefore
+  not help. Every RT model build now rejects `Stokes_IQ`
+  (`_require_rt_polarization` in `rt_set_streams`); the parser, the
+  Scattering-level type and StandaloneSS `ExactSSConfig` runs keep it.
 - [ ] **Raman.** R1: a narrow RRS band with no rotational line inside gets
   `n_Raman = 0` and loses the Raman energy silently (warn/error?). R2: the VS
   Q-branch Placzek–Teller factor uses `(α′/(b γ′))²` where `α′²/(b γ′²)`

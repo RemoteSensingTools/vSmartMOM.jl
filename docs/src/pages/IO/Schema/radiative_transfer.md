@@ -18,7 +18,10 @@ defaults are, and which legacy aliases still work.
   (`LambertianSurfaceScalar`, `CoxMunkSurface`, `rpvSurfaceScalar`, etc.).
 - **`polarization_type`** — `String`. One of `"Stokes_I()"`,
   `"Stokes_IQ()"`, `"Stokes_IQU()"`, `"Stokes_IQUV()"`. Sets the Stokes
-  vector dimension (1/2/3/4 channels respectively).
+  vector dimension (1/2/3/4 channels respectively). `"Stokes_IQ()"` is
+  parsed but rejected when an RT model is built: neglecting U in multiple
+  scattering can cause intensity errors of several percent. Use
+  `"Stokes_IQU()"` instead.
 - **`depol`** — `Real`. Rayleigh depolarization factor. A negative value
   (`-1`, as in `DefaultParameters.yaml`) derives the depolarization per band
   from the N₂/O₂ molecular constants; a value `≥ 0` is used uniformly for the

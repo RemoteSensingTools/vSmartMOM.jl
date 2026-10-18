@@ -71,6 +71,7 @@ vector forms.
 
 - Quadrature: `RadauQuad`, `GaussLegQuad`
 - Polarization: `Stokes_I`, `Stokes_IQ`, `Stokes_IQU`, `Stokes_IQUV`
+  (`Stokes_IQ` parses, but RT model builds reject it)
 - Architecture: `CPU`, `GPU`, `MetalGPU`, `default_architecture` (an `Architectures.` prefix is accepted for `CPU()`, `GPU()` and `MetalGPU()`, not for `default_architecture`)
 - Decomposition: `NAI2`, `PCW`
 - Broadening: `Voigt`, `Lorentz`, `Doppler`

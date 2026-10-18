@@ -34,6 +34,17 @@ const _NODE_MERGE_ULPS = 4
 _nodes_coincide(a, b) = abs(a - b) <=
     _NODE_MERGE_ULPS * max(eps(one(typeof(a))), eps(one(typeof(b))))
 
+# The RT solvers reject `Stokes_IQ`: dropping U from multiple scattering can
+# cause intensity errors of several percent (in the tested aerosol scene
+# comparable to the scalar error, and largest in the principal plane). Every RT
+# model build passes through `rt_set_streams`; the solver entries check again
+# for models assembled by hand.
+_require_rt_polarization(pol_type) = nothing
+_require_rt_polarization(::Stokes_IQ) = throw(ArgumentError(
+    "Stokes_IQ is not supported by the RT solvers: neglecting U in multiple " *
+    "scattering can cause intensity errors of several percent. Use " *
+    "Stokes_IQU() (or Stokes_I() for scalar intensity)."))
+
 """
     _build_output_grid(FT, nodes, μ_vza, μ₀; append_μ₀) -> Vector{FT}
 
@@ -95,6 +106,7 @@ function rt_set_streams(::GaussLegQuad,
                         pol_type,
                         arr_type;
                         external_solar::Bool = false) where {FT}
+    _require_rt_polarization(pol_type)
     (; sza, vza) = obs_geom
     Nquad = (Ltrunc + 2) ÷ 2
 
@@ -164,6 +176,7 @@ function rt_set_streams(::RadauQuad,
                         pol_type,
                         arr_type;
                         external_solar::Bool = false) where {FT}
+    _require_rt_polarization(pol_type)
     external_solar && throw(ArgumentError(
         "external_solar=true is supported only for GaussLegQuad; RadauQuad includes the solar direction in its weighted quadrature"))
     

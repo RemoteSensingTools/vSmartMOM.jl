@@ -185,6 +185,12 @@ end
 
 A struct which defines Stokes Vector ([I,Q]) RT code.
 
+The CoreRT solvers reject `Stokes_IQ`: neglecting U in multiple scattering
+can cause intensity errors of several percent (in the tested aerosol scene,
+largest in the principal plane). The type remains for the Scattering-level
+functions and StandaloneSS `ExactSSConfig` single-scattering runs. Use
+[`Stokes_IQU`](@ref) for RT.
+
 # Fields
 $(DocStringExtensions.FIELDS)
 """

@@ -177,6 +177,7 @@ function rt_run(RS_type::AbstractRamanType,
                     active_layout::Union{Nothing,ActiveParameterLayout} = nothing,
                     jacobian_basis::Symbol = :auto,
                     jacobian_adding::Symbol = :matrix)
+    _require_rt_polarization(polarization_type(model))
     if InelasticScattering.has_inelastic(RS_type)
         throw(ArgumentError(
             "Linearized Raman-active RT is intentionally unsupported. " *

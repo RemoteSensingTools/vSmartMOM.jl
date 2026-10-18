@@ -19,6 +19,7 @@ Calling this routine directly does not resolve `model.sources`.
 function rt_run_test_ms(RS_type::AbstractRamanType,
                         sensor_levels::Vector{Int64},
                         model, iBand)
+    _require_rt_polarization(polarization_type(model))
     model.quad_points.external_solar && throw(ArgumentError(
         "external-solar SFI does not yet support multisensor RT"))
     _warn_explicit_depol_raman(RS_type, model)

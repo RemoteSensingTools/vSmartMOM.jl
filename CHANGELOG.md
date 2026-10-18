@@ -241,6 +241,15 @@ review of General's sequential-version rule.
   by T_ref/T − 1 per layer** (≈ +3 % at 288 K, ≈ +36 % at a 217 K
   tropopause; ≈ +6.7 % for a 33-layer US-standard column at 1.6 and 2.0 µm);
   runs at 296 K are unchanged.
+- **Breaking:** the RT solvers reject `Stokes_IQ` (forward, linearized,
+  `remake_geometry` and Raman model builds raise an `ArgumentError`; use
+  `Stokes_IQU`). Neglecting U in multiple scattering can cause intensity
+  errors of several percent: in one 770 nm scene with aerosol τ = 0.3,
+  `Stokes_IQ` differed from `Stokes_IQU` by up to 4.2 % in I and 7.6 % of I
+  in Q, largest in the principal plane (scalar `Stokes_I`: up to 5.7 %). Its phase-matrix
+  moments also omitted the `T ζ T′` term from the Q←Q element. The parser,
+  the Scattering-level type and StandaloneSS `ExactSSConfig` single-scattering
+  runs still accept it (an RTModel passed to `run_exact_ss` cannot carry it).
 - HITRAN, partition-sum, HAPI, CIA and MT_CKD references added to
   `CITATION.bib`, the References page and the README, with guidance on which
   HITRAN edition a calculation used.

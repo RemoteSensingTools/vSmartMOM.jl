@@ -174,7 +174,9 @@ All surfaces implement `create_surface_layer!()`. Linearized variants have `_lin
 ### Polarization Types (`src/Scattering/types.jl`)
 
 - `Stokes_I` — scalar intensity only (n=1)
-- `Stokes_IQ` — intensity and Q (n=2)
+- `Stokes_IQ` — intensity and Q (n=2); rejected by CoreRT model builds
+  (use `Stokes_IQU`), still used by StandaloneSS `ExactSSConfig` and
+  Scattering functions
 - `Stokes_IQU` — linear polarization (n=3)
 - `Stokes_IQUV` — full Stokes polarization (n=4)
 

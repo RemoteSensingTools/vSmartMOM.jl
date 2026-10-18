@@ -7,7 +7,8 @@
 # beam when μ₀ is a weighted node; TMS with stream exports and with combined
 # bands; the Cox–Munk glint residual on multisensor TOA output; U/V-polarized
 # incident beams; ThermalEmission on paths that ignore it or with a wrong
-# layer count; and linearized runs on surfaces without a linearized layer.
+# layer count; linearized runs on surfaces without a linearized layer; and
+# Stokes_IQ, which the RT solvers reject.
 
 module RTEntryGuardsTests
 
@@ -320,6 +321,47 @@ end
     model_v = _qs_model(pol = "Stokes_IQUV()")
     FV = zeros(4, nspec); FV[1, :] .= 1; FV[4, :] .= 0.1
     @test_throws ArgumentError rt_run(model_v; sources = SolarBeam(F₀ = FV))
+end
+
+@testset "Stokes_IQ is rejected by the RT solvers" begin
+    # The parser and the Scattering-level type still accept Stokes_IQ; every
+    # RT model build rejects it, at any azimuth.
+    for vaz in ([0.0, 180.0], [180.0, 90.0])
+        params = _qs_params(pol = "Stokes_IQ()", vaz = vaz)
+        @test params.polarization_type isa vSmartMOM.Scattering.Stokes_IQ
+        @test_throws ArgumentError model_from_parameters(params)
+        @test_throws ArgumentError model_from_parameters(LinMode(), params)
+    end
+    @test_throws ArgumentError _qs_model(pol = "Stokes_IQ()", quadrature = "RadauQuad()")
+    err = try
+        _qs_model(pol = "Stokes_IQ()")
+    catch e
+        e
+    end
+    @test err isa ArgumentError && occursin("Stokes_IQU()", sprint(showerror, err))
+    @test _qs_model(pol = "Stokes_IQU()") isa CoreRT.RTModel
+    @test _qs_model(pol = "Stokes_I()") isa CoreRT.RTModel
+
+    # A model assembled by hand skips the builder, so the solvers check again.
+    _replace(x, f, v) = typeof(x).name.wrapper(
+        (n === f ? v : getfield(x, n) for n in fieldnames(typeof(x)))...)
+    _as_iq(m) = _replace(m, :solver, _replace(m.solver, :polarization_type,
+                                              vSmartMOM.Scattering.Stokes_IQ{Float64}()))
+    iq = _as_iq(_qs_model(pol = "Stokes_IQU()"))
+    @test CoreRT.polarization_type(iq) isa vSmartMOM.Scattering.Stokes_IQ
+    @test_throws ArgumentError rt_run(iq)
+    @test_throws ArgumentError rt_run_ss(iq)
+    @test_throws ArgumentError rt_run_atmosphere(iq)
+    iq_ms = _as_iq(_qs_model(pol = "Stokes_IQU()", obs_alt = [0, 5.0]))
+    @test_throws ArgumentError rt_run(iq_ms)
+    @test_throws ArgumentError CoreRT.rt_run_test_ms(InelasticScattering.noRS{Float64}(),
+                                                     iq_ms.geometry.sensor_levels, iq_ms, [1])
+    cache = rt_run_atmosphere(_qs_model(pol = "Stokes_IQU()"))
+    @test_throws ArgumentError rt_run_surface(
+        _replace(cache, :pol_type, vSmartMOM.Scattering.Stokes_IQ{Float64}()),
+        CoreRT.LambertianSurfaceScalar(0.15))
+    fwd, lin = model_from_parameters(LinMode(), _qs_params(pol = "Stokes_IQU()"))
+    @test_throws ArgumentError rt_run(_as_iq(fwd), lin, 0, size(lin.τ̇_abs[1], 1), 1)
 end
 
 @testset "ThermalEmission: unsupported paths and layer count" begin
