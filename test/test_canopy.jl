@@ -151,6 +151,22 @@ end
     @test all(R[:, 1, :] .> 0)
 end
 
+@testset "CanopySurface radiance is linear in the solar F₀" begin
+    # Leaf scattering and the soil must both see the solar Stokes vector:
+    # scaling F₀ per spectral point scales the TOA radiance the same way.
+    build() = begin
+        p = parameters_from_yaml("test_parameters/CanopyTest.yaml")
+        p.architecture = vSmartMOM.Architectures.CPU()
+        model_from_parameters(p)
+    end
+    model = build()
+    nspec = size(model.τ_abs[1], 1)
+    R1 = rt_run(model; sources=SolarBeam()).toa
+    scale = collect(range(0.5, 2.0; length=nspec))
+    R2 = rt_run(build(); sources=SolarBeam(F₀=reshape(scale, 1, :))).toa
+    @test R2 ≈ R1 .* reshape(scale, 1, 1, :) rtol=1e-10
+end
+
 @testset "CanopySurface bright-soil coupling stays positive" begin
     ν_800nm = 1e7 / 800.0
     params = parameters_from_dict(Dict{String,Any}(

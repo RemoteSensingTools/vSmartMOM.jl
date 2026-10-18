@@ -347,9 +347,11 @@ end
 """
     create_surface_layer!(canopy::CanopySurface, added_layer, SFI, m, pol_type,
                           quad_points, τ_sum, architecture;
-                          spec_bands_wn=nothing, m_max=2)
+                          spec_bands_wn=nothing, m_max=2, F₀=nothing)
 
 Compute the effective canopy+soil surface layer for Fourier moment `m`.
+`F₀` is the `(nStokes, nSpec)` solar Stokes vector at TOA used by both the leaf
+and soil source terms (`nothing`: unit unpolarized beam).
 `m_max` is the Fourier loop bound in **order semantics**.
 
 When spectral leaf optics are provided, `spec_bands_wn` (the concatenated
@@ -407,6 +409,9 @@ function create_surface_layer!(canopy::CanopySurface{FT},
     G_iμ₀ = Array(cache.G)[iμ₀]
 
     ϖ_canopy = _canopy_ssa(canopy, cache, nSpec, FT)
+    # Leaf scattering sees the same solar Stokes vector as the soil below
+    # (only the source terms use it, so it is not required without SFI).
+    F₀_dev = _surface_solar_F₀(SFI ? F₀ : nothing, FT, pol_type, nSpec, arr_type)
 
     τ_sum_curr = Array(τ_sum)
 
@@ -422,7 +427,7 @@ function create_surface_layer!(canopy::CanopySurface{FT},
         dτ, ndoubl, expk = init_layer(canopy_core, quad_points, pol_type, architecture)
 
         @timeit "canopy elemental" elemental!(
-            pol_type, SFI, τ_sum_dev, dτ, canopy_core,
+            pol_type, SFI, τ_sum_dev, dτ, F₀_dev, canopy_core,
             m, ndoubl, true, quad_points, cache.canopy_added, architecture)
         @timeit "canopy doubling" doubling!(
             pol_type, SFI, expk, ndoubl, cache.canopy_added,
@@ -613,7 +618,7 @@ function create_surface_layer!(RS_type::noRS,
                                architecture) where {FT}
 
     create_surface_layer!(canopy, added_layer, SFI, m, pol_type,
-                          quad_points, τ_sum, architecture)
+                          quad_points, τ_sum, architecture; F₀)
 
     added_layer_lin.ap_ṙ⁻⁺ .= 0
     added_layer_lin.ap_ṙ⁺⁻ .= 0
@@ -639,7 +644,7 @@ function create_surface_layer!(RS_type::noRS,
             (size(added_layer.r⁻⁺,1), size(added_layer.r⁻⁺,2)),
             size(added_layer.r⁻⁺,3))
     create_surface_layer!(perturbed, temp_added, SFI, m, pol_type,
-                          quad_points, τ_sum, architecture)
+                          quad_points, τ_sum, architecture; F₀)
 
     ṙ = (Array(temp_added.r⁻⁺) .- r_ref) ./ ε
     added_layer_lin.ap_ṙ⁻⁺[:,:,:,iparam] .= arr_type(ṙ)

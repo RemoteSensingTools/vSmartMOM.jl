@@ -112,6 +112,12 @@ review of General's sequential-version rule.
   or viewing angles. Previously it dropped interior observers and the TOA
   output metadata, and returned external-solar models to the embedded
   representation.
+- `CanopySurface` leaf scattering now uses the solar Stokes vector `F₀` of
+  the solve, as the soil below it already did. It used a unit beam, so canopy
+  radiances were not proportional to a spectral solar irradiance or a
+  `SolarBeam(F₀=…)` scaling (e.g. R(2F₀)/R(F₀) was 1.34–1.45 instead of 2),
+  and a zero solar beam still gave leaf-scattered radiance. Runs with the
+  default unit beam are unchanged.
 - StandaloneSS `truncated_ss_path2` no longer halves the m = 0 Cox–Munk
   Fourier term (the azimuthal mean), matching the CoreRT correction to the
   glint residual; the truncated series now converges to `run_exact_ss`, and

@@ -7,6 +7,7 @@ This file contains RT elemental-related functions
 function elemental!(pol_type, SFI::Bool, 
                             τ_sum::AbstractArray,#{FT2,1}, #Suniti
                             dτ::AbstractArray,
+                            F₀::AbstractArray,          # F₀: solar irradiance Stokes vector (nStokes, nSpec)
                             computed_layer_properties::CoreDirectionalScatteringOpticalProperties,
                             m::Int,                     # m: fourier moment
                             ndoubl::Int,                # ndoubl: number of doubling computations needed 
@@ -21,7 +22,6 @@ function elemental!(pol_type, SFI::Bool,
     arr_type = array_type(architecture)
     
     # Need to check with paper nomenclature. This is basically eqs. 19-20 in vSmartMOM
-    I₀    = arr_type(pol_type.I₀)
     D     = Diagonal(arr_type(repeat(pol_type.D, size(qp_μ,1))))
 
     device = devi(architecture)
@@ -42,7 +42,7 @@ function elemental!(pol_type, SFI::Bool,
         #@show G
         # SFI part
         kernel! = get_canopy_elem_rt_SFI!(device)
-        event = kernel!(j₀⁺, j₀⁻, ϖ, dτ, arr_type(τ_sum), G, Z⁻⁺, Z⁺⁺, qp_μN, ndoubl, wct02, pol_type.n, I₀, iμ₀, D, ndrange=size(j₀⁺))
+        event = kernel!(j₀⁺, j₀⁻, ϖ, dτ, arr_type(τ_sum), G, Z⁻⁺, Z⁺⁺, qp_μN, ndoubl, wct02, pol_type.n, F₀, iμ₀, D, ndrange=size(j₀⁺))
         #wait(device, event)
         synchronize_if_gpu()
         
@@ -118,23 +118,23 @@ end
 
 """
     get_canopy_elem_rt_SFI!(J₀⁺, J₀⁻, ϖ_λ, dτ_λ, τ_sum, G, Z⁻⁺, Z⁺⁺, μ,
-                            ndoubl, wct02, nStokes, I₀, iμ0, D)
+                            ndoubl, wct02, nStokes, F₀, iμ0, D)
 
 KernelAbstractions source-function kernel for canopy elemental layers. Each
-workitem computes the direct-beam `Z * I₀` contractions for one stream and
-wavelength, applies the canopy path factor `G` in the finite-δ source
+workitem computes the direct-beam `Z * F₀` contractions for one stream and
+wavelength (`F₀` is the `(nStokes, nSpec)` solar Stokes vector), applies the canopy path factor `G` in the finite-δ source
 formulas, multiplies by the direct-beam attenuation above the layer, and
 applies the upwelling D-matrix sign when required.
 """
 @kernel function get_canopy_elem_rt_SFI!(J₀⁺, J₀⁻, @Const(ϖ_λ), @Const(dτ_λ),
                                          @Const(τ_sum), @Const(G), @Const(Z⁻⁺),
                                          @Const(Z⁺⁺), @Const(μ), ndoubl, wct02,
-                                         nStokes, @Const(I₀), iμ0, @Const(D))
+                                         nStokes, @Const(F₀), iμ0, @Const(D))
     i_start  = nStokes*(iμ0-1) + 1 
     i_end    = nStokes*iμ0
     
     i, _, n = @index(Global, NTuple) ##Suniti: What are Global and Ntuple?
-    FT = eltype(I₀)
+    FT = eltype(J₀⁺)
     J₀⁺[i, 1, n] = zero(FT)
     J₀⁻[i, 1, n] = zero(FT)
     n2=1
@@ -146,8 +146,8 @@ applies the upwelling D-matrix sign when required.
     Z⁻⁺_I₀ = zero(FT);
     
     for ii = i_start:i_end
-        Z⁺⁺_I₀ += Z⁺⁺[i,ii,n2] * I₀[ii-i_start+1]
-        Z⁻⁺_I₀ += Z⁻⁺[i,ii,n2] * I₀[ii-i_start+1] 
+        Z⁺⁺_I₀ += Z⁺⁺[i,ii,n2] * F₀[ii-i_start+1,n]
+        Z⁻⁺_I₀ += Z⁻⁺[i,ii,n2] * F₀[ii-i_start+1,n]
     end
 
     if (i >= i_start) & (i <= i_end)
