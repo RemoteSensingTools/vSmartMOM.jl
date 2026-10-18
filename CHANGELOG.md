@@ -201,6 +201,40 @@ review of General's sequential-version rule.
   tangents use the model float type unless the CO2 VMR is a ForwardDiff Dual
   (a Float64 or integer `CO2` VMR left Float64, abstract or failing tangent
   arrays in Float32 models).
+- A reused `RS_type` no longer keeps the solar F₀ that an earlier call
+  wrote into it (a call with `sources=SolarBeam(F₀=2F)` made later default
+  calls return 2×). Precedence is the `sources=` keyword, then a user-preset
+  `RS_type.F₀`, then `model.sources`.
+- HDR, BHR (up and down) and `rt_run_ss`'s `hem_T` no longer double-count
+  the direct beam when μ₀ is a weighted quadrature node (Gauss with the SZA
+  on a node, every Radau run): e.g. vacuum Lambertian HDR was 1 + w_μ₀ too
+  large at SZA 60° with Gauss. `hem_R`/`hem_T` are documented as diffuse
+  fluxes in F₀ units, not normalized reflectances.
+- An SZA or VZA whose cosine lies within 4·eps of a quadrature ordinate
+  (e.g. `sza = acosd(node)`) no longer adds a numerically coincident second
+  ordinate (in the worst sampled case TOA jumped by ≈ 9 % and HDR by ≈ 14 %);
+  within
+  that window the output now equals the on-node result, and other grids are
+  unchanged. Just outside it the elemental 1/(μᵢ − μ₀) cancellation remains
+  (≈ 4e-4 relative at 5·eps in Float64).
+- TMS (`ss_correction`) is evaluated per band in combined-band solves (it
+  raised a `BoundsError`) and is rejected with `rt_run_streams`/stream
+  callbacks, whose reconstruction it broke. Stream exports do not include
+  the Cox–Munk glint residual (documented).
+- Interior-height (multisensor) runs apply the Cox–Munk glint correction to
+  TOA, matching the column path (Stokes I differed by up to 2.2 %, Q by
+  more). The glint
+  correction also works when optical depths are promoted beyond the model
+  precision (Float32 model, Float64 aerosol inputs).
+- **New rejections** with an `ArgumentError` instead of a silently wrong
+  result: incident F₀ with nonzero U or V (azimuthal reconstruction assumes
+  I/Q incidence); active `ThermalEmission` with `rt_run_ss` or the Raman
+  solvers (it was ignored; the empty `ThermalEmission()` placeholder is still
+  accepted); a `ThermalEmission.B_layer` whose row count differs from the
+  model layer count (the one-row zero placeholder is still accepted).
+  Linearized runs on surfaces without a linearized layer (Spectrum, Spline,
+  RPV, Ross–Li) now fail up front with a clear `ArgumentError` instead of a
+  deep `MethodError` (new trait `supports_linearized_surface`).
 - HITRAN, partition-sum, HAPI, CIA and MT_CKD references added to
   `CITATION.bib`, the References page and the README, with guidance on which
   HITRAN edition a calculation used.

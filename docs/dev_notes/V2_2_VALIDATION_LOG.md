@@ -156,9 +156,72 @@ Frankenberg's checkout (SHA-256 identical to the source file).
 - `test_lin_band_selection.jl` 3/3: `[1]` equals band 1 bit for bit; `[1, 1]`
   is rejected with a clear message (previously an unclear downstream error).
 
+## 10. Audit fixes (2026-10-17/18), each reviewed by Codex and an independent Claude reviewer
+
+Evidence (audit reproductions, author and reviewer logs, suite logs) is
+archived in `/home/sanghavi/vsmartmom-release-evidence/2026-10-18/` with
+`SHA256SUMS`. Findings came from five read-only audits (I/O and absorption, scattering and
+Raman, RT core, model build and Jacobians, surfaces and sources); results
+that need a scientific decision are listed in `V2_2_DECISION_LOG.md` §3.1.
+
+| Commit | Fix | Evidence |
+|---|---|---|
+| `6f0fc48d` | Undoubled-layer reverse-operator tangent parity; `Stokes_IQ` parity (`mod1`); LinMode without absorption; default aerosol in hPa | per-layer FD of a 34-layer IQU column: undoubled layers 7.5 % → 5e-8…1e-4; boundary test 1248 assertions over IQ/IQU/IQUV, fails on the old kernel |
+| `d65257e0` | `remake_geometry` keeps observer levels and `external_solar` | scenario sweep 92/92 incl. new bit-exact cases |
+| `b2182562` | StandaloneSS m = 0 Cox–Munk weight | truncated path 2 → exact to 1e-15 (was stuck at 0.5·c₀) |
+| `ccce0ac4` | Canopy leaf scattering uses the solve's F₀ | R(2F₀)/R(F₀) 1.34–1.45 → 2 exactly |
+| `e6bbd658` | δBGE truncation of identically zero f₁₂/f₃₄ | HG/PolHG truncate; nonzero tangent at zero element rejected |
+| `3157678c` | Float32 microphysics update parity | identical update bit-exact in k, fᵗ, τ_aer, TOA |
+| `1be7389a` | Unknown-key warnings | key lists equal to the schema's closed sections |
+| `83676497` | Δ_angle stored as 0; source-unit docs | parser/truncation tests |
+| `e929f5c6` (merge of `bcbea96c`) | Non-scattering layers (stale sources, surface trait, thermal); Radau SZA 0 | +51 % BOA error → 1e-12; Float32 thermal IR ≈3× → matches Float64; Radau SZA 0 negative → positive; 105 + 346 new assertions; bit-identical for ordinary columns |
+| `2707057a` | Cox–Munk 0·Inf at extreme Float32 grazing | 40,000 sampled geometries bit-identical, NaNs removed |
+| `ca6dc61c` (merge) | `FixedAltitudeGrid` convention and Round 7_altgrd pilot | `test_vertical_grid_psurf.jl` 174/174; FixedPressureGrid golden from 7acab570 |
+| `da589da1` | TOML mixed arrays, ENV paths for CIA/MT_CKD, surface count, Float32 gas tangents | parser and Float32 tests |
+| `2669fc01` | Documentation check | docs build clean; `docs/test_examples.jl` passes; ten tutorials run |
+| `1cd9600b` (merge of `fb6122ce`) | Solver entry guards (C5–C9, SS5–SS9), HDR/BHR direct beam, near-node ordinates | `test_rt_entry_guards.jl` 86/86 (fails on the base); vacuum HDR/(μ₀A/π) was 1 + w_μ₀ (1.444 = 1 + 4/9 for 3 Gauss streams at SZA 60°, the test case; 1.1365 in the audit configuration) → 1.000; within the 4·eps merge window TOA equals the on-node value to ≈1e-15 (just outside, ≈4e-4 at 5·eps remains); 2736/2808 sampled grids identical, the other 72 (all SZA = 1e-6°) drop a near-duplicate node (grids checked, not RT output); reviewer's merged-tree run of related test files: 1870 pass, 1 broken |
+
+Merged branches: `release/derivative-contracts` (`c217003a`, abundance
+Jacobian contract) and `release/test-tooling` (`030cf29f`, helper contract
+and fail-closed accuracy gates).
+
+## 11. Full suites and downstream gate
+
+- Default CPU suite at `da589da1`: **16241 pass, 16 broken, 0 fail/error**
+  (26 min, Julia 1.12.5, 8 threads); 14334 pass at `08347c62`.
+- Default CPU suite at `1cd9600b` (after the solver-entry merge):
+  **16328 pass, 16 broken, 0 fail/error** (27 min); docs build at
+  `1cd9600b` clean (Documenter document checks pass; only the existing
+  `greek_beta_cutoff` warning from a test YAML).
+- GPU (physical GPU 1, A100) at `2669fc01`: default suite with
+  `VSMARTMOM_JACOBIAN_GPU_TEST=true` **22857 pass, 3 broken, 0 fail/error**
+  (34 min); `test/local/gpu/runtests.jl` **20325/20325**. On this host the
+  system `/usr/local/cuda/lib64` on `LD_LIBRARY_PATH` shadows the CUDA.jl
+  artifact (`symbol lookup error: … cublasLtSetEnvironmentMode`); run with
+  `env -u LD_LIBRARY_PATH`.
+- Downstream gate at `da589da1` (report: `/home/sanghavi/tmp_claude_gate/GATE_REPORT.md`):
+  no API break on the exercised paths (static symbol/keyword comparison plus
+  the runs below); not run: the full exo_Earth `run_case`, full retrieval
+  campaigns and `generate_bottom_layer_truth.jl`.
+  - ExoOptics `test/runtests.jl` 5487/5487 on the release (5445 + 9 errors
+    on the pure_gas and v2.1 cores, which default to external solar);
+    exo_Earth tests 180/180 on all three; the minimal exo_Earth scene is
+    bit-identical; the one Horak script that relied on the external-solar
+    default reproduces its CSV byte for byte with `external_solar = true`.
+  - RRS_XCO2: `validate_optical_cache.jl` 1732/1732 (original and ported);
+    original self-tests 37 + 76 + 25 + 28 pass on release and v2.1; the
+    truth-map generator agrees with the archived output to 1.8e-6 (Float32);
+    the surface-pressure Jacobian column changes by 1.9–3.3 % and an FD
+    check confirms the release value (the undoubled-layer parity fix).
+  - The release's own portable workflow suite (`test/local/workflows`):
+    1105 pass, 6 errors in its own harness/fixtures (e.g. paths derived from
+    `Base.active_project()`), not in downstream code; the ported
+    `generate_truth_map.jl` now reads the OCORaman config from
+    `sandbox/workflows`; SIF spectra require `VSMARTMOM_SIF_DATA_DIR`
+    (documented in the RRS_XCO2 README).
+
 ## Not yet recorded
 
-The commits and merges after entry 9 on the first-parent history (from
-`6f0fc48d`, undoubled-layer/Stokes_IQ parity, LinMode without absorption and
-the hPa default aerosol, through `da589da1`, TOML mixed arrays and the
-surface count rule) have no entry here yet.
+The GPU suites and the downstream gate were run before the solver-entry
+merge (`2669fc01` and `da589da1`); the merge was checked with the full CPU
+suite and the docs build at `1cd9600b` and the reviewers' related-suite runs.

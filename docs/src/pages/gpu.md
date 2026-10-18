@@ -270,6 +270,12 @@ the RT solver's own architecture. The local GPU test suite
 (`test/local/gpu/`, not part of CI) self-skips cleanly when no CUDA device
 is present.
 
+If CUDA fails to load with `symbol lookup error: … libcublas.so: undefined
+symbol: cublasLt…`, a system CUDA directory on `LD_LIBRARY_PATH` is
+shadowing the libraries that CUDA.jl ships as artifacts; start Julia with
+that directory removed from `LD_LIBRARY_PATH` (e.g. `env -u LD_LIBRARY_PATH
+julia …`).
+
 ## Performance Notes
 
 The main architecture switch is the `radiative_transfer.architecture` field in

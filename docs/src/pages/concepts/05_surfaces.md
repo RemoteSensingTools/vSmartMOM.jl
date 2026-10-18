@@ -18,7 +18,7 @@ method of `create_surface_layer!` that fills the `r⁻⁺`, `r⁺⁻`, `t⁺⁺`
 After the atmosphere has been composed TOA → BOA, the loop calls
 `interaction!` one more time with the surface layer underneath the
 accumulated atmosphere (as a `ScatteringInterface_11` when any atmospheric
-layer scatters, `_01` otherwise; see [Concepts/04](04_mom_solver.md)). Then `interaction_hdrf!` ([`src/CoreRT/CoreKernel/interaction_hdrf.jl:1–42`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/CoreKernel/interaction_hdrf.jl#L1-L42))
+layer scatters, `_01` otherwise; see [Concepts/04](04_mom_solver.md)). Then `interaction_hdrf!` ([`src/CoreRT/CoreKernel/interaction_hdrf.jl`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/CoreKernel/interaction_hdrf.jl))
 runs to extract hemispherical-directional reflectance products for `m=0`.
 
 For opaque lower-boundary surfaces, `t⁻⁻` is zero: an upward field entering

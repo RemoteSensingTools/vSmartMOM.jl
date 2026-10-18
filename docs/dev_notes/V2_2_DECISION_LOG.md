@@ -252,6 +252,18 @@ The audit findings that are code defects with a clear reference were fixed
 in reviewed commits (see `CHANGELOG.md`). The items below change scientific
 results or definitions and wait for a decision.
 
+- [ ] **Solver-entry conventions (fix/rt-entry-guards).** (1) Solar F₀
+  precedence is kwarg > user-preset `RS_type.F₀` > `model.sources` (as the
+  code always did; older comments said `model.sources` beats a preset); a
+  `sources=` call still overwrites a preset permanently. (2) `rt_run_ss`
+  `hem_T` is now diffuse-only (the alternative is to always add
+  μ₀F₀e^(−τ/μ₀)). (3) Interior upwelling levels keep only the
+  Fourier-truncated glint (forward and linearized consistent). (4) Canopy
+  BHR-down omits the direct beam (canopy sets j₀⁺ = 0). (5) The
+  1/(μᵢ − μ₀) cancellation outside the 4·eps merge window remains (≈ 5e-19/δ
+  in Float64, ≈ 2.4e-10/δ in Float32); a full fix needs a limit form in the
+  elemental kernels. Radau's own near-coincident sub-interval nodes are
+  still merged only when exactly equal.
 - [ ] **Sign of ε in the Greek matrix B_l (wording only).** The code stores
   `B[3,4] = +ε`, `B[4,3] = −ε` (`construct_B_matrix`), and
   `concepts/03b_scattering.md` now shows that matrix (2.2.0 docs pass; it
