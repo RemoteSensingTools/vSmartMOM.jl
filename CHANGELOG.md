@@ -134,6 +134,11 @@ review of General's sequential-version rule.
   endpoints for multi-wavelength bands. In Float32 it previously inserted an
   extra knot one ulp from the band edge, so even an identical update changed
   k, fᵗ and the radiance (~1e-4) instead of reproducing a fresh build.
+- The parameter parser warns (once per key and session) about keys it does
+  not read at the top level and in the `radiative_transfer` and `geometry`
+  blocks, the sections the schema closes; a misspelled optional key such as
+  `nstream` previously left the default in effect silently. Such keys remain
+  non-fatal.
 - HITRAN, partition-sum, HAPI, CIA and MT_CKD references added to
   `CITATION.bib`, the References page and the README, with guidance on which
   HITRAN edition a calculation used.

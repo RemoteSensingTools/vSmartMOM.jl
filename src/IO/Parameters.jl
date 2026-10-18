@@ -572,6 +572,52 @@ function aerosol_params_to_obj(aerosols, FT)
     return rt_aerosol_obj_list
 end
 
+# Keys of the sections that `schemas/vsmartmom-parameters.schema.json` closes
+# (`additionalProperties: false`); test_parameters_parser.jl keeps them in step.
+const _KNOWN_CONFIG_KEYS = (
+    top = ("radiative_transfer", "geometry", "atmospheric_profile", "absorption",
+           "scattering", "canopy", "_metadata"),
+    radiative_transfer = ("architecture", "depol", "float_type", "greek_beta_cutoff",
+                          "l_trunc", "m_max", "max_m", "nstreams", "numerics",
+                          "polarization_type", "quadrature_type", "spec_bands",
+                          "surface", "truncation", "Δ_angle"),
+    geometry = ("obs_alt", "sza", "vaz", "vza"),
+)
+const _WARNED_UNKNOWN_KEYS = Set{String}()
+const _WARNED_UNKNOWN_KEYS_LOCK = ReentrantLock()
+
+"""
+    _warn_unknown_keys(params)
+
+Warn, once per key and session, about keys the parser does not read in the
+top level and in the `radiative_transfer` and `geometry` blocks (typically a
+misspelled optional key such as `nstream` or `quadrature`, which would
+otherwise leave the default in effect silently). Unknown keys stay non-fatal so that larger
+configuration files carrying their own sections keep working.
+"""
+function _warn_unknown_keys(params)
+    sections = (("", params, _KNOWN_CONFIG_KEYS.top),
+                ("radiative_transfer.", get(params, "radiative_transfer", nothing),
+                 _KNOWN_CONFIG_KEYS.radiative_transfer),
+                ("geometry.", get(params, "geometry", nothing), _KNOWN_CONFIG_KEYS.geometry))
+    for (prefix, block, known) in sections
+        block isa AbstractDict || continue
+        for key in keys(block)
+            name = prefix * string(key)
+            string(key) in known && continue
+            first_time = lock(_WARNED_UNKNOWN_KEYS_LOCK) do
+                name in _WARNED_UNKNOWN_KEYS ? false :
+                    (push!(_WARNED_UNKNOWN_KEYS, name); true)
+            end
+            first_time || continue
+            @warn "Configuration key `$name` is not read by vSmartMOM and is ignored " *
+                  "(check its spelling against the schema; known keys here: " *
+                  "$(join(known, ", ")))."
+        end
+    end
+    return nothing
+end
+
 "Given a parameter dictionary from a YAML file, validate the dictionary"
 function validate_yaml_parameters(params)
     # Required fields — must be present and well-typed.
@@ -1222,6 +1268,7 @@ Validates schema and parses radiative_transfer, geometry, atmospheric_profile,
 and optional absorption/scattering sections.
 """
 function parameters_from_dict(params_dict::Dict)
+    _warn_unknown_keys(params_dict)
     validate_yaml_parameters(params_dict)
     FT = _parse_float_type(params_dict)
     spec_bands = _parse_spec_bands(params_dict, FT)

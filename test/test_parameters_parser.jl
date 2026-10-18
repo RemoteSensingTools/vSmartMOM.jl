@@ -5,6 +5,7 @@ using vSmartMOM.IO
 using vSmartMOM.CoreRT
 using CanopyOptics
 using Distributions: Normal
+import JSON
 
 function _minimal_parameter_dict(; surface = ["LambertianSurfaceScalar(0.1)"],
                                    float_type = "Float64",
@@ -287,6 +288,30 @@ end
     @test all(iszero, forward.optics.τ_abs[1])
     @test all(iszero, model.optics.τ_abs[1])
     @test all(iszero, lin_model.τ̇_abs[1])
+end
+
+@testset "unknown configuration keys warn once" begin
+    cfg = _minimal_parameter_dict()
+    cfg["radiative_transfer"]["nstreams_misspelt"] = 16
+    cfg["geometry"]["VZA_misspelt"] = [10.0]
+    cfg["absorptoin_misspelt"] = Dict("vmr" => Dict("O2" => 0.21))
+    @test_logs (:warn, r"`radiative_transfer.nstreams_misspelt`") (:warn, r"`geometry.VZA_misspelt`") (:warn, r"`absorptoin_misspelt`") match_mode=:any parameters_from_dict(cfg)
+    @test_logs parameters_from_dict(cfg)          # once per key and session
+    @test_logs parameters_from_dict(_minimal_parameter_dict())
+
+    # The known keys are exactly the schema's closed sections.
+    schema = JSON.parsefile(joinpath(pkgdir(vSmartMOM), "schemas",
+                                     "vsmartmom-parameters.schema.json"))
+    @test schema["additionalProperties"] == false
+    known = vSmartMOM.IO._KNOWN_CONFIG_KEYS
+    @test Set(known.top) == Set(keys(schema["properties"]))
+    for section in (:radiative_transfer, :geometry)
+        ref = schema["properties"][string(section)]["\$ref"]       # "#/<defs>/<name>"
+        _, defs, name = split(ref, "/")
+        block = schema[defs][name]
+        @test get(block, "additionalProperties", true) == false
+        @test Set(getproperty(known, section)) == Set(keys(block["properties"]))
+    end
 end
 
 @testset "default parameters place the aerosol in hPa" begin
