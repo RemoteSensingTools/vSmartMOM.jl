@@ -123,16 +123,20 @@ table's broadener axis; the H₂O absorber LUT is additionally multiplied by the
 
 ## HITRAN edition
 
-Set the HITRAN edition once per session via:
+The default edition, `"artifact"`, is HITRAN2016 distributed as Julia
+artifacts. To use data downloaded from hitran.org instead, set an edition
+label once per session:
 
 ```julia
 using vSmartMOM
-vSmartMOM.set_hitran_edition!(2020)   # default; or 2016
+vSmartMOM.set_hitran_edition!("HITRAN2024")   # downloads on first use
+vSmartMOM.set_hitran_edition!("artifact")     # back to the HITRAN2016 default
 ```
 
-This is a per-session preference, not a YAML field. The Artifacts
-infrastructure caches HITRAN snapshots in `~/.julia/scratchspaces/`
-and downloads on-demand from hitran.org if needed. See the
+This is a per-session preference, not a YAML field. hitran.org serves only
+its current edition; the edition string labels the local cache in
+`~/.julia/scratchspaces/` and does not select a historical edition. Please
+cite the HITRAN edition you used (see [References](../../vSmartMOM/References.md)). See the
 [HITRAN Data Management](../../Absorption/HITRAN_Data.md) page for the
 dispatch flow and edition-selection workflow.
 

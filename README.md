@@ -107,12 +107,13 @@ aerosol, gas, and surface parameters laid out via `ParameterLayout`.
 
 ### Legacy `vSmartMOM.Absorption` (deprecated)
 
-> **Deprecation notice:** AtmosphericAbsorption.jl is the sole supported absorption
-> dependency for vSmartMOM going forward. Do not build new workflows on the internal
-> `vSmartMOM.Absorption` implementation; it remains temporarily for legacy compatibility
-> and will be removed in a future release. Use
+> **Deprecation notice:** AtmosphericAbsorption.jl is the supported absorption
+> dependency for vSmartMOM going forward; the RT pipeline already uses it. The internal
+> standalone line-by-line model (`make_hitran_model`, `HitranModel`) is deprecated in 2.2 and
+> will be removed in 3.0: use
 > [AtmosphericAbsorption.jl](https://github.com/RemoteSensingTools/AtmosphericAbsorption.jl)
-> for line-by-line calculations, interpolators, ABSCO HDF tables, and GPU execution.
+> for line-by-line calculations and GPU execution. Lookup tables: YAML `LUTfiles` accept OCO-2 ABSCO HDF files and AtmosphericAbsorption `.absco` tables (`save_absco_lut`), as well as vSmartMOM JLD2 tables from `make_interpolation_model`; AtmosphericAbsorption's own interpolation tables (`build_interpolation_model`/`save_interpolation_model`) are not read by the 2.x loader.
+> CIA and MT_CKD continuum readers stay in `vSmartMOM.Absorption`.
 
 This module enables absorption cross-section calculations of atmospheric gases at different pressures, temperatures, and broadeners (Doppler, Lorentzian, Voigt). It uses the <a href="https://hitran.org">HITRAN</a> energy transition database for calculations. While it enables lineshape calculations from scratch, it also allows users to create and save an interpolator object at specified wavelength, pressure, and temperature grids. It can perform these computations either on CPU or GPU. <br><img src="docs/src/assets/CrossSectionGIF.gif" alt="Absorption cross-section" /><br>
 
@@ -137,6 +138,8 @@ hitran_info("CO2")  # returns metadata dict with SHA-256, download date, etc.
 
 See the full <a href="https://RemoteSensingTools.github.io/vSmartMOM.jl/dev/pages/Absorption/HITRAN_Data/">HITRAN Data Management</a> documentation for details on edition switching, custom wavenumber ranges, and cache management.
 
+> **Please cite HITRAN.** If you publish results computed with HITRAN line data, cite the HITRAN edition you used: HITRAN2016 for the default artifacts, or the current edition (HITRAN2024 at the time of writing) for data downloaded from hitran.org. See [Citing](#citing).
+
 #### Key functions
 
   - `artifact(molecule::String)`: Retrieve the path to a HITRAN `.par` file for a molecule. Routes through legacy artifacts or hitran.org depending on the active edition.
@@ -153,6 +156,28 @@ This module enables scattering phase-function calculation of atmospheric aerosol
   - `make_univariate_aerosol(size_distribution::ContinuousUnivariateDistribution, r_max, nquad_radius::Int, nᵣ, nᵢ`: Create an aerosol object with size distribution and complex refractive index.
   - `make_mie_model(computation_type::AbstractFourierDecompositionType, aerosol::AbstractAerosolType, λ::Real, polarization::AbstractPolarizationType, truncation_type::AbstractTruncationType, ...)`: Create a MieModel struct that holds all of the model parameters needed to perform a phase function calculation (computation type, aerosol, incident wavelength, etc. )
   - `compute_aerosol_optical_properties(model::MieModel)`: Compute the aerosol optical properties using the specified model parameters
+
+## Citing
+
+If you use vSmartMOM.jl, please cite the software paper (Jeyaram, Sanghavi &
+Frankenberg 2022, [doi:10.21105/joss.04575](https://doi.org/10.21105/joss.04575))
+and the method papers relevant to your work. BibTeX for all of them is in
+[`CITATION.bib`](CITATION.bib).
+
+Gas absorption is computed from [HITRAN](https://hitran.org) line parameters.
+If your results use them, please also cite the HITRAN edition you used:
+
+- HITRAN2016 — the default `"artifact"` data: Gordon et al. (2017),
+  [doi:10.1016/j.jqsrt.2017.06.038](https://doi.org/10.1016/j.jqsrt.2017.06.038);
+- HITRAN2024 — data downloaded from hitran.org at the time of writing: Gordon et
+  al. (2026), [doi:10.1016/j.jqsrt.2026.109807](https://doi.org/10.1016/j.jqsrt.2026.109807);
+- HITRAN2020 — if your own `.par` files come from it: Gordon et al. (2022),
+  [doi:10.1016/j.jqsrt.2021.107949](https://doi.org/10.1016/j.jqsrt.2021.107949).
+
+Partition sums, HAPI (non-Voigt profiles), HITRAN collision-induced absorption
+and MT_CKD continuum references are listed on the
+[References](https://RemoteSensingTools.github.io/vSmartMOM.jl/dev/pages/vSmartMOM/References/)
+page and in `CITATION.bib`.
 
 ## How to Contribute
 

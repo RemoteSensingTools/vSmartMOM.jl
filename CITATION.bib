@@ -66,3 +66,118 @@
   pages   = {108791},
   doi     = {10.1016/j.jqsrt.2023.108791},
 }
+
+% ---------------------------------------------------------------------------
+% Spectroscopic data. vSmartMOM computes gas absorption from HITRAN line
+% parameters (through AtmosphericAbsorption.jl). If you publish results that
+% use them, please cite the HITRAN edition you used:
+%   - default ("artifact" edition): HITRAN2016 (Gordon2017HITRAN2016);
+%   - set_hitran_edition!(...) downloads from hitran.org, which serves only
+%     the current edition (HITRAN2024 at the time of writing; Gordon2026HITRAN2024);
+%   - local .par files: the edition the file came from (e.g. Gordon2022HITRAN2020).
+% Partition sums: TIPS-2021 in AtmosphericAbsorption.jl (Gamache2021TIPS2021);
+% TIPS-2017 in the deprecated internal line engine (Gamache2017TIPS2017).
+% Cite HAPI (Kochanov2016HAPI) when using non-Voigt profiles or parameters,
+% the HITRAN CIA section (Karman2019HITRANCIA) when using HITRAN .cia files,
+% and MT_CKD (Mlawer2012MTCKD, Mlawer2023MTCKDHITRAN) when using the water
+% vapour continuum. See docs/src/pages/vSmartMOM/References.md.
+% ---------------------------------------------------------------------------
+
+@article{Gordon2017HITRAN2016,
+  author  = {Gordon, I.E. and Rothman, L.S. and Hill, C. and Kochanov, R.V. and Tan, Y. and Bernath, P.F. and Birk, M. and Boudon, V. and Campargue, A. and Chance, K.V. and Drouin, B.J. and Flaud, J.-M. and Gamache, R.R. and Hodges, J.T. and Jacquemart, D. and Perevalov, V.I. and Perrin, A. and Shine, K.P. and Smith, M.-A.H. and Tennyson, J. and Toon, G.C. and Tran, H. and Tyuterev, V.G. and Barbe, A. and Császár, A.G. and Devi, V.M. and Furtenbacher, T. and Harrison, J.J. and Hartmann, J.-M. and Jolly, A. and Johnson, T.J. and Karman, T. and Kleiner, I. and Kyuberis, A.A. and Loos, J. and Lyulin, O.M. and Massie, S.T. and Mikhailenko, S.N. and Moazzen-Ahmadi, N. and Müller, H.S.P. and Naumenko, O.V. and Nikitin, A.V. and Polyansky, O.L. and Rey, M. and Rotger, M. and Sharpe, S.W. and Sung, K. and Starikova, E. and Tashkun, S.A. and {Vander Auwera}, J. and Wagner, G. and Wilzewski, J. and Wcisło, P. and Yu, S. and Zak, E.J.},
+  title   = {The {HITRAN2016} molecular spectroscopic database},
+  journal = {Journal of Quantitative Spectroscopy and Radiative Transfer},
+  year    = {2017},
+  volume  = {203},
+  pages   = {3--69},
+  doi     = {10.1016/j.jqsrt.2017.06.038},
+  url     = {https://doi.org/10.1016/j.jqsrt.2017.06.038}
+}
+
+@article{Gordon2022HITRAN2020,
+  author  = {Gordon, I.E. and Rothman, L.S. and Hargreaves, R.J. and Hashemi, R. and Karlovets, E.V. and Skinner, F.M. and Conway, E.K. and Hill, C. and Kochanov, R.V. and Tan, Y. and Wcisło, P. and Finenko, A.A. and Nelson, K. and Bernath, P.F. and Birk, M. and Boudon, V. and Campargue, A. and Chance, K.V. and Coustenis, A. and Drouin, B.J. and Flaud, J.-M. and Gamache, R.R. and Hodges, J.T. and Jacquemart, D. and Mlawer, E.J. and Nikitin, A.V. and Perevalov, V.I. and Rotger, M. and Tennyson, J. and Toon, G.C. and Tran, H. and Tyuterev, V.G. and Adkins, E.M. and Baker, A. and Barbe, A. and Canè, E. and Császár, A.G. and Dudaryonok, A. and Egorov, O. and Fleisher, A.J. and Fleurbaey, H. and Foltynowicz, A. and Furtenbacher, T. and Harrison, J.J. and Hartmann, J.-M. and Horneman, V.-M. and Huang, X. and Karman, T. and Karns, J. and Kassi, S. and Kleiner, I. and Kofman, V. and Kwabia-Tchana, F. and Lavrentieva, N.N. and Lee, T.J. and Long, D.A. and Lukashevskaya, A.A. and Lyulin, O.M. and Makhnev, V.Yu. and Matt, W. and Massie, S.T. and Melosso, M. and Mikhailenko, S.N. and Mondelain, D. and Müller, H.S.P. and Naumenko, O.V. and Perrin, A. and Polyansky, O.L. and Raddaoui, E. and Raston, P.L. and Reed, Z.D. and Rey, M. and Richard, C. and Tóbiás, R. and Sadiek, I. and Schwenke, D.W. and Starikova, E. and Sung, K. and Tamassia, F. and Tashkun, S.A. and Vander Auwera, J. and Vasilenko, I.A. and Vigasin, A.A. and Villanueva, G.L. and Vispoel, B. and Wagner, G. and Yachmenev, A. and Yurchenko, S.N.},
+  title   = {The {HITRAN2020} molecular spectroscopic database},
+  journal = {Journal of Quantitative Spectroscopy and Radiative Transfer},
+  year    = {2022},
+  volume  = {277},
+  pages   = {107949},
+  doi     = {10.1016/j.jqsrt.2021.107949},
+  url     = {https://doi.org/10.1016/j.jqsrt.2021.107949}
+}
+
+@article{Gordon2026HITRAN2024,
+  author  = {Gordon, I.E. and Rothman, L.S. and Hargreaves, R.J. and Gomez, F.M. and Bertin, T. and Hill, C. and Kochanov, R.V. and Tan, Y. and Wcisło, P. and Makhnev, V. Yu. and Bernath, P.F. and Birk, M. and Boudon, V. and Campargue, A. and Coustenis, A. and Drouin, B.J. and Gamache, R.R. and Hodges, J.T. and Jacquemart, D. and Mlawer, E.J. and Nikitin, A.V. and Perevalov, V.I. and Rotger, M. and Robert, S. and Tennyson, J. and Toon, G.C. and Tran, H. and Tyuterev, V.G. and Adkins, E.M. and Barbe, A. and Bailey, D.M. and Bielska, K. and Bizzocchi, L. and Blake, T.A. and Bowesman, C.A. and Cacciani, P. and Čermák, P. and Császár, A.G. and Denis, L. and Egbert, S.C. and Egorov, O. and Ermilov, A. Yu. and Fleisher, A.J. and Fleurbaey, H. and Foltynowicz, A. and Furtenbacher, T. and Germann, M. and Guest, E.R. and Harrison, J.J. and Hartmann, J.-M. and Hjältén, A. and Hu, S.-M. and Huang, X. and Johnson, T.J. and Jóźwiak, H. and Kassi, S. and Khan, M.V. and Kwabia-Tchana, F. and Lee, T.J. and Lisak, D. and Liu, A.-W. and Lyulin, O.M. and Malarich, N.A. and Manceron, L. and Marinina, A.A. and Massie, S.T. and Mascio, J. and Medvedev, E.S. and Meshkov, V.V. and Mellau, G. Ch. and Melosso, M. and Mikhailenko, S.N. and Mondelain, D. and Müller, H.S.P. and O’Donnell, M. and Owens, A. and Perrin, A. and Polyansky, O.L. and Raston, P.L. and Reed, Z.D. and Rey, M. and Richard, C. and Rieker, G.B. and Röske, C. and Sharpe, S.W. and Starikova, E. and Stolarczyk, N. and Stolyarov, A.V. and Sung, K. and Tamassia, F. and Terragni, J. and Ushakov, V.G. and Vasilchenko, S. and Vispoel, B. and Vodopyanov, K.L. and Wagner, G. and Wójtewicz, S. and Yurchenko, S.N. and Zobov, N.F.},
+  title   = {The {HITRAN2024} molecular spectroscopic database},
+  journal = {Journal of Quantitative Spectroscopy and Radiative Transfer},
+  year    = {2026},
+  volume  = {353},
+  pages   = {109807},
+  doi     = {10.1016/j.jqsrt.2026.109807},
+  url     = {https://doi.org/10.1016/j.jqsrt.2026.109807}
+}
+
+@article{Gamache2021TIPS2021,
+  author  = {Gamache, Robert R. and Vispoel, Bastien and Rey, Michaël and Nikitin, Andrei and Tyuterev, Vladimir and Egorov, Oleg and Gordon, Iouli E. and Boudon, Vincent},
+  title   = {Total internal partition sums for the {HITRAN2020} database},
+  journal = {Journal of Quantitative Spectroscopy and Radiative Transfer},
+  year    = {2021},
+  volume  = {271},
+  pages   = {107713},
+  doi     = {10.1016/j.jqsrt.2021.107713},
+  url     = {https://doi.org/10.1016/j.jqsrt.2021.107713}
+}
+
+@article{Gamache2017TIPS2017,
+  author  = {Gamache, Robert R. and Roller, Christopher and Lopes, Eldon and Gordon, Iouli E. and Rothman, Laurence S. and Polyansky, Oleg L. and Zobov, Nikolai F. and Kyuberis, Aleksandra A. and Tennyson, Jonathan and Yurchenko, Sergei N. and Császár, Attila G. and Furtenbacher, Tibor and Huang, Xinchuan and Schwenke, David W. and Lee, Timothy J. and Drouin, Brian J. and Tashkun, Sergei A. and Perevalov, Valery I. and Kochanov, Roman V.},
+  title   = {Total internal partition sums for 166 isotopologues of 51 molecules important in planetary atmospheres: Application to {HITRAN2016} and beyond},
+  journal = {Journal of Quantitative Spectroscopy and Radiative Transfer},
+  year    = {2017},
+  volume  = {203},
+  pages   = {70--87},
+  doi     = {10.1016/j.jqsrt.2017.03.045},
+  url     = {https://doi.org/10.1016/j.jqsrt.2017.03.045}
+}
+
+@article{Kochanov2016HAPI,
+  author  = {Kochanov, R.V. and Gordon, I.E. and Rothman, L.S. and Wcisło, P. and Hill, C. and Wilzewski, J.S.},
+  title   = {{HITRAN} Application Programming Interface ({HAPI}): A comprehensive approach to working with spectroscopic data},
+  journal = {Journal of Quantitative Spectroscopy and Radiative Transfer},
+  year    = {2016},
+  volume  = {177},
+  pages   = {15--30},
+  doi     = {10.1016/j.jqsrt.2016.03.005},
+  url     = {https://doi.org/10.1016/j.jqsrt.2016.03.005}
+}
+
+@article{Karman2019HITRANCIA,
+  author  = {Karman, Tijs and Gordon, Iouli E. and van der Avoird, Ad and Baranov, Yury I. and Boulet, Christian and Drouin, Brian J. and Groenenboom, Gerrit C. and Gustafsson, Magnus and Hartmann, Jean-Michel and Kurucz, Robert L. and Rothman, Laurence S. and Sun, Kang and Sung, Keeyoon and Thalman, Ryan and Tran, Ha and Wishnow, Edward H. and Wordsworth, Robin and Vigasin, Andrey A. and Volkamer, Rainer and van der Zande, Wim J.},
+  title   = {Update of the {HITRAN} collision-induced absorption section},
+  journal = {Icarus},
+  year    = {2019},
+  volume  = {328},
+  pages   = {160--175},
+  doi     = {10.1016/j.icarus.2019.02.034},
+  url     = {https://doi.org/10.1016/j.icarus.2019.02.034}
+}
+
+@article{Mlawer2012MTCKD,
+  author  = {Mlawer, Eli J. and Payne, Vivienne H. and Moncet, Jean-Luc and Delamere, Jennifer S. and Alvarado, Matthew J. and Tobin, David C.},
+  title   = {Development and recent evaluation of the {MT\_CKD} model of continuum absorption},
+  journal = {Philosophical Transactions of the Royal Society A: Mathematical, Physical and Engineering Sciences},
+  year    = {2012},
+  volume  = {370},
+  pages   = {2520--2556},
+  doi     = {10.1098/rsta.2011.0295},
+  url     = {https://doi.org/10.1098/rsta.2011.0295}
+}
+
+@article{Mlawer2023MTCKDHITRAN,
+  author  = {Mlawer, E.J. and Cady-Pereira, K.E. and Mascio, J. and Gordon, I.E.},
+  title   = {The inclusion of the {MT\_CKD} water vapor continuum model in the {HITRAN} molecular spectroscopic database},
+  journal = {Journal of Quantitative Spectroscopy and Radiative Transfer},
+  year    = {2023},
+  volume  = {306},
+  pages   = {108645},
+  doi     = {10.1016/j.jqsrt.2023.108645},
+  url     = {https://doi.org/10.1016/j.jqsrt.2023.108645}
+}

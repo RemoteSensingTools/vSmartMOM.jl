@@ -267,6 +267,23 @@ using Pkg
 Pkg.gc()  # removes unused artifacts
 ```
 
+## Citing HITRAN
+
+The line parameters behind every absorption calculation come from HITRAN. If you
+publish results computed with them, please cite the edition you used:
+
+- the default `"artifact"` edition is **HITRAN2016** (Gordon et al. 2017,
+  [doi:10.1016/j.jqsrt.2017.06.038](https://doi.org/10.1016/j.jqsrt.2017.06.038));
+- data downloaded from hitran.org is the **current edition** at the time of
+  download (HITRAN2024 at the time of writing: Gordon et al. 2026,
+  [doi:10.1016/j.jqsrt.2026.109807](https://doi.org/10.1016/j.jqsrt.2026.109807)).
+  The edition label you choose does not change what the server delivers; the
+  `.meta.toml` sidecar records the download date and checksum;
+- for your own `.par` files, cite the edition they came from.
+
+Partition-sum, HAPI, collision-induced-absorption and MT_CKD references are on the
+[References](../vSmartMOM/References.md) page; BibTeX entries are in `CITATION.bib`.
+
 ## Library Reference
 
 The canonical docstrings for `artifact`, `fetch_hitran`,
