@@ -17,8 +17,11 @@ Use `read_parameters` as the user-facing entry point. It dispatches on the input
 
 The explicit aliases `parameters_from_file`, `parameters_from_dict`, and `parameters_from_source` remain available when code wants the call site to state the input kind. `parameters_from_yaml` is also supported for YAML files.
 
-- `read_atmos_profile(path)` loads a YAML atmospheric profile;
-  `read_atmos_profile_dict(dict)` loads its profile block from memory. Both
+- `read_atmos_profile(path)` loads a standalone YAML atmospheric profile;
+  `read_atmos_profile_dict(dict)` loads the same mapping from memory. The
+  mapping holds `T`, `p_half` (or hybrid `ak`, `bk`, `p_surf`), and optional
+  `q` and `vmr` at its top level; it is not a scene file, whose
+  `atmospheric_profile` block names the interfaces `p`. Both
   profile readers accept `FT=Float32` when a single-precision standalone
   profile is wanted; the default is `Float64`.
 - Format registry: `IO.Formats` selects a loader based on source/extension (YAML and TOML supported).
@@ -42,7 +45,6 @@ cfg = Dict(
     "quadrature_type" => "GaussLegQuad()",
     "polarization_type" => "Stokes_I()",
     "max_m" => 3,
-    "Δ_angle" => 2.0,
     "l_trunc" => 20,
     "depol" => 0.0,
     "float_type" => "Float64",
@@ -69,10 +71,19 @@ vector forms.
 
 - Quadrature: `RadauQuad`, `GaussLegQuad`
 - Polarization: `Stokes_I`, `Stokes_IQ`, `Stokes_IQU`, `Stokes_IQUV`
-- Architecture: `CPU`, `GPU`, `default_architecture`
+- Architecture: `CPU`, `GPU`, `MetalGPU`, `default_architecture` (an `Architectures.` prefix is accepted for `CPU()`, `GPU()` and `MetalGPU()`, not for `default_architecture`)
 - Decomposition: `NAI2`, `PCW`
 - Broadening: `Voigt`, `Lorentz`, `Doppler`
 - Complex error function: `HumlicekWeidemann32SDErrorFunction`
-- Surfaces (BRDF): LambertianSurfaceScalar, LambertianSurfaceSpectrum, LambertianSurfaceLegendre, LambertianSurfaceSpline, rpvSurfaceScalar, RossLiSurfaceScalar, CoxMunkSurface, CanopySurface
+- Surfaces (BRDF): LambertianSurfaceScalar, LambertianSurfaceSpectrum, LambertianSurfaceLegendre, rpvSurfaceScalar, RossLiSurfaceScalar, CoxMunkSurface
+- Truncation: `auto`, `NoTruncation()`, `NoTruncation(l_max=N)`, `δBGE(l_max, Δ_angle)` (the retired `Δ_angle` is forced to 0)
 
 All are passed in as strings in the YAML and mapped safely without `eval`.
+`CanopySurface` is not a surface string: it is built from the top-level
+`canopy` block, which wraps each band's surface as soil.
+`LambertianSurfaceSpline` has no string form; construct it in Julia.
+
+Keys the parser does not read at the top level or in the `radiative_transfer`
+and `geometry` blocks produce a one-time warning per key and session (they are
+not errors), so a misspelled optional key is reported instead of silently
+leaving its default in effect.

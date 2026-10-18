@@ -126,7 +126,14 @@ function _add_binary_psurf_tangent!(τ̇_psurf, τ_binary, ::FixedAltitudeGrid,
 end
 
 """
-    model_from_parameters(::LinMode, params::vSmartMOM_Parameters)
+    model_from_parameters(::LinMode, params::vSmartMOM_Parameters;
+                          sources = SolarBeam(), external_solar = false,
+                          aerosol_anchor_bands = nothing,
+                          compute_aerosol_microphysics_jacobians = true,
+                          compute_h2o_jacobians = true,
+                          compute_pressure_jacobians = true,
+                          abundance_jacobians = :complete,
+                          vertical_grid = FixedPressureGrid())
 
 Construct both the forward `RTModel` and the linearized `RTModelLin` objects
 from the input parameters, for use in linearized (Jacobian) RT computations.
@@ -154,14 +161,18 @@ This is the **linearized** counterpart of `model_from_parameters(params)`. It co
 - Strict-interior observer heights are inserted as exact atmospheric
   interfaces during model construction and are supported by the elastic
   analytic-linearized solver.
-- Aerosol Mie calculations use `ForwardDiff.Dual` numbers to simultaneously obtain
-  derivatives of the extinction cross-section, single-scattering albedo, truncation
-  factor, and greek coefficients with respect to `[nᵣ, nᵢ, rₘ, σᵣ]`.
+- Aerosol Mie derivatives of the extinction cross-section, single-scattering
+  albedo, truncation factor and greek coefficients with respect to
+  `[nᵣ, nᵢ, rₘ, σᵣ]` come from the analytic linearized NAI-2 calculation
+  (`compute_aerosol_optical_properties(LinMode(), mie_model, FT)`), which runs
+  on the CPU.
 - Set `compute_aerosol_microphysics_jacobians=false` when all four Mie
   parameters are fixed. The forward aerosol optics are retained and
   structurally valid zero tangents are supplied to the downstream mixer.
 - Set `compute_h2o_jacobians=false` when the q-driven H2O profile is fixed.
   Its forward absorption is retained without generating H2O tangent entries.
+- Without an `absorption` block the model has no gas absorption, as in the
+  forward constructor (`q` still sets the dry-air column).
 - Native gas columns are the partial `∂τ/∂VMR = σ·N_dry`: line cross
   sections and the CIA and MT_CKD optical depths are held fixed. Where the
   forward absorption also responds to that abundance (H₂O self broadening,

@@ -92,7 +92,11 @@ dR_albedo = dR[:, 1, :, surface_idx]
 println("dR/d(albedo) at nadir, first 5 spectral points: ",
         round.(dR_albedo[1, 1:min(5,end)], digits=6))
 
-# Gas VMR Jacobians are vertical profiles in TOA-to-BOA layer order:
+# Gas VMR Jacobians are vertical profiles in TOA-to-BOA layer order. Gas slot 1
+# is always the q-driven H₂O profile, followed by any `variable_molecules`.
+# This YAML lists O₂ under the legacy `molecules:` key (fixed, no Jacobian
+# column) and sets no humidity (q ≡ 0), so the slot-1 columns printed below are
+# structural zeros, not derivatives:
 
 if NGas > 0
     Nz = length(model.profile.p_full)

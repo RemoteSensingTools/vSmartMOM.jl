@@ -55,7 +55,7 @@ Example: NAI2 (no Wigner tables needed)
 rₘ, σ, nᵣ, nᵢ = 0.3, 2.0, 1.3, 0.001
 aero = Aerosol(LogNormal(log(rₘ), log(σ)), nᵣ, nᵢ)
 λ = 0.55
-model_NAI2 = make_mie_model(NAI2(), aero, λ, Stokes_IQUV(), δBGE(20, 2.0), 30.0, 500)
+model_NAI2 = make_mie_model(NAI2(), aero, λ, Stokes_IQUV(), δBGE(20), 30.0, 500)
 ```
 
 aerosol_optics = compute_aerosol_optical_properties(model_NAI2)
@@ -63,7 +63,7 @@ aerosol_optics = compute_aerosol_optical_properties(model_NAI2)
 PCW requires precomputed Wigner tables (expensive one-time cost):
 N_max = 120
 wigner_A, wigner_B = compute_wigner_values(N_max)
-model_PCW = make_mie_model(PCW(), aero, λ, Stokes_IQUV(), δBGE(20, 2.0), 30.0, 500, wigner_A, wigner_B)
+model_PCW = make_mie_model(PCW(), aero, λ, Stokes_IQUV(), δBGE(20), 30.0, 500, wigner_A, wigner_B)
 
 ---
 
@@ -89,8 +89,7 @@ Start with moderate values (e.g., 500, 20) and increase if needed.
 r_max = 30.0
 nquad_radius = 500
 l_max = 20
-Δ_angle = 2.0
-truncation_type = δBGE(l_max, Δ_angle)
+truncation_type = δBGE(l_max)
 ```
 
 ---
@@ -153,7 +152,8 @@ choose the stream/truncation order and validate the resulting phase/radiance.
 - **`greek_coefs`** — Fourier/Legendre coefficients for the phase matrix
 - **`ω̃`** — single-scattering albedo (``C_{\mathrm{sca}}/C_{\mathrm{ext}}``)
 - **`k`** — extinction cross-section (per particle or per mass, depending on convention)
-- **`fᵗ`** — delta-M truncation factor
+- **`fᵗ`** — delta-M truncation factor (set by `truncate_phase`; the untruncated
+  output of `compute_aerosol_optical_properties` carries the placeholder `1`)
 
 These feed into the doubling-adding kernels. Aerosol layers are combined with molecular
 (Rayleigh) scattering and absorption; the RT solver never needs angle-space phase

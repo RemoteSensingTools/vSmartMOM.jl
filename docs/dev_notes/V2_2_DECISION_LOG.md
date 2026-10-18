@@ -96,10 +96,13 @@ function, so a separate exclusion cone is at best redundant and at worst
 error-prone (the linearized path never honoured it, so non-zero values made
 Jacobians inconsistent with the forward model). Its numerical effect is
 already retired in this branch (the δBGE constructor forces it to 0 with a
-one-time warning). Still to do: remove remaining user-facing documentation
-and tests that treat it as meaningful, while keeping compatibility metadata
-(the YAML key, the `δBGE(l, Δ)` signature, the stored field) accepted and
-ignored, so existing scripts keep running.
+one-time warning, and since `83676497` the parser also stores a nonzero
+`radiative_transfer.Δ_angle` as 0 with a one-time warning). Compatibility
+metadata (the YAML key, the `δBGE(l, Δ)` signature, the stored field) stays
+accepted and ignored, so existing scripts keep running. The user-facing
+documentation and docs examples no longer set it (2.2.0 documentation pass);
+scripts under `sandbox/` still carry `Δ_angle: 2.0` and only trigger the
+warning.
 
 ### 1.6 `Aerosols.compute_optical_properties` placeholder
 
@@ -173,11 +176,13 @@ each round's provenance — task in progress.)
 fixed-altitude airborne observer the layering must not move around the
 observer when p_surf changes. A `FixedAltitudeGrid()` convention (levels
 fixed in altitude; a p_surf change propagates hydrostatically to every
-level) is being implemented alongside the current `FixedPressureGrid()`
-default, and Round 7 is being repeated as a pilot ("Round 7_altgrd": one
-noiseless and one noisy member per scene). Whether Rounds 3–4 (and possibly
-all rounds) need re-running is decided after comparing the pilot with
-Round 7.
+level) is implemented as an opt-in alongside the unchanged
+`FixedPressureGrid()` default (`model_from_parameters(LinMode(), params;
+vertical_grid=FixedAltitudeGrid())`, with `surface_pressure_interfaces` to
+rebuild the interface pressures; merged in `ca6dc61c`), and Round 7 has been
+repeated as a pilot ("Round 7_altgrd": one noiseless and one noisy member
+per scene). Whether Rounds 3–4 (and possibly all rounds) need re-running is
+decided after comparing the pilot with Round 7 (§3.1).
 
 ## 3. Open items / TODO
 
@@ -201,8 +206,9 @@ Round 7.
   Use the loaded package's own path.
 - [ ] Move remaining workflows to `sandbox/workflows/` and update the scripts
   that reference old paths (e.g. `generate_truth_map.jl:42`).
-- [ ] Fixed-altitude grid + Round 7_altgrd pilot: completed; see §3.1 for the
-  results and the decisions it needs (re-running Rounds 3–4 / all rounds).
+- [x] Fixed-altitude grid + Round 7_altgrd pilot: completed (merged in
+  `ca6dc61c`); see §3.1 for the results and the decisions it needs
+  (re-running Rounds 3–4 / all rounds).
 - [ ] TMS GPU efficiency — Christian.
 - [x] **For Suniti (convention, documented 2026-10-17):** `conventions.md` §1
   said Q > 0 means polarization parallel to the meridian plane. The code's
@@ -232,6 +238,9 @@ Round 7.
   BRDFs, but fix the order and docstring in a separate commit.
 - [ ] Extremely grazing Float32 Cox–Munk inputs can overflow the
   1/(4μᵢμᵣcos⁴β) weight (pre-existing; reviewer finding) — add a tail guard.
+  Partly done in `2707057a`: where the slope PDF underflows to 0 the glint
+  term (and its wind derivative) is now exactly 0 instead of NaN; an overflow
+  with a nonzero PDF is not guarded.
 - [ ] Ocean/glint products made before the Cox–Munk corrections (B1 slope
   variance, B2 shadowing, B3 polarization) are stale, e.g. the outputs of
   `sandbox/workflows/RRS_XCO2/scripts/generate_truth_map_land_glint.jl`;
@@ -242,6 +251,14 @@ Round 7.
 The audit findings that are code defects with a clear reference were fixed
 in reviewed commits (see `CHANGELOG.md`). The items below change scientific
 results or definitions and wait for a decision.
+
+- [ ] **Sign of ε in the Greek matrix B_l (wording only).** The code stores
+  `B[3,4] = +ε`, `B[4,3] = −ε` (`construct_B_matrix`), and
+  `concepts/03b_scattering.md` now shows that matrix (2.2.0 docs pass; it
+  previously showed −ε at [3,4]) with a note that Siewert 2000 / de Haan et
+  al. 1987 print −ε at [3,4]. `conventions.md` §2 calls `+ε` at [3,4] "the
+  standard Hovenier convention". Please confirm the matrix against
+  Sanghavi (2014) Mie-Fourier Eq. 16 and whether that wording is right.
 
 - [ ] **MT_CKD density factor (prepared, not merged).** AER's `mt_ckd_h2o`
   scales both continuum terms with the number-density ratio

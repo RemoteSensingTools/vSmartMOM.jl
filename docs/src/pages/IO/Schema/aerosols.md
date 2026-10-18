@@ -12,7 +12,7 @@ runs.
 ## Required when present
 
 - **`aerosols`** — `Vector{Dict}`. One dictionary per aerosol species
-  (see [Per-aerosol fields](#per-aerosol-fields) below).
+  (see [Per-aerosol fields](#Per-aerosol-fields) below).
 - **`r_max`** — `Real` [µm]. Maximum particle radius for the size
   distribution quadrature. 30 µm covers most tropospheric Mie cases.
 - **`nquad_radius`** — `Integer`. Number of radius quadrature points.
@@ -70,10 +70,15 @@ Mie/lognormal aerosols (analytic phase functions throw in `LinMode`).
 
 | Form | Fields | Use case |
 |------|--------|----------|
-| Altitude-form (Sanghavi convention, **preferred**) | `z₀`, `σ₀` | Log-normal in altitude. Generalizes cleanly across atmospheric profiles. |
-| Pressure-form (legacy unified convention) | `p₀`, `σp` | Normal in pressure. The historical default before the sanghavi-unified merge. |
+| Altitude-form (Sanghavi convention, **preferred**) | `z₀` [km above BOA], `σ₀` (width of `log z`) | Log-normal in altitude, `LogNormal(log(z₀), σ₀)`, integrated exactly between geometric layer interfaces. Generalizes cleanly across atmospheric profiles. |
+| Pressure-form (legacy unified convention) | `p₀`, `σp` [hPa, the unit of `atmospheric_profile.p`] | Normal in pressure, `Normal(p₀, σp)`. The historical default before the sanghavi-unified merge; `DefaultParameters.yaml` uses `p₀: 900`, `σp: 50`. |
 
 Both forms with both pairs is rejected.
+
+A configuration with aerosols should also set
+`radiative_transfer.greek_beta_cutoff` (a positive threshold or `null`);
+omitting it behaves as `null` but triggers a migration warning (see
+[`radiative_transfer.md`](radiative_transfer.md)).
 
 ## Examples
 

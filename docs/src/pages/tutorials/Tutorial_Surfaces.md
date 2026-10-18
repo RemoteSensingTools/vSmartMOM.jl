@@ -406,7 +406,7 @@ params.brdf[1] = CoxMunkSurface(wind_speed = 5.0)
 model = model_from_parameters(params)
 R, T = rt_run(model)
 println("R shape: ", size(R))
-println("R(nadir, I): ", R[1, 1, 1])
+println("R(VZA 60°, I): ", R[1, 1, 1])
 ```
 
 Compare with a Lambertian surface at the same geometry:
@@ -416,7 +416,7 @@ params2 = read_parameters(yaml_path)
 params2.brdf[1] = LambertianSurfaceScalar(0.06)
 model2 = model_from_parameters(params2)
 R2, T2 = rt_run(model2)
-println("R(nadir, I) Lambertian 0.06: ", R2[1, 1, 1])
+println("R(VZA 60°, I) Lambertian 0.06: ", R2[1, 1, 1])
 ```
 
 Compare the radiance spectra from the two surface types:

@@ -11,9 +11,9 @@ For a given Mie aerosol size distribution, this file computes:
     ζ(l) of the polarized scattering matrix in the Hovenier basis. β is
     the same as the scalar Legendre expansion of the phase function;
     α…ζ together encode the full 4×4 Mueller matrix.
- 3. The δ-M truncation factor fᵗ when a δBGE-style truncation is
-    requested (otherwise fᵗ = 0). With NoTruncation(), the raw
-    coefficients are returned as-is.
+ 3. The raw (untruncated) coefficients, with the placeholder fᵗ = 1;
+    the δ-M truncation factor is set afterwards by `truncate_phase`
+    when a δBGE-style truncation is requested.
 
 NAI-2 = "Numerical Algorithm for Inelastic-2" in Siewert's notation.
 The companion `compute_PCW.jl` uses precomputed Wigner symbol tables

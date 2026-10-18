@@ -98,7 +98,7 @@ vSmartMOM.total_downwelling_jacobian
 > Source-term types (`SolarBeam`, `BlackbodySource`, `SurfaceSIF`,
 > `SourceSet`, `NoSource`, AD-mode traits, `prepare_source` /
 > `surface_source_contribute!` dispatchers) are documented on the
-> [Source terms](../extending/sources.md#api-reference) page.
+> [Source terms](../extending/sources.md#API-reference) page.
 
 ## Batch Scene Processing
 

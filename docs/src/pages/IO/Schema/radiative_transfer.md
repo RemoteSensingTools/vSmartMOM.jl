@@ -19,17 +19,19 @@ defaults are, and which legacy aliases still work.
 - **`polarization_type`** — `String`. One of `"Stokes_I()"`,
   `"Stokes_IQ()"`, `"Stokes_IQU()"`, `"Stokes_IQUV()"`. Sets the Stokes
   vector dimension (1/2/3/4 channels respectively).
-- **`Δ_angle`** — `Real`, **retired** (parsed for backward
-  compatibility; non-zero values warn once and are treated as `0`).
-  The δBGE fit always uses the full angular domain.
-- **`depol`** — `Real`. Rayleigh depolarization factor (0 = no
-  depolarization, the Natraj-2009 idealization).
+- **`depol`** — `Real`. Rayleigh depolarization factor. A negative value
+  (`-1`, as in `DefaultParameters.yaml`) derives the depolarization per band
+  from the N₂/O₂ molecular constants; a value `≥ 0` is used uniformly for the
+  Rayleigh and Cabannes Greek coefficients and the Rayleigh optical depth
+  (0 = no depolarization, the Natraj-2009 idealization).
 - **`float_type`** — `String`. `"Float64"` or `"Float32"`. Float32 is
   fine for most retrievals and gives a ~2× speedup on large spectral
   windows; Float64 is required for reproducing published benchmarks at
   full precision.
-- **`architecture`** — `String`. `"Architectures.CPU()"`,
-  `"Architectures.GPU()"`, or `"Architectures.MetalGPU()"`. The CUDA
+- **`architecture`** — `String`. `"default_architecture"`,
+  `"CPU()"`, `"GPU()"`, or `"MetalGPU()"` (the last three also accepted
+  with an `Architectures.` prefix, e.g. `"Architectures.CPU()"`;
+  `default_architecture` takes no prefix). The CUDA
   GPU path is implemented by the `vSmartMOMCUDAExt` extension. CUDA is
   currently a direct dependency; CPU execution needs no CUDA device.
 
@@ -97,7 +99,10 @@ recommended path; legacy `max_m` + `l_trunc` configs keep working.
     projection (per Phase C trait clamps).
   - `"δBGE(L, Δ)"`: explicit δ-BGE-fit truncation (Sanghavi & Stephens
     2015). Used for benchmark reproducibility when you want exact
-    parity with a published numerical convention.
+    parity with a published numerical convention. Both arguments are
+    required in the string form; the second is the retired `Δ_angle`,
+    so write `δBGE(L, 0.0)` (a non-zero value warns once and is forced
+    to `0`).
 
 ### Legacy schema (still supported, deprecated v0.7)
 
@@ -109,10 +114,17 @@ recommended path; legacy `max_m` + `l_trunc` configs keep working.
   `stream_l_cap` under the legacy schema.
 
 Setting **both** `nstreams` and `l_trunc` produces a `@warn` — the
-legacy `l_trunc` is ignored and `nstreams` wins.
+legacy `l_trunc` is ignored and `nstreams` wins. Setting both the legacy
+`max_m` (a count) and `m_max` (an order) is rejected with an
+`ArgumentError`, because the two conflict.
 
 ## Other optional fields
 
+- **`Δ_angle`** — `Real`, **retired** (parsed for backward
+  compatibility; non-zero values warn once and are stored as `0`, so the
+  parsed parameters match what the fit uses). The δBGE fit always uses
+  the full angular domain. In TOML the Unicode key must be quoted
+  (`"Δ_angle" = 0.0`); new configurations should omit it.
 - **`quadrature_type`** — *optional, default `"GaussLegQuad()"`*. The
   recommended default. `"RadauQuad()"` is supported but documented as
   expert/legacy: it includes the SZA as a quadrature node (handy for
@@ -152,6 +164,11 @@ legacy `l_trunc` is ignored and `nstreams` wins.
 Unknown numerics keys are rejected. The ASCII aliases `dtau_max_threshold`
 and `dtau_min_floor` are accepted; conflicting Unicode/ASCII values are rejected.
 
+Any other key directly under `radiative_transfer` that the parser does not
+read (for example a misspelled `nstream`) is not an error: the parser emits a
+one-time warning per key and session naming the known keys, and the default
+stays in effect. The same check applies to the top level and to `geometry`.
+
 ## Example — minimal new schema
 
 A new-schema config can omit `nstreams` (default `8`),
@@ -184,7 +201,7 @@ radiative_transfer:
   surface: ["CoxMunkSurface(wind_speed=5.0)"]
   polarization_type: Stokes_IQU()
   nstreams: 16          # 16 weighted streams ⇒ stream_l_cap = 31
-  truncation: auto      # auto → δBGE(31, 2.0) once Mie aerosol is added
+  truncation: auto      # auto → δBGE truncation at l = 31 once Mie aerosol is added
   # Δ_angle is retired (always 0)
   depol: 0.0
   float_type: Float64

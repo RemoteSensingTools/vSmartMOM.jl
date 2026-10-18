@@ -101,8 +101,13 @@ RT. Its end-to-end Jacobians remain unsupported. `DiffuseBoundary` and
 
 All sources in a `SourceSet` should share these units so additive
 composition makes physical sense. `BlackbodySource` defaults to `factor =
-π` (Lambertian-disk → hemispheric irradiance) so its `F₀` is comparable
-to a `SolarBeam(F₀ = 1)` baseline.
+π`, which gives πB, the exitance of a Lambertian emitter at `T`; for the
+irradiance from a distant disk of radius R at distance d, also set
+`scale = (R/d)²` (2.1629e-5 for the Sun at 1 AU). `SolarBeam.F₀` is an
+irradiance, so `factor = 1` alone does not describe a collimated lab beam (it
+leaves the radiance B in `F₀`); for lab illumination set `factor · scale` to
+the solid angle subtended by the source, or the throughput of the optics, that
+converts B into the irradiance of the beam.
 
 For retrievals, `SurfaceSIF(SIF755=..., slope=..., wavelength_nm=...)`
 uses `L_SIF(λ) = SIF755 + slope*(λ_nm-755)`. These two values are

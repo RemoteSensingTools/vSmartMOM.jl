@@ -2,7 +2,8 @@
 
 Sources are configured programmatically through `sources=` on
 `model_from_parameters` or `rt_run`. A YAML/TOML `sources:` list is not
-implemented. The default is `SolarBeam()` with unit Stokes-I irradiance.
+implemented; a top-level `sources:` key is ignored with an unknown-key
+warning. The default is `SolarBeam()` with unit Stokes-I irradiance.
 
 ## Runnable example
 

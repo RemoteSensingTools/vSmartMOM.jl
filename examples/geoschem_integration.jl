@@ -30,15 +30,25 @@ Clean API for running vSmartMOM with GEOSChem data using the new IOSource system
 - `idf::Int`: Cubed-sphere face index (1-6)
 
 # Keyword Arguments
-- `spec_bands`: Spectral bands (e.g., [(1e7/777):0.015:(1e7/757)])
-- `surface`: Surface BRDF (e.g., [LambertianSurfaceScalar(0.15)])
+- `spec_bands`: Spectral bands as strings (e.g., ["(1e7/777):0.015:(1e7/757)"])
+- `surface`: Surface BRDF strings, one per band (e.g., ["LambertianSurfaceScalar(0.15)"])
 - `sza`, `vza`, `vaz`: Geometry angles
 - `obs_alt`: Observer altitude
-- `architecture`: CPU() or GPU()
+- `architecture`: "CPU()", "GPU()" or "default_architecture"
 - Additional parameters to override defaults
 
 # Returns
 - Radiative transfer results
+
+# Notes
+The merged configuration starts from `DefaultParameters.yaml`, so it carries
+the default aerosol of that file (one Mie aerosol with `τ_ref = 1.0` at
+`λ_ref = 0.770` µm, `p₀ = 900` hPa, `σp = 50` hPa, `nquad_radius = 2500`).
+That is a heavy, optically thick choice. To replace it, pass a whole
+`scattering` block as a keyword (`scattering = Dict("aerosols" => [...], ...)`,
+see the `scattering` schema page); to run without aerosols, pass
+`scattering = nothing`, or `delete!(config, "scattering")` on the dict from
+`load_geoschem_as_dict` below before parsing it.
 
 # Example
 ```julia
@@ -52,10 +62,11 @@ R = run_rt_with_geoschem_v2(
 R = run_rt_with_geoschem_v2(
     "GEOSChem.Custom.20190101_0000z.nc4",
     10, 20, 1;
-    spec_bands = [(1e7/777):0.015:(1e7/757)],
+    spec_bands = ["(1e7/777):0.015:(1e7/757)"],
     sza = 45.0,
     vza = [0.0, 30.0, 60.0],
-    architecture = GPU()
+    vaz = [0.0, 0.0, 0.0],
+    architecture = "GPU()"
 )
 ```
 """
@@ -79,58 +90,53 @@ function run_rt_with_geoschem_v2(
     # 1. Create the data source
     src = GeosChemSource(file, idx, idy, idf)
     
-    # 2. Load default parameters as a baseline
-    default_params = default_parameters()
+    # 2. Read GEOSChem data as a complete parameter Dict. `geoschem_to_dict`
+    #    starts from the package defaults (DefaultParameters.yaml), so the
+    #    radiative_transfer, geometry and scattering blocks are already set;
+    #    the atmospheric profile and absorption come from the GEOSChem file.
+    merged_dict = geoschem_to_dict(src)
+    rt = merged_dict["radiative_transfer"]
+    geom = merged_dict["geometry"]
     
-    # 3. Read GEOSChem data and convert to parameter Dict
-    geoschem_dict = geoschem_to_dict(src)
-    
-    # 4. Merge with defaults (user can override radiative_transfer and geometry)
-    # Start with defaults, then overlay GEOSChem atmospheric profile and absorption
-    merged_dict = Dict{String, Any}()
-    
-    # Keep existing radiative_transfer section from defaults
-    merged_dict["radiative_transfer"] = Dict{String, Any}(
-        "spec_bands" => isnothing(spec_bands) ? 
-            default_params.spec_bands : 
-            [collect(sb) for sb in spec_bands],
-        "surface" => isnothing(surface) ? 
-            default_params.BRDF : 
-            surface,
-        "quadrature_type" => isnothing(quadrature_type) ? 
-            "$(typeof(default_params.quadrature_type))()" : 
-            quadrature_type,
-        "polarization_type" => isnothing(polarization_type) ? 
-            "$(typeof(default_params.polarization_type))()" : 
-            polarization_type,
-        "max_m" => default_params.max_m,
-        "Δ_angle" => default_params.Δ_angle,
-        "l_trunc" => default_params.l_trunc,
-        "depol" => default_params.depol,
-        "float_type" => "$(default_params.FT)",
-        "architecture" => isnothing(architecture) ? 
-            "default_architecture" : 
-            "$(architecture)"
-    )
-    
-    # Geometry from user or defaults
-    merged_dict["geometry"] = Dict{String, Any}(
-        "sza" => isnothing(sza) ? default_params.sza : sza,
-        "vza" => isnothing(vza) ? default_params.vza : vza,
-        "vaz" => isnothing(vaz) ? default_params.vaz : vaz,
-        "obs_alt" => isnothing(obs_alt) ? default_params.obs_alt : obs_alt
-    )
-    
-    # Use GEOSChem atmospheric profile and absorption
-    merged_dict["atmospheric_profile"] = geoschem_dict["atmospheric_profile"]
-    if haskey(geoschem_dict, "absorption")
-        merged_dict["absorption"] = geoschem_dict["absorption"]
+    # 3. Overlay user choices. The parser reads the radiative_transfer entries
+    #    as strings, e.g. spec_bands = ["(1e7/777):0.015:(1e7/757)"] and
+    #    surface = ["LambertianSurfaceScalar(0.15)"].
+    isnothing(spec_bands)        || (rt["spec_bands"] = spec_bands)
+    isnothing(surface)           || (rt["surface"] = surface)
+    isnothing(quadrature_type)   || (rt["quadrature_type"] = quadrature_type)
+    isnothing(polarization_type) || (rt["polarization_type"] = polarization_type)
+    isnothing(architecture)      || (rt["architecture"] = architecture)
+    # One surface per band: repeat a single surface if several bands are given.
+    n_bands = length(rt["spec_bands"])
+    if length(rt["surface"]) == 1 && n_bands > 1
+        rt["surface"] = fill(only(rt["surface"]), n_bands)
+    end
+    # `geoschem_to_dict` writes one-band molecule lists; repeat them (and any
+    # other per-band absorption list) so every band has its own entry.
+    if haskey(merged_dict, "absorption") && n_bands > 1
+        ab = merged_dict["absorption"]
+        for key in ("fixed_molecules", "variable_molecules", "molecules",
+                    "h2o_absorption", "LUTfiles")
+            haskey(ab, key) && length(ab[key]) == 1 || continue
+            ab[key] = [deepcopy(only(ab[key])) for _ in 1:n_bands]
+        end
     end
     
-    # Apply any additional kwargs overrides
+    # Geometry from user or defaults
+    isnothing(sza)     || (geom["sza"] = sza)
+    isnothing(vza)     || (geom["vza"] = vza)
+    isnothing(vaz)     || (geom["vaz"] = vaz)
+    isnothing(obs_alt) || (geom["obs_alt"] = obs_alt)
+    
+    # 4. Apply any additional kwargs overrides (whole top-level blocks);
+    #    `nothing` removes a block, e.g. `scattering = nothing`.
     for (key, value) in kwargs
         if haskey(merged_dict, String(key))
-            merged_dict[String(key)] = value
+            if isnothing(value)
+                delete!(merged_dict, String(key))
+            else
+                merged_dict[String(key)] = value
+            end
         end
     end
     
@@ -158,10 +164,10 @@ Useful for inspecting or modifying the configuration before creating parameters.
 ```julia
 # Load and inspect
 config = load_geoschem_as_dict("GEOSChem.Custom.20190101_0000z.nc4", 10, 20, 1)
-println("Available molecules: ", config["absorption"]["molecules"])
+println("Available molecules: ", config["absorption"]["fixed_molecules"])
 
 # Modify before using
-config["radiative_transfer"]["spec_bands"] = [(1e7/777):0.015:(1e7/757)]
+config["radiative_transfer"]["spec_bands"] = ["(1e7/777):0.015:(1e7/757)"]
 config["geometry"]["sza"] = 45.0
 
 # Create parameters
@@ -198,11 +204,11 @@ end
 # Pattern 2: With custom RT parameters
 # R = run_rt_with_geoschem_v2(
 #     "GEOSChem.Custom.20190101_0000z.nc4", 10, 20, 1;
-#     spec_bands = [(1e7/777):0.015:(1e7/757)],
+#     spec_bands = ["(1e7/777):0.015:(1e7/757)"],
 #     sza = 60.0,
 #     vza = [0.0, 30.0, 60.0],
 #     vaz = [0.0, 0.0, 0.0],
-#     architecture = GPU()
+#     architecture = "GPU()"
 # )
 
 # Pattern 3: Maximum control - modify Dict before conversion

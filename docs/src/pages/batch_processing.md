@@ -155,7 +155,9 @@ scene calculations succeed.
 
 `remake_geometry` rebuilds only `ObsGeometry` + `QuadPoints` and shares the
 optics by reference — bit-exact against a full `model_from_parameters`
-rebuild, with zero HITRAN/Mie work:
+rebuild, with zero HITRAN/Mie work. The observer heights resolved at build
+time (interior sensor levels, TOA/BOA outputs) and the `external_solar`
+representation carry over from `model`:
 
 ```julia
 for sza in 0:10:70

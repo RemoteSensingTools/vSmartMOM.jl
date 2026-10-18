@@ -247,8 +247,10 @@ hot lab source illuminating CO₂/CH₄/H₂O absorption.
 mW · m⁻² · sr⁻¹ · cm⁻¹. The default `factor = π` gives πB, the exitance of
 a Lambertian emitter at `T`; for the irradiance from a distant disk of
 radius R at distance d, also set `scale = (R/d)²` (2.1629e-5 for the Sun at
-1 AU). Set `factor = 1` for a head-on collimated lab beam where `F₀` is the
-radiance directly.
+1 AU). `F₀` is an irradiance, so `factor = 1` alone does not describe a
+collimated lab beam (it leaves the radiance B in `F₀`); for lab illumination
+set `factor · scale` to the solid angle subtended by the source, or the
+throughput of the optics, that converts B into the irradiance of the beam.
 
 # Arguments
 - `T :: Real`: blackbody temperature in K.

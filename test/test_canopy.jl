@@ -176,7 +176,6 @@ end
             "quadrature_type" => "RadauQuad()",
             "polarization_type" => "Stokes_I()",
             "max_m" => 4,
-            "Δ_angle" => 2.0,
             "l_trunc" => 20,
             "depol" => -1.0,
             "float_type" => "Float64",

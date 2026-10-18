@@ -32,8 +32,8 @@ params.architecture = vSmartMOM.Architectures.GPU()
 
 `default_architecture()` picks `GPU()` if a functional CUDA device was
 detected when the CUDA extension loaded, `MetalGPU()` if Metal was
-detected, and `CPU()` otherwise; it is used when `architecture` is left
-unset.
+detected, and `CPU()` otherwise. The `radiative_transfer.architecture` key
+is required; set it to `default_architecture` to use this detection.
 
 ## CUDA vs Metal
 
@@ -152,8 +152,9 @@ Float64-widened regardless of precision policy (see `test/local/gpu/test_mie_gpu
   `rt_run`) computes line-by-line absorption via
   [AtmosphericAbsorption.jl](https://github.com/RemoteSensingTools/AtmosphericAbsorption.jl),
   the sole supported absorption dependency going forward, with its own backend
-  dispatch. The internal standalone `Absorption` module is legacy-only and will
-  be removed; do not use its GPU Voigt kernel for new work.
+  dispatch. The internal standalone line-by-line model (`make_hitran_model`,
+  `HitranModel`) is deprecated and will be removed in vSmartMOM 3.0; do not
+  use its GPU Voigt kernel for new work.
 
 ### Metal absorption (experimental)
 
@@ -176,7 +177,7 @@ kernel-launch overhead hundreds of times per spectral point. The batched
 seam (`prepare_mie_node_geometry` + `compute_aerosol_optical_properties_nodes_batched`
 / `compute_aerosol_extinction_nodes_batched`, see
 [Batched Caller-Node Mie Seam](@ref) and
-`proposals/batched_mie_nodes_seam.md`) groups ensembles by their EXACT
+`docs/dev_notes/proposals/batched_mie_nodes_seam.md`) groups ensembles by their EXACT
 Mie `nmax` term count at the current wavelength and issues one kernel-1
 launch per group, instead of per ensemble or a single global-max-padded
 launch (the padded design was rejected: it breaks bit-identity with the

@@ -10,7 +10,7 @@ The purpose of this tutorial is to demonstrate how to compute line-shapes using 
 
 We are making use of the [HITRAN database](https://www.cfa.harvard.edu/hitran/), see a list of tutorials [here](https://www.youtube.com/playlist?list=PLqOG3cBizTUFQw5lwpkCpQFCVuxHTZgrT).
 
-There are other spectroscopic linelists, but we are focusing on HITRAN only here. In addition, there are more complex line-shapes that we are not treating here, including [collisional narrowing](https://journals.aps.org/pr/abstract/10.1103/PhysRev.89.472) and [line-mixing](https://aip.scitation.org/doi/abs/10.1063/1.478724), [collision-induced absorption (CIA)](https://www.sciencedirect.com/science/article/abs/pii/S0022407311003773). In the future, these might be added to vSmartMOM.
+There are other spectroscopic linelists, but we are focusing on HITRAN only here. In addition, there are more complex line-shapes that we are not treating here, including [collisional narrowing](https://journals.aps.org/pr/abstract/10.1103/PhysRev.89.472) and [line-mixing](https://aip.scitation.org/doi/abs/10.1063/1.478724), [collision-induced absorption (CIA)](https://www.sciencedirect.com/science/article/abs/pii/S0022407311003773). (The RT pipeline can add CIA and the MT_CKD water-vapour continuum through the `absorption` block's `cia_files` and `mtckd_file` keys; they are not part of the line-shape calculation shown here.)
 
 ### Line-shape:
 If we have a line-strength S (in cm$^{-1}$ cm$^2$/molecule) for a specific transition at $\nu_0$, we can compute the cross section as:
@@ -141,12 +141,13 @@ using vSmartMOM.Absorption
 ```
 
 > **Deprecation notice:** The functions below (`read_hitran`, `make_hitran_model`,
-> `absorption_cross_section`) belong to the legacy internal `vSmartMOM.Absorption` module.
-> They remain temporarily for compatibility and will be removed. AtmosphericAbsorption.jl
-> is the supported absorption dependency going forward; use it for new direct
-> σ(ν, T, p), custom-grid, ABSCO HDF, and GPU workflows. The RT pipeline
-> (`model_from_parameters` → `rt_run`) already uses AtmosphericAbsorption.jl. The
-> line-by-line model used below (`make_hitran_model`) is deprecated in 2.2. Tables for
+> `absorption_cross_section`) belong to the internal `vSmartMOM.Absorption` module.
+> Its standalone line-by-line model (`make_hitran_model`, `HitranModel`) is deprecated
+> in 2.2 and will be removed in 3.0; its first use logs a one-time notice with the
+> corresponding AtmosphericAbsorption.jl calls and their convention differences.
+> AtmosphericAbsorption.jl is the supported absorption dependency going forward; use it
+> for new direct σ(ν, T, p), custom-grid, ABSCO HDF, and GPU workflows. The RT pipeline
+> (`model_from_parameters` → `rt_run`) already uses AtmosphericAbsorption.jl. Tables for
 > YAML `LUTfiles` are still built with `make_interpolation_model` in 2.x (or saved as
 > AtmosphericAbsorption `.absco` tables).
 

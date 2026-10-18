@@ -61,7 +61,7 @@ and Raman SFI the same operator contract.
 
 The Julia type that carries them is `CoreScatteringOpticalProperties`, and
 the constructor is `constructCoreOpticalProperties` in
-[`src/CoreRT/LayerOpticalProperties/compEffectiveLayerProperties.jl:11–65`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/LayerOpticalProperties/compEffectiveLayerProperties.jl#L11-L65). The
+[`src/CoreRT/LayerOpticalProperties/compEffectiveLayerProperties.jl:314–375`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/LayerOpticalProperties/compEffectiveLayerProperties.jl#L314-L375). The
 build happens once per band, per Fourier moment, before the layer loop:
 
 ```
@@ -81,7 +81,7 @@ build happens once per band, per Fourier moment, before the layer loop:
 ```
 
 The build proceeds in five steps (the relevant lines from
-`compEffectiveLayerProperties.jl:11–65`):
+`compEffectiveLayerProperties.jl:314–375`):
 
 1. **Pick the Rayleigh greek source.** For pure-elastic runs (`noRS`), use the
    full Rayleigh greek — rotational Raman is rolled into the effective
@@ -98,8 +98,8 @@ The build proceeds in five steps (the relevant lines from
 4. **Add gas absorption** to the total optical depth:
    ``\tau_\lambda = \tau_\mathrm{abs} + \tau_\mathrm{scat}``,
    ``\varpi_\lambda = \tau_\mathrm{scat}\,\varpi_0 / \tau_\lambda``. Coded as
-   `combo + CoreAbsorptionOpticalProperties(τ_abs)` (line 58).
-5. **Stack layers vertically with `*`** (line 62):
+   `combo + CoreAbsorptionOpticalProperties(τ_abs)` (line 363).
+5. **Stack layers vertically with `*`** (line 372):
    `prod([band_layer_props[i][iz] for i = 1:length(iBand)])`. The result is a
    `Vector{CoreScatteringOpticalProperties}`, one entry per atmospheric
    layer, ready for [Concepts/04](04_mom_solver.md).
@@ -110,7 +110,7 @@ doubling step cheap.
 
 ## The two operators on `CoreScatteringOpticalProperties`
 
-Mixing scatterers in a layer ([`src/CoreRT/types.jl:1063–1093`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/types.jl#L1063-L1093)):
+Mixing scatterers in a layer ([`src/CoreRT/types.jl:1743–1783`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/types.jl#L1743-L1783)):
 
 ```julia
 function Base.:+(x::CoreScatteringOpticalProperties, y::CoreScatteringOpticalProperties)
@@ -129,7 +129,7 @@ The weighting is ``w_x = \tau_x \cdot \varpi_x`` — proportional to the *scatte
 optical depth contribution from each species. That's what conserves the total
 scattered intensity per stream pair when species are combined.
 
-Stacking layers vertically (`src/CoreRT/types.jl:1096+`):
+Stacking layers vertically (`src/CoreRT/types.jl:1785+`):
 
 ```julia
 function Base.:*(x::CoreScatteringOpticalProperties, y::CoreScatteringOpticalProperties)
@@ -193,11 +193,11 @@ If you only care about what the solver does with these arrays, skip to
 
 | Concept | Source |
 |---|---|
-| Build per-layer (τ, ϖ, Z) | [`src/CoreRT/LayerOpticalProperties/compEffectiveLayerProperties.jl:11–65`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/LayerOpticalProperties/compEffectiveLayerProperties.jl#L11-L65) |
-| Aerosol δ-M wrapper (`createAero`) | `compEffectiveLayerProperties.jl:67–72` |
+| Build per-layer (τ, ϖ, Z) | [`src/CoreRT/LayerOpticalProperties/compEffectiveLayerProperties.jl:314–375`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/LayerOpticalProperties/compEffectiveLayerProperties.jl#L314-L375) |
+| Aerosol δ-M wrapper (`createAero`) | `compEffectiveLayerProperties.jl:478–491` |
 | Cabannes vs Rayleigh greek | `compEffectiveLayerProperties.jl:8–9` |
-| Mix scatterers (operator `+`) | [`src/CoreRT/types.jl:1063–1093`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/types.jl#L1063-L1093) |
-| Stack layers (operator `*`) | `src/CoreRT/types.jl:1096+` |
+| Mix scatterers (operator `+`) | [`src/CoreRT/types.jl:1743–1783`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/types.jl#L1743-L1783) |
+| Stack layers (operator `*`) | `src/CoreRT/types.jl:1785+` |
 | `CoreScatteringOpticalProperties` type | `src/CoreRT/types.jl::CoreScatteringOpticalProperties` |
 | Gas absorption type | `src/CoreRT/types.jl::CoreAbsorptionOpticalProperties` |
 

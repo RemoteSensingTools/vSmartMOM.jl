@@ -155,3 +155,10 @@ Frankenberg's checkout (SHA-256 identical to the source file).
   docstring now describe the derived per-band Fourier bound (B6).
 - `test_lin_band_selection.jl` 3/3: `[1]` equals band 1 bit for bit; `[1, 1]`
   is rejected with a clear message (previously an unclear downstream error).
+
+## Not yet recorded
+
+The commits and merges after entry 9 on the first-parent history (from
+`6f0fc48d`, undoubled-layer/Stokes_IQ parity, LinMode without absorption and
+the hPa default aerosol, through `da589da1`, TOML mixed arrays and the
+surface count rule) have no entry here yet.

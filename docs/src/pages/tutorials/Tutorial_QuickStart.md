@@ -41,7 +41,7 @@ Dimensions: view zenith angles × Stokes components (I,Q,U,V) × spectral points
 ```julia
 println("R shape: ", size(R))
 println("T shape: ", size(T))
-println("R(nadir, I, λ₁) = ", R[1, 1, 1])
+println("R(VZA 60°, I, ν₁) = ", R[1, 1, 1])
 ```
 
 The documentation build renders the same two arrays as an interactive Plotly

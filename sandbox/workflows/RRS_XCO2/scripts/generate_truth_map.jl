@@ -39,7 +39,7 @@ const STEP = FT(0.1)
 const SOLAR_OUT = get(ENV, "SOLAR_OUT",
     joinpath(homedir(), "Raman_misc", "workflows", "worktrees",
              "uni_vSmartMOM_sanghavi_2025-03-18", "src", "SolarModel", "solar.out"))
-const RAMAN_CONFIG = joinpath(pkgdir(vSmartMOM), "workflows", "OCORaman",
+const RAMAN_CONFIG = joinpath(pkgdir(vSmartMOM), "sandbox", "workflows", "OCORaman",
                               "config", "paramsRamanLUT_O2A.yaml")
 const SURFACES = ("urban", "rural", "desert", "forest")
 const XCO2_PPM = (380, 400, 420, 440)

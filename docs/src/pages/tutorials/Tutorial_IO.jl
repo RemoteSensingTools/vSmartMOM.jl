@@ -23,7 +23,6 @@ cfg = Dict(
     "quadrature_type" => "GaussLegQuad()",
     "polarization_type" => "Stokes_I()",
     "max_m" => 1,
-    "Δ_angle" => 2.0,
     "l_trunc" => 1,
     "depol" => 0.0,
     "float_type" => "Float64",
@@ -43,5 +42,5 @@ println("Dict-based radiance shape: ", size(R2))
 
 # ## Mandatory vs optional
 # Mandatory top-level sections: `radiative_transfer`, `geometry`, `atmospheric_profile`.
-# Optional: `absorption`, `scattering`.
+# Optional: `absorption`, `scattering`, `canopy`.
 # See the IO Schema doc page for all keys and constraints.

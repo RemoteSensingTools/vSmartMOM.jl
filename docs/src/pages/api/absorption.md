@@ -65,7 +65,7 @@ vSmartMOM.Absorption.InterpolationModel
 
 The complex error function evaluated inside the Voigt line shape is
 selectable via the `CEF` field on `make_hitran_model` /
-`radiative_transfer.absorption.CEF`.
+`absorption.CEF`.
 
 ```@docs
 vSmartMOM.Absorption.HumlicekErrorFunction

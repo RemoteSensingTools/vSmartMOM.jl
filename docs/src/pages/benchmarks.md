@@ -35,7 +35,7 @@ number of excluded cells are stated in each summary line.
 
 Where applicable, thresholds match the in-tree regression tests:
 for Natraj Q/U we use `|truth| < 0.01`, the same filter applied in
-[`test/test_CoreRT.jl`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/test/test_CoreRT.jl) (`@test maximum(Q_deltas[Q_modeled .≥ 0.01]) < 0.008`).
+[`test/test_CoreRT.jl`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/test/test_CoreRT.jl) (`@test maximum(Q_deltas_all[findall(i -> i >= 0.01, Q_modeled_all)]) < 2.5e-3`).
 
 ## Case A — Siewert 2000 PROBLEM IIA
 

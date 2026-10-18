@@ -14,11 +14,11 @@ atmosphere (BOA).
 - **`vza`** — `Vector{Real}`. Viewing zenith angles [°]. One entry per
   output line of sight. Each entry is appended to the quadrature as a
   zero-weight output node so the solver can interpolate exactly to the
-  requested viewing direction (see [`conventions.md` §6](../../conventions.md#6-quadrature-streams-nstreams-vs-nquad)).
+  requested viewing direction (see [`conventions.md` §6](../../conventions.md)).
 - **`vaz`** — `Vector{Real}`. Viewing azimuth angles [°], one per
   `vza`. Convention: `vaz = 0°` is the principal plane on the sun's
   side; `vaz = 180°` is the anti-solar principal plane. See
-  [`conventions.md` §3](../../conventions.md#3-azimuth-angle-φ) for the
+  [`conventions.md` §3](../../conventions.md) for the
   Hovenier vs Mishchenko sign-difference notes.
 - **`obs_alt`** — `Union{Real, Vector{Real}}`. A scalar height or a
   non-empty vector of heights, in **km above BOA**. Values must be finite

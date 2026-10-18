@@ -270,6 +270,7 @@ every full-RT Jacobian has this stable block ordering:
 | Aerosols | `aerosol_range(layout, iaer)` | seven columns per aerosol | parameter-dependent |
 | Trace gases | `gas_profile_range(layout, igas, Nz)` | `Nz` columns per gas, TOA to BOA | per unit VMR |
 | Surface | `surface_range(layout)` | surface-model parameters | parameter-dependent |
+| SIF | `sif_range(layout)` | `[SIF760, mSIF]` when `SurfaceSIF` is present (`[SIF755, slope]` for the legacy `SIF755`/`slope` interface) | parameter-dependent |
 | Canopy | `canopy_range(layout)` | canopy-model parameters, when present | parameter-dependent |
 
 Thus the state vector is
@@ -281,6 +282,7 @@ x = [p_surf,
      ...,
      VMR_NGas(z₁), ..., VMR_NGas(z_Nz),
      surface parameters,
+     SIF parameters,
      canopy parameters]
 ```
 
@@ -288,10 +290,17 @@ Here `z₁` is the top atmospheric layer and `z_Nz` is the bottom layer. Gas
 VMR means dimensionless mole fraction; a derivative “per ppm” is therefore
 `1e-6 .* dR_dVMR`. Pressure, temperature, dry-air column, and absorption
 cross section are held fixed for a gas-VMR derivative. Surface-pressure
-derivatives are a separate state column, defined on the **final model grid**:
-only the bottom pressure interface changes, while all other interfaces,
-layer temperatures, humidity and VMRs remain fixed. Thus
-`∂p_full[end]/∂p_surf = 1/2`. Ordinary line absorption includes both the
+derivatives are a separate state column, defined on the **final model grid**.
+Under the default `FixedPressureGrid()` convention only the bottom pressure
+interface changes, while all other interfaces, layer temperatures, humidity
+and VMRs remain fixed. Thus `∂p_full[end]/∂p_surf = 1/2`. The opt-in
+`FixedAltitudeGrid()` convention
+(`model_from_parameters(LinMode(), params; vertical_grid=FixedAltitudeGrid())`)
+instead keeps every interface at its geometric altitude, so every interface
+pressure and layer column scales with `p_surf`, and the cross sections respond
+through the layer pressures, (∂σ/∂p_full)·p_full/p_surf. A retrieval
+that varies `p_surf` must rebuild `params.p` with the same convention, via
+`surface_pressure_interfaces(convention, p_half, p_surf)`. Ordinary line absorption includes both the
 molecular-column response and pressure-dependent cross-section response.
 Line-by-line models differentiate their prepared line shapes upstream;
 legacy interpolation tables differentiate their interpolant; native ABSCO

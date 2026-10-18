@@ -47,7 +47,7 @@ R = rt_run(model)
 
 # Option 2: Get Dict and customize
 config = geoschem_to_dict(src)
-config["radiative_transfer"]["spec_bands"] = [(1e7/777):0.015:(1e7/757)]
+config["radiative_transfer"]["spec_bands"] = ["(1e7/777):0.015:(1e7/757)"]
 params = read_parameters(config)
 ```
 
@@ -75,12 +75,11 @@ config = geoschem_to_dict(src)
 
 # Add radiative transfer parameters
 config["radiative_transfer"] = Dict(
-    "spec_bands" => [(1e7/777):0.015:(1e7/757)],
+    "spec_bands" => ["(1e7/777):0.015:(1e7/757)"],   # band strings, as in YAML
     "surface" => ["LambertianSurfaceScalar(0.15)"],
     "quadrature_type" => "GaussLegQuad()",
     "polarization_type" => "Stokes_I()",
     "max_m" => 3,
-    "Δ_angle" => 2.0,
     "l_trunc" => 20,
     "depol" => 0.0,
     "float_type" => "Float64",
@@ -112,10 +111,11 @@ R = run_rt_with_geoschem_v2("GEOSChem.Custom.20190101_0000z.nc4", 10, 20, 1)
 R = run_rt_with_geoschem_v2(
     "GEOSChem.Custom.20190101_0000z.nc4", 
     10, 20, 1;
-    spec_bands = [(1e7/777):0.015:(1e7/757)],
+    spec_bands = ["(1e7/777):0.015:(1e7/757)"],
     sza = 45.0,
     vza = [0.0, 30.0, 60.0],
-    architecture = GPU()
+    vaz = [0.0, 0.0, 0.0],
+    architecture = "GPU()"
 )
 ```
 
@@ -152,9 +152,12 @@ geoschem_to_dict(src::GeosChemSource) -> Dict
 
 Read GEOSChem file and convert to vSmartMOM configuration Dict.
 
-**Returns:** Dict with keys:
+**Returns:** a complete configuration Dict. It starts from the package
+defaults (`src/CoreRT/DefaultParameters.yaml`, including its
+`radiative_transfer`, `geometry` and default `scattering` aerosol, whose
+`p₀`/`σp` are in hPa) and replaces or adds:
 - `"atmospheric_profile"`: T, p, q, vmr, profile_reduction
-- `"absorption"`: molecules, vmr, broadening, CEF, wing_cutoff
+- `"absorption"`: fixed_molecules, variable_molecules, vmr, broadening, CEF, wing_cutoff
 - `"_metadata"`: source_file, latitude, longitude, time, etc.
 
 #### `read_geoschem_profile`

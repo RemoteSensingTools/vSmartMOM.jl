@@ -260,13 +260,13 @@ Base.@kwdef struct NoTruncation <: AbstractTruncationType
 end
 
 """
-    δBGE{FT}(l_max, Δ_angle)
+    δBGE{FT}(l_max)
 
 δ-BGE-fit truncation, vector form (Sanghavi & Stephens 2015, JQSRT 159,
 §3 — extension of Hu et al. 2000 to vector RT). Fits truncated Legendre
-coefficients outside the forward exclusion cone of half-angle
-`Δ_angle` and renormalises by the retained scattering fraction
-``c_0 = 1 - f^t``.
+coefficients over the full angular domain and renormalises by the
+retained scattering fraction ``c_0 = 1 - f^t``. (The former forward
+exclusion cone `Δ_angle` is retired and always `0`; see the field docs.)
 
 Recommended over plain δ-m for hyperspectral retrievals because δ-m
 has known DSE and PTE errors near exact backscatter (Sanghavi &
@@ -320,7 +320,7 @@ Phase D — deferred-decision marker for `truncation: auto` in YAML
   fits within `stream_l_cap` ⇒ `NoTruncation()` (typical for
   Rayleigh-only or smooth-aerosol scenes).
 - Aerosols with `phase_lmax > stream_l_cap` ⇒
-  `δBGE(stream_l_cap, Δ_angle)`.
+  `δBGE(stream_l_cap)` (the retired `Δ_angle` is always 0).
 
 The resolver emits an `@info` line stating which branch was taken
 so the user can always see what was applied. `AutoTruncation` is
@@ -333,7 +333,7 @@ User-facing knobs in YAML:
 |---------------------------|----------------------------------------------------|
 | `truncation: auto`        | This deferred-decision mode (Phase D recommended)  |
 | `truncation: NoTruncation()` / `null` | Exactly no transform; errors if coefs exceed cap |
-| `truncation: δBGE(N, Δ)`  | Explicit; used for benchmarks / cross-validation   |
+| `truncation: δBGE(N, Δ)`  | Explicit; used for benchmarks / cross-validation (Δ is retired and forced to 0) |
 """
 struct AutoTruncation <: AbstractTruncationType end
 

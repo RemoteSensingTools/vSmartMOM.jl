@@ -174,6 +174,7 @@ All surfaces implement `create_surface_layer!()`. Linearized variants have `_lin
 ### Polarization Types (`src/Scattering/types.jl`)
 
 - `Stokes_I` — scalar intensity only (n=1)
+- `Stokes_IQ` — intensity and Q (n=2)
 - `Stokes_IQU` — linear polarization (n=3)
 - `Stokes_IQUV` — full Stokes polarization (n=4)
 
@@ -206,7 +207,7 @@ src/
     hitran_preferences.jl     # Edition selection (set/get_hitran_edition!, available_hitran_editions)
     hitran_api.jl             # Download client (fetch_hitran, fetch_hitran_by_ids)
     artifact_helper.jl        # Unified artifact() dispatch (legacy Artifacts vs scratch cache)
-    download_hitran.jl        # Offline artifact generation script (developer-only)
+    download_hitran_artifacts.jl  # Offline artifact generation script (developer-only)
   Absorption/
     Absorption.jl             # Module entry
     types.jl                  # HitranTable, broadening types, CEF types
@@ -292,7 +293,7 @@ R, T   = rt_run(model)
 using vSmartMOM
 params = read_parameters("config/ocean_coxmunk.yaml")
 model, lin_model = model_from_parameters(LinMode(), params)
-NAer = length(params.scattering_params.rt_aerosols)
+NAer = params.scattering_params === nothing ? 0 : length(params.scattering_params.rt_aerosols)
 NGas = size(lin_model.τ̇_abs[1], 1)
 NSurf = 1
 R, T, dR, dT = rt_run(model, lin_model, NAer, NGas, NSurf)
@@ -309,8 +310,8 @@ reference and examples.
 `max_m` / `l_trunc`. Public contract: `stream_l_cap = 2·nstreams - 1`
 regardless of `quadrature_type`. `nstreams ≥ 3` (Rayleigh m=2
 minimum). `truncation: auto` is the recommended default — resolves
-to `NoTruncation()` if the phase function fits, `δBGE(N, Δ_angle)`
-otherwise. Legacy YAMLs with `max_m`/`l_trunc` keep working unchanged.
+to `NoTruncation()` if the phase function fits, `δBGE(stream_l_cap)`
+otherwise (`Δ_angle` is retired: nonzero values warn and are stored as 0). Legacy YAMLs with `max_m`/`l_trunc` keep working unchanged.
 
 **Editor support**: TOML configs get autocomplete + validation via
 the repo's `.taplo.toml` (wires `schemas/vsmartmom-parameters.schema.json`).

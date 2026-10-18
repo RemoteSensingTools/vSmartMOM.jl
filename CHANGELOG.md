@@ -112,6 +112,11 @@ review of General's sequential-version rule.
   or viewing angles. Previously it dropped interior observers and the TOA
   output metadata, and returned external-solar models to the embedded
   representation.
+- `external_solar` defaults to `false` (embedded μ₀: the solar direction is
+  an extra quadrature node) in the forward and linearized
+  `model_from_parameters`. Code written for cores that defaulted to `true`,
+  such as the HWO/ExoOptics core, must pass `external_solar = true` when
+  building the model before calling `rt_run_toa` on the external-solar path.
 - `CanopySurface` leaf scattering now uses the solar Stokes vector `F₀` of
   the solve, as the soil below it already did. It used a unit beam, so canopy
   radiances were not proportional to a spectral solar irradiance or a

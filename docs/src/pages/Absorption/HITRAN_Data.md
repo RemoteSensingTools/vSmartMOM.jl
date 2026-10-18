@@ -220,6 +220,9 @@ hitran_is_cached("H2O", "HITRAN2024")  # check specific edition
 
 `hitran_is_cached` returns `true` only when `artifact()` would use the cached
 file without downloading, that is, when a verified full dataset is present.
+It checks the scratch-space download cache only: for the default `"artifact"`
+edition it returns `false`, because that data is a Julia artifact managed by
+the package manager.
 
 ### Available molecules
 

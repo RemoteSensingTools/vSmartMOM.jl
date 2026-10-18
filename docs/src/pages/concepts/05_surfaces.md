@@ -17,7 +17,8 @@ method of `create_surface_layer!` that fills the `r⁻⁺`, `r⁺⁻`, `t⁺⁺`
 `j₀⁺`, `j₀⁻` matrices of the bottom `AddedLayer` from the BRDF's parameters.
 After the atmosphere has been composed TOA → BOA, the loop calls
 `interaction!` one more time with the surface layer underneath the
-accumulated atmosphere. Then `interaction_hdrf!` ([`src/CoreRT/CoreKernel/interaction_hdrf.jl:1–42`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/CoreKernel/interaction_hdrf.jl#L1-L42))
+accumulated atmosphere (as a `ScatteringInterface_11` when any atmospheric
+layer scatters, `_01` otherwise; see [Concepts/04](04_mom_solver.md)). Then `interaction_hdrf!` ([`src/CoreRT/CoreKernel/interaction_hdrf.jl:1–42`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/CoreKernel/interaction_hdrf.jl#L1-L42))
 runs to extract hemispherical-directional reflectance products for `m=0`.
 
 For opaque lower-boundary surfaces, `t⁻⁻` is zero: an upward field entering
@@ -59,8 +60,9 @@ The implemented BRDFs and where to find them:
 | `CoxMunkSurface` | wind speed, n_water | sun glint over ocean (polarized) | `Surfaces/coxmunk_surface.jl` |
 | `CanopySurface` | LAI, leaf R/T, soil, n_layers | vegetation canopies | `Surfaces/canopy_surface.jl` |
 
-Linearized variants (`*_lin.jl` files) exist for Lambertian, RPV, Ross-Li,
-and Cox-Munk; canopy linearization is a work in progress.
+Linearized variants (`*_lin.jl` files) exist for Lambertian and Cox-Munk;
+RPV and Ross-Li are forward-only, and canopy linearization is a work in
+progress.
 
 ## Polarized surfaces (Cox–Munk)
 
@@ -70,11 +72,22 @@ to populate the polarized 4×4 Mueller matrix on each facet. The polarized
 `r⁻⁺` blocks are not zero in `Stokes_IQUV` — they couple ``I, Q, U, V``
 through the Fresnel angle dependence.
 
-Optional refinements:
+The slope distribution is an isotropic Gaussian whose *total* mean-square
+slope is ``0.003 + 0.00512\,U`` (``U`` the 10-m wind speed in m/s); each of
+the two slope components carries half of it (`wind_to_sigma2`). Stokes
+vectors are transformed explicitly, by a reflecting change of basis, from
+each beam's meridian plane into the facet's plane of reflection and back
+(`meridian_facet_stokes` in `coxmunk_surface.jl`), so the Mueller matrix follows the
+[Stokes convention](../conventions.md) used everywhere else, and its Fourier
+moments are stored like those of the atmospheric phase matrices.
+
+Refinements, both on by default (`include_whitecaps`, `shadowing`):
 
 - **Whitecaps:** wind-speed-dependent Lambertian contribution from breaking
-  waves (Koepke 1984).
-- **Shadowing:** Mishchenko-Travis shadowing function for grazing geometries.
+  waves (coverage after Monahan & O'Muircheartaigh 1980; albedo
+  `whitecap_albedo = 0.22`, Koepke 1984).
+- **Shadowing:** Smith (1967) shadowing function for the incident and
+  reflected directions, important at grazing geometries.
 
 ## Canopy surfaces
 

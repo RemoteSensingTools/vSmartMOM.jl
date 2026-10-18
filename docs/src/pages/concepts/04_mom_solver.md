@@ -29,7 +29,7 @@ GPU.
 ## The per-layer kernel sequence
 
 ```
-   rt_run loops Fourier moments  m = 0 ... max_m-1
+   rt_run loops Fourier moments  m = 0 ... m_max
         │
         ▼
    constructCoreOpticalProperties  →  Vector of layer optics
@@ -59,7 +59,7 @@ GPU.
    Postprocessing  (azimuthal weighting, VZA interpolation)
 ```
 
-The orchestrator is `rt_kernel!` in [`src/CoreRT/CoreKernel/rt_kernel.jl:48–229`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/CoreKernel/rt_kernel.jl#L48-L229).
+The orchestrator is `rt_kernel!` in [`src/CoreRT/CoreKernel/rt_kernel.jl:186–285`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/CoreKernel/rt_kernel.jl#L186-L285).
 At the top of the layer (TOA, `iz==1`) it copies the added layer directly into
 the composite. For all subsequent layers it runs `interaction!`.
 
@@ -112,7 +112,7 @@ consequences:
   ``e^{-a} - e^{-b}`` lose precision when ``x`` is small or ``a \approx b``.
 
 The numerical-stability discipline shows up in the actual code
-([`src/CoreRT/CoreKernel/elemental.jl:207–252`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/CoreKernel/elemental.jl#L207-L252)):
+([`src/CoreRT/CoreKernel/elemental.jl:286–331`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/CoreKernel/elemental.jl#L286-L331)):
 
 ```julia
 # inside the @kernel function get_elem_rt!
@@ -137,13 +137,13 @@ precision when ``a \approx b``. Both replace error-prone direct evaluations.
 
 ### 2. Scattering-only δτ for sizing, total δτ_λ for transmission
 
-Trace the data flow from `init_layer` / `get_dtau_ndoubl` (`rt_kernel.jl:245–298`)
+Trace the data flow from `init_layer` / `get_dtau_ndoubl` (`rt_kernel.jl:301–396`)
 into `elemental!`:
 
 | Variable | What | Source |
 |---|---|---|
 | `τ` (in `computed_layer_properties`) | scattering optical depth ``\tau_\mathrm{scat}`` | layer-optics build (Concepts/03c) |
-| `dτ` | scattering elemental thickness ``\tau_\mathrm{scat}/2^{N_\mathrm{doubl}}`` | `get_dtau_ndoubl` line 251 |
+| `dτ` | scattering elemental thickness ``\tau_\mathrm{scat}/2^{N_\mathrm{doubl}}`` | `get_dtau_ndoubl` line 325 |
 | `dτ_λ` | per-wavelength **total** elemental thickness | passed through to elemental |
 | `ϖ_λ` | per-wavelength SSA accounting for absorption | layer-optics build |
 
@@ -176,7 +176,7 @@ Eqs. 23–28), simplified by the homogeneity:
 \quad\text{is the matrix geometric series capturing all internal reflections.}
 ```
 
-In code ([`src/CoreRT/CoreKernel/rt_helpers.jl:88–122`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/CoreKernel/rt_helpers.jl#L88-L122)):
+In code ([`src/CoreRT/CoreKernel/rt_helpers.jl:129–242`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/CoreKernel/rt_helpers.jl#L129-L242)):
 
 ```julia
 @inline function compute_geometric_progression!(gp_refl, tt_gp, r⁻⁺, t⁺⁺, I_static, temp2, ...)
@@ -233,7 +233,7 @@ layer). After the loop, recover the four operators via Eq. (32):
 \mathbf{R}_{ab} = \mathbf{R}^{*}_{ba}\,\mathbf{D}.
 ```
 
-`apply_D!` ([`src/CoreRT/CoreKernel/doubling.jl:85–110`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/CoreKernel/doubling.jl#L85-L110)) does this in two
+`apply_D!` ([`src/CoreRT/CoreKernel/doubling.jl:186–208`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/CoreKernel/doubling.jl#L186-L208)) does this in two
 in-place passes:
 
 ```julia
@@ -267,7 +267,7 @@ Metal. See [Concepts/07](07_architecture.md) for the dispatch story.
 
 Doubling builds a single homogeneous layer. *Adding* combines layers with
 different optical properties — the actual atmospheric column. The
-`interaction!` kernel in [`src/CoreRT/CoreKernel/interaction.jl:14–136`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/CoreKernel/interaction.jl#L14-L136)
+`interaction!` kernel in [`src/CoreRT/CoreKernel/interaction.jl:52–410`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/CoreKernel/interaction.jl#L52-L410)
 dispatches on a `ScatteringInterface_*` type chosen once per layer by
 `extractEffectiveProps`:
 
@@ -280,6 +280,16 @@ dispatches on a `ScatteringInterface_*` type chosen once per layer by
 
 The dispatch is on a **type**, not a runtime branch. Each interface subtypes
 `AbstractScatteringInterface` and the kernel specializes at compile time.
+
+A layer counts as scattering when ``\max(\tau\varpi) > 2\,\mathrm{eps}(FT)``.
+A non-scattering layer skips the elemental and doubling steps: its added
+layer is pure direct transmission ``e^{-\tau/\mu}`` with zero reflection and
+zero solar source (`zero_added_noscat!`), and a thermal source, if present,
+emits ``(1-\varpi)B(1-e^{-\tau/\mu})`` over the whole layer. The surface is
+added below the complete column with `surface_scattering_interface`: `_11`
+when any atmospheric layer scatters, `_01` when none does, so the
+surface–atmosphere coupling does not depend on whether the lowest layer
+scatters.
 
 ### The full case (`ScatteringInterface_11`)
 
@@ -327,16 +337,16 @@ construction — for instance, `_00` is just a transmission cascade
 
 | Concept | Source |
 |---|---|
-| Per-layer kernel dispatch | [`src/CoreRT/CoreKernel/rt_kernel.jl:48–229`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/CoreKernel/rt_kernel.jl#L48-L229) |
-| Elemental kernel (driver) | [`src/CoreRT/CoreKernel/elemental.jl:38–139`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/CoreKernel/elemental.jl#L38-L139) |
-| `@kernel get_elem_rt!` (exact finite-δ formulas) | [`src/CoreRT/CoreKernel/elemental.jl:207–252`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/CoreKernel/elemental.jl#L207-L252) |
-| `init_layer` / `get_dtau_ndoubl` | [`src/CoreRT/CoreKernel/rt_kernel.jl:245–298`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/CoreKernel/rt_kernel.jl#L245-L298) |
-| Doubling driver | [`src/CoreRT/CoreKernel/doubling.jl:13–51`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/CoreKernel/doubling.jl#L13-L51) |
-| Geometric series + RT updates | [`src/CoreRT/CoreKernel/rt_helpers.jl:88–122`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/CoreKernel/rt_helpers.jl#L88-L122) |
-| `@kernel apply_D!` | [`src/CoreRT/CoreKernel/doubling.jl:85–110`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/CoreKernel/doubling.jl#L85-L110) |
-| Interaction (4 cases) | [`src/CoreRT/CoreKernel/interaction.jl:14–136`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/CoreKernel/interaction.jl#L14-L136) |
+| Per-layer kernel dispatch | [`src/CoreRT/CoreKernel/rt_kernel.jl:186–285`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/CoreKernel/rt_kernel.jl#L186-L285) |
+| Elemental kernel (driver) | [`src/CoreRT/CoreKernel/elemental.jl:63–139`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/CoreKernel/elemental.jl#L63-L139) |
+| `@kernel get_elem_rt!` (exact finite-δ formulas) | [`src/CoreRT/CoreKernel/elemental.jl:286–331`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/CoreKernel/elemental.jl#L286-L331) |
+| `init_layer` / `get_dtau_ndoubl` | [`src/CoreRT/CoreKernel/rt_kernel.jl:301–396`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/CoreKernel/rt_kernel.jl#L301-L396) |
+| Doubling driver | [`src/CoreRT/CoreKernel/doubling.jl:38–107`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/CoreKernel/doubling.jl#L38-L107) |
+| Geometric series + RT updates | [`src/CoreRT/CoreKernel/rt_helpers.jl:129–242`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/CoreKernel/rt_helpers.jl#L129-L242) |
+| `@kernel apply_D!` | [`src/CoreRT/CoreKernel/doubling.jl:186–208`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/CoreKernel/doubling.jl#L186-L208) |
+| Interaction (4 cases) | [`src/CoreRT/CoreKernel/interaction.jl:52–410`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/CoreKernel/interaction.jl#L52-L410) |
 | `ScatteringInterface_*` types | `src/CoreRT/types.jl::AbstractScatteringInterface` |
-| `extractEffectiveProps` (picks the interface type) | [`src/CoreRT/LayerOpticalProperties/compEffectiveLayerProperties.jl:75–93`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/LayerOpticalProperties/compEffectiveLayerProperties.jl#L75-L93) |
+| `extractEffectiveProps` (picks the interface type) | [`src/CoreRT/LayerOpticalProperties/compEffectiveLayerProperties.jl:493–511`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/LayerOpticalProperties/compEffectiveLayerProperties.jl#L493-L511) |
 
 ## Hands-on tutorials
 

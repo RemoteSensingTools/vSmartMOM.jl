@@ -4,7 +4,7 @@ Wraps each spectral band's existing `radiative_transfer.surface` BRDF as
 **soil** underneath a multi-layer vegetation canopy (`CoreRT.CanopySurface`),
 solved internally via adding-doubling before interacting with the
 atmospheric RT. The mere presence of this top-level block is what activates
-the wrapping — see [`Schema/surface.md` § Composite (canopy + soil)](surface.md#composite-canopy--soil).
+the wrapping — see [`Schema/surface.md` § Composite (canopy + soil)](surface.md#Composite-canopy-soil).
 
 Parsed by `_parse_canopy_section` in
 [`src/IO/Parameters.jl`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/IO/Parameters.jl).
@@ -17,7 +17,7 @@ currently declares `canopy` as `additionalProperties: true` with only a
 block-level description — none of the per-field validation or autocomplete
 below is wired into the schema yet. Field names and defaults on this page
 come from the parser and the `CanopySurface` constructor, not from the JSON
-Schema, so editor autocomplete (see [`Schema.md`](../Schema.md#editor-support--autocomplete--inline-validation))
+Schema, so editor autocomplete (see [`Schema.md`](../Schema.md#Editor-support-—-autocomplete-inline-validation))
 will not catch a typo'd `canopy:` field name.
 
 ## Fields
@@ -81,7 +81,7 @@ Minimal test scene:
 
 ## See also
 
-- [`Schema/surface.md`](surface.md#composite-canopy--soil) — the `surface:`
+- [`Schema/surface.md`](surface.md#Composite-canopy-soil) — the `surface:`
   field this block wraps, and the Phase C `component_m_max` trait for
   `CanopySurface`
 - [`docs/src/pages/api/surfaces.md`](../../api/surfaces.md) —

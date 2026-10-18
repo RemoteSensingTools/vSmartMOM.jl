@@ -16,8 +16,11 @@ radiative_transfer:
     - "<band_expression>"   # one entry per band
 ```
 
-`surface:` (and, for per-band absorption settings, `fixed_molecules` /
-`variable_molecules`) must have the same length as `spec_bands`.
+`surface:` needs one entry per band (fewer is an error at model
+construction, surplus entries are ignored with a warning; see
+[`Schema/surface.md`](surface.md)), and the per-band absorption settings
+(`fixed_molecules` / `variable_molecules`, `LUTfiles`, `h2o_absorption`)
+line up with `spec_bands` in the same way.
 
 ## Supported expression forms
 

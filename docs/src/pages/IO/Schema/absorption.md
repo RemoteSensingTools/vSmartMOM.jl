@@ -3,7 +3,9 @@
 Gas absorption configuration: which molecules are active, where to
 load HITRAN line data from, broadening / line-shape choices, and the
 volume mixing ratios (VMRs) per molecule. Skip this block entirely
-for clear-sky / Rayleigh-only / canopy-only runs.
+for clear-sky / Rayleigh-only / canopy-only runs: without it the forward
+and the linearized (`LinMode()`) models have no gas absorption at all,
+H₂O included (`q` still sets the dry-air column).
 
 ## Required when present
 
@@ -29,18 +31,25 @@ for clear-sky / Rayleigh-only / canopy-only runs.
 
 ### Molecule-list fields (one of)
 
+Without `LUTfiles`, line data are read from HITRAN, so molecule names are
+HITRAN molecule formulas (`O2`, `CO2`, `CH4`, `N2O`, …); a species without
+HITRAN line data, such as Ar, cannot be listed.
+
 - **`fixed_molecules`** — `Vector{Vector{String}}`, one inner list per
   spec_band. Molecules whose VMR is *not* a state variable in the
   linearization. Preferred form.
 - **`variable_molecules`** — `Vector{Vector{String}}`, one inner list
   per spec_band. Molecules whose VMR *is* a state variable
   (Jacobians computed via the analytic `lin_*` path).
-- **`molecules`** — *legacy*. Single molecule list applied to all
-  bands; treated as fully-fixed. Don't combine with
-  `variable_molecules` in new configs.
+- **`molecules`** — *legacy*. One inner list per spec_band, as for
+  `fixed_molecules`; treated as fully-fixed. If combined with
+  `variable_molecules`, the fixed set of each band is `molecules` minus
+  that band's variable molecules. Prefer `fixed_molecules` in new configs.
 
 H₂O is auto-handled when `q` is set in the profile — don't list it
-manually. Its internal `vmr_h2o` value is also a dry-air molar ratio,
+manually (H₂O in any molecule list is rejected). The optional
+**`h2o_absorption`** list, one Boolean per band (default all `true`),
+turns H₂O absorption off for individual bands. Its internal `vmr_h2o` value is also a dry-air molar ratio,
 `N_H2O/N_dry`, rather than a moist-air mole fraction.
 
 ## Optional CIA and continuum fields
@@ -157,12 +166,10 @@ dispatch flow and edition-selection workflow.
 absorption:
   vmr:
     O2: 0.21
-    N2: 0.78
-    Ar: 0.009
   variable_molecules:
     - ["O2"]                # one inner list per spec_band
   fixed_molecules:
-    - ["N2", "Ar"]
+    - []                    # nothing else in this band
   broadening: "Voigt()"
   CEF: "HumlicekWeidemann32SDErrorFunction()"
   wing_cutoff: 25
@@ -175,7 +182,7 @@ atmospheric_profile:
   T: [220.0, 250.0, 280.0]
   p: [0.1, 100.0, 500.0, 1013.25]
   q: [1e-6, 1e-3, 5e-3]      # H₂O auto-included as variable
-  profile_reduction: nothing
+  profile_reduction: null
 
 absorption:
   vmr:

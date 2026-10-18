@@ -12,7 +12,7 @@ The `SolarModel` module provides Planck-spectrum helpers and solar transmission 
 | --- | --- | --- |
 | `planck_spectrum_wn` | wavenumber in `cm^-1` | black-body radiance in `mW m^-2 sr^-1 cm` |
 | `planck_spectrum_wl` | wavelength in micrometers | black-body radiance in `W m^-2 sr^-1 um^-1` |
-| `default_solar_spectrum_at_earth` | wavenumber in `cm^-1` | approximate photon spectrum multiplied by the default solar transmission |
+| `default_solar_spectrum_at_earth` | wavenumber in `cm^-1` | `(n, 2)` matrix `[ν E]`: a 5777 K blackbody at 1 AU multiplied by the default solar transmission, `E` in photons `s^-1 m^-2 um^-1` (not the `mW m^-2 (cm^-1)^-1` units of `SolarBeam` `F₀`; convert before using it as `F₀`) |
 
 The default solar spectrum helper is available as `vSmartMOM.SolarModel.default_solar_spectrum_at_earth`.
 

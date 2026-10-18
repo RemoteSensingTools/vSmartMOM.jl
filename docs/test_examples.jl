@@ -11,7 +11,6 @@ function docs_minimal_parameter_dict()
             "quadrature_type" => "GaussLegQuad()",
             "polarization_type" => "Stokes_I()",
             "max_m" => 1,
-            "Δ_angle" => 2.0,
             "l_trunc" => 1,
             "depol" => 0.0,
             "float_type" => "Float64",

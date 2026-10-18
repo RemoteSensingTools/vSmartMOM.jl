@@ -89,7 +89,7 @@ Hovenier convention.
 ```
 
 with `dpl_p = (1 − δ)/(1 + δ/2)`. This is consistent with vSmartMOM's
-own Mie code (`compute_NAI2.jl:132`, where `f₁₂ = −Re(|s1|² − |s2|²)`),
+own Mie code (`_nai2_bulk_optics` in `compute_NAI2.jl`, where `f₁₂ = −Re(|s1|² − |s2|²)`),
 so the entire vSmartMOM internal pipeline is **self-consistent in
 Hovenier convention**.
 
@@ -246,13 +246,13 @@ accidental treatment of the collimated Sun as diffuse radiation.
 
 - **`Nquad`** — total node count in the square **diffuse operator**. It
   includes the weighted streams and any distinct zero-weight viewing nodes;
-  the explicitly requested legacy Gauss representation also includes the distinct SZA.
+  the default embedded-``μ₀`` Gauss representation also includes the distinct SZA.
   It sets the matrix workspace size
   `NquadN = Nquad · n_stokes`.
 
 - **`phase_qp_μ`** — directions used to evaluate phase matrices. It is
-  identical to `qp_μ` in the legacy representation. In the default
-  external-solar SFI, it additionally records exact ``μ₀`` as compatibility
+  identical to `qp_μ` in the default embedded-``μ₀`` representation. In the
+  opt-in external-solar SFI, it additionally records exact ``μ₀`` as compatibility
   metadata. Production source kernels evaluate rectangular ``Z₀`` columns
   directly and do not index ``μ₀`` as an operator node.
 
@@ -262,7 +262,7 @@ accidental treatment of the collimated Sun as diffuse radiation.
 |--------|-------------------------------|-----------------|
 | `GaussLegQuad` with `external_solar=true` (opt-in, TOA-only) | Gauss-Legendre on `[0, 1]`, `(Ltrunc+2)÷2` nodes (Sanghavi: `+2` form avoids zero streams at `Ltrunc=0`) | Only VZAs are appended to the operator; scalar ``μ₀`` is evaluated directly into rectangular ``Z₀`` columns. |
 | `GaussLegQuad` (default, `external_solar=false`) | Same weighted Gauss nodes | SZA and VZAs are appended as zero-weight operator nodes. |
-| `RadauQuad` | Gauss-Radau on subintervals around μ₀; the SZA-on-node branch builds `(Ltrunc+1)÷2` nodes, while the usual SZA-not-on-node branch builds `2·((Ltrunc+1)÷2)` weighted nodes split around μ₀ | ``μ₀`` is a weighted quadrature node; external-solar mode is not supported. VZAs are appended with zero weight. |
+| `RadauQuad` | Gauss-Radau on subintervals around μ₀; the SZA-on-node branch builds `(Ltrunc+1)÷2` nodes, while the usual SZA-not-on-node branch builds `2·((Ltrunc+1)÷2)` weighted nodes split around μ₀ (coincident nodes of a near-overhead sun are merged, summing their weights) | ``μ₀`` is a weighted quadrature node; external-solar mode is not supported. VZAs are appended with zero weight. |
 
 Because Radau allocates a different number of weighted nodes
 depending on whether μ₀ lands on a Gauss-Radau abscissa, the
@@ -279,7 +279,7 @@ All representations report:
 - `qp.Nstreams` = weighted streams (resolving power)
 - `qp.Nquad` = diffuse-operator total (kernel size)
 - `qp.wt_μ` carries explicit zeros at appended viewing directions and,
-  in legacy Gauss mode, at SZA
+  in the default embedded-``μ₀`` Gauss mode, at SZA
 - `qp.μ₀` supplies the exact external-solar propagation direction;
   `phase_qp_μ/iμ₀_phase` remain compatibility metadata for the embedded path
 
@@ -304,7 +304,7 @@ diffuse operator dimension is
 
 so adding/doubling works on ``18×18`` matrices. Rectangular ``Z₀`` phase
 columns and ``R₀/T₀`` elemental operators supply exact solar coupling without
-enlarging the diffuse operator. The legacy representation would include the distinct
+enlarging the diffuse operator. The default embedded-``μ₀`` representation would include the distinct
 SZA as a seventh node and therefore use ``21×21`` matrices.
 
 The external-solar implementation is deliberately narrow at present:

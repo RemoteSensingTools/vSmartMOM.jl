@@ -42,12 +42,14 @@ distribution). The output of this zone is one
 `CoreScatteringOpticalPropertiesLin` per atmospheric layer:
 
 ```julia
-# src/CoreRT/types_lin.jl:119–149
-struct CoreScatteringOpticalPropertiesLin{T1,T2,T3} <: AbstractOpticalPropertiesLin
+# src/CoreRT/types_lin.jl:330–355
+struct CoreScatteringOpticalPropertiesLin{T1,T2,T3,T4} <: AbstractOpticalPropertiesLin
     τ̇::T1        # ∂τ/∂x
     ϖ̇::T2        # ∂ϖ_0/∂x
     Ż⁺⁺::T3      # ∂Z⁺⁺/∂x
     Ż⁻⁺::T3      # ∂Z⁻⁺/∂x
+    Ż₀⁺::T4      # ∂Z₀⁺/∂x, external-solar phase columns (or nothing)
+    Ż₀⁻::T4      # ∂Z₀⁻/∂x (or nothing)
 end
 ```
 
@@ -59,7 +61,7 @@ active parameter basis before it enters the RT kernels. A plan stores named
 physical parameter keys, one local-to-global map per spectral band, and the
 native optical-property columns needed by that band. The downstream analytic
 formulas are unchanged; only the trailing tangent dimension becomes smaller.
-See [Compute Jacobians → Retrieval-Selected Jacobians](../jacobians.md#retrieval-selected-jacobians).
+See [Compute Jacobians → Retrieval-Selected Jacobians](../jacobians.md#Retrieval-Selected-Jacobians).
 
 Selection is performed during the moment-invariant aerosol/gas cache build,
 not after a full mixed tangent has been formed. Each native column is first
@@ -236,7 +238,7 @@ The full derivation is Sanghavi 2014 App. C. The structure (skipping arithmetic)
 | (C.27)–(C.31) | δ derivatives (elemental thickness from `N_doubl`) | `compEffectiveLayerProperties_lin.jl` |
 | (C.32)–(C.39) | ``\bar{\varpi}_0`` and ``\bar{\mathbf{Z}}`` derivatives (post-truncation) | same |
 | (C.40) | ``\dot{\mathbf{Z}}_m`` from generalized spherical harmonics | `compute_Z_matrices_lin.jl` |
-| (C.41)–(C.42) | ``\dot{\beta}^*`` and ``\dot{\mathbf{B}}_l^*`` for the truncated case | `delta_m_truncation.jl` |
+| (C.41)–(C.42) | ``\dot{\beta}^*`` and ``\dot{\mathbf{B}}_l^*`` for the truncated case | `Scattering/truncate_phase_lin.jl` (Greek coefficients); `delta_m_truncation.jl` (``\tau``, ``\varpi`` chain) |
 
 The `_lin.jl` files in `src/CoreRT/CoreKernel/` are tangent-linear partners
 of `elemental.jl`, `doubling.jl`, `interaction.jl`. Each forward kernel has
@@ -247,7 +249,7 @@ forward ones in a single sweep.
 
 The Jacobian matrix has rows indexed by `(VZA, Stokes, λ)` (the radiance
 output) and columns indexed by *retrieval parameters*. The column ordering
-is centralized in [`src/CoreRT/parameter_layout.jl:1–67`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/parameter_layout.jl#L1-L67):
+is centralized in [`src/CoreRT/parameter_layout.jl:1–245`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/parameter_layout.jl#L1-L245):
 
 ```julia
 struct ParameterLayout
@@ -301,7 +303,7 @@ new parameters):
 | profile location/width | analytic | physical profile coordinates; see `atmo_prof_lin.jl` |
 | `n_r, n_i, μ_logr, σ_logr` | hand-linearized Mie | `compute_aerosol_optical_properties(LinMode(), model, FT)` |
 | Gas VMR | analytic line-absorption scaling | `∂τ_abs/∂VMR = σ*N_dry`; requests omitting H₂O broadening, CIA or MT_CKD response are rejected unless `abundance_jacobians=:frozen_cross_section` |
-| Surface pressure | profile/column response plus upstream line/LUT pressure response | only the bottom interface of the final grid moves, at fixed layer temperature/composition |
+| Surface pressure | profile/column response plus upstream line/LUT pressure response | default `FixedPressureGrid()`: only the bottom interface of the final grid moves; opt-in `FixedAltitudeGrid()` (`vertical_grid=` keyword): every interface keeps its geometric altitude, so every layer's pressure and column scale with ``p_\mathrm{surf}``; both at fixed layer temperature/composition |
 | Temperature profile | future extension | no general end-to-end temperature Jacobian |
 
 A new upstream AD implementation can populate the optical-property tangent
@@ -323,9 +325,9 @@ instrument convolution, and retrieval-level validation.
 | Elemental tangent chain rule | `src/CoreRT/CoreKernel/elemental_fused_lin.jl` |
 | Local-basis contraction after doubling | `src/CoreRT/CoreKernel/local_jacobian.jl` |
 | Local optical coefficients and shared phase basis | `src/CoreRT/LayerOpticalProperties/local_jacobian_cache.jl`, `local_jacobian.jl` |
-| Three-core-variable lin type | [`src/CoreRT/types_lin.jl:119–149`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/types_lin.jl#L119-L149) |
-| Optical-property Jacobian boundary | `src/CoreRT/types.jl::CoreScatteringOpticalPropertiesLin` |
-| ParameterLayout | [`src/CoreRT/parameter_layout.jl:1–67`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/parameter_layout.jl#L1-L67) |
+| Three-core-variable lin type | [`src/CoreRT/types_lin.jl:330–355`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/types_lin.jl#L330-L355) |
+| Optical-property Jacobian boundary | `src/CoreRT/types_lin.jl::CoreScatteringOpticalPropertiesLin` (alias `OpticalPropertyJacobian`) |
+| ParameterLayout | [`src/CoreRT/parameter_layout.jl:1–245`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/parameter_layout.jl#L1-L245) |
 | Mie linearization (analytic) | [`src/Scattering/types_lin.jl`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/Scattering/types_lin.jl) |
 | Linearized atmospheric profile | [`src/CoreRT/tools/atmo_prof_lin.jl`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/tools/atmo_prof_lin.jl) |
 | Linearized δ-M truncation | [`src/CoreRT/LayerOpticalProperties/delta_m_truncation.jl`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/LayerOpticalProperties/delta_m_truncation.jl) |

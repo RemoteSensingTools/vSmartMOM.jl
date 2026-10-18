@@ -19,7 +19,6 @@ cfg = Dict(
     "quadrature_type" => "RadauQuad()",
     "polarization_type" => "Stokes_IQU()",
     "max_m" => 3,
-    "Δ_angle" => 2.0,
     "l_trunc" => 20,
     "depol" => 0.0,
     "float_type" => "Float32",
@@ -48,7 +47,19 @@ radiative_transfer:
 
 ## Atmospheric profile only
 
+The standalone profile readers take a mapping with `T`, `p_half` (interface
+pressures in hPa, TOA first) and optional `q` and `vmr` at its top level; a
+scene file such as `DefaultParameters.yaml` (profile nested under
+`atmospheric_profile`, interfaces named `p`) is not accepted.
+
 ```julia
 using vSmartMOM
-ap = read_atmos_profile(joinpath(pkgdir(vSmartMOM), "src", "CoreRT", "DefaultParameters.yaml"))
+ap = read_atmos_profile_dict(Dict(
+  "T"      => [220.0, 250.0, 280.0],
+  "p_half" => [0.1, 300.0, 700.0, 1000.0],
+  "q"      => [1e-5, 1e-3, 5e-3],
+  "vmr"    => Dict("CO2" => 4.0e-4),
+))
+# or, from a YAML file holding the same keys:
+# ap = read_atmos_profile("profile.yaml")
 ```

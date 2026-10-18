@@ -77,7 +77,9 @@ println("dR shape: ", size(dR_cpu), "  (nVZA × nStokes × nSpec × nParams)")
 
 The Jacobian dimension of `dR` is ordered by `ParameterLayout`:
 surface pressure comes first, then each aerosol gets 7 sub-parameters,
-followed by gas VMRs and surface parameters.
+followed by gas VMRs (slot 1 is the q-driven H₂O profile, then any
+`variable_molecules`; here q ≡ 0, so slot 1 holds structural zeros) and
+surface parameters.
 
 ```julia
 layout = result_cpu.layout
@@ -91,7 +93,7 @@ for ia in 1:NAer
 end
 if NGas > 0
     Nz = length(model.profile.p_full)
-    println("  Gas 1 VMR profile: indices ", CoreRT.gas_profile_range(layout, 1, Nz))
+    println("  Gas 1 (H₂O) VMR profile: indices ", CoreRT.gas_profile_range(layout, 1, Nz))
 end
 println("  Surface:   indices ", CoreRT.surface_range(layout))
 ```
@@ -153,13 +155,13 @@ using vSmartMOM.Scattering
 rt_aer = params.scattering_params.rt_aerosols[1]
 ```
 
-Note: `params.l_trunc` and `params.Δ_angle` are legacy-schema fields parsed from
-the YAML's `l_trunc` / `Δ_angle` keys.  The v0.7 schema derives truncation
+Note: `params.l_trunc` is a legacy-schema field parsed from the YAML's
+`l_trunc` key (the former `Δ_angle` cone is retired).  The v0.7 schema derives truncation
 automatically via `nstreams` + `truncation: auto`; see the IO Schema docs for the
 recommended idiom.  The explicit constructor below is still valid for custom use.
 
 ```julia
-truncation_type = Scattering.δBGE{Float64}(params.l_trunc, params.Δ_angle)
+truncation_type = Scattering.δBGE{Float64}(params.l_trunc)
 mie_model = make_mie_model(params.scattering_params.decomp_type,
                             rt_aer.aerosol, params.scattering_params.λ_ref,
                             params.polarization_type,
@@ -228,8 +230,8 @@ The hybrid AD architecture gives you flexibility:
 | RT kernels | Analytic (linearized adding-doubling) | Performance, GPU, batched matmul |
 | Mie optics | Hand-linearized `LinMode()` | Supported production path |
 | Surface albedo | Analytic (trivial) | Simple scalar derivative |
-| Surface pressure | Profile/column plus line/LUT pressure response | Fixed final grid except its bottom interface; see the Jacobian guide |
-| Gas VMR | Analytic (trivial: ∂τ_abs/∂VMR = cross_section) | Simple scaling |
+| Surface pressure | Profile/column plus line/LUT pressure response | Default `FixedPressureGrid()` moves only the bottom interface; `FixedAltitudeGrid()` is opt-in via `vertical_grid`; see the Jacobian guide |
+| Gas VMR | Analytic native partial ∂τ_abs/∂VMR = σ·N_dry, cross sections held fixed | Simple scaling; see [Gas-abundance columns](../jacobians.md#Gas-abundance-columns) |
 | Aerosol profiles | Analytic | Already validated in atmo_prof_lin.jl |
 
 The `ParameterLayout` struct generalizes the index arithmetic, and

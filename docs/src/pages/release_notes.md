@@ -53,9 +53,45 @@ the repository's `CITATION.bib`, with their original publication author order.
   Jacobians include its wind/optical-depth derivatives. The direct-glint
   correction requires unpolarized incident illumination.
 - Surface-pressure Jacobians include pressure-induced line-shape and LUT
-  changes at fixed final-grid temperature/composition, with only the bottom
-  pressure interface moving. Profile regridding needs a separate chain rule.
-  CIA/MT_CKD abundance tangents remain incomplete; see the absorption schema.
+  changes at fixed final-grid temperature/composition. By default
+  (`FixedPressureGrid()`) only the bottom pressure interface moves; the opt-in
+  `model_from_parameters(LinMode(), params; vertical_grid=FixedAltitudeGrid())`
+  keeps every interface at its geometric altitude, so every interface pressure
+  scales with p_surf. A retrieval that varies p_surf must rebuild `params.p`
+  with the same convention (`surface_pressure_interfaces(grid, p_half, p_surf)`).
+  Profile regridding needs a separate chain rule.
+- **Breaking for some linearized callers:** gas-abundance Jacobian columns are
+  the native partial ∂τ/∂VMR = σ·N_dry, with cross sections, CIA and MT_CKD
+  held fixed. A solve or Jacobian plan that requests a column whose forward
+  absorption also responds to that abundance (for H₂O: self broadening,
+  multi-node ABSCO H₂O-broadener axes, MT_CKD and CIA; for a variable gas: CIA
+  pairs with it as a collider) now raises an `ArgumentError` naming the omitted
+  terms. Pass `abundance_jacobians=:frozen_cross_section` to the linearized
+  constructor to accept the partial (values are unchanged); fixed humidity
+  (`compute_h2o_jacobians=false`), `fixed_molecules` and fixed-broadener tables
+  need no change.
+- `model_from_parameters(LinMode(), params)` no longer adds water-vapour line
+  absorption when the configuration has no `absorption` block: as in the
+  forward constructor, omitting the block means no gas absorption.
+- `default_parameters()` gives the aerosol pressure peak and width in hPa
+  (`p₀: 900`, `σp: 50`), the unit of the profile; they were given in Pa.
+  Aerosol results of `default_parameters()` and of GEOS-Chem-generated
+  configurations change.
+- Give one `radiative_transfer.surface` entry per band: fewer surfaces than
+  bands raise an `ArgumentError` at model construction, and surplus entries
+  are reported once and ignored. The parser also warns, once per key, about
+  keys it does not read at the top level and in the `radiative_transfer` and
+  `geometry` blocks (e.g. a misspelled `nstream`); such keys remain non-fatal.
+  TOML arrays may mix integers and floats (e.g. `vza = [60, 45.5]`).
+- Under a downloaded HITRAN edition, `artifact(molecule)` uses a cached file
+  only if it is a verified full dataset (full range, all isotopologues,
+  SHA-256 matching its metadata); otherwise it downloads the full dataset, and
+  raises an error if that fails (e.g. offline) instead of using a narrower or
+  unverified file. `hitran_is_cached(molecule[, edition])` reports exactly
+  this condition.
+- Revalidate columns with non-scattering layers (τϖ ≤ 2eps, common in Float32
+  and wherever Rayleigh is zeroed), `RadauQuad` runs at SZA = 0, and canopy
+  runs with a non-unit solar `F₀`: these radiances were wrong and change.
 - Retrievals with fixed pressure can disable its upstream derivatives with
   `requires_pressure_jacobians(::MyFlavor) = false` or the constructor keyword
   `compute_pressure_jacobians=false`. Such plans must omit pressure; full-layout
@@ -156,7 +192,19 @@ albedo closure over an SZA/geometry × surface grid, reusing the shared
 optics across the sweep. `remake_geometry` rebuilds just the
 geometry-dependent `ObsGeometry`/`QuadPoints` pair without re-running
 HITRAN absorption or Mie — bit-exact with a fresh `model_from_parameters`
-call at the new geometry.
+call at the new geometry. It keeps the resolved observer heights, the TOA/BOA
+output selection, and the model's embedded or external-solar representation.
+
+### Molecular Rayleigh API
+
+`molecular_rayleigh_properties` and `molecular_rayleigh_cross_section_ratio`
+(in `Scattering`, also exported from `vSmartMOM`) compute pure-gas Rayleigh
+properties by method: `UsingRefInd()` (refractive index plus King factor; He,
+Ar, N₂, O₂, CO₂; `RefractiveIndexRayleigh` is an alias, and the forms without
+a method argument use it) or
+`UsingPolTen()` (Raman-module polarizability tensors; N₂, O₂, H₂).
+`molecular_rayleigh_provenance(UsingRefInd(), species)` covers Ar and CO₂.
+Model defaults are unchanged.
 
 ### New guide
 
@@ -191,12 +239,9 @@ Every selected parameter family is regression-tested against two-sided finite
 differences, in addition to exact comparison with corresponding full native
 Jacobian columns. See [Compute Jacobians](jacobians.md) for usage.
 
-## Unreleased — observer height selection and multi-level radiances
+## Observer height selection and multi-level radiances
 
-Merged into `feat/surface-split` from the multi-sensor branch; ships together
-with the sections above.
-
-Note on defaults after the merge: `model_from_parameters` builds the
+Note on defaults: `model_from_parameters` builds the
 embedded-μ₀ representation (`external_solar=false`) by default, so
 `R, T = rt_run(model)`, observer heights, and the atmosphere/surface split
 all work out of the box. The external-solar SFI representation
@@ -304,7 +349,7 @@ radiative_transfer:
 - **`nstreams ≥ 3`** is enforced — Rayleigh contributes through m=2.
 - **`truncation: auto`** mirrors VLIDORT's `DO_DELTAM_SCALING`: the
   resolver picks `NoTruncation()` when the phase function fits within
-  `stream_l_cap`, `δBGE(N, Δ_angle)` otherwise. Logs the choice via
+  `stream_l_cap`, `δBGE(N)` otherwise. Logs the choice via
   `@info` so the user always sees what was applied.
 - **`GaussLegQuad()`** is the default quadrature when `quadrature_type`
   is omitted. `RadauQuad()` remains an option but is documented as
@@ -316,7 +361,7 @@ radiative_transfer:
   describes the v0.7 schema. Wired to TOML via the repo's
   `.taplo.toml`; YAML editors honour it via
   `# yaml-language-server: $schema=...`. Setup recipe in
-  [`Schema.md`](IO/Schema.md#editor-support--autocomplete--inline-validation).
+  [`Schema.md`](IO/Schema.md#Editor-support-—-autocomplete-inline-validation).
 - **Per-block schema docs** under
   [`docs/src/pages/IO/Schema/`](IO/Schema.md) — one page per top-level
   YAML/TOML block.
@@ -449,8 +494,9 @@ Highlights:
 - Source-unit convention adopted: `F₀` and `SIF₀` in
   **mW · m⁻² · cm⁻¹**, `rt_run` outputs in
   **mW · m⁻² · sr⁻¹ · cm⁻¹**. `BlackbodySource` defaults to
-  `factor = π` (Lambertian-disk → hemisphere irradiance) so its `F₀` is
-  comparable to a unit `SolarBeam(F₀ = 1)` baseline.
+  `factor = π` (the exitance πB of a Lambertian emitter) so its `F₀` is
+  comparable to a unit `SolarBeam(F₀ = 1)` baseline; for a distant disk of
+  radius R at distance d, also set `scale = (R/d)²`.
 
 Legacy compatibility: the main `rt_run` path ignores `RS_type.SIF₀` and
 uses `SurfaceSIF` through `sources=`. Migrate old callers to that API.
@@ -604,7 +650,7 @@ the current codebase.
   `update_aerosol_loading!` / `update_aerosol_microphysics!` API enables
   efficient multi-scene loops (ensemble retrievals, parameter sweeps) by
   caching Mie, Fourier decomposition, and HITRAN parsing across calls.
-  See the [CoreRT API](api/core_rt.md#batch-scene-processing) for details.
+  See the [CoreRT API](api/core_rt.md#Batch-Scene-Processing) for details.
 
 ## Known WIP Areas
 

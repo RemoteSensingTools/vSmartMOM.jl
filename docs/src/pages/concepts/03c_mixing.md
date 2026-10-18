@@ -16,7 +16,7 @@ Two methods of `CoreScatteringOpticalProperties` carry the algebraic
 semantics that show up in `compEffectiveLayerProperties.jl`:
 
 ```julia
-# src/CoreRT/types.jl:1063–1093 — mixing scatterers in a layer
+# src/CoreRT/types.jl:1743–1783 — mixing scatterers in a layer
 function Base.:+(x::CoreScatteringOpticalProperties, y::CoreScatteringOpticalProperties)
     τ  = x.τ .+ y.τ
     wx = x.τ .* x.ϖ                 # scattering-weight from x
@@ -37,7 +37,7 @@ per stream pair when species are combined. A pure-absorption species
 through the ``\tau`` increment, not through ``\mathbf{Z}``.
 
 ```julia
-# src/CoreRT/types.jl:1096+ — vertical concatenation along the spectral axis
+# src/CoreRT/types.jl:1785+ — vertical concatenation along the spectral axis
 function Base.:*(x::CoreScatteringOpticalProperties, y::CoreScatteringOpticalProperties)
     arr_type = array_type(architecture(x.τ))
     x = expandOpticalProperties(x, arr_type)
@@ -132,7 +132,7 @@ A representative O₂ A-band atmospheric layer at the line center:
 | ``\varpi_\lambda = \tau_\mathrm{scat}\varpi / \tau_\lambda`` | ≈ 9.5 × 10⁻⁴ |
 | ``N_\mathrm{doubl}`` (sized by ``\tau_\mathrm{scat}\varpi`` ≈ 0.05) | ~6 |
 
-The elemental kernel in [Concepts/04](04_mom_solver.md#elemental-layer)
+The elemental kernel in [Concepts/04](04_mom_solver.md#Elemental-layer)
 sees ``\delta\tau_\mathrm{scat} = 0.05 / 2^6 \approx 7.8\times10^{-4}`` for
 the scattering-source term and ``\delta\tau_\lambda = 50.05 / 2^6 \approx 0.78``
 for the per-wavelength transmission factors. The two enter different
@@ -175,10 +175,13 @@ truncation order:
 \epsilon_l^{\!*} = \frac{\epsilon_l}{1-f_\mathrm{tr}}.
 ```
 
-In the code, the rescaling lives in `createAero` (`compEffectiveLayerProperties.jl:67–72`)
-for ``\tau`` and ``\varpi``, and in
-[`src/CoreRT/LayerOpticalProperties/delta_m_truncation.jl:44–48`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/LayerOpticalProperties/delta_m_truncation.jl#L44-L48) for the
-Greek coefficients:
+In the code, the ``\tau`` and ``\varpi`` rescaling lives in `createAero`
+(`compEffectiveLayerProperties.jl:478–491`; the same expressions as
+`delta_m_forward` in
+[`src/CoreRT/LayerOpticalProperties/delta_m_truncation.jl:44–48`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/LayerOpticalProperties/delta_m_truncation.jl#L44-L48)).
+The truncated Greek coefficients and ``f^t`` are computed upstream, during the
+Mie step, by `truncate_phase` in
+[`src/Scattering/truncate_phase.jl`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/Scattering/truncate_phase.jl):
 
 ```julia
 function createAero(τAer, aerosol_optics, AerZ⁺⁺, AerZ⁻⁺)
@@ -202,7 +205,10 @@ SS2015 §3 introduces a vector adaptation of Hu et al. (2000) δ-fit, called
 with an SVD-based least-squares fit on the diagonal phase-matrix elements
 ``b_1(\mu)``, ``b_2(\mu)`` (Eqs. 38a–d). The result preserves the diagonal
 elements through the truncation and practically eliminates the error in
-``Q``.
+``Q``. The fit always uses the full angular domain: the former forward-peak
+exclusion cone `Δ_angle` is retired, and a nonzero
+`radiative_transfer.Δ_angle` is accepted but stored as 0 with a one-time
+warning.
 
 ::: tip Design choice — δBGE-fit for hyperspectral retrievals
 SS2015 §4.1 demonstrates that δ-m truncation distorts O₂ A-band line shapes
@@ -216,13 +222,14 @@ distortion in ``I`` is small but the distortion in ``Q`` is severe.
 
 | Concept | Source |
 |---|---|
-| Layer-optics builder | [`src/CoreRT/LayerOpticalProperties/compEffectiveLayerProperties.jl:11–65`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/LayerOpticalProperties/compEffectiveLayerProperties.jl#L11-L65) |
-| Aerosol δ-M wrapper (`createAero`) | `compEffectiveLayerProperties.jl:67–72` |
-| δ-M Greek-coefficient rescaling | [`src/CoreRT/LayerOpticalProperties/delta_m_truncation.jl:44–48`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/LayerOpticalProperties/delta_m_truncation.jl#L44-L48) |
+| Layer-optics builder | [`src/CoreRT/LayerOpticalProperties/compEffectiveLayerProperties.jl:314–375`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/LayerOpticalProperties/compEffectiveLayerProperties.jl#L314-L375) |
+| Aerosol δ-M wrapper (`createAero`) | `compEffectiveLayerProperties.jl:478–491` |
+| Greek-coefficient truncation (δ-M, δBGE) | [`src/Scattering/truncate_phase.jl`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/Scattering/truncate_phase.jl) (`truncate_phase`) |
+| δ-M ``\tau``/``\varpi`` rescaling (standalone form) | [`src/CoreRT/LayerOpticalProperties/delta_m_truncation.jl:44–48`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/LayerOpticalProperties/delta_m_truncation.jl#L44-L48) (`delta_m_forward`) |
 | Layer assembly + absorption combination | [`src/CoreRT/LayerOpticalProperties/compEffectiveLayerProperties.jl`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/LayerOpticalProperties/compEffectiveLayerProperties.jl) — `constructCoreOpticalProperties` |
-| Scattering-only `N_doubl` sizing | `src/CoreRT/CoreKernel/rt_kernel.jl::get_dtau_ndoubl:245–253` |
-| Mix scatterers (`+`) | [`src/CoreRT/types.jl:1063–1093`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/types.jl#L1063-L1093) |
-| Stack layers along spectral axis (`*`) | `src/CoreRT/types.jl:1096+` |
+| Scattering-only `N_doubl` sizing | `src/CoreRT/CoreKernel/rt_kernel.jl::get_dtau_ndoubl:301–327` |
+| Mix scatterers (`+`) | [`src/CoreRT/types.jl:1743–1783`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/types.jl#L1743-L1783) |
+| Stack layers along spectral axis (`*`) | `src/CoreRT/types.jl:1785+` |
 
 ## Hands-on tutorials
 

@@ -60,16 +60,22 @@ Eq. 16):
 \begin{bmatrix}
 \beta_l & \gamma_l & 0 & 0 \\
 \gamma_l & \alpha_l & 0 & 0 \\
-0 & 0 & \zeta_l & -\epsilon_l \\
-0 & 0 & \epsilon_l & \delta_l
+0 & 0 & \zeta_l & \epsilon_l \\
+0 & 0 & -\epsilon_l & \delta_l
 \end{bmatrix}
 ```
+
+This is vSmartMOM's storage convention (`construct_B_matrix`, with
+`B[3,4] = +ε`). Some printed forms (e.g. Siewert 2000; de Haan et al. 1987)
+put ``-\epsilon_l`` at ``[3,4]``; the
+[import/export checklist](../conventions.md#5.-Quick-reference:-import/export-checklist)
+flips the sign of ε for Siewert/VLIDORT imports accordingly.
 
 The six coefficients ``(\alpha_l, \beta_l, \gamma_l, \delta_l, \epsilon_l, \zeta_l)``
 fully determine the polarized scattering pattern — ``\beta_l`` is the
 *phase function* expansion (the only one a scalar code uses); the other
 five carry polarization coupling. They live in the `GreekCoefs` struct at
-[`src/Scattering/types.jl:231–244`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/Scattering/types.jl#L231-L244):
+[`src/Scattering/types.jl:462–475`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/Scattering/types.jl#L462-L475):
 
 ```julia
 struct GreekCoefs{FT}
@@ -83,7 +89,7 @@ end
 ```
 
 The output of `compute_aerosol_optical_properties` packages this with the
-scalar bookkeeping ([`src/Scattering/types.jl:281–292`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/Scattering/types.jl#L281-L292)):
+scalar bookkeeping ([`src/Scattering/types.jl:512–533`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/Scattering/types.jl#L512-L533)):
 
 ```julia
 struct AerosolOptics{FT}
@@ -146,12 +152,12 @@ Sanghavi 2014 (the Mie-Fourier paper) compares two decomposition methods:
   cosine ``\xi``, then projects to Greek coefficients via integrals against
   associated Legendre functions. The ``2N_\mathrm{max} - 1`` quadrature
   roots needed for accurate integration are determined upfront. Default
-  path; entry at [`src/Scattering/compute_NAI2.jl:44`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/Scattering/compute_NAI2.jl#L44).
+  path; entry at [`src/Scattering/compute_NAI2.jl:82`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/Scattering/compute_NAI2.jl#L82).
 - **PCW** (Pre-computed Wigner; Domke's formalism corrected): computes
   Greek coefficients *directly* from products of size-averaged Mie
   coefficients ``\langle a_n^* a_m \rangle`` etc. weighted by precomputed
   Wigner-3j symbols. No reconstruction of the angular scattering matrix.
-  Entry at [`src/Scattering/compute_PCW.jl:28`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/Scattering/compute_PCW.jl#L28).
+  Entry at [`src/Scattering/compute_PCW.jl:37`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/Scattering/compute_PCW.jl#L37).
 
 Tradeoffs (Sanghavi 2014 Mie-Fourier §5):
 
@@ -381,16 +387,16 @@ for the schemes (status: API still being stabilized — WIP).
 
 | Concept | Source |
 |---|---|
-| Mie entry (NAI-2) | [`src/Scattering/compute_NAI2.jl:44`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/Scattering/compute_NAI2.jl#L44) |
-| Mie entry (PCW) | [`src/Scattering/compute_PCW.jl:28`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/Scattering/compute_PCW.jl#L28) |
+| Mie entry (NAI-2) | [`src/Scattering/compute_NAI2.jl:82`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/Scattering/compute_NAI2.jl#L82) |
+| Mie entry (PCW) | [`src/Scattering/compute_PCW.jl:37`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/Scattering/compute_PCW.jl#L37) |
 | Mie helper (a_n, b_n) | [`src/Scattering/mie_helper_functions.jl`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/Scattering/mie_helper_functions.jl) |
-| GreekCoefs type | [`src/Scattering/types.jl:231–244`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/Scattering/types.jl#L231-L244) |
-| AerosolOptics type | [`src/Scattering/types.jl:281–292`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/Scattering/types.jl#L281-L292) |
-| Polarization types | [`src/Scattering/types.jl:92–143`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/Scattering/types.jl#L92-L143) |
+| GreekCoefs type | [`src/Scattering/types.jl:462–475`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/Scattering/types.jl#L462-L475) |
+| AerosolOptics type | [`src/Scattering/types.jl:512–533`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/Scattering/types.jl#L512-L533) |
+| Polarization types | [`src/Scattering/types.jl:142–215`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/Scattering/types.jl#L142-L215) |
 | Z from Greek + μ | `src/Scattering/compute_Z_matrices.jl::compute_Z_moments` |
 | Truncation entry | [`src/Scattering/truncate_phase.jl`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/Scattering/truncate_phase.jl) (used by `createAero`) |
 | Rayleigh / Cabannes selector | [`src/CoreRT/LayerOpticalProperties/compEffectiveLayerProperties.jl:8–9`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/LayerOpticalProperties/compEffectiveLayerProperties.jl#L8-L9) |
-| GPU Mie kernel | [`src/Scattering/gpu_mie_kernels.jl:30–100`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/Scattering/gpu_mie_kernels.jl#L30-L100) |
+| GPU Mie kernel | [`src/Scattering/gpu_mie_kernels.jl:30–158`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/Scattering/gpu_mie_kernels.jl#L30-L158) |
 | YAML decomposition map | `src/IO/Parameters.jl::DECOMP_MAP` |
 
 ## Hands-on tutorials

@@ -30,7 +30,7 @@ R, T = rt_run(model)
 
 println("R shape: ", size(R))
 println("T shape: ", size(T))
-println("R(nadir, I, λ₁) = ", R[1, 1, 1])
+println("R(VZA 60°, I, ν₁) = ", R[1, 1, 1])
 
 # The documentation build renders the same two arrays as an interactive Plotly
 # view. Hovering the bars shows the numeric Stokes-I values returned above.

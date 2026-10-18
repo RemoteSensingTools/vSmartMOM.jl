@@ -18,7 +18,8 @@ Gas columns are flattened species-major: all TOA-to-BOA layers for gas 1,
 then all layers for gas 2, and so on. Each is the native partial
 `∂τ/∂VMR = σ·N_dry` described by [`AbundanceTangentContract`](@ref).
 Surface parameters are followed by the
-optional two-column SIF block `[SIF755, slope]`, then canopy parameters.
+optional two-column SIF block `[SIF760, mSIF]` (`[SIF755, slope]` for the
+legacy `SurfaceSIF` interface), then canopy parameters.
 The final two columns are `(p₀, σ_p)` for a pressure-form `Normal` profile and
 `(z₀, σ₀)` for an altitude-form `LogNormal` profile.
 

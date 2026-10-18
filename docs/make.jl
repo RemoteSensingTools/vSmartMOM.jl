@@ -150,8 +150,6 @@ function _core_rt_vza_plot()
     params = read_parameters(joinpath(pkgdir(vSmartMOM),
                                       "test", "test_parameters", "PureRayleighParameters.yaml"))
     params.architecture = vSmartMOM.Architectures.CPU()
-    params.max_m = 2
-    params.l_trunc = 20
     R = _quietly() do
         model = model_from_parameters(params; external_solar = true)
         rt_run_toa(model)
@@ -205,7 +203,7 @@ function _mie_preview()
             aerosol,
             0.55,
             Stokes_IQUV(),
-            δBGE(30, 2.0),
+            δBGE(30),
             30.0,
             500,
         )

@@ -544,12 +544,15 @@ function model_from_parameters(params::vSmartMOM_Parameters;
                 @debug "AOD at band $i_band (single-λ): $(sum(τ_aer[i_band][i_aer,:,:])), truncation factor = $(aerosol_optics[i_band][i_aer].fᵗ)"
 
             else
-                # ── Multi-wavelength band: Mie at band endpoints, linearly interpolate k(λ) ──
-                # Linear endpoint interpolation is an approximation.
-                # A future improvement could also compute the band-center point and use
-                # quadratic (3-point) interpolation. With smaller spectral bands,
-                # in-band aerosol dispersion is negligible and linear interpolation
-                # introduces at most ~(Δk/k)²/8 relative error in τ.
+                # ── Multi-wavelength band: Mie at the anchor-band endpoints ──
+                # The truncated endpoint optics (k, k·ω̃, fᵗ, Greek coefficients)
+                # are interpolated in wavenumber onto every spectral point:
+                # linearly between the two endpoints, or by a natural cubic
+                # through three nodes when λ_ref lies strictly inside the band
+                # (a third Mie node at λ_ref). Interpolation is an approximation;
+                # with small spectral bands in-band aerosol dispersion is
+                # negligible (linear interpolation errs by at most ~(Δk/k)²/8
+                # relative in τ).
                 length(anchor_band_λ) > 1 || throw(ArgumentError(
                     "a multi-wavelength solve grid requires at least two aerosol anchors"))
                 mie_model_0 = _mie_fwd(anchor_band_λ[1])

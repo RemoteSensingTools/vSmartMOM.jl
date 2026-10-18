@@ -124,7 +124,7 @@ passages only, no benchmarks/intros). Updated 2026-08-07.
 | **SF2014 (3)–(6)** | Scattering matrix elements `f_ij` from Wigner d-functions `π_n`, `τ_n`. | (theory anchor, code uses Greek directly) |
 | **SF2014 (12)–(14)** | **Phase matrix Z Fourier decomposition**: `Z = (1/2)C⁰ + Σₘ[Cᵐ cos m(φ−φ') + Sᵐ sin m(φ−φ')]`, with `Cᵐ = Aᵐ·Δ + Δ·Aᵐ·Δ`, `Aᵐ = Σ_{l=m}^∞ Π^m_l(μ)·B_l·Π^m_l(μ')`. | `compute_Z_matrices.jl::compute_Z_moments` |
 | **SF2014 (15)** | Generalized spherical-harmonic matrices `Π^m_l(μ)` (4×4 with `P^m_l`, `R^m_l`, `T^m_l`). | `compute_Z_matrices.jl` |
-| **SF2014 (16)** | **Greek matrix B_l** with the six coefficients `(α_l, β_l, γ_l, δ_l, ϵ_l, ζ_l)` populating its 4×4 form. | `src/Scattering/types.jl::GreekCoefs` lines 231–244 |
+| **SF2014 (16)** | **Greek matrix B_l** with the six coefficients `(α_l, β_l, γ_l, δ_l, ϵ_l, ζ_l)` populating its 4×4 form. | `src/Scattering/types.jl::GreekCoefs` lines 462–475 |
 | **SF2014 (17)** | Six integral formulas for the Greek coefficients in terms of `f_ij` integrals — used by NAI-2 path. | `src/Scattering/compute_NAI2.jl` |
 | **SF2014 (24)** | Greek matrix `B_l` from precomputed Wigner-3j combinations of `(aₙ, bₙ)` products — used by PCW path. | `src/Scattering/compute_PCW.jl` |
 | **SF2014 §5** | **NAI-2 vs PCW choice**: NAI-2 ≥13× faster than NAI-1 for individual large particles (>228 size parameter); PCW 6–8× faster than NAI-2 for polydispersions over a finite size range. NAI-2 is the safer default; PCW dominates for big polydisperse populations. | `src/Scattering/Scattering.jl` (DECOMP_MAP entry) |

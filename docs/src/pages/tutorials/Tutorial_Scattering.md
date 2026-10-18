@@ -50,8 +50,7 @@ aero = Aerosol(size_distribution, nᵣ, nᵢ)
 λ = 0.55                               # wavelength [μm]
 polarization_type = Stokes_IQUV()
 l_max = 20
-Δ_angle = 2.0
-truncation_type = δBGE(l_max, Δ_angle)
+truncation_type = δBGE(l_max)
 
 model_NAI2 = make_mie_model(
     NAI2(),
@@ -74,6 +73,16 @@ aerosol_optics_NAI2 = compute_aerosol_optical_properties(model_NAI2)
 println("ω̃ = ", aerosol_optics_NAI2.ω̃)
 println("k  = ", aerosol_optics_NAI2.k)
 println("fᵗ = ", aerosol_optics_NAI2.fᵗ)
+```
+
+These are the untruncated Mie optics: the Greek coefficients run to the full
+Mie order and `fᵗ` is a placeholder (`1`) until a truncation is applied. The
+RT model builder applies the δBGE fit itself; to inspect it directly, call
+`truncate_phase` with the same truncation type:
+
+```julia
+aerosol_optics_trunc = truncate_phase(truncation_type, aerosol_optics_NAI2)
+println("fᵗ after δBGE(", l_max, ") truncation = ", aerosol_optics_trunc.fᵗ)
 ```
 
 ---

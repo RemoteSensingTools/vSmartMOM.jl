@@ -163,8 +163,8 @@ outside that block. Five weighted streams plus one distinct VZA in
 
 `Stokes_I` (``n=1``, scalar intensity), `Stokes_IQ` (``n=2``), `Stokes_IQU` (``n=3``),
 `Stokes_IQUV` (``n=4``) each subtype `AbstractPolarizationType` in
-[`src/Scattering/types.jl:92–143`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/Scattering/types.jl#L92-L143). Each carries the polarization symmetry vector
-``\mathbf{D}`` (used in [Concepts/04](04_mom_solver.md#doubling)) and the unit
+[`src/Scattering/types.jl:142–215`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/Scattering/types.jl#L142-L215). Each carries the polarization symmetry vector
+``\mathbf{D}`` (used in [Concepts/04](04_mom_solver.md#Doubling)) and the unit
 solar Stokes vector ``\mathbf{I}_0``.
 
 The kernels specialize on the type at compile time. There is no
@@ -176,13 +176,13 @@ took adding one struct definition; the kernels picked it up automatically.
 
 | Concept | Source |
 |---|---|
-| Top-level RT loop | [`src/CoreRT/rt_run.jl:53–329`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/rt_run.jl#L53-L329) |
-| Fourier-moment dispatch | [`src/CoreRT/rt_run.jl:208`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/rt_run.jl#L208) (`for m = 0:max_m-1`) |
-| Quadrature construction | [`src/CoreRT/tools/rt_set_streams.jl:24–110`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/tools/rt_set_streams.jl#L24-L110) |
+| Top-level RT loop | [`src/CoreRT/rt_run.jl`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/rt_run.jl) (`rt_run` → `_rt_run_column`) |
+| Fourier-moment dispatch | `src/CoreRT/rt_run.jl::_rt_run_column` (`for m = 0:m_max`) |
+| Quadrature construction | [`src/CoreRT/tools/rt_set_streams.jl:23–256`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/tools/rt_set_streams.jl#L23-L256) |
 | `QuadPoints` struct | `src/CoreRT/types.jl::QuadPoints` |
 | External direct-solar phase coupling | `src/CoreRT/CoreKernel/elemental.jl::get_elem_rt_SFI!` |
 | Lean TOA-only entry point | `src/CoreRT/rt_run.jl::rt_run_toa` |
-| Polarization types | [`src/Scattering/types.jl:92–143`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/Scattering/types.jl#L92-L143) |
+| Polarization types | [`src/Scattering/types.jl:142–215`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/Scattering/types.jl#L142-L215) |
 | Phase matrix Z from Greek | `src/Scattering/compute_Z_matrices.jl::compute_Z_moments` |
 | Supermatrix layer types | `src/CoreRT/types.jl::CompositeLayer/AddedLayer` |
 

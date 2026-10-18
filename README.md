@@ -25,9 +25,9 @@
 
 <p align="center">
   <a href="#installation">Installation</a> •
-  <a href="#modules">Modules</a> (<a href="#vsmartmom">vSmartMOM</a>, <a href="#vsmartmomabsorption">Absorption</a>, <a href="#vsmartmomscattering">Scattering</a>) •
-  <a href="#support">Support</a> •
-  <a href="#license">License</a>
+  <a href="#modules">Modules</a> (<a href="#vsmartmom">vSmartMOM</a>, <a href="#legacy-vsmartmomabsorption-deprecated">Absorption</a>, <a href="#vsmartmomscattering">Scattering</a>) •
+  <a href="#how-to-contribute">Support</a> •
+  <a href="#copyright-notice">License</a>
 </p>
 </div>
 This project aims to revamp and modernize key atmospheric remote sensing tools. Specifically, it will enable the fast computation of atmospheric optical properties, full-polarized radiative transfer simulations, and commonly-used inversion routines.
@@ -145,16 +145,16 @@ See the full <a href="https://RemoteSensingTools.github.io/vSmartMOM.jl/dev/page
   - `artifact(molecule::String)`: Retrieve the path to a HITRAN `.par` file for a molecule. Routes through legacy artifacts or hitran.org depending on the active edition.
   - `fetch_hitran(molecule; numin, numax, edition)`: Download HITRAN data directly from hitran.org with optional wavenumber filtering.
   - `read_hitran(filepath::String)`: Creates a HitranTable struct from a fixed-width HITRAN `.par` file.
-  - `make_hitran_model(hitran::HitranTable, broadening::AbstractBroadeningFunction, ...)`: Create a HitranModel struct that holds all of the model parameters needed to perform an absorption cross-section calculation (transitions, broadening type, wing_cutoff, etc.)
-  - `make_interpolation_model(hitran::HitranTable, broadening::AbstractBroadeningFunction, ...)`: Similar to creating a HitranModel, but this will perform the interpolation at the given wavelength, pressure, and temperature grids and store the interpolator in InterpolationModel.
-  - `absorption_cross_section(model::AbstractCrossSectionModel, grid::AbstractRange{<:Real}, pressure::Real, temperature::Real, ...)`: Performs an absorption cross-section calculation with the given model (HitranModel or InterpolationModel), at a given wavelength grid, pressure and temperature
+  - `make_hitran_model(hitran::HitranTable, broadening::AbstractBroadeningFunction, ...)` (deprecated; removal in 3.0): Create a HitranModel struct that holds all of the model parameters needed to perform an absorption cross-section calculation (transitions, broadening type, wing_cutoff, etc.)
+  - `make_interpolation_model(hitran::HitranTable, broadening::AbstractBroadeningFunction, wave_grid, p_grid, t_grid; ...)`: Similar to creating a HitranModel, but this will perform the interpolation at the given uniform wavenumber, pressure, and temperature grids and store the interpolator in InterpolationModel (wavelength grids are rejected).
+  - `absorption_cross_section(model::AbstractCrossSectionModel, grid::AbstractRange{<:Real}, pressure::Real, temperature::Real; wavelength_flag=false)`: Performs an absorption cross-section calculation with the given model (HitranModel or InterpolationModel), at a given wavenumber grid (cm⁻¹; wavelength in nm with `wavelength_flag=true`), pressure (hPa) and temperature (K)
 
 ### vSmartMOM.Scattering
 
 This module enables scattering phase-function calculation of atmospheric aerosols with different size distributions, incident wavelengths, and refractive indices. It can perform the calculation using either the Siewert NAI-2 or Domke PCW methods ([Suniti Sanghavi 2014](https://www.sciencedirect.com/science/article/pii/S0022407313004962)). <br><br><img src="docs/src/assets/ScatteringGIF.gif" alt="Scattering phase function" /><br> Key functions:
 
-  - `make_univariate_aerosol(size_distribution::ContinuousUnivariateDistribution, r_max, nquad_radius::Int, nᵣ, nᵢ`: Create an aerosol object with size distribution and complex refractive index.
-  - `make_mie_model(computation_type::AbstractFourierDecompositionType, aerosol::AbstractAerosolType, λ::Real, polarization::AbstractPolarizationType, truncation_type::AbstractTruncationType, ...)`: Create a MieModel struct that holds all of the model parameters needed to perform a phase function calculation (computation type, aerosol, incident wavelength, etc. )
+  - `Aerosol(size_distribution::ContinuousUnivariateDistribution, nᵣ, nᵢ)`: Create an aerosol object with size distribution and complex refractive index.
+  - `make_mie_model(computation_type::AbstractFourierDecompositionType, aerosol::Aerosol, λ::Real, polarization::AbstractPolarizationType, truncation_type::AbstractTruncationType, r_max, nquad_radius, ...)`: Create a MieModel struct that holds all of the model parameters needed to perform a phase function calculation (computation type, aerosol, incident wavelength, etc. )
   - `compute_aerosol_optical_properties(model::MieModel)`: Compute the aerosol optical properties using the specified model parameters
 
 ## Citing

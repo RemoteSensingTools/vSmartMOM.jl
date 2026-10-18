@@ -14,7 +14,7 @@ import YAML
         # Keep `truncation` in sync with the mutated `l_trunc` — model_from_parameters
         # no longer auto-rebuilds the default δBGE so that explicit user truncation
         # (e.g. NoTruncation()) isn't silently overwritten.
-        params64.truncation = vSmartMOM.Scattering.δBGE{Float64}(10, params64.Δ_angle)
+        params64.truncation = vSmartMOM.Scattering.δBGE{Float64}(10)
         params64.architecture = vSmartMOM.CPU()
         model64 = model_from_parameters(params64)
         R64, _, _, _, _, _, _ = rt_run(model64)
@@ -27,7 +27,7 @@ import YAML
         params32 = vSmartMOM.parameters_from_yaml(yaml32)
         params32.max_m = 2
         params32.l_trunc = 10
-        params32.truncation = vSmartMOM.Scattering.δBGE{Float32}(10, params32.Δ_angle)
+        params32.truncation = vSmartMOM.Scattering.δBGE{Float32}(10)
         params32.architecture = vSmartMOM.CPU()
         model32 = model_from_parameters(params32)
         R32, _, _, _, _, _, _ = rt_run(model32)
@@ -43,7 +43,7 @@ import YAML
         # Keep `truncation` in sync with the mutated `l_trunc` — model_from_parameters
         # no longer auto-rebuilds the default δBGE so that explicit user truncation
         # (e.g. NoTruncation()) isn't silently overwritten.
-        params64.truncation = vSmartMOM.Scattering.δBGE{Float64}(10, params64.Δ_angle)
+        params64.truncation = vSmartMOM.Scattering.δBGE{Float64}(10)
         params64.architecture = vSmartMOM.CPU()
         model64 = model_from_parameters(params64)
         R64, _, _, _, _, _, _ = rt_run(model64)
@@ -51,7 +51,7 @@ import YAML
         params32 = vSmartMOM.parameters_from_yaml(yaml32)
         params32.max_m = 2
         params32.l_trunc = 10
-        params32.truncation = vSmartMOM.Scattering.δBGE{Float32}(10, params32.Δ_angle)
+        params32.truncation = vSmartMOM.Scattering.δBGE{Float32}(10)
         params32.architecture = vSmartMOM.CPU()
         model32 = model_from_parameters(params32)
         R32, _, _, _, _, _, _ = rt_run(model32)

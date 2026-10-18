@@ -12,7 +12,17 @@ radiative_transfer:
     - "<surface_constructor>"   # one entry per spec_band
 ```
 
-The `surface` vector must have **the same length as `spec_bands`**.
+Surface `i` belongs to band `i`, so give **one entry per `spec_bands`
+entry**. Fewer surfaces than bands raise an `ArgumentError` at model
+construction; surplus entries beyond the last band are ignored with a
+one-time warning.
+
+A solve over several bands together (for example
+`rt_run(RS_type, model, iBand)` with more than one band) applies a single
+lower boundary, so every selected band must then hold the same surface;
+otherwise an `ArgumentError` asks you to run the bands separately. Two
+identical plain-value entries such as `LambertianSurfaceScalar(0.15)` count
+as the same surface.
 
 ## Allowed constructors
 
@@ -23,7 +33,10 @@ The `surface` vector must have **the same length as `spec_bands`**.
 | `LambertianSurfaceScalar(albedo::Real)` | Single albedo for all spectral points in the band. The simplest BRDF. Phase C trait: `m_max = 0`. |
 | `LambertianSurfaceSpectrum([albedos...])` | Vector of albedos, one per spectral point in the band. Use when the surface albedo varies appreciably across the band (e.g. snow in NIR). |
 | `LambertianSurfaceLegendre([a₀, a₁, a₂, ...])` | Legendre expansion in the spectral band's normalized coordinate. |
-| `LambertianSurfaceSpline(λ, ρ)` | Spline through tabulated `(λ, ρ)` pairs. For full spectral coverage use the `LambertianSurfaceSpline` helper directly in Julia rather than YAML.|
+
+`LambertianSurfaceSpline` (a spline through tabulated albedos) is not in the
+parser's whitelist; construct it directly in Julia and assign it to the model
+instead of using a YAML/TOML string.
 
 ### Vegetation BRDFs (full Fourier; trait: `m_max = user_l_cap`)
 
@@ -36,7 +49,7 @@ The `surface` vector must have **the same length as `spec_bands`**.
 
 | Constructor | Use case |
 |---|---|
-| `CoxMunkSurface(wind_speed=U, n_water=...)` | Cox-Munk wave-slope statistics + Fresnel + (optional) whitecaps + Smith shadowing. Full polarization. |
+| `CoxMunkSurface(wind_speed=U, n_water=...)` or `CoxMunkSurface(U)` | Cox-Munk wave-slope statistics + Fresnel + (optional) whitecaps + Smith shadowing. Full polarization. |
 
 `CoxMunkSurface` keyword arguments:
 
@@ -44,7 +57,9 @@ The `surface` vector must have **the same length as `spec_bands`**.
   total mean-square slope `⟨zx² + zy²⟩ = 0.003 + 0.00512·U`; each slope
   component has variance `σ² = ½(0.003 + 0.00512·U)`.
 - `n_water` — complex refractive index. Default `nothing` triggers the
-  built-in Segelstein 1981 spectral lookup.
+  built-in Segelstein 1981 spectral lookup. The YAML/TOML string form
+  accepts only a real number here (stored with zero imaginary part); set a
+  complex or spectral `n_water` in Julia.
 - `whitecap_albedo` *(default `0.22`)* — Lambertian whitecap albedo
   (Koepke 1984).
 - `include_whitecaps` *(default `true`)* — whether to include the

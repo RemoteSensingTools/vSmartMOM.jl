@@ -25,9 +25,11 @@ params = read_parameters(
     joinpath(pkgdir(vSmartMOM),
              "test", "test_parameters", "PureRayleighParameters.yaml"))
 params.architecture = vSmartMOM.Architectures.CPU()
-params.max_m = 2
-params.l_trunc = 20
 ```
+
+Angular resolution comes from the YAML's `nstreams: 11`. Do not lower the
+legacy `max_m` count here: Rayleigh needs Fourier moments m = 0, 1, 2, and
+`max_m = 2` would keep only m = 0, 1.
 
 Build the model and run.
 
@@ -40,7 +42,7 @@ R is the top-of-atmosphere reflected Stokes field [nVZA × nStokes × nSpec].
 
 ```julia
 println("R shape: ", size(R))
-println("R(nadir, I, λ₁) = ", R[1, 1, 1])
+println("R(VZA 60°, I, ν₁) = ", R[1, 1, 1])
 ```
 
 The generated docs include a Plotly view of this pure-Rayleigh scene across
@@ -80,8 +82,9 @@ the composite layer (no interaction yet). For `iz > 1`, adding is applied.
 - Truncation updates used by scattering optics:
   Sanghavi and Stephens (2015), Eq. (38a)-(38d).
 
-For a detailed symbol-to-code mapping, see the documentation page:
-`vSmartMOM -> Core RT Theory (Doubling/Adding)`.
+For a detailed symbol-to-code mapping, see the RT basics pages
+[2 · Vector RTE & Discretization](../concepts/02_rt_theory.md) and
+[4 · The MOM Solver](../concepts/04_mom_solver.md).
 
 ---
 

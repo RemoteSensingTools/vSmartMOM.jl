@@ -29,8 +29,9 @@ number density of the absorbing species in the layer. Once computed,
     package (`AtmosphericAbsorption.load_lines` + `LineByLineModel`; TIPS-2021 partition
     functions). The diagram and prose below describe the underlying physics — the same
     line-shape equations apply — but `make_hitran_model` is **not** on the `rt_run` call
-    path since this merge. The internal line-by-line API (`make_hitran_model` /
-    `read_hitran` / `absorption_cross_section` on a `HitranModel`) is deprecated in 2.2 and
+    path since this merge. The internal line-by-line model (`make_hitran_model` /
+    `HitranModel`, used with `read_hitran` and `absorption_cross_section`) is deprecated
+    in 2.2 (a one-time notice on first use lists the AtmosphericAbsorption calls) and
     will be removed in 3.0; new direct σ(ν, T, p) and ABSCO workflows should use
     AtmosphericAbsorption.jl. YAML `LUTfiles` accept OCO-2 ABSCO HDF files and AtmosphericAbsorption `.absco` tables (`save_absco_lut`), as well as vSmartMOM JLD2 tables from `make_interpolation_model`; AtmosphericAbsorption's own interpolation tables (`build_interpolation_model`/`save_interpolation_model`) are not read by the 2.x loader.
 
@@ -89,7 +90,8 @@ implementations including a GPU-friendly Humlicek-style approximation
 The internal `Absorption` module exposes a direct σ(ν, T, p) API
 (`read_hitran` / `make_hitran_model` / `absorption_cross_section`) backed by
 a KernelAbstractions Voigt kernel.  This is the path used by the Tutorial on
-Absorption and by code that needs custom grids or cross-section comparisons.
+Absorption and by code that needs custom grids or cross-section comparisons;
+`make_hitran_model` is deprecated in 2.2 (see the warning above).
 
 > **RT pipeline note:** `model_from_parameters` → `rt_run` computes LBL gas
 > absorption internally via
@@ -100,7 +102,7 @@ Absorption and by code that needs custom grids or cross-section comparisons.
 Because the line-shape sum is a per-grid-point reduction over thousands of
 contributing lines, it parallelizes trivially across the spectral grid —
 exactly the workload pattern of the RT solver. The Voigt kernel from
-[`src/Absorption/compute_absorption_cross_section.jl:229–280`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/Absorption/compute_absorption_cross_section.jl#L229-L280):
+[`src/Absorption/compute_absorption_cross_section.jl:316–332`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/Absorption/compute_absorption_cross_section.jl#L316-L332):
 
 ```julia
 @kernel function line_shape_batch!(A, @Const(grid), @Const(ν_arr), @Const(γ_d_arr),
@@ -169,7 +171,7 @@ gives ``\tau_\mathrm{abs}(\nu, z)``. This is wrapped in a
 `CoreAbsorptionOpticalProperties` and added to the layer-optics build chain:
 
 ```julia
-# inside compEffectiveLayerProperties.jl:58 (paraphrased)
+# inside compEffectiveLayerProperties.jl:363 (paraphrased)
 combo = rayleigh + sum(aerosols)                       # τ_scat, ϖ, Z accumulated
 final = combo + CoreAbsorptionOpticalProperties(τ_abs) # τ_λ = τ_abs + τ_scat,
                                                         # ϖ_λ = τ_scat·ϖ / τ_λ
@@ -186,8 +188,8 @@ scattering-vs-total τ split that makes this work.
 |---|---|
 | HITRAN parser | [`src/Absorption/read_hitran.jl`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/Absorption/read_hitran.jl) |
 | Absorption types | [`src/Absorption/types.jl`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/Absorption/types.jl) |
-| Cross-section computation | [`src/Absorption/compute_absorption_cross_section.jl:32–280`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/Absorption/compute_absorption_cross_section.jl#L32-L280) |
-| Line-shape kernel (`@kernel`) | [`src/Absorption/compute_absorption_cross_section.jl:229–280`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/Absorption/compute_absorption_cross_section.jl#L229-L280) |
+| Cross-section computation | [`src/Absorption/compute_absorption_cross_section.jl:32–332`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/Absorption/compute_absorption_cross_section.jl#L32-L332) |
+| Line-shape kernel (`@kernel`) | [`src/Absorption/compute_absorption_cross_section.jl:316–332`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/Absorption/compute_absorption_cross_section.jl#L316-L332) |
 | Complex error functions | [`src/Absorption/complex_error_functions.jl`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/Absorption/complex_error_functions.jl) |
 | Constants & TIPS partition function | `src/Absorption/constants/` |
 

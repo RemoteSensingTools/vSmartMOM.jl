@@ -13,7 +13,7 @@ optical-property derivation see Sanghavi 2022 (Part I).
 
 vSmartMOM supports rotational Raman (RRS) and vibrational Raman (VRS,
 RVRS) inelastic scattering as a **parallel kernel path** next to the
-elastic one. Pass the configured mode object as `rt_run(rs, model)`: `noRS`
+elastic one. Pass the configured mode object as `rt_run(RS_type, model, iBand)`: `noRS`
 (default; pure elastic), `RRS`, `VS_0to1`, `VS_1to0`, plus `_plus`
 variants for multi-band runs that share spectral structure. The bulk of
 retrievals (NIR shortwave for greenhouse gases, polarized aerosol over
@@ -48,7 +48,7 @@ Architecturally:
 - **Parallel kernel files** at [`src/CoreRT/CoreKernel/elemental_inelastic.jl`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/CoreKernel/elemental_inelastic.jl),
   `doubling_inelastic.jl`, `interaction_inelastic.jl`. `rt_kernel!`
   dispatches on `RS_type` to choose which set runs (see
-  [`src/CoreRT/CoreKernel/rt_kernel.jl:48–229`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/CoreKernel/rt_kernel.jl#L48-L229)). The elastic kernel
+  the `RRS`/`VS_*` methods in [`src/CoreRT/CoreKernel/rt_kernel.jl:399–442`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/CoreKernel/rt_kernel.jl#L399-L442)). The elastic kernel
   *also* runs alongside — Raman is additive on top.
 - **Diffuse redistribution and direct-solar excitation use different angular
   shapes.** Raman diffuse operators remain square
@@ -66,7 +66,7 @@ Architecturally:
   then isolates the Rayleigh-active part of that extinction for the Raman
   source. Computing it before gas absorption would over-weight Raman source
   terms inside absorption lines.
-- **`rt_run_ss`** ([`src/CoreRT/rt_run.jl:364–524`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/rt_run.jl#L364-L524)) is the single-scattering
+- **`rt_run_ss`** ([`src/CoreRT/rt_run.jl`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/rt_run.jl)) is the single-scattering
   approximation that exists alongside `rt_run` for SF2023-II Eq. (32) —
   the inelastic correction `I₁ ≈ I₀ + (I'₁ − I'₀)` that makes the
   linear-in-inelastic approximation usable in absorbing bands. Not a
@@ -86,7 +86,7 @@ Architecturally:
 | Inelastic doubling | [`src/CoreRT/CoreKernel/doubling_inelastic.jl`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/CoreKernel/doubling_inelastic.jl) |
 | Inelastic interaction | [`src/CoreRT/CoreKernel/interaction_inelastic.jl`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/CoreKernel/interaction_inelastic.jl) |
 | `_plus` variants (multi-band) | [`src/CoreRT/CoreKernel/elemental_inelastic_plus.jl`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/CoreKernel/elemental_inelastic_plus.jl) |
-| Single-scatter inelastic correction | `src/CoreRT/rt_run.jl::rt_run_ss:364–524` |
+| Single-scatter inelastic correction | `src/CoreRT/rt_run.jl::rt_run_ss` |
 | Cabannes vs full Rayleigh selector | [`src/CoreRT/LayerOpticalProperties/compEffectiveLayerProperties.jl:8–9`](https://github.com/RemoteSensingTools/vSmartMOM.jl/blob/main/src/CoreRT/LayerOpticalProperties/compEffectiveLayerProperties.jl#L8-L9) |
 | Raman Rayleigh extinction fraction | `src/CoreRT/LayerOpticalProperties/compEffectiveLayerProperties.jl::_rayleigh_fraction_of_total_extinction` |
 
