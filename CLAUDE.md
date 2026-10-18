@@ -249,7 +249,8 @@ ext/
 config/                       # Example YAML configurations
 test/
   runtests.jl                 # Test orchestrator
-  test_helpers.jl             # run_lin_rt, rel_errors, fd_jacobian_R
+  test_helpers.jl             # VSmartMOMTestSupport: run_linearized_rt, forward_R, rel_errors
+  README.md                   # test-file inventory (active/optional/benchmark/support/historical)
   test_parameters/            # Test YAML configs
 ```
 
@@ -273,7 +274,8 @@ test/
 1. Create `test/test_myfeature.jl` with `@testset` blocks
 2. Add `@testset` entry in `test/runtests.jl`
 3. Test YAML files go in `test/test_parameters/`
-4. Use helpers from `test/test_helpers.jl` (e.g., `run_lin_rt`, `rel_errors`, `fd_jacobian_R`)
+4. Use the `VSmartMOMTestSupport` helpers from `test/test_helpers.jl` (`run_linearized_rt`, `linearized_R`, `run_forward_rt`, `forward_R`, `rel_errors`); see its header for the include guard
+5. Add the file to the inventory in `test/README.md`
 
 ### Running Forward RT
 
