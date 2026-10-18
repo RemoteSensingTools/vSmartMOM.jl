@@ -675,6 +675,10 @@ end
         cox_m48 = truncated_ss_path2(cox_config, 48)
         @test all(isfinite.(cox_m48))
         @test norm(vec(cox_m48 .- cox_exact)) < norm(vec(cox_m1 .- cox_exact))
+        # The Fourier series converges to the exact BRDF; the m = 0 term
+        # carries the azimuthal mean with weight one.
+        @test cox_m48 ≈ cox_exact rtol=1e-10
+        @test truncated_ss_path2(cox_config, 200) ≈ cox_exact rtol=1e-10
         @test_throws ArgumentError truncated_ss_path2(cox_config, 0)
     end
 

@@ -110,6 +110,11 @@ function _gauss_legendre_0π(n::Int, ::Type{FT}) where {FT}
     return scale .* (FT.(x) .+ one(FT)), scale .* FT.(w)
 end
 
+# Azimuth rule for the Cox–Munk Fourier coefficients: at least 100 nodes,
+# and enough to resolve cos(mϕ) up to the highest requested order.
+_coxmunk_azimuth_rule(max_m::Int, ::Type{FT}) where {FT} =
+    _gauss_legendre_0π(max(100, 2max_m), FT)
+
 function _coxmunk_fourier_coeff_element(core_surface::CoxMunkSurface{FT},
                                         ϕ, w, n_stokes::Int,
                                         si::Int, sj::Int,
@@ -135,17 +140,16 @@ function _precompute_surface_brdf_fourier(::Val{1},
     ρ = zeros(FT, n_geom, n_spec)
     μ₀ = convert(FT, geometry.μ₀)
     core_surface = _coxmunk_core_surface(surface, FT)
-    ϕ, w = _gauss_legendre_0π(100, FT)
+    ϕ, w = _coxmunk_azimuth_rule(max_m, FT)
     @inbounds for ispec in 1:n_spec, iv in 1:n_geom
         μᵥ = convert(FT, geometry.μv[iv])
         dϕ = convert(FT, geometry.Δϕ[iv])
         n_water = _coxmunk_n_water(surface, ispec, n_spec, FT)
         value = zero(FT)
         for m in 0:(max_m - 1)
-            weight_m = m == 0 ? FT(0.5) : one(FT)
             coeff = _coxmunk_fourier_coeff_element(
                 core_surface, ϕ, w, 1, 1, 1, μᵥ, μ₀, m, n_water)
-            value += weight_m * _ss_azimuthal_kernel(1, 1, m, dϕ) * coeff
+            value += _ss_azimuthal_kernel(1, 1, m, dϕ) * coeff
         end
         ρ[iv, ispec] = value
     end
@@ -161,7 +165,7 @@ function _precompute_surface_brdf_fourier(::Val{N},
     ρ = zeros(FT, n_geom, N, n_spec)
     μ₀ = convert(FT, geometry.μ₀)
     core_surface = _coxmunk_core_surface(surface, FT)
-    ϕ, w = _gauss_legendre_0π(100, FT)
+    ϕ, w = _coxmunk_azimuth_rule(max_m, FT)
     @inbounds for ispec in 1:n_spec, iv in 1:n_geom
         μᵥ = convert(FT, geometry.μv[iv])
         dϕ = convert(FT, geometry.Δϕ[iv])
@@ -169,10 +173,9 @@ function _precompute_surface_brdf_fourier(::Val{N},
         for si in 1:N
             value = zero(FT)
             for m in 0:(max_m - 1)
-                weight_m = m == 0 ? FT(0.5) : one(FT)
                 coeff = _coxmunk_fourier_coeff_element(
                     core_surface, ϕ, w, N, si, 1, μᵥ, μ₀, m, n_water)
-                value += weight_m * _ss_azimuthal_kernel(si, 1, m, dϕ) * coeff
+                value += _ss_azimuthal_kernel(si, 1, m, dϕ) * coeff
             end
             ρ[iv, si, ispec] = value
         end

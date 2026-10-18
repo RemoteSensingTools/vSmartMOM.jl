@@ -112,6 +112,12 @@ review of General's sequential-version rule.
   or viewing angles. Previously it dropped interior observers and the TOA
   output metadata, and returned external-solar models to the embedded
   representation.
+- StandaloneSS `truncated_ss_path2` no longer halves the m = 0 Cox–Munk
+  Fourier term (the azimuthal mean), matching the CoreRT correction to the
+  glint residual; the truncated series now converges to `run_exact_ss`, and
+  Cox–Munk `apply_back_correction!` results change accordingly. Its azimuth
+  rule grows with the requested number of moments (at least 100 nodes,
+  2·max_m above 50 moments).
 - HITRAN, partition-sum, HAPI, CIA and MT_CKD references added to
   `CITATION.bib`, the References page and the README, with guidance on which
   HITRAN edition a calculation used.
