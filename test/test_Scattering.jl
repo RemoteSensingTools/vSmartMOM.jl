@@ -127,6 +127,24 @@ end
     @test size(dZ⁻⁺) == (4, 4, 4)
     @test all(iszero, dZ⁺⁺)
     @test all(iszero, dZ⁻⁺)
+
+    # δBGE truncation of phase matrices with identically zero f₁₂ (HG) or
+    # f₃₄ (synthetic polarized HG): those elements truncate to zero, and the
+    # f₁₁ fit is the same for both, since their f₁₁ agree.
+    hg_optics = analytic_aerosol_optics(HenyeyGreensteinPhaseFunction(g = 0.8); l_max = 80)
+    pol_optics = analytic_aerosol_optics(SyntheticPolarizedHenyeyGreensteinPhaseFunction(
+        g = 0.8, polarization_fraction = 0.5); l_max = 80)
+    hg_t = Scattering.truncate_phase(δBGE{Float64}(20), hg_optics)
+    pol_t = Scattering.truncate_phase(δBGE{Float64}(20), pol_optics)
+    for t in (hg_t, pol_t), f in fieldnames(typeof(t.greek_coefs))
+        @test all(isfinite, getfield(t.greek_coefs, f))
+    end
+    @test 0 < hg_t.fᵗ < 1
+    @test all(iszero, hg_t.greek_coefs.γ)
+    @test all(iszero, pol_t.greek_coefs.ϵ)
+    @test any(!iszero, pol_t.greek_coefs.γ)
+    @test pol_t.fᵗ ≈ hg_t.fᵗ
+    @test pol_t.greek_coefs.β ≈ hg_t.greek_coefs.β
 end
 
 # Test the Aerosol Optics calculations (both NAI2 and Siewert)
@@ -292,4 +310,22 @@ end
         analytic = getproperty(lin_out.lin_greek_coefs, tangent_field)[1, :]
         @test analytic ≈ fd rtol=2e-4 atol=2e-7
     end
+end
+
+@testset "δBGE tangent at an identically zero f₁₂ / f₃₄" begin
+    # HG has γ ≡ ϵ ≡ 0: zero tangents truncate to zero tangents, while a
+    # direction that switches on polarization has no derivative under the
+    # 1/f² weighting and is rejected.
+    raw = analytic_aerosol_optics(HenyeyGreensteinPhaseFunction(g = 0.6); l_max = 40)
+    n = length(raw.greek_coefs.β)
+    make_lin(γ̇) = linAerosolOptics(lin_greek_coefs=linGreekCoefs(
+        zeros(4, n), [1e-2 .* raw.greek_coefs.β'; zeros(3, n)], γ̇,
+        zeros(4, n), zeros(4, n), zeros(4, n)), ω̃̇=zeros(4), k̇=zeros(4), ḟᵗ=zeros(4))
+    t, lin_out = Scattering.truncate_phase(δBGE(15), raw, make_lin(zeros(4, n)))
+    @test all(iszero, t.greek_coefs.γ) && all(iszero, t.greek_coefs.ϵ)
+    @test all(iszero, lin_out.lin_greek_coefs.γ̇)
+    @test all(iszero, lin_out.lin_greek_coefs.ϵ̇)
+    @test any(!iszero, lin_out.lin_greek_coefs.β̇)
+    γ̇ = zeros(4, n); γ̇[1, 4] = 1
+    @test_throws r"nonzero f₁₂ tangent" Scattering.truncate_phase(δBGE(15), raw, make_lin(γ̇))
 end

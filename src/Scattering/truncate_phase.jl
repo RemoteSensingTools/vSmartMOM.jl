@@ -254,7 +254,10 @@ function truncate_phase(mod::δBGE, aero::AerosolOptics{FT}; reportFit=false) wh
         end
     end
     γᵗ = similar(cl); γᵗ[1:2] .=0
-    γᵗ[3:end] = A[3:end,3:end] \ b[3:end]   # G in δ-BGE (γ)
+    # An identically zero f₁₂ (e.g. an unpolarized Henyey–Greenstein phase
+    # function) truncates to zero; its 1/f₁₂² weights are undefined.
+    γᵗ[3:end] = all(iszero, y₁₂) ? zero(γᵗ[3:end]) :
+                A[3:end,3:end] \ b[3:end]   # G in δ-BGE (γ)
 
     if reportFit
         B_sub = fac[3:end]' .* P²_sub[:, 3:l_tr]
@@ -281,7 +284,8 @@ function truncate_phase(mod::δBGE, aero::AerosolOptics{FT}; reportFit=false) wh
     end
 
     ϵᵗ = similar(cl); ϵᵗ[1:2] .=0
-    ϵᵗ[3:end] = A[3:end,3:end] \ b[3:end]   # E in δ-BGE (ϵ)
+    ϵᵗ[3:end] = all(iszero, y₃₄) ? zero(ϵᵗ[3:end]) :
+                A[3:end,3:end] \ b[3:end]   # E in δ-BGE (ϵ), zero for f₃₄ ≡ 0
 
     if reportFit
         B_sub = fac[3:end]' .* P²_sub[:, 3:l_tr]

@@ -3,6 +3,16 @@
 This file specifies how to truncate the AerosolOptics struct, given the truncation type
  
 =#
+# A tangent that switches on an element which is identically zero (e.g. a
+# polarization direction about an unpolarized Henyey–Greenstein phase matrix)
+# has no derivative under the 1/f² weighting of the δBGE fit.
+function _require_zero_tangent(ḟ, name)
+    all(iszero, ḟ) || throw(ArgumentError(
+        "δBGE truncation tangent is undefined for a nonzero $(name) tangent " *
+        "about an identically zero $(name) (its fit weights are 1/$(name)²)"))
+    return nothing
+end
+
 """
     $(FUNCTIONNAME)(mod::δBGE, aero::AerosolOptics, lin_aero::linAerosolOptics; reportFit=false)
 
@@ -119,10 +129,18 @@ function truncate_phase(mod::δBGE, aero::AerosolOptics{FT}, lin_aero::linAeroso
     # once c₀ = cl[1] is available — the derivative formula
     # ẋ = A⁻¹(ḃ − Ȧx) below needs the unnormalised fit x.
     γᵗ_fit = similar(cl); γᵗ_fit[1:2] .= 0
-    γᵗ_fit[3:end] = A[3:end,3:end] \ b[3:end]   # G in δ-BGE (γ)
+    # As in truncate_phase: an identically zero f₁₂ truncates to zero (the
+    # 1/f₁₂² weights are undefined there), and so does a zero tangent.
+    γ_zero = all(iszero, y₁₂)
+    γᵗ_fit[3:end] = γ_zero ? zero(γᵗ_fit[3:end]) :
+                    A[3:end,3:end] \ b[3:end]   # G in δ-BGE (γ)
 
     γ̇ᵗ_fit = zeros(4,l_tr)
     for ctr=1:4
+        if γ_zero
+            _require_zero_tangent(view(ḟ₁₂, ctr, :), "f₁₂")
+            continue
+        end
         Ȧ = zeros(l_tr, l_tr)
         ḃ = zeros(l_tr)
         for i = 3:l_tr
@@ -167,10 +185,16 @@ function truncate_phase(mod::δBGE, aero::AerosolOptics{FT}, lin_aero::linAeroso
     # Unnormalised δ-BGE fit of b₂(μ) — see the γ block above; the 1/c₀
     # renormalisation and its derivative chain are applied below.
     ϵᵗ_fit = similar(cl); ϵᵗ_fit[1:2] .=0
-    ϵᵗ_fit[3:end] = A[3:end,3:end] \ b[3:end]   # E in δ-BGE (ϵ)
+    ϵ_zero = all(iszero, y₃₄)
+    ϵᵗ_fit[3:end] = ϵ_zero ? zero(ϵᵗ_fit[3:end]) :
+                    A[3:end,3:end] \ b[3:end]   # E in δ-BGE (ϵ)
     
     ϵ̇ᵗ_fit = zeros(4,l_tr)
     for ctr=1:4
+        if ϵ_zero
+            _require_zero_tangent(view(ḟ₃₄, ctr, :), "f₃₄")
+            continue
+        end
         Ȧ = zeros(l_tr, l_tr)
         ḃ = zeros(l_tr)
         for i = 3:l_tr
