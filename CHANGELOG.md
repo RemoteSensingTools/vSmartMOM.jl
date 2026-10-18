@@ -107,6 +107,11 @@ review of General's sequential-version rule.
   `default_parameters()` and of GEOS-Chem-generated configurations
   (`geoschem_to_dict`, `GeosChemSource`), which start from these defaults,
   change.
+- `remake_geometry` keeps the resolved observer heights, the TOA/BOA output
+  selection, and the external-solar representation when it changes the solar
+  or viewing angles. Previously it dropped interior observers and the TOA
+  output metadata, and returned external-solar models to the embedded
+  representation.
 - HITRAN, partition-sum, HAPI, CIA and MT_CKD references added to
   `CITATION.bib`, the References page and the README, with guidance on which
   HITRAN edition a calculation used.

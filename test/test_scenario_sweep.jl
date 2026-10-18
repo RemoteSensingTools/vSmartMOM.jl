@@ -92,6 +92,40 @@ using Test
                 @test r_geo[i] == r_ref[i]
             end
         end
+
+        # Observer heights resolved at build time and the external-solar
+        # representation must survive the geometry rebuild.
+        @testset "remake_geometry keeps observers and external solar" begin
+            θ = 40.0
+            for obs_alt in ([0.0, 3.0], 100.0, [3.0])
+                p = _base_params(); p.obs_alt = obs_alt
+                p_ref = deepcopy(p); p_ref.sza = θ
+                model_geo = CoreRT.remake_geometry(model_from_parameters(p), p; sza = θ)
+                model_ref = model_from_parameters(p_ref)
+                for f in (:obs_alt, :sensor_levels, :sensor_altitudes,
+                          :include_toa, :include_boa, :toa_altitude)
+                    @test getfield(model_geo.geometry, f) == getfield(model_ref.geometry, f)
+                end
+                r_geo = rt_run(model_geo); r_ref = rt_run(model_ref)
+                @test r_geo.toa == r_ref.toa
+                @test r_geo.boa == r_ref.boa
+                @test r_geo.toa_altitude_km == r_ref.toa_altitude_km
+                @test length(r_geo.levels) == length(r_ref.levels)
+                for (lg, lr) in zip(r_geo.levels, r_ref.levels)
+                    @test lg.boundary_index == lr.boundary_index
+                    @test lg.upwelling == lr.upwelling
+                    @test lg.downwelling == lr.downwelling
+                end
+            end
+
+            p = _base_params()
+            p_ref = deepcopy(p); p_ref.sza = θ
+            model_geo = CoreRT.remake_geometry(
+                model_from_parameters(p; external_solar = true), p; sza = θ)
+            model_ref = model_from_parameters(p_ref; external_solar = true)
+            @test model_geo.quad_points.external_solar
+            @test CoreRT.rt_run_toa(model_geo) == CoreRT.rt_run_toa(model_ref)
+        end
     end
 
     # ---------------------------------------------------------------------

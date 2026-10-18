@@ -662,7 +662,9 @@ fixed set of weighted quadrature nodes. Everything else — `atmosphere`
 (m_max_bands, truncation) and `surfaces` — is geometry-independent, so
 this function shares them by reference with `model` and only constructs
 fresh `ObsGeometry`/`QuadPoints` objects, THE SAME WAY
-`model_from_parameters` does (identical `rt_set_streams` call).
+`model_from_parameters` does (identical `rt_set_streams` call). The observer
+heights resolved at build time (interior sensor levels, TOA/BOA outputs) and
+the `external_solar` representation are kept from `model`.
 
 `params` must be the SAME parameters object (or an unmutated `deepcopy`)
 used to build `model` in the first place — it supplies the quadrature
@@ -706,9 +708,15 @@ function remake_geometry(model::RTModel, params::vSmartMOM_Parameters;
                          vza::AbstractVector = model.geometry.vza,
                          vaz::AbstractVector = model.geometry.vaz)
     FT = float_type(model)
-    obs_geom = ObsGeometry{FT}(FT(sza), FT.(collect(vza)), FT.(collect(vaz)), model.geometry.obs_alt)
+    # The observer interfaces depend on the profile and `obs_alt`, not on the
+    # angles, so they carry over from `model` unchanged.
+    g = model.geometry
+    obs_geom = ObsGeometry{FT}(FT(sza), FT.(collect(vza)), FT.(collect(vaz)), g.obs_alt,
+                               copy(g.sensor_levels), copy(g.sensor_altitudes),
+                               g.include_toa, g.include_boa, g.toa_altitude)
     quad_points = rt_set_streams(params.quadrature_type, params.l_trunc, obs_geom,
-                                 params.polarization_type, array_type(params.architecture))
+                                 params.polarization_type, array_type(params.architecture);
+                                 external_solar = model.quad_points.external_solar)
     return RTModel(model.architecture, model.solver, model.numerics, obs_geom, quad_points,
                    model.atmosphere, model.optics, model.surfaces, model.sources)
 end
