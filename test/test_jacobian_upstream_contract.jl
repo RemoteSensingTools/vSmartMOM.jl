@@ -59,3 +59,72 @@ struct _UnimplementedJacobianSource <: AbstractSource end
     thermal_model = model_from_parameters(params; sources=ThermalEmission())
     @test_throws ArgumentError rt_run_lin(thermal_model,lin,na,ng,ns)
 end
+
+# A plan with surface pressure and the surface coefficient only.
+struct _PressureSurfaceFlavor <: AbstractJacobianFlavor end
+CoreRT.requires_aerosol_microphysics_jacobians(::_PressureSurfaceFlavor) = false
+function CoreRT.jacobian_plan(::_PressureSurfaceFlavor, params, model, lin)
+    keys = [ParameterKey(:atmosphere, :surface_pressure),
+            ParameterKey(:surface, :albedo; component=1, band=1)]
+    names = ["surface_pressure", "albedo"]
+    layout = ActiveParameterLayout(keys, names, keys, names, [1], 1;
+                                   surface_columns=2:2)
+    JacobianPlan(_PressureSurfaceFlavor(), keys, names, [layout])
+end
+
+@testset "Raman, thermal and TMS tangents are rejected at every linearized entry" begin
+    params = parameters_from_yaml("test_parameters/JacobianTestFast.yaml")
+    params.architecture = vSmartMOM.CPU()
+    model, lin = model_from_parameters(LinMode(), params;
+        compute_aerosol_microphysics_jacobians=false)
+    na, ng = CoreRT.n_aerosols(model), size(lin.τ̇_abs[1], 1)
+    ns = CoreRT.surface_parameter_count(CoreRT.get_surface(model, 1))
+
+    # Inelastic (RRS and both VS directions) on the explicit Raman-type entry.
+    FT = Float64
+    IS = vSmartMOM.InelasticScattering
+    ν = model.atmosphere.spec_bands[1]
+    n2, o2 = IS.getRamanAtmoConstants(ν[1], FT(250))
+    greek = IS.GreekCoefs(ones(FT, 1), ones(FT, 1), ones(FT, 1),
+                                           ones(FT, 1), ones(FT, 1), ones(FT, 1))
+    shared = (n2=n2, o2=o2, greek_raman=greek, ϖ_λ₁λ₀=zeros(FT, 1),
+              i_λ₁λ₀=zeros(Int, 1), Z⁻⁺_λ₁λ₀=zeros(FT, 1, 1),
+              Z⁺⁺_λ₁λ₀=zeros(FT, 1, 1), n_Raman=0,
+              F₀=zeros(FT, 1, 1), SIF₀=zeros(FT, 1, 1))
+    raman_types = (
+        IS.RRS(; shared..., fscattRayl=[one(FT)],
+            ϖ_Cabannes=[one(FT)], i_ref=1),
+        IS.VS_0to1(; shared..., fscattRayl=one(FT),
+            ϖ_Cabannes=one(FT), dτ₀=zero(FT), dτ₀_λ=zero(FT), k_Rayl_scatt=one(FT)),
+        IS.VS_1to0(; shared..., fscattRayl=one(FT),
+            ϖ_Cabannes=one(FT), dτ₀=zero(FT), dτ₀_λ=zero(FT), k_Rayl_scatt=one(FT)))
+    for rs in raman_types
+        @test_throws r"Linearized Raman-active RT is intentionally unsupported" rt_run(
+            rs, model, lin, na, ng, ns, 1)
+    end
+
+    # Retrieval-selected solves share the source and TMS guards.
+    planned_model, planned = model_from_parameters(_PressureSurfaceFlavor(), params)
+    @test all(isfinite, rt_run(planned_model, planned).toa_jacobian)
+    for source in (ThermalEmission(), SolarBeam() + ThermalEmission()),
+            adding in (:matrix, :source)
+        @test_throws r"requires end-to-end source tangent propagation" rt_run(
+            planned_model, planned; sources=source, jacobian_basis=:local,
+            jacobian_adding=adding)
+    end
+    thermal_model, thermal_planned = model_from_parameters(_PressureSurfaceFlavor(), params;
+        sources=ThermalEmission())
+    @test_throws ArgumentError rt_run(thermal_model, thermal_planned)
+
+    tms = deepcopy(params)
+    tms.numerics = CoreRT.RTNumericalParameters{FT}(ss_correction=CoreRT.TMSCorrection())
+    tms_model, tms_lin = model_from_parameters(LinMode(), tms;
+        compute_aerosol_microphysics_jacobians=false)
+    tms_planned_model, tms_planned = model_from_parameters(_PressureSurfaceFlavor(), tms)
+    for basis in (:physical, :local)
+        @test_throws r"TMSCorrection is not implemented in the linearized driver" rt_run(
+            tms_model, tms_lin, na, ng, ns; jacobian_basis=basis)
+        @test_throws r"TMSCorrection is not implemented in the linearized driver" rt_run(
+            tms_planned_model, tms_planned; jacobian_basis=basis)
+    end
+end
