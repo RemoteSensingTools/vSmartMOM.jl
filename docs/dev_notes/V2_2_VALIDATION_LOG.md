@@ -98,3 +98,22 @@ Frankenberg's checkout (SHA-256 identical to the source file).
   cache label). Relative documentation links resolve.
 - Reviews: included in the reviews of entry 4 (Claude APPROVE, Codex
   citation metadata confirmed).
+
+## 6. merge: molecular Rayleigh API (`release/molecular-rayleigh`)
+
+- Branch commits `c4c14770` (verbatim HWO port), `eaa340d3` (UsingRefInd /
+  UsingPolTen), `37f18dd6` (review follow-ups); merged as `a405d87c`.
+- `test_molecular_rayleigh.jl` 445/445; with Raman Rayleigh/Cabannes, Aqua and
+  IO-export tests 521 assertions (implementer). RI outputs identical to the
+  HWO source across all species, ~300 wavelengths, Float64/Float32
+  (Claude reviewer); every ExoOptics call form runs, including the A–D RI
+  audit loop (36,802 rows).
+- UsingPolTen anchored to a closed form from the raw tensor constants
+  (rtol 1e-12) and pinned values at 400 nm; RI vs PolTen for N₂/O₂ at
+  350–800 nm: σ within −1.5…+0.5 %, ρ within −15…+11 % (anisotropy has no
+  dispersion in the Raman-module constants).
+- Reviews: Codex APPROVE (both commits, after fixes); Claude reviewer
+  APPROVE-WITH-FIXES → fixed (37f18dd6) → APPROVE. Follow-up CHANGELOG
+  bullet and docstring note: Codex APPROVE; Claude reviewer
+  APPROVE-WITH-FIXES (provenance scope, "two-argument" wording) → fixed.
+- Open scientific points for Suniti are in the decision log.

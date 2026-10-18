@@ -13,18 +13,18 @@ decisions taken on top of it.
 
 ### 1.1 Molecular Rayleigh: two methods, selected by dispatch
 
-**Planned (not yet implemented in this branch).** The HWO refractive-index
+**Implemented (merge a405d87c).** The HWO refractive-index
 Rayleigh code (`src/Scattering/molecular_rayleigh.jl` in the HWO worktree)
-will be ported with two method types:
+is ported with two method types:
 
 | Type | Physics | Species available now |
 |---|---|---|
 | `UsingRefInd()` | refractive index + (effective) King factor | He, Ar, N₂, O₂, CO₂ |
 | `UsingPolTen()` | polarizability tensor (mean polarizability ᾱ, anisotropy γ) | N₂, O₂, H₂ (constants from the Raman module) |
 
-`RefractiveIndexRayleigh` will stay as an alias of `UsingRefInd` so existing
+`RefractiveIndexRayleigh` stays as an alias of `UsingRefInd` so existing
 ExoOptics code keeps working. The two-argument call
-`molecular_rayleigh_properties(gas, λ)` will remain the refractive-index method
+`molecular_rayleigh_properties(gas, λ)` remains the refractive-index method
 (ExoOptics calls it for He, which has no polarizability tensor yet).
 
 Note on what the RT model uses today: the default *elastic* Rayleigh optical
@@ -181,6 +181,13 @@ Round 7.
 
 ## 3. Open items / TODO
 
+- [ ] **For Suniti (molecular Rayleigh, from the port review):**
+  (1) O₂ King-factor constant 1.09 (He et al. 2021, as ported) vs 1.096
+  (Bates 1984/Bodhaine 1999; +0.54 % in σ); (2) the RI fits are extrapolated
+  beyond 468 nm (N₂) and 546 nm (O₂); (3) the Raman-module anisotropy γ has no
+  wavelength or temperature dependence, which also affects the default
+  `depol: -1`; (4) UsingPolTen default temperature 288.15 K; (5) H₂ has no
+  independent refractive-index check here.
 - [ ] **Polarizability tensors for more species.** Populate ᾱ and γ (and
   their wavelength dependence) for as many species as possible — at least
   Ar, CO₂, He, H₂O, CH₄ — for use in Rayleigh (`UsingPolTen`) and Raman

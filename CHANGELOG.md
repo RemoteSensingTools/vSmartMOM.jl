@@ -53,6 +53,17 @@ review of General's sequential-version rule.
   builder `make_interpolation_model`, still the route for YAML `LUTfiles`, now
   uses its `vmr` argument (previously ignored) and rejects wavelength grids
   early with a uniform-wavenumber recipe.
+- Pure-gas molecular-Rayleigh API in `Scattering` (also exported from
+  `vSmartMOM`): `molecular_rayleigh_properties` and
+  `molecular_rayleigh_cross_section_ratio` dispatch on
+  `AbstractMolecularRayleighMethod`. `UsingRefInd()` is the refractive-index
+  plus King-factor method for He, Ar, N₂, O₂ and CO₂ (`RefractiveIndexRayleigh`
+  is kept as an alias, and the forms without a method argument use it);
+  `UsingPolTen()` uses the Raman-module polarizability tensors for N₂, O₂ and
+  H₂. `molecular_rayleigh_provenance` covers `UsingRefInd()` for Ar and CO₂. The refractive-index part is ported from Suniti Sanghavi's
+  Habitable Worlds Observatory branch. Model defaults are unchanged: Bodhaine
+  (1999) optical depth, with depolarization from the polarizability constants
+  when `depol: -1`.
 - HITRAN, partition-sum, HAPI, CIA and MT_CKD references added to
   `CITATION.bib`, the References page and the README, with guidance on which
   HITRAN edition a calculation used.

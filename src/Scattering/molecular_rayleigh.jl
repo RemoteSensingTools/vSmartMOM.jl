@@ -58,8 +58,8 @@ The returned named tuple contains
 - `refractive_index`: refractive index at the source reference number density.
   It is stored as ``n`` itself, so a `Float32` result resolves ``n-1`` only to
   about `eps(1f0)/(n-1)` relative (`eps(1f0)` ≈ 1.2e-7): a few times 1e-4
-  for N₂, O₂, Ar and CO₂, and a few times 1e-3 for He. The cross section is computed from the refractivity
-  directly and is not affected;
+  for N₂, O₂, Ar and CO₂, and a few times 1e-3 for He. The cross section is
+  computed from the refractivity directly and is not affected;
 - `king_factor`: molecular-anisotropy correction ``F_K``;
 - `depolarization`: depolarization ratio ``\\rho`` in the convention consumed by
   [`get_greek_rayleigh`](@ref), related by
@@ -520,8 +520,8 @@ underflows `Float32`); results are converted to the floating-point type of
 `float(wavelength_nm)`. The method is therefore not ForwardDiff-aware (dual
 numbers are not propagated) and does not gain precision from `BigFloat`
 inputs. As for the RI method, a `Float32` `refractive_index` resolves ``n-1``
-only to a few times 1e-4 relative. The polarizability constants and their temperature
-coefficients come from the Raman module (Buldakov et al.; Asawaroengchai &
+only to about `eps(1f0)/(n-1)` relative (up to ~1e-3, for H₂). The
+polarizability constants and their temperature coefficients come from the Raman module (Buldakov et al.; Asawaroengchai &
 Rosenblatt (1980) for the O₂ and H₂ anisotropies, per the source comments).
 No separate validation interval is attached to them here.
 """
