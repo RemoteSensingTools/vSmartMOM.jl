@@ -104,15 +104,20 @@ end
     summarize(label, modeled, truth; rtol, name="value")
 
 Print summary statistics and return `(passes::Bool, max_rel)` for use with
-`@test`. Skips NaN-masked entries.
+`@test`. Skips the near-zero-truth entries masked by `rel_error`. Fails when
+`modeled` or `truth` has a non-finite value, or when nothing is comparable.
 """
 function summarize(label::AbstractString, modeled, truth; rtol::Real,
                    name::AbstractString = "value")
+    if !(all(isfinite, modeled) && all(isfinite, truth))
+        @warn "$label: non-finite modeled or truth values"
+        return (false, NaN)
+    end
     re = rel_error(modeled, truth)
     valid = filter(!isnan, vec(re))
     if isempty(valid)
         @warn "$label: no comparable (non-zero-truth) entries"
-        return (true, 0.0)
+        return (false, NaN)
     end
     mx, mn = maximum(valid), median(valid)
     pass = mx < rtol

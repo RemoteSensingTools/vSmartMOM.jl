@@ -5,12 +5,27 @@
 # Tests at TWO levels:
 #   1. Model-level: τ̇_aer, k̇, ω̃̇ from model_from_parameters
 #   2. RT-level: dR (TOA reflectance Jacobians) from rt_run
+#
+# LEGACY / HISTORICAL — not an accuracy gate and not in runtests.jl.
+# Its thresholds (1–50 % mean relative error) and `|| isnan(mean_e)`
+# allowances record historical bug-era residuals. The allowances are paired
+# with finiteness checks, so non-finite inputs fail. Do not cite a pass as
+# Jacobian accuracy evidence. The default-suite gates are
+# test_jacobians_unit.jl and the batched/local Jacobian tests.
 # =================================================================
 
-include("test_helpers.jl")
+isdefined(@__MODULE__, :VSmartMOMTestSupport) || include("test_helpers.jl")
+using .VSmartMOMTestSupport
+using vSmartMOM, vSmartMOM.CoreRT
+using Test
 include("../src/Testing/perturb_parameters.jl")
 using Printf
 using Statistics
+
+# `rel_errors` returns NaN statistics for non-finite input; the legacy
+# `|| isnan(mean_e)` allowances below must not accept that, so each one is
+# paired with this finiteness check.
+_finite_pair(a, b) = all(isfinite, a) && all(isfinite, b)
 
 println("="^70)
 println("Analytic Jacobians vs Finite-Difference Validation (EMIT-style)")
@@ -96,6 +111,7 @@ println("─"^70)
                     
                     if pname in ["τ_ref", "p₀", "σp"]
                         # Profile/τ derivatives should be very accurate
+                        @test _finite_pair(K_lin_τ, K_FD_τ)
                         @test mean_e < 0.05 || isnan(mean_e)
                     end
                     
@@ -130,7 +146,7 @@ println("─"^70)
 
 @testset "RT-Level Jacobians" begin
     println("  Running linearized RT...")
-    @time R_base, dR, NAer, NGas, NSurf, model, lin_model = run_lin_rt(params)
+    @time R_base, dR, NAer, NGas, NSurf, model, lin_model = run_linearized_rt(params)
     layout = CoreRT.ParameterLayout(n_aerosols=NAer, n_gases=NGas, n_surface=NSurf)
     Nparams_rt = CoreRT.n_total(layout)
     println("  R shape: $(size(R_base)), dR shape: $(size(dR))")
@@ -151,7 +167,7 @@ println("─"^70)
     
     # --- Surface albedo ---
     @testset "Surface albedo" begin
-        # run_lin_rt uses the default selected RT band (band 1).
+        # run_linearized_rt uses the default selected RT band (band 1).
         for ib in 1:1
             surf_pert_idx = 1 + Nmol + NAer_expected*7 + ib
             dR_idx = CoreRT.surface_range(layout)[ib]
@@ -162,12 +178,13 @@ println("─"^70)
             tmp_params.brdf[ib] = LambertianSurfaceScalar{typeof(old_alb)}(new_alb)
             Δ_alb = new_alb - old_alb
             
-            R_pert = run_fwd_only(tmp_params)
+            R_pert = linearized_R(tmp_params)
             K_FD = (R_pert .- R_base) ./ Δ_alb
             K_lin = dR[:, :, :, dR_idx]
             
             max_e, mean_e = rel_errors(K_lin, K_FD)
             @printf("    Surface albedo band %d: max_err=%.2e, mean_err=%.2e\n", ib, max_e, mean_e)
+            @test _finite_pair(K_lin, K_FD)
             @test mean_e < 0.01 || isnan(mean_e)  # Surface should be very accurate
         end
     end
@@ -181,12 +198,13 @@ println("─"^70)
         Δτ = pert_params[pert_idx].scattering_params.rt_aerosols[iaer].τ_ref - 
              params.scattering_params.rt_aerosols[iaer].τ_ref
         
-        R_pert = run_fwd_only(pert_params[pert_idx])
+        R_pert = linearized_R(pert_params[pert_idx])
         K_FD = (R_pert .- R_base) ./ Δτ
         K_lin = dR[:, :, :, dR_idx]
         
         max_e, mean_e = rel_errors(K_lin, K_FD)
         @printf("    τ_ref (aer %d): max_err=%.2e, mean_err=%.2e\n", iaer, max_e, mean_e)
+        @test _finite_pair(K_lin, K_FD)
         @test mean_e < 0.15 || isnan(mean_e)  # Known ~10% residual from Bug 19
     end
     
@@ -212,7 +230,7 @@ println("─"^70)
                     params.scattering_params.rt_aerosols[iaer].aerosol.size_distribution.σ
             end
             
-            R_pert = run_fwd_only(pert_params[pert_idx])
+            R_pert = linearized_R(pert_params[pert_idx])
             K_FD = (R_pert .- R_base) ./ Δ
             K_lin = dR[:, :, :, dR_idx]
             
@@ -221,6 +239,7 @@ println("─"^70)
             # Mie nᵣ/σ_size radiance sensitivities retain known residuals
             # (bugs 19-21); keep this broad regression guard while printing
             # the actual error above for diagnosis.
+            @test _finite_pair(K_lin, K_FD)
             @test mean_e < 0.50 || isnan(mean_e)
         end
     end
@@ -242,12 +261,13 @@ println("─"^70)
                 Δ = _profile_width(pert_profile) - _profile_width(base_profile)
             end
             
-            R_pert = run_fwd_only(pert_params[pert_idx])
+            R_pert = linearized_R(pert_params[pert_idx])
             K_FD = (R_pert .- R_base) ./ Δ
             K_lin = dR[:, :, :, dR_idx]
             
             max_e, mean_e = rel_errors(K_lin, K_FD)
             @printf("    %s (aer %d): max_err=%.2e, mean_err=%.2e\n", pname, iaer, max_e, mean_e)
+            @test _finite_pair(K_lin, K_FD)
             @test mean_e < 0.15 || isnan(mean_e)
         end
     end

@@ -66,8 +66,11 @@ end
             R_cpu_a = Array(R_cpu)
             dR_cpu_a = Array(dR_cpu)
             rtol = 1e-4
-            @test all(isapprox.(R_gpu_a, R_cpu_a; rtol=rtol, nans=true))
-            @test all(isapprox.(dR_gpu_a, dR_cpu_a; rtol=rtol, nans=true))
+            # Both sides must be finite; agreeing NaNs cannot certify a match.
+            @test all(isfinite, R_cpu_a)
+            @test all(isfinite, dR_cpu_a)
+            @test all(isapprox.(R_gpu_a, R_cpu_a; rtol=rtol))
+            @test all(isapprox.(dR_gpu_a, dR_cpu_a; rtol=rtol))
             println("  GPU vs CPU: R and dR match within rtol=$rtol")
         end
         println("  ✓ GPU Jacobian tests passed.")

@@ -113,6 +113,9 @@ for spec in axis_specs()
 
         @info "Case C: running solar_tester vector [$(spec_tag(spec))]" sza raz
         R, T = solar_tester_vector_run_at(sza, raz; spec=spec)
+        # A NaN rel-err would otherwise be dropped below; require finite output.
+        @test all(isfinite, R)
+        @test all(isfinite, T)
 
         # Per-Stokes representative scale = max truth magnitude in this set.
         # `atol = 100·eps(FT)·scale` is the FT noise floor.
@@ -149,8 +152,8 @@ for spec in axis_specs()
                 end
                 re_u = compare(R[i_vza, s_idx, 1], truth_up, "TOA-up", sza, vza, raz, geom, s_sym)
                 re_d = compare(T[i_vza, s_idx, 1], truth_dn, "BOA-dn", sza, vza, raz, geom, s_sym)
-                isnan(re_u) || push!(rel_up[s_sym], re_u)
-                isnan(re_d) || push!(rel_dn[s_sym], re_d)
+                push!(rel_up[s_sym], re_u)
+                push!(rel_dn[s_sym], re_d)
             end
         end
 

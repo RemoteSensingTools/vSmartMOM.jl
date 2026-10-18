@@ -15,10 +15,16 @@ using vSmartMOM.CoreRT: _M_INVARIANT_DTAU_CACHE_ENABLED
     params = vSmartMOM.parameters_from_yaml("test_parameters/JacobianTestFast.yaml")
     model  = model_from_parameters(params)
 
-    _M_INVARIANT_DTAU_CACHE_ENABLED[] = false
-    R_off, T_off = rt_run(model)
-    _M_INVARIANT_DTAU_CACHE_ENABLED[] = true
-    R_on, T_on = rt_run(model)
+    was = _M_INVARIANT_DTAU_CACHE_ENABLED[]
+    local R_off, T_off, R_on, T_on
+    try
+        _M_INVARIANT_DTAU_CACHE_ENABLED[] = false
+        R_off, T_off = rt_run(model)
+        _M_INVARIANT_DTAU_CACHE_ENABLED[] = true
+        R_on, T_on = rt_run(model)
+    finally
+        _M_INVARIANT_DTAU_CACHE_ENABLED[] = was
+    end
 
     @test Array(R_on) == Array(R_off)
     @test Array(T_on) == Array(T_off)

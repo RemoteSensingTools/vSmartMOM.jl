@@ -97,5 +97,7 @@ if get(ENV,"VSMARTMOM_JACOBIAN_GPU_TEST","false") == "true"
             @test host_bytes < 1024^2
         end
     end
-    include("test_jacobian_tiled.jl")
+    # The tiled CUDA Jacobian cases are owned by runtests.jl ("CUDA Jacobian
+    # tiles"), not included here, so the flagged suite runs them exactly once.
+    # Standalone: `julia --project=. test_jacobian_tiled.jl`.
 end
