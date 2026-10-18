@@ -17,31 +17,10 @@ catch
 end
 
 # ---------------------------------------------------------------
-# Helpers
+# Helpers (single contract: test_helpers.jl)
 # ---------------------------------------------------------------
-function run_lin(params)
-    model, lin_model = model_from_parameters(LinMode(), params)
-    NAer  = length(params.scattering_params.rt_aerosols)
-    NGas  = size(lin_model.τ̇_abs[1], 1)
-    NSurf = 1
-    R, T, dR, dT = rt_run(model, lin_model, NAer, NGas, NSurf)
-    return R, dR, model, lin_model, NAer, NGas, NSurf
-end
-
-function run_fwd(params)
-    R, _, _, _, _, _, _ = run_lin(params)
-    return R
-end
-
-function rel_errors(analytic, fd; threshold=1e-12)
-    mask = abs.(fd) .> threshold
-    if any(mask)
-        errs = abs.(analytic[mask] .- fd[mask]) ./ abs.(fd[mask])
-        return (max=maximum(errs), mean=mean(errs))
-    else
-        return (max=maximum(abs.(analytic .- fd)), mean=mean(abs.(analytic .- fd)))
-    end
-end
+isdefined(@__MODULE__, :VSmartMOMTestSupport) || include("test_helpers.jl")
+using .VSmartMOMTestSupport
 
 # =====================================================================
 @testset "Hybrid AD" begin
@@ -51,7 +30,7 @@ end
 @testset "CPU Linearized RT" begin
     params = parameters_from_yaml(YAML_FAST)
     params.architecture = vSmartMOM.Architectures.CPU()
-    R, dR, model, lin_model, NAer, NGas, NSurf = run_lin(params)
+    R, dR, NAer, NGas, NSurf, model, lin_model = run_linearized_rt(params)
 
     @test all(isfinite.(R))
     @test all(isfinite.(dR))
@@ -67,10 +46,11 @@ end
     brdf = params_p.brdf[1]
     params_p.brdf[1] =
         LambertianSurfaceScalar{Float64}(brdf.albedo + eps_alb)
-    R_p = run_fwd(params_p)
+    R_p = linearized_R(params_p)
     dR_fd_alb = (R_p .- R) ./ eps_alb
 
     errs = rel_errors(dR[:, :, :, idx_alb], dR_fd_alb)
+    @test errs.n > 0
     @test errs.max < 0.05
     println("  CPU albedo Jacobian: max rel err = $(round(errs.max, sigdigits=3))")
 end
@@ -80,7 +60,7 @@ if CUDA_OK
     @testset "GPU Linearized RT" begin
         params_gpu = parameters_from_yaml(YAML_FAST)
         params_gpu.architecture = vSmartMOM.Architectures.GPU()
-        R_gpu, dR_gpu, _, _, NAer, NGas, NSurf = run_lin(params_gpu)
+        R_gpu, dR_gpu, NAer, NGas, NSurf = run_linearized_rt(params_gpu)
 
         R_gpu_a  = Array(R_gpu)
         dR_gpu_a = Array(dR_gpu)
@@ -91,25 +71,30 @@ if CUDA_OK
         # Compare with CPU
         params_cpu = parameters_from_yaml(YAML_FAST)
         params_cpu.architecture = vSmartMOM.Architectures.CPU()
-        R_cpu, dR_cpu, _, _, _, _, _ = run_lin(params_cpu)
+        R_cpu, dR_cpu = run_linearized_rt(params_cpu)
 
-        @test all(isapprox.(R_gpu_a, R_cpu; rtol=1e-4, nans=true))
-        @test all(isapprox.(dR_gpu_a, dR_cpu; rtol=1e-3, nans=true))
+        # Both sides must be finite; agreeing NaNs cannot certify a match.
+        @test all(isfinite, R_cpu)
+        @test all(isfinite, dR_cpu)
+        @test all(isapprox.(R_gpu_a, R_cpu; rtol=1e-4))
+        @test all(isapprox.(dR_gpu_a, dR_cpu; rtol=1e-3))
         println("  GPU vs CPU: R and dR match.")
     end
 
     @testset "GPU Forward noRS" begin
+        # Ordinary forward solver (not the linearized path) on both backends.
         params_gpu = parameters_from_yaml(YAML_FAST)
         params_gpu.architecture = vSmartMOM.Architectures.GPU()
-        R_gpu = run_fwd(params_gpu)
+        R_gpu = forward_R(params_gpu)
 
         params_cpu = parameters_from_yaml(YAML_FAST)
         params_cpu.architecture = vSmartMOM.Architectures.CPU()
-        R_cpu = run_fwd(params_cpu)
+        R_cpu = forward_R(params_cpu)
 
         R_gpu_a = Array(R_gpu)
         @test all(isfinite.(R_gpu_a))
-        @test all(isapprox.(R_gpu_a, R_cpu; rtol=1e-4, nans=true))
+        @test all(isfinite, R_cpu)
+        @test all(isapprox.(R_gpu_a, R_cpu; rtol=1e-4))
         println("  GPU Forward: matches CPU.")
     end
 else

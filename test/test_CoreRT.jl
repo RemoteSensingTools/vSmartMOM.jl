@@ -152,8 +152,15 @@ end
     # |modeled| ≥ 0.01), and 0.01% (U, |modeled| ≥ 0.01) — see
     # docs/src/pages/benchmarks.md. Limits sit ~2× over measured for the
     # noisy-Q rows and ~5× over the very stable I/U rows.
+    # Modeled values must be finite before any masked/filtered maximum is
+    # trusted; the U filter below may only drop NaNs from 0/0 in the table.
+    @test all(isfinite, I_modeled_all)
+    @test all(isfinite, Q_modeled_all)
+    @test all(isfinite, U_modeled_all)
+    U_compared = filter(!isnan, U_deltas_all[findall(i -> i >= 0.01, U_modeled_all)])
+    @test !isempty(U_compared)
     @test maximum(I_deltas_all) < 5e-4
     @test maximum(Q_deltas_all[findall(i -> i >= 0.01, Q_modeled_all)]) < 2.5e-3
-    @test maximum(filter(!isnan, U_deltas_all[findall(i -> i >= 0.01, U_modeled_all)])) < 5e-4
+    @test maximum(U_compared) < 5e-4
 
 end

@@ -24,41 +24,17 @@ using LinearAlgebra
 const YAML_FAST = "test_parameters/JacobianTestFast.yaml"
 
 # ---------------------------------------------------------------
-# Shared helpers
+# Shared helpers (single contract: test_helpers.jl)
 # ---------------------------------------------------------------
-function run_lin_rt(params)
-    model, lin_model = model_from_parameters(LinMode(), params)
-    NAer = isnothing(params.scattering_params) ? 0 :
-           length(params.scattering_params.rt_aerosols)
-    NGas = size(lin_model.τ̇_abs[1], 1)
-    NSurf = 1
-    R, T, dR, dT = rt_run(model, lin_model, NAer, NGas, NSurf)
-    return R, dR, NAer, NGas, NSurf, model, lin_model
-end
-
-function run_fwd_only(params)
-    R, _, _, _, _, _, _ = run_lin_rt(params)
-    return R
-end
-
-"""Compute max and mean relative error, ignoring entries where |fd| < threshold."""
-function rel_errors(analytic, fd; threshold=1e-12)
-    mask = abs.(fd) .> threshold
-    if any(mask)
-        errs = abs.(analytic[mask] .- fd[mask]) ./ abs.(fd[mask])
-        return (max=maximum(errs), mean=mean(errs), median=median(errs))
-    else
-        ae = abs.(analytic .- fd)
-        return (max=maximum(ae), mean=mean(ae), median=median(ae))
-    end
-end
+isdefined(@__MODULE__, :VSmartMOMTestSupport) || include("test_helpers.jl")
+using .VSmartMOMTestSupport
 
 # =====================================================================
 # Run base model once (shared by all tests)
 # =====================================================================
 println("Setting up base model (with Mie)...")
 params_base = parameters_from_yaml(YAML_FAST)
-R_base, dR_base, NAer, NGas, NSurf, model_base, lin_model_base = run_lin_rt(params_base)
+R_base, dR_base, NAer, NGas, NSurf, model_base, lin_model_base = run_linearized_rt(params_base)
 layout = CoreRT.ParameterLayout(n_aerosols=NAer, n_gases=NGas, n_surface=NSurf)
 Nparams = CoreRT.n_total(layout)
 
@@ -80,13 +56,13 @@ println("  nλ=$(size(R_base,3)), nVZA=$(size(R_base,1)), nStokes=$(size(R_base,
     p = parameters_from_yaml("test_parameters/JacobianTestRayleigh.yaml")
     p.architecture = vSmartMOM.Architectures.CPU()
     p.profile_reduction_n = -1
-    R, dR, na, ng, ns, _, _ = run_lin_rt(p)
+    R, dR, na, ng, ns, _, _ = run_linearized_rt(p)
     layout_ps = CoreRT.ParameterLayout(n_aerosols=na, n_gases=ng, n_surface=ns)
     analytic = dR[:, :, :, CoreRT.psurf_index(layout_ps)]
     δp = 0.01
     pp = deepcopy(p); pp.p[end] += δp
     pm = deepcopy(p); pm.p[end] -= δp
-    fd = (run_fwd_only(pp) .- run_fwd_only(pm)) ./ (2δp)
+    fd = (linearized_R(pp) .- linearized_R(pm)) ./ (2δp)
     err = rel_errors(analytic, fd)
     @test err.max < 1e-4
     @test err.mean < 1e-5
@@ -165,7 +141,7 @@ end
     
     params_pert = parameters_from_yaml(YAML_FAST)
     params_pert.brdf = [LambertianSurfaceScalar(albedo_base + δ)]
-    R_pert = run_fwd_only(params_pert)
+    R_pert = linearized_R(params_pert)
     fd = (R_pert .- R_base) ./ δ
     
     err = rel_errors(analytic, fd)
@@ -185,7 +161,7 @@ end
     
     params_pert = parameters_from_yaml(YAML_FAST)
     params_pert.scattering_params.rt_aerosols[1].τ_ref = τ_ref_base + δ
-    R_pert = run_fwd_only(params_pert)
+    R_pert = linearized_R(params_pert)
     fd = (R_pert .- R_base) ./ δ
     
     err = rel_errors(analytic, fd)
@@ -204,7 +180,7 @@ end
     
     params_pert = parameters_from_yaml(YAML_FAST)
     params_pert.scattering_params.rt_aerosols[1].profile = Normal(p0_base + δ, σp_base)
-    R_pert = run_fwd_only(params_pert)
+    R_pert = linearized_R(params_pert)
     fd = (R_pert .- R_base) ./ δ
     
     err = rel_errors(analytic, fd)
@@ -231,7 +207,7 @@ end
     
     params_pert = parameters_from_yaml(YAML_FAST)
     params_pert.scattering_params.rt_aerosols[1].aerosol.nᵣ = nᵣ_base + δ
-    R_pert = run_fwd_only(params_pert)
+    R_pert = linearized_R(params_pert)
     fd = (R_pert .- R_base) ./ δ
     
     err = rel_errors(analytic, fd)
@@ -251,7 +227,7 @@ end
     params_pert = parameters_from_yaml(YAML_FAST)
     params_pert.scattering_params.rt_aerosols[1].aerosol.size_distribution = 
         LogNormal(sd_base.μ, sd_base.σ + δ)
-    R_pert = run_fwd_only(params_pert)
+    R_pert = linearized_R(params_pert)
     fd = (R_pert .- R_base) ./ δ
     
     err = rel_errors(analytic, fd)
@@ -268,6 +244,14 @@ end
     @test all(isfinite.(R_base))          # R is finite
     @test all(isfinite.(dR_base))         # dR is finite
     @test all(R_base[:, 1, :] .>= 0)     # Stokes I ≥ 0
+
+    # Independent ordinary-forward solve (model_from_parameters(params), not
+    # LinMode). Measured agreement is ~2e-16 relative; this is not a FD step.
+    fwd = run_forward_rt(params_base)
+    @test size(fwd.R) == size(R_base)
+    @test all(isfinite, fwd.R)
+    @test all(isfinite, fwd.T)
+    @test all(isapprox.(R_base, fwd.R; rtol=1e-12))
 end
 
 # =====================================================================
