@@ -243,6 +243,12 @@ end
 @testset "Sources (v0.6)" begin include("test_sources.jl") end
 @testset "Source request validation" begin include("test_source_validation.jl") end
 
+# Solve-boundary guards: reused RS objects do not keep a driver-written F₀;
+# HDR/BHR/hem_T count the direct beam once at weighted μ₀ nodes; TMS with
+# stream exports / combined bands; multisensor Cox-Munk TOA; U/V incident
+# beams; ThermalEmission paths and layer count; linearized surface support.
+@testset "RT entry guards" begin include("test_rt_entry_guards.jl") end
+
 # v0.7 Phase A — ThermalEmission per-layer Planck volume source.
 # Pins the corrected TIR weight rule (overrides REFACTOR_SPEC_v6 §2.11):
 # isotropic source fires only at m=0 with 2π factor to undo downstream 0.5/π.

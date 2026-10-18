@@ -862,16 +862,19 @@ end
           3 .* only(unit.levels).unscattered_downwelling rtol=5e-14
 
     # Preserve the established m=0 Stokes selector used by endpoint output:
-    # incident I/Q survive while U/V do not contribute to this Fourier slot.
+    # incident I/Q survive. U/V incidence (sin(mΔφ) parity) is rejected
+    # before any solve, since the azimuth reconstruction assumes I/Q parity.
     polarized_model = _direct_height_model(
         Float64, 5.0; polarization=vSmartMOM.Scattering.Stokes_IQUV())
-    polarized_F₀ = reshape([2.0, -0.5, 0.25, -0.125], 4, 1)
+    polarized_F₀ = reshape([2.0, -0.5, 0.0, 0.0], 4, 1)
     polarized = only(rt_run(
         polarized_model; sources=SolarBeam(F₀=polarized_F₀)).levels)
     attenuation = _expected_unscattered(
         polarized_model, polarized.boundary_index, 1.0)
     @test vec(polarized.unscattered_downwelling[1, :, 1]) ≈
           attenuation .* [2.0, -0.5, 0.0, 0.0] rtol=5e-13 atol=1e-15
+    @test_throws ArgumentError rt_run(polarized_model;
+        sources=SolarBeam(F₀=reshape([2.0, -0.5, 0.25, -0.125], 4, 1)))
 
     # Preserve source compatibility for downstream callers that construct a
     # LevelRadiance with the original six arguments.

@@ -210,7 +210,7 @@ export OpticalPropertyJacobian,               # AD boundary struct alias
        atmosphere_range, psurf_index,
        AbstractVerticalGridConvention, FixedPressureGrid, FixedAltitudeGrid,
        surface_pressure_interfaces,
-       surface_parameter_count,
+       surface_parameter_count, supports_linearized_surface,
        canopy_range, n_layer_params
 
 # Export new hierarchical model types

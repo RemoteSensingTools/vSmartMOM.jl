@@ -63,8 +63,9 @@ function rt_run_test_ms(RS_type::AbstractRamanType,
     arr_type = CoreRT.array_type(model) # Type of array to use
     arch = CoreRT.architecture(model)
     if size(RS_type.F₀) != (pol_type.n, nSpec)
-        RS_type.F₀ = zeros(FT, pol_type.n, nSpec)
-        @views RS_type.F₀[1, :] .= one(FT)
+        F₀_unit = zeros(FT, pol_type.n, nSpec)
+        @views F₀_unit[1, :] .= one(FT)
+        _write_driver_F₀!(RS_type, F₀_unit)
     end
     surface_F₀ = arr_type(FT.(RS_type.F₀))
     SFI = true                          # SFI flag
@@ -102,6 +103,10 @@ function rt_run_test_ms(RS_type::AbstractRamanType,
     # Note: Raman SS properties (ϖ_λ₁λ₀, Z matrices, etc.) are set up
     # in model_from_parameters when RS_type != noRS.
 
+    # BOA cumulative (δ-scaled) optical depth; m-independent, kept for the
+    # Cox–Munk glint correction after the Fourier loop.
+    τ_sum_surf = nothing
+
     # Loop over fourier moments
     for m = 0:m_max
 
@@ -115,6 +120,9 @@ function rt_run_test_ms(RS_type::AbstractRamanType,
         # Determine the scattering interface definitions:
         scattering_interfaces_all, τ_sum_all = 
             extractEffectiveProps(layer_opt_props, quad_points);
+        # Optics may be promoted (e.g. Float64 aerosol inputs in a Float32
+        # model); the correction works in the radiance precision FT.
+        τ_sum_surf === nothing && (τ_sum_surf = FT.(Array(τ_sum_all[:, end])))
 
         # The unscattered solar beam is not part of the diffuse MOM field.
         # Report it once, separately, using the m=0/BOA normalization.
@@ -207,6 +215,17 @@ function rt_run_test_ms(RS_type::AbstractRamanType,
                     weight, nSpec, SFI, 
                     uwJ, dwJ, uwieJ, dwieJ,
                     I_static, arr_type)
+    end
+
+    # Exact direct-solar glint residual, as in the full-column path
+    # (`_rt_run_column`), applied to the TOA record (sentinel level 0). The
+    # Fourier loop above always runs to m_max. Interior upwelling records
+    # carry the Fourier-truncated glint only (as in the linearized driver).
+    i_toa = findfirst(==(0), sensor_levels)
+    if brdf isa CoxMunkSurface && SFI && i_toa !== nothing
+        @timeit "SS Correction" apply_ss_correction!(
+            uwJ[i_toa], brdf, pol_type, vza, vaz, μ₀, τ_sum_surf, m_max, nSpec;
+            F₀=Array(surface_F₀))
     end
 
     # Show timing statistics (gated on numerics.verbose; default off).

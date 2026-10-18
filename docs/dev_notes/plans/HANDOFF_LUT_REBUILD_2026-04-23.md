@@ -39,6 +39,9 @@ is barely affected.
 - `td_dif = hem_T(alb=0)/μ_s − exp(-τ/μ_s)`. `hem_T(alb=0)` is a BOA
   hemispheric flux ratio that integrates every downward slant path, so
   any scattering/absorption gap propagates into it 1:1.
+  *(Superseded 2026-10: `rt_run_ss` `hem_T` is now the diffuse downwelling
+  flux only — the direct beam is excluded for every quadrature — so the
+  diffuse term is `hem_T(alb=0)/μ_s` without subtracting `exp(-τ/μ_s)`.)*
 - `tu_dif = T_up_dir − exp(-τ/μ_v)`, where `T_up_dir = α·(1−0.2·S)/(0.2·T_down)`
   and `α = π·(L(0.2)−L(0))/μ_s`. At near-nadir VZA and small τ both
   `T_up_dir` and `exp(-τ/μ_v)` are close to 1; their *difference* is a

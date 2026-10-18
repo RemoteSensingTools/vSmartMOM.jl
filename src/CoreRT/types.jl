@@ -1160,7 +1160,9 @@ untruncated phase functions, with the N–T scaling `ω/(1−ωf)` paired with
 δ-scaled optical depths (implemented as `β_scat/Δτ′`, which is
 algebraically identical and reuses the solver's own scaled `τ_sum`).
 Requires an unpolarized solar source; currently forward-elastic (`noRS`)
-only — the linearized driver and Raman paths reject it explicitly.
+only — the linearized driver and Raman paths reject it explicitly, as do
+interior sensor heights and per-moment stream exports (`rt_run_streams`).
+Combined-band solves evaluate the correction per band.
 """
 struct TMSCorrection <: AbstractSingleScatteringCorrection end
 

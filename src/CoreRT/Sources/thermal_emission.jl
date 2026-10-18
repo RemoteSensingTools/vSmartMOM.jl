@@ -79,7 +79,12 @@ sources = SolarBeam() + ThermalEmission(T_layers, ν_grid)
 
 # Fields
 - `B_layer :: Union{Nothing, AbstractMatrix}`: Planck radiance per layer
-  per spectral point with shape `(nLayers, nSpec)`. Stored without an
+  per spectral point with shape `(nLayers, nSpec)`. Passed directly to a
+  solve (`rt_run(model; sources)`), `nLayers` must be the final model layer
+  count; `model_from_parameters(...; sources)` also accepts the
+  input-profile grid and reframes it. Only the elastic multiple-scattering
+  solver injects thermal emission: `rt_run_ss` and the Raman solvers reject
+  it, and interior-height and linearized runs do too. Stored without an
   `eltype` constraint — `prepare_source` does the precision conversion
   against the model's `FT` at solve time, matching [`SolarBeam`](@ref)'s
   FT-deferred design.
@@ -318,4 +323,36 @@ function has_thermal_emission(s::SourceSet)
         src isa PreparedThermalEmission && return true
     end
     return false
+end
+
+# Like `has_thermal_emission`, but a zero placeholder (`ThermalEmission()`)
+# does not count: it contributes nothing on any path.
+_thermal_source_active(::Union{NoSource, AbstractPreparedSource}) = false
+_thermal_source_active(p::PreparedThermalEmission) = !iszero(p.B_layer)
+_thermal_source_active(s::SourceSet) = any(_thermal_source_active, s.sources)
+
+"""
+    validate_thermal_layers(sources, nlayers)
+
+Require every `ThermalEmission.B_layer` passed to a solve to have one row per
+model layer (`nlayers`, TOA to BOA on the final model grid) — the grid
+`model_from_parameters(...; sources)` reframes onto. The one-row all-zero
+placeholder is also accepted. Without this check, layers beyond the matrix
+rows would silently receive no emission.
+"""
+validate_thermal_layers(::AbstractSource, ::Integer) = nothing
+function validate_thermal_layers(s::ThermalEmission, nlayers::Integer)
+    B = s.B_layer
+    B === nothing && return nothing
+    n_rows = size(B, 1)
+    (n_rows == nlayers || (n_rows == 1 && iszero(B))) || throw(ArgumentError(
+        "ThermalEmission.B_layer has $n_rows rows; the model has $nlayers " *
+        "layers. Supply one row per final model layer (TOA to BOA), or pass " *
+        "the source to model_from_parameters(...; sources) to reframe it " *
+        "from the input-profile grid."))
+    return nothing
+end
+function validate_thermal_layers(s::SourceSet, nlayers::Integer)
+    foreach(src -> validate_thermal_layers(src, nlayers), s.sources)
+    return nothing
 end

@@ -434,7 +434,8 @@ function rt_run_surface(cache::AtmosphereRTCache{FT}, brdf;
     # rt_run.jl's post-loop block and its incident-source normalization).
     if brdf isa CoxMunkSurface && SFI
         @timeit "SS Correction" apply_ss_correction!(R_SFI, brdf, pol_type, vza, vaz, μ₀,
-                             Array(cache.τ_sum_surf), cache.m_max, nSpec; F₀=Array(cache.surface_F₀))
+                             eltype(R_SFI).(Array(cache.τ_sum_surf)), cache.m_max, nSpec;
+                             F₀=Array(cache.surface_F₀))
     end
 
     # TMS exact single scattering: surface-independent, precomputed once at

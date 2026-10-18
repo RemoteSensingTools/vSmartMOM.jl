@@ -298,6 +298,10 @@ output node was actually masked — see [`_tms_correctable_views`](@ref)).
 `(nSpec, nZ+1)` — using it here is what implements the Nakajima–Tanaka
 `ω/(1−ωf)` scaling (see the module header). Modifies
 `R_SFI :: (nvza, nStokes, nSpec)` in place.
+
+For a combined-band solve (`iBand` a vector), the spectral axis holds the
+bands' grids concatenated in `iBand` order (the `RS_type.bandSpecLim`
+layout); each band's slice is evaluated with that band's own optics.
 """
 function tms_correction!(R_SFI::AbstractArray{FT,3}, model, iBand,
                          τ_sum_all::AbstractMatrix, F₀::AbstractArray) where {FT}
@@ -306,9 +310,21 @@ function tms_correction!(R_SFI::AbstractArray{FT,3}, model, iBand,
     τ_above = @view τ_sum_all[:, 1:nZ]
     Δτ = τ_sum_all[:, 2:end] .- τ_sum_all[:, 1:nZ]
     F₀_I = FT.(@view F₀[1, :])
-    _exact_ss_accumulate!(R_SFI, model, iBand, τ_above, Δτ;
-                          untruncated = true, F₀_I = F₀_I,
-                          view_selected = _tms_correctable_views(model))
+    view_selected = _tms_correctable_views(model)
+    bands = iBand isa Integer ? (Int(iBand),) : iBand
+    nSpec = sum(iB -> size(model.τ_abs[iB], 1), bands)
+    nSpec == size(R_SFI, 3) == size(τ_sum_all, 1) || throw(DimensionMismatch(
+        "TMSCorrection: bands $(collect(bands)) span $nSpec spectral points; " *
+        "the solve has $(size(R_SFI, 3))"))
+    s_end = 0
+    for iB in bands
+        r = s_end .+ (1:size(model.τ_abs[iB], 1))
+        s_end = last(r)
+        _exact_ss_accumulate!(view(R_SFI, :, :, r), model, iB,
+                              view(τ_above, r, :), view(Δτ, r, :);
+                              untruncated = true, F₀_I = view(F₀_I, r),
+                              view_selected)
+    end
     return R_SFI
 end
 
