@@ -61,7 +61,7 @@ function _resolve_auto_truncation(t::Scattering.AbstractTruncationType, params, 
     if has_aerosols
         l_cap = params.stream_l_cap > 0 ? params.stream_l_cap : params.l_trunc
         chosen = Scattering.δBGE{FT}(l_cap, FT(params.Δ_angle))
-        @info "truncation: auto → δBGE(stream_l_cap=$(l_cap), Δ_angle=$(FT(params.Δ_angle))) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)"
+        @info "truncation: auto → δBGE(stream_l_cap=$(l_cap)) (per-band greek length checked at Mie call site; falls back to NoTruncation if phase function already fits)"
         return chosen
     else
         @info "truncation: auto → NoTruncation() (no aerosols; Rayleigh-only scene)"

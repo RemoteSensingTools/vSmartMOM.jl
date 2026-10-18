@@ -216,10 +216,12 @@ end
 #   F₀  [mW · m⁻² · cm⁻¹]  spectral irradiance (Stokes vector by component)
 #   B(ν,T) returned by `vSmartMOM.SolarModel.planck_spectrum_wn` is the
 #   Planck SPECTRAL RADIANCE in mW · m⁻² · sr⁻¹ · cm⁻¹. Multiplying by
-#   `factor=π` converts radiance from a Lambertian disk to incident
-#   hemispheric irradiance (mW · m⁻² · cm⁻¹) — directly comparable to
+#   `factor=π` gives πB, the exitance (hemispheric flux leaving a Lambertian
+#   emitter), in irradiance units (mW · m⁻² · cm⁻¹) — directly comparable to
 #   `SolarBeam` F₀ = 1 (which we adopt as 1 mW · m⁻² · cm⁻¹ for unit
-#   normalization). All sources in a `SourceSet` should share these units;
+#   normalization). The irradiance from a distant disk of radius R at
+#   distance d is πB·(R/d)², i.e. `scale = (R/d)²`. All sources in a
+#   `SourceSet` should share these units;
 #   `R = rt_run(model; sources=...)` is then in mW · m⁻² · sr⁻¹ · cm⁻¹.
 #
 # `BlackbodySource` is a constructor function (not a struct) — it
@@ -242,9 +244,11 @@ hot lab source illuminating CO₂/CH₄/H₂O absorption.
 
 `F₀[pol_component, :] = factor · scale · B(ν, T)` where
 `B(ν,T)` is the Planck radiance from `planck_spectrum_wn` in
-mW · m⁻² · sr⁻¹ · cm⁻¹. The default `factor = π` converts radiance to
-hemispheric irradiance for a Lambertian-disk source — set `factor = 1`
-for a head-on collimated lab beam where `F₀` is the radiance directly.
+mW · m⁻² · sr⁻¹ · cm⁻¹. The default `factor = π` gives πB, the exitance of
+a Lambertian emitter at `T`; for the irradiance from a distant disk of
+radius R at distance d, also set `scale = (R/d)²` (2.1629e-5 for the Sun at
+1 AU). Set `factor = 1` for a head-on collimated lab beam where `F₀` is the
+radiance directly.
 
 # Arguments
 - `T :: Real`: blackbody temperature in K.
@@ -255,7 +259,7 @@ for a head-on collimated lab beam where `F₀` is the radiance directly.
 - `pol_n :: Integer = 3`: number of Stokes components in the model
   (1=Stokes_I, 3=Stokes_IQU, 4=Stokes_IQUV). Match the model's
   polarization to avoid `prepare_source` shape errors.
-- `factor :: Real = π`: geometric factor (π for Lambertian-disk → hemisphere irradiance).
+- `factor :: Real = π`: geometric factor (π: radiance → exitance of a Lambertian emitter).
 - `scale :: Real = 1`: extra normalization multiplier.
 
 # Units

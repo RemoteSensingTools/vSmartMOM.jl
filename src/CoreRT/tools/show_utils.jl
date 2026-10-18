@@ -421,7 +421,7 @@ function Base.show(io::IO, ::MIME"text/plain", x::vSmartMOM_Parameters{FT}) wher
     else
         "max_m=$(x.max_m), l_trunc=$(x.l_trunc), truncation=$trunc_name"
     end
-    println(io, _TREE_PIPE, _TREE_END, "$res_str, Δ_angle=$(x.Δ_angle)°, depol=$(x.depol)")
+    println(io, _TREE_PIPE, _TREE_END, "$res_str, depol=$(x.depol)")
 
     # ── geometry ──
     vza_str = length(x.vza) <= 4 ? string(x.vza) : "[$(length(x.vza)) angles]"

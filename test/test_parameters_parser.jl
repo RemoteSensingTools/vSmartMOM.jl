@@ -290,6 +290,13 @@ end
     @test all(iszero, lin_model.τ̇_abs[1])
 end
 
+@testset "retired Δ_angle is accepted and stored as zero" begin
+    cfg = _minimal_parameter_dict()
+    cfg["radiative_transfer"]["Δ_angle"] = 2.0
+    params = @test_logs (:warn, r"retired") match_mode=:any parameters_from_dict(cfg)
+    @test params.Δ_angle == 0
+end
+
 @testset "unknown configuration keys warn once" begin
     cfg = _minimal_parameter_dict()
     cfg["radiative_transfer"]["nstreams_misspelt"] = 16

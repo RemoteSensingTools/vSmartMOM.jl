@@ -139,6 +139,26 @@ review of General's sequential-version rule.
   blocks, the sections the schema closes; a misspelled optional key such as
   `nstream` previously left the default in effect silently. Such keys remain
   non-fatal.
+- **Breaking for some linearized callers:** gas-abundance Jacobian columns
+  are the native partial ∂τ/∂VMR = σ·N_dry
+  with cross sections, CIA and MT_CKD held fixed. Solves and Jacobian plans
+  that request a column whose forward absorption also responds to that
+  abundance now raise an `ArgumentError` naming the omitted terms (for H₂O:
+  self broadening, multi-node ABSCO H₂O-broadener axes, MT_CKD and CIA; for
+  a variable gas: CIA pairs with it as a collider). Pass
+  `abundance_jacobians=:frozen_cross_section` to accept the partial (values
+  are unchanged); fixed humidity (`compute_h2o_jacobians=false`),
+  `fixed_molecules` and fixed-broadener tables need no change. Plans may not
+  select q-driven H₂O columns when q ≡ 0. In one HITRAN2016 check the native
+  H₂O column differed from the complete response by 4.4% (q = 0.0125) and
+  8.1% (q = 0.025).
+- A nonzero `radiative_transfer.Δ_angle` (the retired δBGE exclusion cone)
+  is still accepted but is now stored as 0 with a one-time warning, so the
+  parsed parameters and their display match what the fit uses.
+- Documentation: `default_solar_spectrum_at_earth` states its units
+  (photons s⁻¹ m⁻² µm⁻¹, not `SolarBeam` F₀ units), and the `BlackbodySource`
+  `factor = π` is described as the exitance πB of a Lambertian emitter (use
+  `scale = (R/d)²` for a distant disk).
 - HITRAN, partition-sum, HAPI, CIA and MT_CKD references added to
   `CITATION.bib`, the References page and the README, with guidance on which
   HITRAN edition a calculation used.

@@ -1288,12 +1288,13 @@ function parameters_from_dict(params_dict::Dict)
     # `_resolve_resolution_knobs` for the exact precedence rules.
     res = _resolve_resolution_knobs(params_dict)
 
-    # Δ_angle is optional (default 0.0 — no forward-peak exclusion in δBGE).
-    # When the legacy parser path resolves `truncation` to `δBGE`, this is the
-    # forward-peak half-angle in degrees. Ignored when `truncation` resolves to
-    # `NoTruncation()` or when `truncation: auto` decides the phase function
-    # already fits within `stream_l_cap`.
-    Δ_angle = FT(get(params_dict["radiative_transfer"], "Δ_angle", 0.0))
+    # Δ_angle (the δBGE forward-peak exclusion cone) is retired: the key is
+    # still accepted for old configurations, but the stored value is 0.
+    Δ_angle_in = get(params_dict["radiative_transfer"], "Δ_angle", 0.0)
+    iszero(Δ_angle_in) || @warn(
+        "radiative_transfer.Δ_angle = $(Δ_angle_in) is retired and ignored (stored as 0): " *
+        "the δBGE fit always uses the full angular domain. Remove the key.", maxlog = 1)
+    Δ_angle = zero(FT)
     truncation = _parse_truncation(params_dict, res.l_trunc, Δ_angle, FT)
     numerics = _parse_numerics(params_dict, FT)
     greek_beta_cutoff_raw = get(params_dict["radiative_transfer"],

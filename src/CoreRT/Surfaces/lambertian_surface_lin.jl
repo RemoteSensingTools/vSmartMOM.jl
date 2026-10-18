@@ -173,7 +173,7 @@ function create_surface_layer!(RS_type::noRS,
 
     else
         added_layer.r⁻⁺ .= zero(FT);
-        added_layer.r⁻⁺ .= zero(FT);
+        added_layer.r⁺⁻ .= zero(FT);
         added_layer.t⁺⁺ .= T_surf;
         added_layer.t⁻⁻ .= zero(FT); #T_surf;
         added_layer.j₀⁺ .= zero(FT);

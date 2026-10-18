@@ -201,8 +201,8 @@ Round 7.
   Use the loaded package's own path.
 - [ ] Move remaining workflows to `sandbox/workflows/` and update the scripts
   that reference old paths (e.g. `generate_truth_map.jl:42`).
-- [ ] Fixed-altitude grid + Round 7_altgrd pilot (in progress); decide on
-  re-running Rounds 3–4 / all rounds afterwards.
+- [ ] Fixed-altitude grid + Round 7_altgrd pilot: completed; see §3.1 for the
+  results and the decisions it needs (re-running Rounds 3–4 / all rounds).
 - [ ] TMS GPU efficiency — Christian.
 - [x] **For Suniti (convention, documented 2026-10-17):** `conventions.md` §1
   said Q > 0 means polarization parallel to the meridian plane. The code's
@@ -221,7 +221,12 @@ Round 7.
 - [ ] `CanopySurface` caches its optics without keying them on the spectral
   grid: one canopy object reused for bands with different grids (or after a
   combined-band solve) reuses a stale cache. Combined-band canopy solves are
-  rejected for now (B8); key the cache on the grid in a follow-up.
+  rejected for now (B8); key the cache on the grid in a follow-up. Related:
+  the linearized canopy wrapper calls the forward canopy layer without
+  `spec_bands_wn`/`m_max`, so a cache it builds uses the default `m_max = 2`
+  (later moments are clamped to the last stored one) and no spectral leaf
+  optics; fix both together (key = quadrature, spectral grid, `m_max`,
+  Stokes count).
 - [ ] Generic analytic surfaces (`analytic_surface.jl`, RPV and Ross–Li) pass
   the reflected (row) direction as `μᵢ`; harmless for these reciprocal scalar
   BRDFs, but fix the order and docstring in a separate commit.
@@ -231,3 +236,61 @@ Round 7.
   variance, B2 shadowing, B3 polarization) are stale, e.g. the outputs of
   `sandbox/workflows/RRS_XCO2/scripts/generate_truth_map_land_glint.jl`;
   regenerate before use.
+
+### 3.1 Added by the 2026-10-17 bug audit (results-changing; need Suniti)
+
+The audit findings that are code defects with a clear reference were fixed
+in reviewed commits (see `CHANGELOG.md`). The items below change scientific
+results or definitions and wait for a decision.
+
+- [ ] **MT_CKD density factor (prepared, not merged).** AER's `mt_ckd_h2o`
+  scales both continuum terms with the number-density ratio
+  `(p/p_ref)(T_ref/T)`; `compute_τ_h2o_continuum!` applies only `p/p_ref`, so
+  the continuum is low by `T/T_ref` (−26 % at 220 K, 0 at 296 K). Proposed fix
+  on branch `proposal/mtckd-density-ratio`
+  (`run_worktrees/vSmartMOM-mtckd-proposal`). MT_CKD is used by the
+  `ParamsEMIT_MODTRANcomp_newLUT*` local configs and the OCORaman LUT script
+  (when `MTCKD_FILE` is set); ExoOptics computes its MT_CKD continuum
+  separately. uni_vSmartMOM's own copy has the same omission.
+- [ ] **`Stokes_IQ` phase-matrix moments.** The I/Q truncation of Π and B drops
+  the U-mediated `T ζ T′` term from the Q←Q element for m ≥ 1, so IQ Z
+  moments are not the I/Q block of the IQU moments (m = 0 and Rayleigh-like
+  cases without ζ are unaffected). Decide whether IQ should be the exact I/Q
+  block (needs Π as 2×3 and a transposed product in the Z-moment kernels).
+- [ ] **Raman.** R1: a narrow RRS band with no rotational line inside gets
+  `n_Raman = 0` and loses the Raman energy silently (warn/error?). R2: the VS
+  Q-branch Placzek–Teller factor uses `(α′/(b γ′))²` where `α′²/(b γ′²)`
+  appears intended (Q-branch low by 5.6 % N₂, 11.8 % O₂). R3: VS uses the
+  RRS-free Cabannes Greek coefficients for the elastic part while keeping RRS
+  in the elastic SSA (probable inconsistency). R4–R8 minor (band-depolarized
+  Q-branch phase, VS_0to1_plus applies no source depletion (~8e-4 of the
+  energy goes to VRS with ϖ_Cabannes = 1), unused/dead overloads,
+  RRS line offsets from an off-grid mean ν).
+- [ ] **Water refractive index for Cox–Munk.** The built-in table departs from
+  Hale & Querry/Segelstein above ~900 nm (n 1.255 vs 1.317 at 1.6 µm), and
+  `n_water = nothing` always uses the 550 nm value instead of a spectral
+  lookup; a vector `n_water` uses its first element. Glint in the SWIR is
+  ~6 % high. Choose the reference data and whether to look up per band or
+  per spectral point.
+- [ ] **NAI2 size-parameter Jacobians.** `r_min = quantile(dist, 1e-8)` moves
+  the radius nodes with μ_logr/σ_logr while the analytic tangent assumes
+  fixed nodes; size Jacobians are accurate only when `nquad_radius` is
+  converged. Radiance Jacobians were off by 33–115 % with 100 nodes
+  (`r_max = 50`, the JacobianTestFast settings); the optical-property
+  derivatives agree to ≈1e-7 with 1600 nodes (`r_max = 5`). Fix the radius
+  grid, differentiate it, or document a minimum `nquad_radius`.
+- [ ] **Surface-pressure Jacobian with `depol: -1`.** The automatic
+  depolarization depends on the column-mean temperature, which moves with
+  `p_surf`; that term (~1e-5 relative) has no tangent.
+- [ ] **VS `_plus` builder** uses the raw `params.depol` (with `depol: -1`
+  τ_Rayleigh ≈ 0.22× the correct value) and mutates `params.spec_bands` and
+  `params.brdf` (probable, from reading the code).
+- [ ] **Round 7_altgrd pilot** (report in the RRS_XCO2 round7_altgrd output
+  directory): no-aerosol scenes match Round 7 (mean ΔXCO2 +0.001 ppm), aerosol
+  scenes are 0.49 ppm lower on average (up to 1.52 ppm); five desert solves
+  hit the iteration limit. Decide: (1) the aerosol rule (altitude-defined
+  aerosols fixed in altitude), (2) the comparability criterion and which
+  rounds/members to re-run, (3) the iteration limit, (4) reconcile the note
+  that the release "adds the bottom-layer dσ/dp term" (among Rounds 4–7, only
+  Round 4 lacked it; Round 3 SIF-on used `cb90b83b`, also without it, and
+  earlier unpinned runs have uncertain provenance).
