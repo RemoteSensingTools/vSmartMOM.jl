@@ -1,10 +1,12 @@
 # HITRAN Spectroscopic Data Management
 
-!!! warning "Legacy vSmartMOM.Absorption documentation"
-    AtmosphericAbsorption.jl is the sole supported absorption dependency for vSmartMOM
-    going forward. The internal `vSmartMOM.Absorption` data path documented below remains
-    temporarily for compatibility and will be removed. New code should use
+!!! note "HITRAN data management remains supported"
+    The HITRAN data management described here (`artifact`, `fetch_hitran`, edition
+    selection and the download cache) remains supported: the RT pipeline reads its
+    line lists through `artifact()` and parses them with
     [AtmosphericAbsorption.jl](https://github.com/RemoteSensingTools/AtmosphericAbsorption.jl).
+    Only the standalone line-by-line cross-section model in `vSmartMOM.Absorption`
+    is deprecated in favour of AtmosphericAbsorption.jl.
 
 vSmartMOM.jl requires spectroscopic line parameters from the [HITRAN database](https://hitran.org) to compute gas absorption cross-sections. This page explains the two available data pathways, how to switch between them, and how version provenance is tracked.
 
@@ -84,11 +86,11 @@ alongside a metadata file:
 For large molecules (e.g., H2O), downloading the full 0--150,000 cm⁻¹ range can be slow. You can restrict the download to the spectral region you need:
 
 ```julia
-# Download only the O2 A-band region
-fetch_hitran("O2"; numin=12900, numax=13200, edition="HITRAN2024")
+# Download only the O2 A-band region, under its own edition label
+fetch_hitran("O2"; numin=12900, numax=13200, edition="HITRAN2024_O2A")
 
 # Download CO2 for the 1.6 um band
-fetch_hitran("CO2"; numin=6000, numax=6400, edition="HITRAN2024")
+fetch_hitran("CO2"; numin=6000, numax=6400, edition="HITRAN2024_1p6um")
 ```
 
 !!! warning "artifact() requires the full dataset"
@@ -156,8 +158,13 @@ Downloads are written to a temporary file in the same directory and checked
 before they replace the cache: the body must be non-empty, every line must be a
 well-formed 160-column HITRAN record, and every line must belong to a requested
 isotopologue inside the requested range. A transport error is a failure even
-if the server had already sent a successful HTTP status. If any step fails, the
-previously cached file and its metadata are left unchanged.
+if the server had already sent a successful HTTP status, with one exception:
+hitran.org declares a length that counts two bytes per line ending but sends
+one, so a complete response ends with "N bytes missing", N being the number of
+lines. That response is accepted only when the declared length equals the
+received size plus the number of lines, the body ends with a newline, and every
+record passes the checks above. If any step fails, the previously cached file
+and its metadata are left unchanged.
 
 You can query this programmatically:
 
@@ -274,8 +281,11 @@ ERROR: HITRAN API rate limit exceeded. You have exceeded the daily limit of API 
 
 To minimize API calls:
 - Data is cached locally after the first download. Subsequent calls use the cache.
-- Use `hitran_is_cached("CO2")` to check before triggering a download.
-- Download only the wavenumber range you need (use `numin`/`numax` in `fetch_hitran`).
+- Use `hitran_is_cached("CO2")` to check whether `artifact()` (and so
+  `model_from_parameters`) will need to download the full dataset.
+- For standalone work, download only the wavenumber range you need (use
+  `numin`/`numax` in `fetch_hitran`) under a separate edition label;
+  `artifact()` always requires the full dataset.
 
 ## Cleaning Up Cached Data
 
