@@ -30,6 +30,12 @@ review of General's sequential-version rule.
   runs apply the same correction, including wind and optical-depth tangents.
   **Ocean radiances change**; revalidate prior ocean baselines. The direct
   glint correction supports unpolarized incident light.
+- Cox–Munk slope statistics corrected: `0.003 + 0.00512U` is now used as the
+  *total* mean-square slope (per-axis variance half of it; previously the
+  glint was √2 wider — twice the slope variance — and half as bright at the
+  specular point), and the
+  Smith shadowing function uses its correct `√π` normalization (shadowing at
+  grazing angles was underestimated or zero). Both change ocean radiances.
 - Shared aerosol reference normalization and spectral angular-cache sizing
   fixes restore constructor parity and avoid spectral-quadratic cache growth.
 - The experimental aerosol ingestion adapter now rejects calls that previously

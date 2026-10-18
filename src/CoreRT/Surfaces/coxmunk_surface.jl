@@ -18,8 +18,19 @@ References:
 # Helper functions
 # ──────────────────────────────────────────────────────────────────────
 
-"""Isotropic slope variance σ² as a function of 10-m wind speed U in m/s (Cox & Munk 1954)."""
-wind_to_sigma2(U::FT) where FT = FT(0.003) + FT(0.00512) * U
+"""
+    wind_to_sigma2(U)
+
+Per-axis slope variance σ² of the isotropic Gaussian facet-slope distribution
+for 10-m wind speed `U` in m/s. Cox & Munk (1954) give the *total* mean-square
+slope ⟨zx² + zy²⟩ = 0.003 + 0.00512U; each of the two slope components carries
+half of it, σ² = ½(0.003 + 0.00512U), which is the variance used by
+`cox_munk_pdf` (and by VLIDORT's GISS Cox–Munk kernel).
+"""
+wind_to_sigma2(U::FT) where FT = (FT(0.003) + FT(0.00512) * U) / 2
+
+"""dσ²/dU of `wind_to_sigma2`: ½ · 0.00512 = 0.00256 (m/s)⁻¹."""
+wind_to_sigma2_dU(::Type{FT}) where FT = FT(0.00512) / 2
 
 """Isotropic Gaussian slope PDF for slope components (zx, zy)."""
 function cox_munk_pdf(zx::FT, zy::FT, σ²::FT) where FT
@@ -33,19 +44,27 @@ function whitecap_fraction(U::FT) where FT
 end
 
 """
-    smith_shadowing(μ, σ²)
+    smith_Λ(μ, σ²)
 
-Smith (1967) monostatic shadowing function Λ(μ) for a Gaussian slope distribution.
-Returns the shadowing factor S = 1/(1 + Λ), where Λ is the shadowing integral.
+Smith (1967) shadowing integral Λ(μ), μ = cos θ, for a Gaussian distribution
+of the slope component in the plane of the ray with variance σ² (the
+per-axis variance, see `wind_to_sigma2`):
+
+```math
+Λ = \\int_c^∞ \\left(\\frac{s}{c} - 1\\right) f_σ(s)\\,ds
+  = \\frac{1}{2}\\left[\\frac{e^{-ν^2}}{\\sqrt{π}\\,ν} - \\operatorname{erfc}(ν)\\right],
+\\qquad c = \\cot θ,\\; ν = \\frac{c}{\\sqrt{2}\\,σ}.
+```
+
+`shadow_factor` combines Λ for the incident and reflected directions.
 """
 function smith_Λ(μ::FT, σ²::FT) where FT
     μ <= zero(FT) && return FT(1e10)  # fully shadowed at grazing
     σ = sqrt(σ²)
     cot_θ = μ / sqrt(max(FT(1e-30), one(FT) - μ^2))
     ν = cot_θ / (sqrt(FT(2)) * σ)
-    # Λ = (exp(-ν²) / (√(2π) ν) - erfc(ν)) / 2
-    # Use the approximation valid for all ν (Tsang et al. 1985):
-    Λ = (exp(-ν^2) / (sqrt(FT(2π)) * ν) - erfc(ν)) / 2
+    Λ = (exp(-ν^2) / (sqrt(FT(π)) * ν) - erfc(ν)) / 2
+    # Λ ≥ 0 analytically; the guard only removes roundoff for large ν.
     return max(zero(FT), Λ)
 end
 
@@ -73,15 +92,14 @@ function smith_Λ_dσ²(μ::FT, σ²::FT) where FT
     ν = cot_θ / (sqrt(FT(2)) * σ)
 
     # Check if Λ itself is zero (derivative of max(0,·) is 0 there)
-    Λ_raw = (exp(-ν^2) / (sqrt(FT(2π)) * ν) - erfc(ν)) / 2
+    Λ_raw = (exp(-ν^2) / (sqrt(FT(π)) * ν) - erfc(ν)) / 2
     Λ_raw <= zero(FT) && return zero(FT)
 
-    # dΛ/dν via product rule on exp(-ν²)/(√(2π) ν) and chain rule on erfc(ν):
-    #   d/dν[exp(-ν²)/(√(2π)ν)] = exp(-ν²)(-2ν² − 1)/(√(2π)ν²)
-    #   d/dν[erfc(ν)]            = −(2/√π) exp(-ν²)
-    exp_neg_ν² = exp(-ν^2)
-    dΛ_dν = (exp_neg_ν² * (-FT(2) * ν^2 - one(FT)) / (sqrt(FT(2π)) * ν^2) +
-             FT(2) / sqrt(FT(π)) * exp_neg_ν²) / 2
+    # dΛ/dν via product rule on exp(-ν²)/(√π ν) and chain rule on erfc(ν):
+    #   d/dν[exp(-ν²)/(√π ν)] = exp(-ν²)(-2ν² − 1)/(√π ν²)
+    #   d/dν[erfc(ν)]         = −(2/√π) exp(-ν²)
+    # The exp(-ν²)-proportional terms cancel, leaving
+    dΛ_dν = -exp(-ν^2) / (2 * sqrt(FT(π)) * ν^2)
 
     # dν/dσ² = −ν / (2σ²)
     dν_dσ² = -ν / (FT(2) * σ²)
@@ -314,7 +332,7 @@ function coxmunk_brdf_mueller_and_deriv(surf::CoxMunkSurface{FT}, n_stokes::Int,
                                          n_water::Complex{FT} = _get_n_water(surf, FT(550))) where FT
     U  = surf.wind_speed
     σ² = wind_to_sigma2(U)
-    dσ²_dU = FT(0.00512)
+    dσ²_dU = wind_to_sigma2_dU(FT)
 
     # ── Geometry, Fresnel, rotations (all independent of U) ──
     geom = coxmunk_geometry(μᵢ, μᵣ, dϕ)

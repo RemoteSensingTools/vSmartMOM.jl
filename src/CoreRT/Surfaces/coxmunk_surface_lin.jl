@@ -6,7 +6,8 @@ with respect to wind speed, following the pattern in lambertian_surface_lin.jl.
 
 The derivative chain is:
   dR_surf/dU = dR_surf/dσ² · dσ²/dU
-where dσ²/dU = 0.00512 (Cox & Munk 1954), plus whitecap derivatives.
+where dσ²/dU = 0.00256 for the per-axis slope variance σ² = ½(0.003 + 0.00512U)
+(Cox & Munk 1954; see `wind_to_sigma2`), plus whitecap derivatives.
 
 Uses the analytical `reflectance_and_deriv` function from coxmunk_surface.jl,
 which shares all wind-speed-independent work (geometry, Fresnel, rotations)

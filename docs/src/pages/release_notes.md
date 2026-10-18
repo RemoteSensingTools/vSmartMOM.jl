@@ -45,7 +45,9 @@ the repository's `CITATION.bib`, with their original publication author order.
 - Nonzero δBGE `Δ_angle` is retired and coerced to zero with a warning.
   Forward and linearized truncation now share the same domain.
 - Revalidate ocean results: Cox–Munk normalization and direct-glint attenuation
-  were corrected. The incident spectrum scales the correction, and full
+  were corrected, the per-axis slope variance is now half the Cox–Munk total
+  mean-square slope (glint narrower and brighter), and Smith shadowing uses
+  its correct normalization. The incident spectrum scales the correction, and full
   Jacobians include its wind/optical-depth derivatives. The direct-glint
   correction requires unpolarized incident illumination.
 - Surface-pressure Jacobians include pressure-induced line-shape and LUT

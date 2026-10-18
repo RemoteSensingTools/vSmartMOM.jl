@@ -40,8 +40,9 @@ The `surface` vector must have **the same length as `spec_bands`**.
 
 `CoxMunkSurface` keyword arguments:
 
-- `wind_speed` *(required, m/s)* — 10 m wind. Drives the Cox-Munk
-  variance via Cox & Munk (1954) `σ² = 0.003 + 0.00512·U`.
+- `wind_speed` *(required, m/s)* — 10 m wind. Cox & Munk (1954) give the
+  total mean-square slope `⟨zx² + zy²⟩ = 0.003 + 0.00512·U`; each slope
+  component has variance `σ² = ½(0.003 + 0.00512·U)`.
 - `n_water` — complex refractive index. Default `nothing` triggers the
   built-in Segelstein 1981 spectral lookup.
 - `whitecap_albedo` *(default `0.22`)* — Lambertian whitecap albedo

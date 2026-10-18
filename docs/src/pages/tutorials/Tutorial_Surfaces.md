@@ -184,9 +184,12 @@ The ocean surface is approximated as a collection of small flat facets
 
 $$P(z_x, z_y) \;=\; \frac{1}{2\pi\sigma^2}\,\exp\!\left(-\frac{z_x^2 + z_y^2}{2\sigma^2}\right)$$
 
-where the slope variance depends linearly on 10-m wind speed $U$ (m/s):
+where $\sigma^2$ is the variance of *each* slope component.  Cox & Munk
+(1954) measured the total mean-square slope
+$\langle z_x^2 + z_y^2\rangle = 2\sigma^2$, which depends linearly on the
+10-m wind speed $U$ (m/s):
 
-$$\sigma^2 \;=\; 0.003 + 0.00512\, U$$
+$$2\sigma^2 \;=\; 0.003 + 0.00512\, U$$
 
 Low wind ($U \lesssim 2$ m/s) gives a nearly mirror-like surface with a
 narrow specular glint; high wind ($U \gtrsim 10$ m/s) spreads the glint
@@ -233,7 +236,7 @@ crests.  The Smith shadowing function corrects for this:
 
 $$S(\mu_i, \mu_r) \;=\; \frac{1}{1 + \Lambda(\mu_i) + \Lambda(\mu_r)}$$
 
-where $\Lambda(\mu) = \tfrac{1}{2}\!\left[\tfrac{\exp(-\nu^2)}{\sqrt{2\pi}\,\nu} - \operatorname{erfc}(\nu)\right]$
+where $\Lambda(\mu) = \tfrac{1}{2}\!\left[\tfrac{\exp(-\nu^2)}{\sqrt{\pi}\,\nu} - \operatorname{erfc}(\nu)\right]$
 with $\nu = \cot\theta / (\sqrt{2}\,\sigma)$ and $\sigma = \sqrt{\sigma^2}$.
 
 ### 5e) Whitecap contribution (Monahan & O'Muircheartaigh, 1980)
@@ -356,7 +359,7 @@ The derivative of the surface reflectance w.r.t. wind speed $U$ is computed
 analytically via the chain rule:
 $$\frac{\partial \boldsymbol{\rho}}{\partial U} \;=\; (1 - f_\text{wc})\!\left[\frac{\partial P}{\partial \sigma^2}\,S + P\,\frac{\partial S}{\partial \sigma^2}\right]\!\frac{d\sigma^2}{dU}\;\frac{\mathbf{L}_2\,\mathbf{M}_F\,\mathbf{L}_1}{4\mu_i\mu_r\cos^4\!\beta} \;+\; \frac{df_\text{wc}}{dU}\left(\boldsymbol{\rho}_\text{wc} - \boldsymbol{\rho}_\text{glint}\right)$$
 
-where $d\sigma^2/dU = 0.00512$.  The geometry, Fresnel coefficients, and
+where $d\sigma^2/dU = 0.00256$.  The geometry, Fresnel coefficients, and
 rotation matrices are all independent of $U$ and shared with the forward
 evaluation.
 

@@ -171,9 +171,78 @@ end
 # ═══════════════════════════════════════════════════════════════════════
 
 @testset "Cox-Munk helpers" begin
-    @testset "Slope variance" begin
-        @test CM.wind_to_sigma2(0.0) ≈ 0.003 atol = 1e-10
-        @test CM.wind_to_sigma2(10.0) ≈ 0.003 + 0.00512 * 10 atol = 1e-10
+    # B1 (docs/dev_notes/RELEASE_READINESS_AND_CLAUDE_HANDOFF_2026-10-16.md):
+    # Cox & Munk's 0.003 + 0.00512U is the
+    # TOTAL mean-square slope ⟨zx² + zy²⟩. The isotropic PDF takes the
+    # per-axis variance, so its integrated second moment must reproduce the
+    # empirical total — checked here by direct quadrature, independently of
+    # wind_to_sigma2's formula.
+    @testset "Slope variance: PDF second moment = Cox–Munk total ($FT)" for FT in (Float64, Float32)
+        z, w = CM.CanopyOptics.gauleg(160, -one(FT), one(FT))
+        for U in FT[0, 2, 5, 10, 20]
+            σ² = CM.wind_to_sigma2(U)
+            L = 8 * sqrt(σ²)                    # ±8σ captures the Gaussian to < 1e-14
+            norm_ = zero(Float64); m2 = zero(Float64)
+            for (zx, wx) in zip(L .* z, L .* w), (zy, wy) in zip(L .* z, L .* w)
+                P = Float64(CM.cox_munk_pdf(zx, zy, σ²))
+                norm_ += wx * wy * P
+                m2 += wx * wy * P * (Float64(zx)^2 + Float64(zy)^2)
+            end
+            tol = FT == Float64 ? 1e-10 : 1e-5
+            @test norm_ ≈ 1 rtol = tol
+            @test m2 ≈ 0.003 + 0.00512 * Float64(U) rtol = tol
+        end
+        # Complete BRDF at the specular point (μᵢ = μᵣ = cos θ, Δϕ = 0; facet
+        # horizontal): ρ₁₁ = R_F(θ) / (4π μ² ⟨zx² + zy²⟩), with the Fresnel
+        # reflectance R_F evaluated here from Snell's law, not the package.
+        for U in FT[2, 5, 10], θ in FT[20, 45]
+            μ = cosd(θ); n = FT(1.33)
+            cosθt = sqrt(1 - (1 - μ^2) / n^2)
+            R_F = ((μ - n * cosθt)^2 / (μ + n * cosθt)^2 +
+                   (n * μ - cosθt)^2 / (n * μ + cosθt)^2) / 2
+            surf = CoxMunkSurface{FT}(wind_speed = U, n_water = complex(n),
+                                      include_whitecaps = false, shadowing = false)
+            ρ = CM.coxmunk_brdf_mueller(surf, 1, μ, μ, zero(FT); n_water = complex(n))[1, 1]
+            @test ρ ≈ R_F / (4 * FT(π) * μ^2 * (FT(0.003) + FT(0.00512) * U)) rtol = 10eps(FT)
+        end
+        # The wind tangent belongs to the same per-axis variance (0.00256).
+        @test CM.wind_to_sigma2_dU(FT) ≈ FT(0.00256)
+        @test (CM.wind_to_sigma2(FT(5) + FT(0.5)) - CM.wind_to_sigma2(FT(5) - FT(0.5))) ≈
+              CM.wind_to_sigma2_dU(FT) rtol = 1e-5
+    end
+
+    # B2: Λ(μ) = ∫_c^∞ (s/c − 1) N(0, σ²)(s) ds with c = cot θ, evaluated by
+    # quadrature (not the closed form under test). Reference values in the
+    # handoff's B2 section (σ² = 0.0286): μ = 0.1, 0.2, 0.3 → 0.2864652175,
+    # 0.0458159841, 0.0065980654.
+    @testset "Smith Λ against projected-slope quadrature" begin
+        function Λ_quadrature(μ, σ²)
+            c = μ / sqrt(1 - μ^2); σ = sqrt(σ²)
+            x, w = CM.CanopyOptics.gauleg(400, c, c + 40σ)
+            return sum(w .* (x ./ c .- 1) .* exp.(-x .^ 2 ./ (2σ²)) ./ sqrt(2π * σ²))
+        end
+        for (μ, Λref) in ((0.1, 0.2864652175), (0.2, 0.0458159841), (0.3, 0.0065980654))
+            # The audit quotes 10 decimals, hence the absolute tolerance.
+            @test CM.smith_Λ(μ, 0.0286) ≈ Λref atol = 1e-10
+            @test Λ_quadrature(μ, 0.0286) ≈ CM.smith_Λ(μ, 0.0286) rtol = 1e-10
+        end
+        for σ² in (0.0015, 0.0143, 0.0286, 0.06), μ in (0.05, 0.1, 0.2, 0.35, 0.5, 0.8)
+            Λq = Λ_quadrature(μ, σ²)
+            Λq > 1e-300 && @test CM.smith_Λ(μ, σ²) ≈ Λq rtol = 1e-8 atol = 1e-15
+            @test CM.smith_Λ(Float32(μ), Float32(σ²)) ≈ Λq rtol = 2e-4 atol = 1e-7
+        end
+        # Bistatic factor combines both directions; grazing shadows strongly.
+        @test CM.shadow_factor(0.1, 0.9, 0.0286) ≈
+              1 / (1 + Λ_quadrature(0.1, 0.0286) + Λ_quadrature(0.9, 0.0286)) rtol = 1e-9
+        @test CM.shadow_factor(0.05, 0.05, 0.0286) < 0.5
+        # Analytic σ² derivative vs centered differences (step converged),
+        # at angles where Λ is not negligible — the regime B2 corrupted.
+        for μ in (0.08, 0.15, 0.3), σ² in (0.0143, 0.03)
+            d = CM.smith_Λ_dσ²(μ, σ²)
+            fd(h) = (CM.smith_Λ(μ, σ² + h) - CM.smith_Λ(μ, σ² - h)) / 2h
+            @test abs(fd(1e-6) - fd(2e-6)) < 1e-6 * abs(d)
+            @test d ≈ fd(1e-6) rtol = 1e-6
+        end
     end
 
     @testset "Whitecap fraction" begin

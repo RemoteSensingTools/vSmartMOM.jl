@@ -820,7 +820,9 @@ end
 Cox-Munk (1954) ocean surface: Fresnel reflection from wind-roughened wave facets.
 Supports full polarization (Mueller matrix) and optional Lambertian whitecap contribution.
 
-Isotropic slope distribution: σ² = 0.003 + 0.00512·U.
+Isotropic Gaussian slope distribution with total mean-square slope
+⟨zx² + zy²⟩ = 0.003 + 0.00512·U (Cox & Munk 1954), i.e. per-axis variance
+σ² = ½(0.003 + 0.00512·U); see `CoreRT.wind_to_sigma2`.
 
 # Fields
 $(DocStringExtensions.FIELDS)
