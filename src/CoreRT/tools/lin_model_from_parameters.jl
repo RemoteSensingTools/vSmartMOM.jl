@@ -209,6 +209,7 @@ function model_from_parameters(lin::LinMode,
         "aerosol_anchor_bands must have one grid per spectral band"))
     all(!isempty, aerosol_bands) || throw(ArgumentError(
         "aerosol interpolation anchor grids must be nonempty"))
+    _require_surface_per_band(params)
     scat = params.scattering_params
     abs_params = params.absorption_params
     if scat !== nothing && any(_has_analytic_phase_function, scat.rt_aerosols)
@@ -240,7 +241,11 @@ function model_from_parameters(lin::LinMode,
     ϖ_Cabannes = zeros(FT, n_bands)
     τ_rayl = [zeros(params.float_type, length(params.spec_bands[i]), length(profile.p_full)) for i=1:n_bands]
 
-    FT2 = isnothing(abs_params) || !haskey(abs_params.vmr, "CO2") ? params.float_type : eltype(abs_params.vmr["CO2"])
+    # Gas-tangent storage follows a ForwardDiff Dual CO2 VMR (hybrid AD) and is
+    # otherwise the model float type.
+    vmr_co2_type = isnothing(abs_params) || !haskey(abs_params.vmr, "CO2") ?
+                   params.float_type : eltype(abs_params.vmr["CO2"])
+    FT2 = vmr_co2_type <: ForwardDiff.Dual ? vmr_co2_type : params.float_type
     τ_abs     = [zeros(FT2, length(params.spec_bands[i]), length(profile.p_full)) for i in 1:n_bands]
     N_fix_gas = isnothing(abs_params) ? 0 : length(unique(Iterators.flatten(abs_params.fixed_molecules)))
     N_var_gas = isnothing(abs_params) ? 0 : length(unique(Iterators.flatten(abs_params.variable_molecules)))
@@ -501,10 +506,12 @@ function model_from_parameters(lin::LinMode,
     aerosol_optics = [Array{AerosolOptics}(undef, (n_aer)) for i=1:n_bands]
     lin_aerosol_optics = [Array{linAerosolOptics}(undef, (n_aer)) for i=1:n_bands]
 
-    FT2 = params.float_type
+    # Aerosol optics use the model float type; `FT2` (the gas-tangent storage
+    # type, possibly a Dual) is kept intact for the coercion at the end.
+    FT_aer = params.float_type
 
-    τ_aer = [zeros(FT2, n_aer, length(params.spec_bands[i]), length(profile.p_full)) for i=1:n_bands]
-    τ̇_aer = [zeros(FT2, n_aer, 7, length(params.spec_bands[i]), length(profile.p_full)) for i=1:n_bands]
+    τ_aer = [zeros(FT_aer, n_aer, length(params.spec_bands[i]), length(profile.p_full)) for i=1:n_bands]
+    τ̇_aer = [zeros(FT_aer, n_aer, 7, length(params.spec_bands[i]), length(profile.p_full)) for i=1:n_bands]
 
     for i_aer=1:n_aer
 
@@ -539,23 +546,23 @@ function model_from_parameters(lin::LinMode,
             k̇_ref[1:2] .= 0  # The reference index is not a retrieved aerosol index.
         else
             k_ref = compute_ref_aerosol_extinction(mie_model_ref, params.float_type)
-            k̇_ref = zeros(FT2, 4)
+            k̇_ref = zeros(FT_aer, 4)
         end
 
         function aerosol_pair(λ)
             mie_model = _mie(λ)
             if compute_aerosol_microphysics_jacobians
-                return compute_aerosol_optical_properties(lin, mie_model, FT2)
+                return compute_aerosol_optical_properties(lin, mie_model, FT_aer)
             end
             aerosol = compute_aerosol_optical_properties(mie_model)
-            return aerosol, _zero_aerosol_microphysics_jacobian(aerosol, FT2)
+            return aerosol, _zero_aerosol_microphysics_jacobian(aerosol, FT_aer)
         end
 
         for i_band=1:n_bands
 
             curr_band_λ = params.float_type(1e4) ./ params.spec_bands[i_band]
-            anchor_ν = FT2.(aerosol_bands[i_band])
-            anchor_band_λ = FT2(1e4) ./ anchor_ν
+            anchor_ν = FT_aer.(aerosol_bands[i_band])
+            anchor_band_λ = FT_aer(1e4) ./ anchor_ν
             already_truncated = false
 
             if length(curr_band_λ) == 1 && length(anchor_band_λ) == 1
@@ -589,8 +596,8 @@ function model_from_parameters(lin::LinMode,
                     aerosol_optics_raw_0, lin_aerosol_optics_raw_0)
                 endpoint₁, lin_endpoint₁ = truncate_endpoint(
                     aerosol_optics_raw_1, lin_aerosol_optics_raw_1)
-                ν_spec = FT2.(params.spec_bands[i_band])
-                ν_ref_phase = FT2(1e4) / scat.λ_ref
+                ν_spec = FT_aer.(params.spec_bands[i_band])
+                ν_ref_phase = FT_aer(1e4) / scat.λ_ref
                 endpoint_ref = lin_endpoint_ref = nothing
                 if _interior_reference_node(anchor_ν, ν_ref_phase)
                     @timeit "Mie calc" aerosol_optics_raw_ref, lin_aerosol_optics_raw_ref =
@@ -632,10 +639,10 @@ function model_from_parameters(lin::LinMode,
 
             k_band = aerosol_optics[i_band][i_aer].k
             k̇_band = lin_aerosol_optics[i_band][i_aer].k̇
-            ν_spec = FT2.(params.spec_bands[i_band])
-            ν_ref = FT2(1e4) / scat.λ_ref
+            ν_spec = FT_aer.(params.spec_bands[i_band])
+            ν_ref = FT_aer(1e4) / scat.λ_ref
             aod_scale = _aod_spectral_scale(ν_spec, k_band, k_ref, ν_ref)
-            aod_scale_dot = zeros(FT2, 4, length(ν_spec))
+            aod_scale_dot = zeros(FT_aer, 4, length(ν_spec))
             # Interpolation is already part of k_band and k̇_band. Apply the
             # same quotient rule at every wavelength, including λ_ref.
             for ctr in 1:4

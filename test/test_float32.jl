@@ -1,5 +1,6 @@
 using vSmartMOM
 using Test
+import YAML
 
 @testset "Float32 Consistency" begin
 
@@ -62,5 +63,18 @@ using Test
         
         println("  Float32 vs Float64: max_rel=$max_rel, mean_rel=$mean_rel")
         @test max_rel < 0.01  # 1% relative tolerance
+    end
+end
+
+@testset "Float32 LinMode tangents use the model float type" begin
+    # A Float64 CO2 entry in absorption.vmr must not leave Float64 tangent
+    # arrays in a Float32 model (they are coerced to the model float type).
+    d = YAML.load_file("test_parameters/JacobianTestFast.yaml")
+    d["radiative_transfer"]["float_type"] = "Float32"
+    d["absorption"]["vmr"]["CO2"] = 400e-6
+    model, lin = model_from_parameters(LinMode(), read_parameters(d))
+    @test eltype(model.optics.τ_abs[1]) == Float32
+    for field in (:τ̇_abs, :τ̇_aer, :τ̇_rayl_psurf, :τ̇_abs_psurf, :τ̇_aer_psurf)
+        @test eltype(first(getfield(lin, field))) == Float32
     end
 end

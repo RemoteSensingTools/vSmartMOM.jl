@@ -44,7 +44,7 @@ function perturb_parameters(params::vSmartMOM.CoreRT.vSmartMOM_Parameters, ppct)
     
     #@show "hi2"
     # variable molecules
-    Nbands = length(params.brdf)
+    Nbands = length(params.spec_bands)
     for iband=1:Nbands
         var_mols = params.absorption_params.variable_molecules[iband]
         Nmol = length(var_mols)
@@ -164,7 +164,7 @@ function compute_FD_modelJacobian(params::vSmartMOM.CoreRT.vSmartMOM_Parameters,
     var_mols = params.absorption_params.variable_molecules
     Nmol = length(var_mols)
     Naer = length(params.scattering_params.rt_aerosols)
-    Nbands = length(params.brdf)
+    Nbands = length(params.spec_bands)
 
     has_q = !isnothing(params.q)
     q_offset = has_q ? 1 : 0

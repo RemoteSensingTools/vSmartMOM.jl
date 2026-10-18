@@ -179,6 +179,23 @@ review of General's sequential-version rule.
   values; tiled CUDA Jacobian tests run once and global switches are restored
   in `finally`; the local data runner fails on unexpected errors and pins
   documented legacy failures; `test/README.md` lists every test file.
+- New surface-pressure Jacobian convention `FixedAltitudeGrid()` (opt-in,
+  `model_from_parameters(LinMode(), params; vertical_grid=...)`): every
+  interface stays at its geometric altitude, so every layer's pressure and
+  column scale with p_surf; `surface_pressure_interfaces(grid, p_half,
+  p_surf)` rebuilds the matching interface pressures. `FixedPressureGrid()` (only the
+  bottom boundary moves) remains the default and is unchanged. The Round
+  7_altgrd pilot campaign and its report are under
+  `sandbox/workflows/RRS_XCO2/inversion/`.
+- TOML configurations accept arrays that mix integers and floats (e.g.
+  `vza = [60, 45.5]`), as YAML already did; `${ENV:NAME}` markers in
+  `cia_files` and `mtckd_file` now resolve like those in `LUTfiles`; surplus
+  `surface` entries beyond the number of bands are reported once (they were
+  silently ignored), and fewer surfaces than bands raise a clear error at
+  model construction instead of a `BoundsError`; and the linearized gas
+  tangents use the model float type unless the CO2 VMR is a ForwardDiff Dual
+  (a Float64 or integer `CO2` VMR left Float64, abstract or failing tangent
+  arrays in Float32 models).
 - HITRAN, partition-sum, HAPI, CIA and MT_CKD references added to
   `CITATION.bib`, the References page and the README, with guidance on which
   HITRAN edition a calculation used.

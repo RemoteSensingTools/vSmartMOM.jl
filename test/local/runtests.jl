@@ -52,7 +52,7 @@ const _LOCAL_KNOWN_FAILURES = Dict(
     "ParamsEMIT_MODTRANcomp.yaml"      => (:parse, ArgumentError, "H2O must not appear in"),
     "ParamsEMIT_MODTRANcomp_alb02.yaml"=> (:parse, ArgumentError, "H2O must not appear in"),
     "ThreeBandsParameters.yaml"        => (:parse, ArgumentError, "radiative_transfer/spec_bands"),
-    "O2ParametersVS.yaml"              => (:build, BoundsError, "AbstractSurfaceType} at index [2]"),
+    "O2ParametersVS.yaml"              => (:build, ArgumentError, "give one surface per band"),
     # `absorption.LUTfiles` is a per-molecule dict; the parser expects per-band lists.
     "O2_parameters2_SIF_grid.yaml"     => (:parse, MethodError, _lutfiles_dict_error),
     "WCO2_parameters_SIF_grid.yaml"    => (:parse, MethodError, _lutfiles_dict_error),

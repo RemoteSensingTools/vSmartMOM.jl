@@ -268,6 +268,7 @@ function model_from_parameters(params::vSmartMOM_Parameters;
         "aerosol_anchor_bands must have one grid per spectral band"))
     all(!isempty, aerosol_bands) || throw(ArgumentError(
         "aerosol interpolation anchor grids must be nonempty"))
+    _require_surface_per_band(params)
 
     # Truncation method (typed; NoTruncation, δBGE, ...). The legacy
     # `params.Δ_angle` is only consulted via the default δBGE built in
@@ -719,6 +720,15 @@ function remake_geometry(model::RTModel, params::vSmartMOM_Parameters;
                                  external_solar = model.quad_points.external_solar)
     return RTModel(model.architecture, model.solver, model.numerics, obs_geom, quad_points,
                    model.atmosphere, model.optics, model.surfaces, model.sources)
+end
+
+"Surface `i` belongs to band `i`: the elastic constructors need one per band."
+function _require_surface_per_band(params)
+    n_surf, n_bands = length(params.brdf), length(params.spec_bands)
+    n_surf >= n_bands || throw(ArgumentError(
+        "radiative_transfer.surface has $n_surf entries for $n_bands spectral " *
+        "bands; give one surface per band"))
+    return nothing
 end
 
 "Re-type the user-supplied `RTNumericalParameters` to the resolved

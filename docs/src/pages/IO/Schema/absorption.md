@@ -53,6 +53,9 @@ manually. Its internal `vmr_h2o` value is also a dry-air molar ratio,
   - **`negative_policy`** — optional `error` (default) or `clamp_zero`.
 - **`mtckd_file`** — optional AER MT_CKD H₂O-continuum NetCDF path.
 
+Like `LUTfiles`, CIA and MT_CKD paths may start with `${ENV:NAME}`, which is
+replaced by the value of environment variable `NAME` when the file is parsed.
+
 A bare CIA path is accepted only when different HITRAN reference families do
 not overlap on the requested model grid. Ambiguous overlap fails closed and
 must be resolved with `reference_codes`. Negative cross sections likewise

@@ -254,6 +254,54 @@ end
     end
 end
 
+@testset "TOML mixed integer/float arrays and ENV paths in CIA/MT_CKD" begin
+    # TOML gives Vector{Any} for [60, 45.5]; it must parse like YAML.
+    toml = joinpath(mktempdir(), "mixed.toml")
+    text = read(joinpath(pkgdir(vSmartMOM), "config", "quickstart.toml"), String)
+    @test occursin("vza = [60.0]", text)
+    write(toml, replace(text, "vza = [60.0]" => "vza = [60, 45.5]",
+                              "vaz = [180.0]" => "vaz = [180, 0]"))
+    params = with_logger(NullLogger()) do
+        read_parameters(toml)
+    end
+    @test params.vza == [60.0, 45.5]
+    @test params.vaz == [180.0, 0.0]
+
+    env_key = "VSMARTMOM_TEST_CIA_DIR"
+    old_value = get(ENV, env_key, nothing)
+    try
+        ENV[env_key] = "/data/cia"
+        cfg = _minimal_parameter_dict()
+        cfg["absorption"] = Dict(
+            "fixed_molecules" => [String[]], "variable_molecules" => [String[]],
+            "vmr" => Dict{String,Any}(), "broadening" => "Voigt()",
+            "CEF" => "HumlicekWeidemann32SDErrorFunction()", "wing_cutoff" => 20,
+            "cia_files" => ["\${ENV:$(env_key)}/O2-O2_2024.cia"],
+            "mtckd_file" => "\${ENV:$(env_key)}/absco-ref_wv-mt-ckd.nc")
+        ap = parameters_from_dict(cfg).absorption_params
+        @test ap.cia_files == [normpath("/data/cia/O2-O2_2024.cia")]
+        @test ap.mtckd_file == normpath("/data/cia/absco-ref_wv-mt-ckd.nc")
+    finally
+        old_value === nothing ? delete!(ENV, env_key) : (ENV[env_key] = old_value)
+    end
+end
+
+@testset "surplus surface entries warn" begin
+    cfg = _minimal_parameter_dict(surface = ["LambertianSurfaceScalar(0.1)",
+                                             "LambertianSurfaceScalar(0.2)"])
+    @test_logs (:warn, r"entries beyond band 1 are ignored") match_mode=:any parameters_from_dict(cfg)
+
+    # Fewer surfaces than bands fail clearly at model construction.
+    cfg = _minimal_parameter_dict()
+    cfg["radiative_transfer"]["spec_bands"] = ["[13000.0, 13000.1]", "[13100.0, 13100.1]"]
+    cfg["atmospheric_profile"]["T"] = [250.0, 290.0]
+    cfg["atmospheric_profile"]["p"] = [0.1, 500.0, 1000.0]
+    cfg["atmospheric_profile"]["profile_reduction"] = nothing
+    params = parameters_from_dict(cfg)
+    @test_throws r"one surface per band" model_from_parameters(params)
+    @test_throws r"one surface per band" model_from_parameters(LinMode(), params)
+end
+
 @testset "per-band H2O absorption switch" begin
     cfg = _minimal_parameter_dict()
     cfg["atmospheric_profile"]["q"] = [0.01]

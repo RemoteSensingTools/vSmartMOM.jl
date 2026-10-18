@@ -1104,7 +1104,7 @@ function _parse_cia_files(abs_dict::AbstractDict)
 
         _require_config(!isempty(strip(path)),
             "absorption/cia_files[$i]/path must not be empty")
-        push!(paths, path)
+        push!(paths, _expand_env_path(path))
         push!(reference_codes, refs)
         push!(negative_policies, policy)
     end
@@ -1229,8 +1229,9 @@ function _parse_absorption(params_dict::Dict, FT, q=nothing, spec_bands=nothing,
 
     cia_files, cia_reference_codes, cia_negative_policies =
         _parse_cia_files(abs_dict)
+    # `${ENV:NAME}` markers resolve here, as for `LUTfiles`.
     mtckd_file = haskey(abs_dict, "mtckd_file") ?
-                 String(abs_dict["mtckd_file"]) :
+                 _expand_env_path(String(abs_dict["mtckd_file"])) :
                  ""
 
     return AbsorptionParameters(fixed_molecules, variable_molecules, vmr,
@@ -1273,6 +1274,12 @@ function parameters_from_dict(params_dict::Dict)
     FT = _parse_float_type(params_dict)
     spec_bands = _parse_spec_bands(params_dict, FT)
     BRDF_per_band = _parse_surfaces(params_dict, FT)
+    # Surface i belongs to band i; entries beyond the last band are never
+    # used. Warn rather than fail, so existing configurations keep running.
+    length(BRDF_per_band) > length(spec_bands) && @warn(
+        "radiative_transfer.surface has $(length(BRDF_per_band)) entries for " *
+        "$(length(spec_bands)) spectral band(s); entries beyond band " *
+        "$(length(spec_bands)) are ignored.", maxlog = 1)
     quadrature_type = _parse_quadrature(params_dict)
     polarization_type = _parse_polarization(params_dict, FT)
     architecture = _parse_architecture(params_dict)
