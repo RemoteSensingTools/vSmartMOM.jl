@@ -167,6 +167,109 @@ that dominate aerosol retrievals over ocean. Selection is via the
 
 ## Rayleigh and the Cabannes choice
 
+### Pure-gas no-redistribution Rayleigh data
+
+New science workflows select the calculation explicitly:
+
+```julia
+method = RefractiveIndexRayleigh()
+p = molecular_rayleigh_properties(method, :CO2, wavelength_nm)
+ratio = molecular_rayleigh_cross_section_ratio(method, :CO2, λ, λ_ref)
+source = molecular_rayleigh_provenance(method, :CO2)
+```
+
+The RI helper returns a refractive index, King factor, solver depolarization
+ratio, and scattering cross section in cm² molecule⁻¹ for `He`, `Ar`, `N2`,
+`O2`, and `CO2`. The HWO campaign's new provenance review and method-explicit
+route are scoped only to Ar and CO₂; He/N₂/O₂ remain compatibility coefficient
+sets and their production scattering paths are unchanged. The presence of a
+provenance record is evidence, not a declaration that a campaign is qualified.
+The method argument is intentionally visible so an RI calculation cannot be
+confused with a future polarizability-tensor implementation.
+
+The cross-section-ratio helper is useful for a matched-reference-optical-depth
+experiment,
+
+```math
+\tau_R(\lambda) = \tau_R(\lambda_{ref})
+                  \frac{\sigma_R(\lambda)}{\sigma_R(\lambda_{ref})}.
+```
+
+The cross section follows the conventional refractive-index/King-factor
+expression used by the cited coefficient compilations:
+
+```math
+\sigma_R = \frac{24\pi^3\nu^4}{N^2}
+           \left(\frac{n^2-1}{n^2+2}\right)^2 F_K,
+\qquad
+\rho = \frac{6(F_K-1)}{7F_K+3}.
+```
+
+Here ``\rho`` is exactly the depolarization convention consumed by
+`get_greek_rayleigh`. He and Ar are monatomic, so ``F_K=1`` and ``\rho=0``;
+they still have different cross-section dispersion. These helpers deliberately
+do not infer pressure, mean molecular mass, or layer column. They also do not
+turn on Raman redistribution. A caller comparing gases at fixed
+``\tau_R(\lambda_{ref})`` must set the optical-depth profile explicitly and
+build the Greek phase source from the returned depolarization at each
+wavelength (or place wavelengths with distinct depolarization in separate
+bands).
+
+For the HWO additions Ar and CO₂, the coefficient provenance and distinct
+evidence intervals are machine-readable through
+`molecular_rayleigh_provenance`:
+
+- The [Peck--Fisher Ar measurement](https://doi.org/10.1364/JOSA.54.001362)
+  spans 17 vacuum wavelengths from 467.9465 to 2058.6909 nm. Sneep and Ubachs
+  adopt its dispersion formula over 5000--33000 cm⁻¹
+  (303.0303--2000 nm). Ar has the monatomic identity ``F_K=1``; it has no
+  empirical King-factor interval.
+- The [Bideau-Mehu CO₂ measurement](https://doi.org/10.1016/0030-4018%2873%2990289-7)
+  spans 180.7--253.7 nm. The implementation is the corrected/scaled formula
+  recorded by [Sneep and Ubachs](https://doi.org/10.1016/j.jqsrt.2004.07.025).
+  Its broader 180.7--1694.5 nm envelope is a secondary database-declared
+  formula range, not the primary measurement range. The source record is
+  frozen at refractiveindex.info database commit
+  `37773dce8128ccabcd9d5108d9958d6041244661`, path
+  `database/data/main/CO2/nk/Bideau-Mehu.yml`, SHA-256
+  `d3b52d2a0b667a2e95aec110f35a7fced0c2ab3f02583d2e604aeb58c204f55c`.
+- The CO₂ King fit in Sneep and Ubachs is based on
+  [Alms--Burnham--Flygare measurements](https://doi.org/10.1063/1.431821) at
+  457.9, 488.0, 514.5, 568.2, and 647.1 nm. Therefore 457.9--647.1 nm is its
+  empirical interpolation span; use outside that span is King-factor
+  extrapolation, independently of whether the dispersion formula is in range.
+- [Wilmouth and Sayres (2019)](https://doi.org/10.1016/j.jqsrt.2019.05.031)
+  directly check both gases continuously over 333--363 nm.
+  [Thalman et al. (2014)](https://doi.org/10.1016/j.jqsrt.2014.05.030), with
+  [its erratum](https://doi.org/10.1016/j.jqsrt.2016.12.014), check Ar in
+  selected regions between 350 and 660 nm, with corrected tabulated points at
+  370.0, 405.8, 532.2, and 660.0 nm. Those selected regions are not a
+  continuous 350--660 nm validation interval.
+  [He et al. (2021)](https://doi.org/10.5194/acp-21-14927-2021) provide a
+  continuous 307--725 nm direct check for CO₂.
+
+The primary-measurement range, adopted dispersion envelope, King-factor
+support, and direct-scattering checks are not interchangeable. Downstream
+audits must report dispersion and King extrapolation separately. Interval
+membership is evidence only: absent an explicit campaign validator or waiver,
+the authoritative campaign qualification state remains pending or blocked,
+never implicitly qualified.
+
+This API performs no explicit frequency redistribution. Its conventional
+Rayleigh cross section and effective King factor are not a separately computed
+Cabannes-only cross section. It neither calls nor modifies the tensor/Raman
+machinery in `InelasticScattering`. The HWO campaign uses the method-explicit
+route for Ar and CO₂; existing N₂/O₂ production paths remain unchanged. A
+future public tensor implementation must introduce its own
+`AbstractMolecularRayleighMethod` subtype rather than reuse
+`RefractiveIndexRayleigh`.
+
+This is the first elastic component of composition-sensitive molecular
+scattering. The existing automatic `model_from_parameters` Rayleigh optical
+depth remains the terrestrial N₂/O₂ Bodhaine path until the atmospheric
+composition schema is connected to molecular columns and scattering-weighted
+phase-matrix mixing.
+
 For the molecular contribution (no aerosols, just air molecules):
 
 - **Pure-elastic runs** (`noRS`) use the *full Rayleigh* Greek expansion. In

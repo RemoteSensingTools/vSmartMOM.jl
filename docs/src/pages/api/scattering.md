@@ -78,6 +78,21 @@ vSmartMOM.Scattering.analytic_aerosol_optics
 vSmartMOM.Scattering.phase_matrix_first_column
 ```
 
+## Pure-Gas Molecular Rayleigh
+
+Method-explicit pure-gas molecular Rayleigh properties (no frequency
+redistribution). See [Rayleigh and the Cabannes choice](../concepts/03b_scattering.md)
+for the physics and provenance.
+
+```@docs
+vSmartMOM.Scattering.AbstractMolecularRayleighMethod
+vSmartMOM.Scattering.RefractiveIndexRayleigh
+vSmartMOM.Scattering.molecular_rayleigh_properties
+vSmartMOM.Scattering.molecular_rayleigh_cross_section_ratio
+vSmartMOM.Scattering.molecular_rayleigh_provenance
+vSmartMOM.Scattering.get_greek_rayleigh
+```
+
 ## Wigner Utilities (PCW)
 
 ```@docs
