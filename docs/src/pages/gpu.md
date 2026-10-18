@@ -155,9 +155,11 @@ Float64-widened regardless of precision policy (see `test/local/gpu/test_mie_gpu
   dispatch. The internal standalone `Absorption` module is legacy-only and will
   be removed; do not use its GPU Voigt kernel for new work.
 
-### Metal absorption boundary
+### Metal absorption (experimental)
 
-The package's AtmosphericAbsorption architecture adapter currently defines
+Metal absorption is experimental: production absorption is not yet
+supported on Metal. The package's AtmosphericAbsorption architecture adapter
+currently defines
 CPU and CUDA methods only (`CoreRT._to_aa_arch`). There is no corresponding
 Metal adapter in `vSmartMOMMetalExt`. Consequently the production absorption
 construction paths that use this adapter are not supported on Metal yet.

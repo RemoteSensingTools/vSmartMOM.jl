@@ -259,7 +259,9 @@ interaction kernels.
 Model construction validates that the compiled plan does not select native
 microphysics, q-driven H2O or surface-pressure columns disabled by the effective upstream
 options (including explicit keyword overrides). Disabled tangents are not
-valid zero sensitivities. Manually wrapping supplied tangents in
+valid zero sensitivities. It likewise rejects gas columns whose native
+partial omits a forward abundance response (H₂O broadening, CIA, MT_CKD)
+unless the model is built with `abundance_jacobians=:frozen_cross_section`. Manually wrapping supplied tangents in
 `PlannedRTModelLin` retains caller responsibility for their provenance.
 
 Pressure defaults to enabled, including for `OCO_RRS_synth`. A fixed-pressure

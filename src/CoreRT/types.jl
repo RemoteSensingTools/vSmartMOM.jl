@@ -800,7 +800,8 @@ Ross-Li kernel-based BRDF (Lucht, Schaaf & Strahler, 2000).  Decomposes
 the surface reflectance into three semi-physical kernels: isotropic,
 RossThick (volumetric canopy scattering), and LiSparse (geometric
 mutual shadowing).  Standard MODIS/RAMI parameterization.  Scalar only
-(Stokes-I); no built-in linearization.
+(Stokes-I); no built-in linearization. Kernel zenith angles are capped at
+80°, a vSmartMOM regularization of grazing nodes rather than MODIS practice.
 
 # Fields
 $(DocStringExtensions.FIELDS)
@@ -959,7 +960,9 @@ The species list per band is the union of `fixed_molecules` (no Jacobian) and
 `variable_molecules` (Jacobian computed). H₂O is handled separately: when
 `atmospheric_profile.q` is provided, line absorption is computed from
 `profile.vmr_h2o` using `h2o_lut` (if present) or HITRAN-on-the-fly otherwise,
-and is automatically treated as variable in the linearised path.
+and is automatically treated as variable in the linearised path. Native gas
+tangents hold cross sections, CIA and MT_CKD fixed; see
+[`AbundanceTangentContract`](@ref) for the requests this rejects.
 """
 mutable struct AbsorptionParameters{FM,VM,V,BF,CE,LT,HL}
     "Fixed-abundance molecules per band (no Jacobian computed). Must NOT include H2O."

@@ -29,6 +29,10 @@ Ross-Li BRDF model (Ross & Li, 2000): linear combination of isotropic, volumetri
 - **fgeo**: Geometric (Li Sparse) coefficient — models shadowing effects.
 
 For scalar RT (n=1) only; returns zero for polarized. See Ross & Li (2000), RSE.
+
+Incident and reflected zenith angles are capped at 80° before the kernels are
+evaluated. This is a package regularization of the grazing quadrature nodes,
+not MODIS practice; reflectances beyond 80° therefore equal those at 80°.
 """
 function reflectance(RossLi::RossLiSurfaceScalar{FT},n, μᵢ::FT, μᵣ::FT, dϕ::FT) where FT
     (; fiso, fvol, fgeo) = RossLi
@@ -41,8 +45,8 @@ function reflectance(RossLi::RossLiSurfaceScalar{FT},n, μᵢ::FT, μᵣ::FT, d�
     # grazing discrete-ordinate nodes (θ ≈ 89.4°) — far outside the kernel's
     # validity (MODIS MCD43 weights are retrieved for θ ≲ 65°) — which makes
     # the surface-interaction geometric series (E − r⁻⁺R⁺⁻)⁻¹ near-singular
-    # and NaN-prone in Float32. Capping evaluation angles is the standard
-    # MODIS/VLIDORT practice for the invalid grazing regime.
+    # and NaN-prone in Float32. The cap is a vSmartMOM regularization, not
+    # MODIS (MCD43) practice: beyond 80° the BRDF is the kernel value at 80°.
     θ_cap = FT(80) * FT(π) / FT(180)
     θᵢ   = min(acos(clamp(μᵢ, FT(-1), FT(1))), θ_cap) #assert 0<=θᵢ<=π/2
     θᵣ   = min(acos(clamp(μᵣ, FT(-1), FT(1))), θ_cap) #assert 0<=θᵣ<=π/2

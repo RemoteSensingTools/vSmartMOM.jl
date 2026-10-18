@@ -60,7 +60,11 @@ fail by default; `clamp_zero` must be requested explicitly.
 
 The surface-pressure tangent includes the hydrostatic-column and midpoint-
 pressure response of CIA and MT_CKD at fixed temperature, humidity, and VMR.
-Their abundance Jacobians are not yet implemented. Ordinary line absorption
+Their abundance response is not differentiated. A Jacobian request for an
+abundance they depend on (H₂O for MT_CKD and every CIA pair, or a variable
+collider gas) is therefore rejected unless the model is built with
+`abundance_jacobians=:frozen_cross_section`; see
+[Gas-abundance columns](../../jacobians.md#Gas-abundance-columns). Ordinary line absorption
 includes the pressure-dependent cross-section response as well as molecular
 column scaling. This is the derivative with only the final grid's bottom
 pressure interface moving, at fixed layer temperature, humidity and VMR;
@@ -120,6 +124,8 @@ wing_cutoff = 25
 Set `ENV["ABSCO_ROOT"]` before reading the file. The O₂/CO₂ absorber abundance still multiplies
 optical depth separately. For every ABSCO gas LUT, `profile.vmr_h2o` is automatically passed to the
 table's broadener axis; the H₂O absorber LUT is additionally multiplied by the profile's H₂O VMR.
+H₂O Jacobians do not include this broadener response; see
+[Gas-abundance columns](../../jacobians.md#Gas-abundance-columns).
 
 ## HITRAN edition
 

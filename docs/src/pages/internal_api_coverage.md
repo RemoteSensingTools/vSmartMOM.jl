@@ -61,6 +61,7 @@ vSmartMOM.Scattering.compute_mie_π_τ
 
 ```@docs
 vSmartMOM.CoreRT.RTModelLin
+vSmartMOM.CoreRT.AbundanceTangentContract
 vSmartMOM.CoreRT.OpticalPropertyJacobian
 vSmartMOM.CoreRT.RawAerosolJacobian
 vSmartMOM.CoreRT.rt_run_ss

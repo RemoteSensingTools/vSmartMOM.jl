@@ -51,6 +51,36 @@ function _zero_aerosol_microphysics_jacobian(aerosol, ::Type{FT}) where {FT<:Abs
         phase_lin_greek=phase_lin)
 end
 
+const _H2O_SELF_BROADENING = "H₂O self broadening of its line cross sections"
+
+"Species label of each native gas slot in band `i_band` (slot 1 is q-driven H₂O)."
+function _native_gas_species(abs_params, i_band, n_slots)
+    variable = isnothing(abs_params) ? String[] : abs_params.variable_molecules[i_band]
+    return [slot == 1 ? "q-driven H₂O" :
+            slot - 1 <= length(variable) ? String(variable[slot - 1]) :
+            "unused gas slot" for slot in 1:n_slots]
+end
+
+"Record that `term` responds to native gas `slot` but is absent from its tangent."
+function _omit_abundance_term!(omitted, i_band, slot, term)
+    term in omitted[i_band][slot] || push!(omitted[i_band][slot], term)
+    return nothing
+end
+
+# ABSCO tables of every gas read the profile's H₂O broadener (line-by-line
+# models of other gases take none; see `_default_broadener`).
+function _omit_profile_broadener!(omitted, i_band, absorber, mol_name, profile)
+    (_default_broadener(absorber, profile, 1) === nothing ||
+     !_cross_section_uses_broadener(absorber)) && return nothing
+    return _omit_abundance_term!(omitted, i_band, 1,
+        "H₂O-broadener axis of the $(mol_name) ABSCO table")
+end
+
+# A CIA pair responds to its collider abundances on this band grid wherever a
+# selected panel tabulates a nonzero cross section, even if a collider's
+# current VMR (and hence the present opacity) is zero.
+_cia_has_cross_section(table) = any(σ -> isfinite(σ) && !iszero(σ), table.σ_νT)
+
 """
     model_from_parameters(::LinMode, params::vSmartMOM_Parameters)
 
@@ -88,6 +118,13 @@ This is the **linearized** counterpart of `model_from_parameters(params)`. It co
   structurally valid zero tangents are supplied to the downstream mixer.
 - Set `compute_h2o_jacobians=false` when the q-driven H2O profile is fixed.
   Its forward absorption is retained without generating H2O tangent entries.
+- Native gas columns are the partial `∂τ/∂VMR = σ·N_dry`: line cross
+  sections and the CIA and MT_CKD optical depths are held fixed. Where the
+  forward absorption also responds to that abundance (H₂O self broadening,
+  ABSCO H₂O-broadener axes, MT_CKD, CIA colliders), the default
+  `abundance_jacobians=:complete` rejects solves or plans requesting those
+  columns. Pass `abundance_jacobians=:frozen_cross_section` to accept the
+  native partial explicitly; tangent values are identical in both settings.
 - Set `compute_pressure_jacobians=false` for a retrieval with fixed pressure.
   Pressure tangent fields are then `nothing`, not zero sensitivities; use a
   `PlannedRTModelLin` whose layout omits pressure. Full-layout solves reject
@@ -105,7 +142,11 @@ function model_from_parameters(lin::LinMode,
     aerosol_anchor_bands=nothing,
     compute_aerosol_microphysics_jacobians::Bool = true,
     compute_h2o_jacobians::Bool = true,
-    compute_pressure_jacobians::Bool = true)
+    compute_pressure_jacobians::Bool = true,
+    abundance_jacobians::Symbol = :complete)
+    abundance_jacobians in (:complete, :frozen_cross_section) || throw(ArgumentError(
+        "abundance_jacobians must be :complete or :frozen_cross_section; " *
+        "got :$abundance_jacobians"))
     FT = params.float_type
     n_bands = length(params.spec_bands)
     n_aer = isnothing(params.scattering_params) ? 0 : length(params.scattering_params.rt_aerosols)
@@ -164,6 +205,12 @@ function model_from_parameters(lin::LinMode,
     τ̇_aer_psurf = compute_pressure_jacobians ?
         [zeros(FT2, n_aer, length(params.spec_bands[i]), Nz) for i in 1:n_bands] : nothing
     psurf_tangents = compute_pressure_jacobians ? psurf_profile_tangents(profile) : nothing
+    # Forward terms that respond to a native gas abundance but are absent from
+    # its tangent, per band and gas slot (see `AbundanceTangentContract`).
+    h2o_tangent = compute_h2o_jacobians && !isnothing(params.q) && any(!iszero, params.q)
+    gas_species = [_native_gas_species(abs_params, i_band, N_gas_species)
+                   for i_band in 1:n_bands]
+    omitted = [[String[] for _ in 1:N_gas_species] for _ in 1:n_bands]
     l_max = zeros(Int, n_bands)
     l_max_aer = zeros(Int, n_aer, n_bands)
 
@@ -219,6 +266,8 @@ function model_from_parameters(lin::LinMode,
             if h2o_setting === :disabled
                 nothing
             elseif h2o_setting !== nothing
+                h2o_tangent && _cross_section_uses_broadener(h2o_setting) &&
+                    _omit_abundance_term!(omitted, i_band, 1, _H2O_SELF_BROADENING)
                 if compute_h2o_jacobians
                     @timeit "Absorption Coeff H2O" compute_h2o_absorption_profile!(
                         τ_abs[i_band], τ̇_abs[i_band], jac_idx,
@@ -239,6 +288,8 @@ function model_from_parameters(lin::LinMode,
                     cpf = abs_params.CEF,
                     architecture = _to_aa_arch(params.architecture),
                     vmr = 0)
+                h2o_tangent && _cross_section_uses_broadener(absorption_model) &&
+                    _omit_abundance_term!(omitted, i_band, 1, _H2O_SELF_BROADENING)
                 if compute_h2o_jacobians
                     @timeit "Absorption Coeff H2O" compute_h2o_absorption_profile!(
                         τ_abs[i_band], τ̇_abs[i_band], jac_idx,
@@ -279,6 +330,8 @@ function model_from_parameters(lin::LinMode,
                             params.spec_bands[i_band],
                             profile.vmr[mol_name],
                             profile; pressure_tangent)
+                        h2o_tangent && _omit_profile_broadener!(omitted, i_band,
+                            abs_params.luts[i_band][molec_i], mol_name, profile)
                     end
                 end
             end
@@ -316,6 +369,9 @@ function model_from_parameters(lin::LinMode,
                             params.spec_bands[i_band],
                             profile.vmr[mol_name],
                             profile; pressure_tangent)
+                        h2o_tangent && _omit_profile_broadener!(omitted, i_band,
+                            abs_params.luts[i_band][lut_offset + molec_i],
+                            mol_name, profile)
                     end
                 end
             end
@@ -335,9 +391,9 @@ function model_from_parameters(lin::LinMode,
         binary_ratio_dot = dry_ratio_dot + midpoint_pressure_ratio_dot
 
         # Collision-induced absorption (HITRAN .cia files), if any. CIA is
-        # fixed with respect to the gas-profile Jacobian τ̇_abs, but its
-        # surface-pressure tangent is exact at fixed T and composition:
-        # τ_CIA ∝ n_midpoint * N_column.
+        # held fixed in the gas-profile Jacobian τ̇_abs; a collider abundance
+        # it depends on is recorded as omitted. Its surface-pressure tangent
+        # is exact at fixed T and composition: τ_CIA ∝ n_midpoint * N_column.
         if !isnothing(abs_params)
             for (cia_i, cia_path) in enumerate(abs_params.cia_files)
                 @timeit "CIA $(basename(cia_path))" begin
@@ -347,6 +403,16 @@ function model_from_parameters(lin::LinMode,
                     Absorption.compute_τ_cia!(τ_cia, cia_table, profile,
                                                profile.vmr)
                     τ_abs[i_band] .+= τ_cia
+                    # Every pair depends on H₂O through the dry-air number
+                    # density; dry colliders through their own VMR.
+                    if _cia_has_cross_section(cia_table)
+                        term = "$(cia_table.pair) collision-induced absorption"
+                        h2o_tangent && _omit_abundance_term!(omitted, i_band, 1, term)
+                        for (i, mol) in enumerate(abs_params.variable_molecules[i_band])
+                            mol in (cia_table.species_a, cia_table.species_b) &&
+                                _omit_abundance_term!(omitted, i_band, 1 + i, term)
+                        end
+                    end
                     # No @views here: Julia 1.10.12's lowering rejects this
                     # particular `@views lhs .+=` in situ ("invalid let
                     # syntax"; fine on 1.11+). An indexed `.+=` LHS is already
@@ -358,9 +424,9 @@ function model_from_parameters(lin::LinMode,
             end
 
             # MT_CKD H₂O continuum, if a reference table is configured.
-            # It is fixed with respect to the H₂O-profile Jacobian for now,
-            # but τ_cont ∝ p_midpoint * N_H2O gives the same exact pressure
-            # factor as CIA when q and T are held fixed.
+            # It is held fixed in the H₂O-profile Jacobian (recorded as
+            # omitted), but τ_cont ∝ p_midpoint * N_H2O gives the same exact
+            # pressure factor as CIA when q and T are held fixed.
             if !isempty(abs_params.mtckd_file)
                 @timeit "MT_CKD H2O continuum" begin
                     mtckd_table = Absorption.load_mtckd(abs_params.mtckd_file)
@@ -370,6 +436,11 @@ function model_from_parameters(lin::LinMode,
                         τ_continuum, mtckd_table, params.spec_bands[i_band],
                         profile, profile.vmr_h2o)
                     τ_abs[i_band] .+= τ_continuum
+                    # With q nonzero, a zero continuum means no coefficients
+                    # on this band grid.
+                    h2o_tangent && any(!iszero, τ_continuum) &&
+                        _omit_abundance_term!(omitted, i_band, 1,
+                            "MT_CKD H₂O self and foreign continuum")
                     # Same 1.10.12 lowering quirk as the CIA block above:
                     # indexed `.+=` is already in-place; @view the RHS only.
                     if compute_pressure_jacobians
@@ -621,14 +692,15 @@ function model_from_parameters(lin::LinMode,
     return model, RTModelLin(_to_model_ft(τ̇_abs), _to_model_ft(τ̇_aer), lin_aerosol_optics,
                              compute_pressure_jacobians ? _to_model_ft(τ̇_rayl_psurf) : nothing,
                              compute_pressure_jacobians ? _to_model_ft(τ̇_aer_psurf) : nothing,
-                             compute_pressure_jacobians ? _to_model_ft(τ̇_abs_psurf) : nothing)
+                             compute_pressure_jacobians ? _to_model_ft(τ̇_abs_psurf) : nothing,
+                             AbundanceTangentContract(abundance_jacobians, gas_species, omitted))
 end
 
 """
-    model_from_parameters_lin(params)
+    model_from_parameters_lin(params; kwargs...)
 
-Convenience alias for `model_from_parameters(LinMode(), params)`.
+Convenience alias for `model_from_parameters(LinMode(), params; kwargs...)`.
 Returns `(model, lin_model)`.
 """
-model_from_parameters_lin(params::vSmartMOM_Parameters) =
-    model_from_parameters(LinMode(), params)
+model_from_parameters_lin(params::vSmartMOM_Parameters; kwargs...) =
+    model_from_parameters(LinMode(), params; kwargs...)

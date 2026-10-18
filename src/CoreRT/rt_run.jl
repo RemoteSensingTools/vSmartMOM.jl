@@ -347,9 +347,9 @@ function _rt_run_column(RS_type::AbstractRamanType, model, iBand;
     _warn_explicit_depol_raman(RS_type, model)
 
     # Apply the per-model BLAS thread cap once per `rt_run` invocation
-    # (no-op when `model.numerics.blas_threads === nothing`). Lives here
-    # so swapping models with different caps "just works" — the caller
-    # doesn't have to remember to re-pin BLAS between runs.
+    # (no-op when `model.numerics.blas_threads === nothing`). This sets the
+    # process-wide BLAS state and is not restored afterwards; models with
+    # different caps must not run concurrently (see `RTNumericalParameters`).
     if model.numerics.blas_threads !== nothing
         LinearAlgebra.BLAS.set_num_threads(model.numerics.blas_threads)
     end
