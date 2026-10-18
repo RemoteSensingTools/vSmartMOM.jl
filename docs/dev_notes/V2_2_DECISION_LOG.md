@@ -208,6 +208,9 @@ Round 7.
   turns strongly negative at grazing quadrature nodes). The cap changes TOA
   intensity by 0.35–0.84 % in the VLIDORT comparison (BOA by up to 1.1 %).
   Keep the cap (physical, non-negative BRDF) or follow the MODIS definition?
+- [ ] ExoOptics audit item 16 (`_read_hitran2024`): delegate to
+  AtmosphericAbsorption's `load_lines(HitranPort(path))`, not to vSmartMOM's
+  legacy `read_hitran` (the standalone line engine is deprecated in 2.2).
 - [ ] Generic analytic surfaces (`analytic_surface.jl`, RPV and Ross–Li) pass
   the reflected (row) direction as `μᵢ`; harmless for these reciprocal scalar
   BRDFs, but fix the order and docstring in a separate commit.

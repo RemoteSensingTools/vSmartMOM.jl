@@ -136,9 +136,12 @@ using vSmartMOM.Absorption
 # > **Deprecation notice:** The functions below (`read_hitran`, `make_hitran_model`,
 # > `absorption_cross_section`) belong to the legacy internal `vSmartMOM.Absorption` module.
 # > They remain temporarily for compatibility and will be removed. AtmosphericAbsorption.jl
-# > is the sole supported absorption dependency going forward; use it for new direct
-# > σ(ν, T, p), custom-grid, interpolator, ABSCO HDF, and GPU workflows. The RT pipeline
-# > (`model_from_parameters` → `rt_run`) already uses AtmosphericAbsorption.jl.
+# > is the supported absorption dependency going forward; use it for new direct
+# > σ(ν, T, p), custom-grid, ABSCO HDF, and GPU workflows. The RT pipeline
+# > (`model_from_parameters` → `rt_run`) already uses AtmosphericAbsorption.jl. The
+# > line-by-line model used below (`make_hitran_model`) is deprecated in 2.2. Tables for
+# > YAML `LUTfiles` are still built with `make_interpolation_model` in 2.x (or saved as
+# > AtmosphericAbsorption `.absco` tables).
 
 # Read the HITRAN database for CO$_2$, using artifacts in Julia:
 co2_par      = vSmartMOM.Absorption.read_hitran(artifact("CO2"), mol=2, iso=1, ν_min=6214.4, ν_max=6214.8);

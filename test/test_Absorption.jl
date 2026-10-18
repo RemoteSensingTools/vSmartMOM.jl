@@ -345,6 +345,43 @@ end
 
 end 
 
+# B5 (docs/dev_notes/RELEASE_READINESS_AND_CLAUDE_HANDOFF_2026-10-16.md): the
+# legacy table builder ignored `vmr`, and its wavelength path failed with a
+# MethodError deep inside construction.
+@testset "make_interpolation_model: vmr and spectral grid" begin
+    ht = Absorption.read_hitran(artifact("CO2"), mol=2, iso=1,
+                                ν_min=6199, ν_max=6201)
+    ν_grid, p_grid, t_grid = 6199.5:0.25:6200.5, 600.0:100.0:800.0, 260.0:10.0:280.0
+    lut(vmr) = make_interpolation_model(ht, Voigt(), ν_grid, p_grid, t_grid; vmr,
+                                        CEF=HumlicekWeidemann32SDErrorFunction(),
+                                        architecture=CPU())
+    direct(vmr) = make_hitran_model(ht, Voigt(); vmr,
+                                    CEF=HumlicekWeidemann32SDErrorFunction(),
+                                    architecture=CPU())
+    tables = Dict(vmr => lut(vmr) for vmr in (0.0, 0.5))
+    for (vmr, table) in tables
+        model = direct(vmr)
+        for p in p_grid, T in t_grid    # the table interpolates through its nodes
+            @test absorption_cross_section(table, ν_grid, p, T) ≈
+                  absorption_cross_section(model, ν_grid, p, T) rtol = 1e-10
+        end
+    end
+    # Self-broadening changes the line shapes, so the tables must differ.
+    σ0 = absorption_cross_section(tables[0.0], ν_grid, 700.0, 270.0)
+    σ½ = absorption_cross_section(tables[0.5], ν_grid, 700.0, 270.0)
+    @test norm(σ½ - σ0) / norm(σ0) > 1e-3
+    # Wavelength grids are rejected up front with migration guidance.
+    λ_grid = 1612.8:0.01:1613.0
+    err = try
+        make_interpolation_model(ht, Voigt(), λ_grid, p_grid, t_grid; wavelength_flag=true)
+        nothing
+    catch e
+        e
+    end
+    @test err isa ArgumentError
+    @test occursin("uniform wavenumber grid", sprint(showerror, err))
+end
+
 @testset "absorption_cross_section_interpolator_outside_band" begin
     ν_grid = 6000.0:1.0:6002.0
     p_grid = 1000.0:100.0:1100.0

@@ -47,6 +47,15 @@ review of General's sequential-version rule.
   runs change in every Stokes component, including I when there is a
   scattering atmosphere** (up to ~3e-3 relative in a Rayleigh test case);
   `Stokes_I` runs and vacuum intensity are unchanged by this item.
+- The standalone line-by-line model (`make_hitran_model`, `HitranModel`) is
+  deprecated (removal in 3.0) with a one-time notice giving the
+  AtmosphericAbsorption calls and their convention differences. The LUT
+  builder `make_interpolation_model`, still the route for YAML `LUTfiles`, now
+  uses its `vmr` argument (previously ignored) and rejects wavelength grids
+  early with a uniform-wavenumber recipe.
+- HITRAN, partition-sum, HAPI, CIA and MT_CKD references added to
+  `CITATION.bib`, the References page and the README, with guidance on which
+  HITRAN edition a calculation used.
 - Shared aerosol reference normalization and spectral angular-cache sizing
   fixes restore constructor parity and avoid spectral-quadratic cache growth.
 - The experimental aerosol ingestion adapter now rejects calls that previously

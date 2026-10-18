@@ -29,10 +29,10 @@ number density of the absorbing species in the layer. Once computed,
     package (`AtmosphericAbsorption.load_lines` + `LineByLineModel`; TIPS-2021 partition
     functions). The diagram and prose below describe the underlying physics — the same
     line-shape equations apply — but `make_hitran_model` is **not** on the `rt_run` call
-    path since this merge. The internal `vSmartMOM.Absorption` API
-    (`make_hitran_model` / `read_hitran` / `absorption_cross_section`) is legacy-only and
-    will be removed in a future release. New direct σ(ν, T, p), LUT, and ABSCO workflows
-    must use AtmosphericAbsorption.jl.
+    path since this merge. The internal line-by-line API (`make_hitran_model` /
+    `read_hitran` / `absorption_cross_section` on a `HitranModel`) is deprecated in 2.2 and
+    will be removed in 3.0; new direct σ(ν, T, p) and ABSCO workflows should use
+    AtmosphericAbsorption.jl. YAML `LUTfiles` accept OCO-2 ABSCO HDF files and AtmosphericAbsorption `.absco` tables (`save_absco_lut`), as well as vSmartMOM JLD2 tables from `make_interpolation_model`; AtmosphericAbsorption's own interpolation tables (`build_interpolation_model`/`save_interpolation_model`) are not read by the 2.x loader.
 
 ## HITRAN line-by-line
 

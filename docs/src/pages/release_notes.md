@@ -88,9 +88,27 @@ exit below that ceiling using the configured guard and consecutive-pass count.
 ### AtmosphericAbsorption is the supported absorption dependency
 
 [AtmosphericAbsorption.jl](https://github.com/RemoteSensingTools/AtmosphericAbsorption.jl)
-is the sole supported absorption dependency going forward. The internal
-`vSmartMOM.Absorption` implementation remains temporarily for legacy compatibility, should
-not be used for new work, and will be removed in a future release.
+is the supported absorption dependency going forward, and the RT pipeline already uses it
+for line-by-line absorption. CIA and MT_CKD continuum readers and the 2.x lookup-table
+loader remain in `vSmartMOM.Absorption`. YAML `LUTfiles` accept OCO-2 ABSCO HDF files and AtmosphericAbsorption `.absco` tables (`save_absco_lut`), as well as vSmartMOM JLD2 tables from `make_interpolation_model`; AtmosphericAbsorption's own interpolation tables (`build_interpolation_model`/`save_interpolation_model`) are not read by the 2.x loader.
+
+The standalone line-by-line model (`make_hitran_model`, `HitranModel`) is
+formally deprecated in 2.2, kept through 2.x, and scheduled for removal in 3.0.
+The first `make_hitran_model` call in a session logs the corresponding
+AtmosphericAbsorption calls (`load_lines`, `LineByLineModel`,
+`compute_cross_section`) and how the two engines differ: they agree closely for
+vmr = 0, but for vmr > 0 AtmosphericAbsorption also mixes the pressure shift
+between air and self, so differences grow with vmr and can reach the percent
+level. Tables for YAML `LUTfiles` are still built
+with `make_interpolation_model`, and saved tables load as before. That builder
+now passes `vmr` to the line model (it was silently ignored) and rejects
+wavelength grids with a uniform-wavenumber recipe instead of failing during
+construction.
+
+If you publish results computed from HITRAN line data, please cite the HITRAN
+edition you used — HITRAN2016 for the default artifacts, the current edition
+(HITRAN2024 at the time of writing) for data downloaded from hitran.org. See
+[References](vSmartMOM/References.md) and `CITATION.bib`.
 
 The release candidate temporarily pins AtmosphericAbsorption to 0.1.2 because
 line-pressure tangents use its internal prepared-line interface. Updating this

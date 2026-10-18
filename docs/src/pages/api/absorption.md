@@ -1,11 +1,13 @@
 # Absorption API
 
 !!! warning "Internal absorption API is deprecated"
-    AtmosphericAbsorption.jl is the sole supported absorption dependency for vSmartMOM
-    going forward. Do not use `vSmartMOM.Absorption` for new work: it remains temporarily
-    for legacy compatibility and will be removed in a future release. Use
+    AtmosphericAbsorption.jl is the supported absorption dependency for vSmartMOM going
+    forward. The standalone line-by-line model here (`make_hitran_model`, `HitranModel`) is
+    deprecated in 2.2 and will be removed in 3.0; use
     [AtmosphericAbsorption.jl](https://github.com/RemoteSensingTools/AtmosphericAbsorption.jl)
-    for line-by-line calculations, interpolators, ABSCO HDF tables, and GPU execution.
+    for line-by-line calculations, ABSCO HDF tables, and GPU execution. YAML `LUTfiles`
+    read OCO-2 ABSCO HDF files, AtmosphericAbsorption `.absco` tables, and vSmartMOM JLD2
+    tables from `make_interpolation_model`, which remains the table builder in 2.x.
 
 ```@docs
 vSmartMOM.Absorption

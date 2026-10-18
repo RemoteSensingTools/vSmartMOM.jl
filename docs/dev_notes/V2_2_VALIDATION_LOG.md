@@ -65,3 +65,36 @@ Frankenberg's checkout (SHA-256 identical to the source file).
   kernel, extra tests) → fixed → APPROVE. Codex APPROVE-WITH-FIXES (Float32
   cancellation in cos θ_local, conventions page, comment) → fixed → APPROVE.
 - Not run: CUDA hardware, Documenter build, full suite.
+
+## 4. fix(absorption): legacy LUT builder vmr and grids (B5); deprecate standalone line model
+
+- `test_Absorption.jl` + `test_quality.jl` + `test_schema_docs.jl`: 228/228.
+  New testset "make_interpolation_model: vmr and spectral grid": 21/21; on
+  HEAD's builder 11–12 fail (identical vmr=0/0.5 tables; `MethodError`
+  instead of an early `ArgumentError` for wavelength grids).
+- Migration recipe run against AtmosphericAbsorption 0.1.2 (CO₂, HITRAN2016
+  artifact): agrees with the legacy engine to 2e-6 at vmr = 0; at vmr > 0
+  the engines differ through AA's mixed air/self pressure shift (reviewers:
+  0.05 % at vmr 0.01 to 2–3.5 % at vmr 0.5, ~11 % at vmr 1).
+- The deprecation notice fires once per session from `make_hitran_model`
+  only; forward and linearized `model_from_parameters` emit none.
+  `make_interpolation_model` stays silent: it remains the builder for YAML
+  `LUTfiles` (which read OCO-2 ABSCO HDF, AA `.absco`, and vSmartMOM JLD2).
+- GPU check (A100, GPU1): `test_coxmunk_rt_contract.jl` with
+  `VSMARTMOM_COXMUNK_ARCH="GPU()"` 10/10 on the B3 commit.
+- Reviews: Claude reviewer APPROVE-WITH-FIXES (engine-difference cause, LUT
+  route, install hint, vmr docstring) → fixed → APPROVE. Codex
+  APPROVE-WITH-FIXES ×3 (grid recipe endpoint, difference wording, LUT
+  guidance across README/docs) → fixed.
+
+## 5. docs(citation): HITRAN and related spectroscopic references
+
+- CITATION.bib entries generated from Crossref BibTeX (HITRAN2016/2020/2024,
+  TIPS-2021, TIPS-2017, HAPI, HITRAN CIA, MT_CKD 2012 and 2023); DOIs,
+  volumes, pages verified against Crossref; `pdflatex`+`bibtex` with
+  `\nocite{*}` renders all 15 entries (Claude reviewer).
+- Edition guidance checked against `src/Artifacts` (default "artifact" =
+  HITRAN2016; downloads = current hitran.org edition; edition string is a
+  cache label). Relative documentation links resolve.
+- Reviews: included in the reviews of entry 4 (Claude APPROVE, Codex
+  citation metadata confirmed).
