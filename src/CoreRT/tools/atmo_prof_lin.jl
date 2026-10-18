@@ -4,7 +4,11 @@ Shared functions (reduce_profile, getRayleighLayerOptProp, construct_atm_layer)
 are defined in atmo_prof.jl; this file contains only the lin-mode extensions.
 =#
 
-"""Profile tangents for a fixed grid whose bottom pressure boundary is p_surf."""
+"""
+Profile tangents for the default [`FixedPressureGrid`](@ref): the interfaces
+above the surface are fixed, so only the bottom layer's columns, thickness,
+and mid-layer pressure (`dp_full[end]/dp_surf = 1/2`) respond to `p_surf`.
+"""
 function psurf_profile_tangents(profile::AtmosphericProfile{FT}; g₀=FT(9.8032465)) where FT
     n = length(profile.T)
     vcd_dry_dot = zeros(FT, n)
@@ -22,7 +26,9 @@ function psurf_profile_tangents(profile::AtmosphericProfile{FT}; g₀=FT(9.80324
     vcd_dry_dot[end] = x_dry * vcd_dot
     vcd_h2o_dot[end] = x_h2o * vcd_dot
     Δz_dot[end] = R * profile.T[end] / (g₀ * M * profile.p_half[end])
-    return (; vcd_dry_dot, vcd_h2o_dot, Δz_dot)
+    p_full_dot = zeros(FT, n)
+    p_full_dot[end] = one(FT) / 2
+    return (; vcd_dry_dot, vcd_h2o_dot, Δz_dot, p_full_dot)
 end
 
 """
@@ -67,6 +73,59 @@ function aerosol_profile_psurf_tangent(dist::LogNormal, profile::AtmosphericProf
     ρdot = [cdf_slope(z_half[i]) * z_half_dot[i] -
             cdf_slope(z_half[i + 1]) * z_half_dot[i + 1]
             for i in eachindex(profile.Δz)]
+    return (ρdot .- ρ .* (sum(ρdot) / sum(ρ))) ./ sum(ρ)
+end
+
+"""
+    psurf_profile_tangents(convention, profile)
+
+Derivatives of the final-grid profile fields with respect to surface pressure
+`p_surf = profile.p_half[end]` [hPa], at fixed layer `T`, `q`, and mixing
+ratios. Returns a named tuple of layer vectors `vcd_dry_dot`, `vcd_h2o_dot`
+[molec cm⁻² hPa⁻¹], `Δz_dot` [m hPa⁻¹], and `p_full_dot` [1]. See
+[`FixedPressureGrid`](@ref) and [`FixedAltitudeGrid`](@ref) for the two
+conventions.
+"""
+psurf_profile_tangents(::FixedPressureGrid, profile::AtmosphericProfile) =
+    psurf_profile_tangents(profile)
+
+function psurf_profile_tangents(::FixedAltitudeGrid,
+                                profile::AtmosphericProfile{FT}) where FT
+    # Every interface pressure scales with p_surf (see FixedAltitudeGrid):
+    # columns are proportional to their pressure thickness, mid-layer
+    # pressures to p_surf, and the geometric thicknesses do not change.
+    p_surf = profile.p_half[end]
+    vcd_dry_dot = profile.vcd_dry ./ p_surf
+    vcd_h2o_dot = profile.vcd_h2o ./ p_surf
+    Δz_dot = zeros(FT, length(profile.T))
+    p_full_dot = profile.p_full ./ p_surf
+    return (; vcd_dry_dot, vcd_h2o_dot, Δz_dot, p_full_dot)
+end
+
+"""
+    aerosol_profile_psurf_tangent(convention, dist, profile, tangents)
+
+Derivative of the normalized aerosol layer allocation with respect to
+`p_surf`. Under [`FixedPressureGrid`](@ref) this is the bottom-boundary
+tangent above. Under [`FixedAltitudeGrid`](@ref) an altitude-form
+`LogNormal` profile has an exactly zero tangent (no interface moves in
+altitude), while a pressure-form `Normal(p₀, σp)` profile is redistributed as
+every mid-layer pressure scales with `p_surf`.
+"""
+aerosol_profile_psurf_tangent(::FixedPressureGrid, dist, profile::AtmosphericProfile,
+                              tangents) =
+    aerosol_profile_psurf_tangent(dist, profile, tangents.Δz_dot)
+
+aerosol_profile_psurf_tangent(::FixedAltitudeGrid, ::LogNormal,
+                              profile::AtmosphericProfile{FT}, tangents) where FT =
+    zeros(FT, length(profile.Δz))
+
+function aerosol_profile_psurf_tangent(::FixedAltitudeGrid, dist::Normal,
+                                       profile::AtmosphericProfile, tangents)
+    p = profile.p_full
+    ρ = pdf.(dist, p) .* profile.Δz
+    # Δz is fixed; each mid-layer pressure moves by p_full_dot = p_full/p_surf.
+    ρdot = ρ .* (-(p .- dist.μ) ./ dist.σ^2) .* tangents.p_full_dot
     return (ρdot .- ρ .* (sum(ρdot) / sum(ρ))) ./ sum(ρ)
 end
 
@@ -277,6 +336,7 @@ function compute_absorption_profile!(τ_abs::Array{FT,2},
                                     ;
                                     self_broadener_vmr=nothing,
                                     pressure_tangent=nothing,
+                                    vertical_grid::AbstractVerticalGridConvention=FixedPressureGrid(),
                                     ) where FT 
 
     # The array to store the cross-sections must be same length as number of layers
@@ -313,7 +373,7 @@ function compute_absorption_profile!(τ_abs::Array{FT,2},
         gas_layer_idx = (jac_idx - 1) * length(profile.p_full) + iz
         τ̇_abs[gas_layer_idx,:,iz] = σ * profile.vcd_dry[iz]
     end
-    _accumulate_absorption_pressure!(pressure_tangent, absorption_model,
+    _accumulate_absorption_pressure!(pressure_tangent, vertical_grid, absorption_model,
         grid, vmr, profile, self_broadener_vmr)
     
 end
@@ -331,9 +391,10 @@ function compute_h2o_absorption_profile!(τ_abs::Array{FT,2},
                                          absorption_model,
                                          grid,
                                          profile::AtmosphericProfile;
-                                         pressure_tangent=nothing) where FT
+                                         pressure_tangent=nothing,
+                                         vertical_grid::AbstractVerticalGridConvention=FixedPressureGrid()) where FT
     x_h2o = _h2o_moist_mole_fraction.(profile.vmr_h2o)
     return compute_absorption_profile!(
         τ_abs, τ̇_abs, jac_idx, absorption_model, grid,
-        profile.vmr_h2o, profile; self_broadener_vmr=x_h2o, pressure_tangent)
+        profile.vmr_h2o, profile; self_broadener_vmr=x_h2o, pressure_tangent, vertical_grid)
 end

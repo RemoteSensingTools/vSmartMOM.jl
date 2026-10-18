@@ -130,6 +130,7 @@ include("tools/ka_batched_kernels.jl")         # Portable KA batched kernels
 include("tools/cpu_batched.jl")                   # CPU batched linear algebra operations
 
 # Utilities / Helper Functions
+include("tools/vertical_grid.jl")                 # Surface-pressure vertical-grid conventions
 include("tools/atmo_prof.jl")                     # Helper Functions for Handling Atmospheric Profiles
 include("tools/absorption_pressure.jl")            # Upstream line/LUT pressure derivatives
 include("tools/atmo_prof_lin.jl")                 # Linearized atmosphere profile
@@ -207,6 +208,8 @@ export OpticalPropertyJacobian,               # AD boundary struct alias
        surface_range, surface_index, sif_range, sif755_index, sif_slope_index,
        sif760_index, msif_index,
        atmosphere_range, psurf_index,
+       AbstractVerticalGridConvention, FixedPressureGrid, FixedAltitudeGrid,
+       surface_pressure_interfaces,
        surface_parameter_count,
        canopy_range, n_layer_params
 

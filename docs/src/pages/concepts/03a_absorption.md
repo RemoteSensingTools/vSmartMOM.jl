@@ -141,9 +141,14 @@ own mutable state while sharing the table storage:
 
 ```julia
 trial = copy_parameters(template; share_luts=true)
-trial.p[end] = new_surface_pressure
-model, lin_model = model_from_parameters(LinMode(), trial)
+grid = FixedPressureGrid()   # or FixedAltitudeGrid()
+trial.p = surface_pressure_interfaces(grid, template.p, new_surface_pressure)
+model, lin_model = model_from_parameters(LinMode(), trial; vertical_grid=grid)
 ```
+
+The same grid convention must rebuild the interfaces and select the
+surface-pressure tangents; see [`FixedPressureGrid`](@ref) and
+[`FixedAltitudeGrid`](@ref).
 
 Atmospheric profiles, gas VMRs, aerosols, surfaces, and the LUT container lists
 are copied. The loaded gas and H₂O tables remain shared and must be treated as

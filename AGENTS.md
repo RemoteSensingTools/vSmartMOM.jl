@@ -186,6 +186,7 @@ material when explaining the package:
 | Phase matrix Z from Greek + μ | `src/Scattering/compute_Z_matrices.jl::compute_Z_moments` |
 | HITRAN absorption | `src/Absorption/compute_absorption_cross_section.jl:32–280` |
 | Pressure-dependent line/LUT cross sections (fixed final-grid bottom-interface coordinate) | `src/CoreRT/tools/absorption_pressure.jl`; `docs/dev_notes/pressure_source_followup_2026-09-08.md` |
+| Surface-pressure vertical-grid conventions (`FixedPressureGrid` default: only the bottom interface moves; `FixedAltitudeGrid`: all interfaces fixed in altitude, pressures scale with p_surf) | `src/CoreRT/tools/vertical_grid.jl`, `psurf_profile_tangents` in `src/CoreRT/tools/atmo_prof_lin.jl`; `model_from_parameters(LinMode(), params; vertical_grid=...)` |
 | Shared source/geometry/surface validation | `src/CoreRT/Sources/validation.jl` |
 | Shared parsed HITRAN cache (forward, linearized, BatchContext) | `src/CoreRT/tools/hitran_cache.jl`; `clear_spectroscopy_cache!` releases cached ownership; see `docs/dev_notes/jacobian_batched/construction_cost.md` |
 | Independent trial parameters with opt-in read-only absorption LUT sharing | `src/CoreRT/tools/copy_parameters.jl::copy_parameters` |
