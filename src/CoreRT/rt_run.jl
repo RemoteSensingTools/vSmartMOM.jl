@@ -17,9 +17,13 @@ Run the forward radiative transfer solver for the selected spectral band.
 
 Performs polarized adding-doubling RT through the atmosphere defined in `model`,
 computing top-of-atmosphere (TOA) upwelling and bottom-of-atmosphere (BOA)
-downwelling Stokes radiances.  The solver iterates over azimuthal Fourier moments
-`m = 0, …, max_m-1`, building layer R/T/J matrices via elemental → doubling →
-interaction steps, then applies surface coupling and postprocessing.
+downwelling Stokes radiances.  The solver iterates over azimuthal Fourier orders
+`m = 0, …, CoreRT.m_max_bands(model)[i_band]` (derived per band from the stream count,
+the phase-function expansions, the surface and the sources; see
+[`model_from_parameters`](@ref)), and may stop earlier when the configured
+Fourier-convergence criterion is met. For each order it builds layer R/T/J
+matrices via elemental → doubling → interaction steps, then applies surface
+coupling and postprocessing.
 
 Equivalent to `rt_run(noRS(), model, i_band)` (no Raman scattering).
 

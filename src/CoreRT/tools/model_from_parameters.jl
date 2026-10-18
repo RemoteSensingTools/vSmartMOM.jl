@@ -101,18 +101,19 @@ function _derive_m_max_bands(l_max::AbstractVector{Int}, legacy_max_m_count::Int
 end
 
 """
-    _derive_m_max_bands_via_traits(l_max, legacy_max_m_count, components_per_band) -> Vector{Int}
+    _derive_m_max_bands_via_traits(l_max, legacy_max_m_count, components_per_band,
+                                   nstreams; greek_beta_cutoff=nothing) -> Vector{Int}
 
-Phase C aggregator (active when `SolverConfig.use_component_traits == true`).
-Computes per-band `m_max_bands` (order) by taking
-`maximum(component_m_max(c, ctx))` across the band's active components and
-clamping to `min(stream_l_cap, legacy_l_cap)` where:
+Per-band last Fourier order `m_max_bands[i]`, used when
+`SolverConfig.use_component_traits == true`: the maximum of
+`component_m_max(c, ctx)` over the band's active components, clamped to
 
-- `stream_l_cap = 2·l_max - 1` (the projection cap implied by the chosen
-  Legendre truncation; conservative since `l_max` is itself capped by
-  the user's `l_trunc`)
-- `legacy_l_cap = legacy_max_m_count - 1` (user's `max_m` knob, in order
-  semantics)
+    user_l_cap = min(2·nstreams - 1, legacy_max_m_count - 1, l_max[i])
+
+(the stream and `max_m` caps floored at zero), i.e. the stream resolving power
+(`stream_l_cap = 2·nstreams - 1`, the same for Gauss and Radau), the legacy
+`max_m` knob in order semantics, and the band's Legendre ceiling `l_max[i]`
+(from the aerosol Greek coefficients, or `l_trunc` without aerosols).
 
 For aerosol components, `component_m_max` optionally applies
 `greek_beta_cutoff` after the size distribution has been integrated into Greek

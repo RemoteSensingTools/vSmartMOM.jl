@@ -71,6 +71,20 @@ review of General's sequential-version rule.
   Habitable Worlds Observatory branch. Model defaults are unchanged: Bodhaine
   (1999) optical depth, with depolarization from the polarizability constants
   when `depol: -1`.
+- HITRAN cache: `artifact(molecule)` under a downloaded edition now uses the
+  cached file only if it is a verified full dataset (0–150000 cm⁻¹, all
+  isotopologues, SHA-256 matching its metadata); otherwise it downloads the
+  full dataset and, if that fails (e.g. offline), raises an error explaining
+  why instead of silently using a narrower or unverified file. Downloads are
+  validated before an atomic replacement that keeps the previous data on
+  failure. `fetch_hitran`/`fetch_hitran_by_ids` reuse a cache only if its
+  molecule, edition, spectral range, isotopologues, size and SHA-256 match
+  (missing metadata forces a re-download). `hitran_is_cached(molecule[,
+  edition])` now means "`artifact()` would use a verified full dataset without
+  downloading".
+- The positional linearized form `rt_run(RS_type, model, lin_model, NAer,
+  NGas, NSurf, iBand)` accepts a one-element band vector and rejects several
+  bands with a clear message (it solves one band per call).
 - HITRAN, partition-sum, HAPI, CIA and MT_CKD references added to
   `CITATION.bib`, the References page and the README, with guidance on which
   HITRAN edition a calculation used.

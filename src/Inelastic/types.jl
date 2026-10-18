@@ -10,9 +10,11 @@ abstract type AbstractRamanType  end
 # parameterized by FT.
 
 """
-    VS_0to1{FT<:AbstractFloat}
+    RRS{FT<:AbstractFloat}
 
-Vibrational Raman transition from the ground to first excited state.
+Rotational Raman scattering by N₂ and O₂ (pure rotational transitions within
+the vibrational ground state), with the elastic Cabannes line treated
+separately.
 # Fields
 $(DocStringExtensions.FIELDS)
 """
@@ -44,9 +46,10 @@ Base.@kwdef mutable struct RRS{FT<:AbstractFloat} <: AbstractRamanType
 end
 
 """
-    VS_1to0{FT<:AbstractFloat}
+    VS_0to1{FT<:AbstractFloat}
 
-Vibrational Raman transition from the first excited to ground state.
+Vibrational Raman scattering by N₂ and O₂ from the ground to the first excited
+vibrational state, including the vibrational and rotational-vibrational line sets.
 # Fields
 $(DocStringExtensions.FIELDS)
 """
@@ -74,8 +77,11 @@ Base.@kwdef struct VS_0to1{FT<:AbstractFloat} <: AbstractRamanType
 end
 
 """
-    struct RRS{FT<:AbstractFloat}
-A struct which defines Rotational Raman Scattering parameters
+    VS_1to0{FT<:AbstractFloat}
+
+Vibrational Raman scattering by N₂ and O₂ from the first excited to the ground
+vibrational state (anti-Stokes), including the vibrational and
+rotational-vibrational line sets.
 # Fields
 $(DocStringExtensions.FIELDS)
 """
@@ -220,8 +226,11 @@ end
 
 
 """
-    struct RRS{FT<:AbstractFloat}
-A struct which defines Rotational Raman Scattering parameters
+    VS_0to1_plus{FT<:AbstractFloat}
+
+Vibrational Raman scattering by N₂ and O₂ from the ground to the first excited
+vibrational state (vibrational and rotational-vibrational lines), over
+concatenated spectral bands (`bandSpecLim`, `iBand`).
 # Fields
 $(DocStringExtensions.FIELDS)
 """
@@ -270,8 +279,11 @@ Base.@kwdef mutable struct VS_0to1_plus{FT<:AbstractFloat} <: AbstractRamanType
 end
 
 """
-    struct RRS{FT<:AbstractFloat}
-A struct which defines Rotational Raman Scattering parameters
+    VS_1to0_plus{FT<:AbstractFloat}
+
+Vibrational Raman scattering by N₂ and O₂ from the first excited to the ground
+vibrational state (anti-Stokes; vibrational and rotational-vibrational lines),
+over concatenated spectral bands (`bandSpecLim`, `iBand`).
 # Fields
 $(DocStringExtensions.FIELDS)
 """
@@ -408,8 +420,10 @@ Base.@kwdef mutable struct sol_RRS{FT<:AbstractFloat} <: AbstractRamanType
 end
 
 """
-    struct RRS{FT<:AbstractFloat}
-A struct which defines Rotational Raman Scattering parameters
+    sol_VS_0to1{FT<:AbstractFloat}
+
+Stellar/solar vibrational Raman mode for H₂-dominated atmospheres, ground to
+first excited state.
 # Fields
 $(DocStringExtensions.FIELDS)
 """
@@ -435,8 +449,10 @@ Base.@kwdef struct sol_VS_0to1{FT<:AbstractFloat} <: AbstractRamanType
 end
 
 """
-    struct RRS{FT<:AbstractFloat}
-A struct which defines Rotational Raman Scattering parameters
+    sol_VS_1to0{FT<:AbstractFloat}
+
+Stellar/solar vibrational Raman mode for H₂-dominated atmospheres, first
+excited to ground state.
 # Fields
 $(DocStringExtensions.FIELDS)
 """
@@ -497,8 +513,10 @@ end
 
 
 """
-    struct RRS{FT<:AbstractFloat}
-A struct which defines Rotational Raman Scattering parameters
+    sol_VS_0to1_plus{FT<:AbstractFloat}
+
+Stellar/solar vibrational Raman mode for H₂-dominated atmospheres, ground to
+first excited state, over concatenated spectral bands.
 # Fields
 $(DocStringExtensions.FIELDS)
 """
@@ -539,8 +557,10 @@ Base.@kwdef mutable struct sol_VS_0to1_plus{FT<:AbstractFloat} <: AbstractRamanT
 end
 
 """
-    struct RRS{FT<:AbstractFloat}
-A struct which defines Rotational Raman Scattering parameters
+    sol_VS_1to0_plus{FT<:AbstractFloat}
+
+Stellar/solar vibrational Raman mode for H₂-dominated atmospheres, first
+excited to ground state, over concatenated spectral bands.
 # Fields
 $(DocStringExtensions.FIELDS)
 """

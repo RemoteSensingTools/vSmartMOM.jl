@@ -141,6 +141,9 @@ end
 @testset "Cox-Munk RT contract" begin include("test_coxmunk_rt_contract.jl") end
 @testset "Cox-Munk polarization" begin include("test_coxmunk_polarization.jl") end
 
+# Linearized RT solves one band per call.
+@testset "Linearized band selection" begin include("test_lin_band_selection.jl") end
+
 # Lambertian surface scaffold — cross-flavor consistency (Scalar/Legendre/
 # Spline/Spectrum share one create_surface_layer!), m>0 conventions, and the
 # LambertianSurfaceSpectrum end-to-end regression.

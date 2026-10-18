@@ -179,6 +179,12 @@ function rt_run(RS_type::AbstractRamanType,
             "Linearized Raman-active RT is intentionally unsupported. " *
             "Use forward Raman RT only; do not call rt_run with lin_model for RRS/VS modes."))
     end
+    # The linearized solver handles one band per call.
+    if !(iBand isa Integer)
+        length(iBand) == 1 || throw(ArgumentError(
+            "linearized RT solves one band per call; got bands $(collect(iBand))"))
+        iBand = only(iBand)
+    end
 
     # Per-model BLAS thread cap (see `rt_run` body for rationale).
     if model.numerics.blas_threads !== nothing

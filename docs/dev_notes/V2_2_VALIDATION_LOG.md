@@ -132,3 +132,26 @@ Frankenberg's checkout (SHA-256 identical to the source file).
   contract → APPROVE. Claude reviewer APPROVE-WITH-FIXES (spanning spectral
   surfaces, Legendre, early check, message tests) → fixed → APPROVE.
 - Downstream: RRS_XCO2, OCORaman and ExoOptics call one band at a time.
+
+## 8. merge: HITRAN cache identity and coverage (`release/b4-hitran-cache`, B4)
+
+- Branch commits `505dffcf`, `20a99b59`, `b6128b2c`, `8e534660`; merged as
+  `08347c62`. `test_hitran_cache.jl` 202/202 on the merged tree; Aqua and IO
+  exports 38/38.
+- Live checks against hitran.org (throwaway depots, 2 + 3 requests): the first
+  exposed a blocker (Content-Length counts one extra byte per record, so every
+  download raised a transport error); after the fix, O2 13000–13010 (23
+  records) and the full O2 set (30,762 records) download, validate, verify by
+  SHA-256 and are reused without re-download.
+- Reviews: Codex REJECT ×2 → APPROVE (round 5); Claude reviewer REJECT (live
+  blocker) → APPROVE.
+
+## 9. cleanup: Raman type docstrings, Fourier-bound docstrings, linearized band selection
+
+- Docstrings of `RRS`, `VS_0to1`, `VS_1to0` were rotated (B6), and those of
+  `sol_VS_0to1`, `sol_VS_1to0`, `VS_0to1_plus`, `VS_1to0_plus`,
+  `sol_VS_0to1_plus` and `sol_VS_1to0_plus` described `RRS`; `Base.Docs.doc`
+  now returns the right text for all nine. `_derive_m_max_bands_via_traits` and the main `rt_run`
+  docstring now describe the derived per-band Fourier bound (B6).
+- `test_lin_band_selection.jl` 3/3: `[1]` equals band 1 bit for bit; `[1, 1]`
+  is rejected with a clear message (previously an unclear downstream error).
